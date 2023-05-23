@@ -232,7 +232,7 @@ static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
     int err = seL4_ARM_VSpace_Clean_Data(3, (uintptr_t)frame, (uintptr_t)frame + copied);
     if (err) {
         print("LWIP|ERROR: ARM VSpace clean failed: ");
-        puthex64(err);
+        print(sel4_strerror(err));
         print("\n");
     }
 

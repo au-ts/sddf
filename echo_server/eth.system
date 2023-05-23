@@ -65,7 +65,7 @@
 
             <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
 
-            <!-- we need physical addresses of hw rings and dma region -->
+            <!-- we need physical addresses of hw rings -->
             <setvar symbol="hw_ring_buffer_paddr" region_paddr="hw_ring_buffer" />
         </protection_domain>
 
@@ -79,7 +79,7 @@
             <map mr="rx_free_copy" vaddr="0x3_000_000" perms="rw" cached="true" setvar_vaddr="rx_free_cli" />
             <map mr="rx_used_copy" vaddr="0x3_200_000" perms="rw" cached="true" setvar_vaddr="rx_used_cli" />
 
-            <map mr="shared_dma_rx" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="shared_dma_vaddr" />
+            <map mr="shared_dma_rx" vaddr="0x2_400_000" perms="r" cached="true" setvar_vaddr="shared_dma_vaddr" />
             <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
 
             <setvar symbol="shared_dma_paddr" region_paddr="shared_dma_rx" />
