@@ -9,10 +9,11 @@ uintptr_t rx_free_cli;
 uintptr_t rx_used_cli;
 
 uintptr_t shared_dma_vaddr;
+uintptr_t shared_dma_paddr;
 uintptr_t uart_base;
 
 #define NUM_CLIENTS 1
-
+#define DMA_SIZE 0x200000
 #define COPY_CH 0
 #define DRIVER_CH 1
 
@@ -30,6 +31,38 @@ int initialised = 0;
 uint8_t broadcast[6] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 uint64_t dropped = 0;
 bool rx_free_was_empty = false;
+
+static uintptr_t
+get_phys_addr(uintptr_t virtual)
+{
+    uint64_t offset = -1;
+    if (virtual >= shared_dma_vaddr && virtual < shared_dma_vaddr + DMA_SIZE) {
+        offset = virtual - shared_dma_vaddr;
+    }
+
+    if (offset < 0) {
+        print("get_phys_addr: offset < 0");
+        return 0;
+    }
+
+    return shared_dma_paddr + offset;
+}
+
+static uintptr_t
+get_virt_addr(uintptr_t phys)
+{
+    uint64_t offset = -1;
+    if (phys >= shared_dma_paddr && phys < shared_dma_paddr + DMA_SIZE) {
+        offset = phys - shared_dma_paddr;
+    }
+
+    if (offset < 0 || offset >= DMA_SIZE) {
+        print("get_phys_addr: offset < 0 || offset >= dma size");
+        return 0;
+    }
+
+    return shared_dma_vaddr + offset;
+}
 
 static void
 dump_mac(uint8_t *mac)
@@ -99,7 +132,15 @@ void process_rx_complete(void)
 
         int err = dequeue_used(&state.rx_ring_drv, &addr, &len, &cookie);
         assert(!err);
-        err = seL4_ARM_VSpace_Invalidate_Data(3, addr, addr + ETHER_MTU);
+
+        int vaddr = get_virt_addr(addr);
+        if (!vaddr) {
+            print("MUX RX|ERROR: get_virt_addr returned 0\nPhys: ");
+            puthex64(addr);
+            print("\n");
+        }
+
+        err = seL4_ARM_VSpace_Invalidate_Data(3, vaddr, vaddr + ETHER_MTU);
         if (err) {
             print("MUX RX|ERROR: ARM Vspace invalidate failed\n");
             puthex64(err);
@@ -107,11 +148,11 @@ void process_rx_complete(void)
         }
 
         // Get MAC address and work out which client it is.
-        int client = get_client(addr);
+        int client = get_client(vaddr);
         if (client >= 0 && !ring_full(state.rx_ring_clients[client].used_ring)) {
             /* enqueue it. */
             int was_empty = ring_empty(state.rx_ring_clients[client].used_ring);
-            int err = enqueue_used(&state.rx_ring_clients[client], addr, len, cookie);
+            int err = enqueue_used(&state.rx_ring_clients[client], vaddr, len, cookie);
             assert(!err);
             if (err) {
                 print("MUX RX|ERROR: failed to enqueue onto used ring\n");
@@ -158,7 +199,14 @@ bool process_rx_free(void)
             void *buffer;
             int err = dequeue_free(&state.rx_ring_clients[i], &addr, &len, &buffer);
             assert(!err);
-            err = enqueue_free(&state.rx_ring_drv, addr, len, buffer);
+
+            int paddr = get_phys_addr(addr);
+            if (!paddr) {
+                print("MUX RX|ERROR: get_phys_addr returned 0\nvirt: ");
+                puthex64(addr);
+                print("\n");
+            }
+            err = enqueue_free(&state.rx_ring_drv, paddr, len, buffer);
             assert(!err);
             enqueued += 1;
         }

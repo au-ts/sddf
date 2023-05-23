@@ -6,8 +6,7 @@
 
     <memory_region name="hw_ring_buffer" size="0x10_000" />
     <memory_region name="shared_dma_rx" size="0x200_000" page_size="0x200_000" />
-    <memory_region name="shared_dma_tx" size="0x200_000" page_size="0x200_000" />
-
+    <memory_region name="shared_dma_tx_cli" size="0x200_000" page_size="0x200_000" />
     <memory_region name="shared_dma_rx_cli" size="0x200_000" page_size="0x200_000" />
 
     <!-- shared memory for driver/mux ring buffer mechanism -->
@@ -62,17 +61,12 @@
             <map mr="tx_free_drv" vaddr="0x4_400_000" perms="rw" cached="true" setvar_vaddr="tx_free" />
             <map mr="tx_used_drv" vaddr="0x4_600_000" perms="rw" cached="true" setvar_vaddr="tx_used" />
 
-            <map mr="shared_dma_rx" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="shared_dma_vaddr_rx" />
-            <map mr="shared_dma_tx" vaddr="0x2_600_000" perms="rw" cached="true" setvar_vaddr="shared_dma_vaddr_tx" />
-
             <irq irq="152" id="0" /> <!--> ethernet interrupt -->
 
             <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
 
             <!-- we need physical addresses of hw rings and dma region -->
             <setvar symbol="hw_ring_buffer_paddr" region_paddr="hw_ring_buffer" />
-            <setvar symbol="shared_dma_paddr_rx" region_paddr="shared_dma_rx" />
-            <setvar symbol="shared_dma_paddr_tx" region_paddr="shared_dma_tx" />
         </protection_domain>
 
         <protection_domain name="mux_rx" priority="99" pp="true" pd_id="2">
@@ -87,12 +81,14 @@
 
             <map mr="shared_dma_rx" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="shared_dma_vaddr" />
             <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
+
+            <setvar symbol="shared_dma_paddr" region_paddr="shared_dma_rx" />
         </protection_domain>
 
         <protection_domain name="copy" priority="98" budget="20000" pd_id="4">
             <program_image path="copy.elf" />
             <map mr="shared_dma_rx_cli" vaddr="0x2_800_000" perms="rw" cached="true" setvar_vaddr="shared_dma_vaddr_cli" />
-            <map mr="shared_dma_rx" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="shared_dma_vaddr_mux" />
+            <map mr="shared_dma_rx" vaddr="0x2_400_000" perms="r" cached="true" setvar_vaddr="shared_dma_vaddr_mux" />
 
             <map mr="rx_free_copy" vaddr="0x3_000_000" perms="rw" cached="true" setvar_vaddr="rx_free_mux" />
             <map mr="rx_used_copy" vaddr="0x3_200_000" perms="rw" cached="true" setvar_vaddr="rx_used_mux" />
@@ -113,8 +109,9 @@
             <map mr="tx_free_cli" vaddr="0x3_400_000" perms="rw" cached="true" setvar_vaddr="tx_free_cli" />
             <map mr="tx_used_cli" vaddr="0x3_600_000" perms="rw" cached="true" setvar_vaddr="tx_used_cli" />
 
-            <map mr="shared_dma_tx" vaddr="0x2_600_000" perms="rw" cached="true" setvar_vaddr="shared_dma_vaddr" />
+            <map mr="shared_dma_tx_cli" vaddr="0x2_600_000" perms="r" cached="true" setvar_vaddr="shared_dma_vaddr_cli" />
             <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
+            <setvar symbol="shared_dma_paddr_cli" region_paddr="shared_dma_tx_cli" />
         </protection_domain>
 
         <protection_domain name="lwip" priority="97" budget="20000" pd_id="5">
@@ -130,7 +127,7 @@
             <map mr="tx_used_cli" vaddr="0x3_600_000" perms="rw" cached="true" setvar_vaddr="tx_used" />
 
             <map mr="shared_dma_rx_cli" vaddr="0x2_800_000" perms="rw" cached="true" setvar_vaddr="shared_dma_vaddr_rx" />
-            <map mr="shared_dma_tx" vaddr="0x2_600_000" perms="rw" cached="true" setvar_vaddr="shared_dma_vaddr_tx" />
+            <map mr="shared_dma_tx_cli" vaddr="0x2_600_000" perms="rw" cached="true" setvar_vaddr="shared_dma_vaddr_tx" />
             <map mr="data_packet" vaddr="0x5_011_000" perms="rw" cached="true" setvar_vaddr="data_packet" />
 
             <!-- shared memory used for benchmarking -->
