@@ -17,7 +17,6 @@ uintptr_t uart_base;
 
 #define BUF_SIZE 2048
 #define NUM_BUFFERS 512
-#define ETHER_MTU 1500
 #define SHARED_DMA_SIZE (BUF_SIZE * NUM_BUFFERS)
 
 ring_handle_t rx_ring_mux;
@@ -73,15 +72,6 @@ void process_rx_complete(void)
         /* Now that we've copied the data, enqueue the buffer to the client's used ring. */
         err = enqueue_used(&rx_ring_cli, c_addr, m_len, cookie2);
         assert(!err);
-
-        /* Clean and invalidate the old buffer so it can be reused */
-        err = seL4_ARM_VSpace_CleanInvalidate_Data(3, m_addr, m_addr + ETHER_MTU);
-        if (err) {
-            print("COPY|ERROR: ARM Vspace clean invalidate failed: ");
-            print(sel4_strerror(err));
-            print("\n");
-        }
-
         /* enqueue the old buffer back to dev_rx_ring.free so the driver can use it again. */
         err = enqueue_free(&rx_ring_mux, m_addr, BUF_SIZE, cookie);
         assert(!err);

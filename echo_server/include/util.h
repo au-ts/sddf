@@ -5,8 +5,6 @@
 
 #pragma once
 
-#include <sel4/sel4.h>
-
 #define UART_REG(x) ((volatile uint32_t *)(UART_BASE + (x)))
 #define UART_BASE 0x5000000 //0x30890000 in hardware on imx8mm.
 #define STAT 0x98
@@ -78,26 +76,6 @@ put8(uint8_t x)
         x /= 10;
     } while (x);
     print(&tmp[i]);
-}
-
-static char*
-sel4_strerror(seL4_Word err)
-{
-    switch (err) {
-        case seL4_NoError: return "seL4_NoError";
-        case seL4_InvalidArgument: return "seL4_InvalidArgument";
-        case seL4_InvalidCapability: return "seL4_InvalidCapability";
-        case seL4_IllegalOperation: return "seL4_IllegalOperation";
-        case seL4_RangeError: return "seL4_RangeError";
-        case seL4_AlignmentError: return "seL4_AlignmentError";
-        case seL4_FailedLookup: return "seL4_FailedLookup";
-        case seL4_TruncatedMessage: return "seL4_TruncatedMessage";
-        case seL4_DeleteFirst: return "seL4_DeleteFirst";
-        case seL4_RevokeFirst: return "seL4_RevokeFirst";
-        case seL4_NotEnoughMemory: return "seL4_NotEnoughMemory";
-    }
-
-    return "<invalid seL4 error>";
 }
 
 static void _assert_fail(

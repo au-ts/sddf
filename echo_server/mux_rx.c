@@ -140,6 +140,13 @@ void process_rx_complete(void)
             print("\n");
         }
 
+        err = seL4_ARM_VSpace_Invalidate_Data(3, vaddr, vaddr + ETHER_MTU);
+        if (err) {
+            print("MUX RX|ERROR: ARM Vspace invalidate failed\n");
+            puthex64(err);
+            print("\n");
+        }
+
         // Get MAC address and work out which client it is.
         int client = get_client(vaddr);
         if (client >= 0 && !ring_full(state.rx_ring_clients[client].used_ring)) {
