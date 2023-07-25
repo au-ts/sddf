@@ -33,20 +33,21 @@ LD := $(TOOLCHAIN)-ld
 AS := $(TOOLCHAIN)-as
 SEL4CP_TOOL ?= $(SEL4CP_SDK)/bin/sel4cp
 
-LWIP=$(abspath ../network/ipstacks/lwip/src)
-BENCHMARK=$(abspath ../benchmark)
-UTIL=$(abspath ../util)
-RING_BUFFER=$(abspath ../network/libethsharedringbuffer)
-ETHERNET_DRIVER=$(abspath ../network/drivers/imx)
-TIMER_DRIVER=$(abspath ../clock/drivers/imx)
-NETWORK_COMPONENTS=$(abspath ../network/components)
+SDDF=$(abspath ../..)
+LWIP=$(SDDF)/network/ipstacks/lwip/src
+BENCHMARK=$(SDDF)/benchmark
+UTIL=$(SDDF)/util
+RING_BUFFER=$(SDDF)/network/libethsharedringbuffer
+ETHERNET_DRIVER=$(SDDF)/network/drivers/imx
+TIMER_DRIVER=$(SDDF)/clock/drivers/imx
+NETWORK_COMPONENTS=$(SDDF)/network/components
 
 BOARD_DIR := $(SEL4CP_SDK)/board/$(SEL4CP_BOARD)/$(SEL4CP_CONFIG)
 
 IMAGES := eth.elf lwip.elf benchmark.elf idle.elf mux_rx.elf mux_tx.elf copy.elf arp.elf timer.elf
 CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall -Wno-unused-function -DNO_ASSERT
 
-LDFLAGS := -L$(BOARD_DIR)/lib -L../lib
+LDFLAGS := -L$(BOARD_DIR)/lib -L$(SDDF)/lib
 LIBS := -lsel4cp -Tsel4cp.ld -lc
 
 IMAGE_FILE = $(BUILD_DIR)/loader.img
