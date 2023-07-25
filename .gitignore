@@ -2,3 +2,5 @@ build/
 *.o
 *.elf
 *.depend
+.DS_Store
+
