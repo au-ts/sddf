@@ -33,18 +33,20 @@ LD := $(TOOLCHAIN)-ld
 AS := $(TOOLCHAIN)-as
 SEL4CP_TOOL ?= $(SEL4CP_SDK)/bin/sel4cp
 
-LWIPDIR=../network/ipstacks/lwip/src
-BENCHDIR=benchmark
-RINGBUFFERDIR=../network/libethsharedringbuffer
-DRIVERDIR=../network/drivers/imx
-COMPONENTDIR=../network/components
+LWIP=$(abspath ../network/ipstacks/lwip/src)
+BENCHMARK=$(abspath ../benchmark)
+UTIL=$(abspath ../util)
+RING_BUFFER=$(abspath ../network/libethsharedringbuffer)
+ETHERNET_DRIVER=$(abspath ../network/drivers/imx)
+TIMER_DRIVER=$(abspath ../clock/drivers/imx)
+NETWORK_COMPONENTS=$(abspath ../network/components)
 
 BOARD_DIR := $(SEL4CP_SDK)/board/$(SEL4CP_BOARD)/$(SEL4CP_CONFIG)
 
 IMAGES := eth.elf lwip.elf benchmark.elf idle.elf mux_rx.elf mux_tx.elf copy.elf arp.elf timer.elf
 CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall -Wno-unused-function -DNO_ASSERT
 
-LDFLAGS := -L$(BOARD_DIR)/lib -L.
+LDFLAGS := -L$(BOARD_DIR)/lib -L../lib
 LIBS := -lsel4cp -Tsel4cp.ld -lc
 
 IMAGE_FILE = $(BUILD_DIR)/loader.img
@@ -53,60 +55,61 @@ REPORT_FILE = $(BUILD_DIR)/report.txt
 CFLAGS += -I$(BOARD_DIR)/include \
 	-Iinclude	\
 	-Iinclude/arch	\
-	-I$(LWIPDIR)/include \
-	-I$(LWIPDIR)/include/ipv4 \
-	-I$(RINGBUFFERDIR)/include \
-	-I$(BENCHDIR)/include \
+	-I$(LWIP)/include \
+	-I$(LWIP)/include/ipv4 \
+	-I$(RING_BUFFER)/include \
+	-I$(BENCHMARK)/include \
+	-I$(UTIL)/include \
 	-MD \
 	-MP
 
 # COREFILES, CORE4FILES: The minimum set of files needed for lwIP.
-COREFILES=$(LWIPDIR)/core/init.c \
-	$(LWIPDIR)/core/def.c \
-	$(LWIPDIR)/core/dns.c \
-	$(LWIPDIR)/core/inet_chksum.c \
-	$(LWIPDIR)/core/ip.c \
-	$(LWIPDIR)/core/mem.c \
-	$(LWIPDIR)/core/memp.c \
-	$(LWIPDIR)/core/netif.c \
-	$(LWIPDIR)/core/pbuf.c \
-	$(LWIPDIR)/core/raw.c \
-	$(LWIPDIR)/core/stats.c \
-	$(LWIPDIR)/core/sys.c \
-	$(LWIPDIR)/core/altcp.c \
-	$(LWIPDIR)/core/altcp_alloc.c \
-	$(LWIPDIR)/core/altcp_tcp.c \
-	$(LWIPDIR)/core/tcp.c \
-	$(LWIPDIR)/core/tcp_in.c \
-	$(LWIPDIR)/core/tcp_out.c \
-	$(LWIPDIR)/core/timeouts.c \
-	$(LWIPDIR)/core/udp.c
+COREFILES=$(LWIP)/core/init.c \
+	$(LWIP)/core/def.c \
+	$(LWIP)/core/dns.c \
+	$(LWIP)/core/inet_chksum.c \
+	$(LWIP)/core/ip.c \
+	$(LWIP)/core/mem.c \
+	$(LWIP)/core/memp.c \
+	$(LWIP)/core/netif.c \
+	$(LWIP)/core/pbuf.c \
+	$(LWIP)/core/raw.c \
+	$(LWIP)/core/stats.c \
+	$(LWIP)/core/sys.c \
+	$(LWIP)/core/altcp.c \
+	$(LWIP)/core/altcp_alloc.c \
+	$(LWIP)/core/altcp_tcp.c \
+	$(LWIP)/core/tcp.c \
+	$(LWIP)/core/tcp_in.c \
+	$(LWIP)/core/tcp_out.c \
+	$(LWIP)/core/timeouts.c \
+	$(LWIP)/core/udp.c
 
-CORE4FILES=$(LWIPDIR)/core/ipv4/autoip.c \
-	$(LWIPDIR)/core/ipv4/dhcp.c \
-	$(LWIPDIR)/core/ipv4/etharp.c \
-	$(LWIPDIR)/core/ipv4/icmp.c \
-	$(LWIPDIR)/core/ipv4/igmp.c \
-	$(LWIPDIR)/core/ipv4/ip4_frag.c \
-	$(LWIPDIR)/core/ipv4/ip4.c \
-	$(LWIPDIR)/core/ipv4/ip4_addr.c
+CORE4FILES=$(LWIP)/core/ipv4/autoip.c \
+	$(LWIP)/core/ipv4/dhcp.c \
+	$(LWIP)/core/ipv4/etharp.c \
+	$(LWIP)/core/ipv4/icmp.c \
+	$(LWIP)/core/ipv4/igmp.c \
+	$(LWIP)/core/ipv4/ip4_frag.c \
+	$(LWIP)/core/ipv4/ip4.c \
+	$(LWIP)/core/ipv4/ip4_addr.c
 
 # NETIFFILES: Files implementing various generic network interface functions
-NETIFFILES=$(LWIPDIR)/netif/ethernet.c
+NETIFFILES=$(LWIP)/netif/ethernet.c
 
 # LWIPFILES: All the above.
-LWIPFILES=lwip.c lwip_timer.c cache.c $(COREFILES) $(CORE4FILES) $(NETIFFILES)
-LWIP_OBJS := $(LWIPFILES:.c=.o) lwip.o $(RINGBUFFERDIR)/shared_ringbuffer.o utilization_socket.o udp_echo_socket.o
+LWIPFILES=lwip.c lwip_timer.c $(UTIL)/cache.c $(COREFILES) $(CORE4FILES) $(NETIFFILES)
+LWIP_OBJS := $(LWIPFILES:.c=.o) lwip.o $(RING_BUFFER)/shared_ringbuffer.o utilization_socket.o udp_echo_socket.o
 
-ETH_OBJS := $(DRIVERDIR)/ethernet.o $(RINGBUFFERDIR)/shared_ringbuffer.o
-MUX_RX_OBJS := $(COMPONENTDIR)/mux_rx.o $(RINGBUFFERDIR)/shared_ringbuffer.o
-#MUX_TX_OBJS := mux_tx_round_robin.o $(RINGBUFFERDIR)/shared_ringbuffer.o
-MUX_TX_OBJS := $(COMPONENTDIR)/mux_tx_bandwidth_limited.o $(RINGBUFFERDIR)/shared_ringbuffer.o
-COPY_OBJS := $(COMPONENTDIR)/copy.o $(RINGBUFFERDIR)/shared_ringbuffer.o
-BENCH_OBJS := benchmark/benchmark.o
-IDLE_OBJS := benchmark/idle.o
-ARP_OBJS := cache.o $(LWIPDIR)/core/inet_chksum.o $(LWIPDIR)/core/def.o $(COMPONENTDIR)/arp.o $(RINGBUFFERDIR)/shared_ringbuffer.o
-TIMER_OBJS := timer.o
+ETH_OBJS := $(ETHERNET_DRIVER)/ethernet.o $(RING_BUFFER)/shared_ringbuffer.o
+MUX_RX_OBJS := $(NETWORK_COMPONENTS)/mux_rx.o $(RING_BUFFER)/shared_ringbuffer.o
+#MUX_TX_OBJS := mux_tx_round_robin.o $(RING_BUFFER)/shared_ringbuffer.o
+MUX_TX_OBJS := $(NETWORK_COMPONENTS)/mux_tx_bandwidth_limited.o $(RING_BUFFER)/shared_ringbuffer.o
+COPY_OBJS := $(NETWORK_COMPONENTS)/copy.o $(RING_BUFFER)/shared_ringbuffer.o
+BENCH_OBJS := $(BENCHMARK)/benchmark.o
+IDLE_OBJS := $(BENCHMARK)/idle.o
+ARP_OBJS := $(UTIL)/cache.o $(LWIP)/core/inet_chksum.o $(LWIP)/core/def.o $(NETWORK_COMPONENTS)/arp.o $(RING_BUFFER)/shared_ringbuffer.o
+TIMER_OBJS := $(TIMER_DRIVER)/timer.o
 
 OBJS := $(sort $(addprefix $(BUILD_DIR)/, $(ETH_OBJS) $(MUX_RX_OBJS) $(MUX_TX_OBJS)\
 	$(COPY_OBJS) $(BENCH_OBJS) $(IDLE_OBJS) \
