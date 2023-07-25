@@ -1,4 +1,0 @@
-build/
-*.o
-*.elf
-*.depend
