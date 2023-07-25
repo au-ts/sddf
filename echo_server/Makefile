@@ -98,8 +98,8 @@ CORE4FILES=$(LWIP)/core/ipv4/autoip.c \
 NETIFFILES=$(LWIP)/netif/ethernet.c
 
 # LWIPFILES: All the above.
-LWIPFILES=lwip.c lwip_timer.c $(UTIL)/cache.c $(COREFILES) $(CORE4FILES) $(NETIFFILES)
-LWIP_OBJS := $(LWIPFILES:.c=.o) lwip.o $(RING_BUFFER)/shared_ringbuffer.o utilization_socket.o udp_echo_socket.o
+LWIPFILES=$(NETWORK_COMPONENTS)/lwip.c $(NETWORK_COMPONENTS)/lwip_timer.c $(UTIL)/cache.c $(COREFILES) $(CORE4FILES) $(NETIFFILES)
+LWIP_OBJS := $(LWIPFILES:.c=.o) $(NETWORK_COMPONENTS)/lwip.o $(RING_BUFFER)/shared_ringbuffer.o $(NETWORK_COMPONENTS)/utilization_socket.o $(NETWORK_COMPONENTS)/udp_echo_socket.o
 
 ETH_OBJS := $(ETHERNET_DRIVER)/ethernet.o $(RING_BUFFER)/shared_ringbuffer.o
 MUX_RX_OBJS := $(NETWORK_COMPONENTS)/mux_rx.o $(RING_BUFFER)/shared_ringbuffer.o
