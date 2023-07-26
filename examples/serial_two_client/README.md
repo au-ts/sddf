@@ -2,8 +2,6 @@
 
 This is an example to show multiple clients being used with the Odroid-C4 UART driver.
 
-The register map can be found in sDDF/serial/drivers/hardkernel/include/serial.h.
-
 The relevant documentation can be found online at: https://dn.odroid.com/S905X3/ODROID-C4/Docs/S905X3_Public_Datasheet_Hardkernel.pdf.
 
 ## Building
