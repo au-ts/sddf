@@ -77,3 +77,7 @@ hello there serial 1
 * Additionally, manually setting the baud rate is not supported.
 
 * Example implementations using the client for printing/getchar is presented in the serial_server.
+
+* Line Mode or Raw mode can be specified in the driver in the serial configure function call. Basic line mode supports buffering, and deleting for line editing. Raw mode gives characters as they are inputted straight to the mux.
+
+* Echo mode can also be specified in the serial configure function call.
