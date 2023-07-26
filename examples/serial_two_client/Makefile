@@ -12,10 +12,6 @@ ifeq ($(strip $(SEL4CP_SDK)),)
 $(error SEL4CP_SDK must be specified)
 endif
 
-ifeq ($(strip $(SEL4CP_BOARD)),)
-$(error SEL4CP_BOARD must be specified)
-endif
-
 ifeq ($(strip $(SEL4CP_CONFIG)),)
 $(error SEL4CP_CONFIG must be specified)
 endif
@@ -28,6 +24,7 @@ CC := $(TOOLCHAIN)-gcc
 LD := $(TOOLCHAIN)-ld
 AS := $(TOOLCHAIN)-as
 SEL4CP_TOOL ?= $(SEL4CP_SDK)/bin/sel4cp
+SEL4CP_BOARD=odroidc4
 
 SDDF=$(abspath ../..)
 RINGBUFFERDIR=$(SDDF)/network/libethsharedringbuffer
