@@ -46,3 +46,14 @@ Checks to make before benchmarking:
 
 ### iMX8MM-EVK
 
+## Adding a new driver
+
+At a *minimum*, each new driver should have the following:
+* An example system in `examples/` showing off the capabilities of the driver
+* The README in the example system should contain the following:
+    * A brief description of what hardware functionality the driver supports
+    * What the example does and how to compile and run it
+* The driver should state exactly what documents where referenced (and what
+  version of the documents) to create the driver. If the driver was taken
+  from U-Boot or Linux that should also be mentioned along with how to find
+  the driver's source code in U-Boot/Linux.
