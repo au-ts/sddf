@@ -47,8 +47,8 @@
         <irq irq="225" id="1" trigger="edge" /> <!-- Serial Interrupt -->    
     </protection_domain>
 
-    <protection_domain name="serial_server" priority="97" pp="true">
-        <program_image path="serial_server.elf" />
+    <protection_domain name="serial_server1" priority="97" pp="true">
+        <program_image path="serial_server_1.elf" />
 
         <!-- shared memory for ring buffer mechanism -->
         <map mr="rx_free_serial_cli" vaddr="0x4_800_000" perms="rw" cached="true" setvar_vaddr="rx_free" />
@@ -63,7 +63,7 @@
     </protection_domain>
 
     <protection_domain name="serial_server2" priority="97" pp="true">
-    <program_image path="serial_server2.elf" />
+    <program_image path="serial_server_2.elf" />
 
     <!-- shared memory for ring buffer mechanism -->
     <map mr="rx_free_serial_cli2" vaddr="0x3_000_000" perms="rw" cached="true" setvar_vaddr="rx_free" />
@@ -119,7 +119,7 @@
     <!-- These following channels are needed for communication between the server and driver -->
 
     <channel>
-        <end pd="serial_server" id="9"/>
+        <end pd="serial_server1" id="9"/>
         <end pd="mux_tx" id="1"/>
     </channel>
 
@@ -129,7 +129,7 @@
     </channel>
 
    <channel>
-        <end pd="serial_server" id="11"/>
+        <end pd="serial_server1" id="11"/>
         <end pd="mux_rx" id="1"/>
     </channel>
 
