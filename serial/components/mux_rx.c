@@ -3,10 +3,10 @@
 #include <stdint.h>
 #include <sel4cp.h>
 #include <sel4/sel4.h>
-#include "serial.h"
-#include "shared_ringbuffer.h"
 #include <string.h>
+#include "shared_ringbuffer.h"
 #include "util.h"
+#include "uart.h"
 
 #define CLI_CH 1
 #define DRV_CH 11

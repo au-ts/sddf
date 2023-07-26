@@ -29,12 +29,12 @@ SEL4CP_BOARD=odroidc4
 SDDF=$(abspath ../..)
 RINGBUFFERDIR=$(SDDF)/network/libethsharedringbuffer
 SERIAL_COMPONENTS=$(SDDF)/serial/components
-SERIAL_DRIVER=$(SDDF)/serial/drivers/hardkernel
+UART_DRIVER=$(SDDF)/serial/drivers/hardkernel
 BOARD_DIR := $(SEL4CP_SDK)/board/$(SEL4CP_BOARD)/$(SEL4CP_CONFIG)
 UTIL=$(SDDF)/util
 
-IMAGES := serial.elf serial_server.elf serial_server2.elf mux_tx.elf mux_rx.elf
-CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall  -Wno-unused-function -DNO_ASSERT
+IMAGES := uart.elf serial_server.elf serial_server2.elf mux_tx.elf mux_rx.elf
+CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall -Wno-unused-function -DNO_ASSERT
 LDFLAGS := -L$(BOARD_DIR)/lib -L$(SDDF)/lib
 LIBS := -lsel4cp -Tsel4cp.ld -lc
 
@@ -44,10 +44,10 @@ REPORT_FILE = $(BUILD_DIR)/report.txt
 CFLAGS += -I$(BOARD_DIR)/include \
 	-Iinclude	\
 	-I$(RINGBUFFERDIR)/include \
-	-I$(SERIAL_DRIVER)/include \
+	-I$(UART_DRIVER)/include \
 	-I$(UTIL)/include \
 
-SERIAL_OBJS := serial.o shared_ringbuffer.o
+UART_OBJS := uart.o shared_ringbuffer.o
 SERIAL_SERVER_OBJS := serial_server.o shared_ringbuffer.o
 SERIAL_SERVER_OBJS2 := serial_server_2.o shared_ringbuffer.o
 MUX_TX_OBJS := mux_tx.o shared_ringbuffer.o
@@ -61,7 +61,7 @@ $(BUILD_DIR)/%.o: $(SERIAL_COMPONENTS)/%.c Makefile
 $(BUILD_DIR)/%.o: $(RINGBUFFERDIR)/%.c Makefile
 	$(CC) -c $(CFLAGS) $< -o $@
 
-$(BUILD_DIR)/%.o: $(SERIAL_DRIVER)/%.c Makefile
+$(BUILD_DIR)/%.o: $(UART_DRIVER)/%.c Makefile
 	$(CC) -c $(CFLAGS) $< -o $@
 
 $(BUILD_DIR)/%.o: %.c Makefile
@@ -76,7 +76,7 @@ $(BUILD_DIR)/mux_tx.elf: $(addprefix $(BUILD_DIR)/, $(MUX_TX_OBJS))
 $(BUILD_DIR)/mux_rx.elf: $(addprefix $(BUILD_DIR)/, $(MUX_RX_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-$(BUILD_DIR)/serial.elf: $(addprefix $(BUILD_DIR)/, $(SERIAL_OBJS))
+$(BUILD_DIR)/uart.elf: $(addprefix $(BUILD_DIR)/, $(UART_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(BUILD_DIR)/serial_server.elf: $(addprefix $(BUILD_DIR)/, $(SERIAL_SERVER_OBJS))

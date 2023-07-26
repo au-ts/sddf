@@ -1,5 +1,4 @@
 #include "serial_server.h"
-#include "serial.h"
 #include "shared_ringbuffer.h"
 #include <string.h>
 #include <stdlib.h>
@@ -102,10 +101,7 @@ int getchar() {
         We will spin here until we have gotten a character. As the driver is a higher priority than us, 
         it should be able to pre-empt this loop
         */
-        sel4cp_dbg_puts(""); /* From Patrick, this is apparently needed to stop the compiler from optimising out the 
-        as it is currently empty. When compiled in a release version the puts statement will be compiled
-        into a nop command.
-        */
+        asm("nop");
     }
 
     // We are only getting one character at a time, so we just need to cast the buffer to an int
