@@ -6,7 +6,7 @@
 #include <stdint.h>
 #include <sel4cp.h>
 #include <sel4/sel4.h>
-#include "serial.h"
+#include "uart.h"
 #include "shared_ringbuffer.h"
 
 #define BIT(nr) (1UL << (nr))
@@ -43,11 +43,7 @@ static int internal_is_tx_fifo_busy(
     return (0 == (regs->sr & AML_UART_TX_EMPTY));
 }
 
-/*
- * BaudRate = RefFreq / (16 * (BMR + 1)/(BIR + 1) )
- * BMR and BIR are 16 bit
- * Function taken from seL4 util_libs serial.c implementation for imx8mm
- */
+/* TODO - Fix setting baud rate */
 static void set_baud(long bps)
 {
     /* TODO: Fix buad rate setup */
@@ -212,21 +208,14 @@ void handle_irq() {
     }
 }
 
-void init_post() {
-    sel4cp_dbg_puts(sel4cp_name);
-    sel4cp_dbg_puts(": init_post function running\n");
-
-    // Init the shared ring buffers
-    ring_init(&rx_ring, (ring_buffer_t *)rx_free, (ring_buffer_t *)rx_used, 0, SIZE, SIZE);
-    ring_init(&tx_ring, (ring_buffer_t *)tx_free, (ring_buffer_t *)tx_used, 0, SIZE, SIZE);
-}
-
 // Init function required by CP for every PD
 void init(void) {
     sel4cp_dbg_puts(sel4cp_name);
     sel4cp_dbg_puts(": elf PD init function running\n");
 
-    init_post();
+    // Init the shared ring buffers
+    ring_init(&rx_ring, (ring_buffer_t *)rx_free, (ring_buffer_t *)rx_used, 0, SIZE, SIZE);
+    ring_init(&tx_ring, (ring_buffer_t *)tx_free, (ring_buffer_t *)tx_used, 0, SIZE, SIZE);
 
     meson_uart_regs_t *regs = (meson_uart_regs_t *) uart_base;
 
