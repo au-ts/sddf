@@ -294,5 +294,4 @@ void notified(sel4cp_channel ch) {
         // This was recieved on a client channel. Index the number of characters to get
         num_to_get_chars[ch - 1] += 1;
     }
-
 }
