@@ -44,7 +44,8 @@
         <setvar symbol="shared_dma_paddr" region_paddr="shared_dma_tx_drv" />
         
 
-        <irq irq="225" id="1" trigger="edge" /> <!-- Serial Interrupt -->    </protection_domain>
+        <irq irq="225" id="1" trigger="edge" /> <!-- Serial Interrupt -->    
+    </protection_domain>
 
     <protection_domain name="serial_server" priority="97" pp="true">
         <program_image path="serial_server.elf" />
@@ -58,8 +59,6 @@
 
         <map mr="shared_dma_tx_cli" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="shared_dma_tx" />
         <map mr="shared_dma_rx_cli" vaddr="0x2_800_000" perms="rw" cached="true" setvar_vaddr="shared_dma_rx" />
-
-        <!-- <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" /> -->
 
     </protection_domain>
 
@@ -75,8 +74,6 @@
 
     <map mr="shared_dma_tx_cli2" vaddr="0x2_600_000" perms="rw" cached="true" setvar_vaddr="shared_dma_tx" />
     <map mr="shared_dma_rx_cli2" vaddr="0x2_000_000" perms="rw" cached="true" setvar_vaddr="shared_dma_rx" />
-
-    <!-- <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" /> -->
 
     </protection_domain>
 
