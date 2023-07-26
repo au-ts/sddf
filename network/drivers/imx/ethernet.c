@@ -7,7 +7,7 @@
 #include <stdint.h>
 #include <sel4cp.h>
 #include <sel4/sel4.h>
-#include "eth.h"
+#include "ethernet.h"
 #include "shared_ringbuffer.h"
 #include "util.h"
 
