@@ -62,8 +62,8 @@ int give_multi_char(char got_char) {
         int ret = dequeue_free(&rx_ring[curr_client], &buffer, &buffer_len, &cookie);
 
         if (ret != 0) {
-            // sel4cp_dbg_puts(sel4cp_name);
-            sel4cp_dbg_puts(": unable to dequeue from the rx available ring\n");
+            sel4cp_dbg_puts(sel4cp_name);
+            sel4cp_dbg_puts(": unable to dequeue from the rx free ring\n");
             return;
         }
 
@@ -73,8 +73,8 @@ int give_multi_char(char got_char) {
         ret = enqueue_used(&rx_ring[curr_client], buffer, 1, &cookie);
 
         if (ret != 0) {
-            // sel4cp_dbg_puts(sel4cp_name);
-            sel4cp_dbg_puts(": unable to enqueue to the tx available ring\n");
+            sel4cp_dbg_puts(sel4cp_name);
+            sel4cp_dbg_puts(": unable to enqueue to the tx free ring\n");
             return 1;
         }
 
@@ -101,7 +101,7 @@ int give_single_char(int curr_client, char got_char) {
 
     if (ret != 0) {
         sel4cp_dbg_puts(sel4cp_name);
-        sel4cp_dbg_puts(": unable to dequeue from the rx available ring\n");
+        sel4cp_dbg_puts(": unable to dequeue from the rx free ring\n");
         return;
     }
 
@@ -112,7 +112,7 @@ int give_single_char(int curr_client, char got_char) {
 
     if (ret != 0) {
         sel4cp_dbg_puts(sel4cp_name);
-        sel4cp_dbg_puts(": unable to enqueue to the tx available ring\n");
+        sel4cp_dbg_puts(": unable to enqueue to the tx free ring\n");
         return 1;
     }
 
@@ -148,13 +148,13 @@ void handle_rx() {
 
     char got_char = *((char *) buffer);
 
-    /* Now that we are finished with the used buffer, we can add it back to the available ring*/
+    /* Now that we are finished with the used buffer, we can add it back to the free ring*/
 
     ret = enqueue_free(&drv_rx_ring, buffer, buffer_len, NULL);
 
     if (ret != 0) {
         sel4cp_dbg_puts(sel4cp_name);
-        sel4cp_dbg_puts(": getchar - unable to enqueue used buffer back into available ring\n");
+        sel4cp_dbg_puts(": getchar - unable to enqueue used buffer back into free ring\n");
     }
 
     // We have now gotten a character, deal with the input direction switch

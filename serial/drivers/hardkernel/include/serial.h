@@ -4,6 +4,20 @@
 
 #define BIT(nr) (1UL << (nr))
 
+/* The driver is based on the Amlogic S905X3 Data Sheet Revision 02.
+
+The following register descriptions and layout are from section 13.5.4.*/
+
+struct meson_uart_regs {
+    uint32_t wfifo;      /* 0x000 Write Data */
+    uint32_t rfifo;      /* 0x040 Read Data */
+    uint32_t cr;         /* 0x080 Control Register */
+    uint32_t sr;         /* 0x0c0 Status Register */
+    uint32_t irqc;       /* 0x100 IRQ Control Register*/
+    uint32_t reg5;       /* 0x140 Baud Rate Control */
+};
+typedef volatile struct meson_uart_regs meson_uart_regs_t;
+
 /* AML_UART_CONTROL bits */
 #define AML_UART_TX_EN			BIT(12)
 #define AML_UART_RX_EN			BIT(13)
@@ -41,6 +55,7 @@
 #define AML_UART_BAUD_XTAL		BIT(24)
 #define AML_UART_BAUD_XTAL_DIV2		BIT(27)
 
+// TODO - Fix ref clk 
 #define UART_REF_CLK 16660000
 
 #define DIV_ROUND_CLOSEST(x, divisor)(			\
@@ -64,12 +79,3 @@ enum serial_parity {
     PARITY_ODD
 };
 
-struct meson_uart_regs {
-    uint32_t wfifo;      /* 0x000 Write Data */
-    uint32_t rfifo;      /* 0x040 Read Data */
-    uint32_t cr;         /* 0x080 Control Register */
-    uint32_t sr;         /* 0x0c0 Status Register */
-    uint32_t irqc;       /* 0x100 IRQ Control Register*/
-    uint32_t reg5;       /* 0x140 Baud Rate Control */
-};
-typedef volatile struct meson_uart_regs meson_uart_regs_t;
