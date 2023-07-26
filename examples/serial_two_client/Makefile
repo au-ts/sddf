@@ -33,7 +33,7 @@ UART_DRIVER=$(SDDF)/serial/drivers/hardkernel
 BOARD_DIR := $(SEL4CP_SDK)/board/$(SEL4CP_BOARD)/$(SEL4CP_CONFIG)
 UTIL=$(SDDF)/util
 
-IMAGES := uart.elf serial_server.elf serial_server2.elf mux_tx.elf mux_rx.elf
+IMAGES := uart.elf serial_server_1.elf serial_server_2.elf mux_tx.elf mux_rx.elf
 CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall -Wno-unused-function -DNO_ASSERT -Werror
 LDFLAGS := -L$(BOARD_DIR)/lib -L$(SDDF)/lib
 LIBS := -lsel4cp -Tsel4cp.ld -lc
@@ -48,7 +48,7 @@ CFLAGS += -I$(BOARD_DIR)/include \
 	-I$(UTIL)/include \
 
 UART_OBJS := uart.o shared_ringbuffer.o
-SERIAL_SERVER_OBJS := serial_server.o shared_ringbuffer.o
+SERIAL_SERVER_OBJS1 := serial_server_1.o shared_ringbuffer.o
 SERIAL_SERVER_OBJS2 := serial_server_2.o shared_ringbuffer.o
 MUX_TX_OBJS := mux_tx.o shared_ringbuffer.o
 MUX_RX_OBJS := mux_rx.o shared_ringbuffer.o
@@ -79,10 +79,10 @@ $(BUILD_DIR)/mux_rx.elf: $(addprefix $(BUILD_DIR)/, $(MUX_RX_OBJS))
 $(BUILD_DIR)/uart.elf: $(addprefix $(BUILD_DIR)/, $(UART_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-$(BUILD_DIR)/serial_server.elf: $(addprefix $(BUILD_DIR)/, $(SERIAL_SERVER_OBJS))
+$(BUILD_DIR)/serial_server_1.elf: $(addprefix $(BUILD_DIR)/, $(SERIAL_SERVER_OBJS1))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-$(BUILD_DIR)/serial_server2.elf: $(addprefix $(BUILD_DIR)/, $(SERIAL_SERVER_OBJS2))
+$(BUILD_DIR)/serial_server_2.elf: $(addprefix $(BUILD_DIR)/, $(SERIAL_SERVER_OBJS2))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(IMAGE_FILE) $(REPORT_FILE): $(addprefix $(BUILD_DIR)/, $(IMAGES)) serial.system
