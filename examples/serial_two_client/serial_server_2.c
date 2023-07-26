@@ -32,7 +32,7 @@ int serial_server_printf(char *string) {
     unsigned int buffer_len = 0; 
     void *cookie = 0;
 
-    // Dequeue a buffer from the available ring from the tx buffer
+    // Dequeue a buffer from the free ring from the tx buffer
     int ret = dequeue_free(&local_server->tx_ring, &buffer, &buffer_len, &cookie);
 
     if(ret != 0) {
@@ -115,12 +115,12 @@ int getchar() {
     // We are only getting one character at a time, so we just need to cast the buffer to an int
     char got_char = *((char *) buffer);
 
-    /* Now that we are finished with the used buffer, we can add it back to the available ring*/
+    /* Now that we are finished with the used buffer, we can add it back to the free ring*/
     int ret = enqueue_free(&local_server->rx_ring, buffer, buffer_len, NULL);
 
     if (ret != 0) {
         sel4cp_dbg_puts(sel4cp_name);
-        sel4cp_dbg_puts(": getchar - unable to enqueue used buffer back into available ring\n");
+        sel4cp_dbg_puts(": getchar - unable to enqueue used buffer back into free ring\n");
     }
 
     return (int) got_char;
