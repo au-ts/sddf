@@ -161,7 +161,7 @@ void handle_tx() {
         char *phys = (char * )buffer;
         // Handle the tx
         raw_tx(phys, len, cookie);
-        // Then enqueue this buffer back into the available queue, so that it can be collected and reused by the server
+        // Then enqueue this buffer back into the free queue, so that it can be collected and reused by the server
         enqueue_free(&tx_ring, buffer, len, &cookie);
     }
 }
@@ -171,7 +171,7 @@ void handle_irq() {
     /* Here we have interrupted because a character has been inputted. We first want to get the 
     character from the hardware FIFO queue.
 
-    Then we want to dequeue from the rx available ring, and populate it, then add to the rx used queue
+    Then we want to dequeue from the rx free ring, and populate it, then add to the rx used queue
     ready to be processed by the client server
     */
     int input = getchar();
@@ -196,7 +196,7 @@ void handle_irq() {
 
     if (ret != 0) {
         sel4cp_dbg_puts(sel4cp_name);
-        sel4cp_dbg_puts(": unable to dequeue from the rx available ring\n");
+        sel4cp_dbg_puts(": unable to dequeue from the rx free ring\n");
         return;
     }
 
@@ -207,7 +207,7 @@ void handle_irq() {
 
     if (ret != 0) {
         sel4cp_dbg_puts(sel4cp_name);
-        sel4cp_dbg_puts(": unable to enqueue to the tx available ring\n");
+        sel4cp_dbg_puts(": unable to enqueue to the tx free ring\n");
         return;
     }
 }
