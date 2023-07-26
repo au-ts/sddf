@@ -1,4 +1,5 @@
 /* MUX is currently limited to a max of 9 clients */
+#include <stdlib.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <sel4cp.h>
