@@ -23,7 +23,7 @@ Enter char to test getchar FOR SERIAL 2
 Attempting to use the server printf! -- FROM SERVER 1
 Enter char to test getchar FOR SERIAL 1
 ```
-This shows our two clients, serial_server and serial_server_2 transmitting to the 
+This shows our two clients, `serial_server_1` and `serial_server_2` transmitting to the 
 same serial driver through a multiplexer (`mux_rx.c` for receive and `mux_tx.c` for transmit). Both clients will now be waiting on input from the user. 
 
 If we then input the characters 'h' and 'e' to the console, we will get the following output:
