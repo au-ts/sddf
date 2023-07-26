@@ -64,7 +64,7 @@ int give_multi_char(char got_char) {
         if (ret != 0) {
             sel4cp_dbg_puts(sel4cp_name);
             sel4cp_dbg_puts(": unable to dequeue from the rx free ring\n");
-            return;
+            return 1;
         }
 
         ((char *) buffer)[0] = (char) got_char;
@@ -80,6 +80,8 @@ int give_multi_char(char got_char) {
 
         num_to_get_chars[curr_client] -= 1;
     }
+
+    return 0;
 }
 
 int give_single_char(int curr_client, char got_char) {
@@ -102,7 +104,7 @@ int give_single_char(int curr_client, char got_char) {
     if (ret != 0) {
         sel4cp_dbg_puts(sel4cp_name);
         sel4cp_dbg_puts(": unable to dequeue from the rx free ring\n");
-        return;
+        return 1;
     }
 
     ((char *) buffer)[0] = (char) got_char;
@@ -117,9 +119,11 @@ int give_single_char(int curr_client, char got_char) {
     }
 
     num_to_get_chars[curr_client - 1] -= 1;
+
+    return 0;
 }
 
-int give_char(int curr_client, char got_char) {
+void give_char(int curr_client, char got_char) {
     if (multi_client == 1) {
         give_multi_char(got_char);
     } else {

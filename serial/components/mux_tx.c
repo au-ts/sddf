@@ -55,7 +55,7 @@ int handle_tx(int curr_client) {
             int ret = driver_dequeue(drv_tx_ring.free_ring, &drv_buffer, &drv_len, &drv_cookie);
             if (ret != 0) {
                 sel4cp_dbg_puts("Failed to dequeue buffer from drv tx avail ring\n");
-                return;
+                return 1;
             }
 
             char *string = (char *) buffer;
@@ -79,6 +79,8 @@ int handle_tx(int curr_client) {
     if (was_empty) {
         sel4cp_notify(DRV_CH);
     }
+
+    return 0;
 }
 
 void init (void) {
