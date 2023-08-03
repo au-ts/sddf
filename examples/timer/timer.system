@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<system>
+    <memory_region name="timer_registers" size="0x10_000" phys_addr="0xc1109000" />
+
+    <!-- The timer driver should run at higher priority than its clients. 
+        As a passive server, RPC into the driver will be fastpathed. -->
+    <protection_domain name="timer" priority="254" pp="true" passive="true">
+        <program_image path="timer.elf" />
+        <map mr="timer_registers" vaddr="0x2_000_000" perms="rw" cached="false" setvar_vaddr="gpt_regs" />
+        <irq irq="42" id="0" trigger="edge" /> <!-- timer interrupt for timer A -->
+    </protection_domain>
+
+    <protection_domain name="client" priority="1" >
+        <program_image path="client.elf" />
+    </protection_domain>
+
+    <channel>
+        <end pd="timer" id="1" />
+        <end pd="client" id="1" /> <!-- Should this number change, so should TIMER_CH in timer.h -->
+    </channel>
+
+</system>
