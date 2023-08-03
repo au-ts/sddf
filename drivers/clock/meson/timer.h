@@ -8,7 +8,7 @@
 #define NS_IN_S  1000000000ULL
 
 /**
- * Request a timeout via RPC into the passive timer driver.
+ * Request a timeout via PPC into the passive timer driver.
  * Use the label to indicate this request.
  * @param timeout relative timeout in nanoseconds.
  */
@@ -20,7 +20,7 @@ set_timeout(uint64_t timeout)
 }
 
 /**
- * Request the time since start up via RPC into the passive timer driver.
+ * Request the time since start up via PPC into the passive timer driver.
  * Use the label to indicate this request.
  * @return the time in nanoseconds since start up.
  */

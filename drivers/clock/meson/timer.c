@@ -8,14 +8,12 @@ uintptr_t gpt_regs;
 #define SET_TIMEOUT 1
 #define MAX_TIMEOUTS 6
 
-#define BIT(n) (1ul<<(n))
-
-#define TIMER_REG_START   0x940    // TIMER_MUX
+#define TIMER_REG_START   0x140    // TIMER_MUX
 
 #define TIMER_A_INPUT_CLK 0
 #define TIMER_E_INPUT_CLK 8
-#define TIMER_A_EN      BIT(16)
-#define TIMER_A_MODE    BIT(12)
+#define TIMER_A_EN      (1 << 16)
+#define TIMER_A_MODE    (1 << 12)
 
 #define TIMESTAMP_TIMEBASE_SYSTEM   0b000
 #define TIMESTAMP_TIMEBASE_1_US     0b001
@@ -80,7 +78,7 @@ set_timeout(uint32_t timeout) {
 }
 
 static void
-irq(sel4cp_channel ch)
+handle_irq(sel4cp_channel ch)
 {
     if (timeout_active) {
         regs->mux &= ~TIMER_A_EN;
@@ -97,9 +95,9 @@ irq(sel4cp_channel ch)
         uint64_t next_timeout = UINT64_MAX;
         sel4cp_channel ch = -1;
 
-        /* A more efficient solution would be to order these in terms of 
-         * timeout time, so then we can just take the head as the next timeout. 
-         * However, this would require a different data structure... 
+        /* A more efficient solution would be to order these in terms of
+         * timeout time, so then we can just take the head as the next timeout.
+         * However, this would require a different data structure...
          */
         for (unsigned i = 0; i < MAX_TIMEOUTS; i++) {
             /* Check if any of these timeouts have gone off in the interim */
@@ -127,8 +125,10 @@ void
 notified(sel4cp_channel ch)
 {
     if (ch == IRQ_CH) {
-        irq(ch);
+        handle_irq(ch);
         sel4cp_irq_ack_delayed(ch);
+    } else {
+        sel4cp_dbg_puts("DRIVER|ERROR: unexpected notification\n");
     }
 }
 
@@ -138,12 +138,12 @@ protected(sel4cp_channel ch, sel4cp_msginfo msginfo)
     uint64_t rel_timeout, cur_ticks, abs_timeout;
     switch (sel4cp_msginfo_get_label(msginfo)) {
         case GET_TIME:
-            // Just wants the time. Return it in nanoseconds. 
+            // Just wants the time. Return it in nanoseconds.
             cur_ticks = get_ticks();
             seL4_SetMR(0, cur_ticks);
             return sel4cp_msginfo_new(0, 1);
         case SET_TIMEOUT:
-            // Request to set a timeout. 
+            // Request to set a timeout.
             rel_timeout = (uint64_t)(seL4_GetMR(0));
             cur_ticks = get_ticks();
             abs_timeout = cur_ticks + rel_timeout;
@@ -157,7 +157,7 @@ protected(sel4cp_channel ch, sel4cp_msginfo msginfo)
                 set_timeout((uint32_t)(rel_timeout / NS_IN_MS));
                 timeout_active = true;
 
-                /* We need to keep track of how far into the future this is so 
+                /* We need to keep track of how far into the future this is so
                     we can order client requests appropriately. */
                 current_timeout = abs_timeout;
                 active_channel = ch;
@@ -166,7 +166,7 @@ protected(sel4cp_channel ch, sel4cp_msginfo msginfo)
             }
             break;
         default:
-            sel4cp_dbg_puts("Unknown request to timer from client\n");
+            sel4cp_dbg_puts("DRIVER|ERROR: Unknown request to timer from client\n");
             break;
     }
 
@@ -178,7 +178,7 @@ init(void)
 {
     regs = (void *)(gpt_regs + TIMER_REG_START);
 
-    /* Start timer E acts as a clock, while timer A can be used for timeouts from clients */ 
+    /* Start timer E acts as a clock, while timer A can be used for timeouts from clients */
     regs->mux = TIMER_A_EN | (TIMESTAMP_TIMEBASE_1_US << TIMER_E_INPUT_CLK) |
                        (TIMEOUT_TIMEBASE_1_MS << TIMER_A_INPUT_CLK);
 

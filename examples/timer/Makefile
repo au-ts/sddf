@@ -2,11 +2,9 @@ ifeq ($(strip $(SEL4CP_SDK)),)
 $(error SEL4CP_SDK must be specified)
 endif
 
-ifeq ($(strip $(SEL4CP_CONFIG)),)
-$(error SEL4CP_CONFIG must be specified)
-endif
-
 BUILD_DIR ?= build
+# By default we make a debug build so that the client debug prints can be seen.
+SEL4CP_CONFIG ?= debug
 
 SEL4CP_BOARD := odroidc4
 CPU := cortex-a53
