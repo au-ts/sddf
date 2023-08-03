@@ -5,8 +5,8 @@
 
 /*
  * Very basic timer driver. Currently only permtis
- * a maximum of a single timeout per client for simplicity. 
- * 
+ * a maximum of a single timeout per client for simplicity.
+ *
  * Interfaces for clients:
  * seL4cp_ppcall() with label 0 is a request to get the current time.
  * with a 1 is a request to set a timeout.
@@ -136,7 +136,7 @@ protected(sel4cp_channel ch, sel4cp_msginfo msginfo)
             seL4_SetMR(0, cur_ticks);
             return sel4cp_msginfo_new(0, 1);
         case SET_TIMEOUT:
-            // Request to set a timeout. 
+            // Request to set a timeout.
             rel_timeout = (uint64_t)(GPT_FREQ) * (seL4_GetMR(0));
             cur_ticks = get_ticks();
             abs_timeout = cur_ticks + rel_timeout;
@@ -161,7 +161,7 @@ protected(sel4cp_channel ch, sel4cp_msginfo msginfo)
             }
             break;
         default:
-            sel4cp_dbg_puts("Unknown request to timer from client\n");
+            sel4cp_dbg_puts("DRIVER|INFO: Unknown request to timer from client\n");
             break;
     }
 

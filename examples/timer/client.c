@@ -26,7 +26,7 @@ notified(sel4cp_channel ch)
     sel4cp_dbg_puts("CLIENT|INFO: Got a timeout!\n");
     /* Get the current time */
     uint64_t time = time_now();
-    sel4cp_dbg_puts("CLIENT|INFO: Now the time is: ");
+    sel4cp_dbg_puts("CLIENT|INFO: Now the time (in nanoseconds) is: ");
     put64(time);
     sel4cp_dbg_puts("\n");
     /* Set another timeout */
