@@ -38,8 +38,8 @@ LWIP=$(SDDF)/network/ipstacks/lwip/src
 BENCHMARK=$(SDDF)/benchmark
 UTIL=$(SDDF)/util
 RING_BUFFER=$(SDDF)/network/libethsharedringbuffer
-ETHERNET_DRIVER=$(SDDF)/network/drivers/imx
-TIMER_DRIVER=$(SDDF)/clock/drivers/imx
+ETHERNET_DRIVER=$(SDDF)/drivers/network/imx
+TIMER_DRIVER=$(SDDF)/drivers/clock/imx
 NETWORK_COMPONENTS=$(SDDF)/network/components
 
 BOARD_DIR := $(SEL4CP_SDK)/board/$(SEL4CP_BOARD)/$(SEL4CP_CONFIG)
