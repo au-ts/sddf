@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <sel4cp.h>
 
 #define TIMER_CH    1
 #define GET_TIME    0
