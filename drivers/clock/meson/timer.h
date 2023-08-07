@@ -14,7 +14,7 @@
  * @param timeout relative timeout in nanoseconds.
  */
 void
-set_timeout(uint64_t timeout)
+timer_set_timeout(uint64_t timeout)
 {
     sel4cp_mr_set(0, timeout);
     sel4cp_ppcall(TIMER_CH, sel4cp_msginfo_new(SET_TIMEOUT, 1));
@@ -26,7 +26,7 @@ set_timeout(uint64_t timeout)
  * @return the time in nanoseconds since start up.
  */
 uint64_t
-time_now(void)
+timer_time_now(void)
 {
     sel4cp_ppcall(TIMER_CH, sel4cp_msginfo_new(GET_TIME, 0));
     uint64_t time_now = seL4_GetMR(0);
