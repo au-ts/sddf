@@ -34,6 +34,12 @@ uintptr_t shared_dma_rx_cli2;
 ring_handle_t rx_ring[NUM_CLIENTS];
 ring_handle_t drv_rx_ring;
 
+/*  Mode 0 for raw.
+    Mode 1 for line.
+    Defaults to mode 0.
+*/
+int mode;
+
 /* We need to do some processing of the input stream to determine when we need 
 to change direction. */
 
@@ -47,7 +53,7 @@ int client;
 int num_to_get_chars[NUM_CLIENTS];
 int multi_client;
 
-int give_multi_char(char got_char) {
+int give_multi_char(char * drv_buffer, int drv_buffer_len) {
     for (int curr_client = 0; curr_client < NUM_CLIENTS; curr_client++) {
 
         if (num_to_get_chars[curr_client] <= 0) {
@@ -68,24 +74,24 @@ int give_multi_char(char got_char) {
             return 1;
         }
 
-        ((char *) buffer)[0] = (char) got_char;
+        memcpy((char *) buffer, drv_buffer, drv_buffer_len);
+        buffer_len = drv_buffer_len;
 
         // Now place in the rx used ring
-        ret = enqueue_used(&rx_ring[curr_client], buffer, 1, &cookie);
+        ret = enqueue_used(&rx_ring[curr_client], buffer, buffer_len, &cookie);
 
         if (ret != 0) {
             sel4cp_dbg_puts(sel4cp_name);
-            sel4cp_dbg_puts(": unable to enqueue to the tx free ring\n");
+            sel4cp_dbg_puts(": unable to enqueue to the rx used ring\n");
             return 1;
         }
 
         num_to_get_chars[curr_client] -= 1;
     }
-
     return 0;
 }
 
-int give_single_char(int curr_client, char got_char) {
+int give_single_char(int curr_client, char * drv_buffer, int drv_buffer_len) {
     if (curr_client < 1 || curr_client > NUM_CLIENTS) {
         return 1;
     }
@@ -108,28 +114,30 @@ int give_single_char(int curr_client, char got_char) {
         return 1;
     }
 
-    ((char *) buffer)[0] = (char) got_char;
+    memcpy((char *) buffer, drv_buffer, drv_buffer_len);
+    buffer_len = drv_buffer_len;
 
     // Now place in the rx used ring
-    ret = enqueue_used(&rx_ring[curr_client - 1], buffer, 1, &cookie);
+    ret = enqueue_used(&rx_ring[curr_client - 1], buffer, buffer_len, &cookie);
 
     if (ret != 0) {
         sel4cp_dbg_puts(sel4cp_name);
-        sel4cp_dbg_puts(": unable to enqueue to the tx free ring\n");
+        sel4cp_dbg_puts(": unable to enqueue to the rx used ring\n");
         return 1;
     }
 
     num_to_get_chars[curr_client - 1] -= 1;
-
     return 0;
 }
 
-void give_char(int curr_client, char got_char) {
+int give_char(int curr_client, char * drv_buffer, int drv_buffer_len) {
     if (multi_client == 1) {
-        give_multi_char(got_char);
+        give_multi_char(drv_buffer, drv_buffer_len);
     } else {
-        give_single_char(curr_client, got_char);
+        give_single_char(curr_client, drv_buffer, drv_buffer_len);
     }
+
+    return 0;
 }
 
 
@@ -149,10 +157,75 @@ void handle_rx() {
         sel4cp_dbg_puts(": getchar - unable to dequeue used buffer\n");
     }
 
-    // We are only getting one character at a time, so we just need to cast the buffer to an int
+    // We can either get a single char here, if driver is in RAW mode, or 
+    // a buffer if driver is in LINE mode.
 
-    char got_char = *((char *) buffer);
+    char *chars = (char *) buffer;
 
+    // This is for our RAW mode, char by char
+    if (mode == RAW_MODE) {
+        sel4cp_dbg_puts("In raw mode mux rx\n");
+        char got_char = chars[0];
+
+        // We have now gotten a character, deal with the input direction switch
+        if (mux_state == 1) {
+            // The previous character was an escape character
+            give_char(client, &got_char, 1);
+            mux_state = 0;
+        }  else if (mux_state == 2) {
+            // We are now switching input direction
+
+            // Case for simultaneous multi client input
+            if (got_char == 'm') {
+                multi_client = 1;
+                client = -1;
+            } else {
+                // Ensure that multi client input is off
+                multi_client = 0;
+                int new_client = atoi(&got_char);
+                if (new_client < 1 || new_client > NUM_CLIENTS) {
+                    sel4cp_dbg_puts("Attempted to switch to invalid client number\n");
+                } else {
+                    client = new_client;
+                }
+            }
+
+            mux_state = 0;
+        } else if (mux_state == 0) {
+            // No escape character has been set
+            if (got_char == '\\') {
+                mux_state = 1;
+                // The next character is going to be escaped
+            } else if (got_char == '@') {
+                mux_state = 2;
+            } else {
+                give_char(client, &got_char, 1);
+            }
+        }
+    } else if (mode == LINE_MODE) {
+        sel4cp_dbg_puts("In line mode mux rx\n");
+        // This is for LINE mode, placing buffers at a time
+        
+        /* Check if the first character is an '@'. The following character
+            must be a number. Otherwise, give to the client.
+        */
+
+       if (chars[0] == '@') {
+            if (chars[1] == 'm') {
+                // case for multi client input
+                multi_client = 1;
+                client = -1;
+            } else {
+                int new_client = atoi(&chars[1]);
+                multi_client = 0;
+                client = new_client;
+            }
+       } else {
+            // Otherwise, give entire buffer to the client
+            give_char(client, chars, buffer_len);
+       }
+    }
+    
     /* Now that we are finished with the used buffer, we can add it back to the free ring*/
 
     ret = enqueue_free(&drv_rx_ring, buffer, buffer_len, NULL);
@@ -161,44 +234,22 @@ void handle_rx() {
         sel4cp_dbg_puts(sel4cp_name);
         sel4cp_dbg_puts(": getchar - unable to enqueue used buffer back into free ring\n");
     }
+}
 
-    // We have now gotten a character, deal with the input direction switch
-    if (mux_state == 1) {
-        // The previous character was an escape character
-        give_char(client, got_char);
-        mux_state = 0;
-    }  else if (mux_state == 2) {
-        // We are now switching input direction
-
-        // Case for simultaneous multi client input
-        if (got_char == 'm') {
-            multi_client = 1;
-            client = -1;
-        } else {
-            // Ensure that multi client input is off
-            multi_client = 0;
-            int new_client = atoi(&got_char);
-            // We also want this to show in the terminal, so print it
-            // print(&got_char);
-            if (new_client < 1 || new_client > NUM_CLIENTS) {
-                sel4cp_dbg_puts("Attempted to switch to invalid client number\n");
-            } else {
-                client = new_client;
-            }
-        }
-
-        mux_state = 0;
-    } else if (mux_state == 0) {
-        // No escape character has been set
-        if (got_char == '\\') {
-            mux_state = 1;
-            // The next character is going to be escaped
-        } else if (got_char == '@') {
-            mux_state = 2;
-        } else {
-            give_char(client, got_char);
+// The driver will call this ppc to set line vs raw mode
+seL4_MessageInfo_t
+protected(sel4cp_channel ch, sel4cp_msginfo msginfo)
+{
+    // DRV channel
+    if (ch == DRV_CH) {
+        uint32_t drv_mode = sel4cp_mr_get(0);
+        if (drv_mode == 0 || drv_mode == 1) {
+            mode = drv_mode;
         }
     }
+
+    return sel4cp_msginfo_new(0, 0);
+
 }
 
 void init (void) {
@@ -225,8 +276,10 @@ void init (void) {
     // Disable simultaneous multi client input
     multi_client = 0;
     // No chars have been requested yet
-    num_to_get_chars[0] = 0;
-    num_to_get_chars[1] = 0;
+    for (int i = 0; i < NUM_CLIENTS; i++) {
+        num_to_get_chars[i] = 0;
+    }
+    mode = 0;
 }
 
 void notified(sel4cp_channel ch) {
@@ -241,4 +294,5 @@ void notified(sel4cp_channel ch) {
         // This was recieved on a client channel. Index the number of characters to get
         num_to_get_chars[ch - 1] += 1;
     }
+
 }

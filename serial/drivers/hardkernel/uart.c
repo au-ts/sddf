@@ -32,6 +32,9 @@ uintptr_t uart_base;
 ring_handle_t rx_ring;
 ring_handle_t tx_ring;
 
+// Global serial driver state
+struct serial_driver global_serial_driver = {0};
+
 static int internal_is_tx_fifo_busy(
     meson_uart_regs_t *regs)
 {
@@ -68,10 +71,15 @@ int serial_configure(
     long bps,
     int char_size,
     enum serial_parity parity,
-    int stop_bits)
+    int stop_bits, 
+    int mode, 
+    int echo)
 {
     meson_uart_regs_t *regs = (meson_uart_regs_t *) uart_base;
     
+    global_serial_driver.mode = mode;
+    global_serial_driver.echo = echo;
+
     uint32_t cr;
     /* Character size */
     cr = regs->cr;
@@ -109,6 +117,11 @@ int serial_configure(
     regs->cr = cr;
     /* Now set the baud rate */
     set_baud(bps);
+
+    // PPC to mux to register the mode
+    sel4cp_mr_set(0, mode);
+    sel4cp_ppcall(RX_CH, sel4cp_msginfo_new(0, 1));
+
     return 0;
 }
 
@@ -171,6 +184,8 @@ void handle_irq() {
     ready to be processed by the client server
     */
     int input = getchar();
+    char input_char = (char) input;
+    sel4cp_irq_ack(IRQ_CH);
 
     // Not sure if we should be printing this here or elsewhere? What is the expected behaviour?
     // putchar(input);
@@ -181,25 +196,108 @@ void handle_irq() {
         return;
     }
 
-    // Address that we will pass to dequeue to store the buffer address
-    uintptr_t buffer = 0;
-    // Integer to store the length of the buffer
-    unsigned int buffer_len = 0; 
+    int ret = 0;
 
-    void *cookie = 0;
-
-    int ret = dequeue_free(&rx_ring, &buffer, &buffer_len, &cookie);
-
-    if (ret != 0) {
-        sel4cp_dbg_puts(sel4cp_name);
-        sel4cp_dbg_puts(": unable to dequeue from the rx free ring\n");
-        return;
+    if (global_serial_driver.echo == ECHO_EN) {
+        // // Special case for backspace
+        if (input_char == '\b' || input_char == 0x7f) {
+            // Backspace will move the cursor back, and space will erase the character
+            putchar('\b');
+            putchar(' ');
+            putchar('\b');
+        } else if (input_char == '\r') {
+            // Convert the carriage return to a new line
+            putchar('\n');
+        }
+        else {
+            putchar(input);
+        }
     }
 
-    ((char *) buffer)[0] = (char) input;
+    if (global_serial_driver.mode == RAW_MODE) {
+        // Place characters straight into the buffer
 
-    // Now place in the rx used ring
-    ret = enqueue_used(&rx_ring, buffer, 1, &cookie);
+        // Address that we will pass to dequeue to store the buffer address
+        uintptr_t buffer = 0;
+        // Integer to store the length of the buffer
+        unsigned int buffer_len = 0; 
+
+        void *cookie = 0;
+
+        ret = dequeue_free(&rx_ring, &buffer, &buffer_len, &cookie);
+
+        if (ret != 0) {
+            sel4cp_dbg_puts(sel4cp_name);
+            sel4cp_dbg_puts(": unable to dequeue from the rx free ring\n");
+            return;
+        }
+
+        ((char *) buffer)[0] = (char) input;
+
+        // Now place in the rx used ring
+        ret = enqueue_used(&rx_ring, buffer, 1, &cookie);
+        sel4cp_notify(RX_CH);
+
+    } else if (global_serial_driver.mode == LINE_MODE) {
+        // Place in a buffer, until we reach a new line, ctrl+d/ctrl+c/enter (check what else can stop)
+        if (global_serial_driver.line_buffer == 0) {
+            // We need to dequeue a buffer to use
+            // Address that we will pass to dequeue to store the buffer address
+            uintptr_t buffer = 0;
+            // Integer to store the length of the buffer
+            unsigned int buffer_len = 0; 
+
+            void *cookie = 0;
+
+            ret = dequeue_free(&rx_ring, &buffer, &buffer_len, &cookie);
+            if (ret != 0) {
+                sel4cp_dbg_puts(sel4cp_name);
+                sel4cp_dbg_puts(": unable to dequeue from the rx free ring\n");
+                return;
+            }
+
+            global_serial_driver.line_buffer = buffer;
+            global_serial_driver.line_buffer_size = 0;
+
+
+        } 
+
+        // Check that the buffer is not full, and other exit conditions here
+        if (global_serial_driver.line_buffer_size > BUFFER_SIZE ||
+            input_char == EOT || 
+            input_char == ETX || 
+            input_char == LF ||
+            input_char == SB ||
+            input_char == CR) {
+                char *char_arr = (char * ) global_serial_driver.line_buffer;
+                void *cookie = 0;
+                // Place the line end character into buffer
+                char_arr[global_serial_driver.line_buffer_size] = input_char;
+                global_serial_driver.line_buffer_size += 1;
+                // Enqueue buffer back
+                ret = enqueue_used(&rx_ring, global_serial_driver.line_buffer, global_serial_driver.line_buffer_size, &cookie);
+                // Zero out the driver states
+                global_serial_driver.line_buffer = 0;
+                global_serial_driver.line_buffer_size = 0;
+                sel4cp_notify(RX_CH);
+
+        } else {
+            // Otherwise, add to the character array
+            char *char_arr = (char * ) global_serial_driver.line_buffer;
+    
+            // Conduct any line editing as long as we have stuff in the buffer
+            if (input_char == 0x7f && global_serial_driver.line_buffer_size > 0) {
+                // Remove last character
+                global_serial_driver.line_buffer_size -= 1;
+                char_arr[global_serial_driver.line_buffer_size] = 0;
+            } else {
+                char_arr[global_serial_driver.line_buffer_size] = input;
+                global_serial_driver.line_buffer_size += 1;
+            }
+        }
+    }
+
+
 
     if (ret != 0) {
         sel4cp_dbg_puts(sel4cp_name);
@@ -220,7 +318,7 @@ void init(void) {
     meson_uart_regs_t *regs = (meson_uart_regs_t *) uart_base;
 
     /* Line configuration */
-    int ret = serial_configure(115200, 8, PARITY_NONE, 1);
+    int ret = serial_configure(115200, 8, PARITY_NONE, 1, LINE_MODE, ECHO_EN);
 
     if (ret != 0) {
         sel4cp_dbg_puts("Error occured during line configuration\n");
@@ -249,8 +347,6 @@ void notified(sel4cp_channel ch) {
     switch(ch) {
         case IRQ_CH:
             handle_irq();
-            sel4cp_irq_ack(ch);
-            sel4cp_notify(RX_CH);
             return;
         case TX_CH:
             handle_tx();
