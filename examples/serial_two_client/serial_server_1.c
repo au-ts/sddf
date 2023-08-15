@@ -189,8 +189,14 @@ void init(void) {
 
     /* Some basic tests for the serial driver */
 
+    ring_plug(local_server->tx_ring.used_ring);
+
     serial_server_printf("Attempting to use the server printf! -- FROM SERVER 1\n");
+
     serial_server_printf("Enter char to test getchar FOR SERIAL 1\n");
+    ring_unplug(local_server->tx_ring.used_ring);
+    sel4cp_notify(SERVER_PRINT_CHANNEL);
+
     char test = getchar();
     serial_server_printf("We got the following char in SERIAL 1: ");
     serial_server_printf(&test);
