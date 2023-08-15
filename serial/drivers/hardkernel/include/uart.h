@@ -18,6 +18,35 @@ struct meson_uart_regs {
 };
 typedef volatile struct meson_uart_regs meson_uart_regs_t;
 
+/*
+Serial driver global state
+*/
+struct serial_driver {
+    int echo;
+    int mode;
+
+    /* Values for handling line mode */
+    uintptr_t line_buffer;
+    int line_buffer_size;
+};
+
+/* LINE CONFIG */
+#define RAW_MODE 0
+#define LINE_MODE 1
+#define ECHO_DIS 0
+#define ECHO_EN 1
+
+/* LINE CONTROL */
+#define ETX 3   /* ctrl+c */
+#define EOT 4   /* ctrl+d */
+#define BS 8    /* backspace */
+#define LF 10   /* Line feed/new line */
+#define CR 13   /* Carriage return */
+#define NEG 21  /* ctrl+u */
+#define SB 26   /* ctrl+z*/
+#define SP 32   /* Space*/
+#define DL 127  /* Delete */
+
 /* AML_UART_CONTROL bits */
 #define AML_UART_TX_EN			BIT(12)
 #define AML_UART_RX_EN			BIT(13)
