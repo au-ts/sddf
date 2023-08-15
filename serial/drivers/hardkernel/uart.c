@@ -318,7 +318,7 @@ void init(void) {
     meson_uart_regs_t *regs = (meson_uart_regs_t *) uart_base;
 
     /* Line configuration */
-    int ret = serial_configure(115200, 8, PARITY_NONE, 1, LINE_MODE, ECHO_EN);
+    int ret = serial_configure(115200, 8, PARITY_NONE, 1, RAW_MODE, ECHO_EN);
 
     if (ret != 0) {
         sel4cp_dbg_puts("Error occured during line configuration\n");

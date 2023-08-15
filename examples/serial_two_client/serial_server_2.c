@@ -189,9 +189,17 @@ void init(void) {
         }
     }
 
+    // Plug the tx used ring
+    ring_plug(local_server->tx_ring.used_ring);
+
     /* Some basic tests for the serial driver */
 
     serial_server_printf("Attempting to use the server printf! -- FROM SERVER 2\n");
+
+    // Unplug the tx used ring
+    ring_unplug(local_server->tx_ring.used_ring);
+    sel4cp_notify(SERVER_PRINT_CHANNEL);
+
     serial_server_printf("Enter char to test getchar FOR SERIAL 2\n");
     char test = getchar();
     serial_server_printf("We got the following char in SERIAL 2: ");
