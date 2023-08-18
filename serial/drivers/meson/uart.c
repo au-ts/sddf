@@ -258,8 +258,6 @@ void handle_irq() {
 
             global_serial_driver.line_buffer = buffer;
             global_serial_driver.line_buffer_size = 0;
-
-
         } 
 
         // Check that the buffer is not full, and other exit conditions here
@@ -317,7 +315,7 @@ void init(void) {
 
     meson_uart_regs_t *regs = (meson_uart_regs_t *) uart_base;
 
-    /* Line configuration */
+    /* Line configuration. Set LINE or RAW mode here, and disable or enable ECHO */
     int ret = serial_configure(115200, 8, PARITY_NONE, 1, RAW_MODE, ECHO_EN);
 
     if (ret != 0) {
