@@ -140,7 +140,6 @@ int give_char(int curr_client, char * drv_buffer, int drv_buffer_len) {
     return 0;
 }
 
-
 /* We will check for escape characters in here, as well as dealing with switching direction*/
 void handle_rx() {
     // Address that we will pass to dequeue to store the buffer address
