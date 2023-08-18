@@ -7,6 +7,7 @@
 #include <sel4cp.h>
 #include <sel4/sel4.h>
 #include "uart.h"
+#include "uart_config.h"
 #include "shared_ringbuffer.h"
 
 #define BIT(nr) (1UL << (nr))
@@ -117,10 +118,6 @@ int serial_configure(
     regs->cr = cr;
     /* Now set the baud rate */
     set_baud(bps);
-
-    // PPC to mux to register the mode
-    sel4cp_mr_set(0, mode);
-    sel4cp_ppcall(RX_CH, sel4cp_msginfo_new(0, 1));
 
     return 0;
 }
@@ -316,7 +313,7 @@ void init(void) {
     meson_uart_regs_t *regs = (meson_uart_regs_t *) uart_base;
 
     /* Line configuration. Set LINE or RAW mode here, and disable or enable ECHO */
-    int ret = serial_configure(115200, 8, PARITY_NONE, 1, RAW_MODE, ECHO_EN);
+    int ret = serial_configure(115200, 8, PARITY_NONE, 1, UART_MODE, ECHO_MODE);
 
     if (ret != 0) {
         sel4cp_dbg_puts("Error occured during line configuration\n");
