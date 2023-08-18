@@ -8,6 +8,7 @@
 #include "shared_ringbuffer.h"
 #include "util.h"
 #include "uart.h"
+#include "uart_config.h"
 
 #define CLI_CH 1
 #define DRV_CH 11
@@ -33,12 +34,6 @@ uintptr_t shared_dma_rx_cli2;
 // Have an array of client rings. 
 ring_handle_t rx_ring[NUM_CLIENTS];
 ring_handle_t drv_rx_ring;
-
-/*  Mode 0 for raw.
-    Mode 1 for line.
-    Defaults to mode 0.
-*/
-int mode;
 
 /* We need to do some processing of the input stream to determine when we need 
 to change direction. */
@@ -162,7 +157,7 @@ void handle_rx() {
     char *chars = (char *) buffer;
 
     // This is for our RAW mode, char by char
-    if (mode == RAW_MODE) {
+    if (UART_MODE == RAW_MODE) {
         sel4cp_dbg_puts("In raw mode mux rx\n");
         char got_char = chars[0];
 
@@ -201,7 +196,7 @@ void handle_rx() {
                 give_char(client, &got_char, 1);
             }
         }
-    } else if (mode == LINE_MODE) {
+    } else if (UART_MODE == LINE_MODE) {
         sel4cp_dbg_puts("In line mode mux rx\n");
         // This is for LINE mode, placing buffers at a time
         
@@ -235,22 +230,6 @@ void handle_rx() {
     }
 }
 
-// The driver will call this ppc to set line vs raw mode
-seL4_MessageInfo_t
-protected(sel4cp_channel ch, sel4cp_msginfo msginfo)
-{
-    // DRV channel
-    if (ch == DRV_CH) {
-        uint32_t drv_mode = sel4cp_mr_get(0);
-        if (drv_mode == 0 || drv_mode == 1) {
-            mode = drv_mode;
-        }
-    }
-
-    return sel4cp_msginfo_new(0, 0);
-
-}
-
 void init (void) {
     // We want to init the client rings here. Currently this only inits one client
     ring_init(&rx_ring[0], (ring_buffer_t *)rx_free_cli, (ring_buffer_t *)rx_used_cli, 0, 512, 512);
@@ -278,7 +257,6 @@ void init (void) {
     for (int i = 0; i < NUM_CLIENTS; i++) {
         num_to_get_chars[i] = 0;
     }
-    mode = 0;
 }
 
 void notified(sel4cp_channel ch) {
