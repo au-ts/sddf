@@ -46,6 +46,7 @@ int handle_tx(int curr_client) {
     
     // Loop over all clients here
     for (int client = 0; client < NUM_CLIENTS; client++) {
+        // The client can plug their ring. If plugged, we won't process it.
         if (ring_plugged(tx_ring[client].used_ring)) {
             continue;
         } 

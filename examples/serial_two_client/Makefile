@@ -29,7 +29,7 @@ SEL4CP_BOARD=odroidc4
 SDDF=$(abspath ../..)
 RINGBUFFERDIR=$(SDDF)/serial/libserialsharedringbuffer
 SERIAL_COMPONENTS=$(SDDF)/serial/components
-UART_DRIVER=$(SDDF)/serial/drivers/hardkernel
+UART_DRIVER=$(SDDF)/serial/drivers/meson
 BOARD_DIR := $(SEL4CP_SDK)/board/$(SEL4CP_BOARD)/$(SEL4CP_CONFIG)
 UTIL=$(SDDF)/util
 
