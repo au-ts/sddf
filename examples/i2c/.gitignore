@@ -1,0 +1,8 @@
+build.sh
+build/
+*.elf
+*.o
+*.d
+*.bin
+*.hex
+.vscode/
