@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "ethernet.h": "c",
+        "i2c-transport.h": "c"
+    }
+}
