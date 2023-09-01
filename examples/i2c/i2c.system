@@ -6,7 +6,7 @@
     <!-- i2c hardware -->
     <memory_region name="i2c" size="0x4_000" phys_addr="0xFFD1C000"/>
     <memory_region name="gpio" size="0x4000" phys_addr="0xFF634000"/>
-    <memory_region name="clk" size="0x1000" phys_addr="0xFF63C000"/> 
+    <memory_region name="clk" size="0x1000" phys_addr="0xFF63C000"/>
 
 
     <!-- Shared ring buffers -->
