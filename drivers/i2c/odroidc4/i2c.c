@@ -10,14 +10,13 @@
 // 08/2023
 
 #include <sel4cp.h>
+#include <sel4/sel4.h>
 #include "i2c-driver.h"
 #include "i2c-token.h"
 #include "sw_shared_ringbuffer.h"
 #include "printf.h"
 #include "i2c-transport.h"
 #include "i2c.h"
-
-
 
 // Security lists: one for each possible bus.
 i2c_security_list_t security_list0[I2C_SECURITY_LIST_SZ];
@@ -207,6 +206,32 @@ static inline void testLong() {
     sel4cp_notify(DRIVER_NOTIFY_ID);
 }
 
+static inline void pn532() {
+    uint8_t addr = 0x11;
+    uint8_t cid = 1;
+
+    i2c_token_t request[11] = {
+        I2C_TK_START,
+        I2C_TK_ADDRR,
+        I2C_TK_DAT,
+        I2C_TK_DAT,
+        I2C_TK_DAT,
+        I2C_TK_DAT,
+        I2C_TK_DAT,
+        I2C_TK_DAT,
+        I2C_TK_DATA_END,
+        I2C_TK_STOP,
+        I2C_TK_END,
+    };
+    req_buf_ptr_t ret = allocReqBuf(2, 11, request, cid, addr);
+    if (!ret) {
+        sel4cp_dbg_puts("test: failed to allocate req buffer\n");
+        return;
+    }
+    sel4cp_notify(DRIVER_NOTIFY_ID);
+}
+static uint8_t uuid[7] = {0,0,0,0,0,0,0};
+static uint8_t client;
 /**
  * Main entrypoint for server.
 */
@@ -221,9 +246,16 @@ void init(void) {
         security_list3[i] = 0;
     }
 
-    // test();
-    testds3231();
-    // testLong();
+    // Loop of misanthropy and hate
+    while (1) {
+        printf("Current uuid: %x %x %x %x\n", uuid[0], uuid[1], uuid[2], uuid[3]);
+        pn532();
+        // seL4_Yield();
+        // Fat artificial delay
+        for (int i = 0; i < 10000000; i++) {
+            asm volatile("nop");
+        }
+    } 
 }
 
 /**
@@ -238,10 +270,10 @@ static inline void driverNotify(void) {
         if (retBufEmpty(i)) {
             continue;
         }
-        size_t *sz;
+        size_t sz;
         ret_buf_ptr_t ret = popRetBuf(i, &sz);
         printf("ret buf first 4 bytes: %x %x %x %x\n", ret[0], ret[1], ret[2], ret[3]);
-        printf("server: Got return buffer %p\n", ret);
+        // printf("server: Got return buffer %p\n", ret);
         printf("bus = %i client = %i addr = %i sz=%u\n", *(uint8_t *) ret,
         *(uint8_t *) (ret + sizeof(uint8_t)), *(uint8_t *) (ret + 2*sizeof(uint8_t)),
         sz);
@@ -255,10 +287,34 @@ static inline void driverNotify(void) {
             printf("server: Error %i on bus %i for client %i at token of type %i\n", err, i, client, addr);
         } else {
             printf("server: Success on bus %i for client %i at address %i\n", i, client, addr);
+
+            // Print data in response
+            // for (int i = 0; i < 10; i++) {
+            //     printf("0x%x ", ret[i]);
+            // }
+            uint8_t olduuid[7];
+            uint8_t diff = 0;
+            for (int i = 0; i < 7; i++) {
+                olduuid[i] = uuid[i];
+                uuid[i] = ret[i+4];
+                if (uuid[i] != olduuid[i]) {
+                    diff = 1;
+                }
+            }
+
+            // If this uuid is new, notify the client
+            if (diff) {
+                sel4cp_notify(client);
+            }
         }
 
         releaseRetBuf(i, ret);
     }
+}
+
+
+static inline void clientNotify(int channel) {
+
 }
 
 
@@ -267,28 +323,36 @@ void notified(sel4cp_channel c) {
         case DRIVER_NOTIFY_ID:
             driverNotify();
             break;
-        case 2:
-            // Client 1
-            break;
+        // case 2:
+        //     clientNotify(c);
+        //     break;
+        default:
+            client = c;
+            pn532();
     }
 }
 
 /**
- * Protected procedure calls into this server are used managing the security lists. 
+ * Protected procedure calls into this serverpn532pn532 are used managing the security lists. 
 */
 seL4_MessageInfo_t protected(sel4cp_channel c, seL4_MessageInfo_t m) {
-    // Determine the type of request
-    uint64_t req = sel4cp_mr_get(I2C_PPC_REQTYPE);
-    uint64_t arg1 = sel4cp_mr_get(1);   // Bus
-    uint64_t arg2 = sel4cp_mr_get(2);   // Address
-    switch (req) {
-        case I2C_PPC_CLAIM:
-            // Claim an address
-            break;
-        case I2C_PPC_RELEASE:
-            // Release an address
-            break;
+    // // Determine the type of request
+    // uint64_t req = sel4cp_mr_get(I2C_PPC_REQTYPE);
+    // uint64_t arg1 = sel4cp_mr_get(1);   // Bus
+    // uint64_t arg2 = sel4cp_mr_get(2);   // Address
+    // switch (req) {
+    //     case I2C_PPC_CLAIM:
+    //         // Claim an address
+    //         break;
+    //     case I2C_PPC_RELEASE:
+    //         // Release an address
+    //         break;
+    // }
+
+    // Return the most recent UID
+    for (int i = 0; i < 7; i++) {
+        sel4cp_mr_set(i, uuid[i]);
     }
 
-    return sel4cp_msginfo_new(0, 0);
+    return sel4cp_msginfo_new(0, 7);
 }

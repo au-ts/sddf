@@ -284,8 +284,8 @@ static inline int i2cGetError(int bus) {
     // Index into ctl register - i2c base + address of appropriate register
     volatile uint32_t ctl = (bus == 2) ? if_m2->ctl : if_m3->ctl;
     uint8_t err = ctl & (1 << 3);   // bit 3 -> set if error
-    uint8_t rd = ctl & 0xF00; // bits 8-11 -> number of bytes read
-    uint8_t tok = ctl & 0xF0; // bits 4-7 -> curr token
+    uint8_t rd = (ctl & 0xF00) >> 8; // bits 8-11 -> number of bytes read
+    uint8_t tok = (ctl & 0xF0) >> 4; // bits 4-7 -> curr token
 
     if (err) {
         return -tok;
@@ -564,11 +564,25 @@ static inline void i2cirq(int bus, int timeout) {
     // printf("notified = %d\n", i2c_ifState[bus].notified);
     
     // IRQ landed: i2c transaction has either completed or timed out.
+    volatile i2c_if_t *interface = (bus == 2) ? if_m2 : if_m3;
     if (timeout) {
         sel4cp_dbg_puts("i2c: timeout!\n");
+        i2cHalt(interface);
+        if (i2c_ifState[bus].current_ret) {
+            i2c_ifState[bus].current_ret[RET_BUF_ERR] = I2C_ERR_TIMEOUT;
+            i2c_ifState[bus].current_ret[RET_BUF_ERR_TK] = 0x0;
+            pushRetBuf(bus, i2c_ifState[bus].current_ret, i2c_ifState[bus].current_req_len);
+        }
+        if (i2c_ifState[bus].current_req) {
+            releaseReqBuf(bus, i2c_ifState[bus].current_req);
+        }
+        i2c_ifState[bus].current_ret = NULL;
+        i2c_ifState[bus].current_req = 0x0;
+        i2c_ifState[bus].current_req_len = 0;
+        i2c_ifState[bus].remaining = 0;
+        return;
     }
 
-    volatile i2c_if_t *interface = (bus == 2) ? if_m2 : if_m3;
     i2cDump(interface);
     i2cHalt(interface);
 
@@ -593,13 +607,16 @@ static inline void i2cirq(int bus, int timeout) {
         ret[RET_BUF_ERR_TK] = -err;   // Token that caused error
     } else {
         // If there was a read, extract the data from the interface
-        // FIXME: this is obviously sus
         if (err > 0) {
             // Get read data
-
             // Copy data into return buffer
             for (int i = 0; i < err; i++) {
-                ret[4+i] = (uint8_t)((interface->rdata0 & 0xFF000000) >> 24);
+                if (i < 4) {
+                    ret[4+i] = (interface->rdata0 >> (i * 8)) & 0xFF;
+                } else {
+                    ret[4+i] = (interface->rdata1 >> ((i - 4) * 8)) & 0xFF;
+                }
+                printf("returning %x in position %d\n", ret[4+i], 4+i);
             }
         }
 
