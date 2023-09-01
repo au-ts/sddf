@@ -489,17 +489,22 @@ static inline void checkBuf(int bus) {
             i2c_ifState[bus].notified = 1;
             return;
         }
-        sel4cp_dbg_puts("driver: starting work for bus\n");
+        // sel4cp_dbg_puts("driver: starting work for bus\n");
         // Otherwise, begin work. Start by extracting the request
 
         size_t sz = 0;
         req_buf_ptr_t req = popReqBuf(bus, &sz);
-        printf("SZ: %zu\n", sz);
 
         if (!req) {
             return;   // If request was invalid, run away.
         }
+
         ret_buf_ptr_t ret = getRetBuf(bus);
+        if (!ret) {
+            printf("driver: no ret buf!\n");
+            releaseReqBuf(bus, req);
+            return;
+        }
 
         // Load bookkeeping data into return buffer
         // Set client PD
@@ -514,6 +519,7 @@ static inline void checkBuf(int bus) {
 
         if (sz <=2 || sz > I2C_BUF_SZ) {
             printf("Invalid request size: %zu!\n", sz);
+            return;
         }
         // printf("ret buf first 4 bytes: %x %x %x %x\n", ret[0], ret[1], ret[2], ret[3]);
         i2c_ifState[bus].current_req = req;

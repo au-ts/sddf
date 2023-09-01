@@ -231,7 +231,7 @@ static inline void pn532() {
     sel4cp_notify(DRIVER_NOTIFY_ID);
 }
 static uint8_t uuid[7] = {0,0,0,0,0,0,0};
-static uint8_t client;
+static uint8_t client_ = 0;
 /**
  * Main entrypoint for server.
 */
@@ -245,17 +245,6 @@ void init(void) {
         security_list2[i] = 0;
         security_list3[i] = 0;
     }
-
-    // Loop of misanthropy and hate
-    while (1) {
-        printf("Current uuid: %x %x %x %x\n", uuid[0], uuid[1], uuid[2], uuid[3]);
-        pn532();
-        // seL4_Yield();
-        // Fat artificial delay
-        for (int i = 0; i < 10000000; i++) {
-            asm volatile("nop");
-        }
-    } 
 }
 
 /**
@@ -272,6 +261,9 @@ static inline void driverNotify(void) {
         }
         size_t sz;
         ret_buf_ptr_t ret = popRetBuf(i, &sz);
+        if (ret == 0) {
+            return;
+        }
         printf("ret buf first 4 bytes: %x %x %x %x\n", ret[0], ret[1], ret[2], ret[3]);
         // printf("server: Got return buffer %p\n", ret);
         printf("bus = %i client = %i addr = %i sz=%u\n", *(uint8_t *) ret,
@@ -304,8 +296,13 @@ static inline void driverNotify(void) {
 
             // If this uuid is new, notify the client
             if (diff) {
-                sel4cp_notify(client);
+                printf("New data! Notifying client %i\n Data=\n", client_);
+                for (int i = 0; i < 7; i++) {
+                    printf("\t0x%x ", uuid[i]);
+                }
             }
+            printf("Notifying client %d\n", client_);
+            sel4cp_notify(client_);
         }
 
         releaseRetBuf(i, ret);
@@ -323,17 +320,16 @@ void notified(sel4cp_channel c) {
         case DRIVER_NOTIFY_ID:
             driverNotify();
             break;
-        // case 2:
-        //     clientNotify(c);
-        //     break;
-        default:
-            client = c;
+        case 2:
+            client_ = c;
             pn532();
+            printf("SERVER: notified by client %d\n", c);
+            break;
     }
 }
 
 /**
- * Protected procedure calls into this serverpn532pn532 are used managing the security lists. 
+ * Protected procedure calls into this server are used managing the security lists. 
 */
 seL4_MessageInfo_t protected(sel4cp_channel c, seL4_MessageInfo_t m) {
     // // Determine the type of request
