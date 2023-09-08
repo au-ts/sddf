@@ -12,8 +12,7 @@
 #ifndef I2C_H
 #define I2C_H
 #include "sw_shared_ringbuffer.h"
-#define I2C_MEM_OFFSET 0x22000
-
+typedef uint8_t i2c_addr_t;         // 7-bit addressing
 
 #define DRIVER_NOTIFY_ID 1  // Matching i2c.system
 

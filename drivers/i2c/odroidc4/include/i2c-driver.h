@@ -14,19 +14,27 @@
 #define I2C_DRIVER_H
 #define ODROIDC4
 #include <stdint.h>
+#include "i2c-transport.h"
+#include "gpio.h"
+#include "clk.h"
+#include <stdint.h>
+#include "printf.h"
+#include "fence.h"
+#include "i2c.h"
 
 #define TOKEN_LIST_MAX 128
 #define WBUF_SZ_MAX 64
 #define RBUF_SZ_MAX 64
 
-// Internal driver state for each bus
-typedef struct _i2c_bus_state {
-    uint16_t speed;         // Current programmed speed. Note that this stores the
-                            // actual speed, not the quarter clock delay.   
-} i2c_bus_t;
-
-
-typedef uint8_t i2c_addr_t;         // 7-bit addressing
+// Driver state
+typedef struct _i2c_ifState {
+    req_buf_ptr_t current_req; // Pointer to current request.
+    ret_buf_ptr_t current_ret; // Pointer to current return buf.
+    int current_req_len;        // Number of bytes in current request.
+    size_t remaining;              // Number of bytes remaining to dispatch.
+    int notified;               // Flag indicating that there is more work waiting.
+    int ddr;                    // Data direction. 0 = write, 1 = read.
+} i2c_ifState_t;
 
 
 // Driver-server interface
