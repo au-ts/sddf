@@ -19,10 +19,8 @@
 #include "i2c.h"
 
 // Security lists: one for each possible bus.
-i2c_security_list_t security_list0[I2C_SECURITY_LIST_SZ];
-i2c_security_list_t security_list1[I2C_SECURITY_LIST_SZ];
-i2c_security_list_t security_list2[I2C_SECURITY_LIST_SZ];
-i2c_security_list_t security_list3[I2C_SECURITY_LIST_SZ];
+i2c_security_list_t security_list[I2C_NUM_BUSES][I2C_SECURITY_LIST_SZ];
+
 
 
 /**
@@ -33,10 +31,9 @@ void init(void) {
     i2cTransportInit(1);
     // Clear security lists
     for (int i = 0; i < I2C_SECURITY_LIST_SZ; i++) {
-        security_list0[i] = 0;
-        security_list1[i] = 0;
-        security_list2[i] = 0;
-        security_list3[i] = 0;
+        for (int j = 0; j < I2C_NUM_BUSES; j++) {
+            security_list[j][i] = -1;
+        }
     }
 }
 
@@ -96,22 +93,78 @@ void notified(sel4cp_channel c) {
     }
 }
 
+static inline seL4_MessageInfo_t ppcError(void) {
+    sel4cp_mr_set(0, -1);
+    return sel4cp_msginfo_new(0, 1);
+}
+
+/**
+ * Claim an address on a bus.
+*/
+static inline seL4_MessageInfo_t securityClaim(int bus, uint8_t addr, uint64_t client) {
+    // Check that the address is not already claimed
+    i2c_security_list_t *list = security_list[bus];
+    if (list[addr] != -1) {
+        sel4_dbg_puts("I2C|ERROR: Address already claimed!\n");
+        return ppcError();
+    }
+
+    // Claim
+    list[addr] = client;
+    sel4cp_mr_set(0, 0);
+    return sel4cp_msginfo_new(0, 1);
+}
+
+/**
+ * Release an address on a bus.
+*/
+static inline seL4_MessageInfo_t securityRelease(int bus, uint8_t addr, uint64_t client) {
+    // Check that the address is claimed by the client
+    i2c_security_list_t *list = security_list[bus];
+    if (list[addr] != client) {
+        sel4_dbg_puts("I2C|ERROR: Address not claimed by client!\n");
+        return ppcError();
+    }
+
+    // Release
+    list[addr] = -1;
+    sel4cp_mr_set(0, 0);
+    return sel4cp_msginfo_new(0, 1);
+}
+
+
+
 /**
  * Protected procedure calls into this server are used managing the security lists. 
 */
 seL4_MessageInfo_t protected(sel4cp_channel c, seL4_MessageInfo_t m) {
-    // // Determine the type of request
-    // uint64_t req = sel4cp_mr_get(I2C_PPC_REQTYPE);
-    // uint64_t arg1 = sel4cp_mr_get(1);   // Bus
-    // uint64_t arg2 = sel4cp_mr_get(2);   // Address
-    // switch (req) {
-    //     case I2C_PPC_CLAIM:
-    //         // Claim an address
-    //         break;
-    //     case I2C_PPC_RELEASE:
-    //         // Release an address
-    //         break;
-    // }
+    // Determine the type of request
+    uint64_t req = sel4cp_mr_get(I2C_PPC_REQTYPE);
+    uint64_t ppc_bus = sel4cp_mr_get(I2C_PPC_MR_BUS)
+    uint64_t ppc_addr = sel4cp_mr_get(I2C_PPC_MR_ADDR);
+
+    // Check arguments are valid
+    if (req != I2C_PPC_CLAIM || req != I2C_PPC_RELEASE) {
+        sel4_dbg_puts("I2C|ERROR: Invalid PPC request type!\n");
+        return ppcError();
+    }
+    if (ppc_addr < 0 || ppc_addr > 127) {
+        sel4_dbg_puts("I2C|ERROR: Invalid i2c address in PPC!\n");
+        return ppcError();
+    }
+    if (ppc_bus < 2 || ppc_bus > 3) {
+        sel4_dbg_puts("I2C|ERROR: Invalid i2c bus in PPC!\n");
+        return ppcError();
+    }
+
+    switch (req) {
+        case I2C_PPC_CLAIM:
+            // Claim an address
+            return securityClaim(ppc_bus, ppc_addr, c);
+        case I2C_PPC_RELEASE:
+            // Release an address
+            return securityRelease(ppc_bus, ppc_addr, c);
+    }
 
     return sel4cp_msginfo_new(0, 7);
 }
