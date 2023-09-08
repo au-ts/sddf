@@ -70,7 +70,7 @@ req_buf_ptr_t allocReqBuf(int bus, size_t size, uint8_t *data, uint8_t client, u
     if (bus != 2 && bus != 3) {
         return 0;
     }
-    if (size > I2C_BUF_SZ - 2*sizeof(i2c_token_t)) {
+    if (size > I2C_BUF_SZ - REQ_BUF_DAT_OFFSET*sizeof(i2c_token_t)) {
         printf("transport: Requested buffer size %zu too large\n", size);
         return 0;
     }
@@ -90,19 +90,17 @@ req_buf_ptr_t allocReqBuf(int bus, size_t size, uint8_t *data, uint8_t client, u
     }
 
     // Load the client ID and i2c address into first two bytes of buffer
-    *(uint8_t *) buf = client;
-    *(uint8_t *) (buf + sizeof(uint8_t)) = addr;
+    (uint8_t *) buf[REQ_BUF_CLIENT] = client;
+    (uint8_t *) buf[REQ_BUF_ADDR] = addr;
+    (uint8_t *) buf[REQ_BUF_BUS] = bus;
+    const uint8_t sz_offset = REQ_BUF_DAT_OFFSET*sizeof(uint8_t);
+
 
     // Copy the data into the buffer
-    memcpy((void *) buf + 2*sizeof(i2c_token_t), data, size);
+    memcpy((void *) buf + sz_offset, data, size);
     
-    // print buffer
-    for (int i = 0; i < size + 2*sizeof(uint8_t); i++) {
-        printf("%x ", *(uint8_t *) (buf + i));
-    }
-    printf("\n");
     // Enqueue the buffer
-    ret = enqueue_used(ring, buf, size + 2*sizeof(uint8_t));
+    ret = enqueue_used(ring, buf, size + sz_offset);
     printf("transport: Allocated request buffer %p storing %u bytes\n", buf, size);
     if (ret != 0) {
         enqueue_free(ring, buf, I2C_BUF_SZ);

@@ -24,214 +24,8 @@ i2c_security_list_t security_list1[I2C_SECURITY_LIST_SZ];
 i2c_security_list_t security_list2[I2C_SECURITY_LIST_SZ];
 i2c_security_list_t security_list3[I2C_SECURITY_LIST_SZ];
 
-static inline void testds3231() {
-    uint8_t addr = 0x68;
-    uint8_t cid = 1;
 
-    i2c_token_t request[10] = {
-        I2C_TK_START,
-        I2C_TK_ADDRW,
-        I2C_TK_DAT,
-        0x6,        //  Year register
-        I2C_TK_DAT,
-        0x20,
-        I2C_TK_DAT,
-        0x24,
-        I2C_TK_STOP,
-        I2C_TK_END,
-    };
-    req_buf_ptr_t ret = allocReqBuf(2, 10, request, cid, addr);
-    if (!ret) {
-        sel4cp_dbg_puts("test: failed to allocate req buffer\n");
-        return;
-    }
-    sel4cp_notify(DRIVER_NOTIFY_ID);
 
-    // Try read back
-    i2c_token_t request2[10] = {
-        I2C_TK_START,
-        I2C_TK_ADDRW,
-        I2C_TK_DAT,
-        0x6,
-        I2C_TK_START,
-        I2C_TK_ADDRR,
-        I2C_TK_DAT,
-        I2C_TK_DATA_END,
-        I2C_TK_STOP,
-        I2C_TK_END,
-    };
-    ret = allocReqBuf(2, 10, request2, cid, addr);
-    if (!ret) {
-        sel4cp_dbg_puts("test: failed to allocate req buffer\n");
-        return;
-    }
-    sel4cp_notify(DRIVER_NOTIFY_ID);
-}
-
-static inline void test() {
-    uint8_t cid = 1; // client id
-    uint8_t addr = 0x24; // address
-    i2c_token_t request[11] = {
-        I2C_TK_START,
-        I2C_TK_ADDRR,
-        I2C_TK_DAT,
-        0x01,
-        I2C_TK_DAT,
-        0x02,
-        I2C_TK_DAT,
-        0x03,
-        I2C_TK_DATA_END,
-        I2C_TK_STOP,
-        I2C_TK_END,
-    };
-    // sel4cp_dbg_puts("test: allocating req buffer\n");
-    // Write 1,2,3 to address 0x20
-    // req_buf_ptr_t ret = allocReqBuf(2, 11, request, cid, addr);
-    // if (!ret) {
-    //     sel4cp_dbg_puts("test: failed to allocate req buffer\n");
-    //     return;
-    // }
-    // sel4cp_notify(DRIVER_NOTIFY_ID);
-
-    addr = 0x24; // address
-    i2c_token_t request2[10] = {
-        I2C_TK_START,
-        I2C_TK_ADDRW,
-        I2C_TK_DAT,
-        0x03,
-        I2C_TK_DAT,
-        0x02,
-        I2C_TK_DAT,
-        0x01,
-        I2C_TK_STOP,
-        I2C_TK_END,
-    };
-    // Write 1,2,3 to address 0x20
-    req_buf_ptr_t ret = allocReqBuf(2, 10, request2, cid, addr);
-    if (!ret) {
-        sel4cp_dbg_puts("test: failed to allocate req buffer\n");
-        return;
-    }
-    sel4cp_notify(DRIVER_NOTIFY_ID);
-    
-    ret = allocReqBuf(2, 11, request, cid, addr);
-    if (!ret) {
-        sel4cp_dbg_puts("test: failed to allocate req buffer\n");
-        return;
-    }
-    sel4cp_notify(DRIVER_NOTIFY_ID);
-    
-    ret = allocReqBuf(2, 10, request2, cid, addr);
-    if (!ret) {
-        sel4cp_dbg_puts("test: failed to allocate req buffer\n");
-        return;
-    }
-    sel4cp_notify(DRIVER_NOTIFY_ID);
-}
-
-static inline void testLong() {
-    uint8_t cid = 1; // client id
-    uint8_t addr = 0x68; // address
-    i2c_token_t request[64] = {
-        I2C_TK_START,
-        I2C_TK_ADDRW,
-        I2C_TK_DAT,
-        0x06,
-        I2C_TK_DAT,
-        0x01,
-        I2C_TK_DAT,
-        0x02,
-        I2C_TK_DAT,
-        0x03,
-        I2C_TK_DAT,
-        0x04,
-        I2C_TK_DAT,
-        0x05,
-        I2C_TK_DAT,
-        0x06,
-        I2C_TK_DAT,
-        0x07,
-        I2C_TK_DAT,
-        0x08,
-        I2C_TK_DAT,
-        0x09,
-        I2C_TK_DAT,
-        0x0A,
-        I2C_TK_DAT,
-        0x0B,
-        I2C_TK_DAT,
-        0x0C,
-        I2C_TK_DAT,
-        0x0D,
-        I2C_TK_DAT,
-        0x0E,
-        I2C_TK_DAT,
-        0x0F,
-        I2C_TK_DAT,
-        0x10,
-        I2C_TK_DAT,
-        0x12,
-        I2C_TK_DAT,
-        0x13,
-        I2C_TK_DAT,
-        0x14,
-        I2C_TK_DAT,
-        0x15,
-        I2C_TK_DAT,
-        0x16,
-        I2C_TK_DAT,
-        0x17,
-        I2C_TK_DAT,
-        0x18,
-        I2C_TK_DAT,
-        0x19,
-        I2C_TK_DAT,
-        0x1A,
-        I2C_TK_DAT,
-        0x1B,
-        I2C_TK_DAT,
-        0x1C,
-        I2C_TK_DAT,
-        0x1D,
-        I2C_TK_DAT,
-        0x1E,
-        I2C_TK_STOP,
-        I2C_TK_END,
-    };
-    req_buf_ptr_t ret = allocReqBuf(2, 64, request, cid, addr);
-    if (!ret) {
-        sel4cp_dbg_puts("test: failed to allocate req buffer\n");
-        return;
-    }
-    sel4cp_notify(DRIVER_NOTIFY_ID);
-}
-
-static inline void pn532() {
-    uint8_t addr = 0x11;
-    uint8_t cid = 1;
-
-    i2c_token_t request[11] = {
-        I2C_TK_START,
-        I2C_TK_ADDRR,
-        I2C_TK_DAT,
-        I2C_TK_DAT,
-        I2C_TK_DAT,
-        I2C_TK_DAT,
-        I2C_TK_DAT,
-        I2C_TK_DAT,
-        I2C_TK_DATA_END,
-        I2C_TK_STOP,
-        I2C_TK_END,
-    };
-    req_buf_ptr_t ret = allocReqBuf(2, 11, request, cid, addr);
-    if (!ret) {
-        sel4cp_dbg_puts("test: failed to allocate req buffer\n");
-        return;
-    }
-    sel4cp_notify(DRIVER_NOTIFY_ID);
-}
-static uint8_t uuid[7] = {0,0,0,0,0,0,0};
-static uint8_t client_ = 0;
 /**
  * Main entrypoint for server.
 */
@@ -280,29 +74,7 @@ static inline void driverNotify(void) {
         } else {
             printf("server: Success on bus %i for client %i at address %i\n", i, client, addr);
 
-            // Print data in response
-            // for (int i = 0; i < 10; i++) {
-            //     printf("0x%x ", ret[i]);
-            // }
-            uint8_t olduuid[7];
-            uint8_t diff = 0;
-            for (int i = 0; i < 7; i++) {
-                olduuid[i] = uuid[i];
-                uuid[i] = ret[i+4];
-                if (uuid[i] != olduuid[i]) {
-                    diff = 1;
-                }
-            }
-
-            // If this uuid is new, notify the client
-            if (diff) {
-                printf("New data! Notifying client %i\n Data=\n", client_);
-                for (int i = 0; i < 7; i++) {
-                    printf("\t0x%x ", uuid[i]);
-                }
-            }
-            printf("Notifying client %d\n", client_);
-            sel4cp_notify(client_);
+            // TODO: logic here
         }
 
         releaseRetBuf(i, ret);
@@ -321,9 +93,6 @@ void notified(sel4cp_channel c) {
             driverNotify();
             break;
         case 2:
-            client_ = c;
-            pn532();
-            printf("SERVER: notified by client %d\n", c);
             break;
     }
 }
@@ -344,11 +113,6 @@ seL4_MessageInfo_t protected(sel4cp_channel c, seL4_MessageInfo_t m) {
     //         // Release an address
     //         break;
     // }
-
-    // Return the most recent UID
-    for (int i = 0; i < 7; i++) {
-        sel4cp_mr_set(i, uuid[i]);
-    }
 
     return sel4cp_msginfo_new(0, 7);
 }
