@@ -72,7 +72,6 @@
         <map mr="gpio"        vaddr="0x3_100_000" perms="rw" setvar_vaddr="gpio" cached="false"/>
         <map mr="clk"         vaddr="0x3_200_000" perms="rw" setvar_vaddr="clk" cached="false"/>
 
-
         <!-- M2 IRQs -->
         <!-- Main interrupt -->
         <irq irq="247" id="2" trigger="edge"/>
