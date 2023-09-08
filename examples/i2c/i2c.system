@@ -68,7 +68,7 @@
         <map mr="m3_ret_free" vaddr="0x4_C00_000" perms="rw" setvar_vaddr="m3_ret_free"/>
         <map mr="m3_ret_used" vaddr="0x4_E00_000" perms="rw" setvar_vaddr="m3_ret_used"/>
         <map mr="driver_bufs" vaddr="0x5_000_000" perms="rw" setvar_vaddr="driver_bufs"/>
-        <map mr="i2c"         vaddr="0x3_000_000" perms="rw" setvar_vaddr="i2c" cached="false"/>
+        <map mr="i2cm2"       vaddr="0x3_000_000" perms="rw" setvar_vaddr="i2c" cached="false"/>
         <map mr="gpio"        vaddr="0x3_100_000" perms="rw" setvar_vaddr="gpio" cached="false"/>
         <map mr="clk"         vaddr="0x3_200_000" perms="rw" setvar_vaddr="clk" cached="false"/>
 

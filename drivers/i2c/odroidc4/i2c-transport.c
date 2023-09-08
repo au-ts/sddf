@@ -90,9 +90,9 @@ req_buf_ptr_t allocReqBuf(int bus, size_t size, uint8_t *data, uint8_t client, u
     }
 
     // Load the client ID and i2c address into first two bytes of buffer
-    (uint8_t *) buf[REQ_BUF_CLIENT] = client;
-    (uint8_t *) buf[REQ_BUF_ADDR] = addr;
-    (uint8_t *) buf[REQ_BUF_BUS] = bus;
+    ((uint8_t *) buf)[REQ_BUF_CLIENT] = client;
+    ((uint8_t *) buf)[REQ_BUF_ADDR] = addr;
+    ((uint8_t *) buf)[REQ_BUF_BUS] = bus;
     const uint8_t sz_offset = REQ_BUF_DAT_OFFSET*sizeof(uint8_t);
 
 
@@ -107,7 +107,7 @@ req_buf_ptr_t allocReqBuf(int bus, size_t size, uint8_t *data, uint8_t client, u
         return 0;
     }
     
-    return buf;
+    return (req_buf_ptr_t)buf;
 }
 
 ret_buf_ptr_t getRetBuf(int bus) {
@@ -132,7 +132,7 @@ ret_buf_ptr_t getRetBuf(int bus) {
         return 0;
     }
     printf("transport: Got return buffer %p\n", buf);
-    return buf;
+    return (ret_buf_ptr_t)buf;
 }
 
 int pushRetBuf(int bus, ret_buf_ptr_t buf, size_t size) {
@@ -162,7 +162,7 @@ int pushRetBuf(int bus, ret_buf_ptr_t buf, size_t size) {
 
 static inline uintptr_t popBuf(ring_handle_t *ring, size_t *sz) {
     uintptr_t buf;
-    int ret = dequeue_used(ring, &buf, sz);
+    int ret = dequeue_used(ring, ((uintptr_t*)&buf), (unsigned *)sz);
     printf("Popping buffer containing %zu bytes\n", *sz);
     if (ret != 0) return 0;
     return buf;

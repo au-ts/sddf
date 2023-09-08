@@ -25,7 +25,6 @@ i2c_security_list_t security_list2[I2C_SECURITY_LIST_SZ];
 i2c_security_list_t security_list3[I2C_SECURITY_LIST_SZ];
 
 
-
 /**
  * Main entrypoint for server.
 */
@@ -74,7 +73,7 @@ static inline void driverNotify(void) {
         } else {
             printf("server: Success on bus %i for client %i at address %i\n", i, client, addr);
 
-            // TODO: logic here
+            // TODO: logic here to return
         }
 
         releaseRetBuf(i, ret);
