@@ -340,7 +340,7 @@ static inline int i2cLoadTokens(int bus) {
     printf("Tokens remaining in this req: %zu\n", i2c_ifState[bus].remaining);
     
     // Extract second byte: address
-    uint8_t addr = tokens[1];
+    uint8_t addr = tokens[REQ_BUF_ADDR];
     if (addr > 0x7F) {
         sel4cp_dbg_puts("i2c: attempted to write to address > 7-bit range!\n");
         return -1;
@@ -383,8 +383,9 @@ static inline int i2cLoadTokens(int bus) {
             continue;
         }
         
-        // Skip first two: client id and addr
-        i2c_token_t tok = tokens[2 + i];
+        // Skip first three: client id and addr
+        i2c_token_t tok = tokens[REQ_BUF_DAT_OFFSET + i];
+        
         uint32_t odroid_tok = 0x0;
         // Translate token to ODROID token
         switch (tok) {
@@ -419,14 +420,9 @@ static inline int i2cLoadTokens(int bus) {
 
         if (tk_offset < 8) {
             interface->tk_list0 |= ((odroid_tok & 0xF) << (tk_offset * 4));
-            // printf("(odroid_tok << (tk_offset * 4)) == 0x%x\n", (odroid_tok << (tk_offset * 4)));
-            // printf("Token %d: %x\n", i, (interface->tk_list0 >> (tk_offset * 4)) & 0xF);
-            // printf("Raw: 0x%x\n", interface->tk_list0);
             tk_offset++;
         } else {
             interface->tk_list1 = interface->tk_list1 | (odroid_tok << ((tk_offset -8) * 4));
-            // printf("Token %d: %x\n", i, (interface->tk_list1 >> ((tk_offset - 8) * 4)) & 0xF);
-            // printf("Raw: 0x%x\n", interface->tk_list1);
             tk_offset++;
         }
         // If data token and we are writing, load data into wbuf registers
@@ -510,21 +506,20 @@ static inline void checkBuf(int bus) {
         // Set client PD
 
         printf("driver: Loading request from client %u on bus %u to address %x of sz %zu\n", req[0], bus, req[1], sz);
-        // printf("ret_data: %p\n", ret);
-        // printf("ret %p\n", ret);
 
-        ret[RET_BUF_CLIENT] = req[0];      // Client PD
+        ret[RET_BUF_CLIENT] = req[REQ_BUF_CLIENT];      // Client PD
+        
         // Set targeted i2c address
-        ret[RET_BUF_ADDR] = req[1];      // Address
+        ret[RET_BUF_ADDR] = req[REQ_BUF_ADDR];          // Address
 
-        if (sz <=2 || sz > I2C_BUF_SZ) {
+        if (sz <= REQ_BUF_DAT_OFFSET || sz > I2C_BUF_SZ) {
             printf("Invalid request size: %zu!\n", sz);
             return;
         }
         // printf("ret buf first 4 bytes: %x %x %x %x\n", ret[0], ret[1], ret[2], ret[3]);
         i2c_ifState[bus].current_req = req;
-        i2c_ifState[bus].current_req_len = sz - 2;
-        i2c_ifState[bus].remaining = sz - 2;    // Ignore client PD and address
+        i2c_ifState[bus].current_req_len = sz - REQ_BUF_DAT_OFFSET;
+        i2c_ifState[bus].remaining = sz - REQ_BUF_DAT_OFFSET;    // Ignore client PD and address
         i2c_ifState[bus].notified = 0;
         i2c_ifState[bus].current_ret = ret;
         if (!i2c_ifState[bus].current_ret) {
@@ -618,11 +613,10 @@ static inline void i2cirq(int bus, int timeout) {
             // Copy data into return buffer
             for (int i = 0; i < err; i++) {
                 if (i < 4) {
-                    ret[4+i] = (interface->rdata0 >> (i * 8)) & 0xFF;
+                    ret[RET_BUF_DAT_OFFSET+i] = (interface->rdata0 >> (i * 8)) & 0xFF;
                 } else {
-                    ret[4+i] = (interface->rdata1 >> ((i - 4) * 8)) & 0xFF;
+                    ret[RET_BUF_DAT_OFFSET+i] = (interface->rdata1 >> ((i - 4) * 8)) & 0xFF;
                 }
-                printf("returning %x in position %d\n", ret[4+i], 4+i);
             }
         }
 
