@@ -25,6 +25,15 @@
 #define RET_BUF_ERR_TK 1
 #define RET_BUF_CLIENT 2
 #define RET_BUF_ADDR 3
+#define RET_BUF_DAT_OFFSET 4    // Number of non-payload bytes. Should match however
+                                // many #defines are listed here.
+
+// Request buffer
+#define REQ_BUF_CLIENT 0
+#define REQ_BUF_ADDR 1
+#define REQ_BUF_BUS 2
+#define REQ_BUF_DAT_OFFSET 3    // Number of non-payload bytes. Should match however
+                                // many #defines are listed here.
 
 // Shared memory regions
 extern uintptr_t m2_req_free;
