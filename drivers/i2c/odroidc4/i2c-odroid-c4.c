@@ -16,6 +16,9 @@
 #include "i2c-driver.h"
 #include "odroidc4-i2c-mem.h"
 
+#ifndef BUS_NUM
+#error "BUS_NUM must be defined!"
+#endif
 
 typedef volatile struct {
     uint32_t ctl;
@@ -30,8 +33,7 @@ typedef volatile struct {
 
 // Hardware memory
 uintptr_t i2c;
-int bus;        // HACK: this variable is elf patched to contain the bus identifier
-                //       - it is not a real memory address.
+const int bus = BUS_NUM;
 uintptr_t gpio;
 uintptr_t clk;
 
