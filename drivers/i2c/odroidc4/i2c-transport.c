@@ -32,6 +32,15 @@ ring_handle_t m2RetRing;
 ring_handle_t m3ReqRing;
 ring_handle_t m3RetRing;
 
+// TODO: refactor this transport layer to decouple all these memory regions. Currently,
+//       the driver and server are tightly coupled to the memory layout of the transport
+//       from the original single-driver single-server design. Nominally, we should have this
+//       interface be far more minimal and avoid mapping all of the regions for all drivers here.
+//      
+//       Note that there is still isolation here - the memory maps are `extern` defined and drivers
+//       will see memory regions belonging to others as an undefined variable. I don't think the core
+//       platform will correctly map these in as a null address without manually doing so in the system
+//       description however and this is consequently really suboptimal
 
 void _putchar(char character) {
     sel4cp_dbg_putc(character);
