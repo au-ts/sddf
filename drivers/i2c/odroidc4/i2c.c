@@ -21,8 +21,6 @@
 // Security lists: one for each possible bus.
 i2c_security_list_t security_list[I2C_NUM_BUSES][I2C_SECURITY_LIST_SZ];
 
-
-
 /**
  * Main entrypoint for server.
 */
@@ -35,6 +33,9 @@ void init(void) {
             security_list[j][i] = -1;
         }
     }
+
+    // Test
+    
 }
 
 /**
@@ -60,7 +61,7 @@ static inline void driverNotify(void) {
         *(uint8_t *) (ret + sizeof(uint8_t)), *(uint8_t *) (ret + 2*sizeof(uint8_t)),
         sz);
 
-        uint8_t err = ret[RET_BUF_ERR];
+    uint8_t err = ret[RET_BUF_ERR];
         uint8_t err_tk = ret[RET_BUF_ERR_TK];
         uint8_t client = ret[RET_BUF_CLIENT];
         uint8_t addr = ret[RET_BUF_ADDR];
@@ -79,7 +80,7 @@ static inline void driverNotify(void) {
 
 
 static inline void clientNotify(int channel) {
-
+    // 
 }
 
 
@@ -105,7 +106,7 @@ static inline seL4_MessageInfo_t securityClaim(int bus, uint8_t addr, uint64_t c
     // Check that the address is not already claimed
     i2c_security_list_t *list = security_list[bus];
     if (list[addr] != -1) {
-        sel4_dbg_puts("I2C|ERROR: Address already claimed!\n");
+        sel4cp_dbg_puts("I2C|ERROR: Address already claimed!\n");
         return ppcError();
     }
 
@@ -122,7 +123,7 @@ static inline seL4_MessageInfo_t securityRelease(int bus, uint8_t addr, uint64_t
     // Check that the address is claimed by the client
     i2c_security_list_t *list = security_list[bus];
     if (list[addr] != client) {
-        sel4_dbg_puts("I2C|ERROR: Address not claimed by client!\n");
+        sel4cp_dbg_puts("I2C|ERROR: Address not claimed by client!\n");
         return ppcError();
     }
 
@@ -139,21 +140,21 @@ static inline seL4_MessageInfo_t securityRelease(int bus, uint8_t addr, uint64_t
 */
 seL4_MessageInfo_t protected(sel4cp_channel c, seL4_MessageInfo_t m) {
     // Determine the type of request
-    uint64_t req = sel4cp_mr_get(I2C_PPC_REQTYPE);
-    uint64_t ppc_bus = sel4cp_mr_get(I2C_PPC_MR_BUS)
+    uint64_t req = sel4cp_mr_get(I2C_PPC_MR_REQTYPE);
+    uint64_t ppc_bus = sel4cp_mr_get(I2C_PPC_MR_BUS);
     uint64_t ppc_addr = sel4cp_mr_get(I2C_PPC_MR_ADDR);
 
     // Check arguments are valid
     if (req != I2C_PPC_CLAIM || req != I2C_PPC_RELEASE) {
-        sel4_dbg_puts("I2C|ERROR: Invalid PPC request type!\n");
+        sel4cp_dbg_puts("I2C|ERROR: Invalid PPC request type!\n");
         return ppcError();
     }
     if (ppc_addr < 0 || ppc_addr > 127) {
-        sel4_dbg_puts("I2C|ERROR: Invalid i2c address in PPC!\n");
+        sel4cp_dbg_puts("I2C|ERROR: Invalid i2c address in PPC!\n");
         return ppcError();
     }
     if (ppc_bus < 2 || ppc_bus > 3) {
-        sel4_dbg_puts("I2C|ERROR: Invalid i2c bus in PPC!\n");
+        sel4cp_dbg_puts("I2C|ERROR: Invalid i2c bus in PPC!\n");
         return ppcError();
     }
 
