@@ -15,11 +15,11 @@ Initially, we effectively ignore the AO domain option for homogeneity (we also w
 
 ## Design
 
-This repository presents a multi-driver single-server structure for handling the i2c interfaces on a device, assuming a homogeneous set of i2c interfaces.
+This repository presents a multi-driver multi-server structure (split driver) for handling the i2c interfaces on a device, assuming a homogeneous set of i2c interfaces.
 
 ### Server
 
-The server acts as the target for API calls from clients and has two responsibilites:
+The servers act as the target for API calls from clients and has two responsibilites:
 
 * Multiplexing: given various client requests, delegate them to the appropriate driver and return results back to the correct caller.
 * Security: i2c devices are a colossal security risk if not protected. The driver ensures that the requesting client has been provisioned access to the requested bus and address.
@@ -27,6 +27,8 @@ The server acts as the target for API calls from clients and has two responsibil
 The server accepts requests in the form of a chain of 8-bit tokens, prepended with the address the clients wishes to target. **Each transaction chain can only target a single address** - this is adequate for a majority of i2c perpipherals however; very few require multi-address calls in a single transaction. This constraint is to guarantee O(1) rejection of inauthentic requests.
 
 Clients interface with the server via a shared memory region, passing data into and out of ring buffers. The server determines if these requests are authentic before copying data into the server<=>driver transport layer.
+
+**Each server corresponds to exactly one driver, and the pair represents one logical i2c interface.**
 
 ### Driver
 

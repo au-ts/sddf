@@ -16,31 +16,15 @@
 #include "printf.h"
 
 // Shared memory regions
-uintptr_t m2_req_free;
-uintptr_t m2_req_used;
-uintptr_t m3_req_free;
-uintptr_t m3_req_used;
-
-uintptr_t m2_ret_free;
-uintptr_t m2_ret_used;
-uintptr_t m3_ret_free;
-uintptr_t m3_ret_used;
+uintptr_t req_free;
+uintptr_t req_used;
+uintptr_t ret_free;
+uintptr_t ret_used;
 uintptr_t driver_bufs;
 
-ring_handle_t m2ReqRing;
-ring_handle_t m2RetRing;
-ring_handle_t m3ReqRing;
-ring_handle_t m3RetRing;
+ring_handle_t reqRing;
+ring_handle_t retRing;
 
-// TODO: refactor this transport layer to decouple all these memory regions. Currently,
-//       the driver and server are tightly coupled to the memory layout of the transport
-//       from the original single-driver single-server design. Nominally, we should have this
-//       interface be far more minimal and avoid mapping all of the regions for all drivers here.
-//      
-//       Note that there is still isolation here - the memory maps are `extern` defined and drivers
-//       will see memory regions belonging to others as an undefined variable. I don't think the core
-//       platform will correctly map these in as a null address without manually doing so in the system
-//       description however and this is consequently really suboptimal
 
 void _putchar(char character) {
     sel4cp_dbg_putc(character);
@@ -54,46 +38,35 @@ void i2cTransportInit(int buffer_init) {
         sel4cp_dbg_puts("Not initialising buffers\n");
     }
     // Initialise rings
-    ring_init(&m2ReqRing, (ring_buffer_t *) m2_req_free, (ring_buffer_t *) m2_req_used, buffer_init);
-    ring_init(&m2RetRing, (ring_buffer_t *) m2_ret_free, (ring_buffer_t *) m2_ret_used, buffer_init);
-    ring_init(&m3ReqRing, (ring_buffer_t *) m3_req_free, (ring_buffer_t *) m3_req_used, buffer_init);
-    ring_init(&m3RetRing, (ring_buffer_t *) m3_ret_free, (ring_buffer_t *) m3_ret_used, buffer_init);
+    ring_init(&reqRing, (ring_buffer_t *) req_free, (ring_buffer_t *) req_used, buffer_init);
+    ring_init(&retRing, (ring_buffer_t *) ret_free, (ring_buffer_t *) ret_used, buffer_init);
 
     // If the caller is initialising, also populate the free buffers.
     // Since all buffers are back to back in memory, need to offset each ring's buffers
     // NOTE: To extend this code for more than 2 i2c masters the memory mapping will need to be adjusted.
     if (buffer_init) {
         for (int i = 0; i < I2C_BUF_COUNT; i++) {
-            enqueue_free(&m2ReqRing, (uintptr_t) driver_bufs + (i * I2C_BUF_SZ), I2C_BUF_SZ);
-            enqueue_free(&m2RetRing, (uintptr_t) driver_bufs + (I2C_BUF_SZ * (i + I2C_BUF_COUNT)), I2C_BUF_SZ);
-            enqueue_free(&m3ReqRing, (uintptr_t) driver_bufs + (I2C_BUF_SZ * (i + 2 * I2C_BUF_COUNT)), I2C_BUF_SZ);
-            enqueue_free(&m3RetRing, (uintptr_t) driver_bufs + (I2C_BUF_SZ * (i + 3 * I2C_BUF_COUNT)), I2C_BUF_SZ);
+            // TODO: check buffer offsetting here. This is definitely too sparse because I haven't updated
+            //       it form the 4-buf design
+            enqueue_free(&reqRing, (uintptr_t) driver_bufs + (i * I2C_BUF_SZ), I2C_BUF_SZ);
+            enqueue_free(&retRing, (uintptr_t) driver_bufs + (I2C_BUF_SZ * (i + I2C_BUF_COUNT)), I2C_BUF_SZ);
         }
     }
 
 }
 
 
-req_buf_ptr_t allocReqBuf(int bus, size_t size, uint8_t *data, uint8_t client, uint8_t addr) {
-    // sel4cp_dbg_puts("transport: Allocating request buffer\n");
-    if (bus != 2 && bus != 3) {
-        return 0;
-    }
+req_buf_ptr_t allocReqBuf(size_t size, uint8_t *data, uint8_t client, uint8_t addr) {
+    // sel4cp_dbg_puts("transport: Allocating request buffer\n")
     if (size > I2C_BUF_SZ - REQ_BUF_DAT_OFFSET*sizeof(i2c_token_t)) {
         printf("transport: Requested buffer size %zu too large\n", size);
         return 0;
     }
     
     // Allocate a buffer from the appropriate ring
-    ring_handle_t *ring;
-    if (bus == 2) {
-        ring = &m2ReqRing;
-    } else {
-        ring = &m3ReqRing;
-    }
     uintptr_t buf;
     unsigned int sz;
-    int ret = dequeue_free(ring, &buf, &sz);
+    int ret = dequeue_free(&reqRing, &buf, &sz);
     if (ret != 0) {
         return 0;
     }
@@ -101,7 +74,6 @@ req_buf_ptr_t allocReqBuf(int bus, size_t size, uint8_t *data, uint8_t client, u
     // Load the client ID and i2c address into first two bytes of buffer
     ((uint8_t *) buf)[REQ_BUF_CLIENT] = client;
     ((uint8_t *) buf)[REQ_BUF_ADDR] = addr;
-    ((uint8_t *) buf)[REQ_BUF_BUS] = bus;
     const uint8_t sz_offset = REQ_BUF_DAT_OFFSET*sizeof(uint8_t);
 
 
@@ -109,33 +81,23 @@ req_buf_ptr_t allocReqBuf(int bus, size_t size, uint8_t *data, uint8_t client, u
     memcpy((void *) buf + sz_offset, data, size);
     
     // Enqueue the buffer
-    ret = enqueue_used(ring, buf, size + sz_offset);
+    ret = enqueue_used(&reqRing, buf, size + sz_offset);
     printf("transport: Allocated request buffer %p storing %u bytes\n", buf, size);
     if (ret != 0) {
-        enqueue_free(ring, buf, I2C_BUF_SZ);
+        enqueue_free(&reqRing, buf, I2C_BUF_SZ);
         return 0;
     }
     
     return (req_buf_ptr_t)buf;
 }
 
-ret_buf_ptr_t getRetBuf(int bus) {
+ret_buf_ptr_t getRetBuf() {
     // sel4cp_dbg_puts("transport: Getting return buffer\n");
-    if (bus != 2 && bus != 3) {
-        return 0;
-    }
-
     
     // Allocate a buffer from the appropriate ring
-    ring_handle_t *ring;
-    if (bus == 2) {
-        ring = &m2RetRing;
-    } else {
-        ring = &m3RetRing;
-    }
     uintptr_t buf;
     unsigned int sz;
-    int ret = dequeue_free(ring, &buf, &sz);
+    int ret = dequeue_free(&retRing, &buf, &sz);
     if (ret != 0) {
         sel4cp_dbg_puts("transport: Failed to get return buffer due to empty free ring!\n");
         return 0;
@@ -144,25 +106,15 @@ ret_buf_ptr_t getRetBuf(int bus) {
     return (ret_buf_ptr_t)buf;
 }
 
-int pushRetBuf(int bus, ret_buf_ptr_t buf, size_t size) {
+int pushRetBuf(ret_buf_ptr_t buf, size_t size) {
     // sel4cp_dbg_puts("transport: pushign return buffer\n");
-    if (bus != 2 && bus != 3) {
-        return 0;
-    }
+
     if (size > I2C_BUF_SZ || !buf) {
         return 0;
     }
-    
-    // Allocate a buffer from the appropriate ring
-    ring_handle_t *ring;
-    if (bus == 2) {
-        ring = &m2RetRing;
-    } else {
-        ring = &m3RetRing;
-    }
 
     // Enqueue the buffer
-    int ret = enqueue_used(ring, (uintptr_t)buf, size);
+    int ret = enqueue_used(&retRing, (uintptr_t)buf, size);
     if (ret != 0) {
         return 0;
     }
@@ -177,37 +129,19 @@ static inline uintptr_t popBuf(ring_handle_t *ring, size_t *sz) {
     return buf;
 } 
 
-req_buf_ptr_t popReqBuf(int bus, size_t *size) {
+req_buf_ptr_t popReqBuf(size_t *size) {
     // sel4cp_dbg_puts("transport: popping request buffer\n");
-    if (bus != 2 && bus != 3) {
-        return 0;
-    }
 
     // Allocate a buffer from the appropriate ring
-    ring_handle_t *ring;
-    if (bus == 2) {
-        ring = &m2ReqRing;
-    } else {
-        ring = &m3ReqRing;
-    }
-    return (req_buf_ptr_t) popBuf(ring, size);
+    return (req_buf_ptr_t) popBuf(&reqRing, size);
 }
 
 
-ret_buf_ptr_t popRetBuf(int bus, size_t *size) {
+ret_buf_ptr_t popRetBuf(size_t *size) {
     // sel4cp_dbg_puts("transport: popping return buffer\n");
-    if (bus != 2 && bus != 3) {
-        return 0;
-    }
 
     // Allocate a buffer from the appropriate ring
-    ring_handle_t *ring;
-    if (bus == 2) {
-        ring = &m2RetRing;
-    } else {
-        ring = &m3RetRing;
-    }
-    return (ret_buf_ptr_t) popBuf(ring, size);
+    return (ret_buf_ptr_t) popBuf(&retRing, size);
 }
 
 int retBufEmpty(int bus) {
@@ -217,7 +151,7 @@ int retBufEmpty(int bus) {
 
     ring_handle_t *ring;
     if (bus == 2) {
-        ring = &m2RetRing;
+        ring = &retRing;
     } else {
         ring = &m3RetRing;
     }
@@ -232,7 +166,7 @@ int reqBufEmpty(int bus) {
 
     ring_handle_t *ring;
     if (bus == 2) {
-        ring = &m2ReqRing;
+        ring = &reqRing;
     } else {
         ring = &m3ReqRing;
     }
@@ -240,7 +174,7 @@ int reqBufEmpty(int bus) {
 }
 
 
-int releaseReqBuf(int bus, req_buf_ptr_t buf) {
+int releaseReqBuf(req_buf_ptr_t buf) {
     // sel4cp_dbg_puts("transport: releasing request buffer\n");
     if (bus != 2 && bus != 3) {
         return 0;
@@ -252,7 +186,7 @@ int releaseReqBuf(int bus, req_buf_ptr_t buf) {
     // Allocate a buffer from the appropriate ring
     ring_handle_t *ring;
     if (bus == 2) {
-        ring = &m2ReqRing;
+        ring = &reqRing;
     } else {
         ring = &m3ReqRing;
     }
@@ -265,7 +199,7 @@ int releaseReqBuf(int bus, req_buf_ptr_t buf) {
     return -1;
 }
 
-int releaseRetBuf(int bus, ret_buf_ptr_t buf) {
+int releaseRetBuf(ret_buf_ptr_t buf) {
     // sel4cp_dbg_puts("transport: releasing return buffer\n");
     if (bus != 2 && bus != 3) {
         return 0;
@@ -277,7 +211,7 @@ int releaseRetBuf(int bus, ret_buf_ptr_t buf) {
     // Allocate a buffer from the appropriate ring
     ring_handle_t *ring;
     if (bus == 2) {
-        ring = &m2RetRing;
+        ring = &retRing;
     } else {
         ring = &m3RetRing;
     }
