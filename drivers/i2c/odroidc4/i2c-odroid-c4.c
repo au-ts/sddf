@@ -33,7 +33,7 @@ typedef volatile struct {
 
 // Hardware memory
 uintptr_t i2c;
-const int bus = BUS_NUM;
+const zint bus = BUS_NUM;
 uintptr_t gpio;
 uintptr_t clk;
 
