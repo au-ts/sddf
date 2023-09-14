@@ -5,7 +5,9 @@
  */
 
 // i2c-transport.h
-// Header for sDDF i2c transport layer.
+// Header for sDDF i2c transport layer. Each instance of this module
+// is split into a Control and Client half. The Control is always the i2c
+// server while the Client is either an i2c driver or a client of the i2c.
 // Matt Rossouw (matthew.rossouw@unsw.edu.au)
 // 08/2023
 
@@ -17,8 +19,6 @@
 #include <string.h>
 #include "i2c-token.h"
 
-#define I2C_BUF_SZ 512
-#define I2C_BUF_COUNT 511
 
 // Return buffer
 #define RET_BUF_ERR 0
@@ -31,30 +31,24 @@
 // Request buffer
 #define REQ_BUF_CLIENT 0
 #define REQ_BUF_ADDR 1
-#define REQ_BUF_BUS 2
-#define REQ_BUF_DAT_OFFSET 3    // Number of non-payload bytes. Should match however
+#define REQ_BUF_DAT_OFFSET 2    // Number of non-payload bytes. Should match however
                                 // many #defines are listed here.
 
 // Shared memory regions
-extern uintptr_t m2_req_free;
-extern uintptr_t m2_req_used;
-extern uintptr_t m3_req_free;
-extern uintptr_t m3_req_used;
-
-extern uintptr_t m2_ret_free;
-extern uintptr_t m2_ret_used;
-extern uintptr_t m3_ret_free;
-extern uintptr_t m3_ret_used;
+extern uintptr_t req_free;
+extern uintptr_t req_used;
+extern uintptr_t ret_free;
+extern uintptr_t ret_used;
 extern uintptr_t driver_bufs;
 
-extern ring_handle_t m2ReqRing;
-extern ring_handle_t m2RetRing;
-extern ring_handle_t m3ReqRing;
-extern ring_handle_t m3RetRing;
+extern ring_handle_t reqRing;
+extern ring_handle_t retRing;
+
 
 
 // Metadata is encoded differently in returns vs. requests so we
-// have two types for safety.
+// have two types for "safety" provided by the compiler. It sometimes
+// bothers to give warnings for this.
 typedef volatile uint8_t *ret_buf_ptr_t;
 typedef volatile uint8_t *req_buf_ptr_t;
 
@@ -74,19 +68,18 @@ void i2cTransportInit(int buffer_init);
  * 
  * @note Expects that data is properly formatted with END token terminator.
  * 
- * @param bus: EE domain i2c master interface number
  * @param size: Size of the data to be loaded into the buffer. Max I2C_BUF_SZ
  * @param data: Pointer to the data to be loaded into the buffer
  * @param client: Protection domain of the client who requested this.
  * @param addr: 7-bit I2C address to be used for the transaction
  * @return Pointer to the buffer allocated for this request
 */
-req_buf_ptr_t allocReqBuf(int bus, size_t size, uint8_t *data, uint8_t client, uint8_t addr);
+req_buf_ptr_t allocReqBuf(size_t size, uint8_t *data, uint8_t client, uint8_t addr);
 
 /**
  * Release a request buffer to the free pool.
 */
-int releaseReqBuf(int bus, req_buf_ptr_t buf);
+int releaseReqBuf(req_buf_ptr_t buf);
 
 /**
  * Allocate a return buffer to get data back to the server from the driver, given a
@@ -102,13 +95,13 @@ int releaseReqBuf(int bus, req_buf_ptr_t buf);
 
  * @return Pointer to the buffer allocated for this request
 */
-ret_buf_ptr_t getRetBuf(int bus);
+ret_buf_ptr_t getRetBuf(void);
 
 
 /**
  * Release a return buffer to the free pool.
 */
-int releaseRetBuf(int bus, ret_buf_ptr_t buf);
+int releaseRetBuf(ret_buf_ptr_t buf);
 
 /**
  * Push a return buffer back to the server for a specified i2c master interface (bus).
@@ -120,14 +113,14 @@ int releaseRetBuf(int bus, ret_buf_ptr_t buf);
  * @param sz: Size of the buffer to be pushed back to the server
  * @return 0 on success
 */
-int pushRetBuf(int bus, ret_buf_ptr_t buf, size_t size);
+int pushRetBuf(ret_buf_ptr_t buf, size_t size);
 
 /**
  * Pop a return buffer from the server for a specified i2c master interface (bus).
  * Removes buffer from the used pool but does not put it in the free queue.
  * @return Pointer to buffer containing request from the server.
 */
-req_buf_ptr_t popReqBuf(int bus, size_t *size);
+req_buf_ptr_t popReqBuf(size_t *size);
 
 
 /**
@@ -135,10 +128,10 @@ req_buf_ptr_t popReqBuf(int bus, size_t *size);
  * Removes buffer from the used pool but does not put it in the free queue.
  * @return Pointer to buffer containing data from the driver.
 */
-ret_buf_ptr_t popRetBuf(int bus, size_t *size);
+ret_buf_ptr_t popRetBuf(size_t *size);
 
-int retBufEmpty(int bus);
-int reqBufEmpty(int bus);
+int retBufEmpty(void);
+int reqBufEmpty(void);
 
 
 // Errors
