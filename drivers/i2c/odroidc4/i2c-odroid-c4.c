@@ -33,7 +33,7 @@ typedef volatile struct {
 
 // Hardware memory
 uintptr_t i2c;
-const zint bus = BUS_NUM;
+const int bus = BUS_NUM;
 uintptr_t gpio;
 uintptr_t clk;
 
@@ -459,12 +459,8 @@ void init(void) {
 /**
  * Check if there is work to do for a given bus and dispatch it if so.
 */
-static inline void checkBuf(int bus) {
-    sel4cp_dbg_puts("driver: checking bus ");
-    sel4cp_dbg_putc((char)bus + '0');
-    sel4cp_dbg_puts("\n");
-
-    if (!reqBufEmpty(bus)) {
+static inline void checkBuf() {
+    if (!reqBufEmpty()) {
         // If this interface is busy, skip notification and
         // set notified flag for later processing
         if (i2c_ifState.current_req) {
@@ -476,23 +472,23 @@ static inline void checkBuf(int bus) {
         // Otherwise, begin work. Start by extracting the request
 
         size_t sz = 0;
-        req_buf_ptr_t req = popReqBuf(bus, &sz);
+        req_buf_ptr_t req = popReqBuf(&sz);
 
         if (!req) {
             return;   // If request was invalid, run away.
         }
 
-        ret_buf_ptr_t ret = getRetBuf(bus);
+        ret_buf_ptr_t ret = getRetBuf();
         if (!ret) {
             printf("driver: no ret buf!\n");
-            releaseReqBuf(bus, req);
+            releaseReqBuf(req);
             return;
         }
 
         // Load bookkeeping data into return buffer
         // Set client PD
 
-        printf("driver: Loading request from client %u on bus %u to address %x of sz %zu\n", req[0], bus, req[1], sz);
+        printf("driver: Loading request from client %u to address %x of sz %zu\n", req[0], req[1], sz);
 
         ret[RET_BUF_CLIENT] = req[REQ_BUF_CLIENT];      // Client PD
         
@@ -516,7 +512,7 @@ static inline void checkBuf(int bus) {
         // Bytes 0 and 1 are for error code / location respectively and are set later
 
         // Trigger work start
-        i2cLoadTokens(bus);
+        i2cLoadTokens();
     } else {
         sel4cp_dbg_puts("driver: called but no work available: resetting notified flag\n");
         // If nothing needs to be done, clear notified flag if it was set.
@@ -544,7 +540,6 @@ static inline void serverNotify(void) {
 
 /**
  * IRQ handler for an i2c interface.
- * @param bus The bus that triggered the IRQ
  * @param timeout Whether the IRQ was triggered by a timeout. 0 if not, 1 if so.
 */
 static inline void i2cirq(int timeout) {
@@ -558,10 +553,10 @@ static inline void i2cirq(int timeout) {
         if (i2c_ifState.current_ret) {
             i2c_ifState.current_ret[RET_BUF_ERR] = I2C_ERR_TIMEOUT;
             i2c_ifState.current_ret[RET_BUF_ERR_TK] = 0x0;
-            pushRetBuf(bus, i2c_ifState.current_ret, i2c_ifState.current_req_len);
+            pushRetBuf(i2c_ifState.current_ret, i2c_ifState.current_req_len);
         }
         if (i2c_ifState.current_req) {
-            releaseReqBuf(bus, i2c_ifState.current_req);
+            releaseReqBuf(i2c_ifState.current_req);
         }
         i2c_ifState.current_ret = NULL;
         i2c_ifState.current_req = 0x0;
@@ -574,7 +569,7 @@ static inline void i2cirq(int timeout) {
     i2cHalt();
 
     // Get result
-    int err = i2cGetError(bus);
+    int err = i2cGetError();
     // If error is 0, successful write. If error >0, successful read of err bytes.
     // Prepare to extract data from the interface.
     ret_buf_ptr_t ret = i2c_ifState.current_ret;
@@ -614,8 +609,8 @@ static inline void i2cirq(int timeout) {
     // If request is completed or there was an error, return data to server and notify.
     if (err < 0 || !i2c_ifState.remaining) {
         printf("driver: request completed or error, returning to server\n");
-        pushRetBuf(bus, i2c_ifState.current_ret, i2c_ifState.current_req_len);
-        releaseReqBuf(bus, i2c_ifState.current_req);
+        pushRetBuf(i2c_ifState.current_ret, i2c_ifState.current_req_len);
+        releaseReqBuf(i2c_ifState.current_req);
         i2c_ifState.current_ret = NULL;
         i2c_ifState.current_req = 0x0;
         i2c_ifState.current_req_len = 0;

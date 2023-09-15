@@ -5,9 +5,7 @@
  */
 
 // i2c-transport.h
-// Header for sDDF i2c transport layer. Each instance of this module
-// is split into a Control and Client half. The Control is always the i2c
-// server while the Client is either an i2c driver or a client of the i2c.
+// Header for sDDF i2c transport layer. Server<=>driver
 // Matt Rossouw (matthew.rossouw@unsw.edu.au)
 // 08/2023
 

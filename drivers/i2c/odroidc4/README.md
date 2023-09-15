@@ -26,7 +26,7 @@ The servers act as the target for API calls from clients and has two responsibil
 
 The server accepts requests in the form of a chain of 8-bit tokens, prepended with the address the clients wishes to target. **Each transaction chain can only target a single address** - this is adequate for a majority of i2c perpipherals however; very few require multi-address calls in a single transaction. This constraint is to guarantee O(1) rejection of inauthentic requests.
 
-Clients interface with the server via a shared memory region, passing data into and out of ring buffers. The server determines if these requests are authentic before copying data into the server<=>driver transport layer.
+Clients interface with the server via a shared memory region, passing data into and out of ring buffers. The server determines if these requests are authentic before copying data into the server<=>driver transport layer. Client requests are put into a queue to guarantee "first-come-first-serve" operation.
 
 **Each server corresponds to exactly one driver, and the pair represents one logical i2c interface.**
 
