@@ -18,6 +18,10 @@
 #include "i2c-transport.h"
 #include "i2c.h"
 
+#ifndef BUS_NUM
+#error "BUS_NUM must be defined!"
+#endif
+
 // Security list: owner of each i2c address on the bus
 i2c_security_list_t security_list[I2C_SECURITY_LIST_SZ];
 
@@ -29,7 +33,7 @@ void init(void) {
     i2cTransportInit(1);
 
     // Clear security list
-    for (int j = 0; j < I2C_NUM_BUSES; j++) {
+    for (int j = 0; j < I2C_SECURITY_LIST_SZ; j++) {
         security_list[j] = -1;
     }
 }
@@ -61,9 +65,9 @@ static inline void driverNotify(void) {
     uint8_t addr = ret[RET_BUF_ADDR];
 
     if (err) {
-        printf("server: Error %i on bus %i for client %i at token of type %i\n", err, i, client, addr);
+        printf("server: Error %i on bus %i for client %i at token of type %i\n", err, BUS_NUM, client, addr);
     } else {
-        printf("server: Success on bus %i for client %i at address %i\n", i, client, addr);
+        printf("server: Success on bus %i for client %i at address %i\n", BUS_NUM, client, addr);
 
         // TODO: logic here to return
     }
@@ -135,6 +139,7 @@ seL4_MessageInfo_t protected(sel4cp_channel c, seL4_MessageInfo_t m) {
     // Determine the type of request
     uint64_t req = sel4cp_mr_get(I2C_PPC_MR_REQTYPE);
     uint64_t ppc_addr = sel4cp_mr_get(I2C_PPC_MR_ADDR);
+    uint64_t client_pd = sel4cp_mr_get(I2C_PPC_MR_CID);
 
     // Check arguments are valid
     if (req != I2C_PPC_CLAIM || req != I2C_PPC_RELEASE) {
@@ -145,18 +150,15 @@ seL4_MessageInfo_t protected(sel4cp_channel c, seL4_MessageInfo_t m) {
         sel4cp_dbg_puts("I2C|ERROR: Invalid i2c address in PPC!\n");
         return ppcError();
     }
-    if (ppc_bus < 2 || ppc_bus > 3) {
-        sel4cp_dbg_puts("I2C|ERROR: Invalid i2c bus in PPC!\n");
-        return ppcError();
-    }
+
 
     switch (req) {
         case I2C_PPC_CLAIM:
             // Claim an address
-            return securityClaim(ppc_addr, c);
+            return securityClaim(ppc_addr, client_pd);
         case I2C_PPC_RELEASE:
             // Release an address
-            return securityRelease(ppc_addr, c);
+            return securityRelease(ppc_addr, client_pd);
     }
 
     return sel4cp_msginfo_new(0, 7);
