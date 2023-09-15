@@ -21,14 +21,17 @@ typedef uint8_t i2c_addr_t;         // 7-bit addressing
 #define I2C_BUF_SZ 512
 #define I2C_BUF_COUNT 511
 
-
+// PPC interface for server - used to allocate/drop addresses
 // PPC MR slots
-#define I2C_PPC_MR_REQTYPE  0
-#define I2C_PPC_MR_BUS      1
-#define I2C_PPC_MR_ADDR     2
+#define I2C_PPC_MR_REQTYPE  0   // arg0: request or release.
+#define I2C_PPC_MR_ADDR     1   // arg1: i2c address to claim.
+#define I2C_PPC_MR_CID      2   // arg2: channel id of client to server.
+                                //       DANGER: this is the client ID as the server
+                                //       sees it.
 // PPC idenitifers
 #define I2C_PPC_CLAIM       1
 #define I2C_PPC_RELEASE     2
+
 
 // Security
 #define I2C_SECURITY_LIST_SZ 127    // Supports one entry for each device

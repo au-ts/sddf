@@ -144,55 +144,24 @@ ret_buf_ptr_t popRetBuf(size_t *size) {
     return (ret_buf_ptr_t) popBuf(&retRing, size);
 }
 
-int retBufEmpty(int bus) {
-    if (bus != 2 && bus != 3) {
-        return 0;
-    }
-
-    ring_handle_t *ring;
-    if (bus == 2) {
-        ring = &retRing;
-    } else {
-        ring = &m3RetRing;
-    }
-    return ring_empty(ring->used_ring);
+int retBufEmpty(void) { 
+    return ring_empty(retRing.used_ring);
 }
 
-int reqBufEmpty(int bus) {
-    if (bus != 2 && bus != 3) {
-        sel4cp_dbg_puts("transport: invalid bus requested on reqBufEmpty\n");
-        return 0;
-    }
-
-    ring_handle_t *ring;
-    if (bus == 2) {
-        ring = &reqRing;
-    } else {
-        ring = &m3ReqRing;
-    }
-    return ring_empty(ring->used_ring);
+int reqBufEmpty(void) {
+    return ring_empty(reqRing.used_ring);
 }
 
 
 int releaseReqBuf(req_buf_ptr_t buf) {
     // sel4cp_dbg_puts("transport: releasing request buffer\n");
-    if (bus != 2 && bus != 3) {
-        return 0;
-    }
+    
     if (!buf) {
         return 0;
     }
-    
-    // Allocate a buffer from the appropriate ring
-    ring_handle_t *ring;
-    if (bus == 2) {
-        ring = &reqRing;
-    } else {
-        ring = &m3ReqRing;
-    }
 
     // Enqueue the buffer
-    int ret = enqueue_free(ring, (uintptr_t)buf, I2C_BUF_SZ);
+    int ret = enqueue_free(&reqRing, (uintptr_t)buf, I2C_BUF_SZ);
     if (ret != 0) {
         return 0;
     }
@@ -201,23 +170,13 @@ int releaseReqBuf(req_buf_ptr_t buf) {
 
 int releaseRetBuf(ret_buf_ptr_t buf) {
     // sel4cp_dbg_puts("transport: releasing return buffer\n");
-    if (bus != 2 && bus != 3) {
-        return 0;
-    }
+    
     if (!buf) {
         return 0;
     }
-    
-    // Allocate a buffer from the appropriate ring
-    ring_handle_t *ring;
-    if (bus == 2) {
-        ring = &retRing;
-    } else {
-        ring = &m3RetRing;
-    }
 
     // Enqueue the buffer
-    int ret = enqueue_free(ring, (uintptr_t)buf, I2C_BUF_SZ);
+    int ret = enqueue_free(&retRing, (uintptr_t)buf, I2C_BUF_SZ);
     if (ret != 0) {
         return 0;
     }

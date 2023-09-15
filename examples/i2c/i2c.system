@@ -35,14 +35,10 @@
         <program_image path="i2c.elf"/>
 
         <!-- Server <=> driver buffers -->
-		<map mr="m2_req_free" vaddr="0x4_000_000" perms="rw" setvar_vaddr="m2_req_free"/>
-        <map mr="m2_req_used" vaddr="0x4_200_000" perms="rw" setvar_vaddr="m2_req_used"/>
-        <map mr="m3_req_free" vaddr="0x4_400_000" perms="rw" setvar_vaddr="m3_req_free"/>
-        <map mr="m3_req_used" vaddr="0x4_600_000" perms="rw" setvar_vaddr="m3_req_used"/>
-        <map mr="m2_ret_free" vaddr="0x4_800_000" perms="rw" setvar_vaddr="m2_ret_free"/>
-        <map mr="m2_ret_used" vaddr="0x4_A00_000" perms="rw" setvar_vaddr="m2_ret_used"/>
-        <map mr="m3_ret_free" vaddr="0x4_C00_000" perms="rw" setvar_vaddr="m3_ret_free"/>
-        <map mr="m3_ret_used" vaddr="0x4_E00_000" perms="rw" setvar_vaddr="m3_ret_used"/>
+		<map mr="m2_req_free" vaddr="0x4_000_000" perms="rw" setvar_vaddr="req_free"/>
+        <map mr="m2_req_used" vaddr="0x4_200_000" perms="rw" setvar_vaddr="req_used"/>
+        <map mr="m2_ret_free" vaddr="0x4_800_000" perms="rw" setvar_vaddr="ret_free"/>
+        <map mr="m2_ret_used" vaddr="0x4_A00_000" perms="rw" setvar_vaddr="ret_used"/>
         <map mr="driver_bufs" vaddr="0x5_000_000" perms="rw" setvar_vaddr="driver_bufs"/>
 
 
@@ -59,14 +55,10 @@
         <program_image path="i2c_driver.elf"/>
 
         <!-- Server <=> driver buffers -->
-		<map mr="m2_req_free" vaddr="0x4_000_000" perms="rw" setvar_vaddr="m2_req_free"/>
-        <map mr="m2_req_used" vaddr="0x4_200_000" perms="rw" setvar_vaddr="m2_req_used"/>
-        <map mr="m3_req_free" vaddr="0x4_400_000" perms="rw" setvar_vaddr="m3_req_free"/>
-        <map mr="m3_req_used" vaddr="0x4_600_000" perms="rw" setvar_vaddr="m3_req_used"/>
-        <map mr="m2_ret_free" vaddr="0x4_800_000" perms="rw" setvar_vaddr="m2_ret_free"/>
-        <map mr="m2_ret_used" vaddr="0x4_A00_000" perms="rw" setvar_vaddr="m2_ret_used"/>
-        <map mr="m3_ret_free" vaddr="0x4_C00_000" perms="rw" setvar_vaddr="m3_ret_free"/>
-        <map mr="m3_ret_used" vaddr="0x4_E00_000" perms="rw" setvar_vaddr="m3_ret_used"/>
+		<map mr="m2_req_free" vaddr="0x4_000_000" perms="rw" setvar_vaddr="req_free"/>
+        <map mr="m2_req_used" vaddr="0x4_200_000" perms="rw" setvar_vaddr="req_used"/>
+        <map mr="m2_ret_free" vaddr="0x4_800_000" perms="rw" setvar_vaddr="ret_free"/>
+        <map mr="m2_ret_used" vaddr="0x4_A00_000" perms="rw" setvar_vaddr="ret_used"/>
         <map mr="driver_bufs" vaddr="0x5_000_000" perms="rw" setvar_vaddr="driver_bufs"/>
         <map mr="i2cm2"       vaddr="0x3_000_000" perms="rw" setvar_vaddr="i2c" cached="false"/>
         <map mr="gpio"        vaddr="0x3_100_000" perms="rw" setvar_vaddr="gpio" cached="false"/>
