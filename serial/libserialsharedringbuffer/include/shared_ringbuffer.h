@@ -8,9 +8,9 @@
 
 #include <stdint.h>
 #include <stddef.h>
-#include <sel4cp.h>
-#include "util.h"
-#include "fence.h"
+#include <microkit.h>
+#include "util/include/util.h"
+#include "util/include/fence.h"
 
 #define SIZE 512
 

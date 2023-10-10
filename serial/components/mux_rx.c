@@ -1,12 +1,10 @@
 /* MUX is currently limited to a max of 9 clients */
-#include <stdlib.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <sel4cp.h>
+#include <microkit.h>
 #include <sel4/sel4.h>
-#include <string.h>
 #include "shared_ringbuffer.h"
-#include "util.h"
+#include "util/include/util.h"
 #include "uart.h"
 #include "uart_config.h"
 
@@ -64,8 +62,8 @@ int give_multi_char(char * drv_buffer, int drv_buffer_len) {
         int ret = dequeue_free(&rx_ring[curr_client], &buffer, &buffer_len, &cookie);
 
         if (ret != 0) {
-            sel4cp_dbg_puts(sel4cp_name);
-            sel4cp_dbg_puts(": unable to dequeue from the rx free ring\n");
+            microkit_dbg_puts(microkit_name);
+            microkit_dbg_puts(": unable to dequeue from the rx free ring\n");
             return 1;
         }
 
@@ -76,8 +74,8 @@ int give_multi_char(char * drv_buffer, int drv_buffer_len) {
         ret = enqueue_used(&rx_ring[curr_client], buffer, buffer_len, &cookie);
 
         if (ret != 0) {
-            sel4cp_dbg_puts(sel4cp_name);
-            sel4cp_dbg_puts(": unable to enqueue to the rx used ring\n");
+            microkit_dbg_puts(microkit_name);
+            microkit_dbg_puts(": unable to enqueue to the rx used ring\n");
             return 1;
         }
 
@@ -104,8 +102,8 @@ int give_single_char(int curr_client, char * drv_buffer, int drv_buffer_len) {
     int ret = dequeue_free(&rx_ring[curr_client - 1], &buffer, &buffer_len, &cookie);
 
     if (ret != 0) {
-        sel4cp_dbg_puts(sel4cp_name);
-        sel4cp_dbg_puts(": unable to dequeue from the rx free ring\n");
+        microkit_dbg_puts(microkit_name);
+        microkit_dbg_puts(": unable to dequeue from the rx free ring\n");
         return 1;
     }
 
@@ -116,8 +114,8 @@ int give_single_char(int curr_client, char * drv_buffer, int drv_buffer_len) {
     ret = enqueue_used(&rx_ring[curr_client - 1], buffer, buffer_len, &cookie);
 
     if (ret != 0) {
-        sel4cp_dbg_puts(sel4cp_name);
-        sel4cp_dbg_puts(": unable to enqueue to the rx used ring\n");
+        microkit_dbg_puts(microkit_name);
+        microkit_dbg_puts(": unable to enqueue to the rx used ring\n");
         return 1;
     }
 
@@ -147,8 +145,8 @@ void handle_rx() {
     // We can only be here if we have been notified by the driver
     int ret = dequeue_used(&drv_rx_ring, &buffer, &buffer_len, &cookie) != 0;
     if (ret != 0) {
-        sel4cp_dbg_puts(sel4cp_name);
-        sel4cp_dbg_puts(": getchar - unable to dequeue used buffer\n");
+        microkit_dbg_puts(microkit_name);
+        microkit_dbg_puts(": getchar - unable to dequeue used buffer\n");
     }
 
     // We can either get a single char here, if driver is in RAW mode, or 
@@ -158,7 +156,7 @@ void handle_rx() {
 
     // This is for our RAW mode, char by char
     if (UART_MODE == RAW_MODE) {
-        sel4cp_dbg_puts("In raw mode mux rx\n");
+        microkit_dbg_puts("In raw mode mux rx\n");
         char got_char = chars[0];
 
         // We have now gotten a character, deal with the input direction switch
@@ -178,7 +176,7 @@ void handle_rx() {
                 multi_client = 0;
                 int new_client = atoi(&got_char);
                 if (new_client < 1 || new_client > NUM_CLIENTS) {
-                    sel4cp_dbg_puts("Attempted to switch to invalid client number\n");
+                    microkit_dbg_puts("Attempted to switch to invalid client number\n");
                 } else {
                     client = new_client;
                 }
@@ -197,7 +195,7 @@ void handle_rx() {
             }
         }
     } else if (UART_MODE == LINE_MODE) {
-        sel4cp_dbg_puts("In line mode mux rx\n");
+        microkit_dbg_puts("In line mode mux rx\n");
         // This is for LINE mode, placing buffers at a time
         
         /* Check if the first character is an '@'. The following character
@@ -225,8 +223,8 @@ void handle_rx() {
     ret = enqueue_free(&drv_rx_ring, buffer, buffer_len, NULL);
 
     if (ret != 0) {
-        sel4cp_dbg_puts(sel4cp_name);
-        sel4cp_dbg_puts(": getchar - unable to enqueue used buffer back into free ring\n");
+        microkit_dbg_puts(microkit_name);
+        microkit_dbg_puts(": getchar - unable to enqueue used buffer back into free ring\n");
     }
 }
 
@@ -241,8 +239,8 @@ void init (void) {
         int ret = enqueue_free(&drv_rx_ring, shared_dma_rx_drv + (i * BUFFER_SIZE), BUFFER_SIZE, NULL);
 
         if (ret != 0) {
-            sel4cp_dbg_puts(sel4cp_name);
-            sel4cp_dbg_puts(": mux rx buffer population, unable to enqueue buffer\n");
+            microkit_dbg_puts(microkit_name);
+            microkit_dbg_puts(": mux rx buffer population, unable to enqueue buffer\n");
             return;
         }
     }
@@ -259,13 +257,13 @@ void init (void) {
     }
 }
 
-void notified(sel4cp_channel ch) {
+void notified(microkit_channel ch) {
     // We should only ever recieve notifications from the client
     // Sanity check the client
     if (ch == DRV_CH) {
         handle_rx();
     } else if (ch < 1 || ch > NUM_CLIENTS) {
-        sel4cp_dbg_puts("Received a bad client channel\n");
+        microkit_dbg_puts("Received a bad client channel\n");
         return;
     }  else {
         // This was recieved on a client channel. Index the number of characters to get

@@ -2,11 +2,10 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <sel4cp.h>
+#include <microkit.h>
 #include <sel4/sel4.h>
-#include <string.h>
 #include "shared_ringbuffer.h"
-#include "util.h"
+#include "util/include/util.h"
 #include "uart.h"
 
 /* TODO: ADD IN DIFFERENT COLOURS TO DIFFERENTIATE DIFFERENT CLIENT STREAMS */
@@ -58,7 +57,7 @@ int handle_tx(int curr_client) {
 
             int ret = driver_dequeue(drv_tx_ring.free_ring, &drv_buffer, &drv_len, &drv_cookie);
             if (ret != 0) {
-                sel4cp_dbg_puts("Failed to dequeue buffer from drv tx avail ring\n");
+                microkit_dbg_puts("Failed to dequeue buffer from drv tx avail ring\n");
                 return 1;
             }
 
@@ -70,7 +69,7 @@ int handle_tx(int curr_client) {
 
             ret = enqueue_used(&drv_tx_ring, drv_buffer, drv_len, drv_cookie);
             if (ret != 0) {
-                sel4cp_dbg_puts("Failed to enqueue buffer to drv tx used ring\n");
+                microkit_dbg_puts("Failed to enqueue buffer to drv tx used ring\n");
                 // Don't know if I should return here, because we need to enqueue a
                 // serpeate buffer
             }
@@ -81,7 +80,7 @@ int handle_tx(int curr_client) {
     }
 
     if (was_empty) {
-        sel4cp_notify(DRV_CH);
+        microkit_notify(DRV_CH);
     }
 
     return 0;
@@ -99,17 +98,17 @@ void init (void) {
         int ret = enqueue_free(&drv_tx_ring, shared_dma_tx_drv + ((i + NUM_BUFFERS) * BUFFER_SIZE), BUFFER_SIZE, NULL);
 
         if (ret != 0) {
-            sel4cp_dbg_puts(sel4cp_name);
-            sel4cp_dbg_puts(": tx buffer population, unable to enqueue buffer\n");
+            microkit_dbg_puts(microkit_name);
+            microkit_dbg_puts(": tx buffer population, unable to enqueue buffer\n");
         }
     }
 }
 
-void notified(sel4cp_channel ch) {
+void notified(microkit_channel ch) {
     // We should only ever recieve notifications from the client
     // Sanity check the client
     if (ch < 1 || ch > NUM_CLIENTS) {
-        sel4cp_dbg_puts("Received a bad client channel\n");
+        microkit_dbg_puts("Received a bad client channel\n");
         return;
     }
 

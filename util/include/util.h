@@ -21,6 +21,38 @@
 #define unlikely(x) (!!(x))
 #endif
 
+static int isdigit(int c)
+{
+    return (unsigned)c-'0' < 10;
+}
+
+static int isspace(int c)
+{
+    return c == ' ' || (unsigned)c-'\t' < 5;
+}
+
+static int atoi(const char *s)
+{
+    int n=0, neg=0;
+    while (isspace(*s)) s++;
+    switch (*s) {
+    case '-': neg=1;
+    case '+': s++;
+    }
+    /* Compute n as a negative number to avoid overflow on INT_MIN */
+    while (isdigit(*s))
+        n = 10*n - (*s++ - '0');
+    return neg ? n : -n;
+}
+
+static void *memcpy(void *restrict dest, const void *restrict src, size_t n)
+{
+    unsigned char *d = dest;
+    const unsigned char *s = src;
+    for (; n; n--) *d++ = *s++;
+    return dest;
+}
+
 static void
 putC(uint8_t ch)
 {
