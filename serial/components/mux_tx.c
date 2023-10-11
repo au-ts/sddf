@@ -24,12 +24,12 @@ uintptr_t tx_used_driver;
 // Transmit rings with the client
 uintptr_t tx_free_client;
 uintptr_t tx_used_client;
-// uintptr_t tx_free_cli2;
-// uintptr_t tx_used_cli2;
+uintptr_t tx_free_client2;
+uintptr_t tx_used_client2;
 
 uintptr_t tx_data_driver;
 uintptr_t tx_data_client;
-// uintptr_t shared_dma_tx_cli2;
+uintptr_t tx_data_client2;
 
 // Have an array of client rings.
 ring_handle_t tx_ring[NUM_CLIENTS];
@@ -49,7 +49,7 @@ int handle_tx(int curr_client) {
         if (ring_plugged(tx_ring[client].used_ring)) {
             continue;
         }
-        while(!dequeue_used(&tx_ring[client], &buffer, &len, &cookie)) {
+        while (!dequeue_used(&tx_ring[client], &buffer, &len, &cookie)) {
             // We want to enqueue into the drivers used ring
             uintptr_t drv_buffer = 0;
             unsigned int drv_len = 0;
@@ -62,7 +62,6 @@ int handle_tx(int curr_client) {
             }
 
             char *string = (char *) buffer;
-
             memcpy((char *) drv_buffer, string, len);
             drv_len = len;
             drv_cookie = cookie;
@@ -89,7 +88,7 @@ int handle_tx(int curr_client) {
 void init (void) {
     // We want to init the client rings here. Currently this only inits one client
     ring_init(&tx_ring[0], (ring_buffer_t *)tx_free_client, (ring_buffer_t *)tx_used_client, 0, 512, 512);
-    // ring_init(&tx_ring[1], (ring_buffer_t *)tx_free_cli2, (ring_buffer_t *)tx_used_cli2, 0, 512, 512);
+    ring_init(&tx_ring[1], (ring_buffer_t *)tx_free_client2, (ring_buffer_t *)tx_used_client2, 0, 512, 512);
     ring_init(&drv_tx_ring, (ring_buffer_t *)tx_free_driver, (ring_buffer_t *)tx_used_driver, 0, 512, 512);
 
     // Add buffers to the drv tx ring from our shared dma region
