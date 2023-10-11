@@ -51,7 +51,7 @@ static int internal_is_tx_fifo_busy(
 static void set_baud(long bps)
 {
     /* TODO: Fix buad rate setup */
-    
+
     // meson_uart_regs_t *regs = (meson_uart_regs_t *) uart_base;
 
     // // Wait to clear transmit port
@@ -72,12 +72,12 @@ int serial_configure(
     long bps,
     int char_size,
     enum serial_parity parity,
-    int stop_bits, 
-    int mode, 
+    int stop_bits,
+    int mode,
     int echo)
 {
     meson_uart_regs_t *regs = (meson_uart_regs_t *) uart_base;
-    
+
     global_serial_driver.mode = mode;
     global_serial_driver.echo = echo;
 
@@ -130,7 +130,7 @@ int getchar()
     return regs->rfifo;
 }
 
-// Putchar that is using the hardware FIFO buffers --> Switch to DMA later 
+// Putchar that is using the hardware FIFO buffers --> Switch to DMA later
 int putchar(int c) {
 
     meson_uart_regs_t *regs = (meson_uart_regs_t *) uart_base;
@@ -174,7 +174,7 @@ void handle_tx() {
 
 
 void handle_irq() {
-    /* Here we have interrupted because a character has been inputted. We first want to get the 
+    /* Here we have interrupted because a character has been inputted. We first want to get the
     character from the hardware FIFO queue.
 
     Then we want to dequeue from the rx free ring, and populate it, then add to the rx used queue
@@ -217,7 +217,7 @@ void handle_irq() {
         // Address that we will pass to dequeue to store the buffer address
         uintptr_t buffer = 0;
         // Integer to store the length of the buffer
-        unsigned int buffer_len = 0; 
+        unsigned int buffer_len = 0;
 
         void *cookie = 0;
 
@@ -242,7 +242,7 @@ void handle_irq() {
             // Address that we will pass to dequeue to store the buffer address
             uintptr_t buffer = 0;
             // Integer to store the length of the buffer
-            unsigned int buffer_len = 0; 
+            unsigned int buffer_len = 0;
 
             void *cookie = 0;
 
@@ -255,12 +255,12 @@ void handle_irq() {
 
             global_serial_driver.line_buffer = buffer;
             global_serial_driver.line_buffer_size = 0;
-        } 
+        }
 
         // Check that the buffer is not full, and other exit conditions here
         if (global_serial_driver.line_buffer_size > BUFFER_SIZE ||
-            input_char == EOT || 
-            input_char == ETX || 
+            input_char == EOT ||
+            input_char == ETX ||
             input_char == LF ||
             input_char == SB ||
             input_char == CR) {
@@ -279,7 +279,7 @@ void handle_irq() {
         } else {
             // Otherwise, add to the character array
             char *char_arr = (char * ) global_serial_driver.line_buffer;
-    
+
             // Conduct any line editing as long as we have stuff in the buffer
             if (input_char == 0x7f && global_serial_driver.line_buffer_size > 0) {
                 // Remove last character
