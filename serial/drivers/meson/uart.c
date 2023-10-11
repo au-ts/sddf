@@ -301,7 +301,7 @@ void handle_irq() {
 // Init function required by CP for every PD
 void init(void) {
     microkit_dbg_puts(microkit_name);
-    microkit_dbg_puts(": elf PD init function running\n");
+    microkit_dbg_puts(": initialising\n");
 
     // Init the shared ring buffers
     ring_init(&rx_ring, (ring_buffer_t *)rx_free, (ring_buffer_t *)rx_used, 0, SIZE, SIZE);
