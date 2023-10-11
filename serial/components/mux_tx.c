@@ -31,7 +31,7 @@ uintptr_t shared_dma_tx_drv;
 uintptr_t shared_dma_tx_cli;
 uintptr_t shared_dma_tx_cli2;
 
-// Have an array of client rings. 
+// Have an array of client rings.
 ring_handle_t tx_ring[NUM_CLIENTS];
 ring_handle_t drv_tx_ring;
 
@@ -42,13 +42,13 @@ int handle_tx(int curr_client) {
     void *cookie = 0;
 
     bool was_empty = ring_empty(drv_tx_ring.used_ring);
-    
+
     // Loop over all clients here
     for (int client = 0; client < NUM_CLIENTS; client++) {
         // The client can plug their ring. If plugged, we won't process it.
         if (ring_plugged(tx_ring[client].used_ring)) {
             continue;
-        } 
+        }
         while(!dequeue_used(&tx_ring[client], &buffer, &len, &cookie)) {
             // We want to enqueue into the drivers used ring
             uintptr_t drv_buffer = 0;

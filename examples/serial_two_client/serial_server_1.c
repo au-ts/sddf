@@ -27,7 +27,7 @@ int serial_server_printf(char *string) {
     // Address that we will pass to dequeue to store the buffer address
     uintptr_t buffer = 0;
     // Integer to store the length of the buffer
-    unsigned int buffer_len = 0; 
+    unsigned int buffer_len = 0;
     void *cookie = 0;
 
     // Dequeue a buffer from the free ring from the tx buffer
@@ -65,8 +65,8 @@ int serial_server_printf(char *string) {
 
     /*
     First we will check if the transmit used ring is empty. If not empty, then the driver was processing
-    the used ring, however it was not finished, potentially running out of budget and being pre-empted. 
-    Therefore, we can just add the buffer to the used ring, and wait for the driver to resume. However if 
+    the used ring, however it was not finished, potentially running out of budget and being pre-empted.
+    Therefore, we can just add the buffer to the used ring, and wait for the driver to resume. However if
     empty, then we can notify the driver to start processing the used ring.
     */
 
@@ -80,7 +80,7 @@ int serial_server_printf(char *string) {
 
 // Return char on success, -1 on failure
 int getchar() {
-    // Notify the driver that we want to get a character. In Patrick's design, this increments 
+    // Notify the driver that we want to get a character. In Patrick's design, this increments
     // the chars_for_clients value.
     sel4cp_notify(SERVER_GETCHAR_CHANNEL);
 
@@ -88,7 +88,7 @@ int getchar() {
 
     /* Now that we have notified the driver, we can attempt to dequeue from the used ring.
     When the driver has processed an interrupt, it will add the inputted character to the used ring.*/
-    
+
     // Address that we will pass to dequeue to store the buffer address
     uintptr_t buffer = 0;
     // Integer to store the length of the buffer
@@ -97,8 +97,8 @@ int getchar() {
     void *cookie = 0;
 
     while (dequeue_used(&local_server->rx_ring, &buffer, &buffer_len, &cookie) != 0) {
-        /* The ring is currently empty, as there is no character to get. 
-        We will spin here until we have gotten a character. As the driver is a higher priority than us, 
+        /* The ring is currently empty, as there is no character to get.
+        We will spin here until we have gotten a character. As the driver is a higher priority than us,
         it should be able to pre-empt this loop
         */
         asm("nop");
@@ -120,11 +120,11 @@ int getchar() {
     return (int) got_char;
 }
 
-/* Return 0 on success, -1 on failure. 
+/* Return 0 on success, -1 on failure.
 Basic scanf implementation using the getchar function above. Gets characters until
 CTRL+C or CTRL+D or new line.
 NOT MEMORY SAFE
-*/ 
+*/
 int serial_server_scanf(char* buffer) {
     int i = 0;
     int getchar_ret = getchar();
@@ -159,11 +159,11 @@ void init(void) {
     // Here we need to init ring buffers and other data structures
 
     struct serial_server *local_server = &global_serial_server;
-    
+
     // Init the shared ring buffers
     ring_init(&local_server->rx_ring, (ring_buffer_t *)rx_free, (ring_buffer_t *)rx_used, 0, 512, 512);
     // We will also need to populate these rings with memory from the shared dma region
-    
+
     // Add buffers to the rx ring
     for (int i = 0; i < NUM_BUFFERS - 1; i++) {
         int ret = enqueue_free(&local_server->rx_ring, shared_dma_rx + (i * BUFFER_SIZE), BUFFER_SIZE, NULL);
@@ -219,9 +219,7 @@ void init(void) {
     }
 
     serial_server_printf("\n---END OF SERIAL 1 TEST---\n");
-    
 }
-
 
 void notified(sel4cp_channel ch) {
     return;

@@ -29,11 +29,11 @@ uintptr_t shared_dma_rx_drv;
 uintptr_t shared_dma_rx_cli;
 uintptr_t shared_dma_rx_cli2;
 
-// Have an array of client rings. 
+// Have an array of client rings.
 ring_handle_t rx_ring[NUM_CLIENTS];
 ring_handle_t drv_rx_ring;
 
-/* We need to do some processing of the input stream to determine when we need 
+/* We need to do some processing of the input stream to determine when we need
 to change direction. */
 
 /* To switch input direction, type the "@" symbol followed immediately by a number.
@@ -41,7 +41,7 @@ Otherwise, can put "\" before "@" to escape this.*/
 
 int mux_state;
 int client;
-// We want to keep track of each clients requests, so that they can be serviced once we have changed 
+// We want to keep track of each clients requests, so that they can be serviced once we have changed
 // input direction
 int num_to_get_chars[NUM_CLIENTS];
 int multi_client;
@@ -55,7 +55,7 @@ int give_multi_char(char * drv_buffer, int drv_buffer_len) {
         // Address that we will pass to dequeue to store the buffer address
         uintptr_t buffer = 0;
         // Integer to store the length of the buffer
-        unsigned int buffer_len = 0; 
+        unsigned int buffer_len = 0;
 
         void *cookie = 0;
 
@@ -95,7 +95,7 @@ int give_single_char(int curr_client, char * drv_buffer, int drv_buffer_len) {
     // Address that we will pass to dequeue to store the buffer address
     uintptr_t buffer = 0;
     // Integer to store the length of the buffer
-    unsigned int buffer_len = 0; 
+    unsigned int buffer_len = 0;
 
     void *cookie = 0;
 
@@ -138,7 +138,7 @@ void handle_rx() {
     // Address that we will pass to dequeue to store the buffer address
     uintptr_t buffer = 0;
     // Integer to store the length of the buffer
-    unsigned int buffer_len = 0; 
+    unsigned int buffer_len = 0;
 
     void *cookie = 0;
 
@@ -149,7 +149,7 @@ void handle_rx() {
         microkit_dbg_puts(": getchar - unable to dequeue used buffer\n");
     }
 
-    // We can either get a single char here, if driver is in RAW mode, or 
+    // We can either get a single char here, if driver is in RAW mode, or
     // a buffer if driver is in LINE mode.
 
     char *chars = (char *) buffer;
@@ -197,7 +197,7 @@ void handle_rx() {
     } else if (UART_MODE == LINE_MODE) {
         microkit_dbg_puts("In line mode mux rx\n");
         // This is for LINE mode, placing buffers at a time
-        
+
         /* Check if the first character is an '@'. The following character
             must be a number. Otherwise, give to the client.
         */
@@ -217,7 +217,7 @@ void handle_rx() {
             give_char(client, chars, buffer_len);
        }
     }
-    
+
     /* Now that we are finished with the used buffer, we can add it back to the free ring*/
 
     ret = enqueue_free(&drv_rx_ring, buffer, buffer_len, NULL);
