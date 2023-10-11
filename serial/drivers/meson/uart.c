@@ -23,9 +23,6 @@ uintptr_t rx_free;
 uintptr_t rx_used;
 uintptr_t tx_free;
 uintptr_t tx_used;
-uintptr_t shared_dma_vaddr;
-uintptr_t shared_dma_paddr;
-uintptr_t shared_dma_rx_drv;
 // Base of the uart registers
 uintptr_t uart_base;
 
