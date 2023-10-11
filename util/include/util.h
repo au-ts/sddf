@@ -21,6 +21,14 @@
 #define unlikely(x) (!!(x))
 #endif
 
+static size_t strlen(const char *str) {
+    int i = 0;
+    while (str[i] != '\0') {
+        i++;
+    }
+    return i;
+}
+
 static int isdigit(int c)
 {
     return (unsigned)c-'0' < 10;
