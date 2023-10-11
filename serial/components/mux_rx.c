@@ -16,18 +16,19 @@
 /* Memory regions as defined in the system file */
 
 // Transmit rings with the driver
-uintptr_t rx_free_drv;
-uintptr_t rx_used_drv;
+uintptr_t rx_free_driver;
+uintptr_t rx_used_driver;
 
 // Transmit rings with the client
-uintptr_t rx_free_cli;
-uintptr_t rx_used_cli;
-uintptr_t rx_free_cli2;
-uintptr_t rx_used_cli2;
+uintptr_t rx_free_client;
+uintptr_t rx_used_client;
+// uintptr_t rx_free_cli2;
+// uintptr_t rx_used_cli2;
 
-uintptr_t shared_dma_rx_drv;
-uintptr_t shared_dma_rx_cli;
-uintptr_t shared_dma_rx_cli2;
+uintptr_t rx_data_driver;
+// @ivanv: unused
+uintptr_t rx_data_client;
+// uintptr_t shared_dma_rx_cli2;
 
 // Have an array of client rings.
 ring_handle_t rx_ring[NUM_CLIENTS];
@@ -230,13 +231,13 @@ void handle_rx() {
 
 void init (void) {
     // We want to init the client rings here. Currently this only inits one client
-    ring_init(&rx_ring[0], (ring_buffer_t *)rx_free_cli, (ring_buffer_t *)rx_used_cli, 0, 512, 512);
-    ring_init(&rx_ring[1], (ring_buffer_t *)rx_free_cli2, (ring_buffer_t *)rx_used_cli2, 0, 512, 512);
+    ring_init(&rx_ring[0], (ring_buffer_t *)rx_free_client, (ring_buffer_t *)rx_used_client, 0, 512, 512);
+    // ring_init(&rx_ring[1], (ring_buffer_t *)rx_free_cli2, (ring_buffer_t *)rx_used_cli2, 0, 512, 512);
 
-    ring_init(&drv_rx_ring, (ring_buffer_t *)rx_free_drv, (ring_buffer_t *)rx_used_drv, 0, 512, 512);
+    ring_init(&drv_rx_ring, (ring_buffer_t *)rx_free_driver, (ring_buffer_t *)rx_used_driver, 0, 512, 512);
 
     for (int i = 0; i < NUM_BUFFERS - 1; i++) {
-        int ret = enqueue_free(&drv_rx_ring, shared_dma_rx_drv + (i * BUFFER_SIZE), BUFFER_SIZE, NULL);
+        int ret = enqueue_free(&drv_rx_ring, rx_data_driver + (i * BUFFER_SIZE), BUFFER_SIZE, NULL);
 
         if (ret != 0) {
             microkit_dbg_puts(microkit_name);
