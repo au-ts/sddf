@@ -211,6 +211,10 @@ void init(void) {
     ring_init(&rx_ring, (ring_buffer_t *)rx_free, (ring_buffer_t *)rx_used, 0, SIZE, SIZE);
     ring_init(&tx_ring, (ring_buffer_t *)tx_free, (ring_buffer_t *)tx_used, 0, SIZE, SIZE);
 
+    volatile struct pl011_uart_regs *regs = (volatile struct pl011_uart_regs *) uart_base;
+    // @ivanv what does 0x50 mean!
+    regs->imsc = 0x50;
+
     // @ivanv: need to do proper initialisation
 
     /* Line configuration. Set LINE or RAW mode here, and disable or enable ECHO */
