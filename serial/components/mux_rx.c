@@ -90,9 +90,9 @@ int give_single_char(int curr_client, char * drv_buffer, int drv_buffer_len) {
         return 1;
     }
 
-    if (num_to_get_chars[curr_client - 1] <= 0) {
-        return 1;
-    }
+    // if (num_to_get_chars[curr_client - 1] <= 0) {
+    //     return 1;
+    // }
     // Address that we will pass to dequeue to store the buffer address
     uintptr_t buffer = 0;
     // Integer to store the length of the buffer
@@ -120,7 +120,10 @@ int give_single_char(int curr_client, char * drv_buffer, int drv_buffer_len) {
         return 1;
     }
 
-    num_to_get_chars[curr_client - 1] -= 1;
+    // num_to_get_chars[curr_client - 1] -= 1;
+
+    microkit_notify(curr_client);
+
     return 0;
 }
 
@@ -157,7 +160,7 @@ void handle_rx() {
 
     // This is for our RAW mode, char by char
     if (UART_MODE == RAW_MODE) {
-        microkit_dbg_puts("In raw mode mux rx\n");
+        // microkit_dbg_puts("In raw mode mux rx\n");
         char got_char = chars[0];
 
         // We have now gotten a character, deal with the input direction switch
