@@ -10,8 +10,7 @@
 
 /* TODO: ADD IN DIFFERENT COLOURS TO DIFFERENTIATE DIFFERENT CLIENT STREAMS */
 
-#define CLI_CH 10
-#define DRV_CH 9
+#define DRIVER_CH 9
 
 #define NUM_CLIENTS 2
 
@@ -73,13 +72,13 @@ int handle_tx(int curr_client) {
                 // serpeate buffer
             }
 
-            // enqueue back to the client avail ring
+            // enqueue back to the client free ring
             enqueue_free(&tx_ring[client], buffer, len, cookie);
         }
     }
 
     if (was_empty) {
-        microkit_notify(DRV_CH);
+        microkit_notify(DRIVER_CH);
     }
 
     return 0;
