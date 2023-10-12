@@ -49,9 +49,10 @@ int putchar(int ch) {
     while ((regs->fr & PL011_UARTFR_TXFF) != 0) {};
 
     regs->dr = ch;
-    if (ch == '\r') {
-        putchar('\n');
-    }
+    // @ivanv: figure out
+    // if (ch == '\r') {
+    //     putchar('\n');
+    // }
 
     return 0;
 }
