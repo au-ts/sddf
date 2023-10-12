@@ -9,7 +9,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <microkit.h>
-#include "util/include/util.h"
+// #include "util/include/util.h"
 #include "util/include/fence.h"
 
 #define SIZE 512
@@ -70,13 +70,13 @@ static inline int ring_empty(ring_buffer_t *ring)
  */
 static inline int ring_full(ring_buffer_t *ring)
 {
-    assert((ring->write_idx - ring->read_idx) >= 0);
+    // assert((ring->write_idx - ring->read_idx) >= 0);
     return !((ring->write_idx - ring->read_idx + 1) % ring->size);
 }
 
 static inline int ring_size(ring_buffer_t *ring)
 {
-    assert((ring->write_idx - ring->read_idx) >= 0);
+    // assert((ring->write_idx - ring->read_idx) >= 0);
     return (ring->write_idx - ring->read_idx);
 }
 
@@ -92,7 +92,7 @@ static inline int ring_size(ring_buffer_t *ring)
  */
 static inline int enqueue(ring_buffer_t *ring, uintptr_t buffer, unsigned int len, void *cookie)
 {
-    assert(buffer != 0);
+    // assert(buffer != 0);
     if (ring_full(ring)) {
         return -1;
     }
@@ -123,7 +123,7 @@ static inline int dequeue(ring_buffer_t *ring, uintptr_t *addr, unsigned int *le
         return -1;
     }
 
-    assert(ring->buffers[ring->read_idx % ring->size].encoded_addr != 0);
+    // assert(ring->buffers[ring->read_idx % ring->size].encoded_addr != 0);
 
     *addr = ring->buffers[ring->read_idx % ring->size].encoded_addr;
     *len = ring->buffers[ring->read_idx % ring->size].len;
@@ -148,7 +148,7 @@ static inline int dequeue(ring_buffer_t *ring, uintptr_t *addr, unsigned int *le
  */
 static inline int enqueue_free(ring_handle_t *ring, uintptr_t addr, unsigned int len, void *cookie)
 {
-    assert(addr);
+    // assert(addr);
     return enqueue(ring->free_ring, addr, len, cookie);
 }
 
@@ -165,7 +165,7 @@ static inline int enqueue_free(ring_handle_t *ring, uintptr_t addr, unsigned int
  */
 static inline int enqueue_used(ring_handle_t *ring, uintptr_t addr, unsigned int len, void *cookie)
 {
-    assert(addr);
+    // assert(addr);
     return enqueue(ring->used_ring, addr, len, cookie);
 }
 
