@@ -199,12 +199,12 @@ process_rx_complete(void)
 
     if (transmitted) {
         // notify tx mux
-        sel4cp_notify_delayed(TX_CH);
+        microkit_notify_delayed(TX_CH);
     }
 }
 
 void
-notified(sel4cp_channel ch)
+notified(microkit_channel ch)
 {
     /* We have one job. */
     process_rx_complete();
@@ -223,22 +223,22 @@ dump_mac(uint8_t *mac)
 }
 
 seL4_MessageInfo_t
-protected(sel4cp_channel ch, sel4cp_msginfo msginfo)
+protected(microkit_channel ch, microkit_msginfo msginfo)
 {
     // get the client ID into our data structures.
     int client = ch - CLIENT_CH_START;
     if (client >= NUM_CLIENTS || client < 0) {
         print("Client out of range: ");
         puthex64(client);
-        return sel4cp_msginfo_new(0, 0);
+        return microkit_msginfo_new(0, 0);
     }
 
     // label is the protocol:
     // eg change my ip or register a new one.
     // reg 1 is the ip address. 
-    uint32_t ip_addr = sel4cp_mr_get(0);
-    uint32_t mac_lower = sel4cp_mr_get(1);
-    uint32_t mac_higher = sel4cp_mr_get(2);
+    uint32_t ip_addr = microkit_mr_get(0);
+    uint32_t mac_lower = microkit_mr_get(1);
+    uint32_t mac_higher = microkit_mr_get(2);
 
     uint8_t mac[8];
     mac[0] = mac_lower >> 24;
@@ -249,7 +249,7 @@ protected(sel4cp_channel ch, sel4cp_msginfo msginfo)
     mac[5] = mac_higher >> 16 & 0xff;
     char buf[16];
 
-    switch (sel4cp_msginfo_get_label(msginfo)) {
+    switch (microkit_msginfo_get_label(msginfo)) {
         case REG_IP:
             print("Client registering ip address: ");
             print(print_ipaddr(ip_addr, buf, 16));
@@ -267,7 +267,7 @@ protected(sel4cp_channel ch, sel4cp_msginfo msginfo)
             break;
     }
 
-    return sel4cp_msginfo_new(0, 0);
+    return microkit_msginfo_new(0, 0);
 }
 
 void

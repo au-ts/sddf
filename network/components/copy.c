@@ -78,7 +78,7 @@ void process_rx_complete(void)
     }
 
     if (rx_ring_cli.used_ring->notify_reader && enqueued) {
-        sel4cp_notify_delayed(CLIENT_CH);
+        microkit_notify_delayed(CLIENT_CH);
     }
 
     /* We want to inform the mux that more free buffers are available or the 
@@ -87,10 +87,10 @@ void process_rx_complete(void)
         if (have_signal && signal == BASE_OUTPUT_NOTIFICATION_CAP + CLIENT_CH) {
             // We need to notify the client, but this should
             // happen first. 
-            sel4cp_notify(CLIENT_CH);
+            microkit_notify(CLIENT_CH);
         }
 
-        sel4cp_notify_delayed(MUX_RX_CH);
+        microkit_notify_delayed(MUX_RX_CH);
     }
 
     if (!ring_empty(rx_ring_mux.used_ring) || rx_ring_mux.free_ring->notify_reader) {
@@ -105,7 +105,7 @@ void process_rx_complete(void)
     }
 }
 
-void notified(sel4cp_channel ch)
+void notified(microkit_channel ch)
 {
     if (ch == CLIENT_CH || ch == MUX_RX_CH) {
         /* We have one job. */

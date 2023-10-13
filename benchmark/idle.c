@@ -4,7 +4,7 @@
  */
 
 #include <stdint.h>
-#include <sel4cp.h>
+#include <microkit.h>
 #include <sel4/sel4.h>
 #include <sel4/benchmark_track_types.h>
 #include "sel4bench.h"
@@ -51,7 +51,7 @@ void count_idle(void)
     }
 }
 
-void notified(sel4cp_channel ch)
+void notified(microkit_channel ch)
 {
     switch(ch) {
         case INIT:
@@ -59,7 +59,7 @@ void notified(sel4cp_channel ch)
             count_idle();
             break;
         default:
-            sel4cp_dbg_puts("Idle thread notified on unexpected channel\n");
+            microkit_dbg_puts("Idle thread notified on unexpected channel\n");
     }
 }
 

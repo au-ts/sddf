@@ -5,7 +5,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <sel4cp.h>
+#include <microkit.h>
 #include <sel4/sel4.h>
 #include "ethernet.h"
 #include "shared_ringbuffer.h"
@@ -222,7 +222,7 @@ handle_rx(volatile struct enet_regs *eth)
      * by caller before the notify causes a context switch.
      */
     if (num && rx_ring.used_ring->notify_reader) {
-        sel4cp_notify(RX_CH);
+        microkit_notify(RX_CH);
     }
 }
 
@@ -297,7 +297,7 @@ complete_tx(volatile struct enet_regs *eth)
     }
 
     if (tx_ring.free_ring->notify_reader && enqueued) {
-        sel4cp_notify(TX_CH);
+        microkit_notify(TX_CH);
     }
 }
 
@@ -329,9 +329,9 @@ static void
 eth_setup(void)
 {
     get_mac_addr(eth, mac);
-    sel4cp_dbg_puts("MAC: ");
+    microkit_dbg_puts("MAC: ");
     // dump_mac(mac);
-    sel4cp_dbg_puts("\n");
+    microkit_dbg_puts("\n");
 
     /* set up descriptor rings */
     rx.cnt = RX_COUNT;
@@ -418,7 +418,7 @@ eth_setup(void)
 
 void init(void)
 {
-    print(sel4cp_name);
+    print(microkit_name);
     print(": elf PD init function running\n");
 
     eth_setup();
@@ -433,31 +433,31 @@ void init(void)
 }
 
 seL4_MessageInfo_t
-protected(sel4cp_channel ch, sel4cp_msginfo msginfo)
+protected(microkit_channel ch, microkit_msginfo msginfo)
 {
     switch (ch) {
         case TX_CH:
             handle_tx(eth);
             break;
         default:
-            sel4cp_dbg_puts("Received ppc on unexpected channel ");
+            microkit_dbg_puts("Received ppc on unexpected channel ");
             puthex64(ch);
             break;
     }
-    return sel4cp_msginfo_new(0, 0);
+    return microkit_msginfo_new(0, 0);
 }
 
 void
-notified(sel4cp_channel ch)
+notified(microkit_channel ch)
 {
     switch(ch) {
         case IRQ_CH:
             handle_eth(eth);
             /*
              * Delay calling into the kernel to ack the IRQ until the next loop
-             * in the seL4CP event handler loop.
+             * in the Microkit event handler loop.
              */
-            sel4cp_irq_ack_delayed(ch);
+            microkit_irq_ack_delayed(ch);
             break;
         case RX_CH:
             fill_rx_bufs();

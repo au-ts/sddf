@@ -1,6 +1,6 @@
 #include <stdbool.h>
 #include <stdint.h>
-#include <sel4cp.h>
+#include <microkit.h>
 #include <string.h>
 
 #include "shared_ringbuffer.h"
@@ -170,7 +170,7 @@ void process_rx_complete(void)
     /* Loop over bitmap and see who we need to notify. */
     for (int client = 0; client < NUM_CLIENTS; client++) {
         if (notify_clients[client]) {
-            sel4cp_notify(client);
+            microkit_notify(client);
         }
 
         if (state.rx_ring_drv.free_ring->notify_reader) {
@@ -220,7 +220,7 @@ bool process_rx_free(void)
        process_rx_complete(), so we could have also missed this empty condition.
        */
     if ((enqueued || dropped) && state.rx_ring_drv.free_ring->notify_reader) {
-        sel4cp_notify_delayed(DRIVER_CH);
+        microkit_notify_delayed(DRIVER_CH);
     }
 
     for (int client = 0; client < NUM_CLIENTS; client++) {
@@ -235,7 +235,7 @@ bool process_rx_free(void)
     return enqueued;
 }
 
-void notified(sel4cp_channel ch)
+void notified(microkit_channel ch)
 {
     process_rx_complete();
     process_rx_free();
@@ -293,7 +293,7 @@ void init(void)
     // ensure we get a notification when a packet comes in
     state.rx_ring_drv.used_ring->notify_reader = true;
     // Notify the driver that we are ready to receive
-    sel4cp_notify(DRIVER_CH);
+    microkit_notify(DRIVER_CH);
 
     return;
 }

@@ -5,9 +5,9 @@ The sDDF aims to provide interfaces and protocols for writing and
 porting device drivers to run as seL4 user level programs. It
 currently supports a network device running on iMX8 hardware, reaching
 near wire speed.  It has been built on top of [seL4 Core
-Platform](https://github.com/BreakawayConsulting/sel4cp) and requires
+Platform](https://github.com/seL4/microkit) and requires
 [this pull
-request](https://github.com/BreakawayConsulting/sel4cp/pull/11). The
+request](https://github.com/seL4/microkit/pull/11). The
 seL4 Core Platform binaries can be built separately and handed to the
 echo_server makefile.
 
@@ -25,8 +25,8 @@ to the Makefile using the argument `TOOLCHAIN=<PREFIX>`.
 ```
     $ cd echo_server
     $ make BUILD_DIR=<path/to/build> \
-        SEL4CP_SDK=<path/to/core/platform/sdk> \
-        SEL4CP_BOARD=imx8mm_evk SEL4CP_CONFIG=(benchmark/release/debug)
+        MICROKIT_SDK=<path/to/core/platform/sdk> \
+        MICROKIT_BOARD=imx8mm_evk MICROKIT_CONFIG=(benchmark/release/debug)
 ```
 
 ## Benchmarking

@@ -8,12 +8,12 @@
  * a maximum of a single timeout per client for simplicity.
  *
  * Interfaces for clients:
- * seL4cp_ppcall() with label 0 is a request to get the current time.
+ * microkit_ppcall() with label 0 is a request to get the current time.
  * with a 1 is a request to set a timeout.
  */
 
 #include <stdint.h>
-#include <sel4cp.h>
+#include <microkit.h>
 #include "util.h"
 
 #define GET_TIME 0
@@ -45,7 +45,7 @@ static volatile uint32_t *gpt;
 static uint32_t overflow_count;
 
 static uint64_t timeouts[MAX_TIMEOUTS];
-static sel4cp_channel active_channel = -1;
+static microkit_channel active_channel = -1;
 static bool timeout_active = false;
 static uint64_t current_timeout;
 static uint8_t pending_timeouts;
@@ -67,7 +67,7 @@ get_ticks(void)
 }
 
 void
-irq(sel4cp_channel ch)
+irq(microkit_channel ch)
 {
     uint32_t sr = gpt[SR];
     gpt[SR] = sr;
@@ -79,22 +79,22 @@ irq(sel4cp_channel ch)
     if (sr & 1) {
         gpt[IR] &= ~1;
         timeout_active = false;
-        sel4cp_channel curr_channel = active_channel;
+        microkit_channel curr_channel = active_channel;
         timeouts[curr_channel] = 0;
         // notify the client.
-        sel4cp_notify(curr_channel);
+        microkit_notify(curr_channel);
     }
 
     if (pending_timeouts && !timeout_active) {
         uint64_t curr_time = get_ticks();
         /* find next timeout */
         uint64_t next_timeout = UINT64_MAX;
-        sel4cp_channel ch = -1;
+        microkit_channel ch = -1;
         for (unsigned i = 0; i < MAX_TIMEOUTS; i++) {
             if (timeouts[i] != 0 && timeouts[i] <= curr_time) {
                 timeouts[i] = 0;
                 pending_timeouts--;
-                sel4cp_notify(i);
+                microkit_notify(i);
             } else if (timeouts[i] != 0 && timeouts[i] < next_timeout) {
                 next_timeout = timeouts[i];
                 ch = i;
@@ -116,25 +116,25 @@ irq(sel4cp_channel ch)
 }
 
 void
-notified(sel4cp_channel ch)
+notified(microkit_channel ch)
 {
     uint64_t rel_timeout, cur_ticks, abs_timeout;
     if (ch == IRQ_CH) {
         irq(ch);
-        sel4cp_irq_ack_delayed(ch);
+        microkit_irq_ack_delayed(ch);
     }
 }
 
 seL4_MessageInfo_t
-protected(sel4cp_channel ch, sel4cp_msginfo msginfo)
+protected(microkit_channel ch, microkit_msginfo msginfo)
 {
     uint64_t rel_timeout, cur_ticks, abs_timeout;
-    switch (sel4cp_msginfo_get_label(msginfo)) {
+    switch (microkit_msginfo_get_label(msginfo)) {
         case GET_TIME:
             // Just wants the time.
             cur_ticks = (get_ticks() / (uint64_t)GPT_FREQ);
             seL4_SetMR(0, cur_ticks);
-            return sel4cp_msginfo_new(0, 1);
+            return microkit_msginfo_new(0, 1);
         case SET_TIMEOUT:
             // Request to set a timeout.
             rel_timeout = (uint64_t)(GPT_FREQ) * (seL4_GetMR(0));
@@ -161,11 +161,11 @@ protected(sel4cp_channel ch, sel4cp_msginfo msginfo)
             }
             break;
         default:
-            sel4cp_dbg_puts("DRIVER|INFO: Unknown request to timer from client\n");
+            microkit_dbg_puts("DRIVER|INFO: Unknown request to timer from client\n");
             break;
     }
 
-    return sel4cp_msginfo_new(0, 0);
+    return microkit_msginfo_new(0, 0);
 }
 
 void

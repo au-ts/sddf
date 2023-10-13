@@ -8,7 +8,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
-#include <sel4cp.h>
+#include <microkit.h>
 #include "util.h"
 #include "fence.h"
 

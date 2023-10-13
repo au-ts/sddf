@@ -116,7 +116,7 @@ get_client(uintptr_t addr)
 static uint64_t
 get_time(void)
 {
-    sel4cp_ppcall(TIMER_CH, sel4cp_msginfo_new(GET_TIME, 0));
+    microkit_ppcall(TIMER_CH, microkit_msginfo_new(GET_TIME, 0));
     uint64_t time_now = seL4_GetMR(0);
     return time_now;
 }
@@ -124,8 +124,8 @@ get_time(void)
 static void
 set_timeout(uint64_t timeout)
 {
-    sel4cp_mr_set(0, timeout);
-    sel4cp_ppcall(TIMER_CH, sel4cp_msginfo_new(SET_TIMEOUT, 1));
+    microkit_mr_set(0, timeout);
+    microkit_ppcall(TIMER_CH, microkit_msginfo_new(SET_TIMEOUT, 1));
 }
 
 void process_tx_ready(void)
@@ -177,7 +177,7 @@ void process_tx_ready(void)
     }
 
     if (state.tx_ring_drv.used_ring->notify_reader && enqueued) {
-        sel4cp_notify_delayed(DRIVER);
+        microkit_notify_delayed(DRIVER);
     }
 
     /* Ensure we get a notification when transmit is complete
@@ -221,13 +221,13 @@ void process_tx_complete(void)
     /* Loop over bitmap and see who we need to notify. */
     for (int client = 0; client < NUM_CLIENTS; client++) {
         if (notify_clients[client]) {
-            sel4cp_notify(client);
+            microkit_notify(client);
         }
     }
     state.tx_ring_drv.free_ring->notify_reader = driver_ntfn;
 }
 
-void notified(sel4cp_channel ch)
+void notified(microkit_channel ch)
 {
     if (ch == TIMER_CH) {
         /* TODO: 

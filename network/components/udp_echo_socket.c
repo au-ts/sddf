@@ -10,7 +10,7 @@
  * @TAG(DATA61_BSD)
  */
 
-#include <sel4cp.h>
+#include <microkit.h>
 
 #include "lwip/ip.h"
 #include "lwip/pbuf.h"

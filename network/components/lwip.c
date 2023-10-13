@@ -5,7 +5,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <sel4cp.h>
+#include <microkit.h>
 #include <string.h>
 #include "lwip/init.h"
 #include "netif/etharp.h"
@@ -83,7 +83,7 @@ int head = 0;
 static void
 dump_mac(uint8_t *mac)
 {
-    print(sel4cp_name);
+    print(microkit_name);
     print(": ");
     for (unsigned i = 0; i < 6; i++) {
         put8((mac[i] >> 4) & 0xf);
@@ -397,10 +397,10 @@ static void netif_status_callback(struct netif *netif)
 {
     if (dhcp_supplied_address(netif)) {
         /* Tell the ARP component so we it can respond to ARP requests. */
-        sel4cp_mr_set(0, ip4_addr_get_u32(netif_ip4_addr(netif)));
-        sel4cp_mr_set(1, (state.mac[0] << 24) | (state.mac[1] << 16) | (state.mac[2] << 8) | (state.mac[3]));
-        sel4cp_mr_set(2, (state.mac[4] << 24) | (state.mac[5] << 16));
-        sel4cp_ppcall(ARP, sel4cp_msginfo_new(0, 1));
+        microkit_mr_set(0, ip4_addr_get_u32(netif_ip4_addr(netif)));
+        microkit_mr_set(1, (state.mac[0] << 24) | (state.mac[1] << 16) | (state.mac[2] << 8) | (state.mac[3]));
+        microkit_mr_set(2, (state.mac[4] << 24) | (state.mac[5] << 16));
+        microkit_ppcall(ARP, microkit_msginfo_new(0, 1));
 
         print("DHCP request finished, IP address for netif ");
         print(netif->name);
@@ -418,14 +418,14 @@ static void get_mac(void)
     state.mac[2] = 0x1;
     state.mac[3] = 0;
     state.mac[4] = 0;
-    if (!strcmp(sel4cp_name, "client0")) {
+    if (!strcmp(microkit_name, "client0")) {
         state.mac[5] = 0;
     } else {
         state.mac[5] = 0x1;
     }
-    /* sel4cp_ppcall(RX_CH, sel4cp_msginfo_new(0, 0));
-    uint32_t palr = sel4cp_mr_get(0);
-    uint32_t paur = sel4cp_mr_get(1);
+    /* microkit_ppcall(RX_CH, microkit_msginfo_new(0, 0));
+    uint32_t palr = microkit_mr_get(0);
+    uint32_t paur = microkit_mr_get(1);
     state.mac[0] = palr >> 24;
     state.mac[1] = palr >> 16 & 0xff;
     state.mac[2] = palr >> 8 & 0xff;
@@ -501,23 +501,23 @@ void init(void)
 
     if (notify_rx && state.rx_ring.free_ring->notify_reader) {
         notify_rx = false;
-        sel4cp_notify_delayed(RX_CH);
+        microkit_notify_delayed(RX_CH);
     }
 
     if (notify_tx && state.tx_ring.used_ring->notify_reader) {
         notify_tx = false;
         if (!have_signal) {
-            sel4cp_notify_delayed(TX_CH);
+            microkit_notify_delayed(TX_CH);
         } else if (signal != BASE_OUTPUT_NOTIFICATION_CAP + TX_CH) {
-            sel4cp_notify(TX_CH);
+            microkit_notify(TX_CH);
         }
     }
 
-    print(sel4cp_name);
+    print(microkit_name);
     print(": elf PD init complete\n");
 }
 
-void notified(sel4cp_channel ch)
+void notified(microkit_channel ch)
 {
     switch(ch) {
         case RX_CH:
@@ -534,7 +534,7 @@ void notified(sel4cp_channel ch)
             process_rx_queue();
             break;
         default:
-            sel4cp_dbg_puts("lwip: received notification on unexpected channel\n");
+            microkit_dbg_puts("lwip: received notification on unexpected channel\n");
             assert(0);
             break;
     }
@@ -542,18 +542,18 @@ void notified(sel4cp_channel ch)
     if (notify_rx && state.rx_ring.free_ring->notify_reader) {
         notify_rx = false;
         if (!have_signal) {
-            sel4cp_notify_delayed(RX_CH);
+            microkit_notify_delayed(RX_CH);
         } else if (signal != BASE_OUTPUT_NOTIFICATION_CAP + RX_CH) {
-            sel4cp_notify(RX_CH);
+            microkit_notify(RX_CH);
         }
     }
 
     if (notify_tx && state.tx_ring.used_ring->notify_reader) {
         notify_tx = false;
         if (!have_signal) {
-            sel4cp_notify_delayed(TX_CH);
+            microkit_notify_delayed(TX_CH);
         } else if (signal != BASE_OUTPUT_NOTIFICATION_CAP + TX_CH) {
-            sel4cp_notify(TX_CH);
+            microkit_notify(TX_CH);
         }
     }
 }

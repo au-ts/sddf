@@ -1,5 +1,5 @@
 #include <stdint.h>
-#include <sel4cp.h>
+#include <microkit.h>
 #include "timer.h"
 
 static void
@@ -12,23 +12,23 @@ put64(uint64_t val) {
         buffer[--i] = '0' + c;
         val /= 10;
     } while (val);
-    sel4cp_dbg_puts(&buffer[i]);
+    microkit_dbg_puts(&buffer[i]);
 }
 
 void
-notified(sel4cp_channel ch)
+notified(microkit_channel ch)
 {
     /*
      * In this example we only have a single possible channel,
      * so we know it's a notification from the driver telling
      * us that the timeout we set has gone off.
      */
-    sel4cp_dbg_puts("CLIENT|INFO: Got a timeout!\n");
+    microkit_dbg_puts("CLIENT|INFO: Got a timeout!\n");
     /* Get the current time */
     uint64_t time = time_now();
-    sel4cp_dbg_puts("CLIENT|INFO: Now the time (in nanoseconds) is: ");
+    microkit_dbg_puts("CLIENT|INFO: Now the time (in nanoseconds) is: ");
     put64(time);
-    sel4cp_dbg_puts("\n");
+    microkit_dbg_puts("\n");
     /* Set another timeout */
     set_timeout(NS_IN_S);
 }
@@ -38,11 +38,11 @@ init(void)
 {
     // lets get the time!
     uint64_t time = time_now();
-    sel4cp_dbg_puts("CLIENT|INFO: The time now is: ");
+    microkit_dbg_puts("CLIENT|INFO: The time now is: ");
     put64(time);
-    sel4cp_dbg_puts("\n");
+    microkit_dbg_puts("\n");
 
     // lets set a timeout
-    sel4cp_dbg_puts("CLIENT|INFO: Setting a time out for 1 second\n");
+    microkit_dbg_puts("CLIENT|INFO: Setting a time out for 1 second\n");
     set_timeout(NS_IN_S);
 }

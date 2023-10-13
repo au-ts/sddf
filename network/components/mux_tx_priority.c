@@ -120,7 +120,7 @@ void process_tx_ready(void)
     }
 
     if ((original_size == 0 || original_size + enqueued != ring_size(state.tx_ring_drv.used_ring)) && enqueued != 0) {
-        sel4cp_notify_delayed(DRIVER_CH);
+        microkit_notify_delayed(DRIVER_CH);
     }
 }
 
@@ -157,12 +157,12 @@ void process_tx_complete(void)
     /* Loop over bitmap and see who we need to notify. */
     for (int client = 0; client < NUM_CLIENTS; client++) {
         if (notify_clients[client]) {
-            sel4cp_notify(client);
+            microkit_notify(client);
         }
     }
 }
 
-void notified(sel4cp_channel ch)
+void notified(microkit_channel ch)
 {
     if (ch == CLIENT_CH || ch == ARP || ch == DRIVER_CH ) {
         process_tx_complete();

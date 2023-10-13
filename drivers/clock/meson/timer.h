@@ -1,5 +1,5 @@
 #include <stdint.h>
-#include <sel4cp.h>
+#include <microkit.h>
 
 #define TIMER_CH    1
 #define GET_TIME    0
@@ -16,8 +16,8 @@
 void
 timer_set_timeout(uint64_t timeout)
 {
-    sel4cp_mr_set(0, timeout);
-    sel4cp_ppcall(TIMER_CH, sel4cp_msginfo_new(SET_TIMEOUT, 1));
+    microkit_mr_set(0, timeout);
+    microkit_ppcall(TIMER_CH, microkit_msginfo_new(SET_TIMEOUT, 1));
 }
 
 /**
@@ -28,7 +28,7 @@ timer_set_timeout(uint64_t timeout)
 uint64_t
 timer_time_now(void)
 {
-    sel4cp_ppcall(TIMER_CH, sel4cp_msginfo_new(GET_TIME, 0));
+    microkit_ppcall(TIMER_CH, microkit_msginfo_new(GET_TIME, 0));
     uint64_t time_now = seL4_GetMR(0);
     return time_now;
 }

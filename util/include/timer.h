@@ -6,7 +6,7 @@
 #pragma once
 
 #include <autoconf.h>
-#include <sel4cp.h>
+#include <microkit.h>
 
 #include "lwip/dhcp.h"
 #include "lwip/ip_addr.h"
