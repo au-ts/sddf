@@ -1,7 +1,8 @@
 {
-    "name": "PL011 UART",
+    "name": "Meson UART",
     "compatible": [
-        "arm,pl011"
+        "amlogic,meson-gx-uart",
+        "amlogic,meson-ao-uart"
     ],
     "resources": {
         "device_regions": [
