@@ -1,19 +1,6 @@
 {
-    "name": "PL011 UART",
-    "compatible": [
-        "arm,pl011"
-    ],
+    "class": "serial",
     "resources": {
-        "device_regions": [
-            {
-                "name": "uart",
-                "perms": "rw",
-                "cached": false,
-                "setvar_vaddr": "uart_base",
-                "page_size": 4096,
-                "size": 4096
-            }
-        ],
         "shared_regions": [
             {
                 "name": "tx_data",
@@ -35,7 +22,7 @@
         "irqs": [
             {
                 "name": "uart",
-                "channel_id": 1
+                "id": 1
             }
         ]
     }
