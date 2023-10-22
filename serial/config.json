@@ -1,7 +1,6 @@
 {
-    "class": "serial",
     "resources": {
-        "shared_regions": [
+        "regions": [
             {
                 "name": "tx_data",
                 "perms": "rw",
@@ -17,12 +16,6 @@
                 "setvar_vaddr": "rx_data",
                 "page_size": 2097152,
                 "size": 2097152
-            }
-        ],
-        "irqs": [
-            {
-                "name": "uart",
-                "id": 1
             }
         ]
     }
