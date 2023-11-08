@@ -14,6 +14,12 @@
 
 #define NUM_CLIENTS 2
 
+#define COLOUR_START_LEN 5
+#define COLOUR_END_LEN 4
+
+char *client_colours[] = { "\x1b[31m", "\x1b[32m" };
+char *client_colour_end = "\x1b[0m";
+
 /* Memory regions as defined in the system file */
 
 // Transmit rings with the driver
@@ -37,7 +43,7 @@ ring_handle_t drv_tx_ring;
 int handle_tx(int curr_client) {
     // Copy data from the client ring to the driver rings.
     uintptr_t buffer = 0;
-    unsigned int len = 0;
+    unsigned int buffer_len = 0;
     void *cookie = 0;
 
     bool was_empty = ring_empty(drv_tx_ring.used_ring);
@@ -48,7 +54,7 @@ int handle_tx(int curr_client) {
         if (ring_plugged(tx_ring[client].used_ring)) {
             continue;
         }
-        while (!dequeue_used(&tx_ring[client], &buffer, &len, &cookie)) {
+        while (!dequeue_used(&tx_ring[client], &buffer, &buffer_len, &cookie)) {
             // We want to enqueue into the drivers used ring
             uintptr_t drv_buffer = 0;
             unsigned int drv_len = 0;
@@ -60,12 +66,23 @@ int handle_tx(int curr_client) {
                 return 1;
             }
 
+            assert(buffer_len + COLOUR_START_LEN + COLOUR_START_LEN <= BUFFER_SIZE);
+            /* First copy the colour start bytes */
+            size_t len_copied = 0;
+            memcpy((char *) drv_buffer, client_colours[client], COLOUR_START_LEN);
+            len_copied += COLOUR_START_LEN;
+            /* Then the actual colour */
+            uintptr_t dest_buffer = drv_buffer + COLOUR_START_LEN;
             char *string = (char *) buffer;
-            memcpy((char *) drv_buffer, string, len);
-            drv_len = len;
+            memcpy((char *) dest_buffer, string, buffer_len);
+            len_copied += buffer_len;
+            /* And then finally the colour end bytes */
+            memcpy((char *)(dest_buffer + buffer_len), client_colour_end, COLOUR_END_LEN);
+            len_copied += COLOUR_END_LEN;
+
             drv_cookie = cookie;
 
-            ret = enqueue_used(&drv_tx_ring, drv_buffer, drv_len, drv_cookie);
+            ret = enqueue_used(&drv_tx_ring, drv_buffer, len_copied, drv_cookie);
             if (ret != 0) {
                 microkit_dbg_puts("Failed to enqueue buffer to drv tx used ring\n");
                 // Don't know if I should return here, because we need to enqueue a
