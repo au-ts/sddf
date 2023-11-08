@@ -148,7 +148,7 @@ static void
 raw_tx(char *phys, unsigned int len, void *cookie)
 {
     // This is byte by byte for now, switch to DMA use later
-    for (int i = 0; i < len || phys[i] != '\0'; i++) {
+    for (int i = 0; i < len && phys[i] != '\0'; i++) {
         // Loop until the fifo queue is ready to transmit
         while (putchar(phys[i]) != 0);
     }
