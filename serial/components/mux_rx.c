@@ -234,10 +234,10 @@ void handle_rx() {
 
 void init (void) {
     // We want to init the client rings here. Currently this only inits one client
-    ring_init(&rx_ring[0], (ring_buffer_t *)rx_free_client, (ring_buffer_t *)rx_used_client, 0, 512, 512);
-    ring_init(&rx_ring[1], (ring_buffer_t *)rx_free_client2, (ring_buffer_t *)rx_used_client2, 0, 512, 512);
+    ring_init(&rx_ring[0], (ring_buffer_t *)rx_free_client, (ring_buffer_t *)rx_used_client, 0, NUM_BUFFERS, NUM_BUFFERS);
+    ring_init(&rx_ring[1], (ring_buffer_t *)rx_free_client2, (ring_buffer_t *)rx_used_client2, 0, NUM_BUFFERS, NUM_BUFFERS);
 
-    ring_init(&drv_rx_ring, (ring_buffer_t *)rx_free_driver, (ring_buffer_t *)rx_used_driver, 0, 512, 512);
+    ring_init(&drv_rx_ring, (ring_buffer_t *)rx_free_driver, (ring_buffer_t *)rx_used_driver, 0, NUM_BUFFERS, NUM_BUFFERS);
 
     for (int i = 0; i < NUM_BUFFERS - 1; i++) {
         int ret = enqueue_free(&drv_rx_ring, rx_data_driver + (i * BUFFER_SIZE), BUFFER_SIZE, NULL);
