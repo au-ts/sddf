@@ -96,7 +96,7 @@ puthex64(uint64_t val)
         buffer[i] = hexchar(val & 0xf);
         val >>= 4;
     }
-    print(buffer);
+    microkit_dbg_puts(buffer);
 }
 
 static char
