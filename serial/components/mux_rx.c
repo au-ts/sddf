@@ -224,7 +224,7 @@ void handle_rx() {
 
     /* Now that we are finished with the used buffer, we can add it back to the free ring*/
 
-    ret = enqueue_free(&drv_rx_ring, buffer, buffer_len, NULL);
+    ret = enqueue_free(&drv_rx_ring, buffer, BUFFER_SIZE, NULL);
 
     if (ret != 0) {
         microkit_dbg_puts(microkit_name);
