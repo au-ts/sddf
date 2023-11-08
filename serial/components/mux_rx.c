@@ -180,8 +180,13 @@ void handle_rx() {
                 multi_client = 0;
                 int new_client = atoi(&got_char);
                 if (new_client < 1 || new_client > NUM_CLIENTS) {
-                    microkit_dbg_puts("Attempted to switch to invalid client number\n");
+                    microkit_dbg_puts("Attempted to switch to invalid client number: ");
+                    puthex64(new_client);
+                    microkit_dbg_puts("\n");
                 } else {
+                    microkit_dbg_puts("Switching to client number: ");
+                    puthex64(new_client);
+                    microkit_dbg_puts("\n");
                     client = new_client;
                 }
             }
