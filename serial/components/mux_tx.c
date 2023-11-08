@@ -73,7 +73,7 @@ int handle_tx(int curr_client) {
             }
 
             // enqueue back to the client free ring
-            enqueue_free(&tx_ring[client], buffer, len, cookie);
+            enqueue_free(&tx_ring[client], buffer, BUFFER_SIZE, cookie);
         }
     }
 
