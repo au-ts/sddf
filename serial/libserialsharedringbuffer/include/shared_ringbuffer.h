@@ -12,7 +12,10 @@
 // #include "util/include/util.h"
 #include "util/include/fence.h"
 
-#define SIZE 512
+/* Number of buffers each ring is configured to have. */
+#define NUM_BUFFERS 512
+/* Size of the data that each buffer descriptor points to. */
+#define BUFFER_SIZE 2048
 
 /* Buffer descriptor */
 typedef struct buff_desc {
@@ -29,7 +32,7 @@ typedef struct ring_buffer {
     bool notify_writer;
     bool notify_reader;
     bool plugged;
-    buff_desc_t buffers[SIZE];
+    buff_desc_t buffers[NUM_BUFFERS];
 } ring_buffer_t;
 
 /* A ring handle for enqueing/dequeuing into  */

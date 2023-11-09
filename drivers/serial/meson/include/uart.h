@@ -99,9 +99,6 @@ struct serial_driver {
 }							\
 )
 
-#define NUM_BUFFERS 512
-#define BUFFER_SIZE 2048
-
 enum serial_parity {
     PARITY_NONE,
     PARITY_EVEN,
