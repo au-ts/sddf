@@ -202,18 +202,18 @@ static inline int dequeue_used(ring_handle_t *ring, uintptr_t *addr, unsigned in
     return dequeue(ring->used_ring, addr, len, cookie);
 }
 
-/** 
+/**
  * Set the plug of a ring to true.
- * 
+ *
  * @param ring Ring handle to plug.
 */
 static inline void ring_plug(ring_buffer_t *ring) {
     ring->plugged = true;
 }
 
-/** 
+/**
  * Set the plug of a ring to false.
- * 
+ *
  * @param ring Ring handle to unplug.
 */
 static inline void ring_unplug(ring_buffer_t *ring) {
@@ -223,9 +223,9 @@ static inline void ring_unplug(ring_buffer_t *ring) {
 
 /**
  * Check the current value of the plug.
- * 
+ *
  * @param ring Ring handle to check plug.
- * 
+ *
  * @return true when ring is plugged, false when unplugged.
 */
 static inline bool ring_plugged(ring_buffer_t *ring) {
