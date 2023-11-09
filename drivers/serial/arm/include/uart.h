@@ -64,9 +64,6 @@ struct serial_driver {
 #define SP 32   /* Space*/
 #define DL 127  /* Delete */
 
-#define NUM_BUFFERS 512
-#define BUFFER_SIZE 2048
-
 enum serial_parity {
     PARITY_NONE,
     PARITY_EVEN,
