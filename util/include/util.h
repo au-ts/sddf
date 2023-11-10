@@ -5,6 +5,9 @@
 
 #pragma once
 
+#include <stddef.h>
+#include <microkit.h>
+
 #define UART_REG(x) ((volatile uint32_t *)(UART_BASE + (x)))
 #define UART_BASE 0x5000000 //0x30890000 in hardware on imx8mm.
 #define STAT 0x98
