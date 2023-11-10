@@ -25,7 +25,7 @@ CFLAGS := -mcpu=$(CPU) \
 		  -O3 \
 		  -Wall -Wno-unused-function -Werror \
 		  -I$(BOARD_DIR)/include \
-		  -I$(SDDF)/drivers/clock/meson \
+		  -I$(SDDF)/include \
 		  -target aarch64-none-elf
 LDFLAGS := -L$(BOARD_DIR)/lib
 LIBS := -lmicrokit -Tmicrokit.ld
@@ -33,8 +33,8 @@ LIBS := -lmicrokit -Tmicrokit.ld
 IMAGE_FILE = $(BUILD_DIR)/loader.img
 REPORT_FILE = $(BUILD_DIR)/report.txt
 
-TIMER_OBJS := timer.o
-CLIENT_OBJS := client.o
+TIMER_DRIVER_OBJS := timer_driver.o
+CLIENT_OBJS := client.o $(BUILD_DIR)/sddf_timer_client.o
 
 TIMER_DRIVER := $(SDDF)/drivers/clock/meson
 
@@ -43,16 +43,19 @@ all: $(BUILD_DIR) $(IMAGE_FILE)
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
-$(BUILD_DIR)/%.o: %.c
-	$(CC) -c $(CFLAGS) $< -o $@
+$(BUILD_DIR)/client.o:
+	$(CC) -c $(CFLAGS) client.c -o $(BUILD_DIR)/client.o
 
-$(BUILD_DIR)/%.o: $(TIMER_DRIVER)/%.c
-	$(CC) -c $(CFLAGS) $< -o $@
+$(BUILD_DIR)/timer_driver.o: $(TIMER_DRIVER)/timer.c
+	$(CC) -c $(CFLAGS) $(TIMER_DRIVER)/timer.c -o $(BUILD_DIR)/timer_driver.o
 
-$(BUILD_DIR)/timer.elf: $(addprefix $(BUILD_DIR)/, $(TIMER_OBJS))
+$(BUILD_DIR)/sddf_timer_client.o:
+	BUILD_DIR=$(abspath $(BUILD_DIR)) MICROKIT_INCLUDE=$(BOARD_DIR)/include TIMER_CHANNEL=1 make -C $(SDDF)/timer/client
+
+$(BUILD_DIR)/timer.elf: $(BUILD_DIR)/timer_driver.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-$(BUILD_DIR)/client.elf: $(addprefix $(BUILD_DIR)/, $(CLIENT_OBJS))
+$(BUILD_DIR)/client.elf: $(BUILD_DIR)/client.o $(BUILD_DIR)/sddf_timer_client.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(IMAGE_FILE) $(REPORT_FILE): $(addprefix $(BUILD_DIR)/, $(IMAGES)) timer.system
