@@ -62,7 +62,6 @@
 #include "lwip/stats.h"
 #include "lwip/snmp.h"
 #include "lwip/dhcp.h"
-#include "util.h"
 #include <string.h>
 
 #ifndef UDP_LOCAL_PORT_RANGE_START
@@ -216,7 +215,6 @@ udp_input(struct pbuf *p, struct netif *inp)
     /* drop short packets */
     LWIP_DEBUGF(UDP_DEBUG,
                 ("udp_input: short UDP datagram (%"U16_F" bytes) discarded\n", p->tot_len));
-    print("udp_input: short UDP datagram\n")
     UDP_STATS_INC(udp.lenerr);
     UDP_STATS_INC(udp.drop);
     MIB2_STATS_INC(mib2.udpinerrors);
@@ -756,7 +754,6 @@ udp_sendto_if_src_chksum(struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t *d
 
   /* packet too large to add a UDP header without causing an overflow? */
   if ((u16_t)(p->tot_len + UDP_HLEN) < p->tot_len) {
-    print("p->tot_len + UDP_HLEN < p->tot_len\n");
     return ERR_MEM;
   }
   /* not enough space to add an UDP header to first pbuf in given p chain? */
@@ -765,7 +762,6 @@ udp_sendto_if_src_chksum(struct udp_pcb *pcb, struct pbuf *p, const ip_addr_t *d
     q = pbuf_alloc(PBUF_IP, UDP_HLEN, PBUF_RAM);
     /* new header pbuf could not be allocated? */
     if (q == NULL) {
-      print("udp_send could not allocate header\n");
       LWIP_DEBUGF(UDP_DEBUG | LWIP_DBG_TRACE | LWIP_DBG_LEVEL_SERIOUS, ("udp_send: could not allocate header\n"));
       return ERR_MEM;
     }

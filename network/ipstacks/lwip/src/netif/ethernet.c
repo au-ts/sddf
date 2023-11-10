@@ -48,7 +48,6 @@
 #include "lwip/etharp.h"
 #include "lwip/ip.h"
 #include "lwip/snmp.h"
-#include "util.h"
 #include <string.h>
 
 #include "netif/ppp/ppp_opts.h"
@@ -180,7 +179,6 @@ ethernet_input(struct pbuf *p, struct netif *netif)
                     ("ethernet_input: IPv4 packet dropped, too short (%"U16_F"/%"U16_F")\n",
                      p->tot_len, next_hdr_offset));
         LWIP_DEBUGF(ETHARP_DEBUG | LWIP_DBG_TRACE, ("Can't move over header in packet"));
-        print("ethernet_input ipv4 packet too short\n");
         goto free_and_return;
       } else {
         /* pass to IP layer */

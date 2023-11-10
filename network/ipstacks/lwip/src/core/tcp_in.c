@@ -145,7 +145,6 @@ tcp_input(struct pbuf *p, struct netif *inp)
   if (p->len < TCP_HLEN) {
     /* drop short packets */
     LWIP_DEBUGF(TCP_INPUT_DEBUG, ("tcp_input: short packet (%"U16_F" bytes) discarded\n", p->tot_len));
-    print("TCP Short packet");
     TCP_STATS_INC(tcp.lenerr);
     goto dropped;
   }
@@ -177,7 +176,6 @@ tcp_input(struct pbuf *p, struct netif *inp)
   hdrlen_bytes = TCPH_HDRLEN_BYTES(tcphdr);
   if ((hdrlen_bytes < TCP_HLEN) || (hdrlen_bytes > p->tot_len)) {
     LWIP_DEBUGF(TCP_INPUT_DEBUG, ("tcp_input: invalid header length (%"U16_F")\n", (u16_t)hdrlen_bytes));
-    print("TCP invalid header length");
     TCP_STATS_INC(tcp.lenerr);
     goto dropped;
   }
@@ -211,7 +209,6 @@ tcp_input(struct pbuf *p, struct netif *inp)
     if (opt2len > p->next->len) {
       /* drop short packets */
       LWIP_DEBUGF(TCP_INPUT_DEBUG, ("tcp_input: options overflow second pbuf (%"U16_F" bytes)\n", p->next->len));
-      print("TCP options overflow second pbuf");
       TCP_STATS_INC(tcp.lenerr);
       goto dropped;
     }
@@ -242,7 +239,6 @@ tcp_input(struct pbuf *p, struct netif *inp)
     if (tcplen < p->tot_len) {
       /* u16_t overflow, cannot handle this */
       LWIP_DEBUGF(TCP_INPUT_DEBUG, ("tcp_input: length u16_t overflow, cannot handle this\n"));
-      print("TCP length u16_t overflow");
       TCP_STATS_INC(tcp.lenerr);
       goto dropped;
     }
