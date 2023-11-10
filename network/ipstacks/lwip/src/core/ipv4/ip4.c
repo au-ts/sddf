@@ -445,7 +445,6 @@ ip4_input(struct pbuf *p, struct netif *inp)
   iphdr = (struct ip_hdr *)p->payload;
   if (IPH_V(iphdr) != 4) {
     LWIP_DEBUGF(IP_DEBUG | LWIP_DBG_LEVEL_WARNING, ("IP packet dropped due to bad version number %"U16_F"\n", (u16_t)IPH_V(iphdr)));
-    print("Bad version number");
     ip4_debug_print(p);
     pbuf_free(p);
     IP_STATS_INC(ip.err);
@@ -476,19 +475,16 @@ ip4_input(struct pbuf *p, struct netif *inp)
     if (iphdr_hlen < IP_HLEN) {
       LWIP_DEBUGF(IP_DEBUG | LWIP_DBG_LEVEL_SERIOUS,
                   ("ip4_input: short IP header (%"U16_F" bytes) received, IP packet dropped\n", iphdr_hlen));
-      print("short IP header");
     }
     if (iphdr_hlen > p->len) {
       LWIP_DEBUGF(IP_DEBUG | LWIP_DBG_LEVEL_SERIOUS,
                   ("IP header (len %"U16_F") does not fit in first pbuf (len %"U16_F"), IP packet dropped.\n",
                    iphdr_hlen, p->len));
-      print("Long IP header");
     }
     if (iphdr_len > p->tot_len) {
       LWIP_DEBUGF(IP_DEBUG | LWIP_DBG_LEVEL_SERIOUS,
                   ("IP (len %"U16_F") is longer than pbuf (len %"U16_F"), IP packet dropped.\n",
                    iphdr_len, p->tot_len));
-      print("Long IP header");
     }
     /* free (drop) packet pbufs */
     pbuf_free(p);
@@ -611,7 +607,6 @@ ip4_input(struct pbuf *p, struct netif *inp)
       /* packet source is not valid */
       LWIP_DEBUGF(IP_DEBUG | LWIP_DBG_TRACE | LWIP_DBG_LEVEL_WARNING, ("ip4_input: packet source is not valid.\n"));
       /* free (drop) packet pbufs */
-      print("invalid packet source");
       pbuf_free(p);
       IP_STATS_INC(ip.drop);
       MIB2_STATS_INC(mib2.ipinaddrerrors);

@@ -51,8 +51,6 @@
 #include "lwip/def.h"
 #include "lwip/ip_addr.h"
 
-#include "util.h"
-
 #include <string.h>
 
 #ifndef LWIP_CHKSUM

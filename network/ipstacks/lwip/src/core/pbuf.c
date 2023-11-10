@@ -243,7 +243,6 @@ pbuf_alloc(pbuf_layer layer, u16_t length, pbuf_type type)
         u16_t qlen;
         q = (struct pbuf *)memp_malloc(MEMP_PBUF_POOL);
         if (q == NULL) {
-          print("Pbuf pool is empty!\n");
           PBUF_POOL_IS_EMPTY();
           /* free chain so far allocated */
           if (p) {
@@ -279,14 +278,12 @@ pbuf_alloc(pbuf_layer layer, u16_t length, pbuf_type type)
       /* bug #50040: Check for integer overflow when calculating alloc_len */
       if ((payload_len < LWIP_MEM_ALIGN_SIZE(length)) ||
           (alloc_len < LWIP_MEM_ALIGN_SIZE(length))) {
-        print("payload_len < length || alloc_len < length\n");
         return NULL;
       }
 
       /* If pbuf is to be allocated in RAM, allocate memory for it. */
       p = (struct pbuf *)mem_malloc(alloc_len);
       if (p == NULL) {
-        print("pbuf_alloc PBUF_RAM: mem_malloc failed\n");
         return NULL;
       }
       pbuf_init_alloced_pbuf(p, LWIP_MEM_ALIGN((void *)((u8_t *)p + SIZEOF_STRUCT_PBUF + offset)),
@@ -335,7 +332,6 @@ pbuf_alloc_reference(void *payload, u16_t length, pbuf_type type)
   /* only allocate memory for the pbuf structure */
   p = (struct pbuf *)memp_malloc(MEMP_PBUF);
   if (p == NULL) {
-    print("pbuf_alloc_reference: Could not allocate MEMP_PBUF\n");
     LWIP_DEBUGF(PBUF_DEBUG | LWIP_DBG_LEVEL_SERIOUS,
                 ("pbuf_alloc_reference: Could not allocate MEMP_PBUF for PBUF_%s.\n",
                  (type == PBUF_ROM) ? "ROM" : "REF"));
