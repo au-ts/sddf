@@ -2,6 +2,10 @@
 #include <microkit.h>
 #include <sddf/timer/client.h>
 
+#ifndef TIMER_CHANNEL
+#error "TIMER_CHANNEL must be provided"
+#endif
+
 #define GET_TIME 0
 #define SET_TIMEOUT 1
 
