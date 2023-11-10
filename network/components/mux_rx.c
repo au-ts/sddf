@@ -3,7 +3,7 @@
 #include <microkit.h>
 #include <string.h>
 
-#include "shared_ringbuffer.h"
+#include <sddf/network/shared_ringbuffer.h>
 #include "util.h"
 #include "lwip/ip_addr.h"
 #include "netif/etharp.h"

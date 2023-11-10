@@ -56,6 +56,7 @@ REPORT_FILE = $(BUILD_DIR)/report.txt
 CFLAGS += -I$(BOARD_DIR)/include \
 	-Iinclude	\
 	-Iinclude/arch	\
+	-I$(SDDF)/include \
 	-I$(LWIP)/include \
 	-I$(LWIP)/include/ipv4 \
 	-I$(RING_BUFFER)/include \
@@ -100,16 +101,16 @@ NETIFFILES=$(LWIP)/netif/ethernet.c
 
 # LWIPFILES: All the above.
 LWIPFILES=$(NETWORK_COMPONENTS)/lwip.c $(NETWORK_COMPONENTS)/lwip_timer.c $(UTIL)/cache.c $(COREFILES) $(CORE4FILES) $(NETIFFILES)
-LWIP_OBJS := $(LWIPFILES:.c=.o) $(NETWORK_COMPONENTS)/lwip.o $(RING_BUFFER)/shared_ringbuffer.o $(NETWORK_COMPONENTS)/utilization_socket.o $(NETWORK_COMPONENTS)/udp_echo_socket.o
+LWIP_OBJS := $(LWIPFILES:.c=.o) $(NETWORK_COMPONENTS)/lwip.o sddf_network_sharedringbuffer.o $(NETWORK_COMPONENTS)/utilization_socket.o $(NETWORK_COMPONENTS)/udp_echo_socket.o
 
-ETH_OBJS := $(ETHERNET_DRIVER)/ethernet.o $(RING_BUFFER)/shared_ringbuffer.o
-MUX_RX_OBJS := $(NETWORK_COMPONENTS)/mux_rx.o $(RING_BUFFER)/shared_ringbuffer.o
-#MUX_TX_OBJS := mux_tx_round_robin.o $(RING_BUFFER)/shared_ringbuffer.o
-MUX_TX_OBJS := $(NETWORK_COMPONENTS)/mux_tx_bandwidth_limited.o $(RING_BUFFER)/shared_ringbuffer.o
-COPY_OBJS := $(NETWORK_COMPONENTS)/copy.o $(RING_BUFFER)/shared_ringbuffer.o
+ETH_OBJS := $(ETHERNET_DRIVER)/ethernet.o sddf_network_sharedringbuffer.o
+MUX_RX_OBJS := $(NETWORK_COMPONENTS)/mux_rx.o sddf_network_sharedringbuffer.o
+#MUX_TX_OBJS := mux_tx_round_robin.o sddf_network_sharedringbuffer.o
+MUX_TX_OBJS := $(NETWORK_COMPONENTS)/mux_tx_bandwidth_limited.o sddf_network_sharedringbuffer.o
+COPY_OBJS := $(NETWORK_COMPONENTS)/copy.o sddf_network_sharedringbuffer.o
 BENCH_OBJS := $(BENCHMARK)/benchmark.o
 IDLE_OBJS := $(BENCHMARK)/idle.o
-ARP_OBJS := $(UTIL)/cache.o $(LWIP)/core/inet_chksum.o $(LWIP)/core/def.o $(NETWORK_COMPONENTS)/arp.o $(RING_BUFFER)/shared_ringbuffer.o
+ARP_OBJS := $(UTIL)/cache.o $(LWIP)/core/inet_chksum.o $(LWIP)/core/def.o $(NETWORK_COMPONENTS)/arp.o sddf_network_sharedringbuffer.o
 TIMER_OBJS := $(TIMER_DRIVER)/timer.o
 
 OBJS := $(sort $(addprefix $(BUILD_DIR)/, $(ETH_OBJS) $(MUX_RX_OBJS) $(MUX_TX_OBJS)\
@@ -126,6 +127,9 @@ $(BUILD_DIR)/%.d $(BUILD_DIR)/%.o: %.c Makefile
 
 $(BUILD_DIR)/%.o: %.s Makefile
 	$(AS) -g3 -mcpu=$(CPU) $< -o $@
+
+$(BUILD_DIR)/sddf_network_sharedringbuffer.o:
+	BUILD_DIR=$(abspath $(BUILD_DIR)) MICROKIT_INCLUDE=$(BOARD_DIR)/include make -C $(RING_BUFFER)
 
 $(BUILD_DIR)/eth.elf: $(addprefix $(BUILD_DIR)/, $(ETH_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@

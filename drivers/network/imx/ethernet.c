@@ -7,9 +7,10 @@
 #include <stdint.h>
 #include <microkit.h>
 #include <sel4/sel4.h>
+#include <sddf/network/shared_ringbuffer.h>
 #include "ethernet.h"
-#include "shared_ringbuffer.h"
 #include "util.h"
+#include "fence.h"
 
 #define IRQ_CH 0
 #define TX_CH  1
