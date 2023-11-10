@@ -1,4 +1,5 @@
-#include "shared_ringbuffer.h"
+#include <microkit.h>
+#include <sddf/network/shared_ringbuffer.h>
 #include "util.h"
 #include <string.h>
 #include <stdbool.h>
