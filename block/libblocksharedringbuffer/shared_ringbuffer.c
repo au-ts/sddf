@@ -5,18 +5,18 @@
 
 #include "shared_ringbuffer.h"
 
-void ring_init(ring_handle_t *ring,
-                cmd_ring_buffer_t *command,
-                resp_ring_buffer_t *response,
-                data_region_t *data_region,
+void blk_ring_init(blk_ring_handle_t *ring,
+                blk_cmd_ring_buffer_t *command,
+                blk_resp_ring_buffer_t *response,
+                blk_data_ring_buffer_t *data,
                 int buffer_init,
                 uint32_t command_size,
                 uint32_t response_size,
-                uint32_t data_region_size)
+                uint32_t data_size)
 {
     ring->cmd_ring = command;
     ring->resp_ring = response;
-    ring->data_region = data_region;
+    ring->data_ring = data;
     if (buffer_init) {
         ring->cmd_ring->write_idx = 0;
         ring->cmd_ring->read_idx = 0;
@@ -30,8 +30,8 @@ void ring_init(ring_handle_t *ring,
         ring->resp_ring->notify_writer =false;
         ring->resp_ring->notify_reader = false;
         ring->resp_ring->plugged = false;
-        ring->data_region->write_idx = 0;
-        ring->data_region->read_idx = 0;
-        ring->data_region->size = data_region_size;
+        ring->data_ring->write_idx = 0;
+        ring->data_ring->read_idx = 0;
+        ring->data_ring->size = data_size;
     }
 }

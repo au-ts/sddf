@@ -12,79 +12,81 @@
 // #include "util/include/util.h"
 #include "util/include/fence.h"
 
-/* Number of entries in shared ring buffer */
-#define NUM_RING_ENTRIES 1024
-/* Number of buffers the data region is configured to have. */
-#define NUM_BUFFERS 2048
-/* Size of a single buffer in the data region. Set to equal sector size. */
-#define BUFFER_SIZE 512
+/* Number of buffers the command ring is configured to have. */
+#define SDDF_BLK_NUM_CMD_BUFFERS 1024
+/* Number of buffers the response ring is configured to have. */
+#define SDDF_BLK_NUM_RESP_BUFFERS 1024
+/* Number of buffers the data ring is configured to have. */
+#define SDDF_BLK_NUM_DATA_BUFFERS 2048
+/* Size of a single buffer in the data ring. Set to equal sector size. */
+#define SDDF_BLK_DATA_BUFFER_SIZE 512
 
 /* Command code for block */
-typedef enum command_code {
+typedef enum blk_command_code {
     BLK_COMMAND_READ,
     BLK_COMMAND_WRITE,
     BLK_COMMAND_BARRIER,
-} command_code_t;
+} blk_command_code_t;
 
 /* Response status for block */
-typedef enum response_status {
+typedef enum blk_response_status {
     BLK_RESPONSE_OK,
     BLK_RESPONSE_ERROR,
-} response_status_t;
+} blk_response_status_t;
 
 /* */
-typedef struct command {
-    command_code_t code; /* command code */
+typedef struct blk_command {
+    blk_command_code_t code; /* command code */
     uintptr_t encoded_base_addr; /* the encoded dma base address of the first buffer in a set of contiguous buffers storing command data */
     uint32_t sector; /* sector number to read/write */
     uint16_t count; /* number of sectors to read/write, also indicates the number of buffers used by this command when buf_size == sector_size */
     void *cookie; /* index into client side metadata, @ericc: stores command ID */
-} command_t;
+} blk_command_t;
 
 /* */
-typedef struct response {
-    response_status_t status; /* response status */
+typedef struct blk_response {
+    blk_response_status_t status; /* response status */
     void *cookie; /* index into client side metadata, @ericc: stores corresponding command ID */
     // @ericc: potentially return address and count on failure,
     // but I haven't found a case where a client needs 
     // to know that much information yet
     // uint16_t count /* on failure, the number of successfully transferred sectors */
     // void *encoded_addr /* on failure, the base dma address of contiguous buffers for transfer */
-} response_t;
+} blk_response_t;
 
 /* Circular buffer containing commands */
-typedef struct cmd_ring_buffer {
+typedef struct blk_cmd_ring_buffer {
     uint32_t write_idx;
     uint32_t read_idx;
-    uint32_t size; /* number of entries in command ring buffer */
+    uint32_t size; /* number of buffers in command ring buffer */
     bool notify_writer;
     bool notify_reader;
     bool plugged;
-    command_t commands[NUM_RING_ENTRIES];
-} cmd_ring_buffer_t;
+    blk_command_t buffers[SDDF_BLK_NUM_CMD_BUFFERS];
+} blk_cmd_ring_buffer_t;
 
 /* Circular buffer containing responses */
-typedef struct resp_ring_buffer {
+typedef struct blk_resp_ring_buffer {
     uint32_t write_idx;
     uint32_t read_idx;
-    uint32_t size; /* number of entries in response ring buffer */
+    uint32_t size; /* number of buffers in response ring buffer */
     bool notify_writer;
     bool notify_reader;
-    response_t responses[NUM_RING_ENTRIES];
-} resp_ring_buffer_t;
+    blk_response_t buffers[SDDF_BLK_NUM_RESP_BUFFERS];
+} blk_resp_ring_buffer_t;
 
-typedef struct data_region {
+typedef struct blk_data_ring_buffer {
     uint32_t write_idx;
     uint32_t read_idx;
     uint32_t size; /* number of buffer segments in shared data */
-} data_region_t;
+} blk_data_ring_buffer_t;
 
 /* A ring handle for enqueing/dequeuing into  */
-typedef struct ring_handle {
-    cmd_ring_buffer_t *cmd_ring;
-    resp_ring_buffer_t *resp_ring;
-    data_region_t *data_region;
-} ring_handle_t;
+typedef struct blk_ring_handle {
+    blk_cmd_ring_buffer_t *cmd_ring;
+    blk_resp_ring_buffer_t *resp_ring;
+    blk_data_ring_buffer_t *data_ring;
+} blk_ring_handle_t;
 
 /**
  * Initialise the shared ring buffer.
@@ -94,18 +96,18 @@ typedef struct ring_handle {
  * @param response pointer to response ring in shared memory.
  * @param buffer_init 1 indicates the read and write indices in shared memory need to be initialised.
  *                    0 indicates they do not. Only one side of the shared memory regions needs to do this.
- * @param command_size number of entries in command ring.
- * @param response_size number of entries in response ring.
- * @param data_region_size number of buffer segments in shared data region.
+ * @param command_size number of buffers in command ring.
+ * @param response_size number of buffers in response ring.
+ * @param data_size number of buffer segments in shared data ring.
  */
-void ring_init(ring_handle_t *ring,
-                cmd_ring_buffer_t *command,
-                resp_ring_buffer_t *response,
-                data_region_t *data_region,
+void blk_ring_init(blk_ring_handle_t *ring,
+                blk_cmd_ring_buffer_t *command,
+                blk_resp_ring_buffer_t *response,
+                blk_data_ring_buffer_t *data,
                 int buffer_init,
                 uint32_t command_size,
                 uint32_t response_size,
-                uint32_t data_region_size);
+                uint32_t data_size);
 
 /**
  * Check if the command ring buffer is empty.
@@ -114,7 +116,7 @@ void ring_init(ring_handle_t *ring,
  *
  * @return true indicates the buffer is empty, false otherwise.
  */
-static inline int cmd_ring_empty(ring_handle_t *ring)
+static inline int blk_cmd_ring_empty(blk_ring_handle_t *ring)
 {
     return !((ring->cmd_ring->write_idx - ring->cmd_ring->read_idx) % ring->cmd_ring->size);
 }
@@ -124,9 +126,9 @@ static inline int cmd_ring_empty(ring_handle_t *ring)
  *
  * @param ring ring handle containing response ring buffer.
  *
- * @return true indicates the buffer is empty, false otherwise.
+ * @return true indicates the response ring buffer is empty, false otherwise.
  */
-static inline int resp_ring_empty(ring_handle_t *ring)
+static inline int blk_resp_ring_empty(blk_ring_handle_t *ring)
 {
     return !((ring->resp_ring->write_idx - ring->resp_ring->read_idx) % ring->resp_ring->size);
 }
@@ -137,9 +139,9 @@ static inline int resp_ring_empty(ring_handle_t *ring)
  *
  * @param ring ring handle containing command ring buffer.
  *
- * @return true indicates the buffer is full, false otherwise.
+ * @return true indicates the command ring buffer is full, false otherwise.
  */
-static inline int cmd_ring_full(ring_handle_t *ring)
+static inline int blk_cmd_ring_full(blk_ring_handle_t *ring)
 {
     return !((ring->cmd_ring->write_idx - ring->cmd_ring->read_idx + 1) % ring->cmd_ring->size);
 }
@@ -149,24 +151,24 @@ static inline int cmd_ring_full(ring_handle_t *ring)
  *
  * @param ring ring handle containing response ring buffer.
  *
- * @return true indicates the buffer is full, false otherwise.
+ * @return true indicates the response ring buffer is full, false otherwise.
  */
-static inline int resp_ring_full(ring_handle_t *ring)
+static inline int blk_resp_ring_full(blk_ring_handle_t *ring)
 {
     return !((ring->resp_ring->write_idx - ring->resp_ring->read_idx + 1) % ring->resp_ring->size);
 }
 
 /**
- * Check if the data region is full.
+ * Check if the data ring is full.
  *
- * @param ring ring handle containing data region.
+ * @param ring ring handle containing data ring.
  * @param count the number of contiguous buffers to be inserted.
  *
- * @return true indicates the buffer is full, false otherwise.
+ * @return true indicates the data ring buffer is full, false otherwise.
  */
-static inline int data_region_full(ring_handle_t *ring, uint32_t count)
+static inline int blk_data_ring_full(blk_ring_handle_t *ring, uint32_t count)
 {
-    return !((ring->data_region->write_idx - ring->data_region->read_idx + count + 1) % ring->data_region->size);
+    return !((ring->data_ring->write_idx - ring->data_ring->read_idx + count + 1) % ring->data_ring->size);
 }
 
 /**
@@ -176,7 +178,7 @@ static inline int data_region_full(ring_handle_t *ring, uint32_t count)
  *
  * @return number of elements in the ring buffer.
  */
-static inline int cmd_ring_size(ring_handle_t *ring)
+static inline int blk_cmd_ring_size(blk_ring_handle_t *ring)
 {
     return (ring->cmd_ring->write_idx - ring->cmd_ring->read_idx);
 }
@@ -188,7 +190,7 @@ static inline int cmd_ring_size(ring_handle_t *ring)
  *
  * @return number of elements in the ring buffer.
  */
-static inline int resp_ring_size(ring_handle_t *ring)
+static inline int blk_resp_ring_size(blk_ring_handle_t *ring)
 {
     return (ring->resp_ring->write_idx - ring->resp_ring->read_idx);
 }
@@ -204,28 +206,28 @@ static inline int resp_ring_size(ring_handle_t *ring)
  * @param count the number of contiguous buffers used by this command.
  * @param cookie command ID to identify this command.
  *
- * @return -1 when ring is full or data region is full, 0 on success.
+ * @return -1 when command ring is full or data ring is full, 0 on success.
  */
-static inline int enqueue_cmd(ring_handle_t *ring,
-                            command_code_t code,
+static inline int blk_enqueue_cmd(blk_ring_handle_t *ring,
+                            blk_command_code_t code,
                             uintptr_t base_addr,
                             uint32_t sector,
                             uint16_t count,
                             void *cookie)
 {
-    if (cmd_ring_full(ring) || data_region_full(ring, count)) {
+    if (blk_cmd_ring_full(ring) || blk_data_ring_full(ring, count)) {
         return -1;
     }
 
-    ring->cmd_ring->commands[ring->cmd_ring->write_idx % ring->cmd_ring->size].code = code;
-    ring->cmd_ring->commands[ring->cmd_ring->write_idx % ring->cmd_ring->size].encoded_base_addr = base_addr;
-    ring->cmd_ring->commands[ring->cmd_ring->write_idx % ring->cmd_ring->size].sector = sector;
-    ring->cmd_ring->commands[ring->cmd_ring->write_idx % ring->cmd_ring->size].count = count;
-    ring->cmd_ring->commands[ring->cmd_ring->write_idx % ring->cmd_ring->size].cookie = cookie;
+    ring->cmd_ring->buffers[ring->cmd_ring->write_idx % ring->cmd_ring->size].code = code;
+    ring->cmd_ring->buffers[ring->cmd_ring->write_idx % ring->cmd_ring->size].encoded_base_addr = base_addr;
+    ring->cmd_ring->buffers[ring->cmd_ring->write_idx % ring->cmd_ring->size].sector = sector;
+    ring->cmd_ring->buffers[ring->cmd_ring->write_idx % ring->cmd_ring->size].count = count;
+    ring->cmd_ring->buffers[ring->cmd_ring->write_idx % ring->cmd_ring->size].cookie = cookie;
 
     THREAD_MEMORY_RELEASE();
     ring->cmd_ring->write_idx++;
-    ring->data_region->write_idx += (uint32_t)count;
+    ring->data_ring->write_idx += (uint32_t)count;
 
     return 0;
 }
@@ -240,16 +242,16 @@ static inline int enqueue_cmd(ring_handle_t *ring,
  *
  * @return -1 when response ring is full, 0 on success.
  */
-static inline int enqueue_resp(ring_handle_t *ring,
-                                response_status_t status,
+static inline int blk_enqueue_resp(blk_ring_handle_t *ring,
+                                blk_response_status_t status,
                                 void *cookie)
 {
-    if (resp_ring_full(ring)) {
+    if (blk_resp_ring_full(ring)) {
         return -1;
     }
 
-    ring->resp_ring->responses[ring->resp_ring->write_idx % ring->resp_ring->size].status = status;
-    ring->resp_ring->responses[ring->resp_ring->write_idx % ring->resp_ring->size].cookie = cookie;
+    ring->resp_ring->buffers[ring->resp_ring->write_idx % ring->resp_ring->size].status = status;
+    ring->resp_ring->buffers[ring->resp_ring->write_idx % ring->resp_ring->size].cookie = cookie;
 
     THREAD_MEMORY_RELEASE();
     ring->resp_ring->write_idx++;
@@ -269,26 +271,26 @@ static inline int enqueue_resp(ring_handle_t *ring,
  *
  * @return -1 when command ring is empty, 0 on success.
  */
-static inline int dequeue_cmd(ring_handle_t *ring,
-                            command_code_t *code,
+static inline int blk_dequeue_cmd(blk_ring_handle_t *ring,
+                            blk_command_code_t *code,
                             uintptr_t *base_addr,
                             uint32_t *sector,
                             uint16_t *count,
                             void **cookie)
 {
-    if (cmd_ring_empty(ring)) {
+    if (blk_cmd_ring_empty(ring)) {
         return -1;
     }
 
-    *code = ring->cmd_ring->commands[ring->cmd_ring->read_idx % ring->cmd_ring->size].code;
-    *base_addr = ring->cmd_ring->commands[ring->cmd_ring->read_idx % ring->cmd_ring->size].encoded_base_addr;
-    *sector = ring->cmd_ring->commands[ring->cmd_ring->read_idx % ring->cmd_ring->size].sector;
-    *count = ring->cmd_ring->commands[ring->cmd_ring->read_idx % ring->cmd_ring->size].count;
-    *cookie = ring->cmd_ring->commands[ring->cmd_ring->read_idx % ring->cmd_ring->size].cookie;
+    *code = ring->cmd_ring->buffers[ring->cmd_ring->read_idx % ring->cmd_ring->size].code;
+    *base_addr = ring->cmd_ring->buffers[ring->cmd_ring->read_idx % ring->cmd_ring->size].encoded_base_addr;
+    *sector = ring->cmd_ring->buffers[ring->cmd_ring->read_idx % ring->cmd_ring->size].sector;
+    *count = ring->cmd_ring->buffers[ring->cmd_ring->read_idx % ring->cmd_ring->size].count;
+    *cookie = ring->cmd_ring->buffers[ring->cmd_ring->read_idx % ring->cmd_ring->size].cookie;
 
     THREAD_MEMORY_RELEASE();
     ring->cmd_ring->read_idx++;
-    ring->data_region->read_idx += (uint32_t)*count;
+    ring->data_ring->read_idx += (uint32_t)*count;
 
     return 0;
 }
@@ -301,16 +303,16 @@ static inline int dequeue_cmd(ring_handle_t *ring,
  * @param cookie pointer to cookie storing command ID to idenfity which command this response is for.
  * @return -1 when response ring is empty, 0 on success.
  */
-static inline int dequeue_resp(ring_handle_t *ring,
-                                response_status_t *status,
+static inline int blk_dequeue_resp(blk_ring_handle_t *ring,
+                                blk_response_status_t *status,
                                 void **cookie)
 {
-    if (resp_ring_empty(ring)) {
+    if (blk_resp_ring_empty(ring)) {
         return -1;
     }
 
-    *status = ring->resp_ring->responses[ring->resp_ring->read_idx % ring->resp_ring->size].status;
-    *cookie = ring->resp_ring->responses[ring->resp_ring->read_idx % ring->resp_ring->size].cookie;
+    *status = ring->resp_ring->buffers[ring->resp_ring->read_idx % ring->resp_ring->size].status;
+    *cookie = ring->resp_ring->buffers[ring->resp_ring->read_idx % ring->resp_ring->size].cookie;
 
     THREAD_MEMORY_RELEASE();
     ring->resp_ring->read_idx++;
@@ -323,7 +325,7 @@ static inline int dequeue_resp(ring_handle_t *ring,
  *
  * @param ring Ring handle containing command ring to check for plug.
 */
-static inline void cmd_ring_plug(ring_handle_t *ring) {
+static inline void blk_cmd_ring_plug(blk_ring_handle_t *ring) {
     ring->cmd_ring->plugged = true;
 }
 
@@ -332,7 +334,7 @@ static inline void cmd_ring_plug(ring_handle_t *ring) {
  *
  * @param ring Ring handle containing command ring to check for plug.
 */
-static inline void cmd_ring_unplug(ring_handle_t *ring) {
+static inline void blk_cmd_ring_unplug(blk_ring_handle_t *ring) {
     ring->cmd_ring->plugged = false;
 }
 
@@ -343,7 +345,7 @@ static inline void cmd_ring_unplug(ring_handle_t *ring) {
  *
  * @return true when command ring is plugged, false when unplugged.
 */
-static inline bool cmd_ring_plugged(ring_handle_t *ring) {
+static inline bool blk_cmd_ring_plugged(blk_ring_handle_t *ring) {
     return ring->cmd_ring->plugged;
 }
 
