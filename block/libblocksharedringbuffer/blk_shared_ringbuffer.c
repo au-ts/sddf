@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-#include "shared_ringbuffer.h"
+#include "blk_shared_ringbuffer.h"
 
 void blk_ring_init(blk_ring_handle_t *ring,
                 blk_cmd_ring_buffer_t *command,
@@ -29,7 +29,6 @@ void blk_ring_init(blk_ring_handle_t *ring,
         ring->resp_ring->size = response_size;
         ring->resp_ring->notify_writer =false;
         ring->resp_ring->notify_reader = false;
-        ring->resp_ring->plugged = false;
         ring->data_ring->write_idx = 0;
         ring->data_ring->read_idx = 0;
         ring->data_ring->size = data_size;
