@@ -3,9 +3,9 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-#include "shared_ringbuffer.h"
+#include "sddf_serial_shared_ringbuffer.h"
 
-void ring_init(ring_handle_t *ring, ring_buffer_t *free, ring_buffer_t *used, int buffer_init, uint32_t free_size, uint32_t used_size)
+void sddf_serial_ring_init(sddf_serial_ring_handle_t *ring, sddf_serial_ring_buffer_t *free, sddf_serial_ring_buffer_t *used, int buffer_init, uint32_t free_size, uint32_t used_size)
 {
     ring->free_ring = free;
     ring->used_ring = used;

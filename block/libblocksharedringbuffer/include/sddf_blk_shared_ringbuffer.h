@@ -22,71 +22,71 @@
 #define SDDF_BLK_DATA_BUFFER_SIZE 512
 
 /* Command code for block */
-typedef enum blk_command_code {
-    BLK_COMMAND_READ,
-    BLK_COMMAND_WRITE,
-    BLK_COMMAND_BARRIER,
-} blk_command_code_t;
+typedef enum sddf_blk_command_code {
+    SDDF_BLK_COMMAND_READ,
+    SDDF_BLK_COMMAND_WRITE,
+    SDDF_BLK_COMMAND_BARRIER,
+} sddf_blk_command_code_t;
 
 /* Response status for block */
-typedef enum blk_response_status {
-    BLK_RESPONSE_OK,
-    BLK_RESPONSE_ERROR,
-} blk_response_status_t;
+typedef enum sddf_blk_response_status {
+    SDDF_BLK_RESPONSE_OK,
+    SDDF_BLK_RESPONSE_ERROR,
+} sddf_blk_response_status_t;
 
 /* */
-typedef struct blk_command {
-    blk_command_code_t code; /* command code */
+typedef struct sddf_blk_command {
+    sddf_blk_command_code_t code; /* command code */
     uintptr_t encoded_base_addr; /* the encoded dma base address of the first buffer in a set of contiguous buffers storing command data */
     uint32_t sector; /* sector number to read/write */
     uint16_t count; /* number of sectors to read/write, also indicates the number of buffers used by this command when buf_size == sector_size */
     void *cookie; /* index into client side metadata, @ericc: stores command ID */
-} blk_command_t;
+} sddf_blk_command_t;
 
 /* */
-typedef struct blk_response {
-    blk_response_status_t status; /* response status */
+typedef struct sddf_blk_response {
+    sddf_blk_response_status_t status; /* response status */
     void *cookie; /* index into client side metadata, @ericc: stores corresponding command ID */
     // @ericc: potentially return address and count on failure,
     // but I haven't found a case where a client needs 
     // to know that much information yet
     // uint16_t count /* on failure, the number of successfully transferred sectors */
     // void *encoded_addr /* on failure, the base dma address of contiguous buffers for transfer */
-} blk_response_t;
+} sddf_blk_response_t;
 
 /* Circular buffer containing commands */
-typedef struct blk_cmd_ring_buffer {
+typedef struct sddf_blk_cmd_ring_buffer {
     uint32_t write_idx;
     uint32_t read_idx;
     uint32_t size; /* number of buffers in command ring buffer */
     bool notify_writer;
     bool notify_reader;
     bool plugged;
-    blk_command_t buffers[SDDF_BLK_NUM_CMD_BUFFERS];
-} blk_cmd_ring_buffer_t;
+    sddf_blk_command_t buffers[SDDF_BLK_NUM_CMD_BUFFERS];
+} sddf_blk_cmd_ring_buffer_t;
 
 /* Circular buffer containing responses */
-typedef struct blk_resp_ring_buffer {
+typedef struct sddf_blk_resp_ring_buffer {
     uint32_t write_idx;
     uint32_t read_idx;
     uint32_t size; /* number of buffers in response ring buffer */
     bool notify_writer;
     bool notify_reader;
-    blk_response_t buffers[SDDF_BLK_NUM_RESP_BUFFERS];
-} blk_resp_ring_buffer_t;
+    sddf_blk_response_t buffers[SDDF_BLK_NUM_RESP_BUFFERS];
+} sddf_blk_resp_ring_buffer_t;
 
-typedef struct blk_data_ring_buffer {
+typedef struct sddf_blk_data_ring_buffer {
     uint32_t write_idx;
     uint32_t read_idx;
     uint32_t size; /* number of buffer segments in shared data */
-} blk_data_ring_buffer_t;
+} sddf_blk_data_ring_buffer_t;
 
 /* A ring handle for enqueing/dequeuing into  */
-typedef struct blk_ring_handle {
-    blk_cmd_ring_buffer_t *cmd_ring;
-    blk_resp_ring_buffer_t *resp_ring;
-    blk_data_ring_buffer_t *data_ring;
-} blk_ring_handle_t;
+typedef struct sddf_blk_ring_handle {
+    sddf_blk_cmd_ring_buffer_t *cmd_ring;
+    sddf_blk_resp_ring_buffer_t *resp_ring;
+    sddf_blk_data_ring_buffer_t *data_ring;
+} sddf_blk_ring_handle_t;
 
 /**
  * Initialise the shared ring buffer.
@@ -100,10 +100,10 @@ typedef struct blk_ring_handle {
  * @param response_size number of buffers in response ring.
  * @param data_size number of buffer segments in shared data ring.
  */
-void blk_ring_init(blk_ring_handle_t *ring,
-                blk_cmd_ring_buffer_t *command,
-                blk_resp_ring_buffer_t *response,
-                blk_data_ring_buffer_t *data,
+void sddf_blk_ring_init(sddf_blk_ring_handle_t *ring,
+                sddf_blk_cmd_ring_buffer_t *command,
+                sddf_blk_resp_ring_buffer_t *response,
+                sddf_blk_data_ring_buffer_t *data,
                 int buffer_init,
                 uint32_t command_size,
                 uint32_t response_size,
@@ -116,7 +116,7 @@ void blk_ring_init(blk_ring_handle_t *ring,
  *
  * @return true indicates the buffer is empty, false otherwise.
  */
-static inline int blk_cmd_ring_empty(blk_ring_handle_t *ring)
+static inline int sddf_blk_cmd_ring_empty(sddf_blk_ring_handle_t *ring)
 {
     return !((ring->cmd_ring->write_idx - ring->cmd_ring->read_idx) % ring->cmd_ring->size);
 }
@@ -128,7 +128,7 @@ static inline int blk_cmd_ring_empty(blk_ring_handle_t *ring)
  *
  * @return true indicates the response ring buffer is empty, false otherwise.
  */
-static inline int blk_resp_ring_empty(blk_ring_handle_t *ring)
+static inline int sddf_blk_resp_ring_empty(sddf_blk_ring_handle_t *ring)
 {
     return !((ring->resp_ring->write_idx - ring->resp_ring->read_idx) % ring->resp_ring->size);
 }
@@ -141,7 +141,7 @@ static inline int blk_resp_ring_empty(blk_ring_handle_t *ring)
  *
  * @return true indicates the command ring buffer is full, false otherwise.
  */
-static inline int blk_cmd_ring_full(blk_ring_handle_t *ring)
+static inline int sddf_blk_cmd_ring_full(sddf_blk_ring_handle_t *ring)
 {
     return !((ring->cmd_ring->write_idx - ring->cmd_ring->read_idx + 1) % ring->cmd_ring->size);
 }
@@ -153,7 +153,7 @@ static inline int blk_cmd_ring_full(blk_ring_handle_t *ring)
  *
  * @return true indicates the response ring buffer is full, false otherwise.
  */
-static inline int blk_resp_ring_full(blk_ring_handle_t *ring)
+static inline int sddf_blk_resp_ring_full(sddf_blk_ring_handle_t *ring)
 {
     return !((ring->resp_ring->write_idx - ring->resp_ring->read_idx + 1) % ring->resp_ring->size);
 }
@@ -166,7 +166,7 @@ static inline int blk_resp_ring_full(blk_ring_handle_t *ring)
  *
  * @return true indicates the data ring buffer is full, false otherwise.
  */
-static inline int blk_data_ring_full(blk_ring_handle_t *ring, uint32_t count)
+static inline int sddf_blk_data_ring_full(sddf_blk_ring_handle_t *ring, uint32_t count)
 {
     return !((ring->data_ring->write_idx - ring->data_ring->read_idx + count + 1) % ring->data_ring->size);
 }
@@ -178,7 +178,7 @@ static inline int blk_data_ring_full(blk_ring_handle_t *ring, uint32_t count)
  *
  * @return number of elements in the ring buffer.
  */
-static inline int blk_cmd_ring_size(blk_ring_handle_t *ring)
+static inline int sddf_blk_cmd_ring_size(sddf_blk_ring_handle_t *ring)
 {
     return (ring->cmd_ring->write_idx - ring->cmd_ring->read_idx);
 }
@@ -190,7 +190,7 @@ static inline int blk_cmd_ring_size(blk_ring_handle_t *ring)
  *
  * @return number of elements in the ring buffer.
  */
-static inline int blk_resp_ring_size(blk_ring_handle_t *ring)
+static inline int sddf_blk_resp_ring_size(sddf_blk_ring_handle_t *ring)
 {
     return (ring->resp_ring->write_idx - ring->resp_ring->read_idx);
 }
@@ -208,14 +208,14 @@ static inline int blk_resp_ring_size(blk_ring_handle_t *ring)
  *
  * @return -1 when command ring is full or data ring is full, 0 on success.
  */
-static inline int blk_enqueue_cmd(blk_ring_handle_t *ring,
-                            blk_command_code_t code,
+static inline int sddf_blk_enqueue_cmd(sddf_blk_ring_handle_t *ring,
+                            sddf_blk_command_code_t code,
                             uintptr_t base_addr,
                             uint32_t sector,
                             uint16_t count,
                             void *cookie)
 {
-    if (blk_cmd_ring_full(ring) || blk_data_ring_full(ring, count)) {
+    if (sddf_blk_cmd_ring_full(ring) || sddf_blk_data_ring_full(ring, count)) {
         return -1;
     }
 
@@ -242,11 +242,11 @@ static inline int blk_enqueue_cmd(blk_ring_handle_t *ring,
  *
  * @return -1 when response ring is full, 0 on success.
  */
-static inline int blk_enqueue_resp(blk_ring_handle_t *ring,
-                                blk_response_status_t status,
+static inline int sddf_blk_enqueue_resp(sddf_blk_ring_handle_t *ring,
+                                sddf_blk_response_status_t status,
                                 void *cookie)
 {
-    if (blk_resp_ring_full(ring)) {
+    if (sddf_blk_resp_ring_full(ring)) {
         return -1;
     }
 
@@ -271,14 +271,14 @@ static inline int blk_enqueue_resp(blk_ring_handle_t *ring,
  *
  * @return -1 when command ring is empty, 0 on success.
  */
-static inline int blk_dequeue_cmd(blk_ring_handle_t *ring,
-                            blk_command_code_t *code,
+static inline int sddf_blk_dequeue_cmd(sddf_blk_ring_handle_t *ring,
+                            sddf_blk_command_code_t *code,
                             uintptr_t *base_addr,
                             uint32_t *sector,
                             uint16_t *count,
                             void **cookie)
 {
-    if (blk_cmd_ring_empty(ring)) {
+    if (sddf_blk_cmd_ring_empty(ring)) {
         return -1;
     }
 
@@ -303,11 +303,11 @@ static inline int blk_dequeue_cmd(blk_ring_handle_t *ring,
  * @param cookie pointer to cookie storing command ID to idenfity which command this response is for.
  * @return -1 when response ring is empty, 0 on success.
  */
-static inline int blk_dequeue_resp(blk_ring_handle_t *ring,
-                                blk_response_status_t *status,
+static inline int sddf_blk_dequeue_resp(sddf_blk_ring_handle_t *ring,
+                                sddf_blk_response_status_t *status,
                                 void **cookie)
 {
-    if (blk_resp_ring_empty(ring)) {
+    if (sddf_blk_resp_ring_empty(ring)) {
         return -1;
     }
 
@@ -325,7 +325,7 @@ static inline int blk_dequeue_resp(blk_ring_handle_t *ring,
  *
  * @param ring Ring handle containing command ring to check for plug.
 */
-static inline void blk_cmd_ring_plug(blk_ring_handle_t *ring) {
+static inline void sddf_blk_cmd_ring_plug(sddf_blk_ring_handle_t *ring) {
     ring->cmd_ring->plugged = true;
 }
 
@@ -334,7 +334,7 @@ static inline void blk_cmd_ring_plug(blk_ring_handle_t *ring) {
  *
  * @param ring Ring handle containing command ring to check for plug.
 */
-static inline void blk_cmd_ring_unplug(blk_ring_handle_t *ring) {
+static inline void sddf_blk_cmd_ring_unplug(sddf_blk_ring_handle_t *ring) {
     ring->cmd_ring->plugged = false;
 }
 
@@ -345,7 +345,7 @@ static inline void blk_cmd_ring_unplug(blk_ring_handle_t *ring) {
  *
  * @return true when command ring is plugged, false when unplugged.
 */
-static inline bool blk_cmd_ring_plugged(blk_ring_handle_t *ring) {
+static inline bool sddf_blk_cmd_ring_plugged(sddf_blk_ring_handle_t *ring) {
     return ring->cmd_ring->plugged;
 }
 

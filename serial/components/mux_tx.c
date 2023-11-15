@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <microkit.h>
 #include <sel4/sel4.h>
-#include "shared_ringbuffer.h"
+#include "sddf_serial_shared_ringbuffer.h"
 #include "util/include/util.h"
 #include "util.h"
 #include "uart.h"
@@ -46,8 +46,8 @@ uintptr_t tx_data_client;
 uintptr_t tx_data_client2;
 
 // Have an array of client rings.
-ring_handle_t tx_ring[NUM_CLIENTS];
-ring_handle_t drv_tx_ring;
+sddf_serial_ring_handle_t tx_ring[NUM_CLIENTS];
+sddf_serial_ring_handle_t drv_tx_ring;
 
 size_t copy_with_colour(size_t client, size_t buffer_len, char *driver_buf, char *client_buf) {
     size_t len_copied = 0;
@@ -79,21 +79,21 @@ int handle_tx(int curr_client) {
     unsigned int client_buf_len = 0;
     void *cookie = 0;
 
-    bool was_empty = ring_empty(drv_tx_ring.used_ring);
+    bool was_empty = sddf_serial_ring_empty(drv_tx_ring.used_ring);
 
     // Loop over all clients here
     for (int client = 0; client < NUM_CLIENTS; client++) {
         // The client can plug their ring. If plugged, we won't process it.
-        if (ring_plugged(tx_ring[client].used_ring)) {
+        if (sddf_serial_ring_plugged(tx_ring[client].used_ring)) {
             continue;
         }
-        while (!dequeue_used(&tx_ring[client], &client_buf, &client_buf_len, &cookie)) {
+        while (!sddf_serial_dequeue_used(&tx_ring[client], &client_buf, &client_buf_len, &cookie)) {
             // We want to enqueue into the drivers used ring
             uintptr_t driver_buf = 0;
             unsigned int driver_buf_len = 0;
             void *drv_cookie = 0;
 
-            int ret = driver_dequeue(drv_tx_ring.free_ring, &driver_buf, &driver_buf_len, &drv_cookie);
+            int ret = sddf_serial_driver_dequeue(drv_tx_ring.free_ring, &driver_buf, &driver_buf_len, &drv_cookie);
             if (ret != 0) {
                 microkit_dbg_puts("Failed to dequeue buffer from drv tx avail ring\n");
                 return 1;
@@ -116,7 +116,7 @@ int handle_tx(int curr_client) {
 
             drv_cookie = cookie;
 
-            ret = enqueue_used(&drv_tx_ring, driver_buf, len_copied, drv_cookie);
+            ret = sddf_serial_enqueue_used(&drv_tx_ring, driver_buf, len_copied, drv_cookie);
             if (ret != 0) {
                 microkit_dbg_puts("Failed to enqueue buffer to drv tx used ring\n");
                 // Don't know if I should return here, because we need to enqueue a
@@ -129,7 +129,7 @@ int handle_tx(int curr_client) {
              * free now, which is why the length we enqueue is the maximum
              * buffer length.
              */
-            enqueue_free(&tx_ring[client], client_buf, BUFFER_SIZE, cookie);
+            sddf_serial_enqueue_free(&tx_ring[client], client_buf, BUFFER_SIZE, cookie);
         }
     }
 
@@ -142,14 +142,14 @@ int handle_tx(int curr_client) {
 
 void init (void) {
     // We want to init the client rings here. Currently this only inits one client
-    ring_init(&tx_ring[0], (ring_buffer_t *)tx_free_client, (ring_buffer_t *)tx_used_client, 0, NUM_BUFFERS, NUM_BUFFERS);
-    ring_init(&tx_ring[1], (ring_buffer_t *)tx_free_client2, (ring_buffer_t *)tx_used_client2, 0, NUM_BUFFERS, NUM_BUFFERS);
-    ring_init(&drv_tx_ring, (ring_buffer_t *)tx_free_driver, (ring_buffer_t *)tx_used_driver, 0, NUM_BUFFERS, NUM_BUFFERS);
+    sddf_serial_ring_init(&tx_ring[0], (sddf_serial_ring_buffer_t *)tx_free_client, (sddf_serial_ring_buffer_t *)tx_used_client, 0, SDDF_SERIAL_NUM_BUFFERS, SDDF_SERIAL_NUM_BUFFERS);
+    sddf_serial_ring_init(&tx_ring[1], (sddf_serial_ring_buffer_t *)tx_free_client2, (sddf_serial_ring_buffer_t *)tx_used_client2, 0, SDDF_SERIAL_NUM_BUFFERS, SDDF_SERIAL_NUM_BUFFERS);
+    sddf_serial_ring_init(&drv_tx_ring, (sddf_serial_ring_buffer_t *)tx_free_driver, (sddf_serial_ring_buffer_t *)tx_used_driver, 0, SDDF_SERIAL_NUM_BUFFERS, SDDF_SERIAL_NUM_BUFFERS);
 
     // Add buffers to the drv tx ring from our shared dma region
-    for (int i = 0; i < NUM_BUFFERS - 1; i++) {
+    for (int i = 0; i < SDDF_SERIAL_NUM_BUFFERS - 1; i++) {
         // Have to start at the memory region left of by the rx ring
-        int ret = enqueue_free(&drv_tx_ring, tx_data_driver + ((i + NUM_BUFFERS) * BUFFER_SIZE), BUFFER_SIZE, NULL);
+        int ret = sddf_serial_enqueue_free(&drv_tx_ring, tx_data_driver + ((i + SDDF_SERIAL_NUM_BUFFERS) * SDDF_SERIAL_BUFFER_SIZE), SDDF_SERIAL_BUFFER_SIZE, NULL);
 
         if (ret != 0) {
             microkit_dbg_puts(microkit_name);

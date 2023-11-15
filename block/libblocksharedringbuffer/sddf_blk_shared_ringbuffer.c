@@ -3,12 +3,12 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-#include "blk_shared_ringbuffer.h"
+#include "sddf_blk_shared_ringbuffer.h"
 
-void blk_ring_init(blk_ring_handle_t *ring,
-                blk_cmd_ring_buffer_t *command,
-                blk_resp_ring_buffer_t *response,
-                blk_data_ring_buffer_t *data,
+void sddf_blk_ring_init(sddf_blk_ring_handle_t *ring,
+                sddf_blk_cmd_ring_buffer_t *command,
+                sddf_blk_resp_ring_buffer_t *response,
+                sddf_blk_data_ring_buffer_t *data,
                 int buffer_init,
                 uint32_t command_size,
                 uint32_t response_size,

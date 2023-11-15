@@ -3,7 +3,7 @@
 #include <microkit.h>
 #include "uart.h"
 #include "uart_config.h"
-#include "shared_ringbuffer.h"
+#include "sddf_serial_shared_ringbuffer.h"
 
 /*
  * The PL011 is supposedly universal, which means that this driver should be
@@ -30,8 +30,8 @@ uintptr_t tx_used;
 uintptr_t uart_base;
 
 /* Handlers to be given to the shared ringbuffer API */
-ring_handle_t rx_ring;
-ring_handle_t tx_ring;
+sddf_serial_ring_handle_t rx_ring;
+sddf_serial_ring_handle_t tx_ring;
 
 struct serial_driver global_serial_driver = {0};
 
@@ -72,13 +72,13 @@ void handle_tx() {
     unsigned int len = 0;
     void *cookie = 0;
     // Dequeue something from the Tx ring -> the server will have placed something in here, if its empty then nothing to do
-    while (!driver_dequeue(tx_ring.used_ring, &buffer, &len, &cookie)) {
+    while (!sddf_serial_driver_dequeue(tx_ring.used_ring, &buffer, &len, &cookie)) {
         // Buffer cointaining the bytes to write to serial
         char *phys = (char * )buffer;
         // Handle the tx
         raw_tx(phys, len, cookie);
         // Then enqueue this buffer back into the free queue, so that it can be collected and reused by the server
-        enqueue_free(&tx_ring, buffer, len, &cookie);
+        sddf_serial_enqueue_free(&tx_ring, buffer, len, &cookie);
     }
 }
 
@@ -129,7 +129,7 @@ void handle_irq() {
 
         void *cookie = 0;
 
-        ret = dequeue_free(&rx_ring, &buffer, &buffer_len, &cookie);
+        ret = sddf_serial_dequeue_free(&rx_ring, &buffer, &buffer_len, &cookie);
 
         if (ret != 0) {
             LOG_DRIVER_ERR("unable to dequeue from RX free ring\n");
@@ -139,7 +139,7 @@ void handle_irq() {
         ((char *) buffer)[0] = (char) input;
 
         // Now place in the rx used ring
-        ret = enqueue_used(&rx_ring, buffer, 1, &cookie);
+        ret = sddf_serial_enqueue_used(&rx_ring, buffer, 1, &cookie);
         microkit_notify(RX_CH);
 
     } else if (global_serial_driver.mode == LINE_MODE) {
@@ -153,7 +153,7 @@ void handle_irq() {
 
             void *cookie = 0;
 
-            ret = dequeue_free(&rx_ring, &buffer, &buffer_len, &cookie);
+            ret = sddf_serial_dequeue_free(&rx_ring, &buffer, &buffer_len, &cookie);
             if (ret != 0) {
                 LOG_DRIVER_ERR("unable to dequeue from the RX free ring\n");
                 return;
@@ -164,7 +164,7 @@ void handle_irq() {
         }
 
         // Check that the buffer is not full, and other exit conditions here
-        if (global_serial_driver.line_buffer_size > BUFFER_SIZE ||
+        if (global_serial_driver.line_buffer_size > SDDF_SERIAL_BUFFER_SIZE ||
             input_char == EOT ||
             input_char == ETX ||
             input_char == LF ||
@@ -176,7 +176,7 @@ void handle_irq() {
                 char_arr[global_serial_driver.line_buffer_size] = input_char;
                 global_serial_driver.line_buffer_size += 1;
                 // Enqueue buffer back
-                ret = enqueue_used(&rx_ring, global_serial_driver.line_buffer, global_serial_driver.line_buffer_size, &cookie);
+                ret = sddf_serial_enqueue_used(&rx_ring, global_serial_driver.line_buffer, global_serial_driver.line_buffer_size, &cookie);
                 // Zero out the driver states
                 global_serial_driver.line_buffer = 0;
                 global_serial_driver.line_buffer_size = 0;
@@ -208,8 +208,8 @@ void init(void) {
     LOG_DRIVER("initialising\n");
 
     // Init the shared ring buffers
-    ring_init(&rx_ring, (ring_buffer_t *)rx_free, (ring_buffer_t *)rx_used, 0, NUM_BUFFERS, NUM_BUFFERS);
-    ring_init(&tx_ring, (ring_buffer_t *)tx_free, (ring_buffer_t *)tx_used, 0, NUM_BUFFERS, NUM_BUFFERS);
+    sddf_serial_ring_init(&rx_ring, (sddf_serial_ring_buffer_t *)rx_free, (sddf_serial_ring_buffer_t *)rx_used, 0, SDDF_SERIAL_NUM_BUFFERS, SDDF_SERIAL_NUM_BUFFERS);
+    sddf_serial_ring_init(&tx_ring, (sddf_serial_ring_buffer_t *)tx_free, (sddf_serial_ring_buffer_t *)tx_used, 0, SDDF_SERIAL_NUM_BUFFERS, SDDF_SERIAL_NUM_BUFFERS);
 
     volatile struct pl011_uart_regs *regs = (volatile struct pl011_uart_regs *) uart_base;
     // @ivanv what does 0x50 mean!

@@ -13,33 +13,33 @@
 #include "util/include/fence.h"
 
 /* Number of buffers each ring is configured to have. */
-#define NUM_BUFFERS 512
+#define SDDF_SERIAL_NUM_BUFFERS 512
 /* Size of the data that each buffer descriptor points to. */
-#define BUFFER_SIZE 2048
+#define SDDF_SERIAL_BUFFER_SIZE 2048
 
 /* Buffer descriptor */
-typedef struct buff_desc {
+typedef struct sddf_serial_buff_desc {
     uintptr_t encoded_addr; /* encoded dma addresses */
     unsigned int len; /* associated memory lengths */
     void *cookie; /* index into client side metadata */
-} buff_desc_t;
+} sddf_serial_buff_desc_t;
 
 /* Circular buffer containing descriptors */
-typedef struct ring_buffer {
+typedef struct sddf_serial_ring_buffer {
     uint32_t write_idx;
     uint32_t read_idx;
     uint32_t size;
     bool notify_writer;
     bool notify_reader;
     bool plugged;
-    buff_desc_t buffers[NUM_BUFFERS];
-} ring_buffer_t;
+    sddf_serial_buff_desc_t buffers[SDDF_SERIAL_NUM_BUFFERS];
+} sddf_serial_ring_buffer_t;
 
 /* A ring handle for enqueing/dequeuing into  */
-typedef struct ring_handle {
-    ring_buffer_t *free_ring;
-    ring_buffer_t *used_ring;
-} ring_handle_t;
+typedef struct sddf_serial_ring_handle {
+    sddf_serial_ring_buffer_t *free_ring;
+    sddf_serial_ring_buffer_t *used_ring;
+} sddf_serial_ring_handle_t;
 
 /**
  * Initialise the shared ring buffer.
@@ -50,7 +50,7 @@ typedef struct ring_handle {
  * @param buffer_init 1 indicates the read and write indices in shared memory need to be initialised.
  *                    0 inidicates they do not. Only one side of the shared memory regions needs to do this.
  */
-void ring_init(ring_handle_t *ring, ring_buffer_t *free, ring_buffer_t *used, int buffer_init, uint32_t free_size, uint32_t used_size);
+void sddf_serial_ring_init(sddf_serial_ring_handle_t *ring, sddf_serial_ring_buffer_t *free, sddf_serial_ring_buffer_t *used, int buffer_init, uint32_t free_size, uint32_t used_size);
 
 /**
  * Check if the ring buffer is empty.
@@ -59,7 +59,7 @@ void ring_init(ring_handle_t *ring, ring_buffer_t *free, ring_buffer_t *used, in
  *
  * @return true indicates the buffer is empty, false otherwise.
  */
-static inline int ring_empty(ring_buffer_t *ring)
+static inline int sddf_serial_ring_empty(sddf_serial_ring_buffer_t *ring)
 {
     return !((ring->write_idx - ring->read_idx) % ring->size);
 }
@@ -71,13 +71,13 @@ static inline int ring_empty(ring_buffer_t *ring)
  *
  * @return true indicates the buffer is full, false otherwise.
  */
-static inline int ring_full(ring_buffer_t *ring)
+static inline int sddf_serial_ring_full(sddf_serial_ring_buffer_t *ring)
 {
     // assert((ring->write_idx - ring->read_idx) >= 0);
     return !((ring->write_idx - ring->read_idx + 1) % ring->size);
 }
 
-static inline int ring_size(ring_buffer_t *ring)
+static inline int sddf_serial_ring_size(sddf_serial_ring_buffer_t *ring)
 {
     // assert((ring->write_idx - ring->read_idx) >= 0);
     return (ring->write_idx - ring->read_idx);
@@ -93,10 +93,10 @@ static inline int ring_size(ring_buffer_t *ring)
  *
  * @return -1 when ring is empty, 0 on success.
  */
-static inline int enqueue(ring_buffer_t *ring, uintptr_t buffer, unsigned int len, void *cookie)
+static inline int sddf_serial_enqueue(sddf_serial_ring_buffer_t *ring, uintptr_t buffer, unsigned int len, void *cookie)
 {
     // assert(buffer != 0);
-    if (ring_full(ring)) {
+    if (sddf_serial_ring_full(ring)) {
         return -1;
     }
 
@@ -120,9 +120,9 @@ static inline int enqueue(ring_buffer_t *ring, uintptr_t buffer, unsigned int le
  *
  * @return -1 when ring is empty, 0 on success.
  */
-static inline int dequeue(ring_buffer_t *ring, uintptr_t *addr, unsigned int *len, void **cookie)
+static inline int sddf_serial_dequeue(sddf_serial_ring_buffer_t *ring, uintptr_t *addr, unsigned int *len, void **cookie)
 {
-    if (ring_empty(ring)) {
+    if (sddf_serial_ring_empty(ring)) {
         return -1;
     }
 
@@ -149,10 +149,10 @@ static inline int dequeue(ring_buffer_t *ring, uintptr_t *addr, unsigned int *le
  *
  * @return -1 when ring is full, 0 on success.
  */
-static inline int enqueue_free(ring_handle_t *ring, uintptr_t addr, unsigned int len, void *cookie)
+static inline int sddf_serial_enqueue_free(sddf_serial_ring_handle_t *ring, uintptr_t addr, unsigned int len, void *cookie)
 {
     // assert(addr);
-    return enqueue(ring->free_ring, addr, len, cookie);
+    return sddf_serial_enqueue(ring->free_ring, addr, len, cookie);
 }
 
 /**
@@ -166,10 +166,10 @@ static inline int enqueue_free(ring_handle_t *ring, uintptr_t addr, unsigned int
  *
  * @return -1 when ring is full, 0 on success.
  */
-static inline int enqueue_used(ring_handle_t *ring, uintptr_t addr, unsigned int len, void *cookie)
+static inline int sddf_serial_enqueue_used(sddf_serial_ring_handle_t *ring, uintptr_t addr, unsigned int len, void *cookie)
 {
     // assert(addr);
-    return enqueue(ring->used_ring, addr, len, cookie);
+    return sddf_serial_enqueue(ring->used_ring, addr, len, cookie);
 }
 
 /**
@@ -182,9 +182,9 @@ static inline int enqueue_used(ring_handle_t *ring, uintptr_t addr, unsigned int
  *
  * @return -1 when ring is empty, 0 on success.
  */
-static inline int dequeue_free(ring_handle_t *ring, uintptr_t *addr, unsigned int *len, void **cookie)
+static inline int sddf_serial_dequeue_free(sddf_serial_ring_handle_t *ring, uintptr_t *addr, unsigned int *len, void **cookie)
 {
-    return dequeue(ring->free_ring, addr, len, cookie);
+    return sddf_serial_dequeue(ring->free_ring, addr, len, cookie);
 }
 
 /**
@@ -197,9 +197,9 @@ static inline int dequeue_free(ring_handle_t *ring, uintptr_t *addr, unsigned in
  *
  * @return -1 when ring is empty, 0 on success.
  */
-static inline int dequeue_used(ring_handle_t *ring, uintptr_t *addr, unsigned int *len, void **cookie)
+static inline int sddf_serial_dequeue_used(sddf_serial_ring_handle_t *ring, uintptr_t *addr, unsigned int *len, void **cookie)
 {
-    return dequeue(ring->used_ring, addr, len, cookie);
+    return sddf_serial_dequeue(ring->used_ring, addr, len, cookie);
 }
 
 /**
@@ -207,7 +207,7 @@ static inline int dequeue_used(ring_handle_t *ring, uintptr_t *addr, unsigned in
  *
  * @param ring Ring handle to plug.
 */
-static inline void ring_plug(ring_buffer_t *ring) {
+static inline void sddf_serial_ring_plug(sddf_serial_ring_buffer_t *ring) {
     ring->plugged = true;
 }
 
@@ -216,7 +216,7 @@ static inline void ring_plug(ring_buffer_t *ring) {
  *
  * @param ring Ring handle to unplug.
 */
-static inline void ring_unplug(ring_buffer_t *ring) {
+static inline void sddf_serial_ring_unplug(sddf_serial_ring_buffer_t *ring) {
     ring->plugged = false;
 }
 
@@ -228,7 +228,7 @@ static inline void ring_unplug(ring_buffer_t *ring) {
  *
  * @return true when ring is plugged, false when unplugged.
 */
-static inline bool ring_plugged(ring_buffer_t *ring) {
+static inline bool sddf_serial_ring_plugged(sddf_serial_ring_buffer_t *ring) {
     return ring->plugged;
 }
 
@@ -244,9 +244,9 @@ static inline bool ring_plugged(ring_buffer_t *ring) {
  *
  * @return -1 when ring is empty, 0 on success.
  */
-static int driver_dequeue(ring_buffer_t *ring, uintptr_t *addr, unsigned int *len, void **cookie)
+static int sddf_serial_driver_dequeue(sddf_serial_ring_buffer_t *ring, uintptr_t *addr, unsigned int *len, void **cookie)
 {
-    if (ring_empty(ring)) {
+    if (sddf_serial_ring_empty(ring)) {
         return -1;
     }
 
