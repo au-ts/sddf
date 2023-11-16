@@ -16,9 +16,9 @@
 #define SDDF_BLK_NUM_CMD_BUFFERS 1024
 /* Number of buffers the response ring is configured to have. */
 #define SDDF_BLK_NUM_RESP_BUFFERS 1024
-/* Number of buffers the data ring is configured to have. */
-#define SDDF_BLK_NUM_DATA_BUFFERS 2048
-/* Size of a single buffer in the data ring. Set to equal sector size. */
+/* Number of buffers the data region is configured to have. */
+#define SDDF_BLK_NUM_DATA_BUFFERS 4096
+/* Size of a single data buffer. Set to equal sector size. */
 #define SDDF_BLK_DATA_BUFFER_SIZE 512
 
 /* Command code for block */
@@ -35,23 +35,28 @@ typedef enum sddf_blk_response_status {
 } sddf_blk_response_status_t;
 
 /* */
+typedef struct sddf_blk_desc {
+    uintptr_t addr; /* the encoded dma address storing data */
+    uint32_t len; /* data in bytes occupied by the descriptor */
+    uint32_t next; /* index to next descriptor in the chain */
+    bool has_next; /* indicates whether this descriptor has a next descriptor */
+} sddf_blk_desc_t;
+
+/* */
 typedef struct sddf_blk_command {
     sddf_blk_command_code_t code; /* command code */
-    uintptr_t encoded_base_addr; /* the encoded dma base address of the first buffer in a set of contiguous buffers storing command data */
+    uint32_t desc; /* index to the first descriptor in a chain of descriptors */
     uint32_t sector; /* sector number to read/write */
-    uint16_t count; /* number of sectors to read/write, also indicates the number of buffers used by this command when buf_size == sector_size */
-    void *cookie; /* index into client side metadata, @ericc: stores command ID */
+    uint16_t count; /* number of sectors to read/write, also indicates the length of descriptor chain due to buf_size == sector_size */
+    void *cookie; /* stores command ID */
 } sddf_blk_command_t;
 
 /* */
 typedef struct sddf_blk_response {
     sddf_blk_response_status_t status; /* response status */
-    void *cookie; /* index into client side metadata, @ericc: stores corresponding command ID */
-    // @ericc: potentially return address and count on failure,
-    // but I haven't found a case where a client needs 
-    // to know that much information yet
-    // uint16_t count /* on failure, the number of successfully transferred sectors */
-    // void *encoded_addr /* on failure, the base dma address of contiguous buffers for transfer */
+    uint32_t desc; /* index to the first descriptor in a chain of descriptors */
+    uint16_t count; /* number of sectors successfully read/written */
+    void *cookie; /* stores corresponding command ID */
 } sddf_blk_response_t;
 
 /* Circular buffer containing commands */
@@ -75,159 +80,184 @@ typedef struct sddf_blk_resp_ring_buffer {
     sddf_blk_response_t buffers[SDDF_BLK_NUM_RESP_BUFFERS];
 } sddf_blk_resp_ring_buffer_t;
 
-typedef struct sddf_blk_data_ring_buffer {
-    uint32_t write_idx;
-    uint32_t read_idx;
-    uint32_t size; /* number of buffer segments in shared data */
-} sddf_blk_data_ring_buffer_t;
+/* */
+typedef struct sddf_blk_desc_handle {
+    uint32_t size;
+    sddf_blk_desc_t descs[SDDF_BLK_NUM_DATA_BUFFERS];
+} sddf_blk_desc_handle_t;
+
+/* */
+typedef struct sddf_blk_freelist_handle {
+    uint32_t head;
+    uint32_t tail;
+    uint32_t num_free;
+    uint32_t size;
+    uint32_t freelist[SDDF_BLK_NUM_DATA_BUFFERS];
+} sddf_blk_freelist_handle_t;
 
 /* A ring handle for enqueing/dequeuing into  */
 typedef struct sddf_blk_ring_handle {
     sddf_blk_cmd_ring_buffer_t *cmd_ring;
     sddf_blk_resp_ring_buffer_t *resp_ring;
-    sddf_blk_data_ring_buffer_t *data_ring;
+    sddf_blk_desc_handle_t *desc_handle;
+    sddf_blk_freelist_handle_t *freelist_handle;
 } sddf_blk_ring_handle_t;
 
 /**
  * Initialise the shared ring buffer.
  *
- * @param ring ring handle to use.
+ * @param ring_handle ring handle to use.
  * @param command pointer to command ring in shared memory.
  * @param response pointer to response ring in shared memory.
  * @param buffer_init 1 indicates the read and write indices in shared memory need to be initialised.
  *                    0 indicates they do not. Only one side of the shared memory regions needs to do this.
  * @param command_size number of buffers in command ring.
  * @param response_size number of buffers in response ring.
- * @param data_size number of buffer segments in shared data ring.
+ * @param num_data_buffers number of buffer segments in data region. Length of descriptor array and freelist will match this.
  */
-void sddf_blk_ring_init(sddf_blk_ring_handle_t *ring,
-                sddf_blk_cmd_ring_buffer_t *command,
-                sddf_blk_resp_ring_buffer_t *response,
-                sddf_blk_data_ring_buffer_t *data,
-                int buffer_init,
-                uint32_t command_size,
-                uint32_t response_size,
-                uint32_t data_size);
+void sddf_blk_ring_init(sddf_blk_ring_handle_t *ring_handle,
+                        sddf_blk_cmd_ring_buffer_t *command,
+                        sddf_blk_resp_ring_buffer_t *response,
+                        sddf_blk_desc_handle_t *desc_handle,
+                        sddf_blk_freelist_handle_t *freelist_handle,
+                        int buffer_init,
+                        uint32_t command_size,
+                        uint32_t response_size,
+                        uint32_t num_data_buffers);
 
 /**
  * Check if the command ring buffer is empty.
  *
- * @param ring ring handle containing command ring buffer.
+ * @param ring_handle ring handle containing command ring buffer.
  *
  * @return true indicates the buffer is empty, false otherwise.
  */
-static inline int sddf_blk_cmd_ring_empty(sddf_blk_ring_handle_t *ring)
+static inline int sddf_blk_cmd_ring_empty(sddf_blk_ring_handle_t *ring_handle)
 {
-    return !((ring->cmd_ring->write_idx - ring->cmd_ring->read_idx) % ring->cmd_ring->size);
+    return !((ring_handle->cmd_ring->write_idx - ring_handle->cmd_ring->read_idx) % ring_handle->cmd_ring->size);
 }
 
 /**
  * Check if the response ring buffer is empty.
  *
- * @param ring ring handle containing response ring buffer.
+ * @param ring_handle ring handle containing response ring buffer.
  *
  * @return true indicates the response ring buffer is empty, false otherwise.
  */
-static inline int sddf_blk_resp_ring_empty(sddf_blk_ring_handle_t *ring)
+static inline int sddf_blk_resp_ring_empty(sddf_blk_ring_handle_t *ring_handle)
 {
-    return !((ring->resp_ring->write_idx - ring->resp_ring->read_idx) % ring->resp_ring->size);
+    return !((ring_handle->resp_ring->write_idx - ring_handle->resp_ring->read_idx) % ring_handle->resp_ring->size);
 }
 
-// @ericc: we are leaving a gap of one buffer before we consider the ring full
+// @ericc: this leaves a gap of one buffer before we consider the ring full
 /**
  * Check if the command ring buffer is full.
  *
- * @param ring ring handle containing command ring buffer.
+ * @param ring_handle ring handle containing command ring buffer.
  *
  * @return true indicates the command ring buffer is full, false otherwise.
  */
-static inline int sddf_blk_cmd_ring_full(sddf_blk_ring_handle_t *ring)
+static inline int sddf_blk_cmd_ring_full(sddf_blk_ring_handle_t *ring_handle)
 {
-    return !((ring->cmd_ring->write_idx - ring->cmd_ring->read_idx + 1) % ring->cmd_ring->size);
+    return !((ring_handle->cmd_ring->write_idx - ring_handle->cmd_ring->read_idx + 1) % ring_handle->cmd_ring->size);
 }
 
 /**
  * Check if the response ring buffer is full.
  *
- * @param ring ring handle containing response ring buffer.
+ * @param ring_handle ring handle containing response ring buffer.
  *
  * @return true indicates the response ring buffer is full, false otherwise.
  */
-static inline int sddf_blk_resp_ring_full(sddf_blk_ring_handle_t *ring)
+static inline int sddf_blk_resp_ring_full(sddf_blk_ring_handle_t *ring_handle)
 {
-    return !((ring->resp_ring->write_idx - ring->resp_ring->read_idx + 1) % ring->resp_ring->size);
-}
-
-/**
- * Check if the data ring is full.
- *
- * @param ring ring handle containing data ring.
- * @param count the number of contiguous buffers to be inserted.
- *
- * @return true indicates the data ring buffer is full, false otherwise.
- */
-static inline int sddf_blk_data_ring_full(sddf_blk_ring_handle_t *ring, uint32_t count)
-{
-    return !((ring->data_ring->write_idx - ring->data_ring->read_idx + count + 1) % ring->data_ring->size);
+    return !((ring_handle->resp_ring->write_idx - ring_handle->resp_ring->read_idx + 1) % ring_handle->resp_ring->size);
 }
 
 /**
  * Get the number of elements in a command ring buffer.
  *
- * @param ring ring handle containing command and response ring buffers.
+ * @param ring_handle ring handle containing command and response ring buffers.
  *
  * @return number of elements in the ring buffer.
  */
-static inline int sddf_blk_cmd_ring_size(sddf_blk_ring_handle_t *ring)
+static inline int sddf_blk_cmd_ring_size(sddf_blk_ring_handle_t *ring_handle)
 {
-    return (ring->cmd_ring->write_idx - ring->cmd_ring->read_idx);
+    return (ring_handle->cmd_ring->write_idx - ring_handle->cmd_ring->read_idx);
 }
 
 /**
  * Get the number of elements in a response ring buffer.
  *
- * @param ring ring handle containing command and response ring buffers.
+ * @param ring_handle ring handle containing command and response ring buffers.
  *
  * @return number of elements in the ring buffer.
  */
-static inline int sddf_blk_resp_ring_size(sddf_blk_ring_handle_t *ring)
+static inline int sddf_blk_resp_ring_size(sddf_blk_ring_handle_t *ring_handle)
 {
-    return (ring->resp_ring->write_idx - ring->resp_ring->read_idx);
+    return (ring_handle->resp_ring->write_idx - ring_handle->resp_ring->read_idx);
 }
 
-// @ericc: maybe pass in a pointer to a struct instead? Lots of arguments here
+/**
+ * Check if there are free descriptors.
+ *
+ * @param ring_handle ring handle containing data descriptors.
+ * @param count number of free descriptor(s) to retrieve.
+ *
+ * @return -1 indicates that "count" many free descriptors are not available, 0 when they are available.
+ */
+int sddf_blk_desc_full(sddf_blk_ring_handle_t *ring_handle, uint32_t count);
+
+/**
+ * Try to retrieve free descriptors
+ *
+ * @param ring_handle ring handle containing data descriptors.
+ * @param desc_head_idx pointer to head of descriptor index
+ * @param count number of free descriptor(s) to retrieve.
+ *
+ * @return -1 indicates that "count" many free descriptors are not available, 0 when they are retrieved.
+ */
+int sddf_blk_get_desc(sddf_blk_ring_handle_t *ring_handle, uint32_t *desc_head_idx, uint32_t count);
+
+/**
+ * Free a chain of descriptors
+ *
+ * @param ring_handle ring handle containing data descriptors.
+ * @param desc_head_idx pointer to head of descriptor index to free
+ */
+void sddf_blk_free_desc(sddf_blk_ring_handle_t *ring_handle, uint32_t desc_head_idx);
+
 /**
  * Enqueue an element into the command ring buffer.
  *
- * @param ring Ring handle containing command ring to enqueue to.
+ * @param ring_handle Ring handle containing command ring to enqueue to.
  * @param code command code.
- * @param base_addr base address of contiguous buffer(s) where command data is stored.
+ * @param desc index of head data descriptor chain
  * @param sector sector number to read/write.
  * @param count the number of contiguous buffers used by this command.
  * @param cookie command ID to identify this command.
  *
  * @return -1 when command ring is full or data ring is full, 0 on success.
  */
-static inline int sddf_blk_enqueue_cmd(sddf_blk_ring_handle_t *ring,
-                            sddf_blk_command_code_t code,
-                            uintptr_t base_addr,
-                            uint32_t sector,
-                            uint16_t count,
-                            void *cookie)
+static inline int sddf_blk_enqueue_cmd(sddf_blk_ring_handle_t *ring_handle,
+                                        sddf_blk_command_code_t code,
+                                        uint32_t desc,
+                                        uint32_t sector,
+                                        uint16_t count,
+                                        void *cookie)
 {
-    if (sddf_blk_cmd_ring_full(ring) || sddf_blk_data_ring_full(ring, count)) {
+    if (sddf_blk_cmd_ring_full(ring_handle)) {
         return -1;
     }
 
-    ring->cmd_ring->buffers[ring->cmd_ring->write_idx % ring->cmd_ring->size].code = code;
-    ring->cmd_ring->buffers[ring->cmd_ring->write_idx % ring->cmd_ring->size].encoded_base_addr = base_addr;
-    ring->cmd_ring->buffers[ring->cmd_ring->write_idx % ring->cmd_ring->size].sector = sector;
-    ring->cmd_ring->buffers[ring->cmd_ring->write_idx % ring->cmd_ring->size].count = count;
-    ring->cmd_ring->buffers[ring->cmd_ring->write_idx % ring->cmd_ring->size].cookie = cookie;
+    ring_handle->cmd_ring->buffers[ring_handle->cmd_ring->write_idx % ring_handle->cmd_ring->size].code = code;
+    ring_handle->cmd_ring->buffers[ring_handle->cmd_ring->write_idx % ring_handle->cmd_ring->size].desc = desc;
+    ring_handle->cmd_ring->buffers[ring_handle->cmd_ring->write_idx % ring_handle->cmd_ring->size].sector = sector;
+    ring_handle->cmd_ring->buffers[ring_handle->cmd_ring->write_idx % ring_handle->cmd_ring->size].count = count;
+    ring_handle->cmd_ring->buffers[ring_handle->cmd_ring->write_idx % ring_handle->cmd_ring->size].cookie = cookie;
 
     THREAD_MEMORY_RELEASE();
-    ring->cmd_ring->write_idx++;
-    ring->data_ring->write_idx += (uint32_t)count;
+    ring_handle->cmd_ring->write_idx++;
 
     return 0;
 }
@@ -236,25 +266,31 @@ static inline int sddf_blk_enqueue_cmd(sddf_blk_ring_handle_t *ring,
  * Enqueue an element into a used ring buffer.
  * This indicates the command has been processed and a response is ready.
  *
- * @param ring Ring handle containing response ring to enqueue to.
+ * @param ring_handle Ring handle containing response ring to enqueue to.
+ * @param desc index of head data descriptor chain
+ * @param count number of sectors successfully read/written
  * @param status response status.
  * @param cookie command ID to identify which command the response is for.
  *
  * @return -1 when response ring is full, 0 on success.
  */
-static inline int sddf_blk_enqueue_resp(sddf_blk_ring_handle_t *ring,
-                                sddf_blk_response_status_t status,
-                                void *cookie)
+static inline int sddf_blk_enqueue_resp(sddf_blk_ring_handle_t *ring_handle,
+                                        sddf_blk_response_status_t status,
+                                        uint32_t desc,
+                                        uint32_t count,
+                                        void *cookie)
 {
-    if (sddf_blk_resp_ring_full(ring)) {
+    if (sddf_blk_resp_ring_full(ring_handle)) {
         return -1;
     }
 
-    ring->resp_ring->buffers[ring->resp_ring->write_idx % ring->resp_ring->size].status = status;
-    ring->resp_ring->buffers[ring->resp_ring->write_idx % ring->resp_ring->size].cookie = cookie;
+    ring_handle->resp_ring->buffers[ring_handle->resp_ring->write_idx % ring_handle->resp_ring->size].status = status;
+    ring_handle->resp_ring->buffers[ring_handle->resp_ring->write_idx % ring_handle->resp_ring->size].desc = desc;
+    ring_handle->resp_ring->buffers[ring_handle->resp_ring->write_idx % ring_handle->resp_ring->size].count = count;
+    ring_handle->resp_ring->buffers[ring_handle->resp_ring->write_idx % ring_handle->resp_ring->size].cookie = cookie;
 
     THREAD_MEMORY_RELEASE();
-    ring->resp_ring->write_idx++;
+    ring_handle->resp_ring->write_idx++;
 
     return 0;
 }
@@ -263,34 +299,33 @@ static inline int sddf_blk_enqueue_resp(sddf_blk_ring_handle_t *ring,
  * Dequeue an element from the command ring buffer.
  *
  * @param ring Ring handle containing command ring to dequeue from.
- * @param code pointer to variable to store command code.
- * @param base_addr pointer to the address of where to store base address of buffer(s) storing command data.
- * @param sector pointer to variable to store sector number to read/write.
- * @param count pointer to variable to store number of sectors to read/write.
+ * @param code pointer to command code.
+ * @param desc pointer to the index of head data descriptor chain
+ * @param sector pointer to  sector number to read/write.
+ * @param count pointer to number of sectors to read/write.
  * @param cookie pointer to cookie to store command ID.
  *
  * @return -1 when command ring is empty, 0 on success.
  */
-static inline int sddf_blk_dequeue_cmd(sddf_blk_ring_handle_t *ring,
-                            sddf_blk_command_code_t *code,
-                            uintptr_t *base_addr,
-                            uint32_t *sector,
-                            uint16_t *count,
-                            void **cookie)
+static inline int sddf_blk_dequeue_cmd(sddf_blk_ring_handle_t *ring_handle,
+                                        sddf_blk_command_code_t *code,
+                                        uint32_t *desc,
+                                        uint32_t *sector,
+                                        uint16_t *count,
+                                        void **cookie)
 {
-    if (sddf_blk_cmd_ring_empty(ring)) {
+    if (sddf_blk_cmd_ring_empty(ring_handle)) {
         return -1;
     }
 
-    *code = ring->cmd_ring->buffers[ring->cmd_ring->read_idx % ring->cmd_ring->size].code;
-    *base_addr = ring->cmd_ring->buffers[ring->cmd_ring->read_idx % ring->cmd_ring->size].encoded_base_addr;
-    *sector = ring->cmd_ring->buffers[ring->cmd_ring->read_idx % ring->cmd_ring->size].sector;
-    *count = ring->cmd_ring->buffers[ring->cmd_ring->read_idx % ring->cmd_ring->size].count;
-    *cookie = ring->cmd_ring->buffers[ring->cmd_ring->read_idx % ring->cmd_ring->size].cookie;
+    *code = ring_handle->cmd_ring->buffers[ring_handle->cmd_ring->read_idx % ring_handle->cmd_ring->size].code;
+    *desc = ring_handle->cmd_ring->buffers[ring_handle->cmd_ring->read_idx % ring_handle->cmd_ring->size].desc;
+    *sector = ring_handle->cmd_ring->buffers[ring_handle->cmd_ring->read_idx % ring_handle->cmd_ring->size].sector;
+    *count = ring_handle->cmd_ring->buffers[ring_handle->cmd_ring->read_idx % ring_handle->cmd_ring->size].count;
+    *cookie = ring_handle->cmd_ring->buffers[ring_handle->cmd_ring->read_idx % ring_handle->cmd_ring->size].cookie;
 
     THREAD_MEMORY_RELEASE();
-    ring->cmd_ring->read_idx++;
-    ring->data_ring->read_idx += (uint32_t)*count;
+    ring_handle->cmd_ring->read_idx++;
 
     return 0;
 }
@@ -299,23 +334,29 @@ static inline int sddf_blk_dequeue_cmd(sddf_blk_ring_handle_t *ring,
  * Dequeue an element from a response ring buffer.
  *
  * @param ring Ring handle containing response ring to dequeue from.
- * @param status pointer to the address of where to store response status.
+ * @param status pointer to response status.
+ * @param desc pointer to index of head data descriptor chain
+ * @param count pointer to number of sectors successfully read/written
  * @param cookie pointer to cookie storing command ID to idenfity which command this response is for.
  * @return -1 when response ring is empty, 0 on success.
  */
-static inline int sddf_blk_dequeue_resp(sddf_blk_ring_handle_t *ring,
-                                sddf_blk_response_status_t *status,
-                                void **cookie)
+static inline int sddf_blk_dequeue_resp(sddf_blk_ring_handle_t *ring_handle,
+                                        sddf_blk_response_status_t *status,
+                                        uint32_t *desc,
+                                        uint32_t *count,
+                                        void **cookie)
 {
-    if (sddf_blk_resp_ring_empty(ring)) {
+    if (sddf_blk_resp_ring_empty(ring_handle)) {
         return -1;
     }
 
-    *status = ring->resp_ring->buffers[ring->resp_ring->read_idx % ring->resp_ring->size].status;
-    *cookie = ring->resp_ring->buffers[ring->resp_ring->read_idx % ring->resp_ring->size].cookie;
+    *status = ring_handle->resp_ring->buffers[ring_handle->resp_ring->read_idx % ring_handle->resp_ring->size].status;
+    *desc = ring_handle->resp_ring->buffers[ring_handle->resp_ring->read_idx % ring_handle->resp_ring->size].desc;
+    *count = ring_handle->resp_ring->buffers[ring_handle->resp_ring->read_idx % ring_handle->resp_ring->size].count;
+    *cookie = ring_handle->resp_ring->buffers[ring_handle->resp_ring->read_idx % ring_handle->resp_ring->size].cookie;
 
     THREAD_MEMORY_RELEASE();
-    ring->resp_ring->read_idx++;
+    ring_handle->resp_ring->read_idx++;
 
     return 0;
 }
@@ -323,10 +364,10 @@ static inline int sddf_blk_dequeue_resp(sddf_blk_ring_handle_t *ring,
 /**
  * Set the plug of the command ring to true.
  *
- * @param ring Ring handle containing command ring to check for plug.
+ * @param ring_handle Ring handle containing command ring to check for plug.
 */
-static inline void sddf_blk_cmd_ring_plug(sddf_blk_ring_handle_t *ring) {
-    ring->cmd_ring->plugged = true;
+static inline void sddf_blk_cmd_ring_plug(sddf_blk_ring_handle_t *ring_handle) {
+    ring_handle->cmd_ring->plugged = true;
 }
 
 /**
@@ -334,8 +375,8 @@ static inline void sddf_blk_cmd_ring_plug(sddf_blk_ring_handle_t *ring) {
  *
  * @param ring Ring handle containing command ring to check for plug.
 */
-static inline void sddf_blk_cmd_ring_unplug(sddf_blk_ring_handle_t *ring) {
-    ring->cmd_ring->plugged = false;
+static inline void sddf_blk_cmd_ring_unplug(sddf_blk_ring_handle_t *ring_handle) {
+    ring_handle->cmd_ring->plugged = false;
 }
 
 /**
@@ -345,11 +386,11 @@ static inline void sddf_blk_cmd_ring_unplug(sddf_blk_ring_handle_t *ring) {
  *
  * @return true when command ring is plugged, false when unplugged.
 */
-static inline bool sddf_blk_cmd_ring_plugged(sddf_blk_ring_handle_t *ring) {
-    return ring->cmd_ring->plugged;
+static inline bool sddf_blk_cmd_ring_plugged(sddf_blk_ring_handle_t *ring_handle) {
+    return ring_handle->cmd_ring->plugged;
 }
 
-// @ericc: need to refactor, currently unused.
+// @ericc: need to refactor, currently unused as we are using driver VM
 /**
  * Dequeue an element from a ring buffer.
  * This function is intended for use by the driver, to collect a pointer
