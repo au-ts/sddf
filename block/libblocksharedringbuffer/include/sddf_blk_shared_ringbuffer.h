@@ -48,7 +48,7 @@ typedef struct sddf_blk_command {
     uint32_t desc; /* index to the first descriptor in a chain of descriptors */
     uint32_t sector; /* sector number to read/write */
     uint16_t count; /* number of sectors to read/write, also indicates the length of descriptor chain due to buf_size == sector_size */
-    void *cookie; /* stores command ID */
+    uint32_t id; /* stores command ID */
 } sddf_blk_command_t;
 
 /* */
@@ -56,7 +56,7 @@ typedef struct sddf_blk_response {
     sddf_blk_response_status_t status; /* response status */
     uint32_t desc; /* index to the first descriptor in a chain of descriptors */
     uint16_t count; /* number of sectors successfully read/written */
-    void *cookie; /* stores corresponding command ID */
+    uint32_t id; /* stores corresponding command ID */
 } sddf_blk_response_t;
 
 /* Circular buffer containing commands */
@@ -204,9 +204,9 @@ static inline int sddf_blk_resp_ring_size(sddf_blk_ring_handle_t *ring_handle)
  * @param ring_handle ring handle containing data descriptors.
  * @param count number of free descriptor(s) to retrieve.
  *
- * @return -1 indicates that "count" many free descriptors are not available, 0 when they are available.
+ * @return true indicates that "count" many free descriptors are not available, false when they are available.
  */
-int sddf_blk_desc_full(sddf_blk_ring_handle_t *ring_handle, uint32_t count);
+bool sddf_blk_desc_full(sddf_blk_ring_handle_t *ring_handle, uint32_t count);
 
 /**
  * Try to retrieve free descriptors
@@ -234,8 +234,8 @@ void sddf_blk_free_desc(sddf_blk_ring_handle_t *ring_handle, uint32_t desc_head_
  * @param code command code.
  * @param desc index of head data descriptor chain
  * @param sector sector number to read/write.
- * @param count the number of contiguous buffers used by this command.
- * @param cookie command ID to identify this command.
+ * @param count the number of sectors to read/write
+ * @param id command ID to identify this command.
  *
  * @return -1 when command ring is full or data ring is full, 0 on success.
  */
@@ -244,7 +244,7 @@ static inline int sddf_blk_enqueue_cmd(sddf_blk_ring_handle_t *ring_handle,
                                         uint32_t desc,
                                         uint32_t sector,
                                         uint16_t count,
-                                        void *cookie)
+                                        uint32_t id)
 {
     if (sddf_blk_cmd_ring_full(ring_handle)) {
         return -1;
@@ -254,7 +254,7 @@ static inline int sddf_blk_enqueue_cmd(sddf_blk_ring_handle_t *ring_handle,
     ring_handle->cmd_ring->buffers[ring_handle->cmd_ring->write_idx % ring_handle->cmd_ring->size].desc = desc;
     ring_handle->cmd_ring->buffers[ring_handle->cmd_ring->write_idx % ring_handle->cmd_ring->size].sector = sector;
     ring_handle->cmd_ring->buffers[ring_handle->cmd_ring->write_idx % ring_handle->cmd_ring->size].count = count;
-    ring_handle->cmd_ring->buffers[ring_handle->cmd_ring->write_idx % ring_handle->cmd_ring->size].cookie = cookie;
+    ring_handle->cmd_ring->buffers[ring_handle->cmd_ring->write_idx % ring_handle->cmd_ring->size].id = id;
 
     THREAD_MEMORY_RELEASE();
     ring_handle->cmd_ring->write_idx++;
@@ -267,10 +267,10 @@ static inline int sddf_blk_enqueue_cmd(sddf_blk_ring_handle_t *ring_handle,
  * This indicates the command has been processed and a response is ready.
  *
  * @param ring_handle Ring handle containing response ring to enqueue to.
+ * @param status response status.
  * @param desc index of head data descriptor chain
  * @param count number of sectors successfully read/written
- * @param status response status.
- * @param cookie command ID to identify which command the response is for.
+ * @param id command ID to identify which command the response is for.
  *
  * @return -1 when response ring is full, 0 on success.
  */
@@ -278,7 +278,7 @@ static inline int sddf_blk_enqueue_resp(sddf_blk_ring_handle_t *ring_handle,
                                         sddf_blk_response_status_t status,
                                         uint32_t desc,
                                         uint32_t count,
-                                        void *cookie)
+                                        uint32_t id)
 {
     if (sddf_blk_resp_ring_full(ring_handle)) {
         return -1;
@@ -287,7 +287,7 @@ static inline int sddf_blk_enqueue_resp(sddf_blk_ring_handle_t *ring_handle,
     ring_handle->resp_ring->buffers[ring_handle->resp_ring->write_idx % ring_handle->resp_ring->size].status = status;
     ring_handle->resp_ring->buffers[ring_handle->resp_ring->write_idx % ring_handle->resp_ring->size].desc = desc;
     ring_handle->resp_ring->buffers[ring_handle->resp_ring->write_idx % ring_handle->resp_ring->size].count = count;
-    ring_handle->resp_ring->buffers[ring_handle->resp_ring->write_idx % ring_handle->resp_ring->size].cookie = cookie;
+    ring_handle->resp_ring->buffers[ring_handle->resp_ring->write_idx % ring_handle->resp_ring->size].id = id;
 
     THREAD_MEMORY_RELEASE();
     ring_handle->resp_ring->write_idx++;
@@ -303,7 +303,7 @@ static inline int sddf_blk_enqueue_resp(sddf_blk_ring_handle_t *ring_handle,
  * @param desc pointer to the index of head data descriptor chain
  * @param sector pointer to  sector number to read/write.
  * @param count pointer to number of sectors to read/write.
- * @param cookie pointer to cookie to store command ID.
+ * @param id pointer to store command ID.
  *
  * @return -1 when command ring is empty, 0 on success.
  */
@@ -312,7 +312,7 @@ static inline int sddf_blk_dequeue_cmd(sddf_blk_ring_handle_t *ring_handle,
                                         uint32_t *desc,
                                         uint32_t *sector,
                                         uint16_t *count,
-                                        void **cookie)
+                                        uint32_t *id)
 {
     if (sddf_blk_cmd_ring_empty(ring_handle)) {
         return -1;
@@ -322,7 +322,7 @@ static inline int sddf_blk_dequeue_cmd(sddf_blk_ring_handle_t *ring_handle,
     *desc = ring_handle->cmd_ring->buffers[ring_handle->cmd_ring->read_idx % ring_handle->cmd_ring->size].desc;
     *sector = ring_handle->cmd_ring->buffers[ring_handle->cmd_ring->read_idx % ring_handle->cmd_ring->size].sector;
     *count = ring_handle->cmd_ring->buffers[ring_handle->cmd_ring->read_idx % ring_handle->cmd_ring->size].count;
-    *cookie = ring_handle->cmd_ring->buffers[ring_handle->cmd_ring->read_idx % ring_handle->cmd_ring->size].cookie;
+    *id = ring_handle->cmd_ring->buffers[ring_handle->cmd_ring->read_idx % ring_handle->cmd_ring->size].id;
 
     THREAD_MEMORY_RELEASE();
     ring_handle->cmd_ring->read_idx++;
@@ -337,14 +337,14 @@ static inline int sddf_blk_dequeue_cmd(sddf_blk_ring_handle_t *ring_handle,
  * @param status pointer to response status.
  * @param desc pointer to index of head data descriptor chain
  * @param count pointer to number of sectors successfully read/written
- * @param cookie pointer to cookie storing command ID to idenfity which command this response is for.
+ * @param id pointer to storing command ID to idenfity which command this response is for.
  * @return -1 when response ring is empty, 0 on success.
  */
 static inline int sddf_blk_dequeue_resp(sddf_blk_ring_handle_t *ring_handle,
                                         sddf_blk_response_status_t *status,
                                         uint32_t *desc,
-                                        uint32_t *count,
-                                        void **cookie)
+                                        uint16_t *count,
+                                        uint32_t *id)
 {
     if (sddf_blk_resp_ring_empty(ring_handle)) {
         return -1;
@@ -353,7 +353,7 @@ static inline int sddf_blk_dequeue_resp(sddf_blk_ring_handle_t *ring_handle,
     *status = ring_handle->resp_ring->buffers[ring_handle->resp_ring->read_idx % ring_handle->resp_ring->size].status;
     *desc = ring_handle->resp_ring->buffers[ring_handle->resp_ring->read_idx % ring_handle->resp_ring->size].desc;
     *count = ring_handle->resp_ring->buffers[ring_handle->resp_ring->read_idx % ring_handle->resp_ring->size].count;
-    *cookie = ring_handle->resp_ring->buffers[ring_handle->resp_ring->read_idx % ring_handle->resp_ring->size].cookie;
+    *id = ring_handle->resp_ring->buffers[ring_handle->resp_ring->read_idx % ring_handle->resp_ring->size].id;
 
     THREAD_MEMORY_RELEASE();
     ring_handle->resp_ring->read_idx++;
@@ -394,7 +394,7 @@ static inline bool sddf_blk_cmd_ring_plugged(sddf_blk_ring_handle_t *ring_handle
 /**
  * Dequeue an element from a ring buffer.
  * This function is intended for use by the driver, to collect a pointer
- * into this structure to be passed around as a cookie.
+ * into this structure to be passed around as a id.
  *
  * @param ring Ring buffer to dequeue from.
  * @param addr pointer to the address of where to store buffer address.
@@ -403,7 +403,7 @@ static inline bool sddf_blk_cmd_ring_plugged(sddf_blk_ring_handle_t *ring_handle
  *
  * @return -1 when ring is empty, 0 on success.
  */
-// static int driver_dequeue(ring_buffer_t *ring, uintptr_t *addr, unsigned int *len, void **cookie)
+// static int driver_dequeue(ring_buffer_t *ring, uintptr_t *addr, unsigned int *len, uint32_t **cookie)
 // {
 //     if (ring_empty(ring)) {
 //         return -1;
@@ -411,7 +411,7 @@ static inline bool sddf_blk_cmd_ring_plugged(sddf_blk_ring_handle_t *ring_handle
 
 //     *addr = ring->buffers[ring->read_idx % ring->size].encoded_addr;
 //     *len = ring->buffers[ring->read_idx % ring->size].len;
-//     *cookie = &ring->buffers[ring->read_idx % ring->size];
+//     *id = &ring->buffers[ring->read_idx % ring->size];
 
 //     THREAD_MEMORY_RELEASE();
 //     ring->read_idx++;

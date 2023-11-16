@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <microkit.h>
 #include "util/include/util.h"
+#include "util/include/fence.h"
 #include "sddf_blk_shared_ringbuffer.h"
 
 void sddf_blk_ring_init(sddf_blk_ring_handle_t *ring_handle,
@@ -57,13 +58,13 @@ void sddf_blk_ring_init(sddf_blk_ring_handle_t *ring_handle,
     }
 }
 
-int sddf_blk_desc_full(sddf_blk_ring_handle_t *ring_handle, uint32_t count)
+bool sddf_blk_desc_full(sddf_blk_ring_handle_t *ring_handle, uint32_t count)
 {
     assert(count > 0);
-    if (ring_handle->freelist_handle->num_free < count) {
-        return -1;
+    if (count > ring_handle->freelist_handle->num_free) {
+        return true;
     }
-    return 0;
+    return false;
 }
 
 // @ericc: no memory barrier needed as get_desc and free_desc are only called from the same side
@@ -75,12 +76,15 @@ int sddf_blk_get_desc(sddf_blk_ring_handle_t *ring_handle, uint32_t *desc_head_i
     }
     
     uint32_t curr_desc_idx = ring_handle->freelist_handle->head;
-    for (uint32_t i=0; i<count; i++) {
+    for (uint32_t i=0; i<count-1; i++) {
         ring_handle->desc_handle->descs[curr_desc_idx].next = ring_handle->freelist_handle->freelist[curr_desc_idx];
         ring_handle->desc_handle->descs[curr_desc_idx].has_next = true;
         curr_desc_idx = ring_handle->freelist_handle->freelist[curr_desc_idx];
     }
-    
+
+    ring_handle->desc_handle->descs[curr_desc_idx].has_next = false;
+    curr_desc_idx = ring_handle->freelist_handle->freelist[curr_desc_idx];
+
     *desc_head_idx = ring_handle->freelist_handle->head;
 
     ring_handle->freelist_handle->num_free -= count;
