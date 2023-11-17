@@ -49,7 +49,7 @@ void sddf_blk_ring_init(sddf_blk_ring_handle_t *ring_handle,
         ring_handle->freelist_handle->head = 0;
         ring_handle->freelist_handle->tail = num_data_buffers - 1;
         ring_handle->freelist_handle->size = num_data_buffers;
-        ring_handle->freelist_handle->num_free = num_data_buffers - 1;
+        ring_handle->freelist_handle->num_free = num_data_buffers;
         /* Initialise freelist */
         for (unsigned int i=0; i<num_data_buffers-1; i++) {
             ring_handle->freelist_handle->freelist[i] = i+1;
@@ -75,41 +75,62 @@ int sddf_blk_get_desc(sddf_blk_ring_handle_t *ring_handle, uint32_t *desc_head_i
         return -1;
     }
     
+    // Initialise descriptor chain
     uint32_t curr_desc_idx = ring_handle->freelist_handle->head;
     for (uint32_t i=0; i<count-1; i++) {
+        // Attach curr descriptor to next free descriptor
         ring_handle->desc_handle->descs[curr_desc_idx].next = ring_handle->freelist_handle->freelist[curr_desc_idx];
         ring_handle->desc_handle->descs[curr_desc_idx].has_next = true;
+        // Go to next free descriptor
         curr_desc_idx = ring_handle->freelist_handle->freelist[curr_desc_idx];
     }
 
+    // Initialise last descriptor of chain
     ring_handle->desc_handle->descs[curr_desc_idx].has_next = false;
-    curr_desc_idx = ring_handle->freelist_handle->freelist[curr_desc_idx];
 
+    // Give caller the head of the descriptor chain
     *desc_head_idx = ring_handle->freelist_handle->head;
 
+    // Update number of free descriptors
     ring_handle->freelist_handle->num_free -= count;
-    ring_handle->freelist_handle->head = curr_desc_idx;
+    // Update head to the next free descriptor
+    ring_handle->freelist_handle->head = ring_handle->freelist_handle->freelist[curr_desc_idx];
     
     return 0;
 }
 
 void sddf_blk_free_desc(sddf_blk_ring_handle_t *ring_handle, uint32_t desc_head_idx)
 {
+    assert(ring_handle->freelist_handle->num_free < SDDF_BLK_NUM_DATA_BUFFERS);
     assert(desc_head_idx < ring_handle->desc_handle->size);
     assert(desc_head_idx >= 0);
 
-    uint32_t curr_desc_idx = desc_head_idx;
-    uint32_t curr_freelist_idx = ring_handle->freelist_handle->tail;
+    // If the descriptor array was completely filled, head will be stale so we need to update it
+    if (ring_handle->freelist_handle->num_free == 0) {
+        ring_handle->freelist_handle->head = desc_head_idx;
+    }
+
+    // Length of descriptor chain
     uint32_t count = 1;
-    
+
+    // Set tail entry in freelist to desc_head_idx
+    ring_handle->freelist_handle->freelist[ring_handle->freelist_handle->tail] = desc_head_idx;
+
+    uint32_t curr_desc_idx = desc_head_idx;
+    uint32_t prev_desc_idx;
     while (ring_handle->desc_handle->descs[curr_desc_idx].has_next) {
+        // Detach current descriptor from the chain
         ring_handle->desc_handle->descs[curr_desc_idx].has_next = false;
-        ring_handle->freelist_handle->freelist[curr_freelist_idx] = curr_desc_idx;
+        // Go to next descriptor
+        prev_desc_idx = curr_desc_idx;
         curr_desc_idx = ring_handle->desc_handle->descs[curr_desc_idx].next;
-        curr_freelist_idx = curr_desc_idx;
+        // Chain prev descriptor to the curr descriptor
+        ring_handle->freelist_handle->freelist[prev_desc_idx] = curr_desc_idx;
         count++;
     }
 
+    // Update num_free descriptors
     ring_handle->freelist_handle->num_free += count;
-    ring_handle->freelist_handle->tail = curr_freelist_idx;
+    // Update tail to the last descriptor in the chain
+    ring_handle->freelist_handle->tail = curr_desc_idx;
 }
