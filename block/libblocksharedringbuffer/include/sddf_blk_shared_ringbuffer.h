@@ -25,6 +25,7 @@
 typedef enum sddf_blk_command_code {
     SDDF_BLK_COMMAND_READ,
     SDDF_BLK_COMMAND_WRITE,
+    SDDF_BLK_COMMAND_FLUSH,
     SDDF_BLK_COMMAND_BARRIER,
 } sddf_blk_command_code_t;
 
