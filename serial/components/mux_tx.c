@@ -12,7 +12,9 @@
 
 #define DRIVER_CH 9
 
-#define NUM_CLIENTS 2
+#ifndef NUM_CLIENTS
+#error "NUM_CLIENTS is expected to be defined for TX serial multiplexor"
+#endif
 
 #define COLOUR_START_LEN 5
 #define COLOUR_END_LEN 4

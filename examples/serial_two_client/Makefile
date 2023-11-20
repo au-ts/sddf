@@ -46,6 +46,7 @@ CFLAGS += -I$(BOARD_DIR)/include \
 	-I$(RINGBUFFERDIR)/include \
 	-I$(UART_DRIVER)/include \
 	-I$(UTIL)/include \
+	-I$(SDDF) \
 
 UART_OBJS := uart.o shared_ringbuffer.o
 SERIAL_SERVER_OBJS1 := serial_server_1.o shared_ringbuffer.o
@@ -56,7 +57,7 @@ MUX_RX_OBJS := mux_rx.o shared_ringbuffer.o
 all: directories $(IMAGE_FILE)
 
 $(BUILD_DIR)/%.o: $(SERIAL_COMPONENTS)/%.c Makefile
-	$(CC) -c $(CFLAGS) $< -o $@
+	$(CC) -c $(CFLAGS) -DNUM_CLIENTS=2 $< -o $@
 
 $(BUILD_DIR)/%.o: $(RINGBUFFERDIR)/%.c Makefile
 	$(CC) -c $(CFLAGS) $< -o $@
