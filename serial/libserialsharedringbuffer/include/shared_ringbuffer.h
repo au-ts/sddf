@@ -7,8 +7,8 @@
 #pragma once
 
 #include <stdint.h>
+#include <stdbool.h>
 #include <stddef.h>
-#include <microkit.h>
 // #include "util/include/util.h"
 #include "util/include/fence.h"
 
