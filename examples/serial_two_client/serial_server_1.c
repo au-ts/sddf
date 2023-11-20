@@ -12,8 +12,8 @@ uintptr_t rx_used;
 uintptr_t tx_free;
 uintptr_t tx_used;
 
-uintptr_t shared_dma_rx;
-uintptr_t shared_dma_tx;
+uintptr_t rx_data;
+uintptr_t tx_data;
 
 struct serial_server global_serial_server = {0};
 
@@ -166,7 +166,7 @@ void init(void) {
 
     // Add buffers to the rx ring
     for (int i = 0; i < NUM_BUFFERS - 1; i++) {
-        int ret = enqueue_free(&local_server->rx_ring, shared_dma_rx + (i * BUFFER_SIZE), BUFFER_SIZE, NULL);
+        int ret = enqueue_free(&local_server->rx_ring, rx_data + (i * BUFFER_SIZE), BUFFER_SIZE, NULL);
 
         if (ret != 0) {
             microkit_dbg_puts(microkit_name);
@@ -179,7 +179,7 @@ void init(void) {
     // Add buffers to the tx ring
     for (int i = 0; i < NUM_BUFFERS - 1; i++) {
         // Have to start at the memory region left of by the rx ring
-        int ret = enqueue_free(&local_server->tx_ring, shared_dma_tx + ((i + NUM_BUFFERS) * BUFFER_SIZE), BUFFER_SIZE, NULL);
+        int ret = enqueue_free(&local_server->tx_ring, tx_data + ((i + NUM_BUFFERS) * BUFFER_SIZE), BUFFER_SIZE, NULL);
 
         if (ret != 0) {
             microkit_dbg_puts(microkit_name);

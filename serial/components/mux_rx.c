@@ -11,7 +11,9 @@
 #define CLI_CH 1
 #define DRV_CH 11
 
-#define NUM_CLIENTS 2
+#ifndef NUM_CLIENTS
+#error "NUM_CLIENTS is expected to be defined for RX serial multiplexor"
+#endif
 
 /* Memory regions as defined in the system file */
 

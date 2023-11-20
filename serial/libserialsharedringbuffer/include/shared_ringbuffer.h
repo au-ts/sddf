@@ -10,7 +10,7 @@
 #include <stddef.h>
 #include <microkit.h>
 // #include "util/include/util.h"
-#include "util/include/fence.h"
+#include "fence.h"
 
 /* Number of buffers each ring is configured to have. */
 #define NUM_BUFFERS 512
