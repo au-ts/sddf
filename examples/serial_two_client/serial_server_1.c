@@ -34,8 +34,8 @@ int serial_server_printf(char *string) {
     int ret = dequeue_free(&local_server->tx_ring, &buffer, &buffer_len, &cookie);
 
     if(ret != 0) {
-        sel4cp_dbg_puts(sel4cp_name);
-        sel4cp_dbg_puts(": serial server printf, unable to dequeue from tx ring, tx ring empty\n");
+        microkit_dbg_puts(microkit_name);
+        microkit_dbg_puts(": serial server printf, unable to dequeue from tx ring, tx ring empty\n");
         return -1;
     }
 
@@ -43,8 +43,8 @@ int serial_server_printf(char *string) {
     int print_len = strlen(string) + 1;
 
     if(print_len > BUFFER_SIZE) {
-        sel4cp_dbg_puts(sel4cp_name);
-        sel4cp_dbg_puts(": print string too long for buffer\n");
+        microkit_dbg_puts(microkit_name);
+        microkit_dbg_puts(": print string too long for buffer\n");
         return -1;
     }
 
@@ -58,8 +58,8 @@ int serial_server_printf(char *string) {
     ret = enqueue_used(&local_server->tx_ring, buffer, print_len, cookie);
 
     if(ret != 0) {
-        sel4cp_dbg_puts(sel4cp_name);
-        sel4cp_dbg_puts(": serial server printf, unable to enqueue to tx used ring\n");
+        microkit_dbg_puts(microkit_name);
+        microkit_dbg_puts(": serial server printf, unable to enqueue to tx used ring\n");
         return -1;
     }
 
@@ -72,7 +72,7 @@ int serial_server_printf(char *string) {
 
     if(is_empty) {
         // Notify the driver through the printf channel
-        sel4cp_notify(SERVER_PRINT_CHANNEL);
+        microkit_notify(SERVER_PRINT_CHANNEL);
     }
 
     return 0;
@@ -82,7 +82,7 @@ int serial_server_printf(char *string) {
 int getchar() {
     // Notify the driver that we want to get a character. In Patrick's design, this increments
     // the chars_for_clients value.
-    sel4cp_notify(SERVER_GETCHAR_CHANNEL);
+    microkit_notify(SERVER_GETCHAR_CHANNEL);
 
     struct serial_server *local_server = &global_serial_server;
 
@@ -113,8 +113,8 @@ int getchar() {
     int ret = enqueue_free(&local_server->rx_ring, buffer, buffer_len, NULL);
 
     if (ret != 0) {
-        sel4cp_dbg_puts(sel4cp_name);
-        sel4cp_dbg_puts(": getchar - unable to enqueue used buffer back into free ring\n");
+        microkit_dbg_puts(microkit_name);
+        microkit_dbg_puts(": getchar - unable to enqueue used buffer back into free ring\n");
     }
 
     return (int) got_char;
@@ -130,7 +130,7 @@ int serial_server_scanf(char* buffer) {
     int getchar_ret = getchar();
 
     if (getchar_ret == -1) {
-        sel4cp_dbg_puts("Error getting char\n");
+        microkit_dbg_puts("Error getting char\n");
         return -1;
     }
 
@@ -141,7 +141,7 @@ int serial_server_scanf(char* buffer) {
         getchar_ret = getchar();
 
         if (getchar_ret == -1) {
-            sel4cp_dbg_puts("Error getting char\n");
+            microkit_dbg_puts("Error getting char\n");
             return -1;
         }
 
@@ -153,8 +153,8 @@ int serial_server_scanf(char* buffer) {
 
 // Init function required by sel4cp, initialise serial datastructres for server here
 void init(void) {
-    sel4cp_dbg_puts(sel4cp_name);
-    sel4cp_dbg_puts(": elf PD init function running\n");
+    microkit_dbg_puts(microkit_name);
+    microkit_dbg_puts(": elf PD init function running\n");
 
     // Here we need to init ring buffers and other data structures
 
@@ -169,8 +169,8 @@ void init(void) {
         int ret = enqueue_free(&local_server->rx_ring, shared_dma_rx + (i * BUFFER_SIZE), BUFFER_SIZE, NULL);
 
         if (ret != 0) {
-            sel4cp_dbg_puts(sel4cp_name);
-            sel4cp_dbg_puts(": server rx buffer population, unable to enqueue buffer\n");
+            microkit_dbg_puts(microkit_name);
+            microkit_dbg_puts(": server rx buffer population, unable to enqueue buffer\n");
         }
     }
 
@@ -182,8 +182,8 @@ void init(void) {
         int ret = enqueue_free(&local_server->tx_ring, shared_dma_tx + ((i + NUM_BUFFERS) * BUFFER_SIZE), BUFFER_SIZE, NULL);
 
         if (ret != 0) {
-            sel4cp_dbg_puts(sel4cp_name);
-            sel4cp_dbg_puts(": server tx buffer population, unable to enqueue buffer\n");
+            microkit_dbg_puts(microkit_name);
+            microkit_dbg_puts(": server tx buffer population, unable to enqueue buffer\n");
         }
     }
 
@@ -195,7 +195,7 @@ void init(void) {
 
     serial_server_printf("Enter char to test getchar FOR SERIAL 1\n");
     ring_unplug(local_server->tx_ring.used_ring);
-    sel4cp_notify(SERVER_PRINT_CHANNEL);
+    microkit_notify(SERVER_PRINT_CHANNEL);
 
     char test = getchar();
     serial_server_printf("We got the following char in SERIAL 1: ");
@@ -221,6 +221,6 @@ void init(void) {
     serial_server_printf("\n---END OF SERIAL 1 TEST---\n");
 }
 
-void notified(sel4cp_channel ch) {
+void notified(microkit_channel ch) {
     return;
 }
