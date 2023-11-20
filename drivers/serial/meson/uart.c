@@ -304,8 +304,8 @@ void init(void) {
     microkit_dbg_puts(": initialising\n");
 
     // Init the shared ring buffers
-    ring_init(&rx_ring, (ring_buffer_t *)rx_free, (ring_buffer_t *)rx_used, 0, SIZE, SIZE);
-    ring_init(&tx_ring, (ring_buffer_t *)tx_free, (ring_buffer_t *)tx_used, 0, SIZE, SIZE);
+    ring_init(&rx_ring, (ring_buffer_t *)rx_free, (ring_buffer_t *)rx_used, 0, BUFFER_SIZE, BUFFER_SIZE);
+    ring_init(&tx_ring, (ring_buffer_t *)tx_free, (ring_buffer_t *)tx_used, 0, BUFFER_SIZE, BUFFER_SIZE);
 
     meson_uart_regs_t *regs = (meson_uart_regs_t *) uart_base;
 
