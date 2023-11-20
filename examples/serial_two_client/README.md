@@ -8,8 +8,8 @@ The relevant documentation can be found online at: https://dn.odroid.com/S905X3/
 
 ```     
 $ make BUILD_DIR=<path/to/build> \
-SEL4CP_SDK=<path/to/core/platform/sdk> \
-SEL4CP_CONFIG=(benchmark/release/debug)
+MICROKIT_SDK=<path/to/sdk> \
+MICROKIT_CONFIG=(benchmark/release/debug)
 ```
 
 ## Running/using
