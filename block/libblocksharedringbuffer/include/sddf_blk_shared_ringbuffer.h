@@ -21,11 +21,6 @@
 /* Size of a single data buffer. Set to equal sector size. */
 #define SDDF_BLK_DATA_BUFFER_SIZE 512
 
-/* Number of bits in an element of available bitmap */
-#define SDDF_BLK_AVAIL_BITMAP_ELEM_SIZE 32
-/* Size of available bitmap */
-#define SDDF_BLK_AVAIL_BITMAP_SIZE (SDDF_BLK_NUM_DATA_BUFFERS / SDDF_BLK_AVAIL_BITMAP_ELEM_SIZE)
-
 /* Command code for block */
 typedef enum sddf_blk_command_code {
     SDDF_BLK_COMMAND_READ,
@@ -75,14 +70,6 @@ typedef struct sddf_blk_resp_ring_buffer {
     sddf_blk_response_t buffers[SDDF_BLK_NUM_RESP_BUFFERS];
 } sddf_blk_resp_ring_buffer_t;
 
-/* Data struct that handles allocation and freeing of data buffers */
-typedef struct sddf_blk_data {
-    uint32_t avail_bitpos; /* bit position of next avail buffer */
-    uint32_t avail_bitmap[SDDF_BLK_AVAIL_BITMAP_SIZE]; /* Bit map representing avail data buffers */
-    uint32_t num_buffers; /* number of buffers in data region */
-    uintptr_t addr; /* encoded base address of data region */
-} sddf_blk_data_t;
-
 /* A ring handle for queueing/dequeueing command and responses */
 typedef struct sddf_blk_ring_handle {
     sddf_blk_cmd_ring_buffer_t *cmd_ring;
@@ -107,12 +94,9 @@ typedef struct sddf_blk_ring_handle {
 void sddf_blk_ring_init(sddf_blk_ring_handle_t *ring_handle,
                         sddf_blk_cmd_ring_buffer_t *command,
                         sddf_blk_resp_ring_buffer_t *response,
-                        sddf_blk_data_t *data,
                         int buffer_init,
                         uint32_t command_size,
-                        uint32_t response_size,
-                        uintptr_t data_addr,
-                        uint32_t data_num_buffers);
+                        uint32_t response_size);
 
 /**
  * Check if the command ring buffer is empty.
@@ -121,7 +105,7 @@ void sddf_blk_ring_init(sddf_blk_ring_handle_t *ring_handle,
  *
  * @return true indicates the buffer is empty, false otherwise.
  */
-static inline int sddf_blk_cmd_ring_empty(sddf_blk_ring_handle_t *ring_handle)
+static inline bool sddf_blk_cmd_ring_empty(sddf_blk_ring_handle_t *ring_handle)
 {
     return !((ring_handle->cmd_ring->write_idx - ring_handle->cmd_ring->read_idx) % ring_handle->cmd_ring->size);
 }
@@ -133,7 +117,7 @@ static inline int sddf_blk_cmd_ring_empty(sddf_blk_ring_handle_t *ring_handle)
  *
  * @return true indicates the response ring buffer is empty, false otherwise.
  */
-static inline int sddf_blk_resp_ring_empty(sddf_blk_ring_handle_t *ring_handle)
+static inline bool sddf_blk_resp_ring_empty(sddf_blk_ring_handle_t *ring_handle)
 {
     return !((ring_handle->resp_ring->write_idx - ring_handle->resp_ring->read_idx) % ring_handle->resp_ring->size);
 }
@@ -146,7 +130,7 @@ static inline int sddf_blk_resp_ring_empty(sddf_blk_ring_handle_t *ring_handle)
  *
  * @return true indicates the command ring buffer is full, false otherwise.
  */
-static inline int sddf_blk_cmd_ring_full(sddf_blk_ring_handle_t *ring_handle)
+static inline bool sddf_blk_cmd_ring_full(sddf_blk_ring_handle_t *ring_handle)
 {
     return !((ring_handle->cmd_ring->write_idx - ring_handle->cmd_ring->read_idx + 1) % ring_handle->cmd_ring->size);
 }
@@ -158,7 +142,7 @@ static inline int sddf_blk_cmd_ring_full(sddf_blk_ring_handle_t *ring_handle)
  *
  * @return true indicates the response ring buffer is full, false otherwise.
  */
-static inline int sddf_blk_resp_ring_full(sddf_blk_ring_handle_t *ring_handle)
+static inline bool sddf_blk_resp_ring_full(sddf_blk_ring_handle_t *ring_handle)
 {
     return !((ring_handle->resp_ring->write_idx - ring_handle->resp_ring->read_idx + 1) % ring_handle->resp_ring->size);
 }
@@ -186,64 +170,6 @@ static inline int sddf_blk_resp_ring_size(sddf_blk_ring_handle_t *ring_handle)
 {
     return (ring_handle->resp_ring->write_idx - ring_handle->resp_ring->read_idx);
 }
-
-/**
- * Check if count is higher than the number of buffers until end of data region.
- * When this is true requesting count number of free buffers will overflow the data region.
- *
- * @param ring_handle ring handle containing data region.
- * @param count number of buffers to check.
- *
- * @return true indicates the data region will overflow, false otherwise.
- */
-static inline int sddf_blk_data_end(sddf_blk_ring_handle_t *ring_handle, uint16_t count)
-{
-    return (sddf_blk_data_endcount(ring_handle) < count);
-}
-
-/**
- * Get the number of buffers until the end of the data region.
- *
- * @param ring_handle ring handle containing data region.
- * 
- * @return number of buffers until the end of the data region.
- */
-static inline uint32_t sddf_blk_data_endcount(sddf_blk_ring_handle_t *ring_handle)
-{
-    return ring_handle->data->num_buffers - ring_handle->data->avail_bitpos;
-}
-
-/**
- * Check if the data region has count number of free buffers.
- *
- * @param ring_handle ring handle containing data region.
- * @param count number of buffers to check.
- *
- * @return true indicates the data region has count number of free buffers, false otherwise.
- */
-int sddf_blk_data_full(sddf_blk_ring_handle_t *ring_handle, uint16_t count);
-
-/**
- * Get count many free buffers in the data region.
- *
- * @param ring_handle ring handle containing data region.
- * @param addr pointer to base address of the resulting contiguous buffer.
- * @param count number of free buffers to get.
- *
- * @return -1 when data region is full, -2 when data region overflows the end, 0 on success.
- */
-int sddf_blk_data_get_buffer(sddf_blk_ring_handle_t *ring_handle, uintptr_t *addr, uint16_t count);
-
-/**
- * Free count many available buffers in the data region.
- *
- * @param ring_handle ring handle containing data region.
- * @param addr base address of the contiguous buffer to free.
- * @param count number of buffers to free.
- * 
- * @return -1 when data region overflows the end, 0 on success
- */
-int sddf_blk_data_free_buffer(sddf_blk_ring_handle_t *ring_handle, uintptr_t addr, uint16_t count);
 
 /**
  * Enqueue an element into the command ring buffer.
@@ -414,7 +340,7 @@ static inline bool sddf_blk_cmd_ring_plugged(sddf_blk_ring_handle_t *ring_handle
     return ring_handle->cmd_ring->plugged;
 }
 
-// @ericc: need to refactor, currently unused as we are using driver VM
+// @ericc: need to refactor, currently unused as we only have a driver VM use case right now
 /**
  * Dequeue an element from a ring buffer.
  * This function is intended for use by the driver, to collect a pointer
