@@ -49,7 +49,7 @@ typedef struct sddf_blk_response {
     sddf_blk_response_status_t status; /* response status */
     uintptr_t addr; /* encoded dma address of data */
     uint16_t count; /* number of sectors allocated for corresponding command */
-    uint16_t successful_count; /* number of sectors successfully read/written */
+    uint16_t success_count; /* number of sectors successfully read/written */
     uint32_t id; /* stores corresponding command ID */
 } sddf_blk_response_t;
 
@@ -74,7 +74,6 @@ typedef struct sddf_blk_resp_ring_buffer {
 typedef struct sddf_blk_ring_handle {
     sddf_blk_cmd_ring_buffer_t *cmd_ring;
     sddf_blk_resp_ring_buffer_t *resp_ring;
-    sddf_blk_data_t *data;
 } sddf_blk_ring_handle_t;
 
 /**
@@ -214,7 +213,7 @@ static inline int sddf_blk_enqueue_cmd(sddf_blk_ring_handle_t *ring_handle,
  * @param status response status.
  * @param addr pointer to encoded dma address of data.
  * @param count number of sectors allocated for corresponding command
- * @param successful_count number of sectors successfully read/written
+ * @param success_count number of sectors successfully read/written
  * @param id command ID to identify which command the response is for.
  *
  * @return -1 when response ring is full, 0 on success.
@@ -223,7 +222,7 @@ static inline int sddf_blk_enqueue_resp(sddf_blk_ring_handle_t *ring_handle,
                                         sddf_blk_response_status_t status,
                                         uintptr_t addr,
                                         uint16_t count,
-                                        uint16_t successful_count,
+                                        uint16_t success_count,
                                         uint32_t id)
 {
     if (sddf_blk_resp_ring_full(ring_handle)) {
@@ -233,7 +232,7 @@ static inline int sddf_blk_enqueue_resp(sddf_blk_ring_handle_t *ring_handle,
     ring_handle->resp_ring->buffers[ring_handle->resp_ring->write_idx % ring_handle->resp_ring->size].status = status;
     ring_handle->resp_ring->buffers[ring_handle->resp_ring->write_idx % ring_handle->resp_ring->size].addr = addr;
     ring_handle->resp_ring->buffers[ring_handle->resp_ring->write_idx % ring_handle->resp_ring->size].count = count;
-    ring_handle->resp_ring->buffers[ring_handle->resp_ring->write_idx % ring_handle->resp_ring->size].successful_count = successful_count;
+    ring_handle->resp_ring->buffers[ring_handle->resp_ring->write_idx % ring_handle->resp_ring->size].success_count = success_count;
     ring_handle->resp_ring->buffers[ring_handle->resp_ring->write_idx % ring_handle->resp_ring->size].id = id;
 
     THREAD_MEMORY_RELEASE();
@@ -284,7 +283,7 @@ static inline int sddf_blk_dequeue_cmd(sddf_blk_ring_handle_t *ring_handle,
  * @param status pointer to response status.
  * @param addr pointer to encoded dma address of data.
  * @param count pointer to number of sectors allocated for corresponding command
- * @param successful_count pointer to number of sectors successfully read/written
+ * @param success_count pointer to number of sectors successfully read/written
  * @param id pointer to storing command ID to idenfity which command this response is for.
  * @return -1 when response ring is empty, 0 on success.
  */
@@ -292,7 +291,7 @@ static inline int sddf_blk_dequeue_resp(sddf_blk_ring_handle_t *ring_handle,
                                         sddf_blk_response_status_t *status,
                                         uintptr_t *addr,
                                         uint16_t *count,
-                                        uint16_t *successful_count,
+                                        uint16_t *success_count,
                                         uint32_t *id)
 {
     if (sddf_blk_resp_ring_empty(ring_handle)) {
@@ -302,7 +301,7 @@ static inline int sddf_blk_dequeue_resp(sddf_blk_ring_handle_t *ring_handle,
     *status = ring_handle->resp_ring->buffers[ring_handle->resp_ring->read_idx % ring_handle->resp_ring->size].status;
     *addr = ring_handle->resp_ring->buffers[ring_handle->resp_ring->read_idx % ring_handle->resp_ring->size].addr;
     *count = ring_handle->resp_ring->buffers[ring_handle->resp_ring->read_idx % ring_handle->resp_ring->size].count;
-    *successful_count = ring_handle->resp_ring->buffers[ring_handle->resp_ring->read_idx % ring_handle->resp_ring->size].successful_count;
+    *success_count = ring_handle->resp_ring->buffers[ring_handle->resp_ring->read_idx % ring_handle->resp_ring->size].success_count;
     *id = ring_handle->resp_ring->buffers[ring_handle->resp_ring->read_idx % ring_handle->resp_ring->size].id;
 
     THREAD_MEMORY_RELEASE();

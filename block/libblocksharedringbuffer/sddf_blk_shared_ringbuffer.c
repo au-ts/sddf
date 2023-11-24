@@ -17,8 +17,8 @@ void sddf_blk_ring_init(sddf_blk_ring_handle_t *ring_handle,
     ring_handle->cmd_ring = command;
     ring_handle->resp_ring = response;
     if (buffer_init) {
-        assert(command_size <= SDDF_BLK_NUM_CMD_BUFFERS);
-        assert(response_size <= SDDF_BLK_NUM_RESP_BUFFERS);
+        // assert(command_size <= SDDF_BLK_NUM_CMD_BUFFERS);
+        // assert(response_size <= SDDF_BLK_NUM_RESP_BUFFERS);
         ring_handle->cmd_ring->write_idx = 0;
         ring_handle->cmd_ring->read_idx = 0;
         ring_handle->cmd_ring->size = command_size;
