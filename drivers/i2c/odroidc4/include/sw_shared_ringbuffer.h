@@ -12,7 +12,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
-#include <sel4cp.h>
+#include <microkit.h>
 #include "fence.h"
 
 #define SIZE 512
@@ -89,7 +89,7 @@ static inline int ring_size(ring_buffer_t *ring)
 static inline int enqueue(ring_buffer_t *ring, uintptr_t buffer, unsigned int len)
 {
     if (ring_full(ring)) {
-        sel4cp_dbg_puts("Ring full");
+        microkit_dbg_puts("Ring full");
         return -1;
     }
 
@@ -114,7 +114,7 @@ static inline int enqueue(ring_buffer_t *ring, uintptr_t buffer, unsigned int le
 static inline int dequeue(ring_buffer_t *ring, uintptr_t *addr, unsigned int *len)
 {
     if (ring_empty(ring)) {
-        //sel4cp_dbg_puts("Ring is empty");
+        //microkit_dbg_puts("Ring is empty");
         return -1;
     }
 

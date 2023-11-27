@@ -12,7 +12,7 @@
 // 08/2023
 
 
-#include <sel4cp.h>
+#include <microkit.h>
 #include "i2c-driver.h"
 #include "odroidc4-i2c-mem.h"
 
@@ -289,7 +289,7 @@ static inline int i2cStart() {
     interface->ctl &= ~0x1;
     interface->ctl |= 0x1;
     if (!(interface->ctl & 0x1)) {
-        sel4cp_dbg_puts("i2c: failed to set start bit!\n");
+        microkit_dbg_puts("i2c: failed to set start bit!\n");
         return -1;
     }
     return 0;
@@ -299,7 +299,7 @@ static inline int i2cHalt() {
     printf("i2c: LIST PROCESSOR HALT\n");
     interface->ctl &= ~0x1;
     if ((interface->ctl & 0x1)) {
-        sel4cp_dbg_puts("i2c: failed to halt!\n");
+        microkit_dbg_puts("i2c: failed to halt!\n");
         return -1;
     }
     return 0;
@@ -325,14 +325,14 @@ static inline int i2cFlush() {
 }
 
 static inline int i2cLoadTokens() {
-    sel4cp_dbg_puts("driver: starting token load\n");
+    microkit_dbg_puts("driver: starting token load\n");
     i2c_token_t * tokens = (i2c_token_t *)i2c_ifState.current_req;
     printf("Tokens remaining in this req: %zu\n", i2c_ifState.remaining);
     
     // Extract second byte: address
     uint8_t addr = tokens[REQ_BUF_ADDR];
     if (addr > 0x7F) {
-        sel4cp_dbg_puts("i2c: attempted to write to address > 7-bit range!\n");
+        microkit_dbg_puts("i2c: attempted to write to address > 7-bit range!\n");
         return -1;
     }
     COMPILER_MEMORY_FENCE();
@@ -453,7 +453,7 @@ void init(void) {
     i2c_ifState.remaining = 0;
     i2c_ifState.notified = 0;
     
-    sel4cp_dbg_puts("Driver initialised.\n");
+    microkit_dbg_puts("Driver initialised.\n");
 }
 
 /**
@@ -464,11 +464,11 @@ static inline void checkBuf() {
         // If this interface is busy, skip notification and
         // set notified flag for later processing
         if (i2c_ifState.current_req) {
-            sel4cp_dbg_puts("driver: request in progress, deferring notification\n");
+            microkit_dbg_puts("driver: request in progress, deferring notification\n");
             i2c_ifState.notified = 1;
             return;
         }
-        // sel4cp_dbg_puts("driver: starting work for bus\n");
+        // microkit_dbg_puts("driver: starting work for bus\n");
         // Otherwise, begin work. Start by extracting the request
 
         size_t sz = 0;
@@ -506,7 +506,7 @@ static inline void checkBuf() {
         i2c_ifState.notified = 0;
         i2c_ifState.current_ret = ret;
         if (!i2c_ifState.current_ret) {
-            sel4cp_dbg_puts("i2c: no ret buf!\n");
+            microkit_dbg_puts("i2c: no ret buf!\n");
         }
 
         // Bytes 0 and 1 are for error code / location respectively and are set later
@@ -514,7 +514,7 @@ static inline void checkBuf() {
         // Trigger work start
         i2cLoadTokens();
     } else {
-        sel4cp_dbg_puts("driver: called but no work available: resetting notified flag\n");
+        microkit_dbg_puts("driver: called but no work available: resetting notified flag\n");
         // If nothing needs to be done, clear notified flag if it was set.
         i2c_ifState.notified = 0;
     }
@@ -532,7 +532,7 @@ static inline void serverNotify(void) {
     // they operate in parallel and notifications carry no other info.
     
     // If there is work to do, attempt to do it
-    sel4cp_dbg_puts("i2c: driver notified!\n");
+    microkit_dbg_puts("i2c: driver notified!\n");
     for (int i = 2; i < 4; i++) {
         checkBuf(i);
     }
@@ -548,7 +548,7 @@ static inline void i2cirq(int timeout) {
     
     // IRQ landed: i2c transaction has either completed or timed out.
     if (timeout) {
-        sel4cp_dbg_puts("i2c: timeout!\n");
+        microkit_dbg_puts("i2c: timeout!\n");
         i2cHalt();
         if (i2c_ifState.current_ret) {
             i2c_ifState.current_ret[RET_BUF_ERR] = I2C_ERR_TIMEOUT;
@@ -578,7 +578,7 @@ static inline void i2cirq(int timeout) {
     // If there was an error, cancel the rest of this transaction and load the
     // error information into the return buffer.
     if (err < 0) {
-        sel4cp_dbg_puts("i2c: error!\n");
+        microkit_dbg_puts("i2c: error!\n");
         if (timeout) {
             ret[RET_BUF_ERR] = I2C_ERR_TIMEOUT;
         } else if (err == -I2C_TK_ADDRR) {
@@ -615,7 +615,7 @@ static inline void i2cirq(int timeout) {
         i2c_ifState.current_req = 0x0;
         i2c_ifState.current_req_len = 0;
         i2c_ifState.remaining = 0;
-        sel4cp_notify(SERVER_NOTIFY_ID);
+        microkit_notify(SERVER_NOTIFY_ID);
         // Reset hardware
         i2cHalt();
     }
@@ -633,21 +633,21 @@ static inline void i2cirq(int timeout) {
 
 
 
-void notified(sel4cp_channel c) {
+void notified(microkit_channel c) {
     switch (c) {
         case SERVER_NOTIFY_ID:
             serverNotify();
             break;
         case IRQ_I2C:
             i2cirq(0);
-            sel4cp_irq_ack(IRQ_I2C);
+            microkit_irq_ack(IRQ_I2C);
             break;
         case IRQ_I2C_TO:
             i2cirq(1);
-            sel4cp_irq_ack(IRQ_I2C_TO);
+            microkit_irq_ack(IRQ_I2C_TO);
             break;
 
         default:
-            sel4cp_dbg_puts("DRIVER|ERROR: unexpected notification!\n");
+            microkit_dbg_puts("DRIVER|ERROR: unexpected notification!\n");
     }
 }

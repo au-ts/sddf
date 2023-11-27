@@ -1,6 +1,4 @@
-// Simple test client PD for I2C
-
-#include <sel4cp.h>
+#include <microkit.h>
 
 #include "i2c.h"
 #include "printf.h"
