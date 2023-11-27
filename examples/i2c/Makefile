@@ -14,10 +14,6 @@ ifeq ($(strip $(MICROKIT_SDK)),)
 $(error MICROKIT_SDK must be specified)
 endif
 
-ifeq ($(strip $(MICROKIT_BOARD)),)
-$(error MICROKIT_BOARD must be specified)
-endif
-
 ifeq ($(strip $(MICROKIT_CONFIG)),)
 $(error MICROKIT_CONFIG must be specified)
 endif
@@ -26,7 +22,8 @@ ifeq ($(strip $(TOOLCHAIN)),)
 	TOOLCHAIN := aarch64-none-elf
 endif
 
-CPU := cortex-a53
+MICROKIT_BOARD ?= odroidc4
+CPU := cortex-a55
 
 CC := $(TOOLCHAIN)-gcc
 LD := $(TOOLCHAIN)-ld
