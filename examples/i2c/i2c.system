@@ -80,9 +80,20 @@
         <irq irq="127" id="5" trigger="edge"/>
     </protection_domain>
 
-    <protection_domain name="client" priority = "1">
+    <protection_domain name="client" priority="1">
         <program_image path="client.elf" />
+
+        <map mr="m2_req_free" vaddr="0x4_000_000" perms="rw" setvar_vaddr="req_free"/>
+        <map mr="m2_req_used" vaddr="0x4_200_000" perms="rw" setvar_vaddr="req_used"/>
+        <map mr="m2_ret_free" vaddr="0x4_800_000" perms="rw" setvar_vaddr="ret_free"/>
+        <map mr="m2_ret_used" vaddr="0x4_A00_000" perms="rw" setvar_vaddr="ret_used"/>
+        <map mr="driver_bufs" vaddr="0x5_000_000" perms="rw" setvar_vaddr="driver_bufs"/>
     </protection_domain>
+
+    <channel>
+        <end pd="client" id="0" />
+        <end pd="i2c_driver" id="1" />
+    </channel>
 
     <!-- Client protection domain - for testing -->
     <!-- <protection_domain name="fool" priority="120"> -->
@@ -96,10 +107,10 @@
     <!-- </protection_domain> -->
 
     <!-- Driver<=>Server notification interface -->
-    <channel>
+<!--     <channel>
         <end pd="i2c_server" id="1"/>
         <end pd="i2c_driver" id="1"/>
-    </channel>
+    </channel> -->
 
     <!-- Server<=>Client notification interface -->
     <!-- <channel> -->
