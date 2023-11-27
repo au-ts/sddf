@@ -9,7 +9,6 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
-// #include "util/include/util.h"
 #include "util/include/fence.h"
 
 /* Number of buffers the command ring is configured to have. */
@@ -82,13 +81,10 @@ typedef struct sddf_blk_ring_handle {
  * @param ring_handle ring handle to use.
  * @param command pointer to command ring in shared memory.
  * @param response pointer to response ring in shared memory.
- * @param data pointer to data region metadata in shared memory.
  * @param buffer_init 1 indicates the read and write indices in shared memory need to be initialised.
  *                    0 indicates they do not. Only one side of the shared memory regions needs to do this.
  * @param command_size number of buffers in command ring.
  * @param response_size number of buffers in response ring.
- * @param data_addr encoded base address of data region.
- * @param data_num_buffers number of buffers in data region.
  */
 void sddf_blk_ring_init(sddf_blk_ring_handle_t *ring_handle,
                         sddf_blk_cmd_ring_buffer_t *command,
