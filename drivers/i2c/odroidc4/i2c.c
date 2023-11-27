@@ -76,11 +76,9 @@ static inline void driverNotify(void) {
     
 }
 
-
 static inline void clientNotify(int channel) {
     // 
 }
-
 
 void notified(sel4cp_channel c) {
     switch (c) {
@@ -130,16 +128,14 @@ static inline seL4_MessageInfo_t securityRelease(uint8_t addr, uint64_t client) 
     return sel4cp_msginfo_new(0, 1);
 }
 
-
-
 /**
- * Protected procedure calls into this server are used managing the security lists. 
+ * Protected procedure calls into this server are used managing the security lists.
 */
 seL4_MessageInfo_t protected(sel4cp_channel c, seL4_MessageInfo_t m) {
     // Determine the type of request
-    uint64_t req = sel4cp_mr_get(I2C_PPC_MR_REQTYPE);
-    uint64_t ppc_addr = sel4cp_mr_get(I2C_PPC_MR_ADDR);
-    uint64_t client_pd = sel4cp_mr_get(I2C_PPC_MR_CID);
+    size_t req = sel4cp_mr_get(I2C_PPC_MR_REQTYPE);
+    size_t ppc_addr = sel4cp_mr_get(I2C_PPC_MR_ADDR);
+    size_t client_pd = sel4cp_mr_get(I2C_PPC_MR_CID);
 
     // Check arguments are valid
     if (req != I2C_PPC_CLAIM || req != I2C_PPC_RELEASE) {
@@ -150,7 +146,6 @@ seL4_MessageInfo_t protected(sel4cp_channel c, seL4_MessageInfo_t m) {
         sel4cp_dbg_puts("I2C|ERROR: Invalid i2c address in PPC!\n");
         return ppcError();
     }
-
 
     switch (req) {
         case I2C_PPC_CLAIM:

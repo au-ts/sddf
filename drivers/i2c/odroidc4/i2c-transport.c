@@ -62,7 +62,7 @@ req_buf_ptr_t allocReqBuf(size_t size, uint8_t *data, uint8_t client, uint8_t ad
         printf("transport: Requested buffer size %zu too large\n", size);
         return 0;
     }
-    
+
     // Allocate a buffer from the appropriate ring
     uintptr_t buf;
     unsigned int sz;
@@ -79,7 +79,7 @@ req_buf_ptr_t allocReqBuf(size_t size, uint8_t *data, uint8_t client, uint8_t ad
 
     // Copy the data into the buffer
     memcpy((void *) buf + sz_offset, data, size);
-    
+
     // Enqueue the buffer
     ret = enqueue_used(&reqRing, buf, size + sz_offset);
     printf("transport: Allocated request buffer %p storing %u bytes\n", buf, size);
@@ -87,13 +87,13 @@ req_buf_ptr_t allocReqBuf(size_t size, uint8_t *data, uint8_t client, uint8_t ad
         enqueue_free(&reqRing, buf, I2C_BUF_SZ);
         return 0;
     }
-    
+
     return (req_buf_ptr_t)buf;
 }
 
 ret_buf_ptr_t getRetBuf() {
     // sel4cp_dbg_puts("transport: Getting return buffer\n");
-    
+
     // Allocate a buffer from the appropriate ring
     uintptr_t buf;
     unsigned int sz;
@@ -127,7 +127,7 @@ static inline uintptr_t popBuf(ring_handle_t *ring, size_t *sz) {
     printf("Popping buffer containing %zu bytes\n", *sz);
     if (ret != 0) return 0;
     return buf;
-} 
+}
 
 req_buf_ptr_t popReqBuf(size_t *size) {
     // sel4cp_dbg_puts("transport: popping request buffer\n");
@@ -144,7 +144,7 @@ ret_buf_ptr_t popRetBuf(size_t *size) {
     return (ret_buf_ptr_t) popBuf(&retRing, size);
 }
 
-int retBufEmpty(void) { 
+int retBufEmpty(void) {
     return ring_empty(retRing.used_ring);
 }
 
@@ -152,10 +152,9 @@ int reqBufEmpty(void) {
     return ring_empty(reqRing.used_ring);
 }
 
-
 int releaseReqBuf(req_buf_ptr_t buf) {
     // sel4cp_dbg_puts("transport: releasing request buffer\n");
-    
+
     if (!buf) {
         return 0;
     }
@@ -170,7 +169,7 @@ int releaseReqBuf(req_buf_ptr_t buf) {
 
 int releaseRetBuf(ret_buf_ptr_t buf) {
     // sel4cp_dbg_puts("transport: releasing return buffer\n");
-    
+
     if (!buf) {
         return 0;
     }
