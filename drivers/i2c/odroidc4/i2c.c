@@ -44,7 +44,7 @@ void init(void) {
 static inline void driverNotify(void) {
     printf("server: Notified by driver!\n");
     // Read the return buffer
-        if (retBufEmpty()) {
+    if (retBufEmpty()) {
         return;
     }
     size_t sz;
@@ -72,7 +72,6 @@ static inline void driverNotify(void) {
     }
 
     releaseRetBuf(ret);
-    
 }
 
 static inline void clientNotify(int channel) {

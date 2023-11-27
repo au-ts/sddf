@@ -20,7 +20,7 @@
 // Unless otherwise indicated, all fields are two words long.
 #define I2C_CTRL        (0x0)         // One word
 #define I2C_ADDRESS     (0x1)         // One word
-#define I2C_TOKEN_LIST  (0x2)   
+#define I2C_TOKEN_LIST  (0x2)
 #define I2C_WDATA       (0x4)
 #define I2C_RDATA       (0x6)
 
@@ -60,7 +60,5 @@
 // IRQs IDs (matching i2c.system)
 #define IRQ_I2C          2
 #define IRQ_I2C_TO       3
-
-
 
 #endif
