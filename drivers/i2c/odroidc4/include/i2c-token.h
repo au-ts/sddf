@@ -35,6 +35,6 @@ typedef uint8_t i2c_token_t;
 #define I2C_TK_STOP     0x6     // STOP: Used to send the STOP condition on the bus to end a transaction. 
                                 //       Causes master to release the bus.
 
-#define I2C_TK_DAT      0x7     // Read or write one byte - the byte after this is treated as payload.
+#define I2C_TK_DATA      0x7     // Read or write one byte - the byte after this is treated as payload.
 
 #endif

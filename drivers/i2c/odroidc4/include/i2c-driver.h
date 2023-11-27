@@ -12,7 +12,9 @@
 
 #ifndef I2C_DRIVER_H
 #define I2C_DRIVER_H
+
 #define ODROIDC4
+
 #include <stdint.h>
 #include "i2c-transport.h"
 #include "gpio.h"
@@ -33,8 +35,11 @@ typedef struct _i2c_ifState {
     int current_req_len;        // Number of bytes in current request.
     size_t remaining;              // Number of bytes remaining to dispatch.
     int notified;               // Flag indicating that there is more work waiting.
-    int ddr;                    // Data direction. 0 = write, 1 = read.
+    int data_direction;                    // Data direction. 0 = write, 1 = read.
 } i2c_ifState_t;
+
+#define DATA_DIRECTION_WRITE (0x0)
+#define DATA_DIRECTION_READ (0x1)
 
 
 // Driver-server interface

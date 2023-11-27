@@ -29,7 +29,7 @@
 // Request buffer
 #define REQ_BUF_CLIENT 0
 #define REQ_BUF_ADDR 1
-#define REQ_BUF_DAT_OFFSET 2    // Number of non-payload bytes. Should match however
+#define REQ_BUF_DATA_OFFSET 2    // Number of non-payload bytes. Should match however
                                 // many #defines are listed here.
 
 // Shared memory regions
