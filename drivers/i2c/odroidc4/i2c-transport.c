@@ -27,15 +27,15 @@ ring_handle_t retRing;
 
 
 void _putchar(char character) {
-    sel4cp_dbg_putc(character);
+    microkit_dbg_putc(character);
 }
 
 void i2cTransportInit(int buffer_init) {
-    sel4cp_dbg_puts("Initialising i2c transport layer => ");
+    microkit_dbg_puts("Initialising i2c transport layer => ");
     if (buffer_init) {
-        sel4cp_dbg_puts("Initialising buffers\n");
+        microkit_dbg_puts("Initialising buffers\n");
     } else {
-        sel4cp_dbg_puts("Not initialising buffers\n");
+        microkit_dbg_puts("Not initialising buffers\n");
     }
     // Initialise rings
     ring_init(&reqRing, (ring_buffer_t *) req_free, (ring_buffer_t *) req_used, buffer_init);
@@ -57,7 +57,7 @@ void i2cTransportInit(int buffer_init) {
 
 
 req_buf_ptr_t allocReqBuf(size_t size, uint8_t *data, uint8_t client, uint8_t addr) {
-    // sel4cp_dbg_puts("transport: Allocating request buffer\n")
+    // microkit_dbg_puts("transport: Allocating request buffer\n")
     if (size > I2C_BUF_SZ - REQ_BUF_DAT_OFFSET*sizeof(i2c_token_t)) {
         printf("transport: Requested buffer size %zu too large\n", size);
         return 0;
@@ -92,14 +92,14 @@ req_buf_ptr_t allocReqBuf(size_t size, uint8_t *data, uint8_t client, uint8_t ad
 }
 
 ret_buf_ptr_t getRetBuf() {
-    // sel4cp_dbg_puts("transport: Getting return buffer\n");
+    // microkit_dbg_puts("transport: Getting return buffer\n");
 
     // Allocate a buffer from the appropriate ring
     uintptr_t buf;
     unsigned int sz;
     int ret = dequeue_free(&retRing, &buf, &sz);
     if (ret != 0) {
-        sel4cp_dbg_puts("transport: Failed to get return buffer due to empty free ring!\n");
+        microkit_dbg_puts("transport: Failed to get return buffer due to empty free ring!\n");
         return 0;
     }
     printf("transport: Got return buffer %p\n", buf);
@@ -107,7 +107,7 @@ ret_buf_ptr_t getRetBuf() {
 }
 
 int pushRetBuf(ret_buf_ptr_t buf, size_t size) {
-    // sel4cp_dbg_puts("transport: pushign return buffer\n");
+    // microkit_dbg_puts("transport: pushign return buffer\n");
 
     if (size > I2C_BUF_SZ || !buf) {
         return 0;
@@ -130,7 +130,7 @@ static inline uintptr_t popBuf(ring_handle_t *ring, size_t *sz) {
 }
 
 req_buf_ptr_t popReqBuf(size_t *size) {
-    // sel4cp_dbg_puts("transport: popping request buffer\n");
+    // microkit_dbg_puts("transport: popping request buffer\n");
 
     // Allocate a buffer from the appropriate ring
     return (req_buf_ptr_t) popBuf(&reqRing, size);
@@ -138,7 +138,7 @@ req_buf_ptr_t popReqBuf(size_t *size) {
 
 
 ret_buf_ptr_t popRetBuf(size_t *size) {
-    // sel4cp_dbg_puts("transport: popping return buffer\n");
+    // microkit_dbg_puts("transport: popping return buffer\n");
 
     // Allocate a buffer from the appropriate ring
     return (ret_buf_ptr_t) popBuf(&retRing, size);
@@ -153,7 +153,7 @@ int reqBufEmpty(void) {
 }
 
 int releaseReqBuf(req_buf_ptr_t buf) {
-    // sel4cp_dbg_puts("transport: releasing request buffer\n");
+    // microkit_dbg_puts("transport: releasing request buffer\n");
 
     if (!buf) {
         return 0;
@@ -168,7 +168,7 @@ int releaseReqBuf(req_buf_ptr_t buf) {
 }
 
 int releaseRetBuf(ret_buf_ptr_t buf) {
-    // sel4cp_dbg_puts("transport: releasing return buffer\n");
+    // microkit_dbg_puts("transport: releasing return buffer\n");
 
     if (!buf) {
         return 0;

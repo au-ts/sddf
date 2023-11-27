@@ -9,8 +9,7 @@
 // Matt Rossouw (matthew.rossouw@unsw.edu.au)
 // 08/2023
 
-#include <sel4cp.h>
-#include <sel4/sel4.h>
+#include <microkit.h>
 #include "i2c-driver.h"
 #include "i2c-token.h"
 #include "sw_shared_ringbuffer.h"
@@ -29,7 +28,7 @@ i2c_security_list_t security_list[I2C_SECURITY_LIST_SZ];
  * Main entrypoint for server.
 */
 void init(void) {
-    sel4cp_dbg_puts("I2C server init\n");
+    microkit_dbg_puts("I2C server init\n");
     i2cTransportInit(1);
 
     // Clear security list
@@ -80,7 +79,7 @@ static inline void clientNotify(int channel) {
     // 
 }
 
-void notified(sel4cp_channel c) {
+void notified(microkit_channel c) {
     switch (c) {
         case DRIVER_NOTIFY_ID:
             driverNotify();
@@ -91,8 +90,8 @@ void notified(sel4cp_channel c) {
 }
 
 static inline seL4_MessageInfo_t ppcError(void) {
-    sel4cp_mr_set(0, -1);
-    return sel4cp_msginfo_new(0, 1);
+    microkit_mr_set(0, -1);
+    return microkit_msginfo_new(0, 1);
 }
 
 /**
@@ -102,14 +101,14 @@ static inline seL4_MessageInfo_t securityClaim(uint8_t addr, uint64_t client) {
     // Check that the address is not already claimed
 
     if (security_list[addr] != -1) {
-        sel4cp_dbg_puts("I2C|ERROR: Address already claimed!\n");
+        microkit_dbg_puts("I2C|ERROR: Address already claimed!\n");
         return ppcError();
     }
 
     // Claim
     security_list[addr] = client;
-    sel4cp_mr_set(0, 0);
-    return sel4cp_msginfo_new(0, 1);
+    microkit_mr_set(0, 0);
+    return microkit_msginfo_new(0, 1);
 }
 
 /**
@@ -118,32 +117,32 @@ static inline seL4_MessageInfo_t securityClaim(uint8_t addr, uint64_t client) {
 static inline seL4_MessageInfo_t securityRelease(uint8_t addr, uint64_t client) {
     // Check that the address is claimed by the client
     if (security_list[addr] != client) {
-        sel4cp_dbg_puts("I2C|ERROR: Address not claimed by client!\n");
+        microkit_dbg_puts("I2C|ERROR: Address not claimed by client!\n");
         return ppcError();
     }
 
     // Release
     security_list[addr] = -1;
-    sel4cp_mr_set(0, 0);
-    return sel4cp_msginfo_new(0, 1);
+    microkit_mr_set(0, 0);
+    return microkit_msginfo_new(0, 1);
 }
 
 /**
  * Protected procedure calls into this server are used managing the security lists.
 */
-seL4_MessageInfo_t protected(sel4cp_channel c, seL4_MessageInfo_t m) {
+seL4_MessageInfo_t protected(microkit_channel c, seL4_MessageInfo_t m) {
     // Determine the type of request
-    size_t req = sel4cp_mr_get(I2C_PPC_MR_REQTYPE);
-    size_t ppc_addr = sel4cp_mr_get(I2C_PPC_MR_ADDR);
-    size_t client_pd = sel4cp_mr_get(I2C_PPC_MR_CID);
+    size_t req = microkit_mr_get(I2C_PPC_MR_REQTYPE);
+    size_t ppc_addr = microkit_mr_get(I2C_PPC_MR_ADDR);
+    size_t client_pd = microkit_mr_get(I2C_PPC_MR_CID);
 
     // Check arguments are valid
     if (req != I2C_PPC_CLAIM || req != I2C_PPC_RELEASE) {
-        sel4cp_dbg_puts("I2C|ERROR: Invalid PPC request type!\n");
+        microkit_dbg_puts("I2C|ERROR: Invalid PPC request type!\n");
         return ppcError();
     }
     if (ppc_addr < 0 || ppc_addr > 127) {
-        sel4cp_dbg_puts("I2C|ERROR: Invalid i2c address in PPC!\n");
+        microkit_dbg_puts("I2C|ERROR: Invalid i2c address in PPC!\n");
         return ppcError();
     }
 
@@ -156,5 +155,5 @@ seL4_MessageInfo_t protected(sel4cp_channel c, seL4_MessageInfo_t m) {
             return securityRelease(ppc_addr, client_pd);
     }
 
-    return sel4cp_msginfo_new(0, 7);
+    return microkit_msginfo_new(0, 7);
 }

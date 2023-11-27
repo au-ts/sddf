@@ -34,7 +34,7 @@
 
 #include <stdarg.h>
 #include <stddef.h>
-#include <sel4cp.h>
+#include <microkit.h>
 
 #ifdef __cplusplus
 extern "C" {
