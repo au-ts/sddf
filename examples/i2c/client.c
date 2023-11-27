@@ -4,6 +4,11 @@
 #include "printf.h"
 #include "i2c-transport.h"
 
+#define DRIVER_CH 0
+
+#define LOG_CLIENT(...) do{ printf("CLIENT|INFO: "); printf(__VA_ARGS__); }while(0)
+#define LOG_CLIENT_ERR(...) do{ printf("CLIENT|ERROR: "); printf(__VA_ARGS__); }while(0)
+
 #define PN532_I2C_BUS_ADDRESS (0x24)
 #define PN532_CMD_GETFIRMWAREVERSION (0x02)
 
@@ -39,9 +44,9 @@ void init(void) {
     ring_init(&req_ring, (ring_buffer_t *) req_free, (ring_buffer_t *) req_used, false);
     ring_init(&ret_ring, (ring_buffer_t *) ret_free, (ring_buffer_t *) ret_used, false);
 
-    uint8_t *buffer = NULL;
-    uintptr_t buffer_len = 0;
-    int ret = dequeue_free(&req_ring, &buffer, &buffer_len);
+    uintptr_t req_buffer = 0;
+    unsigned int buffer_len = 0;
+    int ret = dequeue_free(&req_ring, &req_buffer, &buffer_len);
     if (ret) {
         microkit_dbg_puts("CLIENT|ERROR: could not dequeue free request buffer!\n");
         return;
@@ -49,6 +54,8 @@ void init(void) {
 
     // First dequeue shared ringbuffer buffer
 
+    LOG_CLIENT("buffer is 0x%lx\n", req_buffer);
+    uint8_t *buffer = (uint8_t *) req_buffer;
     // 1. Talk to the I2C server to claim an address (0x48 >> 1).
     //  1.1 Setup client PD in pos0
     // @ivanv: not sure what the client id should be?
@@ -91,8 +98,25 @@ void init(void) {
     enqueue_data(buffer, PN532_POSTAMBLE);
 
     enqueue_data(buffer, I2C_TK_END);
+
+    LOG_CLIENT("finished setting up request\n");
+
+    ret = enqueue_used(&req_ring, req_buffer, data_index + 2);
+    if (ret) {
+        LOG_CLIENT_ERR("failed to enqueue request buffer!\n");
+    }
+
+    LOG_CLIENT("enqueued, signalling driver!\n");
+    microkit_notify(DRIVER_CH);
 }
 
 void notified(microkit_channel ch) {
-
+    LOG_CLIENT("Got notification from 0x%x!\n", ch);
+    switch (ch) {
+        case DRIVER_CH:
+            // process_response();
+            break;
+        default:
+            LOG_CLIENT_ERR("Unknown channel!\n");
+    }
 }
