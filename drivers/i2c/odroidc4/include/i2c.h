@@ -11,10 +11,11 @@
 
 #ifndef I2C_H
 #define I2C_H
+
 #include "sw_shared_ringbuffer.h"
 typedef uint8_t i2c_addr_t;         // 7-bit addressing
 
-#define DRIVER_NOTIFY_ID    1  // Matching i2c.system
+#define DRIVER_NOTIFY_ID    1
 
 
 // Tranposrt layer
@@ -31,7 +32,6 @@ typedef uint8_t i2c_addr_t;         // 7-bit addressing
 // PPC idenitifers
 #define I2C_PPC_CLAIM       1
 #define I2C_PPC_RELEASE     2
-
 
 // Security
 #define I2C_SECURITY_LIST_SZ 127    // Supports one entry for each device
