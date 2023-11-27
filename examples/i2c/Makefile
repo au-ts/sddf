@@ -37,7 +37,7 @@ UTIL=$(SDDF)/util
 
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 
-IMAGES := i2c.elf i2c_driver.elf
+IMAGES := i2c.elf i2c_driver.elf client.elf
 CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall -Wno-unused-function -DNO_ASSERT
 LDFLAGS := -L$(BOARD_DIR)/lib -L$(SDDF)/lib
 LIBS := -lmicrokit -Tmicrokit.ld -lc
@@ -53,13 +53,15 @@ CFLAGS += -I$(BOARD_DIR)/include \
 	-MP
 
 # SERVERFILES: Files implementing the server side of the i2c stack
+CLIENT := client.c
 SERVERFILES=$(I2C)/i2c.c
-DRIVERFILES=$(I2C)/i2c-driver.c $(I2C)/i2c-odroid-c4.c
+DRIVERFILES=$(I2C)/i2c-driver.c
 COMMONFILES=$(I2C)/i2c-transport.c $(I2C)/sw_shared_ringbuffer.c $(I2C)/printf.c
 # FOOLFILES=$(I2C)/fool.c $(I2C)/printf.c
 
+CLIENT_OBJS := client.o $(COMMONFILES:.c=.o)
 SERVER_OBJS := $(I2C)/i2c.o $(COMMONFILES:.c=.o)
-DRIVER_OBJS := $(I2C)/i2c_driver.o $(I2C)/i2c-odroid-c4.o $(COMMONFILES:.c=.o)
+DRIVER_OBJS := $(I2C)/i2c_driver.o $(COMMONFILES:.c=.o)
 # FOOL_OBJS := $(I2C)/fool.o $(I2C)/printf.o
 
 OBJS := $(sort $(addprefix $(BUILD_DIR)/, $(SERVER_OBJS) $(DRIVER_OBJS)))
@@ -79,6 +81,9 @@ $(BUILD_DIR)/i2c.elf: $(addprefix $(BUILD_DIR)/, $(SERVER_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(BUILD_DIR)/i2c_driver.elf: $(addprefix $(BUILD_DIR)/, $(DRIVER_OBJS))
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+
+$(BUILD_DIR)/client.elf: $(addprefix $(BUILD_DIR)/, $(CLIENT_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 # $(BUILD_DIR)/fool.elf: $(addprefix $(BUILD_DIR)/, $(FOOL_OBJS))
