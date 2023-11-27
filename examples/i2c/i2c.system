@@ -80,6 +80,10 @@
         <irq irq="127" id="5" trigger="edge"/>
     </protection_domain>
 
+    <protection_domain name="client" priority = "1">
+        <program_image path="client.elf" />
+    </protection_domain>
+
     <!-- Client protection domain - for testing -->
     <!-- <protection_domain name="fool" priority="120"> -->
         <!-- <program_image path="fool.elf"/> -->
