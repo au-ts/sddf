@@ -11,7 +11,6 @@
 // Matt Rossouw (matthew.rossouw@unsw.edu.au)
 // 08/2023
 
-
 #include <microkit.h>
 #include "i2c-driver.h"
 #include "odroidc4-i2c-mem.h"
@@ -19,6 +18,9 @@
 #ifndef BUS_NUM
 #error "BUS_NUM must be defined!"
 #endif
+
+#define LOG_DRIVER(...) do{ printf("I2C DRIVER|INFO: "); printf(__VA_ARGS__); }while(0)
+#define LOG_DRIVER_ERR(...) do{ printf("I2C DRIVER|ERROR: "); printf(__VA_ARGS__); }while(0)
 
 typedef volatile struct {
     uint32_t ctl;
@@ -42,9 +44,30 @@ uintptr_t clk;
 // elf patcher.
 volatile i2c_if_t *interface = (void *)(uintptr_t)(0x3000000);
 
-static inline int i2cDump(void) {
-    printf("i2c: dumping interface state...\n");
-    
+char *token_to_str(uint8_t token) {
+    switch (token) {
+        case OC4_I2C_TK_END:
+            return "OC4_I2C_TK_END";
+        case OC4_I2C_TK_START:
+            return "OC4_I2C_TK_START";
+        case OC4_I2C_TK_ADDRW:
+            return "OC4_I2C_TK_ADDRW";
+        case OC4_I2C_TK_ADDRR:
+            return "OC4_I2C_TK_ADDRR";
+        case OC4_I2C_TK_DATA:
+            return "OC4_I2C_TK_DATA";
+        case OC4_I2C_TK_DATA_END:
+            return "OC4_I2C_TK_DATA_END";
+        case OC4_I2C_TK_STOP:
+            return "OC4_I2C_TK_STOP";
+        default:
+            return "Unknown token!";
+    }
+}
+
+static inline int i2c_dump(void) {
+    LOG_DRIVER("dumping interface state...\n");
+
     // Print control register fields
     // uint8_t ctl_man = (ctl & REG_CTRL_MANUAL) ? 1 : 0;
     uint8_t ctl_rd_cnt = ((interface->ctl & REG_CTRL_RD_CNT) >> 8);
@@ -61,47 +84,47 @@ static inline int i2cDump(void) {
 
     // Print address
     printf("\t Address register: 0x%x\n", (interface->addr >> 1) & 0x7F);
-    
+
     // Print token register 0 tokens
     printf("\t Token register 0:\n");
     for (int i = 0; i < 8; i++) {
         uint8_t tk = (interface->tk_list0 >> (i * 4)) & 0xF;
-        printf("\t\t Token %d: %x\n", i, tk);
+        printf("\t\t Token %d: %s\n", i, token_to_str(tk));
     }
 
     // Print token register 1 tokens
     printf("\t Token register 1:\n");
     for (int i = 0; i < 8; i++) {
         uint8_t tk = (interface->tk_list1 >> (i * 4)) & 0xF;
-        printf("\t\t Token %d: %x\n", i, tk);
+        printf("\t\t Token %d: %s\n", i, token_to_str(tk));
     }
 
     // Print wdata register 0 tokens
     printf("\t Write data register 0:\n");
     for (int i = 0; i < 4; i++) {
         uint8_t tk = (interface->wdata0 >> (i * 8)) & 0xFF;
-        printf("\t\t Data %d: %x\n", i, tk);
+        printf("\t\t Data %d: 0x%lx\n", i, tk);
     }
 
     // Print wdata register 1 tokens
     printf("\t Write data register 1:\n");
     for (int i = 0; i < 4; i++) {
         uint8_t tk = (interface->wdata1 >> (i * 8)) & 0xFF;
-        printf("\t\t Data %d: %x\n", i, tk);
+        printf("\t\t Data %d: 0x%lx\n", i, tk);
     }
 
     // Print rdata register 0
     printf("\t Read data register 0:\n");
     for (int i = 0; i < 4; i++) {
         uint8_t tk = (interface->rdata0 >> (i * 8)) & 0xFF;
-        printf("\t\t Data %d: %x\n", i, tk);
+        printf("\t\t Data %d: 0x%lx\n", i, tk);
     }
 
     // Print rdata register 1
     printf("\t Read data register 1:\n");
     for (int i = 0; i < 4; i++) {
         uint8_t tk = (interface->rdata1 >> (i * 8)) & 0xFF;
-        printf("\t\t Data %d: %x\n", i, tk);
+        printf("\t\t Data %d: 0x%lx\n", i, tk);
     }
     return 0;
 }
@@ -140,6 +163,7 @@ static inline void setupi2c() {
 
     // Enable i2cm2 -> pinmux 5
     if (bus == 2) {
+        LOG_DRIVER("bus 2 initialising\n");
         pinfunc = GPIO_PM5_X_I2C;
         pinmux5 |= (pinfunc << 4) | (pinfunc << 8);
         *pinmux5_ptr = pinmux5;
@@ -284,28 +308,28 @@ static inline int i2cGetError() {
 }
 
 static inline int i2cStart() {
-    printf("i2c: LIST PROCESSOR START\n");
+    LOG_DRIVER("LIST PROCESSOR START\n");
     interface->ctl &= ~0x1;
     interface->ctl |= 0x1;
     if (!(interface->ctl & 0x1)) {
-        microkit_dbg_puts("i2c: failed to set start bit!\n");
+        LOG_DRIVER("failed to set start bit!\n");
         return -1;
     }
     return 0;
 }
 
-static inline int i2cHalt() {
-    printf("i2c: LIST PROCESSOR HALT\n");
+static inline int i2c_halt() {
+    LOG_DRIVER("LIST PROCESSOR HALT\n");
     interface->ctl &= ~0x1;
     if ((interface->ctl & 0x1)) {
-        microkit_dbg_puts("i2c: failed to halt!\n");
+        LOG_DRIVER("failed to halt!\n");
         return -1;
     }
     return 0;
 }
 
-static inline int i2cFlush() {
-    printf("i2c: LIST PROCESSOR FLUSH\n");
+static inline int i2c_flush() {
+    LOG_DRIVER("LIST PROCESSOR FLUSH\n");
     // Clear token list
     interface->tk_list0 = 0x0;
     interface->tk_list1 = 0x0;
@@ -324,22 +348,26 @@ static inline int i2cFlush() {
 }
 
 static inline int i2c_load_tokens() {
-    microkit_dbg_puts("driver: starting token load\n");
+    LOG_DRIVER("starting token load\n");
     i2c_token_t * tokens = (i2c_token_t *)i2c_ifState.current_req;
-    printf("Tokens remaining in this req: %zu\n", i2c_ifState.remaining);
+    LOG_DRIVER("Tokens remaining in this req: %zu\n", i2c_ifState.remaining);
 
     // Extract second byte: address
     uint8_t addr = tokens[REQ_BUF_ADDR];
     if (addr > 0x7F) {
-        microkit_dbg_puts("i2c: attempted to write to address > 7-bit range!\n");
+        LOG_DRIVER_ERR("attempted to write to address > 7-bit range!\n");
         return -1;
     }
     COMPILER_MEMORY_FENCE();
-    i2cFlush();
+    i2c_flush();
+    COMPILER_MEMORY_FENCE();
     // Load address into address register
     // Address goes into low 7 bits of address register
-    interface->addr = interface->addr & ~(0x7F);
+    interface->addr &= ~(0x7f);
     interface->addr = interface->addr | ((addr& 0x7f) << 1);  // i2c hardware expects that the 7-bit address is shifted left by 1
+    // interface->addr |= ((addr << 1) & 0x7f);  // i2c hardware expects that the 7-bit address is shifted left by 1
+
+    LOG_DRIVER("interface->addr 0x%lx\n", interface->addr);
 
     // Clear token buffer registers
     interface->tk_list0 = 0x0;
@@ -357,24 +385,25 @@ static inline int i2c_load_tokens() {
     int i = i2c_ifState.current_req_len - i2c_ifState.remaining;
     // printf("Current offset into request: %d\n", i);
     while (tk_offset < 16 && wdat_offset < 8) {
+        LOG_DRIVER("i is 0x%lx, tk_offset: 0x%lx, wdat_offset: 0x%lx\n", i, tk_offset, wdat_offset);
         // Explicitly pad END tokens for empty space
         if (i >= i2c_ifState.current_req_len) {
             if (tk_offset < 8) {
                 interface->tk_list0 |= (OC4_I2C_TK_END << (tk_offset * 4));
-                tk_offset++;
             } else {
-                interface->tk_list1 = interface->tk_list1 | (OC4_I2C_TK_END << ((tk_offset -8) * 4));
-                tk_offset++;
+                interface->tk_list1 = interface->tk_list1 | (OC4_I2C_TK_END << ((tk_offset % 8) * 4));
             }
+            tk_offset++;
             i++;
             continue;
         }
 
-        /* Skip first three 'tokens'. The client id, addr, and size */
+        /* Skip first two tokens */
         i2c_token_t tok = tokens[REQ_BUF_DATA_OFFSET + i];
 
         uint32_t odroid_tok = 0x0;
         // Translate token to ODROID token
+        LOG_DRIVER("converting token to odroid token!\n");
         switch (tok) {
             case I2C_TK_END:
                 odroid_tok = OC4_I2C_TK_END;
@@ -397,21 +426,21 @@ static inline int i2c_load_tokens() {
                 odroid_tok = OC4_I2C_TK_DATA_END;
                 break;
             case I2C_TK_STOP:
+                LOG_DRIVER("GOT STOP!\n");
                 odroid_tok = OC4_I2C_TK_STOP;
                 break;
             default:
-                printf("i2c: invalid data token in request! \"%x\"\n", tok);
+                LOG_DRIVER("invalid data token in request! \"%x\"\n", tok);
                 return -1;
         }
         // printf("Loading token %d: %d\n", i, odroid_tok);
 
         if (tk_offset < 8) {
-            interface->tk_list0 |= ((odroid_tok & 0xF) << (tk_offset * 4));
-            tk_offset++;
+            interface->tk_list0 |= (odroid_tok << (tk_offset * 4));
         } else {
-            interface->tk_list1 = interface->tk_list1 | (odroid_tok << ((tk_offset -8) * 4));
-            tk_offset++;
+            interface->tk_list1 |= (odroid_tok << ((tk_offset % 8) * 4));
         }
+        tk_offset++;
         // If data token and we are writing, load data into wbuf registers
         if (odroid_tok == OC4_I2C_TK_DATA && i2c_ifState.data_direction == DATA_DIRECTION_WRITE) {
             if (wdat_offset < 4) {
@@ -428,12 +457,13 @@ static inline int i2c_load_tokens() {
     }
 
     // Data loaded. Update remaining tokens indicator and start list processor
-    i2c_ifState.remaining = (i2c_ifState.current_req_len - i > 0) 
+    i2c_ifState.remaining = (i2c_ifState.current_req_len - i > 0)
                                  ? i2c_ifState.current_req_len - i : 0;
 
-    printf("driver: Tokens loaded. %zu remain for this request\n", i2c_ifState.remaining);
-    i2cDump();
+    LOG_DRIVER("Tokens loaded. %zu remain for this request\n", i2c_ifState.remaining);
+    i2c_dump();
     // Start list processor
+    COMPILER_MEMORY_FENCE();
     i2cStart();
     COMPILER_MEMORY_FENCE();
 
@@ -457,7 +487,7 @@ void init(void) {
  * Check if there is work to do for a given bus and dispatch it if so.
 */
 static void check_buf() {
-    if (!reqBufEmpty()) {
+    if (!ring_empty(req_ring.used_ring)) {
         // If this interface is busy, skip notification and
         // set notified flag for later processing
         if (i2c_ifState.current_req) {
@@ -485,14 +515,14 @@ static void check_buf() {
         // Load bookkeeping data into return buffer
         // Set client PD
 
-        printf("driver: Loading request from client %u to address %x of sz %zu\n", req[0], req[1], sz);
+        LOG_DRIVER("Loading request from client %u to address 0x%x of sz %zu\n", req[0], req[1], sz);
 
         ret[RET_BUF_CLIENT] = req[REQ_BUF_CLIENT];      // Client PD
 
         // Set targeted i2c address
         ret[RET_BUF_ADDR] = req[REQ_BUF_ADDR];          // Address
 
-        if (sz <= REQ_BUF_DATA_OFFSET || sz > I2C_BUF_SZ) {
+        if (sz <= REQ_BUF_DATA_OFFSET || sz > I2C_BUF_SIZE) {
             printf("Invalid request size: %zu!\n", sz);
             return;
         }
@@ -503,7 +533,7 @@ static void check_buf() {
         i2c_ifState.notified = 0;
         i2c_ifState.current_ret = ret;
         if (!i2c_ifState.current_ret) {
-            microkit_dbg_puts("i2c: no ret buf!\n");
+            LOG_DRIVER_ERR("no ret buf!\n");
         }
 
         // Bytes 0 and 1 are for error code / location respectively and are set later
@@ -512,7 +542,7 @@ static void check_buf() {
         // @ivanv: check return value
         i2c_load_tokens();
     } else {
-        microkit_dbg_puts("driver: called but no work available: resetting notified flag\n");
+        LOG_DRIVER("called but no work available: resetting notified flag\n");
         // If nothing needs to be done, clear notified flag if it was set.
         i2c_ifState.notified = 0;
     }
@@ -530,45 +560,57 @@ static inline void serverNotify(void) {
     // they operate in parallel and notifications carry no other info.
 
     // If there is work to do, attempt to do it
-    microkit_dbg_puts("i2c: driver notified!\n");
+    LOG_DRIVER("driver notified!\n");
     // @ivanv ???
-    for (int i = 2; i < 4; i++) {
-        check_buf(i);
-    }
+    // for (int i = 2; i < 4; i++) {
+    check_buf();
+    // }
 }
 
 /**
  * IRQ handler for an i2c interface.
  * @param timeout Whether the IRQ was triggered by a timeout. 0 if not, 1 if so.
 */
-static void handle_irq(int timeout) {
-    printf("i2c: driver irq\n");
+static void handle_irq(bool timeout) {
+    if (timeout) {
+        LOG_DRIVER("handling timeout IRQ\n");
+    } else {
+        // @ivanv: not sure if completion IRQ is the right term
+        LOG_DRIVER("handling completion IRQ\n");
+    }
     // printf("notified = %d\n", i2c_ifState.notified);
 
-    // IRQ landed: i2c transaction has either completed or timed out.
     if (timeout) {
-        microkit_dbg_puts("i2c: timeout!\n");
-        i2cHalt();
-        if (i2c_ifState.current_ret) {
-            i2c_ifState.current_ret[RET_BUF_ERR] = I2C_ERR_TIMEOUT;
-            i2c_ifState.current_ret[RET_BUF_ERR_TK] = 0x0;
-            pushRetBuf(i2c_ifState.current_ret, i2c_ifState.current_req_len);
-        }
-        if (i2c_ifState.current_req) {
-            releaseReqBuf(i2c_ifState.current_req);
-        }
-        i2c_ifState.current_ret = NULL;
-        i2c_ifState.current_req = 0x0;
-        i2c_ifState.current_req_len = 0;
-        i2c_ifState.remaining = 0;
+        LOG_DRIVER_ERR("Got timeout!\n");
         return;
     }
 
-    i2cDump();
-    i2cHalt();
+    // IRQ landed: i2c transaction has either completed or timed out.
+    // if (timeout) {
+    //     i2c_halt();
+    //     if (i2c_ifState.current_ret) {
+    //         i2c_ifState.current_ret[RET_BUF_ERR] = I2C_ERR_TIMEOUT;
+    //         i2c_ifState.current_ret[RET_BUF_ERR_TK] = 0x0;
+    //         pushRetBuf(i2c_ifState.current_ret, i2c_ifState.current_req_len);
+    //         // @ivanv: not sure whether or not we should be notifying here
+    //         // microkit_notify(SERVER_NOTIFY_ID);
+    //     }
+    //     if (i2c_ifState.current_req) {
+    //         releaseReqBuf(i2c_ifState.current_req);
+    //     }
+    //     // i2c_ifState.current_ret = NULL;
+    //     // i2c_ifState.current_req = 0x0;
+    //     // i2c_ifState.current_req_len = 0;
+    //     // i2c_ifState.remaining = 0;
+    //     return;
+    // }
+
+    i2c_dump();
+    i2c_halt();
 
     // Get result
     int err = i2cGetError();
+    LOG_DRIVER("err is 0x%lx\n", err);
     // If error is 0, successful write. If error >0, successful read of err bytes.
     // Prepare to extract data from the interface.
     ret_buf_ptr_t ret = i2c_ifState.current_ret;
@@ -577,7 +619,7 @@ static void handle_irq(int timeout) {
     // If there was an error, cancel the rest of this transaction and load the
     // error information into the return buffer.
     if (err < 0) {
-        microkit_dbg_puts("i2c: error!\n");
+        LOG_DRIVER("error!\n");
         if (timeout) {
             ret[RET_BUF_ERR] = I2C_ERR_TIMEOUT;
         } else if (err == -I2C_TK_ADDRR) {
@@ -593,21 +635,25 @@ static void handle_irq(int timeout) {
             // Copy data into return buffer
             for (int i = 0; i < err; i++) {
                 if (i < 4) {
-                    ret[RET_BUF_DAT_OFFSET+i] = (interface->rdata0 >> (i * 8)) & 0xFF;
+                    uint8_t value = (interface->rdata0 >> (i * 8)) & 0xFF;
+                    ret[RET_BUF_DATA_OFFSET+i] = value;
+                    LOG_DRIVER("loading into ret at %d value 0x%lx\n", RET_BUF_DATA_OFFSET + i, value);
                 } else {
-                    ret[RET_BUF_DAT_OFFSET+i] = (interface->rdata1 >> ((i - 4) * 8)) & 0xFF;
+                    uint8_t value = (interface->rdata1 >> ((i - 4) * 8)) & 0xFF;
+                    ret[RET_BUF_DATA_OFFSET+i] = value;
+                    LOG_DRIVER("loading into ret at %d value 0x%lx\n", RET_BUF_DATA_OFFSET + i, value);
                 }
             }
         }
 
+        LOG_DRIVER("I2C_ERR_OK\n");
         ret[RET_BUF_ERR] = I2C_ERR_OK;    // Error code
         ret[RET_BUF_ERR_TK] = 0x0;           // Token that caused error
     }
-    // printf("IRQ2: ret buf first 4 bytes: %x %x %x %x\n", ret[0], ret[1], ret[2], ret[3]);
 
     // If request is completed or there was an error, return data to server and notify.
     if (err < 0 || !i2c_ifState.remaining) {
-        printf("driver: request completed or error, returning to server\n");
+        LOG_DRIVER("request completed or error, returning to server\n");
         pushRetBuf(i2c_ifState.current_ret, i2c_ifState.current_req_len);
         releaseReqBuf(i2c_ifState.current_req);
         i2c_ifState.current_ret = NULL;
@@ -616,7 +662,7 @@ static void handle_irq(int timeout) {
         i2c_ifState.remaining = 0;
         microkit_notify(SERVER_NOTIFY_ID);
         // Reset hardware
-        i2cHalt();
+        i2c_halt();
     }
 
     // If the driver was notified while this transaction was in progress, immediately start working on the next one.
@@ -628,7 +674,7 @@ static void handle_irq(int timeout) {
         // @ivanv: check return value
         i2c_load_tokens();
     }
-    printf("driver: END OF IRQ HANDLER - notified=%d\n", i2c_ifState.notified);
+    LOG_DRIVER("END OF IRQ HANDLER - notified=%d\n", i2c_ifState.notified);
 }
 
 void notified(microkit_channel c) {
@@ -637,11 +683,11 @@ void notified(microkit_channel c) {
             serverNotify();
             break;
         case IRQ_I2C:
-            handle_irq(0);
+            handle_irq(false);
             microkit_irq_ack(IRQ_I2C);
             break;
         case IRQ_I2C_TO:
-            handle_irq(1);
+            handle_irq(true);
             microkit_irq_ack(IRQ_I2C_TO);
             break;
 
