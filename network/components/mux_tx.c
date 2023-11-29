@@ -1,5 +1,7 @@
+#include <microkit.h>
 #include <sddf/network/shared_ringbuffer.h>
 #include "util.h"
+#include "fence.h"
 
 uintptr_t tx_free_drv;
 uintptr_t tx_used_drv;
@@ -26,6 +28,8 @@ uintptr_t uart_base;
 #define NUM_BUFFERS 512
 #define BUF_SIZE 2048
 #define DMA_SIZE 0x200000
+
+#define _unused(x) ((void)(x))
 
 typedef struct state {
     /* Pointers to shared buffers */
@@ -91,6 +95,7 @@ get_client(uintptr_t addr)
     }
     print("MUX TX|ERROR: Buffer out of range\n");
     assert(0);
+    return NUM_CLIENTS;
 }
 
 /*
@@ -98,11 +103,10 @@ get_client(uintptr_t addr)
  */
 void process_tx_ready(void)
 {
-    uint64_t original_size = ring_size(state.tx_ring_drv.used_ring);
-    uint64_t enqueued = 0;
-    uint64_t old_enqueued = enqueued;
+    bool enqueued = 0;
     int err;
-
+    _unused(err);
+    process_tx_ready_:
     for (int client = 0; client < NUM_CLIENTS; client++) {
         while (!ring_empty(state.tx_ring_clients[client].used_ring) && !ring_full(state.tx_ring_drv.used_ring)) {
             uintptr_t addr;
@@ -117,11 +121,21 @@ void process_tx_ready(void)
             err = enqueue_used(&state.tx_ring_drv, phys, len, cookie);
             assert(!err);
 
-            enqueued += 1;
+            enqueued = true;
+        }
+
+        state.tx_ring_clients[client].used_ring->notify_reader = true;
+
+        THREAD_MEMORY_FENCE();
+
+        if (!ring_empty(state.tx_ring_clients[client].used_ring) && !ring_full(state.tx_ring_drv.used_ring)) {
+            state.tx_ring_clients[client].used_ring->notify_reader = false;
+            goto process_tx_ready_;
         }
     }
 
-    if (state.tx_ring_drv.used_ring->notify_reader) {
+    if (enqueued) {
+        state.tx_ring_drv.used_ring->notify_reader = false;
         microkit_notify_delayed(DRIVER);
     }
 }
@@ -130,18 +144,20 @@ void process_tx_ready(void)
  * Take as many TX free buffers from the driver and give them to
  * the respective clients. This will notify the clients if we have moved buffers
  * around and the client's TX free ring was empty.
+ * !!! We assume a client never has a free queue greater than a used queue. 
  */
 void process_tx_complete(void)
 {
     // bitmap stores whether which clients need notifying.
     bool notify_clients[NUM_CLIENTS] = {false};
-
+    process_tx_complete_:
     while (!ring_empty(state.tx_ring_drv.free_ring)) {
         uintptr_t addr;
         unsigned int len;
         void *cookie;
         int err = dequeue_free(&state.tx_ring_drv, &addr, &len, &cookie);
         assert(!err);
+        _unused(err);
         uintptr_t virt = get_virt_addr(addr);
         assert(virt);
 
@@ -154,9 +170,19 @@ void process_tx_complete(void)
         }
     }
 
+    state.tx_ring_drv.free_ring->notify_reader = true;
+
+    THREAD_MEMORY_FENCE();
+
+    if (!ring_empty(state.tx_ring_drv.free_ring)) {
+        state.tx_ring_drv.free_ring->notify_reader = false;
+        goto process_tx_complete_;
+    };
+
     /* Loop over bitmap and see who we need to notify. */
     for (int client = 0; client < NUM_CLIENTS; client++) {
         if (notify_clients[client]) {
+            state.tx_ring_clients[client].free_ring->notify_reader = false;
             microkit_notify(client);
         }
     }
@@ -164,24 +190,13 @@ void process_tx_complete(void)
 
 void notified(microkit_channel ch)
 {
-    state.tx_ring_drv.free_ring->notify_reader = false;
     process_tx_complete();
     process_tx_ready();
-
-    // We only want to get a notification from the driver regarding 
-    // new free tx buffers, if any
-    // of the clients need a notification. 
-    for (int client = 0; client < NUM_CLIENTS; client++) {
-        if (state.tx_ring_clients[client].free_ring->notify_reader) {
-            state.tx_ring_drv.free_ring->notify_reader = true;
-        }
-    }
 }
 
 void init(void)
 {
     /* Set up shared memory regions */
-    // FIX ME: Use the notify function pointer to put the notification in?
     ring_init(&state.tx_ring_drv, (ring_buffer_t *)tx_free_drv, (ring_buffer_t *)tx_used_drv, 1, NUM_BUFFERS, NUM_BUFFERS);
     ring_init(&state.tx_ring_clients[0], (ring_buffer_t *)tx_free_cli0, (ring_buffer_t *)tx_used_cli0, 1, NUM_BUFFERS, NUM_BUFFERS);
     ring_init(&state.tx_ring_clients[1], (ring_buffer_t *)tx_free_cli1, (ring_buffer_t *)tx_used_cli1, 1, NUM_BUFFERS, NUM_BUFFERS);
@@ -192,18 +207,21 @@ void init(void)
         uintptr_t addr = shared_dma_vaddr_cli0 + (BUF_SIZE * i);
         int err = enqueue_free(&state.tx_ring_clients[0], addr, BUF_SIZE, NULL);
         assert(!err);
+        _unused(err);
     }
 
-    for (int i = 0; i < 16 - 1; i++) {
+    for (int i = 0; i < NUM_BUFFERS - 1; i++) {
         uintptr_t addr = shared_dma_vaddr_cli1 + (BUF_SIZE * i);
         int err = enqueue_free(&state.tx_ring_clients[1], addr, BUF_SIZE, NULL);
         assert(!err);
+        _unused(err);
     }
 
     for (int i = 0; i < NUM_BUFFERS - 1; i++) {
         uintptr_t addr = shared_dma_vaddr_arp + (BUF_SIZE * i);
         int err = enqueue_free(&state.tx_ring_clients[2], addr, BUF_SIZE, NULL);
         assert(!err);
+        _unused(err);
     }
 
     // We are higher priority than the clients, so we always need to be notified
