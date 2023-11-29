@@ -23,7 +23,7 @@
 #define RET_BUF_ERR_TK 1
 #define RET_BUF_CLIENT 2
 #define RET_BUF_ADDR 3
-#define RET_BUF_DAT_OFFSET 4    // Number of non-payload bytes. Should match however
+#define RET_BUF_DATA_OFFSET 4    // Number of non-payload bytes. Should match however
                                 // many #defines are listed here.
 
 // Request buffer
@@ -39,8 +39,8 @@ extern uintptr_t ret_free;
 extern uintptr_t ret_used;
 extern uintptr_t driver_bufs;
 
-extern ring_handle_t reqRing;
-extern ring_handle_t retRing;
+extern ring_handle_t req_ring;
+extern ring_handle_t ret_ring;
 
 
 

@@ -48,8 +48,8 @@ void i2cTransportInit(int buffer_init) {
         for (int i = 0; i < I2C_BUF_COUNT; i++) {
             // TODO: check buffer offsetting here. This is definitely too sparse because I haven't updated
             //       it form the 4-buf design
-            enqueue_free(&req_ring, (uintptr_t) driver_bufs + (i * I2C_BUF_SZ), I2C_BUF_SZ);
-            enqueue_free(&ret_ring, (uintptr_t) driver_bufs + (I2C_BUF_SZ * (i + I2C_BUF_COUNT)), I2C_BUF_SZ);
+            enqueue_free(&req_ring, (uintptr_t) driver_bufs + (i * I2C_BUF_SIZE), I2C_BUF_SIZE);
+            enqueue_free(&ret_ring, (uintptr_t) driver_bufs + (I2C_BUF_SIZE * (i + I2C_BUF_COUNT)), I2C_BUF_SIZE);
         }
     }
 
@@ -58,7 +58,7 @@ void i2cTransportInit(int buffer_init) {
 
 req_buf_ptr_t allocReqBuf(size_t size, uint8_t *data, uint8_t client, uint8_t addr) {
     // microkit_dbg_puts("transport: Allocating request buffer\n")
-    if (size > I2C_BUF_SZ - REQ_BUF_DATA_OFFSET*sizeof(i2c_token_t)) {
+    if (size > I2C_BUF_SIZE - REQ_BUF_DATA_OFFSET*sizeof(i2c_token_t)) {
         printf("transport: Requested buffer size %zu too large\n", size);
         return 0;
     }
@@ -84,7 +84,7 @@ req_buf_ptr_t allocReqBuf(size_t size, uint8_t *data, uint8_t client, uint8_t ad
     ret = enqueue_used(&req_ring, buf, size + sz_offset);
     printf("transport: Allocated request buffer %p storing %u bytes\n", buf, size);
     if (ret != 0) {
-        enqueue_free(&req_ring, buf, I2C_BUF_SZ);
+        enqueue_free(&req_ring, buf, I2C_BUF_SIZE);
         return 0;
     }
 
@@ -107,9 +107,9 @@ ret_buf_ptr_t getRetBuf() {
 }
 
 int pushRetBuf(ret_buf_ptr_t buf, size_t size) {
-    // microkit_dbg_puts("transport: pushign return buffer\n");
+    microkit_dbg_puts("transport: pushing return buffer\n");
 
-    if (size > I2C_BUF_SZ || !buf) {
+    if (size > I2C_BUF_SIZE || !buf) {
         return 0;
     }
 
@@ -148,10 +148,6 @@ int retBufEmpty(void) {
     return ring_empty(ret_ring.used_ring);
 }
 
-int reqBufEmpty(void) {
-    return ring_empty(req_ring.used_ring);
-}
-
 int releaseReqBuf(req_buf_ptr_t buf) {
     // microkit_dbg_puts("transport: releasing request buffer\n");
 
@@ -160,7 +156,7 @@ int releaseReqBuf(req_buf_ptr_t buf) {
     }
 
     // Enqueue the buffer
-    int ret = enqueue_free(&req_ring, (uintptr_t)buf, I2C_BUF_SZ);
+    int ret = enqueue_free(&req_ring, (uintptr_t)buf, I2C_BUF_SIZE);
     if (ret != 0) {
         return 0;
     }
@@ -175,7 +171,7 @@ int releaseRetBuf(ret_buf_ptr_t buf) {
     }
 
     // Enqueue the buffer
-    int ret = enqueue_free(&ret_ring, (uintptr_t)buf, I2C_BUF_SZ);
+    int ret = enqueue_free(&ret_ring, (uintptr_t)buf, I2C_BUF_SIZE);
     if (ret != 0) {
         return 0;
     }

@@ -31,24 +31,24 @@
     <memory_region name="client_ret_used" size="0x200_000" page_size="0x200_000"/>
 
     <!-- Main protection domain - i2c server -->
-    <protection_domain name="i2c_server" priority="200" pp="true">
+<!--     <protection_domain name="i2c_server" priority="200" pp="true">
         <program_image path="i2c.elf"/>
 
-        <!-- Server <=> driver buffers -->
-		<map mr="m2_req_free" vaddr="0x4_000_000" perms="rw" setvar_vaddr="req_free"/>
+ -->        <!-- Server <=> driver buffers -->
+<!-- 		<map mr="m2_req_free" vaddr="0x4_000_000" perms="rw" setvar_vaddr="req_free"/>
         <map mr="m2_req_used" vaddr="0x4_200_000" perms="rw" setvar_vaddr="req_used"/>
         <map mr="m2_ret_free" vaddr="0x4_800_000" perms="rw" setvar_vaddr="ret_free"/>
         <map mr="m2_ret_used" vaddr="0x4_A00_000" perms="rw" setvar_vaddr="ret_used"/>
         <map mr="driver_bufs" vaddr="0x5_000_000" perms="rw" setvar_vaddr="driver_bufs"/>
 
-
+ -->
         <!-- Client <=> server ring buffer -->
         <!-- <map mr="client_req_free" vaddr="0x5_200_000" perms="rw" setvar_vaddr="client_req_free"/> -->
         <!-- <map mr="client_req_used" vaddr="0x5_400_000" perms="rw" setvar_vaddr="client_req_used"/> -->
         <!-- <map mr="client_ret_free" vaddr="0x5_600_000" perms="rw" setvar_vaddr="client_ret_free"/> -->
         <!-- <map mr="client_ret_used" vaddr="0x5_800_000" perms="rw" setvar_vaddr="client_ret_used"/> -->
    
-    </protection_domain>
+    <!-- </protection_domain> -->
 
     <!-- i2c driver -->
     <protection_domain name="i2c_driver" priority="201">

@@ -19,7 +19,7 @@ typedef uint8_t i2c_addr_t;         // 7-bit addressing
 
 
 // Tranposrt layer
-#define I2C_BUF_SZ 512
+#define I2C_BUF_SIZE 512
 #define I2C_BUF_COUNT 511
 
 // PPC interface for server - used to allocate/drop addresses
