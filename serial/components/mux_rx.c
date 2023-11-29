@@ -5,6 +5,7 @@
 #include <sel4/sel4.h>
 #include "shared_ringbuffer.h"
 #include "util/include/util.h"
+#include "util.h"
 #include "uart.h"
 #include "uart_config.h"
 

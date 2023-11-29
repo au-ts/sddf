@@ -31,7 +31,7 @@ RINGBUFFERDIR=$(SDDF)/serial/libserialsharedringbuffer
 SERIAL_COMPONENTS=$(SDDF)/serial/components
 UART_DRIVER=$(SDDF)/drivers/serial/meson
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
-UTIL=$(SDDF)/util
+# UTIL=$(SDDF)/util
 
 IMAGES := uart.elf serial_server_1.elf serial_server_2.elf mux_tx.elf mux_rx.elf
 CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall -Wno-unused-function -DNO_ASSERT -Werror
@@ -45,7 +45,6 @@ CFLAGS += -I$(BOARD_DIR)/include \
 	-Iinclude	\
 	-I$(RINGBUFFERDIR)/include \
 	-I$(UART_DRIVER)/include \
-	-I$(UTIL)/include \
 	-I$(SDDF) \
 
 UART_OBJS := uart.o shared_ringbuffer.o
