@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<system>
+    <protection_domain name="timer" priority="254" pp="true" passive="true">
+        <program_image path="timer.elf" />
+        <!-- <irq irq="42" id="0" trigger="edge" /> -->
+    </protection_domain>
+
+    <protection_domain name="client" priority="1" >
+        <program_image path="client.elf" />
+    </protection_domain>
+
+    <channel>
+        <end pd="timer" id="1" />
+        <end pd="client" id="1" />
+    </channel>
+</system>
