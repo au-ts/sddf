@@ -71,7 +71,7 @@ $(BUILD_DIR)/client.o:
 $(BUILD_DIR)/timer_driver.o: $(TIMER_DRIVER_DIR)/timer.c
 	$(CC) -c $(CFLAGS) $(TIMER_DRIVER_DIR)/timer.c -o $(BUILD_DIR)/timer_driver.o
 
-# Server (Timer API for client)
+# Timer API for client
 $(BUILD_DIR)/sddf_timer_client.o:
 	BUILD_DIR=$(abspath $(BUILD_DIR)) MICROKIT_INCLUDE=$(BOARD_DIR)/include TIMER_CHANNEL=1 make -C $(SDDF_DIR)/timer/client
 
