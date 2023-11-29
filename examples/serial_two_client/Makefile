@@ -57,7 +57,7 @@ MUX_RX_OBJS := mux_rx.o shared_ringbuffer.o
 all: directories $(IMAGE_FILE)
 
 $(BUILD_DIR)/%.o: $(SERIAL_COMPONENTS)/%.c Makefile
-	$(CC) -c $(CFLAGS) -DNUM_CLIENTS=2 $< -o $@
+	$(CC) -c $(CFLAGS) -DNUM_CLIENTS=2 -DTRANSFER_WITH_COLOUR $< -o $@
 
 $(BUILD_DIR)/%.o: $(RINGBUFFERDIR)/%.c Makefile
 	$(CC) -c $(CFLAGS) $< -o $@
