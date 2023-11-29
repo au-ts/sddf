@@ -8,9 +8,7 @@
 
 #include <stdint.h>
 #include "coproc.h"
-#include "timer.h"
-
-#define BIT(nr) (1UL << (nr))
+#include "../util.h"
 
 #define GENERIC_TIMER_ENABLE BIT(0)
 #define GENERIC_TIMER_IMASK  BIT(1)
@@ -23,18 +21,6 @@
  * CNTPCT to be read from user-level. This is done by setting CONFIG_EXPORT_PCNT_USER in
  * a kernel configuration.
  */
-typedef struct {
-    uint32_t freq;
-} generic_timer_t;
-
-static inline timer_properties_t get_generic_timer_properties(void)
-{
-    return (timer_properties_t) {
-        .upcounter = true,
-        .bit_width = 64
-    };
-}
-
 static inline uint64_t generic_timer_get_ticks(void)
 {
     uint64_t time;
@@ -102,6 +88,3 @@ static inline uintptr_t generic_timer_status(void)
 {
     return generic_timer_read_ctrl() & GENERIC_TIMER_STATUS;
 }
-
-int generic_timer_init(generic_timer_t *timer);
-uint64_t generic_timer_get_time(generic_timer_t *timer);
