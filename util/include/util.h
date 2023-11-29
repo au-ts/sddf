@@ -26,6 +26,8 @@
 #define unlikely(x) (!!(x))
 #endif
 
+#define BIT(nr) (1UL << (nr))
+
 static void
 putC(uint8_t ch)
 {
