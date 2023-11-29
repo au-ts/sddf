@@ -13,8 +13,7 @@
 #define IRQ_2  0
 #define IRQ_CH 1
 #define TX_CH  2
-#define RX_CH  2
-#define INIT   4
+#define RX_CH  3
 
 /* Memory regions. These all have to be here to keep compiler happy */
 uintptr_t hw_ring_buffer_vaddr;
@@ -89,15 +88,23 @@ static void set_mac(volatile struct eth_mac_regs *reg, uint8_t *mac)
     reg->macaddr0hi = mac[4] + (mac[5] << 8);
 }
 
+static char
+hexchar(unsigned int v)
+{
+    return v < 10 ? '0' + v : ('a' - 10) + v;
+}
+
 static void
 dump_mac(uint8_t *mac)
 {
     for (unsigned i = 0; i < 6; i++) {
-        //printf("%c%c", hexchar((mac[i] >> 4) & 0xf), hexchar(mac[i] & 0xf));
+        microkit_dbg_putc(hexchar((mac[i] >> 4) & 0xf));
+        microkit_dbg_putc(hexchar(mac[i] & 0xf));
         if (i < 5) {
-            //printf(":");
+            microkit_dbg_putc(':');
         }
     }
+    microkit_dbg_putc('\n');
 }
 
 static uintptr_t 
@@ -222,9 +229,9 @@ handle_rx()
 
     /* Notify client (only if we have actually processed a packet and 
     the client hasn't already been notified!) */
-    if (num > 1 && was_empty) {
+    // if (num > 1 && was_empty) {
         microkit_notify(RX_CH);
-    } 
+    // } 
 }
 
 static void
@@ -455,6 +462,8 @@ eth_setup(void)
 
     eth_dma->rxdesclistaddr = hw_ring_buffer_paddr;
     eth_dma->txdesclistaddr = hw_ring_buffer_paddr + (sizeof(struct descriptor) * RX_COUNT);
+
+    eth_mac->framefilt |= 1;
 }
 
 void init_post()
@@ -474,9 +483,6 @@ void init_post()
     eth_mac->conf |= RXENABLE | TXENABLE;
     eth_dma->opmode |= TXSTART | RXSTART;
 
-    //printf("%s: init complete -- waiting for interrupt\n", microkit_name);
-    microkit_notify(INIT);
-
     /* Now take away our scheduling context. Uncomment this for a passive driver. */
     /* have_signal = true;
     msg = seL4_MessageInfo_new(0, 0, 0, 1);
@@ -491,27 +497,7 @@ void init(void)
     microkit_dbg_puts("ethernet init!\n");
 
     eth_setup();
-
-    /* Now wait for notification from lwip that buffers are initialised */
-}
-
-seL4_MessageInfo_t
-protected(microkit_channel ch, microkit_msginfo msginfo)
-{
-    switch (ch) {
-        case INIT:
-            // return the MAC address. 
-            microkit_mr_set(0, eth_mac->macaddr0lo);
-            microkit_mr_set(1, eth_mac->macaddr0hi);
-            return microkit_msginfo_new(0, 2);
-        case TX_CH:
-            handle_tx();
-            break;
-        default:
-            //printf("Received ppc on unexpected channel %d\n", ch);
-            break;
-    }
-    return microkit_msginfo_new(0, 0);
+    init_post();
 }
 
 void notified(microkit_channel ch)
@@ -528,9 +514,7 @@ void notified(microkit_channel ch)
             have_signal = true;
             signal_msg = seL4_MessageInfo_new(IRQAckIRQ, 0, 0, 0);
             signal = (BASE_IRQ_CAP + IRQ_CH);
-        case INIT:
-            init_post();
-            break;
+            return;
         case TX_CH:
             handle_tx();
             break;
