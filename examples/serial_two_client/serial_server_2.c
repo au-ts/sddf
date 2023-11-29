@@ -1,3 +1,4 @@
+#include <microkit.h>
 #include "serial_server.h"
 #include "shared_ringbuffer.h"
 #include <string.h>
