@@ -27,19 +27,13 @@
 static void
 putC(uint8_t ch)
 {
-    while (!(*UART_REG(STAT) & STAT_TDRE)) { }
-    *UART_REG(TRANSMIT) = ch;
+    microkit_dbg_putc(ch);
 }
 
 static void
 print(const char *s)
 {
-#ifndef NO_PRINTING
-    while (*s) {
-        putC(*s);
-        s++;
-    }
-#endif
+    microkit_dbg_puts(s);
 }
 
 static char
@@ -113,4 +107,3 @@ static void _assert_fail(
     } while(0)
 
 #endif
-
