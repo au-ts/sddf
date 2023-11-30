@@ -8,7 +8,7 @@
 
 #include <stdint.h>
 #include "coproc.h"
-#include "../util.h"
+#include "../../util.h"
 
 #define GENERIC_TIMER_ENABLE BIT(0)
 #define GENERIC_TIMER_IMASK  BIT(1)

@@ -35,7 +35,7 @@ LIBS := -lmicrokit -Tmicrokit.ld
 IMAGE_FILE = $(BUILD_DIR)/loader.img
 REPORT_FILE = $(BUILD_DIR)/report.txt
 
-UTIL := util.o printf.o
+UTIL := util.o printf.o minheap.o
 
 TIMER_DRIVER_OBJS := timer_driver.o $(UTIL)
 CLIENT_OBJS := client.o sddf_timer_client.o $(UTIL)
