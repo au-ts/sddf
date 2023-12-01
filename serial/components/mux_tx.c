@@ -51,7 +51,7 @@ sddf_serial_ring_handle_t drv_tx_ring;
 
 size_t copy_with_colour(size_t client, size_t buffer_len, char *driver_buf, char *client_buf) {
     size_t len_copied = 0;
-    assert(buffer_len + COLOUR_START_LEN + COLOUR_START_LEN <= BUFFER_SIZE);
+    assert(buffer_len + COLOUR_START_LEN + COLOUR_START_LEN <= SDDF_SERIAL_BUFFER_SIZE);
     /* First copy the colour start bytes */
     memcpy((char *) driver_buf, client_colours[client], COLOUR_START_LEN);
     len_copied += COLOUR_START_LEN;
@@ -129,7 +129,7 @@ int handle_tx(int curr_client) {
              * free now, which is why the length we enqueue is the maximum
              * buffer length.
              */
-            sddf_serial_enqueue_free(&tx_ring[client], client_buf, BUFFER_SIZE, cookie);
+            sddf_serial_enqueue_free(&tx_ring[client], client_buf, SDDF_SERIAL_BUFFER_SIZE, cookie);
         }
     }
 
