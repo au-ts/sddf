@@ -51,7 +51,7 @@ handle_irq(microkit_channel ch)
     heap_element_t min;
     heap_extract_min(&timeout_heap, &min);
     
-    microkit_notify(min.ch);
+    microkit_notify(min.value);
 
     if (heap_empty(&timeout_heap)) {
         generic_timer_set_compare(UINT64_MAX);
@@ -91,7 +91,7 @@ protected(microkit_channel ch, microkit_msginfo msginfo)
             uint64_t timeout_duration = (uint64_t)(seL4_GetMR(0));
             uint64_t cur_time = get_time();
             uint64_t timeout = cur_time + timeout_duration;
-            heap_insert(&timeout_heap, (heap_element_t){.key = timeout, .ch = ch});
+            heap_insert(&timeout_heap, (heap_element_t){.key = timeout, .value = ch});
             
             heap_element_t min;
             heap_get_min(&timeout_heap, &min);

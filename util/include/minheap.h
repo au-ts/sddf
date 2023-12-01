@@ -4,14 +4,14 @@
 #include <stdint.h>
 #include <stddef.h>
 
-// @ericc: This is highly coupled to the arm timer implementation for now because its simpler to implement.
+// @ericc: This implementation is not a fully generic miheap for now because its simpler to implement.
 // We can make this more generic later by changing heap_element_t to store an index to some metadata structure instead
-// of a microkit channel ID. Will need to bookkeep the metadata structure when we insert/extract from heap.
+// of some uint64_t value. Will need to bookkeep the metadata structure when we insert/extract from heap.
 
 // Structure for each heap element
 typedef struct {
     uint64_t key;        // The key used for ordering in the min heap
-    uint32_t ch;         // The channel ID of client
+    uint64_t value;      // Client-specific value
 } heap_element_t;
 
 // Structure for the min heap
