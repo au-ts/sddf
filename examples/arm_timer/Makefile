@@ -38,6 +38,7 @@ REPORT_FILE = $(BUILD_DIR)/report.txt
 UTIL := util.o printf.o minheap.o
 
 TIMER_DRIVER_OBJS := timer_driver.o $(UTIL)
+TIMER_CHANNEL := 1
 CLIENT_OBJS := client.o sddf_timer_client.o $(UTIL)
 
 IMAGES := timer.elf client.elf
@@ -65,7 +66,7 @@ $(BUILD_DIR)/%.o : $(UTIL_DIR)/%.c
 
 # Actual client
 $(BUILD_DIR)/client.o:
-	$(CC) -c $(CFLAGS) client.c -o $(BUILD_DIR)/client.o
+	$(CC) -c $(CFLAGS) -DTIMER_CHANNEL=$(TIMER_CHANNEL) client.c -o $(BUILD_DIR)/client.o
 
 # Driver
 $(BUILD_DIR)/timer_driver.o: $(TIMER_DRIVER_DIR)/timer.c
@@ -73,7 +74,7 @@ $(BUILD_DIR)/timer_driver.o: $(TIMER_DRIVER_DIR)/timer.c
 
 # Timer API for client
 $(BUILD_DIR)/sddf_timer_client.o:
-	BUILD_DIR=$(abspath $(BUILD_DIR)) MICROKIT_INCLUDE=$(BOARD_DIR)/include TIMER_CHANNEL=1 make -C $(SDDF_DIR)/timer/client
+	BUILD_DIR=$(abspath $(BUILD_DIR)) MICROKIT_INCLUDE=$(BOARD_DIR)/include TIMER_CHANNEL=$(TIMER_CHANNEL) make -C $(SDDF_DIR)/timer/client
 
 # Driver PD
 $(BUILD_DIR)/timer.elf: $(addprefix $(BUILD_DIR)/,$(TIMER_DRIVER_OBJS))

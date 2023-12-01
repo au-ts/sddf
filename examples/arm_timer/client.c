@@ -2,7 +2,9 @@
 #include <sddf/timer/client.h>
 #include <printf.h>
 
-#define TIMER_CH 1
+#ifndef TIMER_CHANNEL
+#error "TIMER_CHANNEL must be provided"
+#endif
 
 void
 init(void)
@@ -21,7 +23,7 @@ init(void)
 void
 notified(microkit_channel ch)
 {
-    if (ch == TIMER_CH) {
+    if (ch == TIMER_CHANNEL) {
         printf("ARM_TIMER_CLIENT|INFO: Timeout received!\n");
     }
 }
