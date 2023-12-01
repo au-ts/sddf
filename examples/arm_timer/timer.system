@@ -2,7 +2,7 @@
 <system>
     <protection_domain name="timer" priority="254" pp="true" passive="true">
         <program_image path="timer.elf" />
-        <irq irq="30" id="0" trigger="level" />
+        <irq irq="30" id="0"/>
     </protection_domain>
 
     <protection_domain name="client" priority="1" >

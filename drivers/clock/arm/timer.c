@@ -13,8 +13,8 @@
 #define SET_TIMEOUT 1
 
 static uint32_t freq;
-static min_heap_t timeout_heap;
-static heap_element_t timeout_heap_data[MAX_TIMEOUTS];
+// static min_heap_t timeout_heap;
+// static heap_element_t timeout_heap_data[MAX_TIMEOUTS];
 
 
 static uint64_t get_time()
@@ -34,19 +34,38 @@ init(void)
     generic_timer_enable();
     generic_timer_unmask_irq();
     freq = generic_timer_get_freq();
-    heap_init(&timeout_heap, timeout_heap_data, MAX_TIMEOUTS);
+    
+    uint64_t time = get_time();
+    time += 5000000000;
+    generic_timer_set_compare(freq_ns_and_hz_to_cycles(time, freq));
+
+    uint64_t ticks;
+    uint64_t time_print;
+    // printf("freq: %d\n", freq);
+    for(int i = 0; true; i++) {
+        ticks = generic_timer_get_ticks();
+        time_print = freq_cycles_and_hz_to_ns(ticks, freq);
+        
+        if (i % 1000000 == 0) {
+            printf("time: %d\n", time_print / 1000000000);
+            printf("status: %d\n", generic_timer_status());
+        }
+    }
+    
+    // heap_init(&timeout_heap, timeout_heap_data, MAX_TIMEOUTS);
+
 }
 
 static void
 handle_irq(microkit_channel ch)
 {
-    printf("ARM_TIMER_DRIVER|INFO: IRQ received!\n");
-    heap_element_t min;
-    heap_extract_min(&timeout_heap, min);
+    // printf("ARM_TIMER_DRIVER|INFO: IRQ received!\n");
+    // heap_element_t min;
+    // // heap_extract_min(&timeout_heap, min);
     
-    microkit_notify(min.ch);
+    // microkit_notify(min.ch);
     
-    set_timeout(min.key);
+    // set_timeout(min.key);
 }
 
 void
@@ -54,6 +73,7 @@ notified(microkit_channel ch)
 {
     if (ch == GENERIC_TIMER_PCNT_IRQ) {
         handle_irq(ch);
+        // now ACK irq
     } else {
         printf("ARM_TIMER_DRIVER|ERROR: unexpected notification\n");
     }
@@ -69,12 +89,12 @@ protected(microkit_channel ch, microkit_msginfo msginfo)
             return microkit_msginfo_new(0, 1);
         }
         case SET_TIMEOUT: {
-            uint64_t timeout_duration = (uint64_t)(seL4_GetMR(0));
-            uint64_t cur_time = get_time();
-            uint64_t timeout = cur_time + timeout_duration;
-            heap_insert(&timeout_heap, (heap_element_t){.key = timeout, .ch = ch});
-            uint64_t set_timeout;
-            heap_get_min(&timeout_heap, &timeout);
+            // uint64_t timeout_duration = (uint64_t)(seL4_GetMR(0));
+            // uint64_t cur_time = get_time();
+            // uint64_t timeout = cur_time + timeout_duration;
+            // heap_insert(&timeout_heap, (heap_element_t){.key = timeout, .ch = ch});
+            // uint64_t set_timeout;
+            // heap_get_min(&timeout_heap, &timeout);
             break;
         }
         default:
@@ -83,26 +103,8 @@ protected(microkit_channel ch, microkit_msginfo msginfo)
 
     return microkit_msginfo_new(0, 0);
 }
-
-
-
-
-    // uint64_t time = get_time();
-    // time += 5000000000;
-    // generic_timer_set_compare(freq_ns_and_hz_to_cycles(time, freq));
     
-    // uint64_t ticks;
-    // uint64_t time_print;
-    // // printf("freq: %d\n", freq);
-    // for(int i = 0; true; i++) {
-    //     ticks = generic_timer_get_ticks();
-    //     time_print = freq_cycles_and_hz_to_ns(ticks, freq);
-        
-    //     if (i % 1000000 == 0) {
-    //         printf("time: %d\n", time_print / 1000000000);
-    //         printf("status: %d\n", generic_timer_status());
-    //     }
-    // }
+
 
     // heap_insert(&timeout_heap, (heap_element_t){.key = 300, .ch = 3});
     // heap_insert(&timeout_heap, (heap_element_t){.key = 100, .ch = 1});
