@@ -4,6 +4,25 @@
 #include "printf.h"
 #include "i2c-transport.h"
 
+/*
+
+Our goal now is to read the UID of a card
+* setPassiveActivationRetries(0xFF) - this might not be necessary
+* SAMConfig
+* readPassiveTargetID
+
+The first two functions correspond to two operations:
+1. writeCommand
+2. readResposne
+
+writeCommand does:
+* write transaction with data
+* readAckFrame()
+* 
+
+*/
+
+
 #define DRIVER_CH 0
 
 #define LOG_CLIENT(...) do{ printf("CLIENT|INFO: "); printf(__VA_ARGS__); }while(0)
@@ -18,6 +37,7 @@
 #define PN532_POSTAMBLE               (0x00)
 
 #define PN532_HOSTTOPN532             (0xD4)
+#define PN532_PN532TOHOST             (0xD5)
 
 size_t data_index = 0;
 
@@ -63,7 +83,23 @@ uint8_t read_buffer(uint8_t *buffer) {
     return value;
 }
 
-uint8_t RESPONSE_DATA[4];
+#define RESPONSE_DATA_LENGTH (6)
+uint8_t RESPONSE_DATA[RESPONSE_DATA_LENGTH];
+
+void print_buf(ring_handle_t *ring) {
+     uintptr_t ret_buffer = 0;
+    unsigned int ret_buffer_len = 0;
+    int err = dequeue_used(ring, &ret_buffer, &ret_buffer_len);
+    if (err) {
+        LOG_CLIENT_ERR("could not dequeue from return used ring!\n");
+        return;
+    }
+
+    uint8_t *buffer = (uint8_t *) ret_buffer;
+    for (int i = 0; i < ret_buffer_len; i++) {
+        LOG_CLIENT("print_buf: buffer[%d] = 0x%lx\n", i, buffer[i]);
+    }
+}
 
 void read_firwmare_version() {
     uintptr_t ret_buffer = 0;
@@ -73,13 +109,29 @@ void read_firwmare_version() {
         LOG_CLIENT_ERR("could not dequeue from return used ring!\n");
         return;
     }
+    err = dequeue_used(&ret_ring, &ret_buffer, &ret_buffer_len);
+    if (err) {
+        LOG_CLIENT_ERR("could not dequeue from return used ring!\n");
+        return;
+    }
+    uintptr_t ret2_buffer = 0;
+    unsigned int ret2_buffer_len = 0;
+    err = dequeue_used(&ret_ring, &ret2_buffer, &ret2_buffer_len);
+    if (err) {
+        LOG_CLIENT_ERR("could not dequeue from return used ring!\n");
+        return;
+    }
     uint8_t *buffer = (uint8_t *) ret_buffer;
+    uint8_t *buffer2 = (uint8_t *) ret2_buffer;
 
     LOG_CLIENT("return used ring size 0x%lx\n", ring_size(ret_ring.used_ring));
+    LOG_CLIENT("firmware version buffer addr is 0x%lx\n", buffer);
 
-    for (int i = 0; i < 8; i++) {
-        LOG_CLIENT("buffer[%d] = 0x%lx\n", i, buffer[i]);
-    }
+    // for (int i = 0; i < 8; i++) {
+    //     LOG_CLIENT("buffer[%d] = 0x%lx\n", i, buffer[i]);
+    // }
+
+    // print_buf(&ret_ring);
 
     read_index = 0;
     if (!(read_buffer(buffer) & 1)) {
@@ -89,67 +141,122 @@ void read_firwmare_version() {
     }
 
     // Read PREAMBLE
-    read_buffer(buffer);
+    if (read_buffer(buffer) != PN532_PREAMBLE) {
+        LOG_CLIENT_ERR("read_firmware_version: PREAMBLE check failed\n");
+        return;
+    }
     // Read STARTCODE1
-    read_buffer(buffer);
+    if (read_buffer(buffer) != PN532_STARTCODE1) {
+        LOG_CLIENT_ERR("read_firmware_version: STARTCODE1 check failed\n");
+        return;
+    }
     // Read STARTCODE2
-    read_buffer(buffer);
+    if (read_buffer(buffer) != PN532_STARTCODE2) {
+        LOG_CLIENT_ERR("read_firmware_version: STARTCODE2 check failed\n");
+        return;
+    }
     // Read length
     size_t data_length = read_buffer(buffer);
     // Read checksum of length
     read_buffer(buffer);
     // Read response command
-    read_buffer(buffer);
-    read_buffer(buffer);
-    // Read command data
-    if (data_length > 4) {
-        LOG_CLIENT_ERR("Expected data length to be 4\n");
+    if (read_buffer(buffer) != PN532_PN532TOHOST) {
+        LOG_CLIENT_ERR("reading response command failed, expected PN532_PN532TOHOST!\n");
         return;
     }
+    read_index = 0;
+    if (read_buffer(buffer2) != PN532_CMD_GETFIRMWAREVERSION + 1) {
+        LOG_CLIENT_ERR("reading command number from response failed!\n");
+        return;
+    }
+    // Read command data
+    if (data_length != RESPONSE_DATA_LENGTH) {
+        LOG_CLIENT_ERR("Expected data length to be 6\n");
+        return;
+    }
+    LOG_CLIENT("reading RESPONSE_DATA from buffer addr 0x%lx\n", buffer2);
     for (int i = 0; i < data_length; i++) {
-        RESPONSE_DATA[i] = read_buffer(buffer);
+        RESPONSE_DATA[i] = read_buffer(buffer2);
         LOG_CLIENT("RESPONSE_DATA[%d] is 0x%lx\n", i, RESPONSE_DATA[i]);
     }
     // Read checksum of data
-    read_buffer(buffer);
+    read_buffer(buffer2);
     // Read postamble
-    read_buffer(buffer);
+    read_buffer(buffer2);
 
     // @ivanv: should be enqueuing a free buffer here
 }
 
 void request_read_response(size_t length) {
-    uintptr_t req_buffer = 0;
-    unsigned int buffer_len = 0;
-    int ret = dequeue_free(&req_ring, &req_buffer, &buffer_len);
+    uintptr_t req1_buffer = 0;
+    unsigned int req1_buffer_len = 0;
+    int ret = dequeue_free(&req_ring, &req1_buffer, &req1_buffer_len);
     if (ret) {
         LOG_CLIENT_ERR("could not dequeue free request buffer!\n");
         return;
     }
 
-    uint8_t *buffer = (uint8_t *) req_buffer;
+    uint8_t *buffer1 = (uint8_t *) req1_buffer;
 
     data_index = 0;
-    buffer[REQ_BUF_CLIENT] = 0;
-    buffer[REQ_BUF_ADDR] = PN532_I2C_BUS_ADDRESS;
+    buffer1[REQ_BUF_CLIENT] = 0;
+    buffer1[REQ_BUF_ADDR] = PN532_I2C_BUS_ADDRESS;
+
+    size_t total_data_tokens = 6 + length + 2;
+    size_t num_data_tokens_enqueued = 0;
 
     // @ivanv: hack since we're not reading the right length yet
-    length = 4;
     LOG_CLIENT("===== length is 0x%lx\n", length);
-    enqueue_data(buffer, I2C_TK_START);
-    enqueue_data(buffer, I2C_TK_ADDRR);
-    for (int i = 0; i < 6 + length + 2; i++) {
-        enqueue_data(buffer, I2C_TK_DATA);
+    enqueue_data(buffer1, I2C_TK_START);
+    enqueue_data(buffer1, I2C_TK_ADDRR);
+    for (int i = 0; i < total_data_tokens && i < 7; i++) {
+        enqueue_data(buffer1, I2C_TK_DATA);
+        num_data_tokens_enqueued += 1;
     }
-    enqueue_data(buffer, I2C_TK_STOP);
-    enqueue_data(buffer, I2C_TK_END);
+    // enqueue_data(buffer1, I2C_TK_DATA_END);
+    // enqueue_data(buffer1, I2C_TK_STOP);
+    enqueue_data(buffer1, I2C_TK_END);
 
-    ret = enqueue_used(&req_ring, req_buffer, data_index + 2);
+    ret = enqueue_used(&req_ring, req1_buffer, data_index + 2);
+    if (ret) {
+        LOG_CLIENT_ERR("failed to enqueue request buffer!\n");
+    }
+    LOG_CLIENT("request_read_response: enqueueing req1_buffer with size %d\n", data_index + 2);
+
+    /* Now we do the second request to request the rest of the read tokens */
+    uintptr_t req2_buffer = 0;
+    unsigned int req2_buffer_len = 0;
+    ret = dequeue_free(&req_ring, &req2_buffer, &req2_buffer_len);
+    if (ret) {
+        LOG_CLIENT_ERR("could not dequeue free request buffer!\n");
+        return;
+    }
+    LOG_CLIENT("sent request_read_response req1\n");
+    microkit_notify(DRIVER_CH);
+
+    uint8_t *buffer2 = (uint8_t *) req2_buffer;
+    data_index = 0;
+    buffer2[REQ_BUF_CLIENT] = 0;
+    buffer2[REQ_BUF_ADDR] = PN532_I2C_BUS_ADDRESS;
+    // enqueue_data(buffer2, I2C_TK_START);
+    // enqueue_data(buffer2, I2C_TK_ADDRR);
+    if (total_data_tokens - num_data_tokens_enqueued > 8) {
+        LOG_CLIENT_ERR("expected request to fit in two request buffers!\n");
+        return;
+    }
+    for (int i = 0; i < total_data_tokens - num_data_tokens_enqueued; i++) {
+        enqueue_data(buffer2, I2C_TK_DATA);
+    }
+    enqueue_data(buffer2, I2C_TK_DATA_END);
+    enqueue_data(buffer2, I2C_TK_STOP);
+    enqueue_data(buffer2, I2C_TK_END);
+    ret = enqueue_used(&req_ring, req2_buffer, data_index + 2);
+    LOG_CLIENT("request_read_response: enqueueing req2_buffer with size %d\n", data_index + 2);
     if (ret) {
         LOG_CLIENT_ERR("failed to enqueue request buffer!\n");
     }
 
-    LOG_CLIENT("sent request_read_response request\n");
+    LOG_CLIENT("sent request_read_response req2\n");
     microkit_notify(DRIVER_CH);
 }
 
@@ -201,7 +308,7 @@ size_t read_response_length() {
     if (buffer[RET_BUF_DATA_OFFSET] & 1) {
         return buffer[RET_BUF_DATA_OFFSET + 4];
     } else {
-        LOG_CLIENT("read_response_length failed!\n");
+        LOG_CLIENT_ERR("read_response_length failed!\n");
         return 0;
     }
 
@@ -229,6 +336,7 @@ void get_response_length() {
     for (int i = 0; i < 6; i++) {
         enqueue_data(buffer, I2C_TK_DATA);
     }
+    enqueue_data(buffer, I2C_TK_DATA_END);
     enqueue_data(buffer, I2C_TK_STOP);
     enqueue_data(buffer, I2C_TK_END);
 
@@ -264,7 +372,9 @@ uint8_t check_ack_frame_response() {
     if (buffer[RET_BUF_DATA_OFFSET] & 1) {
         for (int i = 0; i < 6; i++) {
             if (buffer[RET_BUF_DATA_OFFSET + 1 + i] != PN532_ACK[i]) {
-                LOG_CLIENT_ERR("Ack malformed!\n");
+                LOG_CLIENT_ERR("Ack malformed at index PN532_ACK[%d], buffer is value %d!\n", i, RET_BUF_DATA_OFFSET + i + 1);
+                LOG_CLIENT_ERR("buffer[RET_BUF_DATA_OFFSET + 1 + i] = 0x%lx\n", buffer[RET_BUF_DATA_OFFSET + 1 + i]);
+                while (1) {}
             }
         }
         return true;
@@ -293,12 +403,12 @@ void read_ack_frame() {
 
     buffer[REQ_BUF_CLIENT] = 0;
     buffer[REQ_BUF_ADDR] = PN532_I2C_BUS_ADDRESS;
-    enqueue_data(buffer, I2C_TK_STOP);
     enqueue_data(buffer, I2C_TK_START);
     enqueue_data(buffer, I2C_TK_ADDRR);
     for (int i = 0; i < 7; i++) {
         enqueue_data(buffer, I2C_TK_DATA);
     }
+    enqueue_data(buffer, I2C_TK_DATA_END);
     enqueue_data(buffer, I2C_TK_STOP);
     enqueue_data(buffer, I2C_TK_END);
 

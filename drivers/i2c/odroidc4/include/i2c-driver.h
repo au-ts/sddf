@@ -32,6 +32,7 @@
 typedef struct _i2c_ifState {
     req_buf_ptr_t current_req; // Pointer to current request.
     ret_buf_ptr_t current_ret; // Pointer to current return buf.
+    int current_ret_len;        // Number of bytes in current return.
     int current_req_len;        // Number of bytes in current request.
     size_t remaining;              // Number of bytes remaining to dispatch.
     int notified;               // Flag indicating that there is more work waiting.
