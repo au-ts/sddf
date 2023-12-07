@@ -329,6 +329,7 @@ void read_response(uint8_t *buffer, uint8_t buffer_len) {
 
     co_switch(t_event);
 
+    LOG_CLIENT("read_response: ret_ring.used_ring size is %d\n", ring_size(ret_ring.used_ring));
     struct response response = {};
     response_init(&response, &ret_ring);
 
