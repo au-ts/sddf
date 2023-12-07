@@ -19,7 +19,14 @@
 #error "BUS_NUM must be defined!"
 #endif
 
+#define DEBUG_DRIVER
+
+#ifdef DEBUG_DRIVER
 #define LOG_DRIVER(...) do{ printf("I2C DRIVER|INFO: "); printf(__VA_ARGS__); }while(0)
+#else
+#define LOG_DRIVER(...) do{}while(0)
+#endif
+
 #define LOG_DRIVER_ERR(...) do{ printf("I2C DRIVER|ERROR: "); printf(__VA_ARGS__); }while(0)
 
 typedef volatile struct {
@@ -66,6 +73,7 @@ char *token_to_str(uint8_t token) {
 }
 
 static inline int i2c_dump(void) {
+#ifdef DEBUG_DRIVER
     LOG_DRIVER("dumping interface state...\n");
 
     // Print control register fields
@@ -126,6 +134,7 @@ static inline int i2c_dump(void) {
         uint8_t tk = (interface->rdata1 >> (i * 8)) & 0xFF;
         printf("\t\t Data %d: 0x%lx\n", i, tk);
     }
+#endif
     return 0;
 }
 
@@ -403,7 +412,6 @@ static inline int i2c_load_tokens() {
 
         uint32_t odroid_tok = 0x0;
         // Translate token to ODROID token
-        LOG_DRIVER("converting token to odroid token!\n");
         switch (tok) {
             case I2C_TK_END:
                 odroid_tok = OC4_I2C_TK_END;
@@ -426,7 +434,6 @@ static inline int i2c_load_tokens() {
                 odroid_tok = OC4_I2C_TK_DATA_END;
                 break;
             case I2C_TK_STOP:
-                LOG_DRIVER("GOT STOP!\n");
                 odroid_tok = OC4_I2C_TK_STOP;
                 break;
             default:
@@ -476,6 +483,7 @@ void init(void) {
     // Set up driver state
     i2c_ifState.current_req = NULL;
     i2c_ifState.current_ret = NULL;
+    i2c_ifState.current_ret_len = 0;
     i2c_ifState.current_req_len = 0;
     i2c_ifState.remaining = 0;
     i2c_ifState.notified = 0;
@@ -634,15 +642,17 @@ static void handle_irq(bool timeout) {
             // Get read data
             // Copy data into return buffer
             for (int i = 0; i < err; i++) {
+                size_t index = RET_BUF_DATA_OFFSET + i2c_ifState.current_ret_len;
                 if (i < 4) {
                     uint8_t value = (interface->rdata0 >> (i * 8)) & 0xFF;
-                    ret[RET_BUF_DATA_OFFSET+i] = value;
+                    ret[index] = value;
                     LOG_DRIVER("loading into ret at %d value 0x%lx\n", RET_BUF_DATA_OFFSET + i, value);
-                } else {
+                } else if (i < 8) {
                     uint8_t value = (interface->rdata1 >> ((i - 4) * 8)) & 0xFF;
-                    ret[RET_BUF_DATA_OFFSET+i] = value;
+                    ret[index] = value;
                     LOG_DRIVER("loading into ret at %d value 0x%lx\n", RET_BUF_DATA_OFFSET + i, value);
                 }
+                i2c_ifState.current_ret_len++;
             }
         }
 
@@ -654,9 +664,11 @@ static void handle_irq(bool timeout) {
     // If request is completed or there was an error, return data to server and notify.
     if (err < 0 || !i2c_ifState.remaining) {
         LOG_DRIVER("request completed or error, returning to server\n");
+        LOG_DRIVER("pushing return buffer with addr 0x%lx and size 0x%lx\n", ret, i2c_ifState.current_req_len);
         pushRetBuf(i2c_ifState.current_ret, i2c_ifState.current_req_len);
         releaseReqBuf(i2c_ifState.current_req);
         i2c_ifState.current_ret = NULL;
+        i2c_ifState.current_ret_len = 0;
         i2c_ifState.current_req = 0x0;
         i2c_ifState.current_req_len = 0;
         i2c_ifState.remaining = 0;
