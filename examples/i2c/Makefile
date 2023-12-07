@@ -34,6 +34,7 @@ I2C=$(abspath ../../drivers/i2c/odroidc4/)
 SDDF=$(abspath ../../)
 BENCHMARK=$(SDDF)/benchmark
 UTIL=$(SDDF)/util
+LIBCO := $(SDDF)/libco
 
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 
@@ -49,6 +50,7 @@ CFLAGS += -I$(BOARD_DIR)/include \
 	-I$(I2C)/include	\
 	-Iinclude/arch	\
 	-I$(UTIL)/include \
+	-I$(LIBCO) \
 	-MD \
 	-MP
 
@@ -59,7 +61,7 @@ DRIVERFILES=$(I2C)/i2c-driver.c
 COMMONFILES=$(I2C)/i2c-transport.c $(I2C)/sw_shared_ringbuffer.c $(I2C)/printf.c
 # FOOLFILES=$(I2C)/fool.c $(I2C)/printf.c
 
-CLIENT_OBJS := client.o $(COMMONFILES:.c=.o)
+CLIENT_OBJS := $(LIBCO)/libco.o helpers.o client.o $(COMMONFILES:.c=.o)
 SERVER_OBJS := $(I2C)/i2c.o $(COMMONFILES:.c=.o)
 DRIVER_OBJS := $(I2C)/i2c_driver.o $(COMMONFILES:.c=.o)
 # FOOL_OBJS := $(I2C)/fool.o $(I2C)/printf.o
