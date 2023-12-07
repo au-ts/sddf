@@ -4,18 +4,13 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
 
-# @ivanv: Changes any of the params given e.g MICROKIT_CONFIG,
-# doesn't actually cause a re-compile. We should fix this.
-ifeq ($(strip $(BUILD_DIR)),)
-$(error BUILD_DIR must be specified)
-endif
+BUILD_DIR ?= build
+MICROKIT_CONFIG ?= debug
+# This example is specifically for the Odroid-C4 platform
+MICROKIT_BOARD := odroidc4
 
 ifeq ($(strip $(MICROKIT_SDK)),)
 $(error MICROKIT_SDK must be specified)
-endif
-
-ifeq ($(strip $(MICROKIT_CONFIG)),)
-$(error MICROKIT_CONFIG must be specified)
 endif
 
 ifeq ($(strip $(TOOLCHAIN)),)
