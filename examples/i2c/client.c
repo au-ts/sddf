@@ -169,12 +169,9 @@ void init(void) {
     /* Define the event loop/notified thread as the active co-routine */
     t_event = co_active();
 
-    LOG_CLIENT("here1\n");
     /* derive main entry point */
-    LOG_CLIENT("here2\n");
     t_main = co_derive((void *)t_client_main_stack, STACK_SIZE, client_main);
 
-    LOG_CLIENT("here3\n");
     co_switch(t_main);
 }
 
