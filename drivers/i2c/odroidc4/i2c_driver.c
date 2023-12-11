@@ -437,7 +437,7 @@ static inline int i2c_load_tokens() {
                 odroid_tok = OC4_I2C_TK_STOP;
                 break;
             default:
-                LOG_DRIVER("invalid data token in request! \"%x\"\n", tok);
+                LOG_DRIVER("invalid data token in request! \"0x%x\" at buffer index %d\n", tok, REQ_BUF_DATA_OFFSET + i);
                 return -1;
         }
         // printf("Loading token %d: %d\n", i, odroid_tok);
