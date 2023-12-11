@@ -390,10 +390,13 @@ static inline int i2c_load_tokens() {
     // Offset into wdata registers
     uint32_t wdat_offset = 0;
 
+    // Offset into rdata registers
+    uint32_t rdata_offset = 0;
+
     // Offset into supplied buffer
     int i = i2c_ifState.current_req_len - i2c_ifState.remaining;
     // printf("Current offset into request: %d\n", i);
-    while (tk_offset < 16 && wdat_offset < 8) {
+    while (tk_offset < 16 && wdat_offset < 8 && rdata_offset < 8) {
         LOG_DRIVER("i is 0x%lx, tk_offset: 0x%lx, wdat_offset: 0x%lx\n", i, tk_offset, wdat_offset);
         // Explicitly pad END tokens for empty space
         if (i >= i2c_ifState.current_req_len) {
@@ -460,6 +463,11 @@ static inline int i2c_load_tokens() {
             // Since we grabbed the next token in the chain, increment offset
             i++;
         }
+
+        if (tok == I2C_TK_DATA && i2c_ifState.data_direction == DATA_DIRECTION_READ) {
+            rdata_offset++;
+        }
+
         i++;
     }
 
@@ -646,11 +654,11 @@ static void handle_irq(bool timeout) {
                 if (i < 4) {
                     uint8_t value = (interface->rdata0 >> (i * 8)) & 0xFF;
                     ret[index] = value;
-                    LOG_DRIVER("loading into ret at %d value 0x%lx\n", RET_BUF_DATA_OFFSET + i, value);
+                    LOG_DRIVER("loading into ret at %d value 0x%lx\n", index, value);
                 } else if (i < 8) {
                     uint8_t value = (interface->rdata1 >> ((i - 4) * 8)) & 0xFF;
                     ret[index] = value;
-                    LOG_DRIVER("loading into ret at %d value 0x%lx\n", RET_BUF_DATA_OFFSET + i, value);
+                    LOG_DRIVER("loading into ret at %d value 0x%lx\n", index, value);
                 }
                 i2c_ifState.current_ret_len++;
             }

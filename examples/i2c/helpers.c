@@ -28,6 +28,9 @@ extern cothread_t t_main;
 struct request {
     ring_handle_t *ring;
     uint8_t *buffer;
+    /* Maximum amount of data the buffer can hold */
+    size_t buffer_size;
+    /* How many I2C tokens for processing we have enqueued */
     size_t data_offset_len;
 };
 
@@ -89,10 +92,16 @@ void request_init(struct request *req, ring_handle_t *ring, uint8_t client, uint
     req->buffer[REQ_BUF_CLIENT] = client;
     req->buffer[REQ_BUF_ADDR] = addr;
     req->data_offset_len = 0;
+    req->buffer_size = req_buffer_len;
 }
 
 void request_add(struct request *req, uint8_t data) {
-    req->buffer[REQ_BUF_DATA_OFFSET + req->data_offset_len] = data;
+    size_t index = REQ_BUF_DATA_OFFSET + req->data_offset_len;
+    if (index >= req->buffer_size) {
+        LOG_CLIENT_ERR("request buffer is full (size is 0x%lx)\n", req->buffer_size);
+        return;
+    }
+    req->buffer[index] = data;
     req->data_offset_len++;
 }
 
@@ -296,48 +305,31 @@ uint8_t read_response_length() {
 }
 
 void read_response(uint8_t *buffer, uint8_t buffer_len) {
-    LOG_CLIENT("in read_response\n");
     size_t length = read_response_length();
-    LOG_CLIENT("===================================\n");
 
     struct request req = {};
     request_init(&req, &req_ring, CLIENT_ID, PN532_I2C_BUS_ADDRESS);
 
-    size_t total_data_tokens = 6 + length + 2;
-    size_t num_data_tokens_enqueued = 0;
+    size_t num_data_tokens = 6 + length + 2;
 
     request_add(&req, I2C_TK_START);
     request_add(&req, I2C_TK_ADDRR);
 
-    for (int i = 0; i < total_data_tokens && i < 7; i++) {
-        request_add(&req, I2C_TK_DATA);
-        num_data_tokens_enqueued += 1;
+    if (num_data_tokens > req.buffer_size) {
+        LOG_CLIENT_ERR("number of request data tokens (0x%lx) exceeds buffer size (0x%lx)\n", num_data_tokens, req.buffer_size);
+        while (1) {}
     }
 
+    for (int i = 0; i < num_data_tokens; i++) {
+        request_add(&req, I2C_TK_DATA);
+    }
+
+    request_add(&req, I2C_TK_DATA_END);
+    request_add(&req, I2C_TK_STOP);
     request_add(&req, I2C_TK_END);
 
-    LOG_CLIENT("read_response: sent first request of size %d\n", num_data_tokens_enqueued);
+    LOG_CLIENT("read_response: sent request of size %d\n", num_data_tokens);
     request_send(&req);
-
-    /* Now, while there are more tokens left to read, we send them as seperate requests */
-    while (num_data_tokens_enqueued < total_data_tokens) {
-        struct request next_req = {};
-        request_init(&next_req, &req_ring, CLIENT_ID, PN532_I2C_BUS_ADDRESS);
-
-        for (int i = 0; num_data_tokens_enqueued < total_data_tokens && i < 7; i++) {
-            request_add(&next_req, I2C_TK_DATA);
-            num_data_tokens_enqueued++;
-        }
-
-        if (num_data_tokens_enqueued == total_data_tokens) {
-            request_add(&next_req, I2C_TK_DATA_END);
-            request_add(&next_req, I2C_TK_STOP);
-        }
-        request_add(&next_req, I2C_TK_END);
-
-        LOG_CLIENT("sending next_req!\n");
-        request_send(&next_req);
-    }
 
     co_switch(t_event);
 
@@ -346,8 +338,6 @@ void read_response(uint8_t *buffer, uint8_t buffer_len) {
     response_init(&response1, &ret_ring);
     struct response response2 = {};
     response_init(&response2, &ret_ring);
-    struct response response3 = {};
-    response_init(&response3, &ret_ring);
 
     if (!(response_read(&response2) & 1)) {
         LOG_CLIENT("reading response failed as device is not ready!\n");
@@ -378,25 +368,19 @@ void read_response(uint8_t *buffer, uint8_t buffer_len) {
     }
     // Read checksum of length
     response_read(&response2);
-    // // Read response command
+    // Read response command
     response_read(&response2);
-    // if (response_read(&response2) != PN532_PN532TOHOST) {
-    //     LOG_CLIENT_ERR("reading response command failed, expected PN532_PN532TOHOST!\n");
-    //     while (1) {}
-    // }
-    response_read(&response3);
-    //     LOG_CLIENT_ERR("reading command number from response failed!\n");
-    //     while (1) {}
-    // }
+
+    response_read(&response2);
     // Read command data
     if (data_length > buffer_len) {
         LOG_CLIENT_ERR("returned data length (0x%lx) greater than user-provided buffer length (0x%lx)\n", data_length, buffer_len);
     }
     for (int i = 0; i < data_length; i++) {
-        buffer[i] = response_read(&response3);
+        buffer[i] = response_read(&response2);
     }
     // Read checksum of data
-    response_read(&response3);
+    response_read(&response2);
     // Read postamble
-    response_read(&response3);
+    response_read(&response2);
 }
