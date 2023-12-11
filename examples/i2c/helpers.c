@@ -379,11 +379,12 @@ void read_response(uint8_t *buffer, uint8_t buffer_len) {
     // Read checksum of length
     response_read(&response2);
     // // Read response command
+    response_read(&response2);
     // if (response_read(&response2) != PN532_PN532TOHOST) {
     //     LOG_CLIENT_ERR("reading response command failed, expected PN532_PN532TOHOST!\n");
     //     while (1) {}
     // }
-    // if (response_read(&response3) != PN532_CMD_GETFIRMWAREVERSION + 1) {
+    response_read(&response3);
     //     LOG_CLIENT_ERR("reading command number from response failed!\n");
     //     while (1) {}
     // }
