@@ -277,10 +277,20 @@ uint8_t read_response_length() {
     struct request nack_req = {};
     request_init(&nack_req, &req_ring, CLIENT_ID, PN532_I2C_BUS_ADDRESS);
 
+    request_add(&nack_req, I2C_TK_START);
+    request_add(&nack_req, I2C_TK_ADDRW);
     for (int i = 0; i < sizeof(PN532_NACK); i++) {
+        request_add(&nack_req, I2C_TK_DATA);
         request_add(&nack_req, PN532_NACK[i]);
     }
+    request_add(&nack_req, I2C_TK_STOP);
+    request_add(&nack_req, I2C_TK_END);
     request_send(&nack_req);
+
+    /* @ivanv: testing, shouldn't be necessary */
+    co_switch(t_event);
+
+    LOG_CLIENT("post nack ring_size of return ring: 0x%lx\n", ring_size(ret_ring.used_ring));
 
     return length;
 }
@@ -288,6 +298,7 @@ uint8_t read_response_length() {
 void read_response(uint8_t *buffer, uint8_t buffer_len) {
     LOG_CLIENT("in read_response\n");
     size_t length = read_response_length();
+    LOG_CLIENT("===================================\n");
 
     struct request req = {};
     request_init(&req, &req_ring, CLIENT_ID, PN532_I2C_BUS_ADDRESS);
@@ -313,7 +324,7 @@ void read_response(uint8_t *buffer, uint8_t buffer_len) {
         struct request next_req = {};
         request_init(&next_req, &req_ring, CLIENT_ID, PN532_I2C_BUS_ADDRESS);
 
-        for (int i = 0; num_data_tokens_enqueued + i < total_data_tokens && i < 7; i++) {
+        for (int i = 0; num_data_tokens_enqueued < total_data_tokens && i < 7; i++) {
             request_add(&next_req, I2C_TK_DATA);
             num_data_tokens_enqueued++;
         }
@@ -324,39 +335,67 @@ void read_response(uint8_t *buffer, uint8_t buffer_len) {
         }
         request_add(&next_req, I2C_TK_END);
 
+        LOG_CLIENT("sending next_req!\n");
         request_send(&next_req);
     }
 
     co_switch(t_event);
 
     LOG_CLIENT("read_response: ret_ring.used_ring size is %d\n", ring_size(ret_ring.used_ring));
-    struct response response = {};
-    response_init(&response, &ret_ring);
+    struct response response1 = {};
+    response_init(&response1, &ret_ring);
+    struct response response2 = {};
+    response_init(&response2, &ret_ring);
+    struct response response3 = {};
+    response_init(&response3, &ret_ring);
 
-    if (!(response_read(&response) & 1)) {
+    if (!(response_read(&response2) & 1)) {
         LOG_CLIENT("reading response failed as device is not ready!\n");
         return;
     }
 
     // Read PREAMBLE
-    if (response_read(&response) != PN532_PREAMBLE) {
+    if (response_read(&response2) != PN532_PREAMBLE) {
         LOG_CLIENT_ERR("read_response: PREAMBLE check failed\n");
         return;
     }
     // Read STARTCODE1
-    if (response_read(&response) != PN532_STARTCODE1) {
+    if (response_read(&response2) != PN532_STARTCODE1) {
         LOG_CLIENT_ERR("read_response: STARTCODE1 check failed\n");
         return;
     }
     // Read STARTCODE2
-    if (response_read(&response) != PN532_STARTCODE2) {
+    if (response_read(&response2) != PN532_STARTCODE2) {
         LOG_CLIENT_ERR("read_response: STARTCODE2 check failed\n");
         return;
     }
     // Read length
-    size_t data_length = response_read(&response);
-    LOG_CLIENT("data length is 0x%lx\n", data_length);
-    // if (data_length != )
+    size_t data_length = response_read(&response2);
+    // LOG_CLIENT("data length is 0x%lx\n", data_length);
+    if (data_length != length) {
+        LOG_CLIENT_ERR("Received data_length of 0x%lx, was expecting 0x%lx\n", data_length, length);
+        while (1) {}
+    }
     // Read checksum of length
-    // read_buffer(buffer);
+    response_read(&response2);
+    // // Read response command
+    // if (response_read(&response2) != PN532_PN532TOHOST) {
+    //     LOG_CLIENT_ERR("reading response command failed, expected PN532_PN532TOHOST!\n");
+    //     while (1) {}
+    // }
+    // if (response_read(&response3) != PN532_CMD_GETFIRMWAREVERSION + 1) {
+    //     LOG_CLIENT_ERR("reading command number from response failed!\n");
+    //     while (1) {}
+    // }
+    // Read command data
+    if (data_length > buffer_len) {
+        LOG_CLIENT_ERR("returned data length (0x%lx) greater than user-provided buffer length (0x%lx)\n", data_length, buffer_len);
+    }
+    for (int i = 0; i < data_length; i++) {
+        buffer[i] = response_read(&response3);
+    }
+    // Read checksum of data
+    response_read(&response3);
+    // Read postamble
+    response_read(&response3);
 }

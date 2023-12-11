@@ -147,8 +147,15 @@ void client_main(void) {
     header[0] = PN532_CMD_GETFIRMWAREVERSION;
     write_command(header, 1, NULL, 0);
 
-    // TODO: finish
-    read_response(NULL, 0);
+    uint8_t response_buffer[6];
+    read_response(response_buffer, 6);
+
+    LOG_CLIENT("read response!\n");
+    for (int i = 0; i < 6; i++) {
+        LOG_CLIENT("firmware_version[%d]: 0x%lx\n", i, response_buffer[i]);
+    }
+
+    while (1) {}
 }
 
 void init(void) {
