@@ -188,19 +188,15 @@ int8_t read_ack_frame(size_t retries) {
 }
 
 static void process_return_buffer() {
-    uintptr_t ret_buffer = 0;
-    unsigned int ret_buffer_len = 0;
-    int err = dequeue_used(&ret_ring, &ret_buffer, &ret_buffer_len);
-    if (err) {
-        LOG_PN532_ERR("could not dequeue from return used ring!\n");
-        return;
+    struct response response = {};
+    response_init(&response, &ret_ring);
+
+    uint8_t err = response_read_idx(&response, RET_BUF_ERR);
+    if (err != I2C_ERR_OK) {
+        LOG_PN532("Previous request failed where RET_BUF_ERR is 0x%lx\n", err);
     }
 
-    uint8_t *buffer = (uint8_t *) ret_buffer;
-
-    if (buffer[RET_BUF_ERR] != I2C_ERR_OK) {
-        LOG_PN532("Previous request failed where RET_BUF_ERR is 0x%lx\n", buffer[RET_BUF_ERR]);
-    }
+    response_finish(&response);
 }
 
 int8_t pn532_write_command(uint8_t *header, uint8_t hlen, const uint8_t *body, uint8_t blen, size_t retries) {
@@ -293,7 +289,7 @@ int8_t read_response_length(size_t retries) {
 
         if (ring_size(ret_ring.used_ring) > 1) {
             LOG_PN532_ERR("return ring size is more than 1, actual size is %d\n", ring_size(ret_ring.used_ring));
-            while (1) {};
+            return -1;
         }
         struct response response = {};
         response_init(&response, &ret_ring);
@@ -355,7 +351,7 @@ bool pn532_read_response(uint8_t *buffer, uint8_t buffer_len, size_t retries) {
 
     if (num_data_tokens > req.buffer_size) {
         LOG_PN532_ERR("number of request data tokens (0x%lx) exceeds buffer size (0x%lx)\n", num_data_tokens, req.buffer_size);
-        while (1) {}
+        return false;
     }
 
     for (int i = 0; i < num_data_tokens; i++) {
@@ -380,22 +376,30 @@ bool pn532_read_response(uint8_t *buffer, uint8_t buffer_len, size_t retries) {
 
     if (!(response_read(&response2) & 1)) {
         LOG_PN532("reading response failed as device is not ready!\n");
+        response_finish(&response1);
+        response_finish(&response2);
         return false;
     }
 
     // Read PREAMBLE
     if (response_read(&response2) != PN532_PREAMBLE) {
         LOG_PN532_ERR("read_response: PREAMBLE check failed\n");
+        response_finish(&response1);
+        response_finish(&response2);
         return false;
     }
     // Read STARTCODE1
     if (response_read(&response2) != PN532_STARTCODE1) {
         LOG_PN532_ERR("read_response: STARTCODE1 check failed\n");
+        response_finish(&response1);
+        response_finish(&response2);
         return false;
     }
     // Read STARTCODE2
     if (response_read(&response2) != PN532_STARTCODE2) {
         LOG_PN532_ERR("read_response: STARTCODE2 check failed\n");
+        response_finish(&response1);
+        response_finish(&response2);
         return false;
     }
     // Read length
@@ -403,7 +407,7 @@ bool pn532_read_response(uint8_t *buffer, uint8_t buffer_len, size_t retries) {
     // LOG_PN532("data length is 0x%lx\n", data_length);
     if (data_length != length) {
         LOG_PN532_ERR("Received data_length of 0x%lx, was expecting 0x%lx\n", data_length, length);
-        while (1) {}
+        return false;
     }
     // Read checksum of length
     response_read(&response2);
@@ -414,6 +418,9 @@ bool pn532_read_response(uint8_t *buffer, uint8_t buffer_len, size_t retries) {
     // Read command data
     if (data_length > buffer_len) {
         LOG_PN532_ERR("returned data length (0x%lx) greater than user-provided buffer length (0x%lx)\n", data_length, buffer_len);
+        response_finish(&response1);
+        response_finish(&response2);
+        return false;
     }
     for (int i = 0; i < data_length; i++) {
         buffer[i] = response_read(&response2);
