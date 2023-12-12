@@ -38,7 +38,6 @@ struct response {
     size_t read_idx;
 };
 
-/* @ivanv: when we finish dealing with a response, we should enqueue the buffer into the free ring */
 void response_init(struct response *response, ring_handle_t *ring) {
     uintptr_t buffer = 0;
     unsigned int buffer_len = 0;
