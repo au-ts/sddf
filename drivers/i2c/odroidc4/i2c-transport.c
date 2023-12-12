@@ -108,7 +108,6 @@ ret_buf_ptr_t getRetBuf() {
 
 int pushRetBuf(ret_buf_ptr_t buf, size_t size) {
     microkit_dbg_puts("transport: pushing return buffer\n");
-
     if (size > I2C_BUF_SIZE || !buf) {
         return 0;
     }
