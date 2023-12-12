@@ -351,6 +351,7 @@ bool pn532_read_response(uint8_t *buffer, uint8_t buffer_len, size_t retries) {
 
     if (num_data_tokens > req.buffer_size) {
         LOG_PN532_ERR("number of request data tokens (0x%lx) exceeds buffer size (0x%lx)\n", num_data_tokens, req.buffer_size);
+        // @ivanv: should be putting the request ring back in the free queue
         return false;
     }
 
