@@ -25,7 +25,7 @@ LD := $(TOOLCHAIN)-ld
 AS := $(TOOLCHAIN)-as
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 
-I2C=$(abspath ../../drivers/i2c/odroidc4/)
+I2C=$(abspath ../../drivers/i2c/meson/)
 SDDF=$(abspath ../../)
 BENCHMARK=$(SDDF)/benchmark
 UTIL=$(SDDF)/util
