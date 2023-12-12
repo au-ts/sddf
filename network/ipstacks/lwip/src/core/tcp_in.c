@@ -164,7 +164,6 @@ tcp_input(struct pbuf *p, struct netif *inp)
     if (chksum != 0) {
       LWIP_DEBUGF(TCP_INPUT_DEBUG, ("tcp_input: packet discarded due to failing checksum 0x%04"X16_F"\n",
                                     chksum));
-      print("TCP failed checksum");                            
       tcp_debug_print(tcphdr);
       TCP_STATS_INC(tcp.chkerr);
       goto dropped;
