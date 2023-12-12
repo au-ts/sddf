@@ -433,7 +433,6 @@ end:
 chkerr:
   LWIP_DEBUGF(UDP_DEBUG | LWIP_DBG_LEVEL_SERIOUS,
               ("udp_input: UDP (or UDP Lite) datagram discarded due to failing checksum\n"));
-  print("udp_input: failing checksum\n");
   UDP_STATS_INC(udp.chkerr);
   UDP_STATS_INC(udp.drop);
   MIB2_STATS_INC(mib2.udpinerrors);
