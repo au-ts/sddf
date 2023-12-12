@@ -56,7 +56,7 @@ DRIVERFILES=$(I2C)/i2c-driver.c
 COMMONFILES=$(I2C)/i2c-transport.c $(I2C)/sw_shared_ringbuffer.c $(I2C)/printf.c
 # FOOLFILES=$(I2C)/fool.c $(I2C)/printf.c
 
-CLIENT_OBJS := $(LIBCO)/libco.o helpers.o client.o $(COMMONFILES:.c=.o)
+CLIENT_OBJS := $(LIBCO)/libco.o pn532.o client.o $(COMMONFILES:.c=.o)
 SERVER_OBJS := $(I2C)/i2c.o $(COMMONFILES:.c=.o)
 DRIVER_OBJS := $(I2C)/i2c_driver.o $(COMMONFILES:.c=.o)
 # FOOL_OBJS := $(I2C)/fool.o $(I2C)/printf.o

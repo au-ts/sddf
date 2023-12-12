@@ -19,7 +19,7 @@
 #error "BUS_NUM must be defined!"
 #endif
 
-#define DEBUG_DRIVER
+// #define DEBUG_DRIVER
 
 #ifdef DEBUG_DRIVER
 #define LOG_DRIVER(...) do{ printf("I2C DRIVER|INFO: "); printf(__VA_ARGS__); }while(0)
@@ -597,7 +597,7 @@ static void handle_irq(bool timeout) {
     // printf("notified = %d\n", i2c_ifState.notified);
 
     if (timeout) {
-        LOG_DRIVER_ERR("Got timeout!\n");
+        // LOG_DRIVER_ERR("Got timeout!\n");
         return;
     }
 
@@ -626,12 +626,10 @@ static void handle_irq(bool timeout) {
 
     // Get result
     int err = i2cGetError();
-    LOG_DRIVER("err is 0x%lx\n", err);
     // If error is 0, successful write. If error >0, successful read of err bytes.
     // Prepare to extract data from the interface.
     ret_buf_ptr_t ret = i2c_ifState.current_ret;
 
-    printf("ret %p\n", ret);
     // If there was an error, cancel the rest of this transaction and load the
     // error information into the return buffer.
     if (err < 0) {
@@ -689,8 +687,11 @@ static void handle_irq(bool timeout) {
     // OR if there is still work to do, crack on with it.
     // NOTE: this incurs more stack depth than needed; could use flag instead?
     if (i2c_ifState.notified || i2c_ifState.remaining) {
-        if (i2c_ifState.notified) printf("driver: notified while processing IRQ, starting next request\n");
-        else { printf("driver: still work to do, starting next batch\n");}
+        if (i2c_ifState.notified) {
+            LOG_DRIVER("notified while processing IRQ, starting next request\n");
+        } else {
+            LOG_DRIVER("still work to do, starting next batch\n");
+        }
         // @ivanv: check return value
         i2c_load_tokens();
     }

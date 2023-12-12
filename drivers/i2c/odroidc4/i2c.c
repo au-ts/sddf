@@ -59,7 +59,7 @@ static inline void driverNotify(void) {
     sz);
 
     uint8_t err = ret[RET_BUF_ERR];
-    uint8_t err_tk = ret[RET_BUF_ERR_TK];
+    // uint8_t err_tk = ret[RET_BUF_ERR_TK];
     uint8_t client = ret[RET_BUF_CLIENT];
     uint8_t addr = ret[RET_BUF_ADDR];
 
