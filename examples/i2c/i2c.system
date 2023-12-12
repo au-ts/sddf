@@ -89,15 +89,15 @@
     </protection_domain>
 
     <!-- Client protection domain - for testing -->
-    <protection_domain name="fool" priority="120">
-        <program_image path="fool.elf"/>
+    <!-- <protection_domain name="fool" priority="120"> -->
+        <!-- <program_image path="fool.elf"/> -->
 
         <!-- Client <=> server ring buffer -->
         <!-- <map mr="client_req_free" vaddr="0x4_000_000" perms="rw" setvar_vaddr="client_req_free"/> -->
         <!-- <map mr="client_req_used" vaddr="0x4_200_000" perms="rw" setvar_vaddr="client_req_used"/> -->
         <!-- <map mr="client_ret_free" vaddr="0x4_400_000" perms="rw" setvar_vaddr="client_ret_free"/> -->
         <!-- <map mr="client_ret_used" vaddr="0x4_600_000" perms="rw" setvar_vaddr="client_ret_used"/> -->
-    </protection_domain>
+    <!-- </protection_domain> -->
 
     <!-- Driver<=>Server notification interface -->
     <channel>
@@ -106,8 +106,8 @@
     </channel>
 
     <!-- Server<=>Client notification interface -->
-    <channel>
-        <end pd="i2c_server" id="2"/>
-        <end pd="fool" id="2"/>
-    </channel>
+    <!-- <channel> -->
+        <!-- <end pd="i2c_server" id="2"/> -->
+        <!-- <end pd="fool" id="2"/> -->
+    <!-- </channel> -->
 </system>
