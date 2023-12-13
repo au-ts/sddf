@@ -85,7 +85,7 @@ void process_rx_complete(void)
     /* We want to inform the mux that more free buffers are available or the 
         used ring can now be refilled */
     if (enqueued && (rx_ring_mux.free_ring->notify_reader || rx_ring_mux.used_ring->notify_writer)) {
-        if (have_signal && signal == BASE_OUTPUT_NOTIFICATION_CAP + CLIENT_CH) {
+        if (have_signal && signal_cap == BASE_OUTPUT_NOTIFICATION_CAP + CLIENT_CH) {
             // We need to notify the client, but this should
             // happen first. 
             microkit_notify(CLIENT_CH);
