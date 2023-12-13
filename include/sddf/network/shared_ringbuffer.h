@@ -64,7 +64,7 @@ int ring_empty(ring_buffer_t *ring);
  */
 int ring_full(ring_buffer_t *ring);
 
-int ring_size(ring_buffer_t *ring);
+uint32_t ring_size(ring_buffer_t *ring);
 
 /**
  * Enqueue an element to a ring buffer
