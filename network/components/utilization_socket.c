@@ -153,7 +153,7 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
             start = bench->ts;
             idle_ccount_start = bench->ccount;
             idle_overflow_start = bench->overflows;
-            // microkit_notify(START_PMU);
+            microkit_notify(START_PMU);
         }
     } else if (msg_match(data_packet_str, STOP)) {
         print(microkit_name);
@@ -191,7 +191,7 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
         tcp_shutdown(pcb, 0, 1);
 
         if (!strcmp(microkit_name, "client0")) { 
-            //microkit_notify(STOP_PMU);
+            microkit_notify(STOP_PMU);
         }
     } else if (msg_match(data_packet_str, QUIT)) {
         /* Do nothing for now */
@@ -233,8 +233,6 @@ int setup_utilization_socket(void)
     if (error) {
         print("Failed to bind the TCP socket");
         return -1;
-    } else {
-        // print("Utilisation port bound to port 1236\n");
     }
 
     utiliz_socket = tcp_listen_with_backlog_and_err(utiliz_socket, 1, &error);

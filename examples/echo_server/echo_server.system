@@ -49,11 +49,11 @@
     <memory_region name="tx_cookies" size="0x200_000" page_size="0x200_000"/>
 
     <memory_region name="data_packet" size="0x1000"/>
+    <memory_region name="data" size="0x1000"/>
     <memory_region name="data_packet1" size="0x1000"/>
+    <memory_region name="data1" size="0x1000"/>
 
     <memory_region name="cyclecounters" size="0x1000"/>
-
-    <!--- <memory_region name="log_buffer" size="0x200_000" page_size="0x200_000"/>-->
 
     <protection_domain name="benchIdle" priority="1" >
         <program_image path="idle.elf" />
@@ -63,10 +63,9 @@
 
     <protection_domain name="bench" priority="102" >
         <program_image path="benchmark.elf" />
-        <!--<map mr="log_buffer" vaddr="0x3_400_000" perms="rw" cached="true" setvar_vaddr="log_buffer" /> -->
         <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
 
-        <protection_domain name="eth" priority="101" pp="true" id="1" budget="100" period="400">
+        <protection_domain name="eth" priority="101" id="1" budget="100" period="400">
             <program_image path="eth.elf" />
             <map mr="eth0" vaddr="0x2_000_000" perms="rw" cached="false"/>
 
@@ -176,6 +175,7 @@
             <map mr="shared_dma_rx_cli0" vaddr="0x2_800_000" perms="rw" cached="true" setvar_vaddr="shared_dma_vaddr_rx" />
             <map mr="shared_dma_tx_cli0" vaddr="0x2_600_000" perms="rw" cached="true" setvar_vaddr="shared_dma_vaddr_tx" />
             <map mr="data_packet" vaddr="0x5_011_000" perms="rw" cached="true" setvar_vaddr="data_packet" />
+            <map mr="data" vaddr="0x5_011_000" perms="rw" cached="true" setvar_vaddr="data" />
 
             <!-- shared memory used for benchmarking -->
             <map mr="cyclecounters" vaddr="0x5_010_000" perms="rw" cached="true" setvar_vaddr="cyclecounters_vaddr" />
@@ -194,6 +194,7 @@
             <map mr="shared_dma_rx_cli1" vaddr="0x2_200_000" perms="rw" cached="true" setvar_vaddr="shared_dma_vaddr_rx" />
             <map mr="shared_dma_tx_cli1" vaddr="0x2_000_000" perms="rw" cached="true" setvar_vaddr="shared_dma_vaddr_tx" />
             <map mr="data_packet1" vaddr="0x5_011_000" perms="rw" cached="true" setvar_vaddr="data_packet" />
+            <map mr="data1" vaddr="0x5_011_000" perms="rw" cached="true" setvar_vaddr="data" />
         </protection_domain>
 
         <protection_domain name="arp" priority="98" budget="20000" pp="true" id="8">
