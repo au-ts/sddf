@@ -77,7 +77,7 @@ static inline int ring_full(ring_buffer_t *ring)
     return !((ring->write_idx - ring->read_idx + 1) % ring->size);
 }
 
-static inline int ring_size(ring_buffer_t *ring)
+static inline uint32_t ring_size(ring_buffer_t *ring)
 {
     // assert((ring->write_idx - ring->read_idx) >= 0);
     return (ring->write_idx - ring->read_idx);
