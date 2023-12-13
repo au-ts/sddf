@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build_linux_x86_64:
+    name: Build examples (Linux x86-64)
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout VMM repository
+        uses: actions/checkout@v3
+      - name: Download Microkit SDK
+        run: wget https://trustworthy.systems/Downloads/microkit/microkit-sdk-dev-4f717f2-linux-x86-64.tar.gz
+        shell: bash
+      - name: Extract Microkit SDK
+        run: tar -xf microkit-sdk-dev-4f717f2-linux-x86-64.tar.gz
+      - name: Install dependencies (via apt)
+        run: sudo apt update && sudo apt install -y make clang lld
+      - name: Download and install AArch64 GCC toolchain
+        run: |
+          wget -O aarch64-toolchain.tar.gz https://trustworthy.systems/Downloads/microkit/arm-gnu-toolchain-11.3.rel1-x86_64-aarch64-none-elf.tar.xz%3Frev%3D73ff9780c12348b1b6772a1f54ab4bb3
+          tar xf aarch64-toolchain.tar.gz
+          echo "$(pwd)/arm-gnu-toolchain-11.3.rel1-x86_64-aarch64-none-elf/bin" >> $GITHUB_PATH
+      - name: Build and run examples
+        run: ./ci/examples.sh ${PWD}/microkit-sdk-1.2.6
+        shell: bash
+  build_macos_x86_64:
+    name: Build examples (macOS x86-64)
+    runs-on: macos-12
+    steps:
+      - name: Checkout VMM repository
+        uses: actions/checkout@v3
+      - name: Download Microkit SDK
+        run: wget https://trustworthy.systems/Downloads/microkit/microkit-sdk-dev-4f717f2-macos-x86-64.tar.gz
+        shell: bash
+      - name: Extract Microkit SDK
+        run: tar -xf microkit-sdk-dev-4f717f2-macos-x86-64.tar.gz
+      - name: Install dependencies (via Homebrew)
+        run: |
+          brew install llvm make
+          echo "/usr/local/opt/llvm/bin:$PATH" >> $GITHUB_PATH
+      - name: Download and install AArch64 GCC toolchain
+        run: |
+          wget -O aarch64-toolchain.tar.gz https://trustworthy.systems/Downloads/microkit/arm-gnu-toolchain-11.3.rel1-darwin-x86_64-aarch64-none-elf.tar.xz%3Frev%3D51c39c753f8c4a54875b7c5dccfb84ef
+          tar xf aarch64-toolchain.tar.gz
+          echo "$(pwd)/arm-gnu-toolchain-11.3.rel1-darwin-x86_64-aarch64-none-elf/bin" >> $GITHUB_PATH
+      - name: Build and run examples
+        run: ./ci/examples.sh ${PWD}/microkit-sdk-1.2.6
+        shell: bash
