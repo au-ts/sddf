@@ -7,7 +7,7 @@ BUILD_DIR ?= build
 MICROKIT_CONFIG ?= debug
 
 MICROKIT_BOARD := odroidc4
-CPU := cortex-a53
+CPU := cortex-a55
 
 CC := clang
 LD := ld.lld
