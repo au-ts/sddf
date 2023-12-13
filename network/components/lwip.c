@@ -21,11 +21,14 @@
 #include "echo.h"
 #include "timer.h"
 #include "cache.h"
+#include "fence.h"
 
 #define TIMER  1
 #define RX_CH  2
 #define TX_CH  3
 #define ARP    7
+
+#define _unused(x) ((void)(x))
 
 /* Memory regions. These all have to be here to keep compiler happy */
 uintptr_t rx_free;
@@ -126,6 +129,7 @@ static inline void return_buffer(uintptr_t addr)
     FIXME: This full condition could change... */
     int err = enqueue_free(&(state.rx_ring), addr, BUF_SIZE, NULL);
     assert(!err);
+    _unused(err);
     notify_rx = true;
 }
 
@@ -185,7 +189,7 @@ alloc_tx_buffer(size_t length)
 {
     if (BUF_SIZE < length) {
         print("Requested buffer size too large.");
-        return NULL;
+        return (uintptr_t) NULL;
     }
 
     uintptr_t addr;
@@ -194,12 +198,12 @@ alloc_tx_buffer(size_t length)
 
     int err = dequeue_free(&(state.tx_ring), &addr, &len, &cookie);
     if (err) {
-        return NULL;
+        return (uintptr_t) NULL;
     }
 
     if (!addr) {
         print("LWIP|ERROR: dequeued a null buffer\n");
-        return NULL;
+        return (uintptr_t) NULL;
     }
 
     return addr;
@@ -248,7 +252,7 @@ lwip_eth_send(struct netif *netif, struct pbuf *p)
 
     
     uintptr_t buffer = alloc_tx_buffer(p->tot_len);
-    if (buffer == NULL) {
+    if (buffer == (uintptr_t) NULL) {
         enqueue_pbufs(p);
         return ERR_OK;
     }
@@ -266,7 +270,7 @@ lwip_eth_send(struct netif *netif, struct pbuf *p)
         copied += curr->len;
     }
 
-    cleanCache(frame, frame + copied);
+    cleanCache((unsigned long) frame, (unsigned long) frame + copied);
 
     /* insert into the used tx queue */
     err = enqueue_used(&(state.tx_ring), (uintptr_t)frame, copied, NULL);
@@ -287,9 +291,10 @@ process_tx_queue(void)
     int err;
     struct pbuf *current = state.head;
     struct pbuf *temp;
+    process_tx_queue_:
     while(current != NULL && !ring_empty(state.tx_ring.free_ring) && !ring_full(state.tx_ring.used_ring)) {
         uintptr_t buffer = alloc_tx_buffer(current->tot_len);
-        if (buffer == NULL) {
+        if (buffer == (uintptr_t) NULL) {
             print("process_tx_queue() could not alloc_tx_buffer\n");
             break;
         }
@@ -313,7 +318,7 @@ process_tx_queue(void)
             puthex64(err);
             print("\n");
         }*/
-        cleanCache(frame, frame + copied);
+        cleanCache((unsigned long) frame, (unsigned long) frame + copied);
 
         /* insert into the used tx queue */
         err = enqueue_used(&(state.tx_ring), buffer, copied, NULL);
@@ -334,18 +339,26 @@ process_tx_queue(void)
 
     // if curr != NULL, we need to make sure we don't lose it and can come back
     state.head = current;
-    if (!state.head) {
-        // no longer need a notification from the tx mux. 
+
+    if (current == NULL || !ring_empty(state.tx_ring.free_ring)) {
         cancel_free_ntfn(&state.tx_ring);
     } else {
         request_free_ntfn(&state.tx_ring);
+
+        THREAD_MEMORY_FENCE();
+
+        if (current != NULL && !ring_empty(state.tx_ring.free_ring) && !ring_full(state.tx_ring.used_ring)) {
+            cancel_free_ntfn(&state.tx_ring);
+            goto process_tx_queue_;
+        }
+
     }
 }
 
 void
 process_rx_queue(void)
 {
-    cancel_used_ntfn(&state.rx_ring);
+    process_rx_queue_:
     while (!ring_empty(state.rx_ring.used_ring)) {
         uintptr_t addr;
         unsigned int len;
@@ -361,7 +374,15 @@ process_rx_queue(void)
             pbuf_free(p);
         }
     }
+    
     request_used_ntfn(&state.rx_ring);
+
+    THREAD_MEMORY_FENCE();
+
+    if (!ring_empty(state.rx_ring.used_ring)) {
+        cancel_used_ntfn(&state.rx_ring);
+        goto process_rx_queue_;
+    }
 }
 
 /**
@@ -400,7 +421,7 @@ static void netif_status_callback(struct netif *netif)
         microkit_mr_set(0, ip4_addr_get_u32(netif_ip4_addr(netif)));
         microkit_mr_set(1, (state.mac[0] << 24) | (state.mac[1] << 16) | (state.mac[2] << 8) | (state.mac[3]));
         microkit_mr_set(2, (state.mac[4] << 24) | (state.mac[5] << 16));
-        microkit_ppcall(ARP, microkit_msginfo_new(0, 1));
+        microkit_ppcall(ARP, microkit_msginfo_new(0, 3));
 
         print("DHCP request finished, IP address for netif ");
         print(netif->name);
@@ -439,9 +460,9 @@ void dump_log(void)
     for (int i = 0; i < NUM_BUFFERS * 2; i++) {
         print(logbuffer[i].action);
         print(",");
-        puthex64(logbuffer[i].pbuf_addr);
+        puthex64((uint64_t) logbuffer[i].pbuf_addr);
         print(",");
-        puthex64(logbuffer[i].dma_addr);
+        puthex64((uint64_t) logbuffer[i].dma_addr);
         print("\n");
     }
 }
@@ -460,10 +481,11 @@ void init(void)
         uintptr_t addr = shared_dma_vaddr_rx + (BUF_SIZE * i);
         int err = enqueue_free(&state.rx_ring, addr, BUF_SIZE, NULL);
         assert(!err);
+        _unused(err);
     }
 
     lwip_init();
-    // set_timeout();
+    set_timeout();
 
     LWIP_MEMPOOL_INIT(RX_POOL);
 
@@ -498,17 +520,22 @@ void init(void)
 
     request_used_ntfn(&state.rx_ring);
     request_used_ntfn(&state.tx_ring);
+    request_free_ntfn(&state.tx_ring);
 
     if (notify_rx && state.rx_ring.free_ring->notify_reader) {
         notify_rx = false;
-        microkit_notify_delayed(RX_CH);
+        if (!have_signal) {
+            microkit_notify_delayed(RX_CH);
+        } else if (signal != BASE_OUTPUT_NOTIFICATION_CAP + RX_CH) {
+            microkit_notify(RX_CH);
+        }
     }
 
     if (notify_tx && state.tx_ring.used_ring->notify_reader) {
         notify_tx = false;
         if (!have_signal) {
             microkit_notify_delayed(TX_CH);
-        } else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + TX_CH) {
+        } else if (signal != BASE_OUTPUT_NOTIFICATION_CAP + TX_CH) {
             microkit_notify(TX_CH);
         }
     }
@@ -540,19 +567,21 @@ void notified(microkit_channel ch)
     }
     
     if (notify_rx && state.rx_ring.free_ring->notify_reader) {
+        state.rx_ring.free_ring->notify_reader = false;
         notify_rx = false;
         if (!have_signal) {
             microkit_notify_delayed(RX_CH);
-        } else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + RX_CH) {
+        } else if (signal != BASE_OUTPUT_NOTIFICATION_CAP + RX_CH) {
             microkit_notify(RX_CH);
         }
     }
 
     if (notify_tx && state.tx_ring.used_ring->notify_reader) {
+        state.tx_ring.used_ring->notify_reader = false;
         notify_tx = false;
         if (!have_signal) {
             microkit_notify_delayed(TX_CH);
-        } else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + TX_CH) {
+        } else if (signal != BASE_OUTPUT_NOTIFICATION_CAP + TX_CH) {
             microkit_notify(TX_CH);
         }
     }

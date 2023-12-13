@@ -19,8 +19,9 @@
 #include "echo.h"
 #include "util.h"
 
+#define NUM_LOOPS 10
 #define UDP_ECHO_PORT 1235
-
+uintptr_t data;
 static struct udp_pcb *udp_socket;
 
 static const char *err_strerr[] = {
@@ -56,6 +57,18 @@ lwip_strerr(err_t err)
     return "Unknown error.";
   }
   return err_strerr[-err];
+}
+
+static void
+calculate_checksum(struct pbuf *p)
+{
+    char *data_str = (char *)data;
+    pbuf_copy_partial(p, (void *)data, p->tot_len, 0);
+
+    uint32_t checksum = 0;
+    for (int i = 0; i < p->tot_len; i++) {
+        checksum += data_str[i];
+    }
 }
 
 
