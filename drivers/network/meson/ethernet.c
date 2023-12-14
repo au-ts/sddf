@@ -507,13 +507,13 @@ void notified(microkit_channel ch)
             handle_eth(eth_dma);
             have_signal = true;
             signal_msg = seL4_MessageInfo_new(IRQAckIRQ, 0, 0, 0);
-            signal = (BASE_IRQ_CAP + IRQ_CH);
+            signal_cap = (BASE_IRQ_CAP + IRQ_CH);
             return;
         case IRQ_2:
             handle_eth(eth_dma);
             have_signal = true;
             signal_msg = seL4_MessageInfo_new(IRQAckIRQ, 0, 0, 0);
-            signal = (BASE_IRQ_CAP + IRQ_CH);
+            signal_cap = (BASE_IRQ_CAP + IRQ_CH);
             return;
         case TX_CH:
             handle_tx();
