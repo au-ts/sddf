@@ -1,7 +1,6 @@
 #include <microkit.h>
 #include "serial_server.h"
-#include "shared_ringbuffer.h"
-#include "serial/components/util.h"
+#include <sddf/serial/util.h>
 
 /* Ring handle components -
 Need to have access to the same ring buffer mechanisms as the driver, so that we can enqueue

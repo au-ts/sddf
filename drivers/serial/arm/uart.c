@@ -3,7 +3,7 @@
 #include <microkit.h>
 #include "uart.h"
 #include "uart_config.h"
-#include "shared_ringbuffer.h"
+#include <sddf/serial/shared_ringbuffer.h>
 
 /*
  * The PL011 is supposedly universal, which means that this driver should be

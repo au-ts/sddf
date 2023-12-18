@@ -8,7 +8,6 @@
 #include <sel4/sel4.h>
 #include "uart.h"
 #include "uart_config.h"
-#include "shared_ringbuffer.h"
 
 #define BIT(nr) (1UL << (nr))
 
