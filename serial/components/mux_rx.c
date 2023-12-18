@@ -3,17 +3,16 @@
 #include <stdint.h>
 #include <microkit.h>
 #include <sel4/sel4.h>
-#include "shared_ringbuffer.h"
-#include "util/include/util.h"
-#include "util.h"
+#include <sddf/serial/shared_ringbuffer.h>
+#include <sddf/serial/util.h>
 #include "uart.h"
 #include "uart_config.h"
 
 #define CLI_CH 1
 #define DRV_CH 11
 
-#ifndef NUM_CLIENTS
-#error "NUM_CLIENTS is expected to be defined for RX serial multiplexor"
+#ifndef SERIAL_NUM_CLIENTS
+#error "SERIAL_NUM_CLIENTS is expected to be defined for RX serial multiplexor"
 #endif
 
 /* Memory regions as defined in the system file */
@@ -34,7 +33,7 @@ uintptr_t rx_data_client;
 uintptr_t rx_data_client2;
 
 // Have an array of client rings.
-ring_handle_t rx_ring[NUM_CLIENTS];
+ring_handle_t rx_ring[SERIAL_NUM_CLIENTS];
 ring_handle_t drv_rx_ring;
 
 /* We need to do some processing of the input stream to determine when we need
@@ -47,11 +46,11 @@ int mux_state;
 int client;
 // We want to keep track of each clients requests, so that they can be serviced once we have changed
 // input direction
-int num_to_get_chars[NUM_CLIENTS];
+int num_to_get_chars[SERIAL_NUM_CLIENTS];
 int multi_client;
 
 int give_multi_char(char * drv_buffer, int drv_buffer_len) {
-    for (int curr_client = 0; curr_client < NUM_CLIENTS; curr_client++) {
+    for (int curr_client = 0; curr_client < SERIAL_NUM_CLIENTS; curr_client++) {
 
         if (num_to_get_chars[curr_client] <= 0) {
             return 1;
@@ -89,7 +88,7 @@ int give_multi_char(char * drv_buffer, int drv_buffer_len) {
 }
 
 int give_single_char(int curr_client, char * drv_buffer, int drv_buffer_len) {
-    if (curr_client < 1 || curr_client > NUM_CLIENTS) {
+    if (curr_client < 1 || curr_client > SERIAL_NUM_CLIENTS) {
         return 1;
     }
 
@@ -182,13 +181,13 @@ void handle_rx() {
                 // Ensure that multi client input is off
                 multi_client = 0;
                 int new_client = atoi(&got_char);
-                if (new_client < 1 || new_client > NUM_CLIENTS) {
+                if (new_client < 1 || new_client > SERIAL_NUM_CLIENTS) {
                     microkit_dbg_puts("MUX|RX: Attempted to switch to invalid client number: ");
-                    puthex64(new_client);
+                    // puthex64(new_client);
                     microkit_dbg_puts("\n");
                 } else {
                     microkit_dbg_puts("MUX|RX: Switching to client number: ");
-                    puthex64(new_client);
+                    // puthex64(new_client);
                     microkit_dbg_puts("\n");
                     client = new_client;
                 }
@@ -264,7 +263,7 @@ void init (void) {
     // Disable simultaneous multi client input
     multi_client = 0;
     // No chars have been requested yet
-    for (int i = 0; i < NUM_CLIENTS; i++) {
+    for (int i = 0; i < SERIAL_NUM_CLIENTS; i++) {
         num_to_get_chars[i] = 0;
     }
 }
@@ -274,7 +273,7 @@ void notified(microkit_channel ch) {
     // Sanity check the client
     if (ch == DRV_CH) {
         handle_rx();
-    } else if (ch < 1 || ch > NUM_CLIENTS) {
+    } else if (ch < 1 || ch > SERIAL_NUM_CLIENTS) {
         microkit_dbg_puts("Received a bad client channel\n");
         return;
     }  else {

@@ -10,7 +10,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 // #include "util/include/util.h"
-#include "util/include/fence.h"
+#include "fence.h"
 
 /* Number of buffers each ring is configured to have. */
 #define NUM_BUFFERS 512
@@ -59,10 +59,7 @@ void ring_init(ring_handle_t *ring, ring_buffer_t *free, ring_buffer_t *used, in
  *
  * @return true indicates the buffer is empty, false otherwise.
  */
-static inline int ring_empty(ring_buffer_t *ring)
-{
-    return !((ring->write_idx - ring->read_idx) % ring->size);
-}
+int ring_empty(ring_buffer_t *ring);
 
 /**
  * Check if the ring buffer is full
@@ -71,17 +68,9 @@ static inline int ring_empty(ring_buffer_t *ring)
  *
  * @return true indicates the buffer is full, false otherwise.
  */
-static inline int ring_full(ring_buffer_t *ring)
-{
-    // assert((ring->write_idx - ring->read_idx) >= 0);
-    return !((ring->write_idx - ring->read_idx + 1) % ring->size);
-}
+int ring_full(ring_buffer_t *ring);
 
-static inline uint32_t ring_size(ring_buffer_t *ring)
-{
-    // assert((ring->write_idx - ring->read_idx) >= 0);
-    return (ring->write_idx - ring->read_idx);
-}
+uint32_t ring_size(ring_buffer_t *ring);
 
 /**
  * Enqueue an element to a ring buffer
@@ -93,22 +82,7 @@ static inline uint32_t ring_size(ring_buffer_t *ring)
  *
  * @return -1 when ring is empty, 0 on success.
  */
-static inline int enqueue(ring_buffer_t *ring, uintptr_t buffer, unsigned int len, void *cookie)
-{
-    // assert(buffer != 0);
-    if (ring_full(ring)) {
-        return -1;
-    }
-
-    ring->buffers[ring->write_idx % ring->size].encoded_addr = buffer;
-    ring->buffers[ring->write_idx % ring->size].len = len;
-    ring->buffers[ring->write_idx % ring->size].cookie = cookie;
-
-    THREAD_MEMORY_RELEASE();
-    ring->write_idx++;
-
-    return 0;
-}
+int enqueue(ring_buffer_t *ring, uintptr_t buffer, unsigned int len, void *cookie);
 
 /**
  * Dequeue an element to a ring buffer.
@@ -120,23 +94,7 @@ static inline int enqueue(ring_buffer_t *ring, uintptr_t buffer, unsigned int le
  *
  * @return -1 when ring is empty, 0 on success.
  */
-static inline int dequeue(ring_buffer_t *ring, uintptr_t *addr, unsigned int *len, void **cookie)
-{
-    if (ring_empty(ring)) {
-        return -1;
-    }
-
-    // assert(ring->buffers[ring->read_idx % ring->size].encoded_addr != 0);
-
-    *addr = ring->buffers[ring->read_idx % ring->size].encoded_addr;
-    *len = ring->buffers[ring->read_idx % ring->size].len;
-    *cookie = ring->buffers[ring->read_idx % ring->size].cookie;
-
-    THREAD_MEMORY_RELEASE();
-    ring->read_idx++;
-
-    return 0;
-}
+int dequeue(ring_buffer_t *ring, uintptr_t *addr, unsigned int *len, void **cookie);
 
 /**
  * Enqueue an element into an free ring buffer.
@@ -149,11 +107,7 @@ static inline int dequeue(ring_buffer_t *ring, uintptr_t *addr, unsigned int *le
  *
  * @return -1 when ring is full, 0 on success.
  */
-static inline int enqueue_free(ring_handle_t *ring, uintptr_t addr, unsigned int len, void *cookie)
-{
-    // assert(addr);
-    return enqueue(ring->free_ring, addr, len, cookie);
-}
+int enqueue_free(ring_handle_t *ring, uintptr_t addr, unsigned int len, void *cookie);
 
 /**
  * Enqueue an element into a used ring buffer.
@@ -166,11 +120,7 @@ static inline int enqueue_free(ring_handle_t *ring, uintptr_t addr, unsigned int
  *
  * @return -1 when ring is full, 0 on success.
  */
-static inline int enqueue_used(ring_handle_t *ring, uintptr_t addr, unsigned int len, void *cookie)
-{
-    // assert(addr);
-    return enqueue(ring->used_ring, addr, len, cookie);
-}
+int enqueue_used(ring_handle_t *ring, uintptr_t addr, unsigned int len, void *cookie);
 
 /**
  * Dequeue an element from the free ring buffer.
@@ -182,10 +132,7 @@ static inline int enqueue_used(ring_handle_t *ring, uintptr_t addr, unsigned int
  *
  * @return -1 when ring is empty, 0 on success.
  */
-static inline int dequeue_free(ring_handle_t *ring, uintptr_t *addr, unsigned int *len, void **cookie)
-{
-    return dequeue(ring->free_ring, addr, len, cookie);
-}
+int dequeue_free(ring_handle_t *ring, uintptr_t *addr, unsigned int *len, void **cookie);
 
 /**
  * Dequeue an element from a used ring buffer.
@@ -197,29 +144,21 @@ static inline int dequeue_free(ring_handle_t *ring, uintptr_t *addr, unsigned in
  *
  * @return -1 when ring is empty, 0 on success.
  */
-static inline int dequeue_used(ring_handle_t *ring, uintptr_t *addr, unsigned int *len, void **cookie)
-{
-    return dequeue(ring->used_ring, addr, len, cookie);
-}
+int dequeue_used(ring_handle_t *ring, uintptr_t *addr, unsigned int *len, void **cookie);
 
 /**
  * Set the plug of a ring to true.
  *
  * @param ring Ring handle to plug.
 */
-static inline void ring_plug(ring_buffer_t *ring) {
-    ring->plugged = true;
-}
+void ring_plug(ring_buffer_t *ring);
 
 /**
  * Set the plug of a ring to false.
  *
  * @param ring Ring handle to unplug.
 */
-static inline void ring_unplug(ring_buffer_t *ring) {
-    ring->plugged = false;
-}
-
+void ring_unplug(ring_buffer_t *ring);
 
 /**
  * Check the current value of the plug.
@@ -228,9 +167,7 @@ static inline void ring_unplug(ring_buffer_t *ring) {
  *
  * @return true when ring is plugged, false when unplugged.
 */
-static inline bool ring_plugged(ring_buffer_t *ring) {
-    return ring->plugged;
-}
+bool ring_plugged(ring_buffer_t *ring);
 
 /**
  * Dequeue an element from a ring buffer.
@@ -244,18 +181,4 @@ static inline bool ring_plugged(ring_buffer_t *ring) {
  *
  * @return -1 when ring is empty, 0 on success.
  */
-static int driver_dequeue(ring_buffer_t *ring, uintptr_t *addr, unsigned int *len, void **cookie)
-{
-    if (ring_empty(ring)) {
-        return -1;
-    }
-
-    *addr = ring->buffers[ring->read_idx % ring->size].encoded_addr;
-    *len = ring->buffers[ring->read_idx % ring->size].len;
-    *cookie = &ring->buffers[ring->read_idx % ring->size];
-
-    THREAD_MEMORY_RELEASE();
-    ring->read_idx++;
-
-    return 0;
-}
+int driver_dequeue(ring_buffer_t *ring, uintptr_t *addr, unsigned int *len, void **cookie);

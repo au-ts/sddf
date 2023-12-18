@@ -4,16 +4,8 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
 
-ifeq ($(strip $(BUILD_DIR)),)
-$(error BUILD_DIR must be specified)
-endif
-
 ifeq ($(strip $(MICROKIT_SDK)),)
 $(error MICROKIT_SDK must be specified)
-endif
-
-ifeq ($(strip $(MICROKIT_CONFIG)),)
-$(error MICROKIT_CONFIG must be specified)
 endif
 
 TOOLCHAIN := aarch64-none-elf
@@ -25,6 +17,8 @@ LD := $(TOOLCHAIN)-ld
 AS := $(TOOLCHAIN)-as
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 MICROKIT_BOARD=odroidc4
+MICROKIT_CONFIG ?= debug
+BUILD_DIR ?= build
 
 SDDF=$(abspath ../..)
 RINGBUFFERDIR=$(SDDF)/serial/libserialsharedringbuffer
@@ -45,7 +39,8 @@ CFLAGS += -I$(BOARD_DIR)/include \
 	-Iinclude	\
 	-I$(RINGBUFFERDIR)/include \
 	-I$(UART_DRIVER)/include \
-	-I$(SDDF) \
+	-I$(SDDF)/include \
+	-I$(SDDF)/util/include \
 
 UART_OBJS := uart.o shared_ringbuffer.o
 SERIAL_SERVER_OBJS1 := serial_server_1.o shared_ringbuffer.o
@@ -56,7 +51,7 @@ MUX_RX_OBJS := mux_rx.o shared_ringbuffer.o
 all: directories $(IMAGE_FILE)
 
 $(BUILD_DIR)/%.o: $(SERIAL_COMPONENTS)/%.c Makefile
-	$(CC) -c $(CFLAGS) -DNUM_CLIENTS=2 -DTRANSFER_WITH_COLOUR $< -o $@
+	$(CC) -c $(CFLAGS) -DSERIAL_NUM_CLIENTS=2 -DSERIAL_TRANSFER_WITH_COLOUR $< -o $@
 
 $(BUILD_DIR)/%.o: $(RINGBUFFERDIR)/%.c Makefile
 	$(CC) -c $(CFLAGS) $< -o $@

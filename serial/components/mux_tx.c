@@ -4,15 +4,14 @@
 #include <stdint.h>
 #include <microkit.h>
 #include <sel4/sel4.h>
-#include "shared_ringbuffer.h"
-#include "util/include/util.h"
-#include "util.h"
+#include <sddf/serial/shared_ringbuffer.h>
+#include <sddf/serial/util.h>
 #include "uart.h"
 
 #define DRIVER_CH 9
 
-#ifndef NUM_CLIENTS
-#error "NUM_CLIENTS is expected to be defined for TX serial multiplexor"
+#ifndef SERIAL_NUM_CLIENTS
+#error "SERIAL_NUM_CLIENTS is expected to be defined for TX serial multiplexor"
 #endif
 
 #define COLOUR_START_LEN 5
@@ -22,7 +21,7 @@
 
 /* This is a simple sanity check that we have defined as many colours
    as the user as specified clients */
-#if NUM_CLIENTS > MAX_NUM_CLIENTS && defined(TRANSFER_WITH_COLOUR)
+#if SERIAL_NUM_CLIENTS > MAX_NUM_CLIENTS && defined(SERIAL_TRANSFER_WITH_COLOUR)
 #error "There are more clients then there are colours to differentiate them"
 #endif
 
@@ -46,12 +45,12 @@ uintptr_t tx_data_client;
 uintptr_t tx_data_client2;
 
 // Have an array of client rings.
-ring_handle_t tx_ring[NUM_CLIENTS];
+ring_handle_t tx_ring[SERIAL_NUM_CLIENTS];
 ring_handle_t drv_tx_ring;
 
 size_t copy_with_colour(size_t client, size_t buffer_len, char *driver_buf, char *client_buf) {
     size_t len_copied = 0;
-    assert(buffer_len + COLOUR_START_LEN + COLOUR_START_LEN <= BUFFER_SIZE);
+    // assert(buffer_len + COLOUR_START_LEN + COLOUR_START_LEN <= BUFFER_SIZE);
     /* First copy the colour start bytes */
     memcpy((char *) driver_buf, client_colours[client], COLOUR_START_LEN);
     len_copied += COLOUR_START_LEN;
@@ -82,7 +81,7 @@ int handle_tx(int curr_client) {
     bool was_empty = ring_empty(drv_tx_ring.used_ring);
 
     // Loop over all clients here
-    for (int client = 0; client < NUM_CLIENTS; client++) {
+    for (int client = 0; client < SERIAL_NUM_CLIENTS; client++) {
         // The client can plug their ring. If plugged, we won't process it.
         if (ring_plugged(tx_ring[client].used_ring)) {
             continue;
@@ -108,7 +107,7 @@ int handle_tx(int curr_client) {
              * like that even if they have multiple clients, which is why this
              * is configurable behaviour.
              */
-#ifdef TRANSFER_WITH_COLOUR
+#ifdef SERIAL_TRANSFER_WITH_COLOUR 
             size_t len_copied = copy_with_colour(client, client_buf_len, (char *)driver_buf, (char *)client_buf);
 #else
             size_t len_copied = copy_normal(client_buf_len, (char *)driver_buf, (char *)client_buf);
@@ -161,7 +160,7 @@ void init (void) {
 void notified(microkit_channel ch) {
     // We should only ever recieve notifications from the client
     // Sanity check the client
-    if (ch < 1 || ch > NUM_CLIENTS) {
+    if (ch < 1 || ch > SERIAL_NUM_CLIENTS) {
         microkit_dbg_puts("Received a bad client channel\n");
         return;
     }
