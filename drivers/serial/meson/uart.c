@@ -332,9 +332,6 @@ void init(void) {
 
 // Entry point that is invoked on a serial interrupt, or notifications from the server using the TX and RX channels
 void notified(microkit_channel ch) {
-    microkit_dbg_puts(microkit_name);
-    microkit_dbg_puts(": elf PD notified function running\n");
-
     switch(ch) {
         case IRQ_CH:
             handle_irq();
