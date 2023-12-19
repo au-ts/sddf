@@ -107,7 +107,7 @@ int handle_tx(int curr_client) {
              * like that even if they have multiple clients, which is why this
              * is configurable behaviour.
              */
-#ifdef SERIAL_TRANSFER_WITH_COLOUR 
+#ifdef SERIAL_TRANSFER_WITH_COLOUR
             size_t len_copied = copy_with_colour(client, client_buf_len, (char *)driver_buf, (char *)client_buf);
 #else
             size_t len_copied = copy_normal(client_buf_len, (char *)driver_buf, (char *)client_buf);
@@ -142,7 +142,10 @@ int handle_tx(int curr_client) {
 void init (void) {
     // We want to init the client rings here. Currently this only inits one client
     ring_init(&tx_ring[0], (ring_buffer_t *)tx_free_client, (ring_buffer_t *)tx_used_client, 0, NUM_BUFFERS, NUM_BUFFERS);
+    // @ivanv: terrible temporary hack
+#if SERIAL_NUM_CLIENTS > 1
     ring_init(&tx_ring[1], (ring_buffer_t *)tx_free_client2, (ring_buffer_t *)tx_used_client2, 0, NUM_BUFFERS, NUM_BUFFERS);
+#endif
     ring_init(&drv_tx_ring, (ring_buffer_t *)tx_free_driver, (ring_buffer_t *)tx_used_driver, 0, NUM_BUFFERS, NUM_BUFFERS);
 
     // Add buffers to the drv tx ring from our shared dma region
