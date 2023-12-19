@@ -242,7 +242,10 @@ void handle_rx() {
 void init (void) {
     // We want to init the client rings here. Currently this only inits one client
     ring_init(&rx_ring[0], (ring_buffer_t *)rx_free_client, (ring_buffer_t *)rx_used_client, 0, NUM_BUFFERS, NUM_BUFFERS);
+    // @ivanv: terrible temporary hack
+#if SERIAL_NUM_CLIENTS > 1
     ring_init(&rx_ring[1], (ring_buffer_t *)rx_free_client2, (ring_buffer_t *)rx_used_client2, 0, NUM_BUFFERS, NUM_BUFFERS);
+#endif
 
     ring_init(&drv_rx_ring, (ring_buffer_t *)rx_free_driver, (ring_buffer_t *)rx_used_driver, 0, NUM_BUFFERS, NUM_BUFFERS);
 
