@@ -309,7 +309,7 @@ void init(void) {
     meson_uart_regs_t *regs = (meson_uart_regs_t *) uart_base;
 
     /* Line configuration. Set LINE or RAW mode here, and disable or enable ECHO */
-    int ret = serial_configure(115200, 8, PARITY_NONE, 1, UART_MODE, ECHO_MODE);
+    int ret = serial_configure(115200, 8, PARITY_NONE, 1, UART_MODE, RAW_MODE);
 
     if (ret != 0) {
         microkit_dbg_puts("Error occured during line configuration\n");
