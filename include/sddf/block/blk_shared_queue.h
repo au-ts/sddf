@@ -43,8 +43,8 @@ typedef enum blk_response_status {
 /* Request struct contained in request queue */
 typedef struct blk_request {
     blk_request_code_t code; /* request code */
-    uintptr_t addr; /*  */
-    uint32_t sector; /* sector number to read/write */
+    uintptr_t addr; /* encoded dma address of data */
+    uint32_t block_number; /* block number to read/write to */
     uint16_t count; /* number of blocks to read/write */
     uint32_t id; /* stores request ID */
 } blk_request_t;
@@ -62,7 +62,7 @@ typedef struct blk_response {
 typedef struct blk_req_queue {
     uint32_t write_idx;
     uint32_t read_idx;
-    uint32_t size; /* number of buffers in request queue */
+    uint32_t size; /* number of slots in request queue */
     bool plugged; /* prevent requests from being dequeued when plugged */
     blk_request_t buffers[BLK_REQ_QUEUE_SIZE];
 } blk_req_queue_t;
@@ -71,7 +71,7 @@ typedef struct blk_req_queue {
 typedef struct blk_resp_queue {
     uint32_t write_idx;
     uint32_t read_idx;
-    uint32_t size; /* number of buffers in response queue */
+    uint32_t size; /* number of slots in response queue */
     blk_response_t buffers[BLK_RESP_QUEUE_SIZE];
 } blk_resp_queue_t;
 
@@ -177,8 +177,8 @@ static inline int blk_resp_queue_size(blk_queue_handle_t *queue_handle)
  * @param queue_handle queue handle containing request queue to enqueue to.
  * @param code request code.
  * @param addr encoded dma address of data to read/write.
- * @param sector sector number to read/write.
- * @param count the number of sectors to read/write
+ * @param block_number block number to read/write to.
+ * @param count the number of blocks to read/write
  * @param id request ID to identify this request.
  *
  * @return -1 when request queue is full, 0 on success.
@@ -186,7 +186,7 @@ static inline int blk_resp_queue_size(blk_queue_handle_t *queue_handle)
 static inline int blk_enqueue_req(blk_queue_handle_t *queue_handle,
                                         blk_request_code_t code,
                                         uintptr_t addr,
-                                        uint32_t sector,
+                                        uint32_t block_number,
                                         uint16_t count,
                                         uint32_t id)
 {
@@ -196,7 +196,7 @@ static inline int blk_enqueue_req(blk_queue_handle_t *queue_handle,
 
     queue_handle->req_queue->buffers[queue_handle->req_queue->write_idx % queue_handle->req_queue->size].code = code;
     queue_handle->req_queue->buffers[queue_handle->req_queue->write_idx % queue_handle->req_queue->size].addr = addr;
-    queue_handle->req_queue->buffers[queue_handle->req_queue->write_idx % queue_handle->req_queue->size].sector = sector;
+    queue_handle->req_queue->buffers[queue_handle->req_queue->write_idx % queue_handle->req_queue->size].block_number = block_number;
     queue_handle->req_queue->buffers[queue_handle->req_queue->write_idx % queue_handle->req_queue->size].count = count;
     queue_handle->req_queue->buffers[queue_handle->req_queue->write_idx % queue_handle->req_queue->size].id = id;
 
@@ -213,8 +213,8 @@ static inline int blk_enqueue_req(blk_queue_handle_t *queue_handle,
  * @param queue_handle queue handle containing response queue to enqueue to.
  * @param status response status.
  * @param addr pointer to encoded dma address of data.
- * @param count number of sectors allocated for corresponding request
- * @param success_count number of sectors successfully read/written
+ * @param count number of blocks allocated for corresponding request
+ * @param success_count number of blocks successfully read/written
  * @param id request ID to identify which request the response is for.
  *
  * @return -1 when response queue is full, 0 on success.
@@ -248,8 +248,8 @@ static inline int blk_enqueue_resp(blk_queue_handle_t *queue_handle,
  * @param queue queue handle containing request queue to dequeue from.
  * @param code pointer to request code.
  * @param addr pointer to encoded dma address of data.
- * @param sector pointer to  sector number to read/write.
- * @param count pointer to number of sectors to read/write.
+ * @param block_number pointer to  block number to read/write to.
+ * @param count pointer to number of blocks to read/write.
  * @param id pointer to store request ID.
  *
  * @return -1 when request queue is empty, 0 on success.
@@ -257,7 +257,7 @@ static inline int blk_enqueue_resp(blk_queue_handle_t *queue_handle,
 static inline int blk_dequeue_req(blk_queue_handle_t *queue_handle,
                                         blk_request_code_t *code,
                                         uintptr_t *addr,
-                                        uint32_t *sector,
+                                        uint32_t *block_number,
                                         uint16_t *count,
                                         uint32_t *id)
 {
@@ -267,7 +267,7 @@ static inline int blk_dequeue_req(blk_queue_handle_t *queue_handle,
 
     *code = queue_handle->req_queue->buffers[queue_handle->req_queue->read_idx % queue_handle->req_queue->size].code;
     *addr = queue_handle->req_queue->buffers[queue_handle->req_queue->read_idx % queue_handle->req_queue->size].addr;
-    *sector = queue_handle->req_queue->buffers[queue_handle->req_queue->read_idx % queue_handle->req_queue->size].sector;
+    *block_number = queue_handle->req_queue->buffers[queue_handle->req_queue->read_idx % queue_handle->req_queue->size].block_number;
     *count = queue_handle->req_queue->buffers[queue_handle->req_queue->read_idx % queue_handle->req_queue->size].count;
     *id = queue_handle->req_queue->buffers[queue_handle->req_queue->read_idx % queue_handle->req_queue->size].id;
 
@@ -283,8 +283,8 @@ static inline int blk_dequeue_req(blk_queue_handle_t *queue_handle,
  * @param queue queue handle containing response queue to dequeue from.
  * @param status pointer to response status.
  * @param addr pointer to encoded dma address of data.
- * @param count pointer to number of sectors allocated for corresponding request
- * @param success_count pointer to number of sectors successfully read/written
+ * @param count pointer to number of blocks allocated for corresponding request
+ * @param success_count pointer to number of blocks successfully read/written
  * @param id pointer to stoqueue request ID to idenfity which request this response is for.
  * @return -1 when response queue is empty, 0 on success.
  */
