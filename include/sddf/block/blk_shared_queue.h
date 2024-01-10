@@ -11,9 +11,9 @@
 #include <stdbool.h>
 #include "fence.h"
 
-/* Number of slots in the request queue. Can be configured for performance. */
+/* Maximum number of slots in the request queue. Can be configured. */
 #define BLK_REQ_QUEUE_SIZE 1024
-/* Number of slots in the response queue. Can be configured for performance. */
+/* Maximum number of slots in the response queue. Can be configured. */
 #define BLK_RESP_QUEUE_SIZE 1024
 
 #define REQ_QUEUE(queue_handle) ((queue_handle)->req_queue)
