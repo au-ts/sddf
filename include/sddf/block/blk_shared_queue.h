@@ -245,7 +245,7 @@ static inline int blk_enqueue_resp(blk_queue_handle_t *queue_handle,
 /**
  * Dequeue an element from the request queue.
  *
- * @param queue queue handle containing request queue to dequeue from.
+ * @param queue_handle queue handle containing request queue to dequeue from.
  * @param code pointer to request code.
  * @param addr pointer to encoded dma address of data.
  * @param block_number pointer to  block number to read/write to.
@@ -280,7 +280,7 @@ static inline int blk_dequeue_req(blk_queue_handle_t *queue_handle,
 /**
  * Dequeue an element from a response queue.
  *
- * @param queue queue handle containing response queue to dequeue from.
+ * @param queue_handle queue handle containing response queue to dequeue from.
  * @param status pointer to response status.
  * @param addr pointer to encoded dma address of data.
  * @param count pointer to number of blocks allocated for corresponding request
@@ -323,7 +323,7 @@ static inline void blk_req_queue_plug(blk_queue_handle_t *queue_handle) {
 /**
  * Set the plug of the request queue to false.
  *
- * @param queue queue handle containing request queue to check for plug.
+ * @param queue_handle queue handle containing request queue to check for plug.
 */
 static inline void blk_req_queue_unplug(blk_queue_handle_t *queue_handle) {
     queue_handle->req_queue->plugged = false;
@@ -332,7 +332,7 @@ static inline void blk_req_queue_unplug(blk_queue_handle_t *queue_handle) {
 /**
  * Check the current value of the request queue plug.
  *
- * @param queue queue handle containing request queue to check for plug.
+ * @param queue_handle queue handle containing request queue to check for plug.
  *
  * @return true when request queue is plugged, false when unplugged.
 */
