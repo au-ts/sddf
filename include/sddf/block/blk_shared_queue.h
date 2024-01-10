@@ -87,15 +87,15 @@ typedef struct blk_queue_handle {
  * @param queue_handle queue handle to use.
  * @param request pointer to request queue in shared memory.
  * @param response pointer to response queue in shared memory.
- * @param buffer_init 1 indicates the read and write indices in shared memory need to be initialised.
- *                    0 indicates they do not. Only one side of the shared memory regions needs to do this.
+ * @param buffer_init true indicates the read and write indices in shared memory need to be initialised.
+ *                    false indicates they do not. Only one side of the shared memory regions needs to do this.
  * @param request_size number of buffers in request queue.
  * @param response_size number of buffers in response queue.
  */
 void blk_queue_init(blk_queue_handle_t *queue_handle,
                         blk_req_queue_t *request,
                         blk_resp_queue_t *response,
-                        int buffer_init,
+                        bool buffer_init,
                         uint32_t request_size,
                         uint32_t response_size);
 

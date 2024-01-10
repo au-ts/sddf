@@ -10,7 +10,7 @@
 void blk_queue_init(blk_queue_handle_t *queue_handle,
                         blk_req_queue_t *request,
                         blk_resp_queue_t *response,
-                        int buffer_init,
+                        bool buffer_init,
                         uint32_t request_size,
                         uint32_t response_size)
 {
