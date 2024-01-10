@@ -11,9 +11,9 @@
 #include <stdbool.h>
 #include "fence.h"
 
-/* Number of buffers the request queue is configured to have. */
+/* Number of slots the request queue is configured to have. */
 #define BLK_REQ_QUEUE_SIZE 1024
-/* Number of buffers the response queue is configured to have. */
+/* Number of slots the response queue is configured to have. */
 #define BLK_RESP_QUEUE_SIZE 1024
 
 typedef struct blk_storage_info {
@@ -89,8 +89,8 @@ typedef struct blk_queue_handle {
  * @param response pointer to response queue in shared memory.
  * @param buffer_init true indicates the read and write indices in shared memory need to be initialised.
  *                    false indicates they do not. Only one side of the shared memory regions needs to do this.
- * @param request_size number of buffers in request queue.
- * @param response_size number of buffers in response queue.
+ * @param request_size number of slots in request queue.
+ * @param response_size number of slots in response queue.
  */
 void blk_queue_init(blk_queue_handle_t *queue_handle,
                         blk_req_queue_t *request,
@@ -104,7 +104,7 @@ void blk_queue_init(blk_queue_handle_t *queue_handle,
  *
  * @param queue_handle queue handle containing request queue.
  *
- * @return true indicates the buffer is empty, false otherwise.
+ * @return true indicates the request queue is empty, false otherwise.
  */
 static inline bool blk_req_queue_empty(blk_queue_handle_t *queue_handle)
 {
