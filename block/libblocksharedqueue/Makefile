@@ -22,11 +22,11 @@ CFLAGS := \
 	-I$(SDDF)/include \
 	-I$(SDDF)/util/include
 
-all: $(BUILD_DIR)/sddf_block_sharedringbuffer.o
+all: $(BUILD_DIR)/sddf_block_shared_queue.o
 
-$(BUILD_DIR)/sddf_block_sharedringbuffer.o: blk_shared_ringbuffer.c $(SDDF)/include/sddf/block/blk_shared_ringbuffer.h
-	$(CC) -c $(CFLAGS) blk_shared_ringbuffer.c -o $(BUILD_DIR)/sddf_block_sharedringbuffer.o
+$(BUILD_DIR)/sddf_block_shared_queue.o: blk_shared_queue.c $(SDDF)/include/sddf/block/blk_shared_queue.h
+	$(CC) -c $(CFLAGS) blk_shared_queue.c -o $(BUILD_DIR)/sddf_block_shared_queue.o
 
 .PHONY: clean
 clean:
-	rm $(BUILD_DIR)/sddf_block_sharedringbuffer.o
+	rm $(BUILD_DIR)/sddf_block_shared_queue.o
