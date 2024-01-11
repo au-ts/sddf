@@ -8,7 +8,7 @@
 # doesn't actually cause a re-compile. We should fix this.
 
 BUILD_DIR ?= build
-MICROKIT_BOARD := imx8mm_evk
+MICROKIT_BOARD := odroidc4
 MICROKIT_CONFIG ?= debug
 
 ifeq ($(strip $(MICROKIT_SDK)),)
@@ -31,8 +31,8 @@ LWIP=$(SDDF)/network/ipstacks/lwip/src
 BENCHMARK=$(SDDF)/benchmark
 UTIL=$(SDDF)/util
 RING_BUFFER=$(SDDF)/network/libethsharedringbuffer
-ETHERNET_DRIVER=$(SDDF)/drivers/network/imx
-TIMER_DRIVER=$(SDDF)/drivers/clock/imx
+ETHERNET_DRIVER=$(SDDF)/drivers/network/meson
+TIMER_DRIVER=$(SDDF)/drivers/clock/meson
 NETWORK_COMPONENTS=$(SDDF)/network/components
 
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)

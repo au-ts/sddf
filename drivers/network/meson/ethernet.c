@@ -11,7 +11,7 @@
 #include "ethernet.h"
 
 #define IRQ_2  0
-#define IRQ_CH 1
+#define IRQ_CH 5
 #define TX_CH  2
 #define RX_CH  3
 

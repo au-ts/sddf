@@ -7,6 +7,7 @@
 #include <sddf/serial/util.h>
 #include "uart.h"
 #include "uart_config.h"
+#include "util.h"
 
 #define CLI_CH 1
 #define DRV_CH 11
@@ -31,6 +32,8 @@ uintptr_t rx_data_driver;
 // @ivanv: unused
 uintptr_t rx_data_client;
 uintptr_t rx_data_client2;
+
+uintptr_t client_mem[SERIAL_NUM_CLIENTS];
 
 // Have an array of client rings.
 ring_handle_t rx_ring[SERIAL_NUM_CLIENTS];
@@ -57,12 +60,16 @@ int give_multi_char(char * drv_buffer, int drv_buffer_len) {
         }
         // Address that we will pass to dequeue to store the buffer address
         uintptr_t buffer = 0;
+        uintptr_t buffer_offset = 0;
         // Integer to store the length of the buffer
         unsigned int buffer_len = 0;
 
         void *cookie = 0;
 
-        int ret = dequeue_free(&rx_ring[curr_client], &buffer, &buffer_len, &cookie);
+        int ret = dequeue_free(&rx_ring[curr_client], &buffer_offset, &buffer_len, &cookie);
+        
+        // TODO: Need a better way to find the shared mem regions of an arbitrary number of clients. 
+        buffer = get_buffer_addr(client_mem[curr_client], buffer_offset);
 
         if (ret != 0) {
             microkit_dbg_puts(microkit_name);
@@ -74,7 +81,7 @@ int give_multi_char(char * drv_buffer, int drv_buffer_len) {
         buffer_len = drv_buffer_len;
 
         // Now place in the rx used ring
-        ret = enqueue_used(&rx_ring[curr_client], buffer, buffer_len, &cookie);
+        ret = enqueue_used(&rx_ring[curr_client], buffer_offset, buffer_len, &cookie);
 
         if (ret != 0) {
             microkit_dbg_puts(microkit_name);
@@ -97,12 +104,14 @@ int give_single_char(int curr_client, char * drv_buffer, int drv_buffer_len) {
     // }
     // Address that we will pass to dequeue to store the buffer address
     uintptr_t buffer = 0;
+    uintptr_t buffer_offset = 0;
     // Integer to store the length of the buffer
     unsigned int buffer_len = 0;
 
     void *cookie = 0;
 
-    int ret = dequeue_free(&rx_ring[curr_client - 1], &buffer, &buffer_len, &cookie);
+    int ret = dequeue_free(&rx_ring[curr_client - 1], &buffer_offset, &buffer_len, &cookie);
+    buffer = get_buffer_addr(client_mem[curr_client], buffer_offset);
 
     if (ret != 0) {
         microkit_dbg_puts(microkit_name);
@@ -114,7 +123,7 @@ int give_single_char(int curr_client, char * drv_buffer, int drv_buffer_len) {
     buffer_len = drv_buffer_len;
 
     // Now place in the rx used ring
-    ret = enqueue_used(&rx_ring[curr_client - 1], buffer, buffer_len, &cookie);
+    ret = enqueue_used(&rx_ring[curr_client - 1], buffer_offset, buffer_len, &cookie);
 
     if (ret != 0) {
         microkit_dbg_puts(microkit_name);
@@ -143,13 +152,17 @@ int give_char(int curr_client, char * drv_buffer, int drv_buffer_len) {
 void handle_rx() {
     // Address that we will pass to dequeue to store the buffer address
     uintptr_t buffer = 0;
+    uintptr_t buffer_offset = 0;
     // Integer to store the length of the buffer
     unsigned int buffer_len = 0;
 
     void *cookie = 0;
 
     // We can only be here if we have been notified by the driver
-    int ret = dequeue_used(&drv_rx_ring, &buffer, &buffer_len, &cookie) != 0;
+    int ret = dequeue_used(&drv_rx_ring, &buffer_offset, &buffer_len, &cookie) != 0;
+
+    buffer = get_buffer_addr(rx_data_driver, buffer_offset);
+
     if (ret != 0) {
         microkit_dbg_puts(microkit_name);
         microkit_dbg_puts(": getchar - unable to dequeue used buffer\n");
@@ -231,7 +244,7 @@ void handle_rx() {
 
     /* Now that we are finished with the used buffer, we can add it back to the free ring*/
 
-    ret = enqueue_free(&drv_rx_ring, buffer, BUFFER_SIZE, NULL);
+    ret = enqueue_free(&drv_rx_ring, buffer_offset, BUFFER_SIZE, NULL);
 
     if (ret != 0) {
         microkit_dbg_puts(microkit_name);
@@ -242,15 +255,18 @@ void handle_rx() {
 void init (void) {
     // We want to init the client rings here. Currently this only inits one client
     ring_init(&rx_ring[0], (ring_buffer_t *)rx_free_client, (ring_buffer_t *)rx_used_client, 0, NUM_BUFFERS, NUM_BUFFERS);
+    client_mem[0] = rx_data_client;
     // @ivanv: terrible temporary hack
 #if SERIAL_NUM_CLIENTS > 1
     ring_init(&rx_ring[1], (ring_buffer_t *)rx_free_client2, (ring_buffer_t *)rx_used_client2, 0, NUM_BUFFERS, NUM_BUFFERS);
+    client_mem[1] = rx_data_client2;
 #endif
 
     ring_init(&drv_rx_ring, (ring_buffer_t *)rx_free_driver, (ring_buffer_t *)rx_used_driver, 0, NUM_BUFFERS, NUM_BUFFERS);
 
     for (int i = 0; i < NUM_BUFFERS - 1; i++) {
-        int ret = enqueue_free(&drv_rx_ring, rx_data_driver + (i * BUFFER_SIZE), BUFFER_SIZE, NULL);
+        // Store the buffer sizes, we will use these as offsets into the mapped in region
+        int ret = enqueue_free(&drv_rx_ring, (i * BUFFER_SIZE), BUFFER_SIZE, NULL);
 
         if (ret != 0) {
             microkit_dbg_puts(microkit_name);

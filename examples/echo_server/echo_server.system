@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <system>
-    <memory_region name="uart" size="0x10_000" phys_addr="0x30890000" />
-    <memory_region name="eth0" size="0x10_000" phys_addr="0x30be0000" />
-    <memory_region name="timer" size="0x10_000" phys_addr="0x302d0000" />
+    <memory_region name="uart" size="0x1_000" phys_addr="0xff803000" />
+    <memory_region name="eth0" size="0x10000" phys_addr="0xff3f0000" />
+    <memory_region name="timer" size="0x1000" phys_addr="0xffd0f000" />
 
     <memory_region name="hw_ring_buffer" size="0x10_000" />
     <memory_region name="shared_dma_rx" size="0x200_000" page_size="0x200_000" />
@@ -80,9 +80,10 @@
             <map mr="tx_free_drv" vaddr="0x4_400_000" perms="rw" cached="true" setvar_vaddr="tx_free" />
             <map mr="tx_used_drv" vaddr="0x4_600_000" perms="rw" cached="true" setvar_vaddr="tx_used" />
 
-            <irq irq="152" id="0" /> <!--> ethernet interrupt -->
-
-            <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
+            <!-- PHY IRQ -->
+            <irq irq="96" id="0" />
+            <!-- ethernet IRQ -->
+            <irq irq="40" id="5" /> 
 
             <!-- we need physical addresses of hw rings and dma region -->
             <setvar symbol="hw_ring_buffer_paddr" region_paddr="hw_ring_buffer" />
@@ -215,8 +216,7 @@
         <protection_domain name="timer" priority="101" pp="true" id="9" passive="true">
             <program_image path="timer.elf" />
             <map mr="timer" vaddr="0x2_000_000" perms="rw" cached="false" setvar_vaddr="gpt_regs" />
-            <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
-            <irq irq="87" id="0" /> <!-- timer interrupt -->
+            <irq irq="42" id="0" trigger="edge" /> <!-- timer interrupt for timer A -->
         </protection_domain>
     </protection_domain>
 

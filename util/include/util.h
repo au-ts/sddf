@@ -93,6 +93,16 @@ static void _assert_fail(
     while (1) {}
 }
 
+static uintptr_t
+get_buffer_addr(uintptr_t base, uintptr_t offset) {
+    return base + offset;
+}
+
+static uintptr_t
+get_buffer_offset(uintptr_t base, uintptr_t addr) {
+    return addr - base;
+}
+
 #ifdef NO_ASSERT
 
 #define assert(expr)

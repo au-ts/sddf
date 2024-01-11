@@ -37,8 +37,8 @@
         <map mr="tx_free_serial_driver" vaddr="0x4_400_000" perms="rw" cached="true" setvar_vaddr="tx_free" />
         <map mr="tx_used_serial_driver" vaddr="0x4_600_000" perms="rw" cached="true" setvar_vaddr="tx_used" />
 
-        <map mr="tx_data_driver" vaddr="0x2_200_000" perms="rw" cached="true" />
-        <map mr="rx_data_driver" vaddr="0x2_600_000" perms="rw" cached="true" />
+        <map mr="tx_data_driver" vaddr="0x2_200_000" perms="rw" cached="true" setvar_vaddr="tx_data_driver"/>
+        <map mr="rx_data_driver" vaddr="0x2_600_000" perms="rw" cached="true" setvar_vaddr="rx_data_driver"/>
 
         <!-- UART interrupt -->
         <irq irq="225" id="1" trigger="edge" />
@@ -85,7 +85,7 @@
         <map mr="tx_free_serial_client2" vaddr="0x3_800_000" perms="rw" cached="true" setvar_vaddr="tx_free_client2" />
         <map mr="tx_used_serial_client2" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="tx_used_client2" />
 
-        <map mr="tx_data_driver" vaddr="0x2_200_000" perms="rw" cached="true" setvar_vaddr="tx_data_driver" />
+        <map mr="tx_data_driver" vaddr="0x6_200_000" perms="rw" cached="true" setvar_vaddr="tx_data_driver" />
 
         <map mr="tx_data_client" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="tx_data_client" />
         <map mr="tx_data_client2" vaddr="0x2_600_000" perms="rw" cached="true" setvar_vaddr="tx_data_client2" />
