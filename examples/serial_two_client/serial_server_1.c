@@ -1,6 +1,7 @@
 #include <microkit.h>
 #include "serial_server.h"
 #include <sddf/serial/util.h>
+#include "util.h"
 
 /* Ring handle components -
 Need to have access to the same ring buffer mechanisms as the driver, so that we can enqueue
@@ -25,18 +26,21 @@ int serial_server_printf(char *string) {
 
     // Address that we will pass to dequeue to store the buffer address
     uintptr_t buffer = 0;
+    uintptr_t buffer_offset = 0;
     // Integer to store the length of the buffer
     unsigned int buffer_len = 0;
     void *cookie = 0;
 
     // Dequeue a buffer from the free ring from the tx buffer
-    int ret = dequeue_free(&local_server->tx_ring, &buffer, &buffer_len, &cookie);
+    int ret = dequeue_free(&local_server->tx_ring, &buffer_offset, &buffer_len, &cookie);
 
     if(ret != 0) {
         microkit_dbg_puts(microkit_name);
         microkit_dbg_puts(": serial server printf, unable to dequeue from tx ring, tx ring empty\n");
         return -1;
     }
+
+    buffer = get_buffer_addr(tx_data, buffer_offset);
 
     // Need to copy over the string into the buffer, if it is less than the buffer length
     int print_len = strlen(string) + 1;
@@ -54,7 +58,7 @@ int serial_server_printf(char *string) {
 
     bool is_empty = ring_empty(local_server->tx_ring.used_ring);
 
-    ret = enqueue_used(&local_server->tx_ring, buffer, print_len, cookie);
+    ret = enqueue_used(&local_server->tx_ring, buffer_offset, print_len, cookie);
 
     if(ret != 0) {
         microkit_dbg_puts(microkit_name);
@@ -90,12 +94,13 @@ int getchar() {
 
     // Address that we will pass to dequeue to store the buffer address
     uintptr_t buffer = 0;
+    uintptr_t buffer_offset = 0;
     // Integer to store the length of the buffer
     unsigned int buffer_len = 0; 
 
     void *cookie = 0;
 
-    while (dequeue_used(&local_server->rx_ring, &buffer, &buffer_len, &cookie) != 0) {
+    while (dequeue_used(&local_server->rx_ring, &buffer_offset, &buffer_len, &cookie) != 0) {
         /* The ring is currently empty, as there is no character to get.
         We will spin here until we have gotten a character. As the driver is a higher priority than us,
         it should be able to pre-empt this loop
@@ -103,13 +108,14 @@ int getchar() {
         asm("nop");
     }
 
+    buffer = get_buffer_addr(rx_data, buffer_offset);
     // We are only getting one character at a time, so we just need to cast the buffer to an int
-
+    
     char got_char = *((char *) buffer);
 
     /* Now that we are finished with the used buffer, we can add it back to the free ring*/
 
-    int ret = enqueue_free(&local_server->rx_ring, buffer, buffer_len, NULL);
+    int ret = enqueue_free(&local_server->rx_ring, buffer_offset, buffer_len, NULL);
 
     if (ret != 0) {
         microkit_dbg_puts(microkit_name);
@@ -165,7 +171,7 @@ void init(void) {
 
     // Add buffers to the rx ring
     for (int i = 0; i < NUM_BUFFERS - 1; i++) {
-        int ret = enqueue_free(&local_server->rx_ring, rx_data + (i * BUFFER_SIZE), BUFFER_SIZE, NULL);
+        int ret = enqueue_free(&local_server->rx_ring, (i * BUFFER_SIZE), BUFFER_SIZE, NULL);
 
         if (ret != 0) {
             microkit_dbg_puts(microkit_name);
@@ -178,7 +184,7 @@ void init(void) {
     // Add buffers to the tx ring
     for (int i = 0; i < NUM_BUFFERS - 1; i++) {
         // Have to start at the memory region left of by the rx ring
-        int ret = enqueue_free(&local_server->tx_ring, tx_data + ((i + NUM_BUFFERS) * BUFFER_SIZE), BUFFER_SIZE, NULL);
+        int ret = enqueue_free(&local_server->tx_ring, ((i + NUM_BUFFERS) * BUFFER_SIZE), BUFFER_SIZE, NULL);
 
         if (ret != 0) {
             microkit_dbg_puts(microkit_name);
