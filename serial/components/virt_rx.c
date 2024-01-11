@@ -31,6 +31,8 @@ uintptr_t rx_data_driver;
 uintptr_t rx_data_client;
 uintptr_t rx_data_client2;
 
+uintptr_t client_data[SERIAL_NUM_CLIENTS];
+
 // Have an array of client rings.
 serial_queue_handle_t rx_queue[SERIAL_NUM_CLIENTS];
 serial_queue_handle_t drv_rx_queue;
@@ -54,12 +56,10 @@ int give_multi_char(char * drv_buffer, int drv_buffer_len) {
         if (num_to_get_chars[curr_client] <= 0) {
             return 1;
         }
-        // Address that we will pass to dequeue to store the buffer address
-        uintptr_t buffer = 0;
-        // Integer to store the length of the buffer
+        uintptr_t buffer_offset = 0;
         unsigned int buffer_len = 0;
 
-        int ret = serial_dequeue_free(&rx_queue[curr_client], &buffer, &buffer_len);
+        int ret = serial_dequeue_free(&rx_queue[curr_client], &buffer_offset, &buffer_len);
 
         if (ret != 0) {
             microkit_dbg_puts(microkit_name);
@@ -67,11 +67,13 @@ int give_multi_char(char * drv_buffer, int drv_buffer_len) {
             return 1;
         }
 
+        uintptr_t buffer = client_data[curr_client] + buffer_offset;
+
         memcpy((char *) buffer, drv_buffer, drv_buffer_len);
         buffer_len = drv_buffer_len;
 
         // Now place in the rx active ring
-        ret = serial_enqueue_active(&rx_queue[curr_client], buffer, buffer_len);
+        ret = serial_enqueue_active(&rx_queue[curr_client], buffer_offset, buffer_len);
 
         if (ret != 0) {
             microkit_dbg_puts(microkit_name);
@@ -84,20 +86,19 @@ int give_multi_char(char * drv_buffer, int drv_buffer_len) {
     return 0;
 }
 
-int give_single_char(int curr_client, char * drv_buffer, int drv_buffer_len) {
-    if (curr_client < 1 || curr_client > SERIAL_NUM_CLIENTS) {
+int give_single_char(size_t client, microkit_channel client_ch, char * drv_buffer, int drv_buffer_len) {
+    if (client > SERIAL_NUM_CLIENTS) {
         return 1;
     }
 
-    // if (num_to_get_chars[curr_client - 1] <= 0) {
+    // if (num_to_get_chars[client] <= 0) {
     //     return 1;
     // }
-    // Address that we will pass to dequeue to store the buffer address
-    uintptr_t buffer = 0;
-    // Integer to store the length of the buffer
+    uintptr_t buffer_offset = 0;
     unsigned int buffer_len = 0;
 
-    int ret = serial_dequeue_free(&rx_queue[curr_client - 1], &buffer, &buffer_len);
+    int ret = serial_dequeue_free(&rx_queue[client], &buffer_offset, &buffer_len);
+    uintptr_t buffer = client_data[client] + buffer_offset;
 
     if (ret != 0) {
         microkit_dbg_puts(microkit_name);
@@ -109,7 +110,7 @@ int give_single_char(int curr_client, char * drv_buffer, int drv_buffer_len) {
     buffer_len = drv_buffer_len;
 
     // Now place in the rx active ring
-    ret = serial_enqueue_active(&rx_queue[curr_client - 1], buffer, buffer_len);
+    ret = serial_enqueue_active(&rx_queue[client], buffer_offset, buffer_len);
 
     if (ret != 0) {
         microkit_dbg_puts(microkit_name);
@@ -117,9 +118,9 @@ int give_single_char(int curr_client, char * drv_buffer, int drv_buffer_len) {
         return 1;
     }
 
-    // num_to_get_chars[curr_client - 1] -= 1;
+    // num_to_get_chars[client] -= 1;
 
-    microkit_notify(curr_client);
+    microkit_notify(client_ch);
 
     return 0;
 }
@@ -128,7 +129,7 @@ int give_char(int curr_client, char * drv_buffer, int drv_buffer_len) {
     if (multi_client == 1) {
         give_multi_char(drv_buffer, drv_buffer_len);
     } else {
-        give_single_char(curr_client, drv_buffer, drv_buffer_len);
+        give_single_char(curr_client - 1, curr_client, drv_buffer, drv_buffer_len);
     }
 
     return 0;
@@ -136,17 +137,17 @@ int give_char(int curr_client, char * drv_buffer, int drv_buffer_len) {
 
 /* We will check for escape characters in here, as well as dealing with switching direction*/
 void handle_rx() {
-    // Address that we will pass to dequeue to store the buffer address
-    uintptr_t buffer = 0;
-    // Integer to store the length of the buffer
+    uintptr_t buffer_offset = 0;
     unsigned int buffer_len = 0;
 
     // We can only be here if we have been notified by the driver
-    int ret = serial_dequeue_active(&drv_rx_queue, &buffer, &buffer_len) != 0;
+    int ret = serial_dequeue_active(&drv_rx_queue, &buffer_offset, &buffer_len);
     if (ret != 0) {
         microkit_dbg_puts(microkit_name);
         microkit_dbg_puts(": getchar - unable to dequeue active buffer\n");
     }
+
+    uintptr_t buffer = rx_data_driver + buffer_offset;
 
     // We can either get a single char here, if driver is in RAW mode, or
     // a buffer if driver is in LINE mode.
@@ -224,7 +225,7 @@ void handle_rx() {
 
     /* Now that we are finished with the active buffer, we can add it back to the free ring*/
 
-    ret = serial_enqueue_free(&drv_rx_queue, buffer, BUFFER_SIZE);
+    ret = serial_enqueue_free(&drv_rx_queue, buffer_offset, BUFFER_SIZE);
 
     if (ret != 0) {
         microkit_dbg_puts(microkit_name);
@@ -240,11 +241,15 @@ void init (void) {
     serial_queue_init(&rx_queue[1], (serial_queue_t *)rx_free_client2, (serial_queue_t *)rx_active_client2, 0, NUM_ENTRIES, NUM_ENTRIES);
 #endif
 
+    client_data[0] = rx_data_client;
+#if SERIAL_NUM_CLIENTS > 1
+    client_data[1] = rx_data_client2;
+#endif
+
     serial_queue_init(&drv_rx_queue, (serial_queue_t *)rx_free_driver, (serial_queue_t *)rx_active_driver, 0, NUM_ENTRIES, NUM_ENTRIES);
 
     for (int i = 0; i < NUM_ENTRIES - 1; i++) {
-        int ret = serial_enqueue_free(&drv_rx_queue, rx_data_driver + (i * BUFFER_SIZE), BUFFER_SIZE);
-
+        int ret = serial_enqueue_free(&drv_rx_queue, (i * BUFFER_SIZE), BUFFER_SIZE);
         if (ret != 0) {
             microkit_dbg_puts(microkit_name);
             microkit_dbg_puts(": virt rx buffer population, unable to enqueue buffer\n");

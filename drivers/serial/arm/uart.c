@@ -30,6 +30,10 @@ uintptr_t tx_active;
 /* UART device registers */
 uintptr_t uart_base;
 
+// Mem regions
+uintptr_t tx_data_driver;
+uintptr_t rx_data_driver;
+
 /* Handlers to be given to the shared ringbuffer API */
 serial_queue_handle_t rx_queue;
 serial_queue_handle_t tx_queue;
@@ -69,16 +73,17 @@ static void raw_tx(char *phys, unsigned int len) {
 }
 
 void handle_tx() {
-    uintptr_t buffer = 0;
+    uintptr_t buffer_offset = 0;
     unsigned int len = 0;
     // Dequeue something from the Tx ring -> the server will have placed something in here, if its empty then nothing to do
-    while (!driver_dequeue(tx_queue.active, &buffer, &len)) {
+    while (!driver_dequeue(tx_queue.active, &buffer_offset, &len)) {
+        buffer = tx_data_driver + buffer_offset;
         // Buffer cointaining the bytes to write to serial
         char *phys = (char * )buffer;
         // Handle the tx
         raw_tx(phys, len);
         // Then enqueue this buffer back into the free queue, so that it can be collected and reused by the server
-        int err = serial_enqueue_free(&tx_queue, buffer, BUFFER_SIZE);
+        int err = serial_enqueue_free(&tx_queue, buffer_offset, BUFFER_SIZE);
         assert(!err);
     }
 }
@@ -125,20 +130,23 @@ void handle_irq() {
 
         // Address that we will pass to dequeue to store the buffer address
         uintptr_t buffer = 0;
+        uintptr_t buffer_offset = 0;
         // Integer to store the length of the buffer
         unsigned int buffer_len = 0;
 
-        ret = serial_dequeue_free(&rx_queue, &buffer, &buffer_len);
+        ret = serial_dequeue_free(&rx_queue, &buffer_offset, &buffer_len);
 
         if (ret != 0) {
             LOG_DRIVER_ERR("unable to dequeue from RX free ring\n");
             return;
         }
 
+        buffer = rx_data_driver + buffer_offset;
+
         ((char *) buffer)[0] = (char) input;
 
-        // Now place in the rx active ring
-        ret = serial_enqueue_active(&rx_queue, buffer, 1);
+        // Now place in the rx active queue
+        ret = serial_enqueue_active(&rx_queue, buffer_offset, 1);
         microkit_notify(RX_CH);
 
     } else if (global_serial_driver.mode == LINE_MODE) {
@@ -147,15 +155,16 @@ void handle_irq() {
             // We need to dequeue a buffer to use
             // Address that we will pass to dequeue to store the buffer address
             uintptr_t buffer = 0;
+            uintptr_t buffer_offset = 0;
             // Integer to store the length of the buffer
             unsigned int buffer_len = 0;
 
-            ret = serial_dequeue_free(&rx_queue, &buffer, &buffer_len);
+            ret = serial_dequeue_free(&rx_queue, &buffer_offset, &buffer_len);
             if (ret != 0) {
                 LOG_DRIVER_ERR("unable to dequeue from the RX free queue\n");
                 return;
             }
-
+            buffer = rx_data_driver + buffer_offset;
             global_serial_driver.line_buffer = buffer;
             global_serial_driver.line_buffer_size = 0;
         }
@@ -172,7 +181,8 @@ void handle_irq() {
                 char_arr[global_serial_driver.line_buffer_size] = input_char;
                 global_serial_driver.line_buffer_size += 1;
                 // Enqueue buffer back
-                ret = serial_enqueue_active(&rx_queue, global_serial_driver.line_buffer, global_serial_driver.line_buffer_size);
+                uintptr_t buffer_offset = global_serial_driver.line_buffer - rx_data_driver;
+                ret = serial_enqueue_active(&rx_queue, buffer_offset, global_serial_driver.line_buffer_size);
                 // Zero out the driver states
                 global_serial_driver.line_buffer = 0;
                 global_serial_driver.line_buffer_size = 0;
