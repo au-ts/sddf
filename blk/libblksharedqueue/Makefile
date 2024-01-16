@@ -22,11 +22,11 @@ CFLAGS := \
 	-I$(SDDF)/include \
 	-I$(SDDF)/util/include
 
-all: $(BUILD_DIR)/shared_queue.o
+all: $(BUILD_DIR)/sddf_blk_shared_queue.o
 
-$(BUILD_DIR)/shared_queue.o: shared_queue.c $(SDDF)/include/sddf/blk/shared_queue.h
-	$(CC) -c $(CFLAGS) shared_queue.c -o $(BUILD_DIR)/shared_queue.o
+$(BUILD_DIR)/sddf_blk_shared_queue.o: shared_queue.c $(SDDF)/include/sddf/blk/shared_queue.h
+	$(CC) -c $(CFLAGS) shared_queue.c -o $(BUILD_DIR)/sddf_blk_shared_queue.o
 
 .PHONY: clean
 clean:
-	rm $(BUILD_DIR)/shared_queue.o
+	rm $(BUILD_DIR)/sddf_blk_shared_queue.o
