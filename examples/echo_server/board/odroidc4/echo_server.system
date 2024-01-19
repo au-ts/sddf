@@ -83,7 +83,7 @@
             <!-- ethernet IRQ -->
             <irq irq="40" id="0" />
             <!-- PHY IRQ -->
-            <irq irq="96" id="4" />
+            <irq irq="96" id="1" />
 
             <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" />
 
@@ -224,7 +224,7 @@
     </protection_domain>
 
     <channel>
-        <end pd="eth" id="2" />
+        <end pd="eth" id="3" />
         <end pd="mux_rx" id="3" />
     </channel>
 
@@ -255,7 +255,7 @@
 
     <channel>
         <end pd="mux_tx" id="3" />
-        <end pd="eth" id="1" />
+        <end pd="eth" id="2" />
     </channel>
 
     <channel>

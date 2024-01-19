@@ -10,8 +10,8 @@
 #include <sddf/network/shared_ringbuffer.h>
 #include "ethernet.h"
 
-#define ETH_IRQ_CH 1
-#define PHY_IRQ_CH 4
+#define ETH_IRQ_CH 0
+#define PHY_IRQ_CH 1
 
 #define TX_CH  2
 #define RX_CH  3
