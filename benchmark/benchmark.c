@@ -268,6 +268,7 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
+#ifdef MICROKIT_CONFIG_benchmark
     sel4bench_init();
     seL4_Word n_counters = sel4bench_get_num_counters();
 
@@ -286,6 +287,9 @@ void init(void)
     sel4bench_start_counters(mask);
 
     benchmark_bf = mask;
+#else
+    microkit_dbg_puts("BENCH|INFO: in debug mode! Not doing anything!\n");
+#endif
 
     /* Notify the idle thread that the sel4bench library is initialised. */
     microkit_notify(INIT);

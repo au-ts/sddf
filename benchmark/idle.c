@@ -22,6 +22,7 @@ struct bench *b = (void *)(uintptr_t)0x5010000;
 
 void count_idle(void)
 {
+#ifdef MICROKIT_CONFIG_benchmark
     b->prev = sel4bench_get_cycle_count();
     b->ccount = 0;
     b->overflows = 0;
@@ -49,6 +50,7 @@ void count_idle(void)
 
         b->prev = b->ts;
     }
+#endif
 }
 
 void notified(microkit_channel ch)
