@@ -25,7 +25,7 @@
 #error "There are more clients then there are colours to differentiate them"
 #endif
 
-char *client_colours[MAX_NUM_CLIENTS] = { "\x1b[31m", "\x1b[32m" };
+char *client_colours[MAX_NUM_CLIENTS] = { "\x1b[32m", "\x1b[31m" };
 char *client_colour_end = "\x1b[0m";
 
 /* Memory regions as defined in the system file */
