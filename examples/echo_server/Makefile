@@ -8,7 +8,7 @@
 # doesn't actually cause a re-compile. We should fix this.
 
 BUILD_DIR ?= build
-MICROKIT_BOARD := imx8mm_evk
+MICROKIT_BOARD ?= imx8mm_evk
 MICROKIT_CONFIG ?= debug
 
 ifeq ($(strip $(MICROKIT_SDK)),)
@@ -36,6 +36,7 @@ TIMER_DRIVER=$(SDDF)/drivers/clock/imx
 NETWORK_COMPONENTS=$(SDDF)/network/components
 
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
+SYSTEM_FILE := board/$(MICROKIT_BOARD)/echo_server.system
 
 IMAGES := eth.elf lwip.elf benchmark.elf idle.elf mux_rx.elf mux_tx.elf copy.elf arp.elf timer.elf
 CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall -Wno-unused-function -DNO_ASSERT
@@ -151,8 +152,8 @@ $(BUILD_DIR)/arp.elf: $(addprefix $(BUILD_DIR)/, $(ARP_OBJS))
 $(BUILD_DIR)/timer.elf: $(addprefix $(BUILD_DIR)/, $(TIMER_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-$(IMAGE_FILE) $(REPORT_FILE): $(addprefix $(BUILD_DIR)/, $(IMAGES)) echo_server.system
-	$(MICROKIT_TOOL) echo_server.system --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
+$(IMAGE_FILE) $(REPORT_FILE): $(addprefix $(BUILD_DIR)/, $(IMAGES)) $(SYSTEM_FILE)
+	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
 
 .PHONY: all compile clean
 
