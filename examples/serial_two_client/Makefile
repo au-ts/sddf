@@ -40,7 +40,7 @@ CFLAGS += -I$(BOARD_DIR)/include \
 	-I$(RINGBUFFERDIR)/include \
 	-I$(UART_DRIVER)/include \
 	-I$(SDDF)/include \
-	-I$(SDDF)/util/include \
+	-I$(SDDF) \
 
 UART_OBJS := uart.o shared_ringbuffer.o
 SERIAL_SERVER_OBJS1 := serial_server_1.o shared_ringbuffer.o
