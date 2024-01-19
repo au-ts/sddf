@@ -19,7 +19,17 @@ ifeq ($(strip $(TOOLCHAIN)),)
 	TOOLCHAIN := aarch64-none-elf
 endif
 
+ifeq ($(MICROKIT_BOARD)),imx8mm_evk)
 CPU := cortex-a53
+else ifeq($(MICROKIT_BOARD),odroidc4)
+CPU := cortex-a55
+endif
+
+ifeq ($(MICROKIT_BOARD)),imx8mm_evk)
+SDDF_PLATFORM_DIR := imx
+else ifeq($(MICROKIT_BOARD),odroidc4)
+SDDF_PLATFORM_DIR := meson
+endif
 
 CC := $(TOOLCHAIN)-gcc
 LD := $(TOOLCHAIN)-ld
@@ -31,8 +41,8 @@ LWIP=$(SDDF)/network/ipstacks/lwip/src
 BENCHMARK=$(SDDF)/benchmark
 UTIL=$(SDDF)/util
 RING_BUFFER=$(SDDF)/network/libethsharedringbuffer
-ETHERNET_DRIVER=$(SDDF)/drivers/network/imx
-TIMER_DRIVER=$(SDDF)/drivers/clock/imx
+ETHERNET_DRIVER=$(SDDF)/drivers/network/$(SDDF_PLATFORM_DIR)
+TIMER_DRIVER=$(SDDF)/drivers/clock/$(SDDF_PLATFORM_DIR)
 NETWORK_COMPONENTS=$(SDDF)/network/components
 
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
