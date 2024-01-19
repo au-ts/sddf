@@ -19,8 +19,7 @@ CFLAGS := \
 	-mstrict-align \
 	-ffreestanding \
 	-I$(MICROKIT_INCLUDE) \
-	-I$(SDDF)/include \
-	-I$(SDDF)/util/include
+	-I$(SDDF)/include
 
 all: $(BUILD_DIR)/sddf_blk_shared_queue.o
 

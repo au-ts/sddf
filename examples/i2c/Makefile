@@ -28,7 +28,6 @@ MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 I2C=$(abspath ../../drivers/i2c/meson/)
 SDDF=$(abspath ../../)
 BENCHMARK=$(SDDF)/benchmark
-UTIL=$(SDDF)/util
 LIBCO := $(SDDF)/libco
 
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
@@ -44,7 +43,7 @@ REPORT_FILE = $(BUILD_DIR)/report.txt
 CFLAGS += -I$(BOARD_DIR)/include \
 	-I$(I2C)/include	\
 	-Iinclude/arch	\
-	-I$(UTIL)/include \
+	-I$(SDDF)/include \
 	-I$(LIBCO) \
 	-MD \
 	-MP

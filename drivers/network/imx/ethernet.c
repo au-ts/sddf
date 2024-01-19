@@ -9,8 +9,8 @@
 #include <sel4/sel4.h>
 #include "ethernet.h"
 #include <sddf/network/shared_ringbuffer.h>
-#include "util.h"
-#include "fence.h"
+#include <sddf/util/util.h>
+#include <sddf/util/fence.h>
 
 #define IRQ_CH 0
 #define TX_CH  1

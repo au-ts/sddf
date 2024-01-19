@@ -1,6 +1,6 @@
 #include <microkit.h>
 #include <sddf/network/shared_ringbuffer.h>
-#include "util.h"
+#include <sddf/util/util.h>
 #include <math.h>
 
 uintptr_t tx_free_drv;

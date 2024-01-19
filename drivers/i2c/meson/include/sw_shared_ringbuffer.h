@@ -13,7 +13,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <microkit.h>
-#include "fence.h"
+#include <sddf/util/fence.h>
 
 #define SIZE 512
 

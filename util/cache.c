@@ -1,7 +1,7 @@
 #include <sel4/sel4.h>
 #include <stdint.h>
-#include "cache.h"
-#include "util.h"
+#include <sddf/util/cache.h>
+#include <sddf/util/util.h>
 
 #define ROUND_DOWN(n, b) (((n) >> (b)) << (b))
 #define LINE_START(a) ROUND_DOWN(a, CONFIG_L1_CACHE_LINE_SIZE_BITS)

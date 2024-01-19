@@ -7,10 +7,10 @@
 #include <microkit.h>
 #include <sel4/sel4.h>
 #include <sel4/benchmark_track_types.h>
-#include "sel4bench.h"
-#include "fence.h"
-#include "bench.h"
-#include "util.h"
+#include <sddf/benchmark/sel4bench.h>
+#include <sddf/util/fence.h>
+#include <sddf/benchmark/bench.h>
+#include <sddf/util/util.h>
 
 #define INIT 3
 #define MAGIC_CYCLES 150

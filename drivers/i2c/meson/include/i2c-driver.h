@@ -21,7 +21,7 @@
 #include "clk.h"
 #include <stdint.h>
 #include "printf.h"
-#include "fence.h"
+#include <sddf/util/fence.h>
 #include "i2c.h"
 
 #define TOKEN_LIST_MAX 128
