@@ -19,13 +19,13 @@ ifeq ($(strip $(TOOLCHAIN)),)
 	TOOLCHAIN := aarch64-none-elf
 endif
 
-ifeq ($(MICROKIT_BOARD)),imx8mm_evk)
+ifeq ($(MICROKIT_BOARD),imx8mm_evk)
 CPU := cortex-a53
 else ifeq($(MICROKIT_BOARD),odroidc4)
 CPU := cortex-a55
 endif
 
-ifeq ($(MICROKIT_BOARD)),imx8mm_evk)
+ifeq ($(MICROKIT_BOARD),imx8mm_evk)
 SDDF_PLATFORM_DIR := imx
 else ifeq($(MICROKIT_BOARD),odroidc4)
 SDDF_PLATFORM_DIR := meson
