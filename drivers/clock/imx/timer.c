@@ -14,7 +14,7 @@
 
 #include <stdint.h>
 #include <microkit.h>
-#include "util.h"
+#include <sddf/util/util.h>
 
 #define GET_TIME 0
 #define SET_TIMEOUT 1

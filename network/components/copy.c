@@ -1,7 +1,7 @@
 #include <microkit.h>
 #include <sddf/network/shared_ringbuffer.h>
-#include "util.h"
-#include "fence.h"
+#include <sddf/util/util.h>
+#include <sddf/util/fence.h>
 #include <string.h>
 #include <stdbool.h>
 

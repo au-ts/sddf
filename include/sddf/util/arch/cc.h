@@ -4,7 +4,7 @@
  */
 
 #include <stdint.h>
-#include "util.h"
+#include <sddf/util/util.h>
 
 typedef  uint8_t  u8_t;
 typedef uint16_t u16_t;

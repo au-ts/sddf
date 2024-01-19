@@ -1,7 +1,7 @@
 #include <microkit.h>
 #include <sddf/network/shared_ringbuffer.h>
-#include "util.h"
-#include "fence.h"
+#include <sddf/util/util.h>
+#include <sddf/util/fence.h>
 
 uintptr_t tx_free_drv;
 uintptr_t tx_used_drv;

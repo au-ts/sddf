@@ -9,7 +9,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
-#include "fence.h"
+#include <sddf/util/fence.h>
 
 /* Maximum number of slots in the request queue. Can be configured. */
 #define BLK_REQ_QUEUE_SIZE 1024

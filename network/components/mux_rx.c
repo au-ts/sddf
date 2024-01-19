@@ -4,10 +4,10 @@
 #include <string.h>
 
 #include <sddf/network/shared_ringbuffer.h>
-#include "util.h"
+#include <sddf/util/util.h>
+#include <sddf/util/fence.h>
 #include "lwip/ip_addr.h"
 #include "netif/etharp.h"
-#include "fence.h"
 
 uintptr_t rx_free_drv;
 uintptr_t rx_used_drv;

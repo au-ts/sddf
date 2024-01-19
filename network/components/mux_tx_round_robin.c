@@ -1,5 +1,5 @@
 #include <sddf/network/shared_ringbuffer.h>
-#include "util.h"
+#include <sddf/util/util.h>
 
 uintptr_t tx_free_drv;
 uintptr_t tx_used_drv;

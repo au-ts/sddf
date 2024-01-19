@@ -1,6 +1,6 @@
 #include <microkit.h>
 #include <sddf/network/shared_ringbuffer.h>
-#include "util.h"
+#include <sddf/util/util.h>
 #include <string.h>
 #include "lwip/ip_addr.h"
 #include "netif/etharp.h"

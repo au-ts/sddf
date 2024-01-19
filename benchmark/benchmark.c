@@ -8,10 +8,10 @@
 #include <sel4/sel4.h>
 #include <sel4/benchmark_track_types.h>
 #include <sel4/benchmark_utilisation_types.h>
-#include "sel4bench.h"
-#include "fence.h"
-#include "bench.h"
-#include "util.h"
+#include <sddf/benchmark/sel4bench.h>
+#include <sddf/util/fence.h>
+#include <sddf/benchmark/bench.h>
+#include <sddf/util/util.h>
 
 #define MAGIC_CYCLES 150
 #define ULONG_MAX 0xfffffffffffffffful
