@@ -8,12 +8,6 @@
 #include <stddef.h>
 #include <microkit.h>
 
-#define UART_REG(x) ((volatile uint32_t *)(UART_BASE + (x)))
-#define UART_BASE 0x5000000 //0x30890000 in hardware on imx8mm.
-#define STAT 0x98
-#define TRANSMIT 0x40
-#define STAT_TDRE (1 << 14)
-
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(x[0]))
 
 #ifdef __GNUC__
@@ -34,6 +28,37 @@ static void
 print(const char *s)
 {
     microkit_dbg_puts(s);
+}
+
+/* Why do we have minimal UART put char functionality here?
+ * We need printing for some benchmarking scenarios which means
+ * we cannot use seL4's debug printing as the kernel is in release
+ * mode for benchmarking.
+ * This is a temporary solution until we integrate propper logging
+ * into the sDDF.
+ */
+#define UART_BASE 0x5000000
+#define UART_REG(x) ((volatile uint32_t *)(UART_BASE + (x)))
+
+static void
+uart_putc(uint8_t ch) {
+#if defined(CONFIG_PLAT_IMX8MM_EVK)
+    while (!(*UART_REG(0x98) & (1 << 14))) { }
+    *UART_REG(0x40) = ch;
+#elif defined(CONFIG_PLAT_ODROIDC4) || defined(CONFIG_PLAT_ODROIDC2)
+    while ((*UART_REG(0xc) & (1 << 21)));
+    *UART_REG(0x0) = ch;
+#endif
+}
+
+static void
+uart_print(const char *s) {
+#ifndef DISABLE_UTIL_UART_PRINT
+    while (*s) {
+        uart_putc(*s);
+        s++;
+    }
+#endif
 }
 
 static char

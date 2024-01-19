@@ -423,11 +423,11 @@ static void netif_status_callback(struct netif *netif)
         microkit_mr_set(2, (state.mac[4] << 24) | (state.mac[5] << 16));
         microkit_ppcall(ARP, microkit_msginfo_new(0, 3));
 
-        print("DHCP request finished, IP address for netif ");
-        print(netif->name);
-        print(" is: ");
-        print(ip4addr_ntoa(netif_ip4_addr(netif)));
-        print("\n");
+        uart_print("DHCP request finished, IP address for netif ");
+        uart_print(netif->name);
+        uart_print(" is: ");
+        uart_print(ip4addr_ntoa(netif_ip4_addr(netif)));
+        uart_print("\n");
     }
 }
 
