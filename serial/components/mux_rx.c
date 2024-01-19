@@ -183,11 +183,11 @@ void handle_rx() {
                 int new_client = atoi(&got_char);
                 if (new_client < 1 || new_client > SERIAL_NUM_CLIENTS) {
                     microkit_dbg_puts("MUX|RX: Attempted to switch to invalid client number: ");
-                    // puthex64(new_client);
+                    puthex64(new_client);
                     microkit_dbg_puts("\n");
                 } else {
                     microkit_dbg_puts("MUX|RX: Switching to client number: ");
-                    // puthex64(new_client);
+                    puthex64(new_client);
                     microkit_dbg_puts("\n");
                     client = new_client;
                 }
