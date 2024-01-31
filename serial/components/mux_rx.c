@@ -111,7 +111,7 @@ int give_single_char(int curr_client, char * drv_buffer, int drv_buffer_len) {
     void *cookie = 0;
 
     int ret = dequeue_free(&rx_ring[curr_client - 1], &buffer_offset, &buffer_len, &cookie);
-    buffer = get_buffer_addr(client_mem[curr_client], buffer_offset);
+    buffer = get_buffer_addr(client_mem[curr_client - 1], buffer_offset);
 
     if (ret != 0) {
         microkit_dbg_puts(microkit_name);
