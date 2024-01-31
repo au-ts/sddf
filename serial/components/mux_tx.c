@@ -103,9 +103,13 @@ int handle_tx(int curr_client) {
                 return 1;
             }
 
-            // Get the actuall address of the buffers
+            // Get the actual address of the buffers
             client_buf = get_buffer_addr(client_mem[client], client_buf_offset);
             driver_buf = get_buffer_addr(tx_data_driver, driver_buf_offset);
+            if (client_buf == 0 || driver_buf == 0) {
+                microkit_dbg_puts("MUX|TX: Invalid buffer address, dropping buffer\n");
+                return 1;
+            }
             /*
              * Depending on the overall system, we may want to add colour to
              * the transmit data in order to easily identify which client the
@@ -159,9 +163,8 @@ void init (void) {
     ring_init(&drv_tx_ring, (ring_buffer_t *)tx_free_driver, (ring_buffer_t *)tx_used_driver, 0, NUM_BUFFERS, NUM_BUFFERS);
 
     // Add buffers to the drv tx ring from our shared dma region
-    for (int i = 0; i < NUM_BUFFERS - 1; i++) {
-        // Have to start at the memory region left of by the rx ring
-        int ret = enqueue_free(&drv_tx_ring, ((i + NUM_BUFFERS) * BUFFER_SIZE), BUFFER_SIZE, NULL);
+    for (int i = 0; i < NUM_BUFFERS; i++) {
+        int ret = enqueue_free(&drv_tx_ring, (i * BUFFER_SIZE), BUFFER_SIZE, NULL);
 
         if (ret != 0) {
             microkit_dbg_puts(microkit_name);

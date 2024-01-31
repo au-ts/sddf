@@ -193,6 +193,11 @@ void handle_tx() {
     // Dequeue something from the Tx ring -> the server will have placed something in here, if its empty then nothing to do
     while (!driver_dequeue(tx_ring.used_ring, &buffer_offset, &len, &cookie)) {
         buffer = get_buffer_addr(tx_data_driver, buffer_offset);
+        if (buffer == 0) {
+            // Drop buffer if address is invalid
+            microkit_dbg_puts("uart: Invalid buffer address, dropping buffer\n");
+            return;
+        }
         // Buffer cointaining the bytes to write to serial
         char *phys = (char * )buffer;
         // Handle the tx
@@ -259,6 +264,12 @@ void handle_irq() {
 
         buffer = get_buffer_addr(rx_data_driver, buffer_offset);
 
+        if (buffer == 0) {
+            // Drop buffer if address is invalid
+            microkit_dbg_puts("uart: Invalid buffer address, dropping buffer\n");
+            return;
+        }
+
         ((char *) buffer)[0] = (char) input;
 
         // Now place in the rx used ring
@@ -286,6 +297,12 @@ void handle_irq() {
 
             buffer = get_buffer_addr(rx_data_driver, buffer_offset);
 
+            if (buffer == 0) {
+                // Drop buffer if address is invalid
+                microkit_dbg_puts("uart: Invalid buffer address, dropping buffer\n");
+                return;
+            }
+
             global_serial_driver.line_buffer = buffer;
             global_serial_driver.line_buffer_size = 0;
         } 
@@ -304,6 +321,11 @@ void handle_irq() {
                 global_serial_driver.line_buffer_size += 1;
                 // Enqueue buffer back
                 uintptr_t buffer_offset = get_buffer_offset(rx_data_driver, global_serial_driver.line_buffer);
+                // Check that the buffer offset is correct, otherwise drop buffer
+                if(buffer_offset > (NUM_BUFFERS - 1) * BUFFER_SIZE) {
+                    microkit_dbg_puts("uart: Invalid buffer offset, dropping buffer\n");
+                    return;
+                }
                 ret = enqueue_used(&rx_ring, buffer_offset, global_serial_driver.line_buffer_size, &cookie);
                 // Zero out the driver states
                 global_serial_driver.line_buffer = 0;

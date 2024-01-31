@@ -77,6 +77,12 @@ int give_multi_char(char * drv_buffer, int drv_buffer_len) {
             return 1;
         }
 
+        if (buffer == 0) {
+            // Drop buffer if address is invalid
+            microkit_dbg_puts("MUX|RX: Invalid buffer address, dropping buffer\n");
+            return 1;
+        }
+
         memcpy((char *) buffer, drv_buffer, drv_buffer_len);
         buffer_len = drv_buffer_len;
 
@@ -116,6 +122,12 @@ int give_single_char(int curr_client, char * drv_buffer, int drv_buffer_len) {
     if (ret != 0) {
         microkit_dbg_puts(microkit_name);
         microkit_dbg_puts(": unable to dequeue from the rx free ring\n");
+        return 1;
+    }
+
+    if (buffer == 0) {
+        // Drop buffer if address is invalid
+        microkit_dbg_puts("MUX|RX: Invalid buffer address, dropping buffer\n");
         return 1;
     }
 
@@ -166,6 +178,13 @@ void handle_rx() {
     if (ret != 0) {
         microkit_dbg_puts(microkit_name);
         microkit_dbg_puts(": getchar - unable to dequeue used buffer\n");
+        return;
+    }
+
+    if (buffer == 0) {
+        // Drop buffer if address is invalid
+        microkit_dbg_puts("MUX|RX: Invalid buffer address, dropping buffer\n");
+        return;
     }
 
     // We can either get a single char here, if driver is in RAW mode, or

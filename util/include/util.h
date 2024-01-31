@@ -95,12 +95,18 @@ static void _assert_fail(
 
 static uintptr_t
 get_buffer_addr(uintptr_t base, uintptr_t offset) {
+    if ((offset) > (NUM_BUFFERS * BUFFER_SIZE)) {
+        microkit_dbg_puts("get_buffer_addr: invalid offset\n");
+        puthex64(offset);
+        return 0;
+    }
     return base + offset;
 }
 
 static uintptr_t
 get_buffer_offset(uintptr_t base, uintptr_t addr) {
-    return addr - base;
+    uintptr_t offset = addr - base;
+    return offset;
 }
 
 #ifdef NO_ASSERT

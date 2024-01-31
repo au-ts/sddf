@@ -42,6 +42,13 @@ int serial_server_printf(char *string) {
 
     buffer = get_buffer_addr(tx_data, buffer_offset);
 
+    if (buffer == 0) {
+        // Drop buffer if address is invalid
+        microkit_dbg_puts(microkit_name);
+        microkit_dbg_puts(": Invalid buffer address, dropping buffer\n");
+        return -1;
+    }
+
     // Need to copy over the string into the buffer, if it is less than the buffer length
     int print_len = strlen(string) + 1;
 
@@ -109,6 +116,14 @@ int getchar() {
     }
 
     buffer = get_buffer_addr(rx_data, buffer_offset);
+
+    if (buffer == 0) {
+        // Drop buffer if address is invalid
+        microkit_dbg_puts(microkit_name);
+        microkit_dbg_puts(": Invalid buffer address, dropping buffer\n");
+        return -1;
+    }
+
     // We are only getting one character at a time, so we just need to cast the buffer to an int
     
     char got_char = *((char *) buffer);
@@ -183,8 +198,7 @@ void init(void) {
 
     // Add buffers to the tx ring
     for (int i = 0; i < NUM_BUFFERS - 1; i++) {
-        // Have to start at the memory region left of by the rx ring
-        int ret = enqueue_free(&local_server->tx_ring, ((i + NUM_BUFFERS) * BUFFER_SIZE), BUFFER_SIZE, NULL);
+        int ret = enqueue_free(&local_server->tx_ring, (i * BUFFER_SIZE), BUFFER_SIZE, NULL);
 
         if (ret != 0) {
             microkit_dbg_puts(microkit_name);
