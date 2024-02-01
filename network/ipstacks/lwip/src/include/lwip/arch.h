@@ -46,6 +46,7 @@
 #endif
 
 #include <sddf/util/arch/cc.h>
+#include <sddf/util/printf.h>
 
 /**
  * @defgroup compiler_abstraction Compiler/platform abstraction

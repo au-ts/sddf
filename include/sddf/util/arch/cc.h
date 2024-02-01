@@ -5,6 +5,7 @@
 
 #include <stdint.h>
 #include <sddf/util/util.h>
+#include <sddf/util/printf.h>
 
 typedef  uint8_t  u8_t;
 typedef uint16_t u16_t;
@@ -58,12 +59,6 @@ typedef uintptr_t mem_ptr_t;
 #include <stdlib.h>
 
 #define LWIP_RAND                       rand
-
-/* Plaform specific diagnostic output */
-#define LWIP_PLATFORM_DIAG(x)           \
-        do {                            \
-            print("lwIP error\n");      \
-        } while(0)
 
 #define LWIP_PLATFORM_ASSERT(x) \
         do {                                                    \

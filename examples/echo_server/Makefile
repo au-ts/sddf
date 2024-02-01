@@ -65,7 +65,6 @@ CFLAGS += -I$(BOARD_DIR)/include \
 	-I$(LWIP)/include/ipv4 \
 	-I$(RING_BUFFER)/include \
 	-I$(BENCHMARK)/include \
-	-I$(UTIL)/include \
 	-MD \
 	-MP
 
@@ -104,8 +103,8 @@ CORE4FILES=$(LWIP)/core/ipv4/autoip.c \
 NETIFFILES=$(LWIP)/netif/ethernet.c
 
 # LWIPFILES: All the above.
-LWIPFILES=$(NETWORK_COMPONENTS)/lwip.c $(NETWORK_COMPONENTS)/lwip_timer.c $(UTIL)/cache.c $(COREFILES) $(CORE4FILES) $(NETIFFILES)
-LWIP_OBJS := $(LWIPFILES:.c=.o) $(NETWORK_COMPONENTS)/lwip.o sddf_network_sharedringbuffer.o $(NETWORK_COMPONENTS)/utilization_socket.o $(NETWORK_COMPONENTS)/udp_echo_socket.o
+LWIPFILES=$(NETWORK_COMPONENTS)/lwip.c $(NETWORK_COMPONENTS)/lwip_timer.c $(UTIL)/cache.c $(UTIL)/util.c $(UTIL)/printf.c $(COREFILES) $(CORE4FILES) $(NETIFFILES)
+LWIP_OBJS := $(LWIPFILES:.c=.o) $(UTIL)/util.o $(UTIL)/printf.o $(NETWORK_COMPONENTS)/lwip.o sddf_network_sharedringbuffer.o $(NETWORK_COMPONENTS)/utilization_socket.o $(NETWORK_COMPONENTS)/udp_echo_socket.o
 
 ETH_OBJS := $(ETHERNET_DRIVER)/ethernet.o sddf_network_sharedringbuffer.o
 MUX_RX_OBJS := $(NETWORK_COMPONENTS)/mux_rx.o sddf_network_sharedringbuffer.o
