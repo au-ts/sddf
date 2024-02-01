@@ -42,7 +42,7 @@ uint32_t ring_size(ring_buffer_t *ring)
     return (ring->write_idx - ring->read_idx);
 }
 
-int enqueue(ring_buffer_t *ring, uintptr_t buffer, unsigned int len, void *cookie)
+int enqueue(ring_buffer_t *ring, uintptr_t buffer, unsigned int len)
 {
     // assert(buffer != 0);
     if (ring_full(ring)) {
@@ -51,7 +51,6 @@ int enqueue(ring_buffer_t *ring, uintptr_t buffer, unsigned int len, void *cooki
 
     ring->buffers[ring->write_idx % ring->size].encoded_addr = buffer;
     ring->buffers[ring->write_idx % ring->size].len = len;
-    ring->buffers[ring->write_idx % ring->size].cookie = cookie;
 
     THREAD_MEMORY_RELEASE();
     ring->write_idx++;
@@ -59,7 +58,7 @@ int enqueue(ring_buffer_t *ring, uintptr_t buffer, unsigned int len, void *cooki
     return 0;
 }
 
-int dequeue(ring_buffer_t *ring, uintptr_t *addr, unsigned int *len, void **cookie)
+int dequeue(ring_buffer_t *ring, uintptr_t *addr, unsigned int *len)
 {
     if (ring_empty(ring)) {
         return -1;
@@ -69,7 +68,6 @@ int dequeue(ring_buffer_t *ring, uintptr_t *addr, unsigned int *len, void **cook
 
     *addr = ring->buffers[ring->read_idx % ring->size].encoded_addr;
     *len = ring->buffers[ring->read_idx % ring->size].len;
-    *cookie = ring->buffers[ring->read_idx % ring->size].cookie;
 
     THREAD_MEMORY_RELEASE();
     ring->read_idx++;
@@ -77,26 +75,26 @@ int dequeue(ring_buffer_t *ring, uintptr_t *addr, unsigned int *len, void **cook
     return 0;
 }
 
-int enqueue_free(ring_handle_t *ring, uintptr_t addr, unsigned int len, void *cookie)
+int enqueue_free(ring_handle_t *ring, uintptr_t addr, unsigned int len)
 {
     // assert(addr);
-    return enqueue(ring->free_ring, addr, len, cookie);
+    return enqueue(ring->free_ring, addr, len);
 }
 
-int enqueue_used(ring_handle_t *ring, uintptr_t addr, unsigned int len, void *cookie)
+int enqueue_used(ring_handle_t *ring, uintptr_t addr, unsigned int len)
 {
     // assert(addr);
-    return enqueue(ring->used_ring, addr, len, cookie);
+    return enqueue(ring->used_ring, addr, len);
 }
 
-int dequeue_free(ring_handle_t *ring, uintptr_t *addr, unsigned int *len, void **cookie)
+int dequeue_free(ring_handle_t *ring, uintptr_t *addr, unsigned int *len)
 {
-    return dequeue(ring->free_ring, addr, len, cookie);
+    return dequeue(ring->free_ring, addr, len);
 }
 
-int dequeue_used(ring_handle_t *ring, uintptr_t *addr, unsigned int *len, void **cookie)
+int dequeue_used(ring_handle_t *ring, uintptr_t *addr, unsigned int *len)
 {
-    return dequeue(ring->used_ring, addr, len, cookie);
+    return dequeue(ring->used_ring, addr, len);
 }
 
 void ring_plug(ring_buffer_t *ring) {
@@ -111,7 +109,7 @@ bool ring_plugged(ring_buffer_t *ring) {
     return ring->plugged;
 }
 
-int driver_dequeue(ring_buffer_t *ring, uintptr_t *addr, unsigned int *len, void **cookie)
+int driver_dequeue(ring_buffer_t *ring, uintptr_t *addr, unsigned int *len)
 {
     if (ring_empty(ring)) {
         return -1;
@@ -119,7 +117,6 @@ int driver_dequeue(ring_buffer_t *ring, uintptr_t *addr, unsigned int *len, void
 
     *addr = ring->buffers[ring->read_idx % ring->size].encoded_addr;
     *len = ring->buffers[ring->read_idx % ring->size].len;
-    *cookie = &ring->buffers[ring->read_idx % ring->size];
 
     THREAD_MEMORY_RELEASE();
     ring->read_idx++;

@@ -21,7 +21,6 @@
 typedef struct buff_desc {
     uintptr_t encoded_addr; /* encoded dma addresses */
     unsigned int len; /* associated memory lengths */
-    void *cookie; /* index into client side metadata */
 } buff_desc_t;
 
 /* Circular buffer containing descriptors */
@@ -78,11 +77,10 @@ uint32_t ring_size(ring_buffer_t *ring);
  * @param ring Ring buffer to enqueue into.
  * @param buffer address into shared memory where data is stored.
  * @param len length of data inside the buffer above.
- * @param cookie optional pointer to data required on dequeueing.
  *
  * @return -1 when ring is empty, 0 on success.
  */
-int enqueue(ring_buffer_t *ring, uintptr_t buffer, unsigned int len, void *cookie);
+int enqueue(ring_buffer_t *ring, uintptr_t buffer, unsigned int len);
 
 /**
  * Dequeue an element to a ring buffer.
@@ -90,11 +88,10 @@ int enqueue(ring_buffer_t *ring, uintptr_t buffer, unsigned int len, void *cooki
  * @param ring Ring buffer to Dequeue from.
  * @param buffer pointer to the address of where to store buffer address.
  * @param len pointer to variable to store length of data dequeueing.
- * @param cookie pointer optional pointer to data required on dequeueing.
  *
  * @return -1 when ring is empty, 0 on success.
  */
-int dequeue(ring_buffer_t *ring, uintptr_t *addr, unsigned int *len, void **cookie);
+int dequeue(ring_buffer_t *ring, uintptr_t *addr, unsigned int *len);
 
 /**
  * Enqueue an element into an free ring buffer.
@@ -103,11 +100,10 @@ int dequeue(ring_buffer_t *ring, uintptr_t *addr, unsigned int *len, void **cook
  * @param ring Ring handle to enqueue into.
  * @param buffer address into shared memory where data is stored.
  * @param len length of data inside the buffer above.
- * @param cookie optional pointer to data required on dequeueing.
  *
  * @return -1 when ring is full, 0 on success.
  */
-int enqueue_free(ring_handle_t *ring, uintptr_t addr, unsigned int len, void *cookie);
+int enqueue_free(ring_handle_t *ring, uintptr_t addr, unsigned int len);
 
 /**
  * Enqueue an element into a used ring buffer.
@@ -116,11 +112,10 @@ int enqueue_free(ring_handle_t *ring, uintptr_t addr, unsigned int len, void *co
  * @param ring Ring handle to enqueue into.
  * @param buffer address into shared memory where data is stored.
  * @param len length of data inside the buffer above.
- * @param cookie optional pointer to data required on dequeueing.
  *
  * @return -1 when ring is full, 0 on success.
  */
-int enqueue_used(ring_handle_t *ring, uintptr_t addr, unsigned int len, void *cookie);
+int enqueue_used(ring_handle_t *ring, uintptr_t addr, unsigned int len);
 
 /**
  * Dequeue an element from the free ring buffer.
@@ -128,11 +123,10 @@ int enqueue_used(ring_handle_t *ring, uintptr_t addr, unsigned int len, void *co
  * @param ring Ring handle to dequeue from.
  * @param buffer pointer to the address of where to store buffer address.
  * @param len pointer to variable to store length of data dequeueing.
- * @param cookie pointer optional pointer to data required on dequeueing.
  *
  * @return -1 when ring is empty, 0 on success.
  */
-int dequeue_free(ring_handle_t *ring, uintptr_t *addr, unsigned int *len, void **cookie);
+int dequeue_free(ring_handle_t *ring, uintptr_t *addr, unsigned int *len);
 
 /**
  * Dequeue an element from a used ring buffer.
@@ -140,11 +134,10 @@ int dequeue_free(ring_handle_t *ring, uintptr_t *addr, unsigned int *len, void *
  * @param ring Ring handle to dequeue from.
  * @param buffer pointer to the address of where to store buffer address.
  * @param len pointer to variable to store length of data dequeueing.
- * @param cookie pointer optional pointer to data required on dequeueing.
  *
  * @return -1 when ring is empty, 0 on success.
  */
-int dequeue_used(ring_handle_t *ring, uintptr_t *addr, unsigned int *len, void **cookie);
+int dequeue_used(ring_handle_t *ring, uintptr_t *addr, unsigned int *len);
 
 /**
  * Set the plug of a ring to true.
@@ -177,8 +170,7 @@ bool ring_plugged(ring_buffer_t *ring);
  * @param ring Ring buffer to dequeue from.
  * @param addr pointer to the address of where to store buffer address.
  * @param len pointer to variable to store length of data dequeueing.
- * @param cookie pointer to store a pointer to this particular entry.
  *
  * @return -1 when ring is empty, 0 on success.
  */
-int driver_dequeue(ring_buffer_t *ring, uintptr_t *addr, unsigned int *len, void **cookie);
+int driver_dequeue(ring_buffer_t *ring, uintptr_t *addr, unsigned int *len);

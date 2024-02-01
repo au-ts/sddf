@@ -29,10 +29,9 @@ int serial_server_printf(char *string) {
     uintptr_t buffer_offset = 0;
     // Integer to store the length of the buffer
     unsigned int buffer_len = 0;
-    void *cookie = 0;
 
     // Dequeue a buffer from the free ring from the tx buffer
-    int ret = dequeue_free(&local_server->tx_ring, &buffer_offset, &buffer_len, &cookie);
+    int ret = dequeue_free(&local_server->tx_ring, &buffer_offset, &buffer_len);
 
     if(ret != 0) {
         microkit_dbg_puts(microkit_name);
@@ -64,7 +63,7 @@ int serial_server_printf(char *string) {
 
     bool is_empty = ring_empty(local_server->tx_ring.used_ring);
 
-    ret = enqueue_used(&local_server->tx_ring, buffer_offset, print_len, cookie);
+    ret = enqueue_used(&local_server->tx_ring, buffer_offset, print_len);
 
     if(ret != 0) {
         microkit_dbg_puts(microkit_name);
@@ -104,9 +103,7 @@ int getchar() {
     // Integer to store the length of the buffer
     unsigned int buffer_len = 0; 
 
-    void *cookie = 0;
-
-    while (dequeue_used(&local_server->rx_ring, &buffer_offset, &buffer_len, &cookie) != 0) {
+    while (dequeue_used(&local_server->rx_ring, &buffer_offset, &buffer_len) != 0) {
         /* The ring is currently empty, as there is no character to get.
         We will spin here until we have gotten a character. As the driver is a higher priority than us,
         it should be able to pre-empt this loop
@@ -129,7 +126,7 @@ int getchar() {
 
     /* Now that we are finished with the used buffer, we can add it back to the free ring*/
 
-    int ret = enqueue_free(&local_server->rx_ring, buffer_offset, buffer_len, NULL);
+    int ret = enqueue_free(&local_server->rx_ring, buffer_offset, buffer_len);
 
     if (ret != 0) {
         microkit_dbg_puts(microkit_name);
@@ -185,7 +182,7 @@ void init(void) {
 
     // Add buffers to the rx ring
     for (int i = 0; i < NUM_BUFFERS - 1; i++) {
-        int ret = enqueue_free(&local_server->rx_ring, (i * BUFFER_SIZE), BUFFER_SIZE, NULL);
+        int ret = enqueue_free(&local_server->rx_ring, (i * BUFFER_SIZE), BUFFER_SIZE);
 
         if (ret != 0) {
             microkit_dbg_puts(microkit_name);
@@ -197,7 +194,7 @@ void init(void) {
 
     // Add buffers to the tx ring
     for (int i = 0; i < NUM_BUFFERS - 1; i++) {
-        int ret = enqueue_free(&local_server->tx_ring, (i * BUFFER_SIZE), BUFFER_SIZE, NULL);
+        int ret = enqueue_free(&local_server->tx_ring, (i * BUFFER_SIZE), BUFFER_SIZE);
 
         if (ret != 0) {
             microkit_dbg_puts(microkit_name);

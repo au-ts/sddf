@@ -63,7 +63,7 @@ int putchar(int ch) {
 }
 
 // Called from handle tx, write each character stored in the buffer to the serial port
-static void raw_tx(char *phys, unsigned int len, void *cookie) {
+static void raw_tx(char *phys, unsigned int len) {
     // This is byte by byte for now, switch to DMA use later
     for (int i = 0; i < len && phys[i] != '\0'; i++) {
         // Loop until the fifo queue is ready to transmit
@@ -76,9 +76,8 @@ void handle_tx() {
     uintptr_t buffer = 0;
     uintptr_t buffer_offset = 0;
     unsigned int len = 0;
-    void *cookie = 0;
     // Dequeue something from the Tx ring -> the server will have placed something in here, if its empty then nothing to do
-    while (!driver_dequeue(tx_ring.used_ring, &buffer_offset, &len, &cookie)) {
+    while (!driver_dequeue(tx_ring.used_ring, &buffer_offset, &len) {
         buffer = get_buffer_addr(tx_data_driver, buffer_offset);
         if (buffer == 0) {
             // Drop buffer if address is invalid
@@ -88,9 +87,9 @@ void handle_tx() {
         // Buffer cointaining the bytes to write to serial
         char *phys = (char * )buffer;
         // Handle the tx
-        raw_tx(phys, len, cookie);
+        raw_tx(phys, len);
         // Then enqueue this buffer back into the free queue, so that it can be collected and reused by the server
-        enqueue_free(&tx_ring, buffer_offset, len, &cookie);
+        enqueue_free(&tx_ring, buffer_offset, len);
     }
 }
 
@@ -140,9 +139,7 @@ void handle_irq() {
         // Integer to store the length of the buffer
         unsigned int buffer_len = 0;
 
-        void *cookie = 0;
-
-        ret = dequeue_free(&rx_ring, &buffer_offset, &buffer_len, &cookie);
+        ret = dequeue_free(&rx_ring, &buffer_offset, &buffer_len);
 
         if (ret != 0) {
             LOG_DRIVER_ERR("unable to dequeue from RX free ring\n");
@@ -160,7 +157,7 @@ void handle_irq() {
         ((char *) buffer)[0] = (char) input;
 
         // Now place in the rx used ring
-        ret = enqueue_used(&rx_ring, buffer_offset, 1, &cookie);
+        ret = enqueue_used(&rx_ring, buffer_offset, 1);
         microkit_notify(RX_CH);
 
     } else if (global_serial_driver.mode == LINE_MODE) {
@@ -173,9 +170,7 @@ void handle_irq() {
             // Integer to store the length of the buffer
             unsigned int buffer_len = 0;
 
-            void *cookie = 0;
-
-            ret = dequeue_free(&rx_ring, &buffer_offset, &buffer_len, &cookie);
+            ret = dequeue_free(&rx_ring, &buffer_offset, &buffer_len);
             if (ret != 0) {
                 LOG_DRIVER_ERR("unable to dequeue from the RX free ring\n");
                 return;
@@ -200,7 +195,6 @@ void handle_irq() {
             input_char == SB ||
             input_char == CR) {
                 char *char_arr = (char * ) global_serial_driver.line_buffer;
-                void *cookie = 0;
                 // Place the line end character into buffer
                 char_arr[global_serial_driver.line_buffer_size] = input_char;
                 global_serial_driver.line_buffer_size += 1;
@@ -211,7 +205,7 @@ void handle_irq() {
                     microkit_dbg_puts("uart: Invalid buffer offset, dropping buffer\n");
                     return;
                 }
-                ret = enqueue_used(&rx_ring, buffer_offset, global_serial_driver.line_buffer_size, &cookie);
+                ret = enqueue_used(&rx_ring, buffer_offset, global_serial_driver.line_buffer_size);
                 // Zero out the driver states
                 global_serial_driver.line_buffer = 0;
                 global_serial_driver.line_buffer_size = 0;
