@@ -47,15 +47,10 @@ IMAGE_FILE = $(BUILD_DIR)/loader.img
 REPORT_FILE = $(BUILD_DIR)/report.txt
 
 CFLAGS += -I$(BOARD_DIR)/include \
-	-Iinclude	\
-	-Iinclude/arch	\
 	-I$(SDDF)/include \
 	-Iinclude/lwip \
 	-I$(LWIP)/include \
 	-I$(LWIP)/include/ipv4 \
-	-I$(RING_BUFFER)/include \
-	-I$(BENCHMARK)/include \
-	-I$(UTIL)/include \
 	-MD \
 	-MP
 
