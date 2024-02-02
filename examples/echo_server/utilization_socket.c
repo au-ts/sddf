@@ -17,9 +17,10 @@
 #include "lwip/pbuf.h"
 #include "lwip/tcp.h"
 
-#include <sddf/util/echo.h>
 #include <sddf/util/util.h>
 #include <sddf/benchmark/bench.h>
+
+#include "echo.h"
 
 #define START_PMU 4
 #define STOP_PMU 5

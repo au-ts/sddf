@@ -17,11 +17,12 @@
 #include "lwip/dhcp.h"
 
 #include <sddf/network/shared_ringbuffer.h>
-#include <sddf/util/echo.h>
-#include <sddf/util/timer.h>
 #include <sddf/util/cache.h>
 #include <sddf/util/fence.h>
 #include <sddf/benchmark/sel4bench.h>
+
+#include "echo.h"
+#include "timer.h"
 
 #define TIMER  1
 #define RX_CH  2
