@@ -50,7 +50,7 @@ CFLAGS += -I$(BOARD_DIR)/include \
 	-Iinclude	\
 	-Iinclude/arch	\
 	-I$(SDDF)/include \
-	-Ilwip_include \
+	-Iinclude/lwip \
 	-I$(LWIP)/include \
 	-I$(LWIP)/include/ipv4 \
 	-I$(RING_BUFFER)/include \
