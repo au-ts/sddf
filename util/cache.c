@@ -3,6 +3,10 @@
 #include <sddf/util/cache.h>
 #include <sddf/util/util.h>
 
+#ifndef CONFIG_AARCH64_USER_CACHE_ENABLE
+#error "CONFIG_AARCH64_USER_CACHE_ENABLE must be enabled"
+#endif
+
 #define ROUND_DOWN(n, b) (((n) >> (b)) << (b))
 #define LINE_START(a) ROUND_DOWN(a, CONFIG_L1_CACHE_LINE_SIZE_BITS)
 #define LINE_INDEX(a) (LINE_START(a)>>CONFIG_L1_CACHE_LINE_SIZE_BITS)
