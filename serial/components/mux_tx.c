@@ -3,7 +3,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <microkit.h>
-#include <sel4/sel4.h>
 #include <sddf/serial/shared_ringbuffer.h>
 #include <sddf/serial/util.h>
 #include "uart.h"
