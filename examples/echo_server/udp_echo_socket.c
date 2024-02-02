@@ -16,8 +16,9 @@
 #include "lwip/pbuf.h"
 #include "lwip/udp.h"
 
-#include <sddf/util/echo.h>
 #include <sddf/util/util.h>
+
+#include "echo.h"
 
 #define NUM_LOOPS 10
 #define UDP_ECHO_PORT 1235
