@@ -17,17 +17,19 @@
 #include "lwip/dhcp.h"
 
 #include <sddf/network/shared_ringbuffer.h>
+#include <sddf/timer/client.h>
 #include <sddf/util/cache.h>
 #include <sddf/util/fence.h>
 #include <sddf/benchmark/sel4bench.h>
 
 #include "echo.h"
-#include "timer.h"
 
 #define TIMER  1
 #define RX_CH  2
 #define TX_CH  3
 #define ARP    7
+
+#define LWIP_TICK_MS 100
 
 #define _unused(x) ((void)(x))
 
@@ -83,6 +85,18 @@ struct log {
 state_t state;
 struct log logbuffer[NUM_BUFFERS * 2];
 int head = 0;
+
+void
+set_timeout(void)
+{
+    sddf_timer_set_timeout(TIMER, LWIP_TICK_MS * US_IN_MS);
+}
+
+uint32_t
+sys_now(void)
+{
+    return sddf_timer_time_now(TIMER) * US_IN_MS;
+}
 
 static void
 dump_mac(uint8_t *mac)
