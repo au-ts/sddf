@@ -99,7 +99,6 @@ LWIP_OBJS := $(LWIPFILES:.c=.o) $(NETWORK_COMPONENTS)/lwip.o sddf_network_shared
 
 ETH_OBJS := $(ETHERNET_DRIVER)/ethernet.o sddf_network_sharedringbuffer.o
 MUX_RX_OBJS := $(NETWORK_COMPONENTS)/mux_rx.o sddf_network_sharedringbuffer.o
-#MUX_TX_OBJS := mux_tx_round_robin.o sddf_network_sharedringbuffer.o
 MUX_TX_OBJS := $(NETWORK_COMPONENTS)/mux_tx_bandwidth_limited.o sddf_network_sharedringbuffer.o
 COPY_OBJS := $(NETWORK_COMPONENTS)/copy.o sddf_network_sharedringbuffer.o
 BENCH_OBJS := $(BENCHMARK)/benchmark.o
