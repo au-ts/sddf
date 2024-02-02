@@ -50,6 +50,7 @@ CFLAGS += -I$(BOARD_DIR)/include \
 	-Iinclude	\
 	-Iinclude/arch	\
 	-I$(SDDF)/include \
+	-I$(SDDF)/include/sddf/util/lwip \
 	-I$(LWIP)/include \
 	-I$(LWIP)/include/ipv4 \
 	-I$(RING_BUFFER)/include \
@@ -162,4 +163,3 @@ $(IMAGE_FILE) $(REPORT_FILE): $(addprefix $(BUILD_DIR)/, $(IMAGES)) echo_server.
 clean:
 	rm -f *.o *.elf .depend*
 	find . -name \*.o |xargs --no-run-if-empty rm
-
