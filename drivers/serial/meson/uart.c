@@ -5,7 +5,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <microkit.h>
-#include <sel4/sel4.h>
 #include "uart.h"
 #include "uart_config.h"
 

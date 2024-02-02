@@ -8,7 +8,6 @@
 // TODO: UNCONDENSE THIS FILE TO USE THE PROPER LIBRARY. 
 
 #include <stdint.h>
-#include <sel4/sel4.h>
 
 /* A counter is an index to a performance counter on a platform.
  * The max counter index is sizeof(seL4_Word) */

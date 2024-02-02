@@ -6,7 +6,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <microkit.h>
-#include <sel4/sel4.h>
 #include "ethernet.h"
 #include <sddf/network/shared_ringbuffer.h>
 #include <sddf/util/util.h>
