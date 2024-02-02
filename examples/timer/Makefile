@@ -50,7 +50,7 @@ $(BUILD_DIR)/timer_driver.o: $(TIMER_DRIVER)/timer.c
 	$(CC) -c $(CFLAGS) $(TIMER_DRIVER)/timer.c -o $(BUILD_DIR)/timer_driver.o
 
 $(BUILD_DIR)/sddf_timer_client.o:
-	BUILD_DIR=$(abspath $(BUILD_DIR)) MICROKIT_INCLUDE=$(BOARD_DIR)/include TIMER_CHANNEL=1 make -C $(SDDF)/timer/client
+	BUILD_DIR=$(abspath $(BUILD_DIR)) MICROKIT_INCLUDE=$(BOARD_DIR)/include make -C $(SDDF)/timer/client
 
 $(BUILD_DIR)/timer.elf: $(BUILD_DIR)/timer_driver.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@

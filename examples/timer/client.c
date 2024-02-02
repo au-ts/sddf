@@ -2,6 +2,8 @@
 #include <microkit.h>
 #include <sddf/timer/client.h>
 
+#define TIMER_CHANNEL 1
+
 static void
 put64(uint64_t val) {
     char buffer[20];
@@ -25,24 +27,24 @@ notified(microkit_channel ch)
      */
     microkit_dbg_puts("CLIENT|INFO: Got a timeout!\n");
     /* Get the current time */
-    uint64_t time = sddf_timer_time_now();
+    uint64_t time = sddf_timer_time_now(TIMER_CHANNEL);
     microkit_dbg_puts("CLIENT|INFO: Now the time (in nanoseconds) is: ");
     put64(time);
     microkit_dbg_puts("\n");
     /* Set another timeout */
-    sddf_timer_set_timeout(NS_IN_S);
+    sddf_timer_set_timeout(TIMER_CHANNEL, NS_IN_S);
 }
 
 void
 init(void)
 {
     // lets get the time!
-    uint64_t time = sddf_timer_time_now();
+    uint64_t time = sddf_timer_time_now(TIMER_CHANNEL);
     microkit_dbg_puts("CLIENT|INFO: The time now is: ");
     put64(time);
     microkit_dbg_puts("\n");
 
     // lets set a timeout
     microkit_dbg_puts("CLIENT|INFO: Setting a time out for 1 second\n");
-    sddf_timer_set_timeout(NS_IN_S);
+    sddf_timer_set_timeout(TIMER_CHANNEL, NS_IN_S);
 }

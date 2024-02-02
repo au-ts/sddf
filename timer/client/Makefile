@@ -8,10 +8,6 @@ ifeq ($(strip $(MICROKIT_INCLUDE)),)
 $(error MICROKIT_INCLUDE must be specified)
 endif
 
-ifeq ($(strip $(TIMER_CHANNEL)),)
-$(error TIMER_CHANNEL must be specified)
-endif
-
 BUILD_DIR ?= .
 
 CC := clang
