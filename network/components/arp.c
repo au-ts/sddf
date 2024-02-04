@@ -1,6 +1,7 @@
 #include <microkit.h>
 #include <sddf/network/shared_ringbuffer.h>
 #include <sddf/util/util.h>
+#include <sddf/util/cache.h>
 #include <string.h>
 #include "lwip/ip_addr.h"
 #include "netif/etharp.h"
@@ -18,66 +19,6 @@
 #define SHARED_DMA_SIZE (BUF_SIZE * NUM_BUFFERS)
 
 #define _unused(x) ((void)(x))
-
-
-#define ROUND_DOWN(n, b) (((n) >> (b)) << (b))
-#define LINE_START(a) ROUND_DOWN(a, CONFIG_L1_CACHE_LINE_SIZE_BITS)
-#define LINE_INDEX(a) (LINE_START(a)>>CONFIG_L1_CACHE_LINE_SIZE_BITS)
-
-static inline void
-dsb(void)
-{
-    asm volatile("dsb sy" ::: "memory");
-}
-
-static inline void 
-dmb(void)
-{
-    asm volatile("dmb sy" ::: "memory");
-}
-
-static inline void
-cleanInvalByVA(unsigned long vaddr)
-{
-    asm volatile("dc civac, %0" : : "r"(vaddr));
-    dsb();
-}
-
-static inline void
-cleanByVA(unsigned long vaddr)
-{
-    asm volatile("dc cvac, %0" : : "r"(vaddr));
-    dmb();
-}
-
-static void
-cleanInvalidateCache(unsigned long start, unsigned long end)
-{
-    unsigned long line;
-    unsigned long index;
-    /* Clean the L1 range */
-
-    /* Finally clean and invalidate the L1 range. The extra clean is only strictly neccessary
-     * in a multiprocessor environment to prevent a write being lost if another core is
-     * attempting a store at the same time. As the range should already be clean asking
-     * it to clean again should not affect performance */
-    for (index = LINE_INDEX(start); index < LINE_INDEX(end) + 1; index++) {
-        line = index << CONFIG_L1_CACHE_LINE_SIZE_BITS;
-        cleanInvalByVA(line);
-    }
-}
-
-static void
-cleanCache(unsigned long start, unsigned long end)
-{
-    unsigned long line;
-    unsigned long index;
-
-    for (index = LINE_INDEX(start); index < LINE_INDEX(end) + 1; index++) {
-        line = index << CONFIG_L1_CACHE_LINE_SIZE_BITS;
-        cleanByVA(line);
-    }
-}
 
 uintptr_t rx_free;
 uintptr_t rx_used;
@@ -207,7 +148,7 @@ arp_reply(const uint8_t ethsrc_addr[ETH_HWADDR_LEN],
     // reply->crc = inet_chksum(reply, 42);
 
     // clean cache
-    cleanCache((uintptr_t)reply, (uintptr_t)reply + 64);
+    cache_clean((uintptr_t)reply, (uintptr_t)reply + 64);
 
     /* insert into the used tx queue */
     err = enqueue_used(&tx_ring, (uintptr_t)reply, 56, cookie);
