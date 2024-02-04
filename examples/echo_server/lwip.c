@@ -285,7 +285,7 @@ lwip_eth_send(struct netif *netif, struct pbuf *p)
         copied += curr->len;
     }
 
-    cleanCache((unsigned long) frame, (unsigned long) frame + copied);
+    cache_clean((unsigned long) frame, (unsigned long) frame + copied);
 
     /* insert into the used tx queue */
     err = enqueue_used(&(state.tx_ring), (uintptr_t)frame, copied, NULL);
@@ -333,7 +333,7 @@ process_tx_queue(void)
             puthex64(err);
             print("\n");
         }*/
-        cleanCache((unsigned long) frame, (unsigned long) frame + copied);
+        cache_clean((unsigned long) frame, (unsigned long) frame + copied);
 
         /* insert into the used tx queue */
         err = enqueue_used(&(state.tx_ring), buffer, copied, NULL);
