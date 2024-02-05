@@ -9,8 +9,6 @@
 #include "uart.h"
 #include "uart_config.h"
 
-#define BIT(nr) (1UL << (nr))
-
 // Defines to manage interrupts and notifications
 #define IRQ_CH 1
 #define TX_CH  8
