@@ -48,7 +48,7 @@ static void set_baud(long bps)
 {
     /* TODO: Fix buad rate setup */
 
-    // meson_uart_regs_t *regs = (meson_uart_regs_t *) uart_base;
+    // volatile meson_uart_regs_t *regs = (meson_uart_regs_t *) (uart_base + UART_REGS_OFFSET);
 
     // // Wait to clear transmit port
     // while (internal_is_tx_fifo_busy(regs)) {
@@ -72,7 +72,7 @@ int serial_configure(
     int mode,
     int echo)
 {
-    meson_uart_regs_t *regs = (meson_uart_regs_t *) uart_base;
+    volatile meson_uart_regs_t *regs = (meson_uart_regs_t *)(uart_base + UART_REGS_OFFSET);
 
     global_serial_driver.mode = mode;
     global_serial_driver.echo = echo;
@@ -120,7 +120,7 @@ int serial_configure(
 
 int getchar()
 {
-    meson_uart_regs_t *regs = (meson_uart_regs_t *) uart_base;
+    volatile meson_uart_regs_t *regs = (meson_uart_regs_t *) (uart_base + UART_REGS_OFFSET);
 
     while (regs->sr & AML_UART_RX_EMPTY);
     return regs->rfifo;
@@ -129,7 +129,7 @@ int getchar()
 // Putchar that is using the hardware FIFO buffers --> Switch to DMA later
 int putchar(int c) {
 
-    meson_uart_regs_t *regs = (meson_uart_regs_t *) uart_base;
+    volatile meson_uart_regs_t *regs = (meson_uart_regs_t *) (uart_base + UART_REGS_OFFSET);
 
     while (regs->sr & AML_UART_TX_FULL);
 
@@ -306,7 +306,7 @@ void init(void) {
     ring_init(&rx_ring, (ring_buffer_t *)rx_free, (ring_buffer_t *)rx_used, 0, BUFFER_SIZE, BUFFER_SIZE);
     ring_init(&tx_ring, (ring_buffer_t *)tx_free, (ring_buffer_t *)tx_used, 0, BUFFER_SIZE, BUFFER_SIZE);
 
-    meson_uart_regs_t *regs = (meson_uart_regs_t *) uart_base;
+    volatile meson_uart_regs_t *regs = (meson_uart_regs_t *) (uart_base + UART_REGS_OFFSET);
 
     /* Line configuration. Set LINE or RAW mode here, and disable or enable ECHO */
     int ret = serial_configure(115200, 8, PARITY_NONE, 1, UART_MODE, RAW_MODE);
