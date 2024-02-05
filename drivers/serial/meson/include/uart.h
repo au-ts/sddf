@@ -1,6 +1,15 @@
 #pragma once
 
+#include <microkit.h>
 #include <sddf/serial/shared_ringbuffer.h>
+
+#if defined(CONFIG_PLAT_ODROIDC2)
+#define UART_REGS_OFFSET (0x4c0)
+#elif defined(CONFIG_PLAT_ODROIDC4)
+#define UART_REGS_OFFSET (0x0)
+#else
+#error "Unexpected platform used with UART meson driver"
+#endif
 
 #define BIT(nr) (1UL << (nr))
 
