@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: Checkout VMM repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Download Microkit SDK
         run: wget https://trustworthy.systems/Downloads/microkit/microkit-sdk-dev-4f717f2-linux-x86-64.tar.gz
         shell: bash
@@ -32,7 +32,7 @@ jobs:
     runs-on: macos-12
     steps:
       - name: Checkout VMM repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Download Microkit SDK
         run: wget https://trustworthy.systems/Downloads/microkit/microkit-sdk-dev-4f717f2-macos-x86-64.tar.gz
         shell: bash
