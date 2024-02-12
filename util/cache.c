@@ -1,7 +1,7 @@
 #include <stdint.h>
 #include <sddf/util/cache.h>
 #include <sddf/util/util.h>
-
+/* This is a small utility library for performing manual cache operations on AArch64 from user-level. The primary use-case is for managing regions of memory that are mapped as cached but are accessible by DMA capable devices. */
 #ifndef CONFIG_AARCH64_USER_CACHE_ENABLE
 #error "CONFIG_AARCH64_USER_CACHE_ENABLE must be enabled"
 #endif
