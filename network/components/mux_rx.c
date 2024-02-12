@@ -6,8 +6,7 @@
 #include <sddf/network/shared_ringbuffer.h>
 #include <sddf/util/util.h>
 #include <sddf/util/fence.h>
-#include "lwip/ip_addr.h"
-#include "netif/etharp.h"
+#include <sddf/network/constants.h>
 
 uintptr_t rx_free_drv;
 uintptr_t rx_used_drv;
@@ -101,7 +100,7 @@ int compare_mac(uint8_t *mac1, uint8_t *mac2)
 
 /* Return the client ID if the Mac address is a match. */
 int get_client(uintptr_t dma_vaddr) {
-    struct eth_hdr *ethhdr = (struct eth_hdr *)dma_vaddr;
+    struct ethernet_header *ethhdr = (struct ethernet_header *)dma_vaddr;
     for (int client = 0; client < NUM_CLIENTS; client++) {
         if (compare_mac(ethhdr->dest.addr, state.mac_addrs[client]) == 0) {
             return client;

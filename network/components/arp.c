@@ -2,9 +2,9 @@
 #include <sddf/network/shared_ringbuffer.h>
 #include <sddf/util/util.h>
 #include <sddf/util/cache.h>
+#include <sddf/network/constants.h>
+#include <sddf/network/util.h>
 #include <string.h>
-#include "lwip/ip_addr.h"
-#include "netif/etharp.h"
 
 #define TX_CH 1
 #define REG_IP 0
@@ -59,19 +59,19 @@ print_ipaddr(uint32_t s_addr, char *buf, int buflen)
 {
     char inv[3];
     char *rp;
-    u8_t *ap;
-    u8_t rem;
-    u8_t n;
-    u8_t i;
+    uint8_t *ap;
+    uint8_t rem;
+    uint8_t n;
+    uint8_t i;
     int len = 0;
 
     rp = buf;
-    ap = (u8_t *)&s_addr;
+    ap = (uint8_t *)&s_addr;
     for (n = 0; n < 4; n++) {
     i = 0;
     do {
-        rem = *ap % (u8_t)10;
-        *ap /= (u8_t)10;
+        rem = *ap % (uint8_t)10;
+        *ap /= (uint8_t)10;
         inv[i++] = (char)('0' + rem);
     } while (*ap);
     while (i--) {
@@ -130,12 +130,12 @@ arp_reply(const uint8_t ethsrc_addr[ETH_HWADDR_LEN],
     memcpy(&reply->ethdst_addr, ethdst_addr, ETH_HWADDR_LEN);
     memcpy(&reply->ethsrc_addr, ethsrc_addr, ETH_HWADDR_LEN);
 
-    reply->type = lwip_htons(ETHTYPE_ARP);
-    reply->hwtype = PP_HTONS(LWIP_IANA_HWTYPE_ETHERNET);
-    reply->proto = PP_HTONS(ETHTYPE_IP);
+    reply->type = HTONS(ETH_TYPE_ARP);
+    reply->hwtype = HTONS(LWIP_IANA_HWTYPE_ETHERNET);
+    reply->proto = HTONS(ETH_TYPE_IP);
     reply->hwlen = ETH_HWADDR_LEN;
     reply->protolen = IPV4_PROTO_LEN;
-    reply->opcode = lwip_htons(ARP_REPLY);
+    reply->opcode = HTONS(ETHARP_OPCODE_REPLY);
 
     memcpy(&reply->hwsrc_addr, hwsrc_addr, ETH_HWADDR_LEN);
     reply->ipsrc_addr = ipsrc_addr;
@@ -176,11 +176,11 @@ process_rx_complete(void)
         assert(!err);
 
         // Check if it's an ARP request 
-        struct eth_hdr *ethhdr = (struct eth_hdr *)addr;
-        if (ethhdr->type == PP_HTONS(ETHTYPE_ARP)) {
+        struct ethernet_header *ethhdr = (struct ethernet_header *)addr;
+        if (ethhdr->type == HTONS(ETH_TYPE_ARP)) {
             struct arp_packet *pkt = (struct arp_packet *)addr;
             // CHeck if it's a probe (we don't care about announcements)
-            if (pkt->opcode == PP_HTONS(ARP_REQUEST)) {
+            if (pkt->opcode == HTONS(ETHARP_OPCODE_REQUEST)) {
                 // CHeck if it's for one of our clients.
                 client = match_arp_to_client(pkt->ipdst_addr);
                 if (client >= 0) {
