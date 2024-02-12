@@ -98,7 +98,7 @@ MUX_TX_OBJS := $(NETWORK_COMPONENTS)/mux_tx_bandwidth_limited.o sddf_network_sha
 COPY_OBJS := $(NETWORK_COMPONENTS)/copy.o sddf_network_sharedringbuffer.o
 BENCH_OBJS := $(BENCHMARK)/benchmark.o
 IDLE_OBJS := $(BENCHMARK)/idle.o
-ARP_OBJS := $(UTIL)/cache.o $(LWIP)/core/inet_chksum.o $(LWIP)/core/def.o $(NETWORK_COMPONENTS)/arp.o sddf_network_sharedringbuffer.o
+ARP_OBJS := $(UTIL)/cache.o $(NETWORK_COMPONENTS)/arp.o sddf_network_sharedringbuffer.o
 TIMER_OBJS := $(TIMER_DRIVER)/timer.o
 
 OBJS := $(sort $(addprefix $(BUILD_DIR)/, $(ETH_OBJS) $(MUX_RX_OBJS) $(MUX_TX_OBJS)\

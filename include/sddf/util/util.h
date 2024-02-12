@@ -24,6 +24,18 @@
 #define unlikely(x) (!!(x))
 #endif
 
+#ifndef BYTE_ORDER
+#if defined(__BYTE_ORDER__)
+#  define BYTE_ORDER __BYTE_ORDER__
+#elif defined(__BIG_ENDIAN)
+#  define BYTE_ORDER BIG_ENDIAN
+#elif defined(__LITTLE_ENDIAN)
+#  define BYTE_ORDER LITTLE_ENDIAN
+#else
+#  error Unable to determine system endianness
+#endif
+#endif
+
 static void
 putC(uint8_t ch)
 {
