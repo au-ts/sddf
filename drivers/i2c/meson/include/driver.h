@@ -13,8 +13,6 @@
 #ifndef I2C_DRIVER_H
 #define I2C_DRIVER_H
 
-#define ODROIDC4
-
 #include <stdint.h>
 #include <sddf/util/printf.h>
 #include <sddf/util/fence.h>
