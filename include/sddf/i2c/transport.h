@@ -13,9 +13,8 @@
 #define I2C_TRANSPORT_H
 #include <stdint.h>
 #include <stddef.h>
+#include <sddf/i2c/i2c.h>
 #include <sw_shared_ringbuffer.h>
-#include <string.h>
-#include "i2c-token.h"
 
 
 // Return buffer
@@ -60,12 +59,12 @@ void i2cTransportInit(int buffer_init);
  * Allocate a request buffer to push data into the driver for a specified
  * i2c master interface (bus). This function loads the data into the buffer.
  * Buffers are allocated from the free pool and loaded with data into the used pool.
- * 
+ *
  * The first two bytes of the buffer store the client ID and address respectively
  * to be used for bookkeeping.
- * 
+ *
  * @note Expects that data is properly formatted with END token terminator.
- * 
+ *
  * @param size: Size of the data to be loaded into the buffer. Max I2C_BUF_SZ
  * @param data: Pointer to the data to be loaded into the buffer
  * @param client: Protection domain of the client who requested this.
@@ -84,11 +83,11 @@ int releaseReqBuf(req_buf_ptr_t buf);
  * i2c master interface (bus). The buffer is just allocated and does not get moved
  * into the used queue by this function, unlike `allocReqBuf`.
  * Address and client are used to demultiplex by the server.
- * 
+ *
  * Buffers are allocated from the free pool, but are not put into the used pool.
- * 
+ *
  * @note Expects that data is properly formatted with END token terminator.
- * 
+ *
  * @param bus: EE domain i2c master interface number
 
  * @return Pointer to the buffer allocated for this request
@@ -105,7 +104,7 @@ int releaseRetBuf(ret_buf_ptr_t buf);
  * Push a return buffer back to the server for a specified i2c master interface (bus).
  * This should only operate on the buffers given by `allocRetBuf`. Puts buffers into
  * the used queue.
- * 
+ *
  * @param bus: EE domain i2c master interface number
  * @param buf: Pointer to the buffer to be pushed back to the server
  * @param sz: Size of the buffer to be pushed back to the server

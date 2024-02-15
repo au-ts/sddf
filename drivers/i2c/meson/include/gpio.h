@@ -43,7 +43,7 @@
 
 // Bias (pull up/down)
 #define GPIO_BIAS_2     0x3c    // GPIO bank X
-#define GPIO_BIAS_2_EN  0x4a    
+#define GPIO_BIAS_2_EN  0x4a
 #define GPIO_BIAS_5     0x3f    // GPIO bank A
 #define GPIO_BIAS_5_EN  0x4d
 
