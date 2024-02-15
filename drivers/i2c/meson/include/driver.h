@@ -15,8 +15,7 @@
 
 #include <stdint.h>
 #include <sddf/util/printf.h>
-#include <sddf/util/fence.h>
-#include "transport.h"
+#include <sddf/i2c/transport.h>
 #include "gpio.h"
 #include "clk.h"
 
@@ -80,7 +79,7 @@ typedef struct _i2c_ifState {
                                     //       Causes master to release the bus.
 
 // Driver-server interface
-#include "i2c-token.h"
+#include <sddf/i2c/i2c.h>
 #define SERVER_NOTIFY_ID 1
 
 

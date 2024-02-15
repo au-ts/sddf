@@ -11,9 +11,9 @@
 
 #include <microkit.h>
 #include <sddf/util/printf.h>
-#include "i2c-token.h"
+#include <sddf/i2c/i2c.h>
+#include <sddf/i2c/transport.h>
 #include "sw_shared_ringbuffer.h"
-#include "transport.h"
 #include "i2c.h"
 
 #ifndef BUS_NUM

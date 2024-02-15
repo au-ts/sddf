@@ -11,9 +11,10 @@
 // Matt Rossouw (matthew.rossouw@unsw.edu.au)
 // 08/2023
 
+#include <string.h>
 #include <sddf/util/printf.h>
+#include <sddf/i2c/transport.h>
 #include "driver.h"
-#include "transport.h"
 #include "i2c.h"
 
 // Shared memory regions

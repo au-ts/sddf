@@ -1,11 +1,11 @@
 #include <microkit.h>
 #include <libco.h>
 #include <sddf/util/printf.h>
+#include <sddf/i2c/transport.h>
 #include "pn532.h"
 #include "client.h"
 
 #include "i2c.h"
-#include "transport.h"
 
 #define DEBUG_CLIENT
 
