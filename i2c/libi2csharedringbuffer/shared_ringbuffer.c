@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-#include "sw_shared_ringbuffer.h"
+#include <sddf/i2c/shared_ringbuffer.h>
 
 void ring_init(ring_handle_t *ring, ring_buffer_t *free, ring_buffer_t *used, int buffer_init)
 {

@@ -13,7 +13,7 @@
 #include <sddf/util/printf.h>
 #include <sddf/i2c/i2c.h>
 #include <sddf/i2c/transport.h>
-#include "sw_shared_ringbuffer.h"
+#include <sddf/i2c/shared_ringbuffer.h>
 #include "i2c.h"
 
 #ifndef BUS_NUM
