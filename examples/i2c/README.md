@@ -1,4 +1,4 @@
-# I2C example
+# I<sup>2</sup>C example
 
 This example makes use of the NXP PN532 card-reader. This example was developed and tested using
 the PN532 NFC RFID Module V3. Documentation on the card-reader itself can be found
