@@ -12,7 +12,8 @@
 #ifndef I2C_H
 #define I2C_H
 
-#include "sw_shared_ringbuffer.h"
+#include <sddf/i2c/shared_ringbuffer.h>
+
 typedef uint8_t i2c_addr_t;         // 7-bit addressing
 
 #define DRIVER_NOTIFY_ID    1

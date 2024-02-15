@@ -32,6 +32,7 @@ UTIL := $(SDDF)/util
 LIBCO := $(SDDF)/libco
 
 I2C := $(SDDF)/drivers/i2c/meson
+LIBI2CSHAREDRINGBUFFER := $(SDDF)/i2c/libi2csharedringbuffer
 
 IMAGES := server.elf driver.elf client.elf
 CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall -Wno-unused-function
@@ -48,7 +49,7 @@ CFLAGS += -I$(BOARD_DIR)/include \
 	-MD \
 	-MP
 
-COMMONFILES=$(I2C)/i2c-transport.c $(I2C)/sw_shared_ringbuffer.c $(UTIL)/printf.c $(UTIL)/util.c
+COMMONFILES=$(I2C)/i2c-transport.c $(LIBI2CSHAREDRINGBUFFER)/shared_ringbuffer.c $(UTIL)/printf.c $(UTIL)/util.c
 
 CLIENT_OBJS := $(LIBCO)/libco.o pn532.o client.o $(COMMONFILES:.c=.o)
 SERVER_OBJS := $(I2C)/server.o $(COMMONFILES:.c=.o)

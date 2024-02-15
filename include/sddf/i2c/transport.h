@@ -14,7 +14,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <sddf/i2c/i2c.h>
-#include <sw_shared_ringbuffer.h>
+#include <sddf/i2c/shared_ringbuffer.h>
 
 
 // Return buffer
