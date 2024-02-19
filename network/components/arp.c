@@ -19,7 +19,6 @@
 #define SHARED_DMA_SIZE (BUF_SIZE * NUM_BUFFERS)
 
 #define _unused(x) ((void)(x))
-
 uintptr_t rx_free;
 uintptr_t rx_used;
 
@@ -286,6 +285,8 @@ protected(microkit_channel ch, microkit_msginfo msginfo)
 void
 init(void)
 {
+    int i;
+
     /* Set up shared memory regions */
     ring_init(&rx_ring, (ring_buffer_t *)rx_free, (ring_buffer_t *)rx_used, 0, NUM_BUFFERS, NUM_BUFFERS);
     ring_init(&tx_ring, (ring_buffer_t *)tx_free, (ring_buffer_t *)tx_used, 0, NUM_BUFFERS, NUM_BUFFERS);
@@ -294,19 +295,9 @@ init(void)
     tx_ring.free_ring->notify_reader = true;
 
     /* Set up hardcoded mac addresses */
-    mac_addrs[0][0] = 0x52;
-    mac_addrs[0][1] = 0x54;
-    mac_addrs[0][2] = 0x1;
-    mac_addrs[0][3] = 0;
-    mac_addrs[0][4] = 0;
-    mac_addrs[0][5] = 0;
-
-    mac_addrs[1][0] = 0x52;
-    mac_addrs[1][1] = 0x54;
-    mac_addrs[1][2] = 0x1;
-    mac_addrs[1][3] = 0;
-    mac_addrs[1][4] = 0;
-    mac_addrs[1][5] = 1;
-
-    return;
+    for (i = 5; i >= 0; --i) {
+        mac_addrs[0][5 - i] = 0xff & (MAC_BASE_ADDRESS >> (i * 8));
+        mac_addrs[1][5 - i] = 0xff & (MAC_BASE_ADDRESS >> (i * 8));
+    }
+    mac_addrs[1][5] += MAC_OFFSET;
 }
