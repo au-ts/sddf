@@ -30,11 +30,9 @@ uintptr_t uart_base;
 
 #define BUF_SIZE 2048
 #define NUM_BUFFERS 512
-/*
 #ifndef MAC_BASE_ADDRESS
 #  define MAC_BASE_ADDRESS (0x525401000000ULL)
 #endif
-*/
 
 #define _unused(x) ((void)(x))
 

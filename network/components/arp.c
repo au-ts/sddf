@@ -32,6 +32,11 @@ uintptr_t uart_base;
 ring_handle_t rx_ring;
 ring_handle_t tx_ring;
 
+#ifndef MAC_BASE_ADDRESS
+#  define MAC_BASE_ADDRESS (0x525401000000ULL)
+#endif
+#define MAC_OFFSET (1)
+
 uint8_t mac_addrs[NUM_CLIENTS][ETH_HWADDR_LEN];
 // TODO: Expand this to support multiple ip addresses for a single client.
 uint32_t ipv4_addrs[NUM_CLIENTS];
