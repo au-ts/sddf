@@ -107,7 +107,8 @@ static void _assert_fail(
 
 #ifdef NO_ASSERT
 
-#define assert(expr)
+#define _unused(x) ((void)(x))
+#define assert(expr) _unused(expr)
 
 #else
 

@@ -22,8 +22,6 @@ uintptr_t uart_base;
 #define NUM_BUFFERS 512
 #define SHARED_DMA_SIZE (BUF_SIZE * NUM_BUFFERS)
 
-#define _unused(x) ((void)(x))
-
 ring_handle_t rx_ring_mux;
 ring_handle_t rx_ring_cli;
 
@@ -42,7 +40,6 @@ void process_rx_complete(void)
         void *cookie = NULL;
         void *cookie2 = NULL;
         int err;
-        _unused(err);
 
         err = dequeue_used(&rx_ring_mux, &m_addr, &m_len, &cookie);
         assert(!err);

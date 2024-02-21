@@ -18,8 +18,6 @@
 #define NUM_BUFFERS 512
 #define SHARED_DMA_SIZE (BUF_SIZE * NUM_BUFFERS)
 
-#define _unused(x) ((void)(x))
-
 uintptr_t rx_free;
 uintptr_t rx_used;
 
@@ -172,7 +170,6 @@ process_rx_complete(void)
         int client = -1;
 
         err = dequeue_used(&rx_ring, &addr, &len, (void **)&cookie);
-        _unused(err);
         assert(!err);
 
         // Check if it's an ARP request

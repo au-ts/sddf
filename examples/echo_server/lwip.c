@@ -31,8 +31,6 @@
 
 #define LWIP_TICK_MS 100
 
-#define _unused(x) ((void)(x))
-
 /* Memory regions. These all have to be here to keep compiler happy */
 uintptr_t rx_free;
 uintptr_t rx_used;
@@ -144,7 +142,6 @@ static inline void return_buffer(uintptr_t addr)
     FIXME: This full condition could change... */
     int err = enqueue_free(&(state.rx_ring), addr, BUF_SIZE, NULL);
     assert(!err);
-    _unused(err);
     notify_rx = true;
 }
 
@@ -496,7 +493,6 @@ void init(void)
         uintptr_t addr = shared_dma_vaddr_rx + (BUF_SIZE * i);
         int err = enqueue_free(&state.rx_ring, addr, BUF_SIZE, NULL);
         assert(!err);
-        _unused(err);
     }
 
     lwip_init();
