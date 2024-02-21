@@ -13,6 +13,5 @@ to take measurements.
 
 Checks to make before benchmarking:
 * Turn off all debug prints.
-* Turn off all sDDF related asserts (pass `NO_ASSERT` in Makefile).
 * Run with LWIP asserts turned off as well (`LWIP_NOASSERT`).
 * Make sure compiler optimisations are enabled.
