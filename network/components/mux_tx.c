@@ -29,8 +29,6 @@ uintptr_t uart_base;
 #define BUF_SIZE 2048
 #define DMA_SIZE 0x200000
 
-#define _unused(x) ((void)(x))
-
 typedef struct state {
     /* Pointers to shared buffers */
     ring_handle_t tx_ring_drv;
@@ -105,7 +103,6 @@ void process_tx_ready(void)
 {
     bool enqueued = 0;
     int err;
-    _unused(err);
     process_tx_ready_:
     for (int client = 0; client < NUM_CLIENTS; client++) {
         while (!ring_empty(state.tx_ring_clients[client].used_ring) && !ring_full(state.tx_ring_drv.used_ring)) {
@@ -157,7 +154,6 @@ void process_tx_complete(void)
         void *cookie;
         int err = dequeue_free(&state.tx_ring_drv, &addr, &len, &cookie);
         assert(!err);
-        _unused(err);
         uintptr_t virt = get_virt_addr(addr);
         assert(virt);
 
@@ -207,21 +203,18 @@ void init(void)
         uintptr_t addr = shared_dma_vaddr_cli0 + (BUF_SIZE * i);
         int err = enqueue_free(&state.tx_ring_clients[0], addr, BUF_SIZE, NULL);
         assert(!err);
-        _unused(err);
     }
 
     for (int i = 0; i < NUM_BUFFERS - 1; i++) {
         uintptr_t addr = shared_dma_vaddr_cli1 + (BUF_SIZE * i);
         int err = enqueue_free(&state.tx_ring_clients[1], addr, BUF_SIZE, NULL);
         assert(!err);
-        _unused(err);
     }
 
     for (int i = 0; i < NUM_BUFFERS - 1; i++) {
         uintptr_t addr = shared_dma_vaddr_arp + (BUF_SIZE * i);
         int err = enqueue_free(&state.tx_ring_clients[2], addr, BUF_SIZE, NULL);
         assert(!err);
-        _unused(err);
     }
 
     // We are higher priority than the clients, so we always need to be notified

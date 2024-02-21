@@ -19,8 +19,6 @@
 
 #define MDC_FREQ    20000000UL
 
-#define _unused(x) ((void)(x))
-
 /* Memory regions. These all have to be here to keep compiler happy */
 uintptr_t hw_ring_buffer_vaddr;
 uintptr_t hw_ring_buffer_paddr;
@@ -318,7 +316,6 @@ complete_tx(volatile struct enet_regs *eth)
         buff_desc_t *desc = (buff_desc_t *)cookie;
         int err = enqueue_free(&tx_ring, desc->encoded_addr, desc->len, desc->cookie);
         assert(!err);
-        _unused(err);
         enqueued = true;
     }
 

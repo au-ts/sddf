@@ -31,8 +31,6 @@ uintptr_t uart_base;
 #define BUF_SIZE 2048
 #define NUM_BUFFERS 512
 
-#define _unused(x) ((void)(x))
-
 typedef struct state {
     /* Pointers to shared buffers */
     ring_handle_t rx_ring_drv;
@@ -202,7 +200,6 @@ bool process_rx_free(void)
             void *buffer = NULL;
             int err = dequeue_free(&state.rx_ring_clients[i], &addr, &len, &buffer);
             assert(!err);
-            _unused(err);
 
             int paddr = get_phys_addr(addr);
             if (!paddr) {
@@ -293,7 +290,6 @@ void init(void)
         uintptr_t addr = shared_dma_paddr + (BUF_SIZE * i);
         int err = enqueue_free(&state.rx_ring_drv, addr, BUF_SIZE, NULL);
         assert(!err);
-        _unused(err);
     }
     // ensure we get a notification when a packet comes in
     state.rx_ring_drv.used_ring->notify_reader = true;
