@@ -105,7 +105,7 @@ static void _assert_fail(
     while (1) {}
 }
 
-#ifdef NO_ASSERT
+#ifndef CONFIG_DEBUG_BUILD
 
 #define _unused(x) ((void)(x))
 #define assert(expr) _unused(expr)
