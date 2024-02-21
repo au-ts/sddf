@@ -175,7 +175,7 @@ process_rx_complete(void)
         _unused(err);
         assert(!err);
 
-        // Check if it's an ARP request 
+        // Check if it's an ARP request
         struct ethernet_header *ethhdr = (struct ethernet_header *)addr;
         if (ethhdr->type == HTONS(ETH_TYPE_ARP)) {
             struct arp_packet *pkt = (struct arp_packet *)addr;
@@ -184,7 +184,7 @@ process_rx_complete(void)
                 // CHeck if it's for one of our clients.
                 client = match_arp_to_client(pkt->ipdst_addr);
                 if (client >= 0) {
-                    // if so, send a response. 
+                    // if so, send a response.
                     if (!arp_reply(mac_addrs[client],
                                 pkt->ethsrc_addr,
                                 mac_addrs[client],
