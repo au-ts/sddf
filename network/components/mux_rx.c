@@ -227,11 +227,11 @@ bool process_rx_free(void)
     }
 
     /* We only want to notify the driver if the queue either was empty, or
-       it wasn't empty, but the driver interrupted us above and emptied it, 
-       and thus the number of packets we enqueued does not equal the ring_size now 
+       it wasn't empty, but the driver interrupted us above and emptied it,
+       and thus the number of packets we enqueued does not equal the ring_size now
        (So the driver could have missed an empty to full ntfn)
-       
-       We also could have enqueued packets into the free ring during 
+
+       We also could have enqueued packets into the free ring during
        process_rx_complete(), so we could have also missed this empty condition.
        */
     if ((enqueued || dropped) && state.rx_ring_drv.free_ring->notify_reader) {
@@ -250,7 +250,7 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
-    // set up client macs 
+    // set up client macs
     state.mac_addrs[0][0] = 0x52;
     state.mac_addrs[0][1] = 0x54;
     state.mac_addrs[0][2] = 0x1;
@@ -265,7 +265,7 @@ void init(void)
     state.mac_addrs[1][4] = 0;
     state.mac_addrs[1][5] = 11;
 
-    // and for broadcast. 
+    // and for broadcast.
     state.mac_addrs[2][0] = 0xff;
     state.mac_addrs[2][1] = 0xff;
     state.mac_addrs[2][2] = 0xff;
@@ -273,7 +273,7 @@ void init(void)
     state.mac_addrs[2][4] = 0xff;
     state.mac_addrs[2][5] = 0xff;
     // This is the legitimate hw address for imx8mm
-    // (can be useful when debugging). 
+    // (can be useful when debugging).
     /*state.mac_addrs[0][0] = 0;
     state.mac_addrs[0][1] = 0x4;
     state.mac_addrs[0][2] = 0x9f;
