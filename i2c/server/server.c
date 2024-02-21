@@ -16,8 +16,8 @@
 #include <sddf/i2c/shared_ringbuffer.h>
 #include "i2c.h"
 
-#ifndef BUS_NUM
-#error "BUS_NUM must be defined!"
+#ifndef I2C_BUS_NUM
+#error "I2C_BUS_NUM must be defined!"
 #endif
 
 // Security list: owner of each i2c address on the bus
@@ -63,9 +63,9 @@ static inline void driverNotify(void) {
     uint8_t addr = ret[RET_BUF_ADDR];
 
     if (err) {
-        printf("server: Error %i on bus %i for client %i at token of type %i\n", err, BUS_NUM, client, addr);
+        printf("server: Error %i on bus %i for client %i at token of type %i\n", err, I2C_BUS_NUM, client, addr);
     } else {
-        printf("server: Success on bus %i for client %i at address %i\n", BUS_NUM, client, addr);
+        printf("server: Success on bus %i for client %i at address %i\n", I2C_BUS_NUM, client, addr);
 
         // TODO: logic here to return
     }

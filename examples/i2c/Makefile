@@ -31,7 +31,8 @@ SDDF := $(abspath ../../)
 UTIL := $(SDDF)/util
 LIBCO := $(SDDF)/libco
 
-I2C := $(SDDF)/drivers/i2c/meson
+I2C := $(SDDF)/i2c
+I2C_DRIVER := $(SDDF)/drivers/i2c/meson
 LIBI2CSHAREDRINGBUFFER := $(SDDF)/i2c/libi2csharedringbuffer
 
 IMAGES := server.elf driver.elf client.elf
@@ -43,17 +44,17 @@ IMAGE_FILE = $(BUILD_DIR)/loader.img
 REPORT_FILE = $(BUILD_DIR)/report.txt
 
 CFLAGS += -I$(BOARD_DIR)/include \
-	-I$(I2C)/include	\
+	-I$(I2C_DRIVER)/include	\
 	-I$(SDDF)/include \
 	-I$(LIBCO) \
 	-MD \
 	-MP
 
-COMMONFILES=$(I2C)/i2c-transport.c $(LIBI2CSHAREDRINGBUFFER)/shared_ringbuffer.c $(UTIL)/printf.c $(UTIL)/util.c
+COMMONFILES=$(I2C_DRIVER)/i2c-transport.c $(LIBI2CSHAREDRINGBUFFER)/shared_ringbuffer.c $(UTIL)/printf.c $(UTIL)/util.c
 
 CLIENT_OBJS := $(LIBCO)/libco.o pn532.o client.o $(COMMONFILES:.c=.o)
-SERVER_OBJS := $(I2C)/server.o $(COMMONFILES:.c=.o)
-DRIVER_OBJS := $(I2C)/i2c.o $(COMMONFILES:.c=.o)
+SERVER_OBJS := $(I2C)/server/server.o $(COMMONFILES:.c=.o)
+DRIVER_OBJS := $(I2C_DRIVER)/i2c.o $(COMMONFILES:.c=.o)
 
 OBJS := $(sort $(addprefix $(BUILD_DIR)/, $(SERVER_OBJS) $(DRIVER_OBJS)))
 DEPS := $(OBJS:.o=.d)
@@ -63,7 +64,7 @@ all: $(IMAGE_FILE)
 
 $(BUILD_DIR)/%.d $(BUILD_DIR)/%.o: %.c Makefile
 	mkdir -p `dirname $(BUILD_DIR)/$*.o`
-	$(CC) -c $(CFLAGS) $< -o $(BUILD_DIR)/$*.o -DBUS_NUM=2
+	$(CC) -c $(CFLAGS) $< -o $(BUILD_DIR)/$*.o -DI2C_BUS_NUM=2
 
 $(BUILD_DIR)/%.o: %.s Makefile
 	$(AS) -g3 -mcpu=$(CPU) $< -o $@
