@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-// i2c-odroid-c4.c
 // Implementation of the i2c driver targeting the ODROID C4.
 // Each instance of this driver corresponds to one of the four
 // available i2c master interfaces on the device.
@@ -15,12 +14,12 @@
 #include "driver.h"
 #include "i2c.h"
 
-#ifndef BUS_NUM
-#error "BUS_NUM must be defined!"
+#ifndef I2C_BUS_NUM
+#error "I2C_BUS_NUM must be defined!"
 #endif
 
-#define IRQ_I2C          2
-#define IRQ_I2C_TO       3
+#define IRQ_CH 2
+#define IRQ_TO_CH 3
 
 // #define DEBUG_DRIVER
 
@@ -44,10 +43,12 @@ typedef volatile struct {
 } i2c_if_t;
 
 // Hardware memory
-uintptr_t i2c;
-const int bus = BUS_NUM;
-uintptr_t gpio;
-uintptr_t clk;
+uintptr_t gpio_regs;
+uintptr_t clk_regs;
+uintptr_t i2c_regs;
+
+// Driver state for each interface
+volatile i2c_ifState_t i2c_ifState;
 
 // Actual interfaces. Note that address here must match the one in i2c.system defined for `i2c` memory region.
 // Hardcoded because the C compiler cannot handle the non-constant symbol `uinptr_t i2c`, which is added by the
@@ -140,9 +141,6 @@ static inline void i2c_dump(void) {
 #endif
 }
 
-// Driver state for each interface
-volatile i2c_ifState_t i2c_ifState;
-
 
 /**
  * Initialise the i2c master interfaces.
@@ -150,10 +148,9 @@ volatile i2c_ifState_t i2c_ifState;
 static inline void i2c_setup() {
     printf("driver: initialising i2c master interfaces...\n");
 
-
     // Note: this is hacky - should do this using a GPIO driver.
     // Set up pinmux
-    volatile uint32_t *gpio_mem = (void*)(gpio + GPIO_OFFSET);
+    volatile uint32_t *gpio_mem = (void*)(gpio_regs + GPIO_OFFSET);
 
     volatile uint32_t *pinmux5_ptr      = ((void*)gpio_mem + GPIO_PINMUX_5*4);
     volatile uint32_t *pinmuxE_ptr      = ((void*)gpio_mem + GPIO_PINMUX_E*4);
@@ -161,7 +158,7 @@ static inline void i2c_setup() {
     volatile uint32_t *pad_ds5a_ptr     = ((void*)gpio_mem + GPIO_DS_5A*4);
     volatile uint32_t *pad_bias2_ptr    = ((void*)gpio_mem + GPIO_BIAS_2_EN*4);
     volatile uint32_t *pad_bias5_ptr    = ((void*)gpio_mem + GPIO_BIAS_5_EN*4);
-    volatile uint32_t *clk81_ptr        = ((void*)clk + I2C_CLK_OFFSET);
+    volatile uint32_t *clk81_ptr        = ((void*)clk_regs + I2C_CLK_OFFSET);
 
     // Read existing register values
     uint32_t pinmux5 = *pinmux5_ptr;
@@ -172,68 +169,66 @@ static inline void i2c_setup() {
     const uint8_t ds = 3;    // 3 mA
     uint8_t pinfunc;
 
+#if I2C_BUS_NUM == 2
     // Enable i2cm2 -> pinmux 5
-    if (bus == 2) {
-        LOG_DRIVER("bus 2 initialising\n");
-        pinfunc = GPIO_PM5_X_I2C;
-        pinmux5 |= (pinfunc << 4) | (pinfunc << 8);
-        *pinmux5_ptr = pinmux5;
+    LOG_DRIVER("bus 2 initialising\n");
+    pinfunc = GPIO_PM5_X_I2C;
+    pinmux5 |= (pinfunc << 4) | (pinfunc << 8);
+    *pinmux5_ptr = pinmux5;
 
-        // Check that registers actually changed
-        if (!(*pinmux5_ptr & (GPIO_PM5_X18 | GPIO_PM5_X17))) {
-            printf("driver: failed to set pinmux5!\n");
-        }
-
-        // Set GPIO drive strength
-        *pad_ds2b_ptr &= ~(GPIO_DS_2B_X17 | GPIO_DS_2B_X18);
-        *pad_ds2b_ptr |= ((ds << GPIO_DS_2B_X17_SHIFT) |
-                        (ds << GPIO_DS_2B_X18_SHIFT));
-
-        // Check register updated
-        if ((*pad_ds2b_ptr & (GPIO_DS_2B_X17 | GPIO_DS_2B_X18)) != ((ds << GPIO_DS_2B_X17_SHIFT) |
-                        (ds << GPIO_DS_2B_X18_SHIFT))) {
-            printf("driver: failed to set drive strength for m2!\n");
-        }
-
-        // Disable bias, because the odroid i2c hardware has undocumented internal ones
-        *pad_bias2_ptr &= ~((1 << 18) | (1 << 17)); // Disable m2 bias - x17 and x18
-
-        // Check registers updated
-        if ((*pad_bias2_ptr & ((1 << 18) | (1 << 17))) != 0) {
-            printf("driver: failed to disable bias for m2!\n");
-        }
+    // Check that registers actually changed
+    if (!(*pinmux5_ptr & (GPIO_PM5_X18 | GPIO_PM5_X17))) {
+        printf("driver: failed to set pinmux5!\n");
     }
 
+    // Set GPIO drive strength
+    *pad_ds2b_ptr &= ~(GPIO_DS_2B_X17 | GPIO_DS_2B_X18);
+    *pad_ds2b_ptr |= ((ds << GPIO_DS_2B_X17_SHIFT) |
+                    (ds << GPIO_DS_2B_X18_SHIFT));
+
+    // Check register updated
+    if ((*pad_ds2b_ptr & (GPIO_DS_2B_X17 | GPIO_DS_2B_X18)) != ((ds << GPIO_DS_2B_X17_SHIFT) |
+                    (ds << GPIO_DS_2B_X18_SHIFT))) {
+        printf("driver: failed to set drive strength for m2!\n");
+    }
+
+    // Disable bias, because the odroid i2c hardware has undocumented internal ones
+    *pad_bias2_ptr &= ~((1 << 18) | (1 << 17)); // Disable m2 bias - x17 and x18
+
+    // Check registers updated
+    if ((*pad_bias2_ptr & ((1 << 18) | (1 << 17))) != 0) {
+        printf("driver: failed to disable bias for m2!\n");
+    }
+#elif I2C_BUS_NUM == 3
     // Enable i2cm3 -> pinmux E
-    if (bus == 3) {
-        pinfunc = GPIO_PE_A_I2C;
-        pinmuxE |= (pinfunc << 24) | (pinfunc << 28);
-        *pinmuxE_ptr = pinmuxE;
+    pinfunc = GPIO_PE_A_I2C;
+    pinmuxE |= (pinfunc << 24) | (pinfunc << 28);
+    *pinmuxE_ptr = pinmuxE;
 
-        // Check registers actually changed
-        if (!(*pinmuxE_ptr & (GPIO_PE_A15 | GPIO_PE_A14))) {
-            printf("driver: failed to set pinmuxE!\n");
-        }
-
-        // Set GPIO drive strength
-        *pad_ds5a_ptr &= ~(GPIO_DS_5A_A14 | GPIO_DS_5A_A15);
-        *pad_ds5a_ptr |= ((ds << GPIO_DS_5A_A14_SHIFT) | 
-                        (ds << GPIO_DS_5A_A15_SHIFT));
-
-        // Check register updated
-        if ((*pad_ds5a_ptr & (GPIO_DS_5A_A14 | GPIO_DS_5A_A15)) != ((ds << GPIO_DS_5A_A14_SHIFT) | 
-                        (ds << GPIO_DS_5A_A15_SHIFT))) {
-            printf("driver: failed to set drive strength for m3!\n");
-        }
-
-        // Disable bias, because the odroid i2c hardware has undocumented internal ones
-        *pad_bias5_ptr &= ~((1 << 14) | (1 << 15)); // Disable m3 bias - a14 and a15
-
-        // Check registers updated
-        if ((*pad_bias5_ptr & ((1 << 14) | (1 << 15))) != 0) {
-            printf("driver: failed to disable bias for m3!\n");
-        }
+    // Check registers actually changed
+    if (!(*pinmuxE_ptr & (GPIO_PE_A15 | GPIO_PE_A14))) {
+        printf("driver: failed to set pinmuxE!\n");
     }
+
+    // Set GPIO drive strength
+    *pad_ds5a_ptr &= ~(GPIO_DS_5A_A14 | GPIO_DS_5A_A15);
+    *pad_ds5a_ptr |= ((ds << GPIO_DS_5A_A14_SHIFT) | 
+                    (ds << GPIO_DS_5A_A15_SHIFT));
+
+    // Check register updated
+    if ((*pad_ds5a_ptr & (GPIO_DS_5A_A14 | GPIO_DS_5A_A15)) != ((ds << GPIO_DS_5A_A14_SHIFT) | 
+                    (ds << GPIO_DS_5A_A15_SHIFT))) {
+        printf("driver: failed to set drive strength for m3!\n");
+    }
+
+    // Disable bias, because the odroid i2c hardware has undocumented internal ones
+    *pad_bias5_ptr &= ~((1 << 14) | (1 << 15)); // Disable m3 bias - a14 and a15
+
+    // Check registers updated
+    if ((*pad_bias5_ptr & ((1 << 14) | (1 << 15))) != 0) {
+        printf("driver: failed to disable bias for m3!\n");
+    }
+#endif /* I2C_BUS_NUM */
 
     // Enable i2c by removing clock gate
     clk81 |= (I2C_CLK81_BIT);
@@ -415,46 +410,46 @@ static inline bool i2c_load_tokens() {
         /* Skip first two tokens */
         i2c_token_t tok = tokens[REQ_BUF_DATA_OFFSET + i];
 
-        uint32_t odroid_tok = 0x0;
+        uint32_t meson_token = 0x0;
         // Translate token to ODROID token
         switch (tok) {
             case I2C_TK_END:
-                odroid_tok = MESON_I2C_TK_END;
+                meson_token = MESON_I2C_TK_END;
                 break;
             case I2C_TK_START:
-                odroid_tok = MESON_I2C_TK_START;
+                meson_token = MESON_I2C_TK_START;
                 break;
             case I2C_TK_ADDRW:
-                odroid_tok = MESON_I2C_TK_ADDRW;
+                meson_token = MESON_I2C_TK_ADDRW;
                 i2c_ifState.data_direction = DATA_DIRECTION_WRITE;
                 break;
             case I2C_TK_ADDRR:
-                odroid_tok = MESON_I2C_TK_ADDRR;
+                meson_token = MESON_I2C_TK_ADDRR;
                 i2c_ifState.data_direction = DATA_DIRECTION_READ;
                 break;
             case I2C_TK_DATA:
-                odroid_tok = MESON_I2C_TK_DATA;
+                meson_token = MESON_I2C_TK_DATA;
                 break;
             case I2C_TK_DATA_END:
-                odroid_tok = MESON_I2C_TK_DATA_END;
+                meson_token = MESON_I2C_TK_DATA_END;
                 break;
             case I2C_TK_STOP:
-                odroid_tok = MESON_I2C_TK_STOP;
+                meson_token = MESON_I2C_TK_STOP;
                 break;
             default:
                 LOG_DRIVER("invalid data token in request! \"0x%x\" at buffer index %d\n", tok, REQ_BUF_DATA_OFFSET + i);
                 return false;
         }
-        // printf("Loading token %d: %d\n", i, odroid_tok);
+        // printf("Loading token %d: %d\n", i, meson_token);
 
         if (tk_offset < 8) {
-            interface->tk_list0 |= (odroid_tok << (tk_offset * 4));
+            interface->tk_list0 |= (meson_token << (tk_offset * 4));
         } else {
-            interface->tk_list1 |= (odroid_tok << ((tk_offset % 8) * 4));
+            interface->tk_list1 |= (meson_token << ((tk_offset % 8) * 4));
         }
         tk_offset++;
         // If data token and we are writing, load data into wbuf registers
-        if (odroid_tok == MESON_I2C_TK_DATA && i2c_ifState.data_direction == DATA_DIRECTION_WRITE) {
+        if (meson_token == MESON_I2C_TK_DATA && i2c_ifState.data_direction == DATA_DIRECTION_WRITE) {
             if (wdat_offset < 4) {
                 interface->wdata0 = interface->wdata0 | (tokens[2 + i + 1] << (wdat_offset * 8));
                 wdat_offset++;
@@ -700,18 +695,18 @@ static void handle_irq(bool timeout) {
     LOG_DRIVER("END OF IRQ HANDLER - notified=%d\n", i2c_ifState.notified);
 }
 
-void notified(microkit_channel c) {
-    switch (c) {
+void notified(microkit_channel ch) {
+    switch (ch) {
         case SERVER_NOTIFY_ID:
             serverNotify();
             break;
-        case IRQ_I2C:
+        case IRQ_CH:
             handle_irq(false);
-            microkit_irq_ack(IRQ_I2C);
+            microkit_irq_ack(ch);
             break;
-        case IRQ_I2C_TO:
+        case IRQ_TO_CH:
             handle_irq(true);
-            microkit_irq_ack(IRQ_I2C_TO);
+            microkit_irq_ack(ch);
             break;
 
         default:
