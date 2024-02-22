@@ -2,12 +2,13 @@
 #include <libco.h>
 #include <sddf/util/printf.h>
 #include <sddf/i2c/transport.h>
+#include <sddf/timer/client.h>
 #include "pn532.h"
 #include "client.h"
 
 #include "i2c.h"
 
-#define DEBUG_CLIENT
+// #define DEBUG_CLIENT
 
 #ifdef DEBUG_CLIENT
 #define LOG_CLIENT(...) do{ printf("CLIENT|INFO: "); printf(__VA_ARGS__); }while(0)
@@ -29,7 +30,7 @@ extern ring_handle_t ret_ring;
 cothread_t t_event;
 cothread_t t_main;
 
-#define DEFAULT_READ_RESPONSE_RETRIES (1)
+#define DEFAULT_READ_RESPONSE_RETRIES (256)
 #define DEFAULT_READ_ACK_FRAME_RETRIES (20)
 
 #define STACK_SIZE (4096)
@@ -102,7 +103,7 @@ void client_main(void) {
     passive_header[4] = 0xff;
     ret = pn532_write_command(passive_header, 5, NULL, 0, DEFAULT_READ_ACK_FRAME_RETRIES);
     if (ret < 0) {
-        LOG_CLIENT_ERR("failed to write PN532_CMD_GETFIRMWAREVERSION\n");
+        LOG_CLIENT_ERR("failed to write PN532_CMD_RFCONFIGURATION\n");
         while (1) {};
     }
     response = pn532_read_response(big_buf, 64, DEFAULT_READ_RESPONSE_RETRIES);
@@ -152,10 +153,25 @@ void client_main(void) {
         } else {
             // PN532 probably timed out waiting for a card
             LOG_CLIENT_ERR("Timed out waiting for a card\n");
-            int i = 0;
-            while (i < 1000000) { i++; };
         }
+
+        delay_ms(1000);
     }
+}
+
+bool delay_ms(size_t milliseconds) {
+    size_t time_ns = milliseconds * NS_IN_MS;
+
+    /* Detect potential overflow */
+    if (milliseconds != 0 && time_ns / milliseconds != b) {
+        LOG_CLIENT_ERR("overflow detected in delay_ms");
+        return false;
+    }
+
+    sddf_timer_set_timeout(TIMER_CH, time_ns);
+    co_switch(t_event);
+
+    return true;
 }
 
 void init(void) {
@@ -187,6 +203,9 @@ size_t length = 0;
 void notified(microkit_channel ch) {
     switch (ch) {
         case DRIVER_CH:
+            co_switch(t_main);
+            break;
+        case TIMER_CH:
             co_switch(t_main);
             break;
         default:

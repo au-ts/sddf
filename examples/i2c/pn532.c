@@ -1,13 +1,14 @@
 #include <stdint.h>
 #include <libco.h>
 #include <sddf/util/printf.h>
+#include <sddf/timer/client.h>
 #include <sddf/i2c/transport.h>
 #include "pn532.h"
 #include "client.h"
 
 #include "i2c.h"
 
-#define DEBUG_PN532
+// #define DEBUG_PN532
 
 #ifdef DEBUG_PN532
 #define LOG_PN532(...) do{ printf("PN532|INFO: "); printf(__VA_ARGS__); }while(0)
@@ -129,8 +130,6 @@ int8_t read_ack_frame(size_t retries) {
      * request where we can actually check the data.
      */
 
-    LOG_PN532("read_ack_frame: called\n");
-
     size_t attempts = 0;
     while (attempts < retries) {
         struct request req = {};
@@ -146,21 +145,17 @@ int8_t read_ack_frame(size_t retries) {
         request_add(&req, I2C_TK_END);
 
         request_send(&req);
-        LOG_PN532("read_ack_frame: sent request\n");
 
         /* Now we need to wait for the return data of the ACK frame */
         co_switch(t_event);
 
         const uint8_t PN532_ACK[] = {0, 0, 0xFF, 0, 0xFF, 0};
-        if (ring_size(ret_ring.used_ring) > 1) {
-            LOG_PN532_ERR("return ring size is more than 1, actual size is %d\n", ring_size(ret_ring.used_ring));
+        if (ring_size(ret_ring.used_ring) != 1) {
+            LOG_PN532_ERR("return ring size is not 1, actual size is %d\n", ring_size(ret_ring.used_ring));
             return -1;
         }
         struct response response = {};
         response_init(&response, &ret_ring);
-
-        int i = 0;
-        while (i < 10000000) { i++; };
 
         if (response_read(&response) & 1) {
             /* Minus one because the first byte is for the device ready status */
@@ -179,6 +174,8 @@ int8_t read_ack_frame(size_t retries) {
 
         attempts++;
         response_finish(&response);
+
+        delay_ms(1);
     }
 
     /* If we get to here we have exhausted the number of times to try read the ack frame successfully */
@@ -264,8 +261,7 @@ int8_t read_response_length(size_t retries) {
     size_t length;
     size_t attempts = 0;
 
-    // int i = 0;
-    // while (i < 10000000) { i++; };
+    delay_ms(1);
 
     while (true) {
         struct request req = {};
@@ -284,7 +280,6 @@ int8_t read_response_length(size_t retries) {
         request_add(&req, I2C_TK_END);
 
         request_send(&req);
-
         co_switch(t_event);
 
         if (ring_size(ret_ring.used_ring) > 1) {
@@ -300,7 +295,7 @@ int8_t read_response_length(size_t retries) {
             break;
         } else {
             if (attempts == retries) {
-                LOG_PN532_ERR("device was not ready when reading the response length!\n");
+                LOG_PN532("device was not ready when reading the response length!\n");
                 response_finish(&response);
                 return -1;
             }
@@ -308,8 +303,7 @@ int8_t read_response_length(size_t retries) {
 
         response_finish(&response);
         attempts++;
-        int i = 0;
-        while (i < 10000000) { i++; };
+        delay_ms(1);
     }
 
     /* Check nack */
@@ -330,109 +324,121 @@ int8_t read_response_length(size_t retries) {
     /* @ivanv: testing, shouldn't be necessary */
     co_switch(t_event);
 
-    LOG_PN532("post nack ring_size of return ring: 0x%lx\n", ring_size(ret_ring.used_ring));
-
     return length;
 }
 
 bool pn532_read_response(uint8_t *buffer, uint8_t buffer_len, size_t retries) {
     int8_t length = read_response_length(retries);
     if (length < 0) {
+        LOG_PN532_ERR("read_response - length was less than zero\n");
         return false;
+    } else {
     }
 
-    struct request req = {};
-    request_init(&req, &req_ring, CLIENT_ID, PN532_I2C_BUS_ADDRESS);
 
-    size_t num_data_tokens = 6 + length + 2;
+    size_t attempts = 0;
+    struct response response = {};
 
-    request_add(&req, I2C_TK_START);
-    request_add(&req, I2C_TK_ADDRR);
+    while (true) {
+        struct request req = {};
+        request_init(&req, &req_ring, CLIENT_ID, PN532_I2C_BUS_ADDRESS);
 
-    if (num_data_tokens > req.buffer_size) {
-        LOG_PN532_ERR("number of request data tokens (0x%lx) exceeds buffer size (0x%lx)\n", num_data_tokens, req.buffer_size);
-        // @ivanv: should be putting the request ring back in the free queue
-        return false;
+        // @alwin: The arduino code does 6 + ... but I see 7 reads?
+        size_t num_data_tokens = 7 + length + 2;
+
+        request_add(&req, I2C_TK_START);
+        request_add(&req, I2C_TK_ADDRR);
+
+        if (num_data_tokens > req.buffer_size) {
+           LOG_PN532_ERR("number of request data tokens (0x%lx) exceeds buffer size (0x%lx)\n", num_data_tokens, req.buffer_size);
+            // @ivanv: should be putting the request ring back in the free queue
+            return false;
+        }
+
+        for (int i = 0; i < num_data_tokens; i++) {
+           request_add(&req, I2C_TK_DATA);
+        }
+
+        request_add(&req, I2C_TK_DATA_END);
+        request_add(&req, I2C_TK_STOP);
+        request_add(&req, I2C_TK_END);
+
+        request_send(&req);
+
+        // LOG_PN532("read_response: sent request of size %d\n", num_data_tokens);
+        co_switch(t_event);
+
+        response_init(&response, &ret_ring);
+        if ((response_read(&response) & 1)) {
+            break;
+        }
+
+        response_finish(&response);
+        if (attempts == retries) {
+            LOG_PN532_ERR("device was not ready when reading the response length!\n");
+            return false;
+        }
+        attempts++;
+        delay_ms(1);
     }
 
-    for (int i = 0; i < num_data_tokens; i++) {
-        request_add(&req, I2C_TK_DATA);
-    }
-
-    request_add(&req, I2C_TK_DATA_END);
-    request_add(&req, I2C_TK_STOP);
-    request_add(&req, I2C_TK_END);
-
-    LOG_PN532("read_response: sent request of size %d\n", num_data_tokens);
-    request_send(&req);
-
-    co_switch(t_event);
-
-    LOG_PN532("read_response: ret_ring.used_ring size is %d\n", ring_size(ret_ring.used_ring));
-    // @ivanv: we shouldn't be just discarding this first response buffer
-    struct response response1 = {};
-    response_init(&response1, &ret_ring);
-    struct response response2 = {};
-    response_init(&response2, &ret_ring);
-
-    if (!(response_read(&response2) & 1)) {
-        LOG_PN532("reading response failed as device is not ready!\n");
-        response_finish(&response1);
-        response_finish(&response2);
-        return false;
-    }
+    // @alwin: We currently need to always consume an extra buffer, which is why there is a bunch
+    // of process_return_buffer() calls. idk where it comes from o_O
 
     // Read PREAMBLE
-    if (response_read(&response2) != PN532_PREAMBLE) {
+    if (response_read(&response) != PN532_PREAMBLE) {
         LOG_PN532_ERR("read_response: PREAMBLE check failed\n");
-        response_finish(&response1);
-        response_finish(&response2);
+        response_finish(&response);
+        process_return_buffer();
         return false;
     }
     // Read STARTCODE1
-    if (response_read(&response2) != PN532_STARTCODE1) {
+    if (response_read(&response) != PN532_STARTCODE1) {
         LOG_PN532_ERR("read_response: STARTCODE1 check failed\n");
-        response_finish(&response1);
-        response_finish(&response2);
+        response_finish(&response);
+        process_return_buffer();
         return false;
     }
     // Read STARTCODE2
-    if (response_read(&response2) != PN532_STARTCODE2) {
+    if (response_read(&response) != PN532_STARTCODE2) {
         LOG_PN532_ERR("read_response: STARTCODE2 check failed\n");
-        response_finish(&response1);
-        response_finish(&response2);
+        response_finish(&response);
+        process_return_buffer();
         return false;
     }
     // Read length
-    size_t data_length = response_read(&response2);
-    // LOG_PN532("data length is 0x%lx\n", data_length);
+    size_t data_length = response_read(&response);
     if (data_length != length) {
         LOG_PN532_ERR("Received data_length of 0x%lx, was expecting 0x%lx\n", data_length, length);
+        response_finish(&response);
+        process_return_buffer();
         return false;
     }
-    // Read checksum of length
-    response_read(&response2);
-    // Read response command
-    response_read(&response2);
 
-    response_read(&response2);
+    // Read checksum of length
+    response_read(&response);
+    // Read response command
+    response_read(&response);
+
+    response_read(&response);
     // Read command data
     if (data_length > buffer_len) {
         LOG_PN532_ERR("returned data length (0x%lx) greater than user-provided buffer length (0x%lx)\n", data_length, buffer_len);
-        response_finish(&response1);
-        response_finish(&response2);
+        response_finish(&response);
+        process_return_buffer();
         return false;
     }
     for (int i = 0; i < data_length; i++) {
-        buffer[i] = response_read(&response2);
+        buffer[i] = response_read(&response);
     }
     // Read checksum of data
-    response_read(&response2);
+    response_read(&response);
     // Read postamble
-    response_read(&response2);
+    response_read(&response);
 
-    response_finish(&response1);
-    response_finish(&response2);
+    response_finish(&response);
+
+    process_return_buffer();
 
     return true;
 }
