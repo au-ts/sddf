@@ -56,7 +56,6 @@ void i2cTransportInit(int buffer_init) {
 req_buf_ptr_t allocReqBuf(size_t size, uint8_t *data, uint8_t client, uint8_t addr) {
     // microkit_dbg_puts("transport: Allocating request buffer\n")
     if (size > I2C_BUF_SIZE - REQ_BUF_DATA_OFFSET*sizeof(i2c_token_t)) {
-        printf("transport: Requested buffer size %zu too large\n", size);
         return 0;
     }
 
@@ -79,7 +78,6 @@ req_buf_ptr_t allocReqBuf(size_t size, uint8_t *data, uint8_t client, uint8_t ad
 
     // Enqueue the buffer
     ret = enqueue_used(&req_ring, buf, size + sz_offset);
-    printf("transport: Allocated request buffer %p storing %u bytes\n", buf, size);
     if (ret != 0) {
         enqueue_free(&req_ring, buf, I2C_BUF_SIZE);
         return 0;
@@ -99,12 +97,10 @@ ret_buf_ptr_t getRetBuf() {
         microkit_dbg_puts("transport: Failed to get return buffer due to empty free ring!\n");
         return 0;
     }
-    printf("transport: Got return buffer %p\n", buf);
     return (ret_buf_ptr_t)buf;
 }
 
 int pushRetBuf(ret_buf_ptr_t buf, size_t size) {
-    microkit_dbg_puts("transport: pushing return buffer\n");
     if (size > I2C_BUF_SIZE || !buf) {
         return 0;
     }
@@ -120,7 +116,6 @@ int pushRetBuf(ret_buf_ptr_t buf, size_t size) {
 static inline uintptr_t popBuf(ring_handle_t *ring, size_t *sz) {
     uintptr_t buf;
     int ret = dequeue_used(ring, ((uintptr_t*)&buf), (unsigned *)sz);
-    printf("Popping buffer containing %zu bytes\n", *sz);
     if (ret != 0) return 0;
     return buf;
 }

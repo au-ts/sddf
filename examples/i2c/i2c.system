@@ -9,6 +9,7 @@
     <memory_region name="gpio" size="0x4000" phys_addr="0xFF634000"/>
     <memory_region name="clk" size="0x1000" phys_addr="0xFF63C000"/>
 
+    <memory_region name="timer_registers" size="0x1000" phys_addr="0xffd0f000" />
 
     <!-- Shared ring buffers -->
     <!-- Transfer channels server <-> driver -->
@@ -47,7 +48,6 @@
         <!-- <map mr="client_req_used" vaddr="0x5_400_000" perms="rw" setvar_vaddr="client_req_used"/> -->
         <!-- <map mr="client_ret_free" vaddr="0x5_600_000" perms="rw" setvar_vaddr="client_ret_free"/> -->
         <!-- <map mr="client_ret_used" vaddr="0x5_800_000" perms="rw" setvar_vaddr="client_ret_used"/> -->
-   
     <!-- </protection_domain> -->
 
     <!-- i2c driver -->
@@ -90,9 +90,20 @@
         <map mr="driver_bufs" vaddr="0x5_000_000" perms="rw" setvar_vaddr="driver_bufs"/>
     </protection_domain>
 
+    <protection_domain name="timer" priority="254" pp="true" passive="true">
+        <program_image path="timer.elf" />
+        <map mr="timer_registers" vaddr="0x2_000_000" perms="rw" cached="false" setvar_vaddr="gpt_regs" />
+        <irq irq="42" id="0" trigger="edge" /> <!-- timer interrupt for timer A -->
+    </protection_domain>
+
     <channel>
         <end pd="client" id="0" />
         <end pd="i2c_driver" id="1" />
+    </channel>
+
+    <channel>
+        <end pd="timer" id="1" />
+        <end pd="client" id="1" /> <!-- Should this number change, so should TIMER_CH in timer.h -->
     </channel>
 
     <!-- Client protection domain - for testing -->

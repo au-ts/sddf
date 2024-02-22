@@ -34,8 +34,9 @@ LIBCO := $(SDDF)/libco
 I2C := $(SDDF)/i2c
 I2C_DRIVER := $(SDDF)/drivers/i2c/meson
 LIBI2CSHAREDRINGBUFFER := $(SDDF)/i2c/libi2csharedringbuffer
+TIMER_DRIVER := $(SDDF)/drivers/clock/meson
 
-IMAGES := server.elf driver.elf client.elf
+IMAGES := server.elf driver.elf client.elf timer.elf
 CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall -Wno-unused-function
 LDFLAGS := -L$(BOARD_DIR)/lib -L$(SDDF)/lib
 LIBS := -lmicrokit -Tmicrokit.ld -lc
@@ -52,9 +53,10 @@ CFLAGS += -I$(BOARD_DIR)/include \
 
 COMMONFILES=$(I2C_DRIVER)/i2c-transport.c $(LIBI2CSHAREDRINGBUFFER)/shared_ringbuffer.c $(UTIL)/printf.c $(UTIL)/util.c
 
-CLIENT_OBJS := $(LIBCO)/libco.o pn532.o client.o $(COMMONFILES:.c=.o)
+CLIENT_OBJS := $(LIBCO)/libco.o pn532.o client.o $(COMMONFILES:.c=.o) sddf_timer_client.o
 SERVER_OBJS := $(I2C)/server/server.o $(COMMONFILES:.c=.o)
 DRIVER_OBJS := $(I2C_DRIVER)/i2c.o $(COMMONFILES:.c=.o)
+TIMER_DRIVER_OBJS := timer_driver.o
 
 OBJS := $(sort $(addprefix $(BUILD_DIR)/, $(SERVER_OBJS) $(DRIVER_OBJS)))
 DEPS := $(OBJS:.o=.d)
@@ -77,6 +79,15 @@ $(BUILD_DIR)/driver.elf: $(addprefix $(BUILD_DIR)/, $(DRIVER_OBJS))
 
 $(BUILD_DIR)/client.elf: $(addprefix $(BUILD_DIR)/, $(CLIENT_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+
+$(BUILD_DIR)/sddf_timer_client.o:
+	BUILD_DIR=$(abspath $(BUILD_DIR)) MICROKIT_INCLUDE=$(BOARD_DIR)/include make -C $(SDDF)/timer/client
+
+$(BUILD_DIR)/timer.elf: $(BUILD_DIR)/timer_driver.o
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+
+$(BUILD_DIR)/timer_driver.o: $(TIMER_DRIVER)/timer.c
+	$(CC) -c $(CFLAGS) $(TIMER_DRIVER)/timer.c -o $(BUILD_DIR)/timer_driver.o
 
 # $(BUILD_DIR)/fool.elf: $(addprefix $(BUILD_DIR)/, $(FOOL_OBJS))
 # 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
