@@ -13,15 +13,13 @@
 
 /* Size of a single block to be transferred */
 #define BLK_TRANSFER_SIZE 4096
-/* Maximum number of slots in the request queue. Can be configured. */
-#define BLK_REQ_QUEUE_SIZE 1024
-/* Maximum number of slots in the response queue. Can be configured. */
-#define BLK_RESP_QUEUE_SIZE 1024
+/* Maximum number of slots in each queue. Can be configured. */
+#define BLK_QUEUE_SIZE 1024
 /* Device serial number max string length */
 #define BLK_MAX_SERIAL_NUMBER 63
 
 typedef struct blk_storage_info {
-    char serial_number[BLK_MAX_SERIAL_NUMBER + 1]; 
+    char serial_number[BLK_MAX_SERIAL_NUMBER + 1];
     bool read_only;
     bool ready; /* true if component closer to driver is ready */
     uint16_t sector_size; /* size of a sector */
@@ -66,14 +64,14 @@ typedef struct blk_req_queue {
     uint32_t head;
     uint32_t tail;
     bool plugged; /* prevent requests from being dequeued when plugged */
-    blk_request_t buffers[BLK_REQ_QUEUE_SIZE];
+    blk_request_t buffers[BLK_QUEUE_SIZE];
 } blk_req_queue_t;
 
 /* Circular buffer containing responses */
 typedef struct blk_resp_queue {
     uint32_t head;
     uint32_t tail;
-    blk_response_t buffers[BLK_RESP_QUEUE_SIZE];
+    blk_response_t buffers[BLK_QUEUE_SIZE];
 } blk_resp_queue_t;
 
 /* A queue handle for queueing/dequeueing request and responses */
@@ -92,9 +90,9 @@ typedef struct blk_queue_handle {
  * @param queue_size number of entries in each queue.
  */
 static inline void blk_queue_init(blk_queue_handle_t *h,
-                                blk_req_queue_t *request,
-                                blk_resp_queue_t *response,
-                                uint32_t queue_size)
+                                  blk_req_queue_t *request,
+                                  blk_resp_queue_t *response,
+                                  uint32_t queue_size)
 {
     h->req_queue = request;
     h->resp_queue = response;
@@ -177,8 +175,6 @@ static inline int blk_resp_queue_size(blk_queue_handle_t *h)
  * Enqueue an element into the request queue.
  *
  * @param h queue handle containing request queue to enqueue to.
- * @param code request code.
- * @param addr encoded dma address of data to read/write.
  * @param block_number block number to read/write to.
  * @param count the number of blocks to read/write
  * @param id request ID to identify this request.
@@ -186,11 +182,11 @@ static inline int blk_resp_queue_size(blk_queue_handle_t *h)
  * @return -1 when request queue is full, 0 on success.
  */
 static inline int blk_enqueue_req(blk_queue_handle_t *h,
-                                        blk_request_code_t code,
-                                        uintptr_t addr,
-                                        uint32_t block_number,
-                                        uint16_t count,
-                                        uint32_t id)
+                                  blk_request_code_t code,
+                                  uintptr_t addr,
+                                  uint32_t block_number,
+                                  uint16_t count,
+                                  uint32_t id)
 {
     if (blk_req_queue_full(h)) {
         return -1;
@@ -220,9 +216,9 @@ static inline int blk_enqueue_req(blk_queue_handle_t *h,
  * @return -1 when response queue is full, 0 on success.
  */
 static inline int blk_enqueue_resp(blk_queue_handle_t *h,
-                                        blk_response_status_t status,
-                                        uint16_t success_count,
-                                        uint32_t id)
+                                   blk_response_status_t status,
+                                   uint16_t success_count,
+                                   uint32_t id)
 {
     if (blk_resp_queue_full(h)) {
         return -1;
@@ -251,11 +247,11 @@ static inline int blk_enqueue_resp(blk_queue_handle_t *h,
  * @return -1 when request queue is empty, 0 on success.
  */
 static inline int blk_dequeue_req(blk_queue_handle_t *h,
-                                        blk_request_code_t *code,
-                                        uintptr_t *addr,
-                                        uint32_t *block_number,
-                                        uint16_t *count,
-                                        uint32_t *id)
+                                  blk_request_code_t *code,
+                                  uintptr_t *addr,
+                                  uint32_t *block_number,
+                                  uint16_t *count,
+                                  uint32_t *id)
 {
     if (blk_req_queue_empty(h)) {
         return -1;
@@ -283,9 +279,9 @@ static inline int blk_dequeue_req(blk_queue_handle_t *h,
  * @return -1 when response queue is empty, 0 on success.
  */
 static inline int blk_dequeue_resp(blk_queue_handle_t *h,
-                                        blk_response_status_t *status,
-                                        uint16_t *success_count,
-                                        uint32_t *id)
+                                   blk_response_status_t *status,
+                                   uint16_t *success_count,
+                                   uint32_t *id)
 {
     if (blk_resp_queue_empty(h)) {
         return -1;
@@ -306,7 +302,8 @@ static inline int blk_dequeue_resp(blk_queue_handle_t *h,
  *
  * @param h queue handle containing request queue to check for plug.
 */
-static inline void blk_req_queue_plug(blk_queue_handle_t *h) {
+static inline void blk_req_queue_plug(blk_queue_handle_t *h)
+{
     h->req_queue->plugged = true;
 }
 
@@ -315,7 +312,8 @@ static inline void blk_req_queue_plug(blk_queue_handle_t *h) {
  *
  * @param h queue handle containing request queue to check for plug.
 */
-static inline void blk_req_queue_unplug(blk_queue_handle_t *h) {
+static inline void blk_req_queue_unplug(blk_queue_handle_t *h)
+{
     h->req_queue->plugged = false;
 }
 
@@ -326,7 +324,8 @@ static inline void blk_req_queue_unplug(blk_queue_handle_t *h) {
  *
  * @return true when request queue is plugged, false when unplugged.
 */
-static inline bool blk_req_queue_plugged(blk_queue_handle_t *h) {
+static inline bool blk_req_queue_plugged(blk_queue_handle_t *h)
+{
     return h->req_queue->plugged;
 }
 
