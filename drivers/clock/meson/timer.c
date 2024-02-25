@@ -26,7 +26,9 @@ uintptr_t gpt_regs;
 #define TIMEOUT_TIMEBASE_100_US 0b10
 #define TIMEOUT_TIMEBASE_1_MS   0b11
 
+/* Number of nanoseconds in microseconds */
 #define NS_IN_US    1000ULL
+/* Number of nanoseconds in milliseconds */
 #define NS_IN_MS    1000000ULL
 
 struct timer_regs {
