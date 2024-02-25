@@ -4,7 +4,7 @@
 <!-- 2023 -->
 <system>
     <!-- i2c hardware -->
-    <memory_region name="i2cm3" size="0x1000" phys_addr="0xFFD1C000"/>
+    <!-- <memory_region name="i2cm3" size="0x1000" phys_addr="0xFFD1C000"/> -->
     <memory_region name="i2cm2" size="0x1000" phys_addr="0xFFD1D000"/>
     <memory_region name="gpio" size="0x4000" phys_addr="0xFF634000"/>
     <memory_region name="clk" size="0x1000" phys_addr="0xFF63C000"/>
@@ -17,19 +17,14 @@
     <memory_region name="m2_req_used" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="m2_ret_free" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="m2_ret_used" size="0x200_000" page_size="0x200_000"/>
-    <memory_region name="m3_req_free" size="0x200_000" page_size="0x200_000"/>
-    <memory_region name="m3_req_used" size="0x200_000" page_size="0x200_000"/>
-    <memory_region name="m3_ret_free" size="0x200_000" page_size="0x200_000"/>
-    <memory_region name="m3_ret_used" size="0x200_000" page_size="0x200_000"/>
-
 	<!-- Data buffer region -->
 	<memory_region name="driver_bufs" size="0x200_000" page_size="0x200_000"/>
 
     <!-- Transfer channels client <=> server -->
-    <memory_region name="client_req_free" size="0x200_000" page_size="0x200_000"/>
+<!--     <memory_region name="client_req_free" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="client_req_used" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="client_ret_free" size="0x200_000" page_size="0x200_000"/>
-    <memory_region name="client_ret_used" size="0x200_000" page_size="0x200_000"/>
+    <memory_region name="client_ret_used" size="0x200_000" page_size="0x200_000"/> -->
 
     <!-- Main protection domain - i2c server -->
 <!--     <protection_domain name="i2c_server" priority="200" pp="true">
