@@ -163,7 +163,7 @@ bool delay_ms(size_t milliseconds) {
     size_t time_ns = milliseconds * NS_IN_MS;
 
     /* Detect potential overflow */
-    if (milliseconds != 0 && time_ns / milliseconds != b) {
+    if (milliseconds != 0 && time_ns / milliseconds != NS_IN_MS) {
         LOG_CLIENT_ERR("overflow detected in delay_ms");
         return false;
     }
