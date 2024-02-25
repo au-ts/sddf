@@ -153,16 +153,16 @@ static inline void i2c_setup() {
     volatile uint32_t *gpio_mem = (void*)(gpio_regs + GPIO_OFFSET);
 
     volatile uint32_t *pinmux5_ptr      = ((void*)gpio_mem + GPIO_PINMUX_5*4);
-    volatile uint32_t *pinmuxE_ptr      = ((void*)gpio_mem + GPIO_PINMUX_E*4);
+    // volatile uint32_t *pinmuxE_ptr      = ((void*)gpio_mem + GPIO_PINMUX_E*4);
     volatile uint32_t *pad_ds2b_ptr     = ((void*)gpio_mem + GPIO_DS_2B*4);
-    volatile uint32_t *pad_ds5a_ptr     = ((void*)gpio_mem + GPIO_DS_5A*4);
+    // volatile uint32_t *pad_ds5a_ptr     = ((void*)gpio_mem + GPIO_DS_5A*4);
     volatile uint32_t *pad_bias2_ptr    = ((void*)gpio_mem + GPIO_BIAS_2_EN*4);
-    volatile uint32_t *pad_bias5_ptr    = ((void*)gpio_mem + GPIO_BIAS_5_EN*4);
+    // volatile uint32_t *pad_bias5_ptr    = ((void*)gpio_mem + GPIO_BIAS_5_EN*4);
     volatile uint32_t *clk81_ptr        = ((void*)clk_regs + I2C_CLK_OFFSET);
 
     // Read existing register values
     uint32_t pinmux5 = *pinmux5_ptr;
-    uint32_t pinmuxE = *pinmuxE_ptr;
+    // uint32_t pinmuxE = *pinmuxE_ptr;
     uint32_t clk81 = *clk81_ptr;
 
     // Common values
