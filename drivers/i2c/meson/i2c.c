@@ -31,7 +31,7 @@
 
 #define LOG_DRIVER_ERR(...) do{ printf("I2C DRIVER|ERROR: "); printf(__VA_ARGS__); }while(0)
 
-typedef volatile struct {
+struct i2c_regs {
     uint32_t ctl;
     uint32_t addr;
     uint32_t tk_list0;
@@ -40,7 +40,7 @@ typedef volatile struct {
     uint32_t wdata1;
     uint32_t rdata0;
     uint32_t rdata1;
-} i2c_if_t;
+};
 
 // Hardware memory
 uintptr_t gpio_regs;
@@ -49,11 +49,6 @@ uintptr_t i2c_regs;
 
 // Driver state for each interface
 volatile i2c_ifState_t i2c_ifState;
-
-// Actual interfaces. Note that address here must match the one in i2c.system defined for `i2c` memory region.
-// Hardcoded because the C compiler cannot handle the non-constant symbol `uinptr_t i2c`, which is added by the
-// elf patcher.
-volatile i2c_if_t *interface = (void *)(uintptr_t)(0x3000000);
 
 char *token_to_str(uint8_t token) {
     switch (token) {
@@ -76,77 +71,78 @@ char *token_to_str(uint8_t token) {
     }
 }
 
-static inline void i2c_dump(void) {
+static inline void i2c_dump(volatile struct i2c_regs *regs) {
 #ifdef DEBUG_DRIVER
     LOG_DRIVER("dumping interface state...\n");
 
     // Print control register fields
     // uint8_t ctl_man = (ctl & REG_CTRL_MANUAL) ? 1 : 0;
-    uint8_t ctl_rd_cnt = ((interface->ctl & REG_CTRL_RD_CNT) >> 8);
-    uint8_t ctl_curr_tk = ((interface->ctl & REG_CTRL_CURR_TK) >> 4);
-    uint8_t ctl_err = (interface->ctl & REG_CTRL_ERROR) ? 1 : 0;
-    uint8_t ctl_status = (interface->ctl & REG_CTRL_STATUS) ? 1 : 0;
-    uint8_t ctl_start = (interface->ctl & REG_CTRL_START) ? 1 : 0;
-    printf("\t Control register:\n");
-    printf("\t\t Start: %u\n", ctl_start);
-    printf("\t\t Status: %u\n", ctl_status);
-    printf("\t\t Error: %u\n", ctl_err);
-    printf("\t\t Current token: %u\n", ctl_curr_tk);
-    printf("\t\t Read count: %u\n", ctl_rd_cnt);
+    uint8_t ctl_rd_cnt = ((regs->ctl & REG_CTRL_RD_CNT) >> 8);
+    uint8_t ctl_curr_tk = ((regs->ctl & REG_CTRL_CURR_TK) >> 4);
+    uint8_t ctl_err = (regs->ctl & REG_CTRL_ERROR) ? 1 : 0;
+    uint8_t ctl_status = (regs->ctl & REG_CTRL_STATUS) ? 1 : 0;
+    uint8_t ctl_start = (regs->ctl & REG_CTRL_START) ? 1 : 0;
+    LOG_DRIVER("\t Control register:\n");
+    LOG_DRIVER("\t\t Start: %u\n", ctl_start);
+    LOG_DRIVER("\t\t Status: %u\n", ctl_status);
+    LOG_DRIVER("\t\t Error: %u\n", ctl_err);
+    LOG_DRIVER("\t\t Current token: %u\n", ctl_curr_tk);
+    LOG_DRIVER("\t\t Read count: %u\n", ctl_rd_cnt);
 
     // Print address
-    printf("\t Address register: 0x%x\n", (interface->addr >> 1) & 0x7F);
+    LOG_DRIVER("\t Address register: 0x%x\n", (regs->addr >> 1) & 0x7F);
 
     // Print token register 0 tokens
-    printf("\t Token register 0:\n");
+    LOG_DRIVER("\t Token register 0:\n");
     for (int i = 0; i < 8; i++) {
-        uint8_t tk = (interface->tk_list0 >> (i * 4)) & 0xF;
-        printf("\t\t Token %d: %s\n", i, token_to_str(tk));
+        uint8_t tk = (regs->tk_list0 >> (i * 4)) & 0xF;
+        LOG_DRIVER("\t\t Token %d: %s\n", i, token_to_str(tk));
     }
 
     // Print token register 1 tokens
-    printf("\t Token register 1:\n");
+    LOG_DRIVER("\t Token register 1:\n");
     for (int i = 0; i < 8; i++) {
-        uint8_t tk = (interface->tk_list1 >> (i * 4)) & 0xF;
-        printf("\t\t Token %d: %s\n", i, token_to_str(tk));
+        uint8_t tk = (regs->tk_list1 >> (i * 4)) & 0xF;
+        LOG_DRIVER("\t\t Token %d: %s\n", i, token_to_str(tk));
     }
 
     // Print wdata register 0 tokens
-    printf("\t Write data register 0:\n");
+    LOG_DRIVER("\t Write data register 0:\n");
     for (int i = 0; i < 4; i++) {
-        uint8_t tk = (interface->wdata0 >> (i * 8)) & 0xFF;
-        printf("\t\t Data %d: 0x%lx\n", i, tk);
+        uint8_t tk = (regs->wdata0 >> (i * 8)) & 0xFF;
+        LOG_DRIVER("\t\t Data %d: 0x%lx\n", i, tk);
     }
 
     // Print wdata register 1 tokens
-    printf("\t Write data register 1:\n");
+    LOG_DRIVER("\t Write data register 1:\n");
     for (int i = 0; i < 4; i++) {
-        uint8_t tk = (interface->wdata1 >> (i * 8)) & 0xFF;
-        printf("\t\t Data %d: 0x%lx\n", i, tk);
+        uint8_t tk = (regs->wdata1 >> (i * 8)) & 0xFF;
+        LOG_DRIVER("\t\t Data %d: 0x%lx\n", i, tk);
     }
 
     // Print rdata register 0
-    printf("\t Read data register 0:\n");
+    LOG_DRIVER("\t Read data register 0:\n");
     for (int i = 0; i < 4; i++) {
-        uint8_t tk = (interface->rdata0 >> (i * 8)) & 0xFF;
-        printf("\t\t Data %d: 0x%lx\n", i, tk);
+        uint8_t tk = (regs->rdata0 >> (i * 8)) & 0xFF;
+        LOG_DRIVER("\t\t Data %d: 0x%lx\n", i, tk);
     }
 
     // Print rdata register 1
-    printf("\t Read data register 1:\n");
+    LOG_DRIVER("\t Read data register 1:\n");
     for (int i = 0; i < 4; i++) {
-        uint8_t tk = (interface->rdata1 >> (i * 8)) & 0xFF;
-        printf("\t\t Data %d: 0x%lx\n", i, tk);
+        uint8_t tk = (regs->rdata1 >> (i * 8)) & 0xFF;
+        LOG_DRIVER("\t\t Data %d: 0x%lx\n", i, tk);
     }
-#endif
+#endif /* DEBUG_DRIVER */
 }
-
 
 /**
  * Initialise the i2c master interfaces.
 */
 static inline void i2c_setup() {
     printf("driver: initialising i2c master interfaces...\n");
+
+    volatile struct i2c_regs *regs = (volatile struct i2c_regs *) regs;
 
     // Note: this is hacky - should do this using a GPIO driver.
     // Set up pinmux
@@ -241,9 +237,9 @@ static inline void i2c_setup() {
 
 
     // Initialise fields
-    interface->ctl &= ~(REG_CTRL_MANUAL);       // Disable manual mode
-    interface->ctl &= ~(REG_CTRL_ACK_IGNORE);   // Disable ACK IGNORE
-    interface->ctl |= (REG_CTRL_CNTL_JIC);      // Bypass dynamic clock gating
+    regs->ctl &= ~(REG_CTRL_MANUAL);       // Disable manual mode
+    regs->ctl &= ~(REG_CTRL_ACK_IGNORE);   // Disable ACK IGNORE
+    regs->ctl |= (REG_CTRL_CNTL_JIC);      // Bypass dynamic clock gating
 
     // Handle clocking
     // (comment) Stolen from Linux Kernel's amlogic driver
@@ -270,25 +266,25 @@ static inline void i2c_setup() {
     uint32_t div_l = 116;
 
     // Set clock divider
-    interface->ctl &= ~(REG_CTRL_CLKDIV_MASK);
-    interface->ctl |= (div_h << REG_CTRL_CLKDIV_SHIFT);
+    regs->ctl &= ~(REG_CTRL_CLKDIV_MASK);
+    regs->ctl |= (div_h << REG_CTRL_CLKDIV_SHIFT);
 
     // Set SCL filtering
-    interface->addr &= ~(REG_ADDR_SCLFILTER);
-    interface->addr |= (0x0 << 11);
+    regs->addr &= ~(REG_ADDR_SCLFILTER);
+    regs->addr |= (0x0 << 11);
 
 
     // Set SDA filtering
-    interface->addr &= ~(REG_ADDR_SDAFILTER);
-    interface->addr |= (0x0 << 8);
+    regs->addr &= ~(REG_ADDR_SDAFILTER);
+    regs->addr |= (0x0 << 8);
 
     // Set clock delay levels
     // Field has 9 bits: clear then shift in div_l
-    interface->addr &= ~(0x1FF << REG_ADDR_SCLDELAY_SHFT);
-    interface->addr |= (div_l << REG_ADDR_SCLDELAY_SHFT);
+    regs->addr &= ~(0x1FF << REG_ADDR_SCLDELAY_SHFT);
+    regs->addr |= (div_l << REG_ADDR_SCLDELAY_SHFT);
 
     // Enable low delay time adjustment
-    interface->addr |= REG_ADDR_SCLDELAY_ENABLE;
+    regs->addr |= REG_ADDR_SCLDELAY_ENABLE;
 }
 
 /**
@@ -299,9 +295,9 @@ static inline void i2c_setup() {
  *         while a negative value corresponds to a bus NACK at a token of value -(ret).
  *         e.g. if NACK on a ADDRW (0x3) the return value will be -3.
  */
-static inline int i2c_get_error() {
+static inline int i2c_get_error(volatile struct i2c_regs *regs) {
     // Index into ctl register - i2c base + address of appropriate register
-    volatile uint32_t ctl = interface->ctl;
+    volatile uint32_t ctl = regs->ctl;
     uint8_t err = ctl & (1 << 3);   // bit 3 -> set if error
     uint8_t rd = (ctl & 0xF00) >> 8; // bits 8-11 -> number of bytes read
     uint8_t tok = (ctl & 0xF0) >> 4; // bits 4-7 -> curr token
@@ -313,49 +309,49 @@ static inline int i2c_get_error() {
     }
 }
 
-static inline int i2c_start() {
+static inline int i2c_start(volatile struct i2c_regs *regs) {
     LOG_DRIVER("LIST PROCESSOR START\n");
-    interface->ctl &= ~0x1;
-    interface->ctl |= 0x1;
-    if (!(interface->ctl & 0x1)) {
+    regs->ctl &= ~0x1;
+    regs->ctl |= 0x1;
+    if (!(regs->ctl & 0x1)) {
         LOG_DRIVER("failed to set start bit!\n");
         return -1;
     }
     return 0;
 }
 
-static inline int i2c_halt() {
+static inline int i2c_halt(volatile struct i2c_regs *regs) {
     LOG_DRIVER("LIST PROCESSOR HALT\n");
-    interface->ctl &= ~0x1;
-    if ((interface->ctl & 0x1)) {
+    regs->ctl &= ~0x1;
+    if ((regs->ctl & 0x1)) {
         LOG_DRIVER("failed to halt!\n");
         return -1;
     }
     return 0;
 }
 
-static inline int i2c_flush() {
+static inline int i2c_flush(volatile struct i2c_regs *regs) {
     LOG_DRIVER("LIST PROCESSOR FLUSH\n");
     // Clear token list
-    interface->tk_list0 = 0x0;
-    interface->tk_list1 = 0x0;
+    regs->tk_list0 = 0x0;
+    regs->tk_list1 = 0x0;
 
     // // Clear wdata
-    // interface->wdata0 = 0x0;
-    // interface->wdata1 = 0x0;
+    // regs->wdata0 = 0x0;
+    // regs->wdata1 = 0x0;
 
     // // Clear rdata
-    // interface->rdata0 = 0x0;
-    // interface->rdata1 = 0x0;
+    // regs->rdata0 = 0x0;
+    // regs->rdata1 = 0x0;
 
     // // Clear address
-    // interface->addr = 0x0;
+    // regs->addr = 0x0;
     return 0;
 }
 
-static inline bool i2c_load_tokens() {
+static inline bool i2c_load_tokens(volatile struct i2c_regs *regs) {
     LOG_DRIVER("starting token load\n");
-    i2c_token_t * tokens = (i2c_token_t *)i2c_ifState.current_req;
+    i2c_token_t *tokens = (i2c_token_t *)i2c_ifState.current_req;
     LOG_DRIVER("Tokens remaining in this req: %zu\n", i2c_ifState.remaining);
 
     // Extract second byte: address
@@ -365,21 +361,21 @@ static inline bool i2c_load_tokens() {
         return false;
     }
     COMPILER_MEMORY_FENCE();
-    i2c_flush();
+    i2c_flush(regs);
     COMPILER_MEMORY_FENCE();
     // Load address into address register
     // Address goes into low 7 bits of address register
-    interface->addr &= ~(0x7f);
-    interface->addr = interface->addr | ((addr& 0x7f) << 1);  // i2c hardware expects that the 7-bit address is shifted left by 1
-    // interface->addr |= ((addr << 1) & 0x7f);  // i2c hardware expects that the 7-bit address is shifted left by 1
+    regs->addr &= ~(0x7f);
+    regs->addr = regs->addr | ((addr& 0x7f) << 1);  // i2c hardware expects that the 7-bit address is shifted left by 1
+    // regs->addr |= ((addr << 1) & 0x7f);  // i2c hardware expects that the 7-bit address is shifted left by 1
 
-    LOG_DRIVER("interface->addr 0x%lx\n", interface->addr);
+    LOG_DRIVER("regs->addr 0x%lx\n", regs->addr);
 
     // Clear token buffer registers
-    interface->tk_list0 = 0x0;
-    interface->tk_list1 = 0x0;
-    interface->wdata0 = 0x0;
-    interface->wdata1 = 0x0;
+    regs->tk_list0 = 0x0;
+    regs->tk_list1 = 0x0;
+    regs->wdata0 = 0x0;
+    regs->wdata1 = 0x0;
 
     // Offset into token registers
     uint32_t tk_offset = 0;
@@ -398,9 +394,9 @@ static inline bool i2c_load_tokens() {
         // Explicitly pad END tokens for empty space
         if (i >= i2c_ifState.current_req_len) {
             if (tk_offset < 8) {
-                interface->tk_list0 |= (MESON_I2C_TK_END << (tk_offset * 4));
+                regs->tk_list0 |= (MESON_I2C_TK_END << (tk_offset * 4));
             } else {
-                interface->tk_list1 = interface->tk_list1 | (MESON_I2C_TK_END << ((tk_offset % 8) * 4));
+                regs->tk_list1 = regs->tk_list1 | (MESON_I2C_TK_END << ((tk_offset % 8) * 4));
             }
             tk_offset++;
             i++;
@@ -443,18 +439,18 @@ static inline bool i2c_load_tokens() {
         // printf("Loading token %d: %d\n", i, meson_token);
 
         if (tk_offset < 8) {
-            interface->tk_list0 |= (meson_token << (tk_offset * 4));
+            regs->tk_list0 |= (meson_token << (tk_offset * 4));
         } else {
-            interface->tk_list1 |= (meson_token << ((tk_offset % 8) * 4));
+            regs->tk_list1 |= (meson_token << ((tk_offset % 8) * 4));
         }
         tk_offset++;
         // If data token and we are writing, load data into wbuf registers
         if (meson_token == MESON_I2C_TK_DATA && i2c_ifState.data_direction == DATA_DIRECTION_WRITE) {
             if (wdat_offset < 4) {
-                interface->wdata0 = interface->wdata0 | (tokens[2 + i + 1] << (wdat_offset * 8));
+                regs->wdata0 = regs->wdata0 | (tokens[2 + i + 1] << (wdat_offset * 8));
                 wdat_offset++;
             } else {
-                interface->wdata1 = interface->wdata1 | (tokens[2 + i + 1] << ((wdat_offset - 4) * 8));
+                regs->wdata1 = regs->wdata1 | (tokens[2 + i + 1] << ((wdat_offset - 4) * 8));
                 wdat_offset++;
             }
             // Since we grabbed the next token in the chain, increment offset
@@ -473,10 +469,10 @@ static inline bool i2c_load_tokens() {
                                  ? i2c_ifState.current_req_len - i : 0;
 
     LOG_DRIVER("Tokens loaded. %zu remain for this request\n", i2c_ifState.remaining);
-    i2c_dump();
+    i2c_dump(regs);
     // Start list processor
     COMPILER_MEMORY_FENCE();
-    i2c_start();
+    i2c_start(regs);
     COMPILER_MEMORY_FENCE();
 
     return true;
@@ -500,6 +496,7 @@ void init(void) {
  * Check if there is work to do for a given bus and dispatch it if so.
 */
 static void check_buf() {
+    volatile struct i2c_regs *regs = (volatile struct i2c_regs *) i2c_regs;
     if (!ring_empty(req_ring.used_ring)) {
         // If this interface is busy, skip notification and
         // set notified flag for later processing
@@ -553,7 +550,7 @@ static void check_buf() {
 
         // Trigger work start
         // @ivanv: check return value
-        i2c_load_tokens();
+        i2c_load_tokens(regs);
     } else {
         LOG_DRIVER("called but no work available: resetting notified flag\n");
         // If nothing needs to be done, clear notified flag if it was set.
@@ -585,6 +582,8 @@ static inline void serverNotify(void) {
  * @param timeout Whether the IRQ was triggered by a timeout. 0 if not, 1 if so.
 */
 static void handle_irq(bool timeout) {
+    volatile struct i2c_regs *regs = (volatile struct i2c_regs *)i2c_regs;
+
     if (timeout) {
         LOG_DRIVER("handling timeout IRQ\n");
     } else {
@@ -618,11 +617,11 @@ static void handle_irq(bool timeout) {
     //     return;
     // }
 
-    i2c_dump();
-    i2c_halt();
+    i2c_dump(regs);
+    i2c_halt(regs);
 
     // Get result
-    int err = i2c_get_error();
+    int err = i2c_get_error(regs);
     // If error is 0, successful write. If error >0, successful read of err bytes.
     // Prepare to extract data from the interface.
     ret_buf_ptr_t ret = i2c_ifState.current_ret;
@@ -647,11 +646,11 @@ static void handle_irq(bool timeout) {
             for (int i = 0; i < err; i++) {
                 size_t index = RET_BUF_DATA_OFFSET + i2c_ifState.current_ret_len;
                 if (i < 4) {
-                    uint8_t value = (interface->rdata0 >> (i * 8)) & 0xFF;
+                    uint8_t value = (regs->rdata0 >> (i * 8)) & 0xFF;
                     ret[index] = value;
                     LOG_DRIVER("loading into ret at %d value 0x%lx\n", index, value);
                 } else if (i < 8) {
-                    uint8_t value = (interface->rdata1 >> ((i - 4) * 8)) & 0xFF;
+                    uint8_t value = (regs->rdata1 >> ((i - 4) * 8)) & 0xFF;
                     ret[index] = value;
                     LOG_DRIVER("loading into ret at %d value 0x%lx\n", index, value);
                 }
@@ -677,7 +676,7 @@ static void handle_irq(bool timeout) {
         i2c_ifState.remaining = 0;
         microkit_notify(SERVER_NOTIFY_ID);
         // Reset hardware
-        i2c_halt();
+        i2c_halt(regs);
     }
 
     // If the driver was notified while this transaction was in progress, immediately start working on the next one.
@@ -690,7 +689,7 @@ static void handle_irq(bool timeout) {
             LOG_DRIVER("still work to do, starting next batch\n");
         }
         // @ivanv: check return value
-        i2c_load_tokens();
+        i2c_load_tokens(regs);
     }
     LOG_DRIVER("END OF IRQ HANDLER - notified=%d\n", i2c_ifState.notified);
 }
