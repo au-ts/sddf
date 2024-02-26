@@ -33,10 +33,10 @@ LIBCO := $(SDDF)/libco
 
 I2C := $(SDDF)/i2c
 I2C_DRIVER := $(SDDF)/drivers/i2c/meson
-LIBI2CSHAREDRINGBUFFER := $(SDDF)/i2c/libi2csharedringbuffer
+LIBI2CQUEUE := $(SDDF)/i2c/queue
 TIMER_DRIVER := $(SDDF)/drivers/clock/meson
 
-IMAGES := server.elf driver.elf client.elf timer.elf
+IMAGES := virtualiser.elf driver.elf client.elf timer.elf
 CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall -Wno-unused-function
 LDFLAGS := -L$(BOARD_DIR)/lib -L$(SDDF)/lib
 LIBS := -lmicrokit -Tmicrokit.ld -lc
@@ -51,10 +51,10 @@ CFLAGS += -I$(BOARD_DIR)/include \
 	-MD \
 	-MP
 
-COMMONFILES=$(I2C_DRIVER)/i2c-transport.c $(LIBI2CSHAREDRINGBUFFER)/shared_ringbuffer.c $(UTIL)/printf.c $(UTIL)/util.c
+COMMONFILES=$(LIBI2CQUEUE)/queue.c $(UTIL)/printf.c $(UTIL)/util.c
 
 CLIENT_OBJS := $(LIBCO)/libco.o pn532.o client.o $(COMMONFILES:.c=.o) sddf_timer_client.o
-SERVER_OBJS := $(I2C)/server/server.o $(COMMONFILES:.c=.o)
+VIRTUALISER_OBJS := $(I2C)/components/virtualiser.o $(COMMONFILES:.c=.o)
 DRIVER_OBJS := $(I2C_DRIVER)/i2c.o $(COMMONFILES:.c=.o)
 TIMER_DRIVER_OBJS := timer_driver.o
 
@@ -71,7 +71,7 @@ $(BUILD_DIR)/%.d $(BUILD_DIR)/%.o: %.c Makefile
 $(BUILD_DIR)/%.o: %.s Makefile
 	$(AS) -g3 -mcpu=$(CPU) $< -o $@
 
-$(BUILD_DIR)/server.elf: $(addprefix $(BUILD_DIR)/, $(SERVER_OBJS))
+$(BUILD_DIR)/virtualiser.elf: $(addprefix $(BUILD_DIR)/, $(VIRTUALISER_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(BUILD_DIR)/driver.elf: $(addprefix $(BUILD_DIR)/, $(DRIVER_OBJS))
