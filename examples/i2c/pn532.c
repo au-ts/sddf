@@ -2,11 +2,9 @@
 #include <libco.h>
 #include <sddf/util/printf.h>
 #include <sddf/timer/client.h>
-#include <sddf/i2c/transport.h>
+#include <sddf/i2c/queue.h>
 #include "pn532.h"
 #include "client.h"
-
-#include "i2c.h"
 
 // #define DEBUG_PN532
 
@@ -21,37 +19,42 @@
 extern cothread_t t_event;
 extern cothread_t t_main;
 
-#define CLIENT_ID (0)
-
 struct request {
-    ring_handle_t *ring;
     uint8_t *buffer;
     /* Maximum amount of data the buffer can hold */
     size_t buffer_size;
     /* How many I2C tokens for processing we have enqueued */
     size_t data_offset_len;
+    /* Bus address we are sending to */
+    size_t bus_address;
 };
 
 struct response {
-    ring_handle_t *ring;
+    /* Client-side address for buffer to be used as response */
     uint8_t *buffer;
     size_t data_size;
     size_t read_idx;
 };
 
-void response_init(struct response *response, ring_handle_t *ring) {
-    uintptr_t buffer = 0;
+/* These are defined in the client code. It is more convenient for these
+   to be global variables than constantly pass them around. */
+extern i2c_queue_handle_t queue;
+extern uintptr_t data_region;
+
+void response_init(struct response *response) {
+    uintptr_t offset = 0;
     unsigned int buffer_len = 0;
-    int ret = dequeue_used(ring, &buffer, &buffer_len);
+    /* This is unused as for our PN532 client only talks to a single I2C bus address. */
+    size_t bus_address = 0;
+    int ret = i2c_dequeue_response(&queue, &bus_address, &offset, &buffer_len);
     if (ret) {
         LOG_PN532_ERR("response_init could not dequeue used response buffer!\n");
         return;
     }
 
-    response->buffer = (uint8_t *) buffer;
+    response->buffer = (uint8_t *) data_region + offset;
     response->data_size = buffer_len;
     response->read_idx = 0;
-    response->ring = ring;
 }
 
 uint8_t response_read(struct response *response) {
@@ -60,7 +63,7 @@ uint8_t response_read(struct response *response) {
         return 0;
     }
 
-    uint8_t value = response->buffer[RET_BUF_DATA_OFFSET + response->read_idx];
+    uint8_t value = response->buffer[RESPONSE_DATA_OFFSET + response->read_idx];
     response->read_idx++;
 
     return value;
@@ -72,37 +75,25 @@ uint8_t response_read_idx(struct response *response, uint8_t idx) {
         return 0;
     }
 
-    uint8_t value = response->buffer[RET_BUF_DATA_OFFSET + idx];
+    uint8_t value = response->buffer[RESPONSE_DATA_OFFSET + idx];
 
     return value;
 }
 
 void response_finish(struct response *response) {
-    int err = enqueue_free(response->ring, (uintptr_t) response->buffer, response->data_size);
-    if (err) {
-        LOG_PN532_ERR("could not enqueue response into free queue\n");
-    }
+    // Do nothing
 }
 
-void request_init(struct request *req, ring_handle_t *ring, uint8_t client, uint8_t addr) {
-    uintptr_t req_buffer = 0;
-    unsigned int req_buffer_len = 0;
-    int err = dequeue_free(ring, &req_buffer, &req_buffer_len);
-    if (err) {
-        LOG_PN532_ERR("could not dequeue free request buffer!\n");
-        return;
-    }
-
-    req->ring = ring;
-    req->buffer = (uint8_t *) req_buffer;
-    req->buffer[REQ_BUF_CLIENT] = client;
-    req->buffer[REQ_BUF_ADDR] = addr;
+void request_init(struct request *req, uint8_t bus_address) {
+    /* @ivanv maybe revisit this to see whether we should take the buffer and size from the client */
     req->data_offset_len = 0;
-    req->buffer_size = req_buffer_len;
+    req->buffer = (uint8_t *)data_region;
+    req->buffer_size = I2C_MAX_DATA_SIZE;
+    req->bus_address = bus_address;
 }
 
 void request_add(struct request *req, uint8_t data) {
-    size_t index = REQ_BUF_DATA_OFFSET + req->data_offset_len;
+    size_t index = req->data_offset_len;
     if (index >= req->buffer_size) {
         LOG_PN532_ERR("request buffer is full (size is 0x%lx)\n", req->buffer_size);
         return;
@@ -113,12 +104,12 @@ void request_add(struct request *req, uint8_t data) {
 
 void request_send(struct request *req) {
     /* Here we add two to account for the REQ_BUF_CLIENT and REQ_BUF_ADDR */
-    int err = enqueue_used(req->ring, (uintptr_t) req->buffer, req->data_offset_len + 2);
+    int err = i2c_enqueue_request(&queue, req->bus_address, (size_t) req->buffer - data_region, req->data_offset_len);
     if (err) {
         LOG_PN532_ERR("failed to enqueue request buffer!\n");
     }
 
-    microkit_notify(DRIVER_CH);
+    microkit_notify(I2C_VIRTUALISER_CH);
 }
 
 #define ACK_FRAME_SIZE (7)
@@ -133,16 +124,16 @@ int8_t read_ack_frame(size_t retries) {
     size_t attempts = 0;
     while (attempts < retries) {
         struct request req = {};
-        request_init(&req, &req_ring, CLIENT_ID, PN532_I2C_BUS_ADDRESS);
+        request_init(&req, PN532_I2C_BUS_ADDRESS);
 
-        request_add(&req, I2C_TK_START);
-        request_add(&req, I2C_TK_ADDRR);
+        request_add(&req, I2C_TOKEN_START);
+        request_add(&req, I2C_TOKEN_ADDR_READ);
         for (int i = 0; i < ACK_FRAME_SIZE; i++) {
-            request_add(&req, I2C_TK_DATA);
+            request_add(&req, I2C_TOKEN_DATA);
         }
-        request_add(&req, I2C_TK_DATA_END);
-        request_add(&req, I2C_TK_STOP);
-        request_add(&req, I2C_TK_END);
+        request_add(&req, I2C_TOKEN_DATA_END);
+        request_add(&req, I2C_TOKEN_STOP);
+        request_add(&req, I2C_TOKEN_END);
 
         request_send(&req);
 
@@ -150,12 +141,12 @@ int8_t read_ack_frame(size_t retries) {
         co_switch(t_event);
 
         const uint8_t PN532_ACK[] = {0, 0, 0xFF, 0, 0xFF, 0};
-        if (ring_size(ret_ring.used_ring) != 1) {
-            LOG_PN532_ERR("return ring size is not 1, actual size is %d\n", ring_size(ret_ring.used_ring));
+        if (i2c_queue_size(queue.response) != 1) {
+            LOG_PN532_ERR("response ring size is not 1, actual size is %d\n", i2c_queue_size(queue.response));
             return -1;
         }
         struct response response = {};
-        response_init(&response, &ret_ring);
+        response_init(&response);
 
         if (response_read(&response) & 1) {
             /* Minus one because the first byte is for the device ready status */
@@ -186,11 +177,11 @@ int8_t read_ack_frame(size_t retries) {
 
 static void process_return_buffer() {
     struct response response = {};
-    response_init(&response, &ret_ring);
+    response_init(&response);
 
-    uint8_t err = response_read_idx(&response, RET_BUF_ERR);
+    uint8_t err = response_read_idx(&response, RESPONSE_ERR);
     if (err != I2C_ERR_OK) {
-        LOG_PN532("Previous request failed where RET_BUF_ERR is 0x%lx\n", err);
+        LOG_PN532("Previous request failed where RESPONSE_ERR is 0x%lx\n", err);
     }
 
     response_finish(&response);
@@ -201,51 +192,51 @@ int8_t pn532_write_command(uint8_t *header, uint8_t hlen, const uint8_t *body, u
 
     /* First dequeue a fresh request buffer */
     struct request req = {};
-    request_init(&req, &req_ring, CLIENT_ID, PN532_I2C_BUS_ADDRESS);
-    request_add(&req, I2C_TK_START);
-    request_add(&req, I2C_TK_ADDRW);
+    request_init(&req, PN532_I2C_BUS_ADDRESS);
+    request_add(&req, I2C_TOKEN_START);
+    request_add(&req, I2C_TOKEN_ADDR_WRITE);
 
-    request_add(&req, I2C_TK_DATA);
+    request_add(&req, I2C_TOKEN_DATA);
     request_add(&req, PN532_PREAMBLE);
 
-    request_add(&req, I2C_TK_DATA);
+    request_add(&req, I2C_TOKEN_DATA);
     request_add(&req, PN532_STARTCODE1);
 
-    request_add(&req, I2C_TK_DATA);
+    request_add(&req, I2C_TOKEN_DATA);
     request_add(&req, PN532_STARTCODE2);
     /* Put length of PN532 data */
     size_t length = hlen + blen + 1;
-    request_add(&req, I2C_TK_DATA);
+    request_add(&req, I2C_TOKEN_DATA);
     request_add(&req, length);
     /* Put checksum of length of PN532 data */
-    request_add(&req, I2C_TK_DATA);
+    request_add(&req, I2C_TOKEN_DATA);
     request_add(&req, ~length + 1);
 
-    request_add(&req, I2C_TK_DATA);
+    request_add(&req, I2C_TOKEN_DATA);
     request_add(&req, PN532_HOSTTOPN532);
 
     uint8_t sum = PN532_HOSTTOPN532;
     for (int i = 0; i < hlen; i++) {
         sum += header[i];
-        request_add(&req, I2C_TK_DATA);
+        request_add(&req, I2C_TOKEN_DATA);
         request_add(&req, header[i]);
     }
 
     for (int i = 0; i < blen; i++) {
         sum += body[i];
-        request_add(&req, I2C_TK_DATA);
+        request_add(&req, I2C_TOKEN_DATA);
         request_add(&req, body[i]);
     }
 
     uint8_t checksum = ~sum + 1;
-    request_add(&req, I2C_TK_DATA);
+    request_add(&req, I2C_TOKEN_DATA);
     request_add(&req, checksum);
 
-    request_add(&req, I2C_TK_DATA);
+    request_add(&req, I2C_TOKEN_DATA);
     request_add(&req, PN532_POSTAMBLE);
 
-    request_add(&req, I2C_TK_STOP);
-    request_add(&req, I2C_TK_END);
+    request_add(&req, I2C_TOKEN_STOP);
+    request_add(&req, I2C_TOKEN_END);
 
     request_send(&req);
 
@@ -265,29 +256,29 @@ int8_t read_response_length(size_t retries) {
 
     while (true) {
         struct request req = {};
-        request_init(&req, &req_ring, CLIENT_ID, PN532_I2C_BUS_ADDRESS);
+        request_init(&req, PN532_I2C_BUS_ADDRESS);
 
-        request_add(&req, I2C_TK_START);
-        request_add(&req, I2C_TK_ADDRR);
+        request_add(&req, I2C_TOKEN_START);
+        request_add(&req, I2C_TOKEN_ADDR_READ);
         /* @ivanv: This is slightly dodgy as I don't think we're actually reading
            6 bytes of data when we get the return buffer. However, this what the
            arduino code does so :shrug: */
         for (int i = 0; i < 6; i++) {
-            request_add(&req, I2C_TK_DATA);
+            request_add(&req, I2C_TOKEN_DATA);
         }
-        request_add(&req, I2C_TK_DATA_END);
-        request_add(&req, I2C_TK_STOP);
-        request_add(&req, I2C_TK_END);
+        request_add(&req, I2C_TOKEN_DATA_END);
+        request_add(&req, I2C_TOKEN_STOP);
+        request_add(&req, I2C_TOKEN_END);
 
         request_send(&req);
         co_switch(t_event);
 
-        if (ring_size(ret_ring.used_ring) > 1) {
-            LOG_PN532_ERR("return ring size is more than 1, actual size is %d\n", ring_size(ret_ring.used_ring));
+        if (i2c_queue_size(queue.response) > 1) {
+            LOG_PN532_ERR("response ring size is more than 1, actual size is %d\n", i2c_queue_size(queue.response));
             return -1;
         }
         struct response response = {};
-        response_init(&response, &ret_ring);
+        response_init(&response);
 
         if (response_read(&response) & 1) {
             length = response_read_idx(&response, 4);
@@ -309,16 +300,16 @@ int8_t read_response_length(size_t retries) {
     /* Check nack */
     const uint8_t PN532_NACK[] = {0, 0, 0xFF, 0xFF, 0, 0};
     struct request nack_req = {};
-    request_init(&nack_req, &req_ring, CLIENT_ID, PN532_I2C_BUS_ADDRESS);
+    request_init(&nack_req, PN532_I2C_BUS_ADDRESS);
 
-    request_add(&nack_req, I2C_TK_START);
-    request_add(&nack_req, I2C_TK_ADDRW);
+    request_add(&nack_req, I2C_TOKEN_START);
+    request_add(&nack_req, I2C_TOKEN_ADDR_WRITE);
     for (int i = 0; i < sizeof(PN532_NACK); i++) {
-        request_add(&nack_req, I2C_TK_DATA);
+        request_add(&nack_req, I2C_TOKEN_DATA);
         request_add(&nack_req, PN532_NACK[i]);
     }
-    request_add(&nack_req, I2C_TK_STOP);
-    request_add(&nack_req, I2C_TK_END);
+    request_add(&nack_req, I2C_TOKEN_STOP);
+    request_add(&nack_req, I2C_TOKEN_END);
     request_send(&nack_req);
 
     /* @ivanv: testing, shouldn't be necessary */
@@ -341,13 +332,13 @@ bool pn532_read_response(uint8_t *buffer, uint8_t buffer_len, size_t retries) {
 
     while (true) {
         struct request req = {};
-        request_init(&req, &req_ring, CLIENT_ID, PN532_I2C_BUS_ADDRESS);
+        request_init(&req, PN532_I2C_BUS_ADDRESS);
 
         // @alwin: The arduino code does 6 + ... but I see 7 reads?
         size_t num_data_tokens = 7 + length + 2;
 
-        request_add(&req, I2C_TK_START);
-        request_add(&req, I2C_TK_ADDRR);
+        request_add(&req, I2C_TOKEN_START);
+        request_add(&req, I2C_TOKEN_ADDR_READ);
 
         if (num_data_tokens > req.buffer_size) {
            LOG_PN532_ERR("number of request data tokens (0x%lx) exceeds buffer size (0x%lx)\n", num_data_tokens, req.buffer_size);
@@ -356,19 +347,19 @@ bool pn532_read_response(uint8_t *buffer, uint8_t buffer_len, size_t retries) {
         }
 
         for (int i = 0; i < num_data_tokens; i++) {
-           request_add(&req, I2C_TK_DATA);
+           request_add(&req, I2C_TOKEN_DATA);
         }
 
-        request_add(&req, I2C_TK_DATA_END);
-        request_add(&req, I2C_TK_STOP);
-        request_add(&req, I2C_TK_END);
+        request_add(&req, I2C_TOKEN_DATA_END);
+        request_add(&req, I2C_TOKEN_STOP);
+        request_add(&req, I2C_TOKEN_END);
 
         request_send(&req);
 
         // LOG_PN532("read_response: sent request of size %d\n", num_data_tokens);
         co_switch(t_event);
 
-        response_init(&response, &ret_ring);
+        response_init(&response);
         if ((response_read(&response) & 1)) {
             break;
         }

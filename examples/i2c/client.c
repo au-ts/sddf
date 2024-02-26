@@ -1,12 +1,11 @@
 #include <microkit.h>
 #include <libco.h>
 #include <sddf/util/printf.h>
-#include <sddf/i2c/transport.h>
 #include <sddf/timer/client.h>
+#include <sddf/i2c/queue.h>
+#include <sddf/i2c/client.h>
 #include "pn532.h"
 #include "client.h"
-
-#include "i2c.h"
 
 // #define DEBUG_CLIENT
 
@@ -17,15 +16,10 @@
 #endif
 #define LOG_CLIENT_ERR(...) do{ printf("CLIENT|ERROR: "); printf(__VA_ARGS__); }while(0)
 
-// @ivanv: do not like this at all, problem is i2c-transport.c
-// already defines these variables
-extern uintptr_t req_free;
-extern uintptr_t req_used;
-extern uintptr_t ret_free;
-extern uintptr_t ret_used;
-
-extern ring_handle_t req_ring;
-extern ring_handle_t ret_ring;
+uintptr_t data_region;
+uintptr_t request_region;
+uintptr_t response_region;
+i2c_queue_handle_t queue;
 
 cothread_t t_event;
 cothread_t t_main;
@@ -177,17 +171,11 @@ bool delay_ms(size_t milliseconds) {
 void init(void) {
     LOG_CLIENT("init\n");
 
-    // @ivanv: as we are the client and directly interacting with the driver, we are responsible
-    // for initialisting the ring buffer completly (hence why we pass true). we should probably
-    // change this to have the driver do the initialisation.
-    ring_init(&req_ring, (ring_buffer_t *) req_free, (ring_buffer_t *) req_used, false);
-    ring_init(&ret_ring, (ring_buffer_t *) ret_free, (ring_buffer_t *) ret_used, false);
-    for (int i = 0; i < I2C_BUF_COUNT; i++) {
-        // TODO: check buffer offsetting here. This is definitely too sparse because I haven't updated
-        //       it form the 4-buf design
-        enqueue_free(&req_ring, (uintptr_t) driver_bufs + (i * I2C_BUF_SIZE), I2C_BUF_SIZE);
-        enqueue_free(&ret_ring, (uintptr_t) driver_bufs + (I2C_BUF_SIZE * (i + I2C_BUF_COUNT)), I2C_BUF_SIZE);
-    }
+    i2c_queue_init(&queue, (i2c_queue_t *) request_region, (i2c_queue_t *) response_region);
+
+    microkit_msginfo msginfo = microkit_msginfo_new(I2C_BUS_CLAIM, 1);
+    microkit_mr_set(I2C_BUS_SLOT, PN532_I2C_BUS_ADDRESS);
+    msginfo = microkit_ppcall(I2C_VIRTUALISER_CH, msginfo);
 
     /* Define the event loop/notified thread as the active co-routine */
     t_event = co_active();
@@ -198,11 +186,9 @@ void init(void) {
     co_switch(t_main);
 }
 
-size_t length = 0;
-
 void notified(microkit_channel ch) {
     switch (ch) {
-        case DRIVER_CH:
+        case I2C_VIRTUALISER_CH:
             co_switch(t_main);
             break;
         case TIMER_CH:

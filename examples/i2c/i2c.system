@@ -1,88 +1,60 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- System definition for i2c driver -->
 <!-- Matt Rossouw - matthew.rossouw@unsw.edu.au -->
 <!-- 2023 -->
 <system>
-    <!-- i2c hardware -->
-    <!-- <memory_region name="i2cm3" size="0x1000" phys_addr="0xFFD1C000"/> -->
-    <memory_region name="i2cm2" size="0x1000" phys_addr="0xFFD1D000"/>
+    <!--
+        These memory regions are required for initialisation. In the future
+        we will have separate drivers to initialise the clocks etc
+     -->
     <memory_region name="gpio" size="0x4000" phys_addr="0xFF634000"/>
     <memory_region name="clk" size="0x1000" phys_addr="0xFF63C000"/>
 
+    <memory_region name="i2c_bus" size="0x1000" phys_addr="0xFFD1D000"/>
+
+    <memory_region name="client_request_region" size="0x200_000" page_size="0x200_000"/>
+    <memory_region name="client_response_region" size="0x200_000" page_size="0x200_000"/>
+    <memory_region name="driver_request_region" size="0x200_000" page_size="0x200_000"/>
+    <memory_region name="driver_response_region" size="0x200_000" page_size="0x200_000"/>
+    <memory_region name="data_region" size="0x200_000" page_size="0x200_000"/>
+
     <memory_region name="timer_registers" size="0x1000" phys_addr="0xffd0f000" />
 
-    <!-- Shared ring buffers -->
-    <!-- Transfer channels server <-> driver -->
-    <memory_region name="m2_req_free" size="0x200_000" page_size="0x200_000"/>
-    <memory_region name="m2_req_used" size="0x200_000" page_size="0x200_000"/>
-    <memory_region name="m2_ret_free" size="0x200_000" page_size="0x200_000"/>
-    <memory_region name="m2_ret_used" size="0x200_000" page_size="0x200_000"/>
-	<!-- Data buffer region -->
-	<memory_region name="driver_bufs" size="0x200_000" page_size="0x200_000"/>
-
-    <!-- Transfer channels client <=> server -->
-<!--     <memory_region name="client_req_free" size="0x200_000" page_size="0x200_000"/>
-    <memory_region name="client_req_used" size="0x200_000" page_size="0x200_000"/>
-    <memory_region name="client_ret_free" size="0x200_000" page_size="0x200_000"/>
-    <memory_region name="client_ret_used" size="0x200_000" page_size="0x200_000"/> -->
-
-    <!-- Main protection domain - i2c server -->
-<!--     <protection_domain name="i2c_server" priority="200" pp="true">
-        <program_image path="i2c.elf"/>
-
- -->        <!-- Server <=> driver buffers -->
-<!-- 		<map mr="m2_req_free" vaddr="0x4_000_000" perms="rw" setvar_vaddr="req_free"/>
-        <map mr="m2_req_used" vaddr="0x4_200_000" perms="rw" setvar_vaddr="req_used"/>
-        <map mr="m2_ret_free" vaddr="0x4_800_000" perms="rw" setvar_vaddr="ret_free"/>
-        <map mr="m2_ret_used" vaddr="0x4_A00_000" perms="rw" setvar_vaddr="ret_used"/>
-        <map mr="driver_bufs" vaddr="0x5_000_000" perms="rw" setvar_vaddr="driver_bufs"/>
-
- -->
-        <!-- Client <=> server ring buffer -->
-        <!-- <map mr="client_req_free" vaddr="0x5_200_000" perms="rw" setvar_vaddr="client_req_free"/> -->
-        <!-- <map mr="client_req_used" vaddr="0x5_400_000" perms="rw" setvar_vaddr="client_req_used"/> -->
-        <!-- <map mr="client_ret_free" vaddr="0x5_600_000" perms="rw" setvar_vaddr="client_ret_free"/> -->
-        <!-- <map mr="client_ret_used" vaddr="0x5_800_000" perms="rw" setvar_vaddr="client_ret_used"/> -->
-    <!-- </protection_domain> -->
-
-    <!-- i2c driver -->
-    <protection_domain name="i2c_driver" priority="201">
+    <protection_domain name="driver" priority="100">
         <program_image path="driver.elf"/>
 
-        <!-- Server <=> driver buffers -->
-		<map mr="m2_req_free" vaddr="0x4_000_000" perms="rw" setvar_vaddr="req_free"/>
-        <map mr="m2_req_used" vaddr="0x4_200_000" perms="rw" setvar_vaddr="req_used"/>
-        <map mr="m2_ret_free" vaddr="0x4_800_000" perms="rw" setvar_vaddr="ret_free"/>
-        <map mr="m2_ret_used" vaddr="0x4_A00_000" perms="rw" setvar_vaddr="ret_used"/>
-        <map mr="driver_bufs" vaddr="0x5_000_000" perms="rw" setvar_vaddr="driver_bufs"/>
-        <map mr="i2cm2"       vaddr="0x3_000_000" perms="rw" setvar_vaddr="i2c_regs" cached="false"/>
-        <map mr="gpio"        vaddr="0x3_100_000" perms="rw" setvar_vaddr="gpio_regs" cached="false"/>
-        <map mr="clk"         vaddr="0x3_200_000" perms="rw" setvar_vaddr="clk_regs" cached="false"/>
+		<map mr="driver_request_region" vaddr="0x4_000_000" perms="rw" setvar_vaddr="request_region" />
+        <map mr="driver_response_region" vaddr="0x5_000_000" perms="rw" setvar_vaddr="response_region" />
 
-        <!-- M2 IRQs -->
+        <map mr="i2c_bus" vaddr="0x3_000_000" perms="rw" setvar_vaddr="i2c_regs" cached="false" />
+
+        <map mr="gpio" vaddr="0x3_100_000" perms="rw" setvar_vaddr="gpio_regs" cached="false" />
+        <map mr="clk" vaddr="0x3_200_000" perms="rw" setvar_vaddr="clk_regs" cached="false" />
+
+        <map mr="data_region" vaddr="0x10_000_000" perms="rw" />
+
+        <!-- IRQs for the particular I2C bus we are using -->
         <!-- Main interrupt -->
-        <irq irq="247" id="2" trigger="edge"/>
-
+        <irq irq="247" id="1" trigger="edge"/>
         <!-- TO interrupt (timeout?) -->
-        <irq irq="126" id="3" trigger="edge"/>
+        <irq irq="126" id="2" trigger="edge"/>
+    </protection_domain>
 
+    <protection_domain name="virtualiser" priority="99" pp="true">
+        <program_image path="virtualiser.elf" />
 
-        <!-- M3 IRQs -->
-        <!-- Main interrupt -->
-        <irq irq="71" id="4" trigger="edge"/>
+        <map mr="client_request_region" vaddr="0x4_000_000" perms="rw" />
+        <map mr="client_response_region" vaddr="0x5_000_000" perms="rw" />
 
-        <!-- TO interrupt (timeout?) -->
-        <irq irq="127" id="5" trigger="edge"/>
+        <map mr="driver_request_region" vaddr="0x6_000_000" perms="rw" setvar_vaddr="driver_request_region" />
+        <map mr="driver_response_region" vaddr="0x7_000_000" perms="rw" setvar_vaddr="driver_response_region" />
     </protection_domain>
 
     <protection_domain name="client" priority="1">
         <program_image path="client.elf" />
 
-        <map mr="m2_req_free" vaddr="0x4_000_000" perms="rw" setvar_vaddr="req_free"/>
-        <map mr="m2_req_used" vaddr="0x4_200_000" perms="rw" setvar_vaddr="req_used"/>
-        <map mr="m2_ret_free" vaddr="0x4_800_000" perms="rw" setvar_vaddr="ret_free"/>
-        <map mr="m2_ret_used" vaddr="0x4_A00_000" perms="rw" setvar_vaddr="ret_used"/>
-        <map mr="driver_bufs" vaddr="0x5_000_000" perms="rw" setvar_vaddr="driver_bufs"/>
+        <map mr="client_request_region" vaddr="0x4_000_000" perms="rw" setvar_vaddr="request_region" />
+        <map mr="client_response_region" vaddr="0x5_000_000" perms="rw" setvar_vaddr="response_region" />
+        <map mr="data_region" vaddr="0x6_000_000" perms="rw" setvar_vaddr="data_region" />
     </protection_domain>
 
     <protection_domain name="timer" priority="254" pp="true" passive="true">
@@ -93,34 +65,16 @@
 
     <channel>
         <end pd="client" id="0" />
-        <end pd="i2c_driver" id="1" />
+        <end pd="virtualiser" id="0" />
+    </channel>
+
+    <channel>
+        <end pd="driver" id="0" />
+        <end pd="virtualiser" id="1" />
     </channel>
 
     <channel>
         <end pd="timer" id="1" />
         <end pd="client" id="1" /> <!-- Should this number change, so should TIMER_CH in timer.h -->
     </channel>
-
-    <!-- Client protection domain - for testing -->
-    <!-- <protection_domain name="fool" priority="120"> -->
-        <!-- <program_image path="fool.elf"/> -->
-
-        <!-- Client <=> server ring buffer -->
-        <!-- <map mr="client_req_free" vaddr="0x4_000_000" perms="rw" setvar_vaddr="client_req_free"/> -->
-        <!-- <map mr="client_req_used" vaddr="0x4_200_000" perms="rw" setvar_vaddr="client_req_used"/> -->
-        <!-- <map mr="client_ret_free" vaddr="0x4_400_000" perms="rw" setvar_vaddr="client_ret_free"/> -->
-        <!-- <map mr="client_ret_used" vaddr="0x4_600_000" perms="rw" setvar_vaddr="client_ret_used"/> -->
-    <!-- </protection_domain> -->
-
-    <!-- Driver<=>Server notification interface -->
-<!--     <channel>
-        <end pd="i2c_server" id="1"/>
-        <end pd="i2c_driver" id="1"/>
-    </channel> -->
-
-    <!-- Server<=>Client notification interface -->
-    <!-- <channel> -->
-        <!-- <end pd="i2c_server" id="2"/> -->
-        <!-- <end pd="fool" id="2"/> -->
-    <!-- </channel> -->
 </system>
