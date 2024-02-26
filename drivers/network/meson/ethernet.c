@@ -9,7 +9,6 @@
 #include <sddf/network/shared_ringbuffer.h>
 #include "ethernet.h"
 
-#define IRQ_2  0
 #define IRQ_CH 1
 #define TX_CH  2
 #define RX_CH  3
@@ -503,12 +502,6 @@ void notified(microkit_channel ch)
 {
     switch(ch) {
         case IRQ_CH:
-            handle_eth(eth_dma);
-            have_signal = true;
-            signal_msg = seL4_MessageInfo_new(IRQAckIRQ, 0, 0, 0);
-            signal_cap = (BASE_IRQ_CAP + IRQ_CH);
-            return;
-        case IRQ_2:
             handle_eth(eth_dma);
             have_signal = true;
             signal_msg = seL4_MessageInfo_new(IRQAckIRQ, 0, 0, 0);
