@@ -503,10 +503,8 @@ void notified(microkit_channel ch)
     switch(ch) {
         case IRQ_CH:
             handle_eth(eth_dma);
-            have_signal = true;
-            signal_msg = seL4_MessageInfo_new(IRQAckIRQ, 0, 0, 0);
-            signal_cap = (BASE_IRQ_CAP + IRQ_CH);
-            return;
+            microkit_irq_ack_delayed(IRQ_CH);
+            break;
         case TX_CH:
             handle_tx();
             break;
