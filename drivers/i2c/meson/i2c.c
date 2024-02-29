@@ -20,7 +20,7 @@
 
 #define VIRTUALISER_CH 0
 #define IRQ_CH 1
-#define IRQ_TO_CH 2
+#define IRQ_TIMEOUT_CH 2
 
 // #define DEBUG_DRIVER
 
@@ -214,11 +214,11 @@ static inline void i2c_setup() {
 
     // Set GPIO drive strength
     *pad_ds5a_ptr &= ~(GPIO_DS_5A_A14 | GPIO_DS_5A_A15);
-    *pad_ds5a_ptr |= ((ds << GPIO_DS_5A_A14_SHIFT) | 
+    *pad_ds5a_ptr |= ((ds << GPIO_DS_5A_A14_SHIFT) |
                     (ds << GPIO_DS_5A_A15_SHIFT));
 
     // Check register updated
-    if ((*pad_ds5a_ptr & (GPIO_DS_5A_A14 | GPIO_DS_5A_A15)) != ((ds << GPIO_DS_5A_A14_SHIFT) | 
+    if ((*pad_ds5a_ptr & (GPIO_DS_5A_A14 | GPIO_DS_5A_A15)) != ((ds << GPIO_DS_5A_A14_SHIFT) |
                     (ds << GPIO_DS_5A_A15_SHIFT))) {
         printf("driver: failed to set drive strength for m3!\n");
     }
@@ -364,10 +364,7 @@ static inline bool i2c_load_tokens(volatile struct i2c_regs *regs) {
         return false;
     }
 
-    // @alwin: why do we need a flush here?
-    COMPILER_MEMORY_FENCE();
     i2c_flush(regs);
-    COMPILER_MEMORY_FENCE();
 
     // Load address into address register
     // Address goes into low 7 bits of address register
@@ -474,9 +471,7 @@ static inline bool i2c_load_tokens(volatile struct i2c_regs *regs) {
     LOG_DRIVER("Tokens loaded. %zu remain for this request\n", i2c_ifState.remaining);
     i2c_dump(regs);
     // Start list processor
-    COMPILER_MEMORY_FENCE();
     i2c_start(regs);
-    COMPILER_MEMORY_FENCE();
 
     return true;
 }
@@ -497,10 +492,8 @@ void init(void) {
     microkit_dbg_puts("Driver initialised.\n");
 }
 
-/**
- * Check if there is work to do for a given bus and dispatch it if so.
-*/
-static void check_buf() {
+static inline void handle_request(void) {
+    LOG_DRIVER("handling request\n");
     volatile struct i2c_regs *regs = (volatile struct i2c_regs *) i2c_regs;
     if (!i2c_queue_empty(queue_handle.request)) {
         // If this interface is busy, skip notification and
@@ -545,25 +538,6 @@ static void check_buf() {
         // If nothing needs to be done, clear notified flag if it was set.
         i2c_ifState.notified = 0;
     }
-}
-
-/**
- * Handling for notifications from the server. Responsible for
- * checking ring buffers and dispatching requests to appropriate
- * interfaces.
-*/
-static inline void handle_request(void) {
-    // If we are notified, data should be available.
-    // Check if the server has deposited something in the request rings
-    // - note that we individually check each interface's ring since
-    // they operate in parallel and notifications carry no other info.
-
-    // If there is work to do, attempt to do it
-    LOG_DRIVER("driver notified!\n");
-    // @ivanv ???
-    // for (int i = 2; i < 4; i++) {
-    check_buf();
-    // }
 }
 
 /**
@@ -695,7 +669,7 @@ void notified(microkit_channel ch) {
             handle_irq(false);
             microkit_irq_ack(ch);
             break;
-        case IRQ_TO_CH:
+        case IRQ_TIMEOUT_CH:
             handle_irq(true);
             microkit_irq_ack(ch);
             break;
