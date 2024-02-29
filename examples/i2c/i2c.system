@@ -52,7 +52,7 @@
 
     <!-- i2c driver -->
     <protection_domain name="i2c_driver" priority="201">
-        <program_image path="i2c_driver.elf"/>
+        <program_image path="driver.elf"/>
 
         <!-- Server <=> driver buffers -->
 		<map mr="m2_req_free" vaddr="0x4_000_000" perms="rw" setvar_vaddr="req_free"/>
