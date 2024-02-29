@@ -9,7 +9,7 @@
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 
-#define DEBUG_VIRTUALISER
+// #define DEBUG_VIRTUALISER
 
 #ifdef DEBUG_VIRTUALISER
 #define LOG_VIRTUALISER(...) do{ printf("I2C VIRTUALISER|INFO: "); printf(__VA_ARGS__); }while(0)
