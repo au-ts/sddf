@@ -20,19 +20,20 @@ endif
 MICROKIT_BOARD ?= odroidc4
 CPU := cortex-a55
 
+BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
+
 CC := $(TOOLCHAIN)-gcc
 LD := $(TOOLCHAIN)-ld
 AS := $(TOOLCHAIN)-as
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 
-I2C=$(abspath ../../drivers/i2c/meson/)
-SDDF=$(abspath ../../)
-BENCHMARK=$(SDDF)/benchmark
+SDDF := $(abspath ../../)
+UTIL := $(SDDF)/util
 LIBCO := $(SDDF)/libco
 
-BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
+I2C := $(SDDF)/drivers/i2c/meson
 
-IMAGES := i2c.elf i2c_driver.elf client.elf
+IMAGES := server.elf driver.elf client.elf
 CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall -Wno-unused-function
 LDFLAGS := -L$(BOARD_DIR)/lib -L$(SDDF)/lib
 LIBS := -lmicrokit -Tmicrokit.ld -lc
@@ -42,23 +43,16 @@ REPORT_FILE = $(BUILD_DIR)/report.txt
 
 CFLAGS += -I$(BOARD_DIR)/include \
 	-I$(I2C)/include	\
-	-Iinclude/arch	\
 	-I$(SDDF)/include \
 	-I$(LIBCO) \
 	-MD \
 	-MP
 
-# SERVERFILES: Files implementing the server side of the i2c stack
-CLIENT := client.c
-SERVERFILES=$(I2C)/i2c.c
-DRIVERFILES=$(I2C)/i2c-driver.c
-COMMONFILES=$(I2C)/i2c-transport.c $(I2C)/sw_shared_ringbuffer.c $(I2C)/printf.c
-# FOOLFILES=$(I2C)/fool.c $(I2C)/printf.c
+COMMONFILES=$(I2C)/i2c-transport.c $(I2C)/sw_shared_ringbuffer.c $(UTIL)/printf.c $(UTIL)/util.c
 
 CLIENT_OBJS := $(LIBCO)/libco.o pn532.o client.o $(COMMONFILES:.c=.o)
-SERVER_OBJS := $(I2C)/i2c.o $(COMMONFILES:.c=.o)
-DRIVER_OBJS := $(I2C)/i2c_driver.o $(COMMONFILES:.c=.o)
-# FOOL_OBJS := $(I2C)/fool.o $(I2C)/printf.o
+SERVER_OBJS := $(I2C)/server.o $(COMMONFILES:.c=.o)
+DRIVER_OBJS := $(I2C)/i2c.o $(COMMONFILES:.c=.o)
 
 OBJS := $(sort $(addprefix $(BUILD_DIR)/, $(SERVER_OBJS) $(DRIVER_OBJS)))
 DEPS := $(OBJS:.o=.d)
@@ -73,10 +67,10 @@ $(BUILD_DIR)/%.d $(BUILD_DIR)/%.o: %.c Makefile
 $(BUILD_DIR)/%.o: %.s Makefile
 	$(AS) -g3 -mcpu=$(CPU) $< -o $@
 
-$(BUILD_DIR)/i2c.elf: $(addprefix $(BUILD_DIR)/, $(SERVER_OBJS))
+$(BUILD_DIR)/server.elf: $(addprefix $(BUILD_DIR)/, $(SERVER_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-$(BUILD_DIR)/i2c_driver.elf: $(addprefix $(BUILD_DIR)/, $(DRIVER_OBJS))
+$(BUILD_DIR)/driver.elf: $(addprefix $(BUILD_DIR)/, $(DRIVER_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(BUILD_DIR)/client.elf: $(addprefix $(BUILD_DIR)/, $(CLIENT_OBJS))

@@ -11,9 +11,10 @@
 // Matt Rossouw (matthew.rossouw@unsw.edu.au)
 // 08/2023
 
-#include "i2c-driver.h"
-#include "i2c-transport.h"
-#include "printf.h"
+#include <sddf/util/printf.h>
+#include "driver.h"
+#include "transport.h"
+#include "i2c.h"
 
 // Shared memory regions
 uintptr_t req_free;
@@ -24,11 +25,6 @@ uintptr_t driver_bufs;
 
 ring_handle_t req_ring;
 ring_handle_t ret_ring;
-
-
-void _putchar(char character) {
-    microkit_dbg_putc(character);
-}
 
 void i2cTransportInit(int buffer_init) {
     microkit_dbg_puts("Initialising i2c transport layer => ");

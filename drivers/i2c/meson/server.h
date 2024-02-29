@@ -4,8 +4,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-// i2c-sel4cp.c
-// Client-server interaction for sDDF i2c driver.
+// API for clients of I2C server
 // Matt Rossouw (matthew.rossouw@unsw.edu.au)
 // 09/2023
 
