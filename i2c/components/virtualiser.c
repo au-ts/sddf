@@ -1,14 +1,8 @@
 /*
- * Copyright 2023, UNSW
+ * Copyright 2024, UNSW
  *
  * SPDX-License-Identifier: BSD-2-Clause
  */
-
-// i2c.c
-// Server for the i2c driver. Responsible for managing device security and multiplexing.
-// Matt Rossouw (matthew.rossouw@unsw.edu.au)
-// 08/2023
-
 #include <microkit.h>
 #include <sddf/i2c/queue.h>
 #include <sddf/i2c/client.h>
@@ -26,19 +20,6 @@
 #define LOG_VIRTUALISER_ERR(...) do{ printf("I2C VIRTUALISER|ERROR: "); printf(__VA_ARGS__); }while(0)
 
 #define BUS_UNCLAIMED (-1)
-
-// 1. Allow the client to reserve a bus address
-    // 1.1 Error if another client has already reserved it.
-// 2. Allow the client to release a bus address
-    // 2.1. What happens if a client releases a bus address before all responses
-    //      on that bus address have finished?
-    // I think that the client fucked up so bad on them.
-// 3. Process requests and send them to the driver
-    // 3.1 Need to check bus address is valid - need to be careful as client can
-    // manipulate the rings here. Make sure to not access request->bus_address
-    // more than once.
-// 4. Process responses from the driver.
-    // 4.1 Check bus address again, same approach as 3.1
 
 /*
  * Note that we have a fundamental assumption that the regions of memory for a
@@ -69,20 +50,6 @@ int security_list[I2C_BUS_ADDRESS_MAX + 1];
 
 uintptr_t driver_response_region;
 uintptr_t driver_request_region;
-
-/**
- * Main entrypoint for server.
-*/
-void init(void) {
-    LOG_VIRTUALISER("initialising\n");
-    for (int i = 0; i < I2C_BUS_ADDRESS_MAX + 1; i++) {
-        security_list[i] = BUS_UNCLAIMED;
-    }
-    i2c_queue_init(&driver_queue, (i2c_queue_t *) driver_request_region, (i2c_queue_t *) driver_response_region);
-    for (int i = 0; i < NUM_CLIENTS; i++) {
-        i2c_queue_init(&client_queues[i], (i2c_queue_t *) client_request_regions[i], (i2c_queue_t *) client_response_regions[i]);
-    }
-}
 
 void process_request(microkit_channel ch) {
     bool enqueued = false;
@@ -157,6 +124,17 @@ void process_response() {
     }
 }
 
+void init(void) {
+    LOG_VIRTUALISER("initialising\n");
+    for (int i = 0; i < I2C_BUS_ADDRESS_MAX + 1; i++) {
+        security_list[i] = BUS_UNCLAIMED;
+    }
+    i2c_queue_init(&driver_queue, (i2c_queue_t *) driver_request_region, (i2c_queue_t *) driver_response_region);
+    for (int i = 0; i < NUM_CLIENTS; i++) {
+        i2c_queue_init(&client_queues[i], (i2c_queue_t *) client_request_regions[i], (i2c_queue_t *) client_response_regions[i]);
+    }
+}
+
 void notified(microkit_channel ch) {
     if (ch == DRIVER_CH) {
         process_response();
@@ -165,9 +143,6 @@ void notified(microkit_channel ch) {
     }
 }
 
-/**
- * Protected procedure calls into this server are used managing the security lists.
-*/
 seL4_MessageInfo_t protected(microkit_channel ch, seL4_MessageInfo_t msginfo) {
     size_t label = microkit_msginfo_get_label(msginfo);
     size_t bus = microkit_mr_get(I2C_BUS_SLOT);
