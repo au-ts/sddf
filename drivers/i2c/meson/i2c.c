@@ -56,7 +56,7 @@ i2c_queue_handle_t queue_handle;
 uintptr_t request_region;
 uintptr_t response_region;
 
-char *token_to_str(uint8_t token) {
+char *meson_token_to_str(uint8_t token) {
     switch (token) {
         case MESON_I2C_TOKEN_END:
             return "MESON_I2C_TOKEN_END";
@@ -102,14 +102,14 @@ static inline void i2c_dump(volatile struct i2c_regs *regs) {
     LOG_DRIVER("\t Token register 0:\n");
     for (int i = 0; i < 8; i++) {
         uint8_t tk = (regs->tk_list0 >> (i * 4)) & 0xF;
-        LOG_DRIVER("\t\t Token %d: %s\n", i, token_to_str(tk));
+        LOG_DRIVER("\t\t Token %d: %s\n", i, meson_token_to_str(tk));
     }
 
     // Print token register 1 tokens
     LOG_DRIVER("\t Token register 1:\n");
     for (int i = 0; i < 8; i++) {
         uint8_t tk = (regs->tk_list1 >> (i * 4)) & 0xF;
-        LOG_DRIVER("\t\t Token %d: %s\n", i, token_to_str(tk));
+        LOG_DRIVER("\t\t Token %d: %s\n", i, meson_token_to_str(tk));
     }
 
     // Print wdata register 0 tokens
@@ -353,6 +353,30 @@ static inline int i2c_flush(volatile struct i2c_regs *regs) {
     return 0;
 }
 
+static inline uint8_t i2c_token_convert(i2c_token_t token) {
+    switch (token) {
+        case I2C_TOKEN_END:
+            return MESON_I2C_TOKEN_END;
+        case I2C_TOKEN_START:
+            return MESON_I2C_TOKEN_START;
+        case I2C_TOKEN_ADDR_WRITE:
+            i2c_ifState.data_direction = DATA_DIRECTION_WRITE;
+            return MESON_I2C_TOKEN_ADDR_WRITE;
+        case I2C_TOKEN_ADDR_READ:
+            i2c_ifState.data_direction = DATA_DIRECTION_READ;
+            return MESON_I2C_TOKEN_ADDR_READ;
+        case I2C_TOKEN_DATA:
+            return MESON_I2C_TOKEN_DATA;
+        case I2C_TOKEN_DATA_END:
+            return MESON_I2C_TOKEN_DATA_END;
+        case I2C_TOKEN_STOP:
+            return MESON_I2C_TOKEN_STOP;
+        default:
+            LOG_DRIVER_ERR("invalid data token in request! \"0x%x\"\n", token);
+            return -1;
+    }
+}
+
 static inline bool i2c_load_tokens(volatile struct i2c_regs *regs) {
     LOG_DRIVER("starting token load\n");
     i2c_token_t *tokens = i2c_ifState.curr_request_data;
@@ -404,37 +428,8 @@ static inline bool i2c_load_tokens(volatile struct i2c_regs *regs) {
             continue;
         }
 
-        i2c_token_t tok = tokens[i];
-
-        uint32_t meson_token = 0x0;
-        switch (tok) {
-            case I2C_TOKEN_END:
-                meson_token = MESON_I2C_TOKEN_END;
-                break;
-            case I2C_TOKEN_START:
-                meson_token = MESON_I2C_TOKEN_START;
-                break;
-            case I2C_TOKEN_ADDR_WRITE:
-                meson_token = MESON_I2C_TOKEN_ADDR_WRITE;
-                i2c_ifState.data_direction = DATA_DIRECTION_WRITE;
-                break;
-            case I2C_TOKEN_ADDR_READ:
-                meson_token = MESON_I2C_TOKEN_ADDR_READ;
-                i2c_ifState.data_direction = DATA_DIRECTION_READ;
-                break;
-            case I2C_TOKEN_DATA:
-                meson_token = MESON_I2C_TOKEN_DATA;
-                break;
-            case I2C_TOKEN_DATA_END:
-                meson_token = MESON_I2C_TOKEN_DATA_END;
-                break;
-            case I2C_TOKEN_STOP:
-                meson_token = MESON_I2C_TOKEN_STOP;
-                break;
-            default:
-                LOG_DRIVER_ERR("invalid data token in request! \"0x%x\" at buffer index %d\n", tok, i);
-                return false;
-        }
+        /* Get the SoC specific token */
+        uint8_t meson_token = i2c_token_convert(tokens[i]);
 
         if (tk_offset < 8) {
             regs->tk_list0 |= (meson_token << (tk_offset * 4));
@@ -457,7 +452,7 @@ static inline bool i2c_load_tokens(volatile struct i2c_regs *regs) {
         }
 
         /* If data token and we are reading, increment counter of rdata */
-        if (tok == I2C_TOKEN_DATA && i2c_ifState.data_direction == DATA_DIRECTION_READ) {
+        if (meson_token == MESON_I2C_TOKEN_DATA && i2c_ifState.data_direction == DATA_DIRECTION_READ) {
             rdata_offset++;
         }
 
