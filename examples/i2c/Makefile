@@ -33,7 +33,7 @@ LIBCO := $(SDDF)/libco
 
 I2C := $(SDDF)/i2c
 I2C_DRIVER := $(SDDF)/drivers/i2c/meson
-LIBI2CQUEUE := $(SDDF)/i2c/queue
+I2C_QUEUE := $(I2C)/queue
 TIMER_DRIVER := $(SDDF)/drivers/clock/meson
 
 IMAGES := virtualiser.elf driver.elf client.elf timer.elf
@@ -45,13 +45,12 @@ IMAGE_FILE = $(BUILD_DIR)/loader.img
 REPORT_FILE = $(BUILD_DIR)/report.txt
 
 CFLAGS += -I$(BOARD_DIR)/include \
-	-I$(I2C_DRIVER)/include	\
 	-I$(SDDF)/include \
 	-I$(LIBCO) \
 	-MD \
 	-MP
 
-COMMONFILES=$(LIBI2CQUEUE)/queue.c $(UTIL)/printf.c $(UTIL)/util.c
+COMMONFILES=$(I2C_QUEUE)/queue.c $(UTIL)/printf.c $(UTIL)/util.c
 
 CLIENT_OBJS := $(LIBCO)/libco.o pn532.o client.o $(COMMONFILES:.c=.o) sddf_timer_client.o
 VIRTUALISER_OBJS := $(I2C)/components/virtualiser.o $(COMMONFILES:.c=.o)
@@ -88,9 +87,6 @@ $(BUILD_DIR)/timer.elf: $(BUILD_DIR)/timer_driver.o
 
 $(BUILD_DIR)/timer_driver.o: $(TIMER_DRIVER)/timer.c
 	$(CC) -c $(CFLAGS) $(TIMER_DRIVER)/timer.c -o $(BUILD_DIR)/timer_driver.o
-
-# $(BUILD_DIR)/fool.elf: $(addprefix $(BUILD_DIR)/, $(FOOL_OBJS))
-# 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(IMAGE_FILE) $(REPORT_FILE): $(addprefix $(BUILD_DIR)/, $(IMAGES)) i2c.system
 	$(MICROKIT_TOOL) i2c.system --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
