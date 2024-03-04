@@ -73,7 +73,7 @@ A token-based abstraction is already used in the ODROID C4 hardware, but we take
 * `I2C_TOKEN_ADDRR` - Transmit a 7 bit address with a READ condition.
 * `I2C_TOKEN_DATA_END` - Transmit a NACK to indicate to the target that we are done reading, if a read was in effect. Required to prevent target from staying in read mode.
 * `I2C_TOKEN_STOP` - Triggers hardware to signal the END condition on the bus, releasing it.
-* `I2C_TOKEN_DAT` - Transmits or receives a byte of data - the next byte after this token is treated as the payload to send under a WRITE condition, otherwise under a READ condition the subsequent byte should be another token which is processed normally.
+* `I2C_TOKEN_DATA` - Transmits or receives a byte of data - the next byte after this token is treated as the payload to send under a WRITE condition, otherwise under a READ condition the subsequent byte should be another token which is processed normally.
 
 ### Error handling and transaction buffer format
 

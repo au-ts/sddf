@@ -299,18 +299,13 @@ static inline void i2c_setup() {
  *         while a negative value corresponds to a bus NACK at a token of value -(ret).
  *         e.g. if NACK on a ADDRW (0x3) the return value will be -3.
  */
-static inline int i2c_get_error(volatile struct i2c_regs *regs) {
-    // Index into ctl register - i2c base + address of appropriate register
+static inline int i2c_get_error(volatile struct i2c_regs *regs, uint8_t *bytes_read, uint8_t *curr_token) {
     volatile uint32_t ctl = regs->ctl;
     uint8_t err = ctl & (1 << 3);   // bit 3 -> set if error
-    uint8_t rd = (ctl & 0xF00) >> 8; // bits 8-11 -> number of bytes read
-    uint8_t tok = (ctl & 0xF0) >> 4; // bits 4-7 -> curr token
+    *bytes_read = (ctl & 0xF00) >> 8; // bits 8-11 -> number of bytes read
+    *curr_token = (ctl & 0xF0) >> 4; // bits 4-7 -> curr token
 
-    if (err) {
-        return -tok;
-    } else {
-        return rd;
-    }
+    return err;
 }
 
 static inline int i2c_start(volatile struct i2c_regs *regs) {
@@ -578,41 +573,41 @@ static void handle_irq(bool timeout) {
     i2c_halt(regs);
 
     // Get result
-    int err = i2c_get_error(regs);
+    uint8_t curr_token = 0;
+    uint8_t bytes_read = 0;
+    uint8_t error = i2c_get_error(regs, &bytes_read, &curr_token);
     // If error is 0, successful write. If error >0, successful read of err bytes.
     // Prepare to extract data from the interface.
     i2c_token_t *ret = i2c_ifState.curr_request_data;
 
     // If there was an error, cancel the rest of this transaction and load the
     // error information into the return buffer.
-    if (err < 0) {
+    if (error) {
         LOG_DRIVER("error!\n");
         if (timeout) {
             ret[RESPONSE_ERR] = I2C_ERR_TIMEOUT;
-        } else if (err == -I2C_TOKEN_ADDR_READ) {
+        } else if (curr_token == I2C_TOKEN_ADDR_READ) {
             ret[RESPONSE_ERR] = I2C_ERR_NOREAD;
         } else {
             ret[RESPONSE_ERR] = I2C_ERR_NACK;
         }
-        ret[RESPONSE_ERR_TOKEN] = -err;   // Token that caused error
+        // Token that caused the error
+        ret[RESPONSE_ERR_TOKEN] = curr_token;
     } else {
-        // If there was a read, extract the data from the interface
-        if (err > 0) {
-            // Get read data
-            // Copy data into return buffer
-            for (int i = 0; i < err; i++) {
-                size_t index = RESPONSE_DATA_OFFSET + i2c_ifState.curr_response_len;
-                if (i < 4) {
-                    uint8_t value = (regs->rdata0 >> (i * 8)) & 0xFF;
-                    ret[index] = value;
-                    LOG_DRIVER("loading into ret at %d value 0x%lx\n", index, value);
-                } else if (i < 8) {
-                    uint8_t value = (regs->rdata1 >> ((i - 4) * 8)) & 0xFF;
-                    ret[index] = value;
-                    LOG_DRIVER("loading into ret at %d value 0x%lx\n", index, value);
-                }
-                i2c_ifState.curr_response_len++;
+        // Get read data
+        // Copy data into return buffer
+        for (int i = 0; i < bytes_read; i++) {
+            size_t index = RESPONSE_DATA_OFFSET + i2c_ifState.curr_response_len;
+            if (i < 4) {
+                uint8_t value = (regs->rdata0 >> (i * 8)) & 0xFF;
+                ret[index] = value;
+                LOG_DRIVER("loading into ret at %d value 0x%lx\n", index, value);
+            } else if (i < 8) {
+                uint8_t value = (regs->rdata1 >> ((i - 4) * 8)) & 0xFF;
+                ret[index] = value;
+                LOG_DRIVER("loading into ret at %d value 0x%lx\n", index, value);
             }
+            i2c_ifState.curr_response_len++;
         }
 
         LOG_DRIVER("I2C_ERR_OK\n");
@@ -621,13 +616,13 @@ static void handle_irq(bool timeout) {
     }
 
     // If request is completed or there was an error, return data to server and notify.
-    if (err < 0 || !i2c_ifState.remaining) {
+    if (error || !i2c_ifState.remaining) {
         LOG_DRIVER("request completed or error, returning to server\n");
         LOG_DRIVER("pushing return buffer with addr 0x%lx and size 0x%lx\n", ret, i2c_ifState.curr_request_len);
 
         // @alwin: why is size here curr_request_len and not curr_response_len?
-        err = i2c_enqueue_response(&queue_handle, i2c_ifState.addr, (size_t) i2c_ifState.curr_request_data - DATA_REGIONS_START, i2c_ifState.curr_request_len);
-        if (err) {
+        int ret = i2c_enqueue_response(&queue_handle, i2c_ifState.addr, (size_t) i2c_ifState.curr_request_data - DATA_REGIONS_START, i2c_ifState.curr_request_len);
+        if (ret) {
             LOG_DRIVER_ERR("Failed to enqueue response\n");
         }
         i2c_ifState.curr_response_data = NULL;
