@@ -15,5 +15,6 @@
 #define I2C_BUS_CLAIM       (1)
 #define I2C_BUS_RELEASE     (2)
 
+/* This is the label of the PPC response from the virtualiser */
 #define I2C_SUCCESS (0)
 #define I2C_FAILURE (1)
