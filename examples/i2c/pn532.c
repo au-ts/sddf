@@ -315,6 +315,8 @@ int8_t read_response_length(size_t retries) {
     /* @ivanv: testing, shouldn't be necessary */
     co_switch(t_event);
 
+    process_return_buffer();
+
     return length;
 }
 
@@ -380,21 +382,18 @@ bool pn532_read_response(uint8_t *buffer, uint8_t buffer_len, size_t retries) {
     if (response_read(&response) != PN532_PREAMBLE) {
         LOG_PN532_ERR("read_response: PREAMBLE check failed\n");
         response_finish(&response);
-        process_return_buffer();
         return false;
     }
     // Read STARTCODE1
     if (response_read(&response) != PN532_STARTCODE1) {
         LOG_PN532_ERR("read_response: STARTCODE1 check failed\n");
         response_finish(&response);
-        process_return_buffer();
         return false;
     }
     // Read STARTCODE2
     if (response_read(&response) != PN532_STARTCODE2) {
         LOG_PN532_ERR("read_response: STARTCODE2 check failed\n");
         response_finish(&response);
-        process_return_buffer();
         return false;
     }
     // Read length
@@ -402,7 +401,6 @@ bool pn532_read_response(uint8_t *buffer, uint8_t buffer_len, size_t retries) {
     if (data_length != length) {
         LOG_PN532_ERR("Received data_length of 0x%lx, was expecting 0x%lx\n", data_length, length);
         response_finish(&response);
-        process_return_buffer();
         return false;
     }
 
@@ -416,7 +414,6 @@ bool pn532_read_response(uint8_t *buffer, uint8_t buffer_len, size_t retries) {
     if (data_length > buffer_len) {
         LOG_PN532_ERR("returned data length (0x%lx) greater than user-provided buffer length (0x%lx)\n", data_length, buffer_len);
         response_finish(&response);
-        process_return_buffer();
         return false;
     }
     for (int i = 0; i < data_length; i++) {
@@ -429,7 +426,6 @@ bool pn532_read_response(uint8_t *buffer, uint8_t buffer_len, size_t retries) {
 
     response_finish(&response);
 
-    process_return_buffer();
 
     return true;
 }
