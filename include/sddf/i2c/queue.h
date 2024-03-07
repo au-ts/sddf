@@ -25,17 +25,17 @@
 typedef uint8_t i2c_token_t;
 
 enum i2c_token {
-	/* END: Terminator for token list, has no meaning to hardware otherwise */
+    /* END: Terminator for token list, has no meaning to hardware otherwise */
     I2C_TOKEN_END = 0x0,
-	/* START: Begin a transfer. Causes master device to capture bus. */
+    /* START: Begin a transfer. Causes master device to capture bus. */
     I2C_TOKEN_START = 0x1,
     /* ADDRESS WRITE: Used to wake up the target device on the bus.
-	 * Sets up and following DATA tokens to be writes. */
+     * Sets up and following DATA tokens to be writes. */
     I2C_TOKEN_ADDR_WRITE = 0x2,
-	/* ADDRESS READ: Same as ADDRW but sets up DATA tokens as reads. */
+    /* ADDRESS READ: Same as ADDRW but sets up DATA tokens as reads. */
     I2C_TOKEN_ADDR_READ = 0x3,
-	/* DATA_LAST: Used for read transactions to write a NACK to alert
-	 * the slave device that the read is now over. */
+    /* DATA_LAST: Used for read transactions to write a NACK to alert
+     * the slave device that the read is now over. */
     I2C_TOKEN_DATA_END = 0x4,
     /* STOP: Used to send the STOP condition on the bus to end a transaction.
      * Causes master to release the bus. */
