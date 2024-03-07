@@ -18,3 +18,29 @@ make MICROKIT_SDK=/path/to/sdk
 ```
 
 The final bootable image will be in `build/loader.img`.
+
+## Running
+
+Running the example will show the following output after the system has booted:
+```
+PN532|ERROR: read_response - length was less than zero
+CLIENT|ERROR: Timed out waiting for a card
+PN532|ERROR: read_response - length was less than zero
+CLIENT|ERROR: Timed out waiting for a card
+```
+
+If you put a card in front of the card reader, you should see messages similar to
+the following:
+```
+UID Length: 4 bytes
+UID Value:  0x9c 0x1b 0xb4 0x1
+UID Length: 4 bytes
+UID Value:  0x9c 0x1b 0xb4 0x1
+UID Length: 4 bytes
+UID Value:  0x9c 0x1b 0xb4 0x1
+```
+
+where the card UID is being read and printed out.
+
+Note that for MiFare Ultra Light cards or cards that have encryption, you may
+see timeouts between each UID card read, this is expected.
