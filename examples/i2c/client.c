@@ -171,7 +171,7 @@ bool delay_ms(size_t milliseconds) {
 void init(void) {
     LOG_CLIENT("init\n");
 
-    i2c_queue_init(&queue, (i2c_queue_t *) request_region, (i2c_queue_t *) response_region);
+    queue = i2c_queue_init((i2c_queue_t *) request_region, (i2c_queue_t *) response_region);
 
     microkit_msginfo msginfo = microkit_msginfo_new(I2C_BUS_CLAIM, 1);
     microkit_mr_set(I2C_BUS_SLOT, PN532_I2C_BUS_ADDRESS);

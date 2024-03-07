@@ -60,7 +60,7 @@ void process_request(microkit_channel ch) {
         size_t offset = 0;
         size_t bus_address = 0;
         unsigned int len = 0;
-        int err = i2c_dequeue_request(&client_queues[ch], &bus_address, &offset, &len);
+        int err = i2c_dequeue_request(client_queues[ch], &bus_address, &offset, &len);
         if (err) {
             LOG_VIRTUALISER_ERR("could not dequeue from request queue\n");
             return;
@@ -79,7 +79,7 @@ void process_request(microkit_channel ch) {
 
         // Now we need to convert the offset into an offset the driver can use in its address space.
         size_t driver_offset = driver_data_offsets[ch] + offset;
-        err = i2c_enqueue_request(&driver_queue, bus_address, driver_offset, len);
+        err = i2c_enqueue_request(driver_queue, bus_address, driver_offset, len);
         /* If this assert fails we have a race as the driver should only ever be dequeuing */
         assert(!err);
 
@@ -104,7 +104,7 @@ void process_response() {
         unsigned int len = 0;
 
         /* We trust the driver to give us a sane bus address */
-        int err = i2c_dequeue_response(&driver_queue, &bus_address, &driver_offset, &len);
+        int err = i2c_dequeue_response(driver_queue, &bus_address, &driver_offset, &len);
         /* If this assert fails we have a race as the virtualiser should be the only one dequeuing
          * from the driver's response queue */
         assert(!err);
@@ -118,7 +118,7 @@ void process_response() {
 
         size_t client_offset = driver_offset - driver_data_offsets[ch];
         /* There is no point checking if the enqueue succeeds or not. */
-        i2c_enqueue_response(&client_queues[ch], bus_address, client_offset, len);
+        i2c_enqueue_response(client_queues[ch], bus_address, client_offset, len);
 
         microkit_notify(ch);
     }
@@ -129,9 +129,9 @@ void init(void) {
     for (int i = 0; i < I2C_BUS_ADDRESS_MAX + 1; i++) {
         security_list[i] = BUS_UNCLAIMED;
     }
-    i2c_queue_init(&driver_queue, (i2c_queue_t *) driver_request_region, (i2c_queue_t *) driver_response_region);
+    driver_queue = i2c_queue_init((i2c_queue_t *) driver_request_region, (i2c_queue_t *) driver_response_region);
     for (int i = 0; i < NUM_CLIENTS; i++) {
-        i2c_queue_init(&client_queues[i], (i2c_queue_t *) client_request_regions[i], (i2c_queue_t *) client_response_regions[i]);
+        client_queues[i] = i2c_queue_init((i2c_queue_t *) client_request_regions[i], (i2c_queue_t *) client_response_regions[i]);
     }
 }
 

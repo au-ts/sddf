@@ -46,7 +46,7 @@ void response_init(struct response *response) {
     unsigned int buffer_len = 0;
     /* This is unused as for our PN532 client only talks to a single I2C bus address. */
     size_t bus_address = 0;
-    int ret = i2c_dequeue_response(&queue, &bus_address, &offset, &buffer_len);
+    int ret = i2c_dequeue_response(queue, &bus_address, &offset, &buffer_len);
     if (ret) {
         LOG_PN532_ERR("response_init could not dequeue used response buffer!\n");
         return;
@@ -104,7 +104,7 @@ void request_add(struct request *req, uint8_t data) {
 
 void request_send(struct request *req) {
     /* Here we add two to account for the REQ_BUF_CLIENT and REQ_BUF_ADDR */
-    int err = i2c_enqueue_request(&queue, req->bus_address, (size_t) req->buffer - data_region, req->data_offset_len);
+    int err = i2c_enqueue_request(queue, req->bus_address, (size_t) req->buffer - data_region, req->data_offset_len);
     if (err) {
         LOG_PN532_ERR("failed to enqueue request buffer!\n");
     }
