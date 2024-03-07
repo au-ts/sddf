@@ -68,7 +68,7 @@ typedef struct i2c_queue_handle {
  * @param request pointer to request queue in shared memory.
  * @param response pointer to response queue in shared memory.
  */
-void i2c_queue_init(i2c_queue_handle_t *h, i2c_queue_t *request, i2c_queue_t *response);
+i2c_queue_handle_t i2c_queue_init(i2c_queue_t *request, i2c_queue_t *response);
 
 /**
  * Check if the ring buffer is empty.
@@ -161,9 +161,9 @@ static inline int i2c_dequeue(i2c_queue_t *queue, size_t *bus_address, size_t *o
  *
  * @return -1 when ring is empty, 0 on success.
  */
-static inline int i2c_enqueue_request(i2c_queue_handle_t *h, size_t bus_address, size_t offset, unsigned int len)
+static inline int i2c_enqueue_request(i2c_queue_handle_t h, size_t bus_address, size_t offset, unsigned int len)
 {
-    return i2c_enqueue(h->request, bus_address, offset, len);
+    return i2c_enqueue(h.request, bus_address, offset, len);
 }
 
 /**
@@ -176,9 +176,9 @@ static inline int i2c_enqueue_request(i2c_queue_handle_t *h, size_t bus_address,
  *
  * @return -1 when ring is empty, 0 on success.
  */
-static inline int i2c_enqueue_response(i2c_queue_handle_t *h, size_t bus_address, size_t offset, unsigned int len)
+static inline int i2c_enqueue_response(i2c_queue_handle_t h, size_t bus_address, size_t offset, unsigned int len)
 {
-    return i2c_enqueue(h->response, bus_address, offset, len);
+    return i2c_enqueue(h.response, bus_address, offset, len);
 }
 
 /**
@@ -190,9 +190,9 @@ static inline int i2c_enqueue_response(i2c_queue_handle_t *h, size_t bus_address
  *
  * @return -1 when ring is empty, 0 on success.
  */
-static inline int i2c_dequeue_request(i2c_queue_handle_t *h, size_t *bus_address, size_t *offset, unsigned int *len)
+static inline int i2c_dequeue_request(i2c_queue_handle_t h, size_t *bus_address, size_t *offset, unsigned int *len)
 {
-    return i2c_dequeue(h->request, bus_address, offset, len);
+    return i2c_dequeue(h.request, bus_address, offset, len);
 }
 
 /**
@@ -204,7 +204,7 @@ static inline int i2c_dequeue_request(i2c_queue_handle_t *h, size_t *bus_address
  *
  * @return -1 when ring is empty, 0 on success.
  */
-static inline int i2c_dequeue_response(i2c_queue_handle_t *h, size_t *bus_address, size_t *offset, unsigned int *len)
+static inline int i2c_dequeue_response(i2c_queue_handle_t h, size_t *bus_address, size_t *offset, unsigned int *len)
 {
-    return i2c_dequeue(h->response, bus_address, offset, len);
+    return i2c_dequeue(h.response, bus_address, offset, len);
 }

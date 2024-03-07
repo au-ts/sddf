@@ -468,7 +468,7 @@ static inline bool i2c_load_tokens(volatile struct i2c_regs *regs) {
 
 void init(void) {
     i2c_setup();
-    i2c_queue_init(&queue_handle, (i2c_queue_t *) request_region, (i2c_queue_t *) response_region);
+    queue_handle = i2c_queue_init((i2c_queue_t *) request_region, (i2c_queue_t *) response_region);
     // i2cTransportInit(0);
     // Set up driver state
     i2c_ifState.curr_request_data = NULL;
@@ -499,7 +499,7 @@ static inline void handle_request(void) {
         size_t bus_address = 0;
         size_t offset = 0;
         unsigned int size = 0;
-        int err = i2c_dequeue_request(&queue_handle, &bus_address, &offset, &size);
+        int err = i2c_dequeue_request(queue_handle, &bus_address, &offset, &size);
         if (err) {
             LOG_DRIVER_ERR("fatal: failed to dequeue request\n");
             return;
@@ -621,7 +621,7 @@ static void handle_irq(bool timeout) {
         LOG_DRIVER("pushing return buffer with addr 0x%lx and size 0x%lx\n", ret, i2c_ifState.curr_request_len);
 
         // @alwin: why is size here curr_request_len and not curr_response_len?
-        int ret = i2c_enqueue_response(&queue_handle, i2c_ifState.addr, (size_t) i2c_ifState.curr_request_data - DATA_REGIONS_START, i2c_ifState.curr_request_len);
+        int ret = i2c_enqueue_response(queue_handle, i2c_ifState.addr, (size_t) i2c_ifState.curr_request_data - DATA_REGIONS_START, i2c_ifState.curr_request_len);
         if (ret) {
             LOG_DRIVER_ERR("Failed to enqueue response\n");
         }
