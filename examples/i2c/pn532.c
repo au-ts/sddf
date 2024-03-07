@@ -41,6 +41,16 @@ struct response {
 extern i2c_queue_handle_t queue;
 extern uintptr_t data_region;
 
+/* Below is a simple API for quickly making requests and sending them off as well
+ * as reading from the responses.
+ * It should be noted that this code has a big assumption right now which is fine
+ * for this system but perhaps not all systems that would make use of I2C.
+ * The assumption is that we only have one request at a time until we get a response.
+ * This assumption lets us use the same region of memory within the data region for
+ * all of our requests and responses, as since it is one-by-one it will never be
+ * over-written.
+ */
+
 void response_init(struct response *response) {
     uintptr_t offset = 0;
     unsigned int buffer_len = 0;
@@ -85,7 +95,6 @@ void response_finish(struct response *response) {
 }
 
 void request_init(struct request *req, uint8_t bus_address) {
-    /* @ivanv maybe revisit this to see whether we should take the buffer and size from the client */
     req->data_offset_len = 0;
     req->buffer = (uint8_t *)data_region;
     req->buffer_size = I2C_MAX_DATA_SIZE;
@@ -260,9 +269,6 @@ int8_t read_response_length(size_t retries) {
 
         request_add(&req, I2C_TOKEN_START);
         request_add(&req, I2C_TOKEN_ADDR_READ);
-        /* @ivanv: This is slightly dodgy as I don't think we're actually reading
-           6 bytes of data when we get the return buffer. However, this what the
-           arduino code does so :shrug: */
         for (int i = 0; i < 6; i++) {
             request_add(&req, I2C_TOKEN_DATA);
         }
@@ -312,7 +318,6 @@ int8_t read_response_length(size_t retries) {
     request_add(&nack_req, I2C_TOKEN_END);
     request_send(&nack_req);
 
-    /* @ivanv: testing, shouldn't be necessary */
     co_switch(t_event);
 
     process_return_buffer();
@@ -336,7 +341,6 @@ bool pn532_read_response(uint8_t *buffer, uint8_t buffer_len, size_t retries) {
         struct request req = {};
         request_init(&req, PN532_I2C_BUS_ADDRESS);
 
-        // @alwin: The arduino code does 6 + ... but I see 7 reads?
         size_t num_data_tokens = 7 + length + 2;
 
         request_add(&req, I2C_TOKEN_START);
@@ -344,7 +348,6 @@ bool pn532_read_response(uint8_t *buffer, uint8_t buffer_len, size_t retries) {
 
         if (num_data_tokens > req.buffer_size) {
            LOG_PN532_ERR("number of request data tokens (0x%lx) exceeds buffer size (0x%lx)\n", num_data_tokens, req.buffer_size);
-            // @ivanv: should be putting the request ring back in the free queue
             return false;
         }
 
@@ -374,9 +377,6 @@ bool pn532_read_response(uint8_t *buffer, uint8_t buffer_len, size_t retries) {
         attempts++;
         delay_ms(1);
     }
-
-    // @alwin: We currently need to always consume an extra buffer, which is why there is a bunch
-    // of process_return_buffer() calls. idk where it comes from o_O
 
     // Read PREAMBLE
     if (response_read(&response) != PN532_PREAMBLE) {
