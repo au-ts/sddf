@@ -110,8 +110,8 @@ static inline uint32_t i2c_queue_size(i2c_queue_t *queue)
  * Enqueue an element to the queue
  *
  * @param queue to enqueue into
- * @param bus_address bus address on the I2C device to request/response is for
- * @param offset offset in data region where the request data is or the response data will be
+ * @param bus_address bus address on the I2C device that the request/response is for
+ * @param offset offset into the data region where the request data is or the response data will be
  * @param len length of data at the offset given
  *
  * @return -1 when ring is full, 0 on success.
@@ -141,7 +141,7 @@ static inline int i2c_enqueue(i2c_queue_t *queue, size_t bus_address, size_t off
  * @param offset pointer for where to store teh offset of the data of associated with the dequeued entry
  * @param len pointer for where to store the length of data associated with the dequeued entry
  *
- * @return -1 when ring is empty, 0 on success.
+ * @return -1 when queue is empty, 0 on success.
  */
 static inline int i2c_dequeue(i2c_queue_t *queue, size_t *bus_address, size_t *offset, unsigned int *len)
 {
@@ -161,14 +161,14 @@ static inline int i2c_dequeue(i2c_queue_t *queue, size_t *bus_address, size_t *o
 }
 
 /**
- * Enqueue an element into a free ring buffer.
- * This indicates the buffer address parameter is currently free for re-use.
+ * Enqueue an element into the request queue
  *
- * @param ring Ring handle to enqueue into.
- * @param buffer address into shared memory where data is stored.
- * @param len length of data inside the buffer above.
+ * @param queue queue handle to enqueue into.
+ * @param bus_address bus address on the I2C device to request on
+ * @param offset offset into the data region where the request data is
+ * @param len length of data at the offset given
  *
- * @return -1 when ring is empty, 0 on success.
+ * @return -1 when queue is full, 0 on success.
  */
 static inline int i2c_enqueue_request(i2c_queue_handle_t h, size_t bus_address, size_t offset, unsigned int len)
 {
@@ -176,14 +176,14 @@ static inline int i2c_enqueue_request(i2c_queue_handle_t h, size_t bus_address, 
 }
 
 /**
- * Enqueue an element into a used ring buffer.
- * This indicates the buffer address parameter is currently in use.
+ * Enqueue an element into the response queue
  *
- * @param ring Ring handle to enqueue into.
- * @param buffer address into shared memory where data is stored.
- * @param len length of data inside the buffer above.
+ * @param queue queue handle to enqueue into.
+ * @param bus_address bus address on the I2C device where the response came from
+ * @param offset offset into the data region where the response data is
+ * @param len length of data at the offset given
  *
- * @return -1 when ring is empty, 0 on success.
+ * @return -1 when queue is full, 0 on success.
  */
 static inline int i2c_enqueue_response(i2c_queue_handle_t h, size_t bus_address, size_t offset, unsigned int len)
 {
@@ -191,13 +191,14 @@ static inline int i2c_enqueue_response(i2c_queue_handle_t h, size_t bus_address,
 }
 
 /**
- * Dequeue an element from the free ring buffer.
+ * Dequeue an element from the request queue
  *
- * @param ring Ring handle to dequeue from.
- * @param buffer pointer to the address of where to store buffer address.
- * @param len pointer to variable to store length of data dequeueing.
+ * @param queue queue handle to dequeue from
+ * @param bus_address pointer for where to store the bus address associated with the dequeued request
+ * @param offset pointer for where to store teh offset of the data of associated with the dequeued request
+ * @param len pointer for where to store the length of data associated with the dequeued request
  *
- * @return -1 when ring is empty, 0 on success.
+ * @return -1 when queue is empty, 0 on success.
  */
 static inline int i2c_dequeue_request(i2c_queue_handle_t h, size_t *bus_address, size_t *offset, unsigned int *len)
 {
@@ -205,13 +206,14 @@ static inline int i2c_dequeue_request(i2c_queue_handle_t h, size_t *bus_address,
 }
 
 /**
- * Dequeue an element from a used ring buffer.
+ * Dequeue an element from the response queue
  *
- * @param ring Ring handle to dequeue from.
- * @param buffer pointer to the address of where to store buffer address.
- * @param len pointer to variable to store length of data dequeueing.
+ * @param queue queue handle to dequeue from
+ * @param bus_address pointer for where to store the bus address associated with the dequeued response
+ * @param offset pointer for where to store teh offset of the data of associated with the dequeued response
+ * @param len pointer for where to store the length of data associated with the dequeued response
  *
- * @return -1 when ring is empty, 0 on success.
+ * @return -1 when queue is empty, 0 on success.
  */
 static inline int i2c_dequeue_response(i2c_queue_handle_t h, size_t *bus_address, size_t *offset, unsigned int *len)
 {
