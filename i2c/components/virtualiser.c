@@ -162,7 +162,7 @@ seL4_MessageInfo_t protected(microkit_channel ch, seL4_MessageInfo_t msginfo) {
         case I2C_BUS_CLAIM:
             // We have a valid bus address, we need to make sure no one else has claimed it.
             if (security_list[bus] != BUS_UNCLAIMED) {
-                LOG_VIRTUALISER_ERR("bus address 0x%lx already claimed, cannot claim for channel 0x%lx", bus, ch);
+                LOG_VIRTUALISER_ERR("bus address 0x%lx already claimed, cannot claim for channel 0x%lx\n", bus, ch);
                 return microkit_msginfo_new(I2C_FAILURE, 0);
             }
 
@@ -170,7 +170,7 @@ seL4_MessageInfo_t protected(microkit_channel ch, seL4_MessageInfo_t msginfo) {
             break;
         case I2C_BUS_RELEASE:
             if (security_list[bus] != ch) {
-                LOG_VIRTUALISER_ERR("bus address 0x%lx is not claimed by channel 0x%lx", bus, ch);
+                LOG_VIRTUALISER_ERR("bus address 0x%lx is not claimed by channel 0x%lx\n", bus, ch);
                 return microkit_msginfo_new(I2C_FAILURE, 0);
             }
 
