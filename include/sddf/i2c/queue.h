@@ -14,8 +14,8 @@
 
 #define RESPONSE_ERR 0
 #define RESPONSE_ERR_TOKEN 1
-#define RESPONSE_DATA_OFFSET 2    // Number of non-payload bytes. Should match however
-                                // many #defines are listed here.
+/* Start of payload bytes in response data */
+#define RESPONSE_DATA_OFFSET 2
 
 #define I2C_ERR_OK 0
 #define I2C_ERR_TIMEOUT 1
@@ -25,16 +25,23 @@
 typedef uint8_t i2c_token_t;
 
 enum i2c_token {
-    I2C_TOKEN_END = 0x0,    // END: Terminator for token list, has no meaning to hardware otherwise
-    I2C_TOKEN_START = 0x1,    // START: Begin an i2c transfer. Causes master device to capture bus.
-    I2C_TOKEN_ADDR_WRITE = 0x2,    // ADDRESS WRITE: Used to wake up the target device on the bus. Sets up
-                                //                any following DATA tokens to be writes.
-    I2C_TOKEN_ADDR_READ = 0x3,    // ADDRESS READ: Same as ADDRW but sets up DATA tokens as reads.
-    I2C_TOKEN_DATA_END = 0x4,    // DATA_LAST: Used for read transactions to write a NACK to alert the slave device
-                                //            that the read is now over.
-    I2C_TOKEN_STOP = 0x5,    // STOP: Used to send the STOP condition on the bus to end a transaction.
-                                //       Causes master to release the bus.
-    I2C_TOKEN_DATA = 0x6,    // Read or write one byte - the byte after this is treated as payload.
+	/* END: Terminator for token list, has no meaning to hardware otherwise */
+    I2C_TOKEN_END = 0x0,
+	/* START: Begin a transfer. Causes master device to capture bus. */
+    I2C_TOKEN_START = 0x1,
+    /* ADDRESS WRITE: Used to wake up the target device on the bus.
+	 * Sets up and following DATA tokens to be writes. */
+    I2C_TOKEN_ADDR_WRITE = 0x2,
+	/* ADDRESS READ: Same as ADDRW but sets up DATA tokens as reads. */
+    I2C_TOKEN_ADDR_READ = 0x3,
+	/* DATA_LAST: Used for read transactions to write a NACK to alert
+	 * the slave device that the read is now over. */
+    I2C_TOKEN_DATA_END = 0x4,
+    /* STOP: Used to send the STOP condition on the bus to end a transaction.
+     * Causes master to release the bus. */
+    I2C_TOKEN_STOP = 0x5,
+    /* Read or write one byte - the byte after this is treated as payload. */
+    I2C_TOKEN_DATA = 0x6,
 };
 
 typedef struct queue_entry {
@@ -71,11 +78,11 @@ typedef struct i2c_queue_handle {
 i2c_queue_handle_t i2c_queue_init(i2c_queue_t *request, i2c_queue_t *response);
 
 /**
- * Check if the ring buffer is empty.
+ * Check if the queue is empty.
  *
- * @param ring ring buffer to check.
+ * @param queue queue to check.
  *
- * @return true indicates the buffer is empty, false otherwise.
+ * @return true indicates the queue is empty, false otherwise.
  */
 static inline int i2c_queue_empty(i2c_queue_t *queue)
 {
@@ -83,9 +90,9 @@ static inline int i2c_queue_empty(i2c_queue_t *queue)
 }
 
 /**
- * Check if the ring buffer is full
+ * Check if the queue is full
  *
- * @param ring ring buffer to check.
+ * @param queue queue to check.
  *
  * @return true indicates the buffer is full, false otherwise.
  */
@@ -102,11 +109,12 @@ static inline uint32_t i2c_queue_size(i2c_queue_t *queue)
 /**
  * Enqueue an element to the queue
  *
- * @param ring Ring buffer to enqueue into.
- * @param buffer address into shared memory where data is stored.
- * @param len length of data inside the buffer above.
+ * @param queue to enqueue into
+ * @param bus_address bus address on the I2C device to request/response is for
+ * @param offset offset in data region where the request data is or the response data will be
+ * @param len length of data at the offset given
  *
- * @return -1 when ring is empty, 0 on success.
+ * @return -1 when ring is full, 0 on success.
  */
 static inline int i2c_enqueue(i2c_queue_t *queue, size_t bus_address, size_t offset, unsigned int len)
 {
@@ -126,11 +134,12 @@ static inline int i2c_enqueue(i2c_queue_t *queue, size_t bus_address, size_t off
 }
 
 /**
- * Dequeue an element to a ring buffer.
+ * Dequeue an element from the queue
  *
- * @param ring Ring buffer to Dequeue from.
- * @param buffer pointer to the address of where to store buffer address.
- * @param len pointer to variable to store length of data dequeueing.
+ * @param queue queue to dequeue from
+ * @param bus_address pointer for where to store the bus address associated with the dequeued entry
+ * @param offset pointer for where to store teh offset of the data of associated with the dequeued entry
+ * @param len pointer for where to store the length of data associated with the dequeued entry
  *
  * @return -1 when ring is empty, 0 on success.
  */
