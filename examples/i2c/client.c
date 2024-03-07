@@ -64,7 +64,6 @@ bool read_passive_target_id(uint8_t card_baud_rate, uint8_t *uid_buf, uint8_t *u
 
 uint8_t big_buf[64];
 
-// @ivanv: TODO, add error checking for write command and read response!
 void client_main(void) {
     LOG_CLIENT("client_main: started\n");
     uint8_t header[1];
