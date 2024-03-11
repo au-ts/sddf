@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <microkit.h>
+#include <sddf/util/printf.h>
 
 uintptr_t gpt_regs;
 
@@ -130,7 +131,7 @@ notified(microkit_channel ch)
         handle_irq(ch);
         microkit_irq_ack_delayed(ch);
     } else {
-        microkit_dbg_puts("DRIVER|ERROR: unexpected notification\n");
+        dprintf("TIMER DRIVER|LOG: unexpected notification %llu\n", ch);
     }
 }
 
@@ -168,7 +169,7 @@ protected(microkit_channel ch, microkit_msginfo msginfo)
             }
             break;
         default:
-            microkit_dbg_puts("DRIVER|ERROR: Unknown request to timer from client\n");
+            dprintf("TIMER DRIVER|LOG: Unknown request to timer from client %llu\n", microkit_msginfo_get_label(msginfo));
             break;
     }
 

@@ -19,11 +19,16 @@
 
 #include <sddf/util/util.h>
 #include <sddf/benchmark/bench.h>
+#include <sddf/util/printf.h>
 
 #include "echo.h"
 
 #define START_PMU 4
 #define STOP_PMU 5
+// #define IPBENCH_STOP 8
+#define MAX_PACKET_SIZE 0x1000
+
+uintptr_t cyclecounters_vaddr;
 
 /* This file implements a TCP based utilization measurment process that starts
  * and stops utilization measurements based on a client's requests.
@@ -52,8 +57,6 @@
  */
 
 static struct tcp_pcb *utiliz_socket;
-uintptr_t data_packet;
-uintptr_t cyclecounters_vaddr;
 
 #define WHOAMI "100 IPBENCH V1.0\n"
 #define HELLO "HELLO\n"
@@ -84,6 +87,8 @@ struct bench *bench = (void *)(uintptr_t)0x5010000;
 uint64_t start;
 uint64_t idle_ccount_start;
 uint64_t idle_overflow_start;
+
+char data_packet_str[MAX_PACKET_SIZE];
 
 
 static inline void my_reverse(char s[])
@@ -127,29 +132,20 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
         return ERR_OK;
     }
 
-    char *data_packet_str = (char *)data_packet;
-
-    pbuf_copy_partial(p, (void *)data_packet, p->tot_len, 0);
+    pbuf_copy_partial(p, (void *)data_packet_str, p->tot_len, 0);
     err_t error;
 
     if (msg_match(data_packet_str, HELLO)) {
         error = tcp_write(pcb, OK_READY, strlen(OK_READY), TCP_WRITE_FLAG_COPY);
-        if (error) {
-            microkit_dbg_puts("Failed to send OK_READY message through utilization peer");
-        }
+        if (error) dprintf("Failed to send OK_READY message through utilization peer\n");
     } else if (msg_match(data_packet_str, LOAD)) {
         error = tcp_write(pcb, OK, strlen(OK), TCP_WRITE_FLAG_COPY);
-        if (error) {
-            microkit_dbg_puts("Failed to send OK message through utilization peer");
-        }
+        if (error) dprintf("Failed to send OK message through utilization peer\n");
     } else if (msg_match(data_packet_str, SETUP)) {
         error = tcp_write(pcb, OK, strlen(OK), TCP_WRITE_FLAG_COPY);
-        if (error) {
-            microkit_dbg_puts("Failed to send OK message through utilization peer");
-        }
+        if (error) dprintf("Failed to send OK message through utilization peer\n");
     } else if (msg_match(data_packet_str, START)) {
-        print(microkit_name);
-        print(" measurement starting... \n");
+        printf("%s measurement starting... \n", microkit_name);
         if (!strcmp(microkit_name, "client0")) {
             start = bench->ts;
             idle_ccount_start = bench->ccount;
@@ -157,8 +153,7 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
             microkit_notify(START_PMU);
         }
     } else if (msg_match(data_packet_str, STOP)) {
-        print(microkit_name);
-        print(" measurement finished \n");;
+        printf("%s measurement finished \n", microkit_name);
 
         uint64_t total = 0, idle = 0;
 
@@ -168,42 +163,35 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
             idle = bench->ccount - idle_ccount_start;
         }
 
-        char tbuf[16];
+        char tbuf[21];
         my_itoa(total, tbuf);
 
-        char ibuf[16];
+        char ibuf[21];
         my_itoa(idle, ibuf);
 
-        char buffer[100];
-
-        int len = strlen(tbuf) + strlen(ibuf) + 2;
+        /* Message format: ",total,idle\0" */
+        int len = strlen(tbuf) + strlen(ibuf) + 3;
         char lbuf[16];
         my_itoa(len, lbuf);
 
+        char buffer[120];
         strcat(strcpy(buffer, "220 VALID DATA (Data to follow)\nContent-length: "), lbuf);
         strcat(buffer, "\n,");
         strcat(buffer, ibuf);
         strcat(buffer, ",");
         strcat(buffer, tbuf);
-
-        // microkit_dbg_puts(buffer);
-        error = tcp_write(pcb, buffer, strlen(buffer), TCP_WRITE_FLAG_COPY);
-
+        
+        error = tcp_write(pcb, buffer, strlen(buffer) + 1, TCP_WRITE_FLAG_COPY);
         tcp_shutdown(pcb, 0, 1);
+        // microkit_notify(IPBENCH_STOP);
 
-        if (!strcmp(microkit_name, "client0")) { 
-            microkit_notify(STOP_PMU);
-        }
+        if (!strcmp(microkit_name, "client0")) microkit_notify(STOP_PMU);
     } else if (msg_match(data_packet_str, QUIT)) {
         /* Do nothing for now */
     } else {
-        microkit_dbg_puts("Received a message that we can't handle ");
-        microkit_dbg_puts(data_packet_str);
-        microkit_dbg_puts("\n");
+        dprintf("Received a message that we can't handle %s\n", data_packet_str);
         error = tcp_write(pcb, ERROR, strlen(ERROR), TCP_WRITE_FLAG_COPY);
-        if (error) {
-            microkit_dbg_puts("Failed to send OK message through utilization peer");
-        }
+        if (error) dprintf("Failed to send OK message through utilization peer\n");
     }
 
     return ERR_OK;
@@ -211,11 +199,9 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
 
 static err_t utilization_accept_callback(void *arg, struct tcp_pcb *newpcb, err_t err)
 {
-    print("Utilization connection established!\n");
+    printf("Utilization connection established!\n");
     err_t error = tcp_write(newpcb, WHOAMI, strlen(WHOAMI), TCP_WRITE_FLAG_COPY);
-    if (error) {
-        print("Failed to send WHOAMI message through utilization peer\n");
-    }
+    if (error) dprintf("Failed to send WHOAMI message through utilization peer\n");
     tcp_sent(newpcb, utilization_sent_callback);
     tcp_recv(newpcb, utilization_recv_callback);
 
@@ -226,19 +212,19 @@ int setup_utilization_socket(void)
 {
     utiliz_socket = tcp_new_ip_type(IPADDR_TYPE_V4);
     if (utiliz_socket == NULL) {
-        print("Failed to open a socket for listening!");
+        dprintf("Failed to open a socket for listening!\n");
         return -1;
     }
 
     err_t error = tcp_bind(utiliz_socket, IP_ANY_TYPE, UTILIZATION_PORT);
     if (error) {
-        print("Failed to bind the TCP socket");
+        dprintf("Failed to bind the TCP socket");
         return -1;
     }
 
     utiliz_socket = tcp_listen_with_backlog_and_err(utiliz_socket, 1, &error);
     if (error != ERR_OK) {
-        print("Failed to listen on the utilization socket");
+        dprintf("Failed to listen on the utilization socket\n");
         return -1;
     }
     tcp_accept(utiliz_socket, utilization_accept_callback);

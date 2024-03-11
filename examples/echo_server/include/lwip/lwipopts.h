@@ -12,6 +12,7 @@
 
 #pragma once
 
+#include <microkit.h>
 #include <stdlib.h>
 #include <stdbool.h>
 
@@ -37,12 +38,26 @@
 #define CHECKSUM_CHECK_ICMP             0
 #define CHECKSUM_CHECK_ICMP6            0
 
+#ifdef CONFIG_PLAT_IMX8MM_EVK
+
 /* Leave the checksum checking on tx to hw */
 #define CHECKSUM_GEN_IP                 0
 #define CHECKSUM_GEN_UDP                0
 #define CHECKSUM_GEN_TCP                0
 #define CHECKSUM_GEN_ICMP               0
 #define CHECKSUM_GEN_ICMP6              0
+
+#endif
+
+#ifdef CONFIG_PLAT_ODROIDC4
+
+#define CHECKSUM_GEN_IP                 1
+#define CHECKSUM_GEN_UDP                0
+#define CHECKSUM_GEN_TCP                1
+#define CHECKSUM_GEN_ICMP               1
+#define CHECKSUM_GEN_ICMP6              1
+
+#endif
 
 #define TCP_SND_QUEUELEN 2500
 #define MEMP_NUM_TCP_SEG TCP_SND_QUEUELEN
@@ -70,11 +85,9 @@
 /* Change this to LWIP_DBG_LEVEL_ALL to see a trace 
 #define LWIP_DBG_MIN_LEVEL              LWIP_DBG_LEVEL_WARNING
 
-#define DHCP_DEBUG                      LWIP_DBG_ON
+#define DHCP_DEBUG                      LWIP_DBG_OFF
 #define UDP_DEBUG                       LWIP_DBG_ON
 #define ETHARP_DEBUG                    LWIP_DBG_ON
-#define PBUF_DEBUG                      LWIP_DBG_ON
-#define IP_DEBUG                        LWIP_DBG_ON
-#define TCPIP_DEBUG                     LWIP_DBG_ON
-#define DHCP_DEBUG                      LWIP_DBG_ON
-#define UDP_DEBUG                       LWIP_DBG_ON*/
+#define PBUF_DEBUG                      LWIP_DBG_OFF
+#define IP_DEBUG                        LWIP_DBG_OFF
+#define TCPIP_DEBUG                     LWIP_DBG_OFF */

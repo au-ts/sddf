@@ -7,27 +7,27 @@
 #include <microkit.h>
 #include <sel4/benchmark_track_types.h>
 #include <sel4/benchmark_utilisation_types.h>
+#include <sddf/benchmark/bench.h>
 #include <sddf/benchmark/sel4bench.h>
 #include <sddf/util/fence.h>
-#include <sddf/benchmark/bench.h>
 #include <sddf/util/util.h>
-
-#define MAGIC_CYCLES 150
-#define ULONG_MAX 0xfffffffffffffffful
-#define UINT_MAX 0xfffffffful
+#include <sddf/util/printf.h>
 
 #define LOG_BUFFER_CAP 7
 
+/* Notification channels and TCB CAP offsets - ensure these align with .system file! */
 #define START 1
 #define STOP 2
-
 #define INIT 3
 
+#define PD_TOTAL        0
 #define PD_ETH_ID       1
 #define PD_MUX_RX_ID    2
 #define PD_MUX_TX_ID    3
 #define PD_COPY_ID      4
+#define PD_COPY1_ID     5
 #define PD_LWIP_ID      6
+#define PD_LWIP1_ID     7
 #define PD_ARP_ID       8
 #define PD_TIMER_ID     9
 
@@ -60,35 +60,34 @@ event_id_t benchmarking_events[] = {
 };
 
 #ifdef CONFIG_BENCHMARK_TRACK_UTILISATION
-static void
-microkit_benchmark_start(void)
+static void microkit_benchmark_start(void)
 {
     seL4_BenchmarkResetThreadUtilisation(TCB_CAP);
     seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_ETH_ID);
     seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_MUX_RX_ID);
     seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_MUX_TX_ID);
     seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_COPY_ID);
+    seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_COPY1_ID);
     seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_LWIP_ID);
+    seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_LWIP1_ID);
     seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_ARP_ID);
     seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_TIMER_ID);
     seL4_BenchmarkResetLog();
 }
 
-static void
-microkit_benchmark_stop(uint64_t *total, uint64_t* idle, uint64_t *kernel, uint64_t *entries)
+static void microkit_benchmark_stop(uint64_t *total, uint64_t* number_schedules, uint64_t *kernel, uint64_t *entries)
 {
     seL4_BenchmarkFinalizeLog();
     seL4_BenchmarkGetThreadUtilisation(TCB_CAP);
     uint64_t *buffer = (uint64_t *)&seL4_GetIPCBuffer()->msg[0];
 
     *total = buffer[BENCHMARK_TOTAL_UTILISATION];
-    *idle = buffer[BENCHMARK_IDLE_LOCALCPU_UTILISATION];
+    *number_schedules = buffer[BENCHMARK_TOTAL_NUMBER_SCHEDULES];
     *kernel = buffer[BENCHMARK_TOTAL_KERNEL_UTILISATION];
     *entries = buffer[BENCHMARK_TOTAL_NUMBER_KERNEL_ENTRIES];
 }
 
-static void
-microkit_benchmark_stop_tcb(uint64_t pd_id, uint64_t *total, uint64_t *number_schedules, uint64_t *kernel, uint64_t *entries)
+static void microkit_benchmark_stop_tcb(uint64_t pd_id, uint64_t *total, uint64_t *number_schedules, uint64_t *kernel, uint64_t *entries)
 {
     seL4_BenchmarkGetThreadUtilisation(BASE_TCB_CAP + pd_id);
     uint64_t *buffer = (uint64_t *)&seL4_GetIPCBuffer()->msg[0];
@@ -99,37 +98,24 @@ microkit_benchmark_stop_tcb(uint64_t pd_id, uint64_t *total, uint64_t *number_sc
     *entries = buffer[BENCHMARK_TCB_NUMBER_KERNEL_ENTRIES];
 }
 
-static void
-print_benchmark_details(uint64_t pd_id, uint64_t kernel_util, uint64_t kernel_entries, uint64_t number_schedules, uint64_t total_util)
+static void print_benchmark_details(uint64_t pd_id, uint64_t kernel_util, uint64_t kernel_entries, uint64_t number_schedules, uint64_t total_util)
 {
-    print("Utilisation details for PD: ");
+    if (pd_id == PD_TOTAL) printf("Total utilisation details: ");
+    else printf("Utilisation details for PD: ");
     switch (pd_id) {
-        case PD_ETH_ID: print("ETH DRIVER"); break;
-        case PD_MUX_RX_ID: print("MUX RX"); break;
-        case PD_MUX_TX_ID: print("MUX TX"); break;
-        case PD_COPY_ID: print("COPIER"); break;
-        case PD_LWIP_ID: print("LWIP CLIENT"); break;
-        case PD_ARP_ID: print("ARP"); break;
-        case PD_TIMER_ID: print("TIMER"); break;
+        case PD_ETH_ID: printf("ETH DRIVER"); break;
+        case PD_MUX_RX_ID: printf("MUX RX"); break;
+        case PD_MUX_TX_ID: printf("MUX TX"); break;
+        case PD_COPY_ID: printf("COPIER0"); break;
+        case PD_COPY1_ID: printf("COPIER1"); break;
+        case PD_LWIP_ID: printf("LWIP CLIENT0"); break;
+        case PD_LWIP1_ID: printf("LWIP CLIENT1"); break;
+        case PD_ARP_ID: printf("ARP"); break;
+        case PD_TIMER_ID: printf("TIMER"); break;
     }
-    print(" (");
-    puthex64(pd_id);
-    print(")\n");
-    print("KernelUtilisation");
-    print(": ");
-    puthex64(kernel_util);
-    print("\n");
-    print("KernelEntries");
-    print(": ");
-    puthex64(kernel_entries);
-    print("\n");
-    print("NumberSchedules: ");
-    puthex64(number_schedules);
-    print("\n");
-    print("TotalUtilisation: ");
-    puthex64(total_util);
-    print("\n");
-    print("}\n");
+    if (pd_id != PD_TOTAL) printf(" ( %llx)", pd_id);
+    printf("\n{\nKernelUtilisation:  %llx\nKernelEntries:  %llx\nNumberSchedules:  %llx\nTotalUtilisation:  %llx\n}\n", 
+            kernel_util, kernel_entries, number_schedules, total_util);
 }
 #endif
 
@@ -147,44 +133,23 @@ static inline void seL4_BenchmarkTrackDumpSummary(benchmark_track_kernel_entry_t
 
     while (logBuffer[index].start_time != 0 && index < logSize) {
         if (logBuffer[index].entry.path == Entry_Syscall) {
-            if (logBuffer[index].entry.is_fastpath) {
-                fastpaths++;
-            }
+            if (logBuffer[index].entry.is_fastpath) fastpaths++;
             syscall_entries++;
-        } else if (logBuffer[index].entry.path == Entry_Interrupt) {
-            interrupt_entries++;
-        } else if (logBuffer[index].entry.path == Entry_UserLevelFault) {
-            userlevelfault_entries++;
-        } else if (logBuffer[index].entry.path == Entry_VMFault) {
-            vmfault_entries++;
-        } else if (logBuffer[index].entry.path == Entry_DebugFault) {
-            debug_fault++;
-        } else {
-            other++;
-        }
+        } else if (logBuffer[index].entry.path == Entry_Interrupt) interrupt_entries++;
+        else if (logBuffer[index].entry.path == Entry_UserLevelFault) userlevelfault_entries++;
+        else if (logBuffer[index].entry.path == Entry_VMFault) vmfault_entries++;
+        else if (logBuffer[index].entry.path == Entry_DebugFault) debug_fault++;
+        else other++;
+
         index++;
     }
 
-    print("Number of system call invocations ");
-    puthex64(syscall_entries);
-    print(" and fastpaths ")
-    puthex64(fastpaths);
-    print("\n");
-    print("Number of interrupt invocations ");
-    puthex64(interrupt_entries);
-    print("\n");
-    print("Number of user-level faults ");
-    puthex64(userlevelfault_entries);
-    print("\n");
-    print("Number of VM faults ");
-    puthex64(vmfault_entries);
-    print("\n");
-    print("Number of debug faults ");
-    puthex64(debug_fault);
-    print("\n");
-    print("Number of others ");
-    puthex64(other);
-    print("\n");
+    printf("Number of system call invocations  %llx and fastpaths  %llx\n", syscall_entries, fastpaths);
+    printf("Number of interrupt invocations  %llx\n", interrupt_entries);
+    printf("Number of user-level faults  %llx\n", userlevelfault_entries);
+    printf("Number of VM faults  %llx\n", vmfault_entries);
+    printf("Number of debug faults  %llx\n", debug_fault);
+    printf("Number of others  %llx\n", other);
 }
 #endif
 
@@ -195,7 +160,6 @@ void notified(microkit_channel ch)
         case START:
             sel4bench_reset_counters();
             THREAD_MEMORY_RELEASE();
-
             sel4bench_start_counters(benchmark_bf);
 
             #ifdef CONFIG_BENCHMARK_TRACK_UTILISATION
@@ -211,23 +175,17 @@ void notified(microkit_channel ch)
             sel4bench_get_counters(benchmark_bf, &counter_values[0]);
             sel4bench_stop_counters(benchmark_bf);
 
-            // Dump the counters 
-            print("{\n");
-            for (int i = 0; i < ARRAY_SIZE(benchmarking_events); i++) {
-                print(counter_names[i]);
-                print(": ");
-                puthex64(counter_values[i]);
-                print("\n");
-            }
+            printf("{\n");
+            for (int i = 0; i < ARRAY_SIZE(benchmarking_events); i++) printf("%s: %llX\n", counter_names[i], counter_values[i]);
+            printf("}\n");
 
             #ifdef CONFIG_BENCHMARK_TRACK_UTILISATION
             uint64_t total;
             uint64_t kernel;
             uint64_t entries;
-            uint64_t idle;
             uint64_t number_schedules;
-            microkit_benchmark_stop(&total, &idle, &kernel, &entries);
-            print_benchmark_details(TCB_CAP, kernel, entries, idle, total);
+            microkit_benchmark_stop(&total, &number_schedules, &kernel, &entries);
+            print_benchmark_details(PD_TOTAL, kernel, entries, number_schedules, total);
 
             microkit_benchmark_stop_tcb(PD_ETH_ID, &total, &number_schedules, &kernel, &entries);
             print_benchmark_details(PD_ETH_ID, kernel, entries, number_schedules, total);
@@ -241,8 +199,14 @@ void notified(microkit_channel ch)
             microkit_benchmark_stop_tcb(PD_COPY_ID, &total, &number_schedules, &kernel, &entries);
             print_benchmark_details(PD_COPY_ID, kernel, entries, number_schedules, total);
 
+            microkit_benchmark_stop_tcb(PD_COPY1_ID, &total, &number_schedules, &kernel, &entries);
+            print_benchmark_details(PD_COPY1_ID, kernel, entries, number_schedules, total);
+
             microkit_benchmark_stop_tcb(PD_LWIP_ID, &total, &number_schedules, &kernel, &entries);
             print_benchmark_details(PD_LWIP_ID, kernel, entries, number_schedules, total);
+            
+            microkit_benchmark_stop_tcb(PD_LWIP1_ID, &total, &number_schedules, &kernel, &entries);
+            print_benchmark_details(PD_LWIP1_ID, kernel, entries, number_schedules, total);
 
             microkit_benchmark_stop_tcb(PD_ARP_ID, &total, &number_schedules, &kernel, &entries);
             print_benchmark_details(PD_ARP_ID, kernel, entries, number_schedules, total);
@@ -253,15 +217,13 @@ void notified(microkit_channel ch)
 
             #ifdef CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES
             entries = seL4_BenchmarkFinalizeLog();
-            print("KernelEntries");
-            print(": ");
-            puthex64(entries);
+            printf("KernelEntries:  %llx\n", entries);
             seL4_BenchmarkTrackDumpSummary(log_buffer, entries);
             #endif
 
             break;
         default:
-            print("Bench thread notified on unexpected channel\n");
+            printf("Bench thread notified on unexpected channel\n");
     }
 }
 
@@ -271,19 +233,15 @@ void init(void)
     seL4_Word n_counters = sel4bench_get_num_counters();
 
     counter_bitfield_t mask = 0;
-
-    for (seL4_Word i = 0; i < n_counters; i++) {
-        seL4_Word counter = i;
-        if (counter >= ARRAY_SIZE(benchmarking_events)) {
-            break;
-        }
-        sel4bench_set_count_event(i, benchmarking_events[counter]);
-        mask |= BIT(i);
+    
+    for (seL4_Word counter = 0; counter < n_counters; counter++) {
+        if (counter >= ARRAY_SIZE(benchmarking_events)) break;
+        sel4bench_set_count_event(counter, benchmarking_events[counter]);
+        mask |= BIT(counter);
     }
 
     sel4bench_reset_counters();
     sel4bench_start_counters(mask);
-
     benchmark_bf = mask;
 
     /* Notify the idle thread that the sel4bench library is initialised. */
@@ -291,11 +249,7 @@ void init(void)
 
 #ifdef CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES
     int res_buf = seL4_BenchmarkSetLogBuffer(LOG_BUFFER_CAP);
-    if (res_buf) {
-        print("Could not set log buffer");
-        puthex64(res_buf);
-    } else {
-        print("We set the log buffer\n");
-    }
+    if (res_buf) printf("Could not set log buffer:  %llx\n", res_buf);
+    else printf("Log buffer set\n");
 #endif
 }

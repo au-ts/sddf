@@ -7,33 +7,29 @@
 #include <stdint.h>
 #include <microkit.h>
 #include <sddf/network/shared_ringbuffer.h>
+#include <sddf/util/fence.h>
+#include <sddf/util/util.h>
+#include <sddf/util/printf.h>
+#include <system_config.h>
+
 #include "ethernet.h"
 
-#define IRQ_CH 1
-#define TX_CH  2
-#define RX_CH  3
+#define IRQ_CH 0
+#define TX_CH  1
+#define RX_CH  2
+// #define IPBENCH_FINISH  3
 
-/* Memory regions. These all have to be here to keep compiler happy */
 uintptr_t hw_ring_buffer_vaddr;
 uintptr_t hw_ring_buffer_paddr;
-uintptr_t shared_dma_vaddr;
-uintptr_t shared_dma_paddr;
-uintptr_t rx_cookies;
-uintptr_t tx_cookies;
+
 uintptr_t rx_free;
 uintptr_t rx_used;
 uintptr_t tx_free;
 uintptr_t tx_used;
 
-/* Make the minimum frame buffer 2k. This is a bit of a waste of memory, but ensures alignment */
-#define PACKET_BUFFER_SIZE  2048
-#define MAX_PACKET_SIZE     1536
-
 #define RX_COUNT 256
 #define TX_COUNT 256
-
-_Static_assert((512 * 2) * PACKET_BUFFER_SIZE <= 0x200000, "Expect rx+tx buffers to fit in single 2MB page");
-_Static_assert(sizeof(ring_buffer_t) <= 0x200000, "Expect ring buffer ring to fit in single 2MB page");
+#define MAX_COUNT MAX(RX_COUNT, TX_COUNT)
 
 struct descriptor {
     uint32_t status;
@@ -42,474 +38,261 @@ struct descriptor {
     uint32_t next;
 };
 
+_Static_assert((RX_COUNT + TX_COUNT) * sizeof(struct descriptor) <= HW_REGION_SIZE, "Expect rx+tx buffers to fit in single 2MB page");
+
 typedef struct {
-    unsigned int cnt;
-    unsigned int remain;
-    unsigned int tail;
-    unsigned int head;
-    volatile struct descriptor *descr;
-    uintptr_t phys;
-    void **cookies;
-} ring_ctx_t;
+    unsigned int tail; /* index to insert at */
+    unsigned int head; /* index to remove from */
+    buff_desc_t descr_mdata[MAX_COUNT]; /* associated meta data array */
+    volatile struct descriptor *descr; /* buffer descripter array */
+} hw_ring_t;
 
-ring_ctx_t rx;
-ring_ctx_t tx;
-unsigned int tx_lengths[TX_COUNT];
+hw_ring_t rx;
+hw_ring_t tx;
 
-/* Pointers to shared_ringbuffers */
 ring_handle_t rx_ring;
 ring_handle_t tx_ring;
 
-static uint8_t mac[6];
-
 volatile struct eth_mac_regs *eth_mac = (void *)(uintptr_t)0x2000000;
-volatile struct eth_dma_regs *eth_dma = (void *)(uintptr_t)0x2000000 + DW_DMA_BASE_OFFSET;
+volatile struct eth_dma_regs *eth_dma = (void *)(uintptr_t)0x2000000 + DMA_REG_OFFSET;
 
-static void get_mac_addr(volatile struct eth_mac_regs *reg, uint8_t *mac)
+static inline bool hw_ring_full(hw_ring_t *ring, size_t ring_size)
 {
-    uint32_t l, h;
-    l = reg->macaddr0lo;
-    h = reg->macaddr0hi;
-
-    mac[3] = l >> 24;
-    mac[2] = l >> 16 & 0xff;
-    mac[1] = l >> 8 & 0xff;
-    mac[0] = l & 0xff;
-    mac[5] = h >> 8 & 0xff;
-    mac[4] = h & 0xff;
+    return !((ring->tail + 2 - ring->head) % ring_size);
 }
 
-static void set_mac(volatile struct eth_mac_regs *reg, uint8_t *mac)
+static inline bool hw_ring_empty(hw_ring_t *ring, size_t ring_size)
 {
-    reg->macaddr0lo = mac[0] + (mac[1] << 8) + (mac[2] << 16) +
-               (mac[3] << 24);
-    reg->macaddr0hi = mac[4] + (mac[5] << 8);
+    return !((ring->tail - ring->head) % ring_size);
 }
 
-static char
-hexchar(unsigned int v)
-{
-    return v < 10 ? '0' + v : ('a' - 10) + v;
-}
-
-static void
-dump_mac(uint8_t *mac)
-{
-    for (unsigned i = 0; i < 6; i++) {
-        microkit_dbg_putc(hexchar((mac[i] >> 4) & 0xf));
-        microkit_dbg_putc(hexchar(mac[i] & 0xf));
-        if (i < 5) {
-            microkit_dbg_putc(':');
-        }
-    }
-    microkit_dbg_putc('\n');
-}
-
-static uintptr_t 
-getPhysAddr(uintptr_t virtual)
-{
-    uint64_t offset = virtual - shared_dma_vaddr;
-    uintptr_t phys;
-
-    if (offset < 0) {
-        //printf("getPhysAddr: offset < 0\n");
-        return 0;
-    }
-
-    phys = shared_dma_paddr + offset;
-    return phys;
-}
-
-static void update_ring_slot(
-    ring_ctx_t *ring,
-    unsigned int idx,
-    uint32_t status,
-    uint32_t cntl,
-    uint32_t phys)
+static void update_ring_slot(hw_ring_t *ring, unsigned int idx, uint32_t status,
+                                uint32_t cntl, uint32_t phys, uint32_t next)
 {
     volatile struct descriptor *d = &(ring->descr[idx]);
     d->addr = phys;
+    d->next = next;
     d->cntl = cntl;
-    d->status = status;
     /* Ensure all writes to the descriptor complete, before we set the flags
      * that makes hardware aware of this slot.
      */
-    __sync_synchronize();
+    THREAD_MEMORY_RELEASE();
+    d->status = status;
 }
 
-static uintptr_t 
-alloc_rx_buf(size_t buf_size, void **cookie)
+static void rx_provide()
 {
-    uintptr_t addr;
-    unsigned int len;
+    bool reprocess = true;
+    while (reprocess) {
+        while (!hw_ring_full(&rx, RX_COUNT) && !ring_empty(rx_ring.free_ring)) {
+            buff_desc_t buffer;
+            int err __attribute__((unused)) = dequeue_free(&rx_ring, &buffer);
+            assert(!err);
 
-    /* Try to grab a buffer from the available ring */
-    if (driver_dequeue(rx_ring.free_ring, &addr, &len, cookie)) {
-        //printf("RX Available ring is empty\n");
-        return 0;
+            uint32_t cntl = (MAX_RX_FRAME_SZ << DESC_RXCTRL_SIZE1SHFT) & DESC_RXCTRL_SIZE1MASK;
+            if (rx.tail + 1 == RX_COUNT) cntl |= DESC_RXCTRL_RXRINGEND;
+
+            rx.descr_mdata[rx.tail] = buffer;
+            update_ring_slot(&rx, rx.tail, DESC_RXSTS_OWNBYDMA, cntl, buffer.phys_or_offset, 0);
+            eth_dma->rxpolldemand = POLL_DATA;
+
+            rx.tail = (rx.tail + 1) % RX_COUNT;
+        }
+
+        request_signal(rx_ring.free_ring);
+        reprocess = false;
+
+        if (!ring_empty(rx_ring.free_ring) && !hw_ring_full(&rx, RX_COUNT)) {
+            cancel_signal(rx_ring.free_ring);
+            reprocess = true;
+        }
     }
-
-    return getPhysAddr(addr);
 }
 
-static void fill_rx_bufs()
+static void rx_return(void)
 {
-    ring_ctx_t *ring = &rx;
-    __sync_synchronize();
-    while (ring->remain > 0) {
-        /* request a buffer */
-        void *cookie = NULL;
-        uintptr_t phys = alloc_rx_buf(MAX_PACKET_SIZE, &cookie);
-        if (!phys) {
-            break;
-        }
-        uint32_t status = DESC_RXSTS_OWNBYDMA;
-        uint32_t cntl = (MAC_MAX_FRAME_SZ & DESC_RXCTRL_SIZE1MASK) | DESC_RXCTRL_RXCHAIN;
+    bool packets_transferred = false;
+    while (!hw_ring_empty(&rx, RX_COUNT)) {
+        /* If buffer slot is still empty, we have processed all packets the device has filled */
+        volatile struct descriptor *d = &(rx.descr[rx.head]);
+        if (d->status & DESC_RXSTS_OWNBYDMA) break;
+        buff_desc_t buffer = rx.descr_mdata[rx.head];
+        THREAD_MEMORY_ACQUIRE();
 
-        int idx = ring->tail;
-        int new_tail = idx + 1;
-        if (new_tail == ring->cnt) {
-            new_tail = 0;
-        }
-        ring->cookies[idx] = cookie;
-        update_ring_slot(ring, idx, status, cntl, phys);
-        ring->tail = new_tail;
-        /* There is a race condition if add/remove is not synchronized. */
-        ring->remain--;
-    }
-    __sync_synchronize();
+        if (d->status & DESC_RXSTS_ERROR) {
+            dprintf("ETH|ERROR: RX descriptor returned with error status %x\n", d->status);
+            uint32_t cntl = (MAX_RX_FRAME_SZ << DESC_RXCTRL_SIZE1SHFT) & DESC_RXCTRL_SIZE1MASK;
+            if (rx.tail + 1 == RX_COUNT) cntl |= DESC_RXCTRL_RXRINGEND;
 
-    if (ring->tail != ring->head) {
-        /* Make sure rx is enabled */
-        eth_mac->conf |= RXENABLE;
+            rx.descr_mdata[rx.tail] = buffer;
+            update_ring_slot(&rx, rx.tail, DESC_RXSTS_OWNBYDMA, cntl, buffer.phys_or_offset, 0);
+            eth_dma->rxpolldemand = POLL_DATA;
+        } else {
+            buffer.len = (d->status & DESC_RXSTS_LENMSK) >> DESC_RXSTS_LENSHFT;
+            int err __attribute__((unused)) = enqueue_used(&rx_ring, buffer);
+            assert(!err);
+            packets_transferred = true;
+        }
+        rx.head = (rx.head + 1) % RX_COUNT;
     }
 
-    eth_dma->rxpolldemand = POLL_DATA;
-}
-
-static void
-handle_rx()
-{
-    ring_ctx_t *ring = &rx;
-    unsigned int head = ring->head;
-
-    int num = 1;
-    int was_empty = ring_empty(rx_ring.used_ring);
-
-    // we don't want to dequeue packets if we have nothing to replace it with
-    while (head != ring->tail && (ring_size(rx_ring.free_ring) > num)) {
-        volatile struct descriptor *d = &(ring->descr[head]);
-        unsigned int status = d->status;
-        /* Ensure no memory references get ordered before we checked the descriptor was written back */
-        __sync_synchronize();
-        /* If the slot is still marked as ready we are done. */
-        if (status & DESC_RXSTS_OWNBYDMA) {
-            break;
-        }
-
-        unsigned int len = (status & DESC_RXSTS_FRMLENMSK) >> DESC_RXSTS_FRMLENSHFT;
-
-        void *cookie = ring->cookies[head];
-        /* Go to next buffer, handle roll-over. */
-        if (++head == ring->cnt) {
-            head = 0;
-        }
-        ring->head = head;
-
-        /* There is a race condition here if add/remove is not synchronized. */
-        ring->remain++;
-
-        buff_desc_t *desc = (buff_desc_t *)cookie;
-
-        enqueue_used(&rx_ring, desc->encoded_addr, len, desc->cookie);
-        num++;
-    }
-
-    /* Notify client (only if we have actually processed a packet and 
-    the client hasn't already been notified!) */
-    // if (num > 1 && was_empty) {
+    if (packets_transferred && require_signal(rx_ring.used_ring)) {
+        cancel_signal(rx_ring.used_ring);
         microkit_notify(RX_CH);
-    // } 
+    }
 }
 
-static void
-complete_tx()
+static void tx_provide(void)
 {
-    unsigned int cnt_org;
-    void *cookie;
-    ring_ctx_t *ring = &tx;
-    unsigned int head = ring->head;
-    unsigned int cnt = 0;
+    bool reprocess = true;
+    while (reprocess) {
+        while (!(hw_ring_full(&tx, TX_COUNT)) && !ring_empty(tx_ring.used_ring)) {
+            buff_desc_t buffer;
+            int err __attribute__((unused)) = dequeue_used(&tx_ring, &buffer);
+            assert(!err);
 
+            uint32_t cntl = (((uint32_t) buffer.len) << DESC_TXCTRL_SIZE1SHFT) & DESC_TXCTRL_SIZE1MASK;
+            cntl |= DESC_TXCTRL_TXLAST | DESC_TXCTRL_TXFIRST | DESC_TXCTRL_TXINT;
+            if (tx.tail + 1 == TX_COUNT) cntl |= DESC_TXCTRL_TXRINGEND;
+            tx.descr_mdata[tx.tail] = buffer;
+            update_ring_slot(&tx, tx.tail, DESC_TXSTS_OWNBYDMA, cntl, buffer.phys_or_offset, 0);
 
-    while (head != ring->tail) {
-        if (0 == cnt) {
-            cnt = tx_lengths[head];
-            if ((0 == cnt) || (cnt > TX_COUNT)) {
-                /* We are not supposed to read 0 here. */
-                //printf("complete_tx with cnt=0 or max\n");
-                return;
-            }
-            cnt_org = cnt;
-            cookie = ring->cookies[head];
+            tx.tail = (tx.tail + 1) % TX_COUNT;
         }
+    
+        request_signal(tx_ring.used_ring);
+        reprocess = false;
 
-        volatile struct descriptor *d = &(ring->descr[head]);
-
-        /* If this buffer was not sent, we can't release any buffer. */
-        if (d->status & DESC_TXSTS_OWNBYDMA) {
-            /* not complete yet */
-            // //printf("Buffer was not sent\n");
-            return;
-        }
-
-        /* Go to next buffer, handle roll-over. */
-        if (++head == TX_COUNT) {
-            head = 0;
-        }
-
-        if (0 == --cnt) {
-            ring->head = head;
-            /* race condition if add/remove is not synchronized. */
-            ring->remain += cnt_org;
-            /* give the buffer back */
-            buff_desc_t *desc = (buff_desc_t *)cookie;
-
-            enqueue_free(&tx_ring, desc->encoded_addr, desc->len, desc->cookie);
+        if (!hw_ring_full(&tx, TX_COUNT) && !ring_empty(tx_ring.used_ring)) {
+            cancel_signal(tx_ring.used_ring);
+            reprocess = true;
         }
     }
-
-    /* The only reason to arrive here is when head equals tails. If cnt is not
-     * zero, then there is some kind of overflow or data corruption. The number
-     * of tx descriptors holding data can't exceed the space in the ring.
-     */
-    if (0 != cnt) {
-        //printf("head reached tail, but cnt!= 0\n");
-    }
+    eth_dma->txpolldemand = POLL_DATA;
 }
 
-static void
-raw_tx(unsigned int num, uintptr_t *phys, unsigned int *len, void *cookie)
+static void tx_return(void)
 {
-    ring_ctx_t *ring = &tx;
+    bool enqueued = false;
+    while (!hw_ring_empty(&tx, TX_COUNT)) {
+        /* Ensure that this buffer has been sent by the device */
+        volatile struct descriptor *d = &(tx.descr[tx.head]);
+        if (d->status & DESC_TXSTS_OWNBYDMA) break;
+        buff_desc_t buffer = tx.descr_mdata[tx.head];
+        THREAD_MEMORY_ACQUIRE();
 
-    /* Ensure we have room */
-    if (ring->remain < num) {
-        /* not enough room, try to complete some and check again */
-        complete_tx();
-        unsigned int rem = ring->remain;
-        if (rem < num) {
-            //printf("TX queue lacks space\n");
-            return;
-        }
+        int err __attribute__((unused)) = enqueue_free(&tx_ring, buffer);
+        assert(!err);
+        enqueued = true;
+        tx.head = (tx.head + 1) % TX_COUNT;
     }
 
-    __sync_synchronize();
-
-    unsigned int tail = ring->tail;
-    unsigned int tail_new = tail;
-
-    unsigned int i = num;
-    while (i-- > 0) {
-        uint32_t cntl = DESC_TXCTRL_TXCHAIN;
-        cntl |= ((*len++) << DESC_TXCTRL_SIZE1SHFT) & DESC_TXCTRL_SIZE1MASK;
-        cntl |= DESC_TXCTRL_TXLAST | DESC_TXCTRL_TXFIRST;
-        cntl |= DESC_TXCTRL_TXINT;
-
-        unsigned int idx = tail_new;
-        if (++tail_new == TX_COUNT) {
-            tail_new = 0;
-        }
-        if (ring->descr[idx].status & DESC_TXSTS_OWNBYDMA) {
-            //printf("CPU not owner of frame!\n");
-        }
-        update_ring_slot(ring, idx, DESC_TXSTS_OWNBYDMA, cntl, *phys++);
+    if (enqueued && require_signal(tx_ring.free_ring)) {
+        cancel_signal(tx_ring.free_ring);
+        microkit_notify(TX_CH);
     }
-
-    ring->cookies[tail] = cookie;
-    tx_lengths[tail] = num;
-    ring->tail = tail_new;
-    /* There is a race condition here if add/remove is not synchronized. */
-    ring->remain -= num;
-
-    __sync_synchronize();
-
-    if (!(eth_mac->conf & TXENABLE)) {
-        eth_mac->conf |= TXENABLE;
-    }
-
-    /* Start the transmission */
-	eth_dma->txpolldemand = POLL_DATA;
 }
 
-static void 
-handle_eth(volatile struct eth_dma_regs *eth_dma)
+// size_t dropped;
+static void handle_irq()
 {
     uint32_t e = eth_dma->status;
-    /* write to clear events */
-    eth_dma->status = e;
-
-    while (e & DMA_INTR_DEFAULT_MASK) {
-        if (e & DMA_INTR_ENA_TIE) {
-            complete_tx();
-        }
-        if (e & DMA_INTR_ENA_RIE) {
-            handle_rx();
-            fill_rx_bufs();
-        }
-        if (e & DMA_INTR_ABNORMAL) {
-            //printf("Error: System bus/uDMA: %llx\n", e);
-            if (e & DMA_INTR_ENA_FBE) {
-                //printf("    Ethernet device fatal bus error\n");
-            }
-            if (e & DMA_INTR_ENA_UNE) {
-                //printf("    Ethernet device TX underflow\n");
-            }
-            if (e & DMA_INTR_ENA_RBU) {
-                //printf("    Ethernet device RX Buffer unavailable\n");
-            }
-            if (e & DMA_INTR_ENA_RPS) {
-                //printf("    Ethernet device RX Stopped\n");
-                fill_rx_bufs();
-                break;
-            }
-            while (1);
-        }
-        e = eth_dma->status;
-        eth_dma->status = e;
+    if (e & DMA_INTR_RXF) {
+        rx_return();
     }
+    if (e & DMA_INTR_TXF) {
+        tx_return();
+    }
+    if (e & DMA_INTR_ABNORMAL) {
+        // if (e & DMA_INTR_RBU) {
+        //     dropped += eth_dma->missedframecount & MSFRM_MASK;
+        //     uint32_t currhostrxdesc = eth_dma->currhostrxdesc;
+        //     uint32_t curr_host_index = (currhostrxdesc - hw_ring_buffer_paddr)/sizeof(struct descriptor);
+        //     dprintf("Host head: %u, our head %u, our tail %u\n", curr_host_index, rx.head, rx.tail);
+
+        //     rx_provide();
+        // }
+        if (e & DMA_INTR_FBE) dprintf("Ethernet device fatal bus error\n");
+    }
+    eth_dma->status &= e;
 }
 
-static void 
-handle_tx()
+static void eth_setup(void)
 {
-    uintptr_t buffer = 0;
-    unsigned int len = 0;
-    void *cookie = NULL;
+    uint32_t l = eth_mac->macaddr0lo;
+    uint32_t h = eth_mac->macaddr0hi;
 
-    // We need to put in an empty condition here. 
-    while ((tx.remain > 1) && !driver_dequeue(tx_ring.used_ring, &buffer, &len, &cookie)) {
-        uintptr_t phys = getPhysAddr(buffer);
-        raw_tx(1, &phys, &len, cookie);
-    }
-}
+    assert((hw_ring_buffer_paddr & 0xFFFFFFFF) == hw_ring_buffer_paddr);
 
-static void 
-eth_setup(void)
-{
-    get_mac_addr(eth_mac, mac);
-    //printf("MAC: ");
-    dump_mac(mac);
-    //printf("\n");
-
-    /* set up descriptor rings */
-    rx.cnt = RX_COUNT;
-    rx.remain = rx.cnt - 2;
-    rx.tail = 0;
-    rx.head = 0;
-    rx.phys = shared_dma_paddr;
-    rx.cookies = (void **)rx_cookies;
     rx.descr = (volatile struct descriptor *)hw_ring_buffer_vaddr;
-
-    uintptr_t next_phys = hw_ring_buffer_paddr;
-    // TODO: Set the descriptor->next field to be the next one. 
-    for (unsigned int i = 0; i < rx.cnt; i++) {
-        next_phys += sizeof(struct descriptor);
-        if (i == (rx.cnt - 1)) {
-            rx.descr[i].next = (uint32_t)(hw_ring_buffer_paddr & 0xFFFFFFFF);
-        } else {
-            rx.descr[i].next = (uint32_t)(next_phys & 0xFFFFFFFF);
-        }
-        rx.descr[i].status = 0;
-        rx.descr[i].addr = 0;
-        rx.descr[i].cntl = (MAC_MAX_FRAME_SZ & DESC_RXCTRL_SIZE1MASK) | DESC_RXCTRL_RXCHAIN;
-    }
-
-    tx.cnt = TX_COUNT;
-    tx.remain = tx.cnt - 2;
-    tx.tail = 0;
-    tx.head = 0;
-    tx.phys = shared_dma_paddr + (sizeof(struct descriptor) * RX_COUNT);
-    tx.cookies = (void **)tx_cookies;
     tx.descr = (volatile struct descriptor *)(hw_ring_buffer_vaddr + (sizeof(struct descriptor) * RX_COUNT));
 
-    next_phys = hw_ring_buffer_paddr + (sizeof(struct descriptor) * RX_COUNT);
-    for (unsigned int i = 0; i < tx.cnt; i++) {
-        next_phys += sizeof(struct descriptor);
-        if (i == (tx.cnt - 1)) {
-            tx.descr[i].next = (uint32_t)((hw_ring_buffer_paddr + (sizeof(struct descriptor) * RX_COUNT)) & 0xFFFFFFFF);
-        } else {
-            tx.descr[i].next = (uint32_t)(next_phys & 0xFFFFFFFF);
-        }
-        tx.descr[i].status = 0;
-        tx.descr[i].cntl = DESC_TXCTRL_TXCHAIN;
-        tx.descr[i].addr = 0;
-    }
-
     /* Perform reset */
-    eth_dma->busmode |= DMAMAC_SRST;
-    while (eth_dma->busmode & DMAMAC_SRST);
+    eth_dma->busmode |= DMAMAC_SWRST;
+    while (eth_dma->busmode & DMAMAC_SWRST);
+
+    /* Perform flush */
+    eth_dma->opmode = FLUSHTXFIFO;
+    while (eth_dma->opmode & FLUSHTXFIFO);
 
     /* Reset removes the mac address */
-    set_mac(eth_mac, mac);
+    eth_mac->macaddr0lo = l;
+    eth_mac->macaddr0hi = h;
 
-    eth_dma->busmode |= FIXEDBURST | PRIORXTX_41 | DMA_PBL;
-    eth_dma->opmode |= FLUSHTXFIFO | STOREFORWARD;
-
-    eth_mac->conf |= FRAMEBURSTENABLE | DISABLERXOWN | FULLDPLXMODE;
+    eth_dma->busmode = PRIORXTX_11 | ((DMA_PBL << TX_PBL_SHFT) & TX_PBL_MASK);
+    eth_dma->opmode = STOREFORWARD;
+    eth_mac->conf = FULLDPLXMODE;
 
     eth_dma->rxdesclistaddr = hw_ring_buffer_paddr;
     eth_dma->txdesclistaddr = hw_ring_buffer_paddr + (sizeof(struct descriptor) * RX_COUNT);
 
-    eth_mac->framefilt |= 1;
-}
-
-void init_post()
-{
-    /* Set up shared memory regions */
-    ring_init(&rx_ring, (ring_buffer_t *)rx_free, (ring_buffer_t *)rx_used, 0, SIZE, SIZE);
-    ring_init(&tx_ring, (ring_buffer_t *)tx_free, (ring_buffer_t *)tx_used, 0, SIZE, SIZE);
-
-    fill_rx_bufs();
-
-    /* Enable IRQs */
-    eth_dma->intenable |= DMA_INTR_DEFAULT_MASK;
-    /* Disable uneeded GMAC irqs */
-    eth_mac->intmask |= GMAC_INT_DEFAULT_MASK;
-
-    /* We are ready to receive. Enable. */
-    eth_mac->conf |= RXENABLE | TXENABLE;
-    eth_dma->opmode |= TXSTART | RXSTART;
-
-    /* Now take away our scheduling context. Uncomment this for a passive driver. */
-    /* have_signal = true;
-    msg = seL4_MessageInfo_new(0, 0, 0, 1);
-    seL4_SetMR(0, 0);
-    signal = (MONITOR_EP); */
-    microkit_irq_ack(IRQ_CH);
+    eth_mac->framefilt |= PMSCUOUS_MODE;
 }
 
 void init(void)
 {
-    //printf("%s: elf PD init function running\n", microkit_name);
-    microkit_dbg_puts("ethernet init!\n");
-
     eth_setup();
-    init_post();
+
+    ring_init(&rx_ring, (ring_buffer_t *)rx_free, (ring_buffer_t *)rx_used, RX_RING_SIZE_DRIV);
+    ring_init(&tx_ring, (ring_buffer_t *)tx_free, (ring_buffer_t *)tx_used, TX_RING_SIZE_DRIV);
+
+    rx_provide();
+    tx_provide();
+
+    /* Enable IRQs */
+    eth_dma->intenable |= DMA_INTR_MASK;
+    // eth_dma->intenable |= DMA_INTR_RBU;
+    
+    /* Disable uneeded GMAC irqs */
+    eth_mac->intmask |= GMAC_INTR_MASK;
+
+    /* We are ready to receive. Enable. */
+    eth_mac->conf |= RX_ENABLE | TX_ENABLE;
+    eth_dma->opmode |= TXSTART | RXSTART;
+
+    microkit_irq_ack(IRQ_CH);
 }
 
 void notified(microkit_channel ch)
 {
     switch(ch) {
         case IRQ_CH:
-            handle_eth(eth_dma);
-            microkit_irq_ack_delayed(IRQ_CH);
+            handle_irq();
+            have_signal = true;
+            signal_msg = seL4_MessageInfo_new(IRQAckIRQ, 0, 0, 0);
+            signal_cap = (BASE_IRQ_CAP + IRQ_CH);
+            break;
+        case RX_CH:
+            rx_provide();
             break;
         case TX_CH:
-            handle_tx();
+            tx_provide();
             break;
+        // case IPBENCH_FINISH:
+        //     dprintf("Total dropped packets: %llu\n", dropped);
+        //     break;
         default:
-            //printf("eth driver: received notification on unexpected channel %d\n", ch);
+            dprintf("ETH|LOG: received notification on unexpected channel %llu\n", ch);
             break;
     }
 }

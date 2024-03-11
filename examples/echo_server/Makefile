@@ -8,8 +8,10 @@
 # doesn't actually cause a re-compile. We should fix this.
 
 BUILD_DIR ?= build
-MICROKIT_BOARD := imx8mm_evk
+MICROKIT_BOARD ?= imx8mm_evk
 MICROKIT_CONFIG ?= debug
+DRIV_DIR ?= imx
+SYSTEM_FILE ?= echo_server_imx.system
 
 ifeq ($(strip $(MICROKIT_SDK)),)
 $(error MICROKIT_SDK must be specified)
@@ -17,6 +19,11 @@ endif
 
 ifeq ($(strip $(TOOLCHAIN)),)
 	TOOLCHAIN := aarch64-none-elf
+endif
+
+ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
+	DRIV_DIR := meson
+	SYSTEM_FILE := echo_server_meson.system
 endif
 
 CPU := cortex-a53
@@ -27,12 +34,13 @@ AS := $(TOOLCHAIN)-as
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 
 SDDF=$(abspath ../..)
+SDDF_INCLUDE=$(SDDF)/include/sddf
 LWIP=$(SDDF)/network/ipstacks/lwip/src
 BENCHMARK=$(SDDF)/benchmark
 UTIL=$(SDDF)/util
 RING_BUFFER=$(SDDF)/network/libethsharedringbuffer
-ETHERNET_DRIVER=$(SDDF)/drivers/network/imx
-TIMER_DRIVER=$(SDDF)/drivers/clock/imx
+ETHERNET_DRIVER=$(SDDF)/drivers/network/$(DRIV_DIR)
+TIMER_DRIVER=$(SDDF)/drivers/clock/$(DRIV_DIR)
 NETWORK_COMPONENTS=$(SDDF)/network/components
 
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
@@ -49,6 +57,7 @@ REPORT_FILE = $(BUILD_DIR)/report.txt
 CFLAGS += -I$(BOARD_DIR)/include \
 	-I$(SDDF)/include \
 	-Iinclude/lwip \
+	-Iinclude/system_config \
 	-I$(LWIP)/include \
 	-I$(LWIP)/include/ipv4 \
 	-MD \
@@ -89,17 +98,17 @@ CORE4FILES=$(LWIP)/core/ipv4/autoip.c \
 NETIFFILES=$(LWIP)/netif/ethernet.c
 
 # LWIPFILES: All the above.
-LWIPFILES=lwip.c $(UTIL)/cache.c $(COREFILES) $(CORE4FILES) $(NETIFFILES)
-LWIP_OBJS := $(LWIPFILES:.c=.o) lwip.o sddf_network_sharedringbuffer.o utilization_socket.o udp_echo_socket.o sddf_timer_client.o
+LWIPFILES=lwip.c $(COREFILES) $(CORE4FILES) $(NETIFFILES)
+LWIP_OBJS := $(LWIPFILES:.c=.o) lwip.o sddf_network_sharedringbuffer.o utilization_socket.o udp_echo_socket.o sddf_timer_client.o printf.o putchar_serial.o
 
-ETH_OBJS := $(ETHERNET_DRIVER)/ethernet.o sddf_network_sharedringbuffer.o
-MUX_RX_OBJS := $(NETWORK_COMPONENTS)/mux_rx.o sddf_network_sharedringbuffer.o
-MUX_TX_OBJS := $(NETWORK_COMPONENTS)/mux_tx_bandwidth_limited.o sddf_network_sharedringbuffer.o
-COPY_OBJS := $(NETWORK_COMPONENTS)/copy.o sddf_network_sharedringbuffer.o
-BENCH_OBJS := $(BENCHMARK)/benchmark.o
-IDLE_OBJS := $(BENCHMARK)/idle.o
-ARP_OBJS := $(UTIL)/cache.o $(NETWORK_COMPONENTS)/arp.o sddf_network_sharedringbuffer.o
-TIMER_OBJS := $(TIMER_DRIVER)/timer.o
+ETH_OBJS := $(ETHERNET_DRIVER)/ethernet.o sddf_network_sharedringbuffer.o printf.o putchar_debug.o
+MUX_RX_OBJS := $(NETWORK_COMPONENTS)/mux_rx.o sddf_network_sharedringbuffer.o printf.o putchar_debug.o
+MUX_TX_OBJS := $(NETWORK_COMPONENTS)/mux_tx.o sddf_network_sharedringbuffer.o $(UTIL)/cache.o printf.o putchar_debug.o
+COPY_OBJS := $(NETWORK_COMPONENTS)/copy.o sddf_network_sharedringbuffer.o printf.o putchar_debug.o
+BENCH_OBJS := $(BENCHMARK)/benchmark.o printf.o putchar_serial.o
+IDLE_OBJS := $(BENCHMARK)/idle.o printf.o putchar_debug.o
+ARP_OBJS := $(NETWORK_COMPONENTS)/arp.o sddf_network_sharedringbuffer.o printf.o putchar_serial.o
+TIMER_OBJS := $(TIMER_DRIVER)/timer.o printf.o putchar_debug.o
 
 OBJS := $(sort $(addprefix $(BUILD_DIR)/, $(ETH_OBJS) $(MUX_RX_OBJS) $(MUX_TX_OBJS)\
 	$(COPY_OBJS) $(BENCH_OBJS) $(IDLE_OBJS) \
@@ -116,10 +125,19 @@ $(BUILD_DIR)/%.d $(BUILD_DIR)/%.o: %.c Makefile
 $(BUILD_DIR)/%.o: %.s Makefile
 	$(AS) -g3 -mcpu=$(CPU) $< -o $@
 
-$(BUILD_DIR)/sddf_timer_client.o:
+$(BUILD_DIR)/printf.o: $(UTIL)/printf.c $(SDDF_INCLUDE)/util/printf.h
+	$(CC) -c $(CFLAGS) $(UTIL)/printf.c -o $(BUILD_DIR)/printf.o
+
+$(BUILD_DIR)/putchar_debug.o: $(UTIL)/putchar_debug.c
+	$(CC) -c $(CFLAGS) $(UTIL)/putchar_debug.c -o $(BUILD_DIR)/putchar_debug.o
+
+$(BUILD_DIR)/putchar_serial.o: $(UTIL)/putchar_serial.c
+	$(CC) -c $(CFLAGS) $(UTIL)/putchar_serial.c -o $(BUILD_DIR)/putchar_serial.o
+
+$(BUILD_DIR)/sddf_timer_client.o: FORCE
 	BUILD_DIR=$(abspath $(BUILD_DIR)) MICROKIT_INCLUDE=$(BOARD_DIR)/include make -C $(SDDF)/timer/client
 
-$(BUILD_DIR)/sddf_network_sharedringbuffer.o:
+$(BUILD_DIR)/sddf_network_sharedringbuffer.o: FORCE
 	BUILD_DIR=$(abspath $(BUILD_DIR)) MICROKIT_INCLUDE=$(BOARD_DIR)/include make -C $(RING_BUFFER)
 
 $(BUILD_DIR)/eth.elf: $(addprefix $(BUILD_DIR)/, $(ETH_OBJS))
@@ -149,8 +167,8 @@ $(BUILD_DIR)/arp.elf: $(addprefix $(BUILD_DIR)/, $(ARP_OBJS))
 $(BUILD_DIR)/timer.elf: $(addprefix $(BUILD_DIR)/, $(TIMER_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-$(IMAGE_FILE) $(REPORT_FILE): $(addprefix $(BUILD_DIR)/, $(IMAGES)) echo_server.system
-	$(MICROKIT_TOOL) echo_server.system --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
+$(IMAGE_FILE) $(REPORT_FILE): $(addprefix $(BUILD_DIR)/, $(IMAGES)) $(SYSTEM_FILE)
+	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
 
 .PHONY: all compile clean
 
@@ -160,3 +178,5 @@ $(IMAGE_FILE) $(REPORT_FILE): $(addprefix $(BUILD_DIR)/, $(IMAGES)) echo_server.
 clean:
 	rm -f *.o *.elf .depend*
 	find . -name \*.o |xargs --no-run-if-empty rm
+
+FORCE: ;
