@@ -7,8 +7,8 @@
 #include <microkit.h>
 #include <sddf/benchmark/sel4bench.h>
 #include <sddf/util/fence.h>
+#include <sddf/util/printf.h>
 #include <sddf/benchmark/bench.h>
-#include <sddf/util/util.h>
 
 #define INIT 3
 #define MAGIC_CYCLES 150
@@ -57,7 +57,7 @@ void notified(microkit_channel ch)
             count_idle();
             break;
         default:
-            microkit_dbg_puts("Idle thread notified on unexpected channel\n");
+            dprintf("Idle thread notified on unexpected channel: %llu\n", ch);
     }
 }
 
