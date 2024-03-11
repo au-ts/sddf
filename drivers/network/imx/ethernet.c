@@ -6,93 +6,70 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <microkit.h>
-#include "ethernet.h"
 #include <sddf/network/shared_ringbuffer.h>
 #include <sddf/util/util.h>
 #include <sddf/util/fence.h>
+#include <sddf/util/printf.h>
+#include <system_config.h>
+
+#include "ethernet.h"
 
 #define IRQ_CH 0
 #define TX_CH  1
 #define RX_CH  2
 
-#define NUM_BUFFERS 512
-
-#define MDC_FREQ    20000000UL
-
-/* Memory regions. These all have to be here to keep compiler happy */
 uintptr_t hw_ring_buffer_vaddr;
 uintptr_t hw_ring_buffer_paddr;
-uintptr_t rx_cookies;
-uintptr_t tx_cookies;
+
 uintptr_t rx_free;
 uintptr_t rx_used;
 uintptr_t tx_free;
 uintptr_t tx_used;
-uintptr_t uart_base;
-
-/* Make the minimum frame buffer 2k. This is a bit of a waste of memory, but ensures alignment */
-#define PACKET_BUFFER_SIZE  2048
-#define MAX_PACKET_SIZE     1536
 
 #define RX_COUNT 256
 #define TX_COUNT 256
+#define MAX_COUNT MAX(RX_COUNT, TX_COUNT)
 
-_Static_assert((RX_COUNT + TX_COUNT) * 2 * PACKET_BUFFER_SIZE <= 0x200000, "Expect rx+tx buffers to fit in single 2MB page");
-_Static_assert(sizeof(ring_buffer_t) <= 0x200000, "Expect ring buffer ring to fit in single 2MB page");
+_Static_assert((RX_COUNT + TX_COUNT) * 2 * BUFF_SIZE <= DATA_REGION_SIZE, "Expect rx+tx buffers to fit in single 2MB page");
 
-ring_ctx_t rx; /* Rx NIC ring */
-ring_ctx_t tx; /* Tx NIC ring */
+/* HW ring descriptor (shared with device) */
+struct descriptor {
+    uint16_t len;
+    uint16_t stat;
+    uint32_t addr;
+};
 
-/* Pointers to shared_ringbuffers */
+/* HW ring buffer data type */
+typedef struct {
+    unsigned int tail; /* index to insert at */
+    unsigned int head; /* index to remove from */
+    buff_desc_t descr_mdata[MAX_COUNT]; /* associated meta data array */
+    volatile struct descriptor *descr; /* buffer descripter array */
+} hw_ring_t;
+
+hw_ring_t rx; /* Rx NIC ring */
+hw_ring_t tx; /* Tx NIC ring */
+
 ring_handle_t rx_ring;
 ring_handle_t tx_ring;
 
-static uint8_t mac[6];
+#define MAX_PACKET_SIZE     1536
 
 volatile struct enet_regs *eth = (void *)(uintptr_t)0x2000000;
 uint32_t irq_mask = IRQ_MASK;
 
-static void complete_tx(volatile struct enet_regs *eth);
-
-static void get_mac_addr(volatile struct enet_regs *reg, uint8_t *mac)
+static inline bool hw_ring_full(hw_ring_t *ring, size_t ring_size)
 {
-    uint32_t l, h;
-    l = reg->palr;
-    h = reg->paur;
-
-    mac[0] = l >> 24;
-    mac[1] = l >> 16 & 0xff;
-    mac[2] = l >> 8 & 0xff;
-    mac[3] = l & 0xff;
-    mac[4] = h >> 24;
-    mac[5] = h >> 16 & 0xff;
+    return !((ring->tail - ring->head + 1) % ring_size);
 }
 
-static void set_mac(volatile struct enet_regs *reg, uint8_t *mac)
+static inline bool hw_ring_empty(hw_ring_t *ring, size_t ring_size)
 {
-    reg->palr = (mac[0] << 24) | (mac[1] << 16) | (mac[2] << 8) | (mac[3]);
-    reg->paur = (mac[4] << 24) | (mac[5] << 16);
+    return !((ring->tail - ring->head) % ring_size);
 }
 
-static void
-dump_mac(uint8_t *mac)
-{
-    for (unsigned i = 0; i < 6; i++) {
-        putC(hexchar((mac[i] >> 4) & 0xf));
-        putC(hexchar(mac[i] & 0xf));
-        if (i < 5) {
-            putC(':');
-        }
-    }
-    putC('\n');
-}
-
-static void update_ring_slot(
-    ring_ctx_t *ring,
-    unsigned int idx,
-    uintptr_t phys,
-    uint16_t len,
-    uint16_t stat)
+static void update_ring_slot(hw_ring_t *ring, unsigned int idx, uintptr_t phys,
+                                uint16_t len, uint16_t stat)
 {
     volatile struct descriptor *d = &(ring->descr[idx]);
     d->addr = phys;
@@ -102,272 +79,150 @@ static void update_ring_slot(
      * that makes hardware aware of this slot.
      */
     __sync_synchronize();
-
     d->stat = stat;
 }
 
-static inline void
-enable_irqs(volatile struct enet_regs *eth, uint32_t mask)
+static inline void enable_irqs(uint32_t mask)
 {
     eth->eimr = mask;
     irq_mask = mask;
 }
 
-static uintptr_t
-alloc_rx_buf(size_t buf_size, void **cookie)
+static void rx_provide(void)
 {
-    uintptr_t addr;
-    unsigned int len;
+    bool reprocess = true;
+    while (reprocess) {
+        while (!hw_ring_full(&rx, RX_COUNT) && !ring_empty(rx_ring.free_ring)) {
+            buff_desc_t buffer;
+            int err __attribute__((unused)) = dequeue_free(&rx_ring, &buffer);
+            assert(!err);
 
-    /* Try to grab a buffer from the free ring */
-    if (driver_dequeue(rx_ring.free_ring, &addr, &len, cookie)) {
-        return 0;
-    }
-
-    return addr;
-}
-
-static void
-fill_rx_bufs(void)
-{
-    ring_ctx_t *ring = &rx;
-    fill_rx_bufs_:
-    while (!hw_ring_full(ring)) {
-        /* request a buffer */
-        void *cookie = NULL;
-        uintptr_t phys = alloc_rx_buf(MAX_PACKET_SIZE, &cookie);
-        if (!phys) {
-            break;
+            uint16_t stat = RXD_EMPTY;
+            if (rx.tail + 1 == RX_COUNT) stat |= WRAP;
+            rx.descr_mdata[rx.tail] = buffer;
+            update_ring_slot(&rx, rx.tail, buffer.phys_or_offset, 0, stat);
+            rx.tail = (rx.tail + 1) % RX_COUNT;
         }
-        uint16_t stat = RXD_EMPTY;
-        int idx = ring->write;
-        int new_write = idx + 1;
-        if (new_write == ring->cnt) {
-            new_write = 0;
-            stat |= WRAP;
+
+        /* Only request a notification from multiplexer if HW ring not full */
+        if (!hw_ring_full(&rx, RX_COUNT)) request_signal(rx_ring.free_ring);
+        else cancel_signal(rx_ring.free_ring);
+        reprocess = false;
+
+        if (!ring_empty(rx_ring.free_ring) && !hw_ring_full(&rx, RX_COUNT)) {
+            cancel_signal(rx_ring.free_ring);
+            reprocess = true;
         }
-        ring->cookies[idx] = cookie;
-        update_ring_slot(ring, idx, phys, 0, stat);
-
-        THREAD_MEMORY_RELEASE();
-        ring->write = new_write;
     }
 
-    /* Only get notified if more rx bufs are available if hw ring not full */
-    if (!hw_ring_full(ring)) {
-        rx_ring.free_ring->notify_reader = true;
-    } else {
-        rx_ring.free_ring->notify_reader = false;
-    }
-
-    THREAD_MEMORY_FENCE();
-
-    if (!ring_empty(rx_ring.free_ring) && !hw_ring_full(ring)) {
-        rx_ring.free_ring->notify_reader = false;
-        goto fill_rx_bufs_;
-    }
-
-    if (!(hw_ring_empty(ring))) {
-        /* Make sure rx is enabled*/
+    if (!(hw_ring_empty(&rx, RX_COUNT))) {
+        /* Ensure rx IRQs are enabled */
         eth->rdar = RDAR_RDAR;
-        if (!(irq_mask & NETIRQ_RXF))
-            enable_irqs(eth, IRQ_MASK);
+        if (!(irq_mask & NETIRQ_RXF)) enable_irqs(IRQ_MASK);
     } else {
-        enable_irqs(eth, NETIRQ_TXF | NETIRQ_EBERR);
+        enable_irqs(NETIRQ_TXF | NETIRQ_EBERR);
     }
 }
 
-static void
-handle_rx(volatile struct enet_regs *eth)
+static void rx_return(void)
 {
-    ring_ctx_t *ring = &rx;
     bool packets_transferred = false;
-    unsigned int read = ring->read;
+    while (!hw_ring_empty(&rx, RX_COUNT)) {
+        /* If buffer slot is still empty, we have processed all packets the device has filled */
+        volatile struct descriptor *d = &(rx.descr[rx.head]);
+        if (d->stat & RXD_EMPTY) break;
 
-    if (ring_full(rx_ring.used_ring))
-    {
-        /*
-         * we can't process any packets because the queues are full
-         * so disable Rx irqs.
-         */
-        enable_irqs(eth, NETIRQ_TXF | NETIRQ_EBERR);
-        __sync_synchronize();
-        rx_ring.used_ring->notify_writer = true;
-        return;
-    }
-
-    /*
-     * Dequeue until either:
-     *   we run out of filled buffers in the NIC ring
-     *   we run out of slots in the upstream Rx ring.
-     */
-    while (!hw_ring_empty(ring) && !ring_full(rx_ring.used_ring)) {
-        volatile struct descriptor *d = &(ring->descr[read]);
-        /*
-         * If a slot is still marked as empty we are done.
-         * Still need to signal upstream if
-         * we've dequeued anything.
-         */
-        if (d->stat & RXD_EMPTY) {
-            break;
-        }
-
-        void *cookie = ring->cookies[read];
-        /* Go to next buffer, handle roll-over. */
-        if (++read == ring->cnt) {
-            read = 0;
-        }
-        THREAD_MEMORY_RELEASE();
-        ring->read = read;
-
-        buff_desc_t *desc = (buff_desc_t *)cookie;
-        int err = enqueue_used(&rx_ring, desc->encoded_addr, d->len, desc->cookie);
-        if (err) {
-            print("ETH|ERROR: Failed to enqueue to RX used ring\n");
-        }
+        buff_desc_t buffer = rx.descr_mdata[rx.head];
+        buffer.len = d->len;
+        int err __attribute__((unused)) = enqueue_used(&rx_ring, buffer);
         assert(!err);
+
         packets_transferred = true;
+        rx.head = (rx.head + 1) % RX_COUNT;
     }
 
-    /* Notify client (only if we have actually processed a packet
-     * and the client hasn't already been notified!)
-     * Driver runs at highest priority, so buffers will be refilled
-     * by caller before the notify causes a context switch.
-     */
-    if (packets_transferred && rx_ring.used_ring->notify_reader) {
-        rx_ring.used_ring->notify_reader = false;
+    if (packets_transferred && require_signal(rx_ring.used_ring)) {
+        cancel_signal(rx_ring.used_ring);
         microkit_notify(RX_CH);
     }
 }
 
-static void
-raw_tx(volatile struct enet_regs *eth, uintptr_t phys,
-                  unsigned int len, void *cookie)
+static void tx_provide(void)
 {
-    ring_ctx_t *ring = &tx;
+    bool reprocess = true;
+    while (reprocess) {
+        while (!(hw_ring_full(&tx, TX_COUNT)) && !ring_empty(tx_ring.used_ring)) {
+            buff_desc_t buffer;
+            int err __attribute__((unused)) = dequeue_used(&tx_ring, &buffer);
+            assert(!err);
 
-    unsigned int write = ring->write;
-    unsigned int write_new = write;
+            uint16_t stat = TXD_READY | TXD_ADDCRC | TXD_LAST;
+            if (tx.tail + 1 == TX_COUNT) stat |= WRAP;
+            tx.descr_mdata[tx.tail] = buffer;
+            update_ring_slot(&tx, tx.tail, buffer.phys_or_offset, buffer.len, stat);
 
-    uint16_t stat = TXD_READY | TXD_ADDCRC | TXD_LAST;
+            tx.tail = (tx.tail + 1) % TX_COUNT;
+            if (!(eth->tdar & TDAR_TDAR)) eth->tdar = TDAR_TDAR;
+        }
+    
+        request_signal(tx_ring.used_ring);
+        reprocess = false;
 
-    unsigned int idx = write_new;
-    if (++write_new == TX_COUNT) {
-        write_new = 0;
-        stat |= WRAP;
-    }
-    update_ring_slot(ring, idx, phys, len, stat);
-
-    ring->cookies[write] = cookie;
-
-    THREAD_MEMORY_RELEASE();
-    ring->write = write_new;
-
-    if (!(eth->tdar & TDAR_TDAR)) {
-        eth->tdar = TDAR_TDAR;
+        if (!hw_ring_full(&tx, TX_COUNT) && !ring_empty(tx_ring.used_ring)) {
+            cancel_signal(tx_ring.used_ring);
+            reprocess = true;
+        }
     }
 }
 
-static void
-handle_tx(volatile struct enet_regs *eth)
+static void tx_return(void)
 {
-    uintptr_t buffer = 0;
-    unsigned int len = 0;
-    void *cookie = NULL;
-
-    handle_tx_:
-    while (!(hw_ring_full(&tx)) && !driver_dequeue(tx_ring.used_ring, &buffer, &len, &cookie)) {
-        raw_tx(eth, buffer, len, cookie);
-    }
-
-    tx_ring.used_ring->notify_reader = true;
-
-    THREAD_MEMORY_FENCE();
-
-    if (!hw_ring_full(&tx) && !ring_empty(tx_ring.used_ring)) {
-        tx_ring.used_ring->notify_reader = false;
-        goto handle_tx_;
-    }
-}
-
-static void
-complete_tx(volatile struct enet_regs *eth)
-{
-    void *cookie;
-    ring_ctx_t *ring = &tx;
-    unsigned int read = ring->read;
     bool enqueued = false;
-    while (!hw_ring_empty(ring) && !ring_full(tx_ring.free_ring)) {
-        cookie = ring->cookies[read];
-        volatile struct descriptor *d = &(ring->descr[read]);
+    while (!hw_ring_empty(&tx, TX_COUNT)) {
+        /* Ensure that this buffer has been sent by the device */
+        volatile struct descriptor *d = &(tx.descr[tx.head]);
+        if (d->stat & TXD_READY) break;
 
-        /* If this buffer was not sent, we can't release any more buffers */
-        if (d->stat & TXD_READY) {
-            break;
-        }
-        /* Go to next buffer, handle roll-over. */
-        if (++read == ring->cnt) {
-            read = 0;
-        }
+        buff_desc_t buffer = tx.descr_mdata[tx.head];
+        buffer.len = 0;
 
-        THREAD_MEMORY_RELEASE();
-        ring->read = read;
-        /* give the buffer back */
-        buff_desc_t *desc = (buff_desc_t *)cookie;
-        int err = enqueue_free(&tx_ring, desc->encoded_addr, desc->len, desc->cookie);
+        tx.head = (tx.head + 1) % TX_COUNT;
+
+        int err __attribute__((unused)) = enqueue_free(&tx_ring, buffer);
         assert(!err);
         enqueued = true;
     }
 
-    if (enqueued && tx_ring.free_ring->notify_reader) {
-        tx_ring.free_ring->notify_reader = false;
+    if (enqueued && require_signal(tx_ring.free_ring)) {
+        cancel_signal(tx_ring.free_ring);
         microkit_notify(TX_CH);
     }
 }
 
-static void
-handle_eth(volatile struct enet_regs *eth)
+static void handle_irq(void)
 {
     uint32_t e = eth->eir & irq_mask;
-    /* write to clear events */
     eth->eir = e;
 
     while (e & irq_mask) {
-        if (e & NETIRQ_TXF) {
-            complete_tx(eth);
-        }
+        if (e & NETIRQ_TXF) tx_return();
         if (e & NETIRQ_RXF) {
-            handle_rx(eth);
-            fill_rx_bufs();
+            rx_return();
+            rx_provide();
         }
-        if (e & NETIRQ_EBERR) {
-            print("Error: System bus/uDMA");
-            while (1);
-        }
+        if (e & NETIRQ_EBERR) dprintf("ETH|ERROR: System bus/uDMA\n");
         e = eth->eir & irq_mask;
         eth->eir = e;
     }
 }
 
-static void
-eth_setup(void)
+static void eth_setup(void)
 {
-    get_mac_addr(eth, mac);
-    microkit_dbg_puts("MAC: ");
-    // dump_mac(mac);
-    microkit_dbg_puts("\n");
+    uint32_t l = eth->palr;
+    uint32_t h = eth->paur;
 
-    /* set up descriptor rings */
-    rx.cnt = RX_COUNT;
-    rx.write = 0;
-    rx.read = 0;
-    rx.cookies = (void **)rx_cookies;
+    /* Set up HW rings */
     rx.descr = (volatile struct descriptor *)hw_ring_buffer_vaddr;
-
-    tx.cnt = TX_COUNT;
-    tx.write = 0;
-    tx.read = 0;
-    tx.cookies = (void **)tx_cookies;
     tx.descr = (volatile struct descriptor *)(hw_ring_buffer_vaddr + (sizeof(struct descriptor) * RX_COUNT));
 
     /* Perform reset */
@@ -398,9 +253,10 @@ eth_setup(void)
     eth->gaur = 0;
     eth->galr = 0;
 
+    /* Mac address needs setting again. */
     if (eth->palr == 0) {
-        // the mac address needs setting again.
-        set_mac(eth, mac);
+        eth->palr = l;
+        eth->paur = h;
     }
 
     eth->opd = PAUSE_OPCODE_FIELD;
@@ -414,7 +270,7 @@ eth_setup(void)
     eth->rsfl = 0;
     /* Do not forward frames with errors + check the csum */
     eth->racc = RACC_LINEDIS | RACC_IPDIS | RACC_PRODIS;
-    /* add the checksum for known IP protocols */
+    /* Add the checksum for known IP protocols */
     eth->tacc = TACC_PROCHK | TACC_IPCHK;
 
     /* Set RDSR */
@@ -442,26 +298,20 @@ eth_setup(void)
 
 void init(void)
 {
-    print(microkit_name);
-    print(": elf PD init function running\n");
-
     eth_setup();
 
-    /* Set up shared memory regions */
-    ring_init(&rx_ring, (ring_buffer_t *)rx_free, (ring_buffer_t *)rx_used, 0, NUM_BUFFERS, NUM_BUFFERS);
-    ring_init(&tx_ring, (ring_buffer_t *)tx_free, (ring_buffer_t *)tx_used, 0, NUM_BUFFERS, NUM_BUFFERS);
+    ring_init(&rx_ring, (ring_buffer_t *)rx_free, (ring_buffer_t *)rx_used, RX_RING_SIZE_DRIV);
+    ring_init(&tx_ring, (ring_buffer_t *)tx_free, (ring_buffer_t *)tx_used, TX_RING_SIZE_DRIV);
 
-    tx_ring.used_ring->notify_reader = true;
-    // check if we have any requests to transmit.
-    handle_tx(eth);
+    rx_provide();
+    tx_provide();
 }
 
-void
-notified(microkit_channel ch)
+void notified(microkit_channel ch)
 {
     switch(ch) {
         case IRQ_CH:
-            handle_eth(eth);
+            handle_irq();
             /*
              * Delay calling into the kernel to ack the IRQ until the next loop
              * in the microkit event handler loop.
@@ -469,16 +319,13 @@ notified(microkit_channel ch)
             microkit_irq_ack_delayed(ch);
             break;
         case RX_CH:
-            fill_rx_bufs();
+            rx_provide();
             break;
         case TX_CH:
-            handle_tx(eth);
+            tx_provide();
             break;
         default:
-            print("eth driver: received notification on unexpected channel: ");
-            puthex64(ch);
-            print("\n");
-            assert(0);
+            dprintf("ETH|LOG: received notification on unexpected channel: %lu\n", ch);
             break;
     }
 }

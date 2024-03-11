@@ -224,39 +224,3 @@ struct enet_regs {
     uint32_t tcsr3;  /* 620 Timer Control Status Register */
     uint32_t tccr3;  /* 624 Timer Compare Capture Register */
 };
-
-struct descriptor {
-    uint16_t len;
-    uint16_t stat;
-    uint32_t addr;
-};
-
-/*
- * Housekeeping for NIC ring buffers.
- * Invariants: 0 <= write < cnt
- *             0 <= read < write
- *             remaining = (read - write) % cnt
- *             descr[read] through desc[write]
- *                   are ready to be or have been used for DMA
- *             descr[write % cnt] through descr[(read - 1) % cnt]
- *                   are unused.
- */
-typedef struct {
-    unsigned int cnt;
-    unsigned int write;
-    unsigned int read;
-    volatile struct descriptor *descr;
-    void **cookies;
-} ring_ctx_t;
-
-static inline bool
-hw_ring_full(ring_ctx_t *ring)
-{
-    return !((ring->write - ring->read + 1) % ring->cnt);
-}
-
-static inline bool
-hw_ring_empty(ring_ctx_t *ring)
-{
-    return !((ring->write - ring->read ) % ring->cnt);
-}

@@ -14,7 +14,7 @@
 
 #include <stdint.h>
 #include <microkit.h>
-#include <sddf/util/util.h>
+#include <sddf/util/printf.h>
 
 #define GET_TIME 0
 #define SET_TIMEOUT 1
@@ -38,7 +38,6 @@
 #define GPT_FREQ   (12u)
 #define NS_IN_US    1000ULL
 
-uintptr_t uart_base;
 uintptr_t gpt_regs;
 static volatile uint32_t *gpt;
 
@@ -51,8 +50,7 @@ static uint64_t current_timeout;
 static uint8_t pending_timeouts;
 
 
-static uint64_t
-get_ticks(void) 
+static uint64_t get_ticks(void) 
 {
     uint64_t overflow = overflow_count;
     uint32_t sr1 = gpt[SR];
@@ -66,8 +64,7 @@ get_ticks(void)
     return (overflow << 32) | cnt;
 }
 
-void
-irq(microkit_channel ch)
+void irq(microkit_channel ch)
 {
     uint32_t sr = gpt[SR];
     gpt[SR] = sr;
@@ -104,9 +101,6 @@ irq(microkit_channel ch)
         if (ch != -1 && overflow_count == (next_timeout >> 32)) {
             pending_timeouts--;
             gpt[OCR1] = (uint32_t)next_timeout;
-            while (gpt[OCR1] != next_timeout) {
-                gpt[OCR1] = (uint32_t)next_timeout;
-            }
             gpt[IR] |= 1;
             timeout_active = true;
             current_timeout = next_timeout;
@@ -115,29 +109,31 @@ irq(microkit_channel ch)
     }
 }
 
-void
-notified(microkit_channel ch)
+void notified(microkit_channel ch)
 {
-    uint64_t rel_timeout, cur_ticks, abs_timeout;
     if (ch == IRQ_CH) {
         irq(ch);
         microkit_irq_ack_delayed(ch);
     }
 }
 
-seL4_MessageInfo_t
-protected(microkit_channel ch, microkit_msginfo msginfo)
+seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
 {
     uint64_t rel_timeout, cur_ticks, abs_timeout;
     switch (microkit_msginfo_get_label(msginfo)) {
         case GET_TIME:
             // Just wants the time.
             cur_ticks = (get_ticks() / (uint64_t)GPT_FREQ);
+            // Convert to nanoseconds.
+            cur_ticks *= NS_IN_US;
             seL4_SetMR(0, cur_ticks);
             return microkit_msginfo_new(0, 1);
         case SET_TIMEOUT:
             // Request to set a timeout.
-            rel_timeout = (uint64_t)(GPT_FREQ) * (seL4_GetMR(0));
+            rel_timeout = (seL4_GetMR(0));
+            // Convert to microseconds.
+            rel_timeout /= NS_IN_US;
+            rel_timeout = (uint64_t)(GPT_FREQ) * rel_timeout;
             cur_ticks = get_ticks();
             abs_timeout = cur_ticks + rel_timeout;
 
@@ -149,9 +145,6 @@ protected(microkit_channel ch, microkit_msginfo msginfo)
                     pending_timeouts++;
                 }
                 gpt[OCR1] = (uint32_t)abs_timeout;
-                while (gpt[OCR1] != abs_timeout) {
-                    gpt[OCR1] = (uint32_t)abs_timeout;
-                }
                 gpt[IR] |= 1;
                 timeout_active = true;
                 current_timeout = abs_timeout;
@@ -161,15 +154,14 @@ protected(microkit_channel ch, microkit_msginfo msginfo)
             }
             break;
         default:
-            microkit_dbg_puts("DRIVER|INFO: Unknown request to timer from client\n");
+            dprintf("TIMER DRIVER|LOG: Unknown request to timer from client %llu\n", microkit_msginfo_get_label(msginfo));
             break;
     }
 
     return microkit_msginfo_new(0, 0);
 }
 
-void
-init(void)
+void init(void)
 {
     gpt = (volatile uint32_t *) gpt_regs;
 

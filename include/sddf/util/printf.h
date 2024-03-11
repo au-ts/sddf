@@ -40,6 +40,11 @@
 extern "C" {
 #endif
 
+#ifdef CONFIG_DEBUG_BUILD
+#define dprintf(fmt, ...) printf(fmt, ##__VA_ARGS__);
+#else
+#define dprintf(...)
+#endif
 
 /**
  * Output a character to a custom device like UART, used by the printf() function

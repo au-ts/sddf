@@ -5,9 +5,9 @@
  */
 #pragma once
 
-// TODO: UNCONDENSE THIS FILE TO USE THE PROPER LIBRARY. 
-
 #include <stdint.h>
+#include <stddef.h>
+#include <microkit.h>
 
 /* A counter is an index to a performance counter on a platform.
  * The max counter index is sizeof(seL4_Word) */
@@ -196,6 +196,11 @@ static FASTFN seL4_Word sel4bench_get_num_counters()
 
 static FASTFN void sel4bench_init()
 {
+    // do kernel-mode PMC init
+// #ifndef CONFIG_EXPORT_PMU_USER
+//     seL4_DebugRun(&sel4bench_private_init, NULL);
+// #endif
+
     //ensure all counters are in the stopped state
     sel4bench_private_write_cntenc(-1);
 
@@ -208,6 +213,11 @@ static FASTFN void sel4bench_init()
     //Enable counters globally.
     MODIFY_PMCR( |, SEL4BENCH_ARMV8A_PMCR_ENABLE);
 
+#ifdef CONFIG_ARM_HYPERVISOR_SUPPORT
+    // Select instruction count incl. PL2 by default */
+    sel4bench_private_write_pmnxsel(0x1f);
+    sel4bench_private_write_evtsel(BIT(27));
+#endif
     //start CCNT
     sel4bench_private_write_cntens(BIT(SEL4BENCH_ARMV8A_COUNTER_CCNT));
 }
@@ -302,4 +312,3 @@ static FASTFN void sel4bench_reset_counters(void)
     //Reset all counters except the CCNT
     MODIFY_PMCR( |, SEL4BENCH_ARMV8A_PMCR_RESET_ALL);
 }
-

@@ -1,227 +1,146 @@
 #include <microkit.h>
 #include <sddf/network/shared_ringbuffer.h>
-#include <sddf/util/util.h>
+#include <sddf/util/cache.h>
 #include <sddf/util/fence.h>
+#include <sddf/util/util.h>
+#include <sddf/util/printf.h>
+#include <system_config.h>
+
+#define DRIVER 0
+#define CLIENT_CH 1
 
 uintptr_t tx_free_drv;
 uintptr_t tx_used_drv;
+uintptr_t tx_free_arp;
+uintptr_t tx_used_arp;
 uintptr_t tx_free_cli0;
 uintptr_t tx_used_cli0;
 uintptr_t tx_free_cli1;
 uintptr_t tx_used_cli1;
-uintptr_t tx_free_arp;
-uintptr_t tx_used_arp;
 
-uintptr_t shared_dma_vaddr_cli0;
-uintptr_t shared_dma_paddr_cli0;
-uintptr_t shared_dma_vaddr_cli1;
-uintptr_t shared_dma_paddr_cli1;
-uintptr_t shared_dma_vaddr_arp;
-uintptr_t shared_dma_paddr_arp;
-uintptr_t uart_base;
+uintptr_t buffer_data_region_arp_vaddr;
+uintptr_t buffer_data_region_cli0_vaddr;
+uintptr_t buffer_data_region_cli1_vaddr;
 
-#define CLIENT_0 0
-#define CLIENT_1 1
-#define ARP 2
-#define NUM_CLIENTS 3
-#define DRIVER 3
-#define NUM_BUFFERS 512
-#define BUF_SIZE 2048
-#define DMA_SIZE 0x200000
+uintptr_t buffer_data_region_arp_paddr;
+uintptr_t buffer_data_region_cli0_paddr;
+uintptr_t buffer_data_region_cli1_paddr;
 
 typedef struct state {
-    /* Pointers to shared buffers */
     ring_handle_t tx_ring_drv;
     ring_handle_t tx_ring_clients[NUM_CLIENTS];
+    uintptr_t buffer_region_vaddrs[NUM_CLIENTS];
+    uintptr_t buffer_region_paddrs[NUM_CLIENTS];
 } state_t;
 
 state_t state;
 
-static uintptr_t
-get_phys_addr(uintptr_t virtual)
-{
-    int offset;
-    uintptr_t base;
-    if (virtual >= shared_dma_vaddr_cli0 && virtual < shared_dma_vaddr_cli0 + DMA_SIZE) {
-        offset = virtual - shared_dma_vaddr_cli0;
-        base = shared_dma_paddr_cli0;
-    } else if (virtual >= shared_dma_vaddr_cli1 && virtual < shared_dma_vaddr_cli1 + DMA_SIZE) {
-        offset = virtual - shared_dma_vaddr_cli1;
-        base = shared_dma_paddr_cli1;
-    } else if (virtual >= shared_dma_vaddr_arp && virtual < shared_dma_vaddr_arp + DMA_SIZE) {
-        offset = virtual - shared_dma_vaddr_arp;
-        base = shared_dma_paddr_arp;
-    } else {
-        print("MUX TX|ERROR: get_phys_addr: invalid virtual address\n");
-        return 0;
-    }
-
-    return base + offset;
-}
-
-static uintptr_t
-get_virt_addr(uintptr_t phys)
-{
-    int offset;
-    uintptr_t base; 
-    if (phys >= shared_dma_paddr_cli0 && phys < shared_dma_paddr_cli0 + DMA_SIZE) {
-        offset = phys - shared_dma_paddr_cli0;
-        base = shared_dma_vaddr_cli0;
-    } else if (phys >= shared_dma_paddr_cli1 && phys < shared_dma_paddr_cli1 + DMA_SIZE) {
-        offset = phys - shared_dma_paddr_cli1;
-        base = shared_dma_vaddr_cli1;
-    }else if (phys >= shared_dma_paddr_arp && phys < shared_dma_paddr_arp + DMA_SIZE) {
-        offset = phys - shared_dma_paddr_arp;
-        base = shared_dma_vaddr_arp;
-    } else {
-        print("MUX TX|ERROR: get_virt_addr: invalid physical address\n");
-        return 0;
-    }
-
-    return base + offset;
-}
-
-static int
-get_client(uintptr_t addr)
-{
-    if (addr >= shared_dma_vaddr_cli0 && addr < shared_dma_vaddr_cli0 + DMA_SIZE) {
-        return CLIENT_0;
-    } else if (addr >= shared_dma_vaddr_cli1 && addr < shared_dma_vaddr_cli1 + DMA_SIZE) {
-        return CLIENT_1;
-    }else if (addr >= shared_dma_vaddr_arp && addr < shared_dma_vaddr_arp + DMA_SIZE) {
-        return ARP;
-    }
-    print("MUX TX|ERROR: Buffer out of range\n");
-    assert(0);
-    return NUM_CLIENTS;
-}
-
-/*
- * Loop over all used tx buffers in client queues and enqueue to driver.
- */
-void process_tx_ready(void)
-{
-    bool enqueued = 0;
-    int err;
-    process_tx_ready_:
+int extract_offset(uintptr_t *phys) {
     for (int client = 0; client < NUM_CLIENTS; client++) {
-        while (!ring_empty(state.tx_ring_clients[client].used_ring) && !ring_full(state.tx_ring_drv.used_ring)) {
-            uintptr_t addr;
-            unsigned int len;
-            void *cookie;
-            uintptr_t phys;
-
-            err = dequeue_used(&state.tx_ring_clients[client], &addr, &len, &cookie);
-            assert(!err);
-            phys = get_phys_addr(addr);
-            assert(phys);
-            err = enqueue_used(&state.tx_ring_drv, phys, len, cookie);
-            assert(!err);
-
-            enqueued = true;
+        if (*phys >= state.buffer_region_paddrs[client] && 
+            *phys < state.buffer_region_paddrs[client] + state.tx_ring_clients[client].free_ring->size * BUFF_SIZE) {
+            *phys = *phys - state.buffer_region_paddrs[client];
+            return client;
         }
+    }
+    return -1;
+}
 
-        state.tx_ring_clients[client].used_ring->notify_reader = true;
+void tx_provide(void)
+{
+    bool enqueued = false;
+    for (int client = 0; client < NUM_CLIENTS; client++) {
+        bool reprocess = true;
+        while (reprocess) {
+            while (!ring_empty(state.tx_ring_clients[client].used_ring)) {
+                buff_desc_t buffer;
+                int err __attribute__((unused)) = dequeue_used(&state.tx_ring_clients[client], &buffer);
+                assert(!err);
 
-        THREAD_MEMORY_FENCE();
+                if (buffer.phys_or_offset % BUFF_SIZE || 
+                    buffer.phys_or_offset >= BUFF_SIZE * state.tx_ring_clients[client].used_ring->size) {
+                    dprintf("MUX_TX|LOG: Client provided offset %llx which is not buffer aligned or outside of buffer region\n", buffer.phys_or_offset);
+                    err = enqueue_free(&state.tx_ring_clients[client], buffer);
+                    assert(!err);
+                    continue;
+                }
 
-        if (!ring_empty(state.tx_ring_clients[client].used_ring) && !ring_full(state.tx_ring_drv.used_ring)) {
-            state.tx_ring_clients[client].used_ring->notify_reader = false;
-            goto process_tx_ready_;
+                cache_clean(buffer.phys_or_offset + state.buffer_region_vaddrs[client], buffer.phys_or_offset + state.buffer_region_vaddrs[client] + buffer.len);
+
+                buffer.phys_or_offset = buffer.phys_or_offset + state.buffer_region_paddrs[client];
+                err = enqueue_used(&state.tx_ring_drv, buffer);
+                assert(!err);
+                enqueued = true;
+            }
+
+            request_signal(state.tx_ring_clients[client].used_ring);
+            reprocess = false;
+
+            if (!ring_empty(state.tx_ring_clients[client].used_ring)) {
+                cancel_signal(state.tx_ring_clients[client].used_ring);
+                reprocess = true;
+            }
         }
     }
 
-    if (enqueued) {
-        state.tx_ring_drv.used_ring->notify_reader = false;
+    if (enqueued && require_signal(state.tx_ring_drv.used_ring)) {
+        cancel_signal(state.tx_ring_drv.used_ring);
         microkit_notify_delayed(DRIVER);
     }
 }
 
-/*
- * Take as many TX free buffers from the driver and give them to
- * the respective clients. This will notify the clients if we have moved buffers
- * around and the client's TX free ring was empty.
- * !!! We assume a client never has a free queue greater than a used queue. 
- */
-void process_tx_complete(void)
+void tx_return(void)
 {
-    // bitmap stores whether which clients need notifying.
+    bool reprocess = true;
     bool notify_clients[NUM_CLIENTS] = {false};
-    process_tx_complete_:
-    while (!ring_empty(state.tx_ring_drv.free_ring)) {
-        uintptr_t addr;
-        unsigned int len;
-        void *cookie;
-        int err = dequeue_free(&state.tx_ring_drv, &addr, &len, &cookie);
-        assert(!err);
-        uintptr_t virt = get_virt_addr(addr);
-        assert(virt);
+    while (reprocess) {
+        while (!ring_empty(state.tx_ring_drv.free_ring)) {
+            buff_desc_t buffer;
+            int err __attribute__((unused)) = dequeue_free(&state.tx_ring_drv, &buffer);
+            assert(!err);
 
-        int client = get_client(virt);
-        err = enqueue_free(&state.tx_ring_clients[client], virt, len, cookie);
-        assert(!err);
+            int client = extract_offset(&buffer.phys_or_offset);
+            assert(client >= 0);
 
-        if (state.tx_ring_clients[client].free_ring->notify_reader) {
+            err = enqueue_free(&state.tx_ring_clients[client], buffer);
+            assert(!err);
             notify_clients[client] = true;
+        }
+
+        request_signal(state.tx_ring_drv.free_ring);
+        reprocess = false;
+
+        if (!ring_empty(state.tx_ring_drv.free_ring)) {
+            cancel_signal(state.tx_ring_drv.free_ring);
+            reprocess = true;
         }
     }
 
-    state.tx_ring_drv.free_ring->notify_reader = true;
-
-    THREAD_MEMORY_FENCE();
-
-    if (!ring_empty(state.tx_ring_drv.free_ring)) {
-        state.tx_ring_drv.free_ring->notify_reader = false;
-        goto process_tx_complete_;
-    };
-
-    /* Loop over bitmap and see who we need to notify. */
     for (int client = 0; client < NUM_CLIENTS; client++) {
-        if (notify_clients[client]) {
-            state.tx_ring_clients[client].free_ring->notify_reader = false;
-            microkit_notify(client);
+        if (notify_clients[client] && require_signal(state.tx_ring_clients[client].free_ring)) {
+            cancel_signal(state.tx_ring_clients[client].free_ring);
+            microkit_notify(client + CLIENT_CH);
         }
     }
 }
 
 void notified(microkit_channel ch)
 {
-    process_tx_complete();
-    process_tx_ready();
+    tx_return();
+    tx_provide();
 }
 
 void init(void)
 {
-    /* Set up shared memory regions */
-    ring_init(&state.tx_ring_drv, (ring_buffer_t *)tx_free_drv, (ring_buffer_t *)tx_used_drv, 1, NUM_BUFFERS, NUM_BUFFERS);
-    ring_init(&state.tx_ring_clients[0], (ring_buffer_t *)tx_free_cli0, (ring_buffer_t *)tx_used_cli0, 1, NUM_BUFFERS, NUM_BUFFERS);
-    ring_init(&state.tx_ring_clients[1], (ring_buffer_t *)tx_free_cli1, (ring_buffer_t *)tx_used_cli1, 1, NUM_BUFFERS, NUM_BUFFERS);
-    ring_init(&state.tx_ring_clients[2], (ring_buffer_t *)tx_free_arp, (ring_buffer_t *)tx_used_arp, 1, NUM_BUFFERS, NUM_BUFFERS);
+    ring_init(&state.tx_ring_drv, (ring_buffer_t *)tx_free_drv, (ring_buffer_t *)tx_used_drv, TX_RING_SIZE_DRIV);
+    mux_ring_init_sys(microkit_name, state.tx_ring_clients, tx_free_arp, tx_used_arp);
+    
+    mem_region_init_sys(microkit_name, state.buffer_region_vaddrs, buffer_data_region_arp_vaddr);
 
-    /* Enqueue free transmit buffers to all clients. */
-    for (int i = 0; i < NUM_BUFFERS - 1; i++) {
-        uintptr_t addr = shared_dma_vaddr_cli0 + (BUF_SIZE * i);
-        int err = enqueue_free(&state.tx_ring_clients[0], addr, BUF_SIZE, NULL);
-        assert(!err);
-    }
-
-    for (int i = 0; i < NUM_BUFFERS - 1; i++) {
-        uintptr_t addr = shared_dma_vaddr_cli1 + (BUF_SIZE * i);
-        int err = enqueue_free(&state.tx_ring_clients[1], addr, BUF_SIZE, NULL);
-        assert(!err);
-    }
-
-    for (int i = 0; i < NUM_BUFFERS - 1; i++) {
-        uintptr_t addr = shared_dma_vaddr_arp + (BUF_SIZE * i);
-        int err = enqueue_free(&state.tx_ring_clients[2], addr, BUF_SIZE, NULL);
-        assert(!err);
-    }
-
-    // We are higher priority than the clients, so we always need to be notified
-    // when a used buffer becomes available to be sent. 
-    state.tx_ring_clients[0].used_ring->notify_reader = true;
-    state.tx_ring_clients[1].used_ring->notify_reader = true;
-    state.tx_ring_clients[2].used_ring->notify_reader = true;
-
-    return;
+    /* CDTODO: Can we make this system agnostic? */
+    state.buffer_region_paddrs[0] = buffer_data_region_arp_paddr;
+    state.buffer_region_paddrs[1] = buffer_data_region_cli0_paddr;
+    state.buffer_region_paddrs[2] = buffer_data_region_cli1_paddr;
+    
+    tx_provide();
 }
