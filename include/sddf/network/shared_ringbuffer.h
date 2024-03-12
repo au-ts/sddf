@@ -14,7 +14,7 @@
 #include <sddf/util/fence.h>
 
 typedef struct buff_desc {
-uintptr_t phys_or_offset; /* offset of buffer within buffer memory region or physical address of buffer */
+    uintptr_t phys_or_offset; /* offset of buffer within buffer memory region or physical address of buffer */
     uint16_t len; /* length of data inside buffer */
 } buff_desc_t;
 
