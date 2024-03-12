@@ -278,9 +278,7 @@ void notified(microkit_channel ch)
     switch(ch) {
         case IRQ_CH:
             handle_irq();
-            have_signal = true;
-            signal_msg = seL4_MessageInfo_new(IRQAckIRQ, 0, 0, 0);
-            signal_cap = (BASE_IRQ_CAP + IRQ_CH);
+            microkit_irq_ack_delayed(ch);
             break;
         case RX_CH:
             rx_provide();
