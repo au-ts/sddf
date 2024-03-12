@@ -169,7 +169,7 @@ protected(microkit_channel ch, microkit_msginfo msginfo)
             }
             break;
         default:
-            dprintf("TIMER DRIVER|LOG: Unknown request to timer from client %llu\n", microkit_msginfo_get_label(msginfo));
+            dprintf("TIMER DRIVER|LOG: Unknown request %llu to timer from channel %llu\n", microkit_msginfo_get_label(msginfo), ch);
             break;
     }
 
