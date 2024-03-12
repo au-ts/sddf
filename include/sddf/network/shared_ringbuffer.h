@@ -12,6 +12,7 @@
 #include <sddf/network/shared_ringbuffer.h>
 #include <sddf/network/constants.h>
 #include <sddf/util/fence.h>
+#include <sddf/util/util.h>
 
 typedef struct buff_desc {
     uintptr_t phys_or_offset; /* offset of buffer within buffer memory region or physical address of buffer */
@@ -183,6 +184,7 @@ static inline void buffers_init(ring_buffer_t *free_ring, uintptr_t base_addr, u
     for (uint32_t i = 0; i < ring_size - 1; i++) {
         buff_desc_t buffer = {(BUFF_SIZE * i) + base_addr, 0};
         int err = enqueue(free_ring, buffer);
+        assert(!err);
     }
 }
 
