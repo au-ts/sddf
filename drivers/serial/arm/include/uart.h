@@ -1,6 +1,6 @@
 #pragma once
 
-#include <sddf/serial/shared_ringbuffer.h> 
+#include <sddf/serial/queue.h> 
 
 /*
  * This UART driver is based on the following specificion:
