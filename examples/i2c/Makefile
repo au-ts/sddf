@@ -50,12 +50,12 @@ CFLAGS += -I$(BOARD_DIR)/include \
 	-MD \
 	-MP
 
-COMMONFILES=$(I2C_QUEUE)/queue.c $(UTIL)/printf.c $(UTIL)/util.c
+COMMONFILES=$(I2C_QUEUE)/queue.c $(UTIL)/printf.c $(UTIL)/putchar_debug.c
 
 CLIENT_OBJS := $(LIBCO)/libco.o pn532.o client.o $(COMMONFILES:.c=.o) sddf_timer_client.o
 VIRTUALISER_OBJS := $(I2C)/components/virtualiser.o $(COMMONFILES:.c=.o)
 DRIVER_OBJS := $(I2C_DRIVER)/i2c.o $(COMMONFILES:.c=.o)
-TIMER_DRIVER_OBJS := timer_driver.o
+TIMER_DRIVER_OBJS := timer_driver.o $(UTIL)/printf.o $(UTIL)/putchar_debug.o
 
 OBJS := $(sort $(addprefix $(BUILD_DIR)/, $(SERVER_OBJS) $(DRIVER_OBJS)))
 DEPS := $(OBJS:.o=.d)
@@ -82,7 +82,7 @@ $(BUILD_DIR)/client.elf: $(addprefix $(BUILD_DIR)/, $(CLIENT_OBJS))
 $(BUILD_DIR)/sddf_timer_client.o:
 	BUILD_DIR=$(abspath $(BUILD_DIR)) MICROKIT_INCLUDE=$(BOARD_DIR)/include make -C $(SDDF)/timer/client
 
-$(BUILD_DIR)/timer.elf: $(BUILD_DIR)/timer_driver.o
+$(BUILD_DIR)/timer.elf: $(addprefix $(BUILD_DIR)/, $(TIMER_DRIVER_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(BUILD_DIR)/timer_driver.o: $(TIMER_DRIVER)/timer.c
