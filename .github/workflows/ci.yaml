@@ -13,10 +13,10 @@ jobs:
       - name: Checkout VMM repository
         uses: actions/checkout@v4
       - name: Download Microkit SDK
-        run: wget https://trustworthy.systems/Downloads/microkit/microkit-sdk-dev-4f717f2-linux-x86-64.tar.gz
+        run: ./ci/acquire_sdk.sh microkit-sdk.zip ${{ secrets.GITHUB_TOKEN }} linux-x86-64
         shell: bash
       - name: Extract Microkit SDK
-        run: tar -xf microkit-sdk-dev-4f717f2-linux-x86-64.tar.gz
+        run: unzip microkit-sdk.zip && tar -xf microkit-sdk-1.2.6.tar.gz
       - name: Install dependencies (via apt)
         run: sudo apt update && sudo apt install -y make clang lld
       - name: Download and install AArch64 GCC toolchain
@@ -34,10 +34,10 @@ jobs:
       - name: Checkout VMM repository
         uses: actions/checkout@v4
       - name: Download Microkit SDK
-        run: wget https://trustworthy.systems/Downloads/microkit/microkit-sdk-dev-4f717f2-macos-x86-64.tar.gz
+        run: ./ci/acquire_sdk.sh microkit-sdk.zip ${{ secrets.GITHUB_TOKEN }} macos-x86-64
         shell: bash
       - name: Extract Microkit SDK
-        run: tar -xf microkit-sdk-dev-4f717f2-macos-x86-64.tar.gz
+        run: unzip microkit-sdk.zip && tar -xf microkit-sdk-1.2.6.tar.gz
       - name: Install dependencies (via Homebrew)
         run: |
           brew install llvm make
