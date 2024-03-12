@@ -21,11 +21,11 @@ CFLAGS := \
 	-I$(MICROKIT_INCLUDE) \
 	-I$(SDDF)/include
 
-all: $(BUILD_DIR)/sddf_serial_sharedringbuffer.o
+all: $(BUILD_DIR)/sddf_serial_queue.o
 
-$(BUILD_DIR)/sddf_serial_sharedringbuffer.o: shared_ringbuffer.c $(SDDF)/include/sddf/serial/shared_ringbuffer.h
-	$(CC) -c $(CFLAGS) shared_ringbuffer.c -o $(BUILD_DIR)/sddf_serial_sharedringbuffer.o
+$(BUILD_DIR)/sddf_serial_queue.o: queue.c $(SDDF)/include/sddf/serial/queue.h
+	$(CC) -c $(CFLAGS) queue.c -o $(BUILD_DIR)/sddf_serial_queue.o
 
 .PHONY: clean
 clean:
-	rm $(BUILD_DIR)/sddf_serial_sharedringbuffer.o
+	rm $(BUILD_DIR)/sddf_serial_queue.o

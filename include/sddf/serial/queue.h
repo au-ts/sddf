@@ -11,34 +11,34 @@
 #include <stddef.h>
 #include <sddf/util/fence.h>
 
-/* Number of buffers each ring is configured to have. */
-#define NUM_BUFFERS 512
-/* Size of the data that each buffer descriptor points to. */
+/* Number of entries each queue is configured to have. */
+#define NUM_ENTRIES 512
+/* Size of the data that each queue entry points to. */
 #define BUFFER_SIZE 2048
 
 /* Buffer descriptor */
-typedef struct buff_desc {
+typedef struct serial_queue_entry {
     uintptr_t encoded_addr; /* encoded dma addresses */
     unsigned int len; /* associated memory lengths */
     void *cookie; /* index into client side metadata */
-} buff_desc_t;
+} serial_queue_entry_t;
 
 /* Circular buffer containing descriptors */
-typedef struct ring_buffer {
+typedef struct serial_queue {
     uint32_t write_idx;
     uint32_t read_idx;
     uint32_t size;
     bool notify_writer;
     bool notify_reader;
     bool plugged;
-    buff_desc_t buffers[NUM_BUFFERS];
-} ring_buffer_t;
+    serial_queue_entry_t entries[NUM_ENTRIES];
+} serial_queue_t;
 
 /* A ring handle for enqueing/dequeuing into  */
-typedef struct ring_handle {
-    ring_buffer_t *free_ring;
-    ring_buffer_t *used_ring;
-} ring_handle_t;
+typedef struct serial_queue_handle {
+    serial_queue_t *free;
+    serial_queue_t *used;
+} serial_queue_handle_t;
 
 /**
  * Initialise the shared ring buffer.
@@ -49,7 +49,7 @@ typedef struct ring_handle {
  * @param buffer_init 1 indicates the read and write indices in shared memory need to be initialised.
  *                    0 inidicates they do not. Only one side of the shared memory regions needs to do this.
  */
-void ring_init(ring_handle_t *ring, ring_buffer_t *free, ring_buffer_t *used, int buffer_init, uint32_t free_size, uint32_t used_size);
+void serial_queue_init(serial_queue_handle_t *queue, serial_queue_t *free, serial_queue_t *used, int buffer_init, uint32_t free_size, uint32_t used_size);
 
 /**
  * Check if the ring buffer is empty.
@@ -58,7 +58,7 @@ void ring_init(ring_handle_t *ring, ring_buffer_t *free, ring_buffer_t *used, in
  *
  * @return true indicates the buffer is empty, false otherwise.
  */
-int ring_empty(ring_buffer_t *ring);
+int serial_queue_empty(serial_queue_t *queue);
 
 /**
  * Check if the ring buffer is full
@@ -67,9 +67,9 @@ int ring_empty(ring_buffer_t *ring);
  *
  * @return true indicates the buffer is full, false otherwise.
  */
-int ring_full(ring_buffer_t *ring);
+int serial_queue_full(serial_queue_t *queue);
 
-uint32_t ring_size(ring_buffer_t *ring);
+uint32_t serial_queue_size(serial_queue_t *queue);
 
 /**
  * Enqueue an element to a ring buffer
@@ -81,7 +81,7 @@ uint32_t ring_size(ring_buffer_t *ring);
  *
  * @return -1 when ring is empty, 0 on success.
  */
-int enqueue(ring_buffer_t *ring, uintptr_t buffer, unsigned int len, void *cookie);
+int serial_enqueue(serial_queue_t *queue, uintptr_t buffer, unsigned int len, void *cookie);
 
 /**
  * Dequeue an element to a ring buffer.
@@ -93,7 +93,7 @@ int enqueue(ring_buffer_t *ring, uintptr_t buffer, unsigned int len, void *cooki
  *
  * @return -1 when ring is empty, 0 on success.
  */
-int dequeue(ring_buffer_t *ring, uintptr_t *addr, unsigned int *len, void **cookie);
+int serial_dequeue(serial_queue_t *queue, uintptr_t *addr, unsigned int *len, void **cookie);
 
 /**
  * Enqueue an element into an free ring buffer.
@@ -106,7 +106,7 @@ int dequeue(ring_buffer_t *ring, uintptr_t *addr, unsigned int *len, void **cook
  *
  * @return -1 when ring is full, 0 on success.
  */
-int enqueue_free(ring_handle_t *ring, uintptr_t addr, unsigned int len, void *cookie);
+int serial_enqueue_free(serial_queue_handle_t *queue, uintptr_t addr, unsigned int len, void *cookie);
 
 /**
  * Enqueue an element into a used ring buffer.
@@ -119,7 +119,7 @@ int enqueue_free(ring_handle_t *ring, uintptr_t addr, unsigned int len, void *co
  *
  * @return -1 when ring is full, 0 on success.
  */
-int enqueue_used(ring_handle_t *ring, uintptr_t addr, unsigned int len, void *cookie);
+int serial_enqueue_used(serial_queue_handle_t *queue, uintptr_t addr, unsigned int len, void *cookie);
 
 /**
  * Dequeue an element from the free ring buffer.
@@ -131,7 +131,7 @@ int enqueue_used(ring_handle_t *ring, uintptr_t addr, unsigned int len, void *co
  *
  * @return -1 when ring is empty, 0 on success.
  */
-int dequeue_free(ring_handle_t *ring, uintptr_t *addr, unsigned int *len, void **cookie);
+int serial_dequeue_free(serial_queue_handle_t *queue, uintptr_t *addr, unsigned int *len, void **cookie);
 
 /**
  * Dequeue an element from a used ring buffer.
@@ -143,21 +143,21 @@ int dequeue_free(ring_handle_t *ring, uintptr_t *addr, unsigned int *len, void *
  *
  * @return -1 when ring is empty, 0 on success.
  */
-int dequeue_used(ring_handle_t *ring, uintptr_t *addr, unsigned int *len, void **cookie);
+int serial_dequeue_used(serial_queue_handle_t *queue, uintptr_t *addr, unsigned int *len, void **cookie);
 
 /**
  * Set the plug of a ring to true.
  *
  * @param ring Ring handle to plug.
 */
-void ring_plug(ring_buffer_t *ring);
+void serial_queue_plug(serial_queue_t *queue);
 
 /**
  * Set the plug of a ring to false.
  *
  * @param ring Ring handle to unplug.
 */
-void ring_unplug(ring_buffer_t *ring);
+void serial_queue_unplug(serial_queue_t *queue);
 
 /**
  * Check the current value of the plug.
@@ -166,7 +166,7 @@ void ring_unplug(ring_buffer_t *ring);
  *
  * @return true when ring is plugged, false when unplugged.
 */
-bool ring_plugged(ring_buffer_t *ring);
+bool serial_queue_plugged(serial_queue_t *queue);
 
 /**
  * Dequeue an element from a ring buffer.
@@ -180,4 +180,4 @@ bool ring_plugged(ring_buffer_t *ring);
  *
  * @return -1 when ring is empty, 0 on success.
  */
-int driver_dequeue(ring_buffer_t *ring, uintptr_t *addr, unsigned int *len, void **cookie);
+int serial_driver_dequeue(serial_queue_t *queue, uintptr_t *addr, unsigned int *len, void **cookie);

@@ -21,7 +21,7 @@ MICROKIT_CONFIG ?= debug
 BUILD_DIR ?= build
 
 SDDF=$(abspath ../..)
-RINGBUFFERDIR=$(SDDF)/serial/libserialsharedringbuffer
+SERIAL_QUEUE=$(SDDF)/serial/queue
 SERIAL_COMPONENTS=$(SDDF)/serial/components
 UART_DRIVER=$(SDDF)/drivers/serial/meson
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
@@ -42,18 +42,18 @@ CFLAGS += -I$(BOARD_DIR)/include \
 	-I$(SDDF)/include \
 	-I$(SDDF) \
 
-UART_OBJS := uart.o shared_ringbuffer.o
-SERIAL_SERVER_OBJS1 := serial_server_1.o shared_ringbuffer.o
-SERIAL_SERVER_OBJS2 := serial_server_2.o shared_ringbuffer.o
-MUX_TX_OBJS := mux_tx.o shared_ringbuffer.o
-MUX_RX_OBJS := mux_rx.o shared_ringbuffer.o
+UART_OBJS := uart.o queue.o
+SERIAL_SERVER_OBJS1 := serial_server_1.o queue.o
+SERIAL_SERVER_OBJS2 := serial_server_2.o queue.o
+MUX_TX_OBJS := mux_tx.o queue.o
+MUX_RX_OBJS := mux_rx.o queue.o
 
 all: directories $(IMAGE_FILE)
 
 $(BUILD_DIR)/%.o: $(SERIAL_COMPONENTS)/%.c Makefile
 	$(CC) -c $(CFLAGS) -DSERIAL_NUM_CLIENTS=2 -DSERIAL_TRANSFER_WITH_COLOUR $< -o $@
 
-$(BUILD_DIR)/%.o: $(RINGBUFFERDIR)/%.c Makefile
+$(BUILD_DIR)/%.o: $(SERIAL_QUEUE)/%.c Makefile
 	$(CC) -c $(CFLAGS) $< -o $@
 
 $(BUILD_DIR)/%.o: $(UART_DRIVER)/%.c Makefile
