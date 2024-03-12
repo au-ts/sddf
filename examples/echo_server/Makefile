@@ -57,7 +57,7 @@ REPORT_FILE = $(BUILD_DIR)/report.txt
 CFLAGS += -I$(BOARD_DIR)/include \
 	-I$(SDDF)/include \
 	-Iinclude/lwip \
-	-Iinclude/system_config \
+	-Iinclude/ethernet_config \
 	-I$(LWIP)/include \
 	-I$(LWIP)/include/ipv4 \
 	-MD \
