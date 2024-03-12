@@ -11,7 +11,7 @@
 #include <sddf/network/shared_ringbuffer.h>
 #include <sddf/timer/client.h>
 #include <sddf/benchmark/sel4bench.h>
-#include <system_config.h>
+#include <ethernet_config.h>
 #include <string.h>
 #include "lwip/init.h"
 #include "netif/etharp.h"

@@ -4,7 +4,7 @@
 #include <sddf/util/fence.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
-#include <system_config.h>
+#include <ethernet_config.h>
 
 #define DRIVER 0
 #define CLIENT_CH 1
