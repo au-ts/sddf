@@ -4,7 +4,7 @@
 #include <sddf/network/constants.h>
 #include <sddf/network/util.h>
 #include <sddf/util/printf.h>
-#include <system_config.h>
+#include <ethernet_config.h>
 
 #define RX_CH 0
 #define TX_CH 1
