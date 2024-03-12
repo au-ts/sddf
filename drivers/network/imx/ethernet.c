@@ -94,7 +94,7 @@ static void rx_provide(void)
     while (reprocess) {
         while (!hw_ring_full(&rx, RX_COUNT) && !ring_empty(rx_ring.free_ring)) {
             buff_desc_t buffer;
-            int err __attribute__((unused)) = dequeue_free(&rx_ring, &buffer);
+            int err = dequeue_free(&rx_ring, &buffer);
             assert(!err);
 
             uint16_t stat = RXD_EMPTY;
@@ -134,7 +134,7 @@ static void rx_return(void)
 
         buff_desc_t buffer = rx.descr_mdata[rx.head];
         buffer.len = d->len;
-        int err __attribute__((unused)) = enqueue_used(&rx_ring, buffer);
+        int err = enqueue_used(&rx_ring, buffer);
         assert(!err);
 
         packets_transferred = true;
@@ -153,7 +153,7 @@ static void tx_provide(void)
     while (reprocess) {
         while (!(hw_ring_full(&tx, TX_COUNT)) && !ring_empty(tx_ring.used_ring)) {
             buff_desc_t buffer;
-            int err __attribute__((unused)) = dequeue_used(&tx_ring, &buffer);
+            int err = dequeue_used(&tx_ring, &buffer);
             assert(!err);
 
             uint16_t stat = TXD_READY | TXD_ADDCRC | TXD_LAST;
@@ -188,7 +188,7 @@ static void tx_return(void)
 
         tx.head = (tx.head + 1) % TX_COUNT;
 
-        int err __attribute__((unused)) = enqueue_free(&tx_ring, buffer);
+        int err = enqueue_free(&tx_ring, buffer);
         assert(!err);
         enqueued = true;
     }

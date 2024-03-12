@@ -90,7 +90,7 @@ static void interface_free_buffer(struct pbuf *p)
     pbuf_custom_offset_t *custom_pbuf_offset = (pbuf_custom_offset_t *)p;
     SYS_ARCH_PROTECT(old_level);
     buff_desc_t buffer = {custom_pbuf_offset->offset, 0};
-    int err __attribute__((unused)) = enqueue_free(&(state.rx_ring), buffer);
+    int err = enqueue_free(&(state.rx_ring), buffer);
     assert(!err);
     notify_rx = true;
     LWIP_MEMPOOL_FREE(RX_POOL, custom_pbuf_offset);
@@ -160,7 +160,7 @@ static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
     }
     
     buff_desc_t buffer;
-    int err __attribute__((unused)) = dequeue_free(&(state.tx_ring), &buffer);
+    int err = dequeue_free(&(state.tx_ring), &buffer);
     assert(!err);
 
     unsigned char *frame = (unsigned char *)(buffer.phys_or_offset + tx_buffer_data_region);
@@ -216,7 +216,7 @@ void receive(void)
     while (reprocess) {
         while (!ring_empty(state.rx_ring.used_ring)) {
             buff_desc_t buffer;
-            int err __attribute__((unused)) = dequeue_used(&state.rx_ring, &buffer);
+            int err = dequeue_used(&state.rx_ring, &buffer);
             assert(!err);
 
             struct pbuf *p = create_interface_buffer(buffer.phys_or_offset, buffer.len);
