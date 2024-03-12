@@ -10,14 +10,16 @@ CI_BUILD_DIR="ci_build"
 
 build_network_echo_server() {
     CONFIG=$1
-    echo "CI|INFO: building echo server example with config: $CONFIG"
-    BUILD_DIR="${PWD}/${CI_BUILD_DIR}/examples/echo_server/${CONFIG}"
+    BOARD=$2
+    echo "CI|INFO: building echo server example with config: $CONFIG, board: $BOARD"
+    BUILD_DIR="${PWD}/${CI_BUILD_DIR}/examples/echo_server/${BOARD}/${CONFIG}"
     rm -rf ${BUILD_DIR}
     mkdir -p ${BUILD_DIR}
     make -C examples/echo_server \
         BUILD_DIR=${BUILD_DIR} \
         MICROKIT_CONFIG=${CONFIG} \
-        MICROKIT_SDK=${SDK_PATH}
+        MICROKIT_SDK=${SDK_PATH} \
+        MICROKIT_BOARD=${BOARD}
 }
 
 build_i2c() {
@@ -56,9 +58,12 @@ build_serial() {
         MICROKIT_SDK=${SDK_PATH}
 }
 
-build_network_echo_server "debug"
-build_network_echo_server "release"
-build_network_echo_server "benchmark"
+build_network_echo_server "debug" "imx8mm_evk"
+build_network_echo_server "release" "imx8mm_evk"
+build_network_echo_server "benchmark" "imx8mm_evk"
+build_network_echo_server "debug" "odroidc4"
+build_network_echo_server "release" "odroidc4"
+build_network_echo_server "benchmark" "odroidc4"
 
 build_i2c "debug"
 build_i2c "release"
