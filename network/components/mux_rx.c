@@ -56,7 +56,7 @@ void rx_return(void)
     while (reprocess) {
         while (!ring_empty(state.rx_ring_drv.used_ring)) {
             buff_desc_t buffer;
-            int err __attribute__((unused)) = dequeue_used(&state.rx_ring_drv, &buffer);
+            int err = dequeue_used(&state.rx_ring_drv, &buffer);
             assert(!err);
 
             buffer.phys_or_offset = buffer.phys_or_offset - buffer_data_paddr;
@@ -99,7 +99,7 @@ void rx_provide(void)
         while (reprocess) {
             while (!ring_empty(state.rx_ring_clients[client].free_ring)) {
                 buff_desc_t buffer;
-                int err __attribute__((unused)) = dequeue_free(&state.rx_ring_clients[client], &buffer);
+                int err = dequeue_free(&state.rx_ring_clients[client], &buffer);
                 assert(!err);
                 assert(!(buffer.phys_or_offset % BUFF_SIZE) && 
                        (buffer.phys_or_offset < BUFF_SIZE * state.rx_ring_clients[client].free_ring->size));

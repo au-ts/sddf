@@ -29,7 +29,7 @@ void rx_return(void)
     while (reprocess) {
         while (!ring_empty(rx_ring_mux.used_ring) && !ring_empty(rx_ring_cli.free_ring)) {
             buff_desc_t cli_buffer, mux_buffer;
-            int err __attribute__((unused)) = dequeue_free(&rx_ring_cli, &cli_buffer);
+            int err = dequeue_free(&rx_ring_cli, &cli_buffer);
             assert(!err);
 
             if (cli_buffer.phys_or_offset % BUFF_SIZE || cli_buffer.phys_or_offset >= BUFF_SIZE * ((ring_buffer_t *)rx_free_cli)->size) {

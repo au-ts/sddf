@@ -54,7 +54,7 @@ void tx_provide(void)
         while (reprocess) {
             while (!ring_empty(state.tx_ring_clients[client].used_ring)) {
                 buff_desc_t buffer;
-                int err __attribute__((unused)) = dequeue_used(&state.tx_ring_clients[client], &buffer);
+                int err = dequeue_used(&state.tx_ring_clients[client], &buffer);
                 assert(!err);
 
                 if (buffer.phys_or_offset % BUFF_SIZE || 
@@ -96,7 +96,7 @@ void tx_return(void)
     while (reprocess) {
         while (!ring_empty(state.tx_ring_drv.free_ring)) {
             buff_desc_t buffer;
-            int err __attribute__((unused)) = dequeue_free(&state.tx_ring_drv, &buffer);
+            int err = dequeue_free(&state.tx_ring_drv, &buffer);
             assert(!err);
 
             int client = extract_offset(&buffer.phys_or_offset);

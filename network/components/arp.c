@@ -97,7 +97,7 @@ static int arp_reply(const uint8_t ethsrc_addr[ETH_HWADDR_LEN],
     }
 
     buff_desc_t buffer;
-    int err __attribute__((unused)) = dequeue_free(&tx_ring, &buffer);
+    int err = dequeue_free(&tx_ring, &buffer);
     assert(!err);
 
     uintptr_t addr = tx_buffer_data_region + buffer.phys_or_offset;
@@ -133,7 +133,7 @@ void receive(void)
     while (reprocess) {
         while (!ring_empty(rx_ring.used_ring)) {
             buff_desc_t buffer;
-            int err __attribute__((unused)) = dequeue_used(&rx_ring, &buffer);
+            int err = dequeue_used(&rx_ring, &buffer);
             assert(!err);
             uintptr_t addr = rx_buffer_data_region + buffer.phys_or_offset;
 

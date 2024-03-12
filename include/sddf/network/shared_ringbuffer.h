@@ -182,7 +182,7 @@ static inline void buffers_init(ring_buffer_t *free_ring, uintptr_t base_addr, u
 {
     for (uint32_t i = 0; i < ring_size - 1; i++) {
         buff_desc_t buffer = {(BUFF_SIZE * i) + base_addr, 0};
-        int err __attribute__((unused)) = enqueue(free_ring, buffer);
+        int err = enqueue(free_ring, buffer);
     }
 }
 

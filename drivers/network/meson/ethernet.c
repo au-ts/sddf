@@ -86,7 +86,7 @@ static void rx_provide()
     while (reprocess) {
         while (!hw_ring_full(&rx, RX_COUNT) && !ring_empty(rx_ring.free_ring)) {
             buff_desc_t buffer;
-            int err __attribute__((unused)) = dequeue_free(&rx_ring, &buffer);
+            int err = dequeue_free(&rx_ring, &buffer);
             assert(!err);
 
             uint32_t cntl = (MAX_RX_FRAME_SZ << DESC_RXCTRL_SIZE1SHFT) & DESC_RXCTRL_SIZE1MASK;
@@ -129,7 +129,7 @@ static void rx_return(void)
             eth_dma->rxpolldemand = POLL_DATA;
         } else {
             buffer.len = (d->status & DESC_RXSTS_LENMSK) >> DESC_RXSTS_LENSHFT;
-            int err __attribute__((unused)) = enqueue_used(&rx_ring, buffer);
+            int err = enqueue_used(&rx_ring, buffer);
             assert(!err);
             packets_transferred = true;
         }
@@ -148,7 +148,7 @@ static void tx_provide(void)
     while (reprocess) {
         while (!(hw_ring_full(&tx, TX_COUNT)) && !ring_empty(tx_ring.used_ring)) {
             buff_desc_t buffer;
-            int err __attribute__((unused)) = dequeue_used(&tx_ring, &buffer);
+            int err = dequeue_used(&tx_ring, &buffer);
             assert(!err);
 
             uint32_t cntl = (((uint32_t) buffer.len) << DESC_TXCTRL_SIZE1SHFT) & DESC_TXCTRL_SIZE1MASK;
@@ -181,7 +181,7 @@ static void tx_return(void)
         buff_desc_t buffer = tx.descr_mdata[tx.head];
         THREAD_MEMORY_ACQUIRE();
 
-        int err __attribute__((unused)) = enqueue_free(&tx_ring, buffer);
+        int err = enqueue_free(&tx_ring, buffer);
         assert(!err);
         enqueued = true;
         tx.head = (tx.head + 1) % TX_COUNT;
