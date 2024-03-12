@@ -44,7 +44,7 @@ enum i2c_token {
     I2C_TOKEN_DATA = 0x6,
 };
 
-typedef struct queue_entry {
+typedef struct i2c_queue_entry {
     /* Offset into the data region for where to look for the request data or
      * where to put the response data */
     size_t offset;
