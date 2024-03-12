@@ -8,12 +8,6 @@
 #include <stddef.h>
 #include <microkit.h>
 
-#define UART_REG(x) ((volatile uint32_t *)(UART_BASE + (x)))
-#define UART_BASE 0x5000000 //0x30890000 in hardware on imx8mm.
-#define STAT 0x98
-#define TRANSMIT 0x40
-#define STAT_TDRE (1 << 14)
-
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(x[0]))
 
 #ifdef __GNUC__
