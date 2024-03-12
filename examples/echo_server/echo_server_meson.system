@@ -184,11 +184,6 @@
         <end pd="eth" id="2" />
         <end pd="mux_rx" id="0" />
     </channel>
-<!-- 
-    <channel>
-        <end pd="eth" id="3" />
-        <end pd="client0" id="8" />
-    </channel> -->
 
     <channel>
         <end pd="mux_rx" id="1" />

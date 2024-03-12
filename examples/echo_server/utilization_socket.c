@@ -25,7 +25,7 @@
 
 #define START_PMU 4
 #define STOP_PMU 5
-// #define IPBENCH_STOP 8
+
 #define MAX_PACKET_SIZE 0x1000
 
 uintptr_t cyclecounters_vaddr;
@@ -183,7 +183,6 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
         
         error = tcp_write(pcb, buffer, strlen(buffer) + 1, TCP_WRITE_FLAG_COPY);
         tcp_shutdown(pcb, 0, 1);
-        // microkit_notify(IPBENCH_STOP);
 
         if (!strcmp(microkit_name, "client0")) microkit_notify(STOP_PMU);
     } else if (msg_match(data_packet_str, QUIT)) {
