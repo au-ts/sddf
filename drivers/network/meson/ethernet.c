@@ -17,7 +17,6 @@
 #define IRQ_CH 0
 #define TX_CH  1
 #define RX_CH  2
-// #define IPBENCH_FINISH  3
 
 uintptr_t hw_ring_buffer_vaddr;
 uintptr_t hw_ring_buffer_paddr;
@@ -204,14 +203,6 @@ static void handle_irq()
         tx_return();
     }
     if (e & DMA_INTR_ABNORMAL) {
-        // if (e & DMA_INTR_RBU) {
-        //     dropped += eth_dma->missedframecount & MSFRM_MASK;
-        //     uint32_t currhostrxdesc = eth_dma->currhostrxdesc;
-        //     uint32_t curr_host_index = (currhostrxdesc - hw_ring_buffer_paddr)/sizeof(struct descriptor);
-        //     dprintf("Host head: %u, our head %u, our tail %u\n", curr_host_index, rx.head, rx.tail);
-
-        //     rx_provide();
-        // }
         if (e & DMA_INTR_FBE) dprintf("Ethernet device fatal bus error\n");
     }
     eth_dma->status &= e;
@@ -261,7 +252,6 @@ void init(void)
 
     /* Enable IRQs */
     eth_dma->intenable |= DMA_INTR_MASK;
-    // eth_dma->intenable |= DMA_INTR_RBU;
     
     /* Disable uneeded GMAC irqs */
     eth_mac->intmask |= GMAC_INTR_MASK;
@@ -286,9 +276,6 @@ void notified(microkit_channel ch)
         case TX_CH:
             tx_provide();
             break;
-        // case IPBENCH_FINISH:
-        //     dprintf("Total dropped packets: %llu\n", dropped);
-        //     break;
         default:
             dprintf("ETH|LOG: received notification on unexpected channel %llu\n", ch);
             break;
