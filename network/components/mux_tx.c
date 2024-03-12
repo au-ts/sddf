@@ -65,7 +65,7 @@ void tx_provide(void)
                     continue;
                 }
 
-                cache_clean(buffer.phys_or_offset + state.buffer_region_vaddrs[client], buffer.phys_or_offset + state.buffer_region_vaddrs[client] + buffer.len);
+                microkit_arm_vspace_data_clean(buffer.phys_or_offset + state.buffer_region_vaddrs[client], buffer.phys_or_offset + state.buffer_region_vaddrs[client] + buffer.len);
 
                 buffer.phys_or_offset = buffer.phys_or_offset + state.buffer_region_paddrs[client];
                 err = enqueue_used(&state.tx_ring_drv, buffer);

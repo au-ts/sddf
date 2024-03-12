@@ -60,9 +60,7 @@ void rx_return(void)
             assert(!err);
 
             buffer.phys_or_offset = buffer.phys_or_offset - buffer_data_paddr;
-            err = seL4_ARM_VSpace_Invalidate_Data(VSPACE_CAP, buffer.phys_or_offset + buffer_data_vaddr, buffer.phys_or_offset + buffer_data_vaddr + buffer.len);
-            if (err) dprintf("MUX_RX|ERROR: ARM Vspace invalidate failed\n");
-            assert(!err);
+            microkit_arm_vspace_data_invalidate(buffer.phys_or_offset + buffer_data_vaddr, buffer.phys_or_offset + buffer_data_vaddr + buffer.len);
 
             int client = get_client((struct ethernet_header *) (buffer.phys_or_offset + buffer_data_vaddr));
             if (client >= 0) {
