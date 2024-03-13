@@ -1,5 +1,6 @@
 #pragma once
 
+#include <microkit.h>
 #include <stdint.h>
 
 #define ETH_TYPE_ARP 0x0806U
@@ -20,3 +21,12 @@ struct ethernet_header {
   struct ethernet_address src;
   uint16_t type;
 } __attribute__((packed));
+
+/*
+ * By default we assume that the hardware we are dealing with
+ * cannot generate checksums on transmit. We use this macro
+ * to know whether to calculate it in the IP stack.
+ */
+#ifdef CONFIG_PLAT_IMX8MM_EVK
+#define NETWORK_HW_HAS_CHECKSUM
+#endif
