@@ -141,94 +141,96 @@ void handle_rx() {
     // Integer to store the length of the buffer
     unsigned int buffer_len = 0;
 
-    // We can only be here if we have been notified by the driver
-    int ret = serial_dequeue_active(&drv_rx_queue, &buffer, &buffer_len) != 0;
-    if (ret != 0) {
-        microkit_dbg_puts(microkit_name);
-        microkit_dbg_puts(": getchar - unable to dequeue active buffer\n");
-    }
+    while (!serial_queue_empty(drv_rx_queue.active)) {
+        // We can only be here if we have been notified by the driver
+        int ret = serial_dequeue_active(&drv_rx_queue, &buffer, &buffer_len) != 0;
+        if (ret != 0) {
+            microkit_dbg_puts(microkit_name);
+            microkit_dbg_puts(": getchar - unable to dequeue active buffer\n");
+        }
 
-    // We can either get a single char here, if driver is in RAW mode, or
-    // a buffer if driver is in LINE mode.
+        // We can either get a single char here, if driver is in RAW mode, or
+        // a buffer if driver is in LINE mode.
 
-    char *chars = (char *) buffer;
+        char *chars = (char *) buffer;
 
-    // This is for our RAW mode, char by char
-    if (UART_MODE == RAW_MODE) {
-        // microkit_dbg_puts("In raw mode virt rx\n");
-        char got_char = chars[0];
+        // This is for our RAW mode, char by char
+        if (UART_MODE == RAW_MODE) {
+            // microkit_dbg_puts("In raw mode virt rx\n");
+            char got_char = chars[0];
 
-        // We have now gotten a character, deal with the input direction switch
-        if (virt_state == 1) {
-            // The previous character was an escape character
-            give_char(client, &got_char, 1);
-            virt_state = 0;
-        }  else if (virt_state == 2) {
-            // We are now switching input direction
+            // We have now gotten a character, deal with the input direction switch
+            if (virt_state == 1) {
+                // The previous character was an escape character
+                give_char(client, &got_char, 1);
+                virt_state = 0;
+            }  else if (virt_state == 2) {
+                // We are now switching input direction
 
-            // Case for simultaneous multi client input
-            if (got_char == 'm') {
-                multi_client = 1;
-                client = -1;
-            } else {
-                // Ensure that multi client input is off
-                multi_client = 0;
-                int new_client = atoi(&got_char);
-                if (new_client < 1 || new_client > SERIAL_NUM_CLIENTS) {
-                    microkit_dbg_puts("VIRT|RX: Attempted to switch to invalid client number: ");
-                    puthex64(new_client);
-                    microkit_dbg_puts("\n");
+                // Case for simultaneous multi client input
+                if (got_char == 'm') {
+                    multi_client = 1;
+                    client = -1;
                 } else {
-                    microkit_dbg_puts("VIRT|RX: Switching to client number: ");
-                    puthex64(new_client);
-                    microkit_dbg_puts("\n");
-                    client = new_client;
+                    // Ensure that multi client input is off
+                    multi_client = 0;
+                    int new_client = atoi(&got_char);
+                    if (new_client < 1 || new_client > SERIAL_NUM_CLIENTS) {
+                        microkit_dbg_puts("VIRT|RX: Attempted to switch to invalid client number: ");
+                        puthex64(new_client);
+                        microkit_dbg_puts("\n");
+                    } else {
+                        microkit_dbg_puts("VIRT|RX: Switching to client number: ");
+                        puthex64(new_client);
+                        microkit_dbg_puts("\n");
+                        client = new_client;
+                    }
+                }
+
+                virt_state = 0;
+            } else if (virt_state == 0) {
+                // No escape character has been set
+                if (got_char == '\\') {
+                    virt_state = 1;
+                    // The next character is going to be escaped
+                } else if (got_char == '@') {
+                    virt_state = 2;
+                } else {
+                    give_char(client, &got_char, 1);
                 }
             }
+        } else if (UART_MODE == LINE_MODE) {
+            microkit_dbg_puts("In line mode virt rx\n");
+            // This is for LINE mode, placing buffers at a time
 
-            virt_state = 0;
-        } else if (virt_state == 0) {
-            // No escape character has been set
-            if (got_char == '\\') {
-                virt_state = 1;
-                // The next character is going to be escaped
-            } else if (got_char == '@') {
-                virt_state = 2;
-            } else {
-                give_char(client, &got_char, 1);
-            }
+            /* Check if the first character is an '@'. The following character
+                must be a number. Otherwise, give to the client.
+            */
+
+           if (chars[0] == '@') {
+                if (chars[1] == 'm') {
+                    // case for multi client input
+                    multi_client = 1;
+                    client = -1;
+                } else {
+                    int new_client = atoi(&chars[1]);
+                    multi_client = 0;
+                    client = new_client;
+                }
+           } else {
+                // Otherwise, give entire buffer to the client
+                give_char(client, chars, buffer_len);
+           }
         }
-    } else if (UART_MODE == LINE_MODE) {
-        microkit_dbg_puts("In line mode virt rx\n");
-        // This is for LINE mode, placing buffers at a time
 
-        /* Check if the first character is an '@'. The following character
-            must be a number. Otherwise, give to the client.
-        */
+        /* Now that we are finished with the active buffer, we can add it back to the free ring*/
 
-       if (chars[0] == '@') {
-            if (chars[1] == 'm') {
-                // case for multi client input
-                multi_client = 1;
-                client = -1;
-            } else {
-                int new_client = atoi(&chars[1]);
-                multi_client = 0;
-                client = new_client;
-            }
-       } else {
-            // Otherwise, give entire buffer to the client
-            give_char(client, chars, buffer_len);
-       }
-    }
+        ret = serial_enqueue_free(&drv_rx_queue, buffer, BUFFER_SIZE);
 
-    /* Now that we are finished with the active buffer, we can add it back to the free ring*/
-
-    ret = serial_enqueue_free(&drv_rx_queue, buffer, BUFFER_SIZE);
-
-    if (ret != 0) {
-        microkit_dbg_puts(microkit_name);
-        microkit_dbg_puts(": getchar - unable to enqueue active buffer back into free ring\n");
+        if (ret != 0) {
+            microkit_dbg_puts(microkit_name);
+            microkit_dbg_puts(": getchar - unable to enqueue active buffer back into free ring\n");
+        }
     }
 }
 
