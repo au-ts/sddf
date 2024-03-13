@@ -81,7 +81,7 @@ static inline int enqueue(ring_buffer_t *ring, buff_desc_t buffer)
     if (ring_full(ring)) return -1;
 
     ring->buffers[ring->tail] = buffer;
-#ifdef MULTICORE
+#ifdef CONFIG_ENABLE_SMP_SUPPORT
     THREAD_MEMORY_RELEASE();
 #endif
     ring->tail = (ring->tail + 1) % ring->size;
@@ -102,7 +102,7 @@ static inline int dequeue(ring_buffer_t *ring, buff_desc_t *buffer)
     if (ring_empty(ring)) return -1;
 
     *buffer = ring->buffers[ring->head];
-#ifdef MULTICORE
+#ifdef CONFIG_ENABLE_SMP_SUPPORT
     THREAD_MEMORY_RELEASE();
 #endif
     ring->head = (ring->head + 1) % ring->size;
@@ -196,7 +196,7 @@ static inline void buffers_init(ring_buffer_t *free_ring, uintptr_t base_addr, u
 static inline void request_signal(ring_buffer_t *ring_buffer)
 {
     ring_buffer->consumer_signalled = false;
-#ifdef MULTICORE
+#ifdef CONFIG_ENABLE_SMP_SUPPORT
     THREAD_MEMORY_RELEASE();
 #endif
 }
@@ -209,7 +209,7 @@ static inline void request_signal(ring_buffer_t *ring_buffer)
 static inline void cancel_signal(ring_buffer_t *ring_buffer)
 {
     ring_buffer->consumer_signalled = true;
-#ifdef MULTICORE
+#ifdef CONFIG_ENABLE_SMP_SUPPORT
     THREAD_MEMORY_RELEASE();
 #endif
 }
