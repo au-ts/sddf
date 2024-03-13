@@ -12,9 +12,9 @@
 
 #pragma once
 
-#include <microkit.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <sddf/network/constants.h>
 
 #define NO_SYS                          1
 #define LWIP_TIMERS                     1
@@ -38,7 +38,7 @@
 #define CHECKSUM_CHECK_ICMP             0
 #define CHECKSUM_CHECK_ICMP6            0
 
-#ifdef CONFIG_PLAT_IMX8MM_EVK
+#ifdef NETWORK_HW_HAS_CHECKSUM
 
 /* Leave the checksum checking on tx to hw */
 #define CHECKSUM_GEN_IP                 0
@@ -47,9 +47,7 @@
 #define CHECKSUM_GEN_ICMP               0
 #define CHECKSUM_GEN_ICMP6              0
 
-#endif
-
-#ifdef CONFIG_PLAT_ODROIDC4
+#else
 
 #define CHECKSUM_GEN_IP                 1
 #define CHECKSUM_GEN_UDP                0
