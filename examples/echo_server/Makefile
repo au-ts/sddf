@@ -4,14 +4,8 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
 
-# @ivanv: Changes any of the params given e.g MICROKIT_CONFIG,
-# doesn't actually cause a re-compile. We should fix this.
-
 BUILD_DIR ?= build
-MICROKIT_BOARD ?= imx8mm_evk
 MICROKIT_CONFIG ?= debug
-DRIV_DIR ?= imx
-SYSTEM_FILE ?= echo_server_imx.system
 
 ifeq ($(strip $(MICROKIT_SDK)),)
 $(error MICROKIT_SDK must be specified)
@@ -23,10 +17,13 @@ endif
 
 ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
 	DRIV_DIR := meson
-	SYSTEM_FILE := echo_server_meson.system
+	CPU := cortex-a55
+else ifeq ($(strip $(MICROKIT_BOARD)), imx8mm_evk)
+	DRIV_DIR := imx
+	CPU := cortex-a53
+else
+$(error Unsupported MICROKIT_BOARD given)
 endif
-
-CPU := cortex-a53
 
 CC := $(TOOLCHAIN)-gcc
 LD := $(TOOLCHAIN)-ld
@@ -44,6 +41,7 @@ TIMER_DRIVER=$(SDDF)/drivers/clock/$(DRIV_DIR)
 NETWORK_COMPONENTS=$(SDDF)/network/components
 
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
+SYSTEM_FILE := board/$(MICROKIT_BOARD)/echo_server.system
 
 IMAGES := eth.elf lwip.elf benchmark.elf idle.elf mux_rx.elf mux_tx.elf copy.elf arp.elf timer.elf
 CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall -Wno-unused-function
