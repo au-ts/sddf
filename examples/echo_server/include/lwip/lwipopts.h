@@ -50,7 +50,7 @@
 #else
 
 #define CHECKSUM_GEN_IP                 1
-#define CHECKSUM_GEN_UDP                0
+#define CHECKSUM_GEN_UDP                1
 #define CHECKSUM_GEN_TCP                1
 #define CHECKSUM_GEN_ICMP               1
 #define CHECKSUM_GEN_ICMP6              1
