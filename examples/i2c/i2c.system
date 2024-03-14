@@ -39,8 +39,8 @@
         <irq irq="126" id="2" trigger="edge"/>
     </protection_domain>
 
-    <protection_domain name="virtualiser" priority="99" pp="true">
-        <program_image path="virtualiser.elf" />
+    <protection_domain name="virt" priority="99" pp="true">
+        <program_image path="virt.elf" />
 
         <map mr="client_request_region" vaddr="0x4_000_000" perms="rw" />
         <map mr="client_response_region" vaddr="0x5_000_000" perms="rw" />
@@ -65,12 +65,12 @@
 
     <channel>
         <end pd="client" id="0" />
-        <end pd="virtualiser" id="0" />
+        <end pd="virt" id="0" />
     </channel>
 
     <channel>
         <end pd="driver" id="0" />
-        <end pd="virtualiser" id="1" />
+        <end pd="virt" id="1" />
     </channel>
 
     <channel>

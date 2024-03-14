@@ -36,7 +36,7 @@ I2C_DRIVER := $(SDDF)/drivers/i2c/meson
 I2C_QUEUE := $(I2C)/queue
 TIMER_DRIVER := $(SDDF)/drivers/clock/meson
 
-IMAGES := virtualiser.elf driver.elf client.elf timer.elf
+IMAGES := virt.elf driver.elf client.elf timer.elf
 CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall -Wno-unused-function
 LDFLAGS := -L$(BOARD_DIR)/lib -L$(SDDF)/lib
 LIBS := -lmicrokit -Tmicrokit.ld -lc
@@ -53,7 +53,7 @@ CFLAGS += -I$(BOARD_DIR)/include \
 COMMONFILES=$(I2C_QUEUE)/queue.c $(UTIL)/printf.c $(UTIL)/putchar_debug.c
 
 CLIENT_OBJS := $(LIBCO)/libco.o pn532.o client.o $(COMMONFILES:.c=.o) sddf_timer_client.o
-VIRTUALISER_OBJS := $(I2C)/components/virtualiser.o $(COMMONFILES:.c=.o)
+VIRT_OBJS := $(I2C)/components/virt.o $(COMMONFILES:.c=.o)
 DRIVER_OBJS := $(I2C_DRIVER)/i2c.o $(COMMONFILES:.c=.o)
 TIMER_DRIVER_OBJS := timer_driver.o $(UTIL)/printf.o $(UTIL)/putchar_debug.o
 
@@ -70,7 +70,7 @@ $(BUILD_DIR)/%.d $(BUILD_DIR)/%.o: %.c Makefile
 $(BUILD_DIR)/%.o: %.s Makefile
 	$(AS) -g3 -mcpu=$(CPU) $< -o $@
 
-$(BUILD_DIR)/virtualiser.elf: $(addprefix $(BUILD_DIR)/, $(VIRTUALISER_OBJS))
+$(BUILD_DIR)/virt.elf: $(addprefix $(BUILD_DIR)/, $(VIRT_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(BUILD_DIR)/driver.elf: $(addprefix $(BUILD_DIR)/, $(DRIVER_OBJS))
