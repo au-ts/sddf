@@ -25,8 +25,8 @@ typedef struct serial_queue_entry {
 
 /* Circular buffer containing descriptors */
 typedef struct serial_queue {
-    uint32_t write_idx;
-    uint32_t read_idx;
+    uint32_t tail;
+    uint32_t head;
     uint32_t size;
     bool notify_writer;
     bool notify_reader;
