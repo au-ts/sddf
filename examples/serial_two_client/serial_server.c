@@ -32,10 +32,9 @@ int serial_server_printf(char *string) {
     uintptr_t buffer = 0;
     // Integer to store the length of the buffer
     unsigned int buffer_len = 0;
-    void *cookie = 0;
 
     // Dequeue a buffer from the free queue from the tx buffer
-    int ret = serial_dequeue_free(&local_server->tx_queue, &buffer, &buffer_len, &cookie);
+    int ret = serial_dequeue_free(&local_server->tx_queue, &buffer, &buffer_len);
 
     if(ret != 0) {
         microkit_dbg_puts(microkit_name);
@@ -60,7 +59,7 @@ int serial_server_printf(char *string) {
 
     bool is_empty = serial_queue_empty(local_server->tx_queue.active);
 
-    ret = serial_enqueue_active(&local_server->tx_queue, buffer, print_len, cookie);
+    ret = serial_enqueue_active(&local_server->tx_queue, buffer, print_len);
 
     if(ret != 0) {
         microkit_dbg_puts(microkit_name);
@@ -101,9 +100,7 @@ int getchar() {
     // Integer to store the length of the buffer
     unsigned int buffer_len = 0; 
 
-    void *cookie = 0;
-
-    while (serial_dequeue_active(&local_server->rx_queue, &buffer, &buffer_len, &cookie) != 0) {
+    while (serial_dequeue_active(&local_server->rx_queue, &buffer, &buffer_len) != 0) {
         /* The queue is currently empty, as there is no character to get. 
         We will spin here until we have gotten a character. As the driver is a higher priority than us, 
         it should be able to pre-empt this loop
@@ -118,7 +115,7 @@ int getchar() {
     char got_char = *((char *) buffer);
 
     /* Now that we are finished with the active buffer, we can add it back to the free queue*/
-    int ret = serial_enqueue_free(&local_server->rx_queue, buffer, buffer_len, NULL);
+    int ret = serial_enqueue_free(&local_server->rx_queue, buffer, buffer_len);
 
     if (ret != 0) {
         microkit_dbg_puts(microkit_name);
@@ -174,7 +171,7 @@ void init(void) {
     
     // Add buffers to the rx queue
     for (int i = 0; i < NUM_ENTRIES - 1; i++) {
-        int ret = serial_enqueue_free(&local_server->rx_queue, rx_data + (i * BUFFER_SIZE), BUFFER_SIZE, NULL);
+        int ret = serial_enqueue_free(&local_server->rx_queue, rx_data + (i * BUFFER_SIZE), BUFFER_SIZE);
 
         if (ret != 0) {
             microkit_dbg_puts(microkit_name);
@@ -187,7 +184,7 @@ void init(void) {
     // Add buffers to the tx queue
     for (int i = 0; i < NUM_ENTRIES - 1; i++) {
         // Have to start at the memory region left of by the rx queue
-        int ret = serial_enqueue_free(&local_server->tx_queue, tx_data + ((i + NUM_ENTRIES) * BUFFER_SIZE), BUFFER_SIZE, NULL);
+        int ret = serial_enqueue_free(&local_server->tx_queue, tx_data + ((i + NUM_ENTRIES) * BUFFER_SIZE), BUFFER_SIZE);
 
         if (ret != 0) {
             microkit_dbg_puts(microkit_name);

@@ -75,7 +75,6 @@ int handle_tx(int curr_client) {
     // Copy data from the client ring to the driver rings.
     uintptr_t client_buf = 0;
     unsigned int client_buf_len = 0;
-    void *cookie = 0;
 
     bool was_empty = serial_queue_empty(drv_tx_queue.active);
 
@@ -85,13 +84,12 @@ int handle_tx(int curr_client) {
         if (serial_queue_plugged(tx_queue[client].active)) {
             continue;
         }
-        while (!serial_dequeue_active(&tx_queue[client], &client_buf, &client_buf_len, &cookie)) {
+        while (!serial_dequeue_active(&tx_queue[client], &client_buf, &client_buf_len)) {
             // We want to enqueue into the drivers active ring
             uintptr_t driver_buf = 0;
             unsigned int driver_buf_len = 0;
-            void *drv_cookie = 0;
 
-            int ret = serial_driver_dequeue(drv_tx_queue.free, &driver_buf, &driver_buf_len, &drv_cookie);
+            int ret = serial_dequeue_free(&drv_tx_queue, &driver_buf, &driver_buf_len);
             if (ret != 0) {
                 microkit_dbg_puts("Failed to dequeue buffer from drv tx avail ring\n");
                 return 1;
@@ -112,9 +110,7 @@ int handle_tx(int curr_client) {
             size_t len_copied = copy_normal(client_buf_len, (char *)driver_buf, (char *)client_buf);
 #endif
 
-            drv_cookie = cookie;
-
-            ret = serial_enqueue_active(&drv_tx_queue, driver_buf, len_copied, drv_cookie);
+            ret = serial_enqueue_active(&drv_tx_queue, driver_buf, len_copied);
             if (ret != 0) {
                 microkit_dbg_puts("Failed to enqueue buffer to drv tx active ring\n");
                 // Don't know if I should return here, because we need to enqueue a
@@ -127,7 +123,7 @@ int handle_tx(int curr_client) {
              * free now, which is why the length we enqueue is the maximum
              * buffer length.
              */
-            serial_enqueue_free(&tx_queue[client], client_buf, BUFFER_SIZE, cookie);
+            serial_enqueue_free(&tx_queue[client], client_buf, BUFFER_SIZE);
         }
     }
 
@@ -150,7 +146,7 @@ void init (void) {
     // Add buffers to the drv tx ring from our shared dma region
     for (int i = 0; i < NUM_ENTRIES - 1; i++) {
         // Have to start at the memory region left of by the rx ring
-        int ret = serial_enqueue_free(&drv_tx_queue, tx_data_driver + ((i + NUM_ENTRIES) * BUFFER_SIZE), BUFFER_SIZE, NULL);
+        int ret = serial_enqueue_free(&drv_tx_queue, tx_data_driver + ((i + NUM_ENTRIES) * BUFFER_SIZE), BUFFER_SIZE);
 
         if (ret != 0) {
             microkit_dbg_puts(microkit_name);
