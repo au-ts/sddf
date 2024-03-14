@@ -59,8 +59,11 @@ $(BUILD_DIR)/%.o: $(SERIAL_QUEUE)/%.c Makefile
 $(BUILD_DIR)/%.o: $(UART_DRIVER)/%.c Makefile
 	$(CC) -c $(CFLAGS) $< -o $@
 
-$(BUILD_DIR)/%.o: %.c Makefile
-	$(CC) -c $(CFLAGS) $< -o $@
+$(BUILD_DIR)/serial_server_1.o: serial_server.c Makefile
+	$(CC) -c $(CFLAGS) -DSERIAL_SERVER_NUMBER=1 $< -o $@
+
+$(BUILD_DIR)/serial_server_2.o: serial_server.c Makefile
+	$(CC) -c $(CFLAGS) -DSERIAL_SERVER_NUMBER=2 $< -o $@
 
 $(BUILD_DIR)/%.o: %.s Makefile
 	$(AS) -g3 -mcpu=$(CPU) $< -o $@
