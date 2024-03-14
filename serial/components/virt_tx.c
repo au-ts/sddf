@@ -29,11 +29,11 @@ char *client_colour_end = "\x1b[0m";
 
 /* Memory regions as defined in the system file */
 
-// Transmit rings with the driver
+// Transmit queues with the driver
 uintptr_t tx_free_driver;
 uintptr_t tx_active_driver;
 
-// Transmit rings with the client
+// Transmit queues with the client
 uintptr_t tx_free_client;
 uintptr_t tx_active_client;
 uintptr_t tx_free_client2;
@@ -42,9 +42,10 @@ uintptr_t tx_active_client2;
 uintptr_t tx_data_driver;
 uintptr_t tx_data_client;
 uintptr_t tx_data_client2;
-uintptr_t client_mem[SERIAL_NUM_CLIENTS];
 
-// Have an array of client rings.
+uintptr_t client_data[SERIAL_NUM_CLIENTS];
+
+// Have an array of client queues.
 serial_queue_handle_t tx_queue[SERIAL_NUM_CLIENTS];
 serial_queue_handle_t drv_tx_queue;
 
@@ -73,7 +74,7 @@ size_t copy_normal(size_t buffer_len, char *driver_buf, char *client_buf) {
 }
 
 int handle_tx(int curr_client) {
-    // Copy data from the client ring to the driver rings.
+    // Copy data from the client queue to the driver queues.
     uintptr_t client_buf = 0;
     uintptr_t client_buf_offset = 0;
     unsigned int client_buf_len = 0;
