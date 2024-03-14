@@ -4,6 +4,7 @@
 #include "uart.h"
 #include "uart_config.h"
 #include <sddf/serial/queue.h>
+#include <sddf/util/util.h>
 
 /*
  * The PL011 is supposedly universal, which means that this driver should be
@@ -77,7 +78,8 @@ void handle_tx() {
         // Handle the tx
         raw_tx(phys, len);
         // Then enqueue this buffer back into the free queue, so that it can be collected and reused by the server
-        serial_enqueue_free(&tx_queue, buffer, len);
+        int err = serial_enqueue_free(&tx_queue, buffer, BUFFER_SIZE);
+        assert(!err);
     }
 }
 

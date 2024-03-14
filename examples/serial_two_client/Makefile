@@ -21,6 +21,7 @@ MICROKIT_CONFIG ?= debug
 BUILD_DIR ?= build
 
 SDDF=$(abspath ../..)
+UTIL=$(SDDF)/util
 SERIAL_QUEUE=$(SDDF)/serial/queue
 SERIAL_COMPONENTS=$(SDDF)/serial/components
 UART_DRIVER=$(SDDF)/drivers/serial/meson
@@ -42,7 +43,7 @@ CFLAGS += -I$(BOARD_DIR)/include \
 	-I$(SDDF)/include \
 	-I$(SDDF) \
 
-UART_OBJS := uart.o queue.o
+UART_OBJS := uart.o queue.o printf.o putchar_debug.o
 SERIAL_SERVER_OBJS1 := serial_server_1.o queue.o
 SERIAL_SERVER_OBJS2 := serial_server_2.o queue.o
 VIRT_TX_OBJS := virt_tx.o queue.o
@@ -59,14 +60,17 @@ $(BUILD_DIR)/%.o: $(SERIAL_QUEUE)/%.c Makefile
 $(BUILD_DIR)/%.o: $(UART_DRIVER)/%.c Makefile
 	$(CC) -c $(CFLAGS) $< -o $@
 
+$(BUILD_DIR)/printf.o: $(UTIL)/printf.c Makefile
+	$(CC) -c $(CFLAGS) $< -o $@
+
+$(BUILD_DIR)/putchar_debug.o: $(UTIL)/putchar_debug.c Makefile
+	$(CC) -c $(CFLAGS) $< -o $@
+
 $(BUILD_DIR)/serial_server_1.o: serial_server.c Makefile
 	$(CC) -c $(CFLAGS) -DSERIAL_SERVER_NUMBER=1 $< -o $@
 
 $(BUILD_DIR)/serial_server_2.o: serial_server.c Makefile
 	$(CC) -c $(CFLAGS) -DSERIAL_SERVER_NUMBER=2 $< -o $@
-
-$(BUILD_DIR)/%.o: %.s Makefile
-	$(AS) -g3 -mcpu=$(CPU) $< -o $@
 
 $(BUILD_DIR)/virt_tx.elf: $(addprefix $(BUILD_DIR)/, $(VIRT_TX_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
