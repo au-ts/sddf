@@ -2,6 +2,10 @@
 #include "serial_server.h"
 #include <sddf/serial/util.h>
 
+#ifndef SERIAL_SERVER_NUMBER
+#error "Need to define SERIAL_SERVER_NUMBER"
+#endif
+
 /* Queue handle components -
 Need to have access to the same queue mechanisms as the driver, so that we can enqueue
 buffers to be serviced by the driver.*/
@@ -21,6 +25,7 @@ Return -1 on failure.
 */
 int serial_server_printf(char *string) {
     struct serial_server *local_server = &global_serial_server;
+
     // Get a buffer from the tx queue
 
     // Address that we will pass to dequeue to store the buffer address
@@ -48,6 +53,7 @@ int serial_server_printf(char *string) {
     }
 
     // Copy over the string to be printed to the buffer
+
     memcpy((char *) buffer, string, print_len);
 
     // We then need to add this buffer to the transmit active queue structure
@@ -64,8 +70,8 @@ int serial_server_printf(char *string) {
 
     /*
     First we will check if the transmit active queue is empty. If not empty, then the driver was processing
-    the active queue, however it was not finished, potentially running out of budget and being pre-empted.
-    Therefore, we can just add the buffer to the active queue, and wait for the driver to resume. However if
+    the active queue, however it was not finished, potentially running out of budget and being pre-empted. 
+    Therefore, we can just add the buffer to the active queue, and wait for the driver to resume. However if 
     empty, then we can notify the driver to start processing the active queue.
     */
 
@@ -79,7 +85,8 @@ int serial_server_printf(char *string) {
 
 // Return char on success, -1 on failure
 int getchar() {
-    // Notify the driver that we want to get a character. In Patrick's design, this increments
+
+    // Notify the driver that we want to get a character. In Patrick's design, this increments 
     // the chars_for_clients value.
     microkit_notify(SERVER_GETCHAR_CHANNEL);
 
@@ -87,43 +94,45 @@ int getchar() {
 
     /* Now that we have notified the driver, we can attempt to dequeue from the active queue.
     When the driver has processed an interrupt, it will add the inputted character to the active queue.*/
-
+    
     // Address that we will pass to dequeue to store the buffer address
     uintptr_t buffer = 0;
+
     // Integer to store the length of the buffer
     unsigned int buffer_len = 0; 
 
     void *cookie = 0;
 
     while (serial_dequeue_active(&local_server->rx_queue, &buffer, &buffer_len, &cookie) != 0) {
-        /* The ring is currently empty, as there is no character to get.
-        We will spin here until we have gotten a character. As the driver is a higher priority than us,
+        /* The queue is currently empty, as there is no character to get. 
+        We will spin here until we have gotten a character. As the driver is a higher priority than us, 
         it should be able to pre-empt this loop
         */
-        asm("nop");
+        microkit_dbg_puts(""); /* From Patrick, this is apparently needed to stop the compiler from optimising out the 
+        as it is currently empty. When compiled in a release version the puts statement will be compiled
+        into a nop command.
+        */
     }
 
     // We are only getting one character at a time, so we just need to cast the buffer to an int
-
     char got_char = *((char *) buffer);
 
-    /* Now that we are finished with the active buffer, we can add it back to the free ring*/
-
+    /* Now that we are finished with the active buffer, we can add it back to the free queue*/
     int ret = serial_enqueue_free(&local_server->rx_queue, buffer, buffer_len, NULL);
 
     if (ret != 0) {
         microkit_dbg_puts(microkit_name);
-        microkit_dbg_puts(": getchar - unable to enqueue active buffer back into free ring\n");
+        microkit_dbg_puts(": getchar - unable to enqueue active buffer back into available queue\n");
     }
 
     return (int) got_char;
 }
 
-/* Return 0 on success, -1 on failure.
+/* Return 0 on success, -1 on failure. 
 Basic scanf implementation using the getchar function above. Gets characters until
 CTRL+C or CTRL+D or new line.
 NOT MEMORY SAFE
-*/
+*/ 
 int serial_server_scanf(char* buffer) {
     int i = 0;
     int getchar_ret = getchar();
@@ -155,15 +164,15 @@ void init(void) {
     microkit_dbg_puts(microkit_name);
     microkit_dbg_puts(": elf PD init function running\n");
 
-    // Here we need to init ring buffers and other data structures
+    // Here we need to init queue buffers and other data structures
 
     struct serial_server *local_server = &global_serial_server;
-
-    // Init the shared ring buffers
+    
+    // Init the shared queue buffers
     serial_queue_init(&local_server->rx_queue, (serial_queue_t *)rx_free, (serial_queue_t *)rx_active, 0, 512, 512);
-    // We will also need to populate these rings with memory from the shared dma region
-
-    // Add buffers to the rx ring
+    // We will also need to populate these queues with memory from the shared dma region
+    
+    // Add buffers to the rx queue
     for (int i = 0; i < NUM_ENTRIES - 1; i++) {
         int ret = serial_enqueue_free(&local_server->rx_queue, rx_data + (i * BUFFER_SIZE), BUFFER_SIZE, NULL);
 
@@ -175,9 +184,9 @@ void init(void) {
 
     serial_queue_init(&local_server->tx_queue, (serial_queue_t *)tx_free, (serial_queue_t *)tx_active, 0, 512, 512);
 
-    // Add buffers to the tx ring
+    // Add buffers to the tx queue
     for (int i = 0; i < NUM_ENTRIES - 1; i++) {
-        // Have to start at the memory region left of by the rx ring
+        // Have to start at the memory region left of by the rx queue
         int ret = serial_enqueue_free(&local_server->tx_queue, tx_data + ((i + NUM_ENTRIES) * BUFFER_SIZE), BUFFER_SIZE, NULL);
 
         if (ret != 0) {
@@ -186,26 +195,40 @@ void init(void) {
         }
     }
 
-    /* Some basic tests for the serial driver */
-
+    // Plug the tx active queue
     serial_queue_plug(local_server->tx_queue.active);
 
-    serial_server_printf("Attempting to use the server printf! -- FROM SERVER 1\n");
+    /* Some basic tests for the serial driver */
 
-    serial_server_printf("Enter char to test getchar FOR SERIAL 1\n");
+    serial_server_printf("Attempting to use the server printf! -- from ");
+    serial_server_printf(microkit_name);
+    serial_server_printf("\n");
+
+    // Unplug the tx active queue
     serial_queue_unplug(local_server->tx_queue.active);
     microkit_notify(SERVER_PRINT_CHANNEL);
 
-    char test = getchar();
-    serial_server_printf("We got the following char in SERIAL 1: ");
-    serial_server_printf(&test);
+    serial_server_printf("Enter char to test getchar for ");
+    serial_server_printf(microkit_name);
     serial_server_printf("\n");
-    serial_server_printf("Enter char to test getchar -- SERIAL 1\n");
+    char test = getchar();
+    serial_server_printf("We got the following char in ");
+    serial_server_printf(microkit_name);
+    serial_server_printf(" : '");
+    serial_server_printf(&test);
+    serial_server_printf("'\n");
+    serial_server_printf("Enter char to test getchar for \n");
+    serial_server_printf(microkit_name);
+    serial_server_printf(": ");
     test = getchar();
-    serial_server_printf("We got the following char in SERIAL 1: ");
+    serial_server_printf("We got the following char in ");
+    serial_server_printf(microkit_name);
+    serial_server_printf(": ");
     serial_server_printf(&test);
 
-    serial_server_printf("\nEnter char to test scanf IN SERIAL 1\n");
+    serial_server_printf("\nEnter char to test scanf in ");
+    serial_server_printf(microkit_name);
+    serial_server_printf("\n");
 
     char temp_buffer = 0;
 
@@ -217,8 +240,11 @@ void init(void) {
         serial_server_printf(&temp_buffer);
     }
 
-    serial_server_printf("\n---END OF SERIAL 1 TEST---\n");
+    serial_server_printf("\n---END OF ");
+    serial_server_printf(microkit_name);
+    serial_server_printf(" TEST---\n");
 }
+
 
 void notified(microkit_channel ch) {
     return;
