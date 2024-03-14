@@ -20,7 +20,6 @@
 typedef struct serial_queue_entry {
     uintptr_t encoded_addr; /* encoded dma addresses */
     unsigned int len; /* associated memory lengths */
-    void *cookie; /* index into client side metadata */
 } serial_queue_entry_t;
 
 /* Circular buffer containing descriptors */
@@ -77,11 +76,10 @@ uint32_t serial_queue_size(serial_queue_t *queue);
  * @param queue queue to enqueue into.
  * @param buffer address into shared memory where data is stored.
  * @param len length of data inside the buffer above.
- * @param cookie optional pointer to data required on dequeueing.
  *
  * @return -1 when queue is empty, 0 on success.
  */
-int serial_enqueue(serial_queue_t *queue, uintptr_t buffer, unsigned int len, void *cookie);
+int serial_enqueue(serial_queue_t *queue, uintptr_t buffer, unsigned int len);
 
 /**
  * Dequeue an element to a queue.
@@ -89,11 +87,10 @@ int serial_enqueue(serial_queue_t *queue, uintptr_t buffer, unsigned int len, vo
  * @param queue queue to Dequeue from.
  * @param buffer pointer to the address of where to store buffer address.
  * @param len pointer to variable to store length of data dequeueing.
- * @param cookie pointer optional pointer to data required on dequeueing.
  *
  * @return -1 when queue is empty, 0 on success.
  */
-int serial_dequeue(serial_queue_t *queue, uintptr_t *addr, unsigned int *len, void **cookie);
+int serial_dequeue(serial_queue_t *queue, uintptr_t *addr, unsigned int *len);
 
 /**
  * Enqueue an element into an free queue.
@@ -102,11 +99,10 @@ int serial_dequeue(serial_queue_t *queue, uintptr_t *addr, unsigned int *len, vo
  * @param queue handle to enqueue into.
  * @param buffer address into shared memory where data is stored.
  * @param len length of data inside the buffer above.
- * @param cookie optional pointer to data required on dequeueing.
  *
  * @return -1 when queue is full, 0 on success.
  */
-int serial_enqueue_free(serial_queue_handle_t *queue, uintptr_t addr, unsigned int len, void *cookie);
+int serial_enqueue_free(serial_queue_handle_t *queue, uintptr_t addr, unsigned int len);
 
 /**
  * Enqueue an element into a active queue.
@@ -115,11 +111,10 @@ int serial_enqueue_free(serial_queue_handle_t *queue, uintptr_t addr, unsigned i
  * @param queue handle to enqueue into.
  * @param buffer address into shared memory where data is stored.
  * @param len length of data inside the buffer above.
- * @param cookie optional pointer to data required on dequeueing.
  *
  * @return -1 when queue is full, 0 on success.
  */
-int serial_enqueue_active(serial_queue_handle_t *queue, uintptr_t addr, unsigned int len, void *cookie);
+int serial_enqueue_active(serial_queue_handle_t *queue, uintptr_t addr, unsigned int len);
 
 /**
  * Dequeue an element from the free queue.
@@ -127,11 +122,10 @@ int serial_enqueue_active(serial_queue_handle_t *queue, uintptr_t addr, unsigned
  * @param queue handle to dequeue from.
  * @param buffer pointer to the address of where to store buffer address.
  * @param len pointer to variable to store length of data dequeueing.
- * @param cookie pointer optional pointer to data required on dequeueing.
  *
  * @return -1 when queue is empty, 0 on success.
  */
-int serial_dequeue_free(serial_queue_handle_t *queue, uintptr_t *addr, unsigned int *len, void **cookie);
+int serial_dequeue_free(serial_queue_handle_t *queue, uintptr_t *addr, unsigned int *len);
 
 /**
  * Dequeue an element from a active queue.
@@ -139,11 +133,10 @@ int serial_dequeue_free(serial_queue_handle_t *queue, uintptr_t *addr, unsigned 
  * @param queue handle to dequeue from.
  * @param buffer pointer to the address of where to store buffer address.
  * @param len pointer to variable to store length of data dequeueing.
- * @param cookie pointer optional pointer to data required on dequeueing.
  *
  * @return -1 when queue is empty, 0 on success.
  */
-int serial_dequeue_active(serial_queue_handle_t *queue, uintptr_t *addr, unsigned int *len, void **cookie);
+int serial_dequeue_active(serial_queue_handle_t *queue, uintptr_t *addr, unsigned int *len);
 
 /**
  * Set the plug of a queue to true.
@@ -167,17 +160,3 @@ void serial_queue_unplug(serial_queue_t *queue);
  * @return true when queue is plugged, false when unplugged.
 */
 bool serial_queue_plugged(serial_queue_t *queue);
-
-/**
- * Dequeue an element from a queue.
- * This function is intended for use by the driver, to collect a pointer
- * into this structure to be passed around as a cookie.
- *
- * @param queue queue to dequeue from.
- * @param addr pointer to the address of where to store buffer address.
- * @param len pointer to variable to store length of data dequeueing.
- * @param cookie pointer to store a pointer to this particular entry.
- *
- * @return -1 when queue is empty, 0 on success.
- */
-int serial_driver_dequeue(serial_queue_t *queue, uintptr_t *addr, unsigned int *len, void **cookie);

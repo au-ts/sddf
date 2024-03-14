@@ -42,7 +42,7 @@ uint32_t serial_queue_size(serial_queue_t *queue)
     return (queue->tail - queue->head);
 }
 
-int serial_enqueue(serial_queue_t *queue, uintptr_t buffer, unsigned int len, void *cookie)
+int serial_enqueue(serial_queue_t *queue, uintptr_t buffer, unsigned int len)
 {
     // assert(buffer != 0);
     if (serial_queue_full(queue)) {
@@ -51,7 +51,6 @@ int serial_enqueue(serial_queue_t *queue, uintptr_t buffer, unsigned int len, vo
 
     queue->entries[queue->tail % queue->size].encoded_addr = buffer;
     queue->entries[queue->tail % queue->size].len = len;
-    queue->entries[queue->tail % queue->size].cookie = cookie;
 
     THREAD_MEMORY_RELEASE();
     queue->tail++;
@@ -59,7 +58,7 @@ int serial_enqueue(serial_queue_t *queue, uintptr_t buffer, unsigned int len, vo
     return 0;
 }
 
-int serial_dequeue(serial_queue_t *queue, uintptr_t *addr, unsigned int *len, void **cookie)
+int serial_dequeue(serial_queue_t *queue, uintptr_t *addr, unsigned int *len)
 {
     if (serial_queue_empty(queue)) {
         return -1;
@@ -69,7 +68,6 @@ int serial_dequeue(serial_queue_t *queue, uintptr_t *addr, unsigned int *len, vo
 
     *addr = queue->entries[queue->head % queue->size].encoded_addr;
     *len = queue->entries[queue->head % queue->size].len;
-    *cookie = queue->entries[queue->head % queue->size].cookie;
 
     THREAD_MEMORY_RELEASE();
     queue->head++;
@@ -77,26 +75,26 @@ int serial_dequeue(serial_queue_t *queue, uintptr_t *addr, unsigned int *len, vo
     return 0;
 }
 
-int serial_enqueue_free(serial_queue_handle_t *queue, uintptr_t addr, unsigned int len, void *cookie)
+int serial_enqueue_free(serial_queue_handle_t *queue, uintptr_t addr, unsigned int len)
 {
     // assert(addr);
-    return serial_enqueue(queue->free, addr, len, cookie);
+    return serial_enqueue(queue->free, addr, len);
 }
 
-int serial_enqueue_active(serial_queue_handle_t *queue, uintptr_t addr, unsigned int len, void *cookie)
+int serial_enqueue_active(serial_queue_handle_t *queue, uintptr_t addr, unsigned int len)
 {
     // assert(addr);
-    return serial_enqueue(queue->active, addr, len, cookie);
+    return serial_enqueue(queue->active, addr, len);
 }
 
-int serial_dequeue_free(serial_queue_handle_t *queue, uintptr_t *addr, unsigned int *len, void **cookie)
+int serial_dequeue_free(serial_queue_handle_t *queue, uintptr_t *addr, unsigned int *len)
 {
-    return serial_dequeue(queue->free, addr, len, cookie);
+    return serial_dequeue(queue->free, addr, len);
 }
 
-int serial_dequeue_active(serial_queue_handle_t *queue, uintptr_t *addr, unsigned int *len, void **cookie)
+int serial_dequeue_active(serial_queue_handle_t *queue, uintptr_t *addr, unsigned int *len)
 {
-    return serial_dequeue(queue->active, addr, len, cookie);
+    return serial_dequeue(queue->active, addr, len);
 }
 
 void serial_queue_plug(serial_queue_t *queue) {
@@ -109,20 +107,4 @@ void serial_queue_unplug(serial_queue_t *queue) {
 
 bool serial_queue_plugged(serial_queue_t *queue) {
     return queue->plugged;
-}
-
-int serial_driver_dequeue(serial_queue_t *queue, uintptr_t *addr, unsigned int *len, void **cookie)
-{
-    if (serial_queue_empty(queue)) {
-        return -1;
-    }
-
-    *addr = queue->entries[queue->head % queue->size].encoded_addr;
-    *len = queue->entries[queue->head % queue->size].len;
-    *cookie = &queue->entries[queue->head % queue->size];
-
-    THREAD_MEMORY_RELEASE();
-    queue->head++;
-
-    return 0;
 }
