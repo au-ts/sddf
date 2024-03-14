@@ -24,7 +24,7 @@ Attempting to use the server printf! -- FROM SERVER 1
 Enter char to test getchar FOR SERIAL 1
 ```
 This shows our two clients, `serial_server_1` and `serial_server_2` transmitting to the 
-same serial driver through a multiplexer (`mux_rx.c` for receive and `mux_tx.c` for transmit). Both clients will now be waiting on input from the user. 
+same serial driver through a multiplexer (`virt_rx.c` for receive and `virt_tx.c` for transmit). Both clients will now be waiting on input from the user. 
 
 If we then input the characters 'h' and 'e' to the console, we will get the following output:
 
@@ -70,7 +70,7 @@ hello there serial 1
 
 # Implementation Notes
 
-* The mux is currently limited to 9 clients. This is due to only reading the next character after '@' for simplicity. This can be adapted in the future.
+* The virtualiser is currently limited to 9 clients. This is due to only reading the next character after '@' for simplicity. This can be adapted in the future.
 
 * The driver uses the Transmit/Receive FIFO buffers. We interrupt on each character inputted.
 
@@ -78,6 +78,6 @@ hello there serial 1
 
 * Example implementations using the client for printing/getchar is presented in the serial_server.
 
-* Line Mode or Raw mode can be specified in the driver in the serial configure function call. Basic line mode supports buffering, and deleting for line editing. Raw mode gives characters as they are inputted straight to the mux.
+* Line Mode or Raw mode can be specified in the driver in the serial configure function call. Basic line mode supports buffering, and deleting for line editing. Raw mode gives characters as they are inputted straight to the virt.
 
 * Echo mode can also be specified in the serial configure function call.

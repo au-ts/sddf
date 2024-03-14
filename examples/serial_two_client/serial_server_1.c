@@ -21,7 +21,7 @@ Return -1 on failure.
 */
 int serial_server_printf(char *string) {
     struct serial_server *local_server = &global_serial_server;
-    // Get a buffer from the tx ring
+    // Get a buffer from the tx queue
 
     // Address that we will pass to dequeue to store the buffer address
     uintptr_t buffer = 0;
@@ -29,12 +29,12 @@ int serial_server_printf(char *string) {
     unsigned int buffer_len = 0;
     void *cookie = 0;
 
-    // Dequeue a buffer from the free ring from the tx buffer
+    // Dequeue a buffer from the free queue from the tx buffer
     int ret = serial_dequeue_free(&local_server->tx_queue, &buffer, &buffer_len, &cookie);
 
     if(ret != 0) {
         microkit_dbg_puts(microkit_name);
-        microkit_dbg_puts(": serial server printf, unable to dequeue from tx ring, tx ring empty\n");
+        microkit_dbg_puts(": serial server printf, unable to dequeue from tx queue, tx queue empty\n");
         return -1;
     }
 
