@@ -6,3 +6,4 @@ build/
 .vscode
 *.P
 *.d
+ci_build/
