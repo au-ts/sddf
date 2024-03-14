@@ -18,13 +18,13 @@
 
 // Transmit rings with the driver
 uintptr_t rx_free_driver;
-uintptr_t rx_used_driver;
+uintptr_t rx_active_driver;
 
 // Transmit rings with the client
 uintptr_t rx_free_client;
-uintptr_t rx_used_client;
+uintptr_t rx_active_client;
 uintptr_t rx_free_client2;
-uintptr_t rx_used_client2;
+uintptr_t rx_active_client2;
 
 uintptr_t rx_data_driver;
 // @ivanv: unused
@@ -72,12 +72,12 @@ int give_multi_char(char * drv_buffer, int drv_buffer_len) {
         memcpy((char *) buffer, drv_buffer, drv_buffer_len);
         buffer_len = drv_buffer_len;
 
-        // Now place in the rx used ring
-        ret = serial_enqueue_used(&rx_queue[curr_client], buffer, buffer_len, &cookie);
+        // Now place in the rx active ring
+        ret = serial_enqueue_active(&rx_queue[curr_client], buffer, buffer_len, &cookie);
 
         if (ret != 0) {
             microkit_dbg_puts(microkit_name);
-            microkit_dbg_puts(": unable to enqueue to the rx used ring\n");
+            microkit_dbg_puts(": unable to enqueue to the rx active ring\n");
             return 1;
         }
 
@@ -112,12 +112,12 @@ int give_single_char(int curr_client, char * drv_buffer, int drv_buffer_len) {
     memcpy((char *) buffer, drv_buffer, drv_buffer_len);
     buffer_len = drv_buffer_len;
 
-    // Now place in the rx used ring
-    ret = serial_enqueue_used(&rx_queue[curr_client - 1], buffer, buffer_len, &cookie);
+    // Now place in the rx active ring
+    ret = serial_enqueue_active(&rx_queue[curr_client - 1], buffer, buffer_len, &cookie);
 
     if (ret != 0) {
         microkit_dbg_puts(microkit_name);
-        microkit_dbg_puts(": unable to enqueue to the rx used ring\n");
+        microkit_dbg_puts(": unable to enqueue to the rx active ring\n");
         return 1;
     }
 
@@ -148,10 +148,10 @@ void handle_rx() {
     void *cookie = 0;
 
     // We can only be here if we have been notified by the driver
-    int ret = serial_dequeue_used(&drv_rx_queue, &buffer, &buffer_len, &cookie) != 0;
+    int ret = serial_dequeue_active(&drv_rx_queue, &buffer, &buffer_len, &cookie) != 0;
     if (ret != 0) {
         microkit_dbg_puts(microkit_name);
-        microkit_dbg_puts(": getchar - unable to dequeue used buffer\n");
+        microkit_dbg_puts(": getchar - unable to dequeue active buffer\n");
     }
 
     // We can either get a single char here, if driver is in RAW mode, or
@@ -228,25 +228,25 @@ void handle_rx() {
        }
     }
 
-    /* Now that we are finished with the used buffer, we can add it back to the free ring*/
+    /* Now that we are finished with the active buffer, we can add it back to the free ring*/
 
     ret = serial_enqueue_free(&drv_rx_queue, buffer, BUFFER_SIZE, NULL);
 
     if (ret != 0) {
         microkit_dbg_puts(microkit_name);
-        microkit_dbg_puts(": getchar - unable to enqueue used buffer back into free ring\n");
+        microkit_dbg_puts(": getchar - unable to enqueue active buffer back into free ring\n");
     }
 }
 
 void init (void) {
     // We want to init the client rings here. Currently this only inits one client
-    serial_queue_init(&rx_queue[0], (serial_queue_t *)rx_free_client, (serial_queue_t *)rx_used_client, 0, NUM_ENTRIES, NUM_ENTRIES);
+    serial_queue_init(&rx_queue[0], (serial_queue_t *)rx_free_client, (serial_queue_t *)rx_active_client, 0, NUM_ENTRIES, NUM_ENTRIES);
     // @ivanv: terrible temporary hack
 #if SERIAL_NUM_CLIENTS > 1
-    serial_queue_init(&rx_queue[1], (serial_queue_t *)rx_free_client2, (serial_queue_t *)rx_used_client2, 0, NUM_ENTRIES, NUM_ENTRIES);
+    serial_queue_init(&rx_queue[1], (serial_queue_t *)rx_free_client2, (serial_queue_t *)rx_active_client2, 0, NUM_ENTRIES, NUM_ENTRIES);
 #endif
 
-    serial_queue_init(&drv_rx_queue, (serial_queue_t *)rx_free_driver, (serial_queue_t *)rx_used_driver, 0, NUM_ENTRIES, NUM_ENTRIES);
+    serial_queue_init(&drv_rx_queue, (serial_queue_t *)rx_free_driver, (serial_queue_t *)rx_active_driver, 0, NUM_ENTRIES, NUM_ENTRIES);
 
     for (int i = 0; i < NUM_ENTRIES - 1; i++) {
         int ret = serial_enqueue_free(&drv_rx_queue, rx_data_driver + (i * BUFFER_SIZE), BUFFER_SIZE, NULL);

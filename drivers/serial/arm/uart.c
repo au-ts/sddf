@@ -23,9 +23,9 @@
 
 /* Shared ring buffers */
 uintptr_t rx_free;
-uintptr_t rx_used;
+uintptr_t rx_active;
 uintptr_t tx_free;
-uintptr_t tx_used;
+uintptr_t tx_active;
 /* UART device registers */
 uintptr_t uart_base;
 
@@ -72,7 +72,7 @@ void handle_tx() {
     unsigned int len = 0;
     void *cookie = 0;
     // Dequeue something from the Tx ring -> the server will have placed something in here, if its empty then nothing to do
-    while (!driver_dequeue(tx_queue.used_ring, &buffer, &len, &cookie)) {
+    while (!driver_dequeue(tx_queue.active, &buffer, &len, &cookie)) {
         // Buffer cointaining the bytes to write to serial
         char *phys = (char * )buffer;
         // Handle the tx
@@ -86,7 +86,7 @@ void handle_irq() {
     /* Here we have interrupted because a character has been inputted. We first want to get the
     character from the hardware FIFO queue.
 
-    Then we want to dequeue from the rx free ring, and populate it, then add to the rx used queue
+    Then we want to dequeue from the rx free ring, and populate it, then add to the rx active queue
     ready to be processed by the client server
     */
     int input = getchar();
@@ -138,8 +138,8 @@ void handle_irq() {
 
         ((char *) buffer)[0] = (char) input;
 
-        // Now place in the rx used ring
-        ret = serial_enqueue_used(&rx_queue, buffer, 1, &cookie);
+        // Now place in the rx active ring
+        ret = serial_enqueue_active(&rx_queue, buffer, 1, &cookie);
         microkit_notify(RX_CH);
 
     } else if (global_serial_driver.mode == LINE_MODE) {
@@ -176,7 +176,7 @@ void handle_irq() {
                 char_arr[global_serial_driver.line_buffer_size] = input_char;
                 global_serial_driver.line_buffer_size += 1;
                 // Enqueue buffer back
-                ret = serial_enqueue_used(&rx_queue, global_serial_driver.line_buffer, global_serial_driver.line_buffer_size, &cookie);
+                ret = serial_enqueue_active(&rx_queue, global_serial_driver.line_buffer, global_serial_driver.line_buffer_size, &cookie);
                 // Zero out the driver states
                 global_serial_driver.line_buffer = 0;
                 global_serial_driver.line_buffer_size = 0;
@@ -208,8 +208,8 @@ void init(void) {
     LOG_DRIVER("initialising\n");
 
     // Init the shared ring buffers
-    ring_init(&rx_queue, (serial_queue_t *)rx_free, (serial_queue_t *)rx_used, 0, NUM_ENTRIES, NUM_ENTRIES);
-    ring_init(&tx_queue, (serial_queue_t *)tx_free, (serial_queue_t *)tx_used, 0, NUM_ENTRIES, NUM_ENTRIES);
+    ring_init(&rx_queue, (serial_queue_t *)rx_free, (serial_queue_t *)rx_active, 0, NUM_ENTRIES, NUM_ENTRIES);
+    ring_init(&tx_queue, (serial_queue_t *)tx_free, (serial_queue_t *)tx_active, 0, NUM_ENTRIES, NUM_ENTRIES);
 
     volatile struct pl011_uart_regs *regs = (volatile struct pl011_uart_regs *) uart_base;
     // @ivanv what does 0x50 mean!

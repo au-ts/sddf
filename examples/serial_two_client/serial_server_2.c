@@ -7,9 +7,9 @@ Need to have access to the same queue mechanisms as the driver, so that we can e
 buffers to be serviced by the driver.*/
 
 uintptr_t rx_free;
-uintptr_t rx_used;
+uintptr_t rx_active;
 uintptr_t tx_free;
-uintptr_t tx_used;
+uintptr_t tx_active;
 
 uintptr_t rx_data;
 uintptr_t tx_data;
@@ -22,7 +22,7 @@ Return -1 on failure.
 int serial_server_printf(char *string) {
     struct serial_server *local_server = &global_serial_server;
 
-    // Get a buffer from the tx ring
+    // Get a buffer from the tx queue
 
     // Address that we will pass to dequeue to store the buffer address
     uintptr_t buffer = 0;
@@ -30,12 +30,12 @@ int serial_server_printf(char *string) {
     unsigned int buffer_len = 0;
     void *cookie = 0;
 
-    // Dequeue a buffer from the free ring from the tx buffer
+    // Dequeue a buffer from the free queue from the tx buffer
     int ret = serial_dequeue_free(&local_server->tx_queue, &buffer, &buffer_len, &cookie);
 
     if(ret != 0) {
         microkit_dbg_puts(microkit_name);
-        microkit_dbg_puts(": serial server printf, unable to dequeue from tx ring, tx ring empty\n");
+        microkit_dbg_puts(": serial server printf, unable to dequeue from tx queue, tx queue empty\n");
         return -1;
     }
 
@@ -52,23 +52,23 @@ int serial_server_printf(char *string) {
 
     memcpy((char *) buffer, string, print_len);
 
-    // We then need to add this buffer to the transmit used ring structure
+    // We then need to add this buffer to the transmit active queue structure
 
-    bool is_empty = serial_queue_empty(local_server->tx_queue.used);
+    bool is_empty = serial_queue_empty(local_server->tx_queue.active);
 
-    ret = serial_enqueue_used(&local_server->tx_queue, buffer, print_len, cookie);
+    ret = serial_enqueue_active(&local_server->tx_queue, buffer, print_len, cookie);
 
     if(ret != 0) {
         microkit_dbg_puts(microkit_name);
-        microkit_dbg_puts(": serial server printf, unable to enqueue to tx used ring\n");
+        microkit_dbg_puts(": serial server printf, unable to enqueue to tx active queue\n");
         return -1;
     }
 
     /*
-    First we will check if the transmit used ring is empty. If not empty, then the driver was processing
-    the used ring, however it was not finished, potentially running out of budget and being pre-empted. 
-    Therefore, we can just add the buffer to the used ring, and wait for the driver to resume. However if 
-    empty, then we can notify the driver to start processing the used ring.
+    First we will check if the transmit active queue is empty. If not empty, then the driver was processing
+    the active queue, however it was not finished, potentially running out of budget and being pre-empted. 
+    Therefore, we can just add the buffer to the active queue, and wait for the driver to resume. However if 
+    empty, then we can notify the driver to start processing the active queue.
     */
 
     if(is_empty) {
@@ -88,8 +88,8 @@ int getchar() {
 
     struct serial_server *local_server = &global_serial_server;
 
-    /* Now that we have notified the driver, we can attempt to dequeue from the used ring.
-    When the driver has processed an interrupt, it will add the inputted character to the used ring.*/
+    /* Now that we have notified the driver, we can attempt to dequeue from the active queue.
+    When the driver has processed an interrupt, it will add the inputted character to the active queue.*/
     
     // Address that we will pass to dequeue to store the buffer address
     uintptr_t buffer = 0;
@@ -99,8 +99,8 @@ int getchar() {
 
     void *cookie = 0;
 
-    while (serial_dequeue_used(&local_server->rx_queue, &buffer, &buffer_len, &cookie) != 0) {
-        /* The ring is currently empty, as there is no character to get. 
+    while (serial_dequeue_active(&local_server->rx_queue, &buffer, &buffer_len, &cookie) != 0) {
+        /* The queue is currently empty, as there is no character to get. 
         We will spin here until we have gotten a character. As the driver is a higher priority than us, 
         it should be able to pre-empt this loop
         */
@@ -113,12 +113,12 @@ int getchar() {
     // We are only getting one character at a time, so we just need to cast the buffer to an int
     char got_char = *((char *) buffer);
 
-    /* Now that we are finished with the used buffer, we can add it back to the free ring*/
+    /* Now that we are finished with the active buffer, we can add it back to the free queue*/
     int ret = serial_enqueue_free(&local_server->rx_queue, buffer, buffer_len, NULL);
 
     if (ret != 0) {
         microkit_dbg_puts(microkit_name);
-        microkit_dbg_puts(": getchar - unable to enqueue used buffer back into available ring\n");
+        microkit_dbg_puts(": getchar - unable to enqueue active buffer back into available queue\n");
     }
 
     return (int) got_char;
@@ -160,15 +160,15 @@ void init(void) {
     microkit_dbg_puts(microkit_name);
     microkit_dbg_puts(": elf PD init function running\n");
 
-    // Here we need to init ring buffers and other data structures
+    // Here we need to init queue buffers and other data structures
 
     struct serial_server *local_server = &global_serial_server;
     
-    // Init the shared ring buffers
-    serial_queue_init(&local_server->rx_queue, (serial_queue_t *)rx_free, (serial_queue_t *)rx_used, 0, 512, 512);
-    // We will also need to populate these rings with memory from the shared dma region
+    // Init the shared queue buffers
+    serial_queue_init(&local_server->rx_queue, (serial_queue_t *)rx_free, (serial_queue_t *)rx_active, 0, 512, 512);
+    // We will also need to populate these queues with memory from the shared dma region
     
-    // Add buffers to the rx ring
+    // Add buffers to the rx queue
     for (int i = 0; i < NUM_ENTRIES - 1; i++) {
         int ret = serial_enqueue_free(&local_server->rx_queue, rx_data + (i * BUFFER_SIZE), BUFFER_SIZE, NULL);
 
@@ -178,11 +178,11 @@ void init(void) {
         }
     }
 
-    serial_queue_init(&local_server->tx_queue, (serial_queue_t *)tx_free, (serial_queue_t *)tx_used, 0, 512, 512);
+    serial_queue_init(&local_server->tx_queue, (serial_queue_t *)tx_free, (serial_queue_t *)tx_active, 0, 512, 512);
 
-    // Add buffers to the tx ring
+    // Add buffers to the tx queue
     for (int i = 0; i < NUM_ENTRIES - 1; i++) {
-        // Have to start at the memory region left of by the rx ring
+        // Have to start at the memory region left of by the rx queue
         int ret = serial_enqueue_free(&local_server->tx_queue, tx_data + ((i + NUM_ENTRIES) * BUFFER_SIZE), BUFFER_SIZE, NULL);
 
         if (ret != 0) {
@@ -191,15 +191,15 @@ void init(void) {
         }
     }
 
-    // Plug the tx used ring
-    serial_queue_plug(local_server->tx_queue.used);
+    // Plug the tx active queue
+    serial_queue_plug(local_server->tx_queue.active);
 
     /* Some basic tests for the serial driver */
 
     serial_server_printf("Attempting to use the server printf! -- FROM SERVER 2\n");
 
-    // Unplug the tx used ring
-    serial_queue_unplug(local_server->tx_queue.used);
+    // Unplug the tx active queue
+    serial_queue_unplug(local_server->tx_queue.active);
     microkit_notify(SERVER_PRINT_CHANNEL);
 
     serial_server_printf("Enter char to test getchar FOR SERIAL 2\n");
