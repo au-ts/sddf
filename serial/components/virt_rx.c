@@ -11,7 +11,7 @@
 #define DRV_CH 11
 
 #ifndef SERIAL_NUM_CLIENTS
-#error "SERIAL_NUM_CLIENTS is expected to be defined for RX serial multiplexor"
+#error "SERIAL_NUM_CLIENTS is expected to be defined for RX serial virtualiser"
 #endif
 
 /* Memory regions as defined in the system file */
@@ -41,7 +41,7 @@ to change direction. */
 /* To switch input direction, type the "@" symbol followed immediately by a number.
 Otherwise, can put "\" before "@" to escape this.*/
 
-int mux_state;
+int virt_state;
 int client;
 // We want to keep track of each clients requests, so that they can be serviced once we have changed
 // input direction
@@ -165,11 +165,11 @@ void handle_rx() {
         char got_char = chars[0];
 
         // We have now gotten a character, deal with the input direction switch
-        if (mux_state == 1) {
+        if (virt_state == 1) {
             // The previous character was an escape character
             give_char(client, &got_char, 1);
-            mux_state = 0;
-        }  else if (mux_state == 2) {
+            virt_state = 0;
+        }  else if (virt_state == 2) {
             // We are now switching input direction
 
             // Case for simultaneous multi client input
@@ -192,14 +192,14 @@ void handle_rx() {
                 }
             }
 
-            mux_state = 0;
-        } else if (mux_state == 0) {
+            virt_state = 0;
+        } else if (virt_state == 0) {
             // No escape character has been set
             if (got_char == '\\') {
-                mux_state = 1;
+                virt_state = 1;
                 // The next character is going to be escaped
             } else if (got_char == '@') {
-                mux_state = 2;
+                virt_state = 2;
             } else {
                 give_char(client, &got_char, 1);
             }
@@ -261,7 +261,7 @@ void init (void) {
     // We initialise the current client to 1
     client = 1;
     // Set the current escape character to 0, we can't have recieved an escape character yet
-    mux_state = 0;
+    virt_state = 0;
     // Disable simultaneous multi client input
     multi_client = 0;
     // No chars have been requested yet

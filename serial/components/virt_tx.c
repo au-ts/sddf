@@ -1,4 +1,4 @@
-/* The policy of the mux tx is that all clients can always request to transmit */
+/* The policy of the virt tx is that all clients can always request to transmit */
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -10,7 +10,7 @@
 #define DRIVER_CH 9
 
 #ifndef SERIAL_NUM_CLIENTS
-#error "SERIAL_NUM_CLIENTS is expected to be defined for TX serial multiplexor"
+#error "SERIAL_NUM_CLIENTS is expected to be defined for TX serial virt"
 #endif
 
 #define COLOUR_START_LEN 5
