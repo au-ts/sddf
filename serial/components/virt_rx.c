@@ -1,4 +1,4 @@
-/* MUX is currently limited to a max of 9 clients */
+/* virt is currently limited to a max of 9 clients */
 #include <stdbool.h>
 #include <stdint.h>
 #include <microkit.h>
@@ -161,7 +161,7 @@ void handle_rx() {
 
     // This is for our RAW mode, char by char
     if (UART_MODE == RAW_MODE) {
-        // microkit_dbg_puts("In raw mode mux rx\n");
+        // microkit_dbg_puts("In raw mode virt rx\n");
         char got_char = chars[0];
 
         // We have now gotten a character, deal with the input direction switch
@@ -181,11 +181,11 @@ void handle_rx() {
                 multi_client = 0;
                 int new_client = atoi(&got_char);
                 if (new_client < 1 || new_client > SERIAL_NUM_CLIENTS) {
-                    microkit_dbg_puts("MUX|RX: Attempted to switch to invalid client number: ");
+                    microkit_dbg_puts("VIRT|RX: Attempted to switch to invalid client number: ");
                     puthex64(new_client);
                     microkit_dbg_puts("\n");
                 } else {
-                    microkit_dbg_puts("MUX|RX: Switching to client number: ");
+                    microkit_dbg_puts("VIRT|RX: Switching to client number: ");
                     puthex64(new_client);
                     microkit_dbg_puts("\n");
                     client = new_client;
@@ -205,7 +205,7 @@ void handle_rx() {
             }
         }
     } else if (UART_MODE == LINE_MODE) {
-        microkit_dbg_puts("In line mode mux rx\n");
+        microkit_dbg_puts("In line mode virt rx\n");
         // This is for LINE mode, placing buffers at a time
 
         /* Check if the first character is an '@'. The following character
@@ -253,7 +253,7 @@ void init (void) {
 
         if (ret != 0) {
             microkit_dbg_puts(microkit_name);
-            microkit_dbg_puts(": mux rx buffer population, unable to enqueue buffer\n");
+            microkit_dbg_puts(": virt rx buffer population, unable to enqueue buffer\n");
             return;
         }
     }
