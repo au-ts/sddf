@@ -27,7 +27,7 @@ UART_DRIVER=$(SDDF)/drivers/serial/meson
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 # UTIL=$(SDDF)/util
 
-IMAGES := uart.elf serial_server_1.elf serial_server_2.elf mux_tx.elf mux_rx.elf
+IMAGES := uart.elf serial_server_1.elf serial_server_2.elf virt_tx.elf virt_rx.elf
 CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall -Wno-unused-function -Werror
 LDFLAGS := -L$(BOARD_DIR)/lib -L$(SDDF)/lib
 LIBS := -lmicrokit -Tmicrokit.ld -lc
@@ -45,8 +45,8 @@ CFLAGS += -I$(BOARD_DIR)/include \
 UART_OBJS := uart.o queue.o
 SERIAL_SERVER_OBJS1 := serial_server_1.o queue.o
 SERIAL_SERVER_OBJS2 := serial_server_2.o queue.o
-MUX_TX_OBJS := mux_tx.o queue.o
-MUX_RX_OBJS := mux_rx.o queue.o
+VIRT_TX_OBJS := virt_tx.o queue.o
+VIRT_RX_OBJS := virt_rx.o queue.o
 
 all: directories $(IMAGE_FILE)
 
@@ -65,10 +65,10 @@ $(BUILD_DIR)/%.o: %.c Makefile
 $(BUILD_DIR)/%.o: %.s Makefile
 	$(AS) -g3 -mcpu=$(CPU) $< -o $@
 
-$(BUILD_DIR)/mux_tx.elf: $(addprefix $(BUILD_DIR)/, $(MUX_TX_OBJS))
+$(BUILD_DIR)/virt_tx.elf: $(addprefix $(BUILD_DIR)/, $(VIRT_TX_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-$(BUILD_DIR)/mux_rx.elf: $(addprefix $(BUILD_DIR)/, $(MUX_RX_OBJS))
+$(BUILD_DIR)/virt_rx.elf: $(addprefix $(BUILD_DIR)/, $(VIRT_RX_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(BUILD_DIR)/uart.elf: $(addprefix $(BUILD_DIR)/, $(UART_OBJS))
