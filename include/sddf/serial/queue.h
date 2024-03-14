@@ -34,7 +34,7 @@ typedef struct serial_queue {
     serial_queue_entry_t entries[NUM_ENTRIES];
 } serial_queue_t;
 
-/* A ring handle for enqueing/dequeuing into  */
+/* A queue handle for enqueing/dequeuing into  */
 typedef struct serial_queue_handle {
     serial_queue_t *free;
     serial_queue_t *active;
@@ -45,25 +45,25 @@ typedef struct serial_queue_handle {
  *
  * @param queue queue handle to use.
  * @param free pointer to free queue in shared memory.
- * @param active pointer to active ring in shared memory.
+ * @param active pointer to active queue in shared memory.
  * @param buffer_init 1 indicates the head and tail indices in shared memory need to be initialised.
  *                    0 inidicates they do not. Only one side of the shared memory regions needs to do this.
  */
 void serial_queue_init(serial_queue_handle_t *queue, serial_queue_t *free, serial_queue_t *active, int buffer_init, uint32_t free_size, uint32_t active_size);
 
 /**
- * Check if the ring buffer is empty.
+ * Check if the queue is empty.
  *
- * @param ring ring buffer to check.
+ * @param queue queue to check.
  *
  * @return true indicates the buffer is empty, false otherwise.
  */
 int serial_queue_empty(serial_queue_t *queue);
 
 /**
- * Check if the ring buffer is full
+ * Check if the queue is full
  *
- * @param ring ring buffer to check.
+ * @param queue queue to check.
  *
  * @return true indicates the buffer is full, false otherwise.
  */
@@ -72,112 +72,112 @@ int serial_queue_full(serial_queue_t *queue);
 uint32_t serial_queue_size(serial_queue_t *queue);
 
 /**
- * Enqueue an element to a ring buffer
+ * Enqueue an element to a queue
  *
- * @param ring Ring buffer to enqueue into.
+ * @param queue queue to enqueue into.
  * @param buffer address into shared memory where data is stored.
  * @param len length of data inside the buffer above.
  * @param cookie optional pointer to data required on dequeueing.
  *
- * @return -1 when ring is empty, 0 on success.
+ * @return -1 when queue is empty, 0 on success.
  */
 int serial_enqueue(serial_queue_t *queue, uintptr_t buffer, unsigned int len, void *cookie);
 
 /**
- * Dequeue an element to a ring buffer.
+ * Dequeue an element to a queue.
  *
- * @param ring Ring buffer to Dequeue from.
+ * @param queue queue to Dequeue from.
  * @param buffer pointer to the address of where to store buffer address.
  * @param len pointer to variable to store length of data dequeueing.
  * @param cookie pointer optional pointer to data required on dequeueing.
  *
- * @return -1 when ring is empty, 0 on success.
+ * @return -1 when queue is empty, 0 on success.
  */
 int serial_dequeue(serial_queue_t *queue, uintptr_t *addr, unsigned int *len, void **cookie);
 
 /**
- * Enqueue an element into an free ring buffer.
+ * Enqueue an element into an free queue.
  * This indicates the buffer address parameter is currently free for use.
  *
- * @param ring Ring handle to enqueue into.
+ * @param queue handle to enqueue into.
  * @param buffer address into shared memory where data is stored.
  * @param len length of data inside the buffer above.
  * @param cookie optional pointer to data required on dequeueing.
  *
- * @return -1 when ring is full, 0 on success.
+ * @return -1 when queue is full, 0 on success.
  */
 int serial_enqueue_free(serial_queue_handle_t *queue, uintptr_t addr, unsigned int len, void *cookie);
 
 /**
- * Enqueue an element into a active ring buffer.
+ * Enqueue an element into a active queue.
  * This indicates the buffer address parameter is currently in use.
  *
- * @param ring Ring handle to enqueue into.
+ * @param queue handle to enqueue into.
  * @param buffer address into shared memory where data is stored.
  * @param len length of data inside the buffer above.
  * @param cookie optional pointer to data required on dequeueing.
  *
- * @return -1 when ring is full, 0 on success.
+ * @return -1 when queue is full, 0 on success.
  */
 int serial_enqueue_active(serial_queue_handle_t *queue, uintptr_t addr, unsigned int len, void *cookie);
 
 /**
- * Dequeue an element from the free ring buffer.
+ * Dequeue an element from the free queue.
  *
- * @param ring Ring handle to dequeue from.
+ * @param queue handle to dequeue from.
  * @param buffer pointer to the address of where to store buffer address.
  * @param len pointer to variable to store length of data dequeueing.
  * @param cookie pointer optional pointer to data required on dequeueing.
  *
- * @return -1 when ring is empty, 0 on success.
+ * @return -1 when queue is empty, 0 on success.
  */
 int serial_dequeue_free(serial_queue_handle_t *queue, uintptr_t *addr, unsigned int *len, void **cookie);
 
 /**
- * Dequeue an element from a active ring buffer.
+ * Dequeue an element from a active queue.
  *
- * @param ring Ring handle to dequeue from.
+ * @param queue handle to dequeue from.
  * @param buffer pointer to the address of where to store buffer address.
  * @param len pointer to variable to store length of data dequeueing.
  * @param cookie pointer optional pointer to data required on dequeueing.
  *
- * @return -1 when ring is empty, 0 on success.
+ * @return -1 when queue is empty, 0 on success.
  */
 int serial_dequeue_active(serial_queue_handle_t *queue, uintptr_t *addr, unsigned int *len, void **cookie);
 
 /**
- * Set the plug of a ring to true.
+ * Set the plug of a queue to true.
  *
- * @param ring Ring handle to plug.
+ * @param queue handle to plug.
 */
 void serial_queue_plug(serial_queue_t *queue);
 
 /**
- * Set the plug of a ring to false.
+ * Set the plug of a queue to false.
  *
- * @param ring Ring handle to unplug.
+ * @param queue handle to unplug.
 */
 void serial_queue_unplug(serial_queue_t *queue);
 
 /**
  * Check the current value of the plug.
  *
- * @param ring Ring handle to check plug.
+ * @param queue handle to check plug.
  *
- * @return true when ring is plugged, false when unplugged.
+ * @return true when queue is plugged, false when unplugged.
 */
 bool serial_queue_plugged(serial_queue_t *queue);
 
 /**
- * Dequeue an element from a ring buffer.
+ * Dequeue an element from a queue.
  * This function is intended for use by the driver, to collect a pointer
  * into this structure to be passed around as a cookie.
  *
- * @param ring Ring buffer to dequeue from.
+ * @param queue queue to dequeue from.
  * @param addr pointer to the address of where to store buffer address.
  * @param len pointer to variable to store length of data dequeueing.
  * @param cookie pointer to store a pointer to this particular entry.
  *
- * @return -1 when ring is empty, 0 on success.
+ * @return -1 when queue is empty, 0 on success.
  */
 int serial_driver_dequeue(serial_queue_t *queue, uintptr_t *addr, unsigned int *len, void **cookie);
