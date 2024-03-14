@@ -61,11 +61,11 @@ typedef unsigned long long ssize_t;
 /* Plaform specific diagnostic output */
 #define LWIP_PLATFORM_DIAG(x)           \
         do {                            \
-            printf x ;\
+            sddf_printf x ;\
         } while(0)
 
 #define LWIP_PLATFORM_ASSERT(x) \
         do {                                                    \
-            printf("Assertion failed: %s\n", #x);              \
+            sddf_printf("Assertion failed: %s\n", #x);              \
             while(1);                                           \
         } while(0)

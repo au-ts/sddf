@@ -92,7 +92,7 @@ static int arp_reply(const uint8_t ethsrc_addr[ETH_HWADDR_LEN],
                 const uint8_t hwdst_addr[ETH_HWADDR_LEN], const uint32_t ipdst_addr)
 {
     if (ring_empty(tx_ring.free_ring)) {
-        dprintf("ARP|LOG: Transmit free ring empty or transmit used ring full. Dropping reply\n");
+        sddf_dprintf("ARP|LOG: Transmit free ring empty or transmit used ring full. Dropping reply\n");
         return -1;
     }
 
@@ -182,7 +182,7 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
 {
     int client = ch - CLIENT_CH;
     if (client >= NUM_ARP_CLIENTS || client < 0) {
-        dprintf("ARP|LOG: PPC from unkown client %d\n", client);
+        sddf_dprintf("ARP|LOG: PPC from unkown client %d\n", client);
         return microkit_msginfo_new(0, 0);
     }
 
@@ -194,13 +194,13 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
     char buf[16];
     switch (microkit_msginfo_get_label(msginfo)) {
         case REG_IP:
-            printf("ARP|NOTICE: client%d registering ip address: %s with MAC: %02x:%02x:%02x:%02x:%02x:%02x\n", 
+            sddf_printf("ARP|NOTICE: client%d registering ip address: %s with MAC: %02x:%02x:%02x:%02x:%02x:%02x\n", 
                         client, ipaddr_to_string(ip_addr, buf, 16), mac >> 40, mac >> 32 & 0xff, mac >> 24 & 0xff, 
                         mac >> 16 & 0xff, mac >> 8 & 0xff, mac & 0xff);
             ipv4_addrs[client] = ip_addr;
             break;
         default:
-            dprintf("ARP|LOG: PPC from client%d with unknown message label %llu\n", client, microkit_msginfo_get_label(msginfo));
+            sddf_dprintf("ARP|LOG: PPC from client%d with unknown message label %llu\n", client, microkit_msginfo_get_label(msginfo));
             break;
     }
 

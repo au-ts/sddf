@@ -150,7 +150,7 @@ void enqueue_pbufs(struct pbuf *p)
 static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
 {   
     if (p->tot_len > BUFF_SIZE) {
-        dprintf("LWIP|ERROR: attempted to send a packet of size  %llx > BUFFER SIZE  %llx\n", p->tot_len, BUFF_SIZE);
+        sddf_dprintf("LWIP|ERROR: attempted to send a packet of size  %llx > BUFFER SIZE  %llx\n", p->tot_len, BUFF_SIZE);
         return ERR_MEM;
     }
 
@@ -186,10 +186,10 @@ void transmit(void)
         while(state.head != NULL && !ring_empty(state.tx_ring.free_ring)) {
             err_t err = lwip_eth_send(&state.netif, state.head);
             if (err == ERR_MEM) {
-                dprintf("LWIP|ERROR: attempted to send a packet of size  %llx > BUFFER SIZE  %llx\n", state.head->tot_len, BUFF_SIZE);
+                sddf_dprintf("LWIP|ERROR: attempted to send a packet of size  %llx > BUFFER SIZE  %llx\n", state.head->tot_len, BUFF_SIZE);
             }
             else if (err != ERR_OK) {
-                dprintf("LWIP|ERROR: unkown error when trying to send pbuf  %llx\n", state.head);
+                sddf_dprintf("LWIP|ERROR: unkown error when trying to send pbuf  %llx\n", state.head);
             }
             
             struct pbuf *temp = state.head;
@@ -221,7 +221,7 @@ void receive(void)
 
             struct pbuf *p = create_interface_buffer(buffer.phys_or_offset, buffer.len);
             if (state.netif.input(p, &state.netif) != ERR_OK) {
-                dprintf("LWIP|ERROR: unkown error inputting pbuf into network stack\n");
+                sddf_dprintf("LWIP|ERROR: unkown error inputting pbuf into network stack\n");
                 pbuf_free(p);
             }
         }
@@ -270,7 +270,7 @@ static void netif_status_callback(struct netif *netif)
         microkit_mr_set(2, (state.mac[2] << 24) |  (state.mac[3] << 16) | (state.mac[4] << 8) | state.mac[5]);
         microkit_ppcall(ARP, microkit_msginfo_new(0, 3));
 
-        printf("LWIP|NOTICE: DHCP request for %s returned IP address: %s\n", microkit_name, ip4addr_ntoa(netif_ip4_addr(netif)));
+        sddf_printf("LWIP|NOTICE: DHCP request for %s returned IP address: %s\n", microkit_name, ip4addr_ntoa(netif_ip4_addr(netif)));
     }
 }
 
@@ -297,13 +297,13 @@ void init(void)
     state.netif.name[1] = '0';
 
     if (!netif_add(&(state.netif), &ipaddr, &netmask, &gw, (void *)&state,
-              ethernet_init, ethernet_input)) dprintf("LWIP|ERROR: Netif add returned NULL\n");
+              ethernet_init, ethernet_input)) sddf_dprintf("LWIP|ERROR: Netif add returned NULL\n");
 
     netif_set_default(&(state.netif));
     netif_set_status_callback(&(state.netif), netif_status_callback);
     netif_set_up(&(state.netif));
 
-    if (dhcp_start(&(state.netif))) dprintf("LWIP|ERROR: failed to start DHCP negotiation\n");
+    if (dhcp_start(&(state.netif))) sddf_dprintf("LWIP|ERROR: failed to start DHCP negotiation\n");
 
     setup_udp_socket();
     setup_utilization_socket();
@@ -338,7 +338,7 @@ void notified(microkit_channel ch)
             receive();
             break;
         default:
-            dprintf("LWIP|LOG: received notification on unexpected channel: %lu\n", ch);
+            sddf_dprintf("LWIP|LOG: received notification on unexpected channel: %lu\n", ch);
             break;
     }
     

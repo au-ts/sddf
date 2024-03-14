@@ -10,7 +10,7 @@ extern uintptr_t uart_base;
 #define TRANSMIT 0x40
 #define STAT_TDRE (1 << 14)
 
-void _putchar(char character)
+void _sddf_putchar(char character)
 {
     while (!(*REG_PTR(UART_STATUS) & STAT_TDRE)) { }
     *REG_PTR(TRANSMIT) = character;
@@ -24,7 +24,7 @@ void _putchar(char character)
 #define UART_WFIFO 0x0
 #define UART_TX_FULL (1 << 21)
 
-void _putchar(char character)
+void _sddf_putchar(char character)
 {
     while ((*REG_PTR(UART_STATUS) & UART_TX_FULL)) {}
     *REG_PTR(UART_WFIFO) = character & 0x7f;

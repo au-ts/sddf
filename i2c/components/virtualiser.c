@@ -12,12 +12,12 @@
 // #define DEBUG_VIRTUALISER
 
 #ifdef DEBUG_VIRTUALISER
-#define LOG_VIRTUALISER(...) do{ printf("I2C VIRTUALISER|INFO: "); printf(__VA_ARGS__); }while(0)
+#define LOG_VIRTUALISER(...) do{ sddf_dprintf("I2C VIRTUALISER|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
 #else
 #define LOG_VIRTUALISER(...) do{}while(0)
 #endif
 
-#define LOG_VIRTUALISER_ERR(...) do{ printf("I2C VIRTUALISER|ERROR: "); printf(__VA_ARGS__); }while(0)
+#define LOG_VIRTUALISER_ERR(...) do{ sddf_printf("I2C VIRTUALISER|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
 #define BUS_UNCLAIMED (-1)
 

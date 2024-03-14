@@ -10,11 +10,11 @@
 // #define DEBUG_CLIENT
 
 #ifdef DEBUG_CLIENT
-#define LOG_CLIENT(...) do{ printf("CLIENT|INFO: "); printf(__VA_ARGS__); }while(0)
+#define LOG_CLIENT(...) do{ sddf_dprintf("CLIENT|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
 #else
 #define LOG_CLIENT(...) do{}while(0)
 #endif
-#define LOG_CLIENT_ERR(...) do{ printf("CLIENT|ERROR: "); printf(__VA_ARGS__); }while(0)
+#define LOG_CLIENT_ERR(...) do{ sddf_printf("CLIENT|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
 uintptr_t data_region;
 uintptr_t request_region;
@@ -137,12 +137,12 @@ void client_main(void) {
 
         if (success) {
             LOG_CLIENT("Found a card!\n");
-            printf("UID Length: %d bytes\n", uid_length);
-            printf("UID Value: ");
+            sddf_printf("UID Length: %d bytes\n", uid_length);
+            sddf_printf("UID Value: ");
             for (int i = 0; i < uid_length; i++) {
-                printf(" 0x%lx", uid[i]);
+                sddf_printf(" 0x%lx", uid[i]);
             }
-            printf("\n");
+            sddf_printf("\n");
         } else {
             // PN532 probably timed out waiting for a card
             LOG_CLIENT_ERR("Timed out waiting for a card\n");

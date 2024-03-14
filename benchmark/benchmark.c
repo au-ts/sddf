@@ -100,21 +100,21 @@ static void microkit_benchmark_stop_tcb(uint64_t pd_id, uint64_t *total, uint64_
 
 static void print_benchmark_details(uint64_t pd_id, uint64_t kernel_util, uint64_t kernel_entries, uint64_t number_schedules, uint64_t total_util)
 {
-    if (pd_id == PD_TOTAL) printf("Total utilisation details: ");
-    else printf("Utilisation details for PD: ");
+    if (pd_id == PD_TOTAL) sddf_printf("Total utilisation details: ");
+    else sddf_printf("Utilisation details for PD: ");
     switch (pd_id) {
-        case PD_ETH_ID: printf("ETH DRIVER"); break;
-        case PD_MUX_RX_ID: printf("MUX RX"); break;
-        case PD_MUX_TX_ID: printf("MUX TX"); break;
-        case PD_COPY_ID: printf("COPIER0"); break;
-        case PD_COPY1_ID: printf("COPIER1"); break;
-        case PD_LWIP_ID: printf("LWIP CLIENT0"); break;
-        case PD_LWIP1_ID: printf("LWIP CLIENT1"); break;
-        case PD_ARP_ID: printf("ARP"); break;
-        case PD_TIMER_ID: printf("TIMER"); break;
+        case PD_ETH_ID: sddf_printf("ETH DRIVER"); break;
+        case PD_MUX_RX_ID: sddf_printf("MUX RX"); break;
+        case PD_MUX_TX_ID: sddf_printf("MUX TX"); break;
+        case PD_COPY_ID: sddf_printf("COPIER0"); break;
+        case PD_COPY1_ID: sddf_printf("COPIER1"); break;
+        case PD_LWIP_ID: sddf_printf("LWIP CLIENT0"); break;
+        case PD_LWIP1_ID: sddf_printf("LWIP CLIENT1"); break;
+        case PD_ARP_ID: sddf_printf("ARP"); break;
+        case PD_TIMER_ID: sddf_printf("TIMER"); break;
     }
-    if (pd_id != PD_TOTAL) printf(" ( %llx)", pd_id);
-    printf("\n{\nKernelUtilisation:  %llx\nKernelEntries:  %llx\nNumberSchedules:  %llx\nTotalUtilisation:  %llx\n}\n", 
+    if (pd_id != PD_TOTAL) sddf_printf(" ( %llx)", pd_id);
+    sddf_printf("\n{\nKernelUtilisation:  %llx\nKernelEntries:  %llx\nNumberSchedules:  %llx\nTotalUtilisation:  %llx\n}\n", 
             kernel_util, kernel_entries, number_schedules, total_util);
 }
 #endif
@@ -144,12 +144,12 @@ static inline void seL4_BenchmarkTrackDumpSummary(benchmark_track_kernel_entry_t
         index++;
     }
 
-    printf("Number of system call invocations  %llx and fastpaths  %llx\n", syscall_entries, fastpaths);
-    printf("Number of interrupt invocations  %llx\n", interrupt_entries);
-    printf("Number of user-level faults  %llx\n", userlevelfault_entries);
-    printf("Number of VM faults  %llx\n", vmfault_entries);
-    printf("Number of debug faults  %llx\n", debug_fault);
-    printf("Number of others  %llx\n", other);
+    sddf_printf("Number of system call invocations  %llx and fastpaths  %llx\n", syscall_entries, fastpaths);
+    sddf_printf("Number of interrupt invocations  %llx\n", interrupt_entries);
+    sddf_printf("Number of user-level faults  %llx\n", userlevelfault_entries);
+    sddf_printf("Number of VM faults  %llx\n", vmfault_entries);
+    sddf_printf("Number of debug faults  %llx\n", debug_fault);
+    sddf_printf("Number of others  %llx\n", other);
 }
 #endif
 
@@ -175,9 +175,11 @@ void notified(microkit_channel ch)
             sel4bench_get_counters(benchmark_bf, &counter_values[0]);
             sel4bench_stop_counters(benchmark_bf);
 
-            printf("{\n");
-            for (int i = 0; i < ARRAY_SIZE(benchmarking_events); i++) printf("%s: %llX\n", counter_names[i], counter_values[i]);
-            printf("}\n");
+            sddf_printf("{\n");
+            for (int i = 0; i < ARRAY_SIZE(benchmarking_events); i++) {
+                sddf_printf("%s: %llX\n", counter_names[i], counter_values[i]);
+            }
+            sddf_printf("}\n");
 
             #ifdef CONFIG_BENCHMARK_TRACK_UTILISATION
             uint64_t total;
@@ -217,13 +219,13 @@ void notified(microkit_channel ch)
 
             #ifdef CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES
             entries = seL4_BenchmarkFinalizeLog();
-            printf("KernelEntries:  %llx\n", entries);
+            sddf_printf("KernelEntries:  %llx\n", entries);
             seL4_BenchmarkTrackDumpSummary(log_buffer, entries);
             #endif
 
             break;
         default:
-            printf("Bench thread notified on unexpected channel\n");
+            sddf_printf("Bench thread notified on unexpected channel\n");
     }
 }
 
@@ -249,7 +251,7 @@ void init(void)
 
 #ifdef CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES
     int res_buf = seL4_BenchmarkSetLogBuffer(LOG_BUFFER_CAP);
-    if (res_buf) printf("Could not set log buffer:  %llx\n", res_buf);
-    else printf("Log buffer set\n");
+    if (res_buf) sddf_printf("Could not set log buffer:  %llx\n", res_buf);
+    else sddf_printf("Log buffer set\n");
 #endif
 }

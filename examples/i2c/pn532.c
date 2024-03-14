@@ -9,12 +9,12 @@
 // #define DEBUG_PN532
 
 #ifdef DEBUG_PN532
-#define LOG_PN532(...) do{ printf("PN532|INFO: "); printf(__VA_ARGS__); }while(0)
+#define LOG_PN532(...) do{ sddf_dprintf("PN532|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
 #else
 #define LOG_PN532(...) do{}while(0)
 #endif
 
-#define LOG_PN532_ERR(...) do{ printf("PN532|ERROR: "); printf(__VA_ARGS__); }while(0)
+#define LOG_PN532_ERR(...) do{ sddf_printf("PN532|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
 extern cothread_t t_event;
 extern cothread_t t_main;
