@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <microkit.h>
-#include <sddf/network/shared_ringbuffer.h>
+#include <sddf/network/queue.h>
 #include <sddf/util/fence.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
@@ -22,9 +22,9 @@ uintptr_t hw_ring_buffer_vaddr;
 uintptr_t hw_ring_buffer_paddr;
 
 uintptr_t rx_free;
-uintptr_t rx_used;
+uintptr_t rx_active;
 uintptr_t tx_free;
-uintptr_t tx_used;
+uintptr_t tx_active;
 
 #define RX_COUNT 256
 #define TX_COUNT 256
@@ -42,15 +42,15 @@ _Static_assert((RX_COUNT + TX_COUNT) * sizeof(struct descriptor) <= HW_REGION_SI
 typedef struct {
     unsigned int tail; /* index to insert at */
     unsigned int head; /* index to remove from */
-    buff_desc_t descr_mdata[MAX_COUNT]; /* associated meta data array */
+    net_buff_desc_t descr_mdata[MAX_COUNT]; /* associated meta data array */
     volatile struct descriptor *descr; /* buffer descripter array */
 } hw_ring_t;
 
 hw_ring_t rx;
 hw_ring_t tx;
 
-ring_handle_t rx_ring;
-ring_handle_t tx_ring;
+net_queue_handle_t rx_queue;
+net_queue_handle_t tx_queue;
 
 volatile struct eth_mac_regs *eth_mac = (void *)(uintptr_t)0x2000000;
 volatile struct eth_dma_regs *eth_dma = (void *)(uintptr_t)0x2000000 + DMA_REG_OFFSET;
@@ -83,9 +83,9 @@ static void rx_provide()
 {
     bool reprocess = true;
     while (reprocess) {
-        while (!hw_ring_full(&rx, RX_COUNT) && !ring_empty(rx_ring.free_ring)) {
-            buff_desc_t buffer;
-            int err = dequeue_free(&rx_ring, &buffer);
+        while (!hw_ring_full(&rx, RX_COUNT) && !net_queue_empty(rx_queue.free)) {
+            net_buff_desc_t buffer;
+            int err = net_dequeue_free(&rx_queue, &buffer);
             assert(!err);
 
             uint32_t cntl = (MAX_RX_FRAME_SZ << DESC_RXCTRL_SIZE1SHFT) & DESC_RXCTRL_SIZE1MASK;
@@ -98,11 +98,11 @@ static void rx_provide()
             rx.tail = (rx.tail + 1) % RX_COUNT;
         }
 
-        request_signal(rx_ring.free_ring);
+        net_request_signal(rx_queue.free);
         reprocess = false;
 
-        if (!ring_empty(rx_ring.free_ring) && !hw_ring_full(&rx, RX_COUNT)) {
-            cancel_signal(rx_ring.free_ring);
+        if (!net_queue_empty(rx_queue.free) && !hw_ring_full(&rx, RX_COUNT)) {
+            net_cancel_signal(rx_queue.free);
             reprocess = true;
         }
     }
@@ -115,7 +115,7 @@ static void rx_return(void)
         /* If buffer slot is still empty, we have processed all packets the device has filled */
         volatile struct descriptor *d = &(rx.descr[rx.head]);
         if (d->status & DESC_RXSTS_OWNBYDMA) break;
-        buff_desc_t buffer = rx.descr_mdata[rx.head];
+        net_buff_desc_t buffer = rx.descr_mdata[rx.head];
         THREAD_MEMORY_ACQUIRE();
 
         if (d->status & DESC_RXSTS_ERROR) {
@@ -128,15 +128,15 @@ static void rx_return(void)
             eth_dma->rxpolldemand = POLL_DATA;
         } else {
             buffer.len = (d->status & DESC_RXSTS_LENMSK) >> DESC_RXSTS_LENSHFT;
-            int err = enqueue_used(&rx_ring, buffer);
+            int err = net_enqueue_active(&rx_queue, buffer);
             assert(!err);
             packets_transferred = true;
         }
         rx.head = (rx.head + 1) % RX_COUNT;
     }
 
-    if (packets_transferred && require_signal(rx_ring.used_ring)) {
-        cancel_signal(rx_ring.used_ring);
+    if (packets_transferred && net_require_signal(rx_queue.active)) {
+        net_cancel_signal(rx_queue.active);
         microkit_notify(RX_CH);
     }
 }
@@ -145,9 +145,9 @@ static void tx_provide(void)
 {
     bool reprocess = true;
     while (reprocess) {
-        while (!(hw_ring_full(&tx, TX_COUNT)) && !ring_empty(tx_ring.used_ring)) {
-            buff_desc_t buffer;
-            int err = dequeue_used(&tx_ring, &buffer);
+        while (!(hw_ring_full(&tx, TX_COUNT)) && !net_queue_empty(tx_queue.active)) {
+            net_buff_desc_t buffer;
+            int err = net_dequeue_active(&tx_queue, &buffer);
             assert(!err);
 
             uint32_t cntl = (((uint32_t) buffer.len) << DESC_TXCTRL_SIZE1SHFT) & DESC_TXCTRL_SIZE1MASK;
@@ -159,11 +159,11 @@ static void tx_provide(void)
             tx.tail = (tx.tail + 1) % TX_COUNT;
         }
     
-        request_signal(tx_ring.used_ring);
+        net_request_signal(tx_queue.active);
         reprocess = false;
 
-        if (!hw_ring_full(&tx, TX_COUNT) && !ring_empty(tx_ring.used_ring)) {
-            cancel_signal(tx_ring.used_ring);
+        if (!hw_ring_full(&tx, TX_COUNT) && !net_queue_empty(tx_queue.active)) {
+            net_cancel_signal(tx_queue.active);
             reprocess = true;
         }
     }
@@ -177,17 +177,17 @@ static void tx_return(void)
         /* Ensure that this buffer has been sent by the device */
         volatile struct descriptor *d = &(tx.descr[tx.head]);
         if (d->status & DESC_TXSTS_OWNBYDMA) break;
-        buff_desc_t buffer = tx.descr_mdata[tx.head];
+        net_buff_desc_t buffer = tx.descr_mdata[tx.head];
         THREAD_MEMORY_ACQUIRE();
 
-        int err = enqueue_free(&tx_ring, buffer);
+        int err = net_enqueue_free(&tx_queue, buffer);
         assert(!err);
         enqueued = true;
         tx.head = (tx.head + 1) % TX_COUNT;
     }
 
-    if (enqueued && require_signal(tx_ring.free_ring)) {
-        cancel_signal(tx_ring.free_ring);
+    if (enqueued && net_require_signal(tx_queue.free)) {
+        net_cancel_signal(tx_queue.free);
         microkit_notify(TX_CH);
     }
 }
@@ -244,8 +244,8 @@ void init(void)
 {
     eth_setup();
 
-    ring_init(&rx_ring, (ring_buffer_t *)rx_free, (ring_buffer_t *)rx_used, RX_RING_SIZE_DRIV);
-    ring_init(&tx_ring, (ring_buffer_t *)tx_free, (ring_buffer_t *)tx_used, TX_RING_SIZE_DRIV);
+    net_queue_init(&rx_queue, (net_queue_t *)rx_free, (net_queue_t *)rx_active, RX_QUEUE_SIZE_DRIV);
+    net_queue_init(&tx_queue, (net_queue_t *)tx_free, (net_queue_t *)tx_active, TX_QUEUE_SIZE_DRIV);
 
     rx_provide();
     tx_provide();
