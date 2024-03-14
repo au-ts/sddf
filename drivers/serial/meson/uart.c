@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <microkit.h>
+#include <sddf/util/util.h>
 #include "uart.h"
 #include "uart_config.h"
 
@@ -160,7 +161,8 @@ void handle_tx() {
         // Handle the tx
         raw_tx(phys, len);
         // Then enqueue this rx_queue back into the free queue, so that it can be collected and reused by the server
-        serial_enqueue_free(&tx_queue, buffer, len);
+        int err = serial_enqueue_free(&tx_queue, buffer, BUFFER_SIZE);
+        assert(!err);
     }
 }
 
