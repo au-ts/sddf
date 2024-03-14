@@ -1,6 +1,6 @@
 #include <microkit.h>
 
-void _putchar(char character)
+void _sddf_putchar(char character)
 {
     microkit_dbg_putc(character);
 }

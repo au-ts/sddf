@@ -25,12 +25,12 @@
 // #define DEBUG_DRIVER
 
 #ifdef DEBUG_DRIVER
-#define LOG_DRIVER(...) do{ printf("I2C DRIVER|INFO: "); printf(__VA_ARGS__); }while(0)
+#define LOG_DRIVER(...) do{ sddf_dprintf("I2C DRIVER|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
 #else
 #define LOG_DRIVER(...) do{}while(0)
 #endif
 
-#define LOG_DRIVER_ERR(...) do{ printf("I2C DRIVER|ERROR: "); printf(__VA_ARGS__); }while(0)
+#define LOG_DRIVER_ERR(...) do{ sddf_printf("I2C DRIVER|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
 struct i2c_regs {
     uint32_t ctl;
@@ -146,7 +146,7 @@ static inline void i2c_dump(volatile struct i2c_regs *regs) {
  * Initialise the i2c master interfaces.
 */
 static inline void i2c_setup() {
-    printf("driver: initialising i2c master interfaces...\n");
+    LOG_DRIVER("initialising i2c master interfaces...\n");
 
     volatile struct i2c_regs *regs = (volatile struct i2c_regs *) i2c_regs;
 
@@ -180,7 +180,7 @@ static inline void i2c_setup() {
 
     // Check that registers actually changed
     if (!(*pinmux5_ptr & (GPIO_PM5_X18 | GPIO_PM5_X17))) {
-        printf("driver: failed to set pinmux5!\n");
+        LOG_DRIVER_ERR("failed to set pinmux5!\n");
     }
 
     // Set GPIO drive strength
@@ -191,7 +191,7 @@ static inline void i2c_setup() {
     // Check register updated
     if ((*pad_ds2b_ptr & (GPIO_DS_2B_X17 | GPIO_DS_2B_X18)) != ((ds << GPIO_DS_2B_X17_SHIFT) |
                     (ds << GPIO_DS_2B_X18_SHIFT))) {
-        printf("driver: failed to set drive strength for m2!\n");
+        LOG_DRIVER_ERR("failed to set drive strength for m2!\n");
     }
 
     // Disable bias, because the odroid i2c hardware has undocumented internal ones
@@ -199,7 +199,7 @@ static inline void i2c_setup() {
 
     // Check registers updated
     if ((*pad_bias2_ptr & ((1 << 18) | (1 << 17))) != 0) {
-        printf("driver: failed to disable bias for m2!\n");
+        LOG_DRIVER_ERR("failed to disable bias for m2!\n");
     }
 #elif I2C_BUS_NUM == 3
     // Enable i2cm3 -> pinmux E
@@ -209,7 +209,7 @@ static inline void i2c_setup() {
 
     // Check registers actually changed
     if (!(*pinmuxE_ptr & (GPIO_PE_A15 | GPIO_PE_A14))) {
-        printf("driver: failed to set pinmuxE!\n");
+        LOG_DRIVER_ERR("failed to set pinmuxE!\n");
     }
 
     // Set GPIO drive strength
@@ -220,7 +220,7 @@ static inline void i2c_setup() {
     // Check register updated
     if ((*pad_ds5a_ptr & (GPIO_DS_5A_A14 | GPIO_DS_5A_A15)) != ((ds << GPIO_DS_5A_A14_SHIFT) |
                     (ds << GPIO_DS_5A_A15_SHIFT))) {
-        printf("driver: failed to set drive strength for m3!\n");
+        LOG_DRIVER_ERR("failed to set drive strength for m3!\n");
     }
 
     // Disable bias, because the odroid i2c hardware has undocumented internal ones
@@ -228,7 +228,7 @@ static inline void i2c_setup() {
 
     // Check registers updated
     if ((*pad_bias5_ptr & ((1 << 14) | (1 << 15))) != 0) {
-        printf("driver: failed to disable bias for m3!\n");
+        LOG_DRIVER_ERR("failed to disable bias for m3!\n");
     }
 #endif /* I2C_BUS_NUM */
 
@@ -238,7 +238,7 @@ static inline void i2c_setup() {
 
     // Check that registers actually changed
     if (!(*clk81_ptr & I2C_CLK81_BIT)) {
-        printf("driver: failed to toggle clock!\n");
+        LOG_DRIVER_ERR("failed to toggle clock!\n");
     }
 
     // Initialise fields
@@ -511,7 +511,7 @@ static inline void handle_request(void) {
         LOG_DRIVER("Loading request from client %u to address 0x%x of sz %zu\n", req[0], req[1], size);
 
         if (size > I2C_MAX_DATA_SIZE) {
-            printf("Invalid request size: %zu!\n", size);
+            LOG_DRIVER_ERR("Invalid request size: %zu!\n", size);
             return;
         }
         i2c_ifState.curr_request_data = (i2c_token_t *) DATA_REGIONS_START + offset;

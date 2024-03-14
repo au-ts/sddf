@@ -210,7 +210,7 @@ static void handle_irq(void)
             rx_return();
             rx_provide();
         }
-        if (e & NETIRQ_EBERR) dprintf("ETH|ERROR: System bus/uDMA\n");
+        if (e & NETIRQ_EBERR) sddf_dprintf("ETH|ERROR: System bus/uDMA\n");
         e = eth->eir & irq_mask;
         eth->eir = e;
     }
@@ -325,7 +325,7 @@ void notified(microkit_channel ch)
             tx_provide();
             break;
         default:
-            dprintf("ETH|LOG: received notification on unexpected channel: %lu\n", ch);
+            sddf_dprintf("ETH|LOG: received notification on unexpected channel: %lu\n", ch);
             break;
     }
 }

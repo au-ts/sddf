@@ -57,7 +57,7 @@ void notified(microkit_channel ch)
             count_idle();
             break;
         default:
-            dprintf("Idle thread notified on unexpected channel: %llu\n", ch);
+            sddf_dprintf("Idle thread notified on unexpected channel: %llu\n", ch);
     }
 }
 

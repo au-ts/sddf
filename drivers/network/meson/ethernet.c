@@ -119,7 +119,7 @@ static void rx_return(void)
         THREAD_MEMORY_ACQUIRE();
 
         if (d->status & DESC_RXSTS_ERROR) {
-            dprintf("ETH|ERROR: RX descriptor returned with error status %x\n", d->status);
+            sddf_dprintf("ETH|ERROR: RX descriptor returned with error status %x\n", d->status);
             uint32_t cntl = (MAX_RX_FRAME_SZ << DESC_RXCTRL_SIZE1SHFT) & DESC_RXCTRL_SIZE1MASK;
             if (rx.tail + 1 == RX_COUNT) cntl |= DESC_RXCTRL_RXRINGEND;
 
@@ -203,7 +203,7 @@ static void handle_irq()
         tx_return();
     }
     if (e & DMA_INTR_ABNORMAL) {
-        if (e & DMA_INTR_FBE) dprintf("Ethernet device fatal bus error\n");
+        if (e & DMA_INTR_FBE) sddf_dprintf("Ethernet device fatal bus error\n");
     }
     eth_dma->status &= e;
 }
@@ -277,7 +277,7 @@ void notified(microkit_channel ch)
             tx_provide();
             break;
         default:
-            dprintf("ETH|LOG: received notification on unexpected channel %llu\n", ch);
+            sddf_dprintf("ETH|LOG: received notification on unexpected channel %llu\n", ch);
             break;
     }
 }
