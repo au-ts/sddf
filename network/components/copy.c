@@ -1,24 +1,24 @@
 #include <string.h>
 #include <stdbool.h>
 #include <microkit.h>
-#include <sddf/network/shared_ringbuffer.h>
+#include <sddf/network/queue.h>
 #include <sddf/util/fence.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 #include <ethernet_config.h>
 
-#define MUX_RX_CH 0
+#define VIRT_RX_CH 0
 #define CLIENT_CH 1
 
-ring_handle_t rx_ring_mux;
-ring_handle_t rx_ring_cli;
+net_queue_handle_t rx_queue_virt;
+net_queue_handle_t rx_queue_cli;
 
-uintptr_t rx_free_mux;
-uintptr_t rx_used_mux;
+uintptr_t rx_free_virt;
+uintptr_t rx_active_virt;
 uintptr_t rx_free_cli;
-uintptr_t rx_used_cli;
+uintptr_t rx_active_cli;
 
-uintptr_t mux_buffer_data_region;
+uintptr_t virt_buffer_data_region;
 uintptr_t cli_buffer_data_region;
 
 void rx_return(void)
@@ -27,58 +27,58 @@ void rx_return(void)
     bool reprocess = true;
 
     while (reprocess) {
-        while (!ring_empty(rx_ring_mux.used_ring) && !ring_empty(rx_ring_cli.free_ring)) {
-            buff_desc_t cli_buffer, mux_buffer;
-            int err = dequeue_free(&rx_ring_cli, &cli_buffer);
+        while (!net_queue_empty(rx_queue_virt.active) && !net_queue_empty(rx_queue_cli.free)) {
+            net_buff_desc_t cli_buffer, virt_buffer;
+            int err = net_dequeue_free(&rx_queue_cli, &cli_buffer);
             assert(!err);
 
-            if (cli_buffer.phys_or_offset % BUFF_SIZE || cli_buffer.phys_or_offset >= BUFF_SIZE * ((ring_buffer_t *)rx_free_cli)->size) {
+            if (cli_buffer.phys_or_offset % ETH_BUFFER_SIZE || cli_buffer.phys_or_offset >= ETH_BUFFER_SIZE * ((net_queue_t *)rx_free_cli)->size) {
                 sddf_dprintf("COPY|LOG: Client provided offset %llx which is not buffer aligned or outside of buffer region\n", cli_buffer.phys_or_offset);
                 continue;
             }
 
-            err = dequeue_used(&rx_ring_mux, &mux_buffer);
+            err = net_dequeue_active(&rx_queue_virt, &virt_buffer);
             assert(!err);
 
             uintptr_t cli_addr = cli_buffer_data_region + cli_buffer.phys_or_offset;
-            uintptr_t mux_addr = mux_buffer_data_region + mux_buffer.phys_or_offset;
+            uintptr_t virt_addr = virt_buffer_data_region + virt_buffer.phys_or_offset;
 
-            memcpy((void *)cli_addr, (void *)mux_addr, mux_buffer.len);
-            cli_buffer.len = mux_buffer.len;
-            mux_buffer.len = 0;
+            memcpy((void *)cli_addr, (void *)virt_addr, virt_buffer.len);
+            cli_buffer.len = virt_buffer.len;
+            virt_buffer.len = 0;
             
-            err = enqueue_used(&rx_ring_cli, cli_buffer);
+            err = net_enqueue_active(&rx_queue_cli, cli_buffer);
             assert(!err);
 
-            err = enqueue_free(&rx_ring_mux, mux_buffer);
+            err = net_enqueue_free(&rx_queue_virt, virt_buffer);
             assert(!err);
 
             enqueued = true;
         }
         
-        request_signal(rx_ring_mux.used_ring);
+        net_request_signal(rx_queue_virt.active);
 
         /* Only request signal from client if incoming packets from multiplexer are awaiting free buffers */
-        if (!ring_empty(rx_ring_mux.used_ring)) request_signal(rx_ring_cli.free_ring);
-        else cancel_signal(rx_ring_cli.free_ring);
+        if (!net_queue_empty(rx_queue_virt.active)) net_request_signal(rx_queue_cli.free);
+        else net_cancel_signal(rx_queue_cli.free);
 
         reprocess = false;
         
-        if (!ring_empty(rx_ring_mux.used_ring) && !ring_empty(rx_ring_cli.free_ring)) {
-            cancel_signal(rx_ring_mux.used_ring);
-            cancel_signal(rx_ring_cli.free_ring);
+        if (!net_queue_empty(rx_queue_virt.active) && !net_queue_empty(rx_queue_cli.free)) {
+            net_cancel_signal(rx_queue_virt.active);
+            net_cancel_signal(rx_queue_cli.free);
             reprocess = true;
         }
     }
 
-    if (enqueued && require_signal(rx_ring_cli.used_ring)) {
-        cancel_signal(rx_ring_cli.used_ring);
+    if (enqueued && net_require_signal(rx_queue_cli.active)) {
+        net_cancel_signal(rx_queue_cli.active);
         microkit_notify(CLIENT_CH);
     }
 
-    if (enqueued && require_signal(rx_ring_mux.free_ring)) {
-        cancel_signal(rx_ring_mux.free_ring);
-        microkit_notify_delayed(MUX_RX_CH);
+    if (enqueued && net_require_signal(rx_queue_virt.free)) {
+        net_cancel_signal(rx_queue_virt.free);
+        microkit_notify_delayed(VIRT_RX_CH);
     }
 }
 
@@ -89,6 +89,6 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
-    copy_ring_init_sys(microkit_name, &rx_ring_cli, rx_free_cli, rx_used_cli, &rx_ring_mux, rx_free_mux, rx_used_mux);
-    buffers_init(rx_ring_cli.free_ring, 0, rx_ring_cli.free_ring->size);
+    copy_queue_init_sys(microkit_name, &rx_queue_cli, rx_free_cli, rx_active_cli, &rx_queue_virt, rx_free_virt, rx_active_virt);
+    net_buffers_init(rx_queue_cli.free, 0, rx_queue_cli.free->size);
 }

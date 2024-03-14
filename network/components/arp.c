@@ -1,6 +1,6 @@
 #include <string.h>
 #include <microkit.h>
-#include <sddf/network/shared_ringbuffer.h>
+#include <sddf/network/queue.h>
 #include <sddf/network/constants.h>
 #include <sddf/network/util.h>
 #include <sddf/util/printf.h>
@@ -15,13 +15,13 @@
 #define LWIP_IANA_HWTYPE_ETHERNET 1
 #define NUM_ARP_CLIENTS (NUM_CLIENTS - 1)
 
-ring_handle_t rx_ring;
-ring_handle_t tx_ring;
+net_queue_handle_t rx_queue;
+net_queue_handle_t tx_queue;
 
 uintptr_t rx_free;
-uintptr_t rx_used;
+uintptr_t rx_active;
 uintptr_t tx_free;
-uintptr_t tx_used;
+uintptr_t tx_active;
 
 uintptr_t rx_buffer_data_region;
 uintptr_t tx_buffer_data_region;
@@ -91,13 +91,13 @@ static int arp_reply(const uint8_t ethsrc_addr[ETH_HWADDR_LEN],
                 const uint8_t hwsrc_addr[ETH_HWADDR_LEN], const uint32_t ipsrc_addr,
                 const uint8_t hwdst_addr[ETH_HWADDR_LEN], const uint32_t ipdst_addr)
 {
-    if (ring_empty(tx_ring.free_ring)) {
+    if (net_queue_empty(tx_queue.free)) {
         sddf_dprintf("ARP|LOG: Transmit free ring empty or transmit used ring full. Dropping reply\n");
         return -1;
     }
 
-    buff_desc_t buffer;
-    int err = dequeue_free(&tx_ring, &buffer);
+    net_buff_desc_t buffer;
+    int err = net_dequeue_free(&tx_queue, &buffer);
     assert(!err);
 
     uintptr_t addr = tx_buffer_data_region + buffer.phys_or_offset;
@@ -120,7 +120,7 @@ static int arp_reply(const uint8_t ethsrc_addr[ETH_HWADDR_LEN],
     memset(&reply->padding, 0, 10);
 
     buffer.len = 56;
-    err = enqueue_used(&tx_ring, buffer);
+    err = net_enqueue_active(&tx_queue, buffer);
     assert(!err);
 
     return 0;
@@ -131,9 +131,9 @@ void receive(void)
     bool transmitted = false;
     bool reprocess = true;
     while (reprocess) {
-        while (!ring_empty(rx_ring.used_ring)) {
-            buff_desc_t buffer;
-            int err = dequeue_used(&rx_ring, &buffer);
+        while (!net_queue_empty(rx_queue.active)) {
+            net_buff_desc_t buffer;
+            int err = net_dequeue_active(&rx_queue, &buffer);
             assert(!err);
             uintptr_t addr = rx_buffer_data_region + buffer.phys_or_offset;
 
@@ -154,21 +154,21 @@ void receive(void)
             }
 
             buffer.len = 0;
-            err = enqueue_free(&rx_ring, buffer);
+            err = net_enqueue_free(&rx_queue, buffer);
             assert(!err);
         }
 
-        request_signal(rx_ring.used_ring);
+        net_request_signal(rx_queue.active);
         reprocess = false;
 
-        if (!ring_empty(rx_ring.used_ring)) {
-            cancel_signal(rx_ring.used_ring);
+        if (!net_queue_empty(rx_queue.active)) {
+            net_cancel_signal(rx_queue.active);
             reprocess = true;
         }
     }
 
-    if (transmitted && require_signal(tx_ring.used_ring)) {
-        cancel_signal(tx_ring.used_ring);
+    if (transmitted && net_require_signal(tx_queue.active)) {
+        net_cancel_signal(tx_queue.active);
         microkit_notify_delayed(TX_CH);
     }
 }
@@ -209,9 +209,9 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
 
 void init(void)
 {
-    ring_init(&rx_ring, (ring_buffer_t *)rx_free, (ring_buffer_t *)rx_used, RX_RING_SIZE_ARP);
-    ring_init(&tx_ring, (ring_buffer_t *)tx_free, (ring_buffer_t *)tx_used, TX_RING_SIZE_ARP);
-    buffers_init((ring_buffer_t *)tx_free, 0, TX_RING_SIZE_ARP);
+    net_queue_init(&rx_queue, (net_queue_t *)rx_free, (net_queue_t *)rx_active, RX_QUEUE_SIZE_ARP);
+    net_queue_init(&tx_queue, (net_queue_t *)tx_free, (net_queue_t *)tx_active, TX_QUEUE_SIZE_ARP);
+    net_buffers_init((net_queue_t *)tx_free, 0, TX_QUEUE_SIZE_ARP);
 
     arp_mac_addr_init_sys(microkit_name, (uint8_t *) mac_addrs);
 }

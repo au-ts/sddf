@@ -22,8 +22,8 @@
 
 #define PD_TOTAL        0
 #define PD_ETH_ID       1
-#define PD_MUX_RX_ID    2
-#define PD_MUX_TX_ID    3
+#define PD_VIRT_RX_ID    2
+#define PD_VIRT_TX_ID    3
 #define PD_COPY_ID      4
 #define PD_COPY1_ID     5
 #define PD_LWIP_ID      6
@@ -64,8 +64,8 @@ static void microkit_benchmark_start(void)
 {
     seL4_BenchmarkResetThreadUtilisation(TCB_CAP);
     seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_ETH_ID);
-    seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_MUX_RX_ID);
-    seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_MUX_TX_ID);
+    seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_VIRT_RX_ID);
+    seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_VIRT_TX_ID);
     seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_COPY_ID);
     seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_COPY1_ID);
     seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_LWIP_ID);
@@ -104,8 +104,8 @@ static void print_benchmark_details(uint64_t pd_id, uint64_t kernel_util, uint64
     else sddf_printf("Utilisation details for PD: ");
     switch (pd_id) {
         case PD_ETH_ID: sddf_printf("ETH DRIVER"); break;
-        case PD_MUX_RX_ID: sddf_printf("MUX RX"); break;
-        case PD_MUX_TX_ID: sddf_printf("MUX TX"); break;
+        case PD_VIRT_RX_ID: sddf_printf("VIRT RX"); break;
+        case PD_VIRT_TX_ID: sddf_printf("VIRT TX"); break;
         case PD_COPY_ID: sddf_printf("COPIER0"); break;
         case PD_COPY1_ID: sddf_printf("COPIER1"); break;
         case PD_LWIP_ID: sddf_printf("LWIP CLIENT0"); break;
@@ -192,11 +192,11 @@ void notified(microkit_channel ch)
             microkit_benchmark_stop_tcb(PD_ETH_ID, &total, &number_schedules, &kernel, &entries);
             print_benchmark_details(PD_ETH_ID, kernel, entries, number_schedules, total);
 
-            microkit_benchmark_stop_tcb(PD_MUX_RX_ID, &total, &number_schedules, &kernel, &entries);
-            print_benchmark_details(PD_MUX_RX_ID, kernel, entries, number_schedules, total);
+            microkit_benchmark_stop_tcb(PD_VIRT_RX_ID, &total, &number_schedules, &kernel, &entries);
+            print_benchmark_details(PD_VIRT_RX_ID, kernel, entries, number_schedules, total);
 
-            microkit_benchmark_stop_tcb(PD_MUX_TX_ID, &total, &number_schedules, &kernel, &entries);
-            print_benchmark_details(PD_MUX_TX_ID, kernel, entries, number_schedules, total);
+            microkit_benchmark_stop_tcb(PD_VIRT_TX_ID, &total, &number_schedules, &kernel, &entries);
+            print_benchmark_details(PD_VIRT_TX_ID, kernel, entries, number_schedules, total);
 
             microkit_benchmark_stop_tcb(PD_COPY_ID, &total, &number_schedules, &kernel, &entries);
             print_benchmark_details(PD_COPY_ID, kernel, entries, number_schedules, total);
