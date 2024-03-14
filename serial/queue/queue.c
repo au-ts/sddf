@@ -5,10 +5,10 @@
 
 #include <sddf/serial/queue.h>
 
-void serial_queue_init(serial_queue_handle_t *queue, serial_queue_t *free, serial_queue_t *used, int buffer_init, uint32_t free_size, uint32_t used_size)
+void serial_queue_init(serial_queue_handle_t *queue, serial_queue_t *free, serial_queue_t *active, int buffer_init, uint32_t free_size, uint32_t active_size)
 {
     queue->free = free;
-    queue->used = used;
+    queue->active = active;
     if (buffer_init) {
         queue->free->tail = 0;
         queue->free->head = 0;
@@ -16,12 +16,12 @@ void serial_queue_init(serial_queue_handle_t *queue, serial_queue_t *free, seria
         queue->free->notify_writer = false;
         queue->free->notify_reader = false;
         queue->free->plugged = false;
-        queue->used->tail = 0;
-        queue->used->head = 0;
-        queue->used->size = used_size;
-        queue->used->notify_writer =false;
-        queue->used->notify_reader = false;
-        queue->used->plugged = false;
+        queue->active->tail = 0;
+        queue->active->head = 0;
+        queue->active->size = active_size;
+        queue->active->notify_writer =false;
+        queue->active->notify_reader = false;
+        queue->active->plugged = false;
     }
 }
 
@@ -83,10 +83,10 @@ int serial_enqueue_free(serial_queue_handle_t *queue, uintptr_t addr, unsigned i
     return serial_enqueue(queue->free, addr, len, cookie);
 }
 
-int serial_enqueue_used(serial_queue_handle_t *queue, uintptr_t addr, unsigned int len, void *cookie)
+int serial_enqueue_active(serial_queue_handle_t *queue, uintptr_t addr, unsigned int len, void *cookie)
 {
     // assert(addr);
-    return serial_enqueue(queue->used, addr, len, cookie);
+    return serial_enqueue(queue->active, addr, len, cookie);
 }
 
 int serial_dequeue_free(serial_queue_handle_t *queue, uintptr_t *addr, unsigned int *len, void **cookie)
@@ -94,9 +94,9 @@ int serial_dequeue_free(serial_queue_handle_t *queue, uintptr_t *addr, unsigned 
     return serial_dequeue(queue->free, addr, len, cookie);
 }
 
-int serial_dequeue_used(serial_queue_handle_t *queue, uintptr_t *addr, unsigned int *len, void **cookie)
+int serial_dequeue_active(serial_queue_handle_t *queue, uintptr_t *addr, unsigned int *len, void **cookie)
 {
-    return serial_dequeue(queue->used, addr, len, cookie);
+    return serial_dequeue(queue->active, addr, len, cookie);
 }
 
 void serial_queue_plug(serial_queue_t *queue) {
