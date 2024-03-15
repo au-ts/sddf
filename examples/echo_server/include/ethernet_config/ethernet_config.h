@@ -19,14 +19,15 @@
 
 #define MAC_ADDR_ARP                        0xFFFFFFFFFFFF
 
-#ifdef CONFIG_PLAT_IMX8MM_EVK
+#if defined(CONFIG_PLAT_IMX8MM_EVK
 #define MAC_ADDR_CLI0                       0x525401000001
 #define MAC_ADDR_CLI1                       0x525401000002
 #endif
-
-#ifdef CONFIG_PLAT_ODROIDC4
+#elif defined(CONFIG_PLAT_ODROIDC4)
 #define MAC_ADDR_CLI0                       0x525401000003
 #define MAC_ADDR_CLI1                       0x525401000004
+#else
+#error "Must define MAC addresses for clients in ethernet config"
 #endif
 
 #ifdef CONFIG_PLAT_MAAXBOARD
