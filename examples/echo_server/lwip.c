@@ -9,6 +9,7 @@
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 #include <sddf/network/shared_ringbuffer.h>
+#include <sddf/network/arp.h>
 #include <sddf/timer/client.h>
 #include <sddf/benchmark/sel4bench.h>
 #include <ethernet_config.h>
@@ -265,12 +266,12 @@ static err_t ethernet_init(struct netif *netif)
 static void netif_status_callback(struct netif *netif)
 {
     if (dhcp_supplied_address(netif)) {
-        microkit_mr_set(0, ip4_addr_get_u32(netif_ip4_addr(netif)));
-        microkit_mr_set(1, (state.mac[0] << 8) | state.mac[1]);
-        microkit_mr_set(2, (state.mac[2] << 24) |  (state.mac[3] << 16) | (state.mac[4] << 8) | state.mac[5]);
-        microkit_ppcall(ARP, microkit_msginfo_new(0, 3));
-
-        sddf_printf("LWIP|NOTICE: DHCP request for %s returned IP address: %s\n", microkit_name, ip4addr_ntoa(netif_ip4_addr(netif)));
+        bool success = arp_register_ipv4(ARP, ip4_addr_get_u32(netif_ip4_addr(netif)), state.mac);
+        if (!success) {
+            sddf_printf("LWIP|ERR: could not register IP with ARP\n");
+        } else {
+            sddf_printf("LWIP|NOTICE: DHCP request for %s returned IP address: %s\n", microkit_name, ip4addr_ntoa(netif_ip4_addr(netif)));
+        }
     }
 }
 
