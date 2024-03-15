@@ -22,7 +22,6 @@ BUILD_DIR ?= build
 
 SDDF=$(abspath ../..)
 UTIL=$(SDDF)/util
-SERIAL_QUEUE=$(SDDF)/serial/queue
 SERIAL_COMPONENTS=$(SDDF)/serial/components
 UART_DRIVER=$(SDDF)/drivers/serial/meson
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
@@ -43,13 +42,13 @@ CFLAGS += -I$(BOARD_DIR)/include \
 	-I$(SDDF)/include \
 	-I$(SDDF) \
 
-UART_OBJS := uart.o queue.o printf.o putchar_debug.o
-SERIAL_SERVER_OBJS1 := serial_server_1.o queue.o
-SERIAL_SERVER_OBJS2 := serial_server_2.o queue.o
-VIRT_TX_OBJS := virt_tx.o queue.o
-VIRT_RX_OBJS := virt_rx.o queue.o
+UART_OBJS := uart.o printf.o putchar_debug.o
+SERIAL_SERVER_OBJS1 := serial_server_1.o
+SERIAL_SERVER_OBJS2 := serial_server_2.o
+VIRT_TX_OBJS := virt_tx.o
+VIRT_RX_OBJS := virt_rx.o
 
-all: directories $(IMAGE_FILE)
+all: $(IMAGE_FILE)
 
 $(BUILD_DIR)/%.o: $(SERIAL_COMPONENTS)/%.c Makefile
 	$(CC) -c $(CFLAGS) -DSERIAL_NUM_CLIENTS=2 -DSERIAL_TRANSFER_WITH_COLOUR $< -o $@
@@ -94,10 +93,6 @@ $(IMAGE_FILE) $(REPORT_FILE): $(addprefix $(BUILD_DIR)/, $(IMAGES)) serial.syste
 
 %.o:
 	$(CC) $(CFLAGS) -c $(@:.o=.c) -o $@
-
-#Make the Directories
-directories:
-	$(info $(shell mkdir -p $(BUILD_DIR)/libsharedringbuffer))	\
 
 clean:
 	rm -f *.o *.elf .depend*
