@@ -56,14 +56,16 @@ build_timer() {
 
 build_serial() {
     CONFIG=$1
-    echo "CI|INFO: building serial example with config: $CONFIG"
-    BUILD_DIR="${PWD}/${CI_BUILD_DIR}/examples/serial/${CONFIG}"
+    BOARD=$2
+    echo "CI|INFO: building serial example with config: $CONFIG, board: $BOARD"
+    BUILD_DIR="${PWD}/${CI_BUILD_DIR}/examples/serial//${BOARD}/${CONFIG}"
     rm -rf ${BUILD_DIR}
     mkdir -p ${BUILD_DIR}
     make -j${NUM_JOBS} -C examples/serial_two_client \
         BUILD_DIR=${BUILD_DIR} \
         MICROKIT_CONFIG=${CONFIG} \
-        MICROKIT_SDK=${SDK_PATH}
+        MICROKIT_SDK=${SDK_PATH} \
+        MICROKIT_BOARD=${BOARD}
 }
 
 build_network_echo_server "debug" "imx8mm_evk"
@@ -79,8 +81,10 @@ build_i2c "release"
 build_timer "debug"
 build_timer "release"
 
-build_serial "debug"
-build_serial "release"
+build_serial "debug" "odroidc4"
+build_serial "release" "odroidc4"
+build_serial "debug" "qemu_arm_virt"
+build_serial "release" "qemu_arm_virt"
 
 echo ""
 echo "CI|INFO: Passed all sDDF tests"
