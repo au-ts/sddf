@@ -3,6 +3,14 @@
 set -e
 
 SDK_PATH=$1
+
+# Number of threads/jobs to compile with, default to 1
+if [ "$#" -eq 1 ]; then
+NUM_JOBS=1
+else
+NUM_JOBS=$2
+fi
+
 CI_BUILD_DIR="ci_build"
 
 [[ -z $SDK_PATH ]] && echo "usage: examples.sh [PATH TO SDK]" && exit 1
@@ -15,7 +23,7 @@ build_network_echo_server() {
     BUILD_DIR="${PWD}/${CI_BUILD_DIR}/examples/echo_server/${BOARD}/${CONFIG}"
     rm -rf ${BUILD_DIR}
     mkdir -p ${BUILD_DIR}
-    make -C examples/echo_server \
+    make -j${NUM_JOBS} -C examples/echo_server \
         BUILD_DIR=${BUILD_DIR} \
         MICROKIT_CONFIG=${CONFIG} \
         MICROKIT_SDK=${SDK_PATH} \
@@ -28,7 +36,7 @@ build_i2c() {
     BUILD_DIR="${PWD}/${CI_BUILD_DIR}/examples/i2c/${CONFIG}"
     rm -rf ${BUILD_DIR}
     mkdir -p ${BUILD_DIR}
-    make -C examples/i2c \
+    make -j${NUM_JOBS} -C examples/i2c \
         BUILD_DIR=${BUILD_DIR} \
         MICROKIT_CONFIG=${CONFIG} \
         MICROKIT_SDK=${SDK_PATH}
@@ -40,7 +48,7 @@ build_timer() {
     BUILD_DIR="${PWD}/${CI_BUILD_DIR}/examples/timer/${CONFIG}"
     rm -rf ${BUILD_DIR}
     mkdir -p ${BUILD_DIR}
-    make -C examples/timer \
+    make -j${NUM_JOBS} -C examples/timer \
         BUILD_DIR=${BUILD_DIR} \
         MICROKIT_CONFIG=${CONFIG} \
         MICROKIT_SDK=${SDK_PATH}
@@ -52,7 +60,7 @@ build_serial() {
     BUILD_DIR="${PWD}/${CI_BUILD_DIR}/examples/serial/${CONFIG}"
     rm -rf ${BUILD_DIR}
     mkdir -p ${BUILD_DIR}
-    make -C examples/serial_two_client \
+    make -j${NUM_JOBS} -C examples/serial_two_client \
         BUILD_DIR=${BUILD_DIR} \
         MICROKIT_CONFIG=${CONFIG} \
         MICROKIT_SDK=${SDK_PATH}
