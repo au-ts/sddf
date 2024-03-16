@@ -172,9 +172,11 @@ void init(void) {
 
     queue = i2c_queue_init((i2c_queue_t *) request_region, (i2c_queue_t *) response_region);
 
-    microkit_msginfo msginfo = microkit_msginfo_new(I2C_BUS_CLAIM, 1);
-    microkit_mr_set(I2C_BUS_SLOT, PN532_I2C_BUS_ADDRESS);
-    msginfo = microkit_ppcall(I2C_VIRTUALISER_CH, msginfo);
+    bool claimed = i2c_bus_claim(I2C_VIRTUALISER_CH, PN532_I2C_BUS_ADDRESS);
+    if (!claimed) {
+        LOG_CLIENT_ERR("failed to claim PN532 bus\n");
+        return;
+    }
 
     /* Define the event loop/notified thread as the active co-routine */
     t_event = co_active();
