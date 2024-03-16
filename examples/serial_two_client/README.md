@@ -1,21 +1,27 @@
-# Odroid-C4 serial example
+# Serial example
 
-This is an example to show multiple clients being used with the Odroid-C4 UART driver.
-
-The relevant documentation can be found online at: https://dn.odroid.com/S905X3/ODROID-C4/Docs/S905X3_Public_Datasheet_Hardkernel.pdf.
+This is an example to show multiple clients being used with a UART driver.
 
 ## Building
 
-```     
-$ make BUILD_DIR=<path/to/build> \
-MICROKIT_SDK=<path/to/sdk> \
-MICROKIT_CONFIG=(benchmark/release/debug)
+```sh
+make MICROKIT_SDK=<path/to/sdk> MICROKIT_BOARD=<board>
+```
+
+Currently the options for `MICROKIT_BOARD` are:
+* odroidc4
+* qemu_arm_virt
+
+After building, the system image to load will be `build/loader.img`.
+
+If you wish to simulate on the QEMU ARM virt platform, you can run the following command:
+```sh
+make MICROKIT_SDK=<path/to/sdk> MICROKIT_BOARD=qemu_arm_virt qemu
 ```
 
 ## Running/using
 
-To run the image, load the `loader.img` (located in the build directory) binary onto an Odroid-C4.
-Upon loading the image, the following will be outputted to the terminal:
+Upon booting the system image, the following will be outputted to the terminal:
 
 ```
 Attempting to use the server printf! -- FROM SERVER 2
