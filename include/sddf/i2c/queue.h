@@ -75,7 +75,14 @@ typedef struct i2c_queue_handle {
  * @param request pointer to request queue in shared memory.
  * @param response pointer to response queue in shared memory.
  */
-i2c_queue_handle_t i2c_queue_init(i2c_queue_t *request, i2c_queue_t *response);
+static inline i2c_queue_handle_t i2c_queue_init(i2c_queue_t *request, i2c_queue_t *response)
+{
+    i2c_queue_handle_t handle;
+    handle.request = request;
+    handle.response = response;
+
+    return handle;
+}
 
 /**
  * Check if the queue is empty.
