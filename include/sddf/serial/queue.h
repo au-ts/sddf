@@ -48,7 +48,7 @@ typedef struct serial_queue_handle {
  * @param buffer_init 1 indicates the head and tail indices in shared memory need to be initialised.
  *                    0 inidicates they do not. Only one side of the shared memory regions needs to do this.
  */
-void serial_queue_init(serial_queue_handle_t *queue, serial_queue_t *free, serial_queue_t *active, int buffer_init, uint32_t free_size, uint32_t active_size)
+static inline void serial_queue_init(serial_queue_handle_t *queue, serial_queue_t *free, serial_queue_t *active, int buffer_init, uint32_t free_size, uint32_t active_size)
 {
     queue->free = free;
     queue->active = active;
