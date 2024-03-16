@@ -33,7 +33,6 @@ LIBCO := $(SDDF)/libco
 
 I2C := $(SDDF)/i2c
 I2C_DRIVER := $(SDDF)/drivers/i2c/meson
-I2C_QUEUE := $(I2C)/queue
 TIMER_DRIVER := $(SDDF)/drivers/clock/meson
 
 IMAGES := virt.elf driver.elf client.elf timer.elf
@@ -50,7 +49,7 @@ CFLAGS += -I$(BOARD_DIR)/include \
 	-MD \
 	-MP
 
-COMMONFILES=$(I2C_QUEUE)/queue.c $(UTIL)/printf.c $(UTIL)/putchar_debug.c
+COMMONFILES=$(UTIL)/printf.c $(UTIL)/putchar_debug.c
 
 CLIENT_OBJS := $(LIBCO)/libco.o pn532.o client.o $(COMMONFILES:.c=.o) sddf_timer_client.o
 VIRT_OBJS := $(I2C)/components/virt.o $(COMMONFILES:.c=.o)
