@@ -61,7 +61,7 @@ build_serial() {
     BUILD_DIR="${PWD}/${CI_BUILD_DIR}/examples/serial//${BOARD}/${CONFIG}"
     rm -rf ${BUILD_DIR}
     mkdir -p ${BUILD_DIR}
-    make -j${NUM_JOBS} -C examples/serial_two_client \
+    make -j${NUM_JOBS} -C examples/serial \
         BUILD_DIR=${BUILD_DIR} \
         MICROKIT_CONFIG=${CONFIG} \
         MICROKIT_SDK=${SDK_PATH} \
