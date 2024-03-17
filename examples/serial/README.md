@@ -21,7 +21,7 @@ make MICROKIT_SDK=<path/to/sdk> MICROKIT_BOARD=qemu_arm_virt qemu
 
 ## Running/using
 
-Upon booting the system image, the following will be outputted to the terminal:
+Upon booting the system image, you will see the following output:
 
 ```
 Attempting to use the server printf! -- FROM SERVER 2
