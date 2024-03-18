@@ -177,7 +177,7 @@ void notified(microkit_channel ch)
 
             sddf_printf("{\n");
             for (int i = 0; i < ARRAY_SIZE(benchmarking_events); i++) {
-                sddf_printf("%s: %llX\n", counter_names[i], counter_values[i]);
+                sddf_printf("%s: %lX\n", counter_names[i], counter_values[i]);
             }
             sddf_printf("}\n");
 

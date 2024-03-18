@@ -33,7 +33,7 @@ void rx_return(void)
             assert(!err);
 
             if (cli_buffer.phys_or_offset % NET_BUFFER_SIZE || cli_buffer.phys_or_offset >= NET_BUFFER_SIZE * ((net_queue_t *)rx_free_cli)->size) {
-                sddf_dprintf("COPY|LOG: Client provided offset %llx which is not buffer aligned or outside of buffer region\n", cli_buffer.phys_or_offset);
+                sddf_dprintf("COPY|LOG: Client provided offset %lx which is not buffer aligned or outside of buffer region\n", cli_buffer.phys_or_offset);
                 continue;
             }
 

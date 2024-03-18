@@ -325,7 +325,7 @@ void notified(microkit_channel ch)
             tx_provide();
             break;
         default:
-            sddf_dprintf("ETH|LOG: received notification on unexpected channel: %lu\n", ch);
+            sddf_dprintf("ETH|LOG: received notification on unexpected channel: %u\n", ch);
             break;
     }
 }
