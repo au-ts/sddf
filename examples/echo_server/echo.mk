@@ -80,7 +80,7 @@ lwip.elf: $(LWIP_OBJS) libsddf_util.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 ${LWIP_OBJS}: |${BUILD_DIR}/${LWIPDIR}
 ${BUILD_DIR}/${LWIPDIR}:
-	mkdir -p $@/core/ipv4 $@/netif
+	mkdir -p $@/core/ipv4 $@/netif $@/api
 
 # Need to build libsddf_util_debug.a because it's included in LIBS
 # for the unimplemented libc dependencies
