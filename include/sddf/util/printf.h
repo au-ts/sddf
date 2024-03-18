@@ -63,7 +63,7 @@ void _sddf_putchar(char character);
  * \return The number of characters that are written into the array, not counting the terminating null character
  */
 #define sddf_printf sddf_printf_
-int sddf_printf_(const char* format, ...);
+int sddf_printf_(const char* format, ...) __attribute__((format(printf, 1, 2)));
 
 
 /**
@@ -74,7 +74,7 @@ int sddf_printf_(const char* format, ...);
  * \return The number of characters that are WRITTEN into the buffer, not counting the terminating null character
  */
 #define sddf_sprintf sddf_sprintf_
-int sddf_sprintf_(char* buffer, const char* format, ...);
+int sddf_sprintf_(char* buffer, const char* format, ...) __attribute__((format(printf, 2, 3)));
 
 
 /**
@@ -89,7 +89,7 @@ int sddf_sprintf_(char* buffer, const char* format, ...);
  */
 #define sddf_snprintf  sddf_snprintf_
 #define sddf_vsnprintf sddf_vsnprintf_
-int  sddf_snprintf_(char* buffer, size_t count, const char* format, ...);
+int  sddf_snprintf_(char* buffer, size_t count, const char* format, ...) __attribute__((format(printf, 3, 4)));
 int sddf_vsnprintf_(char* buffer, size_t count, const char* format, va_list va);
 
 
@@ -111,7 +111,7 @@ int sddf_vprintf_(const char* format, va_list va);
  * \param format A string that specifies the format of the output
  * \return The number of characters that are sent to the output function, not counting the terminating null character
  */
-int sddf_fctprintf(void (*out)(char character, void* arg), void* arg, const char* format, ...);
+int sddf_fctprintf(void (*out)(char character, void* arg), void* arg, const char* format, ...) __attribute__((format(printf, 3, 4)));
 
 
 #ifdef __cplusplus
