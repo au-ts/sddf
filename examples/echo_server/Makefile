@@ -21,6 +21,9 @@ ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
 else ifeq ($(strip $(MICROKIT_BOARD)), imx8mm_evk)
 	DRIV_DIR := imx
 	CPU := cortex-a53
+else ifeq ($(strip $(MICROKIT_BOARD)), maaxboard)
+	DRIV_DIR := imx
+	CPU := cortex-a53
 else
 $(error Unsupported MICROKIT_BOARD given)
 endif

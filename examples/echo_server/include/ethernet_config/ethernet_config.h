@@ -29,6 +29,11 @@
 #define MAC_ADDR_CLI1                       0x525401000004
 #endif
 
+#ifdef CONFIG_PLAT_MAAXBOARD
+#define MAC_ADDR_CLI0                       0x525401000005
+#define MAC_ADDR_CLI1                       0x525401000006
+#endif
+
 #define TX_RING_SIZE_ARP                    512
 #define TX_RING_SIZE_CLI0                   512
 #define TX_RING_SIZE_CLI1                   512
