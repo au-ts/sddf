@@ -65,6 +65,7 @@ CFLAGS += -I$(BOARD_DIR)/include \
 
 # COREFILES, CORE4FILES: The minimum set of files needed for lwIP.
 COREFILES=$(LWIP)/core/init.c \
+	$(LWIP)/api/err.c \
 	$(LWIP)/core/def.c \
 	$(LWIP)/core/dns.c \
 	$(LWIP)/core/inet_chksum.c \
