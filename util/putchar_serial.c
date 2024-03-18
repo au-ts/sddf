@@ -4,7 +4,7 @@ extern uintptr_t uart_base;
 
 #define REG_PTR(offset) ((volatile uint32_t *)((uart_base) + (offset)))
 
-#ifdef CONFIG_PLAT_IMX8MM_EVK
+#if defined(CONFIG_PLAT_IMX8MM_EVK) || defined(CONFIG_PLAT_MAAXBOARD)
 
 #define UART_STATUS 0x98
 #define TRANSMIT 0x40
