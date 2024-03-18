@@ -4,7 +4,6 @@
 #include "uart.h"
 #include "uart_config.h"
 #include <sddf/serial/queue.h>
-#include <sddf/util/util.h>
 
 /*
  * The PL011 is supposedly universal, which means that this driver should be
@@ -16,6 +15,18 @@
 
 #define LOG_DRIVER(...) do{ microkit_dbg_puts(microkit_name); microkit_dbg_puts("|INFO: "); microkit_dbg_puts(__VA_ARGS__); }while(0)
 #define LOG_DRIVER_ERR(...) do{ microkit_dbg_puts(microkit_name); microkit_dbg_puts("|ERROR: "); microkit_dbg_puts(__VA_ARGS__); }while(0)
+
+static void assert_fail(const char *s, int line)
+{
+    LOG_DRIVER_ERR("Assertion failure in uart.c");
+    LOG_DRIVER(s);
+    for (;;)
+        ;
+}
+        
+
+#define assert(x) ((x) || (assert_fail(#x, __LINE__), 0))
+
 
 /* Defines to manage interrupts and notifications */
 #define IRQ_CH 1
@@ -72,7 +83,7 @@ void handle_tx() {
     uintptr_t buffer = 0;
     unsigned int len = 0;
     // Dequeue something from the Tx ring -> the server will have placed something in here, if its empty then nothing to do
-    while (!driver_dequeue(tx_queue.active, &buffer, &len)) {
+    while (!serial_dequeue_active(&tx_queue, &buffer, &len)) {
         // Buffer cointaining the bytes to write to serial
         char *phys = (char * )buffer;
         // Handle the tx
@@ -204,8 +215,8 @@ void init(void) {
     LOG_DRIVER("initialising\n");
 
     // Init the shared ring buffers
-    ring_init(&rx_queue, (serial_queue_t *)rx_free, (serial_queue_t *)rx_active, 0, NUM_ENTRIES, NUM_ENTRIES);
-    ring_init(&tx_queue, (serial_queue_t *)tx_free, (serial_queue_t *)tx_active, 0, NUM_ENTRIES, NUM_ENTRIES);
+    serial_queue_init(&rx_queue, (serial_queue_t *)rx_free, (serial_queue_t *)rx_active, 0, NUM_ENTRIES, NUM_ENTRIES);
+    serial_queue_init(&tx_queue, (serial_queue_t *)tx_free, (serial_queue_t *)tx_active, 0, NUM_ENTRIES, NUM_ENTRIES);
 
     volatile struct pl011_uart_regs *regs = (volatile struct pl011_uart_regs *) uart_base;
     // @ivanv what does 0x50 mean!
