@@ -4,7 +4,7 @@
     <memory_region name="eth0" size="0x10_000" phys_addr="0x30be0000" />
     <memory_region name="timer" size="0x10_000" phys_addr="0x302d0000" />
 
-    <!-- driver/device ring buffer mechanism -->
+    <!-- driver/device queue mechanism -->
     <memory_region name="hw_ring_buffer" size="0x10_000" />
 
     <!-- DMA and virtualised DMA regions -->
@@ -15,13 +15,13 @@
     <memory_region name="tx_buffer_data_region_cli1" size="0x200_000" page_size="0x200_000" />
     <memory_region name="rx_buffer_data_region_cli1" size="0x200_000" page_size="0x200_000" />
 
-    <!-- shared memory for driver/virt ring buffer mechanism -->
+    <!-- shared memory for driver/virt queue mechanism -->
     <memory_region name="rx_free_drv" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="rx_active_drv" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="tx_free_drv" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="tx_active_drv" size="0x200_000" page_size="0x200_000"/>
 
-    <!-- shared memory for virt_rx/copy/arp ring buffer mechanism -->
+    <!-- shared memory for virt_rx/copy/arp queue mechanism -->
     <memory_region name="rx_free_arp" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="rx_active_arp" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="rx_free_copy0" size="0x200_000" page_size="0x200_000"/>
@@ -29,13 +29,13 @@
     <memory_region name="rx_free_copy1" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="rx_active_copy1" size="0x200_000" page_size="0x200_000"/>
 
-    <!-- shared memory for copy/lwip ring buffer mechanism -->
+    <!-- shared memory for copy/lwip queue mechanism -->
     <memory_region name="rx_free_cli0" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="rx_active_cli0" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="rx_free_cli1" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="rx_active_cli1" size="0x200_000" page_size="0x200_000"/>
 
-    <!-- shared memory for arp/lwip/virt_tx ring buffer mechanism -->
+    <!-- shared memory for arp/lwip/virt_tx queue mechanism -->
     <memory_region name="tx_free_arp" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="tx_active_arp" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="tx_free_cli0" size="0x200_000" page_size="0x200_000"/>
