@@ -119,7 +119,7 @@ static struct pbuf *create_interface_buffer(uintptr_t offset, size_t length)
         PBUF_REF,
         &custom_pbuf_offset->custom,
         (void *)(offset + rx_buffer_data_region),
-       NET_BUFFER_SIZE 
+        NET_BUFFER_SIZE 
     );
 }
 
