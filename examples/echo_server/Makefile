@@ -38,7 +38,6 @@ SDDF_INCLUDE=$(SDDF)/include/sddf
 LWIP=$(SDDF)/network/ipstacks/lwip/src
 BENCHMARK=$(SDDF)/benchmark
 UTIL=$(SDDF)/util
-QUEUE=$(SDDF)/network/queue
 ETHERNET_DRIVER=$(SDDF)/drivers/network/$(DRIV_DIR)
 TIMER_DRIVER=$(SDDF)/drivers/clock/$(DRIV_DIR)
 NETWORK_COMPONENTS=$(SDDF)/network/components
@@ -100,15 +99,15 @@ NETIFFILES=$(LWIP)/netif/ethernet.c
 
 # LWIPFILES: All the above.
 LWIPFILES=lwip.c $(COREFILES) $(CORE4FILES) $(NETIFFILES)
-LWIP_OBJS := $(LWIPFILES:.c=.o) lwip.o sddf_net_queue.o utilization_socket.o udp_echo_socket.o sddf_timer_client.o printf.o putchar_serial.o
+LWIP_OBJS := $(LWIPFILES:.c=.o) lwip.o utilization_socket.o udp_echo_socket.o sddf_timer_client.o printf.o putchar_serial.o
 
-ETH_OBJS := $(ETHERNET_DRIVER)/ethernet.o sddf_net_queue.o printf.o putchar_debug.o
-VIRT_RX_OBJS := $(NETWORK_COMPONENTS)/virt_rx.o sddf_net_queue.o printf.o putchar_debug.o
-VIRT_TX_OBJS := $(NETWORK_COMPONENTS)/virt_tx.o sddf_net_queue.o $(UTIL)/cache.o printf.o putchar_debug.o
-COPY_OBJS := $(NETWORK_COMPONENTS)/copy.o sddf_net_queue.o printf.o putchar_debug.o
+ETH_OBJS := $(ETHERNET_DRIVER)/ethernet.o printf.o putchar_debug.o
+VIRT_RX_OBJS := $(NETWORK_COMPONENTS)/virt_rx.o printf.o putchar_debug.o
+VIRT_TX_OBJS := $(NETWORK_COMPONENTS)/virt_tx.o $(UTIL)/cache.o printf.o putchar_debug.o
+COPY_OBJS := $(NETWORK_COMPONENTS)/copy.o printf.o putchar_debug.o
 BENCH_OBJS := $(BENCHMARK)/benchmark.o printf.o putchar_serial.o
 IDLE_OBJS := $(BENCHMARK)/idle.o printf.o putchar_debug.o
-ARP_OBJS := $(NETWORK_COMPONENTS)/arp.o sddf_net_queue.o printf.o putchar_serial.o
+ARP_OBJS := $(NETWORK_COMPONENTS)/arp.o printf.o putchar_serial.o
 TIMER_OBJS := $(TIMER_DRIVER)/timer.o printf.o putchar_debug.o
 
 OBJS := $(sort $(addprefix $(BUILD_DIR)/, $(ETH_OBJS) $(VIRT_RX_OBJS) $(VIRT_TX_OBJS)\
@@ -137,9 +136,6 @@ $(BUILD_DIR)/putchar_serial.o: $(UTIL)/putchar_serial.c
 
 $(BUILD_DIR)/sddf_timer_client.o: FORCE
 	BUILD_DIR=$(abspath $(BUILD_DIR)) MICROKIT_INCLUDE=$(BOARD_DIR)/include make -C $(SDDF)/timer/client
-
-$(BUILD_DIR)/sddf_net_queue.o: FORCE
-	BUILD_DIR=$(abspath $(BUILD_DIR)) MICROKIT_INCLUDE=$(BOARD_DIR)/include make -C $(QUEUE)
 
 $(BUILD_DIR)/eth.elf: $(addprefix $(BUILD_DIR)/, $(ETH_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@

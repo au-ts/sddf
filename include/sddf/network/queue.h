@@ -179,7 +179,13 @@ static inline int net_dequeue_active(net_queue_handle_t *queue, net_buff_desc_t 
  * @param active pointer to active queue in shared memory.
  * @param size size of the free and active queues.
  */
-void net_queue_init(net_queue_handle_t *queue, net_queue_t *free, net_queue_t *active, uint32_t size);
+static inline void net_queue_init(net_queue_handle_t *queue, net_queue_t *free, net_queue_t *active, uint32_t size)
+{
+    queue->free = free;
+    queue->active = active;
+    queue->free->size = size;
+    queue->active->size = size;
+}
 
 /**
  * Initialise the free queue by filling with all free buffers.
