@@ -197,7 +197,7 @@ static inline void net_queue_init(net_queue_handle_t *queue, net_queue_t *free, 
 static inline void net_buffers_init(net_queue_t *free, uintptr_t base_addr, uint32_t queue_size)
 {
     for (uint32_t i = 0; i < queue_size - 1; i++) {
-        net_buff_desc_t buffer = {(ETH_BUFFER_SIZE * i) + base_addr, 0};
+        net_buff_desc_t buffer = {(NET_BUFFER_SIZE * i) + base_addr, 0};
         int err = net_enqueue(free, buffer);
         assert(!err);
     }
