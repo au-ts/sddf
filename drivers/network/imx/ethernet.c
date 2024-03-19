@@ -30,7 +30,7 @@ uintptr_t tx_active;
 #define TX_COUNT 256
 #define MAX_COUNT MAX(RX_COUNT, TX_COUNT)
 
-_Static_assert((RX_COUNT + TX_COUNT) * 2 * ETH_BUFFER_SIZE <= DATA_REGION_SIZE, "Expect rx+tx buffers to fit in single 2MB page");
+_Static_assert((RX_COUNT + TX_COUNT) * 2 * NET_BUFFER_SIZE <= DATA_REGION_SIZE, "Expect rx+tx buffers to fit in single 2MB page");
 
 /* HW ring descriptor (shared with device) */
 struct descriptor {

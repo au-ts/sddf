@@ -41,9 +41,9 @@
 #define TX_DATA_REGION_SIZE_CLI0            DATA_REGION_SIZE
 #define TX_DATA_REGION_SIZE_CLI1            DATA_REGION_SIZE
 
-_Static_assert(TX_DATA_REGION_SIZE_ARP >= TX_QUEUE_SIZE_ARP * ETH_BUFFER_SIZE, "Arp TX data region size must fit Arp TX buffers");
-_Static_assert(TX_DATA_REGION_SIZE_CLI0 >= TX_QUEUE_SIZE_CLI0 * ETH_BUFFER_SIZE, "Client0 TX data region size must fit Client0 TX buffers");
-_Static_assert(TX_DATA_REGION_SIZE_CLI1 >= TX_QUEUE_SIZE_CLI1 * ETH_BUFFER_SIZE, "Client1 TX data region size must fit Client1 TX buffers");
+_Static_assert(TX_DATA_REGION_SIZE_ARP >= TX_QUEUE_SIZE_ARP * NET_BUFFER_SIZE, "Arp TX data region size must fit Arp TX buffers");
+_Static_assert(TX_DATA_REGION_SIZE_CLI0 >= TX_QUEUE_SIZE_CLI0 * NET_BUFFER_SIZE, "Client0 TX data region size must fit Client0 TX buffers");
+_Static_assert(TX_DATA_REGION_SIZE_CLI1 >= TX_QUEUE_SIZE_CLI1 * NET_BUFFER_SIZE, "Client1 TX data region size must fit Client1 TX buffers");
 
 #define RX_QUEUE_SIZE_DRIV                   512
 #define RX_QUEUE_SIZE_ARP                    RX_QUEUE_SIZE_DRIV
@@ -56,9 +56,9 @@ _Static_assert(TX_DATA_REGION_SIZE_CLI1 >= TX_QUEUE_SIZE_CLI1 * ETH_BUFFER_SIZE,
 #define RX_DATA_REGION_SIZE_CLI0            DATA_REGION_SIZE
 #define RX_DATA_REGION_SIZE_CLI1            DATA_REGION_SIZE
 
-_Static_assert(RX_DATA_REGION_SIZE_DRIV >= RX_QUEUE_SIZE_DRIV * ETH_BUFFER_SIZE, "Driver RX data region size must fit Driver RX buffers");
-_Static_assert(RX_DATA_REGION_SIZE_CLI0 >= RX_QUEUE_SIZE_CLI0 * ETH_BUFFER_SIZE, "Client0 RX data region size must fit Client0 RX buffers");
-_Static_assert(RX_DATA_REGION_SIZE_CLI1 >= RX_QUEUE_SIZE_CLI1 * ETH_BUFFER_SIZE, "Client1 RX data region size must fit Client1 RX buffers");
+_Static_assert(RX_DATA_REGION_SIZE_DRIV >= RX_QUEUE_SIZE_DRIV * NET_BUFFER_SIZE, "Driver RX data region size must fit Driver RX buffers");
+_Static_assert(RX_DATA_REGION_SIZE_CLI0 >= RX_QUEUE_SIZE_CLI0 * NET_BUFFER_SIZE, "Client0 RX data region size must fit Client0 RX buffers");
+_Static_assert(RX_DATA_REGION_SIZE_CLI1 >= RX_QUEUE_SIZE_CLI1 * NET_BUFFER_SIZE, "Client1 RX data region size must fit Client1 RX buffers");
 
 #define MAX(a,b) (((a) > (b)) ? (a) : (b))
 

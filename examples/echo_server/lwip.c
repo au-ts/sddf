@@ -119,7 +119,7 @@ static struct pbuf *create_interface_buffer(uintptr_t offset, size_t length)
         PBUF_REF,
         &custom_pbuf_offset->custom,
         (void *)(offset + rx_buffer_data_region),
-       ETH_BUFFER_SIZE 
+       NET_BUFFER_SIZE 
     );
 }
 
@@ -150,8 +150,8 @@ void enqueue_pbufs(struct pbuf *p)
  * */
 static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
 {   
-    if (p->tot_len > ETH_BUFFER_SIZE) {
-        sddf_dprintf("LWIP|ERROR: attempted to send a packet of size  %llx > BUFFER SIZE  %llx\n", p->tot_len, ETH_BUFFER_SIZE);
+    if (p->tot_len > NET_BUFFER_SIZE) {
+        sddf_dprintf("LWIP|ERROR: attempted to send a packet of size  %llx > BUFFER SIZE  %llx\n", p->tot_len, NET_BUFFER_SIZE);
         return ERR_MEM;
     }
 
@@ -187,7 +187,7 @@ void transmit(void)
         while(state.head != NULL && !net_queue_empty(state.tx_queue.free)) {
             err_t err = lwip_eth_send(&state.netif, state.head);
             if (err == ERR_MEM) {
-                sddf_dprintf("LWIP|ERROR: attempted to send a packet of size  %llx > BUFFER SIZE  %llx\n", state.head->tot_len, ETH_BUFFER_SIZE);
+                sddf_dprintf("LWIP|ERROR: attempted to send a packet of size  %llx > BUFFER SIZE  %llx\n", state.head->tot_len, NET_BUFFER_SIZE);
             }
             else if (err != ERR_OK) {
                 sddf_dprintf("LWIP|ERROR: unkown error when trying to send pbuf  %llx\n", state.head);

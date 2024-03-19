@@ -101,8 +101,8 @@ void rx_provide(void)
                 net_buff_desc_t buffer;
                 int err = net_dequeue_free(&state.rx_ring_clients[client], &buffer);
                 assert(!err);
-                assert(!(buffer.phys_or_offset % ETH_BUFFER_SIZE) && 
-                       (buffer.phys_or_offset < ETH_BUFFER_SIZE * state.rx_ring_clients[client].free->size));
+                assert(!(buffer.phys_or_offset % NET_BUFFER_SIZE) && 
+                       (buffer.phys_or_offset < NET_BUFFER_SIZE * state.rx_ring_clients[client].free->size));
 
                 buffer.phys_or_offset = buffer.phys_or_offset + buffer_data_paddr;
                 err = net_enqueue_free(&state.rx_ring_drv, buffer);

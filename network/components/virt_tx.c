@@ -38,7 +38,7 @@ state_t state;
 int extract_offset(uintptr_t *phys) {
     for (int client = 0; client < NUM_CLIENTS; client++) {
         if (*phys >= state.buffer_region_paddrs[client] && 
-            *phys < state.buffer_region_paddrs[client] + state.tx_ring_clients[client].free->size * ETH_BUFFER_SIZE) {
+            *phys < state.buffer_region_paddrs[client] + state.tx_ring_clients[client].free->size * NET_BUFFER_SIZE) {
             *phys = *phys - state.buffer_region_paddrs[client];
             return client;
         }
@@ -57,8 +57,8 @@ void tx_provide(void)
                 int err = net_dequeue_active(&state.tx_ring_clients[client], &buffer);
                 assert(!err);
 
-                if (buffer.phys_or_offset % ETH_BUFFER_SIZE || 
-                    buffer.phys_or_offset >= ETH_BUFFER_SIZE * state.tx_ring_clients[client].active->size) {
+                if (buffer.phys_or_offset % NET_BUFFER_SIZE || 
+                    buffer.phys_or_offset >= NET_BUFFER_SIZE * state.tx_ring_clients[client].active->size) {
                     sddf_dprintf("VIRT_TX|LOG: Client provided offset %llx which is not buffer aligned or outside of buffer region\n", buffer.phys_or_offset);
                     err = net_enqueue_free(&state.tx_ring_clients[client], buffer);
                     assert(!err);
