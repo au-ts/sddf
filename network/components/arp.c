@@ -92,7 +92,7 @@ static int arp_reply(const uint8_t ethsrc_addr[ETH_HWADDR_LEN],
                 const uint8_t hwdst_addr[ETH_HWADDR_LEN], const uint32_t ipdst_addr)
 {
     if (net_queue_empty(tx_queue.free)) {
-        sddf_dprintf("ARP|LOG: Transmit free ring empty or transmit used ring full. Dropping reply\n");
+        sddf_dprintf("ARP|LOG: Transmit free queue empty or transmit active queue full. Dropping reply\n");
         return -1;
     }
 
