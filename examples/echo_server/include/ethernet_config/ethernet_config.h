@@ -70,7 +70,7 @@ _Static_assert(RX_QUEUE_SIZE_COPY0 >= RX_QUEUE_SIZE_DRIV, "Copy0 queues must hav
 _Static_assert(RX_QUEUE_SIZE_COPY1 >= RX_QUEUE_SIZE_DRIV, "Copy1 queues must have capacity to fit all RX buffers.");
 _Static_assert(sizeof(net_queue_t) <= DATA_REGION_SIZE, "net_queue_t must fit into a single data region.");
 
-static bool __str_match(const char *s0, const char *s1)
+static inline bool __str_match(const char *s0, const char *s1)
 {
     while (*s0 != '\0' && *s1 != '\0' && *s0 == *s1) {
         s0++, s1++;
@@ -88,7 +88,7 @@ static void __set_mac_addr(uint8_t *mac, uint64_t val)
     mac[5] = val & 0xff;
 }
 
-static void cli_mac_addr_init_sys(char *pd_name, uint8_t *macs)
+static inline void cli_mac_addr_init_sys(char *pd_name, uint8_t *macs)
 {
     if (__str_match(pd_name, CLI0_NAME)) {
         __set_mac_addr(macs, MAC_ADDR_CLI0);
@@ -97,7 +97,7 @@ static void cli_mac_addr_init_sys(char *pd_name, uint8_t *macs)
     } 
 }
 
-static void arp_mac_addr_init_sys(char *pd_name, uint8_t *macs)
+static inline void arp_mac_addr_init_sys(char *pd_name, uint8_t *macs)
 {
     if (__str_match(pd_name, ARP_NAME)) {
         __set_mac_addr(macs, MAC_ADDR_CLI0);
@@ -105,7 +105,7 @@ static void arp_mac_addr_init_sys(char *pd_name, uint8_t *macs)
     } 
 }
 
-static void virt_mac_addr_init_sys(char *pd_name, uint8_t *macs)
+static inline void virt_mac_addr_init_sys(char *pd_name, uint8_t *macs)
 {
     if (__str_match(pd_name, VIRT_RX_NAME)) {
         __set_mac_addr(macs, MAC_ADDR_ARP);
@@ -114,7 +114,7 @@ static void virt_mac_addr_init_sys(char *pd_name, uint8_t *macs)
     }
 }
 
-static void cli_queue_init_sys(char *pd_name, net_queue_handle_t *rx_queue, uintptr_t rx_free, uintptr_t rx_active,
+static inline void cli_queue_init_sys(char *pd_name, net_queue_handle_t *rx_queue, uintptr_t rx_free, uintptr_t rx_active,
                                 net_queue_handle_t *tx_queue, uintptr_t tx_free, uintptr_t tx_active)
 {
     if (__str_match(pd_name, CLI0_NAME)) {
@@ -126,7 +126,7 @@ static void cli_queue_init_sys(char *pd_name, net_queue_handle_t *rx_queue, uint
     }
 }
 
-static void copy_queue_init_sys(char *pd_name, net_queue_handle_t *cli_queue, uintptr_t cli_free, uintptr_t cli_active,
+static inline void copy_queue_init_sys(char *pd_name, net_queue_handle_t *cli_queue, uintptr_t cli_free, uintptr_t cli_active,
                                 net_queue_handle_t *virt_queue, uintptr_t virt_free, uintptr_t virt_active)
 {
     if (__str_match(pd_name, COPY0_NAME)) {
@@ -138,7 +138,7 @@ static void copy_queue_init_sys(char *pd_name, net_queue_handle_t *cli_queue, ui
     }
 }
 
-static void virt_queue_init_sys(char *pd_name, net_queue_handle_t *cli_queue, uintptr_t cli_free, uintptr_t cli_active)
+static inline void virt_queue_init_sys(char *pd_name, net_queue_handle_t *cli_queue, uintptr_t cli_free, uintptr_t cli_active)
 {
     if (__str_match(pd_name, VIRT_RX_NAME)) {
         net_queue_init(cli_queue, (net_queue_t *) cli_free, (net_queue_t *) cli_active, RX_QUEUE_SIZE_ARP);
@@ -151,7 +151,7 @@ static void virt_queue_init_sys(char *pd_name, net_queue_handle_t *cli_queue, ui
     }
 }
 
-static void mem_region_init_sys(char *pd_name, uintptr_t *mem_regions, uintptr_t start_region) {
+static inline void mem_region_init_sys(char *pd_name, uintptr_t *mem_regions, uintptr_t start_region) {
     if (__str_match(pd_name, VIRT_TX_NAME)) {
         mem_regions[0] = start_region;
         mem_regions[1] = start_region + DATA_REGION_SIZE;
