@@ -27,8 +27,8 @@ uintptr_t buffer_data_region_cli0_paddr;
 uintptr_t buffer_data_region_cli1_paddr;
 
 typedef struct state {
-    net_queue_handle_t tx_ring_drv;
-    net_queue_handle_t tx_ring_clients[NUM_CLIENTS];
+    net_queue_handle_t tx_queue_drv;
+    net_queue_handle_t tx_queue_clients[NUM_CLIENTS];
     uintptr_t buffer_region_vaddrs[NUM_CLIENTS];
     uintptr_t buffer_region_paddrs[NUM_CLIENTS];
 } state_t;
@@ -38,7 +38,7 @@ state_t state;
 int extract_offset(uintptr_t *phys) {
     for (int client = 0; client < NUM_CLIENTS; client++) {
         if (*phys >= state.buffer_region_paddrs[client] && 
-            *phys < state.buffer_region_paddrs[client] + state.tx_ring_clients[client].free->size * NET_BUFFER_SIZE) {
+            *phys < state.buffer_region_paddrs[client] + state.tx_queue_clients[client].free->size * NET_BUFFER_SIZE) {
             *phys = *phys - state.buffer_region_paddrs[client];
             return client;
         }
@@ -52,15 +52,15 @@ void tx_provide(void)
     for (int client = 0; client < NUM_CLIENTS; client++) {
         bool reprocess = true;
         while (reprocess) {
-            while (!net_queue_empty(state.tx_ring_clients[client].active)) {
+            while (!net_queue_empty(state.tx_queue_clients[client].active)) {
                 net_buff_desc_t buffer;
-                int err = net_dequeue_active(&state.tx_ring_clients[client], &buffer);
+                int err = net_dequeue_active(&state.tx_queue_clients[client], &buffer);
                 assert(!err);
 
                 if (buffer.phys_or_offset % NET_BUFFER_SIZE || 
-                    buffer.phys_or_offset >= NET_BUFFER_SIZE * state.tx_ring_clients[client].active->size) {
+                    buffer.phys_or_offset >= NET_BUFFER_SIZE * state.tx_queue_clients[client].active->size) {
                     sddf_dprintf("VIRT_TX|LOG: Client provided offset %llx which is not buffer aligned or outside of buffer region\n", buffer.phys_or_offset);
-                    err = net_enqueue_free(&state.tx_ring_clients[client], buffer);
+                    err = net_enqueue_free(&state.tx_queue_clients[client], buffer);
                     assert(!err);
                     continue;
                 }
@@ -68,23 +68,23 @@ void tx_provide(void)
                 cache_clean(buffer.phys_or_offset + state.buffer_region_vaddrs[client], buffer.phys_or_offset + state.buffer_region_vaddrs[client] + buffer.len);
 
                 buffer.phys_or_offset = buffer.phys_or_offset + state.buffer_region_paddrs[client];
-                err = net_enqueue_active(&state.tx_ring_drv, buffer);
+                err = net_enqueue_active(&state.tx_queue_drv, buffer);
                 assert(!err);
                 enqueued = true;
             }
 
-            net_request_signal(state.tx_ring_clients[client].active);
+            net_request_signal(state.tx_queue_clients[client].active);
             reprocess = false;
 
-            if (!net_queue_empty(state.tx_ring_clients[client].active)) {
-                net_cancel_signal(state.tx_ring_clients[client].active);
+            if (!net_queue_empty(state.tx_queue_clients[client].active)) {
+                net_cancel_signal(state.tx_queue_clients[client].active);
                 reprocess = true;
             }
         }
     }
 
-    if (enqueued && net_require_signal(state.tx_ring_drv.active)) {
-        net_cancel_signal(state.tx_ring_drv.active);
+    if (enqueued && net_require_signal(state.tx_queue_drv.active)) {
+        net_cancel_signal(state.tx_queue_drv.active);
         microkit_notify_delayed(DRIVER);
     }
 }
@@ -94,31 +94,31 @@ void tx_return(void)
     bool reprocess = true;
     bool notify_clients[NUM_CLIENTS] = {false};
     while (reprocess) {
-        while (!net_queue_empty(state.tx_ring_drv.free)) {
+        while (!net_queue_empty(state.tx_queue_drv.free)) {
             net_buff_desc_t buffer;
-            int err = net_dequeue_free(&state.tx_ring_drv, &buffer);
+            int err = net_dequeue_free(&state.tx_queue_drv, &buffer);
             assert(!err);
 
             int client = extract_offset(&buffer.phys_or_offset);
             assert(client >= 0);
 
-            err = net_enqueue_free(&state.tx_ring_clients[client], buffer);
+            err = net_enqueue_free(&state.tx_queue_clients[client], buffer);
             assert(!err);
             notify_clients[client] = true;
         }
 
-        net_request_signal(state.tx_ring_drv.free);
+        net_request_signal(state.tx_queue_drv.free);
         reprocess = false;
 
-        if (!net_queue_empty(state.tx_ring_drv.free)) {
-            net_cancel_signal(state.tx_ring_drv.free);
+        if (!net_queue_empty(state.tx_queue_drv.free)) {
+            net_cancel_signal(state.tx_queue_drv.free);
             reprocess = true;
         }
     }
 
     for (int client = 0; client < NUM_CLIENTS; client++) {
-        if (notify_clients[client] && net_require_signal(state.tx_ring_clients[client].free)) {
-            net_cancel_signal(state.tx_ring_clients[client].free);
+        if (notify_clients[client] && net_require_signal(state.tx_queue_clients[client].free)) {
+            net_cancel_signal(state.tx_queue_clients[client].free);
             microkit_notify(client + CLIENT_CH);
         }
     }
@@ -132,8 +132,8 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
-    net_queue_init(&state.tx_ring_drv, (net_queue_t *)tx_free_drv, (net_queue_t *)tx_active_drv, TX_QUEUE_SIZE_DRIV);
-    virt_queue_init_sys(microkit_name, state.tx_ring_clients, tx_free_arp, tx_active_arp);
+    net_queue_init(&state.tx_queue_drv, (net_queue_t *)tx_free_drv, (net_queue_t *)tx_active_drv, TX_QUEUE_SIZE_DRIV);
+    virt_queue_init_sys(microkit_name, state.tx_queue_clients, tx_free_arp, tx_active_arp);
     
     mem_region_init_sys(microkit_name, state.buffer_region_vaddrs, buffer_data_region_arp_vaddr);
 
