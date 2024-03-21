@@ -1,7 +1,6 @@
 #pragma once
 
-#include <microkit.h>
-#include <sddf/serial/shared_ringbuffer.h>
+#include <sddf/serial/queue.h>
 
 #define BIT(nr) (1UL << (nr))
 
@@ -78,10 +77,6 @@
 #define SB 26   /* ctrl+z*/
 #define SP 32   /* Space*/
 #define DL 127  /* Delete */
-
-// Move this into a seperate file in the future
-#define NUM_BUFFERS 512
-#define BUFFER_SIZE 2048
 
 enum serial_parity {
     PARITY_NONE,
