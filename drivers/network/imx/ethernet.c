@@ -104,7 +104,7 @@ static void rx_provide(void)
             rx.tail = (rx.tail + 1) % RX_COUNT;
         }
 
-        /* Only request a notification from vitualiser if HW ring not full */
+        /* Only request a notification from virtualiser if HW ring not full */
         if (!hw_ring_full(&rx, RX_COUNT)) net_request_signal(rx_queue.free);
         else net_cancel_signal(rx_queue.free);
         reprocess = false;
