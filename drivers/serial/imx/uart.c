@@ -171,7 +171,7 @@ int putchar(int c) {
 
 // Called from handle tx, write each character stored in the buffer to the serial port
 static void
-raw_tx(char *phys, unsigned int len, void *cookie)
+raw_tx(char *phys, unsigned int len)
 {
     // This is byte by byte for now, switch to DMA use later
     for (int i = 0; i < len || phys[i] != '\0'; i++) {
@@ -279,7 +279,6 @@ void handle_irq() {
             input_char == SB ||
             input_char == CR) {
                 char *char_arr = (char * ) global_serial_driver.line_buffer;
-                void *cookie = 0;
                 // Place the line end character into buffer
                 char_arr[global_serial_driver.line_buffer_size] = input_char;
                 global_serial_driver.line_buffer_size += 1;
