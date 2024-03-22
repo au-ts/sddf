@@ -41,7 +41,7 @@
         <map mr="rx_data_driver" vaddr="0x2_600_000" perms="rw" cached="true" />
 
         <!-- UART interrupt -->
-        <irq irq="59" id="1" />
+        <irq irq="58" id="1" />
     </protection_domain>
 
     <protection_domain name="serial_server_1" priority="97" pp="true">
