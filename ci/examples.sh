@@ -88,6 +88,8 @@ build_serial "debug" "odroidc4"
 build_serial "release" "odroidc4"
 build_serial "debug" "qemu_arm_virt"
 build_serial "release" "qemu_arm_virt"
+build_serial "debug" "maaxboard"
+build_serial "release" "maaxboard"
 
 echo ""
 echo "CI|INFO: Passed all sDDF tests"
