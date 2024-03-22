@@ -28,6 +28,9 @@ ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
 else ifeq ($(strip $(MICROKIT_BOARD)), qemu_arm_virt)
 	DRIVER_DIR := arm
 	CPU := cortex-a53
+else ifeq ($(strip $(MICROKIT_BOARD)), maaxboard)
+	DRIVER_DIR := imx
+	CPU := cortex-a53
 else
 $(error Unsupported MICROKIT_BOARD given)
 endif
