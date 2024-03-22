@@ -196,9 +196,9 @@ void handle_tx() {
 
 
 void handle_irq() {
-    /* Here we have interrupted because a character has been inputted. We first want to get the 
+    /* Here we have interrupted because a character has been inputted. We first want to get the
     character from the hardware FIFO queue.
-    Then we want to dequeue from the rx free queue, and populate it, then add to the rx used queue
+    Then we want to dequeue from the rx free queue, and populate it, then add to the rx active queue
     ready to be processed by the client server
     */
     int input = getchar();
@@ -235,19 +235,19 @@ void handle_irq() {
         // Address that we will pass to dequeue to store the buffer address
         uintptr_t buffer = 0;
         // Integer to store the length of the buffer
-        unsigned int buffer_len = 0; 
+        unsigned int buffer_len = 0;
 
         ret = serial_dequeue_free(&rx_queue, &buffer, &buffer_len);
 
         if (ret != 0) {
             microkit_dbg_puts(microkit_name);
-            microkit_dbg_puts(": unable to dequeue from the rx free ring\n");
+            microkit_dbg_puts(": unable to dequeue from the rx free queue\n");
             return;
         }
 
         ((char *) buffer)[0] = (char) input;
 
-        // Now place in the rx used ring
+        // Now place in the rx active queue
         ret = serial_enqueue_active(&rx_queue, buffer, 1);
         microkit_notify(RX_CH);
 
@@ -263,7 +263,7 @@ void handle_irq() {
             ret = serial_dequeue_free(&rx_queue, &buffer, &buffer_len);
             if (ret != 0) {
                 microkit_dbg_puts(microkit_name);
-                microkit_dbg_puts(": unable to dequeue from the rx free ring\n");
+                microkit_dbg_puts(": unable to dequeue from the rx free queue\n");
                 return;
             }
 
@@ -308,7 +308,7 @@ void handle_irq() {
 
     if (ret != 0) {
         microkit_dbg_puts(microkit_name);
-        microkit_dbg_puts(": unable to enqueue to the tx free ring\n");
+        microkit_dbg_puts(": unable to enqueue to the tx free queue\n");
         return;
     }
 }
@@ -318,7 +318,7 @@ void init(void) {
     microkit_dbg_puts(microkit_name);
     microkit_dbg_puts(": elf PD init function running\n");
 
-    // Init the shared ring buffers
+    // Init the shared queues
     serial_queue_init(&rx_queue, (serial_queue_t *)rx_free, (serial_queue_t *)rx_active, 0, BUFFER_SIZE, BUFFER_SIZE);
     serial_queue_init(&tx_queue, (serial_queue_t *)tx_free, (serial_queue_t *)tx_active, 0, BUFFER_SIZE, BUFFER_SIZE);
 
