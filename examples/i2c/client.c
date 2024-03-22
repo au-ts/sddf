@@ -41,7 +41,7 @@ bool read_passive_target_id(uint8_t card_baud_rate, uint8_t *uid_buf, uint8_t *u
     if (!response_ret) return false;
 
     if (response[0] != 1) {
-        LOG_CLIENT_ERR("tags found has wrong response value (0x%lx)!\n", response[0]);
+        LOG_CLIENT_ERR("tags found has wrong response value (0x%x)!\n", response[0]);
         return false;
     }
 
@@ -140,7 +140,7 @@ void client_main(void) {
             sddf_printf("UID Length: %d bytes\n", uid_length);
             sddf_printf("UID Value: ");
             for (int i = 0; i < uid_length; i++) {
-                sddf_printf(" 0x%lx", uid[i]);
+                sddf_printf(" 0x%x", uid[i]);
             }
             sddf_printf("\n");
         } else {

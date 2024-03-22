@@ -131,7 +131,7 @@ notified(microkit_channel ch)
         handle_irq(ch);
         microkit_irq_ack_delayed(ch);
     } else {
-        sddf_dprintf("TIMER DRIVER|LOG: unexpected notification %llu\n", ch);
+        sddf_dprintf("TIMER DRIVER|LOG: unexpected notification %u\n", ch);
     }
 }
 
@@ -169,7 +169,7 @@ protected(microkit_channel ch, microkit_msginfo msginfo)
             }
             break;
         default:
-            sddf_dprintf("TIMER DRIVER|LOG: Unknown request %llu to timer from channel %llu\n", microkit_msginfo_get_label(msginfo), ch);
+            sddf_dprintf("TIMER DRIVER|LOG: Unknown request %lu to timer from channel %u\n", microkit_msginfo_get_label(msginfo), ch);
             break;
     }
 

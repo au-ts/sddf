@@ -68,12 +68,12 @@ void process_request(microkit_channel ch) {
 
         // Check that client can actually access bus
         if (bus_address > I2C_BUS_ADDRESS_MAX || security_list[bus_address] != ch) {
-            LOG_VIRTUALISER_ERR("invalid bus address (0x%lx) requested by client 0x%lx\n", bus_address, ch);
+            LOG_VIRTUALISER_ERR("invalid bus address (0x%lx) requested by client 0x%x\n", bus_address, ch);
             continue;
         }
 
         if (offset > client_data_sizes[ch]) {
-            LOG_VIRTUALISER_ERR("invalid offset (0x%lx) given by client 0x%lx. Max offset is 0x%lx\n", offset, ch, client_data_sizes[ch]);
+            LOG_VIRTUALISER_ERR("invalid offset (0x%lx) given by client 0x%x. Max offset is 0x%lx\n", offset, ch, client_data_sizes[ch]);
             continue;
         }
 
@@ -148,13 +148,13 @@ seL4_MessageInfo_t protected(microkit_channel ch, seL4_MessageInfo_t msginfo) {
     size_t bus = microkit_mr_get(I2C_BUS_SLOT);
 
     if (label != I2C_BUS_CLAIM && label != I2C_BUS_RELEASE) {
-        LOG_VIRTUALISER_ERR("unknown label (0x%lx) given by client on channel 0x%lx\n", label, ch);
+        LOG_VIRTUALISER_ERR("unknown label (0x%lx) given by client on channel 0x%x\n", label, ch);
         return microkit_msginfo_new(I2C_FAILURE, 0);
     }
 
     if (bus > I2C_BUS_ADDRESS_MAX) {
         LOG_VIRTUALISER_ERR("invalid bus address (0x%lx) given by client on "
-                            "channel 0x%lx. Max bus address is 0x%lx\n", bus, ch, I2C_BUS_ADDRESS_MAX);
+                            "channel 0x%x. Max bus address is 0x%x\n", bus, ch, I2C_BUS_ADDRESS_MAX);
         return microkit_msginfo_new(I2C_FAILURE, 0);
     }
 
@@ -162,7 +162,7 @@ seL4_MessageInfo_t protected(microkit_channel ch, seL4_MessageInfo_t msginfo) {
         case I2C_BUS_CLAIM:
             // We have a valid bus address, we need to make sure no one else has claimed it.
             if (security_list[bus] != BUS_UNCLAIMED) {
-                LOG_VIRTUALISER_ERR("bus address 0x%lx already claimed, cannot claim for channel 0x%lx\n", bus, ch);
+                LOG_VIRTUALISER_ERR("bus address 0x%lx already claimed, cannot claim for channel 0x%x\n", bus, ch);
                 return microkit_msginfo_new(I2C_FAILURE, 0);
             }
 
@@ -170,7 +170,7 @@ seL4_MessageInfo_t protected(microkit_channel ch, seL4_MessageInfo_t msginfo) {
             break;
         case I2C_BUS_RELEASE:
             if (security_list[bus] != ch) {
-                LOG_VIRTUALISER_ERR("bus address 0x%lx is not claimed by channel 0x%lx\n", bus, ch);
+                LOG_VIRTUALISER_ERR("bus address 0x%lx is not claimed by channel 0x%x\n", bus, ch);
                 return microkit_msginfo_new(I2C_FAILURE, 0);
             }
 

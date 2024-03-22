@@ -511,7 +511,7 @@ static inline void handle_request(void) {
         LOG_DRIVER("Loading request from client %u to address 0x%x of sz %zu\n", req[0], req[1], size);
 
         if (size > I2C_MAX_DATA_SIZE) {
-            LOG_DRIVER_ERR("Invalid request size: %zu!\n", size);
+            LOG_DRIVER_ERR("Invalid request size: %u!\n", size);
             return;
         }
         i2c_ifState.curr_request_data = (i2c_token_t *) DATA_REGIONS_START + offset;
