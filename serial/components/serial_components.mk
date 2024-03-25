@@ -13,7 +13,7 @@ ifeq ($(strip $(SERIAL_NUM_CLIENTS)),)
 $(error Specify the number of clients for the serial virtualisers.  Expect -DSERIAL_NUM_CLIENTS=3 or similar)
 endif
 ifeq ($(strip $(UART_DRIVER)),)
-$(error The serial virtualisers need headers from the UART source. PLease specify UART_DRIVER)
+$(error The serial virtualisers need headers from the UART source. Please specify UART_DRIVER)
 endif
 
 IMAGES:= serial_rx_virt.elf serial_tx_virt.elf
