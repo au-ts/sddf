@@ -16,7 +16,7 @@
 #define COLOUR_START_LEN 5
 #define COLOUR_END_LEN 4
 
-#define MAX_NUM_CLIENTS 2
+#define MAX_NUM_CLIENTS 3
 
 /* This is a simple sanity check that we have defined as many colours
    as the user as specified clients */
@@ -24,7 +24,7 @@
 #error "There are more clients then there are colours to differentiate them"
 #endif
 
-char *client_colours[MAX_NUM_CLIENTS] = { "\x1b[32m", "\x1b[31m" };
+char *client_colours[MAX_NUM_CLIENTS] = { "\x1b[32m", "\x1b[31m", "\x1b[34m" };
 char *client_colour_end = "\x1b[0m";
 
 /* Memory regions as defined in the system file */
@@ -38,10 +38,13 @@ uintptr_t tx_free_client;
 uintptr_t tx_active_client;
 uintptr_t tx_free_client2;
 uintptr_t tx_active_client2;
+uintptr_t tx_free_client3;
+uintptr_t tx_active_client3;
 
 uintptr_t tx_data_driver;
 uintptr_t tx_data_client;
 uintptr_t tx_data_client2;
+uintptr_t tx_data_client3;
 
 serial_queue_handle_t tx_queue[SERIAL_NUM_CLIENTS];
 serial_queue_handle_t drv_tx_queue;
@@ -146,8 +149,10 @@ void init(void)
     serial_queue_init(&tx_queue[1], (serial_queue_t *)tx_free_client2, (serial_queue_t *)tx_active_client2, 0, NUM_ENTRIES,
                       NUM_ENTRIES);
 #endif
-    serial_queue_init(&drv_tx_queue, (serial_queue_t *)tx_free_driver, (serial_queue_t *)tx_active_driver, 0, NUM_ENTRIES,
-                      NUM_ENTRIES);
+#if SERIAL_NUM_CLIENTS > 2
+    serial_queue_init(&tx_ring[2], (serial_queue_t *)tx_free_client3, (serial_queue_t *)tx_active_client3, 0, NUM_ENTRIES, NUM_ENTRIES);
+#endif
+    serial_queue_init(&drv_tx_queue, (serial_queue_t *)tx_free_driver, (serial_queue_t *)tx_active_driver, 0, NUM_ENTRIES, NUM_ENTRIES);
 
     // Add buffers to the driver tx queue from our shared dma region
     for (int i = 0; i < NUM_ENTRIES - 1; i++) {
