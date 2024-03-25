@@ -30,7 +30,7 @@ ${CHECK_SERIAL_FLAGS_MD5}:
 serial_%_virt.elf: virt_%.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-#virt_tx.o virt_rx.o: ${CHECK_SERIAL_FLAGS_MD5}
+virt_tx.o virt_rx.o: ${CHECK_SERIAL_FLAGS_MD5}
 virt_%.o: ${SDDF}/serial/components/virt_%.c 
 	${CC} ${CFLAGS} ${CFLAGS_serial} -o $@ -c $<
 
