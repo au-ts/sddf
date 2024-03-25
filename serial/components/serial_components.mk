@@ -16,24 +16,30 @@ ifeq ($(strip $(UART_DRIVER)),)
 $(error The serial virtualisers need headers from the UART source. PLease specify UART_DRIVER)
 endif
 
-CFLAGS_serial := -I ${SDDF}/include -I${UART_DRIVER}/include -I${SDDF}/util/include ${SERIAL_NUM_CLIENTS} 
-serial_rx_virt.elf: virt_rx.o #
-	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
-serial_tx_virt.elf: virt_tx.o
+IMAGES:= serial_rx_virt.elf serial_tx_virt.elf
+
+CFLAGS_serial := -I ${SDDF}/include -I${UART_DRIVER}/include -I${SDDF}/util/include ${SERIAL_NUM_CLIENTS}
+
+CHECK_SERIAL_FLAGS_MD5:=.serial_cflags-$(shell echo -- ${CFLAGS} ${CFLAGS_serial} | md5sum | sed 's/  *-//')
+
+${CHECK_SERIAL_FLAGS_MD5}:
+	-rm -f .serial_cflags-*
+	touch $@
+
+
+serial_%_virt.elf: virt_%.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-virt_rx.o: ${SDDF}/serial/components/virt_rx.c
-	${CC} ${CFLAGS} ${CFLAGS_serial} -o $@ -c ${SERIAL_NUM_CLIENTS} $<
-
-virt_tx.o: ${SDDF}/serial/components/virt_tx.c
-	${CC} ${CFLAGS} ${CFLAGS_serial} -o $@ -c ${SERIAL_NUM_CLIENTS} $<
+#virt_tx.o virt_rx.o: ${CHECK_SERIAL_FLAGS_MD5}
+virt_%.o: ${SDDF}/serial/components/virt_%.c 
+	${CC} ${CFLAGS} ${CFLAGS_serial} -o $@ -c $<
 
 clean::
-	rm -f mux_[rt]x.[od]
+	rm -f virt_[rt]x.[od]
 
 clobber::
-	rm -f serial_rx_virt.elf serial_tx_virt.elf
+	rm -f ${IMAGES}
 
 
--include mux_rx.d
--include mux_tx.d
+-include virt_rx.d
+-include virt_tx.d
