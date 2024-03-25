@@ -17,9 +17,9 @@ $(error The serial virtualisers need headers from the UART source. PLease specif
 endif
 
 CFLAGS_serial := -I ${SDDF}/include -I${UART_DRIVER}/include -I${SDDF}/util/include ${SERIAL_NUM_CLIENTS} 
-serial_RX_virtualiser.elf: virt_rx.o
+serial_rx_virt.elf: virt_rx.o #
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
-serial_TX_virtualiser.elf: virt_tx.o
+serial_tx_virt.elf: virt_tx.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 virt_rx.o: ${SDDF}/serial/components/virt_rx.c
@@ -32,7 +32,7 @@ clean::
 	rm -f mux_[rt]x.[od]
 
 clobber::
-	rm -f serial_RX_virtualiser.elf serial_TX_virtualiser.elf
+	rm -f serial_rx_virt.elf serial_tx_virt.elf
 
 
 -include mux_rx.d
