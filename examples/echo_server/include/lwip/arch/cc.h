@@ -3,8 +3,11 @@
  * Copyright (c) 2001-2003 Swedish Institute of Computer Science.
  */
 
+#include <stddef.h>
 #include <stdint.h>
 #include <sddf/util/printf.h>
+
+#define LWIP_NO_CTYPE_H 1
 
 typedef  uint8_t  u8_t;
 typedef uint16_t u16_t;
@@ -17,7 +20,7 @@ typedef int32_t  s32_t;
 typedef int64_t  s64_t;
 
 typedef uintptr_t mem_ptr_t;
-
+typedef size_t ssize_t;
 
 #define U16_F "hu"
 #define S16_F "d"
@@ -54,9 +57,7 @@ typedef uintptr_t mem_ptr_t;
 #define LWIP_PLATFORM_HTONL(x) ( (((u32_t)(x))>>24) | (((x)&0xFF0000)>>8) \
                                | (((x)&0xFF00)<<8) | (((x)&0xFF)<<24) )
 
-typedef unsigned long long ssize_t;
-
-#define LWIP_RAND                       rand
+// #define LWIP_RAND                       rand
 
 /* Plaform specific diagnostic output */
 #define LWIP_PLATFORM_DIAG(x)           \

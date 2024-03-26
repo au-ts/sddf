@@ -88,13 +88,13 @@ typedef seL4_Word event_id_t;
 typedef uint64_t ccnt_t;
 
 
-#define PMU_WRITE(reg, v)                      \
-    do {                                       \
-        seL4_Word _v = v;                         \
-        asm volatile("msr  " reg ", %0" :: "r" (_v)); \
+#define PMU_WRITE(reg, v)					\
+    do {							\
+        /* seL4_Word _v = v; */					\
+        /* asm volatile("msr  " reg ", %0" :: "r" (_v)); */	\
     }while(0)
 
-#define PMU_READ(reg, v) asm volatile("mrs %0, " reg :  "=r"(v))
+#define PMU_READ(reg, v) // asm volatile("mrs %0, " reg :  "=r"(v))
 
 #define SEL4BENCH_READ_CCNT(var) PMU_READ(PMCCNTR, var);
 

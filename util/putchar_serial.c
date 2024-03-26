@@ -31,3 +31,13 @@ void _putchar(char character)
 }
 
 #endif
+
+#ifdef CONFIG_PLAT_PC99
+
+void _putchar(char character)
+{
+    microkit_mr_set(0, (uint64_t)character);
+    microkit_ppcall(13, microkit_msginfo_new(0, 1));
+}
+
+#endif

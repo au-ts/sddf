@@ -21,7 +21,7 @@
 #define LWIP_NETCONN                    0
 #define LWIP_SOCKET                     0
 #define LWIP_ICMP                       1
-#define LWIP_RAND                       rand
+// #define LWIP_RAND                       my_rand
 #define LWIP_DHCP                       1
 
 #define MEM_ALIGNMENT                   4

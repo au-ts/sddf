@@ -1,4 +1,5 @@
 #include <microkit.h>
+
 #include <sddf/network/shared_ringbuffer.h>
 #include <sddf/util/cache.h>
 #include <sddf/util/fence.h>
@@ -9,22 +10,23 @@
 #define DRIVER 0
 #define CLIENT_CH 1
 
-uintptr_t tx_free_drv;
-uintptr_t tx_used_drv;
-uintptr_t tx_free_arp;
-uintptr_t tx_used_arp;
-uintptr_t tx_free_cli0;
-uintptr_t tx_used_cli0;
-uintptr_t tx_free_cli1;
-uintptr_t tx_used_cli1;
+uintptr_t tx_free_drv = 0x2000000;
+uintptr_t tx_used_drv = 0x2200000;
 
-uintptr_t buffer_data_region_arp_vaddr;
-uintptr_t buffer_data_region_cli0_vaddr;
-uintptr_t buffer_data_region_cli1_vaddr;
+uintptr_t tx_free_arp = 0x2400000;
+uintptr_t tx_used_arp = 0x2600000;
+uintptr_t tx_free_cli0 = 0x2800000;
+uintptr_t tx_used_cli0 = 0x2a00000;
+uintptr_t tx_free_cli1 = 0x2c00000;
+uintptr_t tx_used_cli1 = 0x2e00000;
 
-uintptr_t buffer_data_region_arp_paddr;
-uintptr_t buffer_data_region_cli0_paddr;
-uintptr_t buffer_data_region_cli1_paddr;
+uintptr_t buffer_data_region_arp_vaddr = 0x3000000;
+uintptr_t buffer_data_region_cli0_vaddr = 0x3200000;
+uintptr_t buffer_data_region_cli1_vaddr = 0x3400000;
+
+uintptr_t buffer_data_region_arp_paddr = 0x11200000;
+uintptr_t buffer_data_region_cli0_paddr = 0x11400000;
+uintptr_t buffer_data_region_cli1_paddr = 0x11600000;
 
 typedef struct state {
     ring_handle_t tx_ring_drv;
@@ -133,9 +135,10 @@ void notified(microkit_channel ch)
 void init(void)
 {
     ring_init(&state.tx_ring_drv, (ring_buffer_t *)tx_free_drv, (ring_buffer_t *)tx_used_drv, TX_RING_SIZE_DRIV);
-    mux_ring_init_sys(microkit_name, state.tx_ring_clients, tx_free_arp, tx_used_arp);
+
+    mux_ring_init_sys("mux_tx", state.tx_ring_clients, tx_free_arp, tx_used_arp);
     
-    mem_region_init_sys(microkit_name, state.buffer_region_vaddrs, buffer_data_region_arp_vaddr);
+    mem_region_init_sys("mux_tx", state.buffer_region_vaddrs, buffer_data_region_arp_vaddr);
 
     /* CDTODO: Can we make this system agnostic? */
     state.buffer_region_paddrs[0] = buffer_data_region_arp_paddr;

@@ -33,12 +33,12 @@
 #define LWIP_TICK_MS 100
 #define NUM_PBUFFS 512
 
-uintptr_t rx_free;
-uintptr_t rx_used;
-uintptr_t tx_free;
-uintptr_t tx_used;
-uintptr_t rx_buffer_data_region;
-uintptr_t tx_buffer_data_region;
+uintptr_t rx_free = 0x2000000;
+uintptr_t rx_used = 0x2200000;
+uintptr_t tx_free = 0x2400000;
+uintptr_t tx_used = 0x2600000;
+uintptr_t rx_buffer_data_region = 0x2800000;
+uintptr_t tx_buffer_data_region = 0x2a00000;
 uintptr_t uart_base;
 
 /* Booleans to indicate whether packets have been enqueued during notification handling */
@@ -71,6 +71,7 @@ state_t state;
 
 void set_timeout(void)
 {
+    // printf("lwip setting new timeout\n");
     sddf_timer_set_timeout(TIMER, LWIP_TICK_MS * NS_IN_MS);
 }
 
@@ -158,7 +159,7 @@ static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
         enqueue_pbufs(p);
         return ERR_OK;
     }
-    
+
     buff_desc_t buffer;
     int err __attribute__((unused)) = dequeue_free(&(state.tx_ring), &buffer);
     assert(!err);
@@ -175,6 +176,7 @@ static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
     assert(!err);
 
     notify_tx = true;
+    microkit_notify(TX_CH);
 
     return ERR_OK;
 }
@@ -212,6 +214,7 @@ void transmit(void)
 
 void receive(void)
 {
+    uint64_t packets_processed = 0;
     bool reprocess = true;
     while (reprocess) {
         while (!ring_empty(state.rx_ring.used_ring)) {
@@ -224,6 +227,7 @@ void receive(void)
                 dprintf("LWIP|ERROR: unkown error inputting pbuf into network stack\n");
                 pbuf_free(p);
             }
+            packets_processed++;
         }
         
         request_signal(state.rx_ring.used_ring);
@@ -233,6 +237,9 @@ void receive(void)
             cancel_signal(state.rx_ring.used_ring);
             reprocess = true;
         }
+    }
+    if (packets_processed != 0) {
+        // printf("pp=%lu\n", packets_processed);
     }
 }
 
@@ -270,13 +277,13 @@ static void netif_status_callback(struct netif *netif)
         microkit_mr_set(2, (state.mac[2] << 24) |  (state.mac[3] << 16) | (state.mac[4] << 8) | state.mac[5]);
         microkit_ppcall(ARP, microkit_msginfo_new(0, 3));
 
-        printf("LWIP|NOTICE: DHCP request for %s returned IP address: %s\n", microkit_name, ip4addr_ntoa(netif_ip4_addr(netif)));
+        printf("LWIP|NOTICE: DHCP request for %s returned IP address: %s\n", "client0", ip4addr_ntoa(netif_ip4_addr(netif)));
     }
 }
 
 void init(void)
 {
-    cli_ring_init_sys(microkit_name, &state.rx_ring, rx_free, rx_used, &state.tx_ring, tx_free, tx_used);
+    cli_ring_init_sys("client0", &state.rx_ring, rx_free, rx_used, &state.tx_ring, tx_free, tx_used);
     buffers_init((ring_buffer_t *)tx_free, 0, state.tx_ring.free_ring->size);
 
     lwip_init();
@@ -284,7 +291,7 @@ void init(void)
 
     LWIP_MEMPOOL_INIT(RX_POOL);
 
-    cli_mac_addr_init_sys(microkit_name, state.mac);
+    cli_mac_addr_init_sys("client0", state.mac);
 
     /* Set dummy IP configuration values to get lwIP bootstrapped  */
     struct ip4_addr netmask, ipaddr, gw, multicast;
@@ -311,14 +318,14 @@ void init(void)
     if (notify_rx && require_signal(state.rx_ring.free_ring)) {
         cancel_signal(state.rx_ring.free_ring);
         notify_rx = false;
-        if (!have_signal) microkit_notify_delayed(RX_CH);
+        if (!have_signal) microkit_notify(RX_CH);
         else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + RX_CH) microkit_notify(RX_CH);
     }
 
     if (notify_tx && require_signal(state.tx_ring.used_ring)) {
         cancel_signal(state.tx_ring.used_ring);
         notify_tx = false;
-        if (!have_signal) microkit_notify_delayed(TX_CH);
+        if (!have_signal) microkit_notify(TX_CH);
         else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + TX_CH) microkit_notify(TX_CH);
     }
 }
@@ -326,33 +333,33 @@ void init(void)
 void notified(microkit_channel ch)
 {
     switch(ch) {
-        case RX_CH:
-            receive();
-            break;
-        case TIMER:
-            sys_check_timeouts();
-            set_timeout();
-            break;
-        case TX_CH:
-            transmit();
-            receive();
-            break;
-        default:
-            dprintf("LWIP|LOG: received notification on unexpected channel: %lu\n", ch);
-            break;
+    case RX_CH:
+        receive();
+        break;
+    case TIMER:
+        sys_check_timeouts();
+        set_timeout();
+        break;
+    case TX_CH:
+        transmit();
+        receive();
+        break;
+    default:
+        dprintf("LWIP|LOG: received notification on unexpected channel: %lu\n", ch);
+        break;
     }
-    
+
     if (notify_rx && require_signal(state.rx_ring.free_ring)) {
         cancel_signal(state.rx_ring.free_ring);
         notify_rx = false;
-        if (!have_signal) microkit_notify_delayed(RX_CH);
+        if (!have_signal) microkit_notify(RX_CH);
         else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + RX_CH) microkit_notify(RX_CH);
     }
 
     if (notify_tx && require_signal(state.tx_ring.used_ring)) {
         cancel_signal(state.tx_ring.used_ring);
         notify_tx = false;
-        if (!have_signal) microkit_notify_delayed(TX_CH);
+        if (!have_signal) microkit_notify(TX_CH);
         else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + TX_CH) microkit_notify(TX_CH);
     }
 }

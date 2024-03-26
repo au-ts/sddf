@@ -29,6 +29,9 @@
 #define MAC_ADDR_CLI1                       0x525401000004
 #endif
 
+#define MAC_ADDR_CLI0                       0x5254010000a5  // 0xB496916A7F2C
+#define MAC_ADDR_CLI1                       0x5254010000a6
+
 #define TX_RING_SIZE_ARP                    512
 #define TX_RING_SIZE_CLI0                   512
 #define TX_RING_SIZE_CLI1                   512
@@ -96,10 +99,10 @@ static void cli_mac_addr_init_sys(char *pd_name, uint8_t *macs)
 
 static void arp_mac_addr_init_sys(char *pd_name, uint8_t *macs)
 {
-    if (__str_match(pd_name, ARP_NAME)) {
+    // if (__str_match(pd_name, ARP_NAME)) {
         __set_mac_addr(macs, MAC_ADDR_CLI0);
         __set_mac_addr(&macs[ETH_HWADDR_LEN], MAC_ADDR_CLI1);
-    } 
+    // } 
 }
 
 static void mux_mac_addr_init_sys(char *pd_name, uint8_t *macs)
@@ -114,25 +117,25 @@ static void mux_mac_addr_init_sys(char *pd_name, uint8_t *macs)
 static void cli_ring_init_sys(char *pd_name, ring_handle_t *rx_ring, uintptr_t rx_free, uintptr_t rx_used,
                                 ring_handle_t *tx_ring, uintptr_t tx_free, uintptr_t tx_used)
 {
-    if (__str_match(pd_name, CLI0_NAME)) {
+    // if (__str_match(pd_name, CLI0_NAME)) {
         ring_init(rx_ring, (ring_buffer_t *) rx_free, (ring_buffer_t *) rx_used, RX_RING_SIZE_CLI0);
         ring_init(tx_ring, (ring_buffer_t *) tx_free, (ring_buffer_t *) tx_used, TX_RING_SIZE_CLI0);
-    } else if (__str_match(pd_name, CLI1_NAME)) {
-        ring_init(rx_ring, (ring_buffer_t *) rx_free, (ring_buffer_t *) rx_used, RX_RING_SIZE_CLI1);
-        ring_init(tx_ring, (ring_buffer_t *) tx_free, (ring_buffer_t *) tx_used, TX_RING_SIZE_CLI1);
-    }
+    // } else if (__str_match(pd_name, CLI1_NAME)) {
+    //     ring_init(rx_ring, (ring_buffer_t *) rx_free, (ring_buffer_t *) rx_used, RX_RING_SIZE_CLI1);
+    //     ring_init(tx_ring, (ring_buffer_t *) tx_free, (ring_buffer_t *) tx_used, TX_RING_SIZE_CLI1);
+    // }
 }
 
 static void copy_ring_init_sys(char *pd_name, ring_handle_t *cli_ring, uintptr_t cli_free, uintptr_t cli_used,
                                 ring_handle_t *mux_ring, uintptr_t mux_free, uintptr_t mux_used)
 {
-    if (__str_match(pd_name, COPY0_NAME)) {
+    // if (__str_match(pd_name, COPY0_NAME)) {
         ring_init(cli_ring, (ring_buffer_t *) cli_free, (ring_buffer_t *) cli_used, RX_RING_SIZE_CLI0);
         ring_init(mux_ring, (ring_buffer_t *) mux_free, (ring_buffer_t *) mux_used, RX_RING_SIZE_COPY0);
-    } else if (__str_match(pd_name, COPY1_NAME)) {
-        ring_init(cli_ring, (ring_buffer_t *) cli_free, (ring_buffer_t *) cli_used, RX_RING_SIZE_CLI1);
-        ring_init(mux_ring, (ring_buffer_t *) mux_free, (ring_buffer_t *) mux_used, RX_RING_SIZE_COPY1);
-    }
+    // } else if (__str_match(pd_name, COPY1_NAME)) {
+    //     ring_init(cli_ring, (ring_buffer_t *) cli_free, (ring_buffer_t *) cli_used, RX_RING_SIZE_CLI1);
+    //     ring_init(mux_ring, (ring_buffer_t *) mux_free, (ring_buffer_t *) mux_used, RX_RING_SIZE_COPY1);
+    // }
 }
 
 static void mux_ring_init_sys(char *pd_name, ring_handle_t *cli_ring, uintptr_t cli_free, uintptr_t cli_used)

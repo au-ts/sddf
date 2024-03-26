@@ -18,6 +18,21 @@ put64(uint64_t val) {
 }
 
 void
+init(void)
+{
+    microkit_dbg_puts("hello\n");
+    // lets get the time!
+    uint64_t time = sddf_timer_time_now(TIMER_CHANNEL);
+    microkit_dbg_puts("CLIENT|INFO: The time now is: ");
+    put64(time);
+    microkit_dbg_puts("\n");
+
+    // lets set a timeout
+    microkit_dbg_puts("CLIENT|INFO: Setting a time out for 1 second\n");
+    sddf_timer_set_timeout(TIMER_CHANNEL, NS_IN_S);
+}
+
+void
 notified(microkit_channel ch)
 {
     /*
@@ -32,19 +47,5 @@ notified(microkit_channel ch)
     put64(time);
     microkit_dbg_puts("\n");
     /* Set another timeout */
-    sddf_timer_set_timeout(TIMER_CHANNEL, NS_IN_S);
-}
-
-void
-init(void)
-{
-    // lets get the time!
-    uint64_t time = sddf_timer_time_now(TIMER_CHANNEL);
-    microkit_dbg_puts("CLIENT|INFO: The time now is: ");
-    put64(time);
-    microkit_dbg_puts("\n");
-
-    // lets set a timeout
-    microkit_dbg_puts("CLIENT|INFO: Setting a time out for 1 second\n");
     sddf_timer_set_timeout(TIMER_CHANNEL, NS_IN_S);
 }

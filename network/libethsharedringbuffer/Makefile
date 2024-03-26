@@ -11,7 +11,7 @@ endif
 BUILD_DIR ?= .
 
 CC := clang
-TARGET := aarch64-none-elf
+TARGET := x86_64-none-elf
 SDDF := ../../
 
 CFLAGS := \

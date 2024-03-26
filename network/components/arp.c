@@ -18,13 +18,13 @@
 ring_handle_t rx_ring;
 ring_handle_t tx_ring;
 
-uintptr_t rx_free;
-uintptr_t rx_used;
-uintptr_t tx_free;
-uintptr_t tx_used;
+uintptr_t rx_free = 0x2000000;
+uintptr_t rx_used = 0x2200000;
+uintptr_t tx_free = 0x2400000;
+uintptr_t tx_used = 0x2600000;
 
-uintptr_t rx_buffer_data_region;
-uintptr_t tx_buffer_data_region;
+uintptr_t rx_buffer_data_region = 0x2800000;
+uintptr_t tx_buffer_data_region = 0x2a00000;
 
 uintptr_t uart_base;
 

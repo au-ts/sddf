@@ -13,13 +13,13 @@
 ring_handle_t rx_ring_mux;
 ring_handle_t rx_ring_cli;
 
-uintptr_t rx_free_mux;
-uintptr_t rx_used_mux;
-uintptr_t rx_free_cli;
-uintptr_t rx_used_cli;
+uintptr_t rx_free_mux = 0x2000000;
+uintptr_t rx_used_mux = 0x2200000;
+uintptr_t rx_free_cli = 0x2400000;
+uintptr_t rx_used_cli = 0x2600000;
 
-uintptr_t mux_buffer_data_region;
-uintptr_t cli_buffer_data_region;
+uintptr_t mux_buffer_data_region = 0x2800000;
+uintptr_t cli_buffer_data_region = 0x2a00000;
 
 void rx_return(void)
 {

@@ -9,9 +9,10 @@
 #include <sddf/util/fence.h>
 #include <sddf/util/printf.h>
 #include <sddf/benchmark/bench.h>
+#include <sddf/timer/client.h>
 
 #define INIT 3
-#define MAGIC_CYCLES 150
+#define MAGIC_CYCLES 50 // 150
 #define ULONG_MAX 0xfffffffffffffffful
 
 uintptr_t cyclecounters_vaddr;
@@ -26,7 +27,7 @@ void count_idle(void)
 
     while (1) {
 
-        b->ts = (uint64_t)sel4bench_get_cycle_count();
+        b->ts = sddf_timer_time_now(1); // (uint64_t)sel4bench_get_cycle_count();
         uint64_t diff;
 
         /* Handle overflow: This thread needs to run at least 2 times

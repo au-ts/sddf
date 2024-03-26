@@ -28,7 +28,7 @@
 // #define IPBENCH_STOP 8
 #define MAX_PACKET_SIZE 0x1000
 
-uintptr_t cyclecounters_vaddr;
+uintptr_t cyclecounters_vaddr = 0x5010000;
 
 /* This file implements a TCP based utilization measurment process that starts
  * and stops utilization measurements based on a client's requests.
@@ -150,7 +150,7 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
             start = bench->ts;
             idle_ccount_start = bench->ccount;
             idle_overflow_start = bench->overflows;
-            microkit_notify(START_PMU);
+            // microkit_notify(START_PMU);
         }
     } else if (msg_match(data_packet_str, STOP)) {
         printf("%s measurement finished \n", microkit_name);

@@ -14,18 +14,18 @@
 #define CLIENT_CH 1
 
 /* Ring buffer regions */
-uintptr_t rx_free_drv;
-uintptr_t rx_used_drv;
-uintptr_t rx_free_arp;
-uintptr_t rx_used_arp;
-uintptr_t rx_free_cli0;
-uintptr_t rx_used_cli0;
-uintptr_t rx_free_cli1;
-uintptr_t rx_used_cli1;
+uintptr_t rx_free_drv = 0x2000000;
+uintptr_t rx_used_drv = 0x2200000;
+uintptr_t rx_free_arp = 0x2400000;
+uintptr_t rx_used_arp = 0x2600000;
+uintptr_t rx_free_cli0 = 0x2800000;
+uintptr_t rx_used_cli0 = 0x2a00000;
+uintptr_t rx_free_cli1 = 0x2c00000;
+uintptr_t rx_used_cli1 = 0x2e00000;
 
 /* Buffer data regions */
-uintptr_t buffer_data_vaddr;
-uintptr_t buffer_data_paddr;
+uintptr_t buffer_data_vaddr = 0x3000000;
+uintptr_t buffer_data_paddr = 0x11000000;
 
 typedef struct state {
     ring_handle_t rx_ring_drv;
@@ -51,6 +51,7 @@ int get_client(struct ethernet_header * buffer)
 
 void rx_return(void)
 {
+    static uint64_t i = 0;
     bool reprocess = true;
     bool notify_clients[NUM_CLIENTS] = {false};
     while (reprocess) {
@@ -60,20 +61,25 @@ void rx_return(void)
             assert(!err);
 
             buffer.phys_or_offset = buffer.phys_or_offset - buffer_data_paddr;
-            err = seL4_ARM_VSpace_Invalidate_Data(VSPACE_CAP, buffer.phys_or_offset + buffer_data_vaddr, buffer.phys_or_offset + buffer_data_vaddr + buffer.len);
-            if (err) dprintf("MUX_RX|ERROR: ARM Vspace invalidate failed\n");
-            assert(!err);
+            // err = seL4_ARM_VSpace_Invalidate_Data(VSPACE_CAP, buffer.phys_or_offset + buffer_data_vaddr, buffer.phys_or_offset + buffer_data_vaddr + buffer.len);
+            // if (err) dprintf("MUX_RX|ERROR: ARM Vspace invalidate failed\n");
+            // assert(!err);
 
             int client = get_client((struct ethernet_header *) (buffer.phys_or_offset + buffer_data_vaddr));
             if (client >= 0) {
                 err = enqueue_used(&state.rx_ring_clients[client], buffer);
                 assert(!err);
                 notify_clients[client] = true;
+                // printf("%d", client);
             } else {
                 buffer.phys_or_offset = buffer.phys_or_offset + buffer_data_paddr;
                 err = enqueue_free(&state.rx_ring_drv, buffer);
                 assert(!err);
                 notify_drv = true;
+                // printf("_");
+            }
+            if (i++ % 50 == 0) {
+                // printf("\n");
             }
         }
 
@@ -136,10 +142,10 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
-    mux_mac_addr_init_sys(microkit_name, (uint8_t *) state.mac_addrs);
+    mux_mac_addr_init_sys("mux_rx", (uint8_t *) state.mac_addrs);
 
     ring_init(&state.rx_ring_drv, (ring_buffer_t *)rx_free_drv, (ring_buffer_t *)rx_used_drv, RX_RING_SIZE_DRIV);
-    mux_ring_init_sys(microkit_name, state.rx_ring_clients, rx_free_arp, rx_used_arp);
+    mux_ring_init_sys("mux_rx", state.rx_ring_clients, rx_free_arp, rx_used_arp);
     buffers_init((ring_buffer_t *)rx_free_drv, buffer_data_paddr, RX_RING_SIZE_DRIV);
 
     if (require_signal(state.rx_ring_drv.free_ring)) {
