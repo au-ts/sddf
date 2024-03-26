@@ -69,7 +69,7 @@ void response_init(struct response *response) {
 
 uint8_t response_read(struct response *response) {
     if (response->read_idx >= response->data_size) {
-        LOG_PN532_ERR("trying to read more data than exists in response (buffer: 0x%lx)\n", response->buffer);
+        LOG_PN532_ERR("trying to read more data than exists in response (buffer: %p)\n", response->buffer);
         return 0;
     }
 
@@ -81,7 +81,7 @@ uint8_t response_read(struct response *response) {
 
 uint8_t response_read_idx(struct response *response, uint8_t idx) {
     if (idx >= response->data_size) {
-        LOG_PN532_ERR("trying to read more data than exists in response (buffer: 0x%lx)\n", response->buffer);
+        LOG_PN532_ERR("trying to read more data than exists in response (buffer: %p)\n", response->buffer);
         return 0;
     }
 
@@ -399,7 +399,7 @@ bool pn532_read_response(uint8_t *buffer, uint8_t buffer_len, size_t retries) {
     // Read length
     size_t data_length = response_read(&response);
     if (data_length != length) {
-        LOG_PN532_ERR("Received data_length of 0x%lx, was expecting 0x%lx\n", data_length, length);
+        LOG_PN532_ERR("Received data_length of 0x%lx, was expecting 0x%x\n", data_length, length);
         response_finish(&response);
         return false;
     }
@@ -412,7 +412,7 @@ bool pn532_read_response(uint8_t *buffer, uint8_t buffer_len, size_t retries) {
     response_read(&response);
     // Read command data
     if (data_length > buffer_len) {
-        LOG_PN532_ERR("returned data length (0x%lx) greater than user-provided buffer length (0x%lx)\n", data_length, buffer_len);
+        LOG_PN532_ERR("returned data length (0x%lx) greater than user-provided buffer length (0x%x)\n", data_length, buffer_len);
         response_finish(&response);
         return false;
     }

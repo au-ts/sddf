@@ -154,7 +154,7 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
             }
             break;
         default:
-            sddf_dprintf("TIMER DRIVER|LOG: Unknown request %llu to timer from channel %llu\n", microkit_msginfo_get_label(msginfo), ch);
+            sddf_dprintf("TIMER DRIVER|LOG: Unknown request %lu to timer from channel %u\n", microkit_msginfo_get_label(msginfo), ch);
             break;
     }
 

@@ -151,7 +151,7 @@ void enqueue_pbufs(struct pbuf *p)
 static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
 {   
     if (p->tot_len > NET_BUFFER_SIZE) {
-        sddf_dprintf("LWIP|ERROR: attempted to send a packet of size  %llx > BUFFER SIZE  %llx\n", p->tot_len, NET_BUFFER_SIZE);
+        sddf_dprintf("LWIP|ERROR: attempted to send a packet of size  %u > BUFFER SIZE  %u\n", p->tot_len, NET_BUFFER_SIZE);
         return ERR_MEM;
     }
 
@@ -187,10 +187,10 @@ void transmit(void)
         while(state.head != NULL && !net_queue_empty(state.tx_queue.free)) {
             err_t err = lwip_eth_send(&state.netif, state.head);
             if (err == ERR_MEM) {
-                sddf_dprintf("LWIP|ERROR: attempted to send a packet of size  %llx > BUFFER SIZE  %llx\n", state.head->tot_len, NET_BUFFER_SIZE);
+                sddf_dprintf("LWIP|ERROR: attempted to send a packet of size  %u > BUFFER SIZE  %u\n", state.head->tot_len, NET_BUFFER_SIZE);
             }
             else if (err != ERR_OK) {
-                sddf_dprintf("LWIP|ERROR: unkown error when trying to send pbuf  %llx\n", state.head);
+                sddf_dprintf("LWIP|ERROR: unkown error when trying to send pbuf  %p\n", state.head);
             }
             
             struct pbuf *temp = state.head;
@@ -339,7 +339,7 @@ void notified(microkit_channel ch)
             receive();
             break;
         default:
-            sddf_dprintf("LWIP|LOG: received notification on unexpected channel: %lu\n", ch);
+            sddf_dprintf("LWIP|LOG: received notification on unexpected channel: %u\n", ch);
             break;
     }
     

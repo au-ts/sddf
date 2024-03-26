@@ -194,13 +194,13 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
     char buf[16];
     switch (microkit_msginfo_get_label(msginfo)) {
         case REG_IP:
-            sddf_printf("ARP|NOTICE: client%d registering ip address: %s with MAC: %02x:%02x:%02x:%02x:%02x:%02x\n", 
+            sddf_printf("ARP|NOTICE: client%d registering ip address: %s with MAC: %02lx:%02lx:%02lx:%02lx:%02lx:%02lx\n", 
                         client, ipaddr_to_string(ip_addr, buf, 16), mac >> 40, mac >> 32 & 0xff, mac >> 24 & 0xff, 
                         mac >> 16 & 0xff, mac >> 8 & 0xff, mac & 0xff);
             ipv4_addrs[client] = ip_addr;
             break;
         default:
-            sddf_dprintf("ARP|LOG: PPC from client%d with unknown message label %llu\n", client, microkit_msginfo_get_label(msginfo));
+            sddf_dprintf("ARP|LOG: PPC from client%d with unknown message label %lu\n", client, microkit_msginfo_get_label(msginfo));
             break;
     }
 
