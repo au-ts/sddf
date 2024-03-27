@@ -39,6 +39,7 @@ static void _assert_fail(const char  *assertion, const char  *file, unsigned int
     while (1) {}
 }
 
+#ifndef assert
 #ifndef CONFIG_DEBUG_BUILD
 #define _unused(x) ((void)(x))
 #define assert(expr) _unused(expr)
@@ -49,4 +50,5 @@ static void _assert_fail(const char  *assertion, const char  *file, unsigned int
             _assert_fail(#expr, __FILE__, __LINE__, __FUNCTION__); \
         } \
     } while(0)
+#endif
 #endif
