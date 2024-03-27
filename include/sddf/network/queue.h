@@ -43,9 +43,9 @@ typedef struct net_queue_handle {
 /**
  * Check if the free queue is empty.
  *
- * @param queue queue handle to dequeue from.
+ * @param queue queue handle for the free queue to check.
  *
- * @return true indicates the buffer is empty, false otherwise.
+ * @return true indicates the queue is empty, false otherwise.
  */
 static inline bool net_queue_empty_free(net_queue_handle_t *queue)
 {
@@ -55,9 +55,9 @@ static inline bool net_queue_empty_free(net_queue_handle_t *queue)
 /**
  * Check if the active queue is empty.
  *
- * @param queue queue handle to dequeue from.
+ * @param queue queue handle for the active queue to check.
  *
- * @return true indicates the buffer is empty, false otherwise.
+ * @return true indicates the queue is empty, false otherwise.
  */
 static inline bool net_queue_empty_active(net_queue_handle_t *queue)
 {
@@ -67,7 +67,7 @@ static inline bool net_queue_empty_active(net_queue_handle_t *queue)
 /**
  * Check if the free queue is full.
  *
- * @param queue queue handle to dequeue from.
+ * @param queue queue handle t for the free queue to check.
  *
  * @return true indicates the queue is full, false otherwise.
  */
@@ -79,7 +79,7 @@ static inline bool net_queue_full_free(net_queue_handle_t *queue)
 /**
  * Check if the active queue is full.
  *
- * @param queue queue handle to dequeue from.
+ * @param queue queue handle for the active queue to check.
  *
  * @return true indicates the queue is full, false otherwise.
  */
