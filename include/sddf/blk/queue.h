@@ -218,8 +218,6 @@ static inline int blk_enqueue_req(blk_queue_handle_t *h,
  *
  * @param h queue handle containing response queue to enqueue to.
  * @param status response status.
- * @param addr pointer to encoded dma address of data.
- * @param count number of blocks allocated for corresponding request
  * @param success_count number of blocks successfully read/written
  * @param id request ID to identify which request the response is for.
  *
@@ -284,8 +282,6 @@ static inline int blk_dequeue_req(blk_queue_handle_t *h,
  *
  * @param h queue handle containing response queue to dequeue from.
  * @param status pointer to response status.
- * @param addr pointer to encoded dma address of data.
- * @param count pointer to number of blocks allocated for corresponding request
  * @param success_count pointer to number of blocks successfully read/written
  * @param id pointer to stoqueue request ID to idenfity which request this response is for.
  * @return -1 when response queue is empty, 0 on success.
