@@ -45,20 +45,20 @@ environment.
 
 On Linux (x86-64):
 ```sh
-wget https://trustworthy.systems/Downloads/microkit/microkit-sdk-dev-4f717f2-linux-x86-64.tar.gz
-tar xf microkit-sdk-dev-4f717f2-linux-x86-64.tar.gz
+wget https://trustworthy.systems/Downloads/microkit/microkit-sdk-dev-8e40fe8-linux-x86-64.tar.gz
+tar xf microkit-sdk-dev-8e40fe8-linux-x86-64.tar.gz
 ```
 
 On macOS (Apple Silicon/AArch64):
 ```sh
-wget https://trustworthy.systems/Downloads/microkit/microkit-sdk-dev-4f717f2-macos-aarch64.tar.gz
-tar xf microkit-sdk-dev-4f717f2-macos-aarch64.tar.gz
+wget https://trustworthy.systems/Downloads/microkit/microkit-sdk-dev-8e40fe8-macos-aarch64.tar.gz
+tar xf microkit-sdk-dev-8e40fe8-macos-aarch64.tar.gz
 ```
 
 On macOS (Intel/x86-64):
 ```sh
-wget https://trustworthy.systems/Downloads/microkit/microkit-sdk-dev-4f717f2-macos-x86-64.tar.gz
-tar xf microkit-sdk-dev-4f717f2-macos-x86-64.tar.gz
+wget https://trustworthy.systems/Downloads/microkit/microkit-sdk-dev-8e40fe8-macos-x86-64.tar.gz
+tar xf microkit-sdk-dev-8e40fe8-macos-x86-64.tar.gz
 ```
 
 ## Developing sDDF
