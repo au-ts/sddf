@@ -52,10 +52,8 @@ REPORT_FILE = $(BUILD_DIR)/report.txt
 
 CFLAGS += -I$(BOARD_DIR)/include \
 	-Iinclude	\
-	-I$(RINGBUFFERDIR)/include \
 	-I$(UART_DRIVER)/include \
 	-I$(SDDF)/include \
-	-I$(SDDF) \
 
 UART_OBJS := uart.o printf.o putchar_debug.o
 SERIAL_SERVER_OBJS1 := serial_server_1.o
