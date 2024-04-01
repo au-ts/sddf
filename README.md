@@ -38,7 +38,7 @@ The specific version used for testing is:
 ### Microkit SDK
 
 The sDDF is built using the [seL4 Microkit](https://github.com/seL4/microkit) but currently relies
-on some changes to the Microkit] that have not yet been upstreamed.
+on some changes to the Microkit that have not yet been upstreamed.
 
 Below are instructions to acquire the Microkit SDK for use with sDDF depending on your development
 environment.
