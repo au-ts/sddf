@@ -46,7 +46,7 @@ void rx_return(void)
             memcpy((void *)cli_addr, (void *)virt_addr, virt_buffer.len);
             cli_buffer.len = virt_buffer.len;
             virt_buffer.len = 0;
-            
+
             err = net_enqueue_active(&rx_queue_cli, cli_buffer);
             assert(!err);
 
@@ -55,7 +55,7 @@ void rx_return(void)
 
             enqueued = true;
         }
-        
+
         net_request_signal_active(&rx_queue_virt);
 
         /* Only request signal from client if incoming packets from multiplexer are awaiting free buffers */
@@ -63,7 +63,7 @@ void rx_return(void)
         else net_cancel_signal_free(&rx_queue_cli);
 
         reprocess = false;
-        
+
         if (!net_queue_empty_active(&rx_queue_virt) && !net_queue_empty_free(&rx_queue_cli)) {
             net_cancel_signal_active(&rx_queue_virt);
             net_cancel_signal_free(&rx_queue_cli);
