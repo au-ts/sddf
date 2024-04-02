@@ -16,6 +16,11 @@ CI_BUILD_DIR="ci_build"
 [[ -z $SDK_PATH ]] && echo "usage: examples.sh [PATH TO SDK]" && exit 1
 [[ ! -d $SDK_PATH ]] && echo "The path to the SDK provided does not exist: '$SDK_PATH'" && exit 1
 
+NETWORK=true
+I2C=true
+SERIAL=true
+TIMER=true
+
 build_network_echo_server() {
     CONFIG=$1
     BOARD=$2
@@ -68,28 +73,42 @@ build_serial() {
         MICROKIT_BOARD=${BOARD}
 }
 
-build_network_echo_server "debug" "imx8mm_evk"
-build_network_echo_server "release" "imx8mm_evk"
-build_network_echo_server "benchmark" "imx8mm_evk"
-build_network_echo_server "debug" "odroidc4"
-build_network_echo_server "release" "odroidc4"
-build_network_echo_server "benchmark" "odroidc4"
-build_network_echo_server "debug" "maaxboard"
-build_network_echo_server "release" "maaxboard"
-build_network_echo_server "benchmark" "maaxboard"
+network() {
+    build_network_echo_server "debug" "imx8mm_evk"
+    build_network_echo_server "release" "imx8mm_evk"
+    build_network_echo_server "benchmark" "imx8mm_evk"
+    build_network_echo_server "debug" "odroidc4"
+    build_network_echo_server "release" "odroidc4"
+    build_network_echo_server "benchmark" "odroidc4"
+    build_network_echo_server "debug" "maaxboard"
+    build_network_echo_server "release" "maaxboard"
+    build_network_echo_server "benchmark" "maaxboard"
+}
 
-build_i2c "debug"
-build_i2c "release"
+i2c() {
+    build_i2c "debug"
+    build_i2c "release"
+}
 
-build_timer "debug"
-build_timer "release"
+timer() {
+    build_timer "debug"
+    build_timer "release"
+}
 
-build_serial "debug" "odroidc4"
-build_serial "release" "odroidc4"
-build_serial "debug" "qemu_arm_virt"
-build_serial "release" "qemu_arm_virt"
-build_serial "debug" "maaxboard"
-build_serial "release" "maaxboard"
+serial() {
+    build_serial "debug" "odroidc4"
+    build_serial "release" "odroidc4"
+    build_serial "debug" "qemu_arm_virt"
+    build_serial "release" "qemu_arm_virt"
+    build_serial "debug" "maaxboard"
+    build_serial "release" "maaxboard"
+}
+
+# Only run the examples that have been enabled
+$NETWORK && network
+$I2C && i2c
+$TIMER && timer
+$SERIAL && serial
 
 echo ""
 echo "CI|INFO: Passed all sDDF tests"
