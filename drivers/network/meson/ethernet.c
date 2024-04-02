@@ -159,7 +159,7 @@ static void tx_provide(void)
 
             tx.tail = (tx.tail + 1) % TX_COUNT;
         }
-    
+
         net_request_signal_active(&tx_queue);
         reprocess = false;
 
