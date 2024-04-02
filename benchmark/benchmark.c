@@ -271,11 +271,11 @@ void init(void)
 void fault(microkit_id id, microkit_msginfo msginfo) {
     sddf_printf("BENCH|LOG: Faulting PD ");
     print_pdid_name(id);
-    sddf_printf(" (%llx)\n", id);
+    sddf_printf(" (%x)\n", id);
 
     seL4_UserContext regs;
     seL4_TCB_ReadRegisters(BASE_TCB_CAP + id, false, 0, sizeof(seL4_UserContext) / sizeof(seL4_Word), &regs);
-    sddf_printf("Registers: \npc : %llx\nspsr : %llx\nx0 : %llx\nx1 : %llx\nx2 : %llx\nx3 : %llx\nx4 : %llx\nx5 : %llx\nx6 : %llx\nx7 : %llx\n", 
+    sddf_printf("Registers: \npc : %lx\nspsr : %lx\nx0 : %lx\nx1 : %lx\nx2 : %lx\nx3 : %lx\nx4 : %lx\nx5 : %lx\nx6 : %lx\nx7 : %lx\n", 
                     regs.pc, regs.spsr, regs.x0, regs.x1, regs.x2, regs.x3, regs.x4, regs.x5, regs.x6, regs.x7);
 
     switch (microkit_msginfo_get_label(msginfo))
@@ -284,7 +284,7 @@ void fault(microkit_id id, microkit_msginfo msginfo) {
             uint64_t ip = seL4_GetMR(seL4_CapFault_IP);
             uint64_t fault_addr = seL4_GetMR(seL4_CapFault_Addr);
             uint64_t in_recv_phase = seL4_GetMR(seL4_CapFault_InRecvPhase);
-            sddf_printf("CapFault: ip=%llx  fault_addr=%llx  in_recv_phase=%llx\n", ip, fault_addr, (in_recv_phase == 0 ? "false" : "true"));
+            sddf_printf("CapFault: ip=%lx  fault_addr=%lx  in_recv_phase=%s\n", ip, fault_addr, (in_recv_phase == 0 ? "false" : "true"));
             break;
         }
         case seL4_Fault_UserException: {
@@ -296,7 +296,7 @@ void fault(microkit_id id, microkit_msginfo msginfo) {
             uint64_t fault_addr = seL4_GetMR(seL4_VMFault_Addr);
             uint64_t is_instruction = seL4_GetMR(seL4_VMFault_PrefetchFault);
             uint64_t fsr = seL4_GetMR(seL4_VMFault_FSR);
-            sddf_printf("VMFault: ip=%llx  fault_addr=%llx  fsr=%llx %s\n", ip, fault_addr, fsr, (is_instruction ? "(instruction fault)" : "(data fault)"));
+            sddf_printf("VMFault: ip=%lx  fault_addr=%lx  fsr=%lx %s\n", ip, fault_addr, fsr, (is_instruction ? "(instruction fault)" : "(data fault)"));
             break;
         }
         default:
