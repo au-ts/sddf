@@ -46,7 +46,8 @@ uintptr_t tx_data_client2;
 serial_queue_handle_t tx_queue[SERIAL_NUM_CLIENTS];
 serial_queue_handle_t drv_tx_queue;
 
-size_t copy_with_colour(size_t client, size_t buffer_len, char *driver_buf, char *client_buf) {
+size_t copy_with_colour(size_t client, size_t buffer_len, char *driver_buf, char *client_buf)
+{
     size_t len_copied = 0;
     // assert(buffer_len + COLOUR_START_LEN + COLOUR_START_LEN <= BUFFER_SIZE);
     /* First copy the colour start bytes */
@@ -63,14 +64,16 @@ size_t copy_with_colour(size_t client, size_t buffer_len, char *driver_buf, char
     return len_copied;
 }
 
-size_t copy_normal(size_t buffer_len, char *driver_buf, char *client_buf) {
+size_t copy_normal(size_t buffer_len, char *driver_buf, char *client_buf)
+{
     /* All we need to do is copy the client buffer into the driver buffer. */
     memcpy(driver_buf, client_buf, buffer_len);
 
     return buffer_len;
 }
 
-int handle_tx(int curr_client) {
+int handle_tx(int curr_client)
+{
     // Copy data from the client queues to the driver queue.
     uintptr_t client_buf = 0;
     unsigned int client_buf_len = 0;
@@ -133,14 +136,18 @@ int handle_tx(int curr_client) {
     return 0;
 }
 
-void init (void) {
+void init(void)
+{
     // We want to init the client queues here. Currently this only inits one client
-    serial_queue_init(&tx_queue[0], (serial_queue_t *)tx_free_client, (serial_queue_t *)tx_active_client, 0, NUM_ENTRIES, NUM_ENTRIES);
+    serial_queue_init(&tx_queue[0], (serial_queue_t *)tx_free_client, (serial_queue_t *)tx_active_client, 0, NUM_ENTRIES,
+                      NUM_ENTRIES);
     // @ivanv: terrible temporary hack
 #if SERIAL_NUM_CLIENTS > 1
-    serial_queue_init(&tx_queue[1], (serial_queue_t *)tx_free_client2, (serial_queue_t *)tx_active_client2, 0, NUM_ENTRIES, NUM_ENTRIES);
+    serial_queue_init(&tx_queue[1], (serial_queue_t *)tx_free_client2, (serial_queue_t *)tx_active_client2, 0, NUM_ENTRIES,
+                      NUM_ENTRIES);
 #endif
-    serial_queue_init(&drv_tx_queue, (serial_queue_t *)tx_free_driver, (serial_queue_t *)tx_active_driver, 0, NUM_ENTRIES, NUM_ENTRIES);
+    serial_queue_init(&drv_tx_queue, (serial_queue_t *)tx_free_driver, (serial_queue_t *)tx_active_driver, 0, NUM_ENTRIES,
+                      NUM_ENTRIES);
 
     // Add buffers to the driver tx queue from our shared dma region
     for (int i = 0; i < NUM_ENTRIES - 1; i++) {
@@ -154,7 +161,8 @@ void init (void) {
     }
 }
 
-void notified(microkit_channel ch) {
+void notified(microkit_channel ch)
+{
     // We should only ever recieve notifications from the client
     // Sanity check the client
     if (ch < 1 || ch > SERIAL_NUM_CLIENTS) {
