@@ -38,7 +38,8 @@ struct descriptor {
     uint32_t next;
 };
 
-_Static_assert((RX_COUNT + TX_COUNT) * sizeof(struct descriptor) <= HW_REGION_SIZE, "Expect rx+tx buffers to fit in single 2MB page");
+_Static_assert((RX_COUNT + TX_COUNT) * sizeof(struct descriptor) <= HW_REGION_SIZE,
+               "Expect rx+tx buffers to fit in single 2MB page");
 
 typedef struct {
     unsigned int tail; /* index to insert at */
@@ -67,7 +68,7 @@ static inline bool hw_ring_empty(hw_ring_t *ring, size_t ring_size)
 }
 
 static void update_ring_slot(hw_ring_t *ring, unsigned int idx, uint32_t status,
-                                uint32_t cntl, uint32_t phys, uint32_t next)
+                             uint32_t cntl, uint32_t phys, uint32_t next)
 {
     volatile struct descriptor *d = &(ring->descr[idx]);
     d->addr = phys;
@@ -90,7 +91,9 @@ static void rx_provide()
             assert(!err);
 
             uint32_t cntl = (MAX_RX_FRAME_SZ << DESC_RXCTRL_SIZE1SHFT) & DESC_RXCTRL_SIZE1MASK;
-            if (rx.tail + 1 == RX_COUNT) cntl |= DESC_RXCTRL_RXRINGEND;
+            if (rx.tail + 1 == RX_COUNT) {
+                cntl |= DESC_RXCTRL_RXRINGEND;
+            }
 
             rx.descr_mdata[rx.tail] = buffer;
             update_ring_slot(&rx, rx.tail, DESC_RXSTS_OWNBYDMA, cntl, buffer.io_or_offset, 0);
@@ -115,14 +118,18 @@ static void rx_return(void)
     while (!hw_ring_empty(&rx, RX_COUNT)) {
         /* If buffer slot is still empty, we have processed all packets the device has filled */
         volatile struct descriptor *d = &(rx.descr[rx.head]);
-        if (d->status & DESC_RXSTS_OWNBYDMA) break;
+        if (d->status & DESC_RXSTS_OWNBYDMA) {
+            break;
+        }
         net_buff_desc_t buffer = rx.descr_mdata[rx.head];
         THREAD_MEMORY_ACQUIRE();
 
         if (d->status & DESC_RXSTS_ERROR) {
             sddf_dprintf("ETH|ERROR: RX descriptor returned with error status %x\n", d->status);
             uint32_t cntl = (MAX_RX_FRAME_SZ << DESC_RXCTRL_SIZE1SHFT) & DESC_RXCTRL_SIZE1MASK;
-            if (rx.tail + 1 == RX_COUNT) cntl |= DESC_RXCTRL_RXRINGEND;
+            if (rx.tail + 1 == RX_COUNT) {
+                cntl |= DESC_RXCTRL_RXRINGEND;
+            }
 
             rx.descr_mdata[rx.tail] = buffer;
             update_ring_slot(&rx, rx.tail, DESC_RXSTS_OWNBYDMA, cntl, buffer.io_or_offset, 0);
@@ -153,7 +160,9 @@ static void tx_provide(void)
 
             uint32_t cntl = (((uint32_t) buffer.len) << DESC_TXCTRL_SIZE1SHFT) & DESC_TXCTRL_SIZE1MASK;
             cntl |= DESC_TXCTRL_TXLAST | DESC_TXCTRL_TXFIRST | DESC_TXCTRL_TXINT;
-            if (tx.tail + 1 == TX_COUNT) cntl |= DESC_TXCTRL_TXRINGEND;
+            if (tx.tail + 1 == TX_COUNT) {
+                cntl |= DESC_TXCTRL_TXRINGEND;
+            }
             tx.descr_mdata[tx.tail] = buffer;
             update_ring_slot(&tx, tx.tail, DESC_TXSTS_OWNBYDMA, cntl, buffer.io_or_offset, 0);
 
@@ -177,7 +186,9 @@ static void tx_return(void)
     while (!hw_ring_empty(&tx, TX_COUNT)) {
         /* Ensure that this buffer has been sent by the device */
         volatile struct descriptor *d = &(tx.descr[tx.head]);
-        if (d->status & DESC_TXSTS_OWNBYDMA) break;
+        if (d->status & DESC_TXSTS_OWNBYDMA) {
+            break;
+        }
         net_buff_desc_t buffer = tx.descr_mdata[tx.head];
         THREAD_MEMORY_ACQUIRE();
 
@@ -203,7 +214,9 @@ static void handle_irq()
         tx_return();
     }
     if (e & DMA_INTR_ABNORMAL) {
-        if (e & DMA_INTR_FBE) sddf_dprintf("Ethernet device fatal bus error\n");
+        if (e & DMA_INTR_FBE) {
+            sddf_dprintf("Ethernet device fatal bus error\n");
+        }
     }
     eth_dma->status &= e;
 }
@@ -254,7 +267,7 @@ void init(void)
 
     /* Enable IRQs */
     eth_dma->intenable |= DMA_INTR_MASK;
-    
+
     /* Disable uneeded GMAC irqs */
     eth_mac->intmask |= GMAC_INTR_MASK;
 
@@ -267,19 +280,19 @@ void init(void)
 
 void notified(microkit_channel ch)
 {
-    switch(ch) {
-        case IRQ_CH:
-            handle_irq();
-            microkit_irq_ack_delayed(ch);
-            break;
-        case RX_CH:
-            rx_provide();
-            break;
-        case TX_CH:
-            tx_provide();
-            break;
-        default:
-            sddf_dprintf("ETH|LOG: received notification on unexpected channel %u\n", ch);
-            break;
+    switch (ch) {
+    case IRQ_CH:
+        handle_irq();
+        microkit_irq_ack_delayed(ch);
+        break;
+    case RX_CH:
+        rx_provide();
+        break;
+    case TX_CH:
+        tx_provide();
+        break;
+    default:
+        sddf_dprintf("ETH|LOG: received notification on unexpected channel %u\n", ch);
+        break;
     }
 }
