@@ -48,7 +48,8 @@ int client;
 int num_to_get_chars[SERIAL_NUM_CLIENTS];
 int multi_client;
 
-int give_multi_char(char * drv_buffer, int drv_buffer_len) {
+int give_multi_char(char *drv_buffer, int drv_buffer_len)
+{
     for (int curr_client = 0; curr_client < SERIAL_NUM_CLIENTS; curr_client++) {
 
         if (num_to_get_chars[curr_client] <= 0) {
@@ -84,7 +85,8 @@ int give_multi_char(char * drv_buffer, int drv_buffer_len) {
     return 0;
 }
 
-int give_single_char(int curr_client, char * drv_buffer, int drv_buffer_len) {
+int give_single_char(int curr_client, char *drv_buffer, int drv_buffer_len)
+{
     if (curr_client < 1 || curr_client > SERIAL_NUM_CLIENTS) {
         return 1;
     }
@@ -124,7 +126,8 @@ int give_single_char(int curr_client, char * drv_buffer, int drv_buffer_len) {
     return 0;
 }
 
-int give_char(int curr_client, char * drv_buffer, int drv_buffer_len) {
+int give_char(int curr_client, char *drv_buffer, int drv_buffer_len)
+{
     if (multi_client == 1) {
         give_multi_char(drv_buffer, drv_buffer_len);
     } else {
@@ -135,7 +138,8 @@ int give_char(int curr_client, char * drv_buffer, int drv_buffer_len) {
 }
 
 /* We will check for escape characters in here, as well as dealing with switching direction*/
-void handle_rx() {
+void handle_rx()
+{
     // Address that we will pass to dequeue to store the buffer address
     uintptr_t buffer = 0;
     // Integer to store the length of the buffer
@@ -236,15 +240,19 @@ void handle_rx() {
     }
 }
 
-void init (void) {
+void init(void)
+{
     // We want to init the client rings here. Currently this only inits one client
-    serial_queue_init(&rx_queue[0], (serial_queue_t *)rx_free_client, (serial_queue_t *)rx_active_client, 0, NUM_ENTRIES, NUM_ENTRIES);
+    serial_queue_init(&rx_queue[0], (serial_queue_t *)rx_free_client, (serial_queue_t *)rx_active_client, 0, NUM_ENTRIES,
+                      NUM_ENTRIES);
     // @ivanv: terrible temporary hack
 #if SERIAL_NUM_CLIENTS > 1
-    serial_queue_init(&rx_queue[1], (serial_queue_t *)rx_free_client2, (serial_queue_t *)rx_active_client2, 0, NUM_ENTRIES, NUM_ENTRIES);
+    serial_queue_init(&rx_queue[1], (serial_queue_t *)rx_free_client2, (serial_queue_t *)rx_active_client2, 0, NUM_ENTRIES,
+                      NUM_ENTRIES);
 #endif
 
-    serial_queue_init(&drv_rx_queue, (serial_queue_t *)rx_free_driver, (serial_queue_t *)rx_active_driver, 0, NUM_ENTRIES, NUM_ENTRIES);
+    serial_queue_init(&drv_rx_queue, (serial_queue_t *)rx_free_driver, (serial_queue_t *)rx_active_driver, 0, NUM_ENTRIES,
+                      NUM_ENTRIES);
 
     for (int i = 0; i < NUM_ENTRIES - 1; i++) {
         int ret = serial_enqueue_free(&drv_rx_queue, rx_data_driver + (i * BUFFER_SIZE), BUFFER_SIZE);
@@ -268,7 +276,8 @@ void init (void) {
     }
 }
 
-void notified(microkit_channel ch) {
+void notified(microkit_channel ch)
+{
     // We should only ever recieve notifications from the client
     // Sanity check the client
     if (ch == DRV_CH) {
