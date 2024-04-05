@@ -161,26 +161,28 @@ void handle_rx()
         // This is for our RAW mode, char by char
         if (UART_MODE == RAW_MODE) {
             // microkit_dbg_puts("In raw mode virt rx\n");
-            char got_char[2];
-            got_char[0] = chars[0];
-            got_char[1] = '\0';
+            char got_char = chars[0];
 
             // We have now gotten a character, deal with the input direction switch
             if (virt_state == 1) {
                 // The previous character was an escape character
-                give_char(client, &got_char[0], 1);
+                give_char(client, &got_char, 1);
                 virt_state = 0;
             }  else if (virt_state == 2) {
                 // We are now switching input direction
 
                 // Case for simultaneous multi client input
-                if (got_char[0] == 'm') {
+                if (got_char == 'm') {
                     multi_client = 1;
                     client = -1;
                 } else {
                     // Ensure that multi client input is off
                     multi_client = 0;
-                    int new_client = atoi(got_char);
+                    // Null terminate got_char to be safe to use with atoi
+                    char got_char_terminated[2];
+                    got_char_terminated[0] = got_char;
+                    got_char_terminated[1] = '\0';
+                    int new_client = atoi(got_char_terminated);
                     if (new_client < 1 || new_client > SERIAL_NUM_CLIENTS) {
                         microkit_dbg_puts("VIRT|RX: Attempted to switch to invalid client number: ");
                         puthex64(new_client);
@@ -196,13 +198,13 @@ void handle_rx()
                 virt_state = 0;
             } else if (virt_state == 0) {
                 // No escape character has been set
-                if (got_char[0] == '\\') {
+                if (got_char == '\\') {
                     virt_state = 1;
                     // The next character is going to be escaped
-                } else if (got_char[0] == '@') {
+                } else if (got_char == '@') {
                     virt_state = 2;
                 } else {
-                    give_char(client, &got_char[0], 1);
+                    give_char(client, &got_char, 1);
                 }
             }
         } else if (UART_MODE == LINE_MODE) {
