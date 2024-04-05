@@ -157,24 +157,26 @@ void handle_rx() {
         // This is for our RAW mode, char by char
         if (UART_MODE == RAW_MODE) {
             // microkit_dbg_puts("In raw mode virt rx\n");
-            char got_char = chars[0];
+            char got_char[2];
+            got_char[0] = chars[0];
+            got_char[1] = '\0';
 
             // We have now gotten a character, deal with the input direction switch
             if (virt_state == 1) {
                 // The previous character was an escape character
-                give_char(client, &got_char, 1);
+                give_char(client, &got_char[0], 1);
                 virt_state = 0;
             }  else if (virt_state == 2) {
                 // We are now switching input direction
 
                 // Case for simultaneous multi client input
-                if (got_char == 'm') {
+                if (got_char[0] == 'm') {
                     multi_client = 1;
                     client = -1;
                 } else {
                     // Ensure that multi client input is off
                     multi_client = 0;
-                    int new_client = atoi(&got_char);
+                    int new_client = atoi(got_char);
                     if (new_client < 1 || new_client > SERIAL_NUM_CLIENTS) {
                         microkit_dbg_puts("VIRT|RX: Attempted to switch to invalid client number: ");
                         puthex64(new_client);
@@ -190,13 +192,13 @@ void handle_rx() {
                 virt_state = 0;
             } else if (virt_state == 0) {
                 // No escape character has been set
-                if (got_char == '\\') {
+                if (got_char[0] == '\\') {
                     virt_state = 1;
                     // The next character is going to be escaped
-                } else if (got_char == '@') {
+                } else if (got_char[0] == '@') {
                     virt_state = 2;
                 } else {
-                    give_char(client, &got_char, 1);
+                    give_char(client, &got_char[0], 1);
                 }
             }
         } else if (UART_MODE == LINE_MODE) {
@@ -207,7 +209,7 @@ void handle_rx() {
                 must be a number. Otherwise, give to the client.
             */
 
-           if (chars[0] == '@') {
+            if (chars[0] == '@') {
                 if (chars[1] == 'm') {
                     // case for multi client input
                     multi_client = 1;
@@ -217,10 +219,10 @@ void handle_rx() {
                     multi_client = 0;
                     client = new_client;
                 }
-           } else {
+            } else {
                 // Otherwise, give entire buffer to the client
                 give_char(client, chars, buffer_len);
-           }
+            }
         }
 
         /* Now that we are finished with the active buffer, we can add it back to the free ring*/
