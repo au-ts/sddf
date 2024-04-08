@@ -21,8 +21,8 @@ uintptr_t tx_active;
 uintptr_t rx_data;
 uintptr_t tx_data;
 
-serial_queue_handle_t rx_queue;
-serial_queue_handle_t tx_queue;
+static serial_queue_handle_t rx_queue;
+static serial_queue_handle_t tx_queue;
 
 /*
 Return -1 on failure.
