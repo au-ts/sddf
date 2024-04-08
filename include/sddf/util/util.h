@@ -38,6 +38,8 @@
        typeof (d) _d = (d); \
        _d * (_n/_d + (_n % _d == 0 ? 0 : 1)); \
     })
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 static void _assert_fail(const char  *assertion, const char  *file, unsigned int line, const char  *function)
 {

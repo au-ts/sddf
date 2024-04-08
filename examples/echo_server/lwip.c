@@ -308,6 +308,7 @@ void init(void)
 
     setup_udp_socket();
     setup_utilization_socket();
+    setup_tcp_socket();
 
     if (notify_rx && net_require_signal_free(&state.rx_queue)) {
         net_cancel_signal_free(&state.rx_queue);
