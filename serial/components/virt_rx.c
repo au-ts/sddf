@@ -16,11 +16,11 @@
 
 /* Memory regions as defined in the system file */
 
-// Transmit rings with the driver
+// Transmit queues with the driver
 uintptr_t rx_free_driver;
 uintptr_t rx_active_driver;
 
-// Transmit rings with the client
+// Transmit queues with the client
 uintptr_t rx_free_client;
 uintptr_t rx_active_client;
 uintptr_t rx_free_client2;
@@ -31,7 +31,6 @@ uintptr_t rx_data_driver;
 uintptr_t rx_data_client;
 uintptr_t rx_data_client2;
 
-// Have an array of client rings.
 serial_queue_handle_t rx_queue[SERIAL_NUM_CLIENTS];
 serial_queue_handle_t drv_rx_queue;
 
@@ -64,19 +63,19 @@ int give_multi_char(char *drv_buffer, int drv_buffer_len)
 
         if (ret != 0) {
             microkit_dbg_puts(microkit_name);
-            microkit_dbg_puts(": unable to dequeue from the rx free ring\n");
+            microkit_dbg_puts(": unable to dequeue from the rx free queue\n");
             return 1;
         }
 
         memcpy((char *) buffer, drv_buffer, drv_buffer_len);
         buffer_len = drv_buffer_len;
 
-        // Now place in the rx active ring
+        // Now place in the rx active queue
         ret = serial_enqueue_active(&rx_queue[curr_client], buffer, buffer_len);
 
         if (ret != 0) {
             microkit_dbg_puts(microkit_name);
-            microkit_dbg_puts(": unable to enqueue to the rx active ring\n");
+            microkit_dbg_puts(": unable to enqueue to the rx active queue\n");
             return 1;
         }
 
@@ -103,19 +102,19 @@ int give_single_char(int curr_client, char *drv_buffer, int drv_buffer_len)
 
     if (ret != 0) {
         microkit_dbg_puts(microkit_name);
-        microkit_dbg_puts(": unable to dequeue from the rx free ring\n");
+        microkit_dbg_puts(": unable to dequeue from the rx free queue\n");
         return 1;
     }
 
     memcpy((char *) buffer, drv_buffer, drv_buffer_len);
     buffer_len = drv_buffer_len;
 
-    // Now place in the rx active ring
+    // Now place in the rx active queue
     ret = serial_enqueue_active(&rx_queue[curr_client - 1], buffer, buffer_len);
 
     if (ret != 0) {
         microkit_dbg_puts(microkit_name);
-        microkit_dbg_puts(": unable to enqueue to the rx active ring\n");
+        microkit_dbg_puts(": unable to enqueue to the rx active queue\n");
         return 1;
     }
 
@@ -231,20 +230,20 @@ void handle_rx()
             }
         }
 
-        /* Now that we are finished with the active buffer, we can add it back to the free ring*/
+        /* Now that we are finished with the active buffer, we can add it back to the free queue */
 
         ret = serial_enqueue_free(&drv_rx_queue, buffer, BUFFER_SIZE);
 
         if (ret != 0) {
             microkit_dbg_puts(microkit_name);
-            microkit_dbg_puts(": getchar - unable to enqueue active buffer back into free ring\n");
+            microkit_dbg_puts(": getchar - unable to enqueue active buffer back into free queue\n");
         }
     }
 }
 
 void init(void)
 {
-    // We want to init the client rings here. Currently this only inits one client
+    // We want to init the client queues here. Currently this only inits one client
     serial_queue_init(&rx_queue[0], (serial_queue_t *)rx_free_client, (serial_queue_t *)rx_active_client, 0, NUM_ENTRIES,
                       NUM_ENTRIES);
     // @ivanv: terrible temporary hack
