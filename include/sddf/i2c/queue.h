@@ -54,14 +54,14 @@ typedef struct i2c_queue_entry {
     size_t bus_address;
 } i2c_queue_entry_t;
 
-/* Circular buffer containing descriptors */
+/* Shared queue structure that contains either requests or responses */
 typedef struct i2c_queue {
     uint32_t tail;
     uint32_t head;
     i2c_queue_entry_t entries[NUM_QUEUE_ENTRIES];
 } i2c_queue_t;
 
-/* A ring handle for enqueing/dequeuing into  */
+/* Convenience struct for storing request and response queues */
 typedef struct i2c_queue_handle {
     i2c_queue_t *request;
     i2c_queue_t *response;
