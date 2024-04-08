@@ -4,6 +4,9 @@
 
 Right now we only have build-time checks for all examples under `examples/`.
 
+This is a check that runs on each commit and pull request made to the repository.
+This check is required to pass for merging a pull request.
+
 You can reproduce what the CI runs with:
 ```sh
 ./ci/examples.sh /path/to/sdk
