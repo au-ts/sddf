@@ -4,6 +4,7 @@
 #include <sddf/util/string.h>
 #include <sddf/util/util.h>
 #include <sddf/network/queue.h>
+#include <sddf/util/util.h>
 
 #define NET_CLI0_NAME "client0"
 #define NET_CLI1_NAME "client1"

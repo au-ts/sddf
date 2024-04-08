@@ -68,7 +68,7 @@ NETIFFILES:=$(LWIPDIR)/netif/ethernet.c
 # LWIPFILES: All the above.
 LWIPFILES=lwip.c $(COREFILES) $(CORE4FILES) $(NETIFFILES)
 LWIP_OBJS := $(LWIPFILES:.c=.o) lwip.o utilization_socket.o \
-	     udp_echo_socket.o
+	     udp_echo_socket.o tcp_echo_socket.o
 
 OBJS := $(LWIP_OBJS)
 DEPS := $(filter %.d,$(OBJS:.o=.d))
