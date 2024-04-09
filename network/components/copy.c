@@ -33,7 +33,8 @@ void rx_return(void)
             assert(!err);
 
             if (cli_buffer.io_or_offset % NET_BUFFER_SIZE || cli_buffer.io_or_offset >= NET_BUFFER_SIZE * rx_queue_cli.size) {
-                sddf_dprintf("COPY|LOG: Client provided offset %lx which is not buffer aligned or outside of buffer region\n", cli_buffer.io_or_offset);
+                sddf_dprintf("COPY|LOG: Client provided offset %lx which is not buffer aligned or outside of buffer region\n",
+                             cli_buffer.io_or_offset);
                 continue;
             }
 
@@ -59,8 +60,11 @@ void rx_return(void)
         net_request_signal_active(&rx_queue_virt);
 
         /* Only request signal from client if incoming packets from multiplexer are awaiting free buffers */
-        if (!net_queue_empty_active(&rx_queue_virt)) net_request_signal_free(&rx_queue_cli);
-        else net_cancel_signal_free(&rx_queue_cli);
+        if (!net_queue_empty_active(&rx_queue_virt)) {
+            net_request_signal_free(&rx_queue_cli);
+        } else {
+            net_cancel_signal_free(&rx_queue_cli);
+        }
 
         reprocess = false;
 
@@ -89,6 +93,7 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
-    copy_queue_init_sys(microkit_name, &rx_queue_cli, rx_free_cli, rx_active_cli, &rx_queue_virt, rx_free_virt, rx_active_virt);
+    copy_queue_init_sys(microkit_name, &rx_queue_cli, rx_free_cli, rx_active_cli, &rx_queue_virt, rx_free_virt,
+                        rx_active_virt);
     net_buffers_init(&rx_queue_cli, 0);
 }
