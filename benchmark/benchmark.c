@@ -144,7 +144,7 @@ static void print_benchmark_details(uint64_t pd_id, uint64_t kernel_util, uint64
     } else {
         sddf_printf("Utilisation details for PD: ");
         print_pdid_name(pd_id);
-        sddf_printf(" (%llx)\n", pd_id);
+        sddf_printf(" (%lx)\n", pd_id);
     }
     sddf_printf("{\nKernelUtilisation:  %lx\nKernelEntries:  %lx\nNumberSchedules:  %lx\nTotalUtilisation:  %lx\n}\n",
                 kernel_util, kernel_entries, number_schedules, total_util);
