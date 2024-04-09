@@ -28,7 +28,7 @@ void rx_return(void)
 
     while (reprocess) {
         while (!net_queue_empty_active(&rx_queue_virt) && !net_queue_empty_free(&rx_queue_cli)) {
-            net_buff_desc_t cli_buffer, virt_buffer;
+            net_buff_desc_t cli_buffer, virt_buffer = {0};
             int err = net_dequeue_free(&rx_queue_cli, &cli_buffer);
             assert(!err);
 
