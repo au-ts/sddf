@@ -64,10 +64,14 @@ static char *ipaddr_to_string(uint32_t s_addr, char *buf, int buflen)
             inv[i++] = (char)('0' + rem);
         } while (*ap);
         while (i--) {
-            if (len++ >= buflen) return NULL;
+            if (len++ >= buflen) {
+                return NULL;
+            }
             *rp++ = inv[i];
         }
-        if (len++ >= buflen) return NULL;
+        if (len++ >= buflen) {
+            return NULL;
+        }
         *rp++ = '.';
         ap++;
     }
@@ -87,9 +91,9 @@ static int match_ip_to_client(uint32_t addr)
 }
 
 static int arp_reply(const uint8_t ethsrc_addr[ETH_HWADDR_LEN],
-                const uint8_t ethdst_addr[ETH_HWADDR_LEN],
-                const uint8_t hwsrc_addr[ETH_HWADDR_LEN], const uint32_t ipsrc_addr,
-                const uint8_t hwdst_addr[ETH_HWADDR_LEN], const uint32_t ipdst_addr)
+                     const uint8_t ethdst_addr[ETH_HWADDR_LEN],
+                     const uint8_t hwsrc_addr[ETH_HWADDR_LEN], const uint32_t ipsrc_addr,
+                     const uint8_t hwdst_addr[ETH_HWADDR_LEN], const uint32_t ipdst_addr)
 {
     if (net_queue_empty_free(&tx_queue)) {
         sddf_dprintf("ARP|LOG: Transmit free queue empty or transmit active queue full. Dropping reply\n");
@@ -115,7 +119,7 @@ static int arp_reply(const uint8_t ethsrc_addr[ETH_HWADDR_LEN],
 
     memcpy(&reply->hwsrc_addr, hwsrc_addr, ETH_HWADDR_LEN);
     reply->ipsrc_addr = ipsrc_addr;
-    memcpy(&reply->hwdst_addr, hwdst_addr, ETH_HWADDR_LEN); 
+    memcpy(&reply->hwdst_addr, hwdst_addr, ETH_HWADDR_LEN);
     reply->ipdst_addr = ipdst_addr;
     memset(&reply->padding, 0, 10);
 
@@ -148,7 +152,9 @@ void receive(void)
                     if (client >= 0) {
                         /* Send a response */
                         if (!arp_reply(mac_addrs[client], pkt->ethsrc_addr, mac_addrs[client], pkt->ipdst_addr,
-                                    pkt->hwsrc_addr, pkt->ipsrc_addr)) transmitted = true;
+                                       pkt->hwsrc_addr, pkt->ipsrc_addr)) {
+                            transmitted = true;
+                        }
                     }
                 }
             }
@@ -193,15 +199,16 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
 
     char buf[16];
     switch (microkit_msginfo_get_label(msginfo)) {
-        case REG_IP:
-            sddf_printf("ARP|NOTICE: client%d registering ip address: %s with MAC: %02lx:%02lx:%02lx:%02lx:%02lx:%02lx\n", 
-                        client, ipaddr_to_string(ip_addr, buf, 16), mac >> 40, mac >> 32 & 0xff, mac >> 24 & 0xff, 
-                        mac >> 16 & 0xff, mac >> 8 & 0xff, mac & 0xff);
-            ipv4_addrs[client] = ip_addr;
-            break;
-        default:
-            sddf_dprintf("ARP|LOG: PPC from client%d with unknown message label %lu\n", client, microkit_msginfo_get_label(msginfo));
-            break;
+    case REG_IP:
+        sddf_printf("ARP|NOTICE: client%d registering ip address: %s with MAC: %02lx:%02lx:%02lx:%02lx:%02lx:%02lx\n",
+                    client, ipaddr_to_string(ip_addr, buf, 16), mac >> 40, mac >> 32 & 0xff, mac >> 24 & 0xff,
+                    mac >> 16 & 0xff, mac >> 8 & 0xff, mac & 0xff);
+        ipv4_addrs[client] = ip_addr;
+        break;
+    default:
+        sddf_dprintf("ARP|LOG: PPC from client%d with unknown message label %lu\n", client,
+                     microkit_msginfo_get_label(msginfo));
+        break;
     }
 
     return microkit_msginfo_new(0, 0);

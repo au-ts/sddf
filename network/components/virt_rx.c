@@ -40,12 +40,18 @@ state_t state;
 static bool notify_drv;
 
 /* Return the client ID if the Mac address is a match. */
-int get_client(struct ethernet_header * buffer)
+int get_client(struct ethernet_header *buffer)
 {
     for (int client = 0; client < NUM_CLIENTS; client++) {
         bool match = true;
-        for (int i = 0; (i < ETH_HWADDR_LEN) && match; i++) if (buffer->dest.addr[i] != state.mac_addrs[client][i]) match = false;
-        if (match) return client;
+        for (int i = 0; (i < ETH_HWADDR_LEN) && match; i++) {
+            if (buffer->dest.addr[i] != state.mac_addrs[client][i]) {
+                match = false;
+            }
+        }
+        if (match) {
+            return client;
+        }
     }
     return -1;
 }
@@ -118,7 +124,7 @@ void rx_return(void)
             net_cancel_signal_active(&state.rx_queue_clients[client]);
             microkit_notify(client + CLIENT_CH);
         }
-    }    
+    }
 }
 
 void rx_provide(void)
@@ -130,7 +136,7 @@ void rx_provide(void)
                 net_buff_desc_t buffer;
                 int err = net_dequeue_free(&state.rx_queue_clients[client], &buffer);
                 assert(!err);
-                assert(!(buffer.io_or_offset % NET_BUFFER_SIZE) && 
+                assert(!(buffer.io_or_offset % NET_BUFFER_SIZE) &&
                        (buffer.io_or_offset < NET_BUFFER_SIZE * state.rx_queue_clients[client].size));
 
                 // Cache invalidate before DMA write to discard dirty
@@ -142,7 +148,8 @@ void rx_provide(void)
                 //
                 // See comment in rx_return for explanation of why we're using
                 // cache_clean_and_invalidate.
-                cache_clean_and_invalidate(buffer.io_or_offset + buffer_data_vaddr, buffer.io_or_offset + buffer_data_vaddr + NET_BUFFER_SIZE);
+                cache_clean_and_invalidate(buffer.io_or_offset + buffer_data_vaddr,
+                                           buffer.io_or_offset + buffer_data_vaddr + NET_BUFFER_SIZE);
 
                 buffer.io_or_offset = buffer.io_or_offset + buffer_data_paddr;
                 err = net_enqueue_free(&state.rx_queue_drv, buffer);
