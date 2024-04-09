@@ -51,7 +51,8 @@ extern uintptr_t data_region;
  * over-written.
  */
 
-void response_init(struct response *response) {
+void response_init(struct response *response)
+{
     uintptr_t offset = 0;
     unsigned int buffer_len = 0;
     /* This is unused as for our PN532 client only talks to a single I2C bus address. */
@@ -67,7 +68,8 @@ void response_init(struct response *response) {
     response->read_idx = 0;
 }
 
-uint8_t response_read(struct response *response) {
+uint8_t response_read(struct response *response)
+{
     if (response->read_idx >= response->data_size) {
         LOG_PN532_ERR("trying to read more data than exists in response (buffer: %p)\n", response->buffer);
         return 0;
@@ -79,7 +81,8 @@ uint8_t response_read(struct response *response) {
     return value;
 }
 
-uint8_t response_read_idx(struct response *response, uint8_t idx) {
+uint8_t response_read_idx(struct response *response, uint8_t idx)
+{
     if (idx >= response->data_size) {
         LOG_PN532_ERR("trying to read more data than exists in response (buffer: %p)\n", response->buffer);
         return 0;
@@ -90,18 +93,21 @@ uint8_t response_read_idx(struct response *response, uint8_t idx) {
     return value;
 }
 
-void response_finish(struct response *response) {
+void response_finish(struct response *response)
+{
     // Do nothing
 }
 
-void request_init(struct request *req, uint8_t bus_address) {
+void request_init(struct request *req, uint8_t bus_address)
+{
     req->data_offset_len = 0;
     req->buffer = (uint8_t *)data_region;
     req->buffer_size = I2C_MAX_DATA_SIZE;
     req->bus_address = bus_address;
 }
 
-void request_add(struct request *req, uint8_t data) {
+void request_add(struct request *req, uint8_t data)
+{
     size_t index = req->data_offset_len;
     if (index >= req->buffer_size) {
         LOG_PN532_ERR("request buffer is full (size is 0x%lx)\n", req->buffer_size);
@@ -111,7 +117,8 @@ void request_add(struct request *req, uint8_t data) {
     req->data_offset_len++;
 }
 
-void request_send(struct request *req) {
+void request_send(struct request *req)
+{
     /* Here we add two to account for the REQ_BUF_CLIENT and REQ_BUF_ADDR */
     int err = i2c_enqueue_request(queue, req->bus_address, (size_t) req->buffer - data_region, req->data_offset_len);
     if (err) {
@@ -123,7 +130,8 @@ void request_send(struct request *req) {
 
 #define ACK_FRAME_SIZE (7)
 
-int8_t read_ack_frame(size_t retries) {
+int8_t read_ack_frame(size_t retries)
+{
     /*
      * Read ACK frame has two parts, the first is to make the *request*
      * to read the frame. Then we need to process the response to that
@@ -184,7 +192,8 @@ int8_t read_ack_frame(size_t retries) {
     return -1;
 }
 
-static void process_return_buffer() {
+static void process_return_buffer()
+{
     struct response response = {};
     response_init(&response);
 
@@ -196,7 +205,8 @@ static void process_return_buffer() {
     response_finish(&response);
 }
 
-int8_t pn532_write_command(uint8_t *header, uint8_t hlen, const uint8_t *body, uint8_t blen, size_t retries) {
+int8_t pn532_write_command(uint8_t *header, uint8_t hlen, const uint8_t *body, uint8_t blen, size_t retries)
+{
     /* Setup command */
 
     /* First dequeue a fresh request buffer */
@@ -257,7 +267,8 @@ int8_t pn532_write_command(uint8_t *header, uint8_t hlen, const uint8_t *body, u
     return read_ack_frame(retries);
 }
 
-int8_t read_response_length(size_t retries) {
+int8_t read_response_length(size_t retries)
+{
     size_t length;
     size_t attempts = 0;
 
@@ -325,7 +336,8 @@ int8_t read_response_length(size_t retries) {
     return length;
 }
 
-bool pn532_read_response(uint8_t *buffer, uint8_t buffer_len, size_t retries) {
+bool pn532_read_response(uint8_t *buffer, uint8_t buffer_len, size_t retries)
+{
     int8_t length = read_response_length(retries);
     if (length < 0) {
         LOG_PN532_ERR("read_response - length was less than zero\n");
@@ -347,12 +359,12 @@ bool pn532_read_response(uint8_t *buffer, uint8_t buffer_len, size_t retries) {
         request_add(&req, I2C_TOKEN_ADDR_READ);
 
         if (num_data_tokens > req.buffer_size) {
-           LOG_PN532_ERR("number of request data tokens (0x%lx) exceeds buffer size (0x%lx)\n", num_data_tokens, req.buffer_size);
+            LOG_PN532_ERR("number of request data tokens (0x%lx) exceeds buffer size (0x%lx)\n", num_data_tokens, req.buffer_size);
             return false;
         }
 
         for (int i = 0; i < num_data_tokens; i++) {
-           request_add(&req, I2C_TOKEN_DATA);
+            request_add(&req, I2C_TOKEN_DATA);
         }
 
         request_add(&req, I2C_TOKEN_DATA_END);
@@ -412,7 +424,8 @@ bool pn532_read_response(uint8_t *buffer, uint8_t buffer_len, size_t retries) {
     response_read(&response);
     // Read command data
     if (data_length > buffer_len) {
-        LOG_PN532_ERR("returned data length (0x%lx) greater than user-provided buffer length (0x%x)\n", data_length, buffer_len);
+        LOG_PN532_ERR("returned data length (0x%lx) greater than user-provided buffer length (0x%x)\n", data_length,
+                      buffer_len);
         response_finish(&response);
         return false;
     }
