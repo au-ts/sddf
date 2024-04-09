@@ -6,13 +6,13 @@
 #error "Need to define SERIAL_SERVER_NUMBER"
 #endif
 
-#define SERVER_PRINT_CHANNEL 9
-#define SERVER_GETCHAR_CHANNEL 11
+/* Channels to the rest of the serial sub-system. These numbers are
+ * follow what is in the system description file.
+ */
+#define SERIAL_VIRT_TX_CH 0
+#define SERIAL_VIRT_RX_CH 1
 
-/* Queue handle components -
-Need to have access to the same queue mechanisms as the driver, so that we can enqueue
-buffers to be serviced by the driver.*/
-
+/* Shared memory regions that hold the serial data and queue structures. */
 uintptr_t rx_free;
 uintptr_t rx_active;
 uintptr_t tx_free;
@@ -78,8 +78,8 @@ int serial_server_printf(char *string)
     */
 
     if (is_empty) {
-        // Notify the driver through the printf channel
-        microkit_notify(SERVER_PRINT_CHANNEL);
+        // Notify the driver through the TX channel
+        microkit_notify(SERIAL_VIRT_TX_CH);
     }
 
     return 0;
@@ -91,7 +91,7 @@ int getchar()
 
     // Notify the driver that we want to get a character. In Patrick's design, this increments
     // the chars_for_clients value.
-    microkit_notify(SERVER_GETCHAR_CHANNEL);
+    microkit_notify(SERIAL_VIRT_RX_CH);
 
     /* Now that we have notified the driver, we can attempt to dequeue from the active queue.
     When the driver has processed an interrupt, it will add the inputted character to the active queue.*/
@@ -205,7 +205,7 @@ void init(void)
 
     // Unplug the tx active queue
     serial_queue_unplug(tx_queue.active);
-    microkit_notify(SERVER_PRINT_CHANNEL);
+    microkit_notify(SERIAL_VIRT_TX_CH);
 
     serial_server_printf("Enter char to test getchar for ");
     serial_server_printf(microkit_name);
