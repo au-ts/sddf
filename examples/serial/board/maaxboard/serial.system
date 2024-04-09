@@ -111,7 +111,7 @@
 
     <!-- These following channels are needed for communication between the server and driver -->
     <channel>
-        <end pd="serial_server_1" id="9"/>
+        <end pd="serial_server_1" id="0"/>
         <end pd="virt_tx" id="1"/>
     </channel>
 
@@ -121,7 +121,7 @@
     </channel>
 
    <channel>
-        <end pd="serial_server_1" id="11"/>
+        <end pd="serial_server_1" id="1"/>
         <end pd="virt_rx" id="1"/>
     </channel>
 
@@ -131,12 +131,12 @@
     </channel>
 
     <channel>
-        <end pd="serial_server_2" id="9"/>
+        <end pd="serial_server_2" id="0"/>
         <end pd="virt_tx" id="2"/>
     </channel>
 
     <channel>
-        <end pd="serial_server_2" id="11"/>
+        <end pd="serial_server_2" id="1"/>
         <end pd="virt_rx" id="2"/>
     </channel>
 </system>
