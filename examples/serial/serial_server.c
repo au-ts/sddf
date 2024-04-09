@@ -27,7 +27,8 @@ static serial_queue_handle_t tx_queue;
 /*
 Return -1 on failure.
 */
-int serial_server_printf(char *string) {
+int serial_server_printf(char *string)
+{
     // Get a buffer from the tx queue
 
     // Address that we will pass to dequeue to store the buffer address
@@ -38,7 +39,7 @@ int serial_server_printf(char *string) {
     // Dequeue a buffer from the free queue from the tx buffer
     int ret = serial_dequeue_free(&tx_queue, &buffer, &buffer_len);
 
-    if(ret != 0) {
+    if (ret != 0) {
         microkit_dbg_puts(microkit_name);
         microkit_dbg_puts(": serial server printf, unable to dequeue from tx queue, tx queue empty\n");
         return -1;
@@ -47,7 +48,7 @@ int serial_server_printf(char *string) {
     // Need to copy over the string into the buffer, if it is less than the buffer length
     int print_len = strlen(string) + 1;
 
-    if(print_len > BUFFER_SIZE) {
+    if (print_len > BUFFER_SIZE) {
         microkit_dbg_puts(microkit_name);
         microkit_dbg_puts(": print string too long for buffer\n");
         return -1;
@@ -63,7 +64,7 @@ int serial_server_printf(char *string) {
 
     ret = serial_enqueue_active(&tx_queue, buffer, print_len);
 
-    if(ret != 0) {
+    if (ret != 0) {
         microkit_dbg_puts(microkit_name);
         microkit_dbg_puts(": serial server printf, unable to enqueue to tx active queue\n");
         return -1;
@@ -71,12 +72,12 @@ int serial_server_printf(char *string) {
 
     /*
     First we will check if the transmit active queue is empty. If not empty, then the driver was processing
-    the active queue, however it was not finished, potentially running out of budget and being pre-empted. 
-    Therefore, we can just add the buffer to the active queue, and wait for the driver to resume. However if 
+    the active queue, however it was not finished, potentially running out of budget and being pre-empted.
+    Therefore, we can just add the buffer to the active queue, and wait for the driver to resume. However if
     empty, then we can notify the driver to start processing the active queue.
     */
 
-    if(is_empty) {
+    if (is_empty) {
         // Notify the driver through the printf channel
         microkit_notify(SERVER_PRINT_CHANNEL);
     }
@@ -85,27 +86,28 @@ int serial_server_printf(char *string) {
 }
 
 // Return char on success, -1 on failure
-int getchar() {
+int getchar()
+{
 
-    // Notify the driver that we want to get a character. In Patrick's design, this increments 
+    // Notify the driver that we want to get a character. In Patrick's design, this increments
     // the chars_for_clients value.
     microkit_notify(SERVER_GETCHAR_CHANNEL);
 
     /* Now that we have notified the driver, we can attempt to dequeue from the active queue.
     When the driver has processed an interrupt, it will add the inputted character to the active queue.*/
-    
+
     // Address that we will pass to dequeue to store the buffer address
     uintptr_t buffer = 0;
 
     // Integer to store the length of the buffer
-    unsigned int buffer_len = 0; 
+    unsigned int buffer_len = 0;
 
     while (serial_dequeue_active(&rx_queue, &buffer, &buffer_len) != 0) {
-        /* The queue is currently empty, as there is no character to get. 
-        We will spin here until we have gotten a character. As the driver is a higher priority than us, 
+        /* The queue is currently empty, as there is no character to get.
+        We will spin here until we have gotten a character. As the driver is a higher priority than us,
         it should be able to pre-empt this loop
         */
-        microkit_dbg_puts(""); /* From Patrick, this is apparently needed to stop the compiler from optimising out the 
+        microkit_dbg_puts(""); /* From Patrick, this is apparently needed to stop the compiler from optimising out the
         as it is currently empty. When compiled in a release version the puts statement will be compiled
         into a nop command.
         */
@@ -125,12 +127,13 @@ int getchar() {
     return (int) got_char;
 }
 
-/* Return 0 on success, -1 on failure. 
+/* Return 0 on success, -1 on failure.
 Basic scanf implementation using the getchar function above. Gets characters until
 CTRL+C or CTRL+D or new line.
 NOT MEMORY SAFE
-*/ 
-int serial_server_scanf(char* buffer) {
+*/
+int serial_server_scanf(char *buffer)
+{
     int i = 0;
     int getchar_ret = getchar();
 
@@ -140,7 +143,7 @@ int serial_server_scanf(char* buffer) {
     }
 
 
-    while(getchar_ret != '\03' && getchar_ret != '\04' && getchar_ret != '\r') {
+    while (getchar_ret != '\03' && getchar_ret != '\04' && getchar_ret != '\r') {
         ((char *) buffer)[i] = (char) getchar_ret;
 
         getchar_ret = getchar();
@@ -157,7 +160,8 @@ int serial_server_scanf(char* buffer) {
 }
 
 // Init function required by sel4cp, initialise serial datastructres for server here
-void init(void) {
+void init(void)
+{
     microkit_dbg_puts(microkit_name);
     microkit_dbg_puts(": elf PD init function running\n");
 
@@ -166,7 +170,7 @@ void init(void) {
     // Init the shared queue buffers
     serial_queue_init(&rx_queue, (serial_queue_t *)rx_free, (serial_queue_t *)rx_active, 0, 512, 512);
     // We will also need to populate these queues with memory from the shared dma region
-    
+
     // Add buffers to the rx queue
     for (int i = 0; i < NUM_ENTRIES - 1; i++) {
         int ret = serial_enqueue_free(&rx_queue, rx_data + (i * BUFFER_SIZE), BUFFER_SIZE);
@@ -241,6 +245,7 @@ void init(void) {
 }
 
 
-void notified(microkit_channel ch) {
+void notified(microkit_channel ch)
+{
     return;
 }
