@@ -4,11 +4,6 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
 
-BUILD_DIR ?= build
-MICROKIT_CONFIG ?= debug
-# This example is specifically for the Odroid-C4 platform
-MICROKIT_BOARD := odroidc4
-
 ifeq ($(strip $(MICROKIT_SDK)),)
 $(error MICROKIT_SDK must be specified)
 endif
@@ -17,8 +12,10 @@ ifeq ($(strip $(TOOLCHAIN)),)
 	TOOLCHAIN := aarch64-none-elf
 endif
 
+BUILD_DIR ?= build
+MICROKIT_CONFIG ?= debug
 MICROKIT_BOARD ?= odroidc4
-CPU := cortex-a55
+CPU ?= cortex-a55
 
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 
@@ -42,6 +39,7 @@ LIBS := -lmicrokit -Tmicrokit.ld -lc
 
 IMAGE_FILE = $(BUILD_DIR)/loader.img
 REPORT_FILE = $(BUILD_DIR)/report.txt
+SYSTEM_FILE = board/$(MICROKIT_BOARD)/i2c.system
 
 CFLAGS += -I$(BOARD_DIR)/include \
 	-I$(SDDF)/include \
@@ -87,8 +85,8 @@ $(BUILD_DIR)/timer.elf: $(addprefix $(BUILD_DIR)/, $(TIMER_DRIVER_OBJS))
 $(BUILD_DIR)/timer_driver.o: $(TIMER_DRIVER)/timer.c
 	$(CC) -c $(CFLAGS) $(TIMER_DRIVER)/timer.c -o $(BUILD_DIR)/timer_driver.o
 
-$(IMAGE_FILE) $(REPORT_FILE): $(addprefix $(BUILD_DIR)/, $(IMAGES)) i2c.system
-	$(MICROKIT_TOOL) i2c.system --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
+$(IMAGE_FILE) $(REPORT_FILE): $(addprefix $(BUILD_DIR)/, $(IMAGES)) $(SYSTEM_FILE)
+	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
 
 .PHONY: all compile clean
 
