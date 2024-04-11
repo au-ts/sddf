@@ -4,9 +4,6 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
 
-BUILD_DIR ?= build
-MICROKIT_CONFIG ?= debug
-
 ifeq ($(strip $(MICROKIT_SDK)),)
 $(error MICROKIT_SDK must be specified)
 endif
@@ -14,6 +11,9 @@ endif
 ifeq ($(strip $(TOOLCHAIN)),)
 	TOOLCHAIN := aarch64-none-elf
 endif
+
+BUILD_DIR ?= build
+MICROKIT_CONFIG ?= debug
 
 ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
 	DRIV_DIR := meson
