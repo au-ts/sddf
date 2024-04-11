@@ -22,9 +22,9 @@ SERIAL=true
 TIMER=true
 
 build_network_echo_server() {
-    CONFIG=$1
-    BOARD=$2
-    echo "CI|INFO: building echo server example with config: $CONFIG, board: $BOARD"
+    BOARD=$1
+    CONFIG=$2
+    echo "CI|INFO: building echo server example with board: ${BOARD}, config: ${CONFIG}"
     BUILD_DIR="${PWD}/${CI_BUILD_DIR}/examples/echo_server/${BOARD}/${CONFIG}"
     rm -rf ${BUILD_DIR}
     mkdir -p ${BUILD_DIR}
@@ -36,34 +36,38 @@ build_network_echo_server() {
 }
 
 build_i2c() {
-    CONFIG=$1
-    echo "CI|INFO: building I2C example with config: $CONFIG"
-    BUILD_DIR="${PWD}/${CI_BUILD_DIR}/examples/i2c/${CONFIG}"
+    BOARD=$1
+    CONFIG=$2
+    echo "CI|INFO: building I2C example with board: ${BOARD}, config: ${CONFIG}"
+    BUILD_DIR="${PWD}/${CI_BUILD_DIR}/examples/i2c/${BOARD}/${CONFIG}"
     rm -rf ${BUILD_DIR}
     mkdir -p ${BUILD_DIR}
     make -j${NUM_JOBS} -C examples/i2c \
         BUILD_DIR=${BUILD_DIR} \
         MICROKIT_CONFIG=${CONFIG} \
-        MICROKIT_SDK=${SDK_PATH}
+        MICROKIT_SDK=${SDK_PATH} \
+        MICROKIT_BOARD=${BOARD}
 }
 
 build_timer() {
-    CONFIG=$1
-    echo "CI|INFO: building timer example with config: $CONFIG"
-    BUILD_DIR="${PWD}/${CI_BUILD_DIR}/examples/timer/${CONFIG}"
+    BOARD=$1
+    CONFIG=$2
+    echo "CI|INFO: building timer example with board: ${BOARD}, config: ${CONFIG}"
+    BUILD_DIR="${PWD}/${CI_BUILD_DIR}/examples/timer/${BOARD}/${CONFIG}"
     rm -rf ${BUILD_DIR}
     mkdir -p ${BUILD_DIR}
     make -j${NUM_JOBS} -C examples/timer \
         BUILD_DIR=${BUILD_DIR} \
         MICROKIT_CONFIG=${CONFIG} \
-        MICROKIT_SDK=${SDK_PATH}
+        MICROKIT_SDK=${SDK_PATH} \
+        MICROKIT_BOARD=${BOARD}
 }
 
 build_serial() {
-    CONFIG=$1
-    BOARD=$2
-    echo "CI|INFO: building serial example with config: $CONFIG, board: $BOARD"
-    BUILD_DIR="${PWD}/${CI_BUILD_DIR}/examples/serial//${BOARD}/${CONFIG}"
+    BOARD=$1
+    CONFIG=$2
+    echo "CI|INFO: building serial example with board: ${BOARD}, config: ${CONFIG}"
+    BUILD_DIR="${PWD}/${CI_BUILD_DIR}/examples/serial/${BOARD}/${CONFIG}"
     rm -rf ${BUILD_DIR}
     mkdir -p ${BUILD_DIR}
     make -j${NUM_JOBS} -C examples/serial \
@@ -74,34 +78,51 @@ build_serial() {
 }
 
 network() {
-    build_network_echo_server "debug" "imx8mm_evk"
-    build_network_echo_server "release" "imx8mm_evk"
-    build_network_echo_server "benchmark" "imx8mm_evk"
-    build_network_echo_server "debug" "odroidc4"
-    build_network_echo_server "release" "odroidc4"
-    build_network_echo_server "benchmark" "odroidc4"
-    build_network_echo_server "debug" "maaxboard"
-    build_network_echo_server "release" "maaxboard"
-    build_network_echo_server "benchmark" "maaxboard"
+    BOARDS=("odroidc4" "imx8mm_evk" "maaxboard")
+    CONFIGS=("debug" "release" "benchmark")
+    for BOARD in "${BOARDS[@]}"
+    do
+      for CONFIG in "${CONFIGS[@]}"
+      do
+         build_network_echo_server ${BOARD} ${CONFIG}
+       done
+    done
 }
 
 i2c() {
-    build_i2c "debug"
-    build_i2c "release"
+    BOARDS=("odroidc4")
+    CONFIGS=("debug" "release")
+    for BOARD in "${BOARDS[@]}"
+    do
+      for CONFIG in "${CONFIGS[@]}"
+      do
+         build_i2c ${BOARD} ${CONFIG}
+       done
+    done
 }
 
 timer() {
-    build_timer "debug"
-    build_timer "release"
+    BOARDS=("odroidc4")
+    CONFIGS=("debug" "release")
+    for BOARD in "${BOARDS[@]}"
+    do
+      for CONFIG in "${CONFIGS[@]}"
+      do
+         build_timer ${BOARD} ${CONFIG}
+       done
+    done
 }
 
 serial() {
-    build_serial "debug" "odroidc4"
-    build_serial "release" "odroidc4"
-    build_serial "debug" "qemu_arm_virt"
-    build_serial "release" "qemu_arm_virt"
-    build_serial "debug" "maaxboard"
-    build_serial "release" "maaxboard"
+    BOARDS=("odroidc4" "qemu_arm_virt" "maaxboard")
+    CONFIGS=("debug" "release")
+    for BOARD in "${BOARDS[@]}"
+    do
+      for CONFIG in "${CONFIGS[@]}"
+      do
+         build_serial ${BOARD} ${CONFIG}
+       done
+    done
 }
 
 # Only run the examples that have been enabled
