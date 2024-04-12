@@ -28,6 +28,8 @@ uintptr_t rx_active_cli1;
 uintptr_t buffer_data_vaddr;
 uintptr_t buffer_data_paddr;
 
+int buff_refs[RX_QUEUE_SIZE_DRIV] = {0};
+
 typedef struct state {
     net_queue_handle_t rx_queue_drv;
     net_queue_handle_t rx_queue_clients[NUM_CLIENTS];
@@ -38,6 +40,18 @@ state_t state;
 
 /* Boolean to indicate whether a packet has been enqueued into the driver's free queue during notification handling */
 static bool notify_drv;
+
+bool is_broadcast(struct ethernet_header *buffer)
+{
+    bool match = true;
+    for (int i = 0; (i < ETH_HWADDR_LEN) && match; i++) {
+        if (buffer->dest.addr[i] != 0xFF) {
+            match = false;
+        }
+    }
+
+    return match;
+}
 
 /* Return the client ID if the Mac address is a match. */
 int get_client(struct ethernet_header *buffer)
@@ -92,24 +106,44 @@ void rx_return(void)
             // [2]: https://developer.arm.com/documentation/100236/0002/functional-description/cache-behavior-and-cache-protection/invalidating-or-cleaning-a-cache
             cache_clean_and_invalidate(buffer_vaddr, buffer_vaddr + ROUND_UP(buffer.len, 1 << CONFIG_L1_CACHE_LINE_SIZE_BITS));
 
-            int client = get_client((struct ethernet_header *) buffer_vaddr);
-            if (client >= 0) {
-                err = net_enqueue_active(&state.rx_queue_clients[client], buffer);
-                assert(!err);
-                notify_clients[client] = true;
-            } else {
-                // We are returning buffers to the device for DMA, which
-                // normally requires an invalidate (see rx_provide), but not
-                // here since we know there aren't any writes to the buffer
-                // since we invalidated above.
+            bool is_broadcast_packet = is_broadcast((struct ethernet_header *) buffer_vaddr);
 
-                buffer.io_or_offset = buffer.io_or_offset + buffer_data_paddr;
-                err = net_enqueue_free(&state.rx_queue_drv, buffer);
-                assert(!err);
-                notify_drv = true;
+            if (is_broadcast_packet) {
+                int ref_index = buffer.io_or_offset / NET_BUFFER_SIZE;
+                assert(buff_refs[ref_index] == 0);
+                // For broadcast packets, set the refcount to number of clients
+                // in the system. Only enqueue buffer back to driver if
+                // all clients have consumed the buffer.
+                buff_refs[ref_index] = NUM_CLIENTS;
+
+                for (int i = 0; i < NUM_CLIENTS; i++) {
+                    err = net_enqueue_active(&state.rx_queue_clients[i], buffer);
+                    assert(!err);
+                    notify_clients[i] = true;
+                }
+            } else {
+                int client = get_client((struct ethernet_header *) buffer_vaddr);
+                if (client >= 0) {
+                    int ref_index = buffer.io_or_offset / NET_BUFFER_SIZE;
+                    assert(buff_refs[ref_index] == 0);
+                    buff_refs[ref_index] = 1;
+
+                    err = net_enqueue_active(&state.rx_queue_clients[client], buffer);
+                    assert(!err);
+                    notify_clients[client] = true;
+                } else {
+                    // We are returning buffers to the device for DMA, which
+                    // normally requires an invalidate (see rx_provide), but not
+                    // here since we know there aren't any writes to the buffer
+                    // since we invalidated above.
+
+                    buffer.io_or_offset = buffer.io_or_offset + buffer_data_paddr;
+                    err = net_enqueue_free(&state.rx_queue_drv, buffer);
+                    assert(!err);
+                    notify_drv = true;
+                }
             }
         }
-
         net_request_signal_active(&state.rx_queue_drv);
         reprocess = false;
 
@@ -139,6 +173,14 @@ void rx_provide(void)
                 assert(!(buffer.io_or_offset % NET_BUFFER_SIZE) &&
                        (buffer.io_or_offset < NET_BUFFER_SIZE * state.rx_queue_clients[client].size));
 
+                int ref_index = buffer.io_or_offset / NET_BUFFER_SIZE;
+                assert(buff_refs[ref_index] != 0);
+
+                buff_refs[ref_index]--;
+
+                if (buff_refs[ref_index] != 0) {
+                    continue;
+                }
                 // Cache invalidate before DMA write to discard dirty
                 // cachelines, so they don't overwrite received data.
                 //
