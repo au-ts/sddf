@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<system>
+    <!-- The timer driver should run at higher priority than its clients.
+        As a passive server, PPC into the driver will be fastpathed. -->
+    <protection_domain name="timer" priority="254" pp="true" passive="true">
+        <program_image path="timer.elf" />
+        <irq irq="30" id="0" />
+    </protection_domain>
+
+    <protection_domain name="client" priority="1" >
+        <program_image path="client.elf" />
+    </protection_domain>
+
+    <channel>
+        <end pd="timer" id="1" />
+        <end pd="client" id="1" /> <!-- Should this number change, so should TIMER_CH in timer.h -->
+    </channel>
+
+</system>
