@@ -41,6 +41,17 @@ typedef struct net_queue_handle {
 } net_queue_handle_t;
 
 /**
+ * Get the number of buffers enqueued into a queue.
+ *
+ * @param queue queue handle for the queue to get the size of.
+ *
+ * @return number of buffers enqueued into a queue.
+ */
+static inline uint32_t net_queue_size(net_queue_t *queue) {
+    return queue->tail - queue->head;
+}
+
+/**
  * Check if the free queue is empty.
  *
  * @param queue queue handle for the free queue to check.
