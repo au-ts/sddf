@@ -16,13 +16,20 @@ ifeq ($(strip $(TOOLCHAIN)),)
 endif
 
 ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
-	DRIV_DIR := meson
+	ETH_DRIV_DIR := meson
+	TIMER_DRIV_DIR := meson
 	CPU := cortex-a55
 else ifeq ($(strip $(MICROKIT_BOARD)), imx8mm_evk)
-	DRIV_DIR := imx
+	ETH_DRIV_DIR := imx
+	TIMER_DRIV_DIR := imx
 	CPU := cortex-a53
 else ifeq ($(strip $(MICROKIT_BOARD)), maaxboard)
-	DRIV_DIR := imx
+	ETH_DRIV_DIR := imx
+	TIMER_DRIV_DIR := imx
+	CPU := cortex-a53
+else ifeq ($(strip $(MICROKIT_BOARD)), qemu_arm_virt)
+	ETH_DRIV_DIR := virtio
+	TIMER_DRIV_DIR := arm
 	CPU := cortex-a53
 else
 $(error Unsupported MICROKIT_BOARD given)
@@ -32,14 +39,15 @@ CC := $(TOOLCHAIN)-gcc
 LD := $(TOOLCHAIN)-ld
 AS := $(TOOLCHAIN)-as
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
+QEMU := qemu-system-aarch64
 
 SDDF=$(abspath ../..)
 SDDF_INCLUDE=$(SDDF)/include/sddf
 LWIP=$(SDDF)/network/ipstacks/lwip/src
 BENCHMARK=$(SDDF)/benchmark
 UTIL=$(SDDF)/util
-ETHERNET_DRIVER=$(SDDF)/drivers/network/$(DRIV_DIR)
-TIMER_DRIVER=$(SDDF)/drivers/clock/$(DRIV_DIR)
+ETHERNET_DRIVER=$(SDDF)/drivers/network/$(ETH_DRIV_DIR)
+TIMER_DRIVER=$(SDDF)/drivers/clock/$(TIMER_DRIV_DIR)
 NETWORK_COMPONENTS=$(SDDF)/network/components
 
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
@@ -166,6 +174,18 @@ $(BUILD_DIR)/timer.elf: $(addprefix $(BUILD_DIR)/, $(TIMER_OBJS))
 
 $(IMAGE_FILE) $(REPORT_FILE): $(addprefix $(BUILD_DIR)/, $(IMAGES)) $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
+
+qemu: $(IMAGE_FILE)
+	$(QEMU) -machine virt,virtualization=on \
+			-cpu cortex-a53 \
+			-serial mon:stdio \
+			-device loader,file=$(IMAGE_FILE),addr=0x70000000,cpu-num=0 \
+			-m size=2G \
+			-nographic \
+			-device virtio-net-device,netdev=netdev0 \
+			-netdev user,id=netdev0 \
+			-global virtio-mmio.force-legacy=false \
+			-d guest_errors
 
 .PHONY: all compile clean
 
