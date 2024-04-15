@@ -28,7 +28,10 @@ uintptr_t rx_active_cli1;
 uintptr_t buffer_data_vaddr;
 uintptr_t buffer_data_paddr;
 
-int buff_refs[RX_QUEUE_SIZE_DRIV] = {0};
+/* In order to handle broadcast packets where the same buffer is given to multiple clients
+  * we keep track of a reference count of each buffer and only hand it back to the driver once
+  * all clients have returned the buffer. */
+uint32_t buff_refs[RX_QUEUE_SIZE_DRIV] = {0};
 
 typedef struct state {
     net_queue_handle_t rx_queue_drv;
