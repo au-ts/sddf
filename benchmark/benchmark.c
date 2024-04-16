@@ -107,7 +107,6 @@ static void microkit_benchmark_start(void)
     seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_COPY1_ID);
     seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_LWIP_ID);
     seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_LWIP1_ID);
-    seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_ARP_ID);
     seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_TIMER_ID);
     seL4_BenchmarkResetLog();
 }
@@ -249,9 +248,6 @@ void notified(microkit_channel ch)
 
         microkit_benchmark_stop_tcb(PD_LWIP1_ID, &total, &number_schedules, &kernel, &entries);
         print_benchmark_details(PD_LWIP1_ID, kernel, entries, number_schedules, total);
-
-        microkit_benchmark_stop_tcb(PD_ARP_ID, &total, &number_schedules, &kernel, &entries);
-        print_benchmark_details(PD_ARP_ID, kernel, entries, number_schedules, total);
 
         microkit_benchmark_stop_tcb(PD_TIMER_ID, &total, &number_schedules, &kernel, &entries);
         print_benchmark_details(PD_TIMER_ID, kernel, entries, number_schedules, total);

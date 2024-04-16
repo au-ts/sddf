@@ -8,7 +8,6 @@
 #include <microkit.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
-#include <sddf/network/arp.h>
 #include <sddf/network/queue.h>
 #include <sddf/timer/client.h>
 #include <sddf/benchmark/sel4bench.h>
@@ -29,7 +28,6 @@
 #define TIMER  1
 #define RX_CH  2
 #define TX_CH  3
-#define ARP    7
 
 #define LWIP_TICK_MS 100
 #define NUM_PBUFFS 512
@@ -262,16 +260,11 @@ static err_t ethernet_init(struct netif *netif)
     return ERR_OK;
 }
 
-/* Callback function that prints DHCP supplied IP address and registers it with ARP component. */
+/* Callback function that prints DHCP supplied IP address. */
 static void netif_status_callback(struct netif *netif)
 {
     if (dhcp_supplied_address(netif)) {
-        bool success = arp_register_ipv4(ARP, ip4_addr_get_u32(netif_ip4_addr(netif)), state.mac);
-        if (!success) {
-            sddf_printf("LWIP|ERR: could not register IP with ARP\n");
-        } else {
-            sddf_printf("LWIP|NOTICE: DHCP request for %s returned IP address: %s\n", microkit_name, ip4addr_ntoa(netif_ip4_addr(netif)));
-        }
+        sddf_printf("LWIP|NOTICE: DHCP request for %s returned IP address: %s\n", microkit_name, ip4addr_ntoa(netif_ip4_addr(netif)));
     }
 }
 

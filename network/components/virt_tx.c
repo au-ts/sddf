@@ -11,18 +11,14 @@
 
 uintptr_t tx_free_drv;
 uintptr_t tx_active_drv;
-uintptr_t tx_free_arp;
-uintptr_t tx_active_arp;
 uintptr_t tx_free_cli0;
 uintptr_t tx_active_cli0;
 uintptr_t tx_free_cli1;
 uintptr_t tx_active_cli1;
 
-uintptr_t buffer_data_region_arp_vaddr;
 uintptr_t buffer_data_region_cli0_vaddr;
 uintptr_t buffer_data_region_cli1_vaddr;
 
-uintptr_t buffer_data_region_arp_paddr;
 uintptr_t buffer_data_region_cli0_paddr;
 uintptr_t buffer_data_region_cli1_paddr;
 
@@ -136,14 +132,13 @@ void notified(microkit_channel ch)
 void init(void)
 {
     net_queue_init(&state.tx_queue_drv, (net_queue_t *)tx_free_drv, (net_queue_t *)tx_active_drv, TX_QUEUE_SIZE_DRIV);
-    virt_queue_init_sys(microkit_name, state.tx_queue_clients, tx_free_arp, tx_active_arp);
+    virt_queue_init_sys(microkit_name, state.tx_queue_clients, tx_free_cli0, tx_active_cli0);
 
-    mem_region_init_sys(microkit_name, state.buffer_region_vaddrs, buffer_data_region_arp_vaddr);
+    mem_region_init_sys(microkit_name, state.buffer_region_vaddrs, buffer_data_region_cli0_vaddr);
 
     /* CDTODO: Can we make this system agnostic? */
-    state.buffer_region_paddrs[0] = buffer_data_region_arp_paddr;
-    state.buffer_region_paddrs[1] = buffer_data_region_cli0_paddr;
-    state.buffer_region_paddrs[2] = buffer_data_region_cli1_paddr;
+    state.buffer_region_paddrs[0] = buffer_data_region_cli0_paddr;
+    state.buffer_region_paddrs[1] = buffer_data_region_cli1_paddr;
 
     tx_provide();
 }
