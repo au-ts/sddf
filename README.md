@@ -16,7 +16,9 @@ We are working on developing the protocols and interfaces for various device cla
 There is a large amount of experimentation on-going for each device class, although the design
 for the network device class is mostly mature at this point.
 
-More information about the development and design of sDDF can be found
+The latest design documentation can be found [here](https://trustworthy.systems/projects/drivers/sddf-design.pdf).
+
+More information about the sDDF project can be found on the Trustworthy Systems website
 [here](https://trustworthy.systems/projects/drivers/).
 
 ## Building and running examples
