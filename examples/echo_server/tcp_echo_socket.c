@@ -21,7 +21,7 @@ struct echo_state {
 
 // This previously was a LWIP_MEMPOOL, but turns out that doesn't support sizes
 // greater than ~65536 (due to integer overflow somewhere).
-#define MAX_CONCURRENT 8
+#define MAX_CONCURRENT 1
 static struct echo_state tcp_state_pool[MAX_CONCURRENT];
 
 static struct echo_state* tcp_state_alloc()

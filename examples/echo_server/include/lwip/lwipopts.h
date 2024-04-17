@@ -58,9 +58,9 @@
 #endif
 
 #define TCP_MSS 2000 // maximum segment size, max size of a single packet
-#define TCP_WND (50 * TCP_MSS) // tcp window, max data we can receive at once
-#define TCP_SND_BUF (50 * TCP_MSS) // send buffer space
-#define TCP_SND_QUEUELEN 2500 // max queued pbufs
+#define TCP_WND 2000000 // tcp window, max data we can receive at once
+#define TCP_SND_BUF TCP_WND // send buffer space
+#define TCP_SNDLOWAT TCP_MSS
 
 #define TCP_QUEUE_OOSEQ 1 // hold out-of-sequence packets instead of immediately dropping them
 #define LWIP_TCP_SACK_OUT 1 // support sending selective acknowledgements
