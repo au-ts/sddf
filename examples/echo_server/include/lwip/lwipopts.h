@@ -25,7 +25,7 @@
 #define LWIP_DHCP                       1
 
 #define MEM_ALIGNMENT                   4
-#define MEM_SIZE                        0x10000
+#define MEM_SIZE                        0x30000
 
 #define ETHARP_SUPPORT_STATIC_ENTRIES   1
 #define SYS_LIGHTWEIGHT_PROT            0
@@ -90,5 +90,8 @@
 /* Debugging options */
 #define LWIP_DEBUG // we always want this on
 #define LWIP_DBG_MIN_LEVEL LWIP_DBG_LEVEL_WARNING // set this to 0 to see debug warnings
-// #define IP_DEBUG LWIP_DBG_ON
-// #define TCP_INPUT_DEBUG LWIP_DBG_ON
+
+#define MEMP_DEBUG LWIP_DBG_ON
+#define IP_DEBUG LWIP_DBG_ON
+#define TCP_OUTPUT_DEBUG LWIP_DBG_ON
+#define TCP_INPUT_DEBUG LWIP_DBG_ON
