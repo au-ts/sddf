@@ -144,7 +144,7 @@ tcp_input(struct pbuf *p, struct netif *inp)
   /* Check that TCP header fits in payload */
   if (p->len < TCP_HLEN) {
     /* drop short packets */
-    LWIP_DEBUGF(TCP_INPUT_DEBUG, ("tcp_input: short packet (%"U16_F" bytes) discarded\n", p->tot_len));
+    LWIP_DEBUGF(TCP_INPUT_DEBUG | LWIP_DBG_LEVEL_WARNING, ("tcp_input: short packet (%"U16_F" bytes) discarded\n", p->tot_len));
     TCP_STATS_INC(tcp.lenerr);
     goto dropped;
   }
@@ -162,7 +162,7 @@ tcp_input(struct pbuf *p, struct netif *inp)
     u16_t chksum = ip_chksum_pseudo(p, IP_PROTO_TCP, p->tot_len,
                                     ip_current_src_addr(), ip_current_dest_addr());
     if (chksum != 0) {
-      LWIP_DEBUGF(TCP_INPUT_DEBUG, ("tcp_input: packet discarded due to failing checksum 0x%04"X16_F"\n",
+      LWIP_DEBUGF(TCP_INPUT_DEBUG | LWIP_DBG_LEVEL_WARNING, ("tcp_input: packet discarded due to failing checksum 0x%04"X16_F"\n",
                                     chksum));
       tcp_debug_print(tcphdr);
       TCP_STATS_INC(tcp.chkerr);
@@ -174,7 +174,7 @@ tcp_input(struct pbuf *p, struct netif *inp)
   /* sanity-check header length */
   hdrlen_bytes = TCPH_HDRLEN_BYTES(tcphdr);
   if ((hdrlen_bytes < TCP_HLEN) || (hdrlen_bytes > p->tot_len)) {
-    LWIP_DEBUGF(TCP_INPUT_DEBUG, ("tcp_input: invalid header length (%"U16_F")\n", (u16_t)hdrlen_bytes));
+    LWIP_DEBUGF(TCP_INPUT_DEBUG | LWIP_DBG_LEVEL_WARNING, ("tcp_input: invalid header length (%"U16_F")\n", (u16_t)hdrlen_bytes));
     TCP_STATS_INC(tcp.lenerr);
     goto dropped;
   }
@@ -207,7 +207,7 @@ tcp_input(struct pbuf *p, struct netif *inp)
     /* check that the options fit in the second pbuf */
     if (opt2len > p->next->len) {
       /* drop short packets */
-      LWIP_DEBUGF(TCP_INPUT_DEBUG, ("tcp_input: options overflow second pbuf (%"U16_F" bytes)\n", p->next->len));
+      LWIP_DEBUGF(TCP_INPUT_DEBUG | LWIP_DBG_LEVEL_WARNING, ("tcp_input: options overflow second pbuf (%"U16_F" bytes)\n", p->next->len));
       TCP_STATS_INC(tcp.lenerr);
       goto dropped;
     }
@@ -237,7 +237,7 @@ tcp_input(struct pbuf *p, struct netif *inp)
     tcplen++;
     if (tcplen < p->tot_len) {
       /* u16_t overflow, cannot handle this */
-      LWIP_DEBUGF(TCP_INPUT_DEBUG, ("tcp_input: length u16_t overflow, cannot handle this\n"));
+      LWIP_DEBUGF(TCP_INPUT_DEBUG | LWIP_DBG_LEVEL_WARNING, ("tcp_input: length u16_t overflow, cannot handle this\n"));
       TCP_STATS_INC(tcp.lenerr);
       goto dropped;
     }

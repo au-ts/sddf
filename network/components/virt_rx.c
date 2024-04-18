@@ -84,7 +84,7 @@ void rx_return(void)
             //
             // [1]: https://developer.arm.com/documentation/ddi0595/2021-06/AArch64-Instructions/DC-IVAC--Data-or-unified-Cache-line-Invalidate-by-VA-to-PoC
             // [2]: https://developer.arm.com/documentation/100236/0002/functional-description/cache-behavior-and-cache-protection/invalidating-or-cleaning-a-cache
-            cache_clean_and_invalidate(buffer_vaddr, buffer_vaddr + ROUND_UP(buffer.len, 1 << CONFIG_L1_CACHE_LINE_SIZE_BITS));
+            microkit_arm_vspace_data_invalidate(buffer_vaddr, buffer_vaddr + ROUND_UP(buffer.len, 1 << CONFIG_L1_CACHE_LINE_SIZE_BITS));
 
             int client = get_client((struct ethernet_header *) buffer_vaddr);
             if (client >= 0) {
@@ -133,16 +133,13 @@ void rx_provide(void)
                 assert(!(buffer.io_or_offset % NET_BUFFER_SIZE) && 
                        (buffer.io_or_offset < NET_BUFFER_SIZE * state.rx_queue_clients[client].size));
 
-                // Cache invalidate before DMA write to discard dirty
-                // cachelines, so they don't overwrite received data.
+                // Cache clean before DMA write to discard dirty cachelines, so
+                // they don't overwrite received data.
                 //
-                // We need to invalidate the whole buffer since we don't know
-                // the packet length anymore, and also because the client may
-                // have written past the packet anyways.
-                //
-                // See comment in rx_return for explanation of why we're using
-                // cache_clean_and_invalidate.
-                cache_clean_and_invalidate(buffer.io_or_offset + buffer_data_vaddr, buffer.io_or_offset + buffer_data_vaddr + NET_BUFFER_SIZE);
+                // We need to flush the whole buffer since we don't know the
+                // packet length anymore, and also because the client may have
+                // written past the packet anyways.
+                //cache_clean(buffer.io_or_offset + buffer_data_vaddr, buffer.io_or_offset + buffer_data_vaddr + NET_BUFFER_SIZE);
 
                 buffer.io_or_offset = buffer.io_or_offset + buffer_data_paddr;
                 err = net_enqueue_free(&state.rx_queue_drv, buffer);
