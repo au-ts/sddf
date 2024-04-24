@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <sddf/blk/bitarray.h>
 #include <sddf/blk/fsmalloc.h>
+#include <sddf/util/util.h>
 
 /**
  * Convert a bit position to the address of the corresponding data cell.
@@ -68,7 +69,7 @@ void fsmalloc_free(fsmalloc_t *fsmalloc, uintptr_t addr, uint64_t count)
     unsigned int start_bitpos = addr_to_bitpos(fsmalloc, addr);
 
     // Assert here in case we try to free cells that overflow the data region
-    // assert(start_bitpos + count <= fsmalloc->num_cells);
+    assert(start_bitpos + count <= fsmalloc->num_cells);
 
     // Set the next count many bits as available
     bitarray_set_region(fsmalloc->avail_bitarr, start_bitpos, count);
