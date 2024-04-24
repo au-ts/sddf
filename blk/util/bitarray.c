@@ -1,4 +1,5 @@
 #include <sddf/blk/bitarray.h>
+#include <sddf/util/util.h>
 
 #define WORD_MAX  (~(word_t)0)
 
@@ -131,25 +132,28 @@ static inline void _set_region(bitarray_t *bitarr, bit_index_t start,
 
 void bitarray_set_region(bitarray_t *bitarr, bit_index_t start, bit_index_t len)
 {
-    // assert(start + len <= bitarr->num_of_bits);
+    assert(start + len <= bitarr->num_of_bits);
     SET_REGION(bitarr, start, len);
 }
 
 void bitarray_clear_region(bitarray_t *bitarr, bit_index_t start, bit_index_t len)
 {
-    // assert(start + len <= bitarr->num_of_bits);
+    assert(start + len <= bitarr->num_of_bits);
     CLEAR_REGION(bitarr, start, len);
 }
 
 void bitarray_toggle_region(bitarray_t *bitarr, bit_index_t start, bit_index_t len)
 {
-    // assert(start + len <= bitarr->num_of_bits);
+    assert(start + len <= bitarr->num_of_bits);
     TOGGLE_REGION(bitarr, start, len);
 }
 
 bool bitarray_cmp_region(bitarray_t *bitarr1, bit_index_t start1,
                          bitarray_t *bitarr2, bit_index_t start2, bit_index_t len)
 {
+    assert(start1 + len <= bitarr1->num_of_bits);
+    assert(start2 + len <= bitarr2->num_of_bits);
+
     if (len == 0) {
         return true;
     }
