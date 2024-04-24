@@ -135,11 +135,13 @@ static void partitions_init()
 static void request_mbr()
 {
     uintptr_t mbr_addr;
-    fsmalloc_alloc(&fsmalloc, &mbr_addr, 1);
+    int err = fsmalloc_alloc(&fsmalloc, &mbr_addr, 1);
+    assert(!err);
 
     uint64_t mbr_req_id;
     reqbk_t mbr_req_data = {0, 0, 0, mbr_addr, 1, 0};
-    ialloc_alloc(&ialloc, &mbr_req_id);
+    err = ialloc_alloc(&ialloc, &mbr_req_id);
+    assert(!err);
     reqbk[mbr_req_id] = mbr_req_data;
 
     int err = blk_enqueue_req(&drv_h, READ_BLOCKS, mbr_addr, 0, 1, mbr_req_id);
@@ -341,7 +343,8 @@ static void handle_client(int cli_id)
 
         // Bookkeep client request and generate driver req ID
         reqbk_t cli_data = {cli_id, cli_req_id, cli_addr, drv_addr, cli_count, cli_code};
-        ialloc_alloc(&ialloc, &drv_req_id);
+        err = ialloc_alloc(&ialloc, &drv_req_id);
+        assert(!err);
         reqbk[drv_req_id] = cli_data;
 
         err = blk_enqueue_req(&drv_h, cli_code, drv_addr, drv_block_number, cli_count, drv_req_id);
