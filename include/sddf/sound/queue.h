@@ -92,7 +92,7 @@ typedef struct sound_state {
 /**
  * Initialise a queue. Only one side needs to call this function.
  *
- * @param queue_state 
+ * @param queue_state
  * @param buffer_count number of buffers in the queue
  */
 static inline void sound_queue_init(sound_queue_state_t *queue_state, uint32_t buffer_count)
@@ -289,66 +289,91 @@ static inline int sound_dequeue_pcm(sound_pcm_queue_t *queue, sound_pcm_t *out)
 static inline const char *sound_command_code_str(sound_cmd_code_t code)
 {
     switch (code) {
-        case SOUND_CMD_TAKE:
-            return "PCM_SET_PARAMS";
-        case SOUND_CMD_PREPARE:
-            return "PCM_PREPARE";
-        case SOUND_CMD_RELEASE:
-            return "PCM_RELEASE";
-        case SOUND_CMD_START:
-            return "PCM_START";
-        case SOUND_CMD_STOP:
-            return "PCM_STOP";
-        default:
-            return "<unknown>";
+    case SOUND_CMD_TAKE:
+        return "PCM_SET_PARAMS";
+    case SOUND_CMD_PREPARE:
+        return "PCM_PREPARE";
+    case SOUND_CMD_RELEASE:
+        return "PCM_RELEASE";
+    case SOUND_CMD_START:
+        return "PCM_START";
+    case SOUND_CMD_STOP:
+        return "PCM_STOP";
+    default:
+        return "<unknown>";
     }
 }
 
 static inline const char *sound_status_code_str(sound_status_t code)
 {
     switch (code) {
-        case SOUND_S_OK:
-            return "OK";
-        case SOUND_S_BAD_MSG:
-            return "BAD_MSG";
-        case SOUND_S_NOT_SUPP:
-            return "NOT_SUPP";
-        case SOUND_S_IO_ERR:
-            return "IO_ERR";
-        default:
-            return "<unknown>";
+    case SOUND_S_OK:
+        return "OK";
+    case SOUND_S_BAD_MSG:
+        return "BAD_MSG";
+    case SOUND_S_NOT_SUPP:
+        return "NOT_SUPP";
+    case SOUND_S_IO_ERR:
+        return "IO_ERR";
+    default:
+        return "<unknown>";
     }
 }
 
 static inline const char *sound_pcm_fmt_str(sound_pcm_fmt_t fmt)
 {
     switch (fmt) {
-        case SOUND_PCM_FMT_IMA_ADPCM: return "IMA_ADPCM";
-        case SOUND_PCM_FMT_MU_LAW:    return "MU_LAW";
-        case SOUND_PCM_FMT_A_LAW:     return "A_LAW";
-        case SOUND_PCM_FMT_S8:        return "S8";
-        case SOUND_PCM_FMT_U8:        return "U8";
-        case SOUND_PCM_FMT_S16:       return "S16";
-        case SOUND_PCM_FMT_U16:       return "U16";
-        case SOUND_PCM_FMT_S18_3:     return "S18_3";
-        case SOUND_PCM_FMT_U18_3:     return "U18_3";
-        case SOUND_PCM_FMT_S20_3:     return "S20_3";
-        case SOUND_PCM_FMT_U20_3:     return "U20_3";
-        case SOUND_PCM_FMT_S24_3:     return "S24_3";
-        case SOUND_PCM_FMT_U24_3:     return "U24_3";
-        case SOUND_PCM_FMT_S20:       return "S20";
-        case SOUND_PCM_FMT_U20:       return "U20";
-        case SOUND_PCM_FMT_S24:       return "S24";
-        case SOUND_PCM_FMT_U24:       return "U24";
-        case SOUND_PCM_FMT_S32:       return "S32";
-        case SOUND_PCM_FMT_U32:       return "U32";
-        case SOUND_PCM_FMT_FLOAT:     return "FLOAT";
-        case SOUND_PCM_FMT_FLOAT64:   return "FLOAT64";
-        case SOUND_PCM_FMT_DSD_U8:    return "DSD_U8";
-        case SOUND_PCM_FMT_DSD_U16:   return "DSD_U16";
-        case SOUND_PCM_FMT_DSD_U32:   return "DSD_U32";
-        case SOUND_PCM_FMT_IEC958_SUBFRAME: return "IEC958_SUBFRAME";
-        default:
-            return "<unknown>";
+    case SOUND_PCM_FMT_IMA_ADPCM:
+        return "IMA_ADPCM";
+    case SOUND_PCM_FMT_MU_LAW:
+        return "MU_LAW";
+    case SOUND_PCM_FMT_A_LAW:
+        return "A_LAW";
+    case SOUND_PCM_FMT_S8:
+        return "S8";
+    case SOUND_PCM_FMT_U8:
+        return "U8";
+    case SOUND_PCM_FMT_S16:
+        return "S16";
+    case SOUND_PCM_FMT_U16:
+        return "U16";
+    case SOUND_PCM_FMT_S18_3:
+        return "S18_3";
+    case SOUND_PCM_FMT_U18_3:
+        return "U18_3";
+    case SOUND_PCM_FMT_S20_3:
+        return "S20_3";
+    case SOUND_PCM_FMT_U20_3:
+        return "U20_3";
+    case SOUND_PCM_FMT_S24_3:
+        return "S24_3";
+    case SOUND_PCM_FMT_U24_3:
+        return "U24_3";
+    case SOUND_PCM_FMT_S20:
+        return "S20";
+    case SOUND_PCM_FMT_U20:
+        return "U20";
+    case SOUND_PCM_FMT_S24:
+        return "S24";
+    case SOUND_PCM_FMT_U24:
+        return "U24";
+    case SOUND_PCM_FMT_S32:
+        return "S32";
+    case SOUND_PCM_FMT_U32:
+        return "U32";
+    case SOUND_PCM_FMT_FLOAT:
+        return "FLOAT";
+    case SOUND_PCM_FMT_FLOAT64:
+        return "FLOAT64";
+    case SOUND_PCM_FMT_DSD_U8:
+        return "DSD_U8";
+    case SOUND_PCM_FMT_DSD_U16:
+        return "DSD_U16";
+    case SOUND_PCM_FMT_DSD_U32:
+        return "DSD_U32";
+    case SOUND_PCM_FMT_IEC958_SUBFRAME:
+        return "IEC958_SUBFRAME";
+    default:
+        return "<unknown>";
     }
 }
