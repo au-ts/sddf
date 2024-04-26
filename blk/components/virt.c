@@ -144,7 +144,7 @@ static void request_mbr()
     assert(!err);
     reqbk[mbr_req_id] = mbr_req_data;
 
-    int err = blk_enqueue_req(&drv_h, READ_BLOCKS, mbr_addr, 0, 1, mbr_req_id);
+    err = blk_enqueue_req(&drv_h, READ_BLOCKS, mbr_addr, 0, 1, mbr_req_id);
     assert(!err);
 
     microkit_notify_delayed(DRIVER_CH);
