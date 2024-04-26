@@ -35,7 +35,8 @@ static bool started;
 
 static void respond_to_cmd(sound_queues_t *client_rings,
                            sound_cmd_t *cmd,
-                           sound_status_t status) {
+                           sound_status_t status)
+{
     cmd->status = status;
     if (sound_enqueue_cmd(client_rings->cmd_res, cmd) != 0) {
         microkit_dbg_puts("SND VIRT|ERR: failed to respond to command\n");
@@ -44,7 +45,8 @@ static void respond_to_cmd(sound_queues_t *client_rings,
 
 static void respond_to_pcm(sound_queues_t *client_rings,
                            sound_pcm_t *pcm,
-                           sound_status_t status) {
+                           sound_status_t status)
+{
     pcm->status = status;
     pcm->latency_bytes = 0;
     if (sound_enqueue_pcm(client_rings->pcm_res, pcm) != 0) {
@@ -52,7 +54,8 @@ static void respond_to_pcm(sound_queues_t *client_rings,
     }
 }
 
-static int notified_by_client(int client) {
+static int notified_by_client(int client)
+{
 
     if (client < 0 || client > CLIENT_COUNT) {
         microkit_dbg_puts("SND VIRT|ERR: invalid client id\n");
@@ -136,7 +139,8 @@ static int notified_by_client(int client) {
     return 0;
 }
 
-int notified_by_driver(void) {
+int notified_by_driver(void)
+{
 
     bool notify[CLIENT_COUNT] = {0};
 
@@ -155,8 +159,7 @@ int notified_by_driver(void) {
         }
 
         if (cmd.code == SOUND_CMD_RELEASE ||
-            (cmd.code == SOUND_CMD_TAKE && cmd.status != SOUND_S_OK))
-        {
+            (cmd.code == SOUND_CMD_TAKE && cmd.status != SOUND_S_OK)) {
             owners[cmd.stream_id] = -1;
         }
 
@@ -183,7 +186,7 @@ int notified_by_driver(void) {
 
         // Cache is dirty as device may have written to buffer
         microkit_arm_vspace_data_invalidate(pcm.addr, pcm.addr + pcm.len);
-        
+
         if (sound_enqueue_pcm(clients[owner].pcm_res, &pcm) != 0) {
             microkit_dbg_puts("SND VIRT|ERR: Failed to enqueue PCM data\n");
             return -1;
@@ -207,7 +210,8 @@ int notified_by_driver(void) {
     return 0;
 }
 
-void init(void) {
+void init(void)
+{
     clients[0].cmd_req = (void *)c0_cmd_req;
     clients[0].cmd_res = (void *)c0_cmd_res;
     clients[0].pcm_req = (void *)c0_pcm_req;
@@ -230,7 +234,8 @@ void init(void) {
     started = false;
 }
 
-void notified(microkit_channel ch) {
+void notified(microkit_channel ch)
+{
 
     if (ch == DRIVER_CH) {
         if (notified_by_driver() != 0) {

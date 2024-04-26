@@ -256,9 +256,11 @@ void init(void)
 #endif
 
 #if SERIAL_NUM_CLIENTS > 2
-    serial_queue_init(&rx_queue[2], (serial_queue_t *)rx_free_client3, (serial_queue_t *)rx_active_client3, 0, NUM_ENTRIES, NUM_ENTRIES);
+    serial_queue_init(&rx_queue[2], (serial_queue_t *)rx_free_client3, (serial_queue_t *)rx_active_client3, 0, NUM_ENTRIES,
+                      NUM_ENTRIES);
 #endif
-    serial_queue_init(&drv_rx_queue, (serial_queue_t *)rx_free_driver, (serial_queue_t *)rx_active_driver, 0, NUM_ENTRIES, NUM_ENTRIES);
+    serial_queue_init(&drv_rx_queue, (serial_queue_t *)rx_free_driver, (serial_queue_t *)rx_active_driver, 0, NUM_ENTRIES,
+                      NUM_ENTRIES);
 
     for (int i = 0; i < NUM_ENTRIES - 1; i++) {
         int ret = serial_enqueue_free(&drv_rx_queue, rx_data_driver + (i * BUFFER_SIZE), BUFFER_SIZE);
