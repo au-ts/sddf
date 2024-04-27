@@ -6,13 +6,14 @@
 #include <stdint.h>
 #include <microkit.h>
 #include <sddf/util/util.h>
+#include <serial_config.h>
 #include "uart.h"
 #include "uart_config.h"
 
 // Defines to manage interrupts and notifications
-#define IRQ_CH 1
-#define TX_CH  8
-#define RX_CH  10
+#define IRQ_CH 0
+#define TX_CH  1
+#define RX_CH  2
 
 /* Memory regions. These all have to be here to keep compiler happy */
 uintptr_t rx_free;
@@ -294,8 +295,8 @@ void init(void) {
     microkit_dbg_puts(": initialising\n");
 
     // Init the shared queues
-    serial_queue_init(&rx_queue, (serial_queue_t *)rx_free, (serial_queue_t *)rx_active, 0, BUFFER_SIZE, BUFFER_SIZE);
-    serial_queue_init(&tx_queue, (serial_queue_t *)tx_free, (serial_queue_t *)tx_active, 0, BUFFER_SIZE, BUFFER_SIZE);
+    serial_queue_init(&rx_queue, (serial_queue_t *)rx_free, (serial_queue_t *)rx_active, RX_QUEUE_SIZE_DRIV);
+    serial_queue_init(&tx_queue, (serial_queue_t *)tx_free, (serial_queue_t *)tx_active, TX_QUEUE_SIZE_DRIV);
 
     volatile meson_uart_regs_t *regs = (meson_uart_regs_t *) (uart_base + UART_REGS_OFFSET);
 

@@ -5,49 +5,39 @@
 #include <microkit.h>
 #include <sddf/serial/queue.h>
 #include <sddf/serial/util.h>
+#include <serial_config.h>
 #include "uart.h"
 
-#define DRIVER_CH 9
-
-#ifndef SERIAL_NUM_CLIENTS
-#error "SERIAL_NUM_CLIENTS is expected to be defined for TX serial virt"
-#endif
+#define DRIVER_CH 0
+#define CLIENT_OFFSET 1
 
 #define COLOUR_START_LEN 5
 #define COLOUR_END_LEN 4
 
-#define MAX_NUM_CLIENTS 3
+#define MAX_NUM_CLIENTS 8
 
 /* This is a simple sanity check that we have defined as many colours
    as the user as specified clients */
-#if SERIAL_NUM_CLIENTS > MAX_NUM_CLIENTS && defined(SERIAL_TRANSFER_WITH_COLOUR)
+#if NUM_CLIENTS > MAX_NUM_CLIENTS && defined(SERIAL_TRANSFER_WITH_COLOUR)
 #error "There are more clients then there are colours to differentiate them"
 #endif
 
-char *client_colours[MAX_NUM_CLIENTS] = { "\x1b[32m", "\x1b[31m", "\x1b[34m" };
+char *client_colours[MAX_NUM_CLIENTS] = { "\x1b[30m", "\x1b[31m", "\x1b[32m", "\x1b[33m", "\x1b[34m", "\x1b[35m", "\x1b[36m", "\x1b[37m" };
 char *client_colour_end = "\x1b[0m";
 
-/* Memory regions as defined in the system file */
+/* Memory regions as defined in the system file. All data regions must be mapped into the same virtual address in each client! */
 
 // Transmit queues with the driver
 uintptr_t tx_free_driver;
 uintptr_t tx_active_driver;
-
-// Transmit queues with the client
-uintptr_t tx_free_client;
-uintptr_t tx_active_client;
-uintptr_t tx_free_client2;
-uintptr_t tx_active_client2;
-uintptr_t tx_free_client3;
-uintptr_t tx_active_client3;
-
 uintptr_t tx_data_driver;
-uintptr_t tx_data_client;
-uintptr_t tx_data_client2;
-uintptr_t tx_data_client3;
 
-serial_queue_handle_t tx_queue[SERIAL_NUM_CLIENTS];
+// Transmit queues with the client. Client free, active and data regions must be mapped in contiguously
+uintptr_t tx_free_client0;
+uintptr_t tx_active_client0;
+
 serial_queue_handle_t drv_tx_queue;
+serial_queue_handle_t tx_queue[NUM_CLIENTS];
 
 size_t copy_with_colour(size_t client, size_t buffer_len, char *driver_buf, char *client_buf)
 {
@@ -81,10 +71,8 @@ int handle_tx(int curr_client)
     uintptr_t client_buf = 0;
     unsigned int client_buf_len = 0;
 
-    bool was_empty = serial_queue_empty(drv_tx_queue.active);
-
     // Loop over all clients here
-    for (int client = 0; client < SERIAL_NUM_CLIENTS; client++) {
+    for (int client = 0; client < NUM_CLIENTS; client++) {
         // The client can plug their queue. If plugged, we won't process it.
         if (serial_queue_plugged(tx_queue[client].active)) {
             continue;
@@ -132,47 +120,22 @@ int handle_tx(int curr_client)
         }
     }
 
-    if (was_empty) {
-        microkit_notify(DRIVER_CH);
-    }
-
+    microkit_notify(DRIVER_CH);
     return 0;
 }
 
 void init(void)
 {
-    // We want to init the client queues here. Currently this only inits one client
-    serial_queue_init(&tx_queue[0], (serial_queue_t *)tx_free_client, (serial_queue_t *)tx_active_client, 0, NUM_ENTRIES,
-                      NUM_ENTRIES);
-    // @ivanv: terrible temporary hack
-#if SERIAL_NUM_CLIENTS > 1
-    serial_queue_init(&tx_queue[1], (serial_queue_t *)tx_free_client2, (serial_queue_t *)tx_active_client2, 0, NUM_ENTRIES,
-                      NUM_ENTRIES);
-#endif
-#if SERIAL_NUM_CLIENTS > 2
-    serial_queue_init(&tx_queue[2], (serial_queue_t *)tx_free_client3, (serial_queue_t *)tx_active_client3, 0, NUM_ENTRIES,
-                      NUM_ENTRIES);
-#endif
-    serial_queue_init(&drv_tx_queue, (serial_queue_t *)tx_free_driver, (serial_queue_t *)tx_active_driver, 0, NUM_ENTRIES,
-                      NUM_ENTRIES);
-
-    // Add buffers to the driver tx queue from our shared dma region
-    for (int i = 0; i < NUM_ENTRIES - 1; i++) {
-        // Have to start at the memory region left of by the rx queue
-        int ret = serial_enqueue_free(&drv_tx_queue, tx_data_driver + ((i + NUM_ENTRIES) * BUFFER_SIZE), BUFFER_SIZE);
-
-        if (ret != 0) {
-            microkit_dbg_puts(microkit_name);
-            microkit_dbg_puts(": tx buffer population, unable to enqueue buffer\n");
-        }
-    }
+    serial_queue_init(&drv_tx_queue, (serial_queue_t *)tx_free_driver, (serial_queue_t *)tx_active_driver, TX_QUEUE_SIZE_DRIV);
+    serial_buffers_init(&drv_tx_queue, tx_data_driver);
+    virt_queue_init_sys(microkit_name, tx_queue, tx_free_client0, tx_active_client0);
 }
 
 void notified(microkit_channel ch)
 {
     // We should only ever recieve notifications from the client
     // Sanity check the client
-    if (ch < 1 || ch > SERIAL_NUM_CLIENTS) {
+    if (ch == DRIVER_CH || ch > NUM_CLIENTS) {
         microkit_dbg_puts("Received a bad client channel\n");
         return;
     }

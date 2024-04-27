@@ -56,11 +56,12 @@ UTIL := $(SDDF)/util
 SERIAL_NUM_CLIENTS := -DSERIAL_NUM_CLIENTS=2
 SERIAL_COMPONENTS := $(SDDF)/serial/components
 UART_DRIVER := $(SDDF)/drivers/serial/$(DRIVER_DIR)
+SERIAL_CONFIG_INCLUDE:=${TOP}/include/serial_config
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 SYSTEM_FILE := ${TOP}/board/$(MICROKIT_BOARD)/serial.system
 
 IMAGES := uart_driver.elf \
-	  serial_server_1.elf serial_server_2.elf \
+	  serial_server.elf \
 	  serial_tx_virt.elf serial_rx_virt.elf
 CFLAGS := -mcpu=$(CPU)\
 	  -mstrict-align \
@@ -92,11 +93,7 @@ include ${SERIAL_COMPONENTS}/serial_components.mk
 %.elf: %.o
 	${LD} -o $@ ${LDFLAGS} $< ${LIBS} 
 
-
-serial_server_1.o: CFLAGS+=-DSERIAL_SERVER_NUMBER=1
-serial_server_2.o: CFLAGS+=-DSERIAL_SERVER_NUMBER=2
-
-serial_server_%.o: ${TOP}/serial_server.c ${CHECK_FLAGS_BOARD_MD5}
+serial_server.o: ${TOP}/serial_server.c ${CHECK_FLAGS_BOARD_MD5}
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)

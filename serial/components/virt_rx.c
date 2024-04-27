@@ -4,38 +4,26 @@
 #include <microkit.h>
 #include <sddf/serial/queue.h>
 #include <sddf/serial/util.h>
+#include <serial_config.h>
 #include "uart.h"
 #include "uart_config.h"
 
-#define CLI_CH 1
-#define DRV_CH 11
+#define DRV_CH 0
+#define CLIENT_OFFSET 1
 
-#ifndef SERIAL_NUM_CLIENTS
-#error "SERIAL_NUM_CLIENTS is expected to be defined for RX serial virtualiser"
-#endif
-
-/* Memory regions as defined in the system file */
+/* Memory regions as defined in the system file. All data regions must be mapped into the same virtual address in each client! */
 
 // Transmit queues with the driver
 uintptr_t rx_free_driver;
 uintptr_t rx_active_driver;
-
-// Transmit queues with the client
-uintptr_t rx_free_client;
-uintptr_t rx_active_client;
-uintptr_t rx_free_client2;
-uintptr_t rx_active_client2;
-uintptr_t rx_free_client3;
-uintptr_t rx_active_client3;
-
 uintptr_t rx_data_driver;
-// @ivanv: unused
-uintptr_t rx_data_client;
-uintptr_t rx_data_client2;
-uintptr_t rx_data_client3;
 
-serial_queue_handle_t rx_queue[SERIAL_NUM_CLIENTS];
+// Receive queues with the client. Client free, active and data regions must be mapped in contiguously
+uintptr_t rx_free_client0;
+uintptr_t rx_active_client0;
+
 serial_queue_handle_t drv_rx_queue;
+serial_queue_handle_t rx_queue[NUM_CLIENTS];
 
 /* We need to do some processing of the input stream to determine when we need
 to change direction. */
@@ -47,12 +35,12 @@ int virt_state;
 int client;
 // We want to keep track of each clients requests, so that they can be serviced once we have changed
 // input direction
-int num_to_get_chars[SERIAL_NUM_CLIENTS];
+int num_to_get_chars[NUM_CLIENTS];
 int multi_client;
 
 int give_multi_char(char *drv_buffer, int drv_buffer_len)
 {
-    for (int curr_client = 0; curr_client < SERIAL_NUM_CLIENTS; curr_client++) {
+    for (int curr_client = 0; curr_client < NUM_CLIENTS; curr_client++) {
 
         if (num_to_get_chars[curr_client] <= 0) {
             return 1;
@@ -89,7 +77,7 @@ int give_multi_char(char *drv_buffer, int drv_buffer_len)
 
 int give_single_char(int curr_client, char *drv_buffer, int drv_buffer_len)
 {
-    if (curr_client < 1 || curr_client > SERIAL_NUM_CLIENTS) {
+    if (curr_client > NUM_CLIENTS) {
         return 1;
     }
 
@@ -101,7 +89,7 @@ int give_single_char(int curr_client, char *drv_buffer, int drv_buffer_len)
     // Integer to store the length of the buffer
     unsigned int buffer_len = 0;
 
-    int ret = serial_dequeue_free(&rx_queue[curr_client - 1], &buffer, &buffer_len);
+    int ret = serial_dequeue_free(&rx_queue[curr_client], &buffer, &buffer_len);
 
     if (ret != 0) {
         microkit_dbg_puts(microkit_name);
@@ -113,7 +101,7 @@ int give_single_char(int curr_client, char *drv_buffer, int drv_buffer_len)
     buffer_len = drv_buffer_len;
 
     // Now place in the rx active queue
-    ret = serial_enqueue_active(&rx_queue[curr_client - 1], buffer, buffer_len);
+    ret = serial_enqueue_active(&rx_queue[curr_client], buffer, buffer_len);
 
     if (ret != 0) {
         microkit_dbg_puts(microkit_name);
@@ -185,7 +173,7 @@ void handle_rx()
                     got_char_terminated[0] = got_char;
                     got_char_terminated[1] = '\0';
                     int new_client = atoi(got_char_terminated);
-                    if (new_client < 1 || new_client > SERIAL_NUM_CLIENTS) {
+                    if (new_client < 0 || new_client >= NUM_CLIENTS) {
                         microkit_dbg_puts("VIRT|RX: Attempted to switch to invalid client number: ");
                         puthex64(new_client);
                         microkit_dbg_puts("\n");
@@ -246,40 +234,18 @@ void handle_rx()
 
 void init(void)
 {
-    // We want to init the client queues here. Currently this only inits one client
-    serial_queue_init(&rx_queue[0], (serial_queue_t *)rx_free_client, (serial_queue_t *)rx_active_client, 0, NUM_ENTRIES,
-                      NUM_ENTRIES);
-    // @ivanv: terrible temporary hack
-#if SERIAL_NUM_CLIENTS > 1
-    serial_queue_init(&rx_queue[1], (serial_queue_t *)rx_free_client2, (serial_queue_t *)rx_active_client2, 0, NUM_ENTRIES,
-                      NUM_ENTRIES);
-#endif
+    serial_queue_init(&drv_rx_queue, (serial_queue_t *)rx_free_driver, (serial_queue_t *)rx_active_driver, RX_QUEUE_SIZE_DRIV);
+    serial_buffers_init(&drv_rx_queue, rx_data_driver);
+    virt_queue_init_sys(microkit_name, rx_queue, rx_free_client0, rx_active_client0);
 
-#if SERIAL_NUM_CLIENTS > 2
-    serial_queue_init(&rx_queue[2], (serial_queue_t *)rx_free_client3, (serial_queue_t *)rx_active_client3, 0, NUM_ENTRIES,
-                      NUM_ENTRIES);
-#endif
-    serial_queue_init(&drv_rx_queue, (serial_queue_t *)rx_free_driver, (serial_queue_t *)rx_active_driver, 0, NUM_ENTRIES,
-                      NUM_ENTRIES);
-
-    for (int i = 0; i < NUM_ENTRIES - 1; i++) {
-        int ret = serial_enqueue_free(&drv_rx_queue, rx_data_driver + (i * BUFFER_SIZE), BUFFER_SIZE);
-
-        if (ret != 0) {
-            microkit_dbg_puts(microkit_name);
-            microkit_dbg_puts(": virt rx buffer population, unable to enqueue buffer\n");
-            return;
-        }
-    }
-
-    // We initialise the current client to 1
-    client = 1;
+    // We initialise the current client to 0
+    client = 0;
     // Set the current escape character to 0, we can't have recieved an escape character yet
     virt_state = 0;
     // Disable simultaneous multi client input
     multi_client = 0;
     // No chars have been requested yet
-    for (int i = 0; i < SERIAL_NUM_CLIENTS; i++) {
+    for (int i = 0; i < NUM_CLIENTS; i++) {
         num_to_get_chars[i] = 0;
     }
 }
@@ -290,11 +256,11 @@ void notified(microkit_channel ch)
     // Sanity check the client
     if (ch == DRV_CH) {
         handle_rx();
-    } else if (ch < 1 || ch > SERIAL_NUM_CLIENTS) {
+    } else if (ch > NUM_CLIENTS) {
         microkit_dbg_puts("Received a bad client channel\n");
         return;
     }  else {
         // This was recieved on a client channel. Index the number of characters to get
-        num_to_get_chars[ch - 1] += 1;
+        num_to_get_chars[ch - CLIENT_OFFSET] += 1;
     }
 }

@@ -5,6 +5,7 @@
 #include "uart_config.h"
 #include <sddf/serial/queue.h>
 #include <sddf/util/util.h>
+#include <serial_config.h>
 
 /*
  * The PL011 is supposedly universal, which means that this driver should be
@@ -18,9 +19,9 @@
 #define LOG_DRIVER_ERR(...) do{ microkit_dbg_puts(microkit_name); microkit_dbg_puts("|ERROR: "); microkit_dbg_puts(__VA_ARGS__); }while(0)
 
 /* Defines to manage interrupts and notifications */
-#define IRQ_CH 1
-#define TX_CH  8
-#define RX_CH  10
+#define IRQ_CH 0
+#define TX_CH  1
+#define RX_CH  2
 
 /* Shared memory for queues */
 uintptr_t rx_free;
@@ -203,9 +204,8 @@ void handle_irq() {
 void init(void) {
     LOG_DRIVER("initialising\n");
 
-    // Init the shared queues
-    serial_queue_init(&rx_queue, (serial_queue_t *)rx_free, (serial_queue_t *)rx_active, 0, NUM_ENTRIES, NUM_ENTRIES);
-    serial_queue_init(&tx_queue, (serial_queue_t *)tx_free, (serial_queue_t *)tx_active, 0, NUM_ENTRIES, NUM_ENTRIES);
+    serial_queue_init(&rx_queue, (serial_queue_t *)rx_free, (serial_queue_t *)rx_active, RX_QUEUE_SIZE_DRIV);
+    serial_queue_init(&tx_queue, (serial_queue_t *)tx_free, (serial_queue_t *)tx_active, TX_QUEUE_SIZE_DRIV);
 
     volatile struct pl011_uart_regs *regs = (volatile struct pl011_uart_regs *) uart_base;
     // @ivanv what does 0x50 mean!
