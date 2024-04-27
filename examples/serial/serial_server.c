@@ -1,10 +1,7 @@
 #include <microkit.h>
 #include <sddf/serial/queue.h>
 #include <sddf/serial/util.h>
-
-#ifndef SERIAL_SERVER_NUMBER
-#error "Need to define SERIAL_SERVER_NUMBER"
-#endif
+#include <serial_config.h>
 
 /* Channels to the rest of the serial sub-system. These numbers are
  * follow what is in the system description file.
@@ -59,9 +56,6 @@ int serial_server_printf(char *string)
     memcpy((char *) buffer, string, print_len);
 
     // We then need to add this buffer to the transmit active queue structure
-
-    bool is_empty = serial_queue_empty(tx_queue.active);
-
     ret = serial_enqueue_active(&tx_queue, buffer, print_len);
 
     if (ret != 0) {
@@ -70,18 +64,7 @@ int serial_server_printf(char *string)
         return -1;
     }
 
-    /*
-    First we will check if the transmit active queue is empty. If not empty, then the driver was processing
-    the active queue, however it was not finished, potentially running out of budget and being pre-empted.
-    Therefore, we can just add the buffer to the active queue, and wait for the driver to resume. However if
-    empty, then we can notify the driver to start processing the active queue.
-    */
-
-    if (is_empty) {
-        // Notify the driver through the TX channel
-        microkit_notify(SERIAL_VIRT_TX_CH);
-    }
-
+    microkit_notify(SERIAL_VIRT_TX_CH);
     return 0;
 }
 
@@ -117,7 +100,7 @@ int getchar()
     char got_char = *((char *) buffer);
 
     /* Now that we are finished with the active buffer, we can add it back to the free queue*/
-    int ret = serial_enqueue_free(&rx_queue, buffer, buffer_len);
+    int ret = serial_enqueue_free(&rx_queue, buffer, BUFFER_SIZE);
 
     if (ret != 0) {
         microkit_dbg_puts(microkit_name);
@@ -168,31 +151,9 @@ void init(void)
     // Here we need to init queue buffers and other data structures
 
     // Init the shared queue buffers
-    serial_queue_init(&rx_queue, (serial_queue_t *)rx_free, (serial_queue_t *)rx_active, 0, 512, 512);
-    // We will also need to populate these queues with memory from the shared dma region
-
-    // Add buffers to the rx queue
-    for (int i = 0; i < NUM_ENTRIES - 1; i++) {
-        int ret = serial_enqueue_free(&rx_queue, rx_data + (i * BUFFER_SIZE), BUFFER_SIZE);
-
-        if (ret != 0) {
-            microkit_dbg_puts(microkit_name);
-            microkit_dbg_puts(": server rx buffer population, unable to enqueue buffer\n");
-        }
-    }
-
-    serial_queue_init(&tx_queue, (serial_queue_t *)tx_free, (serial_queue_t *)tx_active, 0, 512, 512);
-
-    // Add buffers to the tx queue
-    for (int i = 0; i < NUM_ENTRIES - 1; i++) {
-        // Have to start at the memory region left of by the rx queue
-        int ret = serial_enqueue_free(&tx_queue, tx_data + ((i + NUM_ENTRIES) * BUFFER_SIZE), BUFFER_SIZE);
-
-        if (ret != 0) {
-            microkit_dbg_puts(microkit_name);
-            microkit_dbg_puts(": server tx buffer population, unable to enqueue buffer\n");
-        }
-    }
+    cli_queue_init_sys(microkit_name, &rx_queue, rx_free, rx_active, &tx_queue, tx_free, tx_active);
+    serial_buffers_init(&rx_queue, rx_data);
+    serial_buffers_init(&tx_queue, tx_data);
 
     // Plug the tx active queue
     serial_queue_plug(tx_queue.active);

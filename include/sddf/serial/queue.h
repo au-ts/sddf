@@ -11,8 +11,6 @@
 #include <stddef.h>
 #include <sddf/util/fence.h>
 
-/* Number of entries each queue is configured to have. */
-#define NUM_ENTRIES 512
 /* Size of the data that each queue entry points to. */
 #define BUFFER_SIZE 2048
 
@@ -30,7 +28,7 @@ typedef struct serial_queue {
     bool notify_writer;
     bool notify_reader;
     bool plugged;
-    serial_queue_entry_t entries[NUM_ENTRIES];
+    serial_queue_entry_t entries[];
 } serial_queue_t;
 
 /* A queue handle for enqueing/dequeuing into  */
@@ -45,27 +43,16 @@ typedef struct serial_queue_handle {
  * @param queue queue handle to use.
  * @param free pointer to free queue in shared memory.
  * @param active pointer to active queue in shared memory.
- * @param buffer_init 1 indicates the head and tail indices in shared memory need to be initialised.
- *                    0 inidicates they do not. Only one side of the shared memory regions needs to do this.
+ * @param size Number of entries in each queue.
  */
-static inline void serial_queue_init(serial_queue_handle_t *queue, serial_queue_t *free, serial_queue_t *active, int buffer_init, uint32_t free_size, uint32_t active_size)
+static inline void serial_queue_init(serial_queue_handle_t *queue, serial_queue_t *free, serial_queue_t *active, uint32_t size)
 {
     queue->free = free;
+    queue->free->notify_reader = true;
+    queue->free->size = size;
     queue->active = active;
-    if (buffer_init) {
-        queue->free->tail = 0;
-        queue->free->head = 0;
-        queue->free->size = free_size;
-        queue->free->notify_writer = false;
-        queue->free->notify_reader = false;
-        queue->free->plugged = false;
-        queue->active->tail = 0;
-        queue->active->head = 0;
-        queue->active->size = active_size;
-        queue->active->notify_writer =false;
-        queue->active->notify_reader = false;
-        queue->active->plugged = false;
-    }
+    queue->active->notify_reader = true;
+    queue->active->size = size;
 }
 
 /**
@@ -208,6 +195,19 @@ static inline int serial_dequeue_free(serial_queue_handle_t *queue, uintptr_t *a
 static inline int serial_dequeue_active(serial_queue_handle_t *queue, uintptr_t *addr, unsigned int *len)
 {
     return serial_dequeue(queue->active, addr, len);
+}
+
+/**
+ * Initialise the free queue by filling with all free buffers.
+ *
+ * @param queue queue handle to use.
+ * @param base_addr start of the memory region the offsets are applied to.
+ */
+static inline void serial_buffers_init(serial_queue_handle_t *queue, uintptr_t base_addr)
+{
+    for (uint32_t i = 0; i < queue->free->size - 1; i++) {
+        serial_enqueue_free(queue, (BUFFER_SIZE * i) + base_addr, 0);
+    }
 }
 
 /**
