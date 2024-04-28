@@ -4,6 +4,7 @@
 #include <sddf/util/ialloc.h>
 #include <sddf/virtio/virtio.h>
 #include <sddf/virtio/virtio_queue.h>
+#include <sddf/util/printf.h>
 #include "virtio_i2c.h"
 
 volatile virtio_mmio_regs_t *regs;
@@ -14,13 +15,29 @@ struct virtq requestq;
 
 uintptr_t i2c_regs;
 
-#define VIRTIO_MMIO_I2C_OFFSET (0xc00)
+uintptr_t virtio_mmio_i2c_offset = 0;
+
 #define REQUEST_COUNT 512
 #define HW_RING_SIZE (0x10000)
 
 void init(void)
 {
-    regs = (volatile virtio_mmio_regs_t *) (i2c_regs + VIRTIO_MMIO_I2C_OFFSET);
+    /*
+    *   Rudementry device discovery. Map in all the virtio-mmio regions and scan
+    *   them for an i2c device.
+    *
+    *   NOTE: This offset changes depending on how many virtio-mmio devices
+    *   there are in the system.
+    */
+    for (int i = 0; i < 0x3f00; i+= 0x200) {
+        regs = (volatile virtio_mmio_regs_t *) (i2c_regs + i);
+        if (virtio_mmio_check_device_id(regs, VIRTIO_DEVICE_ID_I2C)) {
+            sddf_dprintf("This is a virtio i2c device at offset: %p\n", i);
+            virtio_mmio_i2c_offset = i;
+        }
+    }
+
+    regs = (volatile virtio_mmio_regs_t *) (i2c_regs + virtio_mmio_i2c_offset);
 
     // Do MMIO device init (section 4.2.3.1)
     if (!virtio_mmio_check_magic(regs)) {
@@ -58,14 +75,14 @@ void init(void)
     uint32_t feature_high = regs->DeviceFeatures;
     uint64_t features = feature_low | ((uint64_t)feature_high << 32);
 
-    sddf_dprintf("These are features low: %b --- these are features high: %b\n", feature_low, feature_high);
-
+    sddf_dprintf("These are features low: %b--- these are features high: %b\n", feature_low, feature_high);
+    sddf_dprintf("These are all the feature bits: %b\n", features);
     /* According to the virtio i2c spec we must negotiate the following features:
      * VIRTIO_I2C_F_ZERO_LENGTH_REQUEST
      */
 
     // Check that the feature is offered by the device
-    if (!(features & ((uint64_t)1 << VIRTIO_I2C_F_ZERO_LENGTH_REQUEST))) {
+    if (!(feature_low & ((uint64_t)1 << VIRTIO_I2C_F_ZERO_LENGTH_REQUEST))) {
         LOG_DRIVER_ERR("Device does not offer zero length request. Unable to negotiate!\n");
         regs->Status = VIRTIO_DEVICE_STATUS_FAILED;
         return;

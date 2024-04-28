@@ -6,8 +6,7 @@
 
 BUILD_DIR ?= build
 MICROKIT_CONFIG ?= debug
-# This example is specifically for the Odroid-C4 platform
-MICROKIT_BOARD := odroidc4
+# This example is specifically for the Odroid-C4 and qemu_arm_virt platforms
 
 ifeq ($(strip $(MICROKIT_SDK)),)
 $(error MICROKIT_SDK must be specified)
@@ -17,23 +16,34 @@ ifeq ($(strip $(TOOLCHAIN)),)
 	TOOLCHAIN := aarch64-none-elf
 endif
 
-MICROKIT_BOARD ?= odroidc4
-CPU := cortex-a55
+ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
+	I2C_DRIVER_DIR := meson
+	TIMER_DRIV_DIR := meson
+	CPU := cortex-a55
+else ifeq ($(strip $(MICROKIT_BOARD)), qemu_arm_virt)
+	I2C_DRIVER_DIR := virtio
+	TIMER_DRIV_DIR := arm
+	CPU := cortex-a53
+else
+$(error Unsupported MICROKIT_BOARD given)
+endif
 
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
+SYSTEM_FILE := board/$(MICROKIT_BOARD)/i2c.system
 
 CC := $(TOOLCHAIN)-gcc
 LD := $(TOOLCHAIN)-ld
 AS := $(TOOLCHAIN)-as
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
+QEMU := qemu-system-aarch64
 
 SDDF := $(abspath ../../)
 UTIL := $(SDDF)/util
 LIBCO := $(SDDF)/libco
 
 I2C := $(SDDF)/i2c
-I2C_DRIVER := $(SDDF)/drivers/i2c/meson
-TIMER_DRIVER := $(SDDF)/drivers/clock/meson
+I2C_DRIVER := $(SDDF)/drivers/i2c/${I2C_DRIVER_DIR}
+TIMER_DRIVER := $(SDDF)/drivers/clock/${TIMER_DRIV_DIR}
 
 IMAGES := virt.elf driver.elf client.elf timer.elf
 CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall -Wno-unused-function
@@ -87,8 +97,21 @@ $(BUILD_DIR)/timer.elf: $(addprefix $(BUILD_DIR)/, $(TIMER_DRIVER_OBJS))
 $(BUILD_DIR)/timer_driver.o: $(TIMER_DRIVER)/timer.c
 	$(CC) -c $(CFLAGS) $(TIMER_DRIVER)/timer.c -o $(BUILD_DIR)/timer_driver.o
 
-$(IMAGE_FILE) $(REPORT_FILE): $(addprefix $(BUILD_DIR)/, $(IMAGES)) i2c.system
-	$(MICROKIT_TOOL) i2c.system --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
+$(IMAGE_FILE) $(REPORT_FILE): $(addprefix $(BUILD_DIR)/, $(IMAGES)) $(SYSTEM_FILE)
+	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
+
+qemu: $(IMAGE_FILE)
+	sudo $(QEMU) -machine virt,virtualization=on \
+			-cpu cortex-a53 \
+			-serial mon:stdio \
+			-device loader,file=$(IMAGE_FILE),addr=0x70000000,cpu-num=0 \
+			-m size=2G \
+			-global virtio-mmio.force-legacy=false \
+			-d guest_errors \
+			-chardev socket,path=/home/kwinter/TS/LionsOS/examples/kitty/vi2c2.sock0,id=vi2c \
+			-device vhost-user-i2c-device,chardev=vi2c,id=i2c \
+			-object memory-backend-file,id=mem,size=2G,mem-path=/dev/shm/qemu.ram,share=on \
+			-numa node,memdev=mem
 
 .PHONY: all compile clean
 
