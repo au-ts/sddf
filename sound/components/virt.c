@@ -77,7 +77,7 @@ static int notified_by_client(int client)
             continue;
         }
 
-        if (owners[cmd.stream_id] == -1) {
+        if (owners[cmd.stream_id] == NO_OWNER) {
             if (cmd.code == SOUND_CMD_TAKE) {
                 owners[cmd.stream_id] = client;
             } else {
@@ -166,7 +166,7 @@ int notified_by_driver(void)
 
         if (cmd.code == SOUND_CMD_RELEASE ||
             (cmd.code == SOUND_CMD_TAKE && cmd.status != SOUND_S_OK)) {
-            owners[cmd.stream_id] = -1;
+            owners[cmd.stream_id] = NO_OWNER;
         }
 
         if (sound_enqueue_cmd(clients[owner].cmd_res, &cmd) != 0) {
