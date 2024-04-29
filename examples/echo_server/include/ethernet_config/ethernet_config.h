@@ -133,10 +133,10 @@ static inline void ethernet_copy_queue_init_sys(char *pd_name, net_queue_handle_
                                                 uintptr_t cli_active, net_queue_handle_t *virt_queue, uintptr_t virt_free, 
                                                 uintptr_t virt_active)
 {
-    if (__ethernet_str_match(pd_name, COPY0_NAME)) {
+    if (__ethernet_str_match(pd_name, ETHERNET_COPY0_NAME)) {
         net_queue_init(cli_queue, (net_queue_t *) cli_free, (net_queue_t *) cli_active, ETHERNET_RX_QUEUE_SIZE_CLI0);
         net_queue_init(virt_queue, (net_queue_t *) virt_free, (net_queue_t *) virt_active, ETHERNET_RX_QUEUE_SIZE_COPY0);
-    } else if (__ethernet_str_match(pd_name, COPY1_NAME)) {
+    } else if (__ethernet_str_match(pd_name, ETHERNET_COPY1_NAME)) {
         net_queue_init(cli_queue, (net_queue_t *) cli_free, (net_queue_t *) cli_active, ETHERNET_RX_QUEUE_SIZE_CLI1);
         net_queue_init(virt_queue, (net_queue_t *) virt_free, (net_queue_t *) virt_active, ETHERNET_RX_QUEUE_SIZE_COPY1);
     }
