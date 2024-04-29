@@ -300,7 +300,7 @@ static inline const char *sound_command_code_str(sound_cmd_code_t code)
     case SOUND_CMD_STOP:
         return "PCM_STOP";
     default:
-        return "<unknown>";
+        return "<unknown sound command code>";
     }
 }
 
@@ -316,7 +316,7 @@ static inline const char *sound_status_code_str(sound_status_t code)
     case SOUND_S_IO_ERR:
         return "IO_ERR";
     default:
-        return "<unknown>";
+        return "<unknown sound status code>";
     }
 }
 
@@ -374,6 +374,6 @@ static inline const char *sound_pcm_fmt_str(sound_pcm_fmt_t fmt)
     case SOUND_PCM_FMT_IEC958_SUBFRAME:
         return "IEC958_SUBFRAME";
     default:
-        return "<unknown>";
+        return "<unknown sound format code>";
     }
 }
