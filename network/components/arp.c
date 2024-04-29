@@ -216,9 +216,9 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
 
 void init(void)
 {
-    net_queue_init(&rx_queue, (net_queue_t *)rx_free, (net_queue_t *)rx_active, RX_QUEUE_SIZE_ARP);
-    net_queue_init(&tx_queue, (net_queue_t *)tx_free, (net_queue_t *)tx_active, TX_QUEUE_SIZE_ARP);
+    net_queue_init(&rx_queue, (net_queue_t *)rx_free, (net_queue_t *)rx_active, ETHERNET_RX_QUEUE_SIZE_ARP);
+    net_queue_init(&tx_queue, (net_queue_t *)tx_free, (net_queue_t *)tx_active, ETHERNET_TX_QUEUE_SIZE_ARP);
     net_buffers_init(&tx_queue, 0);
 
-    arp_mac_addr_init_sys(microkit_name, (uint8_t *) mac_addrs);
+    ethernet_arp_mac_addr_init_sys(microkit_name, (uint8_t *) mac_addrs);
 }
