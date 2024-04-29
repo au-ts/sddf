@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <microkit.h>
 #include <sddf/sound/queue.h>
+#include <sddf/util/cache.h>
 #include <sddf/util/printf.h>
 
 #define DRIVER_CH 0
@@ -126,7 +127,7 @@ static int notified_by_client(int client)
         }
 
         // Write PCM data to RAM
-        microkit_arm_vspace_data_clean(pcm.addr, pcm.addr + pcm.len);
+        cache_clean(pcm.addr, pcm.addr + pcm.len);
 
         if (sound_enqueue_pcm(driver_rings.pcm_req, &pcm) != 0) {
             sddf_dprintf("SND VIRT|ERR: Failed to enqueue PCM data\n");
