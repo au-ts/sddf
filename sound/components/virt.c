@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <microkit.h>
 #include <sddf/sound/queue.h>
+#include <sddf/util/printf.h>
 
 #define DRIVER_CH 0
 #define CLIENT_CH_BEGIN 1
@@ -39,7 +40,7 @@ static void respond_to_cmd(sound_queues_t *client_rings,
 {
     cmd->status = status;
     if (sound_enqueue_cmd(client_rings->cmd_res, cmd) != 0) {
-        microkit_dbg_puts("SND VIRT|ERR: failed to respond to command\n");
+        sddf_dprintf("SND VIRT|ERR: failed to respond to command\n");
     }
 }
 
@@ -50,14 +51,14 @@ static void respond_to_pcm(sound_queues_t *client_rings,
     pcm->status = status;
     pcm->latency_bytes = 0;
     if (sound_enqueue_pcm(client_rings->pcm_res, pcm) != 0) {
-        microkit_dbg_puts("SND VIRT|ERR: failed to respond to pcm\n");
+        sddf_dprintf("SND VIRT|ERR: failed to respond to pcm\n");
     }
 }
 
 static int notified_by_client(int client)
 {
     if (client < 0 || client > NUM_CLIENTS) {
-        microkit_dbg_puts("SND VIRT|ERR: invalid client id\n");
+        sddf_dprintf("SND VIRT|ERR: invalid client id %d\n", client);
         return -1;
     }
 
@@ -69,7 +70,9 @@ static int notified_by_client(int client)
     while (sound_dequeue_cmd(client_rings->cmd_req, &cmd) == 0) {
 
         if (cmd.stream_id > MAX_STREAMS) {
-            microkit_dbg_puts("SND VIRT|ERR: stream id too large\n");
+            sddf_dprintf(
+                "SND VIRT|ERR: [client %d] stream id %u too large (max %u)\n",
+                client, cmd.stream_id, MAX_STREAMS);
             respond_to_cmd(client_rings, &cmd, SOUND_S_BAD_MSG);
             continue;
         }
@@ -78,7 +81,8 @@ static int notified_by_client(int client)
             if (cmd.code == SOUND_CMD_TAKE) {
                 owners[cmd.stream_id] = client;
             } else {
-                microkit_dbg_puts("SND VIRT|ERR: client must take first\n");
+                sddf_dprintf("SND VIRT|ERR: [client %d] client must take first\n",
+                             client);
                 respond_to_cmd(client_rings, &cmd, SOUND_S_BAD_MSG);
                 notify_client = true;
                 continue;
@@ -87,14 +91,16 @@ static int notified_by_client(int client)
 
         int owner = owners[cmd.stream_id];
         if (owner != client) {
-            microkit_dbg_puts("SND VIRT|ERR: stream busy\n");
+            sddf_dprintf("SND VIRT|ERR: [client %d] stream busy\n", client);
             respond_to_cmd(client_rings, &cmd, SOUND_S_BUSY);
             notify_client = true;
             continue;
         }
 
         if (sound_enqueue_cmd(driver_rings.cmd_req, &cmd) != 0) {
-            microkit_dbg_puts("SND VIRT|ERR: Failed to enqueue command\n");
+            sddf_dprintf(
+                "SND VIRT|ERR: [client %d] failed to enqueue command\n",
+                client);
             return -1;
         }
         notify_driver = true;
@@ -104,7 +110,7 @@ static int notified_by_client(int client)
     while (sound_dequeue_pcm(client_rings->pcm_req, &pcm) == 0) {
 
         if (pcm.stream_id > MAX_STREAMS) {
-            microkit_dbg_puts("SND VIRT|ERR: stream id too large\n");
+            sddf_dprintf("SND VIRT|ERR: [client %d] stream id too large\n", client);
             respond_to_pcm(client_rings, &pcm, SOUND_S_BAD_MSG);
             notify_client = true;
             continue;
@@ -112,7 +118,8 @@ static int notified_by_client(int client)
 
         int owner = owners[pcm.stream_id];
         if (owner != client) {
-            microkit_dbg_puts("SND VIRT|ERR: driver replied to busy stream\n");
+            sddf_dprintf("SND VIRT|ERR: [client %d] driver replied to busy stream\n",
+                         client);
             respond_to_pcm(client_rings, &pcm, SOUND_S_BAD_MSG);
             notify_client = true;
             continue;
@@ -122,7 +129,7 @@ static int notified_by_client(int client)
         microkit_arm_vspace_data_clean(pcm.addr, pcm.addr + pcm.len);
 
         if (sound_enqueue_pcm(driver_rings.pcm_req, &pcm) != 0) {
-            microkit_dbg_puts("SND VIRT|ERR: Failed to enqueue PCM data\n");
+            sddf_dprintf("SND VIRT|ERR: Failed to enqueue PCM data\n");
             return -1;
         }
         notify_driver = true;
@@ -146,13 +153,14 @@ int notified_by_driver(void)
     while (sound_dequeue_cmd(driver_rings.cmd_res, &cmd) == 0) {
 
         if (cmd.stream_id > MAX_STREAMS) {
-            microkit_dbg_puts("SND VIRT|ERR: stream id too large\n");
+            sddf_dprintf("SND VIRT|ERR: stream id %u too large (max %u)\n",
+                cmd.stream_id, MAX_STREAMS);
             continue;
         }
 
         int owner = owners[cmd.stream_id];
         if (owner < 0 || owner > NUM_CLIENTS) {
-            microkit_dbg_puts("SND VIRT|ERR: invalid owner id\n");
+            sddf_dprintf("SND VIRT|ERR: invalid owner id %d\n", owner);
             continue;
         }
 
@@ -162,7 +170,9 @@ int notified_by_driver(void)
         }
 
         if (sound_enqueue_cmd(clients[owner].cmd_res, &cmd) != 0) {
-            microkit_dbg_puts("SND VIRT|ERR: Failed to enqueue command response\n");
+            sddf_dprintf(
+                "SND VIRT|ERR: [client %d] failed to enqueue command response\n",
+                owner);
             return -1;
         }
         notify[owner] = true;
@@ -172,13 +182,14 @@ int notified_by_driver(void)
     while (sound_dequeue_pcm(driver_rings.pcm_res, &pcm) == 0) {
 
         if (pcm.stream_id > MAX_STREAMS) {
-            microkit_dbg_puts("SND VIRT|ERR: stream id too large\n");
+            sddf_dprintf("SND VIRT|ERR: stream id %u too large (max %u)\n",
+                pcm.stream_id, MAX_STREAMS);
             continue;
         }
 
         int owner = owners[pcm.stream_id];
         if (owner < 0 || owner > NUM_CLIENTS) {
-            microkit_dbg_puts("SND VIRT|ERR: invalid owner id\n");
+            sddf_dprintf("SND VIRT|ERR: invalid owner id %d\n", owner);
             continue;
         }
 
@@ -186,7 +197,9 @@ int notified_by_driver(void)
         microkit_arm_vspace_data_invalidate(pcm.addr, pcm.addr + pcm.len);
 
         if (sound_enqueue_pcm(clients[owner].pcm_res, &pcm) != 0) {
-            microkit_dbg_puts("SND VIRT|ERR: Failed to enqueue PCM data\n");
+            sddf_dprintf(
+                "SND VIRT|ERR: [client %d] failed to enqueue PCM data\n",
+                owner);
             return -1;
         }
         notify[owner] = true;
@@ -236,13 +249,16 @@ void notified(microkit_channel ch)
 {
     if (ch == DRIVER_CH) {
         if (notified_by_driver() != 0) {
-            microkit_dbg_puts("SND VIRT|ERR: Failed to handle driver notification\n");
+            sddf_dprintf("SND VIRT|ERR: failed to handle driver notification\n");
         }
     } else if (ch >= CLIENT_CH_BEGIN && ch < CLIENT_CH_BEGIN + NUM_CLIENTS) {
-        if (notified_by_client(ch - CLIENT_CH_BEGIN) != 0) {
-            microkit_dbg_puts("SND VIRT|ERR: Failed to handle client notification\n");
+        int client = ch - CLIENT_CH_BEGIN;
+        if (notified_by_client(client) != 0) {
+            sddf_dprintf(
+                "SND VIRT|ERR: failed to handle notification from client %d\n",
+                client);
         }
     } else {
-        microkit_dbg_puts("SND VIRT|ERR: Received a bad client channel\n");
+        sddf_dprintf("SND VIRT|ERR: notified by unexpected channel %d\n", ch);
     }
 }
