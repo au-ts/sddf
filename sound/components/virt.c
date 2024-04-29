@@ -3,7 +3,7 @@
 #include <microkit.h>
 #include <sddf/sound/queue.h>
 
-#define DRIVER_CH 3
+#define DRIVER_CH 0
 #define CLIENT_CH_BEGIN 1
 #define NUM_CLIENTS 2
 
