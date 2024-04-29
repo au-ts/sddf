@@ -30,6 +30,7 @@ struct virtio_i2c_in_hdr {
 
 struct virtio_i2c_req {
     struct virtio_i2c_out_hdr out_hdr;
-    // uint8_t buf[];
+    /* TODO: Figure out how this zero length copy fits in. */
+    uint8_t *buf;
     struct virtio_i2c_in_hdr in_hdr;
 };

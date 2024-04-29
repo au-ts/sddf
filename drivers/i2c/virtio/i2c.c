@@ -13,22 +13,84 @@ uintptr_t hw_ring_buffer_paddr;
 
 struct virtq requestq;
 
+uintptr_t virtio_i2c_headers_vaddr;
+uintptr_t virtio_i2c_headers_paddr;
+
 uintptr_t i2c_regs;
 
 uintptr_t virtio_mmio_i2c_offset = 0;
 
+/* Channels */
+#define VIRTUALISER_CH 0
+#define IRQ_CH 1
+
 #define REQUEST_COUNT 512
 #define HW_RING_SIZE (0x10000)
 
+static inline void handle_request(void)
+{
+    LOG_DRIVER("handling request\n");
+    volatile struct i2c_regs *regs = (volatile struct i2c_regs *) i2c_regs;
+    if (!i2c_queue_empty(queue_handle.request)) {
+        // If this interface is busy, skip notification and
+        // set notified flag for later processing
+        if (i2c_ifState.curr_request_data) {
+            microkit_dbg_puts("driver: request in progress, deferring notification\n");
+            i2c_ifState.notified = 1;
+            return;
+        }
+        // microkit_dbg_puts("driver: starting work for bus\n");
+        // Otherwise, begin work. Start by extracting the request
+
+        size_t bus_address = 0;
+        size_t offset = 0;
+        unsigned int size = 0;
+        int err = i2c_dequeue_request(queue_handle, &bus_address, &offset, &size);
+        if (err) {
+            LOG_DRIVER_ERR("fatal: failed to dequeue request\n");
+            return;
+        }
+
+        // Load bookkeeping data into return buffer
+        // Set client PD
+
+        LOG_DRIVER("Loading request from client %u to address 0x%x of sz %zu\n", req[0], req[1], size);
+
+        if (size > I2C_MAX_DATA_SIZE) {
+            LOG_DRIVER_ERR("Invalid request size: %u!\n", size);
+            return;
+        }
+        i2c_ifState.curr_request_data = (i2c_token_t *) DATA_REGIONS_START + offset;
+        i2c_ifState.addr = bus_address;
+        i2c_ifState.curr_request_len = size;
+        i2c_ifState.remaining = size;    // Ignore client PD and address
+        i2c_ifState.notified = 0;
+
+        // Trigger work start
+        // @ivanv: check return value
+        i2c_load_tokens(regs);
+    } else {
+        LOG_DRIVER("called but no work available: resetting notified flag\n");
+        // If nothing needs to be done, clear notified flag if it was set.
+        i2c_ifState.notified = 0;
+    }
+}
+
 void init(void)
 {
+
     /*
     *   Rudementry device discovery. Map in all the virtio-mmio regions and scan
     *   them for an i2c device.
     *
     *   NOTE: This offset changes depending on how many virtio-mmio devices
     *   there are in the system.
+    *
+    *   You will also have to manually update the IRQ number in the system description
+    *   file. Use the offset printed here, and reference with the dts output by QEMU
+    *   to find the corresponding IRQ number.
     */
+
     for (int i = 0; i < 0x3f00; i+= 0x200) {
         regs = (volatile virtio_mmio_regs_t *) (i2c_regs + i);
         if (virtio_mmio_check_device_id(regs, VIRTIO_DEVICE_ID_I2C)) {
@@ -75,8 +137,6 @@ void init(void)
     uint32_t feature_high = regs->DeviceFeatures;
     uint64_t features = feature_low | ((uint64_t)feature_high << 32);
 
-    sddf_dprintf("These are features low: %b--- these are features high: %b\n", feature_low, feature_high);
-    sddf_dprintf("These are all the feature bits: %b\n", features);
     /* According to the virtio i2c spec we must negotiate the following features:
      * VIRTIO_I2C_F_ZERO_LENGTH_REQUEST
      */
@@ -86,6 +146,8 @@ void init(void)
         LOG_DRIVER_ERR("Device does not offer zero length request. Unable to negotiate!\n");
         regs->Status = VIRTIO_DEVICE_STATUS_FAILED;
         return;
+    } else {
+        sddf_dprintf("Device offers zero length request, negotiating features.\n");
     }
 
     regs->DriverFeaturesSel = 0;
@@ -117,11 +179,33 @@ void init(void)
     requestq.avail = (struct virtq_avail *)(hw_ring_buffer_vaddr + rq_avail_off);
     requestq.used = (struct virtq_used *)(hw_ring_buffer_vaddr + rq_used_off);
 
+    assert(regs->QueueNumMax >= REQUEST_COUNT);
+    /* Select the first queue. We only need 1 for i2c. */
+    regs->QueueSel = 0;
+    regs->QueueNum = REQUEST_COUNT;
+    regs->QueueDescLow = (hw_ring_buffer_paddr + rq_desc_off) & 0xFFFFFFFF;
+    regs->QueueDescHigh = (hw_ring_buffer_paddr + rq_desc_off) >> 32;
+    regs->QueueDriverLow = (hw_ring_buffer_paddr + rq_avail_off) & 0xFFFFFFFF;
+    regs->QueueDriverHigh = (hw_ring_buffer_paddr + rq_avail_off) >> 32;
+    regs->QueueDeviceLow = (hw_ring_buffer_paddr + rq_used_off) & 0xFFFFFFFF;
+    regs->QueueDeviceHigh = (hw_ring_buffer_paddr + rq_used_off) >> 32;
+    regs->QueueReady = 1;
+
     // Set Driver OK status bit
     regs->Status = VIRTIO_DEVICE_STATUS_DRIVER_OK;
 }
 
 void notified(microkit_channel ch)
 {
-
+    switch (ch) {
+        case VIRTUALISER_CH:
+            handle_request();
+            break;
+        case IRQ_CH:
+            handle_irq(false);
+            microkit_irq_ack(ch);
+            break;
+        default:
+            microkit_dbg_puts("DRIVER|ERROR: unexpected notification!\n");
+    }
 }
