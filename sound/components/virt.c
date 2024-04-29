@@ -5,7 +5,7 @@
 
 #define DRIVER_CH 3
 #define CLIENT_CH_BEGIN 1
-#define CLIENT_COUNT 2
+#define NUM_CLIENTS 2
 
 #define NO_OWNER -1
 #define MAX_STREAMS 16
@@ -27,7 +27,7 @@ uintptr_t c1_pcm_res;
 
 uintptr_t sound_shared_state;
 
-static sound_queues_t clients[CLIENT_COUNT];
+static sound_queues_t clients[NUM_CLIENTS];
 static sound_queues_t driver_rings;
 
 static int owners[MAX_STREAMS];
@@ -56,7 +56,7 @@ static void respond_to_pcm(sound_queues_t *client_rings,
 
 static int notified_by_client(int client)
 {
-    if (client < 0 || client > CLIENT_COUNT) {
+    if (client < 0 || client > NUM_CLIENTS) {
         microkit_dbg_puts("SND VIRT|ERR: invalid client id\n");
         return -1;
     }
@@ -140,7 +140,7 @@ static int notified_by_client(int client)
 
 int notified_by_driver(void)
 {
-    bool notify[CLIENT_COUNT] = {0};
+    bool notify[NUM_CLIENTS] = {0};
 
     sound_cmd_t cmd;
     while (sound_dequeue_cmd(driver_rings.cmd_res, &cmd) == 0) {
@@ -151,7 +151,7 @@ int notified_by_driver(void)
         }
 
         int owner = owners[cmd.stream_id];
-        if (owner < 0 || owner > CLIENT_COUNT) {
+        if (owner < 0 || owner > NUM_CLIENTS) {
             microkit_dbg_puts("SND VIRT|ERR: invalid owner id\n");
             continue;
         }
@@ -177,7 +177,7 @@ int notified_by_driver(void)
         }
 
         int owner = owners[pcm.stream_id];
-        if (owner < 0 || owner > CLIENT_COUNT) {
+        if (owner < 0 || owner > NUM_CLIENTS) {
             microkit_dbg_puts("SND VIRT|ERR: invalid owner id\n");
             continue;
         }
@@ -192,14 +192,14 @@ int notified_by_driver(void)
         notify[owner] = true;
     }
 
-    for (int client = 0; client < CLIENT_COUNT; client++) {
+    for (int client = 0; client < NUM_CLIENTS; client++) {
         if (notify[client]) {
             microkit_notify(CLIENT_CH_BEGIN + client);
         }
     }
 
     if (!started) {
-        for (int client = 0; client < CLIENT_COUNT; client++) {
+        for (int client = 0; client < NUM_CLIENTS; client++) {
             microkit_notify(CLIENT_CH_BEGIN + client);
         }
         started = true;
@@ -238,7 +238,7 @@ void notified(microkit_channel ch)
         if (notified_by_driver() != 0) {
             microkit_dbg_puts("SND VIRT|ERR: Failed to handle driver notification\n");
         }
-    } else if (ch >= CLIENT_CH_BEGIN && ch < CLIENT_CH_BEGIN + CLIENT_COUNT) {
+    } else if (ch >= CLIENT_CH_BEGIN && ch < CLIENT_CH_BEGIN + NUM_CLIENTS) {
         if (notified_by_client(ch - CLIENT_CH_BEGIN) != 0) {
             microkit_dbg_puts("SND VIRT|ERR: Failed to handle client notification\n");
         }
