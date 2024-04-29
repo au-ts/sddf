@@ -56,7 +56,6 @@ static void respond_to_pcm(sound_queues_t *client_rings,
 
 static int notified_by_client(int client)
 {
-
     if (client < 0 || client > CLIENT_COUNT) {
         microkit_dbg_puts("SND VIRT|ERR: invalid client id\n");
         return -1;
@@ -141,7 +140,6 @@ static int notified_by_client(int client)
 
 int notified_by_driver(void)
 {
-
     bool notify[CLIENT_COUNT] = {0};
 
     sound_cmd_t cmd;
@@ -236,7 +234,6 @@ void init(void)
 
 void notified(microkit_channel ch)
 {
-
     if (ch == DRIVER_CH) {
         if (notified_by_driver() != 0) {
             microkit_dbg_puts("SND VIRT|ERR: Failed to handle driver notification\n");
