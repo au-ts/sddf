@@ -38,7 +38,7 @@ struct descriptor {
     uint32_t next;
 };
 
-_Static_assert((RX_COUNT + TX_COUNT) * sizeof(struct descriptor) <= HW_REGION_SIZE,
+_Static_assert((RX_COUNT + TX_COUNT) * sizeof(struct descriptor) <= ETHERNET_HW_REGION_SIZE,
                "Expect rx+tx buffers to fit in single 2MB page");
 
 typedef struct {
@@ -259,8 +259,8 @@ void init(void)
 {
     eth_setup();
 
-    net_queue_init(&rx_queue, (net_queue_t *)rx_free, (net_queue_t *)rx_active, RX_QUEUE_SIZE_DRIV);
-    net_queue_init(&tx_queue, (net_queue_t *)tx_free, (net_queue_t *)tx_active, TX_QUEUE_SIZE_DRIV);
+    net_queue_init(&rx_queue, (net_queue_t *)rx_free, (net_queue_t *)rx_active, ETHERNET_RX_QUEUE_SIZE_DRIV);
+    net_queue_init(&tx_queue, (net_queue_t *)tx_free, (net_queue_t *)tx_active, ETHERNET_TX_QUEUE_SIZE_DRIV);
 
     rx_provide();
     tx_provide();
