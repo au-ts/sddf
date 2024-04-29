@@ -155,7 +155,7 @@ int notified_by_driver(void)
 
         if (cmd.stream_id > MAX_STREAMS) {
             sddf_dprintf("SND VIRT|ERR: stream id %u too large (max %u)\n",
-                cmd.stream_id, MAX_STREAMS);
+                         cmd.stream_id, MAX_STREAMS);
             continue;
         }
 
@@ -184,7 +184,7 @@ int notified_by_driver(void)
 
         if (pcm.stream_id > MAX_STREAMS) {
             sddf_dprintf("SND VIRT|ERR: stream id %u too large (max %u)\n",
-                pcm.stream_id, MAX_STREAMS);
+                         pcm.stream_id, MAX_STREAMS);
             continue;
         }
 
