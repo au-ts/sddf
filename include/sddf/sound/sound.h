@@ -67,6 +67,7 @@ typedef struct sound_pcm_info {
 #define SOUND_MAX_STREAM_COUNT 32
 
 typedef struct sound_shared_state {
+    bool ready;
     uint32_t streams;
     sound_pcm_info_t stream_info[SOUND_MAX_STREAM_COUNT];
 } sound_shared_state_t;
