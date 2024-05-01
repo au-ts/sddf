@@ -37,7 +37,7 @@ static void respond_to_cmd(sound_queues_t *client_queues,
                            sound_status_t status)
 {
     cmd->status = status;
-    if (sound_enqueue_cmd(client_queues->cmd_res, cmd) != 0) {
+    if (sound_enqueue_cmd(&client_queues->cmd_res, cmd) != 0) {
         sddf_dprintf("SND VIRT|ERR: failed to respond to command\n");
     }
 }
@@ -48,7 +48,7 @@ static void respond_to_pcm(sound_queues_t *client_queues,
 {
     pcm->status = status;
     pcm->latency_bytes = 0;
-    if (sound_enqueue_pcm(client_queues->pcm_res, pcm) != 0) {
+    if (sound_enqueue_pcm(&client_queues->pcm_res, pcm) != 0) {
         sddf_dprintf("SND VIRT|ERR: failed to respond to pcm\n");
     }
 }
@@ -65,7 +65,7 @@ static int notified_by_client(int client)
     sound_queues_t *client_queues = &clients[client];
     sound_cmd_t cmd;
 
-    while (sound_dequeue_cmd(client_queues->cmd_req, &cmd) == 0) {
+    while (sound_dequeue_cmd(&client_queues->cmd_req, &cmd) == 0) {
 
         if (cmd.stream_id > MAX_STREAMS) {
             sddf_dprintf(
@@ -95,7 +95,7 @@ static int notified_by_client(int client)
             continue;
         }
 
-        if (sound_enqueue_cmd(driver_queues.cmd_req, &cmd) != 0) {
+        if (sound_enqueue_cmd(&driver_queues.cmd_req, &cmd) != 0) {
             sddf_dprintf(
                 "SND VIRT|ERR: [client %d] failed to enqueue command\n",
                 client);
@@ -105,7 +105,7 @@ static int notified_by_client(int client)
     }
 
     sound_pcm_t pcm;
-    while (sound_dequeue_pcm(client_queues->pcm_req, &pcm) == 0) {
+    while (sound_dequeue_pcm(&client_queues->pcm_req, &pcm) == 0) {
 
         if (pcm.stream_id > MAX_STREAMS) {
             sddf_dprintf("SND VIRT|ERR: [client %d] stream id too large\n", client);
@@ -126,7 +126,7 @@ static int notified_by_client(int client)
         // Write PCM data to RAM
         cache_clean(pcm.addr, pcm.addr + pcm.len);
 
-        if (sound_enqueue_pcm(driver_queues.pcm_req, &pcm) != 0) {
+        if (sound_enqueue_pcm(&driver_queues.pcm_req, &pcm) != 0) {
             sddf_dprintf("SND VIRT|ERR: Failed to enqueue PCM data\n");
             return -1;
         }
@@ -148,7 +148,7 @@ int notified_by_driver(void)
     bool notify[NUM_CLIENTS] = {0};
 
     sound_cmd_t cmd;
-    while (sound_dequeue_cmd(driver_queues.cmd_res, &cmd) == 0) {
+    while (sound_dequeue_cmd(&driver_queues.cmd_res, &cmd) == 0) {
 
         if (cmd.stream_id > MAX_STREAMS) {
             sddf_dprintf("SND VIRT|ERR: stream id %u too large (max %u)\n",
@@ -167,7 +167,7 @@ int notified_by_driver(void)
             owners[cmd.stream_id] = NO_OWNER;
         }
 
-        if (sound_enqueue_cmd(clients[owner].cmd_res, &cmd) != 0) {
+        if (sound_enqueue_cmd(&clients[owner].cmd_res, &cmd) != 0) {
             sddf_dprintf(
                 "SND VIRT|ERR: [client %d] failed to enqueue command response\n",
                 owner);
@@ -177,7 +177,7 @@ int notified_by_driver(void)
     }
 
     sound_pcm_t pcm;
-    while (sound_dequeue_pcm(driver_queues.pcm_res, &pcm) == 0) {
+    while (sound_dequeue_pcm(&driver_queues.pcm_res, &pcm) == 0) {
 
         if (pcm.stream_id > MAX_STREAMS) {
             sddf_dprintf("SND VIRT|ERR: stream id %u too large (max %u)\n",
@@ -194,7 +194,7 @@ int notified_by_driver(void)
         // Cache is dirty as device may have written to buffer
         microkit_arm_vspace_data_invalidate(pcm.addr, pcm.addr + pcm.len);
 
-        if (sound_enqueue_pcm(clients[owner].pcm_res, &pcm) != 0) {
+        if (sound_enqueue_pcm(&clients[owner].pcm_res, &pcm) != 0) {
             sddf_dprintf(
                 "SND VIRT|ERR: [client %d] failed to enqueue PCM data\n",
                 owner);
@@ -214,21 +214,30 @@ int notified_by_driver(void)
 
 void init(void)
 {
-    clients[0].cmd_req = (void *)c0_cmd_req;
-    clients[0].cmd_res = (void *)c0_cmd_res;
-    clients[0].pcm_req = (void *)c0_pcm_req;
-    clients[0].pcm_res = (void *)c0_pcm_res;
+    sound_queues_init(&clients[0],
+                      (void *)c0_cmd_req,
+                      (void *)c0_cmd_res,
+                      (void *)c0_pcm_req,
+                      (void *)c0_pcm_res,
+                      SOUND_CMD_QUEUE_SIZE,
+                      SOUND_PCM_QUEUE_SIZE);
 
-    clients[1].cmd_req = (void *)c1_cmd_req;
-    clients[1].cmd_res = (void *)c1_cmd_res;
-    clients[1].pcm_req = (void *)c1_pcm_req;
-    clients[1].pcm_res = (void *)c1_pcm_res;
+    sound_queues_init(&clients[1],
+                      (void *)c1_cmd_req,
+                      (void *)c1_cmd_res,
+                      (void *)c1_pcm_req,
+                      (void *)c1_pcm_res,
+                      SOUND_CMD_QUEUE_SIZE,
+                      SOUND_PCM_QUEUE_SIZE);
 
-    driver_queues.cmd_req = (void *)drv_cmd_req;
-    driver_queues.cmd_res = (void *)drv_cmd_res;
-    driver_queues.pcm_req = (void *)drv_pcm_req;
-    driver_queues.pcm_res = (void *)drv_pcm_res;
-    sound_queues_init_default(&driver_queues);
+    sound_queues_init(&driver_queues,
+                      (void *)drv_cmd_req,
+                      (void *)drv_cmd_res,
+                      (void *)drv_pcm_req,
+                      (void *)drv_pcm_res,
+                      SOUND_CMD_QUEUE_SIZE,
+                      SOUND_PCM_QUEUE_SIZE);
+    sound_queues_init_buffers(&driver_queues);
 
     for (int i = 0; i < MAX_STREAMS; i++) {
         owners[i] = NO_OWNER;

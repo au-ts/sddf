@@ -12,7 +12,8 @@
 #include <sddf/sound/sound.h>
 #include <sddf/util/fence.h>
 
-#define SOUND_NUM_BUFFERS 512
+#define SOUND_CMD_QUEUE_SIZE 64
+#define SOUND_PCM_QUEUE_SIZE 256
 #define SOUND_PCM_BUFFER_SIZE 4096
 
 typedef enum {
@@ -59,70 +60,79 @@ typedef struct sound_pcm {
     uint32_t latency_bytes;
 } sound_pcm_t;
 
-// Eventually this could be moved into its own library
-typedef struct sound_queue_state {
-    uint32_t write_idx;
-    uint32_t read_idx;
-    uint32_t size;
-} sound_queue_state_t;
-
 typedef struct sound_cmd_queue_t {
-    sound_queue_state_t state;
-    sound_cmd_t buffers[SOUND_NUM_BUFFERS];
+    uint32_t tail;
+    uint32_t head;
+    sound_cmd_t buffers[];
 } sound_cmd_queue_t;
 
 typedef struct sound_pcm_queue {
-    sound_queue_state_t state;
-    sound_pcm_t buffers[SOUND_NUM_BUFFERS];
+    uint32_t tail;
+    uint32_t head;
+    sound_pcm_t buffers[];
 } sound_pcm_queue_t;
 
-typedef struct sound_queues {
-    sound_cmd_queue_t *cmd_req;
-    sound_cmd_queue_t *cmd_res;
+typedef struct sound_cmd_queue_handle {
+    sound_cmd_queue_t *q;
+    uint32_t size;
+} sound_cmd_queue_handle_t;
 
-    sound_pcm_queue_t *pcm_req;
-    sound_pcm_queue_t *pcm_res;
+typedef struct sound_pcm_queue_handle {
+    sound_pcm_queue_t *q;
+    uint32_t size;
+} sound_pcm_queue_handle_t;
+
+typedef struct sound_queues {
+    sound_cmd_queue_handle_t cmd_req;
+    sound_cmd_queue_handle_t cmd_res;
+    sound_pcm_queue_handle_t pcm_req;
+    sound_pcm_queue_handle_t pcm_res;
 } sound_queues_t;
 
-typedef struct sound_state {
-    sound_shared_state_t *shared_state;
-    sound_queues_t queues;
-} sound_state_t;
-
-/**
- * Initialise a queue. Only one side needs to call this function.
- *
- * @param queue_state
- * @param buffer_count number of buffers in the queue
- */
-static inline void sound_queue_init(sound_queue_state_t *queue_state, uint32_t buffer_count)
+/** Set queue size. Call on both ends. */
+static inline void sound_queues_init(sound_queues_t *queues,
+                                    sound_cmd_queue_t *cmd_req,
+                                    sound_cmd_queue_t *cmd_res,
+                                    sound_pcm_queue_t *pcm_res,
+                                    sound_pcm_queue_t *pcm_req,
+                                    uint32_t cmd_count,
+                                    uint32_t pcm_count)
 {
-    queue_state->read_idx = 0;
-    queue_state->write_idx = 0;
-    queue_state->size = buffer_count;
+    queues->cmd_req.q = cmd_req;
+    queues->cmd_res.q = cmd_res;
+    queues->pcm_req.q = pcm_req;
+    queues->pcm_res.q = pcm_res;
+
+    queues->cmd_req.size = cmd_count;
+    queues->cmd_res.size = cmd_count;
+    queues->pcm_req.size = pcm_count;
+    queues->pcm_res.size = pcm_count;
 }
 
-/**
- * Initialises all queues to maximum capacity
- */
-static inline void sound_queues_init_default(sound_queues_t *queues)
+/** Only needs to be called once */
+static inline void sound_queues_init_buffers(sound_queues_t *queues)
 {
-    sound_queue_init(&queues->cmd_req->state, SOUND_NUM_BUFFERS);
-    sound_queue_init(&queues->cmd_res->state, SOUND_NUM_BUFFERS);
-    sound_queue_init(&queues->pcm_req->state, SOUND_NUM_BUFFERS);
-    sound_queue_init(&queues->pcm_res->state, SOUND_NUM_BUFFERS);
+    queues->cmd_req.q->head = 0;
+    queues->cmd_res.q->head = 0;
+    queues->pcm_req.q->head = 0;
+    queues->pcm_res.q->head = 0;
+
+    queues->cmd_req.q->tail = 0;
+    queues->cmd_res.q->tail = 0;
+    queues->pcm_req.q->tail = 0;
+    queues->pcm_res.q->tail = 0;
 }
 
 /** Returns true if CMD queue is empty */
-static inline bool sound_cmd_queue_empty(sound_cmd_queue_t *q)
+static inline bool sound_cmd_queue_empty(sound_cmd_queue_handle_t *h)
 {
-    return q->state.write_idx == q->state.read_idx;
+    return h->q->tail == h->q->head;
 }
 
 /** Returns true if PCM queue is empty */
-static inline bool sound_pcm_queue_empty(sound_pcm_queue_t *q)
+static inline bool sound_pcm_queue_empty(sound_pcm_queue_handle_t *h)
 {
-    return q->state.write_idx == q->state.read_idx;
+    return h->q->tail == h->q->head;
 }
 
 /**
@@ -133,9 +143,9 @@ static inline bool sound_pcm_queue_empty(sound_pcm_queue_t *q)
  *
  * @return true indicates the command queue buffer is full, false otherwise.
  */
-static inline bool sound_cmd_queue_full(sound_cmd_queue_t *q)
+static inline bool sound_cmd_queue_full(sound_cmd_queue_handle_t *h)
 {
-    return (q->state.write_idx - q->state.read_idx + 1) == q->state.size;
+    return (h->q->tail - h->q->head) == h->size;
 }
 
 /**
@@ -146,9 +156,9 @@ static inline bool sound_cmd_queue_full(sound_cmd_queue_t *q)
  *
  * @return true indicates the command queue buffer is full, false otherwise.
  */
-static inline bool sound_pcm_queue_full(sound_pcm_queue_t *q)
+static inline bool sound_pcm_queue_full(sound_pcm_queue_handle_t *h)
 {
-    return (q->state.write_idx - q->state.read_idx + 1) == q->state.size;
+    return (h->q->tail - h->q->head) == h->size;
 }
 
 /**
@@ -158,9 +168,9 @@ static inline bool sound_pcm_queue_full(sound_pcm_queue_t *q)
  *
  * @return number of elements in the queue buffer.
  */
-static inline int sound_cmd_queue_size(sound_cmd_queue_t *q)
+static inline int sound_cmd_queue_size(sound_cmd_queue_handle_t *h)
 {
-    return q->state.write_idx - q->state.read_idx;
+    return h->q->tail - h->q->head;
 }
 
 /**
@@ -170,9 +180,9 @@ static inline int sound_cmd_queue_size(sound_cmd_queue_t *q)
  *
  * @return number of elements in the queue buffer.
  */
-static inline int sound_pcm_queue_size(sound_pcm_queue_t *q)
+static inline int sound_pcm_queue_size(sound_pcm_queue_handle_t *h)
 {
-    return q->state.write_idx - q->state.read_idx;
+    return h->q->tail - h->q->head;
 }
 
 /**
@@ -183,13 +193,13 @@ static inline int sound_pcm_queue_size(sound_pcm_queue_t *q)
  *
  * @return -1 when command queue is full, 0 on success.
  */
-static inline int sound_enqueue_cmd(sound_cmd_queue_t *queue, const sound_cmd_t *command)
+static inline int sound_enqueue_cmd(sound_cmd_queue_handle_t *h, const sound_cmd_t *command)
 {
-    if (sound_cmd_queue_full(queue)) {
+    if (sound_cmd_queue_full(h)) {
         return -1;
     }
 
-    sound_cmd_t *dest = &queue->buffers[queue->state.write_idx % queue->state.size];
+    sound_cmd_t *dest = &h->q->buffers[h->q->tail % h->size];
 
     dest->code = command->code;
     dest->cookie = command->cookie;
@@ -197,7 +207,7 @@ static inline int sound_enqueue_cmd(sound_cmd_queue_t *queue, const sound_cmd_t 
     dest->set_params = command->set_params;
 
     THREAD_MEMORY_RELEASE();
-    queue->state.write_idx++;
+    h->q->tail++;
 
     return 0;
 }
@@ -210,13 +220,13 @@ static inline int sound_enqueue_cmd(sound_cmd_queue_t *queue, const sound_cmd_t 
  *
  * @return -1 when queue is full, 0 on success.
  */
-static inline int sound_enqueue_pcm(sound_pcm_queue_t *queue, sound_pcm_t *pcm)
+static inline int sound_enqueue_pcm(sound_pcm_queue_handle_t *h, sound_pcm_t *pcm)
 {
-    if (sound_pcm_queue_full(queue)) {
+    if (sound_pcm_queue_full(h)) {
         return -1;
     }
 
-    sound_pcm_t *data = &queue->buffers[queue->state.write_idx % queue->state.size];
+    sound_pcm_t *data = &h->q->buffers[h->q->tail % h->size];
 
     data->cookie = pcm->cookie;
     data->stream_id = pcm->stream_id;
@@ -226,7 +236,7 @@ static inline int sound_enqueue_pcm(sound_pcm_queue_t *queue, sound_pcm_t *pcm)
     data->latency_bytes = pcm->latency_bytes;
 
     THREAD_MEMORY_RELEASE();
-    queue->state.write_idx++;
+    h->q->tail++;
 
     return 0;
 }
@@ -239,20 +249,20 @@ static inline int sound_enqueue_pcm(sound_pcm_queue_t *queue, sound_pcm_t *pcm)
  *
  * @return -1 when command queue is empty, 0 on success.
  */
-static inline int sound_dequeue_cmd(sound_cmd_queue_t *queue, sound_cmd_t *out)
+static inline int sound_dequeue_cmd(sound_cmd_queue_handle_t *h, sound_cmd_t *out)
 {
-    if (sound_cmd_queue_empty(queue)) {
+    if (sound_cmd_queue_empty(h)) {
         return -1;
     }
 
-    sound_cmd_t *src = &queue->buffers[queue->state.read_idx % queue->state.size];
+    sound_cmd_t *src = &h->q->buffers[h->q->head % h->size];
     out->code = src->code;
     out->cookie = src->cookie;
     out->stream_id = src->stream_id;
     out->set_params = src->set_params;
 
     THREAD_MEMORY_RELEASE();
-    queue->state.read_idx++;
+    h->q->head++;
 
     return 0;
 }
@@ -265,13 +275,13 @@ static inline int sound_dequeue_cmd(sound_cmd_queue_t *queue, sound_cmd_t *out)
  *
  * @return -1 when command queue is empty, 0 on success.
  */
-static inline int sound_dequeue_pcm(sound_pcm_queue_t *queue, sound_pcm_t *out)
+static inline int sound_dequeue_pcm(sound_pcm_queue_handle_t *h, sound_pcm_t *out)
 {
-    if (sound_pcm_queue_empty(queue)) {
+    if (sound_pcm_queue_empty(h)) {
         return -1;
     }
 
-    sound_pcm_t *pcm = &queue->buffers[queue->state.read_idx % queue->state.size];
+    sound_pcm_t *pcm = &h->q->buffers[h->q->head % h->size];
 
     out->cookie = pcm->cookie;
     out->stream_id = pcm->stream_id;
@@ -281,7 +291,7 @@ static inline int sound_dequeue_pcm(sound_pcm_queue_t *queue, sound_pcm_t *out)
     out->latency_bytes = pcm->latency_bytes;
 
     THREAD_MEMORY_RELEASE();
-    queue->state.read_idx++;
+    h->q->head++;
 
     return 0;
 }
