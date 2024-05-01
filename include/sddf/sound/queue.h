@@ -91,12 +91,12 @@ typedef struct sound_queues {
 
 /** Set queue size. Call on both ends. */
 static inline void sound_queues_init(sound_queues_t *queues,
-                                    sound_cmd_queue_t *cmd_req,
-                                    sound_cmd_queue_t *cmd_res,
-                                    sound_pcm_queue_t *pcm_res,
-                                    sound_pcm_queue_t *pcm_req,
-                                    uint32_t cmd_count,
-                                    uint32_t pcm_count)
+                                     sound_cmd_queue_t *cmd_req,
+                                     sound_cmd_queue_t *cmd_res,
+                                     sound_pcm_queue_t *pcm_res,
+                                     sound_pcm_queue_t *pcm_req,
+                                     uint32_t cmd_count,
+                                     uint32_t pcm_count)
 {
     queues->cmd_req.q = cmd_req;
     queues->cmd_res.q = cmd_res;
