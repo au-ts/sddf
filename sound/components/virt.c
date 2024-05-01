@@ -27,13 +27,10 @@ uintptr_t c1_cmd_res;
 uintptr_t c1_pcm_req;
 uintptr_t c1_pcm_res;
 
-uintptr_t sound_shared_state;
-
 static sound_queues_t clients[NUM_CLIENTS];
 static sound_queues_t driver_queues;
 
 static int owners[MAX_STREAMS];
-static bool started;
 
 static void respond_to_cmd(sound_queues_t *client_queues,
                            sound_cmd_t *cmd,
@@ -212,13 +209,6 @@ int notified_by_driver(void)
         }
     }
 
-    if (!started) {
-        for (int client = 0; client < NUM_CLIENTS; client++) {
-            microkit_notify(CLIENT_CH_BEGIN + client);
-        }
-        started = true;
-    }
-
     return 0;
 }
 
@@ -243,7 +233,6 @@ void init(void)
     for (int i = 0; i < MAX_STREAMS; i++) {
         owners[i] = NO_OWNER;
     }
-    started = false;
 }
 
 void notified(microkit_channel ch)
