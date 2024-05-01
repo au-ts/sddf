@@ -78,7 +78,7 @@ build_serial() {
 }
 
 network() {
-    BOARDS=("odroidc4" "imx8mm_evk" "maaxboard")
+    BOARDS=("odroidc4" "imx8mm_evk" "maaxboard" "qemu_arm_virt")
     CONFIGS=("debug" "release" "benchmark")
     for BOARD in "${BOARDS[@]}"
     do
@@ -102,7 +102,7 @@ i2c() {
 }
 
 timer() {
-    BOARDS=("odroidc4")
+    BOARDS=("odroidc4" "qemu_arm_virt")
     CONFIGS=("debug" "release")
     for BOARD in "${BOARDS[@]}"
     do
