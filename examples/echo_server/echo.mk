@@ -10,6 +10,7 @@ LWIPDIR:=network/ipstacks/lwip/src
 BENCHMARK:=$(SDDF)/benchmark
 UTIL:=$(SDDF)/util
 ETHERNET_DRIVER:=$(SDDF)/drivers/network/$(DRIV_DIR)
+ETHERNET_CONFIG_INCLUDE:=${ECHO_SERVER}/include/ethernet_config
 TIMER_DRIVER:=$(SDDF)/drivers/clock/$(DRIV_DIR)
 TIMER_CLIENT:=${SDDF}/timer/client
 NETWORK_COMPONENTS:=$(SDDF)/network/components
@@ -34,7 +35,7 @@ CFLAGS := -mcpu=$(CPU) \
 	  -I$(BOARD_DIR)/include \
 	  -I$(SDDF)/include \
 	  -I${ECHO_INCLUDE}/lwip \
-	  -I${ECHO_INCLUDE}/ethernet_config \
+	  -I${ETHERNET_CONFIG_INCLUDE} \
 	  -I${SDDF}/$(LWIPDIR)/include \
 	  -I${SDDF}/$(LWIPDIR)/include/ipv4 \
 	  -MD \
@@ -42,6 +43,13 @@ CFLAGS := -mcpu=$(CPU) \
 
 LDFLAGS := -L$(BOARD_DIR)/lib -L$(SDDF)/lib -L${LIBC}
 LIBS := -lmicrokit -Tmicrokit.ld -lc
+
+CHECK_FLAGS_BOARD_MD5:=.board_cflags-$(shell echo -- ${CFLAGS} ${BOARD} ${MICROKIT_CONFIG} | md5sum | sed 's/  *-//')
+
+${CHECK_FLAGS_BOARD_MD5}:
+	-rm -f .board_cflags-*
+	touch $@
+
 
 include ${SDDF}/${LWIPDIR}/Filelists.mk
 
