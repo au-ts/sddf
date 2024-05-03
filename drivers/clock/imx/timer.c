@@ -40,17 +40,10 @@
 
 uintptr_t gpt_regs;
 static volatile uint32_t *gpt;
-
 static uint32_t overflow_count;
-
 static uint64_t timeouts[MAX_TIMEOUTS];
-static microkit_channel active_channel = -1;
-static bool timeout_active = false;
-static uint64_t current_timeout;
-static uint8_t pending_timeouts;
 
-
-static uint64_t get_ticks(void) 
+static uint64_t get_ticks(void)
 {
     uint64_t overflow = overflow_count;
     uint32_t sr1 = gpt[SR];
@@ -64,8 +57,37 @@ static uint64_t get_ticks(void)
     return (overflow << 32) | cnt;
 }
 
-void irq(microkit_channel ch)
+static void process_timeouts(uint64_t curr_time)
 {
+    for (int i = 0; i < MAX_TIMEOUTS; i++) {
+        if (timeouts[i] <= curr_time) {
+            microkit_notify(i);
+            timeouts[i] = UINT64_MAX;
+        }
+    }
+
+    uint64_t next_timeout = UINT64_MAX;
+    for (int i = 0; i < MAX_TIMEOUTS; i++) {
+        if (timeouts[i] < next_timeout) {
+            next_timeout = timeouts[i];
+        }
+    }
+
+    if (next_timeout != UINT64_MAX && overflow_count == (next_timeout >> 32)) {
+        gpt[OCR1] = (uint32_t)next_timeout;
+        gpt[IR] |= 1;
+    }
+}
+
+void notified(microkit_channel ch)
+{
+    if (ch != IRQ_CH) {
+        sddf_dprintf("TIMER DRIVER|LOG: unexpected notification from channel %u\n", ch);
+        return;
+    }
+
+    microkit_irq_ack_delayed(ch);
+
     uint32_t sr = gpt[SR];
     gpt[SR] = sr;
 
@@ -75,84 +97,27 @@ void irq(microkit_channel ch)
 
     if (sr & 1) {
         gpt[IR] &= ~1;
-        timeout_active = false;
-        microkit_channel curr_channel = active_channel;
-        timeouts[curr_channel] = 0;
-        // notify the client.
-        microkit_notify(curr_channel);
     }
 
-    if (pending_timeouts && !timeout_active) {
-        uint64_t curr_time = get_ticks();
-        /* find next timeout */
-        uint64_t next_timeout = UINT64_MAX;
-        microkit_channel ch = -1;
-        for (unsigned i = 0; i < MAX_TIMEOUTS; i++) {
-            if (timeouts[i] != 0 && timeouts[i] <= curr_time) {
-                timeouts[i] = 0;
-                pending_timeouts--;
-                microkit_notify(i);
-            } else if (timeouts[i] != 0 && timeouts[i] < next_timeout) {
-                next_timeout = timeouts[i];
-                ch = i;
-            }
-        }
-
-        if (ch != -1 && overflow_count == (next_timeout >> 32)) {
-            pending_timeouts--;
-            gpt[OCR1] = (uint32_t)next_timeout;
-            gpt[IR] |= 1;
-            timeout_active = true;
-            current_timeout = next_timeout;
-            active_channel = ch;
-        }
-    }
-}
-
-void notified(microkit_channel ch)
-{
-    if (ch == IRQ_CH) {
-        irq(ch);
-        microkit_irq_ack_delayed(ch);
-    }
+    uint64_t curr_time = get_ticks();
+    process_timeouts(curr_time);
 }
 
 seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
 {
-    uint64_t rel_timeout, cur_ticks, abs_timeout;
     switch (microkit_msginfo_get_label(msginfo)) {
-        case GET_TIME:
-            // Just wants the time.
-            cur_ticks = (get_ticks() / (uint64_t)GPT_FREQ);
-            // Convert to nanoseconds.
-            cur_ticks *= NS_IN_US;
-            seL4_SetMR(0, cur_ticks);
+        case GET_TIME: {
+            uint64_t time_ns = (get_ticks() / (uint64_t)GPT_FREQ) * NS_IN_US;
+            seL4_SetMR(0, time_ns);
             return microkit_msginfo_new(0, 1);
-        case SET_TIMEOUT:
-            // Request to set a timeout.
-            rel_timeout = (seL4_GetMR(0));
-            // Convert to microseconds.
-            rel_timeout /= NS_IN_US;
-            rel_timeout = (uint64_t)(GPT_FREQ) * rel_timeout;
-            cur_ticks = get_ticks();
-            abs_timeout = cur_ticks + rel_timeout;
-
-            timeouts[ch] = abs_timeout;
-            if ((!timeout_active || abs_timeout < current_timeout)
-                && (cur_ticks >> 32 == abs_timeout >> 32)) {
-                if (timeout_active) {
-                    /* there current timeout is now treated as pending */
-                    pending_timeouts++;
-                }
-                gpt[OCR1] = (uint32_t)abs_timeout;
-                gpt[IR] |= 1;
-                timeout_active = true;
-                current_timeout = abs_timeout;
-                active_channel = ch;
-            } else {
-                pending_timeouts++;
-            }
+        }
+        case SET_TIMEOUT: {
+            uint64_t curr_time = get_ticks();
+            uint64_t offset_ticks = (seL4_GetMR(0) / NS_IN_US) * (uint64_t)GPT_FREQ;
+            timeouts[ch] = curr_time + offset_ticks;
+            process_timeouts(curr_time);
             break;
+        }
         default:
             sddf_dprintf("TIMER DRIVER|LOG: Unknown request %lu to timer from channel %u\n", microkit_msginfo_get_label(msginfo), ch);
             break;
@@ -163,6 +128,10 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
 
 void init(void)
 {
+    for (int i = 0; i < MAX_TIMEOUTS; i++) {
+        timeouts[i] = UINT64_MAX;
+    }
+
     gpt = (volatile uint32_t *) gpt_regs;
 
     /* Disable GPT. */
