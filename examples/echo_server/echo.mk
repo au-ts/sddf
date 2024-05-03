@@ -41,8 +41,8 @@ CFLAGS := -mcpu=$(CPU) \
 	  -MD \
 	  -MP
 
-LDFLAGS := -L$(BOARD_DIR)/lib -L$(SDDF)/lib -L${LIBC}
-LIBS := -lmicrokit -Tmicrokit.ld -lc
+LDFLAGS := -L$(BOARD_DIR)/lib -L${LIBC}
+LIBS := --start-group -lmicrokit -Tmicrokit.ld -lc libsddf_util_debug.a --end-group
 
 CHECK_FLAGS_BOARD_MD5:=.board_cflags-$(shell echo -- ${CFLAGS} ${BOARD} ${MICROKIT_CONFIG} | md5sum | sed 's/  *-//')
 
@@ -59,7 +59,7 @@ NETIFFILES:=$(LWIPDIR)/netif/ethernet.c
 # LWIPFILES: All the above.
 LWIPFILES=lwip.c $(COREFILES) $(CORE4FILES) $(NETIFFILES)
 LWIP_OBJS := $(LWIPFILES:.c=.o) lwip.o utilization_socket.o \
-	     udp_echo_socket.o libtimerclient.a libsddf_util.a
+	     udp_echo_socket.o libsddf_util.a
 
 OBJS := $(LWIP_OBJS)
 DEPS := $(filter %.d,$(OBJS:.o=.d))
@@ -81,7 +81,6 @@ ${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 include ${SDDF}/util/util.mk
 include ${SDDF}/network/components/network_components.mk
 include ${ETHERNET_DRIVER}/ethdriver.mk
-include ${TIMER_CLIENT}/timerclient.mk
 include ${BENCHMARK}/benchmark.mk
 include ${TIMER_DRIVER}/timer.mk
 

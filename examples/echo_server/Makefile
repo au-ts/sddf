@@ -10,6 +10,7 @@ export MICROKIT_CONFIG ?= debug
 ifeq ($(strip $(MICROKIT_SDK)),)
 $(error MICROKIT_SDK must be specified)
 endif
+export override MICROKIT_SDK:=$(abspath ${MICROKIT_SDK})
 
 
 ifeq ($(strip $(TOOLCHAIN)),)
@@ -48,7 +49,7 @@ IMAGE_FILE := $(BUILD_DIR)/loader.img
 REPORT_FILE := $(BUILD_DIR)/report.txt
 
 ${IMAGE_FILE} ${REPORT_FILE} clean clobber: ${BUILD_DIR}/Makefile FORCE
-	${MAKE}  -C ${BUILD_DIR}  -${MAKEFLAGS} $(notdir $@)
+	${MAKE}  -C ${BUILD_DIR}  -${MAKEFLAGS} MICROKIT_SDK=${MICROKIT_SDK} $(notdir $@)
 
 ${BUILD_DIR}/Makefile: echo.mk
 	mkdir -p ${BUILD_DIR}
