@@ -50,49 +50,29 @@ ${CHECK_FLAGS_BOARD_MD5}:
 	-rm -f .board_cflags-*
 	touch $@
 
-
 include ${SDDF}/${LWIPDIR}/Filelists.mk
 
 # NETIFFILES: Files implementing various generic network interface functions
-# OVerride version in Filelists.mk
+# Override version in Filelists.mk
 NETIFFILES:=$(LWIPDIR)/netif/ethernet.c
 
-# LWIPDIRFILES: All the above.
+# LWIPFILES: All the above.
 LWIPFILES=lwip.c $(COREFILES) $(CORE4FILES) $(NETIFFILES)
 LWIP_OBJS := $(LWIPFILES:.c=.o) lwip.o utilization_socket.o \
 	     udp_echo_socket.o libtimerclient.a libsddf_util.a
 
-BENCH_OBJS := $(BENCHMARK)/benchmark.o libsddf_util.a
-IDLE_OBJS := $(BENCHMARK)/idle.o libsddf_util_debug.a
-TIMER_OBJS := $(TIMER_DRIVER)/timer.o libsddf_util_debug.a
-
-OBJS := $(sort $(addprefix $(BUILD_DIR)/, $(ETH_OBJS) \
-	$(BENCH_OBJS) $(IDLE_OBJS) \
-	$(ARP_OBJS) $(TIMER_OBJS)))
+OBJS := $(LWIP_OBJS)
 DEPS := $(filter %.d,$(OBJS:.o=.d))
 
 all: loader.img
 
--include $(DEPS)
-
-
 ${LWIP_OBJS}: ${CHECK_FLAGS_BOARD_MD5}
 lwip.elf: $(LWIP_OBJS)
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
-
 ${LWIP_OBJS}: |${BUILD_DIR}/${LWIPDIR}
-
 ${BUILD_DIR}/${LWIPDIR}:
 	mkdir -p $@/core/ipv4 $@/netif
 
-benchmark.elf: $(BENCH_OBJS)
-	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
-
-idle.elf: $(IDLE_OBJS)
-	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
-
-timer.elf: $(TIMER_OBJS)
-	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 ${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
@@ -102,12 +82,15 @@ include ${SDDF}/util/util.mk
 include ${SDDF}/network/components/network_components.mk
 include ${ETHERNET_DRIVER}/ethdriver.mk
 include ${TIMER_CLIENT}/timerclient.mk
-
+include ${BENCHMARK}/benchmark.mk
+include ${TIMER_DRIVER}/timer.mk
 
 clean::
-	rm -f *.o *.elf .depend*
-	find . -name \*.o |xargs --no-run-if-empty rm
+	${RM} -f *.elf .depend* $
+	find . -name \*.[do] |xargs --no-run-if-empty rm
 
 clobber:: clean
+	rm -f *.a
 	rm -f ${IMAGE_FILE} ${REPORT_FILE}
 
+-include $(DEPS)
