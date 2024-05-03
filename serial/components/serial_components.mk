@@ -16,7 +16,7 @@ ifeq ($(strip $(UART_DRIVER)),)
 $(error The serial virtualisers need headers from the UART source. Please specify UART_DRIVER)
 endif
 
-IMAGES:= serial_rx_virt.elf serial_tx_virt.elf
+SERIAL_IMAGES:= serial_rx_virt.elf serial_tx_virt.elf
 
 CFLAGS_serial := -I ${SDDF}/include -I${UART_DRIVER}/include -I${SDDF}/util/include ${SERIAL_NUM_CLIENTS}
 
@@ -35,10 +35,10 @@ virt_%.o: ${SDDF}/serial/components/virt_%.c
 	${CC} ${CFLAGS} ${CFLAGS_serial} -o $@ -c $<
 
 clean::
-	rm -f virt_[rt]x.[od]
+	rm -f virt_[rt]x.[od] .serial_cflags-*
 
 clobber::
-	rm -f ${IMAGES}
+	rm -f ${SERIAL_IMAGES}
 
 
 -include virt_rx.d
