@@ -1,0 +1,103 @@
+#
+# Copyright 2023, UNSW
+#
+# SPDX-License-Identifier: BSD-2-Clause
+#
+# This Makefile is copied into the build directory
+# and operated on from there.
+#
+
+ifeq ($(strip $(MK_SDK)),)
+$(error MK_SDK must be specified)
+endif
+
+ifeq ($(strip $(SDDF)),)
+$(error SDDF must be specified)
+endif
+
+ifeq ($(strip $(TOOLCHAIN)),)
+	TOOLCHAIN := aarch64-none-elf
+endif
+
+BUILD_DIR ?= build
+MICROKIT_CONFIG ?= debug
+
+TOOLCHAIN ?= aarch64-none-elf
+
+QEMU := qemu-system-aarch64
+
+CC := $(TOOLCHAIN)-gcc
+LD := $(TOOLCHAIN)-ld
+AS := $(TOOLCHAIN)-as
+
+MICROKIT_TOOL := $(MK_SDK)/bin/microkit
+
+ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
+	DRIVER_DIR := meson
+	CPU := cortex-a55
+else ifeq ($(strip $(MICROKIT_BOARD)), qemu_arm_virt)
+	DRIVER_DIR := arm
+	CPU := cortex-a53
+else ifeq ($(strip $(MICROKIT_BOARD)), maaxboard)
+	DRIVER_DIR := imx
+	CPU := cortex-a53
+else ifeq ($(strip $(MICROKIT_BOARD)), imx8mm_evk)
+	DRIVER_DIR := imx
+	CPU := cortex-a53
+else
+$(error Unsupported MICROKIT_BOARD given)
+endif
+
+TOP := ${SDDF}/examples/serial
+UTIL := $(SDDF)/util
+SERIAL_NUM_CLIENTS := -DSERIAL_NUM_CLIENTS=2
+SERIAL_COMPONENTS := $(SDDF)/serial/components
+UART_DRIVER := $(SDDF)/drivers/serial/$(DRIVER_DIR)
+BOARD_DIR := $(MK_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
+SYSTEM_FILE := ${TOP}/board/$(MICROKIT_BOARD)/serial.system
+
+IMAGES := uart_driver.elf \
+	  serial_server_1.elf serial_server_2.elf \
+	  serial_tx_virt.elf serial_rx_virt.elf
+CFLAGS := -mcpu=$(CPU)\
+	  -mstrict-align \
+	  -ffreestanding \
+	  -g3 -O3 -Wall \
+	  -Wno-unused-function -Werror
+LDFLAGS := -L$(BOARD_DIR)/lib -L$(SDDF)/lib
+LIBS := -lmicrokit -Tmicrokit.ld -lc
+
+IMAGE_FILE = loader.img
+REPORT_FILE = report.txt
+CFLAGS += -I$(BOARD_DIR)/include \
+	-I${TOP}/include	\
+	-I$(UART_DRIVER)/include \
+	-I$(SDDF)/include \
+
+
+include ${SDDF}/util/util.mk
+include ${UART_DRIVER}/uart.mk
+include ${SERIAL_COMPONENTS}/serial_components.mk
+
+%.elf: %.o
+	${LD} -o $@ ${LDFLAGS} $< ${LIBS} 
+
+serial_server_1.o: CFLAGS+=-DSERIAL_SERVER_NUMBER=1
+serial_server_2.o: CFLAGS+=-DSERIAL_SERVER_NUMBER=2
+
+serial_server_%.o: ${TOP}/serial_server.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
+	MICROKIT_SDK=${MK_SDK} $(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
+
+qemu: ${IMAGE_FILE}
+	$(QEMU) -machine virt,virtualization=on -cpu cortex-a53 -serial mon:stdio -device loader,file=$(IMAGE_FILE),addr=0x70000000,cpu-num=0 -m size=2G -nographic
+
+
+clean::
+	${RM} -f *.elf
+	find . -name '*.[od]' | xargs ${RM} -f
+
+clobber:: clean
+	${RM} -f ${IMAGE_FILE} ${REPORT_FILE}

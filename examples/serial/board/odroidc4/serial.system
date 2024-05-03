@@ -27,7 +27,7 @@
     <memory_region name="rx_active_serial_client2" size="0x200_000" page_size="0x200_000"/>
 
     <protection_domain name="uart" priority="100" pp="true">
-        <program_image path="uart.elf" />
+        <program_image path="uart_driver.elf" />
 
         <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
 
@@ -73,7 +73,7 @@
     </protection_domain>
 
     <protection_domain name="virt_tx" priority="99" pp="true">
-        <program_image path="virt_tx.elf" />
+        <program_image path="serial_tx_virt.elf" />
 
          <!-- shared memory for driver/virt queues -->
         <map mr="tx_free_serial_driver" vaddr="0x4_400_000" perms="rw" cached="true" setvar_vaddr="tx_free_driver" />
@@ -92,7 +92,7 @@
     </protection_domain>
 
     <protection_domain name="virt_rx" priority="98" pp="true">
-        <program_image path="virt_rx.elf" />
+        <program_image path="serial_rx_virt.elf" />
 
          <!-- shared memory for driver/virt queues -->
         <map mr="rx_free_serial_driver" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="rx_free_driver" />
