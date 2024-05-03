@@ -16,7 +16,5 @@ uart_driver.o: ${SDDF}/drivers/serial/meson/uart.c
 
 -include uart_driver.d
 
-include ${SDDF}/util/util.mk
-
 clean::
 	rm -f uart_driver.[do]

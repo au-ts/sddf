@@ -37,8 +37,8 @@ uint32_t buffer_refs[RX_QUEUE_SIZE_DRIV] = {0};
 
 typedef struct state {
     net_queue_handle_t rx_queue_drv;
-    net_queue_handle_t rx_queue_clients[NUM_CLIENTS];
-    uint8_t mac_addrs[NUM_CLIENTS][ETH_HWADDR_LEN];
+    net_queue_handle_t rx_queue_clients[NUM_NETWORK_CLIENTS];
+    uint8_t mac_addrs[NUM_NETWORK_CLIENTS][ETH_HWADDR_LEN];
 } state_t;
 
 state_t state;
@@ -50,7 +50,7 @@ static bool notify_drv;
   is a broadcast address. */
 int get_mac_addr_match(struct ethernet_header *buffer)
 {
-    for (int client = 0; client < NUM_CLIENTS; client++) {
+    for (int client = 0; client < NUM_NETWORK_CLIENTS; client++) {
         bool match = true;
         for (int i = 0; (i < ETH_HWADDR_LEN) && match; i++) {
             if (buffer->dest.addr[i] != state.mac_addrs[client][i]) {
@@ -78,7 +78,7 @@ int get_mac_addr_match(struct ethernet_header *buffer)
 void rx_return(void)
 {
     bool reprocess = true;
-    bool notify_clients[NUM_CLIENTS] = {false};
+    bool notify_clients[NUM_NETWORK_CLIENTS] = {false};
     while (reprocess) {
         while (!net_queue_empty_active(&state.rx_queue_drv)) {
             net_buff_desc_t buffer;
@@ -154,7 +154,7 @@ void rx_return(void)
         }
     }
 
-    for (int client = 0; client < NUM_CLIENTS; client++) {
+    for (int client = 0; client < NUM_NETWORK_CLIENTS; client++) {
         if (notify_clients[client] && net_require_signal_active(&state.rx_queue_clients[client])) {
             net_cancel_signal_active(&state.rx_queue_clients[client]);
             microkit_notify(client + CLIENT_CH);
@@ -164,7 +164,7 @@ void rx_return(void)
 
 void rx_provide(void)
 {
-    for (int client = 0; client < NUM_CLIENTS; client++) {
+    for (int client = 0; client < NUM_NETWORK_CLIENTS; client++) {
         bool reprocess = true;
         while (reprocess) {
             while (!net_queue_empty_free(&state.rx_queue_clients[client])) {

@@ -34,5 +34,5 @@ $(BUILD_DIR)/meson_ethernet.o: ethernet.c ethernet.h
 	$(CC) -c $(CFLAGS) ethernet.c -o $(BUILD_DIR)/meson_ethernet.o
 
 .PHONY: clean
-clean:
+clean::
 	rm $(BUILD_DIR)/meson_ethernet.o
