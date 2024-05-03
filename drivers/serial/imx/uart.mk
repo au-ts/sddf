@@ -8,7 +8,7 @@
 
 UART_DRIVER:= ${SDDF}/drivers/serial/imx
 
-uart_driver.elf: uart_driver.o sddf_libutil.a
+uart_driver.elf: uart_driver.o libsddf_util.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 uart_driver.o: ${SDDF}/drivers/serial/arm/uart.c
