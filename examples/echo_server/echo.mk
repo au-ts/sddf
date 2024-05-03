@@ -76,6 +76,7 @@ all: loader.img
 -include $(DEPS)
 
 
+${LWIP_OBJS}: ${CHECK_FLAGS_BOARD_MD5}
 lwip.elf: $(LWIP_OBJS)
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 

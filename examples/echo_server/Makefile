@@ -47,9 +47,11 @@ export ECHO_INCLUDE:=$(abspath .)/include
 IMAGE_FILE := $(BUILD_DIR)/loader.img
 REPORT_FILE := $(BUILD_DIR)/report.txt
 
-${IMAGE_FILE} ${REPORT_FILE} clean clobber: ${BUILD_DIR}/Makefile
+${IMAGE_FILE} ${REPORT_FILE} clean clobber: ${BUILD_DIR}/Makefile FORCE
 	${MAKE}  -C ${BUILD_DIR}  -${MAKEFLAGS} $(notdir $@)
 
 ${BUILD_DIR}/Makefile: echo.mk
 	mkdir -p ${BUILD_DIR}
 	cp echo.mk $@
+
+FORCE:

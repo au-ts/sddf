@@ -18,7 +18,7 @@ eth.elf: imx/ethernet.o libsddf_util_debug.a
 
 imx/ethernet.o: ${ETHERNET_DRIVER}/ethernet.c ${CHECK_NETDRV_FLAGS_MD5}
 	mkdir -p imx
-	${CC} -c ${CFLAGS} -I ${ETHERNET_DRIVER} -o $@ $^
+	${CC} -c ${CFLAGS} -I ${ETHERNET_DRIVER} -o $@ $<
 
 
 -include imx/ethernet.d
