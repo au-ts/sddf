@@ -81,7 +81,7 @@ static void process_timeouts(uint64_t curr_time)
     if (next_timeout != UINT64_MAX) {
         regs->mux &= ~TIMER_A_MODE;
         regs->timer_a = next_timeout - curr_time;
-        regs->mux |= TIMER_A_EN; 
+        regs->mux |= TIMER_A_EN;
     }
 }
 
@@ -91,7 +91,7 @@ void notified(microkit_channel ch)
         sddf_dprintf("TIMER DRIVER|LOG: unexpected notification from channel %u\n", ch);
         return;
     }
-    
+
     microkit_irq_ack_delayed(ch);
     regs->mux &= ~TIMER_A_EN;
 
@@ -102,21 +102,22 @@ void notified(microkit_channel ch)
 seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
 {
     switch (microkit_msginfo_get_label(msginfo)) {
-        case SDDF_TIMER_GET_TIME: {
-            uint64_t time_ns = get_ticks() * NS_IN_US;
-            seL4_SetMR(0, time_ns);
-            return microkit_msginfo_new(0, 1);
-        }
-        case SDDF_TIMER_SET_TIMEOUT: {
-            uint64_t curr_time = get_ticks();
-            uint64_t offset_us = seL4_GetMR(0) / NS_IN_US;
-            timeouts[ch] = curr_time + offset_us;
-            process_timeouts(curr_time);
-            break;
-        }
-        default:
-            sddf_dprintf("TIMER DRIVER|LOG: Unknown request %lu to timer from channel %u\n", microkit_msginfo_get_label(msginfo), ch);
-            break;
+    case SDDF_TIMER_GET_TIME: {
+        uint64_t time_ns = get_ticks() * NS_IN_US;
+        seL4_SetMR(0, time_ns);
+        return microkit_msginfo_new(0, 1);
+    }
+    case SDDF_TIMER_SET_TIMEOUT: {
+        uint64_t curr_time = get_ticks();
+        uint64_t offset_us = seL4_GetMR(0) / NS_IN_US;
+        timeouts[ch] = curr_time + offset_us;
+        process_timeouts(curr_time);
+        break;
+    }
+    default:
+        sddf_dprintf("TIMER DRIVER|LOG: Unknown request %lu to timer from channel %u\n", microkit_msginfo_get_label(msginfo),
+                     ch);
+        break;
     }
 
     return microkit_msginfo_new(0, 0);
@@ -128,7 +129,7 @@ void init(void)
 
     /* Start timer E acts as a clock, while timer A can be used for timeouts from clients */
     regs->mux = TIMER_A_EN | (TIMESTAMP_TIMEBASE_1_US << TIMER_E_INPUT_CLK) |
-                       (TIMEOUT_TIMEBASE_1_US << TIMER_A_INPUT_CLK);
+                (TIMEOUT_TIMEBASE_1_US << TIMER_A_INPUT_CLK);
 
     regs->timer_e = 0;
 }
