@@ -21,4 +21,10 @@ VPATH += ${SDDF}/util
 sddf_printf.o: ${SDDF}/util/printf.c
 	${CC} ${CFLAGS} -c -o $@ $<
 
+clean::
+	${RM} -f ${OBJS} ${OBJS:.o=.d} putchar_debug.[od] putchar_serial.[od]
+
+clobber:: clean
+	${RM} -f libsddf_util.a libsddf_util_debug.a
+
 -include ${OBJS:.o=.d} putchar_debug.d putchar_serial.d
