@@ -15,9 +15,7 @@
 #include <stdint.h>
 #include <microkit.h>
 #include <sddf/util/printf.h>
-
-#define GET_TIME 0
-#define SET_TIMEOUT 1
+#include <sddf/timer/protocol.h>
 
 #define GPT_STATUS_REGISTER_CLEAR 0x3F
 #define CR 0
@@ -36,7 +34,6 @@
 #define IRQ_CH 0
 
 #define GPT_FREQ   (12u)
-#define NS_IN_US    1000ULL
 
 uintptr_t gpt_regs;
 static volatile uint32_t *gpt;
@@ -106,12 +103,12 @@ void notified(microkit_channel ch)
 seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
 {
     switch (microkit_msginfo_get_label(msginfo)) {
-        case GET_TIME: {
+        case SDDF_TIMER_GET_TIME: {
             uint64_t time_ns = (get_ticks() / (uint64_t)GPT_FREQ) * NS_IN_US;
             seL4_SetMR(0, time_ns);
             return microkit_msginfo_new(0, 1);
         }
-        case SET_TIMEOUT: {
+        case SDDF_TIMER_SET_TIMEOUT: {
             uint64_t curr_time = get_ticks();
             uint64_t offset_ticks = (seL4_GetMR(0) / NS_IN_US) * (uint64_t)GPT_FREQ;
             timeouts[ch] = curr_time + offset_ticks;

@@ -99,7 +99,7 @@ NETIFFILES=$(LWIP)/netif/ethernet.c
 
 # LWIPFILES: All the above.
 LWIPFILES=lwip.c $(COREFILES) $(CORE4FILES) $(NETIFFILES)
-LWIP_OBJS := $(LWIPFILES:.c=.o) lwip.o utilization_socket.o udp_echo_socket.o sddf_timer_client.o printf.o putchar_serial.o
+LWIP_OBJS := $(LWIPFILES:.c=.o) lwip.o utilization_socket.o udp_echo_socket.o printf.o putchar_serial.o
 
 ETH_OBJS := $(ETHERNET_DRIVER)/ethernet.o printf.o putchar_debug.o
 VIRT_RX_OBJS := $(NETWORK_COMPONENTS)/virt_rx.o $(UTIL)/cache.o printf.o putchar_debug.o
@@ -133,9 +133,6 @@ $(BUILD_DIR)/putchar_debug.o: $(UTIL)/putchar_debug.c
 
 $(BUILD_DIR)/putchar_serial.o: $(UTIL)/putchar_serial.c
 	$(CC) -c $(CFLAGS) $(UTIL)/putchar_serial.c -o $(BUILD_DIR)/putchar_serial.o
-
-$(BUILD_DIR)/sddf_timer_client.o: FORCE
-	BUILD_DIR=$(abspath $(BUILD_DIR)) MICROKIT_INCLUDE=$(BOARD_DIR)/include make -C $(SDDF)/timer/client
 
 $(BUILD_DIR)/eth.elf: $(addprefix $(BUILD_DIR)/, $(ETH_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@

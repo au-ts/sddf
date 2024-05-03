@@ -35,7 +35,7 @@ REPORT_FILE = $(BUILD_DIR)/report.txt
 SYSTEM_FILE = board/$(MICROKIT_BOARD)/timer.system
 
 TIMER_DRIVER_OBJS := timer_driver.o putchar_debug.o printf.o
-CLIENT_OBJS := client.o $(BUILD_DIR)/sddf_timer_client.o
+CLIENT_OBJS := client.o
 
 TIMER_DRIVER := $(SDDF)/drivers/clock/meson
 
@@ -56,13 +56,10 @@ $(BUILD_DIR)/printf.o: $(UTIL)/printf.c
 $(BUILD_DIR)/timer_driver.o: $(TIMER_DRIVER)/timer.c
 	$(CC) -c $(CFLAGS) $(TIMER_DRIVER)/timer.c -o $(BUILD_DIR)/timer_driver.o
 
-$(BUILD_DIR)/sddf_timer_client.o:
-	BUILD_DIR=$(abspath $(BUILD_DIR)) MICROKIT_INCLUDE=$(BOARD_DIR)/include make -C $(SDDF)/timer/client
-
 $(BUILD_DIR)/timer.elf: $(addprefix $(BUILD_DIR)/, $(TIMER_DRIVER_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-$(BUILD_DIR)/client.elf: $(BUILD_DIR)/client.o $(BUILD_DIR)/sddf_timer_client.o
+$(BUILD_DIR)/client.elf: $(BUILD_DIR)/client.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(IMAGE_FILE) $(REPORT_FILE): $(addprefix $(BUILD_DIR)/, $(IMAGES)) $(SYSTEM_FILE)
