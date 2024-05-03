@@ -1,12 +1,11 @@
 #include <stdint.h>
 #include <microkit.h>
 #include <sddf/util/printf.h>
+#include <sddf/timer/protocol.h>
 
 uintptr_t gpt_regs;
 
 #define IRQ_CH 0
-#define GET_TIME 0
-#define SET_TIMEOUT 1
 #define MAX_TIMEOUTS 6
 
 #define TIMER_REG_START   0x140    // TIMER_MUX
@@ -26,11 +25,6 @@ uintptr_t gpt_regs;
 #define TIMEOUT_TIMEBASE_10_US  0b01
 #define TIMEOUT_TIMEBASE_100_US 0b10
 #define TIMEOUT_TIMEBASE_1_MS   0b11
-
-/* Number of nanoseconds in microseconds */
-#define NS_IN_US    1000ULL
-/* Number of nanoseconds in milliseconds */
-#define NS_IN_MS    1000000ULL
 
 struct timer_regs {
     uint32_t mux;
@@ -108,12 +102,12 @@ void notified(microkit_channel ch)
 seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
 {
     switch (microkit_msginfo_get_label(msginfo)) {
-        case GET_TIME: {
+        case SDDF_TIMER_GET_TIME: {
             uint64_t time_ns = get_ticks() * NS_IN_US;
             seL4_SetMR(0, time_ns);
             return microkit_msginfo_new(0, 1);
         }
-        case SET_TIMEOUT: {
+        case SDDF_TIMER_SET_TIMEOUT: {
             uint64_t curr_time = get_ticks();
             uint64_t offset_us = seL4_GetMR(0) / NS_IN_US;
             timeouts[ch] = curr_time + offset_us;
