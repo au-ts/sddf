@@ -54,13 +54,8 @@ volatile struct timer_regs *regs;
  * This timeout array indicates when a timeout should occur,
  * indexed by client ID. */
 static uint64_t timeouts[MAX_TIMEOUTS];
-static microkit_channel active_channel = -1;
-static bool timeout_active = false;
-static uint64_t current_timeout;
-static uint8_t pending_timeouts;
 
-static uint64_t
-get_ticks(void)
+static uint64_t get_ticks(void)
 {
     uint64_t initial_high = regs->timer_e_hi;
     uint64_t low = regs->timer_e;
@@ -70,104 +65,61 @@ get_ticks(void)
     }
 
     uint64_t ticks = (high << 32) | low;
-    return ticks * NS_IN_US;
+    return ticks;
 }
 
-static void
-set_timeout(uint32_t timeout) {
-    regs->mux &= ~TIMER_A_MODE;
-    regs->timer_a = timeout;
-    regs->mux |= TIMER_A_EN;
-}
-
-static void
-handle_irq(microkit_channel ch)
+static void process_timeouts(uint64_t curr_time)
 {
-    if (timeout_active) {
-        regs->mux &= ~TIMER_A_EN;
-        timeout_active = false;
-        microkit_channel curr_channel = active_channel;
-        timeouts[curr_channel] = 0;
-        // notify the client.
-        microkit_notify(curr_channel);
-    }
-
-    if (pending_timeouts && !timeout_active) {
-        uint64_t curr_time = get_ticks();
-        /* find next timeout */
-        uint64_t next_timeout = UINT64_MAX;
-        microkit_channel ch = -1;
-
-        /* A more efficient solution would be to order these in terms of
-         * timeout time, so then we can just take the head as the next timeout.
-         * However, this would require a different data structure...
-         */
-        for (unsigned i = 0; i < MAX_TIMEOUTS; i++) {
-            /* Check if any of these timeouts have gone off in the interim */
-            if (timeouts[i] != 0 && timeouts[i] <= curr_time) {
-                timeouts[i] = 0;
-                pending_timeouts--;
-                microkit_notify(i);
-            } else if (timeouts[i] != 0 && timeouts[i] < next_timeout) {
-                next_timeout = timeouts[i];
-                ch = i;
-            }
-        }
-
-        if (ch != -1) {
-            pending_timeouts--;
-            set_timeout((uint32_t)((next_timeout - curr_time) / NS_IN_MS));
-            timeout_active = true;
-            current_timeout = next_timeout;
-            active_channel = ch;
+    for (int i = 0; i < MAX_TIMEOUTS; i++) {
+        if (timeouts[i] <= curr_time) {
+            microkit_notify(i);
+            timeouts[i] = UINT64_MAX;
         }
     }
-}
 
-void
-notified(microkit_channel ch)
-{
-    if (ch == IRQ_CH) {
-        handle_irq(ch);
-        microkit_irq_ack_delayed(ch);
-    } else {
-        sddf_dprintf("TIMER DRIVER|LOG: unexpected notification %u\n", ch);
+    uint64_t next_timeout = UINT64_MAX;
+    for (int i = 0; i < MAX_TIMEOUTS; i++) {
+        if (timeouts[i] < next_timeout) {
+            next_timeout = timeouts[i];
+        }
+    }
+
+    if (next_timeout != UINT64_MAX) {
+        regs->mux &= ~TIMER_A_MODE;
+        regs->timer_a = next_timeout - curr_time;
+        regs->mux |= TIMER_A_EN; 
     }
 }
 
-seL4_MessageInfo_t
-protected(microkit_channel ch, microkit_msginfo msginfo)
+void notified(microkit_channel ch)
 {
-    uint64_t rel_timeout, cur_ticks, abs_timeout;
+    if (ch != IRQ_CH) {
+        sddf_dprintf("TIMER DRIVER|LOG: unexpected notification from channel %u\n", ch);
+        return;
+    }
+    
+    microkit_irq_ack_delayed(ch);
+    regs->mux &= ~TIMER_A_EN;
+
+    uint64_t curr_time = get_ticks();
+    process_timeouts(curr_time);
+}
+
+seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
+{
     switch (microkit_msginfo_get_label(msginfo)) {
-        case GET_TIME:
-            // Just wants the time. Return it in nanoseconds.
-            cur_ticks = get_ticks();
-            seL4_SetMR(0, cur_ticks);
+        case GET_TIME: {
+            uint64_t time_ns = get_ticks() * NS_IN_US;
+            seL4_SetMR(0, time_ns);
             return microkit_msginfo_new(0, 1);
-        case SET_TIMEOUT:
-            // Request to set a timeout.
-            rel_timeout = (uint64_t)(seL4_GetMR(0));
-            cur_ticks = get_ticks();
-            abs_timeout = cur_ticks + rel_timeout;
-
-            timeouts[ch] = abs_timeout; // in nanoseconds
-            if (!timeout_active || abs_timeout < current_timeout) {
-                if (timeout_active) {
-                    /* there current timeout is now treated as pending */
-                    pending_timeouts++;
-                }
-                set_timeout((uint32_t)(rel_timeout / NS_IN_MS));
-                timeout_active = true;
-
-                /* We need to keep track of how far into the future this is so
-                    we can order client requests appropriately. */
-                current_timeout = abs_timeout;
-                active_channel = ch;
-            } else {
-                pending_timeouts++;
-            }
+        }
+        case SET_TIMEOUT: {
+            uint64_t curr_time = get_ticks();
+            uint64_t offset_us = seL4_GetMR(0) / NS_IN_US;
+            timeouts[ch] = curr_time + offset_us;
+            process_timeouts(curr_time);
             break;
+        }
         default:
             sddf_dprintf("TIMER DRIVER|LOG: Unknown request %lu to timer from channel %u\n", microkit_msginfo_get_label(msginfo), ch);
             break;
@@ -176,14 +128,17 @@ protected(microkit_channel ch, microkit_msginfo msginfo)
     return microkit_msginfo_new(0, 0);
 }
 
-void
-init(void)
+void init(void)
 {
+    for (int i = 0; i < MAX_TIMEOUTS; i++) {
+        timeouts[i] = UINT64_MAX;
+    }
+
     regs = (void *)(gpt_regs + TIMER_REG_START);
 
     /* Start timer E acts as a clock, while timer A can be used for timeouts from clients */
     regs->mux = TIMER_A_EN | (TIMESTAMP_TIMEBASE_1_US << TIMER_E_INPUT_CLK) |
-                       (TIMEOUT_TIMEBASE_1_MS << TIMER_A_INPUT_CLK);
+                       (TIMEOUT_TIMEBASE_1_US << TIMER_A_INPUT_CLK);
 
     regs->timer_e = 0;
 }
