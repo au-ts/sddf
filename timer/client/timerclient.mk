@@ -18,3 +18,7 @@ libtimerclient.a: timer/client/client.o
 
 -include timer/client/timerclient.d
 
+clean::
+	${RM} -rf timer
+clobber:: clean
+	${RM} -f libtimerclient.a
