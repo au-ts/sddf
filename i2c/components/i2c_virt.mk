@@ -5,6 +5,10 @@
 #
 # Include this snippet in your project Makefile to build
 # the i2c virtualiser
+#
+# NOTES:
+#  Builds i2c_virt.elf
+#  Depends on ${SDDF}/util/util.mk also being included
 
 i2c_virt.o: ${SDDF}/i2c/components/virt.c
 	${CC} ${CFLAGS} -c -o $@ $<

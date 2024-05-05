@@ -3,7 +3,7 @@
 #
 # SPDX-License-Identifier: BSD-2-Clause
 #
-# Include this make snippet to buid libco,a
+# Include this make snippet to buid libco,a, a simple coroutine library.
 
 CHECK_LIBCO_FLAGS_MD5:=.libco_cflags-$(shell echo -- ${CFLAGS} ${CFLAGS_network} | md5sum | sed 's/  *-//')
 

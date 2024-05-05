@@ -6,7 +6,10 @@
 # This Makefile snippet builds the serial RX and TX virtualisers
 # it should be included into your project Makefile
 #
-# It relies on the variable SERIAL_NUM_CLIENTS to configure the virtualisers
+# NOTES:
+#  Generates serial_rx_virt.elf serial_tx_virt.elf
+#  It relies on the variable SERIAL_NUM_CLIENTS as a C compiler flag
+#  to configure the virtualisers
 #
 
 ifeq ($(strip $(SERIAL_NUM_CLIENTS)),)
@@ -35,7 +38,7 @@ virt_%.o: ${SDDF}/serial/components/virt_%.c
 	${CC} ${CFLAGS} ${CFLAGS_serial} -o $@ -c $<
 
 clean::
-	rm -f virt_[rt]x.[od] .serial_cflags-*
+	rm -f serial_virt_[rt]x.[od] .serial_cflags-*
 
 clobber::
 	rm -f ${SERIAL_IMAGES}
