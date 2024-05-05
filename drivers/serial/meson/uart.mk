@@ -8,13 +8,19 @@
 
 UART_DRIVER:= ${SDDF}/drivers/serial/meson
 
-uart_driver.elf: uart_driver.o libsddf_util_debug.a
+uart_driver.elf: serial/meson/uart_driver.o libsddf_util_debug.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-uart_driver.o: ${SDDF}/drivers/serial/meson/uart.c
+serial/meson/uart_driver.o: ${SDDF}/drivers/serial/meson/uart.c |serial/meson
 	$(CC) -c $(CFLAGS) -I${UART_DRIVER}/include -o $@ $< 
 
--include uart_driver.d
+serial/meson:
+	mkdir -p $@
+
+-include serial/meson/uart_driver.d
 
 clean::
-	rm -f uart_driver.[do]
+	rm -f serial/meson/uart_driver.[do]
+
+clobber::
+	rm -rf serial

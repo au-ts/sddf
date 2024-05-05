@@ -4,7 +4,12 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
 # Include this snippet in your project Makefile to build
-# the IMX8 NIC driver
+# the Amlogic NIC driver
+#
+# NOTES:
+#   Generates eth.elf
+#   Depends in ${SDDF}/util/util.mk
+#   Needs eth_regs to be set in System Description File
 
 ETHERNET_DRIVER:=${SDDF}/drivers/network/meson
 

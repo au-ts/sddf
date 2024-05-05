@@ -5,6 +5,10 @@
 #
 # Include this snippet in your project Makefile to build
 # the IMX8 timer driver
+#
+# NOTES:
+#  Generates timer.elf
+#  expects ${SDDF}/util/util.mk also to be included
 
 TIMER_DIR=$(dir $(lastword $(MAKEFILE_LIST)))
 TIMER_OBJS := timer/timer.o libsddf_util_debug.a

@@ -5,6 +5,12 @@
 #
 # Include this snippet in your project Makefile to build
 # the IMX8 NIC driver
+#
+# NOTES
+#  Generates eth.elf
+#  Requires ${SDDF}/util/util.mk
+#  Expects System Description File to set eth_regs to the address of
+#  the registers
 
 ETHERNET_DRIVER:=${SDDF}/drivers/network/imx
 CHECK_NETDRV_FLAGS_MD5:=.netdrv_cflags-$(shell echo -- ${CFLAGS} | md5sum | sed 's/  *-//')

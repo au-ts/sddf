@@ -8,13 +8,18 @@
 
 UART_DRIVER:= ${SDDF}/drivers/serial/arm
 
-uart_driver.elf: uart_driver.o libsddf_util_debug.a
+uart_driver.elf: serial/arm/uart_driver.o libsddf_util_debug.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-uart_driver.o: ${SDDF}/drivers/serial/arm/uart.c
+serial/arm/uart_driver.o: ${SDDF}/drivers/serial/arm/uart.c |serial/arm
 	$(CC) -c $(CFLAGS) -I${UART_DRIVER}/include -o $@ $< 
 
--include uart_driver.d
+serial/arm:
+	mkdir -p $@
+-include serial/arm/uart_driver.d
 
 clean::
-	rm -f uart_driver.[do]
+	rm -f serial/arm/uart_driver.[do]
+clobber:: clean
+	rm -rf uart_driver.elf serial
+
