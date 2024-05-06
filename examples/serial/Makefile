@@ -44,8 +44,8 @@ SYSTEM_FILE := board/$(MICROKIT_BOARD)/serial.system
 
 IMAGES := uart.elf serial_server_1.elf serial_server_2.elf virt_tx.elf virt_rx.elf
 CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall -Wno-unused-function -Werror
-LDFLAGS := -L$(BOARD_DIR)/lib -L$(SDDF)/lib
-LIBS := -lmicrokit -Tmicrokit.ld -lc
+LDFLAGS := -L$(BOARD_DIR)/lib
+LIBS := -lmicrokit -Tmicrokit.ld
 
 IMAGE_FILE = $(BUILD_DIR)/loader.img
 REPORT_FILE = $(BUILD_DIR)/report.txt
