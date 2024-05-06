@@ -53,7 +53,7 @@ typedef struct sound_cmd {
 typedef struct sound_pcm {
     uint32_t cookie;
     uint32_t stream_id;
-    uintptr_t addr;
+    uintptr_t io_or_offset;
     unsigned int len;
     // Only used in responses.
     sound_status_t status;
@@ -230,7 +230,7 @@ static inline int sound_enqueue_pcm(sound_pcm_queue_handle_t *h, sound_pcm_t *pc
 
     data->cookie = pcm->cookie;
     data->stream_id = pcm->stream_id;
-    data->addr = pcm->addr;
+    data->io_or_offset = pcm->io_or_offset;
     data->len = pcm->len;
     data->status = pcm->status;
     data->latency_bytes = pcm->latency_bytes;
@@ -285,7 +285,7 @@ static inline int sound_dequeue_pcm(sound_pcm_queue_handle_t *h, sound_pcm_t *ou
 
     out->cookie = pcm->cookie;
     out->stream_id = pcm->stream_id;
-    out->addr = pcm->addr;
+    out->io_or_offset = pcm->io_or_offset;
     out->len = pcm->len;
     out->status = pcm->status;
     out->latency_bytes = pcm->latency_bytes;
