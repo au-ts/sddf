@@ -10,6 +10,7 @@ endif
 
 ifeq ($(strip $(TOOLCHAIN)),)
 	TOOLCHAIN := aarch64-none-elf
+	LIBC := $(dir $(realpath $(shell aarch64-none-elf-gcc --print-file-name libc.a)))
 endif
 
 BUILD_DIR ?= build
@@ -48,7 +49,7 @@ SYSTEM_FILE := board/$(MICROKIT_BOARD)/echo_server.system
 IMAGES := eth.elf lwip.elf benchmark.elf idle.elf virt_rx.elf virt_tx.elf copy.elf arp.elf timer.elf
 CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall -Wno-unused-function -DMICROKIT_CONFIG_$(MICROKIT_CONFIG)
 
-LDFLAGS := -L$(BOARD_DIR)/lib -L$(SDDF)/lib
+LDFLAGS := -L$(BOARD_DIR)/lib -L$(LIBC)
 LIBS := -lmicrokit -Tmicrokit.ld -lc
 
 IMAGE_FILE = $(BUILD_DIR)/loader.img
@@ -99,7 +100,7 @@ NETIFFILES=$(LWIP)/netif/ethernet.c
 
 # LWIPFILES: All the above.
 LWIPFILES=lwip.c $(COREFILES) $(CORE4FILES) $(NETIFFILES)
-LWIP_OBJS := $(LWIPFILES:.c=.o) lwip.o utilization_socket.o udp_echo_socket.o printf.o putchar_serial.o
+LWIP_OBJS := $(LWIPFILES:.c=.o) lwip.o utilization_socket.o udp_echo_socket.o printf.o putchar_serial.o newlibc.o
 
 ETH_OBJS := $(ETHERNET_DRIVER)/ethernet.o printf.o putchar_debug.o
 VIRT_RX_OBJS := $(NETWORK_COMPONENTS)/virt_rx.o $(UTIL)/cache.o printf.o putchar_debug.o
@@ -127,6 +128,9 @@ $(BUILD_DIR)/%.o: %.s Makefile
 
 $(BUILD_DIR)/printf.o: $(UTIL)/printf.c $(SDDF_INCLUDE)/util/printf.h
 	$(CC) -c $(CFLAGS) $(UTIL)/printf.c -o $(BUILD_DIR)/printf.o
+
+$(BUILD_DIR)/newlibc.o: $(UTIL)/newlibc.c
+	$(CC) -c $(CFLAGS) $(UTIL)/newlibc.c -o $(BUILD_DIR)/newlibc.o
 
 $(BUILD_DIR)/putchar_debug.o: $(UTIL)/putchar_debug.c
 	$(CC) -c $(CFLAGS) $(UTIL)/putchar_debug.c -o $(BUILD_DIR)/putchar_debug.o
