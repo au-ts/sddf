@@ -92,23 +92,11 @@ void rx_return(void)
             // This is needed even if we invalidate before the DMA write as it
             // could have been speculatively fetched before the DMA write.
             //
-            // In terms of how we actually do the invalidate, there are a couple
-            // of considerations:
-            //
-            // 1. Compared to the seL4_ARM_VSpace_CleanInvalidate_Data syscalls,
-            //    the cache_* functions do it entirely in userspace via `dc *`
-            //    instructions, avoiding the cost of a syscall.
-            //
-            // 2. On ARM, you cannot only invalidate without cleaning if you're
-            //    at EL0 (i.e. userspace) -- see [1]. Additionally, on at least
-            //    some ARM chips, just invalidating also causes a clean to
-            //    happen if needde -- see [2].
-            //
-            // Out of the available options, cache_clean_and_invalidate was the
-            // fastest. (This explanation also referred to in rx_provide.)
+            // ... well, we would invalidate if it worked in usermode. Alas, it
+            // does not -- see [1]. The fastest one that works is a usermode
+            // CleanInvalidate (faster than a Invalidate via syscall).
             //
             // [1]: https://developer.arm.com/documentation/ddi0595/2021-06/AArch64-Instructions/DC-IVAC--Data-or-unified-Cache-line-Invalidate-by-VA-to-PoC
-            // [2]: https://developer.arm.com/documentation/100236/0002/functional-description/cache-behavior-and-cache-protection/invalidating-or-cleaning-a-cache
             cache_clean_and_invalidate(buffer_vaddr, buffer_vaddr + ROUND_UP(buffer.len, 1 << CONFIG_L1_CACHE_LINE_SIZE_BITS));
             int client = get_mac_addr_match((struct ethernet_header *) buffer_vaddr);
             if (client == BROADCAST_ID) {
@@ -182,17 +170,18 @@ void rx_provide(void)
                 if (buffer_refs[ref_index] != 0) {
                     continue;
                 }
-                // Cache invalidate before DMA write to discard dirty
-                // cachelines, so they don't overwrite received data.
+
+                // There may be pending writes to this buffer in the cache. We
+                // need to invalidate or clean to ensure there's no chance of it
+                // overwriting received data.
                 //
                 // We need to invalidate the whole buffer since we don't know
                 // the packet length anymore, and also because the client may
                 // have written past the packet anyways.
                 //
-                // See comment in rx_return for explanation of why we're using
-                // cache_clean_and_invalidate.
-                cache_clean_and_invalidate(buffer.io_or_offset + buffer_data_vaddr,
-                                           buffer.io_or_offset + buffer_data_vaddr + NET_BUFFER_SIZE);
+                // Usermode cache_clean is the fastest option here.
+                cache_clean(buffer.io_or_offset + buffer_data_vaddr,
+                            buffer.io_or_offset + buffer_data_vaddr + NET_BUFFER_SIZE);
 
                 buffer.io_or_offset = buffer.io_or_offset + buffer_data_paddr;
                 err = net_enqueue_free(&state.rx_queue_drv, buffer);
