@@ -34,8 +34,8 @@ TIMER_DRIVER := $(SDDF)/drivers/clock/meson
 
 IMAGES := virt.elf driver.elf client.elf timer.elf
 CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall -Wno-unused-function
-LDFLAGS := -L$(BOARD_DIR)/lib -L$(SDDF)/lib
-LIBS := -lmicrokit -Tmicrokit.ld -lc
+LDFLAGS := -L$(BOARD_DIR)/lib
+LIBS := -lmicrokit -Tmicrokit.ld
 
 IMAGE_FILE = $(BUILD_DIR)/loader.img
 REPORT_FILE = $(BUILD_DIR)/report.txt
