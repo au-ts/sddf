@@ -27,8 +27,8 @@ uintptr_t c1_cmd_res;
 uintptr_t c1_pcm_req;
 uintptr_t c1_pcm_res;
 
-uintptr_t data_paddr;
-uintptr_t data_vaddr;
+uintptr_t data_region_paddr;
+uintptr_t data_region_vaddr;
 
 static sound_queues_t clients[NUM_CLIENTS];
 static sound_queues_t driver_queues;
@@ -135,8 +135,8 @@ static int notified_by_client(int client)
             continue;
         }
 
-        uintptr_t vaddr = data_vaddr + pcm.io_or_offset;
-        uintptr_t paddr = data_paddr + pcm.io_or_offset;
+        uintptr_t vaddr = data_region_vaddr + pcm.io_or_offset;
+        uintptr_t paddr = data_region_paddr + pcm.io_or_offset;
 
         // Write PCM data to RAM
         cache_clean(vaddr, vaddr + pcm.len);
@@ -210,15 +210,15 @@ int notified_by_driver(void)
         sound_queues_t *client_queues = &clients[owner];
         uintptr_t paddr = pcm.io_or_offset;
 
-        if (paddr < data_paddr ||
-            paddr >= data_paddr + SOUND_PCM_BUFFER_SIZE * client_queues->pcm_res.size ||
+        if (paddr < data_region_paddr ||
+            paddr >= data_region_paddr + SOUND_PCM_BUFFER_SIZE * client_queues->pcm_res.size ||
             pcm.len > SOUND_PCM_BUFFER_SIZE) {
             sddf_dprintf("SND VIRT|ERR: invalid PCM buffer bounds from driver\n");
             continue;
         }
 
-        uintptr_t offset = paddr - data_paddr;
-        uintptr_t vaddr = data_vaddr + pcm.io_or_offset;
+        uintptr_t offset = paddr - data_region_paddr;
+        uintptr_t vaddr = data_region_vaddr + pcm.io_or_offset;
 
         // Cache is dirty as device may have written to buffer
         microkit_arm_vspace_data_invalidate(vaddr, vaddr + pcm.len);
@@ -244,8 +244,8 @@ int notified_by_driver(void)
 
 void init(void)
 {
-    assert(data_paddr);
-    assert(data_vaddr);
+    assert(data_region_paddr);
+    assert(data_region_vaddr);
 
     sound_queues_init(&clients[0],
                       (void *)c0_cmd_req,
