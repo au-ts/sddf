@@ -69,11 +69,13 @@ uint64_t tx_descriptors[TX_COUNT];
 int rx_last_desc_idx = 0;
 int tx_last_desc_idx = 0;
 
-static inline bool virtio_avail_full_rx(struct virtq *virtq) {
+static inline bool virtio_avail_full_rx(struct virtq *virtq)
+{
     return rx_last_desc_idx >= rx_virtq.num;
 }
 
-static inline bool virtio_avail_full_tx(struct virtq *virtq) {
+static inline bool virtio_avail_full_tx(struct virtq *virtq)
+{
     return tx_last_desc_idx >= tx_virtq.num;
 }
 
@@ -401,7 +403,7 @@ static void eth_setup(void)
 
 void init(void)
 {
-    regs = (volatile virtio_mmio_regs_t *) (eth_regs + VIRTIO_MMIO_NET_OFFSET);
+    regs = (volatile virtio_mmio_regs_t *)(eth_regs + VIRTIO_MMIO_NET_OFFSET);
     virtio_net_tx_headers = (virtio_net_hdr_t *) virtio_net_tx_headers_vaddr;
 
     ialloc_init(&rx_ialloc_desc, rx_descriptors, RX_COUNT);
@@ -417,19 +419,19 @@ void init(void)
 
 void notified(microkit_channel ch)
 {
-    switch(ch) {
-        case IRQ_CH:
-            handle_irq();
-            microkit_irq_ack_delayed(ch);
-            break;
-        case RX_CH:
-            rx_provide();
-            break;
-        case TX_CH:
-            tx_provide();
-            break;
-        default:
-            LOG_DRIVER_ERR("received notification on unexpected channel %u\n", ch);
-            break;
+    switch (ch) {
+    case IRQ_CH:
+        handle_irq();
+        microkit_irq_ack_delayed(ch);
+        break;
+    case RX_CH:
+        rx_provide();
+        break;
+    case TX_CH:
+        tx_provide();
+        break;
+    default:
+        LOG_DRIVER_ERR("received notification on unexpected channel %u\n", ch);
+        break;
     }
 }

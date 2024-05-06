@@ -74,7 +74,8 @@ typedef struct virtio_net_hdr {
     // uint16_t num_buffers;
 } virtio_net_hdr_t;
 
-static void virtio_net_print_config(volatile virtio_net_config_t *config) {
+static void virtio_net_print_config(volatile virtio_net_config_t *config)
+{
     LOG_DRIVER("Printing virtIO net config:\n");
     sddf_printf("    mac: %x:%x:%x:%x:%x:%x\n",
                 config->mac[0], config->mac[1], config->mac[2], config->mac[3], config->mac[4], config->mac[5]);
@@ -88,7 +89,8 @@ static void virtio_net_print_config(volatile virtio_net_config_t *config) {
     sddf_printf("    supported_hash_types: 0x%x\n", config->supported_hash_types);
 }
 
-static void virtio_net_print_hdr(volatile virtio_net_hdr_t *hdr) {
+static void virtio_net_print_hdr(volatile virtio_net_hdr_t *hdr)
+{
     LOG_DRIVER("Printing virtIO net header:\n");
     sddf_printf("    flags: 0x%x\n", hdr->flags);
     sddf_printf("    gso_type: 0x%x\n", hdr->gso_type);
@@ -98,7 +100,8 @@ static void virtio_net_print_hdr(volatile virtio_net_hdr_t *hdr) {
     sddf_printf("    csum_offset: 0x%x\n", hdr->csum_offset);
 }
 
-static void virtio_net_print_features(uint64_t features) {
+static void virtio_net_print_features(uint64_t features)
+{
     if (features & ((uint64_t)1 << VIRTIO_NET_F_CSUM)) {
         sddf_printf("    VIRTIO_NET_F_CSUM\n");
     }
