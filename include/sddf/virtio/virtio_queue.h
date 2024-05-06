@@ -1,5 +1,3 @@
-#ifndef VIRTQUEUE_H
-#define VIRTQUEUE_H
 /*
  * Virtual I/O Device (VIRTIO) Version 1.2
  * Committee Specification Draft 01
@@ -9,6 +7,7 @@
  * Latest stage of narrative specification: http://docs.oasis-open.org/virtio/virtio/v1.2/virtio-v1.2.html
  * TC IPR Statement: https://github.com/oasis-tcs/virtio-admin/blob/master/IPR.md
  */
+#pragma once
 
 /*
  * An interface for efficient virtio implementation.
@@ -86,19 +85,18 @@ struct virtq {
 
 static inline int virtq_need_event(uint16_t event_idx, uint16_t new_idx, uint16_t old_idx)
 {
-         return (uint16_t)(new_idx - event_idx - 1) < (uint16_t)(new_idx - old_idx);
+    return (uint16_t)(new_idx - event_idx - 1) < (uint16_t)(new_idx - old_idx);
 }
 
 /* Get location of event indices (only with VIRTIO_F_EVENT_IDX) */
 static inline uint16_t *virtq_used_event(struct virtq *vq)
 {
-        /* For backwards compat, used event index is at *end* of avail ring. */
-        return &vq->avail->ring[vq->num];
+    /* For backwards compat, used event index is at *end* of avail ring. */
+    return &vq->avail->ring[vq->num];
 }
 
 static inline uint16_t *virtq_avail_event(struct virtq *vq)
 {
-        /* For backwards compat, avail event index is at *end* of used ring. */
-        return (uint16_t *)&vq->used->ring[vq->num];
+    /* For backwards compat, avail event index is at *end* of used ring. */
+    return (uint16_t *)&vq->used->ring[vq->num];
 }
-#endif /* VIRTQUEUE_H */

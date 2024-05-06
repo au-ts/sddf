@@ -70,19 +70,23 @@ typedef volatile struct {
     uint32_t Config[0];
 } virtio_mmio_regs_t;
 
-bool virtio_mmio_check_magic(virtio_mmio_regs_t *regs) {
+bool virtio_mmio_check_magic(virtio_mmio_regs_t *regs)
+{
     return regs->MagicValue == 0x74726976;
 }
 
-bool virtio_mmio_check_device_id(virtio_mmio_regs_t *regs, virtio_device_id_t id) {
+bool virtio_mmio_check_device_id(virtio_mmio_regs_t *regs, virtio_device_id_t id)
+{
     return regs->DeviceID == id;
 }
 
-uint32_t virtio_mmio_version(virtio_mmio_regs_t *regs){
+uint32_t virtio_mmio_version(virtio_mmio_regs_t *regs)
+{
     return regs->Version;
 }
 
-void virtio_print_reserved_feature_bits(uint64_t feature) {
+void virtio_print_reserved_feature_bits(uint64_t feature)
+{
     if (feature & ((uint64_t)1 << VIRTIO_F_INDIRECT_DESC)) {
         sddf_dprintf("    VIRTIO_F_INDIRECT_DESC\n");
     }
