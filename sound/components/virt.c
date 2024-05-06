@@ -116,8 +116,8 @@ static int notified_by_client(int client)
 
         int owner = owners[pcm.stream_id];
         if (owner != client) {
-            sddf_dprintf("SND VIRT|ERR: [client %d] driver replied to busy stream\n",
-                         client);
+            sddf_dprintf("SND VIRT|ERR: [client %d] stream %u not owned by client\n",
+                         client, pcm.stream_id);
             respond_to_pcm(client_queues, &pcm, SOUND_S_BAD_MSG);
             notify_client = true;
             continue;
@@ -157,8 +157,8 @@ int notified_by_driver(void)
         }
 
         int owner = owners[cmd.stream_id];
-        if (owner < 0 || owner > NUM_CLIENTS) {
-            sddf_dprintf("SND VIRT|ERR: invalid owner id %d\n", owner);
+        if (owner == NO_OWNER) {
+            sddf_dprintf("SND VIRT|ERR: stream %u not owned\n", cmd.stream_id);
             continue;
         }
 
