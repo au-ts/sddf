@@ -2,8 +2,8 @@
 #include <stdint.h>
 #include <microkit.h>
 #include <sddf/sound/queue.h>
+#include <sddf/util/util.h>
 #include <sddf/util/cache.h>
-#include <sddf/util/printf.h>
 
 #define DRIVER_CH 0
 #define CLIENT_CH_BEGIN 1
@@ -26,6 +26,9 @@ uintptr_t c1_cmd_req;
 uintptr_t c1_cmd_res;
 uintptr_t c1_pcm_req;
 uintptr_t c1_pcm_res;
+
+uintptr_t data_paddr;
+uintptr_t data_vaddr;
 
 static sound_queues_t clients[NUM_CLIENTS];
 static sound_queues_t driver_queues;
@@ -123,9 +126,22 @@ static int notified_by_client(int client)
             continue;
         }
 
-        // Write PCM data to RAM
-        cache_clean(pcm.addr, pcm.addr + pcm.len);
+        if (pcm.io_or_offset % SOUND_PCM_BUFFER_SIZE ||
+            pcm.io_or_offset >= SOUND_PCM_BUFFER_SIZE * client_queues->pcm_req.size ||
+            pcm.len > SOUND_PCM_BUFFER_SIZE) {
+            sddf_dprintf("SND VIRT|ERR: [client %d] invalid PCM buffer bounds\n", client);
+            respond_to_pcm(client_queues, &pcm, SOUND_S_BAD_MSG);
+            notify_client = true;
+            continue;
+        }
 
+        uintptr_t vaddr = data_vaddr + pcm.io_or_offset;
+        uintptr_t paddr = data_paddr + pcm.io_or_offset;
+
+        // Write PCM data to RAM
+        cache_clean(vaddr, vaddr + pcm.len);
+
+        pcm.io_or_offset = paddr;
         if (sound_enqueue_pcm(&driver_queues.pcm_req, &pcm) != 0) {
             sddf_dprintf("SND VIRT|ERR: Failed to enqueue PCM data\n");
             return -1;
@@ -191,10 +207,24 @@ int notified_by_driver(void)
             continue;
         }
 
-        // Cache is dirty as device may have written to buffer
-        microkit_arm_vspace_data_invalidate(pcm.addr, pcm.addr + pcm.len);
+        sound_queues_t *client_queues = &clients[owner];
+        uintptr_t paddr = pcm.io_or_offset;
 
-        if (sound_enqueue_pcm(&clients[owner].pcm_res, &pcm) != 0) {
+        if (paddr < data_paddr ||
+            paddr >= data_paddr + SOUND_PCM_BUFFER_SIZE * client_queues->pcm_res.size ||
+            pcm.len > SOUND_PCM_BUFFER_SIZE) {
+            sddf_dprintf("SND VIRT|ERR: invalid PCM buffer bounds from driver\n");
+            continue;
+        }
+
+        uintptr_t offset = paddr - data_paddr;
+        uintptr_t vaddr = data_vaddr + pcm.io_or_offset;
+
+        // Cache is dirty as device may have written to buffer
+        microkit_arm_vspace_data_invalidate(vaddr, vaddr + pcm.len);
+
+        pcm.io_or_offset = offset;
+        if (sound_enqueue_pcm(&client_queues->pcm_res, &pcm) != 0) {
             sddf_dprintf(
                 "SND VIRT|ERR: [client %d] failed to enqueue PCM data\n",
                 owner);
@@ -214,6 +244,9 @@ int notified_by_driver(void)
 
 void init(void)
 {
+    assert(data_paddr);
+    assert(data_vaddr);
+
     sound_queues_init(&clients[0],
                       (void *)c0_cmd_req,
                       (void *)c0_cmd_res,
