@@ -3,6 +3,7 @@
  *
  * https://en.wikipedia.org/wiki/Master_boot_record
 */
+#pragma once
 
 #include <stdint.h>
 
