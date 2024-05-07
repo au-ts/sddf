@@ -79,7 +79,7 @@ static inline int ialloc_free(ialloc_t *ia, uint64_t id)
  * @param idxlist pointer to the linked list array storing the next free index.
  * @param size number of indices that can be allocated, also length of idxlist.
  */
-void ialloc_init(ialloc_t *ia, uint64_t *idxlist, uint64_t size)
+static void ialloc_init(ialloc_t *ia, uint64_t *idxlist, uint64_t size)
 {
     ia->idxlist = idxlist;
     ia->size = size;
