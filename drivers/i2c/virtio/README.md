@@ -12,3 +12,7 @@ https://github.com/rust-vmm/vhost-device/tree/main/vhost-device-i2c.
 
 Please clone this repository and build the vhost-device-i2c daemon.
 Follow the instructions in the README.md of this repository.
+
+If you wish to run this daemon without sudo access, ensure that you
+add your current user to the group associated with your desired
+i2c device.

@@ -11,23 +11,36 @@
     <memory_region name="client_response_region" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="driver_request_region" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="driver_response_region" size="0x200_000" page_size="0x200_000"/>
-    <memory_region name="data_region" size="0x200_000" page_size="0x200_000"/>
+    <memory_region name="driver_data_region" size="0x200_000" page_size="0x200_000"/>
 
     <!-- Memory regions for driver-virtio device communication -->
-    <memory_region name="hw_ring_buffer" size="0x10_000" />
-    <memory_region name="virtio_i2c_headers" size="0x10_000" />
+    <memory_region name="virtio_requestq" size="0x200_000" />
+    <memory_region name="virtio_i2c_in_hdr" size="0x200_000" />
+    <memory_region name="virtio_i2c_req_buf" size="0x200_000" />
+    <memory_region name="virtio_i2c_out_hdr" size="0x200_000" />
 
     <protection_domain name="driver" priority="100">
         <program_image path="driver.elf"/>
-
         <map mr="virtio_mmio" vaddr="0x2_000_000" perms="rw" setvar_vaddr="i2c_regs" />
 
-        <map mr="hw_ring_buffer" vaddr="0x2_200_000" perms="rw" cached="false" setvar_vaddr="hw_ring_buffer_vaddr" />
-        <map mr="virtio_i2c_headers" vaddr="0x4_000_000" perms="rw" cached="false" setvar_vaddr="virtio_i2c_headers_vaddr" />
+        <!-- For driver-virt commuinication -->
+        <map mr="driver_request_region" vaddr="0x6_000_000" perms="rw" setvar_vaddr="request_region" />
+        <map mr="driver_response_region" vaddr="0x7_000_000" perms="rw" setvar_vaddr="response_region" />
+        <map mr="driver_data_region" vaddr="0x8_000_000" perms="rw" setvar_vaddr="driver_data_region" />
+        <!-- For driver-virtio device communication -->
+        <map mr="virtio_requestq" vaddr="0x2_200_000" perms="rw" cached="false" setvar_vaddr="virtio_requestq_vaddr" />
+        <map mr="virtio_i2c_in_hdr" vaddr="0x4_000_000" perms="rw" cached="false" setvar_vaddr="virtio_i2c_in_hdr_vaddr" />
+        <map mr="virtio_i2c_req_buf" vaddr="0x4_200_000" perms="rw" cached="false" setvar_vaddr="virtio_i2c_req_buf_vaddr" />
+        <map mr="virtio_i2c_out_hdr" vaddr="0x4_400_000" perms="rw" cached="false" setvar_vaddr="virtio_i2c_out_hdr_vaddr" />
 
-        <setvar symbol="virtio_i2c_headers_paddr" region_paddr="virtio_i2c_headers" />
+        <setvar symbol="virtio_i2c_in_hdr_paddr" region_paddr="virtio_i2c_in_hdr" />
+        <setvar symbol="virtio_requestq_paddr" region_paddr="virtio_requestq" />
+        <setvar symbol="virtio_i2c_req_buf_paddr" region_paddr="virtio_i2c_req_buf" />
+        <setvar symbol="virtio_i2c_out_hdr_paddr" region_paddr="virtio_i2c_out_hdr" />
 
-        <irq irq="79" id="1" trigger="edge" /> <!--> ethernet interrupt -->
+        <!-- Note that this interrupt can change depending on what virtio mmio region the
+        i2c device is given by qemu.  -->
+        <irq irq="79" id="1" trigger="edge" />
     </protection_domain>
 
     <protection_domain name="virt" priority="99" pp="true">
@@ -45,7 +58,7 @@
 
         <map mr="client_request_region" vaddr="0x4_000_000" perms="rw" setvar_vaddr="request_region" />
         <map mr="client_response_region" vaddr="0x5_000_000" perms="rw" setvar_vaddr="response_region" />
-        <map mr="data_region" vaddr="0x6_000_000" perms="rw" setvar_vaddr="data_region" />
+        <map mr="driver_data_region" vaddr="0x8_000_000" perms="rw" setvar_vaddr="data_region" />
     </protection_domain>
 
     <channel>

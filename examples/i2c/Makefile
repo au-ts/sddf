@@ -101,7 +101,8 @@ $(IMAGE_FILE) $(REPORT_FILE): $(addprefix $(BUILD_DIR)/, $(IMAGES)) $(SYSTEM_FIL
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
 
 qemu: $(IMAGE_FILE)
-	sudo $(QEMU) -machine virt,virtualization=on \
+		$(QEMU) -machine virt,virtualization=on \
+			-M memory-backend=foo.ram \
 			-cpu cortex-a53 \
 			-serial mon:stdio \
 			-device loader,file=$(IMAGE_FILE),addr=0x70000000,cpu-num=0 \
@@ -110,8 +111,7 @@ qemu: $(IMAGE_FILE)
 			-d guest_errors \
 			-chardev socket,path=/home/kwinter/TS/LionsOS/examples/kitty/vi2c2.sock0,id=vi2c \
 			-device vhost-user-i2c-device,chardev=vi2c,id=i2c \
-			-object memory-backend-file,id=mem,size=2G,mem-path=/dev/shm/qemu.ram,share=on \
-			-numa node,memdev=mem
+			-object memory-backend-file,id=foo.ram,size=2G,mem-path=/dev/shm/qemu.ram,share=on
 
 .PHONY: all compile clean
 

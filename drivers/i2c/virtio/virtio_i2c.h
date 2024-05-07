@@ -10,13 +10,18 @@
 
 #define LOG_DRIVER_ERR(...) do{ sddf_printf("I2C DRIVER|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
-
 /* I2C Feature Flags */
 #define VIRTIO_I2C_F_ZERO_LENGTH_REQUEST 0
 
 /* I2C Message Flags */
 #define VIRTIO_I2C_FLAGS_FAIL_NEXT 0
 #define VIRTIO_I2C_FLAGS_M_RD 1
+#define VIRTIO_I2C_MSG_ERR 1
+
+typedef struct _virtio_i2c_state {
+    uintptr_t curr_data;
+    uint32_t len;
+} virtio_i2c_state_t;
 
 struct virtio_i2c_out_hdr {
     uint16_t addr;
