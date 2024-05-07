@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: BSD-3-Clause
  * Copyright (c) 2001-2003 Swedish Institute of Computer Science.
  */
+#pragma once
 
 #include <stdint.h>
 #include <sddf/util/printf.h>

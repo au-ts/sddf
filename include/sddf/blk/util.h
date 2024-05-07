@@ -1,3 +1,5 @@
+#pragma once
+
 #include <stddef.h>
 
 // @ericc: When we have libc implementation replace this
