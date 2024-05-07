@@ -1,6 +1,7 @@
 #pragma once
 
 #include <microkit.h>
+#include <sddf/util/util.h>
 #include <sddf/network/queue.h>
 
 #define ETHERNET_CLI0_NAME "client0"
@@ -61,8 +62,6 @@ _Static_assert(ETHERNET_RX_DATA_REGION_SIZE_CLI0 >= ETHERNET_RX_QUEUE_SIZE_CLI0 
                 "Client0 RX data region size must fit Client0 RX buffers");
 _Static_assert(ETHERNET_RX_DATA_REGION_SIZE_CLI1 >= ETHERNET_RX_QUEUE_SIZE_CLI1 * NET_BUFFER_SIZE, 
                 "Client1 RX data region size must fit Client1 RX buffers");
-
-#define MAX(a,b) (((a) > (b)) ? (a) : (b))
 
 #define ETHERNET_MAX_QUEUE_SIZE MAX(ETHERNET_TX_QUEUE_SIZE_DRIV, MAX(ETHERNET_RX_QUEUE_SIZE_DRIV, MAX(ETHERNET_RX_QUEUE_SIZE_CLI0, ETHERNET_RX_QUEUE_SIZE_CLI1)))
 _Static_assert(ETHERNET_TX_QUEUE_SIZE_DRIV >= ETHERNET_TX_QUEUE_SIZE_CLI0 + ETHERNET_TX_QUEUE_SIZE_CLI1, 

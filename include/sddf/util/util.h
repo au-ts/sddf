@@ -12,6 +12,8 @@
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(x[0]))
 #define ALIGN(x, align)   (((x) + (align) - 1) & ~((align) - 1))
 
+#define BIT(nr) (1UL << (nr))
+
 #ifdef __GNUC__
 #define likely(x)   __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
@@ -31,6 +33,8 @@
 #  error Unable to determine system endianness
 #endif
 #endif
+
+#define MAX(a,b) (((a) > (b)) ? (a) : (b))
 
 // Doing this with statement expressions & temporary variables to avoid issues
 // with operator precedence and evaluating arguments multiple times.
