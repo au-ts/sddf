@@ -6,238 +6,322 @@
 
 #pragma once
 
-#include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
+#include <string.h>
+#include <sddf/util/util.h>
 #include <sddf/util/fence.h>
 
-/* Size of the data that each queue entry points to. */
-#define BUFFER_SIZE 2048
-
-/* Buffer descriptor */
-typedef struct serial_queue_entry {
-    uintptr_t encoded_addr; /* encoded dma addresses */
-    unsigned int len; /* associated memory lengths */
-} serial_queue_entry_t;
-
-/* Circular buffer containing descriptors */
 typedef struct serial_queue {
+    /* index to insert at */
     uint32_t tail;
+    /* index to remove from */
     uint32_t head;
-    uint32_t size;
-    bool notify_writer;
-    bool notify_reader;
-    bool plugged;
-    serial_queue_entry_t entries[];
+    /* flag to indicate whether consumer requires signalling */
+    uint32_t consumer_signalled;
+    /* flag to indicate whether producer requires signalling */
+    uint32_t producer_signalled;
 } serial_queue_t;
 
-/* A queue handle for enqueing/dequeuing into  */
 typedef struct serial_queue_handle {
-    serial_queue_t *free;
-    serial_queue_t *active;
+    serial_queue_t *queue;
+    uint32_t size;
 } serial_queue_handle_t;
-
-/**
- * Initialise the shared queue structure.
- *
- * @param queue queue handle to use.
- * @param free pointer to free queue in shared memory.
- * @param active pointer to active queue in shared memory.
- * @param size Number of entries in each queue.
- */
-static inline void serial_queue_init(serial_queue_handle_t *queue, serial_queue_t *free, serial_queue_t *active, uint32_t size)
-{
-    queue->free = free;
-    queue->free->notify_reader = true;
-    queue->free->size = size;
-    queue->active = active;
-    queue->active->notify_reader = true;
-    queue->active->size = size;
-}
 
 /**
  * Check if the queue is empty.
  *
- * @param queue queue to check.
+ * @param queue_handle queue to check.
+ * @param local_head head which points to the next character to be dequeued.
  *
- * @return true indicates the buffer is empty, false otherwise.
+ * @return true indicates the queue is empty, false otherwise.
  */
-static inline int serial_queue_empty(serial_queue_t *queue)
+static inline int serial_queue_empty(serial_queue_handle_t *queue_handle, uint32_t local_head)
 {
-    return !((queue->tail - queue->head) % queue->size);
+    return local_head == queue_handle->queue->tail;
 }
 
 /**
  * Check if the queue is full
  *
- * @param queue queue to check.
- *
+ * @param queue_handle queue to check.
+ * @param local_tail tail which points to the next enqueue slot.
+ * 
  * @return true indicates the buffer is full, false otherwise.
  */
-static inline int serial_queue_full(serial_queue_t *queue)
+static inline int serial_queue_full(serial_queue_handle_t *queue_handle, uint32_t local_tail)
 {
-    // assert((queue->tail - queue->head) >= 0);
-    return !((queue->tail - queue->head + 1) % queue->size);
-}
-
-static inline uint32_t serial_queue_size(serial_queue_t *queue)
-{
-    // assert((queue->tail - queue->head) >= 0);
-    return (queue->tail - queue->head);
+    return (local_tail - queue_handle->queue->head) == queue_handle->size;
 }
 
 /**
- * Enqueue an element to a queue
+ * Enqueue a char into a queue.
  *
- * @param queue queue to enqueue into.
- * @param buffer address into shared memory where data is stored.
- * @param len length of data inside the buffer above.
+ * @param queue_handle queue to enqueue into.
+ * @param data_region address of the buffer this queue handle refers to.
+ * @param local_tail address of the tail to be incremented. This allows for clients to 
+ *                      enqueue multiple characters before making the changes visable.
+ * @param character character to be enqueued.
  *
  * @return -1 when queue is empty, 0 on success.
  */
-static inline int serial_enqueue(serial_queue_t *queue, uintptr_t buffer, unsigned int len)
+static inline int serial_enqueue(serial_queue_handle_t *queue_handle, char *data_region, 
+                                        uint32_t *local_tail, char character)
 {
-    // assert(buffer != 0);
-    if (serial_queue_full(queue)) {
+    if (serial_queue_full(queue_handle, *local_tail)) {
         return -1;
     }
 
-    queue->entries[queue->tail % queue->size].encoded_addr = buffer;
-    queue->entries[queue->tail % queue->size].len = len;
-
-    THREAD_MEMORY_RELEASE();
-    queue->tail++;
+    data_region[*local_tail % queue_handle->size] = character;
+    (*local_tail)++;
 
     return 0;
 }
 
 /**
- * Dequeue an element to a queue.
+ * Dequeue a char from a queue.
  *
- * @param queue queue to Dequeue from.
- * @param buffer pointer to the address of where to store buffer address.
- * @param len pointer to variable to store length of data dequeueing.
+ * @param queue_handle queue to dequeue from.
+ * @param data_region address of the buffer this queue handle refers to.
+ * @param local_head address of the head to be incremented. This allows for clients to 
+ *                      dequeue multiple characters before making the changes visable.
+ * @param character character to copy into.
  *
  * @return -1 when queue is empty, 0 on success.
  */
-static inline int serial_dequeue(serial_queue_t *queue, uintptr_t *addr, unsigned int *len)
+static inline int serial_dequeue(serial_queue_handle_t *queue_handle, char *data_region, 
+                                        uint32_t *local_head, char* character)
 {
-    if (serial_queue_empty(queue)) {
+    if (serial_queue_empty(queue_handle, *local_head)) {
         return -1;
     }
 
-    // assert(queue->entries[queue->head % queue->size].encoded_addr != 0);
-
-    *addr = queue->entries[queue->head % queue->size].encoded_addr;
-    *len = queue->entries[queue->head % queue->size].len;
-
-    THREAD_MEMORY_RELEASE();
-    queue->head++;
+    *character = data_region[*local_head % queue_handle->size];
+    (*local_head)++;
 
     return 0;
 }
 
 /**
- * Enqueue an element into an free queue.
- * This indicates the buffer address parameter is currently free for use.
+ * Update the value of the tail in the shared data structure to make
+ * locally enqueued data visible.
  *
- * @param queue handle to enqueue into.
- * @param buffer address into shared memory where data is stored.
- * @param len length of data inside the buffer above.
- *
- * @return -1 when queue is full, 0 on success.
+ * @param queue_handle queue to update.
+ * @param local_tail tail which points to the last character enqueued.
  */
-static inline int serial_enqueue_free(serial_queue_handle_t *queue, uintptr_t addr, unsigned int len)
+static inline void serial_update_visable_tail(serial_queue_handle_t *queue_handle, 
+                                            uint32_t local_tail)
 {
-    // assert(addr);
-    return serial_enqueue(queue->free, addr, len);
+    uint32_t head = queue_handle->queue->head;
+    uint32_t tail = queue_handle->queue->tail;
+    uint32_t max_tail = head + queue_handle->size;
+
+    /* Ensure updates to tail don't overwrite existing data */
+    if (head <= tail) {
+        assert(local_tail >= tail || local_tail < head);
+    } else {
+        /* tail < head */
+        assert(local_tail >= tail && local_tail < head);
+    }
+
+    /* Ensure updates to tail don't exceed size restraints */
+    if (head <= max_tail) {
+        assert(local_tail <= max_tail);
+    } else {
+        /* max_tail < head */
+        assert(local_tail >= head || local_tail <= max_tail);
+    }
+
+#ifdef CONFIG_ENABLE_SMP_SUPPORT
+    THREAD_MEMORY_RELEASE();
+#endif
+
+    queue_handle->queue->tail = local_tail;
 }
 
 /**
- * Enqueue an element into a active queue.
- * This indicates the buffer address parameter is currently in use.
+ * Update the value of the head in the shared data structure to make
+ * locally dequeued data visible.
  *
- * @param queue handle to enqueue into.
- * @param buffer address into shared memory where data is stored.
- * @param len length of data inside the buffer above.
- *
- * @return -1 when queue is full, 0 on success.
+ * @param queue_handle queue to update.
+ * @param local_head head which points to the next character to dequeue.
  */
-static inline int serial_enqueue_active(serial_queue_handle_t *queue, uintptr_t addr, unsigned int len)
+static inline void serial_update_visable_head(serial_queue_handle_t *queue_handle, 
+                                            uint32_t local_head)
 {
-    // assert(addr);
-    return serial_enqueue(queue->active, addr, len);
+    uint32_t head = queue_handle->queue->head;
+    uint32_t tail = queue_handle->queue->tail;
+
+    /* Ensure updates to head don't corrupt existing data */
+    if (head <= tail) {
+        assert(local_head >= head && local_head <= tail);
+    } else {
+        /* head > tail */
+        assert(local_head >= head || local_head <= tail);
+    }
+
+#ifdef CONFIG_ENABLE_SMP_SUPPORT
+    THREAD_MEMORY_RELEASE();
+#endif
+
+    queue_handle->queue->head = local_head;
 }
 
-/**
- * Dequeue an element from the free queue.
- *
- * @param queue handle to dequeue from.
- * @param buffer pointer to the address of where to store buffer address.
- * @param len pointer to variable to store length of data dequeueing.
- *
- * @return -1 when queue is empty, 0 on success.
- */
-static inline int serial_dequeue_free(serial_queue_handle_t *queue, uintptr_t *addr, unsigned int *len)
+static inline uint32_t serial_queue_contiguous_length(serial_queue_handle_t *queue_handle) 
 {
-    return serial_dequeue(queue->free, addr, len);
+    uint32_t head = queue_handle->queue->head;
+    uint32_t tail = queue_handle->queue->tail;
+
+    if (head <= tail) {
+        return tail - head;
+    } else {
+        return (UINT32_MAX - head) + 1;
+    }
 }
 
-/**
- * Dequeue an element from a active queue.
- *
- * @param queue handle to dequeue from.
- * @param buffer pointer to the address of where to store buffer address.
- * @param len pointer to variable to store length of data dequeueing.
- *
- * @return -1 when queue is empty, 0 on success.
- */
-static inline int serial_dequeue_active(serial_queue_handle_t *queue, uintptr_t *addr, unsigned int *len)
+static inline uint32_t serial_queue_length(serial_queue_handle_t *queue_handle)
 {
-    return serial_dequeue(queue->active, addr, len);
+    uint32_t head = queue_handle->queue->head;
+    uint32_t tail = queue_handle->queue->tail;
+
+    if (head <= tail) {
+        return serial_queue_contiguous_length(queue_handle);
+    } else {
+        return serial_queue_contiguous_length(queue_handle) + tail;
+    }
 }
 
-/**
- * Initialise the free queue by filling with all free buffers.
- *
- * @param queue queue handle to use.
- * @param base_addr start of the memory region the offsets are applied to.
- */
-static inline void serial_buffers_init(serial_queue_handle_t *queue, uintptr_t base_addr)
+static inline uint32_t serial_queue_free(serial_queue_handle_t *queue_handle)
 {
-    for (uint32_t i = 0; i < queue->free->size - 1; i++) {
-        serial_enqueue_free(queue, (BUFFER_SIZE * i) + base_addr, 0);
+    return queue_handle->size - serial_queue_length(queue_handle);
+}
+
+static inline uint32_t serial_queue_contiguous_free(serial_queue_handle_t *queue_handle)
+{
+    uint32_t tail = queue_handle->queue->tail;
+    uint32_t free_size = serial_queue_free(queue_handle);
+    if ((tail + free_size) <= UINT32_MAX || (tail + free_size == 0)) {
+        return free_size;
+    } else {
+        return (UINT32_MAX - tail) + 1;
     }
 }
 
 /**
- * Set the plug of a queue to true.
+ * Transfer all data from consume queue to produce queue.
  *
- * @param queue handle to plug.
-*/
-static inline void serial_queue_plug(serial_queue_t *queue)
+ * @param active_queue_handle queue to remove from.
+ * @param active_data_region address of the data region to remove from.
+ * @param free_queue_handle queue to insert into.
+ * @param free_data_region address of the data region to insert into.
+ *
+ * @return -1 when queue is empty, 0 on success.
+ */
+static inline void serial_transfer_all(serial_queue_handle_t *active_queue_handle,
+                char *active_data_region, serial_queue_handle_t *free_queue_handle,
+                char *free_data_region)
 {
-    queue->plugged = true;
+    assert(serial_queue_length(active_queue_handle) <= serial_queue_free(free_queue_handle));
+    
+    while (serial_queue_length(active_queue_handle)) {
+        /* Copy all contigous data */
+        uint32_t active = serial_queue_contiguous_length(active_queue_handle);
+        uint32_t free = serial_queue_contiguous_free(free_queue_handle);
+        uint32_t to_transfer = (active < free)? active: free;
+
+        memcpy(free_data_region + (free_queue_handle->queue->tail % free_queue_handle->size), 
+                    active_data_region + (active_queue_handle->queue->head %
+                    active_queue_handle->size), to_transfer);
+
+        /* Make copy visable */
+        serial_update_visable_tail(free_queue_handle, free_queue_handle->queue->tail + to_transfer);
+        serial_update_visable_head(active_queue_handle, active_queue_handle->queue->head + to_transfer);
+    }
 }
 
 /**
- * Set the plug of a queue to false.
+ * Initialise the shared queue.
  *
- * @param queue handle to unplug.
-*/
-static inline void serial_queue_unplug(serial_queue_t *queue)
+ * @param queue_handle queue handle to use.
+ * @param queue pointer to queue in shared memory.
+ * @param size size of the queue.
+ */
+static inline void serial_queue_init(serial_queue_handle_t *queue_handle, 
+                    serial_queue_t *queue, uint32_t size)
 {
-    queue->plugged = false;
+    queue_handle->queue = queue;
+    queue_handle->size = size;
 }
 
 /**
- * Check the current value of the plug.
+ * Indicate to producer of the queue that consumer requires signalling.
  *
- * @param queue handle to check plug.
- *
- * @return true when queue is plugged, false when unplugged.
-*/
-static inline bool serial_queue_plugged(serial_queue_t *queue)
+ * @param queue queue handle of queue that requires signalling upon enqueuing.
+ */
+static inline void serial_request_consumer_signal(serial_queue_handle_t *queue_handle)
 {
-    return queue->plugged;
+    queue_handle->queue->consumer_signalled = 0;
+#ifdef CONFIG_ENABLE_SMP_SUPPORT
+    THREAD_MEMORY_RELEASE();
+#endif
+}
+
+/**
+ * Indicate to consumer of the queue that producer requires signalling.
+ *
+ * @param queue queue handle of queue that requires signalling upon enqueuing.
+ */
+static inline void serial_request_producer_signal(serial_queue_handle_t *queue_handle)
+{
+    queue_handle->queue->producer_signalled = 0;
+#ifdef CONFIG_ENABLE_SMP_SUPPORT
+    THREAD_MEMORY_RELEASE();
+#endif
+}
+
+/**
+ * Indicate to producer of the queue that consumer has been signalled.
+ *
+ * @param queue queue handle of the queue that has been signalled.
+ */
+static inline void serial_cancel_consumer_signal(serial_queue_handle_t *queue_handle)
+{
+    queue_handle->queue->consumer_signalled = 1;
+#ifdef CONFIG_ENABLE_SMP_SUPPORT
+    THREAD_MEMORY_RELEASE();
+#endif
+}
+
+/**
+ * Indicate to consumer of the queue that producer has been signalled.
+ *
+ * @param queue queue handle of the queue that has been signalled.
+ */
+static inline void serial_cancel_producer_signal(serial_queue_handle_t *queue_handle)
+{
+    queue_handle->queue->producer_signalled = 1;
+#ifdef CONFIG_ENABLE_SMP_SUPPORT
+    THREAD_MEMORY_RELEASE();
+#endif
+}
+
+/**
+ * Consumer of the queue requires signalling.
+ *
+ * @param queue queue handle of the queue to check.
+ */
+static inline bool serial_require_consumer_signal(serial_queue_handle_t *queue_handle)
+{
+    return !queue_handle->queue->consumer_signalled;
+}
+
+/**
+ * Producer of the queue requires signalling.
+ *
+ * @param queue queue handle of the queue to check.
+ */
+static inline bool serial_require_producer_signal(serial_queue_handle_t *queue_handle)
+{
+    return !queue_handle->queue->producer_signalled;
 }

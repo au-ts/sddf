@@ -1,340 +1,214 @@
-/*
-* Sample serial driver for odroid c4 (amlogic meson gx uart) based on the sDDF
-*/
-
 #include <stdbool.h>
 #include <stdint.h>
 #include <microkit.h>
-#include <sddf/util/util.h>
 #include <serial_config.h>
 #include "uart.h"
-#include "uart_config.h"
 
-// Defines to manage interrupts and notifications
 #define IRQ_CH 0
 #define TX_CH  1
 #define RX_CH  2
 
-/* Memory regions. These all have to be here to keep compiler happy */
-uintptr_t rx_free;
-uintptr_t rx_active;
-uintptr_t tx_free;
-uintptr_t tx_active;
-// Base of the uart registers
+serial_queue_t *rx_queue;
+serial_queue_t *tx_queue;
+
+char *rx_data;
+char *tx_data;
+
+serial_queue_handle_t rx_queue_handle;
+serial_queue_handle_t tx_queue_handle;
+
 uintptr_t uart_base;
+volatile meson_uart_regs_t *uart_regs;
+struct uart_clock_state uart_clock;
 
-/* Handles to queue structures */
-serial_queue_handle_t rx_queue;
-serial_queue_handle_t tx_queue;
-
-// Global serial driver state
-struct serial_driver global_serial_driver = {0};
-
-static int internal_is_tx_fifo_busy(
-    meson_uart_regs_t *regs)
+/* UART baud register expects baud rate to be expressed in terms of the number of reference
+ ticks per symbol change. This function calculates these ticks and modifies the divisor of 
+ the reference clock accordingly. */
+static void set_baud(unsigned long baud)
 {
-    /* check the TXFE (transmit buffer FIFO empty) flag, which is cleared
-     * automatically when data is written to the TxFIFO. Even though the flag
-     * is set, the actual data transmission via the UART's 32 byte FIFO buffer
-     * might still be in progress.
-     */
-    return (0 == (regs->sr & AML_UART_TX_EMPTY));
-}
+    /* Baud rate must be positive. */
+    assert(baud > 0);
 
-/* TODO - Fix setting baud rate */
-static void set_baud(long bps)
-{
-    /* TODO: Fix buad rate setup */
+    uint64_t ref_clock_freq = uart_clock.reference_clock_frequency;
+    uint64_t ref_clock_ticks_per_symbol = ref_clock_freq / baud;
 
-    // volatile meson_uart_regs_t *regs = (meson_uart_regs_t *) (uart_base + UART_REGS_OFFSET);
-
-    // // Wait to clear transmit port
-    // while (internal_is_tx_fifo_busy(regs)) {
-
-    // }
-
-    // // Caluclate baud rate
-    // uint32_t val = 0;
-    // val = DIV_ROUND_CLOSEST(UART_REF_CLK / 4, bps) - 1;
-    // val |= AML_UART_BAUD_USE;
-
-    // regs->reg5 = val;
-}
-
-
-int serial_configure(
-    long bps,
-    int char_size,
-    enum serial_parity parity,
-    int stop_bits,
-    int mode,
-    int echo)
-{
-    volatile meson_uart_regs_t *regs = (meson_uart_regs_t *)(uart_base + UART_REGS_OFFSET);
-
-    global_serial_driver.mode = mode;
-    global_serial_driver.echo = echo;
-
-    uint32_t cr;
-    /* Character size */
-    cr = regs->cr;
-    if (char_size == 8) {
-        cr |= AML_UART_DATA_LEN_8BIT;
-    } else if (char_size == 7) {
-        cr |= AML_UART_DATA_LEN_7BIT;
-    } else {
-        return -1;
-    }
-    /* Stop bits */
-    if (stop_bits == 2) {
-        cr |= AML_UART_STOP_BIT_2SB;
-    } else if (stop_bits == 1) {
-        cr |= AML_UART_STOP_BIT_1SB;
-    } else {
-        return -1;
-    }
-
-    /* Parity */
-    if (parity == PARITY_NONE) {
-        cr &= ~AML_UART_PARITY_EN;
-    } else if (parity == PARITY_ODD) {
-        /* ODD */
-        cr |= AML_UART_PARITY_EN;
-        cr |= AML_UART_PARITY_TYPE;
-    } else if (parity == PARITY_EVEN) {
-        /* Even */
-        cr |= AML_UART_PARITY_EN;
-        cr &= ~AML_UART_PARITY_TYPE;
-    } else {
-        return -1;
-    }
-    /* Apply the changes */
-    regs->cr = cr;
-    /* Now set the baud rate */
-    set_baud(bps);
-
-    return 0;
-}
-
-int getchar()
-{
-    volatile meson_uart_regs_t *regs = (meson_uart_regs_t *) (uart_base + UART_REGS_OFFSET);
-
-    while (regs->sr & AML_UART_RX_EMPTY);
-    return regs->rfifo;
-}
-
-// Putchar that is using the hardware FIFO buffers --> Switch to DMA later
-int putchar(int c) {
-
-    volatile meson_uart_regs_t *regs = (meson_uart_regs_t *) (uart_base + UART_REGS_OFFSET);
-
-    while (regs->sr & AML_UART_TX_FULL);
-
-    /* Add character to the buffer. */
-    regs->wfifo = c & 0x7f;
-    if (c == '\n') {
-        putchar('\r');
-    }
-
-    return 0;
-}
-
-// Called from handle tx, write each character stored in the buffer to the serial port
-static void
-raw_tx(char *phys, unsigned int len)
-{
-    // This is byte by byte for now, switch to DMA use later
-    for (int i = 0; i < len && phys[i] != '\0'; i++) {
-        // Loop until the fifo queue is ready to transmit
-        while (putchar(phys[i]) != 0);
-    }
-}
-
-void handle_tx() {
-    uintptr_t buffer = 0;
-    unsigned int len = 0;
-    // Dequeue something from the Tx rx_queue -> the server will have placed something in here, if its empty then nothing to do
-    while (!serial_dequeue_active(&tx_queue, &buffer, &len)) {
-        // Buffer cointaining the bytes to write to serial
-        char *phys = (char * )buffer;
-        // Handle the tx
-        raw_tx(phys, len);
-        // Then enqueue this rx_queue back into the free queue, so that it can be collected and reused by the server
-        int err = serial_enqueue_free(&tx_queue, buffer, BUFFER_SIZE);
-        assert(!err);
-    }
-}
-
-
-void handle_irq() {
-    /* Here we have interrupted because a character has been inputted. We first want to get the
-    character from the hardware FIFO queue.
-
-    Then we want to dequeue from the rx free queue, and populate it, then add to the rx active queue
-    ready to be processed by the client server
-    */
-    int input = getchar();
-    char input_char = (char) input;
-    microkit_irq_ack(IRQ_CH);
-
-    // Not sure if we should be printing this here or elsewhere? What is the expected behaviour?
-    // putchar(input);
-
-    if (input == -1) {
-        microkit_dbg_puts(microkit_name);
-        microkit_dbg_puts(": invalid input when attempting to getchar\n");
-        return;
-    }
-
-    int ret = 0;
-
-    if (global_serial_driver.echo == ECHO_EN) {
-        // // Special case for backspace
-        if (input_char == '\b' || input_char == 0x7f) {
-            // Backspace will move the cursor back, and space will erase the character
-            putchar('\b');
-            putchar(' ');
-            putchar('\b');
-        } else if (input_char == '\r') {
-            // Convert the carriage return to a new line
-            putchar('\n');
-        }
-        else {
-            putchar(input);
-        }
-    }
-
-    if (global_serial_driver.mode == RAW_MODE) {
-        // Place characters straight into the buffer
-
-        // Address that we will pass to dequeue to store the buffer address
-        uintptr_t buffer = 0;
-        // Integer to store the length of the buffer
-        unsigned int buffer_len = 0;
-
-        ret = serial_dequeue_free(&rx_queue, &buffer, &buffer_len);
-
-        if (ret != 0) {
-            microkit_dbg_puts(microkit_name);
-            microkit_dbg_puts(": unable to dequeue from the rx free queues\n");
-            return;
-        }
-
-        ((char *) buffer)[0] = (char) input;
-
-        // Now place in the rx active queue
-        ret = serial_enqueue_active(&rx_queue, buffer, 1);
-        microkit_notify(RX_CH);
-
-    } else if (global_serial_driver.mode == LINE_MODE) {
-        // Place in a buffer, until we reach a new line, ctrl+d/ctrl+c/enter (check what else can stop)
-        if (global_serial_driver.line_buffer == 0) {
-            // We need to dequeue a buffer to use
-            // Address that we will pass to dequeue to store the buffer address
-            uintptr_t buffer = 0;
-            // Integer to store the length of the buffer
-            unsigned int buffer_len = 0;
-
-            ret = serial_dequeue_free(&rx_queue, &buffer, &buffer_len);
-            if (ret != 0) {
-                microkit_dbg_puts(microkit_name);
-                microkit_dbg_puts(": unable to dequeue from the rx free queue\n");
-                return;
-            }
-
-            global_serial_driver.line_buffer = buffer;
-            global_serial_driver.line_buffer_size = 0;
-        }
-
-        // Check that the buffer is not full, and other exit conditions here
-        if (global_serial_driver.line_buffer_size > BUFFER_SIZE ||
-            input_char == EOT ||
-            input_char == ETX ||
-            input_char == LF ||
-            input_char == SB ||
-            input_char == CR) {
-                char *char_arr = (char * ) global_serial_driver.line_buffer;
-                // Place the line end character into buffer
-                char_arr[global_serial_driver.line_buffer_size] = input_char;
-                global_serial_driver.line_buffer_size += 1;
-                // Enqueue buffer back
-                ret = serial_enqueue_active(&rx_queue, global_serial_driver.line_buffer, global_serial_driver.line_buffer_size);
-                // Zero out the driver states
-                global_serial_driver.line_buffer = 0;
-                global_serial_driver.line_buffer_size = 0;
-                microkit_notify(RX_CH);
-
+    /* Check if baud rate can be acheived with a less frequent clock tick. 
+        Note: Linux defaults to use xtal div 3 if the board doesn't implement xtal_div2. 
+        They hardcode what boards support xtal_div2. This IS implemented on the odroidc4, 
+        but this may not work for different meson devices. */
+    uint16_t clock_div = 1;
+    uint32_t baud_register = AML_UART_BAUD_USE;
+    if (uart_clock.crystal_clock) {
+        baud_register |= AML_UART_BAUD_XTAL;
+        if (ref_clock_ticks_per_symbol % 3 == 0) {
+            clock_div = 3;
+            ref_clock_ticks_per_symbol /= 3;
+        } else if (ref_clock_ticks_per_symbol % 2 == 0) {
+            clock_div = 2;
+            ref_clock_ticks_per_symbol /= 2;
+            baud_register |= AML_UART_BAUD_XTAL_DIV2;
         } else {
-            // Otherwise, add to the character array
-            char *char_arr = (char * ) global_serial_driver.line_buffer;
-
-            // Conduct any line editing as long as we have stuff in the buffer
-            if (input_char == 0x7f && global_serial_driver.line_buffer_size > 0) {
-                // Remove last character
-                global_serial_driver.line_buffer_size -= 1;
-                char_arr[global_serial_driver.line_buffer_size] = 0;
-            } else {
-                char_arr[global_serial_driver.line_buffer_size] = input;
-                global_serial_driver.line_buffer_size += 1;
-            }
+            baud_register |= AML_UART_BAUD_XTAL_DIV3;
         }
     }
 
+    /* UART does not support baud rates this slow. */
+    assert((ref_clock_ticks_per_symbol & ~AML_UART_BAUD_MASK) == 0);
 
+    if (uart_clock.crystal_clock) {
+        uart_clock.crystal_clock_divider = clock_div;
+    }
+    uart_clock.baud = baud;
+    uart_clock.reference_ticks_per_symbol = ref_clock_ticks_per_symbol;
+    baud_register |= ref_clock_ticks_per_symbol;
+    uart_regs->reg5 = baud_register;
+}
 
-    if (ret != 0) {
-        microkit_dbg_puts(microkit_name);
-        microkit_dbg_puts(": unable to enqueue to the tx free queue\n");
-        return;
+static void tx_provide(void)
+{
+    bool reprocess = true;
+    bool transferred = false;
+    while (reprocess) {
+        char c;
+        while (!(uart_regs->sr & AML_UART_TX_FULL) && !serial_dequeue(&tx_queue_handle, tx_data, &tx_queue_handle.queue->head, &c)) {
+            uart_regs->wfifo |= (uint32_t)c;
+            transferred = true;
+        }
+
+        serial_request_producer_signal(&tx_queue_handle);
+        /* If transmit fifo is full and there is data remaining to be sent, enable interrupt when fifo is no longer full */
+        if (uart_regs->sr & AML_UART_TX_FULL && !serial_queue_empty(&tx_queue_handle, tx_queue_handle.queue->head)) {
+            uart_regs->cr |= AML_UART_TX_INT_EN;
+        } else {
+            uart_regs->cr &= ~AML_UART_TX_INT_EN;
+        }
+        reprocess = false;
+
+        if (!(uart_regs->sr & AML_UART_TX_FULL) && !serial_queue_empty(&tx_queue_handle, tx_queue_handle.queue->head)) {
+            serial_cancel_producer_signal(&tx_queue_handle);
+            uart_regs->cr &= ~AML_UART_TX_INT_EN;
+            reprocess = true;
+        }
+    }
+
+    if (transferred && serial_require_consumer_signal(&tx_queue_handle)) {
+        serial_cancel_consumer_signal(&tx_queue_handle);
+        microkit_notify(TX_CH);
     }
 }
 
-void init(void) {
-    microkit_dbg_puts(microkit_name);
-    microkit_dbg_puts(": initialising\n");
+static void rx_return(void)
+{
+    bool reprocess = true;
+    bool enqueued = false;
+    while (reprocess) {
+        while (!(uart_regs->sr & AML_UART_RX_EMPTY) && !serial_queue_full(&rx_queue_handle, rx_queue_handle.queue->tail)) {
+            char c = (char) uart_regs->rfifo;
+            serial_enqueue(&rx_queue_handle, rx_data, &rx_queue_handle.queue->tail, c);
+            enqueued = true;
+        }
 
-    // Init the shared queues
-    serial_queue_init(&rx_queue, (serial_queue_t *)rx_free, (serial_queue_t *)rx_active, RX_QUEUE_SIZE_DRIV);
-    serial_queue_init(&tx_queue, (serial_queue_t *)tx_free, (serial_queue_t *)tx_active, TX_QUEUE_SIZE_DRIV);
-
-    volatile meson_uart_regs_t *regs = (meson_uart_regs_t *) (uart_base + UART_REGS_OFFSET);
-
-    /* Line configuration. Set LINE or RAW mode here, and disable or enable ECHO */
-    int ret = serial_configure(115200, 8, PARITY_NONE, 1, UART_MODE, RAW_MODE);
-
-    if (ret != 0) {
-        microkit_dbg_puts("Error occured during line configuration\n");
+        if (!(uart_regs->sr & AML_UART_RX_EMPTY) && serial_queue_full(&rx_queue_handle, rx_queue_handle.queue->tail)) {
+            serial_require_consumer_signal(&rx_queue_handle);
+        }
+        reprocess = false;
+        
+        if (!(uart_regs->sr & AML_UART_RX_EMPTY) && !serial_queue_full(&rx_queue_handle, rx_queue_handle.queue->tail)) {
+            serial_cancel_consumer_signal(&rx_queue_handle);
+            reprocess = true;
+        }
     }
-
-    // /* Enable the UART */
-    uint32_t val;
-    val = regs->cr;
-    val |= AML_UART_CLEAR_ERR;
-    regs->cr = val;
-    val &= ~AML_UART_CLEAR_ERR;
-    regs->cr = val;
-    val |= (AML_UART_RX_EN | AML_UART_TX_EN);
-    regs->cr = val;
-    val |= (AML_UART_RX_INT_EN);
-    regs->cr = val;
-    val = (AML_UART_RECV_IRQ(1));
-    regs->irqc = val;
+    
+    if (enqueued && serial_require_producer_signal(&rx_queue_handle)) {
+        serial_cancel_producer_signal(&rx_queue_handle);
+        microkit_notify(RX_CH);
+    }
 }
 
-// Entry point that is invoked on a serial interrupt, or notifications from the server using the TX and RX channels
-void notified(microkit_channel ch) {
+static void handle_irq()
+{
+    while (uart_regs->sr & UART_INTR_ABNORMAL || !(uart_regs->sr & AML_UART_RX_EMPTY) 
+            || (uart_regs->cr & AML_UART_TX_INT_EN && !(uart_regs->sr & AML_UART_TX_FULL)))
+    {
+        if (!(uart_regs->sr & AML_UART_RX_EMPTY)) {
+            rx_return();
+        }
+        if (uart_regs->cr & AML_UART_TX_INT_EN && !(uart_regs->sr & AML_UART_TX_FULL)) {
+            tx_provide();
+        }
+        if (uart_regs->sr & UART_INTR_ABNORMAL) {
+            sddf_dprintf("UART|ERROR: Uart device encountered an error with status register %u\n", uart_regs->sr);
+            uart_regs->cr |= AML_UART_CLEAR_ERR;
+        }
+    }
+}
+
+static void uart_setup(void) {
+    uart_regs = (meson_uart_regs_t *) (uart_base + UART_REGS_OFFSET);
+
+    /* Wait until receive and transmit state machines are no longer busy */
+    while (uart_regs->sr & (AML_UART_TX_BUSY | AML_UART_RX_BUSY));
+
+    /* Disable transmit and receive */
+    uart_regs->cr &= ~(AML_UART_TX_EN | AML_UART_RX_EN);
+
+    /* Reset UART state machine */
+    uart_regs->cr |= (AML_UART_TX_RST | AML_UART_RX_RST | AML_UART_CLEAR_ERR);
+    uart_regs->cr &= ~(AML_UART_TX_RST | AML_UART_RX_RST | AML_UART_CLEAR_ERR);
+
+    /* Configure stop bit length to 1 */
+    uart_regs->cr &= ~(AML_UART_STOP_BIT_LEN_MASK);
+    uart_regs->cr |= AML_UART_STOP_BIT_1SB;
+
+    /* Set data length to 8 */
+    uart_regs->cr &= ~AML_UART_DATA_LEN_MASK;
+    uart_regs->cr |= AML_UART_DATA_LEN_8BIT;
+
+    /* Configure the reference clock and baud rate */
+    uart_clock = (struct uart_clock_state) {true, UART_XTAL_REF_CLK, 1, 0, 0};
+    set_baud(UART_DEFAULT_BAUD);
+
+    /* Enable receive interrupts every byte */
+    uart_regs->irqc &= ~AML_UART_RECV_IRQ_MASK;
+    uart_regs->irqc |= AML_UART_RECV_IRQ(1);
+    uart_regs->cr |= AML_UART_RX_INT_EN;
+
+    /* Enable transmit interrupts if the write fifo drops below one byte - used when the write fifo becomes full */
+    uart_regs->irqc &= ~AML_UART_XMIT_IRQ_MASK;
+    uart_regs->irqc |= AML_UART_XMIT_IRQ(1);
+
+    /* Enable the UART */
+    uart_regs->cr |= (AML_UART_RX_EN | AML_UART_TX_EN);
+}
+
+void init(void)
+{
+    uart_setup();
+
+    serial_queue_init(&rx_queue_handle, rx_queue, RX_SERIAL_DATA_REGION_SIZE_DRIV);
+    serial_queue_init(&tx_queue_handle, tx_queue, TX_SERIAL_DATA_REGION_SIZE_DRIV);
+
+    /* Print a deterministic string to allow console input to begin */
+    for (uint16_t i = 0; i < SERIAL_CONSOLE_BEGIN_STRING_LEN; i++) {
+        uart_regs->wfifo |= (uint32_t)SERIAL_CONSOLE_BEGIN_STRING[i];
+    }
+}
+
+void notified(microkit_channel ch)
+{
     switch(ch) {
         case IRQ_CH:
             handle_irq();
-            return;
+            microkit_irq_ack_delayed(ch);
+            break;
         case TX_CH:
-            handle_tx();
+            tx_provide();
             break;
         case RX_CH:
+            rx_return();
             break;
         default:
-            microkit_dbg_puts("serial driver: received notification on unexpected channel\n");
+            sddf_dprintf("SERIAL|LOG: received notification on unexpected channel: %u\n", ch);
             break;
     }
 }
