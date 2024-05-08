@@ -47,7 +47,7 @@ volatile struct timer_regs *regs;
 /* Right now, we only service a single timeout per client.
  * This timeout array indicates when a timeout should occur,
  * indexed by client ID. */
-static uint64_t timeouts[MAX_TIMEOUTS] = {UINT64_MAX};
+static uint64_t timeouts[MAX_TIMEOUTS];
 
 static uint64_t get_ticks(void)
 {
@@ -125,6 +125,10 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
 
 void init(void)
 {
+    for (int i = 0; i < MAX_TIMEOUTS; i++) {
+        timeouts[i] = UINT64_MAX;
+    }
+
     regs = (void *)(gpt_regs + TIMER_REG_START);
 
     /* Start timer E acts as a clock, while timer A can be used for timeouts from clients */
