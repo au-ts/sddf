@@ -61,7 +61,7 @@ static inline int serial_queue_full(serial_queue_handle_t *queue_handle, uint32_
  * @param queue_handle queue to enqueue into.
  * @param data_region address of the buffer this queue handle refers to.
  * @param local_tail address of the tail to be incremented. This allows for clients to 
- *                      enqueue multiple characters before making the changes visable.
+ *                      enqueue multiple characters before making the changes visible.
  * @param character character to be enqueued.
  *
  * @return -1 when queue is empty, 0 on success.
@@ -85,7 +85,7 @@ static inline int serial_enqueue(serial_queue_handle_t *queue_handle, char *data
  * @param queue_handle queue to dequeue from.
  * @param data_region address of the buffer this queue handle refers to.
  * @param local_head address of the head to be incremented. This allows for clients to 
- *                      dequeue multiple characters before making the changes visable.
+ *                      dequeue multiple characters before making the changes visible.
  * @param character character to copy into.
  *
  * @return -1 when queue is empty, 0 on success.
@@ -110,7 +110,7 @@ static inline int serial_dequeue(serial_queue_handle_t *queue_handle, char *data
  * @param queue_handle queue to update.
  * @param local_tail tail which points to the last character enqueued.
  */
-static inline void serial_update_visable_tail(serial_queue_handle_t *queue_handle, 
+static inline void serial_update_visible_tail(serial_queue_handle_t *queue_handle, 
                                             uint32_t local_tail)
 {
     uint32_t head = queue_handle->queue->head;
@@ -147,7 +147,7 @@ static inline void serial_update_visable_tail(serial_queue_handle_t *queue_handl
  * @param queue_handle queue to update.
  * @param local_head head which points to the next character to dequeue.
  */
-static inline void serial_update_visable_head(serial_queue_handle_t *queue_handle, 
+static inline void serial_update_visible_head(serial_queue_handle_t *queue_handle, 
                                             uint32_t local_head)
 {
     uint32_t head = queue_handle->queue->head;
@@ -215,8 +215,6 @@ static inline uint32_t serial_queue_contiguous_free(serial_queue_handle_t *queue
  * @param active_data_region address of the data region to remove from.
  * @param free_queue_handle queue to insert into.
  * @param free_data_region address of the data region to insert into.
- *
- * @return -1 when queue is empty, 0 on success.
  */
 static inline void serial_transfer_all(serial_queue_handle_t *active_queue_handle,
                 char *active_data_region, serial_queue_handle_t *free_queue_handle,
@@ -234,9 +232,70 @@ static inline void serial_transfer_all(serial_queue_handle_t *active_queue_handl
                     active_data_region + (active_queue_handle->queue->head %
                     active_queue_handle->size), to_transfer);
 
-        /* Make copy visable */
-        serial_update_visable_tail(free_queue_handle, free_queue_handle->queue->tail + to_transfer);
-        serial_update_visable_head(active_queue_handle, active_queue_handle->queue->head + to_transfer);
+        /* Make copy visible */
+        serial_update_visible_tail(free_queue_handle, free_queue_handle->queue->tail + to_transfer);
+        serial_update_visible_head(active_queue_handle, active_queue_handle->queue->head + to_transfer);
+    }
+}
+
+/**
+ * Transfer all data from consume queue to produce queue.
+ *
+ * @param active_queue_handle queue to remove from.
+ * @param active_data_region address of the data region to remove from.
+ * @param free_queue_handle queue to insert into.
+ * @param free_data_region address of the data region to insert into.
+ * @param colour_start colour string to be printed at the start
+ * @param colour_end colour string to be printed at the end
+ */
+static inline void serial_transfer_all_with_colour(serial_queue_handle_t *active_queue_handle,
+                char *active_data_region, serial_queue_handle_t *free_queue_handle,
+                char *free_data_region, char *colour_start, char *colour_end)
+{
+    uint16_t colour_start_length = strlen(colour_start);
+    uint16_t colour_end_length = strlen(colour_end);
+    assert(serial_queue_length(active_queue_handle) + colour_start_length + colour_end_length
+             <= serial_queue_free(free_queue_handle));
+    
+    uint16_t colour_transferred = 0;
+    while (colour_transferred < colour_start_length) {
+        uint32_t remaining = colour_start_length - colour_transferred;
+        uint32_t free = serial_queue_contiguous_free(free_queue_handle);
+        uint32_t to_transfer = (remaining < free)? remaining: free;
+
+        memcpy(free_data_region + (free_queue_handle->queue->tail % free_queue_handle->size),
+            colour_start + colour_transferred, to_transfer);
+
+        serial_update_visible_tail(free_queue_handle, free_queue_handle->queue->tail + to_transfer);
+        colour_transferred += to_transfer;
+    }
+    
+    while (serial_queue_length(active_queue_handle)) {
+        /* Copy all contigous data */
+        uint32_t active = serial_queue_contiguous_length(active_queue_handle);
+        uint32_t free = serial_queue_contiguous_free(free_queue_handle);
+        uint32_t to_transfer = (active < free)? active: free;
+
+        memcpy(free_data_region + (free_queue_handle->queue->tail % free_queue_handle->size), 
+                    active_data_region + (active_queue_handle->queue->head %
+                    active_queue_handle->size), to_transfer);
+
+        /* Make copy visible */
+        serial_update_visible_tail(free_queue_handle, free_queue_handle->queue->tail + to_transfer);
+        serial_update_visible_head(active_queue_handle, active_queue_handle->queue->head + to_transfer);
+    }
+
+    colour_transferred = 0;
+    while (colour_transferred < colour_end_length) {
+        uint32_t remaining = colour_end_length - colour_transferred;
+        uint32_t free = serial_queue_contiguous_free(free_queue_handle);
+        uint32_t to_transfer = (remaining < free)? remaining: free;
+
+        memcpy(free_data_region + (free_queue_handle->queue->tail % free_queue_handle->size),
+            colour_end + colour_transferred, to_transfer);
+
+        serial_update_visible_tail(free_queue_handle, free_queue_handle->queue->tail + to_transfer);
+        colour_transferred += to_transfer;
     }
 }
 
