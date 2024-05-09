@@ -48,33 +48,25 @@ static bool notify_drv;
   is a broadcast address. */
 int get_mac_addr_match(struct ethernet_header *buffer)
 {
-    bool broadcast_packet = false;
-
     for (int client = 0; client < NUM_CLIENTS; client++) {
         bool match = true;
-        bool is_broadcast = true;
-        for (int i = 0; (i < ETH_HWADDR_LEN) && (match || is_broadcast); i++) {
+        for (int i = 0; (i < ETH_HWADDR_LEN) && match; i++) {
             if (buffer->dest.addr[i] != state.mac_addrs[client][i]) {
                 match = false;
             }
-            /* This assumes that the only broadcast address is 0xFFFFFFFF.*/
-            if (buffer->dest.addr[i] != 0xFF) {
-                is_broadcast = false;
-            }
         }
-
         if (match) {
             return client;
-        } else if (is_broadcast) {
-            /* Mark the existance of a broadcast packet */
-            broadcast_packet = true;
         }
     }
 
-    /* We will only get here if this is a broadcast packet
-        and no client match has been made. In this case,
-        the packet will be sent to all clients. */
-    if (broadcast_packet) {
+    bool broadcast_match = true;
+    for (int i = 0; (i < ETH_HWADDR_LEN) && broadcast_match; i++) {
+        if (buffer->dest.addr[i] != 0xFF) {
+            broadcast_match = false;
+        }
+    }
+    if (broadcast_match) {
         return BROADCAST_ID;
     }
 
