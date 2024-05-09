@@ -77,7 +77,7 @@ static reqbk_t reqbk[REQBK_SIZE];
 
 /* Index allocator for request bookkeep */
 static ialloc_t ialloc;
-static uint64_t ialloc_idxlist[REQBK_SIZE];
+static uint32_t ialloc_idxlist[REQBK_SIZE];
 
 /* MS-DOS Master boot record */
 struct msdos_mbr msdos_mbr;
@@ -138,7 +138,7 @@ static void request_mbr()
     int err = fsmalloc_alloc(&fsmalloc, &mbr_addr, 1);
     assert(!err);
 
-    uint64_t mbr_req_id;
+    uint32_t mbr_req_id;
     reqbk_t mbr_req_data = {0, 0, 0, mbr_addr, 1, 0};
     err = ialloc_alloc(&ialloc, &mbr_req_id);
     assert(!err);
@@ -293,7 +293,7 @@ static void handle_client(int cli_id)
 
     uintptr_t drv_addr;
     uint32_t drv_block_number;
-    uint64_t drv_req_id;
+    uint32_t drv_req_id;
 
     int err = 0;
     while (!blk_req_queue_empty(&h)) {

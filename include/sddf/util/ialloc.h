@@ -10,11 +10,11 @@
  */
 
 typedef struct ialloc {
-    uint64_t *idxlist; /* linked list pointing to the next free index */
-    uint64_t size; /* length of linked list */
-    uint64_t head; /* next free index */
-    uint64_t tail; /* last free index */
-    uint64_t num_free; /* number of free indices */
+    uint32_t *idxlist; /* linked list pointing to the next free index */
+    uint32_t size; /* length of linked list */
+    uint32_t head; /* next free index */
+    uint32_t tail; /* last free index */
+    uint32_t num_free; /* number of free indices */
 } ialloc_t;
 
 /**
@@ -37,7 +37,7 @@ static inline bool ialloc_full(ialloc_t *ia)
  *
  * @return 0 on success, -1 if index list is full.
  */
-static inline int ialloc_alloc(ialloc_t *ia, uint64_t *id)
+static inline int ialloc_alloc(ialloc_t *ia, uint32_t *id)
 {
     if (ialloc_full(ia)) {
         return -1;
@@ -56,7 +56,7 @@ static inline int ialloc_alloc(ialloc_t *ia, uint64_t *id)
  *
  * @return 0 on success, -1 if index is invalid.
  */
-static inline int ialloc_free(ialloc_t *ia, uint64_t id)
+static inline int ialloc_free(ialloc_t *ia, uint32_t id)
 {
     if (id >= ia->size) {
         return -1;
@@ -81,14 +81,14 @@ static inline int ialloc_free(ialloc_t *ia, uint64_t id)
  * @param idxlist pointer to the linked list array storing the next free index.
  * @param size number of indices that can be allocated, also length of idxlist.
  */
-static void ialloc_init(ialloc_t *ia, uint64_t *idxlist, uint64_t size)
+static void ialloc_init(ialloc_t *ia, uint32_t *idxlist, uint32_t size)
 {
     ia->idxlist = idxlist;
     ia->size = size;
     ia->head = 0;
     ia->tail = size - 1;
     ia->num_free = size;
-    for (uint64_t i = 0; i < size - 1; i++) {
+    for (uint32_t i = 0; i < size - 1; i++) {
         ia->idxlist[i] = i + 1;
     }
     ia->idxlist[size - 1] = 0;
