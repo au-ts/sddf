@@ -208,7 +208,7 @@ void notified(microkit_channel ch)
             rx_return();
             break;
         default:
-            sddf_dprintf("SERIAL|LOG: received notification on unexpected channel: %u\n", ch);
+            sddf_dprintf("UART|LOG: received notification on unexpected channel: %u\n", ch);
             break;
     }
 }

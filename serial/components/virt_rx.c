@@ -1,266 +1,146 @@
-/* virt is currently limited to a max of 9 clients */
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <ctype.h>
 #include <microkit.h>
 #include <sddf/serial/queue.h>
-#include <sddf/serial/util.h>
 #include <serial_config.h>
 #include "uart.h"
-#include "uart_config.h"
 
-#define DRV_CH 0
+#define DRIVER_CH 0
 #define CLIENT_OFFSET 1
 
-/* Memory regions as defined in the system file. All data regions must be mapped into the same virtual address in each client! */
+serial_queue_t *rx_queue_drv;
+uintptr_t rx_queue_cli0;
 
-// Transmit queues with the driver
-uintptr_t rx_free_driver;
-uintptr_t rx_active_driver;
-uintptr_t rx_data_driver;
+char *rx_data_drv;
+uintptr_t rx_data_cli0;
 
-// Receive queues with the client. Client free, active and data regions must be mapped in contiguously
-uintptr_t rx_free_client0;
-uintptr_t rx_active_client0;
+serial_queue_handle_t rx_queue_handle_drv;
+serial_queue_handle_t rx_queue_handle_cli[SERIAL_NUM_CLIENTS];
+uintptr_t rx_data_clients[SERIAL_NUM_CLIENTS];
 
-serial_queue_handle_t drv_rx_queue;
-serial_queue_handle_t rx_queue[NUM_CLIENTS];
+#define MAX_CLI_BASE_10 4
+typedef enum mode {normal, switched, number} mode_t;
 
-/* We need to do some processing of the input stream to determine when we need
-to change direction. */
+mode_t current_mode = normal;
+uint32_t current_client = 0;
+char next_client[MAX_CLI_BASE_10 + 1];
+uint8_t next_client_index;
 
-/* To switch input direction, type the "@" symbol followed immediately by a number.
-Otherwise, can put "\" before "@" to escape this.*/
-
-int virt_state;
-int client;
-// We want to keep track of each clients requests, so that they can be serviced once we have changed
-// input direction
-int num_to_get_chars[NUM_CLIENTS];
-int multi_client;
-
-int give_multi_char(char *drv_buffer, int drv_buffer_len)
-{
-    for (int curr_client = 0; curr_client < NUM_CLIENTS; curr_client++) {
-
-        if (num_to_get_chars[curr_client] <= 0) {
-            return 1;
-        }
-        // Address that we will pass to dequeue to store the buffer address
-        uintptr_t buffer = 0;
-        // Integer to store the length of the buffer
-        unsigned int buffer_len = 0;
-
-        int ret = serial_dequeue_free(&rx_queue[curr_client], &buffer, &buffer_len);
-
-        if (ret != 0) {
-            microkit_dbg_puts(microkit_name);
-            microkit_dbg_puts(": unable to dequeue from the rx free queue\n");
-            return 1;
-        }
-
-        memcpy((char *) buffer, drv_buffer, drv_buffer_len);
-        buffer_len = drv_buffer_len;
-
-        // Now place in the rx active queue
-        ret = serial_enqueue_active(&rx_queue[curr_client], buffer, buffer_len);
-
-        if (ret != 0) {
-            microkit_dbg_puts(microkit_name);
-            microkit_dbg_puts(": unable to enqueue to the rx active queue\n");
-            return 1;
-        }
-
-        num_to_get_chars[curr_client] -= 1;
-    }
-    return 0;
+void reset_state() {
+    memset(next_client, '\0', MAX_CLI_BASE_10 + 1);
+    next_client_index = 0;
+    current_mode = normal;
 }
 
-int give_single_char(int curr_client, char *drv_buffer, int drv_buffer_len)
+void rx_return()
 {
-    if (curr_client > NUM_CLIENTS) {
-        return 1;
-    }
+    bool reprocess = true;
+    bool transferred = false;
+    uint32_t local_tail = rx_queue_handle_cli[current_client].queue->tail;
+    char c = '\0';
+    while (reprocess) {
+        while (!serial_dequeue(&rx_queue_handle_drv, (char *)rx_data_drv, &rx_queue_handle_drv.queue->head, &c)) {
 
-    // if (num_to_get_chars[curr_client - 1] <= 0) {
-    //     return 1;
-    // }
-    // Address that we will pass to dequeue to store the buffer address
-    uintptr_t buffer = 0;
-    // Integer to store the length of the buffer
-    unsigned int buffer_len = 0;
+            #if CARRIAGE_TO_NEWLINE
+            if (c == '\r') {
+                c = '\n';
+            }
+            #endif
 
-    int ret = serial_dequeue_free(&rx_queue[curr_client], &buffer, &buffer_len);
-
-    if (ret != 0) {
-        microkit_dbg_puts(microkit_name);
-        microkit_dbg_puts(": unable to dequeue from the rx free queue\n");
-        return 1;
-    }
-
-    memcpy((char *) buffer, drv_buffer, drv_buffer_len);
-    buffer_len = drv_buffer_len;
-
-    // Now place in the rx active queue
-    ret = serial_enqueue_active(&rx_queue[curr_client], buffer, buffer_len);
-
-    if (ret != 0) {
-        microkit_dbg_puts(microkit_name);
-        microkit_dbg_puts(": unable to enqueue to the rx active queue\n");
-        return 1;
-    }
-
-    // num_to_get_chars[curr_client - 1] -= 1;
-
-    microkit_notify(curr_client);
-
-    return 0;
-}
-
-int give_char(int curr_client, char *drv_buffer, int drv_buffer_len)
-{
-    if (multi_client == 1) {
-        give_multi_char(drv_buffer, drv_buffer_len);
-    } else {
-        give_single_char(curr_client, drv_buffer, drv_buffer_len);
-    }
-
-    return 0;
-}
-
-/* We will check for escape characters in here, as well as dealing with switching direction*/
-void handle_rx()
-{
-    // Address that we will pass to dequeue to store the buffer address
-    uintptr_t buffer = 0;
-    // Integer to store the length of the buffer
-    unsigned int buffer_len = 0;
-
-    while (!serial_queue_empty(drv_rx_queue.active)) {
-        // We can only be here if we have been notified by the driver
-        int ret = serial_dequeue_active(&drv_rx_queue, &buffer, &buffer_len) != 0;
-        if (ret != 0) {
-            microkit_dbg_puts(microkit_name);
-            microkit_dbg_puts(": getchar - unable to dequeue active buffer\n");
-        }
-
-        // We can either get a single char here, if driver is in RAW mode, or
-        // a buffer if driver is in LINE mode.
-
-        char *chars = (char *) buffer;
-
-        // This is for our RAW mode, char by char
-        if (UART_MODE == RAW_MODE) {
-            // microkit_dbg_puts("In raw mode virt rx\n");
-            char got_char = chars[0];
-
-            // We have now gotten a character, deal with the input direction switch
-            if (virt_state == 1) {
-                // The previous character was an escape character
-                give_char(client, &got_char, 1);
-                virt_state = 0;
-            }  else if (virt_state == 2) {
-                // We are now switching input direction
-
-                // Case for simultaneous multi client input
-                if (got_char == 'm') {
-                    multi_client = 1;
-                    client = -1;
-                } else {
-                    // Ensure that multi client input is off
-                    multi_client = 0;
-                    // Null terminate got_char to be safe to use with atoi
-                    char got_char_terminated[2];
-                    got_char_terminated[0] = got_char;
-                    got_char_terminated[1] = '\0';
-                    int new_client = atoi(got_char_terminated);
-                    if (new_client < 0 || new_client >= NUM_CLIENTS) {
-                        microkit_dbg_puts("VIRT|RX: Attempted to switch to invalid client number: ");
-                        puthex64(new_client);
-                        microkit_dbg_puts("\n");
-                    } else {
-                        microkit_dbg_puts("VIRT|RX: Switching to client number: ");
-                        puthex64(new_client);
-                        microkit_dbg_puts("\n");
-                        client = new_client;
+            switch (current_mode) {
+            case normal:
+                switch (c) {
+                case SERIAL_SWITCH_CHAR:
+                    current_mode = switched;
+                    break;
+                default:
+                    if (!serial_enqueue(&rx_queue_handle_cli[current_client], (char *)rx_data_clients[current_client], &local_tail, c)) {
+                        transferred = true;
                     }
+                    break;
                 }
-
-                virt_state = 0;
-            } else if (virt_state == 0) {
-                // No escape character has been set
-                if (got_char == '\\') {
-                    virt_state = 1;
-                    // The next character is going to be escaped
-                } else if (got_char == '@') {
-                    virt_state = 2;
+                break;
+            case switched:
+                if (isdigit(c)) {
+                    next_client[next_client_index] = c;
+                    next_client_index ++;
+                    current_mode = number;
                 } else {
-                    give_char(client, &got_char, 1);
+                    if (c == SERIAL_SWITCH_CHAR) {
+                        if (!serial_enqueue(&rx_queue_handle_cli[current_client], (char *)rx_data_clients[current_client], &local_tail, c)) {
+                            transferred = true;
+                        }
+                    } else {
+                        sddf_dprintf("VIRT_RX|LOG: User entered an invalid digit %c\n", c);
+                    }
+                    reset_state();
                 }
-            }
-        } else if (UART_MODE == LINE_MODE) {
-            microkit_dbg_puts("In line mode virt rx\n");
-            // This is for LINE mode, placing buffers at a time
-
-            /* Check if the first character is an '@'. The following character
-                must be a number. Otherwise, give to the client.
-            */
-
-            if (chars[0] == '@') {
-                if (chars[1] == 'm') {
-                    // case for multi client input
-                    multi_client = 1;
-                    client = -1;
+                break;
+            default:
+                if (c == SERIAL_TERM_NUM) {
+                    int input_number = atoi(next_client);
+                    if (input_number >= 0 && input_number < SERIAL_NUM_CLIENTS) {
+                        if (transferred && serial_require_producer_signal(&rx_queue_handle_cli[current_client])) {
+                            serial_update_visible_tail(&rx_queue_handle_cli[current_client], local_tail);
+                            serial_cancel_producer_signal(&rx_queue_handle_cli[current_client]);
+                            microkit_notify(current_client + CLIENT_OFFSET);
+                        }
+                        current_client = (uint32_t)input_number;
+                        local_tail = rx_queue_handle_cli[current_client].queue->tail;
+                        transferred = false;
+                    } else {
+                        sddf_dprintf("VIRT_RX|LOG: User requested to switch to an invalid client %d\n", input_number);
+                    }
+                    reset_state();
+                } else if (next_client_index < MAX_CLI_BASE_10 && isdigit((int)c)) {
+                    next_client[next_client_index] = c;
+                    next_client_index ++;                        
                 } else {
-                    int new_client = atoi(&chars[1]);
-                    multi_client = 0;
-                    client = new_client;
+                    sddf_dprintf("VIRT_RX|LOG: User entered too many (%u < %u) or invalid digit (%c)\n", next_client_index + 1, MAX_CLI_BASE_10, c);
+                    reset_state();
                 }
-            } else {
-                // Otherwise, give entire buffer to the client
-                give_char(client, chars, buffer_len);
+                break;
             }
         }
 
-        /* Now that we are finished with the active buffer, we can add it back to the free queue */
+        serial_update_visible_tail(&rx_queue_handle_cli[current_client], local_tail);
+        serial_request_producer_signal(&rx_queue_handle_drv);
+        reprocess = false;
 
-        ret = serial_enqueue_free(&drv_rx_queue, buffer, BUFFER_SIZE);
-
-        if (ret != 0) {
-            microkit_dbg_puts(microkit_name);
-            microkit_dbg_puts(": getchar - unable to enqueue active buffer back into free queue\n");
+        if (!serial_queue_empty(&rx_queue_handle_drv, rx_queue_handle_drv.queue->head)) {
+            serial_cancel_producer_signal(&rx_queue_handle_drv);
+            reprocess = true;
         }
+    }
+
+    if (!serial_queue_full(&rx_queue_handle_drv, rx_queue_handle_drv.queue->tail) && serial_require_consumer_signal(&rx_queue_handle_drv)) {
+        serial_cancel_consumer_signal(&rx_queue_handle_drv);
+        microkit_notify(DRIVER_CH);
+    }
+
+    if (transferred && serial_require_producer_signal(&rx_queue_handle_cli[current_client])) {
+        serial_cancel_producer_signal(&rx_queue_handle_cli[current_client]);
+        microkit_notify(current_client + CLIENT_OFFSET);
     }
 }
 
 void init(void)
 {
-    serial_queue_init(&drv_rx_queue, (serial_queue_t *)rx_free_driver, (serial_queue_t *)rx_active_driver, RX_QUEUE_SIZE_DRIV);
-    serial_buffers_init(&drv_rx_queue, rx_data_driver);
-    virt_queue_init_sys(microkit_name, rx_queue, rx_free_client0, rx_active_client0);
-
-    // We initialise the current client to 0
-    client = 0;
-    // Set the current escape character to 0, we can't have recieved an escape character yet
-    virt_state = 0;
-    // Disable simultaneous multi client input
-    multi_client = 0;
-    // No chars have been requested yet
-    for (int i = 0; i < NUM_CLIENTS; i++) {
-        num_to_get_chars[i] = 0;
-    }
+    serial_queue_init(&rx_queue_handle_drv, rx_queue_drv, RX_SERIAL_DATA_REGION_SIZE_DRIV);
+    serial_virt_queue_init_sys(microkit_name, rx_queue_handle_cli, rx_queue_cli0);
+    serial_mem_region_init_sys(microkit_name, rx_data_clients, rx_data_cli0);
 }
 
 void notified(microkit_channel ch)
 {
-    // We should only ever recieve notifications from the client
-    // Sanity check the client
-    if (ch == DRV_CH) {
-        handle_rx();
-    } else if (ch > NUM_CLIENTS) {
-        microkit_dbg_puts("Received a bad client channel\n");
-        return;
-    }  else {
-        // This was recieved on a client channel. Index the number of characters to get
-        num_to_get_chars[ch - CLIENT_OFFSET] += 1;
+    switch (ch) {
+        case DRIVER_CH:
+            rx_return();
+            break;
+        default:
+            sddf_dprintf("VIRT_RX|LOG: received notification on unexpected channel: %u\n", ch);
+            break;
     }
 }
