@@ -10,22 +10,11 @@
 #include <sddf/util/cache.h>
 #include <ethernet_config.h>
 
-/* 
- * By default, clients are fowarded all broadcast traffic and the virtualiser keeps track of
- * the refcount of each buffer. If clients are unable to handle broadcast traffic, an ARP is
- * included in the system and broadcast traffic is forwarded to the ARP.
- */
-#ifndef BROADCAST_IS_ARP
-#define BROADCAST_IS_ARP 0
-#endif
-
 /* Notification channels */
 #define DRIVER_CH 0
 #define CLIENT_CH 1
 
-#if !BROADCAST_IS_ARP
 #define BROADCAST_ID (NUM_CLIENTS + 1)
-#endif
 
 /* Queue regions */
 uintptr_t rx_free_drv;
@@ -48,9 +37,6 @@ typedef struct state {
     net_queue_handle_t rx_queue_drv;
     net_queue_handle_t rx_queue_clients[NUM_CLIENTS];
     uint8_t mac_addrs[NUM_CLIENTS][ETH_HWADDR_LEN];
-#if !BROADCAST_IS_ARP
-    uint8_t broadcast_addr[ETH_HWADDR_LEN];
-#endif
 } state_t;
 
 state_t state;
@@ -59,32 +45,38 @@ state_t state;
 static bool notify_drv;
 
 /* Return the client ID if the Mac address is a match to a client, return the broadcast ID if MAC address
-   is a broadcast address. */
+  is a broadcast address. */
 int get_mac_addr_match(struct ethernet_header *buffer)
 {
+    bool broadcast_packet = false;
+
     for (int client = 0; client < NUM_CLIENTS; client++) {
         bool match = true;
-        for (int i = 0; (i < ETH_HWADDR_LEN) && match; i++) {
+        bool is_broadcast = true;
+        for (int i = 0; (i < ETH_HWADDR_LEN) && (match || is_broadcast); i++) {
             if (buffer->dest.addr[i] != state.mac_addrs[client][i]) {
                 match = false;
             }
+            /* This assumes that the only broadcast address is 0xFFFFFFFF.*/
+            if (buffer->dest.addr[i] != 0xFF) {
+                is_broadcast = false;
+            }
         }
+
         if (match) {
             return client;
+        } else if (is_broadcast) {
+            /* Mark the existance of a broadcast packet */
+            broadcast_packet = true;
         }
     }
 
-#if !BROADCAST_IS_ARP
-    bool broadcast_match = true;
-    for (int i = 0; (i < ETH_HWADDR_LEN) && broadcast_match; i++) {
-        if (buffer->dest.addr[i] != state.broadcast_addr[i]) {
-            broadcast_match = false;
-        }
-    }
-    if (broadcast_match) {
+    /* We will only get here if this is a broadcast packet
+        and no client match has been made. In this case,
+        the packet will be sent to all clients. */
+    if (broadcast_packet) {
         return BROADCAST_ID;
     }
-#endif
 
     return -1;
 }
@@ -125,7 +117,6 @@ void rx_return(void)
             // [2]: https://developer.arm.com/documentation/100236/0002/functional-description/cache-behavior-and-cache-protection/invalidating-or-cleaning-a-cache
             cache_clean_and_invalidate(buffer_vaddr, buffer_vaddr + ROUND_UP(buffer.len, 1 << CONFIG_L1_CACHE_LINE_SIZE_BITS));
             int client = get_mac_addr_match((struct ethernet_header *) buffer_vaddr);
-#if !BROADCAST_IS_ARP
             if (client == BROADCAST_ID) {
                 int ref_index = buffer.io_or_offset / NET_BUFFER_SIZE;
                 assert(buffer_refs[ref_index] == 0);
@@ -140,9 +131,7 @@ void rx_return(void)
                     notify_clients[i] = true;
                 }
                 continue;
-            }
-#endif
-            if (client >= 0) {
+            } else if (client >= 0) {
                 int ref_index = buffer.io_or_offset / NET_BUFFER_SIZE;
                 assert(buffer_refs[ref_index] == 0);
                 buffer_refs[ref_index] = 1;
@@ -242,9 +231,6 @@ void notified(microkit_channel ch)
 void init(void)
 {
     virt_mac_addr_init_sys(microkit_name, (uint8_t *) state.mac_addrs);
-#if !BROADCAST_IS_ARP
-    __set_mac_addr(state.broadcast_addr, MAC_ADDR_BROADCAST);
-#endif
 
     net_queue_init(&state.rx_queue_drv, (net_queue_t *)rx_free_drv, (net_queue_t *)rx_active_drv, RX_QUEUE_SIZE_DRIV);
     virt_queue_init_sys(microkit_name, state.rx_queue_clients, rx_free_cli0, rx_active_cli0);
