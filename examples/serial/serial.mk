@@ -7,8 +7,8 @@
 # and operated on from there.
 #
 
-ifeq ($(strip $(MK_SDK)),)
-$(error MK_SDK must be specified)
+ifeq ($(strip $(MICROKIT_SDK)),)
+$(error MICROKIT_SDK must be specified)
 endif
 
 ifeq ($(strip $(SDDF)),)
@@ -31,7 +31,7 @@ CC := $(TOOLCHAIN)-gcc
 LD := $(TOOLCHAIN)-ld
 AS := $(TOOLCHAIN)-as
 
-MICROKIT_TOOL := $(MK_SDK)/bin/microkit
+MICROKIT_TOOL := $(MICROKIT_SDK)/bin/microkit
 
 ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
 	DRIVER_DIR := meson
@@ -54,7 +54,7 @@ UTIL := $(SDDF)/util
 SERIAL_NUM_CLIENTS := -DSERIAL_NUM_CLIENTS=2
 SERIAL_COMPONENTS := $(SDDF)/serial/components
 UART_DRIVER := $(SDDF)/drivers/serial/$(DRIVER_DIR)
-BOARD_DIR := $(MK_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
+BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 SYSTEM_FILE := ${TOP}/board/$(MICROKIT_BOARD)/serial.system
 
 IMAGES := uart_driver.elf \
@@ -90,7 +90,7 @@ serial_server_%.o: ${TOP}/serial_server.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
-	MICROKIT_SDK=${MK_SDK} $(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
+	MICROKIT_SDK=${MICROKIT_SDK} $(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
 
 qemu: ${IMAGE_FILE}
 	$(QEMU) -machine virt,virtualization=on -cpu cortex-a53 -serial mon:stdio -device loader,file=$(IMAGE_FILE),addr=0x70000000,cpu-num=0 -m size=2G -nographic
