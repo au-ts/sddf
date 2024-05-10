@@ -10,3 +10,5 @@ ci_build/
 *.orig
 *~
 .#*
+zig-out/
+zig-cache/
