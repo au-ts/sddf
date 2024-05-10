@@ -3,7 +3,8 @@
 #
 # SPDX-License-Identifier: BSD-2-Clause
 #
-# This Makefile snippet builds the serial RX and TX virtualisers
+# This Makefile snippet builds the network components
+# (for example, simple RX and TX virtualisers)
 # it should be included into your project Makefile
 #
 # NOTES:
