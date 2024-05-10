@@ -23,7 +23,7 @@ REPORT_FILE:= ${BUILD_DIR}/report.txt
 all: ${IMAGE_FILE}
 
 qemu ${IMAGE_FILE} ${REPORT_FILE} clean clobber: ${BUILD_DIR}/Makefile FORCE
-	${MAKE} -C ${BUILD_DIR}  -${MAKEFLAGS} MICROKIT_SDK=${MICROKIT_SDK} $(notdir $@) 
+	${MAKE} -C ${BUILD_DIR}  MICROKIT_SDK=${MICROKIT_SDK} $(notdir $@) 
 
 ${BUILD_DIR}/Makefile: serial.mk
 	mkdir -p ${BUILD_DIR}

@@ -19,7 +19,7 @@ export TOP:= $(abspath $(dir ${MAKEFILE_LIST}))
 TARGETS:= all clobber clean
 
 ${TARGETS}: $(IMAGE_FILE) ${BUILD_DIR}/Makefile FORCE
-	${MAKE} -p -C ${BUILD_DIR} MICROKIT_SDK:=${MICROKIT_SDK} $(filter ${TARGETS},$@)
+	${MAKE} -C ${BUILD_DIR} MICROKIT_SDK=${MICROKIT_SDK} $(filter ${TARGETS},$@)
 
 ${BUILD_DIR}/Makefile: timer.mk
 	mkdir -p ${BUILD_DIR}
