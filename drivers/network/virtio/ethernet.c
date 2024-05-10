@@ -134,9 +134,9 @@ static void rx_return(void)
 {
     /* Extract RX buffers from the 'used' and pass them up to the client by putting them
      * in our sDDF 'active' queues. */
-    bool packets_transferred = false;
-    size_t i = rx_last_seen_used;
-    size_t curr_idx = rx_virtq.used->idx;
+    uint16_t packets_transferred = 0;
+    uint16_t i = rx_last_seen_used;
+    uint16_t curr_idx = rx_virtq.used->idx;
     while (i != curr_idx) {
         LOG_DRIVER("i: 0x%lx\n", i);
         struct virtq_used_elem hdr_used = rx_virtq.used->ring[i % rx_virtq.num];
@@ -158,13 +158,13 @@ static void rx_return(void)
         assert(!err);
 
         rx_last_desc_idx -= 2;
-        packets_transferred = true;
+        assert(rx_last_desc_idx >= 0);
         i++;
+        packets_transferred++;
     }
+    rx_last_seen_used += packets_transferred;
 
-    rx_last_seen_used = curr_idx;
-
-    if (packets_transferred && net_require_signal_active(&rx_queue)) {
+    if (packets_transferred > 0 && net_require_signal_active(&rx_queue)) {
         LOG_DRIVER("signalling RX\n");
         net_cancel_signal_active(&rx_queue);
         microkit_notify(RX_CH);
@@ -231,9 +231,9 @@ static void tx_return(void)
 {
     /* We must look through the 'used' ring of the TX virtqueue and place them in our
      * sDDF TX free queue. */
-    bool enqueued = false;
-    int i = tx_last_seen_used;
-    size_t curr_idx = tx_virtq.used->idx;
+    uint16_t enqueued = 0;
+    uint16_t i = tx_last_seen_used;
+    uint16_t curr_idx = tx_virtq.used->idx;
     while (i != curr_idx && !net_queue_full_free(&tx_queue)) {
         /* For each TX free entry in the sDDF queue, there are *two* virtq used entries.
          * One for the virtIO header, and one for the packet. */
@@ -248,19 +248,21 @@ static void tx_return(void)
         net_buff_desc_t buffer = { addr, 0 };
         int err = net_enqueue_free(&tx_queue, buffer);
         assert(!err);
-        enqueued = true;
 
         err = ialloc_free(&tx_ialloc_desc, hdr_used.id);
         assert(!err);
         err = ialloc_free(&tx_ialloc_desc, tx_virtq.desc[hdr_used.id].next);
         assert(!err);
         tx_last_desc_idx -= 2;
+        assert(tx_last_desc_idx >= 0);
         i++;
+
+        enqueued++;
     }
 
-    tx_last_seen_used = curr_idx;
+    tx_last_seen_used += enqueued;
 
-    if (enqueued && net_require_signal_free(&tx_queue)) {
+    if (enqueued > 0 && net_require_signal_free(&tx_queue)) {
         net_cancel_signal_free(&tx_queue);
         microkit_notify(TX_CH);
     }
