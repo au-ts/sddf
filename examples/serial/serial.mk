@@ -76,6 +76,8 @@ CFLAGS += -I$(BOARD_DIR)/include \
 	-I$(SDDF)/include \
 
 
+${IMAGES}: libsddf_util_debug.a
+
 include ${SDDF}/util/util.mk
 include ${UART_DRIVER}/uart.mk
 include ${SERIAL_COMPONENTS}/serial_components.mk
