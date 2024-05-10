@@ -12,7 +12,6 @@ UTIL:=$(SDDF)/util
 ETHERNET_DRIVER:=$(SDDF)/drivers/network/$(DRIV_DIR)
 ETHERNET_CONFIG_INCLUDE:=${ECHO_SERVER}/include/ethernet_config
 TIMER_DRIVER:=$(SDDF)/drivers/clock/$(DRIV_DIR)
-TIMER_CLIENT:=${SDDF}/timer/client
 NETWORK_COMPONENTS:=$(SDDF)/network/components
 NUM_NETWORK_CLIENTS:=-DNUM_NETWORK_CLIENTS=3
 

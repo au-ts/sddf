@@ -7,9 +7,11 @@
 ifeq ($(strip $(MICROKIT_SDK)),)
 $(error MICROKIT_SDK must be specified)
 endif
+override MICROKIT_SDK:=$(abspath ${MICROKIT_SDK})
 
 ifeq ($(strip $(TOOLCHAIN)),)
-	TOOLCHAIN := aarch64-none-elf
+	export TOOLCHAIN := aarch64-none-elf
+	export LIBC := $(dir $(realpath $(shell aarch64-none-elf-gcc --print-file-name libc.a)))
 endif
 
 BUILD_DIR ?= build
@@ -33,7 +35,7 @@ REPORT_FILE := $(BUILD_DIR)/report.txt
 all: ${IMAGE_FILE}
 
 ${IMAGE_FILE} ${REPORT_FILE} clean clobber: ${BUILD_DIR}/Makefile FORCE
-	${MAKE}  -C ${BUILD_DIR}  -${MAKEFLAGS} $(notdir $@)
+	${MAKE}  -C ${BUILD_DIR}  -${MAKEFLAGS} MICROKIT_SDK=${MICROKIT_SDK}  $(notdir $@)
 
 ${BUILD_DIR}/Makefile: i2c.mk
 	mkdir -p ${BUILD_DIR}

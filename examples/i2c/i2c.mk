@@ -34,12 +34,11 @@ TOP := ${SDDF}/examples/i2c
 I2C := $(SDDF)/i2c
 I2C_DRIVER := $(SDDF)/drivers/i2c/${PLATFORM}
 TIMER_DRIVER := $(SDDF)/drivers/clock/${PLATFORM}
-TIMER_CLIENT := ${SDDF}/timer/client
 
 IMAGES := i2c_virt.elf i2c_driver.elf client.elf timer.elf
 CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall -Wno-unused-function -I${TOP}
-LDFLAGS := -L$(BOARD_DIR)/lib -L$(SDDF)/lib
-LIBS := -lmicrokit -Tmicrokit.ld -lc
+LDFLAGS := -L$(BOARD_DIR)/lib -L$(SDDF)/lib -L${LIBC}
+LIBS := --start-group -lmicrokit -Tmicrokit.ld -lc libsddf_util_debug.a --end-group
 
 IMAGE_FILE = loader.img
 REPORT_FILE = report.txt
@@ -59,7 +58,7 @@ DEPS := $(CLIENT_OBJS:.o=.d)
 VPATH:=${TOP}
 all: $(IMAGE_FILE)
 
-client.elf: $(CLIENT_OBJS) libsddf_util_debug.a libco.a libtimerclient.a
+client.elf: $(CLIENT_OBJS) libsddf_util_debug.a libco.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
@@ -77,7 +76,6 @@ clobber:: clean
 include ${SDDF}/util/util.mk
 include ${I2C}/components/i2c_virt.mk
 include ${TIMER_DRIVER}/timer.mk
-include ${TIMER_CLIENT}/timerclient.mk
 include ${LIBCO}/libco.mk
 include ${I2C_DRIVER}/i2c_driver.mk
 -include $(DEPS)
