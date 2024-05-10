@@ -34,7 +34,7 @@ state_t state;
 int extract_offset(uintptr_t *phys)
 {
     for (int client = 0; client < NUM_NETWORK_CLIENTS; client++) {
-        if (*phys >= state.buffer_region_paddrs[client] && 
+        if (*phys >= state.buffer_region_paddrs[client] &&
             *phys < state.buffer_region_paddrs[client] + state.tx_queue_clients[client].size * NET_BUFFER_SIZE) {
             *phys = *phys - state.buffer_region_paddrs[client];
             return client;
