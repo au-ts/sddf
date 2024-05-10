@@ -21,7 +21,7 @@ NETWORK_IMAGES:= network_virt_rx.elf network_virt_tx.elf arp.elf copy.elf
 
 CFLAGS_network := ${NUM_NETWORK_CLIENTS}
 
-CHECK_NETWORK_FLAGS_MD5:=.network_cflags-$(shell echo -- ${CFLAGS} ${CFLAGS_network} | shasum)
+CHECK_NETWORK_FLAGS_MD5:=.network_cflags-$(shell echo -- ${CFLAGS} ${CFLAGS_network} | shasum | sed 's/ *-//')
 
 ${CHECK_NETWORK_FLAGS_MD5}:
 	-rm -f .network_cflags-*
@@ -32,9 +32,6 @@ network_virt_%.elf: network_virt_%.o libsddf_util_debug.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@ libsddf_util_debug.a
 
 copy.elf arp.elf: LIBS := libsddf_util_debug.a ${LIBS}
-
-%.elf: %.o
-	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
 
 arp.o copy.o network_virt_tx.o network_virt_rx.o: ${CHECK_NETWORK_FLAGS_MD5}
 network_virt_%.o: ${SDDF}/network/components/virt_%.c 

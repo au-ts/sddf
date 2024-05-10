@@ -13,7 +13,7 @@
 
 ETHERNET_DRIVER:=${SDDF}/drivers/network/meson
 
-CHECK_NETDRV_FLAGS_MD5:=.netdrv_cflags-$(shell echo -- ${CFLAGS} ${CFLAGS_network} | shasum)
+CHECK_NETDRV_FLAGS_MD5:=.netdrv_cflags-$(shell echo -- ${CFLAGS} ${CFLAGS_network} | shasum | sed 's/ *-//')
 
 ${CHECK_NETDRV_FLAGS_MD5}:
 	-rm -f .netdrv_cflags-*

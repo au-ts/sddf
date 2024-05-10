@@ -5,7 +5,7 @@
 #
 # Include this make snippet to buid libco,a, a simple coroutine library.
 
-CHECK_LIBCO_FLAGS_MD5:=.libco_cflags-$(shell echo -- ${CFLAGS} ${CFLAGS_network} | shasum)
+CHECK_LIBCO_FLAGS_MD5:=.libco_cflags-$(shell echo -- ${CFLAGS} ${CFLAGS_network} | shasum | sed 's/ *-//')
 
 ${CHECK_LIBCO_FLAGS_MD5}:
 	-rm -f .libco_cflags-*

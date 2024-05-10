@@ -43,11 +43,14 @@ CFLAGS := -mcpu=$(CPU) \
 LDFLAGS := -L$(BOARD_DIR)/lib -L${LIBC}
 LIBS := --start-group -lmicrokit -Tmicrokit.ld -lc libsddf_util_debug.a --end-group
 
-CHECK_FLAGS_BOARD_MD5:=.board_cflags-$(shell echo -- ${CFLAGS} ${BOARD} ${MICROKIT_CONFIG} | shasum)
+CHECK_FLAGS_BOARD_MD5:=.board_cflags-$(shell echo -- ${CFLAGS} ${BOARD} ${MICROKIT_CONFIG} | shasum | sed 's/ *-//')
 
 ${CHECK_FLAGS_BOARD_MD5}:
 	-rm -f .board_cflags-*
 	touch $@
+
+%.elf: %.o
+	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
 
 include ${SDDF}/${LWIPDIR}/Filelists.mk
 
@@ -58,7 +61,7 @@ NETIFFILES:=$(LWIPDIR)/netif/ethernet.c
 # LWIPFILES: All the above.
 LWIPFILES=lwip.c $(COREFILES) $(CORE4FILES) $(NETIFFILES)
 LWIP_OBJS := $(LWIPFILES:.c=.o) lwip.o utilization_socket.o \
-	     udp_echo_socket.o libsddf_util.a
+	     udp_echo_socket.o
 
 OBJS := $(LWIP_OBJS)
 DEPS := $(filter %.d,$(OBJS:.o=.d))

@@ -11,13 +11,13 @@
 # sddf_libutil_debug.a uses the microkit_dbg_putc function.
 # Both are character at a time polling (i.e., slow, and only for debugging)
 
-OBJS := cache.o sddf_printf.o newlibc.o
+OBJS_LIBUTIL := cache.o sddf_printf.o newlibc.o
 
-
-libsddf_util_debug.a: ${OBJS} putchar_debug.o
+libsddf_util_debug.a: ${OBJS_LIBUTIL} putchar_debug.o
 	${AR} rv $@ $^
 	ranlib $@
-libsddf_util.a: ${OBJS} putchar_serial.o
+
+libsddf_util.a: ${OBJS_LIBUTIL} putchar_serial.o
 	${AR} rv $@ $^
 	ranlib $@
 
@@ -27,9 +27,9 @@ sddf_printf.o: ${SDDF}/util/printf.c
 	${CC} ${CFLAGS} -c -o $@ $<
 
 clean::
-	${RM} -f ${OBJS} ${OBJS:.o=.d} putchar_debug.[od] putchar_serial.[od]
+	${RM} -f ${OBJS_LIBUTIL} ${OBJS_LIBUTIL:.o=.d} putchar_debug.[od] putchar_serial.[od]
 
 clobber:: clean
 	${RM} -f libsddf_util.a libsddf_util_debug.a
 
--include ${OBJS:.o=.d} putchar_debug.d putchar_serial.d
+-include ${OBJS_LIBUTIL:.o=.d} putchar_debug.d putchar_serial.d
