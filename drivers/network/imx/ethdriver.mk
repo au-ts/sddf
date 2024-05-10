@@ -13,7 +13,7 @@
 #  the registers
 
 ETHERNET_DRIVER:=${SDDF}/drivers/network/imx
-CHECK_NETDRV_FLAGS_MD5:=.netdrv_cflags-$(shell echo -- ${CFLAGS} | md5sum | sed 's/  *-//')
+CHECK_NETDRV_FLAGS_MD5:=.netdrv_cflags-$(shell echo -- ${CFLAGS} | shasum)
 
 ${CHECK_NETDRV_FLAGS_MD5}:
 	-rm -f .netdrv_cflags-*

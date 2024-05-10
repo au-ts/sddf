@@ -43,7 +43,7 @@ CFLAGS := -mcpu=$(CPU) \
 LDFLAGS := -L$(BOARD_DIR)/lib -L${LIBC}
 LIBS := --start-group -lmicrokit -Tmicrokit.ld -lc libsddf_util_debug.a --end-group
 
-CHECK_FLAGS_BOARD_MD5:=.board_cflags-$(shell echo -- ${CFLAGS} ${BOARD} ${MICROKIT_CONFIG} | md5sum | sed 's/  *-//')
+CHECK_FLAGS_BOARD_MD5:=.board_cflags-$(shell echo -- ${CFLAGS} ${BOARD} ${MICROKIT_CONFIG} | shasum)
 
 ${CHECK_FLAGS_BOARD_MD5}:
 	-rm -f .board_cflags-*

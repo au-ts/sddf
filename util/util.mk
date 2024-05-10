@@ -15,10 +15,11 @@ OBJS := cache.o sddf_printf.o newlibc.o
 
 
 libsddf_util_debug.a: ${OBJS} putchar_debug.o
-	ar rv $@ $^
-
+	${AR} rv $@ $^
+	ranlib $@
 libsddf_util.a: ${OBJS} putchar_serial.o
-	ar rv $@ $^
+	${AR} rv $@ $^
+	ranlib $@
 
 VPATH += ${SDDF}/util
 

@@ -21,7 +21,7 @@ NETWORK_IMAGES:= network_virt_rx.elf network_virt_tx.elf arp.elf copy.elf
 
 CFLAGS_network := ${NUM_NETWORK_CLIENTS}
 
-CHECK_NETWORK_FLAGS_MD5:=.network_cflags-$(shell echo -- ${CFLAGS} ${CFLAGS_network} | md5sum | sed 's/  *-//')
+CHECK_NETWORK_FLAGS_MD5:=.network_cflags-$(shell echo -- ${CFLAGS} ${CFLAGS_network} | shasum)
 
 ${CHECK_NETWORK_FLAGS_MD5}:
 	-rm -f .network_cflags-*

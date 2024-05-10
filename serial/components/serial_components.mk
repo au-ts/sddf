@@ -23,7 +23,7 @@ SERIAL_IMAGES:= serial_rx_virt.elf serial_tx_virt.elf
 
 CFLAGS_serial := -I ${SDDF}/include -I${UART_DRIVER}/include -I${SDDF}/util/include ${SERIAL_NUM_CLIENTS}
 
-CHECK_SERIAL_FLAGS_MD5:=.serial_cflags-$(shell echo -- ${CFLAGS} ${CFLAGS_serial} | md5sum | sed 's/  *-//')
+CHECK_SERIAL_FLAGS_MD5:=.serial_cflags-$(shell echo -- ${CFLAGS} ${CFLAGS_serial} | shasum)
 
 ${CHECK_SERIAL_FLAGS_MD5}:
 	-rm -f .serial_cflags-*
