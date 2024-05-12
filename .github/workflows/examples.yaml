@@ -20,7 +20,7 @@ jobs:
       - name: Extract Microkit SDK
         run: unzip microkit-sdk.zip && tar -xf microkit-sdk-1.2.6.tar.gz
       - name: Install dependencies (via apt)
-        run: sudo apt update && sudo apt install -y make clang lld
+        run: sudo apt update && sudo apt install -y make llvm lld
       - name: Download and install AArch64 GCC toolchain
         run: |
           wget -O aarch64-toolchain.tar.gz https://trustworthy.systems/Downloads/microkit/arm-gnu-toolchain-11.3.rel1-x86_64-aarch64-none-elf.tar.xz%3Frev%3D73ff9780c12348b1b6772a1f54ab4bb3
