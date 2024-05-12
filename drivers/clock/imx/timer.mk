@@ -20,3 +20,8 @@ timer/timer.o: ${TIMER_DIR}/timer.c ${CHECK_FLAGS_BOARD_MD5} |timer
 
 timer:
 	mkdir -p timer
+
+clean::
+	rm -rf timer
+clobber::
+	rm -f timer.elf

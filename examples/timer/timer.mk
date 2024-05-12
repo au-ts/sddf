@@ -48,3 +48,8 @@ client.elf: client.o
 
 $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
+
+clean::
+	rm -f client.o
+clobber:: clean
+	rm -f client.elf ${IMAGE_FILE} ${REPORT_FILE}

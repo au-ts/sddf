@@ -75,6 +75,9 @@ ${LWIP_OBJS}: |${BUILD_DIR}/${LWIPDIR}
 ${BUILD_DIR}/${LWIPDIR}:
 	mkdir -p $@/core/ipv4 $@/netif
 
+# Need to build libsddf_util_debug.a because it's included in LIBS
+# for the unimplemented libc dependencies
+${IMAGES}: libsddf_util_debug.a
 
 ${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)

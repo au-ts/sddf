@@ -8,8 +8,8 @@
 #
 # NOTES:
 #   Generates eth.elf
-#   Depends in ${SDDF}/util/util.mk
 #   Needs eth_regs to be set in System Description File
+#   Assumes libsddf_util_debug.a is in LIBS
 
 ETHERNET_DRIVER:=${SDDF}/drivers/network/meson
 
@@ -19,7 +19,7 @@ ${CHECK_NETDRV_FLAGS_MD5}:
 	-rm -f .netdrv_cflags-*
 	touch $@
 
-eth.elf: meson/ethernet.o libsddf_util_debug.a
+eth.elf: meson/ethernet.o 
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 meson/ethernet.o: ${ETHERNET_DRIVER}/ethernet.c ${CHECK_NETDRV_FLAGS}
