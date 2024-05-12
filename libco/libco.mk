@@ -16,6 +16,6 @@ libco.o: $(LIBCO)/libco.c ${CHECK_LIBCO_FLAGS_MD5}
 
 libco.a: libco.o
 	${AR} cr $@ $^
-	ranlib $@
+	${RANLIB} $@
 
 -include libco.d
