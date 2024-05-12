@@ -30,6 +30,8 @@ QEMU := qemu-system-aarch64
 CC := $(TOOLCHAIN)-gcc
 LD := $(TOOLCHAIN)-ld
 AS := $(TOOLCHAIN)-as
+AR := $(TOOLCHAIN)-ar
+RANLIB := ${TOOLCHAIN}-ranlib
 
 MICROKIT_TOOL := $(MICROKIT_SDK)/bin/microkit
 

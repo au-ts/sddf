@@ -15,17 +15,21 @@ ifeq ($(strip $(TOOLCHAIN)),)
 	TOOLCHAIN := aarch64-none-elf
 endif
 
-BUILD_DIR ?= build
-MICROKIT_CONFIG ?= debug
-MICROKIT_BOARD ?= odroidc4
-PLATFORM := meson
-CPU ?= cortex-a55
+ifeq (${MICROKIT_BOARD},odroidc4)
+	PLATFORM := meson
+	CPU := cortex-a55
+else
+$(error Unsupported MICROKIT_BOARD)
+endif
 
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 
 CC := $(TOOLCHAIN)-gcc
 LD := $(TOOLCHAIN)-ld
 AS := $(TOOLCHAIN)-as
+AR := $(TOOLCHAIN)-ar
+RANLIB := $(TOOLCHAIN)-ranlib
+
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 
 UTIL := $(SDDF)/util

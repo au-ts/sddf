@@ -14,19 +14,11 @@ ifeq ($(strip $(TOOLCHAIN)),)
 	export LIBC := $(dir $(realpath $(shell aarch64-none-elf-gcc --print-file-name libc.a)))
 endif
 
-BUILD_DIR ?= build
-MICROKIT_CONFIG ?= debug
-MICROKIT_BOARD ?= odroidc4
-CPU ?= cortex-a55
+export BUILD_DIR ?= build
+export MICROKIT_CONFIG ?= debug
+export MICROKIT_BOARD ?= odroidc4
 
-BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 export I2C_BUS_NUM:=2
-
-CC := $(TOOLCHAIN)-gcc
-LD := $(TOOLCHAIN)-ld
-AS := $(TOOLCHAIN)-as
-MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
-
 export SDDF := $(abspath ../../)
 
 IMAGE_FILE := $(BUILD_DIR)/loader.img
