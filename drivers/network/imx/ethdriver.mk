@@ -13,7 +13,7 @@
 #  Expects libsddf_util_debug.a to be in LIBS
 
 ETHERNET_DRIVER:=${SDDF}/drivers/network/imx
-CHECK_NETDRV_FLAGS_MD5:=.netdrv_cflags-$(shell echo -- ${CFLAGS} | shasum | sed 's/ *-//')
+CHECK_NETDRV_FLAGS_MD5:=.netdrv_cflags-$(shell echo -- ${CFLAGS} ${CFLAGS_network} | shasum | sed 's/ *-//')
 
 ${CHECK_NETDRV_FLAGS_MD5}:
 	-rm -f .netdrv_cflags-*
@@ -24,7 +24,7 @@ eth.elf: imx/ethernet.o
 
 imx/ethernet.o: ${ETHERNET_DRIVER}/ethernet.c ${CHECK_NETDRV_FLAGS_MD5}
 	mkdir -p imx
-	${CC} -c ${CFLAGS} -I ${ETHERNET_DRIVER} -o $@ $<
+	${CC} -c ${CFLAGS} ${CFLAGS_network} -I ${ETHERNET_DRIVER} -o $@ $<
 
 
 -include imx/ethernet.d
