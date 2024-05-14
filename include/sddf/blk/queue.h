@@ -108,7 +108,7 @@ static inline void blk_queue_init(blk_queue_handle_t *h,
  */
 static inline bool blk_req_queue_empty(blk_queue_handle_t *h)
 {
-    return !((h->req_queue->head - h->req_queue->tail) % h->queue_size);
+    return h->req_queue->head - h->req_queue->tail == 0;
 }
 
 /**
@@ -120,7 +120,7 @@ static inline bool blk_req_queue_empty(blk_queue_handle_t *h)
  */
 static inline bool blk_resp_queue_empty(blk_queue_handle_t *h)
 {
-    return !((h->resp_queue->head - h->resp_queue->tail) % h->queue_size);
+    return h->resp_queue->head - h->resp_queue->tail == 0;
 }
 
 /**
@@ -132,7 +132,7 @@ static inline bool blk_resp_queue_empty(blk_queue_handle_t *h)
  */
 static inline bool blk_req_queue_full(blk_queue_handle_t *h)
 {
-    return !((h->req_queue->head - h->req_queue->tail + 1) % h->queue_size);
+    return h->req_queue->head - h->req_queue->tail + 1 == h->req_queue->size;
 }
 
 /**
@@ -144,7 +144,7 @@ static inline bool blk_req_queue_full(blk_queue_handle_t *h)
  */
 static inline bool blk_resp_queue_full(blk_queue_handle_t *h)
 {
-    return !((h->resp_queue->head - h->resp_queue->tail + 1) % h->queue_size);
+    return h->resp_queue->head - h->resp_queue->tail + 1 == h->resp_queue->size;
 }
 
 /**
