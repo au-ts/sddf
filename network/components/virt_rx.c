@@ -14,6 +14,8 @@
 #define DRIVER_CH 0
 #define CLIENT_CH 1
 
+/* Used to signify that a packet has come in for the broadcast address and does not match with
+ * any particular client. */
 #define BROADCAST_ID (NUM_CLIENTS + 1)
 
 /* Queue regions */
