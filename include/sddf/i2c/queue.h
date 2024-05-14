@@ -93,7 +93,7 @@ static inline i2c_queue_handle_t i2c_queue_init(i2c_queue_t *request, i2c_queue_
  */
 static inline int i2c_queue_empty(i2c_queue_t *queue)
 {
-    return !((queue->tail - queue->head) % NUM_QUEUE_ENTRIES);
+    return queue->tail - queue->head == 0;
 }
 
 /**
@@ -105,7 +105,7 @@ static inline int i2c_queue_empty(i2c_queue_t *queue)
  */
 static inline int i2c_queue_full(i2c_queue_t *queue)
 {
-    return !((queue->tail - queue->head + 1) % NUM_QUEUE_ENTRIES);
+    return queue->tail - queue->head + 1 == NUM_QUEUE_ENTRIES;
 }
 
 static inline uint32_t i2c_queue_size(i2c_queue_t *queue)
