@@ -29,8 +29,7 @@
 #define PD_COPY1_ID     5
 #define PD_LWIP_ID      6
 #define PD_LWIP1_ID     7
-#define PD_ARP_ID       8
-#define PD_TIMER_ID     9
+#define PD_TIMER_ID     8
 
 uintptr_t uart_base;
 uintptr_t cyclecounters_vaddr;
@@ -83,9 +82,6 @@ static void print_pdid_name(uint64_t pd_id)
         break;
     case PD_LWIP1_ID:
         sddf_printf(CLI1_NAME);
-        break;
-    case PD_ARP_ID:
-        sddf_printf(ARP_NAME);
         break;
     case PD_TIMER_ID:
         sddf_printf(TIMER_NAME);

@@ -148,7 +148,7 @@
             <map mr="tx_buffer_data_region_cli1" vaddr="0x2_a00_000" perms="rw" cached="true" setvar_vaddr="tx_buffer_data_region" />
         </protection_domain>
 
-        <protection_domain name="timer" priority="101" pp="true" id="9" passive="true">
+        <protection_domain name="timer" priority="101" pp="true" id="8" passive="true">
             <program_image path="timer.elf" />
             <map mr="timer" vaddr="0x2_000_000" perms="rw" cached="false" setvar_vaddr="gpt_regs" />
             <irq irq="87" id="0" /> <!-- timer interrupt -->
