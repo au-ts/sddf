@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <microkit.h>
 #include <sddf/timer/protocol.h>
 #include <sddf/util/util.h>
@@ -72,6 +73,11 @@ static inline void generic_timer_enable(void)
     generic_timer_or_ctrl(GENERIC_TIMER_ENABLE);
 }
 
+static inline void generic_timer_disable(void)
+{
+    generic_timer_or_ctrl(~GENERIC_TIMER_ENABLE);
+}
+
 #define KHZ (1000)
 #define MHZ (1000 * KHZ)
 #define GHZ (1000 * MHZ)
@@ -100,56 +106,36 @@ void set_timeout(uint64_t timeout)
 }
 
 static uint64_t timeouts[MAX_TIMEOUTS];
-static microkit_channel active_channel = -1;
-static bool timeout_active = false;
-static uint64_t current_timeout;
-static uint8_t pending_timeouts;
 
-static void handle_irq(microkit_channel ch)
+static void process_timeouts(uint64_t curr_time)
 {
-    if (timeout_active) {
-        generic_timer_set_compare(UINT64_MAX);
-        timeout_active = false;
-        microkit_channel curr_channel = active_channel;
-        timeouts[curr_channel] = 0;
-        // notify the client.
-        microkit_notify(curr_channel);
-    }
-
-    if (pending_timeouts && !timeout_active) {
-        uint64_t curr_time = get_ticks();
-        /* find next timeout */
-        uint64_t next_timeout = UINT64_MAX;
-        microkit_channel ch = -1;
-
-        /* A more efficient solution would be to order these in terms of
-         * timeout time, so then we can just take the head as the next timeout.
-         * However, this would require a different data structure...
-         */
-        for (unsigned i = 0; i < MAX_TIMEOUTS; i++) {
-            /* Check if any of these timeouts have gone off in the interim */
-            if (timeouts[i] != 0 && timeouts[i] <= curr_time) {
-                timeouts[i] = 0;
-                pending_timeouts--;
-                microkit_notify(i);
-            } else if (timeouts[i] != 0 && timeouts[i] < next_timeout) {
-                next_timeout = timeouts[i];
-                ch = i;
-            }
-        }
-
-        if (ch != -1) {
-            pending_timeouts--;
-            set_timeout(next_timeout);
-            timeout_active = true;
-            current_timeout = next_timeout;
-            active_channel = ch;
+    for (int i = 0; i < MAX_TIMEOUTS; i++) {
+        if (timeouts[i] <= curr_time) {
+            microkit_notify(i);
+            timeouts[i] = UINT64_MAX;
         }
     }
+
+    uint64_t next_timeout = UINT64_MAX;
+    for (int i = 0; i < MAX_TIMEOUTS; i++) {
+        if (timeouts[i] < next_timeout) {
+            next_timeout = timeouts[i];
+        }
+    }
+
+    if (next_timeout != UINT64_MAX) {
+        set_timeout(next_timeout);
+        generic_timer_enable();
+    }
+
 }
 
 void init()
 {
+    for (int i = 0; i < MAX_TIMEOUTS; i++) {
+        timeouts[i] = UINT64_MAX;
+    }
+
     generic_timer_set_compare(UINT64_MAX);
     generic_timer_enable();
     timer_freq = generic_timer_get_freq();
@@ -158,50 +144,28 @@ void init()
 void notified(microkit_channel ch)
 {
     assert(ch == IRQ_CH);
-
-    handle_irq(ch);
     microkit_irq_ack_delayed(ch);
+
+    generic_timer_set_compare(UINT64_MAX);
+    uint64_t curr_time = freq_cycles_and_hz_to_ns(get_ticks(), timer_freq);
+    process_timeouts(curr_time);
 }
 
 seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
 {
-    uint64_t rel_timeout, cur_ticks, abs_timeout;
     switch (microkit_msginfo_get_label(msginfo)) {
-    case SDDF_TIMER_GET_TIME:
-        // Just wants the time. Return it in nanoseconds.
-        cur_ticks = get_ticks();
-        seL4_SetMR(0, freq_cycles_and_hz_to_ns(cur_ticks, timer_freq));
+    case SDDF_TIMER_GET_TIME: {
+        uint64_t time_ns = freq_cycles_and_hz_to_ns(get_ticks(), timer_freq);
+        seL4_SetMR(0, time_ns);
         return microkit_msginfo_new(0, 1);
-    case SDDF_TIMER_SET_TIMEOUT:
-        /* The timer talks cycles, but our API is in nanoseconds.
-         * Our goal is to set the absolute timeout, which will be
-         * in nanoseconds.
-         * This means we need to convert current ticks to nanoseconds
-         * and add that to what we get from the client.
-         */
-        // Request to set a timeout.
-        rel_timeout = (uint64_t)(seL4_GetMR(0));
-        cur_ticks = freq_cycles_and_hz_to_ns(get_ticks(), timer_freq);
-        abs_timeout = cur_ticks + rel_timeout;
-
-        timeouts[ch] = abs_timeout; // in nanoseconds
-        if (!timeout_active || abs_timeout < current_timeout) {
-            if (timeout_active) {
-                /* there current timeout is now treated as pending */
-                pending_timeouts++;
-            }
-            // sddf_dprintf("setting timeout to %lu, rel_timeout is %lu\n", abs_timeout, rel_timeout);
-            set_timeout(abs_timeout);
-            timeout_active = true;
-
-            /* We need to keep track of how far into the future this is so
-                we can order client requests appropriately. */
-            current_timeout = abs_timeout;
-            active_channel = ch;
-        } else {
-            pending_timeouts++;
-        }
+    }
+    case SDDF_TIMER_SET_TIMEOUT: {
+        uint64_t curr_time = freq_cycles_and_hz_to_ns(get_ticks(), timer_freq);
+        uint64_t offset_us =  (uint64_t)(seL4_GetMR(0));
+        timeouts[ch] = curr_time + offset_us;
+        process_timeouts(curr_time);
         break;
+    }
     default:
         sddf_dprintf("TIMER DRIVER|LOG: Unknown request %lu to timer from channel %u\n", microkit_msginfo_get_label(msginfo),
                      ch);
