@@ -161,7 +161,7 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
     }
     case SDDF_TIMER_SET_TIMEOUT: {
         uint64_t curr_time = freq_cycles_and_hz_to_ns(get_ticks(), timer_freq);
-        uint64_t offset_us =  (uint64_t)(seL4_GetMR(0));
+        uint64_t offset_us = (uint64_t)(seL4_GetMR(0));
         timeouts[ch] = curr_time + offset_us;
         process_timeouts(curr_time);
         break;
