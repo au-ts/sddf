@@ -147,7 +147,6 @@ static void rx_return(void)
         uint32_t len = pkt.len;
         assert(!(pkt.flags & VIRTQ_DESC_F_NEXT));
 
-        // TODO: assert that len > 0?
         net_buff_desc_t buffer = { addr, len };
         int err = net_enqueue_active(&rx_queue, buffer);
         assert(!err);
@@ -341,14 +340,12 @@ static void eth_setup(void)
 
     // Setup the virtqueues
 
-    // TODO: need to have asserts regarding alignment for each desc,avail,used queue
-
     size_t rx_desc_off = 0;
-    size_t rx_avail_off = rx_desc_off + (16 * RX_COUNT);
-    size_t rx_used_off = rx_avail_off + (6 + 2 * RX_COUNT);
-    size_t tx_desc_off = rx_used_off + (6 + 8 * RX_COUNT);
-    size_t tx_avail_off = tx_desc_off + (16 * TX_COUNT);
-    size_t tx_used_off = tx_avail_off + (6 + 2 * TX_COUNT);
+    size_t rx_avail_off = ALIGN(rx_desc_off + (16 * RX_COUNT), 2);
+    size_t rx_used_off = ALIGN(rx_avail_off + (6 + 2 * RX_COUNT), 4);
+    size_t tx_desc_off = ALIGN(rx_used_off + (6 + 8 * RX_COUNT), 16);
+    size_t tx_avail_off = ALIGN(tx_desc_off + (16 * TX_COUNT), 2);
+    size_t tx_used_off = ALIGN(tx_avail_off + (6 + 2 * TX_COUNT), 4);
     size_t size = tx_used_off + (6 + 8 * TX_COUNT);
 
     assert(size <= HW_RING_SIZE);
@@ -358,10 +355,18 @@ static void eth_setup(void)
     rx_virtq.avail = (struct virtq_avail *)(hw_ring_buffer_vaddr + rx_avail_off);
     rx_virtq.used = (struct virtq_used *)(hw_ring_buffer_vaddr + rx_used_off);
 
+    assert((uintptr_t)rx_virtq.desc % 16 == 0);
+    assert((uintptr_t)rx_virtq.avail % 2 == 0);
+    assert((uintptr_t)rx_virtq.used % 4 == 0);
+
     tx_virtq.num = TX_COUNT;
     tx_virtq.desc = (struct virtq_desc *)(hw_ring_buffer_vaddr + tx_desc_off);
     tx_virtq.avail = (struct virtq_avail *)(hw_ring_buffer_vaddr + tx_avail_off);
     tx_virtq.used = (struct virtq_used *)(hw_ring_buffer_vaddr + tx_used_off);
+
+    assert((uintptr_t)tx_virtq.desc % 16 == 0);
+    assert((uintptr_t)tx_virtq.avail % 2 == 0);
+    assert((uintptr_t)tx_virtq.used % 4 == 0);
 
     rx_provide();
     tx_provide();
