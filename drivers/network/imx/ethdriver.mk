@@ -20,7 +20,7 @@ ${CHECK_NETDRV_FLAGS_MD5}:
 	touch $@
 
 eth.elf: imx/ethernet.o
-	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
 
 imx/ethernet.o: ${ETHERNET_DRIVER}/ethernet.c ${CHECK_NETDRV_FLAGS_MD5}
 	mkdir -p imx

@@ -20,10 +20,10 @@ ${CHECK_NETDRV_FLAGS_MD5}:
 	touch $@
 
 eth.elf: meson/ethernet.o 
-	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
 
 meson/ethernet.o: ${ETHERNET_DRIVER}/ethernet.c ${CHECK_NETDRV_FLAGS}
 	mkdir -p meson
-	${CC} -c ${CFLAGS} ${CFLAGS_network} -I ${ETHERNET_DRIVER} -MF meson/ethernet.d -o $@ $^
+	${CC} -c ${CFLAGS} ${CFLAGS_network} -I ${ETHERNET_DRIVER} -MF meson/ethernet.d -o $@ $<
 
 -include meson/ethernet.d
