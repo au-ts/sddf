@@ -16,7 +16,7 @@
 
 /* Used to signify that a packet has come in for the broadcast address and does not match with
  * any particular client. */
-#define BROADCAST_ID (NUM_CLIENTS + 1)
+#define BROADCAST_ID (NUM_NETWORK_CLIENTS + 1)
 
 /* Queue regions */
 uintptr_t rx_free_drv;
@@ -117,9 +117,9 @@ void rx_return(void)
                 // For broadcast packets, set the refcount to number of clients
                 // in the system. Only enqueue buffer back to driver if
                 // all clients have consumed the buffer.
-                buffer_refs[ref_index] = NUM_CLIENTS;
+                buffer_refs[ref_index] = NUM_NETWORK_CLIENTS;
 
-                for (int i = 0; i < NUM_CLIENTS; i++) {
+                for (int i = 0; i < NUM_NETWORK_CLIENTS; i++) {
                     err = net_enqueue_active(&state.rx_queue_clients[i], buffer);
                     assert(!err);
                     notify_clients[i] = true;
