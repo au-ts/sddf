@@ -325,7 +325,7 @@ static void eth_setup(void)
 
     regs->DriverFeatures = VIRTIO_NET_F_MAC;
     regs->DriverFeaturesSel = 1;
-    regs->DriverFeatures = 0;
+    regs->DriverFeatures = VIRTIO_F_VERSION_1;
 
     regs->Status = VIRTIO_DEVICE_STATUS_FEATURES_OK;
 
