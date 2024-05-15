@@ -8,6 +8,10 @@
  * It assumes that the transport method is MMIO.
  * This driver is very minimal and was written for the goal of building systems that
  * use networking on a simulator like QEMU. It is *not* intended to be performant.
+ *
+ * It should also be noted that because this driver is intended to be used with a
+ * simulator such as QEMU, things like memory fences when touching device registers
+ * may be needed if instead this driver was to be used in a different environment.
  */
 #include <stdbool.h>
 #include <stdint.h>
@@ -84,8 +88,6 @@ static void rx_provide(void)
     /* We need to take all of our sDDF free entries and place them in the virtIO 'free' ring. */
     bool reprocess = true;
     while (reprocess) {
-        // sddf_dprintf("size of rx: 0x%lx\n", virtio_avail_size(&rx_virtq));
-        // sddf_dprintf("idx: 0x%lx\n", rx_virtq.avail->idx);
         while (!virtio_avail_full_rx(&rx_virtq) && !net_queue_empty_free(&rx_queue)) {
             net_buff_desc_t buffer;
             int err = net_dequeue_free(&rx_queue, &buffer);
@@ -206,8 +208,6 @@ static void tx_provide(void)
             tx_virtq.desc[pkt_desc_idx].len = buffer.len;
             tx_virtq.desc[pkt_desc_idx].flags = 0;
 
-            /* @ivanv: use a memory fence. If a memory fence is used, it is more optimal
-             * to update this number only once */
             tx_virtq.avail->idx++;
             tx_last_desc_idx += 2;
         }
