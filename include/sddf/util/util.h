@@ -10,6 +10,7 @@
 #include <sddf/util/printf.h>
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(x[0]))
+#define ALIGN(x, align)   (((x) + (align) - 1) & ~((align) - 1))
 
 #ifdef __GNUC__
 #define likely(x)   __builtin_expect(!!(x), 1)
