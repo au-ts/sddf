@@ -13,6 +13,8 @@
 
 OBJS_LIBUTIL := cache.o sddf_printf.o newlibc.o
 
+${OBJS_LIBUTIL} putchar_debug.o putchar_serial.o: ${CHECK_FLAGS_BOARD_MD5}
+
 libsddf_util_debug.a: ${OBJS_LIBUTIL} putchar_debug.o
 	${AR} rv $@ $^
 	${RANLIB} $@

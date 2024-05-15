@@ -11,7 +11,7 @@ IDLE_OBJS := benchmark/idle.o
 LIBUTIL_DBG := libsddf_util_debug.a
 LIBUTIL := libsddf_util.a
 
-${BENCH_OBJS} ${IDLE_OBJS}: |benchmark
+${BENCH_OBJS} ${IDLE_OBJS}: ${CHECK_FLAGS_BOARD_MD5} |benchmark
 benchmark:
 	mkdir -p benchmark
 
