@@ -62,9 +62,9 @@ virtio_net_hdr_t *virtio_net_tx_headers;
 volatile virtio_mmio_regs_t *regs;
 
 ialloc_t rx_ialloc_desc;
-uint64_t rx_descriptors[RX_COUNT];
+uint32_t rx_descriptors[RX_COUNT];
 ialloc_t tx_ialloc_desc;
-uint64_t tx_descriptors[TX_COUNT];
+uint32_t tx_descriptors[TX_COUNT];
 
 int rx_last_desc_idx = 0;
 int tx_last_desc_idx = 0;
@@ -92,10 +92,10 @@ static void rx_provide(void)
             assert(!err);
 
             // Allocate a desc entry for the header, and one for the packet
-            size_t hdr_desc_idx;
+            uint32_t hdr_desc_idx;
             err = ialloc_alloc(&rx_ialloc_desc, &hdr_desc_idx);
             assert(!err);
-            size_t pkt_desc_idx;
+            uint32_t pkt_desc_idx;
             err = ialloc_alloc(&rx_ialloc_desc, &pkt_desc_idx);
             assert(!err);
 
@@ -181,10 +181,10 @@ static void tx_provide(void)
             assert(!err);
 
             /* Now we need to put our buffer into the virtIO ring */
-            size_t hdr_desc_idx;
+            uint32_t hdr_desc_idx;
             err = ialloc_alloc(&tx_ialloc_desc, &hdr_desc_idx);
             assert(!err);
-            size_t pkt_desc_idx;
+            uint32_t pkt_desc_idx;
             err = ialloc_alloc(&tx_ialloc_desc, &pkt_desc_idx);
             assert(!err);
             /* We should not run out of descriptors assuming that the avail ring is not full. */
