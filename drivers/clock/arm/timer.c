@@ -105,8 +105,7 @@ static bool timeout_active = false;
 static uint64_t current_timeout;
 static uint8_t pending_timeouts;
 
-static void
-handle_irq(microkit_channel ch)
+static void handle_irq(microkit_channel ch)
 {
     if (timeout_active) {
         generic_timer_set_compare(UINT64_MAX);
@@ -149,62 +148,64 @@ handle_irq(microkit_channel ch)
     }
 }
 
-void init() {
+void init()
+{
     generic_timer_set_compare(UINT64_MAX);
     generic_timer_enable();
     timer_freq = generic_timer_get_freq();
 }
 
-void notified(microkit_channel ch) {
+void notified(microkit_channel ch)
+{
     assert(ch == IRQ_CH);
 
     handle_irq(ch);
     microkit_irq_ack_delayed(ch);
 }
 
-seL4_MessageInfo_t
-protected(microkit_channel ch, microkit_msginfo msginfo)
+seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
 {
     uint64_t rel_timeout, cur_ticks, abs_timeout;
     switch (microkit_msginfo_get_label(msginfo)) {
-        case SDDF_TIMER_GET_TIME:
-            // Just wants the time. Return it in nanoseconds.
-            cur_ticks = get_ticks();
-            seL4_SetMR(0, freq_cycles_and_hz_to_ns(cur_ticks, timer_freq));
-            return microkit_msginfo_new(0, 1);
-        case SDDF_TIMER_SET_TIMEOUT:
-            /* The timer talks cycles, but our API is in nanoseconds.
-             * Our goal is to set the absolute timeout, which will be
-             * in nanoseconds.
-             * This means we need to convert current ticks to nanoseconds
-             * and add that to what we get from the client.
-             */
-            // Request to set a timeout.
-            rel_timeout = (uint64_t)(seL4_GetMR(0));
-            cur_ticks = freq_cycles_and_hz_to_ns(get_ticks(), timer_freq);
-            abs_timeout = cur_ticks + rel_timeout;
+    case SDDF_TIMER_GET_TIME:
+        // Just wants the time. Return it in nanoseconds.
+        cur_ticks = get_ticks();
+        seL4_SetMR(0, freq_cycles_and_hz_to_ns(cur_ticks, timer_freq));
+        return microkit_msginfo_new(0, 1);
+    case SDDF_TIMER_SET_TIMEOUT:
+        /* The timer talks cycles, but our API is in nanoseconds.
+         * Our goal is to set the absolute timeout, which will be
+         * in nanoseconds.
+         * This means we need to convert current ticks to nanoseconds
+         * and add that to what we get from the client.
+         */
+        // Request to set a timeout.
+        rel_timeout = (uint64_t)(seL4_GetMR(0));
+        cur_ticks = freq_cycles_and_hz_to_ns(get_ticks(), timer_freq);
+        abs_timeout = cur_ticks + rel_timeout;
 
-            timeouts[ch] = abs_timeout; // in nanoseconds
-            if (!timeout_active || abs_timeout < current_timeout) {
-                if (timeout_active) {
-                    /* there current timeout is now treated as pending */
-                    pending_timeouts++;
-                }
-                // sddf_dprintf("setting timeout to %lu, rel_timeout is %lu\n", abs_timeout, rel_timeout);
-                set_timeout(abs_timeout);
-                timeout_active = true;
-
-                /* We need to keep track of how far into the future this is so
-                    we can order client requests appropriately. */
-                current_timeout = abs_timeout;
-                active_channel = ch;
-            } else {
+        timeouts[ch] = abs_timeout; // in nanoseconds
+        if (!timeout_active || abs_timeout < current_timeout) {
+            if (timeout_active) {
+                /* there current timeout is now treated as pending */
                 pending_timeouts++;
             }
-            break;
-        default:
-            sddf_dprintf("TIMER DRIVER|LOG: Unknown request %lu to timer from channel %u\n", microkit_msginfo_get_label(msginfo), ch);
-            break;
+            // sddf_dprintf("setting timeout to %lu, rel_timeout is %lu\n", abs_timeout, rel_timeout);
+            set_timeout(abs_timeout);
+            timeout_active = true;
+
+            /* We need to keep track of how far into the future this is so
+                we can order client requests appropriately. */
+            current_timeout = abs_timeout;
+            active_channel = ch;
+        } else {
+            pending_timeouts++;
+        }
+        break;
+    default:
+        sddf_dprintf("TIMER DRIVER|LOG: Unknown request %lu to timer from channel %u\n", microkit_msginfo_get_label(msginfo),
+                     ch);
+        break;
     }
 
     return microkit_msginfo_new(0, 0);
