@@ -12,25 +12,29 @@ ifeq ($(strip $(MICROKIT_BOARD)),)
 $(error MICROKIT_BOARD must be specified)
 endif
 
-TOOLCHAIN := aarch64-none-elf
 QEMU := qemu-system-aarch64
-CC := $(TOOLCHAIN)-gcc
-LD := $(TOOLCHAIN)-ld
-AS := $(TOOLCHAIN)-as
+CC := clang
+LD := ld.lld
 
 MICROKIT_TOOL := $(MICROKIT_SDK)/bin/microkit
 MICROKIT_CONFIG ?= debug
 BUILD_DIR ?= build
 
 ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
+	ARCH := aarch64
 	DRIVER_DIR := meson
 	CPU := cortex-a55
 else ifeq ($(strip $(MICROKIT_BOARD)), qemu_arm_virt)
+	ARCH := aarch64
 	DRIVER_DIR := arm
 	CPU := cortex-a53
 else ifeq ($(strip $(MICROKIT_BOARD)), maaxboard)
+	ARCH := aarch64
 	DRIVER_DIR := imx
 	CPU := cortex-a53
+else ifeq ($(strip $(MICROKIT_BOARD)), star64)
+	ARCH := riscv64
+	DRIVER_DIR := star64
 else
 $(error Unsupported MICROKIT_BOARD given)
 endif
@@ -42,8 +46,15 @@ UART_DRIVER=$(SDDF)/drivers/serial/$(DRIVER_DIR)
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 SYSTEM_FILE := board/$(MICROKIT_BOARD)/serial.system
 
+CFLAGS := -ffreestanding -g3 -O3 -Wall -Wno-unused-function -Werror -Wno-unused-command-line-argument
+
+ifeq ($(ARCH),aarch64)
+	CFLAGS += -mcpu=$(CPU) -mstrict-align -target aarch64-none-elf
+else ifeq ($(ARCH),riscv64)
+	CFLAGS += -march=rv64imac -target riscv64-none-elf -DPRINTF_DISABLE_SUPPORT_FLOAT
+endif
+
 IMAGES := uart.elf serial_server_1.elf serial_server_2.elf virt_tx.elf virt_rx.elf
-CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall -Wno-unused-function -Werror
 LDFLAGS := -L$(BOARD_DIR)/lib
 LIBS := -lmicrokit -Tmicrokit.ld
 
