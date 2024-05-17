@@ -5,8 +5,6 @@ endif
 BUILD_DIR ?= build
 # By default we make a debug build so that the client debug prints can be seen.
 MICROKIT_CONFIG ?= debug
-MICROKIT_BOARD ?= odroidc4
-CPU ?= cortex-a55
 
 CC := clang
 LD := ld.lld
@@ -36,7 +34,7 @@ IMAGE_FILE := loader.img
 REPORT_FILE := report.txt
 SYSTEM_FILE := ${TOP}/board/$(MICROKIT_BOARD)/timer.system
 CLIENT_OBJS := client.o
-TIMER_DRIVER := $(SDDF)/drivers/clock/meson
+TIMER_DRIVER := $(SDDF)/drivers/clock/$(TIMER_DRIVER_DIR)
 
 
 all: $(IMAGE_FILE)
