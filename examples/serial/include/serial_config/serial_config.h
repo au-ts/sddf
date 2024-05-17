@@ -3,9 +3,6 @@
 #include <microkit.h>
 #include <sddf/serial/queue.h>
 
-/* Convert received carriage returns to newlines in the rx virtualiser. */
-#define CARRIAGE_TO_NEWLINE 1
-
 /* Associate a colour with each client's output. */
 #define SERIAL_WITH_COLOUR 1
 
@@ -13,7 +10,7 @@
 #define SERIAL_SWITCH_CHAR 28
 
 /* Control character to terminate client number input. */
-#define SERIAL_TERM_NUM '\n'
+#define SERIAL_TERM_NUM '\r'
 
 /* Default baud rate of the uart device */
 #define UART_DEFAULT_BAUD 115200
