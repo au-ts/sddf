@@ -42,13 +42,6 @@ void rx_return()
     char c = '\0';
     while (reprocess) {
         while (!serial_dequeue(&rx_queue_handle_drv, (char *)rx_data_drv, &rx_queue_handle_drv.queue->head, &c)) {
-
-            #if CARRIAGE_TO_NEWLINE
-            if (c == '\r') {
-                c = '\n';
-            }
-            #endif
-
             switch (current_mode) {
             case normal:
                 switch (c) {
