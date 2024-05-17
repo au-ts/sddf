@@ -5,11 +5,22 @@ endif
 BUILD_DIR ?= build
 # By default we make a debug build so that the client debug prints can be seen.
 MICROKIT_CONFIG ?= debug
-MICROKIT_BOARD ?= odroidc4
-CPU ?= cortex-a55
 
+ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
+	ARCH := aarch64
+	TIMER_DRIVER_DIR := meson
+	CPU := cortex-a55
+else ifeq ($(strip $(MICROKIT_BOARD)), star64)
+	ARCH := riscv64
+	TIMER_DRIVER_DIR := starfive
+else
+$(error Unsupported MICROKIT_BOARD given)
+endif
+
+# CC := riscv64-unknown-elf-gcc
+LD := riscv64-unknown-elf-ld
 CC := clang
-LD := ld.lld
+# LD := ld.lld
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
@@ -17,18 +28,21 @@ SDDF := $(abspath ../..)
 UTIL := $(SDDF)/util
 
 IMAGES := timer.elf client.elf
-CFLAGS := -mcpu=$(CPU) \
-		  -mstrict-align \
-		  -nostdlib \
+CFLAGS := -nostdlib \
 		  -ffreestanding \
 		  -g3 \
-		  -O3 \
+		  -O0 \
 		  -Wall -Wno-unused-function -Werror -Wno-unused-command-line-argument \
 		  -I$(BOARD_DIR)/include \
-		  -I$(SDDF)/include \
-		  -target aarch64-none-elf
+		  -I$(SDDF)/include
 LDFLAGS := -L$(BOARD_DIR)/lib
 LIBS := -lmicrokit -Tmicrokit.ld
+
+ifeq ($(ARCH),aarch64)
+	CFLAGS += -mcpu=$(CPU) -mstrict-align -target aarch64-none-elf
+else ifeq ($(ARCH),riscv64)
+	CFLAGS += -mabi=lp64 -march=rv64imac -DPRINTF_DISABLE_SUPPORT_FLOAT -target riscv64-none-elf
+endif
 
 IMAGE_FILE = $(BUILD_DIR)/loader.img
 REPORT_FILE = $(BUILD_DIR)/report.txt
@@ -37,7 +51,7 @@ SYSTEM_FILE = board/$(MICROKIT_BOARD)/timer.system
 TIMER_DRIVER_OBJS := timer_driver.o putchar_debug.o printf.o
 CLIENT_OBJS := client.o
 
-TIMER_DRIVER := $(SDDF)/drivers/clock/meson
+TIMER_DRIVER := $(SDDF)/drivers/clock/$(TIMER_DRIVER_DIR)
 
 all: $(BUILD_DIR) $(IMAGE_FILE)
 

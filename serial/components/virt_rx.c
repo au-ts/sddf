@@ -4,7 +4,6 @@
 #include <microkit.h>
 #include <sddf/serial/queue.h>
 #include <sddf/serial/util.h>
-#include "uart.h"
 #include "uart_config.h"
 
 #define CLI_CH 1

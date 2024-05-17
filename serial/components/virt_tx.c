@@ -5,7 +5,6 @@
 #include <microkit.h>
 #include <sddf/serial/queue.h>
 #include <sddf/serial/util.h>
-#include "uart.h"
 
 #define DRIVER_CH 9
 
