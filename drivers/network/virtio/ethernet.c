@@ -27,13 +27,24 @@
 
 #include "ethernet.h"
 
+/*
+ * This default is based on the default QEMU setup but could change
+ * depending on the instantiation of QEMU or wherever this driver is
+ * being used.
+ */
+#ifndef VIRTIO_MMIO_NET_OFFSET
 #define VIRTIO_MMIO_NET_OFFSET (0xe00)
+#endif
 
 #define IRQ_CH 0
 #define TX_CH  1
 #define RX_CH  2
 
 uintptr_t eth_regs;
+/*
+ * The 'hardware' ring buffer region is used to store the virtIO virtqs
+ * as well as the RX and TX virtIO headers.
+ */
 uintptr_t hw_ring_buffer_vaddr;
 uintptr_t hw_ring_buffer_paddr;
 
@@ -46,7 +57,7 @@ uintptr_t tx_active;
 #define TX_COUNT 512
 #define MAX_COUNT MAX(RX_COUNT, TX_COUNT)
 
-#define HW_RING_SIZE (0x30000)
+#define HW_RING_SIZE (0x10000)
 
 struct virtq rx_virtq;
 struct virtq tx_virtq;
@@ -56,10 +67,15 @@ uint16_t tx_last_seen_used = 0;
 net_queue_handle_t rx_queue;
 net_queue_handle_t tx_queue;
 
+/*
+ * This driver has no use of the virtIO net headers that go before
+ * each packet. Our policy is to discard them when we get RX and
+ * initialise to the default values on TX. In order to this, we use a
+ * separate memory region and not the sDDF data region.
+ */
 uintptr_t virtio_net_tx_headers_vaddr;
 uintptr_t virtio_net_tx_headers_paddr;
 uintptr_t virtio_net_rx_headers_paddr;
-
 virtio_net_hdr_t *virtio_net_tx_headers;
 
 volatile virtio_mmio_regs_t *regs;
@@ -345,9 +361,7 @@ static void eth_setup(void)
     size_t tx_desc_off = ALIGN(rx_used_off + (6 + 8 * RX_COUNT), 16);
     size_t tx_avail_off = ALIGN(tx_desc_off + (16 * TX_COUNT), 2);
     size_t tx_used_off = ALIGN(tx_avail_off + (6 + 2 * TX_COUNT), 4);
-    size_t size = tx_used_off + (6 + 8 * TX_COUNT);
-
-    assert(size <= (HW_RING_SIZE / 3));
+    size_t virtq_size = tx_used_off + (6 + 8 * TX_COUNT);
 
     rx_virtq.num = RX_COUNT;
     rx_virtq.desc = (struct virtq_desc *)(hw_ring_buffer_vaddr + rx_desc_off);
@@ -368,14 +382,14 @@ static void eth_setup(void)
     assert((uintptr_t)tx_virtq.used % 4 == 0);
 
     /* Virtio TX headers will proceed the virtq structures. Then RX headers. */
-    virtio_net_tx_headers_vaddr = hw_ring_buffer_vaddr + size;
-    virtio_net_tx_headers_paddr = hw_ring_buffer_paddr + size;
+    virtio_net_tx_headers_vaddr = hw_ring_buffer_vaddr + virtq_size;
+    virtio_net_tx_headers_paddr = hw_ring_buffer_paddr + virtq_size;
     virtio_net_tx_headers = (virtio_net_hdr_t *) virtio_net_tx_headers_vaddr;
-    size += (TX_COUNT * sizeof(virtio_net_hdr_t));
-    virtio_net_rx_headers_paddr = hw_ring_buffer_paddr + size;
-    size += (RX_COUNT * sizeof(virtio_net_hdr_t));
+    size_t tx_headers_size = ((TX_COUNT / 2) * sizeof(virtio_net_hdr_t));
+    virtio_net_rx_headers_paddr = virtio_net_tx_headers_paddr + tx_headers_size;
+    size_t rx_headers_size = ((RX_COUNT / 2) * sizeof(virtio_net_hdr_t));
 
-    assert(size <= HW_RING_SIZE);
+    assert(virtq_size + tx_headers_size + rx_headers_size <= HW_RING_SIZE);
 
     rx_provide();
     tx_provide();
