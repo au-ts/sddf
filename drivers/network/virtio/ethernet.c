@@ -46,7 +46,7 @@ uintptr_t tx_active;
 #define TX_COUNT 512
 #define MAX_COUNT MAX(RX_COUNT, TX_COUNT)
 
-#define HW_RING_SIZE (0x10000)
+#define HW_RING_SIZE (0x30000)
 
 struct virtq rx_virtq;
 struct virtq tx_virtq;
@@ -58,7 +58,6 @@ net_queue_handle_t tx_queue;
 
 uintptr_t virtio_net_tx_headers_vaddr;
 uintptr_t virtio_net_tx_headers_paddr;
-uintptr_t virtio_net_rx_headers_vaddr;
 uintptr_t virtio_net_rx_headers_paddr;
 
 virtio_net_hdr_t *virtio_net_tx_headers;
@@ -348,7 +347,7 @@ static void eth_setup(void)
     size_t tx_used_off = ALIGN(tx_avail_off + (6 + 2 * TX_COUNT), 4);
     size_t size = tx_used_off + (6 + 8 * TX_COUNT);
 
-    assert(size <= HW_RING_SIZE);
+    assert(size <= (HW_RING_SIZE / 3));
 
     rx_virtq.num = RX_COUNT;
     rx_virtq.desc = (struct virtq_desc *)(hw_ring_buffer_vaddr + rx_desc_off);
@@ -367,6 +366,16 @@ static void eth_setup(void)
     assert((uintptr_t)tx_virtq.desc % 16 == 0);
     assert((uintptr_t)tx_virtq.avail % 2 == 0);
     assert((uintptr_t)tx_virtq.used % 4 == 0);
+
+    /* Virtio TX headers will proceed the virtq structures. Then RX headers. */
+    virtio_net_tx_headers_vaddr = hw_ring_buffer_vaddr + size;
+    virtio_net_tx_headers_paddr = hw_ring_buffer_paddr + size;
+    virtio_net_tx_headers = (virtio_net_hdr_t *) virtio_net_tx_headers_vaddr;
+    size += (TX_COUNT * sizeof(virtio_net_hdr_t));
+    virtio_net_rx_headers_paddr = hw_ring_buffer_paddr + size;
+    size += (RX_COUNT * sizeof(virtio_net_hdr_t));
+
+    assert(size <= HW_RING_SIZE);
 
     rx_provide();
     tx_provide();
@@ -411,7 +420,6 @@ static void eth_setup(void)
 void init(void)
 {
     regs = (volatile virtio_mmio_regs_t *)(eth_regs + VIRTIO_MMIO_NET_OFFSET);
-    virtio_net_tx_headers = (virtio_net_hdr_t *) virtio_net_tx_headers_vaddr;
 
     ialloc_init(&rx_ialloc_desc, rx_descriptors, RX_COUNT);
     ialloc_init(&tx_ialloc_desc, tx_descriptors, TX_COUNT);
