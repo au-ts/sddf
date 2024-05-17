@@ -109,12 +109,15 @@ static void rx_return(void)
         }
 
         if (!(uart_regs->sr & AML_UART_RX_EMPTY) && serial_queue_full(&rx_queue_handle, rx_queue_handle.queue->tail)) {
+            /* Disable rx interrupts until virtualisers queue is no longer empty. */
+            uart_regs->cr &= ~AML_UART_RX_INT_EN;
             serial_require_consumer_signal(&rx_queue_handle);
         }
         reprocess = false;
         
         if (!(uart_regs->sr & AML_UART_RX_EMPTY) && !serial_queue_full(&rx_queue_handle, rx_queue_handle.queue->tail)) {
             serial_cancel_consumer_signal(&rx_queue_handle);
+            uart_regs->cr |= AML_UART_RX_INT_EN;
             reprocess = true;
         }
     }
@@ -205,6 +208,7 @@ void notified(microkit_channel ch)
             tx_provide();
             break;
         case RX_CH:
+            uart_regs->cr |= AML_UART_RX_INT_EN;
             rx_return();
             break;
         default:
