@@ -19,7 +19,7 @@ endif
 
 # CC := riscv64-unknown-elf-gcc
 LD := riscv64-unknown-elf-ld
-CC := clang
+CC := riscv64-unknown-elf-gcc
 # LD := ld.lld
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 
@@ -41,7 +41,7 @@ LIBS := -lmicrokit -Tmicrokit.ld
 ifeq ($(ARCH),aarch64)
 	CFLAGS += -mcpu=$(CPU) -mstrict-align -target aarch64-none-elf
 else ifeq ($(ARCH),riscv64)
-	CFLAGS += -mabi=lp64 -march=rv64imac -DPRINTF_DISABLE_SUPPORT_FLOAT -target riscv64-none-elf
+	CFLAGS += -mabi=lp64 -march=rv64imac -DPRINTF_DISABLE_SUPPORT_FLOAT
 endif
 
 IMAGE_FILE = $(BUILD_DIR)/loader.img

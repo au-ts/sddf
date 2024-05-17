@@ -2,6 +2,7 @@
 #include <microkit.h>
 #include <sddf/util/printf.h>
 #include <sddf/timer/protocol.h>
+#include <assert.h>
 
 /*
  * The JH7110 SoC contains a timer with four 32-bit counters. Each one of these
@@ -107,36 +108,66 @@ static void process_timeouts(uint64_t curr_time)
     }
 
     if (next_timeout != UINT64_MAX) {
-        // regs->mux &= ~TIMER_A_MODE;
-        // regs->timer_a = next_timeout - curr_time;
-        // regs->mux |= TIMER_A_EN;
+        uint64_t ns = next_timeout - curr_time;
+        sddf_dprintf("ns: %lu\n", ns);
+        timeout_regs->enable = STARFIVE_TIMER_DISABLED;
+        timeout_timer_elapses = 0;
+        timeout_regs->ctrl = STARFIVE_TIMER_MODE_SINGLE;
+
+        uint64_t ticks_whole_seconds = (ns / NS_IN_S) * STARFIVE_TIMER_TICKS_PER_SECOND;
+        uint64_t ticks_remainder = (ns % NS_IN_S) * STARFIVE_TIMER_TICKS_PER_SECOND / NS_IN_S;
+        uint64_t num_ticks = ticks_whole_seconds + ticks_remainder;
+
+        // assert(num_ticks <= STARFIVE_TIMER_MAX_TICKS);
+        if (num_ticks > STARFIVE_TIMER_MAX_TICKS) {
+            sddf_dprintf("ERROR: num_ticks: 0x%lx\n", num_ticks);
+        }
+
+        sddf_dprintf("num_ticks: 0x%lx\n", num_ticks);
+
+        timeout_regs->load = num_ticks;
+        timeout_regs->enable = STARFIVE_TIMER_ENABLED;
     }
 }
 
 void notified(microkit_channel ch)
 {
-    if (ch != COUNTER_IRQ_CH && ch != TIMEOUT_IRQ_CH) {
-        sddf_dprintf("TIMER DRIVER|LOG: unexpected notification from channel %u\n", ch);
-        return;
-    }
-
     sddf_dprintf("got IRQ!\n");
 
-    counter_timer_elapses += 1;
+    switch (ch) {
+        case COUNTER_IRQ_CH: {
+            counter_timer_elapses += 1;
+            while (counter_regs->intclr & STARFIVE_TIMER_INTCLR_BUSY) {
+                    /*
+                 * Hardware will not currently accept writes to this register.
+                 * Wait for this bit to be unset by hardware.
+                 */
+            }
+            counter_regs->intclr = 1;
+            break;
+        }
+        case TIMEOUT_IRQ_CH: {
+            timeout_timer_elapses += 1;
+            while (timeout_regs->intclr & STARFIVE_TIMER_INTCLR_BUSY) {
+                    /*
+                 * Hardware will not currently accept writes to this register.
+                 * Wait for this bit to be unset by hardware.
+                 */
+            }
+            timeout_regs->intclr = 1;
 
-    while (counter_regs->intclr & STARFIVE_TIMER_INTCLR_BUSY) {
-            /*
-         * Hardware will not currently accept writes to this register.
-         * Wait for this bit to be unset by hardware.
-         */
+            uint64_t curr_time = get_ticks_in_ns();
+            process_timeouts(curr_time);
+
+            break;
+        }
+        default: {
+            sddf_dprintf("TIMER DRIVER|LOG: unexpected notification from channel %u\n", ch);
+            return;
+        }
     }
 
-    counter_regs->intclr = 1;
-
     microkit_irq_ack_delayed(ch);
-
-    uint64_t curr_time = get_ticks_in_ns();
-    process_timeouts(curr_time);
 }
 
 seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
@@ -149,8 +180,8 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
     }
     case SDDF_TIMER_SET_TIMEOUT: {
         uint64_t curr_time = get_ticks_in_ns();
-        uint64_t offset_us = seL4_GetMR(0);
-        timeouts[ch - CLIENT_CH_START] = curr_time + offset_us;
+        uint64_t offset_ns = seL4_GetMR(0);
+        timeouts[ch - CLIENT_CH_START] = curr_time + offset_ns;
         process_timeouts(curr_time);
         break;
     }
