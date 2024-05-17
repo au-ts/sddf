@@ -20,7 +20,7 @@
     <memory_region name="timer_registers" size="0x1000" phys_addr="0xffd0f000" />
 
     <protection_domain name="driver" priority="100">
-        <program_image path="driver.elf"/>
+        <program_image path="i2c_driver.elf"/>
 
 		<map mr="driver_request_region" vaddr="0x4_000_000" perms="rw" setvar_vaddr="request_region" />
         <map mr="driver_response_region" vaddr="0x5_000_000" perms="rw" setvar_vaddr="response_region" />
@@ -40,7 +40,7 @@
     </protection_domain>
 
     <protection_domain name="virt" priority="99" pp="true">
-        <program_image path="virt.elf" />
+        <program_image path="i2c_virt.elf" />
 
         <map mr="client_request_region" vaddr="0x4_000_000" perms="rw" />
         <map mr="client_response_region" vaddr="0x5_000_000" perms="rw" />
@@ -58,7 +58,7 @@
     </protection_domain>
 
     <protection_domain name="timer" priority="254" pp="true" passive="true">
-        <program_image path="timer.elf" />
+        <program_image path="timer_driver.elf" />
         <map mr="timer_registers" vaddr="0x2_000_000" perms="rw" cached="false" setvar_vaddr="gpt_regs" />
         <irq irq="42" id="0" trigger="edge" /> <!-- timer interrupt for timer A -->
     </protection_domain>

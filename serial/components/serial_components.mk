@@ -6,7 +6,10 @@
 # This Makefile snippet builds the serial RX and TX virtualisers
 # it should be included into your project Makefile
 #
-# It relies on the variable SERIAL_NUM_CLIENTS to configure the virtualisers
+# NOTES:
+#  Generates serial_rx_virt.elf serial_tx_virt.elf
+#  It relies on the variable SERIAL_NUM_CLIENTS as a C compiler flag
+#  to configure the virtualisers
 #
 
 ifeq ($(strip $(SERIAL_NUM_CLIENTS)),)
@@ -16,11 +19,11 @@ ifeq ($(strip $(UART_DRIVER)),)
 $(error The serial virtualisers need headers from the UART source. Please specify UART_DRIVER)
 endif
 
-IMAGES:= serial_rx_virt.elf serial_tx_virt.elf
+SERIAL_IMAGES:= serial_rx_virt.elf serial_tx_virt.elf
 
 CFLAGS_serial := -I ${SDDF}/include -I${UART_DRIVER}/include -I${SDDF}/util/include ${SERIAL_NUM_CLIENTS}
 
-CHECK_SERIAL_FLAGS_MD5:=.serial_cflags-$(shell echo -- ${CFLAGS} ${CFLAGS_serial} | md5sum | sed 's/  *-//')
+CHECK_SERIAL_FLAGS_MD5:=.serial_cflags-$(shell echo -- ${CFLAGS} ${CFLAGS_serial} | shasum | sed 's/ *-//')
 
 ${CHECK_SERIAL_FLAGS_MD5}:
 	-rm -f .serial_cflags-*
@@ -35,10 +38,10 @@ virt_%.o: ${SDDF}/serial/components/virt_%.c
 	${CC} ${CFLAGS} ${CFLAGS_serial} -o $@ -c $<
 
 clean::
-	rm -f virt_[rt]x.[od]
+	rm -f serial_virt_[rt]x.[od] .serial_cflags-*
 
 clobber::
-	rm -f ${IMAGES}
+	rm -f ${SERIAL_IMAGES}
 
 
 -include virt_rx.d

@@ -51,7 +51,7 @@
         <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
 
         <protection_domain name="eth" priority="101" id="1" budget="100" period="400">
-            <program_image path="eth.elf" />
+            <program_image path="eth_driver.elf" />
             <map mr="eth0" vaddr="0x2_000_000" perms="rw" cached="false" setvar_vaddr="eth_regs"/>
 
             <map mr="hw_ring_buffer" vaddr="0x2_200_000" perms="rw" cached="false" setvar_vaddr="hw_ring_buffer_vaddr" />
@@ -67,7 +67,7 @@
         </protection_domain>
 
         <protection_domain name="virt_rx" priority="99" pp="true" id="2">
-            <program_image path="virt_rx.elf" />
+            <program_image path="network_virt_rx.elf" />
             <map mr="rx_free_drv" vaddr="0x2_000_000" perms="rw" cached="true" setvar_vaddr="rx_free_drv" />
             <map mr="rx_active_drv" vaddr="0x2_200_000" perms="rw" cached="true" setvar_vaddr="rx_active_drv" />
 
@@ -105,7 +105,7 @@
         </protection_domain>
 
         <protection_domain name="virt_tx" priority="100" budget="20000" id="3">
-            <program_image path="virt_tx.elf" />
+            <program_image path="network_virt_tx.elf" />
             <map mr="tx_free_drv" vaddr="0x2_000_000" perms="rw" cached="true" setvar_vaddr="tx_free_drv" />
             <map mr="tx_active_drv" vaddr="0x2_200_000" perms="rw" cached="true" setvar_vaddr="tx_active_drv" />
 
@@ -149,7 +149,7 @@
         </protection_domain>
 
         <protection_domain name="timer" priority="101" pp="true" id="8" passive="true">
-            <program_image path="timer.elf" />
+            <program_image path="timer_driver.elf" />
             <map mr="timer" vaddr="0x2_000_000" perms="rw" cached="false" setvar_vaddr="gpt_regs" />
             <irq irq="42" id="0" trigger="edge" /> <!-- timer interrupt -->
         </protection_domain>

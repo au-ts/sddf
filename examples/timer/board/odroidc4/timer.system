@@ -5,7 +5,7 @@
     <!-- The timer driver should run at higher priority than its clients.
         As a passive server, PPC into the driver will be fastpathed. -->
     <protection_domain name="timer" priority="254" pp="true" passive="true">
-        <program_image path="timer.elf" />
+        <program_image path="timer_driver.elf" />
         <map mr="timer_registers" vaddr="0x2_000_000" perms="rw" cached="false" setvar_vaddr="gpt_regs" />
         <irq irq="42" id="0" trigger="edge" /> <!-- timer interrupt for timer A -->
     </protection_domain>
