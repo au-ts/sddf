@@ -86,7 +86,7 @@ ${CHECK_FLAGS_BOARD_MD5}:
 ${IMAGES}: libsddf_util_debug.a ${CHECK_FLAGS_BOARD_MD5}
 
 include ${SDDF}/util/util.mk
-include ${UART_DRIVER}/uart.mk
+include ${UART_DRIVER}/uart_driver.mk
 include ${SERIAL_COMPONENTS}/serial_components.mk
 
 %.elf: %.o

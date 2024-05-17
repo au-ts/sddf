@@ -62,7 +62,7 @@ DEPS := $(CLIENT_OBJS:.o=.d)
 VPATH:=${TOP}
 all: $(IMAGE_FILE)
 
-client.elf: $(CLIENT_OBJS) libsddf_util_debug.a libco.a
+client.elf: $(CLIENT_OBJS) libco.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
@@ -79,7 +79,7 @@ clobber:: clean
 
 include ${SDDF}/util/util.mk
 include ${I2C}/components/i2c_virt.mk
-include ${TIMER_DRIVER}/timer.mk
+include ${TIMER_DRIVER}/timer_driver.mk
 include ${LIBCO}/libco.mk
 include ${I2C_DRIVER}/i2c_driver.mk
 -include $(DEPS)

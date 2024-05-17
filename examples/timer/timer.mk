@@ -41,7 +41,7 @@ TIMER_DRIVER := $(SDDF)/drivers/clock/meson
 
 all: $(IMAGE_FILE)
 
-include ${TIMER_DRIVER}/timer.mk
+include ${TIMER_DRIVER}/timer_driver.mk
 include ${SDDF}/util/util.mk
 
 ${IMAGES}: libsddf_util_debug.a

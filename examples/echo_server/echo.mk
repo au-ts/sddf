@@ -85,9 +85,9 @@ ${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 
 include ${SDDF}/util/util.mk
 include ${SDDF}/network/components/network_components.mk
-include ${ETHERNET_DRIVER}/ethdriver.mk
+include ${ETHERNET_DRIVER}/eth_driver.mk
 include ${BENCHMARK}/benchmark.mk
-include ${TIMER_DRIVER}/timer.mk
+include ${TIMER_DRIVER}/timer_driver.mk
 
 clean::
 	${RM} -f *.elf .depend* $
