@@ -125,7 +125,6 @@ static void process_timeouts(uint64_t curr_time)
 
     if (next_timeout != UINT64_MAX) {
         set_timeout(next_timeout);
-        generic_timer_enable();
     }
 
 }
