@@ -52,7 +52,7 @@ static inline int serial_queue_empty(serial_queue_handle_t *queue_handle, uint32
  */
 static inline int serial_queue_full(serial_queue_handle_t *queue_handle, uint32_t local_tail)
 {
-    return (local_tail - queue_handle->queue->head) == queue_handle->size;
+    return local_tail - queue_handle->queue->head == queue_handle->size;
 }
 
 /**
@@ -201,6 +201,7 @@ static inline uint32_t serial_queue_contiguous_free(serial_queue_handle_t *queue
 {
     uint32_t tail = queue_handle->queue->tail;
     uint32_t free_size = serial_queue_free(queue_handle);
+    
     if ((tail + free_size) <= UINT32_MAX || (tail + free_size == 0)) {
         return free_size;
     } else {
