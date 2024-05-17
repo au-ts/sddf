@@ -102,7 +102,7 @@ i2c() {
 }
 
 timer() {
-    BOARDS=("odroidc4")
+    BOARDS=("odroidc4" "star64")
     CONFIGS=("debug" "release")
     for BOARD in "${BOARDS[@]}"
     do
@@ -114,7 +114,7 @@ timer() {
 }
 
 serial() {
-    BOARDS=("odroidc4" "qemu_arm_virt" "maaxboard")
+    BOARDS=("odroidc4" "qemu_arm_virt" "maaxboard" "star64")
     CONFIGS=("debug" "release")
     for BOARD in "${BOARDS[@]}"
     do
