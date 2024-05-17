@@ -18,7 +18,7 @@ MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 UTIL := $(SDDF)/util
 
-IMAGES := timer.elf client.elf
+IMAGES := timer_driver.elf client.elf
 CFLAGS := -mcpu=$(CPU) \
 		  -mstrict-align \
 		  -nostdlib \
@@ -30,7 +30,7 @@ CFLAGS := -mcpu=$(CPU) \
 		  -I$(SDDF)/include \
 		  -target aarch64-none-elf
 LDFLAGS := -L$(BOARD_DIR)/lib
-LIBS := -lmicrokit -Tmicrokit.ld
+LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
 
 IMAGE_FILE := loader.img
 REPORT_FILE := report.txt
@@ -44,10 +44,12 @@ all: $(IMAGE_FILE)
 include ${TIMER_DRIVER}/timer.mk
 include ${SDDF}/util/util.mk
 
+${IMAGES}: libsddf_util_debug.a
+
 client.o: ${TOP}/client.c
-	$(CC) -c $(CFLAGS) $^ -o client.o
+	$(CC) -c $(CFLAGS) $< -o client.o
 client.elf: client.o
-	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
 
 $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)

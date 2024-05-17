@@ -4,15 +4,20 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
 # Include this snippet in your project Makefile to build
-# the Meson UART driver
+# the Meson UART driver.
+#
+# NOTES:
+#   Builds uart_driver.elf
+#   Needs uart_base to be set to the mapped address of the UART
+#    registers in the system description file
 
-UART_DRIVER:= ${SDDF}/drivers/serial/meson
+UART_DRIVER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 
-uart_driver.elf: serial/meson/uart_driver.o libsddf_util_debug.a
+uart_driver.elf: serial/meson/uart_driver.o 
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-serial/meson/uart_driver.o: ${SDDF}/drivers/serial/meson/uart.c |serial/meson
-	$(CC) -c $(CFLAGS) -I${UART_DRIVER}/include -o $@ $< 
+serial/meson/uart_driver.o: ${UART_DRIVER_DIR}/uart.c |serial/meson
+	$(CC) -c $(CFLAGS) -I${UART_DRIVER_DIR}/include -o $@ $< 
 
 serial/meson:
 	mkdir -p $@

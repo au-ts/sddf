@@ -77,7 +77,13 @@ CFLAGS += -I$(BOARD_DIR)/include \
 	-I$(UART_DRIVER)/include \
 	-I$(SDDF)/include \
 
-${IMAGES}: libsddf_util_debug.a
+CHECK_FLAGS_BOARD_MD5:=.board_cflags-$(shell echo -- ${CFLAGS} ${BOARD} ${MICROKIT_CONFIG} | shasum | sed 's/ *-//')
+
+${CHECK_FLAGS_BOARD_MD5}:
+	-rm -f .board_cflags-*
+	touch $@
+
+${IMAGES}: libsddf_util_debug.a ${CHECK_FLAGS_BOARD_MD5}
 
 include ${SDDF}/util/util.mk
 include ${UART_DRIVER}/uart.mk
@@ -86,11 +92,6 @@ include ${SERIAL_COMPONENTS}/serial_components.mk
 %.elf: %.o
 	${LD} -o $@ ${LDFLAGS} $< ${LIBS} 
 
-CHECK_FLAGS_BOARD_MD5:=.board_cflags-$(shell echo -- ${CFLAGS} ${BOARD} ${MICROKIT_CONFIG} | shasum | sed 's/ *-//')
-
-${CHECK_FLAGS_BOARD_MD5}:
-	-rm -f .board_cflags-*
-	touch $@
 
 serial_server_1.o: CFLAGS+=-DSERIAL_SERVER_NUMBER=1
 serial_server_2.o: CFLAGS+=-DSERIAL_SERVER_NUMBER=2

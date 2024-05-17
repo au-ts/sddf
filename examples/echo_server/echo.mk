@@ -22,8 +22,8 @@ REPORT_FILE := report.txt
 
 vpath %.c ${SDDF} ${ECHO_SERVER} ${NETWORK_COMPONENTS}
 
-IMAGES := eth.elf lwip.elf benchmark.elf idle.elf network_virt_rx.elf\
-	  network_virt_tx.elf copy.elf timer.elf
+IMAGES := eth_driver.elf lwip.elf benchmark.elf idle.elf network_virt_rx.elf\
+	  network_virt_tx.elf copy.elf timer_driver.elf
 
 CFLAGS := -mcpu=$(CPU) \
 	  -mstrict-align \
