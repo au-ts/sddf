@@ -69,7 +69,7 @@ DEPS := $(filter %.d,$(OBJS:.o=.d))
 all: loader.img
 
 ${LWIP_OBJS}: ${CHECK_FLAGS_BOARD_MD5}
-lwip.elf: $(LWIP_OBJS)
+lwip.elf: $(LWIP_OBJS) libsddf_util.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 ${LWIP_OBJS}: |${BUILD_DIR}/${LWIPDIR}
 ${BUILD_DIR}/${LWIPDIR}:
