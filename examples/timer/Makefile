@@ -27,21 +27,12 @@ export SDDF := $(abspath ../..)
 export TOP:= $(abspath $(dir ${MAKEFILE_LIST}))
 IMAGE_FILE := $(BUILD_DIR)/loader.img
 REPORT_FILE := $(BUILD_DIR)/report.txt
-TARGETS:= ${IMAGE_FILE} ${REPORT_FILE} clobber clean
 
-${TARGETS}: $(IMAGE_FILE) ${BUILD_DIR}/Makefile FORCE
+qemu ${IMAGE_FILE} ${REPORT_FILE} clean clobber: $(IMAGE_FILE) ${BUILD_DIR}/Makefile FORCE
 	${MAKE} -C ${BUILD_DIR} MICROKIT_SDK=${MICROKIT_SDK} $(notdir $@)
 
 ${BUILD_DIR}/Makefile: timer.mk
 	mkdir -p ${BUILD_DIR}
 	cp timer.mk ${BUILD_DIR}/Makefile
-
-qemu: $(IMAGE_FILE)
-	$(QEMU) -machine virt,virtualization=on \
-			-cpu cortex-a53 \
-			-serial mon:stdio \
-			-device loader,file=$(IMAGE_FILE),addr=0x70000000,cpu-num=0 \
-			-m size=2G \
-			-nographic
 
 FORCE:
