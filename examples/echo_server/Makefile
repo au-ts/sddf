@@ -19,9 +19,6 @@ ifeq ($(strip $(TOOLCHAIN)),)
 	export LIBC := $(dir $(realpath $(shell aarch64-none-elf-gcc --print-file-name libc.a)))
 endif
 
-BUILD_DIR ?= build
-MICROKIT_CONFIG ?= debug
-
 ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
 	export DRIV_DIR := meson
 	export TIMER_DRV_DIR := meson
@@ -58,24 +55,11 @@ export ECHO_INCLUDE:=$(abspath .)/include
 IMAGE_FILE := $(BUILD_DIR)/loader.img
 REPORT_FILE := $(BUILD_DIR)/report.txt
 
-${IMAGE_FILE} ${REPORT_FILE} clean clobber: ${BUILD_DIR}/Makefile FORCE
+qemu ${IMAGE_FILE} ${REPORT_FILE} clean clobber: ${BUILD_DIR}/Makefile FORCE
 	${MAKE}  -C ${BUILD_DIR} MICROKIT_SDK=${MICROKIT_SDK} $(notdir $@)
 
 ${BUILD_DIR}/Makefile: echo.mk
 	mkdir -p ${BUILD_DIR}
 	cp echo.mk $@
-
-qemu: $(IMAGE_FILE)
-	$(QEMU) -machine virt,virtualization=on \
-			-cpu cortex-a53 \
-			-serial mon:stdio \
-			-device loader,file=$(IMAGE_FILE),addr=0x70000000,cpu-num=0 \
-			-m size=2G \
-			-nographic \
-			-device virtio-net-device,netdev=netdev0 \
-			-netdev user,id=netdev0,hostfwd=tcp::1236-:1236,hostfwd=udp::1235-:1235 \
-			-global virtio-mmio.force-legacy=false \
-			-d guest_errors
-
 
 FORCE:

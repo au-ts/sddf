@@ -3,6 +3,9 @@
 #
 # SPDX-License-Identifier: BSD-2-Clause
 #
+
+QEMU := qemu-system-aarch64
+
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 SDDF_INCLUDE:=$(SDDF)/include/sddf
 ECHO_SERVER:=${SDDF}/examples/echo_server
@@ -88,6 +91,18 @@ include ${SDDF}/network/components/network_components.mk
 include ${ETHERNET_DRIVER}/eth_driver.mk
 include ${BENCHMARK}/benchmark.mk
 include ${TIMER_DRIVER}/timer_driver.mk
+
+qemu: $(IMAGE_FILE)
+	$(QEMU) -machine virt,virtualization=on \
+			-cpu cortex-a53 \
+			-serial mon:stdio \
+			-device loader,file=$(IMAGE_FILE),addr=0x70000000,cpu-num=0 \
+			-m size=2G \
+			-nographic \
+			-device virtio-net-device,netdev=netdev0 \
+			-netdev user,id=netdev0,hostfwd=tcp::1236-:1236,hostfwd=udp::1235-:1235 \
+			-global virtio-mmio.force-legacy=false \
+			-d guest_errors
 
 clean::
 	${RM} -f *.elf .depend* $
