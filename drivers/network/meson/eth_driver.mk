@@ -7,7 +7,7 @@
 # the Amlogic NIC driver
 #
 # NOTES:
-#   Generates eth.elf
+#   Generates eth_driver.elf
 #   Needs eth_regs to be set in System Description File
 #   Assumes libsddf_util_debug.a is in LIBS
 
@@ -19,7 +19,7 @@ ${CHECK_NETDRV_FLAGS_MD5}:
 	-rm -f .netdrv_cflags-*
 	touch $@
 
-eth_driver.elf: meson/ethernet.o 
+eth_driver.elf: meson/ethernet.o
 	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
 
 meson/ethernet.o: ${ETHERNET_DRIVER_DIR}/ethernet.c ${CHECK_NETDRV_FLAGS}
