@@ -21,7 +21,7 @@ struct echo_state {
 
 // This previously was a LWIP_MEMPOOL, but turns out that doesn't support sizes
 // greater than ~65536 (due to integer overflow somewhere).
-#define MAX_CONCURRENT 1
+#define MAX_CONCURRENT 4
 static struct echo_state tcp_state_pool[MAX_CONCURRENT];
 
 static struct echo_state *tcp_state_alloc()
@@ -58,6 +58,7 @@ static size_t queue_cont_space(struct echo_state *state)
 static err_t tcp_echo_sent(void *arg, struct tcp_pcb *pcb, u16_t len)
 {
     struct echo_state *state = arg;
+    assert(state != NULL);
 
     state->head = (state->head + len) % ECHO_QUEUE_SIZE;
 
@@ -71,6 +72,7 @@ static err_t tcp_echo_sent(void *arg, struct tcp_pcb *pcb, u16_t len)
 static err_t tcp_echo_recv(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err)
 {
     struct echo_state *state = arg;
+    assert(state != NULL);
 
     if (p == NULL) {
         // closing
@@ -78,8 +80,8 @@ static err_t tcp_echo_recv(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t
                     ipaddr_ntoa(&pcb->remote_ip), pcb->remote_port
                    );
 
-        // TODO is this a use-after-free?
         tcp_state_free(state);
+        tcp_arg(pcb, NULL);
 
         err = tcp_close(pcb);
         if (err) {
@@ -149,6 +151,7 @@ static err_t tcp_echo_recv(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t
 static void tcp_echo_err(void *arg, err_t err)
 {
     struct echo_state *state = arg;
+    assert(state != NULL);
 
     sddf_printf("tcp_echo: %s\n", lwip_strerr(err));
 
