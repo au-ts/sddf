@@ -59,13 +59,13 @@
 #define MEM_SIZE                        0x30000
 
 /**
- * Enable code to support static ARP table entries (using 
+ * Enable code to support static ARP table entries (using
  * etharp_add_static_entry/etharp_remove_static_entry).
  */
 #define ETHARP_SUPPORT_STATIC_ENTRIES   1
 
 /**
- * Enable inter-task protection (and task-vs-interrupt protection) 
+ * Enable inter-task protection (and task-vs-interrupt protection)
  * for certain critical regions during buffer allocation, deallocation
  * and memory allocation and deallocation.
  */
@@ -111,13 +111,13 @@
 
 /**
  * TCP Maximum segment size. For the receive side, this MSS is advertised
- * to the remote side when opening a connection. For the transmit size, this 
+ * to the remote side when opening a connection. For the transmit size, this
  * MSS sets an upper limit on the MSS advertised by the remote host.
  */
 #define TCP_MSS 1460
 
 /**
- * The size of a TCP window - Maximum data we can receive at once. This 
+ * The size of a TCP window - Maximum data we can receive at once. This
  * must be at least (2 * TCP_MSS) for things to work well.
  */
 #define TCP_WND 1000000
@@ -129,8 +129,8 @@
 #define TCP_SND_BUF TCP_WND
 
 /**
- * TCP writable space (bytes). This must be less than TCP_SND_BUF. It is 
- * the amount of space which must be available in the TCP snd_buf for 
+ * TCP writable space (bytes). This must be less than TCP_SND_BUF. It is
+ * the amount of space which must be available in the TCP snd_buf for
  * select to return writable (combined with TCP_SNDQUEUELOWAT).
  */
 #define TCP_SNDLOWAT TCP_MSS
@@ -151,7 +151,7 @@
  */
 #define LWIP_WND_SCALE 1
 
-/** 
+/**
  * Set TCP_RCV_SCALE to the desired scaling factor (shift count in the
  * range of [0..14]).
  * When LWIP_WND_SCALE is enabled but TCP_RCV_SCALE is 0, we can use a large
@@ -193,7 +193,7 @@
 
 /**
  * Enable LWIP pbuf custom to store private data on pbufs. This extends struct
- * pbuf so user can store custom data on every pbuf. We enable pbufs to be 
+ * pbuf so user can store custom data on every pbuf. We enable pbufs to be
  * chained so they can be processed at a later time.
  */
 #define LWIP_PBUF_CUSTOM_DATA \
