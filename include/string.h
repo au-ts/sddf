@@ -40,8 +40,8 @@ static inline void *memcpy(void *dest, const void *src, size_t n)
 #endif
 }
 
-static inline char *strncpy (char *dest, const char *restrict src,
-                             size_t dsize)
+static inline char *strncpy(char *dest, const char *restrict src,
+                            size_t dsize)
 {
 #if __has_builtin(__builtin_strcpy)
     return __builtin_strncpy(dest, src, dsize);
