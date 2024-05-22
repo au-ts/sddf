@@ -67,7 +67,8 @@ CFLAGS := -mcpu=$(CPU)\
 	  -mstrict-align \
 	  -ffreestanding \
 	  -g3 -O3 -Wall \
-	  -Wno-unused-function -Werror
+	  -Wno-unused-function -Werror \
+	  -MD
 LDFLAGS := -L$(BOARD_DIR)/lib -L$(SDDF)/lib -L${LIBC}
 LIBS := --start-group -lmicrokit -Tmicrokit.ld -lc libsddf_util_debug.a --end-group
 
@@ -77,6 +78,7 @@ CFLAGS += -I$(BOARD_DIR)/include \
 	-I${TOP}/include	\
 	-I$(UART_DRIVER)/include \
 	-I$(SDDF)/include \
+	-I$(SERIAL_CONFIG_INCLUDE)
 
 CHECK_FLAGS_BOARD_MD5:=.board_cflags-$(shell echo -- ${CFLAGS} ${BOARD} ${MICROKIT_CONFIG} | shasum | sed 's/ *-//')
 
@@ -91,7 +93,10 @@ include ${UART_DRIVER}/uart_driver.mk
 include ${SERIAL_COMPONENTS}/serial_components.mk
 
 %.elf: %.o
-	${LD} -o $@ ${LDFLAGS} $< ${LIBS} 
+	${LD} -o $@ ${LDFLAGS} $< ${LIBS}
+
+serial_server.elf: serial_server.o libsddf_util.a
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 serial_server.o: ${TOP}/serial_server.c ${CHECK_FLAGS_BOARD_MD5}
 	$(CC) $(CFLAGS) -c -o $@ $<

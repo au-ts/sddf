@@ -32,6 +32,9 @@
 #ifndef _SDDF_PRINTF_H_
 #define _SDDF_PRINTF_H_
 
+#include <microkit.h>
+#include <sddf/serial/queue.h>
+
 #include <stdarg.h>
 #include <stddef.h>
 
@@ -53,6 +56,8 @@ extern "C" {
  */
 void _sddf_putchar(char character);
 
+/* Initialise the serial putchar library. */
+void serial_putchar_init(microkit_channel serial_tx_ch, serial_queue_handle_t *serial_tx_queue_handle);
 
 /**
  * Tiny printf implementation
