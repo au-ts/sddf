@@ -7,6 +7,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <sddf/util/util.h>
 #include <microkit.h>
 
 /* A counter is an index to a performance counter on a platform.
@@ -26,8 +27,6 @@ typedef seL4_Word event_id_t;
 #define FASTFN inline __attribute__((always_inline))
 //functions that must not cache miss
 #define CACHESENSFN __attribute__((noinline, aligned(64)))
-
-#define BIT(n) (1ul<<(n))
 
 #define DIV_ROUND_UP(n,d)   \
     ({ typeof (n) _n = (n); \
