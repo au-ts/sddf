@@ -1,88 +1,10 @@
 #pragma once
 
+#include <sddf/util/util.h>
 #include <sddf/serial/queue.h>
 
-#define BIT(nr) (1UL << (nr))
-
-#define UART_SR1_RRDY          BIT( 9)
-#define UART_SR1_TRDY          BIT(13)
-/* CR1 */
-#define UART_CR1_UARTEN        BIT( 0)
-#define UART_CR1_RRDYEN        BIT( 9)
-/* CR2 */
-#define UART_CR2_SRST          BIT( 0)
-#define UART_CR2_RXEN          BIT( 1)
-#define UART_CR2_TXEN          BIT( 2)
-#define UART_CR2_ATEN          BIT( 3)
-#define UART_CR2_RTSEN         BIT( 4)
-#define UART_CR2_WS            BIT( 5)
-#define UART_CR2_STPB          BIT( 6)
-#define UART_CR2_PROE          BIT( 7)
-#define UART_CR2_PREN          BIT( 8)
-#define UART_CR2_RTEC          BIT( 9)
-#define UART_CR2_ESCEN         BIT(11)
-#define UART_CR2_CTS           BIT(12)
-#define UART_CR2_CTSC          BIT(13)
-#define UART_CR2_IRTS          BIT(14)
-#define UART_CR2_ESCI          BIT(15)
-/* CR3 */
-#define UART_CR3_RXDMUXDEL     BIT( 2)
-/* FCR */
-#define UART_FCR_RFDIV(x)      ((x) * BIT(7))
-#define UART_FCR_RFDIV_MASK    UART_FCR_RFDIV(0x7)
-#define UART_FCR_RXTL(x)       ((x) * BIT(0))
-#define UART_FCR_RXTL_MASK     UART_FCR_RXTL(0x1F)
-/* SR2 */
-#define UART_SR2_RXFIFO_RDR    BIT(0)
-#define UART_SR2_TXFIFO_EMPTY  BIT(14)
-/* RXD */
-#define UART_URXD_READY_MASK   BIT(15)
-#define UART_BYTE_MASK         0xFF
- /* DMA */
-#define UCR1_RXDMAEN	(1<<8)	/* Recv ready DMA enable */
-#define UCR1_TXDMAEN	(1<<3)	/* Transmitter ready DMA enable */
-#define USR1_TRDY	(1<<13) /* Transmitter ready interrupt/dma flag */
-#define USR1_RRDY	(1<<9)	 /* Receiver ready interrupt/dma flag */
-/* INTERRUPT FLAGS*/
-#define USR1_PARITYERR	(1<<15) /* Parity error interrupt flag */
-#define IRQ_MASK (USR1_TRDY | USR1_RRDY)
-
-// Might need to copy over the platform specific files, for now copied into one serial.h
-
-#define UART1_PADDR  0x30860000
-#define UART2_PADDR  0x30890000
-#define UART3_PADDR  0x30880000
-#define UART4_PADDR  0x30a60000
-
-#define UART1_IRQ    58
-#define UART2_IRQ    59
-#define UART3_IRQ    60
-#define UART4_IRQ    61
-
-#define UART_REF_CLK 12096000
-
-/* LINE CONFIG */
-#define RAW_MODE 0
-#define LINE_MODE 1
-#define ECHO_DIS 0
-#define ECHO_EN 1
-
-/* LINE CONTROL */
-#define ETX 3   /* ctrl+c */
-#define EOT 4   /* ctrl+d */
-#define BS 8    /* backspace */
-#define LF 10   /* Line feed/new line */
-#define CR 13   /* Carriage return */
-#define NEG 21  /* ctrl+u */
-#define SB 26   /* ctrl+z*/
-#define SP 32   /* Space*/
-#define DL 127  /* Delete */
-
-enum serial_parity {
-    PARITY_NONE,
-    PARITY_EVEN,
-    PARITY_ODD
-};
+/* The driver is based on the i.MX 8M Mini Applications Processor Reference Manual Rev 0, 02/2019.
+   The following register descriptions and layout are from section 16.2 */
 
 struct imx_uart_regs {
     uint32_t rxd;      /* 0x000 Receiver Register */
@@ -106,14 +28,81 @@ struct imx_uart_regs {
 };
 typedef volatile struct imx_uart_regs imx_uart_regs_t;
 
-/*
-Serial driver global state
-*/
-struct serial_driver {
-    int echo;
-    int mode;
+/* Receive Register bits */
+#define UART_RXD_READY              BIT(15)         /* Indicates an invalid read when the FIFO becomes empty and software tries to read the same old data. This bit should not be used for polling for data written to the RX FIFO. */
+#define UART_RXD_ERR                BIT(14)         /* Indicates whether the character in RX_DATA has an error. */
+#define UART_RX_DATA_MASK           0xFF            /* Holds the received data. */
 
-    /* Values for handling line mode */
-    uintptr_t line_buffer;
-    int line_buffer_size;
-};
+/* Transmit Register bits */
+#define UART_TX_DATA_MASK           0xFF            /* Character is transmitted when written to TX_DATA. */
+
+/* Control Register 1 bits */
+#define UART_CR1_UART_EN            BIT(0)          /* Enables the UART. */
+#define UART_CR1_RX_READY_INT       BIT(9)          /* Enables an interrupt when the rx FIFO contains data. */
+#define UART_CR1_TX_READY_INT       BIT(13)         /* Enables the tx ready interrupt when the transmitter has one or more slots available in the tx FIFO. */
+#define UART_CR1_AUTO_BAUD_DETECT   BIT(14)         /* Enables autopmatic detection of baud rate. */
+#define UART_CR1_AUTO_BAUD_INT      BIT(15)         /* Enables automatic baud rate detect interrupt. */
+
+/* Control Register 2 bits */
+#define UART_CR2_SFT_RESET          BIT(0)          /* Software reset. */
+#define UART_CR2_RX_EN              BIT(1)          /* Enables the receiver. */
+#define UART_CR2_TX_EN              BIT(2)          /* Enables the transmitter. */
+#define UART_CR2_AGE_EN             BIT(3)          /* Enables the aging timer interrupt for rx data. */
+#define UART_CR2_WORD_SZE           BIT(5)          /* Controls the character length. 0 = 7bit, 1 = 8bit. */
+#define UART_CR2_STOP_BITS          BIT(6)          /* Controls the number of stop bits after a character. 0 = 1 stop bit, 1 = 2 stop bits. */
+#define UART_CR2_PARITY             BIT(7)          /* Controls the parity generator and checker. 0 = even, 1 = odd. */
+#define UART_CR2_PARITY_EN          BIT(8)          /* Enables the parity generator and checker. */
+#define UART_CR2_ESCAPE_EN          BIT(11)         /* Enables the escape sequence detection logic. */
+#define UART_CR2_ESCAPE_INT         BIT(15)         /* Enables escape interupts. */
+
+/* Control Register 3 bits */
+#define UART_CR3_RX_STAT_INT        BIT(6)          /* Enables receive status interrupt. */
+#define UART_CR3_AUTO_BAUD_OLD      BIT(7)          /* Disables new features of autobaud detection. */
+#define UART_CR3_PARITY_ERR_INT     BIT(12)         /* Enable parity error interrupts. */
+
+/* Control Register 4 bits */
+#define UART_CR4_TX_FIN_INT         BIT(3)          /* Enables transmit complete interrupts. */
+#define UART_CR4_RX_RDY_INT         BIT(0)          /* Enables receive data ready interrupts. */
+
+/* FIFO Control Register bits */
+#define UART_FCR_RXTL_SHFT          (0)             /* Controls the threshold at which an interrupt is generated by the rx FIFO. Interrupt generated when the FIFO reaches this value. Possible values 0-32. */
+#define UART_FCR_RXTL_MASK          (0x3F)
+#define UART_FCR_REF_FRQ_DIV_SHFT   (7)             /* Controls the divide ratio for the reference clock. */
+#define UART_FCR_REF_FRQ_DIV_MSK    (0x7 << UART_FCR_REF_FRQ_DIV_SHFT)
+#define UART_FCR_TXTL_SHFT          (10)            /* Controls the threshold at which an interrupt is generated by the tx FIFO. Interrupt generated when the FIFO falls below this value. Possible values 0-32. */
+#define UART_FCR_TXTL_MASK          (0x3F << UART_FCR_TXTL_SHFT)
+
+#define UART_FCR_REF_CLK_DIV_1      (0b101 << UART_FCR_REF_FRQ_DIV_SHFT)
+#define UART_FCR_REF_CLK_DIV_2      (0b100 << UART_FCR_REF_FRQ_DIV_SHFT)
+#define UART_FCR_REF_CLK_DIV_3      (0b011 << UART_FCR_REF_FRQ_DIV_SHFT)
+#define UART_FCR_REF_CLK_DIV_4      (0b010 << UART_FCR_REF_FRQ_DIV_SHFT)
+#define UART_FCR_REF_CLK_DIV_5      (0b001 << UART_FCR_REF_FRQ_DIV_SHFT)
+#define UART_FCR_REF_CLK_DIV_6      (0b000 << UART_FCR_REF_FRQ_DIV_SHFT)
+#define UART_FCR_REF_CLK_DIV_7      (0b110 << UART_FCR_REF_FRQ_DIV_SHFT)
+
+#define UART_MOD_CLK 24192000
+
+/* Status Register 1 bits */
+#define UART_SR1_RX_RDY             BIT(9)          /* Rx FIFO is above the threshold. Automatically cleared when FIFO goes below the set threshold. */
+#define UART_SR1_FRM_ERR            BIT(10)         /* Frame error is detected. Write 1 to it to clear. */
+#define UART_SR1_ESC                BIT(11)         /* Escape sequence was detected. Write 1 to it to clear. */
+#define UART_SR1_TX_RDY             BIT(13)         /* Tx FIFO emptied below target threshold. Automatically cleared when FIFO is filled. */
+#define UART_SR1_PARITY_ERR         BIT(15)         /* Parity error was detected. Write 1 to it to clear. */
+
+#define UART_SR1_ABNORMAL (UART_SR1_PARITY_ERR | UART_SR1_FRM_ERR)
+
+/* Status Register 2 bits */
+#define UART_SR2_RXFIFO_RDR         BIT(0)          /* Rx FIFO ready. There is at least 1 character received and written to the FIFO. */
+#define UART_SR2_TX_FIN             BIT(3)          /* Tx complete. */
+#define UART_SR2_TXFIFO_EMPTY       BIT(14)         /* Tx FIFO Empty. */     
+
+/* Escape Character Register bits */
+#define UART_ESC_CHAR_MSK           (0xff)          /* Holds the selected eschape character that all received characters are compared against to detect an escape sequence. */
+
+/* Escape Timer Register bits */
+#define UART_ESC_TIME_MSK           (0xfff)         /* Holds the maximum time interval in ms allowed between escape characters. Programmable in intervals of 2ms - 0x00 = 2ms, 0xfff = 8.192s. */
+
+/* Test Register bits */
+#define UART_TST_SFT_RST            BIT(0)          /* Software Reset Status. */
+#define UART_TST_TX_FIFO_FULL       BIT(4)          /* Tx FIFO is full. */
+#define UART_TST_RX_FIFO_EMPTY      BIT(5)          /* Rx FIFO is empty. */
