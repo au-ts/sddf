@@ -99,14 +99,6 @@ static inline void ethernet_cli_mac_addr_init_sys(char *pd_name, uint8_t *macs)
     } 
 }
 
-static inline void ethernet_arp_mac_addr_init_sys(char *pd_name, uint8_t *macs)
-{
-    if (__ethernet_str_match(pd_name, ETHERNET_ARP_NAME)) {
-        __ethernet_set_mac_addr(macs, MAC_ADDR_CLI0);
-        __ethernet_set_mac_addr(&macs[ETH_HWADDR_LEN], MAC_ADDR_CLI1);
-    } 
-}
-
 static inline void ethernet_virt_mac_addr_init_sys(char *pd_name, uint8_t *macs)
 {
     if (__ethernet_str_match(pd_name, ETHERNET_VIRT_RX_NAME)) {
