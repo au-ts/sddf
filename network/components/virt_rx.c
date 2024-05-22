@@ -33,7 +33,7 @@ uintptr_t buffer_data_paddr;
 /* In order to handle broadcast packets where the same buffer is given to multiple clients
   * we keep track of a reference count of each buffer and only hand it back to the driver once
   * all clients have returned the buffer. */
-uint32_t buffer_refs[RX_QUEUE_SIZE_DRIV] = {0};
+uint32_t buffer_refs[ETHERNET_RX_QUEUE_SIZE_DRIV] = {0};
 
 typedef struct state {
     net_queue_handle_t rx_queue_drv;
