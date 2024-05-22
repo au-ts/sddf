@@ -1,6 +1,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <microkit.h>
+#include <sddf/util/printf.h>
 #include <serial_config.h>
 #include "uart.h"
 
