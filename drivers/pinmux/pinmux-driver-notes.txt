@@ -1,0 +1,17 @@
+Pinmux Driver Notes:
+
+What's already there:
+ - The end to end process skeleton is complete, just needs some specific details complete
+         - Currently, at compile time, the python script drivers/pinmux/create_pinmux_config.py will scan a specified device tree then generate an assembly file with the appropriate data structure. At runtime, this data structure will be read by the pinmux pd (specified in drivers/pinmux/pinmux_setup.c).
+ - There's also a working example for the imx8mm in examples/pinmux_setup. I just copied the echo server as (I believe) it uses a lot of peripherals so there's plenty of opporunity to test if the pinmuxing is working. 
+
+ - Some resources I found that help are below:
+        - u-boot source code, more specifically (u-boot/drivers/pinctrl/nxp/pinctrl-imx.c) in the u-boot repo
+        - The Linux kernel also explains a bit about how these values are stored in the dts: (linux/Documentation/devicetree/bindings/pinctrl/fsl,imx8m-pinctrl.yaml)
+
+
+What needs to be done:
+ - Actually writing the pinmux configuration values in memory
+         - There's actually also some specific cases for certain config values (shown in the u-boot source code), so those will also need to be accounted for when writing config values to the relevant memory locations
+ - Just before pushing everything to the au-ts pinmux branch, I also merged in the latest main as of 6pm 22/05, which involves the Makefile refactorization from Peter. My Makefile doesn't follow that refactorization, so the build currently fails. That also needs to be fixed
+ - The python script currently indiscriminately reads all devices and their pinmux info (some of which will conflict). I wasn't sure how to determine at compile time which devices would actually be in use, but in future, the python script will have to be revised so that it only scans the desired devices from the dts and places them in the data structure
