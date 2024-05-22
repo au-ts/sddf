@@ -56,6 +56,9 @@ extern "C" {
  */
 void _sddf_putchar(char character);
 
+/* Ensure to call serial_putchar_init during initialisation. Transmits one character at a time to the virtualiser. */
+void sddf_putchar_repl(char c);
+
 /* Initialise the serial putchar library. */
 void serial_putchar_init(microkit_channel serial_tx_ch, serial_queue_handle_t *serial_tx_queue_handle);
 

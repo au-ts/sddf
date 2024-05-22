@@ -32,11 +32,11 @@ void notified(microkit_channel ch)
     while (reprocess) {
         while (!serial_dequeue(&rx_queue_handle, &rx_queue_handle.queue->head, c)) {
             if (c[0] == '\r') {
-                sddf_printf("\\r");
+                sddf_putchar_repl('\\');
+                sddf_putchar_repl('r');
             } else {
-                sddf_printf((const char *)&c);
+                sddf_putchar_repl(c[0]);
             }
-            sddf_printf("\r\n");
         }
 
         serial_request_producer_signal(&rx_queue_handle);
