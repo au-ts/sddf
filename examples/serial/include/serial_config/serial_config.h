@@ -2,6 +2,7 @@
 
 #include <microkit.h>
 #include <sddf/serial/queue.h>
+#include <stdint.h>
 
 /* Associate a colour with each client's output. */
 #define SERIAL_WITH_COLOUR 1
@@ -51,36 +52,26 @@ static inline bool __serial_str_match(const char *s0, const char *s1)
     return *s0 == *s1;
 }
 
-static inline void serial_cli_queue_init_sys(char *pd_name, serial_queue_handle_t *rx_queue_handle, uintptr_t rx_queue,
-                                serial_queue_handle_t *tx_queue_handle, uintptr_t tx_queue)
+static inline void serial_cli_queue_init_sys(char *pd_name, serial_queue_handle_t *rx_queue_handle, serial_queue_t *rx_queue,
+                                char *rx_data, serial_queue_handle_t *tx_queue_handle, serial_queue_t *tx_queue, char *tx_data)
 {
     if (__serial_str_match(pd_name, SERIAL_CLI0_NAME)) {
-        serial_queue_init(rx_queue_handle, (serial_queue_t *) rx_queue, RX_SERIAL_DATA_REGION_SIZE_CLI0);
-        serial_queue_init(tx_queue_handle, (serial_queue_t *) tx_queue, TX_SERIAL_DATA_REGION_SIZE_CLI0);
+        serial_queue_init(rx_queue_handle, rx_queue, RX_SERIAL_DATA_REGION_SIZE_CLI0, rx_data);
+        serial_queue_init(tx_queue_handle, tx_queue, TX_SERIAL_DATA_REGION_SIZE_CLI0, tx_data);
     } else if (__serial_str_match(pd_name, SERIAL_CLI1_NAME)) {
-        serial_queue_init(rx_queue_handle, (serial_queue_t *) rx_queue, RX_SERIAL_DATA_REGION_SIZE_CLI1);
-        serial_queue_init(tx_queue_handle, (serial_queue_t *) tx_queue, TX_SERIAL_DATA_REGION_SIZE_CLI1);
+        serial_queue_init(rx_queue_handle, rx_queue, RX_SERIAL_DATA_REGION_SIZE_CLI1, rx_data);
+        serial_queue_init(tx_queue_handle, tx_queue, TX_SERIAL_DATA_REGION_SIZE_CLI1, tx_data);
     }
 }
 
-static inline void serial_virt_queue_init_sys(char *pd_name, serial_queue_handle_t *cli_queue_handle, uintptr_t cli_queue)
+static inline void serial_virt_queue_init_sys(char *pd_name, serial_queue_handle_t *cli_queue_handle, uintptr_t cli_queue, uintptr_t cli_data)
 {
     if (__serial_str_match(pd_name, SERIAL_VIRT_RX_NAME)) {
-        serial_queue_init(cli_queue_handle, (serial_queue_t *) cli_queue, RX_SERIAL_DATA_REGION_SIZE_CLI0);
-        serial_queue_init(&cli_queue_handle[1], (serial_queue_t *) (cli_queue + SERIAL_QUEUE_SIZE), RX_SERIAL_DATA_REGION_SIZE_CLI1);
+        serial_queue_init(cli_queue_handle, (serial_queue_t *) cli_queue, RX_SERIAL_DATA_REGION_SIZE_CLI0, (char *)cli_data);
+        serial_queue_init(&cli_queue_handle[1], (serial_queue_t *) (cli_queue + SERIAL_QUEUE_SIZE), RX_SERIAL_DATA_REGION_SIZE_CLI1, (char *)(cli_data + RX_SERIAL_DATA_REGION_SIZE_CLI0));
     } else if (__serial_str_match(pd_name, SERIAL_VIRT_TX_NAME)) {
-        serial_queue_init(cli_queue_handle, (serial_queue_t *) cli_queue, TX_SERIAL_DATA_REGION_SIZE_CLI0);
-        serial_queue_init(&cli_queue_handle[1], (serial_queue_t *) (cli_queue + SERIAL_QUEUE_SIZE), TX_SERIAL_DATA_REGION_SIZE_CLI1);
-    }
-}
-
-static inline void serial_mem_region_init_sys(char *pd_name, uintptr_t *mem_regions, uintptr_t start_region) {
-    if (__serial_str_match(pd_name, SERIAL_VIRT_TX_NAME)) {
-        mem_regions[0] = start_region;
-        mem_regions[1] = start_region + TX_SERIAL_DATA_REGION_SIZE_CLI0;
-    } else if (__serial_str_match(pd_name, SERIAL_VIRT_RX_NAME)) {
-        mem_regions[0] = start_region;
-        mem_regions[1] = start_region + RX_SERIAL_DATA_REGION_SIZE_CLI0;
+        serial_queue_init(cli_queue_handle, (serial_queue_t *) cli_queue, TX_SERIAL_DATA_REGION_SIZE_CLI0, (char *)cli_data);
+        serial_queue_init(&cli_queue_handle[1], (serial_queue_t *) (cli_queue + SERIAL_QUEUE_SIZE), TX_SERIAL_DATA_REGION_SIZE_CLI1, (char *)(cli_data + TX_SERIAL_DATA_REGION_SIZE_CLI0));
     }
 }
 
