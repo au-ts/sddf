@@ -7,7 +7,6 @@
 QEMU := qemu-system-aarch64
 
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
-SDDF_INCLUDE:=$(SDDF)/include/sddf
 ECHO_SERVER:=${SDDF}/examples/echo_server
 LWIPDIR:=network/ipstacks/lwip/src
 BENCHMARK:=$(SDDF)/benchmark
