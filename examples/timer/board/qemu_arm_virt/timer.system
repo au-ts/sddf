@@ -1,13 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <system>
-    <memory_region name="timer_registers" size="0x10_000" phys_addr="0xffd0f000" />
-
     <!-- The timer driver should run at higher priority than its clients.
         As a passive server, PPC into the driver will be fastpathed. -->
     <protection_domain name="timer" priority="254" pp="true" passive="true">
         <program_image path="timer_driver.elf" />
-        <map mr="timer_registers" vaddr="0x2_000_000" perms="rw" cached="false" setvar_vaddr="gpt_regs" />
-        <irq irq="42" id="0" trigger="edge" /> <!-- timer interrupt for timer A -->
+        <irq irq="30" id="0" />
     </protection_domain>
 
     <protection_domain name="client" priority="1" >

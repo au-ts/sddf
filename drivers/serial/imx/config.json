@@ -1,8 +1,0 @@
-{
-    "name": "IMX UART",
-    "compatible": [
-        "fsl,imx8mm-uart",
-        "fsl,imx6q-uart", 
-        "fsl,imx21-uart"
-    ]
-}

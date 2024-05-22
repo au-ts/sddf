@@ -7,90 +7,29 @@
 ifeq ($(strip $(MICROKIT_SDK)),)
 $(error MICROKIT_SDK must be specified)
 endif
+override MICROKIT_SDK:=$(abspath ${MICROKIT_SDK})
 
 ifeq ($(strip $(TOOLCHAIN)),)
-	TOOLCHAIN := aarch64-none-elf
+	export TOOLCHAIN := aarch64-none-elf
+	export LIBC := $(dir $(realpath $(shell aarch64-none-elf-gcc --print-file-name libc.a)))
 endif
 
-BUILD_DIR ?= build
-MICROKIT_CONFIG ?= debug
-MICROKIT_BOARD ?= odroidc4
-CPU ?= cortex-a55
+export BUILD_DIR ?= build
+export MICROKIT_CONFIG ?= debug
+export MICROKIT_BOARD ?= odroidc4
 
-BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
+export I2C_BUS_NUM:=2
+export SDDF := $(abspath ../../)
 
-CC := $(TOOLCHAIN)-gcc
-LD := $(TOOLCHAIN)-ld
-AS := $(TOOLCHAIN)-as
-MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
+IMAGE_FILE := $(BUILD_DIR)/loader.img
+REPORT_FILE := $(BUILD_DIR)/report.txt
 
-SDDF := $(abspath ../../)
-UTIL := $(SDDF)/util
-LIBCO := $(SDDF)/libco
+all: ${IMAGE_FILE}
 
-I2C := $(SDDF)/i2c
-I2C_DRIVER := $(SDDF)/drivers/i2c/meson
-TIMER_DRIVER := $(SDDF)/drivers/clock/meson
+${IMAGE_FILE} ${REPORT_FILE} clean clobber: ${BUILD_DIR}/Makefile FORCE
+	${MAKE}  -C ${BUILD_DIR} MICROKIT_SDK=${MICROKIT_SDK}  $(notdir $@)
 
-IMAGES := virt.elf driver.elf client.elf timer.elf
-CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall -Wno-unused-function
-LDFLAGS := -L$(BOARD_DIR)/lib
-LIBS := -lmicrokit -Tmicrokit.ld
-
-IMAGE_FILE = $(BUILD_DIR)/loader.img
-REPORT_FILE = $(BUILD_DIR)/report.txt
-SYSTEM_FILE = board/$(MICROKIT_BOARD)/i2c.system
-
-CFLAGS += -I$(BOARD_DIR)/include \
-	-I$(SDDF)/include \
-	-I$(LIBCO) \
-	-MD \
-	-MP
-
-COMMONFILES=$(UTIL)/printf.c $(UTIL)/putchar_debug.c
-
-CLIENT_OBJS := $(LIBCO)/libco.o pn532.o client.o $(COMMONFILES:.c=.o)
-VIRT_OBJS := $(I2C)/components/virt.o $(COMMONFILES:.c=.o)
-DRIVER_OBJS := $(I2C_DRIVER)/i2c.o $(COMMONFILES:.c=.o)
-TIMER_DRIVER_OBJS := timer_driver.o $(UTIL)/printf.o $(UTIL)/putchar_debug.o
-
-OBJS := $(sort $(addprefix $(BUILD_DIR)/, $(SERVER_OBJS) $(DRIVER_OBJS)))
-DEPS := $(OBJS:.o=.d)
-
-all: $(IMAGE_FILE)
--include $(DEPS)
-
-$(BUILD_DIR)/%.d $(BUILD_DIR)/%.o: %.c Makefile
-	mkdir -p `dirname $(BUILD_DIR)/$*.o`
-	$(CC) -c $(CFLAGS) $< -o $(BUILD_DIR)/$*.o -DI2C_BUS_NUM=2
-
-$(BUILD_DIR)/%.o: %.s Makefile
-	$(AS) -g3 -mcpu=$(CPU) $< -o $@
-
-$(BUILD_DIR)/virt.elf: $(addprefix $(BUILD_DIR)/, $(VIRT_OBJS))
-	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
-
-$(BUILD_DIR)/driver.elf: $(addprefix $(BUILD_DIR)/, $(DRIVER_OBJS))
-	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
-
-$(BUILD_DIR)/client.elf: $(addprefix $(BUILD_DIR)/, $(CLIENT_OBJS))
-	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
-
-$(BUILD_DIR)/timer.elf: $(addprefix $(BUILD_DIR)/, $(TIMER_DRIVER_OBJS))
-	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
-
-$(BUILD_DIR)/timer_driver.o: $(TIMER_DRIVER)/timer.c
-	$(CC) -c $(CFLAGS) $(TIMER_DRIVER)/timer.c -o $(BUILD_DIR)/timer_driver.o
-
-$(IMAGE_FILE) $(REPORT_FILE): $(addprefix $(BUILD_DIR)/, $(IMAGES)) $(SYSTEM_FILE)
-	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
-
-.PHONY: all compile clean
-
-%.o:
-	$(CC) $(CFLAGS) -c $(@:.o=.c) -o $@
-
-clean:
-	rm -f *.o *.elf .depend*
-	find . -name \*.o |xargs --no-run-if-empty rm
-
+${BUILD_DIR}/Makefile: i2c.mk
+	mkdir -p ${BUILD_DIR}
+	cp i2c.mk $@
+FORCE:

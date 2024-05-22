@@ -14,3 +14,8 @@
 
 /* Number of microseconds in a millisecond */
 #define US_IN_MS 1000ULL
+/* Number of microseconds in a second */
+#define US_IN_S  1000000ULL
+
+/* Number of milliseconds in a second */
+#define MS_IN_S  1000ULL

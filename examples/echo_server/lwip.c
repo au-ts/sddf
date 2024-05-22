@@ -8,7 +8,6 @@
 #include <microkit.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
-#include <sddf/network/arp.h>
 #include <sddf/network/queue.h>
 #include <sddf/timer/client.h>
 #include <sddf/benchmark/sel4bench.h>
@@ -29,7 +28,6 @@
 #define TIMER  1
 #define RX_CH  2
 #define TX_CH  3
-#define ARP    7
 
 #define LWIP_TICK_MS 100
 #define NUM_PBUFFS 512
@@ -82,7 +80,7 @@ uint32_t sys_now(void)
 
 /**
  * Free a pbuf. This also returns the underlying buffer to the receive free ring.
- * 
+ *
  * @param p pbuf to free.
  */
 static void interface_free_buffer(struct pbuf *p)
@@ -114,18 +112,18 @@ static struct pbuf *create_interface_buffer(uintptr_t offset, size_t length)
     custom_pbuf_offset->custom.custom_free_function = interface_free_buffer;
 
     return pbuf_alloced_custom(
-        PBUF_RAW,
-        length,
-        PBUF_REF,
-        &custom_pbuf_offset->custom,
-        (void *)(offset + rx_buffer_data_region),
-        NET_BUFFER_SIZE 
-    );
+               PBUF_RAW,
+               length,
+               PBUF_REF,
+               &custom_pbuf_offset->custom,
+               (void *)(offset + rx_buffer_data_region),
+               NET_BUFFER_SIZE
+           );
 }
 
 /**
  * Stores a pbuf to be transmitted upon available transmit buffers.
- * 
+ *
  * @param p pbuf to be stored.
  */
 void enqueue_pbufs(struct pbuf *p)
@@ -144,12 +142,12 @@ void enqueue_pbufs(struct pbuf *p)
     pbuf_ref(p);
 }
 
-/** 
- * Insert pbuf into transmit active queue. If no free buffers available or transmit active queue is full, 
- * stores pbuf to be sent upon buffers becoming available. 
+/**
+ * Insert pbuf into transmit active queue. If no free buffers available or transmit active queue is full,
+ * stores pbuf to be sent upon buffers becoming available.
  * */
 static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
-{   
+{
     if (p->tot_len > NET_BUFFER_SIZE) {
         sddf_dprintf("LWIP|ERROR: attempted to send a packet of size  %u > BUFFER SIZE  %u\n", p->tot_len, NET_BUFFER_SIZE);
         return ERR_MEM;
@@ -159,7 +157,7 @@ static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
         enqueue_pbufs(p);
         return ERR_OK;
     }
-    
+
     net_buff_desc_t buffer;
     int err = net_dequeue_free(&state.tx_queue, &buffer);
     assert(!err);
@@ -184,24 +182,29 @@ void transmit(void)
 {
     bool reprocess = true;
     while (reprocess) {
-        while(state.head != NULL && !net_queue_empty_free(&state.tx_queue)) {
+        while (state.head != NULL && !net_queue_empty_free(&state.tx_queue)) {
             err_t err = lwip_eth_send(&state.netif, state.head);
             if (err == ERR_MEM) {
-                sddf_dprintf("LWIP|ERROR: attempted to send a packet of size  %u > BUFFER SIZE  %u\n", state.head->tot_len, NET_BUFFER_SIZE);
-            }
-            else if (err != ERR_OK) {
+                sddf_dprintf("LWIP|ERROR: attempted to send a packet of size  %u > BUFFER SIZE  %u\n", state.head->tot_len,
+                             NET_BUFFER_SIZE);
+            } else if (err != ERR_OK) {
                 sddf_dprintf("LWIP|ERROR: unkown error when trying to send pbuf  %p\n", state.head);
             }
-            
+
             struct pbuf *temp = state.head;
             state.head = temp->next_chain;
-            if (state.head == NULL) state.tail = NULL;
+            if (state.head == NULL) {
+                state.tail = NULL;
+            }
             pbuf_free(temp);
         }
 
         /* Only request a signal if no more pbufs enqueud to send */
-        if (state.head == NULL || !net_queue_empty_free(&state.tx_queue)) net_cancel_signal_free(&state.tx_queue);
-        else net_request_signal_free(&state.tx_queue);
+        if (state.head == NULL || !net_queue_empty_free(&state.tx_queue)) {
+            net_cancel_signal_free(&state.tx_queue);
+        } else {
+            net_request_signal_free(&state.tx_queue);
+        }
         reprocess = false;
 
         if (state.head != NULL && !net_queue_empty_free(&state.tx_queue)) {
@@ -226,7 +229,7 @@ void receive(void)
                 pbuf_free(p);
             }
         }
-        
+
         net_request_signal_active(&state.rx_queue);
         reprocess = false;
 
@@ -239,12 +242,14 @@ void receive(void)
 
 /**
  * Initialise the network interface data structure.
- * 
+ *
  * @param netif network interface data structuer.
  */
 static err_t ethernet_init(struct netif *netif)
 {
-    if (netif->state == NULL) return ERR_ARG;
+    if (netif->state == NULL) {
+        return ERR_ARG;
+    }
     state_t *data = netif->state;
 
     netif->hwaddr[0] = data->mac[0];
@@ -262,16 +267,12 @@ static err_t ethernet_init(struct netif *netif)
     return ERR_OK;
 }
 
-/* Callback function that prints DHCP supplied IP address and registers it with ARP component. */
+/* Callback function that prints DHCP supplied IP address. */
 static void netif_status_callback(struct netif *netif)
 {
     if (dhcp_supplied_address(netif)) {
-        bool success = arp_register_ipv4(ARP, ip4_addr_get_u32(netif_ip4_addr(netif)), state.mac);
-        if (!success) {
-            sddf_printf("LWIP|ERR: could not register IP with ARP\n");
-        } else {
-            sddf_printf("LWIP|NOTICE: DHCP request for %s returned IP address: %s\n", microkit_name, ip4addr_ntoa(netif_ip4_addr(netif)));
-        }
+        sddf_printf("LWIP|NOTICE: DHCP request for %s returned IP address: %s\n", microkit_name,
+                    ip4addr_ntoa(netif_ip4_addr(netif)));
     }
 }
 
@@ -298,13 +299,17 @@ void init(void)
     state.netif.name[1] = '0';
 
     if (!netif_add(&(state.netif), &ipaddr, &netmask, &gw, (void *)&state,
-              ethernet_init, ethernet_input)) sddf_dprintf("LWIP|ERROR: Netif add returned NULL\n");
+                   ethernet_init, ethernet_input)) {
+        sddf_dprintf("LWIP|ERROR: Netif add returned NULL\n");
+    }
 
     netif_set_default(&(state.netif));
     netif_set_status_callback(&(state.netif), netif_status_callback);
     netif_set_up(&(state.netif));
 
-    if (dhcp_start(&(state.netif))) sddf_dprintf("LWIP|ERROR: failed to start DHCP negotiation\n");
+    if (dhcp_start(&(state.netif))) {
+        sddf_dprintf("LWIP|ERROR: failed to start DHCP negotiation\n");
+    }
 
     setup_udp_socket();
     setup_utilization_socket();
@@ -312,48 +317,60 @@ void init(void)
     if (notify_rx && net_require_signal_free(&state.rx_queue)) {
         net_cancel_signal_free(&state.rx_queue);
         notify_rx = false;
-        if (!have_signal) microkit_notify_delayed(RX_CH);
-        else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + RX_CH) microkit_notify(RX_CH);
+        if (!have_signal) {
+            microkit_notify_delayed(RX_CH);
+        } else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + RX_CH) {
+            microkit_notify(RX_CH);
+        }
     }
 
     if (notify_tx && net_require_signal_active(&state.tx_queue)) {
         net_cancel_signal_active(&state.tx_queue);
         notify_tx = false;
-        if (!have_signal) microkit_notify_delayed(TX_CH);
-        else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + TX_CH) microkit_notify(TX_CH);
+        if (!have_signal) {
+            microkit_notify_delayed(TX_CH);
+        } else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + TX_CH) {
+            microkit_notify(TX_CH);
+        }
     }
 }
 
 void notified(microkit_channel ch)
 {
-    switch(ch) {
-        case RX_CH:
-            receive();
-            break;
-        case TIMER:
-            sys_check_timeouts();
-            set_timeout();
-            break;
-        case TX_CH:
-            transmit();
-            receive();
-            break;
-        default:
-            sddf_dprintf("LWIP|LOG: received notification on unexpected channel: %u\n", ch);
-            break;
+    switch (ch) {
+    case RX_CH:
+        receive();
+        break;
+    case TIMER:
+        sys_check_timeouts();
+        set_timeout();
+        break;
+    case TX_CH:
+        transmit();
+        receive();
+        break;
+    default:
+        sddf_dprintf("LWIP|LOG: received notification on unexpected channel: %u\n", ch);
+        break;
     }
-    
+
     if (notify_rx && net_require_signal_free(&state.rx_queue)) {
         net_cancel_signal_free(&state.rx_queue);
         notify_rx = false;
-        if (!have_signal) microkit_notify_delayed(RX_CH);
-        else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + RX_CH) microkit_notify(RX_CH);
+        if (!have_signal) {
+            microkit_notify_delayed(RX_CH);
+        } else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + RX_CH) {
+            microkit_notify(RX_CH);
+        }
     }
 
     if (notify_tx && net_require_signal_active(&state.tx_queue)) {
         net_cancel_signal_active(&state.tx_queue);
         notify_tx = false;
-        if (!have_signal) microkit_notify_delayed(TX_CH);
-        else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + TX_CH) microkit_notify(TX_CH);
+        if (!have_signal) {
+            microkit_notify_delayed(TX_CH);
+        } else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + TX_CH) {
+            microkit_notify(TX_CH);
+        }
     }
 }

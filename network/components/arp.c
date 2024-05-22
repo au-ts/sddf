@@ -13,7 +13,7 @@
 #define IPV4_PROTO_LEN 4
 #define PADDING_SIZE 10
 #define LWIP_IANA_HWTYPE_ETHERNET 1
-#define NUM_ARP_CLIENTS (NUM_CLIENTS - 1)
+#define NUM_ARP_CLIENTS (NUM_NETWORK_CLIENTS - 1)
 
 net_queue_handle_t rx_queue;
 net_queue_handle_t tx_queue;

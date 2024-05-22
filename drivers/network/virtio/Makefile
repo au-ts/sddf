@@ -1,5 +1,5 @@
 #
-# Copyright 2023, UNSW
+# Copyright 2024, UNSW
 #
 # SPDX-License-Identifier: BSD-2-Clause
 #
@@ -28,11 +28,11 @@ CFLAGS := \
 	-I$(ETHERNET_CONFIG_INCLUDE) \
 	-I$(SDDF)/include
 
-all: $(BUILD_DIR)/meson_ethernet.o
+all: $(BUILD_DIR)/ethernet.o
 
-$(BUILD_DIR)/meson_ethernet.o: ethernet.c ethernet.h
-	$(CC) -c $(CFLAGS) ethernet.c -o $(BUILD_DIR)/meson_ethernet.o
+$(BUILD_DIR)/ethernet.o: ethernet.c ethernet.h
+	$(CC) -c $(CFLAGS) ethernet.c -o $(BUILD_DIR)/ethernet.o
 
 .PHONY: clean
 clean:
-	rm $(BUILD_DIR)/meson_ethernet.o
+	rm $(BUILD_DIR)/ethernet.o

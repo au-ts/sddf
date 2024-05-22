@@ -29,8 +29,7 @@
 #define PD_COPY1_ID     5
 #define PD_LWIP_ID      6
 #define PD_LWIP1_ID     7
-#define PD_ARP_ID       8
-#define PD_TIMER_ID     9
+#define PD_TIMER_ID     8
 
 uintptr_t uart_base;
 uintptr_t cyclecounters_vaddr;
@@ -84,9 +83,6 @@ static void print_pdid_name(uint64_t pd_id)
     case PD_LWIP1_ID:
         sddf_printf(CLI1_NAME);
         break;
-    case PD_ARP_ID:
-        sddf_printf(ARP_NAME);
-        break;
     case PD_TIMER_ID:
         sddf_printf(TIMER_NAME);
         break;
@@ -107,7 +103,6 @@ static void microkit_benchmark_start(void)
     seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_COPY1_ID);
     seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_LWIP_ID);
     seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_LWIP1_ID);
-    seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_ARP_ID);
     seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_TIMER_ID);
     seL4_BenchmarkResetLog();
 }
@@ -249,9 +244,6 @@ void notified(microkit_channel ch)
 
         microkit_benchmark_stop_tcb(PD_LWIP1_ID, &total, &number_schedules, &kernel, &entries);
         print_benchmark_details(PD_LWIP1_ID, kernel, entries, number_schedules, total);
-
-        microkit_benchmark_stop_tcb(PD_ARP_ID, &total, &number_schedules, &kernel, &entries);
-        print_benchmark_details(PD_ARP_ID, kernel, entries, number_schedules, total);
 
         microkit_benchmark_stop_tcb(PD_TIMER_ID, &total, &number_schedules, &kernel, &entries);
         print_benchmark_details(PD_TIMER_ID, kernel, entries, number_schedules, total);
