@@ -4,6 +4,7 @@
 #include <ctype.h>
 #include <microkit.h>
 #include <sddf/serial/queue.h>
+#include <sddf/util/printf.h>
 #include <serial_config.h>
 #include "uart.h"
 
@@ -18,7 +19,6 @@ uintptr_t rx_data_cli0;
 
 serial_queue_handle_t rx_queue_handle_drv;
 serial_queue_handle_t rx_queue_handle_cli[SERIAL_NUM_CLIENTS];
-uintptr_t rx_data_clients[SERIAL_NUM_CLIENTS];
 
 #define MAX_CLI_BASE_10 4
 typedef enum mode {normal, switched, number} mode_t;
@@ -41,7 +41,7 @@ void rx_return()
     uint32_t local_tail = rx_queue_handle_cli[current_client].queue->tail;
     char c = '\0';
     while (reprocess) {
-        while (!serial_dequeue(&rx_queue_handle_drv, (char *)rx_data_drv, &rx_queue_handle_drv.queue->head, &c)) {
+        while (!serial_dequeue(&rx_queue_handle_drv, &rx_queue_handle_drv.queue->head, &c)) {
             switch (current_mode) {
             case normal:
                 switch (c) {
@@ -49,7 +49,7 @@ void rx_return()
                     current_mode = switched;
                     break;
                 default:
-                    if (!serial_enqueue(&rx_queue_handle_cli[current_client], (char *)rx_data_clients[current_client], &local_tail, c)) {
+                    if (!serial_enqueue(&rx_queue_handle_cli[current_client], &local_tail, c)) {
                         transferred = true;
                     }
                     break;
@@ -62,7 +62,7 @@ void rx_return()
                     current_mode = number;
                 } else {
                     if (c == SERIAL_SWITCH_CHAR) {
-                        if (!serial_enqueue(&rx_queue_handle_cli[current_client], (char *)rx_data_clients[current_client], &local_tail, c)) {
+                        if (!serial_enqueue(&rx_queue_handle_cli[current_client], &local_tail, c)) {
                             transferred = true;
                         }
                     } else {
@@ -121,9 +121,8 @@ void rx_return()
 
 void init(void)
 {
-    serial_queue_init(&rx_queue_handle_drv, rx_queue_drv, RX_SERIAL_DATA_REGION_SIZE_DRIV);
-    serial_virt_queue_init_sys(microkit_name, rx_queue_handle_cli, rx_queue_cli0);
-    serial_mem_region_init_sys(microkit_name, rx_data_clients, rx_data_cli0);
+    serial_queue_init(&rx_queue_handle_drv, rx_queue_drv, RX_SERIAL_DATA_REGION_SIZE_DRIV, rx_data_drv);
+    serial_virt_queue_init_sys(microkit_name, rx_queue_handle_cli, rx_queue_cli0, rx_data_cli0);
 }
 
 void notified(microkit_channel ch)

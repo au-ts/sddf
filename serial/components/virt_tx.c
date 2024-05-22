@@ -34,7 +34,6 @@ char *clients_colours[SERIAL_NUM_CLIENTS];
 
 serial_queue_handle_t tx_queue_handle_drv;
 serial_queue_handle_t tx_queue_handle_cli[SERIAL_NUM_CLIENTS];
-uintptr_t tx_data_clients[SERIAL_NUM_CLIENTS];
 
 typedef struct tx_pending {
     uint32_t queue[SERIAL_NUM_CLIENTS];
@@ -74,7 +73,6 @@ static void tx_pending_pop(uint32_t *client) {
 
 bool process_tx_queue(uint32_t client) {
     serial_queue_handle_t *handle = &tx_queue_handle_cli[client];
-    char *data = (char *)tx_data_clients[client];
 
     if (serial_queue_empty(handle, handle->queue->head)) {
         serial_request_producer_signal(handle);
@@ -101,9 +99,9 @@ bool process_tx_queue(uint32_t client) {
 #if SERIAL_WITH_COLOUR
     char colour_start_buff[COLOUR_START_START_LEN + MAX_COLOURS_LEN + COLOUR_START_END_LEN + 1];
     sddf_sprintf(colour_start_buff, "%s%u%s", COLOUR_START_START, client % MAX_COLOURS, COLOUR_START_END);
-    serial_transfer_all_with_colour(handle, data, &tx_queue_handle_drv, tx_data_drv, colour_start_buff, COLOUR_END);
+    serial_transfer_all_with_colour(handle, &tx_queue_handle_drv, colour_start_buff, COLOUR_END);
 #else
-    serial_transfer_all(handle, data, &tx_queue_handle_drv, tx_data_drv);
+    serial_transfer_all(handle, &tx_queue_handle_drv);
 #endif
     serial_request_producer_signal(handle);
     return true;
@@ -169,9 +167,8 @@ void tx_provide(microkit_channel ch)
 
 void init(void)
 {
-    serial_queue_init(&tx_queue_handle_drv, tx_queue_drv, TX_SERIAL_DATA_REGION_SIZE_DRIV);
-    serial_virt_queue_init_sys(microkit_name, tx_queue_handle_cli, tx_queue_cli0);
-    serial_mem_region_init_sys(microkit_name, tx_data_clients, tx_data_cli0);
+    serial_queue_init(&tx_queue_handle_drv, tx_queue_drv, TX_SERIAL_DATA_REGION_SIZE_DRIV, tx_data_drv);
+    serial_virt_queue_init_sys(microkit_name, tx_queue_handle_cli, tx_queue_cli0, tx_data_cli0);
 #if SERIAL_WITH_COLOUR
     serial_channel_names_init(clients_colours);
     for (uint32_t i = 0; i < SERIAL_NUM_CLIENTS; i++) {

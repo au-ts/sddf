@@ -70,7 +70,7 @@ static void tx_provide(void)
     bool transferred = false;
     while (reprocess) {
         char c;
-        while (!(uart_regs->sr & AML_UART_TX_FULL) && !serial_dequeue(&tx_queue_handle, tx_data, &tx_queue_handle.queue->head, &c)) {
+        while (!(uart_regs->sr & AML_UART_TX_FULL) && !serial_dequeue(&tx_queue_handle, &tx_queue_handle.queue->head, &c)) {
             uart_regs->wfifo |= (uint32_t)c;
             transferred = true;
         }
@@ -104,7 +104,7 @@ static void rx_return(void)
     while (reprocess) {
         while (!(uart_regs->sr & AML_UART_RX_EMPTY) && !serial_queue_full(&rx_queue_handle, rx_queue_handle.queue->tail)) {
             char c = (char) uart_regs->rfifo;
-            serial_enqueue(&rx_queue_handle, rx_data, &rx_queue_handle.queue->tail, c);
+            serial_enqueue(&rx_queue_handle, &rx_queue_handle.queue->tail, c);
             enqueued = true;
         }
 
@@ -159,37 +159,42 @@ static void uart_setup(void) {
     uart_regs->cr |= (AML_UART_TX_RST | AML_UART_RX_RST | AML_UART_CLEAR_ERR);
     uart_regs->cr &= ~(AML_UART_TX_RST | AML_UART_RX_RST | AML_UART_CLEAR_ERR);
 
+    uint32_t cr = uart_regs->cr;
     /* Configure stop bit length to 1 */
-    uart_regs->cr &= ~(AML_UART_STOP_BIT_LEN_MASK);
-    uart_regs->cr |= AML_UART_STOP_BIT_1SB;
+    cr &= ~(AML_UART_STOP_BIT_LEN_MASK);
+    cr |= AML_UART_STOP_BIT_1SB;
 
     /* Set data length to 8 */
-    uart_regs->cr &= ~AML_UART_DATA_LEN_MASK;
-    uart_regs->cr |= AML_UART_DATA_LEN_8BIT;
+    cr &= ~AML_UART_DATA_LEN_MASK;
+    cr |= AML_UART_DATA_LEN_8BIT;
 
     /* Configure the reference clock and baud rate */
     uart_clock = (struct uart_clock_state) {true, UART_XTAL_REF_CLK, 1, 0, 0};
     set_baud(UART_DEFAULT_BAUD);
 
+    uint32_t irqc = uart_regs->irqc;
     /* Enable receive interrupts every byte */
-    uart_regs->irqc &= ~AML_UART_RECV_IRQ_MASK;
-    uart_regs->irqc |= AML_UART_RECV_IRQ(1);
-    uart_regs->cr |= AML_UART_RX_INT_EN;
+    irqc &= ~AML_UART_RECV_IRQ_MASK;
+    irqc |= AML_UART_RECV_IRQ(1);
+    cr |= AML_UART_RX_INT_EN;
 
     /* Enable transmit interrupts if the write fifo drops below one byte - used when the write fifo becomes full */
-    uart_regs->irqc &= ~AML_UART_XMIT_IRQ_MASK;
-    uart_regs->irqc |= AML_UART_XMIT_IRQ(1);
+    irqc &= ~AML_UART_XMIT_IRQ_MASK;
+    irqc |= AML_UART_XMIT_IRQ(1);
 
     /* Enable the UART */
-    uart_regs->cr |= (AML_UART_RX_EN | AML_UART_TX_EN);
+    cr |= (AML_UART_RX_EN | AML_UART_TX_EN);
+
+    uart_regs->irqc = irqc;
+    uart_regs->cr = cr;
 }
 
 void init(void)
 {
     uart_setup();
 
-    serial_queue_init(&rx_queue_handle, rx_queue, RX_SERIAL_DATA_REGION_SIZE_DRIV);
-    serial_queue_init(&tx_queue_handle, tx_queue, TX_SERIAL_DATA_REGION_SIZE_DRIV);
+    serial_queue_init(&rx_queue_handle, rx_queue, RX_SERIAL_DATA_REGION_SIZE_DRIV, rx_data);
+    serial_queue_init(&tx_queue_handle, tx_queue, TX_SERIAL_DATA_REGION_SIZE_DRIV, tx_data);
 
     /* Print a deterministic string to allow console input to begin */
     for (uint16_t i = 0; i < SERIAL_CONSOLE_BEGIN_STRING_LEN; i++) {
