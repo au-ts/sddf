@@ -7,7 +7,6 @@
 
 #include <stddef.h>
 #include <microkit.h>
-#include <sddf/util/printf.h>
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(x[0]))
 #define ALIGN(x, align)   (((x) + (align) - 1) & ~((align) - 1))
@@ -44,11 +43,7 @@
        _d * (_n/_d + (_n % _d == 0 ? 0 : 1)); \
     })
 
-static void _assert_fail(const char  *assertion, const char  *file, unsigned int line, const char  *function)
-{
-    sddf_dprintf("Failed assertion '%s' at %s:%u in function %s\n", assertion, file, line, function);
-    while (1) {}
-}
+void _assert_fail(const char  *assertion, const char  *file, unsigned int line, const char  *function);
 
 #ifndef assert
 #ifndef CONFIG_DEBUG_BUILD
