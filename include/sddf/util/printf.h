@@ -56,10 +56,20 @@ extern "C" {
  */
 void _sddf_putchar(char character);
 
-/* Ensure to call serial_putchar_init during initialisation. Transmits one character at a time to the virtualiser. */
-void sddf_putchar_repl(char c);
+/**
+ * Transmits a character at a time to the serial tx virtualiser - in contrast to _sddf_putchar
+ * which multiplexes on a flush character. Ensure to call serial_putchar_init before using this function
+ * @param character Character to output.
+ */
+void sddf_putchar_repl(char character);
 
-/* Initialise the serial putchar library. */
+/**
+ * @brief Initialises the serial putchar library. Ensure this is called before using serial printf or
+ * sddf_putchar_repl.
+ * 
+ * @param serial_tx_ch Microkit channel of the serial tx virtualiser.
+ * @param serial_tx_queue_handle Address of the serial tx queue handle.
+ */
 void serial_putchar_init(microkit_channel serial_tx_ch, serial_queue_handle_t *serial_tx_queue_handle);
 
 /**
