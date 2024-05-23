@@ -126,8 +126,11 @@ static void handle_irq()
 static void uart_setup(void) {
     uart_regs = (imx_uart_regs_t *) uart_base;
 
-    /* Disable transmit and receive */
-    uart_regs->cr2 &= ~(UART_CR2_TX_EN | UART_CR2_RX_EN);
+    /* Enable the UART */
+    uart_regs->cr1 |= UART_CR1_UART_EN;
+
+    /* Enable transmit and receive */
+    uart_regs->cr2 |= (UART_CR2_TX_EN | UART_CR2_RX_EN);
 
     /* Configure stop bit length to 1 */
     uart_regs->cr2 &= ~(UART_CR2_STOP_BITS);
@@ -154,10 +157,6 @@ static void uart_setup(void) {
 
     uart_regs->fcr = fcr;
     uart_regs->cr1 |= UART_CR1_RX_READY_INT;
-
-    /* Enable the UART */
-    uart_regs->cr1 |= UART_CR1_UART_EN;
-    uart_regs->cr2 |= (UART_CR2_TX_EN | UART_CR2_RX_EN);
 }
 
 void init(void)
