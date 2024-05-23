@@ -63,28 +63,28 @@ static void print_pdid_name(uint64_t pd_id)
 {
     switch (pd_id) {
     case PD_ETH_ID:
-        sddf_printf(ETHERNET_DRIVER_NAME);
+        sddf_printf(NET_DRIVER_NAME);
         break;
     case PD_VIRT_RX_ID:
-        sddf_printf(ETHERNET_VIRT_RX_NAME);
+        sddf_printf(NET_VIRT_RX_NAME);
         break;
     case PD_VIRT_TX_ID:
-        sddf_printf(ETHERNET_VIRT_TX_NAME);
+        sddf_printf(NET_VIRT_TX_NAME);
         break;
     case PD_COPY_ID:
-        sddf_printf(ETHERNET_COPY0_NAME);
+        sddf_printf(NET_COPY0_NAME);
         break;
     case PD_COPY1_ID:
-        sddf_printf(ETHERNET_COPY1_NAME);
+        sddf_printf(NET_COPY1_NAME);
         break;
     case PD_LWIP_ID:
-        sddf_printf(ETHERNET_CLI0_NAME);
+        sddf_printf(NET_CLI0_NAME);
         break;
     case PD_LWIP1_ID:
-        sddf_printf(ETHERNET_CLI1_NAME);
+        sddf_printf(NET_CLI1_NAME);
         break;
     case PD_TIMER_ID:
-        sddf_printf(ETHERNET_TIMER_NAME);
+        sddf_printf(NET_TIMER_NAME);
         break;
     default:
         sddf_printf("unknown");

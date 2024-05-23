@@ -31,7 +31,7 @@ uintptr_t tx_active;
 #define TX_COUNT 256
 #define MAX_COUNT MAX(RX_COUNT, TX_COUNT)
 
-_Static_assert((RX_COUNT + TX_COUNT) * 2 * NET_BUFFER_SIZE <= ETHERNET_DATA_REGION_SIZE, "Expect rx+tx buffers to fit in single 2MB page");
+_Static_assert((RX_COUNT + TX_COUNT) * 2 * NET_BUFFER_SIZE <= NET_DATA_REGION_SIZE, "Expect rx+tx buffers to fit in single 2MB page");
 
 /* HW ring descriptor (shared with device) */
 struct descriptor {
@@ -302,8 +302,8 @@ void init(void)
 {
     eth_setup();
 
-    net_queue_init(&rx_queue, (net_queue_t *)rx_free, (net_queue_t *)rx_active, ETHERNET_RX_QUEUE_SIZE_DRIV);
-    net_queue_init(&tx_queue, (net_queue_t *)tx_free, (net_queue_t *)tx_active, ETHERNET_TX_QUEUE_SIZE_DRIV);
+    net_queue_init(&rx_queue, (net_queue_t *)rx_free, (net_queue_t *)rx_active, NET_RX_QUEUE_SIZE_DRIV);
+    net_queue_init(&tx_queue, (net_queue_t *)tx_free, (net_queue_t *)tx_active, NET_TX_QUEUE_SIZE_DRIV);
 
     rx_provide();
     tx_provide();

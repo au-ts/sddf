@@ -93,7 +93,7 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
-    ethernet_copy_queue_init_sys(microkit_name, &rx_queue_cli, rx_free_cli, rx_active_cli, &rx_queue_virt, rx_free_virt,
+    net_copy_queue_init_sys(microkit_name, &rx_queue_cli, rx_free_cli, rx_active_cli, &rx_queue_virt, rx_free_virt,
                         rx_active_virt);
     net_buffers_init(&rx_queue_cli, 0);
 }
