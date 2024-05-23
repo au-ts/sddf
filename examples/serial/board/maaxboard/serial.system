@@ -16,7 +16,7 @@
     <memory_region name="rx_queue_client1" size="0x1_000" page_size="0x1_000"/>
     <memory_region name="tx_queue_client1" size="0x1_000" page_size="0x1_000"/>
 
-    <protection_domain name="uart" priority="100" pp="true">
+    <protection_domain name="uart" priority="100">
         <program_image path="uart_driver.elf" />
 
         <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
@@ -31,7 +31,7 @@
     </protection_domain>
 
 
-    <protection_domain name="client0" priority="97" pp="true">
+    <protection_domain name="client0" priority="97">
         <program_image path="serial_server.elf" />
         <map mr="rx_queue_client0" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="rx_queue" />
         <map mr="tx_queue_client0" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="tx_queue" />
@@ -40,7 +40,7 @@
         <map mr="tx_data_client0" vaddr="0x4_400_000" perms="rw" cached="true" setvar_vaddr="tx_data" />
     </protection_domain>
 
-    <protection_domain name="client1" priority="97" pp="true">
+    <protection_domain name="client1" priority="97">
     <program_image path="serial_server.elf" />
         <map mr="rx_queue_client1" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="rx_queue" />
         <map mr="tx_queue_client1" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="tx_queue" />
@@ -49,7 +49,7 @@
         <map mr="tx_data_client1" vaddr="0x4_400_000" perms="rw" cached="true" setvar_vaddr="tx_data" />
     </protection_domain>
 
-    <protection_domain name="virt_tx" priority="99" pp="true">
+    <protection_domain name="virt_tx" priority="99">
         <program_image path="serial_tx_virt.elf" />
         <map mr="tx_queue_driver" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="tx_queue_drv" />
         <map mr="tx_queue_client0" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="tx_queue_cli0" />
@@ -60,7 +60,7 @@
         <map mr="tx_data_client1" vaddr="0x4_600_000" perms="r" cached="true"/>
     </protection_domain>
 
-    <protection_domain name="virt_rx" priority="98" pp="true">
+    <protection_domain name="virt_rx" priority="98">
         <program_image path="serial_rx_virt.elf" />
         <map mr="rx_queue_driver" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="rx_queue_drv" />
         <map mr="rx_queue_client0" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="rx_queue_cli0" />
