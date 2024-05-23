@@ -72,7 +72,7 @@ void rx_return()
                 }
                 break;
             default:
-                if (c == SERIAL_TERM_NUM) {
+                if (c == SERIAL_TERMINATE_NUM) {
                     int input_number = atoi(next_client);
                     if (input_number >= 0 && input_number < SERIAL_NUM_CLIENTS) {
                         if (transferred && serial_require_producer_signal(&rx_queue_handle_cli[current_client])) {
@@ -121,7 +121,7 @@ void rx_return()
 
 void init(void)
 {
-    serial_queue_init(&rx_queue_handle_drv, rx_queue_drv, RX_SERIAL_DATA_REGION_SIZE_DRIV, rx_data_drv);
+    serial_queue_init(&rx_queue_handle_drv, rx_queue_drv, SERIAL_RX_DATA_REGION_SIZE_DRIV, rx_data_drv);
     serial_virt_queue_init_sys(microkit_name, rx_queue_handle_cli, rx_queue_cli0, rx_data_cli0);
 }
 

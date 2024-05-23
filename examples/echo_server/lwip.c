@@ -278,7 +278,7 @@ static void netif_status_callback(struct netif *netif)
 
 void init(void)
 {
-    ethernet_cli_queue_init_sys(microkit_name, &state.rx_queue, rx_free, rx_active, &state.tx_queue, tx_free, tx_active);
+    net_cli_queue_init_sys(microkit_name, &state.rx_queue, rx_free, rx_active, &state.tx_queue, tx_free, tx_active);
     net_buffers_init(&state.tx_queue, 0);
 
     lwip_init();
@@ -286,7 +286,7 @@ void init(void)
 
     LWIP_MEMPOOL_INIT(RX_POOL);
 
-    ethernet_cli_mac_addr_init_sys(microkit_name, state.mac);
+    net_cli_mac_addr_init_sys(microkit_name, state.mac);
 
     /* Set dummy IP configuration values to get lwIP bootstrapped  */
     struct ip4_addr netmask, ipaddr, gw, multicast;

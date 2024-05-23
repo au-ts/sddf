@@ -194,8 +194,8 @@ void init(void)
 {
     uart_setup();
 
-    serial_queue_init(&rx_queue_handle, rx_queue, RX_SERIAL_DATA_REGION_SIZE_DRIV, rx_data);
-    serial_queue_init(&tx_queue_handle, tx_queue, TX_SERIAL_DATA_REGION_SIZE_DRIV, tx_data);
+    serial_queue_init(&rx_queue_handle, rx_queue, SERIAL_RX_DATA_REGION_SIZE_DRIV, rx_data);
+    serial_queue_init(&tx_queue_handle, tx_queue, SERIAL_TX_DATA_REGION_SIZE_DRIV, tx_data);
 
     /* Print a deterministic string to allow console input to begin */
     for (uint16_t i = 0; i < SERIAL_CONSOLE_BEGIN_STRING_LEN; i++) {

@@ -33,7 +33,7 @@ uintptr_t buffer_data_paddr;
 /* In order to handle broadcast packets where the same buffer is given to multiple clients
   * we keep track of a reference count of each buffer and only hand it back to the driver once
   * all clients have returned the buffer. */
-uint32_t buffer_refs[ETHERNET_RX_QUEUE_SIZE_DRIV] = {0};
+uint32_t buffer_refs[NET_RX_QUEUE_SIZE_DRIV] = {0};
 
 typedef struct state {
     net_queue_handle_t rx_queue_drv;
@@ -224,10 +224,10 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
-    ethernet_virt_mac_addr_init_sys(microkit_name, (uint8_t *) state.mac_addrs);
+    net_virt_mac_addr_init_sys(microkit_name, (uint8_t *) state.mac_addrs);
 
-    net_queue_init(&state.rx_queue_drv, (net_queue_t *)rx_free_drv, (net_queue_t *)rx_active_drv, ETHERNET_RX_QUEUE_SIZE_DRIV);
-    ethernet_virt_queue_init_sys(microkit_name, state.rx_queue_clients, rx_free_cli0, rx_active_cli0);
+    net_queue_init(&state.rx_queue_drv, (net_queue_t *)rx_free_drv, (net_queue_t *)rx_active_drv, NET_RX_QUEUE_SIZE_DRIV);
+    net_virt_queue_init_sys(microkit_name, state.rx_queue_clients, rx_free_cli0, rx_active_cli0);
     net_buffers_init(&state.rx_queue_drv, buffer_data_paddr);
 
     if (net_require_signal_free(&state.rx_queue_drv)) {
