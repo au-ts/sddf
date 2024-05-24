@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdint.h>
 #include <microkit.h>
 #include <sddf/util/util.h>
 #include <sddf/serial/queue.h>
