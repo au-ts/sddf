@@ -1,238 +1,194 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <microkit.h>
-#include "uart.h"
-#include "uart_config.h"
-#include <sddf/serial/queue.h>
-#include <sddf/util/util.h>
+#include <sddf/util/printf.h>
 #include <serial_config.h>
+#include <uart.h>
 
-/*
- * The PL011 is supposedly universal, which means that this driver should be
- * usable for any PL011 compatible device.
- * Right now the driver is making assumptions that are true on QEMU, but not
- * necessarily on hardware. Once this is fixed then this is a proper PL011
- * driver.
- */
-
-#define LOG_DRIVER(...) do{ microkit_dbg_puts(microkit_name); microkit_dbg_puts("|INFO: "); microkit_dbg_puts(__VA_ARGS__); }while(0)
-#define LOG_DRIVER_ERR(...) do{ microkit_dbg_puts(microkit_name); microkit_dbg_puts("|ERROR: "); microkit_dbg_puts(__VA_ARGS__); }while(0)
-
-/* Defines to manage interrupts and notifications */
 #define IRQ_CH 0
 #define TX_CH  1
 #define RX_CH  2
 
-/* Shared memory for queues */
-uintptr_t rx_free;
-uintptr_t rx_active;
-uintptr_t tx_free;
-uintptr_t tx_active;
-/* UART device registers */
+serial_queue_t *rx_queue;
+serial_queue_t *tx_queue;
+
+char *rx_data;
+char *tx_data;
+
+serial_queue_handle_t rx_queue_handle;
+serial_queue_handle_t tx_queue_handle;
+
 uintptr_t uart_base;
+volatile pl011_uart_regs_t *uart_regs;
 
-/* Handlers to be given to the queue API */
-serial_queue_handle_t rx_queue;
-serial_queue_handle_t tx_queue;
+/*
+ * BaudDivInt + BaudDivFrac/64 = (RefFreq/ (16 x BaudRate))
+ */
+static void set_baud(long bps)
+{
+    float baud_div = PL011_UART_REF_CLOCK/(16 * bps);
+    uint32_t baud_div_int = (uint32_t)baud_div;
+    uint32_t baud_div_frac = (uint32_t)((baud_div * 64) + 0.5);
 
-struct serial_driver global_serial_driver = {0};
+    /* Minimum divide ratio possible is 1 */
+    assert(baud_div_int >= 1);
 
-int getchar() {
-    volatile struct pl011_uart_regs *regs = (volatile struct pl011_uart_regs *) uart_base;
-    // @ivanv: don't like having an infinite loop here
-    while (regs->fr & PL011_UARTFR_RXFE) {};
+    /* Maximum divide ratio is 0xFFFF */
+    assert(baud_div_int < 0xFFFF || (baud_div_int == 0xFFFF && baud_div_frac == 0));
 
-    return regs->dr;
+    uart_regs->ibrd = baud_div_int;
+    uart_regs->fbrd = baud_div_frac;
 }
 
-int putchar(int ch) {
-    volatile struct pl011_uart_regs *regs = (volatile struct pl011_uart_regs *) uart_base;
-
-    while ((regs->fr & PL011_UARTFR_TXFF) != 0) {};
-
-    regs->dr = ch;
-    // @ivanv: figure out
-    // if (ch == '\r') {
-    //     putchar('\n');
-    // }
-
-    return 0;
-}
-
-// Called from handle tx, write each character stored in the buffer to the serial port
-static void raw_tx(char *phys, unsigned int len) {
-    // This is byte by byte for now, switch to DMA use later
-    for (int i = 0; i < len && phys[i] != '\0'; i++) {
-        // Loop until the fifo queue is ready to transmit
-        // @ivanv: putchar always returns zero? what's the point of the return value
-        while (putchar(phys[i]) != 0);
-    }
-}
-
-void handle_tx() {
-    uintptr_t buffer = 0;
-    unsigned int len = 0;
-    // Dequeue something from the Tx queue -> the virt TX will have placed something in here, if its empty then nothing to do
-    while (!serial_dequeue_active(&tx_queue, &buffer, &len)) {
-        // Buffer cointaining the bytes to write to serial
-        char *phys = (char * )buffer;
-        // Handle the tx
-        raw_tx(phys, len);
-        // Then enqueue this buffer back into the free queue, so that it can be collected and reused by the server
-        int err = serial_enqueue_free(&tx_queue, buffer, BUFFER_SIZE);
-        assert(!err);
-    }
-}
-
-void handle_irq() {
-    /* Here we have interrupted because a character has been inputted. We first want to get the
-    character from the hardware FIFO queue.
-
-    Then we want to dequeue from the rx free queue, and populate it, then add to the rx active queue
-    ready to be processed by the client server
-    */
-    int input = getchar();
-    char input_char = (char) input;
-    microkit_irq_ack(IRQ_CH);
-
-    // Not sure if we should be printing this here or elsewhere? What is the expected behaviour?
-    // putchar(input);
-
-    if (input == -1) {
-        LOG_DRIVER_ERR("invalid input when attempting to getchar\n");
-        return;
-    }
-
-    int ret = 0;
-
-    if (global_serial_driver.echo == ECHO_EN) {
-        // // Special case for backspace
-        if (input_char == '\b' || input_char == 0x7f) {
-            // Backspace will move the cursor back, and space will erase the character
-            putchar('\b');
-            putchar(' ');
-            putchar('\b');
-        } else if (input_char == '\r') {
-            // Convert the carriage return to a new line
-            putchar('\n');
-        }
-        else {
-            putchar(input);
-        }
-    }
-
-    if (global_serial_driver.mode == RAW_MODE) {
-        // Place characters straight into the buffer
-
-        // Address that we will pass to dequeue to store the buffer address
-        uintptr_t buffer = 0;
-        // Integer to store the length of the buffer
-        unsigned int buffer_len = 0;
-
-        ret = serial_dequeue_free(&rx_queue, &buffer, &buffer_len);
-
-        if (ret != 0) {
-            LOG_DRIVER_ERR("unable to dequeue from RX free queue\n");
-            return;
+static void tx_provide(void)
+{
+    bool reprocess = true;
+    bool transferred = false;
+    while (reprocess) {
+        char c;
+        while (!(uart_regs->fr & PL011_FR_TXFF) && !serial_dequeue(&tx_queue_handle, &tx_queue_handle.queue->head, &c)) {
+            uart_regs->dr = c;
+            transferred = true;
         }
 
-        ((char *) buffer)[0] = (char) input;
-
-        // Now place in the rx active queue
-        ret = serial_enqueue_active(&rx_queue, buffer, 1);
-        microkit_notify(RX_CH);
-
-    } else if (global_serial_driver.mode == LINE_MODE) {
-        // Place in a buffer, until we reach a new line, ctrl+d/ctrl+c/enter (check what else can stop)
-        if (global_serial_driver.line_buffer == 0) {
-            // We need to dequeue a buffer to use
-            // Address that we will pass to dequeue to store the buffer address
-            uintptr_t buffer = 0;
-            // Integer to store the length of the buffer
-            unsigned int buffer_len = 0;
-
-            ret = serial_dequeue_free(&rx_queue, &buffer, &buffer_len);
-            if (ret != 0) {
-                LOG_DRIVER_ERR("unable to dequeue from the RX free queue\n");
-                return;
-            }
-
-            global_serial_driver.line_buffer = buffer;
-            global_serial_driver.line_buffer_size = 0;
-        }
-
-        // Check that the buffer is not full, and other exit conditions here
-        if (global_serial_driver.line_buffer_size > BUFFER_SIZE ||
-            input_char == EOT ||
-            input_char == ETX ||
-            input_char == LF ||
-            input_char == SB ||
-            input_char == CR) {
-                char *char_arr = (char * ) global_serial_driver.line_buffer;
-                // Place the line end character into buffer
-                char_arr[global_serial_driver.line_buffer_size] = input_char;
-                global_serial_driver.line_buffer_size += 1;
-                // Enqueue buffer back
-                ret = serial_enqueue_active(&rx_queue, global_serial_driver.line_buffer, global_serial_driver.line_buffer_size);
-                // Zero out the driver states
-                global_serial_driver.line_buffer = 0;
-                global_serial_driver.line_buffer_size = 0;
-                microkit_notify(RX_CH);
-
+        serial_request_producer_signal(&tx_queue_handle);
+        /* If transmit fifo is full and there is data remaining to be sent, enable interrupt when fifo is no longer full */
+        if (uart_regs->fr & PL011_FR_TXFF && !serial_queue_empty(&tx_queue_handle, tx_queue_handle.queue->head)) {
+            uart_regs->imsc |= PL011_IMSC_TX_INT;
         } else {
-            // Otherwise, add to the character array
-            char *char_arr = (char * ) global_serial_driver.line_buffer;
+            uart_regs->imsc &= ~PL011_IMSC_TX_INT;
+        }
+        reprocess = false;
 
-            // Conduct any line editing as long as we have stuff in the buffer
-            if (input_char == 0x7f && global_serial_driver.line_buffer_size > 0) {
-                // Remove last character
-                global_serial_driver.line_buffer_size -= 1;
-                char_arr[global_serial_driver.line_buffer_size] = 0;
-            } else {
-                char_arr[global_serial_driver.line_buffer_size] = input;
-                global_serial_driver.line_buffer_size += 1;
-            }
+        if (!(uart_regs->fr & PL011_FR_TXFF) && !serial_queue_empty(&tx_queue_handle, tx_queue_handle.queue->head)) {
+            serial_cancel_producer_signal(&tx_queue_handle);
+            uart_regs->imsc &= ~PL011_IMSC_TX_INT;
+            reprocess = true;
         }
     }
 
-    if (ret != 0) {
-        LOG_DRIVER_ERR("unable to enqueue to the TX free queue\n");
-        return;
+    if (transferred && serial_require_consumer_signal(&tx_queue_handle)) {
+        serial_cancel_consumer_signal(&tx_queue_handle);
+        microkit_notify(TX_CH);
     }
 }
 
-void init(void) {
-    LOG_DRIVER("initialising\n");
+static void rx_return(void)
+{
+    bool reprocess = true;
+    bool enqueued = false;
+    while (reprocess) {
+        while (!(uart_regs->fr & PL011_FR_RXFE) && !serial_queue_full(&rx_queue_handle, rx_queue_handle.queue->tail)) {
+            char c = (char) (uart_regs->dr & PL011_DR_DATA_MASK);
+            serial_enqueue(&rx_queue_handle, &rx_queue_handle.queue->tail, c);
+            enqueued = true;
+        }
 
-    serial_queue_init(&rx_queue, (serial_queue_t *)rx_free, (serial_queue_t *)rx_active, RX_QUEUE_SIZE_DRIV);
-    serial_queue_init(&tx_queue, (serial_queue_t *)tx_free, (serial_queue_t *)tx_active, TX_QUEUE_SIZE_DRIV);
-
-    volatile struct pl011_uart_regs *regs = (volatile struct pl011_uart_regs *) uart_base;
-    // @ivanv what does 0x50 mean!
-    regs->imsc = 0x50;
-
-    // @ivanv: need to do proper initialisation
-
-    /* Line configuration. Set LINE or RAW mode here, and disable or enable ECHO */
-    // int ret = serial_configure(115200, 8, PARITY_NONE, 1, UART_MODE, ECHO_MODE);
-
-    // if (ret != 0) {
-    //     LOG_DRIVER("error occured during line configuration\n");
-    // }
+        if (!(uart_regs->fr & PL011_FR_RXFE) && serial_queue_full(&rx_queue_handle, rx_queue_handle.queue->tail)) {
+            /* Disable rx interrupts until virtualisers queue is no longer empty. */
+            uart_regs->imsc &= ~(PL011_IMSC_RX_TIMEOUT | PL011_IMSC_RX_INT);
+            serial_require_consumer_signal(&rx_queue_handle);
+        }
+        reprocess = false;
+        
+        if (!(uart_regs->fr & PL011_FR_RXFE) && !serial_queue_full(&rx_queue_handle, rx_queue_handle.queue->tail)) {
+            serial_cancel_consumer_signal(&rx_queue_handle);
+            uart_regs->imsc |= (PL011_IMSC_RX_TIMEOUT | PL011_IMSC_RX_INT);
+            reprocess = true;
+        }
+    }
+    
+    if (enqueued && serial_require_producer_signal(&rx_queue_handle)) {
+        serial_cancel_producer_signal(&rx_queue_handle);
+        microkit_notify(RX_CH);
+    }
 }
 
-void notified(microkit_channel ch) {
+static void handle_irq()
+{
+    while (uart_regs->mis & (PL011_IMSC_RX_TIMEOUT | PL011_IMSC_RX_INT) || uart_regs->mis & PL011_IMSC_TX_INT)
+    {
+        if (uart_regs->mis & (PL011_IMSC_RX_TIMEOUT | PL011_IMSC_RX_INT)) {
+            rx_return();
+        }
+        if (uart_regs->mis & PL011_IMSC_TX_INT) {
+            tx_provide();
+        }
+    }
+}
+
+static void uart_setup(void)
+{
+    uart_regs = (pl011_uart_regs_t *) uart_base;
+
+    /* Wait for UART to finish transmitting. */
+    while (uart_regs->fr & PL011_FR_UART_BUSY);
+
+    /* Disable the UART - UART must be disabled before control registers are reprogrammed. */
+    uart_regs->tcr &= ~(PL011_CR_RX_EN | PL011_CR_TX_EN | PL011_CR_UART_EN);
+
+    /* Configure stop bit length to 1 */
+    uart_regs->lcr_h &= ~(PL011_LCR_2_STP_BITS);
+
+    /* Set data length to 8 */
+    uart_regs->lcr_h |= (0b11 < PL011_LCR_WLEN_SHFT);
+
+    /* Configure the reference clock and baud rate. Difficult to use automatic detection here as it requires the next incoming character to be 'a' or 'A'. */
+    set_baud(UART_DEFAULT_BAUD);
+
+    /* Enable FIFOs */
+    uart_regs->lcr_h |= PL011_LCR_FIFO_EN;
+
+    /* Disable parity checking */
+    uart_regs->lcr_h |= PL011_LCR_PARTY_EN;
+
+    /* Enable receive interrupts when FIFO level exceeds 1/8 or after 32 ticks */
+    uart_regs->ifls &= ~(PL011_IFLS_RX_MASK << PL011_IFLS_RX_SHFT);
+    uart_regs->imsc |= (PL011_IMSC_RX_TIMEOUT | PL011_IMSC_RX_INT);
+
+    /* Enable transmit interrupts if the FIFO drops below 1/8 - used when the write fifo becomes full */
+    uart_regs->ifls &= ~(PL011_IFLS_TX_MASK << PL011_IFLS_TX_SHFT);
+    uart_regs->imsc |= PL011_IMSC_TX_INT;
+
+    /* Enable the UART */
+    uart_regs->tcr |= PL011_CR_UART_EN;
+
+    /* Enable transmit */
+    uart_regs->tcr |= PL011_CR_TX_EN;
+
+    /* Enable receive */
+    uart_regs->tcr |= PL011_CR_RX_EN;
+}
+
+void init(void)
+{
+    uart_setup();
+
+    serial_queue_init(&rx_queue_handle, rx_queue, SERIAL_RX_DATA_REGION_SIZE_DRIV, rx_data);
+    serial_queue_init(&tx_queue_handle, tx_queue, SERIAL_TX_DATA_REGION_SIZE_DRIV, tx_data);
+
+    /* Print a deterministic string to allow console input to begin */
+    for (uint16_t i = 0; i < SERIAL_CONSOLE_BEGIN_STRING_LEN; i++) {
+        uart_regs->dr |= SERIAL_CONSOLE_BEGIN_STRING[i];
+    }
+}
+
+void notified(microkit_channel ch)
+{
     switch(ch) {
         case IRQ_CH:
             handle_irq();
-            return;
+            microkit_irq_ack_delayed(ch);
+            break;
         case TX_CH:
-            handle_tx();
+            tx_provide();
             break;
         case RX_CH:
+            uart_regs->imsc |= (PL011_IMSC_RX_TIMEOUT | PL011_IMSC_RX_INT);
+            rx_return();
             break;
         default:
-            LOG_DRIVER("received notification on unexpected channel\n");
+            sddf_dprintf("UART|LOG: received notification on unexpected channel: %u\n", ch);
             break;
     }
 }
