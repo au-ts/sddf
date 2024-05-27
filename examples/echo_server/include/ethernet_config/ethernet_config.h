@@ -8,8 +8,8 @@
 #define NET_CLI1_NAME "client1"
 #define NET_COPY0_NAME "copy0"
 #define NET_COPY1_NAME "copy1"
-#define NET_VIRT_RX_NAME "virt_rx"
-#define NET_VIRT_TX_NAME "virt_tx"
+#define NET_VIRT_RX_NAME "net_virt_rx"
+#define NET_VIRT_TX_NAME "net_virt_tx"
 #define NET_DRIVER_NAME "eth"
 #define NET_TIMER_NAME "timer"
 

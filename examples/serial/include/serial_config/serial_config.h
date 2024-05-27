@@ -4,6 +4,9 @@
 #include <sddf/serial/queue.h>
 #include <stdint.h>
 
+/* Only support transmission and not receive. */
+#define SERIAL_TX_ONLY 0
+
 /* Associate a colour with each client's output. */
 #define SERIAL_WITH_COLOUR 1
 
@@ -20,12 +23,10 @@
 #define SERIAL_CONSOLE_BEGIN_STRING "UART|LOG: Init complete\n"
 #define SERIAL_CONSOLE_BEGIN_STRING_LEN 25
 
-#define SERIAL_NUM_CLIENTS 2
-
 #define SERIAL_CLI0_NAME "client0"
 #define SERIAL_CLI1_NAME "client1"
-#define SERIAL_VIRT_RX_NAME "virt_rx"
-#define SERIAL_VIRT_TX_NAME "virt_tx"
+#define SERIAL_VIRT_RX_NAME "serial_virt_rx"
+#define SERIAL_VIRT_TX_NAME "serial_virt_tx"
 #define SERIAL_DRIVER_NAME "uart"
 
 #define SERIAL_QUEUE_SIZE                          0x1000
