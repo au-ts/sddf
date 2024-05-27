@@ -47,7 +47,7 @@ static void tx_provide(void)
     while (reprocess) {
         char c;
         while (!(uart_regs->fr & PL011_FR_TXFF) && !serial_dequeue(&tx_queue_handle, &tx_queue_handle.queue->head, &c)) {
-            uart_regs->dr = c;
+            uart_regs->dr = (uint32_t)c;
             transferred = true;
         }
 
@@ -143,8 +143,10 @@ static void uart_setup(void)
     uart_regs->lcr_h |= PL011_LCR_PARTY_EN;
 
     /* Enable receive interrupts when FIFO level exceeds 1/8 or after 32 ticks */
+#if !SERIAL_TX_ONLY
     uart_regs->ifls &= ~(PL011_IFLS_RX_MASK << PL011_IFLS_RX_SHFT);
     uart_regs->imsc |= (PL011_IMSC_RX_TIMEOUT | PL011_IMSC_RX_INT);
+#endif
 
     /* Enable transmit interrupts if the FIFO drops below 1/8 - used when the write fifo becomes full */
     uart_regs->ifls &= ~(PL011_IFLS_TX_MASK << PL011_IFLS_TX_SHFT);
@@ -157,7 +159,9 @@ static void uart_setup(void)
     uart_regs->tcr |= PL011_CR_TX_EN;
 
     /* Enable receive */
+#if !SERIAL_TX_ONLY
     uart_regs->tcr |= PL011_CR_RX_EN;
+#endif
 }
 
 void init(void)
@@ -169,7 +173,7 @@ void init(void)
 
     /* Print a deterministic string to allow console input to begin */
     for (uint16_t i = 0; i < SERIAL_CONSOLE_BEGIN_STRING_LEN; i++) {
-        uart_regs->dr |= SERIAL_CONSOLE_BEGIN_STRING[i];
+        uart_regs->dr = (uint32_t)SERIAL_CONSOLE_BEGIN_STRING[i];
     }
 }
 
