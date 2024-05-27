@@ -48,7 +48,7 @@ static void tx_provide(void)
     while (reprocess) {
         char c;
         while (!(uart_regs->ts & UART_TST_TX_FIFO_FULL) && !serial_dequeue(&tx_queue_handle, &tx_queue_handle.queue->head, &c)) {
-            uart_regs->txd |= c;
+            uart_regs->txd = (uint32_t)c;
             transferred = true;
         }
 
@@ -130,7 +130,10 @@ static void uart_setup(void) {
     uart_regs->cr1 |= UART_CR1_UART_EN;
 
     /* Enable transmit and receive */
-    uart_regs->cr2 |= (UART_CR2_TX_EN | UART_CR2_RX_EN);
+    uart_regs->cr2 |= UART_CR2_TX_EN;
+#if !SERIAL_TX_ONLY
+    uart_regs->cr2 |= UART_CR2_RX_EN;
+#endif
 
     /* Configure stop bit length to 1 */
     uart_regs->cr2 &= ~(UART_CR2_STOP_BITS);
@@ -148,15 +151,19 @@ static void uart_setup(void) {
 
     uint32_t fcr = uart_regs->fcr;
     /* Enable receive interrupts every byte */
+#if !SERIAL_TX_ONLY
     fcr &= ~UART_FCR_RXTL_MASK;
     fcr |= (1 << UART_FCR_RXTL_SHFT);
+#endif
 
     /* Enable transmit interrupts if the write fifo drops below one byte - used when the write fifo becomes full */
     fcr &= ~UART_FCR_TXTL_MASK;
     fcr |= (2 << UART_FCR_TXTL_SHFT);
 
     uart_regs->fcr = fcr;
+#if !SERIAL_TX_ONLY
     uart_regs->cr1 |= UART_CR1_RX_READY_INT;
+#endif
 }
 
 void init(void)
@@ -168,7 +175,7 @@ void init(void)
 
     /* Print a deterministic string to allow console input to begin */
     for (uint16_t i = 0; i < SERIAL_CONSOLE_BEGIN_STRING_LEN; i++) {
-        uart_regs->txd |= SERIAL_CONSOLE_BEGIN_STRING[i];
+        uart_regs->txd = (uint32_t)SERIAL_CONSOLE_BEGIN_STRING[i];
     }
 }
 

@@ -72,7 +72,7 @@ static void tx_provide(void)
     while (reprocess) {
         char c;
         while (!(uart_regs->sr & AML_UART_TX_FULL) && !serial_dequeue(&tx_queue_handle, &tx_queue_handle.queue->head, &c)) {
-            uart_regs->wfifo |= (uint32_t)c;
+            uart_regs->wfifo = (uint32_t)c;
             transferred = true;
         }
 
@@ -175,16 +175,16 @@ static void uart_setup(void) {
 
     uint32_t irqc = uart_regs->irqc;
     /* Enable receive interrupts every byte */
+#if !SERIAL_TX_ONLY
     irqc &= ~AML_UART_RECV_IRQ_MASK;
     irqc |= AML_UART_RECV_IRQ(1);
-    cr |= AML_UART_RX_INT_EN;
+    cr |= (AML_UART_RX_INT_EN | AML_UART_RX_EN);
+#endif
 
     /* Enable transmit interrupts if the write fifo drops below one byte - used when the write fifo becomes full */
     irqc &= ~AML_UART_XMIT_IRQ_MASK;
     irqc |= AML_UART_XMIT_IRQ(1);
-
-    /* Enable the UART */
-    cr |= (AML_UART_RX_EN | AML_UART_TX_EN);
+    cr |= AML_UART_TX_EN;
 
     uart_regs->irqc = irqc;
     uart_regs->cr = cr;
@@ -199,7 +199,7 @@ void init(void)
 
     /* Print a deterministic string to allow console input to begin */
     for (uint16_t i = 0; i < SERIAL_CONSOLE_BEGIN_STRING_LEN; i++) {
-        uart_regs->wfifo |= (uint32_t)SERIAL_CONSOLE_BEGIN_STRING[i];
+        uart_regs->wfifo = (uint32_t)SERIAL_CONSOLE_BEGIN_STRING[i];
     }
 }
 
