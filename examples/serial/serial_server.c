@@ -25,17 +25,22 @@ void init(void)
     sddf_printf("Hello world! I am %s.\r\nPlease give me character!\r\n", microkit_name);
 }
 
+uint16_t char_count;
 void notified(microkit_channel ch)
 {
     bool reprocess = true;
-    char c[2] = {0};
+    char c;
     while (reprocess) {
-        while (!serial_dequeue(&rx_queue_handle, &rx_queue_handle.queue->head, c)) {
-            if (c[0] == '\r') {
+        while (!serial_dequeue(&rx_queue_handle, &rx_queue_handle.queue->head, &c)) {
+            if (c == '\r') {
                 sddf_putchar_repl('\\');
                 sddf_putchar_repl('r');
             } else {
-                sddf_putchar_repl(c[0]);
+                sddf_putchar_repl(c);
+            }
+            char_count ++;
+            if (char_count % 10 == 0) {
+                sddf_printf_("\n%s has received %u characters so far!\n", microkit_name, char_count);
             }
         }
 
