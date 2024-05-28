@@ -25,24 +25,24 @@ In the serial example directory you will find the `include/serial_config/serial_
 This file contains system configuration information that is dependent on your `.system` file, as
 well as the following configuration options:
 
-1. ##SERIAL_TX_ONLY## - enable this if you only want to use the transmit functionality of the
+1. **SERIAL_TX_ONLY** - enable this if you only want to use the transmit functionality of the
 serial subsystem. This stops the uart driver from enabling the receive functionality of the
 device.
-2. ##SERIAL_WITH_COLOUR## - enable this if you want clients outputs to be different colours. This
+2. **SERIAL_WITH_COLOUR** - enable this if you want clients outputs to be different colours. This
 mechanism works by appending a colour code before and after a clients string. Note that the
 transmit virtualiser supports up to 256 colours. Also, the transmit virtualiser does not check
 client output for colour sequences, so there is no gaurantee that clients will only output in
 their own colour. Upon initialisation, the transmit virtualiser will print the name of each client
 in the colour assigned to it.
-3. ##SERIAL_SWITCH_CHAR## and ##SERIAL_TERMINATE_NUM## - these characters control the receive
+3. **SERIAL_SWITCH_CHAR** and **SERIAL_TERMINATE_NUM** - these characters control the receive
 virtualisers input switching mechanism. To switch the input stream to a different client, input
-##SERIAL_SWITCH_CHAR## followed by up to 4 numeric characters corresponding to the new client
-number, and terminate numeric input with ##SERIAL_TERMINATE_NUM##. Upon success there will be no
+**SERIAL_SWITCH_CHAR** followed by up to 4 numeric characters corresponding to the new client
+number, and terminate numeric input with **SERIAL_TERMINATE_NUM**. Upon success there will be no
 output, while upon error the receive virtualiser will print a debug failure message. Client 0
 receives input upon initialisation.
-4. ##UART_DEFAULT_BAUD## - this determines the baud rate that the uart driver will configure for
+4. **UART_DEFAULT_BAUD** - this determines the baud rate that the uart driver will configure for
 the device. Baud rate is always set explicitly instead of detected automatically.
-5. ##SERIAL_CONSOLE_BEGIN_STRING## - this string is printed by the uart driver upon initialisation
+5. **SERIAL_CONSOLE_BEGIN_STRING** - this string is printed by the uart driver upon initialisation
 completion. This is to support input beginning in the interfacing serial server.
 
 If the system file is changed, or the serial subsystem is included into another system, this config
@@ -51,24 +51,24 @@ file will need to be edited or re-created to reflect the new system. Be sure to 
 
 ## Interfacing with Other Systems
 To include the serial subsystem into an existing system, the following steps must be taken:
-* ##.system File##
+* **.system File**
 You must update your system file to include serial data and queue regions for each client and the
 uart driver. You must also include the uart driver, transmit virtualiser, and optionally the
 receive virtualiser protection domains. Finally you must include channels between your clients and
 the virtualisers, as well as between the virtualisers and the uart driver.
-* ##`serial_config` File##
+* **`serial_config` File**
 A new `serial_config` file must be created for your system, containing relevent details of the
 system file including client names and queue sizes, as well as updated initialisation functions
 for clients and virtualisers.
-* ##Makefile##
-You must include directories for ##SERIAL_COMPONENTS##, the ##UART_DRIVER## and your
-##SERIAL_CONFIG_INCLUDE##. You must also supply ##SERIAL_NUM_CLIENTS##. You must add the uart
+* **Makefile**
+You must include directories for **SERIAL_COMPONENTS**, the **UART_DRIVER** and your
+**SERIAL_CONFIG_INCLUDE**. You must also supply **SERIAL_NUM_CLIENTS**. You must add the uart
 driver, transmit virtualiser and optionally the receive virtualiser to your image list. You must
 add your serial include directory to your cflags, and finally you must include the uart driver
 and serial_components make files. For each component you wish to have access to the serial
 subsystem, you must link their printf object file with `libsddf_util.a` as opposed to
 `libsddf_util_debug.a`. This will ensure printf invokes the serial _sddf_putchar.
-* ##Protection Domains##
+* **Protection Domains**
 Each protection domain that outputs to serial must include the serial queue library as well as
 `serial_config.h`. They must also have the following declarations/definitions:
 
