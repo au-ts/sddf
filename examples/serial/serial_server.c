@@ -40,7 +40,7 @@ void notified(microkit_channel ch)
             }
             char_count ++;
             if (char_count % 10 == 0) {
-                sddf_printf_("\n%s has received %u characters so far!\n", microkit_name, char_count);
+                sddf_printf("\n%s has received %u characters so far!\n", microkit_name, char_count);
             }
         }
 
