@@ -9,8 +9,10 @@
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 #include <sddf/network/queue.h>
+#include <sddf/serial/queue.h>
 #include <sddf/timer/client.h>
 #include <sddf/benchmark/sel4bench.h>
+#include <serial_config.h>
 #include <ethernet_config.h>
 #include <string.h>
 #include "lwip/init.h"
@@ -25,9 +27,14 @@
 
 #include "echo.h"
 
+#define SERIAL_TX_CH 0
 #define TIMER  1
 #define RX_CH  2
 #define TX_CH  3
+
+char *serial_tx_data;
+serial_queue_t *serial_tx_queue;
+serial_queue_handle_t serial_tx_queue_handle;
 
 #define LWIP_TICK_MS 100
 #define NUM_PBUFFS 512
@@ -271,13 +278,16 @@ static err_t ethernet_init(struct netif *netif)
 static void netif_status_callback(struct netif *netif)
 {
     if (dhcp_supplied_address(netif)) {
-        sddf_printf("LWIP|NOTICE: DHCP request for %s returned IP address: %s\n", microkit_name,
+        sddf_printf("LWIP|NOTICE: DHCP request for %s returned IP address: %s\r\n", microkit_name,
                     ip4addr_ntoa(netif_ip4_addr(netif)));
     }
 }
 
 void init(void)
 {
+    serial_cli_queue_init_sys(microkit_name, NULL, NULL, NULL, &serial_tx_queue_handle, serial_tx_queue, serial_tx_data);
+    serial_putchar_init(SERIAL_TX_CH, &serial_tx_queue_handle);
+
     net_cli_queue_init_sys(microkit_name, &state.rx_queue, rx_free, rx_active, &state.tx_queue, tx_free, tx_active);
     net_buffers_init(&state.tx_queue, 0);
 

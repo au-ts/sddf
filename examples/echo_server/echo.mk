@@ -13,9 +13,13 @@ BENCHMARK:=$(SDDF)/benchmark
 UTIL:=$(SDDF)/util
 ETHERNET_DRIVER:=$(SDDF)/drivers/network/$(DRIV_DIR)
 ETHERNET_CONFIG_INCLUDE:=${ECHO_SERVER}/include/ethernet_config
+SERIAL_COMPONENTS := $(SDDF)/serial/components
+UART_DRIVER := $(SDDF)/drivers/serial/$(UART_DRIV_DIR)
+SERIAL_CONFIG_INCLUDE:=${ECHO_SERVER}/include/serial_config
 TIMER_DRIVER:=$(SDDF)/drivers/clock/$(TIMER_DRV_DIR)
 NETWORK_COMPONENTS:=$(SDDF)/network/components
 NUM_NETWORK_CLIENTS:=-DNUM_NETWORK_CLIENTS=2
+SERIAL_NUM_CLIENTS:=-DSERIAL_NUM_CLIENTS=3
 
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 SYSTEM_FILE := ${ECHO_SERVER}/board/$(MICROKIT_BOARD)/echo_server.system
@@ -25,7 +29,7 @@ REPORT_FILE := report.txt
 vpath %.c ${SDDF} ${ECHO_SERVER} ${NETWORK_COMPONENTS}
 
 IMAGES := eth_driver.elf lwip.elf benchmark.elf idle.elf network_virt_rx.elf\
-	  network_virt_tx.elf copy.elf timer_driver.elf
+	  network_virt_tx.elf copy.elf timer_driver.elf uart_driver.elf serial_tx_virt.elf
 
 CFLAGS := -mcpu=$(CPU) \
 	  -mstrict-align \
@@ -37,6 +41,7 @@ CFLAGS := -mcpu=$(CPU) \
 	  -I$(SDDF)/include \
 	  -I${ECHO_INCLUDE}/lwip \
 	  -I${ETHERNET_CONFIG_INCLUDE} \
+	  -I$(SERIAL_CONFIG_INCLUDE) \
 	  -I${SDDF}/$(LWIPDIR)/include \
 	  -I${SDDF}/$(LWIPDIR)/include/ipv4 \
 	  -MD \
@@ -90,6 +95,8 @@ include ${SDDF}/network/components/network_components.mk
 include ${ETHERNET_DRIVER}/eth_driver.mk
 include ${BENCHMARK}/benchmark.mk
 include ${TIMER_DRIVER}/timer_driver.mk
+include ${UART_DRIVER}/uart_driver.mk
+include ${SERIAL_COMPONENTS}/serial_components.mk
 
 qemu: $(IMAGE_FILE)
 	$(QEMU) -machine virt,virtualization=on \
