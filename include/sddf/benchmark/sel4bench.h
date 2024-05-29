@@ -184,7 +184,7 @@ static FASTFN uint32_t sel4bench_private_read_overflow(void)
 {
     uint32_t val;
     PMU_READ(PMOVSSERT, val);
-    PMU_WRITE(PMOVSCLR, val); // Clear the overflow bit so we can detect it again. 
+    PMU_WRITE(PMOVSCLR, val); // Clear the overflow bit so we can detect it again.
     return val;
 }
 
@@ -259,7 +259,8 @@ static CACHESENSFN ccnt_t sel4bench_get_counters(counter_bitfield_t mask, ccnt_t
 
     uint32_t enable_word = sel4bench_private_read_cntens(); //store current running state
 
-    sel4bench_private_write_cntenc(enable_word); //stop running counters (we do this instead of stopping the ones we're interested in because it saves an instruction)
+    sel4bench_private_write_cntenc(
+        enable_word); //stop running counters (we do this instead of stopping the ones we're interested in because it saves an instruction)
 
     unsigned int counter = 0;
     for (; mask != 0; mask >>= 1, counter++) { //for each counter...

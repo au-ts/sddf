@@ -26,7 +26,7 @@ volatile pl011_uart_regs_t *uart_regs;
  */
 static void set_baud(long bps)
 {
-    float baud_div = PL011_UART_REF_CLOCK/(16 * bps);
+    float baud_div = PL011_UART_REF_CLOCK / (16 * bps);
     uint32_t baud_div_int = (uint32_t)baud_div;
     uint32_t baud_div_frac = (uint32_t)((baud_div * 64) + 0.5);
 
@@ -79,7 +79,7 @@ static void rx_return(void)
     bool enqueued = false;
     while (reprocess) {
         while (!(uart_regs->fr & PL011_FR_RXFE) && !serial_queue_full(&rx_queue_handle, rx_queue_handle.queue->tail)) {
-            char c = (char) (uart_regs->dr & PL011_DR_DATA_MASK);
+            char c = (char)(uart_regs->dr & PL011_DR_DATA_MASK);
             serial_enqueue(&rx_queue_handle, &rx_queue_handle.queue->tail, c);
             enqueued = true;
         }
@@ -90,14 +90,14 @@ static void rx_return(void)
             serial_require_consumer_signal(&rx_queue_handle);
         }
         reprocess = false;
-        
+
         if (!(uart_regs->fr & PL011_FR_RXFE) && !serial_queue_full(&rx_queue_handle, rx_queue_handle.queue->tail)) {
             serial_cancel_consumer_signal(&rx_queue_handle);
             uart_regs->imsc |= (PL011_IMSC_RX_TIMEOUT | PL011_IMSC_RX_INT);
             reprocess = true;
         }
     }
-    
+
     if (enqueued && serial_require_producer_signal(&rx_queue_handle)) {
         serial_cancel_producer_signal(&rx_queue_handle);
         microkit_notify(RX_CH);
@@ -106,8 +106,7 @@ static void rx_return(void)
 
 static void handle_irq()
 {
-    while (uart_regs->mis & (PL011_IMSC_RX_TIMEOUT | PL011_IMSC_RX_INT) || uart_regs->mis & PL011_IMSC_TX_INT)
-    {
+    while (uart_regs->mis & (PL011_IMSC_RX_TIMEOUT | PL011_IMSC_RX_INT) || uart_regs->mis & PL011_IMSC_TX_INT) {
         if (uart_regs->mis & (PL011_IMSC_RX_TIMEOUT | PL011_IMSC_RX_INT)) {
             rx_return();
         }
@@ -179,20 +178,20 @@ void init(void)
 
 void notified(microkit_channel ch)
 {
-    switch(ch) {
-        case IRQ_CH:
-            handle_irq();
-            microkit_irq_ack_delayed(ch);
-            break;
-        case TX_CH:
-            tx_provide();
-            break;
-        case RX_CH:
-            uart_regs->imsc |= (PL011_IMSC_RX_TIMEOUT | PL011_IMSC_RX_INT);
-            rx_return();
-            break;
-        default:
-            sddf_dprintf("UART|LOG: received notification on unexpected channel: %u\n", ch);
-            break;
+    switch (ch) {
+    case IRQ_CH:
+        handle_irq();
+        microkit_irq_ack_delayed(ch);
+        break;
+    case TX_CH:
+        tx_provide();
+        break;
+    case RX_CH:
+        uart_regs->imsc |= (PL011_IMSC_RX_TIMEOUT | PL011_IMSC_RX_INT);
+        rx_return();
+        break;
+    default:
+        sddf_dprintf("UART|LOG: received notification on unexpected channel: %u\n", ch);
+        break;
     }
 }

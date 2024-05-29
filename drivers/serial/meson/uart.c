@@ -23,7 +23,7 @@ volatile meson_uart_regs_t *uart_regs;
 struct uart_clock_state uart_clock;
 
 /* UART baud register expects baud rate to be expressed in terms of the number of reference
- ticks per symbol change. This function calculates these ticks and modifies the divisor of 
+ ticks per symbol change. This function calculates these ticks and modifies the divisor of
  the reference clock accordingly. */
 static void set_baud(unsigned long baud)
 {
@@ -33,9 +33,9 @@ static void set_baud(unsigned long baud)
     uint64_t ref_clock_freq = uart_clock.reference_clock_frequency;
     uint64_t ref_clock_ticks_per_symbol = ref_clock_freq / baud;
 
-    /* Check if baud rate can be acheived with a less frequent clock tick. 
-        Note: Linux defaults to use xtal div 3 if the board doesn't implement xtal_div2. 
-        They hardcode what boards support xtal_div2. This IS implemented on the odroidc4, 
+    /* Check if baud rate can be acheived with a less frequent clock tick.
+        Note: Linux defaults to use xtal div 3 if the board doesn't implement xtal_div2.
+        They hardcode what boards support xtal_div2. This IS implemented on the odroidc4,
         but this may not work for different meson devices. */
     uint16_t clock_div = 1;
     uint32_t baud_register = AML_UART_BAUD_USE;
@@ -115,14 +115,14 @@ static void rx_return(void)
             serial_require_consumer_signal(&rx_queue_handle);
         }
         reprocess = false;
-        
+
         if (!(uart_regs->sr & AML_UART_RX_EMPTY) && !serial_queue_full(&rx_queue_handle, rx_queue_handle.queue->tail)) {
             serial_cancel_consumer_signal(&rx_queue_handle);
             uart_regs->cr |= AML_UART_RX_INT_EN;
             reprocess = true;
         }
     }
-    
+
     if (enqueued && serial_require_producer_signal(&rx_queue_handle)) {
         serial_cancel_producer_signal(&rx_queue_handle);
         microkit_notify(RX_CH);
@@ -131,9 +131,8 @@ static void rx_return(void)
 
 static void handle_irq()
 {
-    while (uart_regs->sr & UART_INTR_ABNORMAL || !(uart_regs->sr & AML_UART_RX_EMPTY) 
-            || (uart_regs->cr & AML_UART_TX_INT_EN && !(uart_regs->sr & AML_UART_TX_FULL)))
-    {
+    while (uart_regs->sr & UART_INTR_ABNORMAL || !(uart_regs->sr & AML_UART_RX_EMPTY)
+           || (uart_regs->cr & AML_UART_TX_INT_EN && !(uart_regs->sr & AML_UART_TX_FULL))) {
         if (!(uart_regs->sr & AML_UART_RX_EMPTY)) {
             rx_return();
         }
@@ -147,8 +146,9 @@ static void handle_irq()
     }
 }
 
-static void uart_setup(void) {
-    uart_regs = (meson_uart_regs_t *) (uart_base + UART_REGS_OFFSET);
+static void uart_setup(void)
+{
+    uart_regs = (meson_uart_regs_t *)(uart_base + UART_REGS_OFFSET);
 
     /* Wait until receive and transmit state machines are no longer busy */
     while (uart_regs->sr & (AML_UART_TX_BUSY | AML_UART_RX_BUSY));
@@ -170,7 +170,9 @@ static void uart_setup(void) {
     cr |= AML_UART_DATA_LEN_8BIT;
 
     /* Configure the reference clock and baud rate */
-    uart_clock = (struct uart_clock_state) {true, UART_XTAL_REF_CLK, 1, 0, 0};
+    uart_clock = (struct uart_clock_state) {
+        true, UART_XTAL_REF_CLK, 1, 0, 0
+    };
     set_baud(UART_DEFAULT_BAUD);
 
     uint32_t irqc = uart_regs->irqc;
@@ -205,20 +207,20 @@ void init(void)
 
 void notified(microkit_channel ch)
 {
-    switch(ch) {
-        case IRQ_CH:
-            handle_irq();
-            microkit_irq_ack_delayed(ch);
-            break;
-        case TX_CH:
-            tx_provide();
-            break;
-        case RX_CH:
-            uart_regs->cr |= AML_UART_RX_INT_EN;
-            rx_return();
-            break;
-        default:
-            sddf_dprintf("UART|LOG: received notification on unexpected channel: %u\n", ch);
-            break;
+    switch (ch) {
+    case IRQ_CH:
+        handle_irq();
+        microkit_irq_ack_delayed(ch);
+        break;
+    case TX_CH:
+        tx_provide();
+        break;
+    case RX_CH:
+        uart_regs->cr |= AML_UART_RX_INT_EN;
+        rx_return();
+        break;
+    default:
+        sddf_dprintf("UART|LOG: received notification on unexpected channel: %u\n", ch);
+        break;
     }
 }

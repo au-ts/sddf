@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 #include <sddf/util/util.h>
-#include <sddf/serial/queue.h> 
+#include <sddf/serial/queue.h>
 
 /*
  * This UART driver is based on the following specificion:

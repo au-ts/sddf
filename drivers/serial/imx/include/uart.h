@@ -95,7 +95,7 @@ typedef volatile struct imx_uart_regs imx_uart_regs_t;
 /* Status Register 2 bits */
 #define UART_SR2_RXFIFO_RDR         BIT(0)          /* Rx FIFO ready. There is at least 1 character received and written to the FIFO. */
 #define UART_SR2_TX_FIN             BIT(3)          /* Tx complete. */
-#define UART_SR2_TXFIFO_EMPTY       BIT(14)         /* Tx FIFO Empty. */     
+#define UART_SR2_TXFIFO_EMPTY       BIT(14)         /* Tx FIFO Empty. */
 
 /* Escape Character Register bits */
 #define UART_ESC_CHAR_MSK           (0xff)          /* Holds the selected eschape character that all received characters are compared against to detect an escape sequence. */

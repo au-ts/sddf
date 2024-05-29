@@ -47,7 +47,8 @@ static void tx_provide(void)
     bool transferred = false;
     while (reprocess) {
         char c;
-        while (!(uart_regs->ts & UART_TST_TX_FIFO_FULL) && !serial_dequeue(&tx_queue_handle, &tx_queue_handle.queue->head, &c)) {
+        while (!(uart_regs->ts & UART_TST_TX_FIFO_FULL)
+               && !serial_dequeue(&tx_queue_handle, &tx_queue_handle.queue->head, &c)) {
             uart_regs->txd = (uint32_t)c;
             transferred = true;
         }
@@ -91,14 +92,14 @@ static void rx_return(void)
             serial_require_consumer_signal(&rx_queue_handle);
         }
         reprocess = false;
-        
+
         if (!(uart_regs->ts & UART_TST_RX_FIFO_EMPTY) && !serial_queue_full(&rx_queue_handle, rx_queue_handle.queue->tail)) {
             serial_cancel_consumer_signal(&rx_queue_handle);
             uart_regs->cr1 |= UART_CR1_RX_READY_INT;
             reprocess = true;
         }
     }
-    
+
     if (enqueued && serial_require_producer_signal(&rx_queue_handle)) {
         serial_cancel_producer_signal(&rx_queue_handle);
         microkit_notify(RX_CH);
@@ -108,8 +109,7 @@ static void rx_return(void)
 static void handle_irq()
 {
     while (uart_regs->sr1 & UART_SR1_ABNORMAL || uart_regs->sr1 & UART_SR1_RX_RDY
-            || (uart_regs->cr1 & UART_CR1_TX_READY_INT && uart_regs->sr1 & UART_SR1_TX_RDY))
-    {
+           || (uart_regs->cr1 & UART_CR1_TX_READY_INT && uart_regs->sr1 & UART_SR1_TX_RDY)) {
         if (uart_regs->sr1 & UART_SR1_RX_RDY) {
             rx_return();
         }
@@ -123,7 +123,8 @@ static void handle_irq()
     }
 }
 
-static void uart_setup(void) {
+static void uart_setup(void)
+{
     uart_regs = (imx_uart_regs_t *) uart_base;
 
     /* Enable the UART */
@@ -181,20 +182,20 @@ void init(void)
 
 void notified(microkit_channel ch)
 {
-    switch(ch) {
-        case IRQ_CH:
-            handle_irq();
-            microkit_irq_ack_delayed(ch);
-            break;
-        case TX_CH:
-            tx_provide();
-            break;
-        case RX_CH:
-            uart_regs->cr1 |= UART_CR1_RX_READY_INT;
-            rx_return();
-            break;
-        default:
-            sddf_dprintf("UART|LOG: received notification on unexpected channel: %u\n", ch);
-            break;
+    switch (ch) {
+    case IRQ_CH:
+        handle_irq();
+        microkit_irq_ack_delayed(ch);
+        break;
+    case TX_CH:
+        tx_provide();
+        break;
+    case RX_CH:
+        uart_regs->cr1 |= UART_CR1_RX_READY_INT;
+        rx_return();
+        break;
+    default:
+        sddf_dprintf("UART|LOG: received notification on unexpected channel: %u\n", ch);
+        break;
     }
 }
