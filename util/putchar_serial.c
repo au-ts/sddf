@@ -28,7 +28,7 @@ void _sddf_putchar(char character)
     }
 }
 
-void sddf_putchar_repl(char character)
+void sddf_putchar_unbuffered(char character)
 {
     if (serial_queue_full(tx_queue_handle, local_tail)) {
         return;

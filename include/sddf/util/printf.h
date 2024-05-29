@@ -60,11 +60,11 @@ void _sddf_putchar(char character);
  * which multiplexes on a flush character. Ensure to call serial_putchar_init before using this function
  * @param character Character to output.
  */
-void sddf_putchar_repl(char character);
+void sddf_putchar_unbuffered(char character);
 
 /**
  * @brief Initialises the serial putchar library. Ensure this is called before using serial printf or
- * sddf_putchar_repl.
+ * sddf_putchar_unbuffered.
  *
  * @param serial_tx_ch Microkit channel of the serial tx virtualiser.
  * @param serial_tx_queue_handle Address of the serial tx queue handle.
