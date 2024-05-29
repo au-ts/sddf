@@ -149,5 +149,6 @@ static inline void *memmove(void *dest, const void *src, size_t n)
             dest[i] = src[i];
         }
     }
+    return dest;
 #endif
 }
