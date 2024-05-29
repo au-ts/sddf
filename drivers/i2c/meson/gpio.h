@@ -12,8 +12,7 @@
 
 #include <sddf/util/util.h>
 
-#ifndef __GPIO_H__
-#define __GPIO_H__
+#pragma once
 #define GPIO_OFFSET 1024
 
 // Pinmux
@@ -47,7 +46,3 @@
 #define GPIO_BIAS_2_EN  0x4a
 #define GPIO_BIAS_5     0x3f    // GPIO bank A
 #define GPIO_BIAS_5_EN  0x4d
-
-#endif
-
-
