@@ -50,7 +50,6 @@ static inline char *strncpy(char *dest, const char *restrict src,
     while (dsize-- && (*to = *src++)) {
         to++;
     }
-    *to = '\0';
     while (dsize--) {
         *to++ = '\0';
     }
