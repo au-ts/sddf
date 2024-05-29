@@ -29,14 +29,14 @@ uint32_t current_client = 0;
 char next_client[MAX_CLI_BASE_10 + 1];
 uint8_t next_client_index;
 
-void reset_state()
+void reset_state(void)
 {
     sddf_memset(next_client, '\0', MAX_CLI_BASE_10 + 1);
     next_client_index = 0;
     current_mode = normal;
 }
 
-void rx_return()
+void rx_return(void)
 {
     bool reprocess = true;
     bool transferred = false;

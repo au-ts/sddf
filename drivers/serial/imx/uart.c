@@ -106,7 +106,7 @@ static void rx_return(void)
     }
 }
 
-static void handle_irq()
+static void handle_irq(void)
 {
     while (uart_regs->sr1 & UART_SR1_ABNORMAL || uart_regs->sr1 & UART_SR1_RX_RDY
            || (uart_regs->cr1 & UART_CR1_TX_READY_INT && uart_regs->sr1 & UART_SR1_TX_RDY)) {
