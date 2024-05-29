@@ -165,3 +165,28 @@ static inline int isdigit(int ch)
 {
     return ch >= '0' && ch <= '9';
 }
+
+static inline int atoi(const char *str)
+{
+    while (isspace(*str)) {
+        str++;
+    }
+
+    int sign = 1;
+    if (*str == '+') {
+        str++;
+    } else if (*str == '-') {
+        sign = -1;
+        str++;
+    }
+
+    int result = 0;
+    while (isdigit(*str)) {
+        int digit = *str - '0';
+        result *= 10;
+        result += digit;
+        str++;
+    }
+
+    return sign * result;
+}
