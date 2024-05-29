@@ -62,7 +62,7 @@ static inline int strcmp(const char *a, const char *b)
 #if __has_builtin(__builtin_strcmp)
     return __builtin_strcmp(a, b);
 #else
-    while (*a != '\0' && *b != '\0 && *a == *b) {
+    while (*a != '\0' && *b != '\0' && *a == *b) {
         a++;
         b++;
     }
