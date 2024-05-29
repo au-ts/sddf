@@ -83,14 +83,14 @@ serial_queue_handle_t serial_tx_queue_handle;
 If they require serial input then equivalent declarations must exist for the receive serial
 objects. Finally, during initialisation and prior to calling printf, they must initialise their 
 serial queue(s) by calling `serial_cli_queue_init_sys` as well as `serial_putchar_init` which
-allows them to also use `sddf_putchar_repl`.
+allows them to also use `sddf_putchar_unbuffered`.
 
 ## Example
 The serial server example system contains two clients which can both receive serial data as well
 as transmit. By default, the example has SERIAL_WITH_COLOUR enabled so each client prints with a
 different colour. Each client boots up and prints a hello world message when initialisation is
 completed, and waits for input. When a character is received, each client will re-transmit the
-character using `sddf_putchar_repl` which flushes the character to the device immediately. Every
+character using `sddf_putchar_unbuffered` which flushes the character to the device immediately. Every
 tenth character each client will print a string containing their name using `sddf_printf` which
 calls the serial `_sddf_putchar`, flushing characters to the device only when a `\n` is
 encountered.

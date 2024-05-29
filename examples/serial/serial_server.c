@@ -33,10 +33,10 @@ void notified(microkit_channel ch)
     while (reprocess) {
         while (!serial_dequeue(&rx_queue_handle, &rx_queue_handle.queue->head, &c)) {
             if (c == '\r') {
-                sddf_putchar_repl('\\');
-                sddf_putchar_repl('r');
+                sddf_putchar_unbuffered('\\');
+                sddf_putchar_unbuffered('r');
             } else {
-                sddf_putchar_repl(c);
+                sddf_putchar_unbuffered(c);
             }
             char_count ++;
             if (char_count % 10 == 0) {
