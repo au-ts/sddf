@@ -59,3 +59,46 @@ static void _assert_fail(const char  *assertion, const char  *file, unsigned int
     } while(0)
 #endif
 #endif
+
+static inline int sddf_isspace(int ch)
+{
+#if __has_builtin(__builtin_isspace)
+    return __builtin_isspace(ch);
+#else
+    return ch == ' ' || ch == '\f' || ch == '\n' || ch == '\r' || ch == '\t' || ch == '\v';
+#endif
+}
+
+static inline int sddf_isdigit(int ch)
+{
+#if __has_builtin(__builtin_isdigit)
+    return __builtin_isdigit(ch);
+#else
+    return ch >= '0' && ch <= '9';
+#endif
+}
+
+static inline int sddf_atoi(const char *str)
+{
+    while (isspace(*str)) {
+        str++;
+    }
+
+    int sign = 1;
+    if (*str == '+') {
+        str++;
+    } else if (*str == '-') {
+        sign = -1;
+        str++;
+    }
+
+    int result = 0;
+    while (isdigit(*str)) {
+        int digit = *str - '0';
+        result *= 10;
+        result += digit;
+        str++;
+    }
+
+    return sign * result;
+}
