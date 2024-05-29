@@ -4,6 +4,7 @@
 #include <ctype.h>
 #include <microkit.h>
 #include <sddf/serial/queue.h>
+#include <sddf/util/string.h>
 #include <sddf/util/printf.h>
 #include <serial_config.h>
 #include "uart.h"
@@ -30,7 +31,7 @@ uint8_t next_client_index;
 
 void reset_state()
 {
-    memset(next_client, '\0', MAX_CLI_BASE_10 + 1);
+    sddf_memset(next_client, '\0', MAX_CLI_BASE_10 + 1);
     next_client_index = 0;
     current_mode = normal;
 }
@@ -57,7 +58,7 @@ void rx_return()
                 }
                 break;
             case switched:
-                if (isdigit(c)) {
+                if (sddf_isdigit(c)) {
                     next_client[next_client_index] = c;
                     next_client_index ++;
                     current_mode = number;
@@ -74,7 +75,7 @@ void rx_return()
                 break;
             default:
                 if (c == SERIAL_TERMINATE_NUM) {
-                    int input_number = atoi(next_client);
+                    int input_number = sddf_atoi(next_client);
                     if (input_number >= 0 && input_number < SERIAL_NUM_CLIENTS) {
                         if (transferred && serial_require_producer_signal(&rx_queue_handle_cli[current_client])) {
                             serial_update_visible_tail(&rx_queue_handle_cli[current_client], local_tail);
@@ -88,7 +89,7 @@ void rx_return()
                         sddf_dprintf("VIRT_RX|LOG: User requested to switch to an invalid client %d\n", input_number);
                     }
                     reset_state();
-                } else if (next_client_index < MAX_CLI_BASE_10 && isdigit((int)c)) {
+                } else if (next_client_index < MAX_CLI_BASE_10 && sddf_isdigit((int)c)) {
                     next_client[next_client_index] = c;
                     next_client_index ++;
                 } else {

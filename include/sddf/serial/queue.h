@@ -9,7 +9,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <string.h>
+#include <sddf/util/string.h>
 #include <sddf/util/util.h>
 #include <sddf/util/fence.h>
 
@@ -225,7 +225,7 @@ static inline void serial_transfer_all(serial_queue_handle_t *active_queue_handl
         uint32_t free = serial_queue_contiguous_free(free_queue_handle);
         uint32_t to_transfer = (active < free) ? active : free;
 
-        memcpy(free_queue_handle->data_region + (free_queue_handle->queue->tail % free_queue_handle->size),
+        sddf_memcpy(free_queue_handle->data_region + (free_queue_handle->queue->tail % free_queue_handle->size),
                active_queue_handle->data_region + (active_queue_handle->queue->head %
                                                    active_queue_handle->size), to_transfer);
 
@@ -247,8 +247,8 @@ static inline void serial_transfer_all_with_colour(serial_queue_handle_t *active
                                                    serial_queue_handle_t *free_queue_handle,
                                                    char *colour_start, char *colour_end)
 {
-    uint16_t colour_start_length = strlen(colour_start);
-    uint16_t colour_end_length = strlen(colour_end);
+    uint16_t colour_start_length = sddf_strlen(colour_start);
+    uint16_t colour_end_length = sddf_strlen(colour_end);
     assert(serial_queue_length(active_queue_handle) + colour_start_length + colour_end_length
            <= serial_queue_free(free_queue_handle));
 
@@ -258,7 +258,7 @@ static inline void serial_transfer_all_with_colour(serial_queue_handle_t *active
         uint32_t free = serial_queue_contiguous_free(free_queue_handle);
         uint32_t to_transfer = (remaining < free) ? remaining : free;
 
-        memcpy(free_queue_handle->data_region + (free_queue_handle->queue->tail % free_queue_handle->size),
+        sddf_memcpy(free_queue_handle->data_region + (free_queue_handle->queue->tail % free_queue_handle->size),
                colour_start + colour_transferred, to_transfer);
 
         serial_update_visible_tail(free_queue_handle, free_queue_handle->queue->tail + to_transfer);
@@ -271,7 +271,7 @@ static inline void serial_transfer_all_with_colour(serial_queue_handle_t *active
         uint32_t free = serial_queue_contiguous_free(free_queue_handle);
         uint32_t to_transfer = (active < free) ? active : free;
 
-        memcpy(free_queue_handle->data_region + (free_queue_handle->queue->tail % free_queue_handle->size),
+        sddf_memcpy(free_queue_handle->data_region + (free_queue_handle->queue->tail % free_queue_handle->size),
                active_queue_handle->data_region + (active_queue_handle->queue->head %
                                                    active_queue_handle->size), to_transfer);
 
@@ -286,7 +286,7 @@ static inline void serial_transfer_all_with_colour(serial_queue_handle_t *active
         uint32_t free = serial_queue_contiguous_free(free_queue_handle);
         uint32_t to_transfer = (remaining < free) ? remaining : free;
 
-        memcpy(free_queue_handle->data_region + (free_queue_handle->queue->tail % free_queue_handle->size),
+        sddf_memcpy(free_queue_handle->data_region + (free_queue_handle->queue->tail % free_queue_handle->size),
                colour_end + colour_transferred, to_transfer);
 
         serial_update_visible_tail(free_queue_handle, free_queue_handle->queue->tail + to_transfer);

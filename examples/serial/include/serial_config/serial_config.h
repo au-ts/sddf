@@ -1,6 +1,7 @@
 #pragma once
 
 #include <microkit.h>
+#include <sddf/util/string.h>
 #include <sddf/serial/queue.h>
 #include <stdint.h>
 
@@ -46,22 +47,14 @@
 _Static_assert(SERIAL_MAX_DATA_SIZE < UINT32_MAX,
                "Data regions must be smaller than UINT32 max to correctly use queue data structure.");
 
-static inline bool __serial_str_match(const char *s0, const char *s1)
-{
-    while (*s0 != '\0' && *s1 != '\0' && *s0 == *s1) {
-        s0++, s1++;
-    }
-    return *s0 == *s1;
-}
-
 static inline void serial_cli_queue_init_sys(char *pd_name, serial_queue_handle_t *rx_queue_handle,
                                              serial_queue_t *rx_queue,
                                              char *rx_data, serial_queue_handle_t *tx_queue_handle, serial_queue_t *tx_queue, char *tx_data)
 {
-    if (__serial_str_match(pd_name, SERIAL_CLI0_NAME)) {
+    if (!sddf_strcmp(pd_name, SERIAL_CLI0_NAME)) {
         serial_queue_init(rx_queue_handle, rx_queue, SERIAL_RX_DATA_REGION_SIZE_CLI0, rx_data);
         serial_queue_init(tx_queue_handle, tx_queue, SERIAL_TX_DATA_REGION_SIZE_CLI0, tx_data);
-    } else if (__serial_str_match(pd_name, SERIAL_CLI1_NAME)) {
+    } else if (!sddf_strcmp(pd_name, SERIAL_CLI1_NAME)) {
         serial_queue_init(rx_queue_handle, rx_queue, SERIAL_RX_DATA_REGION_SIZE_CLI1, rx_data);
         serial_queue_init(tx_queue_handle, tx_queue, SERIAL_TX_DATA_REGION_SIZE_CLI1, tx_data);
     }
@@ -70,11 +63,11 @@ static inline void serial_cli_queue_init_sys(char *pd_name, serial_queue_handle_
 static inline void serial_virt_queue_init_sys(char *pd_name, serial_queue_handle_t *cli_queue_handle,
                                               uintptr_t cli_queue, uintptr_t cli_data)
 {
-    if (__serial_str_match(pd_name, SERIAL_VIRT_RX_NAME)) {
+    if (!sddf_strcmp(pd_name, SERIAL_VIRT_RX_NAME)) {
         serial_queue_init(cli_queue_handle, (serial_queue_t *) cli_queue, SERIAL_RX_DATA_REGION_SIZE_CLI0, (char *)cli_data);
         serial_queue_init(&cli_queue_handle[1], (serial_queue_t *)(cli_queue + SERIAL_QUEUE_SIZE),
                           SERIAL_RX_DATA_REGION_SIZE_CLI1, (char *)(cli_data + SERIAL_RX_DATA_REGION_SIZE_CLI0));
-    } else if (__serial_str_match(pd_name, SERIAL_VIRT_TX_NAME)) {
+    } else if (!sddf_strcmp(pd_name, SERIAL_VIRT_TX_NAME)) {
         serial_queue_init(cli_queue_handle, (serial_queue_t *) cli_queue, SERIAL_TX_DATA_REGION_SIZE_CLI0, (char *)cli_data);
         serial_queue_init(&cli_queue_handle[1], (serial_queue_t *)(cli_queue + SERIAL_QUEUE_SIZE),
                           SERIAL_TX_DATA_REGION_SIZE_CLI1, (char *)(cli_data + SERIAL_TX_DATA_REGION_SIZE_CLI0));
