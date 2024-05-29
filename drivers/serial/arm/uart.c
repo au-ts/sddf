@@ -104,7 +104,7 @@ static void rx_return(void)
     }
 }
 
-static void handle_irq()
+static void handle_irq(void)
 {
     while (uart_regs->mis & (PL011_IMSC_RX_TIMEOUT | PL011_IMSC_RX_INT) || uart_regs->mis & PL011_IMSC_TX_INT) {
         if (uart_regs->mis & (PL011_IMSC_RX_TIMEOUT | PL011_IMSC_RX_INT)) {

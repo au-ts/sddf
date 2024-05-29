@@ -44,7 +44,7 @@ typedef struct tx_pending {
 
 tx_pending_t tx_pending;
 
-static uint32_t tx_pending_length()
+static uint32_t tx_pending_length(void)
 {
     return tx_pending.tail - tx_pending.head;
 }
@@ -111,7 +111,7 @@ bool process_tx_queue(uint32_t client)
     return true;
 }
 
-void tx_return()
+void tx_return(void)
 {
     uint32_t num_pending_tx = tx_pending_length();
     if (!num_pending_tx) {

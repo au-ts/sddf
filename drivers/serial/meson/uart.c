@@ -129,7 +129,7 @@ static void rx_return(void)
     }
 }
 
-static void handle_irq()
+static void handle_irq(void)
 {
     while (uart_regs->sr & UART_INTR_ABNORMAL || !(uart_regs->sr & AML_UART_RX_EMPTY)
            || (uart_regs->cr & AML_UART_TX_INT_EN && !(uart_regs->sr & AML_UART_TX_FULL))) {
