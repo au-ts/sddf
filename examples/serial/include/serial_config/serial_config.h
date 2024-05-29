@@ -20,9 +20,9 @@
 /* Default baud rate of the uart device */
 #define UART_DEFAULT_BAUD 115200
 
-/* String to be printed by the driver to start console input */
-#define SERIAL_CONSOLE_BEGIN_STRING "UART|LOG: Init complete\n"
-#define SERIAL_CONSOLE_BEGIN_STRING_LEN 25
+/* String to be printed to start console input */
+#define SERIAL_CONSOLE_BEGIN_STRING "Begin input\n"
+#define SERIAL_CONSOLE_BEGIN_STRING_LEN 13
 
 #define SERIAL_CLI0_NAME "client0"
 #define SERIAL_CLI1_NAME "client1"

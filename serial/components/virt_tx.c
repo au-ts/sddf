@@ -176,6 +176,14 @@ void init(void)
 {
     serial_queue_init(&tx_queue_handle_drv, tx_queue_drv, SERIAL_TX_DATA_REGION_SIZE_DRIV, tx_data_drv);
     serial_virt_queue_init_sys(microkit_name, tx_queue_handle_cli, tx_queue_cli0, tx_data_cli0);
+
+#if !SERIAL_TX_ONLY
+    /* Print a deterministic string to allow console input to begin */
+    sddf_memcpy(tx_queue_handle_drv.data_region, SERIAL_CONSOLE_BEGIN_STRING, SERIAL_CONSOLE_BEGIN_STRING_LEN);
+    serial_update_visible_tail(&tx_queue_handle_drv, SERIAL_CONSOLE_BEGIN_STRING_LEN);
+    microkit_notify(DRIVER_CH);
+#endif
+
 #if SERIAL_WITH_COLOUR
     serial_channel_names_init(clients_colours);
     for (uint32_t i = 0; i < SERIAL_NUM_CLIENTS; i++) {
