@@ -33,8 +33,6 @@
 #endif
 #endif
 
-#define MAX(a,b) (((a) > (b)) ? (a) : (b))
-
 // Doing this with statement expressions & temporary variables to avoid issues
 // with operator precedence and evaluating arguments multiple times.
 #define ROUND_UP(n,d) \
