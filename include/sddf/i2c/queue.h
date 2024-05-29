@@ -9,8 +9,19 @@
 #include <stddef.h>
 #include <sddf/util/fence.h>
 
-#define I2C_MAX_DATA_SIZE 512
-#define NUM_QUEUE_ENTRIES 512
+/*
+ * Here we choose the default data size and queue entries. This means
+ * that by default the data region would need 4KiB of space (1 page on
+ * AArch64 for example). These defaults have worked for our example systems
+ * but are left configurable for the system designer if they are too small.
+ */
+#ifndef I2C_MAX_DATA_SIZE
+#define I2C_MAX_DATA_SIZE 128
+#endif
+
+#ifndef NUM_QUEUE_ENTRIES
+#define NUM_QUEUE_ENTRIES 32
+#endif
 
 #define RESPONSE_ERR 0
 #define RESPONSE_ERR_TOKEN 1
