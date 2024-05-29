@@ -41,7 +41,7 @@ static inline void *sddf_memcpy(void *dest, const void *src, size_t n)
 }
 
 static inline char *sddf_strncpy(char *dest, const char *restrict src,
-                            size_t dsize)
+                                 size_t dsize)
 {
 #if __has_builtin(__builtin_strcpy)
     return __builtin_strncpy(dest, src, dsize);

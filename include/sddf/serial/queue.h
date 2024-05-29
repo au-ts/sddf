@@ -226,8 +226,8 @@ static inline void serial_transfer_all(serial_queue_handle_t *active_queue_handl
         uint32_t to_transfer = (active < free) ? active : free;
 
         sddf_memcpy(free_queue_handle->data_region + (free_queue_handle->queue->tail % free_queue_handle->size),
-               active_queue_handle->data_region + (active_queue_handle->queue->head %
-                                                   active_queue_handle->size), to_transfer);
+                    active_queue_handle->data_region + (active_queue_handle->queue->head %
+                                                        active_queue_handle->size), to_transfer);
 
         /* Make copy visible */
         serial_update_visible_tail(free_queue_handle, free_queue_handle->queue->tail + to_transfer);
@@ -259,7 +259,7 @@ static inline void serial_transfer_all_with_colour(serial_queue_handle_t *active
         uint32_t to_transfer = (remaining < free) ? remaining : free;
 
         sddf_memcpy(free_queue_handle->data_region + (free_queue_handle->queue->tail % free_queue_handle->size),
-               colour_start + colour_transferred, to_transfer);
+                    colour_start + colour_transferred, to_transfer);
 
         serial_update_visible_tail(free_queue_handle, free_queue_handle->queue->tail + to_transfer);
         colour_transferred += to_transfer;
@@ -272,8 +272,8 @@ static inline void serial_transfer_all_with_colour(serial_queue_handle_t *active
         uint32_t to_transfer = (active < free) ? active : free;
 
         sddf_memcpy(free_queue_handle->data_region + (free_queue_handle->queue->tail % free_queue_handle->size),
-               active_queue_handle->data_region + (active_queue_handle->queue->head %
-                                                   active_queue_handle->size), to_transfer);
+                    active_queue_handle->data_region + (active_queue_handle->queue->head %
+                                                        active_queue_handle->size), to_transfer);
 
         /* Make copy visible */
         serial_update_visible_tail(free_queue_handle, free_queue_handle->queue->tail + to_transfer);
@@ -287,7 +287,7 @@ static inline void serial_transfer_all_with_colour(serial_queue_handle_t *active
         uint32_t to_transfer = (remaining < free) ? remaining : free;
 
         sddf_memcpy(free_queue_handle->data_region + (free_queue_handle->queue->tail % free_queue_handle->size),
-               colour_end + colour_transferred, to_transfer);
+                    colour_end + colour_transferred, to_transfer);
 
         serial_update_visible_tail(free_queue_handle, free_queue_handle->queue->tail + to_transfer);
         colour_transferred += to_transfer;
