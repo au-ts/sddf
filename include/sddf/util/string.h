@@ -160,3 +160,8 @@ static inline int isspace(int ch)
     return ch == ' ' || ch == '\f' || ch == '\n' || ch == '\r' || ch == '\t' || ch == '\v';
 #endif
 }
+
+static inline int isdigit(int ch)
+{
+    return ch >= '0' && ch <= '9';
+}
