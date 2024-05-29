@@ -13,7 +13,7 @@
 #  define __has_builtin(x) 0
 #endif
 
-static inline void *memset(void *s, int c, size_t n)
+static inline void *sddf_memset(void *s, int c, size_t n)
 {
 #if __has_builtin(__builtin_memset)
     return __builtin_memset(s, c, n);
@@ -26,7 +26,7 @@ static inline void *memset(void *s, int c, size_t n)
 #endif
 }
 
-static inline void *memcpy(void *dest, const void *src, size_t n)
+static inline void *sddf_memcpy(void *dest, const void *src, size_t n)
 {
 #if __has_builtin(__builtin_memcpy)
     return __builtin_memcpy(dest, src, n);
@@ -40,7 +40,7 @@ static inline void *memcpy(void *dest, const void *src, size_t n)
 #endif
 }
 
-static inline char *strncpy(char *dest, const char *restrict src,
+static inline char *sddf_strncpy(char *dest, const char *restrict src,
                             size_t dsize)
 {
 #if __has_builtin(__builtin_strcpy)
@@ -57,7 +57,7 @@ static inline char *strncpy(char *dest, const char *restrict src,
 #endif
 }
 
-static inline int strcmp(const char *a, const char *b)
+static inline int sddf_strcmp(const char *a, const char *b)
 {
 #if __has_builtin(__builtin_strcmp)
     return __builtin_strcmp(a, b);
@@ -70,7 +70,7 @@ static inline int strcmp(const char *a, const char *b)
 #endif
 }
 
-static inline int strncmp(const char *a, const char *b, size_t n)
+static inline int sddf_strncmp(const char *a, const char *b, size_t n)
 {
 #if __has_builtin(__builtin_strncmp)
     return __builtin_strncmp(a, b, n);
@@ -84,7 +84,7 @@ static inline int strncmp(const char *a, const char *b, size_t n)
 #endif
 }
 
-static inline char *strchr(const char *s, int c)
+static inline char *sddf_strchr(const char *s, int c)
 {
 #if __has_builtin(__builtin_strncmp)
     return __builtin_strchr(s, c);
@@ -102,7 +102,7 @@ static inline char *strchr(const char *s, int c)
 #endif
 }
 
-static inline int memcmp(const void *a, const void *b, size_t n)
+static inline int sddf_memcmp(const void *a, const void *b, size_t n)
 {
 #if __has_builtin(__builtin_memcmp)
     return __builtin_memcmp(a, b, n);
@@ -119,7 +119,7 @@ static inline int memcmp(const void *a, const void *b, size_t n)
 }
 
 
-static inline size_t strlen(const char *s)
+static inline size_t sddf_strlen(const char *s)
 {
 #if __has_builtin(__builtin_strlen)
     return __builtin_strlen(s);
@@ -133,7 +133,7 @@ static inline size_t strlen(const char *s)
 }
 
 
-static inline void *memmove(void *dest, const void *src, size_t n)
+static inline void *sddf_memmove(void *dest, const void *src, size_t n)
 {
 #if __has_builtin(__builtin_memmove)
     return __builtin_memmove(dest, src, n);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <microkit.h>
+#include <sddf/util/string.h>
 #include <sddf/util/util.h>
 #include <sddf/network/queue.h>
 
@@ -71,14 +72,6 @@ _Static_assert(NET_RX_QUEUE_SIZE_COPY1 >= NET_RX_QUEUE_SIZE_DRIV,
 _Static_assert(sizeof(net_queue_t) + NET_MAX_QUEUE_SIZE *sizeof(net_buff_desc_t) <= NET_DATA_REGION_SIZE,
                "net_queue_t must fit into a single data region.");
 
-static inline bool __net_str_match(const char *s0, const char *s1)
-{
-    while (*s0 != '\0' && *s1 != '\0' && *s0 == *s1) {
-        s0++, s1++;
-    }
-    return *s0 == *s1;
-}
-
 static void __net_set_mac_addr(uint8_t *mac, uint64_t val)
 {
     mac[0] = val >> 40 & 0xff;
@@ -91,16 +84,16 @@ static void __net_set_mac_addr(uint8_t *mac, uint64_t val)
 
 static inline void net_cli_mac_addr_init_sys(char *pd_name, uint8_t *macs)
 {
-    if (__net_str_match(pd_name, NET_CLI0_NAME)) {
+    if (!sddf_strcmp(pd_name, NET_CLI0_NAME)) {
         __net_set_mac_addr(macs, MAC_ADDR_CLI0);
-    } else if (__net_str_match(pd_name, NET_CLI1_NAME)) {
+    } else if (!sddf_strcmp(pd_name, NET_CLI1_NAME)) {
         __net_set_mac_addr(macs, MAC_ADDR_CLI1);
     }
 }
 
 static inline void net_virt_mac_addr_init_sys(char *pd_name, uint8_t *macs)
 {
-    if (__net_str_match(pd_name, NET_VIRT_RX_NAME)) {
+    if (!sddf_strcmp(pd_name, NET_VIRT_RX_NAME)) {
         __net_set_mac_addr(macs, MAC_ADDR_CLI0);
         __net_set_mac_addr(&macs[ETH_HWADDR_LEN], MAC_ADDR_CLI1);
     }
@@ -110,10 +103,10 @@ static inline void net_cli_queue_init_sys(char *pd_name, net_queue_handle_t *rx_
                                           uintptr_t rx_active, net_queue_handle_t *tx_queue, uintptr_t tx_free,
                                           uintptr_t tx_active)
 {
-    if (__net_str_match(pd_name, NET_CLI0_NAME)) {
+    if (!sddf_strcmp(pd_name, NET_CLI0_NAME)) {
         net_queue_init(rx_queue, (net_queue_t *) rx_free, (net_queue_t *) rx_active, NET_RX_QUEUE_SIZE_CLI0);
         net_queue_init(tx_queue, (net_queue_t *) tx_free, (net_queue_t *) tx_active, NET_TX_QUEUE_SIZE_CLI0);
-    } else if (__net_str_match(pd_name, NET_CLI1_NAME)) {
+    } else if (!sddf_strcmp(pd_name, NET_CLI1_NAME)) {
         net_queue_init(rx_queue, (net_queue_t *) rx_free, (net_queue_t *) rx_active, NET_RX_QUEUE_SIZE_CLI1);
         net_queue_init(tx_queue, (net_queue_t *) tx_free, (net_queue_t *) tx_active, NET_TX_QUEUE_SIZE_CLI1);
     }
@@ -123,10 +116,10 @@ static inline void net_copy_queue_init_sys(char *pd_name, net_queue_handle_t *cl
                                            uintptr_t cli_active, net_queue_handle_t *virt_queue, uintptr_t virt_free,
                                            uintptr_t virt_active)
 {
-    if (__net_str_match(pd_name, NET_COPY0_NAME)) {
+    if (!sddf_strcmp(pd_name, NET_COPY0_NAME)) {
         net_queue_init(cli_queue, (net_queue_t *) cli_free, (net_queue_t *) cli_active, NET_RX_QUEUE_SIZE_CLI0);
         net_queue_init(virt_queue, (net_queue_t *) virt_free, (net_queue_t *) virt_active, NET_RX_QUEUE_SIZE_COPY0);
-    } else if (__net_str_match(pd_name, NET_COPY1_NAME)) {
+    } else if (!sddf_strcmp(pd_name, NET_COPY1_NAME)) {
         net_queue_init(cli_queue, (net_queue_t *) cli_free, (net_queue_t *) cli_active, NET_RX_QUEUE_SIZE_CLI1);
         net_queue_init(virt_queue, (net_queue_t *) virt_free, (net_queue_t *) virt_active, NET_RX_QUEUE_SIZE_COPY1);
     }
@@ -135,11 +128,11 @@ static inline void net_copy_queue_init_sys(char *pd_name, net_queue_handle_t *cl
 static inline void net_virt_queue_init_sys(char *pd_name, net_queue_handle_t *cli_queue, uintptr_t cli_free,
                                            uintptr_t cli_active)
 {
-    if (__net_str_match(pd_name, NET_VIRT_RX_NAME)) {
+    if (!sddf_strcmp(pd_name, NET_VIRT_RX_NAME)) {
         net_queue_init(cli_queue, (net_queue_t *) cli_free, (net_queue_t *) cli_active, NET_RX_QUEUE_SIZE_COPY0);
         net_queue_init(&cli_queue[1], (net_queue_t *)(cli_free + 2 * NET_DATA_REGION_SIZE),
                        (net_queue_t *)(cli_active + 2 * NET_DATA_REGION_SIZE), NET_RX_QUEUE_SIZE_COPY1);
-    } else if (__net_str_match(pd_name, NET_VIRT_TX_NAME)) {
+    } else if (!sddf_strcmp(pd_name, NET_VIRT_TX_NAME)) {
         net_queue_init(cli_queue, (net_queue_t *) cli_free, (net_queue_t *) cli_active, NET_TX_QUEUE_SIZE_CLI0);
         net_queue_init(&cli_queue[1], (net_queue_t *)(cli_free + 2 * NET_DATA_REGION_SIZE),
                        (net_queue_t *)(cli_active + 2 * NET_DATA_REGION_SIZE), NET_TX_QUEUE_SIZE_CLI1);
@@ -148,7 +141,7 @@ static inline void net_virt_queue_init_sys(char *pd_name, net_queue_handle_t *cl
 
 static inline void net_mem_region_init_sys(char *pd_name, uintptr_t *mem_regions, uintptr_t start_region)
 {
-    if (__net_str_match(pd_name, NET_VIRT_TX_NAME)) {
+    if (!sddf_strcmp(pd_name, NET_VIRT_TX_NAME)) {
         mem_regions[0] = start_region;
         mem_regions[1] = start_region + NET_DATA_REGION_SIZE;
     }

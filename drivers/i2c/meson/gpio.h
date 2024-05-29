@@ -10,9 +10,10 @@
 // Matt Rossouw (matthew.rossouw@unsw.edu.au)
 // 08/2023
 
+#include <sddf/util/util.h>
+
 #ifndef __GPIO_H__
 #define __GPIO_H__
-#define BIT(n)  (1U << (n))
 #define GPIO_OFFSET 1024
 
 // Pinmux
