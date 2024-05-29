@@ -62,7 +62,11 @@ static inline int strcmp(const char *a, const char *b)
 #if __has_builtin(__builtin_strcmp)
     return __builtin_strcmp(a, b);
 #else
-#   error Need a strcmp implementation
+    while (*a != '\0' && *b != '\0 && *a == *b) {
+        a++;
+        b++;
+    }
+    return (int)*a - *b;
 #endif
 }
 
@@ -71,7 +75,12 @@ static inline int strncmp(const char *a, const char *b, size_t n)
 #if __has_builtin(__builtin_strncmp)
     return __builtin_strncmp(a, b, n);
 #else
-#   error Need a strncmp implementation
+    for (size_t i = 0; i < n; i++) {
+        if (a[i] == '\0' || b[i] == '\0' || a[i] != b[i]) {
+            return (int)a[i] - b[i];
+        }
+    }
+    return 0;
 #endif
 }
 
@@ -80,7 +89,16 @@ static inline char *strchr(const char *s, int c)
 #if __has_builtin(__builtin_strncmp)
     return __builtin_strchr(s, c);
 #else
-#   error Need a strchr implementation
+    while (*s != '\0') {
+        if (*s == c) {
+            return s;
+        }
+        s++;
+    }
+    if (c == '\0') {
+        return s;
+    }
+    return NULL;
 #endif
 }
 
@@ -89,7 +107,14 @@ static inline int memcmp(const void *a, const void *b, size_t n)
 #if __has_builtin(__builtin_strcmp)
     return __builtin_memcmp(a, b, n);
 #else
-#   error Need a memcmp implementation
+    unsigned char *_a = a;
+    unsigned char *_b = b;
+    for (size_t i = 0; i < n; i++) {
+        if (_a[i] != _b[i]) {
+            return (int)_a[i] - (int)_b[i];
+        }
+    }
+    return 0;
 #endif
 }
 
@@ -99,7 +124,11 @@ static inline size_t strlen(const char *s)
 #if __has_builtin(__builtin_strlen)
     return __builtin_strlen(s);
 #else
-#   error Need a strlen implementation
+    const char *_s;
+    while (*_s != '\0') {
+        _s++;
+    }
+    return (size_t)(s_ - s);
 #endif
 }
 
@@ -109,6 +138,25 @@ static inline void *memmove(void *dest, const void *src, size_t n)
 #if __has_builtin(__builtin_memmove)
     return __builtin_memmove(dest, src, n);
 #else
-#   error Need a memmove implementation
+    if (dest == src) {
+        return dest;
+    }
+    int copy_backwards = dest > src;
+    for (size_t i = 0; i < n; i++) {
+        if (copy_backwards) {
+            dest[n - 1 - i] = src[n - 1 - i];
+        } else {
+            dest[i] = src[i];
+        }
+    }
+#endif
+}
+
+static inline int isspace(int ch)
+{
+#if __has_builtin(__builtin_isspace)
+    return __builtin_isspace(ch);
+#else
+    return ch == ' ' || ch == '\f' || ch == '\n' || ch == '\r' || ch == '\t' || ch == '\v';
 #endif
 }
