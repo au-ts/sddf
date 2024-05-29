@@ -31,7 +31,8 @@ uintptr_t tx_active;
 #define TX_COUNT 256
 #define MAX_COUNT MAX(RX_COUNT, TX_COUNT)
 
-_Static_assert((RX_COUNT + TX_COUNT) * 2 * NET_BUFFER_SIZE <= NET_DATA_REGION_SIZE, "Expect rx+tx buffers to fit in single 2MB page");
+_Static_assert((RX_COUNT + TX_COUNT) * 2 * NET_BUFFER_SIZE <= NET_DATA_REGION_SIZE,
+               "Expect rx+tx buffers to fit in single 2MB page");
 
 /* HW ring descriptor (shared with device) */
 struct descriptor {
@@ -70,7 +71,7 @@ static inline bool hw_ring_empty(hw_ring_t *ring, size_t ring_size)
 }
 
 static void update_ring_slot(hw_ring_t *ring, unsigned int idx, uintptr_t phys,
-                                uint16_t len, uint16_t stat)
+                             uint16_t len, uint16_t stat)
 {
     volatile struct descriptor *d = &(ring->descr[idx]);
     d->addr = phys;
@@ -99,15 +100,20 @@ static void rx_provide(void)
             assert(!err);
 
             uint16_t stat = RXD_EMPTY;
-            if (rx.tail + 1 == RX_COUNT) stat |= WRAP;
+            if (rx.tail + 1 == RX_COUNT) {
+                stat |= WRAP;
+            }
             rx.descr_mdata[rx.tail] = buffer;
             update_ring_slot(&rx, rx.tail, buffer.io_or_offset, 0, stat);
             rx.tail = (rx.tail + 1) % RX_COUNT;
         }
 
         /* Only request a notification from virtualiser if HW ring not full */
-        if (!hw_ring_full(&rx, RX_COUNT)) net_request_signal_free(&rx_queue);
-        else net_cancel_signal_free(&rx_queue);
+        if (!hw_ring_full(&rx, RX_COUNT)) {
+            net_request_signal_free(&rx_queue);
+        } else {
+            net_cancel_signal_free(&rx_queue);
+        }
         reprocess = false;
 
         if (!net_queue_empty_free(&rx_queue) && !hw_ring_full(&rx, RX_COUNT)) {
@@ -119,7 +125,9 @@ static void rx_provide(void)
     if (!(hw_ring_empty(&rx, RX_COUNT))) {
         /* Ensure rx IRQs are enabled */
         eth->rdar = RDAR_RDAR;
-        if (!(irq_mask & NETIRQ_RXF)) enable_irqs(IRQ_MASK);
+        if (!(irq_mask & NETIRQ_RXF)) {
+            enable_irqs(IRQ_MASK);
+        }
     } else {
         enable_irqs(NETIRQ_TXF | NETIRQ_EBERR);
     }
@@ -131,7 +139,9 @@ static void rx_return(void)
     while (!hw_ring_empty(&rx, RX_COUNT)) {
         /* If buffer slot is still empty, we have processed all packets the device has filled */
         volatile struct descriptor *d = &(rx.descr[rx.head]);
-        if (d->stat & RXD_EMPTY) break;
+        if (d->stat & RXD_EMPTY) {
+            break;
+        }
 
         net_buff_desc_t buffer = rx.descr_mdata[rx.head];
         buffer.len = d->len;
@@ -158,14 +168,18 @@ static void tx_provide(void)
             assert(!err);
 
             uint16_t stat = TXD_READY | TXD_ADDCRC | TXD_LAST;
-            if (tx.tail + 1 == TX_COUNT) stat |= WRAP;
+            if (tx.tail + 1 == TX_COUNT) {
+                stat |= WRAP;
+            }
             tx.descr_mdata[tx.tail] = buffer;
             update_ring_slot(&tx, tx.tail, buffer.io_or_offset, buffer.len, stat);
 
             tx.tail = (tx.tail + 1) % TX_COUNT;
-            if (!(eth->tdar & TDAR_TDAR)) eth->tdar = TDAR_TDAR;
+            if (!(eth->tdar & TDAR_TDAR)) {
+                eth->tdar = TDAR_TDAR;
+            }
         }
-    
+
         net_request_signal_active(&tx_queue);
         reprocess = false;
 
@@ -182,7 +196,9 @@ static void tx_return(void)
     while (!hw_ring_empty(&tx, TX_COUNT)) {
         /* Ensure that this buffer has been sent by the device */
         volatile struct descriptor *d = &(tx.descr[tx.head]);
-        if (d->stat & TXD_READY) break;
+        if (d->stat & TXD_READY) {
+            break;
+        }
 
         net_buff_desc_t buffer = tx.descr_mdata[tx.head];
         buffer.len = 0;
@@ -206,12 +222,16 @@ static void handle_irq(void)
     eth->eir = e;
 
     while (e & irq_mask) {
-        if (e & NETIRQ_TXF) tx_return();
+        if (e & NETIRQ_TXF) {
+            tx_return();
+        }
         if (e & NETIRQ_RXF) {
             rx_return();
             rx_provide();
         }
-        if (e & NETIRQ_EBERR) sddf_dprintf("ETH|ERROR: System bus/uDMA\n");
+        if (e & NETIRQ_EBERR) {
+            sddf_dprintf("ETH|ERROR: System bus/uDMA\n");
+        }
         e = eth->eir & irq_mask;
         eth->eir = e;
     }
@@ -311,23 +331,23 @@ void init(void)
 
 void notified(microkit_channel ch)
 {
-    switch(ch) {
-        case IRQ_CH:
-            handle_irq();
-            /*
-             * Delay calling into the kernel to ack the IRQ until the next loop
-             * in the microkit event handler loop.
-             */
-            microkit_irq_ack_delayed(ch);
-            break;
-        case RX_CH:
-            rx_provide();
-            break;
-        case TX_CH:
-            tx_provide();
-            break;
-        default:
-            sddf_dprintf("ETH|LOG: received notification on unexpected channel: %u\n", ch);
-            break;
+    switch (ch) {
+    case IRQ_CH:
+        handle_irq();
+        /*
+         * Delay calling into the kernel to ack the IRQ until the next loop
+         * in the microkit event handler loop.
+         */
+        microkit_irq_ack_delayed(ch);
+        break;
+    case RX_CH:
+        rx_provide();
+        break;
+    case TX_CH:
+        tx_provide();
+        break;
+    default:
+        sddf_dprintf("ETH|LOG: received notification on unexpected channel: %u\n", ch);
+        break;
     }
 }

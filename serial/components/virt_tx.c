@@ -44,11 +44,13 @@ typedef struct tx_pending {
 
 tx_pending_t tx_pending;
 
-static uint32_t tx_pending_length() {
+static uint32_t tx_pending_length()
+{
     return tx_pending.tail - tx_pending.head;
 }
 
-static void tx_pending_push(uint32_t client) {
+static void tx_pending_push(uint32_t client)
+{
     /* Ensure client is not already pending */
     if (tx_pending.clients_pending[client]) {
         return;
@@ -62,7 +64,8 @@ static void tx_pending_push(uint32_t client) {
     tx_pending.tail++;
 }
 
-static void tx_pending_pop(uint32_t *client) {
+static void tx_pending_pop(uint32_t *client)
+{
     /* This should only be called when length > 0 */
     assert(tx_pending_length());
 
@@ -71,7 +74,8 @@ static void tx_pending_pop(uint32_t *client) {
     tx_pending.head++;
 }
 
-bool process_tx_queue(uint32_t client) {
+bool process_tx_queue(uint32_t client)
+{
     serial_queue_handle_t *handle = &tx_queue_handle_cli[client];
 
     if (serial_queue_empty(handle, handle->queue->head)) {
@@ -107,9 +111,12 @@ bool process_tx_queue(uint32_t client) {
     return true;
 }
 
-void tx_return() {
+void tx_return()
+{
     uint32_t num_pending_tx = tx_pending_length();
-    if (!num_pending_tx) return;
+    if (!num_pending_tx) {
+        return;
+    }
 
     uint32_t client;
     bool transferred = false;
@@ -123,7 +130,7 @@ void tx_return() {
 
             /* If more data is available, re-process unless it has been pushed to pending transmits */
             if (!serial_queue_empty(&tx_queue_handle_cli[client], tx_queue_handle_cli[client].queue->head)
-                    && !tx_pending.clients_pending[client]) {
+                && !tx_pending.clients_pending[client]) {
                 serial_cancel_producer_signal(&tx_queue_handle_cli[client]);
                 reprocess = true;
             }
@@ -132,8 +139,8 @@ void tx_return() {
     }
 
     if (transferred && serial_require_producer_signal(&tx_queue_handle_drv)) {
-         serial_cancel_producer_signal(&tx_queue_handle_drv);
-         microkit_notify_delayed(DRIVER_CH);
+        serial_cancel_producer_signal(&tx_queue_handle_drv);
+        microkit_notify_delayed(DRIVER_CH);
     }
 }
 
@@ -153,15 +160,15 @@ void tx_provide(microkit_channel ch)
 
         /* If more data is available, re-process unless it has been pushed to pending transmits */
         if (!serial_queue_empty(&tx_queue_handle_cli[active_client], tx_queue_handle_cli[active_client].queue->head)
-                && !tx_pending.clients_pending[active_client]) {
+            && !tx_pending.clients_pending[active_client]) {
             serial_cancel_producer_signal(&tx_queue_handle_cli[active_client]);
             reprocess = true;
         }
     }
 
     if (transferred && serial_require_producer_signal(&tx_queue_handle_drv)) {
-         serial_cancel_producer_signal(&tx_queue_handle_drv);
-         microkit_notify_delayed(DRIVER_CH);
+        serial_cancel_producer_signal(&tx_queue_handle_drv);
+        microkit_notify_delayed(DRIVER_CH);
     }
 }
 
@@ -172,20 +179,20 @@ void init(void)
 #if SERIAL_WITH_COLOUR
     serial_channel_names_init(clients_colours);
     for (uint32_t i = 0; i < SERIAL_NUM_CLIENTS; i++) {
-        sddf_dprintf("%s%u%s%s is client %u%s\n", COLOUR_START_START, i % MAX_COLOURS, COLOUR_START_END, clients_colours[i], i, COLOUR_END);
+        sddf_dprintf("%s%u%s%s is client %u%s\n", COLOUR_START_START, i % MAX_COLOURS, COLOUR_START_END, clients_colours[i], i,
+                     COLOUR_END);
     }
 #endif
 }
 
 void notified(microkit_channel ch)
 {
-    switch (ch)
-    {
-        case DRIVER_CH:
-            tx_return();
-            break;
-        default:
-            tx_provide(ch);
-            break;
+    switch (ch) {
+    case DRIVER_CH:
+        tx_return();
+        break;
+    default:
+        tx_provide(ch);
+        break;
     }
 }

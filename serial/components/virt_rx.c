@@ -28,7 +28,8 @@ uint32_t current_client = 0;
 char next_client[MAX_CLI_BASE_10 + 1];
 uint8_t next_client_index;
 
-void reset_state() {
+void reset_state()
+{
     memset(next_client, '\0', MAX_CLI_BASE_10 + 1);
     next_client_index = 0;
     current_mode = normal;
@@ -89,9 +90,10 @@ void rx_return()
                     reset_state();
                 } else if (next_client_index < MAX_CLI_BASE_10 && isdigit((int)c)) {
                     next_client[next_client_index] = c;
-                    next_client_index ++;                        
+                    next_client_index ++;
                 } else {
-                    sddf_dprintf("VIRT_RX|LOG: User entered too many (%u < %u) or invalid digit (%c)\n", next_client_index + 1, MAX_CLI_BASE_10, c);
+                    sddf_dprintf("VIRT_RX|LOG: User entered too many (%u < %u) or invalid digit (%c)\n", next_client_index + 1,
+                                 MAX_CLI_BASE_10, c);
                     reset_state();
                 }
                 break;
@@ -108,7 +110,8 @@ void rx_return()
         }
     }
 
-    if (!serial_queue_full(&rx_queue_handle_drv, rx_queue_handle_drv.queue->tail) && serial_require_consumer_signal(&rx_queue_handle_drv)) {
+    if (!serial_queue_full(&rx_queue_handle_drv, rx_queue_handle_drv.queue->tail)
+        && serial_require_consumer_signal(&rx_queue_handle_drv)) {
         serial_cancel_consumer_signal(&rx_queue_handle_drv);
         microkit_notify(DRIVER_CH);
     }
@@ -128,11 +131,11 @@ void init(void)
 void notified(microkit_channel ch)
 {
     switch (ch) {
-        case DRIVER_CH:
-            rx_return();
-            break;
-        default:
-            sddf_dprintf("VIRT_RX|LOG: received notification on unexpected channel: %u\n", ch);
-            break;
+    case DRIVER_CH:
+        rx_return();
+        break;
+    default:
+        sddf_dprintf("VIRT_RX|LOG: received notification on unexpected channel: %u\n", ch);
+        break;
     }
 }

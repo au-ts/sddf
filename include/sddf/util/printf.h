@@ -29,8 +29,7 @@
 //
 ///////////////////////////////////////////////////////////////////////////////
 
-#ifndef _SDDF_PRINTF_H_
-#define _SDDF_PRINTF_H_
+#pragma once
 
 #include <microkit.h>
 #include <sddf/serial/queue.h>
@@ -66,7 +65,7 @@ void sddf_putchar_repl(char character);
 /**
  * @brief Initialises the serial putchar library. Ensure this is called before using serial printf or
  * sddf_putchar_repl.
- * 
+ *
  * @param serial_tx_ch Microkit channel of the serial tx virtualiser.
  * @param serial_tx_queue_handle Address of the serial tx queue handle.
  */
@@ -81,7 +80,7 @@ void serial_putchar_init(microkit_channel serial_tx_ch, serial_queue_handle_t *s
  * \return The number of characters that are written into the array, not counting the terminating null character
  */
 #define sddf_printf sddf_printf_
-int sddf_printf_(const char* format, ...) __attribute__((format(__printf__, 1, 2)));
+int sddf_printf_(const char *format, ...) __attribute__((format(__printf__, 1, 2)));
 
 /**
  * Tiny sprintf implementation
@@ -91,7 +90,7 @@ int sddf_printf_(const char* format, ...) __attribute__((format(__printf__, 1, 2
  * \return The number of characters that are WRITTEN into the buffer, not counting the terminating null character
  */
 #define sddf_sprintf sddf_sprintf_
-int sddf_sprintf_(char* buffer, const char* format, ...) __attribute__((format(__printf__, 2, 3)));
+int sddf_sprintf_(char *buffer, const char *format, ...) __attribute__((format(__printf__, 2, 3)));
 
 
 /**
@@ -106,8 +105,8 @@ int sddf_sprintf_(char* buffer, const char* format, ...) __attribute__((format(_
  */
 #define sddf_snprintf  sddf_snprintf_
 #define sddf_vsnprintf sddf_vsnprintf_
-int  sddf_snprintf_(char* buffer, size_t count, const char* format, ...)
-    __attribute__((format(__printf__, 3, 4)));
+int  sddf_snprintf_(char *buffer, size_t count, const char *format, ...)
+__attribute__((format(__printf__, 3, 4)));
 
 /**
  * Tiny vprintf implementation
@@ -116,7 +115,7 @@ int  sddf_snprintf_(char* buffer, size_t count, const char* format, ...)
  * \return The number of characters that are WRITTEN into the buffer, not counting the terminating null character
  */
 #define sddf_vprintf sddf_vprintf_
-int sddf_vprintf_(const char* format, va_list va);
+int sddf_vprintf_(const char *format, va_list va);
 
 
 /**
@@ -127,10 +126,8 @@ int sddf_vprintf_(const char* format, va_list va);
  * \param format A string that specifies the format of the output
  * \return The number of characters that are sent to the output function, not counting the terminating null character
  */
-int sddf_fctprintf(void (*out)(char character, void* arg), void* arg, const char* format, ...) __attribute__((format(__printf__, 3, 4)));
+int sddf_fctprintf(void (*out)(char character, void *arg), void *arg, const char *format,
+                   ...) __attribute__((format(__printf__, 3, 4)));
 #ifdef __cplusplus
 }
 #endif
-
-
-#endif  // _SDDF_PRINTF_H_
