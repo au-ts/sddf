@@ -96,9 +96,9 @@ static inline int sddf_atoi(const char *str)
     while (sddf_isdigit(*str)) {
         int digit = *str - '0';
         result *= 10;
-        result += digit;
+        result -= digit;
         str++;
     }
 
-    return sign * result;
+    return sign * (-result);
 }
