@@ -80,7 +80,7 @@ static inline int sddf_isdigit(int ch)
 
 static inline int sddf_atoi(const char *str)
 {
-    while (isspace(*str)) {
+    while (sddf_isspace(*str)) {
         str++;
     }
 
@@ -93,7 +93,7 @@ static inline int sddf_atoi(const char *str)
     }
 
     int result = 0;
-    while (isdigit(*str)) {
+    while (sddf_isdigit(*str)) {
         int digit = *str - '0';
         result *= 10;
         result += digit;
