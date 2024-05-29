@@ -66,7 +66,7 @@ static inline int strcmp(const char *a, const char *b)
         a++;
         b++;
     }
-    return (int)*a - *b;
+    return (int)(*a) - *b;
 #endif
 }
 
