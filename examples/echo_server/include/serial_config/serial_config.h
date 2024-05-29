@@ -6,7 +6,7 @@
 #include <stdint.h>
 
 /* Only support transmission and not receive. */
-#define SERIAL_TX_ONLY 0
+#define SERIAL_TX_ONLY 1
 
 /* Associate a colour with each client's output. */
 #define SERIAL_WITH_COLOUR 1
@@ -19,10 +19,6 @@
 
 /* Default baud rate of the uart device */
 #define UART_DEFAULT_BAUD 115200
-
-/* String to be printed by the driver to start console input */
-#define SERIAL_CONSOLE_BEGIN_STRING "UART|LOG: Init complete\n"
-#define SERIAL_CONSOLE_BEGIN_STRING_LEN 25
 
 #define SERIAL_CLI0_NAME "client0"
 #define SERIAL_CLI1_NAME "client1"

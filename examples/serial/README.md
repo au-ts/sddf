@@ -42,8 +42,8 @@ output, while upon error the receive virtualiser will print a debug failure mess
 receives input upon initialisation.
 4. **UART_DEFAULT_BAUD** - this determines the baud rate that the uart driver will configure for
 the device. Baud rate is always set explicitly instead of detected automatically.
-5. **SERIAL_CONSOLE_BEGIN_STRING** - this string is printed by the uart driver upon initialisation
-completion. This is to support input beginning in the interfacing serial server.
+5. **SERIAL_CONSOLE_BEGIN_STRING** - this string is printed by the transmit virtualiser upon
+initialisation completion. This is to support input beginning in the interfacing serial server.
 
 If the system file is changed, or the serial subsystem is included into another system, this config
 file will need to be edited or re-created to reflect the new system. Be sure to check that the 
