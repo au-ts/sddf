@@ -104,7 +104,7 @@ static inline char *strchr(const char *s, int c)
 
 static inline int memcmp(const void *a, const void *b, size_t n)
 {
-#if __has_builtin(__builtin_strcmp)
+#if __has_builtin(__builtin_memcmp)
     return __builtin_memcmp(a, b, n);
 #else
     unsigned char *_a = a;
