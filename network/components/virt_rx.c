@@ -202,6 +202,7 @@ void rx_provide(void)
     if (notify_drv && net_require_signal_free(&state.rx_queue_drv)) {
         net_cancel_signal_free(&state.rx_queue_drv);
         microkit_notify_delayed(DRIVER_CH);
+        notify_drv = false;
     }
 }
 
