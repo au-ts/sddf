@@ -12,11 +12,14 @@ ${CHECK_LIBCO_FLAGS_MD5}:
 	-rm -f .libco_cflags-*
 	touch $@
 
-${LIBCO_DIR}/libco.o: $(LIBCO_DIR)/libco.c ${CHECK_LIBCO_FLAGS_MD5}
+libco/libco.o: $(LIBCO_DIR)/libco.c ${CHECK_LIBCO_FLAGS_MD5} |libco
 	${CC} ${CFLAGS} -c -o $@ $<
 
-libco.a: ${LIBCO_DIR}/libco.o
+libco.a: libco/libco.o
 	${AR} cr $@ $^
 	${RANLIB} $@
 
--include ${LIBCO_DIR}/libco.d
+libco:
+	mkdir -p $@
+
+-include libco/libco.d
