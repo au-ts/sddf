@@ -1,0 +1,163 @@
+#define DRIVER 0
+#define CLIENT_CH 1
+
+#define get_tx_queue_drv(tx_queue_drv)  \
+    var tx_queue_drv = @base;           \
+
+#define get_buffer_region_vaddrs(vaddrs, client)                \
+    var addr = @base + NET_QUEUE_HANDLE_SIZE + client * @biw;   \
+    var vaddrs = lds 1 addr;                                    \
+
+#define get_buffer_region_paddrs(paddrs, client)                \
+    var addr = @base + 5 * @biw + client * @biw;                \
+    var paddrs = lds 1 addr;                                    \
+
+#define get_tx_queue_clients(queue_handle, client)                          \
+    var queue_handle = @base + 7 * @biw + NET_QUEUE_HANDLE_SIZE * client;   \
+
+#define VIRT_TX_FUNC_BASE (@base + 104)
+
+fun main() {
+    return 0;
+}
+
+fun pnk_extract_offset(1 phys) {
+    var client = 0;
+    while (client < NUM_NETWORK_CLIENTS) {
+        var value = 0;
+        !ldw value, phys;
+        get_buffer_region_paddrs(paddrs, client)
+        get_tx_queue_clients(tx_qh, client)
+        get_size(size, tx_qh)
+        if ((value >= paddrs) && (value < paddrs + size * NET_BUFFER_SIZE)) {
+            var new_value = value - paddrs;
+            !stw phys, new_value;
+            return client;
+        }
+        client = client + 1;
+    }
+    return -1;
+}
+
+fun tx_return() {
+    var reprocess = true;
+    var notify_clients = VIRT_TX_FUNC_BASE;
+    get_tx_queue_drv(tx_queue_drv)
+
+    while (reprocess) {
+        while (true) {
+            net_queue_empty_free(empty, tx_queue_drv)
+            if (empty) {
+                break;
+            }
+
+            var buffer_addr = VIRT_TX_FUNC_BASE + 16;
+            var 1 err = net_dequeue_free(tx_queue_drv, buffer_addr);
+            assert(!err)
+
+            // NOTE: here io_or_offset addr is the same as buffer_addr
+            var 1 client = pnk_extract_offset(buffer_addr);
+            assert(client >= 0)
+
+            var buffer = lds {2} buffer_addr;
+            get_tx_queue_clients(tx_qh, client)
+            err = net_enqueue_free(tx_qh, buffer);
+            assert(!err)
+            st (notify_clients + client), true;
+        }
+
+        net_request_signal_free(tx_queue_drv)
+        reprocess = false;
+
+        net_queue_empty_free(signal, tx_queue_drv)
+        if (!signal) {
+            net_cancel_signal_free(tx_queue_drv)
+            reprocess = true;
+        }
+    }
+
+    var client = 0;
+    while (client < NUM_NETWORK_CLIENTS) {
+        var c = lds 1 notify_clients + client;
+        get_tx_queue_clients(tx_qh, client)
+        net_require_signal_free(signal, tx_qh)
+        if (c && signal) {
+            net_cancel_signal_free(tx_qh)
+            microkit_notify(CLIENT_CH + client)
+        }
+        client = client + 1;
+    }
+    return 0;
+}
+
+export fun tx_provide() {
+    var enqueued = false;
+    var client = 0;
+    get_tx_queue_drv(tx_queue_drv)
+
+    while (client < NUM_NETWORK_CLIENTS) {
+        var reprocess = true;
+        get_tx_queue_clients(tx_qh, client)
+        while (reprocess) {
+            while (true) {
+                net_queue_empty_active(empty, tx_qh)
+                if (empty) {
+                    break;
+                }
+
+                var buffer_addr = VIRT_TX_FUNC_BASE;
+                var 1 err = net_dequeue_active(tx_qh, buffer_addr);
+                assert(!err)
+
+                get_io_or_offset(io_or_offset, buffer_addr)
+                pnk_modulo(offset, io_or_offset, NET_BUFFER_SIZE)
+                get_size(size, tx_qh)
+                if (offset || (io_or_offset >= NET_BUFFER_SIZE * size)) {
+                    // TODO: sddf_dprintf
+                    var buffer = lds {2} buffer_addr;
+                    err = net_enqueue_free(tx_qh, buffer);
+                    assert(!err)
+                    continue;
+                }
+
+                get_io_or_offset(io_or_offset, buffer_addr)
+                get_buffer_region_vaddrs(vaddrs, client)
+                get_len(len, buffer_addr)
+                var start = io_or_offset + vaddrs;
+                var end = start + len;
+                cache_clean(start, end)
+
+                get_buffer_region_paddrs(paddrs, client)
+                set_io_or_offset(io_or_offset + paddrs, buffer_addr)
+
+                var buffer = lds {2} buffer_addr;
+                err = net_enqueue_active(tx_queue_drv, buffer);
+                assert(!err)
+                enqueued = true;
+            }
+
+            net_request_signal_active(tx_qh)
+            reprocess = false;
+
+            net_queue_empty_active(empty, tx_qh)
+            if (!empty) {
+                net_cancel_signal_active(tx_qh)
+                reprocess = true;
+            }
+        }
+        client = client + 1;
+    }
+
+    net_require_signal_active(signal, tx_queue_drv)
+    if (enqueued && signal) {
+        net_cancel_signal_active(tx_queue_drv)
+        microkit_deferred_notify(DRIVER)
+    }
+    return 0;
+}
+
+export fun notified(1 ch) {
+    tx_return();
+    tx_provide();
+    return 0;
+}

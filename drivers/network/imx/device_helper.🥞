@@ -1,0 +1,155 @@
+/*
+* Copyright 2025, UNSW
+* SPDX-License-Identifier: BSD-2-Clause
+*/
+/* The reference manual used to acquire these values is:
+*
+* i.MX 8M Mini Applications Processor Reference Manual.
+* Document number: IMX8MMRM.
+* Rev. 3, 11/2020.
+*
+* The ethernet device is described in section 11.5.
+*/
+
+/////////////////// Shared memory with device
+/@ extern predicate valid_hardware_ring_rx_addr @/
+/@ extern predicate valid_hardware_ring_rx_len  @/
+/@ extern predicate valid_hardware_ring_tx_addr @/
+/@ extern predicate valid_hardware_ring_tx_len  @/
+
+/@ extern field hardware_ring_rx_addr: Seq[Int] @/
+/@ extern field hardware_ring_tx_addr: Seq[Int] @/
+/@ extern field hardware_ring_rx_stat: Seq[Int] @/
+/@ extern field hardware_ring_tx_stat: Seq[Int] @/
+/@ extern field hardware_ring_rx_len: Seq[Int] @/
+/@ extern field hardware_ring_tx_len: Seq[Int] @/
+
+/* let transpiler know the device shared memory model */
+/@ shared w u32 hw_ring_rx_addr[HW_DESCR_RX+4..(HW_DESCR_RX+HW_QUEUE_SIZE) : 8] @/
+/@ shared w u32 hw_ring_tx_addr[HW_DESCR_TX+4..(HW_DESCR_TX+HW_QUEUE_SIZE) : 8] @/
+/@ shared rw u8 hw_ring_rx_stat[HW_DESCR_RX+3.. (HW_DESCR_RX+HW_QUEUE_SIZE) : 8] @/
+/@ shared rw u8 hw_ring_tx_stat[HW_DESCR_TX+3.. (HW_DESCR_TX+HW_QUEUE_SIZE) : 8] @/
+/@ shared r u32 hw_ring_rx_len[HW_DESCR_RX..   (HW_DESCR_RX+HW_QUEUE_SIZE) : 8] @/
+/@ shared w u32 hw_ring_tx_len[HW_DESCR_TX..   (HW_DESCR_TX+HW_QUEUE_SIZE) : 8] @/
+/@ shared w u8 hw_ring_reserve[HW_DESCR_RX+2.. (HW_DESCR_TX+HW_QUEUE_SIZE) : 8] @/
+
+/@ shared w u32 RDAR[REG_BASE + RDAR_OFFSET] @/
+/@ shared w u32 TDAR[REG_BASE + TDAR_OFFSET] @/
+/@ shared rw u32 EIR[REG_BASE + EIR_OFFSET]   @/
+
+// todo: make sure we ack EIR after every handle_irq()
+fun get_device_EIR()
+{
+    /@ requires valid_device() @/
+    /@ ensures valid_device() @/
+
+    var eir = 0;
+    !ld32 eir, (REG_BASE + EIR_OFFSET);
+    eir = eir & IRQ_MASK;
+    return eir;
+}
+
+fun receive_available(1 idx)
+{
+    /@ requires valid_device() @/
+    /@ requires idx >= 0 && idx < HW_QUEUE_CAPACITY @/
+    /@ ensures valid_device() @/
+    /@ ensures (retval == 0) || (retval == 1) @/
+    var dscr_addr = HW_DESCR_RX + idx * @biw;
+    var stat = 0;
+    !ld8 stat, dscr_addr + 3;
+    var ret = ((stat & RXD_EMPTY) == 0);
+    return ret;
+}
+
+fun transmit_done(1 idx)
+{
+    /@ requires valid_device() @/
+    /@ requires idx >= 0 && idx < HW_QUEUE_CAPACITY @/
+    /@ ensures valid_device() @/
+    /@ ensures (retval == 0) || (retval == 1) @/
+    var dscr_addr = HW_DESCR_TX + idx * @biw;
+    var stat = 0;
+    !ld8 stat, dscr_addr + 3;
+    var ret = ((stat & TXD_READY) == 0);
+    return ret;
+}
+
+fun rx_update_device_ring_slot(1 idx, {1, 1} net_buffer)
+{
+    /@ requires valid_device() @/
+    /@ requires net_buff_desc(net_buffer) @/
+    /@ requires idx >= 0 && idx < HW_QUEUE_CAPACITY @/
+    /@ ensures valid_device() @/
+    /@ ensures net_buff_desc(net_buffer) @/
+    /@ ensures unfolding net_buff_desc(net_buffer) in
+        net_buffer.0 == old(unfolding net_buff_desc(net_buffer) in net_buffer.0)
+    @/
+    /@ ensures unfolding net_buff_desc(net_buffer) in
+        net_buffer.1 == old(unfolding net_buff_desc(net_buffer) in net_buffer.1)
+    @/
+    /@ ensures unfolding valid_device() in unfolding valid_hardware_ring_rx_addr() in
+        device.hardware_ring_rx_addr[idx] ==
+        unfolding net_buff_desc(net_buffer) in net_buffer[0]
+    @/
+
+    var dst_addr = HW_DESCR_RX + idx * @biw;
+    var stat = RXD_STAT;
+    if (idx + 1 == HW_QUEUE_CAPACITY) {
+        stat = RXD_STAT_WRAP;
+    }
+    /@ unfold net_buff_desc(net_buffer) @/
+    var io_addr = net_buffer.0;
+    var len = net_buffer.1;
+    /@ fold net_buff_desc(net_buffer) @/
+
+    /@ use hw_ring_rx_addr @/
+    !st32 dst_addr + 4, io_addr;
+    /@ use hw_ring_reserve @/
+    !st8 dst_addr + 2, 0;
+    /@ use hw_ring_rx_stat @/
+    !st8 dst_addr + 3, stat;
+    return 0;
+}
+
+fun tx_update_device_ring_slot(1 idx, {1, 1} net_buffer)
+{
+    /@ requires valid_device() @/
+    /@ requires net_buff_desc(net_buffer) @/
+    /@ requires idx >= 0 && idx < HW_QUEUE_CAPACITY @/
+    /@ ensures valid_device() @/
+    /@ ensures net_buff_desc(net_buffer) @/
+    /@ ensures unfolding net_buff_desc(net_buffer) in
+        net_buffer.0 == old(unfolding net_buff_desc(net_buffer) in net_buffer.0)
+    @/
+    /@ ensures unfolding net_buff_desc(net_buffer) in
+        net_buffer.1 == old(unfolding net_buff_desc(net_buffer) in net_buffer.1)
+    @/
+    /@ ensures unfolding valid_device() in unfolding valid_hardware_ring_tx_addr() in
+        device.hardware_ring_tx_addr[idx] ==
+        unfolding net_buff_desc(net_buffer) in net_buffer[0]
+    @/
+    /@ ensures unfolding valid_device() in unfolding valid_hardware_ring_tx_len() in
+        device.hardware_ring_tx_len[idx] ==
+        unfolding net_buff_desc(net_buffer) in net_buffer[1]
+    @/
+    var dst_addr = HW_DESCR_TX + idx * @biw;
+    var stat = TXD_STAT;
+    if (idx + 1 == HW_QUEUE_CAPACITY) {
+        stat = TXD_STAT_WRAP;
+    }
+    /@ unfold net_buff_desc(net_buffer) @/
+    var io_addr = net_buffer.0;
+    var len = net_buffer.1;
+    /@ fold net_buff_desc(net_buffer) @/
+
+    /@ use hw_ring_tx_addr @/
+    !st32 dst_addr + 4, io_addr;
+    /@ use hw_ring_tx_len @/
+    !st32 dst_addr, len;
+    /@ use hw_ring_reserve @/
+    !st8 dst_addr + 2, 0;
+    /@ use hw_ring_tx_stat @/
+    !st8 dst_addr + 3, stat;
+    return 0;
+}

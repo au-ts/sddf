@@ -99,6 +99,10 @@ void tx_return(void)
             assert(!err);
 
             int client = extract_offset(&buffer.io_or_offset);
+            if (client < 0) {
+                sddf_dprintf("VIRT_TX|LOG: Driver provided buffer with offset %lx which is not in buffer region\n",
+                             buffer.io_or_offset);
+            }
             assert(client >= 0);
 
             err = net_enqueue_free(&state.tx_queue_clients[client], buffer);

@@ -12,6 +12,13 @@ $(error MICROKIT_SDK must be specified)
 endif
 export override MICROKIT_SDK:=$(abspath ${MICROKIT_SDK})
 
+ifeq ($(strip $(PANCAKE_NW)), full)
+	export PANCAKE_NW := full
+else ifeq ($(strip $(PANCAKE_NW)), driver)
+	export PANCAKE_NW := driver
+else
+$(error PANCAKE_NW must be specified, use "full" for full network stack, or "driver" for network driver only)
+endif
 
 ifeq ($(strip $(TOOLCHAIN)),)
 	TOOLCHAIN := aarch64-none-elf

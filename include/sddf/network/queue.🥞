@@ -1,0 +1,382 @@
+/*
+ * Copyright 2025, UNSW
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
+#define NET_BUFF_DESC_SIZE  (2 * @biw)
+
+/* Shared queue indices and signals addresses */
+/@ shared rw u64 rx_free[NET_RX_FREE..NET_RX_FREE + 3 * @biw] @/
+/@ shared rw u64 rx_active[NET_RX_ACTIVE..NET_RX_ACTIVE + 3 * @biw] @/
+/@ shared rw u64 tx_free[NET_TX_FREE..NET_TX_FREE + 3 * @biw] @/
+/@ shared rw u64 tx_active[NET_TX_ACTIVE..NET_TX_ACTIVE + 3 * @biw] @/
+
+/* Shared queue buffer regions */
+/@ shared rw u32 net_queue_buffer[(NET_RX_FREE + 3*@biw)..(NET_RX_FREE + (5 + RX_QUEUE_CAPACITY * 2) * @biw)] @/
+/@ shared rw u32 net_queue_buffer[(NET_RX_ACTIVE + 3*@biw) ..(NET_RX_ACTIVE + (5 + RX_QUEUE_CAPACITY * 2) * @biw)] @/
+/@ shared rw u32 net_queue_buffer[(NET_TX_FREE + 3*@biw)..(NET_TX_FREE + (5 + TX_QUEUE_CAPACITY * 2) * @biw)] @/
+/@ shared rw u32 net_queue_buffer[(NET_TX_ACTIVE + 3*@biw)..(NET_TX_ACTIVE + (5 + TX_QUEUE_CAPACITY * 2) * @biw)] @/
+                                 
+/////////////////// Buffer load/store functions
+#define valid_buffer_ptr(ptr)   (((ptr >= NET_RX_FREE + 3 * @biw) && (ptr < NET_RX_FREE + (3 + RX_QUEUE_CAPACITY * 2) * @biw)) ||       \
+                                ((ptr >= NET_RX_ACTIVE + 3 * @biw) && (ptr < NET_RX_ACTIVE + (3 + RX_QUEUE_CAPACITY * 2) * @biw)) ||    \
+                                ((ptr >= NET_TX_FREE + 3 * @biw) && (ptr < NET_TX_FREE + (3 + TX_QUEUE_CAPACITY * 2) * @biw)) ||        \
+                                ((ptr >= NET_TX_ACTIVE + 3 * @biw) && (ptr < NET_TX_ACTIVE + (3 + TX_QUEUE_CAPACITY * 2) * @biw))) &&   \
+                                (ptr % 16 == 8)
+
+fun share_load_buffer(1 buffer_ptr)
+{
+    /@ requires valid_buffer_ptr(buffer_ptr) @/
+    /@ ensures buffer_ptr == old(buffer_ptr) @/
+    /@ ensures net_buff_desc(retval) @/
+
+    var io_addr = 0;
+    var len = 0;
+    !ld32 io_addr, buffer_ptr;
+    !ld32 len, buffer_ptr + @biw;
+
+    var buffer = <io_addr, len>;
+    /@ fold net_buff_desc(buffer) @/
+    return buffer;
+}
+
+fun share_store_buffer(1 buffer_ptr, {1,1} buffer)
+{
+    /@ requires valid_buffer_ptr(buffer_ptr) @/
+    /@ requires net_buff_desc(buffer) @/
+    /@ ensures buffer_ptr == old(buffer_ptr) @/
+    /@ ensures net_buff_desc(buffer) @/
+    /@ ensures unfolding net_buff_desc(buffer) in
+        forall i: Int:: i >= 0 && i < alen(buffer) ==>
+            buffer[i] == old(unfolding net_buff_desc(buffer) in buffer[i])
+    @/
+
+    /@ unfold net_buff_desc(buffer) @/
+    !st32 buffer_ptr, buffer.0;
+    !st32 buffer_ptr + @biw, buffer.1;
+    /@ fold net_buff_desc(buffer) @/
+    return 0;
+}
+
+/////////////////// Queue helper macros
+#define valid_queue_ptr(ptr)                                            \
+  (((ptr == NET_RX_FREE) || (ptr == NET_RX_ACTIVE) ||                   \
+  (ptr == NET_TX_FREE) || (ptr == NET_TX_ACTIVE)) && (ptr % @biw == 0)) \
+
+#define valid_queue_ptr_capacity(ptr, capacity)                                                           \
+  (((queue_ptr == NET_RX_FREE) || (queue_ptr == NET_RX_ACTIVE)) <==> (capacity == RX_QUEUE_CAPACITY)) &&  \
+  (((queue_ptr == NET_TX_FREE) || (queue_ptr == NET_TX_ACTIVE)) <==> (capacity == TX_QUEUE_CAPACITY))     \
+
+#define queue_field(queue_name, field, capacity)   \
+  unfolding valid_virt() in unfolding valid_net_queue(virt.queue_name, capacity) in virt.queue_name.field
+
+#define queue_empty_(queue_name, capacity) \
+  unfolding valid_virt() in unfolding valid_net_queue(virt.queue_name, capacity) in \
+  (virt.queue_name.net_tail == virt.queue_name.net_head)  \
+
+#define queue_full_(queue_name, capacity) \
+  unfolding valid_virt() in unfolding valid_net_queue(virt.queue_name, capacity) in \
+  ((virt.queue_name.net_tail + 1) % capacity == virt.queue_name.net_head)  \
+
+#define queue_not_empty(queue_name, capacity) \
+  unfolding valid_virt() in unfolding valid_net_queue(virt.queue_name, capacity) in \
+  (virt.queue_name.net_tail != virt.queue_name.net_head)  \
+
+#define queue_not_full(queue_name, capacity)  \
+  unfolding valid_virt() in unfolding valid_net_queue(virt.queue_name, capacity) in \
+  ((virt.queue_name.net_tail + 1) % capacity != virt.queue_name.net_head)  \
+
+#define queue_size(queue_name, capacity)    \
+  (unfolding valid_virt() in unfolding valid_net_queue(virt.queue_name, capacity) in  \
+  ((virt.queue_name.net_tail - virt.queue_name.net_head) % capacity))
+
+#define n_enqueue_dequeue_incr(queue_name, capacity)            \
+  queue_field(queue_name, n_enqueue_dequeue, capacity) ==       \
+  old(queue_field(queue_name, n_enqueue_dequeue, capacity) + 1) \
+
+#define tail_unchanged(queue_name, capacity) \
+  unchanged(queue_field(queue_name, net_tail, capacity))
+
+#define head_unchanged(queue_name, capacity) \
+  unchanged(queue_field(queue_name, net_head, capacity))
+
+#define signal_unchanged(queue_name, capacity)  \
+  unchanged(queue_field(queue_name, net_signal, capacity))
+
+#define n_enqueue_dequeue_unchanged(queue_name, capacity)         \
+  unchanged(queue_field(queue_name, n_enqueue_dequeue, capacity)) \
+
+#define rx_notified_unchanged() \
+  unchanged(unfolding valid_virt() in virt.rx_notified)
+
+#define tx_notified_unchanged() \
+  unchanged(unfolding valid_virt() in virt.tx_notified)
+
+#define tail_incr(queue_name, capacity)     \
+  queue_field(queue_name, net_tail, capacity) == (old(queue_field(queue_name, net_tail, capacity)) + 1) % capacity
+
+#define head_incr(queue_name, capacity)     \
+  queue_field(queue_name, net_head, capacity) == (old(queue_field(queue_name, net_head, capacity)) + 1) % capacity
+
+/////////////////// Queue functions
+fun net_queue_empty(1 queue_ptr)
+{
+    /@ requires valid_queue_ptr(queue_ptr) @/
+    /@ requires valid_virt() @/
+    /@ ensures valid_virt() @/
+    /@ ensures queue_ptr == old(queue_ptr) @/
+    /@ ensures ((queue_ptr == NET_RX_FREE) ==> ((retval != 0) == queue_empty_(rx_free, RX_QUEUE_CAPACITY))) &&
+      ((queue_ptr == NET_RX_ACTIVE) ==> ((retval != 0) == queue_empty_(rx_active, RX_QUEUE_CAPACITY))) &&
+      ((queue_ptr == NET_TX_FREE) ==> ((retval != 0) == queue_empty_(tx_free, TX_QUEUE_CAPACITY))) &&
+      ((queue_ptr == NET_TX_ACTIVE) ==> ((retval != 0) == queue_empty_(tx_active, TX_QUEUE_CAPACITY)))
+    @/
+    /@ ensures tail_unchanged(rx_free, RX_QUEUE_CAPACITY) @/
+    /@ ensures tail_unchanged(rx_active, RX_QUEUE_CAPACITY) @/
+    /@ ensures tail_unchanged(tx_free, TX_QUEUE_CAPACITY) @/
+    /@ ensures tail_unchanged(tx_active, TX_QUEUE_CAPACITY) @/
+    /@ ensures head_unchanged(rx_free, RX_QUEUE_CAPACITY) @/
+    /@ ensures head_unchanged(rx_active, RX_QUEUE_CAPACITY) @/
+    /@ ensures head_unchanged(tx_free, TX_QUEUE_CAPACITY) @/
+    /@ ensures head_unchanged(tx_active, TX_QUEUE_CAPACITY) @/
+    /@ ensures signal_unchanged(rx_free, RX_QUEUE_CAPACITY) @/
+    /@ ensures signal_unchanged(rx_active, RX_QUEUE_CAPACITY) @/
+    /@ ensures signal_unchanged(tx_free, TX_QUEUE_CAPACITY) @/
+    /@ ensures signal_unchanged(tx_active, TX_QUEUE_CAPACITY) @/
+    /@ ensures n_enqueue_dequeue_unchanged(rx_free, RX_QUEUE_CAPACITY) @/
+    /@ ensures n_enqueue_dequeue_unchanged(rx_active, RX_QUEUE_CAPACITY) @/
+    /@ ensures n_enqueue_dequeue_unchanged(tx_free, TX_QUEUE_CAPACITY) @/
+    /@ ensures n_enqueue_dequeue_unchanged(tx_active, TX_QUEUE_CAPACITY) @/
+    /@ ensures rx_notified_unchanged() @/
+    /@ ensures tx_notified_unchanged() @/
+
+    var tail = 0;
+    var head = 0;
+    /@ unfold valid_virt() @/
+    !ldw tail, queue_ptr;
+    !ldw head, queue_ptr + @biw;
+    /@ fold valid_virt() @/
+
+    var empty = (tail == head);
+    return empty;
+}
+
+fun net_queue_full(1 queue_ptr, 1 capacity)
+{
+    /@ requires valid_queue_ptr(queue_ptr) @/
+    /@ requires valid_queue_ptr_capacity(queue_ptr, capacity) @/
+    /@ requires valid_virt() @/
+    /@ ensures valid_virt() @/
+    /@ ensures queue_ptr == old(queue_ptr) @/
+    /@ ensures ((queue_ptr == NET_RX_FREE) ==> ((retval != 0) == queue_full_(rx_free, RX_QUEUE_CAPACITY))) &&
+      ((queue_ptr == NET_RX_ACTIVE) ==> ((retval != 0) == queue_full_(rx_active, RX_QUEUE_CAPACITY))) &&
+      ((queue_ptr == NET_TX_FREE) ==> ((retval != 0) == queue_full_(tx_free, TX_QUEUE_CAPACITY))) &&
+      ((queue_ptr == NET_TX_ACTIVE) ==> ((retval != 0) == queue_full_(tx_active, TX_QUEUE_CAPACITY)))
+    @/
+    /@ ensures tail_unchanged(rx_free, RX_QUEUE_CAPACITY) @/
+    /@ ensures tail_unchanged(rx_active, RX_QUEUE_CAPACITY) @/
+    /@ ensures tail_unchanged(tx_free, TX_QUEUE_CAPACITY) @/
+    /@ ensures tail_unchanged(tx_active, TX_QUEUE_CAPACITY) @/
+    /@ ensures head_unchanged(rx_free, RX_QUEUE_CAPACITY) @/
+    /@ ensures head_unchanged(rx_active, RX_QUEUE_CAPACITY) @/
+    /@ ensures head_unchanged(tx_free, TX_QUEUE_CAPACITY) @/
+    /@ ensures head_unchanged(tx_active, TX_QUEUE_CAPACITY) @/
+    /@ ensures signal_unchanged(rx_free, RX_QUEUE_CAPACITY) @/
+    /@ ensures signal_unchanged(rx_active, RX_QUEUE_CAPACITY) @/
+    /@ ensures signal_unchanged(tx_free, TX_QUEUE_CAPACITY) @/
+    /@ ensures signal_unchanged(tx_active, TX_QUEUE_CAPACITY) @/
+    /@ ensures n_enqueue_dequeue_unchanged(rx_free, RX_QUEUE_CAPACITY) @/
+    /@ ensures n_enqueue_dequeue_unchanged(rx_active, RX_QUEUE_CAPACITY) @/
+    /@ ensures n_enqueue_dequeue_unchanged(tx_free, TX_QUEUE_CAPACITY) @/
+    /@ ensures n_enqueue_dequeue_unchanged(tx_active, TX_QUEUE_CAPACITY) @/
+    /@ ensures rx_notified_unchanged() @/
+    /@ ensures tx_notified_unchanged() @/
+
+    var tail = 0;
+    var head = 0;
+    /@ unfold valid_virt() @/
+    !ldw tail, queue_ptr;
+    !ldw head, queue_ptr + @biw;
+    /@ fold valid_virt() @/
+
+    var 1 new_tail = pnk_modulo(tail + 1, capacity);
+    var full = (new_tail == head);
+    return full;
+}
+
+fun net_enqueue(1 queue_ptr, {1, 1} buffer, 1 capacity)
+{
+    /@ requires valid_virt() @/
+    /@ requires valid_queue_ptr(queue_ptr) @/
+    /@ requires valid_queue_ptr_capacity(queue_ptr, capacity) @/
+    /@ requires net_buff_desc(buffer) @/
+    /@ requires (capacity == RX_QUEUE_CAPACITY) || (capacity == TX_QUEUE_CAPACITY) @/
+    /@ requires ((queue_ptr == NET_RX_FREE) ==> queue_not_full(rx_free, RX_QUEUE_CAPACITY)) &&
+      ((queue_ptr == NET_RX_ACTIVE) ==> queue_not_full(rx_active, RX_QUEUE_CAPACITY)) &&
+      ((queue_ptr == NET_TX_FREE) ==> queue_not_full(tx_free, TX_QUEUE_CAPACITY)) &&
+      ((queue_ptr == NET_TX_ACTIVE) ==> queue_not_full(tx_active, TX_QUEUE_CAPACITY))
+    @/
+    /@ ensures queue_ptr == old(queue_ptr) @/
+    /@ ensures valid_virt() @/
+    /@ ensures capacity == old(capacity) @/
+    /@ ensures net_buff_desc(buffer) @/
+    /@ ensures unfolding net_buff_desc(buffer) in forall i: Int:: 
+        i >= 0 && i < alen(buffer) ==> buffer[i] == old(unfolding net_buff_desc(buffer) in buffer[i]) @/
+    /@ ensures ((queue_ptr == NET_RX_FREE) ==> n_enqueue_dequeue_incr(rx_free, RX_QUEUE_CAPACITY)) &&
+      ((queue_ptr == NET_RX_ACTIVE) ==> n_enqueue_dequeue_incr(rx_active, RX_QUEUE_CAPACITY)) &&
+      ((queue_ptr == NET_TX_FREE) ==> n_enqueue_dequeue_incr(tx_free, TX_QUEUE_CAPACITY)) &&
+      ((queue_ptr == NET_TX_ACTIVE) ==> n_enqueue_dequeue_incr(tx_active, TX_QUEUE_CAPACITY)) @/
+    /@ ensures rx_notified_unchanged() @/
+    /@ ensures tx_notified_unchanged() @/
+
+    var tail = 0;
+    /@ unfold valid_virt() @/
+    !ldw tail, queue_ptr;
+    /@ fold valid_virt() @/
+
+    var buff_addr = (queue_ptr + 3 * @biw) + tail * NET_BUFF_DESC_SIZE;
+    share_store_buffer(buff_addr, buffer);
+
+    tail = pnk_modulo(tail + 1, capacity);
+    /@ unfold valid_virt() @/
+    !stw queue_ptr, tail;
+    /@ fold valid_virt() @/
+    return 0;
+}
+
+fun net_dequeue(1 queue_ptr, 1 capacity)
+{
+    /@ requires valid_virt() @/
+    /@ requires valid_queue_ptr(queue_ptr) @/
+    /@ requires valid_queue_ptr_capacity(queue_ptr, capacity) @/
+    /@ requires (capacity == RX_QUEUE_CAPACITY) || (capacity == TX_QUEUE_CAPACITY) @/
+    /@ requires ((queue_ptr == NET_RX_FREE) ==> queue_not_empty(rx_free, RX_QUEUE_CAPACITY)) &&
+      ((queue_ptr == NET_RX_ACTIVE) ==> queue_not_empty(rx_active, RX_QUEUE_CAPACITY)) &&
+      ((queue_ptr == NET_TX_FREE) ==> queue_not_empty(tx_free, TX_QUEUE_CAPACITY)) &&
+      ((queue_ptr == NET_TX_ACTIVE) ==> queue_not_empty(tx_active, TX_QUEUE_CAPACITY)) @/
+    /@ ensures valid_virt() @/
+    /@ ensures queue_ptr == old(queue_ptr) @/
+    /@ ensures capacity == old(capacity) @/
+    /@ ensures net_buff_desc(retval) @/
+    /@ ensures ((queue_ptr == NET_RX_FREE) ==> n_enqueue_dequeue_incr(rx_free, RX_QUEUE_CAPACITY)) &&
+      ((queue_ptr == NET_RX_ACTIVE) ==> n_enqueue_dequeue_incr(rx_active, RX_QUEUE_CAPACITY)) &&
+      ((queue_ptr == NET_TX_FREE) ==> n_enqueue_dequeue_incr(tx_free, TX_QUEUE_CAPACITY)) &&
+      ((queue_ptr == NET_TX_ACTIVE) ==> n_enqueue_dequeue_incr(tx_active, TX_QUEUE_CAPACITY)) @/
+    /@ ensures rx_notified_unchanged() @/
+    /@ ensures tx_notified_unchanged() @/
+
+    var head = 0;
+    /@ unfold valid_virt() @/
+    !ldw head, queue_ptr + @biw;
+    /@ fold valid_virt() @/
+
+    var buff_addr = (queue_ptr + 3 * @biw) + head * NET_BUFF_DESC_SIZE;
+    var {1,1} buffer = share_load_buffer(buff_addr);
+
+    head = pnk_modulo(head + 1, capacity);
+
+    /@ unfold valid_virt() @/
+    !stw queue_ptr + @biw, head;
+    /@ fold valid_virt() @/
+
+    return buffer;
+}
+
+fun net_request_signal(1 queue_ptr)
+{
+    /@ requires valid_virt() @/
+    /@ requires (queue_ptr == NET_RX_FREE) || (queue_ptr == NET_TX_ACTIVE) @/
+    /@ ensures valid_virt() @/
+    /@ ensures queue_ptr == old(queue_ptr) @/
+    /@ ensures (queue_ptr == NET_RX_FREE) ==>
+      (unfolding valid_virt() in unfolding valid_net_queue(virt.rx_free, RX_QUEUE_CAPACITY) in !virt.rx_free.net_signal) @/
+    /@ ensures (queue_ptr == NET_RX_ACTIVE) ==>
+      (unfolding valid_virt() in unfolding valid_net_queue(virt.rx_active, RX_QUEUE_CAPACITY) in !virt.rx_active.net_signal) @/
+    /@ ensures (queue_ptr == NET_TX_FREE) ==>
+      (unfolding valid_virt() in unfolding valid_net_queue(virt.tx_free, TX_QUEUE_CAPACITY) in !virt.tx_free.net_signal) @/
+    /@ ensures (queue_ptr == NET_TX_ACTIVE) ==>
+      (unfolding valid_virt() in unfolding valid_net_queue(virt.tx_active, TX_QUEUE_CAPACITY) in !virt.tx_active.net_signal) @/
+    /@ ensures n_enqueue_dequeue_unchanged(rx_free, RX_QUEUE_CAPACITY) @/
+    /@ ensures n_enqueue_dequeue_unchanged(rx_active, RX_QUEUE_CAPACITY) @/
+    /@ ensures n_enqueue_dequeue_unchanged(tx_free, TX_QUEUE_CAPACITY) @/
+    /@ ensures n_enqueue_dequeue_unchanged(tx_active, TX_QUEUE_CAPACITY) @/
+    /@ ensures rx_notified_unchanged() @/
+    /@ ensures tx_notified_unchanged() @/
+
+    var signal = 0;
+    /@ unfold valid_virt() @/
+    !stw queue_ptr + 2 * @biw, signal;
+    /@ fold valid_virt() @/
+    return 0;
+}
+
+fun net_cancel_signal(1 queue_ptr)
+{
+    /@ requires valid_virt() @/
+    /@ requires valid_queue_ptr(queue_ptr) @/
+    /@ ensures valid_virt() @/
+    /@ ensures queue_ptr == old(queue_ptr) @/
+    /@ ensures (queue_ptr == NET_RX_FREE) ==>
+      (unfolding valid_virt() in unfolding valid_net_queue(virt.rx_free, RX_QUEUE_CAPACITY) in virt.rx_free.net_signal) @/
+    /@ ensures (queue_ptr == NET_RX_ACTIVE) ==>
+      (unfolding valid_virt() in unfolding valid_net_queue(virt.rx_active, RX_QUEUE_CAPACITY) in virt.rx_active.net_signal) @/
+    /@ ensures (queue_ptr == NET_TX_FREE) ==>
+      (unfolding valid_virt() in unfolding valid_net_queue(virt.tx_free, TX_QUEUE_CAPACITY) in virt.tx_free.net_signal) @/
+    /@ ensures (queue_ptr == NET_TX_ACTIVE) ==>
+      (unfolding valid_virt() in unfolding valid_net_queue(virt.tx_active, TX_QUEUE_CAPACITY) in virt.tx_active.net_signal) @/
+    /@ ensures n_enqueue_dequeue_unchanged(rx_free, RX_QUEUE_CAPACITY) @/
+    /@ ensures n_enqueue_dequeue_unchanged(rx_active, RX_QUEUE_CAPACITY) @/
+    /@ ensures n_enqueue_dequeue_unchanged(tx_free, TX_QUEUE_CAPACITY) @/
+    /@ ensures n_enqueue_dequeue_unchanged(tx_active, TX_QUEUE_CAPACITY) @/
+    /@ ensures rx_notified_unchanged() @/
+    /@ ensures tx_notified_unchanged() @/
+
+    var signal = 1;
+    /@ unfold valid_virt() @/
+    !stw queue_ptr + 2 * @biw, signal;
+    /@ fold valid_virt() @/
+    return 0;
+}
+
+fun net_require_signal(1 queue_ptr)
+{
+    /@ requires valid_virt() @/
+    /@ requires (queue_ptr == NET_RX_ACTIVE) || (queue_ptr == NET_TX_FREE) @/
+    /@ ensures valid_virt() @/
+    /@ ensures queue_ptr == old(queue_ptr) @/
+    /@ ensures (queue_ptr == NET_RX_FREE) ==>
+      (retval == 0) == (unfolding valid_virt() in unfolding valid_net_queue(virt.rx_free, RX_QUEUE_CAPACITY) in virt.rx_free.net_signal) @/
+    /@ ensures (queue_ptr == NET_RX_ACTIVE) ==>
+      (retval == 0) == (unfolding valid_virt() in unfolding valid_net_queue(virt.rx_active, RX_QUEUE_CAPACITY) in virt.rx_active.net_signal) @/
+    /@ ensures (queue_ptr == NET_TX_FREE) ==>
+      (retval == 0) == (unfolding valid_virt() in unfolding valid_net_queue(virt.tx_free, TX_QUEUE_CAPACITY) in virt.tx_free.net_signal) @/
+    /@ ensures (queue_ptr == NET_TX_ACTIVE) ==>
+      (retval == 0) == (unfolding valid_virt() in unfolding valid_net_queue(virt.tx_active, TX_QUEUE_CAPACITY) in virt.tx_active.net_signal) @/
+    /@ ensures n_enqueue_dequeue_unchanged(rx_free, RX_QUEUE_CAPACITY) @/
+    /@ ensures n_enqueue_dequeue_unchanged(rx_active, RX_QUEUE_CAPACITY) @/
+    /@ ensures n_enqueue_dequeue_unchanged(tx_free, TX_QUEUE_CAPACITY) @/
+    /@ ensures n_enqueue_dequeue_unchanged(tx_active, TX_QUEUE_CAPACITY) @/
+    /@ ensures rx_notified_unchanged() @/
+    /@ ensures tx_notified_unchanged() @/
+
+    var signalled = 0;
+    /@ unfold valid_virt() @/
+    !ldw signalled, queue_ptr + 2 * @biw;
+    /@ fold valid_virt() @/
+    var ret = !signalled;
+    return ret;
+}
+
+fun pnk_modulo(1 a, 1 b)
+{
+    /@ requires (b == RX_QUEUE_CAPACITY) || (b == TX_QUEUE_CAPACITY) @/
+    /@ requires a >= 0 @/
+    /@ ensures (b == RX_QUEUE_CAPACITY) ==> retval == (a % RX_QUEUE_CAPACITY) @/
+    /@ ensures (b == TX_QUEUE_CAPACITY) ==> retval == (a % TX_QUEUE_CAPACITY) @/
+    if (b == RX_QUEUE_CAPACITY) {
+        var mod = a & 511;
+        return mod;
+    } else {
+        var mod = a & 1023;
+        return mod;
+    }
+}

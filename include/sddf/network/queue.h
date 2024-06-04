@@ -13,20 +13,23 @@
 #include <sddf/util/fence.h>
 #include <sddf/util/util.h>
 
+// Pancake Todo: Change `uint64_t len` etc back to same int type as C sDDF network queue
+// when pancake supports non-shared memory load/store for 16 and 32 bits
+
 typedef struct net_buff_desc {
     /* offset of buffer within buffer memory region or io address of buffer */
     uint64_t io_or_offset;
     /* length of data inside buffer */
-    uint16_t len;
+    uint64_t len;
 } net_buff_desc_t;
 
 typedef struct net_queue {
     /* index to insert at */
-    uint16_t tail;
+    uint64_t tail;
     /* index to remove from */
-    uint16_t head;
+    uint64_t head;
     /* flag to indicate whether consumer requires signalling */
-    uint32_t consumer_signalled;
+    uint64_t consumer_signalled;
     /* buffer descripter array */
     net_buff_desc_t buffers[];
 } net_queue_t;
@@ -37,9 +40,62 @@ typedef struct net_queue_handle {
     /* filled buffers */
     net_queue_t *active;
     /* capacity of the queues */
-    uint32_t capacity;
+    uint64_t capacity;
 } net_queue_handle_t;
 
+////////////// To stay consistent with Pancake implementation
+static inline bool net_queue_empty(net_queue_t *queue)
+{
+    return queue->tail == queue->head;
+}
+
+static inline bool net_queue_full(net_queue_t *queue, uint64_t capacity)
+{
+    uint64_t new_tail = (queue->tail + 1) % capacity;
+    return (new_tail == queue->head);
+}
+
+static inline void net_enqueue(net_queue_t *queue, net_buff_desc_t buffer, uint64_t capacity)
+{
+    queue->buffers[queue->tail] = buffer;
+#ifdef CONFIG_ENABLE_SMP_SUPPORT
+    THREAD_MEMORY_RELEASE();
+#endif
+    queue->tail = (queue->tail + 1) % capacity;
+}
+
+static inline net_buff_desc_t* net_dequeue(net_queue_t *queue, uint64_t capacity)
+{
+    net_buff_desc_t* buffer = &queue->buffers[queue->head];
+#ifdef CONFIG_ENABLE_SMP_SUPPORT
+    THREAD_MEMORY_RELEASE();
+#endif
+    queue->head = (queue->head + 1) % capacity;
+    return buffer;
+}
+
+static inline void net_request_signal(net_queue_t *queue)
+{
+    queue->consumer_signalled = 0;
+#ifdef CONFIG_ENABLE_SMP_SUPPORT
+    THREAD_MEMORY_RELEASE();
+#endif
+}
+
+static inline void net_cancel_signal(net_queue_t *queue)
+{
+    queue->consumer_signalled = 1;
+#ifdef CONFIG_ENABLE_SMP_SUPPORT
+    THREAD_MEMORY_RELEASE();
+#endif
+}
+
+static inline bool net_require_signal(net_queue_t *queue)
+{
+    return !queue->consumer_signalled;
+}
+
+//////////////
 /**
  * Get the number of buffers enqueued into a queue.
  *
@@ -85,7 +141,7 @@ static inline bool net_queue_empty_active(net_queue_handle_t *queue)
  */
 static inline bool net_queue_full_free(net_queue_handle_t *queue)
 {
-    return queue->free->tail - queue->free->head == queue->capacity;
+    return (queue->free->tail + 1) % queue->capacity == queue->free->head;
 }
 
 /**
@@ -97,7 +153,7 @@ static inline bool net_queue_full_free(net_queue_handle_t *queue)
  */
 static inline bool net_queue_full_active(net_queue_handle_t *queue)
 {
-    return queue->active->tail - queue->active->head == queue->capacity;
+    return (queue->active->tail + 1) % queue->capacity == queue->active->head;
 }
 
 /**
@@ -118,7 +174,7 @@ static inline int net_enqueue_free(net_queue_handle_t *queue, net_buff_desc_t bu
 #ifdef CONFIG_ENABLE_SMP_SUPPORT
     THREAD_MEMORY_RELEASE();
 #endif
-    queue->free->tail++;
+    queue->free->tail = (queue->free->tail + 1) % queue->capacity;
 
     return 0;
 }
@@ -141,7 +197,7 @@ static inline int net_enqueue_active(net_queue_handle_t *queue, net_buff_desc_t 
 #ifdef CONFIG_ENABLE_SMP_SUPPORT
     THREAD_MEMORY_RELEASE();
 #endif
-    queue->active->tail++;
+    queue->active->tail = (queue->active->tail + 1) % queue->capacity;
 
     return 0;
 }
@@ -164,7 +220,7 @@ static inline int net_dequeue_free(net_queue_handle_t *queue, net_buff_desc_t *b
 #ifdef CONFIG_ENABLE_SMP_SUPPORT
     THREAD_MEMORY_RELEASE();
 #endif
-    queue->free->head++;
+    queue->free->head = (queue->free->head + 1) % queue->capacity;
 
     return 0;
 }
@@ -187,7 +243,7 @@ static inline int net_dequeue_active(net_queue_handle_t *queue, net_buff_desc_t 
 #ifdef CONFIG_ENABLE_SMP_SUPPORT
     THREAD_MEMORY_RELEASE();
 #endif
-    queue->active->head++;
+    queue->active->head = (queue->active->head + 1) % queue->capacity;
 
     return 0;
 }
@@ -200,7 +256,7 @@ static inline int net_dequeue_active(net_queue_handle_t *queue, net_buff_desc_t 
  * @param active pointer to active queue in shared memory.
  * @param capacity capacity of the free and active queues.
  */
-static inline void net_queue_init(net_queue_handle_t *queue, net_queue_t *free, net_queue_t *active, uint32_t capacity)
+static inline void net_queue_init(net_queue_handle_t *queue, net_queue_t *free, net_queue_t *active, uint64_t capacity)
 {
     queue->free = free;
     queue->active = active;
@@ -215,7 +271,7 @@ static inline void net_queue_init(net_queue_handle_t *queue, net_queue_t *free, 
  */
 static inline void net_buffers_init(net_queue_handle_t *queue, uintptr_t base_addr)
 {
-    for (uint32_t i = 0; i < queue->capacity; i++) {
+    for (uint64_t i = 0; i < queue->capacity - 1; i++) {
         net_buff_desc_t buffer = {(NET_BUFFER_SIZE * i) + base_addr, 0};
         int err = net_enqueue_free(queue, buffer);
         assert(!err);

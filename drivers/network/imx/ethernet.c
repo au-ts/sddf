@@ -38,15 +38,17 @@ struct descriptor {
     uint16_t len;
     uint16_t stat;
     uint32_t addr;
-};
+} descriptor_t;
+
+volatile struct descriptor * rx_desc;
+volatile struct descriptor * tx_desc;
 
 /* HW ring buffer data type */
 typedef struct {
     uint32_t tail; /* index to insert at */
     uint32_t head; /* index to remove from */
-    uint32_t capacity; /* capacity of the ring */
     volatile struct descriptor *descr; /* buffer descriptor array */
-    net_buff_desc_t descr_mdata[MAX_COUNT]; /* associated meta data array */
+    uint64_t descr_mdata[MAX_COUNT]; /* associated meta data array */
 } hw_ring_t;
 
 hw_ring_t rx; /* Rx NIC ring */
@@ -59,60 +61,121 @@ net_queue_handle_t tx_queue;
 
 volatile struct enet_regs *eth;
 
-static inline bool hw_ring_full(hw_ring_t *ring)
+#define RXD_STAT        0x8000   
+#define RXD_STAT_WRAP   0xa000
+static inline void rx_update_ring_slot(uint64_t idx, net_buff_desc_t* buffer)
 {
-    return ring->tail - ring->head == ring->capacity;
-}
-
-static inline bool hw_ring_empty(hw_ring_t *ring)
-{
-    return ring->tail - ring->head == 0;
-}
-
-static void update_ring_slot(hw_ring_t *ring, unsigned int idx, uintptr_t phys,
-                             uint16_t len, uint16_t stat)
-{
-    volatile struct descriptor *d = &(ring->descr[idx]);
-    d->addr = phys;
-    d->len = len;
-
+    volatile struct descriptor *dst_addr = &(rx_desc[idx]);
+    uint16_t stat = RXD_STAT;
+    if (idx + 1 == RX_COUNT) {
+        stat = RXD_STAT_WRAP;
+    }
+    dst_addr->addr = buffer->io_or_offset;
     /* Ensure all writes to the descriptor complete, before we set the flags
      * that makes hardware aware of this slot.
      */
-    THREAD_MEMORY_RELEASE();
-    d->stat = stat;
+    __sync_synchronize();
+    dst_addr->stat = stat;
+}
+
+#define TX_STAT         0x8c00
+#define TX_STAT_WRAP    0xac00
+static inline void tx_update_ring_slot(uint64_t idx, net_buff_desc_t* buffer)
+{
+    volatile struct descriptor *dst_addr = &(tx_desc[idx]);
+    uint16_t stat = TX_STAT;
+    if (idx + 1 == TX_COUNT) {
+        stat = TX_STAT_WRAP;
+    }
+    dst_addr->addr = buffer->io_or_offset;
+    dst_addr->len = buffer->len;
+    /* Ensure all writes to the descriptor complete, before we set the flags
+     * that makes hardware aware of this slot.
+     */
+    __sync_synchronize();
+    dst_addr->stat = stat;
+}
+
+static inline bool rx_hw_queue_empty() 
+{
+    return rx.head == rx.tail;
+}
+
+static inline bool tx_hw_queue_empty() 
+{
+    return tx.head == tx.tail;
+}
+
+static inline bool rx_hw_queue_full() 
+{
+    uint64_t new_tail = (rx.tail + 1) % RX_COUNT;
+    return new_tail == rx.head;
+}
+
+static inline bool tx_hw_queue_full() 
+{
+    uint64_t new_tail = (tx.tail + 1) % TX_COUNT;
+    return new_tail == tx.head;
+}
+
+static inline void hw_ring_rx_enqueue(net_buff_desc_t* buffer) 
+{
+    uint64_t idx = rx.tail;
+    rx.descr_mdata[idx] = buffer->io_or_offset;
+    rx_update_ring_slot(idx, buffer);
+    rx.tail = (idx + 1) % RX_COUNT;
+}
+
+static inline void hw_ring_tx_enqueue(net_buff_desc_t* buffer) 
+{
+    uint64_t idx = tx.tail;
+    tx.descr_mdata[idx] = buffer->io_or_offset;
+    tx_update_ring_slot(idx, buffer);
+    tx.tail = (idx + 1) % TX_COUNT;
+}
+
+static inline net_buff_desc_t hw_ring_rx_dequeue()
+{
+    uint64_t idx = rx.head;
+    volatile struct descriptor *dst_addr = &(rx_desc[idx]);
+    net_buff_desc_t buffer;
+    buffer.io_or_offset = rx.descr_mdata[idx];
+    buffer.len = dst_addr->len;
+    rx.head = (idx + 1) % RX_COUNT;
+    return buffer;
+}
+
+static inline net_buff_desc_t hw_ring_tx_dequeue()
+{
+    uint64_t idx = tx.head;
+    net_buff_desc_t buffer;
+    buffer.io_or_offset = tx.descr_mdata[idx];
+    buffer.len = 0;
+    tx.head = (idx + 1) % TX_COUNT;
+    return buffer;
 }
 
 static void rx_provide(void)
 {
     bool reprocess = true;
     while (reprocess) {
-        while (!hw_ring_full(&rx) && !net_queue_empty_free(&rx_queue)) {
-            net_buff_desc_t buffer;
-            int err = net_dequeue_free(&rx_queue, &buffer);
-            assert(!err);
-
-            uint32_t idx = rx.tail % rx.capacity;
-            uint16_t stat = RXD_EMPTY;
-            if (idx + 1 == rx.capacity) {
-                stat |= WRAP;
-            }
-            rx.descr_mdata[idx] = buffer;
-            update_ring_slot(&rx, idx, buffer.io_or_offset, 0, stat);
-            rx.tail++;
+        while (!rx_hw_queue_full() && !net_queue_empty(rx_free)) {
+            net_buff_desc_t* buffer = net_dequeue(rx_free, NET_RX_QUEUE_CAPACITY_DRIV);
+            hw_ring_rx_enqueue(buffer);
             eth->rdar = RDAR_RDAR;
         }
 
         /* Only request a notification from virtualiser if HW ring not full */
-        if (!hw_ring_full(&rx)) {
-            net_request_signal_free(&rx_queue);
+        bool full = rx_hw_queue_full();
+        if (!full) {
+            net_request_signal(rx_free);
         } else {
-            net_cancel_signal_free(&rx_queue);
+            net_cancel_signal(rx_free);
         }
         reprocess = false;
 
-        if (!net_queue_empty_free(&rx_queue) && !hw_ring_full(&rx)) {
-            net_cancel_signal_free(&rx_queue);
+        if (!net_queue_empty(rx_free) && !full) {
+            net_cancel_signal(rx_free);
             reprocess = true;
         }
     }
@@ -121,27 +184,19 @@ static void rx_provide(void)
 static void rx_return(void)
 {
     bool packets_transferred = false;
-    while (!hw_ring_empty(&rx)) {
+    while (!rx_hw_queue_empty() && !net_queue_full(rx_active, NET_RX_QUEUE_CAPACITY_DRIV)) {
         /* If buffer slot is still empty, we have processed all packets the device has filled */
-        uint32_t idx = rx.head % rx.capacity;
-        volatile struct descriptor *d = &(rx.descr[idx]);
+        volatile struct descriptor *d = &(rx_desc[rx.head]);
         if (d->stat & RXD_EMPTY) {
             break;
         }
-
-        THREAD_MEMORY_ACQUIRE();
-
-        net_buff_desc_t buffer = rx.descr_mdata[idx];
-        buffer.len = d->len;
-        int err = net_enqueue_active(&rx_queue, buffer);
-        assert(!err);
-
+        net_buff_desc_t buffer = hw_ring_rx_dequeue();
+        net_enqueue(rx_active, buffer, NET_RX_QUEUE_CAPACITY_DRIV);
         packets_transferred = true;
-        rx.head++;
     }
 
-    if (packets_transferred && net_require_signal_active(&rx_queue)) {
-        net_cancel_signal_active(&rx_queue);
+    if (packets_transferred && net_require_signal(rx_active)) {
+        net_cancel_signal(rx_active);
         microkit_notify(RX_CH);
     }
 }
@@ -150,27 +205,18 @@ static void tx_provide(void)
 {
     bool reprocess = true;
     while (reprocess) {
-        while (!(hw_ring_full(&tx)) && !net_queue_empty_active(&tx_queue)) {
-            net_buff_desc_t buffer;
-            int err = net_dequeue_active(&tx_queue, &buffer);
-            assert(!err);
-
-            uint32_t idx = tx.tail % tx.capacity;
-            uint16_t stat = TXD_READY | TXD_ADDCRC | TXD_LAST;
-            if (idx + 1 == tx.capacity) {
-                stat |= WRAP;
-            }
-            tx.descr_mdata[idx] = buffer;
-            update_ring_slot(&tx, idx, buffer.io_or_offset, buffer.len, stat);
-            tx.tail++;
+        while (!tx_hw_queue_full() && !net_queue_empty(tx_active)) 
+        {
+            net_buff_desc_t* buffer = net_dequeue(tx_active, NET_TX_QUEUE_CAPACITY_DRIV);
+            hw_ring_tx_enqueue(buffer);
             eth->tdar = TDAR_TDAR;
         }
 
-        net_request_signal_active(&tx_queue);
+        net_request_signal(tx_active);
         reprocess = false;
 
-        if (!hw_ring_full(&tx) && !net_queue_empty_active(&tx_queue)) {
-            net_cancel_signal_active(&tx_queue);
+        if (!tx_hw_queue_full() && !net_queue_empty(tx_active)) {
+            net_cancel_signal(tx_active);
             reprocess = true;
         }
     }
@@ -179,49 +225,42 @@ static void tx_provide(void)
 static void tx_return(void)
 {
     bool enqueued = false;
-    while (!hw_ring_empty(&tx)) {
+    while (!tx_hw_queue_empty() && !net_queue_full(tx_free, NET_TX_QUEUE_CAPACITY_DRIV)) 
+    {
         /* Ensure that this buffer has been sent by the device */
-        uint32_t idx = tx.head % tx.capacity;
-        volatile struct descriptor *d = &(tx.descr[idx]);
+        volatile struct descriptor *d = &(tx_desc[tx.head]);
         if (d->stat & TXD_READY) {
             break;
         }
-
-        THREAD_MEMORY_ACQUIRE();
-
-        net_buff_desc_t buffer = tx.descr_mdata[idx];
-        buffer.len = 0;
-        int err = net_enqueue_free(&tx_queue, buffer);
-        assert(!err);
-
+        net_buff_desc_t buffer = hw_ring_tx_dequeue();
+        net_enqueue(tx_free, buffer, NET_TX_QUEUE_CAPACITY_DRIV);
         enqueued = true;
-        tx.head++;
     }
 
-    if (enqueued && net_require_signal_free(&tx_queue)) {
-        net_cancel_signal_free(&tx_queue);
+    if (enqueued && net_require_signal(tx_free)) {
+        net_cancel_signal(tx_free);
         microkit_notify(TX_CH);
     }
 }
 
+#define IRQ_MASK_       0xa000000
+#define NETIRQ_TXF_     0x8000000
+#define NETIRQ_RXF_     0x2000000
 static void handle_irq(void)
 {
     uint32_t e = eth->eir & IRQ_MASK;
     eth->eir = e;
 
-    while (e & IRQ_MASK) {
-        if (e & NETIRQ_TXF) {
+    while (e & IRQ_MASK_) {
+        if (e & NETIRQ_TXF_) {
             tx_return();
             tx_provide();
         }
-        if (e & NETIRQ_RXF) {
+        if (e & NETIRQ_RXF_) {
             rx_return();
             rx_provide();
         }
-        if (e & NETIRQ_EBERR) {
-            sddf_dprintf("ETH|ERROR: System bus/uDMA\n");
-        }
-        e = eth->eir & IRQ_MASK;
+        e = eth->eir & IRQ_MASK_;
         eth->eir = e;
     }
 }
@@ -232,10 +271,8 @@ static void eth_setup(void)
     uint32_t h = eth->paur;
 
     /* Set up HW rings */
-    rx.capacity = RX_COUNT;
-    rx.descr = (volatile struct descriptor *)hw_ring_buffer_vaddr;
-    tx.capacity = TX_COUNT;
-    tx.descr = (volatile struct descriptor *)(hw_ring_buffer_vaddr + (sizeof(struct descriptor) * RX_COUNT));
+    rx_desc = (volatile struct descriptor *)hw_ring_buffer_vaddr;
+    tx_desc = (volatile struct descriptor *)(hw_ring_buffer_vaddr + (sizeof(struct descriptor) * RX_COUNT));
 
     /* Perform reset */
     eth->ecr = ECR_RESET;
@@ -304,7 +341,7 @@ static void eth_setup(void)
 
     /* enable events */
     eth->eir = eth->eir;
-    eth->eimr = IRQ_MASK;
+    eth->eimr = IRQ_MASK_;
 }
 
 void init(void)

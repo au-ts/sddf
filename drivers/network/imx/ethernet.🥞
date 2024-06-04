@@ -1,0 +1,505 @@
+/*
+ * Copyright 2025, UNSW
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
+#define rx_notified_sent()  \
+    ((unfolding valid_virt() in virt.rx_notified) == old(unfolding valid_virt() in virt.rx_notified) + 1)
+
+#define tx_notified_sent()  \
+    ((unfolding valid_virt() in virt.tx_notified) == old(unfolding valid_virt() in virt.tx_notified) + 1)
+
+fun main ()
+{
+    /@ requires valid_device() @/
+    /@ requires valid_virt() @/
+    /@ requires full_heap_access() @/
+    /@ ensures valid_device() @/
+    /@ ensures valid_virt() @/
+    /@ ensures full_heap_access() @/
+
+    /@ unfold full_heap_access() @/
+    rx_provide();
+    tx_provide();
+    /@ fold full_heap_access() @/
+    return 0;
+}
+
+#define rx_hw_ring_size()   \
+    (unfolding rx_heap_access() in unfolding hardware_ring_rx() in ((heap[0] - heap[1]) % HW_QUEUE_CAPACITY))
+
+#define tx_hw_ring_size()   \
+    (unfolding tx_heap_access() in unfolding hardware_ring_tx() in ((heap[2] - heap[3]) % HW_QUEUE_CAPACITY))
+
+#define n_enqueue_dequeue_count(queue_name, capacity)   \
+    (queue_field(queue_name, n_enqueue_dequeue, capacity) - old(queue_field(queue_name, n_enqueue_dequeue, capacity)))
+
+#define net_queue_signalled(queue_name, capacity)   \
+    (unfolding valid_virt() in unfolding valid_net_queue(virt.queue_name, capacity) in !virt.queue_name.net_signal)
+/*
+ * `rx_return()`: Transfer "active buffer" from device to `virt_rx`
+ * 1. check if `hw_ring_rx` is not empty; if not then exit
+ * 2. get a buffer from `head` slot of `hw_ring_rx`, make sure its status is non-empty; if not then exit
+ * 3. increment `hw_ring_rx` head, enqueue the buffer to `rx_active`
+ * 4. if `rx_active` requires signalling, cancel the signal and notify `virt_rx` via microkit
+ */
+fun rx_return()
+{
+    /@ requires valid_device() @/
+    /@ requires valid_virt() @/
+    /@ requires rx_heap_access() @/
+    /@ ensures valid_device() @/
+    /@ ensures valid_virt() @/
+    /@ ensures rx_heap_access() @/
+    /@ ensures rx_notified_sent() ==> queue_field(rx_active, net_signal, RX_QUEUE_CAPACITY) @/
+    /@ ensures n_enqueue_dequeue_count(rx_active, RX_QUEUE_CAPACITY) ==
+        (old(rx_hw_ring_size()) - rx_hw_ring_size()) @/
+
+    var packets_transferred = false;
+    var rx_active = NET_RX_ACTIVE;
+
+    while (true)
+    {
+        /@ invariant valid_device() @/
+        /@ invariant valid_virt() @/
+        /@ invariant rx_heap_access() @/
+        /@ invariant n_enqueue_dequeue_count(rx_active, RX_QUEUE_CAPACITY) ==
+            (old(rx_hw_ring_size()) - rx_hw_ring_size()) @/
+        /@ invariant unchanged((unfolding valid_virt() in virt.rx_notified)) @/
+
+        /@ unfold rx_heap_access() @/
+        var 1 empty = rx_hw_queue_empty();
+        /@ fold rx_heap_access() @/
+
+        var 1 full = net_queue_full(rx_active, RX_QUEUE_CAPACITY);
+
+        if (full) {
+            break;
+        }
+        if (empty) {
+            break;
+        }
+
+        /@ unfold rx_heap_access() @/
+        /@ unfold hardware_ring_rx() @/
+        var hw_head = lds 1 (HW_RING_RX + @biw);
+        /@ fold hardware_ring_rx() @/
+        /@ fold rx_heap_access() @/
+
+        var 1 receive_avail = receive_available(hw_head);
+        if (!receive_avail) {
+            break;
+        }
+
+        var {1,1} buffer = hw_ring_rx_dequeue();
+
+        ///////////////// data integrity assertions
+        /@ assert (unfolding net_buff_desc(buffer) in buffer.0 ==
+            unfolding rx_heap_access() in unfolding rx_meta_data_access() in
+            heap[RX_MDATA_START_IDX + hw_head])
+        @/
+        /@ assert (unfolding net_buff_desc(buffer) in buffer.1 ==
+            unfolding valid_device() in unfolding valid_hardware_ring_rx_len() in
+            device.hardware_ring_rx_len[hw_head]
+        )
+        @/
+        /////////////////
+
+        net_enqueue(rx_active, buffer, RX_QUEUE_CAPACITY);
+        packets_transferred = true;
+    }
+
+    var 1 signal = net_require_signal(rx_active);
+    if (packets_transferred) {
+        if (signal) {
+            net_cancel_signal(rx_active);
+            /@ unfold valid_virt() @/
+            microkit_notify(RX_CH)
+            /@ fold valid_virt() @/
+        }
+    }
+    /@ assert rx_notified_sent() <==> (signal != 0) && (packets_transferred != 0) @/
+    return 0;
+}
+
+/*
+ * `rx_provide()`: Transfer "free buffer" from `virt_rx` to device
+ * 1. check if `hw_ring_rx` is not full, and `rx_queue` is not empty;  if not then exit
+ * 2. dequeue a buffer from `rx_free`, update the buffer stat
+ * 3. update the tail slot of `hw_ring_rx` to this buffer, increment `hw_ring_rx` tail
+ * 4. set device `rdar` register
+ * 5. set `rx_free` as require signalling if `hw_ring_rx` is not full
+ * 6. recheck (1), process more if needed
+*/
+fun rx_provide()
+{
+    /@ requires valid_device() @/
+    /@ requires valid_virt() @/
+    /@ requires rx_heap_access() @/
+    /@ ensures valid_device() @/
+    /@ ensures valid_virt() @/
+    /@ ensures rx_heap_access() @/
+    /@ ensures (unfolding rx_heap_access() in !is_rx_hw_queue_full()) ==> 
+        net_queue_signalled(rx_free, RX_QUEUE_CAPACITY) @/
+    /@ ensures n_enqueue_dequeue_count(rx_free, RX_QUEUE_CAPACITY) == (rx_hw_ring_size() - old(rx_hw_ring_size())) @/
+
+    var reprocess = true;
+    var rx_free = NET_RX_FREE;
+
+    while (reprocess) {
+        /@ invariant valid_device() @/
+        /@ invariant valid_virt() @/
+        /@ invariant rx_heap_access() @/
+        /@ invariant n_enqueue_dequeue_count(rx_free, RX_QUEUE_CAPACITY) ==
+            (rx_hw_ring_size() - old(rx_hw_ring_size())) 
+        @/
+        /@ invariant (unfolding rx_heap_access() in (!is_rx_hw_queue_full() && (reprocess == 0))) ==> 
+            net_queue_signalled(rx_free, RX_QUEUE_CAPACITY)
+        @/
+
+        while (true)
+        {
+            /@ invariant valid_device() @/
+            /@ invariant valid_virt() @/
+            /@ invariant rx_heap_access() @/
+            /@ invariant n_enqueue_dequeue_count(rx_free, RX_QUEUE_CAPACITY) == 
+                (rx_hw_ring_size() - old(rx_hw_ring_size())) 
+            @/
+    
+            var 1 empty = net_queue_empty(rx_free);
+    
+            /@ unfold rx_heap_access() @/
+            var 1 full = rx_hw_queue_full();
+            /@ fold rx_heap_access() @/
+            if (full) {
+                break;
+            }
+            if (empty) {
+                break;
+            }
+    
+            var {1,1} net_buffer = net_dequeue(rx_free, RX_QUEUE_CAPACITY);
+    
+            // get the hw_tail index before enqueueing to hardware ring
+            /@ unfold rx_heap_access() @/
+            /@ unfold hardware_ring_rx() @/
+            var hw_tail = lds 1 HW_RING_RX;
+            /@ fold hardware_ring_rx() @/
+            /@ fold rx_heap_access() @/
+    
+            // enqueue data buffer to hardware ring
+            hw_ring_rx_enqueue(net_buffer);
+    
+            ///////////////// data integrity assertions
+            // assert device.hardware_ring_rx_addr[hw_tail] == net_buffer.0
+            /@ assert unfolding valid_device() in unfolding valid_hardware_ring_rx_addr() in
+                device.hardware_ring_rx_addr[hw_tail] ==
+                unfolding net_buff_desc(net_buffer) in net_buffer.0 @/
+            // note: no assertion for data length since it's receive buffer
+            // assert heap[RX_MDATA_START_IDX + hw_tail] == net_buffer.0
+            /@ assert unfolding rx_heap_access() in unfolding rx_meta_data_access() in
+                heap[RX_MDATA_START_IDX + hw_tail] ==
+                unfolding net_buff_desc(net_buffer) in net_buffer.0 @/
+            /////////////////
+    
+            !st32 (REG_BASE + RDAR_OFFSET), RDAR_RDAR;
+        }
+
+        // signal only if we dequeued something
+        // Only request a notification from virtualiser if HW ring not full
+        /@ unfold rx_heap_access() @/
+        var 1 full = rx_hw_queue_full();
+        /@ fold rx_heap_access() @/
+        if (!full) {
+            net_request_signal(rx_free);
+        } else {
+            net_cancel_signal(rx_free);
+        }
+        reprocess = false;
+
+        var 1 empty = net_queue_empty(rx_free);
+        if (!empty) {
+            if (!full) {
+                net_cancel_signal(rx_free);
+                reprocess = true;
+            }
+        }
+
+    }
+    return 0;
+}
+
+/*
+ * `tx_return()`: Transfer "free buffer" from device to `virt_tx`
+ * 1. check  if `hw_ring_tx` is not empty; if not then exit
+ * 2. get a buffer from `head` slot of `hw_ring_tx`, make sure it's been processed by the device; if not then exit
+ * 3. increment `hw_ring_tx` head, reset the buffer length, enqueue the buffer to `tx_free`
+ * 4. if `rx_free` requires signalling, cancel the signal and notify `virt_tx` via microkit
+ */
+fun tx_return()
+{
+    /@ requires valid_device() @/
+    /@ requires valid_virt() @/
+    /@ requires tx_heap_access() @/
+    /@ ensures valid_device() @/
+    /@ ensures valid_virt() @/
+    /@ ensures tx_heap_access() @/
+    /@ ensures tx_notified_sent() ==> queue_field(tx_free, net_signal, TX_QUEUE_CAPACITY) @/
+    /@ ensures n_enqueue_dequeue_count(tx_free, TX_QUEUE_CAPACITY) ==
+        (old(tx_hw_ring_size()) - tx_hw_ring_size())
+    @/
+
+    var enqueued = false;
+    var tx_free = NET_TX_FREE;
+
+    while (true)
+    {
+        /@ invariant valid_device() @/
+        /@ invariant valid_virt() @/
+        /@ invariant tx_heap_access() @/
+        /@ invariant n_enqueue_dequeue_count(tx_free, TX_QUEUE_CAPACITY) ==
+            (old(tx_hw_ring_size()) - tx_hw_ring_size())
+        @/
+        /@ invariant unchanged((unfolding valid_virt() in virt.tx_notified)) @/
+
+        /@ unfold tx_heap_access() @/
+        var 1 empty = tx_hw_queue_empty();
+        /@ fold tx_heap_access() @/
+
+        var 1 full = net_queue_full(tx_free, TX_QUEUE_CAPACITY);
+
+        if (empty) {
+            break;
+        }
+        if (full) {
+            break;
+        }
+
+        ///////////////// dequeue tx
+        // Ensure that this buffer has been sent by the device
+        /@ unfold tx_heap_access() @/
+        /@ unfold hardware_ring_tx() @/
+        var hw_head = lds 1 (HW_RING_TX + @biw);
+        /@ fold hardware_ring_tx() @/
+        /@ fold tx_heap_access() @/
+
+        var 1 done = transmit_done(hw_head);
+        if (!done) {
+            break;
+        }
+
+        var {1,1} buffer = hw_ring_tx_dequeue();
+
+        ///////////////// data integrity assertions
+        /@ assert unfolding net_buff_desc(buffer) in buffer.0 ==
+            unfolding valid_device() in unfolding valid_hardware_ring_tx_addr() in
+            unfolding tx_heap_access() in unfolding tx_meta_data_access() in heap[TX_MDATA_START_IDX + hw_head]
+        @/
+        // assert buffer.1 == 0 // because we don't need length after transmitting the data
+        /@ assert unfolding net_buff_desc(buffer) in buffer.1 == 0 @/
+        /////////////////
+
+        net_enqueue(tx_free, buffer, TX_QUEUE_CAPACITY);
+        enqueued = true;
+    }
+
+    var 1 signal = net_require_signal(tx_free);
+    if (enqueued) {
+        if (signal) {
+            net_cancel_signal(tx_free);
+            /@ unfold valid_virt() @/
+            microkit_notify(TX_CH)
+            /@ fold valid_virt() @/
+        }
+    }
+
+    /@ assert tx_notified_sent() <==> (signal != 0) && (enqueued != 0) @/
+    return 0;
+}
+
+/*
+ * `tx_provide()`: Transfer "active buffer" from `virt_tx` to device
+ * 1. check if `hw_ring_tx` is not full, and `tx_active` is not empty; if not then exit
+ * 2. dequeue a buffer from `tx_active`, update the buffer stat
+ * 3. update the tail slot of `hw_ring_tx` to this buffer, increment `hw_ring_tx` tail
+ * 4. set device `tdar` register
+ * 5. set `tx_active` as require signalling
+ * 6. recheck (1), process more if needed
+ */
+fun tx_provide()
+{
+    /@ requires valid_device() @/
+    /@ requires valid_virt() @/
+    /@ requires tx_heap_access() @/
+    /@ ensures valid_device() @/
+    /@ ensures valid_virt() @/
+    /@ ensures tx_heap_access() @/
+    /@ ensures (unfolding tx_heap_access() in !is_tx_hw_queue_full()) ==> 
+        net_queue_signalled(tx_active, TX_QUEUE_CAPACITY) @/
+    /@ ensures n_enqueue_dequeue_count(tx_active, TX_QUEUE_CAPACITY) ==
+        (tx_hw_ring_size() - old(tx_hw_ring_size()))
+    @/
+
+    var reprocess = true;
+    var tx_active = NET_TX_ACTIVE;
+
+    while (reprocess)
+    {
+        /@ invariant valid_device() @/
+        /@ invariant valid_virt() @/
+        /@ invariant tx_heap_access() @/
+        /@ invariant n_enqueue_dequeue_count(tx_active, TX_QUEUE_CAPACITY) ==
+            (tx_hw_ring_size() - old(tx_hw_ring_size())) @/
+        /@ invariant (unfolding tx_heap_access() in (!is_tx_hw_queue_full() && (reprocess == 0))) ==> 
+            net_queue_signalled(tx_active, TX_QUEUE_CAPACITY) @/
+
+        while (true)
+        {
+            /@ invariant valid_device() @/
+            /@ invariant valid_virt() @/
+            /@ invariant tx_heap_access() @/
+            /@ invariant n_enqueue_dequeue_count(tx_active, TX_QUEUE_CAPACITY) ==
+                (tx_hw_ring_size() - old(tx_hw_ring_size())) @/
+    
+            var 1 empty = net_queue_empty(tx_active);
+    
+            /@ unfold tx_heap_access() @/
+            var 1 full = tx_hw_queue_full();
+            /@ fold tx_heap_access() @/
+            if (full) {
+                break;
+            }
+            if (empty) {
+                break;
+            }
+    
+            var {1,1} net_buffer = net_dequeue(tx_active, TX_QUEUE_CAPACITY);
+    
+            // get the hw_tail index before enqueueing to hardware ring
+            /@ unfold tx_heap_access() @/
+            /@ unfold hardware_ring_tx() @/
+            var hw_tail = lds 1 HW_RING_TX;
+            /@ fold hardware_ring_tx() @/
+            /@ fold tx_heap_access() @/
+    
+            // enqueue data buffer to hardware ring
+            hw_ring_tx_enqueue(net_buffer);
+    
+            ///////////////// data integrity assertions
+            // assert device.hardware_ring_tx_addr[hw_tail] == net_buffer.0
+            /@ assert unfolding valid_device() in unfolding valid_hardware_ring_tx_addr() in
+                device.hardware_ring_tx_addr[hw_tail] ==
+                unfolding net_buff_desc(net_buffer) in net_buffer.0 @/
+            // assert device.hardware_ring_tx_len[hw_tail] == net_buffer.1
+            /@ assert unfolding valid_device() in unfolding valid_hardware_ring_tx_len() in
+                device.hardware_ring_tx_len[hw_tail] ==
+                unfolding net_buff_desc(net_buffer) in net_buffer.1 @/
+            // assert heap[TX_MDATA_START_IDX + hw_tail] == net_buffer.0
+            /@ assert unfolding tx_heap_access() in unfolding tx_meta_data_access() in
+                heap[TX_MDATA_START_IDX + hw_tail] ==
+                unfolding net_buff_desc(net_buffer) in net_buffer.0 @/
+            /////////////////
+    
+            !st32 (REG_BASE + TDAR_OFFSET), TDAR_TDAR;
+        }
+
+        net_request_signal(tx_active);
+        reprocess = false;
+
+        var 1 empty = net_queue_empty(tx_active);
+        if (!empty) {
+            /@ unfold tx_heap_access() @/
+            var 1 full = tx_hw_queue_full();
+            /@ fold tx_heap_access() @/
+            if (!full) {
+                net_cancel_signal(tx_active);
+                reprocess = true;
+            }
+        }
+    }
+    return 0;
+}
+
+fun handle_irq()
+{
+    /@ requires valid_device() @/
+    /@ requires valid_virt() @/
+    /@ requires full_heap_access() @/
+    /@ ensures valid_device() @/
+    /@ ensures valid_virt() @/
+    /@ ensures full_heap_access() @/
+
+    var 1 EIR = get_device_EIR();
+    !st32 (REG_BASE + EIR_OFFSET), IRQ_MASK;
+
+    while (true)
+    {
+        /@ invariant valid_device() @/
+        /@ invariant valid_virt() @/
+        /@ invariant full_heap_access() @/
+
+        var rx_work = EIR & EIR_RXF_MASK;
+        var tx_work = EIR & EIR_TXF_MASK;
+        if (rx_work) {
+            /@ unfold full_heap_access() @/
+            rx_return();
+            rx_provide();
+            /@ fold full_heap_access() @/
+        }
+        if (tx_work) {
+            /@ unfold full_heap_access() @/
+            tx_return();
+            tx_provide();
+            /@ fold full_heap_access() @/
+        }
+        if (!rx_work) {
+            if (!tx_work) {
+                break;
+            }
+        }
+        EIR = get_device_EIR();
+        !st32 (REG_BASE + EIR_OFFSET), IRQ_MASK;
+    }
+    return 0;
+}
+
+export fun notified(1 channel)
+{
+    /@ requires (channel == 0) || (channel == 1) || (channel == 2) @/
+    /@ requires valid_device() @/
+    /@ requires valid_virt() @/
+    /@ requires full_heap_access() @/
+    /@ ensures valid_device() @/
+    /@ ensures valid_virt() @/
+    /@ ensures full_heap_access() @/
+
+    if (channel == IRQ_CH) {
+        handle_irq();
+        /*
+         * Delay calling into the kernel to ack the IRQ until the next loop
+         * in the microkit event handler loop.
+         */
+        /@ unfold valid_virt() @/
+        microkit_deferred_irq_ack(channel)
+        /@ fold valid_virt() @/
+        return 0;
+    }
+
+    if (channel == RX_CH) {
+        /@ unfold full_heap_access() @/
+        rx_provide();
+        /@ fold full_heap_access() @/
+        return 0;
+    }
+
+    if (channel == TX_CH) {
+        /@ unfold full_heap_access() @/
+        tx_provide();
+        /@ fold full_heap_access() @/
+        return 0;
+    }
+
+    // we shouldn't reach here
+    /@ assert false @/
+    return -1;
+}

@@ -1,0 +1,381 @@
+/*
+ * Copyright 2025, UNSW
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
+/////////////////// Pancake heap
+/*
+        word
+              ┌──────────────────────────┐
+              │ hw_ring rx {             │
+           0  │  tail index              │
+           1  │  head index              │
+              │ }                        │
+              ├──────────────────────────┤
+              │ hw_ring tx {             │
+           2  │  tail index              │
+           3  │  head index              │
+              │ }                        │
+              ├──────────────────────────┤
+      4..259  │ rx meta data             │
+              ├──────────────────────────┤
+     260..515 │ tx meta data             │
+              ├──────────────────────────┤
+*/
+
+/* offset of memory regions in the Pancake heap */
+#define RX_HW_TAIL_IDX      0
+#define RX_HW_HEAD_IDX      1
+#define TX_HW_TAIL_IDX      2
+#define TX_HW_HEAD_IDX      3
+#define RX_MDATA_START_IDX  4
+#define TX_MDATA_START_IDX  260
+#define TX_MDATA_END_IDX    516
+
+/* hardware ring indices (head and tail) addresses */
+#define HW_RING_RX      (@base + RX_HW_TAIL_IDX * @biw)
+#define HW_RING_TX      (@base + TX_HW_TAIL_IDX * @biw)
+
+/@ predicate full_heap_access()
+{
+    rx_heap_access() && tx_heap_access()
+}
+@/
+
+/@ predicate rx_heap_access()
+{
+    rx_meta_data_access() && hardware_ring_rx()
+}
+@/
+
+/@ predicate tx_heap_access()
+{
+    tx_meta_data_access() && hardware_ring_tx()
+}
+@/
+
+/@ predicate hardware_ring_rx()
+{
+    acc(heap[RX_HW_TAIL_IDX]) && acc(heap[RX_HW_HEAD_IDX]) &&
+    bounded8(heap[RX_HW_TAIL_IDX]) && bounded8(heap[RX_HW_HEAD_IDX])
+}
+@/
+
+/@ predicate hardware_ring_tx()
+{
+    acc(heap[TX_HW_TAIL_IDX]) && acc(heap[TX_HW_HEAD_IDX]) &&
+    bounded8(heap[TX_HW_TAIL_IDX]) && bounded8(heap[TX_HW_HEAD_IDX])
+}
+@/
+
+/@ predicate rx_meta_data_access()
+{
+    (forall i: Int:: (i >= RX_MDATA_START_IDX && i < TX_MDATA_START_IDX) ==>
+        acc(heap[i]) && bounded32(heap[i]))
+}
+@/
+
+/@ predicate tx_meta_data_access()
+{
+    (forall i: Int:: (i >= TX_MDATA_START_IDX && i < TX_MDATA_END_IDX) ==>
+        acc(heap[i]) && bounded32(heap[i]))
+}
+@/
+
+/* hardware ring indices helper functions */
+/@ function is_rx_hw_queue_empty(): Bool
+    requires hardware_ring_rx()
+    ensures result <==> unfolding hardware_ring_rx() in (heap[RX_HW_TAIL_IDX] == heap[RX_HW_HEAD_IDX])
+@/
+
+/@ function is_tx_hw_queue_empty(): Bool
+    requires hardware_ring_tx()
+    ensures result <==> unfolding hardware_ring_tx() in (heap[TX_HW_TAIL_IDX] == heap[TX_HW_HEAD_IDX])
+@/
+
+/////// inline function
+fun rx_hw_queue_empty() {
+    /@ requires hardware_ring_rx() @/
+    /@ ensures hardware_ring_rx() @/
+    /@ ensures unchanged(unfolding hardware_ring_rx() in heap[RX_HW_TAIL_IDX]) @/
+    /@ ensures unchanged(unfolding hardware_ring_rx() in heap[RX_HW_HEAD_IDX]) @/
+    /@ ensures (retval != 0) <==> is_rx_hw_queue_empty() @/
+
+    /@ unfold hardware_ring_rx() @/
+    var tail = lds 1 HW_RING_RX;
+    var head = lds 1 (HW_RING_RX + @biw);
+    /@ fold hardware_ring_rx() @/
+
+    var ret = (head == tail);
+    return ret;
+}
+
+/////// inline function
+fun tx_hw_queue_empty() {
+    /@ requires hardware_ring_tx() @/
+    /@ ensures hardware_ring_tx() @/
+    /@ ensures unchanged(unfolding hardware_ring_tx() in heap[TX_HW_TAIL_IDX]) @/
+    /@ ensures unchanged(unfolding hardware_ring_tx() in heap[TX_HW_HEAD_IDX]) @/
+    /@ ensures (retval != 0) <==> is_tx_hw_queue_empty() @/
+
+    /@ unfold hardware_ring_tx() @/
+    var tail = lds 1 HW_RING_TX;
+    var head = lds 1 (HW_RING_TX + @biw);
+    /@ fold hardware_ring_tx() @/
+
+    var ret = (head == tail);
+    return ret;
+}
+
+/@ function is_rx_hw_queue_full(): Bool
+    requires hardware_ring_rx()
+    ensures result <==> unfolding hardware_ring_rx() in (heap[RX_HW_TAIL_IDX] + 1) % HW_QUEUE_CAPACITY == heap[RX_HW_HEAD_IDX]
+@/
+
+/@ function is_tx_hw_queue_full(): Bool
+    requires hardware_ring_tx()
+    ensures result <==> unfolding hardware_ring_tx() in (heap[TX_HW_TAIL_IDX] + 1) % HW_QUEUE_CAPACITY == heap[TX_HW_HEAD_IDX]
+@/
+
+/////// inline function
+fun rx_hw_queue_full() {
+    /@ requires hardware_ring_rx() @/
+    /@ ensures hardware_ring_rx() @/
+    /@ ensures unchanged(unfolding hardware_ring_rx() in heap[RX_HW_TAIL_IDX]) @/
+    /@ ensures unchanged(unfolding hardware_ring_rx() in heap[RX_HW_HEAD_IDX]) @/
+    /@ ensures (retval != 0) <==> is_rx_hw_queue_full() @/
+
+    /@ unfold hardware_ring_rx() @/
+    var tail = lds 1 HW_RING_RX;
+    var head = lds 1 (HW_RING_RX + @biw);
+    /@ fold hardware_ring_rx() @/
+
+    var 1 new_tail = pnk_modulo256(tail + 1, HW_QUEUE_CAPACITY);
+    var ret = (new_tail == head);
+    return ret;
+}
+
+/////// inline function
+fun tx_hw_queue_full() {
+    /@ requires hardware_ring_tx() @/
+    /@ ensures hardware_ring_tx() @/
+    /@ ensures unchanged(unfolding hardware_ring_tx() in heap[TX_HW_TAIL_IDX]) @/
+    /@ ensures unchanged(unfolding hardware_ring_tx() in heap[TX_HW_HEAD_IDX]) @/
+    /@ ensures (retval != 0) <==> is_tx_hw_queue_full() @/
+
+    /@ unfold hardware_ring_tx() @/
+    var tail = lds 1 HW_RING_TX;
+    var head = lds 1 (HW_RING_TX + @biw);
+    /@ fold hardware_ring_tx() @/
+
+    var 1 new_tail = pnk_modulo256(tail + 1, HW_QUEUE_CAPACITY);
+    var ret = (new_tail == head);
+    return ret;
+}
+
+
+///////////////////
+fun hw_ring_rx_enqueue({1,1} buffer)
+{
+    /@ requires valid_device() @/
+    /@ requires rx_heap_access() @/
+    /@ requires unfolding rx_heap_access() in !is_rx_hw_queue_full() @/
+    /@ requires net_buff_desc(buffer) @/
+    /@ ensures valid_device() @/
+    /@ ensures rx_heap_access() @/
+    /@ ensures net_buff_desc(buffer) @/
+    /@ ensures unfolding net_buff_desc(buffer) in
+        forall i: Int:: i >= 0 && i < alen(buffer) ==>
+        (buffer[i] == old(unfolding net_buff_desc(buffer) in buffer[i]))
+    @/
+    /@ ensures unfolding rx_heap_access() in !is_rx_hw_queue_empty() @/
+    /@ ensures unfolding net_buff_desc(buffer) in buffer.0 ==
+        unfolding valid_device() in unfolding valid_hardware_ring_rx_addr() in
+        device.hardware_ring_rx_addr[(old(unfolding rx_heap_access() in unfolding hardware_ring_rx() in heap[RX_HW_TAIL_IDX]))]
+    @/
+    /@ ensures unfolding net_buff_desc(buffer) in buffer.0 ==
+        unfolding rx_heap_access() in unfolding rx_meta_data_access() in
+        heap[RX_MDATA_START_IDX + (old(unfolding rx_heap_access() in unfolding hardware_ring_rx() in heap[RX_HW_TAIL_IDX]))]
+    @/
+    /@ ensures unfolding rx_heap_access() in unfolding hardware_ring_rx() in heap[RX_HW_TAIL_IDX] ==
+        (old(unfolding rx_heap_access() in unfolding hardware_ring_rx() in heap[RX_HW_TAIL_IDX]) + 1) % HW_QUEUE_CAPACITY
+    @/
+    /@ ensures unchanged(unfolding rx_heap_access() in unfolding hardware_ring_rx() in heap[RX_HW_HEAD_IDX]) @/
+
+    /@ unfold rx_heap_access() @/
+    /@ unfold hardware_ring_rx() @/
+    var tail = lds 1 HW_RING_RX;
+    /@ fold hardware_ring_rx() @/
+
+    /@ unfold net_buff_desc(buffer) @/
+    /@ unfold rx_meta_data_access() @/
+    st (@base + (RX_MDATA_START_IDX + tail) * @biw), buffer.0;
+    /@ fold rx_meta_data_access() @/
+    /@ fold net_buff_desc(buffer) @/
+
+    rx_update_device_ring_slot(tail, buffer);
+    tail = pnk_modulo256(tail + 1, HW_QUEUE_CAPACITY);
+
+    /@ unfold hardware_ring_rx() @/
+    st HW_RING_RX, tail;
+    /@ fold hardware_ring_rx() @/
+    /@ fold rx_heap_access() @/
+
+    return 0;
+}
+
+fun hw_ring_tx_enqueue({1,1} buffer)
+{
+    /@ requires valid_device() @/
+    /@ requires tx_heap_access() @/
+    /@ requires unfolding tx_heap_access() in !is_tx_hw_queue_full() @/
+    /@ requires net_buff_desc(buffer) @/
+    /@ ensures valid_device() @/
+    /@ ensures tx_heap_access() @/
+    /@ ensures net_buff_desc(buffer) @/
+    /@ ensures unfolding net_buff_desc(buffer) in
+        forall i: Int:: i >= 0 && i < alen(buffer) ==>
+        (buffer[i] == old(unfolding net_buff_desc(buffer) in buffer[i]))
+    @/
+    /@ ensures unfolding tx_heap_access() in !is_tx_hw_queue_empty() @/
+    /@ ensures unfolding net_buff_desc(buffer) in buffer.0 ==
+        unfolding valid_device() in unfolding valid_hardware_ring_tx_addr() in
+        device.hardware_ring_tx_addr[(old(unfolding tx_heap_access() in unfolding hardware_ring_tx() in heap[TX_HW_TAIL_IDX]))]
+    @/
+    /@ ensures unfolding net_buff_desc(buffer) in buffer.1 ==
+        unfolding valid_device() in unfolding valid_hardware_ring_tx_len() in
+        device.hardware_ring_tx_len[(old(unfolding tx_heap_access() in unfolding hardware_ring_tx() in heap[TX_HW_TAIL_IDX]))]
+    @/
+    /@ ensures unfolding net_buff_desc(buffer) in buffer.0 ==
+        unfolding tx_heap_access() in unfolding tx_meta_data_access() in
+        heap[TX_MDATA_START_IDX + (old(unfolding tx_heap_access() in unfolding hardware_ring_tx() in heap[TX_HW_TAIL_IDX]))]
+    @/
+    /@ ensures unfolding tx_heap_access() in unfolding hardware_ring_tx() in heap[TX_HW_TAIL_IDX] ==
+        (old(unfolding tx_heap_access() in unfolding hardware_ring_tx() in heap[TX_HW_TAIL_IDX]) + 1) % HW_QUEUE_CAPACITY
+    @/
+    /@ ensures unchanged(unfolding tx_heap_access() in unfolding hardware_ring_tx() in heap[TX_HW_HEAD_IDX]) @/
+
+    /@ unfold tx_heap_access() @/
+    /@ unfold hardware_ring_tx() @/
+    var tail = lds 1 HW_RING_TX;
+    /@ fold hardware_ring_tx() @/
+
+    /@ unfold tx_meta_data_access() @/
+    /@ unfold net_buff_desc(buffer) @/
+    st (@base + (TX_MDATA_START_IDX + tail) * @biw), buffer.0;
+    /@ fold net_buff_desc(buffer) @/
+    /@ fold tx_meta_data_access() @/
+
+    tx_update_device_ring_slot(tail, buffer);
+    tail = pnk_modulo256(tail + 1, HW_QUEUE_CAPACITY);
+
+    /@ unfold hardware_ring_tx() @/
+    st HW_RING_TX, tail;
+    /@ fold hardware_ring_tx() @/
+    /@ fold tx_heap_access() @/
+
+    return 0;
+}
+
+fun hw_ring_rx_dequeue()
+{
+    /@ requires valid_device() @/
+    /@ requires rx_heap_access() @/
+    /@ requires unfolding rx_heap_access() in !is_rx_hw_queue_empty() @/
+    /@ ensures valid_device() @/
+    /@ ensures rx_heap_access() @/
+    /@ ensures unfolding rx_heap_access() in !is_rx_hw_queue_full() @/
+    /@ ensures net_buff_desc(retval) @/
+    /@ ensures unfolding net_buff_desc(retval) in retval.0 ==
+        unfolding rx_heap_access() in unfolding rx_meta_data_access() in
+        heap[RX_MDATA_START_IDX + old(unfolding rx_heap_access() in unfolding hardware_ring_rx() in heap[RX_HW_HEAD_IDX])]
+    @/
+    /@ ensures unfolding net_buff_desc(retval) in retval.1 ==
+        unfolding valid_device() in unfolding valid_hardware_ring_rx_len() in
+        device.hardware_ring_rx_len[old(unfolding rx_heap_access() in unfolding hardware_ring_rx() in heap[RX_HW_HEAD_IDX])]
+    @/
+    /@ ensures unchanged(unfolding rx_heap_access() in unfolding hardware_ring_rx() in heap[RX_HW_TAIL_IDX]) @/
+    /@ ensures unfolding rx_heap_access() in unfolding hardware_ring_rx() in heap[RX_HW_HEAD_IDX] ==
+        (old(unfolding rx_heap_access() in unfolding hardware_ring_rx() in heap[RX_HW_HEAD_IDX]) + 1) % HW_QUEUE_CAPACITY
+    @/
+
+    /@ unfold rx_heap_access() @/
+    /@ unfold hardware_ring_rx() @/
+    var head = lds 1 (HW_RING_RX + @biw);
+    /@ fold hardware_ring_rx() @/
+
+    var dscr_addr = HW_DESCR_RX + head * @biw;
+    // Note: This is a temporary hack and should be removed after Pancake supporting !ld16/!st16
+    var len = 0;
+    !ld32 len, dscr_addr;
+    len = len & MAX_INT16;
+
+    /@ unfold rx_meta_data_access() @/
+    var io_addr = lds 1 (@base + (RX_MDATA_START_IDX + head) * @biw);
+    /@ fold rx_meta_data_access() @/
+
+    var buffer = <io_addr, len>;
+    /@ fold net_buff_desc(buffer) @/
+
+    head = pnk_modulo256(head + 1, HW_QUEUE_CAPACITY);
+
+    /@ unfold hardware_ring_rx() @/
+    st (HW_RING_RX + @biw), head;
+    /@ fold hardware_ring_rx() @/
+    /@ fold rx_heap_access() @/
+
+    return buffer;
+}
+
+fun hw_ring_tx_dequeue()
+{
+    /@ requires valid_device() @/
+    /@ requires tx_heap_access() @/
+    /@ requires unfolding tx_heap_access() in !is_tx_hw_queue_empty() @/
+    /@ ensures valid_device() @/
+    /@ ensures tx_heap_access() @/
+    /@ ensures unfolding tx_heap_access() in !is_tx_hw_queue_full() @/
+    /@ ensures net_buff_desc(retval) @/
+    /@ ensures unfolding net_buff_desc(retval) in retval.0 ==
+        unfolding tx_heap_access() in unfolding tx_meta_data_access() in
+        heap[TX_MDATA_START_IDX + old(unfolding tx_heap_access() in unfolding hardware_ring_tx() in heap[TX_HW_HEAD_IDX])]
+    @/
+    /@ ensures unfolding net_buff_desc(retval) in retval.1 == 0 @/
+    /@ ensures unchanged(unfolding tx_heap_access() in unfolding hardware_ring_tx() in heap[TX_HW_TAIL_IDX])
+    @/
+    /@ ensures unfolding tx_heap_access() in unfolding hardware_ring_tx() in heap[TX_HW_HEAD_IDX] ==
+        (old(unfolding tx_heap_access() in unfolding hardware_ring_tx() in heap[TX_HW_HEAD_IDX]) + 1) % HW_QUEUE_CAPACITY
+    @/
+
+    /@ unfold tx_heap_access() @/
+    /@ unfold hardware_ring_tx() @/
+    var head = lds 1 (HW_RING_TX + @biw);
+    /@ fold hardware_ring_tx() @/
+
+    /@ unfold tx_meta_data_access() @/
+    var io_addr = lds 1 (@base + (TX_MDATA_START_IDX + head) * @biw);
+    /@ fold tx_meta_data_access() @/
+
+    var buffer = <io_addr, 0>;
+    /@ fold net_buff_desc(buffer) @/
+
+    head = pnk_modulo256(head + 1, HW_QUEUE_CAPACITY);
+
+    /@ unfold hardware_ring_tx() @/
+    st (HW_RING_TX + @biw), head;
+    /@ fold hardware_ring_tx() @/
+    /@ fold tx_heap_access() @/
+
+    return buffer;
+}
+
+///////////////////
+fun pnk_modulo256(1 a, 1 b)
+{
+    /@ requires b == 256 @/
+    /@ requires a > 0 @/
+    /@ ensures retval == (a % 256) @/
+    /@ ensures retval < 256 @/
+    var mod = a & 255;
+    return mod;
+}

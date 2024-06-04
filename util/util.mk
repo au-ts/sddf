@@ -32,6 +32,9 @@ util/sddf_printf.o: ${SDDF}/util/printf.c
 util/%.o: ${SDDF}/util/%.c
 	${CC} ${CFLAGS} -c -o $@ $<
 
+pancake_ffi.o: ${SDDF}/util/pancake_ffi.c
+	${CC} ${CFLAGS} -c -o $@ $<
+
 util:
 	mkdir -p $@
 

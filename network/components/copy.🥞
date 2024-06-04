@@ -1,0 +1,116 @@
+#define VIRT_RX_CH 0
+#define CLIENT_CH 1
+
+#define get_virt_buffer_data_region(virt_buffer_data_region)    \
+    var addr = @base;                                           \
+    var virt_buffer_data_region = lds 1 addr;                   \
+
+#define get_cli_buffer_data_region(cli_buffer_data_region)      \
+    var addr = @base + @biw;                                    \
+    var cli_buffer_data_region = lds 1 addr;                    \
+
+#define get_rx_queue_virt_handle(rx_queue_virt)                 \
+    var rx_queue_virt = @base + 2 * @biw;                       \
+
+#define get_rx_queue_cli_handle(rx_queue_cli)                   \
+    var rx_queue_cli = @base + 5 * @biw;                        \
+
+#define COPY_FUNC_BASE (@base + 64)
+
+fun main() {
+    return 0;
+}
+
+fun rx_return() {
+    var enqueued = false;
+    var reprocess = true;
+    get_rx_queue_virt_handle(rx_queue_virt)
+    get_rx_queue_cli_handle(rx_queue_cli)
+    get_cli_buffer_data_region(cli_buffer_data_region)
+    get_virt_buffer_data_region(virt_buffer_data_region)
+
+    while (reprocess) {
+        while (true) {
+            net_queue_empty_active(empty_a, rx_queue_virt)
+            net_queue_empty_free(empty_f, rx_queue_cli)
+            if (!((!empty_a) && (!empty_f))) {
+                break;
+            }
+            var cli_buffer_addr = COPY_FUNC_BASE;
+            var virt_buffer_addr = COPY_FUNC_BASE + 16;
+            var {1} err = net_dequeue_free(rx_queue_cli, cli_buffer_addr);
+            assert(!err)
+
+            var cli_buffer = lds {1,1} cli_buffer_addr;
+            var io_or_offset = cli_buffer.0;
+            pnk_modulo(offset, io_or_offset, NET_BUFFER_SIZE)
+            get_size(size, rx_queue_cli)
+            if (offset || (io_or_offset >= (NET_BUFFER_SIZE * size))) {
+                // TODO: sddf_dprint
+                continue;
+            }
+
+            var {1} err = net_dequeue_active(rx_queue_virt, virt_buffer_addr);
+            assert(!err)
+            var virt_buffer = lds {1,1} virt_buffer_addr;
+            var cli_addr = cli_buffer_data_region + cli_buffer.0;
+            var virt_addr = virt_buffer_data_region + virt_buffer.0;
+
+            var virt_buff_len = virt_buffer.1;
+            pnk_memcpy(cli_addr, virt_addr, virt_buff_len);
+
+            set_len(virt_buff_len, cli_buffer_addr)
+            set_len(0, virt_buffer_addr)
+
+            var cli_buffer = lds {2} cli_buffer_addr;
+
+            err = net_enqueue_active(rx_queue_cli, cli_buffer);
+            assert(!err)
+
+            var virt_buffer = lds {2} virt_buffer_addr;
+            err = net_enqueue_free(rx_queue_virt, virt_buffer);
+            assert(!err)
+
+            enqueued = true;
+        }
+
+        net_request_signal_active(rx_queue_virt)
+
+        // Only request signal from client if incoming packets from multiplexer are awaiting free buffers
+        net_queue_empty_active(empty, rx_queue_virt)
+        if (!empty) {
+            net_request_signal_free(rx_queue_cli)
+        } else {
+            net_cancel_signal_free(rx_queue_cli)
+        }
+
+        reprocess = false;
+
+        net_queue_empty_active(empty_a, rx_queue_virt)
+        net_queue_empty_free(empty_f, rx_queue_cli)
+        if ((!empty_a) && (!empty_f)) {
+            net_cancel_signal_active(rx_queue_virt)
+            net_cancel_signal_free(rx_queue_cli)
+            reprocess = true;
+        }
+    }
+
+    net_require_signal_active(signal_a, rx_queue_cli)
+    if (enqueued && signal_a) {
+        net_cancel_signal_active(rx_queue_cli)
+        microkit_notify(CLIENT_CH)
+    }
+
+    net_require_signal_free(signal_f, rx_queue_virt)
+    if (enqueued && signal_f) {
+        net_cancel_signal_free(rx_queue_virt)
+        microkit_deferred_notify(VIRT_RX_CH)
+    }
+
+    return 0;
+}
+
+export fun notified(1 ch) {
+    rx_return();
+    return 0;
+}

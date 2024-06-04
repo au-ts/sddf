@@ -53,8 +53,14 @@
 
 #define IRQ_MASK        (NETIRQ_RXF | NETIRQ_TXF | NETIRQ_EBERR)
 
+/*
+ * Section 11.5.6.13 Legacy buffer descriptors
+ * Page 3822.
+*/
+// Legacy receive buffer descriptor
 #define RXD_EMPTY       (1UL << 15)
 #define WRAP            (1UL << 13)
+// Legacy transmit buffer descriptor
 #define TXD_READY       (1UL << 15)
 #define TXD_ADDCRC      (1UL << 10)
 #define TXD_LAST        (1UL << 11)

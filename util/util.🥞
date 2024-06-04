@@ -1,0 +1,109 @@
+/*
+ * Copyright 2025, UNSW
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
+/////////////////// Helper constants
+/* Communication channels specified by Microkit */
+#define IRQ_CH  0
+#define TX_CH   1
+#define RX_CH   2
+
+/* Shared queues' capacities with device, rx-virtualiser and tx-virtualiser */
+#define HW_QUEUE_CAPACITY   256
+#define RX_QUEUE_CAPACITY   512
+#define TX_QUEUE_CAPACITY   1024
+// todo: make these capacities configurable
+
+/* The below virtual addresses are statically specified by Microkit system file
+ * in `sddf/examples/echo_server/board/maaxboard/echo_server.system`
+ * in the driver protection domain around line 72-86
+*/
+/////////////////// Shared memory with virtualisers
+#define NET_RX_FREE     37748736    /* 0x2_400_000 */
+#define NET_RX_ACTIVE   39845888    /* 0x2_600_000 */
+#define NET_TX_FREE     41943040    /* 0x2_800_000 */
+#define NET_TX_ACTIVE   44040192    /* 0x2_a00_000 */
+
+/////////////////// Shared memory with device
+#define REG_BASE            33554432    /* 0x2_000_000 */
+#define HW_QUEUE_SHARED     35651584    /* 0x2_200_000 */
+
+#define HW_QUEUE_SIZE       HW_QUEUE_CAPACITY * @biw
+#define HW_DESCR_RX         HW_QUEUE_SHARED                     /* 0x2_200_000 */
+#define HW_DESCR_TX         HW_QUEUE_SHARED + HW_QUEUE_SIZE     /* 0x2_200_800 */
+
+#define MAX_INT16        65535
+#define MAX_INT8         255
+
+/////////////////// Device register helper constants
+// (checkout device.vpr for details)
+#define EIR_RXF_MASK    33554432    /* (1 << 25) Receive Frame Interrupt  */
+#define EIR_TXF_MASK    134217728   /* (1 << 27) Transmit Frame Interrupt */
+
+#define IRQ_MASK        167772160   /* (1 << 27) | (1 << 25) */
+
+/* RX descriptor stat */
+// #define WRAP            (1 << 13)
+#define RXD_EMPTY       128     /* 0x80*/
+#define RXD_STAT        RXD_EMPTY
+#define RXD_STAT_WRAP   160     /* 0xa0 */
+
+/* TX descriptor stat */
+#define TXD_READY       128
+#define TXD_STAT        140     /* 0x8c*/
+#define TXD_STAT_WRAP   172     /* 0xac*/
+
+#define RDAR_RDAR       16777216    /* (1 << 24) */
+#define TDAR_TDAR       16777216    /* (1 << 24) */
+
+/* Device register addresses */
+#define EIR_OFFSET      4
+#define RDAR_OFFSET     16
+#define TDAR_OFFSET     20
+
+/////////////////// High level annotations
+/* Default args to include in method as device and virtulaiser states */
+/@ model field device @/
+/@ model field virt @/
+
+/@ extern predicate valid_device @/
+/@ extern predicate valid_virt @/
+/@ extern predicate net_buff_desc @/
+
+/@ extern field rx_free: Ref @/
+/@ extern field rx_active: Ref @/
+/@ extern field tx_free: Ref @/
+/@ extern field tx_active: Ref @/
+
+/@ extern field rx_notified: Bool @/
+/@ extern field tx_notified: Bool @/
+
+/@ extern field net_tail: Int @/
+/@ extern field net_head: Int @/
+/@ extern field net_signal: Int @/
+/@ extern field n_enqueue_dequeue: Int @/
+
+/@ extern predicate valid_net_queue @/
+
+/////////////////// FFI functions
+/@ ffi microkit_notify @/
+/@ ffi microkit_deferred_irq_ack @/
+
+#define microkit_notify(channel)        \
+    @microkit_notify(0,channel,0,0);    \
+
+#define microkit_deferred_irq_ack(channel)       \
+    @microkit_deferred_irq_ack(0,channel,0,0);   \
+
+/////////////////// Helper functions
+
+/@
+predicate net_buff_desc(buffer: IArray) {
+    alen(buffer) == 2 && acc(buffer[0]) && acc(buffer[1]) &&
+    bounded32(buffer[0]) && bounded16(buffer[1])
+}
+@/
+
+///////////////////
+#define unchanged(exprs)    exprs == old(exprs)

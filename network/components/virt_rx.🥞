@@ -1,0 +1,271 @@
+/* Notification channels */
+#define DRIVER_CH 0
+#define CLIENT_CH 1
+
+/* Used to signify that a packet has come in for the broadcast address and does not match with
+ * any particular client. */
+ #define BROADCAST_ID (NUM_NETWORK_CLIENTS + 1)
+
+#define get_notify_drv(notify_drv)          \
+    var notify_drv = lds 1 @base;           \
+
+// Boolean to indicate whether a packet has been enqueued
+// into the drivers free queue during notification handling
+#define set_notify_drv(notify_drv)          \
+    st @base, notify_drv;                   \
+
+#define get_rx_queue_drv(rx_queue_drv)      \
+    var rx_queue_drv = @base + @biw;        \
+
+/* Buffer data regions */
+#define get_buffer_data_vaddr(buffer_data_vaddr)    \
+    var addrs = @base + 4 * @biw;                   \
+    var buffer_data_vaddr = lds 1 addrs;            \
+
+#define get_buffer_data_paddr(buffer_data_paddr)    \
+    var addrs = @base + 5 * @biw;                   \
+    var buffer_data_paddr = lds 1 addrs;            \
+
+#define get_rx_queue_clients(queue_handle, client)                          \
+    var queue_handle = @base + 6 * @biw + client * NET_QUEUE_HANDLE_SIZE;   \
+
+#define get_mac_addrs_i(mac, client, i)                     \
+    var addrs = @base + 12 * @biw;                          \
+    var mac = ld8 (addrs + (client * ETH_HWADDR_LEN) + i);  \
+
+#define get_buffer_refs(value, ref_index)                   \
+    var addrs = @base + 14 * @biw + ref_index;              \
+    var value = ld8 addrs;                                  \
+
+#define set_buffer_refs(value, ref_index)                   \
+    var addrs = @base + 14 * @biw + ref_index;              \
+    st8 addrs, value;                                       \
+
+#define VIRT_RX_FUNC_BASE (@base + 720)
+
+fun main() {
+    return 0;
+}
+
+/* Return the client ID if the Mac address is a match to a client, return the broadcast ID if MAC address
+  is a broadcast address. */
+fun get_mac_addr_match(1 buffer_addr) {
+    var client = 0;
+    // NOTE: here &dest = &buffer
+    var dest_addr = buffer_addr;
+
+    while (client < NUM_NETWORK_CLIENTS) {
+        var match = true;
+        var i = 0;
+        // compare eth addresses
+        while (i < ETH_HWADDR_LEN) {
+            if (!match) {
+                break;
+            }
+            var dest_i = 0;
+            !ld8 dest_i, dest_addr + i;
+
+            get_mac_addrs_i(mac_i, client, i)
+            if (dest_i != mac_i) {
+                match = false;
+            }
+
+            i = i + 1;
+        }
+        if (match) {
+            return client;
+        }
+        client = client + 1;
+    }
+
+    var broadcast_match = true;
+    var i = 0;
+    while (i < ETH_HWADDR_LEN) {
+        if (!broadcast_match) {
+            break;
+        }
+        var dest_i = 0;
+        !ld8 dest_i, dest_addr + i;
+        if (dest_i != BYTE_MASK) {
+            broadcast_match = false;
+        }
+        i = i + 1;
+    }
+
+    if (broadcast_match) {
+        return BROADCAST_ID;
+    }
+
+    return -1;
+}
+
+fun rx_return() {
+    var reprocess = true;
+    var notify_clients_addr = VIRT_RX_FUNC_BASE;
+    get_rx_queue_drv(rx_queue_drv)
+    get_buffer_data_paddr(buffer_data_paddr)
+    get_buffer_data_vaddr(buffer_data_vaddr)
+
+    while (reprocess) {
+        while (true) {
+            net_queue_empty_active(empty, rx_queue_drv)
+            if (empty) {
+                break;
+            }
+
+            var buffer_addr = VIRT_RX_FUNC_BASE + 24;
+            var 1 err = net_dequeue_active(rx_queue_drv, buffer_addr);
+            assert(!err)
+
+            var buffer = lds {1,1} buffer_addr;
+            var io_or_offset = buffer.0;
+
+            io_or_offset = io_or_offset - buffer_data_paddr;
+            set_io_or_offset(io_or_offset, buffer_addr)
+            var buffer_vaddr = buffer_data_vaddr + io_or_offset;
+
+            var multiple = 1 << CONFIG_L1_CACHE_LINE_SIZE_BITS;
+            var len = buffer.1;
+            cache_clean_and_invalidate(buffer_vaddr, buffer_vaddr + len)
+
+            var 1 client = get_mac_addr_match(buffer_vaddr);
+             
+            if (client == BROADCAST_ID) {
+                var ref_index = io_or_offset >> LOG_NET_BUFFER_SIZE;
+                get_buffer_refs(value, ref_index)
+                assert(value == 0)
+                set_buffer_refs(NUM_NETWORK_CLIENTS, ref_index)
+
+                var i = 0;
+                while (i < NUM_NETWORK_CLIENTS) {
+                    var buffer = lds {2} buffer_addr;
+                    get_rx_queue_clients(rx_qh, i)
+                    err = net_enqueue_active(rx_qh, buffer);
+                    assert(!err)
+                    st notify_clients_addr + i * @biw, true;
+                    i = i + 1;
+                }
+                continue;
+            } else {
+                if (client >= 0) {
+                    var ref_index = io_or_offset >> LOG_NET_BUFFER_SIZE;
+                    get_buffer_refs(value, ref_index)
+                    assert(value == 0)
+                    set_buffer_refs(1, ref_index)
+
+                    get_rx_queue_clients(rx_qh, client)
+                    var buffer = lds {2} buffer_addr;
+                    err = net_enqueue_active(rx_qh, buffer);
+                    assert(!err)
+                    st notify_clients_addr + client * @biw, true;
+                } else {
+                    set_io_or_offset(io_or_offset + buffer_data_paddr, buffer_addr)
+                    var buffer = lds {2} buffer_addr;
+                    err = net_enqueue_free(rx_queue_drv, buffer);
+                    assert(!err)
+                    set_notify_drv(1)
+                }
+            }
+        }
+
+        net_request_signal_active(rx_queue_drv)
+        reprocess = false;
+
+        net_queue_empty_active(empty, rx_queue_drv)
+        if (!empty) {
+            net_cancel_signal_active(rx_queue_drv)
+            reprocess = true;
+        }
+    }
+
+    var client = 0;
+    while (client < NUM_NETWORK_CLIENTS) {
+        var notify = lds 1 (notify_clients_addr + client * @biw);
+        get_rx_queue_clients(rx_qh, client)
+        net_require_signal_active(signal, rx_qh)
+        if (notify && signal) {
+            net_cancel_signal_active(rx_qh)
+            microkit_notify(client + CLIENT_CH)
+        }
+        client = client + 1;
+    }
+    return 0;
+}
+
+fun rx_provide() {
+    var client = 0;
+    get_rx_queue_drv(rx_queue_drv)
+
+    while (client < NUM_NETWORK_CLIENTS) {
+        var reprocess = true;
+        get_rx_queue_clients(rx_qh, client)
+
+        while (reprocess) {
+            while (true) {
+                net_queue_empty_free(empty, rx_qh)
+                if (empty) {
+                    break;
+                }
+
+                var buffer_addr = VIRT_RX_FUNC_BASE;
+                var 1 err = net_dequeue_free(rx_qh, buffer_addr);
+                assert(!err)
+
+                var buffer = lds {1,1} buffer_addr;
+                var io_or_offset = buffer.0;
+                get_size(size, rx_qh)
+
+                pnk_modulo(result, io_or_offset, NET_BUFFER_SIZE)
+                assert((!result) && (io_or_offset < NET_BUFFER_SIZE * size))
+
+                // int ref_index = buffer.io_or_offset / NET_BUFFER_SIZE;
+                var ref_index = io_or_offset >> LOG_NET_BUFFER_SIZE;
+                get_buffer_refs(value, ref_index)
+                assert(value != 0)
+
+                value = value - 1;
+                set_buffer_refs(value, ref_index)
+
+                if (value != 0) {
+                    continue;
+                }
+
+                // To avoid having to perform a cache clean here we ensure that
+                // the DMA region is only mapped in read only. This avoids the
+                // case where pending writes are only written to the buffer
+                // memory after DMA has occured.
+                get_buffer_data_paddr(buffer_data_paddr)
+                set_io_or_offset(io_or_offset + buffer_data_paddr, buffer_addr)
+                var buffer = lds {2} buffer_addr;
+                err = net_enqueue_free(rx_queue_drv, buffer);
+                assert(!err)
+                set_notify_drv(1)
+            }
+
+            net_request_signal_free(rx_qh)
+            reprocess = false;
+
+            net_queue_empty_free(empty, rx_qh)
+            if (!empty) {
+                net_cancel_signal_free(rx_qh)
+                reprocess = true;
+            }
+        }
+        client = client + 1;
+    }
+
+    get_notify_drv(notify_drv)
+    net_require_signal_free(signal, rx_queue_drv)
+    if (notify_drv && signal) {
+        net_cancel_signal_free(rx_queue_drv)
+        microkit_deferred_notify(DRIVER_CH)
+        set_notify_drv(0)
+    }
+    return 0;
+}
+
+export fun notified(1 ch) {
+    rx_return();
+    rx_provide();
+    return 0;
+}
