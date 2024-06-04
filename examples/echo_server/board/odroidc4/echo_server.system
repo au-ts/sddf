@@ -8,7 +8,7 @@
     <memory_region name="hw_ring_buffer" size="0x10_000" />
 
     <!-- DMA and virtualised DMA regions -->
-    <memory_region name="net_rx_buffer_data_region" size="0x200_000" page_size="0x200_000" />
+    <memory_region name="net_rx_buffer_data_region" size="0x200_000" page_size="0x200_000" /> <!-- Must be mapped read-only! -->
     <memory_region name="net_tx_buffer_data_region_cli0" size="0x200_000" page_size="0x200_000" />
     <memory_region name="net_rx_buffer_data_region_cli0" size="0x200_000" page_size="0x200_000" />
     <memory_region name="net_tx_buffer_data_region_cli1" size="0x200_000" page_size="0x200_000" />

@@ -89,12 +89,12 @@ void rx_return(void)
             uintptr_t buffer_vaddr = buffer.io_or_offset + buffer_data_vaddr;
 
             // Cache invalidate after DMA write, so we don't read stale data.
-            // This is needed even if we invalidate before the DMA write as it
-            // could have been speculatively fetched before the DMA write.
+            // This must be performed after the DMA write to avoid reading 
+            // data that was speculatively fetched before the DMA write.
             //
-            // ... well, we would invalidate if it worked in usermode. Alas, it
-            // does not -- see [1]. The fastest one that works is a usermode
-            // CleanInvalidate (faster than a Invalidate via syscall).
+            // We would invalidate if it worked in usermode. Alas, it
+            // does not -- see [1]. The fastest operation that works is a 
+            // usermode CleanInvalidate (faster than a Invalidate via syscall).
             //
             // [1]: https://developer.arm.com/documentation/ddi0595/2021-06/AArch64-Instructions/DC-IVAC--Data-or-unified-Cache-line-Invalidate-by-VA-to-PoC
             cache_clean_and_invalidate(buffer_vaddr, buffer_vaddr + ROUND_UP(buffer.len, 1 << CONFIG_L1_CACHE_LINE_SIZE_BITS));
@@ -122,11 +122,6 @@ void rx_return(void)
                 assert(!err);
                 notify_clients[client] = true;
             } else {
-                // We are returning buffers to the device for DMA, which
-                // normally requires an invalidate (see rx_provide), but not
-                // here since we know there aren't any writes to the buffer
-                // since we invalidated above.
-
                 buffer.io_or_offset = buffer.io_or_offset + buffer_data_paddr;
                 err = net_enqueue_free(&state.rx_queue_drv, buffer);
                 assert(!err);
@@ -171,18 +166,10 @@ void rx_provide(void)
                     continue;
                 }
 
-                // There may be pending writes to this buffer in the cache. We
-                // need to invalidate or clean to ensure there's no chance of it
-                // overwriting received data.
-                //
-                // We need to invalidate the whole buffer since we don't know
-                // the packet length anymore, and also because the client may
-                // have written past the packet anyways.
-                //
-                // Usermode cache_clean is the fastest option here.
-                cache_clean(buffer.io_or_offset + buffer_data_vaddr,
-                            buffer.io_or_offset + buffer_data_vaddr + NET_BUFFER_SIZE);
-
+                // To avoid having to perform a cache clean here we ensure that
+                // the DMA region is only mapped in read only. This avoids the
+                // case where pending writes are only written to the buffer
+                // memory after DMA has occured. 
                 buffer.io_or_offset = buffer.io_or_offset + buffer_data_paddr;
                 err = net_enqueue_free(&state.rx_queue_drv, buffer);
                 assert(!err);
