@@ -17,27 +17,36 @@ ifeq ($(strip $(NUM_NETWORK_CLIENTS)),)
 $(error Specify the number of clients for the network virtualisers.  Expect -DNUM_NETWORK_CLIENTS=3 or similar)
 endif
 
-NETWORK_IMAGES:= network_virt_rx.elf network_virt_tx.elf arp.elf copy.elf
 
-CFLAGS_network += ${NUM_NETWORK_CLIENTS}
+NETWORK_COMPONENTS_DIR := $(abspath $(dir $(lastword ${MAKEFILE_LIST})))
+NETWORK_IMAGES:= network_virt_rx.elf network_virt_tx.elf arp.elf copy.elf
+network/components/%.o: ${SDDF}/network/components/%.c
+	${CC} ${CFLAGS} -c -o $@ $<
+
+NETWORK_COMPONENT_OBJ := $(addprefix network/components/, copy.o arp.o network_virt_tx.o network_virt_rx.o)
+
+CFLAGS_network += ${NUM_NETWORK_CLIENTS} -I${SDDF}/include/sddf/util
 
 CHECK_NETWORK_FLAGS_MD5:=.network_cflags-$(shell echo -- ${CFLAGS} ${CFLAGS_network} | shasum | sed 's/ *-//')
 
 ${CHECK_NETWORK_FLAGS_MD5}:
 	-rm -f .network_cflags-*
 	touch $@
-VPATH += :${SDDF}/network/components
 
-network_virt_%.elf: network_virt_%.o libsddf_util_debug.a
-	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@ libsddf_util_debug.a
+#vpath %.c ${SDDF}/network/components
 
-copy.elf arp.elf: LIBS := libsddf_util_debug.a ${LIBS}
 
-arp.o copy.o network_virt_tx.o network_virt_rx.o: ${CHECK_NETWORK_FLAGS_MD5}
-network_virt_%.o: ${SDDF}/network/components/virt_%.c 
-	${CC} ${CFLAGS} ${CFLAGS_network} -o $@ -MF .${@:.o=.d} -c $<
+${NETWORK_IMAGES): LIBS := libsddf_util_debug.a ${LIBS}
 
-arp.o copy.o: CFLAGS+=${CFLAGS_network}
+${NETWORK_COMPONENT_OBJ}: |network/components
+${NETWORK_COMPONENT_OBJ}: ${CHECK_NETWORK_FLAGS_MD5}
+${NETWORK_COMPONENT_OBJ}: CFLAGS+=${CFLAGS_network}
+
+network/components/network_virt_%.o: ${SDDF}/network/components/virt_%.c 
+	${CC} ${CFLAGS} -c -o $@ $<
+
+%.elf: network/components/%.o
+	${LD} ${LDFLAGS} -o $@ $< ${LIBS}
 
 clean::
 	rm -f network_virt_[rt]x.[od] copy.[od] arp.[od]
@@ -45,7 +54,7 @@ clean::
 clobber::
 	rm -f ${IMAGES}
 
--include network_virt_rx.d
--include network_virt_tx.d
--include arp.d
--include copy.d
+network/components:
+	mkdir -p $@
+
+-include ${NETWORK_COMPONENTS_OBJS:.o=.d}
