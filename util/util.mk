@@ -13,25 +13,33 @@
 
 OBJS_LIBUTIL := cache.o sddf_printf.o newlibc.o assert.o
 
-${OBJS_LIBUTIL} putchar_debug.o putchar_serial.o: ${CHECK_FLAGS_BOARD_MD5}
+ALL_OBJS_LIBUTIL := $(addprefix util/, ${OBJS_LIBUTIL} putchar_debug.o putchar_serial.o)
 
-libsddf_util_debug.a: ${OBJS_LIBUTIL} putchar_debug.o
+BASE_OBJS_LIBUTIL := $(addprefix util/, ${OBJS_LIBUTIL})
+${ALL_OBJS_LIBUTIL}: ${CHECK_FLAGS_BOARD_MD5} |util
+
+libsddf_util_debug.a: ${BASE_OBJS_LIBUTIL} util/putchar_debug.o
 	${AR} rv $@ $^
 	${RANLIB} $@
 
-libsddf_util.a: ${OBJS_LIBUTIL} putchar_serial.o
+libsddf_util.a: ${BASE_OBJS_LIBUTIL} util/putchar_serial.o
 	${AR} rv $@ $^
 	${RANLIB} $@
 
-VPATH += ${SDDF}/util
-
-sddf_printf.o: ${SDDF}/util/printf.c
+util/sddf_printf.o: ${SDDF}/util/printf.c
 	${CC} ${CFLAGS} -c -o $@ $<
 
+util/%.o: ${SDDF}/util/%.c
+	${CC} ${CFLAGS} -c -o $@ $<
+
+util:
+	mkdir -p $@
+
 clean::
-	${RM} -f ${OBJS_LIBUTIL} ${OBJS_LIBUTIL:.o=.d} putchar_debug.[od] putchar_serial.[od]
+	${RM} -f ${ALL_OBJS_LIBUTIL} ${ALL_OBJS_LIBUTIL:.o=.d}
 
 clobber:: clean
 	${RM} -f libsddf_util.a libsddf_util_debug.a
+	rmdir util
 
--include ${OBJS_LIBUTIL:.o=.d} putchar_debug.d putchar_serial.d
+-include ${ALL_OBJS_LIBUTIL:.o=.d}
