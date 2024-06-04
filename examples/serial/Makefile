@@ -13,8 +13,8 @@ $(error MICROKIT_BOARD must be specified)
 endif
 
 QEMU := qemu-system-aarch64
-CC := clang
-LD := ld.lld
+CC := riscv64-unknown-elf-gcc
+LD := riscv64-unknown-elf-ld
 
 MICROKIT_TOOL := $(MICROKIT_SDK)/bin/microkit
 MICROKIT_CONFIG ?= debug
@@ -51,7 +51,7 @@ CFLAGS := -ffreestanding -g3 -O3 -Wall -Wno-unused-function -Werror -Wno-unused-
 ifeq ($(ARCH),aarch64)
 	CFLAGS += -mcpu=$(CPU) -mstrict-align -target aarch64-none-elf
 else ifeq ($(ARCH),riscv64)
-	CFLAGS += -march=rv64imac -target riscv64-none-elf -DPRINTF_DISABLE_SUPPORT_FLOAT
+	CFLAGS += -mabi=lp64 -march=rv64imac -DPRINTF_DISABLE_SUPPORT_FLOAT
 endif
 
 IMAGES := uart.elf serial_server_1.elf serial_server_2.elf virt_tx.elf virt_rx.elf

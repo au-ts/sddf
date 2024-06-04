@@ -2,7 +2,7 @@
 #include <microkit.h>
 #include <sddf/util/printf.h>
 #include <sddf/timer/protocol.h>
-#include <assert.h>
+// #include <assert.h>
 
 /*
  * The JH7110 SoC contains a timer with four 32-bit counters. Each one of these
@@ -12,7 +12,6 @@
  */
 #define STARFIVE_TIMER_NUM_CHANNELS 4
 // @ivanv: why not just use sizeof?
-#define STARFIVE_TIMER_CHANNEL_REGS_SIZE 0x40
 
 #ifndef STARFIVE_TIMER_CHANNEL
 #define STARFIVE_TIMER_CHANNEL 1
@@ -55,6 +54,7 @@ typedef struct {
     uint32_t intclr;
     uint32_t intmask;
 } starfive_timer_regs_t;
+#define STARFIVE_TIMER_CHANNEL_REGS_SIZE sizeof(starfive_timer_regs_t)
 
 uintptr_t timer_base;
 static volatile starfive_timer_regs_t *counter_regs;
@@ -109,7 +109,7 @@ static void process_timeouts(uint64_t curr_time)
 
     if (next_timeout != UINT64_MAX) {
         uint64_t ns = next_timeout - curr_time;
-        sddf_dprintf("ns: %lu\n", ns);
+        // sddf_dprintf("ns: %lu\n", ns);
         timeout_regs->enable = STARFIVE_TIMER_DISABLED;
         timeout_timer_elapses = 0;
         timeout_regs->ctrl = STARFIVE_TIMER_MODE_SINGLE;
@@ -123,8 +123,6 @@ static void process_timeouts(uint64_t curr_time)
             sddf_dprintf("ERROR: num_ticks: 0x%lx\n", num_ticks);
         }
 
-        sddf_dprintf("num_ticks: 0x%lx\n", num_ticks);
-
         timeout_regs->load = num_ticks;
         timeout_regs->enable = STARFIVE_TIMER_ENABLED;
     }
@@ -132,7 +130,7 @@ static void process_timeouts(uint64_t curr_time)
 
 void notified(microkit_channel ch)
 {
-    sddf_dprintf("got IRQ!\n");
+    // sddf_dprintf("got IRQ!\n");
 
     switch (ch) {
         case COUNTER_IRQ_CH: {

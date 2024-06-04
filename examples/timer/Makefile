@@ -10,16 +10,19 @@ ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
 	ARCH := aarch64
 	TIMER_DRIVER_DIR := meson
 	CPU := cortex-a55
+	LD := ld.lld
+	CC := clang
 else ifeq ($(strip $(MICROKIT_BOARD)), star64)
 	ARCH := riscv64
 	TIMER_DRIVER_DIR := starfive
+	LD := ld.lld
+	CC := clang
 else
 $(error Unsupported MICROKIT_BOARD given)
 endif
 
 # CC := riscv64-unknown-elf-gcc
-LD := riscv64-unknown-elf-ld
-CC := riscv64-unknown-elf-gcc
+
 # LD := ld.lld
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 
@@ -32,7 +35,7 @@ CFLAGS := -nostdlib \
 		  -ffreestanding \
 		  -g3 \
 		  -O0 \
-		  -Wall -Wno-unused-function -Werror -Wno-unused-command-line-argument \
+		   -Wno-unused-function -Werror -Wno-unused-command-line-argument \
 		  -I$(BOARD_DIR)/include \
 		  -I$(SDDF)/include
 LDFLAGS := -L$(BOARD_DIR)/lib
@@ -41,7 +44,7 @@ LIBS := -lmicrokit -Tmicrokit.ld
 ifeq ($(ARCH),aarch64)
 	CFLAGS += -mcpu=$(CPU) -mstrict-align -target aarch64-none-elf
 else ifeq ($(ARCH),riscv64)
-	CFLAGS += -mabi=lp64 -march=rv64imac -DPRINTF_DISABLE_SUPPORT_FLOAT
+	CFLAGS += -march=rv64imac -target riscv64-none-elf -DPRINTF_DISABLE_SUPPORT_FLOAT
 endif
 
 IMAGE_FILE = $(BUILD_DIR)/loader.img
