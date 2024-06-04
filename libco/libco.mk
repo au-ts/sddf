@@ -5,17 +5,18 @@
 #
 # Include this make snippet to buid libco,a, a simple coroutine library.
 
-CHECK_LIBCO_FLAGS_MD5:=.libco_cflags-$(shell echo -- ${CFLAGS} ${CFLAGS_network} | shasum | sed 's/ *-//')
+LIBCO_DIR := $(abspath $(dir $(lastword ${MAKEFILE_LIST})))
+CHECK_LIBCO_FLAGS_MD5:=.libco_cflags-$(shell echo -- ${CFLAGS} | shasum | sed 's/ *-//')
 
 ${CHECK_LIBCO_FLAGS_MD5}:
 	-rm -f .libco_cflags-*
 	touch $@
 
-libco.o: $(LIBCO)/libco.c ${CHECK_LIBCO_FLAGS_MD5}
+${LIBCO_DIR}/libco.o: $(LIBCO_DIR)/libco.c ${CHECK_LIBCO_FLAGS_MD5}
 	${CC} ${CFLAGS} -c -o $@ $<
 
-libco.a: libco.o
+libco.a: ${LIBCO_DIR}/libco.o
 	${AR} cr $@ $^
 	${RANLIB} $@
 
--include libco.d
+-include ${LIBCO_DIR}/libco.d
