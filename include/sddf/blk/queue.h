@@ -62,16 +62,16 @@ typedef struct blk_response {
 
 /* Circular buffer containing requests */
 typedef struct blk_req_queue {
-    uint32_t head;
     uint32_t tail;
+    uint32_t head;
     bool plugged; /* prevent requests from being dequeued when plugged */
     blk_request_t buffers[BLK_QUEUE_SIZE];
 } blk_req_queue_t;
 
 /* Circular buffer containing responses */
 typedef struct blk_resp_queue {
-    uint32_t head;
     uint32_t tail;
+    uint32_t head;
     blk_response_t buffers[BLK_QUEUE_SIZE];
 } blk_resp_queue_t;
 
@@ -110,7 +110,7 @@ static inline void blk_queue_init(blk_queue_handle_t *h,
  */
 static inline bool blk_req_queue_empty(blk_queue_handle_t *h)
 {
-    return h->req_queue->head - h->req_queue->tail == 0;
+    return h->req_queue->tail - h->req_queue->head == 0;
 }
 
 /**
@@ -122,7 +122,7 @@ static inline bool blk_req_queue_empty(blk_queue_handle_t *h)
  */
 static inline bool blk_resp_queue_empty(blk_queue_handle_t *h)
 {
-    return h->resp_queue->head - h->resp_queue->tail == 0;
+    return h->resp_queue->tail - h->resp_queue->head == 0;
 }
 
 /**
@@ -134,7 +134,7 @@ static inline bool blk_resp_queue_empty(blk_queue_handle_t *h)
  */
 static inline bool blk_req_queue_full(blk_queue_handle_t *h)
 {
-    return h->req_queue->head - h->req_queue->tail + 1 == h->queue_size;
+    return h->req_queue->tail - h->req_queue->head + 1 == h->queue_size;
 }
 
 /**
@@ -146,7 +146,7 @@ static inline bool blk_req_queue_full(blk_queue_handle_t *h)
  */
 static inline bool blk_resp_queue_full(blk_queue_handle_t *h)
 {
-    return h->resp_queue->head - h->resp_queue->tail + 1 == h->queue_size;
+    return h->resp_queue->tail - h->resp_queue->head + 1 == h->queue_size;
 }
 
 /**
@@ -158,7 +158,7 @@ static inline bool blk_resp_queue_full(blk_queue_handle_t *h)
  */
 static inline int blk_req_queue_size(blk_queue_handle_t *h)
 {
-    return (h->req_queue->head - h->req_queue->tail);
+    return (h->req_queue->tail - h->req_queue->head);
 }
 
 /**
@@ -170,7 +170,7 @@ static inline int blk_req_queue_size(blk_queue_handle_t *h)
  */
 static inline int blk_resp_queue_size(blk_queue_handle_t *h)
 {
-    return (h->resp_queue->head - h->resp_queue->tail);
+    return (h->resp_queue->tail - h->resp_queue->head);
 }
 
 /**
@@ -194,14 +194,14 @@ static inline int blk_enqueue_req(blk_queue_handle_t *h,
         return -1;
     }
 
-    h->req_queue->buffers[h->req_queue->head % h->queue_size].code = code;
-    h->req_queue->buffers[h->req_queue->head % h->queue_size].addr = addr;
-    h->req_queue->buffers[h->req_queue->head % h->queue_size].block_number = block_number;
-    h->req_queue->buffers[h->req_queue->head % h->queue_size].count = count;
-    h->req_queue->buffers[h->req_queue->head % h->queue_size].id = id;
+    h->req_queue->buffers[h->req_queue->tail % h->queue_size].code = code;
+    h->req_queue->buffers[h->req_queue->tail % h->queue_size].addr = addr;
+    h->req_queue->buffers[h->req_queue->tail % h->queue_size].block_number = block_number;
+    h->req_queue->buffers[h->req_queue->tail % h->queue_size].count = count;
+    h->req_queue->buffers[h->req_queue->tail % h->queue_size].id = id;
 
     THREAD_MEMORY_RELEASE();
-    h->req_queue->head++;
+    h->req_queue->tail++;
 
     return 0;
 }
@@ -226,12 +226,12 @@ static inline int blk_enqueue_resp(blk_queue_handle_t *h,
         return -1;
     }
 
-    h->resp_queue->buffers[h->resp_queue->head % h->queue_size].status = status;
-    h->resp_queue->buffers[h->resp_queue->head % h->queue_size].success_count = success_count;
-    h->resp_queue->buffers[h->resp_queue->head % h->queue_size].id = id;
+    h->resp_queue->buffers[h->resp_queue->tail % h->queue_size].status = status;
+    h->resp_queue->buffers[h->resp_queue->tail % h->queue_size].success_count = success_count;
+    h->resp_queue->buffers[h->resp_queue->tail % h->queue_size].id = id;
 
     THREAD_MEMORY_RELEASE();
-    h->resp_queue->head++;
+    h->resp_queue->tail++;
 
     return 0;
 }
@@ -259,14 +259,14 @@ static inline int blk_dequeue_req(blk_queue_handle_t *h,
         return -1;
     }
 
-    *code = h->req_queue->buffers[h->req_queue->tail % h->queue_size].code;
-    *addr = h->req_queue->buffers[h->req_queue->tail % h->queue_size].addr;
-    *block_number = h->req_queue->buffers[h->req_queue->tail % h->queue_size].block_number;
-    *count = h->req_queue->buffers[h->req_queue->tail % h->queue_size].count;
-    *id = h->req_queue->buffers[h->req_queue->tail % h->queue_size].id;
+    *code = h->req_queue->buffers[h->req_queue->head % h->queue_size].code;
+    *addr = h->req_queue->buffers[h->req_queue->head % h->queue_size].addr;
+    *block_number = h->req_queue->buffers[h->req_queue->head % h->queue_size].block_number;
+    *count = h->req_queue->buffers[h->req_queue->head % h->queue_size].count;
+    *id = h->req_queue->buffers[h->req_queue->head % h->queue_size].id;
 
     THREAD_MEMORY_RELEASE();
-    h->req_queue->tail++;
+    h->req_queue->head++;
 
     return 0;
 }
@@ -289,12 +289,12 @@ static inline int blk_dequeue_resp(blk_queue_handle_t *h,
         return -1;
     }
 
-    *status = h->resp_queue->buffers[h->resp_queue->tail % h->queue_size].status;
-    *success_count = h->resp_queue->buffers[h->resp_queue->tail % h->queue_size].success_count;
-    *id = h->resp_queue->buffers[h->resp_queue->tail % h->queue_size].id;
+    *status = h->resp_queue->buffers[h->resp_queue->head % h->queue_size].status;
+    *success_count = h->resp_queue->buffers[h->resp_queue->head % h->queue_size].success_count;
+    *id = h->resp_queue->buffers[h->resp_queue->head % h->queue_size].id;
 
     THREAD_MEMORY_RELEASE();
-    h->resp_queue->tail++;
+    h->resp_queue->head++;
 
     return 0;
 }
