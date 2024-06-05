@@ -78,9 +78,11 @@ all: loader.img
 ${LWIP_OBJS}: ${CHECK_FLAGS_BOARD_MD5}
 lwip.elf: $(LWIP_OBJS) libsddf_util.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
-${LWIP_OBJS}: |${BUILD_DIR}/${LWIPDIR}
-${BUILD_DIR}/${LWIPDIR}:
-	mkdir -p $@/core/ipv4 $@/netif $@/api
+
+LWIPDIRS := $(addprefix ${LWIPDIR}/, core/ipv4 netif api)
+${LWIP_OBJS}: |${BUILD_DIR}/${LWIPDIRS}
+${BUILD_DIR}/${LWIPDIRS}:
+	mkdir -p $@
 
 # Need to build libsddf_util_debug.a because it's included in LIBS
 # for the unimplemented libc dependencies
