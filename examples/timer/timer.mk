@@ -39,6 +39,11 @@ CLIENT_OBJS := client.o
 TIMER_DRIVER := $(SDDF)/drivers/clock/$(TIMER_DRIVER_DIR)
 
 all: $(IMAGE_FILE)
+CHECK_FLAGS_BOARD_MD5:=.board_cflags-$(shell echo -- ${CFLAGS} ${BOARD} ${MICROKIT_CONFIG} | shasum | sed 's/ *-//')
+
+${CHECK_FLAGS_BOARD_MD5}:
+	-rm -f .board_cflags-*
+	touch $@
 
 include ${TIMER_DRIVER}/timer_driver.mk
 include ${SDDF}/util/util.mk
