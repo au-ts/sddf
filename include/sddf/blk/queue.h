@@ -10,6 +10,7 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include <sddf/util/fence.h>
+#include <sddf/util/util.h>
 
 /* Size of a single block to be transferred */
 #define BLK_TRANSFER_SIZE 4096
@@ -94,6 +95,7 @@ static inline void blk_queue_init(blk_queue_handle_t *h,
                                   blk_resp_queue_t *response,
                                   uint32_t queue_size)
 {
+    assert(queue_size <= BLK_QUEUE_SIZE);
     h->req_queue = request;
     h->resp_queue = response;
     h->queue_size = queue_size;
@@ -132,7 +134,7 @@ static inline bool blk_resp_queue_empty(blk_queue_handle_t *h)
  */
 static inline bool blk_req_queue_full(blk_queue_handle_t *h)
 {
-    return h->req_queue->head - h->req_queue->tail + 1 == h->req_queue->size;
+    return h->req_queue->head - h->req_queue->tail + 1 == h->queue_size;
 }
 
 /**
@@ -144,7 +146,7 @@ static inline bool blk_req_queue_full(blk_queue_handle_t *h)
  */
 static inline bool blk_resp_queue_full(blk_queue_handle_t *h)
 {
-    return h->resp_queue->head - h->resp_queue->tail + 1 == h->resp_queue->size;
+    return h->resp_queue->head - h->resp_queue->tail + 1 == h->queue_size;
 }
 
 /**
