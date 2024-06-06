@@ -11,7 +11,9 @@
  * hardware.
  */
 #define STARFIVE_TIMER_NUM_CHANNELS 4
+
 // @ivanv: why not just use sizeof?
+#define STARFIVE_TIMER_CHANNEL_REGS_SIZE 0x40
 
 #ifndef STARFIVE_TIMER_CHANNEL
 #define STARFIVE_TIMER_CHANNEL 1
@@ -54,7 +56,6 @@ typedef struct {
     uint32_t intclr;
     uint32_t intmask;
 } starfive_timer_regs_t;
-#define STARFIVE_TIMER_CHANNEL_REGS_SIZE sizeof(starfive_timer_regs_t)
 
 uintptr_t timer_base;
 static volatile starfive_timer_regs_t *counter_regs;
@@ -199,8 +200,7 @@ void init(void)
     }
 
     counter_regs = (volatile starfive_timer_regs_t *) timer_base;
-    timeout_regs = (volatile starfive_timer_regs_t *) timer_base + STARFIVE_TIMER_CHANNEL_REGS_SIZE * STARFIVE_TIMER_CHANNEL;
-
+    timeout_regs = (volatile starfive_timer_regs_t *) (timer_base + STARFIVE_TIMER_CHANNEL_REGS_SIZE * STARFIVE_TIMER_CHANNEL);
     timeout_regs->enable = STARFIVE_TIMER_DISABLED;
     timeout_regs->ctrl = STARFIVE_TIMER_MODE_CONTINUOUS;
     timeout_regs->load = STARFIVE_TIMER_MAX_TICKS;
