@@ -9,35 +9,42 @@ $(error MICROKIT_SDK must be specified)
 endif
 
 ifeq ($(strip $(TOOLCHAIN)),)
-	TOOLCHAIN := aarch64-none-elf
-	LIBC := $(dir $(realpath $(shell aarch64-none-elf-gcc --print-file-name libc.a)))
+	TOOLCHAIN := riscv64-unknown-elf-gcc
+	LIBC := $(dir $(realpath $(shell riscv64-unknown-elf-gcc --print-file-name libc.a)))
 endif
 
 BUILD_DIR ?= build
 MICROKIT_CONFIG ?= debug
 
 ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
+	ARCH := aarch64
 	DRIV_DIR := meson
 	CPU := cortex-a55
 else ifeq ($(strip $(MICROKIT_BOARD)), imx8mm_evk)
+	ARCH := aarch64
 	DRIV_DIR := imx
 	CPU := cortex-a53
 else ifeq ($(strip $(MICROKIT_BOARD)), maaxboard)
+	ARCH := aarch64
 	DRIV_DIR := imx
 	CPU := cortex-a53
+else ifeq ($(strip $(MICROKIT_BOARD)), star64)
+	ARCH := riscv64
+	DRIV_DIR := starfive
 else
 $(error Unsupported MICROKIT_BOARD given)
 endif
 
-CC := $(TOOLCHAIN)-gcc
-LD := $(TOOLCHAIN)-ld
+
+
 AS := $(TOOLCHAIN)-as
+
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 
 SDDF=$(abspath ../..)
 SDDF_INCLUDE=$(SDDF)/include/sddf
 LWIP=$(SDDF)/network/ipstacks/lwip/src
-BENCHMARK=$(SDDF)/benchmark
+# BENCHMARK=$(SDDF)/benchmark
 UTIL=$(SDDF)/util
 ETHERNET_DRIVER=$(SDDF)/drivers/network/$(DRIV_DIR)
 TIMER_DRIVER=$(SDDF)/drivers/clock/$(DRIV_DIR)
@@ -46,8 +53,26 @@ NETWORK_COMPONENTS=$(SDDF)/network/components
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 SYSTEM_FILE := board/$(MICROKIT_BOARD)/echo_server.system
 
-IMAGES := eth.elf lwip.elf benchmark.elf idle.elf virt_rx.elf virt_tx.elf copy.elf timer.elf
-CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall -Wno-unused-function -DMICROKIT_CONFIG_$(MICROKIT_CONFIG)
+# IMAGES := eth.elf lwip.elf benchmark.elf idle.elf virt_rx.elf virt_tx.elf copy.elf timer.elf
+IMAGES := eth.elf lwip.elf virt_rx.elf virt_tx.elf copy.elf timer.elf
+ifeq ($(ARCH),aarch64)
+	CC := $(TOOLCHAIN)-gcc
+	LD := $(TOOLCHAIN)-ld
+	CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall -Wno-unused-function -DMICROKIT_CONFIG_$(MICROKIT_CONFIG)
+
+else ifeq ($(ARCH),riscv64)
+	CC := riscv64-unknown-elf-gcc
+	LD := riscv64-unknown-elf-ld
+	CFLAGS := -nostdlib \
+		  -ffreestanding \
+		  -g3 \
+		  -O0 \
+		   -Wno-unused-function -Werror -Wno-unused-command-line-argument \
+		  -I$(BOARD_DIR)/include \
+		  -I$(SDDF)/include \
+		  -mabi=lp64d \
+		  -march=rv64imadc
+endif
 
 LDFLAGS := -L$(BOARD_DIR)/lib -L$(LIBC)
 LIBS := -lmicrokit -Tmicrokit.ld -lc
@@ -100,18 +125,21 @@ NETIFFILES=$(LWIP)/netif/ethernet.c
 
 # LWIPFILES: All the above.
 LWIPFILES=lwip.c $(COREFILES) $(CORE4FILES) $(NETIFFILES)
-LWIP_OBJS := $(LWIPFILES:.c=.o) lwip.o utilization_socket.o udp_echo_socket.o printf.o putchar_serial.o newlibc.o
+LWIP_OBJS := $(LWIPFILES:.c=.o) lwip.o utilization_socket.o udp_echo_socket.o printf.o putchar_debug.o newlibc.o
 
 ETH_OBJS := $(ETHERNET_DRIVER)/ethernet.o printf.o putchar_debug.o
 VIRT_RX_OBJS := $(NETWORK_COMPONENTS)/virt_rx.o $(UTIL)/cache.o printf.o putchar_debug.o
 VIRT_TX_OBJS := $(NETWORK_COMPONENTS)/virt_tx.o $(UTIL)/cache.o printf.o putchar_debug.o
 COPY_OBJS := $(NETWORK_COMPONENTS)/copy.o printf.o putchar_debug.o
-BENCH_OBJS := $(BENCHMARK)/benchmark.o printf.o putchar_serial.o
-IDLE_OBJS := $(BENCHMARK)/idle.o printf.o putchar_debug.o
+# BENCH_OBJS := $(BENCHMARK)/benchmark.o printf.o putchar_serial.o
+# IDLE_OBJS := $(BENCHMARK)/idle.o printf.o putchar_debug.o
 TIMER_OBJS := $(TIMER_DRIVER)/timer.o printf.o putchar_debug.o
 
+# OBJS := $(sort $(addprefix $(BUILD_DIR)/, $(ETH_OBJS) $(VIRT_RX_OBJS) $(VIRT_TX_OBJS)\
+# 	$(COPY_OBJS) $(BENCH_OBJS) $(IDLE_OBJS) \
+# 	$(LWIP_OBJS) $(TIMER_OBJS)))
 OBJS := $(sort $(addprefix $(BUILD_DIR)/, $(ETH_OBJS) $(VIRT_RX_OBJS) $(VIRT_TX_OBJS)\
-	$(COPY_OBJS) $(BENCH_OBJS) $(IDLE_OBJS) \
+	$(COPY_OBJS) \
 	$(LWIP_OBJS) $(TIMER_OBJS)))
 DEPS := $(OBJS:.o=.d)
 
@@ -152,11 +180,11 @@ $(BUILD_DIR)/virt_tx.elf: $(addprefix $(BUILD_DIR)/, $(VIRT_TX_OBJS))
 $(BUILD_DIR)/copy.elf: $(addprefix $(BUILD_DIR)/, $(COPY_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-$(BUILD_DIR)/benchmark.elf: $(addprefix $(BUILD_DIR)/, $(BENCH_OBJS))
-	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+# $(BUILD_DIR)/benchmark.elf: $(addprefix $(BUILD_DIR)/, $(BENCH_OBJS))
+# 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-$(BUILD_DIR)/idle.elf: $(addprefix $(BUILD_DIR)/, $(IDLE_OBJS))
-	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+# $(BUILD_DIR)/idle.elf: $(addprefix $(BUILD_DIR)/, $(IDLE_OBJS))
+# 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(BUILD_DIR)/timer.elf: $(addprefix $(BUILD_DIR)/, $(TIMER_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
