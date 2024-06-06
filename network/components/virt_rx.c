@@ -89,11 +89,11 @@ void rx_return(void)
             uintptr_t buffer_vaddr = buffer.io_or_offset + buffer_data_vaddr;
 
             // Cache invalidate after DMA write, so we don't read stale data.
-            // This must be performed after the DMA write to avoid reading 
+            // This must be performed after the DMA write to avoid reading
             // data that was speculatively fetched before the DMA write.
             //
             // We would invalidate if it worked in usermode. Alas, it
-            // does not -- see [1]. The fastest operation that works is a 
+            // does not -- see [1]. The fastest operation that works is a
             // usermode CleanInvalidate (faster than a Invalidate via syscall).
             //
             // [1]: https://developer.arm.com/documentation/ddi0595/2021-06/AArch64-Instructions/DC-IVAC--Data-or-unified-Cache-line-Invalidate-by-VA-to-PoC
@@ -169,7 +169,7 @@ void rx_provide(void)
                 // To avoid having to perform a cache clean here we ensure that
                 // the DMA region is only mapped in read only. This avoids the
                 // case where pending writes are only written to the buffer
-                // memory after DMA has occured. 
+                // memory after DMA has occured.
                 buffer.io_or_offset = buffer.io_or_offset + buffer_data_paddr;
                 err = net_enqueue_free(&state.rx_queue_drv, buffer);
                 assert(!err);
