@@ -89,7 +89,7 @@ static void rx_return(void)
         if (!(uart_regs->ts & UART_TST_RX_FIFO_EMPTY) && serial_queue_full(&rx_queue_handle, rx_queue_handle.queue->tail)) {
             /* Disable rx interrupts until virtualisers queue is no longer empty. */
             uart_regs->cr1 &= ~UART_CR1_RX_READY_INT;
-            serial_require_consumer_signal(&rx_queue_handle);
+            serial_request_consumer_signal(&rx_queue_handle);
         }
         reprocess = false;
 
