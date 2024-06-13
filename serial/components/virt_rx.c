@@ -85,6 +85,7 @@ void rx_return(void)
                         current_client = (uint32_t)input_number;
                         local_tail = rx_queue_handle_cli[current_client].queue->tail;
                         transferred = false;
+                        sddf_dprintf("VIRT_RX|LOG: switching to client %d\n", input_number);
                     } else {
                         sddf_dprintf("VIRT_RX|LOG: User requested to switch to an invalid client %d\n", input_number);
                     }
