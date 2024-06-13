@@ -167,27 +167,20 @@ static inline void serial_update_visible_head(serial_queue_handle_t *queue_handl
     queue_handle->queue->head = local_head;
 }
 
+static inline uint32_t serial_queue_length(serial_queue_handle_t *queue_handle)
+{
+    return queue_handle->queue->tail - queue_handle->queue->head;
+}
+
 static inline uint32_t serial_queue_contiguous_length(serial_queue_handle_t *queue_handle)
 {
-    uint32_t head = queue_handle->queue->head;
-    uint32_t tail = queue_handle->queue->tail;
+    uint32_t head = queue_handle->queue->head % queue_handle->size;
+    uint32_t tail = queue_handle->queue->tail % queue_handle->size;
 
     if (head <= tail) {
         return tail - head;
     } else {
-        return (UINT32_MAX - head) + 1;
-    }
-}
-
-static inline uint32_t serial_queue_length(serial_queue_handle_t *queue_handle)
-{
-    uint32_t head = queue_handle->queue->head;
-    uint32_t tail = queue_handle->queue->tail;
-
-    if (head <= tail) {
-        return serial_queue_contiguous_length(queue_handle);
-    } else {
-        return serial_queue_contiguous_length(queue_handle) + tail;
+        return queue_handle->size - head;
     }
 }
 
@@ -198,13 +191,13 @@ static inline uint32_t serial_queue_free(serial_queue_handle_t *queue_handle)
 
 static inline uint32_t serial_queue_contiguous_free(serial_queue_handle_t *queue_handle)
 {
-    uint32_t tail = queue_handle->queue->tail;
+    uint32_t tail = queue_handle->queue->tail % queue_handle->size;
     uint32_t free_size = serial_queue_free(queue_handle);
 
-    if ((tail + free_size) <= UINT32_MAX || (tail + free_size == 0)) {
+    if ((tail + free_size) <= queue_handle->size && (tail + free_size > tail)) {
         return free_size;
     } else {
-        return (UINT32_MAX - tail) + 1;
+        return queue_handle->size - tail;
     }
 }
 
