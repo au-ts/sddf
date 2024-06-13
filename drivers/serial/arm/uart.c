@@ -87,7 +87,7 @@ static void rx_return(void)
         if (!(uart_regs->fr & PL011_FR_RXFE) && serial_queue_full(&rx_queue_handle, rx_queue_handle.queue->tail)) {
             /* Disable rx interrupts until virtualisers queue is no longer empty. */
             uart_regs->imsc &= ~(PL011_IMSC_RX_TIMEOUT | PL011_IMSC_RX_INT);
-            serial_require_consumer_signal(&rx_queue_handle);
+            serial_request_consumer_signal(&rx_queue_handle);
         }
         reprocess = false;
 
