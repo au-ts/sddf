@@ -46,9 +46,6 @@ fn addUartDriver(
         .name = b.fmt("driver_uart_{s}.elf", .{ @tagName(class) }),
         .target = target,
         .optimize = optimize,
-        // Microkit expects and requires the symbol table to exist in the ELF,
-        // this means that even when building for release mode, we want to tell
-        // Zig not to strip symbols from the binary.
         .strip = false,
     });
     const source = b.fmt("drivers/serial/{s}/uart.c", .{ @tagName(class) });
@@ -111,9 +108,9 @@ pub fn build(b: *std.Build) void {
     };
 
     // Libmicrokit
-    libmicrokit = LazyPath{ .cwd_relative = b.fmt("{s}/lib/libmicrokit.a", .{ microkit_board_dir }) };
-    libmicrokit_linker_script = LazyPath{ .cwd_relative = b.fmt("{s}/lib/microkit.ld", .{ microkit_board_dir }) };
-    libmicrokit_include = LazyPath{ .cwd_relative = b.fmt("{s}/include", .{ microkit_board_dir }) };
+    libmicrokit = .{ .cwd_relative = b.fmt("{s}/lib/libmicrokit.a", .{ microkit_board_dir }) };
+    libmicrokit_linker_script = .{ .cwd_relative = b.fmt("{s}/lib/microkit.ld", .{ microkit_board_dir }) };
+    libmicrokit_include = .{ .cwd_relative = b.fmt("{s}/include", .{ microkit_board_dir }) };
 
     const printf = b.addObject(.{
         .name = "printf",
@@ -128,11 +125,9 @@ pub fn build(b: *std.Build) void {
         .name = "blk_virt.elf",
         .target = target,
         .optimize = optimize,
-        // Microkit expects and requires the symbol table to exist in the ELF,
-        // this means that even when building for release mode, we want to tell
-        // Zig not to strip symbols from the binary.
         .strip = false,
     });
+    // TODO: This flag -DBLK_NUM_CLIENTS needs to be configurable by the user of this dependency
     blk_virt.addCSourceFile(.{ .file = b.path("blk/components/virt.c"), .flags = &.{"-DBLK_NUM_CLIENTS=2"} });
     blk_virt.addCSourceFiles(.{ .files = &.{ "blk/util/bitarray.c", "blk/util/fsmalloc.c", "blk/util/util.c", "util/cache.c" } });
     blk_virt.addIncludePath(b.path("include"));
@@ -143,11 +138,9 @@ pub fn build(b: *std.Build) void {
         .name = "serial_virt_rx.elf",
         .target = target,
         .optimize = optimize,
-        // Microkit expects and requires the symbol table to exist in the ELF,
-        // this means that even when building for release mode, we want to tell
-        // Zig not to strip symbols from the binary.
         .strip = false,
     });
+    // TODO: This flag -DSERIAL_NUM_CLIENTS=3 needs to be configurable by the user of this dependency
     serial_virt_rx.addCSourceFile(.{
         .file = b.path("serial/components/virt_rx.c"),
         .flags = &.{"-DSERIAL_NUM_CLIENTS=3", "-fno-sanitize=undefined"}
@@ -160,11 +153,9 @@ pub fn build(b: *std.Build) void {
         .name = "serial_virt_tx.elf",
         .target = target,
         .optimize = optimize,
-        // Microkit expects and requires the symbol table to exist in the ELF,
-        // this means that even when building for release mode, we want to tell
-        // Zig not to strip symbols from the binary.
         .strip = false,
     });
+    // TODO: This flag -DSERIAL_NUM_CLIENTS=3 -DSERIAL_TRANSFER_WITH_COLOUR needs to be configurable by the user of this dependency
     serial_virt_tx.addCSourceFile(.{
         .file = b.path("serial/components/virt_tx.c"),
         .flags = &.{"-DSERIAL_NUM_CLIENTS=3", "-DSERIAL_TRANSFER_WITH_COLOUR", "-fno-sanitize=undefined"}
@@ -187,7 +178,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     sddf_util.addCSourceFiles(.{ 
-        .files = &(sddf_util_files)
+        .files = &sddf_util_files
     });
     sddf_util.addIncludePath(b.path("include"));
     sddf_util.addIncludePath(libmicrokit_include);
