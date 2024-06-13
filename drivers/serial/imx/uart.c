@@ -108,18 +108,22 @@ static void rx_return(void)
 
 static void handle_irq(void)
 {
-    while (uart_regs->sr1 & UART_SR1_ABNORMAL || uart_regs->sr1 & UART_SR1_RX_RDY
-           || (uart_regs->cr1 & UART_CR1_TX_READY_INT && uart_regs->sr1 & UART_SR1_TX_RDY)) {
-        if (uart_regs->sr1 & UART_SR1_RX_RDY) {
+    uint32_t uart_sr1 = uart_regs->sr1;
+    uint32_t uart_cr1 = uart_regs->cr1;
+    while (uart_sr1 & UART_SR1_ABNORMAL || uart_sr1 & UART_SR1_RX_RDY
+           || (uart_cr1 & UART_CR1_TX_READY_INT && uart_sr1 & UART_SR1_TX_RDY)) {
+        if (uart_sr1 & UART_SR1_RX_RDY) {
             rx_return();
         }
-        if (uart_regs->cr1 & UART_CR1_TX_READY_INT && uart_regs->sr1 & UART_SR1_TX_RDY) {
+        if (uart_cr1 & UART_CR1_TX_READY_INT && uart_sr1 & UART_SR1_TX_RDY) {
             tx_provide();
         }
-        if (uart_regs->sr1 & UART_SR1_ABNORMAL) {
-            sddf_dprintf("UART|ERROR: Uart device encountered an error with status register %u\n", uart_regs->sr1);
+        if (uart_sr1 & UART_SR1_ABNORMAL) {
+            sddf_dprintf("UART|ERROR: Uart device encountered an error with status register %u\n", uart_sr1);
             uart_regs->sr1 |= UART_SR1_ABNORMAL;
         }
+        uart_sr1 = uart_regs->sr1;
+        uart_cr1 = uart_regs->cr1;
     }
 }
 
