@@ -131,18 +131,22 @@ static void rx_return(void)
 
 static void handle_irq(void)
 {
-    while (uart_regs->sr & UART_INTR_ABNORMAL || !(uart_regs->sr & AML_UART_RX_EMPTY)
-           || (uart_regs->cr & AML_UART_TX_INT_EN && !(uart_regs->sr & AML_UART_TX_FULL))) {
-        if (!(uart_regs->sr & AML_UART_RX_EMPTY)) {
+    uint32_t uart_sr = uart_regs->sr;
+    uint32_t uart_cr = uart_regs->cr;
+    while (uart_sr & UART_INTR_ABNORMAL || !(uart_sr & AML_UART_RX_EMPTY)
+           || (uart_cr & AML_UART_TX_INT_EN && !(uart_sr & AML_UART_TX_FULL))) {
+        if (!(uart_sr & AML_UART_RX_EMPTY)) {
             rx_return();
         }
-        if (uart_regs->cr & AML_UART_TX_INT_EN && !(uart_regs->sr & AML_UART_TX_FULL)) {
+        if (uart_cr & AML_UART_TX_INT_EN && !(uart_sr & AML_UART_TX_FULL)) {
             tx_provide();
         }
-        if (uart_regs->sr & UART_INTR_ABNORMAL) {
-            sddf_dprintf("UART|ERROR: Uart device encountered an error with status register %u\n", uart_regs->sr);
+        if (uart_sr & UART_INTR_ABNORMAL) {
+            sddf_dprintf("UART|ERROR: Uart device encountered an error with status register %u\n", uart_sr);
             uart_regs->cr |= AML_UART_CLEAR_ERR;
         }
+        uart_sr = uart_regs->sr;
+        uart_cr = uart_regs->cr;
     }
 }
 
