@@ -11,7 +11,7 @@
         "libco",
         "network",
         "serial",
-        "soubnd",
+        "sound",
         "util",
         "build.zig",
         "build.zig.zon",
