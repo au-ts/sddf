@@ -2,12 +2,12 @@
 <system>
     <memory_region name="uart" size="0x1_000" phys_addr="0x9000000" />
 
-    <memory_region name="rx_data_driver" size="0x200_000" page_size="0x200_000" />
-    <memory_region name="tx_data_driver" size="0x200_000" page_size="0x200_000" />
-    <memory_region name="rx_data_client0" size="0x200_000" page_size="0x200_000" />
-    <memory_region name="tx_data_client0" size="0x200_000" page_size="0x200_000" />
-    <memory_region name="rx_data_client1" size="0x200_000" page_size="0x200_000" />
-    <memory_region name="tx_data_client1" size="0x200_000" page_size="0x200_000" />
+    <memory_region name="rx_data_driver" size="0x2_000" page_size="0x1_000" />
+    <memory_region name="tx_data_driver" size="0x2_000" page_size="0x1_000" />
+    <memory_region name="rx_data_client0" size="0x2_000" page_size="0x1_000" />
+    <memory_region name="tx_data_client0" size="0x2_000" page_size="0x1_000" />
+    <memory_region name="rx_data_client1" size="0x2_000" page_size="0x1_000" />
+    <memory_region name="tx_data_client1" size="0x2_000" page_size="0x1_000" />
 
     <memory_region name="rx_queue_driver" size="0x1_000" page_size="0x1_000"/>
     <memory_region name="tx_queue_driver" size="0x1_000" page_size="0x1_000"/>
@@ -24,8 +24,8 @@
         <map mr="rx_queue_driver" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="rx_queue" />
         <map mr="tx_queue_driver" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="tx_queue" />
 
-        <map mr="rx_data_driver" vaddr="0x4_200_000" perms="rw" cached="true" setvar_vaddr="rx_data" />
-        <map mr="tx_data_driver" vaddr="0x4_400_000" perms="rw" cached="true" setvar_vaddr="tx_data" />
+        <map mr="rx_data_driver" vaddr="0x4_002_000" perms="rw" cached="true" setvar_vaddr="rx_data" />
+        <map mr="tx_data_driver" vaddr="0x4_004_000" perms="rw" cached="true" setvar_vaddr="tx_data" />
 
         <irq irq="33" id="0" /> <!-- UART interrupt -->
     </protection_domain>
@@ -35,8 +35,8 @@
         <map mr="rx_queue_client0" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="rx_queue" />
         <map mr="tx_queue_client0" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="tx_queue" />
 
-        <map mr="rx_data_client0" vaddr="0x4_200_000" perms="rw" cached="true" setvar_vaddr="rx_data" />
-        <map mr="tx_data_client0" vaddr="0x4_400_000" perms="rw" cached="true" setvar_vaddr="tx_data" />
+        <map mr="rx_data_client0" vaddr="0x4_002_000" perms="rw" cached="true" setvar_vaddr="rx_data" />
+        <map mr="tx_data_client0" vaddr="0x4_004_000" perms="rw" cached="true" setvar_vaddr="tx_data" />
     </protection_domain>
 
     <protection_domain name="client1" priority="97">
@@ -44,8 +44,8 @@
         <map mr="rx_queue_client1" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="rx_queue" />
         <map mr="tx_queue_client1" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="tx_queue" />
 
-        <map mr="rx_data_client1" vaddr="0x4_200_000" perms="rw" cached="true" setvar_vaddr="rx_data" />
-        <map mr="tx_data_client1" vaddr="0x4_400_000" perms="rw" cached="true" setvar_vaddr="tx_data" />
+        <map mr="rx_data_client1" vaddr="0x4_002_000" perms="rw" cached="true" setvar_vaddr="rx_data" />
+        <map mr="tx_data_client1" vaddr="0x4_004_000" perms="rw" cached="true" setvar_vaddr="tx_data" />
     </protection_domain>
 
     <protection_domain name="serial_virt_tx" priority="99">
@@ -54,9 +54,9 @@
         <map mr="tx_queue_client0" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="tx_queue_cli0" />
         <map mr="tx_queue_client1" vaddr="0x4_002_000" perms="rw" cached="true"/>
 
-        <map mr="tx_data_driver" vaddr="0x4_200_000" perms="rw" cached="true" setvar_vaddr="tx_data_drv" />
-        <map mr="tx_data_client0" vaddr="0x4_400_000" perms="r" cached="true" setvar_vaddr="tx_data_cli0" />
-        <map mr="tx_data_client1" vaddr="0x4_600_000" perms="r" cached="true"/>
+        <map mr="tx_data_driver" vaddr="0x4_003_000" perms="rw" cached="true" setvar_vaddr="tx_data_drv" />
+        <map mr="tx_data_client0" vaddr="0x4_005_000" perms="r" cached="true" setvar_vaddr="tx_data_cli0" />
+        <map mr="tx_data_client1" vaddr="0x4_007_000" perms="r" cached="true"/>
     </protection_domain>
 
     <protection_domain name="serial_virt_rx" priority="98">
@@ -65,9 +65,9 @@
         <map mr="rx_queue_client0" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="rx_queue_cli0" />
         <map mr="rx_queue_client1" vaddr="0x4_002_000" perms="rw" cached="true"/>
 
-        <map mr="rx_data_driver" vaddr="0x4_200_000" perms="r" cached="true" setvar_vaddr="rx_data_drv" />
-        <map mr="rx_data_client0" vaddr="0x4_400_000" perms="rw" cached="true" setvar_vaddr="rx_data_cli0" />
-        <map mr="rx_data_client1" vaddr="0x4_600_000" perms="rw" cached="true"/>
+        <map mr="rx_data_driver" vaddr="0x4_003_000" perms="r" cached="true" setvar_vaddr="rx_data_drv" />
+        <map mr="rx_data_client0" vaddr="0x4_005_000" perms="rw" cached="true" setvar_vaddr="rx_data_cli0" />
+        <map mr="rx_data_client1" vaddr="0x4_007_000" perms="rw" cached="true"/>
     </protection_domain>
 
     <channel>
