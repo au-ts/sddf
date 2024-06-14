@@ -152,6 +152,7 @@ static void rx_return(void)
 static void tx_provide(void)
 {
     bool reprocess = true;
+    int i = 0;
     while (reprocess) {
         while (!(hw_ring_full(&tx, TX_COUNT)) && !net_queue_empty_active(&tx_queue)) {
             net_buff_desc_t buffer;
@@ -167,6 +168,7 @@ static void tx_provide(void)
             update_ring_slot(&tx, tx.tail, DESC_TXSTS_OWNBYDMA, cntl, buffer.io_or_offset, 0);
 
             tx.tail = (tx.tail + 1) % TX_COUNT;
+            i++;
         }
 
         net_request_signal_active(&tx_queue);
@@ -219,6 +221,111 @@ static void handle_irq()
         }
     }
     eth_dma->status &= e;
+}
+
+static void dma_init(void)
+{
+    /* 1. Software reset */
+
+    /* 2. Init sysbus mode */
+
+    /* 3. Create desc lists for rx and tx */
+
+    /* 4. Program tx and rx ring length registers */
+
+    /* 5. Init rx and tx descriptor list addresses */
+
+    /* 6. Program settings for _CONTROL, _TX_CONTROL, _RX_CONTROL
+          registers */
+
+    /* 7. Enable interrupts */
+
+    /* 8. Start tx and rx DMAs */
+
+    /* NOTE: Repeat these above steps for all of the tx and rx channels
+        that we are using. For now we are going to keep this to one pair. */
+}
+
+static void mtl_init(void)
+{
+    /* 1. Program the tx scheduling and recv arbitration algo fields in the
+          MTL_Operation_mode reg. */
+    uint32_t val = eth_mac + MTL_OPERATION_MODE;
+
+    val &= ~MTL_OPERATION_RAA;
+    val &= ~MTL_OPERATION_SCHALG_MASK;
+
+    // TODO: Figure out correct rx algo to use
+    val |= MTL_OPERATION_RAA_SP;
+
+    // TODO: Figure out correct tx sched algo
+    val |= MTL_OPERATION_SCHALG_SP;
+
+    volatile uint32_t *reg = eth_mac + MTL_OPERATION_MODE;
+    *reg = val;
+
+    /* 2. Program the rx queue to the DMA mapping. */
+    uint32_t map0 = *MTL_REG(MTL_RXQ_DMA_MAP0);
+    // We only have one queue, and we map it onto DMA channel 0
+    map0 &= ~MTL_RXQ_DMA_QXMDMACH_MASK(0);
+    map0 |= MTL_RXQ_DMA_QXMDMACH(0, 0);
+    *MTL_REG(MTL_RXQ_DMA_MAP0) = map0;
+
+    /* 3. Program the TSF, TQE, TQS fields in the MTL_TX_Opeartion_mode reg. */
+
+    // TODO: don't just use '0' here
+    uint32_t txq0_op_mode = *MTL_REG(0);
+
+    // We use the store-and-forward DMA mode
+    txq0_op_mode |= MTL_OP_MODE_TSF;
+
+    // Enable the TX queue
+    txq0_op_mode &= ~MTL_OP_MODE_TXQ_ENABLE_MASK;
+    txq0_op_mode |= MTL_OP_MODE_TXQ_ENABLE;
+
+    // Set the TX queue size
+    txq0_op_mode &= ~MTL_OP_MODE_TQS_MASK;
+    // TODO: unsure if we need to set TX queue size as we only
+    // have one queue and the documentation says that the queue size
+    // field is read-only unless you have more than one queue.
+    // txq0_op_mode |= 
+
+    *MTL_REG(0) = txq0_op_mode;
+
+    /* 4. Do the same as the above for RX in the MTL_TX_Opeartion_mode reg. */
+
+    uint32_t rxq0_op_mode = *MTL_REG(0x30);
+    // Use store-and-forward DMA mode
+    rxq0_op_mode |= MTL_OP_MODE_RSF;
+
+    // Set the RX queue size
+    // TODO: We do not set the RX queue size since we only have one queue
+    sddf_dprintf("RX queue size: )0x%lx\n", (rxq0_op_mode & MTL_OP_MODE_RQS_MASK) >> 20);
+
+    // TODO: for now we ignore setting flow control
+
+    *MTL_REG(0x30) = rxq0_op_mode;
+
+    /* NOTE: We repeate steps 3 and 4 for the amount of tx and rx queues we are
+        using in our system. For now this is just one. */
+}
+
+static void mac_init(void)
+{
+    /* 1. Provide mac address. */
+
+    /* 2. Program the packet filter. (We don't need to do any filtering at
+          this point in time). */
+
+    /* 3. Program the flow control. */
+
+    /* 4. Program the mac interrupt enable register (if applicable). */
+
+    /* 5. Program all other approrpriate fields in MAC_CONFIGURATION
+          (ie. inter-packet gap, jabber diable). */
+
+    /* 6. Set bit 0 and 1 in MAC_CONFIGURATION to start the MAC transmitter
+          and receiver. */
 }
 
 static void eth_setup(void)
@@ -282,6 +389,7 @@ void init(void)
 
 void notified(microkit_channel ch)
 {
+    sddf_dprintf("we got a notification\n");
     switch (ch) {
     case IRQ_CH:
         microkit_dbg_puts("recv an irq\n");
