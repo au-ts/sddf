@@ -15,13 +15,10 @@
 ifeq ($(strip $(SERIAL_NUM_CLIENTS)),)
 $(error Specify the number of clients for the serial virtualisers.  Expect -DSERIAL_NUM_CLIENTS=3 or similar)
 endif
-ifeq ($(strip $(UART_DRIVER)),)
-$(error The serial virtualisers need headers from the UART source. Please specify UART_DRIVER)
-endif
 
 SERIAL_IMAGES:= serial_rx_virt.elf serial_tx_virt.elf
 
-CFLAGS_serial := -I ${SDDF}/include -I${SDDF}/util/include ${SERIAL_NUM_CLIENTS} -I${SDDF}/examples/serial/include
+CFLAGS_serial := -I ${SDDF}/include -I${SDDF}/util/include ${SERIAL_NUM_CLIENTS}
 
 CHECK_SERIAL_FLAGS_MD5:=.serial_cflags-$(shell echo -- ${CFLAGS} ${CFLAGS_serial} | shasum | sed 's/ *-//')
 

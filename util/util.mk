@@ -6,8 +6,8 @@
 #  
 # Include this snippet in your project Makefile to build
 # sddf_libutil.a and sddf_libutil_debug.a
-# sddf_libutil.a needs access to the serial device, and
-# a variable 'uart_base' to be set in the System Description File;
+# sddf_libutil.a needs the component to have channels and queues
+# with the the serial_tx_virt and for putchar to be initialised.
 # sddf_libutil_debug.a uses the microkit_dbg_putc function.
 # Both are character at a time polling (i.e., slow, and only for debugging)
 
