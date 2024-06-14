@@ -76,7 +76,6 @@ IMAGE_FILE = loader.img
 REPORT_FILE = report.txt
 CFLAGS += -I$(BOARD_DIR)/include \
 	-I${TOP}/include	\
-	-I$(UART_DRIVER)/include \
 	-I$(SDDF)/include \
 	-I$(SERIAL_CONFIG_INCLUDE)
 
