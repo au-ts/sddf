@@ -313,19 +313,50 @@ static void mtl_init(void)
 static void mac_init(void)
 {
     /* 1. Provide mac address. */
+    // NOTE: Can we assume that U-Boot has already populated these registers. In that
+    // case can we just save these registers before we do a DMA reset?
 
-    /* 2. Program the packet filter. (We don't need to do any filtering at
-          this point in time). */
+    /* 2. Program the packet filter. */
+    // Set the program filter to Promiscuous mode. In this mode the NIC will pass all
+    // network traffic us.
+
+    uint32_t filter = *MAC_REG(GMAC_PACKET_FILTER);
+    // Reset all filter flags.
+	filter &= ~GMAC_PACKET_FILTER_HMC;
+	filter &= ~GMAC_PACKET_FILTER_HPF;
+	filter &= ~GMAC_PACKET_FILTER_PCF;
+	filter &= ~GMAC_PACKET_FILTER_PM;
+	filter &= ~GMAC_PACKET_FILTER_PR;
+	filter &= ~GMAC_PACKET_FILTER_RA;
+
+    filter |= GMAC_PACKET_FILTER_PR;
+
+    *MAC_REG(GMAC_PACKET_FILTER) = filter;
 
     /* 3. Program the flow control. */
+    // For now, disabling all flow control
+    *MAC_REG(GMAC_QX_TX_FLOW_CTRL(0)) = 0;
 
     /* 4. Program the mac interrupt enable register (if applicable). */
+    // We don't want to setup interrupts for the MAC component. We will enable
+    // them in the DMA componenet
+
+    uint32_t int_en = *MAC_REG(GMAC_INT_EN);
+    int_en = 0;
+    *MAC_REG(GMAC_INT_EN) = int_en;
 
     /* 5. Program all other approrpriate fields in MAC_CONFIGURATION
           (ie. inter-packet gap, jabber diable). */
+    uint32_t conf = *MAC_REG(GMAC_CONFIG);
+    // Set full duplex mode
+    conf |= GMAC_CONFIG_DM;
+    *MAC_REG(GMAC_CONFIG) = conf;
 
     /* 6. Set bit 0 and 1 in MAC_CONFIGURATION to start the MAC transmitter
           and receiver. */
+    conf = *MAC_REG(GMAC_CONFIG);
+    conf |= GMAC_CONFIG_RE;
+    *MAC_REG(GMAC_CONFIG) = conf;
 }
 
 static void eth_setup(void)
