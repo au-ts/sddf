@@ -201,6 +201,7 @@ void notified(microkit_channel ch)
 {
     switch (ch) {
     case START:
+#ifdef MICROKIT_CONFIG_benchmark
         sel4bench_reset_counters();
         THREAD_MEMORY_RELEASE();
         sel4bench_start_counters(benchmark_bf);
@@ -212,9 +213,11 @@ void notified(microkit_channel ch)
 #ifdef CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES
         seL4_BenchmarkResetLog();
 #endif
+#endif
 
         break;
     case STOP:
+#ifdef MICROKIT_CONFIG_benchmark
         sel4bench_get_counters(benchmark_bf, &counter_values[0]);
         sel4bench_stop_counters(benchmark_bf);
 
@@ -223,6 +226,7 @@ void notified(microkit_channel ch)
             sddf_printf("%s: %lX\n", counter_names[i], counter_values[i]);
         }
         sddf_printf("}\n");
+#endif
 
 #ifdef CONFIG_BENCHMARK_TRACK_UTILISATION
         uint64_t total;
