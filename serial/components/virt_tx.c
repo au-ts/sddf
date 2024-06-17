@@ -1,6 +1,5 @@
 #include <stdbool.h>
 #include <stdint.h>
-#include <ctype.h>
 #include <microkit.h>
 #include <sddf/serial/queue.h>
 #include <sddf/util/printf.h>
