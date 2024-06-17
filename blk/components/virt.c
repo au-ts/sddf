@@ -123,12 +123,12 @@ static void partitions_init()
     ((blk_storage_info_t *)blk_config)->sector_size = ((blk_storage_info_t *)blk_config_driver)->sector_size;
     ((blk_storage_info_t *)blk_config)->size = clients[0].sectors / (BLK_TRANSFER_SIZE / MSDOS_MBR_SECTOR_SIZE);
     ((blk_storage_info_t *)blk_config)->read_only = false;
-    ((blk_storage_info_t *)blk_config)->ready = true;
+    __atomic_store_n(&((blk_storage_info_t *)blk_config)->ready, true, __ATOMIC_RELEASE);
 #if BLK_NUM_CLIENTS > 1
     ((blk_storage_info_t *)blk_config2)->sector_size = ((blk_storage_info_t *)blk_config_driver)->sector_size;
     ((blk_storage_info_t *)blk_config2)->size = clients[1].sectors / (BLK_TRANSFER_SIZE / MSDOS_MBR_SECTOR_SIZE);
     ((blk_storage_info_t *)blk_config2)->read_only = false;
-    ((blk_storage_info_t *)blk_config2)->ready = true;
+    __atomic_store_n(&((blk_storage_info_t *)blk_config2)->ready, true, __ATOMIC_RELEASE);
 #endif
 }
 
@@ -183,10 +183,7 @@ static bool handle_mbr_reply()
 
 void init(void)
 {
-    // @ericc: Hack, spin wait for config from driver to be set
-    while (!(((blk_storage_info_t *)blk_config_driver)->ready)) {
-        asm("");
-    }
+    while (!__atomic_load_n(&((blk_storage_info_t *)blk_config_driver)->ready, __ATOMIC_ACQUIRE));
 
     // Initialise driver queue handle
     blk_queue_init(&drv_h, (blk_req_queue_t *)blk_req_queue_driver, (blk_resp_queue_t *)blk_resp_queue_driver,
