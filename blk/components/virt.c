@@ -1,13 +1,13 @@
 #include <microkit.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <sddf/blk/fsmalloc.h>
 #include <sddf/blk/queue.h>
 #include <sddf/blk/msdos_mbr.h>
-#include <sddf/blk/util.h>
 #include <sddf/util/cache.h>
+#include <sddf/util/fsmalloc.h>
 #include <sddf/util/ialloc.h>
 #include <sddf/util/printf.h>
+#include <sddf/util/string.h>
 #include <sddf/util/util.h>
 
 // #define DEBUG_BLK_VIRT
@@ -175,7 +175,7 @@ static bool handle_mbr_reply()
 
     microkit_arm_vspace_data_invalidate(mbr_req_data.drv_addr,
                                         mbr_req_data.drv_addr + (BLK_TRANSFER_SIZE * mbr_req_data.count));
-    memcpy(&msdos_mbr, (void *)mbr_req_data.drv_addr, sizeof(struct msdos_mbr));
+    sddf_memcpy(&msdos_mbr, (void *)mbr_req_data.drv_addr, sizeof(struct msdos_mbr));
     fsmalloc_free(&fsmalloc, mbr_req_data.drv_addr, mbr_req_data.count);
 
     return true;
@@ -253,7 +253,7 @@ static void handle_driver()
                 // Invalidate cache
                 microkit_arm_vspace_data_invalidate(cli_data.drv_addr, cli_data.drv_addr + (BLK_TRANSFER_SIZE * cli_data.count));
                 // Copy data buffers from driver to client
-                memcpy((void *)cli_data.cli_addr, (void *)cli_data.drv_addr, BLK_TRANSFER_SIZE * cli_data.count);
+                sddf_memcpy((void *)cli_data.cli_addr, (void *)cli_data.drv_addr, BLK_TRANSFER_SIZE * cli_data.count);
                 err = blk_enqueue_resp(&h, SUCCESS, drv_success_count, cli_data.cli_req_id);
                 assert(!err);
                 break;
@@ -325,7 +325,7 @@ static void handle_client(int cli_id)
             // Allocate driver data buffers
             fsmalloc_alloc(&fsmalloc, &drv_addr, cli_count);
             // Copy data buffers from client to driver
-            memcpy((void *)drv_addr, (void *)cli_addr, BLK_TRANSFER_SIZE * cli_count);
+            sddf_memcpy((void *)drv_addr, (void *)cli_addr, BLK_TRANSFER_SIZE * cli_count);
             // Flush the cache
             cache_clean(drv_addr, drv_addr + (BLK_TRANSFER_SIZE * cli_count));
             break;
