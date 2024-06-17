@@ -54,8 +54,9 @@ hw_ring_t tx;
 net_queue_handle_t rx_queue;
 net_queue_handle_t tx_queue;
 
-volatile struct eth_mac_regs *eth_mac;
-volatile struct eth_dma_regs *eth_dma;
+#define MAC_REG(x) ((volatile uint32_t *)(eth_regs + x))
+#define MTL_REG(x) ((volatile uint32_t *)(eth_regs + x))
+#define DMA_REG(x) ((volatile uint32_t *)(eth_regs + x))
 
 static inline bool hw_ring_full(hw_ring_t *ring, size_t ring_size)
 {
@@ -97,8 +98,9 @@ static void rx_provide()
 
             rx.descr_mdata[rx.tail] = buffer;
             update_ring_slot(&rx, rx.tail, DESC_RXSTS_OWNBYDMA, cntl, buffer.io_or_offset, 0);
-            eth_dma->rxpolldemand = POLL_DATA;
-
+            /* We will update the hardware register that stores the tail address. This tells
+            the device that we have new descriptors to use. */
+            *DMA_REG(DMA_CHAN_RX_TAIL_ADDR(0)) = hw_ring_buffer_paddr + sizeof(struct descriptor) * rx.tail;
             rx.tail = (rx.tail + 1) % RX_COUNT;
         }
 
@@ -133,7 +135,9 @@ static void rx_return(void)
 
             rx.descr_mdata[rx.tail] = buffer;
             update_ring_slot(&rx, rx.tail, DESC_RXSTS_OWNBYDMA, cntl, buffer.io_or_offset, 0);
-            eth_dma->rxpolldemand = POLL_DATA;
+            /* We will update the hardware register that stores the tail address. This tells
+            the device that we have new descriptors to use. */
+            *DMA_REG(DMA_CHAN_RX_TAIL_ADDR(0)) = hw_ring_buffer_paddr + sizeof(struct descriptor) * rx.tail;
         } else {
             buffer.len = (d->status & DESC_RXSTS_LENMSK) >> DESC_RXSTS_LENSHFT;
             int err = net_enqueue_active(&rx_queue, buffer);
@@ -179,7 +183,9 @@ static void tx_provide(void)
             reprocess = true;
         }
     }
-    eth_dma->txpolldemand = POLL_DATA;
+    /* Set the tail in hardware to the latest tail we have inserted in.
+    This tells the hardware that it has new buffers to send. */
+    *DMA_REG(DMA_CHAN_TX_TAIL_ADDR(0)) = hw_ring_buffer_paddr + RX_COUNT + sizeof(struct descriptor) * tx.tail;
 }
 
 static void tx_return(void)
@@ -208,19 +214,23 @@ static void tx_return(void)
 
 static void handle_irq()
 {
-    uint32_t e = eth_dma->status;
-    if (e & DMA_INTR_RXF) {
+    sddf_dprintf("handling irq\n");
+    uint32_t e = *DMA_REG(DMA_CHAN_STATUS(0));
+    if (e & DMA_INTR_RI) {
+        sddf_dprintf("recv complete\n");
         rx_return();
     }
-    if (e & DMA_INTR_TXF) {
+    if (e & DMA_INTR_TI) {
+        sddf_dprintf("transmit complete\n");
         tx_return();
     }
     if (e & DMA_INTR_ABNORMAL) {
+        sddf_dprintf("abnormal response\n");
         if (e & DMA_INTR_FBE) {
             sddf_dprintf("Ethernet device fatal bus error\n");
         }
     }
-    eth_dma->status &= e;
+    *DMA_REG(DMA_CHAN_STATUS(0)) &= e;
 }
 
 static void dma_init(void)
@@ -280,14 +290,14 @@ static void dma_init(void)
     *DMA_REG(DMA_CHAN_RX_CONTROL(0)) |= DMA_CONTROL_SR;
 
     /* NOTE: Repeat these above steps for all of the tx and rx channels
-        that we are using. For now we are going to keep this to one pair. */
+        that we are using. For now we are going to keep this to one pair.*/
 }
 
 static void mtl_init(void)
 {
     /* 1. Program the tx scheduling and recv arbitration algo fields in the
           MTL_Operation_mode reg. */
-    uint32_t val = eth_mac + MTL_OPERATION_MODE;
+    uint32_t val = *MTL_REG(MTL_OPERATION_MODE);
 
     val &= ~MTL_OPERATION_RAA;
     val &= ~MTL_OPERATION_SCHALG_MASK;
@@ -298,8 +308,7 @@ static void mtl_init(void)
     // TODO: Figure out correct tx sched algo
     val |= MTL_OPERATION_SCHALG_SP;
 
-    volatile uint32_t *reg = eth_mac + MTL_OPERATION_MODE;
-    *reg = val;
+    *MTL_REG(MTL_OPERATION_MODE) = val;
 
     /* 2. Program the rx queue to the DMA mapping. */
     uint32_t map0 = *MTL_REG(MTL_RXQ_DMA_MAP0);
@@ -346,11 +355,13 @@ static void mtl_init(void)
         using in our system. For now this is just one. */
 }
 
-static void mac_init(void)
+static void mac_init(uint32_t machi, uint32_t maclo)
 {
     /* 1. Provide mac address. */
     // NOTE: Can we assume that U-Boot has already populated these registers. In that
     // case can we just save these registers before we do a DMA reset?
+    *MAC_REG(GMAC_ADDR_HIGH(0)) = machi;
+    *MAC_REG(GMAC_ADDR_LOW(0)) = maclo;
 
     /* 2. Program the packet filter. */
     // Set the program filter to Promiscuous mode. In this mode the NIC will pass all
@@ -397,36 +408,26 @@ static void mac_init(void)
 
 static void eth_setup(void)
 {
-    eth_mac = (void *)eth_regs;
-    eth_dma = (void *)(eth_regs + DMA_REG_OFFSET);
-    uint32_t l = eth_mac->macaddr0lo;
-    uint32_t h = eth_mac->macaddr0hi;
+    /* Save the MAC address. This address should have been populated by u-boot. We will
+    just restore these when setting up the MAC component of the eth device. */
+
+    uint32_t l = (uint32_t) *MAC_REG(GMAC_ADDR_LOW(0));
+    uint32_t h = (uint32_t) *MAC_REG(GMAC_ADDR_HIGH(0));
 
     assert((hw_ring_buffer_paddr & 0xFFFFFFFF) == hw_ring_buffer_paddr);
 
     rx.descr = (volatile struct descriptor *)hw_ring_buffer_vaddr;
     tx.descr = (volatile struct descriptor *)(hw_ring_buffer_vaddr + (sizeof(struct descriptor) * RX_COUNT));
 
-    /* Perform reset */
-    eth_dma->busmode |= DMAMAC_SWRST;
-    while (eth_dma->busmode & DMAMAC_SWRST);
+    /* 1. Init DMA */
+    dma_init();
 
-    /* Perform flush */
-    eth_dma->opmode = FLUSHTXFIFO;
-    while (eth_dma->opmode & FLUSHTXFIFO);
+    /* 2. Init MTL */
+    mtl_init();
 
-    /* Reset removes the mac address */
-    eth_mac->macaddr0lo = l;
-    eth_mac->macaddr0hi = h;
+    /* 3. Init MAC */
+    mac_init(h, l);
 
-    eth_dma->busmode = PRIORXTX_11 | ((DMA_PBL << TX_PBL_SHFT) & TX_PBL_MASK);
-    eth_dma->opmode = STOREFORWARD;
-    eth_mac->conf = FULLDPLXMODE;
-
-    eth_dma->rxdesclistaddr = hw_ring_buffer_paddr;
-    eth_dma->txdesclistaddr = hw_ring_buffer_paddr + (sizeof(struct descriptor) * RX_COUNT);
-
-    eth_mac->framefilt |= PMSCUOUS_MODE;
     sddf_dprintf("Finished eth setup\n");
 }
 
@@ -439,16 +440,6 @@ void init(void)
 
     rx_provide();
     tx_provide();
-
-    /* Enable IRQs */
-    eth_dma->intenable |= DMA_INTR_MASK;
-
-    /* Disable uneeded GMAC irqs */
-    eth_mac->intmask |= GMAC_INTR_MASK;
-
-    /* We are ready to receive. Enable. */
-    eth_mac->conf |= RX_ENABLE | TX_ENABLE;
-    eth_dma->opmode |= TXSTART | RXSTART;
 
     microkit_irq_ack(IRQ_CH);
     sddf_dprintf("Finished eth init\n");
