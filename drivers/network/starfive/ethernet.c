@@ -225,22 +225,59 @@ static void handle_irq()
 
 static void dma_init(void)
 {
-    /* 1. Software reset */
+    /* 1. Software reset -- This will reset the MAC internal registers. */
+    uint32_t mode = *DMA_REG(DMA_BUS_MODE);
+    mode |= DMA_BUS_MODE_SFT_RESET;
+    *DMA_REG(DMA_BUS_MODE) = mode;
 
-    /* 2. Init sysbus mode */
+    // Poll on BIT 0. This bit is cleared by the device when the reset is complete.
+    while(1) {
+        mode = *DMA_REG(DMA_BUS_MODE);
+        if (!(mode & DMA_BUS_MODE_SFT_RESET)) {
+            break;
+        }
+    }
 
-    /* 3. Create desc lists for rx and tx */
+    /* 2. Init sysbus mode. */
+    uint32_t sysbus_mode = *DMA_REG(DMA_SYS_BUS_MODE);
+    // Set the fixed length burst to 8
+    sysbus_mode |= DMA_SYS_BUS_FB;
+    sysbus_mode |= DMA_AXI_BLEN8;
+    *DMA_REG(DMA_SYS_BUS_MODE) = sysbus_mode;
 
-    /* 4. Program tx and rx ring length registers */
+    /* 3. Create desc lists for rx and tx. */
 
-    /* 5. Init rx and tx descriptor list addresses */
+    /* 4. Program tx and rx ring length registers. */
+    uint32_t tx_len = *DMA_REG(DMA_CHAN_TX_RING_LEN(0));
+    tx_len = TX_COUNT;
+    *DMA_REG(DMA_CHAN_TX_RING_LEN(0)) = tx_len;
+    uint32_t rx_len = *DMA_REG(DMA_CHAN_RX_RING_LEN(0));
+    rx_len = RX_COUNT;
+    *DMA_REG(DMA_CHAN_RX_RING_LEN(0)) = rx_len;
+
+    /* 5. Init rx and tx descriptor list addresses. */
+    *DMA_REG(DMA_CHAN_RX_BASE_ADDR(0)) = hw_ring_buffer_paddr;
+    *DMA_REG(DMA_CHAN_TX_BASE_ADDR(0)) = hw_ring_buffer_paddr + (sizeof(struct descriptor) * RX_COUNT);
 
     /* 6. Program settings for _CONTROL, _TX_CONTROL, _RX_CONTROL
-          registers */
+          registers. */
+    // Disable control features for 8xPBL mode and Descriptor Skip Length
+    *DMA_REG(DMA_CHAN_CONTROL(0)) = 0;
 
-    /* 7. Enable interrupts */
+    uint32_t tx_chan_ctrl = 0;
+    // Setting this bit ignores the PBL requirement
+    tx_chan_ctrl |= DMA_BUS_MODE_PBL;
+    *DMA_REG(DMA_CHAN_TX_CONTROL(0)) = tx_chan_ctrl;
 
-    /* 8. Start tx and rx DMAs */
+    // TODO: I don't believe there is anything for us to enable in rx
+    // chan control. Double check this.
+
+    /* 7. Enable interrupts. */
+    *DMA_REG(DMA_CHAN_INTR_ENA(0)) |= DMA_INTR_MASK;
+
+    /* 8. Start tx and rx DMAs. */
+    *DMA_REG(DMA_CHAN_TX_CONTROL(0)) |= DMA_CONTROL_ST;
+    *DMA_REG(DMA_CHAN_RX_CONTROL(0)) |= DMA_CONTROL_SR;
 
     /* NOTE: Repeat these above steps for all of the tx and rx channels
         that we are using. For now we are going to keep this to one pair. */
@@ -288,7 +325,6 @@ static void mtl_init(void)
     // TODO: unsure if we need to set TX queue size as we only
     // have one queue and the documentation says that the queue size
     // field is read-only unless you have more than one queue.
-    // txq0_op_mode |= 
 
     *MTL_REG(0) = txq0_op_mode;
 

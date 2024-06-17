@@ -381,9 +381,9 @@ register map outlined in the imx8mp TRM. */
 #define MTL_CHAN_RX_DEBUG(x)	(MTL_CHAN_BASE_ADDR + (x * MTL_CHAN_BASE_OFFSET); + 0x38)
 
 #define MTL_OP_MODE_RSF			BIT(5)
-#define MTL_OP_MODE_TXQEN_MASK		GENMASK(3, 2)
-#define MTL_OP_MODE_TXQEN_AV		BIT(2)
-#define MTL_OP_MODE_TXQEN		BIT(3)
+#define MTL_OP_MODE_TXQ_ENABLE_MASK		GENMASK(3, 2)
+#define MTL_OP_MODE_TXQ_ENABLE_AV		BIT(2)
+#define MTL_OP_MODE_TXQ_ENABLE		BIT(3)
 #define MTL_OP_MODE_TSF			BIT(1)
 
 #define MTL_OP_MODE_TQS_MASK		GENMASK(24, 16)
@@ -420,19 +420,140 @@ register map outlined in the imx8mp TRM. */
 #define MTL_OP_MODE_RTC_96		(2 << MTL_OP_MODE_RTC_SHIFT)
 #define MTL_OP_MODE_RTC_128		(3 << MTL_OP_MODE_RTC_SHIFT)
 
-struct eth_dma_regs {
-    uint32_t busmode;                                   /* 0x00 Controls the Host Interface Mode. */
-    uint32_t txpolldemand;                              /* 0x04 Used by the host to instruct the DMA to poll the Transmit Descriptor List. */
-    uint32_t rxpolldemand;                              /* 0x08 Used by the Host to instruct the DMA to poll the Receive Descriptor list. */
-    uint32_t rxdesclistaddr;                            /* 0x0c Points the DMA to the start of the Receive Descriptor list. */
-    uint32_t txdesclistaddr;                            /* 0x10 Points the DMA to the start of the Transmit Descriptor List. */
-    uint32_t status;                                    /* 0x14 The Software driver (application) reads this register during interrupt service routine or polling to determine the status of the DMA. */
-    uint32_t opmode;                                    /* 0x18 Establishes the Receive and Transmit operating modes and command. */
-    uint32_t intenable;                                 /* 0x1c Enables the interrupts reported by the Status Register. */
-    uint32_t missedframecount;                          /* 0x20 Contains the counters for discarded frames because no host Receive. Descriptor was available, and discarded frames because of Receive FIFO Overflow. */
-    uint32_t reserved1[9];
-    uint32_t currhosttxdesc;                            /* 0x48 Points to the start of current Transmit Descriptor read by the DMA. */
-    uint32_t currhostrxdesc;                            /* 0x4c Points to the start of current Receive Descriptor read by the DMA. */
-    uint32_t currhosttxbuffaddr;                        /* 0x50 Points to the current Transmit Buffer address read by the DMA. */
-    uint32_t currhostrxbuffaddr;                        /* 0x54 Points to the current Transmit Buffer address read by the DMA. */
-};
+/* --------- DMA registers --------- */
+
+#define DMA_BUS_MODE			0x00001000
+#define DMA_SYS_BUS_MODE		0x00001004
+#define DMA_STATUS			0x00001008
+#define DMA_DEBUG_STATUS_0		0x0000100c
+#define DMA_DEBUG_STATUS_1		0x00001010
+#define DMA_DEBUG_STATUS_2		0x00001014
+#define DMA_AXI_BUS_MODE		0x00001028
+#define DMA_TBS_CTRL			0x00001050
+
+/* DMA Bus Mode bitmap */
+#define DMA_BUS_MODE_DCHE		BIT(19)
+#define DMA_BUS_MODE_INTM_MASK		GENMASK(17, 16)
+#define DMA_BUS_MODE_INTM_SHIFT		16
+#define DMA_BUS_MODE_INTM_MODE1		0x1
+#define DMA_BUS_MODE_SFT_RESET		BIT(0)
+
+/* DMA SYS Bus Mode bitmap */
+#define DMA_BUS_MODE_SPH		BIT(24)
+#define DMA_BUS_MODE_PBL		BIT(16)
+#define DMA_BUS_MODE_PBL_SHIFT		16
+#define DMA_BUS_MODE_RPBL_SHIFT		16
+#define DMA_BUS_MODE_MB			BIT(14)
+#define DMA_BUS_MODE_FB			BIT(0)
+
+/* DMA Interrupt top status */
+#define DMA_STATUS_MAC			BIT(17)
+#define DMA_STATUS_MTL			BIT(16)
+#define DMA_STATUS_CHAN7		BIT(7)
+#define DMA_STATUS_CHAN6		BIT(6)
+#define DMA_STATUS_CHAN5		BIT(5)
+#define DMA_STATUS_CHAN4		BIT(4)
+#define DMA_STATUS_CHAN3		BIT(3)
+#define DMA_STATUS_CHAN2		BIT(2)
+#define DMA_STATUS_CHAN1		BIT(1)
+#define DMA_STATUS_CHAN0		BIT(0)
+
+/* DMA debug status bitmap */
+#define DMA_DEBUG_STATUS_TS_MASK	0xf
+#define DMA_DEBUG_STATUS_RS_MASK	0xf
+
+/* DMA AXI bitmap */
+#define DMA_AXI_EN_LPI			BIT(31)
+#define DMA_AXI_LPI_XIT_FRM		BIT(30)
+#define DMA_AXI_WR_OSR_LMT		GENMASK(27, 24)
+#define DMA_AXI_WR_OSR_LMT_SHIFT	24
+#define DMA_AXI_RD_OSR_LMT		GENMASK(19, 16)
+#define DMA_AXI_RD_OSR_LMT_SHIFT	16
+
+#define DMA_AXI_OSR_MAX			0xf
+#define DMA_AXI_MAX_OSR_LIMIT ((DMA_AXI_OSR_MAX << DMA_AXI_WR_OSR_LMT_SHIFT) | \
+				(DMA_AXI_OSR_MAX << DMA_AXI_RD_OSR_LMT_SHIFT))
+
+#define DMA_SYS_BUS_MB			BIT(14)
+#define DMA_AXI_1KBBE			BIT(13)
+#define DMA_SYS_BUS_AAL			BIT(12)
+#define DMA_SYS_BUS_EAME		BIT(11)
+#define DMA_AXI_BLEN256			BIT(7)
+#define DMA_AXI_BLEN128			BIT(6)
+#define DMA_AXI_BLEN64			BIT(5)
+#define DMA_AXI_BLEN32			BIT(4)
+#define DMA_AXI_BLEN16			BIT(3)
+#define DMA_AXI_BLEN8			BIT(2)
+#define DMA_AXI_BLEN4			BIT(1)
+#define DMA_SYS_BUS_FB			BIT(0)
+
+#define DMA_BURST_LEN_DEFAULT		(DMA_AXI_BLEN256 | DMA_AXI_BLEN128 | \
+					DMA_AXI_BLEN64 | DMA_AXI_BLEN32 | \
+					DMA_AXI_BLEN16 | DMA_AXI_BLEN8 | \
+					DMA_AXI_BLEN4)
+
+#define DMA_AXI_BURST_LEN_MASK		0x000000FE
+
+/* DMA TBS Control */
+#define DMA_TBS_FTOS			GENMASK(31, 8)
+#define DMA_TBS_FTOV			BIT(0)
+#define DMA_TBS_DEF_FTOS		(DMA_TBS_FTOS | DMA_TBS_FTOV)
+
+/* Following DMA defines are channel-oriented */
+#define DMA_CHAN_BASE_ADDR		0x00001100
+#define DMA_CHAN_BASE_OFFSET		0x80
+#define DMA_CHAN_CONTROL(x)             DMA_CHAN_BASE_ADDR + (x * DMA_CHAN_BASE_OFFSET)
+#define DMA_CHAN_TX_CONTROL(x)	        (DMA_CHAN_BASE_ADDR + (x * DMA_CHAN_BASE_OFFSET) + 0x4)
+#define DMA_CHAN_RX_CONTROL(x)	        (DMA_CHAN_BASE_ADDR + (x * DMA_CHAN_BASE_OFFSET) + 0x8)
+#define DMA_CHAN_TX_BASE_ADDR_HI(x)	    (DMA_CHAN_BASE_ADDR + (x * DMA_CHAN_BASE_OFFSET) + 0x10)
+#define DMA_CHAN_TX_BASE_ADDR(x)	    (DMA_CHAN_BASE_ADDR + (x * DMA_CHAN_BASE_OFFSET) + 0x14)
+#define DMA_CHAN_RX_BASE_ADDR_HI(x)	    (DMA_CHAN_BASE_ADDR + (x * DMA_CHAN_BASE_OFFSET) + 0x18)
+#define DMA_CHAN_RX_BASE_ADDR(x)	    (DMA_CHAN_BASE_ADDR + (x * DMA_CHAN_BASE_OFFSET) + 0x1c)
+#define DMA_CHAN_TX_END_ADDR(x)	        (DMA_CHAN_BASE_ADDR + (x * DMA_CHAN_BASE_OFFSET) + 0x20)
+#define DMA_CHAN_RX_END_ADDR(x)	        (DMA_CHAN_BASE_ADDR + (x * DMA_CHAN_BASE_OFFSET) + 0x28)
+#define DMA_CHAN_TX_RING_LEN(x)	        (DMA_CHAN_BASE_ADDR + (x * DMA_CHAN_BASE_OFFSET) + 0x2c)
+#define DMA_CHAN_RX_RING_LEN(x)	        (DMA_CHAN_BASE_ADDR + (x * DMA_CHAN_BASE_OFFSET) + 0x30)
+#define DMA_CHAN_INTR_ENA(x)	        (DMA_CHAN_BASE_ADDR + (x * DMA_CHAN_BASE_OFFSET) + 0x34)
+#define DMA_CHAN_RX_WATCHDOG(x)	        (DMA_CHAN_BASE_ADDR + (x * DMA_CHAN_BASE_OFFSET) + 0x38)
+#define DMA_CHAN_SLOT_CTRL_STATUS(x)	(DMA_CHAN_BASE_ADDR + (x * DMA_CHAN_BASE_OFFSET) + 0x3c)
+#define DMA_CHAN_CUR_TX_DESC(x)	        (DMA_CHAN_BASE_ADDR + (x * DMA_CHAN_BASE_OFFSET) + 0x44)
+#define DMA_CHAN_CUR_RX_DESC(x)	        (DMA_CHAN_BASE_ADDR + (x * DMA_CHAN_BASE_OFFSET) + 0x4c)
+#define DMA_CHAN_CUR_TX_BUF_ADDR(x)	    (DMA_CHAN_BASE_ADDR + (x * DMA_CHAN_BASE_OFFSET) + 0x54)
+#define DMA_CHAN_CUR_RX_BUF_ADDR(x)	    (DMA_CHAN_BASE_ADDR + (x * DMA_CHAN_BASE_OFFSET) + 0x5c)
+#define DMA_CHAN_STATUS(x)	            (DMA_CHAN_BASE_ADDR + (x * DMA_CHAN_BASE_OFFSET) + 0x60)
+
+/* DMA Control X */
+#define DMA_CONTROL_SPH			BIT(24)
+#define DMA_CONTROL_MSS_MASK		GENMASK(13, 0)
+
+/* DMA Tx Channel X Control register defines */
+#define DMA_CONTROL_EDSE		BIT(28)
+#define DMA_CONTROL_TSE			BIT(12)
+#define DMA_CONTROL_OSP			BIT(4)
+#define DMA_CONTROL_ST			BIT(0)
+
+/* DMA Rx Channel X Control register defines */
+#define DMA_CONTROL_SR			BIT(0)
+#define DMA_RBSZ_MASK			GENMASK(14, 1)
+#define DMA_RBSZ_SHIFT			1
+
+/* Interrupt enable bits per channel */
+#define DMA_CHAN_INTR_ENA_NIE		BIT(16)
+#define DMA_CHAN_INTR_ENA_AIE		BIT(15)
+#define DMA_CHAN_INTR_ENA_NIE_4_10	BIT(15)
+#define DMA_CHAN_INTR_ENA_AIE_4_10	BIT(14)
+#define DMA_CHAN_INTR_ENA_CDE		BIT(13)
+#define DMA_CHAN_INTR_ENA_FBE		BIT(12)
+#define DMA_CHAN_INTR_ENA_ERE		BIT(11)
+#define DMA_CHAN_INTR_ENA_ETE		BIT(10)
+#define DMA_CHAN_INTR_ENA_RWE		BIT(9)
+#define DMA_CHAN_INTR_ENA_RSE		BIT(8)
+#define DMA_CHAN_INTR_ENA_RBUE		BIT(7)
+#define DMA_CHAN_INTR_ENA_RIE		BIT(6)
+#define DMA_CHAN_INTR_ENA_TBUE		BIT(2)
+#define DMA_CHAN_INTR_ENA_TSE		BIT(1)
+#define DMA_CHAN_INTR_ENA_TIE		BIT(0)
+
+#define DMA_CHAN_INTR_NORMAL		(DMA_CHAN_INTR_ENA_NIE | \
+					 DMA_CHAN_INTR_ENA_RIE | \
+					 DMA_CHAN_INTR_ENA_TIE)
