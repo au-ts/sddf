@@ -1,4 +1,4 @@
-#include <sddf/blk/bitarray.h>
+#include <sddf/util/bitarray.h>
 #include <sddf/util/util.h>
 
 #define WORD_MAX  (~(word_t)0)

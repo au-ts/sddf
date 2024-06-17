@@ -11,7 +11,7 @@
 # sddf_libutil_debug.a uses the microkit_dbg_putc function.
 # Both are character at a time polling (i.e., slow, and only for debugging)
 
-OBJS_LIBUTIL := cache.o sddf_printf.o newlibc.o assert.o
+OBJS_LIBUTIL := cache.o sddf_printf.o newlibc.o assert.o bitarray.o fsmalloc.o
 
 ALL_OBJS_LIBUTIL := $(addprefix util/, ${OBJS_LIBUTIL} putchar_debug.o putchar_serial.o)
 

@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <sddf/blk/bitarray.h>
+#include <sddf/util/bitarray.h>
 
 /**
  * This file handles the allocation and freeing of fixed size data cells in a memory region.
