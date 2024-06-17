@@ -6,9 +6,10 @@
 #pragma once
 
 #include <stddef.h>
-#include <microkit.h>
 
+#ifndef ARRAY_SIZE
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(x[0]))
+#endif
 #define ALIGN(x, align)   (((x) + (align) - 1) & ~((align) - 1))
 
 #define BIT(nr) (1UL << (nr))
