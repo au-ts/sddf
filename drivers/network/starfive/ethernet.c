@@ -58,6 +58,10 @@ net_queue_handle_t tx_queue;
 #define MTL_REG(x) ((volatile uint32_t *)(eth_regs + x))
 #define DMA_REG(x) ((volatile uint32_t *)(eth_regs + x))
 
+static volatile struct mac_regs *mac_regs;
+static volatile struct mtl_regs *mtl_regs;
+static volatile struct dma_regs *dma_regs;
+
 static inline bool hw_ring_full(hw_ring_t *ring, size_t ring_size)
 {
     return !((ring->tail + 2 - ring->head) % ring_size);
@@ -236,39 +240,44 @@ static void handle_irq()
 static void dma_init(void)
 {
     /* 1. Software reset -- This will reset the MAC internal registers. */
-    uint32_t mode = *DMA_REG(DMA_BUS_MODE);
-    mode |= DMA_BUS_MODE_SFT_RESET;
-    *DMA_REG(DMA_BUS_MODE) = mode;
+    // uint32_t mode = *DMA_REG(DMA_BUS_MODE);
+    // mode |= DMA_BUS_MODE_SFT_RESET;
+    // *DMA_REG(DMA_BUS_MODE) = 15000;
+
+    volatile uint32_t *mode = DMA_REG(DMA_BUS_MODE);
+    *mode |= DMA_BUS_MODE_SFT_RESET;
+    sddf_dprintf("This is the value of mode: %x\n", *mode);
 
     // Poll on BIT 0. This bit is cleared by the device when the reset is complete.
     while(1) {
-        mode = *DMA_REG(DMA_BUS_MODE);
-        if (!(mode & DMA_BUS_MODE_SFT_RESET)) {
+        sddf_dprintf("looping\n");
+        mode = DMA_REG(DMA_BUS_MODE);
+        if (!(*mode & DMA_BUS_MODE_SFT_RESET)) {
+            sddf_dprintf("This is the value of DMA_BUS_MODE: %x\n", *mode);
             break;
         }
     }
 
     /* 2. Init sysbus mode. */
-    uint32_t sysbus_mode = *DMA_REG(DMA_SYS_BUS_MODE);
+    volatile uint32_t *sysbus_mode_reg = DMA_REG(DMA_SYS_BUS_MODE);
     // Set the fixed length burst to 8
-    sysbus_mode |= DMA_SYS_BUS_FB;
-    sysbus_mode |= DMA_AXI_BLEN8;
-    *DMA_REG(DMA_SYS_BUS_MODE) = sysbus_mode;
+    *sysbus_mode_reg |= DMA_SYS_BUS_FB;
+    *sysbus_mode_reg |= DMA_AXI_BLEN8;
 
     /* 3. Create desc lists for rx and tx. */
 
     /* 4. Program tx and rx ring length registers. */
-    uint32_t tx_len = *DMA_REG(DMA_CHAN_TX_RING_LEN(0));
-    tx_len = TX_COUNT;
-    *DMA_REG(DMA_CHAN_TX_RING_LEN(0)) = tx_len;
-    uint32_t rx_len = *DMA_REG(DMA_CHAN_RX_RING_LEN(0));
-    rx_len = RX_COUNT;
-    *DMA_REG(DMA_CHAN_RX_RING_LEN(0)) = rx_len;
+    volatile uint32_t *tx_len_reg = DMA_REG(DMA_CHAN_TX_RING_LEN(0));
+    *tx_len_reg = TX_COUNT;
+    volatile uint32_t *rx_len = DMA_REG(DMA_CHAN_RX_RING_LEN(0));
+    *rx_len = RX_COUNT;
 
     /* 5. Init rx and tx descriptor list addresses. */
-    *DMA_REG(DMA_CHAN_RX_BASE_ADDR(0)) = hw_ring_buffer_paddr;
-    *DMA_REG(DMA_CHAN_TX_BASE_ADDR(0)) = hw_ring_buffer_paddr + (sizeof(struct descriptor) * RX_COUNT);
-
+    volatile uint32_t *rx_base_addr_reg = DMA_REG(DMA_CHAN_RX_BASE_ADDR(0));
+    *rx_base_addr_reg = hw_ring_buffer_paddr;
+    volatile uint32_t *tx_base_addr_reg = DMA_REG(DMA_CHAN_TX_BASE_ADDR(0));
+    *tx_base_addr_reg = hw_ring_buffer_paddr + (sizeof(struct descriptor) * RX_COUNT);
+    sddf_dprintf("This is the hwring buffer paddr: %p and this is the rx base: %p\n", hw_ring_buffer_paddr, *rx_base_addr_reg);
     /* 6. Program settings for _CONTROL, _TX_CONTROL, _RX_CONTROL
           registers. */
     // Disable control features for 8xPBL mode and Descriptor Skip Length
@@ -410,9 +419,21 @@ static void eth_setup(void)
 {
     /* Save the MAC address. This address should have been populated by u-boot. We will
     just restore these when setting up the MAC component of the eth device. */
+    mac_regs = (volatile struct mac_regs *) (eth_regs + MAC_REGS_BASE);
+    mtl_regs = (volatile struct mtl_regs *) (eth_regs + MTL_REGS_BASE);
+    dma_regs = (volatile struct dma_regs *) (eth_regs + DMA_REGS_BASE);
 
-    uint32_t l = (uint32_t) *MAC_REG(GMAC_ADDR_LOW(0));
-    uint32_t h = (uint32_t) *MAC_REG(GMAC_ADDR_HIGH(0));
+    sddf_dprintf("This is hardware features: %x\n", mac_regs->hw_feature0);
+
+    mac_regs->address0_low = 0xff35;
+    mac_regs->address0_high = 0xddaa;
+
+    uint32_t l = mac_regs->address0_low;
+    uint32_t h = mac_regs->address0_high;
+
+    sddf_dprintf("This is the addr of mac_regs: %p ---- mtl_regs: %p ---- dma_regs: %p\n", mac_regs, mtl_regs, dma_regs);
+
+    sddf_dprintf("This is the value of the config reg: %x\n", mac_regs->configuration);
 
     assert((hw_ring_buffer_paddr & 0xFFFFFFFF) == hw_ring_buffer_paddr);
 
@@ -426,7 +447,10 @@ static void eth_setup(void)
     mtl_init();
 
     /* 3. Init MAC */
-    mac_init(h, l);
+    mac_init(0xff35, 0xddaa);
+
+    sddf_dprintf("This is mac high: %x -- and mac low: %x\n", mac_regs->address0_high, mac_regs->address0_low);
+
 
     sddf_dprintf("Finished eth setup\n");
 }
