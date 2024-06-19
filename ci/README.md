@@ -29,6 +29,9 @@ git clone https://github.com/seL4/seL4_tools
 ./seL4_tools/misc/style-all.sh /path/to/what/to/style
 ```
 
+Note that you will need to have the `astyle` program installed (e.g `apt install astyle`
+or `brew install astyle`).
+
 All the styling scripts can be found in `seL4_tools/misc`. You can run the script on an
 entire directory or just on a particular file.
 
