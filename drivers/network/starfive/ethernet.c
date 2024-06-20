@@ -474,7 +474,16 @@ void init(void)
     /* De-assert the reset signals that u-boot left asserted. */
     volatile uint32_t *reset_eth = (volatile uint32_t *)(resets + 0x38);
     sddf_dprintf("This is the value of reset_eth: %u\n", *reset_eth);
-    *reset_eth = 0;
+    uint32_t reset_val = *reset_eth;
+    uint32_t mask = 0;
+    /* U-Boot de-asserts BIT(0) first then BIT(1) when starting up eth0. */
+    for (int i = 0; i < 2; i++) {
+        reset_val = *reset_eth;
+        mask = BIT(i);
+        reset_val &= ~mask;
+        *reset_eth = reset_val;
+    }
+
     eth_setup();
 
     net_queue_init(&rx_queue, (net_queue_t *)rx_free, (net_queue_t *)rx_active, RX_QUEUE_SIZE_DRIV);
