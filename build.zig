@@ -108,9 +108,10 @@ pub fn build(b: *std.Build) void {
     };
 
     // Libmicrokit
-    libmicrokit = .{ .cwd_relative = b.fmt("{s}/lib/libmicrokit.a", .{ microkit_board_dir }) };
-    libmicrokit_linker_script = .{ .cwd_relative = b.fmt("{s}/lib/microkit.ld", .{ microkit_board_dir }) };
-    libmicrokit_include = .{ .cwd_relative = b.fmt("{s}/include", .{ microkit_board_dir }) };
+    // We're declaring explicitly here instead of with anonymous structs due to a bug. See https://github.com/ziglang/zig/issues/19832
+    libmicrokit = LazyPath{ .cwd_relative = b.fmt("{s}/lib/libmicrokit.a", .{ microkit_board_dir }) };
+    libmicrokit_linker_script = LazyPath{ .cwd_relative = b.fmt("{s}/lib/microkit.ld", .{ microkit_board_dir }) };
+    libmicrokit_include = LazyPath{ .cwd_relative = b.fmt("{s}/include", .{ microkit_board_dir }) };
 
     const printf = b.addObject(.{
         .name = "printf",
