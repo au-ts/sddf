@@ -19,6 +19,7 @@
 #define RX_CH  2
 
 uintptr_t eth_regs;
+uintptr_t resets;
 uintptr_t hw_ring_buffer_vaddr;
 uintptr_t hw_ring_buffer_paddr;
 
@@ -57,6 +58,9 @@ net_queue_handle_t tx_queue;
 #define MAC_REG(x) ((volatile uint32_t *)(eth_regs + x))
 #define MTL_REG(x) ((volatile uint32_t *)(eth_regs + x))
 #define DMA_REG(x) ((volatile uint32_t *)(eth_regs + x))
+#define writel(b, addr) (void)((*(volatile uint32_t *)(addr)) = (b))
+#define readl(addr) \
+	({ unsigned int __v = (*(volatile uint32_t *)(addr)); __v; })
 
 static volatile struct mac_regs *mac_regs;
 static volatile struct mtl_regs *mtl_regs;
@@ -417,19 +421,29 @@ static void mac_init(uint32_t machi, uint32_t maclo)
 
 static void eth_setup(void)
 {
+    volatile uint32_t *mac_version = ((volatile uint32_t *)(eth_regs + 0x00000110));
+    volatile uint32_t *mac_debug = ((volatile uint32_t *)(eth_regs + GMAC_DEBUG));
+    sddf_dprintf("Beginning eth setup. This is the mac version: %x --- this is the mac debug reg: %x\n", *mac_version, *mac_debug);
     /* Save the MAC address. This address should have been populated by u-boot. We will
     just restore these when setting up the MAC component of the eth device. */
     mac_regs = (volatile struct mac_regs *) (eth_regs + MAC_REGS_BASE);
     mtl_regs = (volatile struct mtl_regs *) (eth_regs + MTL_REGS_BASE);
     dma_regs = (volatile struct dma_regs *) (eth_regs + DMA_REGS_BASE);
 
-    sddf_dprintf("This is hardware features: %x\n", mac_regs->hw_feature0);
+    dma_regs->mode |= DMA_BUS_MODE_SFT_RESET;
+    while(dma_regs->mode & DMA_BUS_MODE_SFT_RESET) {
+        sddf_dprintf("waiting for reset\n");
+    }
 
-    mac_regs->address0_low = 0xff35;
-    mac_regs->address0_high = 0xddaa;
+    sddf_dprintf("This is hardware features: %x\n", mac_regs->hw_feature0);
 
     uint32_t l = mac_regs->address0_low;
     uint32_t h = mac_regs->address0_high;
+    writel(0xfafafafa, &mac_regs->address0_low);
+    writel(0xafafafaf, &mac_regs->address0_high);
+
+    uint32_t test = readl(&mac_regs->address0_low);
+    sddf_dprintf("This is the test value of addr low: %x\n", test);
 
     sddf_dprintf("This is the addr of mac_regs: %p ---- mtl_regs: %p ---- dma_regs: %p\n", mac_regs, mtl_regs, dma_regs);
 
@@ -457,6 +471,10 @@ static void eth_setup(void)
 
 void init(void)
 {
+    /* De-assert the reset signals that u-boot left asserted. */
+    volatile uint32_t *reset_eth = (volatile uint32_t *)(resets + 0x38);
+    sddf_dprintf("This is the value of reset_eth: %u\n", *reset_eth);
+    *reset_eth = 0;
     eth_setup();
 
     net_queue_init(&rx_queue, (net_queue_t *)rx_free, (net_queue_t *)rx_active, RX_QUEUE_SIZE_DRIV);
