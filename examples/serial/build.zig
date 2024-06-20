@@ -79,15 +79,15 @@ pub fn build(b: *std.Build) void {
     const microkit_board_dir = b.fmt("{s}/board/{s}/{s}", .{ microkit_sdk, microkit_board, microkit_config });
     const microkit_tool = b.fmt("{s}/bin/microkit", .{microkit_sdk});
     const libmicrokit = b.fmt("{s}/lib/libmicrokit.a", .{microkit_board_dir});
-    const libmicrokit_linker_script = b.fmt("{s}/lib/microkit.ld", .{microkit_board_dir});
     const libmicrokit_include = b.fmt("{s}/include", .{microkit_board_dir});
+    const libmicrokit_linker_script = b.fmt("{s}/lib/microkit.ld", .{microkit_board_dir});
 
     const sddf_dep = b.dependency("sddf", .{
         .target = target,
         .optimize = optimize,
-        .sdk = microkit_sdk,
-        .config = @as([]const u8, microkit_config),
-        .board = @as([]const u8, microkit_board),
+        .libmicrokit = @as([]const u8, libmicrokit),
+        .libmicrokit_include = @as([]const u8, libmicrokit_include),
+        .libmicrokit_linker_script = @as([]const u8, libmicrokit_linker_script),
         .serial_config_include = @as([]const u8, "include/serial_config"),
     });
 
