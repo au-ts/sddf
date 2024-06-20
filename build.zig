@@ -19,17 +19,27 @@ const DriverUart = enum {
     imx,
 };
 
-const sddf_util_files = [_][]const u8{
+const util_src = [_][]const u8{
     "util/newlibc.c",
     "util/cache.c",
-    "util/printf.c",
-    "util/putchar_debug.c",
     // TODO:
     // should these device specific utils be here?
     // or maybe move these into the outer util directory
     "blk/util/fsmalloc.c",
     "blk/util/bitarray.c",
-    "blk/util/util.c",
+    // "blk/util/util.c",
+};
+
+const util_putchar_debug_src = [_][]const u8{
+    "util/assert.c",
+    "util/printf.c",
+    "util/putchar_debug.c",
+};
+
+const util_putchar_serial_src = [_][]const u8{
+    "util/assert.c",
+    "util/printf.c",
+    "util/putchar_serial.c",
 };
 
 var libmicrokit: std.Build.LazyPath = undefined;
@@ -38,9 +48,11 @@ var libmicrokit_include: std.Build.LazyPath = undefined;
 
 fn addUartDriver(
     b: *std.Build,
+    serial_config_include: LazyPath,
+    util: *std.Build.Step.Compile,
     class: DriverUart,
     target: std.Build.ResolvedTarget,
-    optimize: std.builtin.OptimizeMode
+    optimize: std.builtin.OptimizeMode,
 ) *std.Build.Step.Compile {
     const driver = addPd(b, .{
         .name = b.fmt("driver_uart_{s}.elf", .{ @tagName(class) }),
@@ -56,6 +68,8 @@ fn addUartDriver(
     });
     driver.addIncludePath(b.path("include"));
     driver.addIncludePath(b.path(driver_include));
+    driver.addIncludePath(serial_config_include);
+    driver.linkLibrary(util);
 
     return driver;
 }
@@ -107,21 +121,60 @@ pub fn build(b: *std.Build) void {
         std.posix.exit(1);
     };
 
-    // Libmicrokit
+    const serial_config_include_option = b.option([]const u8, "serial_config_include", "Include path to serial config header") orelse null;
+    // TODO: sort out
+    const serial_config_include = LazyPath{ .cwd_relative = serial_config_include_option.? };
+
+    // libmicrokit
     // We're declaring explicitly here instead of with anonymous structs due to a bug. See https://github.com/ziglang/zig/issues/19832
     libmicrokit = LazyPath{ .cwd_relative = b.fmt("{s}/lib/libmicrokit.a", .{ microkit_board_dir }) };
     libmicrokit_linker_script = LazyPath{ .cwd_relative = b.fmt("{s}/lib/microkit.ld", .{ microkit_board_dir }) };
     libmicrokit_include = LazyPath{ .cwd_relative = b.fmt("{s}/include", .{ microkit_board_dir }) };
 
-    const printf = b.addObject(.{
-        .name = "printf",
+    // util libraries
+    const util = b.addStaticLibrary(.{
+        .name = "util",
         .target = target,
         .optimize = optimize,
     });
-    printf.addCSourceFiles(.{ .files = &.{ "util/printf.c", "util/putchar_debug.c" } });
-    printf.addIncludePath(b.path("include"));
-    printf.addIncludePath(libmicrokit_include);
+    util.addCSourceFiles(.{
+        .files = &util_src,
+        .flags = &.{"-fno-sanitize=undefined"},
+    });
+    util.addIncludePath(b.path("include"));
+    util.addIncludePath(libmicrokit_include);
+    util.installHeadersDirectory(b.path("include"), "", .{});
+    b.installArtifact(util);
 
+    const util_putchar_serial = b.addStaticLibrary(.{
+        .name = "util_putchar_serial",
+        .target = target,
+        .optimize = optimize,
+    });
+    util_putchar_serial.addCSourceFiles(.{
+        .files = &util_putchar_serial_src,
+        .flags = &.{"-fno-sanitize=undefined"},
+    });
+    util_putchar_serial.addIncludePath(b.path("include"));
+    util_putchar_serial.addIncludePath(libmicrokit_include);
+    util_putchar_serial.installHeadersDirectory(b.path("include"), "", .{});
+    b.installArtifact(util_putchar_serial);
+
+    const util_putchar_debug = b.addStaticLibrary(.{
+        .name = "util_putchar_debug",
+        .target = target,
+        .optimize = optimize,
+    });
+    util_putchar_debug.addCSourceFiles(.{
+        .files = &util_putchar_debug_src,
+        .flags = &.{"-fno-sanitize=undefined"},
+    });
+    util_putchar_debug.addIncludePath(b.path("include"));
+    util_putchar_debug.addIncludePath(libmicrokit_include);
+    util_putchar_debug.installHeadersDirectory(b.path("include"), "", .{});
+    b.installArtifact(util_putchar_debug);
+
+    // Block components
     const blk_virt = addPd(b, .{
         .name = "blk_virt.elf",
         .target = target,
@@ -132,9 +185,10 @@ pub fn build(b: *std.Build) void {
     blk_virt.addCSourceFile(.{ .file = b.path("blk/components/virt.c"), .flags = &.{"-DBLK_NUM_CLIENTS=2"} });
     blk_virt.addCSourceFiles(.{ .files = &.{ "blk/util/bitarray.c", "blk/util/fsmalloc.c", "blk/util/util.c", "util/cache.c" } });
     blk_virt.addIncludePath(b.path("include"));
-    blk_virt.addObject(printf);
+    blk_virt.linkLibrary(util_putchar_debug);
     b.installArtifact(blk_virt);
 
+    // Serial components
     const serial_virt_rx = addPd(b, .{
         .name = "serial_virt_rx.elf",
         .target = target,
@@ -146,8 +200,10 @@ pub fn build(b: *std.Build) void {
         .file = b.path("serial/components/virt_rx.c"),
         .flags = &.{"-DSERIAL_NUM_CLIENTS=3", "-fno-sanitize=undefined"}
     });
+    serial_virt_rx.addIncludePath(serial_config_include);
     serial_virt_rx.addIncludePath(b.path("include"));
-    serial_virt_rx.addObject(printf);
+    serial_virt_rx.linkLibrary(util);
+    serial_virt_rx.linkLibrary(util_putchar_debug);
     b.installArtifact(serial_virt_rx);
 
     const serial_virt_tx = addPd(b, .{
@@ -161,30 +217,18 @@ pub fn build(b: *std.Build) void {
         .file = b.path("serial/components/virt_tx.c"),
         .flags = &.{"-DSERIAL_NUM_CLIENTS=3", "-DSERIAL_TRANSFER_WITH_COLOUR", "-fno-sanitize=undefined"}
     });
+    serial_virt_tx.addIncludePath(serial_config_include);
     serial_virt_tx.addIncludePath(b.path("include"));
-    serial_virt_tx.addObject(printf);
+    serial_virt_tx.linkLibrary(util);
+    serial_virt_tx.linkLibrary(util_putchar_debug);
     b.installArtifact(serial_virt_tx);
 
     // UART drivers
     inline for (std.meta.fields(DriverUart)) |class| {
-        const driver = addUartDriver(b, @enumFromInt(class.value), target, optimize);
-        driver.addObject(printf);
+        const driver = addUartDriver(b, serial_config_include, util, @enumFromInt(class.value), target, optimize);
+        driver.linkLibrary(util_putchar_debug);
         b.installArtifact(driver);
     }
-
-    // sDDF util library
-    const sddf_util = b.addStaticLibrary(.{
-        .name = "sddf_util",
-        .target = target,
-        .optimize = optimize,
-    });
-    sddf_util.addCSourceFiles(.{ 
-        .files = &sddf_util_files
-    });
-    sddf_util.addIncludePath(b.path("include"));
-    sddf_util.addIncludePath(libmicrokit_include);
-    sddf_util.installHeadersDirectory(b.path("include"), "", .{});
-    b.installArtifact(sddf_util);
 
     // sDDF headers
     // TODO: Investigate how to get this step to run when it is not an artifact/module/file
