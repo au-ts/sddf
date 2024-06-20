@@ -1,18 +1,6 @@
 const std = @import("std");
 const LazyPath = std.Build.LazyPath;
 
-const MicrokitBoard = enum {
-    qemu_arm_virt,
-    odroidc4,
-    maaxboard
-};
-
-const ConfigOptions = enum {
-    debug,
-    release,
-    benchmark
-};
-
 const DriverUart = enum {
     arm,
     meson,
@@ -87,39 +75,9 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
     const target = b.standardTargetOptions(.{});
 
-    // Microkit SDK option
-    const microkit_sdk_option_tmp = b.option([]const u8, "sdk", "Path to Microkit SDK");
-    if (microkit_sdk_option_tmp == null) {
-        std.log.err("Missing -Dsdk=/path/to/sdk argument being passed\n", .{});
-        std.posix.exit(1);
-    }
-    const microkit_sdk_option = microkit_sdk_option_tmp.?;
-    std.fs.cwd().access(microkit_sdk_option, .{}) catch |err| {
-        switch (err) {
-            error.FileNotFound => std.log.err("Path to SDK '{s}' does not exist\n", .{ microkit_sdk_option }),
-            else => std.log.err("Could not acccess SDK path '{s}', error is {any}\n", .{ microkit_sdk_option, err })
-        }
-        std.posix.exit(1);
-    };
-
-    // Microkit config option
-    const microkit_config_option = b.option(ConfigOptions, "config", "Microkit config to build for") orelse ConfigOptions.debug;
-
-    // Microkit board option
-    const microkit_board_option_tmp = b.option(MicrokitBoard, "board", "Microkit board to target");
-    if (microkit_board_option_tmp == null) {
-        std.log.err("Missing -Dboard=<BOARD> argument being passed\n", .{});
-        std.posix.exit(1);
-    }
-    const microkit_board_option = microkit_board_option_tmp.?;
-    const microkit_board_dir = b.fmt("{s}/board/{s}/{s}", .{ microkit_sdk_option, @tagName(microkit_board_option), @tagName(microkit_config_option) });
-    std.fs.cwd().access(microkit_board_dir, .{}) catch |err| {
-        switch (err) {
-            error.FileNotFound => std.log.err("Path to '{s}' does not exist\n", .{ microkit_board_dir }),
-            else => std.log.err("Could not acccess path '{s}', error is {any}\n", .{ microkit_board_dir, err })
-        }
-        std.posix.exit(1);
-    };
+    const libmicrokit_opt = b.option([]const u8, "libmicrokit", "Path to libmicrokit.a") orelse null;
+    const libmicrokit_include_opt = b.option([]const u8, "libmicrokit_include", "Path to the libmicrokit include directory") orelse null;
+    const libmicrokit_linker_script_opt = b.option([]const u8, "libmicrokit_linker_script", "Path to the libmicrokit linker script") orelse null;
 
     const serial_config_include_option = b.option([]const u8, "serial_config_include", "Include path to serial config header") orelse null;
     // TODO: sort out
@@ -127,9 +85,9 @@ pub fn build(b: *std.Build) void {
 
     // libmicrokit
     // We're declaring explicitly here instead of with anonymous structs due to a bug. See https://github.com/ziglang/zig/issues/19832
-    libmicrokit = LazyPath{ .cwd_relative = b.fmt("{s}/lib/libmicrokit.a", .{ microkit_board_dir }) };
-    libmicrokit_linker_script = LazyPath{ .cwd_relative = b.fmt("{s}/lib/microkit.ld", .{ microkit_board_dir }) };
-    libmicrokit_include = LazyPath{ .cwd_relative = b.fmt("{s}/include", .{ microkit_board_dir }) };
+    libmicrokit = LazyPath{ .cwd_relative = libmicrokit_opt.? };
+    libmicrokit_include = LazyPath{ .cwd_relative = libmicrokit_include_opt.? };
+    libmicrokit_linker_script = LazyPath{ .cwd_relative = libmicrokit_linker_script_opt.? };
 
     // util libraries
     const util = b.addStaticLibrary(.{
@@ -195,7 +153,6 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
         .strip = false,
     });
-    // TODO: This flag -DSERIAL_NUM_CLIENTS=3 needs to be configurable by the user of this dependency
     serial_virt_rx.addCSourceFile(.{
         .file = b.path("serial/components/virt_rx.c"),
         .flags = &.{"-fno-sanitize=undefined"}
