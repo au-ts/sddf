@@ -32,11 +32,18 @@ uintptr_t tx_active;
 #define TX_COUNT 256
 #define MAX_COUNT MAX(RX_COUNT, TX_COUNT)
 
+// struct descriptor {
+//     uint32_t status;
+//     uint32_t cntl;
+//     uint32_t addr;
+//     uint32_t next;
+// };
+
 struct descriptor {
+    uint32_t d0;
+    uint32_t d1;
+    uint32_t d2;
     uint32_t status;
-    uint32_t cntl;
-    uint32_t addr;
-    uint32_t next;
 };
 
 _Static_assert((RX_COUNT + TX_COUNT) * sizeof(struct descriptor) <= HW_REGION_SIZE,
@@ -46,7 +53,7 @@ typedef struct {
     unsigned int tail; /* index to insert at */
     unsigned int head; /* index to remove from */
     net_buff_desc_t descr_mdata[MAX_COUNT]; /* associated meta data array */
-    volatile struct descriptor *descr; /* buffer descripter array */
+    volatile struct descriptor *descr; /* buffer descripter array. This is what lives in the hardware_ring address. */
 } hw_ring_t;
 
 hw_ring_t rx;
@@ -77,12 +84,12 @@ static inline bool hw_ring_empty(hw_ring_t *ring, size_t ring_size)
 }
 
 static void update_ring_slot(hw_ring_t *ring, unsigned int idx, uint32_t status,
-                             uint32_t cntl, uint32_t phys, uint32_t next)
+                             uint32_t cntl, uintptr_t phys, uint32_t length)
 {
     volatile struct descriptor *d = &(ring->descr[idx]);
-    d->addr = phys;
-    d->next = next;
-    d->cntl = cntl;
+    d->d0 = phys & 0xffffffff;
+    d->d1 = phys >> 32;
+    d->d2 = length;
     /* Ensure all writes to the descriptor complete, before we set the flags
      * that makes hardware aware of this slot.
      */
@@ -105,7 +112,7 @@ static void rx_provide()
             }
 
             rx.descr_mdata[rx.tail] = buffer;
-            update_ring_slot(&rx, rx.tail, DESC_RXSTS_OWNBYDMA, cntl, buffer.io_or_offset, 0);
+            update_ring_slot(&rx, rx.tail, DESC_RXSTS_OWNBYDMA | BIT(24), cntl, buffer.io_or_offset, 0);
             /* We will update the hardware register that stores the tail address. This tells
             the device that we have new descriptors to use. */
             *DMA_REG(DMA_CHAN_RX_TAIL_ADDR(0)) = hw_ring_buffer_paddr + sizeof(struct descriptor) * rx.tail;
@@ -142,7 +149,7 @@ static void rx_return(void)
             }
 
             rx.descr_mdata[rx.tail] = buffer;
-            update_ring_slot(&rx, rx.tail, DESC_RXSTS_OWNBYDMA, cntl, buffer.io_or_offset, 0);
+            update_ring_slot(&rx, rx.tail, DESC_RXSTS_OWNBYDMA | BIT(24), cntl, buffer.io_or_offset, 0);
             /* We will update the hardware register that stores the tail address. This tells
             the device that we have new descriptors to use. */
             *DMA_REG(DMA_CHAN_RX_TAIL_ADDR(0)) = hw_ring_buffer_paddr + sizeof(struct descriptor) * rx.tail;
@@ -177,8 +184,13 @@ static void tx_provide(void)
                 cntl |= DESC_TXCTRL_TXRINGEND;
             }
             tx.descr_mdata[tx.tail] = buffer;
-            update_ring_slot(&tx, tx.tail, DESC_TXSTS_OWNBYDMA, cntl, buffer.io_or_offset, 0);
-
+            update_ring_slot(&tx, tx.tail, (DESC_TXSTS_OWNBYDMA | BIT(29) | BIT(28) | buffer.len), cntl, buffer.io_or_offset, buffer.len);
+            /* Set the tail in hardware to the latest tail we have inserted in.
+             * This tells the hardware that it has new buffers to send.
+             * NOTE: Setting this on every enqueued packet for sanity, change this to once per bactch.
+             */
+            *DMA_REG(DMA_CHAN_TX_TAIL_ADDR(0)) = hw_ring_buffer_paddr + ((sizeof(struct descriptor) * (RX_COUNT + tx.tail)));
+            sddf_dprintf("This is the new tail addr: %p --- this is the size of the desc struct: %x -- this is the tail index: %d\n", hw_ring_buffer_paddr + ((sizeof(struct descriptor) * (RX_COUNT + tx.tail))), sizeof(struct descriptor), tx.tail);
             tx.tail = (tx.tail + 1) % TX_COUNT;
             i++;
         }
@@ -191,9 +203,7 @@ static void tx_provide(void)
             reprocess = true;
         }
     }
-    /* Set the tail in hardware to the latest tail we have inserted in.
-    This tells the hardware that it has new buffers to send. */
-    *DMA_REG(DMA_CHAN_TX_TAIL_ADDR(0)) = hw_ring_buffer_paddr + RX_COUNT + sizeof(struct descriptor) * tx.tail;
+
 }
 
 static void tx_return(void)
@@ -277,30 +287,49 @@ static void dma_init(void)
     *rx_len = RX_COUNT;
 
     /* 5. Init rx and tx descriptor list addresses. */
-    volatile uint32_t *rx_base_addr_reg = DMA_REG(DMA_CHAN_RX_BASE_ADDR(0));
-    *rx_base_addr_reg = hw_ring_buffer_paddr;
-    volatile uint32_t *tx_base_addr_reg = DMA_REG(DMA_CHAN_TX_BASE_ADDR(0));
-    *tx_base_addr_reg = hw_ring_buffer_paddr + (sizeof(struct descriptor) * RX_COUNT);
-    sddf_dprintf("This is the hwring buffer paddr: %p and this is the rx base: %p\n", hw_ring_buffer_paddr, *rx_base_addr_reg);
+    *DMA_REG(DMA_CHAN_RX_BASE_ADDR_HI(0)) = hw_ring_buffer_paddr >> 32;
+    *DMA_REG(DMA_CHAN_RX_BASE_ADDR(0)) = hw_ring_buffer_paddr & 0xffffffff;
+    uintptr_t tx_base_addr = hw_ring_buffer_paddr + (sizeof(struct descriptor) * RX_COUNT);
+    *DMA_REG(DMA_CHAN_TX_BASE_ADDR_HI(0)) = tx_base_addr >> 32;
+    *DMA_REG(DMA_CHAN_TX_BASE_ADDR(0)) = tx_base_addr & 0xffffffff;
+
+    /* NOTE ------ FROM U-BOOT SOURCE CODE dwc_eth_qos.c:995 */
+
+    /* TX tail pointer not written until we need to TX a packet */
+	/*
+	 * Point RX tail pointer at last descriptor. Ideally, we'd point at the
+	 * first descriptor, implying all descriptors were available. However,
+	 * that's not distinguishable from none of the descriptors being
+	 * available.
+	 */
+    *DMA_REG(DMA_CHAN_RX_TAIL_ADDR(0)) = hw_ring_buffer_paddr + (sizeof(struct descriptor) *(RX_COUNT - 1));
+
+    sddf_dprintf("This is the hwring buffer paddr: %p and this is the tx base: %p\n", hw_ring_buffer_paddr, tx_base_addr);
     /* 6. Program settings for _CONTROL, _TX_CONTROL, _RX_CONTROL
           registers. */
     // Disable control features for 8xPBL mode and Descriptor Skip Length
-    *DMA_REG(DMA_CHAN_CONTROL(0)) = 0;
+    *DMA_REG(DMA_CHAN_CONTROL(0)) = BIT(16);
 
     uint32_t tx_chan_ctrl = 0;
     // Setting this bit ignores the PBL requirement
     tx_chan_ctrl |= DMA_BUS_MODE_PBL;
     *DMA_REG(DMA_CHAN_TX_CONTROL(0)) = tx_chan_ctrl;
 
-    // TODO: I don't believe there is anything for us to enable in rx
-    // chan control. Double check this.
+    // Set the buffer size in the rx chan control registers
+    uint32_t rx_chan_ctrl = *DMA_REG(DMA_CHAN_RX_CONTROL(0));
+    rx_chan_ctrl &= 0x3fff << 1;
+    rx_chan_ctrl |= NET_BUFFER_SIZE << 1;
 
     /* 7. Enable interrupts. */
-    *DMA_REG(DMA_CHAN_INTR_ENA(0)) |= DMA_INTR_MASK;
+    *DMA_REG(DMA_CHAN_INTR_ENA(0)) |= DMA_CHAN_INTR_NORMAL;
 
     /* 8. Start tx and rx DMAs. */
-    *DMA_REG(DMA_CHAN_TX_CONTROL(0)) |= DMA_CONTROL_ST;
-    *DMA_REG(DMA_CHAN_RX_CONTROL(0)) |= DMA_CONTROL_SR;
+    uint32_t tx_ctrl = *DMA_REG(DMA_CHAN_TX_CONTROL(0));
+    tx_ctrl |= DMA_CONTROL_ST;
+    *DMA_REG(DMA_CHAN_TX_CONTROL(0)) = tx_ctrl;
+    uint32_t rx_ctrl = *DMA_REG(DMA_CHAN_RX_CONTROL(0));
+    rx_ctrl |= DMA_CONTROL_SR;
+    *DMA_REG(DMA_CHAN_RX_CONTROL(0)) = rx_ctrl;
 
     /* NOTE: Repeat these above steps for all of the tx and rx channels
         that we are using. For now we are going to keep this to one pair.*/
@@ -333,36 +362,36 @@ static void mtl_init(void)
     /* 3. Program the TSF, TQE, TQS fields in the MTL_TX_Opeartion_mode reg. */
 
     // TODO: don't just use '0' here
-    uint32_t txq0_op_mode = *MTL_REG(0);
+    uint32_t txq0_op_mode = mtl_regs->txq0_operation_mode;
 
     // We use the store-and-forward DMA mode
     txq0_op_mode |= MTL_OP_MODE_TSF;
 
     // Enable the TX queue
-    txq0_op_mode &= ~MTL_OP_MODE_TXQ_ENABLE_MASK;
-    txq0_op_mode |= MTL_OP_MODE_TXQ_ENABLE;
-
+    // txq0_op_mode &= ~MTL_OP_MODE_TXQ_ENABLE_MASK;
+    // txq0_op_mode |= MTL_OP_MODE_TXQ_ENABLE;
+    txq0_op_mode |= (2 << 2);
     // Set the TX queue size
-    txq0_op_mode &= ~MTL_OP_MODE_TQS_MASK;
+    // txq0_op_mode &= ~MTL_OP_MODE_TQS_MASK;
     // TODO: unsure if we need to set TX queue size as we only
     // have one queue and the documentation says that the queue size
     // field is read-only unless you have more than one queue.
 
-    *MTL_REG(0) = txq0_op_mode;
+    mtl_regs->txq0_operation_mode = txq0_op_mode;
 
     /* 4. Do the same as the above for RX in the MTL_TX_Opeartion_mode reg. */
 
-    uint32_t rxq0_op_mode = *MTL_REG(0x30);
+    uint32_t rxq0_op_mode = mtl_regs->rxq0_operation_mode;
     // Use store-and-forward DMA mode
     rxq0_op_mode |= MTL_OP_MODE_RSF;
 
     // Set the RX queue size
     // TODO: We do not set the RX queue size since we only have one queue
-    sddf_dprintf("RX queue size: )0x%lx\n", (rxq0_op_mode & MTL_OP_MODE_RQS_MASK) >> 20);
+    // sddf_dprintf("RX queue size: )0x%lx\n", (rxq0_op_mode & MTL_OP_MODE_RQS_MASK) >> 20);
 
     // TODO: for now we ignore setting flow control
 
-    *MTL_REG(0x30) = rxq0_op_mode;
+    mtl_regs->rxq0_operation_mode = rxq0_op_mode;
 
     /* NOTE: We repeate steps 3 and 4 for the amount of tx and rx queues we are
         using in our system. For now this is just one. */
@@ -394,7 +423,7 @@ static void mac_init(uint32_t machi, uint32_t maclo)
     *MAC_REG(GMAC_PACKET_FILTER) = filter;
 
     /* 3. Program the flow control. */
-    // For now, disabling all flow control
+    // For now, disabling all flow control. DOUBLE CHECK THE FLOW CONTROL SETTINGS.
     *MAC_REG(GMAC_QX_TX_FLOW_CTRL(0)) = 0;
 
     /* 4. Program the mac interrupt enable register (if applicable). */
@@ -402,7 +431,7 @@ static void mac_init(uint32_t machi, uint32_t maclo)
     // them in the DMA componenet
 
     uint32_t int_en = *MAC_REG(GMAC_INT_EN);
-    int_en = 0;
+    int_en |= GMAC_INT_DEFAULT_ENABLE | BIT(13) | BIT(14);
     *MAC_REG(GMAC_INT_EN) = int_en;
 
     /* 5. Program all other approrpriate fields in MAC_CONFIGURATION
@@ -415,7 +444,7 @@ static void mac_init(uint32_t machi, uint32_t maclo)
     /* 6. Set bit 0 and 1 in MAC_CONFIGURATION to start the MAC transmitter
           and receiver. */
     conf = *MAC_REG(GMAC_CONFIG);
-    conf |= GMAC_CONFIG_RE;
+    conf |= (GMAC_CONFIG_RE | GMAC_CONFIG_TE);
     *MAC_REG(GMAC_CONFIG) = conf;
 }
 
@@ -435,20 +464,6 @@ static void eth_setup(void)
         sddf_dprintf("waiting for reset\n");
     }
 
-    sddf_dprintf("This is hardware features: %x\n", mac_regs->hw_feature0);
-
-    uint32_t l = mac_regs->address0_low;
-    uint32_t h = mac_regs->address0_high;
-    writel(0xfafafafa, &mac_regs->address0_low);
-    writel(0xafafafaf, &mac_regs->address0_high);
-
-    uint32_t test = readl(&mac_regs->address0_low);
-    sddf_dprintf("This is the test value of addr low: %x\n", test);
-
-    sddf_dprintf("This is the addr of mac_regs: %p ---- mtl_regs: %p ---- dma_regs: %p\n", mac_regs, mtl_regs, dma_regs);
-
-    sddf_dprintf("This is the value of the config reg: %x\n", mac_regs->configuration);
-
     assert((hw_ring_buffer_paddr & 0xFFFFFFFF) == hw_ring_buffer_paddr);
 
     rx.descr = (volatile struct descriptor *)hw_ring_buffer_vaddr;
@@ -461,10 +476,11 @@ static void eth_setup(void)
     mtl_init();
 
     /* 3. Init MAC */
-    mac_init(0xff35, 0xddaa);
+    // NOTE: These are hardcoded MAC addresses for our board. The MAC addresses for this device
+    // exists in the EEPROM
+    mac_init(0x0000755b, 0x6ccf3900);
 
-    sddf_dprintf("This is mac high: %x -- and mac low: %x\n", mac_regs->address0_high, mac_regs->address0_low);
-
+    sddf_dprintf("This is the value of the mac config reg: %b\n", mac_regs->configuration);
 
     sddf_dprintf("Finished eth setup\n");
 }
@@ -499,6 +515,12 @@ void init(void)
 void notified(microkit_channel ch)
 {
     sddf_dprintf("we got a notification\n");
+    sddf_dprintf("This is the value of the MTL transmit debug registe: %b\n", mtl_regs->txq0_debug);
+    sddf_dprintf("This is the value of the MTL rx debug register: %b\n", mtl_regs->rxq0_debug);
+    sddf_dprintf("This is the value of the MAC debug register: %b\n", *MAC_REG(GMAC_DEBUG));
+    sddf_dprintf("This is the value of the DMA debug status 0 register %b\n", *DMA_REG(DMA_DEBUG_STATUS_0));
+    sddf_dprintf("This is the value of the DMA debug status 1 register %b\n", *DMA_REG(DMA_DEBUG_STATUS_1));
+
     switch (ch) {
     case IRQ_CH:
         microkit_dbg_puts("recv an irq\n");
