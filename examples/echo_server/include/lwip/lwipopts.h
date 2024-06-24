@@ -216,6 +216,6 @@
 /*
  * Streams can hang around in FIN_WAIT state for a
  * while after closing.  Increase the max number of concurrent streams to allow
- * for a few of these while 
+ * for a few of these while the next benchmark runs.
  */
 #define MEMP_NUM_TCP_PCB 10
