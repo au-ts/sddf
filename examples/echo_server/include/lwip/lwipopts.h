@@ -212,3 +212,10 @@
 #define IP_DEBUG LWIP_DBG_ON
 #define TCP_OUTPUT_DEBUG LWIP_DBG_ON
 #define TCP_INPUT_DEBUG LWIP_DBG_ON
+
+/*
+ * Streams can hang around in FIN_WAIT state for a
+ * while after closing.  Increase the max number of concurrent streams to allow
+ * for a few of these while 
+ */
+#define MEMP_NUM_TCP_PCB 10
