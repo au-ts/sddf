@@ -1,10 +1,22 @@
 const std = @import("std");
 const LazyPath = std.Build.LazyPath;
 
-const DriverUart = enum {
-    arm,
-    meson,
-    imx,
+const DriverClass = struct {
+    const Uart = enum {
+        arm,
+        meson,
+        imx,
+    };
+
+    const Timer = enum {
+        arm,
+        meson,
+        imx,
+    };
+
+    const I2c = enum {
+        meson,
+    };
 };
 
 const util_src = [_][]const u8{
@@ -16,6 +28,7 @@ const util_src = [_][]const u8{
     "blk/util/fsmalloc.c",
     "blk/util/bitarray.c",
     // "blk/util/util.c",
+    "util/assert.c",
 };
 
 const util_putchar_debug_src = [_][]const u8{
@@ -38,7 +51,7 @@ fn addUartDriver(
     b: *std.Build,
     serial_config_include: LazyPath,
     util: *std.Build.Step.Compile,
-    class: DriverUart,
+    class: DriverClass.Uart,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
 ) *std.Build.Step.Compile {
@@ -62,6 +75,56 @@ fn addUartDriver(
     return driver;
 }
 
+fn addTimerDriver(
+    b: *std.Build,
+    util: *std.Build.Step.Compile,
+    class: DriverClass.Timer,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+) *std.Build.Step.Compile {
+    const driver = addPd(b, .{
+        .name = b.fmt("driver_timer_{s}.elf", .{ @tagName(class) }),
+        .target = target,
+        .optimize = optimize,
+        .strip = false,
+    });
+    const source = b.fmt("drivers/clock/{s}/timer.c", .{ @tagName(class) });
+    driver.addCSourceFile(.{
+        .file = b.path(source),
+        .flags = &.{ "-fno-sanitize=undefined" }
+    });
+    driver.addIncludePath(b.path("include"));
+    driver.linkLibrary(util);
+
+    return driver;
+}
+
+fn addI2cDriver(
+    b: *std.Build,
+    util: *std.Build.Step.Compile,
+    class: DriverClass.I2c,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+) *std.Build.Step.Compile {
+    const driver = addPd(b, .{
+        .name = b.fmt("driver_i2c_{s}.elf", .{ @tagName(class) }),
+        .target = target,
+        .optimize = optimize,
+        .strip = false,
+    });
+    const source = b.fmt("drivers/i2c/{s}/i2c.c", .{ @tagName(class) });
+    driver.addCSourceFile(.{
+        .file = b.path(source),
+        // Note: the I2C_BUS_NUM flag is temporary
+        .flags = &.{ "-fno-sanitize=undefined", "-DI2C_BUS_NUM=2" }
+    });
+    driver.addIncludePath(b.path(b.fmt("drivers/i2c/{s}/", .{ @tagName(class) })));
+    driver.addIncludePath(b.path("include"));
+    driver.linkLibrary(util);
+
+    return driver;
+}
+
 fn addPd(b: *std.Build, options: std.Build.ExecutableOptions) *std.Build.Step.Compile {
     const pd = b.addExecutable(options);
     pd.addObjectFile(libmicrokit);
@@ -78,16 +141,17 @@ pub fn build(b: *std.Build) void {
     const libmicrokit_opt = b.option([]const u8, "libmicrokit", "Path to libmicrokit.a") orelse null;
     const libmicrokit_include_opt = b.option([]const u8, "libmicrokit_include", "Path to the libmicrokit include directory") orelse null;
     const libmicrokit_linker_script_opt = b.option([]const u8, "libmicrokit_linker_script", "Path to the libmicrokit linker script") orelse null;
+    const blk_num_clients_opt = b.option(u32, "blk_num_clients", "Number of block clients") orelse 2;
+    const serial_config_include_option = b.option([]const u8, "serial_config_include", "Include path to serial config header") orelse "";
 
-    const serial_config_include_option = b.option([]const u8, "serial_config_include", "Include path to serial config header") orelse null;
     // TODO: sort out
-    const serial_config_include = LazyPath{ .cwd_relative = serial_config_include_option.? };
-
+    const serial_config_include = LazyPath{ .cwd_relative = serial_config_include_option };
     // libmicrokit
     // We're declaring explicitly here instead of with anonymous structs due to a bug. See https://github.com/ziglang/zig/issues/19832
     libmicrokit = LazyPath{ .cwd_relative = libmicrokit_opt.? };
     libmicrokit_include = LazyPath{ .cwd_relative = libmicrokit_include_opt.? };
     libmicrokit_linker_script = LazyPath{ .cwd_relative = libmicrokit_linker_script_opt.? };
+
 
     // util libraries
     const util = b.addStaticLibrary(.{
@@ -139,8 +203,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
         .strip = false,
     });
-    // TODO: This flag -DBLK_NUM_CLIENTS needs to be configurable by the user of this dependency
-    blk_virt.addCSourceFile(.{ .file = b.path("blk/components/virt.c"), .flags = &.{"-DBLK_NUM_CLIENTS=2"} });
+    blk_virt.addCSourceFile(.{ .file = b.path("blk/components/virt.c"), .flags = &.{b.fmt("-DBLK_NUM_CLIENTS={any}", .{blk_num_clients_opt})} });
     blk_virt.addCSourceFiles(.{ .files = &.{ "blk/util/bitarray.c", "blk/util/fsmalloc.c", "blk/util/util.c", "util/cache.c" } });
     blk_virt.addIncludePath(b.path("include"));
     blk_virt.linkLibrary(util_putchar_debug);
@@ -169,7 +232,6 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
         .strip = false,
     });
-    // TODO: This flag -DSERIAL_NUM_CLIENTS=3 -DSERIAL_TRANSFER_WITH_COLOUR needs to be configurable by the user of this dependency
     serial_virt_tx.addCSourceFile(.{
         .file = b.path("serial/components/virt_tx.c"),
         .flags = &.{"-fno-sanitize=undefined"}
@@ -181,8 +243,38 @@ pub fn build(b: *std.Build) void {
     b.installArtifact(serial_virt_tx);
 
     // UART drivers
-    inline for (std.meta.fields(DriverUart)) |class| {
+    inline for (std.meta.fields(DriverClass.Uart)) |class| {
         const driver = addUartDriver(b, serial_config_include, util, @enumFromInt(class.value), target, optimize);
+        driver.linkLibrary(util_putchar_debug);
+        b.installArtifact(driver);
+    }
+
+    // Timer drivers
+    inline for (std.meta.fields(DriverClass.Timer)) |class| {
+        const driver = addTimerDriver(b, util, @enumFromInt(class.value), target, optimize);
+        driver.linkLibrary(util_putchar_debug);
+        b.installArtifact(driver);
+    }
+
+    // I2C components
+    const i2c_virt = addPd(b, .{
+        .name = "i2c_virt.elf",
+        .target = target,
+        .optimize = optimize,
+        .strip = false,
+    });
+    i2c_virt.addCSourceFile(.{
+        .file = b.path("i2c/components/virt.c"),
+        .flags = &.{"-fno-sanitize=undefined"}
+    });
+    i2c_virt.addIncludePath(b.path("include"));
+    i2c_virt.linkLibrary(util);
+    i2c_virt.linkLibrary(util_putchar_debug);
+    b.installArtifact(i2c_virt);
+
+    // I2C drivers
+    inline for (std.meta.fields(DriverClass.I2c)) |class| {
+        const driver = addI2cDriver(b, util, @enumFromInt(class.value), target, optimize);
         driver.linkLibrary(util_putchar_debug);
         b.installArtifact(driver);
     }
