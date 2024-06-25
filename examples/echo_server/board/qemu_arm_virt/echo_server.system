@@ -91,7 +91,7 @@
         </protection_domain>
 
         <protection_domain name="serial_virt_tx" priority="99" id="10">
-            <program_image path="serial_tx_virt.elf" />
+            <program_image path="serial_virt_tx.elf" />
             <map mr="serial_tx_queue_driver" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="tx_queue_drv" />
             <map mr="serial_tx_queue_client0" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="tx_queue_cli0" />
             <map mr="serial_tx_queue_client1" vaddr="0x4_002_000" perms="rw" cached="true"/>

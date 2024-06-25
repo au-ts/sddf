@@ -7,7 +7,7 @@
 # it should be included into your project Makefile
 #
 # NOTES:
-#  Generates serial_rx_virt.elf serial_tx_virt.elf
+#  Generates serial_virt_rx.elf serial_virt_tx.elf
 #  It relies on the variable SERIAL_NUM_CLIENTS as a C compiler flag
 #  to configure the virtualisers
 #
@@ -16,7 +16,7 @@ ifeq ($(strip $(SERIAL_NUM_CLIENTS)),)
 $(error Specify the number of clients for the serial virtualisers.  Expect -DSERIAL_NUM_CLIENTS=3 or similar)
 endif
 
-SERIAL_IMAGES:= serial_rx_virt.elf serial_tx_virt.elf
+SERIAL_IMAGES:= serial_virt_rx.elf serial_virt_tx.elf
 
 CFLAGS_serial := -I ${SDDF}/include ${SERIAL_NUM_CLIENTS}
 
@@ -27,7 +27,7 @@ ${CHECK_SERIAL_FLAGS_MD5}:
 	touch $@
 
 
-serial_%_virt.elf: virt_%.o
+serial_virt_%.elf: virt_%.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 virt_tx.o virt_rx.o: ${CHECK_SERIAL_FLAGS_MD5}
