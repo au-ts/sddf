@@ -153,7 +153,7 @@ pub fn build(b: *std.Build) void {
     libmicrokit_linker_script = LazyPath{ .cwd_relative = libmicrokit_linker_script_opt.? };
 
 
-    // util libraries
+    // Util libraries
     const util = b.addStaticLibrary(.{
         .name = "util",
         .target = target,
@@ -278,10 +278,4 @@ pub fn build(b: *std.Build) void {
         driver.linkLibrary(util_putchar_debug);
         b.installArtifact(driver);
     }
-
-    // sDDF headers
-    // TODO: Investigate how to get this step to run when it is not an artifact/module/file
-    // Not sure how to when this is exposed as a dependency to another build file
-    // const sddf_headers = b.addInstallHeaderFile(b.path("include"), "sddf");
-    // b.getInstallStep().dependOn(&sddf_headers.step);
 }
