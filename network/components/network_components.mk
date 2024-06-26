@@ -25,7 +25,7 @@ network/components/%.o: ${SDDF}/network/components/%.c
 
 NETWORK_COMPONENT_OBJ := $(addprefix network/components/, copy.o arp.o network_virt_tx.o network_virt_rx.o)
 
-CFLAGS_network += ${NUM_NETWORK_CLIENTS} -I${SDDF}/include/sddf/util
+CFLAGS_network += ${NUM_NETWORK_CLIENTS}
 
 CHECK_NETWORK_FLAGS_MD5:=.network_cflags-$(shell echo -- ${CFLAGS} ${CFLAGS_network} | shasum | sed 's/ *-//')
 
