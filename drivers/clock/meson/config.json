@@ -1,0 +1,25 @@
+{
+    "name": "meson_timer",
+    "compatible": [
+        "amlogic,meson-gxbb-wdt"
+    ],
+    "resources": {
+        "device_regions": [
+            {
+                "name": "regs",
+                "perms": "rw",
+                "cached": false,
+                "setvar_vaddr": "gpt_regs",
+                "page_size": 4096,
+                "size": 4096
+            }
+        ],
+        "shared_regions": [],
+        "irqs": [
+            {
+                "name": "timer",
+                "channel_id": 1
+            }
+        ]
+    }
+}

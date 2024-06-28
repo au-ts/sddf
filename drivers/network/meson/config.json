@@ -1,0 +1,25 @@
+{
+    "name": "meson_eth",
+    "compatible": [
+        "amlogic,meson-g12a-dwmac"
+    ],
+    "resources": {
+        "device_regions": [
+            {
+                "name": "regs",
+                "perms": "rw",
+                "cached": false,
+                "setvar_vaddr": "eth_regs",
+                "page_size": 4096,
+                "size": 4096
+            }
+        ],
+        "shared_regions": [],
+        "irqs": [
+            {
+                "name": "ethernet",
+                "channel_id": 1
+            }
+        ]
+    }
+}
