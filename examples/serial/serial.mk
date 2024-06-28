@@ -62,7 +62,7 @@ SYSTEM_FILE := ${TOP}/board/$(MICROKIT_BOARD)/serial.system
 
 IMAGES := uart_driver.elf \
 	  serial_server.elf \
-	  serial_tx_virt.elf serial_rx_virt.elf
+	  serial_virt_tx.elf serial_virt_rx.elf
 CFLAGS := -mcpu=$(CPU)\
 	  -mstrict-align \
 	  -ffreestanding \

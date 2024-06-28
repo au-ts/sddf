@@ -1,6 +1,5 @@
 #include <stdbool.h>
 #include <stdint.h>
-#include <ctype.h>
 #include <microkit.h>
 #include <sddf/serial/queue.h>
 #include <sddf/util/printf.h>
@@ -147,7 +146,7 @@ void tx_return(void)
 void tx_provide(microkit_channel ch)
 {
     if (ch > SERIAL_NUM_CLIENTS) {
-        sddf_dprintf("VIRT_TX|LOG: Received notification from unkown channel %u\n", ch);
+        sddf_dprintf("VIRT_TX|LOG: Received notification from unknown channel %u\n", ch);
         return;
     }
 

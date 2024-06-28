@@ -28,16 +28,13 @@ static inline void *sddf_memset(void *s, int c, size_t n)
 
 static inline void *sddf_memcpy(void *dest, const void *src, size_t n)
 {
-#if __has_builtin(__builtin_memcpy)
-    return __builtin_memcpy(dest, src, n);
-#else
+    // sddf_dprintf("memcpy from 0x%lx to 0x%lx of size 0x%lx\n", src, dest, n);
     unsigned char *to = dest;
     const unsigned char *from = src;
     while (n-- > 0) {
         *to++ = *from++;
     }
     return dest;
-#endif
 }
 
 static inline char *sddf_strncpy(char *dest, const char *restrict src,
@@ -59,15 +56,15 @@ static inline char *sddf_strncpy(char *dest, const char *restrict src,
 
 static inline int sddf_strcmp(const char *a, const char *b)
 {
-#if __has_builtin(__builtin_strcmp)
-    return __builtin_strcmp(a, b);
-#else
+// #if __has_builtin(__builtin_strcmp)
+    // return __builtin_strcmp(a, b);
+// #else
     while (*a != '\0' && *b != '\0' && *a == *b) {
         a++;
         b++;
     }
     return (int)(*a) - *b;
-#endif
+// #endif
 }
 
 static inline int sddf_strncmp(const char *a, const char *b, size_t n)
@@ -121,15 +118,15 @@ static inline int sddf_memcmp(const void *a, const void *b, size_t n)
 
 static inline size_t sddf_strlen(const char *s)
 {
-#if __has_builtin(__builtin_strlen)
-    return __builtin_strlen(s);
-#else
-    const char *_s;
+// #if __has_builtin(__builtin_strlen)
+//     return __builtin_strlen(s);
+// #else
+    const char *_s = s;
     while (*_s != '\0') {
         _s++;
     }
-    return (size_t)(s_ - s);
-#endif
+    return (size_t)(_s - s);
+// #endif
 }
 
 

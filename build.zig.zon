@@ -1,0 +1,21 @@
+.{
+    .name = "sddf",
+    .version = "0.1.0",
+
+    .paths = .{
+        "drivers",
+        "benchmark",
+        "blk",
+        "i2c",
+        "include",
+        "libco",
+        "network",
+        "serial",
+        "sound",
+        "util",
+        "build.zig",
+        "build.zig.zon",
+        "LICENSE",
+        "README.md"
+    }
+}
