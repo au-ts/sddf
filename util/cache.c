@@ -1,3 +1,4 @@
+#include <microkit.h>
 #include <stdint.h>
 #include <sddf/util/cache.h>
 #include <sddf/util/util.h>
@@ -11,27 +12,23 @@
 #define LINE_START(a) ROUND_DOWN(a, CONFIG_L1_CACHE_LINE_SIZE_BITS)
 #define LINE_INDEX(a) (LINE_START(a)>>CONFIG_L1_CACHE_LINE_SIZE_BITS)
 
-static inline void
-dsb(void)
+static inline void dsb(void)
 {
     asm volatile("dsb sy" ::: "memory");
 }
 
-static inline void 
-dmb(void)
+static inline void dmb(void)
 {
     asm volatile("dmb sy" ::: "memory");
 }
 
-static inline void
-clean_and_invalidate_by_va(unsigned long vaddr)
+static inline void clean_and_invalidate_by_va(unsigned long vaddr)
 {
     asm volatile("dc civac, %0" : : "r"(vaddr));
     dsb();
 }
 
-static inline void
-clean_by_va(unsigned long vaddr)
+static inline void clean_by_va(unsigned long vaddr)
 {
     asm volatile("dc cvac, %0" : : "r"(vaddr));
     dmb();
@@ -42,8 +39,7 @@ clean_by_va(unsigned long vaddr)
 //
 // [1]: https://developer.arm.com/documentation/ddi0595/2021-06/AArch64-Instructions/DC-IVAC--Data-or-unified-Cache-line-Invalidate-by-VA-to-PoC
 
-void
-cache_clean_and_invalidate(unsigned long start, unsigned long end)
+void cache_clean_and_invalidate(unsigned long start, unsigned long end)
 {
     unsigned long line;
     unsigned long index;
@@ -59,8 +55,7 @@ cache_clean_and_invalidate(unsigned long start, unsigned long end)
     }
 }
 
-void
-cache_clean(unsigned long start, unsigned long end)
+void cache_clean(unsigned long start, unsigned long end)
 {
     unsigned long line;
     unsigned long index;

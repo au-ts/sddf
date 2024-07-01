@@ -47,7 +47,7 @@ typedef struct net_queue_handle {
  *
  * @return number of buffers enqueued into a queue.
  */
-static inline uint32_t net_queue_size(net_queue_t *queue)
+static inline uint16_t net_queue_size(net_queue_t *queue)
 {
     return queue->tail - queue->head;
 }

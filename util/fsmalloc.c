@@ -1,6 +1,6 @@
 #include <stdint.h>
-#include <sddf/blk/bitarray.h>
-#include <sddf/blk/fsmalloc.h>
+#include <sddf/util/bitarray.h>
+#include <sddf/util/fsmalloc.h>
 #include <sddf/util/util.h>
 
 /**

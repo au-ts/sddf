@@ -28,7 +28,7 @@
 #define SERIAL_DRIVER_NAME "uart"
 
 #define SERIAL_QUEUE_SIZE                          0x1000
-#define SERIAL_DATA_REGION_SIZE                    0x200000
+#define SERIAL_DATA_REGION_SIZE                    0x2000
 
 #define SERIAL_TX_DATA_REGION_SIZE_DRIV            SERIAL_DATA_REGION_SIZE
 #define SERIAL_TX_DATA_REGION_SIZE_CLI0            SERIAL_DATA_REGION_SIZE

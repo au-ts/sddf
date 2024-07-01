@@ -6,9 +6,10 @@
 #pragma once
 
 #include <stddef.h>
-#include <microkit.h>
 
+#ifndef ARRAY_SIZE
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(x[0]))
+#endif
 #define ALIGN(x, align)   (((x) + (align) - 1) & ~((align) - 1))
 
 #define BIT(nr) (1UL << (nr))
@@ -61,20 +62,12 @@ void _assert_fail(const char  *assertion, const char  *file, unsigned int line, 
 
 static inline int sddf_isspace(int ch)
 {
-#if __has_builtin(__builtin_isspace)
-    return __builtin_isspace(ch);
-#else
     return ch == ' ' || ch == '\f' || ch == '\n' || ch == '\r' || ch == '\t' || ch == '\v';
-#endif
 }
 
 static inline int sddf_isdigit(int ch)
 {
-#if __has_builtin(__builtin_isdigit)
-    return __builtin_isdigit(ch);
-#else
     return ch >= '0' && ch <= '9';
-#endif
 }
 
 static inline int sddf_atoi(const char *str)

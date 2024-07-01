@@ -17,7 +17,6 @@ endif
 
 ifeq ($(strip $(TOOLCHAIN)),)
 	TOOLCHAIN := aarch64-none-elf
-	LIBC := $(dir $(realpath $(shell aarch64-none-elf-gcc --print-file-name libc.a)))	
 endif
 
 BUILD_DIR ?= build
@@ -69,14 +68,13 @@ CFLAGS := -mcpu=$(CPU)\
 	  -g3 -O3 -Wall \
 	  -Wno-unused-function -Werror \
 	  -MD
-LDFLAGS := -L$(BOARD_DIR)/lib -L$(SDDF)/lib -L${LIBC}
-LIBS := --start-group -lmicrokit -Tmicrokit.ld -lc libsddf_util_debug.a --end-group
+LDFLAGS := -L$(BOARD_DIR)/lib -L$(SDDF)/lib
+LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
 
 IMAGE_FILE = loader.img
 REPORT_FILE = report.txt
 CFLAGS += -I$(BOARD_DIR)/include \
 	-I${TOP}/include	\
-	-I$(UART_DRIVER)/include \
 	-I$(SDDF)/include \
 	-I$(SERIAL_CONFIG_INCLUDE)
 

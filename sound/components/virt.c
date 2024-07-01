@@ -3,6 +3,7 @@
 #include <microkit.h>
 #include <sddf/sound/queue.h>
 #include <sddf/util/util.h>
+#include <sddf/util/printf.h>
 #include <sddf/util/cache.h>
 
 #define DRIVER_CH 0

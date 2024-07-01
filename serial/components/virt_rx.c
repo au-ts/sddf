@@ -1,13 +1,10 @@
 #include <stdbool.h>
 #include <stdint.h>
-#include <stdlib.h>
-#include <ctype.h>
 #include <microkit.h>
 #include <sddf/serial/queue.h>
 #include <sddf/util/string.h>
 #include <sddf/util/printf.h>
 #include <serial_config.h>
-#include "uart.h"
 
 #define DRIVER_CH 0
 #define CLIENT_OFFSET 1
