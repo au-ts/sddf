@@ -14,8 +14,6 @@
 
 /* Size of a single block to be transferred */
 #define BLK_TRANSFER_SIZE 4096
-/* Maximum number of slots in each queue. Can be configured. */
-#define BLK_QUEUE_SIZE 1024
 /* Device serial number max string length */
 #define BLK_MAX_SERIAL_NUMBER 63
 
@@ -47,7 +45,7 @@ typedef enum blk_response_status {
 /* Request struct contained in request queue */
 typedef struct blk_request {
     blk_request_code_t code; /* request code */
-    uintptr_t addr; /* encoded dma address of data */
+    uint64_t io_or_offset; /* offset of buffer within buffer memory region or io address of buffer */
     uint32_t block_number; /* block number to read/write to */
     uint16_t count; /* number of blocks to read/write */
     uint32_t id; /* stores request ID */
@@ -65,14 +63,14 @@ typedef struct blk_req_queue {
     uint32_t head;
     uint32_t tail;
     bool plugged; /* prevent requests from being dequeued when plugged */
-    blk_request_t buffers[BLK_QUEUE_SIZE];
+    blk_request_t buffers[];
 } blk_req_queue_t;
 
 /* Circular buffer containing responses */
 typedef struct blk_resp_queue {
     uint32_t head;
     uint32_t tail;
-    blk_response_t buffers[BLK_QUEUE_SIZE];
+    blk_response_t buffers[];
 } blk_resp_queue_t;
 
 /* A queue handle for queueing/dequeueing request and responses */
@@ -95,7 +93,6 @@ static inline void blk_queue_init(blk_queue_handle_t *h,
                                   blk_resp_queue_t *response,
                                   uint32_t queue_size)
 {
-    assert(queue_size <= BLK_QUEUE_SIZE);
     h->req_queue = request;
     h->resp_queue = response;
     h->queue_size = queue_size;
@@ -177,6 +174,8 @@ static inline int blk_resp_queue_size(blk_queue_handle_t *h)
  * Enqueue an element into the request queue.
  *
  * @param h queue handle containing request queue to enqueue to.
+ * @param code request code.
+ * @param io_or_offset offset of buffer within buffer memory region or io address of buffer.
  * @param block_number block number to read/write to.
  * @param count the number of blocks to read/write
  * @param id request ID to identify this request.
@@ -185,7 +184,7 @@ static inline int blk_resp_queue_size(blk_queue_handle_t *h)
  */
 static inline int blk_enqueue_req(blk_queue_handle_t *h,
                                   blk_request_code_t code,
-                                  uintptr_t addr,
+                                  uintptr_t io_or_offset,
                                   uint32_t block_number,
                                   uint16_t count,
                                   uint32_t id)
@@ -200,7 +199,7 @@ static inline int blk_enqueue_req(blk_queue_handle_t *h,
     brqp = h->req_queue;
     brp = brqp->buffers + (brqp->tail % h->queue_size);
     brp->code = code;
-    brp->addr = addr;
+    brp->io_or_offset = io_or_offset;
     brp->block_number = block_number;
     brp->count = count;
     brp->id = id;
@@ -250,7 +249,7 @@ static inline int blk_enqueue_resp(blk_queue_handle_t *h,
  *
  * @param h queue handle containing request queue to dequeue from.
  * @param code pointer to request code.
- * @param addr pointer to encoded dma address of data.
+ * @param io_or_offset pointer to offset of buffer within buffer memory region or io address of buffer
  * @param block_number pointer to  block number to read/write to.
  * @param count pointer to number of blocks to read/write.
  * @param id pointer to store request ID.
@@ -259,7 +258,7 @@ static inline int blk_enqueue_resp(blk_queue_handle_t *h,
  */
 static inline int blk_dequeue_req(blk_queue_handle_t *h,
                                   blk_request_code_t *code,
-                                  uintptr_t *addr,
+                                  uintptr_t *io_or_offset,
                                   uint32_t *block_number,
                                   uint16_t *count,
                                   uint32_t *id)
@@ -273,7 +272,7 @@ static inline int blk_dequeue_req(blk_queue_handle_t *h,
     brqp = h->req_queue;
     brp = brqp->buffers + (brqp->head % h->queue_size);
     *code = brp->code;
-    *addr = brp->addr;
+    *io_or_offset = brp->io_or_offset;
     *block_number = brp->block_number;
     *count = brp->count;
     *id = brp->id;

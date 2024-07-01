@@ -9,7 +9,9 @@
 #include <sddf/util/printf.h>
 #include <sddf/util/string.h>
 #include <sddf/util/util.h>
+#include <blk_config.h>
 
+/* Uncomment this to enable debug logging */
 // #define DEBUG_BLK_VIRT
 
 #if defined(DEBUG_BLK_VIRT)
@@ -17,36 +19,27 @@
 #else
 #define LOG_BLK_VIRT(...) do{}while(0)
 #endif
-
-
 #define LOG_BLK_VIRT_ERR(...) do{ sddf_dprintf("BLK_VIRT|ERROR: "); sddf_dprintf(__VA_ARGS__); }while(0)
 
-/* TODO: Currently only works for 1 and 2 clients, need to handle multiple clients */
-
-#define MAX_BLK_NUM_CLIENTS 16
 
 #define DRIVER_CH 1
-#define CLIENT_CH_1 3
-#define CLIENT_CH_2 4
+#define CLI_CH_OFFSET 3
 
-#define MEM_REGION_SIZE 0x200000 //@ericc: autogen this from microkit xml system file
-#define DRV_MAX_DATA_BUFFERS (MEM_REGION_SIZE / BLK_TRANSFER_SIZE)
+#define BLK_NUM_BUFFERS_DRIV (BLK_DATA_REGION_SIZE_DRIV / BLK_TRANSFER_SIZE)
 
-#define REQBK_SIZE (BLK_NUM_CLIENTS * BLK_QUEUE_SIZE)
+#define REQBK_SIZE BLK_QUEUE_SIZE_DRIV
 
 blk_storage_info_t *blk_config_driver;
 blk_req_queue_t *blk_req_queue_driver;
 blk_resp_queue_t *blk_resp_queue_driver;
 uintptr_t blk_data_driver;
 
-uintptr_t blk_data;
-uintptr_t blk_data2;
 blk_storage_info_t *blk_config;
-blk_storage_info_t *blk_config2;
 blk_req_queue_t *blk_req_queue;
-blk_req_queue_t *blk_req_queue2;
 blk_resp_queue_t *blk_resp_queue;
-blk_resp_queue_t *blk_resp_queue2;
+uintptr_t blk_data;
+
+blk_queue_handle_t drv_h;
 
 /* Client specific info */
 typedef struct client {
@@ -55,14 +48,13 @@ typedef struct client {
     uint32_t start_sector;
     uint32_t sectors;
 } client_t;
-client_t clients[MAX_BLK_NUM_CLIENTS];
+client_t clients[BLK_NUM_CLIENTS];
 
-blk_queue_handle_t drv_h;
 
 /* Fixed size memory allocator */
 static fsmalloc_t fsmalloc;
 static bitarray_t fsmalloc_avail_bitarr;
-static word_t fsmalloc_avail_bitarr_words[roundup_bits2words64(DRV_MAX_DATA_BUFFERS)];
+static word_t fsmalloc_avail_bitarr_words[roundup_bits2words64(BLK_NUM_BUFFERS_DRIV)];
 
 /* Bookkeeping struct per request */
 typedef struct reqbk {
@@ -120,16 +112,13 @@ static void partitions_init()
         return;
     }
 
-    blk_config->sector_size = blk_config_driver->sector_size;
-    blk_config->size = clients[0].sectors / (BLK_TRANSFER_SIZE / MSDOS_MBR_SECTOR_SIZE);
-    blk_config->read_only = false;
-    __atomic_store_n(&blk_config->ready, true, __ATOMIC_RELEASE);
-#if BLK_NUM_CLIENTS > 1
-    blk_config2->sector_size = blk_config_driver->sector_size;
-    blk_config2->size = clients[1].sectors / (BLK_TRANSFER_SIZE / MSDOS_MBR_SECTOR_SIZE);
-    blk_config2->read_only = false;
-    __atomic_store_n(&blk_config2->ready, true, __ATOMIC_RELEASE);
-#endif
+    for (int i = 0; i < BLK_NUM_CLIENTS; i++) {
+        blk_storage_info_t *curr_blk_config = blk_virt_cli_config_info(blk_config, i);
+        curr_blk_config->sector_size = blk_config_driver->sector_size;
+        curr_blk_config->size = clients[i].sectors / (BLK_TRANSFER_SIZE / MSDOS_MBR_SECTOR_SIZE);
+        curr_blk_config->read_only = false;
+        __atomic_store_n(&curr_blk_config->ready, true, __ATOMIC_RELEASE);
+    }
 }
 
 static void request_mbr()
@@ -144,7 +133,7 @@ static void request_mbr()
     assert(!err);
     reqbk[mbr_req_id] = mbr_req_data;
 
-    err = blk_enqueue_req(&drv_h, READ_BLOCKS, mbr_addr, 0, 1, mbr_req_id);
+    err = blk_enqueue_req(&drv_h, READ_BLOCKS, mbr_addr - blk_data_driver, 0, 1, mbr_req_id);
     assert(!err);
 
     microkit_notify_delayed(DRIVER_CH);
@@ -185,25 +174,23 @@ void init(void)
 {
     while (!__atomic_load_n(&blk_config_driver->ready, __ATOMIC_ACQUIRE));
 
-    // Initialise driver queue handle
-    blk_queue_init(&drv_h, blk_req_queue_driver, blk_resp_queue_driver, BLK_QUEUE_SIZE);
+    // Initialise client queues
+    for (int i = 0; i < BLK_NUM_CLIENTS; i++) {
+        blk_req_queue_t *curr_req = blk_virt_cli_req_queue(blk_req_queue, i);
+        blk_resp_queue_t *curr_resp = blk_virt_cli_resp_queue(blk_resp_queue, i);
+        uint32_t queue_size = blk_virt_cli_queue_size(i);
+        blk_queue_init(&clients[i].queue_h, curr_req, curr_resp, queue_size);
 
-    // Initialise client queue handles
-    blk_queue_init(&(clients[0].queue_h), blk_req_queue, blk_resp_queue, BLK_QUEUE_SIZE);
-#if BLK_NUM_CLIENTS > 1
-    blk_queue_init(&(clients[1].queue_h), blk_req_queue2, blk_resp_queue2, BLK_QUEUE_SIZE);
-#endif
+        clients[i].ch = CLI_CH_OFFSET + i;
+    }
+
+    // Initialise driver queue
+    blk_queue_init(&drv_h, blk_req_queue_driver, blk_resp_queue_driver, BLK_QUEUE_SIZE_DRIV);
 
     // Initialise fixed size memory allocator and ialloc
     ialloc_init(&ialloc, ialloc_idxlist, REQBK_SIZE);
-    fsmalloc_init(&fsmalloc, blk_data_driver, BLK_TRANSFER_SIZE, DRV_MAX_DATA_BUFFERS, &fsmalloc_avail_bitarr,
-                  fsmalloc_avail_bitarr_words, roundup_bits2words64(DRV_MAX_DATA_BUFFERS));
-
-    // Initialise client channels
-    clients[0].ch = CLIENT_CH_1;
-#if BLK_NUM_CLIENTS > 1
-    clients[1].ch = CLIENT_CH_2;
-#endif
+    fsmalloc_init(&fsmalloc, blk_data_driver, BLK_TRANSFER_SIZE, BLK_NUM_BUFFERS_DRIV, &fsmalloc_avail_bitarr,
+                  fsmalloc_avail_bitarr_words, roundup_bits2words64(BLK_NUM_BUFFERS_DRIV));
 
     request_mbr();
 }
@@ -278,9 +265,11 @@ static void handle_driver()
 static void handle_client(int cli_id)
 {
     blk_queue_handle_t h = clients[cli_id].queue_h;
+    uintptr_t data_base = blk_virt_cli_data_region(blk_data, cli_id);
+    uint64_t data_region_size = blk_virt_cli_data_region_size(cli_id);
 
     blk_request_code_t cli_code;
-    uintptr_t cli_addr;
+    uintptr_t cli_offset;
     uint32_t cli_block_number;
     uint16_t cli_count;
     uint32_t cli_req_id;
@@ -291,16 +280,24 @@ static void handle_client(int cli_id)
 
     int err = 0;
     while (!blk_req_queue_empty(&h)) {
-        err = blk_dequeue_req(&h, &cli_code, &cli_addr, &cli_block_number, &cli_count, &cli_req_id);
+        err = blk_dequeue_req(&h, &cli_code, &cli_offset, &cli_block_number, &cli_count, &cli_req_id);
         assert(!err);
 
         drv_block_number = cli_block_number + (clients[cli_id].start_sector / (BLK_TRANSFER_SIZE / MSDOS_MBR_SECTOR_SIZE));
 
-        // Check if client request is within its allocated bounds
         if (cli_code == READ_BLOCKS || cli_code == WRITE_BLOCKS) {
+            // Check if client request is within its allocated bounds
             unsigned long client_sectors = clients[cli_id].sectors / (BLK_TRANSFER_SIZE / MSDOS_MBR_SECTOR_SIZE);
             unsigned long client_start_sector = clients[cli_id].start_sector / (BLK_TRANSFER_SIZE / MSDOS_MBR_SECTOR_SIZE);
             if (drv_block_number < client_start_sector || drv_block_number + cli_count > client_start_sector + client_sectors) {
+                err = blk_enqueue_resp(&h, SEEK_ERROR, 0, cli_req_id);
+                assert(!err);
+                continue;
+            }
+
+            // Check if client request offset is within its allocated bounds and is aligned to transfer size
+            if (cli_offset % BLK_TRANSFER_SIZE != 0 || (cli_offset + BLK_TRANSFER_SIZE * cli_count) > data_region_size) {
+                // @ericc: Potentially use a new error code? ADDR_OUT_OF_BOUNDS
                 err = blk_enqueue_resp(&h, SEEK_ERROR, 0, cli_req_id);
                 assert(!err);
                 continue;
@@ -322,7 +319,7 @@ static void handle_client(int cli_id)
             // Allocate driver data buffers
             fsmalloc_alloc(&fsmalloc, &drv_addr, cli_count);
             // Copy data buffers from client to driver
-            sddf_memcpy((void *)drv_addr, (void *)cli_addr, BLK_TRANSFER_SIZE * cli_count);
+            sddf_memcpy((void *)drv_addr, (void *)(cli_offset + data_base), BLK_TRANSFER_SIZE * cli_count);
             // Flush the cache
             cache_clean(drv_addr, drv_addr + (BLK_TRANSFER_SIZE * cli_count));
             break;
@@ -331,17 +328,16 @@ static void handle_client(int cli_id)
             if (blk_req_queue_full(&drv_h) || ialloc_full(&ialloc)) {
                 continue;
             }
-            drv_addr = cli_addr;
             break;
         }
 
         // Bookkeep client request and generate driver req ID
-        reqbk_t cli_data = {cli_id, cli_req_id, cli_addr, drv_addr, cli_count, cli_code};
+        reqbk_t cli_data = {cli_id, cli_req_id, cli_offset + data_base, drv_addr, cli_count, cli_code};
         err = ialloc_alloc(&ialloc, &drv_req_id);
         assert(!err);
         reqbk[drv_req_id] = cli_data;
 
-        err = blk_enqueue_req(&drv_h, cli_code, drv_addr, drv_block_number, cli_count, drv_req_id);
+        err = blk_enqueue_req(&drv_h, cli_code, drv_addr - blk_data_driver, drv_block_number, cli_count, drv_req_id);
         assert(!err);
     }
 }
