@@ -39,6 +39,8 @@ blk_req_queue_t *blk_req_queue_driver;
 blk_resp_queue_t *blk_resp_queue_driver;
 uintptr_t blk_data_driver;
 
+uintptr_t blk_data;
+uintptr_t blk_data2;
 blk_storage_info_t *blk_config;
 blk_storage_info_t *blk_config2;
 blk_req_queue_t *blk_req_queue;
