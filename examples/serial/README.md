@@ -4,6 +4,8 @@ This is an example to show multiple clients being used with a UART driver.
 
 ## Building
 
+### Make
+
 ```sh
 make MICROKIT_SDK=<path/to/sdk> MICROKIT_BOARD=<board> MICROKIT_CONFIG=<debug/release/benchmark>
 ```
@@ -18,6 +20,22 @@ After building, the system image to load will be `build/loader.img`.
 
 If you wish to simulate on the QEMU ARM virt platform, you can append `qemu` to your make command
 after building for qemu_arm_virt.
+
+### Zig
+
+You can also build this example with the Zig build system:
+```sh
+zig build -Dsdk=/path/to/sdk -Dboard=<board>
+```
+
+The options for `<board>` are the same as the Makefile.
+
+You can simulate QEMU with:
+```sh
+zig build -Dsdk=/path/to/sdk -Dboard=qemu_arm_virt qemu
+```
+
+The final bootable image will be in `zig-out/bin/loader.img`.
 
 ## Configuration
 
