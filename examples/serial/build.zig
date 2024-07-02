@@ -4,13 +4,13 @@ const MicrokitBoard = enum { qemu_arm_virt, odroidc4, maaxboard };
 
 const Target = struct {
     board: MicrokitBoard,
-    zig_target: std.zig.CrossTarget,
+    zig_target: std.Target.Query,
 };
 
 const targets = [_]Target{
     .{
         .board = MicrokitBoard.qemu_arm_virt,
-        .zig_target = std.zig.CrossTarget{
+        .zig_target = std.Target.Query{
             .cpu_arch = .aarch64,
             .cpu_model = .{ .explicit = &std.Target.arm.cpu.cortex_a53 },
             .os_tag = .freestanding,
@@ -19,7 +19,7 @@ const targets = [_]Target{
     },
     .{
         .board = MicrokitBoard.odroidc4,
-        .zig_target = std.zig.CrossTarget{
+        .zig_target = std.Target.Query{
             .cpu_arch = .aarch64,
             .cpu_model = .{ .explicit = &std.Target.arm.cpu.cortex_a55 },
             .os_tag = .freestanding,
@@ -28,7 +28,7 @@ const targets = [_]Target{
     },
     .{
         .board = MicrokitBoard.maaxboard,
-        .zig_target = std.zig.CrossTarget{
+        .zig_target = std.Target.Query{
             .cpu_arch = .aarch64,
             .cpu_model = .{ .explicit = &std.Target.arm.cpu.cortex_a53 },
             .os_tag = .freestanding,
@@ -37,7 +37,7 @@ const targets = [_]Target{
     }
 };
 
-fn findTarget(board: MicrokitBoard) std.zig.CrossTarget {
+fn findTarget(board: MicrokitBoard) std.Target.Query {
     for (targets) |target| {
         if (board == target.board) {
             return target.zig_target;
@@ -88,8 +88,9 @@ pub fn build(b: *std.Build) void {
         .sdk = microkit_sdk,
         .config = @as([]const u8, microkit_config),
         .board = @as([]const u8, microkit_board),
+        .serial_config_include = @as([]const u8, "include/serial_config"),
     });
-    
+
     const driver_class = switch (microkit_board_option.?) {
         .qemu_arm_virt => "arm",
         .odroidc4 => "meson",
@@ -97,42 +98,34 @@ pub fn build(b: *std.Build) void {
     };
 
     const driver = sddf_dep.artifact(b.fmt("driver_uart_{s}.elf", .{ driver_class }));
-    b.installArtifact(driver);
+    // This is required because the SDF file is expecting a different name to the artifact we
+    // are dealing with.
+    const driver_install = b.addInstallArtifact(driver, .{ .dest_sub_path = "uart_driver.elf" });
 
-    const virt_rx = sddf_dep.artifact("serial_component_virt_rx.elf");
+    const virt_rx = sddf_dep.artifact("serial_virt_rx.elf");
     b.installArtifact(virt_rx);
 
-    const virt_tx = sddf_dep.artifact("serial_component_virt_tx.elf");
+    const virt_tx = sddf_dep.artifact("serial_virt_tx.elf");
     b.installArtifact(virt_tx);
 
-    const serial_server_1 = b.addExecutable(.{
-        .name = "serial_server_1.elf",
+    const serial_server = b.addExecutable(.{
+        .name = "serial_server.elf",
         .target = target,
         .optimize = optimize,
         .strip = false,
     });
 
-    serial_server_1.addCSourceFile(.{ .file = b.path("serial_server.c"), .flags = &.{ "-DSERIAL_SERVER_NUMBER=1", "-fno-sanitize=undefined" } });
-    serial_server_1.addIncludePath(.{ .path = libmicrokit_include });
-    serial_server_1.addIncludePath(sddf_dep.path("include"));
-    serial_server_1.addObjectFile(.{ .path = libmicrokit });
-    serial_server_1.setLinkerScriptPath(.{ .path = libmicrokit_linker_script });
+    serial_server.addCSourceFile(.{ .file = b.path("serial_server.c"), .flags = &.{ "-fno-sanitize=undefined" } });
+    serial_server.addIncludePath(sddf_dep.path("include"));
+    serial_server.addIncludePath(b.path("include/serial_config"));
+    serial_server.linkLibrary(sddf_dep.artifact("util"));
+    serial_server.linkLibrary(sddf_dep.artifact("util_putchar_serial"));
 
-    const serial_server_2 = b.addExecutable(.{
-        .name = "serial_server_2.elf",
-        .target = target,
-        .optimize = optimize,
-        .strip = false,
-    });
+    serial_server.addIncludePath(.{ .cwd_relative = libmicrokit_include });
+    serial_server.addObjectFile(.{ .cwd_relative = libmicrokit });
+    serial_server.setLinkerScriptPath(.{ .cwd_relative = libmicrokit_linker_script });
 
-    serial_server_2.addCSourceFile(.{ .file = b.path("serial_server.c"), .flags = &.{ "-DSERIAL_SERVER_NUMBER=2", "-fno-sanitize=undefined" } });
-    serial_server_2.addIncludePath(.{ .path = libmicrokit_include });
-    serial_server_2.addIncludePath(sddf_dep.path("include"));
-    serial_server_2.addObjectFile(.{ .path = libmicrokit });
-    serial_server_2.setLinkerScriptPath(.{ .path = libmicrokit_linker_script });
-
-    b.installArtifact(serial_server_1);
-    b.installArtifact(serial_server_2);
+    b.installArtifact(serial_server);
 
     const system_description_path = b.fmt("board/{s}/serial.system", .{microkit_board});
     const final_image_dest = b.getInstallPath(.bin, "./loader.img");
@@ -146,6 +139,7 @@ pub fn build(b: *std.Build) void {
         "-r", b.getInstallPath(.prefix, "./report.txt")
     });
     microkit_tool_cmd.step.dependOn(b.getInstallStep());
+    microkit_tool_cmd.step.dependOn(&driver_install.step);
     // Add the "microkit" step, and make it the default step when we execute `zig build`>
     const microkit_step = b.step("microkit", "Compile and build the final bootable image");
     microkit_step.dependOn(&microkit_tool_cmd.step);
