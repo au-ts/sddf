@@ -198,7 +198,7 @@ pub fn build(b: *std.Build) void {
     // TODO: This flag -DSERIAL_NUM_CLIENTS=3 needs to be configurable by the user of this dependency
     serial_virt_rx.addCSourceFile(.{
         .file = b.path("serial/components/virt_rx.c"),
-        .flags = &.{"-DSERIAL_NUM_CLIENTS=3", "-fno-sanitize=undefined"}
+        .flags = &.{"-fno-sanitize=undefined"}
     });
     serial_virt_rx.addIncludePath(serial_config_include);
     serial_virt_rx.addIncludePath(b.path("include"));
@@ -215,7 +215,7 @@ pub fn build(b: *std.Build) void {
     // TODO: This flag -DSERIAL_NUM_CLIENTS=3 -DSERIAL_TRANSFER_WITH_COLOUR needs to be configurable by the user of this dependency
     serial_virt_tx.addCSourceFile(.{
         .file = b.path("serial/components/virt_tx.c"),
-        .flags = &.{"-DSERIAL_NUM_CLIENTS=3", "-DSERIAL_TRANSFER_WITH_COLOUR", "-fno-sanitize=undefined"}
+        .flags = &.{"-fno-sanitize=undefined"}
     });
     serial_virt_tx.addIncludePath(serial_config_include);
     serial_virt_tx.addIncludePath(b.path("include"));
