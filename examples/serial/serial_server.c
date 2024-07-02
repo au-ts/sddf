@@ -1,4 +1,3 @@
-#include <ctype.h>
 #include <microkit.h>
 #include <sddf/serial/queue.h>
 #include <sddf/util/printf.h>
