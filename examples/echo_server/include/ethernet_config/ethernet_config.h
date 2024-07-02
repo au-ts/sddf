@@ -2,7 +2,6 @@
 
 #include <microkit.h>
 #include <sddf/util/string.h>
-#include <sddf/util/util.h>
 #include <sddf/network/queue.h>
 #include <sddf/util/util.h>
 

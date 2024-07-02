@@ -1,6 +1,5 @@
 #include <stdbool.h>
 #include <stdint.h>
-#include <string.h>
 #include <microkit.h>
 #include <sddf/network/queue.h>
 #include <sddf/network/constants.h>
