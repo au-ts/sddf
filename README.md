@@ -39,29 +39,10 @@ The specific version used for testing is:
 
 ### Microkit SDK
 
-The sDDF is built using the [seL4 Microkit](https://github.com/seL4/microkit) but currently relies
-on some changes to the Microkit that have not yet been upstreamed.
+The sDDF is built using the [seL4 Microkit](https://github.com/seL4/microkit) (version 1.4.0).
 
-Below are instructions to acquire the Microkit SDK for use with sDDF depending on your development
-environment.
-
-On Linux (x86-64):
-```sh
-wget https://trustworthy.systems/Downloads/microkit/microkit-sdk-dev-8e40fe8-linux-x86-64.tar.gz
-tar xf microkit-sdk-dev-8e40fe8-linux-x86-64.tar.gz
-```
-
-On macOS (Apple Silicon/AArch64):
-```sh
-wget https://trustworthy.systems/Downloads/microkit/microkit-sdk-dev-8e40fe8-macos-aarch64.tar.gz
-tar xf microkit-sdk-dev-8e40fe8-macos-aarch64.tar.gz
-```
-
-On macOS (Intel/x86-64):
-```sh
-wget https://trustworthy.systems/Downloads/microkit/microkit-sdk-dev-8e40fe8-macos-x86-64.tar.gz
-tar xf microkit-sdk-dev-8e40fe8-macos-x86-64.tar.gz
-```
+You can download version 1.4.0 of Microkit SDK from
+[here](https://github.com/seL4/microkit/releases/tag/1.4.0).
 
 ## Developing sDDF
 

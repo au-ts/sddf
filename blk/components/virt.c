@@ -150,7 +150,7 @@ static void request_mbr()
     err = blk_enqueue_req(&drv_h, READ_BLOCKS, BLK_DRIV_TO_PADDR(mbr_addr), 0, 1, mbr_req_id);
     assert(!err);
 
-    microkit_notify_delayed(DRIVER_CH);
+    microkit_deferred_notify(DRIVER_CH);
 }
 
 static bool handle_mbr_reply()
@@ -372,6 +372,6 @@ void notified(microkit_channel ch)
         for (int i = 0; i < BLK_NUM_CLIENTS; i++) {
             handle_client(i);
         }
-        microkit_notify_delayed(DRIVER_CH);
+        microkit_deferred_notify(DRIVER_CH);
     }
 }

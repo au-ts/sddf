@@ -170,7 +170,7 @@ void receive(void)
 
     if (transmitted && net_require_signal_active(&tx_queue)) {
         net_cancel_signal_active(&tx_queue);
-        microkit_notify_delayed(TX_CH);
+        microkit_deferred_notify(TX_CH);
     }
 }
 

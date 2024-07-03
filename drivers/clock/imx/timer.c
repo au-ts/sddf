@@ -83,7 +83,7 @@ void notified(microkit_channel ch)
         return;
     }
 
-    microkit_irq_ack_delayed(ch);
+    microkit_deferred_irq_ack(ch);
 
     uint32_t sr = gpt[SR];
     gpt[SR] = sr;

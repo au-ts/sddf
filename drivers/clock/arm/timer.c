@@ -143,7 +143,7 @@ void init()
 void notified(microkit_channel ch)
 {
     assert(ch == IRQ_CH);
-    microkit_irq_ack_delayed(ch);
+    microkit_deferred_irq_ack(ch);
 
     generic_timer_set_compare(UINT64_MAX);
     uint64_t curr_time = freq_cycles_and_hz_to_ns(get_ticks(), timer_freq);

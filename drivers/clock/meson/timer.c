@@ -92,7 +92,7 @@ void notified(microkit_channel ch)
         return;
     }
 
-    microkit_irq_ack_delayed(ch);
+    microkit_deferred_irq_ack(ch);
     regs->mux &= ~TIMER_A_EN;
 
     uint64_t curr_time = get_ticks();
