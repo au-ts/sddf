@@ -160,10 +160,10 @@ serial() {
 }
 
 # Only run the examples that have been enabled
-# $NETWORK && network
+$NETWORK && network
 $I2C && i2c
-# $TIMER && timer
-# $SERIAL && serial
+$TIMER && timer
+$SERIAL && serial
 
 echo ""
 echo "CI|INFO: Passed all sDDF tests"
