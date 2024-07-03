@@ -31,6 +31,9 @@ uintptr_t tx_active;
 #define TX_COUNT 256
 #define MAX_COUNT MAX(RX_COUNT, TX_COUNT)
 
+/* The same as Linux's default for pause frame timeout */
+const uint32_t pause_time = 0xffff;
+
 struct descriptor {
     uint32_t status;
     uint32_t cntl;
@@ -247,13 +250,23 @@ static void eth_setup(void)
     eth_mac->macaddr0hi = h;
 
     eth_dma->busmode = PRIORXTX_11 | ((DMA_PBL << TX_PBL_SHFT) & TX_PBL_MASK);
-    eth_dma->opmode = STOREFORWARD;
+    /*
+     * Operate in store-and-forward mode.
+     * Send pause frames when there's only 1k of fifo left,
+     * stop sending them when there is 2k of fifo left.
+     * Continue DMA on 2nd frame while updating status on first
+     */
+    eth_dma->opmode = STOREFORWARD | EN_FLOWCTL | (0 << FLOWCTL_SHFT) | (0 < DISFLOWCTL_SHFT) | TX_OPSCND;
     eth_mac->conf = FULLDPLXMODE;
 
     eth_dma->rxdesclistaddr = hw_ring_buffer_paddr;
     eth_dma->txdesclistaddr = hw_ring_buffer_paddr + (sizeof(struct descriptor) * RX_COUNT);
 
     eth_mac->framefilt |= PMSCUOUS_MODE;
+
+    uint32_t flow_ctrl = GMAC_FLOW_CTRL_UP | GMAC_FLOW_CTRL_RFE | GMAC_FLOW_CTRL_TFE;
+    flow_ctrl |= (pause_time << GMAC_FLOW_CTRL_PT_SHIFT);
+    eth_mac->flowcontrol = flow_ctrl;
 }
 
 void init(void)
