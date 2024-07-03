@@ -34,7 +34,7 @@ else ifeq ($(strip $(MICROKIT_BOARD)), maaxboard)
 	export UART_DRIV_DIR := imx
 	export TIMER_DRV_DIR := imx
 	export CPU := cortex-a53
-else ifeq ($(strip $(MICROKIT_BOARD)), qemu_arm_virt)
+else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
 	export DRIV_DIR := virtio
 	export UART_DRIV_DIR := arm
 	export TIMER_DRV_DIR := arm

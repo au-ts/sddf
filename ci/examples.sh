@@ -109,7 +109,7 @@ build_serial_zig() {
 }
 
 network() {
-    BOARDS=("odroidc4" "imx8mm_evk" "maaxboard" "qemu_arm_virt")
+    BOARDS=("odroidc4" "imx8mm_evk" "maaxboard" "qemu_virt_aarch64")
     CONFIGS=("debug" "release" "benchmark")
     for BOARD in "${BOARDS[@]}"
     do
@@ -134,7 +134,7 @@ i2c() {
 }
 
 timer() {
-    BOARDS=("odroidc4" "qemu_arm_virt")
+    BOARDS=("odroidc4" "qemu_virt_aarch64")
     CONFIGS=("debug" "release")
     for BOARD in "${BOARDS[@]}"
     do
@@ -147,7 +147,7 @@ timer() {
 }
 
 serial() {
-    BOARDS=("odroidc4" "qemu_arm_virt" "maaxboard")
+    BOARDS=("odroidc4" "qemu_virt_aarch64" "maaxboard")
     CONFIGS=("debug" "release")
     for BOARD in "${BOARDS[@]}"
     do

@@ -1,7 +1,7 @@
 const std = @import("std");
 
 const MicrokitBoard = enum {
-    qemu_arm_virt,
+    qemu_virt_aarch64,
     odroidc4
 };
 
@@ -12,7 +12,7 @@ const Target = struct {
 
 const targets = [_]Target{
     .{
-        .board = MicrokitBoard.qemu_arm_virt,
+        .board = MicrokitBoard.qemu_virt_aarch64,
         .zig_target = std.Target.Query{
             .cpu_arch = .aarch64,
             .cpu_model = .{ .explicit = &std.Target.arm.cpu.cortex_a53 },
@@ -83,7 +83,7 @@ pub fn build(b: *std.Build) void {
     });
 
     const driver_class = switch (microkit_board_option.?) {
-        .qemu_arm_virt => "arm",
+        .qemu_virt_aarch64 => "arm",
         .odroidc4 => "meson",
     };
 
@@ -128,7 +128,7 @@ pub fn build(b: *std.Build) void {
     b.default_step = microkit_step;
 
     const loader_arg = b.fmt("loader,file={s},addr=0x70000000,cpu-num=0", .{final_image_dest});
-    if (std.mem.eql(u8, microkit_board, "qemu_arm_virt")) {
+    if (std.mem.eql(u8, microkit_board, "qemu_virt_aarch64")) {
         const qemu_cmd = b.addSystemCommand(&[_][]const u8{
             "qemu-system-aarch64",
             "-machine",

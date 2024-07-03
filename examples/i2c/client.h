@@ -1,3 +1,6 @@
+#include <stdbool.h>
+#include <stdint.h>
+
 #define I2C_VIRTUALISER_CH (0)
 #define TIMER_CH (1)
 
