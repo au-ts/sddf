@@ -297,7 +297,6 @@ static void handle_client(int cli_id)
 
             // Check if client request offset is within its allocated bounds and is aligned to transfer size
             if (cli_offset % BLK_TRANSFER_SIZE != 0 || (cli_offset + BLK_TRANSFER_SIZE * cli_count) > cli_data_region_size) {
-                // @ericc: Potentially use a new error code? ADDR_OUT_OF_BOUNDS
                 err = blk_enqueue_resp(&h, SEEK_ERROR, 0, cli_req_id);
                 assert(!err);
                 continue;
