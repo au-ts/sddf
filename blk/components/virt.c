@@ -265,8 +265,8 @@ static void handle_driver()
 static void handle_client(int cli_id)
 {
     blk_queue_handle_t h = clients[cli_id].queue_h;
-    uintptr_t data_base = blk_virt_cli_data_region(blk_data, cli_id);
-    uint64_t data_region_size = blk_virt_cli_data_region_size(cli_id);
+    uintptr_t cli_data_base = blk_virt_cli_data_region(blk_data, cli_id);
+    uint64_t cli_data_region_size = blk_virt_cli_data_region_size(cli_id);
 
     blk_request_code_t cli_code;
     uintptr_t cli_offset;
@@ -296,7 +296,7 @@ static void handle_client(int cli_id)
             }
 
             // Check if client request offset is within its allocated bounds and is aligned to transfer size
-            if (cli_offset % BLK_TRANSFER_SIZE != 0 || (cli_offset + BLK_TRANSFER_SIZE * cli_count) > data_region_size) {
+            if (cli_offset % BLK_TRANSFER_SIZE != 0 || (cli_offset + BLK_TRANSFER_SIZE * cli_count) > cli_data_region_size) {
                 // @ericc: Potentially use a new error code? ADDR_OUT_OF_BOUNDS
                 err = blk_enqueue_resp(&h, SEEK_ERROR, 0, cli_req_id);
                 assert(!err);
@@ -319,7 +319,7 @@ static void handle_client(int cli_id)
             // Allocate driver data buffers
             fsmalloc_alloc(&fsmalloc, &drv_addr, cli_count);
             // Copy data buffers from client to driver
-            sddf_memcpy((void *)drv_addr, (void *)(cli_offset + data_base), BLK_TRANSFER_SIZE * cli_count);
+            sddf_memcpy((void *)drv_addr, (void *)(cli_offset + cli_data_base), BLK_TRANSFER_SIZE * cli_count);
             // Flush the cache
             cache_clean(drv_addr, drv_addr + (BLK_TRANSFER_SIZE * cli_count));
             break;
@@ -332,7 +332,7 @@ static void handle_client(int cli_id)
         }
 
         // Bookkeep client request and generate driver req ID
-        reqbk_t cli_data = {cli_id, cli_req_id, cli_offset + data_base, drv_addr, cli_count, cli_code};
+        reqbk_t cli_data = {cli_id, cli_req_id, cli_offset + cli_data_base, drv_addr, cli_count, cli_code};
         err = ialloc_alloc(&ialloc, &drv_req_id);
         assert(!err);
         reqbk[drv_req_id] = cli_data;
