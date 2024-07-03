@@ -137,7 +137,7 @@ pub fn build(b: *std.Build) void {
     const libmicrokit_opt = b.option([]const u8, "libmicrokit", "Path to libmicrokit.a") orelse null;
     const libmicrokit_include_opt = b.option([]const u8, "libmicrokit_include", "Path to the libmicrokit include directory") orelse null;
     const libmicrokit_linker_script_opt = b.option([]const u8, "libmicrokit_linker_script", "Path to the libmicrokit linker script") orelse null;
-    const blk_num_clients_opt = b.option(u32, "blk_num_clients", "Number of block clients") orelse 2;
+    const blk_config_include_opt = b.option([]const u8, "blk_config_include", "Include path to block config header") orelse "";
     const serial_config_include_option = b.option([]const u8, "serial_config_include", "Include path to serial config header") orelse "";
 
     // TODO: Right now this is not super ideal. What's happening is that we do not
@@ -146,6 +146,7 @@ pub fn build(b: *std.Build) void {
     // empty string if it has not been provided, which could be an annoying to
     // debug error if you do need a serial config but forgot to pass one in.
     const serial_config_include = LazyPath{ .cwd_relative = serial_config_include_option };
+    const blk_config_include = LazyPath{ .cwd_relative = blk_config_include_opt };
     // libmicrokit
     // We're declaring explicitly here instead of with anonymous structs due to a bug. See https://github.com/ziglang/zig/issues/19832
     libmicrokit = LazyPath{ .cwd_relative = libmicrokit_opt.? };
@@ -202,9 +203,13 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
         .strip = false,
     });
-    blk_virt.addCSourceFile(.{ .file = b.path("blk/components/virt.c"), .flags = &.{b.fmt("-DBLK_NUM_CLIENTS={any}", .{blk_num_clients_opt})} });
-    blk_virt.addCSourceFiles(.{ .files = &.{ "blk/util/bitarray.c", "blk/util/fsmalloc.c", "blk/util/util.c", "util/cache.c" } });
+    blk_virt.addCSourceFile(.{
+        .file = b.path("blk/components/virt.c"),
+        .flags = &.{"-fno-sanitize=undefined"}
+    });
+    blk_virt.addIncludePath(blk_config_include);
     blk_virt.addIncludePath(b.path("include"));
+    blk_virt.linkLibrary(util);
     blk_virt.linkLibrary(util_putchar_debug);
     b.installArtifact(blk_virt);
 
