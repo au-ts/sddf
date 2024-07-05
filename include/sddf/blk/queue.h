@@ -10,7 +10,6 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include <sddf/util/fence.h>
-#include <sddf/util/util.h>
 
 /* Size of a single block to be transferred */
 #define BLK_TRANSFER_SIZE 4096
