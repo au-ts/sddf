@@ -266,7 +266,7 @@ static void handle_driver()
 static void handle_client(int cli_id)
 {
     blk_queue_handle_t h = clients[cli_id].queue_h;
-    uintptr_t cli_data_base = blk_virt_cli_data_region(blk_data, cli_id);
+    uintptr_t cli_data_base = blk_virt_cli_data_region(blk_client_data_start, cli_id);
     uint64_t cli_data_region_size = blk_virt_cli_data_region_size(cli_id);
 
     blk_request_code_t cli_code;
