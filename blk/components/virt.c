@@ -22,8 +22,8 @@
 #define LOG_BLK_VIRT_ERR(...) do{ sddf_dprintf("BLK_VIRT|ERROR: "); sddf_dprintf(__VA_ARGS__); }while(0)
 
 
-#define DRIVER_CH 1
-#define CLI_CH_OFFSET 3
+#define DRIVER_CH 0
+#define CLI_CH_OFFSET 1
 
 #define BLK_NUM_BUFFERS_DRIV (BLK_DATA_REGION_SIZE_DRIV / BLK_TRANSFER_SIZE)
 
@@ -37,7 +37,8 @@ uintptr_t blk_data_driver;
 blk_storage_info_t *blk_config;
 blk_req_queue_t *blk_req_queue;
 blk_resp_queue_t *blk_resp_queue;
-uintptr_t blk_data;
+/* The start of client data regions. */
+uintptr_t blk_client_data_start;
 
 blk_queue_handle_t drv_h;
 
