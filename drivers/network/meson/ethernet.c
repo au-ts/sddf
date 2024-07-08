@@ -256,7 +256,7 @@ static void eth_setup(void)
      * stop sending them when there is 2k of fifo left.
      * Continue DMA on 2nd frame while updating status on first
      */
-    eth_dma->opmode = STOREFORWARD | EN_FLOWCTL | (0 << FLOWCTL_SHFT) | (0 < DISFLOWCTL_SHFT) | TX_OPSCND;
+    eth_dma->opmode = STOREFORWARD | EN_FLOWCTL | (0 << FLOWCTL_SHFT) | (1 < DISFLOWCTL_SHFT) | TX_OPSCND;
     eth_mac->conf = FULLDPLXMODE;
 
     eth_dma->rxdesclistaddr = hw_ring_buffer_paddr;
