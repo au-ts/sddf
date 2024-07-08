@@ -134,6 +134,7 @@ static void rx_return(void)
             rx.descr_mdata[rx.tail] = buffer;
             update_ring_slot(&rx, rx.tail, DESC_RXSTS_OWNBYDMA, cntl, buffer.io_or_offset, 0);
             eth_dma->rxpolldemand = POLL_DATA;
+            rx.tail = (rx.tail + 1) % RX_COUNT;
         } else {
             buffer.len = (d->status & DESC_RXSTS_LENMSK) >> DESC_RXSTS_LENSHFT;
             int err = net_enqueue_active(&rx_queue, buffer);
