@@ -58,7 +58,6 @@ net_queue_handle_t tx_queue;
 #define MAX_PACKET_SIZE     1536
 
 volatile struct enet_regs *eth;
-uint32_t irq_mask = IRQ_MASK;
 
 static inline bool hw_ring_full(hw_ring_t *ring, size_t ring_size)
 {
@@ -84,12 +83,6 @@ static void update_ring_slot(hw_ring_t *ring, unsigned int idx, uintptr_t phys,
     d->stat = stat;
 }
 
-static inline void enable_irqs(uint32_t mask)
-{
-    eth->eimr = mask;
-    irq_mask = mask;
-}
-
 static void rx_provide(void)
 {
     bool reprocess = true;
@@ -106,6 +99,7 @@ static void rx_provide(void)
             rx.descr_mdata[rx.tail] = buffer;
             update_ring_slot(&rx, rx.tail, buffer.io_or_offset, 0, stat);
             rx.tail = (rx.tail + 1) % RX_COUNT;
+            eth->rdar = RDAR_RDAR;
         }
 
         /* Only request a notification from virtualiser if HW ring not full */
@@ -120,16 +114,6 @@ static void rx_provide(void)
             net_cancel_signal_free(&rx_queue);
             reprocess = true;
         }
-    }
-
-    if (!(hw_ring_empty(&rx, RX_COUNT))) {
-        /* Ensure rx IRQs are enabled */
-        eth->rdar = RDAR_RDAR;
-        if (!(irq_mask & NETIRQ_RXF)) {
-            enable_irqs(IRQ_MASK);
-        }
-    } else {
-        enable_irqs(NETIRQ_TXF | NETIRQ_EBERR);
     }
 }
 
@@ -175,9 +159,7 @@ static void tx_provide(void)
             update_ring_slot(&tx, tx.tail, buffer.io_or_offset, buffer.len, stat);
 
             tx.tail = (tx.tail + 1) % TX_COUNT;
-            if (!(eth->tdar & TDAR_TDAR)) {
-                eth->tdar = TDAR_TDAR;
-            }
+            eth->tdar = TDAR_TDAR;
         }
 
         net_request_signal_active(&tx_queue);
@@ -218,10 +200,10 @@ static void tx_return(void)
 
 static void handle_irq(void)
 {
-    uint32_t e = eth->eir & irq_mask;
+    uint32_t e = eth->eir & IRQ_MASK;
     eth->eir = e;
 
-    while (e & irq_mask) {
+    while (e & IRQ_MASK) {
         if (e & NETIRQ_TXF) {
             tx_return();
         }
@@ -232,14 +214,14 @@ static void handle_irq(void)
         if (e & NETIRQ_EBERR) {
             sddf_dprintf("ETH|ERROR: System bus/uDMA\n");
         }
-        e = eth->eir & irq_mask;
+        e = eth->eir & IRQ_MASK;
         eth->eir = e;
     }
 }
 
 static void eth_setup(void)
 {
-    eth = (void *)eth_regs;
+    eth = (struct enet_regs *)eth_regs;
     uint32_t l = eth->palr;
     uint32_t h = eth->paur;
 
