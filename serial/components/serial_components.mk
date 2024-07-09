@@ -8,17 +8,11 @@
 #
 # NOTES:
 #  Generates serial_virt_rx.elf serial_virt_tx.elf
-#  It relies on the variable SERIAL_NUM_CLIENTS as a C compiler flag
-#  to configure the virtualisers
 #
-
-ifeq ($(strip $(SERIAL_NUM_CLIENTS)),)
-$(error Specify the number of clients for the serial virtualisers.  Expect -DSERIAL_NUM_CLIENTS=3 or similar)
-endif
 
 SERIAL_IMAGES:= serial_virt_rx.elf serial_virt_tx.elf
 
-CFLAGS_serial := -I ${SDDF}/include ${SERIAL_NUM_CLIENTS}
+CFLAGS_serial := -I ${SDDF}/include
 
 CHECK_SERIAL_FLAGS_MD5:=.serial_cflags-$(shell echo -- ${CFLAGS} ${CFLAGS_serial} | shasum | sed 's/ *-//')
 

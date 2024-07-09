@@ -52,7 +52,6 @@ endif
 
 TOP := ${SDDF}/examples/serial
 UTIL := $(SDDF)/util
-SERIAL_NUM_CLIENTS := -DSERIAL_NUM_CLIENTS=2
 SERIAL_COMPONENTS := $(SDDF)/serial/components
 UART_DRIVER := $(SDDF)/drivers/serial/$(DRIVER_DIR)
 SERIAL_CONFIG_INCLUDE:=${TOP}/include/serial_config
