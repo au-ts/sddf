@@ -13,6 +13,7 @@
 
 NETWORK_COMPONENTS_DIR := $(abspath $(dir $(lastword ${MAKEFILE_LIST})))
 NETWORK_IMAGES:= network_virt_rx.elf network_virt_tx.elf arp.elf copy.elf
+LIBUTIL := libsddf_util.a
 network/components/%.o: ${SDDF}/network/components/%.c
 	${CC} ${CFLAGS} -c -o $@ $<
 
@@ -27,7 +28,7 @@ ${CHECK_NETWORK_FLAGS_MD5}:
 #vpath %.c ${SDDF}/network/components
 
 
-${NETWORK_IMAGES): LIBS := libsddf_util_debug.a ${LIBS}
+${NETWORK_IMAGES): LIBS := ${LIBUTIL} ${LIBS}
 
 ${NETWORK_COMPONENT_OBJ}: |network/components
 ${NETWORK_COMPONENT_OBJ}: ${CHECK_NETWORK_FLAGS_MD5}
@@ -36,8 +37,8 @@ ${NETWORK_COMPONENT_OBJ}: CFLAGS+=${CFLAGS_network}
 network/components/network_virt_%.o: ${SDDF}/network/components/virt_%.c 
 	${CC} ${CFLAGS} -c -o $@ $<
 
-%.elf: network/components/%.o
-	${LD} ${LDFLAGS} -o $@ $< ${LIBS}
+%.elf: network/components/%.o ${LIBUTIL}
+	${LD} ${LDFLAGS} -o $@ $^ ${LIBS}
 
 clean::
 	rm -f network_virt_[rt]x.[od] copy.[od] arp.[od]

@@ -36,6 +36,9 @@ char *serial_tx_data;
 serial_queue_t *serial_tx_queue;
 serial_queue_handle_t serial_tx_queue_handle;
 
+#define BENCH_FINISH_IN 20
+#define BENCH_FINISH_OUT 21
+
 #define LWIP_TICK_MS 100
 #define NUM_PBUFFS 512
 
@@ -185,8 +188,14 @@ static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
     return ERR_OK;
 }
 
+uint64_t tx_tot = 0;
+uint64_t tx_num = 0;
+uint64_t tx_min = UINT64_MAX;
+uint64_t tx_max = 0;
+
 void transmit(void)
 {
+    uint64_t tx_tot_local = 0;
     bool reprocess = true;
     while (reprocess) {
         while (state.head != NULL && !net_queue_empty_free(&state.tx_queue)) {
@@ -204,6 +213,7 @@ void transmit(void)
                 state.tail = NULL;
             }
             pbuf_free(temp);
+            tx_tot_local++;
         }
 
         /* Only request a signal if no more pbufs enqueud to send */
@@ -219,16 +229,28 @@ void transmit(void)
             reprocess = true;
         }
     }
+
+    tx_num++;
+    tx_tot += tx_tot_local;
+    if (tx_tot_local > tx_max) tx_max = tx_tot_local;
+    if (tx_tot_local < tx_min) tx_min = tx_tot_local; 
 }
+
+uint64_t rx_tot = 0;
+uint64_t rx_num = 0;
+uint64_t rx_min = UINT64_MAX;
+uint64_t rx_max = 0;
 
 void receive(void)
 {
+    uint64_t rx_tot_local = 0;
     bool reprocess = true;
     while (reprocess) {
         while (!net_queue_empty_active(&state.rx_queue)) {
             net_buff_desc_t buffer;
             int err = net_dequeue_active(&state.rx_queue, &buffer);
             assert(!err);
+            rx_tot_local++;
 
             struct pbuf *p = create_interface_buffer(buffer.io_or_offset, buffer.len);
             if (state.netif.input(p, &state.netif) != ERR_OK) {
@@ -245,6 +267,11 @@ void receive(void)
             reprocess = true;
         }
     }
+    
+    rx_num++;
+    rx_tot += rx_tot_local;
+    if (rx_tot_local > rx_max) rx_max = rx_tot_local;
+    if (rx_tot_local < rx_min) rx_min = rx_tot_local;
 }
 
 /**
@@ -359,6 +386,19 @@ void notified(microkit_channel ch)
     case TX_CH:
         transmit();
         receive();
+        break;
+    case BENCH_FINISH_IN:
+        sddf_printf("LWIP Rx Batch Values| Avg: %lu, Min: %lu, Max: %lu\n", rx_tot/rx_num, rx_min, rx_max);
+        sddf_printf("LWIP Tx Batch Values| Avg: %lu, Min: %lu, Max: %lu\n", tx_tot/tx_num, tx_min, tx_max);
+        rx_tot = 0;
+        rx_num = 0;
+        rx_min = UINT64_MAX;
+        rx_max = 0;
+        tx_tot = 0;
+        tx_num = 0;
+        tx_min = UINT64_MAX;
+        tx_max = 0;
+        microkit_notify(BENCH_FINISH_OUT);
         break;
     default:
         sddf_dprintf("LWIP|LOG: received notification on unexpected channel: %u\n", ch);

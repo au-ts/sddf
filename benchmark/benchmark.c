@@ -22,6 +22,7 @@
 #define START 1
 #define STOP 2
 #define INIT 3
+#define BENCH_FINISH_OUT 20
 
 #define PD_TOTAL        0
 #define PD_ETH_ID       1
@@ -267,6 +268,7 @@ void notified(microkit_channel ch)
         seL4_BenchmarkTrackDumpSummary(log_buffer, entries);
 #endif
 
+        microkit_notify(BENCH_FINISH_OUT);
         break;
     default:
         sddf_printf("Bench thread notified on unexpected channel\n");

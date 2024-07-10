@@ -7,10 +7,12 @@
 #include <stdint.h>
 #include <microkit.h>
 #include <sddf/network/queue.h>
+#include <sddf/serial/queue.h>
 #include <sddf/util/util.h>
 #include <sddf/util/fence.h>
 #include <sddf/util/printf.h>
 #include <ethernet_config.h>
+#include <serial_config.h>
 
 #include "ethernet.h"
 
@@ -26,6 +28,14 @@ uintptr_t rx_free;
 uintptr_t rx_active;
 uintptr_t tx_free;
 uintptr_t tx_active;
+
+#define SERIAL_TX_CH 3
+
+char *serial_tx_data;
+serial_queue_t *serial_tx_queue;
+serial_queue_handle_t serial_tx_queue_handle;
+
+#define BENCH_FINISH_IN 20
 
 #define RX_COUNT 256
 #define TX_COUNT 256
@@ -83,8 +93,14 @@ static void update_ring_slot(hw_ring_t *ring, unsigned int idx, uintptr_t phys,
     d->stat = stat;
 }
 
+uint64_t rpx_tot = 0;
+uint64_t rpx_num = 0;
+uint64_t rpx_min = UINT64_MAX;
+uint64_t rpx_max = 0;
+
 static void rx_provide(void)
 {
+    uint64_t rpx_tot_local = 0;
     bool reprocess = true;
     while (reprocess) {
         while (!hw_ring_full(&rx, RX_COUNT) && !net_queue_empty_free(&rx_queue)) {
@@ -100,6 +116,7 @@ static void rx_provide(void)
             update_ring_slot(&rx, rx.tail, buffer.io_or_offset, 0, stat);
             rx.tail = (rx.tail + 1) % RX_COUNT;
             eth->rdar = RDAR_RDAR;
+            rpx_tot_local++;
         }
 
         /* Only request a notification from virtualiser if HW ring not full */
@@ -115,10 +132,21 @@ static void rx_provide(void)
             reprocess = true;
         }
     }
+
+    rpx_num++;
+    rpx_tot += rpx_tot_local;
+    if (rpx_tot_local > rpx_max) rpx_max = rpx_tot_local;
+    if (rpx_tot_local < rpx_min) rpx_min = rpx_tot_local;
 }
+
+uint64_t rrx_tot = 0;
+uint64_t rrx_num = 0;
+uint64_t rrx_min = UINT64_MAX;
+uint64_t rrx_max = 0;
 
 static void rx_return(void)
 {
+    uint64_t rrx_tot_local = 0;
     bool packets_transferred = false;
     while (!hw_ring_empty(&rx, RX_COUNT)) {
         /* If buffer slot is still empty, we have processed all packets the device has filled */
@@ -134,16 +162,28 @@ static void rx_return(void)
 
         packets_transferred = true;
         rx.head = (rx.head + 1) % RX_COUNT;
+        rrx_tot_local++;
     }
 
     if (packets_transferred && net_require_signal_active(&rx_queue)) {
         net_cancel_signal_active(&rx_queue);
         microkit_notify(RX_CH);
     }
+
+    rrx_num++;
+    rrx_tot += rrx_tot_local;
+    if (rrx_tot_local > rrx_max) rrx_max = rrx_tot_local;
+    if (rrx_tot_local < rrx_min) rrx_min = rrx_tot_local;
 }
+
+uint64_t tpx_tot = 0;
+uint64_t tpx_num = 0;
+uint64_t tpx_min = UINT64_MAX;
+uint64_t tpx_max = 0;
 
 static void tx_provide(void)
 {
+    uint64_t tpx_tot_local = 0;
     bool reprocess = true;
     while (reprocess) {
         while (!(hw_ring_full(&tx, TX_COUNT)) && !net_queue_empty_active(&tx_queue)) {
@@ -160,6 +200,7 @@ static void tx_provide(void)
 
             tx.tail = (tx.tail + 1) % TX_COUNT;
             eth->tdar = TDAR_TDAR;
+            tpx_tot_local++;
         }
 
         net_request_signal_active(&tx_queue);
@@ -170,10 +211,21 @@ static void tx_provide(void)
             reprocess = true;
         }
     }
+
+    tpx_num++;
+    tpx_tot += tpx_tot_local;
+    if (tpx_tot_local > tpx_max) tpx_max = tpx_tot_local;
+    if (tpx_tot_local < tpx_min) tpx_min = tpx_tot_local; 
 }
+
+uint64_t trx_tot = 0;
+uint64_t trx_num = 0;
+uint64_t trx_min = UINT64_MAX;
+uint64_t trx_max = 0;
 
 static void tx_return(void)
 {
+    uint64_t trx_tot_local = 0;
     bool enqueued = false;
     while (!hw_ring_empty(&tx, TX_COUNT)) {
         /* Ensure that this buffer has been sent by the device */
@@ -190,12 +242,18 @@ static void tx_return(void)
         int err = net_enqueue_free(&tx_queue, buffer);
         assert(!err);
         enqueued = true;
+        trx_tot_local++;
     }
 
     if (enqueued && net_require_signal_free(&tx_queue)) {
         net_cancel_signal_free(&tx_queue);
         microkit_notify(TX_CH);
     }
+
+    trx_num++;
+    trx_tot += trx_tot_local;
+    if (trx_tot_local > trx_max) trx_max = trx_tot_local;
+    if (trx_tot_local < trx_min) trx_min = trx_tot_local; 
 }
 
 static void handle_irq(void)
@@ -302,6 +360,9 @@ static void eth_setup(void)
 
 void init(void)
 {
+    serial_cli_queue_init_sys(microkit_name, NULL, NULL, NULL, &serial_tx_queue_handle, serial_tx_queue, serial_tx_data);
+    serial_putchar_init(SERIAL_TX_CH, &serial_tx_queue_handle);
+
     eth_setup();
 
     net_queue_init(&rx_queue, (net_queue_t *)rx_free, (net_queue_t *)rx_active, NET_RX_QUEUE_SIZE_DRIV);
@@ -327,6 +388,28 @@ void notified(microkit_channel ch)
         break;
     case TX_CH:
         tx_provide();
+        break;
+    case BENCH_FINISH_IN:
+        sddf_printf("ETH Rx Return Batch Values| Avg: %lu, Min: %lu, Max: %lu\n", rrx_tot/rrx_num, rrx_min, rrx_max);
+        sddf_printf("ETH Rx Provide Batch Values| Avg: %lu, Min: %lu, Max: %lu\n", rpx_tot/rpx_num, rpx_min, rpx_max);
+        sddf_printf("ETH Tx Return Batch Values| Avg: %lu, Min: %lu, Max: %lu\n", trx_tot/trx_num, trx_min, trx_max);
+        sddf_printf("ETH Tx Provide Batch Values| Avg: %lu, Min: %lu, Max: %lu\n", tpx_tot/tpx_num, tpx_min, tpx_max);
+        rrx_tot = 0;
+        rrx_num = 0;
+        rrx_min = UINT64_MAX;
+        rrx_max = 0;
+        rpx_tot = 0;
+        rpx_num = 0;
+        rpx_min = UINT64_MAX;
+        rpx_max = 0;
+        trx_tot = 0;
+        trx_num = 0;
+        trx_min = UINT64_MAX;
+        trx_max = 0;
+        tpx_tot = 0;
+        tpx_num = 0;
+        tpx_min = UINT64_MAX;
+        tpx_max = 0;
         break;
     default:
         sddf_dprintf("ETH|LOG: received notification on unexpected channel: %u\n", ch);

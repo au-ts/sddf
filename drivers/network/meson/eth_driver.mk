@@ -14,13 +14,14 @@
 ETHERNET_DRIVER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 
 CHECK_NETDRV_FLAGS_MD5:=.netdrv_cflags-$(shell echo -- ${CFLAGS} ${CFLAGS_network} | shasum | sed 's/ *-//')
+LIBUTIL := libsddf_util.a
 
 ${CHECK_NETDRV_FLAGS_MD5}:
 	-rm -f .netdrv_cflags-*
 	touch $@
 
-eth_driver.elf: meson/ethernet.o
-	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
+eth_driver.elf: meson/ethernet.o ${LIBUTIL}
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 meson/ethernet.o: ${ETHERNET_DRIVER_DIR}/ethernet.c ${CHECK_NETDRV_FLAGS}
 	mkdir -p meson
