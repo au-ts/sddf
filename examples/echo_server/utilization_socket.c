@@ -146,18 +146,22 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
         if (error) dprintf("Failed to send OK message through utilization peer\n");
     } else if (msg_match(data_packet_str, START)) {
         printf("%s measurement starting... \n", microkit_name);
-        if (!strcmp(microkit_name, "client0")) {
+        // if (!strcmp(microkit_name, "client0")) {
+        if (1) {
             start = bench->ts;
             idle_ccount_start = bench->ccount;
             idle_overflow_start = bench->overflows;
-            // microkit_notify(START_PMU);
+            printf("%s start PMU... \n", microkit_name);
+
+            microkit_notify(START_PMU);
         }
     } else if (msg_match(data_packet_str, STOP)) {
         printf("%s measurement finished \n", microkit_name);
 
         uint64_t total = 0, idle = 0;
 
-        if (!strcmp(microkit_name, "client0")) {
+        // if (!strcmp(microkit_name, "client0")) {
+        if (1) {
             total = bench->ts - start;
             total += ULONG_MAX * (bench->overflows - idle_overflow_start);
             idle = bench->ccount - idle_ccount_start;
@@ -185,7 +189,11 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
         tcp_shutdown(pcb, 0, 1);
         // microkit_notify(IPBENCH_STOP);
 
-        if (!strcmp(microkit_name, "client0")) microkit_notify(STOP_PMU);
+        // if (!strcmp(microkit_name, "client0")) {
+        if (1) {
+            printf("%s stop PMU... \n", microkit_name);
+            microkit_notify(STOP_PMU);
+        }
     } else if (msg_match(data_packet_str, QUIT)) {
         /* Do nothing for now */
     } else {

@@ -10,7 +10,7 @@
 #include <sddf/util/printf.h>
 #include <sddf/network/shared_ringbuffer.h>
 #include <sddf/timer/client.h>
-#include <sddf/benchmark/sel4bench.h>
+#include <sddf/benchmark/x86/sel4bench.h>
 #include <ethernet_config.h>
 #include <string.h>
 #include "lwip/init.h"
@@ -330,8 +330,14 @@ void init(void)
     }
 }
 
+// static size_t notified_count = 0;
+
 void notified(microkit_channel ch)
 {
+    // notified_count++;
+    // if (notified_count % 100 == 0) {
+    //     printf("notified count: %d\n", notified_count);
+    // }
     switch(ch) {
     case RX_CH:
         receive();

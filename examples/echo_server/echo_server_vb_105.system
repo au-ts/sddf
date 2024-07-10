@@ -14,7 +14,7 @@
     <memory_region name="tx_buffer_data_region_cli0" size="0x200_000" page_size="0x200_000" phys_addr="0x11400000" />
     <memory_region name="rx_buffer_data_region_cli0" size="0x200_000" page_size="0x200_000" />
     <memory_region name="tx_buffer_data_region_cli1" size="0x200_000" page_size="0x200_000" phys_addr="0x11600000"/>
-    <memory_region name="rx_buffer_data_region_cli1" size="0x200_000" page_size="0x200_000" />
+    <!-- <memory_region name="rx_buffer_data_region_cli1" size="0x200_000" page_size="0x200_000" /> -->
 
     <!-- shared memory for driver/mux ring buffer mechanism -->
     <memory_region name="rx_free_drv" size="0x200_000" page_size="0x200_000"/>
@@ -33,8 +33,8 @@
     <!-- shared memory for copy/lwip ring buffer mechanism -->
     <memory_region name="rx_free_cli0" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="rx_used_cli0" size="0x200_000" page_size="0x200_000"/>
-    <memory_region name="rx_free_cli1" size="0x200_000" page_size="0x200_000"/>
-    <memory_region name="rx_used_cli1" size="0x200_000" page_size="0x200_000"/>
+    <!-- <memory_region name="rx_free_cli1" size="0x200_000" page_size="0x200_000"/> -->
+    <!-- <memory_region name="rx_used_cli1" size="0x200_000" page_size="0x200_000"/> -->
 
     <!-- shared memory for arp/lwip/mux_tx ring buffer mechanism -->
     <memory_region name="tx_free_arp" size="0x200_000" page_size="0x200_000"/>
@@ -55,7 +55,7 @@
     <protection_domain name="bench" priority="102" >
         <program_image path="benchmark.elf" />
 
-        <protection_domain name="eth" priority="220" id="1" budget="25" period="400">
+        <protection_domain name="eth" priority="220" id="1" budget="50" period="400">
             <program_image path="eth.elf" />
             <map mr="ecam" vaddr="0x3_000_000" perms="rw" cached="true"/>
             <map mr="eth0" vaddr="0x2_000_000" perms="rw" cached="true"/>
@@ -239,15 +239,15 @@
         <end pd="timer" id="4" />
     </channel>
 
-    <!-- <channel> -->
-    <!--     <end pd="client0" id="4" /> <!-\- start channel -\-> -->
-    <!--     <end pd="bench" id="1" /> -->
-    <!-- </channel> -->
+    <channel>
+        <end pd="client0" id="4" /> <!-- start channel -->
+        <end pd="bench" id="1" />
+    </channel>
 
-    <!-- <channel> -->
-    <!--     <end pd="client0" id="5" /> <!-\- stop channel -\-> -->
-    <!--     <end pd="bench" id="2" /> -->
-    <!-- </channel> -->
+    <channel>
+        <end pd="client0" id="5" /> <!-- stop channel -->
+        <end pd="bench" id="2" />
+    </channel>
 
     <channel>
         <end pd="benchIdle" id="3" /> <!-- bench init channel -->
@@ -284,9 +284,23 @@
     <!--     <end pd="client1" id="1" /> -->
     <!-- </channel> -->
 
-    <channel>
+    <!-- <channel>
       <end pd="serial" id="0" />
       <end pd="client0" id="13" />
+    </channel> -->
+
+    <!-- <channel>
+      <end pd="serial" id="0" />
+      <end pd="eth" id="13" />
+    </channel> -->
+
+    <channel>
+      <end pd="serial" id="0" />
+      <end pd="bench" id="13" />
     </channel>
 
+    <!-- <channel>
+      <end pd="serial" id="0" />
+      <end pd="benchIdle" id="13" />
+    </channel> -->
 </system>

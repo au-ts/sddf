@@ -8,7 +8,7 @@
 #include <sel4/benchmark_track_types.h>
 #include <sel4/benchmark_utilisation_types.h>
 #include <sddf/benchmark/bench.h>
-#include <sddf/benchmark/sel4bench.h>
+#include <sddf/benchmark/x86/sel4bench.h>
 #include <sddf/util/fence.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
@@ -62,6 +62,7 @@ event_id_t benchmarking_events[] = {
 #ifdef CONFIG_BENCHMARK_TRACK_UTILISATION
 static void microkit_benchmark_start(void)
 {
+    printf("benchmark start\n");
     seL4_BenchmarkResetThreadUtilisation(TCB_CAP);
     seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_ETH_ID);
     seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_MUX_RX_ID);
@@ -158,6 +159,8 @@ void notified(microkit_channel ch)
 {
     switch(ch) {
         case START:
+            printf("benchmark notified start\n");
+
             sel4bench_reset_counters();
             THREAD_MEMORY_RELEASE();
             sel4bench_start_counters(benchmark_bf);
@@ -229,29 +232,29 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
-    microkit_dbg_puts("benchmark init\n");
+    printf("benchmark init\n");
 
-//     sel4bench_init();
-//     seL4_Word n_counters = sel4bench_get_num_counters();
+    sel4bench_init();
+    seL4_Word n_counters = sel4bench_get_num_counters();
 
-//     counter_bitfield_t mask = 0;
+    counter_bitfield_t mask = 0;
     
-//     for (seL4_Word counter = 0; counter < n_counters; counter++) {
-//         if (counter >= ARRAY_SIZE(benchmarking_events)) break;
-//         sel4bench_set_count_event(counter, benchmarking_events[counter]);
-//         mask |= BIT(counter);
-//     }
+    for (seL4_Word counter = 0; counter < n_counters; counter++) {
+        if (counter >= ARRAY_SIZE(benchmarking_events)) break;
+        sel4bench_set_count_event(counter, benchmarking_events[counter]);
+        mask |= BIT(counter);
+    }
 
-//     sel4bench_reset_counters();
-//     sel4bench_start_counters(mask);
-//     benchmark_bf = mask;
+    sel4bench_reset_counters();
+    sel4bench_start_counters(mask);
+    benchmark_bf = mask;
 
-//     /* Notify the idle thread that the sel4bench library is initialised. */
-//     microkit_notify(INIT);
+    /* Notify the idle thread that the sel4bench library is initialised. */
+    microkit_notify(INIT);
 
-// #ifdef CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES
-//     int res_buf = seL4_BenchmarkSetLogBuffer(LOG_BUFFER_CAP);
-//     if (res_buf) printf("Could not set log buffer:  %llx\n", res_buf);
-//     else printf("Log buffer set\n");
-// #endif
+#ifdef CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES
+    int res_buf = seL4_BenchmarkSetLogBuffer(LOG_BUFFER_CAP);
+    if (res_buf) printf("Could not set log buffer:  %llx\n", res_buf);
+    else printf("Log buffer set\n");
+#endif
 }

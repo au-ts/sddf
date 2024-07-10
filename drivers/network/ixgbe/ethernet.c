@@ -108,7 +108,7 @@ static inline bool hw_rx_ring_full(void)
     return (device.rx_tail + 2) % NUM_RX_DESCS == device.rx_head;
 }
 
-static uint64_t I = 0;
+// static uint64_t I = 0;
 
 void
 tx_provide(void)
@@ -119,6 +119,10 @@ tx_provide(void)
     bool reprocess = true;
     while (reprocess) {
         bool provided = false;
+        if (hw_tx_ring_full()) {
+            printf("hw_tx_ring_full\n");
+        }
+
         while (!(hw_tx_ring_full()) && !ring_empty(tx_ring.used_ring)) {
             buff_desc_t buffer;
             int err __attribute__((unused)) = dequeue_used(&tx_ring, &buffer);
@@ -181,14 +185,25 @@ tx_return(void)
     }
 }
 
+static size_t packet_count = 0;
+
 void
 rx_provide(void)
 {
     uint64_t rx_tail = device.rx_tail;
     
+    packet_count++;
+    if (packet_count % 1000 == 0) {
+        printf("packet count: %d\n", packet_count);
+    }
+
     bool reprocess = true;
     while (reprocess) {
         bool provided = false;
+        // if (hw_rx_ring_full()) {
+        //     printf("hw_rx_ring_full\n");
+        // }
+
         while (!hw_rx_ring_full() && !ring_empty(rx_ring.free_ring)) {
             buff_desc_t buffer;
             int err __attribute__((unused)) = dequeue_free(&rx_ring, &buffer);
@@ -211,8 +226,11 @@ rx_provide(void)
         }
 
         /* Only request a notification from multiplexer if HW ring not full */
-        if (!hw_rx_ring_full()) request_signal(rx_ring.free_ring);
-        else cancel_signal(rx_ring.free_ring);
+        if (!hw_rx_ring_full()) {
+            request_signal(rx_ring.free_ring);
+        } else {
+            cancel_signal(rx_ring.free_ring);
+        }
         reprocess = false;
 
         if (!ring_empty(rx_ring.free_ring) && !hw_rx_ring_full()) {
@@ -620,6 +638,8 @@ print_interrupt_regs(void)
     // printf("\tDEV: EIMS=%0x%08x\n", get_reg(EIMS));
 }
 
+static size_t irq_count = 0;
+
 void
 notified(microkit_channel ch)
 {
@@ -653,6 +673,10 @@ notified(microkit_channel ch)
         // }
         break;
     case IRQ_CH: {
+        irq_count++;
+        if (irq_count % 100 == 0) {
+            // printf("irq count: %d\n", irq_count);
+        }
         // printf("IRQ: EICR=0x%08x\n", get_reg(EICR));
         uint32_t cause = get_reg(EICR);
         clear_flags(EICR, cause);
