@@ -99,7 +99,6 @@ pub fn build(b: *std.Build) void {
 
     client.addCSourceFiles(.{
         .files = &.{ "client.c", "pn532.c" },
-        .flags = &.{ "-fno-sanitize=undefined" }
     });
     client.addIncludePath(sddf_dep.path("include"));
     client.linkLibrary(sddf_dep.artifact("util"));

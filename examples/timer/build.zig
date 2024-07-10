@@ -99,7 +99,7 @@ pub fn build(b: *std.Build) void {
         .strip = false,
     });
 
-    client.addCSourceFile(.{ .file = b.path("client.c"), .flags = &.{ "-fno-sanitize=undefined" } });
+    client.addCSourceFile(.{ .file = b.path("client.c") });
     client.addIncludePath(sddf_dep.path("include"));
     client.linkLibrary(sddf_dep.artifact("util"));
     client.linkLibrary(sddf_dep.artifact("util_putchar_debug"));

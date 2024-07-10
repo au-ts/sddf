@@ -61,7 +61,6 @@ fn addUartDriver(
     const driver_include = b.fmt("drivers/serial/{s}/include", .{ @tagName(class) });
     driver.addCSourceFile(.{
         .file = b.path(source),
-        .flags = &.{ "-fno-sanitize=undefined" }
     });
     driver.addIncludePath(b.path("include"));
     driver.addIncludePath(b.path(driver_include));
@@ -87,7 +86,6 @@ fn addTimerDriver(
     const source = b.fmt("drivers/clock/{s}/timer.c", .{ @tagName(class) });
     driver.addCSourceFile(.{
         .file = b.path(source),
-        .flags = &.{ "-fno-sanitize=undefined" }
     });
     driver.addIncludePath(b.path("include"));
     driver.linkLibrary(util);
@@ -112,7 +110,7 @@ fn addI2cDriver(
     driver.addCSourceFile(.{
         .file = b.path(source),
         // Note: the I2C_BUS_NUM flag is temporary
-        .flags = &.{ "-fno-sanitize=undefined", "-DI2C_BUS_NUM=2" }
+        .flags = &.{ "-DI2C_BUS_NUM=2" }
     });
     driver.addIncludePath(b.path(b.fmt("drivers/i2c/{s}/", .{ @tagName(class) })));
     driver.addIncludePath(b.path("include"));
@@ -161,7 +159,6 @@ pub fn build(b: *std.Build) void {
     });
     util.addCSourceFiles(.{
         .files = &util_src,
-        .flags = &.{"-fno-sanitize=undefined"},
     });
     util.addIncludePath(b.path("include"));
     util.addIncludePath(libmicrokit_include);
@@ -175,7 +172,6 @@ pub fn build(b: *std.Build) void {
     });
     util_putchar_serial.addCSourceFiles(.{
         .files = &util_putchar_serial_src,
-        .flags = &.{"-fno-sanitize=undefined"},
     });
     util_putchar_serial.addIncludePath(b.path("include"));
     util_putchar_serial.addIncludePath(libmicrokit_include);
@@ -189,7 +185,6 @@ pub fn build(b: *std.Build) void {
     });
     util_putchar_debug.addCSourceFiles(.{
         .files = &util_putchar_debug_src,
-        .flags = &.{"-fno-sanitize=undefined"},
     });
     util_putchar_debug.addIncludePath(b.path("include"));
     util_putchar_debug.addIncludePath(libmicrokit_include);
@@ -205,7 +200,6 @@ pub fn build(b: *std.Build) void {
     });
     blk_virt.addCSourceFile(.{
         .file = b.path("blk/components/virt.c"),
-        .flags = &.{"-fno-sanitize=undefined"}
     });
     blk_virt.addIncludePath(blk_config_include);
     blk_virt.addIncludePath(b.path("include"));
@@ -222,7 +216,6 @@ pub fn build(b: *std.Build) void {
     });
     serial_virt_rx.addCSourceFile(.{
         .file = b.path("serial/components/virt_rx.c"),
-        .flags = &.{"-fno-sanitize=undefined"}
     });
     serial_virt_rx.addIncludePath(serial_config_include);
     serial_virt_rx.addIncludePath(b.path("include"));
@@ -238,7 +231,6 @@ pub fn build(b: *std.Build) void {
     });
     serial_virt_tx.addCSourceFile(.{
         .file = b.path("serial/components/virt_tx.c"),
-        .flags = &.{"-fno-sanitize=undefined"}
     });
     serial_virt_tx.addIncludePath(serial_config_include);
     serial_virt_tx.addIncludePath(b.path("include"));
@@ -269,7 +261,6 @@ pub fn build(b: *std.Build) void {
     });
     i2c_virt.addCSourceFile(.{
         .file = b.path("i2c/components/virt.c"),
-        .flags = &.{"-fno-sanitize=undefined"}
     });
     i2c_virt.addIncludePath(b.path("include"));
     i2c_virt.linkLibrary(util);

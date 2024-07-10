@@ -115,7 +115,7 @@ pub fn build(b: *std.Build) void {
         .strip = false,
     });
 
-    serial_server.addCSourceFile(.{ .file = b.path("serial_server.c"), .flags = &.{ "-fno-sanitize=undefined" } });
+    serial_server.addCSourceFile(.{ .file = b.path("serial_server.c") });
     serial_server.addIncludePath(sddf_dep.path("include"));
     serial_server.addIncludePath(b.path("include/serial_config"));
     serial_server.linkLibrary(sddf_dep.artifact("util"));
