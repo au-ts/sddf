@@ -117,18 +117,24 @@ file will need to be edited or re-created to reflect the new system. Be sure to 
 To include the serial subsystem into an existing system, the following steps must be taken:
 ### **`.system` File** 
 You must update your system file to include serial data and queue regions for each client and the
-uart driver. You must also include the uart driver, transmit virtualiser, and optionally the receive
-virtualiser protection domains. Finally you must include channels between your clients and the
-virtualisers, as well as between the virtualisers and the uart driver. The channel numbers that
-clients use to notify the virtualisers may be arbitrary, but the virtualisers expect that a
-consecutive list of client channels starting from 1. The virtualisers also expect the driver channel
-to be 0. The uart driver expects its IRQ channel to be 0, its transmit virtualiser channel to be 1
-and its receive virtualiser channel to be 2. Channels may be changed, but they will need to be
-updated in the corresponding files.
+uart driver. 
+
+You must also include the uart driver, transmit virtualiser, and optionally the receive virtualiser
+protection domains. 
+
+Finally you must include channels between your clients and the virtualisers, as well as between the
+virtualisers and the uart driver. The channel numbers that clients use to notify the virtualisers
+may be arbitrary, but the virtualisers expect client channel numbers to be a consecutively
+increasing list starting from 1. The default channel numbers used between the virtualisers and the
+driver can be found either in the serial example system file, or as macros listed at the top of of
+each `.c` file. Channels may be changed, but they will need to be updated in the corresponding
+files.
+
 ### **`serial_config` File** 
 A new `serial_config` file must be created for your system, containing relevant details of the
 system file including client names and data region sizes, as well as updated initialisation
 functions for clients and virtualisers.
+
 ### **Makefile** 
 You must ensure to build the required serial component images (transmit virtualiser and receive
 virtualiser). This is most easily done by including the `serial/components/serial_components.mk`
