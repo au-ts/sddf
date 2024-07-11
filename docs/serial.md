@@ -163,10 +163,10 @@ serial_queue_handle_t serial_tx_queue_handle;
 ```
 
 The channel must match up with the system file, and is used with the queue handle to initialise the
-putchar library (by calling`serial_putchar_init`).
+putchar library (by calling `serial_putchar_init`).
 
-Prior to passing the the queue handle to to `serial_putchar_init`, it should first be initialised
-with the queue and data region addresses (which will be patched by microkit). A queue handle can be
+Prior to passing the the queue handle to `serial_putchar_init`, it should first be initialised with
+the queue and data region addresses (which will be patched by microkit). A queue handle can be
 initialised directly using `serial_queue_init`, however is typically initialised indirectly using
 `serial_cli_queue_init_sys` defined in the serial config file. `serial_cli_queue_init_sys`
 initialises both the receive and transmit serial queue handles, and allows queue sizes to be
