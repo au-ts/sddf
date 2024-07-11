@@ -15,7 +15,6 @@
  */
 #include <stdbool.h>
 #include <stdint.h>
-#include <microkit.h>
 #include <sddf/network/queue.h>
 #include <sddf/util/fence.h>
 #include <sddf/util/util.h>
@@ -23,9 +22,13 @@
 #include <sddf/util/ialloc.h>
 #include <sddf/virtio/virtio.h>
 #include <sddf/virtio/virtio_queue.h>
-#include <ethernet_config.h>
 
 #include "ethernet.h"
+
+#ifdef MICROKIT
+#include <microkit.h>
+#include <ethernet_config.h>
+#endif
 
 /*
  * This default is based on the default QEMU setup but could change
@@ -48,6 +51,8 @@ struct resources {
     net_queue_t *rx_active;
     net_queue_t *tx_free;
     net_queue_t *tx_active;
+    size_t rx_queue_size;
+    size_t tx_queue_size;
 
     seL4_CPtr irq_cap;
     seL4_CPtr virt_rx_cap;
@@ -477,6 +482,8 @@ void init(void)
         .rx_active = rx_active,
         .tx_free = tx_free,
         .tx_active = tx_active,
+        .rx_queue_size = NET_RX_QUEUE_SIZE_DRIV,
+        .tx_queue_size = NET_TX_QUEUE_SIZE_DRIV,
 
         .irq_cap = BASE_IRQ_CAP + IRQ_CH,
         .virt_rx_cap = BASE_OUTPUT_NOTIFICATION_CAP + RX_CH,
@@ -488,8 +495,8 @@ void init(void)
     ialloc_init(&rx_ialloc_desc, rx_descriptors, RX_COUNT);
     ialloc_init(&tx_ialloc_desc, tx_descriptors, TX_COUNT);
 
-    net_queue_init(&rx_queue, resources.rx_free, resources.rx_active, NET_RX_QUEUE_SIZE_DRIV);
-    net_queue_init(&tx_queue, resources.tx_free, resources.tx_active, NET_TX_QUEUE_SIZE_DRIV);
+    net_queue_init(&rx_queue, resources.rx_free, resources.rx_active, resources.rx_queue_size);
+    net_queue_init(&tx_queue, resources.tx_free, resources.tx_active, resources.tx_queue_size);
 
     eth_setup();
 
