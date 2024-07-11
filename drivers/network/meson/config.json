@@ -11,7 +11,7 @@
                 "cached": false,
                 "setvar_vaddr": "eth_regs",
                 "page_size": 4096,
-                "size": 4096
+                "size": 65536
             }
         ],
         "shared_regions": [],

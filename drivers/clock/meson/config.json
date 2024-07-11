@@ -18,7 +18,7 @@
         "irqs": [
             {
                 "name": "timer",
-                "channel_id": 1
+                "channel_id": 0
             }
         ]
     }
