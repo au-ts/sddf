@@ -5,10 +5,10 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
 # Include this snippet in your project Makefile to build
-# sddf_libutil.a and sddf_libutil_debug.a
-# sddf_libutil.a needs the component to have channels and queues
-# with the the serial_tx_virt and for putchar to be initialised.
-# sddf_libutil_debug.a uses the microkit_dbg_putc function.
+# libsddf_util.a and libsddf_util_debug.a
+# libsddf_util.a needs the component to have channels and queues
+# with the the serial tx virtualiser, and for putchar to be initialised.
+# libsddf_util_debug.a uses the microkit_dbg_puts function.
 # Both are character at a time polling (i.e., slow, and only for debugging)
 
 ifeq ($(strip $(ARCH)),)

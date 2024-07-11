@@ -5,7 +5,6 @@
 #
 # Include this snippet in your project Makefile to build
 # the IMX8 UART driver.
-# Assumes libsddf_util_debug.a is in ${LIBS}.
 
 SERIAL_DRIVER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 
