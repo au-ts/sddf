@@ -40,6 +40,26 @@
 #define TX_CH  1
 #define RX_CH  2
 
+struct resources {
+    uintptr_t regs;
+    uintptr_t hw_ring_buffer_vaddr;
+    uintptr_t hw_ring_buffer_paddr;
+    net_queue_t *rx_free;
+    net_queue_t *rx_active;
+    net_queue_t *tx_free;
+    net_queue_t *tx_active;
+
+    seL4_CPtr irq_cap;
+    seL4_CPtr virt_rx_cap;
+    seL4_CPtr virt_tx_cap;
+};
+
+#ifdef MICROKIT
+struct resources resources;
+#else
+extern struct resources resources;
+#endif
+
 uintptr_t eth_regs;
 /*
  * The 'hardware' ring buffer region is used to store the virtIO virtqs
@@ -191,7 +211,7 @@ static void rx_return(void)
     if (packets_transferred > 0 && net_require_signal_active(&rx_queue)) {
         LOG_DRIVER("signalling RX\n");
         net_cancel_signal_active(&rx_queue);
-        microkit_notify(RX_CH);
+        seL4_Signal(resources.virt_rx_cap);
     }
 }
 
@@ -291,7 +311,7 @@ static void tx_return(void)
 
     if (enqueued > 0 && net_require_signal_free(&tx_queue)) {
         net_cancel_signal_free(&tx_queue);
-        microkit_notify(TX_CH);
+        seL4_Signal(resources.virt_tx_cap);
     }
 }
 
@@ -445,19 +465,35 @@ static void eth_setup(void)
     regs->InterruptACK = VIRTIO_MMIO_IRQ_VQUEUE;
 }
 
+/* By the time we get to here, 'resources' should be valid */
 void init(void)
 {
-    regs = (volatile virtio_mmio_regs_t *)(eth_regs + VIRTIO_MMIO_NET_OFFSET);
+#ifdef MICROKIT
+    resources = (struct resources){
+        .regs = eth_regs,
+        .hw_ring_buffer_vaddr = hw_ring_buffer_vaddr,
+        .hw_ring_buffer_paddr = hw_ring_buffer_paddr,
+        .rx_free = rx_free,
+        .rx_active = rx_active,
+        .tx_free = tx_free,
+        .tx_active = tx_active,
+
+        .irq_cap = BASE_IRQ_CAP + IRQ_CH,
+        .virt_rx_cap = BASE_OUTPUT_NOTIFICATION_CAP + RX_CH,
+        .virt_tx_cap = BASE_OUTPUT_NOTIFICATION_CAP + TX_CH,
+    };
+#endif
+    regs = (volatile virtio_mmio_regs_t *)(resources.regs + VIRTIO_MMIO_NET_OFFSET);
 
     ialloc_init(&rx_ialloc_desc, rx_descriptors, RX_COUNT);
     ialloc_init(&tx_ialloc_desc, tx_descriptors, TX_COUNT);
 
-    net_queue_init(&rx_queue, rx_free, rx_active, NET_RX_QUEUE_CAPACITY_DRIV);
-    net_queue_init(&tx_queue, tx_free, tx_active, NET_TX_QUEUE_CAPACITY_DRIV);
+    net_queue_init(&rx_queue, resources.rx_free, resources.rx_active, NET_RX_QUEUE_SIZE_DRIV);
+    net_queue_init(&tx_queue, resources.tx_free, resources.tx_active, NET_TX_QUEUE_SIZE_DRIV);
 
     eth_setup();
 
-    microkit_irq_ack(IRQ_CH);
+    seL4_IRQHandler_Ack(resources.irq_cap);
 }
 
 void notified(microkit_channel ch)
@@ -465,7 +501,7 @@ void notified(microkit_channel ch)
     switch (ch) {
     case IRQ_CH:
         handle_irq();
-        microkit_deferred_irq_ack(ch);
+        seL4_IRQHandler_Ack(resources.irq_cap);;
         break;
     case RX_CH:
         rx_provide();
