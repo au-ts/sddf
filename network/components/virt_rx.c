@@ -3,7 +3,6 @@
 #include <microkit.h>
 #include <sddf/network/queue.h>
 #include <sddf/network/constants.h>
-#include <sddf/util/fence.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 #include <sddf/util/cache.h>
@@ -18,12 +17,10 @@
 #define BROADCAST_ID (NUM_NETWORK_CLIENTS + 1)
 
 /* Queue regions */
-uintptr_t rx_free_drv;
-uintptr_t rx_active_drv;
-uintptr_t rx_free_cli0;
-uintptr_t rx_active_cli0;
-uintptr_t rx_free_cli1;
-uintptr_t rx_active_cli1;
+net_queue_t *rx_free_drv;
+net_queue_t *rx_active_drv;
+net_queue_t *rx_free_cli0;
+net_queue_t *rx_active_cli0;
 
 /* Buffer data regions */
 uintptr_t buffer_data_vaddr;
@@ -202,7 +199,7 @@ void init(void)
 {
     net_virt_mac_addr_init_sys(microkit_name, (uint8_t *) state.mac_addrs);
 
-    net_queue_init(&state.rx_queue_drv, (net_queue_t *)rx_free_drv, (net_queue_t *)rx_active_drv, NET_RX_QUEUE_SIZE_DRIV);
+    net_queue_init(&state.rx_queue_drv, rx_free_drv, rx_active_drv, NET_RX_QUEUE_SIZE_DRIV);
     net_virt_queue_init_sys(microkit_name, state.rx_queue_clients, rx_free_cli0, rx_active_cli0);
     net_buffers_init(&state.rx_queue_drv, buffer_data_paddr);
 

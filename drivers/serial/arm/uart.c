@@ -169,7 +169,9 @@ void init(void)
 {
     uart_setup();
 
+#if !SERIAL_TX_ONLY
     serial_queue_init(&rx_queue_handle, rx_queue, SERIAL_RX_DATA_REGION_SIZE_DRIV, rx_data);
+#endif
     serial_queue_init(&tx_queue_handle, tx_queue, SERIAL_TX_DATA_REGION_SIZE_DRIV, tx_data);
 }
 

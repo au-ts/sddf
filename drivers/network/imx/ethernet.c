@@ -18,14 +18,13 @@
 #define TX_CH  1
 #define RX_CH  2
 
-uintptr_t eth_regs;
 uintptr_t hw_ring_buffer_vaddr;
 uintptr_t hw_ring_buffer_paddr;
 
-uintptr_t rx_free;
-uintptr_t rx_active;
-uintptr_t tx_free;
-uintptr_t tx_active;
+net_queue_t *rx_free;
+net_queue_t *rx_active;
+net_queue_t *tx_free;
+net_queue_t *tx_active;
 
 #define RX_COUNT 256
 #define TX_COUNT 256
@@ -221,7 +220,6 @@ static void handle_irq(void)
 
 static void eth_setup(void)
 {
-    eth = (struct enet_regs *)eth_regs;
     uint32_t l = eth->palr;
     uint32_t h = eth->paur;
 
@@ -304,8 +302,8 @@ void init(void)
 {
     eth_setup();
 
-    net_queue_init(&rx_queue, (net_queue_t *)rx_free, (net_queue_t *)rx_active, NET_RX_QUEUE_SIZE_DRIV);
-    net_queue_init(&tx_queue, (net_queue_t *)tx_free, (net_queue_t *)tx_active, NET_TX_QUEUE_SIZE_DRIV);
+    net_queue_init(&rx_queue, rx_free, rx_active, NET_RX_QUEUE_SIZE_DRIV);
+    net_queue_init(&tx_queue, tx_free, tx_active, NET_TX_QUEUE_SIZE_DRIV);
 
     rx_provide();
     tx_provide();

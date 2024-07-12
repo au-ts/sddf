@@ -9,10 +9,10 @@
 #define CLIENT_OFFSET 1
 
 serial_queue_t *tx_queue_drv;
-uintptr_t tx_queue_cli0;
+serial_queue_t *tx_queue_cli0;
 
 char *tx_data_drv;
-uintptr_t tx_data_cli0;
+char *tx_data_cli0;
 
 #if SERIAL_WITH_COLOUR
 

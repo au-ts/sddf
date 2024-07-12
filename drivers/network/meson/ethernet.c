@@ -18,14 +18,13 @@
 #define TX_CH  1
 #define RX_CH  2
 
-uintptr_t eth_regs;
 uintptr_t hw_ring_buffer_vaddr;
 uintptr_t hw_ring_buffer_paddr;
 
-uintptr_t rx_free;
-uintptr_t rx_active;
-uintptr_t tx_free;
-uintptr_t tx_active;
+net_queue_t *rx_free;
+net_queue_t *rx_active;
+net_queue_t *tx_free;
+net_queue_t *tx_active;
 
 #define RX_COUNT 256
 #define TX_COUNT 256
@@ -227,8 +226,7 @@ static void handle_irq()
 
 static void eth_setup(void)
 {
-    eth_mac = (void *)eth_regs;
-    eth_dma = (void *)(eth_regs + DMA_REG_OFFSET);
+    eth_dma = (void *)((uintptr_t)eth_mac + DMA_REG_OFFSET);
     uint32_t l = eth_mac->macaddr0lo;
     uint32_t h = eth_mac->macaddr0hi;
 

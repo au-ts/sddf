@@ -1,7 +1,6 @@
 #include <microkit.h>
 #include <sddf/network/queue.h>
 #include <sddf/util/cache.h>
-#include <sddf/util/fence.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 #include <ethernet_config.h>
@@ -9,16 +8,12 @@
 #define DRIVER 0
 #define CLIENT_CH 1
 
-uintptr_t tx_free_drv;
-uintptr_t tx_active_drv;
-uintptr_t tx_free_cli0;
-uintptr_t tx_active_cli0;
-uintptr_t tx_free_cli1;
-uintptr_t tx_active_cli1;
+net_queue_t *tx_free_drv;
+net_queue_t *tx_active_drv;
+net_queue_t *tx_free_cli0;
+net_queue_t *tx_active_cli0;
 
 uintptr_t buffer_data_region_cli0_vaddr;
-uintptr_t buffer_data_region_cli1_vaddr;
-
 uintptr_t buffer_data_region_cli0_paddr;
 uintptr_t buffer_data_region_cli1_paddr;
 
@@ -131,7 +126,7 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
-    net_queue_init(&state.tx_queue_drv, (net_queue_t *)tx_free_drv, (net_queue_t *)tx_active_drv, NET_TX_QUEUE_SIZE_DRIV);
+    net_queue_init(&state.tx_queue_drv, tx_free_drv, tx_active_drv, NET_TX_QUEUE_SIZE_DRIV);
     net_virt_queue_init_sys(microkit_name, state.tx_queue_clients, tx_free_cli0, tx_active_cli0);
 
     net_mem_region_init_sys(microkit_name, state.buffer_region_vaddrs, buffer_data_region_cli0_vaddr);
