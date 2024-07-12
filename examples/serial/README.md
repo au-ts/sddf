@@ -44,7 +44,7 @@ characters over serial. The clients are based on the same executable generated f
 
 The serial server client demonstrates two methods of outputting to serial: the first uses
 `sddf_printf` (linked with `_sddf_putchar` defined in `util/putchar_serial.c`), and the second uses
-`sddf_putchar_unbuffered` defined in the same file. 
+`sddf_putchar_unbuffered` defined in the same file.
 
 The first method demonstrates character buffering based on a flush character or queue capacity, the
 second demonstrates characters being transmitted in an unbuffered fashion, typically used by a REPL.
@@ -55,7 +55,7 @@ characters the client prints a message in a buffered fashion.
 
 This notification handling process with the receive virtualiser demonstrates how the
 *producer_signalled* flag is to be used to prevent against missed notifications from the virtualiser
-which could result in missed characters or deadlock. 
+which could result in missed characters or deadlock.
 
 In this example, **SERIAL_WITH_COLOUR** is enabled so each client prints with a
 different colour.
