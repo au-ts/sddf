@@ -62,7 +62,7 @@ static inline void serial_virt_queue_init_sys(char *pd_name, serial_queue_handle
                           SERIAL_TX_DATA_REGION_SIZE_CLI1, cli_data + SERIAL_TX_DATA_REGION_SIZE_CLI0);
         serial_queue_init(&cli_queue_handle[2], (serial_queue_t *)((uintptr_t)cli_queue + 2 * SERIAL_QUEUE_SIZE),
                           SERIAL_TX_DATA_REGION_SIZE_CLI2, cli_data + SERIAL_TX_DATA_REGION_SIZE_CLI0 +
-                                                                    SERIAL_TX_DATA_REGION_SIZE_CLI1);
+                          SERIAL_TX_DATA_REGION_SIZE_CLI1);
     }
 }
 
