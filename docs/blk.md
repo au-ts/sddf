@@ -12,7 +12,7 @@ and the configuration region.
 
 ## Client protection domain
 Clients of the block subsystem has to include the block queue library and a blk config file.
-The block queues have to be initialised before operating on it. Clients should read from the 
+The block queues have to be initialised before operating on it. Clients should read from the
 blk_config file to access memory mapping information, including the request and response queue
 sizes needed to initialise the queues.
 
@@ -111,7 +111,7 @@ For the virtualiser, the SDF only exposes a pointer to the base address of each 
 region type. Thus each client's memory region is accessed via an offset into this base address.
 The offset is the size of the region.
 
-A recommended prototype for a blk_config file with two clients has the following: 
+A recommended prototype for a blk_config file with two clients has the following:
 ```
 #define BLK_NUM_CLIENTS 2
 
@@ -161,13 +161,13 @@ There are no Makefile snippets for the block subsystem as of yet, unlike the ser
 network subsystems.
 
 Your linker must include sDDF's include directory, and the directory
-containing the blk_config.h header file. 
+containing the blk_config.h header file.
 
 You must compile the block virtualiser and driver yourself,
 and include their object files to the microkit image list.
 
 Note that the block virtualiser needs to link with `libsddf_util_debug.a`.
-Below is a provided snippet on how to build it in your Makefile 
+Below is a provided snippet on how to build it in your Makefile
 ```
 $(BUILD_DIR)/util/%.o: ${SDDF_DIR}/util/%.c
 	${CC} ${CFLAGS} -c -o $@ $<
@@ -185,4 +185,3 @@ needs. Users specify these via the blk_config file, and ensuring that there is e
 
 * The number of clients specified in blk_config file has to match the number
 of client connections to the virtualiser.
-
