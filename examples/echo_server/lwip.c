@@ -37,7 +37,7 @@ serial_queue_t *serial_tx_queue;
 serial_queue_handle_t serial_tx_queue_handle;
 
 #define LWIP_TICK_MS 100
-#define NUM_PBUFFS 512
+#define NUM_PBUFFS NET_MAX_CLIENT_QUEUE_SIZE
 
 uintptr_t rx_free;
 uintptr_t rx_active;
@@ -231,6 +231,7 @@ void receive(void)
             assert(!err);
 
             struct pbuf *p = create_interface_buffer(buffer.io_or_offset, buffer.len);
+            assert(p != NULL);
             if (state.netif.input(p, &state.netif) != ERR_OK) {
                 sddf_dprintf("LWIP|ERROR: unkown error inputting pbuf into network stack\n");
                 pbuf_free(p);
