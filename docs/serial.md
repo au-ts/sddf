@@ -1,4 +1,6 @@
-# Introduction to the serial subsystem
+# The sDDF Serial Subsystem
+
+## System architecture
 
 The serial subsystem adheres to the sDDF design principles of modularalised components split via
 separation of concerns which communicate via shared data structures and microkit channels.
@@ -10,7 +12,7 @@ one a *data region* containing the characters themselves, and the other a *queue
 a queue data structure that allows components to deduce the last position in the data region written
 to or read by their neighbour. Queues are implemented as simple ring buffers containing a *head* and
 *tail* index, as well as additional *notification flags* which allow components to deduce whether
-the consumer of producer of the queue must be notified after a change of queue state has occurred.
+the consumer or producer of the queue must be notified after a change of queue state has occurred.
 
 The implementation of these data structures, along with helper functions to use them, can be found
 in `include/sddf/serial/queue.h`. Further information on how these data structures work, as well as
@@ -29,12 +31,12 @@ invalid updates to queue state.
 
 ### Transmission
 
-In particular, for transmitting characters, it is recommended to do so via `sddf_printf` (which can
-be found in `include/sddf/util/printf.h`), rather than using the serial queue library directly. If
-the definition of `sddf_putchar` is linked with `libsddf_util.a` (containing
-`util/putchar_serial.c`), rather than `libsddf_util_debug.a` (containing `util/putchar_debug.c`),
-`sddf_printf` outputs to the uart device using a simple multiplexing mechanism that vastly reduces
-jumbled client output. 
+If a client wishes to print strings, it is recommended to do so via `sddf_printf` (which can be
+found in `include/sddf/util/printf.h`), rather than using the serial queue library directly.
+`sddf_printf` calls `sddf_putchar` on each character in its input string. If the definition of
+`sddf_putchar` is linked with `libsddf_util.a` (containing `util/putchar_serial.c`), rather than
+`libsddf_util_debug.a` (containing `util/putchar_debug.c`), `sddf_printf` outputs to the uart device
+using a simple multiplexing mechanism that vastly reduces jumbled client output. 
 
 The multiplexing mechanism buffers characters written to the data region by the client, only
 notifying the transmit virtualiser when the region becomes full, or the `FLUSH_CHAR` is seen (which
