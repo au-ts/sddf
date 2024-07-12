@@ -36,7 +36,7 @@ found in `include/sddf/util/printf.h`), rather than using the serial queue libra
 `sddf_printf` calls `sddf_putchar` on each character in its input string. If the definition of
 `sddf_putchar` is linked with `libsddf_util.a` (containing `util/putchar_serial.c`), rather than
 `libsddf_util_debug.a` (containing `util/putchar_debug.c`), `sddf_printf` outputs to the uart device
-using a simple multiplexing mechanism that vastly reduces jumbled client output. 
+using a simple multiplexing mechanism that vastly reduces jumbled client output.
 
 The multiplexing mechanism buffers characters written to the data region by the client, only
 notifying the transmit virtualiser when the region becomes full, or the `FLUSH_CHAR` is seen (which
@@ -46,7 +46,7 @@ If your protection domain requires each character to be output to serial individ
 `util/putchar_serial.c` provides a `sddf_putchar_unbuffered` function, which notifies the transmit
 virtualiser for each character it receives. Examples of how both `sddf_printf` and
 `sddf_putchar_unbuffered` are used can be found in the `serial_server` protection domain in the
-serial example. 
+serial example.
 
 Clients may also update serial transmit data structures themselves, using `util/putchar_serial.c` as
 a guide. If you wish to use `sddf_printf` linked to serial output, ensure to initialise both the
@@ -112,17 +112,17 @@ the device. Baud rate is always set explicitly instead of detected automatically
 initialisation completion.
 
 If the system file is changed, or the serial subsystem is included into another system, this config
-file will need to be edited or re-created to reflect the new system. Be sure to check that the 
+file will need to be edited or re-created to reflect the new system. Be sure to check that the
 `*_init\_sys` functions correctly initialise each protection domains data structures.
 
 ## Interfacing with Other Systems
 To include the serial subsystem into an existing system, the following steps must be taken:
-### **`.system` File** 
+### **`.system` File**
 You must update your system file to include serial data and queue regions for each client and the
-uart driver. 
+uart driver.
 
 You must also include the uart driver, transmit virtualiser, and optionally the receive virtualiser
-protection domains. 
+protection domains.
 
 Finally you must include channels between your clients and the virtualisers, as well as between the
 virtualisers and the uart driver. The channel numbers that clients use to notify the virtualisers
@@ -132,12 +132,12 @@ driver can be found either in the serial example system file, or as macros liste
 each `.c` file. Channels may be changed, but they will need to be updated in the corresponding
 files.
 
-### **`serial_config` File** 
+### **`serial_config` File**
 A new `serial_config` file must be created for your system, containing relevant details of the
 system file including client names and data region sizes, as well as updated initialisation
 functions for clients and virtualisers.
 
-### **Makefile** 
+### **Makefile**
 You must ensure to build the required serial component images (transmit virtualiser and receive
 virtualiser). This is most easily done by including the `serial/components/serial_components.mk`
 make snippet and ensuring the required components are listed within your images to be built.
