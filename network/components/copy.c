@@ -2,7 +2,6 @@
 #include <stdbool.h>
 #include <microkit.h>
 #include <sddf/network/queue.h>
-#include <sddf/util/fence.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 #include <ethernet_config.h>
@@ -13,10 +12,10 @@
 net_queue_handle_t rx_queue_virt;
 net_queue_handle_t rx_queue_cli;
 
-uintptr_t rx_free_virt;
-uintptr_t rx_active_virt;
-uintptr_t rx_free_cli;
-uintptr_t rx_active_cli;
+net_queue_t *rx_free_virt;
+net_queue_t *rx_active_virt;
+net_queue_t *rx_free_cli;
+net_queue_t *rx_active_cli;
 
 uintptr_t virt_buffer_data_region;
 uintptr_t cli_buffer_data_region;

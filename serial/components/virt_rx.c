@@ -10,10 +10,10 @@
 #define CLIENT_OFFSET 1
 
 serial_queue_t *rx_queue_drv;
-uintptr_t rx_queue_cli0;
+serial_queue_t *rx_queue_cli0;
 
 char *rx_data_drv;
-uintptr_t rx_data_cli0;
+char *rx_data_cli0;
 
 serial_queue_handle_t rx_queue_handle_drv;
 serial_queue_handle_t rx_queue_handle_cli[SERIAL_NUM_CLIENTS];

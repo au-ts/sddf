@@ -66,7 +66,7 @@
 
         <protection_domain name="eth" priority="101" id="1" budget="100" period="400">
             <program_image path="eth_driver.elf" />
-            <map mr="eth0" vaddr="0x2_000_000" perms="rw" cached="false" setvar_vaddr="eth_regs"/>
+            <map mr="eth0" vaddr="0x2_000_000" perms="rw" cached="false" setvar_vaddr="eth"/>
 
             <map mr="hw_ring_buffer" vaddr="0x2_200_000" perms="rw" cached="false" setvar_vaddr="hw_ring_buffer_vaddr" />
 
@@ -111,8 +111,8 @@
 
             <map mr="net_rx_free_copy0" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="rx_free_cli0" />
             <map mr="net_rx_active_copy0" vaddr="0x2_600_000" perms="rw" cached="true" setvar_vaddr="rx_active_cli0" />
-            <map mr="net_rx_free_copy1" vaddr="0x2_800_000" perms="rw" cached="true" setvar_vaddr="rx_free_cli1" />
-            <map mr="net_rx_active_copy1" vaddr="0x2_a00_000" perms="rw" cached="true" setvar_vaddr="rx_active_cli1" />
+            <map mr="net_rx_free_copy1" vaddr="0x2_800_000" perms="rw" cached="true" />
+            <map mr="net_rx_active_copy1" vaddr="0x2_a00_000" perms="rw" cached="true" />
 
             <map mr="net_rx_buffer_data_region" vaddr="0x2_c00_000" perms="r" cached="true" setvar_vaddr="buffer_data_vaddr" />
             <setvar symbol="buffer_data_paddr" region_paddr="net_rx_buffer_data_region" />
@@ -149,11 +149,11 @@
 
             <map mr="net_tx_free_cli0" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="tx_free_cli0" />
             <map mr="net_tx_active_cli0" vaddr="0x2_600_000" perms="rw" cached="true" setvar_vaddr="tx_active_cli0" />
-            <map mr="net_tx_free_cli1" vaddr="0x2_800_000" perms="rw" cached="true" setvar_vaddr="tx_free_cli1" />
-            <map mr="net_tx_active_cli1" vaddr="0x2_a00_000" perms="rw" cached="true" setvar_vaddr="tx_active_cli1" />
+            <map mr="net_tx_free_cli1" vaddr="0x2_800_000" perms="rw" cached="true" />
+            <map mr="net_tx_active_cli1" vaddr="0x2_a00_000" perms="rw" cached="true" />
 
             <map mr="net_tx_buffer_data_region_cli0" vaddr="0x2_c00_000" perms="r" cached="true" setvar_vaddr="buffer_data_region_cli0_vaddr" />
-            <map mr="net_tx_buffer_data_region_cli1" vaddr="0x2_e00_000" perms="r" cached="true" setvar_vaddr="buffer_data_region_cli1_vaddr" />
+            <map mr="net_tx_buffer_data_region_cli1" vaddr="0x2_e00_000" perms="r" cached="true" />
             <setvar symbol="buffer_data_region_cli0_paddr" region_paddr="net_tx_buffer_data_region_cli0" />
             <setvar symbol="buffer_data_region_cli1_paddr" region_paddr="net_tx_buffer_data_region_cli1" />
         </protection_domain>

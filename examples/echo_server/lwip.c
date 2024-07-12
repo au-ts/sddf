@@ -39,13 +39,12 @@ serial_queue_handle_t serial_tx_queue_handle;
 #define LWIP_TICK_MS 100
 #define NUM_PBUFFS NET_MAX_CLIENT_QUEUE_SIZE
 
-uintptr_t rx_free;
-uintptr_t rx_active;
-uintptr_t tx_free;
-uintptr_t tx_active;
+net_queue_t *rx_free;
+net_queue_t *rx_active;
+net_queue_t *tx_free;
+net_queue_t *tx_active;
 uintptr_t rx_buffer_data_region;
 uintptr_t tx_buffer_data_region;
-uintptr_t uart_base;
 
 /* Booleans to indicate whether packets have been enqueued during notification handling */
 static bool notify_tx;
@@ -54,7 +53,7 @@ static bool notify_rx;
 /* Wrapper over custom_pbuf structure to keep track of buffer offset */
 typedef struct pbuf_custom_offset {
     struct pbuf_custom custom;
-    uintptr_t offset;
+    uint64_t offset;
 } pbuf_custom_offset_t;
 
 LWIP_MEMPOOL_DECLARE(
@@ -112,7 +111,7 @@ static void interface_free_buffer(struct pbuf *p)
  *
  * @return the newly created pbuf. Can be cast to pbuf_custom.
  */
-static struct pbuf *create_interface_buffer(uintptr_t offset, size_t length)
+static struct pbuf *create_interface_buffer(uint64_t offset, size_t length)
 {
     pbuf_custom_offset_t *custom_pbuf_offset = (pbuf_custom_offset_t *) LWIP_MEMPOOL_ALLOC(RX_POOL);
     custom_pbuf_offset->offset = offset;
@@ -169,10 +168,10 @@ static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
     int err = net_dequeue_free(&state.tx_queue, &buffer);
     assert(!err);
 
-    unsigned char *frame = (unsigned char *)(buffer.io_or_offset + tx_buffer_data_region);
-    unsigned int copied = 0;
+    uintptr_t frame = buffer.io_or_offset + tx_buffer_data_region;
+    uint16_t copied = 0;
     for (struct pbuf *curr = p; curr != NULL; curr = curr->next) {
-        memcpy(frame + copied, curr->payload, curr->len);
+        memcpy((void *)(frame + copied), curr->payload, curr->len);
         copied += curr->len;
     }
 

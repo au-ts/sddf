@@ -48,10 +48,10 @@ uintptr_t eth_regs;
 uintptr_t hw_ring_buffer_vaddr;
 uintptr_t hw_ring_buffer_paddr;
 
-uintptr_t rx_free;
-uintptr_t rx_active;
-uintptr_t tx_free;
-uintptr_t tx_active;
+net_queue_t *rx_free;
+net_queue_t *rx_active;
+net_queue_t *tx_free;
+net_queue_t *tx_active;
 
 #define RX_COUNT 512
 #define TX_COUNT 512
@@ -438,8 +438,8 @@ void init(void)
     ialloc_init(&rx_ialloc_desc, rx_descriptors, RX_COUNT);
     ialloc_init(&tx_ialloc_desc, tx_descriptors, TX_COUNT);
 
-    net_queue_init(&rx_queue, (net_queue_t *)rx_free, (net_queue_t *)rx_active, NET_RX_QUEUE_SIZE_DRIV);
-    net_queue_init(&tx_queue, (net_queue_t *)tx_free, (net_queue_t *)tx_active, NET_TX_QUEUE_SIZE_DRIV);
+    net_queue_init(&rx_queue, rx_free, rx_active, NET_RX_QUEUE_SIZE_DRIV);
+    net_queue_init(&tx_queue, tx_free, tx_active, NET_TX_QUEUE_SIZE_DRIV);
 
     eth_setup();
 
