@@ -50,6 +50,7 @@ _Static_assert(NET_TX_DATA_REGION_SIZE_CLI1 >= NET_TX_QUEUE_SIZE_CLI1 *NET_BUFFE
 #define NET_RX_QUEUE_SIZE_DRIV                   512
 #define NET_RX_QUEUE_SIZE_CLI0                   512
 #define NET_RX_QUEUE_SIZE_CLI1                   512
+#define NET_MAX_CLIENT_QUEUE_SIZE                MAX(NET_RX_QUEUE_SIZE_CLI0, NET_RX_QUEUE_SIZE_CLI1)
 #define NET_RX_QUEUE_SIZE_COPY0                  NET_RX_QUEUE_SIZE_DRIV
 #define NET_RX_QUEUE_SIZE_COPY1                  NET_RX_QUEUE_SIZE_DRIV
 
