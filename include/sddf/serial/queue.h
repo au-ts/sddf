@@ -398,3 +398,29 @@ static inline bool serial_require_producer_signal(serial_queue_handle_t *queue_h
 {
     return !queue_handle->queue->producer_signalled;
 }
+
+/*
+ * Enqueue many characters onto a queue.
+ *
+ * @param qh Pointer to handle for queue
+ * @param n number of characters to enqueue
+ * @param src pointer to characters to be transferred
+ *
+ * @return number of characters actually enqueued.
+ */
+static inline int serial_enqueue_batch(
+    serial_queue_handle_t *qh,
+    int n,
+    const char *src)
+{
+    int avail = serial_queue_contiguous_free(qh);
+    char *p = qh->data_region + (qh->queue->tail % qh->size);
+    n =  MIN(n, avail);
+    sddf_memcpy(p, src, n);
+
+#ifdef CONFIG_ENABLE_SMP_SUPPORT
+    THREAD_MEMORY_RELEASE();
+#endif
+    qh->queue->tail += n;
+    return n;
+}
