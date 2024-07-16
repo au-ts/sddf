@@ -218,14 +218,14 @@ static inline uint32_t serial_queue_contiguous_free(serial_queue_handle_t *queue
     return MIN(queue_handle->size - (queue_handle->queue->tail % queue_handle->size), serial_queue_free(queue_handle));
 }
 
-/*
- * Enqueue many characters contiguously onto a queue.
+/**
+ * Enqueue many bytes contiguously onto a queue.
  *
  * @param qh Pointer to handle for queue
- * @param n number of characters to enqueue
- * @param src pointer to characters to be transferred
+ * @param n number of bytes to enqueue
+ * @param src pointer to bytes to be transferred
  *
- * @return number of characters actually enqueued.
+ * @return number of bytes actually enqueued.
  */
 static inline uint32_t serial_enqueue_batch(serial_queue_handle_t *qh,
                                             uint32_t n,
