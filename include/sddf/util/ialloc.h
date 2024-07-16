@@ -23,6 +23,18 @@ typedef struct ialloc {
 } ialloc_t;
 
 /**
+ * Get the number of free entries available
+ *
+ * @param ia pointer to the ialloc struct.
+ *
+ * @return number of free indices
+ */
+static inline uint32_t ialloc_num_free(ialloc_t *ia)
+{
+    return ia->num_free;
+}
+
+/**
  * Check if the index list is full.
  *
  * @param ia pointer to the ialloc struct.
