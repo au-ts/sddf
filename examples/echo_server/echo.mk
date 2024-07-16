@@ -106,7 +106,7 @@ qemu: $(IMAGE_FILE)
 			-m size=2G \
 			-nographic \
 			-device virtio-net-device,netdev=netdev0 \
-			-netdev user,id=netdev0,hostfwd=tcp::1236-:1236,hostfwd=udp::1235-:1235 \
+			-netdev user,id=netdev0,hostfwd=tcp::1236-:1236,hostfwd=tcp::1237-:1237,hostfwd=udp::1235-:1235 \
 			-global virtio-mmio.force-legacy=false \
 			-d guest_errors
 
