@@ -227,7 +227,9 @@ static inline uint32_t serial_queue_contiguous_free(serial_queue_handle_t *queue
  *
  * @return number of characters actually enqueued.
  */
-static inline uint32_t serial_enqueue_batch(serial_queue_handle_t *qh, uint32_t n, const char *src)
+static inline uint32_t serial_enqueue_batch(serial_queue_handle_t *qh,
+                                            uint32_t n,
+                                            const char *src)
 {
     uint32_t avail = serial_queue_contiguous_free(qh);
     char *p = qh->data_region + (qh->queue->tail % qh->size);
