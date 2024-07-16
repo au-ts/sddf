@@ -21,6 +21,10 @@ const DriverClass = struct {
     const I2c = enum {
         meson,
     };
+
+    const Block = enum {
+        virtio,
+    };
 };
 
 const util_src = [_][]const u8{
@@ -123,6 +127,32 @@ fn addI2cDriver(
     return driver;
 }
 
+fn addBlockDriver(
+    b: *std.Build,
+    blk_config_include: LazyPath,
+    util: *std.Build.Step.Compile,
+    class: DriverClass.Block,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+) *std.Build.Step.Compile {
+    const driver = addPd(b, .{
+        .name = b.fmt("driver_blk_{s}.elf", .{ @tagName(class) }),
+        .target = target,
+        .optimize = optimize,
+        .strip = false,
+    });
+    const source = b.fmt("drivers/blk/{s}/block.c", .{ @tagName(class) });
+    driver.addCSourceFile(.{
+        .file = b.path(source),
+    });
+    driver.addIncludePath(blk_config_include);
+    driver.addIncludePath(b.path(b.fmt("drivers/blk/{s}/", .{ @tagName(class) })));
+    driver.addIncludePath(b.path("include"));
+    driver.linkLibrary(util);
+
+    return driver;
+}
+
 fn addPd(b: *std.Build, options: std.Build.ExecutableOptions) *std.Build.Step.Compile {
     const pd = b.addExecutable(options);
     pd.addObjectFile(libmicrokit);
@@ -210,6 +240,13 @@ pub fn build(b: *std.Build) void {
     blk_virt.linkLibrary(util);
     blk_virt.linkLibrary(util_putchar_debug);
     b.installArtifact(blk_virt);
+
+    // Block drivers
+    inline for (std.meta.fields(DriverClass.Block)) |class| {
+        const driver = addBlockDriver(b, blk_config_include, util, @enumFromInt(class.value), target, optimize);
+        driver.linkLibrary(util_putchar_debug);
+        b.installArtifact(driver);
+    }
 
     // Serial components
     const serial_virt_rx = addPd(b, .{
