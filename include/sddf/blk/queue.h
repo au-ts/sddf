@@ -18,13 +18,19 @@
 
 typedef struct blk_storage_info {
     char serial_number[BLK_MAX_SERIAL_NUMBER + 1];
+    /* device does not accept write requests */
     bool read_only;
-    bool ready; /* true if component closer to driver is ready */
-    uint16_t sector_size; /* size of a sector, in bytes */
-    uint16_t block_size; /* optimal block size, as a multiple of BLK_TRANSFER_SIZE */
+    /* whether this configuration is populated yet */
+    bool ready;
+    /* size of a sector, in bytes */
+    uint16_t sector_size;
+    /* optimal block size, specified in BLK_TRANSFER_SIZE sized units */
+    uint16_t block_size;
     uint16_t queue_depth;
-    uint16_t cylinders, heads, blocks; /* geometry to guide FS layout */
-    uint64_t capacity; /* size of device as a multiple of BLK_TRANSFER_SIZE */
+    /* geometry to guide FS layout */
+    uint16_t cylinders, heads, blocks;
+    /* total capacity of the device, specified in BLK_TRANSFER_SIZE sized units. */
+    uint64_t capacity;
 } blk_storage_info_t;
 
 /* Request code for block */
