@@ -104,7 +104,7 @@
             <map mr="serial_tx_data_client2" vaddr="0x4_00a_000" perms="r" cached="true"/>
         </protection_domain>
 
-        <protection_domain name="net_virt_rx" priority="99" pp="true" id="2">
+        <protection_domain name="net_virt_rx" priority="99" id="2">
             <program_image path="network_virt_rx.elf" />
             <map mr="net_rx_free_drv" vaddr="0x2_000_000" perms="rw" cached="true" setvar_vaddr="rx_free_drv" />
             <map mr="net_rx_active_drv" vaddr="0x2_200_000" perms="rw" cached="true" setvar_vaddr="rx_active_drv" />
