@@ -37,13 +37,19 @@
 
 // Doing this with statement expressions & temporary variables to avoid issues
 // with operator precedence and evaluating arguments multiple times.
+#ifndef ROUND_UP
 #define ROUND_UP(n,d) \
     ({ typeof (n) _n = (n); \
        typeof (d) _d = (d); \
        _d * (_n/_d + (_n % _d == 0 ? 0 : 1)); \
     })
+#endif
+#ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
+#endif
+#ifndef MAX
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
+#endif
 
 void _assert_fail(const char  *assertion, const char  *file, unsigned int line, const char  *function);
 
