@@ -119,7 +119,14 @@ static inline int i2c_queue_full(i2c_queue_t *queue)
     return queue->tail - queue->head + 1 == NUM_QUEUE_ENTRIES;
 }
 
-static inline uint32_t i2c_queue_size(i2c_queue_t *queue)
+/**
+ * Get the number of entries in a queue
+ *
+ * @param queue queue to check.
+ *
+ * @return number of entries in a queue
+ */
+static inline uint32_t i2c_queue_length(i2c_queue_t *queue)
 {
     return (queue->tail - queue->head);
 }
