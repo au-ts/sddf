@@ -218,6 +218,27 @@ static inline uint32_t serial_queue_contiguous_free(serial_queue_handle_t *queue
     return MIN(queue_handle->size - (queue_handle->queue->tail % queue_handle->size), serial_queue_free(queue_handle));
 }
 
+/*
+ * Enqueue many characters contiguously onto a queue.
+ *
+ * @param qh Pointer to handle for queue
+ * @param n number of characters to enqueue
+ * @param src pointer to characters to be transferred
+ *
+ * @return number of characters actually enqueued.
+ */
+static inline uint32_t serial_enqueue_batch(serial_queue_handle_t *qh, uint32_t n, const char *src)
+{
+    uint32_t avail = serial_queue_contiguous_free(qh);
+    char *p = qh->data_region + (qh->queue->tail % qh->size);
+    n =  MIN(n, avail);
+    sddf_memcpy(p, src, n);
+
+    serial_update_visible_tail(qh, qh->queue->tail + n);
+
+    return n;
+}
+
 /**
  * Transfer all data from consume queue to produce queue. Assumes there
  * is enough free space in the free queue to fit all data in the active
@@ -397,30 +418,4 @@ static inline bool serial_require_consumer_signal(serial_queue_handle_t *queue_h
 static inline bool serial_require_producer_signal(serial_queue_handle_t *queue_handle)
 {
     return !queue_handle->queue->producer_signalled;
-}
-
-/*
- * Enqueue many characters onto a queue.
- *
- * @param qh Pointer to handle for queue
- * @param n number of characters to enqueue
- * @param src pointer to characters to be transferred
- *
- * @return number of characters actually enqueued.
- */
-static inline int serial_enqueue_batch(
-    serial_queue_handle_t *qh,
-    int n,
-    const char *src)
-{
-    int avail = serial_queue_contiguous_free(qh);
-    char *p = qh->data_region + (qh->queue->tail % qh->size);
-    n =  MIN(n, avail);
-    sddf_memcpy(p, src, n);
-
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
-    THREAD_MEMORY_RELEASE();
-#endif
-    qh->queue->tail += n;
-    return n;
 }
