@@ -116,7 +116,7 @@ static void partitions_init()
     for (int i = 0; i < BLK_NUM_CLIENTS; i++) {
         blk_storage_info_t *curr_blk_config = blk_virt_cli_config_info(blk_config, i);
         curr_blk_config->sector_size = blk_config_driver->sector_size;
-        curr_blk_config->size = clients[i].sectors / (BLK_TRANSFER_SIZE / MSDOS_MBR_SECTOR_SIZE);
+        curr_blk_config->capacity = clients[i].sectors / (BLK_TRANSFER_SIZE / MSDOS_MBR_SECTOR_SIZE);
         curr_blk_config->read_only = false;
         __atomic_store_n(&curr_blk_config->ready, true, __ATOMIC_RELEASE);
     }
