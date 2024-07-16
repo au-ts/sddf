@@ -27,7 +27,7 @@ ${CHECK_NETWORK_FLAGS_MD5}:
 #vpath %.c ${SDDF}/network/components
 
 
-${NETWORK_IMAGES): LIBS := libsddf_util_debug.a ${LIBS}
+${NETWORK_IMAGES}: LIBS := libsddf_util_debug.a ${LIBS}
 
 ${NETWORK_COMPONENT_OBJ}: |network/components
 ${NETWORK_COMPONENT_OBJ}: ${CHECK_NETWORK_FLAGS_MD5}
