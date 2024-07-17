@@ -13,6 +13,7 @@
  * simulator such as QEMU, things like memory fences when touching device registers
  * may be needed if instead this driver was to be used in a different environment.
  */
+#include <sel4/sel4.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <sddf/network/queue.h>
@@ -28,6 +29,10 @@
 #ifdef MICROKIT
 #include <microkit.h>
 #include <ethernet_config.h>
+#else
+// #include <sel4/arch/syscalls.h>
+// #include <interfaces/sel4_client.h>
+#include <sel4/sel4.h>
 #endif
 
 /*
@@ -59,24 +64,13 @@ struct resources {
     seL4_CPtr virt_tx_cap;
 };
 
-#ifdef MICROKIT
 struct resources resources;
-#else
-extern struct resources resources;
-#endif
 
-uintptr_t eth_regs;
+uint64_t eth_regs;
 /*
  * The 'hardware' ring buffer region is used to store the virtIO virtqs
  * as well as the RX and TX virtIO headers.
  */
-uintptr_t hw_ring_buffer_vaddr;
-uintptr_t hw_ring_buffer_paddr;
-
-net_queue_t *rx_free;
-net_queue_t *rx_active;
-net_queue_t *tx_free;
-net_queue_t *tx_active;
 
 #define RX_COUNT 512
 #define TX_COUNT 512
@@ -98,9 +92,9 @@ net_queue_handle_t tx_queue;
  * initialise to the default values on TX. In order to this, we use a
  * separate memory region and not the sDDF data region.
  */
-uintptr_t virtio_net_tx_headers_vaddr;
-uintptr_t virtio_net_tx_headers_paddr;
-uintptr_t virtio_net_rx_headers_paddr;
+uint64_t virtio_net_tx_headers_vaddr;
+uint64_t virtio_net_tx_headers_paddr;
+uint64_t virtio_net_rx_headers_paddr;
 virtio_net_hdr_t *virtio_net_tx_headers;
 
 volatile virtio_mmio_regs_t *regs;
@@ -392,6 +386,7 @@ static void eth_setup(void)
     virtio_net_print_config(config);
 #endif
 
+
     // Setup the virtqueues
 
     size_t rx_desc_off = 0;
@@ -403,26 +398,26 @@ static void eth_setup(void)
     size_t virtq_size = tx_used_off + (6 + 8 * TX_COUNT);
 
     rx_virtq.num = RX_COUNT;
-    rx_virtq.desc = (struct virtq_desc *)(hw_ring_buffer_vaddr + rx_desc_off);
-    rx_virtq.avail = (struct virtq_avail *)(hw_ring_buffer_vaddr + rx_avail_off);
-    rx_virtq.used = (struct virtq_used *)(hw_ring_buffer_vaddr + rx_used_off);
+    rx_virtq.desc = (struct virtq_desc *)(resources.hw_ring_buffer_vaddr + rx_desc_off);
+    rx_virtq.avail = (struct virtq_avail *)(resources.hw_ring_buffer_vaddr + rx_avail_off);
+    rx_virtq.used = (struct virtq_used *)(resources.hw_ring_buffer_vaddr + rx_used_off);
 
-    assert((uintptr_t)rx_virtq.desc % 16 == 0);
-    assert((uintptr_t)rx_virtq.avail % 2 == 0);
-    assert((uintptr_t)rx_virtq.used % 4 == 0);
+    assert((uint64_t)rx_virtq.desc % 16 == 0);
+    assert((uint64_t)rx_virtq.avail % 2 == 0);
+    assert((uint64_t)rx_virtq.used % 4 == 0);
 
     tx_virtq.num = TX_COUNT;
-    tx_virtq.desc = (struct virtq_desc *)(hw_ring_buffer_vaddr + tx_desc_off);
-    tx_virtq.avail = (struct virtq_avail *)(hw_ring_buffer_vaddr + tx_avail_off);
-    tx_virtq.used = (struct virtq_used *)(hw_ring_buffer_vaddr + tx_used_off);
+    tx_virtq.desc = (struct virtq_desc *)(resources.hw_ring_buffer_vaddr + tx_desc_off);
+    tx_virtq.avail = (struct virtq_avail *)(resources.hw_ring_buffer_vaddr + tx_avail_off);
+    tx_virtq.used = (struct virtq_used *)(resources.hw_ring_buffer_vaddr + tx_used_off);
 
-    assert((uintptr_t)tx_virtq.desc % 16 == 0);
-    assert((uintptr_t)tx_virtq.avail % 2 == 0);
-    assert((uintptr_t)tx_virtq.used % 4 == 0);
+    assert((uint64_t)tx_virtq.desc % 16 == 0);
+    assert((uint64_t)tx_virtq.avail % 2 == 0);
+    assert((uint64_t)tx_virtq.used % 4 == 0);
 
     /* Virtio TX headers will proceed the virtq structures. Then RX headers. */
-    virtio_net_tx_headers_vaddr = hw_ring_buffer_vaddr + virtq_size;
-    virtio_net_tx_headers_paddr = hw_ring_buffer_paddr + virtq_size;
+    virtio_net_tx_headers_vaddr = resources.hw_ring_buffer_vaddr + virtq_size;
+    virtio_net_tx_headers_paddr = resources.hw_ring_buffer_paddr + virtq_size;
     virtio_net_tx_headers = (virtio_net_hdr_t *) virtio_net_tx_headers_vaddr;
     size_t tx_headers_size = ((TX_COUNT / 2) * sizeof(virtio_net_hdr_t));
     virtio_net_rx_headers_paddr = virtio_net_tx_headers_paddr + tx_headers_size;
@@ -437,24 +432,25 @@ static void eth_setup(void)
     assert(regs->QueueNumMax >= RX_COUNT);
     regs->QueueSel = VIRTIO_NET_RX_QUEUE;
     regs->QueueNum = RX_COUNT;
-    regs->QueueDescLow = (hw_ring_buffer_paddr + rx_desc_off) & 0xFFFFFFFF;
-    regs->QueueDescHigh = (hw_ring_buffer_paddr + rx_desc_off) >> 32;
-    regs->QueueDriverLow = (hw_ring_buffer_paddr + rx_avail_off) & 0xFFFFFFFF;
-    regs->QueueDriverHigh = (hw_ring_buffer_paddr + rx_avail_off) >> 32;
-    regs->QueueDeviceLow = (hw_ring_buffer_paddr + rx_used_off) & 0xFFFFFFFF;
-    regs->QueueDeviceHigh = (hw_ring_buffer_paddr + rx_used_off) >> 32;
+    regs->QueueDescLow = (resources.hw_ring_buffer_paddr + rx_desc_off) & 0xFFFFFFFF;
+    regs->QueueDescHigh = (resources.hw_ring_buffer_paddr + rx_desc_off) >> 32;
+    regs->QueueDriverLow = (resources.hw_ring_buffer_paddr + rx_avail_off) & 0xFFFFFFFF;
+    regs->QueueDriverHigh = (resources.hw_ring_buffer_paddr + rx_avail_off) >> 32;
+    regs->QueueDeviceLow = (resources.hw_ring_buffer_paddr + rx_used_off) & 0xFFFFFFFF;
+    regs->QueueDeviceHigh = (resources.hw_ring_buffer_paddr + rx_used_off) >> 32;
     regs->QueueReady = 1;
+
 
     // Setup TX queue
     assert(regs->QueueNumMax >= TX_COUNT);
     regs->QueueSel = VIRTIO_NET_TX_QUEUE;
     regs->QueueNum = TX_COUNT;
-    regs->QueueDescLow = (hw_ring_buffer_paddr + tx_desc_off) & 0xFFFFFFFF;
-    regs->QueueDescHigh = (hw_ring_buffer_paddr + tx_desc_off) >> 32;
-    regs->QueueDriverLow = (hw_ring_buffer_paddr + tx_avail_off) & 0xFFFFFFFF;
-    regs->QueueDriverHigh = (hw_ring_buffer_paddr + tx_avail_off) >> 32;
-    regs->QueueDeviceLow = (hw_ring_buffer_paddr + tx_used_off) & 0xFFFFFFFF;
-    regs->QueueDeviceHigh = (hw_ring_buffer_paddr + tx_used_off) >> 32;
+    regs->QueueDescLow = (resources.hw_ring_buffer_paddr + tx_desc_off) & 0xFFFFFFFF;
+    regs->QueueDescHigh = (resources.hw_ring_buffer_paddr + tx_desc_off) >> 32;
+    regs->QueueDriverLow = (resources.hw_ring_buffer_paddr + tx_avail_off) & 0xFFFFFFFF;
+    regs->QueueDriverHigh = (resources.hw_ring_buffer_paddr + tx_avail_off) >> 32;
+    regs->QueueDeviceLow = (resources.hw_ring_buffer_paddr + tx_used_off) & 0xFFFFFFFF;
+    regs->QueueDeviceHigh = (resources.hw_ring_buffer_paddr + tx_used_off) >> 32;
     regs->QueueReady = 1;
 
     // Set the MAC address
@@ -473,6 +469,7 @@ static void eth_setup(void)
 /* By the time we get to here, 'resources' should be valid */
 void init(void)
 {
+    LOG_DRIVER_ERR("HELLO, I AM IN C!!!\n");
 #ifdef MICROKIT
     resources = (struct resources){
         .regs = eth_regs,
@@ -503,12 +500,12 @@ void init(void)
     seL4_IRQHandler_Ack(resources.irq_cap);
 }
 
-void notified(microkit_channel ch)
+void notified(uint32_t ch)
 {
     switch (ch) {
     case IRQ_CH:
         handle_irq();
-        seL4_IRQHandler_Ack(resources.irq_cap);;
+        seL4_IRQHandler_Ack(resources.irq_cap);
         break;
     case RX_CH:
         rx_provide();

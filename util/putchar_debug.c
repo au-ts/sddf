@@ -9,8 +9,8 @@
 #define MAX_STRING_LENGTH 0x1000
 #define FLUSH_CHAR '\n'
 
-static char string_buffer[MAX_STRING_LENGTH + 1];
-static uint32_t local_tail;
+static char string_buffer[MAX_STRING_LENGTH + 1] = {0};
+static uint32_t local_tail = 0;
 
 void _sddf_puts(const char *s) {
    while (*s) {

@@ -35,7 +35,8 @@
 
 #pragma once
 
-#include <microkit.h>
+// #include <microkit.h>
+#include <sel4/sel4.h>
 #include <sddf/serial/queue.h>
 
 #include <stdarg.h>
@@ -66,6 +67,7 @@ void _sddf_putchar(char character);
  */
 void sddf_putchar_unbuffered(char character);
 
+#ifndef CONFIG_DEBUG_BUILD
 /**
  * @brief Initialises the serial putchar library. Ensure this is called before using serial printf or
  * sddf_putchar_unbuffered.
@@ -74,6 +76,7 @@ void sddf_putchar_unbuffered(char character);
  * @param serial_tx_queue_handle Address of the serial tx queue handle.
  */
 void serial_putchar_init(microkit_channel serial_tx_ch, serial_queue_handle_t *serial_tx_queue_handle);
+#endif
 
 /**
  * Tiny printf implementation

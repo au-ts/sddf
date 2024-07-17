@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include <microkit.h>
+// #include <microkit.h>
 #include <stdint.h>
 
 #define ETH_TYPE_ARP 0x0806U
