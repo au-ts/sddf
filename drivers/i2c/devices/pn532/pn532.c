@@ -148,52 +148,62 @@ static uint8_t process_return_buffer(struct response *response)
 uint8_t read_ack_frame(size_t retries)
 {
     LOG_PN532("reading ack frame\n");
-    struct request req = {};
-    request_init(&req, PN532_I2C_BUS_ADDRESS);
+    uint8_t error;
+    size_t attempts = 0;
+    while (attempts < retries) {
+        struct request req = {};
+        request_init(&req, PN532_I2C_BUS_ADDRESS);
 
-    request_add(&req, I2C_TOKEN_START);
-    request_add(&req, I2C_TOKEN_ADDR_READ);
-    for (int i = 0; i < ACK_FRAME_SIZE - 1; i++) {
-        request_add(&req, I2C_TOKEN_DATA);
-    }
-    request_add(&req, I2C_TOKEN_DATA_END);
-    request_add(&req, I2C_TOKEN_STOP);
-
-    request_send(&req);
-
-    co_switch(t_event);
-
-    const uint8_t PN532_ACK[] = {0, 0, 0xFF, 0, 0xFF, 0};
-
-    struct response response = {};
-
-    response_init(&response);
-
-    uint8_t error = process_return_buffer(&response);
-    if (error) {
-        LOG_PN532_ERR("return buffer error");
-        response_finish(&response);
-        return error;
-    }
-
-    if (response_read(&response) & 1) { // to see if response is ready
-        /* Minus one because the first byte is for the device ready status */
+        request_add(&req, I2C_TOKEN_START);
+        request_add(&req, I2C_TOKEN_ADDR_READ);
         for (int i = 0; i < ACK_FRAME_SIZE - 1; i++) {
-            uint8_t value = response_read(&response);
-            if (value != PN532_ACK[i]) {
-                LOG_PN532_ERR("ACK malformed at index PN532_ACK[%d], value is %d!\n", i, value);
-                response_finish(&response);
-                return I2C_ERR_OTHER;
-            }
+            request_add(&req, I2C_TOKEN_DATA);
+        }
+        request_add(&req, I2C_TOKEN_DATA_END);
+        request_add(&req, I2C_TOKEN_STOP);
+
+        request_send(&req);
+
+        co_switch(t_event);
+        assert(i2c_queue_size(queue.response) == 1);
+
+        const uint8_t PN532_ACK[] = {0, 0, 0xFF, 0, 0xFF, 0};
+
+        struct response response = {};
+
+        response_init(&response);
+
+        uint8_t error = process_return_buffer(&response);
+        if (error) {
+            LOG_PN532_ERR("return buffer error");
+            response_finish(&response);
+            attempts++;
+            continue;
         }
 
+        if (response_read(&response) & 1) { // to see if response is ready
+            /* Minus one because the first byte is for the device ready status */
+            for (int i = 0; i < ACK_FRAME_SIZE - 1; i++) {
+                uint8_t value = response_read(&response);
+                if (value != PN532_ACK[i]) {
+                    LOG_PN532_ERR("ACK malformed at index PN532_ACK[%d], value is %d!\n", i, value);
+                    response_finish(&response);
+                    error = I2C_ERR_OTHER; 
+                    attempts++;
+                    continue;
+                }
+            }
+
+            response_finish(&response);
+            return I2C_ERR_OK;
+        }
+        attempts++;
+        error = I2C_ERR_OTHER; 
         response_finish(&response);
-        return I2C_ERR_OK;
     }
 
     LOG_PN532_ERR("read_ack_frame: device is not ready yet!\n");
-    response_finish(&response);
-    return I2C_ERR_OTHER;
+    return error;
 }
 
 uint8_t pn532_write_command(uint8_t *header, uint8_t hlen, const uint8_t *body, uint8_t blen, size_t retries)
@@ -252,6 +262,7 @@ uint8_t pn532_write_command(uint8_t *header, uint8_t hlen, const uint8_t *body, 
 
     /* Now we need to wait for the response */
     co_switch(t_event);
+    assert(i2c_queue_size(queue.response) == 1);
 
     struct response response = {};
     response_init(&response);
@@ -261,7 +272,6 @@ uint8_t pn532_write_command(uint8_t *header, uint8_t hlen, const uint8_t *body, 
     response_finish(&response);
 
     if (!error) {
-        delay_ms(100); // otherwise too fast and will fail
         error = read_ack_frame(retries);
         return error;
     }
@@ -274,34 +284,48 @@ uint8_t read_response_length(int8_t *length, size_t retries)
 {
     LOG_PN532("reading response length\n");
 
-    struct request req = {};
-    request_init(&req, PN532_I2C_BUS_ADDRESS);
-
-    request_add(&req, I2C_TOKEN_START);
-    request_add(&req, I2C_TOKEN_ADDR_READ);
-    for (int i = 0; i < NACK_SIZE - 1; i++) {
-        request_add(&req, I2C_TOKEN_DATA);
-    }
-    request_add(&req, I2C_TOKEN_DATA_END);
-    request_add(&req, I2C_TOKEN_STOP);
-
-    request_send(&req);
-
-    co_switch(t_event);
-
     struct response response = {};
-    response_init(&response);
 
-    uint8_t error = process_return_buffer(&response);
-    if (error) {
-        response_finish(&response);
-        return error;
+    size_t attempts = 0;
+    uint8_t error = I2C_ERR_OK;
+    while (attempts < retries) {
+        struct request req = {};
+        request_init(&req, PN532_I2C_BUS_ADDRESS);
+
+        request_add(&req, I2C_TOKEN_START);
+        request_add(&req, I2C_TOKEN_ADDR_READ);
+        for (int i = 0; i < NACK_SIZE - 1; i++) {
+            request_add(&req, I2C_TOKEN_DATA);
+        }
+        request_add(&req, I2C_TOKEN_DATA_END);
+        request_add(&req, I2C_TOKEN_STOP);
+
+        request_send(&req);
+
+        co_switch(t_event);
+        assert(i2c_queue_size(queue.response) == 1);
+
+        response_init(&response);
+
+        uint8_t error = process_return_buffer(&response);
+        if (error) {
+            response_finish(&response);
+            attempts++;
+            continue;
+        }
+
+        if (!(response_read(&response) & 1)) {
+            LOG_PN532_ERR("device was not ready when reading the response length!\n");
+            response_finish(&response);
+            error = I2C_ERR_OTHER;         
+            attempts++;
+        } else {
+            break;
+        }
     }
 
-    if (!(response_read(&response) & 1)) {
-        LOG_PN532_ERR("device was not ready when reading the response length!\n");
-        response_finish(&response);
-        return I2C_ERR_OTHER;
+    if (attempts == retries) {
+        return error;
     }
 
     if (response_read(&response) != PN532_PREAMBLE) {
@@ -325,8 +349,6 @@ uint8_t read_response_length(int8_t *length, size_t retries)
     *length = response_read(&response);
     response_finish(&response);
 
-    delay_ms(100); // othweise too fast and will fail
-
     LOG_PN532("checking nack for reading response length\n");
 
     /* Check nack */
@@ -344,6 +366,7 @@ uint8_t read_response_length(int8_t *length, size_t retries)
     request_send(&nack_req);
 
     co_switch(t_event);
+    assert(i2c_queue_size(queue.response) == 1);
 
     struct response response2 = {};
     response_init(&response2);
@@ -357,7 +380,6 @@ uint8_t read_response_length(int8_t *length, size_t retries)
 
 uint8_t pn532_read_response(uint8_t *buffer, uint8_t buffer_len, size_t retries)
 {
-    delay_ms(100); // otherwise too fast and will fail
     int8_t length;
     uint8_t error = read_response_length(&length, retries);
     if (error != I2C_ERR_OK) {
@@ -368,48 +390,56 @@ uint8_t pn532_read_response(uint8_t *buffer, uint8_t buffer_len, size_t retries)
         return I2C_ERR_OTHER;
     }
 
-    delay_ms(100); // otherwise too fast and will fail
-
     LOG_PN532("reading response\n");
     LOG_PN532("length is : %d\n", length);
 
-    struct request request = {};
-    request_init(&request, PN532_I2C_BUS_ADDRESS);
-
-    size_t num_data_tokens = 6 + length + 2; // from arduino code
-
-    request_add(&request, I2C_TOKEN_START);
-    request_add(&request, I2C_TOKEN_ADDR_READ);
-
-    if (num_data_tokens > request.buffer_size) {
-        LOG_PN532_ERR("number of request data tokens (0x%lx) exceeds buffer size (0x%lx)\n", num_data_tokens, request.buffer_size);
-        return I2C_ERR_OTHER;
-    }
-
-    for (int i = 0; i < num_data_tokens - 1; i++) {
-        request_add(&request, I2C_TOKEN_DATA);
-    }
-
-    request_add(&request, I2C_TOKEN_DATA_END);
-    request_add(&request, I2C_TOKEN_STOP);
-
-    request_send(&request);
-
-    LOG_PN532("read_response: sent request of size %d\n", num_data_tokens);
-    co_switch(t_event);
-
     struct response response = {};
-    response_init(&response);
-    error = process_return_buffer(&response);
-    if (error) {
-        response_finish(&response);
-        return error;
-    }
 
-    if (!(response_read(&response) & 1)) {
-        response_finish(&response);
-        LOG_PN532_ERR("not ready yet\n");
-        return I2C_ERR_OTHER;
+    size_t attempts = 0;
+    while (attempts < retries) {
+        struct request request = {};
+        request_init(&request, PN532_I2C_BUS_ADDRESS);
+
+        size_t num_data_tokens = 6 + length + 2; // from arduino code
+
+        request_add(&request, I2C_TOKEN_START);
+        request_add(&request, I2C_TOKEN_ADDR_READ);
+
+        if (num_data_tokens > request.buffer_size) {
+            LOG_PN532_ERR("number of request data tokens (0x%lx) exceeds buffer size (0x%lx)\n", num_data_tokens, request.buffer_size);
+            return I2C_ERR_OTHER;
+        }
+
+        for (int i = 0; i < num_data_tokens - 1; i++) {
+            request_add(&request, I2C_TOKEN_DATA);
+        }
+
+        request_add(&request, I2C_TOKEN_DATA_END);
+        request_add(&request, I2C_TOKEN_STOP);
+
+        request_send(&request);
+
+        LOG_PN532("read_response: sent request of size %d\n", num_data_tokens);
+        co_switch(t_event);
+        assert(i2c_queue_size(queue.response) == 1);
+
+        response_init(&response);
+        error = process_return_buffer(&response);
+        if (error) {
+            response_finish(&response);
+            attempts++;
+            continue;
+        }
+
+        if (!(response_read(&response) & 1)) {
+            response_finish(&response);
+            LOG_PN532_ERR("not ready yet\n");
+            error = I2C_ERR_OTHER;
+            attempts++;
+            continue;
+        } else {
+            break;
+        }
     }
 
     // Read PREAMBLE
@@ -448,7 +478,7 @@ uint8_t pn532_read_response(uint8_t *buffer, uint8_t buffer_len, size_t retries)
     // Read command data
     if (data_length > buffer_len) {
         LOG_PN532_ERR("returned data length (0x%lx) greater than user-provided buffer length (0x%x)\n", data_length,
-                      buffer_len);
+                    buffer_len);
         response_finish(&response);
         return I2C_ERR_OTHER;
     }

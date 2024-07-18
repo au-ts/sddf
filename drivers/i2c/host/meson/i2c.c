@@ -407,7 +407,7 @@ static inline void i2c_load_tokens(volatile struct i2c_regs *regs) {
     while (tk_offset < 16 && wdata_offset < 8 && rdata_offset < 8 && request_data_offset < i2c_ifState.curr_request_len) {
         LOG_DRIVER("request_data_offset : 0x%lx, tk_offset: 0x%lx, wdata_offset: 0x%lx, rdata_offset: 0x%lx\n", request_data_offset, tk_offset, wdata_offset, rdata_offset);
         
-        // @Tristan : the below is most liekly not ever needed because regs->tk_list0 and regs->tk_list1 already set to 0 before this loop, (note: MESON_I2C_TOKEN_END = 0)
+        // @Tristan : the below is most liekly not needed because regs->tk_list0 and regs->tk_list1 already set to 0 before this loop, (note: MESON_I2C_TOKEN_END = 0)
         /* // Explicitly pad END tokens for empty space
         if (request_data_offset == i2c_ifState.curr_request_len) { // we finshed putting all request data into registers
             if (tk_offset < 8) {
@@ -531,7 +531,7 @@ static void handle_response_timeout(void) {
     // from my understanding since the state of the registers doesnt change on returning
     // it just automatically retries again in some amount of time
     // something to do with the clock driver not waiting the correct amount of time before a resposne.
-
+    // only happens on the card reader
 
     //     i2c_halt();
     //     if (i2c_ifState.curr_reseponse_data) {

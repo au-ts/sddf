@@ -55,6 +55,9 @@ enum ds3231_registers {                         // RANGE:
 #define DS3231_BIT_EN32KHZ                    0X03
 #define DS3231_BIT_OSF                        0X07
 
+#define DEFAULT_READ_RESPONSE_RETRIES (256)
+#define DEFAULT_READ_ACK_FRAME_RETRIES (20)
+
 bool ds3231_write(uint8_t *buffer, uint8_t buffer_len, size_t retries);
 bool ds3231_read(uint8_t *buffer, uint8_t buffer_len, size_t retries);
 

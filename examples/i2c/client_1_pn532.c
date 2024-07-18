@@ -16,12 +16,12 @@
 #endif
 #define LOG_CLIENT_ERR(...) do{ sddf_printf("CLIENT|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
-// #define PN_532_ON
+#define PN_532_ON
 
 #ifdef PN_532_ON
-#define CONDITIONAL_HALT(...) do{}while(0)
+#define USING_HALT(...) do{}while(0)
 #else
-#define CONDITIONAL_HALT(...) do{ while(1); }while(0)
+#define USING_HALT(...) do{ while(1); }while(0)
 #endif 
 
 uintptr_t data_region;
@@ -80,6 +80,8 @@ bool read_passive_target_id(uint8_t card_baud_rate, uint8_t *uid_buf, uint8_t *u
 uint8_t big_buf[64];
 
 void client_main(void) {
+    USING_HALT();
+
     LOG_CLIENT("client_main: started\n");
     uint8_t header[1];
     header[0] = PN532_CMD_GETFIRMWAREVERSION;

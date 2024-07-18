@@ -17,12 +17,12 @@
 #define LOG_CLIENT_ERR(...) do{ sddf_printf("DS3231_CLIENT|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
 
-// #define DS_3231_ON
+#define DS_3231_ON
 
 #ifdef DS_3231_ON
-#define CONDITIONAL_HALT(...) do{}while(0)
+#define USING_HALT(...) do{}while(0)
 #else
-#define CONDITIONAL_HALT(...) do{ while(1); }while(0)
+#define USING_HALT(...) do{ while(1); }while(0)
 #endif 
 
 uintptr_t data_region;
@@ -32,6 +32,9 @@ i2c_queue_handle_t queue;
 
 cothread_t t_event;
 cothread_t t_main;
+
+#define DEFAULT_READ_RESPONSE_RETRIES (256)
+#define DEFAULT_READ_ACK_FRAME_RETRIES (20)
 
 #define STACK_SIZE (4096)
 static char t_client_main_stack[STACK_SIZE];
@@ -48,10 +51,12 @@ static const char *day_of_week_strings[] = {
 };
 
 void client_main(void) {
+    USING_HALT();
+
     LOG_CLIENT("client_main: started\n");
 
     LOG_CLIENT("see if ds3231 responds with ACK\n");
-    uint8_t write_fail = ds3231_write(NULL, 0, 1);
+    uint8_t write_fail = ds3231_write(NULL, 0, DEFAULT_READ_ACK_FRAME_RETRIES);
     if (write_fail) {
         LOG_CLIENT_ERR("failed to find DS3231 on bus!\n");
         while (1) {};

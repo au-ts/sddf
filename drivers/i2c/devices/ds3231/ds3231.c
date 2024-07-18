@@ -6,9 +6,6 @@
 #include "ds3231.h"
 #include "client.h"
 
-#define DEFAULT_READ_RESPONSE_RETRIES (256)
-#define DEFAULT_READ_ACK_FRAME_RETRIES (20)
-
 // #define DEBUG_DS3231
 
 #ifdef DEBUG_DS3231
