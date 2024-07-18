@@ -16,6 +16,14 @@
 #endif
 #define LOG_CLIENT_ERR(...) do{ sddf_printf("CLIENT|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
+// #define PN_532_ON
+
+#ifdef PN_532_ON
+#define CONDITIONAL_HALT(...) do{}while(0)
+#else
+#define CONDITIONAL_HALT(...) do{ while(1); }while(0)
+#endif 
+
 uintptr_t data_region;
 uintptr_t request_region;
 uintptr_t response_region;

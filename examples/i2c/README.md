@@ -22,7 +22,7 @@ make MICROKIT_SDK=/path/to/sdk
 
 The final bootable image will be in `build/loader.img`.
 
-### Zig (currently not working)
+### Zig
 
 You can also build this example with the Zig build system:
 ```sh
@@ -32,7 +32,7 @@ zig build -Dsdk=/path/to/sdk -Dboard=odroidc4
 The final bootable image will be in `zig-out/bin/loader.img`.
 
 ## Running PN532
-Place a ```while (1) {};``` after client_main function for respective client you dont want ot see output for.
+Make sure PN_532_ON is defined.
 
 Running the example will show the following output after the system has booted:
 ```
@@ -59,7 +59,7 @@ see timeouts between each UID card read, this is expected.
 **There is a video in this directory of the card reader working.**
 
 ## Running DS3231
-Place a ```while (1) {};``` after client_main function for respective client you dont want ot see output for.
+Make sure DS_3231_ON is defined.
 
 Running the example will show the following output after the system has booted:
 ```

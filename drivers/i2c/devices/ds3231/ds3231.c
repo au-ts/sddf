@@ -6,6 +6,9 @@
 #include "ds3231.h"
 #include "client.h"
 
+#define DEFAULT_READ_RESPONSE_RETRIES (256)
+#define DEFAULT_READ_ACK_FRAME_RETRIES (20)
+
 // #define DEBUG_DS3231
 
 #ifdef DEBUG_DS3231
@@ -196,7 +199,7 @@ bool ds3231_read(uint8_t *buffer, uint8_t buffer_len, size_t retries)
         response_init(&response);
         uint8_t error = process_return_buffer(&response);
         if (!error) {
-            for (int i = 0; i < buffer_len; i++) { // pretty sure buffer cant be longer then 7
+            for (int i = 0; i < buffer_len; i++) {
                 buffer[i] = response_read(&response);
             }
 
@@ -210,3 +213,54 @@ bool ds3231_read(uint8_t *buffer, uint8_t buffer_len, size_t retries)
         delay_ms(1);
     }
 }
+
+bool ds3231_get_time(uint8_t *second, uint8_t *minute, uint8_t *hour, uint8_t *day_of_week, uint8_t *day, uint8_t *month, uint8_t *year) {
+    uint8_t start_register_write_buffer[1];
+    start_register_write_buffer[0] = DS3231_REGISTER_SECONDS; // to tell ds3231 to start reading at register 0
+    uint8_t write_fail = ds3231_write(start_register_write_buffer, 1, DEFAULT_READ_ACK_FRAME_RETRIES);
+    if (write_fail) {
+        return true;
+    }
+
+    uint8_t time_response_buffer[7];
+    uint8_t read_fail = ds3231_read(time_response_buffer, 7, DEFAULT_READ_RESPONSE_RETRIES);
+    if (read_fail) {
+        return true;
+    } 
+
+    *second = bcdToDec(time_response_buffer[0]);
+    *minute = bcdToDec(time_response_buffer[1]);
+    *hour = bcdToDec(time_response_buffer[2]);
+    *day_of_week = bcdToDec(time_response_buffer[3]);
+    *day = bcdToDec(time_response_buffer[4]);
+    *month = bcdToDec(time_response_buffer[5] & (~(1 << DS3231_BIT_CENTURY))); // mask out the century 
+    *year = bcdToDec(time_response_buffer[6]);
+
+    return false;
+}
+
+bool ds3231_set_time(uint8_t second, uint8_t minute, uint8_t hour, uint8_t day_of_week, uint8_t day, uint8_t month, uint8_t year) {
+    uint8_t set_time_buffer[8];
+    set_time_buffer[0] = DS3231_REGISTER_SECONDS; // Address to start writing at
+    set_time_buffer[1] = decToBcd(second);
+    set_time_buffer[2] = decToBcd(minute);
+    set_time_buffer[3] = decToBcd(hour);
+    set_time_buffer[4] = decToBcd(day_of_week);
+    set_time_buffer[5] = decToBcd(day);
+    set_time_buffer[6] = decToBcd(month);
+    set_time_buffer[7] = decToBcd(year);
+
+    uint8_t write_fail = ds3231_write(set_time_buffer, 8, DEFAULT_READ_ACK_FRAME_RETRIES);
+    return write_fail;
+}
+
+// Function to convert decimal to BCD
+uint8_t decToBcd(uint8_t val) {
+  return ((val / 10 * 16) + (val % 10));
+}
+
+// Function to convert BCD to decimal
+uint8_t bcdToDec(uint8_t val) {
+  return ((val / 16 * 10) + (val % 16));
+}
+

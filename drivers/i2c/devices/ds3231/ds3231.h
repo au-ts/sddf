@@ -57,3 +57,10 @@ enum ds3231_registers {                         // RANGE:
 
 bool ds3231_write(uint8_t *buffer, uint8_t buffer_len, size_t retries);
 bool ds3231_read(uint8_t *buffer, uint8_t buffer_len, size_t retries);
+
+// User Provided Functions
+bool ds3231_get_time(uint8_t *seconds, uint8_t *minutes, uint8_t *hours, uint8_t *day_of_week, uint8_t *day, uint8_t *month, uint8_t *year);
+bool ds3231_set_time(uint8_t seconds, uint8_t minutes, uint8_t hours, uint8_t day_of_week, uint8_t day, uint8_t month, uint8_t year);
+
+uint8_t decToBcd(uint8_t val);
+uint8_t bcdToDec(uint8_t val);

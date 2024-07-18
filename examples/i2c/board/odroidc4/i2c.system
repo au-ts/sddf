@@ -11,6 +11,11 @@
 
     <memory_region name="i2c_bus" size="0x1000" phys_addr="0xFFD1D000"/>
 
+    <!--
+	    This system transfers minimal data over I2C and so a data region size of
+        0x1000 is more than enough for our use-case.
+    -->
+
     <memory_region name="client_ds3231_request_region" size="0x1_000"/>
     <memory_region name="client_ds3231_response_region" size="0x1_000"/>
 

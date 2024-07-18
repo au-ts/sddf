@@ -16,6 +16,15 @@
 #endif
 #define LOG_CLIENT_ERR(...) do{ sddf_printf("DS3231_CLIENT|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
+
+// #define DS_3231_ON
+
+#ifdef DS_3231_ON
+#define CONDITIONAL_HALT(...) do{}while(0)
+#else
+#define CONDITIONAL_HALT(...) do{ while(1); }while(0)
+#endif 
+
 uintptr_t data_region;
 uintptr_t request_region;
 uintptr_t response_region;
@@ -24,21 +33,8 @@ i2c_queue_handle_t queue;
 cothread_t t_event;
 cothread_t t_main;
 
-#define DEFAULT_READ_RESPONSE_RETRIES (256)
-#define DEFAULT_READ_ACK_FRAME_RETRIES (20)
-
 #define STACK_SIZE (4096)
 static char t_client_main_stack[STACK_SIZE];
-
-// Function to convert decimal to BCD
-uint8_t decToBcd(uint8_t val) {
-  return ((val / 10 * 16) + (val % 10));
-}
-
-// Function to convert BCD to decimal
-uint8_t bcdToDec(uint8_t val) {
-  return ((val / 16 * 10) + (val % 16));
-}
 
 // weeks bits are from 1 - 7 so remember to index correctly (subtract 1)
 static const char *day_of_week_strings[] = {
@@ -55,62 +51,31 @@ void client_main(void) {
     LOG_CLIENT("client_main: started\n");
 
     LOG_CLIENT("see if ds3231 responds with ACK\n");
-    uint8_t write_fail = ds3231_write(NULL, 0, DEFAULT_READ_ACK_FRAME_RETRIES);
+    uint8_t write_fail = ds3231_write(NULL, 0, 1);
     if (write_fail) {
         LOG_CLIENT_ERR("failed to find DS3231 on bus!\n");
         while (1) {};
     }
 
-    // Set the time
-    uint8_t intial_second = 42;
-    uint8_t intial_minute = 59;
-    uint8_t intial_hour = 23;
-    uint8_t intial_day_of_week = 7;
-    uint8_t intial_day = 31;
-    uint8_t intial_month = 12;
-    uint8_t intial_year = 23;
-
-    uint8_t set_time_buffer[8];
-    set_time_buffer[0] = DS3231_REGISTER_SECONDS; // Address to start writing at
-    set_time_buffer[1] = decToBcd(intial_second);
-    set_time_buffer[2] = decToBcd(intial_minute);
-    set_time_buffer[3] = decToBcd(intial_hour);
-    set_time_buffer[4] = decToBcd(intial_day_of_week);
-    set_time_buffer[5] = decToBcd(intial_day);
-    set_time_buffer[6] = decToBcd(intial_month);
-    set_time_buffer[7] = decToBcd(intial_year);
-    write_fail = ds3231_write(set_time_buffer, 8, DEFAULT_READ_ACK_FRAME_RETRIES);
-    if (write_fail) {
-        LOG_CLIENT_ERR("failed to set time on DS3231 on bus!\n");
+    if (ds3231_set_time(42, 59, 23, 7, 31, 12, 23)) {
+        LOG_CLIENT_ERR("failed to set time on DS3231!\n");
         while (1) {};
     }
-    sddf_printf("Set Date and Time on DS3231 to: %02d-%02d-%02d %02d:%02d:%02d (%s)\n", intial_day, intial_month, intial_year, intial_hour, intial_minute, intial_second, day_of_week_strings[intial_day_of_week - 1]);
+    sddf_printf("Set Date and Time on DS3231 to: %02d-%02d-%02d %02d:%02d:%02d (%s)\n", 31, 12, 23, 23, 59, 42, day_of_week_strings[7 - 1]);
 
     LOG_CLIENT("Starting to ask for the time!\n");
     while (true) {
-        LOG_CLIENT("Tell DS3231 what register to start reading from!\n");
-        uint8_t start_register_write_buffer[1];
-        start_register_write_buffer[0] = DS3231_REGISTER_SECONDS; // to tell ds3231 to start reading at register 0
-        write_fail = ds3231_write(start_register_write_buffer, 1, DEFAULT_READ_ACK_FRAME_RETRIES);
-        if (write_fail) {
-            LOG_CLIENT_ERR("failed to tell DS3231 the correct starting register to read from!\n");
+        uint8_t second;
+        uint8_t minute;
+        uint8_t hour;
+        uint8_t day_of_week;
+        uint8_t day;
+        uint8_t month;
+        uint8_t year;
+        if (ds3231_get_time(&second, &minute, &hour, &day_of_week, &day, &month, &year)) {
+            LOG_CLIENT_ERR("failed to get time from DS3231!\n");
             while (1) {};
         }
-
-        LOG_CLIENT("Make read time request!\n");
-        uint8_t time_response_buffer[7];
-        uint8_t read_fail = ds3231_read(time_response_buffer, 7, DEFAULT_READ_RESPONSE_RETRIES);
-        if (read_fail) {
-            LOG_CLIENT_ERR("failed to read response for getting the time\n");
-            while (1) {};
-        }
-        uint8_t second = bcdToDec(time_response_buffer[0]);
-        uint8_t minute = bcdToDec(time_response_buffer[1]);
-        uint8_t hour = bcdToDec(time_response_buffer[2]);
-        uint8_t day_of_week = bcdToDec(time_response_buffer[3]);
-        uint8_t day = bcdToDec(time_response_buffer[4]);
-        uint8_t month = bcdToDec(time_response_buffer[5] & (~(1 << DS3231_BIT_CENTURY))); // mask out the century 
-        uint8_t year = bcdToDec(time_response_buffer[6]);
 
         sddf_printf("Date and Time: %02d-%02d-%02d %02d:%02d:%02d (%s)\n", day, month, year, hour, minute, second, day_of_week_strings[day_of_week - 1]);
 

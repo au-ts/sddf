@@ -37,7 +37,7 @@
 typedef uint8_t i2c_token_t;
 
 enum i2c_token {
-    /* END: Terminator for token list, has no meaning to hardware otherwise (no need to use ever basically) */
+    /* END: Terminator for token list, has no meaning to hardware otherwise */
     I2C_TOKEN_END = 0x0,
     /* START: Begin a transfer. Causes master device to capture bus. */
     I2C_TOKEN_START = 0x1,
