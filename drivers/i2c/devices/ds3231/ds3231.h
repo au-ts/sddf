@@ -27,7 +27,7 @@ enum ds3231_registers {                         // RANGE:
     DS3231_REGISTER_ALARM2_TEMP_MSB,
     DS3231_REGISTER_ALARM2_TEMP_LSB
 };
-                                              // Below are the bit numbers of the respective field
+// Below are the bit numbers of the respective field
 #define DS3231_BIT_12_24                      0X06
 #define DS3231_BIT_CENTURY                    0X07
 #define DS3231_BIT_A1M1                       0X07
@@ -62,8 +62,10 @@ bool ds3231_write(uint8_t *buffer, uint8_t buffer_len, size_t retries);
 bool ds3231_read(uint8_t *buffer, uint8_t buffer_len, size_t retries);
 
 // User Provided Functions
-bool ds3231_get_time(uint8_t *seconds, uint8_t *minutes, uint8_t *hours, uint8_t *day_of_week, uint8_t *day, uint8_t *month, uint8_t *year);
-bool ds3231_set_time(uint8_t seconds, uint8_t minutes, uint8_t hours, uint8_t day_of_week, uint8_t day, uint8_t month, uint8_t year);
+bool ds3231_get_time(uint8_t *seconds, uint8_t *minutes, uint8_t *hours, uint8_t *day_of_week, uint8_t *day,
+                     uint8_t *month, uint8_t *year);
+bool ds3231_set_time(uint8_t seconds, uint8_t minutes, uint8_t hours, uint8_t day_of_week, uint8_t day, uint8_t month,
+                     uint8_t year);
 
 uint8_t decToBcd(uint8_t val);
 uint8_t bcdToDec(uint8_t val);

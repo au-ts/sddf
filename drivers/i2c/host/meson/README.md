@@ -56,9 +56,9 @@ The servers act as the target for API calls from clients and has two responsibil
 * Security: i2c devices are a colossal security risk if not protected. The driver ensures that the requesting client has been provisioned access to the requested bus and address.
 It also maps client specific offsets to driver specific offsets represented in the queue structure.
 
-Each transaction chain can only target a single address - this is adequate for a majority of i2c perpipherals however; very few require multi-address calls in a single transaction. This constraint is to guarantee O(1) rejection of inauthentic requests. 
+Each transaction chain can only target a single address - this is adequate for a majority of i2c perpipherals however; very few require multi-address calls in a single transaction. This constraint is to guarantee O(1) rejection of inauthentic requests.
 
-So the server determines if client requests are authentic before enqueuing request into the server <=> driver request queue. 
+So the server determines if client requests are authentic before enqueuing request into the server <=> driver request queue.
 Client requests are put into a queue to guarantee "first-come-first-serve" operation.
 
 The virtualiser maps client specific offsets into driver specific offsets with security checks so clients dont access other clients data.
@@ -99,7 +99,7 @@ In transport all i2c operations are decomposed into a list of tokens for more co
 
 A token-based abstraction is already used in the ODROID C4 hardware, but we take it a step further by flattening data sent over the bus/request buffers into the token stream too, for easier buffering. The tokens are defined as follows:
 
-* `I2C_TOKEN_END` - Terminator for token lists; has no effect besides to indicate further bytes are invalid (its jsut zeros, 0x00 and has no effect on the i2c transation itself, but rather used to represent a certain state of the registers). Hence only the driver should use but has not effect other then potentially causing another transaction to happen over the bus.
+* `I2C_TOKEN_END` - Terminator for token lists; has no effect besides to indicate further bytes are invalid (used to represent a certain state of the registers).
 * `I2C_TOKEN_START` - Triggers hardware to signal the START condition on the bus, claiming it.
 * `I2C_TOKEN_ADDRW` - Transmit a 7 bit address with a WRITE condition.
 * `I2C_TOKEN_ADDRR` - Transmit a 7 bit address with a READ condition.
@@ -109,7 +109,20 @@ A token-based abstraction is already used in the ODROID C4 hardware, but we take
 
 Note: a token is represented as a byte of data.
 
-Check out the load tokens function for more details.
+The format of all request buffers is as follows:
+- Begins with a I2C_TOKEN_START.
+- Ends with a I2C_TOKEN_STOP.
+
+For a WRITE operation of n bytes within the request:
+- Begins with a I2C_TOKEN_ADDRW.
+- Followed by n * (I2C_TOKEN_DATA + payload data).
+
+For a READ operation of n bytes within the request:
+- Begins with a I2C_TOKEN_ADDRR.
+- Followed by (n - 1) * I2C_TOKEN_DATA.
+- Concludes with 1 I2C_TOKEN_DATA_END.
+
+A sequence of WRITE and/or READ operations is separated by another I2C_TOKEN_START in a single request, indicating a repeated start condition.
 
 ### Error handling and transaction buffer format
 
@@ -129,7 +142,7 @@ The return buffers between the driver and server are used for both data and erro
 
 #### Request buffer
 
-The request buffers are used between the clients, server and drivers to represent a complete request. They are passed from the client to the server where they are validated and moved to the driver if authentic. The driver then decomposes the request buffer into some number of hardware operations and placed accordingly in the registers.
+The request buffers are used between the clients, server and drivers to represent a complete request. They are passed from the client to the server where they are validated and moved to the driver if authentic. The driver then decomposes the request buffer into some number of hardware operations and placed accordingly in the registers. The format details are already covered above.
 
 #### Example
 
@@ -223,7 +236,7 @@ Offset: 0x7400
 **M2_SLAVE_ADDR**
 ```
 Offset: 0x7401
- paddr: 0xFF822004 
+ paddr: 0xFF822004
 ```
 **M2_TOKEN_LIST_0**
 ```
@@ -266,7 +279,7 @@ Offset: 0x7000
 **M3_SLAVE_ADDR**
 ```
 Offset: 0x7001
- paddr: 0xFF821004 
+ paddr: 0xFF821004
 ```
 **M3_TOKEN_LIST_0**
 ```

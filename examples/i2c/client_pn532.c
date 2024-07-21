@@ -22,7 +22,7 @@
 #define USING_HALT(...) do{}while(0)
 #else
 #define USING_HALT(...) do{ while(1); }while(0)
-#endif 
+#endif
 
 uintptr_t data_region;
 uintptr_t request_region;
@@ -38,7 +38,8 @@ cothread_t t_main;
 #define STACK_SIZE (4096)
 static char t_client_main_stack[STACK_SIZE];
 
-bool read_passive_target_id(uint8_t card_baud_rate, uint8_t *uid_buf, uint8_t *uid_buf_length, uint8_t timeout) {
+bool read_passive_target_id(uint8_t card_baud_rate, uint8_t *uid_buf, uint8_t *uid_buf_length, uint8_t timeout)
+{
     uint8_t cmd_header[3] = { PN532_CMD_INLISTPASSIVETARGET, 1, card_baud_rate };
 
     uint8_t write_fail = pn532_write_command(cmd_header, 3, NULL, 0, DEFAULT_READ_ACK_FRAME_RETRIES);
@@ -79,7 +80,8 @@ bool read_passive_target_id(uint8_t card_baud_rate, uint8_t *uid_buf, uint8_t *u
 
 uint8_t big_buf[64];
 
-void client_main(void) {
+void client_main(void)
+{
     USING_HALT();
 
     LOG_CLIENT("client_main: started\n");
@@ -167,7 +169,8 @@ void client_main(void) {
     }
 }
 
-bool delay_ms(size_t milliseconds) {
+bool delay_ms(size_t milliseconds)
+{
     size_t time_ns = milliseconds * NS_IN_MS;
 
     /* Detect potential overflow */
@@ -182,7 +185,8 @@ bool delay_ms(size_t milliseconds) {
     return true;
 }
 
-void init(void) {
+void init(void)
+{
     LOG_CLIENT("init\n");
 
     queue = i2c_queue_init((i2c_queue_t *) request_region, (i2c_queue_t *) response_region);
@@ -202,15 +206,16 @@ void init(void) {
     co_switch(t_main);
 }
 
-void notified(microkit_channel ch) {
+void notified(microkit_channel ch)
+{
     switch (ch) {
-        case I2C_VIRTUALISER_CH:
-            co_switch(t_main);
-            break;
-        case TIMER_CH:
-            co_switch(t_main);
-            break;
-        default:
-            LOG_CLIENT_ERR("Unknown channel 0x%x!\n", ch);
+    case I2C_VIRTUALISER_CH:
+        co_switch(t_main);
+        break;
+    case TIMER_CH:
+        co_switch(t_main);
+        break;
+    default:
+        LOG_CLIENT_ERR("Unknown channel 0x%x!\n", ch);
     }
 }

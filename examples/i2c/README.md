@@ -8,7 +8,7 @@ for SDA and SCL respectively.
 
 ## Before compiling
 
-Change the virt.c file to fulfil your examples needs: i.e. 1 or 2 clients, channel numbers etc... 
+Change the virt.c file to fulfil your examples needs: i.e. 1 or 2 clients, channel numbers etc...
 Or comment out the client you dont want to use.
 
 ## Building

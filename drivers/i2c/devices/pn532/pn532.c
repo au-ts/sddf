@@ -165,7 +165,7 @@ uint8_t read_ack_frame(size_t retries)
         request_send(&req);
 
         co_switch(t_event);
-        assert(i2c_queue_size(queue.response) == 1);
+        assert(i2c_queue_length(queue.response) == 1);
 
         const uint8_t PN532_ACK[] = {0, 0, 0xFF, 0, 0xFF, 0};
 
@@ -188,7 +188,7 @@ uint8_t read_ack_frame(size_t retries)
                 if (value != PN532_ACK[i]) {
                     LOG_PN532_ERR("ACK malformed at index PN532_ACK[%d], value is %d!\n", i, value);
                     response_finish(&response);
-                    error = I2C_ERR_OTHER; 
+                    error = I2C_ERR_OTHER;
                     attempts++;
                     continue;
                 }
@@ -198,7 +198,7 @@ uint8_t read_ack_frame(size_t retries)
             return I2C_ERR_OK;
         }
         attempts++;
-        error = I2C_ERR_OTHER; 
+        error = I2C_ERR_OTHER;
         response_finish(&response);
     }
 
@@ -223,7 +223,7 @@ uint8_t pn532_write_command(uint8_t *header, uint8_t hlen, const uint8_t *body, 
 
     request_add(&req, I2C_TOKEN_DATA);
     request_add(&req, PN532_STARTCODE2);
-    
+
     /* Put length of PN532 data */
     size_t length = hlen + blen + 1;
     request_add(&req, I2C_TOKEN_DATA);
@@ -262,11 +262,11 @@ uint8_t pn532_write_command(uint8_t *header, uint8_t hlen, const uint8_t *body, 
 
     /* Now we need to wait for the response */
     co_switch(t_event);
-    assert(i2c_queue_size(queue.response) == 1);
+    assert(i2c_queue_length(queue.response) == 1);
 
     struct response response = {};
     response_init(&response);
-    
+
     uint8_t error = process_return_buffer(&response);
 
     response_finish(&response);
@@ -303,7 +303,7 @@ uint8_t read_response_length(int8_t *length, size_t retries)
         request_send(&req);
 
         co_switch(t_event);
-        assert(i2c_queue_size(queue.response) == 1);
+        assert(i2c_queue_length(queue.response) == 1);
 
         response_init(&response);
 
@@ -317,7 +317,7 @@ uint8_t read_response_length(int8_t *length, size_t retries)
         if (!(response_read(&response) & 1)) {
             LOG_PN532_ERR("device was not ready when reading the response length!\n");
             response_finish(&response);
-            error = I2C_ERR_OTHER;         
+            error = I2C_ERR_OTHER;
             attempts++;
         } else {
             break;
@@ -366,7 +366,7 @@ uint8_t read_response_length(int8_t *length, size_t retries)
     request_send(&nack_req);
 
     co_switch(t_event);
-    assert(i2c_queue_size(queue.response) == 1);
+    assert(i2c_queue_length(queue.response) == 1);
 
     struct response response2 = {};
     response_init(&response2);
@@ -406,7 +406,8 @@ uint8_t pn532_read_response(uint8_t *buffer, uint8_t buffer_len, size_t retries)
         request_add(&request, I2C_TOKEN_ADDR_READ);
 
         if (num_data_tokens > request.buffer_size) {
-            LOG_PN532_ERR("number of request data tokens (0x%lx) exceeds buffer size (0x%lx)\n", num_data_tokens, request.buffer_size);
+            LOG_PN532_ERR("number of request data tokens (0x%lx) exceeds buffer size (0x%lx)\n", num_data_tokens,
+                          request.buffer_size);
             return I2C_ERR_OTHER;
         }
 
@@ -421,7 +422,7 @@ uint8_t pn532_read_response(uint8_t *buffer, uint8_t buffer_len, size_t retries)
 
         LOG_PN532("read_response: sent request of size %d\n", num_data_tokens);
         co_switch(t_event);
-        assert(i2c_queue_size(queue.response) == 1);
+        assert(i2c_queue_length(queue.response) == 1);
 
         response_init(&response);
         error = process_return_buffer(&response);
@@ -478,7 +479,7 @@ uint8_t pn532_read_response(uint8_t *buffer, uint8_t buffer_len, size_t retries)
     // Read command data
     if (data_length > buffer_len) {
         LOG_PN532_ERR("returned data length (0x%lx) greater than user-provided buffer length (0x%x)\n", data_length,
-                    buffer_len);
+                      buffer_len);
         response_finish(&response);
         return I2C_ERR_OTHER;
     }

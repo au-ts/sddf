@@ -47,7 +47,7 @@ enum i2c_token {
     /* ADDRESS READ: Same as ADDRW but sets up DATA tokens as reads. */
     I2C_TOKEN_ADDR_READ = 0x3,
     /* DATA_END: Used for read transactions to write a NACK to alert
-     * the slave device that the read is now over. 
+     * the slave device that the read is now over.
      * this also acts the same way as I2C_TOKEN_DATA (ie it actually requests a token to read so should be treated the same in that regard) */
     I2C_TOKEN_DATA_END = 0x4,
     /* STOP: Used to send the STOP condition on the bus to end a transaction.

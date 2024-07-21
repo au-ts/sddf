@@ -10,8 +10,7 @@
 // Matt Rossouw (matthew.rossouw@unsw.edu.au)
 // 08/2023
 
-#ifndef I2C_DRIVER_H
-#define I2C_DRIVER_H
+#pragma once
 
 #include <stdint.h>
 #include <sddf/util/printf.h>
@@ -38,7 +37,7 @@ typedef struct _i2c_ifState {
     size_t remaining;
     /* Flag indicating that there is more independent requests waiting on the queue_handle.request. */
     bool notified;
-    
+
     enum data_direction data_direction;
     /* I2C bus address of the current request being handled */
     size_t addr;
@@ -72,14 +71,12 @@ typedef struct _i2c_ifState {
 #define MESON_I2C_TOKEN_END      (0x0)          // END: Terminator for token list, has no meaning to hardware otherwise
 #define MESON_I2C_TOKEN_START    (0x1)          // START: Begin an i2c transfer. Causes master device to capture bus.
 #define MESON_I2C_TOKEN_ADDR_WRITE    (0x2)     // ADDRESS WRITE: Used to wake up the target device on the bus. Sets up
-                                                   // any following DATA tokens to be writes.
+// any following DATA tokens to be writes.
 #define MESON_I2C_TOKEN_ADDR_READ    (0x3)      // ADDRESS READ: Same as ADDRW but sets up DATA tokens as reads.
 #define MESON_I2C_TOKEN_DATA     (0x4)          // DATA: Causes hardware to either read or write a byte to/from the read/write buffers.
 #define MESON_I2C_TOKEN_DATA_END (0x5)          // DATA_LAST: Used to indicate the last 8-bit byte transfer is a byte transfer of a READ
 #define MESON_I2C_TOKEN_STOP     (0x6)          // STOP: Used to send the STOP condition on the bus to end a transaction.
-                                                    // Causes master to release the bus.
+// Causes master to release the bus.
 
 /* The client cannot attach or use a bus address greater than 7-bits. */
 #define MESON_I2C_MAX_BUS_ADDRESS (0x7f)
-
-#endif

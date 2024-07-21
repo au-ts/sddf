@@ -56,41 +56,43 @@ i2c_queue_handle_t queue_handle;
 uintptr_t request_region;
 uintptr_t response_region;
 
-char *meson_token_to_str(uint8_t token) {
+char *meson_token_to_str(uint8_t token)
+{
     switch (token) {
-        case MESON_I2C_TOKEN_END:
-            return "MESON_I2C_TOKEN_END";
-        case MESON_I2C_TOKEN_START:
-            return "MESON_I2C_TOKEN_START";
-        case MESON_I2C_TOKEN_ADDR_WRITE:
-            return "MESON_I2C_TOKEN_ADDR_WRITE";
-        case MESON_I2C_TOKEN_ADDR_READ:
-            return "MESON_I2C_TOKEN_ADDR_READ";
-        case MESON_I2C_TOKEN_DATA:
-            return "MESON_I2C_TOKEN_DATA";
-        case MESON_I2C_TOKEN_DATA_END:
-            return "MESON_I2C_TOKEN_DATA_END";
-        case MESON_I2C_TOKEN_STOP:
-            return "MESON_I2C_TOKEN_STOP";
-        default:
-            return "Unknown token!";
+    case MESON_I2C_TOKEN_END:
+        return "MESON_I2C_TOKEN_END";
+    case MESON_I2C_TOKEN_START:
+        return "MESON_I2C_TOKEN_START";
+    case MESON_I2C_TOKEN_ADDR_WRITE:
+        return "MESON_I2C_TOKEN_ADDR_WRITE";
+    case MESON_I2C_TOKEN_ADDR_READ:
+        return "MESON_I2C_TOKEN_ADDR_READ";
+    case MESON_I2C_TOKEN_DATA:
+        return "MESON_I2C_TOKEN_DATA";
+    case MESON_I2C_TOKEN_DATA_END:
+        return "MESON_I2C_TOKEN_DATA_END";
+    case MESON_I2C_TOKEN_STOP:
+        return "MESON_I2C_TOKEN_STOP";
+    default:
+        return "Unknown token!";
     }
 }
 
-/** 
+/**
  * Prints the registers of the i2c interface
  */
-static inline void i2c_dump(volatile struct i2c_regs *regs) {
+static inline void i2c_dump(volatile struct i2c_regs *regs)
+{
 #ifdef DEBUG_DRIVER
     LOG_DRIVER("dumping interface state...\n");
 
     // Print control register fields
     // uint8_t ctl_man = (ctl & REG_CTRL_MANUAL) ? 1 : 0;
-    uint8_t ctl_rd_cnt = ((regs->ctl & REG_CTRL_RD_CNT) >> 8);
-    uint8_t ctl_curr_tk = ((regs->ctl & REG_CTRL_CURR_TK) >> 4);
-    uint8_t ctl_err = (regs->ctl & REG_CTRL_ERROR) ? 1 : 0;
-    uint8_t ctl_status = (regs->ctl & REG_CTRL_STATUS) ? 1 : 0;
-    uint8_t ctl_start = (regs->ctl & REG_CTRL_START) ? 1 : 0;
+    uint8_t ctl_rd_cnt = ((regs->ctl &REG_CTRL_RD_CNT) >> 8);
+    uint8_t ctl_curr_tk = ((regs->ctl &REG_CTRL_CURR_TK) >> 4);
+    uint8_t ctl_err = (regs->ctl &REG_CTRL_ERROR) ? 1 : 0;
+    uint8_t ctl_status = (regs->ctl &REG_CTRL_STATUS) ? 1 : 0;
+    uint8_t ctl_start = (regs->ctl &REG_CTRL_START) ? 1 : 0;
     LOG_DRIVER("\t Control register:\n");
     LOG_DRIVER("\t\t Start: %u\n", ctl_start);
     LOG_DRIVER("\t\t Status: %u\n", ctl_status);
@@ -148,22 +150,23 @@ static inline void i2c_dump(volatile struct i2c_regs *regs) {
 /**
  * Initialise the i2c master interfaces.
 */
-static inline void i2c_setup() {
+static inline void i2c_setup()
+{
     LOG_DRIVER("initialising i2c master interfaces...\n");
 
     volatile struct i2c_regs *regs = (volatile struct i2c_regs *) i2c_regs;
 
     // Note: this is hacky - should do this using a GPIO driver.
     // Set up pinmux
-    volatile uint32_t *gpio_mem = (void*)(gpio_regs + GPIO_OFFSET);
+    volatile uint32_t *gpio_mem = (void *)(gpio_regs + GPIO_OFFSET);
 
-    volatile uint32_t *pinmux5_ptr      = ((void*)gpio_mem + GPIO_PINMUX_5*4);
+    volatile uint32_t *pinmux5_ptr      = ((void *)gpio_mem + GPIO_PINMUX_5 * 4);
     // volatile uint32_t *pinmuxE_ptr      = ((void*)gpio_mem + GPIO_PINMUX_E*4);
-    volatile uint32_t *pad_ds2b_ptr     = ((void*)gpio_mem + GPIO_DS_2B*4);
+    volatile uint32_t *pad_ds2b_ptr     = ((void *)gpio_mem + GPIO_DS_2B * 4);
     // volatile uint32_t *pad_ds5a_ptr     = ((void*)gpio_mem + GPIO_DS_5A*4);
-    volatile uint32_t *pad_bias2_ptr    = ((void*)gpio_mem + GPIO_BIAS_2_EN*4);
+    volatile uint32_t *pad_bias2_ptr    = ((void *)gpio_mem + GPIO_BIAS_2_EN * 4);
     // volatile uint32_t *pad_bias5_ptr    = ((void*)gpio_mem + GPIO_BIAS_5_EN*4);
-    volatile uint32_t *clk81_ptr        = ((void*)clk_regs + I2C_CLK_OFFSET);
+    volatile uint32_t *clk81_ptr        = ((void *)clk_regs + I2C_CLK_OFFSET);
 
     // Read existing register values
     uint32_t pinmux5 = *pinmux5_ptr;
@@ -189,11 +192,11 @@ static inline void i2c_setup() {
     // Set GPIO drive strength
     *pad_ds2b_ptr &= ~(GPIO_DS_2B_X17 | GPIO_DS_2B_X18);
     *pad_ds2b_ptr |= ((ds << GPIO_DS_2B_X17_SHIFT) |
-                    (ds << GPIO_DS_2B_X18_SHIFT));
+                      (ds << GPIO_DS_2B_X18_SHIFT));
 
     // Check register updated
     if ((*pad_ds2b_ptr & (GPIO_DS_2B_X17 | GPIO_DS_2B_X18)) != ((ds << GPIO_DS_2B_X17_SHIFT) |
-                    (ds << GPIO_DS_2B_X18_SHIFT))) {
+                                                                (ds << GPIO_DS_2B_X18_SHIFT))) {
         LOG_DRIVER_ERR("failed to set drive strength for m2!\n");
     }
 
@@ -218,11 +221,11 @@ static inline void i2c_setup() {
     // Set GPIO drive strength
     *pad_ds5a_ptr &= ~(GPIO_DS_5A_A14 | GPIO_DS_5A_A15);
     *pad_ds5a_ptr |= ((ds << GPIO_DS_5A_A14_SHIFT) |
-                    (ds << GPIO_DS_5A_A15_SHIFT));
+                      (ds << GPIO_DS_5A_A15_SHIFT));
 
     // Check register updated
     if ((*pad_ds5a_ptr & (GPIO_DS_5A_A14 | GPIO_DS_5A_A15)) != ((ds << GPIO_DS_5A_A14_SHIFT) |
-                    (ds << GPIO_DS_5A_A15_SHIFT))) {
+                                                                (ds << GPIO_DS_5A_A15_SHIFT))) {
         LOG_DRIVER_ERR("failed to set drive strength for m3!\n");
     }
 
@@ -255,7 +258,7 @@ static inline void i2c_setup() {
     * According to I2C-BUS Spec 2.1, in FAST-MODE, LOW period should be at
     * least 1.3uS, and HIGH period should be at lease 0.6. HIGH to LOW
     * ratio as 2 to 5 is more safe.
-    * Duty  = H/(H + L) = 2/5	-- duty 40%%   H/L = 2/3
+    * Duty  = H/(H + L) = 2/5   -- duty 40%%   H/L = 2/3
     * Fast Mode : 400k
     * High Mode : 3400k
     */
@@ -263,8 +266,8 @@ static inline void i2c_setup() {
     // const uint32_t freq = 400000; // 400kHz
     // const uint32_t delay_adjust = 0;
     // uint32_t div_temp = (clk_rate * 2)/(freq * 5);
-	// uint32_t div_h = div_temp - delay_adjust;
-	// uint32_t div_l = (clk_rate * 3)/(freq * 10);
+    // uint32_t div_h = div_temp - delay_adjust;
+    // uint32_t div_l = (clk_rate * 3)/(freq * 10);
 
     // Duty cycle slightly high with this - should adjust (47% instead of 40%)
     // TODO: add clock driver logic here to dynamically set speed. This is a hack.
@@ -299,7 +302,8 @@ static inline void i2c_setup() {
  * Also gets bytes read and curr token (curr token can be used to find the error location)
  * @return error bit - if the i2c device generates a NACK during writing
  */
-static inline bool i2c_get_error(volatile struct i2c_regs *regs, uint8_t *bytes_read, uint8_t *curr_token) {
+static inline bool i2c_get_error(volatile struct i2c_regs *regs, uint8_t *bytes_read, uint8_t *curr_token)
+{
     volatile uint32_t ctl = regs->ctl;
     bool err = ctl & (1 << 3);   // bit 3 -> set if error
     *bytes_read = (ctl & 0xF00) >> 8; // bits 8-11 -> number of bytes to read from rdata registers ( this means max 15? )
@@ -312,7 +316,8 @@ static inline bool i2c_get_error(volatile struct i2c_regs *regs, uint8_t *bytes_
  * Restarts the list processor
  * "To re-start the list processor with a new list (after a previous list has been exhausted), simply set This bit to zero then to one."
  */
-static inline int i2c_start(volatile struct i2c_regs *regs) {
+static inline int i2c_start(volatile struct i2c_regs *regs)
+{
     LOG_DRIVER("LIST PROCESSOR START\n");
     regs->ctl &= ~0x1;
     regs->ctl |= 0x1;
@@ -325,10 +330,11 @@ static inline int i2c_start(volatile struct i2c_regs *regs) {
 
 /**
  * Aborts the current operation
- * "Setting This bit to 0 while the list processor is operating causes the list processor to abort the current I2C operation 
+ * "Setting This bit to 0 while the list processor is operating causes the list processor to abort the current I2C operation
  * and generate an I2C STOP command on the I2C bus"
  */
-static inline int i2c_halt(volatile struct i2c_regs *regs) {
+static inline int i2c_halt(volatile struct i2c_regs *regs)
+{
     LOG_DRIVER("LIST PROCESSOR HALT\n");
     regs->ctl &= ~0x1;
     if ((regs->ctl & 0x1)) {
@@ -341,27 +347,28 @@ static inline int i2c_halt(volatile struct i2c_regs *regs) {
 /**
  * Converts our token abstraction into meson compatible tokens
  */
-static inline uint8_t i2c_token_convert(i2c_token_t token) {
+static inline uint8_t i2c_token_convert(i2c_token_t token)
+{
     switch (token) {
-        case I2C_TOKEN_END:
-            return MESON_I2C_TOKEN_END;
-        case I2C_TOKEN_START:
-            return MESON_I2C_TOKEN_START;
-        case I2C_TOKEN_ADDR_WRITE:
-            i2c_ifState.data_direction = DATA_DIRECTION_WRITE;
-            return MESON_I2C_TOKEN_ADDR_WRITE;
-        case I2C_TOKEN_ADDR_READ:
-            i2c_ifState.data_direction = DATA_DIRECTION_READ;
-            return MESON_I2C_TOKEN_ADDR_READ;
-        case I2C_TOKEN_DATA:
-            return MESON_I2C_TOKEN_DATA;
-        case I2C_TOKEN_DATA_END:
-            return MESON_I2C_TOKEN_DATA_END;
-        case I2C_TOKEN_STOP:
-            return MESON_I2C_TOKEN_STOP;
-        default:
-            LOG_DRIVER_ERR("invalid data token in request! \"0x%x\"\n", token);
-            return -1;
+    case I2C_TOKEN_END:
+        return MESON_I2C_TOKEN_END;
+    case I2C_TOKEN_START:
+        return MESON_I2C_TOKEN_START;
+    case I2C_TOKEN_ADDR_WRITE:
+        i2c_ifState.data_direction = DATA_DIRECTION_WRITE;
+        return MESON_I2C_TOKEN_ADDR_WRITE;
+    case I2C_TOKEN_ADDR_READ:
+        i2c_ifState.data_direction = DATA_DIRECTION_READ;
+        return MESON_I2C_TOKEN_ADDR_READ;
+    case I2C_TOKEN_DATA:
+        return MESON_I2C_TOKEN_DATA;
+    case I2C_TOKEN_DATA_END:
+        return MESON_I2C_TOKEN_DATA_END;
+    case I2C_TOKEN_STOP:
+        return MESON_I2C_TOKEN_STOP;
+    default:
+        LOG_DRIVER_ERR("invalid data token in request! \"0x%x\"\n", token);
+        return -1;
     }
 }
 
@@ -369,7 +376,8 @@ static inline uint8_t i2c_token_convert(i2c_token_t token) {
  * Loads tokens onto specified i2c interface registers
  * This function resets interface registers before uploading data
  */
-static inline void i2c_load_tokens(volatile struct i2c_regs *regs) {
+static inline void i2c_load_tokens(volatile struct i2c_regs *regs)
+{
     LOG_DRIVER("starting token load\n");
     i2c_token_t *tokens = i2c_ifState.curr_request_and_response_data;
     LOG_DRIVER("Tokens remaining in this req: %zu\n", i2c_ifState.remaining);
@@ -405,8 +413,9 @@ static inline void i2c_load_tokens(volatile struct i2c_regs *regs) {
     // - if write add buffer data into wdata
 
     while (tk_offset < 16 && wdata_offset < 8 && rdata_offset < 8 && request_data_offset < i2c_ifState.curr_request_len) {
-        LOG_DRIVER("request_data_offset : 0x%lx, tk_offset: 0x%lx, wdata_offset: 0x%lx, rdata_offset: 0x%lx\n", request_data_offset, tk_offset, wdata_offset, rdata_offset);
-        
+        LOG_DRIVER("request_data_offset : 0x%lx, tk_offset: 0x%lx, wdata_offset: 0x%lx, rdata_offset: 0x%lx\n",
+                   request_data_offset, tk_offset, wdata_offset, rdata_offset);
+
         // @Tristan : the below is most liekly not needed because regs->tk_list0 and regs->tk_list1 already set to 0 before this loop, (note: MESON_I2C_TOKEN_END = 0)
         /* // Explicitly pad END tokens for empty space
         if (request_data_offset == i2c_ifState.curr_request_len) { // we finshed putting all request data into registers
@@ -435,9 +444,11 @@ static inline void i2c_load_tokens(volatile struct i2c_regs *regs) {
         // If data token and we are writing, load data into wbuf registers
         if (meson_token == MESON_I2C_TOKEN_DATA && i2c_ifState.data_direction == DATA_DIRECTION_WRITE) {
             if (wdata_offset < 4) {
-                regs->wdata0 |= (tokens[request_data_offset + 1] << (wdata_offset * 8)); // the + 1 is because tokens[request_data_offset] = MESON_I2C_TOKEN_DATA but we want to store the token the come after
+                regs->wdata0 |= (tokens[request_data_offset + 1] << (wdata_offset *
+                                                                     8)); // the + 1 is because tokens[request_data_offset] = MESON_I2C_TOKEN_DATA but we want to store the token the come after
             } else {
-                regs->wdata1 |= (tokens[request_data_offset + 1] << ((wdata_offset - 4) * 8)); // the + 1 is because tokens[request_data_offset] = MESON_I2C_TOKEN_DATA but we want to store the token the come after
+                regs->wdata1 |= (tokens[request_data_offset + 1] << ((wdata_offset - 4) *
+                                                                     8)); // the + 1 is because tokens[request_data_offset] = MESON_I2C_TOKEN_DATA but we want to store the token the come after
             }
             // Since we grabbed the next token in the chain, increment offset
             wdata_offset++;
@@ -445,14 +456,16 @@ static inline void i2c_load_tokens(volatile struct i2c_regs *regs) {
         }
 
         /* If data token and we are reading, increment counter of rdata */
-        if ((meson_token == MESON_I2C_TOKEN_DATA || meson_token == MESON_I2C_TOKEN_DATA_END) && i2c_ifState.data_direction == DATA_DIRECTION_READ) {
+        if ((meson_token == MESON_I2C_TOKEN_DATA || meson_token == MESON_I2C_TOKEN_DATA_END)
+            && i2c_ifState.data_direction == DATA_DIRECTION_READ) {
             rdata_offset++;
         }
 
         request_data_offset++;
     }
     LOG_DRIVER("data loaded into registers!!\n");
-    LOG_DRIVER("request_data_offset : 0x%lx, tk_offset: 0x%lx, wdata_offset: 0x%lx, rdata_offset: 0x%lx\n", request_data_offset, tk_offset, wdata_offset, rdata_offset);
+    LOG_DRIVER("request_data_offset : 0x%lx, tk_offset: 0x%lx, wdata_offset: 0x%lx, rdata_offset: 0x%lx\n",
+               request_data_offset, tk_offset, wdata_offset, rdata_offset);
 
     // Update remaining tokens indicator and start list processor
     i2c_ifState.remaining = i2c_ifState.curr_request_len - request_data_offset;
@@ -464,10 +477,11 @@ static inline void i2c_load_tokens(volatile struct i2c_regs *regs) {
     i2c_start(regs);
 }
 
-void init(void) {
+void init(void)
+{
     i2c_setup();
     queue_handle = i2c_queue_init((i2c_queue_t *) request_region, (i2c_queue_t *) response_region);
-    
+
     // Set up driver state
     i2c_ifState.curr_request_and_response_data = NULL;
     i2c_ifState.curr_request_len = 0;
@@ -479,7 +493,8 @@ void init(void) {
     microkit_dbg_puts("Driver initialised.\n");
 }
 
-static inline void handle_request(void) {
+static inline void handle_request(void)
+{
     LOG_DRIVER("handling request\n");
     volatile struct i2c_regs *regs = (volatile struct i2c_regs *) i2c_regs;
     if (!i2c_queue_empty(queue_handle.request)) {
@@ -526,7 +541,8 @@ static inline void handle_request(void) {
     }
 }
 
-static void handle_response_timeout(void) {
+static void handle_response_timeout(void)
+{
     LOG_DRIVER("handling timeout IRQ\n");
     // from my understanding since the state of the registers doesnt change on returning
     // it just automatically retries again in some amount of time
@@ -556,7 +572,8 @@ static void handle_response_timeout(void) {
 }
 
 
-static void handle_response(void) {
+static void handle_response(void)
+{
     LOG_DRIVER("handling transfer complete IRQ\n");
     volatile struct i2c_regs *regs = (volatile struct i2c_regs *)i2c_regs;
 
@@ -568,7 +585,8 @@ static void handle_response(void) {
     bool write_error = i2c_get_error(regs, &bytes_read, &curr_token);
 
     // Prepare to extract data from the interface.
-    i2c_token_t *return_buffer = i2c_ifState.curr_request_and_response_data; // Due to the way the token chain abstraction is done in the request buffer there will always be at least 1 more byte of request data then response data.
+    i2c_token_t *return_buffer =
+        i2c_ifState.curr_request_and_response_data; // Due to the way the token chain abstraction is done in the request buffer there will always be at least 1 more byte of request data then response data.
 
     // If there was an error, cancel the rest of this transaction and load the
     // error information into the return buffer.
@@ -588,7 +606,7 @@ static void handle_response(void) {
 
     } else {
         // Get bytes_read amount of read data
-        
+
         // Copy data into return buffer
         for (int i = 0; i < bytes_read; i++) {
             size_t index = RESPONSE_DATA_OFFSET + i2c_ifState.curr_response_len;
@@ -606,16 +624,20 @@ static void handle_response(void) {
 
         LOG_DRIVER("I2C_ERR_OK\n");
         return_buffer[RESPONSE_ERR] = I2C_ERR_OK;      // Error code
-        return_buffer[RESPONSE_ERR_TOKEN] = 0x0;       // Token that caused error (could be anything since we set error code to no error anyway)
+        return_buffer[RESPONSE_ERR_TOKEN] =
+            0x0;       // Token that caused error (could be anything since we set error code to no error anyway)
     }
 
     // If request is completed or there was an error, return data to server and notify.
     if (write_error || !i2c_ifState.remaining) {
         LOG_DRIVER("request completed or error, hence returning response to server\n");
-        LOG_DRIVER("curr_response_len : 0x%lx, curr_request_len : 0x%lx, return address is 0x%lx\n", i2c_ifState.curr_response_len, i2c_ifState.curr_request_len, i2c_ifState.addr);
+        LOG_DRIVER("curr_response_len : 0x%lx, curr_request_len : 0x%lx, return address is 0x%lx\n",
+                   i2c_ifState.curr_response_len, i2c_ifState.curr_request_len, i2c_ifState.addr);
         LOG_DRIVER("enguing response with size: %d\n\n", i2c_ifState.curr_response_len + RESPONSE_DATA_OFFSET);
         // response length is + 2 (RESPONSE_DATA_OFFSET = 2) because of the error tokens at the start
-        int ret = i2c_enqueue_response(queue_handle, i2c_ifState.addr, (size_t) i2c_ifState.curr_request_and_response_data - DATA_REGIONS_START, i2c_ifState.curr_response_len + RESPONSE_DATA_OFFSET);
+        int ret = i2c_enqueue_response(queue_handle, i2c_ifState.addr,
+                                       (size_t) i2c_ifState.curr_request_and_response_data - DATA_REGIONS_START,
+                                       i2c_ifState.curr_response_len + RESPONSE_DATA_OFFSET);
         if (ret) {
             LOG_DRIVER_ERR("Failed to enqueue response\n");
         }
@@ -631,8 +653,8 @@ static void handle_response(void) {
         microkit_notify(VIRTUALISER_CH);
 
         i2c_halt(regs); // stop condition
-    } 
-    
+    }
+
     // If the driver was notified while this transaction was in progress, immediately start working on the next one.
     // OR if there is still more work to do in current request, crack on with it.
     if (i2c_ifState.remaining) {
@@ -644,21 +666,22 @@ static void handle_response(void) {
     }
 }
 
-void notified(microkit_channel ch) {
+void notified(microkit_channel ch)
+{
     switch (ch) {
-        case VIRTUALISER_CH:
-            handle_request();
-            break;
-        case IRQ_CH:
-            handle_response();
-            microkit_irq_ack(ch);
-            break;
-        case IRQ_TIMEOUT_CH:
-            handle_response_timeout();
-            microkit_irq_ack(ch);
-            break;
+    case VIRTUALISER_CH:
+        handle_request();
+        break;
+    case IRQ_CH:
+        handle_response();
+        microkit_irq_ack(ch);
+        break;
+    case IRQ_TIMEOUT_CH:
+        handle_response_timeout();
+        microkit_irq_ack(ch);
+        break;
 
-        default:
-            microkit_dbg_puts("DRIVER|ERROR: unexpected notification!\n");
+    default:
+        microkit_dbg_puts("DRIVER|ERROR: unexpected notification!\n");
     }
 }

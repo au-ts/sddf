@@ -23,7 +23,7 @@
 #define USING_HALT(...) do{}while(0)
 #else
 #define USING_HALT(...) do{ while(1); }while(0)
-#endif 
+#endif
 
 uintptr_t data_region;
 uintptr_t request_region;
@@ -50,7 +50,8 @@ static const char *day_of_week_strings[] = {
     "Sunday"
 };
 
-void client_main(void) {
+void client_main(void)
+{
     USING_HALT();
 
     LOG_CLIENT("client_main: started\n");
@@ -66,7 +67,8 @@ void client_main(void) {
         LOG_CLIENT_ERR("failed to set time on DS3231!\n");
         while (1) {};
     }
-    sddf_printf("Set Date and Time on DS3231 to: %02d-%02d-%02d %02d:%02d:%02d (%s)\n", 31, 12, 23, 23, 59, 42, day_of_week_strings[7 - 1]);
+    sddf_printf("Set Date and Time on DS3231 to: %02d-%02d-%02d %02d:%02d:%02d (%s)\n", 31, 12, 23, 23, 59, 42,
+                day_of_week_strings[7 - 1]);
 
     LOG_CLIENT("Starting to ask for the time!\n");
     while (true) {
@@ -82,13 +84,15 @@ void client_main(void) {
             while (1) {};
         }
 
-        sddf_printf("Date and Time: %02d-%02d-%02d %02d:%02d:%02d (%s)\n", day, month, year, hour, minute, second, day_of_week_strings[day_of_week - 1]);
+        sddf_printf("Date and Time: %02d-%02d-%02d %02d:%02d:%02d (%s)\n", day, month, year, hour, minute, second,
+                    day_of_week_strings[day_of_week - 1]);
 
         delay_ms(500);
     }
 }
 
-bool delay_ms(size_t milliseconds) {
+bool delay_ms(size_t milliseconds)
+{
     size_t time_ns = milliseconds * NS_IN_MS;
 
     /* Detect potential overflow */
@@ -103,7 +107,8 @@ bool delay_ms(size_t milliseconds) {
     return true;
 }
 
-void init(void) {
+void init(void)
+{
     LOG_CLIENT("init\n");
 
     queue = i2c_queue_init((i2c_queue_t *) request_region, (i2c_queue_t *) response_region);
@@ -124,15 +129,16 @@ void init(void) {
     co_switch(t_main);
 }
 
-void notified(microkit_channel ch) {
+void notified(microkit_channel ch)
+{
     switch (ch) {
-        case I2C_VIRTUALISER_CH:
-            co_switch(t_main);
-            break;
-        case TIMER_CH:
-            co_switch(t_main);
-            break;
-        default:
-            LOG_CLIENT_ERR("Unknown channel 0x%x!\n", ch);
+    case I2C_VIRTUALISER_CH:
+        co_switch(t_main);
+        break;
+    case TIMER_CH:
+        co_switch(t_main);
+        break;
+    default:
+        LOG_CLIENT_ERR("Unknown channel 0x%x!\n", ch);
     }
 }

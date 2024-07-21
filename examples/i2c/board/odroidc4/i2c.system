@@ -67,7 +67,7 @@
     </protection_domain>
 
     <protection_domain name="client_ds3231" priority="1">
-        <program_image path="client_2_ds3231.elf" />
+        <program_image path="client_ds3231.elf" />
 
         <map mr="client_ds3231_request_region" vaddr="0x4_000_000" perms="rw" setvar_vaddr="request_region" />
         <map mr="client_ds3231_response_region" vaddr="0x5_000_000" perms="rw" setvar_vaddr="response_region" />
@@ -75,7 +75,7 @@
     </protection_domain>
 
     <protection_domain name="client_pn532" priority="1">
-        <program_image path="client_1_pn532.elf" />
+        <program_image path="client_pn532.elf" />
 
         <map mr="client_pn532_request_region" vaddr="0x4_000_000" perms="rw" setvar_vaddr="request_region" />
         <map mr="client_pn532_response_region" vaddr="0x5_000_000" perms="rw" setvar_vaddr="response_region" />
@@ -105,7 +105,7 @@
 
     <channel>
         <end pd="timer" id="2" />
-        <end pd="client_ds3231" id="1" /> 
+        <end pd="client_ds3231" id="1" />
     </channel>
 
     <channel>

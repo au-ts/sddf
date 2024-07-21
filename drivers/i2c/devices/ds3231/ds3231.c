@@ -3,8 +3,9 @@
 #include <sddf/util/printf.h>
 #include <sddf/timer/client.h>
 #include <sddf/i2c/queue.h>
+#include <sddf/i2c/client.h>
+#include <client.h>
 #include "ds3231.h"
-#include "client.h"
 
 // #define DEBUG_DS3231
 
@@ -133,7 +134,7 @@ static uint8_t process_return_buffer(struct response *response)
     return error;
 }
 
-bool ds3231_write(uint8_t *buffer, uint8_t buffer_len, size_t retries) 
+bool ds3231_write(uint8_t *buffer, uint8_t buffer_len, size_t retries)
 {
     size_t attempts = 1;
     while (true) {
@@ -188,7 +189,7 @@ bool ds3231_read(uint8_t *buffer, uint8_t buffer_len, size_t retries)
 
         request_add(&req, I2C_TOKEN_STOP);
 
-        request_send(&req); 
+        request_send(&req);
 
         co_switch(t_event);
 
@@ -211,7 +212,9 @@ bool ds3231_read(uint8_t *buffer, uint8_t buffer_len, size_t retries)
     }
 }
 
-bool ds3231_get_time(uint8_t *second, uint8_t *minute, uint8_t *hour, uint8_t *day_of_week, uint8_t *day, uint8_t *month, uint8_t *year) {
+bool ds3231_get_time(uint8_t *second, uint8_t *minute, uint8_t *hour, uint8_t *day_of_week, uint8_t *day,
+                     uint8_t *month, uint8_t *year)
+{
     uint8_t start_register_write_buffer[1];
     start_register_write_buffer[0] = DS3231_REGISTER_SECONDS; // to tell ds3231 to start reading at register 0
     uint8_t write_fail = ds3231_write(start_register_write_buffer, 1, DEFAULT_READ_ACK_FRAME_RETRIES);
@@ -223,20 +226,22 @@ bool ds3231_get_time(uint8_t *second, uint8_t *minute, uint8_t *hour, uint8_t *d
     uint8_t read_fail = ds3231_read(time_response_buffer, 7, DEFAULT_READ_RESPONSE_RETRIES);
     if (read_fail) {
         return true;
-    } 
+    }
 
     *second = bcdToDec(time_response_buffer[0]);
     *minute = bcdToDec(time_response_buffer[1]);
     *hour = bcdToDec(time_response_buffer[2]);
     *day_of_week = bcdToDec(time_response_buffer[3]);
     *day = bcdToDec(time_response_buffer[4]);
-    *month = bcdToDec(time_response_buffer[5] & (~(1 << DS3231_BIT_CENTURY))); // mask out the century 
+    *month = bcdToDec(time_response_buffer[5] & (~(1 << DS3231_BIT_CENTURY))); // mask out the century
     *year = bcdToDec(time_response_buffer[6]);
 
     return false;
 }
 
-bool ds3231_set_time(uint8_t second, uint8_t minute, uint8_t hour, uint8_t day_of_week, uint8_t day, uint8_t month, uint8_t year) {
+bool ds3231_set_time(uint8_t second, uint8_t minute, uint8_t hour, uint8_t day_of_week, uint8_t day, uint8_t month,
+                     uint8_t year)
+{
     uint8_t set_time_buffer[8];
     set_time_buffer[0] = DS3231_REGISTER_SECONDS; // Address to start writing at
     set_time_buffer[1] = decToBcd(second);
@@ -252,12 +257,13 @@ bool ds3231_set_time(uint8_t second, uint8_t minute, uint8_t hour, uint8_t day_o
 }
 
 // Function to convert decimal to BCD
-uint8_t decToBcd(uint8_t val) {
-  return ((val / 10 * 16) + (val % 10));
+uint8_t decToBcd(uint8_t val)
+{
+    return ((val / 10 * 16) + (val % 10));
 }
 
 // Function to convert BCD to decimal
-uint8_t bcdToDec(uint8_t val) {
-  return ((val / 16 * 10) + (val % 16));
+uint8_t bcdToDec(uint8_t val)
+{
+    return ((val / 16 * 10) + (val % 16));
 }
-
