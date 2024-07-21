@@ -13,7 +13,7 @@
 
 BLK_IMAGES := blk_virt.elf
 
-CFLAGS_blk := -I ${SDDF}/include
+CFLAGS_blk :=
 
 CHECK_BLK_FLAGS_MD5:=.blk_cflags-$(shell echo -- ${CFLAGS} ${CFLAGS_blk} | shasum | sed 's/ *-//')
 
