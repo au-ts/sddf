@@ -4,6 +4,7 @@
 #include <sddf/util/string.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
+#include <sddf/util/string.h>
 #include <ethernet_config.h>
 
 #define VIRT_RX_CH 0
