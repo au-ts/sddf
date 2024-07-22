@@ -21,7 +21,7 @@ void init(void)
 {
     serial_cli_queue_init_sys(microkit_name, &rx_queue_handle, rx_queue, rx_data, &tx_queue_handle, tx_queue, tx_data);
     serial_putchar_init(TX_CH, &tx_queue_handle);
-    sddf_printf("Hello world! I am %s.\r\nPlease give me character!\r\n", microkit_name);
+    sddf_printf("Hello world! I am %s.\nPlease give me character!\n", microkit_name);
 }
 
 uint16_t char_count;
@@ -39,7 +39,7 @@ void notified(microkit_channel ch)
             }
             char_count ++;
             if (char_count % 10 == 0) {
-                sddf_printf("\r\n%s has received %u characters so far!\r\n", microkit_name, char_count);
+                sddf_printf("\n%s has received %u characters so far!\n", microkit_name, char_count);
             }
         }
 
