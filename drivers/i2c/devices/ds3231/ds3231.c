@@ -1,0 +1,212 @@
+#include <stdint.h>
+#include <libco.h>
+#include <sddf/util/printf.h>
+#include <sddf/timer/client.h>
+#include <sddf/i2c/queue.h>
+#include "ds3231.h"
+#include "client.h"
+
+// #define DEBUG_DS3231
+
+#ifdef DEBUG_DS3231
+#define LOG_DS3231(...) do{ sddf_dprintf("DS3231|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
+#else
+#define LOG_DS3231(...) do{}while(0)
+#endif
+
+#define LOG_DS3231_ERR(...) do{ sddf_printf("DS3231|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
+
+
+extern cothread_t t_event;
+extern cothread_t t_main;
+
+struct request {
+    uint8_t *buffer;
+    /* Maximum amount of data the buffer can hold */
+    size_t buffer_size;
+    /* How many I2C tokens for processing we have enqueued */
+    size_t data_offset_len;
+    /* Bus address we are sending to */
+    size_t bus_address;
+};
+
+struct response {
+    /* Client-side address for buffer to be used as response */
+    uint8_t *buffer;
+    size_t data_size;
+    size_t read_idx;
+};
+
+/* These are defined in the client code. It is more convenient for these
+   to be global variables than constantly pass them around. */
+extern i2c_queue_handle_t queue;
+extern uintptr_t data_region;
+
+/* Below is a simple API for quickly making requests and sending them off as well
+ * as reading from the responses.
+ * It should be noted that this code has a big assumption right now which is fine
+ * for this system but perhaps not all systems that would make use of I2C.
+ * The assumption is that we only have one request at a time until we get a response.
+ * This assumption lets us use the same region of memory within the data region for
+ * all of our requests and responses, as since it is one-by-one it will never be
+ * over-written.
+ */
+
+void response_init(struct response *response)
+{
+    uintptr_t offset = 0;
+    unsigned int buffer_len = 0;
+    size_t bus_address = 0;
+    int ret = i2c_dequeue_response(queue, &bus_address, &offset, &buffer_len);
+    if (ret) {
+        LOG_DS3231_ERR("response_init could not dequeue used response buffer!\n");
+        return;
+    }
+
+    response->buffer = (uint8_t *) data_region + offset;
+    response->data_size = buffer_len;
+    response->read_idx = 0;
+}
+
+uint8_t response_read(struct response *response)
+{
+    if (response->read_idx >= response->data_size) {
+        LOG_DS3231_ERR("trying to read more data than exists in response (buffer: %p)\n", response->buffer);
+        return 0;
+    }
+
+    uint8_t value = response->buffer[RESPONSE_DATA_OFFSET + response->read_idx];
+    response->read_idx++;
+
+    return value;
+}
+
+void response_finish(struct response *response)
+{
+    // Do nothing
+}
+
+void request_init(struct request *req, uint8_t bus_address)
+{
+    req->data_offset_len = 0;
+    req->buffer = (uint8_t *)data_region;
+    req->buffer_size = I2C_MAX_DATA_SIZE;
+    req->bus_address = bus_address;
+}
+
+void request_add(struct request *req, uint8_t data)
+{
+    size_t index = req->data_offset_len;
+    if (index >= req->buffer_size) {
+        LOG_DS3231_ERR("request buffer is full (size is 0x%lx)\n", req->buffer_size);
+        return;
+    }
+    req->buffer[index] = data;
+    req->data_offset_len++;
+}
+
+void request_send(struct request *req)
+{
+    int err = i2c_enqueue_request(queue, req->bus_address, (size_t) req->buffer - data_region, req->data_offset_len);
+    if (err) {
+        LOG_DS3231_ERR("failed to enqueue request buffer!\n");
+    }
+
+    microkit_notify(I2C_VIRTUALISER_CH);
+}
+
+static uint8_t process_return_buffer(struct response *response)
+{
+    LOG_DS3231("processing return buffer\n");
+
+    if (RESPONSE_ERR >= response->data_size) {
+        LOG_DS3231_ERR("trying to read more data than exists in response (buffer: %p).\n", response->buffer);
+        return I2C_ERR_OTHER;
+    }
+
+    uint8_t error = response->buffer[RESPONSE_ERR];
+
+    if (error) {
+        LOG_DS3231_ERR("Previous request failed where RESPONSE_ERR is 0x%x\n", error);
+    }
+
+    return error;
+}
+
+bool ds3231_write(uint8_t *buffer, uint8_t buffer_len, size_t retries) 
+{
+    size_t attempts = 1;
+    while (true) {
+        struct request req = {};
+        request_init(&req, DS3231_I2C_BUS_ADDRESS);
+        request_add(&req, I2C_TOKEN_START);
+        request_add(&req, I2C_TOKEN_ADDR_WRITE);
+
+        for (int i = 0; i < buffer_len; i++) {
+            request_add(&req, I2C_TOKEN_DATA);
+            request_add(&req, buffer[i]);
+        }
+
+        request_add(&req, I2C_TOKEN_STOP);
+        request_add(&req, I2C_TOKEN_END);
+
+        request_send(&req);
+
+        co_switch(t_event);
+
+        struct response response = {};
+        response_init(&response);
+
+        uint8_t error = process_return_buffer(&response);
+
+        response_finish(&response);
+
+        if (!error || attempts == retries) {
+            return error;
+        }
+
+        attempts++;
+        delay_ms(1);
+    }
+}
+
+bool ds3231_read(uint8_t *buffer, uint8_t buffer_len, size_t retries)
+{
+    size_t attempts = 1;
+    while (true) {
+        struct request req = {};
+        request_init(&req, DS3231_I2C_BUS_ADDRESS);
+
+        request_add(&req, I2C_TOKEN_START);
+        request_add(&req, I2C_TOKEN_ADDR_READ);
+
+        for (int i = 0; i < buffer_len - 1; i++) {
+            request_add(&req, I2C_TOKEN_DATA);
+        }
+
+        request_add(&req, I2C_TOKEN_DATA_END);
+
+        request_add(&req, I2C_TOKEN_STOP);
+
+        request_send(&req); 
+
+        co_switch(t_event);
+
+        struct response response = {};
+        response_init(&response);
+        uint8_t error = process_return_buffer(&response);
+        if (!error) {
+            for (int i = 0; i < buffer_len; i++) { // pretty sure buffer cant be longer then 7
+                buffer[i] = response_read(&response);
+            }
+
+            response_finish(&response);
+            return error;
+
+        } else if (attempts == retries) {
+            return error;
+        }
+        attempts++;
+        delay_ms(1);
+    }
+}

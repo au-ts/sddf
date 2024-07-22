@@ -29,27 +29,27 @@
  * what happens...
  */
 
-#define NUM_CLIENTS 1
-#define DRIVER_CH 1
+#define NUM_CLIENTS 2
+#define DRIVER_CH 2
 
 #if DRIVER_CH < NUM_CLIENTS
 #error "DRIVER_CH must be higher than client channels"
 #endif
 
-uintptr_t driver_data_offsets[NUM_CLIENTS] = { 0 };
-size_t client_data_sizes[NUM_CLIENTS] = { 0x200000 };
+uintptr_t driver_data_offsets[NUM_CLIENTS] = { 0, 0x1000 }; // change if NUM_CLIENTS changes
+size_t client_data_sizes[NUM_CLIENTS] = { 0x1000, 0x1000 }; // change if NUM_CLIENTS changes
 
 i2c_queue_handle_t client_queues[NUM_CLIENTS];
 i2c_queue_handle_t driver_queue;
 
-uintptr_t client_request_regions[NUM_CLIENTS] = { 0x4000000 };
-uintptr_t client_response_regions[NUM_CLIENTS] = { 0x5000000 };
+uintptr_t client_request_regions[NUM_CLIENTS] = { 0x4000000, 0x4001000 }; // change if NUM_CLIENTS changes 
+uintptr_t client_response_regions[NUM_CLIENTS] = { 0x5000000, 0x5001000 }; // change if NUM_CLIENTS changes
 
 // Security list: owner of each i2c address on the bus
 int security_list[I2C_BUS_ADDRESS_MAX + 1];
 
-uintptr_t driver_response_region;
-uintptr_t driver_request_region;
+uintptr_t driver_response_region; // mapped memory
+uintptr_t driver_request_region; // mapped memory
 
 void process_request(microkit_channel ch) {
     bool enqueued = false;

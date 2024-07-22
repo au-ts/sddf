@@ -36,10 +36,13 @@ UTIL := $(SDDF)/util
 LIBCO := $(SDDF)/libco
 TOP := ${SDDF}/examples/i2c
 I2C := $(SDDF)/i2c
-I2C_DRIVER := $(SDDF)/drivers/i2c/${PLATFORM}
+I2C_DRIVER := $(SDDF)/drivers/i2c/host/${PLATFORM}
 TIMER_DRIVER := $(SDDF)/drivers/clock/${PLATFORM}
+PN532_DRIVER := $(SDDF)/drivers/i2c/devices/pn532
+DS3231_DRIVER := $(SDDF)/drivers/i2c/devices/ds3231
 
-IMAGES := i2c_virt.elf i2c_driver.elf client.elf timer_driver.elf
+
+IMAGES := i2c_virt.elf i2c_driver.elf client_1_pn532.elf client_2_ds3231.elf timer_driver.elf
 CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall -Wno-unused-function -I${TOP}
 LDFLAGS := -L$(BOARD_DIR)/lib -L$(SDDF)/lib -L${LIBC}
 LIBS := --start-group -lmicrokit -Tmicrokit.ld -lc libsddf_util_debug.a --end-group
@@ -51,18 +54,26 @@ SYSTEM_FILE = ${TOP}/board/$(MICROKIT_BOARD)/i2c.system
 CFLAGS += -I$(BOARD_DIR)/include \
 	-I$(SDDF)/include \
 	-I$(LIBCO) \
+	-I$(PN532_DRIVER) \
+	-I$(DS3231_DRIVER) \
 	-MD \
 	-MP
 
 COMMONFILES=libsddf_util_debug.a
 
-CLIENT_OBJS :=  pn532.o client.o
-DEPS := $(CLIENT_OBJS:.o=.d)
+CLIENT_PN532_OBJS :=  pn532.o client_1_pn532.o
+DEPS_PN532 := $(CLIENT_PN532_OBJS:.o=.d)
+
+CLIENT_DS3231_OBJS :=  ds3231.o client_2_ds3231.o
+DEPS_DS3231 := $(CLIENT_DS3231_OBJS:.o=.d)
 
 VPATH:=${TOP}
 all: $(IMAGE_FILE)
 
-client.elf: $(CLIENT_OBJS) libco.a
+client_1_pn532.elf: $(CLIENT_PN532_OBJS) libco.a
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+
+client_2_ds3231.elf: $(CLIENT_DS3231_OBJS) libco.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
@@ -83,4 +94,7 @@ include ${I2C}/components/i2c_virt.mk
 include ${TIMER_DRIVER}/timer_driver.mk
 include ${LIBCO}/libco.mk
 include ${I2C_DRIVER}/i2c_driver.mk
--include $(DEPS)
+include ${PN532_DRIVER}/pn532.mk
+include ${DS3231_DRIVER}/ds3231.mk
+-include $(DEPS_DS3231)
+-include $(DEPS_PN532)
