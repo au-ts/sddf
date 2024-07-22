@@ -43,8 +43,9 @@ char *client_names[SERIAL_NUM_CLIENTS];
 serial_queue_handle_t tx_queue_handle_drv;
 serial_queue_handle_t tx_queue_handle_cli[SERIAL_NUM_CLIENTS];
 
+#define TX_PENDING_LEN (SERIAL_NUM_CLIENTS + 1)
 typedef struct tx_pending {
-    uint32_t queue[SERIAL_NUM_CLIENTS];
+    uint32_t queue[TX_PENDING_LEN];
     bool clients_pending[SERIAL_NUM_CLIENTS];
     uint32_t head;
     uint32_t tail;
@@ -54,7 +55,7 @@ tx_pending_t tx_pending;
 
 static uint32_t tx_pending_length(void)
 {
-    return tx_pending.tail - tx_pending.head;
+    return (TX_PENDING_LEN + tx_pending.tail - tx_pending.head) % TX_PENDING_LEN;
 }
 
 static void tx_pending_push(uint32_t client)
@@ -69,7 +70,7 @@ static void tx_pending_push(uint32_t client)
 
     tx_pending.queue[tx_pending.tail] = client;
     tx_pending.clients_pending[client] = true;
-    tx_pending.tail++;
+    tx_pending.tail = (tx_pending.tail + 1) % TX_PENDING_LEN;
 }
 
 static void tx_pending_pop(uint32_t *client)
@@ -79,7 +80,7 @@ static void tx_pending_pop(uint32_t *client)
 
     *client = tx_pending.queue[tx_pending.head];
     tx_pending.clients_pending[*client] = false;
-    tx_pending.head++;
+    tx_pending.head = (tx_pending.head + 1) % TX_PENDING_LEN;
 }
 
 bool process_tx_queue(uint32_t client)
