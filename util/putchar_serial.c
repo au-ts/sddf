@@ -13,7 +13,7 @@ static uint32_t local_tail;
 void _sddf_putchar(char character)
 {
     if (serial_queue_full(tx_queue_handle, local_tail) ||
-       (character == '\n' && serial_queue_full(tx_queue_handle, local_tail + 1))) {
+        (character == '\n' && serial_queue_full(tx_queue_handle, local_tail + 1))) {
         return;
     }
 

@@ -278,7 +278,7 @@ static err_t ethernet_init(struct netif *netif)
 static void netif_status_callback(struct netif *netif)
 {
     if (dhcp_supplied_address(netif)) {
-        sddf_printf("LWIP|NOTICE: DHCP request for %s returned IP address: %s\r\n", microkit_name,
+        sddf_printf("LWIP|NOTICE: DHCP request for %s returned IP address: %s\n", microkit_name,
                     ip4addr_ntoa(netif_ip4_addr(netif)));
     }
 }
