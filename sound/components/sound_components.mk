@@ -13,7 +13,7 @@
 
 SND_IMAGES := sound_virt.elf
 
-CFLAGS_sound :=
+CFLAGS_sound ?=
 
 CHECK_SND_FLAGS_MD5:=.sound_cflags-$(shell echo -- $(CFLAGS) $(CFLAGS_sound) | shasum | sed 's/ *-//')
 
