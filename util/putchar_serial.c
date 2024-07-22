@@ -12,10 +12,14 @@ static uint32_t local_tail;
 /* Ensure to call serial_putchar_init during initialisation. Multiplexes output based on \n or when buffer is full. */
 void _sddf_putchar(char character)
 {
-    if (serial_queue_full(tx_queue_handle, local_tail)) {
+    if (serial_queue_full(tx_queue_handle, local_tail) ||
+       (character == '\n' && serial_queue_full(tx_queue_handle, local_tail + 1))) {
         return;
     }
 
+    if (character == '\n') {
+        serial_enqueue(tx_queue_handle, &local_tail, '\r');
+    }
     serial_enqueue(tx_queue_handle, &local_tail, character);
 
     /* Make changes visible to virtualiser if character is flush or if queue is now filled */
