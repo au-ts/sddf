@@ -24,7 +24,7 @@
 
 /* String to be printed to start console input */
 #define SERIAL_CONSOLE_BEGIN_STRING "Begin input\n"
-#define SERIAL_CONSOLE_BEGIN_STRING_LEN 13
+#define SERIAL_CONSOLE_BEGIN_STRING_LEN 12
 
 #define SERIAL_CLI0_NAME "client0"
 #define SERIAL_CLI1_NAME "client1"
