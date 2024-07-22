@@ -254,21 +254,24 @@ static inline void serial_transfer_all(serial_queue_handle_t *active_queue_handl
  *
  * @param active_queue_handle queue to remove from.
  * @param free_queue_handle queue to insert into.
- * @param colour_start colour string to be printed at the start
- * @param colour_end colour string to be printed at the end
+ * @param colour_start colour string to be printed at the start.
+ * @param colour_start_len length of colour start string.
+ * @param colour_end colour string to be printed at the end.
+ * @param colour_end_len length of colour end string.
  */
 static inline void serial_transfer_all_with_colour(serial_queue_handle_t *active_queue_handle,
                                                    serial_queue_handle_t *free_queue_handle,
-                                                   char *colour_start, char *colour_end)
+                                                   const char *colour_start, 
+                                                   uint16_t colour_start_len,
+                                                   const char *colour_end,
+                                                   uint16_t colour_end_len)
 {
-    uint16_t colour_start_length = sddf_strlen(colour_start);
-    uint16_t colour_end_length = sddf_strlen(colour_end);
-    assert(serial_queue_length(active_queue_handle) + colour_start_length + colour_end_length
+    assert(serial_queue_length(active_queue_handle) + colour_start_len + colour_end_len
            <= serial_queue_free(free_queue_handle));
 
     uint16_t colour_transferred = 0;
-    while (colour_transferred < colour_start_length) {
-        uint32_t remaining = colour_start_length - colour_transferred;
+    while (colour_transferred < colour_start_len) {
+        uint32_t remaining = colour_start_len - colour_transferred;
         uint32_t free = serial_queue_contiguous_free(free_queue_handle);
         uint32_t to_transfer = (remaining < free) ? remaining : free;
 
@@ -295,8 +298,8 @@ static inline void serial_transfer_all_with_colour(serial_queue_handle_t *active
     }
 
     colour_transferred = 0;
-    while (colour_transferred < colour_end_length) {
-        uint32_t remaining = colour_end_length - colour_transferred;
+    while (colour_transferred < colour_end_len) {
+        uint32_t remaining = colour_end_len - colour_transferred;
         uint32_t free = serial_queue_contiguous_free(free_queue_handle);
         uint32_t to_transfer = (remaining < free) ? remaining : free;
 
