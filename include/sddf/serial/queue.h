@@ -261,7 +261,7 @@ static inline void serial_transfer_all(serial_queue_handle_t *active_queue_handl
  */
 static inline void serial_transfer_all_with_colour(serial_queue_handle_t *active_queue_handle,
                                                    serial_queue_handle_t *free_queue_handle,
-                                                   const char *colour_start, 
+                                                   const char *colour_start,
                                                    uint16_t colour_start_len,
                                                    const char *colour_end,
                                                    uint16_t colour_end_len)
