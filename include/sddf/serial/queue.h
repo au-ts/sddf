@@ -231,10 +231,20 @@ static inline uint32_t serial_enqueue_batch(serial_queue_handle_t *qh,
                                             uint32_t n,
                                             const char *src)
 {
-    uint32_t avail = serial_queue_contiguous_free(qh);
     char *p = qh->data_region + (qh->queue->tail % qh->size);
-    n =  MIN(n, avail);
-    sddf_memcpy(p, src, n);
+    uint32_t avail = serial_queue_free(qh);
+    uint32_t n_prewrap;
+    uint32_t n_postwrap;
+
+    n = MIN(n, avail);
+    n_prewrap = serial_queue_contiguous_free(qh);
+    n_prewrap = MIN(n, n_prewrap);
+    n_postwrap = n - n_prewrap;
+
+    sddf_memcpy(p, src, n_prewrap);
+    if (n_postwrap) {
+        sddf_memcpy(p, src + n_prewrap, n_postwrap);
+    }
 
     serial_update_visible_tail(qh, qh->queue->tail + n);
 
