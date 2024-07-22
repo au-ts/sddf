@@ -16,18 +16,26 @@ char *tx_data_cli0;
 
 #if SERIAL_WITH_COLOUR
 
-#define MAX_COLOURS 256
-#define MAX_COLOURS_LEN 3
+/* When we have more clients than colours, we re-use the colours. */
+const char *colours[] = {
+    /* foreground red */
+    "\x1b[31m",
+    /* foreground green */
+    "\x1b[32m",
+    /* foreground yellow */
+    "\x1b[33m",
+    /* foreground blue */
+    "\x1b[34m",
+    /* foreground magenta */
+    "\x1b[35m"
+    /* foreground cyan */
+    "\x1b[36m"
+};
 
-#define COLOUR_START_START "\x1b[38;5;"
-#define COLOUR_START_START_LEN 7
-
-#define COLOUR_START_END "m"
-#define COLOUR_START_END_LEN 1
-
+#define COLOUR_LENGTH 5
 #define COLOUR_END "\x1b[0m"
 
-char *clients_colours[SERIAL_NUM_CLIENTS];
+char *client_names[SERIAL_NUM_CLIENTS];
 
 #endif
 
@@ -84,7 +92,9 @@ bool process_tx_queue(uint32_t client)
 
     uint32_t length = serial_queue_length(handle);
 #if SERIAL_WITH_COLOUR
-    length += COLOUR_START_START_LEN + MAX_COLOURS_LEN + COLOUR_START_END_LEN;
+    const char *client_colour = colours[client % ARRAY_SIZE(colours)];
+    assert(COLOUR_LENGTH == sddf_strlen(client_colour));
+    length += COLOUR_LENGTH;
 #endif
 
     /* Not enough space to transmit string to virtualiser. Continue later */
@@ -100,8 +110,8 @@ bool process_tx_queue(uint32_t client)
     }
 
 #if SERIAL_WITH_COLOUR
-    char colour_start_buff[COLOUR_START_START_LEN + MAX_COLOURS_LEN + COLOUR_START_END_LEN + 1];
-    sddf_sprintf(colour_start_buff, "%s%u%s", COLOUR_START_START, client % MAX_COLOURS, COLOUR_START_END);
+    char colour_start_buff[COLOUR_LENGTH];
+    sddf_sprintf(colour_start_buff, "%s", client_colour);
     serial_transfer_all_with_colour(handle, &tx_queue_handle_drv, colour_start_buff, COLOUR_END);
 #else
     serial_transfer_all(handle, &tx_queue_handle_drv);
@@ -184,10 +194,9 @@ void init(void)
 #endif
 
 #if SERIAL_WITH_COLOUR
-    serial_channel_names_init(clients_colours);
+    serial_channel_names_init(client_names);
     for (uint32_t i = 0; i < SERIAL_NUM_CLIENTS; i++) {
-        sddf_dprintf("%s%u%s%s is client %u%s\n", COLOUR_START_START, i % MAX_COLOURS, COLOUR_START_END, clients_colours[i], i,
-                     COLOUR_END);
+        sddf_dprintf("%s'%s' is client %u%s\n", colours[i % ARRAY_SIZE(colours)], client_names[i], i, COLOUR_END);
     }
 #endif
 }
