@@ -32,8 +32,9 @@ const char *colours[] = {
     "\x1b[36m"
 };
 
-#define COLOUR_LENGTH 5
+#define COLOUR_BEGIN_LEN 5
 #define COLOUR_END "\x1b[0m"
+#define COLOUR_END_LEN 4
 
 char *client_names[SERIAL_NUM_CLIENTS];
 
@@ -93,8 +94,8 @@ bool process_tx_queue(uint32_t client)
     uint32_t length = serial_queue_length(handle);
 #if SERIAL_WITH_COLOUR
     const char *client_colour = colours[client % ARRAY_SIZE(colours)];
-    assert(COLOUR_LENGTH == sddf_strlen(client_colour));
-    length += COLOUR_LENGTH;
+    assert(COLOUR_BEGIN_LEN == sddf_strlen(client_colour));
+    length += COLOUR_BEGIN_LEN + COLOUR_END_LEN;
 #endif
 
     /* Not enough space to transmit string to virtualiser. Continue later */
@@ -110,9 +111,8 @@ bool process_tx_queue(uint32_t client)
     }
 
 #if SERIAL_WITH_COLOUR
-    char colour_start_buff[COLOUR_LENGTH];
-    sddf_sprintf(colour_start_buff, "%s", client_colour);
-    serial_transfer_all_with_colour(handle, &tx_queue_handle_drv, colour_start_buff, COLOUR_END);
+    serial_transfer_all_with_colour(handle, &tx_queue_handle_drv, client_colour, COLOUR_BEGIN_LEN,
+                                    COLOUR_END, COLOUR_END_LEN);
 #else
     serial_transfer_all(handle, &tx_queue_handle_drv);
 #endif
