@@ -92,20 +92,13 @@ static void partitions_init()
         return;
     }
 
-    //@ericc: Figure out a better way to assign partitions to clients
-    int client_idx = 0;
-    int num_parts = 0;
+    /* Count the partitions the disk has and whether they are valid for sDDF. */
+    int num_partitions = 0;
     for (int i = 0; i < MSDOS_MBR_MAX_PRIMARY_PARTITIONS; i++) {
         if (msdos_mbr.partitions[i].type == MSDOS_MBR_PARTITION_TYPE_EMPTY) {
             continue;
         } else {
-            num_parts++;
-        }
-
-        if (client_idx < BLK_NUM_CLIENTS) {
-            clients[client_idx].start_sector = msdos_mbr.partitions[i].lba_start;
-            clients[client_idx].sectors = msdos_mbr.partitions[i].sectors;
-            client_idx++;
+            num_partitions++;
         }
 
         if (msdos_mbr.partitions[i].lba_start % (BLK_TRANSFER_SIZE / MSDOS_MBR_SECTOR_SIZE) != 0) {
@@ -115,9 +108,22 @@ static void partitions_init()
         }
     }
 
-    if (num_parts < BLK_NUM_CLIENTS) {
+    if (num_partitions < BLK_NUM_CLIENTS) {
         LOG_BLK_VIRT_ERR("Not enough partitions to assign to clients\n");
         return;
+    }
+
+    /* Assign metadata for each client partition */
+    for (int client = 0; client < BLK_NUM_CLIENTS; client++) {
+        size_t client_partition = blk_partition_mapping[client];
+        if (client_partition >= num_partitions) {
+            LOG_BLK_VIRT_ERR("Invalid client partition mapping for client %d: %zu\n", client, client_partition);
+            return;
+        }
+
+        /* We have a valid partition now. */
+        clients[client].start_sector = msdos_mbr.partitions[client_partition].lba_start;
+        clients[client].sectors = msdos_mbr.partitions[client_partition].sectors;
     }
 
     for (int i = 0; i < BLK_NUM_CLIENTS; i++) {
@@ -135,7 +141,7 @@ static void request_mbr()
     int err = fsmalloc_alloc(&fsmalloc, &mbr_addr, 1);
     assert(!err);
 
-    uint32_t mbr_req_id;
+    uint32_t mbr_req_id = 0;
     reqbk_t mbr_req_data = {0, 0, 0, mbr_addr, 1, 0};
     err = ialloc_alloc(&ialloc, &mbr_req_id);
     assert(!err);
@@ -284,7 +290,7 @@ static void handle_client(int cli_id)
 
     uintptr_t drv_addr;
     uint32_t drv_block_number;
-    uint32_t drv_req_id;
+    uint32_t drv_req_id = 0;
 
     int err = 0;
     while (!blk_req_queue_empty(&h)) {
