@@ -29,10 +29,13 @@
 
 #define REQBK_SIZE BLK_QUEUE_SIZE_DRIV
 
+#define BLK_DRIV_TO_PADDR(addr) ((addr) - blk_data_driver + blk_data_driver_paddr)
+
 blk_storage_info_t *blk_config_driver;
 blk_req_queue_t *blk_req_queue_driver;
 blk_resp_queue_t *blk_resp_queue_driver;
 uintptr_t blk_data_driver;
+uintptr_t blk_data_driver_paddr;
 
 blk_storage_info_t *blk_config;
 blk_req_queue_t *blk_req_queue;
@@ -134,7 +137,7 @@ static void request_mbr()
     assert(!err);
     reqbk[mbr_req_id] = mbr_req_data;
 
-    err = blk_enqueue_req(&drv_h, READ_BLOCKS, mbr_addr - blk_data_driver, 0, 1, mbr_req_id);
+    err = blk_enqueue_req(&drv_h, READ_BLOCKS, BLK_DRIV_TO_PADDR(mbr_addr), 0, 1, mbr_req_id);
     assert(!err);
 
     microkit_notify_delayed(DRIVER_CH);
@@ -337,7 +340,7 @@ static void handle_client(int cli_id)
         assert(!err);
         reqbk[drv_req_id] = cli_data;
 
-        err = blk_enqueue_req(&drv_h, cli_code, drv_addr - blk_data_driver, drv_block_number, cli_count, drv_req_id);
+        err = blk_enqueue_req(&drv_h, cli_code, BLK_DRIV_TO_PADDR(drv_addr), drv_block_number, cli_count, drv_req_id);
         assert(!err);
     }
 }
