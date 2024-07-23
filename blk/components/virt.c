@@ -29,6 +29,10 @@
 
 #define REQBK_SIZE BLK_QUEUE_SIZE_DRIV
 
+/*
+ * Convert a virtual address within the block data region into a physical
+ * address for the driver to give to the device for DMA.
+ */
 #define BLK_DRIV_TO_PADDR(addr) ((addr) - blk_data_driver + blk_data_driver_paddr)
 
 blk_storage_info_t *blk_config_driver;
