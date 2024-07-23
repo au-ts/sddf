@@ -257,7 +257,7 @@ static void handle_driver()
             }
         } else {
             // When more error conditions are added, this will need to be updated to a switch statement
-            err = blk_enqueue_resp(&h, SEEK_ERROR, drv_success_count, cli_data.cli_req_id);
+            err = blk_enqueue_resp(&h, drv_status, drv_success_count, cli_data.cli_req_id);
             assert(!err);
         }
 
