@@ -190,6 +190,7 @@ static void rx_return(void)
 static void tx_provide(void)
 {
     bool reprocess = true;
+    bool packets_transferred = false;
     while (reprocess) {
         while (!virtio_avail_full_tx(&tx_virtq) && !net_queue_empty_active(&tx_queue)) {
             net_buff_desc_t buffer;
@@ -225,6 +226,8 @@ static void tx_provide(void)
 
             tx_virtq.avail->idx++;
             tx_last_desc_idx += 2;
+
+            packets_transferred = true;
         }
 
         net_request_signal_active(&tx_queue);
@@ -236,9 +239,11 @@ static void tx_provide(void)
         }
     }
 
-    // Finally, need to notify the queue
-    /* This assumes VIRTIO_F_NOTIFICATION_DATA has not been negotiated */
-    regs->QueueNotify = VIRTIO_NET_TX_QUEUE;
+    if (packets_transferred) {
+        /* Finally, need to notify the queue if we have transferred data */
+        /* This assumes VIRTIO_F_NOTIFICATION_DATA has not been negotiated */
+        regs->QueueNotify = VIRTIO_NET_TX_QUEUE;
+    }
 }
 
 static void tx_return(void)
