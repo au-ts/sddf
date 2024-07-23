@@ -8,8 +8,12 @@
 #include <sddf/util/cache.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
+
+#ifdef MICROKIT
+#include <microkit.h>
 #include <ethernet_config.h>
 
+/* Microkit specific stuff */
 #define DRIVER 0
 #define CLIENT_CH 1
 
@@ -20,7 +24,8 @@ net_queue_t *tx_active_cli0;
 
 uintptr_t buffer_data_region_cli0_vaddr;
 uintptr_t buffer_data_region_cli0_paddr;
-uintptr_t buffer_data_region_cli1_paddr;
+
+#endif /* MICROKIT */
 
 typedef struct state {
     net_queue_handle_t tx_queue_drv;
@@ -84,7 +89,7 @@ void tx_provide(void)
 
     if (enqueued && net_require_signal_active(&state.tx_queue_drv)) {
         net_cancel_signal_active(&state.tx_queue_drv);
-        microkit_deferred_notify(DRIVER);
+        notify_delayed(resources.drv_cap);
     }
 }
 
@@ -118,12 +123,12 @@ void tx_return(void)
     for (int client = 0; client < NUM_NETWORK_CLIENTS; client++) {
         if (notify_clients[client] && net_require_signal_free(&state.tx_queue_clients[client])) {
             net_cancel_signal_free(&state.tx_queue_clients[client]);
-            microkit_notify(client + CLIENT_CH);
+            seL4_Signal(resources[client].client_cap);
         }
     }
 }
 
-void notified(microkit_channel ch)
+void notified(unsigned int ch)
 {
     tx_return();
     tx_provide();
@@ -131,14 +136,34 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
+#ifdef MICROKIT
+    resources = (struct resources) {
+        .name = microkit_name,
+        .tx_free_drv = tx_free_drv,
+        .tx_active_drv = tx_active_drv,
+        .drv_ch = DRIVER_CH,
+        .drv_cap = BASE_OUTPUT_NOTIFICATION_CAP + DRIVER_CH,
+        .clients = {0},
+    }
+
+    resources.clients[0] = (struct client) {
+        .tx_free = tx_free_cli0,
+        .tx_used = tx_active_cli0,
+        .buffer_data_region_vaddr = buffer_data_region_cli0_vaddr,
+        .buffer_data_region_paddr = buffer_data_region_cli0_paddr,
+        .client_ch = CLIENT_CH,
+        .client_cap = BASE_OUTPUT_NOTIFICATION_CAP + CLIENT_CH,
+    }
+#endif
+
     /* Set up driver queues */
-    net_queue_init(&state.tx_queue_drv, tx_free_drv, tx_active_drv, NET_TX_QUEUE_CAPACITY_DRIV);
+    net_queue_init(&state.tx_queue_drv, resources.tx_free_drv, resources.tx_active_drv, NET_TX_QUEUE_CAPACITY_DRIV);
 
     /* Setup client queues and state */
     net_queue_info_t queue_info[NUM_NETWORK_CLIENTS] = {0};
     uintptr_t client_vaddrs[NUM_NETWORK_CLIENTS] = {0};
-    net_virt_queue_info(microkit_name, tx_free_cli0, tx_active_cli0, queue_info);
-    net_mem_region_vaddr(microkit_name, client_vaddrs, buffer_data_region_cli0_vaddr);
+    net_virt_queue_info(resources.name, resources.clients[0].tx_free, resources.clients[0].tx_active, queue_info);
+    net_mem_region_vaddr(resources.name, client_vaddrs, resources.clients[0].buffer_data_region_paddr);
 
     for (int i = 0; i < NUM_NETWORK_CLIENTS; i++) {
         net_queue_init(&state.tx_queue_clients[i], queue_info[i].free, queue_info[i].active, queue_info[i].capacity);

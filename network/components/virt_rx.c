@@ -5,22 +5,20 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <microkit.h>
 #include <sddf/network/constants.h>
 #include <sddf/network/queue.h>
 #include <sddf/network/util.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 #include <sddf/util/cache.h>
+
+#ifdef MICROKIT
+#include <microkit.h>
 #include <ethernet_config.h>
 
 /* Notification channels */
 #define DRIVER_CH 0
 #define CLIENT_CH 1
-
-/* Used to signify that a packet has come in for the broadcast address and does not match with
- * any particular client. */
-#define BROADCAST_ID (NUM_NETWORK_CLIENTS + 1)
 
 /* Queue regions */
 net_queue_t *rx_free_drv;
@@ -31,6 +29,41 @@ net_queue_t *rx_active_cli0;
 /* Buffer data regions */
 uintptr_t buffer_data_vaddr;
 uintptr_t buffer_data_paddr;
+
+
+void notify_delayed(seL4_CPtr cap) {
+    microkit_notify_delayed(cap - BASE_OUTPUT_NOTIFICATION_CAP);
+}
+
+#else
+
+extern void notify_delayed(seL4_CPtr cap);
+
+#endif
+
+/* Used to signify that a packet has come in for the broadcast address and does not match with
+ * any particular client. */
+#define BROADCAST_ID (NUM_NETWORK_CLIENTS + 1)
+
+struct client {
+    uint64_t rx_free;
+    uint64_t rx_active;
+    uint8_t client_ch;
+    uint8_t client_cap;
+}
+
+struct resources {
+    const char *name;
+    uint64_t rx_free_drv;
+    uint64_t rx_active_drv;
+    uint64_t buffer_data_vaddr;
+    uint64_t buffer_data_paddr;
+    uint8_t driver_ch;
+    seL4_CPtr drv_cap;
+    struct client clients[NUM_NETWORK_CLIENTS];
+};
+
+struct resources resources;
 
 /* In order to handle broadcast packets where the same buffer is given to multiple clients
   * we keep track of a reference count of each buffer and only hand it back to the driver once
@@ -142,7 +175,7 @@ void rx_return(void)
     for (int client = 0; client < NUM_NETWORK_CLIENTS; client++) {
         if (notify_clients[client] && net_require_signal_active(&state.rx_queue_clients[client])) {
             net_cancel_signal_active(&state.rx_queue_clients[client]);
-            microkit_notify(client + CLIENT_CH);
+            seL4_Signal(client + CLIENT_CH);
         }
     }
 }
@@ -190,12 +223,12 @@ void rx_provide(void)
 
     if (notify_drv && net_require_signal_free(&state.rx_queue_drv)) {
         net_cancel_signal_free(&state.rx_queue_drv);
-        microkit_deferred_notify(DRIVER_CH);
+        notify_delayed(resources.drv_cap);
         notify_drv = false;
     }
 }
 
-void notified(microkit_channel ch)
+void notified(unsigned int ch)
 {
     rx_return();
     rx_provide();
@@ -203,11 +236,31 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
+#ifdef MICROKIT
+    resources = (struct resources) {
+        .name = microkit_name,
+        .rx_free_drv = rx_free_drv,
+        .rx_active_drv = rx_active_drv,
+        .buffer_data_vaddr = buffer_data_vaddr,
+        .buffer_data_paddr = buffer_data_paddr,
+        .driver_ch = DRIVER_CH,
+        .drv_cap = BASE_OUTPUT_NOTIFICATION_CAP + DRIVER_CH,
+        .clients = {0},
+    }
+
+    resources.clients[0] = (struct client) {
+        .rx_free = rx_free_cli0,
+        .rx_used = rx_active_cli0,
+        .client_ch = CLIENT_CH,
+        .client_cap = BASE_OUTPUT_NOTIFICATION_CAP + CLIENT_CH,
+
+#endif
+
     uint64_t macs[NUM_NETWORK_CLIENTS] = {0};
     net_queue_info_t queue_info[NUM_NETWORK_CLIENTS] = {0};
 
-    net_virt_mac_addrs(microkit_name, macs);
-    net_virt_queue_info(microkit_name, rx_free_cli0, rx_active_cli0, queue_info);
+    net_virt_mac_addrs(resources.name, macs);
+    net_virt_queue_info(resources.name, resources.clients[0].rx_free, resources.clients[0].rx_active, queue_info);
 
     /* Set up client queues */
     for (int i = 0; i < NUM_NETWORK_CLIENTS; i++) {
@@ -215,12 +268,12 @@ void init(void)
         net_queue_init(&state.rx_queue_clients[i], queue_info[i].free, queue_info[i].active, queue_info[i].capacity);
     }
 
-    /* Set up driver queues */
-    net_queue_init(&state.rx_queue_drv, rx_free_drv, rx_active_drv, NET_RX_QUEUE_CAPACITY_DRIV);
-    net_buffers_init(&state.rx_queue_drv, buffer_data_paddr);
+     /* Set up driver queues */
+    net_queue_init(&state.rx_queue_drv, resources.rx_free_drv, resources.rx_active_drv, NET_RX_QUEUE_CAPACITY_DRIV);
+    net_buffers_init(&state.rx_queue_drv, resources.buffer_data_paddr);
 
     if (net_require_signal_free(&state.rx_queue_drv)) {
         net_cancel_signal_free(&state.rx_queue_drv);
-        microkit_deferred_notify(DRIVER_CH);
+        notify_delayed(DRIVER_CH);
     }
 }

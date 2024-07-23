@@ -26,27 +26,29 @@
 
 #include "ethernet.h"
 
-#ifdef MICROKIT
+// #ifdef MICROKIT
 #include <microkit.h>
 #include <ethernet_config.h>
-#else
-// #include <sel4/arch/syscalls.h>
-// #include <interfaces/sel4_client.h>
-#include <sel4/sel4.h>
-#endif
-
-/*
- * This default is based on the default QEMU setup but could change
- * depending on the instantiation of QEMU or wherever this driver is
- * being used.
- */
-#ifndef VIRTIO_MMIO_NET_OFFSET
-#define VIRTIO_MMIO_NET_OFFSET (0xe00)
-#endif
 
 #define IRQ_CH 0
 #define TX_CH  1
 #define RX_CH  2
+
+
+uintptr_t eth_regs;
+/*
+ * The 'hardware' ring buffer region is used to store the virtIO virtqs
+ * as well as the RX and TX virtIO headers.
+ */
+uintptr_t hw_ring_buffer_vaddr;
+uintptr_t hw_ring_buffer_paddr;
+
+net_queue_t *rx_free;
+net_queue_t *rx_active;
+net_queue_t *tx_free;
+net_queue_t *tx_active;
+
+// #endif
 
 struct resources {
     uintptr_t regs;
@@ -58,19 +60,25 @@ struct resources {
     net_queue_t *tx_active;
     size_t rx_queue_size;
     size_t tx_queue_size;
+    uint8_t irq_ch;
+    uint8_t tx_ch;
+    uint8_t rx_ch;
 
     seL4_CPtr irq_cap;
     seL4_CPtr virt_rx_cap;
     seL4_CPtr virt_tx_cap;
 };
 
-struct resources resources;
-
-uint64_t eth_regs;
 /*
- * The 'hardware' ring buffer region is used to store the virtIO virtqs
- * as well as the RX and TX virtIO headers.
+ * This default is based on the default QEMU setup but could change
+ * depending on the instantiation of QEMU or wherever this driver is
+ * being used.
  */
+#ifndef VIRTIO_MMIO_NET_OFFSET
+#define VIRTIO_MMIO_NET_OFFSET (0xe00)
+#endif
+
+struct resources resources;
 
 #define RX_COUNT 512
 #define TX_COUNT 512
@@ -208,7 +216,6 @@ static void rx_return(void)
     rx_last_seen_used += packets_transferred;
 
     if (packets_transferred > 0 && net_require_signal_active(&rx_queue)) {
-        LOG_DRIVER("signalling RX\n");
         net_cancel_signal_active(&rx_queue);
         seL4_Signal(resources.virt_rx_cap);
     }
@@ -469,7 +476,6 @@ static void eth_setup(void)
 /* By the time we get to here, 'resources' should be valid */
 void init(void)
 {
-    LOG_DRIVER_ERR("HELLO, I AM IN C!!!\n");
 #ifdef MICROKIT
     resources = (struct resources){
         .regs = eth_regs,
@@ -502,19 +508,15 @@ void init(void)
 
 void notified(uint32_t ch)
 {
-    switch (ch) {
-    case IRQ_CH:
+
+    if (ch == resources.irq_ch) {
         handle_irq();
         seL4_IRQHandler_Ack(resources.irq_cap);
-        break;
-    case RX_CH:
+    } else if (ch == resources.rx_ch) {
         rx_provide();
-        break;
-    case TX_CH:
+    } else if (ch == resources.tx_ch) {
         tx_provide();
-        break;
-    default:
+    } else {
         LOG_DRIVER_ERR("received notification on unexpected channel %u\n", ch);
-        break;
     }
 }
