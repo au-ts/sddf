@@ -29,8 +29,8 @@
 #define MAC_ADDR_CLI0                       0x525401000005
 #define MAC_ADDR_CLI1                       0x525401000006
 #elif defined(CONFIG_PLAT_STAR64)
-#define MAC_ADDR_CLI0                       0x525401000005
-#define MAC_ADDR_CLI1                       0x525401000006
+#define MAC_ADDR_CLI0                       0x525401000007
+#define MAC_ADDR_CLI1                       0x525401000008
 #else
 #error "Must define MAC addresses for clients in ethernet config"
 #endif
