@@ -36,10 +36,10 @@ UTIL := $(SDDF)/util
 LIBCO := $(SDDF)/libco
 TOP := ${SDDF}/examples/i2c
 I2C := $(SDDF)/i2c
-I2C_DRIVER := $(SDDF)/drivers/i2c/host/${PLATFORM}
+I2C_DRIVER := $(SDDF)/drivers/i2c/${PLATFORM}
 TIMER_DRIVER := $(SDDF)/drivers/clock/${PLATFORM}
-PN532_DRIVER := $(SDDF)/drivers/i2c/devices/pn532
-DS3231_DRIVER := $(SDDF)/drivers/i2c/devices/ds3231
+PN532_DRIVER := $(SDDF)/i2c/devices/pn532
+DS3231_DRIVER := $(SDDF)/i2c/devices/ds3231
 
 
 IMAGES := i2c_virt.elf i2c_driver.elf client_pn532.elf client_ds3231.elf timer_driver.elf

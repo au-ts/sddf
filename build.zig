@@ -113,11 +113,11 @@ fn addI2cDriverDevice(
         .strip = false,
     });
     driver.addIncludePath(libmicrokit_include);
-    const source = b.fmt("drivers/i2c/devices/{s}/{s}.c", .{ @tagName(device), @tagName(device) });
+    const source = b.fmt("i2c/devices/{s}/{s}.c", .{ @tagName(device), @tagName(device) });
     driver.addCSourceFile(.{
         .file = b.path(source),
     });
-    driver.addIncludePath(b.path(b.fmt("drivers/i2c/devices/{s}/", .{@tagName(device)})));
+    driver.addIncludePath(b.path(b.fmt("i2c/devices/{s}/", .{@tagName(device)})));
     driver.addIncludePath(b.path("include"));
     driver.linkLibrary(util);
     driver.addIncludePath(b.path("libco"));
@@ -139,13 +139,13 @@ fn addI2cDriverHost(
         .optimize = optimize,
         .strip = false,
     });
-    const source = b.fmt("drivers/i2c/host/{s}/i2c.c", .{@tagName(class)});
+    const source = b.fmt("drivers/i2c/{s}/i2c.c", .{@tagName(class)});
     driver.addCSourceFile(.{
         .file = b.path(source),
         // Note: the I2C_BUS_NUM flag is temporary
         .flags = &.{"-DI2C_BUS_NUM=2"},
     });
-    driver.addIncludePath(b.path(b.fmt("drivers/i2c/host/{s}/", .{@tagName(class)})));
+    driver.addIncludePath(b.path(b.fmt("drivers/i2c/{s}/", .{@tagName(class)})));
     driver.addIncludePath(b.path("include"));
     driver.linkLibrary(util);
 
