@@ -12,6 +12,9 @@ the dwmac4 header files. */
 #define MAX_RX_FRAME_SZ             (0x600)             /* Maximum size of a received packet. */
 #define DMA_PBL                     (32)                /* DMA programmable burst length. Must be 1, 2, 4, 8, 16, or 32. */
 
+/* */
+
+
 /* DMA Bus mode register definitions */
 #define DMAMAC_SWRST                (1 << 0)            /* Resets all GMAC Subsystem internal registers and logic. Cleared automatically after the reset operation has completed. */
 #define RXHIGHPRIO                  (1 << 1)            /* DMA Arbitration Scheme - 1: Rx has priority over Tx, 0: round robin with Rx:Tx priority given in bits [15:14]. */
@@ -556,6 +559,7 @@ register map outlined in the imx8mp TRM. */
 
 #define DMA_CHAN_INTR_DEFAULT_MASK	(DMA_CHAN_INTR_NORMAL | \
 					 DMA_CHAN_INTR_ABNORMAL)
+
 /* Descriptor definitions */
 
 /* Rx status bit definitions */
@@ -594,7 +598,7 @@ register map outlined in the imx8mp TRM. */
 
 /* Tx control bit definitions */
 #define DESC_TXCTRL_TXINT		    (1 << 31)           /* Sets Transmit Interrupt after the present frame has been transmitted. */
-#define DESC_TXCTRL_TXLAST		    (1 << 30)           /* Buffer contains the last segment of the frame. */
+#define DESC_TXCTRL_TXLAST		    (1 << 28)           /* Buffer contains the last segment of the frame. */
 #define DESC_TXCTRL_TXFIRST		    (1 << 29)           /* Buffer contains the first segment of a frame. */
 #define DESC_TXCTRL_TXCRCDIS		(1 << 26)           /* GMAC does not append the Cyclic Redundancy Check (CRC) to the end of the transmitted frame.*/
 #define DESC_TXCTRL_TXRINGEND		(1 << 25)           /* Descriptor list reached its final descriptor. DMA must loop around. */

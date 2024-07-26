@@ -114,7 +114,7 @@ static void rx_provide()
             }
 
             rx.descr_mdata[rx.tail] = buffer;
-            // update_ring_slot(&rx, rx.tail, DESC_RXSTS_OWNBYDMA | BIT(30) | BIT(24), buffer.len, buffer.io_or_offset, 0);
+            update_ring_slot(&rx, rx.tail, buffer.io_or_offset, 0, DESC_RXSTS_OWNBYDMA | BIT(30) | BIT(24));
             /* We will update the hardware register that stores the tail address. This tells
             the device that we have new descriptors to use. */
             *DMA_REG(DMA_CHAN_RX_TAIL_ADDR(0)) = rx_desc_base + sizeof(struct descriptor) * rx.tail;
@@ -182,7 +182,13 @@ static void tx_provide(void)
             int err = net_dequeue_active(&tx_queue, &buffer);
             assert(!err);
 
-            uint32_t d2 = DESC_TXCTRL_TXINT | buffer.len;
+            // For normal transmit descriptors, tdes2 needs to be set to generate an IRQ on transmit
+            // completion. We also need to provide the length of the buffer data in bits 13:0.
+            uint32_t tdes2 = DESC_TXCTRL_TXINT | buffer.len;
+
+            // For normal transmit descritpors, we need to give ownership to DMA, as well as indicate
+            // that this is the first and last parts of the current packet.
+            uint32_t tdes3 = (DESC_TXSTS_OWNBYDMA | DESC_TXCTRL_TXFIRST | DESC_TXCTRL_TXLAST | buffer.len);
             sddf_dprintf("-------------- New transmit ------------\n");
             sddf_dprintf("This is the current TX descr: %p\n", *DMA_REG(DMA_CHAN_CUR_TX_DESC(0)));
             sddf_dprintf("This is the current tx buffer for DMA: %p\n", *DMA_REG(DMA_CHAN_CUR_TX_BUF_ADDR(0)));
@@ -190,7 +196,8 @@ static void tx_provide(void)
             sddf_dprintf("This is the current tail pointer: %p\n", *DMA_REG(DMA_CHAN_TX_TAIL_ADDR(0)));
             sddf_dprintf("This is the tail we are operating on: %d\n", tx.tail);
             tx.descr_mdata[tx.tail] = buffer;
-            update_ring_slot(&tx, tx.tail, buffer.io_or_offset, d2, (DESC_TXSTS_OWNBYDMA | BIT(29) | BIT(28)));
+
+            update_ring_slot(&tx, tx.tail, buffer.io_or_offset, tdes2, tdes3);
 
             tx.tail = (tx.tail + 1) % TX_COUNT;
             i++;
@@ -199,13 +206,13 @@ static void tx_provide(void)
              * NOTE: Setting this on every enqueued packet for sanity, change this to once per bactch.
              */
             *DMA_REG(DMA_CHAN_TX_TAIL_ADDR(0)) = tx_desc_base + sizeof(struct descriptor) * (tx.tail);
-            sddf_dprintf("This is the value of the mtl tx operation mode: %b\n", mtl_regs->txq0_operation_mode);
-            sddf_dprintf("This is the value of the MTL transmit debug registe: %b\n", mtl_regs->txq0_debug);
-            sddf_dprintf("This is the value of the MTL rx debug register: %b\n", mtl_regs->rxq0_debug);
-            sddf_dprintf("This is the value of the MAC debug register: %b\n", *MAC_REG(GMAC_DEBUG));
-            sddf_dprintf("This is the value of the MTL FIFO debug status register: %b\n", *MTL_REG(0x00000c0c));
-            sddf_dprintf("This is the value of the MTL FIFO debug data register: %b\n", *MTL_REG(0x00000c10));
+            // sddf_dprintf("This is the value of the mtl tx operation mode: %b\n", mtl_regs->txq0_operation_mode);
+            // sddf_dprintf("This is the value of the MTL rx debug register: %b\n", mtl_regs->rxq0_debug);
+            // sddf_dprintf("This is the value of the MAC debug register: %b\n", *MAC_REG(GMAC_DEBUG));
+            // sddf_dprintf("This is the value of the MTL FIFO debug status register: %b\n", *MTL_REG(0x00000c0c));
+            // sddf_dprintf("This is the value of the MTL FIFO debug data register: %b\n", *MTL_REG(0x00000c10));
             sddf_dprintf("This is the value of the DMA debug status 0 register %b\n", *DMA_REG(DMA_DEBUG_STATUS_0));
+            sddf_dprintf("This is the value of the MTL transmit debug registe: %b\n", mtl_regs->txq0_debug);
             sddf_dprintf("This is the new tail addr: %p --- this is the size of the desc struct: %x -- this is the tail index: %d -- this is the buffer addr: %p\n", \
             hw_ring_buffer_paddr + ((sizeof(struct descriptor) * (RX_COUNT + tx.tail))), sizeof(struct descriptor), tx.tail, buffer.io_or_offset);
             sddf_dprintf("This is the current tx buffer for DMA: %p\n", *DMA_REG(DMA_CHAN_CUR_TX_BUF_ADDR(0)));
@@ -832,7 +839,7 @@ void init(void)
     net_queue_init(&rx_queue, (net_queue_t *)rx_free, (net_queue_t *)rx_active, RX_QUEUE_SIZE_DRIV);
     net_queue_init(&tx_queue, (net_queue_t *)tx_free, (net_queue_t *)tx_active, TX_QUEUE_SIZE_DRIV);
 
-    // rx_provide();
+    rx_provide();
     // sddf_dprintf("This is the value of the DMA debug status 0 register AFTER RX PROVIDE %b\n", *DMA_REG(DMA_DEBUG_STATUS_0));
     tx_provide();
 
