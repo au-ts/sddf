@@ -205,7 +205,7 @@ static void tx_provide(void)
              * This tells the hardware that it has new buffers to send.
              * NOTE: Setting this on every enqueued packet for sanity, change this to once per bactch.
              */
-            *DMA_REG(DMA_CHAN_TX_TAIL_ADDR(0)) = tx_desc_base + sizeof(struct descriptor) * (tx.tail);
+            dma_regs->ch0_txdesc_tail_pointer = tx_desc_base + sizeof(struct descriptor) * (tx.tail);
             // sddf_dprintf("This is the value of the mtl tx operation mode: %b\n", mtl_regs->txq0_operation_mode);
             // sddf_dprintf("This is the value of the MTL rx debug register: %b\n", mtl_regs->rxq0_debug);
             // sddf_dprintf("This is the value of the MAC debug register: %b\n", *MAC_REG(GMAC_DEBUG));
@@ -785,8 +785,8 @@ static void eth_setup(void)
     rx.descr = (volatile struct descriptor *)hw_ring_buffer_vaddr;
     tx.descr = (volatile struct descriptor *)(hw_ring_buffer_vaddr + (sizeof(struct descriptor) * RX_COUNT));
 
-    // eqos_init();
-    eth_init(0x00005b75, 0x0039cf6c);
+    eqos_init();
+    // eth_init(0x00005b75, 0x0039cf6c);
 
     /* 1. Init DMA */
     // dma_init();
