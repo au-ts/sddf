@@ -3,19 +3,19 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+#include "sys_lwip.h"
 #include <stdbool.h>
 #include <stdint.h>
-#include <microkit.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 #include <sddf/network/queue.h>
 #include <sddf/network/util.h>
 #include <sddf/serial/queue.h>
-#include <sddf/timer/client.h>
-#include <sddf/benchmark/sel4bench.h>
-#include <serial_config.h>
-#include <ethernet_config.h>
-#include <string.h>
+#include <sddf/timer/protocol.h>
+// #include <sddf/benchmark/sel4bench.h>
+// #include <serial_config.h>
+// #include <ethernet_config.h>
+#include <sddf/util/string.h>
 #include "lwip/init.h"
 #include "netif/etharp.h"
 #include "lwip/pbuf.h"
@@ -28,24 +28,12 @@
 
 #include "echo.h"
 
-#define SERIAL_TX_CH 0
-#define TIMER  1
-#define RX_CH  2
-#define TX_CH  3
-
 char *serial_tx_data;
 serial_queue_t *serial_tx_queue;
 serial_queue_handle_t serial_tx_queue_handle;
 
 #define LWIP_TICK_MS 100
 #define NUM_PBUFFS NET_MAX_CLIENT_QUEUE_CAPACITY
-
-net_queue_t *rx_free;
-net_queue_t *rx_active;
-net_queue_t *tx_free;
-net_queue_t *tx_active;
-uintptr_t rx_buffer_data_region;
-uintptr_t tx_buffer_data_region;
 
 /* Booleans to indicate whether packets have been enqueued during notification handling */
 static bool notify_tx;
@@ -77,12 +65,12 @@ state_t state;
 
 void set_timeout(void)
 {
-    sddf_timer_set_timeout(TIMER, LWIP_TICK_MS * NS_IN_MS);
+    sddf_timer_set_timeout(resources.timer_id, LWIP_TICK_MS * NS_IN_MS);
 }
 
 uint32_t sys_now(void)
 {
-    return sddf_timer_time_now(TIMER) / NS_IN_MS;
+    return sddf_timer_time_now(resources.timer_id) / NS_IN_MS;
 }
 
 /**
@@ -123,7 +111,7 @@ static struct pbuf *create_interface_buffer(uint64_t offset, size_t length)
                length,
                PBUF_REF,
                &custom_pbuf_offset->custom,
-               (void *)(offset + rx_buffer_data_region),
+               (void *)(offset + resources.rx_buffer_data_region),
                NET_BUFFER_SIZE
            );
 }
@@ -169,7 +157,7 @@ static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
     int err = net_dequeue_free(&state.tx_queue, &buffer);
     assert(!err);
 
-    uintptr_t frame = buffer.io_or_offset + tx_buffer_data_region;
+    uintptr_t frame = buffer.io_or_offset + resources.tx_buffer_data_region;
     uint16_t copied = 0;
     for (struct pbuf *curr = p; curr != NULL; curr = curr->next) {
         memcpy((void *)(frame + copied), curr->payload, curr->len);
@@ -279,20 +267,17 @@ static err_t ethernet_init(struct netif *netif)
 static void netif_status_callback(struct netif *netif)
 {
     if (dhcp_supplied_address(netif)) {
-        sddf_printf("LWIP|NOTICE: DHCP request for %s returned IP address: %s\n", microkit_name,
-                    ip4addr_ntoa(netif_ip4_addr(netif)));
+        sddf_dprintf("LWIP|NOTICE: DHCP request for client0 returned IP address: %s\n", ip4addr_ntoa(netif_ip4_addr(netif)));
     }
 }
 
-void init(void)
+void sddf_init(void)
 {
-    serial_cli_queue_init_sys(microkit_name, NULL, NULL, NULL, &serial_tx_queue_handle, serial_tx_queue, serial_tx_data);
-    serial_putchar_init(SERIAL_TX_CH, &serial_tx_queue_handle);
 
     size_t rx_capacity, tx_capacity;
-    net_cli_queue_capacity(microkit_name, &rx_capacity, &tx_capacity);
-    net_queue_init(&state.rx_queue, rx_free, rx_active, rx_capacity);
-    net_queue_init(&state.tx_queue, tx_free, tx_active, tx_capacity);
+    net_cli_queue_capacity(resources.name, &rx_capacity, &tx_capacity);
+    net_queue_init(&state.rx_queue, resources.rx_free, resources.rx_active, NET_RX_QUEUE_SIZE_CLI0);
+    net_queue_init(&state.tx_queue, resources.tx_free, resources.tx_active, NET_TX_QUEUE_SIZE_CLI0);
     net_buffers_init(&state.tx_queue, 0);
 
     lwip_init();
@@ -300,7 +285,7 @@ void init(void)
 
     LWIP_MEMPOOL_INIT(RX_POOL);
 
-    uint64_t mac_addr = net_cli_mac_addr(microkit_name);
+    uint64_t mac_addr = net_cli_mac_addr(resources.name);
     net_set_mac_addr(state.mac, mac_addr);
 
     /* Set dummy IP configuration values to get lwIP bootstrapped  */
@@ -333,63 +318,58 @@ void init(void)
     if (notify_rx && net_require_signal_free(&state.rx_queue)) {
         net_cancel_signal_free(&state.rx_queue);
         notify_rx = false;
-        if (!microkit_have_signal) {
-            microkit_deferred_notify(RX_CH);
-        } else if (microkit_signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + RX_CH) {
-            microkit_notify(RX_CH);
+        unsigned int curr_delayed = sddf_notify_delayed_curr();
+        if (curr_delayed == -1) {
+            sddf_notify_delayed(resources.rx_id);
+        } else if (curr_delayed != resources.rx_id) {
+            sddf_notify(resources.rx_id);
         }
     }
 
     if (notify_tx && net_require_signal_active(&state.tx_queue)) {
         net_cancel_signal_active(&state.tx_queue);
         notify_tx = false;
-        if (!microkit_have_signal) {
-            microkit_deferred_notify(TX_CH);
-        } else if (microkit_signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + TX_CH) {
-            microkit_notify(TX_CH);
+        unsigned int curr_delayed = sddf_notify_delayed_curr();
+        if (curr_delayed == -1) {
+            sddf_notify_delayed(resources.tx_id);
+        } else if (curr_delayed != resources.tx_id) {
+            sddf_notify(resources.tx_id);
         }
     }
 }
 
-void notified(microkit_channel ch)
+void sddf_notified(unsigned int id)
 {
-    switch (ch) {
-    case RX_CH:
+
+    if (id == resources.rx_id) {
         receive();
-        break;
-    case TIMER:
+    } else if (id == resources.timer_id) {
         sys_check_timeouts();
         set_timeout();
-        break;
-    case TX_CH:
+    } else if (id == resources.tx_id) {
         transmit();
         receive();
-        break;
-    case SERIAL_TX_CH:
-        // Nothing to do
-        break;
-    default:
-        sddf_dprintf("LWIP|LOG: received notification on unexpected channel: %u\n", ch);
-        break;
     }
 
     if (notify_rx && net_require_signal_free(&state.rx_queue)) {
         net_cancel_signal_free(&state.rx_queue);
         notify_rx = false;
-        if (!microkit_have_signal) {
-            microkit_deferred_notify(RX_CH);
-        } else if (microkit_signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + RX_CH) {
-            microkit_notify(RX_CH);
+        unsigned int curr_delayed = sddf_notify_delayed_curr();
+        if (curr_delayed == -1) {
+            sddf_notify_delayed(resources.rx_id);
+        } else if (curr_delayed != resources.rx_id) {
+            sddf_notify(resources.rx_id);
         }
     }
 
     if (notify_tx && net_require_signal_active(&state.tx_queue)) {
         net_cancel_signal_active(&state.tx_queue);
         notify_tx = false;
-        if (!microkit_have_signal) {
-            microkit_deferred_notify(TX_CH);
-        } else if (microkit_signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + TX_CH) {
-            microkit_notify(TX_CH);
+        unsigned int curr_delayed = sddf_notify_delayed_curr();
+        if (curr_delayed == -1) {
+            sddf_notify_delayed(resources.tx_id);
+        } else if (curr_delayed != resources.tx_id) {
+            sddf_notify(resources.tx_id);
         }
     }
 }

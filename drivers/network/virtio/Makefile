@@ -30,8 +30,8 @@ CFLAGS := \
 
 all: $(BUILD_DIR)/ethernet.o
 
-$(BUILD_DIR)/ethernet.o: ethernet.c ethernet.h
-	$(CC) -c $(CFLAGS) ethernet.c -o $(BUILD_DIR)/ethernet.o
+$(BUILD_DIR)/ethernet.o: ethernet.c. microkit_ethernet.c ethernet.h
+	$(CC) -c $(CFLAGS) ethernet.c microkit_ethernet.c -o $(BUILD_DIR)/ethernet.o
 
 .PHONY: clean
 clean:

@@ -7,10 +7,12 @@
 
 #include <microkit.h>
 #include <sddf/util/string.h>
+#include <sddf/network/util.h>
 #include <sddf/network/queue.h>
 #include <sddf/util/util.h>
 
-#define NUM_NETWORK_CLIENTS 2
+// #define NUM_NETWORK_CLIENTS 2
+#define NUM_NETWORK_CLIENTS 1
 
 #define NET_CLI0_NAME "client0"
 #define NET_CLI1_NAME "client1"

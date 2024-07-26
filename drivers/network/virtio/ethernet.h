@@ -3,8 +3,18 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+#pragma once
+
+#ifdef MICROKIT
+#include <microkit.h>
+#else
+#include <sel4/sel4.h>
+#endif
 #include <stdint.h>
 #include <sddf/util/printf.h>
+#include <sddf/network/queue.h>
+#include <sddf/virtio/virtio.h>
+#include <sddf/virtio/virtio_queue.h>
 
 // #define DEBUG_DRIVER
 
@@ -197,4 +207,25 @@ static void virtio_net_print_features(uint64_t features)
         sddf_printf("    VIRTIO_NET_F_SPEED_DUPLEX\n");
     }
 }
+
+struct resources {
+    uintptr_t regs;
+    uintptr_t hw_ring_buffer_vaddr;
+    uintptr_t hw_ring_buffer_paddr;
+    net_queue_t *rx_free;
+    net_queue_t *rx_active;
+    net_queue_t *tx_free;
+    net_queue_t *tx_active;
+    size_t rx_queue_size;
+    size_t tx_queue_size;
+
+    uint8_t irq_id;
+    uint8_t tx_id;
+    uint8_t rx_id;
+};
+
+struct resources resources;
+
+void sddf_init(void);
+void sddf_notified(uint32_t ch);
 

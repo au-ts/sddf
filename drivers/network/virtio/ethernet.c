@@ -13,7 +13,8 @@
  * simulator such as QEMU, things like memory fences when touching device registers
  * may be needed if instead this driver was to be used in a different environment.
  */
-#include <sel4/sel4.h>
+
+#include "sys_ethernet.h" // @alwin: This needs to be included first or bad things happen
 #include <stdbool.h>
 #include <stdint.h>
 #include <sddf/network/queue.h>
@@ -24,51 +25,6 @@
 #include <sddf/virtio/virtio.h>
 #include <sddf/virtio/virtio_queue.h>
 
-#include "ethernet.h"
-
-// #ifdef MICROKIT
-#include <microkit.h>
-#include <ethernet_config.h>
-
-#define IRQ_CH 0
-#define TX_CH  1
-#define RX_CH  2
-
-
-uintptr_t eth_regs;
-/*
- * The 'hardware' ring buffer region is used to store the virtIO virtqs
- * as well as the RX and TX virtIO headers.
- */
-uintptr_t hw_ring_buffer_vaddr;
-uintptr_t hw_ring_buffer_paddr;
-
-net_queue_t *rx_free;
-net_queue_t *rx_active;
-net_queue_t *tx_free;
-net_queue_t *tx_active;
-
-// #endif
-
-struct resources {
-    uintptr_t regs;
-    uintptr_t hw_ring_buffer_vaddr;
-    uintptr_t hw_ring_buffer_paddr;
-    net_queue_t *rx_free;
-    net_queue_t *rx_active;
-    net_queue_t *tx_free;
-    net_queue_t *tx_active;
-    size_t rx_queue_size;
-    size_t tx_queue_size;
-    uint8_t irq_ch;
-    uint8_t tx_ch;
-    uint8_t rx_ch;
-
-    seL4_CPtr irq_cap;
-    seL4_CPtr virt_rx_cap;
-    seL4_CPtr virt_tx_cap;
-};
-
 /*
  * This default is based on the default QEMU setup but could change
  * depending on the instantiation of QEMU or wherever this driver is
@@ -77,8 +33,6 @@ struct resources {
 #ifndef VIRTIO_MMIO_NET_OFFSET
 #define VIRTIO_MMIO_NET_OFFSET (0xe00)
 #endif
-
-struct resources resources;
 
 #define RX_COUNT 512
 #define TX_COUNT 512
@@ -217,7 +171,7 @@ static void rx_return(void)
 
     if (packets_transferred > 0 && net_require_signal_active(&rx_queue)) {
         net_cancel_signal_active(&rx_queue);
-        seL4_Signal(resources.virt_rx_cap);
+        sddf_notify(resources.rx_id);
     }
 }
 
@@ -317,7 +271,7 @@ static void tx_return(void)
 
     if (enqueued > 0 && net_require_signal_free(&tx_queue)) {
         net_cancel_signal_free(&tx_queue);
-        seL4_Signal(resources.virt_tx_cap);
+        sddf_notify(resources.tx_id);
     }
 }
 
@@ -474,25 +428,8 @@ static void eth_setup(void)
 }
 
 /* By the time we get to here, 'resources' should be valid */
-void init(void)
+void sddf_init(void)
 {
-#ifdef MICROKIT
-    resources = (struct resources){
-        .regs = eth_regs,
-        .hw_ring_buffer_vaddr = hw_ring_buffer_vaddr,
-        .hw_ring_buffer_paddr = hw_ring_buffer_paddr,
-        .rx_free = rx_free,
-        .rx_active = rx_active,
-        .tx_free = tx_free,
-        .tx_active = tx_active,
-        .rx_queue_size = NET_RX_QUEUE_SIZE_DRIV,
-        .tx_queue_size = NET_TX_QUEUE_SIZE_DRIV,
-
-        .irq_cap = BASE_IRQ_CAP + IRQ_CH,
-        .virt_rx_cap = BASE_OUTPUT_NOTIFICATION_CAP + RX_CH,
-        .virt_tx_cap = BASE_OUTPUT_NOTIFICATION_CAP + TX_CH,
-    };
-#endif
     regs = (volatile virtio_mmio_regs_t *)(resources.regs + VIRTIO_MMIO_NET_OFFSET);
 
     ialloc_init(&rx_ialloc_desc, rx_descriptors, RX_COUNT);
@@ -503,20 +440,20 @@ void init(void)
 
     eth_setup();
 
-    seL4_IRQHandler_Ack(resources.irq_cap);
+    sddf_irq_ack(resources.irq_id);
 }
 
-void notified(uint32_t ch)
+void sddf_notified(uint32_t id)
 {
 
-    if (ch == resources.irq_ch) {
+    if (id == resources.irq_id) {
         handle_irq();
-        seL4_IRQHandler_Ack(resources.irq_cap);
-    } else if (ch == resources.rx_ch) {
+        sddf_irq_ack(resources.irq_id);
+    } else if (id == resources.rx_id) {
         rx_provide();
-    } else if (ch == resources.tx_ch) {
+    } else if (id == resources.tx_id) {
         tx_provide();
     } else {
-        LOG_DRIVER_ERR("received notification on unexpected channel %u\n", ch);
+        LOG_DRIVER_ERR("received notification from unexpected id %u\n", id);
     }
 }

@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+#include "sys_virt_rx.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <sddf/network/constants.h>
@@ -12,58 +13,9 @@
 #include <sddf/util/printf.h>
 #include <sddf/util/cache.h>
 
-#ifdef MICROKIT
-#include <microkit.h>
-#include <ethernet_config.h>
-
-/* Notification channels */
-#define DRIVER_CH 0
-#define CLIENT_CH 1
-
-/* Queue regions */
-net_queue_t *rx_free_drv;
-net_queue_t *rx_active_drv;
-net_queue_t *rx_free_cli0;
-net_queue_t *rx_active_cli0;
-
-/* Buffer data regions */
-uintptr_t buffer_data_vaddr;
-uintptr_t buffer_data_paddr;
-
-
-void notify_delayed(seL4_CPtr cap) {
-    microkit_notify_delayed(cap - BASE_OUTPUT_NOTIFICATION_CAP);
-}
-
-#else
-
-extern void notify_delayed(seL4_CPtr cap);
-
-#endif
-
 /* Used to signify that a packet has come in for the broadcast address and does not match with
  * any particular client. */
 #define BROADCAST_ID (NUM_NETWORK_CLIENTS + 1)
-
-struct client {
-    uint64_t rx_free;
-    uint64_t rx_active;
-    uint8_t client_ch;
-    uint8_t client_cap;
-}
-
-struct resources {
-    const char *name;
-    uint64_t rx_free_drv;
-    uint64_t rx_active_drv;
-    uint64_t buffer_data_vaddr;
-    uint64_t buffer_data_paddr;
-    uint8_t driver_ch;
-    seL4_CPtr drv_cap;
-    struct client clients[NUM_NETWORK_CLIENTS];
-};
-
-struct resources resources;
 
 /* In order to handle broadcast packets where the same buffer is given to multiple clients
   * we keep track of a reference count of each buffer and only hand it back to the driver once
@@ -120,8 +72,8 @@ void rx_return(void)
             int err = net_dequeue_active(&state.rx_queue_drv, &buffer);
             assert(!err);
 
-            buffer.io_or_offset = buffer.io_or_offset - buffer_data_paddr;
-            uintptr_t buffer_vaddr = buffer.io_or_offset + buffer_data_vaddr;
+            buffer.io_or_offset = buffer.io_or_offset - resources.buffer_data_paddr;
+            uintptr_t buffer_vaddr = buffer.io_or_offset + resources.buffer_data_vaddr;
 
             // Cache invalidate after DMA write, so we don't read stale data.
             // This must be performed after the DMA write to avoid reading
@@ -157,7 +109,7 @@ void rx_return(void)
                 assert(!err);
                 notify_clients[client] = true;
             } else {
-                buffer.io_or_offset = buffer.io_or_offset + buffer_data_paddr;
+                buffer.io_or_offset = buffer.io_or_offset + resources.buffer_data_paddr;
                 err = net_enqueue_free(&state.rx_queue_drv, buffer);
                 assert(!err);
                 notify_drv = true;
@@ -175,7 +127,7 @@ void rx_return(void)
     for (int client = 0; client < NUM_NETWORK_CLIENTS; client++) {
         if (notify_clients[client] && net_require_signal_active(&state.rx_queue_clients[client])) {
             net_cancel_signal_active(&state.rx_queue_clients[client]);
-            seL4_Signal(client + CLIENT_CH);
+            sddf_notify(resources.clients[client].client_id);
         }
     }
 }
@@ -205,7 +157,7 @@ void rx_provide(void)
                 // the DMA region is only mapped in read only. This avoids the
                 // case where pending writes are only written to the buffer
                 // memory after DMA has occured.
-                buffer.io_or_offset = buffer.io_or_offset + buffer_data_paddr;
+                buffer.io_or_offset = buffer.io_or_offset + resources.buffer_data_paddr;
                 err = net_enqueue_free(&state.rx_queue_drv, buffer);
                 assert(!err);
                 notify_drv = true;
@@ -223,48 +175,22 @@ void rx_provide(void)
 
     if (notify_drv && net_require_signal_free(&state.rx_queue_drv)) {
         net_cancel_signal_free(&state.rx_queue_drv);
-        notify_delayed(resources.drv_cap);
+        sddf_notify_delayed(resources.driver_id);
         notify_drv = false;
     }
 }
 
-void notified(unsigned int ch)
+void sddf_notified(unsigned int id)
 {
     rx_return();
     rx_provide();
 }
 
-void init(void)
+void sddf_init(void)
 {
-#ifdef MICROKIT
-    resources = (struct resources) {
-        .name = microkit_name,
-        .rx_free_drv = rx_free_drv,
-        .rx_active_drv = rx_active_drv,
-        .buffer_data_vaddr = buffer_data_vaddr,
-        .buffer_data_paddr = buffer_data_paddr,
-        .driver_ch = DRIVER_CH,
-        .drv_cap = BASE_OUTPUT_NOTIFICATION_CAP + DRIVER_CH,
-        .clients = {0},
-    }
-
-    resources.clients[0] = (struct client) {
-        .rx_free = rx_free_cli0,
-        .rx_used = rx_active_cli0,
-        .client_ch = CLIENT_CH,
-        .client_cap = BASE_OUTPUT_NOTIFICATION_CAP + CLIENT_CH,
-
-#endif
-
-    uint64_t macs[NUM_NETWORK_CLIENTS] = {0};
-    net_queue_info_t queue_info[NUM_NETWORK_CLIENTS] = {0};
-
-    net_virt_mac_addrs(resources.name, macs);
-    net_virt_queue_info(resources.name, resources.clients[0].rx_free, resources.clients[0].rx_active, queue_info);
-
     /* Set up client queues */
     for (int i = 0; i < NUM_NETWORK_CLIENTS; i++) {
-        net_set_mac_addr((uint8_t *) &state.mac_addrs[i], macs[i]);
+        net_set_mac_addr((uint8_t *) &state.mac_addrs[i], resources.clients[i].macs_addr);
         net_queue_init(&state.rx_queue_clients[i], queue_info[i].free, queue_info[i].active, queue_info[i].capacity);
     }
 
@@ -274,6 +200,6 @@ void init(void)
 
     if (net_require_signal_free(&state.rx_queue_drv)) {
         net_cancel_signal_free(&state.rx_queue_drv);
-        notify_delayed(DRIVER_CH);
+        sddf_notify_delayed(resources.driver_id);
     }
 }
