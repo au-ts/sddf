@@ -30,6 +30,8 @@ typedef enum gpu_request_code {
 typedef enum gpu_response_status {
     GPU_RESP_OK, /* success response */
     GPU_RESP_ERR_UNSPEC, /* for misc errors, e.g. attaching backing to a resource that already has backing */
+    GPU_RESP_ERR_OUT_OF_MEMORY, /* out of memory to assign to resource */
+    GPU_RESP_ERR_CONFIG_CHANGE, /* stale requests due to configuration change */
     GPU_RESP_ERR_INVALID_SCANOUT_ID, /* scanout id does not exist */
     GPU_RESP_ERR_INVALID_RESOURCE_ID, /* resource id does not exist */
     GPU_RESP_ERR_INVALID_BOUNDS, /* transfer bounds outside of resource/scanout */
@@ -48,7 +50,7 @@ typedef struct gpu_request {
         gpu_request_set_scanout_t set_scanout;
         gpu_request_transfer_to_2d_t transfer_to_2d;
         gpu_request_resource_flush_t resource_flush;
-    } data;
+    };
 } gpu_request_t;
 
 /* Response struct contained in response queue */
@@ -57,7 +59,7 @@ typedef struct gpu_response {
     uint32_t id; /* stores corresponding request id */
 } gpu_response_t;
 
-/* Configuration struct conatined in config queue */
+/* Configuration struct contained in config queue */
 typedef struct gpu_config {
     uint32_t gen; /* indicates the generation of a configuration entry */
     gpu_scanout_t scanouts[GPU_MAX_SCANOUTS]; /* per-scanout info, its index maps to scanout_id */
@@ -78,7 +80,7 @@ typedef struct gpu_resp_queue {
     gpu_response_t buffers[];
 } gpu_resp_queue_t;
 
-/* Circular buffer containing configuration changes */
+/* Circular buffer containing configuration updates */
 typedef struct gpu_config_queue {
     uint32_t tail;
     uint32_t head;
