@@ -16,28 +16,44 @@
 // #include "ethernet.h"
 #include "layout.h"
 
-/*
- * package flow:
- * 
- *         TX               RX
- * src ----------VSWITCH----------> dest
- * 
- */
+// A vswitch consists of a number of ports, each with an incoming and outgoing
+// set of channels & queues. These ports are analogous to the ports on a
+// physical switch.
 
-#define TX_COUNT 256
-#define RX_COUNT 256
-#define MAX_COUNT MAX(RX_COUNT, TX_COUNT)
+// TODO: move to config header
+#define VSWITCH_PORT_COUNT 4
+#define VSWITCH_LOOKUP_SIZE 256
 
-typedef struct vswitch_client {
-    uint8_t mac_addr[6];
-    net_queue_handle_t rx_queue;
-    net_queue_handle_t tx_queue;
-    size_t rx_ch;
-    size_t tx_ch;
-    // size_t getmac_ch;
-} vswitch_client_t;
+typedef struct mac_addr {
+    uint8_t addr[6];
+} mac_addr_t;
 
-static vswitch_client_t clients[NUM_CLIENTS];
+typedef struct channel_map {
+    // Store macs contiguously for better cache performance during lookup.
+    mac_addr_t macs[VSWITCH_LOOKUP_SIZE];
+    uint8_t port[VSWITCH_LOOKUP_SIZE];
+    uint32_t len;
+} channel_map_t;
+
+typedef struct channel {
+    net_queue_handle_t q;
+    size_t ch;
+    char *data_region;
+} channel_t;
+
+typedef struct port {
+    // For clients, incoming is TX, outgoing is RX
+    // For virtualisers, incoming is RX, outgoing is TX
+    channel_t incoming;
+    channel_t outgoing;
+} port_t;
+
+static struct {
+    port_t ports[VSWITCH_PORT_COUNT];
+    channel_map_t map;
+    // TODO: add port communication filter
+} vswitch;
+
 
 static void debug_dump_packet(int len, uint8_t *buffer)
 {
@@ -55,87 +71,94 @@ static void debug_dump_packet(int len, uint8_t *buffer)
     sddf_dprintf("\n");
 }
 
-int find_dest_client(int src, uint8_t *dest_macaddr)
+static int find_dest_port(channel_map_t *map, uint8_t *dest_macaddr)
 {
-    int dest = -1;
-    for (int c = 0; c < NUM_CLIENTS; c++) {
-        if (mac802_addr_eq(clients[c].mac_addr, dest_macaddr)) {
-            dest = c;
-            break;
+    for (int i = 0; i < map->len; i++) {
+        if (mac802_addr_eq(map->macs[i].addr, dest_macaddr)) {
+            return map->port[i];
         }
     }
-    return dest;
+    return -1;
 }
 
-void tx_if_possible(int src, int dest, net_buff_desc_t *s_buffer)
+static bool forward_frame(channel_t *src, channel_t *dest, net_buff_desc_t *src_buf)
 {
-    if (!IS_CONN(src, dest)) {
-        return;
+    char *src_data = src->data_region + src_buf->io_or_offset;
+
+    net_buff_desc_t d_buffer;
+    if (net_dequeue_free(&dest->q, &d_buffer) != 0) {
+        return false;
     }
-    // fetch empty buffer from sddf free queue (rx)
-    if (!net_queue_empty_free(&clients[dest].rx_queue)) {
-        net_buff_desc_t d_buffer;
-        int err = net_dequeue_free(&clients[dest].rx_queue, &d_buffer);
-        assert(!err);
+    // TODO: make fast memcpy
+    sddf_memcpy(dest->data_region + d_buffer.io_or_offset, src_data, src_buf->len);
 
-        // copy (@jade: any alternative way? Like have a dedicate data region for each conn...)
-        memcpy((void *)d_buffer.io_or_offset, (void *)s_buffer->io_or_offset, s_buffer->len);
-        d_buffer.len = s_buffer->len;
+    d_buffer.len = src_buf->len;
+    net_enqueue_active(&dest->q, d_buffer);
 
-        // @jade: do we need a memory barrier here?
-
-        // ship to the sddf active queue (rx)
-        err = net_enqueue_active(&clients[dest].rx_queue, d_buffer);
-        assert(!err);
-
-        // signal rx_ch (delay)
-        microkit_notify_delayed(clients[dest].rx_ch);
-    }
+    return true;
 }
 
-static void handle_tx(microkit_channel ch)
+static void notified_by_port(int port)
 {
-    for (int src = 0; src < NUM_CLIENTS; src++) {
-        if (ch == clients[src].tx_ch) {
-            // fetch packet(s) from the sddf active queue 
-            while (!net_queue_empty_active(&clients[src].tx_queue)) {
-                net_buff_desc_t buffer;
-                int err = net_dequeue_active(&clients[src].tx_queue, &buffer);
-                assert(!err);
-                
-                // find the dest client (if any) and send the packet (if possible)
-                struct ether_addr *macaddr = (struct ether_addr *)buffer.io_or_offset;
-                int dest;
-                if (mac802_addr_eq_bcast(macaddr->ether_dest_addr_octet)) {
-                    for (dest = 0; dest < NUM_CLIENTS; dest++) {
-                        tx_if_possible(src, dest, &buffer);
-                    }
-                } else {
-                    dest = find_dest_client(src, macaddr->ether_dest_addr_octet);
-                    // @jade: is this check necessary? Should it be an assert?
-                    // I wonder how the networking multiplexor works, package
-                    // that does not have a vswich MAC address shouldn't be sent
-                    // to this "driver" in the frist place.
-                    if (dest >= 0) {
-                        tx_if_possible(src, dest, &buffer);
-                    }
-                }
+    net_buff_desc_t sddf_buffer;
+    port_t *p = &vswitch.ports[port];
 
-                // return buffer to the sddf free queue 
-                err = net_enqueue_free(&clients[src].tx_queue, buffer);
-                assert(!err);
+    channel_t *incoming = &p->incoming;
+    net_queue_handle_t *src_queue = &incoming->q;
+
+    bool reprocess = true;
+    while (reprocess) {
+        while (net_dequeue_active(src_queue, &sddf_buffer) != -1) {
+            struct ether_addr *macaddr = (struct ether_addr *)sddf_buffer.io_or_offset;
+            int dest_port = find_dest_port(&vswitch.map, macaddr->ether_dest_addr_octet);
+
+            if (dest_port < 0) {
+                // Bad destination, drop packet
+                continue;
             }
-            return;
+
+            // TODO: check that src is allowed to send to dest
+            channel_t *outgoing = &vswitch.ports[dest_port].outgoing;
+
+            bool notify = forward_frame(incoming, outgoing, &sddf_buffer);
+
+            if (notify && net_require_signal_active(&outgoing->q)) {
+                net_cancel_signal_active(&outgoing->q);
+                if (!have_signal) {
+                    microkit_notify_delayed(outgoing->ch);
+                } else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + outgoing->ch) {
+                    microkit_notify(outgoing->ch);
+                }
+            }
+
+            sddf_buffer.len = 0;
+            net_enqueue_free(src_queue, sddf_buffer);
+        }
+
+        net_request_signal_active(src_queue);
+        reprocess = false;
+
+        if (!net_queue_empty_active(src_queue)) {
+            net_cancel_signal_active(src_queue);
+            reprocess = true;
         }
     }
-    assert(!"unexpected channel\n");
 }
 
 void notified(microkit_channel ch)
 {
-    // we never "receive" packets since this vswitch
-    // doesn't connect to the outside world at all
-    handle_tx(ch);
+    // This could be optimised but port count is usually low.
+    for (int port = 0; port < VSWITCH_PORT_COUNT; port++) {
+        if (ch == vswitch.ports[port].incoming.ch) {
+            notified_by_port(port);
+            return;
+        }
+        if (ch == vswitch.ports[port].outgoing.ch) {
+            // TODO: check if anyone is waiting for room in this port?
+            // Might be better to drop packets in this case.
+            return;
+        }
+    }
 }
 
 // @jade: this function should contain all the hard-coded craps, so it will be
