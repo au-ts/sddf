@@ -15,6 +15,7 @@
 // #include <sddf/benchmark/sel4bench.h>
 // #include <serial_config.h>
 // #include <ethernet_config.h>
+#include <sddf/network/util.h>
 #include <sddf/util/string.h>
 #include "lwip/init.h"
 #include "netif/etharp.h"
@@ -312,8 +313,8 @@ void sddf_init(void)
     }
 
     setup_udp_socket();
-    setup_utilization_socket();
-    setup_tcp_socket();
+    // setup_utilization_socket();
+    // setup_tcp_socket();
 
     if (notify_rx && net_require_signal_free(&state.rx_queue)) {
         net_cancel_signal_free(&state.rx_queue);
