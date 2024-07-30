@@ -6,23 +6,18 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <microkit.h>
+#include <sddf/network/vswitch.h>
 #include <sddf/network/queue.h>
 #include <sddf/network/mac802.h>
 #include <sddf/network/util.h>
 #include <sddf/util/fence.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
+#define VSWITCH_IMPL
+#include <vswitch_config.h>
 
-// #include "ethernet.h"
-#include "layout.h"
-
-// A vswitch consists of a number of ports, each with an incoming and outgoing
-// set of channels & queues. These ports are analogous to the ports on a
-// physical switch.
-
-// TODO: move to config header
-#define VSWITCH_PORT_COUNT 4
-#define VSWITCH_LOOKUP_SIZE 256
+_Static_assert(VSWITCH_PORT_COUNT <= VSWITCH_MAX_PORT_COUNT, "Too many ports");
+#define UNKNOWN_PORT -1
 
 typedef struct mac_addr {
     uint8_t addr[6];
@@ -35,23 +30,9 @@ typedef struct channel_map {
     uint32_t len;
 } channel_map_t;
 
-typedef struct channel {
-    net_queue_handle_t q;
-    size_t ch;
-    char *data_region;
-} channel_t;
-
-typedef struct port {
-    // For clients, incoming is TX, outgoing is RX
-    // For virtualisers, incoming is RX, outgoing is TX
-    channel_t incoming;
-    channel_t outgoing;
-} port_t;
-
 static struct {
-    port_t ports[VSWITCH_PORT_COUNT];
+    vswitch_port_t ports[VSWITCH_PORT_COUNT];
     channel_map_t map;
-    // TODO: add port communication filter
 } vswitch;
 
 
@@ -78,16 +59,16 @@ static int find_dest_port(channel_map_t *map, uint8_t *dest_macaddr)
             return map->port[i];
         }
     }
-    return -1;
+    return UNKNOWN_PORT;
 }
 
-static bool forward_frame(channel_t *src, channel_t *dest, net_buff_desc_t *src_buf)
+static void forward_frame(vswitch_channel_t *src, vswitch_channel_t *dest, net_buff_desc_t *src_buf)
 {
     char *src_data = src->data_region + src_buf->io_or_offset;
 
     net_buff_desc_t d_buffer;
     if (net_dequeue_free(&dest->q, &d_buffer) != 0) {
-        return false;
+        return;
     }
     // TODO: make fast memcpy
     sddf_memcpy(dest->data_region + d_buffer.io_or_offset, src_data, src_buf->len);
@@ -95,40 +76,50 @@ static bool forward_frame(channel_t *src, channel_t *dest, net_buff_desc_t *src_
     d_buffer.len = src_buf->len;
     net_enqueue_active(&dest->q, d_buffer);
 
-    return true;
+    if (net_require_signal_active(&dest->q)) {
+        net_cancel_signal_active(&dest->q);
+        microkit_notify(dest->ch);
+    }
+}
+
+static void try_broadcast(int src_port, vswitch_port_t *src, net_buff_desc_t *buffer)
+{
+    for (int i = 0; i < VSWITCH_PORT_COUNT; i++) {
+        if (i != src_port && vswitch_can_send_to(src, i)) {
+            vswitch_channel_t *outgoing = &vswitch.ports[i].outgoing;
+            forward_frame(&src->incoming, outgoing, buffer);
+        }
+    }
+}
+
+static void try_send(vswitch_port_t *src, uint8_t *dest_macaddr, net_buff_desc_t *buffer)
+{
+    int dest_port = find_dest_port(&vswitch.map, dest_macaddr);
+
+    if (dest_port == UNKNOWN_PORT || !vswitch_can_send_to(src, dest_port)) {
+        return;
+    }
+
+    vswitch_channel_t *outgoing = &vswitch.ports[dest_port].outgoing;
+    forward_frame(&src->incoming, outgoing, buffer);
 }
 
 static void notified_by_port(int port)
 {
     net_buff_desc_t sddf_buffer;
-    port_t *p = &vswitch.ports[port];
 
-    channel_t *incoming = &p->incoming;
-    net_queue_handle_t *src_queue = &incoming->q;
+    vswitch_port_t *src = &vswitch.ports[port];
+    net_queue_handle_t *src_queue = &src->incoming.q;
 
     bool reprocess = true;
     while (reprocess) {
         while (net_dequeue_active(src_queue, &sddf_buffer) != -1) {
             struct ether_addr *macaddr = (struct ether_addr *)sddf_buffer.io_or_offset;
-            int dest_port = find_dest_port(&vswitch.map, macaddr->ether_dest_addr_octet);
 
-            if (dest_port < 0) {
-                // Bad destination, drop packet
-                continue;
-            }
-
-            // TODO: check that src is allowed to send to dest
-            channel_t *outgoing = &vswitch.ports[dest_port].outgoing;
-
-            bool notify = forward_frame(incoming, outgoing, &sddf_buffer);
-
-            if (notify && net_require_signal_active(&outgoing->q)) {
-                net_cancel_signal_active(&outgoing->q);
-                if (!have_signal) {
-                    microkit_notify_delayed(outgoing->ch);
-                } else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + outgoing->ch) {
-                    microkit_notify(outgoing->ch);
-                }
+            if (mac802_addr_eq(macaddr->ether_dest_addr_octet, bcast_macaddr)) {
+                try_broadcast(port, src, &sddf_buffer);
+            } else {
+                try_send(src, macaddr->ether_dest_addr_octet, &sddf_buffer);
             }
 
             sddf_buffer.len = 0;
@@ -161,33 +152,10 @@ void notified(microkit_channel ch)
     }
 }
 
-// @jade: this function should contain all the hard-coded craps, so it will be
-// easier to refactor later.
 void init(void)
 {
-    // @jade: should we initialize all the queues or 
-    // should the clients initialize their own queues?
-
-    // client #0
-    net_queue_init(&clients[0].tx_queue, (net_queue_t *)tx_free_cli0,
-                   (net_queue_t *)tx_active_cli0, TX_QUEUE_SIZE_DRIV);
-    clients[0].tx_ch = TX_CLI0_CH;
-
-    net_queue_init(&clients[0].rx_queue, (net_queue_t *)rx_free_cli0,
-                   (net_queue_t *)rx_active_cli0, RX_QUEUE_SIZE_DRIV);
-    clients[0].rx_ch = RX_CLI0_CH;
-
-    // @jade: how do I tell clients their mac addresses?
-    mac802_addr_cp(vswitch_mac_base, clients[0].mac_addr, 0);
-
-    // client #1
-    net_queue_init(&clients[1].tx_queue, (net_queue_t *)tx_free_cli1,
-                   (net_queue_t *)tx_active_cli1, TX_QUEUE_SIZE_DRIV);
-    clients[1].tx_ch = TX_CLI1_CH;
-
-    net_queue_init(&clients[1].rx_queue, (net_queue_t *)rx_free_cli1,
-                   (net_queue_t *)rx_active_cli1, RX_QUEUE_SIZE_DRIV);
-    clients[1].rx_ch = RX_CLI1_CH;
-
-    mac802_addr_cp(vswitch_mac_base, clients[1].mac_addr, 1);
+    for (int i = 0; i < VSWITCH_PORT_COUNT; i++)
+    {
+        net_vswitch_init_port(i, &vswitch.ports[i]);
+    }
 }
