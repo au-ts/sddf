@@ -444,8 +444,6 @@ static void eth_setup(void)
     mtl_regs = (volatile struct mtl_regs *) (eth_regs + MTL_REGS_BASE);
     dma_regs = (volatile struct dma_regs *) (eth_regs + DMA_REGS_BASE);
 
-    // TODO: What does this do?
-    *MTL_REG(0x00000c08) = (BIT(0) | BIT(1));
     assert((hw_ring_buffer_paddr & 0xFFFFFFFF) == hw_ring_buffer_paddr);
 
     rx.descr = (volatile struct descriptor *)hw_ring_buffer_vaddr;
