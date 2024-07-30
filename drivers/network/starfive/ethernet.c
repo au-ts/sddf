@@ -29,8 +29,8 @@ uintptr_t rx_active;
 uintptr_t tx_free;
 uintptr_t tx_active;
 
-#define RX_COUNT 16
-#define TX_COUNT 16
+#define RX_COUNT 1024
+#define TX_COUNT 1024
 #define MAX_COUNT MAX(RX_COUNT, TX_COUNT)
 
 struct descriptor {
@@ -69,7 +69,7 @@ static volatile struct dma_regs *dma_regs;
 
 static inline bool hw_ring_full(hw_ring_t *ring, size_t ring_size)
 {
-    return !((ring->tail + 2 - ring->head) % ring_size);
+    return !((ring->tail + 1 - ring->head) % ring_size);
 }
 
 static inline bool hw_ring_empty(hw_ring_t *ring, size_t ring_size)
@@ -93,6 +93,8 @@ static void update_ring_slot(hw_ring_t *ring, unsigned int idx, uint64_t phys,
     d->d3 = d3;
 }
 
+size_t free_dequeued = 0;
+
 static void rx_provide()
 {
     bool reprocess = true;
@@ -101,23 +103,29 @@ static void rx_provide()
             net_buff_desc_t buffer;
             int err = net_dequeue_free(&rx_queue, &buffer);
             assert(!err);
+            free_dequeued += 1;
 
-            uint32_t cntl = (MAX_RX_FRAME_SZ << DESC_RXCTRL_SIZE1SHFT) & DESC_RXCTRL_SIZE1MASK;
-            if (rx.tail + 1 == RX_COUNT) {
-                cntl |= DESC_RXCTRL_RXRINGEND;
-            }
+            // if (*DMA_REG(DMA_CHAN_CUR_RX_DESC(0)) == *DMA_REG(DMA_CHAN_RX_TAIL_ADDR(0))) {
+            //     sddf_dprintf("ran out of desc\n");
+            //     // *DMA_REG(DMA_CHAN_CUR_RX_DESC(0)) = rx_desc_base;
+            //     // *DMA_REG(DMA_CHAN_RX_TAIL_ADDR(0)) = rx_desc_base + sizeof(struct descriptor);
+            // }
+
+            // sddf_dprintf("free_dequeued: %d, buffer 0x%lx, rx.tail: %d, tail: 0x%lx, curr rx desc: 0x%lx\n", free_dequeued, buffer.io_or_offset, rx.tail, *DMA_REG(DMA_CHAN_RX_TAIL_ADDR(0)), *DMA_REG(DMA_CHAN_CUR_RX_DESC(0)));
 
             rx.descr_mdata[rx.tail] = buffer;
             update_ring_slot(&rx, rx.tail, buffer.io_or_offset, 0, DESC_RXSTS_OWNBYDMA | BIT(24) | BIT(30));
             /* We will update the hardware register that stores the tail address. This tells
             the device that we have new descriptors to use. */
             THREAD_MEMORY_RELEASE();
-            // *DMA_REG(DMA_CHAN_RX_TAIL_ADDR(0)) = rx_desc_base + sizeof(struct descriptor) * rx.tail;
+            // sddf_dprintf("This is rx.tail %d --- and addr we are setting tail to: %p\n", rx.tail, rx_desc_base + sizeof(struct descriptor) * rx.tail);
+            *DMA_REG(DMA_CHAN_RX_TAIL_ADDR(0)) = rx_desc_base + sizeof(struct descriptor) * rx.tail;
             rx.tail = (rx.tail + 1) % RX_COUNT;
         }
 
         net_request_signal_free(&rx_queue);
         reprocess = false;
+
 
         if (!net_queue_empty_free(&rx_queue) && !hw_ring_full(&rx, RX_COUNT)) {
             net_cancel_signal_free(&rx_queue);
@@ -145,9 +153,9 @@ static void rx_return(void)
             update_ring_slot(&rx, rx.tail, buffer.io_or_offset, 0, DESC_RXSTS_OWNBYDMA | BIT(24) | BIT(30));
             /* We will update the hardware register that stores the tail address. This tells
             the device that we have new descriptors to use. */
-            rx.head = (rx.head + 1) % RX_COUNT;
 
-            // *DMA_REG(DMA_CHAN_RX_TAIL_ADDR(0)) = rx_desc_base + sizeof(struct descriptor) * rx.tail;
+            *DMA_REG(DMA_CHAN_RX_TAIL_ADDR(0)) = rx_desc_base + sizeof(struct descriptor) * rx.tail;
+            rx.head = (rx.head + 1) % RX_COUNT;
         } else {
             buffer.len = (d->d3 | 0xe);
             int err = net_enqueue_active(&rx_queue, buffer);
@@ -183,6 +191,9 @@ static void tx_provide(void)
             tx.descr_mdata[tx.tail] = buffer;
 
             update_ring_slot(&tx, tx.tail, buffer.io_or_offset, tdes2, tdes3);
+
+
+            // sddf_dprintf("This is the tx cur desc: %p --- this is the tx tail pointer: %p\n", *DMA_REG(DMA_CHAN_CUR_TX_DESC(0)), *DMA_REG(DMA_CHAN_TX_TAIL_ADDR(0)));
 
             tx.tail = (tx.tail + 1) % TX_COUNT;
             i++;
@@ -245,7 +256,7 @@ static void handle_irq()
     *DMA_REG(DMA_CHAN_STATUS(0)) &= e;
 }
 
-static void eqos_init()
+static void eth_init()
 {
     /* 1. Software reset -- This will reset the MAC internal registers. */
     volatile uint32_t *mode = DMA_REG(DMA_BUS_MODE);
@@ -396,9 +407,9 @@ static void eqos_init()
     dma_regs->sysbus_mode = val;
 
     volatile uint32_t *tx_len_reg = DMA_REG(DMA_CHAN_TX_RING_LEN(0));
-    *tx_len_reg = TX_COUNT;
+    *tx_len_reg = TX_COUNT - 1;
     volatile uint32_t *rx_len = DMA_REG(DMA_CHAN_RX_RING_LEN(0));
-    *rx_len = RX_COUNT;
+    *rx_len = RX_COUNT - 1;
 
     /* 5. Init rx and tx descriptor list addresses. */
     tx_desc_base = hw_ring_buffer_paddr + (sizeof(struct descriptor) * RX_COUNT);
@@ -449,7 +460,7 @@ static void eth_setup(void)
     rx.descr = (volatile struct descriptor *)hw_ring_buffer_vaddr;
     tx.descr = (volatile struct descriptor *)(hw_ring_buffer_vaddr + (sizeof(struct descriptor) * RX_COUNT));
 
-    eqos_init();
+    eth_init();
 }
 
 void init(void)
