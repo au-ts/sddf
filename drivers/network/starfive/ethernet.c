@@ -140,10 +140,6 @@ static void rx_return(void)
 
         if (d->d3 & DESC_RXSTS_ERROR) {
             sddf_dprintf("ETH|ERROR: RX descriptor returned with error status %x\n", d->d3);
-            // uint32_t cntl = (MAX_RX_FRAME_SZ << DESC_RXCTRL_SIZE1SHFT) & DESC_RXCTRL_SIZE1MASK;
-            // if (rx.tail + 1 == RX_COUNT) {
-            //     cntl |= DESC_RXCTRL_RXRINGEND;
-            // }
 
             rx.descr_mdata[rx.tail] = buffer;
             update_ring_slot(&rx, rx.tail, buffer.io_or_offset, 0, DESC_RXSTS_OWNBYDMA | BIT(24) | BIT(30));
@@ -184,12 +180,6 @@ static void tx_provide(void)
             // For normal transmit descritpors, we need to give ownership to DMA, as well as indicate
             // that this is the first and last parts of the current packet.
             uint32_t tdes3 = (DESC_TXSTS_OWNBYDMA | DESC_TXCTRL_TXFIRST | DESC_TXCTRL_TXLAST | buffer.len);
-            // sddf_dprintf("-------------- New transmit ------------\n");
-            // sddf_dprintf("This is the current TX descr: %p\n", *DMA_REG(DMA_CHAN_CUR_TX_DESC(0)));
-            // sddf_dprintf("This is the current tx buffer for DMA: %p\n", *DMA_REG(DMA_CHAN_CUR_TX_BUF_ADDR(0)));
-            // sddf_dprintf("This is the value of the DMA debug status 0 register %b\n", *DMA_REG(DMA_DEBUG_STATUS_0));
-            // sddf_dprintf("This is the current tail pointer: %p\n", *DMA_REG(DMA_CHAN_TX_TAIL_ADDR(0)));
-            // sddf_dprintf("This is the tail we are operating on: %d\n", tx.tail);
             tx.descr_mdata[tx.tail] = buffer;
 
             update_ring_slot(&tx, tx.tail, buffer.io_or_offset, tdes2, tdes3);
@@ -201,24 +191,6 @@ static void tx_provide(void)
              * NOTE: Setting this on every enqueued packet for sanity, change this to once per bactch.
              */
             dma_regs->ch0_txdesc_tail_pointer = tx_desc_base + sizeof(struct descriptor) * (tx.tail);
-            // sddf_dprintf("This is the value of the mtl tx operation mode: %b\n", mtl_regs->txq0_operation_mode);
-            // sddf_dprintf("This is the value of the MTL rx debug register: %b\n", mtl_regs->rxq0_debug);
-            // sddf_dprintf("This is the value of the MAC debug register: %b\n", *MAC_REG(GMAC_DEBUG));
-            // sddf_dprintf("This is the value of the MTL FIFO debug status register: %b\n", *MTL_REG(0x00000c0c));
-            // sddf_dprintf("This is the value of the MTL FIFO debug data register: %b\n", *MTL_REG(0x00000c10));
-            // sddf_dprintf("This is the value of the DMA debug status 0 register %b\n", *DMA_REG(DMA_DEBUG_STATUS_0));
-            // sddf_dprintf("This is the value of the MTL transmit debug registe: %b\n", mtl_regs->txq0_debug);
-            // sddf_dprintf("This is the new tail addr: %p --- this is the size of the desc struct: %x -- this is the tail index: %d -- this is the buffer addr: %p\n", \
-            // hw_ring_buffer_paddr + ((sizeof(struct descriptor) * (RX_COUNT + tx.tail))), sizeof(struct descriptor), tx.tail, buffer.io_or_offset);
-            // sddf_dprintf("This is the current tx buffer for DMA: %p\n", *DMA_REG(DMA_CHAN_CUR_TX_BUF_ADDR(0)));
-            // sddf_dprintf("This is the current TX descr: %p\n", *DMA_REG(DMA_CHAN_CUR_TX_DESC(0)));
-            // sddf_dprintf("This is the current rx buffer for DMA: %p\n", *DMA_REG(DMA_CHAN_CUR_RX_BUF_ADDR(0)));
-            // sddf_dprintf("This is the current rX descr: %p\n", *DMA_REG(DMA_CHAN_CUR_RX_DESC(0)));
-            // sddf_dprintf("This is the rx tail pointer: %p\n", dma_regs->ch0_rxdesc_tail_pointer);
-            // sddf_dprintf("This is the DMA Channel 0 Status: %b\n", *DMA_REG(DMA_CHAN_STATUS(0)));
-            // sddf_dprintf("This is the average traffic on the MTL: %x\n", *MTL_REG(0xd14));
-            // sddf_dprintf("-------------- End transmit ------------\n");
-
         }
 
         net_request_signal_active(&tx_queue);
@@ -259,225 +231,18 @@ static void tx_return(void)
 static void handle_irq()
 {
     uint32_t e = *DMA_REG(DMA_CHAN_STATUS(0));
-    // sddf_dprintf("handling irq: %b\n",e);
-    // sddf_dprintf("This is the DMA interrupt status register: %b\n", *DMA_REG(DMA_STATUS));
-    // sddf_dprintf("This is the status of the MAC rx: %b\n", *MAC_REG(0x000000b8))
-    // sddf_dprintf("This is the value of the MTL rx debug register: %b\n", mtl_regs->rxq0_debug);
-    // sddf_dprintf("This is the MAC interrupt status: %b\n", *MAC_REG(0x000000b0))
     if (e & DMA_INTR_RI) {
-        // sddf_dprintf("recv complete\n");
         rx_return();
     }
     if (e & DMA_INTR_TI) {
-        // sddf_dprintf("transmit complete\n");
         tx_return();
     }
     if (e & DMA_INTR_ABNORMAL) {
-        // sddf_dprintf("abnormal response\n");
-        // sddf_dprintf("This is the interrupt enable register: %b\n", *DMA_REG(DMA_CHAN_INTR_ENA(0)));
         if (e & DMA_INTR_FBE) {
             sddf_dprintf("Ethernet device fatal bus error\n");
         }
     }
     *DMA_REG(DMA_CHAN_STATUS(0)) &= e;
-}
-
-static void dma_init(void)
-{
-    /* 1. Software reset -- This will reset the MAC internal registers. */
-    volatile uint32_t *mode = DMA_REG(DMA_BUS_MODE);
-    *mode |= DMA_BUS_MODE_SFT_RESET;
-
-    // Poll on BIT 0. This bit is cleared by the device when the reset is complete.
-    while(1) {
-        mode = DMA_REG(DMA_BUS_MODE);
-        if (!(*mode & DMA_BUS_MODE_SFT_RESET)) {
-            break;
-        }
-    }
-
-    /* 2. Init sysbus mode. */
-    volatile uint32_t *sysbus_mode_reg = DMA_REG(DMA_SYS_BUS_MODE);
-    // Set the fixed length burst to 8
-    *sysbus_mode_reg |= DMA_SYS_BUS_FB;
-    *sysbus_mode_reg |= DMA_AXI_BLEN8;
-
-    /* 3. Create desc lists for rx and tx. */
-
-    /* 4. Program tx and rx ring length registers. */
-    volatile uint32_t *tx_len_reg = DMA_REG(DMA_CHAN_TX_RING_LEN(0));
-    *tx_len_reg = TX_COUNT;
-    volatile uint32_t *rx_len = DMA_REG(DMA_CHAN_RX_RING_LEN(0));
-    *rx_len = RX_COUNT;
-
-    /* 5. Init rx and tx descriptor list addresses. */
-    tx_desc_base = hw_ring_buffer_paddr + (sizeof(struct descriptor) * RX_COUNT);
-    rx_desc_base = hw_ring_buffer_paddr;
-
-    *DMA_REG(DMA_CHAN_RX_BASE_ADDR_HI(0)) = rx_desc_base >> 32;
-    *DMA_REG(DMA_CHAN_RX_BASE_ADDR(0)) = rx_desc_base & 0xffffffff;
-    *DMA_REG(DMA_CHAN_TX_BASE_ADDR_HI(0)) = tx_desc_base >> 32;
-    *DMA_REG(DMA_CHAN_TX_BASE_ADDR(0)) = tx_desc_base & 0xffffffff;
-
-    /* NOTE ------ FROM U-BOOT SOURCE CODE dwc_eth_qos.c:995 */
-
-    *DMA_REG(DMA_CHAN_TX_TAIL_ADDR(0)) = tx_desc_base;
-    /* TX tail pointer not written until we need to TX a packet */
-	/*
-	 * Point RX tail pointer at last descriptor. Ideally, we'd point at the
-	 * first descriptor, implying all descriptors were available. However,
-	 * that's not distinguishable from none of the descriptors being
-	 * available.
-	 */
-
-    // Zero out the rx desc region
-    memset((void *) rx.descr, 0, sizeof(struct descriptor) * RX_COUNT);
-
-    *DMA_REG(DMA_CHAN_RX_TAIL_ADDR(0)) = rx_desc_base + (sizeof(struct descriptor) *(RX_COUNT - 1));
-
-    // sddf_dprintf("This is the hwring buffer paddr: %p and this is the tx base: %p\n", rx_desc_base, tx_desc_base);
-    /* 6. Program settings for _CONTROL, _TX_CONTROL, _RX_CONTROL
-          registers. */
-    // Disable control features for 8xPBL mode and Descriptor Skip Length
-    *DMA_REG(DMA_CHAN_CONTROL(0)) = BIT(16);
-
-    uint32_t tx_chan_ctrl = 0;
-    // Setting this bit ignores the PBL requirement
-    tx_chan_ctrl |= DMA_BUS_MODE_PBL;
-    *DMA_REG(DMA_CHAN_TX_CONTROL(0)) = tx_chan_ctrl;
-
-    // Set the buffer size in the rx chan control registers
-    uint32_t rx_chan_ctrl = *DMA_REG(DMA_CHAN_RX_CONTROL(0));
-    rx_chan_ctrl &= 0x3fff << 1;
-    rx_chan_ctrl |= NET_BUFFER_SIZE << 1;
-
-    /* 7. Enable interrupts. */
-    // Write the interrupt status mask to the DMA Chan Interrupt status register
-    *DMA_REG(DMA_CHAN_INTR_ENA(0)) = DMA_CHAN_INTR_DEFAULT_MASK;
-    *DMA_REG(DMA_CHAN_INTR_ENA(0)) |= DMA_CHAN_INTR_NORMAL;
-
-
-    /* 8. Start tx and rx DMAs. */
-    uint32_t tx_ctrl = *DMA_REG(DMA_CHAN_TX_CONTROL(0));
-    tx_ctrl |= DMA_CONTROL_ST;
-    *DMA_REG(DMA_CHAN_TX_CONTROL(0)) = tx_ctrl;
-    uint32_t rx_ctrl = *DMA_REG(DMA_CHAN_RX_CONTROL(0));
-    rx_ctrl |= DMA_CONTROL_SR;
-    *DMA_REG(DMA_CHAN_RX_CONTROL(0)) = rx_ctrl;
-
-    /* NOTE: Repeat these above steps for all of the tx and rx channels
-        that we are using. For now we are going to keep this to one pair.*/
-}
-
-static void mtl_init(void)
-{
-    /* 1. Program the tx scheduling and recv arbitration algo fields in the
-          MTL_Operation_mode reg - IN THE CASE OF MULTIPLE Tx AND Rx QUEUES. */
-    uint32_t val = *MTL_REG(MTL_OPERATION_MODE);
-
-    val &= ~MTL_OPERATION_RAA;
-    val &= ~MTL_OPERATION_SCHALG_MASK;
-
-    // TODO: Figure out correct rx algo to use
-    val |= MTL_OPERATION_RAA_SP;
-
-    // TODO: Figure out correct tx sched algo
-    val |= MTL_OPERATION_SCHALG_SP;
-
-    *MTL_REG(MTL_OPERATION_MODE) = val;
-
-    /* 2. Program the rx queue to the DMA mapping. */
-    uint32_t map0 = *MTL_REG(MTL_RXQ_DMA_MAP0);
-    // We only have one queue, and we map it onto DMA channel 0
-    map0 &= ~MTL_RXQ_DMA_QXMDMACH_MASK(0);
-    map0 |= MTL_RXQ_DMA_QXMDMACH(0, 0);
-    *MTL_REG(MTL_RXQ_DMA_MAP0) = map0;
-
-    /* 3. Program the TSF, TQE, TQS fields in the MTL_TX_Opeartion_mode reg. */
-
-    // uint32_t txq0_op_mode = mtl_regs->txq0_operation_mode;
-    uint32_t txq0_op_mode = *MTL_REG(MTL_CHAN_TX_OP_MODE(0));
-    sddf_dprintf("This is the mtl tx operation mode: %b\n", txq0_op_mode);
-    // We use the store-and-forward DMA mode
-    txq0_op_mode = MTL_OP_MODE_TSF;
-
-    // Enable the TX queue. This field is apprently read only in single queue configurations.
-    txq0_op_mode &= ~MTL_OP_MODE_TXQ_ENABLE_MASK;
-    txq0_op_mode |= MTL_OP_MODE_TXQ_ENABLE;
-
-    *MTL_REG(MTL_CHAN_TX_OP_MODE(0)) = txq0_op_mode;
-
-    /* 4. Do the same as the above for RX in the MTL_RX_Opeartion_mode reg. */
-
-    uint32_t rxq0_op_mode = *MTL_REG(MTL_CHAN_RX_OP_MODE(0));
-    // Use store-and-forward DMA mode
-    rxq0_op_mode |= MTL_OP_MODE_RSF;
-
-    // Set the RX queue size
-    // TODO: We do not set the RX queue size since we only have one queue
-    // sddf_dprintf("RX queue size: )0x%lx\n", (rxq0_op_mode & MTL_OP_MODE_RQS_MASK) >> 20);
-
-    // TODO: for now we ignore setting flow control
-
-    *MTL_REG(MTL_CHAN_RX_OP_MODE(0)) = rxq0_op_mode;
-
-    /* NOTE: We repeate steps 3 and 4 for the amount of tx and rx queues we are
-        using in our system. For now this is just one. */
-}
-
-static void mac_init(uint32_t machi, uint32_t maclo)
-{
-    /* 1. Provide mac address. */
-    // NOTE: Can we assume that U-Boot has already populated these registers. In that
-    // case can we just save these registers before we do a DMA reset?
-    *MAC_REG(GMAC_ADDR_HIGH(0)) = machi;
-    *MAC_REG(GMAC_ADDR_LOW(0)) = maclo;
-
-    /* 2. Program the packet filter. */
-    // Set the program filter to Promiscuous mode. In this mode the NIC will pass all
-    // network traffic us.
-
-    uint32_t filter = *MAC_REG(GMAC_PACKET_FILTER);
-    // Reset all filter flags.
-	filter &= ~GMAC_PACKET_FILTER_HMC;
-	filter &= ~GMAC_PACKET_FILTER_HPF;
-	filter &= ~GMAC_PACKET_FILTER_PCF;
-	filter &= ~GMAC_PACKET_FILTER_PM;
-	filter &= ~GMAC_PACKET_FILTER_PR;
-	filter &= ~GMAC_PACKET_FILTER_RA;
-
-    filter |= GMAC_PACKET_FILTER_PR;
-
-    *MAC_REG(GMAC_PACKET_FILTER) = filter;
-
-    /* 3. Program the flow control. */
-    // For now, disabling all flow control. This regsiter controls the generation/reception
-    // of the control packets.
-    *MAC_REG(GMAC_QX_TX_FLOW_CTRL(0)) = 0;
-
-    /* 4. Program the mac interrupt enable register (if applicable). */
-    // We don't want to setup interrupts for the MAC component. We will enable
-    // them in the DMA componenet
-
-    uint32_t int_en = *MAC_REG(GMAC_INT_EN);
-    int_en |= GMAC_INT_DEFAULT_ENABLE | BIT(13) | BIT(14) | BIT(17);
-    *MAC_REG(GMAC_INT_EN) = int_en;
-
-    /* 5. Program all other approrpriate fields in MAC_CONFIGURATION
-          (ie. inter-packet gap, jabber disable). */
-    uint32_t conf = *MAC_REG(GMAC_CONFIG);
-    // sddf_dprintf("This is the standard value of the mac config register: %x\n", conf);
-    // Set full duplex mode
-    conf |= GMAC_CONFIG_DM;
-    // Setting the speed of our device to 100mbps
-    conf |= GMAC_CONFIG_FES | GMAC_CONFIG_PS;
-    *MAC_REG(GMAC_CONFIG) = conf;
-
-    /* 6. Set bit 0 and 1 in MAC_CONFIGURATION to start the MAC transmitter
-          and receiver. */
-    conf = *MAC_REG(GMAC_CONFIG);
-    conf |= (GMAC_CONFIG_RE | GMAC_CONFIG_TE);
-    *MAC_REG(GMAC_CONFIG) = conf;
 }
 
 static void eqos_init()
@@ -589,7 +354,6 @@ static void eqos_init()
     // /* 5. Program all other approrpriate fields in MAC_CONFIGURATION
     //       (ie. inter-packet gap, jabber disable). */
     uint32_t conf = *MAC_REG(GMAC_CONFIG);
-    // // sddf_dprintf("This is the standard value of the mac config register: %x\n", conf);
     // // Set full duplex mode
     conf |= GMAC_CONFIG_DM;
 
@@ -654,7 +418,6 @@ static void eqos_init()
 
     /* Populate the rx and tx hardware rings. */
     rx_provide();
-    // sddf_dprintf("This is the value of the DMA debug status 0 register AFTER RX PROVIDE %b\n", *DMA_REG(DMA_DEBUG_STATUS_0));
     tx_provide();
 
     /* Start DMA and MAC */
@@ -677,26 +440,11 @@ static void eqos_init()
 
 static void eth_setup(void)
 {
-    volatile uint32_t *mac_version = ((volatile uint32_t *)(eth_regs + 0x00000110));
-    volatile uint32_t *mac_debug = ((volatile uint32_t *)(eth_regs + GMAC_DEBUG));
-    sddf_dprintf("Beginning eth setup. This is the mac version: %x --- this is the mac debug reg: %x\n", *mac_version, *mac_debug);
-    volatile uint32_t *txp_control_status = MTL_REG(0x00000ca0);
-    sddf_dprintf("This mtl register should be none zero: %x\n", *txp_control_status);
-    volatile uint32_t *mtl_config = MTL_REG(0x00000c00);
-    *mtl_config = 0x2;
-    sddf_dprintf("This mtl config register should be none zero: %x\n", *mtl_config);
-    volatile uint32_t *dma_sysbusmode = DMA_REG(DMA_SYS_BUS_MODE);
-    sddf_dprintf("This dma register shold be none zero: %x\n", *dma_sysbusmode);
-    /* Save the MAC address. This address should have been populated by u-boot. We will
-    just restore these when setting up the MAC component of the eth device. */
     mac_regs = (volatile struct mac_regs *) (eth_regs + MAC_REGS_BASE);
     mtl_regs = (volatile struct mtl_regs *) (eth_regs + MTL_REGS_BASE);
     dma_regs = (volatile struct dma_regs *) (eth_regs + DMA_REGS_BASE);
 
-    dma_regs->mode |= DMA_BUS_MODE_SFT_RESET;
-    while(dma_regs->mode & DMA_BUS_MODE_SFT_RESET) {
-        sddf_dprintf("waiting for reset\n");
-    }
+    // TODO: What does this do?
     *MTL_REG(0x00000c08) = (BIT(0) | BIT(1));
     assert((hw_ring_buffer_paddr & 0xFFFFFFFF) == hw_ring_buffer_paddr);
 
@@ -704,23 +452,6 @@ static void eth_setup(void)
     tx.descr = (volatile struct descriptor *)(hw_ring_buffer_vaddr + (sizeof(struct descriptor) * RX_COUNT));
 
     eqos_init();
-    // eth_init(0x00005b75, 0x0039cf6c);
-
-    /* 1. Init DMA */
-    // dma_init();
-
-    /* 2. Init MTL */
-    // mtl_init();
-
-    /* 3. Init MAC */
-    // NOTE: These are hardcoded MAC addresses for our board. The MAC addresses for this device
-    // exists in the EEPROM. We need an i2c driver for the star64 to read from the EEPROM.
-    // mac_init(0x00005b75, 0x0039cf6c);
-    sddf_dprintf("This is the value of the DMA debug status 0 register AT THE END OF ETH_SETUP %b\n", *DMA_REG(DMA_DEBUG_STATUS_0));
-
-    // sddf_dprintf("This is the value of the mac config reg: %b\n", mac_regs->configuration);
-
-    // sddf_dprintf("Finished eth setup\n");
 }
 
 void init(void)
@@ -760,31 +491,19 @@ void init(void)
 
 
     microkit_irq_ack(IRQ_CH);
-    // sddf_dprintf("Finished eth init\n");
-
 }
 
 void notified(microkit_channel ch)
 {
-    // sddf_dprintf("we got a notification\n");
-    // sddf_dprintf("This is the value of the MTL transmit debug registe: %b\n", mtl_regs->txq0_debug);
-    // sddf_dprintf("This is the value of the MTL rx debug register: %b\n", mtl_regs->rxq0_debug);
-    // sddf_dprintf("This is the value of the MAC debug register: %b\n", *MAC_REG(GMAC_DEBUG));
-    // sddf_dprintf("This is the value of the DMA debug status 0 register %b\n", *DMA_REG(DMA_DEBUG_STATUS_0));
-    // sddf_dprintf("This is the value of the DMA debug status 1 register %b\n", *DMA_REG(DMA_DEBUG_STATUS_1));
-
     switch (ch) {
     case IRQ_CH:
-        // microkit_dbg_puts("recv an irq\n");
         handle_irq();
         microkit_irq_ack_delayed(ch);
         break;
     case RX_CH:
-        // microkit_dbg_puts("rx ch\n");
         rx_provide();
         break;
     case TX_CH:
-        // microkit_dbg_puts("tx ch\n");
         tx_provide();
         break;
     default:
