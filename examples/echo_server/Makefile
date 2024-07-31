@@ -90,8 +90,8 @@ NETIFFILES=$(LWIP)/netif/ethernet.c
 
 # LWIPFILES: All the above.
 LWIPFILES=lwip.c $(COREFILES) $(CORE4FILES) $(NETIFFILES)
-# LWIP_OBJS := $(LWIPFILES:.c=.o) lwip.o sddf_network_sharedringbuffer.o utilization_socket.o udp_echo_socket.o sddf_timer_client.o printf.o putchar_debug.o
-LWIP_OBJS := $(LWIPFILES:.c=.o) lwip.o sddf_network_sharedringbuffer.o utilization_socket.o udp_echo_socket.o sddf_timer_client.o printf.o putchar_serial.o
+LWIP_OBJS := $(LWIPFILES:.c=.o) lwip.o sddf_network_sharedringbuffer.o utilization_socket.o udp_echo_socket.o sddf_timer_client.o printf.o putchar_debug.o
+# LWIP_OBJS := $(LWIPFILES:.c=.o) lwip.o sddf_network_sharedringbuffer.o utilization_socket.o udp_echo_socket.o sddf_timer_client.o printf.o putchar_serial.o
 
 ETH_OBJS := $(ETHERNET_DRIVER)/ethernet.o sddf_network_sharedringbuffer.o printf.o putchar_debug.o sddf_timer_client.o
 # ETH_OBJS := $(ETHERNET_DRIVER)/ethernet.o sddf_network_sharedringbuffer.o printf.o putchar_serial.o sddf_timer_client.o
@@ -100,8 +100,8 @@ MUX_TX_OBJS := $(NETWORK_COMPONENTS)/mux_tx.o sddf_network_sharedringbuffer.o $(
 COPY_OBJS := $(NETWORK_COMPONENTS)/copy.o sddf_network_sharedringbuffer.o printf.o putchar_debug.o
 BENCH_OBJS := $(BENCHMARK)/benchmark.o printf.o putchar_serial.o
 # BENCH_OBJS := $(BENCHMARK)/benchmark.o printf.o putchar_debug.o
-IDLE_OBJS := $(BENCHMARK)/idle.o printf.o putchar_serial.o sddf_timer_client.o
-# IDLE_OBJS := $(BENCHMARK)/idle.o printf.o putchar_debug.o sddf_timer_client.o
+# IDLE_OBJS := $(BENCHMARK)/idle.o printf.o putchar_serial.o sddf_timer_client.o
+IDLE_OBJS := $(BENCHMARK)/idle.o printf.o putchar_debug.o sddf_timer_client.o
 ARP_OBJS := $(NETWORK_COMPONENTS)/arp.o sddf_network_sharedringbuffer.o printf.o putchar_debug.o
 TIMER_OBJS := $(TIMER_DRIVER)/timer.o printf.o putchar_debug.o
 
@@ -178,7 +178,7 @@ $(BUILD_DIR)/timer.elf: $(addprefix $(BUILD_DIR)/, $(TIMER_OBJS))
 # 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r # $(REPORT_FILE)
 
 $(IMAGE_FILE) $(REPORT_FILE): $(addprefix $(BUILD_DIR)/, $(IMAGES)) echo_server_vb_105.system
-	$(MICROKIT_TOOL) echo_server_vb_105.system --search-path $(BUILD_DIR) --capdl --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE)
+	$(MICROKIT_TOOL) echo_server_vb_105.system --search-path $(BUILD_DIR) --capdl --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
 
 
 .PHONY: all compile clean

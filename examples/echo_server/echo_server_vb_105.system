@@ -71,7 +71,7 @@
 
             <!-- <irq irq="152" id="0" /> <!-\-> ethernet interrupt -\-> -->
             <irq irq="1" id="0" type="msi" handle="0" pci_bus="1" pci_dev="0" pci_func="0" />
-            
+
             <setvar symbol="hw_ring_buffer_paddr" region_paddr="hw_ring_buffer" />
         </protection_domain>
 

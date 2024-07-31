@@ -14,6 +14,7 @@
 #include <sddf/util/printf.h>
 
 #define LOG_BUFFER_CAP 7
+#define CONFIG_BENCHMARK_TRACK_UTILISATION
 
 /* Notification channels and TCB CAP offsets - ensure these align with .system file! */
 #define START 1
@@ -68,9 +69,9 @@ static void microkit_benchmark_start(void)
     seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_MUX_RX_ID);
     seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_MUX_TX_ID);
     seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_COPY_ID);
-    seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_COPY1_ID);
+    // seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_COPY1_ID);
     seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_LWIP_ID);
-    seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_LWIP1_ID);
+    // seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_LWIP1_ID);
     seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_ARP_ID);
     seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_TIMER_ID);
     seL4_BenchmarkResetLog();
@@ -114,8 +115,8 @@ static void print_benchmark_details(uint64_t pd_id, uint64_t kernel_util, uint64
         case PD_ARP_ID: printf("ARP"); break;
         case PD_TIMER_ID: printf("TIMER"); break;
     }
-    if (pd_id != PD_TOTAL) printf(" ( %llx)", pd_id);
-    printf("\n{\nKernelUtilisation:  %llx\nKernelEntries:  %llx\nNumberSchedules:  %llx\nTotalUtilisation:  %llx\n}\n", 
+    if (pd_id != PD_TOTAL) printf(" ( %lld)", pd_id);
+    printf("\n{\nKernelUtilisation:  %lld\nKernelEntries:  %lld\nNumberSchedules:  %lld\nTotalUtilisation:  %lld\n}\n", 
             kernel_util, kernel_entries, number_schedules, total_util);
 }
 #endif
@@ -202,14 +203,14 @@ void notified(microkit_channel ch)
             microkit_benchmark_stop_tcb(PD_COPY_ID, &total, &number_schedules, &kernel, &entries);
             print_benchmark_details(PD_COPY_ID, kernel, entries, number_schedules, total);
 
-            microkit_benchmark_stop_tcb(PD_COPY1_ID, &total, &number_schedules, &kernel, &entries);
-            print_benchmark_details(PD_COPY1_ID, kernel, entries, number_schedules, total);
+            // microkit_benchmark_stop_tcb(PD_COPY1_ID, &total, &number_schedules, &kernel, &entries);
+            // print_benchmark_details(PD_COPY1_ID, kernel, entries, number_schedules, total);
 
             microkit_benchmark_stop_tcb(PD_LWIP_ID, &total, &number_schedules, &kernel, &entries);
             print_benchmark_details(PD_LWIP_ID, kernel, entries, number_schedules, total);
             
-            microkit_benchmark_stop_tcb(PD_LWIP1_ID, &total, &number_schedules, &kernel, &entries);
-            print_benchmark_details(PD_LWIP1_ID, kernel, entries, number_schedules, total);
+            // microkit_benchmark_stop_tcb(PD_LWIP1_ID, &total, &number_schedules, &kernel, &entries);
+            // print_benchmark_details(PD_LWIP1_ID, kernel, entries, number_schedules, total);
 
             microkit_benchmark_stop_tcb(PD_ARP_ID, &total, &number_schedules, &kernel, &entries);
             print_benchmark_details(PD_ARP_ID, kernel, entries, number_schedules, total);
@@ -232,7 +233,7 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
-    printf("benchmark init\n");
+    printf("benchmark init %d %d\n", TCB_CAP, BASE_TCB_CAP);
 
     sel4bench_init();
     seL4_Word n_counters = sel4bench_get_num_counters();

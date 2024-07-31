@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <microkit.h>
 #include <sddf/util/printf.h>
+#include <sddf/benchmark/bench.h>
 
 /* hpet data structures / memory maps */
 typedef struct hpet_timer {

@@ -12,6 +12,7 @@
 
 #include <string.h>
 #include <microkit.h>
+#include <sel4/benchmark_utilisation_types.h>
 
 #include "lwip/ip.h"
 #include "lwip/pbuf.h"

@@ -149,7 +149,7 @@ tx_provide(void)
             THREAD_MEMORY_RELEASE();
             set_reg(TDT(0), device.tx_tail);
         }
-    
+
         request_signal(tx_ring.used_ring);
         reprocess = false;
 
@@ -191,18 +191,10 @@ void
 rx_provide(void)
 {
     uint64_t rx_tail = device.rx_tail;
-    
-    packet_count++;
-    if (packet_count % 1000 == 0) {
-        printf("packet count: %d\n", packet_count);
-    }
 
     bool reprocess = true;
     while (reprocess) {
         bool provided = false;
-        // if (hw_rx_ring_full()) {
-        //     printf("hw_rx_ring_full\n");
-        // }
 
         while (!hw_rx_ring_full() && !ring_empty(rx_ring.free_ring)) {
             buff_desc_t buffer;
@@ -214,7 +206,7 @@ rx_provide(void)
             desc->read.hdr_addr = 0;
 
             THREAD_MEMORY_RELEASE();
-            
+
             device.rx_descr_mdata[device.rx_tail] = buffer;
 
             device.rx_tail = (device.rx_tail + 1) % NUM_RX_DESCS;
@@ -355,8 +347,8 @@ dump_all_registers(void)
            get_reg(EICR), get_reg(EIMS), get_reg(GPIE));
 
     printf("Control regs:\n\tCTRL %08x CTRL_EXT %08x\n",
-           get_reg(CTRL), get_reg(CTRL_EXT)); 
-    
+           get_reg(CTRL), get_reg(CTRL_EXT));
+
     printf("EEPROM regs:\n\tEEC_ARD %08x\n",
            get_reg(EEC));
 
@@ -373,7 +365,7 @@ dump_all_registers(void)
            get_reg(DTXMXSZRQ),
            get_reg(RTTDCS),
            get_reg(DMATXCTL));
-    
+
     printf("Stats regs:\n\tGPRC %08x GPTC %08x\n\tGORCL %08x GORCH %08x\n\tGOTCL %08x GOTCH %08x\n\tTXDGPC %08x TXDGBCH %08x TXDGBCL %08x QPTC(0) %08x\n",
            get_reg(GPRC),
            get_reg(GPTC),
@@ -403,10 +395,10 @@ init(void)
     set_reg(PCI_MSI_MESSAGE_ADDRESS_HIGH, 0);
     set_reg16(PCI_MSI_MESSAGE_DATA_16, 0x31);
     clear_flags16(PCI_MSI_MASK, BIT(0));
-    
-    
+
+
     printf("ethernet init stage 0 running\n");
-    
+
     device.rx_ring = (void *)hw_rx_ring_vaddr;
     device.tx_ring = (void *)hw_tx_ring_vaddr;
 
@@ -445,7 +437,7 @@ init_1(void)
     //     *CTRL_EXT = ctrl_ext | IXGBE_CTRL_EXT_NS_DIS;
     // }
 
-    // *CTRL_EXT = IXGBE_CTRL_EXT_DRV_LOAD; 
+    // *CTRL_EXT = IXGBE_CTRL_EXT_DRV_LOAD;
 
     uint8_t mac[6];
     get_mac_addr(mac);
@@ -459,12 +451,12 @@ init_1(void)
     // section 4.6.3 - wait for dma initialization done
     while ((get_reg(RDRXCTL) & IXGBE_RDRXCTL_DMAIDONE) != IXGBE_RDRXCTL_DMAIDONE);
 
-    // section 4.6.4 - initialize link (auto negotiation) 
+    // section 4.6.4 - initialize link (auto negotiation)
     // link auto-configuration register should already be set correctly, we're resetting it anyway
     // set_reg(AUTOC, (get_reg(AUTOC) & ~IXGBE_AUTOC_LMS_MASK) | IXGBE_AUTOC_LMS_10G_SERIAL);
     // set_reg(AUTOC, (get_reg(AUTOC) & ~IXGBE_AUTOC_10G_PMA_PMD_MASK) | IXGBE_AUTOC_10G_XAUI);
 
-    // negotiate link 
+    // negotiate link
     // set_flags(AUTOC, IXGBE_AUTOC_AN_RESTART);
     // datasheet wants us to wait for the link here, but we can continue and wait afterwards
 
@@ -489,7 +481,7 @@ init_1(void)
 
         set_flags(HLREG0, IXGBE_HLREG0_RXCRCSTRP);
         set_flags(RDRXCTL, IXGBE_RDRXCTL_CRCSTRIP);
-        
+
         // accept broadcast packets, promiscuous
         set_flags(FCTRL, IXGBE_FCTRL_BAM | IXGBE_FCTRL_MPE | IXGBE_FCTRL_UPE);
 
@@ -563,14 +555,14 @@ init_1(void)
 		txdctl &= ~(0x7F | (0x7F << 8) | (0x7F << 16)); // clear bits
 		txdctl |= (36 | (8 << 8) | (4 << 16)); // from DPDK
 		set_reg(TXDCTL(i), txdctl);
-    
+
         // final step: enable DMA
 
         set_reg(DMATXCTL, IXGBE_DMATXCTL_TE);
         set_reg(TXDCTL(0), IXGBE_TXDCTL_ENABLE);
         while ((get_reg(TXDCTL(0)) & IXGBE_TXDCTL_ENABLE) == 0);
     }
-    
+
 
     // wait some time for the link to come up
     printf("sleep until link up\n");
@@ -590,7 +582,7 @@ init_2(void)
     printf("   - link speed is %lu Mbit/s\n", get_link_speed());
     printf("ethernet init stage 2 running\n");
 
-    // dump_all_registers(); 
+    // dump_all_registers();
 
     // sleep for 10 seconds. Just stabilize the hardware
     // Well. this ugliness costed us two days of debugging.
