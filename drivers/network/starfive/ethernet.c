@@ -139,9 +139,9 @@ static void rx_return(void)
             rx.descr_mdata[rx.tail] = buffer;
             update_ring_slot(&rx, rx.tail, buffer.io_or_offset & 0xffffffff,
                             buffer.io_or_offset >> 32, 0, DESC_RXSTS_OWNBYDMA | BIT(24) | BIT(30));
+
             /* We will update the hardware register that stores the tail address. This tells
             the device that we have new descriptors to use. */
-
             *DMA_REG(DMA_CHAN_RX_TAIL_ADDR(0)) = rx_desc_base + sizeof(struct descriptor) * rx.tail;
             rx.head = (rx.head + 1) % RX_COUNT;
         } else {
@@ -243,7 +243,7 @@ static void handle_irq()
 
 static void eth_init()
 {
-    /* 1. Software reset -- This will reset the MAC internal registers. */
+    // Software reset -- This will reset the MAC internal registers.
     volatile uint32_t *mode = DMA_REG(DMA_BUS_MODE);
     *mode |= DMA_BUS_MODE_SFT_RESET;
 
@@ -336,6 +336,7 @@ static void eth_init()
     *MAC_REG(GMAC_ADDR_LOW(0)) = 0x0039cf6c;
 
     /* Configure DMA */
+
     // Enable operate on second packet
     *DMA_REG(DMA_CHAN_TX_CONTROL(0)) |= DMA_CONTROL_OSP;
 
@@ -361,15 +362,14 @@ static void eth_init()
     *DMA_REG(DMA_CHAN_TX_BASE_ADDR_HI(0)) = tx_desc_base >> 32;
     *DMA_REG(DMA_CHAN_TX_BASE_ADDR(0)) = tx_desc_base & 0xffffffff;
 
-    /* 7. Enable interrupts. */
-    // Write the interrupt status mask to the DMA Chan Interrupt status register
+    // Enable interrupts.
     *DMA_REG(DMA_CHAN_INTR_ENA(0)) = DMA_CHAN_INTR_NORMAL;
 
-    /* Populate the rx and tx hardware rings. */
+    // Populate the rx and tx hardware rings.
     rx_provide();
     tx_provide();
 
-    /* Start DMA and MAC */
+    // Start DMA and MAC
     *DMA_REG(DMA_CHAN_TX_CONTROL(0)) |= DMA_CONTROL_ST;
     *DMA_REG(DMA_CHAN_RX_CONTROL(0)) |= DMA_CONTROL_SR;
     *MAC_REG(GMAC_CONFIG) |= (GMAC_CONFIG_RE | GMAC_CONFIG_TE);
