@@ -17,6 +17,7 @@ const DriverClass = struct {
         arm,
         meson,
         imx,
+        jh7110,
     };
 
     const Clock = enum {
