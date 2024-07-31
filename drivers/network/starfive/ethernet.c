@@ -100,21 +100,12 @@ static void rx_provide()
             assert(!err);
             free_dequeued += 1;
 
-            // if (*DMA_REG(DMA_CHAN_CUR_RX_DESC(0)) == *DMA_REG(DMA_CHAN_RX_TAIL_ADDR(0))) {
-            //     sddf_dprintf("ran out of desc\n");
-            //     // *DMA_REG(DMA_CHAN_CUR_RX_DESC(0)) = rx_desc_base;
-            //     // *DMA_REG(DMA_CHAN_RX_TAIL_ADDR(0)) = rx_desc_base + sizeof(struct descriptor);
-            // }
-
-            // sddf_dprintf("free_dequeued: %d, buffer 0x%lx, rx.tail: %d, tail: 0x%lx, curr rx desc: 0x%lx\n", free_dequeued, buffer.io_or_offset, rx.tail, *DMA_REG(DMA_CHAN_RX_TAIL_ADDR(0)), *DMA_REG(DMA_CHAN_CUR_RX_DESC(0)));
-
             rx.descr_mdata[rx.tail] = buffer;
             update_ring_slot(&rx, rx.tail, buffer.io_or_offset & 0xffffffff,
                             buffer.io_or_offset >> 32, 0, DESC_RXSTS_OWNBYDMA | BIT(24) | BIT(30));
             /* We will update the hardware register that stores the tail address. This tells
             the device that we have new descriptors to use. */
             THREAD_MEMORY_RELEASE();
-            // sddf_dprintf("This is rx.tail %d --- and addr we are setting tail to: %p\n", rx.tail, rx_desc_base + sizeof(struct descriptor) * rx.tail);
             *DMA_REG(DMA_CHAN_RX_TAIL_ADDR(0)) = rx_desc_base + sizeof(struct descriptor) * rx.tail;
             rx.tail = (rx.tail + 1) % RX_COUNT;
         }
@@ -410,17 +401,17 @@ void init(void)
 {
     /* De-assert the reset signals that u-boot left asserted. */
     volatile uint32_t *reset_eth = (volatile uint32_t *)(resets + 0x38);
-    // sddf_dprintf("This is the value of reset_eth: %u\n", *reset_eth);
-    // uint32_t reset_val = *reset_eth;
-    // uint32_t mask = 0;
-    // /* U-Boot de-asserts BIT(0) first then BIT(1) when starting up eth0. */
-    // for (int i = 0; i < 2; i++) {
-    //     reset_val = *reset_eth;
-    //     mask = BIT(i);
-    //     reset_val &= ~mask;
-    //     *reset_eth = reset_val;
-    // }
-    *reset_eth = 0xe0;
+    uint32_t reset_val = *reset_eth;
+    uint32_t mask = 0;
+    /* U-Boot de-asserts BIT(0) first then BIT(1) when starting up eth0.
+        NOTE: This will be different per-board, but this is correct for the
+        Pine64 Star64. */
+    for (int i = 0; i < 2; i++) {
+        reset_val = *reset_eth;
+        mask = BIT(i);
+        reset_val &= ~mask;
+        *reset_eth = reset_val;
+    }
 
     // Check if the PHY device is up
     uint32_t phy_stat = *MAC_REG(GMAC_PHYIF_CONTROL_STATUS);
