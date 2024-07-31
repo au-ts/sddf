@@ -12,6 +12,7 @@ const DriverClass = struct {
         arm,
         meson,
         imx,
+        jh7110,
     };
 
     const I2c = enum {
