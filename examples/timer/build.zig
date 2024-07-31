@@ -6,7 +6,8 @@ const std = @import("std");
 
 const MicrokitBoard = enum {
     qemu_virt_aarch64,
-    odroidc4
+    odroidc4,
+    star64,
 };
 
 const Target = struct {
@@ -29,6 +30,15 @@ const targets = [_]Target{
         .zig_target = std.Target.Query{
             .cpu_arch = .aarch64,
             .cpu_model = .{ .explicit = &std.Target.arm.cpu.cortex_a55 },
+            .os_tag = .freestanding,
+            .abi = .none,
+        },
+    },
+    .{
+        .board = MicrokitBoard.star64,
+        .zig_target = std.Target.Query{
+            .cpu_arch = .riscv64,
+            .cpu_model = .{ .explicit = &std.Target.riscv.cpu.baseline_rv64 },
             .os_tag = .freestanding,
             .abi = .none,
         },
@@ -89,6 +99,7 @@ pub fn build(b: *std.Build) void {
     const driver_class = switch (microkit_board_option.?) {
         .qemu_virt_aarch64 => "arm",
         .odroidc4 => "meson",
+        .star64 => "jh7110",
     };
 
     const driver = sddf_dep.artifact(b.fmt("driver_timer_{s}.elf", .{ driver_class }));

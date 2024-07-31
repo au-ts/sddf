@@ -25,16 +25,21 @@ BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 UTIL := $(SDDF)/util
 
 IMAGES := timer_driver.elf client.elf
-CFLAGS := -mcpu=$(CPU) \
-		  -mstrict-align \
-		  -nostdlib \
+
+ifeq ($(ARCH),aarch64)
+	CFLAGS_ARCH := -mcpu=$(CPU) -mstrict-align -target aarch64-none-elf
+else ifeq ($(ARCH),riscv64)
+	CFLAGS_ARCH := -march=rv64imafdc -target riscv64-none-elf -DPRINTF_DISABLE_SUPPORT_FLOAT
+endif
+
+CFLAGS := -nostdlib \
 		  -ffreestanding \
 		  -g3 \
 		  -O3 \
 		  -Wall -Wno-unused-function -Werror -Wno-unused-command-line-argument \
 		  -I$(BOARD_DIR)/include \
 		  -I$(SDDF)/include \
-		  -target aarch64-none-elf
+		  $(CFLAGS_ARCH)
 LDFLAGS := -L$(BOARD_DIR)/lib
 LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
 
