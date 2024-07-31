@@ -18,18 +18,20 @@
 #define TX_CH  1
 #define RX_CH  2
 
-uintptr_t eth_regs;
 uintptr_t hw_ring_buffer_vaddr;
 uintptr_t hw_ring_buffer_paddr;
 
-uintptr_t rx_free;
-uintptr_t rx_active;
-uintptr_t tx_free;
-uintptr_t tx_active;
+net_queue_t *rx_free;
+net_queue_t *rx_active;
+net_queue_t *tx_free;
+net_queue_t *tx_active;
 
 #define RX_COUNT 256
 #define TX_COUNT 256
 #define MAX_COUNT MAX(RX_COUNT, TX_COUNT)
+
+/* The same as Linux's default for pause frame timeout */
+const uint32_t pause_time = 0xffff;
 
 struct descriptor {
     uint32_t status;
@@ -38,7 +40,7 @@ struct descriptor {
     uint32_t next;
 };
 
-_Static_assert((RX_COUNT + TX_COUNT) * sizeof(struct descriptor) <= HW_REGION_SIZE,
+_Static_assert((RX_COUNT + TX_COUNT) * sizeof(struct descriptor) <= NET_HW_REGION_SIZE,
                "Expect rx+tx buffers to fit in single 2MB page");
 
 typedef struct {
@@ -134,6 +136,7 @@ static void rx_return(void)
             rx.descr_mdata[rx.tail] = buffer;
             update_ring_slot(&rx, rx.tail, DESC_RXSTS_OWNBYDMA, cntl, buffer.io_or_offset, 0);
             eth_dma->rxpolldemand = POLL_DATA;
+            rx.tail = (rx.tail + 1) % RX_COUNT;
         } else {
             buffer.len = (d->status & DESC_RXSTS_LENMSK) >> DESC_RXSTS_LENSHFT;
             int err = net_enqueue_active(&rx_queue, buffer);
@@ -223,8 +226,7 @@ static void handle_irq()
 
 static void eth_setup(void)
 {
-    eth_mac = (void *)eth_regs;
-    eth_dma = (void *)(eth_regs + DMA_REG_OFFSET);
+    eth_dma = (void *)((uintptr_t)eth_mac + DMA_REG_OFFSET);
     uint32_t l = eth_mac->macaddr0lo;
     uint32_t h = eth_mac->macaddr0hi;
 
@@ -246,21 +248,31 @@ static void eth_setup(void)
     eth_mac->macaddr0hi = h;
 
     eth_dma->busmode = PRIORXTX_11 | ((DMA_PBL << TX_PBL_SHFT) & TX_PBL_MASK);
-    eth_dma->opmode = STOREFORWARD;
+    /*
+     * Operate in store-and-forward mode.
+     * Send pause frames when there's only 1k of fifo left,
+     * stop sending them when there is 2k of fifo left.
+     * Continue DMA on 2nd frame while updating status on first
+     */
+    eth_dma->opmode = STOREFORWARD | EN_FLOWCTL | (0 << FLOWCTL_SHFT) | (1 < DISFLOWCTL_SHFT) | TX_OPSCND;
     eth_mac->conf = FULLDPLXMODE;
 
     eth_dma->rxdesclistaddr = hw_ring_buffer_paddr;
     eth_dma->txdesclistaddr = hw_ring_buffer_paddr + (sizeof(struct descriptor) * RX_COUNT);
 
     eth_mac->framefilt |= PMSCUOUS_MODE;
+
+    uint32_t flow_ctrl = GMAC_FLOW_CTRL_UP | GMAC_FLOW_CTRL_RFE | GMAC_FLOW_CTRL_TFE;
+    flow_ctrl |= (pause_time << GMAC_FLOW_CTRL_PT_SHIFT);
+    eth_mac->flowcontrol = flow_ctrl;
 }
 
 void init(void)
 {
     eth_setup();
 
-    net_queue_init(&rx_queue, (net_queue_t *)rx_free, (net_queue_t *)rx_active, RX_QUEUE_SIZE_DRIV);
-    net_queue_init(&tx_queue, (net_queue_t *)tx_free, (net_queue_t *)tx_active, TX_QUEUE_SIZE_DRIV);
+    net_queue_init(&rx_queue, (net_queue_t *)rx_free, (net_queue_t *)rx_active, NET_RX_QUEUE_SIZE_DRIV);
+    net_queue_init(&tx_queue, (net_queue_t *)tx_free, (net_queue_t *)tx_active, NET_TX_QUEUE_SIZE_DRIV);
 
     rx_provide();
     tx_provide();

@@ -5,6 +5,12 @@ name: PR
 on: [pull_request]
 
 jobs:
+  whitespace:
+    name: 'Trailing Whitespace'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: seL4/ci-actions/git-diff-check@master
+
   style:
     name: Style
     runs-on: ubuntu-latest

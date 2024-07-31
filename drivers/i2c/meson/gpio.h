@@ -10,9 +10,9 @@
 // Matt Rossouw (matthew.rossouw@unsw.edu.au)
 // 08/2023
 
-#ifndef __GPIO_H__
-#define __GPIO_H__
-#define BIT(n)  (1U << (n))
+#include <sddf/util/util.h>
+
+#pragma once
 #define GPIO_OFFSET 1024
 
 // Pinmux
@@ -46,7 +46,3 @@
 #define GPIO_BIAS_2_EN  0x4a
 #define GPIO_BIAS_5     0x3f    // GPIO bank A
 #define GPIO_BIAS_5_EN  0x4d
-
-#endif
-
-

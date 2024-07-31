@@ -18,15 +18,13 @@
 net_queue_handle_t rx_queue;
 net_queue_handle_t tx_queue;
 
-uintptr_t rx_free;
-uintptr_t rx_active;
-uintptr_t tx_free;
-uintptr_t tx_active;
+net_queue_t *rx_free;
+net_queue_t *rx_active;
+net_queue_t *tx_free;
+net_queue_t *tx_active;
 
 uintptr_t rx_buffer_data_region;
 uintptr_t tx_buffer_data_region;
-
-uintptr_t uart_base;
 
 uint8_t mac_addrs[NUM_ARP_CLIENTS][ETH_HWADDR_LEN];
 uint32_t ipv4_addrs[NUM_ARP_CLIENTS];
@@ -104,9 +102,7 @@ static int arp_reply(const uint8_t ethsrc_addr[ETH_HWADDR_LEN],
     int err = net_dequeue_free(&tx_queue, &buffer);
     assert(!err);
 
-    uintptr_t addr = tx_buffer_data_region + buffer.io_or_offset;
-
-    struct arp_packet *reply = (struct arp_packet *)addr;
+    struct arp_packet *reply = (struct arp_packet *)(tx_buffer_data_region + buffer.io_or_offset);
     memcpy(&reply->ethdst_addr, ethdst_addr, ETH_HWADDR_LEN);
     memcpy(&reply->ethsrc_addr, ethsrc_addr, ETH_HWADDR_LEN);
 
@@ -139,10 +135,9 @@ void receive(void)
             net_buff_desc_t buffer;
             int err = net_dequeue_active(&rx_queue, &buffer);
             assert(!err);
-            uintptr_t addr = rx_buffer_data_region + buffer.io_or_offset;
 
             /* Check if packet is an ARP request */
-            struct ethernet_header *ethhdr = (struct ethernet_header *)addr;
+            struct ethernet_header *ethhdr = (struct ethernet_header *)(rx_buffer_data_region + buffer.io_or_offset);
             if (ethhdr->type == HTONS(ETH_TYPE_ARP)) {
                 struct arp_packet *pkt = (struct arp_packet *)addr;
                 /* Check if it's a probe, ignore announcements */
@@ -216,9 +211,9 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
 
 void init(void)
 {
-    net_queue_init(&rx_queue, (net_queue_t *)rx_free, (net_queue_t *)rx_active, RX_QUEUE_SIZE_ARP);
-    net_queue_init(&tx_queue, (net_queue_t *)tx_free, (net_queue_t *)tx_active, TX_QUEUE_SIZE_ARP);
+    net_queue_init(&rx_queue, rx_free, rx_active, ETHERNET_RX_QUEUE_SIZE_ARP);
+    net_queue_init(&tx_queue, tx_free, tx_active, ETHERNET_TX_QUEUE_SIZE_ARP);
     net_buffers_init(&tx_queue, 0);
 
-    arp_mac_addr_init_sys(microkit_name, (uint8_t *) mac_addrs);
+    ethernet_arp_mac_addr_init_sys(microkit_name, (uint8_t *) mac_addrs);
 }

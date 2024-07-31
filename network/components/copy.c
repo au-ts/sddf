@@ -1,8 +1,7 @@
-#include <string.h>
 #include <stdbool.h>
 #include <microkit.h>
 #include <sddf/network/queue.h>
-#include <sddf/util/fence.h>
+#include <sddf/util/string.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 #include <ethernet_config.h>
@@ -13,10 +12,10 @@
 net_queue_handle_t rx_queue_virt;
 net_queue_handle_t rx_queue_cli;
 
-uintptr_t rx_free_virt;
-uintptr_t rx_active_virt;
-uintptr_t rx_free_cli;
-uintptr_t rx_active_cli;
+net_queue_t *rx_free_virt;
+net_queue_t *rx_active_virt;
+net_queue_t *rx_free_cli;
+net_queue_t *rx_active_cli;
 
 uintptr_t virt_buffer_data_region;
 uintptr_t cli_buffer_data_region;
@@ -44,7 +43,7 @@ void rx_return(void)
             uintptr_t cli_addr = cli_buffer_data_region + cli_buffer.io_or_offset;
             uintptr_t virt_addr = virt_buffer_data_region + virt_buffer.io_or_offset;
 
-            memcpy((void *)cli_addr, (void *)virt_addr, virt_buffer.len);
+            sddf_memcpy((void *)cli_addr, (void *)virt_addr, virt_buffer.len);
             cli_buffer.len = virt_buffer.len;
             virt_buffer.len = 0;
 
@@ -93,7 +92,7 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
-    copy_queue_init_sys(microkit_name, &rx_queue_cli, rx_free_cli, rx_active_cli, &rx_queue_virt, rx_free_virt,
-                        rx_active_virt);
+    net_copy_queue_init_sys(microkit_name, &rx_queue_cli, rx_free_cli, rx_active_cli, &rx_queue_virt, rx_free_virt,
+                            rx_active_virt);
     net_buffers_init(&rx_queue_cli, 0);
 }

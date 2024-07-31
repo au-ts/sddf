@@ -7,7 +7,7 @@
 
 #include <stdint.h>
 
-#define DMA_REG_OFFSET              (0x1000)            /* Offset of the DMA Registers. */ 
+#define DMA_REG_OFFSET              (0x1000)            /* Offset of the DMA Registers. */
 #define MAX_RX_FRAME_SZ             (0x600)             /* Maximum size of a received packet. */
 #define DMA_PBL                     (32)                /* DMA programmable burst length. Must be 1, 2, 4, 8, 16, or 32. */
 
@@ -15,23 +15,23 @@
 #define DMAMAC_SWRST                (1 << 0)            /* Resets all GMAC Subsystem internal registers and logic. Cleared automatically after the reset operation has completed. */
 #define RXHIGHPRIO                  (1 << 1)            /* DMA Arbitration Scheme - 1: Rx has priority over Tx, 0: round robin with Rx:Tx priority given in bits [15:14]. */
 #define DSL_MASK                    (0x1c)              /* Number of Words to skip between two unchained descriptors. If 0, descriptor table is taken as contiguous in Ring mode. */
-#define DSL_SHFT                    (2) 
+#define DSL_SHFT                    (2)
 #define TX_PBL_MASK                 (0x3f00)            /* Maximum number of beats to be transferred in one DMA transaction. */
-#define TX_PBL_SHFT                 (8) 
+#define TX_PBL_SHFT                 (8)
 #define PRIORXTX_41                 (3 << 14)           /* Rx:Tx priority ratio. RxDMA requests given priority over TxDMA requests in the ratio 4:1. */
 #define PRIORXTX_31                 (2 << 14)           /* Rx:Tx priority ratio. RxDMA requests given priority over TxDMA requests in the ratio 3:1. */
 #define PRIORXTX_21                 (1 << 14)           /* Rx:Tx priority ratio. RxDMA requests given priority over TxDMA requests in the ratio 2:1. */
 #define PRIORXTX_11                 (0 << 14)           /* Rx:Tx priority ratio. RxDMA requests given priority over TxDMA requests in the ratio 1:1. */
 #define FIXEDBURST                  (1 << 16)           /* Controls whether the AHB Master interface performs fixed burst transfers or not. */
 #define RX_PBL_MASK                 (0x7e0000)          /* Maximum number of beats to be transferred in one RxDMA transaction. Only applicable when USE_SEP_PBL is set. */
-#define RX_PBL_SHFT                 (17)    
+#define RX_PBL_SHFT                 (17)
 #define USE_SEP_PBL                 (1 << 23)           /* Configures the RxDMA to use the value in bits [22:17] and TxDMA to use value in bits [13:8]. When unset [13:8] is applicable for both DMA engines. */
 #define DMA_PBL_X4                  (1 << 24)           /* Multiplies the PBL value programmed (bits[22:17] and bits [13:8]) four times. */
 
-/* DMA Poll demand register definitions - When these bits are written with any value, the DMA reads the current descriptor pointed to by Register 18. 
+/* DMA Poll demand register definitions - When these bits are written with any value, the DMA reads the current descriptor pointed to by Register 18.
    If that descriptor is not available (owned by Host), transmission returns to the Suspend state and buffer unavailable is asserted in the status register.
    If the descriptor is available, transmission resumes.*/
-#define POLL_DATA       0xffffffff  
+#define POLL_DATA       0xffffffff
 
 /* DMA status register definitions */
 #define DMA_INTR_TXF                (1 << 0)            /* Transmission is finished. */
@@ -61,7 +61,7 @@
 #define RXSTART                     (1 << 1)            /* Place the receive process in the running state. DMA attempts to acquire the descriptor from the Receive list and processes incoming frames. */
 #define TX_OPSCND                   (1 << 2)            /* Operate on Second Frame. Instruct the DMA to process a second frame of Transmit data before status for first frame is obtained. */
 #define RTC_MASK                    (0x18)              /* Receive Threshold Control. Threshold level of the MTL Receive FIFO. Transfer to DMA starts when the frame size within the MTL Receive FIFO is larger than the threshold. */
-#define RTC_SHFT                    (3) 
+#define RTC_SHFT                    (3)
 #define RX_FUGF                     (1 << 6)            /* Forward Undersized Good Frames. When set, the Rx FIFO will forward frames with no Error and length less than 64 bytes including pad-bytes and CRC */
 #define RX_FEF                      (1 << 7)            /* Forward Error Frames. When this bit is reset, the Rx FIFO drops frames with error status. */
 #define EN_FLOWCTL                  (1 << 8)            /* Enable HW flow control. When this bit is set, the flow control signal operation based on fill-level of Rx FIFO is enabled. */
@@ -79,7 +79,7 @@
 /* DMA Missed Frame and Buffer Overflow Counter register definitions */
 #define FIFO_OVFLW_BIT              (1 << 28)            /* Overflow bit for FIFO Overflow Counter */
 #define FIFO_OVFLW_MSK              (0xffe0000)          /* Indicates missed frames by the application due to buffer overflow conditions. */
-#define FIFO_OVFLW_SHFT             (17)  
+#define FIFO_OVFLW_SHFT             (17)
 #define MSFRM_OVFLW_BIT             (1 << 16)            /* Overflow bit for Missed Frame Counter */
 #define MSFRM_MASK                  (0xffff)             /* Indicates the number of frames missed by the controller due to the Host Receive Buffer being unavailable. */
 #define MSFRM_SHFT                  (0)
@@ -94,6 +94,14 @@
 /* GMAC Frame Filter register definitions */
 #define RX_ALL_MODE                 (1 << 31)           /* The GMAC Receiver module passes to the Application all frames received irrespective of whether they pass the address filter. */
 #define PMSCUOUS_MODE               (1)                 /* When this bit is set, the Address Filter module passes all incoming frames regardless of its destination or source address. */
+
+/* GMAC Flow Control register definitions */
+#define GMAC_FLOW_CTRL_PT_MASK      (0xffff0000)        /* Pause Time Mask */
+#define GMAC_FLOW_CTRL_PT_SHIFT     (16)
+#define GMAC_FLOW_CTRL_UP           (0x00000008)        /* Unicast pause frame enable */
+#define GMAC_FLOW_CTRL_RFE          (0x00000004)        /* Rx Flow Control Enable */
+#define GMAC_FLOW_CTRL_TFE          (0x00000002)        /* Tx Flow Control Enable */
+#define GMAC_FLOW_CTRL_FCB_BPA      (0x00000001)        /* Flow Control Busy ... */
 
 /* GMAC Interrupt Status Register definitions */
 #define GMAC_INT_RGMII              (1)                 /* RGMII Interrupt Status. */
@@ -141,16 +149,16 @@
 #define DESC_TXSTS_OWNBYDMA         (1 << 31)           /* Descriptor is owned by the DMA of the GMAC Subsystem. */
 
 /* Tx control bit definitions */
-#define DESC_TXCTRL_TXINT		    (1 << 31)           /* Sets Transmit Interrupt after the present frame has been transmitted. */
-#define DESC_TXCTRL_TXLAST		    (1 << 30)           /* Buffer contains the last segment of the frame. */
-#define DESC_TXCTRL_TXFIRST		    (1 << 29)           /* Buffer contains the first segment of a frame. */
-#define DESC_TXCTRL_TXCRCDIS		(1 << 26)           /* GMAC does not append the Cyclic Redundancy Check (CRC) to the end of the transmitted frame.*/
-#define DESC_TXCTRL_TXRINGEND		(1 << 25)           /* Descriptor list reached its final descriptor. DMA must loop around. */
-#define DESC_TXCTRL_TXCHAIN		    (1 << 24)           /* Second address in the descriptor is the Next Descriptor address rather than the second buffer address. */
-#define DESC_TXCTRL_SIZE2MASK		(0x3ff800)
-#define DESC_TXCTRL_SIZE2SHFT		(11)
-#define DESC_TXCTRL_SIZE1MASK		(0x7FF)
-#define DESC_TXCTRL_SIZE1SHFT		(0)
+#define DESC_TXCTRL_TXINT           (1 << 31)           /* Sets Transmit Interrupt after the present frame has been transmitted. */
+#define DESC_TXCTRL_TXLAST          (1 << 30)           /* Buffer contains the last segment of the frame. */
+#define DESC_TXCTRL_TXFIRST         (1 << 29)           /* Buffer contains the first segment of a frame. */
+#define DESC_TXCTRL_TXCRCDIS        (1 << 26)           /* GMAC does not append the Cyclic Redundancy Check (CRC) to the end of the transmitted frame.*/
+#define DESC_TXCTRL_TXRINGEND       (1 << 25)           /* Descriptor list reached its final descriptor. DMA must loop around. */
+#define DESC_TXCTRL_TXCHAIN         (1 << 24)           /* Second address in the descriptor is the Next Descriptor address rather than the second buffer address. */
+#define DESC_TXCTRL_SIZE2MASK       (0x3ff800)
+#define DESC_TXCTRL_SIZE2SHFT       (11)
+#define DESC_TXCTRL_SIZE1MASK       (0x7FF)
+#define DESC_TXCTRL_SIZE1SHFT       (0)
 
 struct eth_mac_regs {
     uint32_t conf;                                      /* 0x00 This is the operation mode register for the MAC. */
@@ -162,7 +170,10 @@ struct eth_mac_regs {
     uint32_t flowcontrol;                               /* 0x18 Controls the generation of control frames. */
     uint32_t vlantag;                                   /* 0x1c Identifies IEEE 802.1Q VLAN type frames */
     uint32_t version;                                   /* 0x20 Identifies the version of the Core */
-    uint32_t reserved_1[5];
+    uint32_t debug;                                     /* 0x24 DEBUG register */
+    uint32_t wakeup_filter;                             /* 0x28 Wake-up frame filter */
+    uint32_t pmt;                                       /* 0x2C PMT control and Status */
+    uint32_t reserved_2[2];
     uint32_t intreg;                                    /* 0x38 Contains the interrupt status. */
     uint32_t intmask;                                   /* 0x3c Contains the masks for generating the interrupts. */
     uint32_t macaddr0hi;                                /* 0x40 Contains the higher 16 bits of the first MAC address */

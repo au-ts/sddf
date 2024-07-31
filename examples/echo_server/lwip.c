@@ -9,8 +9,10 @@
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 #include <sddf/network/queue.h>
+#include <sddf/serial/queue.h>
 #include <sddf/timer/client.h>
 #include <sddf/benchmark/sel4bench.h>
+#include <serial_config.h>
 #include <ethernet_config.h>
 #include <string.h>
 #include "lwip/init.h"
@@ -25,20 +27,24 @@
 
 #include "echo.h"
 
+#define SERIAL_TX_CH 0
 #define TIMER  1
 #define RX_CH  2
 #define TX_CH  3
 
-#define LWIP_TICK_MS 100
-#define NUM_PBUFFS 512
+char *serial_tx_data;
+serial_queue_t *serial_tx_queue;
+serial_queue_handle_t serial_tx_queue_handle;
 
-uintptr_t rx_free;
-uintptr_t rx_active;
-uintptr_t tx_free;
-uintptr_t tx_active;
+#define LWIP_TICK_MS 100
+#define NUM_PBUFFS NET_MAX_CLIENT_QUEUE_SIZE
+
+net_queue_t *rx_free;
+net_queue_t *rx_active;
+net_queue_t *tx_free;
+net_queue_t *tx_active;
 uintptr_t rx_buffer_data_region;
 uintptr_t tx_buffer_data_region;
-uintptr_t uart_base;
 
 /* Booleans to indicate whether packets have been enqueued during notification handling */
 static bool notify_tx;
@@ -47,7 +53,7 @@ static bool notify_rx;
 /* Wrapper over custom_pbuf structure to keep track of buffer offset */
 typedef struct pbuf_custom_offset {
     struct pbuf_custom custom;
-    uintptr_t offset;
+    uint64_t offset;
 } pbuf_custom_offset_t;
 
 LWIP_MEMPOOL_DECLARE(
@@ -105,7 +111,7 @@ static void interface_free_buffer(struct pbuf *p)
  *
  * @return the newly created pbuf. Can be cast to pbuf_custom.
  */
-static struct pbuf *create_interface_buffer(uintptr_t offset, size_t length)
+static struct pbuf *create_interface_buffer(uint64_t offset, size_t length)
 {
     pbuf_custom_offset_t *custom_pbuf_offset = (pbuf_custom_offset_t *) LWIP_MEMPOOL_ALLOC(RX_POOL);
     custom_pbuf_offset->offset = offset;
@@ -162,10 +168,10 @@ static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
     int err = net_dequeue_free(&state.tx_queue, &buffer);
     assert(!err);
 
-    unsigned char *frame = (unsigned char *)(buffer.io_or_offset + tx_buffer_data_region);
-    unsigned int copied = 0;
+    uintptr_t frame = buffer.io_or_offset + tx_buffer_data_region;
+    uint16_t copied = 0;
     for (struct pbuf *curr = p; curr != NULL; curr = curr->next) {
-        memcpy(frame + copied, curr->payload, curr->len);
+        memcpy((void *)(frame + copied), curr->payload, curr->len);
         copied += curr->len;
     }
 
@@ -224,6 +230,7 @@ void receive(void)
             assert(!err);
 
             struct pbuf *p = create_interface_buffer(buffer.io_or_offset, buffer.len);
+            assert(p != NULL);
             if (state.netif.input(p, &state.netif) != ERR_OK) {
                 sddf_dprintf("LWIP|ERROR: unkown error inputting pbuf into network stack\n");
                 pbuf_free(p);
@@ -278,7 +285,10 @@ static void netif_status_callback(struct netif *netif)
 
 void init(void)
 {
-    cli_queue_init_sys(microkit_name, &state.rx_queue, rx_free, rx_active, &state.tx_queue, tx_free, tx_active);
+    serial_cli_queue_init_sys(microkit_name, NULL, NULL, NULL, &serial_tx_queue_handle, serial_tx_queue, serial_tx_data);
+    serial_putchar_init(SERIAL_TX_CH, &serial_tx_queue_handle);
+
+    net_cli_queue_init_sys(microkit_name, &state.rx_queue, rx_free, rx_active, &state.tx_queue, tx_free, tx_active);
     net_buffers_init(&state.tx_queue, 0);
 
     lwip_init();
@@ -286,7 +296,7 @@ void init(void)
 
     LWIP_MEMPOOL_INIT(RX_POOL);
 
-    cli_mac_addr_init_sys(microkit_name, state.mac);
+    net_cli_mac_addr_init_sys(microkit_name, state.mac);
 
     /* Set dummy IP configuration values to get lwIP bootstrapped  */
     struct ip4_addr netmask, ipaddr, gw, multicast;
@@ -313,6 +323,7 @@ void init(void)
 
     setup_udp_socket();
     setup_utilization_socket();
+    setup_tcp_socket();
 
     if (notify_rx && net_require_signal_free(&state.rx_queue)) {
         net_cancel_signal_free(&state.rx_queue);

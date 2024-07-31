@@ -13,20 +13,24 @@
 
 /* Size of a single block to be transferred */
 #define BLK_TRANSFER_SIZE 4096
-/* Maximum number of slots in each queue. Can be configured. */
-#define BLK_QUEUE_SIZE 1024
 /* Device serial number max string length */
 #define BLK_MAX_SERIAL_NUMBER 63
 
 typedef struct blk_storage_info {
     char serial_number[BLK_MAX_SERIAL_NUMBER + 1];
+    /* device does not accept write requests */
     bool read_only;
-    bool ready; /* true if component closer to driver is ready */
-    uint16_t sector_size; /* size of a sector */
-    uint16_t block_size; /* optimal block size, as a multiple of BLK_TRANSFER_SIZE */
+    /* whether this configuration is populated yet */
+    bool ready;
+    /* size of a sector, in bytes */
+    uint16_t sector_size;
+    /* optimal block size, specified in BLK_TRANSFER_SIZE sized units */
+    uint16_t block_size;
     uint16_t queue_depth;
-    uint16_t cylinders, heads, blocks; /* geometry to guide FS layout */
-    uint64_t size; /* number of BLK_TRANSFER_SIZE units */
+    /* geometry to guide FS layout */
+    uint16_t cylinders, heads, blocks;
+    /* total capacity of the device, specified in BLK_TRANSFER_SIZE sized units. */
+    uint64_t capacity;
 } blk_storage_info_t;
 
 /* Request code for block */
@@ -46,7 +50,7 @@ typedef enum blk_response_status {
 /* Request struct contained in request queue */
 typedef struct blk_request {
     blk_request_code_t code; /* request code */
-    uintptr_t addr; /* encoded dma address of data */
+    uint64_t io_or_offset; /* offset of buffer within buffer memory region or io address of buffer */
     uint32_t block_number; /* block number to read/write to */
     uint16_t count; /* number of blocks to read/write */
     uint32_t id; /* stores request ID */
@@ -64,21 +68,21 @@ typedef struct blk_req_queue {
     uint32_t head;
     uint32_t tail;
     bool plugged; /* prevent requests from being dequeued when plugged */
-    blk_request_t buffers[BLK_QUEUE_SIZE];
+    blk_request_t buffers[];
 } blk_req_queue_t;
 
 /* Circular buffer containing responses */
 typedef struct blk_resp_queue {
     uint32_t head;
     uint32_t tail;
-    blk_response_t buffers[BLK_QUEUE_SIZE];
+    blk_response_t buffers[];
 } blk_resp_queue_t;
 
 /* A queue handle for queueing/dequeueing request and responses */
 typedef struct blk_queue_handle {
     blk_req_queue_t *req_queue;
     blk_resp_queue_t *resp_queue;
-    uint32_t queue_size;
+    uint32_t capacity;
 } blk_queue_handle_t;
 
 /**
@@ -87,16 +91,16 @@ typedef struct blk_queue_handle {
  * @param h queue handle to use.
  * @param request pointer to request queue in shared memory.
  * @param response pointer to response queue in shared memory.
- * @param queue_size number of entries in each queue.
+ * @param capacity maximum number of entries in each queue.
  */
 static inline void blk_queue_init(blk_queue_handle_t *h,
                                   blk_req_queue_t *request,
                                   blk_resp_queue_t *response,
-                                  uint32_t queue_size)
+                                  uint32_t capacity)
 {
     h->req_queue = request;
     h->resp_queue = response;
-    h->queue_size = queue_size;
+    h->capacity = capacity;
 }
 
 /**
@@ -108,7 +112,7 @@ static inline void blk_queue_init(blk_queue_handle_t *h,
  */
 static inline bool blk_req_queue_empty(blk_queue_handle_t *h)
 {
-    return !((h->req_queue->head - h->req_queue->tail) % h->queue_size);
+    return h->req_queue->tail - h->req_queue->head == 0;
 }
 
 /**
@@ -120,7 +124,7 @@ static inline bool blk_req_queue_empty(blk_queue_handle_t *h)
  */
 static inline bool blk_resp_queue_empty(blk_queue_handle_t *h)
 {
-    return !((h->resp_queue->head - h->resp_queue->tail) % h->queue_size);
+    return h->resp_queue->tail - h->resp_queue->head == 0;
 }
 
 /**
@@ -132,7 +136,7 @@ static inline bool blk_resp_queue_empty(blk_queue_handle_t *h)
  */
 static inline bool blk_req_queue_full(blk_queue_handle_t *h)
 {
-    return !((h->req_queue->head - h->req_queue->tail + 1) % h->queue_size);
+    return h->req_queue->tail - h->req_queue->head + 1 == h->capacity;
 }
 
 /**
@@ -144,7 +148,7 @@ static inline bool blk_req_queue_full(blk_queue_handle_t *h)
  */
 static inline bool blk_resp_queue_full(blk_queue_handle_t *h)
 {
-    return !((h->resp_queue->head - h->resp_queue->tail + 1) % h->queue_size);
+    return h->resp_queue->tail - h->resp_queue->head + 1 == h->capacity;
 }
 
 /**
@@ -154,9 +158,9 @@ static inline bool blk_resp_queue_full(blk_queue_handle_t *h)
  *
  * @return number of elements in the queue.
  */
-static inline int blk_req_queue_size(blk_queue_handle_t *h)
+static inline int blk_req_queue_length(blk_queue_handle_t *h)
 {
-    return (h->req_queue->head - h->req_queue->tail);
+    return (h->req_queue->tail - h->req_queue->head);
 }
 
 /**
@@ -166,15 +170,17 @@ static inline int blk_req_queue_size(blk_queue_handle_t *h)
  *
  * @return number of elements in the queue.
  */
-static inline int blk_resp_queue_size(blk_queue_handle_t *h)
+static inline int blk_resp_queue_length(blk_queue_handle_t *h)
 {
-    return (h->resp_queue->head - h->resp_queue->tail);
+    return (h->resp_queue->tail - h->resp_queue->head);
 }
 
 /**
  * Enqueue an element into the request queue.
  *
  * @param h queue handle containing request queue to enqueue to.
+ * @param code request code.
+ * @param io_or_offset offset of buffer within buffer memory region or io address of buffer.
  * @param block_number block number to read/write to.
  * @param count the number of blocks to read/write
  * @param id request ID to identify this request.
@@ -183,23 +189,28 @@ static inline int blk_resp_queue_size(blk_queue_handle_t *h)
  */
 static inline int blk_enqueue_req(blk_queue_handle_t *h,
                                   blk_request_code_t code,
-                                  uintptr_t addr,
+                                  uintptr_t io_or_offset,
                                   uint32_t block_number,
                                   uint16_t count,
                                   uint32_t id)
 {
+    struct blk_request *brp;
+    struct blk_req_queue *brqp;
+
     if (blk_req_queue_full(h)) {
         return -1;
     }
 
-    h->req_queue->buffers[h->req_queue->head % h->queue_size].code = code;
-    h->req_queue->buffers[h->req_queue->head % h->queue_size].addr = addr;
-    h->req_queue->buffers[h->req_queue->head % h->queue_size].block_number = block_number;
-    h->req_queue->buffers[h->req_queue->head % h->queue_size].count = count;
-    h->req_queue->buffers[h->req_queue->head % h->queue_size].id = id;
+    brqp = h->req_queue;
+    brp = brqp->buffers + (brqp->tail % h->capacity);
+    brp->code = code;
+    brp->io_or_offset = io_or_offset;
+    brp->block_number = block_number;
+    brp->count = count;
+    brp->id = id;
 
     THREAD_MEMORY_RELEASE();
-    h->req_queue->head++;
+    brqp->tail++;
 
     return 0;
 }
@@ -220,16 +231,20 @@ static inline int blk_enqueue_resp(blk_queue_handle_t *h,
                                    uint16_t success_count,
                                    uint32_t id)
 {
+    struct blk_response *brp;
+    struct blk_resp_queue *brqp;
     if (blk_resp_queue_full(h)) {
         return -1;
     }
 
-    h->resp_queue->buffers[h->resp_queue->head % h->queue_size].status = status;
-    h->resp_queue->buffers[h->resp_queue->head % h->queue_size].success_count = success_count;
-    h->resp_queue->buffers[h->resp_queue->head % h->queue_size].id = id;
+    brqp = h->resp_queue;
+    brp = brqp->buffers + (brqp->tail % h->capacity);
+    brp->status = status;
+    brp->success_count = success_count;
+    brp->id = id;
 
     THREAD_MEMORY_RELEASE();
-    h->resp_queue->head++;
+    brqp->tail++;
 
     return 0;
 }
@@ -239,7 +254,7 @@ static inline int blk_enqueue_resp(blk_queue_handle_t *h,
  *
  * @param h queue handle containing request queue to dequeue from.
  * @param code pointer to request code.
- * @param addr pointer to encoded dma address of data.
+ * @param io_or_offset pointer to offset of buffer within buffer memory region or io address of buffer
  * @param block_number pointer to  block number to read/write to.
  * @param count pointer to number of blocks to read/write.
  * @param id pointer to store request ID.
@@ -248,23 +263,27 @@ static inline int blk_enqueue_resp(blk_queue_handle_t *h,
  */
 static inline int blk_dequeue_req(blk_queue_handle_t *h,
                                   blk_request_code_t *code,
-                                  uintptr_t *addr,
+                                  uintptr_t *io_or_offset,
                                   uint32_t *block_number,
                                   uint16_t *count,
                                   uint32_t *id)
 {
+    struct blk_request *brp;
+    struct blk_req_queue *brqp;
     if (blk_req_queue_empty(h)) {
         return -1;
     }
 
-    *code = h->req_queue->buffers[h->req_queue->tail % h->queue_size].code;
-    *addr = h->req_queue->buffers[h->req_queue->tail % h->queue_size].addr;
-    *block_number = h->req_queue->buffers[h->req_queue->tail % h->queue_size].block_number;
-    *count = h->req_queue->buffers[h->req_queue->tail % h->queue_size].count;
-    *id = h->req_queue->buffers[h->req_queue->tail % h->queue_size].id;
+    brqp = h->req_queue;
+    brp = brqp->buffers + (brqp->head % h->capacity);
+    *code = brp->code;
+    *io_or_offset = brp->io_or_offset;
+    *block_number = brp->block_number;
+    *count = brp->count;
+    *id = brp->id;
 
     THREAD_MEMORY_RELEASE();
-    h->req_queue->tail++;
+    brqp->head++;
 
     return 0;
 }
@@ -283,16 +302,20 @@ static inline int blk_dequeue_resp(blk_queue_handle_t *h,
                                    uint16_t *success_count,
                                    uint32_t *id)
 {
+    struct blk_response *brp;
+    struct blk_resp_queue *brqp;
     if (blk_resp_queue_empty(h)) {
         return -1;
     }
 
-    *status = h->resp_queue->buffers[h->resp_queue->tail % h->queue_size].status;
-    *success_count = h->resp_queue->buffers[h->resp_queue->tail % h->queue_size].success_count;
-    *id = h->resp_queue->buffers[h->resp_queue->tail % h->queue_size].id;
+    brqp = h->resp_queue;
+    brp = brqp->buffers + (brqp->head % h->capacity);
+    *status = brp->status;
+    *success_count = brp->success_count;
+    *id = brp->id;
 
     THREAD_MEMORY_RELEASE();
-    h->resp_queue->tail++;
+    brqp->head++;
 
     return 0;
 }

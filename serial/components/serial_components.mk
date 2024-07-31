@@ -7,21 +7,12 @@
 # it should be included into your project Makefile
 #
 # NOTES:
-#  Generates serial_rx_virt.elf serial_tx_virt.elf
-#  It relies on the variable SERIAL_NUM_CLIENTS as a C compiler flag
-#  to configure the virtualisers
+#  Generates serial_virt_rx.elf serial_virt_tx.elf
 #
 
-ifeq ($(strip $(SERIAL_NUM_CLIENTS)),)
-$(error Specify the number of clients for the serial virtualisers.  Expect -DSERIAL_NUM_CLIENTS=3 or similar)
-endif
-ifeq ($(strip $(UART_DRIVER)),)
-$(error The serial virtualisers need headers from the UART source. Please specify UART_DRIVER)
-endif
+SERIAL_IMAGES:= serial_virt_rx.elf serial_virt_tx.elf
 
-SERIAL_IMAGES:= serial_rx_virt.elf serial_tx_virt.elf
-
-CFLAGS_serial := -I ${SDDF}/include -I${UART_DRIVER}/include -I${SDDF}/util/include ${SERIAL_NUM_CLIENTS}
+CFLAGS_serial := -I ${SDDF}/include
 
 CHECK_SERIAL_FLAGS_MD5:=.serial_cflags-$(shell echo -- ${CFLAGS} ${CFLAGS_serial} | shasum | sed 's/ *-//')
 
@@ -30,7 +21,7 @@ ${CHECK_SERIAL_FLAGS_MD5}:
 	touch $@
 
 
-serial_%_virt.elf: virt_%.o
+serial_virt_%.elf: virt_%.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 virt_tx.o virt_rx.o: ${CHECK_SERIAL_FLAGS_MD5}

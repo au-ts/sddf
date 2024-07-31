@@ -3,6 +3,7 @@
 set -e
 
 SDK_PATH=$1
+SDDF=$(pwd)
 
 # Number of threads/jobs to compile with, default to 1
 if [ "$#" -eq 1 ]; then
@@ -21,60 +22,90 @@ I2C=true
 SERIAL=true
 TIMER=true
 
-build_network_echo_server() {
+build_network_echo_server_make() {
     BOARD=$1
     CONFIG=$2
-    echo "CI|INFO: building echo server example with board: ${BOARD}, config: ${CONFIG}"
-    BUILD_DIR="${PWD}/${CI_BUILD_DIR}/examples/echo_server/${BOARD}/${CONFIG}"
+    echo "CI|INFO: building echo server example with Make, board: ${BOARD}, config: ${CONFIG}"
+    BUILD_DIR="${PWD}/${CI_BUILD_DIR}/examples/echo_server/make/${BOARD}/${CONFIG}"
     rm -rf ${BUILD_DIR}
     mkdir -p ${BUILD_DIR}
-    make -j${NUM_JOBS} -C examples/echo_server \
+    make -j${NUM_JOBS} -C ${SDDF}/examples/echo_server \
         BUILD_DIR=${BUILD_DIR} \
         MICROKIT_CONFIG=${CONFIG} \
         MICROKIT_SDK=${SDK_PATH} \
         MICROKIT_BOARD=${BOARD}
 }
 
-build_i2c() {
+build_i2c_make() {
     BOARD=$1
     CONFIG=$2
-    echo "CI|INFO: building I2C example with board: ${BOARD}, config: ${CONFIG}"
-    BUILD_DIR="${PWD}/${CI_BUILD_DIR}/examples/i2c/${BOARD}/${CONFIG}"
+    echo "CI|INFO: building I2C example with Make, board: ${BOARD}, config: ${CONFIG}"
+    BUILD_DIR="${PWD}/${CI_BUILD_DIR}/examples/i2c/make/${BOARD}/${CONFIG}"
     rm -rf ${BUILD_DIR}
     mkdir -p ${BUILD_DIR}
-    make -j${NUM_JOBS} -C examples/i2c \
+    make -j${NUM_JOBS} -C ${SDDF}/examples/i2c \
         BUILD_DIR=${BUILD_DIR} \
         MICROKIT_CONFIG=${CONFIG} \
         MICROKIT_SDK=${SDK_PATH} \
         MICROKIT_BOARD=${BOARD}
 }
 
-build_timer() {
+build_i2c_zig() {
     BOARD=$1
     CONFIG=$2
-    echo "CI|INFO: building timer example with board: ${BOARD}, config: ${CONFIG}"
-    BUILD_DIR="${PWD}/${CI_BUILD_DIR}/examples/timer/${BOARD}/${CONFIG}"
+    echo "CI|INFO: building I2C example with Zig, board: ${BOARD}, config: ${CONFIG}"
+    BUILD_DIR="${PWD}/${CI_BUILD_DIR}/examples/i2c/zig/${BOARD}/${CONFIG}"
+    rm -rf ${BUILD_DIR}
+    cd ${SDDF}/examples/i2c
+    zig build -Dsdk=${SDK_PATH} -Dboard=${BOARD} -Dconfig=${CONFIG} -p ${BUILD_DIR}
+}
+
+build_timer_make() {
+    BOARD=$1
+    CONFIG=$2
+    echo "CI|INFO: building timer example with Make, board: ${BOARD}, config: ${CONFIG}"
+    BUILD_DIR="${PWD}/${CI_BUILD_DIR}/examples/timer/make/${BOARD}/${CONFIG}"
     rm -rf ${BUILD_DIR}
     mkdir -p ${BUILD_DIR}
-    make -j${NUM_JOBS} -C examples/timer \
+    make -j${NUM_JOBS} -C ${SDDF}/examples/timer \
         BUILD_DIR=${BUILD_DIR} \
         MICROKIT_CONFIG=${CONFIG} \
         MICROKIT_SDK=${SDK_PATH} \
         MICROKIT_BOARD=${BOARD}
 }
 
-build_serial() {
+build_timer_zig() {
     BOARD=$1
     CONFIG=$2
-    echo "CI|INFO: building serial example with board: ${BOARD}, config: ${CONFIG}"
-    BUILD_DIR="${PWD}/${CI_BUILD_DIR}/examples/serial/${BOARD}/${CONFIG}"
+    echo "CI|INFO: building timer example with Zig, board: ${BOARD}, config: ${CONFIG}"
+    BUILD_DIR="${PWD}/${CI_BUILD_DIR}/examples/timer/zig/${BOARD}/${CONFIG}"
+    rm -rf ${BUILD_DIR}
+    cd ${SDDF}/examples/timer
+    zig build -Dsdk=${SDK_PATH} -Dboard=${BOARD} -Dconfig=${CONFIG} -p ${BUILD_DIR}
+}
+
+build_serial_make() {
+    BOARD=$1
+    CONFIG=$2
+    echo "CI|INFO: building serial example with Make, board: ${BOARD}, config: ${CONFIG}"
+    BUILD_DIR="${PWD}/${CI_BUILD_DIR}/examples/serial/make/${BOARD}/${CONFIG}"
     rm -rf ${BUILD_DIR}
     mkdir -p ${BUILD_DIR}
-    make -j${NUM_JOBS} -C examples/serial \
+    make -j${NUM_JOBS} -C ${SDDF}/examples/serial \
         BUILD_DIR=${BUILD_DIR} \
         MICROKIT_CONFIG=${CONFIG} \
         MICROKIT_SDK=${SDK_PATH} \
         MICROKIT_BOARD=${BOARD}
+}
+
+build_serial_zig() {
+    BOARD=$1
+    CONFIG=$2
+    echo "CI|INFO: building serial example with Zig, board: ${BOARD}, config: ${CONFIG}"
+    BUILD_DIR="${PWD}/${CI_BUILD_DIR}/examples/serial/zig/${BOARD}/${CONFIG}"
+    rm -rf ${BUILD_DIR}
+    cd ${SDDF}/examples/serial
+    zig build -Dsdk=${SDK_PATH} -Dboard=${BOARD} -Dconfig=${CONFIG} -p ${BUILD_DIR}
 }
 
 network() {
@@ -84,7 +115,7 @@ network() {
     do
       for CONFIG in "${CONFIGS[@]}"
       do
-         build_network_echo_server ${BOARD} ${CONFIG}
+         build_network_echo_server_make ${BOARD} ${CONFIG}
        done
     done
 }
@@ -96,7 +127,8 @@ i2c() {
     do
       for CONFIG in "${CONFIGS[@]}"
       do
-         build_i2c ${BOARD} ${CONFIG}
+         build_i2c_make ${BOARD} ${CONFIG}
+         build_i2c_zig ${BOARD} ${CONFIG}
        done
     done
 }
@@ -108,7 +140,8 @@ timer() {
     do
       for CONFIG in "${CONFIGS[@]}"
       do
-         build_timer ${BOARD} ${CONFIG}
+         build_timer_make ${BOARD} ${CONFIG}
+         build_timer_zig ${BOARD} ${CONFIG}
        done
     done
 }
@@ -120,7 +153,8 @@ serial() {
     do
       for CONFIG in "${CONFIGS[@]}"
       do
-         build_serial ${BOARD} ${CONFIG}
+         build_serial_make ${BOARD} ${CONFIG}
+         build_serial_zig ${BOARD} ${CONFIG}
        done
     done
 }

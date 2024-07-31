@@ -9,8 +9,19 @@
 #include <stddef.h>
 #include <sddf/util/fence.h>
 
-#define I2C_MAX_DATA_SIZE 512
-#define NUM_QUEUE_ENTRIES 512
+/*
+ * Here we choose the default data size and queue entries. This means
+ * that by default the data region would need 4KiB of space (1 page on
+ * AArch64 for example). These defaults have worked for our example systems
+ * but are left configurable for the system designer if they are too small.
+ */
+#ifndef I2C_MAX_DATA_SIZE
+#define I2C_MAX_DATA_SIZE 128
+#endif
+
+#ifndef NUM_QUEUE_ENTRIES
+#define NUM_QUEUE_ENTRIES 32
+#endif
 
 #define RESPONSE_ERR 0
 #define RESPONSE_ERR_TOKEN 1
@@ -93,7 +104,7 @@ static inline i2c_queue_handle_t i2c_queue_init(i2c_queue_t *request, i2c_queue_
  */
 static inline int i2c_queue_empty(i2c_queue_t *queue)
 {
-    return !((queue->tail - queue->head) % NUM_QUEUE_ENTRIES);
+    return queue->tail - queue->head == 0;
 }
 
 /**
@@ -105,10 +116,17 @@ static inline int i2c_queue_empty(i2c_queue_t *queue)
  */
 static inline int i2c_queue_full(i2c_queue_t *queue)
 {
-    return !((queue->tail - queue->head + 1) % NUM_QUEUE_ENTRIES);
+    return queue->tail - queue->head + 1 == NUM_QUEUE_ENTRIES;
 }
 
-static inline uint32_t i2c_queue_size(i2c_queue_t *queue)
+/**
+ * Get the number of entries in a queue
+ *
+ * @param queue queue to check.
+ *
+ * @return number of entries in a queue
+ */
+static inline uint32_t i2c_queue_length(i2c_queue_t *queue)
 {
     return (queue->tail - queue->head);
 }

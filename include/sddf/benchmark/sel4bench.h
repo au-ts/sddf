@@ -7,6 +7,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <sddf/util/util.h>
 #include <microkit.h>
 
 /* A counter is an index to a performance counter on a platform.
@@ -26,8 +27,6 @@ typedef seL4_Word event_id_t;
 #define FASTFN inline __attribute__((always_inline))
 //functions that must not cache miss
 #define CACHESENSFN __attribute__((noinline, aligned(64)))
-
-#define BIT(n) (1ul<<(n))
 
 #define DIV_ROUND_UP(n,d)   \
     ({ typeof (n) _n = (n); \
@@ -185,7 +184,7 @@ static FASTFN uint32_t sel4bench_private_read_overflow(void)
 {
     uint32_t val;
     PMU_READ(PMOVSSERT, val);
-    PMU_WRITE(PMOVSCLR, val); // Clear the overflow bit so we can detect it again. 
+    PMU_WRITE(PMOVSCLR, val); // Clear the overflow bit so we can detect it again.
     return val;
 }
 
@@ -260,7 +259,8 @@ static CACHESENSFN ccnt_t sel4bench_get_counters(counter_bitfield_t mask, ccnt_t
 
     uint32_t enable_word = sel4bench_private_read_cntens(); //store current running state
 
-    sel4bench_private_write_cntenc(enable_word); //stop running counters (we do this instead of stopping the ones we're interested in because it saves an instruction)
+    sel4bench_private_write_cntenc(
+        enable_word); //stop running counters (we do this instead of stopping the ones we're interested in because it saves an instruction)
 
     unsigned int counter = 0;
     for (; mask != 0; mask >>= 1, counter++) { //for each counter...

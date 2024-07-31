@@ -7,10 +7,13 @@
 
 #include <stddef.h>
 #include <microkit.h>
-#include <sddf/util/printf.h>
 
+#ifndef ARRAY_SIZE
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(x[0]))
+#endif
 #define ALIGN(x, align)   (((x) + (align) - 1) & ~((align) - 1))
+
+#define BIT(nr) (1UL << (nr))
 
 #ifdef __GNUC__
 #define likely(x)   __builtin_expect(!!(x), 1)
@@ -34,17 +37,21 @@
 
 // Doing this with statement expressions & temporary variables to avoid issues
 // with operator precedence and evaluating arguments multiple times.
+#ifndef ROUND_UP
 #define ROUND_UP(n,d) \
     ({ typeof (n) _n = (n); \
        typeof (d) _d = (d); \
        _d * (_n/_d + (_n % _d == 0 ? 0 : 1)); \
     })
+#endif
+#ifndef MIN
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#endif
+#ifndef MAX
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#endif
 
-static void _assert_fail(const char  *assertion, const char  *file, unsigned int line, const char  *function)
-{
-    sddf_dprintf("Failed assertion '%s' at %s:%u in function %s\n", assertion, file, line, function);
-    while (1) {}
-}
+void _assert_fail(const char  *assertion, const char  *file, unsigned int line, const char  *function);
 
 #ifndef assert
 #ifndef CONFIG_DEBUG_BUILD
@@ -59,3 +66,38 @@ static void _assert_fail(const char  *assertion, const char  *file, unsigned int
     } while(0)
 #endif
 #endif
+
+static inline int sddf_isspace(int ch)
+{
+    return ch == ' ' || ch == '\f' || ch == '\n' || ch == '\r' || ch == '\t' || ch == '\v';
+}
+
+static inline int sddf_isdigit(int ch)
+{
+    return ch >= '0' && ch <= '9';
+}
+
+static inline int sddf_atoi(const char *str)
+{
+    while (sddf_isspace(*str)) {
+        str++;
+    }
+
+    int sign = 1;
+    if (*str == '+') {
+        str++;
+    } else if (*str == '-') {
+        sign = -1;
+        str++;
+    }
+
+    int result = 0;
+    while (sddf_isdigit(*str)) {
+        int digit = *str - '0';
+        result *= 10;
+        result -= digit;
+        str++;
+    }
+
+    return sign * (-result);
+}

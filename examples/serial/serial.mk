@@ -17,7 +17,6 @@ endif
 
 ifeq ($(strip $(TOOLCHAIN)),)
 	TOOLCHAIN := aarch64-none-elf
-	LIBC := $(dir $(realpath $(shell aarch64-none-elf-gcc --print-file-name libc.a)))	
 endif
 
 BUILD_DIR ?= build
@@ -53,29 +52,30 @@ endif
 
 TOP := ${SDDF}/examples/serial
 UTIL := $(SDDF)/util
-SERIAL_NUM_CLIENTS := -DSERIAL_NUM_CLIENTS=2
 SERIAL_COMPONENTS := $(SDDF)/serial/components
 UART_DRIVER := $(SDDF)/drivers/serial/$(DRIVER_DIR)
+SERIAL_CONFIG_INCLUDE:=${TOP}/include/serial_config
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 SYSTEM_FILE := ${TOP}/board/$(MICROKIT_BOARD)/serial.system
 
 IMAGES := uart_driver.elf \
-	  serial_server_1.elf serial_server_2.elf \
-	  serial_tx_virt.elf serial_rx_virt.elf
+	  serial_server.elf \
+	  serial_virt_tx.elf serial_virt_rx.elf
 CFLAGS := -mcpu=$(CPU)\
 	  -mstrict-align \
 	  -ffreestanding \
 	  -g3 -O3 -Wall \
-	  -Wno-unused-function -Werror
-LDFLAGS := -L$(BOARD_DIR)/lib -L$(SDDF)/lib -L${LIBC}
-LIBS := --start-group -lmicrokit -Tmicrokit.ld -lc libsddf_util_debug.a --end-group
+	  -Wno-unused-function -Werror \
+	  -MD
+LDFLAGS := -L$(BOARD_DIR)/lib -L$(SDDF)/lib
+LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
 
 IMAGE_FILE = loader.img
 REPORT_FILE = report.txt
 CFLAGS += -I$(BOARD_DIR)/include \
 	-I${TOP}/include	\
-	-I$(UART_DRIVER)/include \
 	-I$(SDDF)/include \
+	-I$(SERIAL_CONFIG_INCLUDE)
 
 CHECK_FLAGS_BOARD_MD5:=.board_cflags-$(shell echo -- ${CFLAGS} ${BOARD} ${MICROKIT_CONFIG} | shasum | sed 's/ *-//')
 
@@ -90,13 +90,12 @@ include ${UART_DRIVER}/uart_driver.mk
 include ${SERIAL_COMPONENTS}/serial_components.mk
 
 %.elf: %.o
-	${LD} -o $@ ${LDFLAGS} $< ${LIBS} 
+	${LD} -o $@ ${LDFLAGS} $< ${LIBS}
 
+serial_server.elf: serial_server.o libsddf_util.a
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-serial_server_1.o: CFLAGS+=-DSERIAL_SERVER_NUMBER=1
-serial_server_2.o: CFLAGS+=-DSERIAL_SERVER_NUMBER=2
-
-serial_server_%.o: ${TOP}/serial_server.c ${CHECK_FLAGS_BOARD_MD5}
+serial_server.o: ${TOP}/serial_server.c ${CHECK_FLAGS_BOARD_MD5}
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)

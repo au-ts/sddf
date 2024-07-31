@@ -9,9 +9,11 @@
 #include <sel4/benchmark_utilisation_types.h>
 #include <sddf/benchmark/bench.h>
 #include <sddf/benchmark/sel4bench.h>
+#include <sddf/serial/queue.h>
 #include <sddf/util/fence.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
+#include <serial_config.h>
 #include <ethernet_config.h>
 
 #define LOG_BUFFER_CAP 7
@@ -36,6 +38,12 @@ uintptr_t cyclecounters_vaddr;
 
 ccnt_t counter_values[8];
 counter_bitfield_t benchmark_bf;
+
+#define SERIAL_TX_CH 0
+
+char *serial_tx_data;
+serial_queue_t *serial_tx_queue;
+serial_queue_handle_t serial_tx_queue_handle;
 
 #ifdef CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES
 benchmark_track_kernel_entry_t *log_buffer;
@@ -63,28 +71,28 @@ static void print_pdid_name(uint64_t pd_id)
 {
     switch (pd_id) {
     case PD_ETH_ID:
-        sddf_printf(ETH_NAME);
+        sddf_printf(NET_DRIVER_NAME);
         break;
     case PD_VIRT_RX_ID:
-        sddf_printf(VIRT_RX_NAME);
+        sddf_printf(NET_VIRT_RX_NAME);
         break;
     case PD_VIRT_TX_ID:
-        sddf_printf(VIRT_TX_NAME);
+        sddf_printf(NET_VIRT_TX_NAME);
         break;
     case PD_COPY_ID:
-        sddf_printf(COPY0_NAME);
+        sddf_printf(NET_COPY0_NAME);
         break;
     case PD_COPY1_ID:
-        sddf_printf(COPY1_NAME);
+        sddf_printf(NET_COPY1_NAME);
         break;
     case PD_LWIP_ID:
-        sddf_printf(CLI0_NAME);
+        sddf_printf(NET_CLI0_NAME);
         break;
     case PD_LWIP1_ID:
-        sddf_printf(CLI1_NAME);
+        sddf_printf(NET_CLI1_NAME);
         break;
     case PD_TIMER_ID:
-        sddf_printf(TIMER_NAME);
+        sddf_printf(NET_TIMER_NAME);
         break;
     default:
         sddf_printf("unknown");
@@ -193,6 +201,7 @@ void notified(microkit_channel ch)
 {
     switch (ch) {
     case START:
+#ifdef MICROKIT_CONFIG_benchmark
         sel4bench_reset_counters();
         THREAD_MEMORY_RELEASE();
         sel4bench_start_counters(benchmark_bf);
@@ -204,9 +213,11 @@ void notified(microkit_channel ch)
 #ifdef CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES
         seL4_BenchmarkResetLog();
 #endif
+#endif
 
         break;
     case STOP:
+#ifdef MICROKIT_CONFIG_benchmark
         sel4bench_get_counters(benchmark_bf, &counter_values[0]);
         sel4bench_stop_counters(benchmark_bf);
 
@@ -215,6 +226,7 @@ void notified(microkit_channel ch)
             sddf_printf("%s: %lX\n", counter_names[i], counter_values[i]);
         }
         sddf_printf("}\n");
+#endif
 
 #ifdef CONFIG_BENCHMARK_TRACK_UTILISATION
         uint64_t total;
@@ -263,6 +275,8 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
+    serial_cli_queue_init_sys(microkit_name, NULL, NULL, NULL, &serial_tx_queue_handle, serial_tx_queue, serial_tx_data);
+    serial_putchar_init(SERIAL_TX_CH, &serial_tx_queue_handle);
 #ifdef MICROKIT_CONFIG_benchmark
     sel4bench_init();
     seL4_Word n_counters = sel4bench_get_num_counters();

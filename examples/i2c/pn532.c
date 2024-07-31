@@ -158,8 +158,8 @@ int8_t read_ack_frame(size_t retries)
         co_switch(t_event);
 
         const uint8_t PN532_ACK[] = {0, 0, 0xFF, 0, 0xFF, 0};
-        if (i2c_queue_size(queue.response) != 1) {
-            LOG_PN532_ERR("response queue size is not 1, actual size is %d\n", i2c_queue_size(queue.response));
+        if (i2c_queue_length(queue.response) != 1) {
+            LOG_PN532_ERR("response queue size is not 1, actual size is %d\n", i2c_queue_length(queue.response));
             return -1;
         }
         struct response response = {};
@@ -290,8 +290,8 @@ int8_t read_response_length(size_t retries)
         request_send(&req);
         co_switch(t_event);
 
-        if (i2c_queue_size(queue.response) > 1) {
-            LOG_PN532_ERR("response queue size is more than 1, actual size is %d\n", i2c_queue_size(queue.response));
+        if (i2c_queue_length(queue.response) > 1) {
+            LOG_PN532_ERR("response queue size is more than 1, actual size is %d\n", i2c_queue_length(queue.response));
             return -1;
         }
         struct response response = {};

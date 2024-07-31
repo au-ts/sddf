@@ -1,181 +1,215 @@
-/* The policy of the virt tx is that all clients can always request to transmit */
-
 #include <stdbool.h>
 #include <stdint.h>
 #include <microkit.h>
 #include <sddf/serial/queue.h>
-#include <sddf/serial/util.h>
-#include "uart.h"
+#include <sddf/util/printf.h>
+#include <serial_config.h>
 
-#define DRIVER_CH 9
+#define DRIVER_CH 0
+#define CLIENT_OFFSET 1
 
-#ifndef SERIAL_NUM_CLIENTS
-#error "SERIAL_NUM_CLIENTS is expected to be defined for TX serial virt"
-#endif
+serial_queue_t *tx_queue_drv;
+serial_queue_t *tx_queue_cli0;
 
-#define COLOUR_START_LEN 5
+char *tx_data_drv;
+char *tx_data_cli0;
+
+#if SERIAL_WITH_COLOUR
+
+/* When we have more clients than colours, we re-use the colours. */
+const char *colours[] = {
+    /* foreground red */
+    "\x1b[31m",
+    /* foreground green */
+    "\x1b[32m",
+    /* foreground yellow */
+    "\x1b[33m",
+    /* foreground blue */
+    "\x1b[34m",
+    /* foreground magenta */
+    "\x1b[35m"
+    /* foreground cyan */
+    "\x1b[36m"
+};
+
+#define COLOUR_BEGIN_LEN 5
+#define COLOUR_END "\x1b[0m"
 #define COLOUR_END_LEN 4
 
-#define MAX_NUM_CLIENTS 3
+char *client_names[SERIAL_NUM_CLIENTS];
 
-/* This is a simple sanity check that we have defined as many colours
-   as the user as specified clients */
-#if SERIAL_NUM_CLIENTS > MAX_NUM_CLIENTS && defined(SERIAL_TRANSFER_WITH_COLOUR)
-#error "There are more clients then there are colours to differentiate them"
 #endif
 
-char *client_colours[MAX_NUM_CLIENTS] = { "\x1b[32m", "\x1b[31m", "\x1b[34m" };
-char *client_colour_end = "\x1b[0m";
+serial_queue_handle_t tx_queue_handle_drv;
+serial_queue_handle_t tx_queue_handle_cli[SERIAL_NUM_CLIENTS];
 
-/* Memory regions as defined in the system file */
+#define TX_PENDING_LEN (SERIAL_NUM_CLIENTS + 1)
+typedef struct tx_pending {
+    uint32_t queue[TX_PENDING_LEN];
+    bool clients_pending[SERIAL_NUM_CLIENTS];
+    uint32_t head;
+    uint32_t tail;
+} tx_pending_t;
 
-// Transmit queues with the driver
-uintptr_t tx_free_driver;
-uintptr_t tx_active_driver;
+tx_pending_t tx_pending;
 
-// Transmit queues with the client
-uintptr_t tx_free_client;
-uintptr_t tx_active_client;
-uintptr_t tx_free_client2;
-uintptr_t tx_active_client2;
-uintptr_t tx_free_client3;
-uintptr_t tx_active_client3;
-
-uintptr_t tx_data_driver;
-uintptr_t tx_data_client;
-uintptr_t tx_data_client2;
-uintptr_t tx_data_client3;
-
-serial_queue_handle_t tx_queue[SERIAL_NUM_CLIENTS];
-serial_queue_handle_t drv_tx_queue;
-
-size_t copy_with_colour(size_t client, size_t buffer_len, char *driver_buf, char *client_buf)
+static uint32_t tx_pending_length(void)
 {
-    size_t len_copied = 0;
-    // assert(buffer_len + COLOUR_START_LEN + COLOUR_START_LEN <= BUFFER_SIZE);
-    /* First copy the colour start bytes */
-    memcpy((char *) driver_buf, client_colours[client], COLOUR_START_LEN);
-    len_copied += COLOUR_START_LEN;
-    /* Copy the actual TX data */
-    char *dest_buffer = driver_buf + COLOUR_START_LEN;
-    memcpy(dest_buffer, client_buf, buffer_len);
-    len_copied += buffer_len;
-    /* And then finally the colour end bytes */
-    memcpy((char *)(dest_buffer + buffer_len), client_colour_end, COLOUR_END_LEN);
-    len_copied += COLOUR_END_LEN;
-
-    return len_copied;
+    return (TX_PENDING_LEN + tx_pending.tail - tx_pending.head) % TX_PENDING_LEN;
 }
 
-size_t copy_normal(size_t buffer_len, char *driver_buf, char *client_buf)
+static void tx_pending_push(uint32_t client)
 {
-    /* All we need to do is copy the client buffer into the driver buffer. */
-    memcpy(driver_buf, client_buf, buffer_len);
+    /* Ensure client is not already pending */
+    if (tx_pending.clients_pending[client]) {
+        return;
+    }
 
-    return buffer_len;
+    /* Ensure the pending queue is not already full */
+    assert(tx_pending_length() < SERIAL_NUM_CLIENTS);
+
+    tx_pending.queue[tx_pending.tail] = client;
+    tx_pending.clients_pending[client] = true;
+    tx_pending.tail = (tx_pending.tail + 1) % TX_PENDING_LEN;
 }
 
-int handle_tx(int curr_client)
+static void tx_pending_pop(uint32_t *client)
 {
-    // Copy data from the client queues to the driver queue.
-    uintptr_t client_buf = 0;
-    unsigned int client_buf_len = 0;
+    /* This should only be called when length > 0 */
+    assert(tx_pending_length());
 
-    bool was_empty = serial_queue_empty(drv_tx_queue.active);
+    *client = tx_pending.queue[tx_pending.head];
+    tx_pending.clients_pending[*client] = false;
+    tx_pending.head = (tx_pending.head + 1) % TX_PENDING_LEN;
+}
 
-    // Loop over all clients here
-    for (int client = 0; client < SERIAL_NUM_CLIENTS; client++) {
-        // The client can plug their queue. If plugged, we won't process it.
-        if (serial_queue_plugged(tx_queue[client].active)) {
-            continue;
-        }
-        while (!serial_dequeue_active(&tx_queue[client], &client_buf, &client_buf_len)) {
-            // We want to enqueue into the drivers active queue
-            uintptr_t driver_buf = 0;
-            unsigned int driver_buf_len = 0;
+bool process_tx_queue(uint32_t client)
+{
+    serial_queue_handle_t *handle = &tx_queue_handle_cli[client];
 
-            int ret = serial_dequeue_free(&drv_tx_queue, &driver_buf, &driver_buf_len);
-            if (ret != 0) {
-                microkit_dbg_puts("Failed to dequeue buffer from drv tx avail queue\n");
-                return 1;
-            }
+    if (serial_queue_empty(handle, handle->queue->head)) {
+        serial_request_producer_signal(handle);
+        return false;
+    }
 
-            /*
-             * Depending on the overall system, we may want to add colour to
-             * the transmit data in order to easily identify which client the
-             * data belongs to when looking at the serial output. This makes
-             * the most sense when you have, for example, multiple client
-             * consoles being multiplexed. However, not all systems will act
-             * like that even if they have multiple clients, which is why this
-             * is configurable behaviour.
-             */
-#ifdef SERIAL_TRANSFER_WITH_COLOUR
-            size_t len_copied = copy_with_colour(client, client_buf_len, (char *)driver_buf, (char *)client_buf);
+    uint32_t length = serial_queue_length(handle);
+#if SERIAL_WITH_COLOUR
+    const char *client_colour = colours[client % ARRAY_SIZE(colours)];
+    assert(COLOUR_BEGIN_LEN == sddf_strlen(client_colour));
+    length += COLOUR_BEGIN_LEN + COLOUR_END_LEN;
+#endif
+
+    /* Not enough space to transmit string to virtualiser. Continue later */
+    if (length > serial_queue_free(&tx_queue_handle_drv)) {
+        tx_pending_push(client);
+
+        /* Request signal from the driver when data has been consumed */
+        serial_request_consumer_signal(&tx_queue_handle_drv);
+
+        /* Cancel further signals from this client */
+        serial_cancel_producer_signal(handle);
+        return false;
+    }
+
+#if SERIAL_WITH_COLOUR
+    serial_transfer_all_with_colour(handle, &tx_queue_handle_drv, client_colour, COLOUR_BEGIN_LEN,
+                                    COLOUR_END, COLOUR_END_LEN);
 #else
-            size_t len_copied = copy_normal(client_buf_len, (char *)driver_buf, (char *)client_buf);
+    serial_transfer_all(handle, &tx_queue_handle_drv);
 #endif
+    serial_request_producer_signal(handle);
+    return true;
+}
 
-            ret = serial_enqueue_active(&drv_tx_queue, driver_buf, len_copied);
-            if (ret != 0) {
-                microkit_dbg_puts("Failed to enqueue buffer to drv tx active queue\n");
-                // Don't know if I should return here, because we need to enqueue a
-                // serpeate buffer
+void tx_return(void)
+{
+    uint32_t num_pending_tx = tx_pending_length();
+    if (!num_pending_tx) {
+        return;
+    }
+
+    uint32_t client;
+    bool transferred = false;
+    for (uint32_t req = 0; req < num_pending_tx; req++) {
+        tx_pending_pop(&client);
+        bool reprocess = true;
+        bool client_transferred = false;
+        while (reprocess) {
+            client_transferred |= process_tx_queue(client);
+            reprocess = false;
+
+            /* If more data is available, re-process unless it has been pushed to pending transmits */
+            if (!serial_queue_empty(&tx_queue_handle_cli[client], tx_queue_handle_cli[client].queue->head)
+                && !tx_pending.clients_pending[client]) {
+                serial_cancel_producer_signal(&tx_queue_handle_cli[client]);
+                reprocess = true;
             }
+        }
+        transferred |= client_transferred;
+    }
 
-            /*
-             * Now that we've finished processing the client's active buffer, we
-             * can put it back in the free queue. Note that the *whole* buffer is
-             * free now, which is why the length we enqueue is the maximum
-             * buffer length.
-             */
-            serial_enqueue_free(&tx_queue[client], client_buf, BUFFER_SIZE);
+    if (transferred && serial_require_producer_signal(&tx_queue_handle_drv)) {
+        serial_cancel_producer_signal(&tx_queue_handle_drv);
+        microkit_notify_delayed(DRIVER_CH);
+    }
+}
+
+void tx_provide(microkit_channel ch)
+{
+    if (ch > SERIAL_NUM_CLIENTS) {
+        sddf_dprintf("VIRT_TX|LOG: Received notification from unknown channel %u\n", ch);
+        return;
+    }
+
+    uint32_t active_client = ch - CLIENT_OFFSET;
+    bool transferred = false;
+    bool reprocess = true;
+    while (reprocess) {
+        transferred |= process_tx_queue(active_client);
+        reprocess = false;
+
+        /* If more data is available, re-process unless it has been pushed to pending transmits */
+        if (!serial_queue_empty(&tx_queue_handle_cli[active_client], tx_queue_handle_cli[active_client].queue->head)
+            && !tx_pending.clients_pending[active_client]) {
+            serial_cancel_producer_signal(&tx_queue_handle_cli[active_client]);
+            reprocess = true;
         }
     }
 
-    if (was_empty) {
-        microkit_notify(DRIVER_CH);
+    if (transferred && serial_require_producer_signal(&tx_queue_handle_drv)) {
+        serial_cancel_producer_signal(&tx_queue_handle_drv);
+        microkit_notify_delayed(DRIVER_CH);
     }
-
-    return 0;
 }
 
 void init(void)
 {
-    // We want to init the client queues here. Currently this only inits one client
-    serial_queue_init(&tx_queue[0], (serial_queue_t *)tx_free_client, (serial_queue_t *)tx_active_client, 0, NUM_ENTRIES,
-                      NUM_ENTRIES);
-    // @ivanv: terrible temporary hack
-#if SERIAL_NUM_CLIENTS > 1
-    serial_queue_init(&tx_queue[1], (serial_queue_t *)tx_free_client2, (serial_queue_t *)tx_active_client2, 0, NUM_ENTRIES,
-                      NUM_ENTRIES);
-#endif
-#if SERIAL_NUM_CLIENTS > 2
-    serial_queue_init(&tx_queue[2], (serial_queue_t *)tx_free_client3, (serial_queue_t *)tx_active_client3, 0, NUM_ENTRIES,
-                      NUM_ENTRIES);
-#endif
-    serial_queue_init(&drv_tx_queue, (serial_queue_t *)tx_free_driver, (serial_queue_t *)tx_active_driver, 0, NUM_ENTRIES,
-                      NUM_ENTRIES);
+    serial_queue_init(&tx_queue_handle_drv, tx_queue_drv, SERIAL_TX_DATA_REGION_SIZE_DRIV, tx_data_drv);
+    serial_virt_queue_init_sys(microkit_name, tx_queue_handle_cli, tx_queue_cli0, tx_data_cli0);
 
-    // Add buffers to the driver tx queue from our shared dma region
-    for (int i = 0; i < NUM_ENTRIES - 1; i++) {
-        // Have to start at the memory region left of by the rx queue
-        int ret = serial_enqueue_free(&drv_tx_queue, tx_data_driver + ((i + NUM_ENTRIES) * BUFFER_SIZE), BUFFER_SIZE);
+#if !SERIAL_TX_ONLY
+    /* Print a deterministic string to allow console input to begin */
+    sddf_memcpy(tx_queue_handle_drv.data_region, SERIAL_CONSOLE_BEGIN_STRING, SERIAL_CONSOLE_BEGIN_STRING_LEN);
+    serial_update_visible_tail(&tx_queue_handle_drv, SERIAL_CONSOLE_BEGIN_STRING_LEN);
+    microkit_notify(DRIVER_CH);
+#endif
 
-        if (ret != 0) {
-            microkit_dbg_puts(microkit_name);
-            microkit_dbg_puts(": tx buffer population, unable to enqueue buffer\n");
-        }
+#if SERIAL_WITH_COLOUR
+    serial_channel_names_init(client_names);
+    for (uint32_t i = 0; i < SERIAL_NUM_CLIENTS; i++) {
+        sddf_dprintf("%s'%s' is client %u%s\n", colours[i % ARRAY_SIZE(colours)], client_names[i], i, COLOUR_END);
     }
+#endif
 }
 
 void notified(microkit_channel ch)
 {
-    // We should only ever recieve notifications from the client
-    // Sanity check the client
-    if (ch < 1 || ch > SERIAL_NUM_CLIENTS) {
-        microkit_dbg_puts("Received a bad client channel\n");
-        return;
+    switch (ch) {
+    case DRIVER_CH:
+        tx_return();
+        break;
+    default:
+        tx_provide(ch);
+        break;
     }
-
-    handle_tx(ch);
 }

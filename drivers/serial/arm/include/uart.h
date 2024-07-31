@@ -1,6 +1,8 @@
 #pragma once
 
-#include <sddf/serial/queue.h> 
+#include <stdint.h>
+#include <sddf/util/util.h>
+#include <sddf/serial/queue.h>
 
 /*
  * This UART driver is based on the following specificion:
@@ -31,42 +33,51 @@ struct pl011_uart_regs {
     uint32_t dmacr;     /* 0x048 DMA Control Register */
     /* The rest of the registers are either reserved or not used */
 };
+typedef volatile struct pl011_uart_regs pl011_uart_regs_t;
 
-#define PL011_UARTFR_TXFF       (1 << 5)
-#define PL011_UARTFR_RXFE       (1 << 4)
+/* Data Register bits */
+#define PL011_DR_DATA_MASK          0xFF            /* Read or write from/to these bits to rx or tx. */
 
-/*
-Serial driver global state
-*/
-struct serial_driver {
-    int echo;
-    int mode;
+/* Flag Register bits */
+#define PL011_FR_TXFE               BIT(7)          /* Transmit FIFO empty. */
+#define PL011_FR_RXFF               BIT(6)          /* Receive FIFO full. */
+#define PL011_FR_TXFF               BIT(5)          /* Transmit FIFO full. */
+#define PL011_FR_RXFE               BIT(4)          /* Receive FIFO empty. */
+#define PL011_FR_UART_BUSY          BIT(3)          /* Uart busy transmitting data. */
 
-    /* Values for handling line mode */
-    uintptr_t line_buffer;
-    int line_buffer_size;
-};
+/* Integer Baud Rate Register */
+#define PL011_IBRD_BAUD_INT_MASK    0xFFFF          /* Integer part of baud rate divisor value. */
 
-/* LINE CONFIG */
-#define RAW_MODE 0
-#define LINE_MODE 1
-#define ECHO_DIS 0
-#define ECHO_EN 1
+/* Fractional Baud Rate Register */
+#define PL011_FBRD_BAUD_FRAC_MASK   0x3F            /* Fractional part of baud rate divisor value. */
 
-/* LINE CONTROL */
-#define ETX 3   /* ctrl+c */
-#define EOT 4   /* ctrl+d */
-#define BS 8    /* backspace */
-#define LF 10   /* Line feed/new line */
-#define CR 13   /* Carriage return */
-#define NEG 21  /* ctrl+u */
-#define SB 26   /* ctrl+z*/
-#define SP 32   /* Space*/
-#define DL 127  /* Delete */
+#define PL011_UART_REF_CLOCK        0x16E3600
 
-enum serial_parity {
-    PARITY_NONE,
-    PARITY_EVEN,
-    PARITY_ODD
-};
+/* Line Control Register bits */
+#define PL011_LCR_WLEN_MASK         0x3             /* Word length. b00 = 5, b01 = 6, b10 = 7, b11 = 8. */
+#define PL011_LCR_WLEN_SHFT         5
+#define PL011_LCR_FIFO_EN           BIT(4)          /* Enable tx and rx FIFOs. */
+#define PL011_LCR_2_STP_BITS        BIT(3)          /* Set this bit to 1 to tx two stop bits. */
+#define PL011_LCR_PARTY_EVEN        BIT(2)          /* Even parity select. */
+#define PL011_LCR_PARTY_EN          BIT(1)          /* Enable parity checks and addition. */
 
+/* Control Register */
+#define PL011_CR_RX_EN              BIT(9)          /* Enable rx. */
+#define PL011_CR_TX_EN              BIT(8)          /* Enable tx. */
+#define PL011_CR_UART_EN            BIT(0)          /* Enable the uart. */
+
+/* Interrupt FIFO Level Select Register */
+#define PL011_IFLS_RX_MASK          0x7             /* Rx interrupt level select. b000 = 1/8, b001 = 1/4, b010 = 1/2, b011 = 3/4, b100 = 7/8. */
+#define PL011_IFLS_RX_SHFT          3
+#define PL011_IFLS_TX_MASK          0x7             /* Tx interrupt level select. b000 = 1/8, b001 = 1/4, b010 = 1/2, b011 = 3/4, b100 = 7/8. */
+#define PL011_IFLS_TX_SHFT          0
+
+/* Interrupt Mask Set/Clear Register */
+#define PL011_IMSC_RX_TIMEOUT       BIT(6)          /* Enable rx timeout interrupt. Occurs when the rx FIFO is not empty, and no more data is received during a 32-bit period. */
+#define PL011_IMSC_TX_INT           BIT(5)          /* Enable tx interrupt when FIFO drops below programmed threshold. */
+#define PL011_IMSC_RX_INT           BIT(4)          /* Enable rx interrupt when FIFO exceeds programmed threshold. */
+
+/* Masked Interrupt Status Register */
+#define PL011_IMSC_RX_TIMEOUT       BIT(6)          /* Rx timeout interrupt. Occurs when the rx FIFO is not empty, and no more data is received during a 32-bit period. */
+#define PL011_IMSC_TX_INT           BIT(5)          /* Tx interrupt when FIFO drops below programmed threshold. */
+#define PL011_IMSC_RX_INT           BIT(4)          /* Rx interrupt when FIFO exceeds programmed threshold. */
