@@ -14,6 +14,7 @@
 #include "ethernet.h"
 #include <sddf/network/util.h>
 #include <string.h>
+
 #define IRQ_CH 0
 #define TX_CH  1
 #define RX_CH  2
