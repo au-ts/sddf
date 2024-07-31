@@ -1,7 +1,7 @@
-#include <string.h>
 #include <stdbool.h>
 #include <microkit.h>
 #include <sddf/network/queue.h>
+#include <sddf/util/string.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 #include <ethernet_config.h>
@@ -43,7 +43,7 @@ void rx_return(void)
             uintptr_t cli_addr = cli_buffer_data_region + cli_buffer.io_or_offset;
             uintptr_t virt_addr = virt_buffer_data_region + virt_buffer.io_or_offset;
 
-            memcpy((void *)cli_addr, (void *)virt_addr, virt_buffer.len);
+            sddf_memcpy((void *)cli_addr, (void *)virt_addr, virt_buffer.len);
             cli_buffer.len = virt_buffer.len;
             virt_buffer.len = 0;
 
