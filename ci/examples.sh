@@ -102,7 +102,7 @@ i2c() {
 }
 
 timer() {
-    BOARDS=("odroidc4")
+    BOARDS=("odroidc4" "star64")
     CONFIGS=("debug" "release")
     for BOARD in "${BOARDS[@]}"
     do

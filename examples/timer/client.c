@@ -39,10 +39,12 @@ void
 init(void)
 {
     // lets get the time!
-    uint64_t time = sddf_timer_time_now(TIMER_CHANNEL);
-    microkit_dbg_puts("CLIENT|INFO: The time now is: ");
-    put64(time);
-    microkit_dbg_puts("\n");
+    for (int i = 0; i < 100; i++) {
+        uint64_t time = sddf_timer_time_now(TIMER_CHANNEL);
+        microkit_dbg_puts("CLIENT|INFO: The time now is: ");
+        put64(time);
+        microkit_dbg_puts("\n");
+    }
 
     // lets set a timeout
     microkit_dbg_puts("CLIENT|INFO: Setting a time out for 1 second\n");
