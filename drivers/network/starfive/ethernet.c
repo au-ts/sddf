@@ -32,7 +32,6 @@ uintptr_t tx_active;
 #define RX_COUNT 1024
 #define TX_COUNT 1024
 #define MAX_COUNT MAX(RX_COUNT, TX_COUNT)
-#define MAX_PACKET_SIZE 0x600
 
 struct descriptor {
     uint32_t d0;
@@ -227,14 +226,14 @@ static void tx_return(void)
 static void handle_irq()
 {
     uint32_t e = *DMA_REG(DMA_CHAN_STATUS(0));
-    if (e & DMA_INTR_RI) {
+    if (e & DMA_CHAN_INTR_ENA_RIE) {
         rx_return();
     }
-    if (e & DMA_INTR_TI) {
+    if (e & DMA_CHAN_INTR_ENA_TIE) {
         tx_return();
     }
-    if (e & DMA_INTR_ABNORMAL) {
-        if (e & DMA_INTR_FBE) {
+    if (e & DMA_CHAN_INTR_ABNORMAL) {
+        if (e & DMA_CHAN_INTR_ENA_FBE) {
             sddf_dprintf("Ethernet device fatal bus error\n");
         }
     }
@@ -342,7 +341,7 @@ static void eth_init()
 
     // Set the max packet size for rx
     *DMA_REG(DMA_CHAN_RX_CONTROL(0)) &= ~(DMA_RBSZ_MASK << DMA_RBSZ_SHIFT);
-    *DMA_REG(DMA_CHAN_RX_CONTROL(0)) |= (MAX_PACKET_SIZE << DMA_RBSZ_SHIFT);
+    *DMA_REG(DMA_CHAN_RX_CONTROL(0)) |= (MAX_RX_FRAME_SZ << DMA_RBSZ_SHIFT);
 
     // Program the descriptor length. This is to tell the device that when
     // we reach the base addr + count, we should then wrap back around to

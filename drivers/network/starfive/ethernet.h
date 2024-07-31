@@ -8,79 +8,7 @@ the dwmac4 header files. */
 #define BIT(x) (1U << (x))
 #define GENMASK(h, l) (((~0UL) << (l)) & (~0UL >> (sizeof(long) * 8 - 1 - (h))))
 
-#define DMA_REG_OFFSET              (0x1000)            /* Offset of the DMA Registers. */
 #define MAX_RX_FRAME_SZ             (0x600)             /* Maximum size of a received packet. */
-#define DMA_PBL                     (32)                /* DMA programmable burst length. Must be 1, 2, 4, 8, 16, or 32. */
-
-/* */
-
-
-/* DMA Bus mode register definitions */
-#define DMAMAC_SWRST                (1 << 0)            /* Resets all GMAC Subsystem internal registers and logic. Cleared automatically after the reset operation has completed. */
-#define RXHIGHPRIO                  (1 << 1)            /* DMA Arbitration Scheme - 1: Rx has priority over Tx, 0: round robin with Rx:Tx priority given in bits [15:14]. */
-#define DSL_MASK                    (0x1c)              /* Number of Words to skip between two unchained descriptors. If 0, descriptor table is taken as contiguous in Ring mode. */
-#define DSL_SHFT                    (2)
-#define TX_PBL_MASK                 (0x3f00)            /* Maximum number of beats to be transferred in one DMA transaction. */
-#define TX_PBL_SHFT                 (8)
-#define PRIORXTX_41                 (3 << 14)           /* Rx:Tx priority ratio. RxDMA requests given priority over TxDMA requests in the ratio 4:1. */
-#define PRIORXTX_31                 (2 << 14)           /* Rx:Tx priority ratio. RxDMA requests given priority over TxDMA requests in the ratio 3:1. */
-#define PRIORXTX_21                 (1 << 14)           /* Rx:Tx priority ratio. RxDMA requests given priority over TxDMA requests in the ratio 2:1. */
-#define PRIORXTX_11                 (0 << 14)           /* Rx:Tx priority ratio. RxDMA requests given priority over TxDMA requests in the ratio 1:1. */
-#define FIXEDBURST                  (1 << 16)           /* Controls whether the AHB Master interface performs fixed burst transfers or not. */
-#define RX_PBL_MASK                 (0x7e0000)          /* Maximum number of beats to be transferred in one RxDMA transaction. Only applicable when USE_SEP_PBL is set. */
-#define RX_PBL_SHFT                 (17)
-#define USE_SEP_PBL                 (1 << 23)           /* Configures the RxDMA to use the value in bits [22:17] and TxDMA to use value in bits [13:8]. When unset [13:8] is applicable for both DMA engines. */
-#define DMA_PBL_X4                  (1 << 24)           /* Multiplies the PBL value programmed (bits[22:17] and bits [13:8]) four times. */
-
-/* DMA status register definitions */
-#define DMA_INTR_TI                 (1 << 0)            /* Packet transmission is complete */
-#define DMA_INTR_TPS                (1 << 1)            /* Transmit process stopped. */
-#define DMA_INTR_TBU                (1 << 2)            /* Next Descriptor in the Transmit List is owned by the host and cannot be acquired by the DMA. Transmission is suspended. */
-/* BIT(3) - BIT(5) are reserved. */
-#define DMA_INTR_RI                 (1 << 6)            /* Frame has been received. */
-#define DMA_INTR_RBU                (1 << 7)            /* Receive Buffer Unavailable. Next Descriptor in the Receive List is owned by the host and cannot be acquired by the DMA. Receive Process is suspended. */
-#define DMA_INTR_RPS                (1 << 8)            /* Receive Process Stopped. */
-#define DMA_INTR_RWT                (1 << 9)            /* Receive Watchdog Timeout bit is asserted when a frame with a length greater than 2,048 bytes is received. */
-#define DMA_INTR_ETI                (1 << 10)           /* Early Transmit Interrupt. */
-#define DMA_INTR_ERI                (1 << 11)           /* Early Receive Intterupt. DMA had filled the first data buffer of the packet. */
-#define DMA_INTR_FBE                (1 << 12)           /* Fatal Bus Error Interrupt. */
-#define DMA_INTR_AIS                (1 << 14)           /* Abnormal Interrupt Summary. Logical OR of interrupts 1, 3, 4, 5, 7, 8, 9, 10, 13. Must be cleared. */
-#define DMA_INTR_NIS                (1 << 15)           /* Normal Interrupt Summary. Logical OR of interrupts 0, 2, 6, 14. Must be cleared. */
-
-#define DMA_INTR_RPS_MASK           (0xe0000)           /* Receive DMA process FSM state. */
-#define DMA_INTR_TPS_MASK           (0x700000)          /* Transmit DMA process FSM state. */
-#define DMA_INTR_ERR_MASK           (0x3800000)         /* Error Bits. Type of error that caused a Bus Error. */
-
-#define DMA_INTR_NORMAL (DMA_INTR_NIS | DMA_INTR_TI | DMA_INTR_RI)
-#define DMA_INTR_ABNORMAL (DMA_INTR_AIS | DMA_INTR_FBE)
-#define DMA_INTR_MASK (DMA_INTR_NORMAL | DMA_INTR_ABNORMAL)
-
-/* DMA operation mode register definitions */
-#define RXSTART                     (1 << 1)            /* Place the receive process in the running state. DMA attempts to acquire the descriptor from the Receive list and processes incoming frames. */
-#define TX_OPSCND                   (1 << 2)            /* Operate on Second Frame. Instruct the DMA to process a second frame of Transmit data before status for first frame is obtained. */
-#define RTC_MASK                    (0x18)              /* Receive Threshold Control. Threshold level of the MTL Receive FIFO. Transfer to DMA starts when the frame size within the MTL Receive FIFO is larger than the threshold. */
-#define RTC_SHFT                    (3)
-#define RX_FUGF                     (1 << 6)            /* Forward Undersized Good Frames. When set, the Rx FIFO will forward frames with no Error and length less than 64 bytes including pad-bytes and CRC */
-#define RX_FEF                      (1 << 7)            /* Forward Error Frames. When this bit is reset, the Rx FIFO drops frames with error status. */
-#define EN_FLOWCTL                  (1 << 8)            /* Enable HW flow control. When this bit is set, the flow control signal operation based on fill-level of Rx FIFO is enabled. */
-#define FLOWCTL_MASK                (0x600)             /* Threshold for activating flow control. These bits control the Fill level of Rx FIFO at which flow control is activated. */
-#define FLOWCTL_SHFT                (9)
-#define DISFLOWCTL_MSK              (0x1800)            /* Threshold for deactivating flow control. These bits control the Fill-level of Rx FIFO at which the flow-control is deasserted after activation. */
-#define DISFLOWCTL_SHFT             (11)
-#define TXSTART                     (1 << 13)            /* Place the transmit process in the Running state. DMA checks the Transmit List at the current position for a frame to be transmitted. */
-#define TX_THRSH_MASK               (0x1c000)            /* Transmit Threshold Control. These three bits control the threshold level of the MTL Transmit FIFO. Transmission starts when the frame size within the MTL Transmit FIFO is larger than the threshold*/
-#define TX_THRSH_SHFT               (14)
-#define FLUSHTXFIFO                 (1 << 20)            /* Flush Transmit FIFO. When this bit is set, the transmit FIFO controller logic is reset to its default values and thus all data in the Tx FIFO is lost/flushed. */
-#define STOREFORWARD                (1 << 21)            /* When this bit is set, transmission starts when a full frame resides in the MTL Transmit FIFO. When this bit is set, the TTC values specified in Register6[16:14] are ignored. */
-#define DIS_FRMFLUSH                (1 << 24)            /* Disable Flushing of Received Frames. When this bit is set, the RxDMA does not flush any frames due to the unavailability of receive descriptors/buffers as it does normally when this bit is reset. */
-
-/* DMA Missed Frame and Buffer Overflow Counter register definitions */
-#define FIFO_OVFLW_BIT              (1 << 28)            /* Overflow bit for FIFO Overflow Counter */
-#define FIFO_OVFLW_MSK              (0xffe0000)          /* Indicates missed frames by the application due to buffer overflow conditions. */
-#define FIFO_OVFLW_SHFT             (17)
-#define MSFRM_OVFLW_BIT             (1 << 16)            /* Overflow bit for Missed Frame Counter */
-#define MSFRM_MASK                  (0xffff)             /* Indicates the number of frames missed by the controller due to the Host Receive Buffer being unavailable. */
-#define MSFRM_SHFT                  (0)
 
 /* These register definitions are from the dwmac4.h. These are inline with the
 register map outlined in the imx8mp TRM. */
