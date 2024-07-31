@@ -14,12 +14,17 @@ BUILD_DIR ?= build
 MICROKIT_CONFIG ?= debug
 
 ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
+	export ARCH := aarch64
 	export TIMER_DRIVER_DIR := meson
 	export CPU := cortex-a55
 else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
+	export ARCH := aarch64
 	export TIMER_DRIVER_DIR := arm
 	export CPU := cortex-a53
 	QEMU := qemu-system-aarch64
+else ifeq ($(strip $(MICROKIT_BOARD)), star64)
+	export ARCH := riscv64
+	export TIMER_DRIVER_DIR := jh7110
 else
 $(error Unsupported MICROKIT_BOARD given)
 endif
