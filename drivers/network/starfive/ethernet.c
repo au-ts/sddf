@@ -32,6 +32,7 @@ uintptr_t tx_active;
 #define RX_COUNT 1024
 #define TX_COUNT 1024
 #define MAX_COUNT MAX(RX_COUNT, TX_COUNT)
+#define MAX_PACKET_SIZE 0x600
 
 struct descriptor {
     uint32_t d0;
@@ -62,10 +63,6 @@ net_queue_handle_t tx_queue;
 #define writel(b, addr) (void)((*(volatile uint32_t *)(addr)) = (b))
 #define readl(addr) \
 	({ unsigned int __v = (*(volatile uint32_t *)(addr)); __v; })
-
-static volatile struct mac_regs *mac_regs;
-static volatile struct mtl_regs *mtl_regs;
-static volatile struct dma_regs *dma_regs;
 
 static inline bool hw_ring_full(hw_ring_t *ring, size_t ring_size)
 {
@@ -201,7 +198,7 @@ static void tx_provide(void)
              * This tells the hardware that it has new buffers to send.
              * NOTE: Setting this on every enqueued packet for sanity, change this to once per bactch.
              */
-            dma_regs->ch0_txdesc_tail_pointer = tx_desc_base + sizeof(struct descriptor) * (tx.tail);
+            *DMA_REG(DMA_CHAN_TX_TAIL_ADDR(0)) = tx_desc_base + sizeof(struct descriptor) * (tx.tail);
         }
 
         net_request_signal_active(&tx_queue);
@@ -272,16 +269,13 @@ static void eth_init()
 
     /* Configure MTL */
 
-    // Enable store and forward mode for TX.
-    mtl_regs->txq0_operation_mode |= BIT(1) | (2 << 2);
-
-    // Transmit queue weight
-    mtl_regs->txq0_quantum_weight = 0x10;
+    // Enable store and forward mode for TX, and enable the TX queue.
+    *MTL_REG(MTL_CHAN_TX_OP_MODE(0)) |= MTL_OP_MODE_TSF | MTL_OP_MODE_TXQ_ENABLE;
 
     // Enable store and forward mode for rx
-    mtl_regs->rxq0_operation_mode |= BIT(5);
+    *MTL_REG(MTL_CHAN_RX_OP_MODE(0)) |= MTL_OP_MODE_RSF;
 
-    /* 2. Program the rx queue to the DMA mapping. */
+    // Program the rx queue to the DMA mapping.
     uint32_t map0 = *MTL_REG(MTL_RXQ_DMA_MAP0);
     // We only have one queue, and we map it onto DMA channel 0
     map0 &= ~MTL_RXQ_DMA_QXMDMACH_MASK(0);
@@ -290,53 +284,35 @@ static void eth_init()
 
 
     // Transmit/receive queue fifo size, use all RAM for 1 queue
-    uint32_t val = mac_regs->hw_feature1;
+    uint32_t val = *MAC_REG(GMAC_HW_FEATURE1);
     uint32_t tx_fifo_sz;
     uint32_t rx_fifo_sz;
-    tx_fifo_sz = (val >> 6) &
-		0x1f;
-	rx_fifo_sz = (val >> 0) &
-		0x1f;
+    // These sizes of the tx and rx FIFO are encoded in the hardware feature 1 register.
+    // These values are expressed as: Log2(FIFO_SIZE) -7
+    tx_fifo_sz = (val >> 6) & 0x1f;
+	rx_fifo_sz = (val >> 0) & 0x1f;
 
     /* r/tx_fifo_sz is encoded as log2(n / 128). Undo that by shifting */
 	tx_fifo_sz = 128 << tx_fifo_sz;
 	rx_fifo_sz = 128 << rx_fifo_sz;
 
+	/* r/tqs is encoded as (n / 256) - 1 */
 	uint32_t tqs = tx_fifo_sz / 256 - 1;
 	uint32_t rqs = rx_fifo_sz / 256 - 1;
 
-    mtl_regs->txq0_operation_mode &= ~(0x1ff << 16);
-    mtl_regs->txq0_operation_mode |= tqs << 16;
-    mtl_regs->rxq0_operation_mode &=  ~(0x3ff << 20);
-    mtl_regs->rxq0_operation_mode |= rqs << 20;
+    *MTL_REG(MTL_CHAN_TX_OP_MODE(0)) &= ~(MTL_OP_MODE_TQS_MASK);
+    *MTL_REG(MTL_CHAN_TX_OP_MODE(0)) |= tqs << MTL_OP_MODE_TQS_SHIFT;
+    *MTL_REG(MTL_CHAN_RX_OP_MODE(0)) &= ~(MTL_OP_MODE_RQS_MASK);
+    *MTL_REG(MTL_CHAN_RX_OP_MODE(0)) |= rqs << MTL_OP_MODE_RQS_SHIFT;
 
     // NOTE - more stuff in dwc_eth_qos that we are skipping regarding to tuning the tqs
 
     /* Configure MAC */
-    mac_regs->rxq_ctrl0 &= ~(3 << 0);
-    mac_regs->rxq_ctrl0 |= (1 << 1);
-
-    // /* Multicast and broadcast queue enable */
-    // mac_regs->unused_0a4 |= 0x00100000;
-    // // /* Enable promise mode */
-    // mac_regs->unused_004[1] |= 0x1;
-
-    // /* Set TX flow control parameters */
-	// /* Set Pause Time */
-    // mac_regs->q0_tx_flow_ctrl |= 0xffff << 16;
-
-    // /* Assign priority for TX flow control */
-    // mac_regs->q0_tx_flow_ctrl &= ~(0xff);
-    // /* Assign priority for RX flow control */
-    // mac_regs->rxq_ctrl2 &= ~(0xff);
-	// /* Enable flow control */
-    // mac_regs->q0_tx_flow_ctrl |= BIT(1);
-    // mac_regs->rx_flow_ctrl |= BIT(0);
-
-    // mac_regs->configuration &= ~(BIT(23) | BIT(19) | BIT(17) | BIT(16));
-    // mac_regs->configuration |= (BIT(21) | BIT(20));
+    *MAC_REG(GMAC_RXQ_CTRL0) &= GMAC_RX_QUEUE_CLEAR(0);
+    *MAC_REG(GMAC_RXQ_CTRL0) |= GMAC_RX_DCB_QUEUE_ENABLE(0);
 
     uint32_t filter = *MAC_REG(GMAC_PACKET_FILTER);
+
     // Reset all filter flags.
 	filter &= ~GMAC_PACKET_FILTER_HMC;
 	filter &= ~GMAC_PACKET_FILTER_HPF;
@@ -349,69 +325,46 @@ static void eth_init()
 
     *MAC_REG(GMAC_PACKET_FILTER) = filter;
 
-    /* 3. Program the flow control. */
     // For now, disabling all flow control. This regsiter controls the generation/reception
     // of the control packets.
     *MAC_REG(GMAC_QX_TX_FLOW_CTRL(0)) = 0;
 
-    /* 4. Program the mac interrupt enable register (if applicable). */
-    // We don't want to setup interrupts for the MAC component. We will enable
-    // them in the DMA componenet
-
-    uint32_t int_en = *MAC_REG(GMAC_INT_EN);
-    int_en |= GMAC_INT_DEFAULT_ENABLE | BIT(13) | BIT(14) | BIT(17);
-    *MAC_REG(GMAC_INT_EN) = int_en;
-
-    // /* 5. Program all other approrpriate fields in MAC_CONFIGURATION
-    //       (ie. inter-packet gap, jabber disable). */
+    // Program all other approrpriate fields in MAC_CONFIGURATION
+    //       (ie. inter-packet gap, jabber disable).
     uint32_t conf = *MAC_REG(GMAC_CONFIG);
     // // Set full duplex mode
     conf |= GMAC_CONFIG_DM;
 
-    // Setting the speed of our device to 100mbps -- THIS LINE IS BROKEN!
-    // conf |= GMAC_CONFIG_FES | GMAC_CONFIG_PS;
+    // Setting the speed of our device to 1000mbps
+    conf &= ~( GMAC_CONFIG_PS | GMAC_CONFIG_FES);
     *MAC_REG(GMAC_CONFIG) = conf;
 
-    /* Update MAC address*/
-    mac_regs->address0_high = 0x00005b75;
-    mac_regs->address0_low = 0x0039cf6c;
+    // Set the MAC Address.
 
-    // TEMP: Enable MAC interrupts
+    /* NOTE: We are hardcoding this MAC address to the hardware MAC address of the
+    Star64 in the TS machine queue. This address is resident the boards EEPROM, however,
+    we need I2C to read from this ROM. */
+    *MAC_REG(GMAC_ADDR_HIGH(0)) = 0x00005b75;
+    *MAC_REG(GMAC_ADDR_LOW(0)) = 0x0039cf6c;
 
     /* Configure DMA */
-    dma_regs->ch0_tx_control |= BIT(4);
+    // Enable operate on second packet
+    *DMA_REG(DMA_CHAN_TX_CONTROL(0)) |= DMA_CONTROL_OSP;
 
-    dma_regs->ch0_rx_control &= ~(0x3fff << 1);
-    dma_regs->ch0_rx_control |= (0x600 << 1);
+    // Set the max packet size for rx
+    *DMA_REG(DMA_CHAN_RX_CONTROL(0)) &= ~(DMA_RBSZ_MASK << DMA_RBSZ_SHIFT);
+    *DMA_REG(DMA_CHAN_RX_CONTROL(0)) |= (MAX_PACKET_SIZE << DMA_RBSZ_SHIFT);
 
-    /* TODO - Desc pad */
-
-	/*
-	 * Burst length must be < 1/2 FIFO size.
-	 * FIFO size in tqs is encoded as (n / 256) - 1.
-	 * Each burst is n * 8 (PBLX8) * 16 (AXI width) == 128 bytes.
-	 * Half of n * 256 is n * 128, so pbl == tqs, modulo the -1.
-	 */
-
-    uint32_t pbl = tqs + 1;
-    if (pbl > 32)
-		pbl = 32;
-    dma_regs->ch0_tx_control &= ~(0x3f << 16);
-    dma_regs->ch0_tx_control |= pbl << 16;
-
-    dma_regs->ch0_rx_control &= ~(0x3f << 16);
-    dma_regs->ch0_rx_control |= 8 << 16;
-
-    /* DMA performance configuration */
-    val = (2 << 16) | BIT(11) | BIT(3) | BIT(2) | BIT(1);
-    dma_regs->sysbus_mode = val;
+    // Program the descriptor length. This is to tell the device that when
+    // we reach the base addr + count, we should then wrap back around to
+    // the base.
 
     volatile uint32_t *tx_len_reg = DMA_REG(DMA_CHAN_TX_RING_LEN(0));
     *tx_len_reg = TX_COUNT - 1;
     volatile uint32_t *rx_len = DMA_REG(DMA_CHAN_RX_RING_LEN(0));
     *rx_len = RX_COUNT - 1;
 
-    /* 5. Init rx and tx descriptor list addresses. */
+    // Init rx and tx descriptor list addresses.
     tx_desc_base = hw_ring_buffer_paddr + (sizeof(struct descriptor) * RX_COUNT);
     rx_desc_base = hw_ring_buffer_paddr;
 
@@ -422,19 +375,16 @@ static void eth_init()
 
     /* 7. Enable interrupts. */
     // Write the interrupt status mask to the DMA Chan Interrupt status register
-    // *DMA_REG(DMA_CHAN_INTR_ENA(0)) = DMA_CHAN_INTR_DEFAULT_MASK;
     *DMA_REG(DMA_CHAN_INTR_ENA(0)) = DMA_CHAN_INTR_NORMAL;
-    *DMA_REG(DMA_CHAN_INTR_ENA(0)) |= DMA_CHAN_INTR_ABNORMAL | BIT(7);
-    // *DMA_REG(DMA_CHAN_INTR_ENA(0)) |= (1 << 15) | (1 << 6);
 
     /* Populate the rx and tx hardware rings. */
     rx_provide();
     tx_provide();
 
     /* Start DMA and MAC */
-    dma_regs->ch0_tx_control |= BIT(0);
-    dma_regs->ch0_rx_control |= BIT(0);
-    mac_regs->configuration |= (BIT(1) | BIT(0));
+    *DMA_REG(DMA_CHAN_TX_CONTROL(0)) |= DMA_CONTROL_ST;
+    *DMA_REG(DMA_CHAN_RX_CONTROL(0)) |= DMA_CONTROL_SR;
+    *MAC_REG(GMAC_CONFIG) |= (GMAC_CONFIG_RE | GMAC_CONFIG_TE);
 
     /* NOTE ------ FROM U-BOOT SOURCE CODE dwc_eth_qos.c:995 */
 
@@ -451,10 +401,6 @@ static void eth_init()
 
 static void eth_setup(void)
 {
-    mac_regs = (volatile struct mac_regs *) (eth_regs + MAC_REGS_BASE);
-    mtl_regs = (volatile struct mtl_regs *) (eth_regs + MTL_REGS_BASE);
-    dma_regs = (volatile struct dma_regs *) (eth_regs + DMA_REGS_BASE);
-
     assert((hw_ring_buffer_paddr & 0xFFFFFFFF) == hw_ring_buffer_paddr);
 
     rx.descr = (volatile struct descriptor *)hw_ring_buffer_vaddr;
