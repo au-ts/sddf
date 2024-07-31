@@ -74,14 +74,12 @@ static inline bool hw_ring_empty(hw_ring_t *ring, size_t ring_size)
     return !((ring->tail - ring->head) % ring_size);
 }
 
-static void update_ring_slot(hw_ring_t *ring, unsigned int idx, uint64_t phys,
+static void update_ring_slot(hw_ring_t *ring, unsigned int idx, uint32_t d0, uint32_t d1,
                             uint32_t d2, uint32_t d3)
 {
     volatile struct descriptor *d = &(ring->descr[idx]);
-    // Place the lower 32 bits of phys in d0
-    d->d0 = phys & 0xffffffff;
-    // Place the upper 32 bits of phys in d1
-    d->d1 = phys >> 32;
+    d->d0 = d0;
+    d->d1 = d1;
     d->d2 = d2;
     /* Ensure all writes to the descriptor complete, before we set the flags
      * that makes hardware aware of this slot.
@@ -111,7 +109,8 @@ static void rx_provide()
             // sddf_dprintf("free_dequeued: %d, buffer 0x%lx, rx.tail: %d, tail: 0x%lx, curr rx desc: 0x%lx\n", free_dequeued, buffer.io_or_offset, rx.tail, *DMA_REG(DMA_CHAN_RX_TAIL_ADDR(0)), *DMA_REG(DMA_CHAN_CUR_RX_DESC(0)));
 
             rx.descr_mdata[rx.tail] = buffer;
-            update_ring_slot(&rx, rx.tail, buffer.io_or_offset, 0, DESC_RXSTS_OWNBYDMA | BIT(24) | BIT(30));
+            update_ring_slot(&rx, rx.tail, buffer.io_or_offset & 0xffffffff,
+                            buffer.io_or_offset >> 32, 0, DESC_RXSTS_OWNBYDMA | BIT(24) | BIT(30));
             /* We will update the hardware register that stores the tail address. This tells
             the device that we have new descriptors to use. */
             THREAD_MEMORY_RELEASE();
@@ -147,7 +146,8 @@ static void rx_return(void)
             sddf_dprintf("ETH|ERROR: RX descriptor returned with error status %x\n", d->d3);
 
             rx.descr_mdata[rx.tail] = buffer;
-            update_ring_slot(&rx, rx.tail, buffer.io_or_offset, 0, DESC_RXSTS_OWNBYDMA | BIT(24) | BIT(30));
+            update_ring_slot(&rx, rx.tail, buffer.io_or_offset & 0xffffffff,
+                            buffer.io_or_offset >> 32, 0, DESC_RXSTS_OWNBYDMA | BIT(24) | BIT(30));
             /* We will update the hardware register that stores the tail address. This tells
             the device that we have new descriptors to use. */
 
@@ -187,10 +187,7 @@ static void tx_provide(void)
             uint32_t tdes3 = (DESC_TXSTS_OWNBYDMA | DESC_TXCTRL_TXFIRST | DESC_TXCTRL_TXLAST | buffer.len);
             tx.descr_mdata[tx.tail] = buffer;
 
-            update_ring_slot(&tx, tx.tail, buffer.io_or_offset, tdes2, tdes3);
-
-
-            // sddf_dprintf("This is the tx cur desc: %p --- this is the tx tail pointer: %p\n", *DMA_REG(DMA_CHAN_CUR_TX_DESC(0)), *DMA_REG(DMA_CHAN_TX_TAIL_ADDR(0)));
+            update_ring_slot(&tx, tx.tail, buffer.io_or_offset & 0xffffffff, buffer.io_or_offset >> 32, tdes2, tdes3);
 
             tx.tail = (tx.tail + 1) % TX_COUNT;
             i++;
