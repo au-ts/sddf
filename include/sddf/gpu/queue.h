@@ -13,17 +13,18 @@
 #include <sddf/gpu/gpu.h>
 
 #define GPU_MAX_SCANOUTS 16
+#define GPU_MAX_RESOURCES 1024 /* assume that resource ids are 0..1023, strictly this isn't necessary but simplifies implementation */
 
 /* Request code for gpu */
 typedef enum gpu_request_code {
     /* 2d commands */
-    GPU_CMD_RESOURCE_CREATE_2D, /* create resource from other side */
-    GPU_CMD_RESOURCE_UNREF, /* destroy resource from other side */
-    GPU_CMD_RESOURCE_ATTACH_BACKING, /* assign shared contiguous memory to resource */
-    GPU_CMD_RESOURCE_DETACH_BACKING, /* unassign the shared memory used in resource */
-    GPU_CMD_SET_SCANOUT, /* set the scanout of a resource */
-    GPU_CMD_TRANSFER_TO_2D, /* notifies other side that data in resource has been updated */
-    GPU_CMD_RESOURCE_FLUSH, /* flushes resource from other side to scanout */
+    GPU_REQ_RESOURCE_CREATE_2D, /* create resource from other side */
+    GPU_REQ_RESOURCE_UNREF, /* destroy resource from other side */
+    GPU_REQ_RESOURCE_ATTACH_BACKING, /* assign shared contiguous memory to resource */
+    GPU_REQ_RESOURCE_DETACH_BACKING, /* unassign the shared memory used in resource */
+    GPU_REQ_SET_SCANOUT, /* set the scanout of a resource */
+    GPU_REQ_TRANSFER_TO_2D, /* notifies other side that data in resource has been updated */
+    GPU_REQ_RESOURCE_FLUSH, /* flushes resource from other side to scanout */
 } gpu_request_code_t;
 
 /* Response status for gpu */

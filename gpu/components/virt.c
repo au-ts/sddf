@@ -42,12 +42,18 @@ uintptr_t gpu_data_cli;
 gpu_queue_handle_t drv_h;
 gpu_config_t drv_config;
 
+static uint32_t res_map[GPU_MAX_RESOURCES]; /* mapping from virtualiser resource id to driver resource id */
+/* Mapping virtualiser scanout ids to driver scanout ids may not make sense when we have a proper windowing system,
+ * for now its just a simple enough implementation of an emulated scanout
+ */
+static uint32_t so_map[GPU_MAX_SCANOUTS]; /* mapping from virtualiser scanout id to driver scanout id */
+
+
 /* Client info and queue handle */
 typedef struct client {
     gpu_queue_handle_t queue_h;
     microkit_channel ch;
     uint32_t gen;
-    // TODO: This resource id can be ANY NUMBER (uint32_t)!, this will not work!
     ialloc_t res_ialloc; /* index allocator for virtualiser-driver resource ids mapping */
     uint32_t res_ialloc_idxlist[GPU_MAX_RESOURCES];
     ialloc_t so_ialloc; /* index allocator for virtualiser-driver scanout ids mapping */
@@ -59,7 +65,8 @@ static client_t clients[GPU_NUM_CLIENTS];
 typedef struct reqbk {
     uint32_t cli_id;
     uint32_t cli_req_id;
-    uint32_t cli_req_gen;
+    gpu_request_code_t code;
+    uint32_t cli_resource_id;
 } reqbk_t;
 static reqbk_t reqbk[REQBK_SIZE];
 
@@ -98,25 +105,22 @@ void init(void)
                     GPU_QUEUE_CAPACITY_DRIV, GPU_CONFIG_QUEUE_CAPACITY_DRIV);
 }
 
-static bool map_request() {
-
-}
-
-static bool map_resource() {
-
-}
-
-static bool map_scanout() {
-
-}
-
 static void handle_driver()
 {
     gpu_response_t resp;
     while (!gpu_resp_queue_empty(&drv_h)) {
         gpu_dequeue_resp(&drv_h, &resp);
 
-        // use reqbk to get client req id, then send response to client
+        reqbk_t *bk = &reqbk[resp.id];
+
+        gpu_response_t cli_resp = {
+            .id = bk->cli_req_id,
+            .status = resp.status,
+        };
+        ialloc_free(&req_ialloc, resp.id);
+        gpu_enqueue_resp(&clients[bk->cli_id].queue_h, &cli_resp);
+
+        notify(clients[bk->cli_id].ch);
     }
 }
 
@@ -153,7 +157,7 @@ static void handle_client(int cli_id)
         ialloc_alloc(&req_ialloc, &drv_req_id);
 
         switch (req.code) {
-        case GPU_CMD_RESOURCE_CREATE_2D: {
+        case GPU_REQ_RESOURCE_CREATE_2D: {
             if (ialloc_full(&clients[cli_id].res_ialloc)) {
                 LOG_GPU_VIRT("Resource mapping full, failing request");
                 goto req_fail;
@@ -161,8 +165,9 @@ static void handle_client(int cli_id)
 
             uint32_t drv_res_id = 0;
             ialloc_alloc(&clients[cli_id].res_ialloc, &drv_res_id);
+            res_map[req.resource_create_2d.resource_id] = drv_res_id;
             gpu_request_t drv_req = {
-                .code = GPU_CMD_RESOURCE_CREATE_2D,
+                .code = GPU_REQ_RESOURCE_CREATE_2D,
                 .gen = drv_config.gen,
                 .id = drv_req_id,
                 .resource_create_2d.resource_id = drv_res_id,
@@ -170,33 +175,82 @@ static void handle_client(int cli_id)
                 .resource_create_2d.height = req.resource_create_2d.height,
                 .resource_create_2d.format = req.resource_create_2d.format,
             };
-            gpu_enqueue_req(&drv_h, &req);
             break;
         }
-        case GPU_CMD_RESOURCE_UNREF: {
+        case GPU_REQ_RESOURCE_UNREF: {
             gpu_request_t drv_req = {
-                .code = GPU_CMD_RESOURCE_UNREF,
+                .code = GPU_REQ_RESOURCE_UNREF,
                 .gen = drv_config.gen,
                 .id = drv_req_id,
-                // TODO: need mapping from virtualiser resource id to driver resource id...
-                .resource_unref.resource_id = 0;
+                .resource_unref.resource_id = res_map[req.resource_unref.resource_id],
+            }
+            reqbk[drv_req_id].cli_resource_id = req.resource_unref.resource_id;
+            break;
+        }
+        case GPU_REQ_RESOURCE_ATTACH_BACKING: {
+            gpu_request_t drv_req = {
+                .code = GPU_REQ_RESOURCE_ATTACH_BACKING,
+                .gen = drv_config.gen,
+                .id = drv_req_id,
+                .resource_attach_backing.resource_id = res_map[req.resource_attach_backing.resource_id],
+                .resource_attach_backing.io_or_offset = req.resource_attach_backing.io_or_offset, // TODO: convert offset to I/O address
+                .resource_attach_backing.data_size = req.resource_attach_backing.data_size,
             }
             break;
         }
-        case GPU_CMD_RESOURCE_ATTACH_BACKING: {
+        case GPU_REQ_RESOURCE_DETACH_BACKING: {
+            gpu_request_t drv_req = {
+                .code = GPU_REQ_RESOURCE_DETACH_BACKING,
+                .gen = drv_config.gen,
+                .id = drv_req_id,
+                .resource_detach_backing.resource_id = res_map[req.resource_detach_backing.resource_id],
+            }
+            break;
+        }
+        case GPU_REQ_SET_SCANOUT: {
+            if (ialloc_full(&clients[cli_id].so_ialloc)) {
+                LOG_GPU_VIRT("Scanout mapping full, failing request");
+                goto req_fail;
+            }
 
+            uint32_t drv_so_id = 0;
+            ialloc_alloc(&clients[cli_id].so_ialloc, &drv_so_id);
+            so_map[req.set_scanout.scanout_id] = drv_so_id;
+
+            gpu_request_t drv_req = {
+                .code = GPU_REQ_SET_SCANOUT,
+                .gen = drv_config.gen,
+                .id = drv_req_id,
+                .set_scanout.scanout_id = drv_so_id,
+                .set_scanout.resource_id = res_map[req.set_scanout.resource_id],
+                .set_scanout.rect.x = req.set_scanout.rect.x,
+                .set_scanout.rect.y = req.set_scanout.rect.y,
+                .set_scanout.rect.width = req.set_scanout.rect.width,
+                .set_scanout.rect.height = req.set_scanout.rect.height,
+            }
             break;
         }
-        case GPU_CMD_RESOURCE_DETACH_BACKING: {
+        case GPU_REQ_TRANSFER_TO_2D: {
+            gpu_request_t drv_req = {
+                .code = GPU_REQ_TRANSFER_TO_2D,
+                .gen = drv_config.gen,
+                .id = drv_req_id,
+                .transfer_to_2d.resource_id = res_map[req.transfer_to_2d.resource_id],
+                .transfer_to_2d.rect.x = req.transfer_to_2d.rect.x,
+                .transfer_to_2d.rect.y = req.transfer_to_2d.rect.y,
+                .transfer_to_2d.rect.width = req.transfer_to_2d.rect.width,
+                .transfer_to_2d.rect.height = req.transfer_to_2d.rect.height,
+                .transfer_to_2d.offset = req.transfer_to_2d.offset,
+            }
             break;
         }
-        case GPU_CMD_SET_SCANOUT: {
-            break;
-        }
-        case GPU_CMD_TRANSFER_TO_2D: {
-            break;
-        }
-        case GPU_CMD_RESOURCE_FLUSH: {
+        case GPU_REQ_RESOURCE_FLUSH: {
+            gpu_request_t drv_req = {
+                .code = GPU_REQ_RESOURCE_FLUSH,
+                .gen = drv_config.gen,
+                .id = drv_req_id,
+                .resource_flush.resource_id = res_map[req.resource_flush.resource_id],
+            }
             break;
         }
         default: {
@@ -207,7 +261,9 @@ static void handle_client(int cli_id)
 
         reqbk[drv_req_id].cli_id = cli_id;
         reqbk[drv_req_id].cli_req_id = req.id;
-        reqbk[drv_req_id].cli_req_gen = req.gen;
+        reqbk[drv_req_id].code = req.code;
+
+        gpu_enqueue_req(&drv_h, &drv_req);
 
         continue;
 req_fail:

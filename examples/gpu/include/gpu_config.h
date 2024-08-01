@@ -4,8 +4,6 @@
 #include <sddf/util/string.h>
 #include <sddf/gpu/queue.h>
 
-#define GPU_MAX_RESOURCES 1024
-
 #define GPU_DATA_CELL_SIZE 4096
 
 #define GPU_NUM_CLIENTS 1
