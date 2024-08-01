@@ -6,7 +6,6 @@
 #include <microkit.h>
 #include <serial_config.h>
 #include <ethernet_config.h>
-#include <sddf/timer/client.h>
 
 #define SERIAL_TX_CH 0
 #define TIMER  1
@@ -24,8 +23,10 @@ void init() {
     resources = (struct resources) {
     	.rx_free = rx_free,
     	.rx_active = rx_active,
+   		.rx_queue_size = NET_RX_QUEUE_SIZE_CLI0,
     	.tx_free = tx_free,
     	.tx_active = tx_active,
+   		.tx_queue_size = NET_TX_QUEUE_SIZE_CLI0,
 
     	.rx_buffer_data_region = rx_buffer_data_region,
     	.tx_buffer_data_region = tx_buffer_data_region,
@@ -58,7 +59,12 @@ inline void sddf_notify(microkit_channel ch) {
 	microkit_notify(ch);
 }
 
+inline microkit_msginfo sddf_ppcall(microkit_channel ch, microkit_msginfo msginfo) {
+	microkit_ppcall(ch, msginfo);
+}
+
 #else
+
 
 #define NET_MAX_CLIENT_QUEUE_SIZE 512
 #define NET_RX_QUEUE_SIZE_CLI0 512
@@ -68,8 +74,9 @@ inline void sddf_notify(microkit_channel ch) {
 extern void sddf_notify_delayed(unsigned int id);
 extern void sddf_notify(unsigned int id);
 extern unsigned int sddf_notify_delayed_curr();
-extern void sddf_timer_set_timeout(unsigned int id, uint64_t time);
-extern uint64_t sddf_timer_time_now(unsigned int id);
+extern seL4_MessageInfo_t sddf_ppcall(unsigned int id, seL4_MessageInfo_t msginfo);
+extern uint64_t sddf_get_mr(unsigned int n);
+extern void sddf_set_mr(unsigned int n, uint64_t val);
 
 #endif /* MICROKIT */
 

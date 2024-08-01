@@ -1,13 +1,16 @@
-// #include <sel4/sel4.h>
+#include <sel4/sel4.h>
 #include <stdint.h>
 
 struct resources {
 	uint64_t rx_free;
 	uint64_t rx_active;
+	uint64_t rx_queue_size;
 	uint64_t tx_free;
 	uint64_t tx_active;
+	uint64_t tx_queue_size;
 	uint64_t rx_buffer_data_region;
 	uint64_t tx_buffer_data_region;
+	uint64_t mac_addr;
 
 	uint8_t timer_id;
 	uint8_t rx_id;

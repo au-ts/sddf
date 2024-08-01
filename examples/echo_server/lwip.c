@@ -15,6 +15,7 @@
 // #include <sddf/benchmark/sel4bench.h>
 // #include <serial_config.h>
 // #include <ethernet_config.h>
+#include <sddf/timer/client.h>
 #include <sddf/network/util.h>
 #include <sddf/util/string.h>
 #include "lwip/init.h"
@@ -286,8 +287,7 @@ void sddf_init(void)
 
     LWIP_MEMPOOL_INIT(RX_POOL);
 
-    uint64_t mac_addr = net_cli_mac_addr(resources.name);
-    net_set_mac_addr(state.mac, mac_addr);
+    net_set_mac_addr(state.mac, resources.mac_addr);
 
     /* Set dummy IP configuration values to get lwIP bootstrapped  */
     struct ip4_addr netmask, ipaddr, gw, multicast;
@@ -341,7 +341,6 @@ void sddf_init(void)
 
 void sddf_notified(unsigned int id)
 {
-
     if (id == resources.rx_id) {
         receive();
     } else if (id == resources.timer_id) {
