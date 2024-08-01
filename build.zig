@@ -10,6 +10,7 @@ const DriverClass = struct {
         arm,
         meson,
         imx,
+        snps,
     };
 
     const Timer = enum {
