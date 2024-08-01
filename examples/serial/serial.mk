@@ -15,37 +15,38 @@ ifeq ($(strip $(SDDF)),)
 $(error SDDF must be specified)
 endif
 
-ifeq ($(strip $(TOOLCHAIN)),)
-	TOOLCHAIN := aarch64-none-elf
-endif
-
 BUILD_DIR ?= build
 MICROKIT_CONFIG ?= debug
 
-TOOLCHAIN ?= aarch64-none-elf
-
 QEMU := qemu-system-aarch64
 
-CC := $(TOOLCHAIN)-gcc
-LD := $(TOOLCHAIN)-ld
-AS := $(TOOLCHAIN)-as
-AR := $(TOOLCHAIN)-ar
-RANLIB := ${TOOLCHAIN}-ranlib
+CC := clang
+LD := ld.lld
+AS := llvm-as
+AR := llvm-ar
+RANLIB := llvm-ranlib
 
 MICROKIT_TOOL := $(MICROKIT_SDK)/bin/microkit
 
 ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
+	ARCH := aarch64
 	DRIVER_DIR := meson
 	CPU := cortex-a55
 else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
+	ARCH := aarch64
 	DRIVER_DIR := arm
 	CPU := cortex-a53
 else ifeq ($(strip $(MICROKIT_BOARD)), maaxboard)
+	ARCH := aarch64
 	DRIVER_DIR := imx
 	CPU := cortex-a53
 else ifeq ($(strip $(MICROKIT_BOARD)), imx8mm_evk)
+	ARCH := aarch64
 	DRIVER_DIR := imx
 	CPU := cortex-a53
+else ifeq ($(strip $(MICROKIT_BOARD)), star64)
+	ARCH := riscv64
+	DRIVER_DIR := snps
 else
 $(error Unsupported MICROKIT_BOARD given)
 endif
@@ -61,9 +62,7 @@ SYSTEM_FILE := ${TOP}/board/$(MICROKIT_BOARD)/serial.system
 IMAGES := uart_driver.elf \
 	  serial_server.elf \
 	  serial_virt_tx.elf serial_virt_rx.elf
-CFLAGS := -mcpu=$(CPU)\
-	  -mstrict-align \
-	  -ffreestanding \
+CFLAGS := -ffreestanding \
 	  -g3 -O3 -Wall \
 	  -Wno-unused-function -Werror \
 	  -MD
@@ -72,10 +71,17 @@ LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
 
 IMAGE_FILE = loader.img
 REPORT_FILE = report.txt
+
+ifeq ($(ARCH),aarch64)
+	CFLAGS += -mcpu=$(CPU) -mstrict-align -target aarch64-none-elf
+else ifeq ($(ARCH),riscv64)
+	CFLAGS += -march=rv64imafdc -target riscv64-none-elf -DPRINTF_DISABLE_SUPPORT_FLOAT
+endif
 CFLAGS += -I$(BOARD_DIR)/include \
 	-I${TOP}/include	\
 	-I$(SDDF)/include \
-	-I$(SERIAL_CONFIG_INCLUDE)
+	-I$(SERIAL_CONFIG_INCLUDE) \
+	$(CFLAGS_ARCH)
 
 CHECK_FLAGS_BOARD_MD5:=.board_cflags-$(shell echo -- ${CFLAGS} ${BOARD} ${MICROKIT_CONFIG} | shasum | sed 's/ *-//')
 
