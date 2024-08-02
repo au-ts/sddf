@@ -93,7 +93,7 @@ void rx_return(void)
             // usermode CleanInvalidate (faster than a Invalidate via syscall).
             //
             // [1]: https://developer.arm.com/documentation/ddi0595/2021-06/AArch64-Instructions/DC-IVAC--Data-or-unified-Cache-line-Invalidate-by-VA-to-PoC
-            cache_clean_and_invalidate(buffer_vaddr, buffer_vaddr + ROUND_UP(buffer.len, 1 << CONFIG_L1_CACHE_LINE_SIZE_BITS));
+            cache_clean_and_invalidate(buffer_vaddr, buffer_vaddr + buffer.len);
             int client = get_mac_addr_match((struct ethernet_header *) buffer_vaddr);
             if (client == BROADCAST_ID) {
                 int ref_index = buffer.io_or_offset / NET_BUFFER_SIZE;
