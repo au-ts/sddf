@@ -10,6 +10,7 @@
 #include <sddf/util/util.h>
 #include <microkit.h>
 
+#ifdef CONFIG_ARCH_ARM
 /* A counter is an index to a performance counter on a platform.
  * The max counter index is sizeof(seL4_Word) */
 typedef seL4_Word counter_t;
@@ -307,3 +308,4 @@ static FASTFN void sel4bench_reset_counters(void)
     //Reset all counters except the CCNT
     MODIFY_PMCR( |, SEL4BENCH_ARMV8A_PMCR_RESET_ALL);
 }
+#endif
