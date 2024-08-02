@@ -50,7 +50,7 @@ void cache_clean_and_invalidate(unsigned long start, unsigned long end)
     unsigned long line;
     unsigned long index;
 
-    for (index = LINE_INDEX(start); index < LINE_INDEX(end) + 1; index++) {
+    for (index = LINE_INDEX(start); index < LINE_INDEX(end); index++) {
         line = index << CONFIG_L1_CACHE_LINE_SIZE_BITS;
         clean_and_invalidate_by_va(line);
     }
@@ -61,7 +61,7 @@ void cache_clean(unsigned long start, unsigned long end)
     unsigned long line;
     unsigned long index;
 
-    for (index = LINE_INDEX(start); index < LINE_INDEX(end) + 1; index++) {
+    for (index = LINE_INDEX(start); index < LINE_INDEX(end); index++) {
         line = index << CONFIG_L1_CACHE_LINE_SIZE_BITS;
         clean_by_va(line);
     }
