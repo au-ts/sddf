@@ -16,6 +16,7 @@
 #include <serial_config.h>
 #include <ethernet_config.h>
 
+#ifdef CONFIG_ARCH_ARM
 #define LOG_BUFFER_CAP 7
 
 /* Notification channels and TCB CAP offsets - ensure these align with .system file! */
@@ -349,3 +350,4 @@ void fault(microkit_id id, microkit_msginfo msginfo)
         break;
     }
 }
+#endif
