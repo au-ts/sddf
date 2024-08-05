@@ -53,8 +53,16 @@ net_queue_t *rx_active_cli1;
 uintptr_t buffer_data_vaddr;
 uintptr_t buffer_data_paddr;
 
+#define MAX_CLIENTS 64
+
 void init() {
-        resources = (struct resources) {
+    queue_info_t client_queue_info[MAX_CLIENTS];
+    net_virt_queue_info(microkit_name, rx_free_cli0, rx_active_cli0, client_queue_info);
+
+    uint64_t mac_addrs[MAX_CLIENTS];
+    net_virt_mac_addr_info(microkit_name, mac_addrs);
+
+    resources = (struct resources) {
         .rx_free_drv = rx_free_drv,
         .rx_active_drv = rx_active_drv,
         .drv_queue_size = NET_RX_QUEUE_SIZE_DRIV,
@@ -64,22 +72,15 @@ void init() {
         .clients = {},
     };
 
-    resources.clients[0] = (struct client) {
-        .rx_free = rx_free_cli0,
-        .rx_active = rx_active_cli0,
-        .queue_size = NET_RX_QUEUE_SIZE_COPY0,
-        .client_id = CLIENT_0_CH,
-        .mac_addr = MAC_ADDR_CLI0,
-    };
-
-    // resources.clients[1] = (struct client) {
-    //     .rx_free = rx_free_cli1,
-    //     .rx_active = rx_active_cli1,
-    //     .queue_size = NET_RX_QUEUE_SIZE_COPY1,
-    //     .client_ch = CLIENT_1_CH,
-    //     .client_cap = BASE_OUTPUT_NOTIFICATION_CAP + CLIENT_1_CH,
-    //     .mac_addr = MAC_ADDR_CLI1,
-    // };
+    for (int i = 0; i < NUM_NETWORK_CLIENTS; i++) {
+        resources.clients[i] = (struct client) {
+            .rx_free = client_queue_info[i].free,
+            .rx_active = client_queue_info[i].active,
+            .queue_size = client_queue_info[i].size,
+            .client_id = CLIENT_0_CH + i,
+            .mac_addr = mac_addrs[i]
+        };
+    }
 
     sddf_init();
 }

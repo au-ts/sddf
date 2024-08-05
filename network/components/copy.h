@@ -42,13 +42,17 @@ uintptr_t virt_buffer_data_region;
 uintptr_t cli_buffer_data_region;
 
 void init() {
+	size_t cli_queue_size, virt_queue_size;
+
+	net_copy_queue_info(microkit_name, &cli_queue_size, &virt_queue_size);
+
 	resources = (struct resources) {
 		.virt_free = rx_free_virt,
 		.virt_active = rx_active_virt,
-		.virt_queue_size = 512,
+		.virt_queue_size = cli_queue_size,
 		.cli_free = rx_free_cli,
 		.cli_active = rx_active_cli,
-		.cli_queue_size = 512,
+		.cli_queue_size = virt_queue_size,
 		.virt_data = virt_buffer_data_region,
 		.cli_data = cli_buffer_data_region,
 

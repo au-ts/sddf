@@ -50,7 +50,15 @@ uintptr_t buffer_data_region_cli0_paddr;
 uintptr_t buffer_data_region_cli1_vaddr;
 uintptr_t buffer_data_region_cli1_paddr;
 
+#define MAX_CLIENTS 64
+
 void init() {
+    queue_info_t client_queue_info[MAX_CLIENTS];
+    net_virt_queue_info(microkit_name, tx_free_cli0, tx_active_cli0, client_queue_info);
+
+    uintptr_t buffer_region_vaddrs[MAX_CLIENTS];
+    net_mem_region_info(microkit_name, buffer_region_vaddrs, buffer_data_region_cli0_vaddr);
+
     resources = (struct resources) {
         .tx_free_drv = tx_free_drv,
         .tx_active_drv = tx_active_drv,
@@ -59,24 +67,18 @@ void init() {
         .clients = {},
     };
 
-    resources.clients[0] = (struct client) {
-        .tx_free = tx_free_cli0,
-        .tx_active = tx_active_cli0,
-        .queue_size = NET_TX_QUEUE_SIZE_CLI0,
-        .buffer_data_region_vaddr = buffer_data_region_cli0_vaddr,
-        .buffer_data_region_paddr = buffer_data_region_cli0_paddr,
-        .client_id = CLIENT_0_CH,
-    };
+    for (int i = 0; i < NUM_NETWORK_CLIENTS; i++) {
+        resources.clients[i] = (struct client) {
+            .tx_free = client_queue_info[i].free,
+            .tx_active =  client_queue_info[i].active,
+            .queue_size = client_queue_info[i].size,
+            .buffer_data_region_vaddr = buffer_region_vaddrs[i],
+            .client_id = CLIENT_0_CH + i,
+        };
+    }
 
-    // resources.clients[1] = (struct client) {
-    //     .tx_free = tx_free_cli1,
-    //     .tx_active = tx_active_cli1,
-    //     .queue_size = NET_TX_QUEUE_SIZE_CLI1
-    //     .buffer_data_region_vaddr = buffer_data_region_cli1_vaddr,
-    //     .buffer_data_region_paddr = buffer_data_region_cli1_paddr,
-    //     .client_ch = CLIENT_1_CH,
-    //     .client_cap = BASE_OUTPUT_NOTIFICATION_CAP + CLIENT_1_CH,
-    // };
+    resources.clients[0].buffer_data_region_paddr = buffer_data_region_cli0_paddr;
+    resources.clients[1].buffer_data_region_paddr = buffer_data_region_cli1_paddr;
 
     sddf_init();
 }
