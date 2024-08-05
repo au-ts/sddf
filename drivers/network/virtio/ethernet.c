@@ -14,7 +14,7 @@
  * may be needed if instead this driver was to be used in a different environment.
  */
 
-#include "sys_ethernet.h" // @alwin: This needs to be included first or bad things happen
+#include "ethernet.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <sddf/network/queue.h>

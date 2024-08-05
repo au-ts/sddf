@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-#include "sys_virt_rx.h"
+#include "virt_rx.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <sddf/network/constants.h>

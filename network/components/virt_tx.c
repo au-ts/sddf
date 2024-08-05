@@ -2,8 +2,7 @@
  * Copyright 2024, UNSW
  * SPDX-License-Identifier: BSD-2-Clause
  */
-
-#include "sys_virt_tx.h"
+#include "virt_tx.h"
 #include <sddf/network/queue.h>
 #include <sddf/util/cache.h>
 #include <sddf/util/util.h>

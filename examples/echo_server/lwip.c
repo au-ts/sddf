@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-#include "sys_lwip.h"
+#include "lwip.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <sddf/util/util.h>
@@ -275,11 +275,12 @@ static void netif_status_callback(struct netif *netif)
 
 void sddf_init(void)
 {
+    // serial_cli_queue_init_sys(microkit_name, NULL, NULL, NULL, &serial_tx_queue_handle, serial_tx_queue, serial_tx_data);
+    // serial_putchar_init(SERIAL_TX_CH, &serial_tx_queue_handle);
 
-    size_t rx_capacity, tx_capacity;
-    net_cli_queue_capacity(resources.name, &rx_capacity, &tx_capacity);
-    net_queue_init(&state.rx_queue, resources.rx_free, resources.rx_active, NET_RX_QUEUE_SIZE_CLI0);
-    net_queue_init(&state.tx_queue, resources.tx_free, resources.tx_active, NET_TX_QUEUE_SIZE_CLI0);
+    net_queue_init(&state.rx_queue, resources.rx_free, resources.rx_active, resources.rx_queue_size);
+    net_queue_init(&state.tx_queue, resources.tx_free, resources.tx_active, resources.tx_queue_size);
+
     net_buffers_init(&state.tx_queue, 0);
 
     lwip_init();
