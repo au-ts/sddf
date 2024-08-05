@@ -183,7 +183,12 @@ void tx_provide(microkit_channel ch)
 
     if (transferred && serial_require_producer_signal(&tx_queue_handle_drv)) {
         serial_cancel_producer_signal(&tx_queue_handle_drv);
-        microkit_deferred_notify(DRIVER_CH);
+        microkit_notify(DRIVER_CH);
+    }
+
+    if (transferred && serial_require_consumer_signal(&tx_queue_handle_cli[active_client])) {
+        serial_cancel_consumer_signal(&tx_queue_handle_cli[active_client]);
+        microkit_deferred_notify(ch);
     }
 }
 
