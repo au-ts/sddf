@@ -4,8 +4,7 @@
 #include <sddf/timer/client.h>
 #include <sddf/i2c/queue.h>
 #include <sddf/i2c/client.h>
-#include "ds3231.h"
-#include "client.h"
+#include <sddf/i2c/ds3231.h>
 
 // #define DEBUG_CLIENT
 

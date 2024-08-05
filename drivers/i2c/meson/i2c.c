@@ -88,11 +88,11 @@ static inline void i2c_dump(volatile struct i2c_regs *regs)
 
     // Print control register fields
     // uint8_t ctl_man = (ctl & REG_CTRL_MANUAL) ? 1 : 0;
-    uint8_t ctl_rd_cnt = ((regs->ctl &REG_CTRL_RD_CNT) >> 8);
-    uint8_t ctl_curr_tk = ((regs->ctl &REG_CTRL_CURR_TK) >> 4);
-    uint8_t ctl_err = (regs->ctl &REG_CTRL_ERROR) ? 1 : 0;
-    uint8_t ctl_status = (regs->ctl &REG_CTRL_STATUS) ? 1 : 0;
-    uint8_t ctl_start = (regs->ctl &REG_CTRL_START) ? 1 : 0;
+    uint8_t ctl_rd_cnt = ((regs->ctl & REG_CTRL_RD_CNT) >> 8);
+    uint8_t ctl_curr_tk = ((regs->ctl & REG_CTRL_CURR_TK) >> 4);
+    uint8_t ctl_err = (regs->ctl & REG_CTRL_ERROR) ? 1 : 0;
+    uint8_t ctl_status = (regs->ctl & REG_CTRL_STATUS) ? 1 : 0;
+    uint8_t ctl_start = (regs->ctl & REG_CTRL_START) ? 1 : 0;
     LOG_DRIVER("\t Control register:\n");
     LOG_DRIVER("\t\t Start: %u\n", ctl_start);
     LOG_DRIVER("\t\t Status: %u\n", ctl_status);
@@ -314,7 +314,6 @@ static inline bool i2c_get_error(volatile struct i2c_regs *regs, uint8_t *bytes_
 
 /**
  * Restarts the list processor
- * "To re-start the list processor with a new list (after a previous list has been exhausted), simply set This bit to zero then to one."
  */
 static inline int i2c_start(volatile struct i2c_regs *regs)
 {
@@ -329,9 +328,7 @@ static inline int i2c_start(volatile struct i2c_regs *regs)
 }
 
 /**
- * Aborts the current operation
- * "Setting This bit to 0 while the list processor is operating causes the list processor to abort the current I2C operation
- * and generate an I2C STOP command on the I2C bus"
+ * Aborts the current operation by generating an I2C STOP command on the I2C bus"
  */
 static inline int i2c_halt(volatile struct i2c_regs *regs)
 {

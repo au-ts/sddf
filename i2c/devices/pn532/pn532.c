@@ -11,7 +11,7 @@
 #ifdef DEBUG_PN532
 #define LOG_PN532(...) do{ sddf_dprintf("PN532|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
 #else
-#define LOG_PN532(...) do{}while(0) /* wont work if not delayed */
+#define LOG_PN532(...) do{}while(0)
 #endif
 
 // #define INCLUDE_ERROR_PN532
@@ -61,6 +61,7 @@ void response_init(struct response *response)
 {
     uintptr_t offset = 0;
     unsigned int buffer_len = 0;
+    /* This is unused as for our PN532 client only talks to a single I2C bus address. */
     size_t bus_address = 0;
     int ret = i2c_dequeue_response(queue, &bus_address, &offset, &buffer_len);
     if (ret) {

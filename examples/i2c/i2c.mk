@@ -54,8 +54,6 @@ SYSTEM_FILE = ${TOP}/board/$(MICROKIT_BOARD)/i2c.system
 CFLAGS += -I$(BOARD_DIR)/include \
 	-I$(SDDF)/include \
 	-I$(LIBCO) \
-	-I$(PN532_DRIVER) \
-	-I$(DS3231_DRIVER) \
 	-MD \
 	-MP
 
