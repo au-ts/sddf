@@ -39,24 +39,25 @@ def get_imx8mm_pinctrl_info(device_nodes):
 
 if __name__ == "__main__":
 
-    if len(sys.argv) != 3:
+    if len(sys.argv) != 4:
         print("Usage: ")
-        print("\tpython3 create_pinmux_setup.py <dts-source> <output-dir>")
+        print("\tpython3 create_pinmux_setup.py <SoC-name> <dts-source> <output-dir>")
         exit(1)
     
     # Parse device tree file
-    devicetree = dtlib.DT(sys.argv[1], force=True)
+    soc_name = sys.argv[1]
+    devicetree = dtlib.DT(sys.argv[2], force=True)
+    out_dir = sys.argv[3]
 
     # For the imx8mm-evk, we have to locate the "pinctrl" device in the dts to be able to get our relevant info
     for node in devicetree.node_iter():
         if "iomuxc" in node.name:
-            print(node.nodes['imx8mq-evk'])
-            pinmux_dict = get_imx8mm_pinctrl_info(node.nodes['imx8mq-evk'])
+            pinmux_dict = get_imx8mm_pinctrl_info(node.nodes[soc_name])
             nums_pin_properties = len(pinmux_dict['mux_reg'])
 
             # This is an interesting way of writing my dict values to an assembly file
             # It works so I won't bother changing it right now
-            with open(sys.argv[2]+"/pinmux_config_data.s", "w") as file:
+            with open(out_dir + "/pinmux_config_data.s", "w") as file:
                 file.write("\t.section .data\n")
 
                 file.write("\t.global num_iomuxc_configs\n")
