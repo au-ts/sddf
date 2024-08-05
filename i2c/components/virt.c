@@ -29,29 +29,30 @@
  * what happens...
  */
 
-#define NUM_CLIENTS 1
-#define DRIVER_CH 1
+#define NUM_CLIENTS 2
+#define DRIVER_CH 2
 
 #if DRIVER_CH < NUM_CLIENTS
 #error "DRIVER_CH must be higher than client channels"
 #endif
 
-uintptr_t driver_data_offsets[NUM_CLIENTS] = { 0 };
-size_t client_data_sizes[NUM_CLIENTS] = { 0x200000 };
+uintptr_t driver_data_offsets[NUM_CLIENTS] = { 0, 0x1000 }; // change if NUM_CLIENTS changes
+size_t client_data_sizes[NUM_CLIENTS] = { 0x1000, 0x1000 }; // change if NUM_CLIENTS changes
 
 i2c_queue_handle_t client_queues[NUM_CLIENTS];
 i2c_queue_handle_t driver_queue;
 
-uintptr_t client_request_regions[NUM_CLIENTS] = { 0x4000000 };
-uintptr_t client_response_regions[NUM_CLIENTS] = { 0x5000000 };
+uintptr_t client_request_regions[NUM_CLIENTS] = { 0x4000000, 0x4001000 }; // change if NUM_CLIENTS changes
+uintptr_t client_response_regions[NUM_CLIENTS] = { 0x5000000, 0x5001000 }; // change if NUM_CLIENTS changes
 
 // Security list: owner of each i2c address on the bus
 int security_list[I2C_BUS_ADDRESS_MAX + 1];
 
-uintptr_t driver_response_region;
-uintptr_t driver_request_region;
+uintptr_t driver_response_region; // mapped memory
+uintptr_t driver_request_region; // mapped memory
 
-void process_request(microkit_channel ch) {
+void process_request(microkit_channel ch)
+{
     bool enqueued = false;
     assert(ch < NUM_CLIENTS);
 
@@ -73,7 +74,8 @@ void process_request(microkit_channel ch) {
         }
 
         if (offset > client_data_sizes[ch]) {
-            LOG_VIRTUALISER_ERR("invalid offset (0x%lx) given by client 0x%x. Max offset is 0x%lx\n", offset, ch, client_data_sizes[ch]);
+            LOG_VIRTUALISER_ERR("invalid offset (0x%lx) given by client 0x%x. Max offset is 0x%lx\n", offset, ch,
+                                client_data_sizes[ch]);
             continue;
         }
 
@@ -91,7 +93,8 @@ void process_request(microkit_channel ch) {
     }
 }
 
-void process_response() {
+void process_response()
+{
     /*
      * Process all responses that the driver has queued up. We look at which client currently has the
      * claim on the bus and deliver the response to them. If a client's response queue is full we
@@ -124,18 +127,21 @@ void process_response() {
     }
 }
 
-void init(void) {
+void init(void)
+{
     LOG_VIRTUALISER("initialising\n");
     for (int i = 0; i < I2C_BUS_ADDRESS_MAX + 1; i++) {
         security_list[i] = BUS_UNCLAIMED;
     }
     driver_queue = i2c_queue_init((i2c_queue_t *) driver_request_region, (i2c_queue_t *) driver_response_region);
     for (int i = 0; i < NUM_CLIENTS; i++) {
-        client_queues[i] = i2c_queue_init((i2c_queue_t *) client_request_regions[i], (i2c_queue_t *) client_response_regions[i]);
+        client_queues[i] = i2c_queue_init((i2c_queue_t *) client_request_regions[i],
+                                          (i2c_queue_t *) client_response_regions[i]);
     }
 }
 
-void notified(microkit_channel ch) {
+void notified(microkit_channel ch)
+{
     if (ch == DRIVER_CH) {
         process_response();
     } else {
@@ -143,7 +149,8 @@ void notified(microkit_channel ch) {
     }
 }
 
-seL4_MessageInfo_t protected(microkit_channel ch, seL4_MessageInfo_t msginfo) {
+seL4_MessageInfo_t protected(microkit_channel ch, seL4_MessageInfo_t msginfo)
+{
     size_t label = microkit_msginfo_get_label(msginfo);
     size_t bus = microkit_mr_get(I2C_BUS_SLOT);
 
@@ -159,26 +166,26 @@ seL4_MessageInfo_t protected(microkit_channel ch, seL4_MessageInfo_t msginfo) {
     }
 
     switch (label) {
-        case I2C_BUS_CLAIM:
-            // We have a valid bus address, we need to make sure no one else has claimed it.
-            if (security_list[bus] != BUS_UNCLAIMED) {
-                LOG_VIRTUALISER_ERR("bus address 0x%lx already claimed, cannot claim for channel 0x%x\n", bus, ch);
-                return microkit_msginfo_new(I2C_FAILURE, 0);
-            }
-
-            security_list[bus] = ch;
-            break;
-        case I2C_BUS_RELEASE:
-            if (security_list[bus] != ch) {
-                LOG_VIRTUALISER_ERR("bus address 0x%lx is not claimed by channel 0x%x\n", bus, ch);
-                return microkit_msginfo_new(I2C_FAILURE, 0);
-            }
-
-            security_list[bus] = BUS_UNCLAIMED;
-            break;
-        default:
-            LOG_VIRTUALISER_ERR("reached unreachable case\n");
+    case I2C_BUS_CLAIM:
+        // We have a valid bus address, we need to make sure no one else has claimed it.
+        if (security_list[bus] != BUS_UNCLAIMED) {
+            LOG_VIRTUALISER_ERR("bus address 0x%lx already claimed, cannot claim for channel 0x%x\n", bus, ch);
             return microkit_msginfo_new(I2C_FAILURE, 0);
+        }
+
+        security_list[bus] = ch;
+        break;
+    case I2C_BUS_RELEASE:
+        if (security_list[bus] != ch) {
+            LOG_VIRTUALISER_ERR("bus address 0x%lx is not claimed by channel 0x%x\n", bus, ch);
+            return microkit_msginfo_new(I2C_FAILURE, 0);
+        }
+
+        security_list[bus] = BUS_UNCLAIMED;
+        break;
+    default:
+        LOG_VIRTUALISER_ERR("reached unreachable case\n");
+        return microkit_msginfo_new(I2C_FAILURE, 0);
     }
 
     return microkit_msginfo_new(I2C_SUCCESS, 0);
