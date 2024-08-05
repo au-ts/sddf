@@ -3,7 +3,6 @@ import sys
 from devicetree import edtlib, dtlib
 import struct
 
-PINMUX_MAX = 1000
 UINT32_T_SIZE = 4
 
 def get_value_from_bytes_array(byte_array: bytes, index: int):
@@ -13,15 +12,13 @@ def get_value_from_bytes_array(byte_array: bytes, index: int):
 def get_imx8mm_pinctrl_info(device_nodes):
 
     # Our information dictionary will look like this
-
     return_dict = {
-        'mux_reg': [],
-        'conf_reg': [],
-        'input_reg': [],
-        'mux_val': [],
-        'input_val': [],
-        'pad_setting': []
-
+        'mux_reg': [],    # Offset of the mux register
+        'conf_reg': [],   # Offset of pad configuration register
+        'input_reg': [],  # Offset of select input register
+        'mux_val': [],    # Mux value to be applied to `mux_reg`
+        'input_val': [],  # Input value to be applied to `input_reg`
+        'pad_setting': [] # Pad setting value to be applied to `conf_reg`
     }
 
     for device in device_nodes.node_iter():
@@ -29,7 +26,6 @@ def get_imx8mm_pinctrl_info(device_nodes):
         if pin_info != None:
             # At this stage, we have the array of values
             # Since each device configuration comes in a set of six values, we'll loop through in sets of 6
-
             for i in range(len(pin_info.value)//(6*UINT32_T_SIZE)):
                 return_dict['mux_reg'].append(get_value_from_bytes_array(pin_info.value, 6*i))
                 return_dict['conf_reg'].append(get_value_from_bytes_array(pin_info.value, 6*i+1))
@@ -53,23 +49,28 @@ if __name__ == "__main__":
 
     # For the imx8mm-evk, we have to locate the "pinctrl" device in the dts to be able to get our relevant info
     for node in devicetree.node_iter():
-        if "pinctrl" in node.name:
-            pinmux_dict = get_imx8mm_pinctrl_info(node.nodes['imx8mm-evk'])
-                
+        if "iomuxc" in node.name:
+            print(node.nodes['imx8mq-evk'])
+            pinmux_dict = get_imx8mm_pinctrl_info(node.nodes['imx8mq-evk'])
+            nums_pin_properties = len(pinmux_dict['mux_reg'])
 
             # This is an interesting way of writing my dict values to an assembly file
             # It works so I won't bother changing it right now
             with open(sys.argv[2]+"/pinmux_config_data.s", "w") as file:
                 file.write("\t.section .data\n")
-                file.write("\t.global conf\n")
-                file.write("conf:\n")
-                file.write(f"\t.word {str(len(pinmux_dict['mux_reg']))}\n")
-                
-                for val_arr in pinmux_dict.values():
+
+                file.write("\t.global num_iomuxc_configs\n")
+                file.write("\t.global iomuxc_configs\n")
+
+                file.write("num_iomuxc_configs:\n")
+                file.write(f"\t.word {nums_pin_properties}\n")
+
+                file.write("iomuxc_configs:\n")
+                for i in range(0, nums_pin_properties):
                     file.write("\t.word ")
-                    for val in val_arr[:-1]:
-                        file.write(f'{str(val)}, ')
-                    file.write(f'{str(val_arr[-1])}\n')
-                    file.write(f'\t.skip {str((PINMUX_MAX - len(val_arr))*UINT32_T_SIZE)}\n')
+                    file.write(f"{pinmux_dict['mux_reg'][i]}, {pinmux_dict['conf_reg'][i]}, {pinmux_dict['input_reg'][i]}, {pinmux_dict['mux_val'][i]}, {pinmux_dict['input_val'][i]}, {pinmux_dict['pad_setting'][i]}\n")
+            
+            break
+
 
     
