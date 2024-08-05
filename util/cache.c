@@ -59,7 +59,7 @@ void cache_clean_and_invalidate(unsigned long start, unsigned long end)
 
     /* If the end address is not on a cache line boundary, we want to perform
      * the cache operation on that cache line as well. */
-    unsigned long end_rounded = ROUND_UP(end, CONFIG_L1_CACHE_LINE_SIZE_BITS);
+    unsigned long end_rounded = ROUND_UP(end, 1 << CONFIG_L1_CACHE_LINE_SIZE_BITS);
 
     for (index = LINE_INDEX(start); index < LINE_INDEX(end_rounded); index++) {
         vaddr = index << CONFIG_L1_CACHE_LINE_SIZE_BITS;
@@ -83,7 +83,7 @@ void cache_clean(unsigned long start, unsigned long end)
 
     /* If the end address is not on a cache line boundary, we want to perform
      * the cache operation on that cache line as well. */
-    unsigned long end_rounded = ROUND_UP(end, CONFIG_L1_CACHE_LINE_SIZE_BITS);
+    unsigned long end_rounded = ROUND_UP(end, 1 << CONFIG_L1_CACHE_LINE_SIZE_BITS);
 
     for (index = LINE_INDEX(start); index < LINE_INDEX(end_rounded); index++) {
         vaddr = index << CONFIG_L1_CACHE_LINE_SIZE_BITS;
