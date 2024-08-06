@@ -133,7 +133,7 @@ void init(void)
 
     /* CDTODO: Can we make this system agnostic? */
     state.buffer_region_paddrs[0] = buffer_data_region_cli0_paddr;
-    state.buffer_region_paddrs[1] = buffer_data_region_cli1_paddr;
+    // state.buffer_region_paddrs[1] = buffer_data_region_cli1_paddr;
 
     tx_provide();
 }
