@@ -16,7 +16,7 @@ typedef struct vswitch_channel {
  * They represent a medium you can send to and receive from. */
 typedef struct vswitch_port {
     /* For clients, incoming is TX, outgoing is RX.
-     * For virtualisers, incoming is RX, outgoing is TX. */ 
+     * For virtualisers, incoming is RX, outgoing is TX. */
     vswitch_channel_t incoming;
     vswitch_channel_t outgoing;
     vswitch_port_bitmap_t allow_list;
