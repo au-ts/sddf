@@ -52,7 +52,7 @@ static void debug_dump_packet(int len, uint8_t *buffer)
     sddf_dprintf("\n");
 }
 
-static int find_dest_port(channel_map_t *map, uint8_t *dest_macaddr)
+static int channel_map_find(channel_map_t *map, uint8_t *dest_macaddr)
 {
     for (int i = 0; i < map->len; i++) {
         if (mac802_addr_eq(map->macs[i].addr, dest_macaddr)) {
@@ -62,9 +62,28 @@ static int find_dest_port(channel_map_t *map, uint8_t *dest_macaddr)
     return UNKNOWN_PORT;
 }
 
+static bool channel_map_add(channel_map_t *map, uint8_t *macaddr, int port)
+{
+    if (map->len >= VSWITCH_LOOKUP_SIZE) {
+        sddf_dprintf("VSWITCH: Channel map is full\n");
+        return false;
+    }
+    if (channel_map_find(map, macaddr) != UNKNOWN_PORT) {
+        return false;
+    }
+    if (mac802_addr_eq(macaddr, bcast_macaddr)) {
+        return false;
+    }
+
+    sddf_memcpy(map->macs[map->len].addr, macaddr, 6);
+    map->port[map->len] = port;
+    map->len++;
+    return true;
+}
+
 static void forward_frame(vswitch_channel_t *src, vswitch_channel_t *dest, net_buff_desc_t *src_buf)
 {
-    char *src_data = src->data_region + src_buf->io_or_offset;
+    const char *src_data = src->data_region + src_buf->io_or_offset;
 
     net_buff_desc_t d_buffer;
     if (net_dequeue_free(&dest->q, &d_buffer) != 0) {
@@ -94,7 +113,7 @@ static void try_broadcast(int src_port, vswitch_port_t *src, net_buff_desc_t *bu
 
 static void try_send(vswitch_port_t *src, uint8_t *dest_macaddr, net_buff_desc_t *buffer)
 {
-    int dest_port = find_dest_port(&vswitch.map, dest_macaddr);
+    int dest_port = channel_map_find(&vswitch.map, dest_macaddr);
 
     if (dest_port == UNKNOWN_PORT || !vswitch_can_send_to(src, dest_port)) {
         return;
@@ -114,8 +133,14 @@ static void notified_by_port(int port)
     bool reprocess = true;
     while (reprocess) {
         while (net_dequeue_active(src_queue, &sddf_buffer) != -1) {
-            struct ether_addr *macaddr = (struct ether_addr *)sddf_buffer.io_or_offset;
+            char *frame_data = src->incoming.data_region + sddf_buffer.io_or_offset;
 
+            struct ether_addr *macaddr = (struct ether_addr *)frame_data;
+
+            // Add forwarding table entry from source MAC to port
+            channel_map_add(&vswitch.map, macaddr->ether_src_addr_octet, port);
+
+            // Forward frame
             if (mac802_addr_eq(macaddr->ether_dest_addr_octet, bcast_macaddr)) {
                 try_broadcast(port, src, &sddf_buffer);
             } else {
@@ -157,5 +182,6 @@ void init(void)
     for (int i = 0; i < VSWITCH_PORT_COUNT; i++)
     {
         net_vswitch_init_port(i, &vswitch.ports[i]);
+        net_buffers_init(&vswitch.ports[i].outgoing.q, 0);
     }
 }
