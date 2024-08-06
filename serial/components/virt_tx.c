@@ -134,6 +134,7 @@ void tx_return(void)
     }
 
     uint32_t client;
+    bool notify_client[SERIAL_NUM_CLIENTS] = {false};
     bool transferred = false;
     for (uint32_t req = 0; req < num_pending_tx; req++) {
         tx_pending_pop(&client);
@@ -151,11 +152,19 @@ void tx_return(void)
             }
         }
         transferred |= client_transferred;
+        notify_client[client] = client_transferred;
     }
 
     if (transferred && serial_require_producer_signal(&tx_queue_handle_drv)) {
         serial_cancel_producer_signal(&tx_queue_handle_drv);
         microkit_deferred_notify(DRIVER_CH);
+    }
+
+    for (uint32_t client = 0; client < SERIAL_NUM_CLIENTS; client++) {
+        if (notify_client[client] && serial_require_consumer_signal(&tx_queue_handle_cli[client])) {
+            serial_cancel_consumer_signal(&tx_queue_handle_cli[client]);
+            microkit_notify(client + CLIENT_OFFSET);
+        }
     }
 }
 
