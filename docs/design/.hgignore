@@ -1,0 +1,18 @@
+syntax: regexp
+
+\..*\.sw.
+(.*/)?\#[^/]*\#$
+\.log
+.*\~
+
+
+syntax: glob
+
+# generated files
+# Note: Do NOT include references.bib here, this should be committed once generated
+*.{aux,dvi,bbl,blg,brf,out,idx,ps,pdf,to?,diff,rel,com,cut}
+*-diff.tex
+*.sw[po]
+*.orig
+tmp.bib
+.DS_Store

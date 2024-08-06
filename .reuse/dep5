@@ -10,6 +10,11 @@ Files:
 Copyright: UNSW
 License: BSD-2-Clause
 
+Files:
+    docs/design/*
+Copyright: UNSW
+License: CC-BY-SA-4.0
+
 Files: libco/*
 Copyright: byuu and the higan team
 License: ISC

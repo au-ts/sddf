@@ -1,0 +1,19 @@
+load-req,load-ach,CPU,cycles/pkt,RTT mean,,,,
+10,9.98,0.03,29218.32,609
+20,20.00,0.05,30279.25,603
+50,50.00,0.12,28214.55,609
+100,100.00,0.22,25471.29,469
+200,200.00,0.34,19805.40,486
+300,300.00,0.43,16840.99,486
+400,400.00,0.50,14696.13,546
+500,499.99,0.57,13354.10,629
+600,600.01,0.62,12257.31,935
+700,700.03,0.68,11621.59,976
+800,800.02,0.74,10977.10,974
+900,899.98,0.79,10510.05,982
+957,956.95,0.83,10379.55,1517
+#,Source:,,,,,,,
+https://docs.google.com/spreadsheets/d/1d1hKhZVVbEvxm7ehs7sXc1KvGjfdJ0RHR4YiMPzR8O8/edit#gid=544160611,,,,,,,,
+#,Measured by Courtney using ipbench 2024-03-21,,,,,,,
+#,Single core 2 clients with thread memory release after ring buffer operations,,,,,,,
+#,Commit,95492dcc32abf8f8b4fc34297ba5c26fb181d891
