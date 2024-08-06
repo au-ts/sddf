@@ -36,22 +36,6 @@ static struct {
 } vswitch;
 
 
-static void debug_dump_packet(int len, uint8_t *buffer)
-{
-    struct ether_addr *macaddr = (struct ether_addr *)buffer;
-    sddf_dprintf("VIRTIO(NET)|DUMP PACKET:\n");
-    sddf_dprintf("dest MAC: "PR_MAC802_ADDR", src MAC: "PR_MAC802_ADDR", type: 0x%02x%02x, size: %d\n",
-            PR_MAC802_DEST_ADDR_ARGS(macaddr), PR_MAC802_SRC_ADDR_ARGS(macaddr),
-            macaddr->etype[0], macaddr->etype[1], len);
-    sddf_dprintf("-------------------- payload begin --------------------\n");
-    for (int i = 0; i < len; i++) {
-        sddf_dprintf("%02x ", macaddr->payload[i]);
-    }
-    sddf_dprintf("\n");
-    sddf_dprintf("--------------------- payload end ---------------------\n");
-    sddf_dprintf("\n");
-}
-
 static int channel_map_find(channel_map_t *map, const uint8_t *dest_macaddr)
 {
     for (int i = 0; i < map->len; i++) {
@@ -178,8 +162,7 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
-    for (int i = 0; i < VSWITCH_PORT_COUNT; i++)
-    {
+    for (int i = 0; i < VSWITCH_PORT_COUNT; i++) {
         net_vswitch_init_port(i, &vswitch.ports[i]);
         net_buffers_init(&vswitch.ports[i].outgoing.q, 0);
     }
