@@ -176,8 +176,10 @@ static bool handle_mbr_reply()
         return false;
     }
 
-    microkit_arm_vspace_data_invalidate(mbr_req_data.drv_addr,
-                                        mbr_req_data.drv_addr + (BLK_TRANSFER_SIZE * mbr_req_data.count));
+    /* TODO: This is a raw seL4 system call because Microkit does not (currently)
+     * include a corresponding libmicrokit API. */
+    seL4_ARM_VSpace_Invalidate_Data(3, mbr_req_data.drv_addr,
+                                    mbr_req_data.drv_addr + (BLK_TRANSFER_SIZE * mbr_req_data.count));
     sddf_memcpy(&msdos_mbr, (void *)mbr_req_data.drv_addr, sizeof(struct msdos_mbr));
     fsmalloc_free(&fsmalloc, mbr_req_data.drv_addr, mbr_req_data.count);
 
@@ -249,7 +251,9 @@ static void handle_driver()
             switch (cli_data.code) {
             case READ_BLOCKS:
                 // Invalidate cache
-                microkit_arm_vspace_data_invalidate(cli_data.drv_addr, cli_data.drv_addr + (BLK_TRANSFER_SIZE * cli_data.count));
+                /* TODO: This is a raw seL4 system call because Microkit does not (currently)
+                 * include a corresponding libmicrokit API. */
+                seL4_ARM_VSpace_Invalidate_Data(3, cli_data.drv_addr, cli_data.drv_addr + (BLK_TRANSFER_SIZE * cli_data.count));
                 // Copy data buffers from driver to client
                 sddf_memcpy((void *)cli_data.cli_addr, (void *)cli_data.drv_addr, BLK_TRANSFER_SIZE * cli_data.count);
                 err = blk_enqueue_resp(&h, SUCCESS, drv_success_count, cli_data.cli_req_id);
