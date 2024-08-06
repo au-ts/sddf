@@ -243,7 +243,7 @@ static inline uint32_t serial_enqueue_batch(serial_queue_handle_t *qh,
 
     sddf_memcpy(p, src, n_prewrap);
     if (n_postwrap) {
-        sddf_memcpy(p, src + n_prewrap, n_postwrap);
+        sddf_memcpy(qh->data_region, src + n_prewrap, n_postwrap);
     }
 
     serial_update_visible_tail(qh, qh->queue->tail + n);
