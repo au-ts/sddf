@@ -4,14 +4,32 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
 # Include this snippet in your project Makefile to build
-# the IMX8MQ iomuxc driver
+# the IMX8MQ pinctrl driver
 #
 # NOTES
-#  Generates iomuxc_driver.elf
-#  Requires libsddf_util_debug.a in ${LIBS} (MAYBE)? 
+#  Generates pinctrl.elf
 #  Has X parameters: TODO
-#  Needs three variables set in system description file:
-#  i2c_bus --- the i2c controller
-#  gpio --- the GPIO registers for the pinmux
-#  clk --- the clock registers
+#  Expects variable iomuxc_base to be set in the system description file to the
+#      mapped address of the I/O Mux controller.
 
+PINCTRL_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
+
+pinctrl_driver.elf: pinctrl/pinctrl.o pinctrl/pinctrl_config_data.o
+	$(LD) $(LDFLAGS) $? $(LIBS) -o $@
+
+pinctrl/pinctrl.o: $(PINCTRL_DIR)/pinctrl.c
+	${CC} ${CFLAGS} -c $< -o $@
+
+pinctrl/pinctrl_config_data.o: pinctrl/pinctrl_config_data.s
+	${AS} $< -o $@
+
+pinctrl/pinctrl_config_data.s:
+	python3 $(PINCTRL_DIR)/create_pinctrl_config.py imx8mq-evk maaxboard.dts build
+
+pinctrl:
+	mkdir -p pinctrl
+
+clean::
+	rm -rf pinctrl
+clobber::
+	rm -f pinctrl_driver.elf

@@ -57,7 +57,7 @@ if __name__ == "__main__":
 
             # This is an interesting way of writing my dict values to an assembly file
             # It works so I won't bother changing it right now
-            with open(out_dir + "/pinmux_config_data.s", "w") as file:
+            with open(out_dir + "/pinctrl_config_data.s", "w") as file:
                 file.write("\t.section .data\n")
 
                 file.write("\t.global num_iomuxc_configs\n")
