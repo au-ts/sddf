@@ -22,21 +22,20 @@
 #define PR_MAC802_DEST_ADDR_ARGS(a) PR_MAC802_ADDR_ARGS(a, dest)
 #define PR_MAC802_SRC_ADDR_ARGS(a) PR_MAC802_ADDR_ARGS(a, src)
 
+#define MAC802_BYTES 6
+
 /* This is a name for the 96 bit ethernet addresses available on many
    systems.  */
 struct ether_addr {
-    uint8_t ether_dest_addr_octet[6];
-    uint8_t ether_src_addr_octet[6];
+    uint8_t ether_dest_addr_octet[MAC802_BYTES];
+    uint8_t ether_src_addr_octet[MAC802_BYTES];
     uint8_t etype[2]; // Ethertype
     uint8_t payload[46];
     uint8_t crc[4];
 } __attribute__ ((__packed__));
 
-// uint8_t null_macaddr[6] = {0, 0, 0, 0, 0, 0};
-uint8_t bcast_macaddr[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-// uint8_t ipv6_multicast_macaddr[6] = {0x33, 0x33, 0x0, 0x0, 0x0, 0x0};
 
-inline bool mac802_addr_eq_num(uint8_t *addr0, uint8_t *addr1, unsigned int num)
+static inline bool mac802_addr_eq_num(const uint8_t *addr0, const uint8_t *addr1, unsigned int num)
 {
     for (int i = 0; i < num; i++) {
         if (addr0[i] != addr1[i]) {
@@ -46,25 +45,13 @@ inline bool mac802_addr_eq_num(uint8_t *addr0, uint8_t *addr1, unsigned int num)
     return true;
 }
 
-inline void mac802_addr_cp(uint8_t *addr_src, uint8_t *addr_dest, uint8_t offset)
+static inline bool mac802_addr_eq(const uint8_t *addr0, const uint8_t *addr1)
 {
-    for (int i = 0; i < 5; i++) {
-        addr_dest[i] = addr_src[i];
-    }
-    addr_dest[5] = addr_src[5] + offset;
+    return mac802_addr_eq_num(addr0, addr1, MAC802_BYTES);
 }
 
-inline bool mac802_addr_eq(uint8_t *addr0, uint8_t *addr1)
+static inline bool mac802_addr_is_bcast(const uint8_t *addr)
 {
-    return mac802_addr_eq_num(addr0, addr1, 6);
-}
-
-inline bool mac802_addr_eq_bcast(uint8_t *addr)
-{
+    const uint8_t bcast_macaddr[MAC802_BYTES] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
     return mac802_addr_eq(addr, bcast_macaddr);
 }
-
-// inline bool mac802_addr_eq_ipv6_mcast(uint8_t *addr)
-// {
-//     return mac802_addr_eq_num(addr, ipv6_multicast_macaddr, 2);
-// }

@@ -52,7 +52,7 @@ static void debug_dump_packet(int len, uint8_t *buffer)
     sddf_dprintf("\n");
 }
 
-static int channel_map_find(channel_map_t *map, uint8_t *dest_macaddr)
+static int channel_map_find(channel_map_t *map, const uint8_t *dest_macaddr)
 {
     for (int i = 0; i < map->len; i++) {
         if (mac802_addr_eq(map->macs[i].addr, dest_macaddr)) {
@@ -62,7 +62,7 @@ static int channel_map_find(channel_map_t *map, uint8_t *dest_macaddr)
     return UNKNOWN_PORT;
 }
 
-static bool channel_map_add(channel_map_t *map, uint8_t *macaddr, int port)
+static bool channel_map_add(channel_map_t *map, const uint8_t *macaddr, int port)
 {
     if (map->len >= VSWITCH_LOOKUP_SIZE) {
         sddf_dprintf("VSWITCH: Channel map is full\n");
@@ -71,7 +71,7 @@ static bool channel_map_add(channel_map_t *map, uint8_t *macaddr, int port)
     if (channel_map_find(map, macaddr) != UNKNOWN_PORT) {
         return false;
     }
-    if (mac802_addr_eq(macaddr, bcast_macaddr)) {
+    if (mac802_addr_is_bcast(macaddr)) {
         return false;
     }
 
@@ -111,7 +111,7 @@ static void try_broadcast(int src_port, vswitch_port_t *src, net_buff_desc_t *bu
     }
 }
 
-static void try_send(vswitch_port_t *src, uint8_t *dest_macaddr, net_buff_desc_t *buffer)
+static void try_send(vswitch_port_t *src, const uint8_t *dest_macaddr, net_buff_desc_t *buffer)
 {
     int dest_port = channel_map_find(&vswitch.map, dest_macaddr);
 
@@ -133,15 +133,14 @@ static void notified_by_port(int port)
     bool reprocess = true;
     while (reprocess) {
         while (net_dequeue_active(src_queue, &sddf_buffer) != -1) {
-            char *frame_data = src->incoming.data_region + sddf_buffer.io_or_offset;
-
-            struct ether_addr *macaddr = (struct ether_addr *)frame_data;
+            const char *frame_data = src->incoming.data_region + sddf_buffer.io_or_offset;
+            const struct ether_addr *macaddr = (void *)frame_data;
 
             // Add forwarding table entry from source MAC to port
             channel_map_add(&vswitch.map, macaddr->ether_src_addr_octet, port);
 
             // Forward frame
-            if (mac802_addr_eq(macaddr->ether_dest_addr_octet, bcast_macaddr)) {
+            if (mac802_addr_is_bcast(macaddr->ether_dest_addr_octet)) {
                 try_broadcast(port, src, &sddf_buffer);
             } else {
                 try_send(src, macaddr->ether_dest_addr_octet, &sddf_buffer);
