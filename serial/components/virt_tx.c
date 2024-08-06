@@ -157,7 +157,7 @@ void tx_return(void)
 
     if (transferred && serial_require_producer_signal(&tx_queue_handle_drv)) {
         serial_cancel_producer_signal(&tx_queue_handle_drv);
-        microkit_deferred_notify(DRIVER_CH);
+        microkit_notify(DRIVER_CH);
     }
 
     for (uint32_t client = 0; client < SERIAL_NUM_CLIENTS; client++) {
@@ -197,7 +197,7 @@ void tx_provide(microkit_channel ch)
 
     if (transferred && serial_require_consumer_signal(&tx_queue_handle_cli[active_client])) {
         serial_cancel_consumer_signal(&tx_queue_handle_cli[active_client]);
-        microkit_deferred_notify(ch);
+        microkit_notify(ch);
     }
 }
 
