@@ -1,3 +1,8 @@
+/*
+ * Copyright 2024, UNSW
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
 #include <stdbool.h>
 #include <stdint.h>
 #include <microkit.h>
@@ -150,7 +155,7 @@ void tx_return(void)
 
     if (transferred && serial_require_producer_signal(&tx_queue_handle_drv)) {
         serial_cancel_producer_signal(&tx_queue_handle_drv);
-        microkit_notify_delayed(DRIVER_CH);
+        microkit_deferred_notify(DRIVER_CH);
     }
 }
 
@@ -178,7 +183,7 @@ void tx_provide(microkit_channel ch)
 
     if (transferred && serial_require_producer_signal(&tx_queue_handle_drv)) {
         serial_cancel_producer_signal(&tx_queue_handle_drv);
-        microkit_notify_delayed(DRIVER_CH);
+        microkit_deferred_notify(DRIVER_CH);
     }
 }
 

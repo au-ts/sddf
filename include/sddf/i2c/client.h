@@ -5,6 +5,8 @@
  */
 #pragma once
 
+#include <stdint.h>
+#include <stdbool.h>
 #include <microkit.h>
 
 /* By default we assume a 7-bit bus address. */

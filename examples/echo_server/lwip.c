@@ -328,9 +328,9 @@ void init(void)
     if (notify_rx && net_require_signal_free(&state.rx_queue)) {
         net_cancel_signal_free(&state.rx_queue);
         notify_rx = false;
-        if (!have_signal) {
-            microkit_notify_delayed(RX_CH);
-        } else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + RX_CH) {
+        if (!microkit_have_signal) {
+            microkit_deferred_notify(RX_CH);
+        } else if (microkit_signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + RX_CH) {
             microkit_notify(RX_CH);
         }
     }
@@ -338,9 +338,9 @@ void init(void)
     if (notify_tx && net_require_signal_active(&state.tx_queue)) {
         net_cancel_signal_active(&state.tx_queue);
         notify_tx = false;
-        if (!have_signal) {
-            microkit_notify_delayed(TX_CH);
-        } else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + TX_CH) {
+        if (!microkit_have_signal) {
+            microkit_deferred_notify(TX_CH);
+        } else if (microkit_signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + TX_CH) {
             microkit_notify(TX_CH);
         }
     }
@@ -368,9 +368,9 @@ void notified(microkit_channel ch)
     if (notify_rx && net_require_signal_free(&state.rx_queue)) {
         net_cancel_signal_free(&state.rx_queue);
         notify_rx = false;
-        if (!have_signal) {
-            microkit_notify_delayed(RX_CH);
-        } else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + RX_CH) {
+        if (!microkit_have_signal) {
+            microkit_deferred_notify(RX_CH);
+        } else if (microkit_signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + RX_CH) {
             microkit_notify(RX_CH);
         }
     }
@@ -378,9 +378,9 @@ void notified(microkit_channel ch)
     if (notify_tx && net_require_signal_active(&state.tx_queue)) {
         net_cancel_signal_active(&state.tx_queue);
         notify_tx = false;
-        if (!have_signal) {
-            microkit_notify_delayed(TX_CH);
-        } else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + TX_CH) {
+        if (!microkit_have_signal) {
+            microkit_deferred_notify(TX_CH);
+        } else if (microkit_signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + TX_CH) {
             microkit_notify(TX_CH);
         }
     }

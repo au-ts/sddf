@@ -311,7 +311,7 @@ void init(void)
 #endif
 }
 
-void fault(microkit_id id, microkit_msginfo msginfo)
+seL4_Bool fault(microkit_child id, microkit_msginfo msginfo, microkit_msginfo *reply_msginfo)
 {
     sddf_printf("BENCH|LOG: Faulting PD ");
     print_pdid_name(id);
@@ -348,4 +348,6 @@ void fault(microkit_id id, microkit_msginfo msginfo)
         sddf_printf("Unknown fault\n");
         break;
     }
+
+    return seL4_False;
 }

@@ -1,0 +1,19 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: seL4 Device Driver Framework
+Source: https://github.com/au-ts/sddf
+
+Files:
+    build.zig.zon
+    examples/i2c/build.zig.zon
+    examples/serial/build.zig.zon
+    examples/timer/build.zig.zon
+Copyright: UNSW
+License: BSD-2-Clause
+
+Files: libco/*
+Copyright: byuu and the higan team
+License: ISC
+
+Files: network/ipstacks/lwip/*
+Copyright: Copyright (c) 2001-2004 Swedish Institute of Computer Science
+License: LicenseRef-BSD-LWIP

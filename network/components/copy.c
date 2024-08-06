@@ -1,3 +1,8 @@
+/*
+ * Copyright 2024, UNSW
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
 #include <stdbool.h>
 #include <microkit.h>
 #include <sddf/network/queue.h>
@@ -81,7 +86,7 @@ void rx_return(void)
 
     if (enqueued && net_require_signal_free(&rx_queue_virt)) {
         net_cancel_signal_free(&rx_queue_virt);
-        microkit_notify_delayed(VIRT_RX_CH);
+        microkit_deferred_notify(VIRT_RX_CH);
     }
 }
 

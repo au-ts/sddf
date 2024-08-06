@@ -456,7 +456,7 @@ void notified(microkit_channel ch)
     switch (ch) {
     case IRQ_CH:
         handle_irq();
-        microkit_irq_ack_delayed(ch);
+        microkit_deferred_irq_ack(ch);
         break;
     case RX_CH:
         rx_provide();

@@ -87,7 +87,7 @@ void process_request(microkit_channel ch) {
     }
 
     if (enqueued) {
-        microkit_notify_delayed(DRIVER_CH);
+        microkit_deferred_notify(DRIVER_CH);
     }
 }
 

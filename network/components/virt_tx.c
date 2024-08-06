@@ -1,3 +1,8 @@
+/*
+ * Copyright 2024, UNSW
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
 #include <microkit.h>
 #include <sddf/network/queue.h>
 #include <sddf/util/cache.h>
@@ -79,7 +84,7 @@ void tx_provide(void)
 
     if (enqueued && net_require_signal_active(&state.tx_queue_drv)) {
         net_cancel_signal_active(&state.tx_queue_drv);
-        microkit_notify_delayed(DRIVER);
+        microkit_deferred_notify(DRIVER);
     }
 }
 

@@ -1,3 +1,9 @@
+#
+# Copyright 2024, UNSW
+#
+# SPDX-License-Identifier: BSD-2-Clause
+#
+
 ifeq ($(strip $(MICROKIT_SDK)),)
 $(error MICROKIT_SDK must be specified)
 endif
@@ -10,7 +16,7 @@ MICROKIT_CONFIG ?= debug
 ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
 	export TIMER_DRIVER_DIR := meson
 	export CPU := cortex-a55
-else ifeq ($(strip $(MICROKIT_BOARD)), qemu_arm_virt)
+else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
 	export TIMER_DRIVER_DIR := arm
 	export CPU := cortex-a53
 	QEMU := qemu-system-aarch64

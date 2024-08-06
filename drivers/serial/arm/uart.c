@@ -1,3 +1,8 @@
+/*
+ * Copyright 2024, UNSW
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
 #include <stdbool.h>
 #include <stdint.h>
 #include <microkit.h>
@@ -180,7 +185,7 @@ void notified(microkit_channel ch)
     switch (ch) {
     case IRQ_CH:
         handle_irq();
-        microkit_irq_ack_delayed(ch);
+        microkit_deferred_irq_ack(ch);
         break;
     case TX_CH:
         tx_provide();

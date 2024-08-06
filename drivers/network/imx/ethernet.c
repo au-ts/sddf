@@ -318,7 +318,7 @@ void notified(microkit_channel ch)
          * Delay calling into the kernel to ack the IRQ until the next loop
          * in the microkit event handler loop.
          */
-        microkit_irq_ack_delayed(ch);
+        microkit_deferred_irq_ack(ch);
         break;
     case RX_CH:
         rx_provide();

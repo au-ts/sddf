@@ -1,3 +1,13 @@
+/*
+ * Copyright 2024, UNSW
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
+#pragma once
+
+#include <stdbool.h>
+#include <stdint.h>
+
 #define I2C_VIRTUALISER_CH (0)
 #define TIMER_CH (1)
 

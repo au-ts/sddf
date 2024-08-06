@@ -1,3 +1,8 @@
+/*
+ * Copyright 2024, UNSW
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
 #include <string.h>
 #include <microkit.h>
 #include <sddf/network/queue.h>
@@ -170,7 +175,7 @@ void receive(void)
 
     if (transmitted && net_require_signal_active(&tx_queue)) {
         net_cancel_signal_active(&tx_queue);
-        microkit_notify_delayed(TX_CH);
+        microkit_deferred_notify(TX_CH);
     }
 }
 

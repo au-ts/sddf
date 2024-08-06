@@ -37,7 +37,7 @@ MICROKIT_TOOL := $(MICROKIT_SDK)/bin/microkit
 ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
 	DRIVER_DIR := meson
 	CPU := cortex-a55
-else ifeq ($(strip $(MICROKIT_BOARD)), qemu_arm_virt)
+else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
 	DRIVER_DIR := arm
 	CPU := cortex-a53
 else ifeq ($(strip $(MICROKIT_BOARD)), maaxboard)
