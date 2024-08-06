@@ -1,12 +1,27 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <system>
-    <memory_region name="iomuxc_device" size="0x10_000" phys_addr="0x30330000" />
-    <memory_region name="uart1" size="0x1_000" phys_addr="0x30860000" />
+    <memory_region name="iomuxc_device" size="0x10000" phys_addr="0x30330000" />
+    <memory_region name="timer" size="0x10000" phys_addr="0x302d0000" />
 
-    <protection_domain name="iomuxc" priority="254">
-        <program_image path="iomuxc_driver.elf" />
+    <protection_domain name="iomuxc" priority="253" pp="true" passive="true">
+        <program_image path="iomuxc.elf" />
 
-        <map mr="iomuxc_device" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="iomuxc_base" />
-        <map mr="uart1" vaddr="0x6_000_000" perms="rw" cached="false" setvar_vaddr="uart1_base" />
+        <map mr="iomuxc_device" vaddr="0x2_000_000" perms="rw" cached="false" setvar_vaddr="iomuxc_base" />
     </protection_domain>
+
+    <protection_domain name="timer" priority="252" pp="true" passive="true">
+        <program_image path="timer.elf" />
+
+        <map mr="timer" vaddr="0x2_000_000" perms="rw" cached="false" setvar_vaddr="gpt_regs" />
+        <irq irq="87" id="0" /> <!-- timer interrupt -->
+    </protection_domain>
+
+    <protection_domain name="client" priority="0">
+        <program_image path="client.elf" />
+    </protection_domain>
+
+    <channel>
+        <end pd="timer" id="1" />
+        <end pd="client" id="1" />
+    </channel>
 </system>

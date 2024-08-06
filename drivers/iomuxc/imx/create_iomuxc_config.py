@@ -9,7 +9,7 @@ def get_value_from_bytes_array(byte_array: bytes, index: int):
     "Extracts a 4-byte integer value from a 'bytes' array at a certain index"
     return int.from_bytes(byte_array[index*UINT32_T_SIZE : (index+1)* UINT32_T_SIZE], 'big', signed=False)
 
-def get_imx8mm_pinctrl_info(device_nodes):
+def get_pinctrl_info(device_nodes):
 
     # Our information dictionary will look like this
     return_dict = {
@@ -52,7 +52,7 @@ if __name__ == "__main__":
     # For the imx8mm-evk, we have to locate the "pinctrl" device in the dts to be able to get our relevant info
     for node in devicetree.node_iter():
         if "iomuxc" in node.name:
-            pinmux_dict = get_imx8mm_pinctrl_info(node.nodes[soc_name])
+            pinmux_dict = get_pinctrl_info(node.nodes[soc_name])
             nums_pin_properties = len(pinmux_dict['mux_reg'])
 
             # This is an interesting way of writing my dict values to an assembly file
