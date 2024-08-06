@@ -1,4 +1,5 @@
 #pragma once
+#include <microkit.h>
 #include <sddf/network/queue.h>
 
 #define VSWITCH_MAX_PORT_COUNT 64
@@ -7,7 +8,7 @@ typedef uint64_t vswitch_port_bitmap_t;
 
 typedef struct vswitch_channel {
     net_queue_handle_t q;
-    size_t ch;
+    microkit_channel ch;
     char *data_region;
 } vswitch_channel_t;
 
