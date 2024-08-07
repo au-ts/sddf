@@ -3,14 +3,14 @@
     <memory_region name="iomuxc_device" size="0x10000" phys_addr="0x30330000" />
     <memory_region name="timer" size="0x10000" phys_addr="0x302d0000" />
 
-    <protection_domain name="iomuxc" priority="253" pp="true" passive="true">
-        <program_image path="iomuxc.elf" />
+    <protection_domain name="pinctrl" priority="253" pp="true" passive="true">
+        <program_image path="pinctrl_driver.elf" />
 
         <map mr="iomuxc_device" vaddr="0x2_000_000" perms="rw" cached="false" setvar_vaddr="iomuxc_base" />
     </protection_domain>
 
     <protection_domain name="timer" priority="252" pp="true" passive="true">
-        <program_image path="timer.elf" />
+        <program_image path="timer_driver.elf" />
 
         <map mr="timer" vaddr="0x2_000_000" perms="rw" cached="false" setvar_vaddr="gpt_regs" />
         <irq irq="87" id="0" /> <!-- timer interrupt -->
