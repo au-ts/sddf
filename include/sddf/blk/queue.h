@@ -34,48 +34,48 @@ typedef struct blk_storage_info {
 } blk_storage_info_t;
 
 /* Request code for block */
-typedef enum blk_request_code {
-    READ_BLOCKS,
-    WRITE_BLOCKS,
-    FLUSH,
-    BARRIER,
-} blk_request_code_t;
+typedef enum blk_req_code {
+    BLK_REQ_READ,
+    BLK_REQ_WRITE,
+    BLK_REQ_FLUSH,
+    BLK_REQ_BARRIER,
+} blk_req_code_t;
 
 /* Response status for block */
-typedef enum blk_response_status {
-    SUCCESS,
-    SEEK_ERROR
-} blk_response_status_t;
+typedef enum blk_resp_status {
+    BLK_RESP_OK,
+    BLK_RESP_SEEK_ERROR,
+} blk_resp_status_t;
 
 /* Request struct contained in request queue */
-typedef struct blk_request {
-    blk_request_code_t code; /* request code */
+typedef struct blk_req {
+    blk_req_code_t code; /* request code */
     uint64_t io_or_offset; /* offset of buffer within buffer memory region or io address of buffer */
     uint32_t block_number; /* block number to read/write to */
     uint16_t count; /* number of blocks to read/write */
     uint32_t id; /* stores request ID */
-} blk_request_t;
+} blk_req_t;
 
 /* Response struct contained in response queue */
-typedef struct blk_response {
-    blk_response_status_t status; /* response status */
+typedef struct blk_resp {
+    blk_resp_status_t status; /* response status */
     uint16_t success_count; /* number of blocks successfully read/written */
     uint32_t id; /* stores corresponding request ID */
-} blk_response_t;
+} blk_resp_t;
 
 /* Circular buffer containing requests */
 typedef struct blk_req_queue {
     uint32_t head;
     uint32_t tail;
     bool plugged; /* prevent requests from being dequeued when plugged */
-    blk_request_t buffers[];
+    blk_req_t buffers[];
 } blk_req_queue_t;
 
 /* Circular buffer containing responses */
 typedef struct blk_resp_queue {
     uint32_t head;
     uint32_t tail;
-    blk_response_t buffers[];
+    blk_resp_t buffers[];
 } blk_resp_queue_t;
 
 /* A queue handle for queueing/dequeueing request and responses */
@@ -110,7 +110,7 @@ static inline void blk_queue_init(blk_queue_handle_t *h,
  *
  * @return true indicates the request queue is empty, false otherwise.
  */
-static inline bool blk_req_queue_empty(blk_queue_handle_t *h)
+static inline bool blk_queue_empty_req(blk_queue_handle_t *h)
 {
     return h->req_queue->tail - h->req_queue->head == 0;
 }
@@ -122,7 +122,7 @@ static inline bool blk_req_queue_empty(blk_queue_handle_t *h)
  *
  * @return true indicates the response queue is empty, false otherwise.
  */
-static inline bool blk_resp_queue_empty(blk_queue_handle_t *h)
+static inline bool blk_queue_empty_resp(blk_queue_handle_t *h)
 {
     return h->resp_queue->tail - h->resp_queue->head == 0;
 }
@@ -134,7 +134,7 @@ static inline bool blk_resp_queue_empty(blk_queue_handle_t *h)
  *
  * @return true indicates the request queue is full, false otherwise.
  */
-static inline bool blk_req_queue_full(blk_queue_handle_t *h)
+static inline bool blk_queue_full_req(blk_queue_handle_t *h)
 {
     return h->req_queue->tail - h->req_queue->head + 1 == h->capacity;
 }
@@ -146,7 +146,7 @@ static inline bool blk_req_queue_full(blk_queue_handle_t *h)
  *
  * @return true indicates the response queue is full, false otherwise.
  */
-static inline bool blk_resp_queue_full(blk_queue_handle_t *h)
+static inline bool blk_queue_full_resp(blk_queue_handle_t *h)
 {
     return h->resp_queue->tail - h->resp_queue->head + 1 == h->capacity;
 }
@@ -158,7 +158,7 @@ static inline bool blk_resp_queue_full(blk_queue_handle_t *h)
  *
  * @return number of elements in the queue.
  */
-static inline int blk_req_queue_length(blk_queue_handle_t *h)
+static inline int blk_queue_length_req(blk_queue_handle_t *h)
 {
     return (h->req_queue->tail - h->req_queue->head);
 }
@@ -170,7 +170,7 @@ static inline int blk_req_queue_length(blk_queue_handle_t *h)
  *
  * @return number of elements in the queue.
  */
-static inline int blk_resp_queue_length(blk_queue_handle_t *h)
+static inline int blk_queue_length_resp(blk_queue_handle_t *h)
 {
     return (h->resp_queue->tail - h->resp_queue->head);
 }
@@ -188,16 +188,16 @@ static inline int blk_resp_queue_length(blk_queue_handle_t *h)
  * @return -1 when request queue is full, 0 on success.
  */
 static inline int blk_enqueue_req(blk_queue_handle_t *h,
-                                  blk_request_code_t code,
+                                  blk_req_code_t code,
                                   uintptr_t io_or_offset,
                                   uint32_t block_number,
                                   uint16_t count,
                                   uint32_t id)
 {
-    struct blk_request *brp;
+    struct blk_req *brp;
     struct blk_req_queue *brqp;
 
-    if (blk_req_queue_full(h)) {
+    if (blk_queue_full_req(h)) {
         return -1;
     }
 
@@ -227,13 +227,13 @@ static inline int blk_enqueue_req(blk_queue_handle_t *h,
  * @return -1 when response queue is full, 0 on success.
  */
 static inline int blk_enqueue_resp(blk_queue_handle_t *h,
-                                   blk_response_status_t status,
+                                   blk_resp_status_t status,
                                    uint16_t success_count,
                                    uint32_t id)
 {
-    struct blk_response *brp;
+    struct blk_resp *brp;
     struct blk_resp_queue *brqp;
-    if (blk_resp_queue_full(h)) {
+    if (blk_queue_full_resp(h)) {
         return -1;
     }
 
@@ -262,15 +262,15 @@ static inline int blk_enqueue_resp(blk_queue_handle_t *h,
  * @return -1 when request queue is empty, 0 on success.
  */
 static inline int blk_dequeue_req(blk_queue_handle_t *h,
-                                  blk_request_code_t *code,
+                                  blk_req_code_t *code,
                                   uintptr_t *io_or_offset,
                                   uint32_t *block_number,
                                   uint16_t *count,
                                   uint32_t *id)
 {
-    struct blk_request *brp;
+    struct blk_req *brp;
     struct blk_req_queue *brqp;
-    if (blk_req_queue_empty(h)) {
+    if (blk_queue_empty_req(h)) {
         return -1;
     }
 
@@ -298,13 +298,13 @@ static inline int blk_dequeue_req(blk_queue_handle_t *h,
  * @return -1 when response queue is empty, 0 on success.
  */
 static inline int blk_dequeue_resp(blk_queue_handle_t *h,
-                                   blk_response_status_t *status,
+                                   blk_resp_status_t *status,
                                    uint16_t *success_count,
                                    uint32_t *id)
 {
-    struct blk_response *brp;
+    struct blk_resp *brp;
     struct blk_resp_queue *brqp;
-    if (blk_resp_queue_empty(h)) {
+    if (blk_queue_empty_resp(h)) {
         return -1;
     }
 
@@ -325,7 +325,7 @@ static inline int blk_dequeue_resp(blk_queue_handle_t *h,
  *
  * @param h queue handle containing request queue to check for plug.
 */
-static inline void blk_req_queue_plug(blk_queue_handle_t *h)
+static inline void blk_queue_plug_req(blk_queue_handle_t *h)
 {
     h->req_queue->plugged = true;
 }
@@ -335,7 +335,7 @@ static inline void blk_req_queue_plug(blk_queue_handle_t *h)
  *
  * @param h queue handle containing request queue to check for plug.
 */
-static inline void blk_req_queue_unplug(blk_queue_handle_t *h)
+static inline void blk_queue_unplug_req(blk_queue_handle_t *h)
 {
     h->req_queue->plugged = false;
 }
@@ -347,7 +347,7 @@ static inline void blk_req_queue_unplug(blk_queue_handle_t *h)
  *
  * @return true when request queue is plugged, false when unplugged.
 */
-static inline bool blk_req_queue_plugged(blk_queue_handle_t *h)
+static inline bool blk_queue_plugged_req(blk_queue_handle_t *h)
 {
     return h->req_queue->plugged;
 }
