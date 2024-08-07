@@ -7,7 +7,7 @@
 
 This is an example to show a single client reading & writing from an SD card.
 
-It has been developed on an Avnet MaaXBoard, and tested on an IMX8MM_EVK board.
+It has been developed on an Avnet MaaXBoard. It has been tested on both the MaaXBoard and NXP i.MX8MM-EVK platforms.
 
 The client reads & writes to the 3rd partition on the SD card (0-index = 2).
 It _will_ overwrite data in this partition.
