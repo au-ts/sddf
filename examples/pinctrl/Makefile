@@ -14,6 +14,7 @@ BUILD_DIR ?= build
 MICROKIT_CONFIG ?= debug
 
 ifeq ($(strip $(MICROKIT_BOARD)), maaxboard)
+	export TIMER_DRIVER_DIR := imx
 	export PINCTRL_DRIVER_DIR := imx
 	export CPU := cortex-a53
 else
