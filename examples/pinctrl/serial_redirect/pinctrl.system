@@ -21,6 +21,11 @@
     </protection_domain>
 
     <channel>
+        <end pd="pinctrl" id="0" />
+        <end pd="client" id="0" />
+    </channel>
+
+    <channel>
         <end pd="timer" id="1" />
         <end pd="client" id="1" />
     </channel>
