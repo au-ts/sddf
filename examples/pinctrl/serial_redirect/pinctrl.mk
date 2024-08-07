@@ -23,6 +23,8 @@ MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 UTIL := $(SDDF)/util
 
+LIBMICROKITCO_PATH := $(TOP)/libmicrokitco
+
 IMAGES := timer_driver.elf pinctrl_driver.elf client.elf
 CFLAGS := -mcpu=$(CPU) \
 		  -mstrict-align \
@@ -32,7 +34,9 @@ CFLAGS := -mcpu=$(CPU) \
 		  -O3 \
 		  -Wall -Wno-unused-function -Werror -Wno-unused-command-line-argument \
 		  -I$(BOARD_DIR)/include \
-		  -I$(SDDF)/include 
+		  -I$(SDDF)/include \
+		  -I$(LIBMICROKITCO_PATH) \
+		  -I$(TOP)
 
 LDFLAGS := -L$(BOARD_DIR)/lib -L.
 LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
@@ -52,9 +56,16 @@ include ${TIMER_DRIVER}/timer_driver.mk
 include ${PINCTRL_DRIVER}/pinctrl_driver.mk
 include ${SDDF}/util/util.mk
 
+LIBMICROKITCO_OPT_PATH := $(TOP)
+export LIBMICROKITCO_PATH LIBMICROKITCO_OPT_PATH MICROKIT_SDK BUILD_DIR MICROKIT_BOARD MICROKIT_CONFIG CPU 
+
+libmicrokitco.a:
+	make -f $(LIBMICROKITCO_PATH)/Makefile TARGET=aarch64-none-elf TOOLCHAIN=aarch64-none-elf
+	mv $(BUILD_DIR)/libmicrokitco/libmicrokitco.a libmicrokitco.a
+
 client.o: ${TOP}/client.c
 	$(CC) -c $(CFLAGS) $< -o client.o
-client.elf: client.o
+client.elf: client.o libmicrokitco.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
