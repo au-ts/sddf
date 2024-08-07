@@ -6,8 +6,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <microkit.h>
-#include <sddf/network/queue.h>
 #include <sddf/network/constants.h>
+#include <sddf/network/queue.h>
+#include <sddf/network/util.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 #include <sddf/util/cache.h>
@@ -202,10 +203,21 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
-    net_virt_mac_addr_init_sys(microkit_name, (uint8_t *) state.mac_addrs);
+    uint64_t macs[NUM_NETWORK_CLIENTS] = {0};
+    queue_info_t queue_info[NUM_NETWORK_CLIENTS] = {0};
 
+    net_virt_mac_addrs(microkit_name, macs);
+    net_virt_queue_info(microkit_name, rx_free_cli0, rx_active_cli0, queue_info);
+
+    /* Set up client queues */
+    for (int i = 0; i < NUM_NETWORK_CLIENTS; i++) {
+        __net_set_mac_addr((uint8_t *) &state.mac_addrs[i], macs[i]);
+        net_queue_init(&state.rx_queue_clients[i], queue_info[i].free, queue_info[i].active,
+                       queue_info[i].size);
+    }
+
+    /* Set up driver queues */
     net_queue_init(&state.rx_queue_drv, rx_free_drv, rx_active_drv, NET_RX_QUEUE_SIZE_DRIV);
-    net_virt_queue_init_sys(microkit_name, state.rx_queue_clients, rx_free_cli0, rx_active_cli0);
     net_buffers_init(&state.rx_queue_drv, buffer_data_paddr);
 
     if (net_require_signal_free(&state.rx_queue_drv)) {
