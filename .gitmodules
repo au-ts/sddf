@@ -1,0 +1,3 @@
+[submodule "examples/pinctrl/serial_redirect/libmicrokitco"]
+	path = examples/pinctrl/serial_redirect/libmicrokitco
+	url = https://github.com/au-ts/libmicrokitco.git
