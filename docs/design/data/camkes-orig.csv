@@ -1,0 +1,15 @@
+#load-req,load-ach,CPU,cycles/pckt,RTT mean
+20,20,7.79,46832
+40,40,14.77,46646.6
+60,60,21.32,46581.7
+80,80,27.62,46624.9
+100,100,33.75,46611.4
+120,120,39.82,46498.1
+150,150,48.57,46371.6
+180,180,57.13,46309.8
+200,200,65.64,48385.7
+210,210,69.21,48595.9
+220,220,72.20,48580.9
+#,Source: https://docs.google.com/spreadsheets/d/1YogSNoPpHuCwbNt4xob0HwUjzAio615C6jGB-P7dOQI
+#,Measured by Curtis,20/5/2021
+#,Original CAmkES
