@@ -7,8 +7,7 @@
 
 This is an example to show a single client reading & writing from an SD card.
 
-This example is intended to be used with an Avnet MaaXBoard.
-It has been tested and developed on that platform.
+It has been developed on an Avnet MaaXBoard, and tested on an IMX8MM_EVK board.
 
 The client reads & writes to the 3rd partition on the SD card (0-index = 2).
 It _will_ overwrite data in this partition.
@@ -22,7 +21,10 @@ The example has been tested using a Class 4 SanDisk 8GiB microSD card formatted 
 make MICROKIT_SDK=<path/to/sdk> MICROKIT_BOARD=<board> MICROKIT_CONFIG=<debug/release>
 ```
 
-Currently the only option for `MICROKIT_BOARD` is "maaxboard".
+Currently the options for `MICROKIT_BOARD` are:
+
+* maaxboard
+* imx8mm_evk
 
 ## Running
 
