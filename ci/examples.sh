@@ -25,6 +25,7 @@ NETWORK=true
 I2C=true
 SERIAL=true
 TIMER=true
+BLK=true
 
 build_network_echo_server_make() {
     BOARD=$1
@@ -112,6 +113,20 @@ build_serial_zig() {
     zig build -Dsdk=${SDK_PATH} -Dboard=${BOARD} -Dconfig=${CONFIG} -p ${BUILD_DIR}
 }
 
+build_blk_make() {
+    BOARD=$1
+    CONFIG=$2
+    echo "CI|INFO: building blk example with Make, board: ${BOARD}, config: ${CONFIG}"
+    BUILD_DIR="${PWD}/${CI_BUILD_DIR}/examples/blk/mmc/make/${BOARD}/${CONFIG}"
+    rm -rf ${BUILD_DIR}
+    mkdir -p ${BUILD_DIR}
+    make -j${NUM_JOBS} -C ${SDDF}/examples/blk/mmc \
+        BUILD_DIR=${BUILD_DIR} \
+        MICROKIT_CONFIG=${CONFIG} \
+        MICROKIT_SDK=${SDK_PATH} \
+        MICROKIT_BOARD=${BOARD}
+}
+
 network() {
     BOARDS=("odroidc4" "imx8mm_evk" "maaxboard" "qemu_virt_aarch64")
     CONFIGS=("debug" "release" "benchmark")
@@ -163,11 +178,24 @@ serial() {
     done
 }
 
+blk() {
+    BOARDS=("maaxboard")
+    CONFIGS=("debug" "release")
+    for BOARD in "${BOARDS[@]}"
+    do
+      for CONFIG in "${CONFIGS[@]}"
+      do
+         build_blk_make ${BOARD} ${CONFIG}
+      done
+    done
+}
+
 # Only run the examples that have been enabled
 $NETWORK && network
 $I2C && i2c
 $TIMER && timer
 $SERIAL && serial
+$BLK && blk
 
 echo ""
 echo "CI|INFO: Passed all sDDF tests"
