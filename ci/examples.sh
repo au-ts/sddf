@@ -61,8 +61,9 @@ build_i2c_zig() {
     echo "CI|INFO: building I2C example with Zig, board: ${BOARD}, config: ${CONFIG}"
     BUILD_DIR="${PWD}/${CI_BUILD_DIR}/examples/i2c/zig/${BOARD}/${CONFIG}"
     rm -rf ${BUILD_DIR}
-    cd ${SDDF}/examples/i2c
+    pushd ${SDDF}/examples/i2c
     zig build -Dsdk=${SDK_PATH} -Dboard=${BOARD} -Dconfig=${CONFIG} -p ${BUILD_DIR}
+    popd
 }
 
 build_timer_make() {
@@ -85,8 +86,9 @@ build_timer_zig() {
     echo "CI|INFO: building timer example with Zig, board: ${BOARD}, config: ${CONFIG}"
     BUILD_DIR="${PWD}/${CI_BUILD_DIR}/examples/timer/zig/${BOARD}/${CONFIG}"
     rm -rf ${BUILD_DIR}
-    cd ${SDDF}/examples/timer
+    pushd ${SDDF}/examples/timer
     zig build -Dsdk=${SDK_PATH} -Dboard=${BOARD} -Dconfig=${CONFIG} -p ${BUILD_DIR}
+    popd
 }
 
 build_serial_make() {
@@ -109,22 +111,48 @@ build_serial_zig() {
     echo "CI|INFO: building serial example with Zig, board: ${BOARD}, config: ${CONFIG}"
     BUILD_DIR="${PWD}/${CI_BUILD_DIR}/examples/serial/zig/${BOARD}/${CONFIG}"
     rm -rf ${BUILD_DIR}
-    cd ${SDDF}/examples/serial
+    pushd ${SDDF}/examples/serial
     zig build -Dsdk=${SDK_PATH} -Dboard=${BOARD} -Dconfig=${CONFIG} -p ${BUILD_DIR}
+    popd
+}
+
+build_mmc_make() {
+    BOARD=$1
+    CONFIG=$2
+    echo "CI|INFO: building mmc example with Make, board: ${BOARD}, config: ${CONFIG}"
+    BUILD_DIR="${PWD}/${CI_BUILD_DIR}/examples/mmc/make/${BOARD}/${CONFIG}"
+    rm -rf ${BUILD_DIR}
+    mkdir -p ${BUILD_DIR}
+    make -j${NUM_JOBS} -C ${SDDF}/examples/mmc \
+        BUILD_DIR=${BUILD_DIR} \
+        MICROKIT_CONFIG=${CONFIG} \
+        MICROKIT_SDK=${SDK_PATH} \
+        MICROKIT_BOARD=${BOARD}
 }
 
 build_blk_make() {
     BOARD=$1
     CONFIG=$2
     echo "CI|INFO: building blk example with Make, board: ${BOARD}, config: ${CONFIG}"
-    BUILD_DIR="${PWD}/${CI_BUILD_DIR}/examples/blk/mmc/make/${BOARD}/${CONFIG}"
+    BUILD_DIR="${PWD}/${CI_BUILD_DIR}/examples/blk/make/${BOARD}/${CONFIG}"
     rm -rf ${BUILD_DIR}
     mkdir -p ${BUILD_DIR}
-    make -j${NUM_JOBS} -C ${SDDF}/examples/blk/mmc \
+    make -j${NUM_JOBS} -C ${SDDF}/examples/blk \
         BUILD_DIR=${BUILD_DIR} \
         MICROKIT_CONFIG=${CONFIG} \
         MICROKIT_SDK=${SDK_PATH} \
         MICROKIT_BOARD=${BOARD}
+}
+
+build_blk_zig() {
+    BOARD=$1
+    CONFIG=$2
+    echo "CI|INFO: building blk example with Zig, board: ${BOARD}, config: ${CONFIG}"
+    BUILD_DIR="${PWD}/${CI_BUILD_DIR}/examples/blk/zig/${BOARD}/${CONFIG}"
+    rm -rf ${BUILD_DIR}
+    pushd ${SDDF}/examples/blk
+    zig build -Dsdk=${SDK_PATH} -Dboard=${BOARD} -Dconfig=${CONFIG} -p ${BUILD_DIR}
+    popd
 }
 
 network() {
@@ -178,15 +206,28 @@ serial() {
     done
 }
 
-blk() {
+mmc() {
     BOARDS=("maaxboard" "imx8mm_evk")
     CONFIGS=("debug" "release")
     for BOARD in "${BOARDS[@]}"
     do
-      for CONFIG in "${CONFIGS[@]}"
-      do
-         build_blk_make ${BOARD} ${CONFIG}
-      done
+        for CONFIG in "${CONFIGS[@]}"
+        do
+            build_mmc_make ${BOARD} ${CONFIG}
+        done
+    done
+}
+
+blk() {
+    BOARDS=("qemu_virt_aarch64")
+    CONFIGS=("debug" "release")
+    for BOARD in "${BOARDS[@]}"
+    do
+        for CONFIG in "${CONFIGS[@]}"
+        do
+            build_blk_make ${BOARD} ${CONFIG}
+            build_blk_zig ${BOARD} ${CONFIG}
+        done
     done
 }
 
@@ -195,6 +236,7 @@ $NETWORK && network
 $I2C && i2c
 $TIMER && timer
 $SERIAL && serial
+$MMC && mmc
 $BLK && blk
 
 echo ""
