@@ -3,6 +3,7 @@
 #include <microkit.h>
 #include <sddf/util/printf.h>
 #include <sddf/timer/client.h>
+#include <sddf/pinctrl/client.h>
 
 #include <libmicrokitco.h>
 
@@ -18,19 +19,13 @@ microkit_cothread_sem_t timer_expire_sem;
 
 void run(void) {
     for (uint64_t i = 0; i < UINT64_MAX; i++) {
-
-        microkit_msginfo iomuxc_msg = microkit_msginfo_new(0, 2);
-        seL4_SetMR(0, 0x238);
         if (i % 2 == 0) {
             // Connect UART1_TXD pad to the UART1 device
-            seL4_SetMR(1, 0x0);
+            sddf_pinctrl_set_mux(PINCTRL_CH, 0x238, 0x0);
         } else {
             // Connect UART1_TXD pad to the SPI device. You will not see the output for odd numbers
-            seL4_SetMR(1, 0x1);
+            sddf_pinctrl_set_mux(PINCTRL_CH, 0x238, 0x1);
         }
-
-        microkit_ppcall(PINCTRL_CH, iomuxc_msg);
-
         
         sddf_printf_("client hello #%lu\n", i);
         sddf_timer_set_timeout(1, 1000000000ULL);
