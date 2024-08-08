@@ -179,7 +179,7 @@ serial() {
 }
 
 blk() {
-    BOARDS=("maaxboard")
+    BOARDS=("maaxboard" "imx8mm_evk")
     CONFIGS=("debug" "release")
     for BOARD in "${BOARDS[@]}"
     do
