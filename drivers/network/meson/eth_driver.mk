@@ -22,7 +22,7 @@ ${CHECK_NETDRV_FLAGS_MD5}:
 eth_driver.elf: meson/ethernet.o
 	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
 
-meson/ethernet.o: ${ETHERNET_DRIVER_DIR}/ethernet.c ${CHECK_NETDRV_FLAGS}
+meson/ethernet.o: ${ETHERNET_DRIVER_DIR}/ethernet.c ${CHECK_NETDRV_FLAGS_MD5}
 	mkdir -p meson
 	${CC} -c ${CFLAGS} ${CFLAGS_network} -I ${ETHERNET_DRIVER_DIR} -o $@ $<
 
