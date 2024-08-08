@@ -58,8 +58,9 @@ if __name__ == "__main__":
             # This is an interesting way of writing my dict values to an assembly file
             # It works so I won't bother changing it right now
             with open(out_dir + "/pinctrl_config_data.s", "w") as file:
-                file.write("\t.section .data\n")
+                file.write(".section .data\n")
 
+                file.write("\t.align 4\n")
                 file.write("\t.global num_iomuxc_configs\n")
                 file.write("\t.global iomuxc_configs\n")
 
@@ -70,8 +71,10 @@ if __name__ == "__main__":
                 for i in range(0, nums_pin_properties):
                     file.write("\t.word ")
                     file.write(f"{pinmux_dict['mux_reg'][i]}, {pinmux_dict['conf_reg'][i]}, {pinmux_dict['input_reg'][i]}, {pinmux_dict['mux_val'][i]}, {pinmux_dict['input_val'][i]}, {pinmux_dict['pad_setting'][i]}\n")
-            
+
             break
 
+    
+    
 
     
