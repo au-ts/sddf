@@ -13,10 +13,10 @@
 #include <sddf/gpu/gpu.h>
 
 #define GPU_MAX_SCANOUTS 16
-#define GPU_MAX_RESOURCES 1024 /* assume that resource ids are 0..1023, strictly this isn't necessary but simplifies implementation */
+#define GPU_MAX_RESOURCES 1024 /* restrict resource ids to 0..GPU_MAX_RESOURCES, strictly this #define isn't necessary but simplifies implementation */
 
 /* Request code for gpu */
-typedef enum gpu_request_code {
+typedef enum gpu_req_code {
     /* 2d commands */
     GPU_REQ_RESOURCE_CREATE_2D, /* create resource from other side */
     GPU_REQ_RESOURCE_UNREF, /* destroy resource from other side */
@@ -25,44 +25,42 @@ typedef enum gpu_request_code {
     GPU_REQ_SET_SCANOUT, /* set the scanout of a resource */
     GPU_REQ_TRANSFER_TO_2D, /* notifies other side that data in resource has been updated */
     GPU_REQ_RESOURCE_FLUSH, /* flushes resource from other side to scanout */
-} gpu_request_code_t;
+} gpu_req_code_t;
 
 /* Response status for gpu */
-typedef enum gpu_response_status {
+typedef enum gpu_resp_status {
     GPU_RESP_OK, /* success response */
     GPU_RESP_ERR_UNSPEC, /* for misc errors, e.g. attaching backing to a resource that already has backing */
     GPU_RESP_ERR_OUT_OF_MEMORY, /* out of memory to assign to resource */
-    GPU_RESP_ERR_CONFIG_CHANGE, /* stale requests due to configuration change */
     GPU_RESP_ERR_INVALID_SCANOUT_ID, /* scanout id does not exist */
     GPU_RESP_ERR_INVALID_RESOURCE_ID, /* resource id does not exist */
     GPU_RESP_ERR_INVALID_BOUNDS, /* transfer bounds outside of resource/scanout */
-} gpu_response_status_t;
+} gpu_resp_status_t;
 
 /* Request struct contained in request queue */
-typedef struct gpu_request {
-    gpu_request_code_t code; /* request code */
-    uint32_t gen; /* indicates which generation of configuration this request is using */
+typedef struct gpu_req {
+    gpu_req_code_t code; /* request code */
     uint32_t id; /* stores request id */
+    uint32_t resource_id; /* resource id to be assigned to resource */
     union {
-        gpu_request_resource_create_2d_t resource_create_2d;
-        gpu_request_resource_unref_t resource_unref;
-        gpu_request_resource_attach_backing_t resource_attach_backing;
-        gpu_request_resource_detach_backing_t rsesource_detach_backing;
-        gpu_request_set_scanout_t set_scanout;
-        gpu_request_transfer_to_2d_t transfer_to_2d;
-        gpu_request_resource_flush_t resource_flush;
+        gpu_req_resource_create_2d_t resource_create_2d;
+        gpu_req_resource_unref_t resource_unref;
+        gpu_req_resource_attach_backing_t resource_attach_backing;
+        gpu_req_resource_detach_backing_t resource_detach_backing;
+        gpu_req_set_scanout_t set_scanout;
+        gpu_req_transfer_to_2d_t transfer_to_2d;
+        gpu_req_resource_flush_t resource_flush;
     };
-} gpu_request_t;
+} gpu_req_t;
 
 /* Response struct contained in response queue */
-typedef struct gpu_response {
-    gpu_response_status_t status; /* response status */
+typedef struct gpu_resp {
+    gpu_resp_status_t status; /* response status */
     uint32_t id; /* stores corresponding request id */
-} gpu_response_t;
+} gpu_resp_t;
 
 /* Configuration struct contained in config queue */
 typedef struct gpu_config {
-    uint32_t gen; /* indicates the generation of a configuration entry */
     gpu_scanout_t scanouts[GPU_MAX_SCANOUTS]; /* per-scanout info, its index maps to scanout_id */
     uint32_t num_scanouts; /* number of scanouts available */
 } gpu_config_t;
@@ -71,14 +69,14 @@ typedef struct gpu_config {
 typedef struct gpu_req_queue {
     uint32_t head;
     uint32_t tail;
-    gpu_request_t buffers[];
+    gpu_req_t buffers[];
 } gpu_req_queue_t;
 
 /* Circular buffer containing responses */
 typedef struct gpu_resp_queue {
     uint32_t head;
     uint32_t tail;
-    gpu_response_t buffers[];
+    gpu_resp_t buffers[];
 } gpu_resp_queue_t;
 
 /* Circular buffer containing configuration updates */
@@ -128,7 +126,7 @@ static inline void gpu_queue_init(gpu_queue_handle_t *h,
  *
  * @return true indicates the request queue is empty, false otherwise.
  */
-static inline bool gpu_req_queue_empty(gpu_queue_handle_t *h)
+static inline bool gpu_queue_empty_req(gpu_queue_handle_t *h)
 {
     return h->req_queue->tail - h->req_queue->head == 0;
 }
@@ -140,7 +138,7 @@ static inline bool gpu_req_queue_empty(gpu_queue_handle_t *h)
  *
  * @return true indicates the response queue is empty, false otherwise.
  */
-static inline bool gpu_resp_queue_empty(gpu_queue_handle_t *h)
+static inline bool gpu_queue_empty_resp(gpu_queue_handle_t *h)
 {
     return h->resp_queue->tail - h->resp_queue->head == 0;
 }
@@ -152,7 +150,7 @@ static inline bool gpu_resp_queue_empty(gpu_queue_handle_t *h)
  *
  * @return true indicates the config queue is empty, false otherwise.
  */
-static inline bool gpu_config_queue_empty(gpu_queue_handle_t *h)
+static inline bool gpu_queue_empty_config(gpu_queue_handle_t *h)
 {
     return h->config_queue->tail - h->config_queue->head == 0;
 }
@@ -164,7 +162,7 @@ static inline bool gpu_config_queue_empty(gpu_queue_handle_t *h)
  *
  * @return true indicates the request queue is full, false otherwise.
  */
-static inline bool gpu_req_queue_full(gpu_queue_handle_t *h)
+static inline bool gpu_queue_full_req(gpu_queue_handle_t *h)
 {
     return h->req_queue->tail - h->req_queue->head + 1 == h->capacity;
 }
@@ -176,7 +174,7 @@ static inline bool gpu_req_queue_full(gpu_queue_handle_t *h)
  *
  * @return true indicates the response queue is full, false otherwise.
  */
-static inline bool gpu_resp_queue_full(gpu_queue_handle_t *h)
+static inline bool gpu_queue_full_resp(gpu_queue_handle_t *h)
 {
     return h->resp_queue->tail - h->resp_queue->head + 1 == h->capacity;
 }
@@ -188,7 +186,7 @@ static inline bool gpu_resp_queue_full(gpu_queue_handle_t *h)
  *
  * @return true indicates the config queue is full, false otherwise.
  */
-static inline bool gpu_config_queue_full(gpu_queue_handle_t *h)
+static inline bool gpu_queue_full_config(gpu_queue_handle_t *h)
 {
     return h->config_queue->tail - h->config_queue->head + 1 == h->config_capacity;
 }
@@ -200,7 +198,7 @@ static inline bool gpu_config_queue_full(gpu_queue_handle_t *h)
  *
  * @return number of elements in the queue.
  */
-static inline int gpu_req_capacity(gpu_queue_handle_t *h)
+static inline int gpu_queue_length_req(gpu_queue_handle_t *h)
 {
     return (h->req_queue->tail - h->req_queue->head);
 }
@@ -212,7 +210,7 @@ static inline int gpu_req_capacity(gpu_queue_handle_t *h)
  *
  * @return number of elements in the queue.
  */
-static inline int gpu_resp_capacity(gpu_queue_handle_t *h)
+static inline int gpu_queue_length_resp(gpu_queue_handle_t *h)
 {
     return (h->resp_queue->tail - h->resp_queue->head);
 }
@@ -224,7 +222,7 @@ static inline int gpu_resp_capacity(gpu_queue_handle_t *h)
  *
  * @return number of elements in the queue.
  */
-static inline int gpu_config_capacity(gpu_queue_handle_t *h)
+static inline int gpu_queue_length_config(gpu_queue_handle_t *h)
 {
     return (h->config_queue->tail - h->config_queue->head);
 }
@@ -237,18 +235,18 @@ static inline int gpu_config_capacity(gpu_queue_handle_t *h)
  *
  * @return -1 when request queue is full, 0 on success.
  */
-static inline int gpu_enqueue_req(gpu_queue_handle_t *h, gpu_request_t req)
+static inline int gpu_enqueue_req(gpu_queue_handle_t *h, gpu_req_t req)
 {
-    gpu_request_t *gpu_req;
+    gpu_req_t *gpu_req;
     gpu_req_queue_t *gpu_req_q;
 
-    if (gpu_req_queue_full(h)) {
+    if (gpu_queue_full_req(h)) {
         return -1;
     }
 
     gpu_req_q = h->req_queue;
     gpu_req = gpu_req_q->buffers + (gpu_req_q->tail % h->capacity);
-    sddf_memcpy(gpu_req, &req, sizeof(gpu_request_t));
+    sddf_memcpy(gpu_req, &req, sizeof(gpu_req_t));
 
     gpu_req_q->tail++;
 
@@ -264,11 +262,11 @@ static inline int gpu_enqueue_req(gpu_queue_handle_t *h, gpu_request_t req)
  *
  * @return -1 when response queue is full, 0 on success.
  */
-static inline int gpu_enqueue_resp(gpu_queue_handle_t *h, gpu_response_t resp)
+static inline int gpu_enqueue_resp(gpu_queue_handle_t *h, gpu_resp_t resp)
 {
-    gpu_response_t *gpu_resp;
+    gpu_resp_t *gpu_resp;
     gpu_resp_queue_t *gpu_resp_q;
-    if (gpu_resp_queue_full(h)) {
+    if (gpu_queue_full_resp(h)) {
         return -1;
     }
 
@@ -294,7 +292,7 @@ static inline int gpu_enqueue_config(gpu_queue_handle_t *h, gpu_config_t config)
 {
     gpu_config_t *gpu_config;
     gpu_config_queue_t *gpu_config_q;
-    if (gpu_config_queue_full(h)) {
+    if (gpu_queue_full_config(h)) {
         return -1;
     }
 
@@ -312,7 +310,6 @@ static inline int gpu_enqueue_config(gpu_queue_handle_t *h, gpu_config_t config)
         so_shared->enabled = so_local->enabled;
     }
     gpu_config->num_scanouts = config.num_scanouts;
-    gpu_config->gen = config.gen;
 
     gpu_config_q->tail++;
 
@@ -327,17 +324,17 @@ static inline int gpu_enqueue_config(gpu_queue_handle_t *h, gpu_config_t config)
  *
  * @return -1 when request queue is empty, 0 on success.
  */
-static inline int gpu_dequeue_req(gpu_queue_handle_t *h, gpu_request_t *req)
+static inline int gpu_dequeue_req(gpu_queue_handle_t *h, gpu_req_t *req)
 {
-    gpu_request_t *gpu_req;
+    gpu_req_t *gpu_req;
     gpu_req_queue_t *gpu_req_q;
-    if (gpu_req_queue_empty(h)) {
+    if (gpu_queue_empty_req(h)) {
         return -1;
     }
 
     gpu_req_q = h->req_queue;
     gpu_req = gpu_req_q->buffers + (gpu_req_q->head % h->capacity);
-    sddf_memcpy(req, gpu_req, sizeof(gpu_request_t));
+    sddf_memcpy(req, gpu_req, sizeof(gpu_req_t));
 
     gpu_req_q->head++;
 
@@ -351,11 +348,11 @@ static inline int gpu_dequeue_req(gpu_queue_handle_t *h, gpu_request_t *req)
  * @param resp pointer to store dequeued response.
  * @return -1 when response queue is empty, 0 on success.
  */
-static inline int gpu_dequeue_resp(gpu_queue_handle_t *h, gpu_response_t *resp)
+static inline int gpu_dequeue_resp(gpu_queue_handle_t *h, gpu_resp_t *resp)
 {
-    gpu_response_t *gpu_resp;
+    gpu_resp_t *gpu_resp;
     gpu_resp_queue_t *gpu_resp_q;
-    if (gpu_resp_queue_empty(h)) {
+    if (gpu_queue_empty_resp(h)) {
         return -1;
     }
 
@@ -381,7 +378,7 @@ static inline int gpu_dequeue_config(gpu_queue_handle_t *h, gpu_config_t *config
 {
     gpu_config_t *gpu_config;
     gpu_config_queue_t *gpu_config_q;
-    if (gpu_config_queue_empty(h)) {
+    if (gpu_queue_empty_config(h)) {
         return -1;
     }
 
@@ -399,7 +396,6 @@ static inline int gpu_dequeue_config(gpu_queue_handle_t *h, gpu_config_t *config
         so_local->enabled = so_shared->enabled;
     }
     config->num_scanouts = gpu_config->num_scanouts;
-    config->gen = gpu_config->gen;
 
     gpu_config_q->head++;
 

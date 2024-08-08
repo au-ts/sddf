@@ -37,40 +37,40 @@ typedef enum gpu_formats {
     GPU_FORMAT_R8G8B8X8_UNORM,
 } gpu_formats_t;
 
-typedef struct gpu_request_resource_create_2d {
+typedef struct gpu_req_resource_create_2d {
     uint32_t resource_id; /* resource id to be assigned to resource */
     uint32_t width; /* width of resource */
     uint32_t height; /* height of resource */
     gpu_formats_t format; /* format of resource */
-} gpu_request_resource_create_2d_t;
+} gpu_req_resource_create_2d_t;
 
-typedef struct gpu_request_resource_unref {
+typedef struct gpu_req_resource_unref {
     uint32_t resource_id;
-} gpu_request_resource_unref_t;
+} gpu_req_resource_unref_t;
 
-typedef struct gpu_request_resource_attach_backing {
+typedef struct gpu_req_resource_attach_backing {
     uint32_t resource_id;
     uintptr_t io_or_offset; /* offset within memory region or io address of the memory backing */
     uint32_t data_size; /* size in bytes of the memory backing */
-} gpu_request_resource_attach_backing_t;
+} gpu_req_resource_attach_backing_t;
 
-typedef struct gpu_request_resource_detach_backing {
+typedef struct gpu_req_resource_detach_backing {
     uint32_t resource_id;
-} gpu_request_resource_detach_backing_t;
+} gpu_req_resource_detach_backing_t;
 
-typedef struct gpu_request_set_scanout {
+typedef struct gpu_req_set_scanout {
     uint32_t scanout_id;
     uint32_t resource_id;
     gpu_rect_t rect; /* rectangle within real/emulated scanout that a resource is scanned out to */
-} gpu_request_set_scanout_t;
+} gpu_req_set_scanout_t;
 
-typedef struct gpu_request_transfer_to_2d {
+typedef struct gpu_req_transfer_to_2d {
     uint32_t resource_id;
     gpu_rect_t rect; /* rectangle in the resource to transfer framebuffer data to other side */
     uint32_t offset; /* offset into the resource, from which framebuffer data begins */
-} gpu_request_transfer_to_2d_t;
+} gpu_req_transfer_to_2d_t;
 
-typedef struct gpu_request_resource_flush {
+typedef struct gpu_req_resource_flush {
     uint32_t resource_id;
     gpu_rect_t rect; /* rectangle in the resource to flush to scanout */
-} gpu_request_resource_flush_t;
+} gpu_req_resource_flush_t;
