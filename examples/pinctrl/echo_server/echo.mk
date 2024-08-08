@@ -7,10 +7,11 @@
 QEMU := qemu-system-aarch64
 
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
-ECHO_SERVER:=${SDDF}/examples/echo_server
+ECHO_SERVER:=${SDDF}/examples/pinctrl/echo_server
 LWIPDIR:=network/ipstacks/lwip/src
 BENCHMARK:=$(SDDF)/benchmark
 UTIL:=$(SDDF)/util
+PINCTRL_DRIVER := $(SDDF)/drivers/pinctrl/$(DRIV_DIR)
 ETHERNET_DRIVER:=$(SDDF)/drivers/network/$(DRIV_DIR)
 ETHERNET_CONFIG_INCLUDE:=${ECHO_SERVER}/include/ethernet_config
 SERIAL_COMPONENTS := $(SDDF)/serial/components
@@ -27,7 +28,7 @@ REPORT_FILE := report.txt
 vpath %.c ${SDDF} ${ECHO_SERVER}
 
 IMAGES := eth_driver.elf lwip.elf benchmark.elf idle.elf network_virt_rx.elf\
-	  network_virt_tx.elf copy.elf timer_driver.elf uart_driver.elf serial_virt_tx.elf
+	  network_virt_tx.elf copy.elf timer_driver.elf uart_driver.elf serial_virt_tx.elf pinctrl_driver.elf 
 
 CFLAGS := -mcpu=$(CPU) \
 	  -mstrict-align \
@@ -97,6 +98,7 @@ include ${BENCHMARK}/benchmark.mk
 include ${TIMER_DRIVER}/timer_driver.mk
 include ${UART_DRIVER}/uart_driver.mk
 include ${SERIAL_COMPONENTS}/serial_components.mk
+include ${PINCTRL_DRIVER}/pinctrl_driver.mk
 
 qemu: $(IMAGE_FILE)
 	$(QEMU) -machine virt,virtualization=on \
