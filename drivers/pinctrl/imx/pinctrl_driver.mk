@@ -18,7 +18,7 @@ pinctrl_driver.elf: pinctrl/pinctrl.o pinctrl/pinctrl_config_data.o
 	$(LD) $(LDFLAGS) $? $(LIBS) -o $@
 
 pinctrl/pinctrl.o: $(PINCTRL_DIR)/pinctrl.c pinctrl
-	${CC} ${CFLAGS} -c $< -o $@
+	${CC} ${CFLAGS} -DCONFIG_DEBUG_BUILD -c $< -o $@
 
 pinctrl/pinctrl_config_data.o: pinctrl/pinctrl_config_data.s
 	${AS} $< -o $@
