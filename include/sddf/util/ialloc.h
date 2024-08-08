@@ -30,6 +30,19 @@ static inline bool ialloc_full(ialloc_t *ia)
 }
 
 /**
+ * Check if an index is in use.
+ *
+ * @param ia pointer to the ialloc struct.
+ * @param id index to check.
+ *
+ * @return true if index is in use, false otherwise.
+ */
+static inline bool ialloc_in_use(ialloc_t *ia, uint32_t id)
+{
+    return ia->idxlist[id] == 0;
+}
+
+/**
  * Allocate a free index.
  *
  * @param ia pointer to the ialloc struct.
@@ -44,12 +57,13 @@ static inline int ialloc_alloc(ialloc_t *ia, uint32_t *id)
     }
     *id = ia->head;
     ia->head = ia->idxlist[ia->head];
+    ia->idxlist[*id] = 0;
     ia->num_free--;
     return 0;
 }
 
 /**
- * Free an active index.
+ * Free an allocated index.
  *
  * @param ia pointer to the ialloc struct.
  * @param id active index to be freed.
@@ -58,7 +72,7 @@ static inline int ialloc_alloc(ialloc_t *ia, uint32_t *id)
  */
 static inline int ialloc_free(ialloc_t *ia, uint32_t id)
 {
-    if (id >= ia->size) {
+    if (id >= ia->size || !ialloc_in_use(ia, id)) {
         return -1;
     }
     if (ialloc_full(ia)) {
@@ -79,17 +93,17 @@ static inline int ialloc_free(ialloc_t *ia, uint32_t id)
  *
  * @param ia pointer to the ialloc struct.
  * @param idxlist pointer to the linked list array storing the next free index.
- * @param size number of indices that can be allocated, also length of idxlist.
+ * @param size number of indices that can be allocated.
  */
 static void ialloc_init(ialloc_t *ia, uint32_t *idxlist, uint32_t size)
 {
     ia->idxlist = idxlist;
     ia->size = size;
-    ia->head = 0;
-    ia->tail = size - 1;
+    ia->head = 1;
+    ia->tail = size;
     ia->num_free = size;
-    for (uint32_t i = 0; i < size - 1; i++) {
+    for (uint32_t i = 1; i < size; i++) {
         ia->idxlist[i] = i + 1;
     }
-    ia->idxlist[size - 1] = 0;
+    ia->idxlist[size] = 0;
 }
