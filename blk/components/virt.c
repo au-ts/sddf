@@ -108,7 +108,7 @@ void init(void)
     fsmalloc_init(&fsmalloc, blk_data_driver, BLK_TRANSFER_SIZE, BLK_NUM_BUFFERS_DRIV, &fsmalloc_avail_bitarr,
                   fsmalloc_avail_bitarr_words, roundup_bits2words64(BLK_NUM_BUFFERS_DRIV));
 
-    bool done = setup_clients(&fsmalloc, &ialloc, &drv_h, DRIVER_CH);
+    bool done = setup_clients(&fsmalloc, &ialloc, &drv_h, DRIVER_CH, blk_config, blk_config_driver);
     if (done) {
         initialised = true;
     }
@@ -270,7 +270,7 @@ static void handle_client(int cli_id)
 void notified(microkit_channel ch)
 {
     if (initialised == false) {
-        bool done = setup_clients(&fsmalloc, &ialloc, &drv_h, DRIVER_CH);
+        bool done = setup_clients(&fsmalloc, &ialloc, &drv_h, DRIVER_CH, blk_config, blk_config_driver);
         if (done) {
             initialised = true;
         }

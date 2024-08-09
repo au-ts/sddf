@@ -128,11 +128,21 @@ static bool handle_mbr_reply(fsmalloc_t *fsmalloc, ialloc_t *ialloc, blk_queue_h
     return true;
 }
 
-void setup_clients(fsmalloc_t *fsmalloc, ialloc_t *ialloc, blk_queue_handle_t *drv_h, microkit_channel driver_ch)
+bool setup_clients(fsmalloc_t *fsmalloc, ialloc_t *ialloc, blk_queue_handle_t *drv_h, microkit_channel driver_ch, blk_storage_info_t *blk_config, blk_storage_info_t *blk_config_driver)
 {
     static bool sent = false;
     if (!sent) {
+        sent = true;
         request_mbr(fsmalloc, ialloc, drv_h, driver_ch);
+        return false;
+    } else {
+        bool sent2 = handle_mbr_reply(fsmalloc, ialloc, drv_h);
+        if (!sent2) {
+            return false;
+        }
+
+        partitions_init(blk_config, blk_config_driver);
+        return true;
     }
 }
 

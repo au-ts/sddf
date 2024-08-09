@@ -26,11 +26,11 @@ blk_virt.elf: blk_virt.o blk_mbr.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 blk_virt.o: ${CHECK_BLK_FLAGS_MD5}
-blk_virt.o: ${SDDF}/blk/components/virt.c
+blk_virt.o: ${SDDF}/blk/components/virt.c ${SDDF}/blk/components/mbr.h
 	${CC} ${CFLAGS} ${CFLAGS_blk} -o $@ -c $<
 
 blk_mbr.o: ${CHECK_BLK_FLAGS_MD5}
-blk_mbr.o: ${SDDF}/blk/components/mbr.c
+blk_mbr.o: ${SDDF}/blk/components/mbr.c ${SDDF}/blk/components/mbr.h
 	${CC} ${CFLAGS} ${CFLAGS_blk} -o $@ -c $<
 
 clean::
