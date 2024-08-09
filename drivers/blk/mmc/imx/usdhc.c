@@ -599,9 +599,12 @@ drv_status_t perform_card_identification_and_select()
                               (SD_IF_COND_VHS27_36 << SD_IF_COND_VHS_SHIFT) | (IF_COND_CHECK_PATTERN << SD_IF_COND_CHECK_SHIFT));
         if (status == DrvIrqWait) {
             return DrvIrqWait;
+        } else if (status == DrvErrorCardGone) {
+            LOG_DRIVER_ERR("No Card\n");
+            return DrvErrorCardGone;
         } else if (status != DrvSuccess) {
             /* TODO: Unhandled card type. */
-            LOG_DRIVER_ERR("No Card, or Ver 1.X SD Card, or Ver2.00 with voltage mismatch not supported\n");
+            LOG_DRIVER_ERR("Ver 1.X SD Card, or Ver2.00 with voltage mismatch not supported\n");
             return DrvErrorCardIncompatible;
         }
 
