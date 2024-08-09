@@ -49,6 +49,8 @@ typedef enum blk_resp_status {
     BLK_RESP_ERR_UNSPEC,
     /* invalid request parameters */
     BLK_RESP_ERR_INVALID_PARAM,
+    /* the device is not inserted */
+    BLK_RESP_ERR_NO_DEVICE,
 } blk_resp_status_t;
 
 /* Request struct contained in request queue */
@@ -355,4 +357,3 @@ static inline bool blk_queue_plugged_req(blk_queue_handle_t *h)
 {
     return h->req_queue->plugged;
 }
-
