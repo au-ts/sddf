@@ -39,6 +39,8 @@ typedef enum blk_req_code {
     BLK_REQ_WRITE,
     BLK_REQ_FLUSH,
     BLK_REQ_BARRIER,
+    BLK_REQ_MOUNT,
+    BLK_REQ_UNMOUNT,
 } blk_req_code_t;
 
 /* Response status for block */
@@ -351,4 +353,3 @@ static inline bool blk_queue_plugged_req(blk_queue_handle_t *h)
 {
     return h->req_queue->plugged;
 }
-

@@ -242,6 +242,10 @@ static void handle_driver()
             break;
         case BLK_REQ_BARRIER:
             break;
+        case BLK_REQ_MOUNT:
+            break;
+        case BLK_REQ_UNMOUNT:
+            break;
         }
 
         // Get the corresponding client queue handle
@@ -270,6 +274,8 @@ static void handle_driver()
                 break;
             case BLK_REQ_FLUSH:
             case BLK_REQ_BARRIER:
+            case BLK_REQ_MOUNT:
+            case BLK_REQ_UNMOUNT:
                 err = blk_enqueue_resp(&h, BLK_RESP_OK, drv_success_count, cli_data.cli_req_id);
                 assert(!err);
                 break;
@@ -350,6 +356,10 @@ static void handle_client(int cli_id)
             if (blk_queue_full_req(&drv_h) || ialloc_full(&ialloc)) {
                 continue;
             }
+            break;
+        case BLK_REQ_MOUNT:
+        case BLK_REQ_UNMOUNT:
+            // assert(!"todo");
             break;
         }
 

@@ -890,6 +890,37 @@ drv_status_t usdhc_write_blocks(uintptr_t dma_address, uint32_t sector_number, u
     }
 }
 
+drv_status_t usdhc_unmount(void)
+{
+    /* TODO: There's no documentation in the SD specifications or iMX8 specification
+     *       about what we actually have to do here....
+     *       There's some notes about disabling clocks & SD bus power in [SD-HOST]
+     *       (see my Week 8 Research Notes) but nothing useful for us.
+     *
+     *       I'm not sure if CMD0 is necessary.
+     */
+
+    drv_status_t status = send_command(SD_CMD0_GO_IDLE_STATE, 0x0);
+    if (status == DrvIrqWait) {
+        return DrvIrqWait;
+    } else if (status != DrvSuccess) {
+        /* ignore any errors from CMD0, since we want to unmount anyway */
+        LOG_DRIVER_ERR("When unmounting, CMD0 returned with status: %u (continuing anyway)", status);
+    }
+
+    reset_driver_and_card_state();
+
+    // Disable interrupts.
+    usdhc_regs->int_status_en = 0x0;
+    usdhc_regs->int_signal_en = 0x0;
+
+    // TODO: Is it OK to do this??? => well the virtualiser makes this not work (externally), so.
+    __atomic_store_n(&blk_config->ready, false, __ATOMIC_RELEASE);
+
+    LOG_DRIVER("Card unmounted\n");
+    return DrvSuccess;
+}
+
 void setup_blk_queues()
 {
     assert(!blk_config->ready);
@@ -1022,6 +1053,22 @@ void usdhc_executor(bool from_virtualiser)
 
         case ExecutorProcessingRequest:
             switch (driver_state.blk_req.code) {
+            case BLK_REQ_MOUNT:
+                status = usdhc_mount();
+                if (status == DrvIrqWait) {
+                    return;
+                }
+
+                break;
+
+            case BLK_REQ_UNMOUNT:
+                status = usdhc_unmount();
+                if (status == DrvIrqWait) {
+                    return;
+                }
+
+                break;
+
             case BLK_REQ_FLUSH:
             case BLK_REQ_BARRIER:
                 /* No-ops. */
