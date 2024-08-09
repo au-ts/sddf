@@ -24,10 +24,10 @@ This is a driver for the MaaXBoard SD host controller, based on the following do
 ## Not Implemented
 - Voltage Negotiation (anything but 3.3V)
 - Version 1 SD cards (the initialisation flow)
-- Version 2 SDSC / SDXC cards (only because I haven't implemented support for calculating card capacity)
+- Version 2 SDSC / SDXC cards (card capacity calculation)
 - Higher speed operation (even Default Speed / 25 MHz ($f_{PP}$)) and DDR
 - Setting as RO when write protect is set on the SD card
 - Clock setup (currently inherits 150MHz clock from U-Boot)
 - Pinmux setup (again, inherits from U-Boot)
-- Timeouts as required by various commands & a lot of error cases
-- Card detect on the MaaXboard doesn't seem to work (even in U-Boot/Linux)
+- Timeouts as required by some SD commands
+- Card detection
