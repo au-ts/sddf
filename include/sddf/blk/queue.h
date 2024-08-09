@@ -47,6 +47,7 @@ typedef enum blk_req_code {
 typedef enum blk_resp_status {
     BLK_RESP_OK,
     BLK_RESP_SEEK_ERROR,
+    BLK_RESP_DEV_GONE,
 } blk_resp_status_t;
 
 /* Request struct contained in request queue */

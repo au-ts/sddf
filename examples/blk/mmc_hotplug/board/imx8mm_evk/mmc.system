@@ -7,7 +7,8 @@
     <!-- Device Driver Regions -->
     <memory_region name="timer"  size="0x10_000" phys_addr="0x302d_0000" />
     <memory_region name="usdhc2" size="0x10_000" phys_addr="0x30b5_0000" />
-    <memory_region name="uart"   size="0x1_000"  phys_addr="0x3089_0000" />
+    <memory_region name="uart"   size="0x1000"   phys_addr="0x3089_0000" />
+    <memory_region name="gpio1"  size="0x1000"   phys_addr="0x3020_0000" />
 
     <!-- Hotplugging -->
     <memory_region name="block_device_hotplug" size="0x1000" />
@@ -37,6 +38,9 @@
         <map mr="blk_driver_config" vaddr="0x40000000" perms="rw" cached="false" setvar_vaddr="blk_config"     />
         <map mr="blk_driver_req"    vaddr="0x40200000" perms="rw" cached="false" setvar_vaddr="blk_req_queue"  />
         <map mr="blk_driver_resp"   vaddr="0x40400000" perms="rw" cached="false" setvar_vaddr="blk_resp_queue" />
+
+        <!-- GPIO Messing -->
+        <map mr="gpio1" vaddr="0x4_500_000" perms="r" cached="false" setvar_vaddr="gpio1_regs" />
     </protection_domain>
 
     <protection_domain name="timer" priority="101" pp="true" passive="true">
