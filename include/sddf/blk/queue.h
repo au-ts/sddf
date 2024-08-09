@@ -39,12 +39,15 @@ typedef enum blk_req_code {
     BLK_REQ_WRITE,
     BLK_REQ_FLUSH,
     BLK_REQ_BARRIER,
+    BLK_REQ_MOUNT,
+    BLK_REQ_UNMOUNT,
 } blk_req_code_t;
 
 /* Response status for block */
 typedef enum blk_resp_status {
     BLK_RESP_OK,
     BLK_RESP_SEEK_ERROR,
+    BLK_RESP_DEV_GONE,
 } blk_resp_status_t;
 
 /* Request struct contained in request queue */
@@ -351,4 +354,3 @@ static inline bool blk_queue_plugged_req(blk_queue_handle_t *h)
 {
     return h->req_queue->plugged;
 }
-

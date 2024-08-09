@@ -220,7 +220,7 @@ static blk_resp_status_t drv_to_blk_status(drv_status_t status)
     case DrvErrorSomething:
         return 1312;
     case DrvErrorCardGone:
-        return 1312;
+        return BLK_RESP_DEV_GONE;
     case DrvErrorCardIncompatible:
         return 1312;
 
@@ -231,13 +231,22 @@ static blk_resp_status_t drv_to_blk_status(drv_status_t status)
     }
 }
 
+volatile uint32_t *gpio1_regs;
+#if defined(CONFIG_PLAT_IMX8MM_EVK)
+#define GPIO_NUM    BIT(15)
+#elif defined(CONFIG_PLAT_MAAXBOARD)
+#define GPIO_NUM    BIT(6)
+#else
+#error "Unknown board type for GPIO card detect"
+#endif
+
 static bool card_detected(void)
 {
 #if 0
     /* This doesn't seem to ever work on this SOC; we need to use GPIO for CD */
     return usdhc_regs->pres_state & USDHC_PRES_STATE_CINST;
 #endif
-    return true;
+    return !(*gpio1_regs & GPIO_NUM);
 }
 
 static drv_status_t handle_interrupt_status(sd_cmd_t cmd)
@@ -261,6 +270,7 @@ static drv_status_t handle_interrupt_status(sd_cmd_t cmd)
 
         if (!card_detected()) {
             /* If the card isn't detected, the error is because of that */
+            // TODO: Reset.
             return DrvErrorCardGone;
         }
 
@@ -589,9 +599,12 @@ drv_status_t perform_card_identification_and_select()
                               (SD_IF_COND_VHS27_36 << SD_IF_COND_VHS_SHIFT) | (IF_COND_CHECK_PATTERN << SD_IF_COND_CHECK_SHIFT));
         if (status == DrvIrqWait) {
             return DrvIrqWait;
+        } else if (status == DrvErrorCardGone) {
+            LOG_DRIVER_ERR("No Card\n");
+            return DrvErrorCardGone;
         } else if (status != DrvSuccess) {
             /* TODO: Unhandled card type. */
-            LOG_DRIVER_ERR("No Card, or Ver 1.X SD Card, or Ver2.00 with voltage mismatch not supported\n");
+            LOG_DRIVER_ERR("Ver 1.X SD Card, or Ver2.00 with voltage mismatch not supported\n");
             return DrvErrorCardIncompatible;
         }
 
@@ -890,6 +903,37 @@ drv_status_t usdhc_write_blocks(uintptr_t dma_address, uint32_t sector_number, u
     }
 }
 
+drv_status_t usdhc_unmount(void)
+{
+    /* TODO: There's no documentation in the SD specifications or iMX8 specification
+     *       about what we actually have to do here....
+     *       There's some notes about disabling clocks & SD bus power in [SD-HOST]
+     *       (see my Week 8 Research Notes) but nothing useful for us.
+     *
+     *       I'm not sure if CMD0 is necessary.
+     */
+
+    drv_status_t status = send_command(SD_CMD0_GO_IDLE_STATE, 0x0);
+    if (status == DrvIrqWait) {
+        return DrvIrqWait;
+    } else if (status != DrvSuccess) {
+        /* ignore any errors from CMD0, since we want to unmount anyway */
+        LOG_DRIVER_ERR("When unmounting, CMD0 returned with status: %u (continuing anyway)", status);
+    }
+
+    reset_driver_and_card_state();
+
+    // Disable interrupts.
+    usdhc_regs->int_status_en = 0x0;
+    usdhc_regs->int_signal_en = 0x0;
+
+    // TODO: Is it OK to do this??? => well the virtualiser makes this not work (externally), so.
+    __atomic_store_n(&blk_config->ready, false, __ATOMIC_RELEASE);
+
+    LOG_DRIVER("Card unmounted\n");
+    return DrvSuccess;
+}
+
 void setup_blk_queues()
 {
     assert(!blk_config->ready);
@@ -1022,6 +1066,22 @@ void usdhc_executor(bool from_virtualiser)
 
         case ExecutorProcessingRequest:
             switch (driver_state.blk_req.code) {
+            case BLK_REQ_MOUNT:
+                status = usdhc_mount();
+                if (status == DrvIrqWait) {
+                    return;
+                }
+
+                break;
+
+            case BLK_REQ_UNMOUNT:
+                status = usdhc_unmount();
+                if (status == DrvIrqWait) {
+                    return;
+                }
+
+                break;
+
             case BLK_REQ_FLUSH:
             case BLK_REQ_BARRIER:
                 /* No-ops. */
@@ -1069,6 +1129,9 @@ void usdhc_executor(bool from_virtualiser)
     }
 }
 
+void begin_polling();
+void do_poll();
+
 void notified(microkit_channel ch)
 {
     switch (ch) {
@@ -1081,8 +1144,7 @@ void notified(microkit_channel ch)
         break;
 
     case USDHC_TIMER_CHANNEL:
-        LOG_DRIVER("got timer interrupt -- UNHANDLED\n");
-        assert(false);
+        do_poll();
         break;
 
     default:
@@ -1105,6 +1167,22 @@ void init()
     /* Make sure we have DMA support. */
     assert(usdhc_regs->host_ctrl_cap & USDHC_HOST_CTRL_CAP_DMAS);
 
-    reset_driver_and_card_state();
-    usdhc_executor(false);
+    if (card_detected()) {
+        reset_driver_and_card_state();
+        usdhc_executor(false);
+    } else {
+        begin_polling();
+    }
 }
+
+void begin_polling()
+{
+
+}
+
+void do_poll()
+{
+
+}
+
+/* This is somewhat dirty, but we probably want something like it anyway... */

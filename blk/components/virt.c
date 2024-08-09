@@ -7,7 +7,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <sddf/blk/queue.h>
-#include <sddf/blk/msdos_mbr.h>
 #include <sddf/util/cache.h>
 #include <sddf/util/fsmalloc.h>
 #include <sddf/util/ialloc.h>
@@ -15,6 +14,8 @@
 #include <sddf/util/string.h>
 #include <sddf/util/util.h>
 #include <blk_config.h>
+
+#include "mbr.h"
 
 /* Uncomment this to enable debug logging */
 // #define DEBUG_BLK_VIRT
@@ -58,10 +59,8 @@ blk_queue_handle_t drv_h;
 typedef struct client {
     blk_queue_handle_t queue_h;
     microkit_channel ch;
-    uint32_t start_sector;
-    uint32_t sectors;
 } client_t;
-client_t clients[BLK_NUM_CLIENTS];
+static client_t clients[BLK_NUM_CLIENTS];
 
 
 /* Fixed size memory allocator */
@@ -84,112 +83,8 @@ static reqbk_t reqbk[REQBK_SIZE];
 static ialloc_t ialloc;
 static uint32_t ialloc_idxlist[REQBK_SIZE];
 
-/* MS-DOS Master boot record */
-struct msdos_mbr msdos_mbr;
-
-/* The virtualiser is not initialised until we can read the MBR and populate the block device configuration. */
+/* The virtualiser is not initialised until ?? */
 bool initialised = false;
-
-static void partitions_init()
-{
-    if (msdos_mbr.signature != MSDOS_MBR_SIGNATURE) {
-        LOG_BLK_VIRT_ERR("Invalid MBR signature\n");
-        return;
-    }
-
-    /* Count the partitions the disk has and whether they are valid for sDDF. */
-    int num_partitions = 0;
-    for (int i = 0; i < MSDOS_MBR_MAX_PRIMARY_PARTITIONS; i++) {
-        if (msdos_mbr.partitions[i].type == MSDOS_MBR_PARTITION_TYPE_EMPTY) {
-            continue;
-        } else {
-            num_partitions++;
-        }
-
-        if (msdos_mbr.partitions[i].lba_start % (BLK_TRANSFER_SIZE / MSDOS_MBR_SECTOR_SIZE) != 0) {
-            LOG_BLK_VIRT_ERR("Partition %d start sector %d not aligned to sDDF transfer size\n", i,
-                             msdos_mbr.partitions[i].lba_start);
-            return;
-        }
-    }
-
-    if (num_partitions < BLK_NUM_CLIENTS) {
-        LOG_BLK_VIRT_ERR("Not enough partitions to assign to clients\n");
-        return;
-    }
-
-    /* Assign metadata for each client partition */
-    for (int client = 0; client < BLK_NUM_CLIENTS; client++) {
-        size_t client_partition = blk_partition_mapping[client];
-        if (client_partition >= num_partitions) {
-            LOG_BLK_VIRT_ERR("Invalid client partition mapping for client %d: %zu\n", client, client_partition);
-            return;
-        }
-
-        /* We have a valid partition now. */
-        clients[client].start_sector = msdos_mbr.partitions[client_partition].lba_start;
-        clients[client].sectors = msdos_mbr.partitions[client_partition].sectors;
-    }
-
-    for (int i = 0; i < BLK_NUM_CLIENTS; i++) {
-        blk_storage_info_t *curr_blk_config = blk_virt_cli_config_info(blk_config, i);
-        curr_blk_config->sector_size = blk_config_driver->sector_size;
-        curr_blk_config->capacity = clients[i].sectors / (BLK_TRANSFER_SIZE / MSDOS_MBR_SECTOR_SIZE);
-        curr_blk_config->read_only = false;
-        __atomic_store_n(&curr_blk_config->ready, true, __ATOMIC_RELEASE);
-    }
-}
-
-static void request_mbr()
-{
-    uintptr_t mbr_addr;
-    int err = fsmalloc_alloc(&fsmalloc, &mbr_addr, 1);
-    assert(!err);
-
-    uint32_t mbr_req_id = 0;
-    reqbk_t mbr_req_data = {0, 0, 0, mbr_addr, 1, 0};
-    err = ialloc_alloc(&ialloc, &mbr_req_id);
-    assert(!err);
-    reqbk[mbr_req_id] = mbr_req_data;
-
-    err = blk_enqueue_req(&drv_h, BLK_REQ_READ, BLK_DRIV_TO_PADDR(mbr_addr), 0, 1, mbr_req_id);
-    assert(!err);
-
-    microkit_deferred_notify(DRIVER_CH);
-}
-
-static bool handle_mbr_reply()
-{
-    int err = 0;
-
-    if (blk_queue_empty_resp(&drv_h)) {
-        LOG_BLK_VIRT("Notified by driver but queue is empty, expecting a response to READ into sector 0\n");
-        return false;
-    }
-
-    blk_resp_status_t drv_status;
-    uint16_t drv_success_count;
-    uint32_t drv_resp_id;
-    err = blk_dequeue_resp(&drv_h, &drv_status, &drv_success_count, &drv_resp_id);
-    assert(!err);
-
-    reqbk_t mbr_req_data = reqbk[drv_resp_id];
-    ialloc_free(&ialloc, drv_resp_id);
-
-    if (drv_status != BLK_RESP_OK) {
-        LOG_BLK_VIRT_ERR("Failed to read sector 0 from driver\n");
-        return false;
-    }
-
-    /* TODO: This is a raw seL4 system call because Microkit does not (currently)
-     * include a corresponding libmicrokit API. */
-    seL4_ARM_VSpace_Invalidate_Data(3, mbr_req_data.drv_addr,
-                                    mbr_req_data.drv_addr + (BLK_TRANSFER_SIZE * mbr_req_data.count));
-    sddf_memcpy(&msdos_mbr, (void *)mbr_req_data.drv_addr, sizeof(struct msdos_mbr));
-    fsmalloc_free(&fsmalloc, mbr_req_data.drv_addr, mbr_req_data.count);
-
-    return true;
-}
 
 void init(void)
 {
@@ -213,7 +108,10 @@ void init(void)
     fsmalloc_init(&fsmalloc, blk_data_driver, BLK_TRANSFER_SIZE, BLK_NUM_BUFFERS_DRIV, &fsmalloc_avail_bitarr,
                   fsmalloc_avail_bitarr_words, roundup_bits2words64(BLK_NUM_BUFFERS_DRIV));
 
-    request_mbr();
+    bool done = setup_clients(&fsmalloc, &ialloc, &drv_h, DRIVER_CH, blk_config, blk_config_driver);
+    if (done) {
+        initialised = true;
+    }
 }
 
 static void handle_driver()
@@ -241,6 +139,10 @@ static void handle_driver()
         case BLK_REQ_FLUSH:
             break;
         case BLK_REQ_BARRIER:
+            break;
+        case BLK_REQ_MOUNT:
+            break;
+        case BLK_REQ_UNMOUNT:
             break;
         }
 
@@ -270,6 +172,8 @@ static void handle_driver()
                 break;
             case BLK_REQ_FLUSH:
             case BLK_REQ_BARRIER:
+            case BLK_REQ_MOUNT:
+            case BLK_REQ_UNMOUNT:
                 err = blk_enqueue_resp(&h, BLK_RESP_OK, drv_success_count, cli_data.cli_req_id);
                 assert(!err);
                 break;
@@ -306,24 +210,19 @@ static void handle_client(int cli_id)
         err = blk_dequeue_req(&h, &cli_code, &cli_offset, &cli_block_number, &cli_count, &cli_req_id);
         assert(!err);
 
-        drv_block_number = cli_block_number + (clients[cli_id].start_sector / (BLK_TRANSFER_SIZE / MSDOS_MBR_SECTOR_SIZE));
+        err = client_get_drv_block_number(cli_id, cli_code, cli_block_number, cli_count, &drv_block_number);
+        if (err) {
+            err = blk_enqueue_resp(&h, BLK_RESP_SEEK_ERROR, 0, cli_req_id);
+            assert(!err);
+            continue;
+        }
 
-        if (cli_code == BLK_REQ_READ || cli_code == BLK_REQ_WRITE) {
-            // Check if client request is within its allocated bounds
-            unsigned long client_sectors = clients[cli_id].sectors / (BLK_TRANSFER_SIZE / MSDOS_MBR_SECTOR_SIZE);
-            unsigned long client_start_sector = clients[cli_id].start_sector / (BLK_TRANSFER_SIZE / MSDOS_MBR_SECTOR_SIZE);
-            if (drv_block_number < client_start_sector || drv_block_number + cli_count > client_start_sector + client_sectors) {
-                err = blk_enqueue_resp(&h, BLK_RESP_SEEK_ERROR, 0, cli_req_id);
-                assert(!err);
-                continue;
-            }
-
-            // Check if client request offset is within its allocated bounds and is aligned to transfer size
-            if (cli_offset % BLK_TRANSFER_SIZE != 0 || (cli_offset + BLK_TRANSFER_SIZE * cli_count) > cli_data_region_size) {
-                err = blk_enqueue_resp(&h, BLK_RESP_SEEK_ERROR, 0, cli_req_id);
-                assert(!err);
-                continue;
-            }
+        // Check if client request offset is within its allocated bounds and is aligned to transfer size
+        if (cli_offset % BLK_TRANSFER_SIZE != 0 || (cli_offset + BLK_TRANSFER_SIZE * cli_count) > cli_data_region_size) {
+            // TODO: This is not really a SEEK error.
+            err = blk_enqueue_resp(&h, BLK_RESP_SEEK_ERROR, 0, cli_req_id);
+            assert(!err);
+            continue;
         }
 
         switch (cli_code) {
@@ -351,6 +250,10 @@ static void handle_client(int cli_id)
                 continue;
             }
             break;
+        case BLK_REQ_MOUNT:
+        case BLK_REQ_UNMOUNT:
+            // assert(!"todo");
+            break;
         }
 
         // Bookkeep client request and generate driver req ID
@@ -367,11 +270,11 @@ static void handle_client(int cli_id)
 void notified(microkit_channel ch)
 {
     if (initialised == false) {
-        bool success = handle_mbr_reply();
-        if (success) {
-            partitions_init();
+        bool done = setup_clients(&fsmalloc, &ialloc, &drv_h, DRIVER_CH, blk_config, blk_config_driver);
+        if (done) {
             initialised = true;
-        };
+        }
+
         return;
     }
 
