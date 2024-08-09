@@ -14,6 +14,8 @@
  * memory that are mapped as cached but are accessible by DMA capable devices.
  */
 
+#ifdef CONFIG_ARCH_ARM
+
 #ifndef CONFIG_AARCH64_USER_CACHE_ENABLE
 #error "CONFIG_AARCH64_USER_CACHE_ENABLE must be enabled"
 #error "seL4 must be configured with CONFIG_AARCH64_USER_CACHE_ENABLE"
@@ -95,3 +97,5 @@ void cache_clean(unsigned long start, unsigned long end)
         clean_by_va(vaddr);
     }
 }
+
+#endif
