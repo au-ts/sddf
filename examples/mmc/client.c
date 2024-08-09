@@ -20,6 +20,7 @@ blk_req_queue_t *blk_req_queue;
 blk_resp_queue_t *blk_resp_queue;
 uintptr_t blk_data;
 
+#define KEEP_REPEATING_COMMANDS false
 #define NUM_READ_BLOCKS   6
 #define NUM_WRITE_BLOCKS  5
 _Static_assert(NUM_READ_BLOCKS > NUM_WRITE_BLOCKS, "#read must be greater than #write");
@@ -94,48 +95,8 @@ void ensure_data_is_correct()
     sddf_printf("Client read/write data is correct!\n");
 }
 
-void notified(microkit_channel ch)
+void send_commands(void)
 {
-    microkit_dbg_puts("client notified!\n");
-    if (ch != BLK_VIRT_CHANNEL) {
-        assert(!"bad channel?");
-    }
-
-    if (blk_queue_length_resp(&blk_queue) < 6 /* the number of requests we sent */) {
-        /* just wait until all requests are serviced */
-        return;
-    }
-
-    /* dequeue and check the requests succeeded */
-    blk_resp_status_t status = BLK_RESP_OK;
-    uint16_t success_count;
-    uint32_t id = 0;
-    while (blk_queue_length_resp(&blk_queue) > 0) {
-        assert(!blk_dequeue_resp(&blk_queue, &status, &success_count, &id));
-        if (status != BLK_RESP_OK) {
-            sddf_printf("request failed: stat: %u, id: %u\n", status, id);
-            assert(!"failed");
-        }
-
-    }
-
-    print_some_data();
-    ensure_data_is_correct();
-}
-
-void init(void)
-{
-    blk_queue_init(&blk_queue, blk_req_queue, blk_resp_queue, BLK_QUEUE_SIZE_CLI0);
-
-    /* Busy wait until blk device is ready */
-    while (!__atomic_load_n(&blk_config->ready, __ATOMIC_ACQUIRE));
-
-    sddf_printf("Hello from client\n");
-
-    /* The third partition on the SD card (after Uboot & Linux) is made empty
-       so we don't overwrite anything important.
-    */
-    assert(blk_partition_mapping[0] == 2);
     uint32_t data_address = 0;
 
     /* Setup a data region with a region to read into from the card, initially zeroed
@@ -174,4 +135,53 @@ void init(void)
     assert(!err);
 
     microkit_notify(BLK_VIRT_CHANNEL);
+}
+
+void notified(microkit_channel ch)
+{
+    if (ch != BLK_VIRT_CHANNEL) {
+        assert(!"bad channel?");
+    }
+
+    if (blk_queue_length_resp(&blk_queue) < 6 /* the number of requests we sent */) {
+        /* just wait until all requests are serviced */
+        return;
+    }
+
+    /* dequeue and check the requests succeeded */
+    blk_resp_status_t status = BLK_RESP_OK;
+    uint16_t success_count;
+    uint32_t id = 0;
+    while (blk_queue_length_resp(&blk_queue) > 0) {
+        assert(!blk_dequeue_resp(&blk_queue, &status, &success_count, &id));
+        if (status != BLK_RESP_OK) {
+            sddf_printf("request failed: stat: %u, id: %u\n", status, id);
+            assert(!"failed");
+        }
+
+    }
+
+    if (!KEEP_REPEATING_COMMANDS) {
+        print_some_data();
+    }
+    ensure_data_is_correct();
+    if (KEEP_REPEATING_COMMANDS) {
+        send_commands();
+    }
+}
+
+void init(void)
+{
+    blk_queue_init(&blk_queue, blk_req_queue, blk_resp_queue, BLK_QUEUE_SIZE_CLI0);
+
+    /* Busy wait until blk device is ready */
+    while (!__atomic_load_n(&blk_config->ready, __ATOMIC_ACQUIRE));
+
+    sddf_printf("Hello from client\n");
+
+    /* The third partition on the SD card (after Uboot & Linux) is made empty
+       so we don't overwrite anything important.
+    */
+    assert(blk_partition_mapping[0] == 2);
+    send_commands();
 }
