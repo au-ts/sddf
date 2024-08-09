@@ -8,6 +8,8 @@ Files:
     examples/i2c/build.zig.zon
     examples/serial/build.zig.zon
     examples/timer/build.zig.zon
+    examples/blk/build.zig.zon
+    examples/blk/basic_data.txt
 Copyright: UNSW
 License: BSD-2-Clause
 

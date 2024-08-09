@@ -35,7 +35,7 @@ MICROKIT_CONFIG ?= debug
 DRIVER_DIR := imx
 CPU := cortex-a53
 
-TOP := ${SDDF}/examples/blk/mmc
+TOP := ${SDDF}/examples/mmc
 CONFIGS_INCLUDE := ${TOP}/include/configs
 
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
