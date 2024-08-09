@@ -1,3 +1,8 @@
+/*
+ * Copyright 2024, UNSW
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
 #include <stdint.h>
 #include <microkit.h>
 #include <sddf/blk/queue.h>
@@ -31,7 +36,8 @@ uint8_t *blk_data;
 
 hotplug_shared_device_t *block_device;
 
-void notified_serial() {
+void notified_serial()
+{
     bool reprocess = true;
     char c;
     while (reprocess) {
@@ -157,11 +163,3 @@ void init(void)
 
     sddf_printf("Hello from plug controller\n");
 }
-
-
-
-
-/*
-    make the game look at and then set the unmount queue thingy and the hotplug client actually do an unplug
-    and then be able to mount again and continue playing
-*/

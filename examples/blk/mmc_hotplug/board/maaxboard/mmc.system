@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Copyright 2024, UNSW
+    SPDX-License-Identifier: BSD-2-Clause
+-->
 <system>
     <memory_region name="timer"  size="0x10_000" phys_addr="0x302d_0000" />
     <memory_region name="usdhc1" size="0x10_000" phys_addr="0x30b4_0000" />

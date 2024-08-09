@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Copyright 2024, UNSW
+    SPDX-License-Identifier: BSD-2-Clause
+-->
 <system>
     <!-- Device Driver Regions -->
     <memory_region name="timer"  size="0x10_000" phys_addr="0x302d_0000" />

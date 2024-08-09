@@ -1,3 +1,8 @@
+/*
+ * Copyright 2024, UNSW
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
 #include <stdint.h>
 #include <microkit.h>
 #include <sddf/blk/queue.h>
@@ -39,7 +44,7 @@ void play_our_game(void)
     for (int stage = UINT8_MAX - 20; stage < UINT8_MAX; stage++) {
         play_our_game_stage(stage);
         err = blk_enqueue_req(&blk_queue, BLK_REQ_WRITE, /* data offset */ 0x0,
-                                  /* block number */ 0x0, /* block count */ 0x1, request_id++);
+                              /* block number */ 0x0, /* block count */ 0x1, request_id++);
         assert(!err);
 
         /* not strictly necessary, but let's do this anyway */
@@ -110,24 +115,24 @@ void notified_hotplug(void)
     GAME_PRINT("Hotplug state notification!\n");
 
     switch (__atomic_load_n(&block_device->state, __ATOMIC_ACQUIRE)) {
-        case SDDF_HOTPLUG_STATE_INSERTED:
-            GAME_PRINT("-> Now inserted\n");
-            if (!is_playing) {
-                play_our_game();
-            }
-            break;
+    case SDDF_HOTPLUG_STATE_INSERTED:
+        GAME_PRINT("-> Now inserted\n");
+        if (!is_playing) {
+            play_our_game();
+        }
+        break;
 
-        case SDDF_HOTPLUG_STATE_EJECTING:
-            GAME_PRINT("-> Wanting unmount\n");
-            break;
+    case SDDF_HOTPLUG_STATE_EJECTING:
+        GAME_PRINT("-> Wanting unmount\n");
+        break;
 
-        case SDDF_HOTPLUG_STATE_OK_TO_EJECT:
-            GAME_PRINT("-> OK to unmount (well we shouldn't ever see this one)\n");
-            break;
+    case SDDF_HOTPLUG_STATE_OK_TO_EJECT:
+        GAME_PRINT("-> OK to unmount (well we shouldn't ever see this one)\n");
+        break;
 
-        case SDDF_HOTPLUG_STATE_EJECTED:
-            GAME_PRINT("-> Card unmounted!\n");
-            break;
+    case SDDF_HOTPLUG_STATE_EJECTED:
+        GAME_PRINT("-> Card unmounted!\n");
+        break;
     }
 }
 
