@@ -39,7 +39,7 @@ static inline bool ialloc_full(ialloc_t *ia)
  */
 static inline bool ialloc_in_use(ialloc_t *ia, uint32_t id)
 {
-    return ia->idxlist[id] == 0;
+    return ia->idxlist[id] == UINT32_MAX;
 }
 
 /**
@@ -57,7 +57,7 @@ static inline int ialloc_alloc(ialloc_t *ia, uint32_t *id)
     }
     *id = ia->head;
     ia->head = ia->idxlist[ia->head];
-    ia->idxlist[*id] = 0;
+    ia->idxlist[*id] = UINT32_MAX;
     ia->num_free--;
     return 0;
 }
@@ -99,11 +99,11 @@ static void ialloc_init(ialloc_t *ia, uint32_t *idxlist, uint32_t size)
 {
     ia->idxlist = idxlist;
     ia->size = size;
-    ia->head = 1;
-    ia->tail = size;
+    ia->head = 0;
+    ia->tail = size - 1;
     ia->num_free = size;
-    for (uint32_t i = 1; i < size; i++) {
+    for (uint32_t i = 0; i < size - 1; i++) {
         ia->idxlist[i] = i + 1;
     }
-    ia->idxlist[size] = 0;
+    ia->idxlist[size - 1] = UINT32_MAX;
 }

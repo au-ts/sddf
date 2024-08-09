@@ -40,8 +40,8 @@ typedef enum gpu_resp_status {
 /* Request struct contained in request queue */
 typedef struct gpu_req {
     gpu_req_code_t code; /* request code */
-    uint32_t id; /* stores request id */
-    uint32_t resource_id; /* resource id to be assigned to resource */
+    uint32_t id; /* request id */
+    uint32_t resource_id;
     union {
         gpu_req_resource_create_2d_t resource_create_2d;
         gpu_req_resource_unref_t resource_unref;
