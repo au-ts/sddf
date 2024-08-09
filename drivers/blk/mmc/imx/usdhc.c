@@ -1129,6 +1129,9 @@ void usdhc_executor(bool from_virtualiser)
     }
 }
 
+void begin_polling();
+void do_poll();
+
 void notified(microkit_channel ch)
 {
     switch (ch) {
@@ -1141,8 +1144,7 @@ void notified(microkit_channel ch)
         break;
 
     case USDHC_TIMER_CHANNEL:
-        LOG_DRIVER("got timer interrupt -- UNHANDLED\n");
-        assert(false);
+        do_poll();
         break;
 
     default:
@@ -1165,6 +1167,22 @@ void init()
     /* Make sure we have DMA support. */
     assert(usdhc_regs->host_ctrl_cap & USDHC_HOST_CTRL_CAP_DMAS);
 
-    reset_driver_and_card_state();
-    usdhc_executor(false);
+    if (card_detected()) {
+        reset_driver_and_card_state();
+        usdhc_executor(false);
+    } else {
+        begin_polling();
+    }
 }
+
+void begin_polling()
+{
+
+}
+
+void do_poll()
+{
+
+}
+
+/* This is somewhat dirty, but we probably want something like it anyway... */
