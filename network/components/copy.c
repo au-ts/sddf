@@ -97,7 +97,12 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
-    net_copy_queue_init_sys(microkit_name, &rx_queue_cli, rx_free_cli, rx_active_cli, &rx_queue_virt, rx_free_virt,
-                            rx_active_virt);
+    size_t cli_queue_size, virt_queue_size = 0;
+    net_copy_queue_size(microkit_name, &cli_queue_size, &virt_queue_size);
+
+    /* Set up the queues */
+    net_queue_init(&rx_queue_cli, rx_free_cli, rx_active_cli, cli_queue_size);
+    net_queue_init(&rx_queue_virt, rx_free_virt, rx_active_virt, virt_queue_size);
+
     net_buffers_init(&rx_queue_cli, 0);
 }
