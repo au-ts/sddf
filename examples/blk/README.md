@@ -12,6 +12,11 @@ with block devices in sDDF.
 The following platforms are supported:
 * qemu_virt_aarch64
 
+Note that this example depends on `dosfstools`.
+
+For `apt` users: `sudo apt-get install dosfstools`.
+For Homebrew users: `brew install dosfstools`.
+
 ### Make
 
 ```sh
