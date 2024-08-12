@@ -14,7 +14,7 @@ on:
 jobs:
   build_linux_x86_64:
     name: Linux x86-64
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
