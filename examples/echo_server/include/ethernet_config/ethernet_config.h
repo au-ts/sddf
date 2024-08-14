@@ -87,10 +87,8 @@ static inline uint64_t net_cli_mac_addr(char *pd_name)
 {
     if (!sddf_strcmp(pd_name, NET_CLI0_NAME)) {
         return MAC_ADDR_CLI0;
-#if NUM_NETWORK_CLIENTS > 1
     } else if (!sddf_strcmp(pd_name, NET_CLI1_NAME)) {
         return MAC_ADDR_CLI1;
-#endif /* NUM_NETWORK_CLIENTS > 1 */
     }
 }
 
@@ -98,9 +96,7 @@ static inline void net_virt_mac_addrs(char *pd_name, uint64_t macs[NUM_NETWORK_C
 {
     if (!sddf_strcmp(pd_name, NET_VIRT_RX_NAME)) {
         macs[0] = MAC_ADDR_CLI0;
-#if NUM_NETWORK_CLIENTS > 1
         macs[1] = MAC_ADDR_CLI1;
-#endif /* NUM_NETWORK_CLIENTS > 1 */
     }
 }
 
@@ -109,11 +105,9 @@ static inline void net_cli_queue_size(char *pd_name, size_t *rx_queue_size, size
     if (!sddf_strcmp(pd_name, NET_CLI0_NAME)) {
         *rx_queue_size = NET_RX_QUEUE_SIZE_CLI0;
         *tx_queue_size = NET_TX_QUEUE_SIZE_CLI0;
-#if NUM_NETWORK_CLIENTS > 1
     } else if (!sddf_strcmp(pd_name, NET_CLI1_NAME)) {
         *rx_queue_size = NET_RX_QUEUE_SIZE_CLI1;
         *tx_queue_size = NET_TX_QUEUE_SIZE_CLI1;
-#endif /* NUM_NETWORK_CLIENTS > 1 */
     }
 }
 
@@ -122,11 +116,9 @@ static inline void net_copy_queue_size(char *pd_name, size_t *cli_queue_size, si
     if (!sddf_strcmp(pd_name, NET_COPY0_NAME)) {
         *cli_queue_size = NET_RX_QUEUE_SIZE_CLI0;
         *virt_queue_size = NET_RX_QUEUE_SIZE_COPY0;
-#if NUM_NETWORK_CLIENTS > 1
     } else if (!sddf_strcmp(pd_name, NET_COPY1_NAME)) {
         *cli_queue_size = NET_RX_QUEUE_SIZE_CLI1;
         *virt_queue_size = NET_RX_QUEUE_SIZE_COPY1;
-#endif /* NUM_NETWORK_CLIENTS > 1 */
     }
 }
 
@@ -143,24 +135,20 @@ static inline void net_virt_queue_info(char *pd_name, net_queue_t *cli0_free, ne
         ret[0] = (queue_info_t) {
             .free = cli0_free, .active = cli0_active, .size = NET_RX_QUEUE_SIZE_COPY0
         };
-#if NUM_NETWORK_CLIENTS > 1
         ret[1] = (queue_info_t) {
             .free = (net_queue_t *)((uintptr_t)cli0_free + 2 * NET_DATA_REGION_SIZE),
             .active = (net_queue_t *)((uintptr_t)cli0_active + 2 * NET_DATA_REGION_SIZE),
             .size = NET_RX_QUEUE_SIZE_COPY1
         };
-#endif /* NUM_NETWORK_CLIENTS > 1 */
     } else if (!sddf_strcmp(pd_name, NET_VIRT_TX_NAME)) {
         ret[0] = (queue_info_t) {
             .free = cli0_free, .active = cli0_active, .size = NET_TX_QUEUE_SIZE_CLI0
         };
-#if NUM_NETWORK_CLIENTS > 1
         ret[1] = (queue_info_t) {
             .free = (net_queue_t *)((uintptr_t)cli0_free + 2 * NET_DATA_REGION_SIZE),
             .active = (net_queue_t *)((uintptr_t)cli0_active + 2 * NET_DATA_REGION_SIZE),
             .size = NET_TX_QUEUE_SIZE_CLI1
         };
-#endif /* NUM_NETWORK_CLIENTS > 1 */
     }
 }
 
@@ -169,8 +157,6 @@ static inline void net_mem_region_vaddr(char *pd_name, uintptr_t mem_regions[NUM
 {
     if (!sddf_strcmp(pd_name, NET_VIRT_TX_NAME)) {
         mem_regions[0] = start_region;
-#if NUM_NETWORK_CLIENTS > 1
         mem_regions[1] = start_region + NET_DATA_REGION_SIZE;
-#endif /* NUM_NETWORK_CLIENTS > 1 */
     }
 }
