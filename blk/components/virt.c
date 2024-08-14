@@ -174,7 +174,8 @@ static bool handle_mbr_reply()
     assert(!err);
 
     reqbk_t mbr_req_data = reqbk[drv_resp_id];
-    ialloc_free(&ialloc, drv_resp_id);
+    err = ialloc_free(&ialloc, drv_resp_id);
+    assert(!err);
 
     if (drv_status != BLK_RESP_OK) {
         LOG_BLK_VIRT_ERR("Failed to read sector 0 from driver\n");
@@ -228,7 +229,8 @@ static void handle_driver()
         assert(!err);
 
         reqbk_t cli_data = reqbk[drv_resp_id];
-        ialloc_free(&ialloc, drv_resp_id);
+        err = ialloc_free(&ialloc, drv_resp_id);
+        assert(!err);
 
         // Free bookkeeping data structures regardless of success or failure
         switch (cli_data.code) {
@@ -332,14 +334,16 @@ static void handle_client(int cli_id)
                 continue;
             }
             // Allocate driver data buffers
-            fsmalloc_alloc(&fsmalloc, &drv_addr, cli_count);
+            err = fsmalloc_alloc(&fsmalloc, &drv_addr, cli_count);
+            assert(!err);
             break;
         case BLK_REQ_WRITE:
             if (blk_queue_full_req(&drv_h) || ialloc_full(&ialloc) || fsmalloc_full(&fsmalloc, cli_count)) {
                 continue;
             }
             // Allocate driver data buffers
-            fsmalloc_alloc(&fsmalloc, &drv_addr, cli_count);
+            err = fsmalloc_alloc(&fsmalloc, &drv_addr, cli_count);
+            assert(!err);
             // Copy data buffers from client to driver
             sddf_memcpy((void *)drv_addr, (void *)(cli_offset + cli_data_base), BLK_TRANSFER_SIZE * cli_count);
             // Flush the cache
