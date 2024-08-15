@@ -8,6 +8,7 @@
 #include <sddf/timer/protocol.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
+#include <sddf/util/udivmodti4.h>
 
 #if !(CONFIG_EXPORT_PCNT_USER && CONFIG_EXPORT_PTMR_USER)
 #error "ARM generic timer is not exported by seL4"
@@ -21,6 +22,8 @@ static uint64_t timer_freq;
 #define GENERIC_TIMER_ENABLE (1 << 0)
 #define GENERIC_TIMER_IMASK  (1 << 1)
 #define GENERIC_TIMER_STATUS (1 << 2)
+#define LOW_WORD(x) (x & 0xffffffffffffffff)
+#define HIGH_WORD(x) (x >> 64)
 
 #define COPROC_WRITE_WORD(R,W) asm volatile ("msr " R  ", %0" :: "r"(W))
 #define COPROC_READ_WORD(R,W)  asm volatile ("mrs %0, " R : "=r" (W))
@@ -97,12 +100,22 @@ static inline uint64_t freq_cycles_and_hz_to_ns(uint64_t ncycles, uint64_t hz)
         return ncycles * US_IN_S / (hz / KHZ);
     }
 
-    return (ncycles * NS_IN_S) / hz;
+    __uint128_t ncycles_in_s = (__uint128_t)ncycles * NS_IN_S;
+    /* We can discard the remainder. */
+    uint64_t rem = 0;
+    uint64_t res = udiv128by64to64(HIGH_WORD(ncycles_in_s), LOW_WORD(ncycles_in_s), NS_IN_S, &rem);
+
+    return res;
 }
 
 static inline uint64_t freq_ns_and_hz_to_cycles(uint64_t ns, uint64_t hz)
 {
-    return (ns * hz) / NS_IN_S;
+    __uint128_t calc = ((__uint128_t)ns * (__uint128_t)hz);
+    /* We can discard the remainder. */
+    uint64_t rem = 0;
+    uint64_t res = udiv128by64to64(HIGH_WORD(calc), LOW_WORD(calc), NS_IN_S, &rem);
+
+    return res;
 }
 
 void set_timeout(uint64_t timeout)
