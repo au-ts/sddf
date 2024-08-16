@@ -67,8 +67,10 @@ char *meson_token_to_str(uint8_t token)
         return "MESON_I2C_TOKEN_ADDR_WRITE";
     case MESON_I2C_TOKEN_ADDR_READ:
         return "MESON_I2C_TOKEN_ADDR_READ";
+    // TODO: REMOVE
     case MESON_I2C_TOKEN_DATA:
         return "MESON_I2C_TOKEN_DATA";
+    // TODO: REMOVE
     case MESON_I2C_TOKEN_DATA_END:
         return "MESON_I2C_TOKEN_DATA_END";
     case MESON_I2C_TOKEN_STOP:
@@ -357,10 +359,6 @@ static inline uint8_t i2c_token_convert(i2c_token_t token)
     case I2C_TOKEN_ADDR_READ:
         i2c_ifState.data_direction = DATA_DIRECTION_READ;
         return MESON_I2C_TOKEN_ADDR_READ;
-    case I2C_TOKEN_DATA:
-        return MESON_I2C_TOKEN_DATA;
-    case I2C_TOKEN_DATA_END:
-        return MESON_I2C_TOKEN_DATA_END;
     case I2C_TOKEN_STOP:
         return MESON_I2C_TOKEN_STOP;
     default:
@@ -414,8 +412,45 @@ static inline void i2c_load_tokens(volatile struct i2c_regs *regs)
     // we have already cleared the registers and it has a value of zero.
 
     while (tk_offset < 16 && wdata_offset < 8 && rdata_offset < 8 && request_data_offset < i2c_ifState.curr_request_len) {
-        // Get the SoC specific token
-        uint8_t meson_token = i2c_token_convert(tokens[request_data_offset]);
+        LOG_DRIVER("request_data_offset : 0x%lx, tk_offset: 0x%lx, wdata_offset: 0x%lx, rdata_offset: 0x%lx\n",
+                   request_data_offset, tk_offset, wdata_offset, rdata_offset);
+
+        // Discover next operation
+        uint8_t meson_token, data;
+        if (i2c_ifState.rw_remaining == 0) {
+            // Get meson_token if no read/write is in progress.
+            meson_token = i2c_token_convert(tokens[request_data_offset]);
+
+            // Grab buffer length, if appropriate.
+            if (meson_token == MESON_I2C_TOKEN_ADDR_WRITE || meson_token == MESON_I2C_TOKEN_ADDR_READ) {
+                // R/W buffer incoming: |RD/WR|LEN|DATA0|DATA1| ... |DATA[LEN-1]|
+                uint8_t buff_length = tokens[request_data_offset+1];
+
+                // Set interface state
+                i2c_ifState.rw_remaining = buff_length;
+                i2c_ifState.data_direction = (meson_token == MESON_I2C_TOKEN_ADDR_WRITE) ? DATA_DIRECTION_WRITE:DATA_DIRECTION_READ;
+
+                // IMPORTANT: skip buffer length byte!
+                request_data_offset++;
+            }
+
+        } else {
+            // We are in the middle of a read or write. Pick up where we left off
+            if (i2c_ifState.rw_remaining == 1) {
+                // Write data end on last byte of buffer.
+                meson_token = MESON_I2C_TOKEN_DATA_END;
+                // TODO: @mattr potential fencepost error? Seems correct to me though.
+            }
+            else {
+                meson_token = MESON_I2C_TOKEN_DATA;
+            }
+            if (i2c_ifState.data_direction == DATA_DIRECTION_WRITE) {
+                data = tokens[request_data_offset]; // Take next byte to write
+            }
+            i2c_ifState.rw_remaining--;
+        }
+
+        LOG_DRIVER("%s\n", meson_token_to_str(meson_token));
 
         LOG_DRIVER("meson_token: 0x%lx, request_data_offset : 0x%lx, tk_offset: 0x%lx, wdata_offset: 0x%lx, rdata_offset: 0x%lx\n",
                    meson_token, request_data_offset, tk_offset, wdata_offset, rdata_offset);
@@ -432,11 +467,11 @@ static inline void i2c_load_tokens(volatile struct i2c_regs *regs)
         if (meson_token == MESON_I2C_TOKEN_DATA && i2c_ifState.data_direction == DATA_DIRECTION_WRITE) {
             // the + 1 is because tokens[request_data_offset] = MESON_I2C_TOKEN_DATA but we want to store the token the come after
             if (wdata_offset < 4) {
-                regs->wdata0 |= (tokens[request_data_offset + 1] << (wdata_offset *
-                                                                     8));
+                regs->wdata0 |= (data << (wdata_offset *
+                                                                     8)); // the + 1 is because tokens[request_data_offset] = MESON_I2C_TOKEN_DATA but we want to store the token the come after
             } else {
-                regs->wdata1 |= (tokens[request_data_offset + 1] << ((wdata_offset - 4) *
-                                                                     8));
+                regs->wdata1 |= (data << ((wdata_offset - 4) *
+                                                                     8)); // the + 1 is because tokens[request_data_offset] = MESON_I2C_TOKEN_DATA but we want to store the token the come after
             }
             // Since we grabbed the next token in the chain, increment offset
             wdata_offset++;
@@ -557,9 +592,7 @@ static void handle_response(void)
     bool write_error = i2c_get_error(regs, &bytes_read, &curr_token);
 
     // Prepare to extract data from the interface.
-    // Due to the way the token chain abstraction is done in the request buffer there will always be
-    // at least 1 more byte of request data then response data.
-    i2c_token_t *return_buffer = i2c_ifState.curr_data;
+    i2c_token_t *return_buffer = i2c_ifState.curr_request_and_response_data;
 
     // If there was an error, cancel the rest of this transaction and load the
     // error information into the return buffer.
@@ -596,18 +629,18 @@ static void handle_response(void)
         }
 
         LOG_DRIVER("I2C_ERR_OK\n");
-        return_buffer[RESPONSE_ERR] = I2C_ERR_OK;
-        // Token that caused error (could be anything since we set error code to no error anyway)
-        return_buffer[RESPONSE_ERR_TOKEN] = 0x0;
+        return_buffer[RESPONSE_ERR] = I2C_ERR_OK;      // Error code
+        return_buffer[RESPONSE_ERR_TOKEN] = 0;         // Placeholder - no error.
     }
 
-    // If request is completed or there was an error, return data to server and notify.
+    // If request is completed or there was an error, return data to virtualiser and notify.
     if (write_error || !i2c_ifState.remaining) {
-        LOG_DRIVER("request completed or error, hence returning response to server\n");
+        LOG_DRIVER("request completed or error. returning response to virtualiser\n");
         LOG_DRIVER("curr_response_len : 0x%lx, curr_request_len : 0x%lx, return address is 0x%lx\n",
                    i2c_ifState.curr_response_len, i2c_ifState.curr_request_len, i2c_ifState.addr);
-        LOG_DRIVER("enguing response with size: %d\n\n", i2c_ifState.curr_response_len + RESPONSE_DATA_OFFSET);
-        // response length is + 2 (RESPONSE_DATA_OFFSET = 2) because of the error tokens at the start
+        LOG_DRIVER("enqueuing response with size: %d\n\n", i2c_ifState.curr_response_len + RESPONSE_DATA_OFFSET);
+
+        // response length is + 2 (RESPONSE_DATA_OFFSET = 2) due to error data preceding payload.
         int ret = i2c_enqueue_response(queue_handle, i2c_ifState.addr,
                                        (size_t) i2c_ifState.curr_data - DATA_REGIONS_START,
                                        i2c_ifState.curr_response_len + RESPONSE_DATA_OFFSET);

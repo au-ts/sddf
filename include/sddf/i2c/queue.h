@@ -42,19 +42,16 @@ enum i2c_token {
     /* START: Begin a transfer. Causes master device to capture bus. */
     I2C_TOKEN_START = 0x1,
     /* ADDRESS WRITE: Used to wake up the target device on the bus.
-     * Sets up and following DATA tokens to be writes. */
+     * The byte immediately following this token is an integer (N) length of the succeeding
+       write. Max 256 (1**8). The next N bytes are the payload. */
     I2C_TOKEN_ADDR_WRITE = 0x2,
-    /* ADDRESS READ: Same as ADDRW but sets up DATA tokens as reads. */
+    /* ADDRESS READ: Same as ADDRW but sets up DATA tokens as reads.
+       FIXME: N bytes must be padded after read to suit current transport layer. This should
+              be replaced, ideally by using a separate shared buffer for return data*/
     I2C_TOKEN_ADDR_READ = 0x3,
-    /* DATA_END: Used for read transactions to write a NACK to alert
-     * the slave device that the read is now over.
-     * this also acts the same way as I2C_TOKEN_DATA (ie it actually requests a token to read so should be treated the same in that regard) */
-    I2C_TOKEN_DATA_END = 0x4,
     /* STOP: Used to send the STOP condition on the bus to end a transaction.
      * Causes master to release the bus. */
-    I2C_TOKEN_STOP = 0x5,
-    /* Read or write one byte - the byte after this is treated as payload. */
-    I2C_TOKEN_DATA = 0x6,
+    I2C_TOKEN_STOP = 0x4,
 };
 
 typedef struct i2c_queue_entry {
