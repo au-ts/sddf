@@ -45,10 +45,10 @@ The specific version used for testing is:
 
 ### Microkit SDK
 
-The sDDF is built using the [seL4 Microkit](https://github.com/seL4/microkit) (version 1.4.0).
+The sDDF is built using the [seL4 Microkit](https://github.com/seL4/microkit) (version 1.4.1).
 
-You can download version 1.4.0 of Microkit SDK from
-[here](https://github.com/seL4/microkit/releases/tag/1.4.0).
+You can download version 1.4.1 of Microkit SDK from
+[here](https://github.com/seL4/microkit/releases/tag/1.4.1).
 
 ## Developing sDDF
 
