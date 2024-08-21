@@ -137,8 +137,14 @@ void init(void)
     net_mem_region_init_sys(microkit_name, state.buffer_region_vaddrs, buffer_data_region_cli0_vaddr);
 
     /* CDTODO: Can we make this system agnostic? */
-    state.buffer_region_paddrs[0] = buffer_data_region_cli0_paddr;
-    state.buffer_region_paddrs[1] = buffer_data_region_cli1_paddr;
+    uintptr_t* data_region_paddr[] = {
+        &buffer_data_region_cli0_paddr,
+        &buffer_data_region_cli1_paddr
+    };
+    // Apparently, NUM_NETWORK_CLIENTS must be smaller or equal to 2
+    for (int i = 0; i < NUM_NETWORK_CLIENTS; i++) {
+        state.buffer_region_paddrs[i] = *(data_region_paddr[i]);
+    }
 
     tx_provide();
 }
