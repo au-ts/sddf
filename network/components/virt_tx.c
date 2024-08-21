@@ -137,7 +137,7 @@ void init(void)
     net_mem_region_init_sys(microkit_name, state.buffer_region_vaddrs, buffer_data_region_cli0_vaddr);
 
     /* CDTODO: Can we make this system agnostic? */
-    uintptr_t* data_region_paddr[] = {
+    uintptr_t *data_region_paddr[] = {
         &buffer_data_region_cli0_paddr,
         &buffer_data_region_cli1_paddr
     };
