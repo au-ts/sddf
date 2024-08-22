@@ -251,11 +251,15 @@ void handle_request()
             break;
         }
         case BLK_REQ_FLUSH: {
-            LOG_DRIVER_ERR("FLUSH request is not supported by driver\n");
+            int err = blk_enqueue_resp(&blk_queue, BLK_RESP_OK, 0, id);
+            assert(!err);
+            microkit_notify(VIRT_CH);
             break;
         }
         case BLK_REQ_BARRIER: {
-            LOG_DRIVER_ERR("BARRIER request is not supported by driver\n");
+            int err = blk_enqueue_resp(&blk_queue, BLK_RESP_OK, 0, id);
+            assert(!err);
+            microkit_notify(VIRT_CH);
             break;
         }
         default:
