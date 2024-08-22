@@ -69,6 +69,8 @@
             <map mr="tx_used_drv" vaddr="0x2_a00_000" perms="rw" cached="true" setvar_vaddr="tx_used" />
             <map mr="rx_buffer_data_region" vaddr="0x11000000" perms="rw" cached="true" setvar_vaddr="rx_dma_region" />
 
+            <map mr="cyclecounters" vaddr="0x5_010_000" perms="rw" cached="true" setvar_vaddr="cyclecounters_vaddr" />
+
             <!-- <irq irq="152" id="0" /> <!-\-> ethernet interrupt -\-> -->
             <irq irq="1" id="0" type="msi" handle="0" pci_bus="1" pci_dev="0" pci_func="0" />
 
@@ -284,10 +286,10 @@
     <!--     <end pd="client1" id="1" /> -->
     <!-- </channel> -->
 
-    <!-- <channel>
-      <end pd="serial" id="0" />
+    <channel>
+      <end pd="serial" id="1" />
       <end pd="client0" id="13" />
-    </channel> -->
+    </channel>
 
     <!-- <channel>
       <end pd="serial" id="0" />

@@ -10,8 +10,18 @@ struct bench {
     uint64_t prev;
     uint64_t ts;
     uint64_t overflows;
-    //@jade: hacks
-    uint64_t eth_ccount;
+    // @jade: packet counts
+    uint64_t eth_pcount_tx;
+    uint64_t eth_pcount_rx;
+    uint64_t eth_irq_count;
+
+    uint64_t lwip_pcount_tx;
+    uint64_t lwip_pcount_rx;
+    uint64_t lwip_irq_count;
+
+    // uint64_t rx_mux_pcount_tx;
+    // uint64_t rx_mux_pcount_rx;
+    // uint64_t rx_mux_irq_count;
 };
 
 // #ifdef CONFIG_BENCHMARK_TRACK_UTILISATION

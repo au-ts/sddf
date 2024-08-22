@@ -10,6 +10,7 @@
 #include <sddf/network/shared_ringbuffer.h>
 #include <sddf/timer/client.h>
 #include <ethernet_config.h>
+#include <sddf/benchmark/bench.h>
 
 #include "ixgbe.h"
 
@@ -36,6 +37,8 @@ const uintptr_t rx_free = 0x2400000;
 const uintptr_t rx_used = 0x2600000;
 const uintptr_t tx_free = 0x2800000;
 const uintptr_t tx_used = 0x2a00000;
+
+struct bench *bench = (void *)(uintptr_t)0x5010000;
 
 const uint64_t ONE_MS_IN_NS = 1000000;
 
@@ -127,7 +130,7 @@ tx_provide(void)
             buff_desc_t buffer;
             int err __attribute__((unused)) = dequeue_used(&tx_ring, &buffer);
             assert(!err);
-
+            bench->eth_pcount_tx++;
             volatile ixgbe_adv_tx_desc_t *desc = &device.tx_ring[device.tx_tail];
             desc->read.buffer_addr = buffer.phys_or_offset;
             desc->read.cmd_type_len = IXGBE_ADVTXD_DCMD_EOP
@@ -200,7 +203,7 @@ rx_provide(void)
             buff_desc_t buffer;
             int err __attribute__((unused)) = dequeue_free(&rx_ring, &buffer);
             assert(!err);
-
+            bench->eth_pcount_rx++;
             volatile ixgbe_adv_rx_desc_t *desc = &device.rx_ring[device.rx_tail];
             desc->read.pkt_addr = buffer.phys_or_offset;
             desc->read.hdr_addr = 0;
@@ -630,11 +633,11 @@ print_interrupt_regs(void)
     // printf("\tDEV: EIMS=%0x%08x\n", get_reg(EIMS));
 }
 
-static size_t irq_count = 0;
-
 void
 notified(microkit_channel ch)
 {
+    bench->eth_irq_count++;
+    
     print_interrupt_regs();
     // printf("PCI interrupt pending? %d\n", get_reg16(ECAM + 0x6) & BIT(3) != 0);
     // printf("vendor id: %x\n", get_reg(ECAM));
@@ -665,11 +668,6 @@ notified(microkit_channel ch)
         // }
         break;
     case IRQ_CH: {
-        irq_count++;
-        if (irq_count % 100 == 0) {
-            // printf("irq count: %d\n", irq_count);
-        }
-        // printf("IRQ: EICR=0x%08x\n", get_reg(EICR));
         uint32_t cause = get_reg(EICR);
         clear_flags(EICR, cause);
         rx_return();

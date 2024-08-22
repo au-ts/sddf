@@ -90,8 +90,8 @@ NETIFFILES=$(LWIP)/netif/ethernet.c
 
 # LWIPFILES: All the above.
 LWIPFILES=lwip.c $(COREFILES) $(CORE4FILES) $(NETIFFILES)
-LWIP_OBJS := $(LWIPFILES:.c=.o) lwip.o sddf_network_sharedringbuffer.o utilization_socket.o udp_echo_socket.o sddf_timer_client.o printf.o putchar_debug.o
-# LWIP_OBJS := $(LWIPFILES:.c=.o) lwip.o sddf_network_sharedringbuffer.o utilization_socket.o udp_echo_socket.o sddf_timer_client.o printf.o putchar_serial.o
+# LWIP_OBJS := $(LWIPFILES:.c=.o) lwip.o sddf_network_sharedringbuffer.o utilization_socket.o udp_echo_socket.o sddf_timer_client.o printf.o putchar_debug.o
+LWIP_OBJS := $(LWIPFILES:.c=.o) lwip.o sddf_network_sharedringbuffer.o utilization_socket.o udp_echo_socket.o sddf_timer_client.o printf.o putchar_serial.o
 
 ETH_OBJS := $(ETHERNET_DRIVER)/ethernet.o sddf_network_sharedringbuffer.o printf.o putchar_debug.o sddf_timer_client.o
 # ETH_OBJS := $(ETHERNET_DRIVER)/ethernet.o sddf_network_sharedringbuffer.o printf.o putchar_serial.o sddf_timer_client.o

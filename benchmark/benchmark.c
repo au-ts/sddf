@@ -14,7 +14,6 @@
 #include <sddf/util/printf.h>
 
 #define LOG_BUFFER_CAP 7
-#define CONFIG_BENCHMARK_TRACK_UTILISATION
 
 /* Notification channels and TCB CAP offsets - ensure these align with .system file! */
 #define START 1
@@ -179,9 +178,9 @@ void notified(microkit_channel ch)
             sel4bench_get_counters(benchmark_bf, &counter_values[0]);
             sel4bench_stop_counters(benchmark_bf);
 
-            printf("{\n");
-            for (int i = 0; i < ARRAY_SIZE(benchmarking_events); i++) printf("%s: %llX\n", counter_names[i], counter_values[i]);
-            printf("}\n");
+            // printf("{\n");
+            // for (int i = 0; i < ARRAY_SIZE(benchmarking_events); i++) printf("%s: %llX\n", counter_names[i], counter_values[i]);
+            // printf("}\n");
 
             #ifdef CONFIG_BENCHMARK_TRACK_UTILISATION
             uint64_t total;
@@ -233,7 +232,7 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
-    printf("benchmark init %d %d\n", TCB_CAP, BASE_TCB_CAP);
+    printf("benchmark init\n");
 
     sel4bench_init();
     seL4_Word n_counters = sel4bench_get_num_counters();

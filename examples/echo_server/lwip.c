@@ -11,6 +11,7 @@
 #include <sddf/network/shared_ringbuffer.h>
 #include <sddf/timer/client.h>
 #include <sddf/benchmark/x86/sel4bench.h>
+#include <sddf/benchmark/bench.h>
 #include <ethernet_config.h>
 #include <string.h>
 #include "lwip/init.h"
@@ -40,6 +41,8 @@ uintptr_t tx_used = 0x2600000;
 uintptr_t rx_buffer_data_region = 0x2800000;
 uintptr_t tx_buffer_data_region = 0x2a00000;
 uintptr_t uart_base;
+
+struct bench *b = (void *)(uintptr_t)0x5010000;
 
 /* Booleans to indicate whether packets have been enqueued during notification handling */
 static bool notify_tx;
@@ -175,6 +178,8 @@ static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
     err = enqueue_used(&(state.tx_ring), buffer);
     assert(!err);
 
+    b->lwip_pcount_tx++;
+
     notify_tx = true;
     microkit_notify(TX_CH);
 
@@ -221,6 +226,8 @@ void receive(void)
             buff_desc_t buffer;
             int err __attribute__((unused)) = dequeue_used(&state.rx_ring, &buffer);
             assert(!err);
+
+            b->lwip_pcount_rx++;
 
             struct pbuf *p = create_interface_buffer(buffer.phys_or_offset, buffer.len);
             if (state.netif.input(p, &state.netif) != ERR_OK) {
@@ -318,26 +325,26 @@ void init(void)
     if (notify_rx && require_signal(state.rx_ring.free_ring)) {
         cancel_signal(state.rx_ring.free_ring);
         notify_rx = false;
+        // microkit_notify(RX_CH);
         if (!have_signal) microkit_notify(RX_CH);
         else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + RX_CH) microkit_notify(RX_CH);
     }
 
     if (notify_tx && require_signal(state.tx_ring.used_ring)) {
+    // if (notify_tx) {
         cancel_signal(state.tx_ring.used_ring);
         notify_tx = false;
+        // microkit_notify(TX_CH);
         if (!have_signal) microkit_notify(TX_CH);
         else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + TX_CH) microkit_notify(TX_CH);
     }
 }
 
-// static size_t notified_count = 0;
 
 void notified(microkit_channel ch)
 {
-    // notified_count++;
-    // if (notified_count % 100 == 0) {
-    //     printf("notified count: %d\n", notified_count);
-    // }
+    b->lwip_irq_count++;
+
     switch(ch) {
     case RX_CH:
         receive();
@@ -355,16 +362,20 @@ void notified(microkit_channel ch)
         break;
     }
 
+    // if (notify_rx) {
     if (notify_rx && require_signal(state.rx_ring.free_ring)) {
         cancel_signal(state.rx_ring.free_ring);
         notify_rx = false;
+        // microkit_notify(RX_CH);
         if (!have_signal) microkit_notify(RX_CH);
         else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + RX_CH) microkit_notify(RX_CH);
     }
 
     if (notify_tx && require_signal(state.tx_ring.used_ring)) {
+    // if (notify_tx) {
         cancel_signal(state.tx_ring.used_ring);
         notify_tx = false;
+        // microkit_notify(TX_CH);
         if (!have_signal) microkit_notify(TX_CH);
         else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + TX_CH) microkit_notify(TX_CH);
     }

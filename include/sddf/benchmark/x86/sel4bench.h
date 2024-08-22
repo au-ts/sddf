@@ -59,7 +59,7 @@ typedef uint64_t ccnt_t;
 
 static inline uint64_t sel4bench_x86_rdmsr(uint32_t reg) {
 // #ifdef CONFIG_KERNEL_X86_DANGEROUS_MSR
-    return microkit_x86_rdmsr(reg);
+    return seL4_X86DangerousRDMSR(reg);
 // #else
 //     uint32_t msr_data[3];
 //     msr_data[0] = reg;
@@ -73,7 +73,7 @@ static inline uint64_t sel4bench_x86_rdmsr(uint32_t reg) {
 
 static inline void sel4bench_x86_wrmsr(uint32_t reg, uint64_t val) {
 // #ifdef CONFIG_KERNEL_X86_DANGEROUS_MSR
-    microkit_x86_wrmsr(reg, val);
+    seL4_X86DangerousWRMSR(reg, val);
 // #else
 //     uint32_t msr_data[3];
 //     msr_data[0] = reg;
