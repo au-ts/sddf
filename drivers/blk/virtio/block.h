@@ -99,34 +99,34 @@ struct virtio_blk_req {
 
 static void virtio_blk_print_req(struct virtio_blk_req *req)
 {
-    LOG_DRIVER("type: 0x%lx, reserved: 0x%lx, sector: 0x%lx, status: 0x%lx\n",
+    LOG_DRIVER("type: 0x%x, reserved: 0x%x, sector: 0x%lx, status: 0x%x\n",
                req->type, req->reserved, req->sector, req->status);
 }
 
 static void virtio_blk_print_config(volatile struct virtio_blk_config *config)
 {
     LOG_DRIVER("capacity: 0x%lx (0x%lx bytes)\n", config->capacity, config->capacity * VIRTIO_BLK_SECTOR_SIZE);
-    LOG_DRIVER("size_max: 0x%lx\n", config->size_max);
-    LOG_DRIVER("seg_max: 0x%lx\n", config->seg_max);
-    LOG_DRIVER("geometry.cylinders: 0x%lx\n", config->geometry.cylinders);
-    LOG_DRIVER("geometry.heads: 0x%lx\n", config->geometry.heads);
-    LOG_DRIVER("geometry.sectors: 0x%lx\n", config->geometry.sectors);
-    LOG_DRIVER("blk_size: 0x%lx\n", config->blk_size);
-    LOG_DRIVER("topology.physical_block_exp: 0x%lx\n", config->topology.physical_block_exp);
-    LOG_DRIVER("topology.alignment_offset: 0x%lx\n", config->topology.alignment_offset);
-    LOG_DRIVER("topology.min_io_size: 0x%lx\n", config->topology.min_io_size);
-    LOG_DRIVER("topology.opt_io_size: 0x%lx\n", config->topology.opt_io_size);
-    LOG_DRIVER("writeback: 0x%lx\n", config->writeback);
-    LOG_DRIVER("num_queues: 0x%lx\n", config->num_queues);
-    LOG_DRIVER("max_discard_sectors: 0x%lx\n", config->max_discard_sectors);
-    LOG_DRIVER("max_discard_seg: 0x%lx\n", config->max_discard_seg);
-    LOG_DRIVER("discard_sector_alignment: 0x%lx\n", config->discard_sector_alignment);
-    LOG_DRIVER("max_write_zeroes_sectors: 0x%lx\n", config->max_write_zeroes_sectors);
-    LOG_DRIVER("max_write_zeroes_seg: 0x%lx\n", config->max_write_zeroes_seg);
-    LOG_DRIVER("write_zeroes_may_unmap: 0x%lx\n", config->write_zeroes_may_unmap);
-    LOG_DRIVER("max_secure_erase_sectors: 0x%lx\n", config->max_secure_erase_sectors);
-    LOG_DRIVER("max_secure_erase_seg: 0x%lx\n", config->max_secure_erase_seg);
-    LOG_DRIVER("secure_erase_sector_alignment: 0x%lx\n", config->secure_erase_sector_alignment);
+    LOG_DRIVER("size_max: 0x%x\n", config->size_max);
+    LOG_DRIVER("seg_max: 0x%x\n", config->seg_max);
+    LOG_DRIVER("geometry.cylinders: 0x%x\n", config->geometry.cylinders);
+    LOG_DRIVER("geometry.heads: 0x%x\n", config->geometry.heads);
+    LOG_DRIVER("geometry.sectors: 0x%x\n", config->geometry.sectors);
+    LOG_DRIVER("blk_size: 0x%x\n", config->blk_size);
+    LOG_DRIVER("topology.physical_block_exp: 0x%hhx\n", config->topology.physical_block_exp);
+    LOG_DRIVER("topology.alignment_offset: 0x%hhx\n", config->topology.alignment_offset);
+    LOG_DRIVER("topology.min_io_size: 0x%hx\n", config->topology.min_io_size);
+    LOG_DRIVER("topology.opt_io_size: 0x%x\n", config->topology.opt_io_size);
+    LOG_DRIVER("writeback: 0x%hhx\n", config->writeback);
+    LOG_DRIVER("num_queues: 0x%hx\n", config->num_queues);
+    LOG_DRIVER("max_discard_sectors: 0x%x\n", config->max_discard_sectors);
+    LOG_DRIVER("max_discard_seg: 0x%x\n", config->max_discard_seg);
+    LOG_DRIVER("discard_sector_alignment: 0x%x\n", config->discard_sector_alignment);
+    LOG_DRIVER("max_write_zeroes_sectors: 0x%x\n", config->max_write_zeroes_sectors);
+    LOG_DRIVER("max_write_zeroes_seg: 0x%x\n", config->max_write_zeroes_seg);
+    LOG_DRIVER("write_zeroes_may_unmap: 0x%hhx\n", config->write_zeroes_may_unmap);
+    LOG_DRIVER("max_secure_erase_sectors: 0x%x\n", config->max_secure_erase_sectors);
+    LOG_DRIVER("max_secure_erase_seg: 0x%x\n", config->max_secure_erase_seg);
+    LOG_DRIVER("secure_erase_sector_alignment: 0x%x\n", config->secure_erase_sector_alignment);
 }
 
 static void virtio_blk_print_features(uint64_t features)
