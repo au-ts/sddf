@@ -18,7 +18,7 @@ ${CHECK_NETDRV_FLAGS_MD5}:
 	-rm -f .netdrv_cflags-*
 	touch $@
 
-eth_driver.elf eth_driver_dwmac-5.10a.elf: network/dwmac-5.10a/ethernet.o
+eth_driver_dwmac-5.10a.elf: network/dwmac-5.10a/ethernet.o
 	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
 
 network/dwmac-5.10a/ethernet.o: ${ETHERNET_DRIVER_DIR}ethernet.c ${CHECK_NETDRV_FLAGS} | $(SDDF_LIBC_INCLUDE)
