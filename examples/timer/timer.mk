@@ -42,7 +42,7 @@ IMAGE_FILE := loader.img
 REPORT_FILE := report.txt
 SYSTEM_FILE := ${TOP}/board/$(MICROKIT_BOARD)/timer.system
 CLIENT_OBJS := client.o
-TIMER_DRIVER := $(SDDF)/drivers/clock/$(TIMER_DRIVER_DIR)
+TIMER_DRIVER := $(SDDF)/drivers/timer/$(TIMER_DRIVER_DIR)
 
 all: $(IMAGE_FILE)
 CHECK_FLAGS_BOARD_MD5:=.board_cflags-$(shell echo -- ${CFLAGS} ${BOARD} ${MICROKIT_CONFIG} | shasum | sed 's/ *-//')
