@@ -91,7 +91,7 @@ fn addTimerDriver(
         .optimize = optimize,
         .strip = false,
     });
-    const source = b.fmt("drivers/clock/{s}/timer.c", .{ @tagName(class) });
+    const source = b.fmt("drivers/timer/{s}/timer.c", .{ @tagName(class) });
     driver.addCSourceFile(.{
         .file = b.path(source),
     });

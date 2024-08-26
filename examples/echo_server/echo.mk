@@ -16,7 +16,7 @@ ETHERNET_CONFIG_INCLUDE:=${ECHO_SERVER}/include/ethernet_config
 SERIAL_COMPONENTS := $(SDDF)/serial/components
 UART_DRIVER := $(SDDF)/drivers/serial/$(UART_DRIV_DIR)
 SERIAL_CONFIG_INCLUDE:=${ECHO_SERVER}/include/serial_config
-TIMER_DRIVER:=$(SDDF)/drivers/clock/$(TIMER_DRV_DIR)
+TIMER_DRIVER:=$(SDDF)/drivers/timer/$(TIMER_DRV_DIR)
 NETWORK_COMPONENTS:=$(SDDF)/network/components
 
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)

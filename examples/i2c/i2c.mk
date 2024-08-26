@@ -37,7 +37,7 @@ LIBCO := $(SDDF)/libco
 TOP := ${SDDF}/examples/i2c
 I2C := $(SDDF)/i2c
 I2C_DRIVER := $(SDDF)/drivers/i2c/${PLATFORM}
-TIMER_DRIVER := $(SDDF)/drivers/clock/${PLATFORM}
+TIMER_DRIVER := $(SDDF)/drivers/timer/${PLATFORM}
 
 IMAGES := i2c_virt.elf i2c_driver.elf client.elf timer_driver.elf
 CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall -Wno-unused-function -I${TOP}

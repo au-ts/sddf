@@ -61,7 +61,7 @@ REPORT_FILE  := report.txt
 SYSTEM_FILE  := ${TOP}/board/$(MICROKIT_BOARD)/mmc.system
 
 MMC_DRIVER   := $(SDDF)/drivers/blk/mmc/${DRIVER_DIR}
-TIMER_DRIVER := $(SDDF)/drivers/clock/${DRIVER_DIR}
+TIMER_DRIVER := $(SDDF)/drivers/timer/${DRIVER_DIR}
 
 BLK_COMPONENTS := $(SDDF)/blk/components
 
