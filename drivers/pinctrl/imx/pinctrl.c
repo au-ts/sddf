@@ -3,6 +3,8 @@
 #include <sddf/util/printf.h>
 #include <sddf/pinctrl/protocol.h>
 
+#define DEBUG_DRIVER
+
 #ifdef DEBUG_DRIVER
 #define LOG_DRIVER(...) do{ sddf_dprintf("PINCTRL DRIVER|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
 #else
@@ -31,7 +33,7 @@ void init(void) {
 
     LOG_DRIVER("data dump begin...one pin per line\n");
     for (uint32_t i = 0; i < num_iomuxc_configs; i += 1) {
-        LOG_DRIVER("%u %u %u %u %u %u\n", iomuxc_configs[i].mux_reg, iomuxc_configs[i].conf_reg, iomuxc_configs[i].input_reg, iomuxc_configs[i].mux_val, iomuxc_configs[i].input_val, iomuxc_configs[i].pad_setting);
+        LOG_DRIVER("mux reg: 0x%x = %u, input reg: 0x%x = %u, pad conf reg: 0x%x = %u\n", iomuxc_configs[i].mux_reg, iomuxc_configs[i].mux_val, iomuxc_configs[i].input_reg, iomuxc_configs[i].input_val, iomuxc_configs[i].conf_reg, iomuxc_configs[i].pad_setting);
     }
 
     LOG_DRIVER("initialising...\n");
