@@ -15,112 +15,52 @@ ifeq ($(strip $(SDDF)),)
 $(error SDDF must be specified)
 endif
 
-BUILD_DIR ?= build
-MICROKIT_CONFIG ?= debug
 IMAGE_FILE = loader.img
 REPORT_FILE = report.txt
-
-CC := clang
-LD := ld.lld
-AS := llvm-as
-AR := llvm-ar
-RANLIB := llvm-ranlib
-OBJCOPY := llvm-objcopy
-DTC := dtc
-PYTHON ?= python3
-
+BUILD_DIR ?= build
+MICROKIT_CONFIG ?= debug
 MICROKIT_TOOL := $(MICROKIT_SDK)/bin/microkit
 
-ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
-	DRIVER_DIR := meson
-	CPU := cortex-a55
-else ifeq ($(strip $(MICROKIT_BOARD)), odroidc2)
-	DRIVER_DIR := meson
-	CPU := cortex-a53
-else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
-	QEMU_ARCH_ARGS := -machine virt,virtualization=on \
-					  -cpu cortex-a53 \
-					  -device loader,file=$(IMAGE_FILE),addr=0x70000000,cpu-num=0
-	DRIVER_DIR := arm
-	CPU := cortex-a53
-else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_riscv64)
-	QEMU_ARCH_ARGS := -machine virt -kernel $(IMAGE_FILE)
-	DRIVER_DIR := ns16550a
-else ifneq ($(filter $(strip $(MICROKIT_BOARD)),imx8mm_evk imx8mp_evk imx8mq_evk maaxboard),)
-	DRIVER_DIR := imx
-	CPU := cortex-a53
-else ifneq ($(filter $(strip $(MICROKIT_BOARD)),cheshire star64 hifive_p550),)
-	DRIVER_DIR := ns16550a
-else ifeq ($(strip $(MICROKIT_BOARD)), zcu102)
-	DRIVER_DIR := zynqmp
-	CPU := cortex-a53
-else ifeq ($(strip $(MICROKIT_BOARD)), rpi4b_1gb)
-	DRIVER_DIR := ns16550a
-	CPU := cortex-a72
-else
-$(error Unsupported MICROKIT_BOARD given)
-endif
+SUPPORTED_BOARDS:= imx8mm_evk maaxboard odroidc4 qemu_virt_aarch64 \
+		   rpi4b_1gb zcu102
+
+include ${SDDF}/tools/Make/board/common.mk
 
 TOP := ${SDDF}/examples/serial
 METAPROGRAM := $(TOP)/meta.py
 UTIL := $(SDDF)/util
 SERIAL_COMPONENTS := $(SDDF)/serial/components
-UART_DRIVER := $(SDDF)/drivers/serial/$(DRIVER_DIR)
-BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
+UART_DRIVER := $(SDDF)/drivers/serial/$(UART_DRIV_DIR)
 SYSTEM_FILE := serial.system
-DTS := $(SDDF)/dts/$(MICROKIT_BOARD).dts
-DTB := $(MICROKIT_BOARD).dtb
-ARCH := ${shell grep 'CONFIG_SEL4_ARCH  ' $(BOARD_DIR)/include/kernel/gen_config.h | cut -d' ' -f4}
 SDDF_CUSTOM_LIBC := 1
-QEMU := qemu-system-$(ARCH)
 
 IMAGES := serial_driver.elf \
 	  client0.elf client1.elf \
 	  serial_virt_tx.elf serial_virt_rx.elf
-CFLAGS := -ffreestanding \
-	  -g3 -O3 -Wall \
-	  -Wno-unused-function -Werror \
-	  -MD
+CFLAGS +=  -Wno-unused-function -Werror
+
 LDFLAGS := -L$(BOARD_DIR)/lib -L$(SDDF)/lib
 LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
 
-ifeq ($(ARCH),aarch64)
-	CFLAGS += -mcpu=$(CPU) -mstrict-align -target aarch64-none-elf
-else ifeq ($(ARCH),riscv64)
-	CFLAGS += -march=rv64imafdc -target riscv64-none-elf
-endif
-CFLAGS += -I$(BOARD_DIR)/include \
-	-I${TOP}/include	\
+CFLAGS += \
+	-I${TOP}/include  \
 	-I${SDDF}/include \
-	-I${SDDF}/include/microkit \
-	$(CFLAGS_ARCH)
+	-I${SDDF}/include/microkit
 
-CHECK_FLAGS_BOARD_MD5 := .board_cflags-$(shell echo -- ${CFLAGS} ${MICROKIT_SDK} ${MICROKIT_BOARD} ${MICROKIT_CONFIG} | shasum | sed 's/ *-//')
-
-${CHECK_FLAGS_BOARD_MD5}:
-	-rm -f .board_cflags-*
-	touch $@
-
-${IMAGES}: libsddf_util_debug.a ${CHECK_FLAGS_BOARD_MD5}
+${IMAGES}: libsddf_util_debug.a
 
 include ${SDDF}/util/util.mk
 include ${UART_DRIVER}/serial_driver.mk
 include ${SERIAL_COMPONENTS}/serial_components.mk
 
-%.elf: %.o
-	${LD} -o $@ ${LDFLAGS} $< ${LIBS}
-
 client.elf: client.o libsddf_util.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-client.o: ${TOP}/client.c ${CHECK_FLAGS_BOARD_MD5}
+client.o: ${TOP}/client.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 client0.elf client1.elf: client.elf
 	cp client.elf $@
-
-$(DTB): $(DTS)
-	dtc -q -I dts -O dtb $(DTS) > $(DTB)
 
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE)
