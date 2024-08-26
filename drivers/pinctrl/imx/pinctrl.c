@@ -3,6 +3,14 @@
 #include <sddf/util/printf.h>
 #include <sddf/pinctrl/protocol.h>
 
+#ifdef DEBUG_DRIVER
+#define LOG_DRIVER(...) do{ sddf_dprintf("PINCTRL DRIVER|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
+#else
+#define LOG_DRIVER(...) do{}while(0)
+#endif
+
+#define LOG_DRIVER_ERR(...) do{ sddf_printf("PINCTRL DRIVER|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
+
 uintptr_t iomuxc_base;
 
 typedef struct iomuxc_config {
@@ -18,17 +26,17 @@ extern iomuxc_config_t iomuxc_configs[];
 extern uint32_t num_iomuxc_configs;
 
 void init(void) {
-    sddf_dprintf("PINCTRL DRIVER|LOG: started\n");
-    sddf_dprintf("PINCTRL DRIVER|LOG: nums of config is %u\n", num_iomuxc_configs);
+    LOG_DRIVER("started\n");
+    LOG_DRIVER("nums of config is %u\n", num_iomuxc_configs);
 
-    sddf_dprintf("PINCTRL DRIVER|LOG: data dump begin...one pin per line\n");
+    LOG_DRIVER("data dump begin...one pin per line\n");
     for (uint32_t i = 0; i < num_iomuxc_configs; i += 1) {
-        sddf_dprintf("%u %u %u %u %u %u\n", iomuxc_configs[i].mux_reg, iomuxc_configs[i].conf_reg, iomuxc_configs[i].input_reg, iomuxc_configs[i].mux_val, iomuxc_configs[i].input_val, iomuxc_configs[i].pad_setting);
+        LOG_DRIVER("%u %u %u %u %u %u\n", iomuxc_configs[i].mux_reg, iomuxc_configs[i].conf_reg, iomuxc_configs[i].input_reg, iomuxc_configs[i].mux_val, iomuxc_configs[i].input_val, iomuxc_configs[i].pad_setting);
     }
 
-    sddf_dprintf("PINCTRL DRIVER|LOG: initialising...\n");
+    LOG_DRIVER("initialising...\n");
     for (uint32_t i = 0; i < num_iomuxc_configs; i += 1) {
-        sddf_dprintf("PINCTRL DRIVER|LOG: writing pin #%u\n", i);
+        LOG_DRIVER("writing pin #%u\n", i);
         uint32_t *mux_reg_offset = (uint32_t *) (iomuxc_base + (uintptr_t) iomuxc_configs[i].mux_reg);
         *mux_reg_offset = iomuxc_configs[i].mux_val;
 
@@ -39,11 +47,11 @@ void init(void) {
         *input_reg_offset = iomuxc_configs[i].input_val;
     }
 
-    sddf_dprintf("PINCTRL DRIVER|LOG: done\n");
+    LOG_DRIVER("pinctrl device initialisation done\n");
 }
 
 void notified(microkit_channel ch) {
-    sddf_dprintf("PINCTRL DRIVER|LOG: received ntfn on channel %u\n", ch);
+    LOG_DRIVER_ERR("received ntfn on unexpected channel %u\n", ch);
 }
 
 microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo) {
@@ -57,8 +65,7 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo) {
         break;
     }
     default:
-        sddf_dprintf("PINCTRL DRIVER|LOG: Unknown request %lu to pinctrl from channel %u\n", microkit_msginfo_get_label(msginfo),
-                     ch);
+        LOG_DRIVER_ERR("Unknown request %lu to pinctrl from channel %u\n", microkit_msginfo_get_label(msginfo), ch);
         break;
     }
 
