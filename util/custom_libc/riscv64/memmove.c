@@ -16,9 +16,9 @@
    http://www.opensource.org/licenses.
 */
 
-#if defined(PREFER_SIZE_OVER_SPEED) || defined(__OPTIMIZE_SIZE__)
+//#if defined(PREFER_SIZE_OVER_SPEED) || defined(__OPTIMIZE_SIZE__)
 /* memmove defined in memmove-asm.S */
-#else
+//#else
 
 #include "local.h"
 #include "sys/asm.h"
@@ -263,4 +263,4 @@ memmove (void *dst_void, const void *src_void, size_t length)
       return dst_void;
     }
 }
-#endif
+//#endif
