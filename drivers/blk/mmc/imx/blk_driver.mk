@@ -7,6 +7,8 @@
 # Assumes libsddf_util_debug.a is in ${LIBS}.
 
 USDHC_DRIVER_DIR := $(realpath $(dir $(lastword $(MAKEFILE_LIST))))
+# This block driver needs a configured timer driver
+BLK_NEED_TIMER := 1
 
 blk_driver.elf: blk/mmc/imx/blk_driver.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@

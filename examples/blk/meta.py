@@ -1,63 +1,23 @@
 # Copyright 2025, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
+import os, sys
 import argparse
 from typing import List, Optional
 from dataclasses import dataclass
 from sdfgen import SystemDescription, Sddf, DeviceTree
 from importlib.metadata import version
 
+sys.path.append(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../tools/meta")
+)
+from board import BOARDS
+
 assert version("sdfgen").split(".")[1] == "27", "Unexpected sdfgen version"
 
 ProtectionDomain = SystemDescription.ProtectionDomain
 
 
-@dataclass
-class Board:
-    name: str
-    arch: SystemDescription.Arch
-    paddr_top: int
-    blk: str
-    # Default partition if the user has not specified one
-    partition: int
-    # Use actual serial driver for output, so we can test non-debug configurations
-    serial: str
-    # Some block drivers need a timer driver as well, the example
-    # itself does not need a timer driver.
-    timer: Optional[str]
-
-
-BOARDS: List[Board] = [
-    Board(
-        name="qemu_virt_aarch64",
-        arch=SystemDescription.Arch.AARCH64,
-        paddr_top=0x6_0000_000,
-        partition=0,
-        blk="virtio_mmio@a003e00",
-        serial="pl011@9000000",
-        timer=None,
-    ),
-    Board(
-        name="maaxboard",
-        arch=SystemDescription.Arch.AARCH64,
-        paddr_top=0x7_0000_000,
-        partition=2,
-        blk="soc@0/bus@30800000/mmc@30b40000",
-        timer="soc@0/bus@30000000/timer@302d0000",
-        serial="soc@0/bus@30800000/serial@30860000",
-    ),
-    Board(
-        name="qemu_virt_riscv64",
-        arch=SystemDescription.Arch.RISCV64,
-        paddr_top=0xA_0000_000,
-        partition=0,
-        blk="soc/virtio_mmio@10008000",
-        serial="soc/serial@10000000",
-        timer=None,
-    ),
-]
-
-
-def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
+def generate(sdf_file: str, output_dir: str, dtb: DeviceTree, need_timer: bool):
     serial_driver = ProtectionDomain("serial_driver", "serial_driver.elf", priority=200)
     # Increase the stack size as running with UBSAN uses more stack space than normal.
     serial_virt_tx = ProtectionDomain(
@@ -81,7 +41,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
     blk_node = dtb.node(board.blk)
     assert blk_node is not None
-    if board.timer:
+    if need_timer:
         timer_node = dtb.node(board.timer)
         assert timer_node is not None
 
@@ -98,7 +58,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     serial_system.add_client(client)
 
     pds = [serial_driver, serial_virt_tx, blk_driver, blk_virt, client]
-    if board.timer:
+    if need_timer:
         pds += [timer_driver]
     for pd in pds:
         sdf.add_pd(pd)
@@ -107,7 +67,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     assert blk_system.serialise_config(output_dir)
     assert serial_system.connect()
     assert serial_system.serialise_config(output_dir)
-    if board.timer:
+    if need_timer:
         assert timer_system.connect()
         assert timer_system.serialise_config(output_dir)
 
@@ -122,6 +82,7 @@ if __name__ == "__main__":
     parser.add_argument("--board", required=True, choices=[b.name for b in BOARDS])
     parser.add_argument("--output", required=True)
     parser.add_argument("--sdf", required=True)
+    parser.add_argument("--need_timer", action="store_true", default=False)
     parser.add_argument("--partition")
 
     args = parser.parse_args()
@@ -134,4 +95,4 @@ if __name__ == "__main__":
     with open(args.dtb, "rb") as f:
         dtb = DeviceTree(f.read())
 
-    generate(args.sdf, args.output, dtb)
+    generate(args.sdf, args.output, dtb, args.need_timer)
