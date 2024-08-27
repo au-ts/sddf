@@ -9,8 +9,11 @@
 # NOTES
 #  Generates pinctrl.elf
 #  Has X parameters: TODO
-#  Expects variable iomuxc_base to be set in the system description file to the
-#      mapped address of the I/O Mux controller.
+#  Expects variable iomuxc_device to be set in the system description file to the
+#    mapped address of the I/O Mux controller.
+#  Expects variable iomuxc_gpr to be set in the system description file to the
+#    mapped address of the General Purpose Registers (GPR) of the Mux controller.
+#  These two memory region must be contiguous, with iomuxc_device coming before iomuxc_gpr.
 
 PINCTRL_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 
