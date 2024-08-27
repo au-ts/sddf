@@ -19,6 +19,8 @@
 
 #define LOG_DRIVER_ERR(...) do{ sddf_printf("PINCTRL DRIVER|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
+#define IOMUXC_SIZE 0x10000
+
 // From Documentation/devicetree/bindings/pinctrl/fsl,imx-pinctrl.txt
 // Special values for pad_setting:
 // Indicate this pin does not need config
@@ -43,6 +45,17 @@ typedef struct iomuxc_config {
 extern const iomuxc_config_t iomuxc_configs[];
 extern const uint32_t num_iomuxc_configs;
 
+bool set_mux(uint32_t offset, uint32_t val) {
+    uint32_t *mux_reg_vaddr = (uint32_t *) (iomuxc_base + (uintptr_t) offset);
+
+    if (mux_reg_vaddr > (uint32_t *) (iomuxc_base + IOMUXC_SIZE - sizeof(uint32_t))) {
+        return false;
+    } else {
+        *mux_reg_vaddr = val;
+        return true;
+    }
+}
+
 void init(void) {
     LOG_DRIVER("started\n");
     LOG_DRIVER("nums of config is %u\n", num_iomuxc_configs);
@@ -64,14 +77,10 @@ void init(void) {
     LOG_DRIVER("initialising...\n");
     for (uint32_t i = 0; i < num_iomuxc_configs; i += 1) {
         LOG_DRIVER("writing pin #%u\n", i);
-        uint32_t *mux_reg_offset = (uint32_t *) (iomuxc_base + (uintptr_t) iomuxc_configs[i].mux_reg);
-        *mux_reg_offset = iomuxc_configs[i].mux_val;
 
-        uint32_t *conf_reg_offset = (uint32_t *) (iomuxc_base + (uintptr_t) iomuxc_configs[i].conf_reg);
-        *conf_reg_offset = iomuxc_configs[i].pad_setting;
-
-        uint32_t *input_reg_offset = (uint32_t *) (iomuxc_base + (uintptr_t) iomuxc_configs[i].input_reg);
-        *input_reg_offset = iomuxc_configs[i].input_val;
+        set_mux(iomuxc_configs[i].mux_reg, iomuxc_configs[i].mux_val);
+        set_mux(iomuxc_configs[i].conf_reg, iomuxc_configs[i].pad_setting);
+        set_mux(iomuxc_configs[i].input_reg, iomuxc_configs[i].input_val);
     }
 
     LOG_DRIVER("pinctrl device initialisation done\n");
@@ -93,8 +102,11 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo) {
         uint32_t reg_offset = (uint32_t) microkit_mr_get(SET_MUX_REQ_OFFSET);
         uint32_t reg_val = (uint32_t) microkit_mr_get(SET_MUX_REQ_VALUE);
 
-        uint32_t *mux_reg_offset = (uint32_t *) (iomuxc_base + (uintptr_t) reg_offset);
-        *mux_reg_offset = reg_val;
+        if (set_mux(reg_offset, reg_val)) {
+            return microkit_msginfo_new(SDDF_PINCTRL_SUCCESS, SET_MUX_RESP_NUM_RESULTS);
+        } else {
+            return microkit_msginfo_new(SDDF_PINCTRL_INVALID_ARGS, 0);
+        }
         break;
     }
 
@@ -140,6 +152,4 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo) {
         LOG_DRIVER_ERR("Unknown request %lu to pinctrl from channel %u\n", microkit_msginfo_get_label(msginfo), ch);
         return microkit_msginfo_new(SDDF_PINCTRL_UNKNOWN_REQ, 0);
     }
-
-    return microkit_msginfo_new(SDDF_PINCTRL_SUCCESS, 0);
 }
