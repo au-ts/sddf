@@ -28,8 +28,11 @@
 // Software Input On Field.
 // Force the selected mux mode input path no matter of MUX_MODE functionality.
 // By default the input path is determined by functionality of the selected
-// mux mode (regular).
-#define SION (1 << 30)
+// mux mode (regular). This bit will be set in "pad_setting"
+#define PAD_SION (1 << 30)
+
+// If the above bit is set, clear it from "pad_setting" then set this bit in "mux_reg"
+#define MUX_SION (1 << 4)
 
 uintptr_t iomuxc_base;
 
@@ -42,7 +45,7 @@ typedef struct iomuxc_config {
     uint32_t pad_setting; /* Pad configuration values to be applied */
 } iomuxc_config_t;
 
-extern const iomuxc_config_t iomuxc_configs[];
+extern iomuxc_config_t iomuxc_configs[];
 extern const uint32_t num_iomuxc_configs;
 
 bool set_mux(uint32_t offset, uint32_t val) {
@@ -67,8 +70,15 @@ void init(void) {
                     iomuxc_configs[i].input_reg, iomuxc_configs[i].input_val, 
                     iomuxc_configs[i].conf_reg, iomuxc_configs[i].pad_setting
         );
-        if (iomuxc_configs[i].pad_setting & SION) {
+        if (iomuxc_configs[i].pad_setting & PAD_SION) {
             LOG_DRIVER("Software Input On Field.\n");
+
+            // For pins that have SION bit set in "pad_setting", flip it in "mux_val" and clear it from "pad_setting"
+            iomuxc_configs[i].mux_reg |= MUX_SION;
+            iomuxc_configs[i].pad_setting &= ~PAD_SION;
+
+        } else if (iomuxc_configs[i].pad_setting & NO_PAD_CTL) {
+            LOG_DRIVER("Do not config.\n");
         } else {
             LOG_DRIVER("Normal.\n");
         }
@@ -95,7 +105,11 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo) {
 
     case SDDF_PINCTRL_SET_MUX: {
         if (microkit_msginfo_get_count(msginfo) != SET_MUX_REQ_NUM_ARGS) {
-            LOG_DRIVER_ERR("Set mux PPC from channel %u does not have the correct number of arguments %lu != %d\n", ch, microkit_msginfo_get_count(msginfo), SET_MUX_REQ_NUM_ARGS);
+            LOG_DRIVER_ERR(
+                "Set mux PPC from channel %u does not have the correct number of arguments %lu != %d\n", 
+                ch, 
+                microkit_msginfo_get_count(msginfo), SET_MUX_REQ_NUM_ARGS
+            );
             return microkit_msginfo_new(SDDF_PINCTRL_INVALID_ARGS, 0);
         }
 
@@ -112,7 +126,11 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo) {
 
     case SDDF_PINCTRL_QUERY_DTS: {
         if (microkit_msginfo_get_count(msginfo) != QUERY_DTS_REQ_NUM_ARGS) {
-            LOG_DRIVER_ERR("Query DTS PPC from channel %u does not have the correct number of arguments %lu != %d\n", ch, microkit_msginfo_get_count(msginfo), QUERY_DTS_REQ_NUM_ARGS);
+            LOG_DRIVER_ERR(
+                "Query DTS PPC from channel %u does not have the correct number of arguments %lu != %d\n", 
+                ch, 
+                microkit_msginfo_get_count(msginfo), QUERY_DTS_REQ_NUM_ARGS
+            );
             return microkit_msginfo_new(SDDF_PINCTRL_INVALID_ARGS, 0);
         }
 
