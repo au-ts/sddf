@@ -18,12 +18,17 @@ const DriverClass = struct {
         imx,
     };
 
-    const I2c = enum {
+    const I2cHost = enum {
         meson,
     };
 
     const Block = enum {
         virtio,
+    };
+
+    const I2cDevice = enum {
+        ds3231,
+        pn532,
     };
 };
 
@@ -60,13 +65,13 @@ fn addUartDriver(
     optimize: std.builtin.OptimizeMode,
 ) *std.Build.Step.Compile {
     const driver = addPd(b, .{
-        .name = b.fmt("driver_uart_{s}.elf", .{ @tagName(class) }),
+        .name = b.fmt("driver_uart_{s}.elf", .{@tagName(class)}),
         .target = target,
         .optimize = optimize,
         .strip = false,
     });
-    const source = b.fmt("drivers/serial/{s}/uart.c", .{ @tagName(class) });
-    const driver_include = b.fmt("drivers/serial/{s}/include", .{ @tagName(class) });
+    const source = b.fmt("drivers/serial/{s}/uart.c", .{@tagName(class)});
+    const driver_include = b.fmt("drivers/serial/{s}/include", .{@tagName(class)});
     driver.addCSourceFile(.{
         .file = b.path(source),
     });
@@ -86,7 +91,7 @@ fn addTimerDriver(
     optimize: std.builtin.OptimizeMode,
 ) *std.Build.Step.Compile {
     const driver = addPd(b, .{
-        .name = b.fmt("driver_timer_{s}.elf", .{ @tagName(class) }),
+        .name = b.fmt("driver_timer_{s}.elf", .{@tagName(class)}),
         .target = target,
         .optimize = optimize,
         .strip = false,
@@ -101,26 +106,54 @@ fn addTimerDriver(
     return driver;
 }
 
-fn addI2cDriver(
+fn addI2cDriverDevice(
     b: *std.Build,
     util: *std.Build.Step.Compile,
-    class: DriverClass.I2c,
+    device: DriverClass.I2cDevice,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
+    i2c_client_include: LazyPath,
 ) *std.Build.Step.Compile {
-    const driver = addPd(b, .{
-        .name = b.fmt("driver_i2c_{s}.elf", .{ @tagName(class) }),
+    const driver = b.addStaticLibrary(.{
+        .name = b.fmt("driver_i2c_device_{s}", .{@tagName(device)}),
         .target = target,
         .optimize = optimize,
         .strip = false,
     });
-    const source = b.fmt("drivers/i2c/{s}/i2c.c", .{ @tagName(class) });
+    driver.addIncludePath(libmicrokit_include);
+    const source = b.fmt("i2c/devices/{s}/{s}.c", .{ @tagName(device), @tagName(device) });
+    driver.addCSourceFile(.{
+        .file = b.path(source),
+    });
+    driver.addIncludePath(b.path(b.fmt("i2c/devices/{s}/", .{@tagName(device)})));
+    driver.addIncludePath(b.path("include"));
+    driver.linkLibrary(util);
+    driver.addIncludePath(b.path("libco"));
+    driver.addIncludePath(i2c_client_include);
+
+    return driver;
+}
+
+fn addI2cDriverHost(
+    b: *std.Build,
+    util: *std.Build.Step.Compile,
+    class: DriverClass.I2cHost,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+) *std.Build.Step.Compile {
+    const driver = addPd(b, .{
+        .name = b.fmt("driver_i2c_{s}.elf", .{@tagName(class)}),
+        .target = target,
+        .optimize = optimize,
+        .strip = false,
+    });
+    const source = b.fmt("drivers/i2c/{s}/i2c.c", .{@tagName(class)});
     driver.addCSourceFile(.{
         .file = b.path(source),
         // Note: the I2C_BUS_NUM flag is temporary
-        .flags = &.{ "-DI2C_BUS_NUM=2" }
+        .flags = &.{"-DI2C_BUS_NUM=2"},
     });
-    driver.addIncludePath(b.path(b.fmt("drivers/i2c/{s}/", .{ @tagName(class) })));
+    driver.addIncludePath(b.path(b.fmt("drivers/i2c/{s}/", .{@tagName(class)})));
     driver.addIncludePath(b.path("include"));
     driver.linkLibrary(util);
 
@@ -171,6 +204,7 @@ pub fn build(b: *std.Build) void {
     const libmicrokit_linker_script_opt = b.option([]const u8, "libmicrokit_linker_script", "Path to the libmicrokit linker script") orelse null;
     const blk_config_include_opt = b.option([]const u8, "blk_config_include", "Include path to block config header") orelse "";
     const serial_config_include_option = b.option([]const u8, "serial_config_include", "Include path to serial config header") orelse "";
+    const i2c_client_include_option = b.option([]const u8, "i2c_client_include", "Include path to client config header") orelse "";
 
     // TODO: Right now this is not super ideal. What's happening is that we do not
     // always need a serial config include, but we must always specify it
@@ -179,6 +213,7 @@ pub fn build(b: *std.Build) void {
     // debug error if you do need a serial config but forgot to pass one in.
     const serial_config_include = LazyPath{ .cwd_relative = serial_config_include_option };
     const blk_config_include = LazyPath{ .cwd_relative = blk_config_include_opt };
+    const i2c_client_include = LazyPath{ .cwd_relative = i2c_client_include_option };
     // libmicrokit
     // We're declaring explicitly here instead of with anonymous structs due to a bug. See https://github.com/ziglang/zig/issues/19832
     libmicrokit = LazyPath{ .cwd_relative = libmicrokit_opt.? };
@@ -309,8 +344,14 @@ pub fn build(b: *std.Build) void {
     b.installArtifact(i2c_virt);
 
     // I2C drivers
-    inline for (std.meta.fields(DriverClass.I2c)) |class| {
-        const driver = addI2cDriver(b, util, @enumFromInt(class.value), target, optimize);
+    inline for (std.meta.fields(DriverClass.I2cHost)) |class| {
+        const driver = addI2cDriverHost(b, util, @enumFromInt(class.value), target, optimize);
+        driver.linkLibrary(util_putchar_debug);
+        b.installArtifact(driver);
+    }
+
+    inline for (std.meta.fields(DriverClass.I2cDevice)) |device| {
+        const driver = addI2cDriverDevice(b, util, @enumFromInt(device.value), target, optimize, i2c_client_include);
         driver.linkLibrary(util_putchar_debug);
         b.installArtifact(driver);
     }

@@ -4,9 +4,7 @@
 //
 const std = @import("std");
 
-const MicrokitBoard = enum {
-    odroidc4
-};
+const MicrokitBoard = enum { odroidc4 };
 
 const Target = struct {
     board: MicrokitBoard,
@@ -74,6 +72,7 @@ pub fn build(b: *std.Build) void {
         .libmicrokit = @as([]const u8, libmicrokit),
         .libmicrokit_include = @as([]const u8, libmicrokit_include),
         .libmicrokit_linker_script = @as([]const u8, libmicrokit_linker_script),
+        .i2c_client_include = @as([]const u8, ""),
     });
 
     const i2c_driver_class = switch (microkit_board_option.?) {
@@ -84,54 +83,74 @@ pub fn build(b: *std.Build) void {
         .odroidc4 => "meson",
     };
 
-    const timer_driver = sddf_dep.artifact(b.fmt("driver_timer_{s}.elf", .{ timer_driver_class }));
+    const timer_driver = sddf_dep.artifact(b.fmt("driver_timer_{s}.elf", .{timer_driver_class}));
     // This is required because the SDF file is expecting a different name to the artifact we
     // are dealing with.
     const timer_driver_install = b.addInstallArtifact(timer_driver, .{ .dest_sub_path = "timer_driver.elf" });
 
-    const i2c_driver = sddf_dep.artifact(b.fmt("driver_i2c_{s}.elf", .{ i2c_driver_class }));
+    const pn532_driver = sddf_dep.artifact("driver_i2c_device_pn532");
+    const ds3231_driver = sddf_dep.artifact("driver_i2c_device_ds3231");
+
+    const i2c_driver = sddf_dep.artifact(b.fmt("driver_i2c_{s}.elf", .{i2c_driver_class}));
     // This is required because the SDF file is expecting a different name to the artifact we
     // are dealing with.
     const i2c_driver_install = b.addInstallArtifact(i2c_driver, .{ .dest_sub_path = "i2c_driver.elf" });
 
-    const client = b.addExecutable(.{
-        .name = "client.elf",
+    const client_pn532 = b.addExecutable(.{
+        .name = "client_pn532.elf",
         .target = target,
         .optimize = optimize,
         .strip = false,
     });
 
-    client.addCSourceFiles(.{
-        .files = &.{ "client.c", "pn532.c" },
+    client_pn532.addCSourceFiles(.{
+        .files = &.{"client_pn532.c"},
     });
-    client.addIncludePath(sddf_dep.path("include"));
-    client.linkLibrary(sddf_dep.artifact("util"));
-    client.linkLibrary(sddf_dep.artifact("util_putchar_debug"));
+    client_pn532.addIncludePath(sddf_dep.path("include"));
+    client_pn532.linkLibrary(sddf_dep.artifact("util"));
+    client_pn532.linkLibrary(sddf_dep.artifact("util_putchar_debug"));
+    client_pn532.linkLibrary(pn532_driver);
+
+    const client_ds3231 = b.addExecutable(.{
+        .name = "client_ds3231.elf",
+        .target = target,
+        .optimize = optimize,
+        .strip = false,
+    });
+
+    client_ds3231.addCSourceFiles(.{
+        .files = &.{"client_ds3231.c"},
+    });
+    client_ds3231.addIncludePath(sddf_dep.path("include"));
+    client_ds3231.linkLibrary(sddf_dep.artifact("util"));
+    client_ds3231.linkLibrary(sddf_dep.artifact("util_putchar_debug"));
+    client_ds3231.linkLibrary(ds3231_driver);
 
     // Here we compile libco. Right now this is the only example that uses libco and so
     // we just compile it here instead of in a separate build.zig
-    client.addIncludePath(sddf_dep.path("libco"));
-    client.addCSourceFile(.{ .file = sddf_dep.path("libco/libco.c") });
+    client_pn532.addIncludePath(sddf_dep.path("libco"));
+    client_pn532.addCSourceFile(.{ .file = sddf_dep.path("libco/libco.c") });
 
-    client.addIncludePath(.{ .cwd_relative = libmicrokit_include });
-    client.addObjectFile(.{ .cwd_relative = libmicrokit });
-    client.setLinkerScriptPath(.{ .cwd_relative = libmicrokit_linker_script });
+    client_pn532.addIncludePath(.{ .cwd_relative = libmicrokit_include });
+    client_pn532.addObjectFile(.{ .cwd_relative = libmicrokit });
+    client_pn532.setLinkerScriptPath(.{ .cwd_relative = libmicrokit_linker_script });
 
-    b.installArtifact(client);
+    b.installArtifact(client_pn532);
+
+    client_ds3231.addIncludePath(sddf_dep.path("libco"));
+    client_ds3231.addCSourceFile(.{ .file = sddf_dep.path("libco/libco.c") });
+
+    client_ds3231.addIncludePath(.{ .cwd_relative = libmicrokit_include });
+    client_ds3231.addObjectFile(.{ .cwd_relative = libmicrokit });
+    client_ds3231.setLinkerScriptPath(.{ .cwd_relative = libmicrokit_linker_script });
+
+    b.installArtifact(client_ds3231);
 
     b.installArtifact(sddf_dep.artifact("i2c_virt.elf"));
 
     const system_description_path = b.fmt("board/{s}/i2c.system", .{microkit_board});
     const final_image_dest = b.getInstallPath(.bin, "./loader.img");
-    const microkit_tool_cmd = b.addSystemCommand(&[_][]const u8{
-        microkit_tool,
-        system_description_path,
-        "--search-path", b.getInstallPath(.bin, ""),
-        "--board", microkit_board,
-        "--config", microkit_config,
-        "-o", final_image_dest,
-        "-r", b.getInstallPath(.prefix, "./report.txt")
-    });
+    const microkit_tool_cmd = b.addSystemCommand(&[_][]const u8{ microkit_tool, system_description_path, "--search-path", b.getInstallPath(.bin, ""), "--board", microkit_board, "--config", microkit_config, "-o", final_image_dest, "-r", b.getInstallPath(.prefix, "./report.txt") });
     microkit_tool_cmd.step.dependOn(b.getInstallStep());
     microkit_tool_cmd.step.dependOn(&i2c_driver_install.step);
     microkit_tool_cmd.step.dependOn(&timer_driver_install.step);
@@ -139,4 +158,3 @@ pub fn build(b: *std.Build) void {
     microkit_step.dependOn(&microkit_tool_cmd.step);
     b.default_step = microkit_step;
 }
-

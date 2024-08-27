@@ -15,14 +15,22 @@
     <memory_region name="i2c_bus" size="0x1000" phys_addr="0xFFD1D000"/>
 
     <!--
-	 This system transfers minimal data over I2C and so a data region size of
-	 0x1000 is more than enough for our use-case.
+	    This system transfers minimal data over I2C and so a data region size of
+        0x1000 is more than enough for our use-case.
     -->
-    <memory_region name="client_request_region" size="0x1_000"/>
-    <memory_region name="client_response_region" size="0x1_000"/>
+
+    <memory_region name="client_ds3231_request_region" size="0x1_000"/>
+    <memory_region name="client_ds3231_response_region" size="0x1_000"/>
+
+    <memory_region name="client_pn532_request_region" size="0x1_000"/>
+    <memory_region name="client_pn532_response_region" size="0x1_000"/>
+
     <memory_region name="driver_request_region" size="0x1_000"/>
     <memory_region name="driver_response_region" size="0x1_000"/>
-    <memory_region name="data_region" size="0x1_000"/>
+
+    <memory_region name="client_ds3231_data_region" size="0x1_000"/>
+    <memory_region name="client_pn532_data_region" size="0x1_000"/>
+
 
     <memory_region name="timer_registers" size="0x1000" phys_addr="0xffd0f000" />
 
@@ -37,7 +45,9 @@
         <map mr="gpio" vaddr="0x3_100_000" perms="rw" setvar_vaddr="gpio_regs" cached="false" />
         <map mr="clk" vaddr="0x3_200_000" perms="rw" setvar_vaddr="clk_regs" cached="false" />
 
-        <map mr="data_region" vaddr="0x10_000_000" perms="rw" />
+        <map mr="client_ds3231_data_region" vaddr="0x10_000_000" perms="rw" />
+        <map mr="client_pn532_data_region" vaddr="0x10_001_000" perms="rw" />
+
 
         <!-- IRQs for the particular I2C bus we are using -->
         <!-- Main interrupt -->
@@ -49,19 +59,30 @@
     <protection_domain name="virt" priority="99" pp="true">
         <program_image path="i2c_virt.elf" />
 
-        <map mr="client_request_region" vaddr="0x4_000_000" perms="rw" />
-        <map mr="client_response_region" vaddr="0x5_000_000" perms="rw" />
+        <map mr="client_ds3231_request_region" vaddr="0x4_000_000" perms="rw" />
+        <map mr="client_ds3231_response_region" vaddr="0x5_000_000" perms="rw" />
+
+        <map mr="client_pn532_request_region" vaddr="0x4_001_000" perms="rw" />
+        <map mr="client_pn532_response_region" vaddr="0x5_001_000" perms="rw" />
 
         <map mr="driver_request_region" vaddr="0x6_000_000" perms="rw" setvar_vaddr="driver_request_region" />
         <map mr="driver_response_region" vaddr="0x7_000_000" perms="rw" setvar_vaddr="driver_response_region" />
     </protection_domain>
 
-    <protection_domain name="client" priority="1">
-        <program_image path="client.elf" />
+    <protection_domain name="client_ds3231" priority="1">
+        <program_image path="client_ds3231.elf" />
 
-        <map mr="client_request_region" vaddr="0x4_000_000" perms="rw" setvar_vaddr="request_region" />
-        <map mr="client_response_region" vaddr="0x5_000_000" perms="rw" setvar_vaddr="response_region" />
-        <map mr="data_region" vaddr="0x6_000_000" perms="rw" setvar_vaddr="data_region" />
+        <map mr="client_ds3231_request_region" vaddr="0x4_000_000" perms="rw" setvar_vaddr="request_region" />
+        <map mr="client_ds3231_response_region" vaddr="0x5_000_000" perms="rw" setvar_vaddr="response_region" />
+        <map mr="client_ds3231_data_region" vaddr="0x6_000_000" perms="rw" setvar_vaddr="data_region" />
+    </protection_domain>
+
+    <protection_domain name="client_pn532" priority="1">
+        <program_image path="client_pn532.elf" />
+
+        <map mr="client_pn532_request_region" vaddr="0x4_000_000" perms="rw" setvar_vaddr="request_region" />
+        <map mr="client_pn532_response_region" vaddr="0x5_000_000" perms="rw" setvar_vaddr="response_region" />
+        <map mr="client_pn532_data_region" vaddr="0x6_000_000" perms="rw" setvar_vaddr="data_region" />
     </protection_domain>
 
     <protection_domain name="timer" priority="254" pp="true" passive="true">
@@ -71,17 +92,27 @@
     </protection_domain>
 
     <channel>
-        <end pd="client" id="0" />
+        <end pd="client_ds3231" id="0" />
         <end pd="virt" id="0" />
     </channel>
 
     <channel>
-        <end pd="driver" id="0" />
+        <end pd="client_pn532" id="0" />
         <end pd="virt" id="1" />
     </channel>
 
     <channel>
+        <end pd="driver" id="0" />
+        <end pd="virt" id="2" />
+    </channel>
+
+    <channel>
+        <end pd="timer" id="2" />
+        <end pd="client_ds3231" id="1" />
+    </channel>
+
+    <channel>
         <end pd="timer" id="1" />
-        <end pd="client" id="1" /> <!-- Should this number change, so should TIMER_CH in timer.h -->
+        <end pd="client_pn532" id="1" />
     </channel>
 </system>
