@@ -19,10 +19,17 @@
 
 #define LOG_DRIVER_ERR(...) do{ sddf_printf("PINCTRL DRIVER|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
+// Contains 32-bits wide registers to mux individual pads on the SoC.
+#define IOMUXC_DEVICE_SIZE 0x10000
+uintptr_t iomuxc_dev_base;
 
-#define IOMUXC_SIZE 0x10000
+// General Purpose Registers: a memory region contiguous with the iomuxc device.
+//                            That is, assert(iomuxc_dev_base + IOMUXC_DEVICE_SIZE == iomuxc_gpr_base).
+// Contains control registers to pads that can't be mux'ed. E.g. HDMI, DDR, DSI, PCIe,...
+#define IOMUXC_GPR_SIZE 0x10000
+uintptr_t iomuxc_gpr_base;
 
-// From Documentation/devicetree/bindings/pinctrl/fsl,imx-pinctrl.txt
+// From Linux's Documentation/devicetree/bindings/pinctrl/fsl,imx-pinctrl.txt
 // Special values for pad_setting:
 // Indicate this pin does not need config
 #define NO_PAD_CTL (1 << 31)
@@ -35,8 +42,6 @@
 // If the above bit is set, clear it from "pad_setting" then set this bit in "mux_reg"
 #define MUX_SION (1 << 4)
 
-uintptr_t iomuxc_base;
-
 typedef struct iomuxc_config {
     uint32_t mux_reg;     /* Contains offset of mux registers */
     uint32_t conf_reg;    /* Offset of pad configuration register */
@@ -46,13 +51,25 @@ typedef struct iomuxc_config {
     uint32_t pad_setting; /* Pad configuration values to be applied */
 } iomuxc_config_t;
 
+// Data from Device Tree that is linked during compile time.
 extern iomuxc_config_t iomuxc_configs[];
 extern const uint32_t num_iomuxc_configs;
 
-bool set_mux(uint32_t offset, uint32_t val) {
-    uint32_t *mux_reg_vaddr = (uint32_t *) (iomuxc_base + (uintptr_t) offset);
+uint32_t read_mux(uint32_t offset) {
+    uint32_t *mux_reg_vaddr = (uint32_t *) (iomuxc_dev_base + (uintptr_t) offset);
+    return *mux_reg_vaddr;
+}
 
-    if (mux_reg_vaddr > (uint32_t *) (iomuxc_base + IOMUXC_SIZE - sizeof(uint32_t))) {
+bool set_mux(uint32_t offset, uint32_t val) {
+    if (!offset) {
+        LOG_DRIVER_ERR("null offset in set_mux()\n");
+        return false;
+    }
+
+    uint32_t *mux_reg_vaddr = (uint32_t *) (iomuxc_dev_base + (uintptr_t) offset);
+
+    if (mux_reg_vaddr > (uint32_t *) (iomuxc_dev_base + IOMUXC_DEVICE_SIZE + IOMUXC_GPR_SIZE - sizeof(uint32_t))) {
+        LOG_DRIVER_ERR("offset out of bound in set_mux()\n");
         return false;
     } else {
         *mux_reg_vaddr = val;
@@ -79,22 +96,64 @@ void init(void) {
         } else {
             LOG_DRIVER("Normal.\n");
         }
+
+        if (iomuxc_configs[i].input_val >> 24 == 0xFF) {
+            LOG_DRIVER("Quirky select input.\n");
+        }
     }
 #endif
 
-    // Preprocessing steps before we can actually write the device tree values into memory.
     for (uint32_t i = 0; i < num_iomuxc_configs; i += 1) {
         // For pins that have SION bit set in "pad_setting", flip it in "mux_val" and clear it from "pad_setting"
         if (iomuxc_configs[i].pad_setting & PAD_SION) {
             iomuxc_configs[i].mux_reg |= MUX_SION;
             iomuxc_configs[i].pad_setting &= ~PAD_SION;
         }
-    }
-
-    for (uint32_t i = 0; i < num_iomuxc_configs; i += 1) {
+        // Write mux settings
         set_mux(iomuxc_configs[i].mux_reg, iomuxc_configs[i].mux_val);
-        set_mux(iomuxc_configs[i].input_reg, iomuxc_configs[i].input_val);
 
+        // Handle input settings. From U-Boot:
+        /*
+            * If the select input value begins with 0xff,
+            * it's a quirky select input and the value should
+            * be interpreted as below.
+            *     31     23      15      7        0
+            *     | 0xff | shift | width | select |
+            * It's used to work around the problem that the
+            * select input for some pin is not implemented in
+            * the select input register but in some general
+            * purpose register. We encode the select input
+            * value, width and shift of the bit field into
+            * input_val cell of pin function ID in device tree,
+            * and then decode them here for setting up the select
+            * input bits in general purpose register.
+        */
+        if (iomuxc_configs[i].input_val >> 24 == 0xff) {
+            uint32_t val = iomuxc_configs[i].input_val;
+            uint8_t select = val & 0xff;
+            uint8_t width = (val >> 8) & 0xff;
+            uint8_t shift = (val >> 16) & 0xff;
+            uint32_t mask = ((1 << width) - 1) << shift;
+            /*
+                * The iomuxc_configs[i].input_reg here is actually some
+                * IOMUXC general purpose register, not
+                * regular select input register.
+            */
+            val = read_mux(iomuxc_configs[i].input_reg);
+            val &= ~mask;
+            val |= select << shift;
+            iomuxc_configs[i].input_val = val;
+            set_mux(iomuxc_configs[i].input_reg, iomuxc_configs[i].input_val);
+        
+        } else if (iomuxc_configs[i].input_reg) {
+            // Regular select input register can never be at offset 0.
+            set_mux(iomuxc_configs[i].input_reg, iomuxc_configs[i].input_val);
+        }
+
+        // All these value changes are saved into the info array so that
+        // a query DTS call returns the exact value what was written into memory.
+
+        // Write pad settings if no setting bit is not set
         if (!(iomuxc_configs[i].pad_setting & NO_PAD_CTL)) {
             set_mux(iomuxc_configs[i].conf_reg, iomuxc_configs[i].pad_setting);
         }
