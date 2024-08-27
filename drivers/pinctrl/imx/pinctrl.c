@@ -91,13 +91,10 @@ void init(void) {
         }
     }
 
-    LOG_DRIVER("initialising...\n");
     for (uint32_t i = 0; i < num_iomuxc_configs; i += 1) {
-        LOG_DRIVER("writing pin #%u\n", i);
-
         set_mux(iomuxc_configs[i].mux_reg, iomuxc_configs[i].mux_val);
-        set_mux(iomuxc_configs[i].conf_reg, iomuxc_configs[i].pad_setting);
         set_mux(iomuxc_configs[i].input_reg, iomuxc_configs[i].input_val);
+        set_mux(iomuxc_configs[i].conf_reg, iomuxc_configs[i].pad_setting);
     }
 
     LOG_DRIVER("pinctrl device initialisation done\n");
