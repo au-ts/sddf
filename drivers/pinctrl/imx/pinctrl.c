@@ -24,7 +24,6 @@
 uintptr_t iomuxc_dev_base;
 
 // General Purpose Registers: a memory region contiguous with the iomuxc device.
-//                            That is, assert(iomuxc_dev_base + IOMUXC_DEVICE_SIZE == iomuxc_gpr_base).
 // Contains control registers to pads that can't be mux'ed. E.g. HDMI, DDR, DSI, PCIe,...
 #define IOMUXC_GPR_SIZE 0x10000
 uintptr_t iomuxc_gpr_base;
@@ -78,6 +77,11 @@ bool set_mux(uint32_t offset, uint32_t val) {
 }
 
 void init(void) {
+    if (iomuxc_gpr_base != iomuxc_dev_base + IOMUXC_DEVICE_SIZE) {
+        LOG_DRIVER_ERR("the GPR region must be mapped contiguously after the normal mux registers region\n");
+        while (true) {};
+    }
+
 #ifdef DEBUG_DRIVER
     LOG_DRIVER("started\n");
     LOG_DRIVER("nums of config is %u\n", num_iomuxc_configs);
