@@ -94,7 +94,10 @@ void init(void) {
     for (uint32_t i = 0; i < num_iomuxc_configs; i += 1) {
         set_mux(iomuxc_configs[i].mux_reg, iomuxc_configs[i].mux_val);
         set_mux(iomuxc_configs[i].input_reg, iomuxc_configs[i].input_val);
-        set_mux(iomuxc_configs[i].conf_reg, iomuxc_configs[i].pad_setting);
+
+        if (!(iomuxc_configs[i].pad_setting & NO_PAD_CTL)) {
+            set_mux(iomuxc_configs[i].conf_reg, iomuxc_configs[i].pad_setting);
+        }
     }
 
     LOG_DRIVER("pinctrl device initialisation done\n");
