@@ -25,13 +25,14 @@
 
 #define RESPONSE_ERR 0
 #define RESPONSE_ERR_TOKEN 1
-/* Start of payload bytes in response data */
+/* Start of payload bytes in response data (index of first non error byte that driver adds) */
 #define RESPONSE_DATA_OFFSET 2
 
 #define I2C_ERR_OK 0
 #define I2C_ERR_TIMEOUT 1
 #define I2C_ERR_NACK 2
 #define I2C_ERR_NOREAD 3
+#define I2C_ERR_OTHER 3 // can be used for driver specific implementations
 
 typedef uint8_t i2c_token_t;
 
@@ -45,8 +46,9 @@ enum i2c_token {
     I2C_TOKEN_ADDR_WRITE = 0x2,
     /* ADDRESS READ: Same as ADDRW but sets up DATA tokens as reads. */
     I2C_TOKEN_ADDR_READ = 0x3,
-    /* DATA_LAST: Used for read transactions to write a NACK to alert
-     * the slave device that the read is now over. */
+    /* DATA_END: Used for read transactions to write a NACK to alert
+     * the slave device that the read is now over.
+     * this also acts the same way as I2C_TOKEN_DATA (ie it actually requests a token to read so should be treated the same in that regard) */
     I2C_TOKEN_DATA_END = 0x4,
     /* STOP: Used to send the STOP condition on the bus to end a transaction.
      * Causes master to release the bus. */

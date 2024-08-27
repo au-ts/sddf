@@ -9,7 +9,7 @@
 #include <sddf/timer/client.h>
 #include <sddf/i2c/queue.h>
 #include <sddf/i2c/client.h>
-#include "pn532.h"
+#include <sddf/i2c/devices/pn532/pn532.h>
 #include "client.h"
 
 // #define DEBUG_CLIENT
@@ -20,6 +20,14 @@
 #define LOG_CLIENT(...) do{}while(0)
 #endif
 #define LOG_CLIENT_ERR(...) do{ sddf_printf("CLIENT|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
+
+#define PN_532_ON
+
+#ifdef PN_532_ON
+#define USING_HALT(...) do{}while(0)
+#else
+#define USING_HALT(...) do{ while(1); }while(0)
+#endif
 
 uintptr_t data_region;
 uintptr_t request_region;
@@ -35,15 +43,23 @@ cothread_t t_main;
 #define STACK_SIZE (4096)
 static char t_client_main_stack[STACK_SIZE];
 
-bool read_passive_target_id(uint8_t card_baud_rate, uint8_t *uid_buf, uint8_t *uid_buf_length, uint8_t timeout) {
+bool read_passive_target_id(uint8_t card_baud_rate, uint8_t *uid_buf, uint8_t *uid_buf_length, uint8_t timeout)
+{
     uint8_t cmd_header[3] = { PN532_CMD_INLISTPASSIVETARGET, 1, card_baud_rate };
 
-    int ret = pn532_write_command(cmd_header, 3, NULL, 0, DEFAULT_READ_ACK_FRAME_RETRIES);
-    if (ret < 0) return false;
+    uint8_t write_fail = pn532_write_command(cmd_header, 3, NULL, 0, DEFAULT_READ_ACK_FRAME_RETRIES);
+    if (write_fail) {
+        LOG_CLIENT_ERR("failed to write PN532_CMD_INLISTPASSIVETARGET!\n");
+        return false;
+    };
 
     uint8_t response[64];
-    bool response_ret = pn532_read_response(response, 64, DEFAULT_READ_RESPONSE_RETRIES);
-    if (!response_ret) return false;
+    uint8_t read_fail = pn532_read_response(response, 64, DEFAULT_READ_RESPONSE_RETRIES);
+    if (read_fail) {
+        // LOG_CLIENT_ERR("failed to read response for PN532_CMD_INLISTPASSIVETARGET!\n");
+        // this is what fails when card times out
+        return false;
+    };
 
     if (response[0] != 1) {
         LOG_CLIENT_ERR("tags found has wrong response value (0x%x)!\n", response[0]);
@@ -69,19 +85,22 @@ bool read_passive_target_id(uint8_t card_baud_rate, uint8_t *uid_buf, uint8_t *u
 
 uint8_t big_buf[64];
 
-void client_main(void) {
+void client_main(void)
+{
+    USING_HALT();
+
     LOG_CLIENT("client_main: started\n");
     uint8_t header[1];
     header[0] = PN532_CMD_GETFIRMWAREVERSION;
-    int ret = pn532_write_command(header, 1, NULL, 0, DEFAULT_READ_ACK_FRAME_RETRIES);
-    if (ret < 0) {
+    uint8_t write_fail = pn532_write_command(header, 1, NULL, 0, DEFAULT_READ_ACK_FRAME_RETRIES);
+    if (write_fail) {
         LOG_CLIENT_ERR("failed to write PN532_CMD_GETFIRMWAREVERSION\n");
         while (1) {};
     }
 
     uint8_t response_buffer[6];
-    bool response = pn532_read_response(response_buffer, 6, DEFAULT_READ_RESPONSE_RETRIES);
-    if (!response) {
+    uint8_t read_fail = pn532_read_response(response_buffer, 6, DEFAULT_READ_RESPONSE_RETRIES);
+    if (read_fail) {
         LOG_CLIENT_ERR("failed to read response for PN532_CMD_GETFIRMWAREVERSION\n");
         while (1) {};
     }
@@ -94,18 +113,17 @@ void client_main(void) {
     LOG_CLIENT("set passive activation retries\n");
     uint8_t passive_header[5];
     passive_header[0] = PN532_CMD_RFCONFIGURATION;
-    passive_header[1] = 5;
-    passive_header[2] = 0xFF;
-    passive_header[3] = 0x1;
-    /* max retries according to the Arduino code */
-    passive_header[4] = 0xff;
-    ret = pn532_write_command(passive_header, 5, NULL, 0, DEFAULT_READ_ACK_FRAME_RETRIES);
-    if (ret < 0) {
+    passive_header[1] = 5; // Config item 5 (MaxRetries)
+    passive_header[2] = 0xFF; // MxRtyATR (default = 0xFF)
+    passive_header[3] = 0x1; // MxRtyPSL (default = 0x01)
+    passive_header[4] = 0xff; // max retries according to the Arduino code
+    write_fail = pn532_write_command(passive_header, 5, NULL, 0, DEFAULT_READ_ACK_FRAME_RETRIES);
+    if (write_fail) {
         LOG_CLIENT_ERR("failed to write PN532_CMD_RFCONFIGURATION\n");
         while (1) {};
     }
-    response = pn532_read_response(big_buf, 64, DEFAULT_READ_RESPONSE_RETRIES);
-    if (!response) {
+    read_fail = pn532_read_response(big_buf, 64, DEFAULT_READ_RESPONSE_RETRIES);
+    if (read_fail) {
         LOG_CLIENT_ERR("failed to read response for PN532_CMD_RFCONFIGURATION\n");
         while (1) {};
     }
@@ -116,19 +134,18 @@ void client_main(void) {
     sam_config_header[1] = 0x1;
     sam_config_header[2] = 0x14;
     sam_config_header[3] = 0x01;
-    ret = pn532_write_command(sam_config_header, 4, NULL, 0, DEFAULT_READ_ACK_FRAME_RETRIES);
-    if (ret < 0) {
+    write_fail = pn532_write_command(sam_config_header, 4, NULL, 0, DEFAULT_READ_ACK_FRAME_RETRIES);
+    if (write_fail) {
         LOG_CLIENT_ERR("failed to write PN532_CMD_SAMCONFIGURATION\n");
         while (1) {};
     }
-    response = pn532_read_response(big_buf, 64, DEFAULT_READ_RESPONSE_RETRIES);
-    if (!response) {
+    read_fail = pn532_read_response(big_buf, 64, DEFAULT_READ_RESPONSE_RETRIES);
+    if (read_fail) {
         LOG_CLIENT_ERR("failed to read response for PN532_CMD_RFCONFIGURATION\n");
         while (1) {};
     }
 
     LOG_CLIENT("waiting for card!\n");
-
     while (true) {
         /* Buffer to store the returned UID */
         uint8_t uid[] = { 0, 0, 0, 0, 0, 0, 0 };
@@ -153,11 +170,12 @@ void client_main(void) {
             LOG_CLIENT_ERR("Timed out waiting for a card\n");
         }
 
-        delay_ms(1000);
+        delay_ms(500);
     }
 }
 
-bool delay_ms(size_t milliseconds) {
+bool delay_ms(size_t milliseconds)
+{
     size_t time_ns = milliseconds * NS_IN_MS;
 
     /* Detect potential overflow */
@@ -172,7 +190,8 @@ bool delay_ms(size_t milliseconds) {
     return true;
 }
 
-void init(void) {
+void init(void)
+{
     LOG_CLIENT("init\n");
 
     queue = i2c_queue_init((i2c_queue_t *) request_region, (i2c_queue_t *) response_region);
@@ -192,15 +211,16 @@ void init(void) {
     co_switch(t_main);
 }
 
-void notified(microkit_channel ch) {
+void notified(microkit_channel ch)
+{
     switch (ch) {
-        case I2C_VIRTUALISER_CH:
-            co_switch(t_main);
-            break;
-        case TIMER_CH:
-            co_switch(t_main);
-            break;
-        default:
-            LOG_CLIENT_ERR("Unknown channel 0x%x!\n", ch);
+    case I2C_VIRTUALISER_CH:
+        co_switch(t_main);
+        break;
+    case TIMER_CH:
+        co_switch(t_main);
+        break;
+    default:
+        LOG_CLIENT_ERR("Unknown channel 0x%x!\n", ch);
     }
 }
