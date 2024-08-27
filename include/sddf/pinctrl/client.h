@@ -17,11 +17,34 @@
  * @param reg_offset offset of the desired register from the device base physical address.
  * @param reg_val desired value to write to the register.
  */
-static inline bool sddf_pinctrl_set_mux(microkit_channel channel, uint32_t reg_offset, uint32_t reg_val)
+static inline sddf_pinctrl_response_t sddf_pinctrl_set_mux(microkit_channel channel, uint32_t reg_offset, uint32_t reg_val)
 {
-    microkit_mr_set(REGISTER_OFFSET_WORD, reg_offset);
-    microkit_mr_set(REGISTER_VALUE_WORD, reg_val);
-    microkit_ppcall(channel, microkit_msginfo_new(SDDF_PINCTRL_SET_MUX, 2));
+    microkit_mr_set(SET_MUX_REQ_OFFSET, reg_offset);
+    microkit_mr_set(SET_MUX_REQ_VALUE, reg_val);
 
-    return microkit_mr_get(0) > 0;
+    microkit_msginfo resp = microkit_ppcall(channel, microkit_msginfo_new(SDDF_PINCTRL_SET_MUX, SET_MUX_REQ_NUM_ARGS));
+    
+    return ((sddf_pinctrl_response_t) microkit_msginfo_get_label(resp));
 }
+
+/**
+ * Query the pinmux register value of the given register's offset from the device tree linked at compile time
+ * Use the label to indicate this request.
+ * @param microkit channel of pinctrl driver.
+ * @param reg_offset offset of the desired register from the device base physical address.
+ * @param reg_val_ret if the return value is a success, the register value in the device tree is written to this pointer.
+ */
+static inline sddf_pinctrl_response_t sddf_pinctrl_query_dts(microkit_channel channel, uint32_t reg_offset, uint32_t *reg_val)
+{
+    microkit_mr_set(QUERY_DTS_REQ_OFFSET, reg_offset);
+
+    microkit_msginfo resp = microkit_ppcall(channel, microkit_msginfo_new(SDDF_PINCTRL_QUERY_DTS, QUERY_DTS_REQ_NUM_ARGS));
+    sddf_pinctrl_response_t status = (sddf_pinctrl_response_t) microkit_msginfo_get_label(resp);
+
+    if (status == SDDF_PINCTRL_SUCCESS) {
+        *reg_val = (uint32_t) microkit_mr_get(QUERY_DTS_RESP_VALUE);
+    }
+
+    return status;
+}
+
