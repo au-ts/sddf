@@ -28,7 +28,8 @@ static inline sddf_pinctrl_response_t sddf_pinctrl_set_mux(microkit_channel chan
 }
 
 /**
- * Query the pinmux register value of the given register's offset from the device tree linked at compile time
+ * Query the pinmux register value that was written to memory when the driver initialised.
+ * It won't necessarily be the same as the value in the Device Tree, see SION and "Quirky input registers" handling in the driver.
  * Use the label to indicate this request.
  * @param microkit channel of pinctrl driver.
  * @param reg_offset offset of the desired register from the device base physical address.
@@ -47,4 +48,3 @@ static inline sddf_pinctrl_response_t sddf_pinctrl_query_dts(microkit_channel ch
 
     return status;
 }
-
