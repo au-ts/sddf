@@ -19,6 +19,7 @@
 
 #define LOG_DRIVER_ERR(...) do{ sddf_printf("PINCTRL DRIVER|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
+
 #define IOMUXC_SIZE 0x10000
 
 // From Documentation/devicetree/bindings/pinctrl/fsl,imx-pinctrl.txt
@@ -60,9 +61,9 @@ bool set_mux(uint32_t offset, uint32_t val) {
 }
 
 void init(void) {
+#ifdef DEBUG_DRIVER
     LOG_DRIVER("started\n");
     LOG_DRIVER("nums of config is %u\n", num_iomuxc_configs);
-
     LOG_DRIVER("data dump begin...one pin per line\n");
     for (uint32_t i = 0; i < num_iomuxc_configs; i += 1) {
         LOG_DRIVER("mux reg: 0x%x = %u, input reg: 0x%x = %u, pad conf reg: 0x%x = %u. ", 
@@ -70,17 +71,23 @@ void init(void) {
                     iomuxc_configs[i].input_reg, iomuxc_configs[i].input_val, 
                     iomuxc_configs[i].conf_reg, iomuxc_configs[i].pad_setting
         );
+
         if (iomuxc_configs[i].pad_setting & PAD_SION) {
             LOG_DRIVER("Software Input On Field.\n");
-
-            // For pins that have SION bit set in "pad_setting", flip it in "mux_val" and clear it from "pad_setting"
-            iomuxc_configs[i].mux_reg |= MUX_SION;
-            iomuxc_configs[i].pad_setting &= ~PAD_SION;
-
         } else if (iomuxc_configs[i].pad_setting & NO_PAD_CTL) {
             LOG_DRIVER("Do not config.\n");
         } else {
             LOG_DRIVER("Normal.\n");
+        }
+    }
+#endif
+
+    // Preprocessing steps before we can actually write the device tree values into memory.
+    for (uint32_t i = 0; i < num_iomuxc_configs; i += 1) {
+        // For pins that have SION bit set in "pad_setting", flip it in "mux_val" and clear it from "pad_setting"
+        if (iomuxc_configs[i].pad_setting & PAD_SION) {
+            iomuxc_configs[i].mux_reg |= MUX_SION;
+            iomuxc_configs[i].pad_setting &= ~PAD_SION;
         }
     }
 
