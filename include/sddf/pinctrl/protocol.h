@@ -27,6 +27,17 @@ enum set_mux_reponse_ipc_index {
 };
 
 
+enum read_mux_request_ipc_index {
+    READ_MUX_REQ_OFFSET = 0,
+    READ_MUX_REQ_NUM_ARGS,
+};
+
+enum read_mux_reponse_ipc_index {
+    READ_MUX_RESP_VALUE = 0,
+    READ_MUX_RESP_NUM_RESULTS,
+};
+
+
 enum query_dts_request_ipc_index {
     QUERY_DTS_REQ_OFFSET = 0,
     QUERY_DTS_REQ_NUM_ARGS,
