@@ -9,7 +9,9 @@
 
 enum sddf_pinctrl_request_label {
     SDDF_PINCTRL_RESERVED = 0,
+    SDDF_PINCTRL_RESET,
     SDDF_PINCTRL_SET_MUX,
+    SDDF_PINCTRL_READ_MUX,
     SDDF_PINCTRL_QUERY_DTS,
 };
 

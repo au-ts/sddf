@@ -27,7 +27,7 @@ void run(void) {
 #ifdef SOC_IMX8MQ_EVK
         if (i % 2 == 0) {
             // Connect UART1_TXD pad to the UART1 device
-            sddf_pinctrl_set_mux(PINCTRL_CH, 0x238, 0x0);
+            sddf_pinctrl_reset(PINCTRL_CH);
         } else {
             // Connect UART1_TXD pad to the SPI device. You will not see the output for odd numbers
             sddf_pinctrl_set_mux(PINCTRL_CH, 0x238, 0x1);
@@ -37,7 +37,7 @@ void run(void) {
 #ifdef SOC_IMX8MM_EVK
         if (i % 2 == 0) {
             // Connect UART2_TXD pad to the UART2 device
-            sddf_pinctrl_set_mux(PINCTRL_CH, 0x240, 0x0);
+            sddf_pinctrl_reset(PINCTRL_CH);
         } else {
             // Connect UART2_TXD pad to the SPI device. You will not see the output for odd numbers
             sddf_pinctrl_set_mux(PINCTRL_CH, 0x240, 0x1);
