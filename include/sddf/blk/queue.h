@@ -43,8 +43,11 @@ typedef enum blk_req_code {
 
 /* Response status for block */
 typedef enum blk_resp_status {
-    BLK_RESP_OK,
-    BLK_RESP_SEEK_ERROR,
+    BLK_RESP_OK,                /* success status */
+    BLK_RESP_ERR_UNSPEC,        /* unspecified miscellaneous errors */
+    BLK_RESP_ERR_INVALID_PARAM, /* invalid request parameters */
+    BLK_RESP_ERR_SEEK,          /* seek error */
+    BLK_RESP_ERR_NO_DEVICE,     /* device is unplugged */
 } blk_resp_status_t;
 
 /* Request struct contained in request queue */
