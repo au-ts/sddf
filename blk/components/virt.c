@@ -331,7 +331,7 @@ static void handle_client(int cli_id)
 
             if (cli_count == 0) {
                 LOG_BLK_VIRT_ERR("client %d requested zero blocks\n", cli_id);
-                err = blk_enqueue_resp(&h, BLK_RESP_SEEK_ERROR, 0, cli_req_id);
+                err = blk_enqueue_resp(&h, BLK_RESP_ERR_SEEK, 0, cli_req_id);
                 assert(!err);
                 continue;
             }
