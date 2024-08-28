@@ -9,7 +9,7 @@
     <memory_region name="blk_regs" size="0x10_000" phys_addr="0xa003000" />
     <!-- Needed specifically for the virtIO block driver -->
     <!-- TODO: make this one region -->
-    <memory_region name="blk_virtio_headers" size="0x2000" />
+    <memory_region name="blk_virtio_headers" size="0x10000" />
     <memory_region name="blk_driver_metadata" size="0x200000" />
 
     <memory_region name="blk_driver_config" size="0x1000" page_size="0x1000" />
