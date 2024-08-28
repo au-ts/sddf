@@ -113,7 +113,7 @@ void handle_response()
         if (hdr->status == VIRTIO_BLK_S_OK) {
             status = BLK_RESP_OK;
         } else {
-            status = BLK_RESP_ERR_SEEK;
+            status = BLK_RESP_ERR_UNSPEC;
         }
         int err = blk_enqueue_resp(&blk_queue, status, data_len / BLK_TRANSFER_SIZE, virtio_header_to_id[hdr_used.id]);
         assert(!err);
