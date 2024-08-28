@@ -13,18 +13,29 @@ BUILD_DIR ?= build
 # By default we make a debug build so that the client debug prints can be seen.
 MICROKIT_CONFIG ?= debug
 
+export TOP:= $(abspath $(dir ${MAKEFILE_LIST}))
+
 ifeq ($(strip $(MICROKIT_BOARD)), maaxboard)
 	export TIMER_DRIVER_DIR := imx
 	export PINCTRL_DRIVER_DIR := imx
 	export CPU := cortex-a53
+	export SOC := imx8mq-evk
+	export DTS_FILE := $(TOP)/dts/maaxboard.dts
+	export PINMUX_DEVICE := iomuxc
 else ifeq ($(strip $(MICROKIT_BOARD)), imx8mq_evk)
 	export TIMER_DRIVER_DIR := imx
 	export PINCTRL_DRIVER_DIR := imx
 	export CPU := cortex-a53
+	export SOC := imx8mq-evk
+	export DTS_FILE := $(TOP)/dts/imx8mq_evk.dts
+	export PINMUX_DEVICE := iomuxc
 else ifeq ($(strip $(MICROKIT_BOARD)), imx8mm_evk)
 	export TIMER_DRIVER_DIR := imx
 	export PINCTRL_DRIVER_DIR := imx
 	export CPU := cortex-a53
+	export SOC := imx8mm-evk
+	export DTS_FILE := $(TOP)/dts/imx8mm_evk.dts
+	export PINMUX_DEVICE := pinctrl
 else
 $(error Unsupported MICROKIT_BOARD given)
 endif
@@ -35,7 +46,6 @@ export MICROKIT_TOOL ?= $(abspath $(MICROKIT_SDK)/bin/microkit)
 
 export BOARD_DIR := $(abspath $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG))
 export SDDF := $(abspath ../../..)
-export TOP:= $(abspath $(dir ${MAKEFILE_LIST}))
 IMAGE_FILE := $(BUILD_DIR)/loader.img
 REPORT_FILE := $(BUILD_DIR)/report.txt
 
