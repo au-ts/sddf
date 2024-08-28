@@ -328,6 +328,13 @@ static void handle_client(int cli_id)
                 assert(!err);
                 continue;
             }
+
+            if (cli_count == 0) {
+                LOG_BLK_VIRT_ERR("client %d requested zero blocks\n", cli_id);
+                err = blk_enqueue_resp(&h, BLK_RESP_SEEK_ERROR, 0, cli_req_id);
+                assert(!err);
+                continue;
+            }
         }
 
         switch (cli_code) {
