@@ -340,6 +340,7 @@ void virtio_blk_init(void)
     blk_config->heads = virtio_config->geometry.heads;
     blk_config->blocks = virtio_config->geometry.sectors;
     blk_config->block_size = 1;
+    blk_config->sector_size = VIRTIO_BLK_SECTOR_SIZE;
 
     /* Finished populating configuration */
     __atomic_store_n(&blk_config->ready, true, __ATOMIC_RELEASE);
