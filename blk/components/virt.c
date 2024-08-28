@@ -324,14 +324,14 @@ static void handle_client(int cli_id)
             // Check if client request offset is within its allocated bounds and is aligned to transfer size
             if (cli_offset % BLK_TRANSFER_SIZE != 0 || (cli_offset + BLK_TRANSFER_SIZE * cli_count) > cli_data_region_size) {
                 LOG_BLK_VIRT_ERR("client %d request offset 0x%lx is invalid\n", cli_id, cli_offset);
-                err = blk_enqueue_resp(&h, BLK_RESP_ERR_SEEK, 0, cli_req_id);
+                err = blk_enqueue_resp(&h, BLK_RESP_ERR_INVALID_PARAM, 0, cli_req_id);
                 assert(!err);
                 continue;
             }
 
             if (cli_count == 0) {
                 LOG_BLK_VIRT_ERR("client %d requested zero blocks\n", cli_id);
-                err = blk_enqueue_resp(&h, BLK_RESP_ERR_SEEK, 0, cli_req_id);
+                err = blk_enqueue_resp(&h, BLK_RESP_ERR_INVALID_PARAM, 0, cli_req_id);
                 assert(!err);
                 continue;
             }
