@@ -143,6 +143,7 @@ void init(void) {
         while (true) {};
     } else {
         sddf_printf_("all pinmux driver arguments validation tests passed...continuing\n");
+        sddf_pinctrl_reset(PINCTRL_CH);
     }
 
     // Correct console output:
