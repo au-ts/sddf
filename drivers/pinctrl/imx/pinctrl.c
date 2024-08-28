@@ -3,6 +3,10 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+// Documents referenced:
+// Linux: Documentation/devicetree/bindings/pinctrl/fsl,imx-pinctrl.txt
+// U-Boot: drivers/pinctrl/nxp/pinctrl-imx.c
+
 #include <microkit.h>
 #include <stdint.h>
 #include <stdbool.h>
