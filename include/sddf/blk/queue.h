@@ -47,7 +47,6 @@ typedef enum blk_resp_status {
     BLK_RESP_ERR_UNSPEC,        /* unspecified miscellaneous errors */
     BLK_RESP_ERR_INVALID_PARAM, /* invalid request parameters */
     BLK_RESP_ERR_SEEK,          /* seek error */
-    BLK_RESP_ERR_NO_DEVICE,     /* device is unplugged */
 } blk_resp_status_t;
 
 /* Request struct contained in request queue */
