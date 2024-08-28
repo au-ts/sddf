@@ -24,6 +24,7 @@ microkit_cothread_sem_t timer_expire_sem;
 
 void run(void) {
     for (uint64_t i = 0; i < UINT64_MAX; i++) {
+#ifdef SOC_IMX8MQ_EVK
         if (i % 2 == 0) {
             // Connect UART1_TXD pad to the UART1 device
             sddf_pinctrl_set_mux(PINCTRL_CH, 0x238, 0x0);
@@ -31,6 +32,17 @@ void run(void) {
             // Connect UART1_TXD pad to the SPI device. You will not see the output for odd numbers
             sddf_pinctrl_set_mux(PINCTRL_CH, 0x238, 0x1);
         }
+#endif
+
+#ifdef SOC_IMX8MM_EVK
+        if (i % 2 == 0) {
+            // Connect UART2_TXD pad to the UART2 device
+            sddf_pinctrl_set_mux(PINCTRL_CH, 0x240, 0x0);
+        } else {
+            // Connect UART2_TXD pad to the SPI device. You will not see the output for odd numbers
+            sddf_pinctrl_set_mux(PINCTRL_CH, 0x240, 0x1);
+        }
+#endif
         
         sddf_printf_("client hello #%lu\n", i);
         sddf_timer_set_timeout(1, 1000000000ULL);
