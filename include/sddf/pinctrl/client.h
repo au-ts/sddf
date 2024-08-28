@@ -11,6 +11,18 @@
 #include <sddf/pinctrl/protocol.h>
 
 /**
+ * Reset the I/O mux controller to default values in DTS via PPC into the passive pinctrl driver.
+ * Use the label to indicate this request.
+ * @param microkit channel of pinctrl driver.
+ */
+static inline sddf_pinctrl_response_t sddf_pinctrl_reset(microkit_channel channel)
+{
+    microkit_msginfo resp = microkit_ppcall(channel, microkit_msginfo_new(SDDF_PINCTRL_RESET, 0));
+    
+    return ((sddf_pinctrl_response_t) microkit_msginfo_get_label(resp));
+}
+
+/**
  * Set a pinmux value in the I/O mux controller via PPC into the passive pinctrl driver.
  * Use the label to indicate this request.
  * @param microkit channel of pinctrl driver.
@@ -26,6 +38,23 @@ static inline sddf_pinctrl_response_t sddf_pinctrl_set_mux(microkit_channel chan
     
     return ((sddf_pinctrl_response_t) microkit_msginfo_get_label(resp));
 }
+
+// /**
+//  * Read a value from a pinmux register via PPC into the passive pinctrl driver.
+//  * Use the label to indicate this request.
+//  * @param microkit channel of pinctrl driver.
+//  * @param reg_offset offset of the desired register from the device base physical address.
+//  * @param reg_val desired value to write to the register.
+//  */
+// static inline sddf_pinctrl_response_t sddf_pinctrl_set_mux(microkit_channel channel, uint32_t reg_offset, uint32_t reg_val)
+// {
+//     microkit_mr_set(SET_MUX_REQ_OFFSET, reg_offset);
+//     microkit_mr_set(SET_MUX_REQ_VALUE, reg_val);
+
+//     microkit_msginfo resp = microkit_ppcall(channel, microkit_msginfo_new(SDDF_PINCTRL_SET_MUX, SET_MUX_REQ_NUM_ARGS));
+    
+//     return ((sddf_pinctrl_response_t) microkit_msginfo_get_label(resp));
+// }
 
 /**
  * Query the pinmux register value that was written to memory when the driver initialised.
