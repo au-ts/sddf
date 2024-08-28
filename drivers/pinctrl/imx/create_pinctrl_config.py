@@ -42,19 +42,20 @@ def get_pinctrl_info(device_nodes):
 
 if __name__ == "__main__":
 
-    if len(sys.argv) != 4:
+    if len(sys.argv) != 5:
         print("Usage: ")
-        print("\tpython3 create_pinmux_setup.py <SoC-name> <dts-source> <output-dir>")
+        print("\tpython3 create_pinmux_setup.py <SoC-name> <dts-source> <pinmux-device-name> <output-dir>")
         exit(1)
     
     # Parse device tree file
     soc_name = sys.argv[1]
     devicetree = dtlib.DT(sys.argv[2], force=True)
-    out_dir = sys.argv[3]
+    device_name = sys.argv[3]
+    out_dir = sys.argv[4]
 
     # For the imx8mq, we have to locate the "pinctrl" device in the dts to be able to get our relevant info
     for node in devicetree.node_iter():
-        if "iomuxc" in node.name:
+        if device_name in node.name:
             pinmux_dict = get_pinctrl_info(node.nodes[soc_name])
             nums_pin_properties = len(pinmux_dict['mux_reg'])
 
@@ -76,8 +77,3 @@ if __name__ == "__main__":
                     file.write(f"{pinmux_dict['mux_reg'][i]}, {pinmux_dict['conf_reg'][i]}, {pinmux_dict['input_reg'][i]}, {pinmux_dict['mux_val'][i]}, {pinmux_dict['input_val'][i]}, {pinmux_dict['pad_setting'][i]}\n")
 
             break
-
-    
-    
-
-    
