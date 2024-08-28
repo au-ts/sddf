@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+// Pinctrl driver. Tested on MaaXBoard (imx8mq), imx8mq-evk and imx8mm-evk.
+
 // Documents referenced:
 // Linux: Documentation/devicetree/bindings/pinctrl/fsl,imx-pinctrl.txt
 // U-Boot: drivers/pinctrl/nxp/pinctrl-imx.c
