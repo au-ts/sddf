@@ -64,7 +64,7 @@ libmicrokitco.a:
 	mv $(BUILD_DIR)/libmicrokitco/libmicrokitco.a libmicrokitco.a
 
 client.o: ${TOP}/client.c
-	$(CC) -c $(CFLAGS) $< -o client.o
+	$(CC) -c $(CFLAGS) -DSOC_$(shell echo $(SOC) | tr a-z A-Z | tr - _) $< -o client.o
 client.elf: client.o libmicrokitco.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
