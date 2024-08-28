@@ -19,14 +19,33 @@
 
 #define LOG_DRIVER_ERR(...) do{ sddf_printf("PINCTRL DRIVER|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
+#define BYTES_IN_32_BITS 4
+
 // Contains 32-bits wide registers to mux individual pads on the SoC.
 #define IOMUXC_DEVICE_SIZE 0x10000
+#define IOMUXC_DEVICE_BASE_PAD 0x14 // Distance between iomuxc_dev_base and first mux register
+
+// Size of all registers inclusive
+#ifdef SOC_IMX8MQ_EVK
+#define IOMUXC_DEVICE_EFFECTIVE_SIZE 0x520 
+#endif
+#ifdef SOC_IMX8MM_EVK
+#define IOMUXC_DEVICE_EFFECTIVE_SIZE 0x538
+#endif
+
 uintptr_t iomuxc_dev_base;
+// The registers are only within iomuxc_dev_base + IOMUXC_DEVICE_BASE_PAD and 
+// iomuxc_dev_base + IOMUXC_DEVICE_BASE_PAD + IOMUXC_DEVICE_EFFECTIVE_SIZE
 
 // General Purpose Registers: a memory region contiguous with the iomuxc device.
 // Contains control registers to pads that can't be mux'ed. E.g. HDMI, DDR, DSI, PCIe,...
 #define IOMUXC_GPR_SIZE 0x10000
+#define IOMUXC_GPR_EFFECTIVE_SIZE 0xC0 // Size of all registers inclusive
 uintptr_t iomuxc_gpr_base;
+// The registers are only within iomuxc_gpr_base and iomuxc_gpr_base + IOMUXC_GPR_EFFECTIVE_SIZE
+
+// Phys and virt memory layout:
+// iomuxc_dev_base | ... | iomuxc_dev_base + 0xffff | iomuxc_gpr_base
 
 // From Linux's Documentation/devicetree/bindings/pinctrl/fsl,imx-pinctrl.txt
 // Special values for pad_setting:
@@ -54,26 +73,48 @@ typedef struct iomuxc_config {
 extern iomuxc_config_t iomuxc_configs[];
 extern const uint32_t num_iomuxc_configs;
 
-uint32_t read_mux(uint32_t offset) {
+bool check_offset_bound(uint32_t offset) {
+    if (offset >= IOMUXC_DEVICE_BASE_PAD && offset <= IOMUXC_DEVICE_BASE_PAD + IOMUXC_DEVICE_EFFECTIVE_SIZE - BYTES_IN_32_BITS) {
+        // Offset valid in iomuxc_dev_base
+        return true;
+    } else {
+        if (offset >= IOMUXC_DEVICE_SIZE && offset <= IOMUXC_DEVICE_SIZE + IOMUXC_GPR_EFFECTIVE_SIZE - BYTES_IN_32_BITS) {
+            // Offset valid in iomuxc_gpr_base
+            return true;
+        }
+    }
+
+    LOG_DRIVER_ERR("offset is out of bound\n");
+    return false;
+}
+
+bool check_offset_4_bytes_aligned(uint32_t offset) {
+    if (offset % 4 == 0) {
+        return true;
+    } else {
+        LOG_DRIVER_ERR("offset is not 4 bytes aligned\n");
+        return false;
+    }
+}
+
+bool read_mux(uint32_t offset, uint32_t *ret) {
+    if (!check_offset_bound(offset) || !check_offset_4_bytes_aligned(offset)) {
+        return false;
+    }
+    
     uint32_t *mux_reg_vaddr = (uint32_t *) (iomuxc_dev_base + (uintptr_t) offset);
-    return *mux_reg_vaddr;
+    *ret = *mux_reg_vaddr;
+    return true;
 }
 
 bool set_mux(uint32_t offset, uint32_t val) {
-    if (!offset) {
-        LOG_DRIVER_ERR("null offset in set_mux()\n");
+    if (!check_offset_bound(offset) || !check_offset_4_bytes_aligned(offset)) {
         return false;
     }
 
     uint32_t *mux_reg_vaddr = (uint32_t *) (iomuxc_dev_base + (uintptr_t) offset);
-
-    if (mux_reg_vaddr > (uint32_t *) (iomuxc_dev_base + IOMUXC_DEVICE_SIZE + IOMUXC_GPR_SIZE - sizeof(uint32_t))) {
-        LOG_DRIVER_ERR("offset out of bound in set_mux()\n");
-        return false;
-    } else {
-        *mux_reg_vaddr = val;
-        return true;
-    }
+    *mux_reg_vaddr = val;
+    return true;
 }
 
 void init(void) {
@@ -114,7 +155,9 @@ void init(void) {
             iomuxc_configs[i].pad_setting &= ~PAD_SION;
         }
         // Write mux settings
-        set_mux(iomuxc_configs[i].mux_reg, iomuxc_configs[i].mux_val);
+        if (!set_mux(iomuxc_configs[i].mux_reg, iomuxc_configs[i].mux_val)) {
+            while (true) {};
+        }
 
         // Handle input settings. From U-Boot:
         /*
@@ -143,15 +186,21 @@ void init(void) {
                 * IOMUXC general purpose register, not
                 * regular select input register.
             */
-            val = read_mux(iomuxc_configs[i].input_reg);
+            if (!read_mux(iomuxc_configs[i].input_reg, &val)) {
+                while (true) {};
+            }
             val &= ~mask;
             val |= select << shift;
             iomuxc_configs[i].input_val = val;
-            set_mux(iomuxc_configs[i].input_reg, iomuxc_configs[i].input_val);
+            if (!set_mux(iomuxc_configs[i].input_reg, iomuxc_configs[i].input_val)) {
+                while (true) {};
+            }
         
         } else if (iomuxc_configs[i].input_reg) {
             // Regular select input register can never be at offset 0.
-            set_mux(iomuxc_configs[i].input_reg, iomuxc_configs[i].input_val);
+            if (!set_mux(iomuxc_configs[i].input_reg, iomuxc_configs[i].input_val)) {
+                while (true) {};
+            }
         }
 
         // All these value changes are saved into the info array so that
@@ -159,7 +208,9 @@ void init(void) {
 
         // Write pad settings if no setting bit is not set
         if (!(iomuxc_configs[i].pad_setting & NO_PAD_CTL)) {
-            set_mux(iomuxc_configs[i].conf_reg, iomuxc_configs[i].pad_setting);
+            if (!set_mux(iomuxc_configs[i].conf_reg, iomuxc_configs[i].pad_setting)) {
+                while (true) {};
+            }
         }
     }
 
