@@ -17,6 +17,7 @@ LD := aarch64-none-elf-ld
 AR := aarch64-none-elf-ar
 AS := aarch64-none-elf-as
 RANLIB := aarch64-none-elf-ranlib
+PYTHON := python3
 
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 
@@ -31,7 +32,6 @@ CFLAGS := -mcpu=$(CPU) \
 		  -nostdlib \
 		  -ffreestanding \
 		  -g3 \
-		  -O3 \
 		  -Wall -Wno-unused-function -Werror -Wno-unused-command-line-argument \
 		  -I$(BOARD_DIR)/include \
 		  -I$(SDDF)/include \
