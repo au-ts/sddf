@@ -117,14 +117,7 @@ bool set_mux(uint32_t offset, uint32_t val) {
     return true;
 }
 
-void init(void) {
-    if (iomuxc_gpr_base != iomuxc_dev_base + IOMUXC_DEVICE_SIZE) {
-        LOG_DRIVER_ERR("the GPR region must be mapped contiguously after the normal mux registers region\n");
-        while (true) {};
-    }
-
-#ifdef DEBUG_DRIVER
-    LOG_DRIVER("started\n");
+void debug_dts_print() {
     LOG_DRIVER("nums of config is %u\n", num_iomuxc_configs);
     LOG_DRIVER("data dump begin...one pin per line\n");
     for (uint32_t i = 0; i < num_iomuxc_configs; i += 1) {
@@ -146,17 +139,14 @@ void init(void) {
             LOG_DRIVER("Quirky select input.\n");
         }
     }
-#endif
+}
 
+void process_dts_values_to_register_values() {
     for (uint32_t i = 0; i < num_iomuxc_configs; i += 1) {
         // For pins that have SION bit set in "pad_setting", flip it in "mux_val" and clear it from "pad_setting"
         if (iomuxc_configs[i].pad_setting & PAD_SION) {
             iomuxc_configs[i].mux_reg |= MUX_SION;
             iomuxc_configs[i].pad_setting &= ~PAD_SION;
-        }
-        // Write mux settings
-        if (!set_mux(iomuxc_configs[i].mux_reg, iomuxc_configs[i].mux_val)) {
-            while (true) {};
         }
 
         // Handle input settings. From U-Boot:
@@ -195,24 +185,46 @@ void init(void) {
             if (!set_mux(iomuxc_configs[i].input_reg, iomuxc_configs[i].input_val)) {
                 while (true) {};
             }
-        
-        } else if (iomuxc_configs[i].input_reg) {
-            // Regular select input register can never be at offset 0.
+        }
+
+        // All these value changes are saved into the info array so that
+        // a query DTS call returns the exact value what was written into memory.
+    }
+}
+
+void reset_pinmux() {
+    for (uint32_t i = 0; i < num_iomuxc_configs; i += 1) {
+        // Write mux settings
+        if (!set_mux(iomuxc_configs[i].mux_reg, iomuxc_configs[i].mux_val)) {
+            while (true) {};
+        }
+
+        // Write input settings
+        if (iomuxc_configs[i].input_reg) {
             if (!set_mux(iomuxc_configs[i].input_reg, iomuxc_configs[i].input_val)) {
                 while (true) {};
             }
         }
 
-        // All these value changes are saved into the info array so that
-        // a query DTS call returns the exact value what was written into memory.
-
-        // Write pad settings if no setting bit is not set
+        // Write pad settings
         if (!(iomuxc_configs[i].pad_setting & NO_PAD_CTL)) {
             if (!set_mux(iomuxc_configs[i].conf_reg, iomuxc_configs[i].pad_setting)) {
                 while (true) {};
             }
         }
     }
+}
+
+void init(void) {
+    LOG_DRIVER("starting\n");
+    if (iomuxc_gpr_base != iomuxc_dev_base + IOMUXC_DEVICE_SIZE) {
+        LOG_DRIVER_ERR("the GPR region must be mapped contiguously after the normal mux registers region\n");
+        while (true) {};
+    }
+
+    debug_dts_print();
+    process_dts_values_to_register_values();
+    reset_pinmux();
 
     LOG_DRIVER("pinctrl device initialisation done\n");
 }
@@ -223,6 +235,11 @@ void notified(microkit_channel ch) {
 
 microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo) {
     switch (microkit_msginfo_get_label(msginfo)) {
+
+    case SDDF_PINCTRL_RESET: {
+        reset_pinmux();
+        return microkit_msginfo_new(SDDF_PINCTRL_SUCCESS, 0);
+    }
 
     case SDDF_PINCTRL_SET_MUX: {
         if (microkit_msginfo_get_count(msginfo) != SET_MUX_REQ_NUM_ARGS) {
@@ -242,7 +259,6 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo) {
         } else {
             return microkit_msginfo_new(SDDF_PINCTRL_INVALID_ARGS, 0);
         }
-        break;
     }
 
     case SDDF_PINCTRL_QUERY_DTS: {
