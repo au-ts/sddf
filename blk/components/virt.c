@@ -316,7 +316,7 @@ static void handle_client(int cli_id)
             unsigned long client_start_sector = clients[cli_id].start_sector / (BLK_TRANSFER_SIZE / MSDOS_MBR_SECTOR_SIZE);
             if (drv_block_number < client_start_sector || drv_block_number + cli_count > client_start_sector + client_sectors) {
                 LOG_BLK_VIRT_ERR("client %d request for block %d is out of bounds\n", cli_id, cli_block_number);
-                err = blk_enqueue_resp(&h, BLK_RESP_ERR_SEEK, 0, cli_req_id);
+                err = blk_enqueue_resp(&h, BLK_RESP_ERR_INVALID_PARAM, 0, cli_req_id);
                 assert(!err);
                 continue;
             }
