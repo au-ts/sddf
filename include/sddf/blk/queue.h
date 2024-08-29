@@ -49,8 +49,6 @@ typedef enum blk_resp_status {
     BLK_RESP_ERR_UNSPEC,
     /* invalid request parameters */
     BLK_RESP_ERR_INVALID_PARAM,
-    /* out of bounds block number access error */
-    BLK_RESP_ERR_SEEK,
 } blk_resp_status_t;
 
 /* Request struct contained in request queue */
