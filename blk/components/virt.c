@@ -364,6 +364,12 @@ static void handle_client(int cli_id)
                 continue;
             }
             break;
+        default:
+            /* Invalid request code given */
+            LOG_BLK_VIRT_ERR("client %d gave an invalid request code %d\n", cli_id, cli_code);
+            err = blk_enqueue_resp(&h, BLK_RESP_ERR_INVALID_PARAM, 0, cli_req_id);
+            assert(!err);
+            continue;
         }
 
         // Bookkeep client request and generate driver req ID
