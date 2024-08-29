@@ -88,14 +88,15 @@ void handle_response()
     uint16_t i = last_seen_used;
     uint16_t curr_idx = virtq.used->idx;
     while (i != curr_idx) {
-        struct virtq_used_elem hdr_used = virtq.used->ring[i % virtq.num];
+        uint16_t virtq_idx = i % virtq.num;
+        struct virtq_used_elem hdr_used = virtq.used->ring[virtq_idx];
         assert(virtq.desc[hdr_used.id].flags & VIRTQ_DESC_F_NEXT);
 
         struct virtq_desc hdr_desc = virtq.desc[hdr_used.id];
         LOG_DRIVER("response header addr: 0x%lx, len: %d\n", hdr_desc.addr, hdr_desc.len);
 
         assert(hdr_desc.len == VIRTIO_BLK_REQ_HDR_SIZE);
-        struct virtio_blk_req *hdr = (struct virtio_blk_req *)(virtio_headers_vaddr + (i * sizeof(struct virtio_blk_req)));
+        struct virtio_blk_req *hdr = &virtio_headers[virtq_idx];
         virtio_blk_print_req(hdr);
 
         uint16_t data_desc_idx = virtq.desc[hdr_used.id].next;
