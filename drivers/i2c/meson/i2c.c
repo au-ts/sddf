@@ -374,7 +374,7 @@ static inline uint8_t i2c_token_convert(i2c_token_t token)
 static inline void i2c_load_tokens(volatile struct i2c_regs *regs)
 {
     LOG_DRIVER("starting token load\n");
-    i2c_token_t *tokens = i2c_ifState.curr_data;
+    i2c_token_t *tokens = i2c_ifState.curr_request_and_response_data;
     LOG_DRIVER("Tokens remaining in this req: %zu\n", i2c_ifState.remaining);
 
     // Load address into address register
@@ -507,7 +507,7 @@ void init(void)
     queue_handle = i2c_queue_init((i2c_queue_t *) request_region, (i2c_queue_t *) response_region);
 
     // Set up driver state
-    i2c_ifState.curr_data = NULL;
+    i2c_ifState.curr_request_and_response_data = NULL;
     i2c_ifState.curr_request_len = 0;
     i2c_ifState.curr_response_len = 0;
     i2c_ifState.remaining = 0;
@@ -524,7 +524,7 @@ static inline void handle_request(void)
     if (!i2c_queue_empty(queue_handle.request)) {
         // If this interface is busy, skip notification and
         // set notified flag for later processing
-        if (i2c_ifState.curr_data) {
+        if (i2c_ifState.curr_request_and_response_data) {
             LOG_DRIVER("driver: request in progress, deferring notification until later\n");
             i2c_ifState.notified = 1;
             return;
@@ -551,7 +551,7 @@ static inline void handle_request(void)
 
         LOG_DRIVER("Loading request for bus address 0x%x of size %zu\n", bus_address, size);
 
-        i2c_ifState.curr_data = (i2c_token_t *) DATA_REGIONS_START + offset;
+        i2c_ifState.curr_request_and_response_data = (i2c_token_t *) DATA_REGIONS_START + offset;
         i2c_ifState.addr = bus_address;
         i2c_ifState.curr_request_len = size;
         i2c_ifState.remaining = size;
@@ -642,7 +642,8 @@ static void handle_response(void)
 
         // response length is + 2 (RESPONSE_DATA_OFFSET = 2) due to error data preceding payload.
         int ret = i2c_enqueue_response(queue_handle, i2c_ifState.addr,
-                                       (size_t) i2c_ifState.curr_data - DATA_REGIONS_START,
+                                       (size_t) i2c_ifState.curr_request_and_response_data
+                                       - DATA_REGIONS_START,
                                        i2c_ifState.curr_response_len + RESPONSE_DATA_OFFSET);
         if (ret) {
             LOG_DRIVER_ERR("Failed to enqueue response\n");
@@ -651,7 +652,7 @@ static void handle_response(void)
         // reset driver state for another request
         // load tokens resets the interface registers so no need here
         i2c_ifState.curr_response_len = 0;
-        i2c_ifState.curr_data = NULL;
+        i2c_ifState.curr_request_and_response_data = NULL;
         i2c_ifState.curr_request_len = 0;
         i2c_ifState.remaining = 0;
         i2c_ifState.addr = 0;
