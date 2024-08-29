@@ -108,10 +108,6 @@ void handle_response()
 #endif
 
         uint16_t footer_desc_idx = virtq.desc[data_desc_idx].next;
-        // TODO: deal with
-        // struct virtq_desc footer_desc = virtq.desc[footer_desc_idx % virtq.num];
-        // uint64_t footer_addr = footer_desc.addr;
-        // uint32_t footer_len = footer_desc.len;
 
         blk_resp_status_t status;
         if (hdr->status == VIRTIO_BLK_S_OK) {
