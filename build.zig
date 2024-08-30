@@ -19,6 +19,10 @@ const DriverClass = struct {
         imx,
     };
 
+    const Clock = enum {
+        meson,
+    };
+
     const I2cHost = enum {
         meson,
     };
@@ -187,6 +191,29 @@ fn addBlockDriver(
     return driver;
 }
 
+fn addClockDriver(
+    b: *std.Build,
+    util: *std.Build.Step.Compile,
+    class: DriverClass.Clock,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+) *std.Build.Step.Compile {
+    const driver = addPd(b, .{
+        .name = b.fmt("driver_clk_{s}.elf", .{@tagName(class)}),
+        .target = target,
+        .optimize = optimize,
+        .strip = false,
+    });
+    const source = b.fmt("drivers/clk/{s}/clk.c", .{ @tagName(class) });
+    driver.addCSourceFile(.{
+        .file = b.path(source),
+    });
+    driver.addIncludePath(b.path("include"));
+    driver.linkLibrary(util);
+
+    return driver;
+}
+
 fn addPd(b: *std.Build, options: std.Build.ExecutableOptions) *std.Build.Step.Compile {
     const pd = b.addExecutable(options);
     pd.addObjectFile(libmicrokit);
@@ -325,6 +352,13 @@ pub fn build(b: *std.Build) void {
     // Timer drivers
     inline for (std.meta.fields(DriverClass.Timer)) |class| {
         const driver = addTimerDriver(b, util, @enumFromInt(class.value), target, optimize);
+        driver.linkLibrary(util_putchar_debug);
+        b.installArtifact(driver);
+    }
+
+    // Clock drivers
+    inline for (std.meta.fields(DriverClass.Clock)) |class| {
+        const driver = addClockDriver(b, util, @enumFromInt(class.value), target, optimize);
         driver.linkLibrary(util_putchar_debug);
         b.installArtifact(driver);
     }
