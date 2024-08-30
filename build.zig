@@ -285,6 +285,7 @@ fn addNetworkDriver(
     driver.addIncludePath(net_config_include);
     driver.addIncludePath(b.path(b.fmt("drivers/network/{s}/", .{ @tagName(class) })));
     driver.addIncludePath(b.path("include"));
+    driver.addIncludePath(b.path(b.fmt("drivers/clk/{s}/include", .{@tagName(class)})));
     driver.linkLibrary(util);
 
     return driver;
