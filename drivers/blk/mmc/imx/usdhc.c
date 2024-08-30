@@ -901,19 +901,70 @@ void setup_blk_config()
                       | ((__uint128_t)card_info.csd[1] << 64)
                       | ((__uint128_t)card_info.csd[2] << 32)
                       | ((__uint128_t)card_info.csd[3] <<  0);
-    /* [SD-PHY] 5.3.3 CSD Register (Ver2); CSD[127:126] CSD_STRUCTURE == 0b01
-        =>  the below calculation is different for different versions (TODO(#187)) */
-    assert(((csd /* & SD_CSD_CSD_STRUCTURE_MASK */) >> SD_CSD_CSD_STRUCTURE_SHIFT) == 0b01);
 
-    /* [SD-PHY] 5.3.4 C_SIZE (pg. 234)
-       > The user data area capacity is calculated from C_SIZE as follows:
-       >
-       >             memory capacity = (C_SIZE+1) * 512KByte
-    */
-    uint64_t c_size = (csd & SD_CSD_C_SIZE_MASK) >> SD_CSD_C_SIZE_SHIFT;
-    blk_config->capacity = (c_size + 1) * (512 * 1024) / BLK_TRANSFER_SIZE;
+    LOG_DRIVER("CSD Version: %x\n",
+               (uint32_t)((csd & SD_CSD_CSD_STRUCTURE_MASK) >> SD_CSD_CSD_STRUCTURE_SHIFT));
 
-    LOG_DRIVER("size: %lu\n", blk_config->capacity);
+    /* [SD-PHY] 5.3.1 CSD Structure specifies the version. */
+    switch ((csd & SD_CSD_CSD_STRUCTURE_MASK) >> SD_CSD_CSD_STRUCTURE_SHIFT) {
+    case 0b00: {
+        /* CSD Version 1 (SDSC); Reference [SD-PHY] 5.3.2
+           >
+           > The memory capacity of the card is computed from the entries C_SIZE,
+           > C_SIZE_MULT and READ_BL_LEN as follows:
+           >
+           >            memory capacity = BLOCKNR * BLOCK_LEN
+           > Where
+           >    BLOCKNR = (C_SIZE+1) * MULT
+           >    MULT = 2^{C_SIZE_MULT+2}           (C_SIZE_MULT < 8)
+           >    BLOCK_LEN = 2^{READ_BL_LEN},       (READ_BL_LEN < 12)
+        */
+        uint16_t c_size = (csd & SD_CSD_V1_C_SIZE_MASK) >> SD_CSD_V1_C_SIZE_SHIFT;
+        uint8_t read_bl_len = (csd & SD_CSD_V1_READ_BL_LEN_MASK) >> SD_CSD_V1_READ_BL_LEN_SHIFT;
+        uint8_t c_size_mult = (csd & SD_CSD_V1_C_SIZE_MULT_MASK) >> SD_CSD_V1_C_SIZE_MULT_SHIFT;
+
+        LOG_DRIVER("READ_BL_LEN: %x\n", read_bl_len);
+        LOG_DRIVER("C_SIZE: %x\n", c_size);
+        LOG_DRIVER("C_SIZE_MULT: %x\n", c_size_mult);
+
+        uint32_t mult = 1 << (c_size_mult + 2);
+        uint32_t block_nr = (c_size + 1) * mult;
+        uint32_t block_len = 1 << read_bl_len;
+        blk_config->capacity = block_nr * block_len / BLK_TRANSFER_SIZE;
+        break;
+    }
+
+    case 0b01: {
+        /* [SD-PHY] 5.3.3 CSD Version 2 (SDHC,SDXC)
+           >
+           > The user data area capacity is calculated from C_SIZE as follows:
+           >
+           >             memory capacity = (C_SIZE+1) * 512KByte
+        */
+        uint32_t c_size = (csd & SD_CSD_V2_C_SIZE_MASK) >> SD_CSD_V2_C_SIZE_SHIFT;
+        blk_config->capacity = (c_size + 1) * (512 * 1024) / BLK_TRANSFER_SIZE;
+        break;
+    }
+
+    case 0b10: {
+        /* [SD-PHY] 5.3.4 CSD Version 3 (SDUC)
+           >
+           > The user data area capacity is calculated from C_SIZE as follows:
+           >
+           >             memory capacity = (C_SIZE+1) * 512KByte
+        */
+        uint32_t c_size = (csd & SD_CSD_V3_C_SIZE_MASK) >> SD_CSD_V3_C_SIZE_SHIFT;
+        blk_config->capacity = (c_size + 1) * (512 * 1024) / BLK_TRANSFER_SIZE;
+        break;
+    }
+
+    case 0b11:
+        /* Reserved; unsupported. */
+        assert(!"todo");
+        break;
+    }
+
+    LOG_DRIVER("Card size (blocks): %lu\n", blk_config->capacity);
 
     __atomic_store_n(&blk_config->ready, true, __ATOMIC_RELEASE);
     LOG_DRIVER("Driver initialisation complete\n");

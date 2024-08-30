@@ -19,7 +19,7 @@ This is a driver for the MaaXBoard SD host controller, based on the following do
 
 ## Implemented
 - IRQ & DMA based driver
-- Supports 3.3V operation of Version 2 SDHC cards (4GiB–32GiB) at $f_{OD}$ (400kHz).
+- Supports Version 2 SD Cards (SDSC, SDHC, SDXC, SDUC) operating at 3.3V / $f_{OD}$ (400kHz).
 
 ## Not Implemented
 - Voltage Negotiation (anything but 3.3V)
