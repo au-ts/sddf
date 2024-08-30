@@ -69,6 +69,7 @@ typedef struct imx_usdhc_regs {
 
 #define _LEN(start, end) ((end - start) + 1)
 #define _MASK(start, end)  ((BIT(_LEN(start, end)) - 1) << (start))
+#define _MASK_128(start, end)  ((__uint128_t)(BIT(_LEN(start, end)) - 1) << (start))
 
 /* [IMX8MDQLQRM] Section 10.3.7.1.3 Block Attributes */
 #define USDHC_BLK_ATT_BLKSIZE_SHIFT 0             /* Transfer block size  */
@@ -260,11 +261,26 @@ typedef struct {
 #define SD_OCR_HCS              BIT(30)  /* Host Capacity Status (HCS) */
 #define SD_OCR_POWER_UP_STATUS  BIT(31)  /* Card power up status bit (busy) */
 
+/* [SD-PHY] Section 5.3.1 CSD Register */
+#define SD_CSD_CSD_STRUCTURE_SHIFT    126             /* CSD Structure (version)      */
+#define SD_CSD_CSD_STRUCTURE_MASK     _MASK_128(126, 127) /* CSD-slice: [127:126]         */
+
+/* [SD-PHY] Section 5.3.2 CSD Register (CSD Version 1.0) */
+#define SD_CSD_V1_READ_BL_LEN_SHIFT   80                 /* max. read data block length  */
+#define SD_CSD_V1_READ_BL_LEN_MASK    _MASK_128(80, 83)  /* CSD-slice: [83:80]           */
+#define SD_CSD_V1_C_SIZE_MULT_SHIFT   47                 /* device size multiplier       */
+#define SD_CSD_V1_C_SIZE_MULT_MASK    _MASK_128(47, 49)  /* CSD-slice: [49:47]           */
+#define SD_CSD_V1_C_SIZE_SHIFT        62                 /* device size (user area size) */
+#define SD_CSD_V1_C_SIZE_MASK         _MASK_128(62, 73)  /* CSD-slice: [75:48]           */
+
+/* [SD-PHY] Section 5.3.3 CSD Register (CSD Version 2.0) */
+#define SD_CSD_V2_C_SIZE_SHIFT        48                 /* device size (user area size) */
+#define SD_CSD_V2_C_SIZE_MASK         _MASK_128(48, 69)  /* CSD-slice: [69:48]           */
+
 /* [SD-PHY] Section 5.3.4 CSD Register (CSD Version 3.0) */
-#define SD_CSD_CSD_STRUCTURE_SHIFT 126              /* CSD Structure (version)      */
-#define SD_CSD_CSD_STRUCTURE_MASK  _MASK(126, 127)  /* CSD-slice: [127:126]         */
-#define SD_CSD_C_SIZE_SHIFT        48               /* device size (user area size) */
-#define SD_CSD_C_SIZE_MASK         _MASK(48, 75)    /* CSD-slice: [75:48]           */
+#define SD_CSD_V3_C_SIZE_SHIFT        48                 /* device size (user area size) */
+#define SD_CSD_V3_C_SIZE_MASK         _MASK_128(48, 75)  /* CSD-slice: [75:48]           */
+
 
 /* [SD-HOST] Section 3.2.3 Clock Frequency Change - timeout is 150ms */
 #define SD_CLOCK_STABLE_TIMEOUT (150 * NS_IN_MS)
