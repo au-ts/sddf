@@ -52,7 +52,7 @@
 
 blk_queue_handle_t blk_queue;
 volatile imx_usdhc_regs_t *usdhc_regs;
-blk_storage_info_t *blk_config;
+blk_storage_info_t *blk_storage_info;
 blk_req_queue_t *blk_req_queue;
 blk_resp_queue_t *blk_resp_queue;
 uintptr_t blk_data;
@@ -890,13 +890,13 @@ drv_status_t usdhc_write_blocks(uintptr_t dma_address, uint32_t sector_number, u
     }
 }
 
-void setup_blk_config()
+void setup_blk_storage_info()
 {
-    assert(!blk_config->ready);
+    assert(!blk_storage_info->ready);
 
-    blk_config->sector_size = SD_BLOCK_SIZE;
-    // blk_config->read_only = /* TODO(#187): look at write protect flag */
-    blk_config->block_size = 1;
+    blk_storage_info->sector_size = SD_BLOCK_SIZE;
+    // blk_storage_info->read_only = /* TODO(#187): look at write protect flag */
+    blk_storage_info->block_size = 1;
 
     __uint128_t csd = ((__uint128_t)card_info.csd[0] << 96)
                       | ((__uint128_t)card_info.csd[1] << 64)
@@ -931,7 +931,7 @@ void setup_blk_config()
         uint32_t mult = 1 << (c_size_mult + 2);
         uint32_t block_nr = (c_size + 1) * mult;
         uint32_t block_len = 1 << read_bl_len;
-        blk_config->capacity = block_nr * block_len / BLK_TRANSFER_SIZE;
+        blk_storage_info->capacity = block_nr * block_len / BLK_TRANSFER_SIZE;
         break;
     }
 
@@ -943,7 +943,7 @@ void setup_blk_config()
            >             memory capacity = (C_SIZE+1) * 512KByte
         */
         uint32_t c_size = (csd & SD_CSD_V2_C_SIZE_MASK) >> SD_CSD_V2_C_SIZE_SHIFT;
-        blk_config->capacity = (c_size + 1) * (512 * 1024) / BLK_TRANSFER_SIZE;
+        blk_storage_info->capacity = (c_size + 1) * (512 * 1024) / BLK_TRANSFER_SIZE;
         break;
     }
 
@@ -955,7 +955,7 @@ void setup_blk_config()
            >             memory capacity = (C_SIZE+1) * 512KByte
         */
         uint32_t c_size = (csd & SD_CSD_V3_C_SIZE_MASK) >> SD_CSD_V3_C_SIZE_SHIFT;
-        blk_config->capacity = (c_size + 1) * (512 * 1024) / BLK_TRANSFER_SIZE;
+        blk_storage_info->capacity = (c_size + 1) * (512 * 1024) / BLK_TRANSFER_SIZE;
         break;
     }
 
@@ -965,9 +965,9 @@ void setup_blk_config()
         break;
     }
 
-    LOG_DRIVER("Card size (blocks): %lu\n", blk_config->capacity);
+    LOG_DRIVER("Card size (blocks): %lu\n", blk_storage_info->capacity);
 
-    __atomic_store_n(&blk_config->ready, true, __ATOMIC_RELEASE);
+    __atomic_store_n(&blk_storage_info->ready, true, __ATOMIC_RELEASE);
     LOG_DRIVER("Driver initialisation complete\n");
 }
 
@@ -1064,7 +1064,7 @@ void usdhc_executor(bool is_irq)
         if (status != DrvSuccess) {
             return;
         }
-        setup_blk_config();
+        setup_blk_storage_info();
 
         driver_state.executor = ExecutorStateActive;
         fallthrough;
@@ -1112,7 +1112,7 @@ void init()
     LOG_DRIVER("Beginning driver initialisation...\n");
 
     /* Setup the sDDF block queue */
-    blk_queue_init(&blk_queue, blk_req_queue, blk_resp_queue, BLK_QUEUE_SIZE_DRIV);
+    blk_queue_init(&blk_queue, blk_req_queue, blk_resp_queue, BLK_QUEUE_CAPACITY_DRIV);
 
     /* Make sure we have DMA support. */
     assert(usdhc_regs->host_ctrl_cap & USDHC_HOST_CTRL_CAP_DMAS);
