@@ -30,6 +30,8 @@ typedef enum blk_resp_status {
     BLK_RESP_ERR_UNSPEC,
     /* invalid request parameters */
     BLK_RESP_ERR_INVALID_PARAM,
+    /* device failed to complete request */
+    BLK_RESP_ERR_IO,
     /* the device is not inserted */
     BLK_RESP_ERR_NO_DEVICE,
 } blk_resp_status_t;

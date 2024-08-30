@@ -9,6 +9,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#define BLK_STORAGE_INFO_REGION_SIZE 0x1000
+
 /* Device serial number max string length */
 #define BLK_MAX_SERIAL_NUMBER 63
 

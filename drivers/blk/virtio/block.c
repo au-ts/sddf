@@ -48,7 +48,7 @@
 
 uintptr_t blk_regs;
 
-blk_storage_info_t *blk_config;
+blk_storage_info_t *blk_storage_info;
 uintptr_t blk_request;
 uintptr_t blk_response;
 
@@ -332,16 +332,16 @@ void virtio_blk_init(void)
     }
 
     /* This driver does not support Read-Only devices, so we always leave this as false */
-    blk_config->read_only = false;
-    blk_config->capacity = (virtio_config->capacity * VIRTIO_BLK_SECTOR_SIZE) / BLK_TRANSFER_SIZE;
-    blk_config->cylinders = virtio_config->geometry.cylinders;
-    blk_config->heads = virtio_config->geometry.heads;
-    blk_config->blocks = virtio_config->geometry.sectors;
-    blk_config->block_size = 1;
-    blk_config->sector_size = VIRTIO_BLK_SECTOR_SIZE;
+    blk_storage_info->read_only = false;
+    blk_storage_info->capacity = (virtio_config->capacity * VIRTIO_BLK_SECTOR_SIZE) / BLK_TRANSFER_SIZE;
+    blk_storage_info->cylinders = virtio_config->geometry.cylinders;
+    blk_storage_info->heads = virtio_config->geometry.heads;
+    blk_storage_info->blocks = virtio_config->geometry.sectors;
+    blk_storage_info->block_size = 1;
+    blk_storage_info->sector_size = VIRTIO_BLK_SECTOR_SIZE;
 
     /* Finished populating configuration */
-    __atomic_store_n(&blk_config->ready, true, __ATOMIC_RELEASE);
+    __atomic_store_n(&blk_storage_info->ready, true, __ATOMIC_RELEASE);
 
 #ifdef DEBUG_DRIVER
     uint32_t features_low = regs->DeviceFeatures;
