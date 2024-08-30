@@ -16,7 +16,7 @@
 
 blk_queue_handle_t blk_queue;
 /* set by microkit */
-blk_storage_info_t *blk_config;
+blk_storage_info_t *blk_storage_info;
 blk_req_queue_t *blk_req_queue;
 blk_resp_queue_t *blk_resp_queue;
 uintptr_t blk_data;
@@ -173,10 +173,10 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
-    blk_queue_init(&blk_queue, blk_req_queue, blk_resp_queue, BLK_QUEUE_SIZE_CLI0);
+    blk_queue_init(&blk_queue, blk_req_queue, blk_resp_queue, BLK_QUEUE_CAPACITY_CLI0);
 
     /* Busy wait until blk device is ready */
-    while (!blk_storage_is_ready(blk_config));
+    while (!blk_storage_is_ready(blk_storage_info));
 
     sddf_printf("Hello from client\n");
 

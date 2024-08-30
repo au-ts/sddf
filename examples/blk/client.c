@@ -22,7 +22,7 @@
 #define QUEUE_SIZE 128
 #define VIRT_CH 0
 
-blk_storage_info_t *blk_config;
+blk_storage_info_t *blk_storage_info;
 uintptr_t blk_request;
 uintptr_t blk_response;
 uintptr_t blk_data;
@@ -123,10 +123,10 @@ void init(void)
     blk_queue_init(&blk_queue, (blk_req_queue_t *)blk_request, (blk_resp_queue_t *)blk_response, QUEUE_SIZE);
 
     /* Want to print out configuration information, so wait until the config is ready. */
-    while (!blk_storage_is_ready(blk_config));
+    while (!blk_storage_is_ready(blk_storage_info));
     LOG_CLIENT("device config ready\n");
 
-    LOG_CLIENT("device size: 0x%lx bytes\n", blk_config->capacity * BLK_TRANSFER_SIZE);
+    LOG_CLIENT("device size: 0x%lx bytes\n", blk_storage_info->capacity * BLK_TRANSFER_SIZE);
 
     test_basic();
     microkit_notify(VIRT_CH);

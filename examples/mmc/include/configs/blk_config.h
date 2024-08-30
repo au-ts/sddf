@@ -9,37 +9,30 @@
 #include <sddf/blk/storage_info.h>
 #include <sddf/util/string.h>
 
-#define BLK_NUM_CLIENTS 1
+#define BLK_NUM_CLIENTS                         1
 
-#define BLK_NAME_CLI0                       "CLIENT_MMC"
+#define BLK_NAME_CLI0                           "CLIENT_MMC"
 
-#define BLK_QUEUE_SIZE_CLI0                 1024
-#define BLK_QUEUE_SIZE_DRIV                 (BLK_QUEUE_SIZE_CLI0)
+#define BLK_QUEUE_CAPACITY_CLI0                 1024
+#define BLK_QUEUE_CAPACITY_DRIV                 BLK_QUEUE_CAPACITY_CLI0
 
-#define BLK_REGION_SIZE                     0x200000
-#define BLK_CONFIG_REGION_SIZE_CLI0         BLK_REGION_SIZE
+#define BLK_QUEUE_REGION_SIZE                   0x200000
+#define BLK_DATA_REGION_SIZE_CLI0               BLK_QUEUE_REGION_SIZE
+#define BLK_DATA_REGION_SIZE_DRIV               BLK_QUEUE_REGION_SIZE
 
-#define BLK_DATA_REGION_SIZE_CLI0           BLK_REGION_SIZE
-#define BLK_DATA_REGION_SIZE_DRIV           BLK_REGION_SIZE
-
-#define BLK_QUEUE_REGION_SIZE_CLI0          BLK_REGION_SIZE
-#define BLK_QUEUE_REGION_SIZE_DRIV          BLK_REGION_SIZE
-
-_Static_assert(BLK_DATA_REGION_SIZE_CLI0 >= BLK_TRANSFER_SIZE && BLK_DATA_REGION_SIZE_CLI0 % BLK_TRANSFER_SIZE == 0,
-               "Client0 data region size must be a multiple of the transfer size");
-_Static_assert(BLK_DATA_REGION_SIZE_DRIV >= BLK_TRANSFER_SIZE && BLK_DATA_REGION_SIZE_DRIV % BLK_TRANSFER_SIZE == 0,
-               "Driver data region size must be a multiple of the transfer size");
+#define BLK_QUEUE_REGION_SIZE_CLI0              BLK_QUEUE_REGION_SIZE
+#define BLK_QUEUE_REGION_SIZE_DRIV              BLK_QUEUE_REGION_SIZE
 
 /* Mapping from client index to disk partition that the client will have access to. */
 static const int blk_partition_mapping[BLK_NUM_CLIENTS] = { 2 };
 
-static inline blk_storage_info_t *blk_virt_cli_config_info(blk_storage_info_t *info, unsigned int id)
+static inline blk_storage_info_t *blk_virt_cli_storage_info(blk_storage_info_t *info, unsigned int id)
 {
     switch (id) {
     case 0:
         return info;
     case 1:
-        return (blk_storage_info_t *)((uintptr_t)info + BLK_CONFIG_REGION_SIZE_CLI0);
+        return (blk_storage_info_t *)((uintptr_t)info + BLK_STORAGE_INFO_REGION_SIZE);
     default:
         return NULL;
     }
@@ -89,7 +82,7 @@ static inline uint32_t blk_virt_cli_queue_size(unsigned int id)
 {
     switch (id) {
     case 0:
-        return BLK_QUEUE_SIZE_CLI0;
+        return BLK_QUEUE_CAPACITY_CLI0;
     default:
         return 0;
     }
@@ -98,7 +91,7 @@ static inline uint32_t blk_virt_cli_queue_size(unsigned int id)
 static inline uint32_t blk_cli_queue_size(char *pd_name)
 {
     if (!sddf_strcmp(pd_name, BLK_NAME_CLI0)) {
-        return BLK_QUEUE_SIZE_CLI0;
+        return BLK_QUEUE_CAPACITY_CLI0;
     } else {
         return 0;
     }
