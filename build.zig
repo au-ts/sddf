@@ -209,6 +209,7 @@ fn addClockDriver(
         .file = b.path(source),
     });
     driver.addIncludePath(b.path("include"));
+    driver.addIncludePath(b.path(b.fmt("drivers/clk/{s}/include", .{@tagName(class)})));
     driver.linkLibrary(util);
 
     return driver;
