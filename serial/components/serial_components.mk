@@ -21,7 +21,7 @@ ${CHECK_SERIAL_FLAGS_MD5}:
 	touch $@
 
 
-serial_virt_%.elf: virt_%.o
+serial_virt_%.elf: virt_%.o libsddf_util_debug.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 virt_tx.o virt_rx.o: ${CHECK_SERIAL_FLAGS_MD5}

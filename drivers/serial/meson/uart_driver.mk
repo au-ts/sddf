@@ -13,7 +13,7 @@
 
 UART_DRIVER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 
-uart_driver.elf: serial/meson/uart_driver.o 
+uart_driver.elf: serial/meson/uart_driver.o libsddf_util_debug.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 serial/meson/uart_driver.o: ${UART_DRIVER_DIR}/uart.c |serial/meson
