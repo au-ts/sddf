@@ -8,48 +8,13 @@
 #include <microkit.h>
 #include <sddf/util/printf.h>
 #include <sddf/timer/client.h>
+#include <sddf/timer/protocol.h>
 #include <sddf/pinctrl/client.h>
-
-#include <libmicrokitco.h>
 
 #define PINCTRL_CH 0
 #define TIMER_CH 1
 
-#define COSTACK_SIZE 8192
-
-char co_stack[COSTACK_SIZE];
-char co_control[sizeof(co_control_t)];
-
-microkit_cothread_sem_t timer_expire_sem;
-
-void run(void) {
-    for (uint64_t i = 0; i < UINT64_MAX; i++) {
-#ifdef SOC_IMX8MQ_EVK
-        if (i % 2 == 0) {
-            // Connect UART1_TXD pad to the UART1 device
-            sddf_pinctrl_reset(PINCTRL_CH);
-        } else {
-            // Connect UART1_TXD pad to the SPI device. You will not see the output for odd numbers
-            sddf_pinctrl_set_mux(PINCTRL_CH, 0x238, 0x1);
-        }
-#endif
-
-#ifdef SOC_IMX8MM_EVK
-        if (i % 2 == 0) {
-            // Connect UART2_TXD pad to the UART2 device
-            sddf_pinctrl_reset(PINCTRL_CH);
-        } else {
-            // Connect UART2_TXD pad to the SPI device. You will not see the output for odd numbers
-            sddf_pinctrl_set_mux(PINCTRL_CH, 0x240, 0x1);
-        }
-#endif
-        
-        sddf_printf_("client hello #%lu\n", i);
-        sddf_timer_set_timeout(1, 1000000000ULL);
-
-        microkit_cothread_semaphore_wait(&timer_expire_sem);
-    }
-}
+uint64_t echo_number = 0;
 
 void init(void) {
     sddf_printf_("client begin testing pinmux driver args validation:\n");
@@ -167,15 +132,38 @@ void init(void) {
     // gpr write first register...PASS
     // gpr write last register...PASS
     // all pinmux driver arguments validation tests passed...continuing
-
-    microkit_cothread_init((co_control_t *) co_control, COSTACK_SIZE, co_stack);
-    microkit_cothread_spawn(run, NULL);
-    microkit_cothread_semaphore_init(&timer_expire_sem);
-    microkit_cothread_yield();
+        
+    sddf_printf_("client hello #%lu\n", echo_number);
+    sddf_timer_set_timeout(1, NS_IN_S);
 }
 
 void notified(microkit_channel ch) {
     if (ch == TIMER_CH) {
-        microkit_cothread_semaphore_signal(&timer_expire_sem);
+        echo_number += 1;
+        // 1 sec timer has expired, echo then set pinmux for UART1TX
+
+#ifdef SOC_IMX8MQ_EVK
+        if (echo_number % 2 == 0) {
+            // Connect UART1_TXD pad to the UART1 device
+            sddf_pinctrl_reset(PINCTRL_CH);
+        } else {
+            // Connect UART1_TXD pad to the SPI device. You will not see the output for odd numbers
+            sddf_pinctrl_set_mux(PINCTRL_CH, 0x238, 0x1);
+        }
+#endif
+
+#ifdef SOC_IMX8MM_EVK
+        // For some obscure reason IMX8MM on machine queue uses UART2 instead of UART1 for debug output.
+        if (echo_number % 2 == 0) {
+            // Connect UART2_TXD pad to the UART2 device
+            sddf_pinctrl_reset(PINCTRL_CH);
+        } else {
+            // Connect UART2_TXD pad to the SPI device. You will not see the output for odd numbers
+            sddf_pinctrl_set_mux(PINCTRL_CH, 0x240, 0x1);
+        }
+#endif
+
+        sddf_printf_("client hello #%lu\n", echo_number);
+        sddf_timer_set_timeout(1, NS_IN_S);
     }
 }
