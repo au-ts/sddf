@@ -181,7 +181,7 @@ i2c() {
 }
 
 timer() {
-    BOARDS=("odroidc4" "qemu_virt_aarch64")
+    BOARDS=("odroidc4" "qemu_virt_aarch64" "star64")
     CONFIGS=("debug" "release")
     for BOARD in "${BOARDS[@]}"
     do
