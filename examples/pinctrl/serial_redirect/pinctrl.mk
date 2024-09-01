@@ -24,8 +24,6 @@ MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 UTIL := $(SDDF)/util
 
-LIBMICROKITCO_PATH := $(TOP)/libmicrokitco
-
 IMAGES := timer_driver.elf pinctrl_driver.elf client.elf
 CFLAGS := -mcpu=$(CPU) \
 		  -mstrict-align \
@@ -56,16 +54,9 @@ include ${TIMER_DRIVER}/timer_driver.mk
 include ${PINCTRL_DRIVER}/pinctrl_driver.mk
 include ${SDDF}/util/util.mk
 
-LIBMICROKITCO_OPT_PATH := $(TOP)
-export LIBMICROKITCO_PATH LIBMICROKITCO_OPT_PATH MICROKIT_SDK BUILD_DIR MICROKIT_BOARD MICROKIT_CONFIG CPU 
-
-libmicrokitco.a:
-	make -f $(LIBMICROKITCO_PATH)/Makefile TARGET=aarch64-none-elf TOOLCHAIN=aarch64-none-elf
-	mv $(BUILD_DIR)/libmicrokitco/libmicrokitco.a libmicrokitco.a
-
 client.o: ${TOP}/client.c
 	$(CC) -c $(CFLAGS) -DSOC_$(shell echo $(SOC) | tr a-z A-Z | tr - _) $< -o client.o
-client.elf: client.o libmicrokitco.a
+client.elf: client.o 
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
