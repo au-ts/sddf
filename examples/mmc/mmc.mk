@@ -42,7 +42,10 @@ MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 
-IMAGES := mmc_driver.elf timer_driver.elf client.elf blk_virt.elf
+IMAGES := client.elf \
+		  mmc_driver.elf blk_virt.elf \
+		  timer_driver.elf
+
 CFLAGS := -mcpu=$(CPU) \
 		  -mstrict-align \
 		  -nostdlib \
