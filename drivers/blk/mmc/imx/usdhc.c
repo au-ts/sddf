@@ -257,13 +257,25 @@ static blk_resp_status_t drv_to_blk_status(drv_status_t status)
     }
 }
 
-static bool card_detected(void)
+volatile uint32_t *gpio1_regs;
+#if defined(CONFIG_PLAT_IMX8MM_EVK)
+#define GPIO_NUM    BIT(15)
+#elif defined(CONFIG_PLAT_MAAXBOARD)
+#define GPIO_NUM    BIT(6)
+#else
+#error "Unknown board type for GPIO card detect"
+#endif
+
+static bool gpio_card_detected(void)
 {
 #if 0
     /* This doesn't seem to ever work on this SOC; we need to use GPIO for CD */
     return usdhc_regs->pres_state & USDHC_PRES_STATE_CINST;
-#endif
+#elif 1
+    return !(*gpio1_regs & GPIO_NUM);
+#else
     return true;
+#endif
 }
 
 static drv_status_t handle_interrupt_status(sd_cmd_t cmd)
@@ -293,7 +305,7 @@ static drv_status_t handle_interrupt_status(sd_cmd_t cmd)
 
         usdhc_regs->int_status = 0xffffffff;
 
-        if (!card_detected()) {
+        if (!gpio_card_detected()) {
             /* If the card isn't detected, the error is because of that
                ... don't do anything with this aside from return an error,
                    though, as this is the wrong layer for that to make sense */
@@ -1134,7 +1146,7 @@ void handle_client(bool was_irq)
 
         /* if we're inactive (by choice or by recognition),
            or if there's no card (but we haven't yet propagated this change to the state) */
-        if (driver_status == DrvStatusInactive || !card_detected()) {
+        if (driver_status == DrvStatusInactive || !gpio_card_detected()) {
             handle_client_device_inactive();
             return;
         }
