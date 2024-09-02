@@ -247,26 +247,6 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo) {
         return microkit_msginfo_new(SDDF_PINCTRL_SUCCESS, 0);
     }
 
-    case SDDF_PINCTRL_SET_MUX: {
-        if (microkit_msginfo_get_count(msginfo) != SET_MUX_REQ_NUM_ARGS) {
-            LOG_DRIVER_ERR(
-                "Set mux PPC from channel %u does not have the correct number of arguments %lu != %d\n", 
-                ch, 
-                microkit_msginfo_get_count(msginfo), SET_MUX_REQ_NUM_ARGS
-            );
-            return microkit_msginfo_new(SDDF_PINCTRL_INVALID_ARGS, 0);
-        }
-
-        uint32_t reg_offset = (uint32_t) microkit_mr_get(SET_MUX_REQ_OFFSET);
-        uint32_t reg_val = (uint32_t) microkit_mr_get(SET_MUX_REQ_VALUE);
-
-        if (set_mux(reg_offset, reg_val)) {
-            return microkit_msginfo_new(SDDF_PINCTRL_SUCCESS, SET_MUX_RESP_NUM_RESULTS);
-        } else {
-            return microkit_msginfo_new(SDDF_PINCTRL_INVALID_ARGS, 0);
-        }
-    }
-
     case SDDF_PINCTRL_READ_MUX: {
         if (microkit_msginfo_get_count(msginfo) != READ_MUX_REQ_NUM_ARGS) {
             LOG_DRIVER_ERR(
