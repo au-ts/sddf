@@ -21,6 +21,7 @@
 #include <sddf/virtio/virtio.h>
 #include <sddf/virtio/virtio_queue.h>
 #include <sddf/blk/queue.h>
+#include <sddf/blk/storage_info.h>
 #include "block.h"
 
 #define IRQ_CH 0

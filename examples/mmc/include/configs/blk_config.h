@@ -6,11 +6,12 @@
 #pragma once
 
 #include <sddf/blk/queue.h>
+#include <sddf/blk/storage_info.h>
 #include <sddf/util/string.h>
 
 #define BLK_NUM_CLIENTS 1
 
-#define BLK_NAME_CLI0                      "CLIENT_MMC"
+#define BLK_NAME_CLI0                       "CLIENT_MMC"
 
 #define BLK_QUEUE_SIZE_CLI0                 1024
 #define BLK_QUEUE_SIZE_DRIV                 (BLK_QUEUE_SIZE_CLI0)
