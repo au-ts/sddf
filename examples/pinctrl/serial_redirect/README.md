@@ -4,10 +4,11 @@
 -->
 
 # Terminology
-- Port: refers to an input or output line of a logic instance in the chip (e.g. UART, DDR, HDMI, I2C,...). For example, the I2C1 instance have a SDA and SCL ports. Not to be confused with pad.
+- Port: refers to an input or output line of a logic instance in the chip (e.g. UART, DDR, HDMI, I2C,...). For example, the I2C1 instance have SDA and SCL ports. Not to be confused with pad.
 - Pad: refers to the physical pin on the chip package (example, ball for BGA packaged chips). 
 
 # Overview
+<!-- This paragraph is from Linux documentation -->
 The chip contains a limited number of pins, most of which have multiple signal options. These signal-to-pin and pin-to-signal options are selected by the input-output multiplexer called IOMUX. The IOMUX is also used to configure other pin characteristics, such as voltage level, drive strength, and hysteresis.
 
 In other words, a pad can be switched/muxed between a subset of the chip's ports dynamically. For example, you can connect a SPI3_MOSI port onto a UART1_TX pad. However, not all pads can be muxed where it does not make sense to do so, e.g. HDMI, DDR, USB... and since the muxing is implemented in hardware, not all muxing path is possible, e.g. you can't connect a UART1_TX port onto a UART3_TX pad on the iMX8-* chips.
