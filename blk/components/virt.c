@@ -321,3 +321,8 @@ void notified(microkit_channel ch)
         handle_clients();
     }
 }
+
+microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
+{
+    return microkit_ppcall(config.driver.conn.id_state, msginfo);
+}
