@@ -7,6 +7,7 @@
 
 #include <microkit.h>
 #include <sddf/blk/queue.h>
+#include <sddf/blk/storage_info.h>
 #include <sddf/util/printf.h>
 #include <sddf/timer/client.h>
 

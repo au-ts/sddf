@@ -5,8 +5,9 @@
 
 #pragma once
 
-#include <sddf/util/string.h>
 #include <sddf/blk/queue.h>
+#include <sddf/blk/storage_info.h>
+#include <sddf/util/string.h>
 
 #define BLK_NUM_CLIENTS 1
 
