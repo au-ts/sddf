@@ -29,45 +29,70 @@ if __name__ == "__main__":
     out_dir = sys.argv[4]
 
     for node in devicetree.node_iter():
-        if pinmux_node_name + "@" in node.name:
+        if pinmux_node_name in node.name:
             log_normal_parser(f"== mux: {node.name}")
 
             pinmux_node = node
+            # `pinmux_node` looks something like this:
+            # pinctrl@40 {
+            #     compatible = "amlogic,meson-g12a-periphs-pinctrl";
+            #     #address-cells = <0x02>;
+            #     #size-cells = <0x02>;
+            #     ranges;
+            #     phandle = <0x19>;
+
+            #     bank@40 {
+            #         ...
+            #     };
+
+            #     cec_ao_a_h {
+            #         mux {
+            #             groups = "cec_ao_a_h";
+            #             function = "cec_ao_a_h";
+            #             bias-disable;
+            #         };
+            #     };
+
             for muxed_device_name in pinmux_node.nodes:
                 muxed_device_node = pinmux_node.nodes[muxed_device_name]
 
                 if "bank" in muxed_device_name:
+                    # We don't care about the bank node because it just have the registers sizes.
                     continue
 
                 log_normal_parser(f"==== device: {muxed_device_node.name}")
 
                 for muxed_device_property_node_name in muxed_device_node.nodes:
+                    # Each device can have multiple mux properties it's different ports.
+                    # E.g. an emmc_cmd port need pull up, whereas an emmc_clk does not need bias at all
+
                     muxed_device_property_node = muxed_device_node.nodes[muxed_device_property_node_name]
 
                     log_normal_parser(f"====== property: {muxed_device_property_node.name}")
 
+                    # These variables are what we care about
                     group_names = []
                     function_name = ""
                     bias_enable = -1
                     bias_pullup = -1
                     drive_strength = -1
 
-                    for property_name in muxed_device_property_node.props:
-                        if property_name == "groups":
-                            group_names = muxed_device_property_node.props[property_name].to_string().split('\0')
+                    for subproperty_name in muxed_device_property_node.props:
+                        if subproperty_name == "groups":
+                            group_names = muxed_device_property_node.props[subproperty_name].to_string().split('\0')
                         
-                        if property_name == "function":
-                            values_list = muxed_device_property_node.props[property_name].to_string().split('\0')
+                        if subproperty_name == "function":
+                            values_list = muxed_device_property_node.props[subproperty_name].to_string().split('\0')
                             if len(values_list) != 1:
                                 log_error_parser("looks like your DTS is wrong, you can't have more than two functions for a pin group.\n")
                                 exit(1)
                             function_name = values_list[0]
 
-                        if property_name == "bias-disable":
+                        if subproperty_name == "bias-disable":
                             bias_enable = False
 
-                        if (property_name == "drive-strength-microamp"):
-                            drive_strength = muxed_device_property_node.props[property_name].to_num()
+                        if subproperty_name == "drive-strength-microamp":
+                            drive_strength = muxed_device_property_node.props[subproperty_name].to_num()
                         
                     if bias_enable == -1:
                         # We haven't encountered the "bias-disable" property
@@ -90,5 +115,6 @@ if __name__ == "__main__":
                         else:
                             log_normal_parser("pull down")
                     
+                    # Drive strength can be undefined for input pads.
                     if drive_strength > 0:
                         log_normal_parser(f"drive strength = {drive_strength}")
