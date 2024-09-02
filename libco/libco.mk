@@ -11,7 +11,7 @@ libco/libco.o: $(LIBCO_DIR)/libco.c ${CHECK_FLAGS_BOARD_MD5} |libco
 	${CC} ${CFLAGS} -c -o $@ $<
 
 libco.a: libco/libco.o
-	${AR} cr $@ $^
+	${AR} crv $@ $^
 	${RANLIB} $@
 
 libco:
