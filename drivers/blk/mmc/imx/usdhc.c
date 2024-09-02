@@ -231,13 +231,25 @@ static blk_resp_status_t drv_to_blk_status(drv_status_t status)
     }
 }
 
-static bool card_detected(void)
+volatile uint32_t *gpio1_regs;
+#if defined(CONFIG_PLAT_IMX8MM_EVK)
+#define GPIO_NUM    BIT(15)
+#elif defined(CONFIG_PLAT_MAAXBOARD)
+#define GPIO_NUM    BIT(6)
+#else
+#error "Unknown board type for GPIO card detect"
+#endif
+
+static bool gpio_card_detected(void)
 {
 #if 0
     /* This doesn't seem to ever work on this SOC; we need to use GPIO for CD */
     return usdhc_regs->pres_state & USDHC_PRES_STATE_CINST;
-#endif
+#elif 1
+    return !(*gpio1_regs & GPIO_NUM);
+#else
     return true;
+#endif
 }
 
 static drv_status_t handle_interrupt_status(sd_cmd_t cmd)
@@ -259,7 +271,7 @@ static drv_status_t handle_interrupt_status(sd_cmd_t cmd)
         LOG_DRIVER("-> received error response\n");
         usdhc_regs->int_status = 0xffffffff;
 
-        if (!card_detected()) {
+        if (!gpio_card_detected()) {
             /* If the card isn't detected, the error is because of that */
             return DrvErrorCardGone;
         }
