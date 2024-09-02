@@ -8,6 +8,7 @@
 #include <microkit.h>
 #include <sddf/blk/queue.h>
 #include <sddf/blk/storage_info.h>
+#include <sddf/hotplug/control.h>
 #include <sddf/util/printf.h>
 #include <sddf/timer/client.h>
 
@@ -1363,4 +1364,51 @@ void handle_card_detect_irq()
 void *memset(void *s, int c, size_t n)
 {
     return sddf_memset(s, c, n);
+}
+
+seL4_MessageInfo_t protected(microkit_channel ch, seL4_MessageInfo_t msginfo)
+{
+    /* only the state channel should allow ppcalls. (can we enforce this?) */
+    assert(ch == CHANNEL_BLK_STATE);
+
+    switch (microkit_msginfo_get_label(msginfo)) {
+    case SDDF_HOTPLUG_REQ_INSERT:
+        if (!gpio_card_detected()) {
+            return microkit_msginfo_new(SDDF_HOTPLUG_RESP_NO_DEV, 0);
+        }
+
+        if (driver_status == DrvStatusActive) {
+            return microkit_msginfo_new(SDDF_HOTPLUG_RESP_NOOP, 0);
+        } else if (driver_status == DrvStatusInactive) {
+
+            /* protected() invariant: do_bringup() should near-immediately
+               begin waiting for an IRQ, won't block for ages */
+            driver_status = DrvStatusBringup;
+            do_bringup();
+            return microkit_msginfo_new(SDDF_HOTPLUG_RESP_OK, 0);
+        } else if (driver_status == DrvStatusBringup) {
+            return microkit_msginfo_new(SDDF_HOTPLUG_RESP_OK, 0);
+        } else if (driver_status == DrvStatusTeardown) {
+            return microkit_msginfo_new(SDDF_HOTPLUG_RESP_INVALID_OPERATION, 0);
+        }
+
+    case SDDF_HOTPLUG_REQ_EJECT:
+        if (driver_status == DrvStatusActive) {
+            driver_status = DrvStatusTeardown;
+            do_teardown();
+            return microkit_msginfo_new(SDDF_HOTPLUG_RESP_OK, 0);
+        } else if (driver_status == DrvStatusInactive) {
+            /* already there */
+            return microkit_msginfo_new(SDDF_HOTPLUG_RESP_NOOP, 0);
+        } else if (driver_status == DrvStatusBringup) {
+            return microkit_msginfo_new(SDDF_HOTPLUG_RESP_INVALID_OPERATION, 0);
+        } else if (driver_status == DrvStatusTeardown) {
+            /* already in progress */
+            return microkit_msginfo_new(SDDF_HOTPLUG_RESP_OK, 0);
+        }
+
+    default:
+        LOG_DRIVER_ERR("Unhandled protected call message label\n");
+        return microkit_msginfo_new(SDDF_HOTPLUG_RESP_INVALID_OPERATION, 0);
+    }
 }

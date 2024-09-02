@@ -332,3 +332,8 @@ void notified(microkit_channel ch)
         handle_clients();
     }
 }
+
+microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
+{
+    return microkit_ppcall(DRIVER_BLK_STATE_CH, msginfo);
+}
