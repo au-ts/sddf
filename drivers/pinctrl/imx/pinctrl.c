@@ -108,8 +108,12 @@ bool read_mux(uint32_t offset, uint32_t *ret) {
         return false;
     }
     
-    uint32_t *mux_reg_vaddr = (uint32_t *) (iomuxc_dev_base + (uintptr_t) offset);
+    volatile uint32_t *mux_reg_vaddr = (uint32_t *) (iomuxc_dev_base + (uintptr_t) offset);
+
+    asm volatile("" : : : "memory");
     *ret = *mux_reg_vaddr;
+    asm volatile("" : : : "memory");
+
     return true;
 }
 
@@ -118,8 +122,12 @@ bool set_mux(uint32_t offset, uint32_t val) {
         return false;
     }
 
-    uint32_t *mux_reg_vaddr = (uint32_t *) (iomuxc_dev_base + (uintptr_t) offset);
+    volatile uint32_t *mux_reg_vaddr = (uint32_t *) (iomuxc_dev_base + (uintptr_t) offset);
+
+    asm volatile("" : : : "memory");
     *mux_reg_vaddr = val;
+    asm volatile("" : : : "memory");
+
     return true;
 }
 
