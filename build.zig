@@ -285,7 +285,6 @@ fn addNetworkDriver(
     driver.addIncludePath(net_config_include);
     driver.addIncludePath(b.path(b.fmt("drivers/network/{s}/", .{ @tagName(class) })));
     driver.addIncludePath(b.path("include"));
-    driver.addIncludePath(b.path(b.fmt("drivers/clk/{s}/include", .{@tagName(class)})));
     driver.linkLibrary(util);
 
     return driver;
@@ -311,6 +310,7 @@ pub fn build(b: *std.Build) void {
     const serial_config_include_option = b.option([]const u8, "serial_config_include", "Include path to serial config header") orelse "";
     const net_config_include_option = b.option([]const u8, "net_config_include", "Include path to network config header") orelse "";
     const i2c_client_include_option = b.option([]const u8, "i2c_client_include", "Include path to client config header") orelse "";
+    const clk_client_include_option = b.option([]const u8, "clk_client_include", "Include path to client config header") orelse "";
 
     // TODO: Right now this is not super ideal. What's happening is that we do not
     // always need a serial config include, but we must always specify it
@@ -321,6 +321,7 @@ pub fn build(b: *std.Build) void {
     const blk_config_include = LazyPath{ .cwd_relative = blk_config_include_opt };
     const net_config_include = LazyPath{ .cwd_relative = net_config_include_option };
     const i2c_client_include = LazyPath{ .cwd_relative = i2c_client_include_option };
+    const clk_client_include = LazyPath{ .cwd_relative = clk_client_include_option };
     // libmicrokit
     // We're declaring explicitly here instead of with anonymous structs due to a bug. See https://github.com/ziglang/zig/issues/19832
     libmicrokit = LazyPath{ .cwd_relative = libmicrokit_opt.? };
@@ -442,7 +443,7 @@ pub fn build(b: *std.Build) void {
 
     // Clock drivers
     inline for (std.meta.fields(DriverClass.Clock)) |class| {
-        const driver = addClockDriver(b, util, @enumFromInt(class.value), target, optimize);
+        const driver = addClockDriver(b, clk_client_include, util, @enumFromInt(class.value), target, optimize);
         driver.linkLibrary(util_putchar_debug);
         b.installArtifact(driver);
     }
