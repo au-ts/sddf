@@ -109,12 +109,12 @@ static void rx_provide(void)
             assert(!err);
 
             // Allocate a desc entry for the header, and one for the packet
-            uint32_t hdr_desc_idx;
+            uint32_t hdr_desc_idx = -1;
             err = ialloc_alloc(&rx_ialloc_desc, &hdr_desc_idx);
-            assert(!err);
-            uint32_t pkt_desc_idx;
+            assert(!err && hdr_desc_idx != -1);
+            uint32_t pkt_desc_idx = -1;
             err = ialloc_alloc(&rx_ialloc_desc, &pkt_desc_idx);
-            assert(!err);
+            assert(!err && pkt_desc_idx != -1);
 
             assert(hdr_desc_idx < rx_virtq.num);
             assert(pkt_desc_idx < rx_virtq.num);
@@ -198,12 +198,12 @@ static void tx_provide(void)
             assert(!err);
 
             /* Now we need to put our buffer into the virtIO ring */
-            uint32_t hdr_desc_idx;
+            uint32_t hdr_desc_idx = -1;
             err = ialloc_alloc(&tx_ialloc_desc, &hdr_desc_idx);
-            assert(!err);
-            uint32_t pkt_desc_idx;
+            assert(!err && hdr_desc_idx != -1);
+            uint32_t pkt_desc_idx = -1;
             err = ialloc_alloc(&tx_ialloc_desc, &pkt_desc_idx);
-            assert(!err);
+            assert(!err && pkt_desc_idx != -1);
             /* We should not run out of descriptors assuming that the avail ring is not full. */
             assert(hdr_desc_idx < tx_virtq.num);
             assert(pkt_desc_idx < tx_virtq.num);
