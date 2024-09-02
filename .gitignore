@@ -15,3 +15,4 @@ ci_build/
 .#*
 zig-out/
 .zig-cache/
+zig-cache/
