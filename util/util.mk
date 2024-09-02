@@ -3,7 +3,7 @@
 # Copyright 2024, UNSW
 #
 # SPDX-License-Identifier: BSD-2-Clause
-#  
+#
 # Include this snippet in your project Makefile to build
 # sddf_libutil.a and sddf_libutil_debug.a
 # sddf_libutil.a needs the component to have channels and queues
@@ -19,11 +19,11 @@ BASE_OBJS_LIBUTIL := $(addprefix util/, ${OBJS_LIBUTIL})
 ${ALL_OBJS_LIBUTIL}: ${CHECK_FLAGS_BOARD_MD5} |util
 
 libsddf_util_debug.a: ${BASE_OBJS_LIBUTIL} util/putchar_debug.o
-	${AR} rv $@ $^
+	${AR} crv $@ $^
 	${RANLIB} $@
 
 libsddf_util.a: ${BASE_OBJS_LIBUTIL} util/putchar_serial.o
-	${AR} rv $@ $^
+	${AR} crv $@ $^
 	${RANLIB} $@
 
 util/sddf_printf.o: ${SDDF}/util/printf.c
