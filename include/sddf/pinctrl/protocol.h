@@ -10,20 +10,8 @@
 enum sddf_pinctrl_request_label {
     SDDF_PINCTRL_RESERVED = 0,
     SDDF_PINCTRL_RESET,
-    SDDF_PINCTRL_SET_MUX,
     SDDF_PINCTRL_READ_MUX,
     SDDF_PINCTRL_QUERY_DTS,
-};
-
-
-enum set_mux_request_ipc_index {
-    SET_MUX_REQ_OFFSET = 0,
-    SET_MUX_REQ_VALUE,
-    SET_MUX_REQ_NUM_ARGS,
-};
-
-enum set_mux_reponse_ipc_index {
-    SET_MUX_RESP_NUM_RESULTS = 0,
 };
 
 
