@@ -69,7 +69,7 @@ void client_main(void)
         while (1) {};
     }
 
-    if (ds3231_set_time(42, 59, 23, 7, 31, 12, 23)) {
+    if (ds3231_set_time(42, 59, 10, 7, 31, 12, 23)) {
         LOG_CLIENT_ERR("failed to set time on DS3231!\n");
         while (1) {};
     }
@@ -88,6 +88,13 @@ void client_main(void)
         if (ds3231_get_time(&second, &minute, &hour, &day_of_week, &day, &month, &year)) {
             LOG_CLIENT_ERR("failed to get time from DS3231!\n");
             while (1) {};
+        }
+
+        if (day_of_week < 1 || day_of_week > 7) {
+            LOG_CLIENT_ERR("day of week index is wrong\n");
+            sddf_printf("Date and Time: %02d-%02d-%02d %02d:%02d:%02d\n", day, month, year, hour, minute, second);
+            delay_ms(500);
+            continue;
         }
 
         sddf_printf("Date and Time: %02d-%02d-%02d %02d:%02d:%02d (%s)\n", day, month, year, hour, minute, second,

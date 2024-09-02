@@ -22,7 +22,7 @@
 #define IRQ_CH 1
 #define IRQ_TIMEOUT_CH 2
 
-//#define DEBUG_DRIVER
+// #define DEBUG_DRIVER
 
 #ifdef DEBUG_DRIVER
 #define LOG_DRIVER(...) do{ sddf_dprintf("I2C DRIVER|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
@@ -121,28 +121,28 @@ static inline void i2c_dump(volatile struct i2c_regs *regs)
     LOG_DRIVER("\t Write data register 0:\n");
     for (int i = 0; i < 4; i++) {
         uint8_t tk = (regs->wdata0 >> (i * 8)) & 0xFF;
-        LOG_DRIVER("\t\t Data %d: 0x%lx\n", i, tk);
+        LOG_DRIVER("\t\t Data %d: 0x%x\n", i, tk);
     }
-
+    // 
     // Print wdata register 1 tokens
     LOG_DRIVER("\t Write data register 1:\n");
     for (int i = 0; i < 4; i++) {
         uint8_t tk = (regs->wdata1 >> (i * 8)) & 0xFF;
-        LOG_DRIVER("\t\t Data %d: 0x%lx\n", i, tk);
+        LOG_DRIVER("\t\t Data %d: 0x%x\n", i, tk);
     }
 
     // Print rdata register 0
     LOG_DRIVER("\t Read data register 0:\n");
     for (int i = 0; i < 4; i++) {
         uint8_t tk = (regs->rdata0 >> (i * 8)) & 0xFF;
-        LOG_DRIVER("\t\t Data %d: 0x%lx\n", i, tk);
+        LOG_DRIVER("\t\t Data %d: 0x%x\n", i, tk);
     }
 
     // Print rdata register 1
     LOG_DRIVER("\t Read data register 1:\n");
     for (int i = 0; i < 4; i++) {
         uint8_t tk = (regs->rdata1 >> (i * 8)) & 0xFF;
-        LOG_DRIVER("\t\t Data %d: 0x%lx\n", i, tk);
+        LOG_DRIVER("\t\t Data %d: 0x%x\n", i, tk);
     }
 #endif /* DEBUG_DRIVER */
 }
@@ -386,7 +386,7 @@ static inline void i2c_load_tokens(volatile struct i2c_regs *regs)
     // Device expects that the 7-bit address is shifted left by 1 bit
     regs->addr |= ((i2c_ifState.addr & 0x7f) << 1);
 
-    LOG_DRIVER("regs->addr 0x%lx\n", regs->addr);
+    LOG_DRIVER("regs->addr 0x%x\n", regs->addr);
 
     // Clear token buffer registers
     regs->tk_list0 = 0x0;
@@ -417,9 +417,9 @@ static inline void i2c_load_tokens(volatile struct i2c_regs *regs)
         // Get the SoC specific token
         uint8_t meson_token = i2c_token_convert(tokens[request_data_offset]);
 
-        LOG_DRIVER("meson_token: 0x%lx, request_data_offset : 0x%lx, tk_offset: 0x%lx, wdata_offset: 0x%lx, rdata_offset: 0x%lx\n",
-                   meson_token, request_data_offset, tk_offset, wdata_offset, rdata_offset);
-
+        LOG_DRIVER("request_data_offset : 0x%x, tk_offset: 0x%x, wdata_offset: 0x%x, rdata_offset: 0x%x\n",
+                   request_data_offset, tk_offset, wdata_offset, rdata_offset);
+        LOG_DRIVER("%s\n", meson_token_to_str(meson_token));
 
         if (tk_offset < 8) {
             regs->tk_list0 |= (meson_token << (tk_offset * 4));
@@ -453,14 +453,14 @@ static inline void i2c_load_tokens(volatile struct i2c_regs *regs)
         request_data_offset++;
     }
     LOG_DRIVER("data loaded into registers!!\n");
-    LOG_DRIVER("request_data_offset : 0x%lx, tk_offset: 0x%lx, wdata_offset: 0x%lx, rdata_offset: 0x%lx\n",
+    LOG_DRIVER("request_data_offset : 0x%x, tk_offset: 0x%x, wdata_offset: 0x%x, rdata_offset: 0x%x\n",
                request_data_offset, tk_offset, wdata_offset, rdata_offset);
 
     // Update remaining tokens indicator and start list processor
     i2c_ifState.remaining = i2c_ifState.curr_request_len - request_data_offset;
 
     LOG_DRIVER("Tokens loaded. %zu remain for this request\n", i2c_ifState.remaining);
-    i2c_dump(regs);
+    // i2c_dump(regs);
 
     // Start list processor
     i2c_start(regs);
@@ -514,7 +514,7 @@ static inline void handle_request(void)
             return;
         }
 
-        LOG_DRIVER("Loading request for bus address 0x%x of size %zu\n", bus_address, size);
+        LOG_DRIVER("Loading request for bus address 0x%lx of size %u\n", bus_address, size);
 
         i2c_ifState.curr_data = (i2c_token_t *) DATA_REGIONS_START + offset;
         i2c_ifState.addr = bus_address;
@@ -539,7 +539,7 @@ static inline void handle_request(void)
  */
 static void handle_response_timeout(void)
 {
-    LOG_DRIVER("handling timeout IRQ\n");
+    // LOG_DRIVER("handling timeout IRQ\n");
     return;
 }
 
@@ -549,7 +549,7 @@ static void handle_response(void)
     LOG_DRIVER("handling transfer complete IRQ\n");
     volatile struct i2c_regs *regs = (volatile struct i2c_regs *)i2c_regs;
 
-    i2c_dump(regs);
+    // i2c_dump(regs);
 
     // Get result
     uint8_t curr_token = 0;
@@ -564,19 +564,19 @@ static void handle_response(void)
     // If there was an error, cancel the rest of this transaction and load the
     // error information into the return buffer.
     if (write_error) {
-        LOG_DRIVER("error!\n");
+        // LOG_DRIVER_ERR("error!\n");
         // handle_response_timeout already has error logic for timeout
         if (curr_token == I2C_TOKEN_ADDR_READ) {
             return_buffer[RESPONSE_ERR] = I2C_ERR_NOREAD;
-            LOG_DRIVER("I2C_ERR_NOREAD!\n");
+            // LOG_DRIVER_ERR("I2C_ERR_NOREAD!\n");
         } else {
             return_buffer[RESPONSE_ERR] = I2C_ERR_NACK;
-            LOG_DRIVER("I2C_ERR_NACK!\n");
+            // LOG_DRIVER_ERR("I2C_ERR_NACK!\n");
         }
         // Token that caused the error
         return_buffer[RESPONSE_ERR_TOKEN] = curr_token;
-        LOG_DRIVER("token that caused error: %d!\n", curr_token);
-
+        // LOG_DRIVER_ERR("token that caused error: %d!\n", curr_token);
+        // LOG_DRIVER_ERR("bus address is: %zu!\n", i2c_ifState.addr);
     } else {
         // Get bytes_read amount of read data
 
@@ -586,16 +586,15 @@ static void handle_response(void)
             if (i < 4) {
                 uint8_t value = (regs->rdata0 >> (i * 8)) & 0xFF;
                 return_buffer[index] = value;
-                LOG_DRIVER("loading into return_buffer at %d value 0x%lx\n", index, value);
+                LOG_DRIVER("loading into return_buffer at %ld value 0x%x\n", index, value);
             } else if (i < 8) {
                 uint8_t value = (regs->rdata1 >> ((i - 4) * 8)) & 0xFF;
                 return_buffer[index] = value;
-                LOG_DRIVER("loading into return_buffer at %d value 0x%lx\n", index, value);
+                LOG_DRIVER("loading into return_buffer at %ld value 0x%x\n", index, value);
             }
             i2c_ifState.curr_response_len++;
         }
 
-        LOG_DRIVER("I2C_ERR_OK\n");
         return_buffer[RESPONSE_ERR] = I2C_ERR_OK;
         // Token that caused error (could be anything since we set error code to no error anyway)
         return_buffer[RESPONSE_ERR_TOKEN] = 0x0;
@@ -604,7 +603,7 @@ static void handle_response(void)
     // If request is completed or there was an error, return data to server and notify.
     if (write_error || !i2c_ifState.remaining) {
         LOG_DRIVER("request completed or error, hence returning response to server\n");
-        LOG_DRIVER("curr_response_len : 0x%lx, curr_request_len : 0x%lx, return address is 0x%lx\n",
+        LOG_DRIVER("curr_response_len : 0x%x, curr_request_len : 0x%x, return address is 0x%lx\n",
                    i2c_ifState.curr_response_len, i2c_ifState.curr_request_len, i2c_ifState.addr);
         LOG_DRIVER("enguing response with size: %d\n\n", i2c_ifState.curr_response_len + RESPONSE_DATA_OFFSET);
         // response length is + 2 (RESPONSE_DATA_OFFSET = 2) because of the error tokens at the start
