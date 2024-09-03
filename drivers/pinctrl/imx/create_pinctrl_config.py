@@ -1,6 +1,8 @@
 # Copyright 2024, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
 
+# Only works with device tree source files found in https://github.com/seL4/seL4/tree/master/tools/dts
+
 import os
 import sys
 from devicetree import edtlib, dtlib
