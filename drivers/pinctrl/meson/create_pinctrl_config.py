@@ -1,6 +1,8 @@
 # Copyright 2024, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
 
+# Only works with device tree source files found in https://github.com/seL4/seL4/tree/master/tools/dts
+
 import os
 import sys
 from devicetree import edtlib, dtlib
@@ -16,7 +18,6 @@ def log_error_parser(print_str: str) -> None:
     sys.stderr.write(print_str)
 
 if __name__ == "__main__":
-
     if len(sys.argv) != 5:
         log_error_parser("Usage: ")
         log_error_parser("\tpython3 create_pinmux_setup.py <SoC-name> <dts-source> <pinmux-device-name> <output-dir>")
