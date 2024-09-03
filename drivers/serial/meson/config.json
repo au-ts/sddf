@@ -1,0 +1,24 @@
+{
+    "name": "meson_uart",
+    "compatible": [
+        "amlogic,meson-gx-uart",
+        "amlogic,meson-ao-uart"
+    ],
+    "resources": {
+        "device_regions": [
+            {
+                "name": "regs",
+                "perms": "rw",
+                "setvar_vaddr": "uart_base",
+                "size": 4096,
+                "dt_index": 0
+            }
+        ],
+        "irqs": [
+            {
+                "channel_id": 0,
+                "dt_index": 0
+            }
+        ]
+    }
+}
