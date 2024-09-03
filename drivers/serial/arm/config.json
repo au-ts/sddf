@@ -1,0 +1,23 @@
+{
+    "name": "arm_pl011_uart",
+    "compatible": [
+        "arm,pl011"
+    ],
+    "resources": {
+        "device_regions": [
+            {
+                "name": "regs",
+                "perms": "rw",
+                "setvar_vaddr": "uart_base",
+                "size": 4096,
+                "dt_index": 0
+            }
+        ],
+        "irqs": [
+            {
+                "channel_id": 0,
+                "dt_index": 0
+            }
+        ]
+    }
+}
