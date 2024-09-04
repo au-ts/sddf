@@ -25,6 +25,7 @@ def log_warning_parser(print_str: str) -> None:
 def log_error_parser(print_str: str) -> None:
     sys.stderr.write("PARSER|ERROR: " + print_str)
 
+# Each mux data node inside the DTS is represented with this class.
 class PinData:
     def __init__(self, 
                  muxed_device_name: str, 
@@ -44,7 +45,7 @@ class PinData:
         self.function_name = function_name
         self.bias_enable = bias_enable
         self.bias_pullup = bias_pullup       # Ignore if bias_enable is False
-        self.drive_strength = drive_strength # <0 for output pads
+        self.drive_strength = drive_strength # <0 for input pads
 
     def __str__(self):
         representation = f"Property {self.muxed_device_property_node_name} of {self.muxed_device_name}\n"
