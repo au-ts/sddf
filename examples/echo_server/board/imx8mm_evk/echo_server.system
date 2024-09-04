@@ -164,7 +164,7 @@
         </protection_domain>
 
         <protection_domain name="client0" priority="97" budget="20000" id="6">
-            <program_image path="lwip.elf" />
+            <program_image path="echo.elf" />
 
             <map mr="net_rx_free_cli0" vaddr="0x2_000_000" perms="rw" cached="true" setvar_vaddr="rx_free" />
             <map mr="net_rx_active_cli0" vaddr="0x2_200_000" perms="rw" cached="true" setvar_vaddr="rx_active" />
@@ -181,7 +181,7 @@
         </protection_domain>
 
         <protection_domain name="client1" priority="95" budget="20000" id="7">
-            <program_image path="lwip.elf" />
+            <program_image path="echo.elf" />
 
             <map mr="net_rx_free_cli1" vaddr="0x2_000_000" perms="rw" cached="true" setvar_vaddr="rx_free" />
             <map mr="net_rx_active_cli1" vaddr="0x2_200_000" perms="rw" cached="true" setvar_vaddr="rx_active" />

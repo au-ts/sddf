@@ -7,17 +7,17 @@
 QEMU := qemu-system-aarch64
 
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
-ECHO_SERVER:=${SDDF}/examples/echo_server
-LWIPDIR:=network/ipstacks/lwip/src
-BENCHMARK:=$(SDDF)/benchmark
-UTIL:=$(SDDF)/util
-ETHERNET_DRIVER:=$(SDDF)/drivers/network/$(DRIV_DIR)
-ETHERNET_CONFIG_INCLUDE:=${ECHO_SERVER}/include/ethernet_config
+ECHO_SERVER := ${SDDF}/examples/echo_server
+LWIPDIR := network/ipstacks/lwip/src
+BENCHMARK := $(SDDF)/benchmark
+UTIL := $(SDDF)/util
+ETHERNET_DRIVER := $(SDDF)/drivers/network/$(DRIV_DIR)
+ETHERNET_CONFIG_INCLUDE := ${ECHO_SERVER}/include/ethernet_config
 SERIAL_COMPONENTS := $(SDDF)/serial/components
 UART_DRIVER := $(SDDF)/drivers/serial/$(UART_DRIV_DIR)
-SERIAL_CONFIG_INCLUDE:=${ECHO_SERVER}/include/serial_config
+SERIAL_CONFIG_INCLUDE := ${ECHO_SERVER}/include/serial_config
 TIMER_DRIVER:=$(SDDF)/drivers/timer/$(TIMER_DRV_DIR)
-NETWORK_COMPONENTS:=$(SDDF)/network/components
+NETWORK_COMPONENTS := $(SDDF)/network/components
 
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 SYSTEM_FILE := ${ECHO_SERVER}/board/$(MICROKIT_BOARD)/echo_server.system
@@ -26,7 +26,7 @@ REPORT_FILE := report.txt
 
 vpath %.c ${SDDF} ${ECHO_SERVER}
 
-IMAGES := eth_driver.elf lwip.elf benchmark.elf idle.elf network_virt_rx.elf\
+IMAGES := eth_driver.elf echo.elf benchmark.elf idle.elf network_virt_rx.elf\
 	  network_virt_tx.elf copy.elf timer_driver.elf uart_driver.elf serial_virt_tx.elf
 
 CFLAGS := -mcpu=$(CPU) \
@@ -41,14 +41,13 @@ CFLAGS := -mcpu=$(CPU) \
 	  -I${ETHERNET_CONFIG_INCLUDE} \
 	  -I$(SERIAL_CONFIG_INCLUDE) \
 	  -I${SDDF}/$(LWIPDIR)/include \
-	  -I${SDDF}/$(LWIPDIR)/include/ipv4 \
 	  -MD \
 	  -MP
 
 LDFLAGS := -L$(BOARD_DIR)/lib -L${LIBC}
 LIBS := --start-group -lmicrokit -Tmicrokit.ld -lc libsddf_util_debug.a --end-group
 
-CHECK_FLAGS_BOARD_MD5:=.board_cflags-$(shell echo -- ${CFLAGS} ${BOARD} ${MICROKIT_CONFIG} | shasum | sed 's/ *-//')
+CHECK_FLAGS_BOARD_MD5 := .board_cflags-$(shell echo -- ${CFLAGS} ${BOARD} ${MICROKIT_CONFIG} | shasum | sed 's/ *-//')
 
 ${CHECK_FLAGS_BOARD_MD5}:
 	-rm -f .board_cflags-*
@@ -64,17 +63,16 @@ include ${SDDF}/${LWIPDIR}/Filelists.mk
 NETIFFILES:=$(LWIPDIR)/netif/ethernet.c
 
 # LWIPFILES: All the above.
-LWIPFILES=lwip.c $(COREFILES) $(CORE4FILES) $(NETIFFILES)
-LWIP_OBJS := $(LWIPFILES:.c=.o) lwip.o utilization_socket.o \
+LWIPFILES = echo.c $(COREFILES) $(CORE4FILES) $(NETIFFILES)
+LWIP_OBJS := $(LWIPFILES:.c=.o) echo.o utilization_socket.o \
 	     udp_echo_socket.o tcp_echo_socket.o
 
-OBJS := $(LWIP_OBJS)
-DEPS := $(filter %.d,$(OBJS:.o=.d))
+DEPS := $(filter %.d,$(LWIP_OBJS:.o=.d))
 
 all: loader.img
 
 ${LWIP_OBJS}: ${CHECK_FLAGS_BOARD_MD5}
-lwip.elf: $(LWIP_OBJS) libsddf_util.a
+echo.elf: $(LWIP_OBJS) libsddf_util.a lib_sddf_lwip.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 LWIPDIRS := $(addprefix ${LWIPDIR}/, core/ipv4 netif api)
@@ -92,6 +90,9 @@ ${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 
 include ${SDDF}/util/util.mk
 include ${SDDF}/network/components/network_components.mk
+# Specify how many pbufs sDDF LWIP library requires for all clients
+MAX_NUM_BUFFS=512
+include ${SDDF}/network/lib_sddf_lwip/lib_sddf_lwip.mk
 include ${ETHERNET_DRIVER}/eth_driver.mk
 include ${BENCHMARK}/benchmark.mk
 include ${TIMER_DRIVER}/timer_driver.mk
