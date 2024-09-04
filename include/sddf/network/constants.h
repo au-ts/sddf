@@ -31,6 +31,6 @@ struct ethernet_header {
  * cannot generate checksums on transmit. We use this macro
  * to know whether to calculate it in the IP stack.
  */
-#if defined(CONFIG_PLAT_IMX8MM_EVK) || defined(CONFIG_PLAT_MAAXBOARD)
+#if defined(CONFIG_PLAT_IMX8MM_EVK) || defined(CONFIG_PLAT_MAAXBOARD) || defined(CONFIG_PLAT_IMX8MP_EVK)
 #define NETWORK_HW_HAS_CHECKSUM
 #endif
