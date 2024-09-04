@@ -123,7 +123,7 @@ void init(void)
     blk_queue_init(&blk_queue, (blk_req_queue_t *)blk_request, (blk_resp_queue_t *)blk_response, QUEUE_SIZE);
 
     /* Want to print out configuration information, so wait until the config is ready. */
-    while (!__atomic_load_n(&blk_config->ready, __ATOMIC_ACQUIRE));
+    while (!blk_storage_is_ready(blk_config));
     LOG_CLIENT("device config ready\n");
 
     LOG_CLIENT("device size: 0x%lx bytes\n", blk_config->capacity * BLK_TRANSFER_SIZE);

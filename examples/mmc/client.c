@@ -176,7 +176,7 @@ void init(void)
     blk_queue_init(&blk_queue, blk_req_queue, blk_resp_queue, BLK_QUEUE_SIZE_CLI0);
 
     /* Busy wait until blk device is ready */
-    while (!__atomic_load_n(&blk_config->ready, __ATOMIC_ACQUIRE));
+    while (!blk_storage_is_ready(blk_config));
 
     sddf_printf("Hello from client\n");
 

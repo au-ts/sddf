@@ -194,7 +194,7 @@ static bool handle_mbr_reply()
 
 void init(void)
 {
-    while (!__atomic_load_n(&blk_config_driver->ready, __ATOMIC_ACQUIRE));
+    while (!blk_storage_is_ready(blk_config_driver));
 
     // Initialise client queues
     for (int i = 0; i < BLK_NUM_CLIENTS; i++) {

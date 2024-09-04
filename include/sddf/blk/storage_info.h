@@ -29,3 +29,16 @@ typedef struct blk_storage_info {
     /* total capacity of the device, specified in BLK_TRANSFER_SIZE sized units. */
     uint64_t capacity;
 } blk_storage_info_t;
+
+/**
+ * Load from shared memory whether the block storage device is ready.
+ * This does an atomic acquire operation.
+ *
+ * @param storage_info the block storage device to check
+ * @return true the block storage device is ready to use
+ * @return false the block storage device is not ready (removed, or initialising)
+ */
+static inline bool blk_storage_is_ready(blk_storage_info_t *storage_info)
+{
+    return __atomic_load_n(&storage_info->ready, __ATOMIC_ACQUIRE);
+}
