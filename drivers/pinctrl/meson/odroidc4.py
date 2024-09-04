@@ -3,6 +3,9 @@
 
 # Document referenced: Linux: drivers/pinctrl/meson/pinctrl-meson-g12a.c
 
+# This file defines how each pad of the chip map to each port.
+# And how such mapping is defined in the DTS.
+
 # Each GPIO chip has a list of pads, each assigned an index.
 
 # First GPIO chip, AKA, the "Always-On" AO chip.
