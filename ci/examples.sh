@@ -156,7 +156,7 @@ build_blk_zig() {
 }
 
 network() {
-    BOARDS=("odroidc4" "imx8mm_evk" "maaxboard" "qemu_virt_aarch64")
+    BOARDS=("odroidc4" "imx8mm_evk" "imx8mp_evk" "maaxboard" "qemu_virt_aarch64")
     CONFIGS=("debug" "release" "benchmark")
     for BOARD in "${BOARDS[@]}"
     do
