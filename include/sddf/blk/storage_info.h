@@ -8,7 +8,6 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <microkit.h>
 
 /* Device serial number max string length */
 #define BLK_MAX_SERIAL_NUMBER 63
