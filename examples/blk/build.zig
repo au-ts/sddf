@@ -145,8 +145,14 @@ pub fn build(b: *std.Build) void {
     const loader_arg = b.fmt("loader,file={s},addr=0x70000000,cpu-num=0", .{ final_image_dest });
     if (std.mem.eql(u8, microkit_board, "qemu_virt_aarch64")) {
         const create_disk_cmd = b.addSystemCommand(&[_][]const u8{
-            "bash", "mkvirtdisk", "mydisk", "1", "512", b.fmt("{}", .{ 1024 * 1024 * 16 }),
+            "bash", "mkvirtdisk",
         });
+        const disk = create_disk_cmd.addOutputFileArg("disk");
+        create_disk_cmd.addArgs(&[_][]const u8{
+            "1", "512", b.fmt("{}", .{ 1024 * 1024 * 16 }),
+        });
+        const disk_install = b.addInstallFile(disk, "disk");
+        disk_install.step.dependOn(&create_disk_cmd.step);
 
         const qemu_cmd = b.addSystemCommand(&[_][]const u8{
             "qemu-system-aarch64",
@@ -158,12 +164,12 @@ pub fn build(b: *std.Build) void {
             "-nographic",
             "-global", "virtio-mmio.force-legacy=false",
             "-d", "guest_errors",
-            "-drive", "file=mydisk,if=none,format=raw,id=hd",
+            "-drive", b.fmt("file={s},if=none,format=raw,id=hd", .{ b.getInstallPath(.prefix, "disk") }),
             "-device", "virtio-blk-device,drive=hd",
             // "--trace", "events=/tmp/events",
         });
         qemu_cmd.step.dependOn(b.default_step);
-        qemu_cmd.step.dependOn(&create_disk_cmd.step);
+        qemu_cmd.step.dependOn(&disk_install.step);
         const simulate_step = b.step("qemu", "Simulate the image using QEMU");
         simulate_step.dependOn(&qemu_cmd.step);
     }
