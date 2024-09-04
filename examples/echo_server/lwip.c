@@ -360,6 +360,9 @@ void notified(microkit_channel ch)
         transmit();
         receive();
         break;
+    case SERIAL_TX_CH:
+        // Nothing to do
+        break;
     default:
         sddf_dprintf("LWIP|LOG: received notification on unexpected channel: %u\n", ch);
         break;
