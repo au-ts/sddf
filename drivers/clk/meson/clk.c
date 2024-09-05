@@ -21,32 +21,62 @@ uintptr_t clk_regs;
 
 static int clk_regmap_gate_enable(uintptr_t clk_base, struct clk_hw *hw)
 {
-    volatile uint32_t *clk_reg = ((void *)clk_base + hw->reg_offset);
-    *clk_reg |= BIT(hw->bit_idx);
+    sddf_dprintf("Clk enabling...\n");
+    sddf_dprintf("gate_data addr: 0x%x\n", hw->clk);
+    struct clk_gate_data *data = (struct clk_gate_data *)(hw->clk->data);
+    sddf_dprintf("Clk enabling...\n");
+    volatile uint32_t *clk_reg = ((void *)clk_base + data->offset);
+    sddf_dprintf("Clk enabling...\n");
+    *clk_reg |= BIT(data->bit_idx);
 
-	/* TODO: Check if the register has been updated correctly */
+    /* TODO: Check if the register has been updated correctly */
 
-	return 0;
+    return 0;
 }
 
 static void clk_regmap_gate_disable(uintptr_t clk_base, struct clk_hw *hw)
 {
-    volatile uint32_t *clk_reg = ((void *)clk_base + hw->reg_offset);
-    *clk_reg &= ~BIT(hw->bit_idx);
+    struct clk_gate_data *data = (struct clk_gate_data *)(hw->clk->data);
+    volatile uint32_t *clk_reg = ((void *)clk_base + data->offset);
+    *clk_reg &= ~BIT(data->bit_idx);
 }
 
 static struct clk_ops clk_regmap_gate_ops = {
     .enable = &clk_regmap_gate_enable,
-	.disable = &clk_regmap_gate_disable,
+    .disable = &clk_regmap_gate_disable,
 };
 
-#define MESON_GATE(_name, _reg, _bit)           \
-struct clk _name = {                            \
-    .hw = (struct clk_hw) {                     \
-        .reg_offset = (_reg),                   \
-        .bit_idx = (_bit),                      \
-    },                                          \
-    .ops = &clk_regmap_gate_ops,                \
+static struct clk g12a_clk81 = {
+    .data = &(struct clk_gate_data){
+        .offset = HHI_MPEG_CLK_CNTL,
+        .bit_idx = 7,
+        .flags = 0
+    },
+    .hw.init = &(struct clk_init_data){
+        .name = "clk81",
+        .ops = &clk_regmap_gate_ops,
+        .parent_hws = {},
+        .num_parents = 0,
+        .flags = 0,
+    },
+};
+
+#define MESON_GATE(_name, _reg, _bit)                        \
+struct clk _name = {                                         \
+    .data = &(struct clk_gate_data) {                        \
+        .offset = (_reg),                                    \
+        .bit_idx = (_bit),                                   \
+        .flags = 0,                                          \
+    },                                                       \
+    .hw.init = &(struct clk_init_data) {                     \
+        .name = #_name,                                      \
+        .ops = &clk_regmap_gate_ops,                         \
+        .parent_hws = (const struct clk_hw *[]) {            \
+            &g12a_clk81.hw,                                  \
+        },                                                   \
+        .num_parents = 1,                                    \
+        .flags = 0,                                          \
+    },                                                       \
 }
 
 /* Everything Else (EE) domain gates */
@@ -127,7 +157,7 @@ static MESON_GATE(g12a_vclk2_other1,		HHI_GCLK_OTHER,	26);
 /* static MESON_GATE_RO(g12a_reset_sec,		HHI_GCLK_OTHER2, 3); */
 /* static MESON_GATE_RO(g12a_sec_ahb_apb3,		HHI_GCLK_OTHER2, 4); */
 
-static struct clk *sm1_clks[] = {
+static struct clk_hw *sm1_clks[] = {
 	/* [CLKID_SYS_PLL]			= &g12a_sys_pll.hw, */
 	/* [CLKID_FIXED_PLL]		= &g12a_fixed_pll.hw, */
 	/* [CLKID_FCLK_DIV2]		= &g12a_fclk_div2.hw, */
@@ -144,51 +174,51 @@ static struct clk *sm1_clks[] = {
 	/* [CLKID_MPLL1]			= &g12a_mpll1.hw, */
 	/* [CLKID_MPLL2]			= &g12a_mpll2.hw, */
 	/* [CLKID_MPLL3]			= &g12a_mpll3.hw, */
-	[CLKID_DDR]			= &g12a_ddr,
-	[CLKID_DOS]			= &g12a_dos,
-	[CLKID_AUDIO_LOCKER]		= &g12a_audio_locker,
-	[CLKID_MIPI_DSI_HOST]		= &g12a_mipi_dsi_host,
-	[CLKID_ETH_PHY]			= &g12a_eth_phy,
-	[CLKID_ISA]			= &g12a_isa,
-	[CLKID_PL301]			= &g12a_pl301,
-	[CLKID_PERIPHS]			= &g12a_periphs,
-	[CLKID_SPICC0]			= &g12a_spicc_0,
-	[CLKID_I2C]			= &g12a_i2c,
-	[CLKID_SANA]			= &g12a_sana,
-	[CLKID_SD]			= &g12a_sd,
-	[CLKID_RNG0]			= &g12a_rng0,
-	[CLKID_UART0]			= &g12a_uart0,
-	[CLKID_SPICC1]			= &g12a_spicc_1,
-	[CLKID_HIU_IFACE]		= &g12a_hiu_reg,
-	[CLKID_MIPI_DSI_PHY]		= &g12a_mipi_dsi_phy,
-	[CLKID_ASSIST_MISC]		= &g12a_assist_misc,
-	[CLKID_SD_EMMC_A]		= &g12a_emmc_a,
-	[CLKID_SD_EMMC_B]		= &g12a_emmc_b,
-	[CLKID_SD_EMMC_C]		= &g12a_emmc_c,
-	[CLKID_AUDIO_CODEC]		= &g12a_audio_codec,
-	[CLKID_AUDIO]			= &g12a_audio,
-	[CLKID_ETH]			= &g12a_eth_core,
-	[CLKID_DEMUX]			= &g12a_demux,
-	[CLKID_AUDIO_IFIFO]		= &g12a_audio_ififo,
-	[CLKID_ADC]			= &g12a_adc,
-	[CLKID_UART1]			= &g12a_uart1,
-	[CLKID_G2D]			= &g12a_g2d,
-	[CLKID_RESET]			= &g12a_reset,
-	[CLKID_PCIE_COMB]		= &g12a_pcie_comb,
-	[CLKID_PARSER]			= &g12a_parser,
-	[CLKID_USB]			= &g12a_usb_general,
-	[CLKID_PCIE_PHY]		= &g12a_pcie_phy,
-	[CLKID_AHB_ARB0]		= &g12a_ahb_arb0,
-	[CLKID_AHB_DATA_BUS]		= &g12a_ahb_data_bus,
-	[CLKID_AHB_CTRL_BUS]		= &g12a_ahb_ctrl_bus,
-	[CLKID_HTX_HDCP22]		= &g12a_htx_hdcp22,
-	[CLKID_HTX_PCLK]		= &g12a_htx_pclk,
-	[CLKID_BT656]			= &g12a_bt656,
-	[CLKID_USB1_DDR_BRIDGE]		= &g12a_usb1_to_ddr,
-	[CLKID_MMC_PCLK]		= &g12a_mmc_pclk,
-	[CLKID_UART2]			= &g12a_uart2,
-	[CLKID_VPU_INTR]		= &g12a_vpu_intr,
-	[CLKID_GIC]			= &g12a_gic,
+	[CLKID_DDR]			= &g12a_ddr.hw,
+	[CLKID_DOS]			= &g12a_dos.hw,
+	[CLKID_AUDIO_LOCKER]		= &g12a_audio_locker.hw,
+	[CLKID_MIPI_DSI_HOST]		= &g12a_mipi_dsi_host.hw,
+	[CLKID_ETH_PHY]			= &g12a_eth_phy.hw,
+	[CLKID_ISA]			= &g12a_isa.hw,
+	[CLKID_PL301]			= &g12a_pl301.hw,
+	[CLKID_PERIPHS]			= &g12a_periphs.hw,
+	[CLKID_SPICC0]			= &g12a_spicc_0.hw,
+	[CLKID_I2C]			= &g12a_i2c.hw,
+	[CLKID_SANA]			= &g12a_sana.hw,
+	[CLKID_SD]			= &g12a_sd.hw,
+	[CLKID_RNG0]			= &g12a_rng0.hw,
+	[CLKID_UART0]			= &g12a_uart0.hw,
+	[CLKID_SPICC1]			= &g12a_spicc_1.hw,
+	[CLKID_HIU_IFACE]		= &g12a_hiu_reg.hw,
+	[CLKID_MIPI_DSI_PHY]		= &g12a_mipi_dsi_phy.hw,
+	[CLKID_ASSIST_MISC]		= &g12a_assist_misc.hw,
+	[CLKID_SD_EMMC_A]		= &g12a_emmc_a.hw,
+	[CLKID_SD_EMMC_B]		= &g12a_emmc_b.hw,
+	[CLKID_SD_EMMC_C]		= &g12a_emmc_c.hw,
+	[CLKID_AUDIO_CODEC]		= &g12a_audio_codec.hw,
+	[CLKID_AUDIO]			= &g12a_audio.hw,
+	[CLKID_ETH]			= &g12a_eth_core.hw,
+	[CLKID_DEMUX]			= &g12a_demux.hw,
+	[CLKID_AUDIO_IFIFO]		= &g12a_audio_ififo.hw,
+	[CLKID_ADC]			= &g12a_adc.hw,
+	[CLKID_UART1]			= &g12a_uart1.hw,
+	[CLKID_G2D]			= &g12a_g2d.hw,
+	[CLKID_RESET]			= &g12a_reset.hw,
+	[CLKID_PCIE_COMB]		= &g12a_pcie_comb.hw,
+	[CLKID_PARSER]			= &g12a_parser.hw,
+	[CLKID_USB]			= &g12a_usb_general.hw,
+	[CLKID_PCIE_PHY]		= &g12a_pcie_phy.hw,
+	[CLKID_AHB_ARB0]		= &g12a_ahb_arb0.hw,
+	[CLKID_AHB_DATA_BUS]		= &g12a_ahb_data_bus.hw,
+	[CLKID_AHB_CTRL_BUS]		= &g12a_ahb_ctrl_bus.hw,
+	[CLKID_HTX_HDCP22]		= &g12a_htx_hdcp22.hw,
+	[CLKID_HTX_PCLK]		= &g12a_htx_pclk.hw,
+	[CLKID_BT656]			= &g12a_bt656.hw,
+	[CLKID_USB1_DDR_BRIDGE]		= &g12a_usb1_to_ddr.hw,
+	[CLKID_MMC_PCLK]		= &g12a_mmc_pclk.hw,
+	[CLKID_UART2]			= &g12a_uart2.hw,
+	[CLKID_VPU_INTR]		= &g12a_vpu_intr.hw,
+	[CLKID_GIC]			= &g12a_gic.hw,
 	/* [CLKID_SD_EMMC_A_CLK0_SEL]	= &g12a_sd_emmc_a_clk0_sel, */
 	/* [CLKID_SD_EMMC_A_CLK0_DIV]	= &g12a_sd_emmc_a_clk0_div, */
 	/* [CLKID_SD_EMMC_A_CLK0]		= &g12a_sd_emmc_a_clk0, */
@@ -209,25 +239,25 @@ static struct clk *sm1_clks[] = {
 	/* [CLKID_FCLK_DIV7_DIV]		= &g12a_fclk_div7_div, */
 	/* [CLKID_FCLK_DIV2P5_DIV]		= &g12a_fclk_div2p5_div, */
 	/* [CLKID_HIFI_PLL]		= &g12a_hifi_pll, */
-	[CLKID_VCLK2_VENCI0]		= &g12a_vclk2_venci0,
-	[CLKID_VCLK2_VENCI1]		= &g12a_vclk2_venci1,
-	[CLKID_VCLK2_VENCP0]		= &g12a_vclk2_vencp0,
-	[CLKID_VCLK2_VENCP1]		= &g12a_vclk2_vencp1,
-	[CLKID_VCLK2_VENCT0]		= &g12a_vclk2_venct0,
-	[CLKID_VCLK2_VENCT1]		= &g12a_vclk2_venct1,
-	[CLKID_VCLK2_OTHER]		= &g12a_vclk2_other,
-	[CLKID_VCLK2_ENCI]		= &g12a_vclk2_enci,
-	[CLKID_VCLK2_ENCP]		= &g12a_vclk2_encp,
-	[CLKID_DAC_CLK]			= &g12a_dac_clk,
-	[CLKID_AOCLK]			= &g12a_aoclk_gate,
-	[CLKID_IEC958]			= &g12a_iec958_gate,
-	[CLKID_ENC480P]			= &g12a_enc480p,
-	[CLKID_RNG1]			= &g12a_rng1,
-	[CLKID_VCLK2_ENCT]		= &g12a_vclk2_enct,
-	[CLKID_VCLK2_ENCL]		= &g12a_vclk2_encl,
-	[CLKID_VCLK2_VENCLMMC]		= &g12a_vclk2_venclmmc,
-	[CLKID_VCLK2_VENCL]		= &g12a_vclk2_vencl,
-	[CLKID_VCLK2_OTHER1]		= &g12a_vclk2_other1,
+	[CLKID_VCLK2_VENCI0]		= &g12a_vclk2_venci0.hw,
+	[CLKID_VCLK2_VENCI1]		= &g12a_vclk2_venci1.hw,
+	[CLKID_VCLK2_VENCP0]		= &g12a_vclk2_vencp0.hw,
+	[CLKID_VCLK2_VENCP1]		= &g12a_vclk2_vencp1.hw,
+	[CLKID_VCLK2_VENCT0]		= &g12a_vclk2_venct0.hw,
+	[CLKID_VCLK2_VENCT1]		= &g12a_vclk2_venct1.hw,
+	[CLKID_VCLK2_OTHER]		= &g12a_vclk2_other.hw,
+	[CLKID_VCLK2_ENCI]		= &g12a_vclk2_enci.hw,
+	[CLKID_VCLK2_ENCP]		= &g12a_vclk2_encp.hw,
+	[CLKID_DAC_CLK]			= &g12a_dac_clk.hw,
+	[CLKID_AOCLK]			= &g12a_aoclk_gate.hw,
+	[CLKID_IEC958]			= &g12a_iec958_gate.hw,
+	[CLKID_ENC480P]			= &g12a_enc480p.hw,
+	[CLKID_RNG1]			= &g12a_rng1.hw,
+	[CLKID_VCLK2_ENCT]		= &g12a_vclk2_enct.hw,
+	[CLKID_VCLK2_ENCL]		= &g12a_vclk2_encl.hw,
+	[CLKID_VCLK2_VENCLMMC]		= &g12a_vclk2_venclmmc.hw,
+	[CLKID_VCLK2_VENCL]		= &g12a_vclk2_vencl.hw,
+	[CLKID_VCLK2_OTHER1]		= &g12a_vclk2_other1.hw,
 	/* [CLKID_FIXED_PLL_DCO]		= &g12a_fixed_pll_dco, */
 	/* [CLKID_SYS_PLL_DCO]		= &g12a_sys_pll_dco, */
 	/* [CLKID_GP0_PLL_DCO]		= &g12a_gp0_pll_dco, */
@@ -374,9 +404,291 @@ static struct clk *sm1_clks[] = {
 	/* [CLKID_MIPI_DSI_PXCLK]		= &g12a_mipi_dsi_pxclk, */
 };
 
+/* Convenience table to populate regmap in .probe */
+static struct clk *const g12a_clk_regmaps[] = {
+	&g12a_clk81,
+	&g12a_dos,
+	&g12a_ddr,
+	&g12a_audio_locker,
+	&g12a_mipi_dsi_host,
+	&g12a_eth_phy,
+	&g12a_isa,
+	&g12a_pl301,
+	&g12a_periphs,
+	&g12a_spicc_0,
+	&g12a_i2c,
+	&g12a_sana,
+	&g12a_sd,
+	&g12a_rng0,
+	&g12a_uart0,
+	&g12a_spicc_1,
+	&g12a_hiu_reg,
+	&g12a_mipi_dsi_phy,
+	&g12a_assist_misc,
+	&g12a_emmc_a,
+	&g12a_emmc_b,
+	&g12a_emmc_c,
+	&g12a_audio_codec,
+	&g12a_audio,
+	&g12a_eth_core,
+	&g12a_demux,
+	&g12a_audio_ififo,
+	&g12a_adc,
+	&g12a_uart1,
+	&g12a_g2d,
+	&g12a_reset,
+	&g12a_pcie_comb,
+	&g12a_parser,
+	&g12a_usb_general,
+	&g12a_pcie_phy,
+	&g12a_ahb_arb0,
+	&g12a_ahb_data_bus,
+	&g12a_ahb_ctrl_bus,
+	&g12a_htx_hdcp22,
+	&g12a_htx_pclk,
+	&g12a_bt656,
+	&g12a_usb1_to_ddr,
+	&g12a_mmc_pclk,
+	&g12a_uart2,
+	&g12a_vpu_intr,
+	&g12a_gic,
+	/* &g12a_sd_emmc_a_clk0, */
+	/* &g12a_sd_emmc_b_clk0, */
+	/* &g12a_sd_emmc_c_clk0, */
+	/* &g12a_mpeg_clk_div, */
+	/* &g12a_sd_emmc_a_clk0_div, */
+	/* &g12a_sd_emmc_b_clk0_div, */
+	/* &g12a_sd_emmc_c_clk0_div, */
+	/* &g12a_mpeg_clk_sel, */
+	/* &g12a_sd_emmc_a_clk0_sel, */
+	/* &g12a_sd_emmc_b_clk0_sel, */
+	/* &g12a_sd_emmc_c_clk0_sel, */
+	/* &g12a_mpll0, */
+	/* &g12a_mpll1, */
+	/* &g12a_mpll2, */
+	/* &g12a_mpll3, */
+	/* &g12a_mpll0_div, */
+	/* &g12a_mpll1_div, */
+	/* &g12a_mpll2_div, */
+	/* &g12a_mpll3_div, */
+	/* &g12a_fixed_pll, */
+	/* &g12a_sys_pll, */
+	/* &g12a_gp0_pll, */
+	/* &g12a_hifi_pll, */
+	/* &g12a_vclk2_venci0, */
+	/* &g12a_vclk2_venci1, */
+	/* &g12a_vclk2_vencp0, */
+	/* &g12a_vclk2_vencp1, */
+	/* &g12a_vclk2_venct0, */
+	/* &g12a_vclk2_venct1, */
+	/* &g12a_vclk2_other, */
+	/* &g12a_vclk2_enci, */
+	/* &g12a_vclk2_encp, */
+	/* &g12a_dac_clk, */
+	/* &g12a_aoclk_gate, */
+	/* &g12a_iec958_gate, */
+	/* &g12a_enc480p, */
+	/* &g12a_rng1, */
+	/* &g12a_vclk2_enct, */
+	/* &g12a_vclk2_encl, */
+	/* &g12a_vclk2_venclmmc, */
+	/* &g12a_vclk2_vencl, */
+	/* &g12a_vclk2_other1, */
+	/* &g12a_fixed_pll_dco, */
+	/* &g12a_sys_pll_dco, */
+	/* &g12a_gp0_pll_dco, */
+	/* &g12a_hifi_pll_dco, */
+	/* &g12a_fclk_div2, */
+	/* &g12a_fclk_div3, */
+	/* &g12a_fclk_div4, */
+	/* &g12a_fclk_div5, */
+	/* &g12a_fclk_div7, */
+	/* &g12a_fclk_div2p5, */
+	/* &g12a_dma, */
+	/* &g12a_efuse, */
+	/* &g12a_rom_boot, */
+	/* &g12a_reset_sec, */
+	/* &g12a_sec_ahb_apb3, */
+	/* &g12a_vpu_0_sel, */
+	/* &g12a_vpu_0_div, */
+	/* &g12a_vpu_0, */
+	/* &g12a_vpu_1_sel, */
+	/* &g12a_vpu_1_div, */
+	/* &g12a_vpu_1, */
+	/* &g12a_vpu, */
+	/* &g12a_vapb_0_sel, */
+	/* &g12a_vapb_0_div, */
+	/* &g12a_vapb_0, */
+	/* &g12a_vapb_1_sel, */
+	/* &g12a_vapb_1_div, */
+	/* &g12a_vapb_1, */
+	/* &g12a_vapb_sel, */
+	/* &g12a_vapb, */
+	/* &g12a_hdmi_pll_dco, */
+	/* &g12a_hdmi_pll_od, */
+	/* &g12a_hdmi_pll_od2, */
+	/* &g12a_hdmi_pll, */
+	/* &g12a_vid_pll_div, */
+	/* &g12a_vid_pll_sel, */
+	/* &g12a_vid_pll, */
+	/* &g12a_vclk_sel, */
+	/* &g12a_vclk2_sel, */
+	/* &g12a_vclk_input, */
+	/* &g12a_vclk2_input, */
+	/* &g12a_vclk_div, */
+	/* &g12a_vclk2_div, */
+	/* &g12a_vclk, */
+	/* &g12a_vclk2, */
+	/* &g12a_vclk_div1, */
+	/* &g12a_vclk_div2_en, */
+	/* &g12a_vclk_div4_en, */
+	/* &g12a_vclk_div6_en, */
+	/* &g12a_vclk_div12_en, */
+	/* &g12a_vclk2_div1, */
+	/* &g12a_vclk2_div2_en, */
+	/* &g12a_vclk2_div4_en, */
+	/* &g12a_vclk2_div6_en, */
+	/* &g12a_vclk2_div12_en, */
+	/* &g12a_cts_enci_sel, */
+	/* &g12a_cts_encp_sel, */
+	/* &g12a_cts_encl_sel, */
+	/* &g12a_cts_vdac_sel, */
+	/* &g12a_hdmi_tx_sel, */
+	/* &g12a_cts_enci, */
+	/* &g12a_cts_encp, */
+	/* &g12a_cts_encl, */
+	/* &g12a_cts_vdac, */
+	/* &g12a_hdmi_tx, */
+	/* &g12a_hdmi_sel, */
+	/* &g12a_hdmi_div, */
+	/* &g12a_hdmi, */
+	/* &g12a_mali_0_sel, */
+	/* &g12a_mali_0_div, */
+	/* &g12a_mali_0, */
+	/* &g12a_mali_1_sel, */
+	/* &g12a_mali_1_div, */
+	/* &g12a_mali_1, */
+	/* &g12a_mali, */
+	/* &g12a_mpll_50m, */
+	/* &g12a_sys_pll_div16_en, */
+	/* &g12a_cpu_clk_premux0, */
+	/* &g12a_cpu_clk_mux0_div, */
+	/* &g12a_cpu_clk_postmux0, */
+	/* &g12a_cpu_clk_premux1, */
+	/* &g12a_cpu_clk_mux1_div, */
+	/* &g12a_cpu_clk_postmux1, */
+	/* &g12a_cpu_clk_dyn, */
+	/* &g12a_cpu_clk, */
+	/* &g12a_cpu_clk_div16_en, */
+	/* &g12a_cpu_clk_apb_div, */
+	/* &g12a_cpu_clk_apb, */
+	/* &g12a_cpu_clk_atb_div, */
+	/* &g12a_cpu_clk_atb, */
+	/* &g12a_cpu_clk_axi_div, */
+	/* &g12a_cpu_clk_axi, */
+	/* &g12a_cpu_clk_trace_div, */
+	/* &g12a_cpu_clk_trace, */
+	/* &g12a_pcie_pll_od, */
+	/* &g12a_pcie_pll_dco, */
+	/* &g12a_vdec_1_sel, */
+	/* &g12a_vdec_1_div, */
+	/* &g12a_vdec_1, */
+	/* &g12a_vdec_hevc_sel, */
+	/* &g12a_vdec_hevc_div, */
+	/* &g12a_vdec_hevc, */
+	/* &g12a_vdec_hevcf_sel, */
+	/* &g12a_vdec_hevcf_div, */
+	/* &g12a_vdec_hevcf, */
+	/* &g12a_ts_div, */
+	/* &g12a_ts, */
+	/* &g12b_cpu_clk, */
+	/* &g12b_sys1_pll_dco, */
+	/* &g12b_sys1_pll, */
+	/* &g12b_sys1_pll_div16_en, */
+	/* &g12b_cpub_clk_premux0, */
+	/* &g12b_cpub_clk_mux0_div, */
+	/* &g12b_cpub_clk_postmux0, */
+	/* &g12b_cpub_clk_premux1, */
+	/* &g12b_cpub_clk_mux1_div, */
+	/* &g12b_cpub_clk_postmux1, */
+	/* &g12b_cpub_clk_dyn, */
+	/* &g12b_cpub_clk, */
+	/* &g12b_cpub_clk_div16_en, */
+	/* &g12b_cpub_clk_apb_sel, */
+	/* &g12b_cpub_clk_apb, */
+	/* &g12b_cpub_clk_atb_sel, */
+	/* &g12b_cpub_clk_atb, */
+	/* &g12b_cpub_clk_axi_sel, */
+	/* &g12b_cpub_clk_axi, */
+	/* &g12b_cpub_clk_trace_sel, */
+	/* &g12b_cpub_clk_trace, */
+	/* &sm1_gp1_pll_dco, */
+	/* &sm1_gp1_pll, */
+	/* &sm1_dsu_clk_premux0, */
+	/* &sm1_dsu_clk_premux1, */
+	/* &sm1_dsu_clk_mux0_div, */
+	/* &sm1_dsu_clk_postmux0, */
+	/* &sm1_dsu_clk_mux1_div, */
+	/* &sm1_dsu_clk_postmux1, */
+	/* &sm1_dsu_clk_dyn, */
+	/* &sm1_dsu_final_clk, */
+	/* &sm1_dsu_clk, */
+	/* &sm1_cpu1_clk, */
+	/* &sm1_cpu2_clk, */
+	/* &sm1_cpu3_clk, */
+	/* &g12a_spicc0_sclk_sel, */
+	/* &g12a_spicc0_sclk_div, */
+	/* &g12a_spicc0_sclk, */
+	/* &g12a_spicc1_sclk_sel, */
+	/* &g12a_spicc1_sclk_div, */
+	/* &g12a_spicc1_sclk, */
+	/* &sm1_nna_axi_clk_sel, */
+	/* &sm1_nna_axi_clk_div, */
+	/* &sm1_nna_axi_clk, */
+	/* &sm1_nna_core_clk_sel, */
+	/* &sm1_nna_core_clk_div, */
+	/* &sm1_nna_core_clk, */
+	/* &g12a_mipi_dsi_pxclk_sel, */
+	/* &g12a_mipi_dsi_pxclk_div, */
+	/* &g12a_mipi_dsi_pxclk, */
+	/* &g12b_mipi_isp_sel, */
+	/* &g12b_mipi_isp_div, */
+	/* &g12b_mipi_isp, */
+	/* &g12b_mipi_isp_gate, */
+	/* &g12b_csi_phy1, */
+	/* &g12b_csi_phy0, */
+};
+
+void clk_probe(struct clk **clks) {
+    /* uint32_t num_clks = sizeof(clks) / sizeof((clks)[0]); */
+    uint32_t num_clks = sizeof(g12a_clk_regmaps) / sizeof(g12a_clk_regmaps[0]);
+    /* uint32_t num_clks = 279; */
+
+    for (uint32_t i = 0; i < num_clks; i++) {
+        if (clks[i] != NULL) {
+            clks[i]->hw.clk = clks[i];
+            sddf_dprintf("%u. Bind clk 0x%x to hw 0x%x\n", i, clks[i], &(clks[i]->hw));
+        }
+    }
+}
+
 void notified(microkit_channel ch)
 {
 
+}
+
+void read_cfg(char name[], uint32_t reg_offset, uint32_t bit_shift, uint32_t width)
+{
+    volatile uint32_t *reg_addr = ((void *)clk_regs + reg_offset);
+    uint32_t val = (*reg_addr) >> bit_shift;
+    sddf_dprintf("%s - ref_addr: 0x%x, val: 0b", name, reg_addr);
+
+    uint32_t mask = 1 << (width - 1);
+    while (mask) {
+        sddf_dprintf("%d", (val & mask ? 1 : 0));
+        mask >>= 1;
+    }
+    sddf_dprintf("\n");
 }
 
 void init(void)
@@ -385,9 +697,12 @@ void init(void)
 
     sddf_dprintf("Clock driver initialising...\n");
 
+    clk_probe(g12a_clk_regmaps);
+
     for (int i = 0; i < NUM_DEVICE_CLKS; i++) {
         struct clk *clk = sm1_clks[enabled_hw_clks[i]->clk_id];
-        clk->ops->enable(clk_regs, &(clk->hw));
+        struct clk_hw *hw = &(clk->hw);
+        hw->init->ops->enable(clk_regs, hw);
         sddf_dprintf("CLKID-%d enabled\n", enabled_hw_clks[i]->clk_id);
     }
 
@@ -395,4 +710,23 @@ void init(void)
     if (!(*clk_i2c_ptr & I2C_CLK_BIT)) {
         sddf_dprintf("failed to toggle clock!\n");
     }
+
+    sddf_dprintf("-----------------\n");
+
+    read_cfg("fix_pll_en", HHI_FIX_PLL_CNTL0, 28, 1);
+    read_cfg("fix_pll_m", HHI_FIX_PLL_CNTL0, 0, 8);
+    read_cfg("fix_pll_n", HHI_FIX_PLL_CNTL0, 10, 5);
+    read_cfg("fix_pll_frac", HHI_FIX_PLL_CNTL1, 0, 17);
+    read_cfg("fix_pll_l", HHI_FIX_PLL_CNTL0, 31, 1);
+    read_cfg("fix_pll_rst", HHI_FIX_PLL_CNTL0, 29, 1);
+
+    read_cfg("fix_pll_od", HHI_FIX_PLL_CNTL0, 16, 2);
+
+    sddf_dprintf("-----------------\n");
+
+    read_cfg("mpeg_clk_sel", HHI_MPEG_CLK_CNTL, 12, 3);
+    read_cfg("mpeg_clk_div", HHI_MPEG_CLK_CNTL, 0, 7);
+
 }
+
+// 0000 0000 0000 0000 0101 1000 0001 0010
