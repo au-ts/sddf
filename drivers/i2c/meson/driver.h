@@ -26,9 +26,7 @@ enum data_direction {
 
 // Driver state
 typedef struct _i2c_ifState {
-    /* Pointer to current request/response data being handled */
-    /* Due to the way the token chain abstraction is done in the request buffer
-     * there will always be at least 1 more byte of request data then response data. */
+    /* Pointer to current request/response being handled */
     uint8_t *curr_data;
     /* Number of bytes in current request (number of tokens) */
     int curr_request_len;
@@ -38,6 +36,10 @@ typedef struct _i2c_ifState {
     size_t remaining;
     /* Flag indicating that there is more independent requests waiting on the queue_handle.request. */
     bool notified;
+
+    /* Number of bytes to read/write if request data offset is in the midst of a buffer. If this is
+       zero, no read/write is in progress and we can interpret the current byte as a token.*/
+    uint8_t rw_remaining;
 
     enum data_direction data_direction;
     /* I2C bus address of the current request being handled */

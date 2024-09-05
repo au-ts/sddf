@@ -162,10 +162,11 @@ uint8_t read_ack_frame(size_t retries)
 
         request_add(&req, I2C_TOKEN_START);
         request_add(&req, I2C_TOKEN_ADDR_READ);
-        for (int i = 0; i < ACK_FRAME_SIZE - 1; i++) {
-            request_add(&req, I2C_TOKEN_DATA);
+        request_add(&req, ACK_FRAME_SIZE + 1);      // Add request data size
+        for (int i = 0; i <= ACK_FRAME_SIZE; i++) {
+            request_add(&req, 0x0); /* Temporary - logic to skip this step will be added as
+                                       part of issue 211 https://github.com/au-ts/sddf/issues/211 */
         }
-        request_add(&req, I2C_TOKEN_DATA_END);
         request_add(&req, I2C_TOKEN_STOP);
 
         request_send(&req);
@@ -216,50 +217,39 @@ uint8_t pn532_write_command(uint8_t *header, uint8_t hlen, const uint8_t *body, 
 {
     LOG_PN532("writing command\n");
     struct request req = {};
+    size_t length = hlen + blen + 1;
     request_init(&req, PN532_I2C_BUS_ADDRESS);
 
     request_add(&req, I2C_TOKEN_START);
     request_add(&req, I2C_TOKEN_ADDR_WRITE);
+    // Write length of write transaction preamble + data length + checksum bytes
+    request_add(&req, PN532_PREAMBLE_LEN + PN532_DATA_CHK_LEN + length + PN532_POSTAMBLE_LEN);
 
-    request_add(&req, I2C_TOKEN_DATA);
     request_add(&req, PN532_PREAMBLE);
-
-    request_add(&req, I2C_TOKEN_DATA);
     request_add(&req, PN532_STARTCODE1);
-
-    request_add(&req, I2C_TOKEN_DATA);
     request_add(&req, PN532_STARTCODE2);
 
     /* Put length of PN532 data */
-    size_t length = hlen + blen + 1;
-    request_add(&req, I2C_TOKEN_DATA);
     request_add(&req, length);
 
     /* Put checksum of length of PN532 data */
-    request_add(&req, I2C_TOKEN_DATA);
     request_add(&req, ~length + 1);
-
-    request_add(&req, I2C_TOKEN_DATA);
     request_add(&req, PN532_HOSTTOPN532);
 
     uint8_t sum = PN532_HOSTTOPN532;
     for (int i = 0; i < hlen; i++) {
         sum += header[i];
-        request_add(&req, I2C_TOKEN_DATA);
         request_add(&req, header[i]);
     }
 
     for (int i = 0; i < blen; i++) {
         sum += body[i];
-        request_add(&req, I2C_TOKEN_DATA);
         request_add(&req, body[i]);
     }
 
     uint8_t checksum = ~sum + 1;
-    request_add(&req, I2C_TOKEN_DATA);
     request_add(&req, checksum);
 
-    request_add(&req, I2C_TOKEN_DATA);
     request_add(&req, PN532_POSTAMBLE);
 
     request_add(&req, I2C_TOKEN_STOP);
@@ -300,10 +290,11 @@ uint8_t read_response_length(int8_t *length, size_t retries)
 
         request_add(&req, I2C_TOKEN_START);
         request_add(&req, I2C_TOKEN_ADDR_READ);
-        for (int i = 0; i < NACK_SIZE - 1; i++) {
-            request_add(&req, I2C_TOKEN_DATA);
-        }
-        request_add(&req, I2C_TOKEN_DATA_END);
+        request_add(&req, NACK_SIZE + 1);       // Add request size
+
+        for (int i = 0; i <= NACK_SIZE; i++) {
+            request_add(&req, 0x0);             // Temporary - logic to skip this step will be added as
+        }                                       // part of issue 211 https://github.com/au-ts/sddf/issues/211
         request_add(&req, I2C_TOKEN_STOP);
 
         request_send(&req);
@@ -364,8 +355,8 @@ uint8_t read_response_length(int8_t *length, size_t retries)
 
     request_add(&nack_req, I2C_TOKEN_START);
     request_add(&nack_req, I2C_TOKEN_ADDR_WRITE);
+    request_add(&nack_req, NACK_SIZE);          // Add write size
     for (int i = 0; i < NACK_SIZE; i++) {
-        request_add(&nack_req, I2C_TOKEN_DATA);
         request_add(&nack_req, PN532_NACK[i]);
     }
     request_add(&nack_req, I2C_TOKEN_STOP);
@@ -410,6 +401,7 @@ uint8_t pn532_read_response(uint8_t *buffer, uint8_t buffer_len, size_t retries)
 
         request_add(&request, I2C_TOKEN_START);
         request_add(&request, I2C_TOKEN_ADDR_READ);
+        request_add(&request, num_data_tokens);     // Add number of bytes to read
 
         if (num_data_tokens > request.buffer_size) {
             LOG_PN532_ERR("number of request data tokens (0x%lx) exceeds buffer size (0x%lx)\n", num_data_tokens,
@@ -417,11 +409,10 @@ uint8_t pn532_read_response(uint8_t *buffer, uint8_t buffer_len, size_t retries)
             return I2C_ERR_OTHER;
         }
 
-        for (int i = 0; i < num_data_tokens - 1; i++) {
-            request_add(&request, I2C_TOKEN_DATA);
-        }
+        for (int i = 0; i < num_data_tokens; i++) {
+            request_add(&request, 0x0);     // Temporary - logic to skip this step will be added as
+        }                                   // part of issue 211 https://github.com/au-ts/sddf/issues/211
 
-        request_add(&request, I2C_TOKEN_DATA_END);
         request_add(&request, I2C_TOKEN_STOP);
 
         request_send(&request);
