@@ -25,19 +25,22 @@ You will need to provide the path to your Microkit SDK.
 The CI runs a style check on any changed files and new files added in each GitHub
 pull request.
 
-We use the same style checking as the official seL4 projects. The style check primarily
-exists not for enforcing a certain style, but for having some consistency with the code
-in order to make it more readable.
+We use `clang-format` from LLVM18, following the style guide in `.clang-format`.
 
-You can reproduce the style check by doing the following:
+You can reproduce the style check by doing the following, which prints the diff
+of your committed changes against the main branch.
+
 ```sh
-git clone https://github.com/seL4/seL4_tools
-./seL4_tools/misc/style-all.sh /path/to/what/to/style
+git clang-format --diff main
 ```
 
-Note that you will need to have the `astyle` program installed (e.g `apt install astyle`
-or `brew install astyle`).
+You can also autoformt changed files by omitting the `--diff` argument.
 
-All the styling scripts can be found in `seL4_tools/misc`. You can run the script on an
-entire directory or just on a particular file.
+```sh
+git clang-format main
+```
 
+Omitting the branch name runs the formatter on any staged files.
+
+You will need to have the `git-clang-format` program installed, which is often
+installed with `clang-tools`.
