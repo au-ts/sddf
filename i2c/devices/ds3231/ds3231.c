@@ -148,9 +148,9 @@ bool ds3231_write(uint8_t *buffer, uint8_t buffer_len, size_t retries)
         request_init(&req, DS3231_I2C_BUS_ADDRESS);
         request_add(&req, I2C_TOKEN_START);
         request_add(&req, I2C_TOKEN_ADDR_WRITE);
+        request_add(&req, buffer_len); // Add buffer size
 
         for (int i = 0; i < buffer_len; i++) {
-            request_add(&req, I2C_TOKEN_DATA);
             request_add(&req, buffer[i]);
         }
 
@@ -186,12 +186,11 @@ bool ds3231_read(uint8_t *buffer, uint8_t buffer_len, size_t retries)
 
         request_add(&req, I2C_TOKEN_START);
         request_add(&req, I2C_TOKEN_ADDR_READ);
+        request_add(&req, buffer_len);      // Add read length
 
         for (int i = 0; i < buffer_len - 1; i++) {
-            request_add(&req, I2C_TOKEN_DATA);
-        }
-
-        request_add(&req, I2C_TOKEN_DATA_END);
+            request_add(&req, 0x0);             // Temporary - will be changed as part of
+        }                                       // issue 211 https://github.com/au-ts/sddf/issues/211
 
         request_add(&req, I2C_TOKEN_STOP);
 

@@ -15,6 +15,9 @@
 #define PN532_STARTCODE1              (0x00)
 #define PN532_STARTCODE2              (0xFF)
 #define PN532_POSTAMBLE               (0x00)
+#define PN532_PREAMBLE_LEN            (3)
+#define PN532_DATA_CHK_LEN            (2)
+#define PN532_POSTAMBLE_LEN           (1)
 
 #define PN532_HOSTTOPN532             (0xD4)
 #define PN532_PN532TOHOST             (0xD5)
