@@ -12,9 +12,11 @@ in
         llvm.lld
         llvm.libllvm
         dosfstools
+
+        # for git-clang-format. nix is weird.
+        llvm.libclang.python
     ];
     # Nix will automatically add flags to Clang that depend
     # on OS functionality we do not provide (e.g stack protection).
     hardeningDisable = [ "all" ];
 }
-
