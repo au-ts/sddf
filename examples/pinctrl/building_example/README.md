@@ -1,0 +1,1 @@
+This example system demos how the pinctrl driver can be built and used. Currently, it simply tests that the driver's argument validation is correct and print a number every second.

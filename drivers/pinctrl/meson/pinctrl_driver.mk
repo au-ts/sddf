@@ -31,7 +31,8 @@ ifndef SOC
 $(error SOC is not set)
 endif
 
-ifeq (amlogic\,sm1,$(findstring amlogic\,sm1,$(SOC)))
+ODROIDC4_DTS_STR := amlogic,sm1
+ifeq ($(ODROIDC4_DTS_STR),$(findstring $(ODROIDC4_DTS_STR),$(SOC)))
 else
 $(error Pinctrl driver: unsupported SoC: $(SOC))
 endif
