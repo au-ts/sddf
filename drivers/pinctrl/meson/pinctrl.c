@@ -69,17 +69,6 @@ bool set_mux(uint32_t *vaddr, uint32_t val) {
     return true;
 }
 
-void reset_ao_pinmux_to_default(void) {
-    for (int i = 0; i < sizeof(default_ao_pinmux) / sizeof(pindata_t); i++) {
-        if (!set_mux(MUX_REG_ADDR(pinctrl_ao_base, default_ao_pinmux[i].offset), default_ao_pinmux[i].value)) {
-            LOG_DRIVER_ERR("cannot reset AO pinmux to default values");
-            while (true) {};
-        } else {
-            LOG_DRIVER("written default value %x to offset %x of AO pinmux\n", default_ao_pinmux[i].value, default_ao_pinmux[i].offset);
-        }
-    }
-}
-
 void reset_periphs_pinmux_to_default(void) {
     LOG_DRIVER("in reset_periphs_pinmux_to_default\n");
     for (int i = 0; i < sizeof(default_periphs_pinmux) / sizeof(pindata_t); i++) {
@@ -92,7 +81,6 @@ void reset_periphs_pinmux_to_default(void) {
     }
 }
 
-
 void init(void) {
     LOG_DRIVER("starting\n");
 
@@ -101,10 +89,7 @@ void init(void) {
     // into the pinmux device.
     pinctrl_periphs_base += 0x400;
 
-    // reset_ao_pinmux_to_default();
     reset_periphs_pinmux_to_default();
-
-
 
     LOG_DRIVER("pinctrl device initialisation done\n");
 }
