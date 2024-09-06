@@ -76,23 +76,24 @@ sddf_state_t sddf_state;
 
 /**
  * Helper function to convert sddf errors to lwip errors.
- * 
+ *
  * @param sddf_err sddf error.
  *
- * @return Equivalent lwip error. 
+ * @return Equivalent lwip error.
  */
-static err_t sddf_err_to_lwip_err(net_sddf_err_t sddf_err) {
+static err_t sddf_err_to_lwip_err(net_sddf_err_t sddf_err)
+{
     switch (sddf_err) {
-        case SDDF_ERR_OK:
-            return ERR_OK;
-        case SDDF_ERR_PBUF:
-            return ERR_BUF;
-        case SDDF_ERR_NO_BUF:
-            return ERR_MEM;
-        case SDDF_ERR_ENQUEUED:
-            return ERR_OK;
-        case SDDF_ERR_UNHANDLED:
-            return ERR_MEM;
+    case SDDF_ERR_OK:
+        return ERR_OK;
+    case SDDF_ERR_PBUF:
+        return ERR_BUF;
+    case SDDF_ERR_NO_BUF:
+        return ERR_MEM;
+    case SDDF_ERR_ENQUEUED:
+        return ERR_OK;
+    case SDDF_ERR_UNHANDLED:
+        return ERR_MEM;
     }
     return ERR_ARG;
 }
@@ -100,38 +101,42 @@ static err_t sddf_err_to_lwip_err(net_sddf_err_t sddf_err) {
 /**
  * Default netif status callback function. Prints client MAC address and
  * obtained ip address.
- * 
- * @param ip_addr Obtained ip address as a string. 
+ *
+ * @param ip_addr Obtained ip address as a string.
  */
-static void netif_status_callback_default(char *ip_addr) {
+static void netif_status_callback_default(char *ip_addr)
+{
     uint8_t *mac = lwip_state.netif.hwaddr;
     lwip_state.err_output("LWIP|NOTICE: DHCP request for mac "
-                       "%02lx:%02lx:%02lx:%02lx:%02lx:%02lx "
-                       "returned ip address: %s\n", mac[0],
-                       mac[1], mac[2], mac[3], mac[4], mac[5],
-                       ip_addr);
+                          "%02lx:%02lx:%02lx:%02lx:%02lx:%02lx "
+                          "returned ip address: %s\n", mac[0],
+                          mac[1], mac[2], mac[3], mac[4], mac[5],
+                          ip_addr);
 }
 
 /**
  * Default handling function to be called during transmission if tx free
  * queue is empty.
- * 
+ *
  * @param p pbuf that could not be sent due to queue being empty.
  *
  * @return Simply returns the sddf error indicating nothing was done.
  */
-static net_sddf_err_t handle_empty_tx_free_default(struct pbuf *p) {
+static net_sddf_err_t handle_empty_tx_free_default(struct pbuf *p)
+{
     return SDDF_ERR_UNHANDLED;
 }
 
 /**
  * Returns current time from the timer.
  */
-uint32_t sys_now(void) {
+uint32_t sys_now(void)
+{
     return sddf_timer_time_now(sddf_state.timer_ch) / NS_IN_MS;
 }
 
-void sddf_lwip_process_timeout() {
+void sddf_lwip_process_timeout()
+{
     sys_check_timeouts();
 }
 
@@ -140,7 +145,8 @@ void sddf_lwip_process_timeout() {
  *
  * @param p pbuf to free.
  */
-static void interface_free_buffer(struct pbuf *p) {
+static void interface_free_buffer(struct pbuf *p)
+{
     SYS_ARCH_DECL_PROTECT(old_level);
     pbuf_custom_offset_t *custom_pbuf_offset = (pbuf_custom_offset_t *)p;
     SYS_ARCH_PROTECT(old_level);
@@ -160,7 +166,8 @@ static void interface_free_buffer(struct pbuf *p) {
  *
  * @return the newly created pbuf. Can be cast to pbuf_custom.
  */
-static struct pbuf *create_interface_buffer(uint64_t offset, size_t length) {
+static struct pbuf *create_interface_buffer(uint64_t offset, size_t length)
+{
     pbuf_custom_offset_t *custom_pbuf_offset = (pbuf_custom_offset_t *) LWIP_MEMPOOL_ALLOC(RX_POOL);
     custom_pbuf_offset->offset = offset;
     custom_pbuf_offset->custom.custom_free_function = interface_free_buffer;
@@ -186,7 +193,8 @@ static struct pbuf *create_interface_buffer(uint64_t offset, size_t length) {
  * sddf buffers available, handle_empty_tx_free will be called with the pbuf,
  * and the equivalent lwip error will be returned.
  */
-static err_t lwip_eth_send(struct netif *netif, struct pbuf *p) {
+static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
+{
     if (p->tot_len > NET_BUFFER_SIZE) {
         lwip_state.err_output("LWIP|ERROR: attempted to send a packet of size %u > BUFFER SIZE %u\n",
                               p->tot_len, NET_BUFFER_SIZE);
@@ -217,7 +225,8 @@ static err_t lwip_eth_send(struct netif *netif, struct pbuf *p) {
     return ERR_OK;
 }
 
-net_sddf_err_t sddf_lwip_transmit_pbuf(struct pbuf *p) {
+net_sddf_err_t sddf_lwip_transmit_pbuf(struct pbuf *p)
+{
     if (p->tot_len > NET_BUFFER_SIZE) {
         lwip_state.err_output("LWIP|ERROR: attempted to send a packet of size %u > BUFFER SIZE %u\n",
                               p->tot_len, NET_BUFFER_SIZE);
@@ -234,7 +243,8 @@ net_sddf_err_t sddf_lwip_transmit_pbuf(struct pbuf *p) {
     return SDDF_ERR_OK;
 }
 
-void sddf_lwip_process_rx(void) {
+void sddf_lwip_process_rx(void)
+{
     bool reprocess = true;
     while (reprocess) {
         while (!net_queue_empty_active(&sddf_state.rx_queue)) {
@@ -265,11 +275,12 @@ void sddf_lwip_process_rx(void) {
  *
  * @param netif network interface data structure.
  */
-static err_t ethernet_init(struct netif *netif) {
+static err_t ethernet_init(struct netif *netif)
+{
     if (netif->state == NULL) {
         return ERR_ARG;
     }
-    
+
     net_set_mac_addr(netif->hwaddr, lwip_state.mac);
     netif->mtu = SDDF_LWIP_ETHER_MTU;
     netif->hwaddr_len = ETHARP_HWADDR_LEN;
@@ -288,7 +299,8 @@ static err_t ethernet_init(struct netif *netif) {
  *
  * @param netif network interface data structure.
  */
-static void netif_status_callback(struct netif *netif) {
+static void netif_status_callback(struct netif *netif)
+{
     if (dhcp_supplied_address(netif)) {
         char ip4_str[IP4ADDR_STRLEN_MAX];
         lwip_state.netif_callback(ip4addr_ntoa_r(netif_ip4_addr(netif), ip4_str, IP4ADDR_STRLEN_MAX));
@@ -302,7 +314,8 @@ void sddf_lwip_init(net_queue_handle_t rx_queue, net_queue_handle_t tx_queue,
                     microkit_channel timer_ch,
                     uint64_t mac, sddf_lwip_err_output_fn err_output,
                     sddf_lwip_netif_status_callback_fn netif_callback,
-                    sddf_lwip_handle_empty_tx_free_fn handle_empty_tx_free) {
+                    sddf_lwip_handle_empty_tx_free_fn handle_empty_tx_free)
+{
     /* Initialise sddf state */
     sddf_state.rx_queue = rx_queue;
     sddf_state.tx_queue = tx_queue;
@@ -314,9 +327,9 @@ void sddf_lwip_init(net_queue_handle_t rx_queue, net_queue_handle_t tx_queue,
 
     /* Initialise lwip state */
     lwip_state.mac = mac;
-    lwip_state.err_output = (err_output == NULL)? sddf_printf_: err_output;
-    lwip_state.netif_callback = (netif_callback == NULL)? netif_status_callback_default: netif_callback;
-    lwip_state.handle_empty_tx_free = (handle_empty_tx_free == NULL)? handle_empty_tx_free_default: handle_empty_tx_free;
+    lwip_state.err_output = (err_output == NULL) ? sddf_printf_ : err_output;
+    lwip_state.netif_callback = (netif_callback == NULL) ? netif_status_callback_default : netif_callback;
+    lwip_state.handle_empty_tx_free = (handle_empty_tx_free == NULL) ? handle_empty_tx_free_default : handle_empty_tx_free;
 
     lwip_init();
 
@@ -346,7 +359,8 @@ void sddf_lwip_init(net_queue_handle_t rx_queue, net_queue_handle_t tx_queue,
     }
 }
 
-void sddf_lwip_maybe_notify() {
+void sddf_lwip_maybe_notify()
+{
     if (sddf_state.notify_rx && net_require_signal_free(&sddf_state.rx_queue)) {
         net_cancel_signal_free(&sddf_state.rx_queue);
         sddf_state.notify_rx = false;

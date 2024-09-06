@@ -47,7 +47,7 @@ typedef void (*sddf_lwip_netif_status_callback_fn)(char *ip_addr);
  */
 typedef net_sddf_err_t (*sddf_lwip_handle_empty_tx_free_fn)(struct pbuf *p);
 
-/** 
+/**
  * Checks LWIP system timeouts. Should be invoked after every LWIP tick.
  */
 void sddf_lwip_process_timeout(void);
@@ -65,7 +65,7 @@ void sddf_lwip_process_timeout(void);
  */
 net_sddf_err_t sddf_lwip_transmit_pbuf(struct pbuf *p);
 
-/** 
+/**
  * Handles the passing of incoming packets in sDDF buffers to LWIP. Must be
  * called to process the sDDF RX queue each time a notification is received
  * from the network virtualiser.

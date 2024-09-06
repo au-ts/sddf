@@ -49,14 +49,16 @@ struct pbuf *tail;
  *
  * @param ip_addr ip address of the client.
  */
-void netif_status_callback(char *ip_addr) {
+void netif_status_callback(char *ip_addr)
+{
     sddf_printf("DHCP request finished, IP address for netif %s is: %s\n", microkit_name, ip_addr);
 }
 
 /**
  * Sets a timeout for the next lwip tick.
  */
-void set_timeout(void) {
+void set_timeout(void)
+{
     sddf_timer_set_timeout(TIMER, LWIP_TICK_MS * NS_IN_MS);
 }
 
