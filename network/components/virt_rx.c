@@ -211,7 +211,7 @@ void init(void)
 
     /* Set up client queues */
     for (int i = 0; i < NUM_NETWORK_CLIENTS; i++) {
-        __net_set_mac_addr((uint8_t *) &state.mac_addrs[i], macs[i]);
+        net_set_mac_addr((uint8_t *) &state.mac_addrs[i], macs[i]);
         net_queue_init(&state.rx_queue_clients[i], queue_info[i].free, queue_info[i].active,
                        queue_info[i].size);
     }

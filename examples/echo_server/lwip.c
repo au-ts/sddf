@@ -301,7 +301,7 @@ void init(void)
     LWIP_MEMPOOL_INIT(RX_POOL);
 
     uint64_t mac_addr = net_cli_mac_addr(microkit_name);
-    __net_set_mac_addr(state.mac, mac_addr);
+    net_set_mac_addr(state.mac, mac_addr);
 
     /* Set dummy IP configuration values to get lwIP bootstrapped  */
     struct ip4_addr netmask, ipaddr, gw, multicast;
