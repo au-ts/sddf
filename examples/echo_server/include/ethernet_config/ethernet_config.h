@@ -90,6 +90,8 @@ static inline uint64_t net_cli_mac_addr(char *pd_name)
     } else if (!sddf_strcmp(pd_name, NET_CLI1_NAME)) {
         return MAC_ADDR_CLI1;
     }
+
+    return 0;
 }
 
 static inline void net_virt_mac_addrs(char *pd_name, uint64_t macs[NUM_NETWORK_CLIENTS])
@@ -122,29 +124,29 @@ static inline void net_copy_queue_size(char *pd_name, size_t *cli_queue_size, si
     }
 }
 
-typedef struct queue_info {
+typedef struct net_queue_info {
     net_queue_t *free;
     net_queue_t *active;
     size_t size;
-} queue_info_t;
+} net_queue_info_t;
 
 static inline void net_virt_queue_info(char *pd_name, net_queue_t *cli0_free, net_queue_t *cli0_active,
-                                       queue_info_t ret[NUM_NETWORK_CLIENTS])
+                                       net_queue_info_t ret[NUM_NETWORK_CLIENTS])
 {
     if (!sddf_strcmp(pd_name, NET_VIRT_RX_NAME)) {
-        ret[0] = (queue_info_t) {
+        ret[0] = (net_queue_info_t) {
             .free = cli0_free, .active = cli0_active, .size = NET_RX_QUEUE_SIZE_COPY0
         };
-        ret[1] = (queue_info_t) {
+        ret[1] = (net_queue_info_t) {
             .free = (net_queue_t *)((uintptr_t)cli0_free + 2 * NET_DATA_REGION_SIZE),
             .active = (net_queue_t *)((uintptr_t)cli0_active + 2 * NET_DATA_REGION_SIZE),
             .size = NET_RX_QUEUE_SIZE_COPY1
         };
     } else if (!sddf_strcmp(pd_name, NET_VIRT_TX_NAME)) {
-        ret[0] = (queue_info_t) {
+        ret[0] = (net_queue_info_t) {
             .free = cli0_free, .active = cli0_active, .size = NET_TX_QUEUE_SIZE_CLI0
         };
-        ret[1] = (queue_info_t) {
+        ret[1] = (net_queue_info_t) {
             .free = (net_queue_t *)((uintptr_t)cli0_free + 2 * NET_DATA_REGION_SIZE),
             .active = (net_queue_t *)((uintptr_t)cli0_active + 2 * NET_DATA_REGION_SIZE),
             .size = NET_TX_QUEUE_SIZE_CLI1

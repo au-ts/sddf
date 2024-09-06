@@ -204,7 +204,7 @@ void notified(microkit_channel ch)
 void init(void)
 {
     uint64_t macs[NUM_NETWORK_CLIENTS] = {0};
-    queue_info_t queue_info[NUM_NETWORK_CLIENTS] = {0};
+    net_queue_info_t queue_info[NUM_NETWORK_CLIENTS] = {0};
 
     net_virt_mac_addrs(microkit_name, macs);
     net_virt_queue_info(microkit_name, rx_free_cli0, rx_active_cli0, queue_info);

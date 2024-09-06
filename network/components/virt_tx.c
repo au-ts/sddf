@@ -135,7 +135,7 @@ void init(void)
     net_queue_init(&state.tx_queue_drv, tx_free_drv, tx_active_drv, NET_TX_QUEUE_SIZE_DRIV);
 
     /* Setup client queues and state */
-    queue_info_t queue_info[NUM_NETWORK_CLIENTS] = {0};
+    net_queue_info_t queue_info[NUM_NETWORK_CLIENTS] = {0};
     uintptr_t client_vaddrs[NUM_NETWORK_CLIENTS] = {0};
     net_virt_queue_info(microkit_name, tx_free_cli0, tx_active_cli0, queue_info);
     net_mem_region_vaddr(microkit_name, client_vaddrs, buffer_data_region_cli0_vaddr);
@@ -146,11 +146,10 @@ void init(void)
         state.buffer_region_vaddrs[i] = client_vaddrs[i];
     }
 
-    /* CDTODO: Can we make this system agnostic? */
     state.buffer_region_paddrs[0] = buffer_data_region_cli0_paddr;
-#ifdef NUM_NETWORK_CLIENTS > 1
+#if NUM_NETWORK_CLIENTS > 1
     state.buffer_region_paddrs[1] = buffer_data_region_cli1_paddr;
-#endif /* NUM_NETWORK_CLIENTS > 1 */
+#endif
 
     tx_provide();
 }
