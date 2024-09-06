@@ -4,11 +4,11 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
 
-ifeq ($(strip $(MAX_NUM_BUFFS)),)
+ifeq ($(strip $(SDDF_LWIP_NUM_BUFFS)),)
 $(error MAX_NUM_BUFFS must be specified)
 endif
 
-CFLAGS += -DMAX_NUM_BUFFS=$(MAX_NUM_BUFFS)
+CFLAGS += -DSDDF_LWIP_NUM_BUFFS=$(SDDF_LWIP_NUM_BUFFS)
 
 LIB_SDDF_LWIP_DIR := ${SDDF}/network/lib_sddf_lwip
 LIB_SDDF_LWIP_FILES := $(addprefix ${LIB_SDDF_LWIP_DIR}/, lib_sddf_lwip.c)
