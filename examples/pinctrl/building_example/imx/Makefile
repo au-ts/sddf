@@ -45,7 +45,7 @@ LD := ld.lld
 export MICROKIT_TOOL ?= $(abspath $(MICROKIT_SDK)/bin/microkit)
 
 export BOARD_DIR := $(abspath $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG))
-export SDDF := $(abspath ../../..)
+export SDDF := $(abspath ../../../..)
 IMAGE_FILE := $(BUILD_DIR)/loader.img
 REPORT_FILE := $(BUILD_DIR)/report.txt
 
