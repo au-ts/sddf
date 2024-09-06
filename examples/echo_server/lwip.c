@@ -9,6 +9,7 @@
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 #include <sddf/network/queue.h>
+#include <sddf/network/util.h>
 #include <sddf/serial/queue.h>
 #include <sddf/timer/client.h>
 #include <sddf/benchmark/sel4bench.h>
@@ -288,7 +289,10 @@ void init(void)
     serial_cli_queue_init_sys(microkit_name, NULL, NULL, NULL, &serial_tx_queue_handle, serial_tx_queue, serial_tx_data);
     serial_putchar_init(SERIAL_TX_CH, &serial_tx_queue_handle);
 
-    net_cli_queue_init_sys(microkit_name, &state.rx_queue, rx_free, rx_active, &state.tx_queue, tx_free, tx_active);
+    size_t rx_size, tx_size;
+    net_cli_queue_size(microkit_name, &rx_size, &tx_size);
+    net_queue_init(&state.rx_queue, rx_free, rx_active, rx_size);
+    net_queue_init(&state.tx_queue, tx_free, tx_active, tx_size);
     net_buffers_init(&state.tx_queue, 0);
 
     lwip_init();
@@ -296,7 +300,8 @@ void init(void)
 
     LWIP_MEMPOOL_INIT(RX_POOL);
 
-    net_cli_mac_addr_init_sys(microkit_name, state.mac);
+    uint64_t mac_addr = net_cli_mac_addr(microkit_name);
+    net_set_mac_addr(state.mac, mac_addr);
 
     /* Set dummy IP configuration values to get lwIP bootstrapped  */
     struct ip4_addr netmask, ipaddr, gw, multicast;
