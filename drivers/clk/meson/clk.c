@@ -3,7 +3,6 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-
 #include <microkit.h>
 #include <stdint.h>
 #include <sddf/util/printf.h>
@@ -16,34 +15,73 @@
 
 #define I2C_CLK_OFFSET 320
 #define I2C_CLK_BIT (1 << 9) // bit 9
+#define DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
 
 uintptr_t clk_regs;
 
-static int clk_regmap_gate_enable(uintptr_t clk_base, struct clk_hw *hw)
+static inline int regmap_update_bits(uint32_t offset, uint8_t shift, uint8_t width, uint32_t val)
 {
-    sddf_dprintf("Clk enabling...\n");
-    sddf_dprintf("gate_data addr: 0x%x\n", hw->clk);
-    struct clk_gate_data *data = (struct clk_gate_data *)(hw->clk->data);
-    sddf_dprintf("Clk enabling...\n");
-    volatile uint32_t *clk_reg = ((void *)clk_base + data->offset);
-    sddf_dprintf("Clk enabling...\n");
-    *clk_reg |= BIT(data->bit_idx);
+    volatile uint32_t *clk_reg = ((void *)clk_regs + offset);
+    uint32_t reg_val = *clk_reg;
+    uint32_t mask = (1 << width) - 1;
+
+    reg_val &= ~(mask << shift);
+    reg_val |= ((val & mask) << shift);
+
+    *clk_reg = reg_val;
 
     /* TODO: Check if the register has been updated correctly */
 
     return 0;
 }
 
-static void clk_regmap_gate_disable(uintptr_t clk_base, struct clk_hw *hw)
+static int clk_regmap_div_set_rate(struct clk_hw *hw, uint32_t rate, uint32_t parent_rate)
+{
+    struct clk_div_data *data = (struct clk_div_data *)(hw->clk->data);
+    uint32_t val = DIV_ROUND_UP(parent_rate, rate) - 1;
+
+    return regmap_update_bits(data->offset, data->shift, data->width, val);
+}
+
+static int clk_regmap_gate_enable(struct clk_hw *hw)
 {
     struct clk_gate_data *data = (struct clk_gate_data *)(hw->clk->data);
-    volatile uint32_t *clk_reg = ((void *)clk_base + data->offset);
-    *clk_reg &= ~BIT(data->bit_idx);
+
+    return regmap_update_bits(data->offset, data->bit_idx, 1, 1);
 }
+
+static void clk_regmap_gate_disable(struct clk_hw *hw)
+{
+    struct clk_gate_data *data = (struct clk_gate_data *)(hw->clk->data);
+
+    regmap_update_bits(data->offset, data->bit_idx, 1, 0);
+}
+
+static struct clk_ops clk_regmap_divider_ops = {
+    .set_rate = &clk_regmap_div_set_rate,
+};
 
 static struct clk_ops clk_regmap_gate_ops = {
     .enable = &clk_regmap_gate_enable,
     .disable = &clk_regmap_gate_disable,
+};
+
+static struct clk g12a_mpeg_clk_div = {
+    .data = &(struct clk_div_data) {
+        .offset = HHI_MPEG_CLK_CNTL,
+        .shift = 0,
+        .width = 7,
+    },
+    .hw.init = &(struct clk_init_data) {
+        .name = "mpeg_clk_div",
+        .ops = &clk_regmap_divider_ops,
+        .parent_hws = (const struct clk_hw *[]) {
+            /* &g12a_mpeg_clk_sel.hw */
+        },
+        .num_parents = 0,
+        /* .flags = CLK_SET_RATE_PARENT, */
+        .flags = 0,
+    }
 };
 
 static struct clk g12a_clk81 = {
@@ -168,7 +206,7 @@ static struct clk_hw *sm1_clks[] = {
 	/* [CLKID_FCLK_DIV2P5]		= &g12a_fclk_div2p5.hw, */
 	/* [CLKID_GP0_PLL]			= &g12a_gp0_pll.hw, */
 	/* [CLKID_MPEG_SEL]		= &g12a_mpeg_clk_sel.hw, */
-	/* [CLKID_MPEG_DIV]		= &g12a_mpeg_clk_div.hw, */
+	[CLKID_MPEG_DIV]		= &g12a_mpeg_clk_div.hw,
 	/* [CLKID_CLK81]			= &g12a_clk81.hw, */
 	/* [CLKID_MPLL0]			= &g12a_mpll0.hw, */
 	/* [CLKID_MPLL1]			= &g12a_mpll1.hw, */
@@ -455,7 +493,7 @@ static struct clk *const g12a_clk_regmaps[] = {
 	/* &g12a_sd_emmc_a_clk0, */
 	/* &g12a_sd_emmc_b_clk0, */
 	/* &g12a_sd_emmc_c_clk0, */
-	/* &g12a_mpeg_clk_div, */
+	&g12a_mpeg_clk_div,
 	/* &g12a_sd_emmc_a_clk0_div, */
 	/* &g12a_sd_emmc_b_clk0_div, */
 	/* &g12a_sd_emmc_c_clk0_div, */
@@ -659,15 +697,14 @@ static struct clk *const g12a_clk_regmaps[] = {
 	/* &g12b_csi_phy0, */
 };
 
-void clk_probe(struct clk **clks) {
+void clk_probe() {
     /* uint32_t num_clks = sizeof(clks) / sizeof((clks)[0]); */
     uint32_t num_clks = sizeof(g12a_clk_regmaps) / sizeof(g12a_clk_regmaps[0]);
     /* uint32_t num_clks = 279; */
 
     for (uint32_t i = 0; i < num_clks; i++) {
-        if (clks[i] != NULL) {
-            clks[i]->hw.clk = clks[i];
-            sddf_dprintf("%u. Bind clk 0x%x to hw 0x%x\n", i, clks[i], &(clks[i]->hw));
+        if (g12a_clk_regmaps[i] != NULL) {
+            g12a_clk_regmaps[i]->hw.clk = g12a_clk_regmaps[i];
         }
     }
 }
@@ -681,7 +718,7 @@ void read_cfg(char name[], uint32_t reg_offset, uint32_t bit_shift, uint32_t wid
 {
     volatile uint32_t *reg_addr = ((void *)clk_regs + reg_offset);
     uint32_t val = (*reg_addr) >> bit_shift;
-    sddf_dprintf("%s - ref_addr: 0x%x, val: 0b", name, reg_addr);
+    sddf_dprintf("%s - ref_addr: 0x%p, val: 0b", name, reg_addr);
 
     uint32_t mask = 1 << (width - 1);
     while (mask) {
@@ -697,12 +734,11 @@ void init(void)
 
     sddf_dprintf("Clock driver initialising...\n");
 
-    clk_probe(g12a_clk_regmaps);
+    clk_probe();
 
     for (int i = 0; i < NUM_DEVICE_CLKS; i++) {
-        struct clk *clk = sm1_clks[enabled_hw_clks[i]->clk_id];
-        struct clk_hw *hw = &(clk->hw);
-        hw->init->ops->enable(clk_regs, hw);
+        struct clk_hw *hw = sm1_clks[enabled_hw_clks[i]->clk_id];
+        hw->init->ops->enable(hw);
         sddf_dprintf("CLKID-%d enabled\n", enabled_hw_clks[i]->clk_id);
     }
 
@@ -710,6 +746,10 @@ void init(void)
     if (!(*clk_i2c_ptr & I2C_CLK_BIT)) {
         sddf_dprintf("failed to toggle clock!\n");
     }
+
+    /* CLOCK CONFIGURATION TEST */
+    /* struct clk_hw *mpeg_clk_div_hw = sm1_clks[CLKID_MPEG_DIV]; */
+    /* mpeg_clk_div_hw->init->ops->set_rate(mpeg_clk_div_hw, 100, 500); */
 
     sddf_dprintf("-----------------\n");
 
@@ -729,4 +769,3 @@ void init(void)
 
 }
 
-// 0000 0000 0000 0000 0101 1000 0001 0010

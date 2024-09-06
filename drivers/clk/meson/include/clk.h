@@ -5,7 +5,6 @@
 
 #define BIT(nr) (1UL << (nr))
 
-
 static uintptr_t clk_base;
 
 struct clk;
@@ -18,8 +17,9 @@ struct clk_hw {
 
 
 struct clk_ops {
-    int (*enable)(uintptr_t clk_base, struct clk_hw *hw);
-    void (*disable)(uintptr_t clk_base, struct clk_hw *hw);
+    int (*set_rate)(struct clk_hw *hw, uint32_t rate, uint32_t parent_rate);
+    int (*enable)(struct clk_hw *hw);
+    void (*disable)(struct clk_hw *hw);
 };
 
 struct clk {
