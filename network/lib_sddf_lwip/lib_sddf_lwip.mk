@@ -10,7 +10,7 @@ endif
 
 CFLAGS += -DMAX_NUM_BUFFS=$(MAX_NUM_BUFFS)
 
-LIB_SDDF_LWIP_DIR := network/lib_sddf_lwip
+LIB_SDDF_LWIP_DIR := ${SDDF}/network/lib_sddf_lwip
 LIB_SDDF_LWIP_FILES := $(addprefix ${LIB_SDDF_LWIP_DIR}/, lib_sddf_lwip.c)
 LIB_SDDF_LWIP_OBJS := $(LIB_SDDF_LWIP_FILES:.c=.o)
 
