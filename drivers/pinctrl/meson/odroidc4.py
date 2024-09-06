@@ -1052,4 +1052,9 @@ ao_function_to_group = {
 
 ########################################################
 # With the above information, it is enough to decode the DTS pinmux data,
-# which is in the form: port: string -> function: string
+# which is in the form: port: string -> function: string -> pad
+
+import sys
+
+if __name__ == "__main__":
+    sys.stderr.write(sys.argv[0] + ": This script is not meant to be run, see create_pinctrl_config.py.")
