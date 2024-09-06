@@ -36,8 +36,8 @@ extern const uint32_t num_pinctrl_ao_configs;
 extern pindata_t pinctrl_periphs_configs[];
 extern const uint32_t num_pinctrl_periphs_configs;
 
-bool check_vaddr_4_bytes_aligned(uint32_t vaddr) {
-    if (vaddr % 4 == 0) {
+bool check_vaddr_4_bytes_aligned(uint32_t *vaddr) {
+    if (((uintptr_t) vaddr) % 4 == 0) {
         return true;
     } else {
         LOG_DRIVER_ERR("vaddr is not 4 bytes aligned\n");
@@ -45,29 +45,25 @@ bool check_vaddr_4_bytes_aligned(uint32_t vaddr) {
     }
 }
 
-bool read_mux(uintptr_t base, uint32_t offset, uint32_t *ret) {
-    if (!check_vaddr_4_bytes_aligned(offset)) {
+bool read_mux(uint32_t *vaddr, uint32_t *ret) {
+    if (!check_vaddr_4_bytes_aligned(vaddr)) {
         return false;
     }
-    
-    volatile uint32_t *mux_reg_vaddr = (uint32_t *) base + offset;
 
     asm volatile("" : : : "memory");
-    *ret = *mux_reg_vaddr;
+    *ret = *vaddr;
     asm volatile("" : : : "memory");
 
     return true;
 }
 
-bool set_mux(uintptr_t base, uint32_t offset, uint32_t val) {
-    if (!check_offset_4_bytes_aligned(offset)) {
+bool set_mux(uint32_t *vaddr, uint32_t val) {
+    if (!check_vaddr_4_bytes_aligned(vaddr)) {
         return false;
     }
 
-    volatile uint32_t *mux_reg_vaddr = (uint32_t *) base + offset;
-
     asm volatile("" : : : "memory");
-    *mux_reg_vaddr = val;
+    *vaddr = val;
     asm volatile("" : : : "memory");
 
     return true;
@@ -75,7 +71,7 @@ bool set_mux(uintptr_t base, uint32_t offset, uint32_t val) {
 
 void reset_ao_pinmux_to_default(void) {
     for (int i = 0; i < sizeof(default_ao_pinmux) / sizeof(pindata_t); i++) {
-        if (!set_mux(pinctrl_ao_base, REG_ADDR(pinctrl_ao_base, default_ao_pinmux[i].offset), default_ao_pinmux[i].value)) {
+        if (!set_mux(MUX_REG_ADDR(pinctrl_ao_base, default_ao_pinmux[i].offset), default_ao_pinmux[i].value)) {
             LOG_DRIVER_ERR("cannot reset AO pinmux to default values");
             while (true) {};
         } else {
@@ -85,8 +81,9 @@ void reset_ao_pinmux_to_default(void) {
 }
 
 void reset_periphs_pinmux_to_default(void) {
+    LOG_DRIVER("in reset_periphs_pinmux_to_default\n");
     for (int i = 0; i < sizeof(default_periphs_pinmux) / sizeof(pindata_t); i++) {
-        if (!set_mux(pinctrl_periphs_base, REG_ADDR(pinctrl_periphs_base, default_periphs_pinmux[i].offset), default_periphs_pinmux[i].value)) {
+        if (!set_mux(MUX_REG_ADDR(pinctrl_periphs_base, default_periphs_pinmux[i].offset), default_periphs_pinmux[i].value)) {
             LOG_DRIVER_ERR("cannot reset peripherals pinmux to default values");
             while (true) {};
         } else {
@@ -96,11 +93,15 @@ void reset_periphs_pinmux_to_default(void) {
 }
 
 
-
 void init(void) {
     LOG_DRIVER("starting\n");
 
-    reset_ao_pinmux_to_default();
+    // The peripherals pinmux device physical address isn't aligned on page boundary whereas
+    // memory regions can only be mapped on page bondary, we need to offset the page boundary address
+    // into the pinmux device.
+    pinctrl_periphs_base += 0x400;
+
+    // reset_ao_pinmux_to_default();
     reset_periphs_pinmux_to_default();
 
 

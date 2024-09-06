@@ -188,3 +188,7 @@ if __name__ == "__main__":
     #     print(str(pin))
 
     # Map pinmux data from DTS to memory values
+
+    with open(out_dir + "/pinctrl_config_data.s", "w") as file:
+        file.write(".section .data\n")
+        file.write("\t.align 4\n")
