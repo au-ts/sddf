@@ -9,7 +9,11 @@
 #include <sddf/network/queue.h>
 #include "lwip/pbuf.h"
 
+/* Default gigabit link speed. */
+#define SDDF_LWIP_LINK_SPEED 1000000000
 
+/* Default ethernet MTU. */
+#define SDDF_LWIP_ETHER_MTU 1500
 
 /* Definitions for sDDF error constants. */
 typedef enum {

@@ -271,11 +271,11 @@ static err_t ethernet_init(struct netif *netif) {
     }
     
     net_set_mac_addr(netif->hwaddr, lwip_state.mac);
-    netif->mtu = ETHER_MTU;
+    netif->mtu = SDDF_LWIP_ETHER_MTU;
     netif->hwaddr_len = ETHARP_HWADDR_LEN;
     netif->output = etharp_output;
     netif->linkoutput = lwip_eth_send;
-    NETIF_INIT_SNMP(netif, snmp_ifType_ethernet_csmacd, LINK_SPEED);
+    NETIF_INIT_SNMP(netif, snmp_ifType_ethernet_csmacd, SDDF_LWIP_LINK_SPEED);
     netif->flags = NETIF_FLAG_BROADCAST | NETIF_FLAG_ETHARP | NETIF_FLAG_LINK_UP | NETIF_FLAG_IGMP;
 
     return ERR_OK;
