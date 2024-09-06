@@ -250,11 +250,6 @@ void notified(microkit_channel ch) {
 microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo) {
     switch (microkit_msginfo_get_label(msginfo)) {
 
-    case SDDF_PINCTRL_RESET: {
-        reset_pinmux();
-        return microkit_msginfo_new(SDDF_PINCTRL_SUCCESS, 0);
-    }
-
     case SDDF_PINCTRL_READ_MUX: {
         if (microkit_msginfo_get_count(msginfo) != READ_MUX_REQ_NUM_ARGS) {
             LOG_DRIVER_ERR(
@@ -273,48 +268,6 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo) {
             return microkit_msginfo_new(SDDF_PINCTRL_SUCCESS, READ_MUX_RESP_NUM_RESULTS);
         } else {
             return microkit_msginfo_new(SDDF_PINCTRL_INVALID_ARGS, 0);
-        }
-    }
-
-    case SDDF_PINCTRL_QUERY_DTS: {
-        if (microkit_msginfo_get_count(msginfo) != QUERY_DTS_REQ_NUM_ARGS) {
-            LOG_DRIVER_ERR(
-                "Query DTS PPC from channel %u does not have the correct number of arguments %lu != %d\n", 
-                ch, 
-                microkit_msginfo_get_count(msginfo), QUERY_DTS_REQ_NUM_ARGS
-            );
-            return microkit_msginfo_new(SDDF_PINCTRL_INVALID_ARGS, 0);
-        }
-
-        uint32_t reg_offset = (uint32_t) microkit_mr_get(QUERY_DTS_REQ_OFFSET);
-
-        bool found = false;
-        uint32_t found_value;
-        for (uint32_t i = 0; i < num_iomuxc_configs; i += 1) {
-            if (reg_offset == iomuxc_configs[i].mux_reg) {
-                found_value = iomuxc_configs[i].mux_val;
-                found = true;
-                break;
-            }
-            
-            if (reg_offset == iomuxc_configs[i].conf_reg) {
-                found_value = iomuxc_configs[i].pad_setting;
-                found = true;
-                break;
-            }
-
-            if (reg_offset == iomuxc_configs[i].input_reg) {
-                found_value = iomuxc_configs[i].input_val;
-                found = true;
-                break;
-            }
-        }
-
-        if (found) {
-            microkit_mr_set(QUERY_DTS_RESP_VALUE, found_value);
-            return microkit_msginfo_new(SDDF_PINCTRL_SUCCESS, QUERY_DTS_RESP_NUM_RESULTS);
-        } else {
-            return microkit_msginfo_new(SDDF_PINCTRL_NOT_IN_DTS, 0);
         }
     }
 
