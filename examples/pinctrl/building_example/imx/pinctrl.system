@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Copyright 2024, UNSW
+
+    SPDX-License-Identifier: BSD-2-Clause
+-->
 <system>
     <memory_region name="iomuxc_device" size="0x10000" phys_addr="0x30330000" />
     <memory_region name="iomuxc_gpr" size="0x10000" phys_addr="0x30340000" />
