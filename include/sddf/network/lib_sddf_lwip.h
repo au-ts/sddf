@@ -9,8 +9,7 @@
 #include <sddf/network/queue.h>
 #include "lwip/pbuf.h"
 
-#define LINK_SPEED 1000000000 // Gigabit
-#define ETHER_MTU 1500
+
 
 /* Definitions for sDDF error constants. */
 typedef enum {
@@ -71,8 +70,8 @@ void sddf_lwip_process_rx(void);
 
 /**
  * Handles the sending of notifications to the network RX and TX virtualisers.
- * Must be invoked at the end of each event handling loop to ensure outgoing
- * buffers are processed by the virtualisers.
+ * Must be invoked at the end of each event handling loop and initialisation
+ * to ensure outgoing buffers are processed by the virtualisers.
  */
 void sddf_lwip_maybe_notify(void);
 
