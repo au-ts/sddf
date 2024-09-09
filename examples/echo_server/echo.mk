@@ -63,20 +63,20 @@ include ${SDDF}/${LWIPDIR}/Filelists.mk
 NETIFFILES:=$(LWIPDIR)/netif/ethernet.c
 
 # LWIPFILES: All the above.
-LWIPFILES = echo.c $(COREFILES) $(CORE4FILES) $(NETIFFILES)
-LWIP_OBJS := $(LWIPFILES:.c=.o) echo.o utilization_socket.o \
+LWIPFILES := $(COREFILES) $(CORE4FILES) $(NETIFFILES)
+ECHO_OBJS := $(LWIPFILES:.c=.o) echo.o utilization_socket.o \
 	     udp_echo_socket.o tcp_echo_socket.o
 
-DEPS := $(filter %.d,$(LWIP_OBJS:.o=.d))
+DEPS := $(filter %.d,$(ECHO_OBJS:.o=.d))
 
 all: loader.img
 
-${LWIP_OBJS}: ${CHECK_FLAGS_BOARD_MD5}
-echo.elf: $(LWIP_OBJS) libsddf_util.a lib_sddf_lwip.a
+${ECHO_OBJS}: ${CHECK_FLAGS_BOARD_MD5}
+echo.elf: $(ECHO_OBJS) lib_sddf_lwip.a libsddf_util.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 LWIPDIRS := $(addprefix ${LWIPDIR}/, core/ipv4 netif api)
-${LWIP_OBJS}: |${BUILD_DIR}/${LWIPDIRS}
+${ECHO_OBJS}: |${BUILD_DIR}/${LWIPDIRS}
 ${BUILD_DIR}/${LWIPDIRS}:
 	mkdir -p $@
 
