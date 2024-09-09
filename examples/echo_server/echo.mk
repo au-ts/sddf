@@ -91,7 +91,7 @@ ${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 include ${SDDF}/util/util.mk
 include ${SDDF}/network/components/network_components.mk
 # Specify how many pbufs sDDF LWIP library requires for all clients
-SDDF_LWIP_NUM_BUFFS=512
+SDDF_LWIP_NUM_BUFS=512
 include ${SDDF}/network/lib_sddf_lwip/lib_sddf_lwip.mk
 include ${ETHERNET_DRIVER}/eth_driver.mk
 include ${BENCHMARK}/benchmark.mk

@@ -66,7 +66,7 @@ typedef struct pbuf_custom_offset {
 
 LWIP_MEMPOOL_DECLARE(
     RX_POOL,
-    SDDF_LWIP_NUM_BUFFS * 2,
+    SDDF_LWIP_NUM_BUFS * 2,
     sizeof(struct pbuf_custom_offset),
     "Zero-copy RX pool"
 );
