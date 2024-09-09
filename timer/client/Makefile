@@ -10,13 +10,12 @@ endif
 
 BUILD_DIR ?= .
 
-CC := clang
-TARGET := x86_64-none-elf
+CC := zig cc
+TARGET := x86_64-freestanding
 SDDF := ../../
 
 CFLAGS := \
 	-target $(TARGET) \
-	-mstrict-align \
 	-ffreestanding \
 	-I$(MICROKIT_INCLUDE) \
 	-I$(SDDF)/include \
