@@ -5,112 +5,117 @@
 
 # This file defines how each pad of the chip map to each port.
 # And how such mapping is defined in the DTS.
+# This data comes from the Linux kernel.
 
 # Each GPIO chip has a list of pads, each assigned an index.
 
 # First GPIO chip, AKA, the "Always-On" AO chip.
-GPIOAO_0  = 0
-GPIOAO_1  = 1
-GPIOAO_2  = 2
-GPIOAO_3  = 3
-GPIOAO_4  = 4
-GPIOAO_5  = 5
-GPIOAO_6  = 6
-GPIOAO_7  = 7
-GPIOAO_8  = 8
-GPIOAO_9  = 9
-GPIOAO_10 = 10
-GPIOAO_11 = 11
-GPIOE_0   = 12
-GPIOE_1   = 13
-GPIOE_2   = 14
+ao_pad_to_idx = {
+    "GPIOAO_0"  : 0,
+    "GPIOAO_1"  : 1,
+    "GPIOAO_2"  : 2,
+    "GPIOAO_3"  : 3,
+    "GPIOAO_4"  : 4,
+    "GPIOAO_5"  : 5,
+    "GPIOAO_6"  : 6,
+    "GPIOAO_7"  : 7,
+    "GPIOAO_8"  : 8,
+    "GPIOAO_9"  : 9,
+    "GPIOAO_10" : 10,
+    "GPIOAO_11" : 11,
+    "GPIOE_0"   : 12,
+    "GPIOE_1"   : 13,
+    "GPIOE_2"   : 14
+}
 
 # Second and main GPIO chip, AKA peripherals
-GPIOZ_0  = 0
-GPIOZ_1  = 1
-GPIOZ_2  = 2
-GPIOZ_3  = 3
-GPIOZ_4  = 4
-GPIOZ_5  = 5
-GPIOZ_6  = 6
-GPIOZ_7  = 7
-GPIOZ_8  = 8
-GPIOZ_9  = 9
-GPIOZ_10 = 10
-GPIOZ_11 = 11
-GPIOZ_12 = 12
-GPIOZ_13 = 13
-GPIOZ_14 = 14
-GPIOZ_15 = 15
-GPIOH_0  = 16
-GPIOH_1  = 17
-GPIOH_2  = 18
-GPIOH_3  = 19
-GPIOH_4  = 20
-GPIOH_5  = 21
-GPIOH_6  = 22
-GPIOH_7  = 23
-GPIOH_8  = 24
-BOOT_0   = 25
-BOOT_1   = 26
-BOOT_2   = 27
-BOOT_3   = 28
-BOOT_4   = 29
-BOOT_5   = 30
-BOOT_6   = 31
-BOOT_7   = 32
-BOOT_8   = 33
-BOOT_9   = 34
-BOOT_10  = 35
-BOOT_11  = 36
-BOOT_12  = 37
-BOOT_13  = 38
-BOOT_14  = 39
-BOOT_15  = 40
-GPIOC_0  = 41
-GPIOC_1  = 42
-GPIOC_2  = 43
-GPIOC_3  = 44
-GPIOC_4  = 45
-GPIOC_5  = 46
-GPIOC_6  = 47
-GPIOC_7  = 48
-GPIOA_0  = 49
-GPIOA_1  = 50
-GPIOA_2  = 51
-GPIOA_3  = 52
-GPIOA_4  = 53
-GPIOA_5  = 54
-GPIOA_6  = 55
-GPIOA_7  = 56
-GPIOA_8  = 57
-GPIOA_9  = 58
-GPIOA_10 = 59
-GPIOA_11 = 60
-GPIOA_12 = 61
-GPIOA_13 = 62
-GPIOA_14 = 63
-GPIOA_15 = 64
-GPIOX_0  = 65
-GPIOX_1  = 66
-GPIOX_2  = 67
-GPIOX_3  = 68
-GPIOX_4  = 69
-GPIOX_5  = 70
-GPIOX_6  = 71
-GPIOX_7  = 72
-GPIOX_8  = 73
-GPIOX_9  = 74
-GPIOX_10 = 75
-GPIOX_11 = 76
-GPIOX_12 = 77
-GPIOX_13 = 78
-GPIOX_14 = 79
-GPIOX_15 = 80
-GPIOX_16 = 81
-GPIOX_17 = 82
-GPIOX_18 = 83
-GPIOX_19 = 84
+pad_to_idx = {
+    "GPIOZ_0"  : 0,
+    "GPIOZ_1"  : 1,
+    "GPIOZ_2"  : 2,
+    "GPIOZ_3"  : 3,
+    "GPIOZ_4"  : 4,
+    "GPIOZ_5"  : 5,
+    "GPIOZ_6"  : 6,
+    "GPIOZ_7"  : 7,
+    "GPIOZ_8"  : 8,
+    "GPIOZ_9"  : 9,
+    "GPIOZ_10" : 10,
+    "GPIOZ_11" : 11,
+    "GPIOZ_12" : 12,
+    "GPIOZ_13" : 13,
+    "GPIOZ_14" : 14,
+    "GPIOZ_15" : 15,
+    "GPIOH_0"  : 16,
+    "GPIOH_1"  : 17,
+    "GPIOH_2"  : 18,
+    "GPIOH_3"  : 19,
+    "GPIOH_4"  : 20,
+    "GPIOH_5"  : 21,
+    "GPIOH_6"  : 22,
+    "GPIOH_7"  : 23,
+    "GPIOH_8"  : 24,
+    "BOOT_0"   : 25,
+    "BOOT_1"   : 26,
+    "BOOT_2"   : 27,
+    "BOOT_3"   : 28,
+    "BOOT_4"   : 29,
+    "BOOT_5"   : 30,
+    "BOOT_6"   : 31,
+    "BOOT_7"   : 32,
+    "BOOT_8"   : 33,
+    "BOOT_9"   : 34,
+    "BOOT_10"  : 35,
+    "BOOT_11"  : 36,
+    "BOOT_12"  : 37,
+    "BOOT_13"  : 38,
+    "BOOT_14"  : 39,
+    "BOOT_15"  : 40,
+    "GPIOC_0"  : 41,
+    "GPIOC_1"  : 42,
+    "GPIOC_2"  : 43,
+    "GPIOC_3"  : 44,
+    "GPIOC_4"  : 45,
+    "GPIOC_5"  : 46,
+    "GPIOC_6"  : 47,
+    "GPIOC_7"  : 48,
+    "GPIOA_0"  : 49,
+    "GPIOA_1"  : 50,
+    "GPIOA_2"  : 51,
+    "GPIOA_3"  : 52,
+    "GPIOA_4"  : 53,
+    "GPIOA_5"  : 54,
+    "GPIOA_6"  : 55,
+    "GPIOA_7"  : 56,
+    "GPIOA_8"  : 57,
+    "GPIOA_9"  : 58,
+    "GPIOA_10" : 59,
+    "GPIOA_11" : 60,
+    "GPIOA_12" : 61,
+    "GPIOA_13" : 62,
+    "GPIOA_14" : 63,
+    "GPIOA_15" : 64,
+    "GPIOX_0"  : 65,
+    "GPIOX_1"  : 66,
+    "GPIOX_2"  : 67,
+    "GPIOX_3"  : 68,
+    "GPIOX_4"  : 69,
+    "GPIOX_5"  : 70,
+    "GPIOX_6"  : 71,
+    "GPIOX_7"  : 72,
+    "GPIOX_8"  : 73,
+    "GPIOX_9"  : 74,
+    "GPIOX_10" : 75,
+    "GPIOX_11" : 76,
+    "GPIOX_12" : 77,
+    "GPIOX_13" : 78,
+    "GPIOX_14" : 79,
+    "GPIOX_15" : 80,
+    "GPIOX_16" : 81,
+    "GPIOX_17" : 82,
+    "GPIOX_18" : 83,
+    "GPIOX_19" : 84
+}
 
 ########################################################
 AO_BASE             = 0xFF80_0000
@@ -124,415 +129,416 @@ PERIPHS_FIRST_REG_OFFSET = 0xB0
 
 port_to_pad = {
     # emmc:
-    "emmc_nand_d0" : BOOT_0,
-    "emmc_nand_d1" : BOOT_1,
-    "emmc_nand_d2" : BOOT_2,
-    "emmc_nand_d3" : BOOT_3,
-    "emmc_nand_d4" : BOOT_4,
-    "emmc_nand_d5" : BOOT_5,
-    "emmc_nand_d6" : BOOT_6,
-    "emmc_nand_d7" : BOOT_7,
-    "emmc_clk"     : BOOT_8,
-    "emmc_cmd"     : BOOT_10,
-    "emmc_nand_ds" : BOOT_13,
+    "emmc_nand_d0" : pad_to_idx["BOOT_0"],
+    "emmc_nand_d1" : pad_to_idx["BOOT_1"],
+    "emmc_nand_d2" : pad_to_idx["BOOT_2"],
+    "emmc_nand_d3" : pad_to_idx["BOOT_3"],
+    "emmc_nand_d4" : pad_to_idx["BOOT_4"],
+    "emmc_nand_d5" : pad_to_idx["BOOT_5"],
+    "emmc_nand_d6" : pad_to_idx["BOOT_6"],
+    "emmc_nand_d7" : pad_to_idx["BOOT_7"],
+    "emmc_clk"     : pad_to_idx["BOOT_8"],
+    "emmc_cmd"     : pad_to_idx["BOOT_10"],
+    "emmc_nand_ds" : pad_to_idx["BOOT_13"],
 
     # nand:
-    "nand_wen_clk" : BOOT_8,
-    "nand_ale"     : BOOT_9,
-    "nand_cle"     : BOOT_10,
-    "nand_ce0"     : BOOT_11,
-    "nand_ren_wr"  : BOOT_12,
-    "nand_rb0"     : BOOT_14,
-    "nand_ce1"     : BOOT_15,
+    "nand_wen_clk" : pad_to_idx["BOOT_8"],
+    "nand_ale"     : pad_to_idx["BOOT_9"],
+    "nand_cle"     : pad_to_idx["BOOT_10"],
+    "nand_ce0"     : pad_to_idx["BOOT_11"],
+    "nand_ren_wr"  : pad_to_idx["BOOT_12"],
+    "nand_rb0"     : pad_to_idx["BOOT_14"],
+    "nand_ce1"     : pad_to_idx["BOOT_15"],
 
     # nor
-    "nor_hold" : BOOT_3,
-    "nor_d"    : BOOT_4,
-    "nor_q"    : BOOT_5,
-    "nor_c"    : BOOT_6,
-    "nor_wp"   : BOOT_7,
-    "nor_cs"   : BOOT_14,
+    "nor_hold" : pad_to_idx["BOOT_3"],
+    "nor_d"    : pad_to_idx["BOOT_4"],
+    "nor_q"    : pad_to_idx["BOOT_5"],
+    "nor_c"    : pad_to_idx["BOOT_6"],
+    "nor_wp"   : pad_to_idx["BOOT_7"],
+    "nor_cs"   : pad_to_idx["BOOT_14"],
 
     # sdio
-    "sdio_d0"  : GPIOX_0,
-    "sdio_d1"  : GPIOX_1,
-    "sdio_d2"  : GPIOX_2,
-    "sdio_d3"  : GPIOX_3,
-    "sdio_clk" : GPIOX_4,
-    "sdio_cmd" : GPIOX_5,
+    "sdio_d0"  : pad_to_idx["GPIOX_0"],
+    "sdio_d1"  : pad_to_idx["GPIOX_1"],
+    "sdio_d2"  : pad_to_idx["GPIOX_2"],
+    "sdio_d3"  : pad_to_idx["GPIOX_3"],
+    "sdio_clk" : pad_to_idx["GPIOX_4"],
+    "sdio_cmd" : pad_to_idx["GPIOX_5"],
 
     # sdcard
-    "sdcard_d0_c"  : GPIOC_0,
-    "sdcard_d1_c"  : GPIOC_1,
-    "sdcard_d2_c"  : GPIOC_2,
-    "sdcard_d3_c"  : GPIOC_3,
-    "sdcard_clk_c" : GPIOC_4,
-    "sdcard_cmd_c" : GPIOC_5,
+    "sdcard_d0_c"  : pad_to_idx["GPIOC_0"],
+    "sdcard_d1_c"  : pad_to_idx["GPIOC_1"],
+    "sdcard_d2_c"  : pad_to_idx["GPIOC_2"],
+    "sdcard_d3_c"  : pad_to_idx["GPIOC_3"],
+    "sdcard_clk_c" : pad_to_idx["GPIOC_4"],
+    "sdcard_cmd_c" : pad_to_idx["GPIOC_5"],
 
-    "sdcard_d0_z"  : GPIOZ_2,
-    "sdcard_d1_z"  : GPIOZ_3,
-    "sdcard_d2_z"  : GPIOZ_4,
-    "sdcard_d3_z"  : GPIOZ_5,
-    "sdcard_clk_z" : GPIOZ_6,
-    "sdcard_cmd_z" : GPIOZ_7,
+    "sdcard_d0_z"  : pad_to_idx["GPIOZ_2"],
+    "sdcard_d1_z"  : pad_to_idx["GPIOZ_3"],
+    "sdcard_d2_z"  : pad_to_idx["GPIOZ_4"],
+    "sdcard_d3_z"  : pad_to_idx["GPIOZ_5"],
+    "sdcard_clk_z" : pad_to_idx["GPIOZ_6"],
+    "sdcard_cmd_z" : pad_to_idx["GPIOZ_7"],
 
     # spi0
-    "spi0_mosi_c" : GPIOC_0,
-    "spi0_miso_c" : GPIOC_1,
-    "spi0_ss0_c"  : GPIOC_2,
-    "spi0_clk_c"  : GPIOC_3,
+    "spi0_mosi_c" : pad_to_idx["GPIOC_0"],
+    "spi0_miso_c" : pad_to_idx["GPIOC_1"],
+    "spi0_ss0_c"  : pad_to_idx["GPIOC_2"],
+    "spi0_clk_c"  : pad_to_idx["GPIOC_3"],
 
-    "spi0_mosi_x" : GPIOX_8,
-    "spi0_miso_x" : GPIOX_9,
-    "spi0_ss0_x"  : GPIOX_10,
-    "spi0_clk_x"  : GPIOX_11,
+    "spi0_mosi_x" : pad_to_idx["GPIOX_8"],
+    "spi0_miso_x" : pad_to_idx["GPIOX_9"],
+    "spi0_ss0_x"  : pad_to_idx["GPIOX_10"],
+    "spi0_clk_x"  : pad_to_idx["GPIOX_11"],
 
     # spi1
-    "spi1_mosi" : GPIOH_4,
-    "spi1_miso" : GPIOH_5,
-    "spi1_ss0"  : GPIOH_6,
-    "spi1_clk"  : GPIOH_7,
+    "spi1_mosi" : pad_to_idx["GPIOH_4"],
+    "spi1_miso" : pad_to_idx["GPIOH_5"],
+    "spi1_ss0"  : pad_to_idx["GPIOH_6"],
+    "spi1_clk"  : pad_to_idx["GPIOH_7"],
 
     # i2c0
-    "i2c0_sda_c"  : GPIOC_5,
-    "i2c0_sck_c"  : GPIOC_6,
-    "i2c0_sda_z0" : GPIOZ_0,
-    "i2c0_sck_z1" : GPIOZ_1,
-    "i2c0_sda_z7" : GPIOZ_7,
-    "i2c0_sck_z8" : GPIOZ_8,
+    "i2c0_sda_c"  : pad_to_idx["GPIOC_5"],
+    "i2c0_sck_c"  : pad_to_idx["GPIOC_6"],
+    "i2c0_sda_z0" : pad_to_idx["GPIOZ_0"],
+    "i2c0_sck_z1" : pad_to_idx["GPIOZ_1"],
+    "i2c0_sda_z7" : pad_to_idx["GPIOZ_7"],
+    "i2c0_sck_z8" : pad_to_idx["GPIOZ_8"],
 
     # i2c1
-    "i2c1_sda_x"  : GPIOX_10,
-    "i2c1_sck_x"  : GPIOX_11,
-    "i2c1_sda_h2" : GPIOH_2,
-    "i2c1_sck_h3" : GPIOH_3,
-    "i2c1_sda_h6" : GPIOH_6,
-    "i2c1_sck_h7" : GPIOH_7,
+    "i2c1_sda_x"  : pad_to_idx["GPIOX_10"],
+    "i2c1_sck_x"  : pad_to_idx["GPIOX_11"],
+    "i2c1_sda_h2" : pad_to_idx["GPIOH_2"],
+    "i2c1_sck_h3" : pad_to_idx["GPIOH_3"],
+    "i2c1_sda_h6" : pad_to_idx["GPIOH_6"],
+    "i2c1_sck_h7" : pad_to_idx["GPIOH_7"],
 
     # i2c2
-    "i2c2_sda_x" : GPIOX_17,
-    "i2c2_sck_x" : GPIOX_18,
-    "i2c2_sda_z" : GPIOZ_14,
-    "i2c2_sck_z" : GPIOZ_15,
+    "i2c2_sda_x" : pad_to_idx["GPIOX_17"],
+    "i2c2_sck_x" : pad_to_idx["GPIOX_18"],
+    "i2c2_sda_z" : pad_to_idx["GPIOZ_14"],
+    "i2c2_sck_z" : pad_to_idx["GPIOZ_15"],
 
     # i2c3
-    "i2c3_sda_h" : GPIOH_0,
-    "i2c3_sck_h" : GPIOH_1,
-    "i2c3_sda_a" : GPIOA_14,
-    "i2c3_sck_a" : GPIOA_15,
+    "i2c3_sda_h" : pad_to_idx["GPIOH_0"],
+    "i2c3_sck_h" : pad_to_idx["GPIOH_1"],
+    "i2c3_sda_a" : pad_to_idx["GPIOA_14"],
+    "i2c3_sck_a" : pad_to_idx["GPIOA_15"],
 
     # uart_a
-    "uart_a_tx"  : GPIOX_12,
-    "uart_a_rx"  : GPIOX_13,
-    "uart_a_cts" : GPIOX_14,
-    "uart_a_rts" : GPIOX_15,
+    "uart_a_tx"  : pad_to_idx["GPIOX_12"],
+    "uart_a_rx"  : pad_to_idx["GPIOX_13"],
+    "uart_a_cts" : pad_to_idx["GPIOX_14"],
+    "uart_a_rts" : pad_to_idx["GPIOX_15"],
 
     # uart_b
-    "uart_b_tx" : GPIOX_6,
-    "uart_b_rx" : GPIOX_7,
+    "uart_b_tx" : pad_to_idx["GPIOX_6"],
+    "uart_b_rx" : pad_to_idx["GPIOX_7"],
 
     # uart_c
-    "uart_c_rts" : GPIOH_4,
-    "uart_c_cts" : GPIOH_5,
-    "uart_c_rx"  : GPIOH_6,
-    "uart_c_tx"  : GPIOH_7,
+    "uart_c_rts" : pad_to_idx["GPIOH_4"],
+    "uart_c_cts" : pad_to_idx["GPIOH_5"],
+    "uart_c_rx"  : pad_to_idx["GPIOH_6"],
+    "uart_c_tx"  : pad_to_idx["GPIOH_7"],
 
     # uart_ao_a_c
-    "uart_ao_a_rx_c" : GPIOC_2,
-    "uart_ao_a_tx_c" : GPIOC_3,
+    "uart_ao_a_rx_c" : pad_to_idx["GPIOC_2"],
+    "uart_ao_a_tx_c" : pad_to_idx["GPIOC_3"],
 
     # iso7816
-    "iso7816_clk_c"  : GPIOC_5,
-    "iso7816_data_c" : GPIOC_6,
-    "iso7816_clk_x"  : GPIOX_8,
-    "iso7816_data_x" : GPIOX_9,
-    "iso7816_clk_h"  : GPIOH_6,
-    "iso7816_data_h" : GPIOH_7,
-    "iso7816_clk_z"  : GPIOZ_0,
-    "iso7816_data_z" : GPIOZ_1,
+    "iso7816_clk_c"  : pad_to_idx["GPIOC_5"],
+    "iso7816_data_c" : pad_to_idx["GPIOC_6"],
+    "iso7816_clk_x"  : pad_to_idx["GPIOX_8"],
+    "iso7816_data_x" : pad_to_idx["GPIOX_9"],
+    "iso7816_clk_h"  : pad_to_idx["GPIOH_6"],
+    "iso7816_data_h" : pad_to_idx["GPIOH_7"],
+    "iso7816_clk_z"  : pad_to_idx["GPIOZ_0"],
+    "iso7816_data_z" : pad_to_idx["GPIOZ_1"],
 
     # eth
-    "eth_mdio"         : GPIOZ_0,
-    "eth_mdc"          : GPIOZ_1,
-    "eth_rgmii_rx_clk" : GPIOZ_2,
-    "eth_rx_dv"        : GPIOZ_3,
-    "eth_rxd0"         : GPIOZ_4,
-    "eth_rxd1"         : GPIOZ_5,
-    "eth_rxd2_rgmii"   : GPIOZ_6,
-    "eth_rxd3_rgmii"   : GPIOZ_7,
-    "eth_rgmii_tx_clk" : GPIOZ_8,
-    "eth_txen"         : GPIOZ_9,
-    "eth_txd0"         : GPIOZ_10,
-    "eth_txd1"         : GPIOZ_11,
-    "eth_txd2_rgmii"   : GPIOZ_12,
-    "eth_txd3_rgmii"   : GPIOZ_13,
-    "eth_link_led"     : GPIOZ_14,
-    "eth_act_led"      : GPIOZ_15,
+    "eth_mdio"         : pad_to_idx["GPIOZ_0"],
+    "eth_mdc"          : pad_to_idx["GPIOZ_1"],
+    "eth_rgmii_rx_clk" : pad_to_idx["GPIOZ_2"],
+    "eth_rx_dv"        : pad_to_idx["GPIOZ_3"],
+    "eth_rxd0"         : pad_to_idx["GPIOZ_4"],
+    "eth_rxd1"         : pad_to_idx["GPIOZ_5"],
+    "eth_rxd2_rgmii"   : pad_to_idx["GPIOZ_6"],
+    "eth_rxd3_rgmii"   : pad_to_idx["GPIOZ_7"],
+    "eth_rgmii_tx_clk" : pad_to_idx["GPIOZ_8"],
+    "eth_txen"         : pad_to_idx["GPIOZ_9"],
+    "eth_txd0"         : pad_to_idx["GPIOZ_10"],
+    "eth_txd1"         : pad_to_idx["GPIOZ_11"],
+    "eth_txd2_rgmii"   : pad_to_idx["GPIOZ_12"],
+    "eth_txd3_rgmii"   : pad_to_idx["GPIOZ_13"],
+    "eth_link_led"     : pad_to_idx["GPIOZ_14"],
+    "eth_act_led"      : pad_to_idx["GPIOZ_15"],
 
     # pwm_a
-    "pwm_a" : GPIOX_6,
+    "pwm_a" : pad_to_idx["GPIOX_6"],
 
     # pwm_b
-    "pwm_b_x7"  : GPIOX_7,
-    "pwm_b_x19" : GPIOX_19,
+    "pwm_b_x7"  : pad_to_idx["GPIOX_7"],
+    "pwm_b_x19" : pad_to_idx["GPIOX_19"],
 
     # pwm_c
-    "pwm_c_c"  : GPIOC_4,
-    "pwm_c_x5" : GPIOX_5,
-    "pwm_c_x8" : GPIOX_8,
+    "pwm_c_c"  : pad_to_idx["GPIOC_4"],
+    "pwm_c_x5" : pad_to_idx["GPIOX_5"],
+    "pwm_c_x8" : pad_to_idx["GPIOX_8"],
 
     # pwm_d
-    "pwm_d_x3" : GPIOX_3,
-    "pwm_d_x6" : GPIOX_6,
+    "pwm_d_x3" : pad_to_idx["GPIOX_3"],
+    "pwm_d_x6" : pad_to_idx["GPIOX_6"],
 
     # pwm_e
-    "pwm_e" : GPIOX_16,
+    "pwm_e" : pad_to_idx["GPIOX_16"],
 
     # pwm_f
-    "pwm_f_z" : GPIOZ_12,
-    "pwm_f_a" : GPIOA_11,
-    "pwm_f_x" : GPIOX_7,
-    "pwm_f_h" : GPIOH_5,
+    "pwm_f_z" : pad_to_idx["GPIOZ_12"],
+    "pwm_f_a" : pad_to_idx["GPIOA_11"],
+    "pwm_f_x" : pad_to_idx["GPIOX_7"],
+    "pwm_f_h" : pad_to_idx["GPIOH_5"],
 
     # cec_ao 
-    "cec_ao_a_h" : GPIOH_3,
-    "cec_ao_b_h" : GPIOH_3,
+    "cec_ao_a_h" : pad_to_idx["GPIOH_3"],
+    "cec_ao_b_h" : pad_to_idx["GPIOH_3"],
 
     # jtag_b
-    "jtag_b_tdo" : GPIOC_0,
-    "jtag_b_tdi" : GPIOC_1,
-    "jtag_b_clk" : GPIOC_4,
-    "jtag_b_tms" : GPIOC_5,
+    "jtag_b_tdo" : pad_to_idx["GPIOC_0"],
+    "jtag_b_tdi" : pad_to_idx["GPIOC_1"],
+    "jtag_b_clk" : pad_to_idx["GPIOC_4"],
+    "jtag_b_tms" : pad_to_idx["GPIOC_5"],
 
     # bt565_a
-    "bt565_a_vs"   : GPIOZ_0,
-    "bt565_a_hs"   : GPIOZ_1,
-    "bt565_a_clk"  : GPIOZ_3,
-    "bt565_a_din0" : GPIOZ_4,
-    "bt565_a_din1" : GPIOZ_5,
-    "bt565_a_din2" : GPIOZ_6,
-    "bt565_a_din3" : GPIOZ_7,
-    "bt565_a_din4" : GPIOZ_8,
-    "bt565_a_din5" : GPIOZ_9,
-    "bt565_a_din6" : GPIOZ_10,
-    "bt565_a_din7" : GPIOZ_11,
+    "bt565_a_vs"   : pad_to_idx["GPIOZ_0"],
+    "bt565_a_hs"   : pad_to_idx["GPIOZ_1"],
+    "bt565_a_clk"  : pad_to_idx["GPIOZ_3"],
+    "bt565_a_din0" : pad_to_idx["GPIOZ_4"],
+    "bt565_a_din1" : pad_to_idx["GPIOZ_5"],
+    "bt565_a_din2" : pad_to_idx["GPIOZ_6"],
+    "bt565_a_din3" : pad_to_idx["GPIOZ_7"],
+    "bt565_a_din4" : pad_to_idx["GPIOZ_8"],
+    "bt565_a_din5" : pad_to_idx["GPIOZ_9"],
+    "bt565_a_din6" : pad_to_idx["GPIOZ_10"],
+    "bt565_a_din7" : pad_to_idx["GPIOZ_11"],
 
     # tsin_a 
-    "tsin_a_valid" : GPIOX_2,
-    "tsin_a_sop"   : GPIOX_1,
-    "tsin_a_din0"  : GPIOX_0,
-    "tsin_a_clk"   : GPIOX_3,
+    "tsin_a_valid" : pad_to_idx["GPIOX_2"],
+    "tsin_a_sop"   : pad_to_idx["GPIOX_1"],
+    "tsin_a_din0"  : pad_to_idx["GPIOX_0"],
+    "tsin_a_clk"   : pad_to_idx["GPIOX_3"],
 
     # tsin_b
-    "tsin_b_valid_x" : GPIOX_9,
-    "tsin_b_sop_x"   : GPIOX_8,
-    "tsin_b_din0_x"  : GPIOX_10,
-    "tsin_b_clk_x"   : GPIOX_11,
+    "tsin_b_valid_x" : pad_to_idx["GPIOX_9"],
+    "tsin_b_sop_x"   : pad_to_idx["GPIOX_8"],
+    "tsin_b_din0_x"  : pad_to_idx["GPIOX_10"],
+    "tsin_b_clk_x"   : pad_to_idx["GPIOX_11"],
 
-    "tsin_b_valid_z" : GPIOZ_2,
-    "tsin_b_sop_z"   : GPIOZ_3,
-    "tsin_b_din0_z"  : GPIOZ_4,
-    "tsin_b_clk_z"   : GPIOZ_5,
+    "tsin_b_valid_z" : pad_to_idx["GPIOZ_2"],
+    "tsin_b_sop_z"   : pad_to_idx["GPIOZ_3"],
+    "tsin_b_din0_z"  : pad_to_idx["GPIOZ_4"],
+    "tsin_b_clk_z"   : pad_to_idx["GPIOZ_5"],
 
-    "tsin_b_fail" : GPIOZ_6,
-    "tsin_b_din1" : GPIOZ_7,
-    "tsin_b_din2" : GPIOZ_8,
-    "tsin_b_din3" : GPIOZ_9,
-    "tsin_b_din4" : GPIOZ_10,
-    "tsin_b_din5" : GPIOZ_11,
-    "tsin_b_din6" : GPIOZ_12,
-    "tsin_b_din7" : GPIOZ_13,
+    "tsin_b_fail" : pad_to_idx["GPIOZ_6"],
+    "tsin_b_din1" : pad_to_idx["GPIOZ_7"],
+    "tsin_b_din2" : pad_to_idx["GPIOZ_8"],
+    "tsin_b_din3" : pad_to_idx["GPIOZ_9"],
+    "tsin_b_din4" : pad_to_idx["GPIOZ_10"],
+    "tsin_b_din5" : pad_to_idx["GPIOZ_11"],
+    "tsin_b_din6" : pad_to_idx["GPIOZ_12"],
+    "tsin_b_din7" : pad_to_idx["GPIOZ_13"],
 
     # hdmitx
-    "hdmitx_sda"    : GPIOH_0,
-    "hdmitx_sck"    : GPIOH_1,
-    "hdmitx_hpd_in" : GPIOH_2,
+    "hdmitx_sda"    : pad_to_idx["GPIOH_0"],
+    "hdmitx_sck"    : pad_to_idx["GPIOH_1"],
+    "hdmitx_hpd_in" : pad_to_idx["GPIOH_2"],
 
     # pdm
-    "pdm_din0_c" : GPIOC_0,
-    "pdm_din1_c" : GPIOC_1,
-    "pdm_din2_c" : GPIOC_2,
-    "pdm_din3_c" : GPIOC_3,
-    "pdm_dclk_c" : GPIOC_4,
+    "pdm_din0_c" : pad_to_idx["GPIOC_0"],
+    "pdm_din1_c" : pad_to_idx["GPIOC_1"],
+    "pdm_din2_c" : pad_to_idx["GPIOC_2"],
+    "pdm_din3_c" : pad_to_idx["GPIOC_3"],
+    "pdm_dclk_c" : pad_to_idx["GPIOC_4"],
 
-    "pdm_din0_x" : GPIOX_0,
-    "pdm_din1_x" : GPIOX_1,
-    "pdm_din2_x" : GPIOX_2,
-    "pdm_din3_x" : GPIOX_3,
-    "pdm_dclk_x" : GPIOX_4,
+    "pdm_din0_x" : pad_to_idx["GPIOX_0"],
+    "pdm_din1_x" : pad_to_idx["GPIOX_1"],
+    "pdm_din2_x" : pad_to_idx["GPIOX_2"],
+    "pdm_din3_x" : pad_to_idx["GPIOX_3"],
+    "pdm_dclk_x" : pad_to_idx["GPIOX_4"],
 
-    "pdm_din0_z" : GPIOZ_2,
-    "pdm_din1_z" : GPIOZ_3,
-    "pdm_din2_z" : GPIOZ_4,
-    "pdm_din3_z" : GPIOZ_5,
-    "pdm_dclk_z" : GPIOZ_6,
+    "pdm_din0_z" : pad_to_idx["GPIOZ_2"],
+    "pdm_din1_z" : pad_to_idx["GPIOZ_3"],
+    "pdm_din2_z" : pad_to_idx["GPIOZ_4"],
+    "pdm_din3_z" : pad_to_idx["GPIOZ_5"],
+    "pdm_dclk_z" : pad_to_idx["GPIOZ_6"],
 
-    "pdm_din0_a" : GPIOA_8,
-    "pdm_din1_a" : GPIOA_9,
-    "pdm_din2_a" : GPIOA_6,
-    "pdm_din3_a" : GPIOA_5,
-    "pdm_dclk_a" : GPIOA_7,
+    "pdm_din0_a" : pad_to_idx["GPIOA_8"],
+    "pdm_din1_a" : pad_to_idx["GPIOA_9"],
+    "pdm_din2_a" : pad_to_idx["GPIOA_6"],
+    "pdm_din3_a" : pad_to_idx["GPIOA_5"],
+    "pdm_dclk_a" : pad_to_idx["GPIOA_7"],
 
     # spdif_in
-    "spdif_in_h"   : GPIOH_5,
-    "spdif_in_a10" : GPIOA_10,
-    "spdif_in_a12" : GPIOA_12,
+    "spdif_in_h"   : pad_to_idx["GPIOH_5"],
+    "spdif_in_a10" : pad_to_idx["GPIOA_10"],
+    "spdif_in_a12" : pad_to_idx["GPIOA_12"],
 
     # spdif_out
-    "spdif_out_h"   : GPIOH_4,
-    "spdif_out_a11" : GPIOA_11,
-    "spdif_out_a13" : GPIOA_13,
+    "spdif_out_h"   : pad_to_idx["GPIOH_4"],
+    "spdif_out_a11" : pad_to_idx["GPIOA_11"],
+    "spdif_out_a13" : pad_to_idx["GPIOA_13"],
 
     # mclk0
-    "mclk0_a" : GPIOA_0,
+    "mclk0_a" : pad_to_idx["GPIOA_0"],
 
     # mclk1
-    "mclk1_x" : GPIOX_5,
-    "mclk1_z" : GPIOZ_8,
-    "mclk1_a" : GPIOA_11,
+    "mclk1_x" : pad_to_idx["GPIOX_5"],
+    "mclk1_z" : pad_to_idx["GPIOZ_8"],
+    "mclk1_a" : pad_to_idx["GPIOA_11"],
 
     # tdm
-    "tdm_a_slv_sclk" : GPIOX_11,
-    "tdm_a_slv_fs"   : GPIOX_10,
-    "tdm_a_sclk"     : GPIOX_11,
-    "tdm_a_fs"       : GPIOX_10,
-    "tdm_a_din0"     : GPIOX_9,
-    "tdm_a_din1"     : GPIOX_8,
-    "tdm_a_dout0"    : GPIOX_9,
-    "tdm_a_dout1"    : GPIOX_8,
+    "tdm_a_slv_sclk" : pad_to_idx["GPIOX_11"],
+    "tdm_a_slv_fs"   : pad_to_idx["GPIOX_10"],
+    "tdm_a_sclk"     : pad_to_idx["GPIOX_11"],
+    "tdm_a_fs"       : pad_to_idx["GPIOX_10"],
+    "tdm_a_din0"     : pad_to_idx["GPIOX_9"],
+    "tdm_a_din1"     : pad_to_idx["GPIOX_8"],
+    "tdm_a_dout0"    : pad_to_idx["GPIOX_9"],
+    "tdm_a_dout1"    : pad_to_idx["GPIOX_8"],
 
-    "tdm_b_slv_sclk" : GPIOA_1,
-    "tdm_b_slv_fs"   : GPIOA_2,
-    "tdm_b_sclk"     : GPIOA_1,
-    "tdm_b_fs"       : GPIOA_2,
-    "tdm_b_din0"     : GPIOA_3,
-    "tdm_b_din1"     : GPIOA_4,
-    "tdm_b_din2"     : GPIOA_5,
-    "tdm_b_din3_a"   : GPIOA_6,
-    "tdm_b_din3_h"   : GPIOH_5,
-    "tdm_b_dout0"    : GPIOA_3,
-    "tdm_b_dout1"    : GPIOA_4,
-    "tdm_b_dout2"    : GPIOA_5,
-    "tdm_b_dout3_a"  : GPIOA_6,
-    "tdm_b_dout3_h"  : GPIOH_5,
+    "tdm_b_slv_sclk" : pad_to_idx["GPIOA_1"],
+    "tdm_b_slv_fs"   : pad_to_idx["GPIOA_2"],
+    "tdm_b_sclk"     : pad_to_idx["GPIOA_1"],
+    "tdm_b_fs"       : pad_to_idx["GPIOA_2"],
+    "tdm_b_din0"     : pad_to_idx["GPIOA_3"],
+    "tdm_b_din1"     : pad_to_idx["GPIOA_4"],
+    "tdm_b_din2"     : pad_to_idx["GPIOA_5"],
+    "tdm_b_din3_a"   : pad_to_idx["GPIOA_6"],
+    "tdm_b_din3_h"   : pad_to_idx["GPIOH_5"],
+    "tdm_b_dout0"    : pad_to_idx["GPIOA_3"],
+    "tdm_b_dout1"    : pad_to_idx["GPIOA_4"],
+    "tdm_b_dout2"    : pad_to_idx["GPIOA_5"],
+    "tdm_b_dout3_a"  : pad_to_idx["GPIOA_6"],
+    "tdm_b_dout3_h"  : pad_to_idx["GPIOH_5"],
 
-    "tdm_c_slv_sclk_a" : GPIOA_12,
-    "tdm_c_slv_fs_a"   : GPIOA_13,
-    "tdm_c_slv_sclk_z" : GPIOZ_7,
-    "tdm_c_slv_fs_z"   : GPIOZ_6,
-    "tdm_c_sclk_a"     : GPIOA_12,
-    "tdm_c_fs_a"       : GPIOA_13,
-    "tdm_c_sclk_z"     : GPIOZ_7,
-    "tdm_c_fs_z"       : GPIOZ_6,
-    "tdm_c_din0_a"     : GPIOA_10,
-    "tdm_c_din1_a"     : GPIOA_9,
-    "tdm_c_din2_a"     : GPIOA_8,
-    "tdm_c_din3_a"     : GPIOA_7,
-    "tdm_c_din0_z"     : GPIOZ_2,
-    "tdm_c_din1_z"     : GPIOZ_3,
-    "tdm_c_din2_z"     : GPIOZ_4,
-    "tdm_c_din3_z"     : GPIOZ_5,
-    "tdm_c_dout0_a"    : GPIOA_10,
-    "tdm_c_dout1_a"    : GPIOA_9,
-    "tdm_c_dout2_a"    : GPIOA_8,
-    "tdm_c_dout3_a"    : GPIOA_7,
-    "tdm_c_dout0_z"    : GPIOZ_2,
-    "tdm_c_dout1_z"    : GPIOZ_3,
-    "tdm_c_dout2_z"    : GPIOZ_4,
-    "tdm_c_dout3_z"    : GPIOZ_5,
+    "tdm_c_slv_sclk_a" : pad_to_idx["GPIOA_12"],
+    "tdm_c_slv_fs_a"   : pad_to_idx["GPIOA_13"],
+    "tdm_c_slv_sclk_z" : pad_to_idx["GPIOZ_7"],
+    "tdm_c_slv_fs_z"   : pad_to_idx["GPIOZ_6"],
+    "tdm_c_sclk_a"     : pad_to_idx["GPIOA_12"],
+    "tdm_c_fs_a"       : pad_to_idx["GPIOA_13"],
+    "tdm_c_sclk_z"     : pad_to_idx["GPIOZ_7"],
+    "tdm_c_fs_z"       : pad_to_idx["GPIOZ_6"],
+    "tdm_c_din0_a"     : pad_to_idx["GPIOA_10"],
+    "tdm_c_din1_a"     : pad_to_idx["GPIOA_9"],
+    "tdm_c_din2_a"     : pad_to_idx["GPIOA_8"],
+    "tdm_c_din3_a"     : pad_to_idx["GPIOA_7"],
+    "tdm_c_din0_z"     : pad_to_idx["GPIOZ_2"],
+    "tdm_c_din1_z"     : pad_to_idx["GPIOZ_3"],
+    "tdm_c_din2_z"     : pad_to_idx["GPIOZ_4"],
+    "tdm_c_din3_z"     : pad_to_idx["GPIOZ_5"],
+    "tdm_c_dout0_a"    : pad_to_idx["GPIOA_10"],
+    "tdm_c_dout1_a"    : pad_to_idx["GPIOA_9"],
+    "tdm_c_dout2_a"    : pad_to_idx["GPIOA_8"],
+    "tdm_c_dout3_a"    : pad_to_idx["GPIOA_7"],
+    "tdm_c_dout0_z"    : pad_to_idx["GPIOZ_2"],
+    "tdm_c_dout1_z"    : pad_to_idx["GPIOZ_3"],
+    "tdm_c_dout2_z"    : pad_to_idx["GPIOZ_4"],
+    "tdm_c_dout3_z"    : pad_to_idx["GPIOZ_5"],
 }
 
 ao_port_to_pad = {
     # uart_ao_a
-    "uart_ao_a_tx_pins"  : GPIOAO_0,
-    "uart_ao_a_rx_pins"  : GPIOAO_1,
-    "uart_ao_a_cts_pins" : GPIOE_0,
-    "uart_ao_a_rts_pins" : GPIOE_1,
+    "uart_ao_a_tx_pins"  : ao_pad_to_idx["GPIOAO_0"],
+    "uart_ao_a_rx_pins"  : ao_pad_to_idx["GPIOAO_1"],
+    "uart_ao_a_cts_pins" : ao_pad_to_idx["GPIOE_0"],
+    "uart_ao_a_rts_pins" : ao_pad_to_idx["GPIOE_1"],
 
     # uart_ao_b
-    "uart_ao_b_tx_2_pins" : GPIOAO_2,
-    "uart_ao_b_rx_3_pins" : GPIOAO_3,
-    "uart_ao_b_tx_8_pins" : GPIOAO_8,
-    "uart_ao_b_rx_9_pins" : GPIOAO_9,
-    "uart_ao_b_cts_pins"  : GPIOE_0,
-    "uart_ao_b_rts_pins"  : GPIOE_1,
+    "uart_ao_b_tx_2_pins" : ao_pad_to_idx["GPIOAO_2"],
+    "uart_ao_b_rx_3_pins" : ao_pad_to_idx["GPIOAO_3"],
+    "uart_ao_b_tx_8_pins" : ao_pad_to_idx["GPIOAO_8"],
+    "uart_ao_b_rx_9_pins" : ao_pad_to_idx["GPIOAO_9"],
+    "uart_ao_b_cts_pins"  : ao_pad_to_idx["GPIOE_0"],
+    "uart_ao_b_rts_pins"  : ao_pad_to_idx["GPIOE_1"],
 
     # i2c_ao
-    "i2c_ao_sck_pins" : GPIOAO_2,
-    "i2c_ao_sda_pins" : GPIOAO_3,
+    "i2c_ao_sck_pins" : ao_pad_to_idx["GPIOAO_2"],
+    "i2c_ao_sda_pins" : ao_pad_to_idx["GPIOAO_3"],
 
-    "i2c_ao_sck_e_pins" : GPIOE_0,
-    "i2c_ao_sda_e_pins" : GPIOE_1,
+    "i2c_ao_sck_e_pins" : ao_pad_to_idx["GPIOE_0"],
+    "i2c_ao_sda_e_pins" : ao_pad_to_idx["GPIOE_1"],
 
     # i2c_ao_slave
-    "i2c_ao_slave_sck_pins" : GPIOAO_2,
-    "i2c_ao_slave_sda_pins" : GPIOAO_3,
+    "i2c_ao_slave_sck_pins" : ao_pad_to_idx["GPIOAO_2"],
+    "i2c_ao_slave_sda_pins" : ao_pad_to_idx["GPIOAO_3"],
 
     # ir_in
-    "remote_ao_input_pins" : GPIOAO_5,
+    "remote_ao_input_pins" : ao_pad_to_idx["GPIOAO_5"],
 
     # ir_out
-    "remote_ao_out_pins" : GPIOAO_4,
+    "remote_ao_out_pins" : ao_pad_to_idx["GPIOAO_4"],
 
     # pwm_a_e
-    "pwm_a_e_pins" : GPIOE_2,
+    "pwm_a_e_pins" : ao_pad_to_idx["GPIOE_2"],
 
     # pwm_ao_a
-    "pwm_ao_a_pins" : GPIOAO_11,
-    "pwm_ao_a_hiz_pins" : GPIOAO_11,
+    "pwm_ao_a_pins"     : ao_pad_to_idx["GPIOAO_11"],
+    "pwm_ao_a_hiz_pins" : ao_pad_to_idx["GPIOAO_11"],
 
     # pwm_ao_b
-    "pwm_ao_b_pins" : GPIOE_0,
+    "pwm_ao_b_pins" : ao_pad_to_idx["GPIOE_0"],
 
     # pwm_ao_c
-    "pwm_ao_c_4_pins" : GPIOAO_4,
-    "pwm_ao_c_hiz_pins" : GPIOAO_4,
-    "pwm_ao_c_6_pins" : GPIOAO_6,
+    "pwm_ao_c_4_pins"   : ao_pad_to_idx["GPIOAO_4"],
+    "pwm_ao_c_hiz_pins" : ao_pad_to_idx["GPIOAO_4"],
+    "pwm_ao_c_6_pins"   : ao_pad_to_idx["GPIOAO_6"],
 
     # pwm_ao_d
-    "pwm_ao_d_5_pins" : GPIOAO_5,
-    "pwm_ao_d_10_pins" : GPIOAO_10,
-    "pwm_ao_d_e_pins" : GPIOE_1,
+    "pwm_ao_d_5_pins"  : ao_pad_to_idx["GPIOAO_5"],
+    "pwm_ao_d_10_pins" : ao_pad_to_idx["GPIOAO_10"],
+    "pwm_ao_d_e_pins"  : ao_pad_to_idx["GPIOE_1"],
 
     # jtag_a
-    "jtag_a_tdi_pins" : GPIOAO_8,
-    "jtag_a_tdo_pins" : GPIOAO_9,
-    "jtag_a_clk_pins" : GPIOAO_6,
-    "jtag_a_tms_pins" : GPIOAO_7,
+    "jtag_a_tdi_pins" : ao_pad_to_idx["GPIOAO_8"],
+    "jtag_a_tdo_pins" : ao_pad_to_idx["GPIOAO_9"],
+    "jtag_a_clk_pins" : ao_pad_to_idx["GPIOAO_6"],
+    "jtag_a_tms_pins" : ao_pad_to_idx["GPIOAO_7"],
 
     # cec_ao
-    "cec_ao_a_pins" : GPIOAO_10,
-    "cec_ao_b_pins" : GPIOAO_10,
+    "cec_ao_a_pins" : ao_pad_to_idx["GPIOAO_10"],
+    "cec_ao_b_pins" : ao_pad_to_idx["GPIOAO_10"],
 
     # tsin_ao_a
-    "tsin_ao_asop_pins" : GPIOAO_6,
-    "tsin_ao_adin0_pins" : GPIOAO_7,
-    "tsin_ao_aclk_pins" : GPIOAO_8,
-    "tsin_ao_a_valid_pins" : GPIOAO_9,
+    "tsin_ao_asop_pins"    : ao_pad_to_idx["GPIOAO_6"],
+    "tsin_ao_adin0_pins"   : ao_pad_to_idx["GPIOAO_7"],
+    "tsin_ao_aclk_pins"    : ao_pad_to_idx["GPIOAO_8"],
+    "tsin_ao_a_valid_pins" : ao_pad_to_idx["GPIOAO_9"],
 
     # spdif_ao_out
-    "spdif_ao_out_pins" : GPIOAO_10,
+    "spdif_ao_out_pins" : ao_pad_to_idx["GPIOAO_10"],
 
     # tdm_ao_b
-    "tdm_ao_b_slv_fs_pins" : GPIOAO_7,
-    "tdm_ao_b_slv_sclk_pins" : GPIOAO_8,
-    "tdm_ao_b_fs_pins" : GPIOAO_7,
-    "tdm_ao_b_sclk_pins" : GPIOAO_8,
-    "tdm_ao_b_din0_pins" : GPIOAO_4,
-    "tdm_ao_b_din1_pins" : GPIOAO_10,
-    "tdm_ao_b_din2_pins" : GPIOAO_6,
-    "tdm_ao_b_dout0_pins" : GPIOAO_4,
-    "tdm_ao_b_dout1_pins" : GPIOAO_10,
-    "tdm_ao_b_dout2_pins" : GPIOAO_6,
+    "tdm_ao_b_slv_fs_pins"   : ao_pad_to_idx["GPIOAO_7"],
+    "tdm_ao_b_slv_sclk_pins" : ao_pad_to_idx["GPIOAO_8"],
+    "tdm_ao_b_fs_pins"       : ao_pad_to_idx["GPIOAO_7"],
+    "tdm_ao_b_sclk_pins"     : ao_pad_to_idx["GPIOAO_8"],
+    "tdm_ao_b_din0_pins"     : ao_pad_to_idx["GPIOAO_4"],
+    "tdm_ao_b_din1_pins"     : ao_pad_to_idx["GPIOAO_10"],
+    "tdm_ao_b_din2_pins"     : ao_pad_to_idx["GPIOAO_6"],
+    "tdm_ao_b_dout0_pins"    : ao_pad_to_idx["GPIOAO_4"],
+    "tdm_ao_b_dout1_pins"    : ao_pad_to_idx["GPIOAO_10"],
+    "tdm_ao_b_dout2_pins"    : ao_pad_to_idx["GPIOAO_6"],
 
     # mclk0_ao
-    "mclk0_ao_pins" : GPIOAO_9,
+    "mclk0_ao_pins" : ao_pad_to_idx["GPIOAO_9"],
 }
 
 ########################################################
 # To represent the above in hardware, each pad has a 3 bits integer mux value.
 # To indicate what port it is muxed to.
 # All pads are assigned function 0 by default, then these values override it.
+# Essentially the representation of the above in memory value.
 
 port_to_mux_func = {
     # bank BOOT
@@ -1053,6 +1059,124 @@ ao_function_to_group = {
 ########################################################
 # With the above information, it is enough to decode the DTS pinmux data,
 # which is in the form: port: string -> function: string -> pad
+
+########################################################
+# This is the actual data that will be written to the chip at init time.
+# These values are default values from the SoC datasheet, it is then patched
+# with the data from enabled devices in the DTS.
+
+# If a register does not have a value here, it is either reserved or read-only.
+pinmux_registers = [
+    {
+        # PERIPHS_PIN_MUX_0
+        "first_pad": pad_to_idx["BOOT_0"],
+        "last_pad": pad_to_idx["BOOT_7"],
+        "offset": 0xB0 * 4,
+        "bits_per_pin": 3,
+        "value": 0 
+    },
+    {
+        # PERIPHS_PIN_MUX_1
+        "first_pad": pad_to_idx["BOOT_8"],
+        "last_pad": pad_to_idx["BOOT_15"],
+        "offset": 0xB1 * 4,
+        "bits_per_pin": 3,
+        "value": 0 
+    },
+    {
+        # PERIPHS_PIN_MUX_3
+        "first_pad": pad_to_idx["GPIOX_0"],
+        "last_pad": pad_to_idx["GPIOX_7"],
+        "offset": 0xB3 * 4,
+        "bits_per_pin": 3,
+        "value": 0 
+    },
+    {
+        # PERIPHS_PIN_MUX_4
+        "first_pad": pad_to_idx["GPIOX_8"],
+        "last_pad": pad_to_idx["GPIOX_15"],
+        "offset": 0xB4 * 4,
+        "bits_per_pin": 3,
+        "value": 0 
+    },
+    {
+        # PERIPHS_PIN_MUX_5
+        "first_pad": pad_to_idx["GPIOX_16"],
+        "last_pad": pad_to_idx["GPIOX_19"],
+        "offset": 0xB5 * 4,
+        "bits_per_pin": 3,
+        "value": 0 
+    },
+    {
+        # PERIPHS_PIN_MUX_6
+        "first_pad": pad_to_idx["GPIOZ_0"],
+        "last_pad": pad_to_idx["GPIOZ_7"],
+        "offset": 0xB6 * 4,
+        "bits_per_pin": 3,
+        "value": 0 
+    },    
+    {
+        # PERIPHS_PIN_MUX_7
+        "first_pad": pad_to_idx["GPIOZ_8"],
+        "last_pad": pad_to_idx["GPIOZ_15"],
+        "offset": 0xB7 * 4,
+        "bits_per_pin": 3,
+        "value": 0 
+    },
+    {
+        # PERIPHS_PIN_MUX_9
+        "first_pad": pad_to_idx["GPIOC_0"],
+        "last_pad": pad_to_idx["GPIOC_7"],
+        "offset": 0xB9 * 4,
+        "bits_per_pin": 3,
+        "value": 0 
+    },
+    {
+        # PERIPHS_PIN_MUX_B
+        "first_pad": pad_to_idx["GPIOH_0"],
+        "last_pad": pad_to_idx["GPIOH_7"],
+        "offset": 0xBB * 4,
+        "bits_per_pin": 3,
+        "value": 0 
+    },
+    {
+        # PERIPHS_PIN_MUX_C
+        "first_pad": pad_to_idx["GPIOH_8"],
+        "last_pad": pad_to_idx["GPIOH_8"],
+        "offset": 0xBC * 4,
+        "bits_per_pin": 3,
+        "value": 0 
+    },
+    # PERIPHS_PIN_MUX_D and PERIPHS_PIN_MUX_E is undocumented, these values come from the Linux driver.
+    {
+        # PERIPHS_PIN_MUX_D
+        "first_pad": pad_to_idx["GPIOA_0"],
+        "last_pad": pad_to_idx["GPIOA_7"],
+        "offset": 0xBD * 4,
+        "bits_per_pin": 3,
+        "value": 0 
+    },
+    {
+        # PERIPHS_PIN_MUX_E
+        "first_pad": pad_to_idx["GPIOA_8"],
+        "last_pad": pad_to_idx["GPIOA_15"],
+        "offset": 0xBE * 4,
+        "bits_per_pin": 3,
+        "value": 0 
+    },
+]
+
+drive_strength_registers = {
+
+}
+
+bias_enable_registers = {
+
+}
+
+pull_up_registers = {
+
+}
 
 import sys
 
