@@ -8,7 +8,7 @@ ifeq ($(strip $(SDDF_LWIP_NUM_BUFS)),)
 $(error SDDF_LWIP_NUM_BUFS must be specified)
 endif
 
-LIB_SDDF_LWIP_DIR := ${SDDF}/network/lib_sddf_lwip
+LIB_SDDF_LWIP_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 LIB_SDDF_LWIP_FILES := $(addprefix ${LIB_SDDF_LWIP_DIR}/, lib_sddf_lwip.c)
 LIB_SDDF_LWIP_OBJS := $(LIB_SDDF_LWIP_FILES:.c=.o)
 
