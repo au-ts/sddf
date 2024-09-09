@@ -67,7 +67,7 @@ LWIPFILES := $(COREFILES) $(CORE4FILES) $(NETIFFILES)
 ECHO_OBJS := $(LWIPFILES:.c=.o) echo.o utilization_socket.o \
 	     udp_echo_socket.o tcp_echo_socket.o
 
-DEPS := $(filter %.d,$(ECHO_OBJS:.o=.d))
+DEPS := $(ECHO_OBJS:.o=.d)
 
 all: loader.img
 
