@@ -237,6 +237,7 @@ pub fn build(b: *std.Build) void {
     const serial_config_include_option = b.option([]const u8, "serial_config_include", "Include path to serial config header") orelse "";
     const i2c_client_include_option = b.option([]const u8, "i2c_client_include", "Include path to client config header") orelse "";
     const clk_client_include_option = b.option([]const u8, "clk_client_include", "Include path to client config header") orelse "";
+    const dtb_path = b.option([]const u8, "dtb_path", "Path to the DTB file");
 
     // TODO: Right now this is not super ideal. What's happening is that we do not
     // always need a serial config include, but we must always specify it
@@ -365,6 +366,14 @@ pub fn build(b: *std.Build) void {
     inline for (std.meta.fields(DriverClass.Clock)) |class| {
         const driver = addClockDriver(b, clk_client_include, util, @enumFromInt(class.value), target, optimize);
         driver.linkLibrary(util_putchar_debug);
+
+       const clk_config = b.addSystemCommand(&.{
+           "python",
+           b.fmt("drivers/clk/{s}/create_clk_config.py", .{ class.name }),
+           dtb_path orelse "",
+        }); // Creates a system command which runs the python interpreter
+        driver.step.dependOn(&clk_config.step);
+
         b.installArtifact(driver);
     }
 
