@@ -108,7 +108,7 @@ static void netif_status_callback_default(char *ip_addr)
 {
     uint8_t *mac = lwip_state.netif.hwaddr;
     lwip_state.err_output("LWIP|NOTICE: DHCP request for mac "
-                          "%02lx:%02lx:%02lx:%02lx:%02lx:%02lx "
+                          "%02x:%02x:%02x:%02x:%02x:%02x "
                           "returned ip address: %s\n", mac[0],
                           mac[1], mac[2], mac[3], mac[4], mac[5],
                           ip_addr);

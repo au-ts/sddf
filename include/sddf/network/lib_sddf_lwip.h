@@ -32,7 +32,7 @@ typedef enum {
 /**
  * Function type for output of sDDF LWIP errors.
  */
-typedef int (*sddf_lwip_err_output_fn)(const char *format, ...);
+typedef int (*sddf_lwip_err_output_fn)(const char *format, ...) __attribute__((format(__printf__, 1, 2)));
 
 /**
  * Function type for netif status callback. Invoked by LWIP upon
