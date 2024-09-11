@@ -1065,6 +1065,8 @@ ao_function_to_group = {
 # These values are default values from the SoC datasheet, it is then patched
 # with the data from enabled devices in the DTS.
 
+# "first_bit" is counting from right to left
+
 # If a register does not have a value here, it is either reserved or read-only.
 pinmux_registers = [
     {
@@ -1072,6 +1074,7 @@ pinmux_registers = [
         "first_pad": pad_to_idx["BOOT_0"],
         "last_pad": pad_to_idx["BOOT_7"],
         "offset": 0xB0 * 4,
+        "first_bit": 0,
         "bits_per_pin": 3,
         "value": 0 
     },
@@ -1080,6 +1083,7 @@ pinmux_registers = [
         "first_pad": pad_to_idx["BOOT_8"],
         "last_pad": pad_to_idx["BOOT_15"],
         "offset": 0xB1 * 4,
+        "first_bit": 0,
         "bits_per_pin": 3,
         "value": 0 
     },
@@ -1088,6 +1092,7 @@ pinmux_registers = [
         "first_pad": pad_to_idx["GPIOX_0"],
         "last_pad": pad_to_idx["GPIOX_7"],
         "offset": 0xB3 * 4,
+        "first_bit": 0,
         "bits_per_pin": 3,
         "value": 0 
     },
@@ -1096,6 +1101,7 @@ pinmux_registers = [
         "first_pad": pad_to_idx["GPIOX_8"],
         "last_pad": pad_to_idx["GPIOX_15"],
         "offset": 0xB4 * 4,
+        "first_bit": 0,
         "bits_per_pin": 3,
         "value": 0 
     },
@@ -1104,6 +1110,7 @@ pinmux_registers = [
         "first_pad": pad_to_idx["GPIOX_16"],
         "last_pad": pad_to_idx["GPIOX_19"],
         "offset": 0xB5 * 4,
+        "first_bit": 0,
         "bits_per_pin": 3,
         "value": 0 
     },
@@ -1112,6 +1119,7 @@ pinmux_registers = [
         "first_pad": pad_to_idx["GPIOZ_0"],
         "last_pad": pad_to_idx["GPIOZ_7"],
         "offset": 0xB6 * 4,
+        "first_bit": 0,
         "bits_per_pin": 3,
         "value": 0 
     },    
@@ -1120,6 +1128,7 @@ pinmux_registers = [
         "first_pad": pad_to_idx["GPIOZ_8"],
         "last_pad": pad_to_idx["GPIOZ_15"],
         "offset": 0xB7 * 4,
+        "first_bit": 0,
         "bits_per_pin": 3,
         "value": 0 
     },
@@ -1128,6 +1137,7 @@ pinmux_registers = [
         "first_pad": pad_to_idx["GPIOC_0"],
         "last_pad": pad_to_idx["GPIOC_7"],
         "offset": 0xB9 * 4,
+        "first_bit": 0,
         "bits_per_pin": 3,
         "value": 0 
     },
@@ -1136,6 +1146,7 @@ pinmux_registers = [
         "first_pad": pad_to_idx["GPIOH_0"],
         "last_pad": pad_to_idx["GPIOH_7"],
         "offset": 0xBB * 4,
+        "first_bit": 0,
         "bits_per_pin": 3,
         "value": 0 
     },
@@ -1144,15 +1155,16 @@ pinmux_registers = [
         "first_pad": pad_to_idx["GPIOH_8"],
         "last_pad": pad_to_idx["GPIOH_8"],
         "offset": 0xBC * 4,
+        "first_bit": 0,
         "bits_per_pin": 3,
         "value": 0 
     },
-    # PERIPHS_PIN_MUX_D and PERIPHS_PIN_MUX_E is undocumented, these values come from the Linux driver.
     {
         # PERIPHS_PIN_MUX_D
         "first_pad": pad_to_idx["GPIOA_0"],
         "last_pad": pad_to_idx["GPIOA_7"],
         "offset": 0xBD * 4,
+        "first_bit": 0,
         "bits_per_pin": 3,
         "value": 0 
     },
@@ -1161,24 +1173,283 @@ pinmux_registers = [
         "first_pad": pad_to_idx["GPIOA_8"],
         "last_pad": pad_to_idx["GPIOA_15"],
         "offset": 0xBE * 4,
+        "first_bit": 0,
         "bits_per_pin": 3,
         "value": 0 
     },
 ]
 
-drive_strength_registers = {
+drive_strength_registers = [
+    {
+        # PAD_DS_REG0A
+        "first_pad": pad_to_idx["BOOT_0"],
+        "last_pad": pad_to_idx["BOOT_15"],
+        "offset": 0xD0 * 4,
+        "first_bit": 0,
+        "bits_per_pin": 2,
+        "value": 0xAAAAAAAA
+    },
+    {
+        # PAD_DS_REG1A
+        "first_pad": pad_to_idx["GPIOC_0"],
+        "last_pad": pad_to_idx["GPIOC_6"],
+        "offset": 0xD1 * 4,
+        "first_bit": 0,
+        "bits_per_pin": 2,
+        "value": 0xAAAA9AAA
+    },
+    {
+        # PAD_DS_REG2A
+        "first_pad": pad_to_idx["GPIOX_0"],
+        "last_pad": pad_to_idx["GPIOX_15"],
+        "offset": 0xD2 * 4,
+        "first_bit": 0,
+        "bits_per_pin": 2,
+        "value": 0x55955AAA
+    },
+    {
+        # PAD_DS_REG2B
+        # For some obscure reason, GPIOX_18 and GPIOX_19 shares the same drive strength register...
+        # So GPIOX_19 is omitted, this must be manually handled
+        "first_pad": pad_to_idx["GPIOX_16"],
+        "last_pad": pad_to_idx["GPIOX_18"],
+        "offset": 0xD3 * 4,
+        "first_bit": 0,
+        "bits_per_pin": 2,
+        "value": 0xAAAAAA55
+    },
+    {
+        # PAD_DS_REG3A
+        "first_pad": pad_to_idx["GPIOH_4"],
+        "last_pad": pad_to_idx["GPIOH_7"],
+        "offset": 0xD4 * 4,
+        "first_bit": 8,
+        "bits_per_pin": 2,
+        "value": 0xAAAA55AA
+    },
+    {
+        # PAD_DS_REG4A
+        "first_pad": pad_to_idx["GPIOZ_0"],
+        "last_pad": pad_to_idx["GPIOZ_13"],
+        "offset": 0xD5 * 4,
+        "first_bit": 0,
+        "bits_per_pin": 2,
+        "value": 0xAAAAAAA5
+    },
+    {
+        # PAD_DS_REG5A
+        "first_pad": pad_to_idx["GPIOA_0"],
+        "last_pad": pad_to_idx["GPIOA_15"],
+        "offset": 0xD6 * 4,
+        "first_bit": 0,
+        "bits_per_pin": 2,
+        "value": 0x5695555A
+    },
+]
 
-}
+bias_enable_registers = [
+    {
+        # PAD_PULL_UP_EN_REG0
+        "first_pad": pad_to_idx["BOOT_0"],
+        "last_pad": pad_to_idx["BOOT_15"],
+        "offset": 0x48 * 4,
+        "first_bit": 0,
+        "bits_per_pin": 1,
+        "value": 0x0000FFFF
+    },
+    {
+        # PAD_PULL_UP_EN_REG1
+        "first_pad": pad_to_idx["GPIOC_0"],
+        "last_pad": pad_to_idx["GPIOC_6"],
+        "offset": 0x49 * 4,
+        "first_bit": 0,
+        "bits_per_pin": 1,
+        "value": 0x000000FF
+    },
+    {
+        # PAD_PULL_UP_EN_REG2
+        "first_pad": pad_to_idx["GPIOX_0"],
+        "last_pad": pad_to_idx["GPIOX_19"],
+        "offset": 0x4A * 4,
+        "first_bit": 0,
+        "bits_per_pin": 1,
+        "value": 0x0007FFFF
+    },
+    {
+        # PAD_PULL_UP_EN_REG3
+        "first_pad": pad_to_idx["GPIOH_4"],
+        "last_pad": pad_to_idx["GPIOH_7"],
+        "offset": 0x4B * 4,
+        "first_bit": 4,
+        "bits_per_pin": 1,
+        "value": 0x000001FF
+    },
+    {
+        # PAD_PULL_UP_EN_REG4
+        "first_pad": pad_to_idx["GPIOZ_0"],
+        "last_pad": pad_to_idx["GPIOZ_13"],
+        "offset": 0x4C * 4,
+        "first_bit": 0,
+        "bits_per_pin": 1,
+        "value": 0x00003FFF
+    },
+    {
+        # PAD_PULL_UP_EN_REG5
+        "first_pad": pad_to_idx["GPIOA_0"],
+        "last_pad": pad_to_idx["GPIOA_15"],
+        "offset": 0x4D * 4,
+        "first_bit": 0,
+        "bits_per_pin": 1,
+        "value": 0x0000FFFF
+    },
+]
 
-bias_enable_registers = {
+pull_up_registers = [
+    {
+        # PAD_PULL_UP_REG0
+        "first_pad": pad_to_idx["BOOT_0"],
+        "last_pad": pad_to_idx["BOOT_15"],
+        "offset": 0x3A * 4,
+        "first_bit": 0,
+        "bits_per_pin": 1,
+        "value": 0x0000CFFF
+    },
+    {
+        # PAD_PULL_UP_REG1
+        "first_pad": pad_to_idx["GPIOC_0"],
+        "last_pad": pad_to_idx["GPIOC_6"],
+        "offset": 0x3B * 4,
+        "first_bit": 0,
+        "bits_per_pin": 1,
+        "value": 0x000000FF
+    },
+    {
+        # PAD_PULL_UP_REG2
+        "first_pad": pad_to_idx["GPIOX_0"],
+        "last_pad": pad_to_idx["GPIOX_19"],
+        "offset": 0x3C * 4,
+        "first_bit": 0,
+        "bits_per_pin": 1,
+        "value": 0x0005FFBF
+    },
+    {
+        # PAD_PULL_UP_REG3
+        "first_pad": pad_to_idx["GPIOH_4"],
+        "last_pad": pad_to_idx["GPIOH_7"],
+        "offset": 0x3D * 4,
+        "first_bit": 4,
+        "bits_per_pin": 1,
+        "value": 0x0000010F
+    },
+    {
+        # PAD_PULL_UP_REG4
+        "first_pad": pad_to_idx["GPIOZ_0"],
+        "last_pad": pad_to_idx["GPIOZ_13"],
+        "offset": 0x3E * 4,
+        "first_bit": 0,
+        "bits_per_pin": 1,
+        "value": 0x0000C1FF
+    },
+    {
+        # PAD_PULL_UP_REG5
+        "first_pad": pad_to_idx["GPIOA_0"],
+        "last_pad": pad_to_idx["GPIOA_15"],
+        "offset": 0x3F * 4,
+        "first_bit": 0,
+        "bits_per_pin": 1,
+        "value": 0x0000C000
+    },
+]
 
-}
 
-pull_up_registers = {
-
-}
+ao_pinmux_registers = [
+    {
+        # AO_RTI_PINMUX_REG0
+        "first_pad": ao_pad_to_idx["GPIOAO_0"],
+        "last_pad": ao_pad_to_idx["GPIOAO_7"],
+        "offset": 0x05 * 4,
+        "first_bit": 0,
+        "bits_per_pin": 3,
+        "value": 0x0
+    },
+    {
+        # AO_RTI_PINMUX_REG1
+        "first_pad": ao_pad_to_idx["GPIOAO_8"],
+        "last_pad": ao_pad_to_idx["GPIOE_2"],
+        "offset": 0x06 * 4,
+        "first_bit": 0,
+        "bits_per_pin": 3,
+        "value": 0x0
+    },
+]
+ao_drive_strength_registers = [
+    {
+        # AO_PAD_DS_A
+        "first_pad": ao_pad_to_idx["GPIOAO_0"],
+        "last_pad": ao_pad_to_idx["GPIOAO_11"],
+        "offset": 0x07 * 4,
+        "first_bit": 0,
+        "bits_per_pin": 2,
+        "value": 0xAAAAAAAA
+    },
+    {
+        # AO_PAD_DS_B
+        "first_pad": ao_pad_to_idx["GPIOE_0"],
+        "last_pad": ao_pad_to_idx["GPIOE_2"],
+        "offset": 0x08 * 4,
+        "first_bit": 0,
+        "bits_per_pin": 2,
+        "value": 0xAAAAAAAA
+    },
+]
+ao_bias_enable_registers = [
+    # These two pseudo registers are the same register,
+    # which need to be OR'ed together because their effective bits 
+    # are not contiguous like other registers...
+    {
+        # AO_RTI_PULL_UP_EN_REG _A
+        "first_pad": pad_to_idx["GPIOAO_0"],
+        "last_pad": pad_to_idx["GPIOAO_11"],
+        "offset": 0x0C * 4,
+        "first_bit": 0,
+        "bits_per_pin": 1,
+        "value": 0x00000FFF
+    },
+    {
+        # AO_RTI_PULL_UP_EN_REG _B
+        "first_pad": pad_to_idx["GPIOE_0"],
+        "last_pad": pad_to_idx["GPIOE_2"],
+        "offset": 0x0C * 4,
+        "first_bit": 16,
+        "bits_per_pin": 1,
+        "value": 0x80040000
+    },
+]
+ao_pull_up_registers = [
+    # Same issue as above
+    {
+        # AO_RTI_PULL_UP_REG _A
+        "first_pad": pad_to_idx["GPIOAO_0"],
+        "last_pad": pad_to_idx["GPIOAO_11"],
+        "offset": 0x0B * 4,
+        "first_bit": 0,
+        "bits_per_pin": 1,
+        "value": 0x000005AB
+    },
+    {
+        # AO_RTI_PULL_UP_REG _B
+        "first_pad": pad_to_idx["GPIOE_0"],
+        "last_pad": pad_to_idx["GPIOE_2"],
+        "offset": 0x0B * 4,
+        "first_bit": 16,
+        "bits_per_pin": 1,
+        "value": 0x80000000
+    },
+]
 
 import sys
 
 if __name__ == "__main__":
-    sys.stderr.write(sys.argv[0] + ": This script is not meant to be run, see create_pinctrl_config.py.")
+    sys.stderr.write(sys.argv[0] + ": This script is not meant to be run, see create_pinctrl_config.py.\n")
+    sys.stderr.flush()
+    sys.exit(1)
