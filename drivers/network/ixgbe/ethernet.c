@@ -31,8 +31,10 @@
 
 const uint64_t hw_rx_ring_paddr = 0x10000000;
 const uint64_t hw_rx_ring_vaddr = 0x2200000;
-const uint64_t hw_tx_ring_paddr = 0x10002000;
-const uint64_t hw_tx_ring_vaddr = 0x2202000;
+const uint64_t hw_tx_ring_paddr = 0x10004000;
+const uint64_t hw_tx_ring_vaddr = 0x2204000;
+// const uint64_t hw_tx_ring_paddr = 0x10002000;
+// const uint64_t hw_tx_ring_vaddr = 0x2202000;
 const uintptr_t rx_free = 0x2400000;
 const uintptr_t rx_used = 0x2600000;
 const uintptr_t tx_free = 0x2800000;
@@ -44,6 +46,8 @@ const uint64_t ONE_MS_IN_NS = 1000000;
 
 #define NUM_TX_DESCS 512llu
 #define NUM_RX_DESCS 512llu
+// #define NUM_TX_DESCS 1024llu
+// #define NUM_RX_DESCS 1024llu
 #define TX_CLEAN_BATCH 32llu
 
 struct ixgbe_device {
@@ -58,6 +62,9 @@ struct ixgbe_device {
 
 ring_handle_t rx_ring;
 ring_handle_t tx_ring;
+
+void enable_interrupts(void);
+void disable_interrupts(void);
 
 static inline void set_reg(uintptr_t reg, uint32_t value) {
     __atomic_store_n(((volatile uint32_t *)reg), value, __ATOMIC_SEQ_CST);
@@ -116,15 +123,13 @@ static inline bool hw_rx_ring_full(void)
 void
 tx_provide(void)
 {
-    if (hw_rx_ring_empty()) {
-        return;
-    }
+    // @jade: whyyy?
+    // if (hw_rx_ring_empty()) {
+    //     return;
+    // }
     bool reprocess = true;
     while (reprocess) {
         bool provided = false;
-        if (hw_tx_ring_full()) {
-            printf("hw_tx_ring_full\n");
-        }
 
         while (!(hw_tx_ring_full()) && !ring_empty(tx_ring.used_ring)) {
             buff_desc_t buffer;
@@ -151,6 +156,7 @@ tx_provide(void)
         if (provided) {
             THREAD_MEMORY_RELEASE();
             set_reg(TDT(0), device.tx_tail);
+            bench->eth_tx_ntfn_count++;
         }
 
         request_signal(tx_ring.used_ring);
@@ -182,13 +188,15 @@ tx_return(void)
         device.tx_head = (device.tx_head + 1) % NUM_TX_DESCS;
     }
 
+    // if (enqueued) {
+    //     bench->eth_tx_ntfn_count++;
+    // }
+
     if (enqueued && require_signal(tx_ring.free_ring)) {
         cancel_signal(tx_ring.free_ring);
         microkit_notify(TX_CH);
     }
 }
-
-static size_t packet_count = 0;
 
 void
 rx_provide(void)
@@ -218,11 +226,13 @@ rx_provide(void)
         if (provided) {
             THREAD_MEMORY_RELEASE();
             set_reg(RDT(0), device.rx_tail);
+            bench->eth_irq_count++;
         }
 
         /* Only request a notification from multiplexer if HW ring not full */
         if (!hw_rx_ring_full()) {
             request_signal(rx_ring.free_ring);
+            disable_interrupts();
         } else {
             cancel_signal(rx_ring.free_ring);
         }
@@ -231,6 +241,7 @@ rx_provide(void)
         if (!ring_empty(rx_ring.free_ring) && !hw_rx_ring_full()) {
             cancel_signal(rx_ring.free_ring);
             reprocess = true;
+            enable_interrupts();
         }
     }
 
@@ -274,6 +285,10 @@ static void rx_return(void)
         packets_transferred = true;
         device.rx_head = (device.rx_head + 1) % NUM_RX_DESCS;
     }
+
+    // if (packets_transferred) {
+    //     bench->eth_irq_count++;
+    // }
 
     if (packets_transferred && require_signal(rx_ring.used_ring)) {
         cancel_signal(rx_ring.used_ring);
@@ -636,7 +651,6 @@ print_interrupt_regs(void)
 void
 notified(microkit_channel ch)
 {
-    bench->eth_irq_count++;
     
     print_interrupt_regs();
     // printf("PCI interrupt pending? %d\n", get_reg16(ECAM + 0x6) & BIT(3) != 0);
@@ -686,11 +700,14 @@ notified(microkit_channel ch)
     }
     case RX_CH:
         if (device.init_stage == 4) {
+            enable_interrupts();
+            rx_return();
             rx_provide();
         }
         break;
     case TX_CH:
         if (device.init_stage == 4) {
+            enable_interrupts();
             tx_provide();
         }
         break;

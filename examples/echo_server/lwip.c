@@ -32,7 +32,8 @@
 #define ARP    7
 
 #define LWIP_TICK_MS 100
-#define NUM_PBUFFS 512
+// #define NUM_PBUFFS 512
+#define NUM_PBUFFS 1024
 
 uintptr_t rx_free = 0x2000000;
 uintptr_t rx_used = 0x2200000;
@@ -160,6 +161,9 @@ static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
 
     if (ring_empty(state.tx_ring.free_ring)) {
         enqueue_pbufs(p);
+        // request_signal(state.tx_ring.free_ring);
+        b->lwip_tx_ntfn_count++;
+        microkit_notify(TX_CH);
         return ERR_OK;
     }
 
@@ -181,7 +185,13 @@ static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
     b->lwip_pcount_tx++;
 
     notify_tx = true;
-    microkit_notify(TX_CH);
+    // microkit_notify(TX_CH);
+
+    // doesn't really help
+    // if (ring_size(state.tx_ring.free_ring) <= TX_RING_SIZE_CLI0) {
+    //     request_signal(state.tx_ring.free_ring);
+    //     microkit_notify(TX_CH);
+    // }
 
     return ERR_OK;
 }
@@ -219,6 +229,11 @@ void transmit(void)
 
 void receive(void)
 {
+    // don't receive if tx free q is empty
+    if (ring_empty(state.tx_ring.free_ring)) {
+        return;
+    }
+
     uint64_t packets_processed = 0;
     bool reprocess = true;
     while (reprocess) {
@@ -244,6 +259,12 @@ void receive(void)
             cancel_signal(state.rx_ring.used_ring);
             reprocess = true;
         }
+
+        // // don't receive if tx free q is empty
+        // if (ring_empty(state.tx_ring.free_ring)) {
+        //     reprocess = false;
+        // }
+
     }
     if (packets_processed != 0) {
         // printf("pp=%lu\n", packets_processed);
@@ -343,7 +364,7 @@ void init(void)
 
 void notified(microkit_channel ch)
 {
-    b->lwip_irq_count++;
+    b->lwip_ntfn_count++;
 
     switch(ch) {
     case RX_CH:
@@ -355,6 +376,10 @@ void notified(microkit_channel ch)
         break;
     case TX_CH:
         transmit();
+        // don't do if tx free q is empty
+        // if (!ring_empty(state.tx_ring.free_ring)) {
+        //     receive();
+        // }
         receive();
         break;
     default:

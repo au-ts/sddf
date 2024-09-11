@@ -32,8 +32,11 @@
 #define MAC_ADDR_CLI0                       0x5254010000a5  // 0xB496916A7F2C
 #define MAC_ADDR_CLI1                       0x5254010000a6
 
+// #define TX_RING_SIZE_ARP                    1024
+#define TX_RING_SIZE_CLI0                   1024
+// #define TX_RING_SIZE_CLI1                   1024
 #define TX_RING_SIZE_ARP                    512
-#define TX_RING_SIZE_CLI0                   512
+// #define TX_RING_SIZE_CLI0                   512
 #define TX_RING_SIZE_CLI1                   512
 #define TX_RING_SIZE_DRIV                   (TX_RING_SIZE_ARP + TX_RING_SIZE_CLI0 + TX_RING_SIZE_CLI1)
 
@@ -45,8 +48,11 @@ _Static_assert(TX_DATA_REGION_SIZE_ARP >= TX_RING_SIZE_ARP * BUFF_SIZE, "Arp TX 
 _Static_assert(TX_DATA_REGION_SIZE_CLI0 >= TX_RING_SIZE_CLI0 * BUFF_SIZE, "Client0 TX data region size must fit Client0 TX buffers");
 _Static_assert(TX_DATA_REGION_SIZE_CLI1 >= TX_RING_SIZE_CLI1 * BUFF_SIZE, "Client1 TX data region size must fit Client1 TX buffers");
 
+// #define RX_RING_SIZE_DRIV                   1024
 #define RX_RING_SIZE_DRIV                   512
 #define RX_RING_SIZE_ARP                    RX_RING_SIZE_DRIV
+// #define RX_RING_SIZE_CLI0                   1024
+// #define RX_RING_SIZE_CLI1                   1024
 #define RX_RING_SIZE_CLI0                   512
 #define RX_RING_SIZE_CLI1                   512
 #define RX_RING_SIZE_COPY0                  RX_RING_SIZE_DRIV

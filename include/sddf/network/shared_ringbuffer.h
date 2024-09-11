@@ -12,6 +12,7 @@
 #include <sddf/network/shared_ringbuffer.h>
 #include <sddf/network/constants.h>
 #include <sddf/util/fence.h>
+// #include <sddf/util/printf.h>
 
 typedef struct buff_desc {
 uintptr_t phys_or_offset; /* offset of buffer within buffer memory region or physical address of buffer */
@@ -79,6 +80,9 @@ static inline int enqueue(ring_buffer_t *ring, buff_desc_t buffer)
 {
     if (ring_full(ring)) return -1;
 
+    // if (ring->tail >= MAX_BUFFS) {
+    //     printf("ring->tail >= MAX_BUFFS\n");
+    // }
     ring->buffers[ring->tail] = buffer;
 #ifdef MULTICORE
     THREAD_MEMORY_RELEASE();
@@ -99,6 +103,10 @@ static inline int enqueue(ring_buffer_t *ring, buff_desc_t buffer)
 static inline int dequeue(ring_buffer_t *ring, buff_desc_t *buffer)
 {
     if (ring_empty(ring)) return -1;
+
+    // if (ring->head >= MAX_BUFFS) {
+    //     printf("ring->head >= MAX_BUFFS\n");
+    // }
 
     *buffer = ring->buffers[ring->head];
 #ifdef MULTICORE

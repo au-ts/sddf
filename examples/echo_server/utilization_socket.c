@@ -92,10 +92,12 @@ uint64_t idle_overflow_start;
 uint64_t eth_pcount_tx_start;
 uint64_t eth_pcount_rx_start;
 uint64_t eth_irq_count_start;
+uint64_t eth_tx_ntfn_count_start;
 
 uint64_t lwip_pcount_tx_start;
 uint64_t lwip_pcount_rx_start;
-uint64_t lwip_irq_count_start;
+uint64_t lwip_ntfn_count_start;
+uint64_t lwip_tx_ntfn_count_start;
 
 char data_packet_str[MAX_PACKET_SIZE];
 
@@ -164,10 +166,12 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
             eth_pcount_tx_start = bench->eth_pcount_tx;
             eth_pcount_rx_start = bench->eth_pcount_rx;
             eth_irq_count_start = bench->eth_irq_count;
+            eth_tx_ntfn_count_start = bench->eth_tx_ntfn_count;
             
             lwip_pcount_tx_start = bench->lwip_pcount_tx;
             lwip_pcount_rx_start = bench->lwip_pcount_rx;
-            lwip_irq_count_start = bench->lwip_irq_count;
+            lwip_ntfn_count_start = bench->lwip_ntfn_count;
+            lwip_tx_ntfn_count_start = bench->lwip_tx_ntfn_count;
             printf("%s start PMU... \n", microkit_name);
 
             microkit_notify(START_PMU);
@@ -187,12 +191,16 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
         uint64_t eth_pcount_tx = bench->eth_pcount_tx - eth_pcount_tx_start;
         uint64_t eth_pcount_rx = bench->eth_pcount_rx - eth_pcount_rx_start;
         uint64_t eth_irq_count = bench->eth_irq_count - eth_irq_count_start;
-        printf("eth_pcount_tx: %ld, eth_pcount_rx: %ld, eth_irq_count: %ld\n", eth_pcount_tx, eth_pcount_rx, eth_irq_count);
+        uint64_t eth_tx_ntfn_count = bench->eth_tx_ntfn_count - eth_tx_ntfn_count_start;
+        printf("eth_pcount_tx: %ld, eth_pcount_rx: %ld, eth_rx_irq_count: %ld, eth_tx_ntfn_count: %ld\n", 
+               eth_pcount_tx, eth_pcount_rx, eth_irq_count, eth_tx_ntfn_count);
 
         uint64_t lwip_pcount_tx = bench->lwip_pcount_tx - lwip_pcount_tx_start;
         uint64_t lwip_pcount_rx = bench->lwip_pcount_rx - lwip_pcount_rx_start;
-        uint64_t lwip_irq_count = bench->lwip_irq_count - lwip_irq_count_start;
-        printf("lwip_pcount_tx: %ld, lwip_pcount_rx: %ld, lwip_irq_count: %ld\n", lwip_pcount_tx, lwip_pcount_rx, lwip_irq_count);
+        uint64_t lwip_ntfn_count = bench->lwip_ntfn_count - lwip_ntfn_count_start;
+        uint64_t lwip_tx_ntfn_count = bench->lwip_tx_ntfn_count - lwip_tx_ntfn_count_start;
+        printf("lwip_pcount_tx: %ld, lwip_pcount_rx: %ld, lwip_rx_ntfn_count: %ld, lwip_tx_ntfn_count: %ld\n",
+               lwip_pcount_tx, lwip_pcount_rx, lwip_ntfn_count, lwip_tx_ntfn_count);
 
         char tbuf[21];
         my_itoa(total, tbuf);

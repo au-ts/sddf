@@ -8,7 +8,8 @@
 #define ETHARP_OPCODE_REQUEST 1
 #define ETHARP_OPCODE_REPLY 2
 
-#define MAX_BUFFS 1536
+#define MAX_BUFFS 3072
+// #define MAX_BUFFS 1536
 #define BUFF_SIZE 2048
 
 struct ethernet_address {
