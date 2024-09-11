@@ -1408,8 +1408,8 @@ ao_bias_enable_registers = [
     # are not contiguous like other registers...
     {
         # AO_RTI_PULL_UP_EN_REG _A
-        "first_pad": pad_to_idx["GPIOAO_0"],
-        "last_pad": pad_to_idx["GPIOAO_11"],
+        "first_pad": ao_pad_to_idx["GPIOAO_0"],
+        "last_pad": ao_pad_to_idx["GPIOAO_11"],
         "offset": 0x0C * 4,
         "first_bit": 0,
         "bits_per_pin": 1,
@@ -1417,8 +1417,8 @@ ao_bias_enable_registers = [
     },
     {
         # AO_RTI_PULL_UP_EN_REG _B
-        "first_pad": pad_to_idx["GPIOE_0"],
-        "last_pad": pad_to_idx["GPIOE_2"],
+        "first_pad": ao_pad_to_idx["GPIOE_0"],
+        "last_pad": ao_pad_to_idx["GPIOE_2"],
         "offset": 0x0C * 4,
         "first_bit": 16,
         "bits_per_pin": 1,
@@ -1429,8 +1429,8 @@ ao_pull_up_registers = [
     # Same issue as above
     {
         # AO_RTI_PULL_UP_REG _A
-        "first_pad": pad_to_idx["GPIOAO_0"],
-        "last_pad": pad_to_idx["GPIOAO_11"],
+        "first_pad": ao_pad_to_idx["GPIOAO_0"],
+        "last_pad": ao_pad_to_idx["GPIOAO_11"],
         "offset": 0x0B * 4,
         "first_bit": 0,
         "bits_per_pin": 1,
@@ -1438,8 +1438,8 @@ ao_pull_up_registers = [
     },
     {
         # AO_RTI_PULL_UP_REG _B
-        "first_pad": pad_to_idx["GPIOE_0"],
-        "last_pad": pad_to_idx["GPIOE_2"],
+        "first_pad": ao_pad_to_idx["GPIOE_0"],
+        "last_pad": ao_pad_to_idx["GPIOE_2"],
         "offset": 0x0B * 4,
         "first_bit": 16,
         "bits_per_pin": 1,
