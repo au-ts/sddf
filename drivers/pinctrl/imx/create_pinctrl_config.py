@@ -55,11 +55,30 @@ if __name__ == "__main__":
     device_name = sys.argv[3]
     out_dir = sys.argv[4]
 
+    # Check which devices are actually enabled
+    enabled_phandles = set()
+    for node in devicetree.node_iter():
+        if "status" in node.props and node.props["status"] == "okay":
+            pass
+
     # For the imx8mq, we have to locate the "pinctrl" device in the dts to be able to get our relevant info
     for node in devicetree.node_iter():
         if device_name in node.name:
             pinmux_dict = get_pinctrl_info(node.nodes[soc_name])
             nums_pin_properties = len(pinmux_dict['mux_reg'])
+
+            errored = False
+            if len(set(pinmux_dict['mux_reg'])) != len(pinmux_dict['mux_reg']):
+                print("there were duplicate mux registers!")
+                errored = True
+            if len(set(pinmux_dict['conf_reg'])) != len(pinmux_dict['conf_reg']):
+                print("there were duplicate config registers!")
+                errored = True
+            if len(set(pinmux_dict['input_reg'])) != len(pinmux_dict['input_reg']):
+                print("there were duplicate input registers!")
+                errored = True
+            if errored:
+                exit(1)
 
             # This is an interesting way of writing my dict values to an assembly file
             # It works so I won't bother changing it right now
