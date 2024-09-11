@@ -220,6 +220,81 @@ def zero_n_bits_at_ith_bit_of_32bits(register: int, n: int, ith: int) -> int:
 
     return result
 
+##### MEMORY
+def pindata_to_register_values(
+    # Input
+    dts_data,
+    func_to_group_map,
+    pad_to_idx_map,
+    port_to_pad_map,
+    port_to_mux_func_map,
+
+    # Output
+    mux_registers,
+    ds_registers,
+    bias_en_registers,
+    pull_dir_registers
+) -> None:
+    encountered_pad = set()
+    for pindata in dts_data:
+        for port in pindata.group_names:
+            this_port_function_group: str = pindata.function_name
+            if port not in func_to_group_map[this_port_function_group]:
+                log_error_parser(f"the function group {this_port_function_group} does not contain port {port}")
+                exit(1)
+            else:
+                pad_idx = -1
+                mux_func = -1
+                if pindata.function_name == "gpio_periphs":
+                    # Special case where the pad is not connected to any port and is used as a GPIO
+                    pad_idx = pad_to_idx_map[port]
+                    mux_func = 0
+                else:
+                    pad_idx = port_to_pad_map[port]
+                    mux_func = port_to_mux_func_map[port]
+
+                if pad_idx in encountered_pad:
+                    log_error_parser(f"the pad {pad_idx} has been muxed twice!")
+                    exit(1)
+                else:
+                    encountered_pad.add(pad_idx)
+
+                if mux_func < 0 or mux_func > 7:
+                    log_error_parser(f"the pad {pad_idx} have an invalid mux value: {mux_func}")
+                    exit(1)
+
+                # Work out which mux register this pad is in
+                found = False
+                for reg in pinmux_registers:
+                    if pad_idx >= reg["first_pad"] and pad_idx <= reg["last_pad"]:
+                        found = True
+                        nth_pin = pad_idx - reg["first_pad"]    # in the bank
+                        nth_bit = nth_pin * reg["bits_per_pin"] # in the bank
+
+                        # Fetch the bank value then zero out the bits that belong to this pad
+                        zeroed_regval = zero_n_bits_at_ith_bit_of_32bits(reg["value"], reg["bits_per_pin"], nth_bit)
+                        
+                        # Prepare mux setting value to be OR'ed into the zeroed out slot
+                        data_mask = mux_func << nth_bit
+
+                        log_normal_parser(f"pad #{pad_idx} was given mux func {mux_func}, prev reg is {hex(reg["value"])}, ")
+
+                        reg["value"] = zeroed_regval | data_mask
+
+                        log_normal_parser(f"after reg is {hex(reg["value"])}\n")
+
+                if not found:
+                    log_error_parser(f"cannot find the pin bank that the port {port} belongs in\n")
+                    exit(1)
+
+                # Then work out the biasing (if any)
+                
+
+def register_values_to_assembler(out_dir: str):
+    with open(out_dir + "/pinctrl_config_data.s", "w") as file:
+        file.write(".section .data\n")
+        file.write("\t.align 4\n")
+
 
 ##### MAIN
 
@@ -271,59 +346,25 @@ if __name__ == "__main__":
     if len(processed_phandles) != len(set(enabled_phandles.keys())):
         log_warning_parser(f"Seems like some phandles does not have pinctrl data associated: {set(enabled_phandles.keys()) - processed_phandles}")
 
-    log_normal_parser
-
     # Map pinmux data from DTS to memory values
+    # Input for pheripherals
     dts_data = peripherals_dts_data
     func_to_group_map = function_to_group
     pad_to_idx_map = pad_to_idx
     port_to_pad_map = port_to_pad
     port_to_mux_func_map = port_to_mux_func
+    # Output for pheripherals
+    mux_registers = pinmux_registers
+    ds_registers = drive_strength_registers
+    bias_en_registers = bias_enable_registers
+    pull_dir_registers = pull_up_registers
 
-    encountered_pad = set()
-    for pindata in dts_data:
-
-        for port in pindata.group_names:
-            this_port_function_group: str = pindata.function_name
-            if port not in func_to_group_map[this_port_function_group]:
-                log_error_parser(f"the function group {this_port_function_group} does not contain port {port}")
-                exit(1)
-            else:
-                pad_idx = -1
-                mux_func = -1
-                if pindata.function_name == "gpio_periphs":
-                    # Special case where the pad is not connected to any port and is used as a GPIO
-                    pad_idx = pad_to_idx_map[port]
-                    mux_func = 0
-                else:
-                    pad_idx = port_to_pad_map[port]
-                    mux_func = port_to_mux_func_map[port]
-
-                if pad_idx in encountered_pad:
-                    log_error_parser(f"the pad {pad_idx} has been muxed twice!")
-                    exit(1)
-                else:
-                    encountered_pad.add(pad_idx)
-
-                if mux_func < 0 or mux_func > 7:
-                    log_error_parser(f"the pad {pad_idx} have an invalid mux value: {mux_func}")
-                    exit(1)
-
-                # Work out which mux register this pad is in
-                found = False
-                for reg in pinmux_registers:
-                    if pad_idx >= reg["first_pad"] and pad_idx <= reg["last_pad"]:
-                        found = True
-                        nth_pin = pad_idx - reg["first_pad"]
-                        nth_bit = nth_pin * reg["bits_per_pin"]
-
-                        zeroed_regval = zero_n_bits_at_ith_bit_of_32bits(reg["value"], reg["bits_per_pin"], nth_bit)
-                        
-                        data_mask = mux_func << nth_bit
-                        reg["value"] = zeroed_regval | data_mask
-
+    pindata_to_register_values(
+        # Input
+        dts_data, func_to_group_map, pad_to_idx_map, port_to_pad_map, port_to_mux_func_map,
+        # Output
+        mux_registers, ds_registers, bias_en_registers, pull_dir_registers
+    )
 
     # Write to assembly file
-    with open(out_dir + "/pinctrl_config_data.s", "w") as file:
-        file.write(".section .data\n")
-        file.write("\t.align 4\n")
+    register_values_to_assembler(out_dir)
