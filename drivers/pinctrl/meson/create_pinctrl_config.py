@@ -8,16 +8,17 @@
 # A typical invocation might look like:
 # $ python3 create_pinctrl_config.py hardkernel,odroid-c4 your_device_tree.dts build 
 
-import os
 import sys
+sys.dont_write_bytecode = True
+
+import os
 import re
 from devicetree import edtlib, dtlib
 import struct
 
 from odroidc4 import *
 
-supported_compat_str_board = { "hardkernel,odroid-c4" }
-
+##### LOGGING
 debug_parser = True
 
 def log_normal_parser(print_str: str) -> None:
@@ -30,11 +31,44 @@ def log_warning_parser(print_str: str) -> None:
 def log_error_parser(print_str: str) -> None:
     sys.stderr.write("PARSER|ERROR: " + print_str)
 
+##### COMPATIBILITY CHECKING
+supported_compat_str_board = { "hardkernel,odroid-c4" }
 
+def is_dts_compatible(devicetree: dtlib.DT) -> None:
+    supported = False
+    for compat_str in devicetree.root.props["compatible"].to_strings():
+        if compat_str in supported_compat_str_board:
+            supported = True
+            break
+    if not supported:
+        log_error_parser("this board is not supported.")
+        exit(1)
 
-# Each mux data node inside the DTS is represented with this class.
+##### DTS SANITISATION
+
+# Given the device tree, extract any devices that are enabled (prop status = "okay")
+# and have pinctrl phandles. Returns a dict of phandle int -> device name for debugging.
+def fetch_enabled_devices(devicetree: dtlib.DT) -> dict[int, str]:
+    enabled_phandles: dict[int, str] = {}
+    for node in devicetree.node_iter():
+        if "status" in node.props and node.props["status"].to_string() == "okay":
+            if "pinctrl-0" in node.props.keys():
+                for phandle in node.props["pinctrl-0"].to_nums():
+                    if phandle in enabled_phandles:
+                        log_error_parser(f"duplicate pinctrl phandle: {hex(phandle)}")
+                        exit(1)
+                    else:
+                        enabled_phandles[phandle] = node.name
+
+    return enabled_phandles
+
+##### PINCTRL DATA REPRESENTATION
+
+# Each pinctrl data node inside the DTS is represented with this class.
+# These data are then converted into memory values for writing into pinmux registers.
 class PinData:
     def __init__(self, 
+                 phandle: int,
                  muxed_device_name: str, 
                  muxed_device_property_node_name: str, 
                  group_names: list[str], 
@@ -43,6 +77,7 @@ class PinData:
                  bias_pullup: bool, 
                  drive_strength: int):
         
+        self.phandle = phandle
         # for debugging: name of the device in DTS
         self.muxed_device_name = muxed_device_name
         # for debugging: name of the mux subproperty
@@ -72,9 +107,12 @@ class PinData:
 
         return representation
 
+##### PINCTRL DATA EXTRACTION
+
 # This function extract pinmux data from the "pinctrl" node in DTS and return a list of PinData.
 # It will be called twice, once for peripherals and always-on GPIO chips.
-def get_pinctrl_data(pinmux_node, enabled_phandles): 
+# Returns a list of PinData.
+def get_pinctrl_data(pinmux_node: dtlib.Node, enabled_phandles: dict[int, str]) -> list[PinData]: 
     # `pinmux_node` looks something like this:
     # pinctrl@40 {
     #     compatible = "amlogic,meson-g12a-periphs-pinctrl";
@@ -96,7 +134,7 @@ def get_pinctrl_data(pinmux_node, enabled_phandles):
     #         };
     #     };
 
-    result = []
+    result: list[PinData] = []
     for muxed_device_name in pinmux_node.nodes:
         muxed_device_node = pinmux_node.nodes[muxed_device_name]
 
@@ -104,8 +142,7 @@ def get_pinctrl_data(pinmux_node, enabled_phandles):
             # We don't care about the bank node because it just have the registers sizes.
             continue
 
-        if "phandle" in muxed_device_node.props.keys() and hex(muxed_device_node.props["phandle"].to_num()) in enabled_phandles:
-            enabled_phandles[hex(muxed_device_node.props["phandle"].to_num())] = True
+        if "phandle" in muxed_device_node.props.keys() and muxed_device_node.props["phandle"].to_num() in enabled_phandles:
             for muxed_device_property_node_name in muxed_device_node.nodes:
                 # Each device can have multiple mux properties of it's different ports.
                 # E.g. an emmc_cmd port need pull up, whereas an emmc_clk does not need bias at all
@@ -148,10 +185,43 @@ def get_pinctrl_data(pinmux_node, enabled_phandles):
                         log_warning_parser("Warning: bias undefined for device: " + muxed_device_node.name + ". Defaulting to disabling bias!\n")
                         bias_enable = False
                 
-                result.append(PinData(muxed_device_name, muxed_device_property_node_name, group_names, function_name, bias_enable, bias_pullup, drive_strength))
+                result.append(PinData(muxed_device_node.props["phandle"].to_num(), 
+                                      muxed_device_name, 
+                                      muxed_device_property_node_name, 
+                                      group_names, 
+                                      function_name, 
+                                      bias_enable, 
+                                      bias_pullup, 
+                                      drive_strength)
+                )
 
     return result
 
+##### BITS UTIL
+def zero_n_bits_at_ith_bit_of_32bits(register: int, n: int, ith: int) -> int:
+    if n < 0 or ith < 0:
+        log_error_parser(f"invalid arg to zero_n_bits_at_ith_bit: n = {n}, ith = {ith}\n")
+        exit(1)
+    
+    mask = 0xFFFF_FFFF
+    mask = mask >> (ith + n)
+
+    for i in range(n):
+        mask = mask << 1
+    
+    for i in range(ith):
+        mask = mask << 1
+        mask |= 1
+    
+    result = register & mask
+    if result > 0xFFFF_FFFF:
+        log_error_parser(f"bad output zero_n_bits_at_ith_bit_of_32bits(register={hex(register)}, n={n}, ith={ith}) = {hex(result)}")
+        exit(1)
+
+    return result
+
+
+##### MAIN
 
 if __name__ == "__main__":
     if len(sys.argv) != 4:
@@ -165,37 +235,14 @@ if __name__ == "__main__":
     pinmux_node_name = "pinctrl@"
     out_dir = sys.argv[3]
     
-    # Check compatibility
-    supported = False
-    for compat_str in devicetree.root.props["compatible"].to_strings():
-        if compat_str in supported_compat_str_board:
-            supported = True
-            break
-    if not supported:
-        log_error_parser("this board is not supported.")
-        exit(1)
+    is_dts_compatible(devicetree)
 
-    # Only parse devices that are enabled.
-    # Set of pinctrl phandles we care about, hex represented as string, value is whether the phandle has been
-    #    encountered in later parsing steps.
-    enabled_phandles: dict[str, bool] = {}
-    for node in devicetree.node_iter():
-        if "status" in node.props and node.props["status"].to_string() == "okay":
-            for prop_name in node.props.keys():
-                if re.match(r"^pinctrl-[0-9]+$", prop_name):
-                    for phandle in node.props[prop_name].to_nums():
-                        if phandle in enabled_phandles:
-                            log_error_parser(f"duplicate pinctrl phandle: {hex(phandle)}")
-                            exit(1)
-                        else:
-                            enabled_phandles[hex(phandle)] = False
-    
-    log_normal_parser("Enabled devices found: " + str(enabled_phandles))
+    enabled_phandles: dict[int, str] = fetch_enabled_devices(devicetree)
+    log_normal_parser("Enabled devices found: " + str(enabled_phandles.values()))
 
     # Read actual pinmux data
     peripherals_dts_data: list[PinData] = []
     ao_dts_data: list[PinData] = []
-
     for node in devicetree.node_iter():
         if pinmux_node_name in node.name:
             pinmux_node = node
@@ -215,10 +262,16 @@ if __name__ == "__main__":
     for pin in ao_dts_data:
         log_normal_parser(str(pin))
 
-    for phandle, processed in enabled_phandles.items():
-        if not processed:
-            log_error_parser(f"phandle {phandle} does not have any configuration data in DTS")
-            exit(1)
+    # Sanity check that all the enabled phandles have pinctrl data associated.
+    processed_phandles: set[int] = set()
+    for pindata in peripherals_dts_data:
+        processed_phandles.add(pindata.phandle)
+    for pindata in ao_dts_data:
+        processed_phandles.add(pindata.phandle)
+    if len(processed_phandles) != len(set(enabled_phandles.keys())):
+        log_warning_parser(f"Seems like some phandles does not have pinctrl data associated: {set(enabled_phandles.keys()) - processed_phandles}")
+
+    log_normal_parser
 
     # Map pinmux data from DTS to memory values
     dts_data = peripherals_dts_data
@@ -229,6 +282,7 @@ if __name__ == "__main__":
 
     encountered_pad = set()
     for pindata in dts_data:
+
         for port in pindata.group_names:
             this_port_function_group: str = pindata.function_name
             if port not in func_to_group_map[this_port_function_group]:
@@ -251,8 +305,25 @@ if __name__ == "__main__":
                 else:
                     encountered_pad.add(pad_idx)
 
+                if mux_func < 0 or mux_func > 7:
+                    log_error_parser(f"the pad {pad_idx} have an invalid mux value: {mux_func}")
+                    exit(1)
+
+                # Work out which mux register this pad is in
+                found = False
+                for reg in pinmux_registers:
+                    if pad_idx >= reg["first_pad"] and pad_idx <= reg["last_pad"]:
+                        found = True
+                        nth_pin = pad_idx - reg["first_pad"]
+                        nth_bit = nth_pin * reg["bits_per_pin"]
+
+                        zeroed_regval = zero_n_bits_at_ith_bit_of_32bits(reg["value"], reg["bits_per_pin"], nth_bit)
+                        
+                        data_mask = mux_func << nth_bit
+                        reg["value"] = zeroed_regval | data_mask
+
+
     # Write to assembly file
     with open(out_dir + "/pinctrl_config_data.s", "w") as file:
         file.write(".section .data\n")
         file.write("\t.align 4\n")
-
