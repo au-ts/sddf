@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
 # Include this snippet in your project Makefile to build
-# the IMX8MQ pinctrl driver
+# the OdroidC4 pinctrl driver
 #
 # NOTES
 #  Generates pinctrl.elf
@@ -31,7 +31,7 @@ ifndef SOC
 $(error SOC is not set)
 endif
 
-ODROIDC4_DTS_STR := amlogic,sm1
+ODROIDC4_DTS_STR := hardkernel,odroid-c4
 ifeq ($(ODROIDC4_DTS_STR),$(findstring $(ODROIDC4_DTS_STR),$(SOC)))
 else
 $(error Pinctrl driver: unsupported SoC: $(SOC))
