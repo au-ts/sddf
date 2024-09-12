@@ -58,6 +58,17 @@ static inline int regmap_read_bits(uint32_t offset, uint8_t shift, uint8_t width
     return reg_val;
 }
 
+static inline int regmap_mux_read_bits(uint32_t offset, uint8_t shift, uint32_t mask)
+{
+    volatile uint32_t *clk_reg = ((void *)clk_regs + offset);
+    uint32_t reg_val = *clk_reg;
+
+    reg_val >>= shift;
+    reg_val &= mask;
+
+    return reg_val;
+}
+
 static int clk_regmap_gate_enable(struct clk_hw *hw)
 {
     struct clk_gate_data *data = (struct clk_gate_data *)(hw->clk->data);
@@ -138,26 +149,26 @@ static int clk_regmap_div_set_rate(struct clk_hw *hw, uint32_t rate, uint32_t pa
     return regmap_update_bits(data->offset, data->shift, data->width, div);
 }
 
-static int clk_regmap_div_determine_rate(struct clk_hw *hw,
-                     struct clk_rate_request *req)
-{
-    struct clk_div_data *data = (struct clk_div_data *)(hw->clk->data);
-    /* struct clk_regmap *clk = to_clk_regmap(hw); */
-    /* struct clk_regmap_div_data *div = clk_get_regmap_div_data(clk); */
-    uint32_t val;
+/* static int clk_regmap_div_determine_rate(struct clk_hw *hw, */
+/*                      struct clk_rate_request *req) */
+/* { */
+/*     struct clk_div_data *data = (struct clk_div_data *)(hw->clk->data); */
+/*     /\* struct clk_regmap *clk = to_clk_regmap(hw); *\/ */
+/*     /\* struct clk_regmap_div_data *div = clk_get_regmap_div_data(clk); *\/ */
+/*     uint32_t val; */
 
-    /* if read only, just return current value */
-    if (data->flags & CLK_DIVIDER_READ_ONLY) {
-        val = regmap_read_bits(data->offset, data->shift, data->width);
+/*     /\* if read only, just return current value *\/ */
+/*     if (data->flags & CLK_DIVIDER_READ_ONLY) { */
+/*         val = regmap_read_bits(data->offset, data->shift, data->width); */
 
-        /* return divider_ro_determine_rate(hw, req, div->table, */
-                         /* div->width, div->flags, val); */
-    }
+/*         /\* return divider_ro_determine_rate(hw, req, div->table, *\/ */
+/*                          /\* div->width, div->flags, val); *\/ */
+/*     } */
 
-    /* return divider_determine_rate(hw, req, div->table, div->width, */
-                      /* div->flags); */
-    return 0;
-}
+/*     /\* return divider_determine_rate(hw, req, div->table, div->width, *\/ */
+/*                       /\* div->flags); *\/ */
+/*     return 0; */
+/* } */
 
 const struct clk_ops clk_regmap_divider_ops = {
     .recalc_rate = clk_regmap_div_recalc_rate,
@@ -170,27 +181,124 @@ const struct clk_ops clk_regmap_divider_ro_ops = {
     /* .determine_rate = clk_regmap_div_determine_rate, */
 };
 
+static uint8_t clk_regmap_mux_get_parent(struct clk_hw *hw)
+{
+    struct clk_mux_data *data = (struct clk_mux_data *)(hw->clk->data);
+	uint32_t num_parents = hw->init->num_parents;
+	uint32_t val = regmap_mux_read_bits(data->offset, data->shift, data->mask);
+
+	if (data->table) {
+		int i;
+		for (i = 0; i < num_parents; i++) {
+			if (data->table[i] == val)
+				return i;
+		}
+		return -1;
+		/* return -EINVAL; */
+	}
+
+	/* if (val && (flags & CLK_MUX_INDEX_BIT)) */
+	/* 	val = ffs(val) - 1; */
+
+	/* if (val && (flags & CLK_MUX_INDEX_ONE)) */
+	/* 	val--; */
+
+	if (val >= num_parents)
+		/* return -EINVAL; */
+		return -1;
+
+	/* return val; */
+	return 0;
+}
+
 static struct clk_ops clk_regmap_mux_ops = {
-    /* .get_parent = clk_regmap_mux_get_parent, */
+    .get_parent = clk_regmap_mux_get_parent,
     /* .set_parent = clk_regmap_mux_set_parent, */
     /* .determine_rate = clk_regmap_mux_determine_rate, */
 };
 
 const struct clk_ops clk_regmap_mux_ro_ops = {
-    /* .get_parent = clk_regmap_mux_get_parent, */
+    .get_parent = clk_regmap_mux_get_parent,
 };
 
+static unsigned long clk_factor_recalc_rate(struct clk_hw *hw,
+		unsigned long parent_rate)
+{
+	struct clk_fixed_factor_data *data = (struct clk_fixed_factor_data *)(hw->clk->data);
+	unsigned long long int rate;
 
-static uint32_t mux_table_clk81[]    = { 0, 2, 3, 4, 5, 6, 7 };
-/* static const struct clk_parent_data clk81_parent_data[] = { */
-/*     { .fw_name = "xtal", } */
+	rate = (unsigned long long int)parent_rate * data->mult;
+	do_div(rate, data->div);
+	return (unsigned long)rate;
+}
+
+const struct clk_ops clk_fixed_factor_ops = {
+	/* .round_rate = clk_factor_round_rate, */
+	/* .set_rate = clk_factor_set_rate, */
+	/* .recalc_rate = clk_factor_recalc_rate, */
+	/* .recalc_accuracy = clk_factor_recalc_accuracy, */
+};
+
+static struct clk g12a_fixed_pll = {
+	.data = &(struct clk_div_data){
+		.offset = HHI_FIX_PLL_CNTL0,
+		.shift = 16,
+		.width = 2,
+		.flags = CLK_DIVIDER_POWER_OF_TWO,
+	},
+	.hw.init = &(struct clk_init_data){
+		.name = "fixed_pll",
+		.ops = &clk_regmap_divider_ro_ops,
+		.parent_hws = (const struct clk_hw *[]) {
+			/* &g12a_fixed_pll_dco.hw */
+		},
+		.num_parents = 1,
+		/*
+		 * This clock won't ever change at runtime so
+		 * CLK_SET_RATE_PARENT is not required
+		 */
+	},
+};
+
+static struct clk g12a_fclk_div4_div = {
+    .data = &(struct clk_fixed_factor_data) {
+	    .mult = 1,
+	    .div = 4,
+    },
+	.hw.init = &(struct clk_init_data){
+		.name = "fclk_div4_div",
+		.ops = &clk_fixed_factor_ops,
+		.parent_hws = (const struct clk_hw *[]) { &g12a_fixed_pll.hw },
+		.num_parents = 1,
+	},
+};
+
+static struct clk g12a_fclk_div4 = {
+	.data = &(struct clk_gate_data){
+	    .offset = HHI_FIX_PLL_CNTL1,
+		.bit_idx = 1,
+    },
+	.hw.init = &(struct clk_init_data){
+		.name = "fclk_div4",
+		.ops = &clk_regmap_gate_ops,
+		.parent_hws = (const struct clk_hw *[]) {
+		    &g12a_fclk_div4_div.hw
+	    },
+		.num_parents = 1,
+	},
+};
+
+/* static uint32_t mux_table_clk81[]    = { 0, 2, 3, 4, 5, 6, 7 }; */
+static uint32_t mux_table_clk81[]    = { 0, 5 };
+static const struct clk_parent_data clk81_parent_data[] = {
+    { .fw_name = "xtal", },
 /*     { .hw = &g12a_fclk_div7.hw }, */
 /*     { .hw = &g12a_mpll1.hw }, */
 /*     { .hw = &g12a_mpll2.hw }, */
-/*     { .hw = &g12a_fclk_div4.hw }, */
+    { .hw = &g12a_fclk_div4.hw },
 /*     { .hw = &g12a_fclk_div3.hw }, */
 /*     { .hw = &g12a_fclk_div5.hw }, */
-/* }; */
+};
 
 static struct clk g12a_mpeg_clk_sel = {
     .data = &(struct clk_mux_data) {
@@ -201,13 +309,9 @@ static struct clk g12a_mpeg_clk_sel = {
     },
     .hw.init = &(struct clk_init_data) {
         .name = "mpeg_clk_sel",
-        .ops = &clk_regmap_mux_ops,
-        .parent_hws = (const struct clk_hw *[]) {
-            /* &g12a_mpeg_clk_sel.hw */
-        },
-        .num_parents = 0,
-        /* .flags = CLK_SET_RATE_PARENT, */
-        .flags = 0,
+        .ops = &clk_regmap_mux_ro_ops,
+		.parent_data = clk81_parent_data,
+        .num_parents = ARRAY_SIZE(clk81_parent_data),
     }
 };
 
@@ -345,12 +449,12 @@ static struct clk_hw *sm1_clks[] = {
     /* [CLKID_FIXED_PLL]        = &g12a_fixed_pll.hw, */
     /* [CLKID_FCLK_DIV2]        = &g12a_fclk_div2.hw, */
     /* [CLKID_FCLK_DIV3]        = &g12a_fclk_div3.hw, */
-    /* [CLKID_FCLK_DIV4]        = &g12a_fclk_div4.hw, */
+    [CLKID_FCLK_DIV4]        = &g12a_fclk_div4.hw,
     /* [CLKID_FCLK_DIV5]        = &g12a_fclk_div5.hw, */
     /* [CLKID_FCLK_DIV7]        = &g12a_fclk_div7.hw, */
     /* [CLKID_FCLK_DIV2P5]        = &g12a_fclk_div2p5.hw, */
     /* [CLKID_GP0_PLL]            = &g12a_gp0_pll.hw, */
-    /* [CLKID_MPEG_SEL]        = &g12a_mpeg_clk_sel.hw, */
+    [CLKID_MPEG_SEL]        = &g12a_mpeg_clk_sel.hw,
     [CLKID_MPEG_DIV]        = &g12a_mpeg_clk_div.hw,
     /* [CLKID_CLK81]            = &g12a_clk81.hw, */
     /* [CLKID_MPLL0]            = &g12a_mpll0.hw, */
@@ -417,7 +521,7 @@ static struct clk_hw *sm1_clks[] = {
     /* [CLKID_MPLL3_DIV]        = &g12a_mpll3_div, */
     /* [CLKID_FCLK_DIV2_DIV]        = &g12a_fclk_div2_div, */
     /* [CLKID_FCLK_DIV3_DIV]        = &g12a_fclk_div3_div, */
-    /* [CLKID_FCLK_DIV4_DIV]        = &g12a_fclk_div4_div, */
+    [CLKID_FCLK_DIV4_DIV]        = &g12a_fclk_div4_div,
     /* [CLKID_FCLK_DIV5_DIV]        = &g12a_fclk_div5_div, */
     /* [CLKID_FCLK_DIV7_DIV]        = &g12a_fclk_div7_div, */
     /* [CLKID_FCLK_DIV2P5_DIV]        = &g12a_fclk_div2p5_div, */
@@ -642,7 +746,7 @@ static struct clk *const g12a_clk_regmaps[] = {
     /* &g12a_sd_emmc_a_clk0_div, */
     /* &g12a_sd_emmc_b_clk0_div, */
     /* &g12a_sd_emmc_c_clk0_div, */
-    /* &g12a_mpeg_clk_sel, */
+    &g12a_mpeg_clk_sel,
     /* &g12a_sd_emmc_a_clk0_sel, */
     /* &g12a_sd_emmc_b_clk0_sel, */
     /* &g12a_sd_emmc_c_clk0_sel, */
@@ -683,7 +787,7 @@ static struct clk *const g12a_clk_regmaps[] = {
     /* &g12a_hifi_pll_dco, */
     /* &g12a_fclk_div2, */
     /* &g12a_fclk_div3, */
-    /* &g12a_fclk_div4, */
+    &g12a_fclk_div4,
     /* &g12a_fclk_div5, */
     /* &g12a_fclk_div7, */
     /* &g12a_fclk_div2p5, */
@@ -893,15 +997,18 @@ void init(void)
         sddf_dprintf("failed to toggle clock!\n");
     }
 
-    /* CLOCK CONFIGURATION TEST */
+    /* Clock divider configuration test */
     struct clk_hw *mpeg_clk_div_hw = sm1_clks[CLKID_MPEG_DIV];
-    /* mpeg_clk_div_hw->init->ops->set_rate(mpeg_clk_div_hw, 100, 500); */
     unsigned long rate = mpeg_clk_div_hw->init->ops->recalc_rate(mpeg_clk_div_hw, 500000000);
     sddf_dprintf("Old rate: %lu\n", rate);
+    /* mpeg_clk_div_hw->init->ops->set_rate(mpeg_clk_div_hw, 100000000, 500000000); */
+    /* rate = mpeg_clk_div_hw->init->ops->recalc_rate(mpeg_clk_div_hw, 500000000); */
+    /* sddf_dprintf("New rate: %lu\n", rate); */
 
-    mpeg_clk_div_hw->init->ops->set_rate(mpeg_clk_div_hw, 100000000, 500000000);
-    rate = mpeg_clk_div_hw->init->ops->recalc_rate(mpeg_clk_div_hw, 500000000);
-    sddf_dprintf("New rate: %lu\n", rate);
+	/* Clock mux configuration test */
+	struct clk_hw *mpeg_clk_sel_hw = sm1_clks[CLKID_MPEG_SEL];
+	uint8_t parent_idx = mpeg_clk_sel_hw->init->ops->get_parent(mpeg_clk_sel_hw);
+	sddf_dprintf("Parent index: %u\n", parent_idx);
 
     read_cfg("fix_pll_en", HHI_FIX_PLL_CNTL0, 28, 1);
     read_cfg("fix_pll_m", HHI_FIX_PLL_CNTL0, 0, 8);
