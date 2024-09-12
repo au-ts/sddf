@@ -91,7 +91,7 @@ void init(void) {
 
     // The peripherals pinmux device physical address isn't aligned on page boundary whereas
     // memory regions can only be mapped on page boundary, we need to offset the page boundary address
-    // into the pinmux device.
+    // into the actual pinmux device.
     pinctrl_periphs_base += 0x400;
 
     for (uint32_t i = 0; i < num_peripheral_registers; i += 1) {
