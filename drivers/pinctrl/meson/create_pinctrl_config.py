@@ -404,6 +404,8 @@ def register_values_to_assembler(out_dir: str, peripherals_data: OrderedDict[int
         file.write("\t.global num_ao_registers\n")
         file.write("\t.global ao_registers\n")
 
+        file.write("\t.global pinmux_data_magic\n")
+
         file.write("num_peripheral_registers:\n")
         file.write(f"\t.word {len(peripherals_data)}\n")
 
@@ -419,6 +421,9 @@ def register_values_to_assembler(out_dir: str, peripherals_data: OrderedDict[int
         for offset, value in ao_data.items():
             file.write("\t.word ")
             file.write(f"{int(offset)}, {int(value)}\n")
+
+        file.write("pinmux_data_magic:\n")
+        file.write(f"\t.word 1940637231\n")
 
 ##### MAIN
 
