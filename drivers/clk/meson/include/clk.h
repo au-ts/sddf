@@ -58,6 +58,7 @@ struct clk_hw {
 
 
 struct clk_ops {
+    uint8_t (*get_parent)(struct clk_hw *hw);
     unsigned long (*recalc_rate)(struct clk_hw *hw, unsigned long parent_rate);
     int (*set_rate)(struct clk_hw *hw, uint32_t rate, uint32_t parent_rate);
     int (*enable)(struct clk_hw *hw);
@@ -75,12 +76,28 @@ struct clk_core {
     uint32_t rate;          // TODO: Type?
 };
 
+/**
+ * struct clk_parent_data - clk parent information
+ * @hw: parent clk_hw pointer (used for clk providers with internal clks)
+ * @fw_name: parent name local to provider registering clk
+ * @name: globally unique parent name (used as a fallback)
+ * @index: parent index local to provider registering clk (if @fw_name absent)
+ */
+struct clk_parent_data {
+    const struct clk_hw *hw;
+    const char *fw_name;
+    const char *name;
+    int index;
+};
+
+
 struct clk_init_data {
+    uint32_t num_parents;
+    uint32_t flags;
     const char *name;
     const struct clk_ops *ops;
     const struct clk_hw **parent_hws;
-    uint8_t num_parents;
-    uint32_t flags;
+    const struct clk_parent_data *parent_data;
 };
 
 
@@ -103,7 +120,7 @@ struct clk_div_data {
 };
 
 struct clk_fixed_factor_data {
-    uint32_t mul;
+    uint32_t mult;
     uint32_t div;
 };
 
