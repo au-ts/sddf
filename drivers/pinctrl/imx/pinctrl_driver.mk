@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
 # Include this snippet in your project Makefile to build
-# the IMX8MQ pinctrl driver
+# the IMX8 pinctrl driver
 #
 # NOTES
 #  Generates pinctrl.elf
