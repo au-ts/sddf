@@ -81,13 +81,9 @@ static inline uint16_t net_queue_size(net_queue_t *queue)
 static inline bool net_queue_empty_free(net_queue_handle_t *queue)
 {
 #if CONFIG_ENABLE_SMP_SUPPORT
-    uint16_t tail = __atomic_load_n(&queue->free->tail, __ATOMIC_RELAXED);
+    uint16_t tail = __atomic_load_n(&queue->free->tail, __ATOMIC_ACQUIRE);
     uint16_t head = __atomic_load_n(&queue->free->head, __ATOMIC_RELAXED);
     bool ret = tail - head == 0;
-
-    // this is expensive for the same reason as in net_queue_size()
-    // in addition, it prevents reordering of the relaxed load in net_dequeue_free()
-    THREAD_MEMORY_ACQUIRE();
 
     return ret;
 #else
@@ -105,10 +101,9 @@ static inline bool net_queue_empty_free(net_queue_handle_t *queue)
 static inline bool net_queue_empty_active(net_queue_handle_t *queue)
 {
 #if CONFIG_ENABLE_SMP_SUPPORT
-    uint16_t tail = __atomic_load_n(&queue->active->tail, __ATOMIC_RELAXED);
+    uint16_t tail = __atomic_load_n(&queue->active->tail, __ATOMIC_ACQUIRE);
     uint16_t head = __atomic_load_n(&queue->active->head, __ATOMIC_RELAXED);
     bool ret = tail - head == 0;
-    THREAD_MEMORY_ACQUIRE();
     return ret;
 #else
     return queue->active->tail - queue->active->head == 0;
@@ -125,10 +120,9 @@ static inline bool net_queue_empty_active(net_queue_handle_t *queue)
 static inline bool net_queue_full_free(net_queue_handle_t *queue)
 {
 #if CONFIG_ENABLE_SMP_SUPPORT
+    uint16_t head = __atomic_load_n(&queue->free->head, __ATOMIC_ACQUIRE);
     uint16_t tail = __atomic_load_n(&queue->free->tail, __ATOMIC_RELAXED);
-    uint16_t head = __atomic_load_n(&queue->free->head, __ATOMIC_RELAXED);
     bool ret = tail + 1 - head == queue->size;
-    THREAD_MEMORY_ACQUIRE();
     return ret;
 #else
     return queue->free->tail + 1 - queue->free->head == queue->size;
@@ -145,10 +139,9 @@ static inline bool net_queue_full_free(net_queue_handle_t *queue)
 static inline bool net_queue_full_active(net_queue_handle_t *queue)
 {
 #if CONFIG_ENABLE_SMP_SUPPORT
+    uint16_t head = __atomic_load_n(&queue->active->head, __ATOMIC_ACQUIRE);
     uint16_t tail = __atomic_load_n(&queue->active->tail, __ATOMIC_RELAXED);
-    uint16_t head = __atomic_load_n(&queue->active->head, __ATOMIC_RELAXED);
     bool ret = tail + 1 - head == queue->size;
-    THREAD_MEMORY_ACQUIRE();
     return ret;
 #else
     return queue->active->tail + 1 - queue->active->head == queue->size;
