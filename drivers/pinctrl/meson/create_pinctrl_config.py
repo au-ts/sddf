@@ -16,8 +16,6 @@ import re
 from devicetree import edtlib, dtlib
 import struct
 
-from odroidc4 import *
-
 ##### LOGGING
 debug_parser = True
 
@@ -390,6 +388,8 @@ def register_values_to_assembler(out_dir: str):
 
 ##### MAIN
 
+from odroidc4 import *
+
 if __name__ == "__main__":
     if len(sys.argv) != 4:
         log_error_parser("Usage: ")
@@ -439,24 +439,24 @@ if __name__ == "__main__":
         log_warning_parser(f"Seems like some phandles does not have pinctrl data associated: {set(enabled_phandles.keys()) - processed_phandles}")
 
     # Map pinmux data from DTS to memory values
-    # Input for pheripherals
-    dts_data = peripherals_dts_data
-    func_to_group_map = function_to_group
-    pad_to_idx_map = pad_to_idx
-    port_to_pad_map = port_to_pad
-    port_to_mux_func_map = port_to_mux_func
-    # Output for pheripherals
-    mux_registers = pinmux_registers
-    ds_registers = drive_strength_registers
-    bias_en_registers = bias_enable_registers
-    pull_dir_registers = pull_up_registers
-
+    # Peripherals
     pindata_to_register_values(
         # Input
-        dts_data, func_to_group_map, pad_to_idx_map, port_to_pad_map, port_to_mux_func_map,
+        peripherals_dts_data, function_to_group, pad_to_idx, port_to_pad, port_to_mux_func,
         # Output
-        mux_registers, ds_registers, bias_en_registers, pull_dir_registers
+        pinmux_registers, drive_strength_registers, bias_enable_registers, pull_up_registers
     )
+
+    log_normal_parser("=================\n")
+
+    # Always On
+    pindata_to_register_values(
+        # Input
+        ao_dts_data, ao_function_to_group, ao_pad_to_idx, ao_port_to_pad, ao_port_to_mux_func,
+        # Output
+        ao_pinmux_registers, ao_drive_strength_registers, ao_bias_enable_registers, ao_pull_up_registers
+    )
+
 
     # Write to assembly file
     register_values_to_assembler(out_dir)
