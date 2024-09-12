@@ -19,7 +19,7 @@ ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
 	export TIMER_DRIVER_DIR := meson
 	export PINCTRL_DRIVER_DIR := meson
 	export CPU := cortex-a55
-	export SOC := amlogic,sm1
+	export SOC := hardkernel,odroid-c4
 	export DTS_FILE := $(TOP)/dts/odroidc4.dts
 else
 $(error Unsupported MICROKIT_BOARD given)
