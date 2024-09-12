@@ -199,8 +199,8 @@ def get_pinctrl_data(pinmux_node: dtlib.Node, enabled_phandles: dict[int, str]) 
 
 ##### BITS UTIL
 def zero_n_bits_at_ith_bit_of_32bits(register: int, n: int, ith: int) -> int:
-    if n < 0 or ith < 0:
-        log_error_parser(f"invalid arg to zero_n_bits_at_ith_bit: n = {n}, ith = {ith}\n")
+    if n < 0 or ith < 0 or register > 0xFFFF_FFFF:
+        log_error_parser(f"invalid arg to zero_n_bits_at_ith_bit: register = {register}, n = {n}, ith = {ith}\n")
         exit(1)
     
     mask = 0xFFFF_FFFF
@@ -236,8 +236,11 @@ def pindata_to_register_values(
     pull_dir_registers
 ) -> None:
     encountered_pad = set()
+    pindata: PinData
     for pindata in dts_data:
+        # Each pindata properties can contain settings for a group of pins
         for port in pindata.group_names:
+            # For each pin and the attached common function, work out the appropriate muxing data
             this_port_function_group: str = pindata.function_name
             if port not in func_to_group_map[this_port_function_group]:
                 log_error_parser(f"the function group {this_port_function_group} does not contain port {port}")
@@ -265,9 +268,10 @@ def pindata_to_register_values(
 
                 # Work out which mux register this pad is in
                 found = False
-                for reg in pinmux_registers:
+                for reg in mux_registers:
                     if pad_idx >= reg["first_pad"] and pad_idx <= reg["last_pad"]:
                         found = True
+
                         nth_pin = pad_idx - reg["first_pad"]    # in the bank
                         nth_bit = nth_pin * reg["bits_per_pin"] # in the bank
 
@@ -283,12 +287,100 @@ def pindata_to_register_values(
 
                         log_normal_parser(f"after reg is {hex(reg["value"])}\n")
 
+                        break
+
                 if not found:
-                    log_error_parser(f"cannot find the pin bank that the port {port} belongs in\n")
+                    log_error_parser(f"cannot find the pin bank that the port {port} belongs in for muxing\n")
                     exit(1)
 
                 # Then work out the biasing (if any)
+                found = False
+                bias_enabled = False
+                for reg in bias_en_registers:
+                    if pad_idx >= reg["first_pad"] and pad_idx <= reg["last_pad"]:
+                        found = True
+
+                        nth_pin = pad_idx - reg["first_pad"]
+                        nth_bit = nth_pin * reg["bits_per_pin"]
+                        
+                        if pindata.bias_enable:
+                            log_normal_parser(f"pad #{pad_idx} have bias enabled, prev reg is {hex(reg["value"])}, ")
+                            data_mask = 1 << nth_bit
+                            reg["value"] |= data_mask
+                            bias_enabled = True
+                        else:
+                            log_normal_parser(f"pad #{pad_idx} have bias disabled, prev reg is {hex(reg["value"])}, ")
+                            reg["value"] = zero_n_bits_at_ith_bit_of_32bits(reg["value"], reg["bits_per_pin"], nth_bit)
+                        
+                        log_normal_parser(f"after reg is {hex(reg["value"])}\n")
+
+                if not found:
+                    # This isn't necessarily an error, the pad's register could be reserved
+                    # For example the HDMI's I2C bus's bias and drive strength registers are reserved.
+                    log_warning_parser(f"cannot find the pin bank that the port {port} belongs in for biasing enable\n")
+
+                # If bias is enabled, set the pull direction
+                if bias_enabled:
+                    found = False
+                    for reg in pull_dir_registers:
+                        if pad_idx >= reg["first_pad"] and pad_idx <= reg["last_pad"]:
+                            found = True
+
+                            nth_pin = pad_idx - reg["first_pad"]
+                            nth_bit = nth_pin * reg["bits_per_pin"]
+                            if pindata.bias_pullup:
+                                log_normal_parser(f"pad #{pad_idx} have pull up, prev reg is {hex(reg["value"])}, ")
+                                data_mask = 1 << nth_bit
+                                reg["value"] |= data_mask
+                            else:
+                                log_normal_parser(f"pad #{pad_idx} have pull down, prev reg is {hex(reg["value"])}, ")
+                                reg["value"] = zero_n_bits_at_ith_bit_of_32bits(reg["value"], reg["bits_per_pin"], nth_bit)
+                        
+                            log_normal_parser(f"after reg is {hex(reg["value"])}\n")
                 
+                    if not found:
+                        # Also not an error for the reason above
+                        log_warning_parser(f"cannot find the pin bank that the port {port} belongs in for bias direction\n")
+
+
+                # Set drive strength if defined
+                if pindata.drive_strength != -1:
+                    ds_val = -1
+                    if pindata.drive_strength == 500: # micro Amps
+                        ds_val = 0
+                    elif pindata.drive_strength == 2500:
+                        ds_val = 1
+                    elif pindata.drive_strength == 3000:
+                        ds_val = 2
+                    elif pindata.drive_strength == 4000:
+                        ds_val = 3
+                    else:
+                        log_error_parser(f"unknown drive strength value of f{pindata.drive_strength} for pad #{pad_idx}\n")
+                        exit(1) 
+                    
+                    found = False
+                    for reg in ds_registers:
+                        if pad_idx >= reg["first_pad"] and pad_idx <= reg["last_pad"]:
+                            found = True
+
+                            nth_pin = pad_idx - reg["first_pad"]
+                            nth_bit = nth_pin * reg["bits_per_pin"]
+
+                            # Fetch the bank value then zero out the bits that belong to this pad
+                            zeroed_regval = zero_n_bits_at_ith_bit_of_32bits(reg["value"], reg["bits_per_pin"], nth_bit)
+                            
+                            # Prepare mux setting value to be OR'ed into the zeroed out slot
+                            data_mask = ds_val << nth_bit
+
+                            log_normal_parser(f"pad #{pad_idx} have drive strength {ds_val}, prev reg is {hex(reg["value"])}, ")
+
+                            reg["value"] = zeroed_regval | data_mask
+
+                            log_normal_parser(f"after reg is {hex(reg["value"])}\n")
+                    if not found:
+                        # Also not an error for the reason above
+                        log_warning_parser(f"cannot find the pin bank that the port {port} belongs in for drive strength\n")
+
 
 def register_values_to_assembler(out_dir: str):
     with open(out_dir + "/pinctrl_config_data.s", "w") as file:
