@@ -15,6 +15,7 @@ import os
 import re
 from devicetree import edtlib, dtlib
 import struct
+from collections import OrderedDict
 
 ##### LOGGING
 debug_parser = True
@@ -379,12 +380,45 @@ def pindata_to_register_values(
                         # Also not an error for the reason above
                         log_warning_parser(f"cannot find the pin bank that the port {port} belongs in for drive strength\n")
 
+def consolidate_registers(mux_registers, ds_registers, bias_en_registers, pull_dir_registers) -> OrderedDict[int, int]:
+    # key = offset to write, value = value to write to offset
+    result = OrderedDict()
+    for reg in mux_registers + ds_registers + bias_en_registers + pull_dir_registers:
+        if reg["offset"] in result:
+            log_normal_parser(f"consolidating existing register {hex(reg["offset"])}, old value is {hex(result[reg["offset"]])} with value {hex(reg["value"])}, result is {hex(result[reg["offset"]] | reg["value"])}")
+            result[reg["offset"]] |= reg["value"]
+        else:
+            log_normal_parser(f"consolidating new register {hex(reg["offset"])} with value {hex(reg["value"])}")
+            result[reg["offset"]] = reg["value"]
 
-def register_values_to_assembler(out_dir: str):
+    return result
+
+def register_values_to_assembler(out_dir: str, peripherals_data: OrderedDict[int, int], ao_data: OrderedDict[int, int]):
     with open(out_dir + "/pinctrl_config_data.s", "w") as file:
         file.write(".section .data\n")
         file.write("\t.align 4\n")
 
+        file.write("\t.global num_peripheral_registers\n")
+        file.write("\t.global peripheral_registers\n")
+
+        file.write("\t.global num_ao_registers\n")
+        file.write("\t.global ao_registers\n")
+
+        file.write("num_peripheral_registers:\n")
+        file.write(f"\t.word {len(peripherals_data)}\n")
+
+        file.write("peripheral_registers:\n")
+        for offset, value in peripherals_data.items():
+            file.write("\t.word ")
+            file.write(f"{int(offset)}, {int(value)}\n")
+
+        file.write("num_ao_registers:\n")
+        file.write(f"\t.word {len(ao_data)}\n")
+
+        file.write("ao_registers:\n")
+        for offset, value in ao_data.items():
+            file.write("\t.word ")
+            file.write(f"{int(offset)}, {int(value)}\n")
 
 ##### MAIN
 
@@ -457,6 +491,12 @@ if __name__ == "__main__":
         ao_pinmux_registers, ao_drive_strength_registers, ao_bias_enable_registers, ao_pull_up_registers
     )
 
+    # Collect data in easy to process format,
+    # Also merges registers at the same offset
+    peripherals_memory_data = consolidate_registers(pinmux_registers, drive_strength_registers, bias_enable_registers, pull_up_registers)
+    log_normal_parser("=================\n")
+    ao_memory_data = consolidate_registers(ao_pinmux_registers, ao_drive_strength_registers, ao_bias_enable_registers, ao_pull_up_registers)
 
     # Write to assembly file
-    register_values_to_assembler(out_dir)
+    register_values_to_assembler(out_dir, peripherals_memory_data, ao_memory_data)
+
