@@ -15,8 +15,7 @@
 #include <sddf/util/printf.h>
 #include <sddf/pinctrl/protocol.h>
 
-#include "odroidc4.h"
-
+// Logging
 #define DEBUG_DRIVER
 
 #ifdef DEBUG_DRIVER
@@ -27,14 +26,28 @@
 
 #define LOG_DRIVER_ERR(...) do{ sddf_printf("PINCTRL DRIVER|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
+// Memory definitions
+#define MUX_REG_ADDR(base, offset) ((uint32_t *) (base + offset))
+
+typedef struct {
+    uint32_t offset;
+    uint32_t value;
+} pindata_t;
+
+#define PINMUX_DATA_MAGIC 0x73ABC62F
+
+// Device mapped
 uintptr_t pinctrl_ao_base;
 uintptr_t pinctrl_periphs_base;
 
-extern pindata_t pinctrl_ao_configs[];
-extern const uint32_t num_pinctrl_ao_configs;
+// Data from DTS prepared by Python script
+extern pindata_t ao_registers[];
+extern const uint32_t num_ao_registers;
 
-extern pindata_t pinctrl_periphs_configs[];
-extern const uint32_t num_pinctrl_periphs_configs;
+extern pindata_t peripheral_registers[];
+extern const uint32_t num_peripheral_registers;
+
+extern const uint32_t pinmux_data_magic;
 
 bool check_vaddr_4_bytes_aligned(uint32_t *vaddr) {
     if (((uintptr_t) vaddr) % 4 == 0) {
@@ -69,27 +82,21 @@ bool set_mux(uint32_t *vaddr, uint32_t val) {
     return true;
 }
 
-void reset_periphs_pinmux_to_default(void) {
-    LOG_DRIVER("in reset_periphs_pinmux_to_default\n");
-    for (int i = 0; i < sizeof(default_periphs_pinmux) / sizeof(pindata_t); i++) {
-        if (!set_mux(MUX_REG_ADDR(pinctrl_periphs_base, default_periphs_pinmux[i].offset), default_periphs_pinmux[i].value)) {
-            LOG_DRIVER_ERR("cannot reset peripherals pinmux to default values");
-            while (true) {};
-        } else {
-            LOG_DRIVER("written default value %x to offset %x of peripherals pinmux\n", default_periphs_pinmux[i].value, default_periphs_pinmux[i].offset);
-        }
-    }
-}
-
 void init(void) {
     LOG_DRIVER("starting\n");
 
+    if (pinmux_data_magic != PINMUX_DATA_MAGIC) {
+        LOG_DRIVER_ERR("magic does not match");
+    }
+
     // The peripherals pinmux device physical address isn't aligned on page boundary whereas
-    // memory regions can only be mapped on page bondary, we need to offset the page boundary address
+    // memory regions can only be mapped on page boundary, we need to offset the page boundary address
     // into the pinmux device.
     pinctrl_periphs_base += 0x400;
 
-    reset_periphs_pinmux_to_default();
+    for (uint32_t i = 0; i < num_peripheral_registers; i += 1) {
+        set_mux(MUX_REG_ADDR(pinctrl_periphs_base, peripheral_registers[i].offset), peripheral_registers[i].value);
+    }
 
     LOG_DRIVER("pinctrl device initialisation done\n");
 }
