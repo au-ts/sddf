@@ -366,6 +366,38 @@ static inline uint8_t i2c_token_convert(i2c_token_t token)
 }
 
 /**
+ * Return current buffer to sender and reset interface state for next transaction.
+ */
+static inline void i2c_return_and_reset(void)
+{
+    volatile struct i2c_regs *regs = (volatile struct i2c_regs *)i2c_regs;
+    LOG_DRIVER("returning to virtualiser!\n");
+    LOG_DRIVER("curr_response_len : 0x%lx, curr_request_len : 0x%lx, return address is 0x%lx\n",
+               i2c_ifState.curr_response_len, i2c_ifState.curr_request_len, i2c_ifState.addr);
+    LOG_DRIVER("enqueueing response with size: %d\n\n", i2c_ifState.curr_response_len + RESPONSE_DATA_OFFSET);
+
+    // response length is + 2 (RESPONSE_DATA_OFFSET = 2) because of the error tokens at the start
+    int ret = i2c_enqueue_response(queue_handle, i2c_ifState.addr, (size_t)i2c_ifState.curr_data - DATA_REGIONS_START,
+                                   i2c_ifState.curr_response_len + RESPONSE_DATA_OFFSET);
+    if (ret) {
+        LOG_DRIVER_ERR("Failed to enqueue response\n");
+    }
+
+    // reset driver state for another request
+    // load tokens resets the interface registers so no need here
+    i2c_ifState.curr_response_len = 0;
+    i2c_ifState.curr_data = NULL;
+    i2c_ifState.curr_request_len = 0;
+    i2c_ifState.remaining = 0;
+    i2c_ifState.addr = 0;
+    i2c_ifState.rw_remaining = 0;
+
+    microkit_notify(VIRTUALISER_CH);
+
+    i2c_halt(regs); // stop condition
+}
+
+/**
  * Loads tokens onto specified i2c interface registers
  * This function resets interface registers before uploading data
  */
@@ -389,6 +421,8 @@ static inline void i2c_load_tokens(volatile struct i2c_regs *regs)
     regs->tk_list1 = 0x0;
     regs->wdata0 = 0x0;
     regs->wdata1 = 0x0;
+
+    i2c_ifState.timeout = 0;
 
     // Offset into token list registers
     uint32_t tk_offset = 0;
@@ -456,8 +490,6 @@ static inline void i2c_load_tokens(volatile struct i2c_regs *regs)
             i2c_ifState.rw_remaining--;
         }
 
-
-
         LOG_DRIVER("meson_token: 0x%lx, request_data_offset : 0x%lx, tk_offset: 0x%lx, wdata_offset: 0x%lx, rdata_offset: 0x%lx\n",
                    meson_token, request_data_offset, tk_offset, wdata_offset, rdata_offset);
 
@@ -515,6 +547,8 @@ void init(void)
     i2c_ifState.remaining = 0;
     i2c_ifState.notified = 0;
     i2c_ifState.addr = 0;
+    i2c_ifState.rw_remaining = 0;
+    i2c_ifState.timeout = 0;
 
     microkit_dbg_puts("Driver initialised.\n");
 }
@@ -558,6 +592,7 @@ static inline void handle_request(void)
         i2c_ifState.curr_request_len = size;
         i2c_ifState.remaining = size;
         i2c_ifState.notified = 0;
+        i2c_ifState.rw_remaining = 0;
 
         i2c_load_tokens(regs);
     } else {
@@ -567,102 +602,110 @@ static inline void handle_request(void)
     }
 }
 
-/* Right now we do not do anything to handle a response timeout, even though we should
- * be. More investigation is required.
- * We observed very frequent timeout IRQs in our example system using an I2C card reader,
- * we believe the source of this problem is a misconfiguration with the clocks, and will
- * hopefully be resovled once we have an actual clock driver.
- * See https://github.com/au-ts/sddf/issues/212 for more details.
- */
 static void handle_response_timeout(void)
 {
     LOG_DRIVER("handling timeout IRQ\n");
-    return;
-}
+    volatile struct i2c_regs *regs = (volatile struct i2c_regs *)i2c_regs;
 
+    /* A timeout IRQ notionally occurs when a device has successfully ACKed a transaction
+    *   but stops responding sometime thereafter while we are awaiting an R/W operation.
+    *   The danger is that the device has not actually died and partially receives the
+    *   transaction and we give up on it too quickly, leaving the device in a potentially
+    *   incoherent state.
+    *
+    *   Unfortunately, the datasheet describes nothing about this IRQ so it is hard to reason
+    *   about the true conditions that make it occur. It happens often, so we opt to just wait
+    *   until a very large number of IRQs have arrived before bailing.
+    *
+    *   The timeout counter is reset to 0 upon every successful token load to ensure we only bail
+    *   out when a huge amount of time is spent on a single batch.
+    */
+
+    // IRQs still arrive when nothing is happening!
+    // @mattr: since the behaviour of this IRQ is unknown, this handler may be a vector for
+    //         bugs in the future. If you ever find transactions being terminated with no
+    //         clear electrical reason, inspect this!
+    if (i2c_ifState.timeout >= TIMEOUT_MAX) {
+        i2c_halt(regs);
+
+        // Get state
+        i2c_token_t *return_buffer = i2c_ifState.curr_data;
+
+        uint8_t curr_token = 0;
+        uint8_t bytes_read = 0;
+        bool err = i2c_get_error(regs, &bytes_read, &curr_token);
+
+        return_buffer[RESPONSE_ERR] = I2C_ERR_TIMEOUT;
+        // Token that caused the error
+        return_buffer[RESPONSE_ERR_TOKEN] = curr_token;
+
+        i2c_return_and_reset();
+        sddf_printf("I2C | %lu timeouts occured for this token batch! Aborting.\n");
+    }
+}
 
 static void handle_response(void)
 {
     LOG_DRIVER("handling transfer complete IRQ\n");
     volatile struct i2c_regs *regs = (volatile struct i2c_regs *)i2c_regs;
-
-    i2c_dump(regs);
-
-    // Get result
-    uint8_t curr_token = 0;
-    uint8_t bytes_read = 0;
-    bool write_error = i2c_get_error(regs, &bytes_read, &curr_token);
-
-    // Prepare to extract data from the interface.
-    // INVARIANT: request data is always smaller than returned data to allow
-    //            reuse.
-    i2c_token_t *return_buffer = i2c_ifState.curr_data;
-
-    // If there was an error, cancel the rest of this transaction and load the
-    // error information into the return buffer.
-    if (write_error) {
-        LOG_DRIVER("error!\n");
-        // handle_response_timeout already has error logic for timeout
-        if (curr_token == I2C_TOKEN_ADDR_READ) {
-            return_buffer[RESPONSE_ERR] = I2C_ERR_NOREAD;
-            LOG_DRIVER("I2C_ERR_NOREAD!\n");
-        } else {
-            return_buffer[RESPONSE_ERR] = I2C_ERR_NACK;
-            LOG_DRIVER("I2C_ERR_NACK!\n");
-        }
-        // Token that caused the error
-        return_buffer[RESPONSE_ERR_TOKEN] = curr_token;
-        LOG_DRIVER("token that caused error: %d!\n", curr_token);
-
+    if (!i2c_ifState.curr_data) {
+        LOG_DRIVER("Bogus transfer complete - ignoring!\n");
+        return;
     } else {
-        // Get bytes_read amount of read data
+        i2c_dump(regs);
 
-        // Copy data into return buffer
-        for (int i = 0; i < bytes_read; i++) {
-            size_t index = RESPONSE_DATA_OFFSET + i2c_ifState.curr_response_len;
-            if (i < 4) {
-                uint8_t value = (regs->rdata0 >> (i * 8)) & 0xFF;
-                return_buffer[index] = value;
-                LOG_DRIVER("loading into return_buffer at %d value 0x%lx\n", index, value);
-            } else if (i < 8) {
-                uint8_t value = (regs->rdata1 >> ((i - 4) * 8)) & 0xFF;
-                return_buffer[index] = value;
-                LOG_DRIVER("loading into return_buffer at %d value 0x%lx\n", index, value);
+        // Get result
+        uint8_t curr_token = 0;
+        uint8_t bytes_read = 0;
+        bool write_error = i2c_get_error(regs, &bytes_read, &curr_token);
+
+        // Prepare to extract data from the interface.
+        // INVARIANT: request data is always smaller than returned data to allow
+        //            reuse.
+        i2c_token_t *return_buffer = i2c_ifState.curr_data;
+
+        // If there was an error, cancel the rest of this transaction and load the
+        // error information into the return buffer.
+        if (write_error) {
+            LOG_DRIVER("error!\n");
+            // handle_response_timeout already has error logic for timeout
+            if (curr_token == I2C_TOKEN_ADDR_READ) {
+                return_buffer[RESPONSE_ERR] = I2C_ERR_NOREAD;
+                LOG_DRIVER("I2C_ERR_NOREAD!\n");
+            } else {
+                return_buffer[RESPONSE_ERR] = I2C_ERR_NACK;
+                LOG_DRIVER("I2C_ERR_NACK!\n");
             }
-            i2c_ifState.curr_response_len++;
+            // Token that caused the error
+            return_buffer[RESPONSE_ERR_TOKEN] = curr_token;
+            LOG_DRIVER("token that caused error: %d!\n", curr_token);
+
+        } else {
+            // Copy data into return buffer
+            for (int i = 0; i < bytes_read; i++) {
+                size_t index = RESPONSE_DATA_OFFSET + i2c_ifState.curr_response_len;
+                if (i < 4) {
+                    uint8_t value = (regs->rdata0 >> (i * 8)) & 0xFF;
+                    return_buffer[index] = value;
+                    LOG_DRIVER("loading into return_buffer at %d value 0x%lx\n", index, value);
+                } else if (i < 8) {
+                    uint8_t value = (regs->rdata1 >> ((i - 4) * 8)) & 0xFF;
+                    return_buffer[index] = value;
+                    LOG_DRIVER("loading into return_buffer at %d value 0x%lx\n", index, value);
+                }
+                i2c_ifState.curr_response_len++;
+            }
+
+            LOG_DRIVER("I2C_ERR_OK\n");
+            return_buffer[RESPONSE_ERR] = I2C_ERR_OK;
+            // Token that caused error (could be anything since we set error code to no error anyway)
+            return_buffer[RESPONSE_ERR_TOKEN] = 0x0;
         }
 
-        LOG_DRIVER("I2C_ERR_OK\n");
-        return_buffer[RESPONSE_ERR] = I2C_ERR_OK;
-        // Token that caused error (could be anything since we set error code to no error anyway)
-        return_buffer[RESPONSE_ERR_TOKEN] = 0x0;
-    }
-
-    // If request is completed or there was an error, return data to server and notify.
-    if (write_error || !i2c_ifState.remaining) {
-        LOG_DRIVER("request completed or error, hence returning response to server\n");
-        LOG_DRIVER("curr_response_len : 0x%lx, curr_request_len : 0x%lx, return address is 0x%lx\n",
-                   i2c_ifState.curr_response_len, i2c_ifState.curr_request_len, i2c_ifState.addr);
-        LOG_DRIVER("enguing response with size: %d\n\n", i2c_ifState.curr_response_len + RESPONSE_DATA_OFFSET);
-        // response length is + 2 (RESPONSE_DATA_OFFSET = 2) because of the error tokens at the start
-        int ret = i2c_enqueue_response(queue_handle, i2c_ifState.addr,
-                                       (size_t) i2c_ifState.curr_data - DATA_REGIONS_START,
-                                       i2c_ifState.curr_response_len + RESPONSE_DATA_OFFSET);
-        if (ret) {
-            LOG_DRIVER_ERR("Failed to enqueue response\n");
+        // If request is completed or there was an error, return data to server and notify.
+        if (write_error || !i2c_ifState.remaining) {
+            i2c_return_and_reset();
         }
-
-        // reset driver state for another request
-        // load tokens resets the interface registers so no need here
-        i2c_ifState.curr_response_len = 0;
-        i2c_ifState.curr_data = NULL;
-        i2c_ifState.curr_request_len = 0;
-        i2c_ifState.remaining = 0;
-        i2c_ifState.addr = 0;
-
-        microkit_notify(VIRTUALISER_CH);
-
-        i2c_halt(regs); // stop condition
     }
 
     // If the driver was notified while this transaction was in progress, immediately start working on the next one.
