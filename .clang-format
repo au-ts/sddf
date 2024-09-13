@@ -10,6 +10,8 @@ UseTab:         Never
 ReflowComments: false
 SortIncludes: Never
 PointerAlignment: Right
+AlignTrailingComments:
+    Kind: Leave
 # function() \n{} vs function() {}
 BreakBeforeBraces: Linux
 # we prefer expanded
