@@ -1,3 +1,8 @@
+/*
+ * Copyright 2022, UNSW
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
 #include <clk-operations.h>
 #include <sddf/util/printf.h>
 

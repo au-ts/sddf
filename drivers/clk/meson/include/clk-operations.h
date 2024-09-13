@@ -1,3 +1,8 @@
+/*
+ * Copyright 2022, UNSW
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
 #ifndef CLK_OPERATIONS_H_
 #define CLK_OPERATIONS_H_
 
