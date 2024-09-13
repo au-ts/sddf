@@ -31,12 +31,12 @@ def log_error_parser(print_str: str) -> None:
     sys.stderr.write("PARSER|ERROR: " + print_str)
 
 ##### COMPATIBILITY CHECKING
-supported_compat_str_board = { "hardkernel,odroid-c4" }
+supported_compat_str_model = { "Hardkernel ODROID-C4" }
 
 def is_dts_compatible(devicetree: dtlib.DT) -> None:
     supported = False
-    for compat_str in devicetree.root.props["compatible"].to_strings():
-        if compat_str in supported_compat_str_board:
+    for compat_str in devicetree.root.props["model"].to_strings():
+        if compat_str in supported_compat_str_model:
             supported = True
             break
     if not supported:
@@ -53,7 +53,7 @@ def fetch_enabled_devices(devicetree: dtlib.DT) -> dict[int, str]:
         if "status" in node.props and node.props["status"].to_string() == "okay":
             if "pinctrl-0" in node.props.keys():
                 for phandle in node.props["pinctrl-0"].to_nums():
-                    if phandle in enabled_phandles:
+                    if phandle in enabled_phandles.keys():
                         log_error_parser(f"duplicate pinctrl phandle: {hex(phandle)}")
                         exit(1)
                     else:
@@ -111,7 +111,7 @@ class PinData:
 # This function extract pinmux data from the "pinctrl" node in DTS and return a list of PinData.
 # It will be called twice, once for peripherals and always-on GPIO chips.
 # Returns a list of PinData.
-def get_pinctrl_data(pinmux_node: dtlib.Node, enabled_phandles: dict[int, str]) -> list[PinData]: 
+def get_pinctrl_data(pinmux_node: dtlib.Node, enabled_phandles: dict[int, str], func_to_group_map: dict[str, list[str]]) -> list[PinData]: 
     # `pinmux_node` looks something like this:
     # pinctrl@40 {
     #     compatible = "amlogic,meson-g12a-periphs-pinctrl";
@@ -141,7 +141,8 @@ def get_pinctrl_data(pinmux_node: dtlib.Node, enabled_phandles: dict[int, str]) 
             # We don't care about the bank node because it just have the registers sizes.
             continue
 
-        if "phandle" in muxed_device_node.props.keys() and muxed_device_node.props["phandle"].to_num() in enabled_phandles:
+        if "phandle" in muxed_device_node.props.keys() and muxed_device_node.props["phandle"].to_num() in enabled_phandles.keys():
+            undocumented = False
             for muxed_device_property_node_name in muxed_device_node.nodes:
                 # Each device can have multiple mux properties of it's different ports.
                 # E.g. an emmc_cmd port need pull up, whereas an emmc_clk does not need bias at all
@@ -166,6 +167,17 @@ def get_pinctrl_data(pinmux_node: dtlib.Node, enabled_phandles: dict[int, str]) 
                             exit(1)
                         function_name = values_list[0]
 
+                        # If for whatever reason the device defined in the DTS does not have data in our
+                        # mapping tables, drop it. This can happens for undocumented devices/pads that does not appear
+                        # in the Linux kernel. An example is the DTS from the OdroidC4's Ubuntu image: 
+                        #    ubuntu-20.04-4.9-minimal-odroid-c4-hc4-20220228
+                        # Where the "cec_ao_a_ee" and "cec_ao_b_ee" groups with "cec_ao_ee" function are not defined in the Linux kernel and datasheet at all.
+                        if function_name not in func_to_group_map:
+                            log_warning_parser(f"""pinctrl subnode {muxed_device_property_node_name} \
+of parent node {muxed_device_node.name}, containing groups {str(group_names)} with function {function_name} does not appears in the mainline Linux kernel. Skipping it.\n""")
+                            undocumented = True
+                            break
+
                     if subproperty_name == "bias-disable":
                         bias_enable = False
 
@@ -184,6 +196,9 @@ def get_pinctrl_data(pinmux_node: dtlib.Node, enabled_phandles: dict[int, str]) 
                         log_warning_parser("Warning: bias undefined for device: " + muxed_device_node.name + ". Defaulting to disabling bias!\n")
                         bias_enable = False
                 
+                if undocumented:
+                    break
+
                 result.append(PinData(muxed_device_node.props["phandle"].to_num(), 
                                       muxed_device_name, 
                                       muxed_device_property_node_name, 
@@ -445,6 +460,7 @@ if __name__ == "__main__":
 
     enabled_phandles: dict[int, str] = fetch_enabled_devices(devicetree)
     log_normal_parser("Enabled devices found: " + str(enabled_phandles.values()))
+    log_normal_parser("Enabled phandles found: " + str(enabled_phandles.keys()))
 
     # Read actual pinmux data
     peripherals_dts_data: list[PinData] = []
@@ -453,9 +469,9 @@ if __name__ == "__main__":
         if pinmux_node_name in node.name:
             pinmux_node = node
             if pinmux_node.props["compatible"].to_string() == "amlogic,meson-g12a-periphs-pinctrl":
-                peripherals_dts_data = get_pinctrl_data(pinmux_node, enabled_phandles)
+                peripherals_dts_data = get_pinctrl_data(pinmux_node, enabled_phandles, function_to_group)
             elif pinmux_node.props["compatible"].to_string() == "amlogic,meson-g12a-aobus-pinctrl":
-                ao_dts_data = get_pinctrl_data(pinmux_node, enabled_phandles)
+                ao_dts_data = get_pinctrl_data(pinmux_node, enabled_phandles, ao_function_to_group)
             else:
                 log_error_parser("encountered unsupported pinmux node.")
                 exit(1)
@@ -475,7 +491,7 @@ if __name__ == "__main__":
     for pindata in ao_dts_data:
         processed_phandles.add(pindata.phandle)
     if len(processed_phandles) != len(set(enabled_phandles.keys())):
-        log_warning_parser(f"Seems like some phandles does not have pinctrl data associated: {set(enabled_phandles.keys()) - processed_phandles}")
+        log_warning_parser(f"Seems like some phandles does not have pinctrl data associated: {set(enabled_phandles.keys()) - processed_phandles}\n")
 
     # Map pinmux data from DTS to memory values
     # Peripherals
