@@ -41,8 +41,6 @@ uintptr_t pinctrl_ao_base;
 uintptr_t pinctrl_periphs_base;
 
 // Data from DTS prepared by Python script
-// Even though this has been prepared by the Pythons script,
-// Writting anything to the AO GPIO chip will cause the board to halt...
 extern pindata_t ao_registers[];
 extern const uint32_t num_ao_registers;
 
@@ -96,7 +94,19 @@ void init(void) {
     // into the actual pinmux device.
     pinctrl_periphs_base += 0x400;
 
+    for (uint32_t i = 0; i < num_ao_registers; i += 1) {
+        uint32_t curr;
+        read_mux(MUX_REG_ADDR(pinctrl_ao_base, ao_registers[i].offset), &curr);
+        sddf_printf_("offset %x, curr = %x, dest = %x\n", ao_registers[i].offset, curr, ao_registers[i].value);
+    
+        set_mux(MUX_REG_ADDR(pinctrl_ao_base, ao_registers[i].offset), ao_registers[i].value);
+    }
+
     for (uint32_t i = 0; i < num_peripheral_registers; i += 1) {
+        uint32_t curr;
+        read_mux(MUX_REG_ADDR(pinctrl_periphs_base, peripheral_registers[i].offset), &curr);
+        sddf_printf_("offset %x, curr = %x, dest = %x\n", peripheral_registers[i].offset, curr, peripheral_registers[i].value);
+    
         set_mux(MUX_REG_ADDR(pinctrl_periphs_base, peripheral_registers[i].offset), peripheral_registers[i].value);
     }
 
