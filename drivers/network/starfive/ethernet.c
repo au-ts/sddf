@@ -20,7 +20,6 @@
 #define RX_CH  2
 
 uintptr_t eth_regs;
-uintptr_t resets;
 uintptr_t hw_ring_buffer_vaddr;
 uintptr_t hw_ring_buffer_paddr;
 uintptr_t rx_desc_base;
@@ -29,6 +28,10 @@ uintptr_t rx_free;
 uintptr_t rx_active;
 uintptr_t tx_free;
 uintptr_t tx_active;
+
+#ifdef CONFIG_PLAT_STAR64
+uintptr_t resets;
+#endif /* CONFIG_PLAT_STAR64 */
 
 #define RX_COUNT 256
 #define TX_COUNT 256
@@ -400,6 +403,7 @@ static void eth_setup(void)
 void init(void)
 {
     /* De-assert the reset signals that u-boot left asserted. */
+    #ifdef CONFIG_PLAT_STAR64
     volatile uint32_t *reset_eth = (volatile uint32_t *)(resets + 0x38);
     uint32_t reset_val = *reset_eth;
     uint32_t mask = 0;
@@ -412,6 +416,7 @@ void init(void)
         reset_val &= ~mask;
         *reset_eth = reset_val;
     }
+    #endif /* CONFIG_PLAT_STAR64 */
 
     // Check if the PHY device is up
     uint32_t phy_stat = *MAC_REG(GMAC_PHYIF_CONTROL_STATUS);
