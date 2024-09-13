@@ -1048,23 +1048,17 @@ unsigned long clk_recalc_rate(struct clk_hw *hw)
 
 		if (parent_data.hw) {
 			struct clk_hw *parent_hw = parent_data.hw;
-			/* sddf_dprintf("1\n"); */
-			sddf_dprintf("#1 Parent of clock %s: %s\n", hw->init->name, parent_hw->init->name);
 			parent_rate = clk_recalc_rate(parent_hw);
 		} else if (parent_data.fw_name == "xtal") {
-			sddf_dprintf("#2 Parent name of clock %s: %s\n", hw->init->name, parent_data.fw_name);
-			/* sddf_dprintf("2\n"); */
-			/* Replace this with a hw structure */
+			/* TODO: Replace this with an hw structure */
 			parent_rate = 24000000;
 		}
 	} else {
 		struct clk_hw *parent_hw = hw->init->parent_hws[0];
-		sddf_dprintf("#3 Parent of clock %s: %s\n", hw->init->name, parent_hw->init->name);
 		parent_rate = clk_recalc_rate(parent_hw);
 	}
 
     sddf_dprintf("Clock: %s, parent rate: %lu", hw->init->name, parent_rate);
-	/* sddf_dprintf("Parent clock rate: %llu", parent_rate); */
     unsigned long rate = parent_rate;
 	if (hw->init->ops->recalc_rate) {
 		rate = hw->init->ops->recalc_rate(hw, parent_rate);
@@ -1100,28 +1094,13 @@ void init(void)
 
     sddf_dprintf("-----------------\n");
 
-	uint64_t xtal_rate = 24000000;
-
-	/* Fixed PLL clock frequency */
-    struct clk_hw *fixed_pll_dco_hw = sm1_clks[CLKID_FIXED_PLL_DCO];
-    unsigned long rate = fixed_pll_dco_hw->init->ops->recalc_rate(fixed_pll_dco_hw, xtal_rate);
-    sddf_dprintf("Fixed PLL DCO Rate: %lu\n", rate);
-
-    /* Clock divider configuration test */
-    struct clk_hw *mpeg_clk_div_hw = sm1_clks[CLKID_MPEG_DIV];
-    rate = mpeg_clk_div_hw->init->ops->recalc_rate(mpeg_clk_div_hw, 500000000);
-    sddf_dprintf("MPEG CLK DIV Rate: %lu\n", rate);
-    /* mpeg_clk_div_hw->init->ops->set_rate(mpeg_clk_div_hw, 100000000, 500000000); */
-    /* rate = mpeg_clk_div_hw->init->ops->recalc_rate(mpeg_clk_div_hw, 500000000); */
-    /* sddf_dprintf("New rate: %lu\n", rate); */
-
 	/* Clock mux configuration test */
 	struct clk_hw *mpeg_clk_sel_hw = sm1_clks[CLKID_MPEG_SEL];
 	uint8_t parent_idx = mpeg_clk_sel_hw->init->ops->get_parent(mpeg_clk_sel_hw);
 
 	struct clk_hw *clk81_hw = sm1_clks[CLKID_CLK81];
 	uint64_t ret = clk_recalc_rate(clk81_hw);
-	sddf_dprintf("RET: %llu\n", ret);
+	sddf_dprintf("Clock %s rate: %llu\n", clk81_hw->init->name, ret);
 
     sddf_dprintf("-----------------\n");
 }
