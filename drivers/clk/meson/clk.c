@@ -224,7 +224,8 @@ const struct clk_ops clk_regmap_mux_ro_ops = {
 static unsigned long clk_factor_recalc_rate(struct clk_hw *hw,
 		unsigned long parent_rate)
 {
-	struct clk_fixed_factor_data *data = (struct clk_fixed_factor_data *)(hw->clk->data);
+	struct clk *clk = (struct clk *)(hw->clk);
+	struct clk_fixed_factor_data *data = (struct clk_fixed_factor_data *)(clk->data);
 	unsigned long long int rate;
 
 	rate = (unsigned long long int)parent_rate * data->mult;
@@ -235,8 +236,83 @@ static unsigned long clk_factor_recalc_rate(struct clk_hw *hw,
 const struct clk_ops clk_fixed_factor_ops = {
 	/* .round_rate = clk_factor_round_rate, */
 	/* .set_rate = clk_factor_set_rate, */
-	/* .recalc_rate = clk_factor_recalc_rate, */
+	.recalc_rate = clk_factor_recalc_rate,
 	/* .recalc_accuracy = clk_factor_recalc_accuracy, */
+};
+
+static unsigned long meson_clk_pll_recalc_rate(struct clk_hw *hw,
+						unsigned long parent_rate)
+{
+	struct meson_clk_pll_data *data = (struct meson_clk_pll_data *)(hw->clk->data);
+	uint32_t n, m, frac;
+
+	n = regmap_read_bits(data->n.reg_off, data->n.shift, data->n.width);
+	if (n == 0)
+		return 0;
+
+	m = regmap_read_bits(data->m.reg_off, data->m.shift, data->m.width);
+
+	frac = data->frac.width ?
+		    regmap_read_bits(data->frac.reg_off, data->frac.shift, data->frac.width) :
+		    0;
+
+	uint64_t rate = (uint64_t)parent_rate * m;
+
+	if (frac) {
+		uint64_t frac_rate = (uint64_t)parent_rate * frac;
+		rate += DIV_ROUND_UP_ULL(frac_rate, (1 << data->frac.width));
+	}
+	sddf_dprintf("n = %lu, m = %lu, frac = %lu, rate = %lu\n", n, m, frac, rate);
+
+	return DIV_ROUND_UP_ULL(rate, n);
+}
+
+const struct clk_ops meson_clk_pll_ro_ops = {
+	.recalc_rate = meson_clk_pll_recalc_rate,
+	/* .is_enabled	= meson_clk_pll_is_enabled, */
+};
+
+static struct clk g12a_fixed_pll_dco = {
+	.data = &(struct meson_clk_pll_data){
+		.en = {
+			.reg_off = HHI_FIX_PLL_CNTL0,
+			.shift   = 28,
+			.width   = 1,
+		},
+		.m = {
+			.reg_off = HHI_FIX_PLL_CNTL0,
+			.shift   = 0,
+			.width   = 8,
+		},
+		.n = {
+			.reg_off = HHI_FIX_PLL_CNTL0,
+			.shift   = 10,
+			.width   = 5,
+		},
+		.frac = {
+			.reg_off = HHI_FIX_PLL_CNTL1,
+			.shift   = 0,
+			.width   = 17,
+		},
+		.l = {
+			.reg_off = HHI_FIX_PLL_CNTL0,
+			.shift   = 31,
+			.width   = 1,
+		},
+		.rst = {
+			.reg_off = HHI_FIX_PLL_CNTL0,
+			.shift   = 29,
+			.width   = 1,
+		},
+	},
+	.hw.init = &(struct clk_init_data){
+		.name = "fixed_pll_dco",
+		.ops = &meson_clk_pll_ro_ops,
+		.parent_data = &(const struct clk_parent_data) {
+			.fw_name = "xtal",
+		},
+		.num_parents = 1,
+	},
 };
 
 static struct clk g12a_fixed_pll = {
@@ -250,7 +326,7 @@ static struct clk g12a_fixed_pll = {
 		.name = "fixed_pll",
 		.ops = &clk_regmap_divider_ro_ops,
 		.parent_hws = (const struct clk_hw *[]) {
-			/* &g12a_fixed_pll_dco.hw */
+			&g12a_fixed_pll_dco.hw
 		},
 		.num_parents = 1,
 		/*
@@ -342,7 +418,9 @@ static struct clk g12a_clk81 = {
     .hw.init = &(struct clk_init_data){
         .name = "clk81",
         .ops = &clk_regmap_gate_ops,
-        .parent_hws = {},
+        .parent_hws = (const struct clk_hw *[]) {
+			&g12a_mpeg_clk_div.hw
+		},
         .num_parents = 0,
         .flags = 0,
     },
@@ -446,7 +524,7 @@ static MESON_GATE(g12a_vclk2_other1,        HHI_GCLK_OTHER,    26);
 
 static struct clk_hw *sm1_clks[] = {
     /* [CLKID_SYS_PLL]            = &g12a_sys_pll.hw, */
-    /* [CLKID_FIXED_PLL]        = &g12a_fixed_pll.hw, */
+    [CLKID_FIXED_PLL]        = &g12a_fixed_pll.hw,
     /* [CLKID_FCLK_DIV2]        = &g12a_fclk_div2.hw, */
     /* [CLKID_FCLK_DIV3]        = &g12a_fclk_div3.hw, */
     [CLKID_FCLK_DIV4]        = &g12a_fclk_div4.hw,
@@ -456,7 +534,7 @@ static struct clk_hw *sm1_clks[] = {
     /* [CLKID_GP0_PLL]            = &g12a_gp0_pll.hw, */
     [CLKID_MPEG_SEL]        = &g12a_mpeg_clk_sel.hw,
     [CLKID_MPEG_DIV]        = &g12a_mpeg_clk_div.hw,
-    /* [CLKID_CLK81]            = &g12a_clk81.hw, */
+    [CLKID_CLK81]            = &g12a_clk81.hw,
     /* [CLKID_MPLL0]            = &g12a_mpll0.hw, */
     /* [CLKID_MPLL1]            = &g12a_mpll1.hw, */
     /* [CLKID_MPLL2]            = &g12a_mpll2.hw, */
@@ -521,7 +599,7 @@ static struct clk_hw *sm1_clks[] = {
     /* [CLKID_MPLL3_DIV]        = &g12a_mpll3_div, */
     /* [CLKID_FCLK_DIV2_DIV]        = &g12a_fclk_div2_div, */
     /* [CLKID_FCLK_DIV3_DIV]        = &g12a_fclk_div3_div, */
-    [CLKID_FCLK_DIV4_DIV]        = &g12a_fclk_div4_div,
+    [CLKID_FCLK_DIV4_DIV]        = &g12a_fclk_div4_div.hw,
     /* [CLKID_FCLK_DIV5_DIV]        = &g12a_fclk_div5_div, */
     /* [CLKID_FCLK_DIV7_DIV]        = &g12a_fclk_div7_div, */
     /* [CLKID_FCLK_DIV2P5_DIV]        = &g12a_fclk_div2p5_div, */
@@ -545,7 +623,7 @@ static struct clk_hw *sm1_clks[] = {
     [CLKID_VCLK2_VENCLMMC]        = &g12a_vclk2_venclmmc.hw,
     [CLKID_VCLK2_VENCL]        = &g12a_vclk2_vencl.hw,
     [CLKID_VCLK2_OTHER1]        = &g12a_vclk2_other1.hw,
-    /* [CLKID_FIXED_PLL_DCO]        = &g12a_fixed_pll_dco, */
+    [CLKID_FIXED_PLL_DCO]        = &g12a_fixed_pll_dco.hw,
     /* [CLKID_SYS_PLL_DCO]        = &g12a_sys_pll_dco, */
     /* [CLKID_GP0_PLL_DCO]        = &g12a_gp0_pll_dco, */
     /* [CLKID_HIFI_PLL_DCO]        = &g12a_hifi_pll_dco, */
@@ -758,7 +836,7 @@ static struct clk *const g12a_clk_regmaps[] = {
     /* &g12a_mpll1_div, */
     /* &g12a_mpll2_div, */
     /* &g12a_mpll3_div, */
-    /* &g12a_fixed_pll, */
+    &g12a_fixed_pll,
     /* &g12a_sys_pll, */
     /* &g12a_gp0_pll, */
     /* &g12a_hifi_pll, */
@@ -781,13 +859,14 @@ static struct clk *const g12a_clk_regmaps[] = {
     /* &g12a_vclk2_venclmmc, */
     /* &g12a_vclk2_vencl, */
     /* &g12a_vclk2_other1, */
-    /* &g12a_fixed_pll_dco, */
+    &g12a_fixed_pll_dco,
     /* &g12a_sys_pll_dco, */
     /* &g12a_gp0_pll_dco, */
     /* &g12a_hifi_pll_dco, */
     /* &g12a_fclk_div2, */
     /* &g12a_fclk_div3, */
     &g12a_fclk_div4,
+    &g12a_fclk_div4_div,
     /* &g12a_fclk_div5, */
     /* &g12a_fclk_div7, */
     /* &g12a_fclk_div2p5, */
@@ -958,23 +1037,46 @@ void clk_probe() {
     }
 }
 
+unsigned long clk_recalc_rate(struct clk_hw *hw)
+{
+	uint32_t num_parents = hw->init->num_parents;
+	unsigned long parent_rate = 1;
+
+	if (hw->init->parent_data) {
+		uint8_t parent_idx = num_parents > 1 ? hw->init->ops->get_parent(hw) : 0;
+		struct clk_parent_data parent_data = hw->init->parent_data[parent_idx];
+
+		if (parent_data.hw) {
+			struct clk_hw *parent_hw = parent_data.hw;
+			/* sddf_dprintf("1\n"); */
+			sddf_dprintf("#1 Parent of clock %s: %s\n", hw->init->name, parent_hw->init->name);
+			parent_rate = clk_recalc_rate(parent_hw);
+		} else if (parent_data.fw_name == "xtal") {
+			sddf_dprintf("#2 Parent name of clock %s: %s\n", hw->init->name, parent_data.fw_name);
+			/* sddf_dprintf("2\n"); */
+			/* Replace this with a hw structure */
+			parent_rate = 24000000;
+		}
+	} else {
+		struct clk_hw *parent_hw = hw->init->parent_hws[0];
+		sddf_dprintf("#3 Parent of clock %s: %s\n", hw->init->name, parent_hw->init->name);
+		parent_rate = clk_recalc_rate(parent_hw);
+	}
+
+    sddf_dprintf("Clock: %s, parent rate: %lu", hw->init->name, parent_rate);
+	/* sddf_dprintf("Parent clock rate: %llu", parent_rate); */
+    unsigned long rate = parent_rate;
+	if (hw->init->ops->recalc_rate) {
+		rate = hw->init->ops->recalc_rate(hw, parent_rate);
+	}
+	sddf_dprintf(" => rate: %lu\n", rate);
+
+	return rate;
+}
+
 void notified(microkit_channel ch)
 {
 
-}
-
-void read_cfg(char name[], uint32_t reg_offset, uint32_t bit_shift, uint32_t width)
-{
-    volatile uint32_t *reg_addr = ((void *)clk_regs + reg_offset);
-    uint32_t val = (*reg_addr) >> bit_shift;
-    sddf_dprintf("%s - ref_addr: 0x%p, val: 0b", name, reg_addr);
-
-    uint32_t mask = 1 << (width - 1);
-    while (mask) {
-        sddf_dprintf("%d", (val & mask ? 1 : 0));
-        mask >>= 1;
-    }
-    sddf_dprintf("\n");
 }
 
 void init(void)
@@ -989,7 +1091,6 @@ void init(void)
     for (int i = 0; i < NUM_DEVICE_CLKS; i++) {
         struct clk_hw *hw = sm1_clks[enabled_hw_clks[i]->clk_id];
         hw->init->ops->enable(hw);
-        sddf_dprintf("CLKID-%d enabled\n", enabled_hw_clks[i]->clk_id);
     }
 
     // Check that registers actually changed
@@ -997,10 +1098,19 @@ void init(void)
         sddf_dprintf("failed to toggle clock!\n");
     }
 
+    sddf_dprintf("-----------------\n");
+
+	uint64_t xtal_rate = 24000000;
+
+	/* Fixed PLL clock frequency */
+    struct clk_hw *fixed_pll_dco_hw = sm1_clks[CLKID_FIXED_PLL_DCO];
+    unsigned long rate = fixed_pll_dco_hw->init->ops->recalc_rate(fixed_pll_dco_hw, xtal_rate);
+    sddf_dprintf("Fixed PLL DCO Rate: %lu\n", rate);
+
     /* Clock divider configuration test */
     struct clk_hw *mpeg_clk_div_hw = sm1_clks[CLKID_MPEG_DIV];
-    unsigned long rate = mpeg_clk_div_hw->init->ops->recalc_rate(mpeg_clk_div_hw, 500000000);
-    sddf_dprintf("Old rate: %lu\n", rate);
+    rate = mpeg_clk_div_hw->init->ops->recalc_rate(mpeg_clk_div_hw, 500000000);
+    sddf_dprintf("MPEG CLK DIV Rate: %lu\n", rate);
     /* mpeg_clk_div_hw->init->ops->set_rate(mpeg_clk_div_hw, 100000000, 500000000); */
     /* rate = mpeg_clk_div_hw->init->ops->recalc_rate(mpeg_clk_div_hw, 500000000); */
     /* sddf_dprintf("New rate: %lu\n", rate); */
@@ -1008,19 +1118,10 @@ void init(void)
 	/* Clock mux configuration test */
 	struct clk_hw *mpeg_clk_sel_hw = sm1_clks[CLKID_MPEG_SEL];
 	uint8_t parent_idx = mpeg_clk_sel_hw->init->ops->get_parent(mpeg_clk_sel_hw);
-	sddf_dprintf("Parent index: %u\n", parent_idx);
 
-    read_cfg("fix_pll_en", HHI_FIX_PLL_CNTL0, 28, 1);
-    read_cfg("fix_pll_m", HHI_FIX_PLL_CNTL0, 0, 8);
-    read_cfg("fix_pll_n", HHI_FIX_PLL_CNTL0, 10, 5);
-    read_cfg("fix_pll_frac", HHI_FIX_PLL_CNTL1, 0, 19);
-    read_cfg("fix_pll_l", HHI_FIX_PLL_CNTL0, 31, 1);
-    read_cfg("fix_pll_rst", HHI_FIX_PLL_CNTL0, 29, 1);
-
-    read_cfg("fix_pll_od", HHI_FIX_PLL_CNTL0, 16, 2);
-
-    read_cfg("mpeg_clk_sel", HHI_MPEG_CLK_CNTL, 12, 3);
-    read_cfg("mpeg_clk_div", HHI_MPEG_CLK_CNTL, 0, 7);
+	struct clk_hw *clk81_hw = sm1_clks[CLKID_CLK81];
+	uint64_t ret = clk_recalc_rate(clk81_hw);
+	sddf_dprintf("RET: %llu\n", ret);
 
     sddf_dprintf("-----------------\n");
 }
