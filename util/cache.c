@@ -9,9 +9,22 @@
 #include <sddf/util/util.h>
 
 /*
- * This is a small utility library for performing manual cache operations on
- * AArch64 from user-level. The primary use-case is for managing regions of
- * memory that are mapped as cached but are accessible by DMA capable devices.
+ * This is a small utility library for performing cache operations in order
+ * to deal with DMA cache coherency. On DMA coherent architectures/platforms
+ * (such as certain RISC-V platforms and x86), these operations are no-ops.
+ *
+ * This library currently has the assumption that all RISC-V platforms are
+ * DMA coherent, it does not support platforms with the Zicbom extension.
+ */
+
+#ifdef CONFIG_ARCH_AARCH64
+
+/*
+ * On ARM, we perform all cache operations from user-space. We do not have a
+ * cache_invalidate as the ARM instruction to do so -- `dc ivac` --
+ * is not supported in userspace (EL0). See [1].
+ *
+ * [1]: https://developer.arm.com/documentation/ddi0595/2021-06/AArch64-Instructions/DC-IVAC--Data-or-unified-Cache-line-Invalidate-by-VA-to-PoC
  */
 
 #ifndef CONFIG_AARCH64_USER_CACHE_ENABLE
@@ -21,42 +34,19 @@
 
 #define LINE_INDEX(a) (a >> CONFIG_L1_CACHE_LINE_SIZE_BITS)
 
-static inline void dsb(void)
-{
-    asm volatile("dsb sy" ::: "memory");
-}
-
-static inline void dmb(void)
-{
-    asm volatile("dmb sy" ::: "memory");
-}
-
-static inline void clean_and_invalidate_by_va(unsigned long vaddr)
-{
-    asm volatile("dc civac, %0" : : "r"(vaddr));
-    dsb();
-}
-
-static inline void clean_by_va(unsigned long vaddr)
-{
-    asm volatile("dc cvac, %0" : : "r"(vaddr));
-    dmb();
-}
-
-// Intentionally no invalidate_by_va or cache_invalidate. The ARM instruction
-// for that -- `dc ivac` -- does not work in userspace (EL0). See [1].
-//
-// [1]: https://developer.arm.com/documentation/ddi0595/2021-06/AArch64-Instructions/DC-IVAC--Data-or-unified-Cache-line-Invalidate-by-VA-to-PoC
+#endif
 
 /*
  * Cleans and invalidates the from start to end. This is not inclusive.
  * If end is on a cache line boundary, the cache line starting at end
  * will not be cleaned/invalidated.
  *
- * This operation ultimately performs the 'dc civac' instruction.
+ * On ARM, this operation ultimately performs the 'dc civac' instruction.
+ * On RISC-V, this is a no-op.
  */
 void cache_clean_and_invalidate(unsigned long start, unsigned long end)
 {
+#ifdef CONFIG_ARCH_AARCH64
     unsigned long vaddr;
     unsigned long index;
 
@@ -68,8 +58,10 @@ void cache_clean_and_invalidate(unsigned long start, unsigned long end)
 
     for (index = LINE_INDEX(start); index < LINE_INDEX(end_rounded); index++) {
         vaddr = index << CONFIG_L1_CACHE_LINE_SIZE_BITS;
-        clean_and_invalidate_by_va(vaddr);
+        asm volatile("dc civac, %0" : : "r"(vaddr));
+        asm volatile("dsb sy" ::: "memory");
     }
+#endif
 }
 
 /*
@@ -77,10 +69,12 @@ void cache_clean_and_invalidate(unsigned long start, unsigned long end)
  * If end is on a cache line boundary, the cache line starting at end
  * will not be cleanend.
  *
- * This operation ultimately performs the 'dc civac' instruction.
+ * On ARM, this operation ultimately performs the 'dc cvac' instruction.
+ * On RISC-V, this is a no-op.
  */
 void cache_clean(unsigned long start, unsigned long end)
 {
+#ifdef CONFIG_ARCH_AARCH64
     unsigned long vaddr;
     unsigned long index;
 
@@ -92,6 +86,8 @@ void cache_clean(unsigned long start, unsigned long end)
 
     for (index = LINE_INDEX(start); index < LINE_INDEX(end_rounded); index++) {
         vaddr = index << CONFIG_L1_CACHE_LINE_SIZE_BITS;
-        clean_by_va(vaddr);
+        asm volatile("dc cvac, %0" : : "r"(vaddr));
+        asm volatile("dmb sy" ::: "memory");
     }
+#endif
 }
