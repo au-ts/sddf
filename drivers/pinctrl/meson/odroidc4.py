@@ -1075,7 +1075,7 @@ pinmux_registers = [
         "last_pad": pad_to_idx["BOOT_7"],
         "offset": 0xB0 * 4,
         "first_bit": 0,
-        "bits_per_pin": 3,
+        "bits_per_pin": 4,
         "value": 0 
     },
     {
@@ -1084,7 +1084,7 @@ pinmux_registers = [
         "last_pad": pad_to_idx["BOOT_15"],
         "offset": 0xB1 * 4,
         "first_bit": 0,
-        "bits_per_pin": 3,
+        "bits_per_pin": 4,
         "value": 0 
     },
     {
@@ -1093,7 +1093,7 @@ pinmux_registers = [
         "last_pad": pad_to_idx["GPIOX_7"],
         "offset": 0xB3 * 4,
         "first_bit": 0,
-        "bits_per_pin": 3,
+        "bits_per_pin": 4,
         "value": 0 
     },
     {
@@ -1102,7 +1102,7 @@ pinmux_registers = [
         "last_pad": pad_to_idx["GPIOX_15"],
         "offset": 0xB4 * 4,
         "first_bit": 0,
-        "bits_per_pin": 3,
+        "bits_per_pin": 4,
         "value": 0 
     },
     {
@@ -1111,7 +1111,7 @@ pinmux_registers = [
         "last_pad": pad_to_idx["GPIOX_19"],
         "offset": 0xB5 * 4,
         "first_bit": 0,
-        "bits_per_pin": 3,
+        "bits_per_pin": 4,
         "value": 0 
     },
     {
@@ -1120,7 +1120,7 @@ pinmux_registers = [
         "last_pad": pad_to_idx["GPIOZ_7"],
         "offset": 0xB6 * 4,
         "first_bit": 0,
-        "bits_per_pin": 3,
+        "bits_per_pin": 4,
         "value": 0 
     },    
     {
@@ -1129,7 +1129,7 @@ pinmux_registers = [
         "last_pad": pad_to_idx["GPIOZ_15"],
         "offset": 0xB7 * 4,
         "first_bit": 0,
-        "bits_per_pin": 3,
+        "bits_per_pin": 4,
         "value": 0 
     },
     {
@@ -1138,7 +1138,7 @@ pinmux_registers = [
         "last_pad": pad_to_idx["GPIOC_7"],
         "offset": 0xB9 * 4,
         "first_bit": 0,
-        "bits_per_pin": 3,
+        "bits_per_pin": 4,
         "value": 0 
     },
     {
@@ -1147,7 +1147,7 @@ pinmux_registers = [
         "last_pad": pad_to_idx["GPIOH_7"],
         "offset": 0xBB * 4,
         "first_bit": 0,
-        "bits_per_pin": 3,
+        "bits_per_pin": 4,
         "value": 0 
     },
     {
@@ -1156,7 +1156,7 @@ pinmux_registers = [
         "last_pad": pad_to_idx["GPIOH_8"],
         "offset": 0xBC * 4,
         "first_bit": 0,
-        "bits_per_pin": 3,
+        "bits_per_pin": 4,
         "value": 0 
     },
     {
@@ -1165,7 +1165,7 @@ pinmux_registers = [
         "last_pad": pad_to_idx["GPIOA_7"],
         "offset": 0xBD * 4,
         "first_bit": 0,
-        "bits_per_pin": 3,
+        "bits_per_pin": 4,
         "value": 0 
     },
     {
@@ -1174,7 +1174,7 @@ pinmux_registers = [
         "last_pad": pad_to_idx["GPIOA_15"],
         "offset": 0xBE * 4,
         "first_bit": 0,
-        "bits_per_pin": 3,
+        "bits_per_pin": 4,
         "value": 0 
     },
 ]
@@ -1369,7 +1369,7 @@ ao_pinmux_registers = [
         "last_pad": ao_pad_to_idx["GPIOAO_7"],
         "offset": 0x05 * 4,
         "first_bit": 0,
-        "bits_per_pin": 3,
+        "bits_per_pin": 4,
         "value": 0x0
     },
     {
@@ -1378,7 +1378,7 @@ ao_pinmux_registers = [
         "last_pad": ao_pad_to_idx["GPIOE_2"],
         "offset": 0x06 * 4,
         "first_bit": 0,
-        "bits_per_pin": 3,
+        "bits_per_pin": 4,
         "value": 0x0
     },
 ]
