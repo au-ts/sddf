@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Copyright 2024, UNSW
+
+    SPDX-License-Identifier: BSD-2-Clause
+-->
+<system>
+    <memory_region name="pcie_regs" phys_addr="0x2c000000" size="0x100000" />
+    <memory_region name="pcie_config" phys_addr="0x940000000" size="0x1000000" />
+    <protection_domain name="pcie" priority="254" >
+        <map mr="pcie_regs" vaddr="0x10_000_000" perms="rw" cached="false" setvar_vaddr="pcie_regs" />
+        <map mr="pcie_config" vaddr="0x20_000_000" perms="rw" cached="false" setvar_vaddr="pcie_config" />
+        <program_image path="pcie_driver.elf" />
+    </protection_domain>
+</system>
