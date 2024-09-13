@@ -9,6 +9,9 @@
     <memory_region name="eth0" size="0x10_000" phys_addr="0xff3f0000" />
     <memory_region name="timer" size="0x1_000" phys_addr="0xffd0f000" />
 
+    <memory_region name="pinctrl_ao" size="0x1000" phys_addr="0xFF80_0000" />
+    <memory_region name="pinctrl_periphs" size="0x2000" phys_addr="0xFF63_4000" />
+
     <!-- driver/device queue mechanism -->
     <memory_region name="hw_ring_buffer" size="0x10_000" />
 
@@ -56,6 +59,13 @@
     <memory_region name="serial_tx_queue_client0" size="0x1_000" />
     <memory_region name="serial_tx_queue_client1" size="0x1_000" />
     <memory_region name="serial_tx_queue_client2" size="0x1_000" />
+
+    <protection_domain name="pinctrl" priority="253" pp="true" passive="true">
+        <program_image path="pinctrl_driver.elf" />
+
+        <map mr="pinctrl_ao" vaddr="0x2_000_000" perms="rw" cached="false" setvar_vaddr="pinctrl_ao_base" />
+        <map mr="pinctrl_periphs" vaddr="0x2_010_000" perms="rw" cached="false" setvar_vaddr="pinctrl_periphs_base" />
+    </protection_domain>
 
     <protection_domain name="benchIdle" priority="1" >
         <program_image path="idle.elf" />
