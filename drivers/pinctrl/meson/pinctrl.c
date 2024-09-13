@@ -41,6 +41,8 @@ uintptr_t pinctrl_ao_base;
 uintptr_t pinctrl_periphs_base;
 
 // Data from DTS prepared by Python script
+// Even though this has been prepared by the Pythons script,
+// Writting anything to the AO GPIO chip will cause the board to halt...
 extern pindata_t ao_registers[];
 extern const uint32_t num_ao_registers;
 
@@ -105,3 +107,32 @@ void notified(microkit_channel ch) {
     LOG_DRIVER_ERR("received ntfn on unexpected channel %u\n", ch);
 }
 
+// microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo) {
+//     switch (microkit_msginfo_get_label(msginfo)) {
+
+//     case SDDF_PINCTRL_READ_MUX: {
+//         if (microkit_msginfo_get_count(msginfo) != READ_MUX_REQ_NUM_ARGS) {
+//             LOG_DRIVER_ERR(
+//                 "Read mux PPC from channel %u does not have the correct number of arguments %lu != %d\n", 
+//                 ch, 
+//                 microkit_msginfo_get_count(msginfo), READ_MUX_REQ_NUM_ARGS
+//             );
+//             return microkit_msginfo_new(SDDF_PINCTRL_INVALID_ARGS, 0);
+//         }
+
+//         uint32_t reg_offset = (uint32_t) microkit_mr_get(READ_MUX_REQ_OFFSET);
+//         uint32_t reg_val;
+
+//         if (read_mux(reg_offset, &reg_val)) {
+//             microkit_mr_set(READ_MUX_RESP_VALUE, reg_val);
+//             return microkit_msginfo_new(SDDF_PINCTRL_SUCCESS, READ_MUX_RESP_NUM_RESULTS);
+//         } else {
+//             return microkit_msginfo_new(SDDF_PINCTRL_INVALID_ARGS, 0);
+//         }
+//     }
+
+//     default:
+//         LOG_DRIVER_ERR("Unknown request %lu to pinctrl from channel %u\n", microkit_msginfo_get_label(msginfo), ch);
+//         return microkit_msginfo_new(SDDF_PINCTRL_UNKNOWN_REQ, 0);
+//     }
+// }
