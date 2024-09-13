@@ -46,8 +46,6 @@
 
 #define BIT(nr) (1UL << (nr))
 
-static uintptr_t clk_base;
-
 struct clk;
 
 struct clk_hw {
