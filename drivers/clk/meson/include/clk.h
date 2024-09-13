@@ -132,4 +132,26 @@ struct clk_mux_data {
     uint8_t flags;
 };
 
+struct parm {
+    uint16_t reg_off;
+    uint8_t shift;
+    uint8_t width;
+};
+
+struct meson_clk_pll_data {
+    struct parm en;
+    struct parm m;
+    struct parm n;
+    struct parm frac;
+    struct parm l;
+    struct parm rst;
+    struct parm current_en;
+    struct parm l_detect;
+    /* const struct reg_sequence *init_regs; */
+    unsigned int init_count;
+    /* const struct pll_params_table *table; */
+    /* const struct pll_mult_range *range; */
+    uint8_t flags;
+};
+
 #endif // CLK_H_
