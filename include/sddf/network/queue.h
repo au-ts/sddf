@@ -170,6 +170,7 @@ static inline int net_enqueue_free(net_queue_handle_t *queue, net_buff_desc_t bu
     __atomic_store_n(&queue->free->tail, tail + 1, __ATOMIC_RELEASE);
 #else
     queue->free->buffers[queue->free->tail % queue->size] = buffer;
+    THREAD_MEMORY_RELEASE();
     queue->free->tail++;
 #endif
 
@@ -196,6 +197,7 @@ static inline int net_enqueue_active(net_queue_handle_t *queue, net_buff_desc_t 
     __atomic_store_n(&queue->active->tail, tail + 1, __ATOMIC_RELEASE);
 #else
     queue->active->buffers[queue->active->tail % queue->size] = buffer;
+    THREAD_MEMORY_RELEASE();
     queue->active->tail++;
 #endif
 
@@ -222,6 +224,7 @@ static inline int net_dequeue_free(net_queue_handle_t *queue, net_buff_desc_t *b
     __atomic_store_n(&queue->free->head, head + 1, __ATOMIC_RELEASE);
 #else
     *buffer = queue->free->buffers[queue->free->head % queue->size];
+    THREAD_MEMORY_RELEASE();
     queue->free->head++;
 #endif
 
@@ -249,6 +252,7 @@ static inline int net_dequeue_active(net_queue_handle_t *queue, net_buff_desc_t 
     __atomic_store_n(&queue->active->head, head + 1, __ATOMIC_RELEASE);
 #else
     *buffer = queue->active->buffers[queue->active->head % queue->size];
+    THREAD_MEMORY_RELEASE();
     queue->active->head++;
 #endif
 
