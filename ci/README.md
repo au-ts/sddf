@@ -25,7 +25,17 @@ You will need to provide the path to your Microkit SDK.
 The CI runs a style check on any changed files and new files added in each GitHub
 pull request.
 
-We use `clang-format` from LLVM18, following the style guide in `.clang-format`.
+We use `clang-format`, following the style guide in `.clang-format`.
+
+### Installation
+
+On macOS: `brew install clang-format`.
+
+On apt: `sudo apt install clang-format`.
+
+On Nix: `nix-shell` in the root of the repository.
+
+### Using
 
 You can reproduce the style check by doing the following, which prints the diff
 of your committed changes against the main branch.
@@ -34,13 +44,10 @@ of your committed changes against the main branch.
 git clang-format --diff main
 ```
 
-You can also autoformt changed files by omitting the `--diff` argument.
+You can also auto-format changed files by omitting the `--diff` argument.
 
 ```sh
 git clang-format main
 ```
 
 Omitting the branch name runs the formatter on any staged files.
-
-You will need to have the `git-clang-format` program installed, which is often
-installed with `clang-tools`.
