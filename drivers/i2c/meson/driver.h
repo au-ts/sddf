@@ -44,10 +44,17 @@ typedef struct _i2c_ifState {
     enum data_direction data_direction;
     /* I2C bus address of the current request being handled */
     size_t addr;
+
+    unsigned long timeout;
 } i2c_ifState_t;
 
 #define DATA_DIRECTION_WRITE (0x0)
 #define DATA_DIRECTION_READ (0x1)
+
+// Max number of timeout IRQs before giving up. For some devices such as the pn532,
+// these arrive constantly in normal operation. As a result we need a high threshold
+// before acting.
+#define TIMEOUT_MAX 100000
 
 // Ctl register fields
 #define REG_CTRL_START      (BIT(0))
