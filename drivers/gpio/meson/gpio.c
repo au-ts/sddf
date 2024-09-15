@@ -7,21 +7,17 @@
 #include <microkit.h>
 #include <sddf/gpio/gpio.h>
 #include <sddf/gpio/meson/gpio.h>
+#include <gpio_config.h>
 
 #include "driver.h"
 
-#define GPIO_IRQ_0_CH       0
-#define GPIO_IRQ_1_CH       1
-#define GPIO_IRQ_2_CH       2
-#define GPIO_IRQ_3_CH       3
-#define GPIO_IRQ_4_CH       4
-#define GPIO_IRQ_5_CH       5
-#define GPIO_IRQ_6_CH       6
-#define GPIO_IRQ_7_CH       7
-#define AO_GPIO_IRQ_0_CH    8
-#define AO_GPIO_IRQ_1_CH    9
+#ifndef GPIO_CONFIG_H
+    #error "Must define GPIO channel mappings for clients in gpio config"
+#endif
 
-#define VIRTUALISER_CH     10
+_Static_assert(sizeof(gpio_channel_mappings) == EXPECTED_SIZE, "channel_mappings does not have the expected size");
+_Static_assert(sizeof(gpio_channel_mappings[0]) == sizeof(int[3]), "channel_mappings elements must be of type int[2]");
+_Static_assert(gpio_channel_mappings[0][CHANNEL_MAPPINGS_CHANNEL_NUMBER_INDEX] == 0, "channel_mappings must start at channel 0");
 
 #define DEBUG_DRIVER
 
@@ -38,43 +34,14 @@ uintptr_t gpio_regs;
 uintptr_t gpio_ao_regs;
 uintptr_t interupt_control_regs;
 
-// Driver gpio control interface
-static struct meson_gpio_control *gpio_config_control[MESON_GPIO_NUM_REG];
-static struct meson_irq_control *irq_config_control[MESON_IRQ_NUM_REG];
-
-gpio_irq_queue_handle_t queue_handle;
-
-uintptr_t notification_data_region;
-
-static void print_binary(uint32_t n) {
-    char binary_str[40];  // 32 bits + 7 spaces + 1 for the null terminator
-    int index = 0;
-
-    for (int i = 31; i >= 0; i--) {
-        binary_str[index++] = ((n >> i) & 1) ? '1' : '0';
-
-        // Insert a space after every 4 bits, but not at the end
-        if (i % 4 == 0 && i != 0) {
-            binary_str[index++] = ' ';
-        }
-    }
-
-    binary_str[index] = '\0';
-
-    LOG_DRIVER("%s \n", binary_str);
-}
-
 void init(void)
 {
     // Initialise Interface
 
     // NOTE: the hardware has been wrong in some situations.
     // Hence this intialisation is subject to change.
-    // E.g. not including enabling output for TEST_N when it does exist
-    // E.g. Some stuff is just weird as well.
     // For instance you can enable output for GPIO_Z pins 14:15 but
     // cant read input or set ouput for GPIO_Z pins 14:15 according to datasheet
-    // E.g. the following may have been entered in wrong as well
 
     static struct meson_gpio_bank out[] = {
         MESON_GPIO_BANK( GPIO_AO, MESON_REGISTER_DATA(AO_GPIO_O, 0, 11, 0, true) ),
@@ -195,19 +162,76 @@ void init(void)
     irq_config_control[MESON_IRQ_REG_AOSEL] = aosel;
     irq_config_control[MESON_IRQ_REG_SEL] = sel;
 
-    queue_handle = gpio_irq_queue_init((gpio_irq_queue_t *) notification_data_region);
-
     microkit_dbg_puts("Driver initialised.\n");
 }
 
-static void handle_irq(uint8_t channel_id) {
-
-    int ret = gpio_irq_enqueue_response(queue_handle, channel_id);
-    if (ret) {
-        LOG_DRIVER_ERR("Failed to enqueue response\n");
+/* Will not notify channel if not configured */
+void notify_client_channel(int ch) {
+    // currently using O(NUM_CLI_GPIO_CHANNELS) traversal
+    // could have another mapping table in the config file for O(1) traversal
+    for (int i = 0; i < NUM_CLI_GPIO_CHANNELS; i++) {
+        if (channel_mappings[i][CHANNEL_MAPPINGS_DEV_IRQ_CHANNEL_INDEX] == ch) {
+            // forward
+            microkit_notify(channel_mappings[i][CHANNEL_MAPPINGS_CHANNEL_NUMBER_INDEX]);
+            return;
+        }
     }
+    LOG_DRIVER_ERR("No corresponding client channel configured with device IRQ!\n")
+}
 
-    microkit_notify(VIRTUALISER_CH);
+void notified(microkit_channel ch)
+{
+    switch (ch) {
+        case DEV_GPIO_IRQ_0_CH:
+            microkit_irq_ack(ch);
+            notify_client_channel(DEV_GPIO_IRQ_0_CH);
+            break;
+        case DEV_GPIO_IRQ_1_CH:
+            microkit_irq_ack(ch);
+            notify_client_channel(DEV_GPIO_IRQ_1_CH);
+            break;
+        case DEV_GPIO_IRQ_2_CH:
+            microkit_irq_ack(ch);
+            notify_client_channel(DEV_GPIO_IRQ_2_CH);
+            break;
+        case DEV_GPIO_IRQ_3_CH:
+            microkit_irq_ack(ch);
+            notify_client_channel(DEV_GPIO_IRQ_3_CH);
+            break;
+        case DEV_GPIO_IRQ_4_CH:
+            microkit_irq_ack(ch);
+            notify_client_channel(DEV_GPIO_IRQ_4_CH);
+            break;
+        case DEV_GPIO_IRQ_5_CH:
+            microkit_irq_ack(ch);
+            notify_client_channel(DEV_GPIO_IRQ_5_CH);
+            break;
+        case DEV_GPIO_IRQ_6_CH:
+            microkit_irq_ack(ch);
+            notify_client_channel(DEV_GPIO_IRQ_6_CH);
+            break;
+        case DEV_GPIO_IRQ_7_CH:
+            microkit_irq_ack(ch);
+            notify_client_channel(DEV_GPIO_IRQ_7_CH);
+            break;
+        case DEV_GPIO_AO_IRQ_0_CH:
+            microkit_irq_ack(ch);
+            notify_client_channel(DEV_GPIO_AO_IRQ_0_CH);
+            break;
+        case DEV_GPIO_AO_IRQ_1_CH:
+            microkit_irq_ack(ch);
+            notify_client_channel(DEV_GPIO_AO_IRQ_1_CH);
+            break;
+        default:
+            microkit_dbg_puts("DRIVER|ERROR: unexpected notification!\n");
+    }
+}
+
+static seL4_MessageInfo_t invalid_request_error_message(gpio_irq_error_t error) {
+    seL4_MessageInfo_t error_message = microkit_msginfo_new(REQ_FAILURE, 1);
+    microkit_mr_set(RES_GPIO_IRQ_ERROR_SLOT, (size_t)error);
+    LOG_DRIVER_ERR("Invalid Request : %d", error);
+    return error_message;
 }
 
 static gpio_meson_bank_t meson_get_gpio_bank(size_t pin) {
@@ -314,13 +338,6 @@ static bool meson_irq_calc_reg_and_bits(meson_irq_reg_type_t function, size_t ch
     return false;
 }
 
-static seL4_MessageInfo_t invalid_request_error_message(gpio_irq_error_t error) {
-    seL4_MessageInfo_t error_message = microkit_msginfo_new(FAILURE, 1);
-    microkit_mr_set(RES_GPIO_IRQ_ERROR_SLOT, (size_t)error);
-    LOG_DRIVER_ERR("Invalid Request : %d", error);
-    return error_message;
-}
-
 static seL4_MessageInfo_t meson_get_gpio_output(size_t pin) {
     volatile uint32_t *reg = NULL;
     uint32_t start_bit = 0;
@@ -411,7 +428,7 @@ static seL4_MessageInfo_t meson_get_gpio_pull(size_t pin) {
 
     if (value == 0) {
         seL4_MessageInfo_t response = microkit_msginfo_new(SUCCESS, 1);
-        microkit_mr_set(RES_GPIO_VALUE_SLOT, DISABLE);
+        microkit_mr_set(RES_GPIO_VALUE_SLOT, NO_PULL);
         return response;
     }
 
@@ -430,7 +447,7 @@ static seL4_MessageInfo_t meson_get_gpio_pull(size_t pin) {
 }
 
 static seL4_MessageInfo_t meson_set_gpio_pull(size_t pin, size_t value) {
-    if (value != PULL_UP && value != PULL_DOWN && value != DISABLE) {
+    if (value != PULL_UP && value != PULL_DOWN && value != NO_PULL) {
         return invalid_request_error_message(INVALID_VALUE);
     }
 
@@ -441,7 +458,7 @@ static seL4_MessageInfo_t meson_set_gpio_pull(size_t pin, size_t value) {
     }
 
     // set actual value
-    if (value == DISABLE) {
+    if (value == NO_PULL) {
         *reg &= ~BIT(start_bit);
         return microkit_msginfo_new(SUCCESS, 0);
     }
@@ -491,38 +508,6 @@ static seL4_MessageInfo_t meson_set_gpio_drive_strength(size_t pin, size_t value
     *reg |= shifted_value;
 
     return microkit_msginfo_new(SUCCESS, 0);
-}
-
-static seL4_MessageInfo_t handle_get_gpio_request(size_t pin, size_t config) {
-    switch (config) {
-        case OUTPUT:
-            return meson_get_gpio_output(pin);
-        case INPUT:
-            return meson_get_gpio_input(pin);
-        case DIRECTION:
-            return meson_get_gpio_direction(pin);
-        case PULL:
-            return meson_get_gpio_pull(pin);
-        case DRIVE_STRENGTH:
-            return meson_get_gpio_drive_strength(pin);
-        default:
-            return invalid_request_error_message(INVALID_CONFIG);
-    }
-}
-
-static seL4_MessageInfo_t handle_set_gpio_request(size_t pin, size_t config, size_t value) {
-   switch (config) {
-        case OUTPUT:
-            return meson_get_gpio_output(pin, value);
-        case DIRECTION:
-            return meson_set_gpio_direction(pin, value);
-        case PULL:
-            return meson_set_gpio_pull(pin, value);
-        case DRIVE_STRENGTH:
-            return meson_set_gpio_drive_strength(pin, value);
-        default:
-            return invalid_request_error_message(INVALID_CONFIG);
-    }
 }
 
 static seL4_MessageInfo_t meson_get_irq_pin(size_t channel, size_t value) {
@@ -705,6 +690,38 @@ static seL4_MessageInfo_t meson_set_irq_filter(size_t channel, size_t value) {
     return microkit_msginfo_new(SUCCESS, 0);
 }
 
+static seL4_MessageInfo_t handle_get_gpio_request(size_t pin, size_t config) {
+    switch (config) {
+        case OUTPUT:
+            return meson_get_gpio_output(pin);
+        case INPUT:
+            return meson_get_gpio_input(pin);
+        case DIRECTION:
+            return meson_get_gpio_direction(pin);
+        case PULL:
+            return meson_get_gpio_pull(pin);
+        case DRIVE_STRENGTH:
+            return meson_get_gpio_drive_strength(pin);
+        default:
+            return invalid_request_error_message(INVALID_CONFIG);
+    }
+}
+
+static seL4_MessageInfo_t handle_set_gpio_request(size_t pin, size_t config, size_t value) {
+   switch (config) {
+        case OUTPUT:
+            return meson_get_gpio_output(pin, value);
+        case DIRECTION:
+            return meson_set_gpio_direction(pin, value);
+        case PULL:
+            return meson_set_gpio_pull(pin, value);
+        case DRIVE_STRENGTH:
+            return meson_set_gpio_drive_strength(pin, value);
+        default:
+            return invalid_request_error_message(INVALID_CONFIG);
+    }
+}
+
 static seL4_MessageInfo_t handle_get_irq_request(size_t channel, size_t config) {
     switch (config) {
         case PIN:
@@ -731,94 +748,63 @@ static seL4_MessageInfo_t handle_set_irq_request(size_t channel, size_t config, 
     }
 }
 
-void notified(microkit_channel ch)
-{
-    switch (ch) {
-        case GPIO_IRQ_0_CH:
-            handle_irq(GPIO_IRQ_0_CH);
-            microkit_irq_ack(ch);
-            break;
-        case GPIO_IRQ_1_CH:
-            handle_irq(GPIO_IRQ_1_CH);
-            microkit_irq_ack(ch);
-            break;
-        case GPIO_IRQ_2_CH:
-            handle_irq(GPIO_IRQ_2_CH);
-            microkit_irq_ack(ch);
-            break;
-        case GPIO_IRQ_3_CH:
-            handle_irq(GPIO_IRQ_3_CH);
-            microkit_irq_ack(ch);
-            break;
-        case GPIO_IRQ_4_CH:
-            handle_irq(GPIO_IRQ_4_CH);
-            microkit_irq_ack(ch);
-            break;
-        case GPIO_IRQ_5_CH:
-            handle_irq(GPIO_IRQ_5_CH);
-            microkit_irq_ack(ch);
-            break;
-        case GPIO_IRQ_6_CH:
-            handle_irq(GPIO_IRQ_6_CH);
-            microkit_irq_ack(ch);
-            break;
-        case GPIO_IRQ_7_CH:
-            handle_irq(GPIO_IRQ_7_CH);
-            microkit_irq_ack(ch);
-            break;
-        case GPIO_AO_IRQ_0_CH:
-            handle_irq(GPIO_AO_IRQ_0_CH);
-            microkit_irq_ack(ch);
-            break;
-        case GPIO_AO_IRQ_1_CH:
-            handle_irq(GPIO_AO_IRQ_1_CH);
-            microkit_irq_ack(ch);
-            break;
-        default:
-            microkit_dbg_puts("DRIVER|ERROR: unexpected notification!\n");
-    }
-}
-
 seL4_MessageInfo_t protected(microkit_channel ch, seL4_MessageInfo_t msginfo)
 {
     size_t label = microkit_msginfo_get_label(msginfo);
     size_t count = microkit_msginfo_get_count(msginfo);
 
     switch (label) {
-        case GET_GPIO_CONFIG:
+        case GET_GPIO:
+            if (count != 1) {
+                return invalid_request_error_message(INVALID_NUM_ARGS);
+            }
+            // check mapping
+            if (channel_mappings[ch][CHANNEL_MAPPINGS_GPIO_PIN_INDEX] < 0) {
+                return invalid_request_error_message(INVALID_CONFIG_TABLE_ENTRY);
+            }
+            size_t config = microkit_mr_get(REQ_GPIO_CONFIG_SLOT);
+            size_t pin = channel_mappings[ch][CHANNEL_MAPPINGS_GPIO_PIN_INDEX];
+            return handle_get_gpio_request(pin, config);
+        case GET_IRQ:
+            if (count != 1) {
+                return invalid_request_error_message(INVALID_NUM_ARGS);
+            }
+            // check mapping
+            if (channel_mappings[ch][CHANNEL_MAPPINGS_DEV_IRQ_CHANNEL_INDEX] < 0) {
+                return invalid_request_error_message(INVALID_CONFIG_TABLE_ENTRY);
+            }
+            size_t config = microkit_mr_get(REQ_GPIO_CONFIG_SLOT);
+            size_t channel = channel_mappings[ch][CHANNEL_MAPPINGS_DEV_IRQ_CHANNEL_INDEX] - DEV_IRQ_CHANNEL_OFFSET;
+            return handle_get_irq_request(channel, config);
+        case SET_GPIO:
             if (count != 2) {
                 return invalid_request_error_message(INVALID_NUM_ARGS);
             }
-            size_t pin = microkit_mr_get(REQ_GPIO_PIN_SLOT);
-            size_t config = microkit_mr_get(REQ_IRQ_CONFIG_SLOT);
-
-            return handle_get_gpio_request(config, pin);
-        case SET_GPIO_CONFIG:
-            if (count != 3) {
-                return invalid_request_error_message(INVALID_NUM_ARGS);
+            // check mapping
+            if (channel_mappings[ch][CHANNEL_MAPPINGS_GPIO_PIN_INDEX] < 0) {
+                return invalid_request_error_message(INVALID_CONFIG_TABLE_ENTRY);
             }
-            size_t pin = microkit_mr_get(REQ_GPIO_PIN_SLOT);
-            size_t config = microkit_mr_get(REQ_IRQ_CONFIG_SLOT);
+            size_t config = microkit_mr_get(REQ_GPIO_CONFIG_SLOT);
+            size_t pin = channel_mappings[ch][CHANNEL_MAPPINGS_GPIO_PIN_INDEX];
             size_t value = microkit_mr_get(REQ_GPIO_VALUE_SLOT);
-
-            return handle_set_gpio_request(config, pin, value);
-        case GET_IRQ_CONFIG:
+            return handle_set_gpio_request(pin, config, value);
+        case SET_IRQ:
             if (count != 2) {
                 return invalid_request_error_message(INVALID_NUM_ARGS);
             }
-            size_t channel = microkit_mr_get(REQ_IRQ_CHANNEL_SLOT);
-            size_t config = microkit_mr_get(REQ_IRQ_CONFIG_SLOT);
-
-            return handle_get_irq_request(config, channel);
-        case SET_IRQ_CONFIG:
-            if (count != 3) {
-                return invalid_request_error_message(INVALID_NUM_ARGS);
+            // check mapping
+            if (channel_mappings[ch][CHANNEL_MAPPINGS_DEV_IRQ_CHANNEL_INDEX] < 0) {
+                return invalid_request_error_message(INVALID_CONFIG_TABLE_ENTRY);
             }
-            size_t channel = microkit_mr_get(REQ_IRQ_CHANNEL_SLOT);
-            size_t config = microkit_mr_get(REQ_IRQ_CONFIG_SLOT);
+            size_t config = microkit_mr_get(REQ_GPIO_CONFIG_SLOT);
+            size_t channel = channel_mappings[ch][CHANNEL_MAPPINGS_DEV_IRQ_CHANNEL_INDEX] - DEV_IRQ_CHANNEL_OFFSET;
             size_t value = microkit_mr_get(REQ_GPIO_VALUE_SLOT);
 
-            return handle_set_irq_request(config, channel, value);
+            // Check irq channel can be configured to gpio pin
+            if (config == PIN && channel_mappings[ch][CHANNEL_MAPPINGS_GPIO_PIN_INDEX] != value) {
+                return invalid_request_error_message(INVALID_PERMISSION);
+            }
+            return handle_set_irq_request(channel, config, value);
         default:
             return invalid_request_error_message(INVALID_LABEL);
     }

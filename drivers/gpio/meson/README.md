@@ -16,8 +16,8 @@ When a digtial I/O pin is not being used for any specific purpose (i2c, uart) it
 
 ### Security
 Security is currently enforced by the system designer. There is no virtualiser to claim GPIO pins or IRQ channels.
-Instead each channel from the client to the driver is assigned to either one GPIO pin or one IRQ channel (TODO: where is it assigned??)
-and hence other clients not given access to the channel in the system file cannot complete SET or GET requests to that GPIO or IRQ.
+Instead each channel from the client to the driver is assigned to either one GPIO pin or one IRQ channel (TODO: where is it assigned??).
+Hence other complete SET or GET requests to that GPIO or IRQ they must be sent through the channel.
 
 ### Clients
 Clients PPC to the Driver in the channel associated with the GPIO or IRQ they want to configure.
@@ -30,8 +30,7 @@ before returning if it was a success or failure. It also forwards IRQs to the co
 
 ### Transport
 All requests (both SET and GET) transport is done through PPCs.
-In the case where a client has subscribed to a certain IRQ, then when the device sends an IRQ to the driver,
-it must be forwarded from driver to client.
+In the case where a client has subscribed to a certain IRQ,  when the device sends an IRQ to the driver, it is forwarded from driver to client.
 
 ### Communication
 
@@ -57,7 +56,7 @@ Where to actually place the arguements in the ppcs is the same for every platfor
 (outlined in include/sddf/gpio/gpio.h).
 
 #### IRQ
-Irqs are recieved my driver and forwarded to associated client. Nothing else is done.
+Irqs are recieved my driver and forwarded to associated client based on the config file.
 
 ## ODROID C4 GPIO Specifications
 

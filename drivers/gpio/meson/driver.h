@@ -181,7 +181,7 @@ typedef enum {
 	MESON_IRQ_REG_AOSEL,
     MESON_IRQ_REG_SEL,
     // MESON_IRQ_REG_FILCLKEN - not implemented
-	MESON_IRQ_NUM_REG, // not actually a register - just a count
+	MESON_IRQ_NUM_REG, // not actually a register, just a count
 } meson_irq_reg_type_t;
 
 /* how many bits are assigned for each register type per pin */
