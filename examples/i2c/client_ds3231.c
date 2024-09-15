@@ -90,6 +90,13 @@ void client_main(void)
             while (1) {};
         }
 
+        if (day_of_week < 1 || day_of_week > 7) {
+            LOG_CLIENT_ERR("day of week index is wrong\n");
+            sddf_printf("Date and Time: %02d-%02d-%02d %02d:%02d:%02d\n", day, month, year, hour, minute, second);
+            delay_ms(500);
+            continue;
+        }
+
         sddf_printf("Date and Time: %02d-%02d-%02d %02d:%02d:%02d (%s)\n", day, month, year, hour, minute, second,
                     day_of_week_strings[day_of_week - 1]);
 
