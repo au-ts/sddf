@@ -19,6 +19,7 @@
 */
 
 /* Device <-> Driver GPIO IRQ channels */
+/* Must be linear, skip numbers and be in this order */
 #define DEV_GPIO_IRQ_0_CH       53
 #define DEV_GPIO_IRQ_1_CH       54
 #define DEV_GPIO_IRQ_2_CH       55

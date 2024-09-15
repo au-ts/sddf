@@ -83,6 +83,33 @@ void client_main(void) {
         while (1) {};
     }
 
+    sddf_printf("Setting GPIO1 drive strength to 4000UA!\n");
+    msginfo = microkit_msginfo_new(SET_GPIO, 2);
+    microkit_mr_set(REQ_GPIO_CONFIG_SLOT, DRIVE_STRENGTH);
+    microkit_mr_set(REQ_GPIO_VALUE_SLOT, DS_4000UA);
+    msginfo = microkit_ppcall(GPIO_DRIVER_CH_1, msginfo);
+    if (microkit_msginfo_get_label(msginfo) == FAILURE) {
+        size_t error = microkit_mr_get(RES_GPIO_IRQ_ERROR_SLOT);
+        LOG_CLIENT_ERR("failed to set output of gpio with error %d!\n", error);
+        while (1) {};
+    }
+
+    sddf_printf("Checking with get request!\n");
+    msginfo = microkit_msginfo_new(GET_GPIO, 1);
+    microkit_mr_set(REQ_GPIO_CONFIG_SLOT, DRIVE_STRENGTH);
+    msginfo = microkit_ppcall(GPIO_DRIVER_CH_1, msginfo);
+    if (microkit_msginfo_get_label(msginfo) == FAILURE) {
+        size_t error = microkit_mr_get(RES_GPIO_IRQ_ERROR_SLOT);
+        LOG_CLIENT_ERR("failed to get drive strength of gpio with error %d!\n", error);
+        while (1) {};
+    }
+
+    size_t value = microkit_mr_get(RES_GPIO_VALUE_SLOT);
+    if (value != DS_4000UA) {
+        LOG_CLIENT_ERR("problem with output in driver!\n");
+        while (1) {};
+    }
+
     delay_ms(3000);
 
     sddf_printf("Setting GPIO1 to off!\n");
@@ -139,10 +166,10 @@ void client_main(void) {
         while (1) {};
     }
 
-    sddf_printf("Setting pull of GPIO2 to rising!\n");
+    sddf_printf("Setting pull of GPIO2 to down!\n");
     msginfo = microkit_msginfo_new(SET_GPIO, 2);
     microkit_mr_set(REQ_GPIO_CONFIG_SLOT, PULL);
-    microkit_mr_set(REQ_GPIO_VALUE_SLOT, RISING);
+    microkit_mr_set(REQ_GPIO_VALUE_SLOT, PULL_DOWN);
     msginfo = microkit_ppcall(GPIO_DRIVER_CH_2, msginfo);
     if (microkit_msginfo_get_label(msginfo) == FAILURE) {
         size_t error = microkit_mr_get(RES_GPIO_IRQ_ERROR_SLOT);
@@ -161,7 +188,7 @@ void client_main(void) {
     }
 
     size_t value = microkit_mr_get(RES_GPIO_VALUE_SLOT);
-    if (value != RISING) {
+    if (value != PULL_DOWN) {
         LOG_CLIENT_ERR("problem with pull in driver!\n");
         while (1) {};
     }

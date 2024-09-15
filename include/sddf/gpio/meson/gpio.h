@@ -32,22 +32,7 @@ typedef enum {
 } meson_gpio_bank_t;
 
 #define MESON_GPIO_PIN_COUNT 101
-
 #define MESON_GPIO_BANK_COUNT 9
-
-typedef enum {
-    GPIO_IRQ_0 = 0,
-    GPIO_IRQ_1,
-    GPIO_IRQ_2,
-    GPIO_IRQ_3,
-    GPIO_IRQ_4,
-    GPIO_IRQ_5,
-    GPIO_IRQ_6,
-    GPIO_IRQ_7,
-    GPIO_AO_IRQ_0 = 8,
-    GPIO_AO_IRQ_1,
-} meson_irq_gpio_t;
-
 #define MESON_IRQ_CHANNEL_COUNT 10
 
 /*
