@@ -6,6 +6,7 @@
 // Pinctrl driver. Tested on OdroidC4 (Amlogic S903X3)
 
 // Documents referenced:
+// Amlogic S905X3 Datasheet revision 2
 // Linux: drivers/pinctrl/meson/pinctrl-meson-g12a.c
 // Linux: drivers/pinctrl/meson/pinctrl-meson.c
 
@@ -14,6 +15,8 @@
 #include <stdbool.h>
 #include <sddf/util/printf.h>
 #include <sddf/pinctrl/protocol.h>
+
+#include "odroidc4.h"
 
 // Logging
 #define DEBUG_DRIVER
@@ -28,11 +31,6 @@
 
 // Memory definitions
 #define MUX_REG_ADDR(base, offset) ((uint32_t *) (base + offset))
-
-typedef struct {
-    uint32_t offset;
-    uint32_t value;
-} pindata_t;
 
 #define PINMUX_DATA_MAGIC 0x73ABC62F
 
@@ -49,6 +47,7 @@ extern const uint32_t num_peripheral_registers;
 
 extern const uint32_t pinmux_data_magic;
 
+// Helper functions
 bool check_vaddr_4_bytes_aligned(uint32_t *vaddr) {
     if (((uintptr_t) vaddr) % 4 == 0) {
         return true;
@@ -82,18 +81,8 @@ bool set_mux(uint32_t *vaddr, uint32_t val) {
     return true;
 }
 
-void init(void) {
-    LOG_DRIVER("starting\n");
-
-    if (pinmux_data_magic != PINMUX_DATA_MAGIC) {
-        LOG_DRIVER_ERR("magic does not match");
-    }
-
-    // The peripherals pinmux device physical address isn't aligned on page boundary whereas
-    // memory regions can only be mapped on page boundary, we need to offset the page boundary address
-    // into the actual pinmux device.
-    pinctrl_periphs_base += 0x400;
-
+void initialise_ao_chip(void) {
+    sddf_printf_("Initialising Always-On GPIO chip to values in DTS\n");
     for (uint32_t i = 0; i < num_ao_registers; i += 1) {
         uint32_t curr;
         read_mux(MUX_REG_ADDR(pinctrl_ao_base, ao_registers[i].offset), &curr);
@@ -101,7 +90,25 @@ void init(void) {
     
         set_mux(MUX_REG_ADDR(pinctrl_ao_base, ao_registers[i].offset), ao_registers[i].value);
     }
+}
 
+void fix_peripherals_chip_offset(void) {
+    // The peripherals pinmux device physical address isn't aligned on page boundary whereas
+    // memory regions can only be mapped on page boundary, we need to offset the page boundary address
+    // into the actual pinmux device.
+    pinctrl_periphs_base += 0x400;
+}
+
+void default_initialise_peripherals_chip(void) {
+    sddf_printf_("Default initialising peripherals GPIO chip to values in datasheet\n");
+    for (int i = 0; i < sizeof(default_periphs_pinmux) / sizeof(default_periphs_pinmux[0]); i += 1) {
+        sddf_printf_("offset %x = %x\n", default_periphs_pinmux[i].offset, default_periphs_pinmux[i].value);
+        set_mux(MUX_REG_ADDR(peripheral_registers, default_periphs_pinmux[i].offset), default_periphs_pinmux[i].value);
+    }
+}
+
+void initialise_peripherals_chip(void) {
+    sddf_printf_("Initialising peripherals GPIO chip to values in DTS\n");
     for (uint32_t i = 0; i < num_peripheral_registers; i += 1) {
         uint32_t curr;
         read_mux(MUX_REG_ADDR(pinctrl_periphs_base, peripheral_registers[i].offset), &curr);
@@ -109,6 +116,20 @@ void init(void) {
     
         set_mux(MUX_REG_ADDR(pinctrl_periphs_base, peripheral_registers[i].offset), peripheral_registers[i].value);
     }
+}
+
+void init(void) {
+    LOG_DRIVER("starting\n");
+
+    if (pinmux_data_magic != PINMUX_DATA_MAGIC) {
+        LOG_DRIVER_ERR("magic does not match");
+    }
+
+    initialise_ao_chip();
+
+    fix_peripherals_chip_offset();
+    default_initialise_peripherals_chip();
+    initialise_peripherals_chip();
 
     LOG_DRIVER("pinctrl device initialisation done\n");
 }
