@@ -41,4 +41,8 @@ jobs:
       - name: Check formatting
         run: |
           git clang-format-19 --binary 'clang-format-19' \
-            --diff ${GITHUB_BASE_REF} test-revision --verbose
+            --diff ${GITHUB_BASE_REF} test-revision --verbose \
+          || (
+            echo "::error::Has your style check failed? Go to sddf/ci/README to learn more"
+            exit 1
+          )
