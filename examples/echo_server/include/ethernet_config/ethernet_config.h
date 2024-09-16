@@ -50,9 +50,9 @@
 #define NET_TX_DATA_REGION_SIZE_CLI0            NET_DATA_REGION_SIZE
 #define NET_TX_DATA_REGION_SIZE_CLI1            NET_DATA_REGION_SIZE
 
-_Static_assert(NET_TX_DATA_REGION_SIZE_CLI0 >= NET_TX_QUEUE_SIZE_CLI0 *NET_BUFFER_SIZE,
+_Static_assert(NET_TX_DATA_REGION_SIZE_CLI0 >= NET_TX_QUEUE_SIZE_CLI0 * NET_BUFFER_SIZE,
                "Client0 TX data region size must fit Client0 TX buffers");
-_Static_assert(NET_TX_DATA_REGION_SIZE_CLI1 >= NET_TX_QUEUE_SIZE_CLI1 *NET_BUFFER_SIZE,
+_Static_assert(NET_TX_DATA_REGION_SIZE_CLI1 >= NET_TX_QUEUE_SIZE_CLI1 * NET_BUFFER_SIZE,
                "Client1 TX data region size must fit Client1 TX buffers");
 
 #define NET_RX_QUEUE_SIZE_DRIV                   512
@@ -66,11 +66,11 @@ _Static_assert(NET_TX_DATA_REGION_SIZE_CLI1 >= NET_TX_QUEUE_SIZE_CLI1 *NET_BUFFE
 #define NET_RX_DATA_REGION_SIZE_CLI0            NET_DATA_REGION_SIZE
 #define NET_RX_DATA_REGION_SIZE_CLI1            NET_DATA_REGION_SIZE
 
-_Static_assert(NET_RX_DATA_REGION_SIZE_DRIV >= NET_RX_QUEUE_SIZE_DRIV *NET_BUFFER_SIZE,
+_Static_assert(NET_RX_DATA_REGION_SIZE_DRIV >= NET_RX_QUEUE_SIZE_DRIV * NET_BUFFER_SIZE,
                "Driver RX data region size must fit Driver RX buffers");
-_Static_assert(NET_RX_DATA_REGION_SIZE_CLI0 >= NET_RX_QUEUE_SIZE_CLI0 *NET_BUFFER_SIZE,
+_Static_assert(NET_RX_DATA_REGION_SIZE_CLI0 >= NET_RX_QUEUE_SIZE_CLI0 * NET_BUFFER_SIZE,
                "Client0 RX data region size must fit Client0 RX buffers");
-_Static_assert(NET_RX_DATA_REGION_SIZE_CLI1 >= NET_RX_QUEUE_SIZE_CLI1 *NET_BUFFER_SIZE,
+_Static_assert(NET_RX_DATA_REGION_SIZE_CLI1 >= NET_RX_QUEUE_SIZE_CLI1 * NET_BUFFER_SIZE,
                "Client1 RX data region size must fit Client1 RX buffers");
 
 #define NET_MAX_QUEUE_SIZE MAX(NET_TX_QUEUE_SIZE_DRIV, MAX(NET_RX_QUEUE_SIZE_DRIV, MAX(NET_RX_QUEUE_SIZE_CLI0, NET_RX_QUEUE_SIZE_CLI1)))
@@ -80,7 +80,7 @@ _Static_assert(NET_RX_QUEUE_SIZE_COPY0 >= NET_RX_QUEUE_SIZE_DRIV,
                "Copy0 queues must have capacity to fit all RX buffers.");
 _Static_assert(NET_RX_QUEUE_SIZE_COPY1 >= NET_RX_QUEUE_SIZE_DRIV,
                "Copy1 queues must have capacity to fit all RX buffers.");
-_Static_assert(sizeof(net_queue_t) + NET_MAX_QUEUE_SIZE *sizeof(net_buff_desc_t) <= NET_DATA_REGION_SIZE,
+_Static_assert(sizeof(net_queue_t) + NET_MAX_QUEUE_SIZE * sizeof(net_buff_desc_t) <= NET_DATA_REGION_SIZE,
                "net_queue_t must fit into a single data region.");
 
 static inline uint64_t net_cli_mac_addr(char *pd_name)
