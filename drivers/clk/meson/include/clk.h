@@ -62,6 +62,7 @@ struct clk_hw {
 
 struct clk_ops {
     uint8_t (*get_parent)(struct clk_hw *hw);
+    int (*set_parent)(struct clk_hw *hw, uint8_t index);
     unsigned long (*recalc_rate)(struct clk_hw *hw, unsigned long parent_rate);
     int (*set_rate)(struct clk_hw *hw, uint32_t rate, uint32_t parent_rate);
     int (*enable)(struct clk_hw *hw);
