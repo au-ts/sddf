@@ -12,6 +12,7 @@
 #  gpio --- the GPIO registers.
 #  gpio_ao --- the Always On GPIO registers.
 #  interupt_control -- the interrupt control registers.
+#  Needs a config file to be defined that defines what channels are used
 
 GPIO_DRIVER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 

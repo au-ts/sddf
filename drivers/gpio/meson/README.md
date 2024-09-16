@@ -41,9 +41,9 @@ Then there are platform specific interfaces in a seperate per-platform header.
 
 Requests:
 
-Label = either GET or SET.
-Message Register 0 = The function we want.
-Message Register 1 = The value we want to set the function too (only used in SETs)
+Label = either GET_GPIO, SET_GPIO, GET_IRQ or SET_IRQ.
+Message Register 0 = The function we want to configure.
+Message Register 1 = The value we want to set the function to (only used in SETs)
 
 Responses
 Label = either SUCCESS or FAILURE
@@ -56,7 +56,7 @@ Where to actually place the arguements in the ppcs is the same for every platfor
 (outlined in include/sddf/gpio/gpio.h).
 
 #### IRQ
-Irqs are recieved my driver and forwarded to associated client based on the config file.
+Irqs are recieved by driver and forwarded to associated client based on the config file.
 
 ## ODROID C4 GPIO Specifications
 

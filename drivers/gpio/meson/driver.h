@@ -166,7 +166,7 @@ struct meson_gpio_bank {
 #define MESON_GPIO_BANK(bank_id, ...)                                 \
     {                                                                 \
         .bank = bank_id,                                              \
-        .registers = (struct meson_register_data[]){ __VA_ARGS__ }    \
+        .registers = (struct meson_gpio_register_data[]){ __VA_ARGS__ }    \
     }
 
 /*
