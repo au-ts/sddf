@@ -34,7 +34,7 @@ NETWORK_COMPONENTS=$(SDDF)/network/components
 
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 
-IMAGES := eth.elf lwip.elf benchmark.elf idle.elf mux_rx.elf mux_tx.elf copy.elf arp.elf timer.elf serial.elf
+IMAGES := eth.elf lwip.elf benchmark.elf idle.elf mux_rx.elf mux_tx.elf arp.elf timer.elf serial.elf
 CFLAGS := -ffreestanding -g3 -O3 -Wall -Wno-unused-function -nostdlib  -target $(TARGET)
 
 LDFLAGS := -L$(BOARD_DIR)/lib -nostdlib -target $(TARGET)
@@ -97,7 +97,6 @@ ETH_OBJS := $(ETHERNET_DRIVER)/ethernet.o sddf_network_sharedringbuffer.o printf
 # ETH_OBJS := $(ETHERNET_DRIVER)/ethernet.o sddf_network_sharedringbuffer.o printf.o putchar_serial.o sddf_timer_client.o
 MUX_RX_OBJS := $(NETWORK_COMPONENTS)/mux_rx.o sddf_network_sharedringbuffer.o printf.o putchar_debug.o
 MUX_TX_OBJS := $(NETWORK_COMPONENTS)/mux_tx.o sddf_network_sharedringbuffer.o $(UTIL)/cache.o printf.o putchar_debug.o
-COPY_OBJS := $(NETWORK_COMPONENTS)/copy.o sddf_network_sharedringbuffer.o printf.o putchar_debug.o
 BENCH_OBJS := $(BENCHMARK)/benchmark.o printf.o putchar_serial.o
 # BENCH_OBJS := $(BENCHMARK)/benchmark.o printf.o putchar_debug.o
 # IDLE_OBJS := $(BENCHMARK)/idle.o printf.o putchar_serial.o sddf_timer_client.o
@@ -106,7 +105,7 @@ ARP_OBJS := $(NETWORK_COMPONENTS)/arp.o sddf_network_sharedringbuffer.o printf.o
 TIMER_OBJS := $(TIMER_DRIVER)/timer.o printf.o putchar_debug.o
 
 OBJS := $(sort $(addprefix $(BUILD_DIR)/, $(ETH_OBJS) $(MUX_RX_OBJS) $(MUX_TX_OBJS)\
-	$(COPY_OBJS) $(BENCH_OBJS) $(IDLE_OBJS) \
+	$(BENCH_OBJS) $(IDLE_OBJS) \
 	$(LWIP_OBJS) $(ARP_OBJS) $(TIMER_OBJS)))
 DEPS := $(OBJS:.o=.d)
 
@@ -157,9 +156,6 @@ $(BUILD_DIR)/mux_rx.elf: $(addprefix $(BUILD_DIR)/, $(MUX_RX_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(BUILD_DIR)/mux_tx.elf: $(addprefix $(BUILD_DIR)/, $(MUX_TX_OBJS))
-	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
-
-$(BUILD_DIR)/copy.elf: $(addprefix $(BUILD_DIR)/, $(COPY_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(BUILD_DIR)/benchmark.elf: $(addprefix $(BUILD_DIR)/, $(BENCH_OBJS))

@@ -147,6 +147,8 @@ void init(void)
     ring_init(&state.rx_ring_drv, (ring_buffer_t *)rx_free_drv, (ring_buffer_t *)rx_used_drv, RX_RING_SIZE_DRIV);
     mux_ring_init_sys("mux_rx", state.rx_ring_clients, rx_free_arp, rx_used_arp);
     buffers_init((ring_buffer_t *)rx_free_drv, buffer_data_paddr, RX_RING_SIZE_DRIV);
+    buffers_init(state.rx_ring_clients[0].free_ring, 0, state.rx_ring_clients[0].free_ring->size);
+
 
     if (require_signal(state.rx_ring_drv.free_ring)) {
         cancel_signal(state.rx_ring_drv.free_ring);
