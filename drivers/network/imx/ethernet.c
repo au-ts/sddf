@@ -12,6 +12,14 @@
 #include <sddf/util/printf.h>
 #include <ethernet_config.h>
 
+#define VIRTQ_QUEUE_SIZE 1
+#define GPU_VIRTIO_DATA_REGION_SIZE 10000
+
+/* Size of data contained in a single descriptor */
+#define VIRTIO_DATA_ENTRY_SIZE 2048
+_Static_assert((uint64_t)VIRTIO_DATA_ENTRY_SIZE * (uint64_t)VIRTQ_QUEUE_SIZE <= GPU_VIRTIO_DATA_REGION_SIZE,
+               "VIRTIO_DATA_ENTRY_SIZE * VIRTQ_QUEUE_SIZE must be less than or equal to GPU_VIRTIO_DATA_REGION_SIZE");
+
 #include "ethernet.h"
 
 #define IRQ_CH 0
