@@ -1,5 +1,5 @@
 /*
- * Copyright 2022, UNSW
+ * Copyright 2024, UNSW
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
@@ -11,6 +11,7 @@
 /* Test for Odroid-C4 */
 #include <clk.h>
 #include <clk-operations.h>
+#include <clk-measure.h>
 #include <g12a.h>
 #include <g12a-clkc.h>
 
@@ -18,6 +19,7 @@
 #define I2C_CLK_BIT (1 << 9) // bit 9
 
 uintptr_t clk_regs;
+uintptr_t msr_clk_base;
 
 static struct clk g12a_fixed_pll_dco = {
     .data = &(struct meson_clk_pll_data){
@@ -843,14 +845,11 @@ void init(void)
 
     sddf_dprintf("-----------------\n");
 
-    /* Clock mux configuration test */
-    struct clk_hw *mpeg_clk_sel_hw = sm1_clks[CLKID_MPEG_SEL];
-    uint8_t parent_idx = mpeg_clk_sel_hw->init->ops->get_parent(mpeg_clk_sel_hw);
-
     struct clk_hw *clk81_hw = sm1_clks[CLKID_CLK81];
     uint64_t ret = clk_recalc_rate(clk81_hw);
     sddf_dprintf("Clock %s rate: %llu\n", clk81_hw->init->name, ret);
 
+	clk_msr_stat();
+
     sddf_dprintf("-----------------\n");
 }
-
