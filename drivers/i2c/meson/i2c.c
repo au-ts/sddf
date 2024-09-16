@@ -46,7 +46,9 @@ struct i2c_regs {
 };
 
 // Hardware memory
+#ifndef DISABLE_I2C_PINMUX_INIT
 uintptr_t gpio_regs;
+#endif
 uintptr_t clk_regs;
 uintptr_t i2c_regs;
 
