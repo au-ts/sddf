@@ -15,11 +15,11 @@
 
 #  Expects variable pinctrl_ao_base to be set in the system description file to the
 #    mapped address of the pinmux controller of the Always-On domain.
-#  On OdroidC4 it is 0xFF63_4000 for 0x2000 size
+#  On OdroidC4 it is 0xFF80_0000 for 0x1000 size
 
 #  Expects variable pinctrl_periphs_base to be set in the system description file to the
 #    mapped address of the peripherals pinmux controller.
-#  On OdroidC4 it is 0xFF80_0000 for 0x1000 size
+#  On OdroidC4 it is 0xFF63_4000 for 0x2000 size
 
 ifndef PYTHON
 $(error PYTHON is not set)
