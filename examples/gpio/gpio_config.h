@@ -39,7 +39,7 @@
 ================================================================================
 */
 
-#define NUM_CLI_GPIO_CHANNELS (63-10)
+#define NUM_CLI_GPIO_CHANNELS (63 - MESON_IRQ_CHANNEL_COUNT)
 #define EXPECTED_SIZE (NUM_CLI_GPIO_CHANNELS * sizeof(int[3]))
 
 #define CHANNEL_MAPPINGS_CHANNEL_NUMBER_INDEX 0
@@ -51,7 +51,7 @@
 - Pins must use the linear scheme inside of sddf/include/gpio/{platform}/gpio.h.
 - Unused fields must be initialised to -1.
 */
-extern const int channel_mappings[NUM_CLI_GPIO_CHANNELS][3] = {
+const int cli_channel_mappings[NUM_CLI_GPIO_CHANNELS][3] = {
     { 0, GPIO_1, -1 }, // we are using this channel but its not mapped
     { 1, GPIO_2, DEV_GPIO_IRQ_0_CH},
     { 2, -1, -1 },

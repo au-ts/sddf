@@ -36,8 +36,10 @@ UTIL := $(SDDF)/util
 LIBCO := $(SDDF)/libco
 TOP := ${SDDF}/examples/gpio
 GPIO_DRIVER := $(SDDF)/drivers/gpio/${PLATFORM}
+TIMER_DRIVER := $(SDDF)/drivers/timer/${PLATFORM}
+CONFIGS_INCLUDE := ${TOP}
 
-IMAGES := gpio_driver.elf
+IMAGES := gpio_driver.elf timer_driver.elf client.elf
 CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall -Wno-unused-function -I${TOP}
 LDFLAGS := -L$(BOARD_DIR)/lib -L$(SDDF)/lib -L${LIBC}
 LIBS := --start-group -lmicrokit -Tmicrokit.ld -lc libsddf_util_debug.a --end-group
@@ -49,13 +51,19 @@ SYSTEM_FILE = ${TOP}/board/$(MICROKIT_BOARD)/gpio.system
 CFLAGS += -I$(BOARD_DIR)/include \
 	-I$(SDDF)/include \
 	-I$(LIBCO) \
+	-I$(CONFIGS_INCLUDE) \
 	-MD \
 	-MP
 
 COMMONFILES=libsddf_util_debug.a
 
+CLIENT_OBJS := client.o
+
 VPATH:=${TOP}
 all: $(IMAGE_FILE)
+
+client.elf: $(CLIENT_OBJS) libco.a
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
@@ -73,3 +81,5 @@ clobber:: clean
 include ${SDDF}/util/util.mk
 include ${LIBCO}/libco.mk
 include ${GPIO_DRIVER}/gpio_driver.mk
+include ${TIMER_DRIVER}/timer_driver.mk
+

@@ -27,11 +27,25 @@ Circuit 2:
 GPIO_X ----[ ]---- VCC (3.3)
           Button
 
-# TODO
-get rid of value in set pin
-should be pretty clear they arent trying to do something else
-this could even be done inside of the initialisation of the driver and hence doesnt even need a set request!!!!!!!
+## Building
 
+### Make
+
+To build the image, run the following command:
+```sh
+make MICROKIT_SDK=/path/to/sdk
+```
+
+The final bootable image will be in `build/loader.img`.
+
+### Zig
+
+You can also build this example with the Zig build system:
+```sh
+zig build -Dsdk=/path/to/sdk -Dboard=odroidc4
+```
+
+The final bootable image will be in `zig-out/bin/loader.img`.
 
 
 
