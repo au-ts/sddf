@@ -22,6 +22,8 @@
 #define IRQ_CH 1
 #define IRQ_TIMEOUT_CH 2
 
+#define DISABLE_I2C_PINMUX_INIT
+
 // #define DEBUG_DRIVER
 
 #ifdef DEBUG_DRIVER
@@ -156,6 +158,7 @@ static inline void i2c_setup()
 
     volatile struct i2c_regs *regs = (volatile struct i2c_regs *) i2c_regs;
 
+#ifndef DISABLE_I2C_PINMUX_INIT
     // Note: this is hacky - should do this using a GPIO driver.
     // Set up pinmux
     volatile uint32_t *gpio_mem = (void *)(gpio_regs + GPIO_OFFSET);
@@ -177,7 +180,7 @@ static inline void i2c_setup()
     const uint8_t ds = 3;    // 3 mA
     uint8_t pinfunc;
 
-#if I2C_BUS_NUM == 2
+# if I2C_BUS_NUM == 2
     // Enable i2cm2 -> pinmux 5
     LOG_DRIVER("bus 2 initialising\n");
     pinfunc = GPIO_PM5_X_I2C;
@@ -207,7 +210,7 @@ static inline void i2c_setup()
     if ((*pad_bias2_ptr & ((1 << 18) | (1 << 17))) != 0) {
         LOG_DRIVER_ERR("failed to disable bias for m2!\n");
     }
-#elif I2C_BUS_NUM == 3
+# elif I2C_BUS_NUM == 3
     // Enable i2cm3 -> pinmux E
     pinfunc = GPIO_PE_A_I2C;
     pinmuxE |= (pinfunc << 24) | (pinfunc << 28);
@@ -236,7 +239,7 @@ static inline void i2c_setup()
     if ((*pad_bias5_ptr & ((1 << 14) | (1 << 15))) != 0) {
         LOG_DRIVER_ERR("failed to disable bias for m3!\n");
     }
-#endif /* I2C_BUS_NUM */
+# endif /* I2C_BUS_NUM */
 
     // Enable i2c by removing clock gate
     clk81 |= (I2C_CLK81_BIT);
@@ -246,6 +249,7 @@ static inline void i2c_setup()
     if (!(*clk81_ptr & I2C_CLK81_BIT)) {
         LOG_DRIVER_ERR("failed to toggle clock!\n");
     }
+#endif
 
     // Initialise fields
     regs->ctl &= ~(REG_CTRL_MANUAL);       // Disable manual mode
