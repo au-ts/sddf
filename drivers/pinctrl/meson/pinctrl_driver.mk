@@ -48,7 +48,7 @@ pinctrl/pinctrl.o: $(PINCTRL_DIR)/pinctrl.c pinctrl
 	${CC} ${CFLAGS} -DCONFIG_DEBUG_BUILD -c $< -o $@
 
 pinctrl/pinctrl_config_data.o: pinctrl/pinctrl_config_data.s
-	${AS} $< -o $@
+	${AS} ${ASFLAGS} $< -o $@
 
 pinctrl/pinctrl_config_data.s:
 	${PYTHON} ${PINCTRL_DIR}/create_pinctrl_config.py ${SOC} ${DTS_FILE} pinctrl
