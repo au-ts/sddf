@@ -15,7 +15,6 @@ void init_clk_base(uintptr_t base_addr)
 
 static inline int regmap_update_bits(uint32_t offset, uint8_t shift, uint8_t width, uint32_t val)
 {
-    sddf_dprintf("clk_base1: 0x%x\n", clk_base);
     volatile uint32_t *clk_reg = ((void *)clk_base + offset);
     uint32_t reg_val = *clk_reg;
 
@@ -247,7 +246,6 @@ static unsigned long meson_clk_pll_recalc_rate(struct clk_hw *hw,
         uint64_t frac_rate = (uint64_t)parent_rate * frac;
         rate += DIV_ROUND_UP_ULL(frac_rate, (1 << data->frac.width));
     }
-    sddf_dprintf("n = %lu, m = %lu, frac = %lu, rate = %lu\n", n, m, frac, rate);
 
     return DIV_ROUND_UP_ULL(rate, n);
 }
