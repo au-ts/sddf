@@ -164,7 +164,7 @@ unsigned long clk_msr(unsigned long clk_mux)
 {
     volatile uint32_t *mclk_reg0 = ((void *)MSR_CLK_BASE + (MSR_CLK_REG0 << 2));
     volatile uint32_t *mclk_reg2 = ((void *)MSR_CLK_BASE + (MSR_CLK_REG2 << 2));
-    uint32_t duration = 32;
+    uint32_t duration = 640;
     uint32_t regval = 0;
 
     /* Disable continuous measurement */
@@ -195,7 +195,7 @@ unsigned long clk_msr(unsigned long clk_mux)
     while (true) {
         now_time = sddf_timer_time_now(TIMER_CH);
 
-        if ((now_time - start_time) > 100000) {
+        if ((now_time - start_time) > 1000000) {
             break;
         }
         /* TODO: Could be optimised via timeouts */
