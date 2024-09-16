@@ -28,6 +28,7 @@ extern const struct clk_ops clk_regmap_gate_ops;
 extern const struct clk_ops clk_regmap_gate_ro_ops;
 extern const struct clk_ops clk_regmap_divider_ops;
 extern const struct clk_ops clk_regmap_divider_ro_ops;
+extern const struct clk_ops clk_regmap_mux_ops;
 extern const struct clk_ops clk_regmap_mux_ro_ops;
 extern const struct clk_ops clk_fixed_factor_ops;
 extern const struct clk_ops meson_clk_pll_ro_ops;

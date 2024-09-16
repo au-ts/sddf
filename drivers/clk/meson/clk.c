@@ -113,8 +113,36 @@ static struct clk g12a_fclk_div4 = {
     },
 };
 
+static struct clk g12a_fclk_div5_div = {
+    .data = &(struct clk_fixed_factor_data) {
+        .mult = 1,
+        .div = 5,
+    },
+    .hw.init = &(struct clk_init_data){
+        .name = "fclk_div5_div",
+        .ops = &clk_fixed_factor_ops,
+        .parent_hws = (const struct clk_hw *[]) { &g12a_fixed_pll.hw },
+        .num_parents = 1,
+    },
+};
+
+static struct clk g12a_fclk_div5 = {
+    .data = &(struct clk_gate_data){
+        .offset = HHI_FIX_PLL_CNTL1,
+        .bit_idx = 22,
+    },
+    .hw.init = &(struct clk_init_data){
+        .name = "fclk_div5",
+        .ops = &clk_regmap_gate_ops,
+        .parent_hws = (const struct clk_hw *[]) {
+            &g12a_fclk_div5_div.hw
+        },
+        .num_parents = 1,
+    },
+};
+
 /* static uint32_t mux_table_clk81[]    = { 0, 2, 3, 4, 5, 6, 7 }; */
-static uint32_t mux_table_clk81[]    = { 0, 5 };
+static uint32_t mux_table_clk81[]    = { 0, 5, 7 };
 static const struct clk_parent_data clk81_parent_data[] = {
     { .fw_name = "xtal", },
 /*     { .hw = &g12a_fclk_div7.hw }, */
@@ -122,7 +150,7 @@ static const struct clk_parent_data clk81_parent_data[] = {
 /*     { .hw = &g12a_mpll2.hw }, */
     { .hw = &g12a_fclk_div4.hw },
 /*     { .hw = &g12a_fclk_div3.hw }, */
-/*     { .hw = &g12a_fclk_div5.hw }, */
+    { .hw = &g12a_fclk_div5.hw },
 };
 
 static struct clk g12a_mpeg_clk_sel = {
@@ -134,7 +162,7 @@ static struct clk g12a_mpeg_clk_sel = {
     },
     .hw.init = &(struct clk_init_data) {
         .name = "mpeg_clk_sel",
-        .ops = &clk_regmap_mux_ro_ops,
+        .ops = &clk_regmap_mux_ops,
         .parent_data = clk81_parent_data,
         .num_parents = ARRAY_SIZE(clk81_parent_data),
     }
@@ -277,7 +305,7 @@ static struct clk_hw *sm1_clks[] = {
     /* [CLKID_FCLK_DIV2]        = &g12a_fclk_div2.hw, */
     /* [CLKID_FCLK_DIV3]        = &g12a_fclk_div3.hw, */
     [CLKID_FCLK_DIV4]        = &g12a_fclk_div4.hw,
-    /* [CLKID_FCLK_DIV5]        = &g12a_fclk_div5.hw, */
+    [CLKID_FCLK_DIV5]        = &g12a_fclk_div5.hw,
     /* [CLKID_FCLK_DIV7]        = &g12a_fclk_div7.hw, */
     /* [CLKID_FCLK_DIV2P5]        = &g12a_fclk_div2p5.hw, */
     /* [CLKID_GP0_PLL]            = &g12a_gp0_pll.hw, */
@@ -349,7 +377,7 @@ static struct clk_hw *sm1_clks[] = {
     /* [CLKID_FCLK_DIV2_DIV]        = &g12a_fclk_div2_div, */
     /* [CLKID_FCLK_DIV3_DIV]        = &g12a_fclk_div3_div, */
     [CLKID_FCLK_DIV4_DIV]        = &g12a_fclk_div4_div.hw,
-    /* [CLKID_FCLK_DIV5_DIV]        = &g12a_fclk_div5_div, */
+    [CLKID_FCLK_DIV5_DIV]        = &g12a_fclk_div5_div.hw,
     /* [CLKID_FCLK_DIV7_DIV]        = &g12a_fclk_div7_div, */
     /* [CLKID_FCLK_DIV2P5_DIV]        = &g12a_fclk_div2p5_div, */
     /* [CLKID_HIFI_PLL]        = &g12a_hifi_pll, */
@@ -616,7 +644,8 @@ static struct clk *const g12a_clk_regmaps[] = {
     /* &g12a_fclk_div3, */
     &g12a_fclk_div4,
     &g12a_fclk_div4_div,
-    /* &g12a_fclk_div5, */
+    &g12a_fclk_div5,
+    &g12a_fclk_div5_div,
     /* &g12a_fclk_div7, */
     /* &g12a_fclk_div2p5, */
     /* &g12a_dma, */
@@ -824,7 +853,7 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
-	init_clk_base(clk_regs);
+    init_clk_base(clk_regs);
 
     sddf_dprintf("-----------------\n");
     volatile uint32_t *clk_i2c_ptr = ((void *)clk_regs + I2C_CLK_OFFSET);
@@ -845,11 +874,18 @@ void init(void)
 
     sddf_dprintf("-----------------\n");
 
-    struct clk_hw *clk81_hw = sm1_clks[CLKID_CLK81];
-    uint64_t ret = clk_recalc_rate(clk81_hw);
-    sddf_dprintf("Clock %s rate: %llu\n", clk81_hw->init->name, ret);
+    struct clk_hw *mpeg_sel_hw = sm1_clks[CLKID_MPEG_SEL];
+    /* uint8_t ret = mpeg_sel_hw->init->ops->get_parent(mpeg_sel_hw); */
+    int ret = mpeg_sel_hw->init->ops->set_parent(mpeg_sel_hw, 2);
+    uint64_t rate = clk_recalc_rate(mpeg_sel_hw);
+    sddf_dprintf("MEPG_SEL clock rate: %llu\n", rate);
 
-	clk_msr_stat();
+    struct clk_hw *clk81_hw = sm1_clks[CLKID_CLK81];
+    rate = clk_recalc_rate(clk81_hw);
+    sddf_dprintf("Clock %s rate: %llu\n", clk81_hw->init->name, rate);
+
+    clk_msr_stat();
 
     sddf_dprintf("-----------------\n");
+
 }

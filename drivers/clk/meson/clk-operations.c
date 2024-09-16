@@ -39,6 +39,21 @@ static inline int regmap_read_bits(uint32_t offset, uint8_t shift, uint8_t width
     return reg_val;
 }
 
+static inline int regmap_mux_update_bits(uint32_t offset, uint8_t shift, uint32_t mask, uint32_t val)
+{
+    volatile uint32_t *clk_reg = ((void *)clk_base + offset);
+    uint32_t reg_val = *clk_reg;
+
+    reg_val &= ~(mask << shift);
+    reg_val |= ((mask & val) << shift);
+
+    *clk_reg = reg_val;
+
+    /* TODO: Check if the register has been updated correctly */
+
+    return 0;
+}
+
 static inline int regmap_mux_read_bits(uint32_t offset, uint8_t shift, uint32_t mask)
 {
     volatile uint32_t *clk_reg = ((void *)clk_base + offset);
@@ -195,9 +210,21 @@ static uint8_t clk_regmap_mux_get_parent(struct clk_hw *hw)
     return 0;
 }
 
-static struct clk_ops clk_regmap_mux_ops = {
+static int clk_regmap_mux_set_parent(struct clk_hw *hw, uint8_t index)
+{
+    struct clk_mux_data *data = (struct clk_mux_data *)(hw->clk->data);
+
+    if (data->table) {
+        unsigned int val = data->table[index];
+        regmap_mux_update_bits(data->offset, data->shift, data->mask, val);
+    }
+
+    return 0;
+}
+
+const struct clk_ops clk_regmap_mux_ops = {
     .get_parent = clk_regmap_mux_get_parent,
-    /* .set_parent = clk_regmap_mux_set_parent, */
+    .set_parent = clk_regmap_mux_set_parent,
     /* .determine_rate = clk_regmap_mux_determine_rate, */
 };
 

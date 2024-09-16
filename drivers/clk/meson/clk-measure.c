@@ -8,10 +8,14 @@
 #include <sddf/util/printf.h>
 #include <sddf/timer/client.h>
 
-/*
- * Same as above but for u64 dividends. divisor must be a 32-bit
- * number.
- */
+#define TIMER_CH 1
+
+#define MSR_CLK_BASE 0x03300000
+#define MSR_CLK_DUTY 0x00
+#define MSR_CLK_REG0 0x01
+#define MSR_CLK_REG1 0x02
+#define MSR_CLK_REG2 0x03
+
 #define DIV_ROUND_CLOSEST_ULL(x, divisor)(        \
 {                                                 \
     typeof(divisor) __d = divisor;                \
@@ -151,14 +155,6 @@ static const char *const sm1_table[] = {
     [126] = "csi_phy0_clk_out",
     [127] = "clk_csi2_data",
 };
-
-#define MSR_CLK_BASE 0x03300000
-#define MSR_CLK_DUTY 0x00
-#define MSR_CLK_REG0 0x01
-#define MSR_CLK_REG1 0x02
-#define MSR_CLK_REG2 0x03
-
-#define TIMER_CH 1
 
 unsigned long clk_msr(unsigned long clk_mux)
 {
