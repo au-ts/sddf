@@ -75,7 +75,7 @@ REPORT_FILE = report.txt
 ifeq ($(ARCH),aarch64)
 	CFLAGS += -mcpu=$(CPU) -mstrict-align -target aarch64-none-elf
 else ifeq ($(ARCH),riscv64)
-	CFLAGS += -march=rv64imafdc -target riscv64-none-elf -DPRINTF_DISABLE_SUPPORT_FLOAT
+	CFLAGS += -march=rv64imafdc -target riscv64-none-elf
 endif
 CFLAGS += -I$(BOARD_DIR)/include \
 	-I${TOP}/include	\
