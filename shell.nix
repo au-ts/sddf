@@ -12,7 +12,7 @@ in
         llvm.lld
         llvm.libllvm
         dosfstools
-
+        pkgsCross.riscv64-embedded.buildPackages.gcc
         # for git-clang-format. nix is weird.
         llvm.libclang.python
     ];
