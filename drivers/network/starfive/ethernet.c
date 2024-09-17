@@ -104,7 +104,7 @@ static void rx_provide()
 
             rx.descr_mdata[rx.tail] = buffer;
             update_ring_slot(&rx, rx.tail, (uint32_t) (buffer.io_or_offset & 0xffffffff),
-                            (uint32_t) (buffer.io_or_offset >> 32), 0, (uint32_t) (DESC_RXSTS_OWNBYDMA | BIT(24) | BIT(30)));
+                            (uint32_t) (buffer.io_or_offset >> 32), 0, (uint32_t) (DESC_RXSTS_OWNBYDMA | DESC_RXSTS_BUFFER1_ADDR_VALID | DESC_RXSTS_IOC));
             /* We will update the hardware register that stores the tail address. This tells
             the device that we have new descriptors to use. */
             THREAD_MEMORY_RELEASE();
@@ -140,7 +140,7 @@ static void rx_return(void)
 
             rx.descr_mdata[rx.tail] = buffer;
             update_ring_slot(&rx, rx.tail, (uint32_t) (buffer.io_or_offset & 0xffffffff),
-                            (uint32_t) (buffer.io_or_offset >> 32), 0, (uint32_t) (DESC_RXSTS_OWNBYDMA | BIT(24) | BIT(30)));
+                            (uint32_t) (buffer.io_or_offset >> 32), 0, (uint32_t) (DESC_RXSTS_OWNBYDMA | DESC_RXSTS_BUFFER1_ADDR_VALID | DESC_RXSTS_IOC));
 
             /* We will update the hardware register that stores the tail address. This tells
             the device that we have new descriptors to use. */
