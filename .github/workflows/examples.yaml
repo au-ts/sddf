@@ -30,10 +30,9 @@ jobs:
           tar xf aarch64-toolchain.tar.gz
           echo "$(pwd)/arm-gnu-toolchain-11.3.rel1-x86_64-aarch64-none-elf/bin" >> $GITHUB_PATH
       - name: Install Zig
-        run: |
-          wget https://ziglang.org/download/0.13.0/zig-linux-x86_64-0.13.0.tar.xz
-          tar xf zig-linux-x86_64-0.13.0.tar.xz
-          echo "${PWD}/zig-linux-x86_64-0.13.0/:$PATH" >> $GITHUB_PATH
+        uses: mlugg/setup-zig@v1.2.0
+        with:
+          version: 0.13.0
       - name: Build and run examples
         run: ./ci/examples.sh ${PWD}/microkit-sdk-1.4.1
         shell: bash
@@ -52,10 +51,9 @@ jobs:
           brew install llvm make
           echo "/usr/local/opt/llvm/bin:$PATH" >> $GITHUB_PATH
       - name: Install Zig
-        run: |
-          wget https://ziglang.org/download/0.13.0/zig-macos-x86_64-0.13.0.tar.xz
-          tar xf zig-macos-x86_64-0.13.0.tar.xz
-          echo "${PWD}/zig-macos-x86_64-0.13.0/:$PATH" >> $GITHUB_PATH
+        uses: mlugg/setup-zig@v1.2.0
+        with:
+          version: 0.13.0
       - name: Download and install AArch64 GCC toolchain
         run: |
           wget -O aarch64-toolchain.tar.gz https://trustworthy.systems/Downloads/microkit/arm-gnu-toolchain-11.3.rel1-darwin-x86_64-aarch64-none-elf.tar.xz%3Frev%3D51c39c753f8c4a54875b7c5dccfb84ef
