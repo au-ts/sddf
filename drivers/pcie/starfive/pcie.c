@@ -65,6 +65,45 @@ void device_print(uint8_t bus, uint8_t device, uint8_t function)
     sddf_dprintf("revision ID: 0x%02x\n", header->revision_id);
     sddf_dprintf("base-class code: 0x%02x | sub-class code: 0x%02x\n", header->base_class_code, header->subclass_code);
     sddf_dprintf("header type: 0x%02x\n", header->header_type);
+
+    sddf_dprintf("\thas multi-functions: %s\n", header->header_type & PCIE_HEADER_TYPE_HAS_MULTI_FUNCTIONS ? "yes" : "no");
+    sddf_dprintf("\tlayout variant: 0x%02x\n", header->header_type & PCIE_HEADER_TYPE_LAYOUT_MASK);
+
+    if ((header->header_type & PCIE_HEADER_TYPE_LAYOUT_MASK) == PCIE_HEADER_TYPE_GENERAL) {
+        pcie_header_type0_t *type0_header = (pcie_header_type0_t *)config_base;
+        for (int i = 0; i < 6; i++) {
+            uint32_t bar = type0_header->base_address_registers[i];
+            sddf_dprintf("BAR%01d: 0x%08x\n", i, bar);
+            if (bar == 0) {
+                sddf_dprintf("\tunimplemented\n");
+                continue;
+            }
+
+            /* TODO: Page 226-227, setting, and then reading with dual 64-bit ones */
+
+            if (bar & BIT(0)) {
+                sddf_dprintf("\tbase address for I/O\n");
+                sddf_dprintf("\taddress: 0x%08x\n", bar & ~(BIT(0) | BIT(1)));
+            } else {
+                sddf_dprintf("\tbase address for memory\n");
+                sddf_dprintf("\ttype: ");
+                switch ((bar & (BIT(1) | BIT(2))) >> 1) {
+                    case 0b00:
+                        sddf_dprintf("32-bit space\n");
+                        break;
+
+                    case 0b10:
+                        sddf_dprintf("64-bit space\n");
+                        break;
+
+                    default:
+                        sddf_dprintf("reserved\n");
+                }
+                sddf_dprintf("\tprefetchable: %s\n", bar & BIT(3) ? "yes" : "no");
+                sddf_dprintf("\taddress: %08x\n", bar & ~(BIT(4) - 1));
+            }
+        }
+    }
 }
 
 void init()

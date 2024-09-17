@@ -55,3 +55,31 @@ typedef struct pcie_header {
 _Static_assert(sizeof(pcie_header_t) == 16, "PCI Common Configuration Space Header must be 16 bytes");
 
 #define PCIE_VENDOR_INVALID 0xffff
+
+#define PCIE_HEADER_TYPE_HAS_MULTI_FUNCTIONS BIT(7)
+
+#define PCIE_HEADER_TYPE_LAYOUT_MASK    (BIT(7) - 1)
+#define PCIE_HEADER_TYPE_GENERAL        0x00
+#define PCIE_HEADER_TYPE_PCI_PCI_BRIDGE 0x01
+
+/* [PCIe-2.0] §7.5.2 Type 0 Configuration Space Header */
+typedef struct pcie_header_type0 {
+    pcie_header_t common_header;
+   /* [PCI-3.0] 6.2.5. Base Addresses
+      Base Address Registers (BAR) can be 32-bit (1 slot) or 64-bit (2 slots).
+   */
+    uint32_t base_address_registers[6];
+   /* Points to the Card Information Structure (CIS) for a CardBus card. */
+    uint32_t cardbus_cis_pointer;
+    uint16_t subsystem_vendor_id;
+    uint16_t subsystem_id;
+    uint32_t expansion_rom_base_address;
+    uint8_t capabilities_pointer;
+    uint8_t _reserved[7];
+    uint8_t interrupt_line;
+    uint8_t interrupt_pin;
+    uint8_t min_gnt;
+    uint8_t max_lat;
+} __attribute__((packed)) pcie_header_type0_t;
+
+_Static_assert(sizeof(pcie_header_type0_t) == 64, "Type 0 Configuration Space Header must be 64 bytes");
