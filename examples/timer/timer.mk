@@ -29,7 +29,7 @@ IMAGES := timer_driver.elf client.elf
 ifeq ($(ARCH),aarch64)
 	CFLAGS_ARCH := -mcpu=$(CPU) -mstrict-align -target aarch64-none-elf
 else ifeq ($(ARCH),riscv64)
-	CFLAGS_ARCH := -march=rv64imafdc -target riscv64-none-elf -DPRINTF_DISABLE_SUPPORT_FLOAT
+	CFLAGS_ARCH := -march=rv64imafdc -target riscv64-none-elf
 endif
 
 CFLAGS := -nostdlib \
