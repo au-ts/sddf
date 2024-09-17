@@ -319,7 +319,7 @@ static void eth_init()
     // of the control packets.
     *MAC_REG(GMAC_QX_TX_FLOW_CTRL(0)) = 0;
 
-    // Program all other approrpriate fields in MAC_CONFIGURATION
+    // Program all other appropriate fields in MAC_CONFIGURATION
     //       (ie. inter-packet gap, jabber disable).
     uint32_t conf = *MAC_REG(GMAC_CONFIG);
     // // Set full duplex mode
