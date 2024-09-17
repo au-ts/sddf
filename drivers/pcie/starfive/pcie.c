@@ -42,6 +42,21 @@ void device_print(uint8_t bus, uint8_t device, uint8_t function)
         return;
     }
 
+    /*
+        See: plda_pcie_addr_valid() in U-Boot
+        https://lore.kernel.org/u-boot/20230423105859.125764-2-minda.chen@starfivetech.com/
+
+        In the secondary bus of host bridge, can only access bus device 0;
+        all other devices are duplicates of device 0.
+
+        @todo there appears to be some way to change the secondary bus number?
+              see e.g. plda_pcie_config_write()
+              so it might not always be bus number 1.
+    */
+    if (bus == 1 && device > 0) {
+        return;
+    }
+
     sddf_dprintf("\nB.D:F: %02x:%02x.%01x\n", bus, device, function);
     sddf_dprintf("vendor ID: 0x%04x\n", header->vendor_id);
     sddf_dprintf("device ID: 0x%04x\n", header->device_id);
