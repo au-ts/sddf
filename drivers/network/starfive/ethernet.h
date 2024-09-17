@@ -491,7 +491,8 @@ register map outlined in the imx8mp TRM. */
 
 /* Rx status bit definitions */
 #define DESC_RXSTS_OWNBYDMA         (1 << 31)           /* Descriptor is owned by the DMA of the GMAC Subsystem. */
-#define DESC_RXSTS_DAFILTERFAIL     (1 << 30)           /* Frame that failed in the DA Filter in the GMAC Core. */
+#define DESC_RXSTS_BUFFER1_ADDR_VALID (1 << 24)			/* Indicates to the DMA that the buffer 1 address specified in RDES1 is valid. */
+#define DESC_RXSTS_IOC     			(1 << 30)           /* Interrupt enable on completion. */
 #define DESC_RXSTS_LENMSK           (0x3fff0000)        /* Byte length of the received frame that was transferred to Host memory. */
 #define DESC_RXSTS_LENSHFT          (16)
 #define DESC_RXSTS_ERROR            (1 << 15)           /* Error Summary. */
