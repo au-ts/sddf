@@ -8,12 +8,7 @@
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 
-/*
-    References:
-
-    [PCIe-2.0] PCI Express 2.0 Base Specification Revision 0.9 (Sep 11, 2006).
-        https://community.intel.com/cipcp26785/attachments/cipcp26785/fpga-intellectual-property/8220/1/PCI_Express_Base_Specification_v20.pdf
-*/
+#include "pcie.h"
 
 void *pcie_regs;
 
@@ -40,22 +35,21 @@ uintptr_t get_bdf_offset(uint8_t bus, uint8_t device, uint8_t function)
 
 void device_print(uint8_t bus, uint8_t device, uint8_t function)
 {
-    void *base = (void *)(pcie_config + get_bdf_offset(bus, device, function));
-    uint16_t vendor_id = *(uint16_t *)(&base[0x0]);
-    if (vendor_id == 0xffff) {
+    void *config_base = (void *)(pcie_config + get_bdf_offset(bus, device, function));
+    pcie_header_t *header = (pcie_header_t *)config_base;
+
+    if (header->vendor_id == PCIE_VENDOR_INVALID) {
         return;
     }
 
-    sddf_dprintf("\nB.D.F: %02x.%02x.%01x\n", bus, device, function);
-    sddf_dprintf("vendor ID: 0x%04x\n", vendor_id);
-    sddf_dprintf("device ID: 0x%04x\n", *(uint16_t *)(&base[0x2]));
-    sddf_dprintf("command register: 0x%04x\n", *(uint16_t *)(&base[0x4]));
-    sddf_dprintf("status register: 0x%04x\n", *(uint16_t *)(&base[0x6]));
-    sddf_dprintf("class code | revision ID: 0x%04x\n", *(uint32_t *)(&base[0x8]));
-    // sddf_dprintf("cache line size: 0x%02x\n", base[0xC]);
-    // sddf_dprintf("master latency timer: 0x%02x\n", base[0xD]);
-    sddf_dprintf("header type: 0x%02x\n", *(uint8_t *)(&base[0xE]));
-    sddf_dprintf("BIST: 0x%02x\n", *(uint8_t *)(&base[0xF]));
+    sddf_dprintf("\nB.D:F: %02x:%02x.%01x\n", bus, device, function);
+    sddf_dprintf("vendor ID: 0x%04x\n", header->vendor_id);
+    sddf_dprintf("device ID: 0x%04x\n", header->device_id);
+    sddf_dprintf("command register: 0x%04x\n", header->command);
+    sddf_dprintf("status register: 0x%04x\n", header->status);
+    sddf_dprintf("revision ID: 0x%02x\n", header->revision_id);
+    sddf_dprintf("base-class code: 0x%02x | sub-class code: 0x%02x\n", header->base_class_code, header->subclass_code);
+    sddf_dprintf("header type: 0x%02x\n", header->header_type);
 }
 
 void init()
@@ -76,7 +70,7 @@ void init()
     }
 
 out:
-    sddf_dprintf("Done\n");
+    sddf_dprintf("\n\nPCIE_ENUM_COMPLETE\n");
 }
 
 void notified(microkit_channel ch)
