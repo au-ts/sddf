@@ -32,7 +32,7 @@ else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
 	QEMU := qemu-system-aarch64
 	export ARCH := aarch64
 else ifeq ($(strip $(MICROKIT_BOARD)), star64)
-	export DRIV_DIR := starfive
+	export DRIV_DIR := dwmac-5.10a
 	export UART_DRIV_DIR := snps
 	export TIMER_DRV_DIR := jh7110
 	export ARCH := riscv64
