@@ -8,7 +8,8 @@
 #
 # NOTES
 #  Generates pinctrl.elf
-#  Has 3 parameters: 
+#  Has 4 parameters: 
+#    SDDF: path to sddf root
 #    PYTHON
 #    DTS_FILE: absolute path to the device tree source file.
 #    SOC: System-on-Chip name that referenced by the pinmux device in DTS.
@@ -41,11 +42,14 @@ endif
 
 PINCTRL_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 
+# Include this in your client as well
+CHIP_HEADER_INC := -I$(SDDF)/include/sddf/pinctrl/board/meson
+
 pinctrl_driver.elf: pinctrl/pinctrl.o pinctrl/pinctrl_config_data.o
 	${LD} ${LDFLAGS} $^ ${LIBS} -o $@
 
 pinctrl/pinctrl.o: $(PINCTRL_DIR)/pinctrl.c pinctrl
-	${CC} ${CFLAGS} -DCONFIG_DEBUG_BUILD -c $< -o $@
+	${CC} ${CFLAGS} ${CHIP_HEADER_INC} -DCONFIG_DEBUG_BUILD -c $< -o $@
 
 pinctrl/pinctrl_config_data.o: pinctrl/pinctrl_config_data.s
 	${AS} ${ASFLAGS} $< -o $@
