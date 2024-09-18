@@ -7,7 +7,7 @@
  * Linux kernel. The licenses of all input files to this process
  * are compatible with GPL-2.0-only.
  *
- * This file came from the seL4 kernel with the i2c2 patched to enable it
+ * This file came from the seL4 kernel with the i2c2 and hdmicec patched to enable
  */
 
 /dts-v1/;
@@ -359,6 +359,7 @@
 					};
 
 					cec_ao_a_h {
+						phandle = <0x1a>;
 
 						mux {
 							groups = "cec_ao_a_h";
@@ -2367,9 +2368,12 @@
 				compatible = "amlogic,meson-gx-ao-cec";
 				reg = <0x00 0x100 0x00 0x14>;
 				interrupts = <0x00 0xc7 0x01>;
-				clocks = <0x23 0x1b>;
+				clocks = <0x19 0x1b>;
 				clock-names = "core";
 				status = "disabled";
+				pinctrl-0 = <0x1a>;
+				pinctrl-names = "default";
+				hdmi-phandle = <0x1b>;
 			};
 
 			ao-secure@140 {
