@@ -110,7 +110,7 @@ bool test_basic()
     }
     default:
         LOG_CLIENT_ERR("internal error, invalid state\n");
-        while (1) {}
+        assert(false);
     }
 
     return false;

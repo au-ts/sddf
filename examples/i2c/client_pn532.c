@@ -95,14 +95,14 @@ void client_main(void)
     uint8_t write_fail = pn532_write_command(header, 1, NULL, 0, DEFAULT_READ_ACK_FRAME_RETRIES);
     if (write_fail) {
         LOG_CLIENT_ERR("failed to write PN532_CMD_GETFIRMWAREVERSION\n");
-        while (1) {};
+        assert(false);
     }
 
     uint8_t response_buffer[6];
     uint8_t read_fail = pn532_read_response(response_buffer, 6, DEFAULT_READ_RESPONSE_RETRIES);
     if (read_fail) {
         LOG_CLIENT_ERR("failed to read response for PN532_CMD_GETFIRMWAREVERSION\n");
-        while (1) {};
+        assert(false);
     }
 
     LOG_CLIENT("read response!\n");
@@ -120,12 +120,12 @@ void client_main(void)
     write_fail = pn532_write_command(passive_header, 5, NULL, 0, DEFAULT_READ_ACK_FRAME_RETRIES);
     if (write_fail) {
         LOG_CLIENT_ERR("failed to write PN532_CMD_RFCONFIGURATION\n");
-        while (1) {};
+        assert(false);
     }
     read_fail = pn532_read_response(big_buf, 64, DEFAULT_READ_RESPONSE_RETRIES);
     if (read_fail) {
         LOG_CLIENT_ERR("failed to read response for PN532_CMD_RFCONFIGURATION\n");
-        while (1) {};
+        assert(false);
     }
 
     LOG_CLIENT("SAM configure\n");
@@ -137,12 +137,12 @@ void client_main(void)
     write_fail = pn532_write_command(sam_config_header, 4, NULL, 0, DEFAULT_READ_ACK_FRAME_RETRIES);
     if (write_fail) {
         LOG_CLIENT_ERR("failed to write PN532_CMD_SAMCONFIGURATION\n");
-        while (1) {};
+        assert(false);
     }
     read_fail = pn532_read_response(big_buf, 64, DEFAULT_READ_RESPONSE_RETRIES);
     if (read_fail) {
         LOG_CLIENT_ERR("failed to read response for PN532_CMD_RFCONFIGURATION\n");
-        while (1) {};
+        assert(false);
     }
 
     LOG_CLIENT("waiting for card!\n");
