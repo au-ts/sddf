@@ -42,8 +42,13 @@ if __name__ == "__main__":
         if "status" in props and "clocks" in props:
             status = node.props["status"].to_string()
             if status == "okay":
-                print(node.name, node.props["clocks"].to_nums())
+                clocks = []
+                max_frequency = []
+                assigned_clock_rates = []
+                if "clocks" in props:
+                    clocks = node.props["clocks"].to_nums()
                 if "max-frequency" in props:
-                    print(node.props["max_frequency"].to_nums())
+                    max_frequency = node.props["max-frequency"].to_nums()
                 if "assigend-clock-rates" in props:
-                    print(node.props["assigned-clock-rates"].to_nums())
+                    assigned_clock_rates = node.props["assigned-clock-rates"].to_nums()
+                print("{} - clocks: {}, max-frequency: {}, assigned_clock-rates: {}".format(node.name, clocks, max_frequency, assigned_clock_rates))

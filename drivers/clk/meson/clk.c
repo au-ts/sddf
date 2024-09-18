@@ -70,6 +70,10 @@ static struct clk g12a_fixed_pll = {
         .offset = HHI_FIX_PLL_CNTL0,
         .shift = 16,
         .width = 2,
+        /*
+         * This clock won't ever change at runtime so
+         * CLK_SET_RATE_PARENT is not required
+         */
         .flags = CLK_DIVIDER_POWER_OF_TWO,
     },
     .hw.init = &(struct clk_init_data){
@@ -357,6 +361,24 @@ struct clk _name = {                                         \
     },                                                       \
 }
 
+#define MESON_GATE_RO(_name, _reg, _bit)                        \
+struct clk _name = {                                         \
+    .data = &(struct clk_gate_data) {                        \
+        .offset = (_reg),                                    \
+        .bit_idx = (_bit),                                   \
+        .flags = 0,                                          \
+    },                                                       \
+    .hw.init = &(struct clk_init_data) {                     \
+        .name = #_name,                                      \
+        .ops = &clk_regmap_gate_ro_ops,                      \
+        .parent_hws = (const struct clk_hw *[]) {            \
+            &g12a_clk81.hw,                                  \
+        },                                                   \
+        .num_parents = 1,                                    \
+        .flags = 0,                                          \
+    },                                                       \
+}
+
 /* Everything Else (EE) domain gates */
 static MESON_GATE(g12a_ddr,            HHI_GCLK_MPEG0,    0);
 static MESON_GATE(g12a_dos,            HHI_GCLK_MPEG0,    1);
@@ -429,11 +451,11 @@ static MESON_GATE(g12a_vclk2_venclmmc,        HHI_GCLK_OTHER,    24);
 static MESON_GATE(g12a_vclk2_vencl,        HHI_GCLK_OTHER,    25);
 static MESON_GATE(g12a_vclk2_other1,        HHI_GCLK_OTHER,    26);
 
-/* static MESON_GATE_RO(g12a_dma,            HHI_GCLK_OTHER2, 0); */
-/* static MESON_GATE_RO(g12a_efuse,        HHI_GCLK_OTHER2, 1); */
-/* static MESON_GATE_RO(g12a_rom_boot,        HHI_GCLK_OTHER2, 2); */
-/* static MESON_GATE_RO(g12a_reset_sec,        HHI_GCLK_OTHER2, 3); */
-/* static MESON_GATE_RO(g12a_sec_ahb_apb3,        HHI_GCLK_OTHER2, 4); */
+static MESON_GATE_RO(g12a_dma,            HHI_GCLK_OTHER2, 0);
+static MESON_GATE_RO(g12a_efuse,        HHI_GCLK_OTHER2, 1);
+static MESON_GATE_RO(g12a_rom_boot,        HHI_GCLK_OTHER2, 2);
+static MESON_GATE_RO(g12a_reset_sec,        HHI_GCLK_OTHER2, 3);
+static MESON_GATE_RO(g12a_sec_ahb_apb3,        HHI_GCLK_OTHER2, 4);
 
 static struct clk_hw *sm1_clks[] = {
     /* [CLKID_SYS_PLL]            = &g12a_sys_pll.hw, */
@@ -540,11 +562,11 @@ static struct clk_hw *sm1_clks[] = {
     /* [CLKID_SYS_PLL_DCO]        = &g12a_sys_pll_dco, */
     /* [CLKID_GP0_PLL_DCO]        = &g12a_gp0_pll_dco, */
     /* [CLKID_HIFI_PLL_DCO]        = &g12a_hifi_pll_dco, */
-    /* [CLKID_DMA]            = &g12a_dma, */
-    /* [CLKID_EFUSE]            = &g12a_efuse, */
-    /* [CLKID_ROM_BOOT]        = &g12a_rom_boot, */
-    /* [CLKID_RESET_SEC]        = &g12a_reset_sec, */
-    /* [CLKID_SEC_AHB_APB3]        = &g12a_sec_ahb_apb3, */
+    [CLKID_DMA]            = &g12a_dma.hw,
+    [CLKID_EFUSE]            = &g12a_efuse.hw,
+    [CLKID_ROM_BOOT]        = &g12a_rom_boot.hw,
+    [CLKID_RESET_SEC]        = &g12a_reset_sec.hw,
+    [CLKID_SEC_AHB_APB3]        = &g12a_sec_ahb_apb3.hw,
     /* [CLKID_MPLL_PREDIV]        = &g12a_mpll_prediv, */
     /* [CLKID_VPU_0_SEL]        = &g12a_vpu_0_sel, */
     /* [CLKID_VPU_0_DIV]        = &g12a_vpu_0_div, */
@@ -787,11 +809,11 @@ static struct clk *const g12a_clk_regmaps[] = {
     &g12a_fclk_div7,
     &g12a_fclk_div7_div,
     /* &g12a_fclk_div2p5, */
-    /* &g12a_dma, */
-    /* &g12a_efuse, */
-    /* &g12a_rom_boot, */
-    /* &g12a_reset_sec, */
-    /* &g12a_sec_ahb_apb3, */
+    &g12a_dma,
+    &g12a_efuse,
+    &g12a_rom_boot,
+    &g12a_reset_sec,
+    &g12a_sec_ahb_apb3,
     /* &g12a_vpu_0_sel, */
     /* &g12a_vpu_0_div, */
     /* &g12a_vpu_0, */
