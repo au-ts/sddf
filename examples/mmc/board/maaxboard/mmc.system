@@ -24,9 +24,9 @@
         <irq irq="54" id="1"  />
 
         <!-- sDDF block -->
-        <map mr="blk_driver_config" vaddr="0x40000000" perms="rw" cached="false" setvar_vaddr="blk_config"     />
-        <map mr="blk_driver_req"    vaddr="0x40200000" perms="rw" cached="false" setvar_vaddr="blk_req_queue"  />
-        <map mr="blk_driver_resp"   vaddr="0x40400000" perms="rw" cached="false" setvar_vaddr="blk_resp_queue" />
+        <map mr="blk_driver_config" vaddr="0x40000000" perms="rw" cached="false" setvar_vaddr="blk_storage_info" />
+        <map mr="blk_driver_req"    vaddr="0x40200000" perms="rw" cached="false" setvar_vaddr="blk_req_queue"    />
+        <map mr="blk_driver_resp"   vaddr="0x40400000" perms="rw" cached="false" setvar_vaddr="blk_resp_queue"   />
     </protection_domain>
 
     <protection_domain name="timer" priority="101" pp="true" passive="true">

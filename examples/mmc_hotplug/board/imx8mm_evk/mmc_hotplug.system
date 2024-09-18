@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Copyright 2024, UNSW
+    SPDX-License-Identifier: BSD-2-Clause
+-->
+<system>
+    <!-- Device Driver Regions -->
+    <memory_region name="timer"  size="0x10_000" phys_addr="0x302d_0000" />
+    <memory_region name="usdhc2" size="0x10_000" phys_addr="0x30b5_0000" />
+    <memory_region name="uart"   size="0x1000"   phys_addr="0x3089_0000" />
+    <memory_region name="gpio1"  size="0x1000"   phys_addr="0x3020_0000" />
+
+    <!-- sDDF Block -->
+    <memory_region name="blk_driver_config" size="0x1000"   page_size="0x1000"   />
+    <memory_region name="blk_driver_req"    size="0x200000" page_size="0x200000" />
+    <memory_region name="blk_driver_resp"   size="0x200000" page_size="0x200000" />
+    <memory_region name="blk_driver_data"   size="0x200000" page_size="0x200000" />
+
+    <memory_region name="blk_client0_config" size="0x1000"   page_size="0x1000"   />
+    <memory_region name="blk_client0_req"    size="0x200000" page_size="0x200000" />
+    <memory_region name="blk_client0_resp"   size="0x200000" page_size="0x200000" />
+    <memory_region name="blk_client0_data"   size="0x200000" page_size="0x200000" />
+
+    <memory_region name="blk_client1_config" size="0x1000"   page_size="0x1000"   />
+    <memory_region name="blk_client1_req"    size="0x200000" page_size="0x200000" />
+    <memory_region name="blk_client1_resp"   size="0x200000" page_size="0x200000" />
+    <memory_region name="blk_client1_data"   size="0x200000" page_size="0x200000" />
+
+    <!-- Hotplug -->
+    <memory_region name="hotplug_client0_info" size="0x1000" page_size="0x1000" />
+
+    <protection_domain name="mmc_driver" priority="100" pp="true">
+        <program_image path="mmc_driver.elf" />
+        <map mr="usdhc2" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="usdhc_regs" />
+        <irq irq="55" id="0"  />
+
+        <!-- sDDF block -->
+        <map mr="blk_driver_config" vaddr="0x40000000" perms="rw" cached="false" setvar_vaddr="blk_storage_info" />
+        <map mr="blk_driver_req"    vaddr="0x40200000" perms="rw" cached="false" setvar_vaddr="blk_req_queue"    />
+        <map mr="blk_driver_resp"   vaddr="0x40400000" perms="rw" cached="false" setvar_vaddr="blk_resp_queue"   />
+
+        <!-- GPIO Messing -->
+        <map mr="gpio1" vaddr="0x4_500_000" perms="r" cached="false" setvar_vaddr="gpio1_regs" />
+    </protection_domain>
+
+    <protection_domain name="timer" priority="101" pp="true" passive="true">
+        <program_image path="timer_driver.elf" />
+        <map mr="timer" vaddr="0x2_000_000" perms="rw" cached="false" setvar_vaddr="gpt_regs" />
+        <irq irq="87" id="0" />
+    </protection_domain>
+
+    <channel>
+        <end pd="timer"      id="1" />
+        <end pd="mmc_driver" id="3" />
+    </channel>
+
+    <protection_domain name="game" priority="1" >
+        <program_image path="game.elf" />
+
+        <!-- sDDF Block -->
+        <map mr="blk_client0_config" vaddr="0x30000000" perms="rw" cached="false" setvar_vaddr="blk_storage_info" />
+        <map mr="blk_client0_req"    vaddr="0x30200000" perms="rw" cached="false" setvar_vaddr="blk_req_queue"    />
+        <map mr="blk_client0_resp"   vaddr="0x30400000" perms="rw" cached="false" setvar_vaddr="blk_resp_queue"   />
+        <map mr="blk_client0_data"   vaddr="0x30600000" perms="rw" cached="false" setvar_vaddr="blk_data"         />
+
+        <!-- Hotplug -->
+        <map mr="hotplug_client0_info" vaddr="0x3500_0000" perms="r" cached="true" setvar_vaddr="hotplug_info" />
+    </protection_domain>
+
+    <channel>
+        <!-- block queue -->
+        <end pd="game"     id="0" />
+        <end pd="blk_virt" id="2" />
+    </channel>
+
+    <channel>
+        <!-- storage info -->
+        <end pd="game"     id="1" />
+        <end pd="blk_virt" id="3" />
+    </channel>
+
+    <channel>
+        <!-- safe hotplug -->
+        <end pd="game"            id="2" />
+        <end pd="plug_controller" id="5" />
+    </channel>
+
+    <!-- Plug Controller -->
+    <protection_domain name="plug_controller" priority="2" pp="true" >
+        <program_image path="plug_controller.elf" />
+
+        <!-- Serial -->
+        <map mr="rx_queue_client0" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="rx_queue" />
+        <map mr="tx_queue_client0" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="tx_queue" />
+        <map mr="rx_data_client0"  vaddr="0x4_002_000" perms="rw" cached="true" setvar_vaddr="rx_data"  />
+        <map mr="tx_data_client0"  vaddr="0x4_004_000" perms="rw" cached="true" setvar_vaddr="tx_data"  />
+
+        <!-- sDDF Block -->
+        <map mr="blk_client1_config" vaddr="0x30000000" perms="rw" cached="false" setvar_vaddr="blk_storage_info" />
+        <map mr="blk_client1_req"    vaddr="0x30200000" perms="rw" cached="false" setvar_vaddr="blk_req_queue"    />
+        <map mr="blk_client1_resp"   vaddr="0x30400000" perms="rw" cached="false" setvar_vaddr="blk_resp_queue"   />
+        <map mr="blk_client1_data"   vaddr="0x30600000" perms="rw" cached="false" setvar_vaddr="blk_data"         />
+
+        <!-- Hotplug -->
+        <map mr="hotplug_client0_info" vaddr="0x3500_0000" perms="rw" cached="true" setvar_vaddr="hotplug_client0_info" />
+    </protection_domain>
+
+    <channel>
+        <end pd="serial_virt_tx" id="1"/>
+        <end pd="plug_controller" id="1"/>
+    </channel>
+
+    <channel>
+        <end pd="serial_virt_rx" id="1"/>
+        <end pd="plug_controller" id="2"/>
+    </channel>
+
+    <channel>
+        <!-- block queues -->
+        <end pd="plug_controller" id="3" />
+        <end pd="blk_virt"        id="4" />
+    </channel>
+
+    <channel>
+        <!-- storage info -->
+        <end pd="plug_controller" id="4" />
+        <end pd="blk_virt"        id="5" />
+    </channel>
+
+    <!-- sDDF Block -->
+    <protection_domain name="blk_virt" priority="99" pp="true">
+        <program_image path="blk_virt.elf" />
+
+        <map mr="blk_driver_config" vaddr="0x40000000" perms="rw" cached="false" setvar_vaddr="blk_config_driver"     />
+        <map mr="blk_driver_req"    vaddr="0x40200000" perms="rw" cached="false" setvar_vaddr="blk_req_queue_driver"  />
+        <map mr="blk_driver_resp"   vaddr="0x40400000" perms="rw" cached="false" setvar_vaddr="blk_resp_queue_driver" />
+        <map mr="blk_driver_data"   vaddr="0x40600000" perms="rw" cached="true" setvar_vaddr="blk_data_driver" />
+        <setvar symbol="blk_data_driver_paddr" region_paddr="blk_driver_data" />
+
+        <map mr="blk_client0_config" vaddr="0x30000000" perms="rw" cached="false" setvar_vaddr="blk_config"     />
+        <map mr="blk_client1_config" vaddr="0x30001000" perms="rw" cached="false"                               />
+        <map mr="blk_client0_req"    vaddr="0x30200000" perms="rw" cached="false" setvar_vaddr="blk_req_queue"  />
+        <map mr="blk_client1_req"    vaddr="0x30400000" perms="rw" cached="false"                               />
+        <map mr="blk_client0_resp"   vaddr="0x30600000" perms="rw" cached="false" setvar_vaddr="blk_resp_queue" />
+        <map mr="blk_client1_resp"   vaddr="0x30800000" perms="rw" cached="false"                               />
+        <map mr="blk_client0_data"   vaddr="0x30A00000" perms="rw" cached="true" setvar_vaddr="blk_client_data_start" />
+        <map mr="blk_client1_data"   vaddr="0x30C00000" perms="rw" cached="true"                                      />
+    </protection_domain>
+
+    <channel>
+        <!-- block queues -->
+        <end pd="mmc_driver" id="1" />
+        <end pd="blk_virt"   id="0" />
+    </channel>
+
+    <channel>
+        <!-- state control / storage info -->
+        <end pd="mmc_driver" id="2" />
+        <end pd="blk_virt"   id="1" />
+    </channel>
+
+    <!-- sDDF Serial -->
+    <memory_region name="rx_data_driver" size="0x2_000" />
+    <memory_region name="tx_data_driver" size="0x2_000" />
+    <memory_region name="rx_data_client0" size="0x2_000" />
+    <memory_region name="tx_data_client0" size="0x2_000" />
+
+    <memory_region name="rx_queue_driver" size="0x1_000" />
+    <memory_region name="tx_queue_driver" size="0x1_000" />
+    <memory_region name="rx_queue_client0" size="0x1_000" />
+    <memory_region name="tx_queue_client0" size="0x1_000" />
+
+    <protection_domain name="uart" priority="100">
+        <program_image path="uart_driver.elf" />
+
+        <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
+
+        <map mr="rx_queue_driver" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="rx_queue" />
+        <map mr="tx_queue_driver" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="tx_queue" />
+
+        <map mr="rx_data_driver" vaddr="0x4_002_000" perms="rw" cached="true" setvar_vaddr="rx_data" />
+        <map mr="tx_data_driver" vaddr="0x4_004_000" perms="rw" cached="true" setvar_vaddr="tx_data" />
+
+        <irq irq="59" id="0" /> <!-- UART interrupt -->
+    </protection_domain>
+
+    <protection_domain name="serial_virt_tx" priority="99">
+        <program_image path="serial_virt_tx.elf" />
+        <map mr="tx_queue_driver" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="tx_queue_drv" />
+        <map mr="tx_queue_client0" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="tx_queue_cli0" />
+
+        <map mr="tx_data_driver" vaddr="0x4_003_000" perms="rw" cached="true" setvar_vaddr="tx_data_drv" />
+        <map mr="tx_data_client0" vaddr="0x4_005_000" perms="r" cached="true" setvar_vaddr="tx_data_cli0" />
+    </protection_domain>
+
+    <protection_domain name="serial_virt_rx" priority="98">
+        <program_image path="serial_virt_rx.elf" />
+        <map mr="rx_queue_driver" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="rx_queue_drv" />
+        <map mr="rx_queue_client0" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="rx_queue_cli0" />
+
+        <map mr="rx_data_driver" vaddr="0x4_003_000" perms="r" cached="true" setvar_vaddr="rx_data_drv" />
+        <map mr="rx_data_client0" vaddr="0x4_005_000" perms="rw" cached="true" setvar_vaddr="rx_data_cli0" />
+    </protection_domain>
+
+    <channel>
+        <end pd="uart" id="1"/>
+        <end pd="serial_virt_tx" id="0"/>
+    </channel>
+
+    <channel>
+        <end pd="uart" id="2"/>
+        <end pd="serial_virt_rx" id="0"/>
+    </channel>
+
+</system>

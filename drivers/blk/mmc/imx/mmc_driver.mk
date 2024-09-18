@@ -16,7 +16,7 @@ mmc_driver.elf: blk/mmc/imx/mmc_driver.o
 blk/mmc/imx/mmc_driver.o: ${USDHC_DRIVER_DIR}/usdhc.c |blk/mmc/imx
 	$(CC) -c $(CFLAGS) -I${USDHC_DRIVER_DIR}/include -o $@ $<
 
--include mmc_driver.d
+-include blk/mmc/imx/mmc_driver.d
 
 blk/mmc/imx:
 	mkdir -p $@
