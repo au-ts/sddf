@@ -40,4 +40,6 @@ if __name__ == "__main__":
     for node in devicetree.node_iter():
         props = list(node.props.keys())
         if "status" in props and "clocks" in props:
-            print(node.name, node.props["clocks"])
+            status = node.props["status"].to_string()
+            if status == "okay":
+                print(node.name, node.props["clocks"].to_nums())
