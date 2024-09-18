@@ -66,12 +66,12 @@ void client_main(void)
     uint8_t write_fail = ds3231_write(NULL, 0, DEFAULT_READ_ACK_FRAME_RETRIES);
     if (write_fail) {
         LOG_CLIENT_ERR("failed to find DS3231 on bus!\n");
-        while (1) {};
+        assert(false);
     }
 
     if (ds3231_set_time(42, 59, 23, 7, 31, 12, 23)) {
         LOG_CLIENT_ERR("failed to set time on DS3231!\n");
-        while (1) {};
+        assert(false);
     }
     sddf_printf("Set Date and Time on DS3231 to: %02d-%02d-%02d %02d:%02d:%02d (%s)\n", 31, 12, 23, 23, 59, 42,
                 day_of_week_strings[7 - 1]);
@@ -87,7 +87,7 @@ void client_main(void)
         uint8_t year;
         if (ds3231_get_time(&second, &minute, &hour, &day_of_week, &day, &month, &year)) {
             LOG_CLIENT_ERR("failed to get time from DS3231!\n");
-            while (1) {};
+            assert(false);
         }
 
         if (day_of_week < 1 || day_of_week > 7) {
