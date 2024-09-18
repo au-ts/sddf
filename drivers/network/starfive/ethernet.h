@@ -531,6 +531,7 @@ register map outlined in the imx8mp TRM. */
 #define DESC_TXCTRL_TXCRCDIS		(1 << 26)           /* GMAC does not append the Cyclic Redundancy Check (CRC) to the end of the transmitted frame.*/
 #define DESC_TXCTRL_TXRINGEND		(1 << 25)           /* Descriptor list reached its final descriptor. DMA must loop around. */
 #define DESC_TXCTRL_TXCHAIN		    (1 << 24)           /* Second address in the descriptor is the Next Descriptor address rather than the second buffer address. */
+#define DESC_TXCTRL_TXCIC			(2 << 16)			/* IP header checksum and payload checksum insertion are enabled. Pseudo-header checksum is caclculated in hardware. */
 #define DESC_TXCTRL_SIZE2MASK		(0x3ff800)
 #define DESC_TXCTRL_SIZE2SHFT		(11)
 #define DESC_TXCTRL_SIZE1MASK		(0x7FF)

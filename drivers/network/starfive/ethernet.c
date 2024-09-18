@@ -177,7 +177,7 @@ static void tx_provide(void)
 
             // For normal transmit descritpors, we need to give ownership to DMA, as well as indicate
             // that this is the first and last parts of the current packet.
-            uint32_t tdes3 = (DESC_TXSTS_OWNBYDMA | DESC_TXCTRL_TXFIRST | DESC_TXCTRL_TXLAST | buffer.len);
+            uint32_t tdes3 = (DESC_TXSTS_OWNBYDMA | DESC_TXCTRL_TXFIRST | DESC_TXCTRL_TXLAST | DESC_TXCTRL_TXCIC |buffer.len);
             tx.descr_mdata[tx.tail] = buffer;
 
             update_ring_slot(&tx, tx.tail, buffer.io_or_offset & 0xffffffff, buffer.io_or_offset >> 32, tdes2, tdes3);
@@ -322,8 +322,10 @@ static void eth_init()
     // Program all other appropriate fields in MAC_CONFIGURATION
     //       (ie. inter-packet gap, jabber disable).
     uint32_t conf = *MAC_REG(GMAC_CONFIG);
-    // // Set full duplex mode
+    // Set full duplex mode
     conf |= GMAC_CONFIG_DM;
+    // Enable checksum offload
+    conf |= GMAC_CONFIG_IPC;
 
     // Setting the speed of our device to 1000mbps
     conf &= ~( GMAC_CONFIG_PS | GMAC_CONFIG_FES);
