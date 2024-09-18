@@ -17,6 +17,7 @@
 #include <sddf/pinctrl/protocol.h>
 
 #include <pinctrl_chips.h>
+#include <pinctrl_memranges.h>
 
 #include "odroidc4.h"
 
