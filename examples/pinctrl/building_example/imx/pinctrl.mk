@@ -44,7 +44,7 @@ REPORT_FILE := report.txt
 SYSTEM_FILE := ${TOP}/pinctrl.system
 CLIENT_OBJS := client.o
 PINCTRL_DRIVER := $(SDDF)/drivers/pinctrl/$(PINCTRL_DRIVER_DIR)
-TIMER_DRIVER := $(SDDF)/drivers/clock/$(PINCTRL_DRIVER_DIR)
+TIMER_DRIVER := $(SDDF)/drivers/timer/$(PINCTRL_DRIVER_DIR)
 
 all: $(IMAGE_FILE)
 
@@ -55,7 +55,7 @@ include ${PINCTRL_DRIVER}/pinctrl_driver.mk
 include ${SDDF}/util/util.mk
 
 client.o: ${TOP}/client.c
-	$(CC) -c $(CFLAGS) -DSOC_$(shell echo $(SOC) | tr a-z A-Z | tr - _) $< -o client.o
+	$(CC) -c $(CFLAGS) $(CHIP_HEADER_INC) -DSOC_$(shell echo $(SOC) | tr a-z A-Z | tr - _) $< -o client.o
 client.elf: client.o 
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 

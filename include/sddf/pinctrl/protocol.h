@@ -12,20 +12,21 @@ enum sddf_pinctrl_request_label {
     SDDF_PINCTRL_READ_MUX,
 };
 
-enum read_mux_request_ipc_index {
-    READ_MUX_REQ_OFFSET = 0,
+enum sddf_read_mux_request_ipc_index {
+    READ_MUX_REQ_CHIP_IDX = 0,
+    READ_MUX_REQ_OFFSET,
     READ_MUX_REQ_NUM_ARGS,
 };
 
-enum read_mux_reponse_ipc_index {
+enum sddf_read_mux_reponse_ipc_index {
     READ_MUX_RESP_VALUE = 0,
     READ_MUX_RESP_NUM_RESULTS,
 };
 
-enum sddf_pinctrl_request_response_label {
+enum sddf_pinctrl_response_label {
     SDDF_PINCTRL_SUCCESS = 0,
     SDDF_PINCTRL_UNKNOWN_REQ,
     SDDF_PINCTRL_INVALID_ARGS,
 };
 
-typedef enum sddf_pinctrl_request_response_label sddf_pinctrl_response_t;
+typedef enum sddf_pinctrl_response_label sddf_pinctrl_response_t;
