@@ -290,22 +290,22 @@ void virtio_blk_init(void)
     // Do MMIO device init (section 4.2.3.1)
     if (!virtio_mmio_check_magic(regs)) {
         LOG_DRIVER_ERR("invalid virtIO magic value!\n");
-        while (1) {}
+        assert(false);
     }
 
     if (virtio_mmio_version(regs) != VIRTIO_VERSION) {
         LOG_DRIVER_ERR("not correct virtIO version!\n");
-        while (1) {}
+        assert(false);
     }
 
     if (!virtio_mmio_check_device_id(regs, VIRTIO_DEVICE_ID_BLK)) {
         LOG_DRIVER_ERR("not a virtIO block device!\n");
-        while (1) {}
+        assert(false);
     }
 
     if (virtio_mmio_version(regs) != VIRTIO_BLK_DRIVER_VERSION) {
         LOG_DRIVER_ERR("driver does not support given virtIO version: 0x%x\n", virtio_mmio_version(regs));
-        while (1) {}
+        assert(false);
     }
 
     ialloc_init(&ialloc_desc, descriptors, QUEUE_SIZE);
@@ -328,7 +328,7 @@ void virtio_blk_init(void)
         LOG_DRIVER_ERR("driver does not support device capacity smaller than 0x%x bytes"
                        " (device has capacity of 0x%lx bytes)\n",
                        BLK_TRANSFER_SIZE, virtio_config->capacity * VIRTIO_BLK_SECTOR_SIZE);
-        while (1) {}
+        assert(false);
     }
 
     /* This driver does not support Read-Only devices, so we always leave this as false */
