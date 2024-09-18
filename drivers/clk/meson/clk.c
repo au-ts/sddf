@@ -5,6 +5,7 @@
 
 #include <microkit.h>
 #include <stdint.h>
+#include <sddf/util/string.h>
 #include <sddf/util/printf.h>
 #include <clk_config.h>
 
@@ -78,11 +79,36 @@ static struct clk g12a_fixed_pll = {
             &g12a_fixed_pll_dco.hw
         },
         .num_parents = 1,
-        /*
-         * This clock won't ever change at runtime so
-         * CLK_SET_RATE_PARENT is not required
-         */
     },
+};
+
+static struct clk g12a_fclk_div2_div = {
+    .data = &(struct clk_fixed_factor_data){
+	    .mult = 1,
+	    .div = 2,
+    },
+	.hw.init = &(struct clk_init_data){
+		.name = "fclk_div2_div",
+		.ops = &clk_fixed_factor_ops,
+		.parent_hws = (const struct clk_hw *[]) { &g12a_fixed_pll.hw },
+		.num_parents = 1,
+	},
+};
+
+static struct clk g12a_fclk_div2 = {
+	.data = &(struct clk_gate_data){
+		.offset = HHI_FIX_PLL_CNTL1,
+		.bit_idx = 24,
+	},
+	.hw.init = &(struct clk_init_data){
+		.name = "fclk_div2",
+		.ops = &clk_regmap_gate_ops,
+		.parent_hws = (const struct clk_hw *[]) {
+			&g12a_fclk_div2_div.hw
+		},
+		.num_parents = 1,
+		.flags = CLK_IS_CRITICAL,
+	},
 };
 
 static struct clk g12a_fclk_div3_div = {
@@ -110,15 +136,6 @@ static struct clk g12a_fclk_div3 = {
 			&g12a_fclk_div3_div.hw
 		},
 		.num_parents = 1,
-		/*
-		 * This clock is used by the resident firmware and is required
-		 * by the platform to operate correctly.
-		 * Until the following condition are met, we need this clock to
-		 * be marked as critical:
-		 * a) Mark the clock used by a firmware resource, if possible
-		 * b) CCF has a clock hand-off mechanism to make the sure the
-		 *    clock stays on until the proper driver comes along
-		 */
 		.flags = CLK_IS_CRITICAL,
 	},
 };
@@ -177,6 +194,34 @@ static struct clk g12a_fclk_div5 = {
         },
         .num_parents = 1,
     },
+};
+
+static struct clk g12a_fclk_div7_div = {
+    .data = &(struct clk_fixed_factor_data){
+    	.mult = 1,
+    	.div = 7,
+    },
+	.hw.init = &(struct clk_init_data){
+		.name = "fclk_div7_div",
+		.ops = &clk_fixed_factor_ops,
+		.parent_hws = (const struct clk_hw *[]) { &g12a_fixed_pll.hw },
+		.num_parents = 1,
+	},
+};
+
+static struct clk g12a_fclk_div7 = {
+	.data = &(struct clk_gate_data){
+		.offset = HHI_FIX_PLL_CNTL1,
+		.bit_idx = 23,
+	},
+	.hw.init = &(struct clk_init_data){
+		.name = "fclk_div7",
+		.ops = &clk_regmap_gate_ops,
+		.parent_hws = (const struct clk_hw *[]) {
+			&g12a_fclk_div7_div.hw
+		},
+		.num_parents = 1,
+	},
 };
 
 static const struct clk_parent_data g12a_hdmi_parent_data[] = {
@@ -240,7 +285,7 @@ static const struct clk_parent_data clk81_parent_data[] = {
 /*     { .hw = &g12a_mpll1.hw }, */
 /*     { .hw = &g12a_mpll2.hw }, */
     { .hw = &g12a_fclk_div4.hw },
-/*     { .hw = &g12a_fclk_div3.hw }, */
+    { .hw = &g12a_fclk_div3.hw },
     { .hw = &g12a_fclk_div5.hw },
 };
 
@@ -393,11 +438,11 @@ static MESON_GATE(g12a_vclk2_other1,        HHI_GCLK_OTHER,    26);
 static struct clk_hw *sm1_clks[] = {
     /* [CLKID_SYS_PLL]            = &g12a_sys_pll.hw, */
     [CLKID_FIXED_PLL]        = &g12a_fixed_pll.hw,
-    /* [CLKID_FCLK_DIV2]        = &g12a_fclk_div2.hw, */
-    /* [CLKID_FCLK_DIV3]        = &g12a_fclk_div3.hw, */
+    [CLKID_FCLK_DIV2]        = &g12a_fclk_div2.hw,
+    [CLKID_FCLK_DIV3]        = &g12a_fclk_div3.hw,
     [CLKID_FCLK_DIV4]        = &g12a_fclk_div4.hw,
     [CLKID_FCLK_DIV5]        = &g12a_fclk_div5.hw,
-    /* [CLKID_FCLK_DIV7]        = &g12a_fclk_div7.hw, */
+    [CLKID_FCLK_DIV7]        = &g12a_fclk_div7.hw,
     /* [CLKID_FCLK_DIV2P5]        = &g12a_fclk_div2p5.hw, */
     /* [CLKID_GP0_PLL]            = &g12a_gp0_pll.hw, */
     [CLKID_MPEG_SEL]        = &g12a_mpeg_clk_sel.hw,
@@ -466,7 +511,7 @@ static struct clk_hw *sm1_clks[] = {
     /* [CLKID_MPLL2_DIV]        = &g12a_mpll2_div, */
     /* [CLKID_MPLL3_DIV]        = &g12a_mpll3_div, */
     /* [CLKID_FCLK_DIV2_DIV]        = &g12a_fclk_div2_div, */
-    /* [CLKID_FCLK_DIV3_DIV]        = &g12a_fclk_div3_div, */
+    [CLKID_FCLK_DIV3_DIV]        = &g12a_fclk_div3_div.hw,
     [CLKID_FCLK_DIV4_DIV]        = &g12a_fclk_div4_div.hw,
     [CLKID_FCLK_DIV5_DIV]        = &g12a_fclk_div5_div.hw,
     /* [CLKID_FCLK_DIV7_DIV]        = &g12a_fclk_div7_div, */
@@ -731,13 +776,16 @@ static struct clk *const g12a_clk_regmaps[] = {
     /* &g12a_sys_pll_dco, */
     /* &g12a_gp0_pll_dco, */
     /* &g12a_hifi_pll_dco, */
-    /* &g12a_fclk_div2, */
-    /* &g12a_fclk_div3, */
+    &g12a_fclk_div2,
+    &g12a_fclk_div2_div,
+    &g12a_fclk_div3,
+    &g12a_fclk_div3_div,
     &g12a_fclk_div4,
     &g12a_fclk_div4_div,
     &g12a_fclk_div5,
     &g12a_fclk_div5_div,
-    /* &g12a_fclk_div7, */
+    &g12a_fclk_div7,
+    &g12a_fclk_div7_div,
     /* &g12a_fclk_div2p5, */
     /* &g12a_dma, */
     /* &g12a_efuse, */
@@ -916,14 +964,14 @@ unsigned long clk_recalc_rate(struct clk_hw *hw)
         struct clk_parent_data parent_data = hw->init->parent_data[parent_idx];
 
         if (parent_data.hw) {
-            struct clk_hw *parent_hw = parent_data.hw;
+            const struct clk_hw *parent_hw = parent_data.hw;
             parent_rate = clk_recalc_rate(parent_hw);
-        } else if (parent_data.fw_name == "xtal") {
+        } else if (sddf_strcmp(parent_data.fw_name, "xtal") == 0) {
             /* TODO: Replace this with an hw structure */
             parent_rate = 24000000;
         }
     } else {
-        struct clk_hw *parent_hw = hw->init->parent_hws[0];
+        const struct clk_hw *parent_hw = hw->init->parent_hws[0];
         parent_rate = clk_recalc_rate(parent_hw);
     }
 
@@ -968,11 +1016,11 @@ void init(void)
     struct clk_hw *mpeg_sel_hw = sm1_clks[CLKID_MPEG_SEL];
     int ret = mpeg_sel_hw->init->ops->set_parent(mpeg_sel_hw, 2);
     uint64_t rate = clk_recalc_rate(mpeg_sel_hw);
-    sddf_dprintf("MEPG_SEL clock rate: %llu\n", rate);
+    sddf_dprintf("MEPG_SEL clock rate: %lu\n", rate);
 
     struct clk_hw *clk81_hw = sm1_clks[CLKID_CLK81];
     rate = clk_recalc_rate(clk81_hw);
-    sddf_dprintf("Clock %s rate: %llu\n", clk81_hw->init->name, rate);
+    sddf_dprintf("Clock %s rate: %lu\n", clk81_hw->init->name, rate);
 
     clk_msr_stat();
 
