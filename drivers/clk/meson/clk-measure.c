@@ -214,7 +214,7 @@ int clk_msr_stat()
 
     for (i = 0; i < 128; i++) {
         clk_freq = clk_msr(i);
-        sddf_dprintf("[%4d][%4ld Hz] %s\n", i, clk_freq, sm1_table[i]);
+        sddf_dprintf("[%4d][%4ldHz] %s\n", i, clk_freq, sm1_table[i]);
     }
 
     return 0;

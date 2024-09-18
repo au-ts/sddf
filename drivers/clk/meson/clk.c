@@ -85,6 +85,44 @@ static struct clk g12a_fixed_pll = {
     },
 };
 
+static struct clk g12a_fclk_div3_div = {
+    .data = &(struct clk_fixed_factor_data){
+	    .mult = 1,
+	    .div = 3,
+    },
+	.hw.init = &(struct clk_init_data){
+		.name = "fclk_div3_div",
+		.ops = &clk_fixed_factor_ops,
+		.parent_hws = (const struct clk_hw *[]) { &g12a_fixed_pll.hw },
+		.num_parents = 1,
+	},
+};
+
+static struct clk g12a_fclk_div3 = {
+	.data = &(struct clk_gate_data){
+		.offset = HHI_FIX_PLL_CNTL1,
+		.bit_idx = 20,
+	},
+	.hw.init = &(struct clk_init_data){
+		.name = "fclk_div3",
+		.ops = &clk_regmap_gate_ops,
+		.parent_hws = (const struct clk_hw *[]) {
+			&g12a_fclk_div3_div.hw
+		},
+		.num_parents = 1,
+		/*
+		 * This clock is used by the resident firmware and is required
+		 * by the platform to operate correctly.
+		 * Until the following condition are met, we need this clock to
+		 * be marked as critical:
+		 * a) Mark the clock used by a firmware resource, if possible
+		 * b) CCF has a clock hand-off mechanism to make the sure the
+		 *    clock stays on until the proper driver comes along
+		 */
+		.flags = CLK_IS_CRITICAL,
+	},
+};
+
 static struct clk g12a_fclk_div4_div = {
     .data = &(struct clk_fixed_factor_data) {
         .mult = 1,
@@ -140,6 +178,59 @@ static struct clk g12a_fclk_div5 = {
         .num_parents = 1,
     },
 };
+
+static const struct clk_parent_data g12a_hdmi_parent_data[] = {
+	{ .fw_name = "xtal", },
+	{ .hw = &g12a_fclk_div4.hw },
+	{ .hw = &g12a_fclk_div3.hw },
+	{ .hw = &g12a_fclk_div5.hw },
+};
+
+static struct clk g12a_hdmi_sel = {
+	.data = &(struct clk_mux_data){
+		.offset = HHI_HDMI_CLK_CNTL,
+		.mask = 0x3,
+		.shift = 9,
+		.flags = CLK_MUX_ROUND_CLOSEST,
+	},
+	.hw.init = &(struct clk_init_data){
+		.name = "hdmi_sel",
+		.ops = &clk_regmap_mux_ops,
+		.parent_data = g12a_hdmi_parent_data,
+		.num_parents = ARRAY_SIZE(g12a_hdmi_parent_data),
+		.flags = CLK_SET_RATE_NO_REPARENT | CLK_GET_RATE_NOCACHE,
+	},
+};
+
+static struct clk g12a_hdmi_div = {
+	.data = &(struct clk_div_data){
+		.offset = HHI_HDMI_CLK_CNTL,
+		.shift = 0,
+		.width = 7,
+	},
+	.hw.init = &(struct clk_init_data){
+		.name = "hdmi_div",
+		.ops = &clk_regmap_divider_ops,
+		.parent_hws = (const struct clk_hw *[]) { &g12a_hdmi_sel.hw },
+		.num_parents = 1,
+		.flags = CLK_GET_RATE_NOCACHE,
+	},
+};
+
+static struct clk g12a_hdmi = {
+	.data = &(struct clk_gate_data){
+		.offset = HHI_HDMI_CLK_CNTL,
+		.bit_idx = 8,
+	},
+	.hw.init = &(struct clk_init_data) {
+		.name = "hdmi",
+		.ops = &clk_regmap_gate_ops,
+		.parent_hws = (const struct clk_hw *[]) { &g12a_hdmi_div.hw },
+		.num_parents = 1,
+		.flags = CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED,
+	},
+};
+
 
 /* static uint32_t mux_table_clk81[]    = { 0, 2, 3, 4, 5, 6, 7 }; */
 static uint32_t mux_table_clk81[]    = { 0, 5, 7 };
@@ -470,7 +561,7 @@ static struct clk_hw *sm1_clks[] = {
     /* [CLKID_HDMI_TX]            = &g12a_hdmi_tx, */
     /* [CLKID_HDMI_SEL]        = &g12a_hdmi_sel, */
     /* [CLKID_HDMI_DIV]        = &g12a_hdmi_div, */
-    /* [CLKID_HDMI]            = &g12a_hdmi, */
+    [CLKID_HDMI]            = &g12a_hdmi,
     /* [CLKID_MALI_0_SEL]        = &g12a_mali_0_sel, */
     /* [CLKID_MALI_0_DIV]        = &g12a_mali_0_div, */
     /* [CLKID_MALI_0]            = &g12a_mali_0, */
@@ -705,7 +796,7 @@ static struct clk *const g12a_clk_regmaps[] = {
     /* &g12a_hdmi_tx, */
     /* &g12a_hdmi_sel, */
     /* &g12a_hdmi_div, */
-    /* &g12a_hdmi, */
+    &g12a_hdmi,
     /* &g12a_mali_0_sel, */
     /* &g12a_mali_0_div, */
     /* &g12a_mali_0, */
@@ -875,7 +966,6 @@ void init(void)
     sddf_dprintf("-----------------\n");
 
     struct clk_hw *mpeg_sel_hw = sm1_clks[CLKID_MPEG_SEL];
-    /* uint8_t ret = mpeg_sel_hw->init->ops->get_parent(mpeg_sel_hw); */
     int ret = mpeg_sel_hw->init->ops->set_parent(mpeg_sel_hw, 2);
     uint64_t rate = clk_recalc_rate(mpeg_sel_hw);
     sddf_dprintf("MEPG_SEL clock rate: %llu\n", rate);
@@ -887,5 +977,4 @@ void init(void)
     clk_msr_stat();
 
     sddf_dprintf("-----------------\n");
-
 }

@@ -94,7 +94,6 @@ struct clk_parent_data {
     int index;
 };
 
-
 struct clk_init_data {
     uint32_t num_parents;
     uint32_t flags;
@@ -103,7 +102,6 @@ struct clk_init_data {
     const struct clk_hw **parent_hws;
     const struct clk_parent_data *parent_data;
 };
-
 
 struct clk_gate_data {
     uint32_t offset;
@@ -156,6 +154,32 @@ struct meson_clk_pll_data {
     /* const struct pll_params_table *table; */
     /* const struct pll_mult_range *range; */
     uint8_t flags;
+};
+
+/**
+ * struct clk_rate_request - Structure encoding the clk constraints that
+ * a clock user might require.
+ *
+ * Should be initialized by calling clk_hw_init_rate_request().
+ *
+ * @core:           Pointer to the struct clk_core affected by this request
+ * @rate:           Requested clock rate. This field will be adjusted by
+ *                    clock drivers according to hardware capabilities.
+ * @min_rate:        Minimum rate imposed by clk users.
+ * @max_rate:        Maximum rate imposed by clk users.
+ * @best_parent_rate:    The best parent rate a parent can provide to fulfill the
+ *            requested constraints.
+ * @best_parent_hw:    The most appropriate parent clock that fulfills the
+ *            requested constraints.
+ *
+ */
+struct clk_rate_request {
+    struct clk_core *core;
+    unsigned long rate;
+    unsigned long min_rate;
+    unsigned long max_rate;
+    unsigned long best_parent_rate;
+    struct clk_hw *best_parent_hw;
 };
 
 #endif // CLK_H_
