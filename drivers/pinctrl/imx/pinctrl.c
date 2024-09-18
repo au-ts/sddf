@@ -130,6 +130,12 @@ bool set_mux(uint32_t offset, uint32_t val) {
     *mux_reg_vaddr = val;
     asm volatile("" : : : "memory");
 
+    // Make sure the write actually happened
+    if (*mux_reg_vaddr != val) {
+        LOG_DRIVER_ERR("write was not completed, real != expected: %x != %x", *mux_reg_vaddr, val);
+        return false;
+    }
+
     return true;
 }
 

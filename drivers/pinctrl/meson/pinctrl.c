@@ -80,6 +80,12 @@ bool set_mux(uint32_t *vaddr, uint32_t val) {
     *vaddr = val;
     asm volatile("" : : : "memory");
 
+    // Make sure the write actually happened
+    if (*vaddr != val) {
+        LOG_DRIVER_ERR("write was not completed, real != expected: %x != %x", *vaddr, val);
+        return false;
+    }
+
     return true;
 }
 
