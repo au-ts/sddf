@@ -15,6 +15,8 @@
 #include <sddf/util/printf.h>
 #include <sddf/pinctrl/protocol.h>
 
+#include <pinctrl_chips.h>
+
 #define DEBUG_DRIVER
 
 #ifdef DEBUG_DRIVER
@@ -232,7 +234,7 @@ void reset_pinmux() {
 void init(void) {
     LOG_DRIVER("starting\n");
     if (iomuxc_gpr_base != iomuxc_dev_base + IOMUXC_DEVICE_SIZE) {
-        LOG_DRIVER_ERR("the GPR region must be mapped contiguously after the normal mux registers region\n");
+        LOG_DRIVER_ERR("the GPR region must be mapped contiguously after the normal mux registers region in virtual memory\n");
         while (true) {};
     }
 
@@ -258,6 +260,11 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo) {
                 microkit_msginfo_get_count(msginfo), READ_MUX_REQ_NUM_ARGS
             );
             return microkit_msginfo_new(SDDF_PINCTRL_INVALID_ARGS, 0);
+        }
+
+        sddf_pinctrl_chip_idx_t chip = (sddf_pinctrl_chip_idx_t) microkit_mr_get(READ_MUX_REQ_CHIP_IDX);
+        if (chip >= PINCTRL_NUM_CHIPS) {
+            LOG_DRIVER_ERR("Read mux PPC from channel %u gave an unknown chip index %d\n", ch, chip);
         }
 
         uint32_t reg_offset = (uint32_t) microkit_mr_get(READ_MUX_REQ_OFFSET);
