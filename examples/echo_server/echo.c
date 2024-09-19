@@ -20,7 +20,7 @@
 #include "echo.h"
 
 #define SERIAL_TX_CH 0
-#define TIMER  1
+#define TIMER_CH  1
 #define RX_CH  2
 #define TX_CH  3
 
@@ -59,7 +59,7 @@ void netif_status_callback(char *ip_addr)
  */
 void set_timeout(void)
 {
-    sddf_timer_set_timeout(TIMER, LWIP_TICK_MS * NS_IN_MS);
+    sddf_timer_set_timeout(TIMER_CH, LWIP_TICK_MS * NS_IN_MS);
 }
 
 /**
@@ -132,7 +132,7 @@ void init(void)
     net_queue_init(&net_tx_handle, tx_free, tx_active, tx_size);
     net_buffers_init(&net_tx_handle, 0);
 
-    sddf_lwip_init(net_rx_handle, net_tx_handle, RX_CH, TX_CH, rx_buffer_data_region, tx_buffer_data_region, TIMER,
+    sddf_lwip_init(net_rx_handle, net_tx_handle, RX_CH, TX_CH, rx_buffer_data_region, tx_buffer_data_region, TIMER_CH,
                    net_cli_mac_addr(microkit_name), NULL, netif_status_callback, enqueue_pbufs);
     set_timeout();
 
@@ -149,7 +149,7 @@ void notified(microkit_channel ch)
     case RX_CH:
         sddf_lwip_process_rx();
         break;
-    case TIMER:
+    case TIMER_CH:
         sddf_lwip_process_timeout();
         set_timeout();
         break;
