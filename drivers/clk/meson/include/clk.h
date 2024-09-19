@@ -133,6 +133,12 @@ struct parm {
     uint8_t width;
 };
 
+struct reg_sequence {
+    unsigned int reg;
+    unsigned int def;
+    unsigned int delay_us;
+};
+
 struct meson_clk_pll_data {
     struct parm en;
     struct parm m;
@@ -146,6 +152,18 @@ struct meson_clk_pll_data {
     unsigned int init_count;
     /* const struct pll_params_table *table; */
     /* const struct pll_mult_range *range; */
+    uint8_t flags;
+};
+
+struct meson_clk_mpll_data {
+    struct parm sdm;
+    struct parm sdm_en;
+    struct parm n2;
+    struct parm ssen;
+    struct parm misc;
+    const struct reg_sequence *init_regs;
+    unsigned int init_count;
+    /* spinlock_t *lock; */
     uint8_t flags;
 };
 
