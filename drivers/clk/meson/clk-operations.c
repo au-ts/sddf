@@ -65,23 +65,23 @@ static inline int regmap_mux_read_bits(uint32_t offset, uint8_t shift, uint32_t 
     return reg_val;
 }
 
-static int clk_regmap_gate_enable(struct clk_hw *hw)
+static int clk_regmap_gate_enable(struct clk *clk)
 {
-    struct clk_gate_data *data = (struct clk_gate_data *)(hw->clk->data);
+    struct clk_gate_data *data = (struct clk_gate_data *)(clk->data);
 
     return regmap_update_bits(data->offset, data->bit_idx, 1, 1);
 }
 
-static void clk_regmap_gate_disable(struct clk_hw *hw)
+static void clk_regmap_gate_disable(struct clk *clk)
 {
-    struct clk_gate_data *data = (struct clk_gate_data *)(hw->clk->data);
+    struct clk_gate_data *data = (struct clk_gate_data *)(clk->data);
 
     regmap_update_bits(data->offset, data->bit_idx, 1, 0);
 }
 
-static int clk_regmap_gate_is_enabled(struct clk_hw *hw)
+static int clk_regmap_gate_is_enabled(struct clk *clk)
 {
-    struct clk_gate_data *data = (struct clk_gate_data *)(hw->clk->data);
+    struct clk_gate_data *data = (struct clk_gate_data *)(clk->data);
 
     /* TODO: to be checked */
     /* if (gate->flags & CLK_GATE_SET_TO_DISABLE) */
@@ -94,8 +94,8 @@ static int clk_regmap_gate_is_enabled(struct clk_hw *hw)
 }
 
 const struct clk_ops clk_regmap_gate_ops = {
-    .enable = &clk_regmap_gate_enable,
-    .disable = &clk_regmap_gate_disable,
+    .enable = clk_regmap_gate_enable,
+    .disable = clk_regmap_gate_disable,
     .is_enabled = clk_regmap_gate_is_enabled,
 };
 
@@ -103,11 +103,11 @@ const struct clk_ops clk_regmap_gate_ro_ops = {
     .is_enabled = clk_regmap_gate_is_enabled,
 };
 
-static unsigned long clk_regmap_div_recalc_rate(struct clk_hw *hw,
+static unsigned long clk_regmap_div_recalc_rate(struct clk *clk,
                                 unsigned long prate)
 {
 
-    struct clk_div_data *data = (struct clk_div_data *)(hw->clk->data);
+    struct clk_div_data *data = (struct clk_div_data *)(clk->data);
     uint32_t div = regmap_read_bits(data->offset, data->shift, data->width);
 
     /* TODO: Need to verify the following cases */
@@ -117,9 +117,6 @@ static unsigned long clk_regmap_div_recalc_rate(struct clk_hw *hw,
         div = 1 << div;
     } else if (data->flags & CLK_DIVIDER_MAX_AT_ZERO) {
         div = div ? div: MASK(data->width) + 1;
-    } else if (data->table) {
-        /* TODO: to be implemented */
-        /* div = _get_table_div(table, val); */
     } else {
         div += 1;
     }
@@ -127,9 +124,9 @@ static unsigned long clk_regmap_div_recalc_rate(struct clk_hw *hw,
     return DIV_ROUND_UP_ULL((uint64_t)prate, div);
 }
 
-static int clk_regmap_div_set_rate(struct clk_hw *hw, uint32_t rate, uint32_t parent_rate)
+static int clk_regmap_div_set_rate(struct clk *clk, uint32_t rate, uint32_t parent_rate)
 {
-    struct clk_div_data *data = (struct clk_div_data *)(hw->clk->data);
+    struct clk_div_data *data = (struct clk_div_data *)(clk->data);
     uint32_t div = DIV_ROUND_UP(parent_rate, rate);
 
     if (data->flags & CLK_DIVIDER_ONE_BASED) {
@@ -139,9 +136,6 @@ static int clk_regmap_div_set_rate(struct clk_hw *hw, uint32_t rate, uint32_t pa
         /* div = __ffs(div); */
     } else if (data->flags & CLK_DIVIDER_MAX_AT_ZERO) {
         div = (div == MASK(data->width) + 1) ? 0 : div;
-    } else if (data->table) {
-        /* TODO: to be implemented */
-        /* return  _get_table_val(table, div); */
     } else {
         div -= 1;
     }
@@ -180,10 +174,10 @@ const struct clk_ops clk_regmap_divider_ro_ops = {
     /* .determine_rate = clk_regmap_div_determine_rate, */
 };
 
-static uint8_t clk_regmap_mux_get_parent(struct clk_hw *hw)
+static uint8_t clk_regmap_mux_get_parent(struct clk *clk)
 {
-    struct clk_mux_data *data = (struct clk_mux_data *)(hw->clk->data);
-    uint32_t num_parents = hw->init->num_parents;
+    struct clk_mux_data *data = (struct clk_mux_data *)(clk->data);
+    uint32_t num_parents = clk->hw.init->num_parents;
     uint32_t val = regmap_mux_read_bits(data->offset, data->shift, data->mask);
 
     if (data->table) {
@@ -210,9 +204,9 @@ static uint8_t clk_regmap_mux_get_parent(struct clk_hw *hw)
     return 0;
 }
 
-static int clk_regmap_mux_set_parent(struct clk_hw *hw, uint8_t index)
+static int clk_regmap_mux_set_parent(struct clk *clk, uint8_t index)
 {
-    struct clk_mux_data *data = (struct clk_mux_data *)(hw->clk->data);
+    struct clk_mux_data *data = (struct clk_mux_data *)(clk->data);
 
     if (data->table) {
         unsigned int val = data->table[index];
@@ -232,10 +226,9 @@ const struct clk_ops clk_regmap_mux_ro_ops = {
     .get_parent = clk_regmap_mux_get_parent,
 };
 
-static unsigned long clk_factor_recalc_rate(struct clk_hw *hw,
+static unsigned long clk_factor_recalc_rate(struct clk *clk,
         unsigned long parent_rate)
 {
-    struct clk *clk = (struct clk *)(hw->clk);
     struct clk_fixed_factor_data *data = (struct clk_fixed_factor_data *)(clk->data);
     unsigned long long int rate;
 
@@ -251,10 +244,10 @@ const struct clk_ops clk_fixed_factor_ops = {
     /* .recalc_accuracy = clk_factor_recalc_accuracy, */
 };
 
-static unsigned long meson_clk_pll_recalc_rate(struct clk_hw *hw,
+static unsigned long meson_clk_pll_recalc_rate(struct clk *clk,
                         unsigned long parent_rate)
 {
-    struct meson_clk_pll_data *data = (struct meson_clk_pll_data *)(hw->clk->data);
+    struct meson_clk_pll_data *data = (struct meson_clk_pll_data *)(clk->data);
     uint32_t n, m, frac;
 
     n = regmap_read_bits(data->n.reg_off, data->n.shift, data->n.width);
