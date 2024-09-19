@@ -83,7 +83,7 @@ static err_t sddf_err_to_lwip_err(net_sddf_err_t sddf_err)
         return ERR_OK;
     case SDDF_LWIP_ERR_PBUF:
         return ERR_BUF;
-    case SDDF_ERR_NO_BUF:
+    case SDDF_LWIP_ERR_NO_BUF:
         return ERR_MEM;
     case SDDF_LWIP_ERR_ENQUEUED:
         return ERR_OK;
