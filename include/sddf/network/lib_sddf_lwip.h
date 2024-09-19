@@ -18,15 +18,15 @@
 /* Definitions for sDDF error constants. */
 typedef enum {
     /* No error, everything OK. */
-    SDDF_ERR_OK = 0,
+    SDDF_LWIP_ERR_OK = 0,
     /* Pbuf too large for sDDF buffer. */
-    SDDF_ERR_PBUF = -1,
+    SDDF_LWIP_ERR_PBUF = -1,
     /* No buffers available. */
-    SDDF_ERR_NO_BUF = -2,
+    SDDF_LWIP_ERR_NO_BUF = -2,
     /* Pbuf successfully enqueued to be sent later. */
-    SDDF_ERR_ENQUEUED    = -3,
+    SDDF_LWIP_ERR_ENQUEUED    = -3,
     /* Could not resolve error. */
-    SDDF_ERR_UNHANDLED    = -4
+    SDDF_LWIP_ERR_UNHANDLED    = -4
 } net_sddf_err_t;
 
 /**
@@ -57,8 +57,8 @@ void sddf_lwip_process_timeout(void);
  *
  * @param p pbuf to be transmitted.
  *
- * @return If the pbuf is sent successfully, SDDF_ERR_OK is returned and the
- * pbuf can safely be freed. If the pbuf is too large, SDDF_ERR_PBUF is
+ * @return If the pbuf is sent successfully, SDDF_LWIP_ERR_OK is returned and the
+ * pbuf can safely be freed. If the pbuf is too large, SDDF_LWIP_ERR_PBUF is
  * returned. If there are no free sDDF buffers available,
  * handle_empty_tx_free will be called with the pbuf, and the return value
  * will be returned.

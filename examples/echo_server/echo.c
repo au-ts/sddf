@@ -82,7 +82,7 @@ net_sddf_err_t enqueue_pbufs(struct pbuf *p)
     /* Increment reference count to ensure this pbuf is not freed by lwip */
     pbuf_ref(p);
 
-    return SDDF_ERR_OK;
+    return SDDF_LWIP_ERR_OK;
 }
 
 void transmit(void)
@@ -91,10 +91,10 @@ void transmit(void)
     while (reprocess) {
         while (head != NULL && !net_queue_empty_free(&net_tx_handle)) {
             net_sddf_err_t err = sddf_lwip_transmit_pbuf(head);
-            if (err == SDDF_ERR_PBUF) {
+            if (err == SDDF_LWIP_ERR_PBUF) {
                 sddf_dprintf("LWIP|ERROR: attempted to send a packet of size %u > BUFFER SIZE %u\n",
                              head->tot_len, NET_BUFFER_SIZE);
-            } else if (err != SDDF_ERR_OK) {
+            } else if (err != SDDF_LWIP_ERR_OK) {
                 sddf_dprintf("LWIP|ERROR: unkown error when trying to send pbuf %p\n", head);
             }
 

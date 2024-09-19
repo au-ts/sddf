@@ -84,15 +84,15 @@ sddf_state_t sddf_state;
 static err_t sddf_err_to_lwip_err(net_sddf_err_t sddf_err)
 {
     switch (sddf_err) {
-    case SDDF_ERR_OK:
+    case SDDF_LWIP_ERR_OK:
         return ERR_OK;
-    case SDDF_ERR_PBUF:
+    case SDDF_LWIP_ERR_PBUF:
         return ERR_BUF;
     case SDDF_ERR_NO_BUF:
         return ERR_MEM;
-    case SDDF_ERR_ENQUEUED:
+    case SDDF_LWIP_ERR_ENQUEUED:
         return ERR_OK;
-    case SDDF_ERR_UNHANDLED:
+    case SDDF_LWIP_ERR_UNHANDLED:
         return ERR_MEM;
     }
     return ERR_ARG;
@@ -124,7 +124,7 @@ static void netif_status_callback_default(char *ip_addr)
  */
 static net_sddf_err_t handle_empty_tx_free_default(struct pbuf *p)
 {
-    return SDDF_ERR_UNHANDLED;
+    return SDDF_LWIP_ERR_UNHANDLED;
 }
 
 /**
@@ -230,7 +230,7 @@ net_sddf_err_t sddf_lwip_transmit_pbuf(struct pbuf *p)
     if (p->tot_len > NET_BUFFER_SIZE) {
         lwip_state.err_output("LWIP|ERROR: attempted to send a packet of size %u > BUFFER SIZE %u\n",
                               p->tot_len, NET_BUFFER_SIZE);
-        return SDDF_ERR_PBUF;
+        return SDDF_LWIP_ERR_PBUF;
     }
 
     if (net_queue_empty_free(&sddf_state.tx_queue)) {
@@ -240,7 +240,7 @@ net_sddf_err_t sddf_lwip_transmit_pbuf(struct pbuf *p)
     err_t err = lwip_eth_send(&lwip_state.netif, p);
     assert(!err);
 
-    return SDDF_ERR_OK;
+    return SDDF_LWIP_ERR_OK;
 }
 
 void sddf_lwip_process_rx(void)
