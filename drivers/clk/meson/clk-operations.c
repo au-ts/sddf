@@ -274,3 +274,8 @@ const struct clk_ops meson_clk_pll_ro_ops = {
     .recalc_rate = meson_clk_pll_recalc_rate,
     /* .is_enabled    = meson_clk_pll_is_enabled, */
 };
+
+
+const struct clk_ops meson_clk_mpll_ops = {
+
+};
