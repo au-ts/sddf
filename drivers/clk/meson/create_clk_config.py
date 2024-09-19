@@ -39,16 +39,29 @@ if __name__ == "__main__":
 
     for node in devicetree.node_iter():
         props = list(node.props.keys())
-        if "status" in props and "clocks" in props:
+        if "status" in props:
             status = node.props["status"].to_string()
             if status == "okay":
                 clocks = []
                 max_frequency = []
+                assigned_clocks = []
+                assigned_clock_parents = []
                 assigned_clock_rates = []
                 if "clocks" in props:
                     clocks = node.props["clocks"].to_nums()
                 if "max-frequency" in props:
                     max_frequency = node.props["max-frequency"].to_nums()
-                if "assigend-clock-rates" in props:
+                if "assigned-clocks" in props:
+                    assigned_clocks = node.props["assigned-clocks"].to_nums()
+                if "assigned-clock-parents" in props:
+                    assigned_clock_parents = node.props["assigned-clock-parents"].to_nums()
+                if "assigned-clock-rates" in props:
                     assigned_clock_rates = node.props["assigned-clock-rates"].to_nums()
-                print("{} - clocks: {}, max-frequency: {}, assigned_clock-rates: {}".format(node.name, clocks, max_frequency, assigned_clock_rates))
+                print("{} - clocks: {}, max-frequency: {}, assigned-clocks: {}, assigned-clock-parents: {}, assigned-clock-rates: {}".format(
+                    node.name,
+                    clocks,
+                    max_frequency,
+                    assigned_clocks,
+                    assigned_clock_parents,
+                    assigned_clock_rates)
+                )
