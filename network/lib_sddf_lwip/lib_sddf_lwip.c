@@ -64,12 +64,7 @@ typedef struct pbuf_custom_offset {
     uint64_t offset;
 } pbuf_custom_offset_t;
 
-LWIP_MEMPOOL_DECLARE(
-    RX_POOL,
-    SDDF_LWIP_NUM_BUFS * 2,
-    sizeof(struct pbuf_custom_offset),
-    "Zero-copy RX pool"
-);
+LWIP_MEMPOOL_DECLARE(RX_POOL, SDDF_LWIP_NUM_BUFS * 2, sizeof(struct pbuf_custom_offset), "Zero-copy RX pool");
 
 lwip_state_t lwip_state;
 sddf_state_t sddf_state;
@@ -109,9 +104,8 @@ static void netif_status_callback_default(char *ip_addr)
     uint8_t *mac = lwip_state.netif.hwaddr;
     lwip_state.err_output("LWIP|NOTICE: DHCP request for mac "
                           "%02x:%02x:%02x:%02x:%02x:%02x "
-                          "returned ip address: %s\n", mac[0],
-                          mac[1], mac[2], mac[3], mac[4], mac[5],
-                          ip_addr);
+                          "returned ip address: %s\n",
+                          mac[0], mac[1], mac[2], mac[3], mac[4], mac[5], ip_addr);
 }
 
 /**
@@ -150,7 +144,7 @@ static void interface_free_buffer(struct pbuf *p)
     SYS_ARCH_DECL_PROTECT(old_level);
     pbuf_custom_offset_t *custom_pbuf_offset = (pbuf_custom_offset_t *)p;
     SYS_ARCH_PROTECT(old_level);
-    net_buff_desc_t buffer = {custom_pbuf_offset->offset, 0};
+    net_buff_desc_t buffer = { custom_pbuf_offset->offset, 0 };
     int err = net_enqueue_free(&(sddf_state.rx_queue), buffer);
     assert(!err);
     sddf_state.notify_rx = true;
@@ -168,18 +162,12 @@ static void interface_free_buffer(struct pbuf *p)
  */
 static struct pbuf *create_interface_buffer(uint64_t offset, size_t length)
 {
-    pbuf_custom_offset_t *custom_pbuf_offset = (pbuf_custom_offset_t *) LWIP_MEMPOOL_ALLOC(RX_POOL);
+    pbuf_custom_offset_t *custom_pbuf_offset = (pbuf_custom_offset_t *)LWIP_MEMPOOL_ALLOC(RX_POOL);
     custom_pbuf_offset->offset = offset;
     custom_pbuf_offset->custom.custom_free_function = interface_free_buffer;
 
-    return pbuf_alloced_custom(
-               PBUF_RAW,
-               length,
-               PBUF_REF,
-               &custom_pbuf_offset->custom,
-               (void *)(offset + sddf_state.rx_buffer_data_region),
-               NET_BUFFER_SIZE
-           );
+    return pbuf_alloced_custom(PBUF_RAW, length, PBUF_REF, &custom_pbuf_offset->custom,
+                               (void *)(offset + sddf_state.rx_buffer_data_region), NET_BUFFER_SIZE);
 }
 
 /**
@@ -196,8 +184,8 @@ static struct pbuf *create_interface_buffer(uint64_t offset, size_t length)
 static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
 {
     if (p->tot_len > NET_BUFFER_SIZE) {
-        lwip_state.err_output("LWIP|ERROR: attempted to send a packet of size %u > BUFFER SIZE %u\n",
-                              p->tot_len, NET_BUFFER_SIZE);
+        lwip_state.err_output("LWIP|ERROR: attempted to send a packet of size %u > BUFFER SIZE %u\n", p->tot_len,
+                              NET_BUFFER_SIZE);
         return ERR_MEM;
     }
 
@@ -228,8 +216,8 @@ static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
 net_sddf_err_t sddf_lwip_transmit_pbuf(struct pbuf *p)
 {
     if (p->tot_len > NET_BUFFER_SIZE) {
-        lwip_state.err_output("LWIP|ERROR: attempted to send a packet of size %u > BUFFER SIZE %u\n",
-                              p->tot_len, NET_BUFFER_SIZE);
+        lwip_state.err_output("LWIP|ERROR: attempted to send a packet of size %u > BUFFER SIZE %u\n", p->tot_len,
+                              NET_BUFFER_SIZE);
         return SDDF_LWIP_ERR_PBUF;
     }
 
@@ -307,12 +295,9 @@ static void netif_status_callback(struct netif *netif)
     }
 }
 
-void sddf_lwip_init(net_queue_handle_t rx_queue, net_queue_handle_t tx_queue,
-                    microkit_channel rx_ch, microkit_channel tx_ch,
-                    uintptr_t rx_buffer_data_region,
-                    uintptr_t tx_buffer_data_region,
-                    microkit_channel timer_ch,
-                    uint64_t mac, sddf_lwip_err_output_fn err_output,
+void sddf_lwip_init(net_queue_handle_t rx_queue, net_queue_handle_t tx_queue, microkit_channel rx_ch,
+                    microkit_channel tx_ch, uintptr_t rx_buffer_data_region, uintptr_t tx_buffer_data_region,
+                    microkit_channel timer_ch, uint64_t mac, sddf_lwip_err_output_fn err_output,
                     sddf_lwip_netif_status_callback_fn netif_callback,
                     sddf_lwip_handle_empty_tx_free_fn handle_empty_tx_free)
 {
@@ -329,7 +314,8 @@ void sddf_lwip_init(net_queue_handle_t rx_queue, net_queue_handle_t tx_queue,
     lwip_state.mac = mac;
     lwip_state.err_output = (err_output == NULL) ? sddf_printf_ : err_output;
     lwip_state.netif_callback = (netif_callback == NULL) ? netif_status_callback_default : netif_callback;
-    lwip_state.handle_empty_tx_free = (handle_empty_tx_free == NULL) ? handle_empty_tx_free_default : handle_empty_tx_free;
+    lwip_state.handle_empty_tx_free = (handle_empty_tx_free == NULL) ? handle_empty_tx_free_default
+                                                                     : handle_empty_tx_free;
 
     lwip_init();
 
@@ -345,8 +331,7 @@ void sddf_lwip_init(net_queue_handle_t rx_queue, net_queue_handle_t tx_queue,
     lwip_state.netif.name[0] = 'e';
     lwip_state.netif.name[1] = '0';
 
-    if (!netif_add(&(lwip_state.netif), &ipaddr, &netmask, &gw, (void *)&lwip_state,
-                   ethernet_init, ethernet_input)) {
+    if (!netif_add(&(lwip_state.netif), &ipaddr, &netmask, &gw, (void *)&lwip_state, ethernet_init, ethernet_input)) {
         lwip_state.err_output("LWIP|ERROR: Netif add returned NULL\n");
     }
 

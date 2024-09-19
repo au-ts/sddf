@@ -92,8 +92,8 @@ void transmit(void)
         while (head != NULL && !net_queue_empty_free(&net_tx_handle)) {
             net_sddf_err_t err = sddf_lwip_transmit_pbuf(head);
             if (err == SDDF_LWIP_ERR_PBUF) {
-                sddf_dprintf("LWIP|ERROR: attempted to send a packet of size %u > BUFFER SIZE %u\n",
-                             head->tot_len, NET_BUFFER_SIZE);
+                sddf_dprintf("LWIP|ERROR: attempted to send a packet of size %u > BUFFER SIZE %u\n", head->tot_len,
+                             NET_BUFFER_SIZE);
             } else if (err != SDDF_LWIP_ERR_OK) {
                 sddf_dprintf("LWIP|ERROR: unkown error when trying to send pbuf %p\n", head);
             }
@@ -123,7 +123,8 @@ void transmit(void)
 
 void init(void)
 {
-    serial_cli_queue_init_sys(microkit_name, NULL, NULL, NULL, &serial_tx_queue_handle, serial_tx_queue, serial_tx_data);
+    serial_cli_queue_init_sys(microkit_name, NULL, NULL, NULL, &serial_tx_queue_handle, serial_tx_queue,
+                              serial_tx_data);
     serial_putchar_init(SERIAL_TX_CH, &serial_tx_queue_handle);
 
     size_t rx_size, tx_size;

@@ -24,9 +24,9 @@ typedef enum {
     /* No buffers available. */
     SDDF_LWIP_ERR_NO_BUF = -2,
     /* Pbuf successfully enqueued to be sent later. */
-    SDDF_LWIP_ERR_ENQUEUED    = -3,
+    SDDF_LWIP_ERR_ENQUEUED = -3,
     /* Could not resolve error. */
-    SDDF_LWIP_ERR_UNHANDLED    = -4
+    SDDF_LWIP_ERR_UNHANDLED = -4
 } net_sddf_err_t;
 
 /**
@@ -104,11 +104,8 @@ void sddf_lwip_maybe_notify(void);
  * handling function for no available sDDF TX buffers during sending of LWIP
  * pbuf. Provide NULL to leave unhandled.
  */
-void sddf_lwip_init(net_queue_handle_t rx_queue, net_queue_handle_t tx_queue,
-                    microkit_channel rx_ch, microkit_channel tx_ch,
-                    uintptr_t rx_buffer_data_region,
-                    uintptr_t tx_buffer_data_region,
-                    microkit_channel timer_ch,
-                    uint64_t mac, sddf_lwip_err_output_fn err_output,
+void sddf_lwip_init(net_queue_handle_t rx_queue, net_queue_handle_t tx_queue, microkit_channel rx_ch,
+                    microkit_channel tx_ch, uintptr_t rx_buffer_data_region, uintptr_t tx_buffer_data_region,
+                    microkit_channel timer_ch, uint64_t mac, sddf_lwip_err_output_fn err_output,
                     sddf_lwip_netif_status_callback_fn netif_callback,
                     sddf_lwip_handle_empty_tx_free_fn handle_empty_tx_free);
