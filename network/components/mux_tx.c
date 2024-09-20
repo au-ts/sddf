@@ -39,7 +39,7 @@ state_t state;
 
 int extract_offset(uintptr_t *phys) {
     for (int client = 0; client < NUM_CLIENTS; client++) {
-        if (*phys >= state.buffer_region_paddrs[client] && 
+        if (*phys >= state.buffer_region_paddrs[client] &&
             *phys < state.buffer_region_paddrs[client] + state.tx_ring_clients[client].free_ring->size * BUFF_SIZE) {
             *phys = *phys - state.buffer_region_paddrs[client];
             return client;
@@ -59,7 +59,7 @@ void tx_provide(void)
                 int err __attribute__((unused)) = dequeue_used(&state.tx_ring_clients[client], &buffer);
                 assert(!err);
 
-                if (buffer.phys_or_offset % BUFF_SIZE || 
+                if (buffer.phys_or_offset % BUFF_SIZE ||
                     buffer.phys_or_offset >= BUFF_SIZE * state.tx_ring_clients[client].used_ring->size) {
                     dprintf("MUX_TX|LOG: Client provided offset %llx which is not buffer aligned or outside of buffer region\n", buffer.phys_or_offset);
                     err = enqueue_free(&state.tx_ring_clients[client], buffer);
@@ -87,7 +87,7 @@ void tx_provide(void)
 
     if (enqueued && require_signal(state.tx_ring_drv.used_ring)) {
         cancel_signal(state.tx_ring_drv.used_ring);
-        microkit_notify_delayed(DRIVER);
+        // microkit_notify(DRIVER);
     }
 }
 
@@ -121,15 +121,13 @@ void tx_return(void)
     for (int client = 0; client < NUM_CLIENTS; client++) {
         if (notify_clients[client] && require_signal(state.tx_ring_clients[client].free_ring)) {
             cancel_signal(state.tx_ring_clients[client].free_ring);
-            microkit_notify(client + CLIENT_CH);
+            // microkit_notify(client + CLIENT_CH);
         }
     }
 }
 
 void notified(microkit_channel ch)
 {
-    tx_return();
-    tx_provide();
 }
 
 void init(void)
@@ -137,13 +135,16 @@ void init(void)
     ring_init(&state.tx_ring_drv, (ring_buffer_t *)tx_free_drv, (ring_buffer_t *)tx_used_drv, TX_RING_SIZE_DRIV);
 
     mux_ring_init_sys("mux_tx", state.tx_ring_clients, tx_free_arp, tx_used_arp);
-    
+
     mem_region_init_sys("mux_tx", state.buffer_region_vaddrs, buffer_data_region_arp_vaddr);
 
     /* CDTODO: Can we make this system agnostic? */
     state.buffer_region_paddrs[0] = buffer_data_region_arp_paddr;
     state.buffer_region_paddrs[1] = buffer_data_region_cli0_paddr;
     state.buffer_region_paddrs[2] = buffer_data_region_cli1_paddr;
-    
-    tx_provide();
+
+    for (uint64_t i = 0; ; i++) {
+        tx_return();
+        tx_provide();
+    }
 }

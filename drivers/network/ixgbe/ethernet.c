@@ -177,7 +177,7 @@ tx_return(void)
 
     if (enqueued && require_signal(tx_ring.free_ring)) {
         cancel_signal(tx_ring.free_ring);
-        microkit_notify(TX_CH);
+        // microkit_notify(TX_CH);
     }
 }
 
@@ -264,7 +264,7 @@ static void rx_return(void)
 
     if (packets_transferred && require_signal(rx_ring.used_ring)) {
         cancel_signal(rx_ring.used_ring);
-        microkit_notify(RX_CH);
+        // microkit_notify(RX_CH);
     }
 
     uint64_t rx_head_new = device.rx_head;
@@ -337,8 +337,8 @@ dump_all_registers(void)
            get_reg(EICR), get_reg(EIMS), get_reg(GPIE));
 
     printf("Control regs:\n\tCTRL %08x CTRL_EXT %08x\n",
-           get_reg(CTRL), get_reg(CTRL_EXT)); 
-    
+           get_reg(CTRL), get_reg(CTRL_EXT));
+
     printf("EEPROM regs:\n\tEEC_ARD %08x\n",
            get_reg(EEC));
 
@@ -427,7 +427,7 @@ init_1(void)
     //     *CTRL_EXT = ctrl_ext | IXGBE_CTRL_EXT_NS_DIS;
     // }
 
-    // *CTRL_EXT = IXGBE_CTRL_EXT_DRV_LOAD; 
+    // *CTRL_EXT = IXGBE_CTRL_EXT_DRV_LOAD;
 
     uint8_t mac[6];
     get_mac_addr(mac);
@@ -589,9 +589,17 @@ init_3(void)
     rx_provide();
     tx_provide();
 
-    enable_interrupts();
 
     device.init_stage = 4;
+
+    printf("ETH|LOG: entering polling mode\n");
+    for (uint64_t i = 0; ; i++) {
+        rx_return();
+        rx_provide();
+        tx_return();
+        tx_provide();
+    }
+
 
     // sddf_timer_set_timeout(TIMER_CH, 100 * NS_IN_MS);
 }
@@ -667,17 +675,12 @@ notified(microkit_channel ch)
          * Delay calling into the kernel to ack the IRQ until the next loop
          * in the seL4CP event handler loop.
          */
-        microkit_irq_ack_delayed(ch);
+        microkit_irq_ack(ch);
         break;
     }
     case RX_CH:
-        if (device.init_stage == 4) {
-            rx_provide();
-        }
-        break;
     case TX_CH:
         if (device.init_stage == 4) {
-            tx_provide();
         }
         break;
     default:

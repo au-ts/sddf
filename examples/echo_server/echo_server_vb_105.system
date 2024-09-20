@@ -55,7 +55,7 @@
     <protection_domain name="bench" priority="102" >
         <program_image path="benchmark.elf" />
 
-        <protection_domain name="eth" priority="220" id="1" budget="25" period="400">
+        <protection_domain name="eth" priority="220" id="1" cpu="1">
             <program_image path="eth.elf" />
             <map mr="ecam" vaddr="0x3_000_000" perms="rw" cached="true"/>
             <map mr="eth0" vaddr="0x2_000_000" perms="rw" cached="true"/>
@@ -75,7 +75,7 @@
             <setvar symbol="hw_ring_buffer_paddr" region_paddr="hw_ring_buffer" />
         </protection_domain>
 
-        <protection_domain name="mux_rx" priority="99" pp="true" id="2">
+        <protection_domain name="mux_rx" priority="99" pp="true" id="2" cpu="4">
             <program_image path="mux_rx.elf" />
             <map mr="rx_free_drv" vaddr="0x2_000_000" perms="rw" cached="true" setvar_vaddr="rx_free_drv" />
             <map mr="rx_used_drv" vaddr="0x2_200_000" perms="rw" cached="true" setvar_vaddr="rx_used_drv" />
@@ -91,7 +91,7 @@
             <setvar symbol="buffer_data_paddr" region_paddr="rx_buffer_data_region" />
         </protection_domain>
 
-        <protection_domain name="copy0" priority="98" budget="20000" id="4">
+        <protection_domain name="copy0" priority="98" id="4" cpu="3">
             <program_image path="copy.elf" />
             <map mr="rx_free_copy0" vaddr="0x2_000_000" perms="rw" cached="true" setvar_vaddr="rx_free_mux" />
             <map mr="rx_used_copy0" vaddr="0x2_200_000" perms="rw" cached="true" setvar_vaddr="rx_used_mux" />
@@ -103,19 +103,7 @@
             <map mr="rx_buffer_data_region_cli0" vaddr="0x2_a00_000" perms="rw" cached="true" setvar_vaddr="cli_buffer_data_region" />
         </protection_domain>
 
-        <!-- <protection_domain name="copy1" priority="96" budget="20000" id="5"> -->
-        <!--     <program_image path="copy.elf" /> -->
-        <!--     <map mr="rx_free_copy1" vaddr="0x2_000_000" perms="rw" cached="true" setvar_vaddr="rx_free_mux" /> -->
-        <!--     <map mr="rx_used_copy1" vaddr="0x2_200_000" perms="rw" cached="true" setvar_vaddr="rx_used_mux" /> -->
-
-        <!--     <map mr="rx_free_cli1" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="rx_free_cli" /> -->
-        <!--     <map mr="rx_used_cli1" vaddr="0x2_600_000" perms="rw" cached="true" setvar_vaddr="rx_used_cli" /> -->
-
-        <!--     <map mr="rx_buffer_data_region" vaddr="0x2_800_000" perms="r" cached="true" setvar_vaddr="mux_buffer_data_region" /> -->
-        <!--     <map mr="rx_buffer_data_region_cli1" vaddr="0x2_a00_000" perms="rw" cached="true" setvar_vaddr="cli_buffer_data_region" /> -->
-        <!-- </protection_domain> -->
-
-        <protection_domain name="mux_tx" priority="100" budget="20000" id="3">
+        <protection_domain name="mux_tx" priority="100" id="3" cpu="5">
             <program_image path="mux_tx.elf" />
             <map mr="tx_free_drv" vaddr="0x2_000_000" perms="rw" cached="true" />
             <map mr="tx_used_drv" vaddr="0x2_200_000" perms="rw" cached="true" />
@@ -132,7 +120,7 @@
             <map mr="tx_buffer_data_region_cli1" vaddr="0x3_400_000" perms="rw" cached="true"  />
         </protection_domain>
 
-        <protection_domain name="client0" priority="97" budget="20000" id="6">
+        <protection_domain name="client0" priority="97" id="6" cpu="2">
             <program_image path="lwip.elf" />
 
             <map mr="rx_free_cli0" vaddr="0x2_000_000" perms="rw" cached="true" setvar_vaddr="rx_free" />
@@ -146,19 +134,7 @@
             <map mr="cyclecounters" vaddr="0x5_010_000" perms="rw" cached="true" setvar_vaddr="cyclecounters_vaddr" />
         </protection_domain>
 
-        <!-- <protection_domain name="client1" priority="95" budget="20000" id="7"> -->
-        <!--     <program_image path="lwip.elf" /> -->
-
-        <!--     <map mr="rx_free_cli1" vaddr="0x2_000_000" perms="rw" cached="true" setvar_vaddr="rx_free" /> -->
-        <!--     <map mr="rx_used_cli1" vaddr="0x2_200_000" perms="rw" cached="true" setvar_vaddr="rx_used" /> -->
-        <!--     <map mr="tx_free_cli1" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="tx_free" /> -->
-        <!--     <map mr="tx_used_cli1" vaddr="0x2_600_000" perms="rw" cached="true" setvar_vaddr="tx_used" /> -->
-
-        <!--     <map mr="rx_buffer_data_region_cli1" vaddr="0x2_800_000" perms="rw" cached="true" setvar_vaddr="rx_buffer_data_region" /> -->
-        <!--     <map mr="tx_buffer_data_region_cli1" vaddr="0x2_a00_000" perms="rw" cached="true" setvar_vaddr="tx_buffer_data_region" /> -->
-        <!-- </protection_domain> -->
-
-        <protection_domain name="arp" priority="98" budget="20000" pp="true" id="8">
+        <protection_domain name="arp" priority="98" pp="true" id="8" cpu="0">
             <program_image path="arp.elf" />
 
             <map mr="rx_free_arp" vaddr="0x2_000_000" perms="rw" cached="true" setvar_vaddr="rx_free" />
@@ -171,12 +147,12 @@
             <map mr="rx_buffer_data_region" vaddr="0x2_a00_000" perms="r" cached="true" setvar_vaddr="rx_buffer_data_region" />
         </protection_domain>
 
-        <protection_domain name="serial" priority="254" pp="true" id="10" passive="true">
+        <protection_domain name="serial" priority="254" pp="true" id="10" passive="true" cpu="0">
           <program_image path="serial.elf" />
           <ioport ioport="0" start="0x3f8" end="0x400" />
         </protection_domain>
 
-        <protection_domain name="timer" priority="253" pp="true" id="9" passive="true">
+        <protection_domain name="timer" priority="253" pp="true" id="9" passive="true" cpu="0">
             <program_image path="timer.elf" />
             <map mr="timer" vaddr="0x500_000_000" perms="rw" cached="true" />
             <irq irq="0" id="0" type="msi" handle="0" pci_bus="0" pci_dev="0" pci_func="0" />

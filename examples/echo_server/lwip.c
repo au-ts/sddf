@@ -176,13 +176,14 @@ static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
     assert(!err);
 
     notify_tx = true;
-    microkit_notify(TX_CH);
+    // microkit_notify(TX_CH);
 
     return ERR_OK;
 }
 
-void transmit(void)
+int transmit(void)
 {
+    int i = 0;
     bool reprocess = true;
     while (reprocess) {
         while(state.head != NULL && !ring_empty(state.tx_ring.free_ring)) {
@@ -193,11 +194,12 @@ void transmit(void)
             else if (err != ERR_OK) {
                 dprintf("LWIP|ERROR: unkown error when trying to send pbuf  %llx\n", state.head);
             }
-            
+
             struct pbuf *temp = state.head;
             state.head = temp->next_chain;
             if (state.head == NULL) state.tail = NULL;
             pbuf_free(temp);
+            i++;
         }
 
         /* Only request a signal if no more pbufs enqueud to send */
@@ -210,10 +212,12 @@ void transmit(void)
             reprocess = true;
         }
     }
+    return i;
 }
 
-void receive(void)
+int receive(void)
 {
+    int i = 0;
     uint64_t packets_processed = 0;
     bool reprocess = true;
     while (reprocess) {
@@ -228,8 +232,9 @@ void receive(void)
                 pbuf_free(p);
             }
             packets_processed++;
+            i++;
         }
-        
+
         request_signal(state.rx_ring.used_ring);
         reprocess = false;
 
@@ -241,11 +246,12 @@ void receive(void)
     if (packets_processed != 0) {
         // printf("pp=%lu\n", packets_processed);
     }
+    return i;
 }
 
 /**
  * Initialise the network interface data structure.
- * 
+ *
  * @param netif network interface data structuer.
  */
 static err_t ethernet_init(struct netif *netif)
@@ -277,7 +283,7 @@ static void netif_status_callback(struct netif *netif)
         microkit_mr_set(2, (state.mac[2] << 24) |  (state.mac[3] << 16) | (state.mac[4] << 8) | state.mac[5]);
         microkit_ppcall(ARP, microkit_msginfo_new(0, 3));
 
-        printf("LWIP|NOTICE: DHCP request for %s returned IP address: %s\n", "client0", ip4addr_ntoa(netif_ip4_addr(netif)));
+        printf("CLIENT|NOTICE: DHCP request for %s returned IP address: %s\n", "client0", ip4addr_ntoa(netif_ip4_addr(netif)));
     }
 }
 
@@ -315,23 +321,40 @@ void init(void)
     setup_udp_socket();
     setup_utilization_socket();
 
-    if (notify_rx && require_signal(state.rx_ring.free_ring)) {
-        cancel_signal(state.rx_ring.free_ring);
-        notify_rx = false;
-        if (!have_signal) microkit_notify(RX_CH);
-        else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + RX_CH) microkit_notify(RX_CH);
-    }
+    // if (notify_rx && require_signal(state.rx_ring.free_ring)) {
+    //     cancel_signal(state.rx_ring.free_ring);
+    //     notify_rx = false;
+    //     if (!have_signal) microkit_notify(RX_CH);
+    //     else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + RX_CH) microkit_notify(RX_CH);
+    // }
 
-    if (notify_tx && require_signal(state.tx_ring.used_ring)) {
-        cancel_signal(state.tx_ring.used_ring);
-        notify_tx = false;
-        if (!have_signal) microkit_notify(TX_CH);
-        else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + TX_CH) microkit_notify(TX_CH);
-    }
+    // if (notify_tx && require_signal(state.tx_ring.used_ring)) {
+    //     cancel_signal(state.tx_ring.used_ring);
+    //     notify_tx = false;
+    //     if (!have_signal) microkit_notify(TX_CH);
+    //     else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + TX_CH) microkit_notify(TX_CH);
+    // }
+
 }
 
 void notified(microkit_channel ch)
 {
+    double useful = 0, redundant = 0;
+    for (uint64_t i = 0; ; i++) {
+        if (i % 100000 == 0) {
+            printf("client: %f%%\n", 100.0 * useful / (useful + redundant));
+            useful = redundant = 0.0;
+        }
+        sys_check_timeouts();
+        int j = transmit();
+        j += receive();
+        if (j != 0) {
+            useful += 1.0;
+        } else {
+            redundant += 1.0;
+        }
+    }
+
     switch(ch) {
     case RX_CH:
         receive();
@@ -347,19 +370,5 @@ void notified(microkit_channel ch)
     default:
         dprintf("LWIP|LOG: received notification on unexpected channel: %lu\n", ch);
         break;
-    }
-
-    if (notify_rx && require_signal(state.rx_ring.free_ring)) {
-        cancel_signal(state.rx_ring.free_ring);
-        notify_rx = false;
-        if (!have_signal) microkit_notify(RX_CH);
-        else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + RX_CH) microkit_notify(RX_CH);
-    }
-
-    if (notify_tx && require_signal(state.tx_ring.used_ring)) {
-        cancel_signal(state.tx_ring.used_ring);
-        notify_tx = false;
-        if (!have_signal) microkit_notify(TX_CH);
-        else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + TX_CH) microkit_notify(TX_CH);
     }
 }
