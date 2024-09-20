@@ -73,7 +73,7 @@ void device_print(uint8_t bus, uint8_t device, uint8_t function)
         pcie_header_type0_t *type0_header = (pcie_header_type0_t *)config_base;
         for (int i = 0; i < 6; i++) {
             uint32_t bar = type0_header->base_address_registers[i];
-            sddf_dprintf("BAR%01d: 0x%08x\n", i, bar);
+            sddf_dprintf("BAR%01d raw val: %08x\n", i, bar);
             if (bar == 0) {
                 sddf_dprintf("\tunimplemented\n");
                 continue;
@@ -90,17 +90,19 @@ void device_print(uint8_t bus, uint8_t device, uint8_t function)
                 switch ((bar & (BIT(1) | BIT(2))) >> 1) {
                     case 0b00:
                         sddf_dprintf("32-bit space\n");
+                        sddf_dprintf("\tfull address: 0x%08x\n", bar & ~(BIT(4) - 1));
                         break;
 
                     case 0b10:
                         sddf_dprintf("64-bit space\n");
+                        sddf_dprintf("\tfull address: 0x%08x_%08x\n", type0_header->base_address_registers[i + 1], bar & ~(BIT(4) - 1));
+                        i += 1; // skip one slot.
                         break;
 
                     default:
                         sddf_dprintf("reserved\n");
                 }
                 sddf_dprintf("\tprefetchable: %s\n", bar & BIT(3) ? "yes" : "no");
-                sddf_dprintf("\taddress: %08x\n", bar & ~(BIT(4) - 1));
             }
         }
     }
