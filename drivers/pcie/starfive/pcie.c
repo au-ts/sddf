@@ -10,13 +10,15 @@
 
 #include "pcie.h"
 
-void *pcie_regs;
+// void *pcie_regs;
 
 /* This is the PCI Enhanced Configuration Access Mechanism,
     See [PCIe-2.0] §7.22
 */
 uintptr_t pcie_config;
 #define PCIE_CONFIG_SIZE 0x1000000
+
+uintptr_t nvme_regs;
 
 /* bus between [0, 256)
    device between [0, 31)
@@ -161,6 +163,27 @@ void init()
 
 out:
     sddf_dprintf("\n\nPCIE_ENUM_COMPLETE\n");
+
+    sddf_dprintf("Starting NVME config...\n");
+    // [NVME-2.1] Figure 33 (§3.1.4)
+    volatile struct {
+        uint64_t cap;
+        uint32_t vs;
+        uint32_t intms;
+        uint32_t intmc;
+        uint32_t cc;
+    } *nvme_reg = (void*)nvme_regs;
+
+    // We should do a Function Level Reset as defined by [PCIe-2.0] spec §6.6.2
+
+    // https://github.com/bootreer/vroom/blob/d8bbe9db2b1cfdfc38eec31f3b48f5eb167879a9/src/nvme.rs#L220
+
+    // [NVME-2.1] 3.5.1 Memory-based Controller Initialization (PCIe)
+
+    sddf_dprintf("CAP: %016lx\n", nvme_reg->cap);
+    sddf_dprintf("VS: %08x\n", nvme_reg->vs);
+    sddf_dprintf("CC: %08x\n", nvme_reg->cc);
+
 }
 
 void notified(microkit_channel ch)
