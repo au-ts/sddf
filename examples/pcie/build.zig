@@ -119,26 +119,4 @@ pub fn build(b: *std.Build) void {
     const microkit_step = b.step("microkit", "Compile and build the final bootable image");
     microkit_step.dependOn(&microkit_tool_cmd.step);
     b.default_step = microkit_step;
-
-    const loader_arg = b.fmt("loader,file={s},addr=0x70000000,cpu-num=0", .{final_image_dest});
-    if (std.mem.eql(u8, microkit_board, "qemu_virt_aarch64")) {
-        const qemu_cmd = b.addSystemCommand(&[_][]const u8{
-            "qemu-system-aarch64",
-            "-machine",
-            "virt,virtualization=on,highmem=off,secure=off",
-            "-cpu",
-            "cortex-a53",
-            "-serial",
-            "mon:stdio",
-            "-device",
-            loader_arg,
-            "-m",
-            "2G",
-            "-nographic",
-        });
-        qemu_cmd.step.dependOn(b.default_step);
-        const simulate_step = b.step("qemu", "Simulate the image using QEMU");
-        simulate_step.dependOn(&qemu_cmd.step);
-    }
 }
-
