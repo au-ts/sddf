@@ -63,6 +63,8 @@ struct ixgbe_device {
 ring_handle_t rx_ring;
 ring_handle_t tx_ring;
 
+static bool achieved_something;
+
 void enable_interrupts(void);
 void disable_interrupts(void);
 
@@ -132,6 +134,7 @@ tx_provide(void)
         bool provided = false;
 
         while (!(hw_tx_ring_full()) && !ring_empty(tx_ring.used_ring)) {
+            achieved_something = true;
             buff_desc_t buffer;
             int err __attribute__((unused)) = dequeue_used(&tx_ring, &buffer);
             assert(!err);
@@ -174,6 +177,8 @@ tx_return(void)
 {
     bool enqueued = false;
     while (!hw_tx_ring_empty() && !ring_full(tx_ring.free_ring)) {
+        achieved_something = true;
+
         /* Ensure that this buffer has been sent by the device */
         ixgbe_adv_tx_desc_wb_t hw_desc = device.tx_ring[device.tx_head].wb;
         if ((hw_desc.status & IXGBE_ADVTXD_STAT_DD) == 0) break;
@@ -208,6 +213,8 @@ rx_provide(void)
         bool provided = false;
 
         while (!hw_rx_ring_full() && !ring_empty(rx_ring.free_ring)) {
+            achieved_something = true;
+
             buff_desc_t buffer;
             int err __attribute__((unused)) = dequeue_free(&rx_ring, &buffer);
             assert(!err);
@@ -265,6 +272,8 @@ static void rx_return(void)
 
     bool packets_transferred = false;
     while (!hw_rx_ring_empty() && !ring_full(rx_ring.used_ring)) {
+        achieved_something = true;
+
         /* If buffer slot is still empty, we have processed all packets the device has filled */
         ixgbe_adv_rx_desc_wb_t desc = device.rx_ring[device.rx_head].wb;
         if ((desc.upper.status_error & IXGBE_RXDADV_STAT_DD) == 0) break;
@@ -651,6 +660,8 @@ print_interrupt_regs(void)
 void
 notified(microkit_channel ch)
 {
+    achieved_something = false;
+    bench->eth_notified++;
     
     print_interrupt_regs();
     // printf("PCI interrupt pending? %d\n", get_reg16(ECAM + 0x6) & BIT(3) != 0);
@@ -666,6 +677,7 @@ notified(microkit_channel ch)
         // set EICS
     switch (ch) {
     case TIMER_CH:
+        achieved_something = true;
         if (device.init_stage == 0) {
             init_1();
         } else if (device.init_stage == 1) {
@@ -715,5 +727,9 @@ notified(microkit_channel ch)
         printf("ETH|LOG: received notification on unexpected channel: %X\n", ch);
         break;
     }
+    if (!achieved_something) {
+        bench->eth_idle_notified++;
+    }
+
     // enable_interrupts();
 }

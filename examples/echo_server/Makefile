@@ -34,7 +34,7 @@ NETWORK_COMPONENTS=$(SDDF)/network/components
 
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 
-IMAGES := eth.elf lwip.elf benchmark.elf idle.elf mux_rx.elf mux_tx.elf arp.elf timer.elf serial.elf
+IMAGES := eth.elf lwip.elf benchmark.elf idle.elf snap.elf mux_rx.elf mux_tx.elf arp.elf timer.elf serial.elf
 CFLAGS := -ffreestanding -g3 -O3 -Wall -Wno-unused-function -nostdlib  -target $(TARGET)
 
 LDFLAGS := -L$(BOARD_DIR)/lib -nostdlib -target $(TARGET)
@@ -93,8 +93,9 @@ LWIPFILES=lwip.c $(COREFILES) $(CORE4FILES) $(NETIFFILES)
 # LWIP_OBJS := $(LWIPFILES:.c=.o) lwip.o sddf_network_sharedringbuffer.o utilization_socket.o udp_echo_socket.o sddf_timer_client.o printf.o putchar_debug.o
 LWIP_OBJS := $(LWIPFILES:.c=.o) lwip.o sddf_network_sharedringbuffer.o utilization_socket.o udp_echo_socket.o sddf_timer_client.o printf.o putchar_serial.o
 
-ETH_OBJS := $(ETHERNET_DRIVER)/ethernet.o sddf_network_sharedringbuffer.o printf.o putchar_debug.o sddf_timer_client.o
+ETH_OBJS := $(ETHERNET_DRIVER)/ethernet.o sddf_network_sharedringbuffer.o printf.o putchar_serial.o sddf_timer_client.o
 # ETH_OBJS := $(ETHERNET_DRIVER)/ethernet.o sddf_network_sharedringbuffer.o printf.o putchar_serial.o sddf_timer_client.o
+SNAP_OBJS := $(NETWORK_COMPONENTS)/snap.o sddf_network_sharedringbuffer.o sddf_timer_client.o printf.o putchar_serial.o
 MUX_RX_OBJS := $(NETWORK_COMPONENTS)/mux_rx.o sddf_network_sharedringbuffer.o printf.o putchar_debug.o
 MUX_TX_OBJS := $(NETWORK_COMPONENTS)/mux_tx.o sddf_network_sharedringbuffer.o $(UTIL)/cache.o printf.o putchar_debug.o
 BENCH_OBJS := $(BENCHMARK)/benchmark.o printf.o putchar_serial.o
@@ -106,7 +107,7 @@ TIMER_OBJS := $(TIMER_DRIVER)/timer.o printf.o putchar_debug.o
 
 OBJS := $(sort $(addprefix $(BUILD_DIR)/, $(ETH_OBJS) $(MUX_RX_OBJS) $(MUX_TX_OBJS)\
 	$(BENCH_OBJS) $(IDLE_OBJS) \
-	$(LWIP_OBJS) $(ARP_OBJS) $(TIMER_OBJS)))
+	$(LWIP_OBJS) $(SNAP_OBJS) $(ARP_OBJS) $(TIMER_OBJS)))
 DEPS := $(OBJS:.o=.d)
 
 all: $(IMAGE_FILE)
@@ -150,6 +151,9 @@ $(BUILD_DIR)/eth.elf: $(addprefix $(BUILD_DIR)/, $(ETH_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(BUILD_DIR)/lwip.elf: $(addprefix $(BUILD_DIR)/, $(LWIP_OBJS))
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+
+$(BUILD_DIR)/snap.elf: $(addprefix $(BUILD_DIR)/, $(SNAP_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(BUILD_DIR)/mux_rx.elf: $(addprefix $(BUILD_DIR)/, $(MUX_RX_OBJS))

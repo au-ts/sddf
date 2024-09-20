@@ -93,7 +93,8 @@ uintptr_t HPET_REGION = 0x500000000;
 hpet_timer_t *timer_0;
 const uint64_t tick_period_fs = 41666667; // main counter tick period in femtoseconds
 
-#define MAX_CLIENTS 5
+#define MAX_CLIENTS 6
+// #define MAX_CLIENTS 5
 
 uint64_t client_timeout[MAX_CLIENTS];
 uint64_t next_timeout = UINT64_MAX;

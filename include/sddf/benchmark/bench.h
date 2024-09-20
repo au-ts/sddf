@@ -6,24 +6,39 @@
 #pragma once
 
 struct bench {
+    // bench utilize
     uint64_t ccount;
     uint64_t prev;
     uint64_t ts;
     uint64_t overflows;
-    // @jade: packet counts
+
+    // driver
     uint64_t eth_pcount_tx;
     uint64_t eth_pcount_rx;
+
     uint64_t eth_irq_count;
     uint64_t eth_tx_ntfn_count;
+    
+    uint64_t eth_notified;
+    uint64_t eth_idle_notified;
 
+    // client0
     uint64_t lwip_pcount_tx;
     uint64_t lwip_pcount_rx;
+
     uint64_t lwip_ntfn_count;
     uint64_t lwip_tx_ntfn_count;
 
-    // uint64_t rx_mux_pcount_tx;
-    // uint64_t rx_mux_pcount_rx;
-    // uint64_t rx_mux_irq_count;
+    uint64_t lwip_notified;
+    uint64_t lwip_idle_notified;
+
+    // rx mux
+    uint64_t rx_mux_notified;
+    uint64_t rx_mux_idle_notified;
+
+    // tx mux
+    uint64_t tx_mux_notified;
+    uint64_t tx_mux_idle_notified;
 };
 
 // #ifdef CONFIG_BENCHMARK_TRACK_UTILISATION

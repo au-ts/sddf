@@ -8,6 +8,7 @@
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 #include <ethernet_config.h>
+#include <sddf/benchmark/bench.h>
 
 /* Notification channels */
 #define DRIVER_CH 0
@@ -26,6 +27,9 @@ uintptr_t rx_used_cli1 = 0x2e00000;
 /* Buffer data regions */
 uintptr_t buffer_data_vaddr = 0x3000000;
 uintptr_t buffer_data_paddr = 0x11000000;
+
+struct bench *b = (void *)(uintptr_t)0x5010000;
+static bool achieved_something;
 
 typedef struct state {
     ring_handle_t rx_ring_drv;
@@ -59,7 +63,7 @@ void rx_return(void)
             buff_desc_t buffer;
             int err __attribute__((unused)) = dequeue_used(&state.rx_ring_drv, &buffer);
             assert(!err);
-
+            achieved_something = true;
             buffer.phys_or_offset = buffer.phys_or_offset - buffer_data_paddr;
             // err = seL4_ARM_VSpace_Invalidate_Data(VSPACE_CAP, buffer.phys_or_offset + buffer_data_vaddr, buffer.phys_or_offset + buffer_data_vaddr + buffer.len);
             // if (err) dprintf("MUX_RX|ERROR: ARM Vspace invalidate failed\n");
@@ -111,6 +115,7 @@ void rx_provide(void)
                 assert(!err);
                 assert(!(buffer.phys_or_offset % BUFF_SIZE) && 
                        (buffer.phys_or_offset < BUFF_SIZE * state.rx_ring_clients[client].free_ring->size));
+                achieved_something = true;
 
                 buffer.phys_or_offset = buffer.phys_or_offset + buffer_data_paddr;
                 err = enqueue_free(&state.rx_ring_drv, buffer);
@@ -136,8 +141,15 @@ void rx_provide(void)
 
 void notified(microkit_channel ch)
 {
+    achieved_something = false;
+    b->rx_mux_notified++;
+
     rx_return();
     rx_provide();
+
+    if (!achieved_something) {
+        b->rx_mux_idle_notified++;
+    }
 }
 
 void init(void)

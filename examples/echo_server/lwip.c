@@ -49,6 +49,8 @@ struct bench *b = (void *)(uintptr_t)0x5010000;
 static bool notify_tx;
 static bool notify_rx;
 
+static bool achieved_something;
+
 /* Wrapper over custom_pbuf structure to keep track of buffer offset */
 typedef struct pbuf_custom_offset {
     struct pbuf_custom custom;
@@ -201,6 +203,7 @@ void transmit(void)
     bool reprocess = true;
     while (reprocess) {
         while(state.head != NULL && !ring_empty(state.tx_ring.free_ring)) {
+            achieved_something = true;
             err_t err = lwip_eth_send(&state.netif, state.head);
             if (err == ERR_MEM) {
                 dprintf("LWIP|ERROR: attempted to send a packet of size  %llx > BUFFER SIZE  %llx\n", state.head->tot_len, BUFF_SIZE);
@@ -243,6 +246,7 @@ void receive(void)
             assert(!err);
 
             b->lwip_pcount_rx++;
+            achieved_something = true;
 
             struct pbuf *p = create_interface_buffer(buffer.phys_or_offset, buffer.len);
             if (state.netif.input(p, &state.netif) != ERR_OK) {
@@ -364,6 +368,8 @@ void init(void)
 
 void notified(microkit_channel ch)
 {
+    achieved_something = false;
+    b->lwip_notified++;
     b->lwip_ntfn_count++;
 
     switch(ch) {
@@ -371,6 +377,7 @@ void notified(microkit_channel ch)
         receive();
         break;
     case TIMER:
+        achieved_something = true;
         sys_check_timeouts();
         set_timeout();
         break;
@@ -385,6 +392,9 @@ void notified(microkit_channel ch)
     default:
         dprintf("LWIP|LOG: received notification on unexpected channel: %lu\n", ch);
         break;
+    }
+    if (!achieved_something) {
+        b->lwip_idle_notified++;
     }
 
     // if (notify_rx) {

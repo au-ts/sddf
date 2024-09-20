@@ -6,6 +6,7 @@
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 #include <ethernet_config.h>
+#include <sddf/benchmark/bench.h>
 
 #define DRIVER 0
 #define CLIENT_CH 1
@@ -27,6 +28,9 @@ uintptr_t buffer_data_region_cli1_vaddr = 0x3400000;
 uintptr_t buffer_data_region_arp_paddr = 0x11200000;
 uintptr_t buffer_data_region_cli0_paddr = 0x11400000;
 uintptr_t buffer_data_region_cli1_paddr = 0x11600000;
+
+struct bench *b = (void *)(uintptr_t)0x5010000;
+static bool achieved_something;
 
 typedef struct state {
     ring_handle_t tx_ring_drv;
@@ -58,6 +62,7 @@ void tx_provide(void)
                 buff_desc_t buffer;
                 int err __attribute__((unused)) = dequeue_used(&state.tx_ring_clients[client], &buffer);
                 assert(!err);
+                achieved_something = true;
 
                 if (buffer.phys_or_offset % BUFF_SIZE || 
                     buffer.phys_or_offset >= BUFF_SIZE * state.tx_ring_clients[client].used_ring->size) {
@@ -100,6 +105,7 @@ void tx_return(void)
             buff_desc_t buffer;
             int err __attribute__((unused)) = dequeue_free(&state.tx_ring_drv, &buffer);
             assert(!err);
+            achieved_something = true;
 
             int client = extract_offset(&buffer.phys_or_offset);
             assert(client >= 0);
@@ -128,8 +134,15 @@ void tx_return(void)
 
 void notified(microkit_channel ch)
 {
+    achieved_something = false;
+    b->tx_mux_notified++;
+
     tx_return();
     tx_provide();
+
+    if (!achieved_something) {
+        b->tx_mux_idle_notified++;
+    }
 }
 
 void init(void)
