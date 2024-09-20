@@ -5,11 +5,19 @@
     SPDX-License-Identifier: BSD-2-Clause
 -->
 <system>
-    <memory_region name="pcie_regs" phys_addr="0x2c000000" size="0x100000" />
+    <!-- <memory_region name="pcie_regs" phys_addr="0x2c000000" size="0x100000" /> -->
     <memory_region name="pcie_config" phys_addr="0x9C0000000" size="0x1000000" />
+
+    <!-- Hardcoded from what PCIe gives us. Ideally we should learn this at runtime
+         or overwrite the BARs. But for now... -->
+    <memory_region name="nvme_regs" phys_addr="0x3800_0000" size="0x4000" />
+
     <protection_domain name="pcie" priority="254" >
-        <map mr="pcie_regs" vaddr="0x10_000_000" perms="rw" cached="false" setvar_vaddr="pcie_regs" />
-        <map mr="pcie_config" vaddr="0x20_000_000" perms="rw" cached="false" setvar_vaddr="pcie_config" />
+        <!-- <map mr="pcie_regs" vaddr="0x1000_0000" perms="rw" cached="false" setvar_vaddr="pcie_regs" /> -->
+        <map mr="pcie_config" vaddr="0x2000_0000" perms="rw" cached="false" setvar_vaddr="pcie_config" />
+
+        <map mr="nvme_regs" vaddr="0x3000_0000" perms="rw" cached="false" setvar_vaddr="nvme_regs" />
+
         <program_image path="pcie_driver.elf" />
     </protection_domain>
 </system>
