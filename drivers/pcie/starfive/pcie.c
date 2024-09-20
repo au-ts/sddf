@@ -36,7 +36,7 @@ uintptr_t get_bdf_offset(uint8_t bus, uint8_t device, uint8_t function)
 void device_print(uint8_t bus, uint8_t device, uint8_t function)
 {
     void *config_base = (void *)(pcie_config + get_bdf_offset(bus, device, function));
-    pcie_header_t *header = (pcie_header_t *)config_base;
+    volatile pcie_header_t *header = (pcie_header_t *)config_base;
 
     if (header->vendor_id == PCIE_VENDOR_INVALID) {
         return;
@@ -70,7 +70,7 @@ void device_print(uint8_t bus, uint8_t device, uint8_t function)
     sddf_dprintf("\tlayout variant: 0x%02x\n", header->header_type & PCIE_HEADER_TYPE_LAYOUT_MASK);
 
     if ((header->header_type & PCIE_HEADER_TYPE_LAYOUT_MASK) == PCIE_HEADER_TYPE_GENERAL) {
-        pcie_header_type0_t *type0_header = (pcie_header_type0_t *)config_base;
+        volatile pcie_header_type0_t *type0_header = (pcie_header_type0_t *)config_base;
         for (int i = 0; i < 6; i++) {
             uint32_t bar = type0_header->base_address_registers[i];
             sddf_dprintf("BAR%01d raw val: %08x\n", i, bar);
@@ -78,8 +78,6 @@ void device_print(uint8_t bus, uint8_t device, uint8_t function)
                 sddf_dprintf("\tunimplemented\n");
                 continue;
             }
-
-            /* TODO: Page 226-227, setting, and then reading with dual 64-bit ones */
 
             if (bar & BIT(0)) {
                 sddf_dprintf("\tbase address for I/O\n");
@@ -95,7 +93,43 @@ void device_print(uint8_t bus, uint8_t device, uint8_t function)
 
                     case 0b10:
                         sddf_dprintf("64-bit space\n");
-                        sddf_dprintf("\tfull address: 0x%08x_%08x\n", type0_header->base_address_registers[i + 1], bar & ~(BIT(4) - 1));
+                        if (i >= 5) {
+                            sddf_dprintf("\tspecified 64-bit in the last slot, ignoring...");
+                            continue;
+                        }
+
+                        uint32_t bar_upper = type0_header->base_address_registers[i + 1];
+
+                        sddf_dprintf("\tfull address: 0x%08x_%08x\n", bar_upper, bar & ~(BIT(4) - 1));
+
+                        /* [PCI-3.0] 6.2.5.1 Address Maps (Implementation Note) p227*/
+
+                        // Decode (I/O or memory) of a register is disabled via the command register before sizing a Base Address register.
+                        header->command &= ~(BIT(1));
+
+                        // calculate size.
+                        type0_header->base_address_registers[i] = 0xffffffff;
+                        type0_header->base_address_registers[i + 1] = 0xffffffff;
+
+                        // read back
+                        uint32_t size_lower = type0_header->base_address_registers[i];
+                        uint32_t size_upper = type0_header->base_address_registers[i + 1];
+                        uint64_t size_readback = ((uint64_t)size_upper << 32) | (size_lower);
+                        // calculation can be done from the 32-bit value read by first clearing encoding information bits
+                        // (bit 0 for I/O, bits 0-3 formemory), inverting all 32 bits (logical NOT), then incrementing by 1
+                        size_readback &= ~(BIT(3) | BIT(2) | BIT(1) | BIT(0));
+                        size_readback = ~size_readback;
+                        size_readback += 1;
+
+                        sddf_dprintf("\tsize: 0x%lx\n", size_readback);
+
+                        // The original value in the Base Address register is restored before re-enabling
+                        // decode in the command register of the device.
+                        type0_header->base_address_registers[i] = bar;
+                        type0_header->base_address_registers[i + 1] = bar_upper;
+                        header->command |= BIT(1);
+
+
                         i += 1; // skip one slot.
                         break;
 
