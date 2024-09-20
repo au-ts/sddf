@@ -33,7 +33,7 @@
 #define MAC_ADDR_CLI1                       0x5254010000a6
 
 // #define TX_RING_SIZE_ARP                    1024
-#define TX_RING_SIZE_CLI0                   1024
+#define TX_RING_SIZE_CLI0                   512
 // #define TX_RING_SIZE_CLI1                   1024
 #define TX_RING_SIZE_ARP                    512
 // #define TX_RING_SIZE_CLI0                   512
