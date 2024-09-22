@@ -35,7 +35,7 @@ int extract_offset(uintptr_t *phys)
 {
     for (int client = 0; client < NUM_NETWORK_CLIENTS; client++) {
         if (*phys >= state.buffer_region_paddrs[client] &&
-            *phys < state.buffer_region_paddrs[client] + state.tx_queue_clients[client].size * NET_BUFFER_SIZE) {
+            *phys < state.buffer_region_paddrs[client] + state.tx_queue_clients[client].capacity * NET_BUFFER_SIZE) {
             *phys = *phys - state.buffer_region_paddrs[client];
             return client;
         }
@@ -55,7 +55,7 @@ void tx_provide(void)
                 assert(!err);
 
                 if (buffer.io_or_offset % NET_BUFFER_SIZE ||
-                    buffer.io_or_offset >= NET_BUFFER_SIZE * state.tx_queue_clients[client].size) {
+                    buffer.io_or_offset >= NET_BUFFER_SIZE * state.tx_queue_clients[client].capacity) {
                     sddf_dprintf("VIRT_TX|LOG: Client provided offset %lx which is not buffer aligned or outside of buffer region\n",
                                  buffer.io_or_offset);
                     err = net_enqueue_free(&state.tx_queue_clients[client], buffer);
@@ -132,7 +132,7 @@ void notified(microkit_channel ch)
 void init(void)
 {
     /* Set up driver queues */
-    net_queue_init(&state.tx_queue_drv, tx_free_drv, tx_active_drv, NET_TX_QUEUE_SIZE_DRIV);
+    net_queue_init(&state.tx_queue_drv, tx_free_drv, tx_active_drv, NET_TX_QUEUE_CAPACITY_DRIV);
 
     /* Setup client queues and state */
     net_queue_info_t queue_info[NUM_NETWORK_CLIENTS] = {0};
@@ -142,7 +142,7 @@ void init(void)
 
     for (int i = 0; i < NUM_NETWORK_CLIENTS; i++) {
         net_queue_init(&state.tx_queue_clients[i], queue_info[i].free, queue_info[i].active,
-                       queue_info[i].size);
+                       queue_info[i].capacity);
         state.buffer_region_vaddrs[i] = client_vaddrs[i];
     }
 

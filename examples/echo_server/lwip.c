@@ -38,7 +38,7 @@ serial_queue_t *serial_tx_queue;
 serial_queue_handle_t serial_tx_queue_handle;
 
 #define LWIP_TICK_MS 100
-#define NUM_PBUFFS NET_MAX_CLIENT_QUEUE_SIZE
+#define NUM_PBUFFS NET_MAX_CLIENT_QUEUE_CAPACITY
 
 net_queue_t *rx_free;
 net_queue_t *rx_active;
@@ -289,10 +289,10 @@ void init(void)
     serial_cli_queue_init_sys(microkit_name, NULL, NULL, NULL, &serial_tx_queue_handle, serial_tx_queue, serial_tx_data);
     serial_putchar_init(SERIAL_TX_CH, &serial_tx_queue_handle);
 
-    size_t rx_size, tx_size;
-    net_cli_queue_size(microkit_name, &rx_size, &tx_size);
-    net_queue_init(&state.rx_queue, rx_free, rx_active, rx_size);
-    net_queue_init(&state.tx_queue, tx_free, tx_active, tx_size);
+    size_t rx_capacity, tx_capacity;
+    net_cli_queue_capacity(microkit_name, &rx_capacity, &tx_capacity);
+    net_queue_init(&state.rx_queue, rx_free, rx_active, rx_capacity);
+    net_queue_init(&state.tx_queue, tx_free, tx_active, tx_capacity);
     net_buffers_init(&state.tx_queue, 0);
 
     lwip_init();

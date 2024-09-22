@@ -443,8 +443,8 @@ void init(void)
     ialloc_init(&rx_ialloc_desc, rx_descriptors, RX_COUNT);
     ialloc_init(&tx_ialloc_desc, tx_descriptors, TX_COUNT);
 
-    net_queue_init(&rx_queue, rx_free, rx_active, NET_RX_QUEUE_SIZE_DRIV);
-    net_queue_init(&tx_queue, tx_free, tx_active, NET_TX_QUEUE_SIZE_DRIV);
+    net_queue_init(&rx_queue, rx_free, rx_active, NET_RX_QUEUE_CAPACITY_DRIV);
+    net_queue_init(&tx_queue, tx_free, tx_active, NET_TX_QUEUE_CAPACITY_DRIV);
 
     eth_setup();
 

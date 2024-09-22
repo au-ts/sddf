@@ -13,15 +13,15 @@
 
 #include <sddf/util/util.h>
 
-// At most ECHO_QUEUE_SIZE - 1 bytes can be in the queue
-#define ECHO_QUEUE_SIZE (TCP_WND + 1)
+// At most ECHO_QUEUE_CAPACITY - 1 bytes can be in the queue
+#define ECHO_QUEUE_CAPACITY (TCP_WND + 1)
 
 struct echo_state {
     bool in_use;
     // sending ring buffer
     size_t tail; // data gets added at tail
     size_t head; // moved forward for acknowledged data
-    char buf[ECHO_QUEUE_SIZE];
+    char buf[ECHO_QUEUE_CAPACITY];
 };
 
 // This previously was a LWIP_MEMPOOL, but turns out that doesn't support sizes
@@ -49,13 +49,13 @@ static void tcp_state_free(struct echo_state *state)
 
 static size_t queue_space(struct echo_state *state)
 {
-    return (state->head + ECHO_QUEUE_SIZE - state->tail - 1) % ECHO_QUEUE_SIZE;
+    return (state->head + ECHO_QUEUE_CAPACITY - state->tail - 1) % ECHO_QUEUE_CAPACITY;
 }
 
 static size_t queue_cont_space(struct echo_state *state)
 {
     if (state->tail >= state->head) {
-        return ECHO_QUEUE_SIZE - state->tail;
+        return ECHO_QUEUE_CAPACITY - state->tail;
     }
     return state->head - state->tail - 1;
 }
@@ -65,7 +65,7 @@ static err_t tcp_echo_sent(void *arg, struct tcp_pcb *pcb, u16_t len)
     struct echo_state *state = arg;
     assert(state != NULL);
 
-    state->head = (state->head + len) % ECHO_QUEUE_SIZE;
+    state->head = (state->head + len) % ECHO_QUEUE_CAPACITY;
 
     // tcp_recved is only for increasing the TCP window, and isn't required to
     // ACK incoming packets (that is done automatically on receive).
@@ -144,7 +144,7 @@ static err_t tcp_echo_recv(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t
         }
 
         offset += copied_len;
-        state->tail = (state->tail + copied_len) % ECHO_QUEUE_SIZE;
+        state->tail = (state->tail + copied_len) % ECHO_QUEUE_CAPACITY;
     }
 
     tcp_output(pcb);

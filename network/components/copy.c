@@ -36,7 +36,7 @@ void rx_return(void)
             int err = net_dequeue_free(&rx_queue_cli, &cli_buffer);
             assert(!err);
 
-            if (cli_buffer.io_or_offset % NET_BUFFER_SIZE || cli_buffer.io_or_offset >= NET_BUFFER_SIZE * rx_queue_cli.size) {
+            if (cli_buffer.io_or_offset % NET_BUFFER_SIZE || cli_buffer.io_or_offset >= NET_BUFFER_SIZE * rx_queue_cli.capacity) {
                 sddf_dprintf("COPY|LOG: Client provided offset %lx which is not buffer aligned or outside of buffer region\n",
                              cli_buffer.io_or_offset);
                 continue;
@@ -97,12 +97,12 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
-    size_t cli_queue_size, virt_queue_size = 0;
-    net_copy_queue_size(microkit_name, &cli_queue_size, &virt_queue_size);
+    size_t cli_queue_capacity, virt_queue_capacity = 0;
+    net_copy_queue_capacity(microkit_name, &cli_queue_capacity, &virt_queue_capacity);
 
     /* Set up the queues */
-    net_queue_init(&rx_queue_cli, rx_free_cli, rx_active_cli, cli_queue_size);
-    net_queue_init(&rx_queue_virt, rx_free_virt, rx_active_virt, virt_queue_size);
+    net_queue_init(&rx_queue_cli, rx_free_cli, rx_active_cli, cli_queue_capacity);
+    net_queue_init(&rx_queue_virt, rx_free_virt, rx_active_virt, virt_queue_capacity);
 
     net_buffers_init(&rx_queue_cli, 0);
 }
