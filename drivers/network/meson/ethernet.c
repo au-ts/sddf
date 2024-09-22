@@ -59,14 +59,14 @@ net_queue_handle_t tx_queue;
 volatile struct eth_mac_regs *eth_mac;
 volatile struct eth_dma_regs *eth_dma;
 
-static inline bool hw_ring_full(hw_ring_t *ring, size_t ring_size)
+static inline bool hw_ring_full(hw_ring_t *ring, size_t ring_capacity)
 {
-    return !((ring->tail + 2 - ring->head) % ring_size);
+    return !((ring->tail + 2 - ring->head) % ring_capacity);
 }
 
-static inline bool hw_ring_empty(hw_ring_t *ring, size_t ring_size)
+static inline bool hw_ring_empty(hw_ring_t *ring, size_t ring_capacity)
 {
-    return !((ring->tail - ring->head) % ring_size);
+    return !((ring->tail - ring->head) % ring_capacity);
 }
 
 static void update_ring_slot(hw_ring_t *ring, unsigned int idx, uint32_t status,
@@ -271,8 +271,8 @@ void init(void)
 {
     eth_setup();
 
-    net_queue_init(&rx_queue, (net_queue_t *)rx_free, (net_queue_t *)rx_active, NET_RX_QUEUE_SIZE_DRIV);
-    net_queue_init(&tx_queue, (net_queue_t *)tx_free, (net_queue_t *)tx_active, NET_TX_QUEUE_SIZE_DRIV);
+    net_queue_init(&rx_queue, (net_queue_t *)rx_free, (net_queue_t *)rx_active, NET_RX_QUEUE_CAPACITY_DRIV);
+    net_queue_init(&tx_queue, (net_queue_t *)tx_free, (net_queue_t *)tx_active, NET_TX_QUEUE_CAPACITY_DRIV);
 
     rx_provide();
     tx_provide();
