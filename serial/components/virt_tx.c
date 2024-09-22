@@ -203,7 +203,7 @@ void tx_provide(microkit_channel ch)
 
 void init(void)
 {
-    serial_queue_init(&tx_queue_handle_drv, tx_queue_drv, SERIAL_TX_DATA_REGION_SIZE_DRIV, tx_data_drv);
+    serial_queue_init(&tx_queue_handle_drv, tx_queue_drv, SERIAL_TX_DATA_REGION_CAPACITY_DRIV, tx_data_drv);
     serial_virt_queue_init_sys(microkit_name, tx_queue_handle_cli, tx_queue_cli0, tx_data_cli0);
 
 #if !SERIAL_TX_ONLY
