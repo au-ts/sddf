@@ -11,7 +11,6 @@
 # Generates network_virt_rx.elf network_virt_tx.elf arp.elf copy.elf
 # Requires ${SDDF}/util/util.mk to build the utility library for debug output
 
-NETWORK_COMPONENTS_DIR := $(abspath $(dir $(lastword ${MAKEFILE_LIST})))
 NETWORK_IMAGES:= network_virt_rx.elf network_virt_tx.elf arp.elf copy.elf
 network/components/%.o: ${SDDF}/network/components/%.c
 	${CC} ${CFLAGS} -c -o $@ $<
@@ -40,10 +39,11 @@ network/components/network_virt_%.o: ${SDDF}/network/components/virt_%.c
 	${LD} ${LDFLAGS} -o $@ $< ${LIBS}
 
 clean::
-	rm -f network_virt_[rt]x.[od] copy.[od] arp.[od]
+	${RM} -f network_virt_[rt]x.[od] copy.[od] arp.[od]
 
 clobber::
-	rm -f ${IMAGES}
+	${RM} -f ${NETWORK_IMAGES}
+	rmdir network/components
 
 network/components:
 	mkdir -p $@
