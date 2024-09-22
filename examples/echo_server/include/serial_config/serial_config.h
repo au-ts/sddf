@@ -11,7 +11,7 @@
 #include <stdint.h>
 
 /* Number of clients that can be connected to the serial server. */
-#define SERIAL_NUM_CLIENTS 3
+#define NUM_SERIAL_CLIENTS 3
 
 /* Only support transmission and not receive. */
 #define SERIAL_TX_ONLY 1
@@ -41,47 +41,63 @@
 #define SERIAL_TX_DATA_REGION_CAPACITY_CLI1            SERIAL_DATA_REGION_CAPACITY
 #define SERIAL_TX_DATA_REGION_CAPACITY_CLI2            SERIAL_DATA_REGION_CAPACITY
 
+/* To avoid deadlocks caused when the virtualiser adds colour codes to the
+   start and end of strings, driver data region must be larger than any
+   client data region. */
 #define SERIAL_MAX_CLIENT_TX_DATA_CAPACITY MAX(SERIAL_TX_DATA_REGION_CAPACITY_CLI2, MAX(SERIAL_TX_DATA_REGION_CAPACITY_CLI0, SERIAL_TX_DATA_REGION_CAPACITY_CLI1))
 #if SERIAL_WITH_COLOUR
 _Static_assert(SERIAL_TX_DATA_REGION_CAPACITY_DRIV > SERIAL_MAX_CLIENT_TX_DATA_CAPACITY,
                "Driver TX data region must be larger than all client data regions in SERIAL_WITH_COLOUR mode.");
 #endif
 
+/* Ensure the entire data region can be assigned a unique index by a 32 bit
+   unsigned. */
 #define SERIAL_MAX_DATA_CAPACITY MAX(SERIAL_TX_DATA_REGION_CAPACITY_DRIV, SERIAL_MAX_CLIENT_TX_DATA_CAPACITY)
 _Static_assert(SERIAL_MAX_DATA_CAPACITY < UINT32_MAX,
                "Data regions must be smaller than UINT32 max to correctly use queue data structure.");
 
-static inline void serial_cli_queue_init_sys(char *pd_name, serial_queue_handle_t *rx_queue_handle,
-                                             serial_queue_t *rx_queue,
-                                             char *rx_data, serial_queue_handle_t *tx_queue_handle, serial_queue_t *tx_queue, char *tx_data)
+static inline void serial_cli_data_capacity(char *pd_name, uint32_t *rx_data_capacity, uint32_t *tx_data_capacity)
 {
     if (!sddf_strcmp(pd_name, SERIAL_CLI0_NAME)) {
-        serial_queue_init(tx_queue_handle, tx_queue, SERIAL_TX_DATA_REGION_CAPACITY_CLI0, tx_data);
+        *tx_data_capacity = SERIAL_TX_DATA_REGION_CAPACITY_CLI0;
     } else if (!sddf_strcmp(pd_name, SERIAL_CLI1_NAME)) {
-        serial_queue_init(tx_queue_handle, tx_queue, SERIAL_TX_DATA_REGION_CAPACITY_CLI1, tx_data);
+        *tx_data_capacity = SERIAL_TX_DATA_REGION_CAPACITY_CLI1;
     } else if (!sddf_strcmp(pd_name, SERIAL_CLI2_NAME)) {
-        serial_queue_init(tx_queue_handle, tx_queue, SERIAL_TX_DATA_REGION_CAPACITY_CLI2, tx_data);
+        *tx_data_capacity = SERIAL_TX_DATA_REGION_CAPACITY_CLI2;
     }
 }
 
-static inline void serial_virt_queue_init_sys(char *pd_name, serial_queue_handle_t *cli_queue_handle,
-                                              serial_queue_t *cli_queue, char *cli_data)
+typedef struct serial_queue_info {
+    serial_queue_t *cli_queue;
+    char *cli_data;
+    uint32_t capacity;
+} serial_queue_info_t;
+
+static inline void serial_virt_queue_info(char *pd_name, serial_queue_t *cli_queue, char *cli_data,
+                                          serial_queue_info_t ret[NUM_SERIAL_CLIENTS])
 {
     if (!sddf_strcmp(pd_name, SERIAL_VIRT_TX_NAME)) {
-        serial_queue_init(cli_queue_handle, cli_queue, SERIAL_TX_DATA_REGION_CAPACITY_CLI0, cli_data);
-        serial_queue_init(&cli_queue_handle[1], (serial_queue_t *)((uintptr_t)cli_queue + SERIAL_QUEUE_SIZE),
-                          SERIAL_TX_DATA_REGION_CAPACITY_CLI1, cli_data + SERIAL_TX_DATA_REGION_CAPACITY_CLI0);
-        serial_queue_init(&cli_queue_handle[2], (serial_queue_t *)((uintptr_t)cli_queue + 2 * SERIAL_QUEUE_SIZE),
-                          SERIAL_TX_DATA_REGION_CAPACITY_CLI2,
-                          cli_data + SERIAL_TX_DATA_REGION_CAPACITY_CLI0 + SERIAL_TX_DATA_REGION_CAPACITY_CLI1);
+        ret[0] = (serial_queue_info_t) { .cli_queue = cli_queue,
+                                         .cli_data = cli_data,
+                                         .capacity = SERIAL_TX_DATA_REGION_CAPACITY_CLI0 };
+        ret[1] =
+            (serial_queue_info_t) { .cli_queue = (serial_queue_t *)((uintptr_t)ret[0].cli_queue + SERIAL_QUEUE_SIZE),
+                                    .cli_data = ret[0].cli_data + ret[0].capacity,
+                                    .capacity = SERIAL_TX_DATA_REGION_CAPACITY_CLI1 };
+        ret[2] =
+            (serial_queue_info_t) { .cli_queue = (serial_queue_t *)((uintptr_t)ret[1].cli_queue + SERIAL_QUEUE_SIZE),
+                                    .cli_data = ret[1].cli_data + ret[1].capacity,
+                                    .capacity = SERIAL_TX_DATA_REGION_CAPACITY_CLI2 };
     }
 }
 
 #if SERIAL_WITH_COLOUR
-static inline void serial_channel_names_init(char **client_names)
+static inline void serial_channel_names_init(char *pd_name, char *client_names[NUM_SERIAL_CLIENTS])
 {
-    client_names[0] = SERIAL_CLI0_NAME;
-    client_names[1] = SERIAL_CLI1_NAME;
-    client_names[2] = SERIAL_CLI2_NAME;
+    if (!sddf_strcmp(pd_name, SERIAL_VIRT_TX_NAME)) {
+        client_names[0] = SERIAL_CLI0_NAME;
+        client_names[1] = SERIAL_CLI1_NAME;
+        client_names[2] = SERIAL_CLI2_NAME;
+    }
 }
 #endif

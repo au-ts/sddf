@@ -86,7 +86,7 @@ system file including client names and queue sizes, as well as updated initialis
 for clients and virtualisers.
 * **Makefile**
 You must include directories for **SERIAL_COMPONENTS**, the **UART_DRIVER** and your
-**SERIAL_CONFIG_INCLUDE**. You must also supply **SERIAL_NUM_CLIENTS**. You must add the uart
+**SERIAL_CONFIG_INCLUDE**. You must also supply **NUM_SERIAL_CLIENTS**. You must add the uart
 driver, transmit virtualiser and optionally the receive virtualiser to your image list. You must
 add your serial include directory to your cflags, and finally you must include the uart driver
 and serial_components make files. For each component you wish to have access to the serial
