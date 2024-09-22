@@ -32,7 +32,7 @@ const char *colours[] = {
     /* foreground blue */
     "\x1b[34m",
     /* foreground magenta */
-    "\x1b[35m"
+    "\x1b[35m",
     /* foreground cyan */
     "\x1b[36m"
 };
