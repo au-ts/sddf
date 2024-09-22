@@ -58,14 +58,14 @@ net_queue_handle_t tx_queue;
 
 volatile struct enet_regs *eth;
 
-static inline bool hw_ring_full(hw_ring_t *ring, size_t ring_size)
+static inline bool hw_ring_full(hw_ring_t *ring, size_t ring_capacity)
 {
-    return !((ring->tail - ring->head + 1) % ring_size);
+    return !((ring->tail - ring->head + 1) % ring_capacity);
 }
 
-static inline bool hw_ring_empty(hw_ring_t *ring, size_t ring_size)
+static inline bool hw_ring_empty(hw_ring_t *ring, size_t ring_capacity)
 {
-    return !((ring->tail - ring->head) % ring_size);
+    return !((ring->tail - ring->head) % ring_capacity);
 }
 
 static void update_ring_slot(hw_ring_t *ring, unsigned int idx, uintptr_t phys,
@@ -302,8 +302,8 @@ void init(void)
 {
     eth_setup();
 
-    net_queue_init(&rx_queue, rx_free, rx_active, NET_RX_QUEUE_SIZE_DRIV);
-    net_queue_init(&tx_queue, tx_free, tx_active, NET_TX_QUEUE_SIZE_DRIV);
+    net_queue_init(&rx_queue, rx_free, rx_active, NET_RX_QUEUE_CAPACITY_DRIV);
+    net_queue_init(&tx_queue, tx_free, tx_active, NET_TX_QUEUE_CAPACITY_DRIV);
 
     rx_provide();
     tx_provide();

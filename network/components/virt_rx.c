@@ -35,7 +35,7 @@ uintptr_t buffer_data_paddr;
 /* In order to handle broadcast packets where the same buffer is given to multiple clients
   * we keep track of a reference count of each buffer and only hand it back to the driver once
   * all clients have returned the buffer. */
-uint32_t buffer_refs[NET_RX_QUEUE_SIZE_DRIV] = {0};
+uint32_t buffer_refs[NET_RX_QUEUE_CAPACITY_DRIV] = {0};
 
 typedef struct state {
     net_queue_handle_t rx_queue_drv;
@@ -157,7 +157,7 @@ void rx_provide(void)
                 int err = net_dequeue_free(&state.rx_queue_clients[client], &buffer);
                 assert(!err);
                 assert(!(buffer.io_or_offset % NET_BUFFER_SIZE) &&
-                       (buffer.io_or_offset < NET_BUFFER_SIZE * state.rx_queue_clients[client].size));
+                       (buffer.io_or_offset < NET_BUFFER_SIZE * state.rx_queue_clients[client].capacity));
 
                 int ref_index = buffer.io_or_offset / NET_BUFFER_SIZE;
                 assert(buffer_refs[ref_index] != 0);
@@ -213,11 +213,11 @@ void init(void)
     for (int i = 0; i < NUM_NETWORK_CLIENTS; i++) {
         net_set_mac_addr((uint8_t *) &state.mac_addrs[i], macs[i]);
         net_queue_init(&state.rx_queue_clients[i], queue_info[i].free, queue_info[i].active,
-                       queue_info[i].size);
+                       queue_info[i].capacity);
     }
 
     /* Set up driver queues */
-    net_queue_init(&state.rx_queue_drv, rx_free_drv, rx_active_drv, NET_RX_QUEUE_SIZE_DRIV);
+    net_queue_init(&state.rx_queue_drv, rx_free_drv, rx_active_drv, NET_RX_QUEUE_CAPACITY_DRIV);
     net_buffers_init(&state.rx_queue_drv, buffer_data_paddr);
 
     if (net_require_signal_free(&state.rx_queue_drv)) {

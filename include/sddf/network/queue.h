@@ -36,18 +36,18 @@ typedef struct net_queue_handle {
     net_queue_t *free;
     /* filled buffers */
     net_queue_t *active;
-    /* size of the queues */
-    uint32_t size;
+    /* capacity of the queues */
+    uint32_t capacity;
 } net_queue_handle_t;
 
 /**
  * Get the number of buffers enqueued into a queue.
  *
- * @param queue queue handle for the queue to get the size of.
+ * @param queue queue handle for the queue to get the length of.
  *
  * @return number of buffers enqueued into a queue.
  */
-static inline uint16_t net_queue_size(net_queue_t *queue)
+static inline uint16_t net_queue_length(net_queue_t *queue)
 {
     return queue->tail - queue->head;
 }
@@ -79,13 +79,13 @@ static inline bool net_queue_empty_active(net_queue_handle_t *queue)
 /**
  * Check if the free queue is full.
  *
- * @param queue queue handle t for the free queue to check.
+ * @param queue queue handle for the free queue to check.
  *
  * @return true indicates the queue is full, false otherwise.
  */
 static inline bool net_queue_full_free(net_queue_handle_t *queue)
 {
-    return queue->free->tail + 1 - queue->free->head == queue->size;
+    return queue->free->tail + 1 - queue->free->head == queue->capacity;
 }
 
 /**
@@ -97,7 +97,7 @@ static inline bool net_queue_full_free(net_queue_handle_t *queue)
  */
 static inline bool net_queue_full_active(net_queue_handle_t *queue)
 {
-    return queue->active->tail + 1 - queue->active->head == queue->size;
+    return queue->active->tail + 1 - queue->active->head == queue->capacity;
 }
 
 /**
@@ -114,7 +114,7 @@ static inline int net_enqueue_free(net_queue_handle_t *queue, net_buff_desc_t bu
         return -1;
     }
 
-    queue->free->buffers[queue->free->tail % queue->size] = buffer;
+    queue->free->buffers[queue->free->tail % queue->capacity] = buffer;
 #ifdef CONFIG_ENABLE_SMP_SUPPORT
     THREAD_MEMORY_RELEASE();
 #endif
@@ -137,7 +137,7 @@ static inline int net_enqueue_active(net_queue_handle_t *queue, net_buff_desc_t 
         return -1;
     }
 
-    queue->active->buffers[queue->active->tail % queue->size] = buffer;
+    queue->active->buffers[queue->active->tail % queue->capacity] = buffer;
 #ifdef CONFIG_ENABLE_SMP_SUPPORT
     THREAD_MEMORY_RELEASE();
 #endif
@@ -160,7 +160,7 @@ static inline int net_dequeue_free(net_queue_handle_t *queue, net_buff_desc_t *b
         return -1;
     }
 
-    *buffer = queue->free->buffers[queue->free->head % queue->size];
+    *buffer = queue->free->buffers[queue->free->head % queue->capacity];
 #ifdef CONFIG_ENABLE_SMP_SUPPORT
     THREAD_MEMORY_RELEASE();
 #endif
@@ -183,7 +183,7 @@ static inline int net_dequeue_active(net_queue_handle_t *queue, net_buff_desc_t 
         return -1;
     }
 
-    *buffer = queue->active->buffers[queue->active->head % queue->size];
+    *buffer = queue->active->buffers[queue->active->head % queue->capacity];
 #ifdef CONFIG_ENABLE_SMP_SUPPORT
     THREAD_MEMORY_RELEASE();
 #endif
@@ -198,13 +198,13 @@ static inline int net_dequeue_active(net_queue_handle_t *queue, net_buff_desc_t 
  * @param queue queue handle to use.
  * @param free pointer to free queue in shared memory.
  * @param active pointer to active queue in shared memory.
- * @param size size of the free and active queues.
+ * @param capacity capacity of the free and active queues.
  */
-static inline void net_queue_init(net_queue_handle_t *queue, net_queue_t *free, net_queue_t *active, uint32_t size)
+static inline void net_queue_init(net_queue_handle_t *queue, net_queue_t *free, net_queue_t *active, uint32_t capacity)
 {
     queue->free = free;
     queue->active = active;
-    queue->size = size;
+    queue->capacity = capacity;
 }
 
 /**
@@ -215,7 +215,7 @@ static inline void net_queue_init(net_queue_handle_t *queue, net_queue_t *free, 
  */
 static inline void net_buffers_init(net_queue_handle_t *queue, uintptr_t base_addr)
 {
-    for (uint32_t i = 0; i < queue->size - 1; i++) {
+    for (uint32_t i = 0; i < queue->capacity - 1; i++) {
         net_buff_desc_t buffer = {(NET_BUFFER_SIZE * i) + base_addr, 0};
         int err = net_enqueue_free(queue, buffer);
         assert(!err);
