@@ -286,13 +286,15 @@ static void netif_status_callback(struct netif *netif)
 
 void init(void)
 {
-    serial_cli_queue_init_sys(microkit_name, NULL, NULL, NULL, &serial_tx_queue_handle, serial_tx_queue, serial_tx_data);
+    uint32_t serial_tx_data_capacity;
+    serial_cli_data_capacity(microkit_name, NULL, &serial_tx_data_capacity);
+    serial_queue_init(&serial_tx_queue_handle, serial_tx_queue, serial_tx_data_capacity, serial_tx_data);
     serial_putchar_init(SERIAL_TX_CH, &serial_tx_queue_handle);
 
-    size_t rx_capacity, tx_capacity;
-    net_cli_queue_capacity(microkit_name, &rx_capacity, &tx_capacity);
-    net_queue_init(&state.rx_queue, rx_free, rx_active, rx_capacity);
-    net_queue_init(&state.tx_queue, tx_free, tx_active, tx_capacity);
+    size_t net_rx_capacity, net_tx_capacity;
+    net_cli_queue_capacity(microkit_name, &net_rx_capacity, &net_tx_capacity);
+    net_queue_init(&state.rx_queue, rx_free, rx_active, net_rx_capacity);
+    net_queue_init(&state.tx_queue, tx_free, tx_active, net_tx_capacity);
     net_buffers_init(&state.tx_queue, 0);
 
     lwip_init();
