@@ -20,6 +20,12 @@ const DriverClass = struct {
         jh7110,
     };
 
+    const Network = enum {
+        imx,
+        meson,
+        virtio
+    };
+
     const I2cHost = enum {
         meson,
     };
@@ -188,6 +194,32 @@ fn addBlockDriver(
     return driver;
 }
 
+fn addNetworkDriver(
+    b: *std.Build,
+    net_config_include: LazyPath,
+    util: *std.Build.Step.Compile,
+    class: DriverClass.Network,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+) *std.Build.Step.Compile {
+    const driver = addPd(b, .{
+        .name = b.fmt("driver_net_{s}.elf", .{ @tagName(class) }),
+        .target = target,
+        .optimize = optimize,
+        .strip = false,
+    });
+    const source = b.fmt("drivers/network/{s}/ethernet.c", .{ @tagName(class) });
+    driver.addCSourceFile(.{
+        .file = b.path(source),
+    });
+    driver.addIncludePath(net_config_include);
+    driver.addIncludePath(b.path(b.fmt("drivers/network/{s}/", .{ @tagName(class) })));
+    driver.addIncludePath(b.path("include"));
+    driver.linkLibrary(util);
+
+    return driver;
+}
+
 fn addPd(b: *std.Build, options: std.Build.ExecutableOptions) *std.Build.Step.Compile {
     const pd = b.addExecutable(options);
     pd.addObjectFile(libmicrokit);
@@ -206,6 +238,7 @@ pub fn build(b: *std.Build) void {
     const libmicrokit_linker_script_opt = b.option([]const u8, "libmicrokit_linker_script", "Path to the libmicrokit linker script") orelse null;
     const blk_config_include_opt = b.option([]const u8, "blk_config_include", "Include path to block config header") orelse "";
     const serial_config_include_option = b.option([]const u8, "serial_config_include", "Include path to serial config header") orelse "";
+    const net_config_include_option = b.option([]const u8, "net_config_include", "Include path to network config header") orelse "";
     const i2c_client_include_option = b.option([]const u8, "i2c_client_include", "Include path to client config header") orelse "";
 
     // TODO: Right now this is not super ideal. What's happening is that we do not
@@ -215,6 +248,7 @@ pub fn build(b: *std.Build) void {
     // debug error if you do need a serial config but forgot to pass one in.
     const serial_config_include = LazyPath{ .cwd_relative = serial_config_include_option };
     const blk_config_include = LazyPath{ .cwd_relative = blk_config_include_opt };
+    const net_config_include = LazyPath{ .cwd_relative = net_config_include_option };
     const i2c_client_include = LazyPath{ .cwd_relative = i2c_client_include_option };
     // libmicrokit
     // We're declaring explicitly here instead of with anonymous structs due to a bug. See https://github.com/ziglang/zig/issues/19832
@@ -357,4 +391,57 @@ pub fn build(b: *std.Build) void {
         driver.linkLibrary(util_putchar_debug);
         b.installArtifact(driver);
     }
+
+    // Network drivers
+    inline for (std.meta.fields(DriverClass.Network)) |class| {
+        const driver = addNetworkDriver(b, net_config_include, util, @enumFromInt(class.value), target, optimize);
+        driver.linkLibrary(util_putchar_debug);
+        b.installArtifact(driver);
+    }
+
+    // Network components
+    const net_virt_rx = addPd(b, .{
+        .name = "net_virt_rx.elf",
+        .target = target,
+        .optimize = optimize,
+        .strip = false,
+    });
+    net_virt_rx.addCSourceFile(.{
+        .file = b.path("network/components/virt_rx.c"),
+    });
+    net_virt_rx.addIncludePath(net_config_include);
+    net_virt_rx.addIncludePath(b.path("include"));
+    net_virt_rx.linkLibrary(util);
+    net_virt_rx.linkLibrary(util_putchar_debug);
+    b.installArtifact(net_virt_rx);
+
+    const net_virt_tx = addPd(b, .{
+        .name = "net_virt_tx.elf",
+        .target = target,
+        .optimize = optimize,
+        .strip = false,
+    });
+    net_virt_tx.addCSourceFile(.{
+        .file = b.path("network/components/virt_tx.c"),
+    });
+    net_virt_tx.addIncludePath(net_config_include);
+    net_virt_tx.addIncludePath(b.path("include"));
+    net_virt_tx.linkLibrary(util);
+    net_virt_tx.linkLibrary(util_putchar_debug);
+    b.installArtifact(net_virt_tx);
+
+    const net_copy = addPd(b, .{
+        .name = "net_copy.elf",
+        .target = target,
+        .optimize = optimize,
+        .strip = false,
+    });
+    net_copy.addCSourceFile(.{
+        .file = b.path("network/components/copy.c"),
+    });
+    net_copy.addIncludePath(net_config_include);
+    net_copy.addIncludePath(b.path("include"));
+    net_copy.linkLibrary(util);
+    net_copy.linkLibrary(util_putchar_debug);
+    b.installArtifact(net_copy);
 }
