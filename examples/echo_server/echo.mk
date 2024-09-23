@@ -7,19 +7,24 @@
 QEMU := qemu-system-aarch64
 
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
-ECHO_SERVER:=${SDDF}/examples/echo_server
-LWIPDIR:=network/ipstacks/lwip/src
+BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
+ECHO_SERVER:=$(SDDF)/examples/echo_server
+
 BENCHMARK:=$(SDDF)/benchmark
-UTIL:=$(SDDF)/util
+CORE_CONFIG_INCLUDE:=$(ECHO_SERVER)/include/core_config$(CONFIG_INCLUDE_SMP)
+
+LWIPDIR:=network/ipstacks/lwip/src
+NETWORK_COMPONENTS:=$(SDDF)/network/components
 ETHERNET_DRIVER:=$(SDDF)/drivers/network/$(DRIV_DIR)
-ETHERNET_CONFIG_INCLUDE:=${ECHO_SERVER}/include/ethernet_config
+ETHERNET_CONFIG_INCLUDE:=$(ECHO_SERVER)/include/ethernet_config
+
 SERIAL_COMPONENTS := $(SDDF)/serial/components
 UART_DRIVER := $(SDDF)/drivers/serial/$(UART_DRIV_DIR)
-SERIAL_CONFIG_INCLUDE:=${ECHO_SERVER}/include/serial_config
-TIMER_DRIVER:=$(SDDF)/drivers/timer/$(TIMER_DRV_DIR)
-NETWORK_COMPONENTS:=$(SDDF)/network/components
+SERIAL_CONFIG_INCLUDE:=$(ECHO_SERVER)/include/serial_config$(CONFIG_INCLUDE_SMP)
 
-BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
+TIMER_DRIVER:=$(SDDF)/drivers/timer/$(TIMER_DRV_DIR)
+UTIL:=$(SDDF)/util
+
 SYSTEM_FILE := ${ECHO_SERVER}/board/$(MICROKIT_BOARD)/echo_server.system
 IMAGE_FILE := loader.img
 REPORT_FILE := report.txt
@@ -37,11 +42,12 @@ CFLAGS := -mcpu=$(CPU) \
 	  -DMICROKIT_CONFIG_$(MICROKIT_CONFIG) \
 	  -I$(BOARD_DIR)/include \
 	  -I$(SDDF)/include \
-	  -I${ECHO_INCLUDE}/lwip \
-	  -I${ETHERNET_CONFIG_INCLUDE} \
+	  -I$(ECHO_INCLUDE)/lwip \
+	  -I$(CORE_CONFIG_INCLUDE) \
+	  -I$(ETHERNET_CONFIG_INCLUDE) \
 	  -I$(SERIAL_CONFIG_INCLUDE) \
-	  -I${SDDF}/$(LWIPDIR)/include \
-	  -I${SDDF}/$(LWIPDIR)/include/ipv4 \
+	  -I$(SDDF)/$(LWIPDIR)/include \
+	  -I$(SDDF)/$(LWIPDIR)/include/ipv4 \
 	  -MD \
 	  -MP
 

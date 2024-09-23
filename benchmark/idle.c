@@ -13,7 +13,6 @@
 #define INIT 3
 #define MAGIC_CYCLES 150
 
-uintptr_t cyclecounters_vaddr;
 struct bench *b;
 
 void count_idle(void)
@@ -48,6 +47,5 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
-    b = (void *)cyclecounters_vaddr;
     return;
 }

@@ -43,33 +43,56 @@
     <memory_region name="net_tx_free_cli1" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="net_tx_active_cli1" size="0x200_000" page_size="0x200_000"/>
 
-    <memory_region name="cyclecounters" size="0x1000"/>
+    <memory_region name="cyclecounters0" size="0x1000"/>
+    <memory_region name="cyclecounters1" size="0x1000"/>
+    <memory_region name="cyclecounters2" size="0x1000"/>
+    <memory_region name="cyclecounters3" size="0x1000"/>
 
     <!-- shared memory for serial data regions -->
     <memory_region name="serial_tx_data_driver" size="0x4_000" />
     <memory_region name="serial_tx_data_client0" size="0x2_000" />
     <memory_region name="serial_tx_data_client1" size="0x2_000" />
     <memory_region name="serial_tx_data_client2" size="0x2_000" />
+    <memory_region name="serial_tx_data_client3" size="0x2_000" />
+    <memory_region name="serial_tx_data_client4" size="0x2_000" />
+    <memory_region name="serial_tx_data_client5" size="0x2_000" />
 
     <!-- shared memory for serial queue regions -->
     <memory_region name="serial_tx_queue_driver" size="0x1_000" />
     <memory_region name="serial_tx_queue_client0" size="0x1_000" />
     <memory_region name="serial_tx_queue_client1" size="0x1_000" />
     <memory_region name="serial_tx_queue_client2" size="0x1_000" />
+    <memory_region name="serial_tx_queue_client3" size="0x1_000" />
+    <memory_region name="serial_tx_queue_client4" size="0x1_000" />
+    <memory_region name="serial_tx_queue_client5" size="0x1_000" />
 
-    <protection_domain name="benchIdle" priority="1" >
+    <protection_domain name="benchIdle0" priority="1" cpu="0">
         <program_image path="idle.elf" />
-        <!-- benchmark.c puts PMU data in here for lwip to collect -->
-        <map mr="cyclecounters" vaddr="0x5_010_000" perms="rw" cached="true" setvar_vaddr="b" />
+        <map mr="cyclecounters0" vaddr="0x5_010_000" perms="rw" cached="true" setvar_vaddr="b" />
     </protection_domain>
 
-    <protection_domain name="bench0" priority="102" >
+    <protection_domain name="benchIdle1" priority="1" cpu="1">
+        <program_image path="idle.elf" />
+        <map mr="cyclecounters1" vaddr="0x5_010_000" perms="rw" cached="true" setvar_vaddr="b" />
+    </protection_domain>
+
+    <protection_domain name="benchIdle2" priority="1" cpu="2">
+        <program_image path="idle.elf" />
+        <map mr="cyclecounters2" vaddr="0x5_010_000" perms="rw" cached="true" setvar_vaddr="b" />
+    </protection_domain>
+
+    <protection_domain name="benchIdle3" priority="1" cpu="3">
+        <program_image path="idle.elf" />
+        <map mr="cyclecounters3" vaddr="0x5_010_000" perms="rw" cached="true" setvar_vaddr="b" />
+    </protection_domain>
+
+    <protection_domain name="bench0" priority="102" cpu="0">
         <program_image path="benchmark.elf" />
 
         <map mr="serial_tx_queue_client2" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="serial_tx_queue" />
         <map mr="serial_tx_data_client2" vaddr="0x4_002_000" perms="rw" cached="true" setvar_vaddr="serial_tx_data" />
 
-        <protection_domain name="eth" priority="101" id="1" budget="100" period="400">
+        <protection_domain name="eth" priority="101" id="1" budget="100" period="400" cpu="0">
             <program_image path="eth_driver.elf" />
             <map mr="eth0" vaddr="0x2_000_000" perms="rw" cached="false" setvar_vaddr="eth"/>
 
@@ -84,6 +107,115 @@
 
             <setvar symbol="hw_ring_buffer_paddr" region_paddr="hw_ring_buffer" />
         </protection_domain>
+
+        <protection_domain name="net_virt_tx" priority="100" budget="20000" id="3" cpu="0">
+            <program_image path="network_virt_tx.elf" />
+            <map mr="net_tx_free_drv" vaddr="0x2_000_000" perms="rw" cached="true" setvar_vaddr="tx_free_drv" />
+            <map mr="net_tx_active_drv" vaddr="0x2_200_000" perms="rw" cached="true" setvar_vaddr="tx_active_drv" />
+
+            <map mr="net_tx_free_cli0" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="tx_free_cli0" />
+            <map mr="net_tx_active_cli0" vaddr="0x2_600_000" perms="rw" cached="true" setvar_vaddr="tx_active_cli0" />
+            <map mr="net_tx_free_cli1" vaddr="0x2_800_000" perms="rw" cached="true" />
+            <map mr="net_tx_active_cli1" vaddr="0x2_a00_000" perms="rw" cached="true" />
+
+            <map mr="net_tx_buffer_data_region_cli0" vaddr="0x2_c00_000" perms="r" cached="true" setvar_vaddr="buffer_data_region_cli0_vaddr" />
+            <map mr="net_tx_buffer_data_region_cli1" vaddr="0x2_e00_000" perms="r" cached="true" />
+            <setvar symbol="buffer_data_region_cli0_paddr" region_paddr="net_tx_buffer_data_region_cli0" />
+            <setvar symbol="buffer_data_region_cli1_paddr" region_paddr="net_tx_buffer_data_region_cli1" />
+        </protection_domain>
+    </protection_domain>
+
+    <protection_domain name="bench1" priority="102" cpu="1">
+        <program_image path="benchmark.elf" />
+
+        <map mr="serial_tx_queue_client3" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="serial_tx_queue" />
+        <map mr="serial_tx_data_client3" vaddr="0x4_002_000" perms="rw" cached="true" setvar_vaddr="serial_tx_data" />
+
+        <protection_domain name="net_virt_rx" priority="99" id="2" cpu="1">
+            <program_image path="network_virt_rx.elf" />
+            <map mr="net_rx_free_drv" vaddr="0x2_000_000" perms="rw" cached="true" setvar_vaddr="rx_free_drv" />
+            <map mr="net_rx_active_drv" vaddr="0x2_200_000" perms="rw" cached="true" setvar_vaddr="rx_active_drv" />
+
+            <map mr="net_rx_free_copy0" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="rx_free_cli0" />
+            <map mr="net_rx_active_copy0" vaddr="0x2_600_000" perms="rw" cached="true" setvar_vaddr="rx_active_cli0" />
+            <map mr="net_rx_free_copy1" vaddr="0x2_800_000" perms="rw" cached="true" />
+            <map mr="net_rx_active_copy1" vaddr="0x2_a00_000" perms="rw" cached="true" />
+
+            <map mr="net_rx_buffer_data_region" vaddr="0x2_c00_000" perms="r" cached="true" setvar_vaddr="buffer_data_vaddr" />
+            <setvar symbol="buffer_data_paddr" region_paddr="net_rx_buffer_data_region" />
+        </protection_domain>
+
+        <protection_domain name="copy0" priority="98" budget="20000" id="4" cpu="1">
+            <program_image path="copy.elf" />
+            <map mr="net_rx_free_copy0" vaddr="0x2_000_000" perms="rw" cached="true" setvar_vaddr="rx_free_virt" />
+            <map mr="net_rx_active_copy0" vaddr="0x2_200_000" perms="rw" cached="true" setvar_vaddr="rx_active_virt" />
+
+            <map mr="net_rx_free_cli0" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="rx_free_cli" />
+            <map mr="net_rx_active_cli0" vaddr="0x2_600_000" perms="rw" cached="true" setvar_vaddr="rx_active_cli" />
+
+            <map mr="net_rx_buffer_data_region" vaddr="0x2_800_000" perms="r" cached="true" setvar_vaddr="virt_buffer_data_region" />
+            <map mr="net_rx_buffer_data_region_cli0" vaddr="0x2_a00_000" perms="rw" cached="true" setvar_vaddr="cli_buffer_data_region" />
+        </protection_domain>
+
+        <protection_domain name="copy1" priority="96" budget="20000" id="5" cpu="1">
+            <program_image path="copy.elf" />
+            <map mr="net_rx_free_copy1" vaddr="0x2_000_000" perms="rw" cached="true" setvar_vaddr="rx_free_virt" />
+            <map mr="net_rx_active_copy1" vaddr="0x2_200_000" perms="rw" cached="true" setvar_vaddr="rx_active_virt" />
+
+            <map mr="net_rx_free_cli1" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="rx_free_cli" />
+            <map mr="net_rx_active_cli1" vaddr="0x2_600_000" perms="rw" cached="true" setvar_vaddr="rx_active_cli" />
+
+            <map mr="net_rx_buffer_data_region" vaddr="0x2_800_000" perms="r" cached="true" setvar_vaddr="virt_buffer_data_region" />
+            <map mr="net_rx_buffer_data_region_cli1" vaddr="0x2_a00_000" perms="rw" cached="true" setvar_vaddr="cli_buffer_data_region" />
+        </protection_domain>
+
+        <protection_domain name="client0" priority="97" budget="20000" id="6" cpu="1">
+            <program_image path="lwip.elf" />
+
+            <map mr="net_rx_free_cli0" vaddr="0x2_000_000" perms="rw" cached="true" setvar_vaddr="rx_free" />
+            <map mr="net_rx_active_cli0" vaddr="0x2_200_000" perms="rw" cached="true" setvar_vaddr="rx_active" />
+            <map mr="net_tx_free_cli0" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="tx_free" />
+            <map mr="net_tx_active_cli0" vaddr="0x2_600_000" perms="rw" cached="true" setvar_vaddr="tx_active" />
+
+            <map mr="net_rx_buffer_data_region_cli0" vaddr="0x2_800_000" perms="rw" cached="true" setvar_vaddr="rx_buffer_data_region" />
+            <map mr="net_tx_buffer_data_region_cli0" vaddr="0x2_a00_000" perms="rw" cached="true" setvar_vaddr="tx_buffer_data_region" />
+
+            <map mr="serial_tx_queue_client0" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="serial_tx_queue" />
+            <map mr="serial_tx_data_client0" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="serial_tx_data" />
+
+            <map mr="cyclecounters0" vaddr="0x5_010_000" perms="rw" cached="true" setvar_vaddr="idle_ccounts_vaddr" />
+            <map mr="cyclecounters1" vaddr="0x5_011_000" perms="rw" cached="true" />
+            <map mr="cyclecounters2" vaddr="0x5_012_000" perms="rw" cached="true" />
+            <map mr="cyclecounters3" vaddr="0x5_013_000" perms="rw" cached="true" />
+        </protection_domain>
+
+        <protection_domain name="client1" priority="95" budget="20000" id="7" cpu="1">
+            <program_image path="lwip.elf" />
+
+            <map mr="net_rx_free_cli1" vaddr="0x2_000_000" perms="rw" cached="true" setvar_vaddr="rx_free" />
+            <map mr="net_rx_active_cli1" vaddr="0x2_200_000" perms="rw" cached="true" setvar_vaddr="rx_active" />
+            <map mr="net_tx_free_cli1" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="tx_free" />
+            <map mr="net_tx_active_cli1" vaddr="0x2_600_000" perms="rw" cached="true" setvar_vaddr="tx_active" />
+
+            <map mr="net_rx_buffer_data_region_cli1" vaddr="0x2_800_000" perms="rw" cached="true" setvar_vaddr="rx_buffer_data_region" />
+            <map mr="net_tx_buffer_data_region_cli1" vaddr="0x2_a00_000" perms="rw" cached="true" setvar_vaddr="tx_buffer_data_region" />
+
+            <map mr="serial_tx_queue_client1" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="serial_tx_queue" />
+            <map mr="serial_tx_data_client1" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="serial_tx_data" />
+        </protection_domain>
+
+        <protection_domain name="timer" priority="101" pp="true" id="8" passive="true" cpu="1">
+            <program_image path="timer_driver.elf" />
+            <map mr="timer" vaddr="0x2_000_000" perms="rw" cached="false" setvar_vaddr="gpt_regs" />
+            <irq irq="87" id="0" /> <!-- timer interrupt -->
+        </protection_domain>
+    </protection_domain>
+
+    <protection_domain name="bench2" priority="102" cpu="2">
+        <program_image path="benchmark.elf" />
+
+        <map mr="serial_tx_queue_client4" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="serial_tx_queue" />
+        <map mr="serial_tx_data_client4" vaddr="0x4_002_000" perms="rw" cached="true" setvar_vaddr="serial_tx_data" />
 
         <protection_domain name="uart" priority="100" id="9">
             <program_image path="uart_driver.elf" />
@@ -102,104 +234,25 @@
             <map mr="serial_tx_queue_client0" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="tx_queue_cli0" />
             <map mr="serial_tx_queue_client1" vaddr="0x4_002_000" perms="rw" cached="true"/>
             <map mr="serial_tx_queue_client2" vaddr="0x4_003_000" perms="rw" cached="true"/>
+            <map mr="serial_tx_queue_client3" vaddr="0x4_004_000" perms="rw" cached="true"/>
+            <map mr="serial_tx_queue_client4" vaddr="0x4_005_000" perms="rw" cached="true"/>
+            <map mr="serial_tx_queue_client5" vaddr="0x4_006_000" perms="rw" cached="true"/>
 
-            <map mr="serial_tx_data_driver" vaddr="0x4_004_000" perms="rw" cached="true" setvar_vaddr="tx_data_drv" />
-            <map mr="serial_tx_data_client0" vaddr="0x4_008_000" perms="r" cached="true" setvar_vaddr="tx_data_cli0" />
-            <map mr="serial_tx_data_client1" vaddr="0x4_00a_000" perms="r" cached="true"/>
-            <map mr="serial_tx_data_client2" vaddr="0x4_00c_000" perms="r" cached="true"/>
+            <map mr="serial_tx_data_driver" vaddr="0x4_008_000" perms="rw" cached="true" setvar_vaddr="tx_data_drv" />
+            <map mr="serial_tx_data_client0" vaddr="0x4_00c_000" perms="r" cached="true" setvar_vaddr="tx_data_cli0" />
+            <map mr="serial_tx_data_client1" vaddr="0x4_00e_000" perms="r" cached="true"/>
+            <map mr="serial_tx_data_client2" vaddr="0x4_010_000" perms="r" cached="true"/>
+            <map mr="serial_tx_data_client3" vaddr="0x4_012_000" perms="r" cached="true"/>
+            <map mr="serial_tx_data_client4" vaddr="0x4_014_000" perms="r" cached="true"/>
+            <map mr="serial_tx_data_client5" vaddr="0x4_016_000" perms="r" cached="true"/>
         </protection_domain>
+    </protection_domain>
 
-        <protection_domain name="net_virt_rx" priority="99" id="2">
-            <program_image path="network_virt_rx.elf" />
-            <map mr="net_rx_free_drv" vaddr="0x2_000_000" perms="rw" cached="true" setvar_vaddr="rx_free_drv" />
-            <map mr="net_rx_active_drv" vaddr="0x2_200_000" perms="rw" cached="true" setvar_vaddr="rx_active_drv" />
+    <protection_domain name="bench3" priority="102" cpu="3">
+        <program_image path="benchmark.elf" />
 
-            <map mr="net_rx_free_copy0" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="rx_free_cli0" />
-            <map mr="net_rx_active_copy0" vaddr="0x2_600_000" perms="rw" cached="true" setvar_vaddr="rx_active_cli0" />
-            <map mr="net_rx_free_copy1" vaddr="0x2_800_000" perms="rw" cached="true" />
-            <map mr="net_rx_active_copy1" vaddr="0x2_a00_000" perms="rw" cached="true" />
-
-            <map mr="net_rx_buffer_data_region" vaddr="0x2_c00_000" perms="r" cached="true" setvar_vaddr="buffer_data_vaddr" />
-            <setvar symbol="buffer_data_paddr" region_paddr="net_rx_buffer_data_region" />
-        </protection_domain>
-
-        <protection_domain name="copy0" priority="98" budget="20000" id="4">
-            <program_image path="copy.elf" />
-            <map mr="net_rx_free_copy0" vaddr="0x2_000_000" perms="rw" cached="true" setvar_vaddr="rx_free_virt" />
-            <map mr="net_rx_active_copy0" vaddr="0x2_200_000" perms="rw" cached="true" setvar_vaddr="rx_active_virt" />
-
-            <map mr="net_rx_free_cli0" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="rx_free_cli" />
-            <map mr="net_rx_active_cli0" vaddr="0x2_600_000" perms="rw" cached="true" setvar_vaddr="rx_active_cli" />
-
-            <map mr="net_rx_buffer_data_region" vaddr="0x2_800_000" perms="r" cached="true" setvar_vaddr="virt_buffer_data_region" />
-            <map mr="net_rx_buffer_data_region_cli0" vaddr="0x2_a00_000" perms="rw" cached="true" setvar_vaddr="cli_buffer_data_region" />
-        </protection_domain>
-
-        <protection_domain name="copy1" priority="96" budget="20000" id="5">
-            <program_image path="copy.elf" />
-            <map mr="net_rx_free_copy1" vaddr="0x2_000_000" perms="rw" cached="true" setvar_vaddr="rx_free_virt" />
-            <map mr="net_rx_active_copy1" vaddr="0x2_200_000" perms="rw" cached="true" setvar_vaddr="rx_active_virt" />
-
-            <map mr="net_rx_free_cli1" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="rx_free_cli" />
-            <map mr="net_rx_active_cli1" vaddr="0x2_600_000" perms="rw" cached="true" setvar_vaddr="rx_active_cli" />
-
-            <map mr="net_rx_buffer_data_region" vaddr="0x2_800_000" perms="r" cached="true" setvar_vaddr="virt_buffer_data_region" />
-            <map mr="net_rx_buffer_data_region_cli1" vaddr="0x2_a00_000" perms="rw" cached="true" setvar_vaddr="cli_buffer_data_region" />
-        </protection_domain>
-
-        <protection_domain name="net_virt_tx" priority="100" budget="20000" id="3">
-            <program_image path="network_virt_tx.elf" />
-            <map mr="net_tx_free_drv" vaddr="0x2_000_000" perms="rw" cached="true" setvar_vaddr="tx_free_drv" />
-            <map mr="net_tx_active_drv" vaddr="0x2_200_000" perms="rw" cached="true" setvar_vaddr="tx_active_drv" />
-
-            <map mr="net_tx_free_cli0" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="tx_free_cli0" />
-            <map mr="net_tx_active_cli0" vaddr="0x2_600_000" perms="rw" cached="true" setvar_vaddr="tx_active_cli0" />
-            <map mr="net_tx_free_cli1" vaddr="0x2_800_000" perms="rw" cached="true" />
-            <map mr="net_tx_active_cli1" vaddr="0x2_a00_000" perms="rw" cached="true" />
-
-            <map mr="net_tx_buffer_data_region_cli0" vaddr="0x2_c00_000" perms="r" cached="true" setvar_vaddr="buffer_data_region_cli0_vaddr" />
-            <map mr="net_tx_buffer_data_region_cli1" vaddr="0x2_e00_000" perms="r" cached="true" />
-            <setvar symbol="buffer_data_region_cli0_paddr" region_paddr="net_tx_buffer_data_region_cli0" />
-            <setvar symbol="buffer_data_region_cli1_paddr" region_paddr="net_tx_buffer_data_region_cli1" />
-        </protection_domain>
-
-        <protection_domain name="client0" priority="97" budget="20000" id="6">
-            <program_image path="lwip.elf" />
-
-            <map mr="net_rx_free_cli0" vaddr="0x2_000_000" perms="rw" cached="true" setvar_vaddr="rx_free" />
-            <map mr="net_rx_active_cli0" vaddr="0x2_200_000" perms="rw" cached="true" setvar_vaddr="rx_active" />
-            <map mr="net_tx_free_cli0" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="tx_free" />
-            <map mr="net_tx_active_cli0" vaddr="0x2_600_000" perms="rw" cached="true" setvar_vaddr="tx_active" />
-
-            <map mr="net_rx_buffer_data_region_cli0" vaddr="0x2_800_000" perms="rw" cached="true" setvar_vaddr="rx_buffer_data_region" />
-            <map mr="net_tx_buffer_data_region_cli0" vaddr="0x2_a00_000" perms="rw" cached="true" setvar_vaddr="tx_buffer_data_region" />
-
-            <map mr="serial_tx_queue_client0" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="serial_tx_queue" />
-            <map mr="serial_tx_data_client0" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="serial_tx_data" />
-
-            <map mr="cyclecounters" vaddr="0x5_010_000" perms="rw" cached="true" setvar_vaddr="idle_ccounts_vaddr" />
-        </protection_domain>
-
-        <protection_domain name="client1" priority="95" budget="20000" id="7">
-            <program_image path="lwip.elf" />
-
-            <map mr="net_rx_free_cli1" vaddr="0x2_000_000" perms="rw" cached="true" setvar_vaddr="rx_free" />
-            <map mr="net_rx_active_cli1" vaddr="0x2_200_000" perms="rw" cached="true" setvar_vaddr="rx_active" />
-            <map mr="net_tx_free_cli1" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="tx_free" />
-            <map mr="net_tx_active_cli1" vaddr="0x2_600_000" perms="rw" cached="true" setvar_vaddr="tx_active" />
-
-            <map mr="net_rx_buffer_data_region_cli1" vaddr="0x2_800_000" perms="rw" cached="true" setvar_vaddr="rx_buffer_data_region" />
-            <map mr="net_tx_buffer_data_region_cli1" vaddr="0x2_a00_000" perms="rw" cached="true" setvar_vaddr="tx_buffer_data_region" />
-
-            <map mr="serial_tx_queue_client1" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="serial_tx_queue" />
-            <map mr="serial_tx_data_client1" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="serial_tx_data" />
-        </protection_domain>
-
-        <protection_domain name="timer" priority="101" pp="true" id="8" passive="true">
-            <program_image path="timer_driver.elf" />
-            <map mr="timer" vaddr="0x2_000_000" perms="rw" cached="false" setvar_vaddr="gpt_regs" />
-            <irq irq="87" id="0" /> <!-- timer interrupt -->
-        </protection_domain>
+        <map mr="serial_tx_queue_client5" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="serial_tx_queue" />
+        <map mr="serial_tx_data_client5" vaddr="0x4_002_000" perms="rw" cached="true" setvar_vaddr="serial_tx_data" />
     </protection_domain>
 
     <channel>
@@ -220,6 +273,21 @@
    <channel>
         <end pd="serial_virt_tx" id="3"/>
         <end pd="bench0" id="0"/>
+    </channel>
+
+   <channel>
+        <end pd="serial_virt_tx" id="4"/>
+        <end pd="bench1" id="0"/>
+    </channel>
+
+   <channel>
+        <end pd="serial_virt_tx" id="5"/>
+        <end pd="bench2" id="0"/>
+    </channel>
+
+   <channel>
+        <end pd="serial_virt_tx" id="6"/>
+        <end pd="bench3" id="0"/>
     </channel>
 
     <channel>
@@ -263,18 +331,63 @@
     </channel>
 
     <channel>
-        <end pd="client0" id="4" /> <!-- start channel -->
+        <end pd="client0" id="4" /> <!-- core 0 start channel -->
         <end pd="bench0" id="1" />
     </channel>
 
     <channel>
-        <end pd="client0" id="5" /> <!-- stop channel -->
+        <end pd="client0" id="5" /> <!-- core 0 stop channel -->
         <end pd="bench0" id="2" />
     </channel>
 
     <channel>
-        <end pd="benchIdle" id="3" /> <!-- bench init channel -->
+        <end pd="bench0" id="3" /> <!-- core 1 start channel -->
+        <end pd="bench1" id="1" />
+    </channel>
+
+    <channel>
+        <end pd="bench0" id="4" /> <!-- core 1 stop channel -->
+        <end pd="bench1" id="2" />
+    </channel>
+
+    <channel>
+        <end pd="bench1" id="3" /> <!-- core 2 start channel -->
+        <end pd="bench2" id="1" />
+    </channel>
+
+    <channel>
+        <end pd="bench1" id="4" /> <!-- core 2 stop channel -->
+        <end pd="bench2" id="2" />
+    </channel>
+
+    <channel>
+        <end pd="bench2" id="3" /> <!-- core 3 start channel -->
+        <end pd="bench3" id="1" />
+    </channel>
+
+    <channel>
+        <end pd="bench2" id="4" /> <!-- core 3 stop channel -->
+        <end pd="bench3" id="2" />
+    </channel>
+
+    <channel>
+        <end pd="benchIdle0" id="3" /> <!-- core 0 bench init channel -->
         <end pd="bench0" id="5" />
+    </channel>
+
+    <channel>
+        <end pd="benchIdle1" id="3" /> <!-- core 1 bench init channel -->
+        <end pd="bench1" id="5" />
+    </channel>
+
+    <channel>
+        <end pd="benchIdle2" id="3" /> <!-- core 2 bench init channel -->
+        <end pd="bench2" id="5" />
+    </channel>
+
+    <channel>
+        <end pd="benchIdle3" id="3" /> <!-- core 3 bench init channel -->
+        <end pd="bench3" id="5" />
     </channel>
 
     <channel>
