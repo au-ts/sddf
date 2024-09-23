@@ -309,17 +309,17 @@ static void eth_setup(void)
     // Do MMIO device init (section 4.2.3.1)
     if (!virtio_mmio_check_magic(regs)) {
         LOG_DRIVER_ERR("invalid virtIO magic value!\n");
-        return;
+        assert(false);
     }
 
     if (virtio_mmio_version(regs) != VIRTIO_VERSION) {
         LOG_DRIVER_ERR("not correct virtIO version!\n");
-        return;
+        assert(false);
     }
 
     if (!virtio_mmio_check_device_id(regs, VIRTIO_DEVICE_ID_NET)) {
         LOG_DRIVER_ERR("not a virtIO network device!\n");
-        return;
+        assert(false);
     }
 
     LOG_DRIVER("version: 0x%x\n", virtio_mmio_version(regs));
