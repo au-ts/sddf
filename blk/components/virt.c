@@ -234,13 +234,9 @@ static void handle_driver()
 
         blk_queue_handle_t h = clients[reqbk.cli_id].queue_h;
 
-        /* Drop response if client resp queue is full */
-        if (blk_queue_full_resp(&h)) {
-            LOG_BLK_VIRT_ERR("client %d response queue is full, response id %d dropped\n", reqbk.cli_id,
-                             reqbk.cli_req_id);
-            continue;
-        }
-
+        /* Response queue should never be full since number of inflight requests (ialloc size)
+         * should always be less than or equal to resp queue capacity.
+         */
         err = blk_enqueue_resp(&h, drv_status, drv_success_count, reqbk.cli_req_id);
         assert(!err);
         client_notify[reqbk.cli_id] = true;
@@ -346,11 +342,9 @@ static bool handle_client(int cli_id)
         continue;
 
     req_fail:
-        if (blk_queue_full_resp(&h)) {
-            LOG_BLK_VIRT_ERR("client %d request %d has failed AND response queue is full, dropping response\n", cli_id,
-                             cli_req_id);
-            continue;
-        }
+        /* Response queue should never be full since number of inflight requests (ialloc size)
+         * should always be less than or equal to resp queue capacity.
+         */
         err = blk_enqueue_resp(&h, resp_status, 0, cli_req_id);
         assert(!err);
         client_notify = true;
