@@ -85,7 +85,7 @@ static inline bool net_queue_empty_active(net_queue_handle_t *queue)
  */
 static inline bool net_queue_full_free(net_queue_handle_t *queue)
 {
-    return queue->free->tail + 1 - queue->free->head == queue->capacity;
+    return queue->free->tail - queue->free->head == queue->capacity;
 }
 
 /**
@@ -97,7 +97,7 @@ static inline bool net_queue_full_free(net_queue_handle_t *queue)
  */
 static inline bool net_queue_full_active(net_queue_handle_t *queue)
 {
-    return queue->active->tail + 1 - queue->active->head == queue->capacity;
+    return queue->active->tail - queue->active->head == queue->capacity;
 }
 
 /**
@@ -215,7 +215,7 @@ static inline void net_queue_init(net_queue_handle_t *queue, net_queue_t *free, 
  */
 static inline void net_buffers_init(net_queue_handle_t *queue, uintptr_t base_addr)
 {
-    for (uint32_t i = 0; i < queue->capacity - 1; i++) {
+    for (uint32_t i = 0; i < queue->capacity; i++) {
         net_buff_desc_t buffer = {(NET_BUFFER_SIZE * i) + base_addr, 0};
         int err = net_enqueue_free(queue, buffer);
         assert(!err);
