@@ -205,6 +205,7 @@ static void handle_irq(void)
     while (e & IRQ_MASK) {
         if (e & NETIRQ_TXF) {
             tx_return();
+            tx_provide();
         }
         if (e & NETIRQ_RXF) {
             rx_return();
