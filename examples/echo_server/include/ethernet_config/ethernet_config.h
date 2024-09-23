@@ -50,9 +50,9 @@
 #define NET_TX_DATA_REGION_SIZE_CLI0            NET_DATA_REGION_SIZE
 #define NET_TX_DATA_REGION_SIZE_CLI1            NET_DATA_REGION_SIZE
 
-_Static_assert(NET_TX_DATA_REGION_SIZE_CLI0 >= NET_TX_QUEUE_CAPACITY_CLI0 *NET_BUFFER_SIZE,
+_Static_assert(NET_TX_DATA_REGION_SIZE_CLI0 >= NET_TX_QUEUE_CAPACITY_CLI0 * NET_BUFFER_SIZE,
                "Client0 TX data region size must fit Client0 TX buffers");
-_Static_assert(NET_TX_DATA_REGION_SIZE_CLI1 >= NET_TX_QUEUE_CAPACITY_CLI1 *NET_BUFFER_SIZE,
+_Static_assert(NET_TX_DATA_REGION_SIZE_CLI1 >= NET_TX_QUEUE_CAPACITY_CLI1 * NET_BUFFER_SIZE,
                "Client1 TX data region size must fit Client1 TX buffers");
 
 #define NET_RX_QUEUE_CAPACITY_DRIV                   512
@@ -66,11 +66,11 @@ _Static_assert(NET_TX_DATA_REGION_SIZE_CLI1 >= NET_TX_QUEUE_CAPACITY_CLI1 *NET_B
 #define NET_RX_DATA_REGION_SIZE_CLI0            NET_DATA_REGION_SIZE
 #define NET_RX_DATA_REGION_SIZE_CLI1            NET_DATA_REGION_SIZE
 
-_Static_assert(NET_RX_DATA_REGION_SIZE_DRIV >= NET_RX_QUEUE_CAPACITY_DRIV *NET_BUFFER_SIZE,
+_Static_assert(NET_RX_DATA_REGION_SIZE_DRIV >= NET_RX_QUEUE_CAPACITY_DRIV * NET_BUFFER_SIZE,
                "Driver RX data region size must fit Driver RX buffers");
-_Static_assert(NET_RX_DATA_REGION_SIZE_CLI0 >= NET_RX_QUEUE_CAPACITY_CLI0 *NET_BUFFER_SIZE,
+_Static_assert(NET_RX_DATA_REGION_SIZE_CLI0 >= NET_RX_QUEUE_CAPACITY_CLI0 * NET_BUFFER_SIZE,
                "Client0 RX data region size must fit Client0 RX buffers");
-_Static_assert(NET_RX_DATA_REGION_SIZE_CLI1 >= NET_RX_QUEUE_CAPACITY_CLI1 *NET_BUFFER_SIZE,
+_Static_assert(NET_RX_DATA_REGION_SIZE_CLI1 >= NET_RX_QUEUE_CAPACITY_CLI1 * NET_BUFFER_SIZE,
                "Client1 RX data region size must fit Client1 RX buffers");
 
 #define NET_MAX_QUEUE_CAPACITY MAX(NET_TX_QUEUE_CAPACITY_DRIV, MAX(NET_RX_QUEUE_CAPACITY_DRIV, MAX(NET_RX_QUEUE_CAPACITY_CLI0, NET_RX_QUEUE_CAPACITY_CLI1)))
@@ -80,7 +80,7 @@ _Static_assert(NET_RX_QUEUE_CAPACITY_COPY0 >= NET_RX_QUEUE_CAPACITY_DRIV,
                "Copy0 queues must have capacity to fit all RX buffers.");
 _Static_assert(NET_RX_QUEUE_CAPACITY_COPY1 >= NET_RX_QUEUE_CAPACITY_DRIV,
                "Copy1 queues must have capacity to fit all RX buffers.");
-_Static_assert(sizeof(net_queue_t) + NET_MAX_QUEUE_CAPACITY *sizeof(net_buff_desc_t) <= NET_DATA_REGION_SIZE,
+_Static_assert(sizeof(net_queue_t) + NET_MAX_QUEUE_CAPACITY * sizeof(net_buff_desc_t) <= NET_DATA_REGION_SIZE,
                "net_queue_t must fit into a single data region.");
 
 static inline uint64_t net_cli_mac_addr(char *pd_name)
@@ -134,23 +134,17 @@ static inline void net_virt_queue_info(char *pd_name, net_queue_t *cli0_free, ne
                                        net_queue_info_t ret[NUM_NETWORK_CLIENTS])
 {
     if (!sddf_strcmp(pd_name, NET_VIRT_RX_NAME)) {
-        ret[0] = (net_queue_info_t) {
-            .free = cli0_free, .active = cli0_active, .capacity = NET_RX_QUEUE_CAPACITY_COPY0
-        };
-        ret[1] = (net_queue_info_t) {
-            .free = (net_queue_t *)((uintptr_t)cli0_free + 2 * NET_DATA_REGION_SIZE),
-            .active = (net_queue_t *)((uintptr_t)cli0_active + 2 * NET_DATA_REGION_SIZE),
-            .capacity = NET_RX_QUEUE_CAPACITY_COPY1
-        };
+        ret[0] =
+            (net_queue_info_t) { .free = cli0_free, .active = cli0_active, .capacity = NET_RX_QUEUE_CAPACITY_COPY0 };
+        ret[1] = (net_queue_info_t) { .free = (net_queue_t *)((uintptr_t)cli0_free + 2 * NET_DATA_REGION_SIZE),
+                                      .active = (net_queue_t *)((uintptr_t)cli0_active + 2 * NET_DATA_REGION_SIZE),
+                                      .capacity = NET_RX_QUEUE_CAPACITY_COPY1 };
     } else if (!sddf_strcmp(pd_name, NET_VIRT_TX_NAME)) {
-        ret[0] = (net_queue_info_t) {
-            .free = cli0_free, .active = cli0_active, .capacity = NET_TX_QUEUE_CAPACITY_CLI0
-        };
-        ret[1] = (net_queue_info_t) {
-            .free = (net_queue_t *)((uintptr_t)cli0_free + 2 * NET_DATA_REGION_SIZE),
-            .active = (net_queue_t *)((uintptr_t)cli0_active + 2 * NET_DATA_REGION_SIZE),
-            .capacity = NET_TX_QUEUE_CAPACITY_CLI1
-        };
+        ret[0] =
+            (net_queue_info_t) { .free = cli0_free, .active = cli0_active, .capacity = NET_TX_QUEUE_CAPACITY_CLI0 };
+        ret[1] = (net_queue_info_t) { .free = (net_queue_t *)((uintptr_t)cli0_free + 2 * NET_DATA_REGION_SIZE),
+                                      .active = (net_queue_t *)((uintptr_t)cli0_active + 2 * NET_DATA_REGION_SIZE),
+                                      .capacity = NET_TX_QUEUE_CAPACITY_CLI1 };
     }
 }
 

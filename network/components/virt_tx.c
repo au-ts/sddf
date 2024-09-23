@@ -34,8 +34,8 @@ state_t state;
 int extract_offset(uintptr_t *phys)
 {
     for (int client = 0; client < NUM_NETWORK_CLIENTS; client++) {
-        if (*phys >= state.buffer_region_paddrs[client] &&
-            *phys < state.buffer_region_paddrs[client] + state.tx_queue_clients[client].capacity * NET_BUFFER_SIZE) {
+        if (*phys >= state.buffer_region_paddrs[client]
+            && *phys < state.buffer_region_paddrs[client] + state.tx_queue_clients[client].capacity * NET_BUFFER_SIZE) {
             *phys = *phys - state.buffer_region_paddrs[client];
             return client;
         }
@@ -54,8 +54,8 @@ void tx_provide(void)
                 int err = net_dequeue_active(&state.tx_queue_clients[client], &buffer);
                 assert(!err);
 
-                if (buffer.io_or_offset % NET_BUFFER_SIZE ||
-                    buffer.io_or_offset >= NET_BUFFER_SIZE * state.tx_queue_clients[client].capacity) {
+                if (buffer.io_or_offset % NET_BUFFER_SIZE
+                    || buffer.io_or_offset >= NET_BUFFER_SIZE * state.tx_queue_clients[client].capacity) {
                     sddf_dprintf("VIRT_TX|LOG: Client provided offset %lx which is not buffer aligned or outside of buffer region\n",
                                  buffer.io_or_offset);
                     err = net_enqueue_free(&state.tx_queue_clients[client], buffer);
@@ -141,8 +141,7 @@ void init(void)
     net_mem_region_vaddr(microkit_name, client_vaddrs, buffer_data_region_cli0_vaddr);
 
     for (int i = 0; i < NUM_NETWORK_CLIENTS; i++) {
-        net_queue_init(&state.tx_queue_clients[i], queue_info[i].free, queue_info[i].active,
-                       queue_info[i].capacity);
+        net_queue_init(&state.tx_queue_clients[i], queue_info[i].free, queue_info[i].active, queue_info[i].capacity);
         state.buffer_region_vaddrs[i] = client_vaddrs[i];
     }
 
