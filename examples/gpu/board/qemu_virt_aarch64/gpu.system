@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ Copyright 2024, UNSW
+
+ SPDX-License-Identifier: BSD-2-Clause
+-->
+<system>
+    <memory_region name="virtio_regs" size="0x10_000" page_size="0x1_000" phys_addr="0xa003000" />
+    <memory_region name="virtio_metadata" size="0x200_000" page_size="0x200_000" />
+    <memory_region name="virtio_data" size="0x200_000" page_size="0x200_000" />
+
+    <memory_region name="gpu_driver_events" size="0x1_000" page_size="0x1_000" />
+    <memory_region name="gpu_driver_req_queue" size="0x200_000" page_size="0x200_000" />
+    <memory_region name="gpu_driver_resp_queue" size="0x200_000" page_size="0x200_000" />
+    <memory_region name="gpu_driver_data" size="0x1_000" page_size="0x1_000" />
+
+    <memory_region name="gpu_client_events" size="0x1_000" page_size="0x1_000" />
+    <memory_region name="gpu_client_req_queue" size="0x200_000" page_size="0x200_000" />
+    <memory_region name="gpu_client_resp_queue" size="0x200_000" page_size="0x200_000" />
+    <memory_region name="gpu_client_data" size="0x200_000" page_size="0x200_000" />
+
+    <protection_domain name="gpu_driver" priority="254" stack_size="0x10000">
+        <program_image path="gpu_driver.elf" />
+        <map mr="virtio_regs" vaddr="0x2_000_000" perms="rw" cached="false" setvar_vaddr="virtio_regs" />
+        <map mr="virtio_metadata" vaddr="0x60_000_000" perms="rw" cached="false" setvar_vaddr="virtio_metadata" />
+        <map mr="virtio_data" vaddr="0x60_200_000" perms="rw" cached="false" setvar_vaddr="virtio_data" />
+        <setvar symbol="virtio_metadata_paddr" region_paddr="virtio_metadata" />
+        <setvar symbol="virtio_data_paddr" region_paddr="virtio_data" />
+
+        <map mr="gpu_driver_events" vaddr="0x40_000_000" perms="rw" cached="false" setvar_vaddr="gpu_events" />
+        <map mr="gpu_driver_req_queue" vaddr="0x40_200_000" perms="rw" cached="false" setvar_vaddr="gpu_req_queue" />
+        <map mr="gpu_driver_resp_queue" vaddr="0x40_400_000" perms="rw" cached="false" setvar_vaddr="gpu_resp_queue" />
+        <map mr="gpu_driver_data" vaddr="0x40_600_000" perms="rw" cached="true" setvar_vaddr="gpu_driver_data" />
+        <setvar symbol="gpu_client_data_paddr" region_paddr="gpu_client_data" />
+        <irq irq="79" id="0" trigger="edge" />
+    </protection_domain>
+
+    <protection_domain name="timer_driver" priority="254" pp="true" passive="true">
+        <program_image path="timer_driver.elf" />
+        <irq irq="30" id="0" />
+    </protection_domain>
+
+    <protection_domain name="gpu_virt" priority="99" stack_size="0x10000">
+        <program_image path="gpu_virt.elf" />
+        <map mr="gpu_driver_events" vaddr="0x40000000" perms="rw" cached="false" setvar_vaddr="gpu_driver_events" />
+        <map mr="gpu_driver_req_queue" vaddr="0x40200000" perms="rw" cached="false" setvar_vaddr="gpu_driver_req_queue" />
+        <map mr="gpu_driver_resp_queue" vaddr="0x40400000" perms="rw" cached="false" setvar_vaddr="gpu_driver_resp_queue" />
+        <map mr="gpu_driver_data" vaddr="0x40600000" perms="rw" cached="true" setvar_vaddr="gpu_driver_data" />
+
+        <map mr="gpu_client_events" vaddr="0x30000000" perms="rw" cached="false" setvar_vaddr="gpu_client_events" />
+        <map mr="gpu_client_req_queue" vaddr="0x30200000" perms="rw" cached="false" setvar_vaddr="gpu_client_req_queue" />
+        <map mr="gpu_client_resp_queue" vaddr="0x30400000" perms="rw" cached="false" setvar_vaddr="gpu_client_resp_queue" />
+        <map mr="gpu_client_data" vaddr="0x30600000" perms="rw" cached="true" setvar_vaddr="gpu_client_data" />
+    </protection_domain>
+
+    <protection_domain name="client" priority="1" stack_size="0x10000">
+        <program_image path="client.elf" />
+        <map mr="gpu_client_events" vaddr="0x40_000_000" perms="rw" cached="false" setvar_vaddr="gpu_events" />
+        <map mr="gpu_client_req_queue" vaddr="0x40_200_000" perms="rw" cached="false" setvar_vaddr="gpu_req_queue" />
+        <map mr="gpu_client_resp_queue" vaddr="0x40_400_000" perms="rw" cached="false" setvar_vaddr="gpu_resp_queue" />
+        <map mr="gpu_client_data" vaddr="0x40_800_000" perms="rw" cached="true" setvar_vaddr="gpu_data" />
+    </protection_domain>
+
+    <channel>
+        <end pd="client" id="0" />
+        <end pd="gpu_virt" id="1" />
+    </channel>
+
+    <channel>
+        <end pd="client" id="1" />
+        <end pd="timer_driver" id="1" />
+    </channel>
+
+    <channel>
+        <end pd="gpu_virt" id="0" />
+        <end pd="gpu_driver" id="1" />
+    </channel>
+</system>

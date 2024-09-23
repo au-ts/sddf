@@ -6,6 +6,7 @@
         "drivers",
         "benchmark",
         "blk",
+        "gpu",
         "i2c",
         "include",
         "libco",
