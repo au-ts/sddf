@@ -70,7 +70,7 @@ void device_print(uint8_t bus, uint8_t device, uint8_t function)
     sddf_dprintf("header type: 0x%02x\n", header->header_type);
 
     sddf_dprintf("\thas multi-functions: %s\n", header->header_type & PCIE_HEADER_TYPE_HAS_MULTI_FUNCTIONS ? "yes" : "no");
-    sddf_dprintf("\tlayout variant: 0x%02x\n", header->header_type & PCIE_HEADER_TYPE_LAYOUT_MASK);
+    sddf_dprintf("\tlayout variant: 0x%02lx\n", header->header_type & PCIE_HEADER_TYPE_LAYOUT_MASK);
 
     if ((header->header_type & PCIE_HEADER_TYPE_LAYOUT_MASK) == PCIE_HEADER_TYPE_GENERAL) {
         volatile pcie_header_type0_t *type0_header = (pcie_header_type0_t *)config_base;
@@ -84,14 +84,14 @@ void device_print(uint8_t bus, uint8_t device, uint8_t function)
 
             if (bar & BIT(0)) {
                 sddf_dprintf("\tbase address for I/O\n");
-                sddf_dprintf("\taddress: 0x%08x\n", (uint32_t)(bar & ~(BIT(0) | BIT(1))));
+                sddf_dprintf("\taddress: 0x%08lx\n", bar & ~(BIT(0) | BIT(1)));
             } else {
                 sddf_dprintf("\tbase address for memory\n");
                 sddf_dprintf("\ttype: ");
                 switch ((bar & (BIT(1) | BIT(2))) >> 1) {
                     case 0b00:
                         sddf_dprintf("32-bit space\n");
-                        sddf_dprintf("\tfull address: 0x%08x\n", (uint32_t)(bar & ~(BIT(4) - 1)));
+                        sddf_dprintf("\tfull address: 0x%08lx\n", bar & ~(BIT(4) - 1));
                         break;
 
                     case 0b10:
@@ -103,7 +103,7 @@ void device_print(uint8_t bus, uint8_t device, uint8_t function)
 
                         uint32_t bar_upper = type0_header->base_address_registers[i + 1];
 
-                        sddf_dprintf("\tfull address: 0x%08x_%08x\n", bar_upper, (uint32_t)(bar & ~(BIT(4) - 1)));
+                        sddf_dprintf("\tfull address: 0x%08x_%08lx\n", bar_upper, bar & ~(BIT(4) - 1));
 
                         /* [PCI-3.0] 6.2.5.1 Address Maps (Implementation Note) p227*/
 
@@ -171,11 +171,50 @@ out:
 
     // https://github.com/bootreer/vroom/blob/d8bbe9db2b1cfdfc38eec31f3b48f5eb167879a9/src/nvme.rs#L220
 
-    // [NVME-2.1] 3.5.1 Memory-based Controller Initialization (PCIe)
 
     sddf_dprintf("CAP: %016lx\n", nvme_controller->cap);
     sddf_dprintf("VS: major: %u, minor: %u, tertiary: %u\n", nvme_controller->vs.mjr, nvme_controller->vs.mnr, nvme_controller->vs.ter);
     sddf_dprintf("CC: %08x\n", nvme_controller->cc);
+
+    /* [NVME-2.1] 3.5.1 Memory-based Controller Initialization (PCIe) */
+    nvme_controller->cc &= ~NVME_CC_EN;
+
+    // 1. Wait for CSTS.RDY to become '0' (i.e. not ready)
+    while (nvme_controller->csts & NVME_CSTS_RDY);
+
+    // 2. Configure Admin Queue(s) TODO.
+    // nvme_controller->asq = nvme_admin_submission_queue;
+    // nvme_controller->acq = nvme_admin_completion_queue;
+    /* TODO: queue size def. */
+    nvme_controller->aqa &= ~(NVME_AQA_ACQS_MASK | NVME_AQA_ASQS_MASK);
+    nvme_controller->aqa |= ((4096 - 1) << NVME_AQA_ACQS_SHIFT) | ((4096 - 1) << NVME_AQA_ASQS_SHIFT);
+
+    // 3. Initialise Command Support Sets.
+    nvme_controller->cc &= ~(NVME_CC_CSS_MASK);
+    if (nvme_controller->cap & NVME_CAP_NOIOCSS) {
+        nvme_controller->cc |= 0b111 << NVME_CC_CSS_SHIFT;
+    } else if (nvme_controller->cap & NVME_CAP_IOCSS) {
+        nvme_controller->cc |= 0b110 << NVME_CC_CSS_SHIFT;
+    } else if (nvme_controller->cap & NVME_CAP_NCSS) {
+        nvme_controller->cc |= 0b000 << NVME_CC_CSS_SHIFT;
+    }
+
+    // (not-spec but in vroom?) TODO set completion/submission entry sizes?
+
+    // 4a. Arbitration Mechanism (TODO)
+    // 4b. Memory Page Size
+    nvme_controller->cc &= ~NVME_CC_MPS_MASK;
+    /* nb: host page size. TODO: do we have a define for this? */
+    /* n.b.: page size = 2 ^ (12 + MPS)*/
+    nvme_controller->cc |= (4096 >> 12) << NVME_CC_MPS_SHIFT;
+
+    // 5. Enable the controller
+    nvme_controller->cc |= NVME_CC_EN;
+
+    // 6. Wait for ready
+    sddf_dprintf("waiting ready\n");
+    while (!(nvme_controller->csts & NVME_CSTS_RDY));
+    sddf_dprintf("now ready\n");
 }
 
 void notified(microkit_channel ch)

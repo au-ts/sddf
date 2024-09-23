@@ -22,9 +22,9 @@
 typedef struct nvme_controller {
     uint64_t cap;     /* Controller Capabilities (RO) */
     struct vs {
-        uint16_t mjr; /* Major Version */
-        uint8_t mnr;  /* Minor Version */
         uint8_t ter;  /* Tertiary Version */
+        uint8_t mnr;  /* Minor Version */
+        uint16_t mjr; /* Major Version */
     } vs;             /* Version (RO) */
     uint32_t intms;   /* Interrupt Mask Set (RWS) */
     uint32_t intmc;   /* Interrupt Mask Clear (RWC) */
@@ -53,11 +53,29 @@ typedef struct nvme_controller {
 
 _Static_assert(offsetof(nvme_controller_t, _reserved2) == 0x6C, "nvme_controller_t must match spec layout");
 
+#define _LEN(start, end) ((end - start) + 1)
+#define _MASK(start, end)  ((BIT(_LEN(start, end)) - 1) << (start))
+
+/* [NVMe-2.1] 3.1.4.1 Offset 0h: CAP – Controller Capabilities */
+#define NVME_CAP_NOIOCSS BIT(37 + 7) /* No I/O Command Set Support */
+#define NVME_CAP_IOCSS   BIT(37 + 6) /* I/O Command Set Support    */
+#define NVME_CAP_NCSS    BIT(37 + 0) /* NVM Command Set Support    */
+
 /* [NVMe-2.1] 3.1.4.5 Offset 14h: CC – Controller Configuration */
-#define NVME_CC_EN BIT(0) /* Controller Enable (RW) */
+#define NVME_CC_MPS_SHIFT 7            /* Host Memory Page Size */
+#define NVME_CC_MPS_MASK  _MASK(7, 10) /* Host Memory Page Size */
+#define NVME_CC_CSS_SHIFT 4            /* I/O Command Set Selected */
+#define NVME_CC_CSS_MASK  _MASK(4, 6)  /* I/O Command Set Selected */
+#define NVME_CC_EN        BIT(0)       /* Controller Enable */
 
 /* [NVMe-2.1] 3.1.4.6 Offset 1Ch: CSTS – Controller Status */
 #define NVME_CSTS_RDY BIT(0) /* Controller Ready (RO) */
 
 /* [NVMe-2.1] 3.1.4.7 Offset 20h: NSSR – NVM Subsystem Reset */
 #define NVME_NSSRC_VALUE (0x4E564D65) /* NVM Subsystem Reset Control - Reset value */
+
+/* [NVMe-2.1] 3.1.4.8 Offset 24h: AQA – Admin Queue Attributes */
+#define NVME_AQA_ACQS_SHIFT 16             /* Admin Completion Queue Size (#entries) */
+#define NVME_AQA_ACQS_MASK  _MASK(16, 27)  /* Admin Completion Queue Size (#entries) */
+#define NVME_AQA_ASQS_SHIFT 0              /* Admin Submission Queue Size (#entries) */
+#define NVME_AQA_ASQS_MASK  _MASK(0, 11)   /* Admin Submission Queue Size (#entries) */
