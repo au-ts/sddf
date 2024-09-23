@@ -711,20 +711,6 @@ static struct clk *sm1_clks[] = {
 };
 
 
-/* void set_clk_parents(void) */
-/* { */
-/*     num_parents = count_parents(); */
-
-
-/* } */
-
-/* void set_clk_rates(void) */
-/* { */
-/*     CLKID_MPLL2    0x11940000 */
-/*     CLKID_MPLL0    0x10266000 */
-/*     CLKID_MPLL1 0x17700000 */
-/* } */
-
 unsigned long clk_recalc_rate(struct clk *clk)
 {
     const struct clk_init_data *init = (struct clk_init_data *)clk->hw.init;
@@ -788,11 +774,22 @@ void init(void)
     uint64_t rate = clk_recalc_rate(mpeg_sel);
     sddf_dprintf("MEPG_SEL clock rate: %lu\n", rate);
 
-    struct clk *clk81 = sm1_clks[CLKID_CLK81];
-    rate = clk_recalc_rate(clk81);
-    /* sddf_dprintf("Clock %s rate: %lu\n", clk81_hw->init->name, rate); */
+    /*     CLKID_MPLL2    0x11940000 */
+    /*     CLKID_MPLL0    0x10266000 */
+    /*     CLKID_MPLL1 0x17700000 */
+	struct clk *parent_clk = sm1_clks[CLKID_MPLL_PREDIV];
+    uint64_t prate = clk_recalc_rate(parent_clk);
+    sddf_dprintf("%s rate: %lu\n", parent_clk->hw.init->name, rate);
+
+    struct clk *test_clk = sm1_clks[CLKID_MPLL0_DIV];
+	test_clk->hw.init->ops->init(test_clk);
+    rate = clk_recalc_rate(test_clk);
+    sddf_dprintf("%s rate: %lu\n", test_clk->hw.init->name, rate);
+	test_clk->hw.init->ops->set_rate(test_clk, 0x10266000, prate);
+    rate = clk_recalc_rate(test_clk);
+    sddf_dprintf("%s rate: %lu\n", test_clk->hw.init->name, rate);
 
     clk_msr_stat();
 
-    sddf_dprintf("-----------------\n");
+   sddf_dprintf("-----------------\n");
 }

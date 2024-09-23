@@ -13,6 +13,14 @@ void init_clk_base(uintptr_t base_addr)
     clk_base = base_addr;
 }
 
+static inline int reg_write(uint32_t offset, uint32_t val)
+{
+    volatile uint32_t *clk_reg = ((void *)clk_base + offset);
+    *clk_reg = val;
+
+    return 0;
+}
+
 static inline int regmap_update_bits(uint32_t offset, uint8_t shift, uint8_t width, uint32_t val)
 {
     volatile uint32_t *clk_reg = ((void *)clk_base + offset);
@@ -275,7 +283,88 @@ const struct clk_ops meson_clk_pll_ro_ops = {
     /* .is_enabled    = meson_clk_pll_is_enabled, */
 };
 
+#define SDM_DEN 16384
+#define N2_MIN 4
+#define N2_MAX 511
+
+static unsigned long mpll_recalc_rate(struct clk *clk,
+                                unsigned long prate)
+{
+    struct meson_clk_mpll_data *data = (struct meson_clk_mpll_data *)(clk->data);
+    uint32_t sdm, n2, rate;
+
+    sdm = regmap_read_bits(data->sdm.reg_off, data->sdm.shift, data->sdm.width);
+    n2 = regmap_read_bits(data->n2.reg_off, data->n2.shift, data->n2.width);
+
+    uint32_t divisor = (SDM_DEN * n2) + sdm;
+    if (n2 < N2_MIN)
+        return -1;
+
+    return DIV_ROUND_UP_ULL((uint64_t)prate * SDM_DEN, divisor);
+}
+
+static int mpll_set_rate(struct clk *clk,
+             uint32_t rate,
+             uint32_t parent_rate)
+{
+    struct meson_clk_mpll_data *data = (struct meson_clk_mpll_data *)(clk->data);
+    uint64_t div = parent_rate;
+    uint64_t frac = do_div(div, rate);
+    uint32_t sdm, n2;
+
+    frac *= SDM_DEN;
+
+    if (data->flags & CLK_MESON_MPLL_ROUND_CLOSEST)
+        sdm = DIV_ROUND_CLOSEST_ULL(frac, rate);
+    else
+        sdm = DIV_ROUND_UP_ULL(frac, rate);
+
+    if (sdm == SDM_DEN) {
+        sdm = 0;
+        div += 1;
+    }
+
+    if (div < N2_MIN) {
+        n2 = N2_MIN;
+        sdm = 0;
+    } else if (div > N2_MAX) {
+        n2 = N2_MAX;
+        sdm = SDM_DEN - 1;
+    } else {
+        n2 = div;
+    }
+
+    regmap_update_bits(data->sdm.reg_off, data->sdm.shift, data->sdm.width, sdm);
+    regmap_update_bits(data->n2.reg_off, data->n2.shift, data->n2.width, n2);
+
+    volatile uint32_t *clk_reg = ((void *)clk_base + data->sdm.reg_off);
+
+    return 0;
+}
+
+static void mpll_init(struct clk *clk)
+{
+    struct meson_clk_mpll_data *data = (struct meson_clk_mpll_data *)(clk->data);
+    if (data->init_count) {
+        int i;
+        const struct reg_sequence *init_regs = data->init_regs;
+        for (i = 0; i < data->init_count; i++) {
+            reg_write(init_regs[i].reg, init_regs[i].def);
+        }
+    }
+
+    /* Enable the fractional part */
+    regmap_update_bits(data->sdm_en.reg_off, data->sdm_en.shift, data->sdm_en.width, 1);
+
+    /* Set spread spectrum if possible */
+    unsigned int ss = data->flags & CLK_MESON_MPLL_SPREAD_SPECTRUM ? 1 : 0;
+    regmap_update_bits(data->ssen.reg_off, data->ssen.shift, data->ssen.width, ss);
+}
+
 
 const struct clk_ops meson_clk_mpll_ops = {
-
+    .recalc_rate = mpll_recalc_rate,
+    /* .determine_rate = mpll_determine_rate, */
+    .set_rate = mpll_set_rate,
+    .init = mpll_init,
 };
