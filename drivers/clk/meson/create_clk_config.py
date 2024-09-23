@@ -57,7 +57,8 @@ if __name__ == "__main__":
                     assigned_clock_parents = node.props["assigned-clock-parents"].to_nums()
                 if "assigned-clock-rates" in props:
                     assigned_clock_rates = node.props["assigned-clock-rates"].to_nums()
-                print("{} - clocks: {}, max-frequency: {}, assigned-clocks: {}, assigned-clock-parents: {}, assigned-clock-rates: {}".format(
+                print("---------------------")
+                print("{}\nclocks: {}\nmax-frequency: {}\nassigned-clocks: {}\nassigned-clock-parents: {}\nassigned-clock-rates: {}".format(
                     node.name,
                     clocks,
                     max_frequency,
