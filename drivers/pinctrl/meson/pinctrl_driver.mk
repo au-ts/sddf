@@ -54,7 +54,7 @@ pinctrl/pinctrl.o: $(PINCTRL_DIR)/pinctrl.c pinctrl
 pinctrl/pinctrl_config_data.o: pinctrl/pinctrl_config_data.s
 	${AS} ${ASFLAGS} $< -o $@
 
-pinctrl/pinctrl_config_data.s: ${DTS_FILE}
+pinctrl/pinctrl_config_data.s: ${DTS_FILE} ${PINCTRL_DIR}/create_pinctrl_config.py
 	${PYTHON} ${PINCTRL_DIR}/create_pinctrl_config.py ${SOC} ${DTS_FILE} pinctrl
 
 pinctrl: 
