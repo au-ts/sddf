@@ -22,6 +22,93 @@
 uintptr_t clk_regs;
 uintptr_t msr_clk_base;
 
+#define MESON_FIXED_FACTOR(_name, _mult, _div, _parent_clks, _num_parents, _flags)  \
+struct clk _name = {                                                                \
+    .data = &(struct clk_fixed_factor_data) {                                       \
+        .mult = (_mult),                                                            \
+        .div = (_div),                                                              \
+    },                                                                              \
+    .hw.init = &(struct clk_init_data) {                                            \
+        .name = #_name,                                                             \
+        .ops = &clk_fixed_factor_ops,                                               \
+        .parent_clks = (const struct clk *[]) _parent_clks,                         \
+        .num_parents = (_num_parents),                                              \
+        .flags = (_flags),                                                          \
+    },                                                                              \
+}
+
+#define MESON_GATE(_name, _offset, _bit, _data_flags, _parent_clks,                 \
+                        _num_parents, _hw_flags)                                    \
+struct clk _name = {                                                                \
+    .data = &(struct clk_gate_data) {                                               \
+        .offset = (_offset),                                                        \
+        .bit_idx = (_bit),                                                          \
+        .flags = (_data_flags),                                                     \
+    },                                                                              \
+    .hw.init = &(struct clk_init_data) {                                            \
+        .name = #_name,                                                             \
+        .ops = &clk_regmap_gate_ops,                                                \
+        .parent_clks = (const struct clk *[]) _parent_clks,                         \
+        .num_parents = _num_parents,                                                \
+        .flags = (_hw_flags),                                                       \
+    },                                                                              \
+}
+
+#define MESON_MUX(_name, _offset, _mask, _shift, _table,                            \
+                  _data_flags, _parent_data, _num_parents, _hw_flags)               \
+struct clk _name = {                                                                \
+    .data = &(struct clk_mux_data) {                                                \
+        .offset = (_offset),                                                        \
+        .mask = (_mask),                                                            \
+        .shift = (_shift),                                                          \
+        .table = (_table),                                                          \
+        .flags = (_data_flags),                                                     \
+    },                                                                              \
+    .hw.init = &(struct clk_init_data) {                                            \
+        .name = #_name,                                                             \
+        .ops = &clk_regmap_mux_ops,                                                 \
+        .parent_data = (_parent_data),                                              \
+        .num_parents = (_num_parents),                                              \
+        .flags = (_hw_flags),                                                       \
+    },                                                                              \
+}
+
+#define MESON_DIV(_name, _offset, _shift, _width, _data_flags,                      \
+                  _parent_clks, _num_parents, _hw_flags)                            \
+struct clk _name = {                                                                \
+    .data = &(struct clk_div_data) {                                                \
+        .offset = (_offset),                                                        \
+        .shift = (_shift),                                                          \
+        .width = (_width),                                                          \
+        .flags = (_data_flags),                                                     \
+    },                                                                              \
+    .hw.init = &(struct clk_init_data) {                                            \
+        .name = #_name,                                                             \
+        .ops = &clk_regmap_divider_ops,                                             \
+        .parent_clks = (const struct clk *[]) _parent_clks,                         \
+        .num_parents = (_num_parents),                                              \
+        .flags = (_hw_flags),                                                       \
+    },                                                                              \
+}
+
+#define MESON_DIV_RO(_name, _offset, _shift, _width, _data_flags,                   \
+                  _parent_clks, _num_parents, _hw_flags)                            \
+struct clk _name = {                                                                \
+    .data = &(struct clk_div_data) {                                                \
+        .offset = (_offset),                                                        \
+        .shift = (_shift),                                                          \
+        .width = (_width),                                                          \
+        .flags = (_data_flags),                                                     \
+    },                                                                              \
+    .hw.init = &(struct clk_init_data) {                                            \
+        .name = #_name,                                                             \
+        .ops = &clk_regmap_divider_ro_ops,                                          \
+        .parent_clks = (const struct clk *[]) _parent_clks,                         \
+        .num_parents = (_num_parents),                                              \
+        .flags = (_hw_flags),                                                       \
+    },                                                                              \
+}
+
 static struct clk g12a_fixed_pll_dco = {
     .data = &(struct meson_clk_pll_data){
         .en = {
@@ -65,93 +152,53 @@ static struct clk g12a_fixed_pll_dco = {
     },
 };
 
-static struct clk g12a_fixed_pll = {
-    .data = &(struct clk_div_data){
-        .offset = HHI_FIX_PLL_CNTL0,
-        .shift = 16,
-        .width = 2,
-        .flags = CLK_DIVIDER_POWER_OF_TWO,
-    },
-    .hw.init = &(struct clk_init_data){
-        .name = "fixed_pll",
-        .ops = &clk_regmap_divider_ro_ops,
-        .parent_clks = (const struct clk *[]) {
-            &g12a_fixed_pll_dco
-        },
-        .num_parents = 1,
-    },
-};
-
-#define MESON_FIXED_FACTOR(_name, _mult, _div, _parent_clks, _num_parents, _flags)  \
-struct clk _name = {                                                                \
-    .data = &(struct clk_fixed_factor_data) {                                       \
-        .mult = (_mult),                                                            \
-        .div = (_div),                                                              \
-    },                                                                              \
-    .hw.init = &(struct clk_init_data) {                                            \
-        .name = #_name,                                                             \
-        .ops = &clk_fixed_factor_ops,                                               \
-        .parent_clks = (const struct clk *[]) _parent_clks,                         \
-        .num_parents = (_num_parents),                                              \
-        .flags = (_flags),                                                          \
-    },                                                                              \
-}
-
-#define MESON_GATE(_name, _offset, _bit, _data_flags, _parent_clks,                 \
-                        _num_parents, _hw_flags)                                    \
-struct clk _name = {                                                                \
-    .data = &(struct clk_gate_data) {                                               \
-        .offset = (_offset),                                                        \
-        .bit_idx = (_bit),                                                          \
-        .flags = (_data_flags),                                                     \
-    },                                                                              \
-    .hw.init = &(struct clk_init_data) {                                            \
-        .name = #_name,                                                             \
-        .ops = &clk_regmap_gate_ops,                                                \
-        .parent_clks = (const struct clk *[]) _parent_clks,                         \
-        .num_parents = _num_parents,                                                \
-        .flags = (_hw_flags),                                                       \
-    },                                                                              \
-}
-
-#define MESON_MUX(_name, _offset, _mask, _shift, _table,                            \
-                  _data_flags, _parent_data, _num_parents, _hw_flags)                \
-struct clk _name = {                                                                \
-    .data = &(struct clk_mux_data) {                                                \
-        .offset = (_offset),                                                        \
-        .mask = (_mask),                                                            \
-        .shift = (_shift),                                                          \
-        .table = (_table),                                                          \
-        .flags = (_data_flags),                                                     \
-    },                                                                              \
-    .hw.init = &(struct clk_init_data) {                                            \
-        .name = #_name,                                                             \
-        .ops = &clk_regmap_mux_ops,                                                 \
-        .parent_data = (_parent_data),                                              \
-        .num_parents = (_num_parents),                                              \
-        .flags = (_hw_flags),                                                       \
-    },                                                                              \
-}
-
-#define MESON_DIV(_name, _offset, _shift, _width, _data_flags,                      \
-                  _parent_clks, _num_parents, _hw_flags)                            \
-struct clk _name = {                                                                \
-    .data = &(struct clk_div_data) {                                                \
-        .offset = (_offset),                                                        \
-        .shift = (_shift),                                                          \
-        .width = (_width),                                                          \
-        .flags = (_data_flags),                                                     \
-    },                                                                              \
-    .hw.init = &(struct clk_init_data) {                                            \
-        .name = #_name,                                                             \
-        .ops = &clk_regmap_divider_ops,                                             \
-        .parent_clks = (const struct clk *[]) _parent_clks,                         \
-        .num_parents = (_num_parents),                                              \
-        .flags = (_hw_flags),                                                       \
-    },                                                                              \
-}
+static MESON_DIV_RO(g12a_fixed_pll, HHI_FIX_PLL_CNTL0, 16, 2, CLK_DIVIDER_POWER_OF_TWO, { &g12a_fixed_pll_dco }, 1, 0);
 
 static MESON_FIXED_FACTOR(g12a_mpll_prediv, 1, 2, { &g12a_fixed_pll_dco }, 1, 0);
+
+static struct clk g12a_sys_pll_dco = {
+	.data = &(struct meson_clk_pll_data){
+		.en = {
+			.reg_off = HHI_SYS_PLL_CNTL0,
+			.shift   = 28,
+			.width   = 1,
+		},
+		.m = {
+			.reg_off = HHI_SYS_PLL_CNTL0,
+			.shift   = 0,
+			.width   = 8,
+		},
+		.n = {
+			.reg_off = HHI_SYS_PLL_CNTL0,
+			.shift   = 10,
+			.width   = 5,
+		},
+		.l = {
+			.reg_off = HHI_SYS_PLL_CNTL0,
+			.shift   = 31,
+			.width   = 1,
+		},
+		.rst = {
+			.reg_off = HHI_SYS_PLL_CNTL0,
+			.shift   = 29,
+			.width   = 1,
+		},
+		.range_min = 128,
+		.range_max = 250,
+	},
+	.hw.init = &(struct clk_init_data){
+		.name = "sys_pll_dco",
+		.ops = &meson_clk_pll_ops,
+		.parent_data = &(const struct clk_parent_data) {
+			.fw_name = "xtal",
+		},
+		.num_parents = 1,
+		/* This clock feeds the CPU, avoid disabling it */
+		.flags = CLK_IS_CRITICAL,
+	},
+};
+
+static MESON_DIV(g12a_sys_pll, HHI_SYS_PLL_CNTL0, 16, 3, CLK_DIVIDER_POWER_OF_TWO, { &g12a_sys_pll_dco }, 1, CLK_SET_RATE_PARENT);
 
 static const struct reg_sequence g12a_mpll0_init_regs[] = {
     { .reg = HHI_MPLL_CNTL2,    .def = 0x40000033 },
@@ -349,6 +396,18 @@ static MESON_MUX(g12a_mpeg_clk_sel, HHI_MPEG_CLK_CNTL, 0x7, 12, mux_table_clk81,
 static MESON_DIV(g12a_mpeg_clk_div, HHI_MPEG_CLK_CNTL, 0, 7, 0, { &g12a_mpeg_clk_sel }, 1, 0);
 static MESON_GATE(g12a_clk81, HHI_MPEG_CLK_CNTL, 7, 0, { &g12a_mpeg_clk_div }, 1, 0);
 
+static const struct clk_parent_data g12a_sd_emmc_clk0_parent_data[] = {
+	{ .fw_name = "xtal", },
+	{ .clk = &g12a_fclk_div2 },
+	{ .clk = &g12a_fclk_div3 },
+	{ .clk = &g12a_fclk_div5 },
+	{ .clk = &g12a_fclk_div7 },
+};
+
+static MESON_MUX(g12a_sd_emmc_b_clk0_sel, HHI_SD_EMMC_CLK_CNTL, 0x7, 25, NULL, 0, g12a_sd_emmc_clk0_parent_data, ARRAY_SIZE(g12a_sd_emmc_clk0_parent_data), CLK_SET_RATE_PARENT);
+static MESON_DIV(g12a_sd_emmc_b_clk0_div, HHI_SD_EMMC_CLK_CNTL, 0, 7, 0, { &g12a_sd_emmc_b_clk0_sel }, 1, CLK_SET_RATE_PARENT);
+static MESON_GATE(g12a_sd_emmc_b_clk0, HHI_SD_EMMC_CLK_CNTL, 23, 0, { &g12a_sd_emmc_b_clk0_div }, 1, CLK_SET_RATE_PARENT);
+
 #define MESON_CLK81_GATE(_name, _reg, _bit)                  \
 struct clk _name = {                                         \
     .data = &(struct clk_gate_data) {                        \
@@ -464,7 +523,7 @@ static MESON_CLK81_GATE_RO(g12a_reset_sec,        HHI_GCLK_OTHER2, 3);
 static MESON_CLK81_GATE_RO(g12a_sec_ahb_apb3,        HHI_GCLK_OTHER2, 4);
 
 static struct clk *sm1_clks[] = {
-    /* [CLKID_SYS_PLL]            = &g12a_sys_pll, */
+    [CLKID_SYS_PLL]            = &g12a_sys_pll,
     [CLKID_FIXED_PLL]        = &g12a_fixed_pll,
     [CLKID_FCLK_DIV2]        = &g12a_fclk_div2,
     [CLKID_FCLK_DIV3]        = &g12a_fclk_div3,
@@ -528,9 +587,9 @@ static struct clk *sm1_clks[] = {
     /* [CLKID_SD_EMMC_A_CLK0_SEL]    = &g12a_sd_emmc_a_clk0_sel, */
     /* [CLKID_SD_EMMC_A_CLK0_DIV]    = &g12a_sd_emmc_a_clk0_div, */
     /* [CLKID_SD_EMMC_A_CLK0]        = &g12a_sd_emmc_a_clk0, */
-    /* [CLKID_SD_EMMC_B_CLK0_SEL]    = &g12a_sd_emmc_b_clk0_sel, */
-    /* [CLKID_SD_EMMC_B_CLK0_DIV]    = &g12a_sd_emmc_b_clk0_div, */
-    /* [CLKID_SD_EMMC_B_CLK0]        = &g12a_sd_emmc_b_clk0, */
+    [CLKID_SD_EMMC_B_CLK0_SEL]    = &g12a_sd_emmc_b_clk0_sel,
+    [CLKID_SD_EMMC_B_CLK0_DIV]    = &g12a_sd_emmc_b_clk0_div,
+    [CLKID_SD_EMMC_B_CLK0]        = &g12a_sd_emmc_b_clk0,
     /* [CLKID_SD_EMMC_C_CLK0_SEL]    = &g12a_sd_emmc_c_clk0_sel, */
     /* [CLKID_SD_EMMC_C_CLK0_DIV]    = &g12a_sd_emmc_c_clk0_div, */
     /* [CLKID_SD_EMMC_C_CLK0]        = &g12a_sd_emmc_c_clk0, */
@@ -776,18 +835,28 @@ void init(void)
 
     /*     CLKID_MPLL2    0x11940000 */
     /*     CLKID_MPLL0    0x10266000 */
-    /*     CLKID_MPLL1 0x17700000 */
+    /*     CLKID_MPLL1    0x17700000 */
 	struct clk *parent_clk = sm1_clks[CLKID_MPLL_PREDIV];
     uint64_t prate = clk_recalc_rate(parent_clk);
     sddf_dprintf("%s rate: %lu\n", parent_clk->hw.init->name, rate);
 
-    struct clk *test_clk = sm1_clks[CLKID_MPLL0_DIV];
-	test_clk->hw.init->ops->init(test_clk);
-    rate = clk_recalc_rate(test_clk);
-    sddf_dprintf("%s rate: %lu\n", test_clk->hw.init->name, rate);
-	test_clk->hw.init->ops->set_rate(test_clk, 0x10266000, prate);
-    rate = clk_recalc_rate(test_clk);
-    sddf_dprintf("%s rate: %lu\n", test_clk->hw.init->name, rate);
+    struct clk *mpll0_clk = sm1_clks[CLKID_MPLL0_DIV];
+	mpll0_clk->hw.init->ops->init(mpll0_clk);
+	mpll0_clk->hw.init->ops->set_rate(mpll0_clk, 0x10266000, prate);
+    rate = clk_recalc_rate(mpll0_clk);
+    sddf_dprintf("%s rate: %lu\n", mpll0_clk->hw.init->name, rate);
+
+    struct clk *mpll1_clk = sm1_clks[CLKID_MPLL1_DIV];
+	mpll1_clk->hw.init->ops->init(mpll1_clk);
+	mpll1_clk->hw.init->ops->set_rate(mpll1_clk, 0x17700000, prate);
+    rate = clk_recalc_rate(mpll1_clk);
+    sddf_dprintf("%s rate: %lu\n", mpll1_clk->hw.init->name, rate);
+
+    struct clk *mpll2_clk = sm1_clks[CLKID_MPLL2_DIV];
+	mpll2_clk->hw.init->ops->init(mpll2_clk);
+	mpll2_clk->hw.init->ops->set_rate(mpll2_clk, 0x11940000, prate);
+    rate = clk_recalc_rate(mpll2_clk);
+    sddf_dprintf("%s rate: %lu\n", mpll2_clk->hw.init->name, rate);
 
     clk_msr_stat();
 

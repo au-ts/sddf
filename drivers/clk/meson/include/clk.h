@@ -156,6 +156,8 @@ struct meson_clk_pll_data {
     unsigned int init_count;
     /* const struct pll_params_table *table; */
     /* const struct pll_mult_range *range; */
+    uint8_t range_min;
+    uint8_t range_max;
     uint8_t flags;
 };
 

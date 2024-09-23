@@ -278,6 +278,16 @@ static unsigned long meson_clk_pll_recalc_rate(struct clk *clk,
     return DIV_ROUND_UP_ULL(rate, n);
 }
 
+const struct clk_ops meson_clk_pll_ops = {
+    /* .init           = meson_clk_pll_init, */
+    .recalc_rate    = meson_clk_pll_recalc_rate,
+    /* .determine_rate = meson_clk_pll_determine_rate, */
+    /* .set_rate       = meson_clk_pll_set_rate, */
+    /* .is_enabled     = meson_clk_pll_is_enabled, */
+    /* .enable         = meson_clk_pll_enable, */
+    /* .disable        = meson_clk_pll_disable */
+};
+
 const struct clk_ops meson_clk_pll_ro_ops = {
     .recalc_rate = meson_clk_pll_recalc_rate,
     /* .is_enabled    = meson_clk_pll_is_enabled, */
