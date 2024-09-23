@@ -47,7 +47,10 @@
 
 #define CLK_FRAC_DIVIDER_ZERO_BASED        BIT(0)
 #define CLK_FRAC_DIVIDER_BIG_ENDIAN        BIT(1)
-#define CLK_FRAC_DIVIDER_POWER_OF_TWO_PS    BIT(2)
+#define CLK_FRAC_DIVIDER_POWER_OF_TWO_PS   BIT(2)
+
+#define CLK_MESON_MPLL_ROUND_CLOSEST       BIT(0)
+#define CLK_MESON_MPLL_SPREAD_SPECTRUM     BIT(1)
 
 #define BIT(nr) (1UL << (nr))
 
@@ -65,6 +68,7 @@ struct clk_ops {
     int (*set_parent)(struct clk *clk, uint8_t index);
     unsigned long (*recalc_rate)(struct clk *clk, unsigned long parent_rate);
     int (*set_rate)(struct clk *clk, uint32_t rate, uint32_t parent_rate);
+    void (*init)(struct clk *clk);
     int (*enable)(struct clk *clk);
     void (*disable)(struct clk *clk);
     int (*is_enabled)(struct clk *clk);
