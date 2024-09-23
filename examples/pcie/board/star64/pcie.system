@@ -16,7 +16,7 @@
         <!-- <map mr="pcie_regs" vaddr="0x1000_0000" perms="rw" cached="false" setvar_vaddr="pcie_regs" /> -->
         <map mr="pcie_config" vaddr="0x2000_0000" perms="rw" cached="false" setvar_vaddr="pcie_config" />
 
-        <map mr="nvme_regs" vaddr="0x3000_0000" perms="rw" cached="false" setvar_vaddr="nvme_regs" />
+        <map mr="nvme_regs" vaddr="0x3000_0000" perms="rw" cached="false" setvar_vaddr="nvme_controller" />
 
         <program_image path="pcie_driver.elf" />
     </protection_domain>
