@@ -9,6 +9,7 @@
 #include <sddf/util/printf.h>
 
 #include "pcie.h"
+#include "nvme.h"
 
 // void *pcie_regs;
 
@@ -18,7 +19,7 @@
 uintptr_t pcie_config;
 #define PCIE_CONFIG_SIZE 0x1000000
 
-uintptr_t nvme_regs;
+volatile nvme_controller_t *nvme_controller;
 
 /* bus between [0, 256)
    device between [0, 31)
@@ -83,14 +84,14 @@ void device_print(uint8_t bus, uint8_t device, uint8_t function)
 
             if (bar & BIT(0)) {
                 sddf_dprintf("\tbase address for I/O\n");
-                sddf_dprintf("\taddress: 0x%08x\n", bar & ~(BIT(0) | BIT(1)));
+                sddf_dprintf("\taddress: 0x%08x\n", (uint32_t)(bar & ~(BIT(0) | BIT(1))));
             } else {
                 sddf_dprintf("\tbase address for memory\n");
                 sddf_dprintf("\ttype: ");
                 switch ((bar & (BIT(1) | BIT(2))) >> 1) {
                     case 0b00:
                         sddf_dprintf("32-bit space\n");
-                        sddf_dprintf("\tfull address: 0x%08x\n", bar & ~(BIT(4) - 1));
+                        sddf_dprintf("\tfull address: 0x%08x\n", (uint32_t)(bar & ~(BIT(4) - 1)));
                         break;
 
                     case 0b10:
@@ -102,7 +103,7 @@ void device_print(uint8_t bus, uint8_t device, uint8_t function)
 
                         uint32_t bar_upper = type0_header->base_address_registers[i + 1];
 
-                        sddf_dprintf("\tfull address: 0x%08x_%08x\n", bar_upper, bar & ~(BIT(4) - 1));
+                        sddf_dprintf("\tfull address: 0x%08x_%08x\n", bar_upper, (uint32_t)(bar & ~(BIT(4) - 1)));
 
                         /* [PCI-3.0] 6.2.5.1 Address Maps (Implementation Note) p227*/
 
@@ -148,7 +149,7 @@ void init()
 {
     sddf_dprintf("pcie driver starting!\n");
 
-    for (uint8_t bus = 0; bus < 256; bus++) {
+    for (uint8_t bus = 0; bus <= 255; bus++) {
         for (uint8_t device = 0; device < 32; device++) {
             for (uint8_t function = 0; function < 8; function++) {
                 uintptr_t offset = get_bdf_offset(bus, device, function);
@@ -165,14 +166,6 @@ out:
     sddf_dprintf("\n\nPCIE_ENUM_COMPLETE\n");
 
     sddf_dprintf("Starting NVME config...\n");
-    // [NVME-2.1] Figure 33 (§3.1.4)
-    volatile struct {
-        uint64_t cap;
-        uint32_t vs;
-        uint32_t intms;
-        uint32_t intmc;
-        uint32_t cc;
-    } *nvme_reg = (void*)nvme_regs;
 
     // We should do a Function Level Reset as defined by [PCIe-2.0] spec §6.6.2
 
@@ -180,10 +173,9 @@ out:
 
     // [NVME-2.1] 3.5.1 Memory-based Controller Initialization (PCIe)
 
-    sddf_dprintf("CAP: %016lx\n", nvme_reg->cap);
-    sddf_dprintf("VS: %08x\n", nvme_reg->vs);
-    sddf_dprintf("CC: %08x\n", nvme_reg->cc);
-
+    sddf_dprintf("CAP: %016lx\n", nvme_controller->cap);
+    sddf_dprintf("VS: major: %u, minor: %u, tertiary: %u\n", nvme_controller->vs.mjr, nvme_controller->vs.mnr, nvme_controller->vs.ter);
+    sddf_dprintf("CC: %08x\n", nvme_controller->cc);
 }
 
 void notified(microkit_channel ch)
