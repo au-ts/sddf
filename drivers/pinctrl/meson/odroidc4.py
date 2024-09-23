@@ -1361,6 +1361,64 @@ pull_up_registers = [
     },
 ]
 
+gpio_enable_registers = [
+    {
+        # PREG_PAD_GPIO0_EN_N
+        "first_pad": pad_to_idx["BOOT_0"],
+        "last_pad": pad_to_idx["BOOT_15"],
+        "offset": 0x10 * 4,
+        "first_bit": 0,
+        "bits_per_pin": 1,
+        "value": 0xFFFFFFFF
+    },
+    {
+        # PREG_PAD_GPIO1_EN_N
+        "first_pad": pad_to_idx["GPIOC_0"],
+        "last_pad": pad_to_idx["GPIOC_7"],
+        "offset": 0x13 * 4,
+        "first_bit": 0,
+        "bits_per_pin": 1,
+        "value": 0xFFFFFFFF
+    },
+    {
+        # PREG_PAD_GPIO2_EN_N
+        "first_pad": pad_to_idx["GPIOX_0"],
+        "last_pad": pad_to_idx["GPIOX_19"],
+        "offset": 0x16 * 4,
+        "first_bit": 0,
+        "bits_per_pin": 1,
+        "value": 0xFFFFFFFF
+    },
+    {
+        # PREG_PAD_GPIO3_EN_N
+        "first_pad": pad_to_idx["GPIOH_0"],
+        "last_pad": pad_to_idx["GPIOH_8"],
+        "offset": 0x19 * 4,
+        "first_bit": 0,
+        "bits_per_pin": 1,
+        "value": 0xFFFFFFFF
+    },
+    {
+        # PREG_PAD_GPIO4_EN_N
+        "first_pad": pad_to_idx["GPIOZ_0"],
+        "last_pad": pad_to_idx["GPIOZ_15"],
+        "offset": 0x1c * 4,
+        "first_bit": 0,
+        "bits_per_pin": 1,
+        "value": 0xFFFFFFFF
+    },
+    {
+        # PREG_PAD_GPIO5_EN_N
+        "first_pad": pad_to_idx["GPIOA_0"],
+        "last_pad": pad_to_idx["GPIOA_15"],
+        "offset": 0x20 * 4,
+        "first_bit": 0,
+        "bits_per_pin": 1,
+        "value": 0xFFFFFFFF
+    },
+]
+
+######
 
 ao_pinmux_registers = [
     {

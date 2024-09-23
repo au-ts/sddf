@@ -248,8 +248,10 @@ def pindata_to_register_values(
     ds_registers,
     bias_en_registers,
     pull_dir_registers
-) -> None:
+) -> list[int]: # Returns a list of pad indexes that needs its GPIO switch turned off
     encountered_pad = set()
+    gpio_turn_off = []
+
     pindata: PinData
     for pindata in dts_data:
         # Each pindata properties can contain settings for a group of pins
@@ -300,6 +302,10 @@ def pindata_to_register_values(
                         reg["value"] = zeroed_regval | data_mask
 
                         log_normal_parser(f"after reg is {hex(reg["value"])}\n")
+
+                        # By default all pads are GPIOs, if a pad function is non GPIO, turn off the GPIO switch for this pad
+                        if mux_func != 0:
+                            gpio_turn_off.append(pad_idx)
 
                         break
 
@@ -395,11 +401,34 @@ def pindata_to_register_values(
                         # Also not an error for the reason above
                         log_warning_parser(f"cannot find the pin bank that the port {port} belongs in for drive strength\n")
 
+    return gpio_turn_off
+
+def turn_off_gpios(target_pads: list[int], gpio_enable_regs) -> None:
+    pad_idx: int
+    for pad_idx in target_pads:
+        found = False
+        for reg in gpio_enable_regs:
+            if pad_idx >= reg["first_pad"] and pad_idx <= reg["last_pad"]:
+                found = True
+
+                nth_pin = pad_idx - reg["first_pad"]
+                nth_bit = nth_pin * reg["bits_per_pin"]
+
+                prev = reg["value"]
+                reg["value"] = zero_n_bits_at_ith_bit_of_32bits(reg["value"], reg["bits_per_pin"], nth_bit)
+
+                log_normal_parser(f"disabled GPIO func for pad idx {pad_idx}, prev reg is {hex(prev)}, now is {hex(reg["value"])}")
+
+        if not found:
+            log_error_parser(f"cannot find GPIO enable register for pad index {pad_idx}\n")
+            exit(1)
+
 def consolidate_registers(mux_registers, ds_registers, bias_en_registers, pull_dir_registers) -> OrderedDict[int, int]:
     # key = offset to write, value = value to write to offset
     result = OrderedDict()
     for reg in mux_registers + ds_registers + bias_en_registers + pull_dir_registers:
         if reg["offset"] in result:
+            # Some register's bitfield are not contigous....see AO_RTI_PULL_UP_REG for example
             log_normal_parser(f"consolidating existing register {hex(reg["offset"])}, old value is {hex(result[reg["offset"]])} with value {hex(reg["value"])}, result is {hex(result[reg["offset"]] | reg["value"])}")
             result[reg["offset"]] |= reg["value"]
         else:
@@ -407,6 +436,17 @@ def consolidate_registers(mux_registers, ds_registers, bias_en_registers, pull_d
             result[reg["offset"]] = reg["value"]
 
     return result
+
+# A bit of a special case, the AO domain does not have discrete GPIO enable registers like the peripherals domain
+# so it doesn't fit in as nicely as the other function.
+def consolidate_gpio_en_registers(gpio_enable_regs, consolidated_registers: OrderedDict[int, int]) -> None:
+    for reg in gpio_enable_regs:
+        if reg["offset"] in consolidated_registers.keys():
+            log_error_parser(f"GPIO EN register {hex(reg["offset"])} is duplicated")
+            exit(1)
+
+        log_normal_parser(f"consolidating new GPIO EN register {hex(reg["offset"])} with value {hex(reg["value"])}")
+        consolidated_registers[reg["offset"]] = reg["value"]
 
 def register_values_to_assembler(out_dir: str, peripherals_data: OrderedDict[int, int], ao_data: OrderedDict[int, int]):
     with open(out_dir + "/pinctrl_config_data.s", "w") as file:
@@ -495,12 +535,15 @@ if __name__ == "__main__":
 
     # Map pinmux data from DTS to memory values
     # Peripherals
-    pindata_to_register_values(
+    turn_off_gpio_pads = pindata_to_register_values(
         # Input
         peripherals_dts_data, function_to_group, pad_to_idx, port_to_pad, port_to_mux_func,
         # Output
         pinmux_registers, drive_strength_registers, bias_enable_registers, pull_up_registers
     )
+
+    # By default all pads are GPIOs, if a pad function is non GPIO, turn off the GPIO switch for this pad
+    turn_off_gpios(turn_off_gpio_pads, gpio_enable_registers)
 
     log_normal_parser("=================\n")
 
@@ -515,9 +558,12 @@ if __name__ == "__main__":
     # Collect data in easy to process format,
     # Also merges registers at the same offset
     peripherals_memory_data = consolidate_registers(pinmux_registers, drive_strength_registers, bias_enable_registers, pull_up_registers)
+    consolidate_gpio_en_registers(gpio_enable_registers, peripherals_memory_data)
+
     log_normal_parser("=================\n")
     ao_memory_data = consolidate_registers(ao_pinmux_registers, ao_drive_strength_registers, ao_bias_enable_registers, ao_pull_up_registers)
 
     # Write to assembly file
     register_values_to_assembler(out_dir, peripherals_memory_data, ao_memory_data)
 
+    log_normal_parser("FINISHED")
