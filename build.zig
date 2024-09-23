@@ -273,6 +273,7 @@ fn addPcieDriver(
     const source = b.fmt("drivers/pcie/{s}/pcie.c", .{ @tagName(class) });
     driver.addCSourceFile(.{
         .file = b.path(source),
+        .flags = &.{ "-Werror" }
     });
     driver.addIncludePath(b.path(b.fmt("drivers/pcie/{s}/", .{ @tagName(class) })));
     driver.addIncludePath(b.path("include"));
