@@ -33,7 +33,6 @@
 #define LOG_DRIVER_ERR(...) do{ sddf_printf("PINCTRL DRIVER|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
 // Memory definitions
-#define BYTES_IN_32_BITS 4
 #define MUX_REG_ADDR(base, offset) ((uint32_t *) (base + offset))
 #define PINMUX_DATA_MAGIC 0x73ABC62F
 
@@ -112,7 +111,7 @@ void default_initialise_peripherals_chip(void) {
     sddf_printf_("Default initialising peripherals GPIO chip to values in datasheet\n");
     for (int i = 0; i < sizeof(default_periphs_pinmux) / sizeof(default_periphs_pinmux[0]); i += 1) {
         sddf_printf_("offset %x = %x\n", default_periphs_pinmux[i].offset, default_periphs_pinmux[i].value);
-        set_mux(MUX_REG_ADDR(peripheral_registers, default_periphs_pinmux[i].offset), default_periphs_pinmux[i].value);
+        set_mux(MUX_REG_ADDR(pinctrl_periphs_base, default_periphs_pinmux[i].offset), default_periphs_pinmux[i].value);
     }
 }
 
