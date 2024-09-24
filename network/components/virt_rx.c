@@ -93,15 +93,7 @@ void rx_return(void)
             // Cache invalidate after DMA write, so we don't read stale data.
             // This must be performed after the DMA write to avoid reading
             // data that was speculatively fetched before the DMA write.
-            //
-            // We would invalidate if it worked in usermode. Alas, it
-            // does not -- see [1]. The fastest operation that works is a
-            // usermode CleanInvalidate (faster than a Invalidate via syscall).
-            //
-            // [1]: https://developer.arm.com/documentation/ddi0595/2021-06/AArch64-Instructions/DC-IVAC--Data-or-unified-Cache-line-Invalidate-by-VA-to-PoC
-            #ifdef CONFIG_ARCH_ARM
-            cache_clean_and_invalidate(buffer_vaddr, buffer_vaddr + ROUND_UP(buffer.len, 1 << CONFIG_L1_CACHE_LINE_SIZE_BITS));
-            #endif
+            cache_clean_and_invalidate(buffer_vaddr, buffer_vaddr + buffer.len);
             int client = get_mac_addr_match((struct ethernet_header *) buffer_vaddr);
             if (client == BROADCAST_ID) {
                 int ref_index = buffer.io_or_offset / NET_BUFFER_SIZE;
