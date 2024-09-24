@@ -14,7 +14,7 @@ mmc_driver.elf: blk/mmc/imx/mmc_driver.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 blk/mmc/imx/mmc_driver.o: ${USDHC_DRIVER_DIR}/usdhc.c |blk/mmc/imx
-	$(CC) -c $(CFLAGS) -I${USDHC_DRIVER_DIR}/include -o $@ $<
+	$(CC) -c $(CFLAGS) -o $@ $<
 
 -include mmc_driver.d
 
