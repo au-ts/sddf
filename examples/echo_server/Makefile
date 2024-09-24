@@ -12,31 +12,42 @@ $(error MICROKIT_SDK must be specified)
 endif
 export override MICROKIT_SDK:=$(abspath ${MICROKIT_SDK})
 
-
-ifeq ($(strip $(TOOLCHAIN)),)
-	TOOLCHAIN := aarch64-none-elf
-	export TOOLCHAIN := aarch64-none-elf
-	export LIBC := $(dir $(realpath $(shell aarch64-none-elf-gcc --print-file-name libc.a)))
-endif
-
 ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
 	export DRIV_DIR := meson
 	export UART_DRIV_DIR := meson
 	export TIMER_DRV_DIR := meson
 	export CPU := cortex-a55
+	export ARCH := aarch64
 else ifneq ($(filter $(strip $(MICROKIT_BOARD)),imx8mm_evk imx8mp_evk maaxboard),)
 	export DRIV_DIR := imx
 	export UART_DRIV_DIR := imx
 	export TIMER_DRV_DIR := imx
 	export CPU := cortex-a53
+	export ARCH := aarch64
 else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
 	export DRIV_DIR := virtio
 	export UART_DRIV_DIR := arm
 	export TIMER_DRV_DIR := arm
 	export CPU := cortex-a53
 	QEMU := qemu-system-aarch64
+	export ARCH := aarch64
+else ifeq ($(strip $(MICROKIT_BOARD)), star64)
+	export DRIV_DIR := dwmac-5.10a
+	export UART_DRIV_DIR := snps
+	export TIMER_DRV_DIR := jh7110
+	export ARCH := riscv64
 else
 $(error Unsupported MICROKIT_BOARD given)
+endif
+
+ifeq ($(ARCH),aarch64)
+	TOOLCHAIN := aarch64-none-elf
+	export TOOLCHAIN := aarch64-none-elf
+	export LIBC := $(dir $(realpath $(shell aarch64-none-elf-gcc --print-file-name libc.a)))
+else ifeq ($(ARCH),riscv64)
+	TOOLCHAIN := riscv64-none-elf
+	export TOOLCHAIN := $(TOOLCHAIN)
+	export LIBC := $(dir $(realpath $(shell riscv64-none-elf-gcc --print-file-name libc.a)))
 endif
 
 export BUILD_DIR:=$(abspath ${BUILD_DIR})
