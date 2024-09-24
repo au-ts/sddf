@@ -356,3 +356,10 @@ seL4_Bool fault(microkit_child id, microkit_msginfo msginfo, microkit_msginfo *r
     return seL4_False;
 }
 #endif
+
+#ifdef CONFIG_ARCH_RISCV
+
+void init(void) {}
+void notified(microkit_channel ch) {}
+
+#endif
