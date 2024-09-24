@@ -34,11 +34,11 @@ NETWORK_COMPONENTS=$(SDDF)/network/components
 
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 
-IMAGES := eth.elf lwip.elf benchmark.elf idle.elf mux_rx.elf mux_tx.elf copy.elf arp.elf timer.elf serial.elf
+IMAGES := eth.elf client0.elf client1.elf benchmark.elf idle.elf mux_rx.elf mux_tx.elf copy.elf arp.elf timer.elf serial.elf
 CFLAGS := -ffreestanding -g3 -O3 -Wall -Wno-unused-function -nostdlib  -target $(TARGET)
 
 LDFLAGS := -L$(BOARD_DIR)/lib -nostdlib -target $(TARGET)
-LIBS := -lmicrokit -Tmicrokit.ld $(SDDF)/lib/libc.a	
+LIBS := -lmicrokit -Tmicrokit.ld $(SDDF)/lib/libc.a
 
 IMAGE_FILE = $(BUILD_DIR)/loader.img
 REPORT_FILE = $(BUILD_DIR)/report.txt
@@ -89,8 +89,9 @@ CORE4FILES=$(LWIP)/core/ipv4/autoip.c \
 NETIFFILES=$(LWIP)/netif/ethernet.c
 
 # LWIPFILES: All the above.
-LWIPFILES=lwip.c $(COREFILES) $(CORE4FILES) $(NETIFFILES)
-LWIP_OBJS := $(LWIPFILES:.c=.o) lwip.o sddf_network_sharedringbuffer.o utilization_socket.o udp_echo_socket.o sddf_timer_client.o printf.o putchar_serial.o
+LWIP_FILES := $(COREFILES) $(CORE4FILES) $(NETIFFILES)
+CLIENT0_OBJS := $(LWIP_FILES:.c=.o) client0.o sddf_network_sharedringbuffer.o utilization_socket.o udp_echo_socket.o sddf_timer_client.o printf.o putchar_serial.o
+CLIENT1_OBJS := $(LWIP_FILES:.c=.o) client1.o sddf_network_sharedringbuffer.o utilization_socket.o udp_echo_socket.o sddf_timer_client.o printf.o putchar_serial.o
 
 ETH_OBJS := $(ETHERNET_DRIVER)/ethernet.o sddf_network_sharedringbuffer.o printf.o putchar_debug.o sddf_timer_client.o
 MUX_RX_OBJS := $(NETWORK_COMPONENTS)/mux_rx.o sddf_network_sharedringbuffer.o printf.o putchar_debug.o
@@ -103,7 +104,7 @@ TIMER_OBJS := $(TIMER_DRIVER)/timer.o printf.o putchar_debug.o
 
 OBJS := $(sort $(addprefix $(BUILD_DIR)/, $(ETH_OBJS) $(MUX_RX_OBJS) $(MUX_TX_OBJS)\
 	$(COPY_OBJS) $(BENCH_OBJS) $(IDLE_OBJS) \
-	$(LWIP_OBJS) $(ARP_OBJS) $(TIMER_OBJS)))
+	$(CLIENT0_OBJS) $(CLIENT1_OBJS) $(ARP_OBJS) $(TIMER_OBJS)))
 DEPS := $(OBJS:.o=.d)
 
 all: $(IMAGE_FILE)
@@ -115,6 +116,12 @@ $(BUILD_DIR)/%.d $(BUILD_DIR)/%.o: %.c Makefile
 
 $(BUILD_DIR)/%.o: %.s Makefile
 	$(AS) -g3 $< -o $@
+
+$(BUILD_DIR)/client0.o: lwip.c
+	$(CC) -c $(CFLAGS) -DCLIENT0 $< -o $@
+
+$(BUILD_DIR)/client1.o: lwip.c
+	$(CC) -c $(CFLAGS) -DCLIENT1 $< -o $@
 
 $(BUILD_DIR)/printf.o: $(UTIL)/printf.c $(SDDF_INCLUDE)/util/printf.h
 	$(CC) -c $(CFLAGS) $(UTIL)/printf.c -o $(BUILD_DIR)/printf.o
@@ -146,7 +153,10 @@ $(BUILD_DIR)/serial.elf: $(BUILD_DIR)/serial.o
 $(BUILD_DIR)/eth.elf: $(addprefix $(BUILD_DIR)/, $(ETH_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-$(BUILD_DIR)/lwip.elf: $(addprefix $(BUILD_DIR)/, $(LWIP_OBJS))
+$(BUILD_DIR)/client0.elf: $(addprefix $(BUILD_DIR)/, $(CLIENT0_OBJS))
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+
+$(BUILD_DIR)/client1.elf: $(addprefix $(BUILD_DIR)/, $(CLIENT1_OBJS))
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(BUILD_DIR)/mux_rx.elf: $(addprefix $(BUILD_DIR)/, $(MUX_RX_OBJS))

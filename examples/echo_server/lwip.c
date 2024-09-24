@@ -33,6 +33,12 @@
 #define LWIP_TICK_MS 100
 #define NUM_PBUFFS 512
 
+#ifdef CLIENT0
+#define NAME "client0"
+#else
+#define NAME "client1"
+#endif
+
 uintptr_t rx_free = 0x2000000;
 uintptr_t rx_used = 0x2200000;
 uintptr_t tx_free = 0x2400000;
@@ -82,7 +88,7 @@ uint32_t sys_now(void)
 
 /**
  * Free a pbuf. This also returns the underlying buffer to the receive free ring.
- * 
+ *
  * @param p pbuf to free.
  */
 static void interface_free_buffer(struct pbuf *p)
@@ -125,7 +131,7 @@ static struct pbuf *create_interface_buffer(uintptr_t offset, size_t length)
 
 /**
  * Stores a pbuf to be transmitted upon available transmit buffers.
- * 
+ *
  * @param p pbuf to be stored.
  */
 void enqueue_pbufs(struct pbuf *p)
@@ -144,12 +150,12 @@ void enqueue_pbufs(struct pbuf *p)
     pbuf_ref(p);
 }
 
-/** 
- * Insert pbuf into transmit used queue. If no free buffers available or transmit used queue is full, 
- * stores pbuf to be sent upon buffers becoming available. 
+/**
+ * Insert pbuf into transmit used queue. If no free buffers available or transmit used queue is full,
+ * stores pbuf to be sent upon buffers becoming available.
  * */
 static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
-{   
+{
     if (p->tot_len > BUFF_SIZE) {
         dprintf("LWIP|ERROR: attempted to send a packet of size  %llx > BUFFER SIZE  %llx\n", p->tot_len, BUFF_SIZE);
         return ERR_MEM;
@@ -283,13 +289,18 @@ static void netif_status_callback(struct netif *netif)
         microkit_mr_set(2, (state.mac[2] << 24) |  (state.mac[3] << 16) | (state.mac[4] << 8) | state.mac[5]);
         microkit_ppcall(ARP, microkit_msginfo_new(0, 3));
 
-        printf("CLIENT|NOTICE: DHCP request for %s returned IP address: %s\n", "client0", ip4addr_ntoa(netif_ip4_addr(netif)));
+#ifdef CLIENT1
+        for (int i = 0; i < 1000000000; i++) {
+            __asm__ __volatile__ ("nop" ::);
+        }
+#endif
+        printf("LWIP|NOTICE: DHCP request for %s returned IP address: %s\n", NAME, ip4addr_ntoa(netif_ip4_addr(netif)));
     }
 }
 
 void init(void)
 {
-    cli_ring_init_sys("client0", &state.rx_ring, rx_free, rx_used, &state.tx_ring, tx_free, tx_used);
+    cli_ring_init_sys(NAME, &state.rx_ring, rx_free, rx_used, &state.tx_ring, tx_free, tx_used);
     buffers_init((ring_buffer_t *)tx_free, 0, state.tx_ring.free_ring->size);
 
     lwip_init();
@@ -297,7 +308,7 @@ void init(void)
 
     LWIP_MEMPOOL_INIT(RX_POOL);
 
-    cli_mac_addr_init_sys("client0", state.mac);
+    cli_mac_addr_init_sys(NAME, state.mac);
 
     /* Set dummy IP configuration values to get lwIP bootstrapped  */
     struct ip4_addr netmask, ipaddr, gw, multicast;
@@ -321,6 +332,23 @@ void init(void)
     setup_udp_socket();
     setup_utilization_socket();
 
+    double useful = 0, redundant = 0;
+    for (uint64_t i = 0; ; i++) {
+        if (i % 100000 == 0) {
+            printf("%s: %f%%\n", NAME, 100.0 * useful / (useful + redundant));
+            useful = redundant = 0.0;
+        }
+        sys_check_timeouts();
+        int j = transmit();
+        j += receive();
+        if (j != 0) {
+            useful += 1.0;
+        } else {
+            redundant += 1.0;
+        }
+    }
+
+
     // if (notify_rx && require_signal(state.rx_ring.free_ring)) {
     //     cancel_signal(state.rx_ring.free_ring);
     //     notify_rx = false;
@@ -339,21 +367,6 @@ void init(void)
 
 void notified(microkit_channel ch)
 {
-    double useful = 0, redundant = 0;
-    for (uint64_t i = 0; ; i++) {
-        if (i % 100000 == 0) {
-            printf("client: %f%%\n", 100.0 * useful / (useful + redundant));
-            useful = redundant = 0.0;
-        }
-        sys_check_timeouts();
-        int j = transmit();
-        j += receive();
-        if (j != 0) {
-            useful += 1.0;
-        } else {
-            redundant += 1.0;
-        }
-    }
 
     switch(ch) {
     case RX_CH:

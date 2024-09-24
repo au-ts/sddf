@@ -25,8 +25,8 @@
     <!-- shared memory for mux_rx/copy/arp ring buffer mechanism -->
     <memory_region name="rx_free_arp" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="rx_used_arp" size="0x200_000" page_size="0x200_000"/>
-    <memory_region name="rx_free_copy0" size="0x200_000" page_size="0x200_000"/>
-    <memory_region name="rx_used_copy0" size="0x200_000" page_size="0x200_000"/>
+    <!-- <memory_region name="rx_free_copy0" size="0x200_000" page_size="0x200_000"/> -->
+    <!-- <memory_region name="rx_used_copy0" size="0x200_000" page_size="0x200_000"/> -->
     <memory_region name="rx_free_copy1" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="rx_used_copy1" size="0x200_000" page_size="0x200_000"/>
 
@@ -71,7 +71,7 @@
 
             <!-- <irq irq="152" id="0" /> <!-\-> ethernet interrupt -\-> -->
             <irq irq="1" id="0" type="msi" handle="0" pci_bus="1" pci_dev="0" pci_func="0" />
-            
+
             <setvar symbol="hw_ring_buffer_paddr" region_paddr="hw_ring_buffer" />
         </protection_domain>
 
@@ -82,26 +82,26 @@
 
             <map mr="rx_free_arp" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="rx_free_arp" />
             <map mr="rx_used_arp" vaddr="0x2_600_000" perms="rw" cached="true" setvar_vaddr="rx_used_arp" />
-            <map mr="rx_free_copy0" vaddr="0x2_800_000" perms="rw" cached="true" setvar_vaddr="rx_free_cli0" />
-            <map mr="rx_used_copy0" vaddr="0x2_a00_000" perms="rw" cached="true" setvar_vaddr="rx_used_cli0" />
-            <map mr="rx_free_copy1" vaddr="0x2_c00_000" perms="rw" cached="true" setvar_vaddr="rx_free_cli1" />
-            <map mr="rx_used_copy1" vaddr="0x2_e00_000" perms="rw" cached="true" setvar_vaddr="rx_used_cli1" />
+            <map mr="rx_free_cli0" vaddr="0x2_800_000" perms="rw" cached="true" setvar_vaddr="rx_free_cli0" />
+            <map mr="rx_used_cli0" vaddr="0x2_a00_000" perms="rw" cached="true" setvar_vaddr="rx_used_cli0" />
+            <map mr="rx_free_cli1" vaddr="0x2_c00_000" perms="rw" cached="true" setvar_vaddr="rx_free_cli1" />
+            <map mr="rx_used_cli1" vaddr="0x2_e00_000" perms="rw" cached="true" setvar_vaddr="rx_used_cli1" />
 
             <map mr="rx_buffer_data_region" vaddr="0x3_000_000" perms="rw" cached="true" setvar_vaddr="buffer_data_vaddr" />
             <setvar symbol="buffer_data_paddr" region_paddr="rx_buffer_data_region" />
         </protection_domain>
 
-        <protection_domain name="copy0" priority="98" id="4" cpu="3">
-            <program_image path="copy.elf" />
-            <map mr="rx_free_copy0" vaddr="0x2_000_000" perms="rw" cached="true" setvar_vaddr="rx_free_mux" />
-            <map mr="rx_used_copy0" vaddr="0x2_200_000" perms="rw" cached="true" setvar_vaddr="rx_used_mux" />
+        <!-- <protection_domain name="copy0" priority="98" id="4" cpu="3"> -->
+        <!--     <program_image path="copy.elf" /> -->
+        <!--     <map mr="rx_free_copy0" vaddr="0x2_000_000" perms="rw" cached="true" setvar_vaddr="rx_free_mux" /> -->
+        <!--     <map mr="rx_used_copy0" vaddr="0x2_200_000" perms="rw" cached="true" setvar_vaddr="rx_used_mux" /> -->
 
-            <map mr="rx_free_cli0" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="rx_free_cli" />
-            <map mr="rx_used_cli0" vaddr="0x2_600_000" perms="rw" cached="true" setvar_vaddr="rx_used_cli" />
+        <!--     <map mr="rx_free_cli0" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="rx_free_cli" /> -->
+        <!--     <map mr="rx_used_cli0" vaddr="0x2_600_000" perms="rw" cached="true" setvar_vaddr="rx_used_cli" /> -->
 
-            <map mr="rx_buffer_data_region" vaddr="0x2_800_000" perms="r" cached="true" setvar_vaddr="mux_buffer_data_region" />
-            <map mr="rx_buffer_data_region_cli0" vaddr="0x2_a00_000" perms="rw" cached="true" setvar_vaddr="cli_buffer_data_region" />
-        </protection_domain>
+        <!--     <map mr="rx_buffer_data_region" vaddr="0x2_800_000" perms="r" cached="true" setvar_vaddr="mux_buffer_data_region" /> -->
+        <!--     <map mr="rx_buffer_data_region_cli0" vaddr="0x2_a00_000" perms="rw" cached="true" setvar_vaddr="cli_buffer_data_region" /> -->
+        <!-- </protection_domain> -->
 
         <protection_domain name="mux_tx" priority="100" id="3" cpu="5">
             <program_image path="mux_tx.elf" />
@@ -121,15 +121,29 @@
         </protection_domain>
 
         <protection_domain name="client0" priority="97" id="6" cpu="2">
-            <program_image path="lwip.elf" />
+            <program_image path="client0.elf" />
 
             <map mr="rx_free_cli0" vaddr="0x2_000_000" perms="rw" cached="true" setvar_vaddr="rx_free" />
             <map mr="rx_used_cli0" vaddr="0x2_200_000" perms="rw" cached="true" setvar_vaddr="rx_used" />
             <map mr="tx_free_cli0" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="tx_free" />
             <map mr="tx_used_cli0" vaddr="0x2_600_000" perms="rw" cached="true" setvar_vaddr="tx_used" />
 
-            <map mr="rx_buffer_data_region_cli0" vaddr="0x2_800_000" perms="rw" cached="true" setvar_vaddr="rx_buffer_data_region" />
+            <map mr="rx_buffer_data_region" vaddr="0x2_800_000" perms="rw" cached="true" setvar_vaddr="rx_buffer_data_region" />
             <map mr="tx_buffer_data_region_cli0" vaddr="0x2_a00_000" perms="rw" cached="true" setvar_vaddr="tx_buffer_data_region" />
+
+            <map mr="cyclecounters" vaddr="0x5_010_000" perms="rw" cached="true" setvar_vaddr="cyclecounters_vaddr" />
+        </protection_domain>
+
+        <protection_domain name="client1" priority="97" id="99" cpu="3">
+            <program_image path="client1.elf" />
+
+            <map mr="rx_free_cli1" vaddr="0x2_000_000" perms="rw" cached="true" setvar_vaddr="rx_free" />
+            <map mr="rx_used_cli1" vaddr="0x2_200_000" perms="rw" cached="true" setvar_vaddr="rx_used" />
+            <map mr="tx_free_cli1" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="tx_free" />
+            <map mr="tx_used_cli1" vaddr="0x2_600_000" perms="rw" cached="true" setvar_vaddr="tx_used" />
+
+            <map mr="rx_buffer_data_region" vaddr="0x2_800_000" perms="rw" cached="true" setvar_vaddr="rx_buffer_data_region" />
+            <map mr="tx_buffer_data_region_cli1" vaddr="0x2_a00_000" perms="rw" cached="true" setvar_vaddr="tx_buffer_data_region" />
 
             <map mr="cyclecounters" vaddr="0x5_010_000" perms="rw" cached="true" setvar_vaddr="cyclecounters_vaddr" />
         </protection_domain>
@@ -170,20 +184,20 @@
         <end pd="arp" id="0" />
     </channel>
 
-    <channel>
-        <end pd="mux_rx" id="2" />
-        <end pd="copy0" id="0" />
-    </channel>
+    <!-- <channel> -->
+    <!--     <end pd="mux_rx" id="2" /> -->
+    <!--     <end pd="copy0" id="0" /> -->
+    <!-- </channel> -->
 
     <!-- <channel> -->
     <!--     <end pd="mux_rx" id="3" /> -->
     <!--     <end pd="copy1" id="0" /> -->
     <!-- </channel> -->
 
-    <channel>
-        <end pd="copy0" id="1" />
-        <end pd="client0" id="2" />
-    </channel>
+    <!-- <channel> -->
+    <!--     <end pd="copy0" id="1" /> -->
+    <!--     <end pd="client0" id="2" /> -->
+    <!-- </channel> -->
 
     <!-- <channel> -->
     <!--     <end pd="copy1" id="1" /> -->
@@ -235,10 +249,10 @@
         <end pd="client0" id="7" />
     </channel>
 
-    <!-- <channel> -->
-    <!--     <end pd="arp" id="3" /> -->
-    <!--     <end pd="client1" id="7" /> -->
-    <!-- </channel> -->
+    <channel>
+        <end pd="arp" id="3" />
+        <end pd="client1" id="7" />
+    </channel>
 
     <channel>
         <end pd="timer" id="1" />
@@ -255,14 +269,19 @@
       <end pd="benchIdle" id="1" />
     </channel>
 
-    <!-- <channel> -->
-    <!--     <end pd="timer" id="3" /> -->
-    <!--     <end pd="client1" id="1" /> -->
-    <!-- </channel> -->
+    <channel>
+        <end pd="timer" id="5" />
+        <end pd="client1" id="1" />
+    </channel>
 
     <channel>
       <end pd="serial" id="0" />
       <end pd="client0" id="13" />
+    </channel>
+
+    <channel>
+      <end pd="serial" id="1" />
+      <end pd="client1" id="13" />
     </channel>
 
 </system>

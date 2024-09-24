@@ -15,6 +15,7 @@ TARGET := x86_64-freestanding
 SDDF := ../../
 
 CFLAGS := \
+	-O3 \
 	-target $(TARGET) \
 	-ffreestanding \
 	-I$(MICROKIT_INCLUDE) \
