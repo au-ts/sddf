@@ -62,10 +62,8 @@ void tx_provide(void)
                     assert(!err);
                     continue;
                 }
-                #ifdef CONFIG_ARCH_ARM
                 cache_clean(buffer.io_or_offset + state.buffer_region_vaddrs[client],
                             buffer.io_or_offset + state.buffer_region_vaddrs[client] + buffer.len);
-                #endif
 
                 buffer.io_or_offset = buffer.io_or_offset + state.buffer_region_paddrs[client];
                 err = net_enqueue_active(&state.tx_queue_drv, buffer);
