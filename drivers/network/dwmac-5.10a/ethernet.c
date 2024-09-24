@@ -280,15 +280,15 @@ static void eth_init()
     // These sizes of the tx and rx FIFO are encoded in the hardware feature 1 register.
     // These values are expressed as: Log2(FIFO_SIZE) -7
     tx_fifo_sz = (val >> 6) & 0x1f;
-	rx_fifo_sz = (val >> 0) & 0x1f;
+    rx_fifo_sz = (val >> 0) & 0x1f;
 
     /* r/tx_fifo_sz is encoded as log2(n / 128). Undo that by shifting */
-	tx_fifo_sz = 128 << tx_fifo_sz;
-	rx_fifo_sz = 128 << rx_fifo_sz;
+    tx_fifo_sz = 128 << tx_fifo_sz;
+    rx_fifo_sz = 128 << rx_fifo_sz;
 
-	/* r/tqs is encoded as (n / 256) - 1 */
-	uint32_t tqs = tx_fifo_sz / 256 - 1;
-	uint32_t rqs = rx_fifo_sz / 256 - 1;
+    /* r/tqs is encoded as (n / 256) - 1 */
+    uint32_t tqs = tx_fifo_sz / 256 - 1;
+    uint32_t rqs = rx_fifo_sz / 256 - 1;
 
     *MTL_REG(MTL_CHAN_TX_OP_MODE(0)) &= ~(MTL_OP_MODE_TQS_MASK);
     *MTL_REG(MTL_CHAN_TX_OP_MODE(0)) |= tqs << MTL_OP_MODE_TQS_SHIFT;
@@ -404,7 +404,7 @@ static void eth_setup(void)
 void init(void)
 {
     /* De-assert the reset signals that u-boot left asserted. */
-    #ifdef CONFIG_PLAT_STAR64
+#ifdef CONFIG_PLAT_STAR64
     volatile uint32_t *reset_eth = (volatile uint32_t *)(resets + 0x38);
     uint32_t reset_val = *reset_eth;
     uint32_t mask = 0;
@@ -417,7 +417,7 @@ void init(void)
         reset_val &= ~mask;
         *reset_eth = reset_val;
     }
-    #endif /* CONFIG_PLAT_STAR64 */
+#endif /* CONFIG_PLAT_STAR64 */
 
     // Check if the PHY device is up
     uint32_t phy_stat = *MAC_REG(GMAC_PHYIF_CONTROL_STATUS);
@@ -436,7 +436,7 @@ void init(void)
     net_queue_init(&rx_queue, (net_queue_t *)rx_free, (net_queue_t *)rx_active, NET_RX_QUEUE_SIZE_DRIV);
     net_queue_init(&tx_queue, (net_queue_t *)tx_free, (net_queue_t *)tx_active, NET_TX_QUEUE_SIZE_DRIV);
 
-        eth_setup();
+    eth_setup();
 
 
     microkit_irq_ack(IRQ_CH);
