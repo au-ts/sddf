@@ -170,7 +170,7 @@ static inline int net_enqueue_free(net_queue_handle_t *queue, net_buff_desc_t bu
     __atomic_store_n(&queue->free->tail, tail + 1, __ATOMIC_RELEASE);
 #else
     queue->free->buffers[queue->free->tail % queue->capacity] = buffer;
-    THREAD_MEMORY_RELEASE();
+    COMPILER_MEMORY_RELEASE();
     queue->free->tail++;
 #endif
 
@@ -197,7 +197,7 @@ static inline int net_enqueue_active(net_queue_handle_t *queue, net_buff_desc_t 
     __atomic_store_n(&queue->active->tail, tail + 1, __ATOMIC_RELEASE);
 #else
     queue->active->buffers[queue->active->tail % queue->capacity] = buffer;
-    THREAD_MEMORY_RELEASE();
+    COMPILER_MEMORY_RELEASE();
     queue->active->tail++;
 #endif
 
@@ -224,7 +224,7 @@ static inline int net_dequeue_free(net_queue_handle_t *queue, net_buff_desc_t *b
     __atomic_store_n(&queue->free->head, head + 1, __ATOMIC_RELEASE);
 #else
     *buffer = queue->free->buffers[queue->free->head % queue->capacity];
-    THREAD_MEMORY_RELEASE();
+    COMPILER_MEMORY_RELEASE();
     queue->free->head++;
 #endif
 
@@ -252,7 +252,7 @@ static inline int net_dequeue_active(net_queue_handle_t *queue, net_buff_desc_t 
     __atomic_store_n(&queue->active->head, head + 1, __ATOMIC_RELEASE);
 #else
     *buffer = queue->active->buffers[queue->active->head % queue->capacity];
-    THREAD_MEMORY_RELEASE();
+    COMPILER_MEMORY_RELEASE();
     queue->active->head++;
 #endif
 
@@ -283,7 +283,7 @@ static inline void net_queue_init(net_queue_handle_t *queue, net_queue_t *free, 
 static inline void net_buffers_init(net_queue_handle_t *queue, uintptr_t base_addr)
 {
     for (uint32_t i = 0; i < queue->capacity; i++) {
-        net_buff_desc_t buffer = {(NET_BUFFER_capacity * i) + base_addr, 0};
+        net_buff_desc_t buffer = {(NET_BUFFER_SIZE * i) + base_addr, 0};
         int err = net_enqueue_free(queue, buffer);
         assert(!err);
     }
