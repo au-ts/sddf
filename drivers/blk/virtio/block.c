@@ -49,8 +49,8 @@
 uintptr_t blk_regs;
 
 blk_storage_info_t *blk_storage_info;
-uintptr_t blk_request;
-uintptr_t blk_response;
+blk_req_queue_t *blk_req_queue;
+blk_resp_queue_t *blk_resp_queue;
 
 uintptr_t requests_paddr;
 uintptr_t requests_vaddr;
@@ -395,7 +395,7 @@ void init(void)
     regs = (volatile virtio_mmio_regs_t *)(blk_regs + VIRTIO_MMIO_BLK_OFFSET);
     virtio_blk_init();
 
-    blk_queue_init(&blk_queue, (blk_req_queue_t *)blk_request, (blk_resp_queue_t *)blk_response, QUEUE_SIZE);
+    blk_queue_init(&blk_queue, blk_req_queue, blk_resp_queue, QUEUE_SIZE);
 }
 
 void notified(microkit_channel ch)

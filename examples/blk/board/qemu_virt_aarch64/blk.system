@@ -29,8 +29,8 @@
         <setvar symbol="requests_paddr" region_paddr="blk_driver_metadata" />
 
         <map mr="blk_driver_storage_info" vaddr="0x40_000_000" perms="rw" cached="true" setvar_vaddr="blk_storage_info" />
-        <map mr="blk_driver_request" vaddr="0x40_200_000" perms="rw" cached="true" setvar_vaddr="blk_request" />
-        <map mr="blk_driver_response" vaddr="0x40_400_000" perms="rw" cached="true" setvar_vaddr="blk_response" />
+        <map mr="blk_driver_request" vaddr="0x40_200_000" perms="rw" cached="true" setvar_vaddr="blk_req_queue" />
+        <map mr="blk_driver_response" vaddr="0x40_400_000" perms="rw" cached="true" setvar_vaddr="blk_resp_queue" />
 
         <map mr="blk_virtio_headers" vaddr="0x50_000_000" perms="rw" cached="false" setvar_vaddr="virtio_headers_vaddr" />
         <map mr="blk_driver_metadata" vaddr="0x60_000_000" perms="rw" cached="false" setvar_vaddr="requests_vaddr" />
