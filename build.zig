@@ -34,6 +34,10 @@ const DriverClass = struct {
         virtio,
     };
 
+    const Mmc = enum {
+        imx,
+    };
+
     const I2cDevice = enum {
         ds3231,
         pn532,
@@ -194,6 +198,32 @@ fn addBlockDriver(
     return driver;
 }
 
+fn addMmcDriver(
+    b: *std.Build,
+    blk_config_include: LazyPath,
+    util: *std.Build.Step.Compile,
+    class: DriverClass.Mmc,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+) *std.Build.Step.Compile {
+    const driver = addPd(b, .{
+        .name = b.fmt("driver_blk_mmc_{s}.elf", .{ @tagName(class) }),
+        .target = target,
+        .optimize = optimize,
+        .strip = false,
+    });
+    const source = b.fmt("drivers/blk/mmc/{s}/usdhc.c", .{ @tagName(class) });
+    driver.addCSourceFile(.{
+        .file = b.path(source),
+    });
+    driver.addIncludePath(blk_config_include);
+    driver.addIncludePath(b.path(b.fmt("drivers/blk/mmc/{s}/", .{ @tagName(class) })));
+    driver.addIncludePath(b.path("include"));
+    driver.linkLibrary(util);
+
+    return driver;
+}
+
 fn addNetworkDriver(
     b: *std.Build,
     net_config_include: LazyPath,
@@ -315,6 +345,11 @@ pub fn build(b: *std.Build) void {
     // Block drivers
     inline for (std.meta.fields(DriverClass.Block)) |class| {
         const driver = addBlockDriver(b, blk_config_include, util, @enumFromInt(class.value), target, optimize);
+        driver.linkLibrary(util_putchar_debug);
+        b.installArtifact(driver);
+    }
+    inline for (std.meta.fields(DriverClass.Mmc)) |class| {
+        const driver = addMmcDriver(b, blk_config_include, util, @enumFromInt(class.value), target, optimize);
         driver.linkLibrary(util_putchar_debug);
         b.installArtifact(driver);
     }
