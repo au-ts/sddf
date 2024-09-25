@@ -229,18 +229,24 @@ static void tx_return(void)
 static void handle_irq()
 {
     uint32_t e = *DMA_REG(DMA_CHAN_STATUS(0));
-    if (e & DMA_CHAN_INTR_ENA_RIE) {
-        rx_return();
-    }
-    if (e & DMA_CHAN_INTR_ENA_TIE) {
-        tx_return();
-    }
-    if (e & DMA_CHAN_INTR_ABNORMAL) {
-        if (e & DMA_CHAN_INTR_ENA_FBE) {
-            sddf_dprintf("Ethernet device fatal bus error\n");
-        }
-    }
     *DMA_REG(DMA_CHAN_STATUS(0)) &= e;
+
+    while (e & DMA_CHAN_INTR_DEFAULT_MASK) {
+        if (e & DMA_CHAN_INTR_ENA_RIE) {
+            rx_return();
+        }
+        if (e & DMA_CHAN_INTR_ENA_TIE) {
+            tx_return();
+            tx_provide();
+        }
+        if (e & DMA_CHAN_INTR_ABNORMAL) {
+            if (e & DMA_CHAN_INTR_ENA_FBE) {
+                sddf_dprintf("Ethernet device fatal bus error\n");
+            }
+        }
+        e = *DMA_REG(DMA_CHAN_STATUS(0));
+        *DMA_REG(DMA_CHAN_STATUS(0)) &= e;
+    }
 }
 
 static void eth_init()
