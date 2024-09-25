@@ -121,13 +121,15 @@ void tx_return(void)
     for (int client = 0; client < NUM_CLIENTS; client++) {
         if (notify_clients[client] && require_signal(state.tx_ring_clients[client].free_ring)) {
             cancel_signal(state.tx_ring_clients[client].free_ring);
-            // microkit_notify(client + CLIENT_CH);
+            microkit_notify(client + CLIENT_CH);
         }
     }
 }
 
 void notified(microkit_channel ch)
 {
+    tx_return();
+    tx_provide();
 }
 
 void init(void)
@@ -142,9 +144,4 @@ void init(void)
     state.buffer_region_paddrs[0] = buffer_data_region_arp_paddr;
     state.buffer_region_paddrs[1] = buffer_data_region_cli0_paddr;
     state.buffer_region_paddrs[2] = buffer_data_region_cli1_paddr;
-
-    for (uint64_t i = 0; ; i++) {
-        tx_return();
-        tx_provide();
-    }
 }

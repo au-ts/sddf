@@ -58,11 +58,11 @@ int rx_return(void)
             j++;
         }
 
-        // request_signal(rx_ring_mux.used_ring);
+        request_signal(rx_ring_mux.used_ring);
 
-        /* Only request signal from client if incoming packets from multiplexer are awaiting free buffers */
-        // if (!ring_empty(rx_ring_mux.used_ring)) request_signal(rx_ring_cli.free_ring);
-        // else cancel_signal(rx_ring_cli.free_ring);
+        // Only request signal from client if incoming packets from multiplexer are awaiting free buffers
+        if (!ring_empty(rx_ring_mux.used_ring)) request_signal(rx_ring_cli.free_ring);
+        else cancel_signal(rx_ring_cli.free_ring);
 
         reprocess = false;
 
@@ -73,12 +73,12 @@ int rx_return(void)
 
     if (enqueued && require_signal(rx_ring_cli.used_ring)) {
         cancel_signal(rx_ring_cli.used_ring);
-        // microkit_notify(CLIENT_CH);
+        microkit_notify(CLIENT_CH);
     }
 
     if (enqueued && require_signal(rx_ring_mux.free_ring)) {
         cancel_signal(rx_ring_mux.free_ring);
-        // microkit_notify_delayed(MUX_RX_CH);
+        microkit_notify_delayed(MUX_RX_CH);
     }
 
     return j;
@@ -97,17 +97,17 @@ void init(void)
     cancel_signal(rx_ring_mux.used_ring);
     cancel_signal(rx_ring_cli.free_ring);
 
-    double useful = 0, redundant = 0;
-    for (uint64_t i = 0; ; i++) {
-        if (i % 1000000000 == 0) {
-            printf("copier: %f%%\n", 100.0 * useful / (useful + redundant));
-            useful = redundant = 0.0;
-        }
-        int j = rx_return();
-        if (j != 0) {
-            useful += 1.0;
-        } else {
-            redundant += 1.0;
-        }
-    }
+    // double useful = 0, redundant = 0;
+    // for (uint64_t i = 0; ; i++) {
+    //     if (i % 1000000000 == 0) {
+    //         printf("copier: %f%%\n", 100.0 * useful / (useful + redundant));
+    //         useful = redundant = 0.0;
+    //     }
+    //     int j = rx_return();
+    //     if (j != 0) {
+    //         useful += 1.0;
+    //     } else {
+    //         redundant += 1.0;
+    //     }
+    // }
 }

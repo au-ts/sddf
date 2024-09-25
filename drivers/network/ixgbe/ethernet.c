@@ -177,7 +177,7 @@ tx_return(void)
 
     if (enqueued && require_signal(tx_ring.free_ring)) {
         cancel_signal(tx_ring.free_ring);
-        // microkit_notify(TX_CH);
+        microkit_notify(TX_CH);
     }
 }
 
@@ -264,7 +264,7 @@ static void rx_return(void)
 
     if (packets_transferred && require_signal(rx_ring.used_ring)) {
         cancel_signal(rx_ring.used_ring);
-        // microkit_notify(RX_CH);
+        microkit_notify(RX_CH);
     }
 
     uint64_t rx_head_new = device.rx_head;

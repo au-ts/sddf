@@ -96,7 +96,7 @@ int rx_return(void)
     for (int client = 0; client < NUM_CLIENTS; client++) {
         if (notify_clients[client] && require_signal(state.rx_ring_clients[client].used_ring)) {
             cancel_signal(state.rx_ring_clients[client].used_ring);
-            // microkit_notify(client + CLIENT_CH);
+            microkit_notify(client + CLIENT_CH);
         }
     }
 
@@ -143,6 +143,8 @@ int rx_provide(void)
 
 void notified(microkit_channel ch)
 {
+    rx_return();
+    rx_provide();
 }
 
 void init(void)
@@ -158,18 +160,18 @@ void init(void)
         // microkit_notify(DRIVER_CH);
     }
 
-    double useful = 0, redundant = 0;
-    for (uint64_t i = 0; ; i++) {
-        if (i % 100000000 == 0) {
-            printf("mux_rx: %f%%\n", 100.0 * useful / (useful + redundant));
-            useful = redundant = 0.0;
-        }
-        int j = rx_return();
-        j += rx_provide();
-        if (j != 0) {
-            useful += 1.0;
-        } else {
-            redundant += 1.0;
-        }
-    }
+    // double useful = 0, redundant = 0;
+    // for (uint64_t i = 0; ; i++) {
+    //     if (i % 100000000 == 0) {
+    //         printf("mux_rx: %f%%\n", 100.0 * useful / (useful + redundant));
+    //         useful = redundant = 0.0;
+    //     }
+    //     int j = rx_return();
+    //     j += rx_provide();
+    //     if (j != 0) {
+    //         useful += 1.0;
+    //     } else {
+    //         redundant += 1.0;
+    //     }
+    // }
 }

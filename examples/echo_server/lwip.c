@@ -182,7 +182,7 @@ static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
     assert(!err);
 
     notify_tx = true;
-    // microkit_notify(TX_CH);
+    microkit_notify(TX_CH);
 
     return ERR_OK;
 }
@@ -332,42 +332,28 @@ void init(void)
     setup_udp_socket();
     setup_utilization_socket();
 
-    double useful = 0, redundant = 0;
-    for (uint64_t i = 0; ; i++) {
-        if (i % 100000 == 0) {
-            printf("%s: %f%%\n", NAME, 100.0 * useful / (useful + redundant));
-            useful = redundant = 0.0;
-        }
-        sys_check_timeouts();
-        int j = transmit();
-        j += receive();
-        if (j != 0) {
-            useful += 1.0;
-        } else {
-            redundant += 1.0;
-        }
-    }
+    // double useful = 0, redundant = 0;
+    // for (uint64_t i = 0; ; i++) {
+    //     if (i % 100000 == 0) {
+    //         printf("%s: %f%%\n", NAME, 100.0 * useful / (useful + redundant));
+    //         useful = redundant = 0.0;
+    //     }
+    //     sys_check_timeouts();
+    //     int j = transmit();
+    //     j += receive();
+    //     if (j != 0) {
+    //         useful += 1.0;
+    //     } else {
+    //         redundant += 1.0;
+
+    //     }
 
 
-    // if (notify_rx && require_signal(state.rx_ring.free_ring)) {
-    //     cancel_signal(state.rx_ring.free_ring);
-    //     notify_rx = false;
-    //     if (!have_signal) microkit_notify(RX_CH);
-    //     else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + RX_CH) microkit_notify(RX_CH);
     // }
-
-    // if (notify_tx && require_signal(state.tx_ring.used_ring)) {
-    //     cancel_signal(state.tx_ring.used_ring);
-    //     notify_tx = false;
-    //     if (!have_signal) microkit_notify(TX_CH);
-    //     else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + TX_CH) microkit_notify(TX_CH);
-    // }
-
 }
 
 void notified(microkit_channel ch)
 {
-
     switch(ch) {
     case RX_CH:
         receive();
@@ -383,5 +369,19 @@ void notified(microkit_channel ch)
     default:
         dprintf("LWIP|LOG: received notification on unexpected channel: %lu\n", ch);
         break;
+    }
+
+    if (notify_rx && require_signal(state.rx_ring.free_ring)) {
+        cancel_signal(state.rx_ring.free_ring);
+        notify_rx = false;
+        if (!have_signal) microkit_notify(RX_CH);
+        else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + RX_CH) microkit_notify(RX_CH);
+    }
+
+    if (notify_tx && require_signal(state.tx_ring.used_ring)) {
+        cancel_signal(state.tx_ring.used_ring);
+        notify_tx = false;
+        if (!have_signal) microkit_notify(TX_CH);
+        else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + TX_CH) microkit_notify(TX_CH);
     }
 }
