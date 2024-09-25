@@ -8,7 +8,7 @@
 
 #include <clk.h>
 
-#define MASK(width)  ((1 << width) - 1)
+#define MASK(width)  ((1UL << width) - 1)
 #define DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
 #define do_div(n,base) ({                       \
     uint32_t __base = (base);                   \
