@@ -10,11 +10,8 @@ struct clk_cfg {
 };
 
 #define NUM_DEVICE_CLKS 1
-static struct clk_cfg *enabled_hw_clks[] = {
-    &(struct clk_cfg) {
-        .clk_id = 0x18,
-        .frequency = 1,
-    }
+static struct clk_cfg clk_configs[] = {
+    { .clk_id = 0x18, .frequency = 0, }
 };
 
 #endif // CLK_CONFIG_H_
