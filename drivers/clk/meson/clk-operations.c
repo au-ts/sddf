@@ -378,3 +378,15 @@ const struct clk_ops meson_clk_mpll_ops = {
     .set_rate = mpll_set_rate,
     .init = mpll_init,
 };
+
+static unsigned long clk_source_get_rate(struct clk *clk,
+                                unsigned long prate)
+{
+    struct clk_source_data *data = (struct clk_source_data *)(clk->data);
+
+    return data->rate;
+}
+
+const struct clk_ops meson_clk_source_ops = {
+    .recalc_rate = clk_source_get_rate,
+};
