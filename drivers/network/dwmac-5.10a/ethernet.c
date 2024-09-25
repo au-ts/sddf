@@ -47,10 +47,11 @@ _Static_assert((RX_COUNT + TX_COUNT) * sizeof(struct descriptor) <= NET_HW_REGIO
                "Expect rx+tx buffers to fit in single 2MB page");
 
 typedef struct {
-    unsigned int tail; /* index to insert at */
-    unsigned int head; /* index to remove from */
+    uint32_t tail; /* index to insert at */
+    uint32_t head; /* index to remove from */
+    uint32_t capacity; /* capacity of the ring */
+    volatile struct descriptor *descr; /* buffer descripter array */
     net_buff_desc_t descr_mdata[MAX_COUNT]; /* associated meta data array */
-    volatile struct descriptor *descr; /* buffer descripter array. This is what lives in the hardware_ring address. */
 } hw_ring_t;
 
 hw_ring_t rx;
@@ -66,14 +67,14 @@ net_queue_handle_t tx_queue;
 #define readl(addr) \
 	({ unsigned int __v = (*(volatile uint32_t *)(addr)); __v; })
 
-static inline bool hw_ring_full(hw_ring_t *ring, size_t ring_size)
+static inline bool hw_ring_full(hw_ring_t *ring)
 {
-    return !((ring->tail + 1 - ring->head) % ring_size);
+    return ring->tail - ring->head == ring->capacity;
 }
 
-static inline bool hw_ring_empty(hw_ring_t *ring, size_t ring_size)
+static inline bool hw_ring_empty(hw_ring_t *ring)
 {
-    return !((ring->tail - ring->head) % ring_size);
+    return ring->tail - ring->head == 0;
 }
 
 static void update_ring_slot(hw_ring_t *ring, unsigned int idx, uint32_t d0, uint32_t d1,
@@ -96,27 +97,28 @@ static void rx_provide()
 {
     bool reprocess = true;
     while (reprocess) {
-        while (!hw_ring_full(&rx, RX_COUNT) && !net_queue_empty_free(&rx_queue)) {
+        while (!hw_ring_full(&rx) && !net_queue_empty_free(&rx_queue)) {
             net_buff_desc_t buffer;
             int err = net_dequeue_free(&rx_queue, &buffer);
             assert(!err);
             free_dequeued += 1;
 
-            rx.descr_mdata[rx.tail] = buffer;
-            update_ring_slot(&rx, rx.tail, (uint32_t) (buffer.io_or_offset & 0xffffffff),
+            uint32_t idx = rx.tail % rx.capacity;
+            rx.descr_mdata[idx] = buffer;
+            update_ring_slot(&rx, idx, (uint32_t) (buffer.io_or_offset & 0xffffffff),
                             (uint32_t) (buffer.io_or_offset >> 32), 0, (uint32_t) (DESC_RXSTS_OWNBYDMA | DESC_RXSTS_BUFFER1_ADDR_VALID | DESC_RXSTS_IOC));
             /* We will update the hardware register that stores the tail address. This tells
             the device that we have new descriptors to use. */
             THREAD_MEMORY_RELEASE();
             *DMA_REG(DMA_CHAN_RX_TAIL_ADDR(0)) = rx_desc_base + sizeof(struct descriptor) * rx.tail;
-            rx.tail = (rx.tail + 1) % RX_COUNT;
+            rx.tail++;
         }
 
         net_request_signal_free(&rx_queue);
         reprocess = false;
 
 
-        if (!net_queue_empty_free(&rx_queue) && !hw_ring_full(&rx, RX_COUNT)) {
+        if (!net_queue_empty_free(&rx_queue) && !hw_ring_full(&rx)) {
             net_cancel_signal_free(&rx_queue);
             reprocess = true;
         }
@@ -126,33 +128,39 @@ static void rx_provide()
 static void rx_return(void)
 {
     bool packets_transferred = false;
-    while (!hw_ring_empty(&rx, RX_COUNT)) {
+    while (!hw_ring_empty(&rx)) {
         /* If buffer slot is still empty, we have processed all packets the device has filled */
-        volatile struct descriptor *d = &(rx.descr[rx.head]);
+        uint32_t idx = rx.head % rx.capacity;
+        volatile struct descriptor *d = &(rx.descr[idx]);
         if (d->d3 & DESC_RXSTS_OWNBYDMA) {
             break;
         }
-        net_buff_desc_t buffer = rx.descr_mdata[rx.head];
+
         THREAD_MEMORY_ACQUIRE();
 
+        net_buff_desc_t buffer = rx.descr_mdata[idx];
         if (d->d3 & DESC_RXSTS_ERROR) {
             sddf_dprintf("ETH|ERROR: RX descriptor returned with error status %x\n", d->d3);
-
-            rx.descr_mdata[rx.tail] = buffer;
-            update_ring_slot(&rx, rx.tail, (uint32_t) (buffer.io_or_offset & 0xffffffff),
+            idx = rx.tail % rx.capacity;
+            rx.descr_mdata[idx] = buffer;
+            update_ring_slot(&rx, idx, (uint32_t) (buffer.io_or_offset & 0xffffffff),
                             (uint32_t) (buffer.io_or_offset >> 32), 0, (uint32_t) (DESC_RXSTS_OWNBYDMA | DESC_RXSTS_BUFFER1_ADDR_VALID | DESC_RXSTS_IOC));
 
             /* We will update the hardware register that stores the tail address. This tells
             the device that we have new descriptors to use. */
-            *DMA_REG(DMA_CHAN_RX_TAIL_ADDR(0)) = rx_desc_base + sizeof(struct descriptor) * rx.tail;
-            rx.head = (rx.head + 1) % RX_COUNT;
+            *DMA_REG(DMA_CHAN_RX_TAIL_ADDR(0)) = rx_desc_base + sizeof(struct descriptor) * idx;
+            /* @krishnan: check why I was incrementing head here and not tail. */
+            // rx.head = (rx.head + 1) % RX_COUNT;
+            rx.tail++;
         } else {
             buffer.len = (d->d3 | 0xe);
             int err = net_enqueue_active(&rx_queue, buffer);
             assert(!err);
             packets_transferred = true;
-            rx.head = (rx.head + 1) % RX_COUNT;
+            /* @krishnan: Check why i was doing this here. */
+            // rx.head = (rx.head + 1) % RX_COUNT;
         }
+        rx.head++;
     }
 
     if (packets_transferred && net_require_signal_active(&rx_queue)) {
@@ -166,7 +174,7 @@ static void tx_provide(void)
     bool reprocess = true;
     int i = 0;
     while (reprocess) {
-        while (!(hw_ring_full(&tx, TX_COUNT)) && !net_queue_empty_active(&tx_queue)) {
+        while (!(hw_ring_full(&tx)) && !net_queue_empty_active(&tx_queue)) {
             net_buff_desc_t buffer;
             int err = net_dequeue_active(&tx_queue, &buffer);
             assert(!err);
@@ -175,26 +183,27 @@ static void tx_provide(void)
             // completion. We also need to provide the length of the buffer data in bits 13:0.
             uint32_t tdes2 = DESC_TXCTRL_TXINT | buffer.len;
 
+            uint32_t idx = tx.tail % tx.capacity;
             // For normal transmit descritpors, we need to give ownership to DMA, as well as indicate
             // that this is the first and last parts of the current packet.
             uint32_t tdes3 = (DESC_TXSTS_OWNBYDMA | DESC_TXCTRL_TXFIRST | DESC_TXCTRL_TXLAST | DESC_TXCTRL_TXCIC |buffer.len);
-            tx.descr_mdata[tx.tail] = buffer;
+            tx.descr_mdata[idx] = buffer;
 
-            update_ring_slot(&tx, tx.tail, buffer.io_or_offset & 0xffffffff, buffer.io_or_offset >> 32, tdes2, tdes3);
+            update_ring_slot(&tx, idx, buffer.io_or_offset & 0xffffffff, buffer.io_or_offset >> 32, tdes2, tdes3);
 
-            tx.tail = (tx.tail + 1) % TX_COUNT;
+            tx.tail++;
             i++;
             /* Set the tail in hardware to the latest tail we have inserted in.
              * This tells the hardware that it has new buffers to send.
              * NOTE: Setting this on every enqueued packet for sanity, change this to once per bactch.
              */
-            *DMA_REG(DMA_CHAN_TX_TAIL_ADDR(0)) = tx_desc_base + sizeof(struct descriptor) * (tx.tail);
+            *DMA_REG(DMA_CHAN_TX_TAIL_ADDR(0)) = tx_desc_base + sizeof(struct descriptor) * (idx);
         }
 
         net_request_signal_active(&tx_queue);
         reprocess = false;
 
-        if (!hw_ring_full(&tx, TX_COUNT) && !net_queue_empty_active(&tx_queue)) {
+        if (!hw_ring_full(&tx) && !net_queue_empty_active(&tx_queue)) {
             net_cancel_signal_active(&tx_queue);
             reprocess = true;
         }
@@ -205,19 +214,20 @@ static void tx_provide(void)
 static void tx_return(void)
 {
     bool enqueued = false;
-    while (!hw_ring_empty(&tx, TX_COUNT)) {
+    while (!hw_ring_empty(&tx)) {
         /* Ensure that this buffer has been sent by the device */
-        volatile struct descriptor *d = &(tx.descr[tx.head]);
+        uint32_t idx = tx.head % tx.capacity;
+        volatile struct descriptor *d = &(tx.descr[idx]);
         if (d->d3 & DESC_TXSTS_OWNBYDMA) {
             break;
         }
-        net_buff_desc_t buffer = tx.descr_mdata[tx.head];
         THREAD_MEMORY_ACQUIRE();
 
+        net_buff_desc_t buffer = tx.descr_mdata[idx];
         int err = net_enqueue_free(&tx_queue, buffer);
         assert(!err);
         enqueued = true;
-        tx.head = (tx.head + 1) % TX_COUNT;
+        tx.head++;
     }
 
     if (enqueued && net_require_signal_free(&tx_queue)) {
@@ -401,7 +411,9 @@ static void eth_setup(void)
 {
     assert((hw_ring_buffer_paddr & 0xFFFFFFFF) == hw_ring_buffer_paddr);
 
+    rx.capacity = RX_COUNT;
     rx.descr = (volatile struct descriptor *)hw_ring_buffer_vaddr;
+    tx.capacity = TX_COUNT;
     tx.descr = (volatile struct descriptor *)(hw_ring_buffer_vaddr + (sizeof(struct descriptor) * RX_COUNT));
 
     eth_init();
