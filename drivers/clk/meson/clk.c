@@ -109,6 +109,16 @@ struct clk _name = {                                                            
     },                                                                              \
 }
 
+static struct clk g12a_xtal = {
+    .data = &(struct clk_source_data){
+        .rate = 24000000,
+    },
+    .hw.init = &(struct clk_init_data){
+        .name = "xtal",
+        .ops = &meson_clk_source_ops,
+    }
+};
+
 static struct clk g12a_fixed_pll_dco = {
     .data = &(struct meson_clk_pll_data){
         .en = {
@@ -157,45 +167,45 @@ static MESON_DIV_RO(g12a_fixed_pll, HHI_FIX_PLL_CNTL0, 16, 2, CLK_DIVIDER_POWER_
 static MESON_FIXED_FACTOR(g12a_mpll_prediv, 1, 2, { &g12a_fixed_pll_dco }, 1, 0);
 
 static struct clk g12a_sys_pll_dco = {
-	.data = &(struct meson_clk_pll_data){
-		.en = {
-			.reg_off = HHI_SYS_PLL_CNTL0,
-			.shift   = 28,
-			.width   = 1,
-		},
-		.m = {
-			.reg_off = HHI_SYS_PLL_CNTL0,
-			.shift   = 0,
-			.width   = 8,
-		},
-		.n = {
-			.reg_off = HHI_SYS_PLL_CNTL0,
-			.shift   = 10,
-			.width   = 5,
-		},
-		.l = {
-			.reg_off = HHI_SYS_PLL_CNTL0,
-			.shift   = 31,
-			.width   = 1,
-		},
-		.rst = {
-			.reg_off = HHI_SYS_PLL_CNTL0,
-			.shift   = 29,
-			.width   = 1,
-		},
-		.range_min = 128,
-		.range_max = 250,
-	},
-	.hw.init = &(struct clk_init_data){
-		.name = "sys_pll_dco",
-		.ops = &meson_clk_pll_ops,
-		.parent_data = &(const struct clk_parent_data) {
-			.fw_name = "xtal",
-		},
-		.num_parents = 1,
-		/* This clock feeds the CPU, avoid disabling it */
-		.flags = CLK_IS_CRITICAL,
-	},
+    .data = &(struct meson_clk_pll_data){
+        .en = {
+            .reg_off = HHI_SYS_PLL_CNTL0,
+            .shift   = 28,
+            .width   = 1,
+        },
+        .m = {
+            .reg_off = HHI_SYS_PLL_CNTL0,
+            .shift   = 0,
+            .width   = 8,
+        },
+        .n = {
+            .reg_off = HHI_SYS_PLL_CNTL0,
+            .shift   = 10,
+            .width   = 5,
+        },
+        .l = {
+            .reg_off = HHI_SYS_PLL_CNTL0,
+            .shift   = 31,
+            .width   = 1,
+        },
+        .rst = {
+            .reg_off = HHI_SYS_PLL_CNTL0,
+            .shift   = 29,
+            .width   = 1,
+        },
+        .range_min = 128,
+        .range_max = 250,
+    },
+    .hw.init = &(struct clk_init_data){
+        .name = "sys_pll_dco",
+        .ops = &meson_clk_pll_ops,
+        .parent_data = &(const struct clk_parent_data) {
+            .fw_name = "xtal",
+        },
+        .num_parents = 1,
+        /* This clock feeds the CPU, avoid disabling it */
+        .flags = CLK_IS_CRITICAL,
+    },
 };
 
 static MESON_DIV(g12a_sys_pll, HHI_SYS_PLL_CNTL0, 16, 3, CLK_DIVIDER_POWER_OF_TWO, { &g12a_sys_pll_dco }, 1, CLK_SET_RATE_PARENT);
@@ -318,41 +328,41 @@ static struct clk g12a_mpll2_div = {
 static MESON_GATE(g12a_mpll2, HHI_MPLL_CNTL5, 31, 0, { &g12a_mpll2_div }, 1, CLK_SET_RATE_PARENT);
 
 static const struct reg_sequence g12a_mpll3_init_regs[] = {
-	{ .reg = HHI_MPLL_CNTL8,	.def = 0x40000033 },
+    { .reg = HHI_MPLL_CNTL8,    .def = 0x40000033 },
 };
 static struct clk g12a_mpll3_div = {
-	.data = &(struct meson_clk_mpll_data){
-		.sdm = {
-			.reg_off = HHI_MPLL_CNTL7,
-			.shift   = 0,
-			.width   = 14,
-		},
-		.sdm_en = {
-			.reg_off = HHI_MPLL_CNTL7,
-			.shift   = 30,
-			.width	 = 1,
-		},
-		.n2 = {
-			.reg_off = HHI_MPLL_CNTL7,
-			.shift   = 20,
-			.width   = 9,
-		},
-		.ssen = {
-			.reg_off = HHI_MPLL_CNTL7,
-			.shift   = 29,
-			.width	 = 1,
-		},
-		.init_regs = g12a_mpll3_init_regs,
-		.init_count = ARRAY_SIZE(g12a_mpll3_init_regs),
-	},
-	.hw.init = &(struct clk_init_data){
-		.name = "mpll3_div",
-		.ops = &meson_clk_mpll_ops,
-		.parent_clks = (const struct clk *[]) {
-			&g12a_mpll_prediv
-		},
-		.num_parents = 1,
-	},
+    .data = &(struct meson_clk_mpll_data){
+        .sdm = {
+            .reg_off = HHI_MPLL_CNTL7,
+            .shift   = 0,
+            .width   = 14,
+        },
+        .sdm_en = {
+            .reg_off = HHI_MPLL_CNTL7,
+            .shift   = 30,
+            .width     = 1,
+        },
+        .n2 = {
+            .reg_off = HHI_MPLL_CNTL7,
+            .shift   = 20,
+            .width   = 9,
+        },
+        .ssen = {
+            .reg_off = HHI_MPLL_CNTL7,
+            .shift   = 29,
+            .width     = 1,
+        },
+        .init_regs = g12a_mpll3_init_regs,
+        .init_count = ARRAY_SIZE(g12a_mpll3_init_regs),
+    },
+    .hw.init = &(struct clk_init_data){
+        .name = "mpll3_div",
+        .ops = &meson_clk_mpll_ops,
+        .parent_clks = (const struct clk *[]) {
+            &g12a_mpll_prediv
+        },
+        .num_parents = 1,
+    },
 };
 static MESON_GATE(g12a_mpll3, HHI_MPLL_CNTL7, 31, 0, { &g12a_mpll3_div }, 1, CLK_SET_RATE_PARENT);
 
@@ -397,11 +407,11 @@ static MESON_DIV(g12a_mpeg_clk_div, HHI_MPEG_CLK_CNTL, 0, 7, 0, { &g12a_mpeg_clk
 static MESON_GATE(g12a_clk81, HHI_MPEG_CLK_CNTL, 7, 0, { &g12a_mpeg_clk_div }, 1, 0);
 
 static const struct clk_parent_data g12a_sd_emmc_clk0_parent_data[] = {
-	{ .fw_name = "xtal", },
-	{ .clk = &g12a_fclk_div2 },
-	{ .clk = &g12a_fclk_div3 },
-	{ .clk = &g12a_fclk_div5 },
-	{ .clk = &g12a_fclk_div7 },
+    { .fw_name = "xtal", },
+    { .clk = &g12a_fclk_div2 },
+    { .clk = &g12a_fclk_div3 },
+    { .clk = &g12a_fclk_div5 },
+    { .clk = &g12a_fclk_div7 },
 };
 
 static MESON_MUX(g12a_sd_emmc_b_clk0_sel, HHI_SD_EMMC_CLK_CNTL, 0x7, 25, NULL, 0, g12a_sd_emmc_clk0_parent_data, ARRAY_SIZE(g12a_sd_emmc_clk0_parent_data), CLK_SET_RATE_PARENT);
@@ -770,7 +780,7 @@ static struct clk *sm1_clks[] = {
 };
 
 
-unsigned long clk_recalc_rate(struct clk *clk)
+const struct clk *get_parent(struct clk *clk)
 {
     const struct clk_init_data *init = (struct clk_init_data *)clk->hw.init;
     uint32_t num_parents = init->num_parents;
@@ -781,16 +791,29 @@ unsigned long clk_recalc_rate(struct clk *clk)
         struct clk_parent_data parent_data = init->parent_data[parent_idx];
 
         if (parent_data.clk) {
-            struct clk *parent_clk = parent_data.clk;
-            parent_rate = clk_recalc_rate(parent_clk);
+            return parent_data.clk;
         } else if (sddf_strcmp(parent_data.fw_name, "xtal") == 0) {
-            /* TODO: Replace this with an hw structure */
-            parent_rate = 24000000;
+            return &g12a_xtal;
         }
-    } else {
-        struct clk *parent_clk = init->parent_clks[0];
-        parent_rate = clk_recalc_rate(parent_clk);
     }
+
+	if (num_parents > 0) {
+		return init->parent_clks[0];
+	}
+
+	return NULL;
+}
+
+unsigned long clk_recalc_rate(struct clk *clk)
+{
+    const struct clk_init_data *init = (struct clk_init_data *)clk->hw.init;
+    uint32_t num_parents = init->num_parents;
+    unsigned long parent_rate = 0;
+
+    const struct clk *parent_clk = get_parent(clk);
+	if (parent_clk) {
+		parent_rate = clk_recalc_rate(parent_clk);
+	}
 
     sddf_dprintf("Clock: %s, parent rate: %lu", init->name, parent_rate);
     unsigned long rate = parent_rate;
@@ -800,6 +823,24 @@ unsigned long clk_recalc_rate(struct clk *clk)
     sddf_dprintf(" => rate: %lu\n", rate);
 
     return rate;
+}
+
+void enable_clk(struct clk *clk)
+{
+    if (clk->hw.init->ops->enable) {
+        clk->hw.init->ops->enable(clk);
+    }
+}
+
+void set_clk_rate(struct clk *clk, uint32_t rate)
+{
+
+    if (clk->hw.init->ops->set_rate) {
+		/* determine_rate() needs to be implemented */
+		struct clk *parent_clk = get_parent(clk);
+		uint64_t prate = clk_recalc_rate(parent_clk);
+        clk->hw.init->ops->set_rate(clk, rate, prate);
+    }
 }
 
 void notified(microkit_channel ch)
@@ -816,10 +857,14 @@ void init(void)
 
     sddf_dprintf("Clock driver initialising...\n");
 
-    /* for (int i = 0; i < NUM_DEVICE_CLKS; i++) { */
-        /* struct clk *clk = sm1_clks[enabled_hw_clks[i]->clk_id]; */
-        /* clk->hw.init->ops->enable(clk); */
-    /* } */
+    for (int i = 0; i < NUM_DEVICE_CLKS; i++) {
+        struct clk *clk = sm1_clks[clk_configs[i].clk_id];
+
+        enable_clk(clk);
+        if (clk_configs[i].frequency > 0) {
+            set_clk_rate(clk, clk_configs[i].frequency);
+        }
+    }
 
     // Check that registers actually changed
     if (!(*clk_i2c_ptr & I2C_CLK_BIT)) {
@@ -836,25 +881,25 @@ void init(void)
     /*     CLKID_MPLL2    0x11940000 */
     /*     CLKID_MPLL0    0x10266000 */
     /*     CLKID_MPLL1    0x17700000 */
-	struct clk *parent_clk = sm1_clks[CLKID_MPLL_PREDIV];
+    struct clk *parent_clk = sm1_clks[CLKID_MPLL_PREDIV];
     uint64_t prate = clk_recalc_rate(parent_clk);
     sddf_dprintf("%s rate: %lu\n", parent_clk->hw.init->name, rate);
 
     struct clk *mpll0_clk = sm1_clks[CLKID_MPLL0_DIV];
-	mpll0_clk->hw.init->ops->init(mpll0_clk);
-	mpll0_clk->hw.init->ops->set_rate(mpll0_clk, 0x10266000, prate);
+    mpll0_clk->hw.init->ops->init(mpll0_clk);
+    mpll0_clk->hw.init->ops->set_rate(mpll0_clk, 0x10266000, prate);
     rate = clk_recalc_rate(mpll0_clk);
     sddf_dprintf("%s rate: %lu\n", mpll0_clk->hw.init->name, rate);
 
     struct clk *mpll1_clk = sm1_clks[CLKID_MPLL1_DIV];
-	mpll1_clk->hw.init->ops->init(mpll1_clk);
-	mpll1_clk->hw.init->ops->set_rate(mpll1_clk, 0x17700000, prate);
+    mpll1_clk->hw.init->ops->init(mpll1_clk);
+    mpll1_clk->hw.init->ops->set_rate(mpll1_clk, 0x17700000, prate);
     rate = clk_recalc_rate(mpll1_clk);
     sddf_dprintf("%s rate: %lu\n", mpll1_clk->hw.init->name, rate);
 
     struct clk *mpll2_clk = sm1_clks[CLKID_MPLL2_DIV];
-	mpll2_clk->hw.init->ops->init(mpll2_clk);
-	mpll2_clk->hw.init->ops->set_rate(mpll2_clk, 0x11940000, prate);
+    mpll2_clk->hw.init->ops->init(mpll2_clk);
+    mpll2_clk->hw.init->ops->set_rate(mpll2_clk, 0x11940000, prate);
     rate = clk_recalc_rate(mpll2_clk);
     sddf_dprintf("%s rate: %lu\n", mpll2_clk->hw.init->name, rate);
 

@@ -37,6 +37,8 @@ if __name__ == "__main__":
         log_error_parser("this board is not supported.")
         exit(1)
 
+    enabled_clks = []
+
     for node in devicetree.node_iter():
         props = list(node.props.keys())
         if "status" in props:
@@ -47,8 +49,20 @@ if __name__ == "__main__":
                 assigned_clocks = []
                 assigned_clock_parents = []
                 assigned_clock_rates = []
+                print("---------------------")
                 if "clocks" in props:
                     clocks = node.props["clocks"].to_nums()
+                    i = 0
+                    while (i < len(clocks)):
+                        pnode = devicetree.phandle2node[clocks[i]]
+                        if "#clock-cells" in pnode.props and pnode.props["#clock-cells"].to_num() == 0:
+                            print("<{}>".format(clocks[i]))
+                        elif clocks[i] > 0:
+                            print("<{}, {}>".format(clocks[i], clocks[i+1]))
+                            i += 1
+                        else:
+                            print("<0x00>")
+                        i += 1
                 if "max-frequency" in props:
                     max_frequency = node.props["max-frequency"].to_nums()
                 if "assigned-clocks" in props:
@@ -57,7 +71,6 @@ if __name__ == "__main__":
                     assigned_clock_parents = node.props["assigned-clock-parents"].to_nums()
                 if "assigned-clock-rates" in props:
                     assigned_clock_rates = node.props["assigned-clock-rates"].to_nums()
-                print("---------------------")
                 print("{}\nclocks: {}\nmax-frequency: {}\nassigned-clocks: {}\nassigned-clock-parents: {}\nassigned-clock-rates: {}".format(
                     node.name,
                     clocks,

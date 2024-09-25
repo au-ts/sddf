@@ -110,6 +110,10 @@ struct clk_div_table {
 
 };
 
+struct clk_source_data {
+    uint64_t rate;
+};
+
 struct clk_div_data {
     uint32_t offset;
     uint8_t shift;
