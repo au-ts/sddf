@@ -828,17 +828,22 @@ unsigned long clk_recalc_rate(struct clk *clk)
 void enable_clk(struct clk *clk)
 {
     if (clk->hw.init->ops->enable) {
+		sddf_dprintf("enable %s\n", clk->hw.init->name);
         clk->hw.init->ops->enable(clk);
     }
 }
 
 void set_clk_rate(struct clk *clk, uint32_t rate)
 {
+    if (clk->hw.init->ops->init) {
+		clk->hw.init->ops->init(clk);
+	}
 
     if (clk->hw.init->ops->set_rate) {
 		/* determine_rate() needs to be implemented */
 		struct clk *parent_clk = get_parent(clk);
 		uint64_t prate = clk_recalc_rate(parent_clk);
+		sddf_dprintf("set %s to %dHz\n", clk->hw.init->name, rate);
         clk->hw.init->ops->set_rate(clk, rate, prate);
     }
 }
@@ -886,24 +891,24 @@ void init(void)
     sddf_dprintf("%s rate: %lu\n", parent_clk->hw.init->name, rate);
 
     struct clk *mpll0_clk = sm1_clks[CLKID_MPLL0_DIV];
-    mpll0_clk->hw.init->ops->init(mpll0_clk);
-    mpll0_clk->hw.init->ops->set_rate(mpll0_clk, 0x10266000, prate);
+    /* mpll0_clk->hw.init->ops->init(mpll0_clk); */
+    /* mpll0_clk->hw.init->ops->set_rate(mpll0_clk, 0x10266000, prate); */
     rate = clk_recalc_rate(mpll0_clk);
     sddf_dprintf("%s rate: %lu\n", mpll0_clk->hw.init->name, rate);
 
     struct clk *mpll1_clk = sm1_clks[CLKID_MPLL1_DIV];
-    mpll1_clk->hw.init->ops->init(mpll1_clk);
-    mpll1_clk->hw.init->ops->set_rate(mpll1_clk, 0x17700000, prate);
+    /* mpll1_clk->hw.init->ops->init(mpll1_clk); */
+    /* mpll1_clk->hw.init->ops->set_rate(mpll1_clk, 0x17700000, prate); */
     rate = clk_recalc_rate(mpll1_clk);
     sddf_dprintf("%s rate: %lu\n", mpll1_clk->hw.init->name, rate);
 
     struct clk *mpll2_clk = sm1_clks[CLKID_MPLL2_DIV];
-    mpll2_clk->hw.init->ops->init(mpll2_clk);
-    mpll2_clk->hw.init->ops->set_rate(mpll2_clk, 0x11940000, prate);
+    /* mpll2_clk->hw.init->ops->init(mpll2_clk); */
+    /* mpll2_clk->hw.init->ops->set_rate(mpll2_clk, 0x11940000, prate); */
     rate = clk_recalc_rate(mpll2_clk);
     sddf_dprintf("%s rate: %lu\n", mpll2_clk->hw.init->name, rate);
 
-    clk_msr_stat();
+    /* clk_msr_stat(); */
 
    sddf_dprintf("-----------------\n");
 }
