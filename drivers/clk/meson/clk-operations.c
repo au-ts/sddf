@@ -120,7 +120,7 @@ static unsigned long clk_regmap_div_recalc_rate(const struct clk *clk,
 
     /* TODO: Need to verify the following cases */
     if (data->flags & CLK_DIVIDER_ONE_BASED) {
-        div = div;
+        ;
     } else if (data->flags & CLK_DIVIDER_POWER_OF_TWO) {
         div = 1 << div;
     } else if (data->flags & CLK_DIVIDER_MAX_AT_ZERO) {
@@ -139,7 +139,7 @@ static int clk_regmap_div_set_rate(struct clk *clk, uint32_t rate, uint32_t pare
 
     if (data->flags & CLK_DIVIDER_ONE_BASED) {
         /* TODO: to be implemented */
-        div = div;
+        ;
     } else if (data->flags & CLK_DIVIDER_POWER_OF_TWO) {
         /* div = __ffs(div); */
     } else if (data->flags & CLK_DIVIDER_MAX_AT_ZERO) {
