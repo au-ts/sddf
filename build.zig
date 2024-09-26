@@ -215,6 +215,7 @@ fn addClockDriver(
     driver.addCSourceFile(.{
         .file = b.path(b.fmt("drivers/clk/{s}/clk-measure.c", .{ @tagName(class) }))
     });
+    driver.addIncludePath(b.path("include/sddf/clk"));
     driver.addIncludePath(clk_config_include);
     driver.addIncludePath(b.path("include"));
     driver.addIncludePath(b.path(b.fmt("drivers/clk/{s}/include", .{@tagName(class)})));
@@ -242,8 +243,8 @@ pub fn build(b: *std.Build) void {
     const blk_config_include_opt = b.option([]const u8, "blk_config_include", "Include path to block config header") orelse "";
     const serial_config_include_option = b.option([]const u8, "serial_config_include", "Include path to serial config header") orelse "";
     const i2c_client_include_option = b.option([]const u8, "i2c_client_include", "Include path to client config header") orelse "";
-    const clk_client_include_option = b.option([]const u8, "clk_client_include", "Include path to client config header") orelse "";
-    const dtb_path = b.option([]const u8, "dtb_path", "Path to the DTB file");
+    const clk_conf_include_option = b.option([]const u8, "clk_conf_include", "Include path to client config header") orelse "";
+    const dtb_path = b.option([]const u8, "dtb_path", "Path to the DTB file") orelse "";
 
     // TODO: Right now this is not super ideal. What's happening is that we do not
     // always need a serial config include, but we must always specify it
@@ -253,7 +254,7 @@ pub fn build(b: *std.Build) void {
     const serial_config_include = LazyPath{ .cwd_relative = serial_config_include_option };
     const blk_config_include = LazyPath{ .cwd_relative = blk_config_include_opt };
     const i2c_client_include = LazyPath{ .cwd_relative = i2c_client_include_option };
-    const clk_client_include = LazyPath{ .cwd_relative = clk_client_include_option };
+    const clk_client_include = LazyPath{ .cwd_relative = clk_conf_include_option };
     // libmicrokit
     // We're declaring explicitly here instead of with anonymous structs due to a bug. See https://github.com/ziglang/zig/issues/19832
     libmicrokit = LazyPath{ .cwd_relative = libmicrokit_opt.? };
@@ -376,7 +377,8 @@ pub fn build(b: *std.Build) void {
        const clk_config = b.addSystemCommand(&.{
            "python",
            b.fmt("drivers/clk/{s}/create_clk_config.py", .{ class.name }),
-           dtb_path orelse "",
+           dtb_path,
+           clk_conf_include_option,
         }); // Creates a system command which runs the python interpreter
         driver.step.dependOn(&clk_config.step);
 

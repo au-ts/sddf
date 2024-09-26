@@ -815,12 +815,10 @@ unsigned long clk_recalc_rate(struct clk *clk)
 		parent_rate = clk_recalc_rate(parent_clk);
 	}
 
-    sddf_dprintf("Clock: %s, parent rate: %lu", init->name, parent_rate);
     unsigned long rate = parent_rate;
     if (init->ops->recalc_rate) {
         rate = init->ops->recalc_rate(clk, parent_rate);
     }
-    sddf_dprintf(" => rate: %lu\n", rate);
 
     return rate;
 }
@@ -865,7 +863,12 @@ void init(void)
     for (int i = 0; i < NUM_DEVICE_CLKS; i++) {
         struct clk *clk = sm1_clks[clk_configs[i].clk_id];
 
+		/* Enable the clock */
         enable_clk(clk);
+
+		/* TODO: Set parent */
+
+		/* Set rate for the target clock */
         if (clk_configs[i].frequency > 0) {
             set_clk_rate(clk, clk_configs[i].frequency);
         }
