@@ -1,9 +1,5 @@
-#include <clk.h>
+#include <conf_types.h>
 
-struct clk_cfg {
-    uint32_t clk_id;
-    uint32_t frequency;
-};
 
 #define NUM_DEVICE_CLKS 4
 static struct clk_cfg clk_configs[] = {

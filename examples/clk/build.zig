@@ -72,6 +72,8 @@ pub fn build(b: *std.Build) void {
         std.posix.exit(1);
     }
     const dtb_path = std.Build.LazyPath{ .cwd_relative = dtb_arg.? };
+    // TODO: Need to define this with built-in output path
+    const clk_conf_include = std.Build.LazyPath{ .cwd_relative = "zig-out/bin/" };
     const sddf_dep = b.dependency("sddf", .{
         .target = target,
         .optimize = optimize,
@@ -79,7 +81,7 @@ pub fn build(b: *std.Build) void {
         .libmicrokit_include = @as([]const u8, libmicrokit_include),
         .libmicrokit_linker_script = @as([]const u8, libmicrokit_linker_script),
         .i2c_client_include = @as([]const u8, ""),
-        .clk_client_include = @as([]const u8, "include"),
+        .clk_conf_include = @as([]const u8, clk_conf_include.getPath(b)),
         .dtb_path = @as([]const u8, dtb_path.getPath(b) ),
     });
 
