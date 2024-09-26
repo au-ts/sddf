@@ -43,5 +43,6 @@ extern const struct clk_ops meson_clk_source_ops;
 extern const struct clk_ops meson_clk_pll_ops;
 extern const struct clk_ops meson_clk_pll_ro_ops;
 extern const struct clk_ops meson_clk_mpll_ops;
+extern const struct clk_ops meson_clk_pcie_pll_ops;
 
 #endif // CLK_OPERATIONS_H_
