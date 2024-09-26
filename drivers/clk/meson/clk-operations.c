@@ -111,7 +111,7 @@ const struct clk_ops clk_regmap_gate_ro_ops = {
     .is_enabled = clk_regmap_gate_is_enabled,
 };
 
-static unsigned long clk_regmap_div_recalc_rate(struct clk *clk,
+static unsigned long clk_regmap_div_recalc_rate(const struct clk *clk,
                                 unsigned long prate)
 {
 
@@ -182,7 +182,7 @@ const struct clk_ops clk_regmap_divider_ro_ops = {
     /* .determine_rate = clk_regmap_div_determine_rate, */
 };
 
-static uint8_t clk_regmap_mux_get_parent(struct clk *clk)
+static uint8_t clk_regmap_mux_get_parent(const struct clk *clk)
 {
     struct clk_mux_data *data = (struct clk_mux_data *)(clk->data);
     uint32_t num_parents = clk->hw.init->num_parents;
@@ -234,7 +234,7 @@ const struct clk_ops clk_regmap_mux_ro_ops = {
     .get_parent = clk_regmap_mux_get_parent,
 };
 
-static unsigned long clk_factor_recalc_rate(struct clk *clk,
+static unsigned long clk_factor_recalc_rate(const struct clk *clk,
         unsigned long parent_rate)
 {
     struct clk_fixed_factor_data *data = (struct clk_fixed_factor_data *)(clk->data);
@@ -252,7 +252,7 @@ const struct clk_ops clk_fixed_factor_ops = {
     /* .recalc_accuracy = clk_factor_recalc_accuracy, */
 };
 
-static unsigned long meson_clk_pll_recalc_rate(struct clk *clk,
+static unsigned long meson_clk_pll_recalc_rate(const struct clk *clk,
                         unsigned long parent_rate)
 {
     struct meson_clk_pll_data *data = (struct meson_clk_pll_data *)(clk->data);
@@ -297,11 +297,11 @@ const struct clk_ops meson_clk_pll_ro_ops = {
 #define N2_MIN 4
 #define N2_MAX 511
 
-static unsigned long mpll_recalc_rate(struct clk *clk,
+static unsigned long mpll_recalc_rate(const struct clk *clk,
                                 unsigned long prate)
 {
     struct meson_clk_mpll_data *data = (struct meson_clk_mpll_data *)(clk->data);
-    uint32_t sdm, n2, rate;
+    uint32_t sdm, n2;
 
     sdm = regmap_read_bits(data->sdm.reg_off, data->sdm.shift, data->sdm.width);
     n2 = regmap_read_bits(data->n2.reg_off, data->n2.shift, data->n2.width);
@@ -347,7 +347,7 @@ static int mpll_set_rate(struct clk *clk,
     regmap_update_bits(data->sdm.reg_off, data->sdm.shift, data->sdm.width, sdm);
     regmap_update_bits(data->n2.reg_off, data->n2.shift, data->n2.width, n2);
 
-    volatile uint32_t *clk_reg = ((void *)clk_base + data->sdm.reg_off);
+    /* volatile uint32_t *clk_reg = ((void *)clk_base + data->sdm.reg_off); */
 
     return 0;
 }
@@ -388,7 +388,7 @@ static int clk_source_set_rate(struct clk *clk, uint32_t rate, uint32_t parent_r
 }
 
 
-static unsigned long clk_source_get_rate(struct clk *clk,
+static unsigned long clk_source_get_rate(const struct clk *clk,
                                 unsigned long prate)
 {
     struct clk_source_data *data = (struct clk_source_data *)(clk->data);
