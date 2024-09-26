@@ -24,23 +24,23 @@ def log_warning_parser(print_str: str) -> None:
 def log_error_parser(print_str: str) -> None:
     sys.stderr.write("PARSER|ERROR: " + print_str)
 
-def parse_clocks(dt: dtlib.DT, clocks: List) -> List:
-    clk_ids = []
-    i = 0
+# def parse_clocks(dt: dtlib.DT, clocks: List) -> List:
+#     clk_ids = []
+#     i = 0
 
-    while (i < len(clocks)):
-        pnode = devicetree.phandle2node[clocks[i]]
-        if "#clock-cells" in pnode.props and pnode.props["#clock-cells"].to_num() == 0:
-            # TODO: consider the case of `xtal` and represent this clock another way
-            clk_ids.append(clocks[i])
-        elif clocks[i] > 0:
-            clk_ids.append(clocks[i+1])
-            i += 1
-        else:
-            clk_ids.append(-1)
-        i += 1
+#     while (i < len(clocks)):
+#         pnode = devicetree.phandle2node[clocks[i]]
+#         if "#clock-cells" in pnode.props and pnode.props["#clock-cells"].to_num() == 0:
+#             # TODO: consider the case of `xtal` and represent this clock another way
+#             clk_ids.append(clocks[i])
+#         elif clocks[i] > 0:
+#             clk_ids.append(clocks[i+1])
+#             i += 1
+#         else:
+#             clk_ids.append(-1)
+#         i += 1
 
-    return clk_ids;
+#     return clk_ids;
 
 def write_configs_to_headerfile(path):
     with open(path + '/clk_config.h', "w") as f:
