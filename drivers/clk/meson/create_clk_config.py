@@ -24,6 +24,32 @@ def log_warning_parser(print_str: str) -> None:
 def log_error_parser(print_str: str) -> None:
     sys.stderr.write("PARSER|ERROR: " + print_str)
 
+def parse_clocks(dt: dtlib.DT, clocks: List) -> List:
+    clk_ids = []
+    i = 0
+
+    while (i < len(clocks)):
+        pnode = devicetree.phandle2node[clocks[i]]
+        if "#clock-cells" in pnode.props and pnode.props["#clock-cells"].to_num() == 0:
+            # TODO: consider the case of `xtal` and represent this clock another way
+            clk_ids.append(clocks[i])
+        elif clocks[i] > 0:
+            clk_ids.append(clocks[i+1])
+            i += 1
+        else:
+            clk_ids.append(-1)
+        i += 1
+
+    return clk_ids;
+
+def write_configs_to_headerfile(path):
+    with open(path + '/clk_config.h', "w") as f:
+        f.write("#include <conf_types.h>\n")
+        f.write("#define NUM_DEVICE_CLKS 1\n")
+
+        clk_configs = "{{ .clk_id = 0x18, .frequency = 0, }}"
+        f.write("static struct clk_cfg clk_configs[] = {};".format(clk_configs))
+
 if __name__ == "__main__":
     print("Creating a config file for clock driver to intialise the system...")
 
@@ -38,6 +64,9 @@ if __name__ == "__main__":
         exit(1)
 
     enabled_clks = []
+    print("path: {}".format(sys.argv[1]))
+    print("path: {}".format(sys.argv[2]))
+    write_configs_to_headerfile(sys.argv[2])
 
     for node in devicetree.node_iter():
         props = list(node.props.keys())
