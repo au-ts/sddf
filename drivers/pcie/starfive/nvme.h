@@ -57,9 +57,11 @@ _Static_assert(offsetof(nvme_controller_t, _reserved2) == 0x6C, "nvme_controller
 #define _MASK(start, end)  ((BIT(_LEN(start, end)) - 1) << (start))
 
 /* [NVMe-2.1] 3.1.4.1 Offset 0h: CAP – Controller Capabilities */
-#define NVME_CAP_NOIOCSS BIT(37 + 7) /* No I/O Command Set Support */
-#define NVME_CAP_IOCSS   BIT(37 + 6) /* I/O Command Set Support    */
-#define NVME_CAP_NCSS    BIT(37 + 0) /* NVM Command Set Support    */
+#define NVME_CAP_NOIOCSS     BIT(37 + 7)   /* No I/O Command Set Support */
+#define NVME_CAP_IOCSS       BIT(37 + 6)   /* I/O Command Set Support    */
+#define NVME_CAP_NCSS        BIT(37 + 0)   /* NVM Command Set Support    */
+#define NVME_CAP_DSTRD_SHIFT 32            /* Doorbell Stride (2 ^ (2 + DSTRD)) */
+#define NVME_CAP_DSTRD_MASK  _MASK(32, 35) /* Doorbell Stride (2 ^ (2 + DSTRD)) */
 
 /* [NVMe-2.1] 3.1.4.5 Offset 14h: CC – Controller Configuration */
 #define NVME_CC_MPS_SHIFT 7            /* Host Memory Page Size */
@@ -79,3 +81,124 @@ _Static_assert(offsetof(nvme_controller_t, _reserved2) == 0x6C, "nvme_controller
 #define NVME_AQA_ACQS_MASK  _MASK(16, 27)  /* Admin Completion Queue Size (#entries) */
 #define NVME_AQA_ASQS_SHIFT 0              /* Admin Submission Queue Size (#entries) */
 #define NVME_AQA_ASQS_MASK  _MASK(0, 11)   /* Admin Submission Queue Size (#entries) */
+
+/**
+ * Queue Structures
+ */
+
+/* [NVMe-2.1] 4.1 Submission Queue Entry */
+typedef struct nvme_submission_queue_entry {
+    // TODO: split out to opcode etc (figure 91??)
+
+    uint32_t cdw0; /* Command Dword 0 (common) */
+    uint32_t nsid; /* Namespace Identifier */
+    uint32_t cdw2; /* Command Dword 2 (command-specific) */
+    uint32_t cdw3; /* Command Dword 3 (command-specific) */
+    uint64_t mptr; /* Metadata Pointer */
+    uint64_t dptr_lo; /* Data Pointer (low 8 bytes)  */
+    uint64_t dptr_hi; /* Data Pointer (high 8 bytes) */
+    uint32_t cdw10; /* Command Dword 10 (command-specific) */
+    uint32_t cdw11; /* Command Dword 11 (command-specific) */
+    uint32_t cdw12; /* Command Dword 12 (command-specific) */
+    uint32_t cdw13; /* Command Dword 13 (command-specific) */
+    uint32_t cdw14; /* Command Dword 14 (command-specific) */
+    uint32_t cdw15; /* Command Dword 15 (command-specific) */
+} nvme_submission_queue_entry_t;
+_Static_assert(sizeof(nvme_submission_queue_entry_t) == 64, "Each Common Command Format command is 64 bytes in size.");
+
+/* [NVMe-2.1] 4.2 Completion Queue Entry */
+typedef struct nvme_completion_queue_entry {
+    uint32_t cdw0; /* Command Dword 0 (command-specific) */
+    uint32_t cdw1; /* Command Dword 1 (command-specific) */
+    uint16_t sqhd; /* Submission Queue Head Pointer */
+    uint16_t sqid; /* Submission Queue ID */
+    uint16_t cid;  /* Command Identifier */
+    uint16_t phase_tag_and_status; /* Phase Tag (P) and Status */
+} nvme_completion_queue_entry_t;
+_Static_assert(sizeof(nvme_completion_queue_entry_t) == 16,
+               "The Common Completion Queue Entry Layout is 16 bytes in size");
+
+/**
+ * Below here is NVMe PCIe Transport Specific Properties.
+ */
+
+#define NVME_PCIE_SQT_MASK _MASK(0, 15) /* Submission Queue Tail*/
+#define NVME_PCIE_CQH_MASK _MASK(0, 15) /* Completion Queue Head */
+
+#define NVME_PCIE_DOORBELL_OFFSET(i, DSTRD) (0x1000 + (i * (4 << DSTRD)))
+
+/**
+ * Get the value of the 'Submission Queue y Tail Doorbell' register.
+ *
+ * Ref: [NVMEe-Transport-PCIe-1.1] 3.1.2.1 SQyTDBL
+ *
+ * @param nvme_controller Base address of the NVMe controller registers
+ * @param DSTRD CAP.DSTRD of the NVMe controller
+ * @param y the submission queue number. the 0th queue is the admin queue.
+ *
+ * @todo how big can y be?
+ */
+static inline uint16_t nvme_sqytdbl_read(volatile void *nvme_controller, uint16_t DSTRD, uint16_t y)
+{
+    volatile uint32_t *addr = nvme_controller + NVME_PCIE_DOORBELL_OFFSET(2 * y, DSTRD);
+    return (*addr) & NVME_PCIE_SQT_MASK;
+}
+
+/**
+ * Set the value of the 'Submission Queue y Tail Doorbell' register.
+ *
+ * Ref: [NVMEe-Transport-PCIe-1.1] 3.1.2.1 SQyTDBL
+ *
+ * @param nvme_controller Base address of the NVMe controller registers
+ * @param DSTRD CAP.DSTRD of the NVMe controller
+ * @param y the submission queue number. the 0th queue is the admin queue.
+ * @param tail the new value of the tail register
+ *
+ * @todo how big can y be?
+ */
+static inline void nvme_sqytdbl_write(volatile void *nvme_controller, uint16_t DSTRD, uint16_t y, uint16_t tail)
+{
+    volatile uint32_t *addr = nvme_controller + NVME_PCIE_DOORBELL_OFFSET(2 * y, DSTRD);
+    uint32_t val = *addr;
+    val &= ~NVME_PCIE_SQT_MASK;
+    val |= tail & NVME_PCIE_SQT_MASK;
+    *addr = val;
+}
+
+/**
+ * Get the value of the 'Completion Queue y Head Doorbell' register.
+ *
+ * Ref: [NVMEe-Transport-PCIe-1.1] 3.1.2.2 CQyHDBL
+ *
+ * @param nvme_controller Base address of the NVMe controller registers
+ * @param DSTRD CAP.DSTRD of the NVMe controller
+ * @param y the completion queue number. the 0th queue is the admin queue.
+ *
+ * @todo how big can y be?
+ */
+static inline uint16_t nvme_cqyhdbl_read(volatile void *nvme_controller, uint16_t DSTRD, uint16_t y)
+{
+    volatile uint32_t *addr = nvme_controller + NVME_PCIE_DOORBELL_OFFSET(2 * y + 1, DSTRD);
+    return (*addr) & NVME_PCIE_CQH_MASK;
+}
+
+/**
+ * Set the value of the 'Completion Queue y Head Doorbell' register.
+ *
+ * Ref: [NVMEe-Transport-PCIe-1.1] 3.1.2.2 CQyHDBL
+ *
+ * @param nvme_controller Base address of the NVMe controller registers
+ * @param DSTRD CAP.DSTRD of the NVMe controller
+ * @param y the submission queue number. the 0th queue is the admin queue.
+ * @param head the new value of the head register
+ *
+ * @todo how big can y be?
+ */
+static inline void nvme_cqyhdbl_write(volatile void *nvme_controller, uint16_t DSTRD, uint16_t y, uint16_t head)
+{
+    volatile uint32_t *addr = nvme_controller + NVME_PCIE_DOORBELL_OFFSET(2 * y + 1, DSTRD);
+    uint32_t val = *addr;
+    val &= ~NVME_PCIE_CQH_MASK;
+    val |= head & NVME_PCIE_CQH_MASK;
+    *addr = val;
+}
