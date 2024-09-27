@@ -56,6 +56,11 @@ CFLAGS += -I$(BOARD_DIR)/include \
 	-MD \
 	-MP
 
+# The I2C example should still be isolated so leave the pinmux initialisation as is.
+# Then it is up to the user if they want the pinmux driver or the i2c driver to do the
+# circuitry setup.
+CFLAGS+=-DENABLE_OVERRIDE_I2C_PINMUX_INIT_FROM_COMPILER
+
 COMMONFILES=libsddf_util_debug.a
 
 CLIENT_PN532_OBJS :=  pn532.o client_pn532.o
