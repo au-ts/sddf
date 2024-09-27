@@ -14,6 +14,8 @@
     <memory_region name="nvme_asq"                          size="0x1000" />
     <memory_region name="nvme_acq"                          size="0x1000" />
 
+    <memory_region name="data_region" size="0x10_000" />
+
     <protection_domain name="pcie" priority="254" >
         <!-- <map mr="pcie_regs" vaddr="0x1000_0000" perms="rw" cached="false" setvar_vaddr="pcie_regs" /> -->
         <map mr="pcie_config" vaddr="0x2000_0000" perms="rw" cached="false" setvar_vaddr="pcie_config" />
@@ -22,6 +24,9 @@
         <!-- TODO: cached? -->
         <map mr="nvme_asq"  vaddr="0x3001_0000" perms="rw" cached="false" setvar_vaddr="nvme_asq_region" />
         <map mr="nvme_acq"  vaddr="0x3002_0000" perms="rw" cached="false" setvar_vaddr="nvme_acq_region" />
+
+         <map mr="data_region" vaddr="0x3003_0000" perms="rw" cached="false" setvar_vaddr="data_region" />
+         <setvar symbol="data_region_paddr" region_paddr="data_region" />
 
         <program_image path="pcie_driver.elf" />
     </protection_domain>

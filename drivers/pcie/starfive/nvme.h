@@ -118,6 +118,9 @@ typedef struct nvme_completion_queue_entry {
 _Static_assert(sizeof(nvme_completion_queue_entry_t) == 16,
                "The Common Completion Queue Entry Layout is 16 bytes in size");
 
+
+#define NVME_ADMIN_COMMAND_IDENTIFY 0x6
+
 /**
  * Below here is NVMe PCIe Transport Specific Properties.
  */
