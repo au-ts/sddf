@@ -222,7 +222,7 @@ static void handle_irq()
         }
         if (e & DMA_INTR_ABNORMAL) {
             if (e & DMA_INTR_FBE) {
-                sddf_dprintf("Ethernet device fatal bus error\n");
+                sddf_dprintf("ETH|ERROR: Ethernet device fatal bus error %u\n", e);
             }
         }
         e = eth_dma->status;
