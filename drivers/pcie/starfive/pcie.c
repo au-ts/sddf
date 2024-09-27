@@ -26,6 +26,10 @@ uintptr_t nvme_asq_region_paddr;
 uintptr_t nvme_acq_region_paddr;
 #define NVME_ADMIN_QUEUE_SIZE 0x1000
 
+
+uintptr_t data_region_paddr;
+uint8_t *data_region;
+
 /* TODO: don't hardcode */
 #define NVME_ASQ_CAPACITY (NVME_ADMIN_QUEUE_SIZE / 64)
 #define NVME_ACQ_CAPACITY (NVME_ADMIN_QUEUE_SIZE / 64)
@@ -196,9 +200,8 @@ void nvme_controller_init()
     // 4a. Arbitration Mechanism (TODO)
     // 4b. Memory Page Size
     nvme_controller->cc &= ~NVME_CC_MPS_MASK;
-    /* nb: host page size. TODO: do we have a define for this? */
-    /* n.b.: page size = 2 ^ (12 + MPS)*/
-    nvme_controller->cc |= (PAGE_SIZE >> 12) << NVME_CC_MPS_SHIFT;
+    /* n.b. page size = 2 ^ (12 + MPS) */
+    nvme_controller->cc |= ((PAGE_SIZE >> 12) << NVME_CC_MPS_SHIFT) & NVME_CC_MPS_MASK;
 
     // 5. Enable the controller
     nvme_controller->cc |= NVME_CC_EN;
@@ -207,20 +210,23 @@ void nvme_controller_init()
     sddf_dprintf("waiting ready\n");
     while (!(nvme_controller->csts & NVME_CSTS_RDY));
 
-    // 7. Send the Identify Controller command (CNS = 01h)
+    // 7. Send the Identify Controller command (Identify with CNS = 01h)
     uint8_t DSTRD = (nvme_controller->cap & NVME_CAP_DSTRD_MASK) >> NVME_CAP_DSTRD_SHIFT;
     uint16_t sq_tail = nvme_sqytdbl_read(nvme_controller, DSTRD, 0);
     uint16_t cq_head = nvme_cqyhdbl_read(nvme_controller, DSTRD, 0);
     sddf_dprintf("admin tail: %u\n", sq_tail);
     sddf_dprintf("admin head: %u\n", cq_head);
 
+    // Identify Command (5.1.13)
     nvme_asq_region[sq_tail] = (nvme_submission_queue_entry_t){
-        .cdw0 = 01,
+        .cdw0 = /* CID */ (sq_tail << 16) | /* PSDT */ 0 | /* FUSE */ 0 | /* OPC */ 0x6,
+        .cdw10 = /* CNTID[31:16] */ 0x0 | /* CNS */ 0x01,
+        .dptr_hi = 0,
+        .dptr_lo = data_region_paddr, /* TEMP */
     };
 
     // todo: overflow?
     nvme_sqytdbl_write(nvme_controller, DSTRD, 0, ++sq_tail);
-    sddf_dprintf("new tail: %u\n", sq_tail);
 
     uint16_t orig_cq_head = cq_head;
     while (cq_head == orig_cq_head) {
@@ -228,6 +234,9 @@ void nvme_controller_init()
     }
 
     sddf_dprintf("new head: %u\n", cq_head);
+    for (int i = 0; i < 32; i++) {
+        sddf_dprintf("[%04x]: %x\n", i, data_region[i]);
+    }
 }
 
 void nvme_init()
