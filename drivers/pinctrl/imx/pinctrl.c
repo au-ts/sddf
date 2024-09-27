@@ -271,8 +271,16 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
 
     case SDDF_PINCTRL_READ_MUX: {
         if (microkit_msginfo_get_count(msginfo) != READ_MUX_REQ_NUM_ARGS) {
+<<<<<<< HEAD
             LOG_DRIVER_ERR("Read mux PPC from channel %u does not have the correct number of arguments %lu != %d\n", ch,
                            microkit_msginfo_get_count(msginfo), READ_MUX_REQ_NUM_ARGS);
+=======
+            LOG_DRIVER_ERR(
+                "Read mux PPC from channel %u does not have the correct number of arguments %lu != %d\n",
+                ch,
+                microkit_msginfo_get_count(msginfo), READ_MUX_REQ_NUM_ARGS
+            );
+>>>>>>> cb8cdb2 (pinctrl: style: remove trailling whitespaces)
             return microkit_msginfo_new(SDDF_PINCTRL_INVALID_ARGS, 0);
         }
 
