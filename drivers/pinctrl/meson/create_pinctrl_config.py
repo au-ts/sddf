@@ -1,7 +1,8 @@
 # Copyright 2024, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
 
-# This script only works with Device Tree Source (DTS) file for Odroid C4
+# This script only works with Device Tree Source (DTS) file for Odroid C4 that was derived
+# from mainline Linux.
 # If you only have a compiled DTB, you can decompile it into a DTS with:
 # $ dtc -I dtb -O dts -o input.dtb output.dts
 
@@ -193,6 +194,7 @@ of parent node {muxed_device_node.name}, containing groups {str(group_names)} wi
                         bias_enable = True
                         bias_pullup = False
                     else:
+                        # This isn't an error because that pin could be used for input
                         log_warning_parser("Warning: bias undefined for device: " + muxed_device_node.name + ". Defaulting to disabling bias!\n")
                         bias_enable = False
                 
@@ -279,6 +281,7 @@ def pindata_to_register_values(
                     encountered_pad.add(pad_idx)
 
                 if mux_func < 0 or mux_func > 7:
+                    # Mistakes in the definition table, if we get here will need to triple check with Linux's definition.
                     log_error_parser(f"the pad {pad_idx} have an invalid mux value: {mux_func}")
                     exit(1)
 
@@ -335,9 +338,8 @@ def pindata_to_register_values(
                         log_normal_parser(f"after reg is {hex(reg["value"])}\n")
 
                 if not found:
-                    # This isn't necessarily an error, the pad's register could be reserved
-                    # For example the HDMI's I2C bus's bias and drive strength registers are reserved.
-                    log_warning_parser(f"cannot find the pin bank that the port {port} belongs in for biasing enable\n")
+                    log_error_parser(f"cannot find the pin bank that the port {port} belongs in for biasing enable\n")
+                    exit(1)
 
                 # If bias is enabled, set the pull direction
                 if bias_enabled:
@@ -359,8 +361,8 @@ def pindata_to_register_values(
                             log_normal_parser(f"after reg is {hex(reg["value"])}\n")
                 
                     if not found:
-                        # Also not an error for the reason above
-                        log_warning_parser(f"cannot find the pin bank that the port {port} belongs in for bias direction\n")
+                        log_error_parser(f"cannot find the pin bank that the port {port} belongs in for bias direction\n")
+                        exit(1)
 
 
                 # Set drive strength if defined
@@ -398,8 +400,8 @@ def pindata_to_register_values(
 
                             log_normal_parser(f"after reg is {hex(reg["value"])}\n")
                     if not found:
-                        # Also not an error for the reason above
-                        log_warning_parser(f"cannot find the pin bank that the port {port} belongs in for drive strength\n")
+                        log_error_parser(f"cannot find the pin bank that the port {port} belongs in for drive strength\n")
+                        exit(1)
 
     return gpio_turn_off
 
@@ -543,6 +545,8 @@ if __name__ == "__main__":
     )
 
     # By default all pads are GPIOs, if a pad function is non GPIO, turn off the GPIO switch for this pad
+    # This procedure is only performed for the peripherals chip, as the AO chip does not have these registers.
+    # Although if they do its undocumented...
     turn_off_gpios(turn_off_gpio_pads, gpio_enable_registers)
 
     log_normal_parser("=================\n")
