@@ -50,8 +50,9 @@ extern const uint32_t num_peripheral_registers;
 extern const uint32_t pinmux_data_magic;
 
 // Helper functions
-bool check_vaddr_4_bytes_aligned(uint32_t *vaddr) {
-    if (((uintptr_t) vaddr) % 4 == 0) {
+bool check_vaddr_4_bytes_aligned(uint32_t *vaddr)
+{
+    if (((uintptr_t)vaddr) % 4 == 0) {
         return true;
     } else {
         LOG_DRIVER_ERR("vaddr is not 4 bytes aligned\n");
@@ -59,7 +60,8 @@ bool check_vaddr_4_bytes_aligned(uint32_t *vaddr) {
     }
 }
 
-bool read_mux(uint32_t *vaddr, uint32_t *ret) {
+bool read_mux(uint32_t *vaddr, uint32_t *ret)
+{
     if (!check_vaddr_4_bytes_aligned(vaddr)) {
         return false;
     }
@@ -71,7 +73,8 @@ bool read_mux(uint32_t *vaddr, uint32_t *ret) {
     return true;
 }
 
-bool set_mux(uint32_t *vaddr, uint32_t val) {
+bool set_mux(uint32_t *vaddr, uint32_t val)
+{
     if (!check_vaddr_4_bytes_aligned(vaddr)) {
         return false;
     }
@@ -89,7 +92,8 @@ bool set_mux(uint32_t *vaddr, uint32_t val) {
     return true;
 }
 
-void initialise_ao_chip(void) {
+void initialise_ao_chip(void)
+{
     sddf_printf_("Initialising Always-On GPIO chip to values in DTS\n");
     for (uint32_t i = 0; i < num_ao_registers; i += 1) {
         uint32_t curr;
@@ -100,14 +104,16 @@ void initialise_ao_chip(void) {
     }
 }
 
-void fix_peripherals_chip_offset(void) {
+void fix_peripherals_chip_offset(void)
+{
     // The peripherals pinmux device physical address isn't aligned on page boundary whereas
     // memory regions can only be mapped on page boundary, we need to offset the page boundary address
     // into the actual pinmux device.
     pinctrl_periphs_base += 0x400;
 }
 
-void default_initialise_peripherals_chip(void) {
+void default_initialise_peripherals_chip(void)
+{
     sddf_printf_("Default initialising peripherals GPIO chip to values in datasheet\n");
     for (int i = 0; i < sizeof(default_periphs_pinmux) / sizeof(default_periphs_pinmux[0]); i += 1) {
         sddf_printf_("offset %x = %x\n", default_periphs_pinmux[i].offset, default_periphs_pinmux[i].value);
@@ -115,18 +121,21 @@ void default_initialise_peripherals_chip(void) {
     }
 }
 
-void initialise_peripherals_chip(void) {
+void initialise_peripherals_chip(void)
+{
     sddf_printf_("Initialising peripherals GPIO chip to values in DTS\n");
     for (uint32_t i = 0; i < num_peripheral_registers; i += 1) {
         uint32_t curr;
         read_mux(MUX_REG_ADDR(pinctrl_periphs_base, peripheral_registers[i].offset), &curr);
-        sddf_printf_("offset %x, curr = %x, dest = %x\n", peripheral_registers[i].offset, curr, peripheral_registers[i].value);
+        sddf_printf_("offset %x, curr = %x, dest = %x\n", peripheral_registers[i].offset, curr,
+                     peripheral_registers[i].value);
 
         set_mux(MUX_REG_ADDR(pinctrl_periphs_base, peripheral_registers[i].offset), peripheral_registers[i].value);
     }
 }
 
-void init(void) {
+void init(void)
+{
     LOG_DRIVER("starting\n");
 
     if (pinmux_data_magic != PINMUX_DATA_MAGIC) {
@@ -142,37 +151,36 @@ void init(void) {
     LOG_DRIVER("pinctrl device initialisation done\n");
 }
 
-void notified(microkit_channel ch) {
+void notified(microkit_channel ch)
+{
     LOG_DRIVER_ERR("received ntfn on unexpected channel %u\n", ch);
 }
 
-microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo) {
+microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
+{
     switch (microkit_msginfo_get_label(msginfo)) {
 
     case SDDF_PINCTRL_READ_MUX: {
         if (microkit_msginfo_get_count(msginfo) != READ_MUX_REQ_NUM_ARGS) {
-            LOG_DRIVER_ERR(
-                "Read mux PPC from channel %u does not have the correct number of arguments %lu != %d\n",
-                ch,
-                microkit_msginfo_get_count(msginfo), READ_MUX_REQ_NUM_ARGS
-            );
+            LOG_DRIVER_ERR("Read mux PPC from channel %u does not have the correct number of arguments %lu != %d\n", ch,
+                           microkit_msginfo_get_count(msginfo), READ_MUX_REQ_NUM_ARGS);
             return microkit_msginfo_new(SDDF_PINCTRL_INVALID_ARGS, 0);
         }
 
-        uint32_t reg_offset = (uint32_t) microkit_mr_get(READ_MUX_REQ_OFFSET);
+        uint32_t reg_offset = (uint32_t)microkit_mr_get(READ_MUX_REQ_OFFSET);
         uint32_t *reg_vaddr;
         uint32_t reg_val;
 
-        sddf_pinctrl_chip_idx_t chip = (sddf_pinctrl_chip_idx_t) microkit_mr_get(READ_MUX_REQ_CHIP_IDX);
+        sddf_pinctrl_chip_idx_t chip = (sddf_pinctrl_chip_idx_t)microkit_mr_get(READ_MUX_REQ_CHIP_IDX);
         if (chip == PINCTRL_CHIP_AO) {
             if (reg_offset >= AO_BASE_PAD && reg_offset <= AO_LAST_REGISTER_OFFSET) {
-                reg_vaddr = (uint32_t *) (pinctrl_ao_base + reg_offset);
+                reg_vaddr = (uint32_t *)(pinctrl_ao_base + reg_offset);
             } else {
                 return microkit_msginfo_new(SDDF_PINCTRL_INVALID_ARGS, 0);
             }
         } else if (chip == PINCTRL_CHIP_PERIPHERALS) {
             if (reg_offset >= PERIPHS_BASE_PAD && reg_offset <= PERIPHS_LAST_REGISTER_OFFSET) {
-                reg_vaddr = (uint32_t *) (pinctrl_periphs_base + reg_offset);
+                reg_vaddr = (uint32_t *)(pinctrl_periphs_base + reg_offset);
             } else {
                 return microkit_msginfo_new(SDDF_PINCTRL_INVALID_ARGS, 0);
             }
