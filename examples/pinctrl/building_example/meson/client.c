@@ -101,7 +101,7 @@ void init(void) {
     } else {
         sddf_printf_("all pinmux driver arguments validation tests passed...continuing\n");
     }
-        
+
     sddf_printf_("client hello #%lu\n", echo_number);
     sddf_timer_set_timeout(1, NS_IN_S);
 }
