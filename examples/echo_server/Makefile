@@ -23,8 +23,6 @@ ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
 	export DRIV_DIR := meson
 	export UART_DRIV_DIR := meson
 	export TIMER_DRV_DIR := meson
-	export PINCTRL_DRIVER_DIR := meson
-	export SOC := hardkernel,odroid-c4
 	export CPU := cortex-a55
 else ifneq ($(filter $(strip $(MICROKIT_BOARD)),imx8mm_evk imx8mp_evk maaxboard),)
 	export DRIV_DIR := imx
@@ -52,7 +50,6 @@ export RANLIB := $(TOOLCHAIN)-ranlib
 export MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 export SDDF=$(abspath ../..)
 export ECHO_INCLUDE:=$(abspath .)/include
-export PYTHON := python3
 
 IMAGE_FILE := $(BUILD_DIR)/loader.img
 REPORT_FILE := $(BUILD_DIR)/report.txt

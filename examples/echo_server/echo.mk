@@ -28,8 +28,7 @@ REPORT_FILE := report.txt
 vpath %.c ${SDDF} ${ECHO_SERVER}
 
 IMAGES := eth_driver.elf lwip.elf benchmark.elf idle.elf network_virt_rx.elf \
-	  network_virt_tx.elf copy.elf timer_driver.elf uart_driver.elf serial_virt_tx.elf \
-	  pinctrl_driver.elf
+	  network_virt_tx.elf copy.elf timer_driver.elf uart_driver.elf serial_virt_tx.elf
 
 CFLAGS := -mcpu=$(CPU) \
 	  -mstrict-align \
@@ -91,6 +90,7 @@ ${IMAGES}: libsddf_util_debug.a
 ${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
 
+
 include ${SDDF}/util/util.mk
 include ${SDDF}/network/components/network_components.mk
 include ${ETHERNET_DRIVER}/eth_driver.mk
@@ -98,9 +98,6 @@ include ${BENCHMARK}/benchmark.mk
 include ${TIMER_DRIVER}/timer_driver.mk
 include ${UART_DRIVER}/uart_driver.mk
 include ${SERIAL_COMPONENTS}/serial_components.mk
-
-export DTS_FILE := $(ECHO_SERVER)/board/$(MICROKIT_BOARD)/$(MICROKIT_BOARD).dts
-include $(PINCTRL_DRIVER)/pinctrl_driver.mk
 
 qemu: $(IMAGE_FILE)
 	$(QEMU) -machine virt,virtualization=on \
