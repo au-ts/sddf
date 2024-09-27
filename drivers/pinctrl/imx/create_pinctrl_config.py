@@ -62,7 +62,7 @@ if __name__ == "__main__":
         print("Usage: ")
         print("\tpython3 create_pinmux_setup.py <SoC-name> <dts-source> <pinmux-device-name> <output-dir>")
         exit(1)
-    
+
     # Parse device tree file
     soc_name = sys.argv[1]
     devicetree = dtlib.DT(sys.argv[2], force=True)
