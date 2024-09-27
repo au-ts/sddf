@@ -56,7 +56,7 @@ include ${SDDF}/util/util.mk
 
 client.o: ${TOP}/client.c
 	$(CC) -c $(CFLAGS) $(CHIP_HEADER_INC) -DSOC_$(shell echo $(SOC) | tr a-z A-Z | tr - _) $< -o client.o
-client.elf: client.o 
+client.elf: client.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
