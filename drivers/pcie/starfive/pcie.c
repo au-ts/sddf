@@ -20,6 +20,17 @@ uintptr_t pcie_config;
 #define PCIE_CONFIG_SIZE 0x1000000
 
 volatile nvme_controller_t *nvme_controller;
+nvme_submission_queue_entry_t *nvme_asq_region;
+nvme_completion_queue_entry_t *nvme_acq_region;
+uintptr_t nvme_asq_region_paddr;
+uintptr_t nvme_acq_region_paddr;
+#define NVME_ADMIN_QUEUE_SIZE 0x1000
+
+/* TODO: don't hardcode */
+#define NVME_ASQ_CAPACITY (NVME_ADMIN_QUEUE_SIZE / 64)
+#define NVME_ACQ_CAPACITY (NVME_ADMIN_QUEUE_SIZE / 64)
+_Static_assert(NVME_ASQ_CAPACITY <= 0x1000, "capacity of ASQ must be <=4096 (entries)");
+_Static_assert(NVME_ACQ_CAPACITY <= 0x1000, "capacity of ACQ must be <=4096 (entries)");
 
 /* bus between [0, 256)
    device between [0, 31)
@@ -69,7 +80,8 @@ void device_print(uint8_t bus, uint8_t device, uint8_t function)
     sddf_dprintf("base-class code: 0x%02x | sub-class code: 0x%02x\n", header->base_class_code, header->subclass_code);
     sddf_dprintf("header type: 0x%02x\n", header->header_type);
 
-    sddf_dprintf("\thas multi-functions: %s\n", header->header_type & PCIE_HEADER_TYPE_HAS_MULTI_FUNCTIONS ? "yes" : "no");
+    sddf_dprintf("\thas multi-functions: %s\n",
+                 header->header_type & PCIE_HEADER_TYPE_HAS_MULTI_FUNCTIONS ? "yes" : "no");
     sddf_dprintf("\tlayout variant: 0x%02lx\n", header->header_type & PCIE_HEADER_TYPE_LAYOUT_MASK);
 
     if ((header->header_type & PCIE_HEADER_TYPE_LAYOUT_MASK) == PCIE_HEADER_TYPE_GENERAL) {
@@ -89,60 +101,145 @@ void device_print(uint8_t bus, uint8_t device, uint8_t function)
                 sddf_dprintf("\tbase address for memory\n");
                 sddf_dprintf("\ttype: ");
                 switch ((bar & (BIT(1) | BIT(2))) >> 1) {
-                    case 0b00:
-                        sddf_dprintf("32-bit space\n");
-                        sddf_dprintf("\tfull address: 0x%08lx\n", bar & ~(BIT(4) - 1));
-                        break;
+                case 0b00:
+                    sddf_dprintf("32-bit space\n");
+                    sddf_dprintf("\tfull address: 0x%08lx\n", bar & ~(BIT(4) - 1));
+                    break;
 
-                    case 0b10:
-                        sddf_dprintf("64-bit space\n");
-                        if (i >= 5) {
-                            sddf_dprintf("\tspecified 64-bit in the last slot, ignoring...");
-                            continue;
-                        }
+                case 0b10:
+                    sddf_dprintf("64-bit space\n");
+                    if (i >= 5) {
+                        sddf_dprintf("\tspecified 64-bit in the last slot, ignoring...");
+                        continue;
+                    }
 
-                        uint32_t bar_upper = type0_header->base_address_registers[i + 1];
+                    uint32_t bar_upper = type0_header->base_address_registers[i + 1];
 
-                        sddf_dprintf("\tfull address: 0x%08x_%08lx\n", bar_upper, bar & ~(BIT(4) - 1));
+                    sddf_dprintf("\tfull address: 0x%08x_%08lx\n", bar_upper, bar & ~(BIT(4) - 1));
 
                         /* [PCI-3.0] 6.2.5.1 Address Maps (Implementation Note) p227*/
 
-                        // Decode (I/O or memory) of a register is disabled via the command register before sizing a Base Address register.
-                        header->command &= ~(BIT(1));
+                    // Decode (I/O or memory) of a register is disabled via the command register before sizing a Base Address register.
+                    header->command &= ~(BIT(1));
 
-                        // calculate size.
-                        type0_header->base_address_registers[i] = 0xffffffff;
-                        type0_header->base_address_registers[i + 1] = 0xffffffff;
+                    // calculate size.
+                    type0_header->base_address_registers[i] = 0xffffffff;
+                    type0_header->base_address_registers[i + 1] = 0xffffffff;
 
-                        // read back
-                        uint32_t size_lower = type0_header->base_address_registers[i];
-                        uint32_t size_upper = type0_header->base_address_registers[i + 1];
-                        uint64_t size_readback = ((uint64_t)size_upper << 32) | (size_lower);
-                        // calculation can be done from the 32-bit value read by first clearing encoding information bits
-                        // (bit 0 for I/O, bits 0-3 formemory), inverting all 32 bits (logical NOT), then incrementing by 1
-                        size_readback &= ~(BIT(3) | BIT(2) | BIT(1) | BIT(0));
-                        size_readback = ~size_readback;
-                        size_readback += 1;
+                    // read back
+                    uint32_t size_lower = type0_header->base_address_registers[i];
+                    uint32_t size_upper = type0_header->base_address_registers[i + 1];
+                    uint64_t size_readback = ((uint64_t)size_upper << 32) | (size_lower);
+                    // calculation can be done from the 32-bit value read by first clearing encoding information bits
+                    // (bit 0 for I/O, bits 0-3 formemory), inverting all 32 bits (logical NOT), then incrementing by 1
+                    size_readback &= ~(BIT(3) | BIT(2) | BIT(1) | BIT(0));
+                    size_readback = ~size_readback;
+                    size_readback += 1;
 
-                        sddf_dprintf("\tsize: 0x%lx\n", size_readback);
+                    sddf_dprintf("\tsize: 0x%lx\n", size_readback);
 
-                        // The original value in the Base Address register is restored before re-enabling
-                        // decode in the command register of the device.
-                        type0_header->base_address_registers[i] = bar;
-                        type0_header->base_address_registers[i + 1] = bar_upper;
-                        header->command |= BIT(1);
+                    // The original value in the Base Address register is restored before re-enabling
+                    // decode in the command register of the device.
+                    type0_header->base_address_registers[i] = bar;
+                    type0_header->base_address_registers[i + 1] = bar_upper;
+                    header->command |= BIT(1);
 
+                    i += 1; // skip one slot.
+                    break;
 
-                        i += 1; // skip one slot.
-                        break;
-
-                    default:
-                        sddf_dprintf("reserved\n");
+                default:
+                    sddf_dprintf("reserved\n");
                 }
                 sddf_dprintf("\tprefetchable: %s\n", bar & BIT(3) ? "yes" : "no");
             }
         }
     }
+}
+
+/* [NVMe-2.1] 3.3.1 Memory-based Transport Queue Model (PCIe) */
+void nvme_queue_init()
+{
+    // TODO.
+}
+
+/* [NVMe-2.1] 3.5.1 Memory-based Controller Initialization (PCIe) */
+void nvme_controller_init()
+{
+    sddf_dprintf("CAP: %016lx\n", nvme_controller->cap);
+    sddf_dprintf("VS: major: %u, minor: %u, tertiary: %u\n", nvme_controller->vs.mjr, nvme_controller->vs.mnr,
+                 nvme_controller->vs.ter);
+    sddf_dprintf("CC: %08x\n", nvme_controller->cc);
+
+
+    nvme_controller->cc &= ~NVME_CC_EN;
+
+    // 1. Wait for CSTS.RDY to become '0' (i.e. not ready)
+    while (nvme_controller->csts & NVME_CSTS_RDY);
+
+    // 2. Configure Admin Queue(s) TODO.
+    nvme_controller->asq = nvme_asq_region_paddr;
+    nvme_controller->acq = nvme_acq_region_paddr;
+    nvme_controller->aqa &= ~(NVME_AQA_ACQS_MASK | NVME_AQA_ASQS_MASK);
+    nvme_controller->aqa |= ((NVME_ASQ_CAPACITY - 1) << NVME_AQA_ASQS_SHIFT)
+                          | ((NVME_ACQ_CAPACITY - 1) << NVME_AQA_ACQS_SHIFT);
+
+    // 3. Initialise Command Support Sets.
+    nvme_controller->cc &= ~(NVME_CC_CSS_MASK);
+    if (nvme_controller->cap & NVME_CAP_NOIOCSS) {
+        nvme_controller->cc |= 0b111 << NVME_CC_CSS_SHIFT;
+    } else if (nvme_controller->cap & NVME_CAP_IOCSS) {
+        nvme_controller->cc |= 0b110 << NVME_CC_CSS_SHIFT;
+    } else if (nvme_controller->cap & NVME_CAP_NCSS) {
+        nvme_controller->cc |= 0b000 << NVME_CC_CSS_SHIFT;
+    }
+
+    // 4a. Arbitration Mechanism (TODO)
+    // 4b. Memory Page Size
+    nvme_controller->cc &= ~NVME_CC_MPS_MASK;
+    /* nb: host page size. TODO: do we have a define for this? */
+    /* n.b.: page size = 2 ^ (12 + MPS)*/
+    nvme_controller->cc |= (4096 >> 12) << NVME_CC_MPS_SHIFT;
+
+    // 5. Enable the controller
+    nvme_controller->cc |= NVME_CC_EN;
+
+    // 6. Wait for ready
+    sddf_dprintf("waiting ready\n");
+    while (!(nvme_controller->csts & NVME_CSTS_RDY));
+
+    // 7. Send the Identify Controller command (CNS = 01h)
+    uint8_t DSTRD = (nvme_controller->cap & NVME_CAP_DSTRD_MASK) >> NVME_CAP_DSTRD_SHIFT;
+    uint16_t sq_tail = nvme_sqytdbl_read(nvme_controller, DSTRD, 0);
+    uint16_t cq_head = nvme_cqyhdbl_read(nvme_controller, DSTRD, 0);
+    sddf_dprintf("admin tail: %u\n", sq_tail);
+    sddf_dprintf("admin head: %u\n", cq_head);
+
+    nvme_asq_region[sq_tail] = (nvme_submission_queue_entry_t){
+        .cdw0 = 01,
+    };
+
+    // todo: overflow?
+    nvme_sqytdbl_write(nvme_controller, DSTRD, 0, ++sq_tail);
+    sddf_dprintf("new tail: %u\n", sq_tail);
+
+    uint16_t orig_cq_head = cq_head;
+    while (cq_head == orig_cq_head) {
+        cq_head = nvme_cqyhdbl_read(nvme_controller, DSTRD, 0);
+    }
+
+    sddf_dprintf("new head: %u\n", cq_head);
+}
+
+void nvme_init()
+{
+    sddf_dprintf("Starting NVME config...\n");
+
+    // We should do a Function Level Reset as defined by [PCIe-2.0] spec §6.6.2
+
+    // https://github.com/bootreer/vroom/blob/d8bbe9db2b1cfdfc38eec31f3b48f5eb167879a9/src/nvme.rs#L220
+
+    nvme_controller_init();
+    nvme_queue_init();
 }
 
 void init()
@@ -165,57 +262,11 @@ void init()
 out:
     sddf_dprintf("\n\nPCIE_ENUM_COMPLETE\n");
 
-    sddf_dprintf("Starting NVME config...\n");
-
-    // We should do a Function Level Reset as defined by [PCIe-2.0] spec §6.6.2
-
-    // https://github.com/bootreer/vroom/blob/d8bbe9db2b1cfdfc38eec31f3b48f5eb167879a9/src/nvme.rs#L220
-
-
-    sddf_dprintf("CAP: %016lx\n", nvme_controller->cap);
-    sddf_dprintf("VS: major: %u, minor: %u, tertiary: %u\n", nvme_controller->vs.mjr, nvme_controller->vs.mnr, nvme_controller->vs.ter);
-    sddf_dprintf("CC: %08x\n", nvme_controller->cc);
-
-    /* [NVME-2.1] 3.5.1 Memory-based Controller Initialization (PCIe) */
-    nvme_controller->cc &= ~NVME_CC_EN;
-
-    // 1. Wait for CSTS.RDY to become '0' (i.e. not ready)
-    while (nvme_controller->csts & NVME_CSTS_RDY);
-
-    // 2. Configure Admin Queue(s) TODO.
-    // nvme_controller->asq = nvme_admin_submission_queue;
-    // nvme_controller->acq = nvme_admin_completion_queue;
-    /* TODO: queue size def. */
-    nvme_controller->aqa &= ~(NVME_AQA_ACQS_MASK | NVME_AQA_ASQS_MASK);
-    nvme_controller->aqa |= ((4096 - 1) << NVME_AQA_ACQS_SHIFT) | ((4096 - 1) << NVME_AQA_ASQS_SHIFT);
-
-    // 3. Initialise Command Support Sets.
-    nvme_controller->cc &= ~(NVME_CC_CSS_MASK);
-    if (nvme_controller->cap & NVME_CAP_NOIOCSS) {
-        nvme_controller->cc |= 0b111 << NVME_CC_CSS_SHIFT;
-    } else if (nvme_controller->cap & NVME_CAP_IOCSS) {
-        nvme_controller->cc |= 0b110 << NVME_CC_CSS_SHIFT;
-    } else if (nvme_controller->cap & NVME_CAP_NCSS) {
-        nvme_controller->cc |= 0b000 << NVME_CC_CSS_SHIFT;
-    }
-
-    // (not-spec but in vroom?) TODO set completion/submission entry sizes?
-
-    // 4a. Arbitration Mechanism (TODO)
-    // 4b. Memory Page Size
-    nvme_controller->cc &= ~NVME_CC_MPS_MASK;
-    /* nb: host page size. TODO: do we have a define for this? */
-    /* n.b.: page size = 2 ^ (12 + MPS)*/
-    nvme_controller->cc |= (4096 >> 12) << NVME_CC_MPS_SHIFT;
-
-    // 5. Enable the controller
-    nvme_controller->cc |= NVME_CC_EN;
-
-    // 6. Wait for ready
-    sddf_dprintf("waiting ready\n");
-    while (!(nvme_controller->csts & NVME_CSTS_RDY));
-    sddf_dprintf("now ready\n");
+    nvme_init();
 }
+
+/* See: 3.3 NVM Queue MOdels */
+// CAP.MQES
 
 void notified(microkit_channel ch)
 {

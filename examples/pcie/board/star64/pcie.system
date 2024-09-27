@@ -11,12 +11,17 @@
     <!-- Hardcoded from what PCIe gives us. Ideally we should learn this at runtime
          or overwrite the BARs. But for now... -->
     <memory_region name="nvme_regs" phys_addr="0x3800_0000" size="0x4000" />
+    <memory_region name="nvme_asq"                          size="0x1000" />
+    <memory_region name="nvme_acq"                          size="0x1000" />
 
     <protection_domain name="pcie" priority="254" >
         <!-- <map mr="pcie_regs" vaddr="0x1000_0000" perms="rw" cached="false" setvar_vaddr="pcie_regs" /> -->
         <map mr="pcie_config" vaddr="0x2000_0000" perms="rw" cached="false" setvar_vaddr="pcie_config" />
 
         <map mr="nvme_regs" vaddr="0x3000_0000" perms="rw" cached="false" setvar_vaddr="nvme_controller" />
+        <!-- TODO: cached? -->
+        <map mr="nvme_asq"  vaddr="0x3001_0000" perms="rw" cached="false" setvar_vaddr="nvme_asq_region" />
+        <map mr="nvme_acq"  vaddr="0x3002_0000" perms="rw" cached="false" setvar_vaddr="nvme_acq_region" />
 
         <program_image path="pcie_driver.elf" />
     </protection_domain>
