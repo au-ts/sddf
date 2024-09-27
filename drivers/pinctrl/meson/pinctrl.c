@@ -95,7 +95,7 @@ void initialise_ao_chip(void) {
         uint32_t curr;
         read_mux(MUX_REG_ADDR(pinctrl_ao_base, ao_registers[i].offset), &curr);
         sddf_printf_("offset %x, curr = %x, dest = %x\n", ao_registers[i].offset, curr, ao_registers[i].value);
-    
+
         set_mux(MUX_REG_ADDR(pinctrl_ao_base, ao_registers[i].offset), ao_registers[i].value);
     }
 }
@@ -121,7 +121,7 @@ void initialise_peripherals_chip(void) {
         uint32_t curr;
         read_mux(MUX_REG_ADDR(pinctrl_periphs_base, peripheral_registers[i].offset), &curr);
         sddf_printf_("offset %x, curr = %x, dest = %x\n", peripheral_registers[i].offset, curr, peripheral_registers[i].value);
-    
+
         set_mux(MUX_REG_ADDR(pinctrl_periphs_base, peripheral_registers[i].offset), peripheral_registers[i].value);
     }
 }
@@ -152,8 +152,8 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo) {
     case SDDF_PINCTRL_READ_MUX: {
         if (microkit_msginfo_get_count(msginfo) != READ_MUX_REQ_NUM_ARGS) {
             LOG_DRIVER_ERR(
-                "Read mux PPC from channel %u does not have the correct number of arguments %lu != %d\n", 
-                ch, 
+                "Read mux PPC from channel %u does not have the correct number of arguments %lu != %d\n",
+                ch,
                 microkit_msginfo_get_count(msginfo), READ_MUX_REQ_NUM_ARGS
             );
             return microkit_msginfo_new(SDDF_PINCTRL_INVALID_ARGS, 0);

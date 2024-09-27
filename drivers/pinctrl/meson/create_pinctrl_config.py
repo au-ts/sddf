@@ -7,7 +7,7 @@
 # $ dtc -I dtb -O dts -o input.dtb output.dts
 
 # A typical invocation might look like:
-# $ python3 create_pinctrl_config.py hardkernel,odroid-c4 your_device_tree.dts build 
+# $ python3 create_pinctrl_config.py hardkernel,odroid-c4 your_device_tree.dts build
 
 import sys
 sys.dont_write_bytecode = True
@@ -67,16 +67,16 @@ def fetch_enabled_devices(devicetree: dtlib.DT) -> dict[int, str]:
 # Each pinctrl data node inside the DTS is represented with this class.
 # These data are then converted into memory values for writing into pinmux registers.
 class PinData:
-    def __init__(self, 
+    def __init__(self,
                  phandle: int,
-                 muxed_device_name: str, 
-                 muxed_device_property_node_name: str, 
-                 group_names: list[str], 
-                 function_name: str, 
-                 bias_enable: bool, 
-                 bias_pullup: bool, 
+                 muxed_device_name: str,
+                 muxed_device_property_node_name: str,
+                 group_names: list[str],
+                 function_name: str,
+                 bias_enable: bool,
+                 bias_pullup: bool,
                  drive_strength: int):
-        
+
         self.phandle = phandle
         # for debugging: name of the device in DTS
         self.muxed_device_name = muxed_device_name
@@ -112,7 +112,7 @@ class PinData:
 # This function extract pinmux data from the "pinctrl" node in DTS and return a list of PinData.
 # It will be called twice, once for peripherals and always-on GPIO chips.
 # Returns a list of PinData.
-def get_pinctrl_data(pinmux_node: dtlib.Node, enabled_phandles: dict[int, str], func_to_group_map: dict[str, list[str]]) -> list[PinData]: 
+def get_pinctrl_data(pinmux_node: dtlib.Node, enabled_phandles: dict[int, str], func_to_group_map: dict[str, list[str]]) -> list[PinData]:
     # `pinmux_node` looks something like this:
     # pinctrl@40 {
     #     compatible = "amlogic,meson-g12a-periphs-pinctrl";
@@ -160,7 +160,7 @@ def get_pinctrl_data(pinmux_node: dtlib.Node, enabled_phandles: dict[int, str], 
                 for subproperty_name in muxed_device_property_node.props:
                     if subproperty_name == "groups":
                         group_names = muxed_device_property_node.props[subproperty_name].to_string().split('\0')
-                    
+
                     if subproperty_name == "function":
                         values_list = muxed_device_property_node.props[subproperty_name].to_string().split('\0')
                         if len(values_list) != 1:
@@ -170,7 +170,7 @@ def get_pinctrl_data(pinmux_node: dtlib.Node, enabled_phandles: dict[int, str], 
 
                         # If for whatever reason the device defined in the DTS does not have data in our
                         # mapping tables, drop it. This can happens for undocumented devices/pads that does not appear
-                        # in the Linux kernel. An example is the DTS from the OdroidC4's Ubuntu image: 
+                        # in the Linux kernel. An example is the DTS from the OdroidC4's Ubuntu image:
                         #    ubuntu-20.04-4.9-minimal-odroid-c4-hc4-20220228
                         # Where the "cec_ao_a_ee" and "cec_ao_b_ee" groups with "cec_ao_ee" function are not defined in the Linux kernel and datasheet at all.
                         if function_name not in func_to_group_map:
@@ -184,7 +184,7 @@ of parent node {muxed_device_node.name}, containing groups {str(group_names)} wi
 
                     if subproperty_name == "drive-strength-microamp":
                         drive_strength = muxed_device_property_node.props[subproperty_name].to_num()
-                    
+
                 if bias_enable == -1:
                     # We haven't encountered the "bias-disable" property
                     if "bias-pull-up" in muxed_device_property_node.props:
@@ -197,17 +197,17 @@ of parent node {muxed_device_node.name}, containing groups {str(group_names)} wi
                         # This isn't an error because that pin could be used for input
                         log_warning_parser("Warning: bias undefined for device: " + muxed_device_node.name + ". Defaulting to disabling bias!\n")
                         bias_enable = False
-                
+
                 if undocumented:
                     break
 
-                result.append(PinData(muxed_device_node.props["phandle"].to_num(), 
-                                      muxed_device_name, 
-                                      muxed_device_property_node_name, 
-                                      group_names, 
-                                      function_name, 
-                                      bias_enable, 
-                                      bias_pullup, 
+                result.append(PinData(muxed_device_node.props["phandle"].to_num(),
+                                      muxed_device_name,
+                                      muxed_device_property_node_name,
+                                      group_names,
+                                      function_name,
+                                      bias_enable,
+                                      bias_pullup,
                                       drive_strength)
                 )
 
@@ -218,17 +218,17 @@ def zero_n_bits_at_ith_bit_of_32bits(register: int, n: int, ith: int) -> int:
     if n < 0 or ith < 0 or register > 0xFFFF_FFFF:
         log_error_parser(f"invalid arg to zero_n_bits_at_ith_bit: register = {register}, n = {n}, ith = {ith}\n")
         exit(1)
-    
+
     mask = 0xFFFF_FFFF
     mask = mask >> (ith + n)
 
     for i in range(n):
         mask = mask << 1
-    
+
     for i in range(ith):
         mask = mask << 1
         mask |= 1
-    
+
     result = register & mask
     if result > 0xFFFF_FFFF:
         log_error_parser(f"bad output zero_n_bits_at_ith_bit_of_32bits(register={hex(register)}, n={n}, ith={ith}) = {hex(result)}")
@@ -296,7 +296,7 @@ def pindata_to_register_values(
 
                         # Fetch the bank value then zero out the bits that belong to this pad
                         zeroed_regval = zero_n_bits_at_ith_bit_of_32bits(reg["value"], reg["bits_per_pin"], nth_bit)
-                        
+
                         # Prepare mux setting value to be OR'ed into the zeroed out slot
                         data_mask = mux_func << nth_bit
 
@@ -325,7 +325,7 @@ def pindata_to_register_values(
 
                         nth_pin = pad_idx - reg["first_pad"]
                         nth_bit = nth_pin * reg["bits_per_pin"]
-                        
+
                         if pindata.bias_enable:
                             log_normal_parser(f"pad #{pad_idx} have bias enabled, prev reg is {hex(reg["value"])}, ")
                             data_mask = 1 << nth_bit
@@ -334,7 +334,7 @@ def pindata_to_register_values(
                         else:
                             log_normal_parser(f"pad #{pad_idx} have bias disabled, prev reg is {hex(reg["value"])}, ")
                             reg["value"] = zero_n_bits_at_ith_bit_of_32bits(reg["value"], reg["bits_per_pin"], nth_bit)
-                        
+
                         log_normal_parser(f"after reg is {hex(reg["value"])}\n")
 
                 if not found:
@@ -357,9 +357,9 @@ def pindata_to_register_values(
                             else:
                                 log_normal_parser(f"pad #{pad_idx} have pull down, prev reg is {hex(reg["value"])}, ")
                                 reg["value"] = zero_n_bits_at_ith_bit_of_32bits(reg["value"], reg["bits_per_pin"], nth_bit)
-                        
+
                             log_normal_parser(f"after reg is {hex(reg["value"])}\n")
-                
+
                     if not found:
                         log_error_parser(f"cannot find the pin bank that the port {port} belongs in for bias direction\n")
                         exit(1)
@@ -378,8 +378,8 @@ def pindata_to_register_values(
                         ds_val = 3
                     else:
                         log_error_parser(f"unknown drive strength value of f{pindata.drive_strength} for pad #{pad_idx}\n")
-                        exit(1) 
-                    
+                        exit(1)
+
                     found = False
                     for reg in ds_registers:
                         if pad_idx >= reg["first_pad"] and pad_idx <= reg["last_pad"]:
@@ -390,7 +390,7 @@ def pindata_to_register_values(
 
                             # Fetch the bank value then zero out the bits that belong to this pad
                             zeroed_regval = zero_n_bits_at_ith_bit_of_32bits(reg["value"], reg["bits_per_pin"], nth_bit)
-                            
+
                             # Prepare mux setting value to be OR'ed into the zeroed out slot
                             data_mask = ds_val << nth_bit
 
@@ -491,13 +491,13 @@ if __name__ == "__main__":
         log_error_parser("Usage: ")
         log_error_parser("\tpython3 create_pinmux_setup.py <SoC-name> <dts-source> <output-dir>")
         exit(1)
-    
+
     # Parse device tree file
     soc_name = sys.argv[1]
     devicetree = dtlib.DT(sys.argv[2], force=True)
     pinmux_node_name = "pinctrl@"
     out_dir = sys.argv[3]
-    
+
     is_dts_compatible(devicetree)
 
     enabled_phandles: dict[int, str] = fetch_enabled_devices(devicetree)

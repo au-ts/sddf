@@ -8,7 +8,7 @@
 #
 # NOTES
 #  Generates pinctrl.elf
-#  Has 4 parameters: 
+#  Has 4 parameters:
 #    SDDF: path to sddf root
 #    PYTHON
 #    DTS_FILE: absolute path to the device tree source file.
@@ -27,15 +27,15 @@ ifndef PYTHON
 $(error PYTHON is not set)
 endif
 
-ifndef DTS_FILE 
+ifndef DTS_FILE
 $(error DTS_FILE is not set)
 endif
 
-ifndef PINMUX_DEVICE 
+ifndef PINMUX_DEVICE
 $(error PINMUX_DEVICE is not set)
 endif
 
-ifndef SOC 
+ifndef SOC
 $(error SOC is not set)
 endif
 
@@ -62,7 +62,7 @@ pinctrl/pinctrl_config_data.o: pinctrl/pinctrl_config_data.s
 pinctrl/pinctrl_config_data.s: ${DTS_FILE} ${PINCTRL_DIR}/create_pinctrl_config.py
 	${PYTHON} ${PINCTRL_DIR}/create_pinctrl_config.py ${SOC} ${DTS_FILE} ${PINMUX_DEVICE} pinctrl
 
-pinctrl: 
+pinctrl:
 	mkdir -p pinctrl
 
 clean::
