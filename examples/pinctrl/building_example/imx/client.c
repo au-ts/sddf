@@ -18,7 +18,7 @@ uint64_t echo_number = 0;
 
 void init(void) {
     sddf_printf_("client begin testing pinmux driver args validation:\n");
-    
+
     bool all_tests_passed = true;
     if (sddf_pinctrl_read_mux(PINCTRL_CH, 0x0, PINCTRL_CHIP_IOMUXC, 0x0) != SDDF_PINCTRL_INVALID_ARGS) {
         sddf_printf_("NULL offset...FAIL\n");
@@ -84,7 +84,7 @@ void init(void) {
     } else {
         sddf_printf_("all pinmux driver arguments validation tests passed...continuing\n");
     }
-        
+
     sddf_printf_("client hello #%lu\n", echo_number);
     sddf_timer_set_timeout(1, NS_IN_S);
 }
