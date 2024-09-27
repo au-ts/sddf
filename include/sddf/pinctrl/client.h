@@ -21,9 +21,9 @@
  * @param ret_val if the return value is a success, the register value in the device is written to this pointer.
  */
 static inline sddf_pinctrl_response_t sddf_pinctrl_read_mux(
-    microkit_channel channel, 
-    uint32_t reg_offset, 
-    sddf_pinctrl_chip_idx_t chip, 
+    microkit_channel channel,
+    uint32_t reg_offset,
+    sddf_pinctrl_chip_idx_t chip,
     uint32_t *ret_val)
 {
     microkit_mr_set(READ_MUX_REQ_OFFSET, reg_offset);

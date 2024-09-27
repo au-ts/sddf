@@ -35,14 +35,14 @@
 
 // Size of all registers inclusive
 #ifdef SOC_IMX8MQ_EVK
-#define IOMUXC_DEVICE_EFFECTIVE_SIZE 0x520 
+#define IOMUXC_DEVICE_EFFECTIVE_SIZE 0x520
 #endif
 #ifdef SOC_IMX8MM_EVK
 #define IOMUXC_DEVICE_EFFECTIVE_SIZE 0x538
 #endif
 
 uintptr_t iomuxc_dev_base;
-// The registers are only within iomuxc_dev_base + IOMUXC_DEVICE_BASE_PAD and 
+// The registers are only within iomuxc_dev_base + IOMUXC_DEVICE_BASE_PAD and
 // iomuxc_dev_base + IOMUXC_DEVICE_BASE_PAD + IOMUXC_DEVICE_EFFECTIVE_SIZE
 
 // General Purpose Registers: a memory region contiguous with the iomuxc device.
@@ -109,7 +109,7 @@ bool read_mux(uint32_t offset, uint32_t *ret) {
     if (!check_offset_bound(offset) || !check_offset_4_bytes_aligned(offset)) {
         return false;
     }
-    
+
     volatile uint32_t *mux_reg_vaddr = (uint32_t *) (iomuxc_dev_base + (uintptr_t) offset);
 
     asm volatile("" : : : "memory");
@@ -143,9 +143,9 @@ void debug_dts_print() {
     LOG_DRIVER("nums of config is %u\n", num_iomuxc_configs);
     LOG_DRIVER("data dump begin...one pin per line\n");
     for (uint32_t i = 0; i < num_iomuxc_configs; i += 1) {
-        LOG_DRIVER("mux reg: 0x%x = %u, input reg: 0x%x = %u, pad conf reg: 0x%x = %u. ", 
-                    iomuxc_configs[i].mux_reg, iomuxc_configs[i].mux_val, 
-                    iomuxc_configs[i].input_reg, iomuxc_configs[i].input_val, 
+        LOG_DRIVER("mux reg: 0x%x = %u, input reg: 0x%x = %u, pad conf reg: 0x%x = %u. ",
+                    iomuxc_configs[i].mux_reg, iomuxc_configs[i].mux_val,
+                    iomuxc_configs[i].input_reg, iomuxc_configs[i].input_val,
                     iomuxc_configs[i].conf_reg, iomuxc_configs[i].pad_setting
         );
 
@@ -261,8 +261,8 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo) {
     case SDDF_PINCTRL_READ_MUX: {
         if (microkit_msginfo_get_count(msginfo) != READ_MUX_REQ_NUM_ARGS) {
             LOG_DRIVER_ERR(
-                "Read mux PPC from channel %u does not have the correct number of arguments %lu != %d\n", 
-                ch, 
+                "Read mux PPC from channel %u does not have the correct number of arguments %lu != %d\n",
+                ch,
                 microkit_msginfo_get_count(msginfo), READ_MUX_REQ_NUM_ARGS
             );
             return microkit_msginfo_new(SDDF_PINCTRL_INVALID_ARGS, 0);

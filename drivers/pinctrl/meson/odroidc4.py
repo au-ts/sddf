@@ -299,7 +299,7 @@ port_to_pad = {
     "pwm_f_x" : pad_to_idx["GPIOX_7"],
     "pwm_f_h" : pad_to_idx["GPIOH_5"],
 
-    # cec_ao 
+    # cec_ao
     "cec_ao_a_h" : pad_to_idx["GPIOH_3"],
     "cec_ao_b_h" : pad_to_idx["GPIOH_3"],
 
@@ -322,7 +322,7 @@ port_to_pad = {
     "bt565_a_din6" : pad_to_idx["GPIOZ_10"],
     "bt565_a_din7" : pad_to_idx["GPIOZ_11"],
 
-    # tsin_a 
+    # tsin_a
     "tsin_a_valid" : pad_to_idx["GPIOX_2"],
     "tsin_a_sop"   : pad_to_idx["GPIOX_1"],
     "tsin_a_din0"  : pad_to_idx["GPIOX_0"],
@@ -888,13 +888,13 @@ function_to_group = {
               "nand_ce0", "nand_ale", "nand_cle",
               "nand_wen_clk", "nand_ren_wr", "nand_rb0",
               "emmc_nand_ds", "nand_ce1" ],
-    
+
     "nor": [ "nor_d", "nor_q", "nor_c", "nor_cs",
              "nor_hold", "nor_wp" ],
-    
+
     "sdio": [ "sdio_d0", "sdio_d1", "sdio_d2", "sdio_d3",
               "sdio_cmd", "sdio_clk", "sdio_dummy" ],
-    
+
     "sdcard": [ "sdcard_d0_c", "sdcard_d1_c", "sdcard_d2_c", "sdcard_d3_c",
                 "sdcard_clk_c", "sdcard_cmd_c",
                 "sdcard_d0_z", "sdcard_d1_z", "sdcard_d2_z", "sdcard_d3_z",
@@ -902,7 +902,7 @@ function_to_group = {
 
     "spi0": [ "spi0_mosi_c", "spi0_miso_c", "spi0_ss0_c", "spi0_clk_c",
               "spi0_mosi_x", "spi0_miso_x", "spi0_ss0_x", "spi0_clk_x" ],
-    
+
     "spi1": [ "spi1_mosi", "spi1_miso", "spi1_ss0", "spi1_clk" ],
 
     "i2c0": [ "i2c0_sda_c", "i2c0_sck_c",
@@ -912,13 +912,13 @@ function_to_group = {
     "i2c1": [ "i2c1_sda_x", "i2c1_sck_x",
               "i2c1_sda_h2", "i2c1_sck_h3",
               "i2c1_sda_h6", "i2c1_sck_h7" ],
-    
+
     "i2c2": [ "i2c2_sda_x", "i2c2_sck_x",
               "i2c2_sda_z", "i2c2_sck_z" ],
-    
+
     "i2c3": [ "i2c3_sda_h", "i2c3_sck_h",
               "i2c3_sda_a", "i2c3_sck_a" ],
-    
+
     "uart_a": [ "uart_a_tx", "uart_a_rx", "uart_a_cts", "uart_a_rts" ],
 
     "uart_b": [ "uart_b_tx", "uart_b_rx" ],
@@ -937,7 +937,7 @@ function_to_group = {
              "eth_txd0", "eth_txd1", "eth_txen", "eth_mdc",
              "eth_rxd0", "eth_rxd1", "eth_rx_dv", "eth_mdio",
              "eth_link_led", "eth_act_led" ],
-    
+
     "pwm_a": [ "pwm_a" ],
 
     "pwm_b": [ "pwm_b_x7", "pwm_b_x19" ],
@@ -965,7 +965,7 @@ function_to_group = {
                 "tsin_b_valid_z", "tsin_b_sop_z", "tsin_b_din0_z", "tsin_b_clk_z",
                 "tsin_b_fail", "tsin_b_din1", "tsin_b_din2", "tsin_b_din3",
                 "tsin_b_din4", "tsin_b_din5", "tsin_b_din6", "tsin_b_din7" ],
-    
+
     "hdmitx": [ "hdmitx_sda", "hdmitx_sck", "hdmitx_hpd_in" ],
 
     "pdm": [ "pdm_din0_c", "pdm_din1_c", "pdm_din2_c", "pdm_din3_c",
@@ -1021,7 +1021,7 @@ ao_function_to_group = {
 
     "i2c_ao": ["i2c_ao_sck", "i2c_ao_sda",
                 "i2c_ao_sck_e", "i2c_ao_sda_e" ],
-    
+
     "i2c_ao_slave": [ "i2c_ao_slave_sck", "i2c_ao_slave_sda" ],
 
     "remote_ao_input": [ "remote_ao_input" ],
@@ -1076,7 +1076,7 @@ pinmux_registers = [
         "offset": 0xB0 * 4,
         "first_bit": 0,
         "bits_per_pin": 4,
-        "value": 0 
+        "value": 0
     },
     {
         # PERIPHS_PIN_MUX_1
@@ -1085,7 +1085,7 @@ pinmux_registers = [
         "offset": 0xB1 * 4,
         "first_bit": 0,
         "bits_per_pin": 4,
-        "value": 0 
+        "value": 0
     },
     {
         # PERIPHS_PIN_MUX_3
@@ -1094,7 +1094,7 @@ pinmux_registers = [
         "offset": 0xB3 * 4,
         "first_bit": 0,
         "bits_per_pin": 4,
-        "value": 0 
+        "value": 0
     },
     {
         # PERIPHS_PIN_MUX_4
@@ -1103,7 +1103,7 @@ pinmux_registers = [
         "offset": 0xB4 * 4,
         "first_bit": 0,
         "bits_per_pin": 4,
-        "value": 0 
+        "value": 0
     },
     {
         # PERIPHS_PIN_MUX_5
@@ -1112,7 +1112,7 @@ pinmux_registers = [
         "offset": 0xB5 * 4,
         "first_bit": 0,
         "bits_per_pin": 4,
-        "value": 0 
+        "value": 0
     },
     {
         # PERIPHS_PIN_MUX_6
@@ -1121,8 +1121,8 @@ pinmux_registers = [
         "offset": 0xB6 * 4,
         "first_bit": 0,
         "bits_per_pin": 4,
-        "value": 0 
-    },    
+        "value": 0
+    },
     {
         # PERIPHS_PIN_MUX_7
         "first_pad": pad_to_idx["GPIOZ_8"],
@@ -1130,7 +1130,7 @@ pinmux_registers = [
         "offset": 0xB7 * 4,
         "first_bit": 0,
         "bits_per_pin": 4,
-        "value": 0 
+        "value": 0
     },
     {
         # PERIPHS_PIN_MUX_9
@@ -1139,7 +1139,7 @@ pinmux_registers = [
         "offset": 0xB9 * 4,
         "first_bit": 0,
         "bits_per_pin": 4,
-        "value": 0 
+        "value": 0
     },
     {
         # PERIPHS_PIN_MUX_B
@@ -1148,7 +1148,7 @@ pinmux_registers = [
         "offset": 0xBB * 4,
         "first_bit": 0,
         "bits_per_pin": 4,
-        "value": 0 
+        "value": 0
     },
     {
         # PERIPHS_PIN_MUX_C
@@ -1157,7 +1157,7 @@ pinmux_registers = [
         "offset": 0xBC * 4,
         "first_bit": 0,
         "bits_per_pin": 4,
-        "value": 0 
+        "value": 0
     },
     {
         # PERIPHS_PIN_MUX_D
@@ -1166,7 +1166,7 @@ pinmux_registers = [
         "offset": 0xBD * 4,
         "first_bit": 0,
         "bits_per_pin": 4,
-        "value": 0 
+        "value": 0
     },
     {
         # PERIPHS_PIN_MUX_E
@@ -1175,7 +1175,7 @@ pinmux_registers = [
         "offset": 0xBE * 4,
         "first_bit": 0,
         "bits_per_pin": 4,
-        "value": 0 
+        "value": 0
     },
 ]
 
@@ -1462,7 +1462,7 @@ ao_drive_strength_registers = [
 ]
 ao_bias_enable_registers = [
     # These two pseudo registers are the same register,
-    # which need to be OR'ed together because their effective bits 
+    # which need to be OR'ed together because their effective bits
     # are not contiguous like other registers...
     {
         # AO_RTI_PULL_UP_EN_REG _A
