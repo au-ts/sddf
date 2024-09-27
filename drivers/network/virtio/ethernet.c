@@ -301,7 +301,7 @@ static void handle_irq()
     }
 
     if (irq_status & VIRTIO_MMIO_IRQ_CONFIG) {
-        LOG_DRIVER_ERR("unexpected change in configuration\n");
+        LOG_DRIVER_ERR("ETH|ERROR: unexpected change in configuration %u\n", irq_status);
     }
 }
 

@@ -212,7 +212,7 @@ static void handle_irq(void)
             rx_provide();
         }
         if (e & NETIRQ_EBERR) {
-            sddf_dprintf("ETH|ERROR: System bus/uDMA\n");
+            sddf_dprintf("ETH|ERROR: System bus/uDMA %u\n", e);
         }
         e = eth->eir & IRQ_MASK;
         eth->eir = e;
