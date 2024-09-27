@@ -198,7 +198,7 @@ void nvme_controller_init()
     nvme_controller->cc &= ~NVME_CC_MPS_MASK;
     /* nb: host page size. TODO: do we have a define for this? */
     /* n.b.: page size = 2 ^ (12 + MPS)*/
-    nvme_controller->cc |= (4096 >> 12) << NVME_CC_MPS_SHIFT;
+    nvme_controller->cc |= (PAGE_SIZE >> 12) << NVME_CC_MPS_SHIFT;
 
     // 5. Enable the controller
     nvme_controller->cc |= NVME_CC_EN;
