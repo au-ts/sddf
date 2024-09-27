@@ -1220,10 +1220,10 @@ drive_strength_registers = [
     },
     {
         # PAD_DS_REG3A
-        "first_pad": pad_to_idx["GPIOH_4"],
-        "last_pad": pad_to_idx["GPIOH_7"],
+        "first_pad": pad_to_idx["GPIOH_0"],
+        "last_pad": pad_to_idx["GPIOH_8"],
         "offset": 0xD4 * 4,
-        "first_bit": 8,
+        "first_bit": 0,
         "bits_per_pin": 2,
         "value": 0xAAAA55AA
     },
@@ -1277,10 +1277,10 @@ bias_enable_registers = [
     },
     {
         # PAD_PULL_UP_EN_REG3
-        "first_pad": pad_to_idx["GPIOH_4"],
-        "last_pad": pad_to_idx["GPIOH_7"],
+        "first_pad": pad_to_idx["GPIOH_0"],
+        "last_pad": pad_to_idx["GPIOH_8"],
         "offset": 0x4B * 4,
-        "first_bit": 4,
+        "first_bit": 0,
         "bits_per_pin": 1,
         "value": 0x000001FF
     },
@@ -1334,10 +1334,10 @@ pull_up_registers = [
     },
     {
         # PAD_PULL_UP_REG3
-        "first_pad": pad_to_idx["GPIOH_4"],
-        "last_pad": pad_to_idx["GPIOH_7"],
+        "first_pad": pad_to_idx["GPIOH_0"],
+        "last_pad": pad_to_idx["GPIOH_8"],
         "offset": 0x3D * 4,
-        "first_bit": 4,
+        "first_bit": 0,
         "bits_per_pin": 1,
         "value": 0x0000010F
     },
