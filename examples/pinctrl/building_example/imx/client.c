@@ -16,7 +16,8 @@
 
 uint64_t echo_number = 0;
 
-void init(void) {
+void init(void)
+{
     sddf_printf_("client begin testing pinmux driver args validation:\n");
 
     bool all_tests_passed = true;
@@ -27,8 +28,8 @@ void init(void) {
         sddf_printf_("NULL offset...PASS\n");
     }
 
-    if (sddf_pinctrl_read_mux(PINCTRL_CH, 0x4, PINCTRL_CHIP_IOMUXC, 0x0) != SDDF_PINCTRL_INVALID_ARGS ||
-        sddf_pinctrl_read_mux(PINCTRL_CH, 0x10, PINCTRL_CHIP_IOMUXC, 0x0) != SDDF_PINCTRL_INVALID_ARGS) {
+    if (sddf_pinctrl_read_mux(PINCTRL_CH, 0x4, PINCTRL_CHIP_IOMUXC, 0x0) != SDDF_PINCTRL_INVALID_ARGS
+        || sddf_pinctrl_read_mux(PINCTRL_CH, 0x10, PINCTRL_CHIP_IOMUXC, 0x0) != SDDF_PINCTRL_INVALID_ARGS) {
         sddf_printf_("mux underflow offset...FAIL\n");
         all_tests_passed = false;
     } else {
@@ -39,61 +40,61 @@ void init(void) {
     if (sddf_pinctrl_read_mux(PINCTRL_CH, 0x534, PINCTRL_CHIP_IOMUXC, 0x0) != SDDF_PINCTRL_INVALID_ARGS) {
 #endif
 #ifdef SOC_IMX8MM_EVK
-    if (sddf_pinctrl_read_mux(PINCTRL_CH, 0x54c, PINCTRL_CHIP_IOMUXC, 0x0) != SDDF_PINCTRL_INVALID_ARGS) {
+        if (sddf_pinctrl_read_mux(PINCTRL_CH, 0x54c, PINCTRL_CHIP_IOMUXC, 0x0) != SDDF_PINCTRL_INVALID_ARGS) {
 #endif
-        sddf_printf_("mux overflow offset...FAIL\n");
-        all_tests_passed = false;
-    } else {
-        sddf_printf_("mux overflow offset...PASS\n");
-    }
+            sddf_printf_("mux overflow offset...FAIL\n");
+            all_tests_passed = false;
+        } else {
+            sddf_printf_("mux overflow offset...PASS\n");
+        }
 
-    if (sddf_pinctrl_read_mux(PINCTRL_CH, 0x11d, PINCTRL_CHIP_IOMUXC, 0x0) != SDDF_PINCTRL_INVALID_ARGS ||
-        sddf_pinctrl_read_mux(PINCTRL_CH, 0x201, PINCTRL_CHIP_IOMUXC, 0x0) != SDDF_PINCTRL_INVALID_ARGS
-    ) {
-        sddf_printf_("unaligned offset...FAIL\n");
-        all_tests_passed = false;
-    } else {
-        sddf_printf_("unaligned offset...PASS\n");
-    }
+        if (sddf_pinctrl_read_mux(PINCTRL_CH, 0x11d, PINCTRL_CHIP_IOMUXC, 0x0) != SDDF_PINCTRL_INVALID_ARGS
+            || sddf_pinctrl_read_mux(PINCTRL_CH, 0x201, PINCTRL_CHIP_IOMUXC, 0x0) != SDDF_PINCTRL_INVALID_ARGS) {
+            sddf_printf_("unaligned offset...FAIL\n");
+            all_tests_passed = false;
+        } else {
+            sddf_printf_("unaligned offset...PASS\n");
+        }
 
-    if (sddf_pinctrl_read_mux(PINCTRL_CH, 0xfffc, PINCTRL_CHIP_IOMUXC, 0x0) != SDDF_PINCTRL_INVALID_ARGS) {
-        sddf_printf_("gpr underflow offset...FAIL\n");
-        all_tests_passed = false;
-    } else {
-        sddf_printf_("gpr underflow offset...PASS\n");
-    }
+        if (sddf_pinctrl_read_mux(PINCTRL_CH, 0xfffc, PINCTRL_CHIP_IOMUXC, 0x0) != SDDF_PINCTRL_INVALID_ARGS) {
+            sddf_printf_("gpr underflow offset...FAIL\n");
+            all_tests_passed = false;
+        } else {
+            sddf_printf_("gpr underflow offset...PASS\n");
+        }
 
-    if (sddf_pinctrl_read_mux(PINCTRL_CH, 0x100c0, PINCTRL_CHIP_IOMUXC, 0x0) != SDDF_PINCTRL_INVALID_ARGS) {
-        sddf_printf_("gpr overflow offset...FAIL\n");
-        all_tests_passed = false;
-    } else {
-        sddf_printf_("gpr overflow offset...PASS\n");
-    }
+        if (sddf_pinctrl_read_mux(PINCTRL_CH, 0x100c0, PINCTRL_CHIP_IOMUXC, 0x0) != SDDF_PINCTRL_INVALID_ARGS) {
+            sddf_printf_("gpr overflow offset...FAIL\n");
+            all_tests_passed = false;
+        } else {
+            sddf_printf_("gpr overflow offset...PASS\n");
+        }
 
-    uint32_t discard;
-    if (sddf_pinctrl_read_mux(PINCTRL_CH, 0x14, PINCTRL_CHIP_IOMUXC, &discard) != SDDF_PINCTRL_SUCCESS) {
-        sddf_printf_("mux read first register...FAIL\n");
-        all_tests_passed = false;
-    } else {
-        sddf_printf_("mux read first register...PASS\n");
-    }
+        uint32_t discard;
+        if (sddf_pinctrl_read_mux(PINCTRL_CH, 0x14, PINCTRL_CHIP_IOMUXC, &discard) != SDDF_PINCTRL_SUCCESS) {
+            sddf_printf_("mux read first register...FAIL\n");
+            all_tests_passed = false;
+        } else {
+            sddf_printf_("mux read first register...PASS\n");
+        }
 
-    if (!all_tests_passed) {
-        sddf_printf_("some pinmux driver arguments validation tests failed...aborting\n");
-        while (true) {};
-    } else {
-        sddf_printf_("all pinmux driver arguments validation tests passed...continuing\n");
-    }
-
-    sddf_printf_("client hello #%lu\n", echo_number);
-    sddf_timer_set_timeout(1, NS_IN_S);
-}
-
-void notified(microkit_channel ch) {
-    if (ch == TIMER_CH) {
-        echo_number += 1;
+        if (!all_tests_passed) {
+            sddf_printf_("some pinmux driver arguments validation tests failed...aborting\n");
+            while (true) {};
+        } else {
+            sddf_printf_("all pinmux driver arguments validation tests passed...continuing\n");
+        }
 
         sddf_printf_("client hello #%lu\n", echo_number);
         sddf_timer_set_timeout(1, NS_IN_S);
     }
-}
+
+    void notified(microkit_channel ch)
+    {
+        if (ch == TIMER_CH) {
+            echo_number += 1;
+
+            sddf_printf_("client hello #%lu\n", echo_number);
+            sddf_timer_set_timeout(1, NS_IN_S);
+        }
+    }
