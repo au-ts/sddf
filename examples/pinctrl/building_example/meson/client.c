@@ -16,7 +16,8 @@
 
 uint64_t echo_number = 0;
 
-void init(void) {
+void init(void)
+{
     sddf_printf_("client begin testing pinmux driver:\n");
 
     bool all_tests_passed = true;
@@ -61,9 +62,8 @@ void init(void) {
         sddf_printf_("periphs overflow offset...PASS\n");
     }
 
-    if (sddf_pinctrl_read_mux(PINCTRL_CH, 0x15, PINCTRL_CHIP_AO, 0x0) != SDDF_PINCTRL_INVALID_ARGS ||
-        sddf_pinctrl_read_mux(PINCTRL_CH, 0x353, PINCTRL_CHIP_PERIPHERALS, 0x0) != SDDF_PINCTRL_INVALID_ARGS
-    ) {
+    if (sddf_pinctrl_read_mux(PINCTRL_CH, 0x15, PINCTRL_CHIP_AO, 0x0) != SDDF_PINCTRL_INVALID_ARGS
+        || sddf_pinctrl_read_mux(PINCTRL_CH, 0x353, PINCTRL_CHIP_PERIPHERALS, 0x0) != SDDF_PINCTRL_INVALID_ARGS) {
         sddf_printf_("unaligned offset...FAIL\n");
         all_tests_passed = false;
     } else {
@@ -106,7 +106,8 @@ void init(void) {
     sddf_timer_set_timeout(1, NS_IN_S);
 }
 
-void notified(microkit_channel ch) {
+void notified(microkit_channel ch)
+{
     if (ch == TIMER_CH) {
         echo_number += 1;
 

@@ -10,7 +10,4 @@
 // On imx, we dont differentiate between the normal and GPR registers as they are
 // contiguous in phys and virt memory.
 
-typedef enum {
-    PINCTRL_CHIP_IOMUXC,
-    PINCTRL_NUM_CHIPS
-} sddf_pinctrl_chip_idx_t;
+typedef enum { PINCTRL_CHIP_IOMUXC, PINCTRL_NUM_CHIPS } sddf_pinctrl_chip_idx_t;

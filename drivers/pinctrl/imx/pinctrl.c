@@ -81,12 +81,15 @@ typedef struct iomuxc_config {
 extern iomuxc_config_t iomuxc_configs[];
 extern const uint32_t num_iomuxc_configs;
 
-bool check_offset_bound(uint32_t offset) {
-    if (offset >= IOMUXC_DEVICE_BASE_PAD && offset <= IOMUXC_DEVICE_BASE_PAD + IOMUXC_DEVICE_EFFECTIVE_SIZE - BYTES_IN_32_BITS) {
+bool check_offset_bound(uint32_t offset)
+{
+    if (offset >= IOMUXC_DEVICE_BASE_PAD
+        && offset <= IOMUXC_DEVICE_BASE_PAD + IOMUXC_DEVICE_EFFECTIVE_SIZE - BYTES_IN_32_BITS) {
         // Offset valid in iomuxc_dev_base
         return true;
     } else {
-        if (offset >= IOMUXC_DEVICE_SIZE && offset <= IOMUXC_DEVICE_SIZE + IOMUXC_GPR_EFFECTIVE_SIZE - BYTES_IN_32_BITS) {
+        if (offset >= IOMUXC_DEVICE_SIZE
+            && offset <= IOMUXC_DEVICE_SIZE + IOMUXC_GPR_EFFECTIVE_SIZE - BYTES_IN_32_BITS) {
             // Offset valid in iomuxc_gpr_base
             return true;
         }
@@ -96,7 +99,8 @@ bool check_offset_bound(uint32_t offset) {
     return false;
 }
 
-bool check_offset_4_bytes_aligned(uint32_t offset) {
+bool check_offset_4_bytes_aligned(uint32_t offset)
+{
     if (offset % 4 == 0) {
         return true;
     } else {
@@ -105,12 +109,13 @@ bool check_offset_4_bytes_aligned(uint32_t offset) {
     }
 }
 
-bool read_mux(uint32_t offset, uint32_t *ret) {
+bool read_mux(uint32_t offset, uint32_t *ret)
+{
     if (!check_offset_bound(offset) || !check_offset_4_bytes_aligned(offset)) {
         return false;
     }
 
-    volatile uint32_t *mux_reg_vaddr = (uint32_t *) (iomuxc_dev_base + (uintptr_t) offset);
+    volatile uint32_t *mux_reg_vaddr = (uint32_t *)(iomuxc_dev_base + (uintptr_t)offset);
 
     asm volatile("" : : : "memory");
     *ret = *mux_reg_vaddr;
@@ -119,12 +124,13 @@ bool read_mux(uint32_t offset, uint32_t *ret) {
     return true;
 }
 
-bool set_mux(uint32_t offset, uint32_t val) {
+bool set_mux(uint32_t offset, uint32_t val)
+{
     if (!check_offset_bound(offset) || !check_offset_4_bytes_aligned(offset)) {
         return false;
     }
 
-    volatile uint32_t *mux_reg_vaddr = (uint32_t *) (iomuxc_dev_base + (uintptr_t) offset);
+    volatile uint32_t *mux_reg_vaddr = (uint32_t *)(iomuxc_dev_base + (uintptr_t)offset);
 
     asm volatile("" : : : "memory");
     *mux_reg_vaddr = val;
@@ -139,15 +145,14 @@ bool set_mux(uint32_t offset, uint32_t val) {
     return true;
 }
 
-void debug_dts_print() {
+void debug_dts_print()
+{
     LOG_DRIVER("nums of config is %u\n", num_iomuxc_configs);
     LOG_DRIVER("data dump begin...one pin per line\n");
     for (uint32_t i = 0; i < num_iomuxc_configs; i += 1) {
-        LOG_DRIVER("mux reg: 0x%x = %u, input reg: 0x%x = %u, pad conf reg: 0x%x = %u. ",
-                    iomuxc_configs[i].mux_reg, iomuxc_configs[i].mux_val,
-                    iomuxc_configs[i].input_reg, iomuxc_configs[i].input_val,
-                    iomuxc_configs[i].conf_reg, iomuxc_configs[i].pad_setting
-        );
+        LOG_DRIVER("mux reg: 0x%x = %u, input reg: 0x%x = %u, pad conf reg: 0x%x = %u. ", iomuxc_configs[i].mux_reg,
+                   iomuxc_configs[i].mux_val, iomuxc_configs[i].input_reg, iomuxc_configs[i].input_val,
+                   iomuxc_configs[i].conf_reg, iomuxc_configs[i].pad_setting);
 
         if (iomuxc_configs[i].pad_setting & PAD_SION) {
             LOG_DRIVER("Software Input On Field.\n");
@@ -163,7 +168,8 @@ void debug_dts_print() {
     }
 }
 
-void process_dts_values_to_register_values() {
+void process_dts_values_to_register_values()
+{
     for (uint32_t i = 0; i < num_iomuxc_configs; i += 1) {
         // For pins that have SION bit set in "pad_setting", flip it in "mux_val" and clear it from "pad_setting"
         if (iomuxc_configs[i].pad_setting & PAD_SION) {
@@ -214,7 +220,8 @@ void process_dts_values_to_register_values() {
     }
 }
 
-void reset_pinmux() {
+void reset_pinmux()
+{
     for (uint32_t i = 0; i < num_iomuxc_configs; i += 1) {
         // Write mux settings
         if (!set_mux(iomuxc_configs[i].mux_reg, iomuxc_configs[i].mux_val)) {
@@ -237,10 +244,12 @@ void reset_pinmux() {
     }
 }
 
-void init(void) {
+void init(void)
+{
     LOG_DRIVER("starting\n");
     if (iomuxc_gpr_base != iomuxc_dev_base + IOMUXC_DEVICE_SIZE) {
-        LOG_DRIVER_ERR("the GPR region must be mapped contiguously after the normal mux registers region in virtual memory\n");
+        LOG_DRIVER_ERR(
+            "the GPR region must be mapped contiguously after the normal mux registers region in virtual memory\n");
         while (true) {};
     }
 
@@ -251,29 +260,28 @@ void init(void) {
     LOG_DRIVER("pinctrl device initialisation done\n");
 }
 
-void notified(microkit_channel ch) {
+void notified(microkit_channel ch)
+{
     LOG_DRIVER_ERR("received ntfn on unexpected channel %u\n", ch);
 }
 
-microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo) {
+microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
+{
     switch (microkit_msginfo_get_label(msginfo)) {
 
     case SDDF_PINCTRL_READ_MUX: {
         if (microkit_msginfo_get_count(msginfo) != READ_MUX_REQ_NUM_ARGS) {
-            LOG_DRIVER_ERR(
-                "Read mux PPC from channel %u does not have the correct number of arguments %lu != %d\n",
-                ch,
-                microkit_msginfo_get_count(msginfo), READ_MUX_REQ_NUM_ARGS
-            );
+            LOG_DRIVER_ERR("Read mux PPC from channel %u does not have the correct number of arguments %lu != %d\n", ch,
+                           microkit_msginfo_get_count(msginfo), READ_MUX_REQ_NUM_ARGS);
             return microkit_msginfo_new(SDDF_PINCTRL_INVALID_ARGS, 0);
         }
 
-        sddf_pinctrl_chip_idx_t chip = (sddf_pinctrl_chip_idx_t) microkit_mr_get(READ_MUX_REQ_CHIP_IDX);
+        sddf_pinctrl_chip_idx_t chip = (sddf_pinctrl_chip_idx_t)microkit_mr_get(READ_MUX_REQ_CHIP_IDX);
         if (chip >= PINCTRL_NUM_CHIPS) {
             LOG_DRIVER_ERR("Read mux PPC from channel %u gave an unknown chip index %d\n", ch, chip);
         }
 
-        uint32_t reg_offset = (uint32_t) microkit_mr_get(READ_MUX_REQ_OFFSET);
+        uint32_t reg_offset = (uint32_t)microkit_mr_get(READ_MUX_REQ_OFFSET);
         uint32_t reg_val;
 
         if (read_mux(reg_offset, &reg_val)) {
