@@ -265,18 +265,19 @@ fn addPcieDriver(
     optimize: std.builtin.OptimizeMode,
 ) *std.Build.Step.Compile {
     const driver = addPd(b, .{
-        .name = b.fmt("driver_pcie_{s}.elf", .{ @tagName(class) }),
+        .name = b.fmt("driver_pcie_{s}.elf", .{@tagName(class)}),
         .target = target,
         .optimize = optimize,
         .strip = false,
     });
-    const source = b.fmt("drivers/pcie/{s}/pcie.c", .{ @tagName(class) });
-    driver.addCSourceFile(.{
-        .file = b.path(source),
-        .flags = &.{ "-Werror" }
-    });
-    driver.addIncludePath(b.path(b.fmt("drivers/pcie/{s}/", .{ @tagName(class) })));
+    const source = b.fmt("drivers/pcie/{s}/pcie.c", .{@tagName(class)});
+    driver.addCSourceFile(.{ .file = b.path(source), .flags = &.{"-Werror"} });
+    driver.addIncludePath(b.path(b.fmt("drivers/pcie/{s}/", .{@tagName(class)})));
     driver.addIncludePath(b.path("include"));
+
+    driver.addCSourceFile(.{ .file = b.path("drivers/nvme/nvme.c"), .flags = &.{"-Werror"} });
+    driver.addIncludePath(b.path("drivers/nvme/"));
+
     driver.linkLibrary(util);
 
     return driver;

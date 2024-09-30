@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#include <sddf/util/util.h>
+
 /*
     References:
 
