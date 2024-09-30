@@ -23,10 +23,12 @@
         <map mr="nvme_regs" vaddr="0x3000_0000" perms="rw" cached="false" setvar_vaddr="nvme_controller" />
         <!-- TODO: cached? -->
         <map mr="nvme_asq"  vaddr="0x3001_0000" perms="rw" cached="false" setvar_vaddr="nvme_asq_region" />
+        <setvar symbol="nvme_asq_region_paddr" region_paddr="nvme_asq" />
         <map mr="nvme_acq"  vaddr="0x3002_0000" perms="rw" cached="false" setvar_vaddr="nvme_acq_region" />
+        <setvar symbol="nvme_acq_region_paddr" region_paddr="nvme_acq" />
 
-         <map mr="data_region" vaddr="0x3003_0000" perms="rw" cached="false" setvar_vaddr="data_region" />
-         <setvar symbol="data_region_paddr" region_paddr="data_region" />
+        <map mr="data_region" vaddr="0x3003_0000" perms="rw" cached="false" setvar_vaddr="data_region" />
+        <setvar symbol="data_region_paddr" region_paddr="data_region" />
 
         <program_image path="pcie_driver.elf" />
     </protection_domain>
