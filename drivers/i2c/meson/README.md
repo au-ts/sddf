@@ -17,7 +17,7 @@ The initial scope of this driver is to supply an interface to the EE domain i2c 
 
 All interfaces can operate both in controller (formerly master) and target (formerly slave) mode. We choose to only expose two interfaces as m2 and m3 since the others are not available via external GPIO on the ODROID C4. We chose to only allow the interfaces to operate in master mode as well.
 
-Initially, we effectively ignore the AO domain option for homogeneity (we also will never run this code with EE disabled). This driver is intended to operate the demo system for the [KISS OS](https://github.com/au-ts/kiss) where it will operate the touchscreen and NFC devices.
+Initially, we effectively ignore the AO domain option for homogeneity (we also will never run this code with EE disabled). This driver is intended to operate the demo system for [LionsOS](https://github.com/au-ts/lionsos) where it will operate the touchscreen and NFC devices.
 
 ## Design
 
