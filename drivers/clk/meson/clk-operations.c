@@ -73,6 +73,11 @@ static inline int regmap_mux_read_bits(uint32_t offset, uint8_t shift, uint32_t 
     return reg_val;
 }
 
+static inline uint32_t meson_parm_read(struct parm parm)
+{
+    return regmap_read_bits(parm.reg_off, parm.shift, parm.width);
+}
+
 static int clk_regmap_gate_enable(struct clk *clk)
 {
     struct clk_gate_data *data = (struct clk_gate_data *)(clk->data);
@@ -252,6 +257,27 @@ const struct clk_ops clk_fixed_factor_ops = {
     /* .recalc_accuracy = clk_factor_recalc_accuracy, */
 };
 
+static void meson_clk_pll_init(struct clk *clk)
+{
+    struct meson_clk_pll_data *data = (struct meson_clk_pll_data *)(clk->data);
+    if ((data->flags & CLK_MESON_PLL_NOINIT_ENABLED) && clk->hw.init->ops->is_enabled(clk))
+        return ;
+
+    if (data->init_count) {
+        /* Set the reset bit */
+        regmap_update_bits(data->rst.reg_off, data->rst.shift, data->rst.width, 1);
+
+        int i;
+        const struct reg_sequence *init_regs = data->init_regs;
+        for (i = 0; i < data->init_count; i++) {
+            reg_write(init_regs[i].reg, init_regs[i].def);
+        }
+
+        /* Clear the reset bit */
+        regmap_update_bits(data->rst.reg_off, data->rst.shift, data->rst.width, 0);
+    }
+}
+
 static unsigned long meson_clk_pll_recalc_rate(const struct clk *clk,
                         unsigned long parent_rate)
 {
@@ -278,12 +304,27 @@ static unsigned long meson_clk_pll_recalc_rate(const struct clk *clk,
     return DIV_ROUND_UP_ULL(rate, n);
 }
 
+static int meson_clk_pll_is_enabled(struct clk *clk)
+{
+    struct meson_clk_pll_data *data = (struct meson_clk_pll_data *)(clk->data);
+
+    if (data->rst.width && meson_parm_read(data->rst)) {
+        return 0;
+    }
+
+    if (!meson_parm_read(data->en) || !meson_parm_read(data->l)) {
+        return 0;
+    }
+
+    return 1;
+}
+
 const struct clk_ops meson_clk_pll_ops = {
-    /* .init           = meson_clk_pll_init, */
+    .init           = meson_clk_pll_init,
     .recalc_rate    = meson_clk_pll_recalc_rate,
     /* .determine_rate = meson_clk_pll_determine_rate, */
     /* .set_rate       = meson_clk_pll_set_rate, */
-    /* .is_enabled     = meson_clk_pll_is_enabled, */
+    .is_enabled     = meson_clk_pll_is_enabled,
     /* .enable         = meson_clk_pll_enable, */
     /* .disable        = meson_clk_pll_disable */
 };
