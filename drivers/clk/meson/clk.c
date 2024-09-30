@@ -622,6 +622,9 @@ static MESON_GATE(g12a_fclk_div5, HHI_FIX_PLL_CNTL1, 22, 0, { &g12a_fclk_div5_di
 static MESON_FIXED_FACTOR(g12a_fclk_div7_div, 1, 7, { &g12a_fixed_pll }, 1, 0);
 static MESON_GATE(g12a_fclk_div7, HHI_FIX_PLL_CNTL1, 23, 0, { &g12a_fclk_div5_div }, 1, 0);
 
+static MESON_FIXED_FACTOR(g12a_fclk_div2p5_div, 1, 5, { &g12a_fixed_pll_dco }, 1, 0);
+static MESON_GATE(g12a_fclk_div2p5, HHI_FIX_PLL_CNTL1, 25, 0, { &g12a_fclk_div2p5_div }, 1, 0);
+
 static const struct clk_parent_data g12a_hdmi_parent_data[] = {
     { .fw_name = "xtal", },
     { .clk = &g12a_fclk_div4 },
@@ -778,7 +781,7 @@ static struct clk *sm1_clks[] = {
     [CLKID_FCLK_DIV4]        = &g12a_fclk_div4,
     [CLKID_FCLK_DIV5]        = &g12a_fclk_div5,
     [CLKID_FCLK_DIV7]        = &g12a_fclk_div7,
-    /* [CLKID_FCLK_DIV2P5]        = &g12a_fclk_div2p5, */
+    [CLKID_FCLK_DIV2P5]        = &g12a_fclk_div2p5,
     [CLKID_GP0_PLL]            = &g12a_gp0_pll,
     [CLKID_MPEG_SEL]        = &g12a_mpeg_clk_sel,
     [CLKID_MPEG_DIV]        = &g12a_mpeg_clk_div,
@@ -850,7 +853,7 @@ static struct clk *sm1_clks[] = {
     [CLKID_FCLK_DIV4_DIV]        = &g12a_fclk_div4_div,
     [CLKID_FCLK_DIV5_DIV]        = &g12a_fclk_div5_div,
     [CLKID_FCLK_DIV7_DIV]        = &g12a_fclk_div7_div,
-    /* [CLKID_FCLK_DIV2P5_DIV]        = &g12a_fclk_div2p5_div, */
+    [CLKID_FCLK_DIV2P5_DIV]        = &g12a_fclk_div2p5_div,
     [CLKID_HIFI_PLL]        = &g12a_hifi_pll,
     [CLKID_VCLK2_VENCI0]        = &g12a_vclk2_venci0,
     [CLKID_VCLK2_VENCI1]        = &g12a_vclk2_venci1,
