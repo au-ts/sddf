@@ -1,4 +1,5 @@
 #include "nvme.h"
+#include "nvme_queue.h"
 
 #include <sddf/util/printf.h>
 
@@ -90,45 +91,36 @@ void nvme_controller_init()
 
     // 7. Send the Identify Controller command (Identify with CNS = 01h)
     uint8_t DSTRD = (nvme_controller->cap & NVME_CAP_DSTRD_MASK) >> NVME_CAP_DSTRD_SHIFT;
-    uint16_t sq_tail = nvme_sqytdbl_read(nvme_controller, DSTRD, 0);
-    uint16_t cq_head = nvme_cqyhdbl_read(nvme_controller, DSTRD, 0);
-    sddf_dprintf("admin tail: %u\n", sq_tail);
-    sddf_dprintf("admin head: %u\n", cq_head);
 
     // Identify Command (5.1.13)
-    nvme_asq_region[sq_tail] = (nvme_submission_queue_entry_t){
+    nvme_queue_submit(nvme_asq_region, nvme_controller, DSTRD, &(nvme_submission_queue_entry_t){
         .cdw0 = /* CID */ (0b1111 << 16) | /* PSDT */ 0 | /* FUSE */ 0 | /* OPC */ 0x6,
         .cdw10 = /* CNTID[31:16] */ 0x0 | /* CNS */ 0x01,
         .dptr_hi = 0,
         .dptr_lo = data_region_paddr, /* TEMP */
-    };
+    });
 
-    uint32_t orig_dw3 = ((volatile uint32_t *)nvme_acq_region)[3];
-    sddf_dprintf("orig dw3: %x\n", orig_dw3);
+    nvme_completion_queue_entry_t entry;
+    while (true) {
+        int ret = nvme_queue_consume(nvme_acq_region, nvme_controller, DSTRD, &entry);
+        if (ret == 0) {
+            sddf_dprintf("succeed\n");
+            /* succeeded */
+            break;
+        }
+        sddf_dprintf("fail\n");
+    }
 
-    // todo: overflow?
-    nvme_sqytdbl_write(nvme_controller, DSTRD, 0, ++sq_tail);
+    sddf_dprintf("CDW0: %04x\n", entry.cdw0);
+    sddf_dprintf("CDW1: %04x\n", entry.cdw1);
+    sddf_dprintf("SQHD: %02x\n", entry.sqhd);
+    sddf_dprintf("SQID: %02x\n", entry.sqid);
+    sddf_dprintf(" CID: %02x\n", entry.cid);
+    sddf_dprintf("P&STATUS: %02x\n", entry.phase_tag_and_status);
 
-    nvme_debug_dump_controller_regs();
-
-    // 4.2.4.1 shows how to send commands
-    sddf_dprintf("waiting for completed command...\n");
-    while (!(nvme_acq_region[cq_head].phase_tag_and_status & BIT(0)));
-    sddf_dprintf("complete\n");
-
-
-    // sddf_dprintf("new submission tail: %u\n", nvme_sqytdbl_read(nvme_controller, DSTRD, 0));
-    // sddf_dprintf("waiting completion queue change...\n");
-    // uint16_t orig_cq_head = cq_head;
-    // while (cq_head == orig_cq_head) {
-    //     cq_head = nvme_cqyhdbl_read(nvme_controller, DSTRD, 0);
-    // }
-    // sddf_dprintf("\tdone\n");
-
-    sddf_dprintf("new head: %u\n", cq_head);
     // sudo nvme admin-passthru /dev/nvme0 --opcode=0x06 --cdw10=0x0001 --data-len=4096 -r  -s
     for (int i = 0; i < 64; i++) {
-        sddf_dprintf("[%04x]: %x: %c\n", i, data_region[i], data_region[i]);
+        // sddf_dprintf("[%04x]: %x: %c\n", i, data_region[i], data_region[i]);
     }
 }
 
