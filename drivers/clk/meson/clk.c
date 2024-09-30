@@ -1029,9 +1029,10 @@ static struct clk *sm1_clks[] = {
 void clk_init(struct clk *sm1_clks[])
 {
     int i;
-    for (i = 0; i < 128; i++) {
+    for (i = 0; i < CLKID_PCIE_PLL; i++) {
         if (sm1_clks[i] && sm1_clks[i]->hw.init->ops->init) {
             sm1_clks[i]->hw.init->ops->init(sm1_clks[i]);
+            sddf_dprintf("Initialise %s\n", sm1_clks[i]->hw.init->name);
         }
     }
 }
