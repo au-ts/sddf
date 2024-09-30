@@ -4,6 +4,7 @@
  */
 
 #include <clk-operations.h>
+#include <sddf/timer/client.h>
 #include <sddf/util/printf.h>
 
 uintptr_t clk_base;
@@ -76,6 +77,19 @@ static inline int regmap_mux_read_bits(uint32_t offset, uint8_t shift, uint32_t 
 static inline uint32_t meson_parm_read(struct parm parm)
 {
     return regmap_read_bits(parm.reg_off, parm.shift, parm.width);
+}
+
+int regmap_multi_reg_write(const struct reg_sequence *regs, int num_regs)
+{
+    int i;
+    for (i = 0; i < num_regs; i++) {
+        reg_write(regs[i].reg, regs[i].def);
+        /* TODO: delay is needed */
+        /* if (regs[i].delay_us) { */
+        /*     delay_us(regs[i].delay_us); */
+        /* } */
+    }
+    return 0;
 }
 
 static int clk_regmap_gate_enable(struct clk *clk)
@@ -270,7 +284,7 @@ static void meson_clk_pll_init(struct clk *clk)
         int i;
         const struct reg_sequence *init_regs = data->init_regs;
         for (i = 0; i < data->init_count; i++) {
-            reg_write(init_regs[i].reg, init_regs[i].def);
+            regmap_multi_reg_write(data->init_regs, data->init_count);
         }
 
         /* Clear the reset bit */
@@ -400,7 +414,7 @@ static void mpll_init(struct clk *clk)
         int i;
         const struct reg_sequence *init_regs = data->init_regs;
         for (i = 0; i < data->init_count; i++) {
-            reg_write(init_regs[i].reg, init_regs[i].def);
+            regmap_multi_reg_write(data->init_regs, data->init_count);
         }
     }
 
