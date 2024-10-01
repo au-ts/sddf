@@ -120,7 +120,7 @@ void nvme_controller_init()
 
     // sudo nvme admin-passthru /dev/nvme0 --opcode=0x06 --cdw10=0x0001 --data-len=4096 -r  -s
     for (int i = 0; i < 64; i++) {
-        // sddf_dprintf("[%04x]: %x: %c\n", i, data_region[i], data_region[i]);
+        sddf_dprintf("[%04x]: %x: %c\n", i, data_region[i], data_region[i]);
     }
 }
 
