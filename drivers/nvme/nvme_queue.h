@@ -27,24 +27,11 @@ static int nvme_queue_consume(volatile nvme_completion_queue_entry_t queue[], vo
     uint16_t cq_head = nvme_cqyhdbl_read(nvme_controller, DSTRD, 0);
 
     /* if the head is not new */
-    THREAD_MEMORY_FENCE();
-    if ((queue[cq_head].phase_tag_and_status & BIT(0)) != phase) {
+    if ((queue[cq_head].phase_tag_and_status & BIT(0)) == phase) {
         return -1;
-    }
-    THREAD_MEMORY_FENCE();
-
-    // this makes the queue[cq_head] return p (0b1111)
-    int i = 500;
-    while (i--) {
-        seL4_Yield();
     }
 
     *entry = queue[cq_head];
-    microkit_dbg_puts("queue[cq_head]: ");
-    microkit_dbg_putc(97 + (queue[cq_head].cid & 0b1111));
-    microkit_dbg_puts("\nentry: ");
-    microkit_dbg_putc(97 + (entry->cid & 0b1111));
-    microkit_dbg_putc('\n');
 
     cq_head++; /* TODO: wrapping */
     // if (cq_head == length) {
