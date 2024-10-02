@@ -282,7 +282,6 @@ static void meson_clk_pll_init(struct clk *clk)
         regmap_update_bits(data->rst.reg_off, data->rst.shift, data->rst.width, 1);
 
         int i;
-        const struct reg_sequence *init_regs = data->init_regs;
         for (i = 0; i < data->init_count; i++) {
             regmap_multi_reg_write(data->init_regs, data->init_count);
         }
@@ -412,7 +411,6 @@ static void mpll_init(struct clk *clk)
     struct meson_clk_mpll_data *data = (struct meson_clk_mpll_data *)(clk->data);
     if (data->init_count) {
         int i;
-        const struct reg_sequence *init_regs = data->init_regs;
         for (i = 0; i < data->init_count; i++) {
             regmap_multi_reg_write(data->init_regs, data->init_count);
         }
