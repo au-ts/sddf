@@ -1,6 +1,37 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
- * Copyright 2024, UNSW
- * SPDX-License-Identifier: BSD-2-Clause
+ * Macros and data some structures are copied from:
+ *   https://github.com/torvalds/linux/blob/befe87380e21f0d37633273e1068c9318f8135ff/include/linux/clk-provider.h
+ *
+ *  Copyright (c) 2010-2011 Jeremy Kerr <jeremy.kerr@canonical.com>
+ *  Copyright (C) 2011-2012 Linaro Ltd <mturquette@linaro.org>
+ */
+
+/* SPDX-License-Identifier: GPL-2.0 */
+/*
+ * Some data structures are derived from:
+ *   https://github.com/torvalds/linux/blob/befe87380e21f0d37633273e1068c9318f8135ff/drivers/clk/meson/clk-regmap.h
+ *
+ * Copyright (c) 2018 BayLibre, SAS.
+ * Author: Jerome Brunet <jbrunet@baylibre.com>
+ */
+
+/* SPDX-License-Identifier: GPL-2.0 */
+/*
+ * Some data structures are derived from:
+ *   https://github.com/torvalds/linux/blob/befe87380e21f0d37633273e1068c9318f8135ff/drivers/clk/meson/clk-pll.h
+ *
+ * Copyright (c) 2019 BayLibre, SAS.
+ * Author: Jerome Brunet <jbrunet@baylibre.com>
+ */
+
+/* SPDX-License-Identifier: GPL-2.0 */
+/*
+ * Some data structures are derived from:
+ *   https://github.com/torvalds/linux/blob/befe87380e21f0d37633273e1068c9318f8135ff/drivers/clk/meson/clk-mpll.h
+ *
+ * Copyright (c) 2019 BayLibre, SAS.
+ * Author: Jerome Brunet <jbrunet@baylibre.com>
  */
 
 #ifndef CLK_H_
@@ -183,32 +214,6 @@ struct meson_clk_mpll_data {
     unsigned int init_count;
     /* spinlock_t *lock; */
     uint8_t flags;
-};
-
-/**
- * struct clk_rate_request - Structure encoding the clk constraints that
- * a clock user might require.
- *
- * Should be initialized by calling clk_hw_init_rate_request().
- *
- * @core:           Pointer to the struct clk_core affected by this request
- * @rate:           Requested clock rate. This field will be adjusted by
- *                    clock drivers according to hardware capabilities.
- * @min_rate:        Minimum rate imposed by clk users.
- * @max_rate:        Maximum rate imposed by clk users.
- * @best_parent_rate:    The best parent rate a parent can provide to fulfill the
- *            requested constraints.
- * @best_parent_hw:    The most appropriate parent clock that fulfills the
- *            requested constraints.
- *
- */
-struct clk_rate_request {
-    struct clk_core *core;
-    unsigned long rate;
-    unsigned long min_rate;
-    unsigned long max_rate;
-    unsigned long best_parent_rate;
-    struct clk_hw *best_parent_hw;
 };
 
 #endif // CLK_H_
