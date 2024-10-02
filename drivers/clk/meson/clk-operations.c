@@ -1,6 +1,63 @@
+// SPDX-License-Identifier: (GPL-2.0 OR BSD-3-Clause)
 /*
- * Copyright 2024, UNSW
- * SPDX-License-Identifier: BSD-2-Clause
+ * Operations for MPLL clocks are derived from:
+ *   https://github.com/torvalds/linux/blob/befe87380e21f0d37633273e1068c9318f8135ff/drivers/clk/meson/clk-mpll.c
+ *
+ * Copyright (c) 2016 AmLogic, Inc.
+ * Author: Michael Turquette <mturquette@baylibre.com>
+ */
+
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Operations for PLL clocks are derived from:
+ *   https://github.com/torvalds/linux/blob/befe87380e21f0d37633273e1068c9318f8135ff/drivers/clk/meson/clk-pll.c
+ *
+ * Copyright (c) 2015 Endless Mobile, Inc.
+ * Author: Carlo Caione <carlo@endlessm.com>
+ *
+ * Copyright (c) 2018 Baylibre, SAS.
+ * Author: Jerome Brunet <jbrunet@baylibre.com>
+ */
+
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Operations for gate clocks are derived from:
+ *   https://github.com/torvalds/linux/blob/befe87380e21f0d37633273e1068c9318f8135ff/drivers/clk/meson/clk-regmap.c
+ *
+ * Copyright (c) 2018 BayLibre, SAS.
+ * Author: Jerome Brunet <jbrunet@baylibre.com>
+ */
+
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Operations for fixed factor clocks are derived from:
+ *   https://github.com/torvalds/linux/blob/befe87380e21f0d37633273e1068c9318f8135ff/drivers/clk/clk-fixed-factor.c
+ *
+ * Copyright (C) 2011 Sascha Hauer, Pengutronix <s.hauer@pengutronix.de>
+ */
+
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Operations for divider clocks are derived from:
+ *   https://github.com/torvalds/linux/blob/befe87380e21f0d37633273e1068c9318f8135ff/drivers/clk/clk-divider.c
+ *
+ * Copyright (C) 2011 Sascha Hauer, Pengutronix <s.hauer@pengutronix.de>
+ * Copyright (C) 2011 Richard Zhao, Linaro <richard.zhao@linaro.org>
+ * Copyright (C) 2011-2012 Mike Turquette, Linaro Ltd <mturquette@linaro.org>
+ *
+ * Adjustable divider clock implementation
+ */
+
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Operations for multiplexer clocks are derived from:
+ *   https://github.com/torvalds/linux/blob/befe87380e21f0d37633273e1068c9318f8135ff/drivers/clk/clk-mux.c
+ *
+ * Copyright (C) 2011 Sascha Hauer, Pengutronix <s.hauer@pengutronix.de>
+ * Copyright (C) 2011 Richard Zhao, Linaro <richard.zhao@linaro.org>
+ * Copyright (C) 2011-2012 Mike Turquette, Linaro Ltd <mturquette@linaro.org>
+ *
+ * Simple multiplexer clock implementation
  */
 
 #include <clk-operations.h>
