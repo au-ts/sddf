@@ -11,6 +11,7 @@
 struct clk_cfg {
     uint32_t clk_id;
     uint32_t frequency;
+    uint32_t pclk_id;
 };
 
 #endif // CONF_TYPES_H_
