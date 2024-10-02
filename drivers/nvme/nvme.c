@@ -4,12 +4,14 @@
 #include <sddf/util/printf.h>
 
 volatile nvme_controller_t *nvme_controller;
-volatile nvme_submission_queue_entry_t *nvme_asq_region;
-volatile nvme_completion_queue_entry_t *nvme_acq_region;
+nvme_submission_queue_entry_t *nvme_asq_region;
+nvme_completion_queue_entry_t *nvme_acq_region;
 uintptr_t nvme_asq_region_paddr;
 uintptr_t nvme_acq_region_paddr;
 #define NVME_ADMIN_QUEUE_SIZE 0x1000
 
+static nvme_queue_info_t admin_queue_info;
+// static nvme_queue_info_t main_io_queue;
 
 uintptr_t data_region_paddr;
 uint8_t *data_region;
@@ -20,11 +22,6 @@ uint8_t *data_region;
 _Static_assert(NVME_ASQ_CAPACITY <= 0x1000, "capacity of ASQ must be <=4096 (entries)");
 _Static_assert(NVME_ACQ_CAPACITY <= 0x1000, "capacity of ACQ must be <=4096 (entries)");
 
-/* [NVMe-2.1] 3.3.1 Memory-based Transport Queue Model (PCIe) */
-void nvme_queue_init()
-{
-    // TODO.
-}
 
 void nvme_debug_dump_controller_regs()
 {
@@ -54,7 +51,8 @@ void nvme_controller_init()
     // 1. Wait for CSTS.RDY to become '0' (i.e. not ready)
     while (nvme_controller->csts & NVME_CSTS_RDY);
 
-    // 2. Configure Admin Queue(s)
+    // 2. Configure Admin Queue(s); i.e. y = 0.
+    nvme_queues_init(&admin_queue_info, 0, nvme_controller, nvme_asq_region, nvme_acq_region, NVME_ASQ_CAPACITY); // todo: capacity?
     assert(nvme_asq_region_paddr != 0x0);
     assert(nvme_acq_region_paddr != 0x0);
     nvme_controller->asq = nvme_asq_region_paddr;
@@ -89,11 +87,8 @@ void nvme_controller_init()
     while (!(nvme_controller->csts & NVME_CSTS_RDY));
     sddf_dprintf("\tdone\n");
 
-    // 7. Send the Identify Controller command (Identify with CNS = 01h)
-    uint8_t DSTRD = (nvme_controller->cap & NVME_CAP_DSTRD_MASK) >> NVME_CAP_DSTRD_SHIFT;
-
-    // Identify Command (5.1.13)
-    nvme_queue_submit(nvme_asq_region, nvme_controller, DSTRD, &(nvme_submission_queue_entry_t){
+    // 7. Send the Identify Controller command (Identify with CNS = 01h); §5.1.13
+    nvme_queue_submit(&admin_queue_info, &(nvme_submission_queue_entry_t){
         .cdw0 = /* CID */ (0b1111 << 16) | /* PSDT */ 0 | /* FUSE */ 0 | /* OPC */ 0x6,
         .cdw10 = /* CNTID[31:16] */ 0x0 | /* CNS */ 0x01,
         .dptr_hi = 0,
@@ -101,14 +96,19 @@ void nvme_controller_init()
     });
 
     nvme_completion_queue_entry_t entry;
+    int i = 0;
     while (true) {
-        int ret = nvme_queue_consume(nvme_acq_region, nvme_controller, DSTRD, &entry);
+        int ret = nvme_queue_consume(&admin_queue_info, &entry);
         if (ret == 0) {
             sddf_dprintf("succeed\n");
             /* succeeded */
             break;
         }
         sddf_dprintf("fail\n");
+        i++;
+        if (i > 10) {
+            assert(!"oops");
+        }
     }
 
     sddf_dprintf("CDW0: %04x\n", entry.cdw0);
@@ -133,5 +133,4 @@ void nvme_init()
     // https://github.com/bootreer/vroom/blob/d8bbe9db2b1cfdfc38eec31f3b48f5eb167879a9/src/nvme.rs#L220
 
     nvme_controller_init();
-    nvme_queue_init();
 }
