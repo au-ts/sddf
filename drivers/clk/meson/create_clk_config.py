@@ -7,7 +7,7 @@
 
 import os
 import sys
-
+from typing import List
 from devicetree import edtlib, dtlib
 
 supported_compat_str_board = { "hardkernel,odroid-c4" }
@@ -24,31 +24,35 @@ def log_warning_parser(print_str: str) -> None:
 def log_error_parser(print_str: str) -> None:
     sys.stderr.write("PARSER|ERROR: " + print_str)
 
-# def parse_clocks(dt: dtlib.DT, clocks: List) -> List:
-#     clk_ids = []
-#     i = 0
+def parse_clocks(dt: dtlib.DT, clocks: List) -> List:
+    clk_ids = []
+    i = 0
 
-#     while (i < len(clocks)):
-#         pnode = devicetree.phandle2node[clocks[i]]
-#         if "#clock-cells" in pnode.props and pnode.props["#clock-cells"].to_num() == 0:
-#             # TODO: consider the case of `xtal` and represent this clock another way
-#             clk_ids.append(clocks[i])
-#         elif clocks[i] > 0:
-#             clk_ids.append(clocks[i+1])
-#             i += 1
-#         else:
-#             clk_ids.append(-1)
-#         i += 1
+    while (i < len(clocks)):
+        if clocks[i] == 0:
+            clk_ids.append(clocks[i])
+            i += 1
+            continue
+        pnode = devicetree.phandle2node[clocks[i]]
+        if "#clock-cells" in pnode.props and pnode.props["#clock-cells"].to_num() == 0:
+            # TODO: consider the case of `xtal` and represent this clock another way
+            clk_ids.append(clocks[i])
+        elif clocks[i] > 0:
+            clk_ids.append(clocks[i+1])
+            i += 1
+        else:
+            clk_ids.append(-1)
+        i += 1
 
-#     return clk_ids;
+    return clk_ids;
 
-def write_configs_to_headerfile(path):
+def write_configs_to_headerfile(path: str, clk_configs: List) -> None:
     with open(path + '/clk_config.h', "w") as f:
         f.write("#include <conf_types.h>\n")
-        f.write("#define NUM_DEVICE_CLKS 1\n")
+        f.write("#define NUM_DEVICE_CLKS {}\n\n".format(len(clk_configs)))
 
-        clk_configs = "{{ .clk_id = 0x18, .frequency = 0, }}"
-        f.write("static struct clk_cfg clk_configs[] = {};".format(clk_configs))
+        clk_cfg_strs = ["{{ .clk_id = {}, .frequency = {}, .pclk_id = {} }}".format(clk_cfg[0], clk_cfg[1], clk_cfg[2]) for clk_cfg in clk_configs]
+        f.write("static struct clk_cfg clk_configs[] = {{\n{}\n}};".format(",\n".join(clk_cfg_strs)))
 
 if __name__ == "__main__":
     print("Creating a config file for clock driver to intialise the system...")
@@ -64,9 +68,6 @@ if __name__ == "__main__":
         exit(1)
 
     enabled_clks = []
-    print("path: {}".format(sys.argv[1]))
-    print("path: {}".format(sys.argv[2]))
-    write_configs_to_headerfile(sys.argv[2])
 
     for node in devicetree.node_iter():
         props = list(node.props.keys())
@@ -81,25 +82,28 @@ if __name__ == "__main__":
                 print("---------------------")
                 if "clocks" in props:
                     clocks = node.props["clocks"].to_nums()
-                    i = 0
-                    while (i < len(clocks)):
-                        pnode = devicetree.phandle2node[clocks[i]]
-                        if "#clock-cells" in pnode.props and pnode.props["#clock-cells"].to_num() == 0:
-                            print("<{}>".format(clocks[i]))
-                        elif clocks[i] > 0:
-                            print("<{}, {}>".format(clocks[i], clocks[i+1]))
-                            i += 1
-                        else:
-                            print("<0x00>")
-                        i += 1
+                    clock_ids = parse_clocks(devicetree, clocks)
+                    for clk_id in clock_ids:
+                        enabled_clks.append([clk_id, 0, 0])
                 if "max-frequency" in props:
                     max_frequency = node.props["max-frequency"].to_nums()
-                if "assigned-clocks" in props:
-                    assigned_clocks = node.props["assigned-clocks"].to_nums()
-                if "assigned-clock-parents" in props:
-                    assigned_clock_parents = node.props["assigned-clock-parents"].to_nums()
-                if "assigned-clock-rates" in props:
+
+                if "assigned-clocks" in props and "assigned-clock-rates" in props:
+                    assigned_clocks = parse_clocks(devicetree, node.props["assigned-clocks"].to_nums())
                     assigned_clock_rates = node.props["assigned-clock-rates"].to_nums()
+                    for clk_id, clk_rate in zip(assigned_clocks, assigned_clock_rates):
+                        if (clk_rate):
+                            enabled_clks.append([clk_id, clk_rate, 0])
+                        print("rate: <{}, {}>".format(clk_id, clk_rate))
+
+                if "assigned-clocks" in props and "assigned-clock-parents" in props:
+                    assigned_clocks = parse_clocks(devicetree, node.props["assigned-clocks"].to_nums())
+                    assigned_clock_parents = parse_clocks(devicetree, node.props["assigned-clock-parents"].to_nums())
+                    for clk_id, pclk_id in zip(assigned_clocks, assigned_clock_parents):
+                        print(f"pclk: <{clk_id}, {pclk_id}>")
+                        if (pclk_id):
+                            enabled_clks.append([clk_id, 0, pclk_id])
+
                 print("{}\nclocks: {}\nmax-frequency: {}\nassigned-clocks: {}\nassigned-clock-parents: {}\nassigned-clock-rates: {}".format(
                     node.name,
                     clocks,
@@ -108,3 +112,5 @@ if __name__ == "__main__":
                     assigned_clock_parents,
                     assigned_clock_rates)
                 )
+
+    write_configs_to_headerfile(sys.argv[2], enabled_clks)
