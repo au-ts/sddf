@@ -34,6 +34,14 @@
  * Author: Jerome Brunet <jbrunet@baylibre.com>
  */
 
+/* SPDX-License-Identifier: GPL-2.0 */
+/*
+ * Some data structures are derived from:
+ *   https://github.com/torvalds/linux/blob/7ec462100ef9142344ddbf86f2c3008b97acddbe/drivers/clk/meson/vclk.h
+ *
+ * Copyright (c) 2024 Neil Armstrong <neil.armstrong@linaro.org>
+ */
+
 #ifndef CLK_H_
 #define CLK_H_
 
@@ -213,6 +221,25 @@ struct meson_clk_mpll_data {
     const struct reg_sequence *init_regs;
     unsigned int init_count;
     /* spinlock_t *lock; */
+    uint8_t flags;
+};
+
+struct meson_vid_pll_div_data {
+    struct parm val;
+    struct parm sel;
+};
+
+struct meson_vclk_gate_data {
+    struct parm enable;
+    struct parm reset;
+    uint8_t flags;
+};
+
+struct meson_vclk_div_data {
+    struct parm div;
+    struct parm enable;
+    struct parm reset;
+    const struct clk_div_table *table;
     uint8_t flags;
 };
 

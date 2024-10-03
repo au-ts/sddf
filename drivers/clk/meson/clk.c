@@ -322,7 +322,7 @@ static struct clk sm1_gp1_pll_dco = {
         .flags = CLK_IS_CRITICAL,
     },
 };
-/* static MESON_DIV(sm1_gp1_pll, HHI_GP1_PLL_CNTL0, 16, 3, (CLK_DIVIDER_POWER_OF_TWO | CLK_DIVIDER_ROUND_CLOSEST), { &sm1_gp1_pll_dco }, 1, 0); */
+static MESON_DIV(sm1_gp1_pll, HHI_GP1_PLL_CNTL0, 16, 3, (CLK_DIVIDER_POWER_OF_TWO | CLK_DIVIDER_ROUND_CLOSEST), { &sm1_gp1_pll_dco }, 1, 0);
 
 /*
  * Internal hifi pll emulation configuration parameters
@@ -459,6 +459,60 @@ static struct clk g12a_pcie_pll_dco = {
 static MESON_FIXED_FACTOR(g12a_pcie_pll_dco_div2, 1, 2, { &g12a_pcie_pll_dco }, 1, CLK_SET_RATE_PARENT);
 static MESON_DIV(g12a_pcie_pll_od, HHI_PCIE_PLL_CNTL0, 16, 5, (CLK_DIVIDER_ROUND_CLOSEST | CLK_DIVIDER_ONE_BASED | CLK_DIVIDER_ALLOW_ZERO), { &g12a_pcie_pll_dco_div2 }, 1, CLK_SET_RATE_PARENT);
 static MESON_FIXED_FACTOR(g12a_pcie_pll, 1, 2, { &g12a_pcie_pll_od }, 1, CLK_SET_RATE_PARENT);
+
+static struct clk g12a_hdmi_pll_dco = {
+    .data = &(struct meson_clk_pll_data){
+        .en = {
+            .reg_off = HHI_HDMI_PLL_CNTL0,
+            .shift   = 28,
+            .width   = 1,
+        },
+        .m = {
+            .reg_off = HHI_HDMI_PLL_CNTL0,
+            .shift   = 0,
+            .width   = 8,
+        },
+        .n = {
+            .reg_off = HHI_HDMI_PLL_CNTL0,
+            .shift   = 10,
+            .width   = 5,
+        },
+        .frac = {
+            .reg_off = HHI_HDMI_PLL_CNTL1,
+            .shift   = 0,
+            .width   = 16,
+        },
+        .l = {
+            .reg_off = HHI_HDMI_PLL_CNTL0,
+            .shift   = 30,
+            .width   = 1,
+        },
+        .rst = {
+            .reg_off = HHI_HDMI_PLL_CNTL0,
+            .shift   = 29,
+            .width   = 1,
+        },
+    },
+    .hw.init = &(struct clk_init_data){
+        .name = "hdmi_pll_dco",
+        .ops = &meson_clk_pll_ro_ops,
+        .parent_data = &(const struct clk_parent_data) {
+            .fw_name = "xtal",
+        },
+        .num_parents = 1,
+        .flags = CLK_GET_RATE_NOCACHE,
+    },
+};
+static MESON_DIV(g12a_hdmi_pll_od, HHI_HDMI_PLL_CNTL0, 16, 2, CLK_DIVIDER_POWER_OF_TWO, { &g12a_hdmi_pll_dco }, 1, CLK_GET_RATE_NOCACHE | CLK_SET_RATE_PARENT);
+static MESON_DIV(g12a_hdmi_pll_od2, HHI_HDMI_PLL_CNTL0, 18, 2, CLK_DIVIDER_POWER_OF_TWO, { &g12a_hdmi_pll_od }, 1, CLK_GET_RATE_NOCACHE | CLK_SET_RATE_PARENT);
+static MESON_DIV(g12a_hdmi_pll, HHI_HDMI_PLL_CNTL0, 20, 2, CLK_DIVIDER_POWER_OF_TWO, { &g12a_hdmi_pll_od2 }, 1, CLK_GET_RATE_NOCACHE | CLK_SET_RATE_PARENT);
+
+
+/* static MESON_GATE(g12a_vapb_0, HHI_VAPBCLK_CNTL, 30, 0, { &g12a_vapb_0_div }, 1, CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED); */
+/* static MESON_DIV(g12a_vapb_1_div, HHI_VAPBCLK_CNTL, 16, 7, 0, { &g12a_vapb_1_sel }, 1, CLK_SET_RATE_PARENT); */
+/* static MESON_GATE(g12a_vapb_1, HHI_VAPBCLK_CNTL, 24, 0, { &g12a_vapb_1_div }, 1, CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED); */
+/* static MESON_MUX(g12a_vapb_sel, HHI_VAPBCLK_CNTL, 0x1, 31, NULL, 0, { &g12a_vapb_0, g12a_vapb_1 }, 2, CLK_SET_RATE_NO_REPARENT); */
+/* static MESON_GATE(g12a_vapb, HHI_VAPBCLK_CNTL, 30, 0, { &g12a_vapb_sel }, 1, CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED); */
 
 static const struct reg_sequence g12a_mpll0_init_regs[] = {
     { .reg = HHI_MPLL_CNTL2,    .def = 0x40000033 },
@@ -644,7 +698,141 @@ static MESON_MUX(g12a_hdmi_sel, HHI_HDMI_CLK_CNTL, 0x3, 9, NULL, CLK_MUX_ROUND_C
 static MESON_DIV(g12a_hdmi_div, HHI_HDMI_CLK_CNTL, 0, 7, 0, { &g12a_hdmi_sel }, 1, CLK_GET_RATE_NOCACHE);
 static MESON_GATE(g12a_hdmi, HHI_HDMI_CLK_CNTL, 8, 0, { &g12a_hdmi_div }, 1, CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED);
 
-static uint32_t mux_table_clk81[]    = { 0, 2, 3, 4, 5, 6, 7 };
+static struct clk g12a_vid_pll_div = {
+    .data = &(struct meson_vid_pll_div_data){
+        .val = {
+            .reg_off = HHI_VID_PLL_CLK_DIV,
+            .shift   = 0,
+            .width   = 15,
+        },
+        .sel = {
+            .reg_off = HHI_VID_PLL_CLK_DIV,
+            .shift   = 16,
+            .width   = 2,
+        },
+    },
+    .hw.init = &(struct clk_init_data) {
+        .name = "vid_pll_div",
+        .ops = &meson_vid_pll_div_ro_ops,
+        .parent_clks = (const struct clk *[]) { &g12a_hdmi_pll },
+        .num_parents = 1,
+        .flags = CLK_SET_RATE_PARENT | CLK_GET_RATE_NOCACHE,
+    },
+};
+
+static const struct clk_parent_data g12a_vid_pll_parent_data[] = {
+    { .clk = &g12a_vid_pll_div, },
+    { .clk = &g12a_hdmi_pll, },
+};
+static MESON_MUX(g12a_vid_pll_sel, HHI_VID_PLL_CLK_DIV, 0x1, 18, NULL, 0, g12a_vid_pll_parent_data, ARRAY_SIZE(g12a_vid_pll_parent_data), CLK_SET_RATE_NO_REPARENT | CLK_GET_RATE_NOCACHE);
+static MESON_GATE(g12a_vid_pll, HHI_VID_PLL_CLK_DIV, 19, 0, { &g12a_vid_pll_sel }, 1, CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED);
+static const struct clk_parent_data g12a_vclk_parent_data[] = {
+    { .clk = &g12a_vid_pll, },
+    { .clk = &g12a_gp0_pll, },
+    { .clk = &g12a_hifi_pll, },
+    { .clk = &g12a_mpll1, },
+    { .clk = &g12a_fclk_div3, },
+    { .clk = &g12a_fclk_div4, },
+    { .clk = &g12a_fclk_div5, },
+    { .clk = &g12a_fclk_div7, },
+};
+static MESON_MUX(g12a_vclk_sel, HHI_VID_CLK_CNTL, 0x7, 16, NULL, 0, g12a_vclk_parent_data, ARRAY_SIZE(g12a_vclk_parent_data), CLK_SET_RATE_NO_REPARENT | CLK_GET_RATE_NOCACHE);
+static MESON_GATE(g12a_vclk_input, HHI_VID_CLK_CNTL, 16, 0, { &g12a_vclk_sel }, 1, CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED);
+static MESON_DIV(g12a_vclk_div, HHI_VID_CLK_CNTL, 0, 8, 0, { &g12a_vclk_input }, 1, CLK_GET_RATE_NOCACHE);
+static MESON_GATE(g12a_vclk, HHI_VID_CLK_CNTL, 19, 0, { &g12a_vclk_div }, 1, CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED);
+static MESON_GATE(g12a_vclk_div1, HHI_VID_CLK_CNTL, 0, 0, { &g12a_vclk }, 1, CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED);
+
+static MESON_GATE(g12a_vclk_div2_en, HHI_VID_CLK_CNTL, 1, 0, { &g12a_vclk }, 1, CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED);
+static MESON_FIXED_FACTOR(g12a_vclk_div2, 1, 2, { &g12a_vclk_div2_en }, 1, 0);
+static MESON_GATE(g12a_vclk_div4_en, HHI_VID_CLK_CNTL, 2, 0, { &g12a_vclk }, 1, CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED);
+static MESON_FIXED_FACTOR(g12a_vclk_div4, 1, 4, { &g12a_vclk_div4_en }, 1, 0);
+static MESON_GATE(g12a_vclk_div6_en, HHI_VID_CLK_CNTL, 3, 0, { &g12a_vclk }, 1, CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED);
+static MESON_FIXED_FACTOR(g12a_vclk_div6, 1, 6, { &g12a_vclk_div6_en }, 1, 0);
+static MESON_GATE(g12a_vclk_div12_en, HHI_VID_CLK_CNTL, 4, 0, { &g12a_vclk }, 1, CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED);
+static MESON_FIXED_FACTOR(g12a_vclk_div12, 1, 12, { &g12a_vclk_div12_en }, 1, 0);
+
+
+
+static MESON_MUX(g12a_vclk2_sel, HHI_VIID_CLK_CNTL, 0x7, 16, NULL, 0, g12a_vclk_parent_data, ARRAY_SIZE(g12a_vclk_parent_data), CLK_SET_RATE_NO_REPARENT);
+static MESON_GATE(g12a_vclk2_input, HHI_VIID_CLK_DIV, 16, 0, { &g12a_vclk2_sel }, 1, 0);
+static struct clk g12a_vclk2_div = {
+    .data = &(struct meson_vclk_div_data){
+        .div = {
+            .reg_off = HHI_VIID_CLK_DIV,
+            .shift   = 0,
+            .width   = 8,
+        },
+        .enable = {
+            .reg_off = HHI_VIID_CLK_DIV,
+            .shift   = 16,
+            .width   = 1,
+        },
+        .reset = {
+            .reg_off = HHI_VIID_CLK_DIV,
+            .shift   = 17,
+            .width   = 1,
+        },
+        .flags = CLK_DIVIDER_ROUND_CLOSEST,
+    },
+    .hw.init = &(struct clk_init_data){
+        .name = "vclk2_div",
+        .ops = &meson_vclk_div_ops,
+        .parent_clks = (const struct clk *[]) {
+            &g12a_vclk2_input
+        },
+        .num_parents = 1,
+        .flags = CLK_SET_RATE_GATE,
+    },
+};
+
+static struct clk g12a_vclk2 = {
+    .data = &(struct meson_vclk_gate_data){
+        .enable = {
+            .reg_off = HHI_VIID_CLK_CNTL,
+            .shift   = 19,
+            .width   = 1,
+        },
+        .reset = {
+            .reg_off = HHI_VIID_CLK_CNTL,
+            .shift   = 15,
+            .width   = 1,
+        },
+    },
+    .hw.init = &(struct clk_init_data) {
+        .name = "g12a_vclk2",
+        .ops = &meson_vclk_gate_ops,
+        .parent_clks = (const struct clk *[]) { &g12a_vclk2_div },
+        .num_parents = 1,
+        .flags = CLK_SET_RATE_PARENT,
+    },
+};
+static MESON_GATE(g12a_vclk2_div1, HHI_VIID_CLK_CNTL, 0, 0, { &g12a_vclk2 }, 1, CLK_SET_RATE_PARENT);
+static MESON_GATE(g12a_vclk2_div2_en, HHI_VIID_CLK_CNTL, 1, 0, { &g12a_vclk2 }, 1, CLK_SET_RATE_PARENT);
+static MESON_FIXED_FACTOR(g12a_vclk2_div2, 1, 2, { &g12a_vclk2_div2_en }, 1, CLK_SET_RATE_PARENT);
+static MESON_GATE(g12a_vclk2_div4_en, HHI_VIID_CLK_CNTL, 2, 0, { &g12a_vclk2 }, 1, CLK_SET_RATE_PARENT);
+static MESON_FIXED_FACTOR(g12a_vclk2_div4, 1, 4, { &g12a_vclk2_div4_en }, 1, CLK_SET_RATE_PARENT);
+static MESON_GATE(g12a_vclk2_div6_en, HHI_VIID_CLK_CNTL, 3, 0, { &g12a_vclk2 }, 1, CLK_SET_RATE_PARENT);
+static MESON_FIXED_FACTOR(g12a_vclk2_div6, 1, 6, { &g12a_vclk2_div6_en }, 1, CLK_SET_RATE_PARENT);
+static MESON_GATE(g12a_vclk2_div12_en, HHI_VIID_CLK_CNTL, 4, 0, { &g12a_vclk2 }, 1, CLK_SET_RATE_PARENT);
+static MESON_FIXED_FACTOR(g12a_vclk2_div12, 1, 12, { &g12a_vclk2_div12_en }, 1, CLK_SET_RATE_PARENT);
+
+static uint32_t mux_table_hdmi_tx_sel[] = { 0, 1, 2, 3, 4, 8, 9, 10, 11, 12 };
+static const struct clk_parent_data g12a_cts_hdmi_tx_parent_data[] = {
+    { .clk = &g12a_vclk_div1, },
+    { .clk = &g12a_vclk_div2, },
+    { .clk = &g12a_vclk_div4, },
+    { .clk = &g12a_vclk_div6, },
+    { .clk = &g12a_vclk_div12, },
+    { .clk = &g12a_vclk2_div1, },
+    { .clk = &g12a_vclk2_div2, },
+    { .clk = &g12a_vclk2_div4, },
+    { .clk = &g12a_vclk2_div6, },
+    { .clk = &g12a_vclk2_div12, },
+};
+static MESON_MUX(g12a_hdmi_tx_sel, HHI_HDMI_CLK_CNTL, 0xf, 16, mux_table_hdmi_tx_sel, 0, g12a_cts_hdmi_tx_parent_data, ARRAY_SIZE(g12a_cts_hdmi_tx_parent_data), CLK_SET_RATE_NO_REPARENT | CLK_GET_RATE_NOCACHE);
+static MESON_GATE(g12a_hdmi_tx, HHI_VID_CLK_CNTL2, 5, 0, { &g12a_hdmi_tx_sel }, 1, CLK_SET_RATE_PARENT | CLK_IGNORE_UNUSED);
+
+static uint32_t mux_table_clk81[] = { 0, 2, 3, 4, 5, 6, 7 };
 static const struct clk_parent_data clk81_parent_data[] = {
     { .fw_name = "xtal", },
     { .clk = &g12a_fclk_div7 },
@@ -654,7 +842,6 @@ static const struct clk_parent_data clk81_parent_data[] = {
     { .clk = &g12a_fclk_div3 },
     { .clk = &g12a_fclk_div5 },
 };
-
 static MESON_MUX(g12a_mpeg_clk_sel, HHI_MPEG_CLK_CNTL, 0x7, 12, mux_table_clk81, 0, clk81_parent_data, ARRAY_SIZE(clk81_parent_data), 0);
 static MESON_DIV(g12a_mpeg_clk_div, HHI_MPEG_CLK_CNTL, 0, 7, 0, { &g12a_mpeg_clk_sel }, 1, 0);
 static MESON_GATE(g12a_clk81, HHI_MPEG_CLK_CNTL, 7, 0, { &g12a_mpeg_clk_div }, 1, 0);
@@ -908,51 +1095,51 @@ static struct clk *sm1_clks[] = {
     /* [CLKID_VAPB_1]            = &g12a_vapb_1, */
     /* [CLKID_VAPB_SEL]        = &g12a_vapb_sel, */
     /* [CLKID_VAPB]            = &g12a_vapb, */
-    /* [CLKID_HDMI_PLL_DCO]        = &g12a_hdmi_pll_dco, */
-    /* [CLKID_HDMI_PLL_OD]        = &g12a_hdmi_pll_od, */
-    /* [CLKID_HDMI_PLL_OD2]        = &g12a_hdmi_pll_od2, */
-    /* [CLKID_HDMI_PLL]        = &g12a_hdmi_pll, */
+    [CLKID_HDMI_PLL_DCO]        = &g12a_hdmi_pll_dco,
+    [CLKID_HDMI_PLL_OD]        = &g12a_hdmi_pll_od,
+    [CLKID_HDMI_PLL_OD2]        = &g12a_hdmi_pll_od2,
+    [CLKID_HDMI_PLL]        = &g12a_hdmi_pll,
     /* [CLKID_VID_PLL]            = &g12a_vid_pll_div, */
     /* [CLKID_VID_PLL_SEL]        = &g12a_vid_pll_sel, */
     /* [CLKID_VID_PLL_DIV]        = &g12a_vid_pll, */
-    /* [CLKID_VCLK_SEL]        = &g12a_vclk_sel, */
-    /* [CLKID_VCLK2_SEL]        = &g12a_vclk2_sel, */
-    /* [CLKID_VCLK_INPUT]        = &g12a_vclk_input, */
-    /* [CLKID_VCLK2_INPUT]        = &g12a_vclk2_input, */
-    /* [CLKID_VCLK_DIV]        = &g12a_vclk_div, */
-    /* [CLKID_VCLK2_DIV]        = &g12a_vclk2_div, */
-    /* [CLKID_VCLK]            = &g12a_vclk, */
-    /* [CLKID_VCLK2]            = &g12a_vclk2, */
-    /* [CLKID_VCLK_DIV1]        = &g12a_vclk_div1, */
-    /* [CLKID_VCLK_DIV2_EN]        = &g12a_vclk_div2_en, */
-    /* [CLKID_VCLK_DIV4_EN]        = &g12a_vclk_div4_en, */
-    /* [CLKID_VCLK_DIV6_EN]        = &g12a_vclk_div6_en, */
-    /* [CLKID_VCLK_DIV12_EN]        = &g12a_vclk_div12_en, */
-    /* [CLKID_VCLK2_DIV1]        = &g12a_vclk2_div1, */
-    /* [CLKID_VCLK2_DIV2_EN]        = &g12a_vclk2_div2_en, */
-    /* [CLKID_VCLK2_DIV4_EN]        = &g12a_vclk2_div4_en, */
-    /* [CLKID_VCLK2_DIV6_EN]        = &g12a_vclk2_div6_en, */
-    /* [CLKID_VCLK2_DIV12_EN]        = &g12a_vclk2_div12_en, */
-    /* [CLKID_VCLK_DIV2]        = &g12a_vclk_div2, */
-    /* [CLKID_VCLK_DIV4]        = &g12a_vclk_div4, */
-    /* [CLKID_VCLK_DIV6]        = &g12a_vclk_div6, */
-    /* [CLKID_VCLK_DIV12]        = &g12a_vclk_div12, */
-    /* [CLKID_VCLK2_DIV2]        = &g12a_vclk2_div2, */
-    /* [CLKID_VCLK2_DIV4]        = &g12a_vclk2_div4, */
-    /* [CLKID_VCLK2_DIV6]        = &g12a_vclk2_div6, */
-    /* [CLKID_VCLK2_DIV12]        = &g12a_vclk2_div12, */
+    [CLKID_VCLK_SEL]        = &g12a_vclk_sel,
+    [CLKID_VCLK2_SEL]        = &g12a_vclk2_sel,
+    [CLKID_VCLK_INPUT]        = &g12a_vclk_input,
+    [CLKID_VCLK2_INPUT]        = &g12a_vclk2_input,
+    [CLKID_VCLK_DIV]        = &g12a_vclk_div,
+    [CLKID_VCLK2_DIV]        = &g12a_vclk2_div,
+    [CLKID_VCLK]            = &g12a_vclk,
+    [CLKID_VCLK2]            = &g12a_vclk2,
+    [CLKID_VCLK_DIV1]        = &g12a_vclk_div1,
+    [CLKID_VCLK_DIV2_EN]        = &g12a_vclk_div2_en,
+    [CLKID_VCLK_DIV4_EN]        = &g12a_vclk_div4_en,
+    [CLKID_VCLK_DIV6_EN]        = &g12a_vclk_div6_en,
+    [CLKID_VCLK_DIV12_EN]        = &g12a_vclk_div12_en,
+    [CLKID_VCLK2_DIV1]        = &g12a_vclk2_div1,
+    [CLKID_VCLK2_DIV2_EN]        = &g12a_vclk2_div2_en,
+    [CLKID_VCLK2_DIV4_EN]        = &g12a_vclk2_div4_en,
+    [CLKID_VCLK2_DIV6_EN]        = &g12a_vclk2_div6_en,
+    [CLKID_VCLK2_DIV12_EN]        = &g12a_vclk2_div12_en,
+    [CLKID_VCLK_DIV2]        = &g12a_vclk_div2,
+    [CLKID_VCLK_DIV4]        = &g12a_vclk_div4,
+    [CLKID_VCLK_DIV6]        = &g12a_vclk_div6,
+    [CLKID_VCLK_DIV12]        = &g12a_vclk_div12,
+    [CLKID_VCLK2_DIV2]        = &g12a_vclk2_div2,
+    [CLKID_VCLK2_DIV4]        = &g12a_vclk2_div4,
+    [CLKID_VCLK2_DIV6]        = &g12a_vclk2_div6,
+    [CLKID_VCLK2_DIV12]        = &g12a_vclk2_div12,
     /* [CLKID_CTS_ENCI_SEL]        = &g12a_cts_enci_sel, */
     /* [CLKID_CTS_ENCP_SEL]        = &g12a_cts_encp_sel, */
     /* [CLKID_CTS_ENCL_SEL]        = &g12a_cts_encl_sel, */
     /* [CLKID_CTS_VDAC_SEL]        = &g12a_cts_vdac_sel, */
-    /* [CLKID_HDMI_TX_SEL]        = &g12a_hdmi_tx_sel, */
+    [CLKID_HDMI_TX_SEL]        = &g12a_hdmi_tx_sel,
     /* [CLKID_CTS_ENCI]        = &g12a_cts_enci, */
     /* [CLKID_CTS_ENCP]        = &g12a_cts_encp, */
     /* [CLKID_CTS_ENCL]        = &g12a_cts_encl, */
     /* [CLKID_CTS_VDAC]        = &g12a_cts_vdac, */
-    /* [CLKID_HDMI_TX]            = &g12a_hdmi_tx, */
-    /* [CLKID_HDMI_SEL]        = &g12a_hdmi_sel, */
-    /* [CLKID_HDMI_DIV]        = &g12a_hdmi_div, */
+    [CLKID_HDMI_TX]            = &g12a_hdmi_tx,
+    [CLKID_HDMI_SEL]        = &g12a_hdmi_sel,
+    [CLKID_HDMI_DIV]        = &g12a_hdmi_div,
     [CLKID_HDMI]            = &g12a_hdmi,
     /* [CLKID_MALI_0_SEL]        = &g12a_mali_0_sel, */
     /* [CLKID_MALI_0_DIV]        = &g12a_mali_0_div, */
@@ -998,8 +1185,8 @@ static struct clk *sm1_clks[] = {
     /* [CLKID_VDEC_HEVCF]        = &g12a_vdec_hevcf, */
     /* [CLKID_TS_DIV]            = &g12a_ts_div, */
     /* [CLKID_TS]            = &g12a_ts, */
-    /* [CLKID_GP1_PLL_DCO]        = &sm1_gp1_pll_dco, */
-    /* [CLKID_GP1_PLL]            = &sm1_gp1_pll, */
+    [CLKID_GP1_PLL_DCO]        = &sm1_gp1_pll_dco,
+    [CLKID_GP1_PLL]            = &sm1_gp1_pll,
     /* [CLKID_DSU_CLK_DYN0_SEL]    = &sm1_dsu_clk_premux0, */
     /* [CLKID_DSU_CLK_DYN0_DIV]    = &sm1_dsu_clk_premux1, */
     /* [CLKID_DSU_CLK_DYN0]        = &sm1_dsu_clk_mux0_div, */
@@ -1092,10 +1279,11 @@ unsigned long clk_recalc_rate(const struct clk *clk)
 
 void enable_clk(struct clk *clk)
 {
-    if (clk->hw.init->ops->enable) {
-        sddf_dprintf("enable %s\n", clk->hw.init->name);
+    sddf_dprintf("enable %s, 0x%x\n", clk->hw.init->name, clk->hw.init->ops);
+    if (clk->hw.init->ops->enable != NULL) {
         clk->hw.init->ops->enable(clk);
     }
+    sddf_dprintf("Done\n");
 }
 
 void set_clk_rate(struct clk *clk, uint32_t rate)
