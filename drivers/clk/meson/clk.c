@@ -322,7 +322,7 @@ static struct clk sm1_gp1_pll_dco = {
         .flags = CLK_IS_CRITICAL,
     },
 };
-/* static MESON_DIV(sm1_gp1_pll, HHI_GP1_PLL_CNTL0, 16, 3, (CLK_DIVIDER_POWER_OF_TWO | CLK_DIVIDER_ROUND_CLOSEST), { &sm1_gp1_pll_dco }, 1, 0); */
+static MESON_DIV(sm1_gp1_pll, HHI_GP1_PLL_CNTL0, 16, 3, (CLK_DIVIDER_POWER_OF_TWO | CLK_DIVIDER_ROUND_CLOSEST), { &sm1_gp1_pll_dco }, 1, 0);
 
 /*
  * Internal hifi pll emulation configuration parameters
