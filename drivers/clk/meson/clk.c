@@ -22,6 +22,17 @@
 #define I2C_CLK_OFFSET 320
 #define I2C_CLK_BIT (1 << 9) // bit 9
 
+// Logging
+#define DEBUG_DRIVER
+
+#ifdef DEBUG_DRIVER
+#define LOG_DRIVER(...) do{ sddf_dprintf("CLK DRIVER|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
+#else
+#define LOG_DRIVER(...) do{}while(0)
+#endif
+
+#define LOG_DRIVER_ERR(...) do{ sddf_printf("CLK DRIVER|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
+
 uintptr_t clk_regs;
 uintptr_t msr_clk_base;
 
@@ -40,7 +51,7 @@ void clk_init(struct clk *sm1_clks[])
     for (i = 0; i < CLKID_PCIE_PLL; i++) {
         if (sm1_clks[i] && sm1_clks[i]->hw.init->ops->init) {
             sm1_clks[i]->hw.init->ops->init(sm1_clks[i]);
-            sddf_dprintf("Initialise %s\n", sm1_clks[i]->hw.init->name);
+            LOG_DRIVER("Initialise %s\n", sm1_clks[i]->hw.init->name);
         }
     }
 }
@@ -88,7 +99,7 @@ unsigned long clk_recalc_rate(const struct clk *clk)
 
 void enable_clk(struct clk *clk)
 {
-    sddf_dprintf("enable %s, 0x%x\n", clk->hw.init->name, clk->hw.init->ops);
+    LOG_DRIVER("enable %s, 0x%x\n", clk->hw.init->name, clk->hw.init->ops);
     if (clk->hw.init->ops->enable != NULL) {
         clk->hw.init->ops->enable(clk);
     }
@@ -104,9 +115,23 @@ void set_clk_rate(struct clk *clk, uint32_t rate)
         /* determine_rate() needs to be implemented */
         const struct clk *parent_clk = get_parent(clk);
         uint64_t prate = clk_recalc_rate(parent_clk);
-        sddf_dprintf("set %s to %dHz\n", clk->hw.init->name, rate);
+        LOG_DRIVER("set %s to %dHz\n", clk->hw.init->name, rate);
         clk->hw.init->ops->set_rate(clk, rate, prate);
     }
+}
+
+int clk_msr_stat()
+{
+    unsigned long clk_freq;
+    int i = 0;
+
+    char **clk_msr_list = get_msr_clk_list();
+    for (i = 0; i < 128; i++) {
+        clk_freq = clk_msr(i);
+        LOG_DRIVER("[%4d][%4ldHz] %s\n", i, clk_freq, clk_msr_list[i]);
+    }
+
+    return 0;
 }
 
 void notified(microkit_channel ch)
@@ -116,14 +141,13 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
+    LOG_DRIVER("Clock driver initialising...\n");
     struct clk **sm1_clks = get_clk_list();
     init_clk_base(clk_regs);
     clk_init(sm1_clks);
 
-    sddf_dprintf("-----------------\n");
     volatile uint32_t *clk_i2c_ptr = ((void *)clk_regs + I2C_CLK_OFFSET);
 
-    sddf_dprintf("Clock driver initialising...\n");
 
     for (int i = 0; i < NUM_DEVICE_CLKS; i++) {
         struct clk *clk = sm1_clks[clk_configs[i].clk_id];
@@ -141,38 +165,8 @@ void init(void)
 
     // Check that registers actually changed
     if (!(*clk_i2c_ptr & I2C_CLK_BIT)) {
-        sddf_dprintf("failed to toggle clock!\n");
+        LOG_DRIVER_ERR("failed to toggle clock!\n");
     }
 
-    sddf_dprintf("-----------------\n");
-
-    struct clk *mpeg_sel = sm1_clks[CLKID_MPEG_SEL];
-    uint64_t rate = clk_recalc_rate(mpeg_sel);
-    sddf_dprintf("MEPG_SEL clock rate: %lu\n", rate);
-
-    /* /\*     CLKID_MPLL2    0x11940000 *\/ */
-    /* /\*     CLKID_MPLL0    0x10266000 *\/ */
-    /* /\*     CLKID_MPLL1    0x17700000 *\/ */
-    struct clk *parent_clk = sm1_clks[CLKID_MPLL_PREDIV];
-    uint64_t prate = clk_recalc_rate(parent_clk);
-    sddf_dprintf("%s rate: %lu\n", parent_clk->hw.init->name, rate);
-
-    struct clk *mpll0_clk = sm1_clks[CLKID_MPLL0_DIV];
-    mpll0_clk->hw.init->ops->set_rate(mpll0_clk, 0x10266000, prate);
-    rate = clk_recalc_rate(mpll0_clk);
-    sddf_dprintf("%s rate: %lu\n", mpll0_clk->hw.init->name, rate);
-
-    struct clk *mpll1_clk = sm1_clks[CLKID_MPLL1_DIV];
-    mpll1_clk->hw.init->ops->set_rate(mpll1_clk, 0x17700000, prate);
-    rate = clk_recalc_rate(mpll1_clk);
-    sddf_dprintf("%s rate: %lu\n", mpll1_clk->hw.init->name, rate);
-
-    struct clk *mpll2_clk = sm1_clks[CLKID_MPLL2_DIV];
-    mpll2_clk->hw.init->ops->set_rate(mpll2_clk, 0x11940000, prate);
-    rate = clk_recalc_rate(mpll2_clk);
-    sddf_dprintf("%s rate: %lu\n", mpll2_clk->hw.init->name, rate);
-
     clk_msr_stat();
-
-    sddf_dprintf("-----------------\n");
 }

@@ -195,7 +195,6 @@ unsigned long clk_msr(unsigned long clk_mux)
     *mclk_reg0 = regval;
 
     regval = *mclk_reg0;
-    /* sddf_dprintf("reg_addr 0x%x, reg_val: 0x%0x\n", mclk_reg0, regval); */
 
     uint64_t start_time = sddf_timer_time_now(TIMER_CH);
     uint64_t now_time = start_time;
@@ -224,15 +223,8 @@ unsigned long clk_msr(unsigned long clk_mux)
     return DIV_ROUND_CLOSEST_ULL((msr_val & ((1 << 19) - 1)) * 1000000ULL, duration);
 }
 
-int clk_msr_stat()
+
+char **get_msr_clk_list(void)
 {
-    unsigned long clk_freq;
-    int i = 0;
-
-    for (i = 0; i < 128; i++) {
-        clk_freq = clk_msr(i);
-        sddf_dprintf("[%4d][%4ldHz] %s\n", i, clk_freq, sm1_table[i]);
-    }
-
-    return 0;
+    return sm1_table;
 }
