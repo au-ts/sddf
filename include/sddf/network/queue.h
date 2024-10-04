@@ -50,8 +50,8 @@ typedef struct net_queue_handle {
 static inline uint16_t net_queue_length_consumer(net_queue_t *queue)
 {
 #if CONFIG_ENABLE_SMP_SUPPORT
-    uint16_t tail = __atomic_load_n(&queue->tail, __ATOMIC_ACQUIRE);
     uint16_t head = __atomic_load_n(&queue->head, __ATOMIC_RELAXED);
+    uint16_t tail = __atomic_load_n(&queue->tail, __ATOMIC_ACQUIRE);
     return tail - head;
 #else
     COMPILER_MEMORY_ACQUIRE();
@@ -105,8 +105,7 @@ static inline void net_queue_publish_dequeued(net_queue_t *queue, uint16_t num_d
 {
     if (!num_dequeued) return;
 #if CONFIG_ENABLE_SMP_SUPPORT
-    uint16_t head = __atomic_load_n(&queue->head, __ATOMIC_RELAXED);
-    __atomic_store_n(&queue->head, head + num_dequeued, __ATOMIC_RELEASE);
+    __atomic_fetch_add(&queue->head, num_dequeued, __ATOMIC_RELEASE);
 #else
     COMPILER_MEMORY_RELEASE();
     queue->head = queue->head + num_dequeued;
@@ -119,8 +118,7 @@ static inline void net_queue_publish_enqueued(net_queue_t *queue, uint16_t num_e
 {
     if (!num_enqueued) return;
 #if CONFIG_ENABLE_SMP_SUPPORT
-    uint16_t tail = __atomic_load_n(&queue->tail, __ATOMIC_RELAXED);
-    __atomic_store_n(&queue->tail, tail + num_enqueued, __ATOMIC_RELEASE);
+    __atomic_fetch_add(&queue->tail, num_enqueued, __ATOMIC_RELEASE);
 #else
     COMPILER_MEMORY_RELEASE();
     queue->tail = queue->tail + num_enqueued;
