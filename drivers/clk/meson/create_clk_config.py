@@ -97,16 +97,16 @@ def extract_clocks(dt: dtlib.DT, node: dtlib.Node) -> List:
 def write_configs_to_headerfile(path: str) -> None:
     with open(path + '/clk_config.h', "w") as f:
         f.write("#include <conf_types.h>\n")
-        # f.write("#define NUM_DEVICE_CLKS {}\n\n".format(len(clock_list)))
-        f.write("#define NUM_DEVICE_CLKS 0\n\n")
+        f.write("#define NUM_DEVICE_CLKS {}\n\n".format(len(clock_list)))
+        # f.write("#define NUM_DEVICE_CLKS 0\n\n")
 
         clk_cfg_strs = []
         for key, value in clock_list.items():
             clk_cfg_strs.append("    {{ .clk_id = {}, .frequency = {}, .pclk_id = {} }}".format(key, value[0], value[1]))
 
         # clk_cfg_strs = ["{{ .clk_id = {}, .frequency = {}, .pclk_id = {} }}".format(clk_cfg[0], clk_cfg[1], clk_cfg[2]) for clk_cfg in clk_configs]
-        # f.write("static struct clk_cfg clk_configs[] = {{\n{}\n}};".format(",\n".join(clk_cfg_strs)))
-        f.write("static struct clk_cfg clk_configs[] = {};")
+        f.write("static struct clk_cfg clk_configs[] = {{\n{}\n}};".format(",\n".join(clk_cfg_strs)))
+        # f.write("static struct clk_cfg clk_configs[] = {};")
 
 if __name__ == "__main__":
     print("Creating a config file for clock driver to intialise the system...")
