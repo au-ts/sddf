@@ -66,11 +66,15 @@ _Static_assert(offsetof(nvme_controller_t, _reserved2) == 0x6C, "nvme_controller
 #define NVME_CAP_DSTRD_MASK  _MASK(32, 35) /* Doorbell Stride (2 ^ (2 + DSTRD)) */
 
 /* [NVMe-2.1] 3.1.4.5 Offset 14h: CC – Controller Configuration */
-#define NVME_CC_MPS_SHIFT 7            /* Host Memory Page Size */
-#define NVME_CC_MPS_MASK  _MASK(7, 10) /* Host Memory Page Size */
-#define NVME_CC_CSS_SHIFT 4            /* I/O Command Set Selected */
-#define NVME_CC_CSS_MASK  _MASK(4, 6)  /* I/O Command Set Selected */
-#define NVME_CC_EN        BIT(0)       /* Controller Enable */
+#define NVME_CC_IOCQES_SHIFT 20            /* I/O Completion Queue Entry Size */
+#define NVME_CC_IOCQES_MASK  _MASK(20, 23) /* I/O Completion Queue Entry Size */
+#define NVME_CC_IOSQES_SHIFT 16            /* I/O Submission Queue Entry Size */
+#define NVME_CC_IOSQES_MASK  _MASK(16, 19) /* I/O Submission Queue Entry Size */
+#define NVME_CC_MPS_SHIFT    7             /* Host Memory Page Size */
+#define NVME_CC_MPS_MASK     _MASK(7, 10)  /* Host Memory Page Size */
+#define NVME_CC_CSS_SHIFT    4             /* I/O Command Set Selected */
+#define NVME_CC_CSS_MASK     _MASK(4, 6)   /* I/O Command Set Selected */
+#define NVME_CC_EN           BIT(0)        /* Controller Enable */
 
 /* [NVMe-2.1] 3.1.4.6 Offset 1Ch: CSTS – Controller Status */
 #define NVME_CSTS_RDY BIT(0) /* Controller Ready (RO) */
