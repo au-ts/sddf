@@ -21,7 +21,7 @@ fi
 SDK_PATH=$1
 GITHUB_TOKEN=$2
 SDK_TARGET=$3
-MICROKIT_REPO="Ivan-Velickovic/microkit"
+MICROKIT_REPO="seL4/microkit"
 # zip is the only available option
 ARCHIVE_FORMAT="zip"
 
@@ -36,10 +36,6 @@ else
     exit 1
 fi
 
-# @ivanv: should assert that the SDK target matches what we expect after
-# we actually get the artifact. Or, even better, we find a way to extract
-# the artifact ID that matches our target
-
 ARTIFACT_ID=`curl \
   -H "Accept: application/vnd.github+json" \
   -H "Authorization: Bearer ${GITHUB_TOKEN}"\
@@ -49,8 +45,8 @@ ARTIFACT_ID=`curl \
 echo "Downloading SDK with artifact ID: ${ARTIFACT_ID}"
 curl \
   -L \
-  -u "Ivan-Velickovic:${GITHUB_TOKEN}" \
   -o $SDK_PATH \
   -H "Accept: application/vnd.github+json" \
+  -H "Authorization: Bearer ${GITHUB_TOKEN}"\
   -H "X-GitHub-Api-Version: 2022-11-28" \
   https://api.github.com/repos/$MICROKIT_REPO/actions/artifacts/$ARTIFACT_ID/$ARCHIVE_FORMAT
