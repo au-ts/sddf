@@ -92,7 +92,6 @@ void enable_clk(struct clk *clk)
     if (clk->hw.init->ops->enable != NULL) {
         clk->hw.init->ops->enable(clk);
     }
-    sddf_dprintf("Done\n");
 }
 
 void set_clk_rate(struct clk *clk, uint32_t rate)
