@@ -11,8 +11,11 @@
     <!-- Hardcoded from what PCIe gives us. Ideally we should learn this at runtime
          or overwrite the BARs. But for now... -->
     <memory_region name="nvme_regs" phys_addr="0x3800_0000" size="0x4000" />
+    <!-- NVMe Queues -->
     <memory_region name="nvme_asq"                          size="0x1000" />
     <memory_region name="nvme_acq"                          size="0x1000" />
+    <memory_region name="nvme_io_sq"                        size="0x1000" />
+    <memory_region name="nvme_io_cq"                        size="0x1000" />
 
     <memory_region name="data_region" size="0x10_000" />
 
@@ -27,7 +30,12 @@
         <map mr="nvme_acq"  vaddr="0x3002_0000" perms="rw" cached="false" setvar_vaddr="nvme_acq_region" />
         <setvar symbol="nvme_acq_region_paddr" region_paddr="nvme_acq" />
 
-        <map mr="data_region" vaddr="0x3003_0000" perms="rw" cached="false" setvar_vaddr="data_region" />
+        <map mr="nvme_io_sq"  vaddr="0x3003_0000" perms="rw" cached="false" setvar_vaddr="nvme_io_sq_region" />
+        <setvar symbol="nvme_io_sq_region_paddr" region_paddr="nvme_io_sq" />
+        <map mr="nvme_io_cq"  vaddr="0x3004_0000" perms="rw" cached="false" setvar_vaddr="nvme_io_cq_region" />
+        <setvar symbol="nvme_io_cq_region_paddr" region_paddr="nvme_io_cq" />
+
+        <map mr="data_region" vaddr="0x3005_0000" perms="rw" cached="false" setvar_vaddr="data_region" />
         <setvar symbol="data_region_paddr" region_paddr="data_region" />
 
         <program_image path="pcie_driver.elf" />
