@@ -60,10 +60,10 @@
     <protection_domain name="benchIdle" priority="1" >
         <program_image path="idle.elf" />
         <!-- benchmark.c puts PMU data in here for lwip to collect -->
-        <map mr="cyclecounters" vaddr="0x5_010_000" perms="rw" cached="true" setvar_vaddr="cyclecounters_vaddr" />
+        <map mr="cyclecounters" vaddr="0x5_010_000" perms="rw" cached="true" setvar_vaddr="b" />
     </protection_domain>
 
-    <protection_domain name="bench" priority="102" >
+    <protection_domain name="bench0" priority="102" >
         <program_image path="benchmark.elf" />
 
         <map mr="serial_tx_queue_client2" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="serial_tx_queue" />
@@ -177,7 +177,7 @@
             <map mr="serial_tx_queue_client0" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="serial_tx_queue" />
             <map mr="serial_tx_data_client0" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="serial_tx_data" />
 
-            <map mr="cyclecounters" vaddr="0x5_010_000" perms="rw" cached="true" setvar_vaddr="cyclecounters_vaddr" />
+            <map mr="cyclecounters" vaddr="0x5_010_000" perms="rw" cached="true" setvar_vaddr="idle_ccounts_vaddr" />
         </protection_domain>
 
         <protection_domain name="client1" priority="95" budget="20000" id="7">
@@ -219,7 +219,7 @@
 
    <channel>
         <end pd="serial_virt_tx" id="3"/>
-        <end pd="bench" id="0"/>
+        <end pd="bench0" id="0"/>
     </channel>
 
     <channel>
@@ -264,17 +264,17 @@
 
     <channel>
         <end pd="client0" id="4" /> <!-- start channel -->
-        <end pd="bench" id="1" />
+        <end pd="bench0" id="1" />
     </channel>
 
     <channel>
         <end pd="client0" id="5" /> <!-- stop channel -->
-        <end pd="bench" id="2" />
+        <end pd="bench0" id="2" />
     </channel>
 
     <channel>
         <end pd="benchIdle" id="3" /> <!-- bench init channel -->
-        <end pd="bench" id="3" />
+        <end pd="bench0" id="5" />
     </channel>
 
     <channel>
