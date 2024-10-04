@@ -87,11 +87,12 @@ static void update_ring_slot(hw_ring_t *ring, unsigned int idx, uint32_t status,
 static void rx_provide()
 {
     bool reprocess = true;
+    uint16_t free_length = net_queue_length_consumer(rx_queue.free);
     while (reprocess) {
-        while (!hw_ring_full(&rx) && !net_queue_empty_free(&rx_queue)) {
-            net_buff_desc_t buffer;
-            int err = net_dequeue_free(&rx_queue, &buffer);
-            assert(!err);
+        uint16_t bufs_dequeued = 0;
+        while (!hw_ring_full(&rx) && bufs_dequeued < free_length) {
+            net_buff_desc_t *buf = net_queue_next_full(rx_queue.free, rx_queue.capacity, bufs_dequeued);
+            bufs_dequeued++;
 
             uint32_t idx = rx.tail % rx.capacity;
             uint32_t cntl = (MAX_RX_FRAME_SZ << DESC_RXCTRL_SIZE1SHFT) & DESC_RXCTRL_SIZE1MASK;
@@ -99,17 +100,19 @@ static void rx_provide()
                 cntl |= DESC_RXCTRL_RXRINGEND;
             }
 
-            rx.descr_mdata[idx] = buffer;
-            update_ring_slot(&rx, idx, DESC_RXSTS_OWNBYDMA, cntl, buffer.io_or_offset, 0);
+            rx.descr_mdata[idx].io_or_offset = buf->io_or_offset;
+            update_ring_slot(&rx, idx, DESC_RXSTS_OWNBYDMA, cntl, buf->io_or_offset, 0);
             eth_dma->rxpolldemand = POLL_DATA;
-
             rx.tail++;
         }
+
+        net_queue_publish_dequeued(rx_queue.free, bufs_dequeued);
 
         net_request_signal_free(&rx_queue);
         reprocess = false;
 
-        if (!net_queue_empty_free(&rx_queue) && !hw_ring_full(&rx)) {
+        free_length = net_queue_length_consumer(rx_queue.free);
+        if (!hw_ring_full(&rx) && free_length) {
             net_cancel_signal_free(&rx_queue);
             reprocess = true;
         }
@@ -118,40 +121,41 @@ static void rx_provide()
 
 static void rx_return(void)
 {
-    bool packets_transferred = false;
+    uint16_t bufs_enqueued = 0;
     while (!hw_ring_empty(&rx)) {
         /* If buffer slot is still empty, we have processed all packets the device has filled */
-        uint32_t idx = rx.head % rx.capacity;
-        volatile struct descriptor *d = &(rx.descr[idx]);
+        uint32_t head_idx = rx.head % rx.capacity;
+        volatile struct descriptor *d = &(rx.descr[head_idx]);
         if (d->status & DESC_RXSTS_OWNBYDMA) {
             break;
         }
 
         THREAD_MEMORY_ACQUIRE();
 
-        net_buff_desc_t buffer = rx.descr_mdata[idx];
         if (d->status & DESC_RXSTS_ERROR) {
             sddf_dprintf("ETH|ERROR: RX descriptor returned with error status %x\n", d->status);
-            idx = rx.tail % rx.capacity;
+            uint32_t tail_idx = rx.tail % rx.capacity;
             uint32_t cntl = (MAX_RX_FRAME_SZ << DESC_RXCTRL_SIZE1SHFT) & DESC_RXCTRL_SIZE1MASK;
-            if (idx + 1 == rx.capacity) {
+            if (tail_idx + 1 == rx.capacity) {
                 cntl |= DESC_RXCTRL_RXRINGEND;
             }
 
-            rx.descr_mdata[idx] = buffer;
-            update_ring_slot(&rx, idx, DESC_RXSTS_OWNBYDMA, cntl, buffer.io_or_offset, 0);
+            rx.descr_mdata[tail_idx].io_or_offset = rx.descr_mdata[head_idx].io_or_offset;
+            update_ring_slot(&rx, tail_idx, DESC_RXSTS_OWNBYDMA, cntl, rx.descr_mdata[tail_idx].io_or_offset, 0);
             eth_dma->rxpolldemand = POLL_DATA;
             rx.tail++;
         } else {
-            buffer.len = (d->status & DESC_RXSTS_LENMSK) >> DESC_RXSTS_LENSHFT;
-            int err = net_enqueue_active(&rx_queue, buffer);
-            assert(!err);
-            packets_transferred = true;
+            net_buff_desc_t *slot = net_queue_next_empty(rx_queue.active, rx_queue.capacity, bufs_enqueued);
+            bufs_enqueued++;
+            slot->io_or_offset = rx.descr_mdata[head_idx].io_or_offset;
+            slot->len = (d->status & DESC_RXSTS_LENMSK) >> DESC_RXSTS_LENSHFT;
         }
         rx.head++;
     }
 
-    if (packets_transferred && net_require_signal_active(&rx_queue)) {
+    net_queue_publish_enqueued(rx_queue.active, bufs_enqueued);
+
+    if (bufs_enqueued && net_require_signal_active(&rx_queue)) {
         net_cancel_signal_active(&rx_queue);
         microkit_notify(RX_CH);
     }
@@ -160,28 +164,31 @@ static void rx_return(void)
 static void tx_provide(void)
 {
     bool reprocess = true;
+    uint16_t active_length = net_queue_length_consumer(tx_queue.active);
     while (reprocess) {
-        while (!(hw_ring_full(&tx)) && !net_queue_empty_active(&tx_queue)) {
-            net_buff_desc_t buffer;
-            int err = net_dequeue_active(&tx_queue, &buffer);
-            assert(!err);
+        uint16_t bufs_dequeued = 0;
+        while (!(hw_ring_full(&tx)) && bufs_dequeued < active_length) {
+            net_buff_desc_t *buf = net_queue_next_full(tx_queue.active, tx_queue.capacity, bufs_dequeued);
+            bufs_dequeued++;
 
             uint32_t idx = tx.tail % tx.capacity;
-            uint32_t cntl = (((uint32_t) buffer.len) << DESC_TXCTRL_SIZE1SHFT) & DESC_TXCTRL_SIZE1MASK;
+            uint32_t cntl = (((uint32_t) buf->len) << DESC_TXCTRL_SIZE1SHFT) & DESC_TXCTRL_SIZE1MASK;
             cntl |= DESC_TXCTRL_TXLAST | DESC_TXCTRL_TXFIRST | DESC_TXCTRL_TXINT;
             if (idx + 1 == tx.capacity) {
                 cntl |= DESC_TXCTRL_TXRINGEND;
             }
-            tx.descr_mdata[idx] = buffer;
-            update_ring_slot(&tx, idx, DESC_TXSTS_OWNBYDMA, cntl, buffer.io_or_offset, 0);
-
+            tx.descr_mdata[idx].io_or_offset = buf->io_or_offset;
+            update_ring_slot(&tx, idx, DESC_TXSTS_OWNBYDMA, cntl, buf->io_or_offset, 0);
             tx.tail++;
         }
+
+        net_queue_publish_dequeued(tx_queue.active, bufs_dequeued);
 
         net_request_signal_active(&tx_queue);
         reprocess = false;
 
-        if (!hw_ring_full(&tx) && !net_queue_empty_active(&tx_queue)) {
+        active_length = net_queue_length_consumer(tx_queue.active);
+        if (!hw_ring_full(&tx) && active_length) {
             net_cancel_signal_active(&tx_queue);
             reprocess = true;
         }
@@ -191,7 +198,7 @@ static void tx_provide(void)
 
 static void tx_return(void)
 {
-    bool enqueued = false;
+    uint16_t bufs_enqueued = 0;
     while (!hw_ring_empty(&tx)) {
         /* Ensure that this buffer has been sent by the device */
         uint32_t idx = tx.head % tx.capacity;
@@ -202,14 +209,16 @@ static void tx_return(void)
 
         THREAD_MEMORY_ACQUIRE();
 
-        net_buff_desc_t buffer = tx.descr_mdata[idx];
-        int err = net_enqueue_free(&tx_queue, buffer);
-        assert(!err);
-        enqueued = true;
+        net_buff_desc_t *slot = net_queue_next_empty(tx_queue.free, tx_queue.capacity, bufs_enqueued);
+        bufs_enqueued++;
+        slot->io_or_offset = tx.descr_mdata[idx].io_or_offset;
+
         tx.head++;
     }
 
-    if (enqueued && net_require_signal_free(&tx_queue)) {
+    net_queue_publish_enqueued(tx_queue.free, bufs_enqueued);
+
+    if (bufs_enqueued && net_require_signal_free(&tx_queue)) {
         net_cancel_signal_free(&tx_queue);
         microkit_notify(TX_CH);
     }

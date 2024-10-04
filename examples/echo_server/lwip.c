@@ -95,9 +95,9 @@ static void interface_free_buffer(struct pbuf *p)
     SYS_ARCH_DECL_PROTECT(old_level);
     pbuf_custom_offset_t *custom_pbuf_offset = (pbuf_custom_offset_t *)p;
     SYS_ARCH_PROTECT(old_level);
-    net_buff_desc_t buffer = {custom_pbuf_offset->offset, 0};
-    int err = net_enqueue_free(&(state.rx_queue), buffer);
-    assert(!err);
+    net_buff_desc_t *slot = net_queue_next_empty(state.rx_queue.free, state.rx_queue.capacity, 0);
+    slot->io_or_offset = custom_pbuf_offset->offset;
+    net_queue_publish_enqueued(state.rx_queue.free, 1);
     notify_rx = true;
     LWIP_MEMPOOL_FREE(RX_POOL, custom_pbuf_offset);
     SYS_ARCH_UNPROTECT(old_level);
@@ -149,6 +149,9 @@ void enqueue_pbufs(struct pbuf *p)
     pbuf_ref(p);
 }
 
+// Maybe batch tx/rx free updates
+bool internal_tx = false;
+
 /**
  * Insert pbuf into transmit active queue. If no free buffers available or transmit active queue is full,
  * stores pbuf to be sent upon buffers becoming available.
@@ -160,26 +163,28 @@ static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
         return ERR_MEM;
     }
 
-    if (net_queue_empty_free(&state.tx_queue)) {
-        enqueue_pbufs(p);
+    if (!net_queue_length_consumer(state.tx_queue.free)) {
+        if (internal_tx) {
+            internal_tx = false;
+        } else {
+            enqueue_pbufs(p);
+        }
         return ERR_OK;
     }
 
-    net_buff_desc_t buffer;
-    int err = net_dequeue_free(&state.tx_queue, &buffer);
-    assert(!err);
-
-    uintptr_t frame = buffer.io_or_offset + tx_buffer_data_region;
+    net_buff_desc_t *buf = net_queue_next_full(state.tx_queue.free, state.tx_queue.capacity, 0);
+    net_buff_desc_t *slot = net_queue_next_empty(state.tx_queue.active, state.tx_queue.capacity, 0);
+    uintptr_t frame = buf->io_or_offset + tx_buffer_data_region;
     uint16_t copied = 0;
     for (struct pbuf *curr = p; curr != NULL; curr = curr->next) {
         memcpy((void *)(frame + copied), curr->payload, curr->len);
         copied += curr->len;
     }
+    slot->io_or_offset = buf->io_or_offset;
+    slot->len = copied;
 
-    buffer.len = copied;
-    err = net_enqueue_active(&state.tx_queue, buffer);
-    assert(!err);
-
+    net_queue_publish_dequeued(state.tx_queue.free, 1);
+    net_queue_publish_enqueued(state.tx_queue.active, 1);
     notify_tx = true;
 
     return ERR_OK;
@@ -189,13 +194,16 @@ void transmit(void)
 {
     bool reprocess = true;
     while (reprocess) {
-        while (state.head != NULL && !net_queue_empty_free(&state.tx_queue)) {
+        internal_tx = true;
+        while (state.head != NULL) {
             err_t err = lwip_eth_send(&state.netif, state.head);
             if (err == ERR_MEM) {
                 sddf_dprintf("LWIP|ERROR: attempted to send a packet of size  %u > BUFFER SIZE  %u\n", state.head->tot_len,
                              NET_BUFFER_SIZE);
             } else if (err != ERR_OK) {
                 sddf_dprintf("LWIP|ERROR: unkown error when trying to send pbuf  %p\n", state.head);
+            } else if (!internal_tx) {
+                break;
             }
 
             struct pbuf *temp = state.head;
@@ -206,31 +214,33 @@ void transmit(void)
             pbuf_free(temp);
         }
 
-        /* Only request a signal if no more pbufs enqueud to send */
-        if (state.head == NULL || !net_queue_empty_free(&state.tx_queue)) {
+        /* Only request a signal if more pbufs enqueued to send */
+        if (state.head == NULL) {
             net_cancel_signal_free(&state.tx_queue);
         } else {
             net_request_signal_free(&state.tx_queue);
         }
         reprocess = false;
 
-        if (state.head != NULL && !net_queue_empty_free(&state.tx_queue)) {
+        if (state.head != NULL && net_queue_length_consumer(state.tx_queue.free)) {
             net_cancel_signal_free(&state.tx_queue);
             reprocess = true;
         }
     }
+    internal_tx = false;
 }
 
 void receive(void)
 {
     bool reprocess = true;
+    uint16_t active_length = net_queue_length_consumer(state.rx_queue.active);
     while (reprocess) {
-        while (!net_queue_empty_active(&state.rx_queue)) {
-            net_buff_desc_t buffer;
-            int err = net_dequeue_active(&state.rx_queue, &buffer);
-            assert(!err);
+        uint16_t bufs_dequeued = 0;
+        while (bufs_dequeued < active_length) {
+            net_buff_desc_t *buf = net_queue_next_full(state.rx_queue.active, state.rx_queue.capacity, bufs_dequeued);
+            bufs_dequeued++;
 
-            struct pbuf *p = create_interface_buffer(buffer.io_or_offset, buffer.len);
+            struct pbuf *p = create_interface_buffer(buf->io_or_offset, buf->len);
             assert(p != NULL);
             if (state.netif.input(p, &state.netif) != ERR_OK) {
                 sddf_dprintf("LWIP|ERROR: unkown error inputting pbuf into network stack\n");
@@ -238,10 +248,12 @@ void receive(void)
             }
         }
 
+        net_queue_publish_dequeued(state.rx_queue.active, bufs_dequeued);
         net_request_signal_active(&state.rx_queue);
         reprocess = false;
 
-        if (!net_queue_empty_active(&state.rx_queue)) {
+        active_length = net_queue_length_consumer(state.rx_queue.active);
+        if (active_length) {
             net_cancel_signal_active(&state.rx_queue);
             reprocess = true;
         }
