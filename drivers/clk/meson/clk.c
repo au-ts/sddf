@@ -1,15 +1,7 @@
-// SPDX-License-Identifier: GPL-2.0+
 /*
- * Amlogic Meson-G12A Clock Controller Driver
+ * Copyright 2023, UNSW
  *
- * Copyright (c) 2016 Baylibre SAS.
- * Author: Michael Turquette <mturquette@baylibre.com>
- *
- * Copyright (c) 2018 Amlogic, inc.
- * Author: Qiufang Dai <qiufang.dai@amlogic.com>
- * Author: Jian Hu <jian.hu@amlogic.com>
- *
- * Derived from: https://github.com/torvalds/linux/blob/befe87380e21f0d37633273e1068c9318f8135ff/drivers/clk/meson/g12a.c
+ * SPDX-License-Identifier: BSD-2-Clause
  */
 
 #include <microkit.h>
