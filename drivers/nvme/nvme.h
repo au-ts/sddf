@@ -130,4 +130,4 @@ _Static_assert(sizeof(nvme_completion_queue_entry_t) == 16,
 #define NVME_PCIE_SQT_MASK _MASK(0, 15) /* Submission Queue Tail*/
 #define NVME_PCIE_CQH_MASK _MASK(0, 15) /* Completion Queue Head */
 
-#define NVME_PCIE_DOORBELL_OFFSET(i, DSTRD) (0x1000 + (i * (4 << DSTRD)))
+#define NVME_PCIE_DOORBELL_OFFSET(i, DSTRD) (0x1000 + ((i) * (4 << (DSTRD))))
