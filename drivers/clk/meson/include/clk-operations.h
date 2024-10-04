@@ -47,5 +47,5 @@ extern const struct clk_ops meson_clk_pcie_pll_ops;
 extern const struct clk_ops meson_vid_pll_div_ro_ops;
 extern const struct clk_ops meson_vclk_gate_ops;
 extern const struct clk_ops meson_vclk_div_ops;
-
+extern const struct clk_ops meson_clk_cpu_dyndiv_ops;
 #endif // CLK_OPERATIONS_H_

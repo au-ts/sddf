@@ -1,6 +1,18 @@
 #include <clk.h>
-#include <g12a.h>
 #include <g12a-clkc.h>
+#include <sm1_clk_hws.h>
+#include <clk-operations.h>
+#include <sddf/util/util.h>
+
+const struct clk g12a_xtal = {
+    .data = &(struct clk_source_data){
+        .rate = 24000000,
+    },
+    .hw.init = &(struct clk_init_data){
+        .name = "xtal",
+        .ops = &meson_clk_source_ops,
+    }
+};
 
 static struct clk g12a_fixed_pll_dco = {
     .data = &(struct meson_clk_pll_data){
@@ -35,7 +47,7 @@ static struct clk g12a_fixed_pll_dco = {
             .width   = 1,
         },
     },
-    .init = &(struct clk_init_data){
+    .hw.init = &(struct clk_init_data){
         .name = "fixed_pll_dco",
         .ops = &meson_clk_pll_ro_ops,
         .parent_data = &(const struct clk_parent_data) {
@@ -72,9 +84,10 @@ static struct clk g12a_sys_pll_dco = {
             .shift   = 29,
             .width   = 1,
         },
-        .range = &g12a_sys_pll_mult_range,
+        .range_min = 128,
+        .range_max = 250,
     },
-    .init = &(struct clk_init_data){
+    .hw.init = &(struct clk_init_data){
         .name = "sys_pll_dco",
         .ops = &meson_clk_pll_ops,
         .parent_data = &(const struct clk_parent_data) {
@@ -86,65 +99,24 @@ static struct clk g12a_sys_pll_dco = {
     },
 };
 static MESON_DIV(g12a_sys_pll, HHI_SYS_PLL_CNTL0, 16, 3, CLK_DIVIDER_POWER_OF_TWO, { &g12a_sys_pll_dco }, 1, 0);
-static struct clk g12b_sys1_pll_dco = {
-    .data = &(struct meson_clk_pll_data){
-        .en = {
-            .reg_off = HHI_SYS1_PLL_CNTL0,
-            .shift   = 28,
-            .width   = 1,
-        },
-        .m = {
-            .reg_off = HHI_SYS1_PLL_CNTL0,
-            .shift   = 0,
-            .width   = 8,
-        },
-        .n = {
-            .reg_off = HHI_SYS1_PLL_CNTL0,
-            .shift   = 10,
-            .width   = 5,
-        },
-        .l = {
-            .reg_off = HHI_SYS1_PLL_CNTL0,
-            .shift   = 31,
-            .width   = 1,
-        },
-        .rst = {
-            .reg_off = HHI_SYS1_PLL_CNTL0,
-            .shift   = 29,
-            .width   = 1,
-        },
-        .range = &g12a_sys_pll_mult_range,
-    },
-    .init = &(struct clk_init_data){
-        .name = "sys1_pll_dco",
-        .ops = &meson_clk_pll_ops,
-        .parent_data = &(const struct clk_parent_data) {
-            .fw_name = "xtal",
-        },
-        .num_parents = 1,
-        /* This clock feeds the CPU, avoid disabling it */
-        .flags = CLK_IS_CRITICAL,
-    },
-};
-static MESON_DIV(g12b_sys1_pll, HHI_SYS1_PLL_CNTL0, 16, 3, CLK_DIVIDER_POWER_OF_TWO, { &g12b_sys1_pll_dco }, 1, 0);
 static MESON_GATE_RO(g12a_sys_pll_div16_en, HHI_SYS_CPU_CLK_CNTL1, 24, 0, { &g12a_sys_pll }, 1, 0);
-static MESON_GATE_RO(g12b_sys1_pll_div16_en, HHI_SYS_CPUB_CLK_CNTL1, 24, 0, { &g12b_sys1_pll }, 1, 0);
 static MESON_FIXED_FACTOR(g12a_sys_pll_div16, 1, 16, { &g12a_sys_pll_div16_en }, 1, 0);
-static MESON_FIXED_FACTOR(g12b_sys1_pll_div16, 1, 16, { &g12b_sys1_pll_div16_en }, 1, 0);
 static MESON_FIXED_FACTOR(g12a_fclk_div2_div, 1, 2, { &g12a_fixed_pll }, 1, 0);
 static MESON_GATE(g12a_fclk_div2, HHI_FIX_PLL_CNTL1, 24, 0, { &g12a_fclk_div2_div }, 1, 0);
 static MESON_FIXED_FACTOR(g12a_fclk_div3_div, 1, 3, { &g12a_fixed_pll }, 1, 0);
 static MESON_GATE(g12a_fclk_div3, HHI_FIX_PLL_CNTL1, 20, 0, { &g12a_fclk_div3_div }, 1, 0);
-static MESON_MUX(g12a_cpu_clk_premux0, HHI_SYS_CPU_CLK_CNTL0, 0x3, 0, NULL, CLK_MUX_ROUND_CLOSEST, (const struct clk_parent_data []) {
+const struct clk_parent_data g12a_cpu_clk_premux0_parent_table[] = {
             { .fw_name = "xtal", },
-            { .hw = &g12a_fclk_div2.hw },
-            { .hw = &g12a_fclk_div3.hw },
-        }, 3, 0);
-static MESON_MUX(g12a_cpu_clk_premux1, HHI_SYS_CPU_CLK_CNTL0, 0x3, 16, NULL, 0, (const struct clk_parent_data []) {
+            { .clk = &g12a_fclk_div2 },
+            { .clk = &g12a_fclk_div3 },
+};
+static MESON_MUX(g12a_cpu_clk_premux0, HHI_SYS_CPU_CLK_CNTL0, 0x3, 0, 0, CLK_MUX_ROUND_CLOSEST, g12a_cpu_clk_premux0_parent_table, 3, 0);
+const struct clk_parent_data g12a_cpu_clk_premux1_parent_table[] = {
             { .fw_name = "xtal", },
-            { .hw = &g12a_fclk_div2.hw },
-            { .hw = &g12a_fclk_div3.hw },
-        }, 3, 0);
+            { .clk = &g12a_fclk_div2 },
+            { .clk = &g12a_fclk_div3 },
+};
+static MESON_MUX(g12a_cpu_clk_premux1, HHI_SYS_CPU_CLK_CNTL0, 0x3, 16, 0, 0, g12a_cpu_clk_premux1_parent_table, 3, 0);
 static struct clk g12a_cpu_clk_mux0_div = {
     .data = &(struct meson_clk_cpu_dyndiv_data){
         .div = {
@@ -158,7 +130,7 @@ static struct clk g12a_cpu_clk_mux0_div = {
             .width = 1,
         },
     },
-    .init = &(struct clk_init_data){
+    .hw.init = &(struct clk_init_data){
         .name = "cpu_clk_dyn0_div",
         .ops = &meson_clk_cpu_dyndiv_ops,
         .parent_clks = (const struct clk *[]) {
@@ -168,135 +140,37 @@ static struct clk g12a_cpu_clk_mux0_div = {
         .flags = CLK_SET_RATE_PARENT,
     },
 };
-const struct clk_parent_data [] g12a_cpu_clk_postmux0_parent_table = {
+const struct clk_parent_data g12a_cpu_clk_postmux0_parent_table[] = {
     { .clk = &g12a_cpu_clk_premux0 },
     { .clk = &g12a_cpu_clk_mux0_div },
 };
-static MESON_MUX(g12a_cpu_clk_postmux0, HHI_SYS_CPU_CLK_CNTL0, 0x1, 2, NULL, CLK_MUX_ROUND_CLOSEST, g12a_cpu_clk_postmux0_parent_table, 2, 0);
+static MESON_MUX(g12a_cpu_clk_postmux0, HHI_SYS_CPU_CLK_CNTL0, 0x1, 2, 0, CLK_MUX_ROUND_CLOSEST, g12a_cpu_clk_postmux0_parent_table, 2, 0);
 static MESON_DIV_RO(g12a_cpu_clk_mux1_div, HHI_SYS_CPU_CLK_CNTL0, 20, 6, 0, { &g12a_cpu_clk_premux1 }, 1, 0);
-const struct clk_parent_data [] g12a_cpu_clk_postmux1_parent_table = {
+const struct clk_parent_data g12a_cpu_clk_postmux1_parent_table[] = {
     { .clk = &g12a_cpu_clk_premux1 },
     { .clk = &g12a_cpu_clk_mux1_div },
 };
-static MESON_MUX(g12a_cpu_clk_postmux1, HHI_SYS_CPU_CLK_CNTL0, 0x1, 18, NULL, 0, g12a_cpu_clk_postmux1_parent_table, 2, 0);
-const struct clk_parent_data [] g12a_cpu_clk_dyn_parent_table = {
+static MESON_MUX(g12a_cpu_clk_postmux1, HHI_SYS_CPU_CLK_CNTL0, 0x1, 18, 0, 0, g12a_cpu_clk_postmux1_parent_table, 2, 0);
+const struct clk_parent_data g12a_cpu_clk_dyn_parent_table[] = {
     { .clk = &g12a_cpu_clk_postmux0 },
     { .clk = &g12a_cpu_clk_postmux1 },
 };
-static MESON_MUX(g12a_cpu_clk_dyn, HHI_SYS_CPU_CLK_CNTL0, 0x1, 10, NULL, CLK_MUX_ROUND_CLOSEST, g12a_cpu_clk_dyn_parent_table, 2, 0);
-const struct clk_parent_data [] g12a_cpu_clk_parent_table = {
+static MESON_MUX(g12a_cpu_clk_dyn, HHI_SYS_CPU_CLK_CNTL0, 0x1, 10, 0, CLK_MUX_ROUND_CLOSEST, g12a_cpu_clk_dyn_parent_table, 2, 0);
+const struct clk_parent_data g12a_cpu_clk_parent_table[] = {
     { .clk = &g12a_cpu_clk_dyn },
     { .clk = &g12a_sys_pll },
 };
-static MESON_MUX(g12a_cpu_clk, HHI_SYS_CPU_CLK_CNTL0, 0x1, 11, NULL, CLK_MUX_ROUND_CLOSEST, g12a_cpu_clk_parent_table, 2, 0);
-const struct clk_parent_data [] g12b_cpu_clk_parent_table = {
-    { .clk = &g12a_cpu_clk_dyn },
-    { .clk = &g12b_sys1_pll },
+static MESON_MUX(g12a_cpu_clk, HHI_SYS_CPU_CLK_CNTL0, 0x1, 11, 0, CLK_MUX_ROUND_CLOSEST, g12a_cpu_clk_parent_table, 2, 0);
+
+
+static const struct reg_sequence g12a_gp0_init_regs[] = {
+    { .reg = HHI_GP0_PLL_CNTL1,    .def = 0x00000000 },
+    { .reg = HHI_GP0_PLL_CNTL2,    .def = 0x00000000 },
+    { .reg = HHI_GP0_PLL_CNTL3,    .def = 0x48681c00 },
+    { .reg = HHI_GP0_PLL_CNTL4,    .def = 0x33771290 },
+    { .reg = HHI_GP0_PLL_CNTL5,    .def = 0x39272000 },
+    { .reg = HHI_GP0_PLL_CNTL6,    .def = 0x56540000 },
 };
-static MESON_MUX(g12b_cpu_clk, HHI_SYS_CPU_CLK_CNTL0, 0x1, 11, NULL, CLK_MUX_ROUND_CLOSEST, g12b_cpu_clk_parent_table, 2, 0);
-static MESON_MUX(g12b_cpub_clk_premux0, HHI_SYS_CPUB_CLK_CNTL, 0x3, 0, NULL, CLK_MUX_ROUND_CLOSEST, (const struct clk_parent_data []) {
-            { .fw_name = "xtal", },
-            { .hw = &g12a_fclk_div2.hw },
-            { .hw = &g12a_fclk_div3.hw },
-        }, 3, 0);
-static struct clk g12b_cpub_clk_mux0_div = {
-    .data = &(struct meson_clk_cpu_dyndiv_data){
-        .div = {
-            .reg_off = HHI_SYS_CPUB_CLK_CNTL,
-            .shift = 4,
-            .width = 6,
-        },
-        .dyn = {
-            .reg_off = HHI_SYS_CPUB_CLK_CNTL,
-            .shift = 26,
-            .width = 1,
-        },
-    },
-    .init = &(struct clk_init_data){
-        .name = "cpub_clk_dyn0_div",
-        .ops = &meson_clk_cpu_dyndiv_ops,
-        .parent_clks = (const struct clk *[]) {
-            &g12b_cpub_clk_premux0
-        },
-        .num_parents = 1,
-        .flags = CLK_SET_RATE_PARENT,
-    },
-};
-const struct clk_parent_data [] g12b_cpub_clk_postmux0_parent_table = {
-    { .clk = &g12b_cpub_clk_premux0 },
-    { .clk = &g12b_cpub_clk_mux0_div },
-};
-static MESON_MUX(g12b_cpub_clk_postmux0, HHI_SYS_CPUB_CLK_CNTL, 0x1, 2, NULL, CLK_MUX_ROUND_CLOSEST, g12b_cpub_clk_postmux0_parent_table, 2, 0);
-static MESON_MUX(g12b_cpub_clk_premux1, HHI_SYS_CPUB_CLK_CNTL, 0x3, 16, NULL, 0, (const struct clk_parent_data []) {
-            { .fw_name = "xtal", },
-            { .hw = &g12a_fclk_div2.hw },
-            { .hw = &g12a_fclk_div3.hw },
-        }, 3, 0);
-static MESON_DIV_RO(g12b_cpub_clk_mux1_div, HHI_SYS_CPUB_CLK_CNTL, 20, 6, 0, { &g12b_cpub_clk_premux1 }, 1, 0);
-const struct clk_parent_data [] g12b_cpub_clk_postmux1_parent_table = {
-    { .clk = &g12b_cpub_clk_premux1 },
-    { .clk = &g12b_cpub_clk_mux1_div },
-};
-static MESON_MUX(g12b_cpub_clk_postmux1, HHI_SYS_CPUB_CLK_CNTL, 0x1, 18, NULL, 0, g12b_cpub_clk_postmux1_parent_table, 2, 0);
-const struct clk_parent_data [] g12b_cpub_clk_dyn_parent_table = {
-    { .clk = &g12b_cpub_clk_postmux0 },
-    { .clk = &g12b_cpub_clk_postmux1 },
-};
-static MESON_MUX(g12b_cpub_clk_dyn, HHI_SYS_CPUB_CLK_CNTL, 0x1, 10, NULL, CLK_MUX_ROUND_CLOSEST, g12b_cpub_clk_dyn_parent_table, 2, 0);
-const struct clk_parent_data [] g12b_cpub_clk_parent_table = {
-    { .clk = &g12b_cpub_clk_dyn },
-    { .clk = &g12a_sys_pll },
-};
-static MESON_MUX(g12b_cpub_clk, HHI_SYS_CPUB_CLK_CNTL, 0x1, 11, NULL, CLK_MUX_ROUND_CLOSEST, g12b_cpub_clk_parent_table, 2, 0);
-static MESON_MUX_RO(sm1_dsu_clk_premux0, HHI_SYS_CPU_CLK_CNTL5, 0x3, 0, NULL, 0, (const struct clk_parent_data []) {
-            { .fw_name = "xtal", },
-            { .hw = &g12a_fclk_div2.hw },
-            { .hw = &g12a_fclk_div3.hw },
-            { .hw = &sm1_gp1_pll.hw },
-        }, 4, 0);
-static MESON_MUX_RO(sm1_dsu_clk_premux1, HHI_SYS_CPU_CLK_CNTL5, 0x3, 16, NULL, 0, (const struct clk_parent_data []) {
-            { .fw_name = "xtal", },
-            { .hw = &g12a_fclk_div2.hw },
-            { .hw = &g12a_fclk_div3.hw },
-            { .hw = &sm1_gp1_pll.hw },
-        }, 4, 0);
-static MESON_DIV_RO(sm1_dsu_clk_mux0_div, HHI_SYS_CPU_CLK_CNTL5, 4, 6, 0, { &sm1_dsu_clk_premux0 }, 1, 0);
-static MESON_MUX_RO(sm1_dsu_clk_postmux0, HHI_SYS_CPU_CLK_CNTL5, 0x1, 2, NULL, 0, None, 2, 0);
-static MESON_DIV_RO(sm1_dsu_clk_mux1_div, HHI_SYS_CPU_CLK_CNTL5, 20, 6, 0, { &sm1_dsu_clk_premux1 }, 1, 0);
-static MESON_MUX_RO(sm1_dsu_clk_postmux1, HHI_SYS_CPU_CLK_CNTL5, 0x1, 18, NULL, 0, None, 2, 0);
-static MESON_MUX_RO(sm1_dsu_clk_dyn, HHI_SYS_CPU_CLK_CNTL5, 0x1, 10, NULL, 0, None, 2, 0);
-static MESON_MUX_RO(sm1_dsu_final_clk, HHI_SYS_CPU_CLK_CNTL5, 0x1, 11, NULL, 0, None, 2, 0);
-static MESON_MUX_RO(sm1_cpu1_clk, HHI_SYS_CPU_CLK_CNTL6, 0x1, 24, NULL, 0, None, 1, 0);
-static MESON_MUX_RO(sm1_cpu2_clk, HHI_SYS_CPU_CLK_CNTL6, 0x1, 25, NULL, 0, None, 1, 0);
-static MESON_MUX_RO(sm1_cpu3_clk, HHI_SYS_CPU_CLK_CNTL6, 0x1, 26, NULL, 0, None, 1, 0);
-static MESON_MUX_RO(sm1_dsu_clk, HHI_SYS_CPU_CLK_CNTL6, 0x1, 27, NULL, 0, None, 2, 0);
-static MESON_GATE_RO(g12a_cpu_clk_div16_en, HHI_SYS_CPU_CLK_CNTL1, 1, 0, { &g12a_cpu_clk }, 1, 0);
-static MESON_GATE_RO(g12b_cpub_clk_div16_en, HHI_SYS_CPUB_CLK_CNTL1, 1, 0, { &g12b_cpub_clk }, 1, 0);
-static MESON_FIXED_FACTOR(g12a_cpu_clk_div16, 1, 16, { &g12a_cpu_clk_div16_en }, 1, 0);
-static MESON_FIXED_FACTOR(g12b_cpub_clk_div16, 1, 16, { &g12b_cpub_clk_div16_en }, 1, 0);
-static MESON_DIV_RO(g12a_cpu_clk_apb_div, HHI_SYS_CPU_CLK_CNTL1, 3, 3, CLK_DIVIDER_POWER_OF_TWO, { &g12a_cpu_clk }, 1, 0);
-static MESON_GATE_RO(g12a_cpu_clk_apb, HHI_SYS_CPU_CLK_CNTL1, 1, 0, { &g12a_cpu_clk_apb_div }, 1, 0);
-static MESON_DIV_RO(g12a_cpu_clk_atb_div, HHI_SYS_CPU_CLK_CNTL1, 6, 3, CLK_DIVIDER_POWER_OF_TWO, { &g12a_cpu_clk }, 1, 0);
-static MESON_GATE_RO(g12a_cpu_clk_atb, HHI_SYS_CPU_CLK_CNTL1, 17, 0, { &g12a_cpu_clk_atb_div }, 1, 0);
-static MESON_DIV_RO(g12a_cpu_clk_axi_div, HHI_SYS_CPU_CLK_CNTL1, 9, 3, CLK_DIVIDER_POWER_OF_TWO, { &g12a_cpu_clk }, 1, 0);
-static MESON_GATE_RO(g12a_cpu_clk_axi, HHI_SYS_CPU_CLK_CNTL1, 18, 0, { &g12a_cpu_clk_axi_div }, 1, 0);
-static MESON_DIV_RO(g12a_cpu_clk_trace_div, HHI_SYS_CPU_CLK_CNTL1, 20, 3, CLK_DIVIDER_POWER_OF_TWO, None, 1, 0);
-static MESON_GATE_RO(g12a_cpu_clk_trace, HHI_SYS_CPU_CLK_CNTL1, 23, 0, { &g12a_cpu_clk_trace_div }, 1, 0);
-static MESON_FIXED_FACTOR(g12b_cpub_clk_div2, 1, 2, { &g12b_cpub_clk }, 1, 0);
-static MESON_FIXED_FACTOR(g12b_cpub_clk_div3, 1, 3, { &g12b_cpub_clk }, 1, 0);
-static MESON_FIXED_FACTOR(g12b_cpub_clk_div4, 1, 4, { &g12b_cpub_clk }, 1, 0);
-static MESON_FIXED_FACTOR(g12b_cpub_clk_div5, 1, 5, { &g12b_cpub_clk }, 1, 0);
-static MESON_FIXED_FACTOR(g12b_cpub_clk_div6, 1, 6, { &g12b_cpub_clk }, 1, 0);
-static MESON_FIXED_FACTOR(g12b_cpub_clk_div7, 1, 7, { &g12b_cpub_clk }, 1, 0);
-static MESON_FIXED_FACTOR(g12b_cpub_clk_div8, 1, 8, { &g12b_cpub_clk }, 1, 0);
-static MESON_MUX_RO(g12b_cpub_clk_apb_sel, HHI_SYS_CPUB_CLK_CNTL1, 7, 3, mux_table_cpub, 0, None, 7, 0);
-static MESON_GATE_RO(g12b_cpub_clk_apb, HHI_SYS_CPUB_CLK_CNTL1, 16, CLK_GATE_SET_TO_DISABLE, { &g12b_cpub_clk_apb_sel }, 1, 0);
-static MESON_MUX_RO(g12b_cpub_clk_atb_sel, HHI_SYS_CPUB_CLK_CNTL1, 7, 6, mux_table_cpub, 0, None, 7, 0);
-static MESON_GATE_RO(g12b_cpub_clk_atb, HHI_SYS_CPUB_CLK_CNTL1, 17, CLK_GATE_SET_TO_DISABLE, { &g12b_cpub_clk_atb_sel }, 1, 0);
-static MESON_MUX_RO(g12b_cpub_clk_axi_sel, HHI_SYS_CPUB_CLK_CNTL1, 7, 9, mux_table_cpub, 0, None, 7, 0);
-static MESON_GATE_RO(g12b_cpub_clk_axi, HHI_SYS_CPUB_CLK_CNTL1, 18, CLK_GATE_SET_TO_DISABLE, { &g12b_cpub_clk_axi_sel }, 1, 0);
-static MESON_MUX_RO(g12b_cpub_clk_trace_sel, HHI_SYS_CPUB_CLK_CNTL1, 7, 20, mux_table_cpub, 0, None, 7, 0);
-static MESON_GATE_RO(g12b_cpub_clk_trace, HHI_SYS_CPUB_CLK_CNTL1, 23, CLK_GATE_SET_TO_DISABLE, { &g12b_cpub_clk_trace_sel }, 1, 0);
 static struct clk g12a_gp0_pll_dco = {
     .data = &(struct meson_clk_pll_data){
         .en = {
@@ -329,11 +203,12 @@ static struct clk g12a_gp0_pll_dco = {
             .shift   = 29,
             .width   = 1,
         },
-        .range = &g12a_gp0_pll_mult_range,
+        .range_min = 125,
+        .range_max = 255,
         .init_regs = g12a_gp0_init_regs,
         .init_count = ARRAY_SIZE(g12a_gp0_init_regs),
     },
-    .init = &(struct clk_init_data){
+    .hw.init = &(struct clk_init_data){
         .name = "gp0_pll_dco",
         .ops = &meson_clk_pll_ops,
         .parent_data = &(const struct clk_parent_data) {
@@ -377,7 +252,7 @@ static struct clk sm1_gp1_pll_dco = {
             .width   = 1,
         },
     },
-    .init = &(struct clk_init_data){
+    .hw.init = &(struct clk_init_data){
         .name = "gp1_pll_dco",
         .ops = &meson_clk_pll_ro_ops,
         .parent_data = &(const struct clk_parent_data) {
@@ -390,6 +265,76 @@ static struct clk sm1_gp1_pll_dco = {
 };
 static MESON_DIV_RO(sm1_gp1_pll, HHI_GP1_PLL_CNTL0, 16, 3, (CLK_DIVIDER_POWER_OF_TWO |
               CLK_DIVIDER_ROUND_CLOSEST), { &sm1_gp1_pll_dco }, 1, 0);
+
+const struct clk_parent_data sm1_dsu_clk_premux0_parent_table[] = {
+    { .fw_name = "xtal", },
+    { .clk = &g12a_fclk_div2 },
+    { .clk = &g12a_fclk_div3 },
+    { .clk = &sm1_gp1_pll },
+};
+static MESON_MUX_RO(sm1_dsu_clk_premux0, HHI_SYS_CPU_CLK_CNTL5, 0x3, 0, 0, 0, sm1_dsu_clk_premux0_parent_table, 4, 0);
+const struct clk_parent_data sm1_dsu_clk_premux1_parent_table[] = {
+    { .fw_name = "xtal", },
+    { .clk = &g12a_fclk_div2 },
+    { .clk = &g12a_fclk_div3 },
+    { .clk = &sm1_gp1_pll },
+};
+static MESON_MUX_RO(sm1_dsu_clk_premux1, HHI_SYS_CPU_CLK_CNTL5, 0x3, 16, 0, 0, sm1_dsu_clk_premux1_parent_table, 4, 0);
+static MESON_DIV_RO(sm1_dsu_clk_mux0_div, HHI_SYS_CPU_CLK_CNTL5, 4, 6, 0, { &sm1_dsu_clk_premux0 }, 1, 0);
+const struct clk_parent_data sm1_dsu_clk_postmux0_parent_table[] = {
+    { .clk = &sm1_dsu_clk_premux0, },
+    { .clk = &sm1_dsu_clk_mux0_div },
+};
+static MESON_MUX_RO(sm1_dsu_clk_postmux0, HHI_SYS_CPU_CLK_CNTL5, 0x1, 2, 0, 0, sm1_dsu_clk_postmux0_parent_table, 2, 0);
+static MESON_DIV_RO(sm1_dsu_clk_mux1_div, HHI_SYS_CPU_CLK_CNTL5, 20, 6, 0, { &sm1_dsu_clk_premux1 }, 1, 0);
+
+const struct clk_parent_data sm1_dsu_clk_postmux1_parent_table[] = {
+    { .clk = &sm1_dsu_clk_premux1, },
+    { .clk = &sm1_dsu_clk_mux1_div },
+};
+static MESON_MUX_RO(sm1_dsu_clk_postmux1, HHI_SYS_CPU_CLK_CNTL5, 0x1, 18, 0, 0, sm1_dsu_clk_postmux1_parent_table, 2, 0);
+const struct clk_parent_data sm1_dsu_clk_dyn_parent_table[] = {
+    { .clk = &sm1_dsu_clk_premux0, },
+    { .clk = &sm1_dsu_clk_postmux1, },
+};
+static MESON_MUX_RO(sm1_dsu_clk_dyn, HHI_SYS_CPU_CLK_CNTL5, 0x1, 10, 0, 0, sm1_dsu_clk_dyn_parent_table, 2, 0);
+const struct clk_parent_data sm1_dsu_final_clk_parent_table[] = {
+    { .clk = &sm1_dsu_clk_dyn, },
+    { .clk = &g12a_sys_pll, },
+};
+static MESON_MUX_RO(sm1_dsu_final_clk, HHI_SYS_CPU_CLK_CNTL5, 0x1, 11, 0, 0, sm1_dsu_final_clk_parent_table, 2, 0);
+const struct clk_parent_data sm1_cpu_clk_parent_table[] = {
+    { .clk = &g12a_cpu_clk, },
+};
+static MESON_MUX_RO(sm1_cpu1_clk, HHI_SYS_CPU_CLK_CNTL6, 0x1, 24, 0, 0, sm1_cpu_clk_parent_table, 1, 0);
+static MESON_MUX_RO(sm1_cpu2_clk, HHI_SYS_CPU_CLK_CNTL6, 0x1, 25, 0, 0, sm1_cpu_clk_parent_table, 1, 0);
+static MESON_MUX_RO(sm1_cpu3_clk, HHI_SYS_CPU_CLK_CNTL6, 0x1, 26, 0, 0, sm1_cpu_clk_parent_table, 1, 0);
+const struct clk_parent_data sm1_dsu_clk_parent_table[] = {
+    { .clk = &g12a_cpu_clk, },
+    { .clk = &sm1_dsu_final_clk, },
+};
+static MESON_MUX_RO(sm1_dsu_clk, HHI_SYS_CPU_CLK_CNTL6, 0x1, 27, 0, 0, sm1_dsu_clk_parent_table, 2, 0);
+static MESON_GATE_RO(g12a_cpu_clk_div16_en, HHI_SYS_CPU_CLK_CNTL1, 1, 0, { &g12a_cpu_clk }, 1, 0);
+static MESON_FIXED_FACTOR(g12a_cpu_clk_div16, 1, 16, { &g12a_cpu_clk_div16_en }, 1, 0);
+static MESON_DIV_RO(g12a_cpu_clk_apb_div, HHI_SYS_CPU_CLK_CNTL1, 3, 3, CLK_DIVIDER_POWER_OF_TWO, { &g12a_cpu_clk }, 1, 0);
+static MESON_GATE_RO(g12a_cpu_clk_apb, HHI_SYS_CPU_CLK_CNTL1, 1, 0, { &g12a_cpu_clk_apb_div }, 1, 0);
+static MESON_DIV_RO(g12a_cpu_clk_atb_div, HHI_SYS_CPU_CLK_CNTL1, 6, 3, CLK_DIVIDER_POWER_OF_TWO, { &g12a_cpu_clk }, 1, 0);
+static MESON_GATE_RO(g12a_cpu_clk_atb, HHI_SYS_CPU_CLK_CNTL1, 17, 0, { &g12a_cpu_clk_atb_div }, 1, 0);
+static MESON_DIV_RO(g12a_cpu_clk_axi_div, HHI_SYS_CPU_CLK_CNTL1, 9, 3, CLK_DIVIDER_POWER_OF_TWO, { &g12a_cpu_clk }, 1, 0);
+static MESON_GATE_RO(g12a_cpu_clk_axi, HHI_SYS_CPU_CLK_CNTL1, 18, 0, { &g12a_cpu_clk_axi_div }, 1, 0);
+/* TODO: special case, ignore its parent clk at the moment */
+static MESON_DIV_RO(g12a_cpu_clk_trace_div, HHI_SYS_CPU_CLK_CNTL1, 20, 3, CLK_DIVIDER_POWER_OF_TWO, { }, 0, 0);
+static MESON_GATE_RO(g12a_cpu_clk_trace, HHI_SYS_CPU_CLK_CNTL1, 23, 0, { &g12a_cpu_clk_trace_div }, 1, 0);
+
+static const struct reg_sequence g12a_hifi_init_regs[] = {
+    { .reg = HHI_HIFI_PLL_CNTL1,    .def = 0x00000000 },
+    { .reg = HHI_HIFI_PLL_CNTL2,    .def = 0x00000000 },
+    { .reg = HHI_HIFI_PLL_CNTL3,    .def = 0x6a285c00 },
+    { .reg = HHI_HIFI_PLL_CNTL4,    .def = 0x65771290 },
+    { .reg = HHI_HIFI_PLL_CNTL5,    .def = 0x39272000 },
+    { .reg = HHI_HIFI_PLL_CNTL6,    .def = 0x56540000 },
+};
+
 static struct clk g12a_hifi_pll_dco = {
     .data = &(struct meson_clk_pll_data){
         .en = {
@@ -422,12 +367,13 @@ static struct clk g12a_hifi_pll_dco = {
             .shift   = 29,
             .width   = 1,
         },
-        .range = &g12a_gp0_pll_mult_range,
+        .range_min = 125,
+        .range_max = 255,
         .init_regs = g12a_hifi_init_regs,
         .init_count = ARRAY_SIZE(g12a_hifi_init_regs),
         .flags = CLK_MESON_PLL_ROUND_CLOSEST,
     },
-    .init = &(struct clk_init_data){
+    .hw.init = &(struct clk_init_data){
         .name = "hifi_pll_dco",
         .ops = &meson_clk_pll_ops,
         .parent_data = &(const struct clk_parent_data) {
@@ -438,6 +384,31 @@ static struct clk g12a_hifi_pll_dco = {
 };
 static MESON_DIV(g12a_hifi_pll, HHI_HIFI_PLL_CNTL0, 16, 2, (CLK_DIVIDER_POWER_OF_TWO |
               CLK_DIVIDER_ROUND_CLOSEST), { &g12a_hifi_pll_dco }, 1, 0);
+
+/*
+ * The Meson G12A PCIE PLL is fined tuned to deliver a very precise
+ * 100MHz reference clock for the PCIe Analog PHY, and thus requires
+ * a strict register sequence to enable the PLL.
+ */
+static const struct reg_sequence g12a_pcie_pll_init_regs[] = {
+    { .reg = HHI_PCIE_PLL_CNTL0,    .def = 0x20090496 },
+    { .reg = HHI_PCIE_PLL_CNTL0,    .def = 0x30090496 },
+    { .reg = HHI_PCIE_PLL_CNTL1,    .def = 0x00000000 },
+    { .reg = HHI_PCIE_PLL_CNTL2,    .def = 0x00001100 },
+    { .reg = HHI_PCIE_PLL_CNTL3,    .def = 0x10058e00 },
+    { .reg = HHI_PCIE_PLL_CNTL4,    .def = 0x000100c0 },
+    { .reg = HHI_PCIE_PLL_CNTL5,    .def = 0x68000048 },
+    { .reg = HHI_PCIE_PLL_CNTL5,    .def = 0x68000068, .delay_us = 20 },
+    { .reg = HHI_PCIE_PLL_CNTL4,    .def = 0x008100c0, .delay_us = 10 },
+    { .reg = HHI_PCIE_PLL_CNTL0,    .def = 0x34090496 },
+    { .reg = HHI_PCIE_PLL_CNTL0,    .def = 0x14090496, .delay_us = 10 },
+    { .reg = HHI_PCIE_PLL_CNTL2,    .def = 0x00001000 },
+};
+/* Keep a single entry table for recalc/round_rate() ops */
+static const struct pll_params_table g12a_pcie_pll_table[] = {
+    { .m = 150, .n = 1 },
+    { .m = 0, .n = 0},
+};
 static struct clk g12a_pcie_pll_dco = {
     .data = &(struct meson_clk_pll_data){
         .en = {
@@ -474,7 +445,7 @@ static struct clk g12a_pcie_pll_dco = {
         .init_regs = g12a_pcie_pll_init_regs,
         .init_count = ARRAY_SIZE(g12a_pcie_pll_init_regs),
     },
-    .init = &(struct clk_init_data){
+    .hw.init = &(struct clk_init_data){
         .name = "pcie_pll_dco",
         .ops = &meson_clk_pcie_pll_ops,
         .parent_data = &(const struct clk_parent_data) {
@@ -521,7 +492,7 @@ static struct clk g12a_hdmi_pll_dco = {
             .width   = 1,
         },
     },
-    .init = &(struct clk_init_data){
+    .hw.init = &(struct clk_init_data){
         .name = "hdmi_pll_dco",
         .ops = &meson_clk_pll_ro_ops,
         .parent_data = &(const struct clk_parent_data) {
@@ -547,11 +518,16 @@ static MESON_GATE(g12a_fclk_div7, HHI_FIX_PLL_CNTL1, 23, 0, { &g12a_fclk_div7_di
 static MESON_FIXED_FACTOR(g12a_fclk_div2p5_div, 1, 5, { &g12a_fixed_pll_dco }, 1, 0);
 static MESON_GATE(g12a_fclk_div2p5, HHI_FIX_PLL_CNTL1, 25, 0, { &g12a_fclk_div2p5_div }, 1, 0);
 static MESON_FIXED_FACTOR(g12a_mpll_50m_div, 1, 80, { &g12a_fixed_pll_dco }, 1, 0);
-static MESON_MUX_RO(g12a_mpll_50m, HHI_FIX_PLL_CNTL3, 0x1, 5, NULL, 0, (const struct clk_parent_data []) {
-            { .fw_name = "xtal", },
-            { .hw = &g12a_mpll_50m_div.hw },
-        }, 2, 0);
+const static struct clk_parent_data g12a_mpll_50m_parent_table[] = {
+    { .fw_name = "xtal", },
+    { .clk = &g12a_mpll_50m_div },
+};
+static MESON_MUX_RO(g12a_mpll_50m, HHI_FIX_PLL_CNTL3, 0x1, 5, 0, 0, g12a_mpll_50m_parent_table, 2, 0);
 static MESON_FIXED_FACTOR(g12a_mpll_prediv, 1, 2, { &g12a_fixed_pll_dco }, 1, 0);
+
+static const struct reg_sequence g12a_mpll0_init_regs[] = {
+    { .reg = HHI_MPLL_CNTL2,    .def = 0x40000033 },
+};
 static struct clk g12a_mpll0_div = {
     .data = &(struct meson_clk_mpll_data){
         .sdm = {
@@ -574,11 +550,11 @@ static struct clk g12a_mpll0_div = {
             .shift   = 29,
             .width     = 1,
         },
-        .lock = &meson_clk_lock,
+        /* .lock = &meson_clk_lock, */
         .init_regs = g12a_mpll0_init_regs,
         .init_count = ARRAY_SIZE(g12a_mpll0_init_regs),
     },
-    .init = &(struct clk_init_data){
+    .hw.init = &(struct clk_init_data){
         .name = "mpll0_div",
         .ops = &meson_clk_mpll_ops,
         .parent_clks = (const struct clk *[]) {
@@ -588,6 +564,9 @@ static struct clk g12a_mpll0_div = {
     },
 };
 static MESON_GATE(g12a_mpll0, HHI_MPLL_CNTL1, 31, 0, { &g12a_mpll0_div }, 1, 0);
+static const struct reg_sequence g12a_mpll1_init_regs[] = {
+    { .reg = HHI_MPLL_CNTL4,    .def = 0x40000033 },
+};
 static struct clk g12a_mpll1_div = {
     .data = &(struct meson_clk_mpll_data){
         .sdm = {
@@ -610,11 +589,11 @@ static struct clk g12a_mpll1_div = {
             .shift   = 29,
             .width     = 1,
         },
-        .lock = &meson_clk_lock,
+        /* .lock = &meson_clk_lock, */
         .init_regs = g12a_mpll1_init_regs,
         .init_count = ARRAY_SIZE(g12a_mpll1_init_regs),
     },
-    .init = &(struct clk_init_data){
+    .hw.init = &(struct clk_init_data){
         .name = "mpll1_div",
         .ops = &meson_clk_mpll_ops,
         .parent_clks = (const struct clk *[]) {
@@ -624,6 +603,9 @@ static struct clk g12a_mpll1_div = {
     },
 };
 static MESON_GATE(g12a_mpll1, HHI_MPLL_CNTL3, 31, 0, { &g12a_mpll1_div }, 1, 0);
+static const struct reg_sequence g12a_mpll2_init_regs[] = {
+    { .reg = HHI_MPLL_CNTL6, .def = 0x40000033 },
+};
 static struct clk g12a_mpll2_div = {
     .data = &(struct meson_clk_mpll_data){
         .sdm = {
@@ -646,11 +628,11 @@ static struct clk g12a_mpll2_div = {
             .shift   = 29,
             .width     = 1,
         },
-        .lock = &meson_clk_lock,
+        /* .lock = &meson_clk_lock, */
         .init_regs = g12a_mpll2_init_regs,
         .init_count = ARRAY_SIZE(g12a_mpll2_init_regs),
     },
-    .init = &(struct clk_init_data){
+    .hw.init = &(struct clk_init_data){
         .name = "mpll2_div",
         .ops = &meson_clk_mpll_ops,
         .parent_clks = (const struct clk *[]) {
@@ -660,6 +642,9 @@ static struct clk g12a_mpll2_div = {
     },
 };
 static MESON_GATE(g12a_mpll2, HHI_MPLL_CNTL5, 31, 0, { &g12a_mpll2_div }, 1, 0);
+static const struct reg_sequence g12a_mpll3_init_regs[] = {
+    { .reg = HHI_MPLL_CNTL8,    .def = 0x40000033 },
+};
 static struct clk g12a_mpll3_div = {
     .data = &(struct meson_clk_mpll_data){
         .sdm = {
@@ -682,11 +667,11 @@ static struct clk g12a_mpll3_div = {
             .shift   = 29,
             .width     = 1,
         },
-        .lock = &meson_clk_lock,
+        /* .lock = &meson_clk_lock, */
         .init_regs = g12a_mpll3_init_regs,
         .init_count = ARRAY_SIZE(g12a_mpll3_init_regs),
     },
-    .init = &(struct clk_init_data){
+    .hw.init = &(struct clk_init_data){
         .name = "mpll3_div",
         .ops = &meson_clk_mpll_ops,
         .parent_clks = (const struct clk *[]) {
@@ -696,16 +681,34 @@ static struct clk g12a_mpll3_div = {
     },
 };
 static MESON_GATE(g12a_mpll3, HHI_MPLL_CNTL7, 31, 0, { &g12a_mpll3_div }, 1, 0);
-static MESON_MUX_RO(g12a_mpeg_clk_sel, HHI_MPEG_CLK_CNTL, 0x7, 12, mux_table_clk81, 0, clk81_parent_data, 0, 0);
+
+static uint32_t mux_table_clk81[] = { 0, 2, 3, 4, 5, 6, 7 };
+static const struct clk_parent_data clk81_parent_data[] = {
+    { .fw_name = "xtal", },
+    { .clk = &g12a_fclk_div7 },
+    { .clk = &g12a_mpll1 },
+    { .clk = &g12a_mpll2 },
+    { .clk = &g12a_fclk_div4 },
+    { .clk = &g12a_fclk_div3 },
+    { .clk = &g12a_fclk_div5 },
+};
+static MESON_MUX_RO(g12a_mpeg_clk_sel, HHI_MPEG_CLK_CNTL, 0x7, 12, mux_table_clk81, 0, clk81_parent_data, ARRAY_SIZE(clk81_parent_data), 0);
 static MESON_DIV(g12a_mpeg_clk_div, HHI_MPEG_CLK_CNTL, 0, 7, 0, { &g12a_mpeg_clk_sel }, 1, 0);
 static MESON_GATE(g12a_clk81, HHI_MPEG_CLK_CNTL, 7, 0, { &g12a_mpeg_clk_div }, 1, 0);
-static MESON_MUX(g12a_sd_emmc_a_clk0_sel, HHI_SD_EMMC_CLK_CNTL, 0x7, 9, NULL, 0, g12a_sd_emmc_clk0_parent_data, 0, CLK_SET_RATE_PARENT);
+static const struct clk_parent_data g12a_sd_emmc_clk0_parent_data[] = {
+    { .fw_name = "xtal", },
+    { .clk = &g12a_fclk_div2 },
+    { .clk = &g12a_fclk_div3 },
+    { .clk = &g12a_fclk_div5 },
+    { .clk = &g12a_fclk_div7 },
+};
+static MESON_MUX(g12a_sd_emmc_a_clk0_sel, HHI_SD_EMMC_CLK_CNTL, 0x7, 9, 0, 0, g12a_sd_emmc_clk0_parent_data, 0, CLK_SET_RATE_PARENT);
 static MESON_DIV(g12a_sd_emmc_a_clk0_div, HHI_SD_EMMC_CLK_CNTL, 0, 7, 0, { &g12a_sd_emmc_a_clk0_sel }, 1, 0);
 static MESON_GATE(g12a_sd_emmc_a_clk0, HHI_SD_EMMC_CLK_CNTL, 7, 0, { &g12a_sd_emmc_a_clk0_div }, 1, 0);
-static MESON_MUX(g12a_sd_emmc_b_clk0_sel, HHI_SD_EMMC_CLK_CNTL, 0x7, 25, NULL, 0, g12a_sd_emmc_clk0_parent_data, 0, CLK_SET_RATE_PARENT);
+static MESON_MUX(g12a_sd_emmc_b_clk0_sel, HHI_SD_EMMC_CLK_CNTL, 0x7, 25, 0, 0, g12a_sd_emmc_clk0_parent_data, 0, CLK_SET_RATE_PARENT);
 static MESON_DIV(g12a_sd_emmc_b_clk0_div, HHI_SD_EMMC_CLK_CNTL, 16, 7, 0, { &g12a_sd_emmc_b_clk0_sel }, 1, 0);
 static MESON_GATE(g12a_sd_emmc_b_clk0, HHI_SD_EMMC_CLK_CNTL, 23, 0, { &g12a_sd_emmc_b_clk0_div }, 1, 0);
-static MESON_MUX(g12a_sd_emmc_c_clk0_sel, HHI_NAND_CLK_CNTL, 0x7, 9, NULL, 0, g12a_sd_emmc_clk0_parent_data, 0, CLK_SET_RATE_PARENT);
+static MESON_MUX(g12a_sd_emmc_c_clk0_sel, HHI_NAND_CLK_CNTL, 0x7, 9, 0, 0, g12a_sd_emmc_clk0_parent_data, 0, CLK_SET_RATE_PARENT);
 static MESON_DIV(g12a_sd_emmc_c_clk0_div, HHI_NAND_CLK_CNTL, 0, 7, 0, { &g12a_sd_emmc_c_clk0_sel }, 1, 0);
 static MESON_GATE(g12a_sd_emmc_c_clk0, HHI_NAND_CLK_CNTL, 7, 0, { &g12a_sd_emmc_c_clk0_div }, 1, 0);
 static struct clk g12a_vid_pll_div = {
@@ -721,7 +724,7 @@ static struct clk g12a_vid_pll_div = {
             .width   = 2,
         },
     },
-    .init = &(struct clk_init_data) {
+    .hw.init = &(struct clk_init_data) {
         .name = "vid_pll_div",
         .ops = &meson_vid_pll_div_ro_ops,
         .parent_clks = (const struct clk *[]) { &g12a_hdmi_pll },
@@ -729,42 +732,87 @@ static struct clk g12a_vid_pll_div = {
         .flags = CLK_SET_RATE_PARENT | CLK_GET_RATE_NOCACHE,
     },
 };
-static MESON_MUX(g12a_vid_pll_sel, HHI_VID_PLL_CLK_DIV, 0x1, 18, NULL, 0, None, 0, CLK_SET_RATE_NO_REPARENT | CLK_GET_RATE_NOCACHE);
+static const struct clk_parent_data g12a_vid_pll_parent_table[] = {
+    { .clk = &g12a_vid_pll_div, },
+    { .clk = &g12a_hdmi_pll, },
+};
+
+static MESON_MUX(g12a_vid_pll_sel, HHI_VID_PLL_CLK_DIV, 0x1, 18, 0, 0, g12a_vid_pll_parent_table, 0, CLK_SET_RATE_NO_REPARENT | CLK_GET_RATE_NOCACHE);
 static MESON_GATE(g12a_vid_pll, HHI_VID_PLL_CLK_DIV, 19, 0, { &g12a_vid_pll_sel }, 1, 0);
-static MESON_MUX(g12a_vpu_0_sel, HHI_VPU_CLK_CNTL, 0x7, 9, NULL, 0, None, 0, CLK_SET_RATE_NO_REPARENT);
+const static struct clk_parent_data g12a_vpu_sel_parent_table[] = {
+    { .clk = &g12a_fclk_div3, },
+    { .clk = &g12a_fclk_div4, },
+    { .clk = &g12a_fclk_div5, },
+    { .clk = &g12a_fclk_div7, },
+    { .clk = &g12a_mpll1, },
+    { .clk = &g12a_vid_pll, },
+    { .clk = &g12a_hifi_pll, },
+    { .clk = &g12a_gp0_pll, },
+};
+static MESON_MUX(g12a_vpu_0_sel, HHI_VPU_CLK_CNTL, 0x7, 9, 0, 0, g12a_vpu_sel_parent_table, 0, CLK_SET_RATE_NO_REPARENT);
 static MESON_DIV(g12a_vpu_0_div, HHI_VPU_CLK_CNTL, 0, 7, 0, { &g12a_vpu_0_sel }, 1, 0);
 static MESON_GATE(g12a_vpu_0, HHI_VPU_CLK_CNTL, 8, 0, { &g12a_vpu_0_div }, 1, 0);
-static MESON_MUX(g12a_vpu_1_sel, HHI_VPU_CLK_CNTL, 0x7, 25, NULL, 0, None, 0, CLK_SET_RATE_NO_REPARENT);
+static MESON_MUX(g12a_vpu_1_sel, HHI_VPU_CLK_CNTL, 0x7, 25, 0, 0, g12a_vpu_sel_parent_table, 0, CLK_SET_RATE_NO_REPARENT);
 static MESON_DIV(g12a_vpu_1_div, HHI_VPU_CLK_CNTL, 16, 7, 0, { &g12a_vpu_1_sel }, 1, 0);
 static MESON_GATE(g12a_vpu_1, HHI_VPU_CLK_CNTL, 24, 0, { &g12a_vpu_1_div }, 1, 0);
-const struct clk_parent_data [] g12a_vpu_parent_table = {
+const struct clk_parent_data g12a_vpu_parent_table[] = {
     { .clk = &g12a_vpu_0 },
     { .clk = &g12a_vpu_1 },
 };
-static MESON_MUX(g12a_vpu, HHI_VPU_CLK_CNTL, 1, 31, NULL, 0, g12a_vpu_parent_table, 2, 0);
-static MESON_MUX(g12a_vdec_1_sel, HHI_VDEC_CLK_CNTL, 0x7, 9, NULL, CLK_MUX_ROUND_CLOSEST, None, 0, CLK_SET_RATE_PARENT);
+static MESON_MUX(g12a_vpu, HHI_VPU_CLK_CNTL, 1, 31, 0, 0, g12a_vpu_parent_table, 2, 0);
+static const struct clk_parent_data g12a_vdec_parent_table[] = {
+    { .clk = &g12a_fclk_div2p5, },
+    { .clk = &g12a_fclk_div3, },
+    { .clk = &g12a_fclk_div4, },
+    { .clk = &g12a_fclk_div5, },
+    { .clk = &g12a_fclk_div7, },
+    { .clk = &g12a_hifi_pll, },
+    { .clk = &g12a_gp0_pll, },
+};
+
+static MESON_MUX(g12a_vdec_1_sel, HHI_VDEC_CLK_CNTL, 0x7, 9, 0, CLK_MUX_ROUND_CLOSEST, g12a_vdec_parent_table, 0, CLK_SET_RATE_PARENT);
 static MESON_DIV(g12a_vdec_1_div, HHI_VDEC_CLK_CNTL, 0, 7, CLK_DIVIDER_ROUND_CLOSEST, { &g12a_vdec_1_sel }, 1, 0);
 static MESON_GATE(g12a_vdec_1, HHI_VDEC_CLK_CNTL, 8, 0, { &g12a_vdec_1_div }, 1, 0);
-static MESON_MUX(g12a_vdec_hevcf_sel, HHI_VDEC2_CLK_CNTL, 0x7, 9, NULL, CLK_MUX_ROUND_CLOSEST, None, 0, CLK_SET_RATE_PARENT);
+static MESON_MUX(g12a_vdec_hevcf_sel, HHI_VDEC2_CLK_CNTL, 0x7, 9, 0, CLK_MUX_ROUND_CLOSEST, g12a_vdec_parent_table, 0, CLK_SET_RATE_PARENT);
 static MESON_DIV(g12a_vdec_hevcf_div, HHI_VDEC2_CLK_CNTL, 0, 7, CLK_DIVIDER_ROUND_CLOSEST, { &g12a_vdec_hevcf_sel }, 1, 0);
 static MESON_GATE(g12a_vdec_hevcf, HHI_VDEC2_CLK_CNTL, 8, 0, { &g12a_vdec_hevcf_div }, 1, 0);
-static MESON_MUX(g12a_vdec_hevc_sel, HHI_VDEC2_CLK_CNTL, 0x7, 25, NULL, CLK_MUX_ROUND_CLOSEST, None, 0, CLK_SET_RATE_PARENT);
+static MESON_MUX(g12a_vdec_hevc_sel, HHI_VDEC2_CLK_CNTL, 0x7, 25, 0, CLK_MUX_ROUND_CLOSEST, g12a_vdec_parent_table, 0, CLK_SET_RATE_PARENT);
 static MESON_DIV(g12a_vdec_hevc_div, HHI_VDEC2_CLK_CNTL, 16, 7, CLK_DIVIDER_ROUND_CLOSEST, { &g12a_vdec_hevc_sel }, 1, 0);
 static MESON_GATE(g12a_vdec_hevc, HHI_VDEC2_CLK_CNTL, 24, 0, { &g12a_vdec_hevc_div }, 1, 0);
-static MESON_MUX(g12a_vapb_0_sel, HHI_VAPBCLK_CNTL, 0x3, 9, NULL, 0, None, 0, CLK_SET_RATE_NO_REPARENT);
+static const struct clk_parent_data g12a_vapb_parent_table[] = {
+    { .clk = &g12a_fclk_div4, },
+    { .clk = &g12a_fclk_div3, },
+    { .clk = &g12a_fclk_div5, },
+    { .clk = &g12a_fclk_div7, },
+    { .clk = &g12a_mpll1, },
+    { .clk = &g12a_vid_pll, },
+    { .clk = &g12a_mpll2, },
+    { .clk = &g12a_fclk_div2p5, },
+};
+static MESON_MUX(g12a_vapb_0_sel, HHI_VAPBCLK_CNTL, 0x3, 9, 0, 0, g12a_vapb_parent_table, 0, CLK_SET_RATE_NO_REPARENT);
 static MESON_DIV(g12a_vapb_0_div, HHI_VAPBCLK_CNTL, 0, 7, 0, { &g12a_vapb_0_sel }, 1, 0);
 static MESON_GATE(g12a_vapb_0, HHI_VAPBCLK_CNTL, 8, 0, { &g12a_vapb_0_div }, 1, 0);
-static MESON_MUX(g12a_vapb_1_sel, HHI_VAPBCLK_CNTL, 0x3, 25, NULL, 0, None, 0, CLK_SET_RATE_NO_REPARENT);
+static MESON_MUX(g12a_vapb_1_sel, HHI_VAPBCLK_CNTL, 0x3, 25, 0, 0, g12a_vapb_parent_table, 0, CLK_SET_RATE_NO_REPARENT);
 static MESON_DIV(g12a_vapb_1_div, HHI_VAPBCLK_CNTL, 16, 7, 0, { &g12a_vapb_1_sel }, 1, 0);
 static MESON_GATE(g12a_vapb_1, HHI_VAPBCLK_CNTL, 24, 0, { &g12a_vapb_1_div }, 1, 0);
-const struct clk_parent_data [] g12a_vapb_sel_parent_table = {
+const struct clk_parent_data g12a_vapb_sel_parent_table[] = {
     { .clk = &g12a_vapb_0 },
     { .clk = &g12a_vapb_1 },
 };
-static MESON_MUX(g12a_vapb_sel, HHI_VAPBCLK_CNTL, 1, 31, NULL, 0, g12a_vapb_sel_parent_table, 2, 0);
+static MESON_MUX(g12a_vapb_sel, HHI_VAPBCLK_CNTL, 1, 31, 0, 0, g12a_vapb_sel_parent_table, 2, 0);
 static MESON_GATE(g12a_vapb, HHI_VAPBCLK_CNTL, 30, 0, { &g12a_vapb_sel }, 1, 0);
-static MESON_MUX(g12a_vclk_sel, HHI_VID_CLK_CNTL, 0x7, 16, NULL, 0, None, 0, CLK_SET_RATE_NO_REPARENT | CLK_GET_RATE_NOCACHE);
-static MESON_MUX(g12a_vclk2_sel, HHI_VIID_CLK_CNTL, 0x7, 16, NULL, 0, None, 0, CLK_SET_RATE_NO_REPARENT);
+static const struct clk_parent_data g12a_vclk_parent_table[] = {
+    { .clk = &g12a_vid_pll, },
+    { .clk = &g12a_gp0_pll, },
+    { .clk = &g12a_hifi_pll, },
+    { .clk = &g12a_mpll1, },
+    { .clk = &g12a_fclk_div3, },
+    { .clk = &g12a_fclk_div4, },
+    { .clk = &g12a_fclk_div5, },
+    { .clk = &g12a_fclk_div7, },
+};
+static MESON_MUX(g12a_vclk_sel, HHI_VID_CLK_CNTL, 0x7, 16, 0, 0, g12a_vclk_parent_table, 0, CLK_SET_RATE_NO_REPARENT | CLK_GET_RATE_NOCACHE);
+static MESON_MUX(g12a_vclk2_sel, HHI_VIID_CLK_CNTL, 0x7, 16, 0, 0, g12a_vclk_parent_table, 0, CLK_SET_RATE_NO_REPARENT);
 static MESON_GATE(g12a_vclk_input, HHI_VID_CLK_DIV, 16, 0, { &g12a_vclk_sel }, 1, 0);
 static MESON_GATE(g12a_vclk2_input, HHI_VIID_CLK_DIV, 16, 0, { &g12a_vclk2_sel }, 1, 0);
 static MESON_DIV(g12a_vclk_div, HHI_VID_CLK_DIV, 0, 8, 0, { &g12a_vclk_input }, 1, 0);
@@ -787,7 +835,7 @@ static struct clk g12a_vclk2_div = {
         },
         .flags = CLK_DIVIDER_ROUND_CLOSEST,
     },
-    .init = &(struct clk_init_data){
+    .hw.init = &(struct clk_init_data){
         .name = "vclk2_div",
         .ops = &meson_vclk_div_ops,
         .parent_clks = (const struct clk *[]) {
@@ -811,7 +859,7 @@ static struct clk g12a_vclk2 = {
             .width   = 1,
         },
     },
-    .init = &(struct clk_init_data) {
+    .hw.init = &(struct clk_init_data) {
         .name = "vclk2",
         .ops = &meson_vclk_gate_ops,
         .parent_clks = (const struct clk *[]) { &g12a_vclk2_div },
@@ -837,46 +885,193 @@ static MESON_FIXED_FACTOR(g12a_vclk2_div2, 1, 2, { &g12a_vclk2_div2_en }, 1, 0);
 static MESON_FIXED_FACTOR(g12a_vclk2_div4, 1, 4, { &g12a_vclk2_div4_en }, 1, 0);
 static MESON_FIXED_FACTOR(g12a_vclk2_div6, 1, 6, { &g12a_vclk2_div6_en }, 1, 0);
 static MESON_FIXED_FACTOR(g12a_vclk2_div12, 1, 12, { &g12a_vclk2_div12_en }, 1, 0);
-static MESON_MUX(g12a_cts_enci_sel, HHI_VID_CLK_DIV, 0xf, 28, mux_table_cts_sel, 0, None, 0, CLK_SET_RATE_NO_REPARENT | CLK_GET_RATE_NOCACHE);
-static MESON_MUX(g12a_cts_encp_sel, HHI_VID_CLK_DIV, 0xf, 20, mux_table_cts_sel, 0, None, 0, CLK_SET_RATE_NO_REPARENT | CLK_GET_RATE_NOCACHE);
-static MESON_MUX(g12a_cts_encl_sel, HHI_VIID_CLK_DIV, 0xf, 12, mux_table_cts_sel, 0, None, 0, CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT);
-static MESON_MUX(g12a_cts_vdac_sel, HHI_VIID_CLK_DIV, 0xf, 28, mux_table_cts_sel, 0, None, 0, CLK_SET_RATE_NO_REPARENT | CLK_GET_RATE_NOCACHE);
-static MESON_MUX(g12a_hdmi_tx_sel, HHI_HDMI_CLK_CNTL, 0xf, 16, mux_table_hdmi_tx_sel, 0, None, 0, CLK_SET_RATE_NO_REPARENT | CLK_GET_RATE_NOCACHE);
+static uint32_t mux_table_cts_sel[] = { 0, 1, 2, 3, 4, 8, 9, 10, 11, 12 };
+static const struct clk_parent_data g12a_cts_parent_table[] = {
+    { .clk = &g12a_vclk_div1, },
+    { .clk = &g12a_vclk_div2, },
+    { .clk = &g12a_vclk_div4, },
+    { .clk = &g12a_vclk_div6, },
+    { .clk = &g12a_vclk_div12, },
+    { .clk = &g12a_vclk2_div1, },
+    { .clk = &g12a_vclk2_div2, },
+    { .clk = &g12a_vclk2_div4, },
+    { .clk = &g12a_vclk2_div6, },
+    { .clk = &g12a_vclk2_div12, },
+};
+static MESON_MUX(g12a_cts_enci_sel, HHI_VID_CLK_DIV, 0xf, 28, mux_table_cts_sel, 0, g12a_cts_parent_table, ARRAY_SIZE(g12a_cts_parent_table), CLK_SET_RATE_NO_REPARENT | CLK_GET_RATE_NOCACHE);
+static MESON_MUX(g12a_cts_encp_sel, HHI_VID_CLK_DIV, 0xf, 20, mux_table_cts_sel, 0, g12a_cts_parent_table, ARRAY_SIZE(g12a_cts_parent_table), CLK_SET_RATE_NO_REPARENT | CLK_GET_RATE_NOCACHE);
+static MESON_MUX(g12a_cts_encl_sel, HHI_VIID_CLK_DIV, 0xf, 12, mux_table_cts_sel, 0, g12a_cts_parent_table, ARRAY_SIZE(g12a_cts_parent_table), CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT);
+static MESON_MUX(g12a_cts_vdac_sel, HHI_VIID_CLK_DIV, 0xf, 28, mux_table_cts_sel, 0, g12a_cts_parent_table, ARRAY_SIZE(g12a_cts_parent_table), CLK_SET_RATE_NO_REPARENT | CLK_GET_RATE_NOCACHE);
+static uint32_t mux_table_hdmi_tx_sel[] = { 0, 1, 2, 3, 4, 8, 9, 10, 11, 12 };
+static const struct clk_parent_data g12a_cts_hdmi_tx_parent_table[] = {
+    { .clk = &g12a_vclk_div1, },
+    { .clk = &g12a_vclk_div2, },
+    { .clk = &g12a_vclk_div4, },
+    { .clk = &g12a_vclk_div6, },
+    { .clk = &g12a_vclk_div12, },
+    { .clk = &g12a_vclk2_div1, },
+    { .clk = &g12a_vclk2_div2, },
+    { .clk = &g12a_vclk2_div4, },
+    { .clk = &g12a_vclk2_div6, },
+    { .clk = &g12a_vclk2_div12, },
+};
+static MESON_MUX(g12a_hdmi_tx_sel, HHI_HDMI_CLK_CNTL, 0xf, 16, mux_table_hdmi_tx_sel, 0, g12a_cts_hdmi_tx_parent_table, ARRAY_SIZE(g12a_cts_hdmi_tx_parent_table), CLK_SET_RATE_NO_REPARENT | CLK_GET_RATE_NOCACHE);
 static MESON_GATE(g12a_cts_enci, HHI_VID_CLK_CNTL2, 0, 0, { &g12a_cts_enci_sel }, 1, 0);
 static MESON_GATE(g12a_cts_encp, HHI_VID_CLK_CNTL2, 2, 0, { &g12a_cts_encp_sel }, 1, 0);
 static MESON_GATE(g12a_cts_encl, HHI_VID_CLK_CNTL2, 3, 0, { &g12a_cts_encl_sel }, 1, 0);
 static MESON_GATE(g12a_cts_vdac, HHI_VID_CLK_CNTL2, 4, 0, { &g12a_cts_vdac_sel }, 1, 0);
 static MESON_GATE(g12a_hdmi_tx, HHI_VID_CLK_CNTL2, 5, 0, { &g12a_hdmi_tx_sel }, 1, 0);
-static MESON_MUX(g12a_mipi_dsi_pxclk_sel, HHI_MIPIDSI_PHY_CLK_CNTL, 0x7, 12, NULL, CLK_MUX_ROUND_CLOSEST, None, 0, CLK_SET_RATE_NO_REPARENT | CLK_SET_RATE_PARENT);
+static const struct clk_parent_data g12a_mipi_dsi_pxclk_parent_table[] = {
+    { .clk = &g12a_vid_pll, },
+    { .clk = &g12a_gp0_pll, },
+    { .clk = &g12a_hifi_pll, },
+    { .clk = &g12a_mpll1, },
+    { .clk = &g12a_fclk_div2, },
+    { .clk = &g12a_fclk_div2p5, },
+    { .clk = &g12a_fclk_div3, },
+    { .clk = &g12a_fclk_div7, },
+};
+static MESON_MUX(g12a_mipi_dsi_pxclk_sel, HHI_MIPIDSI_PHY_CLK_CNTL, 0x7, 12, 0, CLK_MUX_ROUND_CLOSEST, g12a_mipi_dsi_pxclk_parent_table, ARRAY_SIZE(g12a_mipi_dsi_pxclk_parent_table), CLK_SET_RATE_NO_REPARENT | CLK_SET_RATE_PARENT);
 static MESON_DIV(g12a_mipi_dsi_pxclk_div, HHI_MIPIDSI_PHY_CLK_CNTL, 0, 7, 0, { &g12a_mipi_dsi_pxclk_sel }, 1, 0);
 static MESON_GATE(g12a_mipi_dsi_pxclk, HHI_MIPIDSI_PHY_CLK_CNTL, 8, 0, { &g12a_mipi_dsi_pxclk_div }, 1, 0);
-static MESON_MUX(g12b_mipi_isp_sel, HHI_ISP_CLK_CNTL, 7, 9, NULL, 0, g12b_mipi_isp_parent_data, 0, 0);
-static MESON_DIV(g12b_mipi_isp_div, HHI_ISP_CLK_CNTL, 0, 7, 0, { &g12b_mipi_isp_sel }, 1, 0);
-static MESON_GATE(g12b_mipi_isp, HHI_ISP_CLK_CNTL, 8, 0, { &g12b_mipi_isp_div }, 1, 0);
-static MESON_MUX(g12a_hdmi_sel, HHI_HDMI_CLK_CNTL, 0x3, 9, NULL, CLK_MUX_ROUND_CLOSEST, g12a_hdmi_parent_data, 0, CLK_SET_RATE_NO_REPARENT | CLK_GET_RATE_NOCACHE);
+static const struct clk_parent_data g12a_hdmi_parent_table[] = {
+    { .fw_name = "xtal", },
+    { .clk = &g12a_fclk_div4 },
+    { .clk = &g12a_fclk_div3 },
+    { .clk = &g12a_fclk_div5 },
+};
+static MESON_MUX(g12a_hdmi_sel, HHI_HDMI_CLK_CNTL, 0x3, 9, 0, CLK_MUX_ROUND_CLOSEST, g12a_hdmi_parent_table, ARRAY_SIZE(g12a_hdmi_parent_table), CLK_SET_RATE_NO_REPARENT | CLK_GET_RATE_NOCACHE);
 static MESON_DIV(g12a_hdmi_div, HHI_HDMI_CLK_CNTL, 0, 7, 0, { &g12a_hdmi_sel }, 1, 0);
 static MESON_GATE(g12a_hdmi, HHI_HDMI_CLK_CNTL, 8, 0, { &g12a_hdmi_div }, 1, 0);
-static MESON_MUX(g12a_mali_0_sel, HHI_MALI_CLK_CNTL, 0x7, 9, NULL, 0, g12a_mali_0_1_parent_data, 8, 0);
+static const struct clk_parent_data g12a_mali_0_1_parent_data[] = {
+    { .fw_name = "xtal", },
+    { .clk = &g12a_gp0_pll },
+    { .clk = &g12a_hifi_pll },
+    { .clk = &g12a_fclk_div2p5 },
+    { .clk = &g12a_fclk_div3 },
+    { .clk = &g12a_fclk_div4 },
+    { .clk = &g12a_fclk_div5 },
+    { .clk = &g12a_fclk_div7 },
+};
+static MESON_MUX(g12a_mali_0_sel, HHI_MALI_CLK_CNTL, 0x7, 9, 0, 0, g12a_mali_0_1_parent_data, 8, 0);
 static MESON_DIV(g12a_mali_0_div, HHI_MALI_CLK_CNTL, 0, 7, 0, { &g12a_mali_0_sel }, 1, 0);
 static MESON_GATE(g12a_mali_0, HHI_MALI_CLK_CNTL, 8, 0, { &g12a_mali_0_div }, 1, 0);
-static MESON_MUX(g12a_mali_1_sel, HHI_MALI_CLK_CNTL, 0x7, 25, NULL, 0, g12a_mali_0_1_parent_data, 8, 0);
+static MESON_MUX(g12a_mali_1_sel, HHI_MALI_CLK_CNTL, 0x7, 25, 0, 0, g12a_mali_0_1_parent_data, 8, 0);
 static MESON_DIV(g12a_mali_1_div, HHI_MALI_CLK_CNTL, 16, 7, 0, { &g12a_mali_1_sel }, 1, 0);
 static MESON_GATE(g12a_mali_1, HHI_MALI_CLK_CNTL, 24, 0, { &g12a_mali_1_div }, 1, 0);
-static MESON_MUX(g12a_mali, HHI_MALI_CLK_CNTL, 1, 31, NULL, 0, None, 2, CLK_SET_RATE_PARENT);
-static MESON_DIV_RO(g12a_ts_div, HHI_TS_CLK_CNTL, 0, 8, 0, None, 1, 0);
+static const struct clk_parent_data g12a_mali_parent_table[] = {
+    { .clk = &g12a_mali_0, },
+    { .clk = &g12a_mali_1, },
+};
+static MESON_MUX(g12a_mali, HHI_MALI_CLK_CNTL, 1, 31, 0, 0, g12a_mali_parent_table, 2, CLK_SET_RATE_PARENT);
+static MESON_DIV_RO(g12a_ts_div, HHI_TS_CLK_CNTL, 0, 8, 0, { &g12a_ts_div }, 1, 0);
 static MESON_GATE(g12a_ts, HHI_TS_CLK_CNTL, 8, 0, { &g12a_ts_div }, 1, 0);
-static MESON_MUX(g12a_spicc0_sclk_sel, HHI_SPICC_CLK_CNTL, 7, 7, NULL, 0, spicc_sclk_parent_data, 0, 0);
+static const struct clk_parent_data spicc_sclk_parent_data[] = {
+	{ .fw_name = "xtal", },
+	{ .clk = &g12a_clk81 },
+	{ .clk = &g12a_fclk_div4 },
+	{ .clk = &g12a_fclk_div3 },
+	{ .clk = &g12a_fclk_div5 },
+	{ .clk = &g12a_fclk_div7 },
+};
+
+static MESON_MUX(g12a_spicc0_sclk_sel, HHI_SPICC_CLK_CNTL, 7, 7, 0, 0, spicc_sclk_parent_data, 0, 0);
 static MESON_DIV(g12a_spicc0_sclk_div, HHI_SPICC_CLK_CNTL, 0, 6, 0, { &g12a_spicc0_sclk_sel }, 1, 0);
 static MESON_GATE(g12a_spicc0_sclk, HHI_SPICC_CLK_CNTL, 6, 0, { &g12a_spicc0_sclk_div }, 1, 0);
-static MESON_MUX(g12a_spicc1_sclk_sel, HHI_SPICC_CLK_CNTL, 7, 23, NULL, 0, spicc_sclk_parent_data, 0, 0);
+static MESON_MUX(g12a_spicc1_sclk_sel, HHI_SPICC_CLK_CNTL, 7, 23, 0, 0, spicc_sclk_parent_data, 0, 0);
 static MESON_DIV(g12a_spicc1_sclk_div, HHI_SPICC_CLK_CNTL, 16, 6, 0, { &g12a_spicc1_sclk_sel }, 1, 0);
 static MESON_GATE(g12a_spicc1_sclk, HHI_SPICC_CLK_CNTL, 22, 0, { &g12a_spicc1_sclk_div }, 1, 0);
-static MESON_MUX(sm1_nna_axi_clk_sel, HHI_NNA_CLK_CNTL, 7, 9, NULL, 0, nna_clk_parent_data, 0, 0);
+static const struct clk_parent_data nna_clk_parent_data[] = {
+	{ .fw_name = "xtal", },
+	{ .clk = &g12a_gp0_pll, },
+	{ .clk = &g12a_hifi_pll, },
+	{ .clk = &g12a_fclk_div2p5, },
+	{ .clk = &g12a_fclk_div3, },
+	{ .clk = &g12a_fclk_div4, },
+	{ .clk = &g12a_fclk_div5, },
+	{ .clk = &g12a_fclk_div7 },
+};
+static MESON_MUX(sm1_nna_axi_clk_sel, HHI_NNA_CLK_CNTL, 7, 9, 0, 0, nna_clk_parent_data, 0, 0);
 static MESON_DIV(sm1_nna_axi_clk_div, HHI_NNA_CLK_CNTL, 0, 7, 0, { &sm1_nna_axi_clk_sel }, 1, 0);
 static MESON_GATE(sm1_nna_axi_clk, HHI_NNA_CLK_CNTL, 8, 0, { &sm1_nna_axi_clk_div }, 1, 0);
-static MESON_MUX(sm1_nna_core_clk_sel, HHI_NNA_CLK_CNTL, 7, 25, NULL, 0, nna_clk_parent_data, 0, 0);
+static MESON_MUX(sm1_nna_core_clk_sel, HHI_NNA_CLK_CNTL, 7, 25, 0, 0, nna_clk_parent_data, 0, 0);
 static MESON_DIV(sm1_nna_core_clk_div, HHI_NNA_CLK_CNTL, 16, 7, 0, { &sm1_nna_core_clk_sel }, 1, 0);
 static MESON_GATE(sm1_nna_core_clk, HHI_NNA_CLK_CNTL, 24, 0, { &sm1_nna_core_clk_div }, 1, 0);
+
+/* Everything Else (EE) domain gates */
+static MESON_CLK81_GATE(g12a_ddr,               HHI_GCLK_MPEG0,    0);
+static MESON_CLK81_GATE(g12a_dos,               HHI_GCLK_MPEG0,    1);
+static MESON_CLK81_GATE(g12a_audio_locker,      HHI_GCLK_MPEG0,    2);
+static MESON_CLK81_GATE(g12a_mipi_dsi_host,     HHI_GCLK_MPEG0,    3);
+static MESON_CLK81_GATE(g12a_eth_phy,           HHI_GCLK_MPEG0,    4);
+static MESON_CLK81_GATE(g12a_isa,               HHI_GCLK_MPEG0,    5);
+static MESON_CLK81_GATE(g12a_pl301,             HHI_GCLK_MPEG0,    6);
+static MESON_CLK81_GATE(g12a_periphs,           HHI_GCLK_MPEG0,    7);
+static MESON_CLK81_GATE(g12a_spicc_0,           HHI_GCLK_MPEG0,    8);
+static MESON_CLK81_GATE(g12a_i2c,            HHI_GCLK_MPEG0,    9);
+static MESON_CLK81_GATE(g12a_sana,            HHI_GCLK_MPEG0,    10);
+static MESON_CLK81_GATE(g12a_sd,            HHI_GCLK_MPEG0,    11);
+static MESON_CLK81_GATE(g12a_rng0,            HHI_GCLK_MPEG0,    12);
+static MESON_CLK81_GATE(g12a_uart0,            HHI_GCLK_MPEG0,    13);
+static MESON_CLK81_GATE(g12a_spicc_1,            HHI_GCLK_MPEG0,    14);
+static MESON_CLK81_GATE(g12a_hiu_reg,            HHI_GCLK_MPEG0,    19);
+static MESON_CLK81_GATE(g12a_mipi_dsi_phy,        HHI_GCLK_MPEG0,    20);
+static MESON_CLK81_GATE(g12a_assist_misc,        HHI_GCLK_MPEG0,    23);
+static MESON_CLK81_GATE(g12a_emmc_a,            HHI_GCLK_MPEG0,    4);
+static MESON_CLK81_GATE(g12a_emmc_b,            HHI_GCLK_MPEG0,    25);
+static MESON_CLK81_GATE(g12a_emmc_c,            HHI_GCLK_MPEG0,    26);
+static MESON_CLK81_GATE(g12a_audio_codec,        HHI_GCLK_MPEG0,    28);
+
+static MESON_CLK81_GATE(g12a_audio,            HHI_GCLK_MPEG1,    0);
+static MESON_CLK81_GATE(g12a_eth_core,        HHI_GCLK_MPEG1,    3);
+static MESON_CLK81_GATE(g12a_demux,            HHI_GCLK_MPEG1,    4);
+static MESON_CLK81_GATE(g12a_audio_ififo,        HHI_GCLK_MPEG1,    11);
+static MESON_CLK81_GATE(g12a_adc,            HHI_GCLK_MPEG1,    13);
+static MESON_CLK81_GATE(g12a_uart1,            HHI_GCLK_MPEG1,    16);
+static MESON_CLK81_GATE(g12a_g2d,            HHI_GCLK_MPEG1,    20);
+static MESON_CLK81_GATE(g12a_reset,            HHI_GCLK_MPEG1,    23);
+static MESON_CLK81_GATE(g12a_pcie_comb,        HHI_GCLK_MPEG1,    24);
+static MESON_CLK81_GATE(g12a_parser,            HHI_GCLK_MPEG1,    25);
+static MESON_CLK81_GATE(g12a_usb_general,        HHI_GCLK_MPEG1,    26);
+static MESON_CLK81_GATE(g12a_pcie_phy,        HHI_GCLK_MPEG1,    27);
+static MESON_CLK81_GATE(g12a_ahb_arb0,        HHI_GCLK_MPEG1,    29);
+
+static MESON_CLK81_GATE(g12a_ahb_data_bus,        HHI_GCLK_MPEG2,    1);
+static MESON_CLK81_GATE(g12a_ahb_ctrl_bus,        HHI_GCLK_MPEG2,    2);
+static MESON_CLK81_GATE(g12a_htx_hdcp22,        HHI_GCLK_MPEG2,    3);
+static MESON_CLK81_GATE(g12a_htx_pclk,        HHI_GCLK_MPEG2,    4);
+static MESON_CLK81_GATE(g12a_bt656,            HHI_GCLK_MPEG2,    6);
+static MESON_CLK81_GATE(g12a_usb1_to_ddr,        HHI_GCLK_MPEG2,    8);
+static MESON_CLK81_GATE(g12a_mmc_pclk,        HHI_GCLK_MPEG2,    11);
+static MESON_CLK81_GATE(g12a_uart2,            HHI_GCLK_MPEG2,    15);
+static MESON_CLK81_GATE(g12a_vpu_intr,        HHI_GCLK_MPEG2,    25);
+static MESON_CLK81_GATE(g12a_gic,            HHI_GCLK_MPEG2,    30);
+
+static MESON_CLK81_GATE(g12a_vclk2_venci0,        HHI_GCLK_OTHER,    1);
+static MESON_CLK81_GATE(g12a_vclk2_venci1,        HHI_GCLK_OTHER,    2);
+static MESON_CLK81_GATE(g12a_vclk2_vencp0,        HHI_GCLK_OTHER,    3);
+static MESON_CLK81_GATE(g12a_vclk2_vencp1,        HHI_GCLK_OTHER,    4);
+static MESON_CLK81_GATE(g12a_vclk2_venct0,        HHI_GCLK_OTHER,    5);
+static MESON_CLK81_GATE(g12a_vclk2_venct1,        HHI_GCLK_OTHER,    6);
+static MESON_CLK81_GATE(g12a_vclk2_other,        HHI_GCLK_OTHER,    7);
+static MESON_CLK81_GATE(g12a_vclk2_enci,        HHI_GCLK_OTHER,    8);
+static MESON_CLK81_GATE(g12a_vclk2_encp,        HHI_GCLK_OTHER,    9);
+static MESON_CLK81_GATE(g12a_dac_clk,            HHI_GCLK_OTHER,    10);
+static MESON_CLK81_GATE(g12a_aoclk_gate,        HHI_GCLK_OTHER,    14);
+static MESON_CLK81_GATE(g12a_iec958_gate,        HHI_GCLK_OTHER,    16);
+static MESON_CLK81_GATE(g12a_enc480p,            HHI_GCLK_OTHER,    20);
+static MESON_CLK81_GATE(g12a_rng1,            HHI_GCLK_OTHER,    21);
+static MESON_CLK81_GATE(g12a_vclk2_enct,        HHI_GCLK_OTHER,    22);
+static MESON_CLK81_GATE(g12a_vclk2_encl,        HHI_GCLK_OTHER,    23);
+static MESON_CLK81_GATE(g12a_vclk2_venclmmc,        HHI_GCLK_OTHER,    24);
+static MESON_CLK81_GATE(g12a_vclk2_vencl,        HHI_GCLK_OTHER,    25);
+static MESON_CLK81_GATE(g12a_vclk2_other1,        HHI_GCLK_OTHER,    26);
+
+static MESON_CLK81_GATE_RO(g12a_dma,            HHI_GCLK_OTHER2, 0);
+static MESON_CLK81_GATE_RO(g12a_efuse,        HHI_GCLK_OTHER2, 1);
+static MESON_CLK81_GATE_RO(g12a_rom_boot,        HHI_GCLK_OTHER2, 2);
+static MESON_CLK81_GATE_RO(g12a_reset_sec,        HHI_GCLK_OTHER2, 3);
+static MESON_CLK81_GATE_RO(g12a_sec_ahb_apb3,        HHI_GCLK_OTHER2, 4);
 
 static struct clk *sm1_clks[] = {
     [CLKID_SYS_PLL]            = &g12a_sys_pll,
@@ -1124,3 +1319,8 @@ static struct clk *sm1_clks[] = {
     /* [CLKID_MIPI_DSI_PXCLK_DIV]    = &g12a_mipi_dsi_pxclk_div, */
     /* [CLKID_MIPI_DSI_PXCLK]        = &g12a_mipi_dsi_pxclk, */
 };
+
+struct clk **get_clk_list(void)
+{
+    return sm1_clks;
+}

@@ -226,6 +226,9 @@ fn addClockDriver(
     driver.addCSourceFile(.{
         .file = b.path(b.fmt("drivers/clk/{s}/clk-measure.c", .{ @tagName(class) }))
     });
+    driver.addCSourceFile(.{
+        .file = b.path(b.fmt("drivers/clk/{s}/sm1_clk_hws.c", .{ @tagName(class) }))
+    });
     driver.addIncludePath(b.path("include/sddf/clk"));
     driver.addIncludePath(clk_config_include);
     driver.addIncludePath(b.path("include"));

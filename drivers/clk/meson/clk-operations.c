@@ -301,11 +301,15 @@ static uint8_t clk_regmap_mux_get_parent(const struct clk *clk)
 
 static int clk_regmap_mux_set_parent(struct clk *clk, uint8_t index)
 {
+    sddf_dprintf("set parent");
     struct clk_mux_data *data = (struct clk_mux_data *)(clk->data);
+    sddf_dprintf("mux_data: 0x%x\n", data);
 
     if (data->table) {
         unsigned int val = data->table[index];
+        sddf_dprintf("val: 0x%x\n", val);
         regmap_mux_update_bits(data->offset, data->shift, data->mask, val);
+        sddf_dprintf("update\n");
     }
 
     return 0;
@@ -714,4 +718,10 @@ const struct clk_ops meson_vclk_div_ops = {
     .enable = meson_vclk_div_enable,
     .disable = meson_vclk_div_disable,
     .is_enabled = meson_vclk_div_is_enabled,
+};
+
+const struct clk_ops meson_clk_cpu_dyndiv_ops = {
+    /* .recalc_rate = meson_clk_cpu_dyndiv_recalc_rate, */
+    /* .determine_rate = meson_clk_cpu_dyndiv_determine_rate, */
+    /* .set_rate = meson_clk_cpu_dyndiv_set_rate, */
 };
