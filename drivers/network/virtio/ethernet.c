@@ -295,12 +295,13 @@ static void handle_irq()
         // or TX queue, so we check both.
         rx_return();
         tx_return();
+        tx_provide();
         // We have handled the used buffer notification
         regs->InterruptACK = VIRTIO_MMIO_IRQ_VQUEUE;
     }
 
     if (irq_status & VIRTIO_MMIO_IRQ_CONFIG) {
-        LOG_DRIVER_ERR("unexpected change in configuration\n");
+        LOG_DRIVER_ERR("ETH|ERROR: unexpected change in configuration %u\n", irq_status);
     }
 }
 

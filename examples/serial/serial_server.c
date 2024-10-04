@@ -24,7 +24,10 @@ uint32_t local_head;
 
 void init(void)
 {
-    serial_cli_queue_init_sys(microkit_name, &rx_queue_handle, rx_queue, rx_data, &tx_queue_handle, tx_queue, tx_data);
+    uint32_t rx_data_capacity, tx_data_capacity;
+    serial_cli_data_capacity(microkit_name, &rx_data_capacity, &tx_data_capacity);
+    serial_queue_init(&rx_queue_handle, rx_queue, rx_data_capacity, rx_data);
+    serial_queue_init(&tx_queue_handle, tx_queue, tx_data_capacity, tx_data);
     serial_putchar_init(TX_CH, &tx_queue_handle);
     sddf_printf("Hello world! I am %s.\nPlease give me character!\n", microkit_name);
 }
