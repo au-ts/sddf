@@ -1,8 +1,16 @@
+/* SPDX-License-Identifier: GPL-2.0 */
+/*
+ * Copyright (c) 2018 BayLibre, SAS.
+ * Author: Jerome Brunet <jbrunet@baylibre.com>
+ *
+ * Derived from:
+ *   https://github.com/torvalds/linux/blob/0c559323bbaabee7346c12e74b497e283aaafef5/drivers/clk/meson/clk-regmap.h
+ */
+
 #ifndef SM1_CLK_HWS_H_
 #define SM1_CLK_HWS_H_
 
 #include <g12a.h>
-#include <clk-operations.h>
 
 #define MESON_FIXED_FACTOR(_name, _mult, _div, _parent_clks, _num_parents, _flags)  \
 struct clk _name = {                                                                \
