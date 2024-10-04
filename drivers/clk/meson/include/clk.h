@@ -194,6 +194,11 @@ struct pll_params_table {
     unsigned int    n;
 };
 
+struct meson_clk_cpu_dyndiv_data {
+    struct parm div;
+    struct parm dyn;
+};
+
 struct meson_clk_pll_data {
     struct parm en;
     struct parm m;
