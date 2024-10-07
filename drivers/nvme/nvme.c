@@ -1,7 +1,12 @@
+#include <sddf/util/printf.h>
+
 #include "nvme.h"
 #include "nvme_queue.h"
 
-#include <sddf/util/printf.h>
+#define DEBUG_DRIVER
+#ifdef DEBUG_DRIVER
+#include "nvme_debug.h"
+#endif
 
 volatile nvme_controller_t *nvme_controller;
 nvme_submission_queue_entry_t *nvme_asq_region;
@@ -29,61 +34,6 @@ _Static_assert(NVME_ACQ_CAPACITY <= 0x1000, "capacity of ACQ must be <=4096 (ent
 #define NVME_IOQ_CAPACITY (NVME_IO_QUEUE_SIZE / 64)
 // §3.3.3.1
 _Static_assert(NVME_ASQ_CAPACITY <= 0x10000, "capacity of ASQ must be <=65536 (slots)");
-
-static void nvme_debug_dump_controller_regs()
-{
-    sddf_dprintf("CAP: %016lx\n", nvme_controller->cap);
-    sddf_dprintf("VS: major: %u, minor: %u, tertiary: %u\n", nvme_controller->vs.mjr, nvme_controller->vs.mnr,
-                 nvme_controller->vs.ter);
-    sddf_dprintf("INTMS: %08x\n", nvme_controller->intms);
-    sddf_dprintf("INTMC: %08x\n", nvme_controller->intmc);
-    sddf_dprintf("CC: %08x\n", nvme_controller->cc);
-    sddf_dprintf("CSTS: %08x\n", nvme_controller->csts);
-    sddf_dprintf("AQA: %08x\n", nvme_controller->aqa);
-    sddf_dprintf("ASQ: %016lx\n", nvme_controller->asq);
-    sddf_dprintf("ACQ: %016lx\n", nvme_controller->acq);
-}
-
-static nvme_completion_queue_entry_t nvme_queue_submit_and_consume_poll(nvme_queue_info_t *queue,
-                                                            nvme_submission_queue_entry_t *entry)
-{
-    nvme_queue_submit(queue, entry);
-
-    nvme_completion_queue_entry_t response;
-    int i = 0;
-    while (true) {
-        int ret = nvme_queue_consume(queue, &response);
-        if (ret == 0) {
-            sddf_dprintf("received a response for submission with CDW0: %x\n", entry->cdw0);
-            return response;
-        }
-
-        if (i % 100 == 0) {
-            sddf_dprintf("waiting for response to submission with CDW0: %x\n", entry->cdw0);
-        }
-    }
-}
-
-// TODO: tidy up.
-/* 5.1.12.1.2  Error Information (Log Page Identifier 01h) */
-typedef struct {
-    uint64_t ecnt; /* Error Count; unique ID for this error. (retained across power off) */
-    uint16_t sqid; /* Submission Queue ID */
-    uint16_t cid;  /* Command ID */
-    uint16_t sts;  /* Status Info (from the completion queue entry - Status + Phase) */
-    uint16_t pel;  /* Parameter Error location (!!!!) */
-    uint64_t lba;  /* Logical Block Address */
-    uint32_t nsid;
-    uint8_t vsia; /* vendor specific info available */
-    uint8_t trtype; /* transport type */
-    uint8_t csi; /* command set indiciator (valid if version > 0x1)*/
-    uint8_t opc; /* opcode (valid if version > 0x1)*/
-    uint64_t csinfo; /* command specific information (if specified in the command) */
-    uint16_t ttsi; /* transport type specification information */
-    uint8_t _reserved[20];
-    uint8_t lpver; /* log page version */
-} nvme_error_information_log_page_t;
-_Static_assert(sizeof(nvme_error_information_log_page_t) == 64, "should be 64 bytes.");
 
 /* [NVMe-2.1] 3.5.1 Memory-based Controller Initialization (PCIe) */
 void nvme_controller_init()
@@ -196,39 +146,7 @@ void nvme_controller_init()
         .dptr_lo = nvme_io_sq_region_paddr,
     });
 
-    sddf_dprintf("CDW0: %04x\n", entry.cdw0);
-    sddf_dprintf("CDW1: %04x\n", entry.cdw1);
-    sddf_dprintf("SQHD: %02x\n", entry.sqhd);
-    sddf_dprintf("SQID: %02x\n", entry.sqid);
-    sddf_dprintf(" CID: %02x\n", entry.cid);
-    sddf_dprintf("P&STATUS: %02x\n", entry.phase_tag_and_status);
-    // should exist again.
     assert((entry.phase_tag_and_status & _MASK(1, 15)) == 0x0); // §4.2.3 Status Field
-    return;
-
-    // try a get log page command (0x2)
-    sddf_dprintf("!!! LOG PAGE !!!\n");
-    entry = nvme_queue_submit_and_consume_poll(&admin_queue, &(nvme_submission_queue_entry_t){
-        .cdw0 = /* CID */ (0b1001 << 16) | /* PSDT */ 0 | /* FUSE */ 0 | /* OPC */ 0x2,
-        .dptr_hi = 0,
-        .dptr_lo = data_region_paddr,
-        .cdw10 = /* NUMDL*/ (0x100 << 16) | /* LID*/ 0x01,
-        .cdw11 = 0x0,
-        .cdw12 = 0x0,
-    });
-
-    assert((entry.phase_tag_and_status & _MASK(1, 15)) == 0x0); // §4.2.3 Status Field
-
-    volatile nvme_error_information_log_page_t *errors = (volatile void*)data_region;
-    for (int i = 0; i < 2; i++) {
-        sddf_dprintf("Error 0x%lx\n", errors[i].ecnt);
-        // These produce Store/AMO faults, NEAR THE BEGINNING of this function??? TODO???
-        // sddf_dprintf("\tSQID: 0x%x\n", errors[i].sqid);
-        // sddf_dprintf("\t CID: 0x%x\n", errors[i].cid);
-        sddf_dprintf("\t STS: 0x%x\n", errors[i].sts);
-        sddf_dprintf("\t PEL: 0x%x\n", errors[i].pel);
-        sddf_dprintf("\t(elided)\n");
-    }
 }
 
 void nvme_init()
