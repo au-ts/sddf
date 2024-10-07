@@ -67,11 +67,6 @@ void _assert_fail(const char  *assertion, const char  *file, unsigned int line, 
 #endif
 #endif
 
-#ifndef PAGE_SIZE
-#define PAGE_SIZE_4K 0x1000
-#define PAGE_SIZE PAGE_SIZE_4K
-#endif
-
 static inline int sddf_isspace(int ch)
 {
     return ch == ' ' || ch == '\f' || ch == '\n' || ch == '\r' || ch == '\t' || ch == '\v';

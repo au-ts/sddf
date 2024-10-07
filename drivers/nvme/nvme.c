@@ -121,9 +121,11 @@ void nvme_controller_init()
 
     // 4a. Arbitration Mechanism (TODO)
     // 4b. Memory Page Size
+    // TODO: Check CAP.MPSMAX/CAP.MPSMIN fields
     nvme_controller->cc &= ~NVME_CC_MPS_MASK;
     /* n.b. page size = 2 ^ (12 + MPS) */
-    nvme_controller->cc |= ((PAGE_SIZE >> 12) << NVME_CC_MPS_SHIFT) & NVME_CC_MPS_MASK;
+    uint8_t page_size_log2 = 12; /* all architectures we care about have page size 2^12. */
+    nvme_controller->cc |= ((page_size_log2 - 12) << NVME_CC_MPS_SHIFT) & NVME_CC_MPS_MASK;
 
     // TODO: See initialisation note under §4.2.4; fine since already that way.
 
@@ -185,18 +187,13 @@ void nvme_controller_init()
     // 11. Allocate the appropriate number of I/O Submission Queues [...]
     //     The I/O Submission Queues are allocated using the Create I/O Submission Queue command.
     // §5.2.2
-    sddf_dprintf("!!! IO SQ Create !!!\n");
-    sddf_dprintf("sq region paddr: %lx\n", nvme_io_sq_region_paddr);
     entry = nvme_queue_submit_and_consume_poll(&admin_queue, &(nvme_submission_queue_entry_t){
         .cdw0 = /* CID */ (0b1110 << 16) | /* PSDT */ 0 | /* FUSE */ 0 | /* OPC */ 0x1,
         .cdw10 = /* QSIZE */ ((NVME_IOQ_CAPACITY-1) << 16) | /* QID */ io_queue_id,
         .cdw11 = /* CQID */ (io_queue_id << 16) | /* QPRIO */ (0b00 << 1) | /* PC */ 0b1,
         .cdw12 = 0,
         .dptr_hi = 0,
-
-        // Changing sizes in the system file makes different commands work/not.
-        .dptr_lo = nvme_io_cq_region_paddr,    // TODO: This somehow works
-        // .dptr_lo = nvme_io_sq_region_paddr, // TODO: This doesn't???
+        .dptr_lo = nvme_io_sq_region_paddr,
     });
 
     sddf_dprintf("CDW0: %04x\n", entry.cdw0);
@@ -206,13 +203,8 @@ void nvme_controller_init()
     sddf_dprintf(" CID: %02x\n", entry.cid);
     sddf_dprintf("P&STATUS: %02x\n", entry.phase_tag_and_status);
     // should exist again.
-    // assert((entry.phase_tag_and_status & _MASK(1, 15)) == 0x0); // §4.2.3 Status Field
-    if ((entry.phase_tag_and_status & _MASK(1, 15)) == 0x0) {
-        sddf_dprintf(".... SUCCESS?\n");
-        return;
-    } else {
-        sddf_dprintf("... FAILED\n");
-    }
+    assert((entry.phase_tag_and_status & _MASK(1, 15)) == 0x0); // §4.2.3 Status Field
+    return;
 
     // try a get log page command (0x2)
     sddf_dprintf("!!! LOG PAGE !!!\n");
