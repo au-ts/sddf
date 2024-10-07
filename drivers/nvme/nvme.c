@@ -30,7 +30,7 @@ _Static_assert(NVME_ACQ_CAPACITY <= 0x1000, "capacity of ACQ must be <=4096 (ent
 // §3.3.3.1
 _Static_assert(NVME_ASQ_CAPACITY <= 0x10000, "capacity of ASQ must be <=65536 (slots)");
 
-void nvme_debug_dump_controller_regs()
+static void nvme_debug_dump_controller_regs()
 {
     sddf_dprintf("CAP: %016lx\n", nvme_controller->cap);
     sddf_dprintf("VS: major: %u, minor: %u, tertiary: %u\n", nvme_controller->vs.mjr, nvme_controller->vs.mnr,
@@ -42,6 +42,26 @@ void nvme_debug_dump_controller_regs()
     sddf_dprintf("AQA: %08x\n", nvme_controller->aqa);
     sddf_dprintf("ASQ: %016lx\n", nvme_controller->asq);
     sddf_dprintf("ACQ: %016lx\n", nvme_controller->acq);
+}
+
+static nvme_completion_queue_entry_t nvme_queue_submit_and_consume_poll(nvme_queue_info_t *queue,
+                                                            nvme_submission_queue_entry_t *entry)
+{
+    nvme_queue_submit(queue, entry);
+
+    nvme_completion_queue_entry_t response;
+    int i = 0;
+    while (true) {
+        int ret = nvme_queue_consume(queue, &response);
+        if (ret == 0) {
+            sddf_dprintf("received a response for submission with CDW0: %x\n", entry->cdw0);
+            return response;
+        }
+
+        if (i % 100 == 0) {
+            sddf_dprintf("waiting for response to submission with CDW0: %x\n", entry->cdw0);
+        }
+    }
 }
 
 /* [NVMe-2.1] 3.5.1 Memory-based Controller Initialization (PCIe) */
@@ -97,35 +117,14 @@ void nvme_controller_init()
     // 7. Send the Identify Controller command (Identify with CNS = 01h); §5.1.13
     // TODO: What do we actually need this for????
     // sudo nvme admin-passthru /dev/nvme0 --opcode=0x06 --cdw10=0x0001 --data-len=4096 -r  -s
-    nvme_queue_submit(&admin_queue, &(nvme_submission_queue_entry_t){
+    nvme_completion_queue_entry_t entry;
+    entry = nvme_queue_submit_and_consume_poll(&admin_queue, &(nvme_submission_queue_entry_t){
         .cdw0 = /* CID */ (0b1111 << 16) | /* PSDT */ 0 | /* FUSE */ 0 | /* OPC */ 0x6,
         .cdw10 = /* CNTID[31:16] */ 0x0 | /* CNS */ 0x01,
         .dptr_hi = 0,
         .dptr_lo = data_region_paddr, /* TEMP */
     });
 
-    nvme_completion_queue_entry_t entry;
-    int i = 0;
-    while (true) {
-        int ret = nvme_queue_consume(&admin_queue, &entry);
-        if (ret == 0) {
-            sddf_dprintf("succeed\n");
-            /* succeeded */
-            break;
-        }
-        sddf_dprintf("fail\n");
-        i++;
-        if (i > 10) {
-            assert(!"oops");
-        }
-    }
-
-    sddf_dprintf("CDW0: %04x\n", entry.cdw0);
-    sddf_dprintf("CDW1: %04x\n", entry.cdw1);
-    sddf_dprintf("SQHD: %02x\n", entry.sqhd);
-    sddf_dprintf("SQID: %02x\n", entry.sqid);
-    sddf_dprintf(" CID: %02x\n", entry.cid);
-    sddf_dprintf("P&STATUS: %02x\n", entry.phase_tag_and_status);
     assert((entry.phase_tag_and_status & _MASK(1, 15)) == 0x0); // §4.2.3 Status Field
 
     // 8. The host determines any I/O Command Set specific configuration information
@@ -152,7 +151,7 @@ void nvme_controller_init()
     // 10. Allocate the appropriate number of I/O Completion Queues [...]
     //     The I/O Completion Queues are allocated using the Create I/O Completion Queue command.
     // §5.2.1
-    nvme_queue_submit(&admin_queue, &(nvme_submission_queue_entry_t){
+    entry = nvme_queue_submit_and_consume_poll(&admin_queue, &(nvme_submission_queue_entry_t){
         .cdw0 = /* CID */ (0b1010 << 16) | /* PSDT */ 0 | /* FUSE */ 0 | /* OPC */ 0x5,
         .cdw10 = /* QSIZE */ ((NVME_IOQ_CAPACITY - 1)<< 16) | /* QID */ io_queue_id,
         .cdw11 = /* IV */ (0x0 << 16) | /* IEN */ 0 << 1 | /* PC */ 0x1,
@@ -160,40 +159,21 @@ void nvme_controller_init()
         .dptr_lo = nvme_io_cq_region_paddr,
     });
 
-    i = 0;
-    while (true) {
-        int ret = nvme_queue_consume(&admin_queue, &entry);
-        if (ret == 0) {
-            sddf_dprintf("succeed\n");
-            /* succeeded */
-            break;
-        }
-        sddf_dprintf("fail\n");
-        i++;
-        if (i > 10) {
-            assert(!"oops");
-        }
-    }
-
-    sddf_dprintf("CDW0: %04x\n", entry.cdw0);
-    sddf_dprintf("CDW1: %04x\n", entry.cdw1);
-    sddf_dprintf("SQHD: %02x\n", entry.sqhd);
-    sddf_dprintf("SQID: %02x\n", entry.sqid);
-    sddf_dprintf(" CID: %02x\n", entry.cid);
-    sddf_dprintf("P&STATUS: %02x\n", entry.phase_tag_and_status);
     assert((entry.phase_tag_and_status & _MASK(1, 15)) == 0x0); // §4.2.3 Status Field
 
     // 11. Allocate the appropriate number of I/O Submission Queues [...]
-    //     The I/O Completion Queues are allocated using the Create I/O Submission Queue command.
+    //     The I/O Submission Queues are allocated using the Create I/O Submission Queue command.
     // §5.2.2
+    sddf_dprintf("!!! IO SQ Create !!!\n");
     sddf_dprintf("sq region paddr: %lx\n", nvme_io_sq_region_paddr);
-    nvme_queue_submit(&admin_queue, &(nvme_submission_queue_entry_t){
+    entry = nvme_queue_submit_and_consume_poll(&admin_queue, &(nvme_submission_queue_entry_t){
         .cdw0 = /* CID */ (0b1110 << 16) | /* PSDT */ 0 | /* FUSE */ 0 | /* OPC */ 0x1,
         .cdw10 = /* QSIZE */ ((NVME_IOQ_CAPACITY-1) << 16) | /* QID */ io_queue_id,
         .cdw11 = /* CQID */ (io_queue_id << 16) | /* QPRIO */ (0b00 << 1) | /* PC */ 0b1,
         .cdw12 = 0,
         .dptr_hi = 0,
-        .dptr_lo = nvme_io_sq_region_paddr, // TODO: get log info page size byte 0x18, i.e. dptr_lo???
+         // TODO: get log info page size byte 0x18, i.e. dptr_lo???
+        .dptr_lo = nvme_io_sq_region_paddr,
 
         // zeroing...
         .nsid = 0x0,
@@ -205,32 +185,18 @@ void nvme_controller_init()
         .cdw15 = 0x0,
     });
 
-    i = 0;
-    while (true) {
-        int ret = nvme_queue_consume(&admin_queue, &entry);
-        if (ret == 0) {
-            sddf_dprintf("succeed\n");
-            /* succeeded */
-            break;
-        }
-        sddf_dprintf("fail\n");
-        i++;
-        if (i > 10) {
-            assert(!"oops");
-        }
-    }
-
     sddf_dprintf("CDW0: %04x\n", entry.cdw0);
     sddf_dprintf("CDW1: %04x\n", entry.cdw1);
     sddf_dprintf("SQHD: %02x\n", entry.sqhd);
     sddf_dprintf("SQID: %02x\n", entry.sqid);
     sddf_dprintf(" CID: %02x\n", entry.cid);
     sddf_dprintf("P&STATUS: %02x\n", entry.phase_tag_and_status);
-
     // should exist again.
     // assert((entry.phase_tag_and_status & _MASK(1, 15)) == 0x0); // §4.2.3 Status Field
+
     // try a get log page command (0x2)
-    nvme_queue_submit(&admin_queue, &(nvme_submission_queue_entry_t){
+    sddf_dprintf("!!! LOG PAGE !!!\n");
+    entry = nvme_queue_submit_and_consume_poll(&admin_queue, &(nvme_submission_queue_entry_t){
         .cdw0 = /* CID */ (0b1001 << 16) | /* PSDT */ 0 | /* FUSE */ 0 | /* OPC */ 0x2,
         .dptr_hi = 0,
         .dptr_lo = data_region_paddr,
@@ -239,27 +205,6 @@ void nvme_controller_init()
         .cdw12 = 0x0,
     });
 
-    i = 0;
-    while (true) {
-        int ret = nvme_queue_consume(&admin_queue, &entry);
-        if (ret == 0) {
-            sddf_dprintf("succeed\n");
-            /* succeeded */
-            break;
-        }
-        sddf_dprintf("fail\n");
-        i++;
-        if (i > 100) {
-            assert(!"oops");
-        }
-    }
-
-    sddf_dprintf("CDW0: %04x\n", entry.cdw0);
-    sddf_dprintf("CDW1: %04x\n", entry.cdw1);
-    sddf_dprintf("SQHD: %02x\n", entry.sqhd);
-    sddf_dprintf("SQID: %02x\n", entry.sqid);
-    sddf_dprintf(" CID: %02x\n", entry.cid);
-    sddf_dprintf("P&STATUS: %02x\n", entry.phase_tag_and_status);
     for (int i = 0; i < 64; i++) {
         sddf_dprintf("[%04x]: %x: %c\n", i, data_region[i], data_region[i]);
     }
