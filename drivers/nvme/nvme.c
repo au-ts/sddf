@@ -172,7 +172,7 @@ void nvme_init()
         .cdw0 = /* CID */ (0b1011 << 16) | /* PSDT */ 0 | /* FUSE */ 0 | /* OPC */ 0x2,
         .cdw10 = /* SLBA[31:00] */ 0x0,
         .cdw11 = /* SLBA[63:32] */ 0x0,
-        .cdw12 = /* LR */ (0b1 << 31) | /* others */ 0 | /* NLB */ (number_blocks - 1),
+        .cdw12 = /* LR */ (0b1U << 31) | /* others */ 0 | /* NLB */ (number_blocks - 1),
         .dptr_hi = 0x0,
         .dptr_lo = data_region_paddr,
     });
