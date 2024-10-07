@@ -38,11 +38,10 @@ _Static_assert(NVME_ASQ_CAPACITY <= 0x10000, "capacity of ASQ must be <=65536 (s
 /* [NVMe-2.1] 3.5.1 Memory-based Controller Initialization (PCIe) */
 void nvme_controller_init()
 {
-    sddf_dprintf("CAP: %016lx\n", nvme_controller->cap);
-    sddf_dprintf("VS: major: %u, minor: %u, tertiary: %u\n", nvme_controller->vs.mjr, nvme_controller->vs.mnr,
-                 nvme_controller->vs.ter);
-    sddf_dprintf("CC: %08x\n", nvme_controller->cc);
-
+    LOG_NVME("CAP: %016lx\n", nvme_controller->cap);
+    LOG_NVME("VS: major: %u, minor: %u, tertiary: %u\n", nvme_controller->vs.mjr, nvme_controller->vs.mnr,
+             nvme_controller->vs.ter);
+    LOG_NVME("CC: %08x\n", nvme_controller->cc);
 
     nvme_controller->cc &= ~NVME_CC_EN;
 
@@ -83,9 +82,9 @@ void nvme_controller_init()
     nvme_controller->cc |= NVME_CC_EN;
 
     // 6. Wait for ready
-    sddf_dprintf("waiting ready...\n");
+    LOG_NVME("waiting ready...\n");
     while (!(nvme_controller->csts & NVME_CSTS_RDY));
-    sddf_dprintf("\tdone\n");
+    LOG_NVME("\tdone\n");
 
     // 7. Send the Identify Controller command (Identify with CNS = 01h); §5.1.13
     // TODO: What do we actually need this for????
@@ -126,7 +125,7 @@ void nvme_controller_init()
     // §5.2.1
     entry = nvme_queue_submit_and_consume_poll(&admin_queue, &(nvme_submission_queue_entry_t){
         .cdw0 = /* CID */ (0b1010 << 16) | /* PSDT */ 0 | /* FUSE */ 0 | /* OPC */ 0x5,
-        .cdw10 = /* QSIZE */ ((NVME_IOQ_CAPACITY - 1)<< 16) | /* QID */ io_queue_id,
+        .cdw10 = /* QSIZE */ ((NVME_IOQ_CAPACITY - 1U) << 16) | /* QID */ io_queue_id,
         .cdw11 = /* IV */ (0x0 << 16) | /* IEN */ 0 << 1 | /* PC */ 0x1,
         .dptr_hi = 0,
         .dptr_lo = nvme_io_cq_region_paddr,
@@ -139,7 +138,7 @@ void nvme_controller_init()
     // §5.2.2
     entry = nvme_queue_submit_and_consume_poll(&admin_queue, &(nvme_submission_queue_entry_t){
         .cdw0 = /* CID */ (0b1110 << 16) | /* PSDT */ 0 | /* FUSE */ 0 | /* OPC */ 0x1,
-        .cdw10 = /* QSIZE */ ((NVME_IOQ_CAPACITY-1) << 16) | /* QID */ io_queue_id,
+        .cdw10 = /* QSIZE */ ((NVME_IOQ_CAPACITY-1U) << 16) | /* QID */ io_queue_id,
         .cdw11 = /* CQID */ (io_queue_id << 16) | /* QPRIO */ (0b00 << 1) | /* PC */ 0b1,
         .cdw12 = 0,
         .dptr_hi = 0,
@@ -157,11 +156,32 @@ void nvme_controller_init()
 
 void nvme_init()
 {
-    sddf_dprintf("Starting NVME config...\n");
+    LOG_NVME("Starting NVME config... (%s)\n", microkit_name);
 
     // We should do a Function Level Reset as defined by [PCIe-2.0] spec §6.6.2
 
     // https://github.com/bootreer/vroom/blob/d8bbe9db2b1cfdfc38eec31f3b48f5eb167879a9/src/nvme.rs#L220
 
     nvme_controller_init();
+
+
+    /* [NVMe-CommandSet-1.1] 3.3.4 Read command */
+    nvme_completion_queue_entry_t entry;
+    uint16_t number_blocks = 10;
+    entry = nvme_queue_submit_and_consume_poll(&io_queue, &(nvme_submission_queue_entry_t){
+        .cdw0 = /* CID */ (0b1011 << 16) | /* PSDT */ 0 | /* FUSE */ 0 | /* OPC */ 0x2,
+        .cdw10 = /* SLBA[31:00] */ 0x0,
+        .cdw11 = /* SLBA[63:32] */ 0x0,
+        .cdw12 = /* LR */ (0b1 << 31) | /* others */ 0 | /* NLB */ (number_blocks - 1),
+        .dptr_hi = 0x0,
+        .dptr_lo = data_region_paddr,
+    });
+
+    LOG_NVME("CDW0: %04x\n", entry.cdw0);
+    LOG_NVME("CDW1: %04x\n", entry.cdw1);
+    LOG_NVME("SQHD: %02x\n", entry.sqhd);
+    LOG_NVME("SQID: %02x\n", entry.sqid);
+    LOG_NVME(" CID: %02x\n", entry.cid);
+    LOG_NVME("P&STATUS: %02x\n", entry.phase_tag_and_status);
+
 }
