@@ -64,6 +64,27 @@ static nvme_completion_queue_entry_t nvme_queue_submit_and_consume_poll(nvme_que
     }
 }
 
+// TODO: tidy up.
+/* 5.1.12.1.2  Error Information (Log Page Identifier 01h) */
+typedef struct {
+    uint64_t ecnt; /* Error Count; unique ID for this error. (retained across power off) */
+    uint16_t sqid; /* Submission Queue ID */
+    uint16_t cid;  /* Command ID */
+    uint16_t sts;  /* Status Info (from the completion queue entry - Status + Phase) */
+    uint16_t pel;  /* Parameter Error location (!!!!) */
+    uint64_t lba;  /* Logical Block Address */
+    uint32_t nsid;
+    uint8_t vsia; /* vendor specific info available */
+    uint8_t trtype; /* transport type */
+    uint8_t csi; /* command set indiciator (valid if version > 0x1)*/
+    uint8_t opc; /* opcode (valid if version > 0x1)*/
+    uint64_t csinfo; /* command specific information (if specified in the command) */
+    uint16_t ttsi; /* transport type specification information */
+    uint8_t _reserved[20];
+    uint8_t lpver; /* log page version */
+} nvme_error_information_log_page_t;
+_Static_assert(sizeof(nvme_error_information_log_page_t) == 64, "should be 64 bytes.");
+
 /* [NVMe-2.1] 3.5.1 Memory-based Controller Initialization (PCIe) */
 void nvme_controller_init()
 {
@@ -172,17 +193,10 @@ void nvme_controller_init()
         .cdw11 = /* CQID */ (io_queue_id << 16) | /* QPRIO */ (0b00 << 1) | /* PC */ 0b1,
         .cdw12 = 0,
         .dptr_hi = 0,
-         // TODO: get log info page size byte 0x18, i.e. dptr_lo???
-        .dptr_lo = nvme_io_sq_region_paddr,
 
-        // zeroing...
-        .nsid = 0x0,
-        .cdw2 = 0x0,
-        .cdw3 = 0x0,
-        .mptr = 0x0,
-        .cdw13 = 0x0,
-        .cdw14 = 0x0,
-        .cdw15 = 0x0,
+        // Changing sizes in the system file makes different commands work/not.
+        .dptr_lo = nvme_io_cq_region_paddr,    // TODO: This somehow works
+        // .dptr_lo = nvme_io_sq_region_paddr, // TODO: This doesn't???
     });
 
     sddf_dprintf("CDW0: %04x\n", entry.cdw0);
@@ -193,6 +207,12 @@ void nvme_controller_init()
     sddf_dprintf("P&STATUS: %02x\n", entry.phase_tag_and_status);
     // should exist again.
     // assert((entry.phase_tag_and_status & _MASK(1, 15)) == 0x0); // §4.2.3 Status Field
+    if ((entry.phase_tag_and_status & _MASK(1, 15)) == 0x0) {
+        sddf_dprintf(".... SUCCESS?\n");
+        return;
+    } else {
+        sddf_dprintf("... FAILED\n");
+    }
 
     // try a get log page command (0x2)
     sddf_dprintf("!!! LOG PAGE !!!\n");
@@ -205,8 +225,17 @@ void nvme_controller_init()
         .cdw12 = 0x0,
     });
 
-    for (int i = 0; i < 64; i++) {
-        sddf_dprintf("[%04x]: %x: %c\n", i, data_region[i], data_region[i]);
+    assert((entry.phase_tag_and_status & _MASK(1, 15)) == 0x0); // §4.2.3 Status Field
+
+    volatile nvme_error_information_log_page_t *errors = (volatile void*)data_region;
+    for (int i = 0; i < 2; i++) {
+        sddf_dprintf("Error 0x%lx\n", errors[i].ecnt);
+        // These produce Store/AMO faults, NEAR THE BEGINNING of this function??? TODO???
+        // sddf_dprintf("\tSQID: 0x%x\n", errors[i].sqid);
+        // sddf_dprintf("\t CID: 0x%x\n", errors[i].cid);
+        sddf_dprintf("\t STS: 0x%x\n", errors[i].sts);
+        sddf_dprintf("\t PEL: 0x%x\n", errors[i].pel);
+        sddf_dprintf("\t(elided)\n");
     }
 }
 
