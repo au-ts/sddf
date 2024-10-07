@@ -13,6 +13,9 @@
 
     [NVMEe-Transport-PCIe-1.1] NVMe over PCIe Transport Specification, Revision 1.1 (Aug 5, 2024)
         https://nvmexpress.org/wp-content/uploads/NVM-Express-PCI-Express-Transport-Specification-Revision-1.1-2024.08.05-Ratified.pdf
+
+    [NVMe-CommandSet-1.1] NVM Command Set Specification, Revision 1.1 (Aug 5, 2024)
+        https://nvmexpress.org/wp-content/uploads/NVM-Express-NVM-Command-Set-Specification-Revision-1.1-2024.08.05-Ratified.pdf
 */
 
 /* [NVMe-2.1] Section 3.1.4 Controller Properties

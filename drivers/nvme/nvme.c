@@ -147,6 +147,12 @@ void nvme_controller_init()
     });
 
     assert((entry.phase_tag_and_status & _MASK(1, 15)) == 0x0); // §4.2.3 Status Field
+
+    // 12. To enable asynchronous notification of optional events, the host should issue a Set Features
+    // command specifying the events to enable. To enable asynchronous notification of events, the host
+    // should submit an appropriate number of Asynchronous Event Request commands. This step may
+    // be done at any point after the controller signals that the controller is ready (i.e., CSTS.RDY is set to ‘1’).
+    // TODO: ???
 }
 
 void nvme_init()
