@@ -42,7 +42,7 @@ build_network_echo_server_make() {
 }
 
 build_i2c_make() {
-    pip install devicetree
+    pipx install devicetree
     BOARD=$1
     CONFIG=$2
     echo "CI|INFO: building I2C example with Make, board: ${BOARD}, config: ${CONFIG}"
