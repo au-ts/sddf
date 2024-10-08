@@ -85,8 +85,8 @@ static void nvme_debug_get_error_information_log_page(nvme_queue_info_t *admin_q
     for (int i = 0; i < 2; i++) {
         LOG_NVME("Error 0x%lx\n", errors[i].ecnt);
         // These produce Store/AMO faults, NEAR THE BEGINNING of this function??? TODO???
-        // LOG_NVME("\tSQID: 0x%x\n", errors[i].sqid);
-        // LOG_NVME("\t CID: 0x%x\n", errors[i].cid);
+        LOG_NVME("\tSQID: 0x%x\n", errors[i].sqid);
+        LOG_NVME("\t CID: 0x%x\n", errors[i].cid);
         LOG_NVME("\t STS: 0x%x\n", errors[i].sts);
         LOG_NVME("\t PEL: 0x%x\n", errors[i].pel);
         LOG_NVME("\t(elided)\n");
