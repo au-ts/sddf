@@ -26,14 +26,15 @@ static nvme_queue_info_t io_queue;
 uintptr_t data_region_paddr;
 volatile uint8_t *data_region;
 
-/* TODO: don't hardcode 64? is 64 even right for CQ?? */
-#define NVME_ASQ_CAPACITY (NVME_ADMIN_QUEUE_SIZE / 64)
-#define NVME_ACQ_CAPACITY (NVME_ADMIN_QUEUE_SIZE / 64)
+#define NVME_ASQ_CAPACITY (NVME_ADMIN_QUEUE_SIZE / sizeof(nvme_submission_queue_entry_t))
+#define NVME_ACQ_CAPACITY (NVME_ADMIN_QUEUE_SIZE / sizeof(nvme_completion_queue_entry_t))
 _Static_assert(NVME_ASQ_CAPACITY <= 0x1000, "capacity of ASQ must be <=4096 (entries)");
 _Static_assert(NVME_ACQ_CAPACITY <= 0x1000, "capacity of ACQ must be <=4096 (entries)");
-#define NVME_IOQ_CAPACITY (NVME_IO_QUEUE_SIZE / 64)
+#define NVME_IO_SQ_CAPACITY (NVME_IO_QUEUE_SIZE / sizeof(nvme_submission_queue_entry_t))
+#define NVME_IO_CQ_CAPACITY (NVME_IO_QUEUE_SIZE / sizeof(nvme_completion_queue_entry_t))
 // §3.3.3.1
-_Static_assert(NVME_ASQ_CAPACITY <= 0x10000, "capacity of ASQ must be <=65536 (slots)");
+_Static_assert(NVME_IO_SQ_CAPACITY <= 0x10000, "capacity of IO SQ must be <=65536 (entries)");
+_Static_assert(NVME_IO_CQ_CAPACITY <= 0x10000, "capacity of IO CQ must be <=65536 (entries)");
 
 /* [NVMe-2.1] 3.5.1 Memory-based Controller Initialization (PCIe) */
 void nvme_controller_init()
@@ -48,8 +49,9 @@ void nvme_controller_init()
     // 1. Wait for CSTS.RDY to become '0' (i.e. not ready)
     while (nvme_controller->csts & NVME_CSTS_RDY);
 
-    // 2. Configure Admin Queue(s); i.e. y = 0.
-    nvme_queues_init(&admin_queue, 0, nvme_controller, nvme_asq_region, nvme_acq_region, NVME_ASQ_CAPACITY); // todo: capacity?
+    // 2. Configure Admin Queue(s);
+    nvme_queues_init(&admin_queue, /* y */ 0, nvme_controller, nvme_asq_region, NVME_ASQ_CAPACITY, nvme_acq_region,
+                     NVME_ACQ_CAPACITY);
     assert(nvme_asq_region_paddr != 0x0);
     assert(nvme_acq_region_paddr != 0x0);
     nvme_controller->asq = nvme_asq_region_paddr;
@@ -112,7 +114,8 @@ void nvme_controller_init()
     assert(nvme_io_cq_region != 0x0);
     assert(nvme_io_sq_region_paddr != 0x0);
     assert(nvme_io_cq_region_paddr != 0x0);
-    nvme_queues_init(&io_queue, io_queue_id, nvme_controller, nvme_io_sq_region, nvme_io_cq_region, NVME_IOQ_CAPACITY); // todo: capacity?
+    nvme_queues_init(&io_queue, io_queue_id, nvme_controller, nvme_io_sq_region, NVME_IO_SQ_CAPACITY, nvme_io_cq_region,
+                     NVME_IO_CQ_CAPACITY);
 
     // §3.3.1.1 Queue Seutp & Initialization
         // => Configures the size of the I/O Submission Queues (CC.IOSQES) and I/O Completion Queues (CC.IOCQES)
@@ -125,7 +128,7 @@ void nvme_controller_init()
     // §5.2.1
     entry = nvme_queue_submit_and_consume_poll(&admin_queue, &(nvme_submission_queue_entry_t){
         .cdw0 = /* CID */ (0b1010 << 16) | /* PSDT */ 0 | /* FUSE */ 0 | /* OPC */ 0x5,
-        .cdw10 = /* QSIZE */ ((NVME_IOQ_CAPACITY - 1U) << 16) | /* QID */ io_queue_id,
+        .cdw10 = /* QSIZE */ ((NVME_IO_CQ_CAPACITY - 1U) << 16) | /* QID */ io_queue_id,
         .cdw11 = /* IV */ (0x0 << 16) | /* IEN */ 0 << 1 | /* PC */ 0x1,
         .prp2 = 0,
         .prp1 = nvme_io_cq_region_paddr,
@@ -138,7 +141,7 @@ void nvme_controller_init()
     // §5.2.2
     entry = nvme_queue_submit_and_consume_poll(&admin_queue, &(nvme_submission_queue_entry_t){
         .cdw0 = /* CID */ (0b1110 << 16) | /* PSDT */ 0 | /* FUSE */ 0 | /* OPC */ 0x1,
-        .cdw10 = /* QSIZE */ ((NVME_IOQ_CAPACITY-1U) << 16) | /* QID */ io_queue_id,
+        .cdw10 = /* QSIZE */ ((NVME_IO_SQ_CAPACITY - 1U) << 16) | /* QID */ io_queue_id,
         .cdw11 = /* CQID */ (io_queue_id << 16) | /* QPRIO */ (0b00 << 1) | /* PC */ 0b1,
         .cdw12 = 0,
         .prp2 = 0,
@@ -163,11 +166,6 @@ void nvme_init()
     // https://github.com/bootreer/vroom/blob/d8bbe9db2b1cfdfc38eec31f3b48f5eb167879a9/src/nvme.rs#L220
 
     nvme_controller_init();
-
-    sddf_memset((void *)data_region, 'a', 512);
-    for (int i = 0; i < 10; i++) {
-        sddf_dprintf("Data [%02x]: %04x\n", i, data_region[i]);
-    }
 
     /* [NVMe-CommandSet-1.1] 3.3.4 Read command */
     nvme_completion_queue_entry_t entry;
