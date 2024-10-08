@@ -155,7 +155,7 @@ static inline void i2c_setup()
     volatile struct i2c_regs *regs = (volatile struct i2c_regs *) i2c_regs;
 
     // Should be removed once the clock driver is integrated
-    volatile uint32_t *clk81_ptr        = ((void *)clk_regs + I2C_CLK_OFFSET);
+    volatile uint32_t *clk81_ptr = ((void *)clk_regs + I2C_CLK_OFFSET);
     uint32_t clk81 = *clk81_ptr;
     // Enable i2c by removing clock gate
     clk81 |= (I2C_CLK81_BIT);
