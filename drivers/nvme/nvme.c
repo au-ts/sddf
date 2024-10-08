@@ -93,8 +93,8 @@ void nvme_controller_init()
     entry = nvme_queue_submit_and_consume_poll(&admin_queue, &(nvme_submission_queue_entry_t){
         .cdw0 = /* CID */ (0b1111 << 16) | /* PSDT */ 0 | /* FUSE */ 0 | /* OPC */ 0x6,
         .cdw10 = /* CNTID[31:16] */ 0x0 | /* CNS */ 0x01,
-        .dptr_hi = 0,
-        .dptr_lo = data_region_paddr, /* TEMP */
+        .prp2 = 0,
+        .prp1 = data_region_paddr, /* TEMP */
     });
 
     assert((entry.phase_tag_and_status & _MASK(1, 15)) == 0x0); // §4.2.3 Status Field
@@ -127,8 +127,8 @@ void nvme_controller_init()
         .cdw0 = /* CID */ (0b1010 << 16) | /* PSDT */ 0 | /* FUSE */ 0 | /* OPC */ 0x5,
         .cdw10 = /* QSIZE */ ((NVME_IOQ_CAPACITY - 1U) << 16) | /* QID */ io_queue_id,
         .cdw11 = /* IV */ (0x0 << 16) | /* IEN */ 0 << 1 | /* PC */ 0x1,
-        .dptr_hi = 0,
-        .dptr_lo = nvme_io_cq_region_paddr,
+        .prp2 = 0,
+        .prp1 = nvme_io_cq_region_paddr,
     });
 
     assert((entry.phase_tag_and_status & _MASK(1, 15)) == 0x0); // §4.2.3 Status Field
@@ -141,8 +141,8 @@ void nvme_controller_init()
         .cdw10 = /* QSIZE */ ((NVME_IOQ_CAPACITY-1U) << 16) | /* QID */ io_queue_id,
         .cdw11 = /* CQID */ (io_queue_id << 16) | /* QPRIO */ (0b00 << 1) | /* PC */ 0b1,
         .cdw12 = 0,
-        .dptr_hi = 0,
-        .dptr_lo = nvme_io_sq_region_paddr,
+        .prp2 = 0,
+        .prp1 = nvme_io_sq_region_paddr,
     });
 
     assert((entry.phase_tag_and_status & _MASK(1, 15)) == 0x0); // §4.2.3 Status Field
