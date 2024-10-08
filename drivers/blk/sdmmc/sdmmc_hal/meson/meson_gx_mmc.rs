@@ -1,6 +1,6 @@
 use core::ptr;
 
-use sdmmc_protocol::sdmmc::{MmcData, MmcDataFlag, SdmmcCmd, SdmmcHalError, SdmmcHardware};
+use sdmmc_protocol::sdmmc::{InterruptType, MmcData, MmcDataFlag, SdmmcCmd, SdmmcHalError, SdmmcHardware};
 use sel4_microkit::debug_println;
 
 const SDIO_BASE: u64 = 0xffe05000; // Base address from DTS
@@ -56,6 +56,27 @@ const STATUS_RESP_ERR: u32 = 1 << 10;          // BIT(10)
 const STATUS_RESP_TIMEOUT: u32 = 1 << 11;      // BIT(11)
 const STATUS_DESC_TIMEOUT: u32 = 1 << 12;      // BIT(12)
 const STATUS_END_OF_CHAIN: u32 = 1 << 13;      // BIT(13)
+const STATUS_BUSY: u32 = 1 << 31;
+const STATUS_DESC_BUSY: u32 = 1 << 30;
+const STATUS_DATI: u32 = 0xFF << 16;         // Equivalent to GENMASK(23, 16)
+
+// IRQ enable register masks and flags
+const IRQ_RXD_ERR_MASK: u32 = 0xFF; // Equivalent to GENMASK(7, 0)
+const IRQ_TXD_ERR: u32 = 1 << 8;
+const IRQ_DESC_ERR: u32 = 1 << 9;
+const IRQ_RESP_ERR: u32 = 1 << 10;
+// Equivalent to (IRQ_RXD_ERR_MASK | IRQ_TXD_ERR | IRQ_DESC_ERR | IRQ_RESP_ERR)
+const IRQ_CRC_ERR: u32 = IRQ_RXD_ERR_MASK | IRQ_TXD_ERR | IRQ_DESC_ERR | IRQ_RESP_ERR;
+const IRQ_RESP_TIMEOUT: u32 = 1 << 11;
+const IRQ_DESC_TIMEOUT: u32 = 1 << 12;
+// Equivalent to (IRQ_RESP_TIMEOUT | IRQ_DESC_TIMEOUT)
+const IRQ_TIMEOUTS: u32 = IRQ_RESP_TIMEOUT | IRQ_DESC_TIMEOUT;
+const IRQ_END_OF_CHAIN: u32 = 1 << 13;
+const IRQ_RESP_STATUS: u32 = 1 << 14;
+const IRQ_SDIO: u32 = 1 << 15;
+const IRQ_ERR_MASK: u32 = IRQ_CRC_ERR | IRQ_TIMEOUTS;
+// Equivalent to (IRQ_CRC_ERR | IRQ_TIMEOUTS | IRQ_END_OF_CHAIN)
+const IRQ_EN_MASK: u32 = IRQ_CRC_ERR | IRQ_TIMEOUTS | IRQ_END_OF_CHAIN;
 
 // Configuration constants (assuming based on context)
 const CFG_BL_LEN_MASK: u32 = 0xF << 4; // Bits 4-7
@@ -213,8 +234,8 @@ impl MesonSdmmcRegisters {
 
             cfg |= ilog2(data.blocksize) << CFG_BL_LEN_SHIFT;
             
-            // This value should only be 9
-            assert!(ilog2(data.blocksize) == 9);
+            // This value should only be 512
+            assert!(data.blocksize == 512);
 
             unsafe { ptr::write_volatile(&mut self.cfg, cfg); };
             
@@ -279,9 +300,10 @@ impl SdmmcHardware for MesonSdmmcRegisters {
         self.meson_mmc_set_up_cmd_cfg_and_cfg(&cmd, data);
 
         // Reset status register before executing the cmd
+        // If we keep this line of code, do we still need to manually ack interrupts???
         unsafe { ptr::write_volatile(&mut self.status, STATUS_MASK); }
 
-        // For testing
+        // Clear the response register, for testing & debugging
         unsafe { ptr::write_volatile(&mut self.cmd_rsp, 0u32); }
 
         unsafe { ptr::write_volatile(&mut self.cmd_arg, cmd.cmdarg); }
@@ -313,5 +335,35 @@ impl SdmmcHardware for MesonSdmmcRegisters {
         self.meson_read_response(cmd, response);
 
         return_val
+    }
+
+    fn sdmmc_enable_interrupt(&mut self, irq_to_enable: &mut u32) -> Result<(), SdmmcHalError> {
+        let mut irq_bits_to_set: u32 = 0;
+        if *irq_to_enable & (InterruptType::Success as u32) > 0 {
+            irq_bits_to_set |= IRQ_END_OF_CHAIN;
+        }
+        if *irq_to_enable & (InterruptType::Error as u32) > 0 {
+            irq_bits_to_set |= IRQ_ERR_MASK;
+        }
+        if *irq_to_enable & (InterruptType::SDIO as u32) > 0 {
+            irq_bits_to_set |= IRQ_SDIO;
+        }
+        unsafe { ptr::write_volatile(&mut self.irq_en, irq_bits_to_set); }
+        return Ok(());
+    }
+
+    fn sdmmc_ack_interrupt(&mut self, irq_enabled: &u32) -> Result<(), SdmmcHalError> {
+        let mut irq_bits_to_set: u32 = 0;
+        if *irq_enabled & (InterruptType::Success as u32) > 0 {
+            irq_bits_to_set |= IRQ_END_OF_CHAIN;
+        }
+        if *irq_enabled & (InterruptType::Error as u32) > 0 {
+            irq_bits_to_set |= IRQ_ERR_MASK;
+        }
+        if *irq_enabled & (InterruptType::SDIO as u32) > 0 {
+            irq_bits_to_set |= IRQ_SDIO;
+        }
+        unsafe { ptr::write_volatile(&mut self.status, irq_bits_to_set); }
+        return Ok(());
     }
 }
