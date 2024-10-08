@@ -5,25 +5,26 @@
 typedef struct nvme_queue_info {
     struct {
         nvme_submission_queue_entry_t *queue;
+        uint16_t capacity;
         uint16_t tail;
         volatile uint32_t *doorbell;
     } submission;
 
     struct {
         nvme_completion_queue_entry_t *queue;
+        uint16_t capacity;
         uint16_t head;
         volatile uint32_t *doorbell;
         _Bool phase;
     } completion;
 
-    uint16_t capacity;
 } nvme_queue_info_t;
 
 
 // y is the submission queue index
 static inline void nvme_queues_init(nvme_queue_info_t *queue, uint16_t y, volatile nvme_controller_t *nvme_controller,
-                                    nvme_submission_queue_entry_t *submission_queue,
-                                    nvme_completion_queue_entry_t *completion_queue, uint16_t capacity)
+                                    nvme_submission_queue_entry_t *submission_queue, uint16_t submission_capacity,
+                                    nvme_completion_queue_entry_t *completion_queue, uint16_t completion_capacity)
 {
     uint8_t DSTRD = (nvme_controller->cap & NVME_CAP_DSTRD_MASK) >> NVME_CAP_DSTRD_SHIFT;
 
@@ -35,16 +36,17 @@ static inline void nvme_queues_init(nvme_queue_info_t *queue, uint16_t y, volati
     *queue = (nvme_queue_info_t){
         .submission = {
             .queue = submission_queue,
+            .capacity = submission_capacity,
             .tail = *submission_doorbell & NVME_PCIE_SQT_MASK,
             .doorbell = submission_doorbell,
         },
         .completion = {
             .queue = completion_queue,
+            .capacity = completion_capacity,
             .head = *completion_doorbell & NVME_PCIE_CQH_MASK,
             .doorbell = completion_doorbell,
             .phase = 0,
         },
-        .capacity = capacity,
     };
 }
 
