@@ -19,7 +19,7 @@
 
     <memory_region name="data_region" size="0x10_000" />
 
-    <protection_domain name="pcie" priority="254" >
+    <protection_domain name="pcie" priority="254" stack_size="0x2000">
         <!-- <map mr="pcie_regs" vaddr="0x1000_0000" perms="rw" cached="false" setvar_vaddr="pcie_regs" /> -->
         <map mr="pcie_config" vaddr="0x2000_0000" perms="rw" cached="false" setvar_vaddr="pcie_config" />
 
