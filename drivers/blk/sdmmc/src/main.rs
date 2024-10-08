@@ -92,6 +92,11 @@ impl<'a, T: SdmmcHardware> Handler for HandlerImpl<'a, T> {
     fn notified(&mut self, channel: Channel) -> Result<(), Self::Error> {
         debug_println!("SDMMC_DRIVER: MESSAGE FROM CHANNEL: {}", channel.index());
         let mut notify_virt: bool = false;
+        if channel.index() == 1 {
+            if let Some(sdmmc) = &mut self.sdmmc {
+                sdmmc.ack_interrupt();
+            }
+        }
         loop {
             // Polling if receive any notification, it is to poll even the notification is not from the interrupt as polling is cheap
             if let Some(request) = &mut self.request {
@@ -99,6 +104,7 @@ impl<'a, T: SdmmcHardware> Handler for HandlerImpl<'a, T> {
                     let waker = create_dummy_waker();
                     let mut cx = Context::from_waker(&waker);
                     // TODO: I can get rid of this loop once I configure out how to enable interrupt from Linux kernel driver
+                    debug_println!("SDMMC_DRIVER: Polling future!");
                     match future.as_mut().poll(&mut cx) {
                         Poll::Ready((result, sdmmc)) => {
                             // debug_println!("SDMMC_DRIVER: Future completed with result");
@@ -153,13 +159,15 @@ impl<'a, T: SdmmcHardware> Handler for HandlerImpl<'a, T> {
                         &mut request.id as *mut u32,
                     );
                 }
+                request.block_number = request.block_number * SDDF_TO_REAL_SECTOR;
+                request.count = request.count * SDDF_TO_REAL_SECTOR as u16;
                 // Print the retrieved values
-                /*
-                debug_println!("io_or_offset: 0x{:x}", io_or_offset);// Simple u64
-                debug_println!("block_number: {}", block_number);    // Simple u32
-                debug_println!("count: {}", count);                  // Simple u16
-                debug_println!("id: {}", id);                        // Simple u32
-                */
+                
+                debug_println!("io_or_offset: 0x{:x}", request.io_or_offset);// Simple u64
+                debug_println!("block_number: {}", request.block_number);    // Simple u32
+                debug_println!("count: {}", request.count);                  // Simple u16
+                debug_println!("id: {}", request.id);                        // Simple u32
+                
                 match request.request_code {
                     BlkOp::BlkReqRead => {
                         // Reset retry chance here
@@ -188,6 +196,7 @@ impl<'a, T: SdmmcHardware> Handler for HandlerImpl<'a, T> {
                     match request.request_code {
                         BlkOp::BlkReqRead => {
                             // TODO: The MAX_BLOCK_PER_TRANSFER is got by hackily get the defines in hardware layer which is wrong, check that to get properly from protocol layer
+                            debug_println!("Read future created here!");
                             request.count_to_do = core::cmp::min(request.count as u32, sdmmc_hal::meson_gx_mmc::MAX_BLOCK_PER_TRANSFER);
                             if let Some(sdmmc) = self.sdmmc.take() {
                                 self.future = Some(Box::pin(sdmmc.read_block(request.count_to_do as u32, request.block_number as u64 + request.success_count as u64, request.io_or_offset + request.success_count as u64 * SDCARD_SECTOR_SIZE as u64)));
@@ -218,6 +227,7 @@ impl<'a, T: SdmmcHardware> Handler for HandlerImpl<'a, T> {
             }
         }
         if notify_virt == true {
+            debug_println!("SDMMC_DRIVER: Notify the BLK_VIRTUALIZER!");
             BLK_VIRTUALIZER.notify();
         }
         Ok(())
