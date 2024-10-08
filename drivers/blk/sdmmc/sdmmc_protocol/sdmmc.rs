@@ -21,6 +21,7 @@ pub enum MmcDataFlag {
     SdmmcDataRead,
     SdmmcDataWrite,
 }
+
 pub enum SdmmcHalError {
     // Error for result not ready yet
     EBUSY,
@@ -32,6 +33,15 @@ pub enum SdmmcHalError {
     EUNDEFINED,
     // The block transfer succeed, but fail to stop the read/write process
     ESTOPCMD,
+}
+
+// Interrupt related define
+#[repr(u32)]  // Ensures the enum variants are stored as 32-bit integers
+pub enum InterruptType {
+    Success = 0b0001,    // 1st bit
+    Error   = 0b0010,    // 2nd bit
+    SDIO    = 0b0100,    // 3rd bit
+    // You can add more flags as needed
 }
 
 // Define the MMC response flags
@@ -72,11 +82,11 @@ pub trait SdmmcHardware {
         return Err(SdmmcHalError::ENOTIMPLEMENTED);
     }
 
-    fn sdmmc_set_interrupt(&mut self, status: bool) -> Result<(), SdmmcHalError> {
+    fn sdmmc_enable_interrupt(&mut self, irq_to_enable: &mut u32) -> Result<(), SdmmcHalError> {
         return Err(SdmmcHalError::ENOTIMPLEMENTED);
     }
 
-    fn sdmmc_ack_interrupt(&mut self) -> Result<(), SdmmcHalError> {
+    fn sdmmc_ack_interrupt(&mut self, irq_enabled: &u32) -> Result<(), SdmmcHalError> {
         return Err(SdmmcHalError::ENOTIMPLEMENTED);
     }
 
@@ -88,13 +98,32 @@ pub trait SdmmcHardware {
 /// TODO: Add more variables for SdmmcProtocol to track the state of the sdmmc controller and card correctly
 pub struct SdmmcProtocol<'a, T: SdmmcHardware> {
     pub hardware: &'a mut T,
+    enabled_irq: u32,
 }
 
 impl<T> Unpin for SdmmcProtocol<'_, T> where T: Unpin + SdmmcHardware {}
 
 impl<'a, T: SdmmcHardware> SdmmcProtocol<'a, T> {
     pub fn new(hardware: &'a mut T) -> Self {
-        SdmmcProtocol { hardware }
+        SdmmcProtocol {
+            hardware,
+            enabled_irq: 0,
+        }
+    }
+
+    pub fn reset_card(&mut self) -> Result<(), SdmmcHalError> {
+        let all: u32 = InterruptType::Success as u32 | InterruptType::Error as u32 | InterruptType::SDIO as u32;
+        self.hardware.sdmmc_ack_interrupt(&all)
+    }
+
+    pub fn enable_interrupt(&mut self, irq_to_enable: &mut u32) -> Result<(), SdmmcHalError> {
+        let res = self.hardware.sdmmc_enable_interrupt(irq_to_enable);
+        self.enabled_irq = *irq_to_enable;
+        res
+    }
+
+    pub fn ack_interrupt(&mut self) -> Result<(), SdmmcHalError> {
+        self.hardware.sdmmc_ack_interrupt(&self.enabled_irq)
     }
 
     pub async fn read_block(self, blockcnt: u32, start_idx: u64, destination: u64) -> (Result<(), SdmmcHalError>, Option<SdmmcProtocol<'a, T>>) {
