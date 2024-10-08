@@ -99,13 +99,13 @@ _Static_assert(offsetof(nvme_controller_t, _reserved2) == 0x6C, "nvme_controller
 typedef struct nvme_submission_queue_entry {
     // TODO: split out to opcode etc (figure 91??)
 
-    uint32_t cdw0; /* Command Dword 0 (common) */
-    uint32_t nsid; /* Namespace Identifier */
-    uint32_t cdw2; /* Command Dword 2 (command-specific) */
-    uint32_t cdw3; /* Command Dword 3 (command-specific) */
-    uint64_t mptr; /* Metadata Pointer */
-    uint64_t dptr_lo; /* Data Pointer (low 8 bytes)  */
-    uint64_t dptr_hi; /* Data Pointer (high 8 bytes) */
+    uint32_t cdw0;  /* Command Dword 0 (common) */
+    uint32_t nsid;  /* Namespace Identifier */
+    uint32_t cdw2;  /* Command Dword 2 (command-specific) */
+    uint32_t cdw3;  /* Command Dword 3 (command-specific) */
+    uint64_t mptr;  /* Metadata Pointer */
+    uint64_t prp1;  /* Data Pointer - PRP Entry 1 */
+    uint64_t prp2;  /* Data Pointer - PRP Entry 2 */
     uint32_t cdw10; /* Command Dword 10 (command-specific) */
     uint32_t cdw11; /* Command Dword 11 (command-specific) */
     uint32_t cdw12; /* Command Dword 12 (command-specific) */

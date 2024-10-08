@@ -72,8 +72,8 @@ static void nvme_debug_get_error_information_log_page(nvme_queue_info_t *admin_q
     entry = nvme_queue_submit_and_consume_poll(
         admin_queue, &(nvme_submission_queue_entry_t) {
                          .cdw0 = /* CID */ (0b1001 << 16) | /* PSDT */ 0 | /* FUSE */ 0 | /* OPC */ 0x2,
-                         .dptr_hi = 0,
-                         .dptr_lo = data_paddr,
+                         .prp2 = 0,
+                         .prp1 = data_paddr,
                          .cdw10 = /* NUMDL*/ (0x100 << 16) | /* LID*/ 0x01,
                          .cdw11 = 0x0,
                          .cdw12 = 0x0,
