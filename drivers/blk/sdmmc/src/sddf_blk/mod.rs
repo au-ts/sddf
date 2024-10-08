@@ -24,3 +24,14 @@ pub enum BlkStatus {
     BlkRespOk,
     BlkRespSeekError,
 }
+
+pub struct BlkRequest {
+    pub request_code: BlkOp,
+    pub io_or_offset: u64,
+    pub block_number: u32,
+    pub count: u16,
+    // I suggest use u32 here and change the count to use u32 in sddf_blk
+    pub success_count: u32,
+    pub count_to_do: u32,
+    pub id: u32,
+}
