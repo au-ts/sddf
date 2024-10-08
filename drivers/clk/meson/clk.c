@@ -111,12 +111,21 @@ void set_clk_rate(struct clk *clk, uint32_t rate)
         clk->hw.init->ops->init(clk);
     }
 
+    const struct clk *pclk = get_parent(clk);
+    uint64_t prate = clk_recalc_rate(pclk);
     if (clk->hw.init->ops->set_rate) {
-        /* determine_rate() needs to be implemented */
-        const struct clk *parent_clk = get_parent(clk);
-        uint64_t prate = clk_recalc_rate(parent_clk);
+        /* TODO: determine_rate() needs to be implemented */
         LOG_DRIVER("set %s to %dHz\n", clk->hw.init->name, rate);
         clk->hw.init->ops->set_rate(clk, rate, prate);
+    } else {
+        /* TODO: We only propagate one level right now */
+        if (pclk->hw.init->ops->set_rate) {
+            const struct clk *ppclk = get_parent(pclk);
+            uint64_t pprate = clk_recalc_rate(ppclk);
+            /* TODO: determine_rate() needs to be implemented */
+            LOG_DRIVER("set %s to %dHz\n", pclk->hw.init->name, rate);
+            pclk->hw.init->ops->set_rate(pclk, prate, pprate);
+        }
     }
 }
 
