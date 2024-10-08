@@ -95,6 +95,38 @@ pub trait SdmmcHardware {
     }
 }
 
+fn send_cmd_and_receive_resp<T: SdmmcHardware>(
+    hardware: &mut T,
+    cmd: &SdmmcCmd,
+    data: Option<&MmcData>,
+    resp: &mut [u32; 4]
+) -> Result<(), SdmmcHalError> {
+    // Send the command using the hardware layer
+    let mut res = hardware.sdmmc_send_command(cmd, data);
+    if res.is_err() {
+        return res;
+    }
+
+    // TODO: Change it to use the sleep function provided by the hardware layer
+    let mut retry: u32 = 1000000;
+    
+    while retry > 0 {
+        // Try to receive the response
+        res = hardware.sdmmc_receive_response(cmd, resp);
+        
+        if let Err(SdmmcHalError::EBUSY) = res {
+            // Busy response, retry
+            retry -= 1;
+            // hardware.sleep(1); // Placeholder: Implement a sleep function in SdmmcHardware trait
+        } else {
+            // If any other error or success, break the loop
+            break;
+        }
+    }
+
+    res // Return the final result (Ok or Err)
+}
+
 /// TODO: Add more variables for SdmmcProtocol to track the state of the sdmmc controller and card correctly
 pub struct SdmmcProtocol<'a, T: SdmmcHardware> {
     pub hardware: &'a mut T,
@@ -178,8 +210,7 @@ impl<'a, T: SdmmcHardware> SdmmcProtocol<'a, T> {
                     resp_type: MMC_RSP_R1B,
                     cmdarg: 0,
                 };
-                let future = SdmmcCmdFuture::new(self.hardware, &cmd, None, &mut resp);
-                res = future.await;
+                res = send_cmd_and_receive_resp(self.hardware, &cmd, None, &mut resp);
                 return (res.map_err(|_| SdmmcHalError::ESTOPCMD), Some(self));
             } else {
                 return (res, Some(self));
@@ -231,8 +262,7 @@ impl<'a, T: SdmmcHardware> SdmmcProtocol<'a, T> {
                     resp_type: MMC_RSP_R1B,
                     cmdarg: 0,
                 };
-                let future = SdmmcCmdFuture::new(self.hardware, &cmd, None, &mut resp);
-                res = future.await;
+                res = send_cmd_and_receive_resp(self.hardware, &cmd, None, &mut resp);
                 return (res.map_err(|_| SdmmcHalError::ESTOPCMD), Some(self));
             } else {
                 return (res, Some(self));
