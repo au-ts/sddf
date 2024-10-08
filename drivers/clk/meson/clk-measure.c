@@ -224,7 +224,7 @@ unsigned long clk_msr(unsigned long clk_mux)
 }
 
 
-char **get_msr_clk_list(void)
+const char *const *get_msr_clk_list(void)
 {
     return sm1_table;
 }

@@ -218,7 +218,7 @@ static unsigned long clk_regmap_div_recalc_rate(const struct clk *clk,
     return DIV_ROUND_UP_ULL((uint64_t)prate, div);
 }
 
-static int clk_regmap_div_set_rate(struct clk *clk, uint32_t rate, uint32_t parent_rate)
+static int clk_regmap_div_set_rate(const struct clk *clk, uint32_t rate, uint32_t parent_rate)
 {
     struct clk_div_data *data = (struct clk_div_data *)(clk->data);
     uint32_t div = DIV_ROUND_UP(parent_rate, rate);
@@ -301,15 +301,11 @@ static uint8_t clk_regmap_mux_get_parent(const struct clk *clk)
 
 static int clk_regmap_mux_set_parent(struct clk *clk, uint8_t index)
 {
-    sddf_dprintf("set parent");
     struct clk_mux_data *data = (struct clk_mux_data *)(clk->data);
-    sddf_dprintf("mux_data: 0x%x\n", data);
 
     if (data->table) {
         unsigned int val = data->table[index];
-        sddf_dprintf("val: 0x%x\n", val);
         regmap_mux_update_bits(data->offset, data->shift, data->mask, val);
-        sddf_dprintf("update\n");
     }
 
     return 0;
@@ -416,6 +412,7 @@ static int meson_clk_pll_enable(struct clk *clk)
     regmap_update_bits(data->rst.reg_off, data->rst.shift, data->rst.width, 1);
 
     regmap_update_bits(data->current_en.reg_off, data->current_en.shift, data->current_en.width, 1);
+    return 0;
 }
 
 static void meson_clk_pll_disable(struct clk *clk)
@@ -461,7 +458,7 @@ static unsigned long mpll_recalc_rate(const struct clk *clk,
     return DIV_ROUND_UP_ULL((uint64_t)prate * SDM_DEN, divisor);
 }
 
-static int mpll_set_rate(struct clk *clk,
+static int mpll_set_rate(const struct clk *clk,
              uint32_t rate,
              uint32_t parent_rate)
 {
@@ -526,7 +523,7 @@ const struct clk_ops meson_clk_mpll_ops = {
     .init = mpll_init,
 };
 
-static int clk_source_set_rate(struct clk *clk, uint32_t rate, uint32_t parent_rate)
+static int clk_source_set_rate(const struct clk *clk, uint32_t rate, uint32_t parent_rate)
 {
     struct clk_source_data *data = (struct clk_source_data *)(clk->data);
     data->rate = rate;
@@ -668,7 +665,7 @@ static unsigned long meson_vclk_div_recalc_rate(const struct clk *clk,
     return DIV_ROUND_UP_ULL((uint64_t)prate, div);
 }
 
-static int meson_vclk_div_set_rate(struct clk *clk, uint32_t rate, uint32_t parent_rate)
+static int meson_vclk_div_set_rate(const struct clk *clk, uint32_t rate, uint32_t parent_rate)
 {
     struct meson_vclk_div_data *data = (struct meson_vclk_div_data *)(clk->data);
 
