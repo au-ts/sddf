@@ -14,10 +14,6 @@
 #include <sddf/i2c/queue.h>
 #include "driver.h"
 
-#ifndef I2C_BUS_NUM
-#error "I2C_BUS_NUM must be defined!"
-#endif
-
 #define VIRTUALISER_CH 0
 #define IRQ_CH 1
 #define IRQ_TIMEOUT_CH 2
@@ -46,9 +42,7 @@ struct i2c_regs {
 };
 
 // Hardware memory
-#ifndef DISABLE_I2C_PINMUX_INIT
-uintptr_t gpio_regs;
-#endif
+// Should be removed once the clock driver is integrated
 uintptr_t clk_regs;
 uintptr_t i2c_regs;
 
@@ -160,98 +154,16 @@ static inline void i2c_setup()
 
     volatile struct i2c_regs *regs = (volatile struct i2c_regs *) i2c_regs;
 
-#ifndef DISABLE_I2C_PINMUX_INIT
-    // Note: this is hacky - should do this using a GPIO driver.
-    // Set up pinmux
-    volatile uint32_t *gpio_mem = (void *)(gpio_regs + GPIO_OFFSET);
-
-    volatile uint32_t *pinmux5_ptr      = ((void *)gpio_mem + GPIO_PINMUX_5 * 4);
-    // volatile uint32_t *pinmuxE_ptr      = ((void*)gpio_mem + GPIO_PINMUX_E*4);
-    volatile uint32_t *pad_ds2b_ptr     = ((void *)gpio_mem + GPIO_DS_2B * 4);
-    // volatile uint32_t *pad_ds5a_ptr     = ((void*)gpio_mem + GPIO_DS_5A*4);
-    volatile uint32_t *pad_bias2_ptr    = ((void *)gpio_mem + GPIO_BIAS_2_EN * 4);
-    // volatile uint32_t *pad_bias5_ptr    = ((void*)gpio_mem + GPIO_BIAS_5_EN*4);
+    // Should be removed once the clock driver is integrated
     volatile uint32_t *clk81_ptr        = ((void *)clk_regs + I2C_CLK_OFFSET);
-
-    // Read existing register values
-    uint32_t pinmux5 = *pinmux5_ptr;
-    // uint32_t pinmuxE = *pinmuxE_ptr;
     uint32_t clk81 = *clk81_ptr;
-
-    // Common values
-    const uint8_t ds = 3;    // 3 mA
-    uint8_t pinfunc;
-
-# if I2C_BUS_NUM == 2
-    // Enable i2cm2 -> pinmux 5
-    LOG_DRIVER("bus 2 initialising\n");
-    pinfunc = GPIO_PM5_X_I2C;
-    pinmux5 |= (pinfunc << 4) | (pinfunc << 8);
-    *pinmux5_ptr = pinmux5;
-
-    // Check that registers actually changed
-    if (!(*pinmux5_ptr & (GPIO_PM5_X18 | GPIO_PM5_X17))) {
-        LOG_DRIVER_ERR("failed to set pinmux5!\n");
-    }
-
-    // Set GPIO drive strength
-    *pad_ds2b_ptr &= ~(GPIO_DS_2B_X17 | GPIO_DS_2B_X18);
-    *pad_ds2b_ptr |= ((ds << GPIO_DS_2B_X17_SHIFT) |
-                      (ds << GPIO_DS_2B_X18_SHIFT));
-
-    // Check register updated
-    if ((*pad_ds2b_ptr & (GPIO_DS_2B_X17 | GPIO_DS_2B_X18)) != ((ds << GPIO_DS_2B_X17_SHIFT) |
-                                                                (ds << GPIO_DS_2B_X18_SHIFT))) {
-        LOG_DRIVER_ERR("failed to set drive strength for m2!\n");
-    }
-
-    // Disable bias, because the odroid i2c hardware has undocumented internal ones
-    *pad_bias2_ptr &= ~((1 << 18) | (1 << 17)); // Disable m2 bias - x17 and x18
-
-    // Check registers updated
-    if ((*pad_bias2_ptr & ((1 << 18) | (1 << 17))) != 0) {
-        LOG_DRIVER_ERR("failed to disable bias for m2!\n");
-    }
-# elif I2C_BUS_NUM == 3
-    // Enable i2cm3 -> pinmux E
-    pinfunc = GPIO_PE_A_I2C;
-    pinmuxE |= (pinfunc << 24) | (pinfunc << 28);
-    *pinmuxE_ptr = pinmuxE;
-
-    // Check registers actually changed
-    if (!(*pinmuxE_ptr & (GPIO_PE_A15 | GPIO_PE_A14))) {
-        LOG_DRIVER_ERR("failed to set pinmuxE!\n");
-    }
-
-    // Set GPIO drive strength
-    *pad_ds5a_ptr &= ~(GPIO_DS_5A_A14 | GPIO_DS_5A_A15);
-    *pad_ds5a_ptr |= ((ds << GPIO_DS_5A_A14_SHIFT) |
-                      (ds << GPIO_DS_5A_A15_SHIFT));
-
-    // Check register updated
-    if ((*pad_ds5a_ptr & (GPIO_DS_5A_A14 | GPIO_DS_5A_A15)) != ((ds << GPIO_DS_5A_A14_SHIFT) |
-                                                                (ds << GPIO_DS_5A_A15_SHIFT))) {
-        LOG_DRIVER_ERR("failed to set drive strength for m3!\n");
-    }
-
-    // Disable bias, because the odroid i2c hardware has undocumented internal ones
-    *pad_bias5_ptr &= ~((1 << 14) | (1 << 15)); // Disable m3 bias - a14 and a15
-
-    // Check registers updated
-    if ((*pad_bias5_ptr & ((1 << 14) | (1 << 15))) != 0) {
-        LOG_DRIVER_ERR("failed to disable bias for m3!\n");
-    }
-# endif /* I2C_BUS_NUM */
-
     // Enable i2c by removing clock gate
     clk81 |= (I2C_CLK81_BIT);
     *clk81_ptr = clk81;
-
     // Check that registers actually changed
     if (!(*clk81_ptr & I2C_CLK81_BIT)) {
         LOG_DRIVER_ERR("failed to toggle clock!\n");
     }
-#endif
 
     // Initialise fields
     regs->ctl &= ~(REG_CTRL_MANUAL);       // Disable manual mode

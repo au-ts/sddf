@@ -18,7 +18,6 @@ export BUILD_DIR ?= build
 export MICROKIT_CONFIG ?= debug
 export MICROKIT_BOARD ?= odroidc4
 
-export I2C_BUS_NUM:=2
 export SDDF := $(abspath ../../)
 
 IMAGE_FILE := $(BUILD_DIR)/loader.img

@@ -9,10 +9,10 @@
         These memory regions are required for initialisation. In the future
         we will have separate drivers to initialise the clocks etc
      -->
-    <memory_region name="gpio" size="0x4000" phys_addr="0xFF634000"/>
     <memory_region name="clk" size="0x1000" phys_addr="0xFF63C000"/>
-
     <memory_region name="i2c_bus" size="0x1000" phys_addr="0xFFD1D000"/>
+    <memory_region name="pinctrl_ao" size="0x1000" phys_addr="0xFF80_0000" />
+    <memory_region name="pinctrl_periphs" size="0x2000" phys_addr="0xFF63_4000" />
 
     <!--
 	    This system transfers minimal data over I2C and so a data region size of
@@ -31,8 +31,14 @@
     <memory_region name="client_ds3231_data_region" size="0x1_000"/>
     <memory_region name="client_pn532_data_region" size="0x1_000"/>
 
-
     <memory_region name="timer_registers" size="0x1000" phys_addr="0xffd0f000" />
+
+    <protection_domain name="pinctrl" priority="253" pp="true" passive="true">
+        <program_image path="pinctrl_driver.elf" />
+
+        <map mr="pinctrl_ao" vaddr="0x2_000_000" perms="rw" cached="false" setvar_vaddr="pinctrl_ao_base" />
+        <map mr="pinctrl_periphs" vaddr="0x2_010_000" perms="rw" cached="false" setvar_vaddr="pinctrl_periphs_base" />
+    </protection_domain>
 
     <protection_domain name="driver" priority="100">
         <program_image path="i2c_driver.elf"/>
@@ -41,8 +47,7 @@
         <map mr="driver_response_region" vaddr="0x5_000_000" perms="rw" setvar_vaddr="response_region" />
 
         <map mr="i2c_bus" vaddr="0x3_000_000" perms="rw" setvar_vaddr="i2c_regs" cached="false" />
-
-        <!-- <map mr="gpio" vaddr="0x3_100_000" perms="rw" setvar_vaddr="gpio_regs" cached="false" /> -->
+        <!-- Remove after clock driver is integrated -->
         <map mr="clk" vaddr="0x3_200_000" perms="rw" setvar_vaddr="clk_regs" cached="false" />
 
         <map mr="client_ds3231_data_region" vaddr="0x10_000_000" perms="rw" />

@@ -10,7 +10,8 @@ This example makes use of the DS3231 RTC and NXP PN532 card-reader.
 Documentation and more specific infomation about each can be found below.
 
 This example is intended to run on an Odroid-C4 using the I2C connected via GPIO pins 3 and 5
-for SDA and SCL respectively.
+for SDA and SCL respectively. This is known as the I2C2 bus in mainline Linux, if you'd like to use
+a different I2C bus, edit the status key of the appropriate node in the DTS and memory mapping accordingly.
 
 ## Before compiling
 

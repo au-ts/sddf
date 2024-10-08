@@ -29,6 +29,7 @@ LD := $(TOOLCHAIN)-ld
 AS := $(TOOLCHAIN)-as
 AR := $(TOOLCHAIN)-ar
 RANLIB := $(TOOLCHAIN)-ranlib
+PYTHON := python3
 
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 
@@ -38,13 +39,19 @@ TOP := ${SDDF}/examples/i2c
 I2C := $(SDDF)/i2c
 I2C_DRIVER := $(SDDF)/drivers/i2c/${PLATFORM}
 TIMER_DRIVER := $(SDDF)/drivers/timer/${PLATFORM}
+PINCTRL_DRIVER := $(SDDF)/drivers/pinctrl/${PLATFORM}
 PN532_DRIVER := $(SDDF)/i2c/devices/pn532
 DS3231_DRIVER := $(SDDF)/i2c/devices/ds3231
 
-IMAGES := i2c_virt.elf i2c_driver.elf client_pn532.elf client_ds3231.elf timer_driver.elf
+IMAGES := i2c_virt.elf i2c_driver.elf client_pn532.elf client_ds3231.elf timer_driver.elf pinctrl_driver.elf
 CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall -Wno-unused-function -I${TOP}
 LDFLAGS := -L$(BOARD_DIR)/lib -L$(SDDF)/lib -L${LIBC}
 LIBS := --start-group -lmicrokit -Tmicrokit.ld -lc libsddf_util_debug.a --end-group
+
+# Pinctrl driver build config
+DTS_FILE := $(TOP)/board/$(MICROKIT_BOARD)/odroidc4_patched.dts
+SOC := hardkernel,odroid-c4
+include ${PINCTRL_DRIVER}/pinctrl_driver.mk
 
 IMAGE_FILE = loader.img
 REPORT_FILE = report.txt
