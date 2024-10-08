@@ -164,24 +164,27 @@ void nvme_init()
 
     nvme_controller_init();
 
+    sddf_memset((void *)data_region, 'a', 512);
+    for (int i = 0; i < 10; i++) {
+        sddf_dprintf("Data [%02x]: %04x\n", i, data_region[i]);
+    }
 
     /* [NVMe-CommandSet-1.1] 3.3.4 Read command */
     nvme_completion_queue_entry_t entry;
-    uint16_t number_blocks = 10;
+    uint16_t number_blocks = 1;
     entry = nvme_queue_submit_and_consume_poll(&io_queue, &(nvme_submission_queue_entry_t){
         .cdw0 = /* CID */ (0b1011 << 16) | /* PSDT */ 0 | /* FUSE */ 0 | /* OPC */ 0x2,
+        .nsid = 0x1, // TOOD: Why is NSID 1 now ????
         .cdw10 = /* SLBA[31:00] */ 0x0,
         .cdw11 = /* SLBA[63:32] */ 0x0,
         .cdw12 = /* LR */ (0b1U << 31) | /* others */ 0 | /* NLB */ (number_blocks - 1),
-        .dptr_hi = 0x0,
-        .dptr_lo = data_region_paddr,
+        .prp2 = 0x0,
+        .prp1 = data_region_paddr,
     });
 
-    LOG_NVME("CDW0: %04x\n", entry.cdw0);
-    LOG_NVME("CDW1: %04x\n", entry.cdw1);
-    LOG_NVME("SQHD: %02x\n", entry.sqhd);
-    LOG_NVME("SQID: %02x\n", entry.sqid);
-    LOG_NVME(" CID: %02x\n", entry.cid);
-    LOG_NVME("P&STATUS: %02x\n", entry.phase_tag_and_status);
+    assert((entry.phase_tag_and_status & _MASK(1, 15)) == 0x0); // §4.2.3 Status Field
 
+    for (int i = 0; i < 10; i++) {
+        sddf_dprintf("Data [%02x]: %04x\n", i, data_region[i]);
+    }
 }
