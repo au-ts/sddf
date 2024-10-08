@@ -109,7 +109,7 @@ struct clk_ops {
     uint8_t (*get_parent)(const struct clk *clk);
     int (*set_parent)(struct clk *clk, uint8_t index);
     unsigned long (*recalc_rate)(const struct clk *clk, unsigned long parent_rate);
-    int (*set_rate)(struct clk *clk, uint32_t rate, uint32_t parent_rate);
+    int (*set_rate)(const struct clk *clk, uint32_t rate, uint32_t parent_rate);
     void (*init)(struct clk *clk);
     int (*enable)(struct clk *clk);
     void (*disable)(struct clk *clk);

@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 
 CLK_DRIVER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
-CLK_DRIVER_OBJS := clk.o clk-operations.o clk-measure.o
+CLK_DRIVER_OBJS := clk.o clk-operations.o clk-measure.o sm1_clk_hws.o
 
 clk_driver.elf: $(CLK_DRIVER_OBJS) libsddf_util_debug.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@

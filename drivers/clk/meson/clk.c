@@ -99,7 +99,6 @@ unsigned long clk_recalc_rate(const struct clk *clk)
 
 void enable_clk(struct clk *clk)
 {
-    LOG_DRIVER("enable %s, 0x%x\n", clk->hw.init->name, clk->hw.init->ops);
     if (clk->hw.init->ops->enable != NULL) {
         clk->hw.init->ops->enable(clk);
     }
@@ -134,7 +133,7 @@ int clk_msr_stat()
     unsigned long clk_freq;
     int i = 0;
 
-    char **clk_msr_list = get_msr_clk_list();
+    const char *const *clk_msr_list = get_msr_clk_list();
     for (i = 0; i < 128; i++) {
         clk_freq = clk_msr(i);
         LOG_DRIVER("[%4d][%4ldHz] %s\n", i, clk_freq, clk_msr_list[i]);

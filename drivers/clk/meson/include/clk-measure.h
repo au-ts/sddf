@@ -6,7 +6,7 @@
 #ifndef CLK_MEASURE_H_
 #define CLK_MEASURE_H_
 
-char **get_msr_clk_list(void);
+const char *const *get_msr_clk_list(void);
 unsigned long clk_msr(unsigned long clk_mux);
 
 #endif // CLK_MEASURE_H_
