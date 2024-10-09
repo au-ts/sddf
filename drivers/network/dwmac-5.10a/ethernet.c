@@ -28,6 +28,10 @@ uintptr_t rx_active;
 uintptr_t tx_free;
 uintptr_t tx_active;
 
+#ifndef ENABLE_IP_CHECKSUM
+#define ENABLE_IP_CHECKSUM true
+#endif
+
 #ifdef CONFIG_PLAT_STAR64
 uintptr_t resets;
 #endif /* CONFIG_PLAT_STAR64 */
@@ -177,7 +181,10 @@ static void tx_provide(void)
 
             // For normal transmit descritpors, we need to give ownership to DMA, as well as indicate
             // that this is the first and last parts of the current packet.
-            uint32_t tdes3 = (DESC_TXSTS_OWNBYDMA | DESC_TXCTRL_TXFIRST | DESC_TXCTRL_TXLAST | DESC_TXCTRL_TXCIC |buffer.len);
+            uint32_t tdes3 = (DESC_TXSTS_OWNBYDMA | DESC_TXCTRL_TXFIRST | DESC_TXCTRL_TXLAST |buffer.len);
+            #if ENABLE_IP_CHECKSUM
+            tdes3 |= DESC_TXCTRL_TXCIC;
+            #endif
             tx.descr_mdata[tx.tail] = buffer;
 
             update_ring_slot(&tx, tx.tail, buffer.io_or_offset & 0xffffffff, buffer.io_or_offset >> 32, tdes2, tdes3);
@@ -325,7 +332,9 @@ static void eth_init()
     // Set full duplex mode
     conf |= GMAC_CONFIG_DM;
     // Enable checksum offload
+    #if ENABLE_IP_CHECKSUM
     conf |= GMAC_CONFIG_IPC;
+    #endif
 
     // Setting the speed of our device to 1000mbps
     conf &= ~( GMAC_CONFIG_PS | GMAC_CONFIG_FES);

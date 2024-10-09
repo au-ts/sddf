@@ -14,6 +14,10 @@
 
 #include "ethernet.h"
 
+#ifndef ENABLE_IP_CHECKSUM
+#define ENABLE_IP_CHECKSUM true
+#endif
+
 #define IRQ_CH 0
 #define TX_CH  1
 #define RX_CH  2
@@ -272,8 +276,10 @@ static void eth_setup(void)
     eth->rsfl = 0;
     /* Do not forward frames with errors + check the csum */
     eth->racc = RACC_LINEDIS | RACC_IPDIS | RACC_PRODIS;
+    #if ENABLE_IP_CHECKSUM
     /* Add the checksum for known IP protocols */
     eth->tacc = TACC_PROCHK | TACC_IPCHK;
+    #endif
 
     /* Set RDSR */
     eth->rdsr = hw_ring_buffer_paddr;

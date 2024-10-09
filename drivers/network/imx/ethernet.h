@@ -28,6 +28,7 @@
 #define ECR_SPEED       (1UL << 5) /* Enable 1000Mbps */
 #define PAUSE_OPCODE_FIELD (1UL << 16)
 #define TCR_FDEN        (1UL << 2) /* Full duplex enable */
+#define TCR_CRCFWD      (1UL << 9)  /* Transmitter does not append any CRC to a frame */
 #define ICEN            (1UL << 31) /* enable irq coalescence */
 
 /*
