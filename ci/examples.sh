@@ -169,16 +169,16 @@ network() {
 }
 
 i2c() {
-    BOARDS=("odroidc4")
-    CONFIGS=("debug" "release")
-    for BOARD in "${BOARDS[@]}"
-    do
-      for CONFIG in "${CONFIGS[@]}"
-      do
-         build_i2c_make ${BOARD} ${CONFIG}
-         build_i2c_zig ${BOARD} ${CONFIG}
-       done
-    done
+    # BOARDS=("odroidc4")
+    # CONFIGS=("debug" "release")
+    # for BOARD in "${BOARDS[@]}"
+    # do
+    #   for CONFIG in "${CONFIGS[@]}"
+    #   do
+    #      build_i2c_make ${BOARD} ${CONFIG}
+    #      build_i2c_zig ${BOARD} ${CONFIG}
+    #    done
+    # done
 }
 
 timer() {
