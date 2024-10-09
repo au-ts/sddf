@@ -26,6 +26,10 @@ const DriverClass = struct {
         virtio
     };
 
+    const Clock = enum {
+        meson,
+    };
+
     const I2cHost = enum {
         meson,
     };
@@ -193,6 +197,42 @@ fn addBlockDriver(
     driver.addIncludePath(blk_config_include);
     driver.addIncludePath(b.path(b.fmt("drivers/blk/{s}/", .{ @tagName(class) })));
     driver.addIncludePath(b.path("include"));
+    driver.linkLibrary(util);
+
+    return driver;
+}
+
+fn addClockDriver(
+    b: *std.Build,
+    clk_config_include: LazyPath,
+    util: *std.Build.Step.Compile,
+    class: DriverClass.Clock,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+) *std.Build.Step.Compile {
+    const driver = addPd(b, .{
+        .name = b.fmt("driver_clk_{s}.elf", .{@tagName(class)}),
+        .target = target,
+        .optimize = optimize,
+        .strip = false,
+    });
+    const source = b.fmt("drivers/clk/{s}/clk.c", .{ @tagName(class) });
+    driver.addCSourceFile(.{
+        .file = b.path(source),
+    });
+    driver.addCSourceFile(.{
+        .file = b.path(b.fmt("drivers/clk/{s}/clk-operations.c", .{ @tagName(class) }))
+    });
+    driver.addCSourceFile(.{
+        .file = b.path(b.fmt("drivers/clk/{s}/clk-measure.c", .{ @tagName(class) }))
+    });
+    driver.addCSourceFile(.{
+        .file = b.path(b.fmt("drivers/clk/{s}/sm1_clk_hws.c", .{ @tagName(class) }))
+    });
+    driver.addIncludePath(b.path("include/sddf/clk"));
+    driver.addIncludePath(clk_config_include);
+    driver.addIncludePath(b.path("include"));
+    driver.addIncludePath(b.path(b.fmt("drivers/clk/{s}/include", .{@tagName(class)})));
     driver.linkLibrary(util);
 
     return driver;
@@ -395,6 +435,13 @@ pub fn build(b: *std.Build) void {
     // Timer drivers
     inline for (std.meta.fields(DriverClass.Timer)) |class| {
         const driver = addTimerDriver(b, util, @enumFromInt(class.value), target, optimize);
+        driver.linkLibrary(util_putchar_debug);
+        b.installArtifact(driver);
+    }
+
+    // Clock drivers
+    inline for (std.meta.fields(DriverClass.Clock)) |class| {
+        const driver = addClockDriver(b, util, @enumFromInt(class.value), target, optimize);
         driver.linkLibrary(util_putchar_debug);
         b.installArtifact(driver);
     }
