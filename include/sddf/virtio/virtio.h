@@ -37,6 +37,7 @@
 typedef enum {
     VIRTIO_DEVICE_ID_NET = 0x1,
     VIRTIO_DEVICE_ID_BLK = 0x2,
+    VIRTIO_DEVICE_ID_CONSOLE = 0x3,
 } virtio_device_id_t;
 
 typedef volatile struct {
