@@ -10,15 +10,16 @@ endif
 
 
 ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
-  TIMER_DRIVER_DIR := meson
-  CLK_DRIVER_DIR := meson
   CPU := cortex-a55
   DTS_FILE := $(TOP)/odroidc4.dts
+	SYSTEM_FILE := ${TOP}/board/odroidc4/clk.system
 	ARCH := aarch64
 	DRIVER_DIR := meson
 	CPU := cortex-a55
-else ifeq ($(strip $(MICROKIT_BOARD)), imx8mm_evk)
+else ifeq ($(strip $(MICROKIT_BOARD)), maaxboard)
 	ARCH := aarch64
+  DTS_FILE := $(TOP)/imx8mq-evk.dts
+	SYSTEM_FILE := ${TOP}/board/imx/clk.system
 	DRIVER_DIR := imx
 	CPU := cortex-a53
 else
@@ -58,10 +59,9 @@ LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
 
 IMAGE_FILE := loader.img
 REPORT_FILE := report.txt
-SYSTEM_FILE := ${TOP}/board/odroidc4/clk.system
 CLIENT_OBJS := client.o
-CLK_DRIVER := $(SDDF)/drivers/clk/$(CLK_DRIVER_DIR)
-TIMER_DRIVER := $(SDDF)/drivers/timer/$(CLK_DRIVER_DIR)
+CLK_DRIVER := $(SDDF)/drivers/clk/$(DRIVER_DIR)
+TIMER_DRIVER := $(SDDF)/drivers/timer/$(DRIVER_DIR)
 
 all: $(IMAGE_FILE)
 
