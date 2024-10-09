@@ -168,9 +168,8 @@ out:
     nvme_init();
 }
 
-/* See: 3.3 NVM Queue MOdels */
-// CAP.MQES
-
 void notified(microkit_channel ch)
 {
+    sddf_dprintf("notified on ch: %u\n", ch);
+    microkit_irq_ack(ch);
 }
