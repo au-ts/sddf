@@ -22,8 +22,6 @@
 #define IRQ_CH 1
 #define IRQ_TIMEOUT_CH 2
 
-#define DISABLE_I2C_PINMUX_INIT
-
 // #define DEBUG_DRIVER
 
 #ifdef DEBUG_DRIVER
@@ -699,4 +697,4 @@ void notified(microkit_channel ch)
     default:
         microkit_dbg_puts("DRIVER|ERROR: unexpected notification!\n");
     }
-}
+j
