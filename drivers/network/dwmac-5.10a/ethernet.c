@@ -151,7 +151,8 @@ static void rx_return(void)
             *DMA_REG(DMA_CHAN_RX_TAIL_ADDR(0)) = rx_desc_base + sizeof(struct descriptor) * rx.tail;
             rx.head = (rx.head + 1) % RX_COUNT;
         } else {
-            buffer.len = (d->d3 | 0xe);
+            /* Read 0-14 bits to get length of received packet, manual pg 4081, table 11-152, RDES3 Normal Descriptor */
+            buffer.len = (d->d3 & 0x7FFF); 
             int err = net_enqueue_active(&rx_queue, buffer);
             assert(!err);
             packets_transferred = true;
