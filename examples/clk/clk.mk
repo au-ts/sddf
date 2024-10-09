@@ -8,6 +8,23 @@ ifeq ($(strip $(MICROKIT_SDK)),)
 $(error MICROKIT_SDK must be specified)
 endif
 
+
+ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
+  TIMER_DRIVER_DIR := meson
+  CLK_DRIVER_DIR := meson
+  CPU := cortex-a55
+  DTS_FILE := $(TOP)/odroidc4.dts
+	ARCH := aarch64
+	DRIVER_DIR := meson
+	CPU := cortex-a55
+else ifeq ($(strip $(MICROKIT_BOARD)), imx8mm_evk)
+	ARCH := aarch64
+	DRIVER_DIR := imx
+	CPU := cortex-a53
+else
+$(error Unsupported MICROKIT_BOARD given)
+endif
+
 BUILD_DIR ?= $(TOP)/build
 # By default we make a debug build so that the client debug prints can be seen.
 MICROKIT_CONFIG ?= debug

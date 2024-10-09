@@ -9,20 +9,16 @@ $(error MICROKIT_SDK must be specified)
 endif
 override MICROKIT_SDK := $(abspath ${MICROKIT_SDK})
 
+ifeq ($(strip $(MICROKIT_BOARD)),)
+$(error MICROKIT_BOARD must be specified)
+endif
+export MICROKIT_BOARD
+
 BUILD_DIR ?= build
 # By default we make a debug build so that the client debug prints can be seen.
 MICROKIT_CONFIG ?= debug
 
 export TOP:= $(abspath $(dir ${MAKEFILE_LIST}))
-
-ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
-	export TIMER_DRIVER_DIR := meson
-    export CLK_DRIVER_DIR := meson
-	export CPU := cortex-a55
-	export DTS_FILE := $(TOP)/odroidc4.dts
-else
-$(error Unsupported MICROKIT_BOARD given)
-endif
 
 CC := clang
 LD := ld.lld
