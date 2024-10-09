@@ -174,8 +174,8 @@ void init(void)
     for (int i = 0; i < BLK_NUM_CLIENTS; i++) {
         blk_req_queue_t *curr_req = blk_virt_cli_req_queue(blk_client_req_queue, i);
         blk_resp_queue_t *curr_resp = blk_virt_cli_resp_queue(blk_client_resp_queue, i);
-        uint32_t queue_size = blk_virt_cli_queue_size(i);
-        blk_queue_init(&clients[i].queue_h, curr_req, curr_resp, queue_size);
+        uint32_t queue_capacity = blk_virt_cli_queue_capacity(i);
+        blk_queue_init(&clients[i].queue_h, curr_req, curr_resp, queue_capacity);
         clients[i].ch = CLI_CH_OFFSET + i;
     }
 
