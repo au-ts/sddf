@@ -22,11 +22,6 @@
 #define IRQ_CH 1
 #define IRQ_TIMEOUT_CH 2
 
-<<<<<<< HEAD
-=======
-#define DISABLE_I2C_PINMUX_INIT
-
->>>>>>> 4ed7a11 (i2c: disable pinmux initialisation)
 // #define DEBUG_DRIVER
 
 #ifdef DEBUG_DRIVER
