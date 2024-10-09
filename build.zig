@@ -223,6 +223,7 @@ fn addClockDriver(
     driver.addCSourceFile(.{
         .file = b.path(b.fmt("drivers/clk/{s}/clk-operations.c", .{ @tagName(class) }))
     });
+<<<<<<< HEAD
     driver.addCSourceFile(.{
         .file = b.path(b.fmt("drivers/clk/{s}/clk-measure.c", .{ @tagName(class) }))
     });
@@ -230,6 +231,8 @@ fn addClockDriver(
         .file = b.path(b.fmt("drivers/clk/{s}/sm1_clk_hws.c", .{ @tagName(class) }))
     });
     driver.addIncludePath(b.path("include/sddf/clk"));
+=======
+>>>>>>> 0871335 (split file)
     driver.addIncludePath(clk_config_include);
     driver.addIncludePath(b.path("include"));
     driver.addIncludePath(b.path(b.fmt("drivers/clk/{s}/include", .{@tagName(class)})));
