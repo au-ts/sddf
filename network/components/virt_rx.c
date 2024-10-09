@@ -14,6 +14,11 @@
 #include <sddf/util/cache.h>
 #include <ethernet_config.h>
 
+
+#ifndef DEFAULT_RxV_CHANNEL
+#define DEFAULT_RxV_CHANNEL
+#endif
+
 /* Notification channels */
 #define DRIVER_CH 0
 #define CLIENT_CH 1
@@ -74,7 +79,7 @@ int get_mac_addr_match(struct ethernet_header *buffer)
         return BROADCAST_ID;
     }
 
-    return -1;
+    return DEFAULT_RxV_CHANNEL;
 }
 
 void rx_return(void)
