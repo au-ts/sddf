@@ -76,7 +76,7 @@ static inline blk_resp_queue_t *blk_virt_cli_resp_queue(blk_resp_queue_t *resp, 
     }
 }
 
-static inline uint32_t blk_virt_cli_queue_size(unsigned int id)
+static inline uint32_t blk_virt_cli_queue_capacity(unsigned int id)
 {
     switch (id) {
     case 0:
@@ -86,7 +86,7 @@ static inline uint32_t blk_virt_cli_queue_size(unsigned int id)
     }
 }
 
-static inline uint32_t blk_cli_queue_size(char *pd_name)
+static inline uint32_t blk_cli_queue_capacity(char *pd_name)
 {
     if (!sddf_strcmp(pd_name, BLK_NAME_CLI0)) {
         return BLK_QUEUE_CAPACITY_CLI0;
