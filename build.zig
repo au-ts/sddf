@@ -30,12 +30,6 @@ const DriverClass = struct {
         meson,
     };
 
-    const Network = enum {
-        imx,
-        meson,
-        virtio
-    };
-
     const I2cHost = enum {
         meson,
     };
