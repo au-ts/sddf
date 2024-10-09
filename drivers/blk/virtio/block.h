@@ -164,7 +164,5 @@ static void virtio_blk_print_features(uint64_t features)
     if (features & ((uint64_t)1 << VIRTIO_BLK_F_ZONED)) {
         LOG_DRIVER("    VIRTIO_BLK_F_ZONED\n");
     }
-    /* The reserved feature bits, that are not device specific, sit in the middle
-     * of all the network feature bits, which is why we print them here. */
     virtio_print_reserved_feature_bits(features);
 }
