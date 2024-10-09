@@ -11,14 +11,14 @@ endif
 
 ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
   CPU := cortex-a55
-  DTS_FILE := $(TOP)/odroidc4.dts
+  DTS_FILE := $(TOP)/dts/odroidc4.dts
 	SYSTEM_FILE := ${TOP}/board/odroidc4/clk.system
 	ARCH := aarch64
 	DRIVER_DIR := meson
 	CPU := cortex-a55
 else ifeq ($(strip $(MICROKIT_BOARD)), maaxboard)
 	ARCH := aarch64
-  DTS_FILE := $(TOP)/imx8mq-evk.dts
+  DTS_FILE := $(TOP)/dts/maaxboard.dts
 	SYSTEM_FILE := ${TOP}/board/imx/clk.system
 	DRIVER_DIR := imx
 	CPU := cortex-a53

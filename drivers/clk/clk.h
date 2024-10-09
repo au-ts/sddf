@@ -5,6 +5,17 @@
 
 #define TEST_VAL 1
 
+#define CLK_HW_SOURCE(_name, _rate)                                                 \
+struct clk _name = {                                                                \
+    .data = &(struct clk_source_data) {                                             \
+        .rate = (_rate),                                                            \
+    },                                                                              \
+    .hw.init = &(struct clk_init_data) {                                            \
+        .name = #_name,                                                             \
+        .ops = &clk_source_ops,                                                     \
+    },                                                                              \
+}
+
 #define CLK_HW_FIXED_FACTOR(_name, _mult, _div, _parent_clks, _num_parents, _flags) \
 struct clk _name = {                                                                \
     .data = &(struct clk_fixed_factor_data) {                                       \

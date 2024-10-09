@@ -10,7 +10,7 @@ import sys
 from typing import List
 from devicetree import edtlib, dtlib
 
-supported_compat_str_board = { "hardkernel,odroid-c4", "fsl,imx8mm-evk", "fsl,imx8mq-evk" }
+supported_compat_str_board = { "hardkernel,odroid-c4", "fsl,imx8mm-evk", "fsl,imx8mq" }
 
 debug_parser = True
 clock_list = {}

@@ -14,13 +14,14 @@
 
 #define MASK(width)  ((1UL << width) - 1)
 
+static CLK_HW_SOURCE(dummy, 0);
 static CLK_HW_SOURCE(osc_24m, 24000000);
 
 static struct clk_parent_data pll_ref_sels[] = {
     { .clk = &osc_24m, },
-    /* { .clk = "dummy", }, */
-    /* { .clk = "dummy", }, */
-    /* { .clk = "dummy", } */
+    { .clk = &dummy, },
+    { .clk = &dummy, },
+    { .clk = &dummy, },
 };
 
 static CLK_HW_MUX(audio_pll1_ref_sel, 0x0, MASK(2), 0, 0, 0, pll_ref_sels, ARRAY_SIZE(pll_ref_sels), 0);
