@@ -101,6 +101,7 @@ static inline bool virtio_avail_full_tx(struct virtq *virtq)
 static void rx_provide(void)
 {
     /* We need to take all of our sDDF free entries and place them in the virtIO 'free' ring. */
+    bool transferred = false;
     bool reprocess = true;
     while (reprocess) {
         while (!virtio_avail_full_rx(&rx_virtq) && !net_queue_empty_free(&rx_queue)) {
@@ -135,6 +136,8 @@ static void rx_provide(void)
             // this list, but we are adding two desc entries.
             rx_virtq.avail->idx++;
             rx_last_desc_idx += 2;
+
+            transferred = true;
         }
 
         net_request_signal_free(&rx_queue);
@@ -144,6 +147,11 @@ static void rx_provide(void)
             net_cancel_signal_free(&rx_queue);
             reprocess = true;
         }
+    }
+
+    if (transferred) {
+        /* We have added more avail buffers, so notify the device */
+        regs->QueueNotify = VIRTIO_NET_RX_QUEUE;
     }
 }
 
