@@ -15,6 +15,10 @@ ifeq ($(strip $(TOOLCHAIN)),)
 	TOOLCHAIN := aarch64-none-elf
 endif
 
+ifeq ($(strip $(PYTHON)),)
+	PYTHON := python3
+endif
+
 ifeq (${MICROKIT_BOARD},odroidc4)
 	PLATFORM := meson
 	CPU := cortex-a55
@@ -29,7 +33,6 @@ LD := $(TOOLCHAIN)-ld
 AS := $(TOOLCHAIN)-as
 AR := $(TOOLCHAIN)-ar
 RANLIB := $(TOOLCHAIN)-ranlib
-PYTHON := python3
 
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 
