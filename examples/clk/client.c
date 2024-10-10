@@ -21,6 +21,15 @@ void init(void)
     uint32_t ret = sddf_clk_enable(CLK_DRIVER_CH, 10);
     sddf_dprintf("ret_val: %x\n", ret);
 
+    ret = sddf_clk_disable(CLK_DRIVER_CH, 24);
+    sddf_dprintf("ret_val: %x\n", ret);
+
+    ret = sddf_clk_get_rate(CLK_DRIVER_CH, 10);
+    sddf_dprintf("ret_val: %x\n", ret);
+
+    ret = sddf_clk_set_rate(CLK_DRIVER_CH, 10, 150000000);
+    sddf_dprintf("ret_val: %x\n", ret);
+
     sddf_dprintf("--------------------\n");
 
 }

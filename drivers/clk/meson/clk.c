@@ -81,14 +81,14 @@ const struct clk *get_parent(const struct clk *clk)
     return NULL;
 }
 
-unsigned long clk_recalc_rate(const struct clk *clk)
+unsigned long clk_get_rate(const struct clk *clk)
 {
     const struct clk_init_data *init = (struct clk_init_data *)clk->hw.init;
     unsigned long parent_rate = 0;
 
     const struct clk *parent_clk = get_parent(clk);
     if (parent_clk) {
-        parent_rate = clk_recalc_rate(parent_clk);
+        parent_rate = clk_get_rate(parent_clk);
     }
 
     unsigned long rate = parent_rate;
@@ -117,14 +117,14 @@ uint32_t clk_disable(struct clk *clk)
     return CLK_INVALID_OP;
 }
 
-void set_clk_rate(struct clk *clk, uint32_t rate)
+uint32_t clk_set_rate(struct clk *clk, uint32_t rate)
 {
     if (clk->hw.init->ops->init) {
         clk->hw.init->ops->init(clk);
     }
 
     const struct clk *pclk = get_parent(clk);
-    uint64_t prate = clk_recalc_rate(pclk);
+    uint64_t prate = clk_get_rate(pclk);
     if (clk->hw.init->ops->set_rate) {
         /* TODO: determine_rate() needs to be implemented */
         LOG_DRIVER("set %s to %dHz\n", clk->hw.init->name, rate);
@@ -133,12 +133,14 @@ void set_clk_rate(struct clk *clk, uint32_t rate)
         /* TODO: We only propagate one level right now */
         if (pclk->hw.init->ops->set_rate) {
             const struct clk *ppclk = get_parent(pclk);
-            uint64_t pprate = clk_recalc_rate(ppclk);
+            uint64_t pprate = clk_get_rate(ppclk);
             /* TODO: determine_rate() needs to be implemented */
             LOG_DRIVER("set %s to %dHz\n", pclk->hw.init->name, rate);
             pclk->hw.init->ops->set_rate(pclk, prate, pprate);
         }
     }
+
+    return 0;
 }
 
 int clk_msr_stat()
@@ -180,7 +182,7 @@ void init(void)
 
         /* Set rate for the target clock */
         if (clk_configs[i].frequency > 0) {
-            set_clk_rate(clk, clk_configs[i].frequency);
+            clk_set_rate(clk, clk_configs[i].frequency);
         }
     }
 
@@ -200,7 +202,6 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
     switch (microkit_msginfo_get_label(msginfo)) {
 
         case SDDF_CLK_ENABLE: {
-
             if (argc != 1) {
                 LOG_DRIVER_ERR("Incorrect number of arguments %lu != 1\n", argc);
                 ret = CLK_INCORRECT_ARGS;
@@ -212,15 +213,35 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
             break;
         }
         case SDDF_CLK_DISABLE: {
-            ret = 2;
+            if (argc != 1) {
+                LOG_DRIVER_ERR("Incorrect number of arguments %lu != 1\n", argc);
+                ret = CLK_INCORRECT_ARGS;
+                break;
+            }
+            uint32_t clk_id = (uint32_t)microkit_mr_get(SDDF_CLK_PARAM_ID);
+            LOG_DRIVER("get request clk_disable(%d)\n", clk_id);
+            ret = clk_disable(sm1_clks[clk_id]);
             break;
         }
         case SDDF_CLK_GET_RATE: {
-            ret = 3;
+            if (argc != 1) {
+                LOG_DRIVER_ERR("Incorrect number of arguments %lu != 1\n", argc);
+                ret = CLK_INCORRECT_ARGS;
+                break;
+            }
+            uint32_t clk_id = (uint32_t)microkit_mr_get(SDDF_CLK_PARAM_ID);
+            ret = clk_get_rate(sm1_clks[clk_id]);
             break;
         }
         case SDDF_CLK_SET_RATE: {
-            ret = 4;
+            if (argc != 2) {
+                LOG_DRIVER_ERR("Incorrect number of arguments %lu != 1\n", argc);
+                ret = CLK_INCORRECT_ARGS;
+                break;
+            }
+            uint32_t clk_id = (uint32_t)microkit_mr_get(SDDF_CLK_PARAM_ID);
+            uint32_t rate = (uint32_t)microkit_mr_get(SDDF_CLK_PARAM_RATE);
+            ret = clk_set_rate(sm1_clks[clk_id], rate);
             break;
         }
         defualt:
