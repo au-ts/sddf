@@ -5,7 +5,7 @@
 
 #define TEST_VAL 1
 
-#define CLK_HW_SOURCE(_name, _rate)                                                 \
+#define CLK_SOURCE(_name, _rate)                                                    \
 struct clk _name = {                                                                \
     .data = &(struct clk_source_data) {                                             \
         .rate = (_rate),                                                            \
@@ -16,7 +16,7 @@ struct clk _name = {                                                            
     },                                                                              \
 }
 
-#define CLK_HW_FIXED_FACTOR(_name, _mult, _div, _parent_clks, _num_parents, _flags) \
+#define CLK_FIXED_FACTOR(_name, _mult, _div, _parent_clks, _num_parents, _flags)    \
 struct clk _name = {                                                                \
     .data = &(struct clk_fixed_factor_data) {                                       \
         .mult = (_mult),                                                            \
@@ -31,7 +31,7 @@ struct clk _name = {                                                            
     },                                                                              \
 }
 
-#define CLK_HW_GATE(_name, _offset, _bit, _data_flags, _parent_clks,                \
+#define CLK_GATE(_name, _offset, _bit, _data_flags, _parent_clks,                   \
                         _num_parents, _hw_flags)                                    \
 struct clk _name = {                                                                \
     .data = &(struct clk_gate_data) {                                               \
@@ -48,7 +48,7 @@ struct clk _name = {                                                            
     },                                                                              \
 }
 
-#define CLK_HW_GATE_RO(_name, _offset, _bit, _data_flags, _parent_clks,             \
+#define CLK_GATE_RO(_name, _offset, _bit, _data_flags, _parent_clks,                \
                         _num_parents, _hw_flags)                                    \
 struct clk _name = {                                                                \
     .data = &(struct clk_gate_data) {                                               \
@@ -65,7 +65,7 @@ struct clk _name = {                                                            
     },                                                                              \
 }
 
-#define CLK_HW_MUX(_name, _offset, _mask, _shift, _table,                           \
+#define CLK_MUX(_name, _offset, _mask, _shift, _table,                           \
                   _data_flags, _parent_data, _num_parents, _hw_flags)               \
 struct clk _name = {                                                                \
     .data = &(struct clk_mux_data) {                                                \
@@ -84,7 +84,7 @@ struct clk _name = {                                                            
     },                                                                              \
 }
 
-#define CLK_HW_MUX_RO(_name, _offset, _mask, _shift, _table,                        \
+#define CLK_MUX_RO(_name, _offset, _mask, _shift, _table,                        \
                   _data_flags, _parent_data, _num_parents, _hw_flags)               \
 struct clk _name = {                                                                \
     .data = &(struct clk_mux_data) {                                                \
@@ -103,7 +103,7 @@ struct clk _name = {                                                            
     },                                                                              \
 }
 
-#define CLK_HW_DIV(_name, _offset, _shift, _width, _data_flags,                     \
+#define CLK_DIV(_name, _offset, _shift, _width, _data_flags,                     \
                   _parent_clks, _num_parents, _hw_flags)                            \
 struct clk _name = {                                                                \
     .data = &(struct clk_div_data) {                                                \
@@ -121,7 +121,7 @@ struct clk _name = {                                                            
     },                                                                              \
 }
 
-#define CLK_HW_DIV_RO(_name, _offset, _shift, _width, _data_flags,                   \
+#define CLK_DIV_RO(_name, _offset, _shift, _width, _data_flags,                   \
                   _parent_clks, _num_parents, _hw_flags)                            \
 struct clk _name = {                                                                \
     .data = &(struct clk_div_data) {                                                \

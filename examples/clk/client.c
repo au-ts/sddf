@@ -9,12 +9,17 @@
 #include <stdint.h>
 #include <sddf/util/printf.h>
 #include <sddf/timer/client.h>
+#include <sddf/clk/client.h>
+
+#define CLK_DRIVER_CH 0
 
 void init(void)
 {
     sddf_dprintf("--------------------\n");
-    sddf_dprintf("Clock frequency measurement\n");
+    sddf_dprintf("Clock request test\n");
 
+    uint32_t ret = sddf_clk_enable(CLK_DRIVER_CH, 10);
+    sddf_dprintf("ret_val: %x\n", ret);
 
     sddf_dprintf("--------------------\n");
 

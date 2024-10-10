@@ -112,7 +112,7 @@ struct clk_ops {
     int (*set_rate)(const struct clk *clk, uint32_t rate, uint32_t parent_rate);
     void (*init)(struct clk *clk);
     int (*enable)(struct clk *clk);
-    void (*disable)(struct clk *clk);
+    int (*disable)(struct clk *clk);
     int (*is_enabled)(struct clk *clk);
 };
 

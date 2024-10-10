@@ -96,7 +96,7 @@ def extract_clocks(dt: dtlib.DT, node: dtlib.Node) -> List:
 
 def write_configs_to_headerfile(path: str) -> None:
     with open(path + '/clk_config.h', "w") as f:
-        f.write("#include <conf_types.h>\n")
+        f.write("#include <sddf/clk/protocol.h>\n")
         f.write("#define NUM_DEVICE_CLKS {}\n\n".format(len(clock_list)))
         # f.write("#define NUM_DEVICE_CLKS 0\n\n")
 

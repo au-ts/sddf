@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <sddf/util/string.h>
 #include <sddf/util/printf.h>
+#include <sddf/clk/protocol.h>
 #include <clk_config.h>
 
 /* Test for Odroid-C4 */
@@ -16,7 +17,6 @@
 #include <clk-measure.h>
 #include <g12a.h>
 #include <g12a-clkc.h>
-#include <conf_types.h>
 #include <sm1_clk_hws.h>
 
 #define I2C_CLK_OFFSET 320
@@ -35,6 +35,8 @@
 
 uintptr_t clk_regs;
 uintptr_t msr_clk_base;
+
+struct clk **sm1_clks;
 
 /* TODO: Should be configured with init_regs */
 /* static struct clk_cfg fixed_clk_configs[] = { */
@@ -97,11 +99,22 @@ unsigned long clk_recalc_rate(const struct clk *clk)
     return rate;
 }
 
-void enable_clk(struct clk *clk)
+uint32_t clk_enable(struct clk *clk)
 {
     if (clk->hw.init->ops->enable != NULL) {
-        clk->hw.init->ops->enable(clk);
+        return clk->hw.init->ops->enable(clk);
     }
+
+    return CLK_INVALID_OP;
+}
+
+uint32_t clk_disable(struct clk *clk)
+{
+    if (clk->hw.init->ops->disable != NULL) {
+        return clk->hw.init->ops->disable(clk);
+    }
+
+    return CLK_INVALID_OP;
 }
 
 void set_clk_rate(struct clk *clk, uint32_t rate)
@@ -150,7 +163,7 @@ void notified(microkit_channel ch)
 void init(void)
 {
     LOG_DRIVER("Clock driver initialising...\n");
-    struct clk **sm1_clks = get_clk_list();
+    sm1_clks = get_clk_list();
     init_clk_base(clk_regs);
     clk_init(sm1_clks);
 
@@ -161,7 +174,7 @@ void init(void)
         struct clk *clk = sm1_clks[clk_configs[i].clk_id];
 
         /* Enable the clock */
-        enable_clk(clk);
+        clk_enable(clk);
 
         /* TODO: Set parent */
 
@@ -177,4 +190,42 @@ void init(void)
     }
 
     clk_msr_stat();
+}
+
+microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
+{
+    uint32_t ret = 0;
+    uint32_t argc = microkit_msginfo_get_count(msginfo);
+
+    switch (microkit_msginfo_get_label(msginfo)) {
+
+        case SDDF_CLK_ENABLE: {
+
+            if (argc != 1) {
+                LOG_DRIVER_ERR("Incorrect number of arguments %lu != 1\n", argc);
+                ret = CLK_INCORRECT_ARGS;
+                break;
+            }
+            uint32_t clk_id = (uint32_t)microkit_mr_get(SDDF_CLK_PARAM_ID);
+            LOG_DRIVER("get request clk_enable(%d)\n", clk_id);
+            ret = clk_enable(sm1_clks[clk_id]);
+            break;
+        }
+        case SDDF_CLK_DISABLE: {
+            ret = 2;
+            break;
+        }
+        case SDDF_CLK_GET_RATE: {
+            ret = 3;
+            break;
+        }
+        case SDDF_CLK_SET_RATE: {
+            ret = 4;
+            break;
+        }
+        defualt:
+            LOG_DRIVER_ERR("Unknown request %lu to clockk driver from channel %u\n", microkit_msginfo_get_label(msginfo), ch);
+            ret = 5;
+    }
+    return microkit_msginfo_new(ret, 0);
 }

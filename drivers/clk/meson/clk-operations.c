@@ -166,11 +166,12 @@ static int clk_regmap_gate_enable(struct clk *clk)
     return regmap_update_bits(data->offset, data->bit_idx, 1, 1);
 }
 
-static void clk_regmap_gate_disable(struct clk *clk)
+static int clk_regmap_gate_disable(struct clk *clk)
 {
     struct clk_gate_data *data = (struct clk_gate_data *)(clk->data);
 
     regmap_update_bits(data->offset, data->bit_idx, 1, 0);
+    return 0;
 }
 
 static int clk_regmap_gate_is_enabled(struct clk *clk)
@@ -415,12 +416,13 @@ static int meson_clk_pll_enable(struct clk *clk)
     return 0;
 }
 
-static void meson_clk_pll_disable(struct clk *clk)
+static int meson_clk_pll_disable(struct clk *clk)
 {
     struct meson_clk_pll_data *data = (struct meson_clk_pll_data *)(clk->data);
 
     regmap_update_bits(data->rst.reg_off, data->rst.shift, data->rst.width, 1);
     regmap_update_bits(data->en.reg_off, data->en.shift, data->en.width, 0);
+    return 0;
 }
 
 const struct clk_ops meson_clk_pll_ops = {
@@ -626,11 +628,12 @@ static int meson_vclk_gate_enable(struct clk *clk)
     return 0;
 }
 
-static void meson_vclk_gate_disable(struct clk *clk)
+static int meson_vclk_gate_disable(struct clk *clk)
 {
     struct meson_vclk_gate_data *data = (struct meson_vclk_gate_data *)(clk->data);
 
     regmap_update_bits(data->enable.reg_off, data->enable.shift, data->enable.width, 0);
+    return 0;
 }
 
 static int meson_vclk_gate_is_enabled(struct clk *clk)
@@ -694,12 +697,13 @@ static int meson_vclk_div_enable(struct clk *clk)
     return 0;
 }
 
-static void meson_vclk_div_disable(struct clk *clk)
+static int meson_vclk_div_disable(struct clk *clk)
 {
     struct meson_vclk_div_data *data = (struct meson_vclk_div_data *)(clk->data);
 
     regmap_update_bits(data->enable.reg_off, data->enable.shift, data->enable.width, 0);
     regmap_update_bits(data->reset.reg_off, data->reset.shift, data->reset.width, 1);
+    return 0;
 }
 
 static int meson_vclk_div_is_enabled(struct clk *clk)
