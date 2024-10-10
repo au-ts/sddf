@@ -153,7 +153,8 @@ static void rx_return(void)
             // rx.head = (rx.head + 1) % RX_COUNT;
             rx.tail++;
         } else {
-            buffer.len = (d->d3 | 0xe);
+            /* Read 0-14 bits to get length of received packet, manual pg 4081, table 11-152, RDES3 Normal Descriptor */
+            buffer.len = (d->d3 & 0x7FFF); 
             int err = net_enqueue_active(&rx_queue, buffer);
             assert(!err);
             packets_transferred = true;
