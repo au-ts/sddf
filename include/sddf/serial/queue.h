@@ -365,24 +365,11 @@ static inline void serial_queue_init(serial_queue_handle_t *queue_handle, serial
 }
 
 /**
- * Indicate to producer of the queue that consumer requires signalling.
- *
- * @param queue queue handle of queue that requires signalling upon enqueuing.
- */
-static inline void serial_request_consumer_signal(serial_queue_handle_t *queue_handle)
-{
-    queue_handle->queue->consumer_signalled = 0;
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
-    THREAD_MEMORY_RELEASE();
-#endif
-}
-
-/**
  * Indicate to consumer of the queue that producer requires signalling.
  *
  * @param queue queue handle of queue that requires signalling upon enqueuing.
  */
-static inline void serial_request_producer_signal(serial_queue_handle_t *queue_handle)
+static inline void serial_request_consumer_signal(serial_queue_handle_t *queue_handle)
 {
     queue_handle->queue->producer_signalled = 0;
 #ifdef CONFIG_ENABLE_SMP_SUPPORT
@@ -391,24 +378,24 @@ static inline void serial_request_producer_signal(serial_queue_handle_t *queue_h
 }
 
 /**
- * Indicate to producer of the queue that consumer has been signalled.
+ * Indicate to producer of the queue that consumer requires signalling.
  *
- * @param queue queue handle of the queue that has been signalled.
+ * @param queue queue handle of queue that requires signalling upon enqueuing.
  */
-static inline void serial_cancel_consumer_signal(serial_queue_handle_t *queue_handle)
+static inline void serial_request_producer_signal(serial_queue_handle_t *queue_handle)
 {
-    queue_handle->queue->consumer_signalled = 1;
+    queue_handle->queue->consumer_signalled = 0;
 #ifdef CONFIG_ENABLE_SMP_SUPPORT
     THREAD_MEMORY_RELEASE();
 #endif
 }
 
 /**
- * Indicate to consumer of the queue that producer has been signalled.
+ * Indicate that producer has been signalled.
  *
  * @param queue queue handle of the queue that has been signalled.
  */
-static inline void serial_cancel_producer_signal(serial_queue_handle_t *queue_handle)
+static inline void serial_cancel_consumer_signal(serial_queue_handle_t *queue_handle)
 {
     queue_handle->queue->producer_signalled = 1;
 #ifdef CONFIG_ENABLE_SMP_SUPPORT
@@ -417,13 +404,16 @@ static inline void serial_cancel_producer_signal(serial_queue_handle_t *queue_ha
 }
 
 /**
- * Consumer of the queue requires signalling.
+ * Indicate that consumer has been signalled.
  *
- * @param queue queue handle of the queue to check.
+ * @param queue queue handle of the queue that has been signalled.
  */
-static inline bool serial_require_consumer_signal(serial_queue_handle_t *queue_handle)
+static inline void serial_cancel_producer_signal(serial_queue_handle_t *queue_handle)
 {
-    return !queue_handle->queue->consumer_signalled;
+    queue_handle->queue->consumer_signalled = 1;
+#ifdef CONFIG_ENABLE_SMP_SUPPORT
+    THREAD_MEMORY_RELEASE();
+#endif
 }
 
 /**
@@ -431,7 +421,17 @@ static inline bool serial_require_consumer_signal(serial_queue_handle_t *queue_h
  *
  * @param queue queue handle of the queue to check.
  */
-static inline bool serial_require_producer_signal(serial_queue_handle_t *queue_handle)
+static inline bool serial_require_consumer_signal(serial_queue_handle_t *queue_handle)
 {
     return !queue_handle->queue->producer_signalled;
+}
+
+/**
+ * Consumer of the queue requires signalling.
+ *
+ * @param queue queue handle of the queue to check.
+ */
+static inline bool serial_require_producer_signal(serial_queue_handle_t *queue_handle)
+{
+    return !queue_handle->queue->consumer_signalled;
 }
