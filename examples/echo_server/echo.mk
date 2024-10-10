@@ -29,24 +29,31 @@ vpath %.c ${SDDF} ${ECHO_SERVER}
 IMAGES := eth_driver.elf lwip.elf benchmark.elf idle.elf network_virt_rx.elf\
 	  network_virt_tx.elf copy.elf timer_driver.elf uart_driver.elf serial_virt_tx.elf
 
-CFLAGS := -mcpu=$(CPU) \
-	  -mstrict-align \
-	  -ffreestanding \
-	  -g3 -O3 -Wall \
-	  -Wno-unused-function \
-	  -DMICROKIT_CONFIG_$(MICROKIT_CONFIG) \
-	  -I$(BOARD_DIR)/include \
-	  -I$(SDDF)/include \
-	  -I${ECHO_INCLUDE}/lwip \
-	  -I${ETHERNET_CONFIG_INCLUDE} \
-	  -I$(SERIAL_CONFIG_INCLUDE) \
-	  -I${SDDF}/$(LWIPDIR)/include \
-	  -I${SDDF}/$(LWIPDIR)/include/ipv4 \
-	  -MD \
-	  -MP
+CFLAGS := -mstrict-align \
+	-ffreestanding \
+	-g3 -O3 -Wall \
+	-Wno-unused-function \
+	-DMICROKIT_CONFIG_$(MICROKIT_CONFIG) \
+	-I$(BOARD_DIR)/include \
+	-I$(SDDF)/include \
+	-I${ECHO_INCLUDE}/lwip \
+	-I${ETHERNET_CONFIG_INCLUDE} \
+	-I$(SERIAL_CONFIG_INCLUDE) \
+	-I${SDDF}/$(LWIPDIR)/include \
+	-I${SDDF}/$(LWIPDIR)/include/ipv4 \
+	-MD \
+	-MP
 
-LDFLAGS := -L$(BOARD_DIR)/lib -L${LIBC}
-LIBS := --start-group -lmicrokit -Tmicrokit.ld -lc libsddf_util_debug.a --end-group
+LDFLAGS := -L$(BOARD_DIR)/lib -L${LIBC} -L.
+LIBS := --start-group -lmicrokit -Tmicrokit.ld -lc -lsddf_util_debug --end-group
+
+ifeq ($(ARCH),aarch64)
+	CFLAGS += -mcpu=$(CPU)
+	LIBS += -lc
+else ifeq ($(ARCH),riscv64)
+	CFLAGS += -mabi=lp64d -march=rv64imafdc
+	LIBS += -lc
+endif
 
 CHECK_FLAGS_BOARD_MD5:=.board_cflags-$(shell echo -- ${CFLAGS} ${BOARD} ${MICROKIT_CONFIG} | shasum | sed 's/ *-//')
 
