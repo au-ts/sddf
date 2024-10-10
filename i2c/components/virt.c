@@ -29,21 +29,21 @@
  * what happens...
  */
 
-#define NUM_CLIENTS 2
-#define DRIVER_CH 2
+#define NUM_CLIENTS 1
+#define DRIVER_CH 1
 
 #if DRIVER_CH < NUM_CLIENTS
 #error "DRIVER_CH must be higher than client channels"
 #endif
 
-uintptr_t driver_data_offsets[NUM_CLIENTS] = { 0, 0x1000 }; // change if NUM_CLIENTS changes
-size_t client_data_sizes[NUM_CLIENTS] = { 0x1000, 0x1000 }; // change if NUM_CLIENTS changes
+uintptr_t driver_data_offsets[NUM_CLIENTS] = { 0 }; // change if NUM_CLIENTS changes
+size_t client_data_sizes[NUM_CLIENTS] = { 0x1000 }; // change if NUM_CLIENTS changes
 
 i2c_queue_handle_t client_queues[NUM_CLIENTS];
 i2c_queue_handle_t driver_queue;
 
-uintptr_t client_request_regions[NUM_CLIENTS] = { 0x4000000, 0x4001000 }; // change if NUM_CLIENTS changes
-uintptr_t client_response_regions[NUM_CLIENTS] = { 0x5000000, 0x5001000 }; // change if NUM_CLIENTS changes
+uintptr_t client_request_regions[NUM_CLIENTS] = { 0x4000000 }; // change if NUM_CLIENTS changes
+uintptr_t client_response_regions[NUM_CLIENTS] = { 0x5000000 }; // change if NUM_CLIENTS changes
 
 // Security list: owner of each i2c address on the bus
 int security_list[I2C_BUS_ADDRESS_MAX + 1];
@@ -53,6 +53,7 @@ uintptr_t driver_request_region; // mapped memory
 
 void process_request(microkit_channel ch)
 {
+    LOG_VIRTUALISER("processing client %d\n", ch);
     bool enqueued = false;
     assert(ch < NUM_CLIENTS);
 
@@ -133,6 +134,8 @@ void init(void)
     for (int i = 0; i < I2C_BUS_ADDRESS_MAX + 1; i++) {
         security_list[i] = BUS_UNCLAIMED;
     }
+    assert(driver_request_region);
+    assert(driver_response_region);
     driver_queue = i2c_queue_init((i2c_queue_t *) driver_request_region, (i2c_queue_t *) driver_response_region);
     for (int i = 0; i < NUM_CLIENTS; i++) {
         client_queues[i] = i2c_queue_init((i2c_queue_t *) client_request_regions[i],
