@@ -300,11 +300,11 @@ def pindata_to_register_values(
                         # Prepare mux setting value to be OR'ed into the zeroed out slot
                         data_mask = mux_func << nth_bit
 
-                        log_normal_parser(f"pad #{pad_idx} was given mux func {mux_func}, prev reg is {hex(reg["value"])}, ")
+                        log_normal_parser(f"pad #{pad_idx} was given mux func {mux_func}, prev reg is {hex(reg['value'])}, ")
 
                         reg["value"] = zeroed_regval | data_mask
 
-                        log_normal_parser(f"after reg is {hex(reg["value"])}\n")
+                        log_normal_parser(f"after reg is {hex(reg['value'])}\n")
 
                         # By default all pads are GPIOs, if a pad function is non GPIO, turn off the GPIO switch for this pad
                         if mux_func != 0:
@@ -327,15 +327,15 @@ def pindata_to_register_values(
                         nth_bit = nth_pin * reg["bits_per_pin"]
 
                         if pindata.bias_enable:
-                            log_normal_parser(f"pad #{pad_idx} have bias enabled, prev reg is {hex(reg["value"])}, ")
+                            log_normal_parser(f"pad #{pad_idx} have bias enabled, prev reg is {hex(reg['value'])}, ")
                             data_mask = 1 << nth_bit
                             reg["value"] |= data_mask
                             bias_enabled = True
                         else:
-                            log_normal_parser(f"pad #{pad_idx} have bias disabled, prev reg is {hex(reg["value"])}, ")
+                            log_normal_parser(f"pad #{pad_idx} have bias disabled, prev reg is {hex(reg['value'])}, ")
                             reg["value"] = zero_n_bits_at_ith_bit_of_32bits(reg["value"], reg["bits_per_pin"], nth_bit)
 
-                        log_normal_parser(f"after reg is {hex(reg["value"])}\n")
+                        log_normal_parser(f"after reg is {hex(reg['value'])}\n")
 
                 if not found:
                     log_error_parser(f"cannot find the pin bank that the port {port} belongs in for biasing enable\n")
@@ -351,14 +351,14 @@ def pindata_to_register_values(
                             nth_pin = pad_idx - reg["first_pad"]
                             nth_bit = nth_pin * reg["bits_per_pin"]
                             if pindata.bias_pullup:
-                                log_normal_parser(f"pad #{pad_idx} have pull up, prev reg is {hex(reg["value"])}, ")
+                                log_normal_parser(f"pad #{pad_idx} have pull up, prev reg is {hex(reg['value'])}, ")
                                 data_mask = 1 << nth_bit
                                 reg["value"] |= data_mask
                             else:
-                                log_normal_parser(f"pad #{pad_idx} have pull down, prev reg is {hex(reg["value"])}, ")
+                                log_normal_parser(f"pad #{pad_idx} have pull down, prev reg is {hex(reg['value'])}, ")
                                 reg["value"] = zero_n_bits_at_ith_bit_of_32bits(reg["value"], reg["bits_per_pin"], nth_bit)
 
-                            log_normal_parser(f"after reg is {hex(reg["value"])}\n")
+                            log_normal_parser(f"after reg is {hex(reg['value'])}\n")
 
                     if not found:
                         log_error_parser(f"cannot find the pin bank that the port {port} belongs in for bias direction\n")
@@ -394,11 +394,11 @@ def pindata_to_register_values(
                             # Prepare mux setting value to be OR'ed into the zeroed out slot
                             data_mask = ds_val << nth_bit
 
-                            log_normal_parser(f"pad #{pad_idx} have drive strength {ds_val}, prev reg is {hex(reg["value"])}, ")
+                            log_normal_parser(f"pad #{pad_idx} have drive strength {ds_val}, prev reg is {hex(reg['value'])}, ")
 
                             reg["value"] = zeroed_regval | data_mask
 
-                            log_normal_parser(f"after reg is {hex(reg["value"])}\n")
+                            log_normal_parser(f"after reg is {hex(reg['value'])}\n")
                     if not found:
                         log_error_parser(f"cannot find the pin bank that the port {port} belongs in for drive strength\n")
                         exit(1)
@@ -419,7 +419,7 @@ def turn_off_gpios(target_pads: list[int], gpio_enable_regs) -> None:
                 prev = reg["value"]
                 reg["value"] = zero_n_bits_at_ith_bit_of_32bits(reg["value"], reg["bits_per_pin"], nth_bit)
 
-                log_normal_parser(f"disabled GPIO func for pad idx {pad_idx}, prev reg is {hex(prev)}, now is {hex(reg["value"])}")
+                log_normal_parser(f"disabled GPIO func for pad idx {pad_idx}, prev reg is {hex(prev)}, now is {hex(reg['value'])}")
 
         if not found:
             log_error_parser(f"cannot find GPIO enable register for pad index {pad_idx}\n")
@@ -431,10 +431,10 @@ def consolidate_registers(mux_registers, ds_registers, bias_en_registers, pull_d
     for reg in mux_registers + ds_registers + bias_en_registers + pull_dir_registers:
         if reg["offset"] in result:
             # Some register's bitfield are not contigous....see AO_RTI_PULL_UP_REG for example
-            log_normal_parser(f"consolidating existing register {hex(reg["offset"])}, old value is {hex(result[reg["offset"]])} with value {hex(reg["value"])}, result is {hex(result[reg["offset"]] | reg["value"])}")
+            log_normal_parser(f"consolidating existing register {hex(reg['offset'])}, old value is {hex(result[reg['offset']])} with value {hex(reg['value'])}, result is {hex(result[reg['offset']] | reg['value'])}")
             result[reg["offset"]] |= reg["value"]
         else:
-            log_normal_parser(f"consolidating new register {hex(reg["offset"])} with value {hex(reg["value"])}")
+            log_normal_parser(f"consolidating new register {hex(reg['offset'])} with value {hex(reg['value'])}")
             result[reg["offset"]] = reg["value"]
 
     return result
@@ -444,10 +444,10 @@ def consolidate_registers(mux_registers, ds_registers, bias_en_registers, pull_d
 def consolidate_gpio_en_registers(gpio_enable_regs, consolidated_registers: OrderedDict[int, int]) -> None:
     for reg in gpio_enable_regs:
         if reg["offset"] in consolidated_registers.keys():
-            log_error_parser(f"GPIO EN register {hex(reg["offset"])} is duplicated")
+            log_error_parser(f"GPIO EN register {hex(reg['offset'])} is duplicated")
             exit(1)
 
-        log_normal_parser(f"consolidating new GPIO EN register {hex(reg["offset"])} with value {hex(reg["value"])}")
+        log_normal_parser(f"consolidating new GPIO EN register {hex(reg['offset'])} with value {hex(reg['value'])}")
         consolidated_registers[reg["offset"]] = reg["value"]
 
 def register_values_to_assembler(out_dir: str, peripherals_data: OrderedDict[int, int], ao_data: OrderedDict[int, int]):
