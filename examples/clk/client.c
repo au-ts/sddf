@@ -31,7 +31,6 @@ void init(void)
     sddf_dprintf("ret_val: %x\n", ret);
 
     sddf_dprintf("--------------------\n");
-
 }
 
 void notified(microkit_channel ch)

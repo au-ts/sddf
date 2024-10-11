@@ -74,6 +74,8 @@
 #include <sddf/timer/client.h>
 #include <sddf/util/printf.h>
 
+#define TIMER_CH 1
+
 uintptr_t clk_base;
 
 void init_clk_base(uintptr_t base_addr)
@@ -146,15 +148,25 @@ static inline uint32_t meson_parm_read(struct parm parm)
     return regmap_read_bits(parm.reg_off, parm.shift, parm.width);
 }
 
+/* TODO: Replace this doggy dealy() with a standard interface */
+void delay_us(uint32_t us)
+{
+    uint64_t start_time = sddf_timer_time_now(TIMER_CH);
+    uint64_t now_time = start_time;
+    while (now_time - start_time < us) {
+        now_time = sddf_timer_time_now(TIMER_CH);
+    }
+}
+
 int regmap_multi_reg_write(const struct reg_sequence *regs, int num_regs)
 {
     int i;
     for (i = 0; i < num_regs; i++) {
         reg_write(regs[i].reg, regs[i].def);
         /* TODO: delay is needed */
-        /* if (regs[i].delay_us) { */
-        /*     delay_us(regs[i].delay_us); */
-        /* } */
+        if (regs[i].delay_us) {
+            delay_us(regs[i].delay_us);
+        }
     }
     return 0;
 }
