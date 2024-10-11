@@ -74,7 +74,7 @@
 #include <sddf/timer/client.h>
 #include <sddf/util/printf.h>
 
-#define TIMER_CH 1
+#define TIMER_CH 0
 
 uintptr_t clk_base;
 
