@@ -26,7 +26,8 @@ generates a C header file that specifies required clocks and corresponding
 rates at compile time. The clock driver must be given a highest priority to
 ensure that it is initialised earlier than all potential users in the system.
 At `init()` time, the driver initialises the clock tree based on the generated
-`clk_conf.h` file.
+`clk_conf.h` file which can also be manually modified to specify a clock
+frequency.
 
 ## Usage
 
