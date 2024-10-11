@@ -29,6 +29,10 @@ At `init()` time, the driver initialises the clock tree based on the generated
 `clk_conf.h` file which can also be manually modified to specify a clock
 frequency.
 
+The below picture gives a sample of how a clock tree looks like:
+
+![Figure 1. Sample diagram of clock tree](./sub_clock_tree.png)
+
 ## Usage
 
 This driver can be used as a clock server to manage and control clock hardware in
