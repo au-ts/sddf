@@ -43,11 +43,10 @@ typedef enum {
     GPIO_IRQ_5,
     GPIO_IRQ_6,
     GPIO_IRQ_7,
-    GPIO_AO_IRQ_0 = 8,
+    GPIO_AO_IRQ_0,
     GPIO_AO_IRQ_1,
     MESON_IRQ_CHANNEL_COUNT
 } meson_irq_gpio_t;
-
 
 /*
 ================================================================================

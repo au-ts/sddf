@@ -19,7 +19,8 @@
 */
 
 /* Device <-> Driver GPIO IRQ channels */
-/* Must be linear, skip numbers and be in this order */
+/* These Channels MUST be linear, not skip numbers
+and be in the order defined in sddf/gpio/{platform}/gpio.h */
 #define DEV_GPIO_IRQ_0_CH       53
 #define DEV_GPIO_IRQ_1_CH       54
 #define DEV_GPIO_IRQ_2_CH       55
@@ -28,8 +29,8 @@
 #define DEV_GPIO_IRQ_5_CH       58
 #define DEV_GPIO_IRQ_6_CH       59
 #define DEV_GPIO_IRQ_7_CH       60
-#define DEV_AO_GPIO_IRQ_0_CH    61
-#define DEV_AO_GPIO_IRQ_1_CH    62
+#define DEV_GPIO_AO_IRQ_0_CH    61
+#define DEV_GPIO_AO_IRQ_1_CH    62
 
 #define DEV_IRQ_CHANNEL_OFFSET DEV_GPIO_IRQ_0_CH
 
@@ -47,8 +48,8 @@
 #define CHANNEL_MAPPINGS_DEV_IRQ_CHANNEL_INDEX 2
 
 /*
-- Channel Mappings must not skip any channel numbers between 0 and up to last channel defined above.
-- Pins must use the linear scheme inside of sddf/include/gpio/{platform}/gpio.h.
+- Channel Mappings must not skip any channel numbers between 0 and up to NUM_CLI_GPIO_CHANNELS.
+- GPIO Pin entries must use the linear scheme inside of sddf/include/gpio/{platform}/gpio.h.
 - Unused fields must be initialised to -1.
 */
 const int cli_channel_mappings[NUM_CLI_GPIO_CHANNELS][3] = {

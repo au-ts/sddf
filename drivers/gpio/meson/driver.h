@@ -12,7 +12,7 @@
 #ifndef GPIO_DRIVER_H
 #define GPIO_DRIVER_H
 
-#define GPIO_OFFSET 1024
+#define GPIO_REGS_OFFSET 1024
 
 /*
 ================================================================================
@@ -106,6 +106,8 @@
 ================================================================================
 */
 
+#define MESON_MAX_GPIO_REGISTERS_DATA 3
+
 typedef enum {
 	MESON_GPIO_REG_PULLEN = 0,
 	MESON_GPIO_REG_PULL,
@@ -151,11 +153,11 @@ struct meson_gpio_register_data {
  */
 struct meson_gpio_bank {
     int bank;
-    struct meson_gpio_register_data *registers;
+    struct meson_gpio_register_data registers[MESON_MAX_GPIO_REGISTERS_DATA];
 };
 
 #define MESON_GPIO_REGISTER_DATA(reg_offset, s_bit, e_bit, s_pin, last)    \
-    {                                                                 \
+    (struct meson_gpio_register_data) {                               \
         .register_offset = reg_offset,                                \
         .start_bit = s_bit,                                           \
         .end_bit = e_bit,                                             \
@@ -166,12 +168,14 @@ struct meson_gpio_bank {
 #define MESON_GPIO_BANK(bank_id, ...)                                 \
     {                                                                 \
         .bank = bank_id,                                              \
-        .registers = (struct meson_gpio_register_data[]){ __VA_ARGS__ }    \
+        .registers = { __VA_ARGS__ }                                  \
     }
 
 /*
 ================================================================================
 */
+
+#define MESON_MAX_IRQ_REGISTERS_DATA 10
 
 typedef enum {
 	MESON_IRQ_REG_BOTHEDGEEN = 0,
@@ -181,7 +185,7 @@ typedef enum {
 	MESON_IRQ_REG_AOSEL,
     MESON_IRQ_REG_SEL,
     // MESON_IRQ_REG_FILCLKEN - not implemented
-	MESON_IRQ_NUM_REG, // not actually a register, just a count
+	MESON_IRQ_NUM_REG, // just a count
 } meson_irq_reg_type_t;
 
 /* how many bits are assigned for each register type per pin */

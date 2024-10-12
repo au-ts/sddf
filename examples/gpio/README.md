@@ -8,21 +8,16 @@
 
 This example makes use two circuits.
 
-I need to use a resistor otherwise too much current might be pulled
-this is from ohms law V = IR
-hence small resistance (from gpio pin and led) and 3.3 - 2v neans big current
-Use a resistor that accounts for the LEDs forward voltage
-and see
+Each GPIO outputs 3.3V.
 
-The ODROID-C4 provides 40-pin dual row expansion header “J2”. All signals on the expansion headers are 3.3V except for the analog input signal.
-
-Circuit 1:
+### Circuit 1:
 
 GPIO_H --------|>|----[R]-------- GND
-               LED
+             LED(2V)
 
+Note: Add appropriate resistance.
 
-Circuit 2:
+### Circuit 2:
 
 GPIO_X ----[ ]---- VCC (3.3)
           Button
@@ -47,7 +42,18 @@ zig build -Dsdk=/path/to/sdk -Dboard=odroidc4
 
 The final bootable image will be in `zig-out/bin/loader.img`.
 
+# TODO
 
+# what im trying to do with registers
 
+# i think the best design is to make the offset in the mappings a complete calc
+offset = (uint32_t)*gpio_mem + GPIO_MEM_OFFSET + AO_RTI_PULL_UP_EN_REG * 4
+then call a fcuntion that returns this final address, and stores it in a pointer whhcih is the variable at that address
 
+# TIDY UP?
+- need to fix the config file and link it appropriately (apparently need a source file and header)
+- get this stupid intialiser list crap sorted
 
+- general style stuff perhaps
+
+could just store the actual pointer in the ds
