@@ -38,7 +38,9 @@ uintptr_t get_bdf_offset(uint8_t bus, uint8_t device, uint8_t function)
 
 void device_print(uint8_t bus, uint8_t device, uint8_t function)
 {
-    void *config_base = (void *)(pcie_config + get_bdf_offset(bus, device, function));
+    uintptr_t offset = get_bdf_offset(bus, device, function);
+    assert(offset < PCIE_CONFIG_SIZE);
+    void *config_base = (void *)(pcie_config + offset);
     volatile pcie_header_t *header = (pcie_header_t *)config_base;
 
     if (header->vendor_id == PCIE_VENDOR_INVALID) {
