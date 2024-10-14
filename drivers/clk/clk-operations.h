@@ -3,41 +3,142 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-#ifndef CLK_OPERATIONS_H_
-#define CLK_OPERATIONS_H_
+#pragma once
 
 #include <clk.h>
 
-#define MASK(width)  ((1UL << width) - 1)
-#define DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
-#define do_div(n,base) ({                       \
-    uint32_t __base = (base);                   \
-    uint32_t __rem;                             \
-    __rem = ((uint64_t)(n)) % __base;           \
-    (n) = ((uint64_t)(n)) / __base;             \
-    __rem;                                      \
- })
-#define DIV_ROUND_DOWN_ULL(ll, d)               \
-    ({ uint64_t _tmp = (ll); do_div(_tmp, d); _tmp; })
-#define DIV_ROUND_UP_ULL(ll, d)                 \
-    DIV_ROUND_DOWN_ULL((uint64_t)(ll) + (d) - 1, (d))
-#define DIV_ROUND_CLOSEST_ULL(x, divisor)(      \
-{                                               \
-    typeof(divisor) __d = divisor;              \
-    unsigned long long _tmp = (x) + (__d) / 2;  \
-    do_div(_tmp, __d);                          \
-    _tmp;                                       \
-}                                               \
-)
-
 extern void init_clk_base(uintptr_t base_addr);
 
-extern const struct clk_ops clk_regmap_gate_ops;
-extern const struct clk_ops clk_regmap_gate_ro_ops;
-extern const struct clk_ops clk_regmap_divider_ops;
-extern const struct clk_ops clk_regmap_divider_ro_ops;
-extern const struct clk_ops clk_regmap_mux_ops;
-extern const struct clk_ops clk_regmap_mux_ro_ops;
-extern const struct clk_ops clk_fixed_factor_ops;
 extern const struct clk_ops clk_source_ops;
-#endif // CLK_OPERATIONS_H_
+extern const struct clk_ops clk_fixed_factor_ops;
+extern const struct clk_ops clk_divider_ops;
+extern const struct clk_ops clk_divider_ro_ops;
+extern const struct clk_ops clk_mux_ops;
+extern const struct clk_ops clk_mux_ro_ops;
+extern const struct clk_ops clk_gate_ops;
+extern const struct clk_ops clk_gate_ro_ops;
+
+#define CLK_FIXED_FACTOR(_name, _mult, _div, _data_flags, _parent_clks,             \
+                         _num_parents, _init_flags)                                 \
+struct clk _name = {                                                                \
+    .data = &(struct clk_fixed_factor_data) {                                       \
+        .mult = (_mult),                                                            \
+        .div = (_div),                                                              \
+        .flags = (_data_flags),                                                     \
+    },                                                                              \
+    .hw.init = &(struct clk_init_data) {                                            \
+        .name = #_name,                                                             \
+        .ops = &clk_fixed_factor_ops,                                               \
+        .parent_clks = (const struct clk *[]) _parent_clks,                         \
+        .num_parents = (_num_parents),                                              \
+        .flags = (_init_flags),                                                     \
+    },                                                                              \
+}
+
+#define CLK_GATE(_name, _offset, _bit, _data_flags, _parent_clks,                   \
+                        _num_parents, _init_flags)                                  \
+struct clk _name = {                                                                \
+    .data = &(struct clk_gate_data) {                                               \
+        .offset = (_offset),                                                        \
+        .bit_idx = (_bit),                                                          \
+        .flags = (_data_flags),                                                     \
+    },                                                                              \
+    .hw.init = &(struct clk_init_data) {                                            \
+        .name = #_name,                                                             \
+        .ops = &clk_gate_ops,                                                       \
+        .parent_clks = (const struct clk *[]) _parent_clks,                         \
+        .num_parents = _num_parents,                                                \
+        .flags = (_init_flags),                                                     \
+    },                                                                              \
+}
+
+#define CLK_GATE_RO(_name, _offset, _bit, _data_flags, _parent_clks,                \
+                        _num_parents, _init_flags)                                  \
+struct clk _name = {                                                                \
+    .data = &(struct clk_gate_data) {                                               \
+        .offset = (_offset),                                                        \
+        .bit_idx = (_bit),                                                          \
+        .flags = (_data_flags),                                                     \
+    },                                                                              \
+    .hw.init = &(struct clk_init_data) {                                            \
+        .name = #_name,                                                             \
+        .ops = &clk_gate_ro_ops,                                                    \
+        .parent_clks = (const struct clk *[]) _parent_clks,                         \
+        .num_parents = _num_parents,                                                \
+        .flags = (_init_flags),                                                     \
+    },                                                                              \
+}
+
+#define CLK_MUX(_name, _offset, _mask, _shift, _table,                              \
+                  _data_flags, _parent_data, _num_parents, _init_flags)             \
+struct clk _name = {                                                                \
+    .data = &(struct clk_mux_data) {                                                \
+        .offset = (_offset),                                                        \
+        .mask = (_mask),                                                            \
+        .shift = (_shift),                                                          \
+        .table = (_table),                                                          \
+        .flags = (_data_flags),                                                     \
+    },                                                                              \
+    .hw.init = &(struct clk_init_data) {                                            \
+        .name = #_name,                                                             \
+        .ops = &clk_mux_ops,                                                        \
+        .parent_data = (_parent_data),                                              \
+        .num_parents = (_num_parents),                                              \
+        .flags = (_init_flags),                                                     \
+    },                                                                              \
+}
+
+#define CLK_MUX_RO(_name, _offset, _mask, _shift, _table,                           \
+                  _data_flags, _parent_data, _num_parents, _init_flags)             \
+struct clk _name = {                                                                \
+    .data = &(struct clk_mux_data) {                                                \
+        .offset = (_offset),                                                        \
+        .mask = (_mask),                                                            \
+        .shift = (_shift),                                                          \
+        .table = (_table),                                                          \
+        .flags = (_data_flags),                                                     \
+    },                                                                              \
+    .hw.init = &(struct clk_init_data) {                                            \
+        .name = #_name,                                                             \
+        .ops = &clk_mux_ro_ops,                                                     \
+        .parent_data = (_parent_data),                                              \
+        .num_parents = (_num_parents),                                              \
+        .flags = (_init_flags),                                                     \
+    },                                                                              \
+}
+
+#define CLK_DIV(_name, _offset, _shift, _width, _data_flags,                        \
+                  _parent_clks, _num_parents, _init_flags)                          \
+struct clk _name = {                                                                \
+    .data = &(struct clk_div_data) {                                                \
+        .offset = (_offset),                                                        \
+        .shift = (_shift),                                                          \
+        .width = (_width),                                                          \
+        .flags = (_data_flags),                                                     \
+    },                                                                              \
+    .hw.init = &(struct clk_init_data) {                                            \
+        .name = #_name,                                                             \
+        .ops = &clk_divider_ops,                                                    \
+        .parent_clks = (const struct clk *[]) _parent_clks,                         \
+        .num_parents = (_num_parents),                                              \
+        .flags = (_init_flags),                                                     \
+    },                                                                              \
+}
+
+#define CLK_DIV_RO(_name, _offset, _shift, _width, _data_flags,                     \
+                  _parent_clks, _num_parents, _init_flags)                          \
+struct clk _name = {                                                                \
+    .data = &(struct clk_div_data) {                                                \
+        .offset = (_offset),                                                        \
+        .shift = (_shift),                                                          \
+        .width = (_width),                                                          \
+        .flags = (_data_flags),                                                     \
+    },                                                                              \
+    .hw.init = &(struct clk_init_data) {                                            \
+        .name = #_name,                                                             \
+        .ops = &clk_divider_ro_ops,                                                 \
+        .parent_clks = (const struct clk *[]) _parent_clks,                         \
+        .num_parents = (_num_parents),                                              \
+        .flags = (_init_flags),                                                     \
+    },                                                                              \
+}
