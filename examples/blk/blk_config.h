@@ -31,7 +31,8 @@ _Static_assert(BLK_DATA_REGION_SIZE_DRIV >= BLK_TRANSFER_SIZE && BLK_DATA_REGION
                "Driver data region size must be a multiple of the transfer size");
 
 /* Mapping from client index to disk partition that the client will have access to. */
-static const int blk_partition_mapping[BLK_NUM_CLIENTS] = { 0 };
+// Please ensure this point to a partition that you do not mind to courrupt as the example involves write data to that component
+static const int blk_partition_mapping[BLK_NUM_CLIENTS] = { 2 };
 
 static inline blk_storage_info_t *blk_virt_cli_config_info(blk_storage_info_t *info, unsigned int id)
 {
