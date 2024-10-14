@@ -1,7 +1,9 @@
 /*
- * Copyright 2023, UNSW
+ * Copyright 2024, UNSW
  *
  * SPDX-License-Identifier: BSD-2-Clause
+ *
+ * Terry Bai: tianyi.bai@unsw.edu.au
  */
 
 #include <microkit.h>
@@ -32,8 +34,6 @@
 
 uintptr_t clk_regs;
 uintptr_t msr_clk_base;
-
-struct clk **sm1_clks;
 
 /* TODO: Should be configured with init_regs */
 /* static struct clk_cfg fixed_clk_configs[] = { */
@@ -190,7 +190,7 @@ void init(void)
         LOG_DRIVER_ERR("failed to toggle clock!\n");
     }
 
-    clk_msr_stat();
+    /* clk_msr_stat(); */
 }
 
 microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
@@ -198,6 +198,7 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
     uint32_t ret = 0;
     uint32_t argc = microkit_msginfo_get_count(msginfo);
 
+    /* TODO: Check if the channel is valid */
     switch (microkit_msginfo_get_label(msginfo)) {
 
         case SDDF_CLK_ENABLE: {
