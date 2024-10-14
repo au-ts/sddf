@@ -7,6 +7,9 @@
 
 #include <clk.h>
 
+#define CLK_INCORRECT_ARGS 1
+#define CLK_INVALID_OP 2
+
 extern void init_clk_base(uintptr_t base_addr);
 
 extern const struct clk_ops clk_source_ops;
