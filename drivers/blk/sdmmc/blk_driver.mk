@@ -27,10 +27,10 @@ blk/sdmmc/meson:
 	mkdir -p $@
 
 # Main build target
-sdmmc_driver.elf: $(BUILD_DIR) blk/sdmmc/meson/libsddfblk.a
+blk_driver.elf: $(BUILD_DIR) blk/sdmmc/meson/libsddfblk.a
 	cp blk/sdmmc/meson/libsddfblk.a $(abspath ${SDMMC_DRIVER_DIR})
 	@cd $(abspath ${SDMMC_DRIVER_DIR}) && \
-	echo "Building sdmmc_driver.elf for board $(MICROKIT_BOARD)..." && \
+	echo "Building blk_driver.elf for board $(MICROKIT_BOARD)..." && \
 	echo "MICROKIT SDK config directory: $(microkit_sdk_config_dir)" && \
 	echo "SEl4 include directories: $(sel4_include_dirs)" && \
 	SEL4_INCLUDE_DIRS=$(abspath $(sel4_include_dirs)) \
@@ -39,5 +39,5 @@ sdmmc_driver.elf: $(BUILD_DIR) blk/sdmmc/meson/libsddfblk.a
 		-Z build-std-features=compiler-builtins-mem \
 		--target-dir $(BUILD_DIR)/blk/sdmmc/meson/ \
 		--target support/targets/aarch64-sel4-microkit-minimal.json && \
-	cp $(BUILD_DIR)/blk/sdmmc/meson/aarch64-sel4-microkit-minimal/debug/sdmmc_driver.elf $(BUILD_DIR)
+	cp $(BUILD_DIR)/blk/sdmmc/meson/aarch64-sel4-microkit-minimal/debug/blk_driver.elf $(BUILD_DIR)
 	echo "Build complete: $(TARGET_ELF)"
