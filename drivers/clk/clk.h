@@ -1,12 +1,10 @@
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
- * Copyright 2024, UNSW
+ *  Copyright (c) 2010-2011 Jeremy Kerr <jeremy.kerr@canonical.com>
+ *  Copyright (C) 2011-2012 Linaro Ltd <mturquette@linaro.org>
  *
- * SPDX-License-Identifier: BSD-2-Clause
- *
- * This file defines common data structures, macros, and interfaces.
- *
- * References:
- *   https://github.com/torvalds/linux/blob/6485cf5ea253d40d507cd71253c9568c5470cd27/include/linux/clk-provider.h
+ *  This file is derived from:
+ *    https://github.com/torvalds/linux/blob/6485cf5ea253d40d507cd71253c9568c5470cd27/include/linux/clk-provider.h
  */
 
 #pragma once
@@ -296,9 +294,9 @@ struct clk_div_data {
 /**
  * struct clk_fixed_factor_data - fixed multiplier and divider clock
  *
- * @mult:	multiplier
- * @div:	divider
- * @flags:	behavior modifying flags
+ * @mult:    multiplier
+ * @div:    divider
+ * @flags:    behavior modifying flags
  *
  * Clock with a fixed multiplier and divider. The output frequency is the
  * parent clock rate divided by div and multiplied by mult.
@@ -317,12 +315,12 @@ struct clk_fixed_factor_data {
 /**
  * struct clk_mux_data - multiplexer clock
  *
- * @reg:	register controlling multiplexer
- * @table:	array of register values corresponding to the parent index
- * @shift:	shift to multiplexer bit field
- * @mask:	mask of mutliplexer bit field
- * @flags:	hardware-specific flags
- * @lock:	register lock
+ * @reg:    register controlling multiplexer
+ * @table:  array of register values corresponding to the parent index
+ * @shift:  shift to multiplexer bit field
+ * @mask:   mask of mutliplexer bit field
+ * @flags:  hardware-specific flags
+ * @lock:   register lock
  *
  * Clock with multiple selectable parents.  Implements .get_parent, .set_parent
  * and .recalc_rate
@@ -331,16 +329,16 @@ struct clk_fixed_factor_data {
  * CLK_MUX_INDEX_ONE - register index starts at 1, not 0
  * CLK_MUX_INDEX_BIT - register index is a single bit (power of two)
  * CLK_MUX_HIWORD_MASK - The mux settings are only in lower 16-bit of this
- *	register, and mask of mux bits are in higher 16-bit of this register.
- *	While setting the mux bits, higher 16-bit should also be updated to
- *	indicate changing mux bits.
+ *    register, and mask of mux bits are in higher 16-bit of this register.
+ *    While setting the mux bits, higher 16-bit should also be updated to
+ *    indicate changing mux bits.
  * CLK_MUX_READ_ONLY - The mux registers can't be written, only read in the
- * 	.get_parent clk_op.
+ *     .get_parent clk_op.
  * CLK_MUX_ROUND_CLOSEST - Use the parent rate that is closest to the desired
- *	frequency.
+ *    frequency.
  * CLK_MUX_BIG_ENDIAN - By default little endian register accesses are used for
- *	the mux register.  Setting this flag makes the register accesses big
- *	endian.
+ *    the mux register.  Setting this flag makes the register accesses big
+ *    endian.
  */
 struct clk_mux_data {
     uint32_t offset;
@@ -350,3 +348,48 @@ struct clk_mux_data {
     uint8_t flags;
 };
 
+/**
+ * function clk_probe() - initialise all clocks
+ *
+ * @clk_list:    array of pointers to the clocks on SoC
+ *
+ * All parent clocks will be parsed by name and bound to the struct clk
+ */
+void clk_probe(struct clk *clk_list[]);
+
+/**
+ * function get_parent() - get the current parent clk
+ *
+ * @clk:    pointer to the current clk
+ */
+const struct clk *get_parent(const struct clk *clk);
+
+/**
+ * function clk_get_rate() - get the rate of target clock
+ *
+ * @clk:    pointer to the current clk
+ *
+ */
+unsigned long clk_get_rate(const struct clk *clk);
+
+/**
+ * function clk_enable() - enable the target clock signal
+ *
+ * @clk:    pointer to the current clk
+ */
+uint32_t clk_enable(struct clk *clk);
+
+/**
+ * function clk_disable() - disable the target clock signal
+ *
+ * @clk:    pointer to the current clk
+ */
+uint32_t clk_disable(struct clk *clk);
+
+/**
+ * function clk_set_rate() - set the nearest rate to the requested rate for
+ * the target clock
+ *
+ * @clk:    pointer to the current clk
+ */
+uint32_t clk_set_rate(struct clk *clk, uint32_t rate);

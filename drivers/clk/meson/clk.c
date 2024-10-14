@@ -19,9 +19,6 @@
 #include <g12a-clkc.h>
 #include <sm1_clk_hws.h>
 
-#define I2C_CLK_OFFSET 320
-#define I2C_CLK_BIT (1 << 9) // bit 9
-
 // Logging
 #define DEBUG_DRIVER
 
@@ -81,6 +78,8 @@ const struct clk *get_parent(const struct clk *clk)
     return NULL;
 }
 
+/* TODO: Should be just read from the structure, but need to update everytime when */
+/*     related clocks are modified */
 unsigned long clk_get_rate(const struct clk *clk)
 {
     const struct clk_init_data *init = (struct clk_init_data *)clk->hw.init;
