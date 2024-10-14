@@ -22,7 +22,7 @@
     <protection_domain name="pcie" priority="254" stack_size="0x2000">
         <!-- <map mr="pcie_regs" vaddr="0x1000_0000" perms="rw" cached="false" setvar_vaddr="pcie_regs" /> -->
         <map mr="pcie_config" vaddr="0x2000_0000" perms="rw" cached="false" setvar_vaddr="pcie_config" />
-        <irq irq="57" id="0" />
+        <irq irq="57" id="0" trigger="level" /> <!-- 0x38 -->
 
         <map mr="nvme_regs" vaddr="0x3000_0000" perms="rw" cached="false" setvar_vaddr="nvme_controller" />
         <!-- TODO: cached? -->
