@@ -129,12 +129,13 @@ impl<'a, T: SdmmcHardware> Handler for HandlerImpl<'a, T> {
                             if request.count == 0 {
                                 let resp_status = BlkStatus::BlkRespOk;
                                 notify_virt = true;
-                                unsafe { blk_enqueue_resp_helper(resp_status, request.success_count, request.id); }
+                                // Have to divide the SDDF_TO_REAL_SECTOR here, we should really use real sector
+                                unsafe { blk_enqueue_resp_helper(resp_status, request.success_count / SDDF_TO_REAL_SECTOR, request.id); }
                                 self.request = None;
                             } else if self.retry == 0 {
                                 let resp_status = BlkStatus::BlkRespSeekError;
                                 notify_virt = true;
-                                unsafe { blk_enqueue_resp_helper(resp_status, request.success_count, request.id); }
+                                unsafe { blk_enqueue_resp_helper(resp_status, request.success_count / SDDF_TO_REAL_SECTOR, request.id); }
                                 self.request = None;
                             }
                         }

@@ -60,6 +60,10 @@ else ifeq ($(strip $(MICROKIT_BOARD)), maaxboard)
 	SERIAL_DRIVER_DIR := imx
 	BLK_DRIVER_DIR := mmc/imx
 	TIMER_DRIVER_DIR := imx
+else ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
+	ARCH := aarch64
+	CPU := cortex-a55
+	BLK_DRIVER_DIR := sdmmc
 else
 $(error Unsupported MICROKIT_BOARD given)
 endif
@@ -79,8 +83,11 @@ BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 ARCH := ${shell grep 'CONFIG_SEL4_ARCH  ' $(BOARD_DIR)/include/kernel/gen_config.h | cut -d' ' -f4}
 SDDF_CUSTOM_LIBC := 1
 
-IMAGES := blk_driver.elf client.elf blk_virt.elf serial_virt_tx.elf serial_driver.elf
-CFLAGS := -nostdlib \
+IMAGES := client.elf blk_virt.elf serial_virt_tx.elf serial_driver.elf
+
+CFLAGS := -mcpu=$(CPU) \
+		  -mstrict-align \
+		  -nostdlib \
 		  -ffreestanding \
 		  -g3 \
 		  -O3 \
