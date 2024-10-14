@@ -9,7 +9,7 @@
 #define LOG_NVME(...) do{ sddf_dprintf("NVME|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
 // clang-format on
 
-static void nvme_debug_dump_controller_regs(nvme_controller_t *nvme_controller)
+static void nvme_debug_dump_controller_regs(volatile nvme_controller_t *nvme_controller)
 {
     LOG_NVME("CAP: %016lx\n", nvme_controller->cap);
     LOG_NVME("VS: major: %u, minor: %u, tertiary: %u\n", nvme_controller->vs.mjr, nvme_controller->vs.mnr,
