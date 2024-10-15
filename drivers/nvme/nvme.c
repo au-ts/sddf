@@ -40,8 +40,9 @@ _Static_assert(NVME_IO_CQ_CAPACITY <= 0x10000, "capacity of IO CQ must be <=6553
 void nvme_controller_init()
 {
     LOG_NVME("CAP: %016lx\n", nvme_controller->cap);
-    LOG_NVME("VS: major: %u, minor: %u, tertiary: %u\n", nvme_controller->vs.mjr, nvme_controller->vs.mnr,
-             nvme_controller->vs.ter);
+    // TODO: alignment 32-bit.
+    // LOG_NVME("VS: major: %u, minor: %u, tertiary: %u\n", nvme_controller->vs.mjr, nvme_controller->vs.mnr,
+            //  nvme_controller->vs.ter);
     LOG_NVME("CC: %08x\n", nvme_controller->cc);
 
     nvme_controller->cc &= ~NVME_CC_EN;
@@ -198,7 +199,7 @@ void nvme_init()
         assert((entry.phase_tag_and_status & _MASK(1, 15)) == 0x0); // §4.2.3 Status Field
 
         // for (int i = 0; i < 32; i++) {
-        //     sddf_dprintf("Data [%02x]: %02x\n", i, data_region[i]);
+            // sddf_dprintf("Data [%02x]: %02x\n", i, data_region[i]);
         // }
 
         for (int i = 0; i < 4096; i++) {

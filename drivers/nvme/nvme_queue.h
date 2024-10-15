@@ -28,22 +28,23 @@ static inline void nvme_queues_init(nvme_queue_info_t *queue, uint16_t y, volati
 {
     uint8_t DSTRD = (nvme_controller->cap & NVME_CAP_DSTRD_MASK) >> NVME_CAP_DSTRD_SHIFT;
 
-    /* [NVMEe-Transport-PCIe-1.1] 3.1.2.1 SQyTDBL */
+    /* [NVMEe-Transport-PCIe-1.1] 3.1.2.1 SQyTDBL & 3.1.2.2 CQyHDBL
+       Note: "The host should not read the doorbell registers"
+    */
     volatile uint32_t *submission_doorbell = (void *)nvme_controller + NVME_PCIE_DOORBELL_OFFSET(2 * y, DSTRD);
-    /* [NVMEe-Transport-PCIe-1.1] 3.1.2.2 CQyHDBL */
     volatile uint32_t *completion_doorbell = (void *)nvme_controller + NVME_PCIE_DOORBELL_OFFSET(2 * y + 1, DSTRD);
 
     *queue = (nvme_queue_info_t){
         .submission = {
             .queue = submission_queue,
             .capacity = submission_capacity,
-            .tail = *submission_doorbell & NVME_PCIE_SQT_MASK,
+            .tail = 0,
             .doorbell = submission_doorbell,
         },
         .completion = {
             .queue = completion_queue,
             .capacity = completion_capacity,
-            .head = *completion_doorbell & NVME_PCIE_CQH_MASK,
+            .head = 0,
             .doorbell = completion_doorbell,
             .phase = 0,
         },
@@ -57,10 +58,7 @@ static inline void nvme_queue_submit(nvme_queue_info_t *queue, nvme_submission_q
     // todo: overflow. todo: full queue.
     queue->submission.tail++;
 
-    uint32_t val = *queue->submission.doorbell;
-    val &= ~NVME_PCIE_SQT_MASK;
-    val |= queue->submission.tail & NVME_PCIE_SQT_MASK;
-    *queue->submission.doorbell = val;
+    *queue->submission.doorbell = queue->submission.tail;
 }
 
 static inline int nvme_queue_consume(nvme_queue_info_t *queue, nvme_completion_queue_entry_t *entry)
@@ -80,10 +78,7 @@ static inline int nvme_queue_consume(nvme_queue_info_t *queue, nvme_completion_q
     //     phase ^= 1; /* flip phase */
     // }
 
-    uint32_t val = *queue->completion.doorbell;
-    val &= ~NVME_PCIE_CQH_MASK;
-    val |= queue->completion.head & NVME_PCIE_CQH_MASK;
-    *queue->completion.doorbell = val;
+    *queue->completion.doorbell = queue->completion.head;
 
     return 0;
 }
