@@ -67,14 +67,19 @@ void nvme_controller_init()
                           | ((NVME_ACQ_CAPACITY - 1) << NVME_AQA_ACQS_SHIFT);
 
     // 3. Initialise Command Support Sets.
-    nvme_controller->cc &= ~(NVME_CC_CSS_MASK);
-    if (nvme_controller->cap & NVME_CAP_NOIOCSS) {
-        nvme_controller->cc |= 0b111 << NVME_CC_CSS_SHIFT;
-    } else if (nvme_controller->cap & NVME_CAP_IOCSS) {
-        nvme_controller->cc |= 0b110 << NVME_CC_CSS_SHIFT;
-    } else if (nvme_controller->cap & NVME_CAP_NCSS) {
-        nvme_controller->cc |= 0b000 << NVME_CC_CSS_SHIFT;
-    }
+    /*
+        https://forum.osdev.org/viewtopic.php?p=343454#p343454
+        For whatever reason this is broken under QEMU.
+
+        nvme_controller->cc &= ~(NVME_CC_CSS_MASK);
+        if (nvme_controller->cap & NVME_CAP_NOIOCSS) {
+            nvme_controller->cc |= 0b111 << NVME_CC_CSS_SHIFT;
+        } else if (nvme_controller->cap & NVME_CAP_IOCSS) {
+            nvme_controller->cc |= 0b110 << NVME_CC_CSS_SHIFT;
+        } else if (nvme_controller->cap & NVME_CAP_NCSS) {
+            nvme_controller->cc |= 0b000 << NVME_CC_CSS_SHIFT;
+        }
+    */
 
     // 4a. Arbitration Mechanism (TODO)
     // 4b. Memory Page Size
