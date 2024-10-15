@@ -116,10 +116,6 @@ void nvme_controller_init()
 
     assert((entry.phase_tag_and_status & _MASK(1, 15)) == 0x0); // §4.2.3 Status Field
 
-    nvme_controller->intms = 0x00000001;
-    /* At this point: we start getting interrupts */
-    return;
-
     // 8. The host determines any I/O Command Set specific configuration information
     // TODO: Why???
 
@@ -185,43 +181,42 @@ void nvme_init()
     // https://github.com/bootreer/vroom/blob/d8bbe9db2b1cfdfc38eec31f3b48f5eb167879a9/src/nvme.rs#L220
 
     nvme_controller_init();
-    return;
+}
 
-    for (int z = 0; z < 9; z++) {
-        /* [NVMe-CommandSet-1.1] 3.3.4 Read command */
-        nvme_completion_queue_entry_t entry;
-        uint16_t number_blocks = 1;
-        entry = nvme_queue_submit_and_consume_poll(&io_queue, &(nvme_submission_queue_entry_t){
-            .cdw0 = /* CID */ (0b1011 << 16) | /* PSDT */ 0 | /* FUSE */ 0 | /* OPC */ 0x2,
-            .nsid = 0x1, // TOOD: Why is NSID 1 now ????
-            .cdw10 = /* SLBA[31:00] */ 0x0,
-            .cdw11 = /* SLBA[63:32] */ 0x0,
-            .cdw12 = /* LR */ (0b1U << 31) | /* others */ 0 | /* NLB */ (number_blocks - 1),
-            .prp2 = 0x0,
-            .prp1 = data_region_paddr,
-        });
+void nvme_continue(int z)
+{
+    /* [NVMe-CommandSet-1.1] 3.3.4 Read command */
+    nvme_completion_queue_entry_t entry;
+    uint16_t number_blocks = 1;
+    entry = nvme_queue_submit_and_consume_poll(&io_queue, &(nvme_submission_queue_entry_t){
+        .cdw0 = /* CID */ (0b1011 << 16) | /* PSDT */ 0 | /* FUSE */ 0 | /* OPC */ 0x2,
+        .nsid = 0x1, // TOOD: Why is NSID 1 now ????
+        .cdw10 = /* SLBA[31:00] */ 0x0,
+        .cdw11 = /* SLBA[63:32] */ 0x0,
+        .cdw12 = /* LR */ (0b1U << 31) | /* others */ 0 | /* NLB */ (number_blocks - 1),
+        .prp2 = 0x0,
+        .prp1 = data_region_paddr,
+    });
 
-        assert((entry.phase_tag_and_status & _MASK(1, 15)) == 0x0); // §4.2.3 Status Field
+    assert((entry.phase_tag_and_status & _MASK(1, 15)) == 0x0); // §4.2.3 Status Field
 
-        // for (int i = 0; i < 32; i++) {
-            // sddf_dprintf("Data [%02x]: %02x\n", i, data_region[i]);
-        // }
+    // for (int i = 0; i < 32; i++) {
+        // sddf_dprintf("Data [%02x]: %02x\n", i, data_region[i]);
+    // }
 
-        for (int i = 0; i < 4096; i++) {
-            data_region[i] = data_region[i] ^ 0xbb;
-        }
-
-        entry = nvme_queue_submit_and_consume_poll(&io_queue, &(nvme_submission_queue_entry_t){
-            .cdw0 = /* CID */ (0b1101 << 16) | /* PSDT */ 0 | /* FUSE */ 0 | /* OPC */ 0x1,
-            .nsid = 0x1, // TOOD: Why is NSID 1 now ????
-            .cdw10 = /* SLBA[31:00] */ 0x0,
-            .cdw11 = /* SLBA[63:32] */ 0x0,
-            .cdw12 = /* LR */ (0b1U << 31) | /* others */ 0 | /* NLB */ (number_blocks - 1),
-            .prp2 = 0x0,
-            .prp1 = data_region_paddr,
-        });
-
-        assert((entry.phase_tag_and_status & _MASK(1, 15)) == 0x0); // §4.2.3 Status Field
-
+    for (int i = 0; i < 4096; i++) {
+        data_region[i] = data_region[i] ^ 0xbb;
     }
+
+    entry = nvme_queue_submit_and_consume_poll(&io_queue, &(nvme_submission_queue_entry_t){
+        .cdw0 = /* CID */ (0b1101 << 16) | /* PSDT */ 0 | /* FUSE */ 0 | /* OPC */ 0x1,
+        .nsid = 0x1, // TOOD: Why is NSID 1 now ????
+        .cdw10 = /* SLBA[31:00] */ 0x0,
+        .cdw11 = /* SLBA[63:32] */ 0x0,
+        .cdw12 = /* LR */ (0b1U << 31) | /* others */ 0 | /* NLB */ (number_blocks - 1),
+        .prp2 = 0x0,
+        .prp1 = data_region_paddr,
+    });
+
+    assert((entry.phase_tag_and_status & _MASK(1, 15)) == 0x0); // §4.2.3 Status Field
 }
