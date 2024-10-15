@@ -88,6 +88,10 @@ void nvme_controller_init()
     while (!(nvme_controller->csts & NVME_CSTS_RDY));
     LOG_NVME("\tdone\n");
 
+    /* https://github.com/redox-os/drivers/blob/master/storage/nvmed/src/nvme/mod.rs#L292*/
+    nvme_controller->intms = 0xFFFFFFFF;
+    nvme_controller->intmc = 0x00000001;
+
     // 7. Send the Identify Controller command (Identify with CNS = 01h); §5.1.13
     // TODO: What do we actually need this for????
     // sudo nvme admin-passthru /dev/nvme0 --opcode=0x06 --cdw10=0x0001 --data-len=4096 -r  -s
@@ -100,6 +104,10 @@ void nvme_controller_init()
     });
 
     assert((entry.phase_tag_and_status & _MASK(1, 15)) == 0x0); // §4.2.3 Status Field
+
+    nvme_controller->intms = 0x00000001;
+    /* At this point: we start getting interrupts */
+    return;
 
     // 8. The host determines any I/O Command Set specific configuration information
     // TODO: Why???
@@ -166,6 +174,7 @@ void nvme_init()
     // https://github.com/bootreer/vroom/blob/d8bbe9db2b1cfdfc38eec31f3b48f5eb167879a9/src/nvme.rs#L220
 
     nvme_controller_init();
+    return;
 
     for (int z = 0; z < 9; z++) {
         /* [NVMe-CommandSet-1.1] 3.3.4 Read command */
@@ -183,9 +192,9 @@ void nvme_init()
 
         assert((entry.phase_tag_and_status & _MASK(1, 15)) == 0x0); // §4.2.3 Status Field
 
-        for (int i = 0; i < 32; i++) {
-            sddf_dprintf("Data [%02x]: %02x\n", i, data_region[i]);
-        }
+        // for (int i = 0; i < 32; i++) {
+        //     sddf_dprintf("Data [%02x]: %02x\n", i, data_region[i]);
+        // }
 
         for (int i = 0; i < 4096; i++) {
             data_region[i] = data_region[i] ^ 0xbb;
