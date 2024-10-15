@@ -36,6 +36,12 @@ uintptr_t get_bdf_offset(uint8_t bus, uint8_t device, uint8_t function)
     return offset;
 }
 
+static bool found_nvme = false;
+static uint8_t nvme_bus;
+static uint8_t nvme_device;
+static uint8_t nvme_function;
+uintptr_t nvme_controller_paddr;
+
 void device_print(uint8_t bus, uint8_t device, uint8_t function)
 {
     uintptr_t offset = get_bdf_offset(bus, device, function);
@@ -69,6 +75,21 @@ void device_print(uint8_t bus, uint8_t device, uint8_t function)
     sddf_dprintf("status register: 0x%04x\n", header->status);
     sddf_dprintf("revision ID: 0x%02x\n", header->revision_id);
     sddf_dprintf("base-class code: 0x%02x | sub-class code: 0x%02x\n", header->base_class_code, header->subclass_code);
+    if (header->base_class_code == 0x1 && header->subclass_code == 0x8) {
+        sddf_dprintf("FOUND NVME!!!\n");
+        found_nvme = true;
+        nvme_bus = bus;
+        nvme_device = device;
+        nvme_function = function;
+
+        // TODO: hacky
+        volatile pcie_header_type0_t *type0_header = (pcie_header_type0_t *)config_base;
+        header->command &= ~BIT(1);
+        type0_header->base_address_registers[0] = nvme_controller_paddr;
+        type0_header->base_address_registers[1] = 0x0;
+        header->command |= BIT(1);
+
+    }
     sddf_dprintf("header type: 0x%02x\n", header->header_type);
 
     sddf_dprintf("\thas multi-functions: %s\n",
@@ -177,7 +198,9 @@ void device_ack_irq(uint8_t bus, uint8_t device, uint8_t function, bool to_mask)
     // interrupt pin: 0 = no, 1 => INTA#, 2 => INTB#, 3 => INTC#, 4 => INTD#
     sddf_printf("\t(PIN-based) interrupt line: %02x, interrupt pin: %02x\n", type0_header->interrupt_line, type0_header->interrupt_pin);
 
-    assert(header->status & BIT(4)); /* assert capabilities list status exists */
+    if (!(header->status & BIT(4))) {
+        sddf_dprintf("no capabilities??\n");
+    }; /* assert capabilities list status exists */
     sddf_dprintf("start capabilities PTR: %u\n", type0_header->capabilities_pointer);
 
     /* ach capability
@@ -221,7 +244,7 @@ void init()
 {
     sddf_dprintf("pcie driver starting!\n");
 
-#if 0
+#if 1
     for (uint8_t bus = 0; bus <= 255; bus++) {
         for (uint8_t device = 0; device < 32; device++) {
             for (uint8_t function = 0; function < 8; function++) {
@@ -230,6 +253,8 @@ void init()
                     goto out;
                 }
 
+                /* TODO: This also configures BARs for the NVMe devices... */
+                /* That is not printing. */
                 device_print(bus, device, function);
             }
         }
@@ -239,8 +264,8 @@ out:
     sddf_dprintf("\n\nPCIE_ENUM_COMPLETE\n");
 #endif
 
-    device_ack_irq(0, 0, 0, false);
-    device_ack_irq(1, 0, 0, false);
+    assert(found_nvme);
+    device_ack_irq(nvme_bus, nvme_device, nvme_function, false);
     nvme_init();
 }
 
@@ -258,8 +283,7 @@ void notified(microkit_channel ch)
         microkit_irq_ack(ch);
         i++;
     } else {
-        device_ack_irq(0, 0, 0, true);
-        device_ack_irq(1, 0, 0, true);
+        device_ack_irq(nvme_bus, nvme_device, nvme_function, true);
         sddf_dprintf("stopped ACKing seL4\n");
     }
 }
