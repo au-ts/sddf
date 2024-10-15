@@ -85,6 +85,7 @@ void device_print(uint8_t bus, uint8_t device, uint8_t function)
         nvme_function = function;
 
         // TODO: hacky
+        assert(nvme_controller_paddr != 0);
         volatile pcie_header_type0_t *type0_header = (pcie_header_type0_t *)config_base;
         header->command &= ~BIT(1);
         type0_header->base_address_registers[0] = nvme_controller_paddr;
