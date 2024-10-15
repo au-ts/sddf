@@ -77,7 +77,7 @@ void device_print(uint8_t bus, uint8_t device, uint8_t function)
     sddf_dprintf("status register: 0x%04x\n", header->status);
     sddf_dprintf("revision ID: 0x%02x\n", header->revision_id);
     sddf_dprintf("base-class code: 0x%02x | sub-class code: 0x%02x\n", header->base_class_code, header->subclass_code);
-    if (header->base_class_code == 0x1 && header->subclass_code == 0x8) {
+    if (header->base_class_code == 0x1 && header->subclass_code == 0x8 && !found_nvme) {
         sddf_dprintf("FOUND NVME!!!\n");
         found_nvme = true;
         nvme_bus = bus;
@@ -272,21 +272,25 @@ out:
     nvme_init();
 }
 
+void nvme_continue(int z);
 void notified(microkit_channel ch)
 {
     static int i = 0;
     sddf_dprintf("notified on ch: %u\n", ch);
 
-    // if (i == 0) {
-    //     device_print(1, 0, 0);
-    //     i++;
-    // }
-
     if (i < 10) {
+        sddf_dprintf("acking (%u)\n", i);
+        // // device_print(nvme_bus, nvme_device, nvme_function);
+        // device_ack_irq(nvme_bus, nvme_device, nvme_function, false);
         microkit_irq_ack(ch);
-        i++;
+
+        nvme_continue(i);
+    } else if (i < 20) {
+        sddf_dprintf("\nhopefully stopping\n");
+        microkit_irq_ack(ch);
     } else {
-        device_ack_irq(nvme_bus, nvme_device, nvme_function, true);
-        sddf_dprintf("stopped ACKing seL4\n");
+        sddf_dprintf("stopping\n");
     }
+
+    i++;
 }
