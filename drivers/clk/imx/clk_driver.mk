@@ -5,7 +5,7 @@
 
 CLK_DRIVER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 CLK_DRIVER_COMMON_DIR := $(SDDF)/drivers/clk
-CLK_DRIVER_OBJS := clk.o clk-imx8mq.o clk-operations.o
+CLK_DRIVER_OBJS := clk.o clk-imx8mq.o clk-operations.o clk-meson.o
 
 clk_driver.elf: $(CLK_DRIVER_OBJS) libsddf_util_debug.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@

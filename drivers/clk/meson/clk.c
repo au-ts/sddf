@@ -209,7 +209,7 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
 
         case SDDF_CLK_ENABLE: {
             if (argc != 1) {
-                LOG_DRIVER_ERR("Incorrect number of arguments %lu != 1\n", argc);
+                LOG_DRIVER_ERR("Incorrect number of arguments %u != 1\n", argc);
                 ret = CLK_INCORRECT_ARGS;
                 break;
             }
@@ -220,7 +220,7 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
         }
         case SDDF_CLK_DISABLE: {
             if (argc != 1) {
-                LOG_DRIVER_ERR("Incorrect number of arguments %lu != 1\n", argc);
+                LOG_DRIVER_ERR("Incorrect number of arguments %u != 1\n", argc);
                 ret = CLK_INCORRECT_ARGS;
                 break;
             }
@@ -231,7 +231,7 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
         }
         case SDDF_CLK_GET_RATE: {
             if (argc != 1) {
-                LOG_DRIVER_ERR("Incorrect number of arguments %lu != 1\n", argc);
+                LOG_DRIVER_ERR("Incorrect number of arguments %u != 1\n", argc);
                 ret = CLK_INCORRECT_ARGS;
                 break;
             }
@@ -241,7 +241,7 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
         }
         case SDDF_CLK_SET_RATE: {
             if (argc != 2) {
-                LOG_DRIVER_ERR("Incorrect number of arguments %lu != 1\n", argc);
+                LOG_DRIVER_ERR("Incorrect number of arguments %u != 1\n", argc);
                 ret = CLK_INCORRECT_ARGS;
                 break;
             }
@@ -250,7 +250,7 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
             ret = clk_set_rate(clk_list[clk_id], rate);
             break;
         }
-        defualt:
+        default:
             LOG_DRIVER_ERR("Unknown request %lu to clockk driver from channel %u\n", microkit_msginfo_get_label(msginfo), ch);
             ret = 5;
     }
