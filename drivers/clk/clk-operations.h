@@ -10,6 +10,12 @@
 #define CLK_INCORRECT_ARGS 1
 #define CLK_INVALID_OP 2
 
+int reg_write(uint64_t base, uint32_t offset, uint32_t val);
+int regmap_update_bits(uint64_t base, uint32_t offset, uint8_t shift, uint8_t width, uint32_t val);
+int regmap_read_bits(uint64_t base, uint32_t offset, uint8_t shift, uint8_t width);
+int regmap_mux_update_bits(uint64_t base, uint32_t offset, uint8_t shift, uint32_t mask, uint32_t val);
+int regmap_mux_read_bits(uint64_t base, uint32_t offset, uint8_t shift, uint32_t mask);
+
 extern const struct clk_ops clk_source_ops;
 extern const struct clk_ops clk_fixed_factor_ops;
 extern const struct clk_ops clk_divider_ops;

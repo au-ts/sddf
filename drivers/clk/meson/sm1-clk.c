@@ -67,7 +67,7 @@ static struct clk g12a_fixed_pll_dco = {
         .name = "fixed_pll_dco",
         .ops = &meson_clk_pll_ro_ops,
         .parent_data = &(const struct clk_parent_data) {
-            .fw_name = "xtal",
+            .name = "xtal",
         },
         .num_parents = 1,
     },
@@ -107,7 +107,7 @@ static struct clk g12a_sys_pll_dco = {
         .name = "sys_pll_dco",
         .ops = &meson_clk_pll_ops,
         .parent_data = &(const struct clk_parent_data) {
-            .fw_name = "xtal",
+            .name = "xtal",
         },
         .num_parents = 1,
         /* This clock feeds the CPU, avoid disabling it */
@@ -122,13 +122,13 @@ static CLK_GATE(g12a_fclk_div2, HHI_FIX_PLL_CNTL1, 24, 0, { &g12a_fclk_div2_div 
 static CLK_FIXED_FACTOR(g12a_fclk_div3_div, 1, 3, 0, { &g12a_fixed_pll }, 1, 0);
 static CLK_GATE(g12a_fclk_div3, HHI_FIX_PLL_CNTL1, 20, 0, { &g12a_fclk_div3_div }, 1, 0);
 const struct clk_parent_data g12a_cpu_clk_premux0_parent_table[] = {
-            { .fw_name = "xtal", },
+            { .name = "xtal", },
             { .clk = &g12a_fclk_div2 },
             { .clk = &g12a_fclk_div3 },
 };
 static CLK_MUX(g12a_cpu_clk_premux0, HHI_SYS_CPU_CLK_CNTL0, 0x3, 0, 0, CLK_MUX_ROUND_CLOSEST, g12a_cpu_clk_premux0_parent_table, 3, 0);
 const struct clk_parent_data g12a_cpu_clk_premux1_parent_table[] = {
-            { .fw_name = "xtal", },
+            { .name = "xtal", },
             { .clk = &g12a_fclk_div2 },
             { .clk = &g12a_fclk_div3 },
 };
@@ -228,7 +228,7 @@ static struct clk g12a_gp0_pll_dco = {
         .name = "gp0_pll_dco",
         .ops = &meson_clk_pll_ops,
         .parent_data = &(const struct clk_parent_data) {
-            .fw_name = "xtal",
+            .name = "xtal",
         },
         .num_parents = 1,
     },
@@ -272,7 +272,7 @@ static struct clk sm1_gp1_pll_dco = {
         .name = "gp1_pll_dco",
         .ops = &meson_clk_pll_ro_ops,
         .parent_data = &(const struct clk_parent_data) {
-            .fw_name = "xtal",
+            .name = "xtal",
         },
         .num_parents = 1,
         /* This clock feeds the DSU, avoid disabling it */
@@ -283,14 +283,14 @@ static CLK_DIV_RO(sm1_gp1_pll, HHI_GP1_PLL_CNTL0, 16, 3, (CLK_DIVIDER_POWER_OF_T
               CLK_DIVIDER_ROUND_CLOSEST), { &sm1_gp1_pll_dco }, 1, 0);
 
 const struct clk_parent_data sm1_dsu_clk_premux0_parent_table[] = {
-    { .fw_name = "xtal", },
+    { .name = "xtal", },
     { .clk = &g12a_fclk_div2 },
     { .clk = &g12a_fclk_div3 },
     { .clk = &sm1_gp1_pll },
 };
 static CLK_MUX_RO(sm1_dsu_clk_premux0, HHI_SYS_CPU_CLK_CNTL5, 0x3, 0, 0, 0, sm1_dsu_clk_premux0_parent_table, 4, 0);
 const struct clk_parent_data sm1_dsu_clk_premux1_parent_table[] = {
-    { .fw_name = "xtal", },
+    { .name = "xtal", },
     { .clk = &g12a_fclk_div2 },
     { .clk = &g12a_fclk_div3 },
     { .clk = &sm1_gp1_pll },
@@ -393,7 +393,7 @@ static struct clk g12a_hifi_pll_dco = {
         .name = "hifi_pll_dco",
         .ops = &meson_clk_pll_ops,
         .parent_data = &(const struct clk_parent_data) {
-            .fw_name = "xtal",
+            .name = "xtal",
         },
         .num_parents = 1,
     },
@@ -465,7 +465,7 @@ static struct clk g12a_pcie_pll_dco = {
         .name = "pcie_pll_dco",
         .ops = &meson_clk_pcie_pll_ops,
         .parent_data = &(const struct clk_parent_data) {
-            .fw_name = "xtal",
+            .name = "xtal",
         },
         .num_parents = 1,
     },
@@ -512,7 +512,7 @@ static struct clk g12a_hdmi_pll_dco = {
         .name = "hdmi_pll_dco",
         .ops = &meson_clk_pll_ro_ops,
         .parent_data = &(const struct clk_parent_data) {
-            .fw_name = "xtal",
+            .name = "xtal",
         },
         .num_parents = 1,
         /*
@@ -535,7 +535,7 @@ static CLK_FIXED_FACTOR(g12a_fclk_div2p5_div, 1, 5, 0, { &g12a_fixed_pll_dco }, 
 static CLK_GATE(g12a_fclk_div2p5, HHI_FIX_PLL_CNTL1, 25, 0, { &g12a_fclk_div2p5_div }, 1, 0);
 static CLK_FIXED_FACTOR(g12a_mpll_50m_div, 1, 80, 0, { &g12a_fixed_pll_dco }, 1, 0);
 const static struct clk_parent_data g12a_mpll_50m_parent_table[] = {
-    { .fw_name = "xtal", },
+    { .name = "xtal", },
     { .clk = &g12a_mpll_50m_div },
 };
 static CLK_MUX_RO(g12a_mpll_50m, HHI_FIX_PLL_CNTL3, 0x1, 5, 0, 0, g12a_mpll_50m_parent_table, 2, 0);
@@ -700,7 +700,7 @@ static CLK_GATE(g12a_mpll3, HHI_MPLL_CNTL7, 31, 0, { &g12a_mpll3_div }, 1, 0);
 
 static uint32_t mux_table_clk81[] = { 0, 2, 3, 4, 5, 6, 7 };
 static const struct clk_parent_data clk81_parent_data[] = {
-    { .fw_name = "xtal", },
+    { .name = "xtal", },
     { .clk = &g12a_fclk_div7 },
     { .clk = &g12a_mpll1 },
     { .clk = &g12a_mpll2 },
@@ -712,7 +712,7 @@ static CLK_MUX_RO(g12a_mpeg_clk_sel, HHI_MPEG_CLK_CNTL, 0x7, 12, mux_table_clk81
 static CLK_DIV(g12a_mpeg_clk_div, HHI_MPEG_CLK_CNTL, 0, 7, 0, { &g12a_mpeg_clk_sel }, 1, 0);
 static CLK_GATE(g12a_clk81, HHI_MPEG_CLK_CNTL, 7, 0, { &g12a_mpeg_clk_div }, 1, 0);
 static const struct clk_parent_data g12a_sd_emmc_clk0_parent_data[] = {
-    { .fw_name = "xtal", },
+    { .name = "xtal", },
     { .clk = &g12a_fclk_div2 },
     { .clk = &g12a_fclk_div3 },
     { .clk = &g12a_fclk_div5 },
@@ -951,7 +951,7 @@ static CLK_MUX(g12a_mipi_dsi_pxclk_sel, HHI_MIPIDSI_PHY_CLK_CNTL, 0x7, 12, 0, CL
 static CLK_DIV(g12a_mipi_dsi_pxclk_div, HHI_MIPIDSI_PHY_CLK_CNTL, 0, 7, 0, { &g12a_mipi_dsi_pxclk_sel }, 1, 0);
 static CLK_GATE(g12a_mipi_dsi_pxclk, HHI_MIPIDSI_PHY_CLK_CNTL, 8, 0, { &g12a_mipi_dsi_pxclk_div }, 1, 0);
 static const struct clk_parent_data g12a_hdmi_parent_table[] = {
-    { .fw_name = "xtal", },
+    { .name = "xtal", },
     { .clk = &g12a_fclk_div4 },
     { .clk = &g12a_fclk_div3 },
     { .clk = &g12a_fclk_div5 },
@@ -960,7 +960,7 @@ static CLK_MUX(g12a_hdmi_sel, HHI_HDMI_CLK_CNTL, 0x3, 9, 0, CLK_MUX_ROUND_CLOSES
 static CLK_DIV(g12a_hdmi_div, HHI_HDMI_CLK_CNTL, 0, 7, 0, { &g12a_hdmi_sel }, 1, 0);
 static CLK_GATE(g12a_hdmi, HHI_HDMI_CLK_CNTL, 8, 0, { &g12a_hdmi_div }, 1, 0);
 static const struct clk_parent_data g12a_mali_0_1_parent_data[] = {
-    { .fw_name = "xtal", },
+    { .name = "xtal", },
     { .clk = &g12a_gp0_pll },
     { .clk = &g12a_hifi_pll },
     { .clk = &g12a_fclk_div2p5 },
@@ -983,7 +983,7 @@ static CLK_MUX(g12a_mali, HHI_MALI_CLK_CNTL, 1, 31, 0, 0, g12a_mali_parent_table
 static CLK_DIV_RO(g12a_ts_div, HHI_TS_CLK_CNTL, 0, 8, 0, { &g12a_ts_div }, 1, 0);
 static CLK_GATE(g12a_ts, HHI_TS_CLK_CNTL, 8, 0, { &g12a_ts_div }, 1, 0);
 static const struct clk_parent_data spicc_sclk_parent_data[] = {
-	{ .fw_name = "xtal", },
+	{ .name = "xtal", },
 	{ .clk = &g12a_clk81 },
 	{ .clk = &g12a_fclk_div4 },
 	{ .clk = &g12a_fclk_div3 },
@@ -998,7 +998,7 @@ static CLK_MUX(g12a_spicc1_sclk_sel, HHI_SPICC_CLK_CNTL, 7, 23, 0, 0, spicc_sclk
 static CLK_DIV(g12a_spicc1_sclk_div, HHI_SPICC_CLK_CNTL, 16, 6, 0, { &g12a_spicc1_sclk_sel }, 1, 0);
 static CLK_GATE(g12a_spicc1_sclk, HHI_SPICC_CLK_CNTL, 22, 0, { &g12a_spicc1_sclk_div }, 1, 0);
 static const struct clk_parent_data nna_clk_parent_data[] = {
-	{ .fw_name = "xtal", },
+	{ .name = "xtal", },
 	{ .clk = &g12a_gp0_pll, },
 	{ .clk = &g12a_hifi_pll, },
 	{ .clk = &g12a_fclk_div2p5, },

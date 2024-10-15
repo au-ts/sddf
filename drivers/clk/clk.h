@@ -184,7 +184,7 @@ struct clk {
  */
 struct clk_parent_data {
     const struct clk *clk;
-    const char *fw_name;
+    const char *name;
 };
 
 /**

@@ -71,7 +71,7 @@ const struct clk *get_parent(const struct clk *clk)
 
         if (parent_data.clk) {
             return parent_data.clk;
-        } else if (sddf_strcmp(parent_data.fw_name, "xtal") == 0) {
+        } else if (sddf_strcmp(parent_data.name, "xtal") == 0) {
             return &g12a_xtal;
         }
     }

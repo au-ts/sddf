@@ -76,7 +76,7 @@
 #include <sddf/timer/client.h>
 #include <sddf/util/printf.h>
 
-static inline int reg_write(uint64_t base, uint32_t offset, uint32_t val)
+int reg_write(uint64_t base, uint32_t offset, uint32_t val)
 {
     volatile uint32_t *clk_reg = ((void *)base + offset);
     *clk_reg = val;
@@ -84,7 +84,7 @@ static inline int reg_write(uint64_t base, uint32_t offset, uint32_t val)
     return 0;
 }
 
-static inline int regmap_update_bits(uint64_t base, uint32_t offset, uint8_t shift, uint8_t width, uint32_t val)
+int regmap_update_bits(uint64_t base, uint32_t offset, uint8_t shift, uint8_t width, uint32_t val)
 {
     volatile uint32_t *clk_reg = ((void *)base + offset);
     uint32_t reg_val = *clk_reg;
@@ -99,7 +99,7 @@ static inline int regmap_update_bits(uint64_t base, uint32_t offset, uint8_t shi
     return 0;
 }
 
-static inline int regmap_read_bits(uint64_t base, uint32_t offset, uint8_t shift, uint8_t width)
+int regmap_read_bits(uint64_t base, uint32_t offset, uint8_t shift, uint8_t width)
 {
     volatile uint32_t *clk_reg = ((void *)base + offset);
     uint32_t reg_val = *clk_reg;
@@ -110,7 +110,7 @@ static inline int regmap_read_bits(uint64_t base, uint32_t offset, uint8_t shift
     return reg_val;
 }
 
-static inline int regmap_mux_update_bits(uint64_t base, uint32_t offset, uint8_t shift, uint32_t mask, uint32_t val)
+int regmap_mux_update_bits(uint64_t base, uint32_t offset, uint8_t shift, uint32_t mask, uint32_t val)
 {
     volatile uint32_t *clk_reg = ((void *)base + offset);
     uint32_t reg_val = *clk_reg;
@@ -125,7 +125,7 @@ static inline int regmap_mux_update_bits(uint64_t base, uint32_t offset, uint8_t
     return 0;
 }
 
-static inline int regmap_mux_read_bits(uint64_t base, uint32_t offset, uint8_t shift, uint32_t mask)
+int regmap_mux_read_bits(uint64_t base, uint32_t offset, uint8_t shift, uint32_t mask)
 {
     volatile uint32_t *clk_reg = ((void *)base + offset);
     uint32_t reg_val = *clk_reg;
