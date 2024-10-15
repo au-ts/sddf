@@ -6,6 +6,7 @@ const std = @import("std");
 
 const MicrokitBoard = enum {
     star64,
+    qemu_virt_riscv64,
 };
 
 const Target = struct {
@@ -16,6 +17,15 @@ const Target = struct {
 const targets = [_]Target{
     .{
         .board = MicrokitBoard.star64,
+        .zig_target = std.Target.Query{
+            .cpu_arch = .riscv64,
+            .cpu_model = .{ .explicit = &std.Target.riscv.cpu.baseline_rv64 },
+            .os_tag = .freestanding,
+            .abi = .none,
+        },
+    },
+    .{
+        .board = MicrokitBoard.qemu_virt_riscv64,
         .zig_target = std.Target.Query{
             .cpu_arch = .riscv64,
             .cpu_model = .{ .explicit = &std.Target.riscv.cpu.baseline_rv64 },
@@ -78,9 +88,10 @@ pub fn build(b: *std.Build) void {
 
     const driver_class = switch (microkit_board_option.?) {
         .star64 => "starfive",
+        .qemu_virt_riscv64 => "starfive", // hack
     };
 
-    const driver = sddf_dep.artifact(b.fmt("driver_pcie_{s}.elf", .{ driver_class }));
+    const driver = sddf_dep.artifact(b.fmt("driver_pcie_{s}.elf", .{driver_class}));
     // This is required because the SDF file is expecting a different name to the artifact we
     // are dealing with.
     const driver_install = b.addInstallArtifact(driver, .{ .dest_sub_path = "pcie_driver.elf" });
@@ -105,18 +116,38 @@ pub fn build(b: *std.Build) void {
 
     const system_description_path = b.fmt("board/{s}/pcie.system", .{microkit_board});
     const final_image_dest = b.getInstallPath(.bin, "./loader.img");
-    const microkit_tool_cmd = b.addSystemCommand(&[_][]const u8{
-        microkit_tool,
-        system_description_path,
-        "--search-path", b.getInstallPath(.bin, ""),
-        "--board", microkit_board,
-        "--config", microkit_config,
-        "-o", final_image_dest,
-        "-r", b.getInstallPath(.prefix, "./report.txt")
-    });
+    const microkit_tool_cmd = b.addSystemCommand(&[_][]const u8{ microkit_tool, system_description_path, "--search-path", b.getInstallPath(.bin, ""), "--board", microkit_board, "--config", microkit_config, "-o", final_image_dest, "-r", b.getInstallPath(.prefix, "./report.txt") });
     microkit_tool_cmd.step.dependOn(b.getInstallStep());
     microkit_tool_cmd.step.dependOn(&driver_install.step);
     const microkit_step = b.step("microkit", "Compile and build the final bootable image");
     microkit_step.dependOn(&microkit_tool_cmd.step);
     b.default_step = microkit_step;
+
+    if (std.mem.eql(u8, microkit_board, "qemu_virt_riscv64")) {
+        const create_disk_cmd = b.addSystemCommand(&[_][]const u8{
+            "bash", "../blk/mkvirtdisk",
+        });
+        const disk = create_disk_cmd.addOutputFileArg("disk");
+        create_disk_cmd.addArgs(&[_][]const u8{
+            "1", "512", b.fmt("{}", .{ 1024 * 1024 * 16 }),
+        });
+        const disk_install = b.addInstallFile(disk, "disk");
+        disk_install.step.dependOn(&create_disk_cmd.step);
+
+        const qemu_cmd = b.addSystemCommand(&[_][]const u8{
+            "qemu-system-riscv64",
+            "-machine", "virt",
+            "-serial", "mon:stdio",
+            "-kernel", final_image_dest,
+            "-m", "size=2G",
+            "-nographic",
+            "-drive", b.fmt("file={s},if=none,format=raw,id=hd", .{ b.getInstallPath(.prefix, "disk") }),
+            "-device", "nvme,serial=deadbeef,drive=hd",
+            // "--trace", "events=/tmp/events",
+        });
+        qemu_cmd.step.dependOn(b.default_step);
+        qemu_cmd.step.dependOn(&disk_install.step);
+        const simulate_step = b.step("qemu", "Simulate the image using QEMU");
+        simulate_step.dependOn(&qemu_cmd.step);
+    }
 }
