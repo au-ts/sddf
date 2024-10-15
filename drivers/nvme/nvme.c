@@ -47,7 +47,12 @@ void nvme_controller_init()
     nvme_controller->cc &= ~NVME_CC_EN;
 
     // 1. Wait for CSTS.RDY to become '0' (i.e. not ready)
-    while (nvme_controller->csts & NVME_CSTS_RDY);
+    int i = 100;
+    while (nvme_controller->csts & NVME_CSTS_RDY && i != 0) i--;
+    if (i == 0) {
+        sddf_dprintf("time out\n");
+        return;
+    }
 
     // 2. Configure Admin Queue(s);
     nvme_queues_init(&admin_queue, /* y */ 0, nvme_controller, nvme_asq_region, NVME_ASQ_CAPACITY, nvme_acq_region,

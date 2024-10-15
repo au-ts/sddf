@@ -141,9 +141,12 @@ pub fn build(b: *std.Build) void {
             "-kernel", final_image_dest,
             "-m", "size=2G",
             "-nographic",
+            "-d", "guest_errors",
             "-drive", b.fmt("file={s},if=none,format=raw,id=hd", .{ b.getInstallPath(.prefix, "disk") }),
             "-device", "nvme,serial=deadbeef,drive=hd",
-            // "--trace", "events=/tmp/events",
+            // "--trace", "pci*",
+            // "--trace", "pci_nvme*",
+            // "--trace", "nvme*",
         });
         qemu_cmd.step.dependOn(b.default_step);
         qemu_cmd.step.dependOn(&disk_install.step);
