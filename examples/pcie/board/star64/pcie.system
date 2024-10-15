@@ -25,6 +25,7 @@
         <irq irq="57" id="0" trigger="level" /> <!-- 0x38 -->
 
         <map mr="nvme_regs" vaddr="0x3000_0000" perms="rw" cached="false" setvar_vaddr="nvme_controller" />
+        <setvar symbol="nvme_controller_paddr" region_paddr="nvme_regs" />
         <!-- TODO: cached? -->
         <map mr="nvme_asq"  vaddr="0x3001_0000" perms="rw" cached="false" setvar_vaddr="nvme_asq_region" />
         <setvar symbol="nvme_asq_region_paddr" region_paddr="nvme_asq" />
