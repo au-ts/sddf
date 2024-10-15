@@ -13,13 +13,12 @@
 #include <sddf/clk/protocol.h>
 #include <clk_config.h>
 
-/* Test for Odroid-C4 */
-#include <clk.h>
-#include <clk-operations.h>
-#include <clk-measure.h>
-#include <g12a.h>
-#include <g12a-clkc.h>
-#include <sm1_clk_hws.h>
+#include <clk.h>            /* common definitions and interfaces */
+#include <clk-operations.h> /* ops of common clocks e.g., div, mux, fixed factor, and gate*/
+#include <clk-measure.h>    /* implementation of clock measurements */
+#include <clk-meson.h>      /* operations for meson-specific clocks */
+#include <g12a-regs.h>      /* offsets of control registers */
+#include <g12a-bindings.h>  /* clock id bindings*/
 
 // Logging
 #define DEBUG_DRIVER
@@ -32,8 +31,13 @@
 
 #define LOG_DRIVER_ERR(...) do{ sddf_printf("CLK DRIVER|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
+#define I2C_CLK_OFFSET 320
+#define I2C_CLK_BIT (1 << 9) // bit 9
+
 uintptr_t clk_regs;
 uintptr_t msr_clk_base;
+
+struct clk **clk_list;
 
 /* TODO: Should be configured with init_regs */
 /* static struct clk_cfg fixed_clk_configs[] = { */
@@ -44,13 +48,14 @@ uintptr_t msr_clk_base;
 /*     { .clk_id = CLKID_FCLK_DIV7_DIV, .frequency = 285700000 }, */
 /* } */
 
-void clk_init(struct clk *sm1_clks[])
+void clk_probe(struct clk *clk_list[])
 {
     int i;
     for (i = 0; i < CLKID_PCIE_PLL; i++) {
-        if (sm1_clks[i] && sm1_clks[i]->hw.init->ops->init) {
-            sm1_clks[i]->hw.init->ops->init(sm1_clks[i]);
-            LOG_DRIVER("Initialise %s\n", sm1_clks[i]->hw.init->name);
+        clk_list[i]->base = (uint64_t)clk_regs;
+        if (clk_list[i] && clk_list[i]->hw.init->ops->init) {
+            clk_list[i]->hw.init->ops->init(clk_list[i]);
+            LOG_DRIVER("Initialise %s\n", clk_list[i]->hw.init->name);
         }
     }
 }
@@ -164,15 +169,16 @@ void notified(microkit_channel ch)
 void init(void)
 {
     LOG_DRIVER("Clock driver initialising...\n");
-    sm1_clks = get_clk_list();
-    init_clk_base(clk_regs);
-    clk_init(sm1_clks);
+
+    clk_list = get_clk_list();
+
+    clk_probe(clk_list);
 
     volatile uint32_t *clk_i2c_ptr = ((void *)clk_regs + I2C_CLK_OFFSET);
 
 
     for (int i = 0; i < NUM_DEVICE_CLKS; i++) {
-        struct clk *clk = sm1_clks[clk_configs[i].clk_id];
+        struct clk *clk = clk_list[clk_configs[i].clk_id];
 
         /* Enable the clock */
         clk_enable(clk);
@@ -209,7 +215,7 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
             }
             uint32_t clk_id = (uint32_t)microkit_mr_get(SDDF_CLK_PARAM_ID);
             LOG_DRIVER("get request clk_enable(%d)\n", clk_id);
-            ret = clk_enable(sm1_clks[clk_id]);
+            ret = clk_enable(clk_list[clk_id]);
             break;
         }
         case SDDF_CLK_DISABLE: {
@@ -220,7 +226,7 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
             }
             uint32_t clk_id = (uint32_t)microkit_mr_get(SDDF_CLK_PARAM_ID);
             LOG_DRIVER("get request clk_disable(%d)\n", clk_id);
-            ret = clk_disable(sm1_clks[clk_id]);
+            ret = clk_disable(clk_list[clk_id]);
             break;
         }
         case SDDF_CLK_GET_RATE: {
@@ -230,7 +236,7 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
                 break;
             }
             uint32_t clk_id = (uint32_t)microkit_mr_get(SDDF_CLK_PARAM_ID);
-            ret = clk_get_rate(sm1_clks[clk_id]);
+            ret = clk_get_rate(clk_list[clk_id]);
             break;
         }
         case SDDF_CLK_SET_RATE: {
@@ -241,7 +247,7 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
             }
             uint32_t clk_id = (uint32_t)microkit_mr_get(SDDF_CLK_PARAM_ID);
             uint32_t rate = (uint32_t)microkit_mr_get(SDDF_CLK_PARAM_RATE);
-            ret = clk_set_rate(sm1_clks[clk_id], rate);
+            ret = clk_set_rate(clk_list[clk_id], rate);
             break;
         }
         defualt:

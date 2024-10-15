@@ -2,6 +2,11 @@
 
 #include <stdint.h>
 
+#define CLK_MESON_MPLL_ROUND_CLOSEST       BIT(0)
+#define CLK_MESON_MPLL_SPREAD_SPECTRUM     BIT(1)
+
+#define CLK_MESON_PLL_ROUND_CLOSEST    BIT(0)
+#define CLK_MESON_PLL_NOINIT_ENABLED    BIT(1)
 
 /* SPDX-License-Identifier: GPL-2.0 */
 /*
@@ -121,14 +126,6 @@ struct meson_vclk_div_data {
     uint8_t flags;
 };
 
-extern const struct clk_ops clk_regmap_gate_ops;
-extern const struct clk_ops clk_regmap_gate_ro_ops;
-extern const struct clk_ops clk_regmap_divider_ops;
-extern const struct clk_ops clk_regmap_divider_ro_ops;
-extern const struct clk_ops clk_regmap_mux_ops;
-extern const struct clk_ops clk_regmap_mux_ro_ops;
-extern const struct clk_ops clk_fixed_factor_ops;
-extern const struct clk_ops meson_clk_source_ops;
 extern const struct clk_ops meson_clk_pll_ops;
 extern const struct clk_ops meson_clk_pll_ro_ops;
 extern const struct clk_ops meson_clk_mpll_ops;
@@ -147,7 +144,7 @@ struct clk _name = {                                         \
     },                                                       \
     .hw.init = &(struct clk_init_data) {                     \
         .name = #_name,                                      \
-        .ops = &clk_regmap_gate_ops,                         \
+        .ops = &clk_gate_ops,                         \
         .parent_clks = (const struct clk *[]) {              \
             &g12a_clk81,                                     \
         },                                                   \
@@ -165,7 +162,7 @@ struct clk _name = {                                         \
     },                                                       \
     .hw.init = &(struct clk_init_data) {                     \
         .name = #_name,                                      \
-        .ops = &clk_regmap_gate_ro_ops,                      \
+        .ops = &clk_gate_ro_ops,                      \
         .parent_clks = (const struct clk *[]) {              \
             &g12a_clk81,                                     \
         },                                                   \
@@ -173,3 +170,6 @@ struct clk _name = {                                         \
         .flags = 0,                                          \
     },                                                       \
 }
+
+extern const struct clk g12a_xtal;
+struct clk **get_clk_list(void);

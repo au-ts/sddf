@@ -174,6 +174,7 @@ struct clk_ops {
 struct clk {
     struct clk_hw hw;
     void *data;
+    uint64_t base;
 };
 
 /**

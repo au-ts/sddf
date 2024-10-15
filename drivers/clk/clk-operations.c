@@ -71,29 +71,22 @@
  */
 
 #include <clk.h>
-#include <clk-provider.h>
+#include <utils.h>
 #include <clk-operations.h>
 #include <sddf/timer/client.h>
 #include <sddf/util/printf.h>
 
-uintptr_t clk_base;
-
-void init_clk_base(uintptr_t base_addr)
+static inline int reg_write(uint64_t base, uint32_t offset, uint32_t val)
 {
-    clk_base = base_addr;
-}
-
-static inline int reg_write(uint32_t offset, uint32_t val)
-{
-    volatile uint32_t *clk_reg = ((void *)clk_base + offset);
+    volatile uint32_t *clk_reg = ((void *)base + offset);
     *clk_reg = val;
 
     return 0;
 }
 
-static inline int regmap_update_bits(uint32_t offset, uint8_t shift, uint8_t width, uint32_t val)
+static inline int regmap_update_bits(uint64_t base, uint32_t offset, uint8_t shift, uint8_t width, uint32_t val)
 {
-    volatile uint32_t *clk_reg = ((void *)clk_base + offset);
+    volatile uint32_t *clk_reg = ((void *)base + offset);
     uint32_t reg_val = *clk_reg;
 
     reg_val &= ~(MASK(width) << shift);
@@ -106,9 +99,9 @@ static inline int regmap_update_bits(uint32_t offset, uint8_t shift, uint8_t wid
     return 0;
 }
 
-static inline int regmap_read_bits(uint32_t offset, uint8_t shift, uint8_t width)
+static inline int regmap_read_bits(uint64_t base, uint32_t offset, uint8_t shift, uint8_t width)
 {
-    volatile uint32_t *clk_reg = ((void *)clk_base + offset);
+    volatile uint32_t *clk_reg = ((void *)base + offset);
     uint32_t reg_val = *clk_reg;
 
     reg_val >>= shift;
@@ -117,9 +110,9 @@ static inline int regmap_read_bits(uint32_t offset, uint8_t shift, uint8_t width
     return reg_val;
 }
 
-static inline int regmap_mux_update_bits(uint32_t offset, uint8_t shift, uint32_t mask, uint32_t val)
+static inline int regmap_mux_update_bits(uint64_t base, uint32_t offset, uint8_t shift, uint32_t mask, uint32_t val)
 {
-    volatile uint32_t *clk_reg = ((void *)clk_base + offset);
+    volatile uint32_t *clk_reg = ((void *)base + offset);
     uint32_t reg_val = *clk_reg;
 
     reg_val &= ~(mask << shift);
@@ -132,9 +125,9 @@ static inline int regmap_mux_update_bits(uint32_t offset, uint8_t shift, uint32_
     return 0;
 }
 
-static inline int regmap_mux_read_bits(uint32_t offset, uint8_t shift, uint32_t mask)
+static inline int regmap_mux_read_bits(uint64_t base, uint32_t offset, uint8_t shift, uint32_t mask)
 {
-    volatile uint32_t *clk_reg = ((void *)clk_base + offset);
+    volatile uint32_t *clk_reg = ((void *)base + offset);
     uint32_t reg_val = *clk_reg;
 
     reg_val >>= shift;
@@ -143,34 +136,22 @@ static inline int regmap_mux_read_bits(uint32_t offset, uint8_t shift, uint32_t 
     return reg_val;
 }
 
-int regmap_multi_reg_write(const struct reg_sequence *regs, int num_regs)
+static int clk_gate_enable(struct clk *clk)
 {
-    int i;
-    for (i = 0; i < num_regs; i++) {
-        reg_write(regs[i].reg, regs[i].def);
-        /* TODO: delay is needed */
-        /* if (regs[i].delay_us) { */
-        /*     delay_us(regs[i].delay_us); */
-        /* } */
-    }
+    struct clk_gate_data *data = (struct clk_gate_data *)(clk->data);
+
+    return regmap_update_bits(clk->base, data->offset, data->bit_idx, 1, 1);
+}
+
+static int clk_gate_disable(struct clk *clk)
+{
+    struct clk_gate_data *data = (struct clk_gate_data *)(clk->data);
+
+    regmap_update_bits(clk->base, data->offset, data->bit_idx, 1, 0);
     return 0;
 }
 
-static int clk_regmap_gate_enable(struct clk *clk)
-{
-    struct clk_gate_data *data = (struct clk_gate_data *)(clk->data);
-
-    return regmap_update_bits(data->offset, data->bit_idx, 1, 1);
-}
-
-static void clk_regmap_gate_disable(struct clk *clk)
-{
-    struct clk_gate_data *data = (struct clk_gate_data *)(clk->data);
-
-    regmap_update_bits(data->offset, data->bit_idx, 1, 0);
-}
-
-static int clk_regmap_gate_is_enabled(struct clk *clk)
+static int clk_gate_is_enabled(struct clk *clk)
 {
     struct clk_gate_data *data = (struct clk_gate_data *)(clk->data);
 
@@ -181,25 +162,25 @@ static int clk_regmap_gate_is_enabled(struct clk *clk)
     /* val &= BIT(gate->bit_idx); */
     /* return val ? 1 : 0; */
 
-    return regmap_read_bits(data->offset, data->bit_idx, 1);
+    return regmap_read_bits(clk->base, data->offset, data->bit_idx, 1);
 }
 
-const struct clk_ops clk_regmap_gate_ops = {
-    .enable = clk_regmap_gate_enable,
-    .disable = clk_regmap_gate_disable,
-    .is_enabled = clk_regmap_gate_is_enabled,
+const struct clk_ops clk_gate_ops = {
+    .enable = clk_gate_enable,
+    .disable = clk_gate_disable,
+    .is_enabled = clk_gate_is_enabled,
 };
 
-const struct clk_ops clk_regmap_gate_ro_ops = {
-    .is_enabled = clk_regmap_gate_is_enabled,
+const struct clk_ops clk_gate_ro_ops = {
+    .is_enabled = clk_gate_is_enabled,
 };
 
-static unsigned long clk_regmap_div_recalc_rate(const struct clk *clk,
+static unsigned long clk_div_recalc_rate(const struct clk *clk,
                                 unsigned long prate)
 {
 
     struct clk_div_data *data = (struct clk_div_data *)(clk->data);
-    uint32_t div = regmap_read_bits(data->offset, data->shift, data->width);
+    uint32_t div = regmap_read_bits(clk->base, data->offset, data->shift, data->width);
 
     /* TODO: Need to verify the following cases */
     if (data->flags & CLK_DIVIDER_ONE_BASED) {
@@ -215,7 +196,7 @@ static unsigned long clk_regmap_div_recalc_rate(const struct clk *clk,
     return DIV_ROUND_UP_ULL((uint64_t)prate, div);
 }
 
-static int clk_regmap_div_set_rate(const struct clk *clk, uint32_t rate, uint32_t parent_rate)
+static int clk_div_set_rate(const struct clk *clk, uint32_t rate, uint32_t parent_rate)
 {
     struct clk_div_data *data = (struct clk_div_data *)(clk->data);
     uint32_t div = DIV_ROUND_UP(parent_rate, rate);
@@ -230,15 +211,15 @@ static int clk_regmap_div_set_rate(const struct clk *clk, uint32_t rate, uint32_
     } else {
         div -= 1;
     }
-    return regmap_update_bits(data->offset, data->shift, data->width, div);
+    return regmap_update_bits(clk->base, data->offset, data->shift, data->width, div);
 }
 
-/* static int clk_regmap_div_determine_rate(struct clk_hw *hw, */
+/* static int clk_div_determine_rate(struct clk_hw *hw, */
 /*                      struct clk_rate_request *req) */
 /* { */
 /*     struct clk_div_data *data = (struct clk_div_data *)(hw->clk->data); */
 /*     /\* struct clk_regmap *clk = to_clk_regmap(hw); *\/ */
-/*     /\* struct clk_regmap_div_data *div = clk_get_regmap_div_data(clk); *\/ */
+/*     /\* struct clk_div_data *div = clk_get_regmap_div_data(clk); *\/ */
 /*     uint32_t val; */
 
 /*     /\* if read only, just return current value *\/ */
@@ -254,23 +235,23 @@ static int clk_regmap_div_set_rate(const struct clk *clk, uint32_t rate, uint32_
 /*     return 0; */
 /* } */
 
-const struct clk_ops clk_regmap_divider_ops = {
+const struct clk_ops clk_divider_ops = {
     .enable = NULL,
-    .recalc_rate = clk_regmap_div_recalc_rate,
-    /* .determine_rate = clk_regmap_div_determine_rate, */
-    .set_rate = clk_regmap_div_set_rate,
+    .recalc_rate = clk_div_recalc_rate,
+    /* .determine_rate = clk_div_determine_rate, */
+    .set_rate = clk_div_set_rate,
 };
 
-const struct clk_ops clk_regmap_divider_ro_ops = {
-    .recalc_rate = clk_regmap_div_recalc_rate,
-    /* .determine_rate = clk_regmap_div_determine_rate, */
+const struct clk_ops clk_divider_ro_ops = {
+    .recalc_rate = clk_div_recalc_rate,
+    /* .determine_rate = clk_div_determine_rate, */
 };
 
-static uint8_t clk_regmap_mux_get_parent(const struct clk *clk)
+static uint8_t clk_mux_get_parent(const struct clk *clk)
 {
     struct clk_mux_data *data = (struct clk_mux_data *)(clk->data);
     uint32_t num_parents = clk->hw.init->num_parents;
-    uint32_t val = regmap_mux_read_bits(data->offset, data->shift, data->mask);
+    uint32_t val = regmap_mux_read_bits(clk->base, data->offset, data->shift, data->mask);
 
     if (data->table) {
         int i;
@@ -296,26 +277,26 @@ static uint8_t clk_regmap_mux_get_parent(const struct clk *clk)
     return 0;
 }
 
-static int clk_regmap_mux_set_parent(struct clk *clk, uint8_t index)
+static int clk_mux_set_parent(struct clk *clk, uint8_t index)
 {
     struct clk_mux_data *data = (struct clk_mux_data *)(clk->data);
 
     if (data->table) {
         unsigned int val = data->table[index];
-        regmap_mux_update_bits(data->offset, data->shift, data->mask, val);
+        regmap_mux_update_bits(clk->base, data->offset, data->shift, data->mask, val);
     }
 
     return 0;
 }
 
-const struct clk_ops clk_regmap_mux_ops = {
-    .get_parent = clk_regmap_mux_get_parent,
-    .set_parent = clk_regmap_mux_set_parent,
-    /* .determine_rate = clk_regmap_mux_determine_rate, */
+const struct clk_ops clk_mux_ops = {
+    .get_parent = clk_mux_get_parent,
+    .set_parent = clk_mux_set_parent,
+    /* .determine_rate = clk_mux_determine_rate, */
 };
 
-const struct clk_ops clk_regmap_mux_ro_ops = {
-    .get_parent = clk_regmap_mux_get_parent,
+const struct clk_ops clk_mux_ro_ops = {
+    .get_parent = clk_mux_get_parent,
 };
 
 static unsigned long clk_factor_recalc_rate(const struct clk *clk,

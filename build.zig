@@ -221,16 +221,20 @@ fn addClockDriver(
         .file = b.path(source),
     });
     driver.addCSourceFile(.{
-        .file = b.path(b.fmt("drivers/clk/{s}/clk-operations.c", .{ @tagName(class) }))
+        .file = b.path(b.fmt("drivers/clk/{s}/clk-meson.c", .{ @tagName(class) }))
     });
     driver.addCSourceFile(.{
         .file = b.path(b.fmt("drivers/clk/{s}/clk-measure.c", .{ @tagName(class) }))
     });
     driver.addCSourceFile(.{
-        .file = b.path(b.fmt("drivers/clk/{s}/sm1_clk_hws.c", .{ @tagName(class) }))
+        .file = b.path(b.fmt("drivers/clk/{s}/sm1-clk.c", .{ @tagName(class) }))
+    });
+    driver.addCSourceFile(.{
+        .file = b.path("drivers/clk/clk-operations.c")
     });
     driver.addIncludePath(clk_config_include);
     driver.addIncludePath(b.path("include"));
+    driver.addIncludePath(b.path("drivers/clk"));
     driver.addIncludePath(b.path(b.fmt("drivers/clk/{s}/include", .{@tagName(class)})));
     driver.linkLibrary(util);
 
