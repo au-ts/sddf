@@ -69,6 +69,8 @@ void device_print(uint8_t bus, uint8_t device, uint8_t function)
     }
 
     sddf_dprintf("\nB.D:F: %02x:%02x.%01x\n", bus, device, function);
+    // enable bus mastering... and memory accesses
+    header->command |= BIT(2) | BIT(1);
     sddf_dprintf("vendor ID: 0x%04x\n", header->vendor_id);
     sddf_dprintf("device ID: 0x%04x\n", header->device_id);
     sddf_dprintf("command register: 0x%04x\n", header->command);
@@ -88,13 +90,13 @@ void device_print(uint8_t bus, uint8_t device, uint8_t function)
         type0_header->base_address_registers[0] = nvme_controller_paddr;
         type0_header->base_address_registers[1] = 0x0;
         header->command |= BIT(1);
-
     }
     sddf_dprintf("header type: 0x%02x\n", header->header_type);
 
     sddf_dprintf("\thas multi-functions: %s\n",
                  header->header_type & PCIE_HEADER_TYPE_HAS_MULTI_FUNCTIONS ? "yes" : "no");
     sddf_dprintf("\tlayout variant: 0x%02lx\n", header->header_type & PCIE_HEADER_TYPE_LAYOUT_MASK);
+
 
     if ((header->header_type & PCIE_HEADER_TYPE_LAYOUT_MASK) == PCIE_HEADER_TYPE_GENERAL) {
         volatile pcie_header_type0_t *type0_header = (pcie_header_type0_t *)config_base;
