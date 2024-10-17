@@ -102,8 +102,8 @@ static inline bool virtio_avail_full_tx(struct virtq *virtq)
 }
 
 /* The virtio MMIO region */
-uintptr_t uart_regs;
-volatile virtio_mmio_regs_t *regs;
+uintptr_t uart_base;
+volatile virtio_mmio_regs_t *uart_regs;
 
 static void tx_provide(void)
 {
@@ -156,7 +156,7 @@ static void tx_provide(void)
     if (transferred) {
         /* Finally, need to notify the queue if we have transferred data */
         /* This assumes VIRTIO_F_NOTIFICATION_DATA has not been negotiated */
-        regs->QueueNotify = VIRTIO_SERIAL_TX_QUEUE;
+        uart_regs->QueueNotify = VIRTIO_SERIAL_TX_QUEUE;
         if (serial_require_consumer_signal(&tx_queue_handle)) {
             serial_cancel_consumer_signal(&tx_queue_handle);
             microkit_notify(TX_CH);
@@ -228,7 +228,7 @@ static void rx_provide(void)
 
     if (transferred) {
         /* We have added more avail buffers, so notify the device */
-        regs->QueueNotify = VIRTIO_SERIAL_RX_QUEUE;
+        uart_regs->QueueNotify = VIRTIO_SERIAL_RX_QUEUE;
     }
 }
 
@@ -287,44 +287,44 @@ static void rx_return(void)
 
 void console_setup()
 {
-    if (!virtio_mmio_check_magic(regs)) {
+    if (!virtio_mmio_check_magic(uart_regs)) {
         LOG_DRIVER_ERR("invalid virtIO magic value!\n");
         return;
     }
 
-    if (!virtio_mmio_check_device_id(regs, VIRTIO_DEVICE_ID_CONSOLE)) {
+    if (!virtio_mmio_check_device_id(uart_regs, VIRTIO_DEVICE_ID_CONSOLE)) {
         LOG_DRIVER_ERR("Not a virtIO console device!\n");
         return;
     }
 
-    if (virtio_mmio_version(regs) != VIRTIO_VERSION) {
+    if (virtio_mmio_version(uart_regs) != VIRTIO_VERSION) {
         LOG_DRIVER_ERR("not correct virtIO version!\n");
         return;
     }
 
-    LOG_DRIVER("version: 0x%x\n", virtio_mmio_version(regs));
+    LOG_DRIVER("version: 0x%x\n", virtio_mmio_version(uart_regs));
 
     // Do normal device initialisation (section 3.2)
     // First reset the device
-    regs->Status = 0;
+    uart_regs->Status = 0;
 
     // Set the ACKNOWLEDGE bit to say we have noticed the device
-    regs->Status = VIRTIO_DEVICE_STATUS_ACKNOWLEDGE;
+    uart_regs->Status = VIRTIO_DEVICE_STATUS_ACKNOWLEDGE;
 
         // Set the DRIVER bit to say we know how to drive the device
-    regs->Status = VIRTIO_DEVICE_STATUS_DRIVER;
+    uart_regs->Status = VIRTIO_DEVICE_STATUS_DRIVER;
 
 #ifdef DEBUG_DRIVER
-    uint32_t features_low = regs->DeviceFeatures;
-    regs->DeviceFeaturesSel = 1;
-    uint32_t features_high = regs->DeviceFeatures;
+    uint32_t features_low = uart_regs->DeviceFeatures;
+    uart_regs->DeviceFeaturesSel = 1;
+    uint32_t features_high = uart_regs->DeviceFeatures;
     uint64_t features = features_low | ((uint64_t)features_high << 32);
     virtio_console_print_features(features);
 #endif /* DEBUG_DRIVER */
 
-    regs->Status = VIRTIO_DEVICE_STATUS_FEATURES_OK;
+    uart_regs->Status = VIRTIO_DEVICE_STATUS_FEATURES_OK;
 
-    if (!(regs->Status & VIRTIO_DEVICE_STATUS_FEATURES_OK)) {
+    if (!(uart_regs->Status & VIRTIO_DEVICE_STATUS_FEATURES_OK)) {
         LOG_DRIVER_ERR("device status features is not OK!\n");
         return;
     }
@@ -359,37 +359,37 @@ void console_setup()
     rx_provide();
 
     // Setup RX queue first
-    assert(regs->QueueNumMax >= RX_COUNT);
-    regs->QueueSel = VIRTIO_SERIAL_RX_QUEUE;
-    regs->QueueNum = RX_COUNT;
-    regs->QueueDescLow = (hw_ring_buffer_paddr + rx_desc_off) & 0xFFFFFFFF;
-    regs->QueueDescHigh = (hw_ring_buffer_paddr + rx_desc_off) >> 32;
-    regs->QueueDriverLow = (hw_ring_buffer_paddr + rx_avail_off) & 0xFFFFFFFF;
-    regs->QueueDriverHigh = (hw_ring_buffer_paddr + rx_avail_off) >> 32;
-    regs->QueueDeviceLow = (hw_ring_buffer_paddr + rx_used_off) & 0xFFFFFFFF;
-    regs->QueueDeviceHigh = (hw_ring_buffer_paddr + rx_used_off) >> 32;
-    regs->QueueReady = 1;
+    assert(uart_regs->QueueNumMax >= RX_COUNT);
+    uart_regs->QueueSel = VIRTIO_SERIAL_RX_QUEUE;
+    uart_regs->QueueNum = RX_COUNT;
+    uart_regs->QueueDescLow = (hw_ring_buffer_paddr + rx_desc_off) & 0xFFFFFFFF;
+    uart_regs->QueueDescHigh = (hw_ring_buffer_paddr + rx_desc_off) >> 32;
+    uart_regs->QueueDriverLow = (hw_ring_buffer_paddr + rx_avail_off) & 0xFFFFFFFF;
+    uart_regs->QueueDriverHigh = (hw_ring_buffer_paddr + rx_avail_off) >> 32;
+    uart_regs->QueueDeviceLow = (hw_ring_buffer_paddr + rx_used_off) & 0xFFFFFFFF;
+    uart_regs->QueueDeviceHigh = (hw_ring_buffer_paddr + rx_used_off) >> 32;
+    uart_regs->QueueReady = 1;
 
     // Setup TX queue
-    assert(regs->QueueNumMax >= TX_COUNT);
-    regs->QueueSel = VIRTIO_SERIAL_TX_QUEUE;
-    regs->QueueNum = TX_COUNT;
-    regs->QueueDescLow = (hw_ring_buffer_paddr + tx_desc_off) & 0xFFFFFFFF;
-    regs->QueueDescHigh = (hw_ring_buffer_paddr + tx_desc_off) >> 32;
-    regs->QueueDriverLow = (hw_ring_buffer_paddr + tx_avail_off) & 0xFFFFFFFF;
-    regs->QueueDriverHigh = (hw_ring_buffer_paddr + tx_avail_off) >> 32;
-    regs->QueueDeviceLow = (hw_ring_buffer_paddr + tx_used_off) & 0xFFFFFFFF;
-    regs->QueueDeviceHigh = (hw_ring_buffer_paddr + tx_used_off) >> 32;
-    regs->QueueReady = 1;
+    assert(uart_regs->QueueNumMax >= TX_COUNT);
+    uart_regs->QueueSel = VIRTIO_SERIAL_TX_QUEUE;
+    uart_regs->QueueNum = TX_COUNT;
+    uart_regs->QueueDescLow = (hw_ring_buffer_paddr + tx_desc_off) & 0xFFFFFFFF;
+    uart_regs->QueueDescHigh = (hw_ring_buffer_paddr + tx_desc_off) >> 32;
+    uart_regs->QueueDriverLow = (hw_ring_buffer_paddr + tx_avail_off) & 0xFFFFFFFF;
+    uart_regs->QueueDriverHigh = (hw_ring_buffer_paddr + tx_avail_off) >> 32;
+    uart_regs->QueueDeviceLow = (hw_ring_buffer_paddr + tx_used_off) & 0xFFFFFFFF;
+    uart_regs->QueueDeviceHigh = (hw_ring_buffer_paddr + tx_used_off) >> 32;
+    uart_regs->QueueReady = 1;
 
     // Set the DRIVER_OK status bit
-    regs->Status = VIRTIO_DEVICE_STATUS_DRIVER_OK;
-    regs->InterruptACK = VIRTIO_MMIO_IRQ_VQUEUE;
+    uart_regs->Status = VIRTIO_DEVICE_STATUS_DRIVER_OK;
+    uart_regs->InterruptACK = VIRTIO_MMIO_IRQ_VQUEUE;
 }
 
 static void handle_irq()
 {
-    uint32_t irq_status = regs->InterruptStatus;
+    uint32_t irq_status = uart_regs->InterruptStatus;
     if (irq_status & VIRTIO_MMIO_IRQ_VQUEUE) {
         // We don't know whether the IRQ is related to a change to the RX queue
         // or TX queue, so we check both.
@@ -398,7 +398,7 @@ static void handle_irq()
         tx_return();
         tx_provide();
         // We have handled the used buffer notification
-        regs->InterruptACK = VIRTIO_MMIO_IRQ_VQUEUE;
+        uart_regs->InterruptACK = VIRTIO_MMIO_IRQ_VQUEUE;
     }
 
     if (irq_status & VIRTIO_MMIO_IRQ_CONFIG) {
@@ -408,7 +408,7 @@ static void handle_irq()
 
 void init()
 {
-    regs = (volatile virtio_mmio_regs_t *)(uart_regs + VIRTIO_MMIO_CONSOLE_OFFSET);
+    uart_regs = (volatile virtio_mmio_regs_t *)(uart_base + VIRTIO_MMIO_CONSOLE_OFFSET);
 
     ialloc_init(&rx_ialloc_desc, rx_descriptors, RX_COUNT);
     ialloc_init(&tx_ialloc_desc, tx_descriptors, TX_COUNT);
