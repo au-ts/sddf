@@ -40,6 +40,34 @@ _Static_assert(NVME_ACQ_CAPACITY <= 0x1000, "capacity of ACQ must be <=4096 (ent
 _Static_assert(NVME_IO_SQ_CAPACITY <= 0x10000, "capacity of IO SQ must be <=65536 (entries)");
 _Static_assert(NVME_IO_CQ_CAPACITY <= 0x10000, "capacity of IO CQ must be <=65536 (entries)");
 
+void nvme_irq_mask(void)
+{
+    /* [NVMe-Transport-PCIe-1.1] 3.5.1.1 Differences between Pin Based and MSI Interrupts
+        > Pin-based and single MSI only use one interrupt vector.
+        > Multiple MSI may use up to 32 interrupt vectors.
+
+       [NVMe-2.1] 3.1.4.10 Admin Completion Queue Base Address
+        > This queue is always associated with interrupt vector 0.
+    */
+
+    /* For now -- we mask out every interrupt vector) */
+    nvme_controller->intms = 0xffffffff;
+}
+
+void nvme_irq_unmask(void)
+{
+    /* [NVMe-Transport-PCIe-1.1] 3.5.1.1 Differences between Pin Based and MSI Interrupts
+        > Pin-based and single MSI only use one interrupt vector.
+        > Multiple MSI may use up to 32 interrupt vectors.
+
+       [NVMe-2.1] 3.1.4.10 Admin Completion Queue Base Address
+        > This queue is always associated with interrupt vector 0.
+    */
+
+    /* For now -- we mask in only vector 0, as it's the only one */
+    nvme_controller->intmc = 0xffffffff;
+}
+
 /* [NVMe-2.1] 3.5.1 Memory-based Controller Initialization (PCIe) */
 void nvme_controller_init()
 {
@@ -62,6 +90,7 @@ void nvme_controller_init()
     // 2. Configure Admin Queue(s);
     nvme_queues_init(&admin_queue, /* y */ 0, nvme_controller, nvme_asq_region, NVME_ASQ_CAPACITY, nvme_acq_region,
                      NVME_ACQ_CAPACITY);
+    nvme_irq_mask();
     assert(nvme_asq_region_paddr != 0x0);
     assert(nvme_acq_region_paddr != 0x0);
     nvme_controller->asq = nvme_asq_region_paddr;
@@ -107,12 +136,6 @@ void nvme_controller_init()
     while (!(nvme_controller->csts & NVME_CSTS_RDY));
     LOG_NVME("\tdone\n");
 
-    /* https://github.com/redox-os/drivers/blob/master/storage/nvmed/src/nvme/mod.rs#L292*/
-    nvme_controller->intms = 0xFFFFFFFF;
-    /* TODO: Somethigng about this. See PCIe transport spec. */
-    nvme_controller->intmc = 0x00000001;
-    // nvme_controller->intms = 0x00000001;
-
     // 7. Send the Identify Controller command (Identify with CNS = 01h); §5.1.13
     // TODO: What do we actually need this for????
     // sudo nvme admin-passthru /dev/nvme0 --opcode=0x06 --cdw10=0x0001 --data-len=4096 -r  -s
@@ -154,7 +177,7 @@ void nvme_controller_init()
     entry = nvme_queue_submit_and_consume_poll(&admin_queue, &(nvme_submission_queue_entry_t){
         .cdw0 = /* CID */ (0b1010 << 16) | /* PSDT */ 0 | /* FUSE */ 0 | /* OPC */ 0x5,
         .cdw10 = /* QSIZE */ ((NVME_IO_CQ_CAPACITY - 1U) << 16) | /* QID */ io_queue_id,
-        .cdw11 = /* IV */ (0x0 << 16) | /* IEN */ 0 << 1 | /* PC */ 0x1,
+        .cdw11 = /* IV */ (0x0 << 16) | /* IEN */ 1 << 1 | /* PC */ 0x1,
         .prp2 = 0,
         .prp1 = nvme_io_cq_region_paddr,
     });
@@ -180,53 +203,70 @@ void nvme_controller_init()
     // should submit an appropriate number of Asynchronous Event Request commands. This step may
     // be done at any point after the controller signals that the controller is ready (i.e., CSTS.RDY is set to ‘1’).
     // TODO: ???
+
+    nvme_irq_unmask();
 }
 
+void nvme_continue(int z);
 void nvme_init()
 {
-    LOG_NVME("Starting NVME config... (%s)\n", microkit_name);
+    LOG_NVME("Starting NVME initialisation... (%s)\n", microkit_name);
 
     // We should do a Function Level Reset as defined by [PCIe-2.0] spec §6.6.2
 
     // https://github.com/bootreer/vroom/blob/d8bbe9db2b1cfdfc38eec31f3b48f5eb167879a9/src/nvme.rs#L220
 
     nvme_controller_init();
+    LOG_NVME("NVME initialised\n");
+
+    /* TODO: Don't send via this */
+    nvme_continue(0);
 }
 
+#define NUMBER_BLOCKS 1
 void nvme_continue(int z)
 {
-    /* [NVMe-CommandSet-1.1] 3.3.4 Read command */
-    nvme_completion_queue_entry_t entry;
-    uint16_t number_blocks = 1;
-    entry = nvme_queue_submit_and_consume_poll(&io_queue, &(nvme_submission_queue_entry_t){
-        .cdw0 = /* CID */ (0b1011 << 16) | /* PSDT */ 0 | /* FUSE */ 0 | /* OPC */ 0x2,
-        .nsid = 0x1, // TOOD: Why is NSID 1 now ????
-        .cdw10 = /* SLBA[31:00] */ 0x0,
-        .cdw11 = /* SLBA[63:32] */ 0x0,
-        .cdw12 = /* LR */ (0b1U << 31) | /* others */ 0 | /* NLB */ (number_blocks - 1),
-        .prp2 = 0x0,
-        .prp1 = data_region_paddr,
-    });
+    if (z == 0) {
+        /* [NVMe-CommandSet-1.1] 3.3.4 Read command */
+        nvme_queue_submit(&io_queue, &(nvme_submission_queue_entry_t){
+            .cdw0 = /* CID */ (0b1011 << 16) | /* PSDT */ 0 | /* FUSE */ 0 | /* OPC */ 0x2,
+            .nsid = 0x1, // TOOD: Why is NSID 1 now ????
+            .cdw10 = /* SLBA[31:00] */ 0x0,
+            .cdw11 = /* SLBA[63:32] */ 0x0,
+            .cdw12 = /* LR */ (0b1U << 31) | /* others */ 0 | /* NLB */ (NUMBER_BLOCKS - 1),
+            .prp2 = 0x0,
+            .prp1 = data_region_paddr,
+        });
+    } else if (z == 1) {
+        nvme_completion_queue_entry_t cq_entry;
+        int ret = nvme_queue_consume(&io_queue, &cq_entry);
+        assert(ret == 0);
+        assert((cq_entry.phase_tag_and_status & _MASK(1, 15)) == 0x0); // §4.2.3 Status Field
 
-    assert((entry.phase_tag_and_status & _MASK(1, 15)) == 0x0); // §4.2.3 Status Field
+        for (int i = 0; i < 8; i++) {
+            LOG_NVME("Data [%02x]: %02x\n", i, data_region[i]);
+        }
 
-    // for (int i = 0; i < 32; i++) {
-        // sddf_dprintf("Data [%02x]: %02x\n", i, data_region[i]);
-    // }
+        for (int i = 0; i < 4096; i++) {
+            data_region[i] = data_region[i] ^ 0xbb;
+        }
 
-    for (int i = 0; i < 4096; i++) {
-        data_region[i] = data_region[i] ^ 0xbb;
+        /* [NVMe-CommandSet-1.1] ??????? write */
+        nvme_queue_submit(&io_queue, &(nvme_submission_queue_entry_t){
+            .cdw0 = /* CID */ (0b1101 << 16) | /* PSDT */ 0 | /* FUSE */ 0 | /* OPC */ 0x1,
+            .nsid = 0x1, // TOOD: Why is NSID 1 now ????
+            .cdw10 = /* SLBA[31:00] */ 0x0,
+            .cdw11 = /* SLBA[63:32] */ 0x0,
+            .cdw12 = /* LR */ (0b1U << 31) | /* others */ 0 | /* NLB */ (NUMBER_BLOCKS - 1),
+            .prp2 = 0x0,
+            .prp1 = data_region_paddr,
+        });
+    } else if (z == 2) {
+        nvme_completion_queue_entry_t cq_entry;
+        int ret = nvme_queue_consume(&io_queue, &cq_entry);
+        assert(ret == 0);
+        assert((cq_entry.phase_tag_and_status & _MASK(1, 15)) == 0x0); // §4.2.3 Status Field
+
+        LOG_NVME("Got response for write!\n");
     }
-
-    entry = nvme_queue_submit_and_consume_poll(&io_queue, &(nvme_submission_queue_entry_t){
-        .cdw0 = /* CID */ (0b1101 << 16) | /* PSDT */ 0 | /* FUSE */ 0 | /* OPC */ 0x1,
-        .nsid = 0x1, // TOOD: Why is NSID 1 now ????
-        .cdw10 = /* SLBA[31:00] */ 0x0,
-        .cdw11 = /* SLBA[63:32] */ 0x0,
-        .cdw12 = /* LR */ (0b1U << 31) | /* others */ 0 | /* NLB */ (number_blocks - 1),
-        .prp2 = 0x0,
-        .prp1 = data_region_paddr,
-    });
-
-    assert((entry.phase_tag_and_status & _MASK(1, 15)) == 0x0); // §4.2.3 Status Field
 }
