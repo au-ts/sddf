@@ -67,19 +67,23 @@ void nvme_controller_init()
                           | ((NVME_ACQ_CAPACITY - 1) << NVME_AQA_ACQS_SHIFT);
 
     // 3. Initialise Command Support Sets.
-    /*
-        https://forum.osdev.org/viewtopic.php?p=343454#p343454
-        For whatever reason this is broken under QEMU.
+    nvme_controller->cc &= ~(NVME_CC_CSS_MASK);
+    if (nvme_controller->cap & NVME_CAP_NOIOCSS) {
+        nvme_controller->cc |= 0b111 << NVME_CC_CSS_SHIFT;
+    } else if (nvme_controller->cap & NVME_CAP_IOCSS) {
+        nvme_controller->cc |= 0b110 << NVME_CC_CSS_SHIFT;
+    } else if (nvme_controller->cap & NVME_CAP_NCSS) {
+        nvme_controller->cc |= 0b000 << NVME_CC_CSS_SHIFT;
+    }
 
-        nvme_controller->cc &= ~(NVME_CC_CSS_MASK);
-        if (nvme_controller->cap & NVME_CAP_NOIOCSS) {
-            nvme_controller->cc |= 0b111 << NVME_CC_CSS_SHIFT;
-        } else if (nvme_controller->cap & NVME_CAP_IOCSS) {
-            nvme_controller->cc |= 0b110 << NVME_CC_CSS_SHIFT;
-        } else if (nvme_controller->cap & NVME_CAP_NCSS) {
-            nvme_controller->cc |= 0b000 << NVME_CC_CSS_SHIFT;
-        }
+#if defined(CONFIG_PLAT_QEMU_RISCV_VIRT)
+    /*
+        QEMU deviates from the NVMe specification:
+        https://gitlab.com/qemu-project/qemu/-/issues/1691
     */
+   nvme_controller->cc &= ~(NVME_CC_CSS_MASK);
+   nvme_controller->cc |= 0b000 << NVME_CC_CSS_SHIFT;
+#endif
 
     // 4a. Arbitration Mechanism (TODO)
     // 4b. Memory Page Size
@@ -101,7 +105,9 @@ void nvme_controller_init()
 
     /* https://github.com/redox-os/drivers/blob/master/storage/nvmed/src/nvme/mod.rs#L292*/
     nvme_controller->intms = 0xFFFFFFFF;
+    /* TODO: Somethigng about this. See PCIe transport spec. */
     nvme_controller->intmc = 0x00000001;
+    // nvme_controller->intms = 0x00000001;
 
     // 7. Send the Identify Controller command (Identify with CNS = 01h); §5.1.13
     // TODO: What do we actually need this for????
