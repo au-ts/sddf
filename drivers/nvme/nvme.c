@@ -8,6 +8,10 @@
 #include "nvme_debug.h"
 #endif
 
+#if __BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__
+#error "code assumes little endian CPU as NVMe/PCIe is little endian"
+#endif
+
 volatile nvme_controller_t *nvme_controller;
 nvme_submission_queue_entry_t *nvme_asq_region;
 nvme_completion_queue_entry_t *nvme_acq_region;
