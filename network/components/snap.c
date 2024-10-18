@@ -58,12 +58,12 @@ result_t res;
 
 void init(void)
 {
-    printf("snap init\n");
-    ring_init(&state.rx_ring_cli0, (ring_buffer_t *) rx_free_cli0, (ring_buffer_t *) rx_used_cli0, RX_RING_SIZE_CLI0);
-    ring_init(&state.tx_ring_cli0, (ring_buffer_t *) tx_free_cli0, (ring_buffer_t *) tx_used_cli0, TX_RING_SIZE_CLI0);
+    // printf("snap init\n");
+    // ring_init(&state.rx_ring_cli0, (ring_buffer_t *) rx_free_cli0, (ring_buffer_t *) rx_used_cli0, RX_RING_SIZE_CLI0);
+    // ring_init(&state.tx_ring_cli0, (ring_buffer_t *) tx_free_cli0, (ring_buffer_t *) tx_used_cli0, TX_RING_SIZE_CLI0);
 
-    ring_init(&state.rx_ring_drv, (ring_buffer_t *) rx_free_drv, (ring_buffer_t *) rx_used_drv, RX_RING_SIZE_DRIV);
-    ring_init(&state.tx_ring_drv, (ring_buffer_t *) tx_free_drv, (ring_buffer_t *) tx_used_drv, TX_RING_SIZE_DRIV);
+    // ring_init(&state.rx_ring_drv, (ring_buffer_t *) rx_free_drv, (ring_buffer_t *) rx_used_drv, RX_RING_SIZE_DRIV);
+    // ring_init(&state.tx_ring_drv, (ring_buffer_t *) tx_free_drv, (ring_buffer_t *) tx_used_drv, TX_RING_SIZE_DRIV);
 }
 
 void reset(void) {
@@ -105,19 +105,19 @@ void notified(microkit_channel ch)
 {
     switch(ch) {
         case START_CH:
-            reset();
-            snapshot();
-            sddf_timer_set_timeout(TIMER_CH, INTERVAL_S * 1000000000lu);
+            // reset();
+            // snapshot();
+            // sddf_timer_set_timeout(TIMER_CH, INTERVAL_S * 1000000000lu);
             break;
 
         case STOP_CH:
-            print_result();
+            // print_result();
             break;
 
         case TIMER_CH:
-            snapshot();
-            // sleep for 5 seconds.
-            sddf_timer_set_timeout(TIMER_CH, INTERVAL_S * 1000000000lu);
+            // snapshot();
+            // sleep for INTERVAL_S seconds.
+            // sddf_timer_set_timeout(TIMER_CH, INTERVAL_S * 1000000000lu);
             break;
 
         default:

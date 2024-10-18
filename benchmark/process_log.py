@@ -72,11 +72,12 @@ import json
 # NumberSchedules:  24966
 # TotalUtilisation:  708185834
 # }
-colors = ['purple', 'blue', 'green', 'red', 'cyan', 'magenta', 'yellow', 'black']
-throughputs = [500000000, 750000000, 1000000000, 1250000000, 1500000000, 1750000000, 2000000000, 2500000000]
+colors = ['purple', 'blue', 'green', 'red', 'cyan', 'magenta', 'orange', 'yellow', 'black', 'teal', 'pink', 'brown', 'olive']
+throughputs = [500000000, 750000000, 1000000000, 1250000000, 1500000000, 1750000000, 2000000000, 2250000000, 2500000000, 2750000000, 3000000000, 3200000000, 4000000000]
 file = sys.argv[1]
 with open(file, "r") as f:
     
+    uutils = {}
     utils = {}
     kes = {}
     scheds = {}
@@ -85,6 +86,9 @@ with open(file, "r") as f:
         # skip garbage
         while not re.match("Total utilisation details.*", f.readline()):
             pass
+
+        sum_util = 0
+        sum_kutil = 0
 
         f.readline() # {
         f.readline() # KernelUtilisation
@@ -100,22 +104,34 @@ with open(file, "r") as f:
             # print(pd)
 
             f.readline() # {
-            f.readline() # KernelUtilisation
+            [_, kutil] = f.readline().split(':') # KernelUtilisation
             [_, ke] = f.readline().split(':') # KernelEntries
             [_, sched] = f.readline().split(':') # NumberSchedules
             [_, util] = f.readline().split(':') # TotalUtilisation
             f.readline() # }
 
+            sum_util = sum_util + eval(util)
+            sum_kutil = sum_kutil + eval(kutil)
+
             if pd in utils:
+                uutils[pd].append((eval(util) - eval(kutil))/ tot_util)
                 utils[pd].append(eval(util) / tot_util)
                 kes[pd].append(eval(ke))
                 scheds[pd].append(eval(sched))
             else:
+                uutils[pd] = [(eval(util) - eval(kutil)) / tot_util]
                 utils[pd] = [eval(util) / tot_util]
                 kes[pd] = [eval(ke)]
                 scheds[pd] = [eval(sched)]
             
             title = f.readline()
+
+        if 'TOTAL' in utils:
+            utils['TOTAL'].append(sum_util / tot_util)
+            uutils['KERNEL'].append(sum_kutil / tot_util)
+        else:
+            utils['TOTAL'] = [(sum_util / tot_util)]
+            uutils['KERNEL'] = [(sum_kutil / tot_util)]
 
     #util
     color_idx = 0
@@ -138,6 +154,31 @@ with open(file, "r") as f:
     plt.tight_layout()
     plt.show()
 
+    #uutil
+    color_idx = 0
+    plt.figure(figsize=(8, 6))
+
+    for key in uutils: 
+        if key == 'KERNEL':
+            plt.plot(throughputs, uutils[key], color=colors[color_idx], label=key + ' CPU Util')
+        else:
+            plt.plot(throughputs, uutils[key], color=colors[color_idx], label=key + ' Userlevel CPU Util')
+        color_idx += 1
+    
+    plt.plot(throughputs, utils['TOTAL'], color=colors[color_idx], label='TOTAL CPU Util')
+
+    plt.title('Requested Throughput' + ' vs ' + 'Userlevel CPU Util')
+    plt.xlabel('Requested Throughput')
+    plt.ylabel('CPU Util')
+    plt.grid(True)
+    plt.legend()
+
+    # plt.xscale('log')  # Since Requested_Throughput values are large, log scale for x-axis
+    # plt.xticks(throughputs, [f'{x:,}' for x in throughputs])
+    plt.ticklabel_format(style='sci', axis='x', scilimits=(0,0))
+
+    plt.tight_layout()
+    plt.show()
 
     # kernel entries
     # plt.figure(figsize=(8, 6))

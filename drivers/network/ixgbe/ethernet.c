@@ -28,6 +28,7 @@
 #define TX_CH 1
 #define RX_CH 2
 #define TIMER_CH 3
+#define COUNTER_CH 4
 
 const uint64_t hw_rx_ring_paddr = 0x10000000;
 const uint64_t hw_rx_ring_vaddr = 0x2200000;
@@ -156,6 +157,7 @@ tx_provide(void)
             device.tx_tail = (device.tx_tail + 1) % NUM_TX_DESCS;
             provided = true;
         }
+        // @jade: should I move this to the outer block?
         if (provided) {
             THREAD_MEMORY_RELEASE();
             set_reg(TDT(0), device.tx_tail);
@@ -233,7 +235,7 @@ rx_provide(void)
         if (provided) {
             THREAD_MEMORY_RELEASE();
             set_reg(RDT(0), device.rx_tail);
-            bench->eth_irq_count++;
+            bench->eth_rx_irq_count++;
         }
 
         /* Only request a notification from multiplexer if HW ring not full */
@@ -334,7 +336,8 @@ enable_interrupts(void)
     clear_interrupts();
     // uint32_t mask = get_reg(EIMS);
     // mask |= ~BIT(31);
-    set_reg(EIMS, ~BIT(31));
+    // set_reg(EIMS, ~BIT(31));
+    set_reg(EIMS, BIT(1));
 }
 
 void
@@ -423,6 +426,8 @@ init(void)
     set_reg16(PCI_MSI_MESSAGE_DATA_16, 0x31);
     clear_flags16(PCI_MSI_MASK, BIT(0));
 
+    // initialise the statistic registers. Must keep.
+    set_reg(RQSMR(0), 0);
 
     printf("ethernet init stage 0 running\n");
 
@@ -676,6 +681,14 @@ notified(microkit_channel ch)
 
         // set EICS
     switch (ch) {
+    case COUNTER_CH:
+        uint64_t packets_count = get_reg(QPRC(0));
+        bench->hw_pcount_rx = packets_count;
+
+        uint64_t dropped_packets_count = get_reg(QPRDC(0));
+        bench->hw_pcount_rx_dropped = dropped_packets_count;
+        break;
+
     case TIMER_CH:
         achieved_something = true;
         if (device.init_stage == 0) {
@@ -694,12 +707,13 @@ notified(microkit_channel ch)
         // }
         break;
     case IRQ_CH: {
+        bench->eth_irq_count++;
         uint32_t cause = get_reg(EICR);
         clear_flags(EICR, cause);
-        rx_return();
-        rx_provide();
-        tx_return();
-        tx_provide();
+            rx_return();
+            rx_provide();
+            tx_return();
+            tx_provide();
         // uint32_t cause = get_reg(EICR);
         // set_reg(EICR, 0);
         // handle_irq();

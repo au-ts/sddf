@@ -82,6 +82,13 @@ declare_array_register(DEVICE_BASE, QPTC, 0x08680, 16, 0x4);
 declare_array_register(DEVICE_BASE, RAL, 0x0A200, 128, 0x8);
 declare_array_register(DEVICE_BASE, RAH, 0x0A204, 128, 0x8);
 
+// Queue Packets Received Count 
+declare_array_register(DEVICE_BASE, QPRC, 0x01030, 16, 0x40);
+// Queue Packets Received Drop Count
+declare_array_register(DEVICE_BASE, QPRDC, 0x01430, 16, 0x40);
+// Receive Queue Statistic Mapping Registers
+declare_array_register(DEVICE_BASE, RQSMR, 0x02300, 32, 0x4);
+
 const uint64_t IXGBE_CTRL_LNK_RST = 0x00000008; /* Link Reset. Resets everything. */
 const uint64_t IXGBE_CTRL_RST = 0x04000000; /* Reset (SW) */
 const uint64_t IXGBE_CTRL_RST_MASK = IXGBE_CTRL_LNK_RST | IXGBE_CTRL_RST;
@@ -167,6 +174,13 @@ const uint32_t IXGBE_ADVTXD_DTYP_DATA = 0x00300000; /* Adv Data Descriptor */
 const uint32_t IXGBE_ADVTXD_DCMD_DEXT = IXGBE_TXD_CMD_DEXT; /* Desc ext 1=Adv */
 const uint32_t IXGBE_TXD_STAT_DD = 0x00000001; /* Descriptor Done */
 const uint32_t IXGBE_ADVTXD_STAT_DD = IXGBE_TXD_STAT_DD; /* Descriptor Done */
+
+// bit 15:0, Receive/Transmit Queue Interrupts, activated on receive/transmit
+// events.The mapping of queue to the RTxQ bits is done by the IVAR registers
+const uint64_t IXGBE_EICR_RTXQ_BASE = 1;
+// Missed packet interrupt is activated for each received packet that
+// overflows the Rx packet buffer (overrun)
+const uint64_t IXGBE_EICR_RX_MISS = 1 << 17;
 
 typedef struct {
     uint64_t pkt_addr; // Packet buffer address

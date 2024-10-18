@@ -16,11 +16,17 @@ struct bench {
     uint64_t eth_pcount_tx;
     uint64_t eth_pcount_rx;
 
+    uint64_t eth_rx_irq_count;
+    uint64_t eth_txrx_irq_count;
     uint64_t eth_irq_count;
     uint64_t eth_tx_ntfn_count;
     
     uint64_t eth_notified;
     uint64_t eth_idle_notified;
+
+    // NIC
+    uint64_t hw_pcount_rx;
+    uint64_t hw_pcount_rx_dropped;
 
     // client0
     uint64_t lwip_pcount_tx;

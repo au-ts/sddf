@@ -165,9 +165,11 @@ static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
         enqueue_pbufs(p);
         // request_signal(state.tx_ring.free_ring);
         b->lwip_tx_ntfn_count++;
-        microkit_notify(TX_CH);
+        // @jade: should not be here anyway
+        // microkit_notify(TX_CH);
         return ERR_OK;
     }
+    assert(!ring_empty(state.tx_ring.free_ring));
 
     buff_desc_t buffer;
     int err __attribute__((unused)) = dequeue_free(&(state.tx_ring), &buffer);

@@ -328,6 +328,11 @@
     </channel>
 
     <channel>
+      <end pd="client0" id="9" /> <!-- stop eth counter channel -->
+      <end pd="eth" id="4" />
+    </channel>
+
+    <channel>
       <end pd="timer" id="5" />
       <end pd="snap" id="2" />
     </channel>
