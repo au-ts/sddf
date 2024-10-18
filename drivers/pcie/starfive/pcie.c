@@ -294,6 +294,9 @@ void notified(microkit_channel ch)
            we see -> but [continues]
         */
         nvme_continue(i);
+        /* TODO: we should use NVMe INTMS/INTMC while this is happening
+                 because that PCI virtual INTx line is shared
+                 howveer since we don't share it, meh! */
         microkit_irq_ack(ch);
 
         /* on all platforms this shows interrupt status: none after the 3rd
