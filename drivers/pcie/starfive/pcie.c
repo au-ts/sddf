@@ -275,7 +275,7 @@ out:
 void nvme_continue(int z);
 void notified(microkit_channel ch)
 {
-    static int i = 0;
+    static int i = 1;
     sddf_dprintf("notified on ch: %u\n", ch);
 
     if (i < 10) {
