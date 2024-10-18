@@ -171,7 +171,7 @@ void device_print(uint8_t bus, uint8_t device, uint8_t function)
     }
 }
 
-void device_ack_irq(uint8_t bus, uint8_t device, uint8_t function, bool to_mask)
+void print_pci_info(uint8_t bus, uint8_t device, uint8_t function, bool to_mask)
 {
     uintptr_t offset = get_bdf_offset(bus, device, function);
     assert(offset < PCIE_CONFIG_SIZE);
@@ -185,6 +185,8 @@ void device_ack_irq(uint8_t bus, uint8_t device, uint8_t function, bool to_mask)
     sddf_dprintf("ACK: status register: 0x%04x\n", header->status);
     sddf_dprintf("\t(PIN-based) interrupt disable: %s\n", (header->command & BIT(10)) ? "is disabled" : "is not disabled");
     sddf_dprintf("\t(PIN-based) interrupt status: %s\n", (header->status & BIT(3)) ? "asserted" : "none");
+
+    return;
 
     /* mask out the interrupt... */
     // https://elixir.bootlin.com/linux/v5.18-rc4/source/drivers/pci/pci.c#L4595
@@ -268,7 +270,7 @@ out:
 #endif
 
     assert(found_nvme);
-    device_ack_irq(nvme_bus, nvme_device, nvme_function, false);
+    print_pci_info(nvme_bus, nvme_device, nvme_function, false);
     nvme_init();
 }
 
@@ -276,20 +278,37 @@ void nvme_continue(int z);
 void notified(microkit_channel ch)
 {
     static int i = 1;
+    sddf_dprintf("\n===============================\n");
     sddf_dprintf("notified on ch: %u\n", ch);
 
-    if (i < 10) {
-        sddf_dprintf("acking (%u)\n", i);
-        // // device_print(nvme_bus, nvme_device, nvme_function);
-        // device_ack_irq(nvme_bus, nvme_device, nvme_function, false);
+    if (i <= 3 /* keep i nsync with nvme_continue */) {
+        /* this shows asserted on all platforms, as you would expect */
+        print_pci_info(nvme_bus, nvme_device, nvme_function, /* don't ack? */ false);
+
+        sddf_dprintf("\nacking (%u)\n", i);
+        /* this usually acknowledges the CQ doorbell, causing interrupts to disappear
+           but for the second time we intentionally making the level interrupt fire
+           again by not acking it.
+
+           on QEMU RISCV we see "should get an IRQ" and that's the last message
+           we see -> but [continues]
+        */
+        nvme_continue(i);
         microkit_irq_ack(ch);
 
-        nvme_continue(i);
-    } else if (i < 20) {
-        sddf_dprintf("\nhopefully stopping\n");
+        /* on all platforms this shows interrupt status: none after the 3rd
+           ack when we stop doing anything.
+
+           [...] on QEMU RISCV this shows "asserted" yet we don't get further IRQs
+
+           AND!!! on Star64 RISCV this shows "none" but we still get interrupts!!
+        */
+        print_pci_info(nvme_bus, nvme_device, nvme_function, /* don't ack? */ false);
+    } else if (i < 10) {
+        sddf_dprintf("\nYou should not see this message -- trying to ACK again\n");
         microkit_irq_ack(ch);
     } else {
-        sddf_dprintf("stopping\n");
+        sddf_dprintf("Stopping IRQ ACKing\n");
     }
 
     i++;
