@@ -109,7 +109,7 @@ void nvme_controller_init()
         nvme_controller->cc |= 0b000 << NVME_CC_CSS_SHIFT;
     }
 
-#if defined(CONFIG_PLAT_QEMU_RISCV_VIRT)
+#if defined(CONFIG_PLAT_QEMU_RISCV_VIRT) || defined(CONFIG_PLAT_QEMU_ARM_VIRT)
     /*
         QEMU deviates from the NVMe specification:
         https://gitlab.com/qemu-project/qemu/-/issues/1691
@@ -238,6 +238,14 @@ void nvme_continue(int z)
             .prp1 = data_region_paddr,
         });
     } else if (z == 1) {
+        sddf_dprintf("doing nothing :P -- should get another IRQ \n");
+        /*
+            So this works fine on QEMU AArch64...
+            but on QEMU RISCV level interrupts only get triggerred once
+            ... this caused issues in linux
+            ... https://www.mail-archive.com/qemu-devel@nongnu.org/msg931360.html
+        */
+    } else if (z == 2) {
         nvme_completion_queue_entry_t cq_entry;
         int ret = nvme_queue_consume(&io_queue, &cq_entry);
         assert(ret == 0);
@@ -261,7 +269,7 @@ void nvme_continue(int z)
             .prp2 = 0x0,
             .prp1 = data_region_paddr,
         });
-    } else if (z == 2) {
+    } else if (z == 3) {
         nvme_completion_queue_entry_t cq_entry;
         int ret = nvme_queue_consume(&io_queue, &cq_entry);
         assert(ret == 0);
