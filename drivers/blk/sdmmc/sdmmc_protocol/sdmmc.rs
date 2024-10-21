@@ -95,6 +95,7 @@ pub trait SdmmcHardware {
     }
 }
 
+// Not used right now, but would be useful in the future once we want to execute some command synchronously
 fn send_cmd_and_receive_resp<T: SdmmcHardware>(
     hardware: &mut T,
     cmd: &SdmmcCmd,
@@ -143,8 +144,10 @@ impl<'a, T: SdmmcHardware> SdmmcProtocol<'a, T> {
         }
     }
 
+    // Funtion that is not completed
     pub fn reset_card(&mut self) -> Result<(), SdmmcHalError> {
         let all: u32 = InterruptType::Success as u32 | InterruptType::Error as u32 | InterruptType::SDIO as u32;
+        todo!();
         self.hardware.sdmmc_ack_interrupt(&all)
     }
 
