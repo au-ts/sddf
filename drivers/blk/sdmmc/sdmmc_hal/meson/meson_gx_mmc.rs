@@ -5,11 +5,16 @@ use sel4_microkit::debug_println;
 
 const SDIO_BASE: u64 = 0xffe05000; // Base address from DTS
 
+macro_rules! div_round_up {
+    ($n:expr, $d:expr) => {
+        (($n + $d - 1) / $d)
+    };
+}
+
 // Constants translated from the C version
 // Clock related constant
 const SD_EMMC_CLKSRC_24M: u32 = 24000000;       // 24 MHz
 const SD_EMMC_CLKSRC_DIV2: u32 = 1000000000;    // 1 GHz
-
 const CLK_MAX_DIV: u32 = 63;
 const CLK_SRC_24M: u32 = 0 << 6;
 const CLK_SRC_DIV2: u32 = 1 << 6;
@@ -20,12 +25,6 @@ const CLK_CO_PHASE_270: u32 = 3 << 8;
 const CLK_TX_PHASE_000: u32 = 0 << 10;
 const CLK_TX_PHASE_180: u32 = 2 << 10;
 const CLK_ALWAYS_ON: u32 = 1 << 24;
-
-macro_rules! div_round_up {
-    ($n:expr, $d:expr) => {
-        (($n + $d - 1) / $d)
-    };
-}
 
 // CMD_CFG constants
 const CMD_CFG_CMD_INDEX_SHIFT: u32 = 24;
@@ -167,7 +166,7 @@ impl MesonSdmmcRegisters {
     /// * `mmc_clock` - The desired clock frequency in Hz.
     /// * `is_sm1_soc` - A boolean indicating whether the SoC is an SM1 variant.
     /// * For odorid C4, this is_sm1_soc is true
-    pub fn meson_mmc_config_clock(&mut self) {
+    fn meson_mmc_config_clock(&mut self, frequency: u32) {
         // #define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))
         let mut meson_mmc_clk:u32 = 0;
 
@@ -177,7 +176,7 @@ impl MesonSdmmcRegisters {
         let clk: u32; 
         let clk_src: u32;
         // 400 khz for init the card
-        let clock_freq: u32 = 400000;
+        let clock_freq: u32 = frequency;
         if clock_freq > 16000000 {
             clk = SD_EMMC_CLKSRC_DIV2;
             clk_src = CLK_SRC_DIV2;
@@ -194,6 +193,7 @@ impl MesonSdmmcRegisters {
         * Other SoCs use CLK_CO_PHASE_180 by default.
         * It needs to find what is a proper value about each SoCs.
         * Since we are using Odroid C4, we set phase to 270
+        * TODO: Config it as what Linux driver are doing
         */
         meson_mmc_clk |= CLK_CO_PHASE_270;
         meson_mmc_clk |= CLK_TX_PHASE_000;
@@ -202,6 +202,14 @@ impl MesonSdmmcRegisters {
         meson_mmc_clk |= clk_div;
 
         unsafe { ptr::write_volatile(&mut self.clock, meson_mmc_clk); }
+    }
+
+    // Incomplete placeholder function, need regulator system to configure voltage
+    pub fn meson_set_ios(&mut self) {
+        /*
+         * This function should be able to adjust the voltage, frequency and number of data lanes in use
+         *
+         */
     }
 
     // This function can be seen as a Rust version of meson_mmc_setup_cmd function in uboot
