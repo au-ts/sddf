@@ -62,7 +62,6 @@ void tx_provide(void)
                     assert(!err);
                     continue;
                 }
-
                 cache_clean(buffer.io_or_offset + state.buffer_region_vaddrs[client],
                             buffer.io_or_offset + state.buffer_region_vaddrs[client] + buffer.len);
 
