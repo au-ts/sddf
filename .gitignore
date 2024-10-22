@@ -15,3 +15,5 @@ ci_build/
 .#*
 zig-out/
 .zig-cache/
+target/
+Cargo.lock

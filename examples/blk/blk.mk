@@ -37,9 +37,7 @@ QEMU := qemu-system-aarch64
 BUILD_DIR ?= build
 MICROKIT_CONFIG ?= debug
 
-BLK_DRIVER_DIR := virtio
 TIMER_DRIVER_DIR := arm
-CPU := cortex-a53
 
 TOP := ${SDDF}/examples/blk
 CONFIGS_INCLUDE := ${TOP}
@@ -48,7 +46,23 @@ MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 
-IMAGES := blk_driver.elf timer_driver.elf client.elf blk_virt.elf
+IMAGES := client.elf blk_virt.elf
+
+ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
+	IMAGES += sdmmc_driver.elf
+	BLK_DRIVER_DIR := sdmmc
+	BLK_DRIVER_MK := sdmmc_driver.mk
+	CPU := cortex-a53
+else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
+	IMAGES += blk_driver.elf
+	BLK_DRIVER_DIR := virtio
+	BLK_DRIVER_MK := blk_driver.mk
+	CPU := cortex-a53
+	QEMU := qemu-system-aarch64
+else
+	$(error Unsupported MICROKIT_BOARD given)
+endif
+
 CFLAGS := -mcpu=$(CPU) \
 		  -mstrict-align \
 		  -nostdlib \
@@ -73,7 +87,7 @@ BLK_COMPONENTS := $(SDDF)/blk/components
 
 all: $(IMAGE_FILE)
 
-include ${BLK_DRIVER}/blk_driver.mk
+include ${BLK_DRIVER}/$(BLK_DRIVER_MK)
 include ${TIMER_DRIVER}/timer_driver.mk
 
 include ${SDDF}/util/util.mk

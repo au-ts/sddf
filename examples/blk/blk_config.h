@@ -24,6 +24,7 @@
 #define BLK_QUEUE_REGION_SIZE_DRIV              BLK_QUEUE_REGION_SIZE
 
 /* Mapping from client index to disk partition that the client will have access to. */
+// Please ensure this point to a partition that you do not mind to courrupt as the example involves write data to that component
 static const int blk_partition_mapping[BLK_NUM_CLIENTS] = { 0 };
 
 static inline blk_storage_info_t *blk_virt_cli_storage_info(blk_storage_info_t *info, unsigned int id)
