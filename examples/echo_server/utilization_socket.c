@@ -13,6 +13,7 @@
 #include <sddf/util/util.h>
 #include <sddf/benchmark/bench.h>
 #include <sddf/util/printf.h>
+#include <core_config.h>
 
 #include "echo.h"
 
@@ -20,8 +21,6 @@
 #define STOP_PMU 5
 
 #define MAX_PACKET_SIZE 0x1000
-
-uintptr_t cyclecounters_vaddr;
 
 /* This file implements a TCP based utilization measurment process that starts
  * and stops utilization measurements based on a client's requests.
@@ -74,14 +73,16 @@ static struct tcp_pcb *utiliz_socket;
     "Content-length: "STR(x)"\n"\
     ","STR(y)","STR(z)
 
+uintptr_t idle_ccounts_vaddr;
 
-struct bench *bench;
+#define IDLE_CCOUNTS_SIZE 0x1000
 
-uint64_t start;
-uint64_t idle_ccount_start;
+uint16_t active_cores;
+
+uint64_t core_ccount_start[MAX_CORES];
+uint64_t idle_ccount_start[MAX_CORES];
 
 char data_packet_str[MAX_PACKET_SIZE];
-
 
 static inline void my_reverse(char s[])
 {
@@ -139,8 +140,13 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
     } else if (msg_match(data_packet_str, START)) {
         sddf_printf("%s measurement starting... \n", microkit_name);
         if (!strcmp(microkit_name, "client0")) {
-            start = __atomic_load_n(&bench->ts, __ATOMIC_RELAXED);
-            idle_ccount_start = __atomic_load_n(&bench->ccount, __ATOMIC_RELAXED);
+            for (int i = 0; i < MAX_CORES; i++) {
+                if (active_cores & (1 << i)) {
+                    struct bench *core_ccounts = (struct bench *)(idle_ccounts_vaddr + IDLE_CCOUNTS_SIZE * i);
+                    core_ccount_start[i] = __atomic_load_n(&core_ccounts->ts, __ATOMIC_RELAXED);
+                    idle_ccount_start[i] = __atomic_load_n(&core_ccounts->ccount, __ATOMIC_RELAXED);
+                }
+            }
             microkit_notify(START_PMU);
         }
     } else if (msg_match(data_packet_str, STOP)) {
@@ -149,8 +155,13 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
         uint64_t total = 0, idle = 0;
 
         if (!strcmp(microkit_name, "client0")) {
-            total = __atomic_load_n(&bench->ts, __ATOMIC_RELAXED) - start;
-            idle = __atomic_load_n(&bench->ccount, __ATOMIC_RELAXED) - idle_ccount_start;
+            for (int i = 0; i < MAX_CORES; i++) {
+                if (active_cores & (1 << i)) {
+                    struct bench *core_ccounts = (struct bench *)(idle_ccounts_vaddr + IDLE_CCOUNTS_SIZE * i);
+                    total += __atomic_load_n(&core_ccounts->ts, __ATOMIC_RELAXED) - core_ccount_start[i];
+                    idle += __atomic_load_n(&core_ccounts->ccount, __ATOMIC_RELAXED) - idle_ccount_start[i];
+                }
+            }
         }
 
         char tbuf[21];
@@ -199,7 +210,8 @@ static err_t utilization_accept_callback(void *arg, struct tcp_pcb *newpcb, err_
 
 int setup_utilization_socket(void)
 {
-    bench = (void *)cyclecounters_vaddr;
+    active_cores = bench_active_cores();
+
     utiliz_socket = tcp_new_ip_type(IPADDR_TYPE_V4);
     if (utiliz_socket == NULL) {
         sddf_dprintf("Failed to open a socket for listening!\n");
