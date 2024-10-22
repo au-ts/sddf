@@ -21,7 +21,7 @@ char *rx_data_drv;
 char *rx_data_cli0;
 
 serial_queue_handle_t rx_queue_handle_drv;
-serial_queue_handle_t rx_queue_handle_cli[SERIAL_NUM_CLIENTS];
+serial_queue_handle_t rx_queue_handle_cli[NUM_SERIAL_CLIENTS];
 
 #define MAX_CLI_BASE_10 4
 typedef enum mode {normal, switched, number} mode_t;
@@ -78,7 +78,7 @@ void rx_return(void)
             default:
                 if (c == SERIAL_TERMINATE_NUM) {
                     int input_number = sddf_atoi(next_client);
-                    if (input_number >= 0 && input_number < SERIAL_NUM_CLIENTS) {
+                    if (input_number >= 0 && input_number < NUM_SERIAL_CLIENTS) {
                         if (transferred && serial_require_producer_signal(&rx_queue_handle_cli[current_client])) {
                             serial_update_visible_tail(&rx_queue_handle_cli[current_client], local_tail);
                             serial_cancel_producer_signal(&rx_queue_handle_cli[current_client]);
@@ -129,7 +129,13 @@ void rx_return(void)
 void init(void)
 {
     serial_queue_init(&rx_queue_handle_drv, rx_queue_drv, SERIAL_RX_DATA_REGION_CAPACITY_DRIV, rx_data_drv);
-    serial_virt_queue_init_sys(microkit_name, rx_queue_handle_cli, rx_queue_cli0, rx_data_cli0);
+
+    serial_queue_info_t queue_info[NUM_SERIAL_CLIENTS] = { 0 };
+    serial_virt_queue_info(microkit_name, rx_queue_cli0, rx_data_cli0, queue_info);
+    for (int i = 0; i < NUM_SERIAL_CLIENTS; i++) {
+        serial_queue_init(&rx_queue_handle_cli[i], queue_info[i].cli_queue, queue_info[i].capacity,
+                          queue_info[i].cli_data);
+    }
 }
 
 void notified(microkit_channel ch)
