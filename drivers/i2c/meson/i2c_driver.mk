@@ -20,7 +20,7 @@ I2C_DRIVER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 i2c_driver.elf: i2c/i2c_driver.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-i2c/i2c_driver.o: CFLAGS+=-I${I2C_DRIVER_DIR} -DI2C_BUS_NUM=${I2C_BUS_NUM}
+i2c/i2c_driver.o: CFLAGS+=-I${I2C_DRIVER_DIR} -DI2C_BUS_NUM=${I2C_BUS_NUM} -DDISABLE_I2C_PINMUX_INIT
 i2c/i2c_driver.o: ${I2C_DRIVER_DIR}/i2c.c |i2c
 	${CC} ${CFLAGS} -c -o $@ $<
 

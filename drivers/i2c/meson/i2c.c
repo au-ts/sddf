@@ -159,6 +159,17 @@ static inline void i2c_setup()
 
     volatile struct i2c_regs *regs = (volatile struct i2c_regs *) i2c_regs;
 
+    volatile uint32_t *clk81_ptr        = ((void *)clk_regs + I2C_CLK_OFFSET);
+    uint32_t clk81 = *clk81_ptr;
+    // Enable i2c by removing clock gate
+    clk81 |= (I2C_CLK81_BIT);
+    *clk81_ptr = clk81;
+
+    // Check that registers actually changed
+    if (!(*clk81_ptr & I2C_CLK81_BIT)) {
+        LOG_DRIVER_ERR("failed to toggle clock!\n");
+    }
+
 #ifndef DISABLE_I2C_PINMUX_INIT
     // Note: this is hacky - should do this using a GPIO driver.
     // Set up pinmux
@@ -170,12 +181,12 @@ static inline void i2c_setup()
     // volatile uint32_t *pad_ds5a_ptr     = ((void*)gpio_mem + GPIO_DS_5A*4);
     volatile uint32_t *pad_bias2_ptr    = ((void *)gpio_mem + GPIO_BIAS_2_EN * 4);
     // volatile uint32_t *pad_bias5_ptr    = ((void*)gpio_mem + GPIO_BIAS_5_EN*4);
-    volatile uint32_t *clk81_ptr        = ((void *)clk_regs + I2C_CLK_OFFSET);
+    // volatile uint32_t *clk81_ptr        = ((void *)clk_regs + I2C_CLK_OFFSET);
 
     // Read existing register values
     uint32_t pinmux5 = *pinmux5_ptr;
     // uint32_t pinmuxE = *pinmuxE_ptr;
-    uint32_t clk81 = *clk81_ptr;
+    // uint32_t clk81 = *clk81_ptr;
 
     // Common values
     const uint8_t ds = 3;    // 3 mA
@@ -242,14 +253,14 @@ static inline void i2c_setup()
     }
 # endif /* I2C_BUS_NUM */
 
-    // Enable i2c by removing clock gate
-    clk81 |= (I2C_CLK81_BIT);
-    *clk81_ptr = clk81;
+    // // Enable i2c by removing clock gate
+    // clk81 |= (I2C_CLK81_BIT);
+    // *clk81_ptr = clk81;
 
-    // Check that registers actually changed
-    if (!(*clk81_ptr & I2C_CLK81_BIT)) {
-        LOG_DRIVER_ERR("failed to toggle clock!\n");
-    }
+    // // Check that registers actually changed
+    // if (!(*clk81_ptr & I2C_CLK81_BIT)) {
+    //     LOG_DRIVER_ERR("failed to toggle clock!\n");
+    // }
 #endif
 
     // Initialise fields
