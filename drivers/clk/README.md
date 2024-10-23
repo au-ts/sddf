@@ -38,7 +38,7 @@ The below picture gives a sample of how a clock tree looks like:
 This driver can be used as a clock server to manage and control clock hardware in
 a SoC. To initialise the whole clock tree, a DTS file is required to be prepared.
 
-To control the clocks, the following APIs can be used :
+To control the clocks, the following APIs can be invoked at userspace:
 - `static inline uint32_t sddf_clk_enable(microkit_channel channel, uint32_t clk_id)`
 - `static inline uint32_t sddf_clk_disable(microkit_channel channel, uint32_t clk_id)`
 - `static inline uint32_t sddf_clk_get_rate(microkit_channel channel, uint32_t clk_id)`
@@ -56,4 +56,3 @@ See `include/sddf/clk/client.h` for more details.
 
 ## iMX8-*
 
-In progress

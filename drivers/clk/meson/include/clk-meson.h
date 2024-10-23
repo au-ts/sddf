@@ -144,7 +144,7 @@ struct clk _name = {                                         \
     },                                                       \
     .hw.init = &(struct clk_init_data) {                     \
         .name = #_name,                                      \
-        .ops = &clk_gate_ops,                         \
+        .ops = &clk_gate_ops,                                \
         .parent_clks = (const struct clk *[]) {              \
             &g12a_clk81,                                     \
         },                                                   \
@@ -162,7 +162,7 @@ struct clk _name = {                                         \
     },                                                       \
     .hw.init = &(struct clk_init_data) {                     \
         .name = #_name,                                      \
-        .ops = &clk_gate_ro_ops,                      \
+        .ops = &clk_gate_ro_ops,                             \
         .parent_clks = (const struct clk *[]) {              \
             &g12a_clk81,                                     \
         },                                                   \
