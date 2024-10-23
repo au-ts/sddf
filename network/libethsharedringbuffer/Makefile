@@ -10,13 +10,15 @@ endif
 
 BUILD_DIR ?= .
 
-CC := clang
-TARGET := x86_64-none-elf
+CC := zig cc
+TARGET := x86_64-freestanding
+# CC := clang
+# TARGET := x86_64-none-elf
 SDDF := ../../
 
+# @jade: James added "-O3" here but somehow it makes the echo server slower
 CFLAGS := \
 	-target $(TARGET) \
-	-mstrict-align \
 	-ffreestanding \
 	-I$(MICROKIT_INCLUDE) \
 	-I$(SDDF)/include

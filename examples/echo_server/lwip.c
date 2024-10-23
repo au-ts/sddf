@@ -164,10 +164,12 @@ static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
     if (ring_empty(state.tx_ring.free_ring)) {
         enqueue_pbufs(p);
         // request_signal(state.tx_ring.free_ring);
-        b->lwip_tx_ntfn_count++;
-        microkit_notify(TX_CH);
+        // @jade: should not be here anyway
+        // b->lwip_tx_notify++;
+        // microkit_notify(TX_CH);
         return ERR_OK;
     }
+    assert(!ring_empty(state.tx_ring.free_ring));
 
     buff_desc_t buffer;
     int err __attribute__((unused)) = dequeue_free(&(state.tx_ring), &buffer);
@@ -187,7 +189,6 @@ static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
     b->lwip_pcount_tx++;
 
     notify_tx = true;
-    // microkit_notify(TX_CH);
 
     // doesn't really help
     // if (ring_size(state.tx_ring.free_ring) <= TX_RING_SIZE_CLI0) {
@@ -350,7 +351,6 @@ void init(void)
     if (notify_rx && require_signal(state.rx_ring.free_ring)) {
         cancel_signal(state.rx_ring.free_ring);
         notify_rx = false;
-        // microkit_notify(RX_CH);
         if (!have_signal) microkit_notify(RX_CH);
         else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + RX_CH) microkit_notify(RX_CH);
     }
@@ -359,7 +359,6 @@ void init(void)
     // if (notify_tx) {
         cancel_signal(state.tx_ring.used_ring);
         notify_tx = false;
-        // microkit_notify(TX_CH);
         if (!have_signal) microkit_notify(TX_CH);
         else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + TX_CH) microkit_notify(TX_CH);
     }
@@ -369,11 +368,10 @@ void init(void)
 void notified(microkit_channel ch)
 {
     achieved_something = false;
-    b->lwip_notified++;
-    b->lwip_ntfn_count++;
 
     switch(ch) {
     case RX_CH:
+        b->lwip_rx_notified++;
         receive();
         break;
     case TIMER:
@@ -382,6 +380,7 @@ void notified(microkit_channel ch)
         set_timeout();
         break;
     case TX_CH:
+        b->lwip_tx_notified++;
         transmit();
         // don't do if tx free q is empty
         // if (!ring_empty(state.tx_ring.free_ring)) {
@@ -401,17 +400,25 @@ void notified(microkit_channel ch)
     if (notify_rx && require_signal(state.rx_ring.free_ring)) {
         cancel_signal(state.rx_ring.free_ring);
         notify_rx = false;
-        // microkit_notify(RX_CH);
-        if (!have_signal) microkit_notify(RX_CH);
-        else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + RX_CH) microkit_notify(RX_CH);
+        if (!have_signal) {
+            b->lwip_rx_notify++;
+            microkit_notify(RX_CH);
+        } else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + RX_CH) {
+            b->lwip_rx_notify++;
+            microkit_notify(RX_CH);
+        }
     }
 
     if (notify_tx && require_signal(state.tx_ring.used_ring)) {
     // if (notify_tx) {
         cancel_signal(state.tx_ring.used_ring);
         notify_tx = false;
-        // microkit_notify(TX_CH);
-        if (!have_signal) microkit_notify(TX_CH);
-        else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + TX_CH) microkit_notify(TX_CH);
+        if (!have_signal) {
+            b->lwip_tx_notify++;
+            microkit_notify(TX_CH);
+        } else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + TX_CH) {
+            b->lwip_tx_notify++;
+            microkit_notify(TX_CH);
+        }
     }
 }

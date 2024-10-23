@@ -199,8 +199,8 @@ void notified(microkit_channel ch)
             microkit_benchmark_stop_tcb(PD_MUX_TX_ID, &total, &number_schedules, &kernel, &entries);
             print_benchmark_details(PD_MUX_TX_ID, kernel, entries, number_schedules, total);
 
-            microkit_benchmark_stop_tcb(PD_COPY_ID, &total, &number_schedules, &kernel, &entries);
-            print_benchmark_details(PD_COPY_ID, kernel, entries, number_schedules, total);
+            // microkit_benchmark_stop_tcb(PD_COPY_ID, &total, &number_schedules, &kernel, &entries);
+            // print_benchmark_details(PD_COPY_ID, kernel, entries, number_schedules, total);
 
             // microkit_benchmark_stop_tcb(PD_COPY1_ID, &total, &number_schedules, &kernel, &entries);
             // print_benchmark_details(PD_COPY1_ID, kernel, entries, number_schedules, total);

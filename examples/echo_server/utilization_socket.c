@@ -29,6 +29,7 @@
 
 #define START_SNAP 6
 #define STOP_SNAP 8
+#define STOP_COUNTER 9
 
 // #define IPBENCH_STOP 8
 #define MAX_PACKET_SIZE 0x1000
@@ -95,6 +96,7 @@ uint64_t idle_overflow_start;
 
 uint64_t eth_pcount_tx_start;
 uint64_t eth_pcount_rx_start;
+uint64_t eth_rx_irq_count_start;
 uint64_t eth_irq_count_start;
 uint64_t eth_tx_ntfn_count_start;
 
@@ -103,10 +105,11 @@ uint64_t eth_idle_notified_start;
 
 uint64_t lwip_pcount_tx_start;
 uint64_t lwip_pcount_rx_start;
-uint64_t lwip_ntfn_count_start;
-uint64_t lwip_tx_ntfn_count_start;
+uint64_t lwip_rx_notify_start;
+uint64_t lwip_tx_notify_start;
 
-uint64_t lwip_notified_start;
+uint64_t lwip_rx_notified_start;
+uint64_t lwip_tx_notified_start;
 uint64_t lwip_idle_notified_start;
 
 uint64_t rx_mux_notified_start;
@@ -182,17 +185,19 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
             eth_pcount_tx_start = bench->eth_pcount_tx;
             eth_pcount_rx_start = bench->eth_pcount_rx;
             eth_irq_count_start = bench->eth_irq_count;
+            eth_rx_irq_count_start = bench->eth_rx_irq_count;
             eth_tx_ntfn_count_start = bench->eth_tx_ntfn_count;
             
             lwip_pcount_tx_start = bench->lwip_pcount_tx;
             lwip_pcount_rx_start = bench->lwip_pcount_rx;
-            lwip_ntfn_count_start = bench->lwip_ntfn_count;
-            lwip_tx_ntfn_count_start = bench->lwip_tx_ntfn_count;
+            lwip_rx_notify_start = bench->lwip_rx_notify;
+            lwip_tx_notify_start = bench->lwip_tx_notify;
 
             eth_notified_start = bench->eth_notified;
             eth_idle_notified_start = bench->eth_idle_notified;
 
-            lwip_notified_start = bench->lwip_notified;
+            lwip_rx_notified_start = bench->lwip_rx_notified;
+            lwip_tx_notified_start = bench->lwip_tx_notified;
             lwip_idle_notified_start = bench->lwip_idle_notified;
 
             rx_mux_notified_start = bench->rx_mux_notified;
@@ -206,6 +211,14 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
             microkit_notify(START_SNAP);
         }
     } else if (msg_match(data_packet_str, STOP)) {
+        if (1) {
+            printf("%s stop PMU... \n", microkit_name);
+            microkit_notify(STOP_PMU);
+            printf("%s stop SNAP... \n", microkit_name);
+            microkit_notify(STOP_SNAP);
+            printf("%s stop NIC Statistic Counters... \n", microkit_name);
+            microkit_notify(STOP_COUNTER);
+        }
         printf("%s measurement finished \n", microkit_name);
 
         uint64_t total = 0, idle = 0;
@@ -217,26 +230,30 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
             idle = bench->ccount - idle_ccount_start;
         }
 
-        printf("driver RX pk,driver TX pk,driver RX IRQ,driver TX ntfn,client0 RX pk,client0 TX pk,client0 RX ntfn,client0 TX ntfn\n");
-
         uint64_t eth_pcount_tx = bench->eth_pcount_tx - eth_pcount_tx_start;
         uint64_t eth_pcount_rx = bench->eth_pcount_rx - eth_pcount_rx_start;
+        uint64_t eth_rx_irq_count = bench->eth_rx_irq_count - eth_rx_irq_count_start;
         uint64_t eth_irq_count = bench->eth_irq_count - eth_irq_count_start;
         uint64_t eth_tx_ntfn_count = bench->eth_tx_ntfn_count - eth_tx_ntfn_count_start;
 
         uint64_t lwip_pcount_tx = bench->lwip_pcount_tx - lwip_pcount_tx_start;
         uint64_t lwip_pcount_rx = bench->lwip_pcount_rx - lwip_pcount_rx_start;
-        uint64_t lwip_ntfn_count = bench->lwip_ntfn_count - lwip_ntfn_count_start;
-        uint64_t lwip_tx_ntfn_count = bench->lwip_tx_ntfn_count - lwip_tx_ntfn_count_start;
+        uint64_t lwip_rx_notify = bench->lwip_rx_notify - lwip_rx_notify_start;
+        uint64_t lwip_tx_notify = bench->lwip_tx_notify - lwip_tx_notify_start;
+        uint64_t lwip_rx_notified = bench->lwip_rx_notified - lwip_rx_notified_start;
+        uint64_t lwip_tx_notified = bench->lwip_tx_notified - lwip_tx_notified_start;
 
-        printf("%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld\n",
-               eth_pcount_rx, eth_pcount_tx, eth_irq_count, eth_tx_ntfn_count,
-               lwip_pcount_rx, lwip_pcount_tx, lwip_ntfn_count, lwip_tx_ntfn_count);
+        printf("NIC RX pk,NIC RX dropped pk,driver RX pk,driver TX pk,driver IRQ,driver RX IRQ,driver TX ntfn,client0 RX pk,client0 TX pk,client0 RX notify,client0 TX notify,client0 RX notified,client0 TX notified\n");
+
+        printf("%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,\n",
+               bench->hw_pcount_rx, bench->hw_pcount_rx_dropped,
+               eth_pcount_rx, eth_pcount_tx, eth_irq_count, eth_rx_irq_count, eth_tx_ntfn_count,
+               lwip_pcount_rx, lwip_pcount_tx,
+               lwip_rx_notify, lwip_tx_notify, lwip_rx_notified, lwip_tx_notified);
 
         uint64_t eth_notified = bench->eth_notified - eth_notified_start;
         uint64_t eth_idle_notified = bench->eth_idle_notified - eth_idle_notified_start;
 
-        uint64_t lwip_notified = bench->lwip_notified - lwip_notified_start;
         uint64_t lwip_idle_notified = bench->lwip_idle_notified - lwip_idle_notified_start;
         
         uint64_t tx_mux_notified = bench->tx_mux_notified - tx_mux_notified_start;
@@ -247,9 +264,9 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
 
         printf("driver ntfn,driver idle ntfn,lwip ntfn,lwip idle ntfn,tx mux ntfn,tx mux idle ntfn,rx mux ntfn,rx mux idle ntfn\n");
 
-        printf("%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld\n",
+        printf("%ld,%ld,%ld,%ld,%ld,%ld,%ld\n",
                eth_notified, eth_idle_notified,
-               lwip_notified, lwip_idle_notified,
+               lwip_idle_notified,
                tx_mux_notified, tx_mux_idle_notified,
                rx_mux_notified, rx_mux_idle_notified);
 
@@ -276,12 +293,12 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
         // microkit_notify(IPBENCH_STOP);
 
         // if (!strcmp(microkit_name, "client0")) {
-        if (1) {
-            printf("%s stop PMU... \n", microkit_name);
-            microkit_notify(STOP_PMU);
-            printf("%s stop SNAP... \n", microkit_name);
-            microkit_notify(STOP_SNAP);
-        }
+        // if (1) {
+        //     printf("%s stop PMU... \n", microkit_name);
+        //     microkit_notify(STOP_PMU);
+        //     printf("%s stop SNAP... \n", microkit_name);
+        //     microkit_notify(STOP_SNAP);
+        // }
     } else if (msg_match(data_packet_str, QUIT)) {
         /* Do nothing for now */
     } else {
