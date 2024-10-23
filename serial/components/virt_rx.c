@@ -130,6 +130,10 @@ void init(void)
 {
     serial_queue_init(&rx_queue_handle_drv, rx_queue_drv, SERIAL_RX_DATA_REGION_CAPACITY_DRIV, rx_data_drv);
     serial_virt_queue_init_sys(microkit_name, rx_queue_handle_cli, rx_queue_cli0, rx_data_cli0);
+
+    for (int i = 0; i < SERIAL_NUM_CLIENTS; i++) {
+        sddf_dprintf("rx i: %d, queue: %p, data: %p\n", i, rx_queue_handle_cli[i].queue, rx_queue_handle_cli[i].data_region);
+    }
 }
 
 void notified(microkit_channel ch)
