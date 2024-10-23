@@ -245,6 +245,7 @@ fn addNetworkDriver(
     const source = b.fmt("drivers/network/{s}/ethernet.c", .{ @tagName(class) });
     driver.addCSourceFile(.{
         .file = b.path(source),
+        .flags = &.{ "-fno-sanitize=undefined" },
     });
     driver.addIncludePath(net_config_include);
     driver.addIncludePath(b.path(b.fmt("drivers/network/{s}/", .{ @tagName(class) })));
