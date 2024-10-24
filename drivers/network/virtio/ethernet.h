@@ -228,9 +228,6 @@ struct resources {
 
 struct resources resources;
 
-void sddf_init(void);
-void sddf_notified(uint32_t ch);
-
 #ifdef MICROKIT
 
 #define IRQ_CH 0
@@ -259,8 +256,8 @@ void init(void) {
         .rx_active = rx_active,
         .tx_free = tx_free,
         .tx_active = tx_active,
-        .rx_queue_size = NET_RX_QUEUE_SIZE_DRIV,
-        .tx_queue_size = NET_TX_QUEUE_SIZE_DRIV,
+        .rx_queue_size = NET_RX_QUEUE_CAPACITY_DRIV,
+        .tx_queue_size = NET_TX_QUEUE_CAPACITY_DRIV,
 
         .irq_id = IRQ_CH,
         .rx_id = RX_CH,
@@ -270,8 +267,4 @@ void init(void) {
     sddf_init();
 }
 
-
-#else
-
-#endif
-
+#endif /* MICROKIT */

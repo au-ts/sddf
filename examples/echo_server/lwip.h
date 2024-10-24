@@ -45,9 +45,10 @@ uintptr_t rx_buffer_data_region;
 uintptr_t tx_buffer_data_region;
 
 void init() {
+
 	size_t rx_queue_size, tx_queue_size;
-	net_cli_queue_info(microkit_name, &rx_queue_size, &tx_queue_size);
-	uint64_t mac_addr = net_cli_mac_addr_info(microkit_name);
+	net_cli_queue_capacity(microkit_name, &rx_queue_size, &tx_queue_size);
+	uint64_t mac_addr = net_cli_mac_addr(microkit_name);
 
     resources = (struct resources) {
     	.rx_free = rx_free,

@@ -70,7 +70,7 @@ void tx_provide(void)
 
     if (enqueued && net_require_signal_active(&state.tx_queue_drv)) {
         net_cancel_signal_active(&state.tx_queue_drv);
-        sddf_notify_delayed(resources.drv_id);
+        sddf_deferred_notify(resources.drv_id);
     }
 }
 
@@ -118,10 +118,10 @@ void sddf_notified(unsigned int id)
 void sddf_init(void)
 {
     net_queue_init(&state.tx_queue_drv, (net_queue_t *)resources.tx_free_drv,
-                   (net_queue_t *)resources.tx_active_drv, resources.drv_queue_size);
+                   (net_queue_t *)resources.tx_active_drv, resources.drv_queue_capacity);
 
-    for (int i = 0; i < NUM_NETWORK_CLIENTS; i++) {
-        net_queue_init(&state.tx_queue_clients[i], (net_queue_t *) resources.clients[i].tx_free, (net_queue_t *)resources.clients[i].tx_active, resources.clients[i].queue_size);
+    for (int i = 0; i < resources.num_network_clients; i++) {
+        net_queue_init(&state.tx_queue_clients[i], (net_queue_t *) resources.clients[i].tx_free, (net_queue_t *)resources.clients[i].tx_active, resources.clients[i].queue_capacity);
         state.buffer_region_vaddrs[i] = resources.clients[i].buffer_data_region_vaddr;
         state.buffer_region_paddrs[i] = resources.clients[i].buffer_data_region_paddr;
     }

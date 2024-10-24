@@ -13,7 +13,7 @@
 struct client {
     uint64_t tx_free;
     uint64_t tx_active;
-    uint64_t queue_size;
+    uint64_t queue_capacity;
     uint8_t client_id;
     uint64_t buffer_data_region_vaddr;
     uint64_t buffer_data_region_paddr;
@@ -22,8 +22,9 @@ struct client {
 struct resources {
     uint64_t tx_free_drv;
     uint64_t tx_active_drv;
-    uint64_t drv_queue_size;
+    uint64_t drv_queue_capacity;
     uint8_t drv_id;
+    uint8_t num_network_clients;
     struct client clients[MAX_CLIENTS];
 };
 
@@ -50,20 +51,19 @@ uintptr_t buffer_data_region_cli0_paddr;
 uintptr_t buffer_data_region_cli1_vaddr;
 uintptr_t buffer_data_region_cli1_paddr;
 
-#define MAX_CLIENTS 64
-
 void init() {
-    queue_info_t client_queue_info[MAX_CLIENTS];
+    net_queue_info_t client_queue_info[MAX_CLIENTS] = {0};
     net_virt_queue_info(microkit_name, tx_free_cli0, tx_active_cli0, client_queue_info);
 
-    uintptr_t buffer_region_vaddrs[MAX_CLIENTS];
-    net_mem_region_info(microkit_name, buffer_region_vaddrs, buffer_data_region_cli0_vaddr);
+    uintptr_t buffer_region_vaddrs[MAX_CLIENTS] = {0};
+    net_mem_region_vaddr(microkit_name, buffer_region_vaddrs, buffer_data_region_cli0_vaddr);
 
     resources = (struct resources) {
         .tx_free_drv = tx_free_drv,
         .tx_active_drv = tx_active_drv,
-        .drv_queue_size = NET_TX_QUEUE_SIZE_DRIV,
+        .drv_queue_capacity = NET_TX_QUEUE_CAPACITY_DRIV,
         .drv_id = DRIVER_CH,
+        .num_network_clients = NUM_NETWORK_CLIENTS,
         .clients = {},
     };
 
@@ -71,7 +71,7 @@ void init() {
         resources.clients[i] = (struct client) {
             .tx_free = client_queue_info[i].free,
             .tx_active =  client_queue_info[i].active,
-            .queue_size = client_queue_info[i].size,
+            .queue_capacity = client_queue_info[i].capacity,
             .buffer_data_region_vaddr = buffer_region_vaddrs[i],
             .client_id = CLIENT_0_CH + i,
         };
@@ -82,8 +82,4 @@ void init() {
 
     sddf_init();
 }
-#else
-/* @alwin: Actually these should kinda be defined in rust and exported or something */
-#define NUM_NETWORK_CLIENTS 1
-
-#endif
+#endif /* MICROKIT */

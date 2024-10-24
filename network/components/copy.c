@@ -76,7 +76,7 @@ void rx_return(void)
 
     if (enqueued && net_require_signal_free(&rx_queue_virt)) {
         net_cancel_signal_free(&rx_queue_virt);
-        sddf_notify_delayed(resources.virt_id);
+        sddf_deferred_notify(resources.virt_id);
     }
 }
 

@@ -175,7 +175,7 @@ void rx_provide(void)
 
     if (notify_drv && net_require_signal_free(&state.rx_queue_drv)) {
         net_cancel_signal_free(&state.rx_queue_drv);
-        sddf_notify_delayed(resources.driver_id);
+        sddf_deferred_notify(resources.driver_id);
         notify_drv = false;
     }
 }
@@ -190,8 +190,8 @@ void sddf_init(void)
 {
     /* Set up client queues */
     for (int i = 0; i < NUM_NETWORK_CLIENTS; i++) {
-        net_set_mac_addr((uint8_t *) &state.mac_addrs[i], resources.clients[i].macs_addr);
-        net_queue_init(&state.rx_queue_clients[i], queue_info[i].free, queue_info[i].active, queue_info[i].capacity);
+        net_set_mac_addr((uint8_t *) &state.mac_addrs[i], resources.clients[i].mac_addr);
+        net_queue_init(&state.rx_queue_clients[i], resources.clients[i].rx_free, resources.clients[i].rx_active, resources.clients[i].queue_capacity);
     }
 
      /* Set up driver queues */
@@ -200,6 +200,6 @@ void sddf_init(void)
 
     if (net_require_signal_free(&state.rx_queue_drv)) {
         net_cancel_signal_free(&state.rx_queue_drv);
-        sddf_notify_delayed(resources.driver_id);
+        sddf_deferred_notify(resources.driver_id);
     }
 }

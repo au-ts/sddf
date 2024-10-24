@@ -44,7 +44,7 @@ uintptr_t cli_buffer_data_region;
 void init() {
 	size_t cli_queue_size, virt_queue_size;
 
-	net_copy_queue_info(microkit_name, &cli_queue_size, &virt_queue_size);
+	net_copy_queue_capacity(microkit_name, &cli_queue_size, &virt_queue_size);
 
 	resources = (struct resources) {
 		.virt_free = rx_free_virt,
@@ -62,7 +62,5 @@ void init() {
 
 	sddf_init();
 }
-
-#else
 
 #endif /* MICROKIT */

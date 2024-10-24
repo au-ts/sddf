@@ -445,7 +445,6 @@ void sddf_init(void)
 
 void sddf_notified(uint32_t id)
 {
-
     if (id == resources.irq_id) {
         handle_irq();
         sddf_irq_ack(resources.irq_id);

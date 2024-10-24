@@ -14,7 +14,7 @@
 struct client {
     uint64_t rx_free;
     uint64_t rx_active;
-    uint64_t queue_size;
+    uint64_t queue_capacity;
     uint8_t client_id;
     uint64_t mac_addr;
 };
@@ -22,10 +22,11 @@ struct client {
 struct resources {
     uint64_t rx_free_drv;
     uint64_t rx_active_drv;
-    uint64_t drv_queue_size;
+    uint64_t drv_queue_capacity;
     uint64_t buffer_data_vaddr;
     uint64_t buffer_data_paddr;
     uint8_t driver_id;
+    uint8_t num_network_clients;
     struct client clients[MAX_CLIENTS];
 };
 
@@ -53,22 +54,21 @@ net_queue_t *rx_active_cli1;
 uintptr_t buffer_data_vaddr;
 uintptr_t buffer_data_paddr;
 
-#define MAX_CLIENTS 64
-
 void init() {
-    queue_info_t client_queue_info[MAX_CLIENTS];
+    net_queue_info_t client_queue_info[MAX_CLIENTS] = {0};
     net_virt_queue_info(microkit_name, rx_free_cli0, rx_active_cli0, client_queue_info);
 
-    uint64_t mac_addrs[MAX_CLIENTS];
-    net_virt_mac_addr_info(microkit_name, mac_addrs);
+    uint64_t mac_addrs[MAX_CLIENTS] = {0};
+    net_virt_mac_addrs(microkit_name, mac_addrs);
 
     resources = (struct resources) {
         .rx_free_drv = rx_free_drv,
         .rx_active_drv = rx_active_drv,
-        .drv_queue_size = NET_RX_QUEUE_SIZE_DRIV,
+        .drv_queue_capacity = NET_RX_QUEUE_CAPACITY_DRIV,
         .buffer_data_vaddr = buffer_data_vaddr,
         .buffer_data_paddr = buffer_data_paddr,
         .driver_id = DRIVER_CH,
+        .num_network_clients = NUM_NETWORK_CLIENTS,
         .clients = {},
     };
 
@@ -76,7 +76,7 @@ void init() {
         resources.clients[i] = (struct client) {
             .rx_free = client_queue_info[i].free,
             .rx_active = client_queue_info[i].active,
-            .queue_size = client_queue_info[i].size,
+            .queue_capacity = client_queue_info[i].capacity,
             .client_id = CLIENT_0_CH + i,
             .mac_addr = mac_addrs[i]
         };
@@ -85,9 +85,4 @@ void init() {
     sddf_init();
 }
 
-#else
-
-#define NUM_NETWORK_CLIENTS 1
-#define NET_RX_QUEUE_SIZE_DRIV 512 //@alwin: What to do about this?
-
-#endif
+#endif /* MICROKIT */

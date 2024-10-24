@@ -158,7 +158,7 @@ void sddf_init()
 void sddf_notified(unsigned int ch)
 {
     assert(ch == resources.irq_id);
-    sddf_irq_ack_delayed(ch);
+    sddf_deferred_irq_ack(ch);
 
     generic_timer_set_compare(UINT64_MAX);
     uint64_t curr_time = freq_cycles_and_hz_to_ns(get_ticks(), timer_freq);

@@ -275,12 +275,11 @@ static void netif_status_callback(struct netif *netif)
 
 void sddf_init(void)
 {
-    // serial_cli_queue_init_sys(microkit_name, NULL, NULL, NULL, &serial_tx_queue_handle, serial_tx_queue, serial_tx_data);
-    // serial_putchar_init(SERIAL_TX_CH, &serial_tx_queue_handle);
+    serial_cli_queue_init_sys(microkit_name, NULL, NULL, NULL, &serial_tx_queue_handle, serial_tx_queue, serial_tx_data);
+    serial_putchar_init(SERIAL_TX_CH, &serial_tx_queue_handle);
 
     net_queue_init(&state.rx_queue, resources.rx_free, resources.rx_active, resources.rx_queue_size);
     net_queue_init(&state.tx_queue, resources.tx_free, resources.tx_active, resources.tx_queue_size);
-
     net_buffers_init(&state.tx_queue, 0);
 
     lwip_init();
@@ -320,22 +319,22 @@ void sddf_init(void)
     if (notify_rx && net_require_signal_free(&state.rx_queue)) {
         net_cancel_signal_free(&state.rx_queue);
         notify_rx = false;
-        unsigned int curr_delayed = sddf_notify_delayed_curr();
+        unsigned int curr_delayed = sddf_deferred_notify_curr();
         if (curr_delayed == -1) {
-            sddf_notify_delayed(resources.rx_id);
+            sddf_deferred_notify(resources.rx_id);
         } else if (curr_delayed != resources.rx_id) {
-            sddf_notify(resources.rx_id);
+            sddf_deferred_notify(resources.rx_id);
         }
     }
 
     if (notify_tx && net_require_signal_active(&state.tx_queue)) {
         net_cancel_signal_active(&state.tx_queue);
         notify_tx = false;
-        unsigned int curr_delayed = sddf_notify_delayed_curr();
+        unsigned int curr_delayed = sddf_deferred_notify_curr();
         if (curr_delayed == -1) {
-            sddf_notify_delayed(resources.tx_id);
+            sddf_deferred_notify(resources.tx_id);
         } else if (curr_delayed != resources.tx_id) {
-            sddf_notify(resources.tx_id);
+            sddf_deferred_notify(resources.tx_id);
         }
     }
 }
@@ -355,22 +354,22 @@ void sddf_notified(unsigned int id)
     if (notify_rx && net_require_signal_free(&state.rx_queue)) {
         net_cancel_signal_free(&state.rx_queue);
         notify_rx = false;
-        unsigned int curr_delayed = sddf_notify_delayed_curr();
+        unsigned int curr_delayed = sddf_deferred_notify_curr();
         if (curr_delayed == -1) {
-            sddf_notify_delayed(resources.rx_id);
+            sddf_deferred_notify(resources.rx_id);
         } else if (curr_delayed != resources.rx_id) {
-            sddf_notify(resources.rx_id);
+            sddf_deferred_notify(resources.rx_id);
         }
     }
 
     if (notify_tx && net_require_signal_active(&state.tx_queue)) {
         net_cancel_signal_active(&state.tx_queue);
         notify_tx = false;
-        unsigned int curr_delayed = sddf_notify_delayed_curr();
+        unsigned int curr_delayed = sddf_deferred_notify_curr();
         if (curr_delayed == -1) {
-            sddf_notify_delayed(resources.tx_id);
+            sddf_deferred_notify(resources.tx_id);
         } else if (curr_delayed != resources.tx_id) {
-            sddf_notify(resources.tx_id);
+            sddf_deferred_notify(resources.tx_id);
         }
     }
 }
