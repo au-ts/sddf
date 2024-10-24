@@ -72,6 +72,7 @@ void init() {
 
 #else
 
-#define NET_MAX_CLIENT_QUEUE_SIZE 512 //@alwin: What to do about this?
+// TODO: THIS IS BAD, but what is the max size/can we implement the lwip.c differently?
+#define NET_MAX_CLIENT_QUEUE_CAPACITY 512 //@alwin: What to do about this?
 
 #endif /* MICROKIT */

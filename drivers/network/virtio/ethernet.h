@@ -15,8 +15,6 @@
 #include <stdint.h>
 #include <sddf/util/printf.h>
 #include <sddf/network/queue.h>
-#include <sddf/virtio/virtio.h>
-#include <sddf/virtio/virtio_queue.h>
 
 // #define DEBUG_DRIVER
 

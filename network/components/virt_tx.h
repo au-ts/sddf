@@ -48,7 +48,6 @@ net_queue_t *tx_active_cli1;
 
 uintptr_t buffer_data_region_cli0_vaddr;
 uintptr_t buffer_data_region_cli0_paddr;
-uintptr_t buffer_data_region_cli1_vaddr;
 uintptr_t buffer_data_region_cli1_paddr;
 
 void init() {
@@ -78,7 +77,9 @@ void init() {
     }
 
     resources.clients[0].buffer_data_region_paddr = buffer_data_region_cli0_paddr;
+#ifdef NUM_NETWORK_CLIENTS > 1
     resources.clients[1].buffer_data_region_paddr = buffer_data_region_cli1_paddr;
+#endif /* NUM_NETWORK_CLIENTS > 1 */
 
     sddf_init();
 }

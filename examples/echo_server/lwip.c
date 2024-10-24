@@ -14,7 +14,6 @@
 #include <sddf/timer/protocol.h>
 // #include <sddf/benchmark/sel4bench.h>
 // #include <serial_config.h>
-// #include <ethernet_config.h>
 #include <sddf/timer/client.h>
 #include <sddf/network/util.h>
 #include <sddf/util/string.h>
@@ -275,8 +274,8 @@ static void netif_status_callback(struct netif *netif)
 
 void sddf_init(void)
 {
-    serial_cli_queue_init_sys(microkit_name, NULL, NULL, NULL, &serial_tx_queue_handle, serial_tx_queue, serial_tx_data);
-    serial_putchar_init(SERIAL_TX_CH, &serial_tx_queue_handle);
+    // serial_cli_queue_init_sys(microkit_name, NULL, NULL, NULL, &serial_tx_queue_handle, serial_tx_queue, serial_tx_data);
+    // serial_putchar_init(SERIAL_TX_CH, &serial_tx_queue_handle);
 
     net_queue_init(&state.rx_queue, resources.rx_free, resources.rx_active, resources.rx_queue_size);
     net_queue_init(&state.tx_queue, resources.tx_free, resources.tx_active, resources.tx_queue_size);
@@ -313,8 +312,10 @@ void sddf_init(void)
     }
 
     setup_udp_socket();
-    // setup_utilization_socket();
-    // setup_tcp_socket();
+#ifdef MICROKIT
+    setup_utilization_socket();
+#endif /* MICROKIT */
+    setup_tcp_socket();
 
     if (notify_rx && net_require_signal_free(&state.rx_queue)) {
         net_cancel_signal_free(&state.rx_queue);

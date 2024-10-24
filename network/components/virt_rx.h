@@ -47,8 +47,6 @@ net_queue_t *rx_free_drv;
 net_queue_t *rx_active_drv;
 net_queue_t *rx_free_cli0;
 net_queue_t *rx_active_cli0;
-net_queue_t *rx_free_cli1;
-net_queue_t *rx_active_cli1;
 
 /* Buffer data regions */
 uintptr_t buffer_data_vaddr;
@@ -84,5 +82,10 @@ void init() {
 
     sddf_init();
 }
+
+#else
+
+// TODO: THIS IS BAD, but what is the max size/can we implement the virt_rx differently?
+#define NET_RX_QUEUE_CAPACITY_DRIV                   512
 
 #endif /* MICROKIT */

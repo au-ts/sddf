@@ -430,6 +430,7 @@ static void eth_setup(void)
 /* By the time we get to here, 'resources' should be valid */
 void sddf_init(void)
 {
+    // TODO: Should this just be passed in at the right offset?
     regs = (volatile virtio_mmio_regs_t *)(resources.regs + VIRTIO_MMIO_NET_OFFSET);
 
     ialloc_init(&rx_ialloc_desc, rx_descriptors, RX_COUNT);

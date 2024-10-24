@@ -15,7 +15,7 @@
  */
 static inline void sddf_timer_set_timeout(unsigned int id, uint64_t timeout)
 {
-    // sddf_set_mr(0, timeout);
+    sddf_set_mr(0, timeout);
     sddf_ppcall(id, seL4_MessageInfo_new(SDDF_TIMER_SET_TIMEOUT, 0, 0, 1));
 }
 
@@ -28,6 +28,6 @@ static inline void sddf_timer_set_timeout(unsigned int id, uint64_t timeout)
 static inline uint64_t sddf_timer_time_now(unsigned int id)
 {
     sddf_ppcall(id, seL4_MessageInfo_new(SDDF_TIMER_GET_TIME, 0, 0, 0));
-    uint64_t time_now = 0;//sddf_get_mr(0);
+    uint64_t time_now = sddf_get_mr(0);
     return time_now;
 }
