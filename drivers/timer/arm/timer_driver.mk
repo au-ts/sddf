@@ -16,7 +16,7 @@ timer_driver.elf: timer/timer.o
 	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
 
 timer/timer.o: ${TIMER_DIR}/timer.c ${CHECK_FLAGS_BOARD_MD5} |timer
-	${CC} ${CFLAGS} -o $@ -c $<
+	${CC} ${CFLAGS} -DMICROKIT -o $@ -c $<
 
 timer:
 	mkdir -p timer

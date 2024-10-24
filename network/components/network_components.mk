@@ -14,7 +14,7 @@
 NETWORK_COMPONENTS_DIR := $(abspath $(dir $(lastword ${MAKEFILE_LIST})))
 NETWORK_IMAGES:= network_virt_rx.elf network_virt_tx.elf arp.elf copy.elf
 network/components/%.o: ${SDDF}/network/components/%.c
-	${CC} ${CFLAGS} -c -o $@ $<
+	${CC} ${CFLAGS} -DMICROKIT -c -o $@ $<
 
 NETWORK_COMPONENT_OBJ := $(addprefix network/components/, copy.o arp.o network_virt_tx.o network_virt_rx.o)
 
@@ -34,7 +34,7 @@ ${NETWORK_COMPONENT_OBJ}: ${CHECK_NETWORK_FLAGS_MD5}
 ${NETWORK_COMPONENT_OBJ}: CFLAGS+=${CFLAGS_network}
 
 network/components/network_virt_%.o: ${SDDF}/network/components/virt_%.c 
-	${CC} ${CFLAGS} -c -o $@ $<
+	${CC} ${CFLAGS} -DMICROKIT -c -o $@ $<
 
 %.elf: network/components/%.o
 	${LD} ${LDFLAGS} -o $@ $< ${LIBS}
