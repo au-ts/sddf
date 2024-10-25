@@ -33,7 +33,6 @@ blk_queue_handle_t drv_h;
 /* Client specific info */
 typedef struct client {
     blk_queue_handle_t queue_h;
-    uintptr_t data_paddr;
 } client_t;
 client_t clients[SDDF_BLK_MAX_CLIENTS];
 
@@ -61,11 +60,6 @@ static void handle_driver_state();
 
 void init(void)
 {
-    assert(blk_config_check_magic(&config));
-
-    blk_storage_info_t *driver_storage_info = config.driver.conn.storage_info.vaddr;
-    while (!blk_storage_is_ready(driver_storage_info));
-
     /* Initialise client queues */
     for (int i = 0; i < config.num_clients; i++) {
         blk_virt_config_client_t *client = &config.clients[i];
@@ -83,7 +77,7 @@ void init(void)
     /* Initialise index allocator */
     ialloc_init(&ialloc, ialloc_idxlist, DRIVER_MAX_NUM_BUFFERS);
 
-    handle_driver_state();
+    /* continued via driver block state ready notifications */
 }
 
 static void notify_clients_ready_state()
@@ -93,7 +87,7 @@ static void notify_clients_ready_state()
         blk_virt_config_client_t *client = &config.clients[i];
         blk_storage_info_t *client_storage_info = client->conn.storage_info.vaddr;
 
-        __atomic_store_n(&client_storage_info->ready, driver_ready, __ATOMIC_RELEASE);
+        blk_storage_notify_ready(client_storage_info, client->conn.id_state, driver_ready);
     }
 }
 
@@ -302,6 +296,11 @@ static void handle_clients()
 
 void notified(microkit_channel ch)
 {
+    if (ch == config.driver.conn.id_state) {
+        handle_driver_state();
+        return;
+    }
+
     if (virt_status == VirtBringup) {
         if (ch != config.driver.conn.id) {
             /* ignore client requests */
