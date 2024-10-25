@@ -1340,3 +1340,72 @@ struct clk **get_clk_list(void)
 {
     return sm1_clks;
 }
+
+int meson_hdmi_pll_init(uint64_t base)
+{
+
+
+    /* meson_hdmi_pll_set_params() in meson_vclk.c */
+    /* Enable and reset */
+    regmap_update_bits(base, HHI_HDMI_PLL_CNTL0, 28, 2, 0x3);
+    reg_write(base, HHI_HDMI_PLL_CNTL1, 0x5555);
+    reg_write(base, HHI_HDMI_PLL_CNTL2, 0x00000000);
+
+    /* G12A HDMI PLL Needs specific parameters for 5.4GHz */
+    reg_write(base, HHI_HDMI_PLL_CNTL3, 0x0a691c00);
+    reg_write(base, HHI_HDMI_PLL_CNTL4, 0x33771290);
+    reg_write(base, HHI_HDMI_PLL_CNTL5, 0x39270000);
+    reg_write(base, HHI_HDMI_PLL_CNTL6, 0x50540000);
+
+    /* Reset PLL */
+    regmap_update_bits(base, HHI_HDMI_PLL_CNTL0, 29, 1 ,1);
+    /* UN-Reset PLL */
+    regmap_update_bits(base, HHI_HDMI_PLL_CNTL0, 29, 1, 0);
+    /* do { */
+    /*     /\* Reset PLL *\/ */
+    /*     regmap_update_bits(base, HHI_HDMI_PLL_CNTL0, 29, 1 ,1); */
+    /*     /\* UN-Reset PLL *\/ */
+    /*     regmap_update_bits(base, HHI_HDMI_PLL_CNTL0, 29, 1, 0); */
+    /*     /\* Poll for lock bit [30, 31] *\/ */
+    /*     if (regmap_read_bits(base, HHI_HDMI_PLL_CNTL0, 30, 2) != 0x3) { */
+    /*         break; */
+    /*     } */
+    /* } while(1); */
+
+    regmap_update_bits(base, HHI_HDMI_PLL_CNTL0, 16, 3, 2);
+    regmap_update_bits(base, HHI_HDMI_PLL_CNTL0, 18, 3, 1);
+    regmap_update_bits(base, HHI_HDMI_PLL_CNTL0, 20, 3, 0);
+
+    /* meson_vid_pll_set() */
+    /* Setup vid_pll divider. */
+    regmap_update_bits(base, HHI_VID_PLL_CLK_DIV, 19, 1, 1);
+    regmap_update_bits(base, HHI_VID_PLL_CLK_DIV, 15, 1, 1);
+    reg_write(base, HHI_VID_CLK_DIV, 0x100);
+
+    /* Set VCLK div */
+
+    /* Set HDMI-TX source */
+
+    /* dw init */
+    reg_write(base, HHI_HDMI_PHY_CNTL1, 0x03900000);
+    reg_write(base, HHI_HDMI_PHY_CNTL0, 0x0);
+
+    /* Disable clock, fifo, fifo_wr */
+    regmap_update_bits(base, HHI_HDMI_PHY_CNTL1, 0, 4, 0);
+
+    /* Enable g12a_mali_0 */
+    sm1_clks[CLKID_MALI_0]->hw.init->ops->enable(sm1_clks[CLKID_MALI_0]);
+    sm1_clks[CLKID_SYS_PLL_DCO]->hw.init->ops->enable(sm1_clks[CLKID_SYS_PLL_DCO]);
+
+    /* Set parent for CPU CLK */
+    /* sm1_clks[CLKID_CPU_CLK]->hw.init->ops->set_parent(sm1_clks[CLKID_CPU_CLK], 0); */
+    /* regmap_update_bits(base, HHI_SYS_CPU_CLK_CNTL0, 11, 1, 0); */
+
+    /* SYS_PLL */
+    /* regmap_update_bits(base, HHI_SYS_PLL_CNTL0, 29, 1, 1); */
+    /* regmap_update_bits(base, HHI_SYS_PLL_CNTL0, 28, 1, 0); */
+    /* regmap_update_bits(base, HHI_SYS_PLL_CNTL0, 0, 8, 0x9f); */
+    /* regmap_update_bits(base, HHI_SYS_PLL_CNTL0, 28, 1, 1); */
+
+    return 0;
+}

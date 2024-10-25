@@ -24,12 +24,15 @@
 #define DEBUG_DRIVER
 
 #ifdef DEBUG_DRIVER
-#define LOG_DRIVER(...) do{ sddf_dprintf("CLK DRIVER|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
+#define LOG_CLK(...) do{ sddf_dprintf("CLK DRIVER|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
 #else
-#define LOG_DRIVER(...) do{}while(0)
+#define LOG_CLK(...) do{}while(0)
 #endif
 
-#define LOG_DRIVER_ERR(...) do{ sddf_printf("CLK DRIVER|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
+#define LOG_CLK_ERR(...) do{ sddf_printf("CLK DRIVER|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
+
+#define NUM_CLK_LIST CLKID_PCIE_PLL
+#define CLK_PHYS_BASE 0xff63c000
 
 #define I2C_CLK_OFFSET 320
 #define I2C_CLK_BIT (1 << 9) // bit 9
@@ -51,11 +54,11 @@ struct clk **clk_list;
 void clk_probe(struct clk *clk_list[])
 {
     int i;
-    for (i = 0; i < CLKID_PCIE_PLL; i++) {
+    for (i = 0; i < NUM_CLK_LIST; i++) {
         clk_list[i]->base = (uint64_t)clk_regs;
         if (clk_list[i] && clk_list[i]->hw.init->ops->init) {
             clk_list[i]->hw.init->ops->init(clk_list[i]);
-            LOG_DRIVER("Initialise %s\n", clk_list[i]->hw.init->name);
+            LOG_CLK("Initialise %s\n", clk_list[i]->hw.init->name);
         }
     }
 }
@@ -131,7 +134,7 @@ uint32_t clk_set_rate(struct clk *clk, uint32_t rate)
     uint64_t prate = clk_get_rate(pclk);
     if (clk->hw.init->ops->set_rate) {
         /* TODO: determine_rate() needs to be implemented */
-        LOG_DRIVER("set %s to %dHz\n", clk->hw.init->name, rate);
+        LOG_CLK("set %s to %dHz\n", clk->hw.init->name, rate);
         clk->hw.init->ops->set_rate(clk, rate, prate);
     } else {
         /* TODO: We only propagate one level right now */
@@ -139,8 +142,27 @@ uint32_t clk_set_rate(struct clk *clk, uint32_t rate)
             const struct clk *ppclk = get_parent(pclk);
             uint64_t pprate = clk_get_rate(ppclk);
             /* TODO: determine_rate() needs to be implemented */
-            LOG_DRIVER("set %s to %dHz\n", pclk->hw.init->name, rate);
+            LOG_CLK("set %s to %dHz\n", pclk->hw.init->name, rate);
             pclk->hw.init->ops->set_rate(pclk, prate, pprate);
+        }
+    }
+
+    return 0;
+}
+
+/* TODO: This is a hacky function that only handles enabling gate request */
+uint32_t clk_handle_request(microkit_channel ch, uint32_t phys_addr, uint32_t val)
+{
+    uint32_t offset = phys_addr - CLK_PHYS_BASE;
+    LOG_CLK("write 0x%x to 0x%x---\n", val, phys_addr);
+    if (ch == 2) {
+        if ((offset >= 0x3a0 && offset < 0x3a8) ||
+            (offset >= 0x320 && offset < 0x33b) ||
+            (offset >= 0x2f4 && offset < 0x2f8) ||
+            (offset >= 0x1b0 && offset < 0x1b4) ||
+            (offset >= 0x19c && offset < 0x1a4)) {
+            LOG_CLK("write 0x%x to 0x%x\n", val, phys_addr);
+            reg_write(clk_regs, offset, val);
         }
     }
 
@@ -155,7 +177,7 @@ int clk_msr_stat()
     const char *const *clk_msr_list = get_msr_clk_list();
     for (i = 0; i < 128; i++) {
         clk_freq = clk_msr(i);
-        LOG_DRIVER("[%4d][%4ldHz] %s\n", i, clk_freq, clk_msr_list[i]);
+        LOG_CLK("[%4d][%4ldHz] %s\n", i, clk_freq, clk_msr_list[i]);
     }
 
     return 0;
@@ -168,7 +190,7 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
-    LOG_DRIVER("Clock driver initialising...\n");
+    LOG_CLK("Clock driver initialising...\n");
 
     clk_list = get_clk_list();
 
@@ -193,7 +215,7 @@ void init(void)
 
     // Check that registers actually changed
     if (!(*clk_i2c_ptr & I2C_CLK_BIT)) {
-        LOG_DRIVER_ERR("failed to toggle clock!\n");
+        LOG_CLK_ERR("failed to toggle clock!\n");
     }
 
     /* clk_msr_stat(); */
@@ -209,29 +231,29 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
 
         case SDDF_CLK_ENABLE: {
             if (argc != 1) {
-                LOG_DRIVER_ERR("Incorrect number of arguments %u != 1\n", argc);
+                LOG_CLK_ERR("Incorrect number of arguments %u != 1\n", argc);
                 ret = CLK_INCORRECT_ARGS;
                 break;
             }
             uint32_t clk_id = (uint32_t)microkit_mr_get(SDDF_CLK_PARAM_ID);
-            LOG_DRIVER("get request clk_enable(%d)\n", clk_id);
+            LOG_CLK("get request clk_enable(%d)\n", clk_id);
             ret = clk_enable(clk_list[clk_id]);
             break;
         }
         case SDDF_CLK_DISABLE: {
             if (argc != 1) {
-                LOG_DRIVER_ERR("Incorrect number of arguments %u != 1\n", argc);
+                LOG_CLK_ERR("Incorrect number of arguments %u != 1\n", argc);
                 ret = CLK_INCORRECT_ARGS;
                 break;
             }
             uint32_t clk_id = (uint32_t)microkit_mr_get(SDDF_CLK_PARAM_ID);
-            LOG_DRIVER("get request clk_disable(%d)\n", clk_id);
+            LOG_CLK("get request clk_disable(%d)\n", clk_id);
             ret = clk_disable(clk_list[clk_id]);
             break;
         }
         case SDDF_CLK_GET_RATE: {
             if (argc != 1) {
-                LOG_DRIVER_ERR("Incorrect number of arguments %u != 1\n", argc);
+                LOG_CLK_ERR("Incorrect number of arguments %u != 1\n", argc);
                 ret = CLK_INCORRECT_ARGS;
                 break;
             }
@@ -241,7 +263,7 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
         }
         case SDDF_CLK_SET_RATE: {
             if (argc != 2) {
-                LOG_DRIVER_ERR("Incorrect number of arguments %u != 1\n", argc);
+                LOG_CLK_ERR("Incorrect number of arguments %u != 1\n", argc);
                 ret = CLK_INCORRECT_ARGS;
                 break;
             }
@@ -250,8 +272,19 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
             ret = clk_set_rate(clk_list[clk_id], rate);
             break;
         }
+        case SDDF_CLK_HANDLE_REQUEST: {
+            if (argc != 2) {
+                LOG_CLK_ERR("Incorrect number of arguments %u != 1\n", argc);
+                ret = CLK_INCORRECT_ARGS;
+                break;
+            }
+            uint32_t phys_addr = (uint32_t)microkit_mr_get(SDDF_CLK_PARAM_PADDR);
+            uint32_t val = (uint32_t)microkit_mr_get(SDDF_CLK_PARAM_VALUE);
+            ret = clk_handle_request(ch, phys_addr, val);
+            break;
+        }
         default:
-            LOG_DRIVER_ERR("Unknown request %lu to clockk driver from channel %u\n", microkit_msginfo_get_label(msginfo), ch);
+            LOG_CLK_ERR("Unknown request %lu to clockk driver from channel %u\n", microkit_msginfo_get_label(msginfo), ch);
             ret = 5;
     }
     return microkit_msginfo_new(ret, 0);

@@ -16,9 +16,12 @@
 #define SDDF_CLK_DISABLE        1
 #define SDDF_CLK_GET_RATE       2
 #define SDDF_CLK_SET_RATE       3
+#define SDDF_CLK_HANDLE_REQUEST 4
 
 #define SDDF_CLK_PARAM_ID       0
 #define SDDF_CLK_PARAM_RATE     1
+#define SDDF_CLK_PARAM_PADDR    0
+#define SDDF_CLK_PARAM_VALUE    1
 
 struct clk_cfg {
     uint32_t clk_id;

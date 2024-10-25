@@ -128,4 +128,7 @@
 #define HHI_SYS1_PLL_CNTL5		0x394
 #define HHI_SYS1_PLL_CNTL6		0x398
 
+#define HHI_HDMI_PHY_CNTL0		0x3a0
+#define HHI_HDMI_PHY_CNTL1		0x3a4
+
 #endif /* __G12A_H */

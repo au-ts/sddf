@@ -75,3 +75,23 @@ static inline uint32_t sddf_clk_set_rate(microkit_channel channel, uint32_t clk_
 
     return (uint32_t)microkit_msginfo_get_label(msginfo);
 }
+
+/**
+ * @TODO: This is a temporary solution to intercept reuqests from driver VMMs
+ *
+ * VMM can use this interface to process unmatched writes
+ *
+ * @param channel of clock driver.
+ * @param addr offset of the write operation.
+ * @param value that the driver vm tries to write.
+ */
+static inline uint32_t sddf_clk_handle_request(microkit_channel channel, uint32_t paddr, uint32_t value)
+{
+    microkit_msginfo msginfo = microkit_msginfo_new(SDDF_CLK_HANDLE_REQUEST, 2);
+    microkit_mr_set(SDDF_CLK_PARAM_PADDR, paddr);
+    microkit_mr_set(SDDF_CLK_PARAM_VALUE, value);
+
+    msginfo = microkit_ppcall(channel, msginfo);
+
+    return (uint32_t)microkit_msginfo_get_label(msginfo);
+}
