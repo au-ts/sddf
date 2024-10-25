@@ -159,16 +159,16 @@ static inline void i2c_setup()
 
     volatile struct i2c_regs *regs = (volatile struct i2c_regs *) i2c_regs;
 
-    volatile uint32_t *clk81_ptr        = ((void *)clk_regs + I2C_CLK_OFFSET);
-    uint32_t clk81 = *clk81_ptr;
-    // Enable i2c by removing clock gate
-    clk81 |= (I2C_CLK81_BIT);
-    *clk81_ptr = clk81;
+    // volatile uint32_t *clk81_ptr        = ((void *)clk_regs + I2C_CLK_OFFSET);
+    // uint32_t clk81 = *clk81_ptr;
+    // // Enable i2c by removing clock gate
+    // clk81 |= (I2C_CLK81_BIT);
+    // *clk81_ptr = clk81;
 
-    // Check that registers actually changed
-    if (!(*clk81_ptr & I2C_CLK81_BIT)) {
-        LOG_DRIVER_ERR("failed to toggle clock!\n");
-    }
+    // // Check that registers actually changed
+    // if (!(*clk81_ptr & I2C_CLK81_BIT)) {
+    //     LOG_DRIVER_ERR("failed to toggle clock!\n");
+    // }
 
 #ifndef DISABLE_I2C_PINMUX_INIT
     // Note: this is hacky - should do this using a GPIO driver.

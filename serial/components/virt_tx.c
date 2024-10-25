@@ -206,6 +206,10 @@ void init(void)
     serial_queue_init(&tx_queue_handle_drv, tx_queue_drv, SERIAL_TX_DATA_REGION_CAPACITY_DRIV, tx_data_drv);
     serial_virt_queue_init_sys(microkit_name, tx_queue_handle_cli, tx_queue_cli0, tx_data_cli0);
 
+    for (int i = 0; i < SERIAL_NUM_CLIENTS; i++) {
+        sddf_dprintf("tx i: %d, queue: %p, data: %p\n", i, tx_queue_handle_cli[i].queue, tx_queue_handle_cli[i].data_region);
+    }
+
 #if !SERIAL_TX_ONLY
     /* Print a deterministic string to allow console input to begin */
     sddf_memcpy(tx_queue_handle_drv.data_region, SERIAL_CONSOLE_BEGIN_STRING, SERIAL_CONSOLE_BEGIN_STRING_LEN);
