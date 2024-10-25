@@ -34,7 +34,8 @@ blk_queue_handle_t drv_h;
 /* Client specific info */
 typedef struct client {
     blk_queue_handle_t queue_h;
-    microkit_channel ch;
+    microkit_channel queue_ch;
+    microkit_channel state_ch;
     uintptr_t data_paddr;
 } client_t;
 client_t clients[BLK_NUM_CLIENTS];
@@ -63,15 +64,15 @@ static void handle_driver_state();
 
 void init(void)
 {
-    while (!blk_storage_is_ready(blk_driver_storage_info));
-
     /* Initialise client queues */
     for (int i = 0; i < BLK_NUM_CLIENTS; i++) {
         blk_req_queue_t *curr_req = blk_virt_cli_req_queue(blk_client_req_queue, i);
         blk_resp_queue_t *curr_resp = blk_virt_cli_resp_queue(blk_client_resp_queue, i);
         uint32_t queue_capacity = blk_virt_cli_queue_capacity(i);
         blk_queue_init(&clients[i].queue_h, curr_req, curr_resp, queue_capacity);
-        clients[i].ch = CLI_CH_OFFSET + i;
+
+        clients[i].queue_ch = CLI_CH_BASE + (i * CLI_CH_STRIDE) + CLI_CH_BLK_QUEUE_IDX;
+        clients[i].state_ch = CLI_CH_BASE + (i * CLI_CH_STRIDE) + CLI_CH_BLK_STATE_IDX;
     }
 
     /* TODO: make data paddr handling system agnostic */
@@ -87,7 +88,7 @@ void init(void)
     /* Initialise index allocator */
     ialloc_init(&ialloc, ialloc_idxlist, BLK_QUEUE_CAPACITY_DRIV);
 
-    handle_driver_state();
+    /* continued via driver block state ready notifications */
 }
 
 static void notify_clients_state()
@@ -96,7 +97,7 @@ static void notify_clients_state()
     for (int i = 0; i < BLK_NUM_CLIENTS; i++) {
         blk_storage_info_t *cli_storage_info = blk_virt_cli_storage_info(blk_client_storage_info, i);
 
-        __atomic_store_n(&cli_storage_info->ready, driver_ready, __ATOMIC_RELEASE);
+        blk_storage_notify_ready(cli_storage_info, clients[i].state_ch, driver_ready);
     }
 }
 
@@ -177,7 +178,7 @@ static void handle_driver_queue()
     /* Notify corresponding client if a response was enqueued */
     for (int i = 0; i < BLK_NUM_CLIENTS; i++) {
         if (client_notify[i]) {
-            microkit_notify(clients[i].ch);
+            microkit_notify(clients[i].queue_ch);
         }
     }
 }
@@ -278,7 +279,7 @@ static bool handle_client(int cli_id)
     }
 
     if (client_notify) {
-        microkit_notify(clients[cli_id].ch);
+        microkit_notify(clients[cli_id].queue_ch);
     }
 
     return driver_notify;
@@ -294,14 +295,19 @@ static void handle_clients()
     }
 
     if (driver_notify) {
-        microkit_notify(DRIVER_CH);
+        microkit_notify(DRIVER_BLK_QUEUE_CH);
     }
 }
 
 void notified(microkit_channel ch)
 {
+    if (ch == DRIVER_BLK_STATE_CH) {
+        handle_driver_state();
+        return;
+    }
+
     if (virt_status == VirtBringup) {
-        if (ch != DRIVER_CH) {
+        if (ch != DRIVER_BLK_QUEUE_CH) {
             /* ignore client requests */
             return;
         }
@@ -319,7 +325,7 @@ void notified(microkit_channel ch)
         return;
     }
 
-    if (ch == DRIVER_CH) {
+    if (ch == DRIVER_BLK_QUEUE_CH) {
         handle_driver_queue();
         handle_clients();
     } else {

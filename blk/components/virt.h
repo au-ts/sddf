@@ -14,8 +14,15 @@
 
 #include "blk_config.h"
 
-#define DRIVER_CH  0
-#define CLI_CH_OFFSET        1
+#define DRIVER_BLK_QUEUE_CH  0
+#define DRIVER_BLK_STATE_CH  1
+#define CLI_CH_BASE          2
+
+/* Expects channels like [ DRV_BLK_QUEUE, DRV_STATE, CLI0_BLK, CLI0_STATE,
+                           CLI1_BLK, CLI1_STATE, ... ] */
+#define CLI_CH_BLK_QUEUE_IDX  0
+#define CLI_CH_BLK_STATE_IDX  1
+#define CLI_CH_STRIDE         2
 
 /* Uncomment this to enable debug logging */
 // #define DEBUG_BLK_VIRT

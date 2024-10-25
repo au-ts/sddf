@@ -23,9 +23,10 @@
 
 #define LOG_DRIVER_ERR(...) do{ sddf_printf("uSDHC DRIVER|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
-#define CHANNEL_CLIENT    0
-#define CHANNEL_USDHC_IRQ 1
-#define CHANNEL_TIMER     2
+#define CHANNEL_USDHC_IRQ 0
+#define CHANNEL_BLK_QUEUE 1
+#define CHANNEL_BLK_STATE 2
+#define CHANNEL_TIMER     3
 
 #define INT_STATUSES_ENABLED ( \
     USDHC_INT_STATUS_EN_CCSEN   | USDHC_INT_STATUS_EN_TCSEN                                  \
@@ -86,6 +87,16 @@ typedef enum {
     SendStateDone,
 } command_state_t;
 
+void handle_card_detect_irq();
+
+/* The current action-status of the driver */
+static enum {
+    DrvStatusInactive,
+    DrvStatusBringup,
+    DrvStatusActive,
+    DrvStatusTeardown,
+} driver_status;
+
 static struct driver_state {
     struct command_state {
         command_state_t normal;
@@ -93,14 +104,10 @@ static struct driver_state {
     } command;
 
     enum {
-        ExecutorStateInit = DRIVER_STATE_INIT,
-        ExecutorStateActive,
-    } executor;
-
-    enum {
-        ClientStateIdle = DRIVER_STATE_INIT,
-        ClientStateInflight,
-    } clients;
+        InitReset = DRIVER_STATE_INIT,
+        InitCardIdent,
+        InitDone,
+    } init;
 
     enum {
         CardIdentStateInit = DRIVER_STATE_INIT,
@@ -120,22 +127,51 @@ static struct driver_state {
         DataStateInit = DRIVER_STATE_INIT,
         DataStateSend,
     } data_transfer;
+
+    struct {
+        bool inflight;
+        uint32_t id;
+        blk_req_code_t code;
+        uintptr_t paddr;
+        uint32_t blk_number;
+        uint16_t blk_count;
+    } blk_req;
 } driver_state;
 
-static inline void reset_driver_and_card_state(void)
+/* Used for clearing card state on ejection */
+static inline void clear_card_state(void);
+/* Cancel the driver's active operations and clear current card info */
+static inline void stop_operations_and_clear_card_state(void)
 {
+    /* Mask out interrupts
+     * This is important as we don't want command interrupts after resetting
+     * our knowledge of what's going on.
+     */
+    usdhc_regs->int_status_en = 0x0;
+    usdhc_regs->int_signal_en = 0x0;
+
+    if (driver_state.blk_req.inflight) {
+        /* if the queue is full we can't do anything about it... */
+        (void)blk_enqueue_resp(&blk_queue, BLK_RESP_ERR_NO_DEVICE, 0, driver_state.blk_req.id);
+    }
+
     driver_state = (struct driver_state) {
         .command = {
             .normal = DRIVER_STATE_INIT,
             .app_prefix = DRIVER_STATE_INIT,
         },
-        .executor = DRIVER_STATE_INIT,
-        .clients = DRIVER_STATE_INIT,
+        .init = DRIVER_STATE_INIT,
         .card_ident = DRIVER_STATE_INIT,
         .card_init_start_time = DRIVER_STATE_INIT,
         .data_transfer = DRIVER_STATE_INIT,
+        .blk_req = {0},
     };
 
+    clear_card_state();
+}
+
+static inline void clear_card_state(void)
+{
     card_info = (struct card_info) {
         .rca = 0,
         .ccs = false, /* really: unknown */
@@ -143,12 +179,8 @@ static inline void reset_driver_and_card_state(void)
         /* [SD-PHY] Section 4.2.1 Card Reset:
         > After power-on by the host, all cards are in Idle State */
         .card_state = CardStateIdle,
-        .csd = {0x0, 0x0, 0x0, 0x0},
+        .csd = { 0x0, 0x0, 0x0, 0x0 },
     };
-
-    // Disable interrupts.
-    usdhc_regs->int_status_en = 0x0;
-    usdhc_regs->int_signal_en = 0x0;
 }
 
 static inline void usdhc_debug(void)
@@ -223,6 +255,7 @@ static blk_resp_status_t drv_to_blk_status(drv_status_t status)
     case DrvErrorCardGone:
         return BLK_RESP_ERR_NO_DEVICE;
 
+    /* these should never make it to the block queue */
     case DrvErrorCardIncompatible:
     case DrvIrqWait:
     default:
@@ -272,7 +305,9 @@ static drv_status_t handle_interrupt_status(sd_cmd_t cmd)
         usdhc_regs->int_status = 0xffffffff;
 
         if (!gpio_card_detected()) {
-            /* If the card isn't detected, the error is because of that */
+            /* If the card isn't detected, the error is because of that
+               ... don't do anything with this aside from return an error,
+                   though, as this is the wrong layer for that to make sense */
             return DrvErrorCardGone;
         }
 
@@ -579,11 +614,14 @@ drv_status_t perform_card_identification_and_select()
         /* [SD-PHY] Section 4.21.5 Pre-init mode
             => we now exit this mode and move to idle */
         status = send_command(SD_CMD0_GO_IDLE_STATE, 0x0);
+        if (status == DrvIrqWait) {
+            return DrvIrqWait;
+        }
+        driver_state.command = (struct command_state) {};
         if (status != DrvSuccess) {
             return status;
         }
 
-        driver_state.command = (struct command_state) {};
         driver_state.card_ident = CardIdentStateIfCond;
         fallthrough;
 
@@ -596,7 +634,9 @@ drv_status_t perform_card_identification_and_select()
                               (SD_IF_COND_VHS27_36 << SD_IF_COND_VHS_SHIFT) | (IF_COND_CHECK_PATTERN << SD_IF_COND_CHECK_SHIFT));
         if (status == DrvIrqWait) {
             return DrvIrqWait;
-        } else if (status == DrvErrorCardGone) {
+        }
+        driver_state.command = (struct command_state) {};
+        if (status == DrvErrorCardGone) {
             LOG_DRIVER("No Card\n");
             return DrvErrorCardGone;
         } else if (status != DrvSuccess) {
@@ -620,7 +660,6 @@ drv_status_t perform_card_identification_and_select()
         }
 
         driver_state.card_ident = CardIdentStateOpCondInquiry;
-        driver_state.command = (struct command_state) {};
         fallthrough;
 
     case CardIdentStateOpCondInquiry:
@@ -631,6 +670,10 @@ drv_status_t perform_card_identification_and_select()
             > shall ignore the other field (bit 31-24) in the argument.
         */
         status = send_command(SD_ACMD41_SD_SEND_OP_COND, 0x0);
+        if (status == DrvIrqWait) {
+            return DrvIrqWait;
+        }
+        driver_state.command = (struct command_state) {};
         if (status != DrvSuccess) {
             return status;
         }
@@ -645,7 +688,6 @@ drv_status_t perform_card_identification_and_select()
         }
 
         driver_state.card_ident = CardIdentStateOpCond;
-        driver_state.command = (struct command_state) {};
         fallthrough;
 
     case CardIdentStateOpCond:
@@ -672,10 +714,13 @@ drv_status_t perform_card_identification_and_select()
         do {
             status = send_command(SD_ACMD41_SD_SEND_OP_COND,
                                   SD_OCR_HCS | SD_OCR_VDD31_32 | SD_OCR_VDD32_33);
+            if (status == DrvIrqWait) {
+                return DrvIrqWait;
+            }
+            driver_state.command = (struct command_state) {};
             if (status != DrvSuccess) {
                 return status;
             }
-            driver_state.command = (struct command_state) {};
 
             ocr_register = usdhc_regs->cmd_rsp0;
             if (!(ocr_register & SD_OCR_POWER_UP_STATUS)) {
@@ -701,6 +746,10 @@ drv_status_t perform_card_identification_and_select()
 
     case CardIdentStateSendCid:
         status = send_command(SD_CMD2_ALL_SEND_CID, 0x0);
+        if (status == DrvIrqWait) {
+            return DrvIrqWait;
+        }
+        driver_state.command = (struct command_state) {};
         if (status != DrvSuccess) {
             return status;
         }
@@ -710,11 +759,14 @@ drv_status_t perform_card_identification_and_select()
 
         card_info.card_state = CardStateIdent;
         driver_state.card_ident = CardIdentStateSendRca;
-        driver_state.command = (struct command_state) {};
         fallthrough;
 
     case CardIdentStateSendRca:
         status = send_command(SD_CMD3_SEND_RELATIVE_ADDR, 0x0);
+        if (status == DrvIrqWait) {
+            return DrvIrqWait;
+        }
+        driver_state.command = (struct command_state) {};
         if (status != DrvSuccess) {
             return status;
         }
@@ -730,11 +782,14 @@ drv_status_t perform_card_identification_and_select()
             TODO(#187): Actually do `usdhc_change_clock_frequency(ClockSpeedDefault_25MHz)`
          */
         driver_state.card_ident = CardIdentStateSendCsd;
-        driver_state.command = (struct command_state) {};
         fallthrough;
 
     case CardIdentStateSendCsd:
         status = send_command(SD_CMD9_SEND_CSD, ((uint32_t)card_info.rca << SD_RCA_SHIFT));
+        if (status == DrvIrqWait) {
+            return DrvIrqWait;
+        }
+        driver_state.command = (struct command_state) {};
         if (status != DrvSuccess) {
             return status;
         }
@@ -742,11 +797,14 @@ drv_status_t perform_card_identification_and_select()
         read_r2_response(card_info.csd);
 
         driver_state.card_ident = CardIdentStateCardSelect;
-        driver_state.command = (struct command_state) {};
         fallthrough;
 
     case CardIdentStateCardSelect:
         status = send_command(SD_CMD7_CARD_SELECT, ((uint32_t)card_info.rca << SD_RCA_SHIFT));
+        if (status == DrvIrqWait) {
+            return DrvIrqWait;
+        }
+        driver_state.command = (struct command_state) {};
         if (status != DrvSuccess) {
             return status;
         }
@@ -755,7 +813,6 @@ drv_status_t perform_card_identification_and_select()
         card_info.card_state = CardStateTran;
 
         driver_state.card_ident = CardIdentStateDone;
-        driver_state.command = (struct command_state) {};
         fallthrough;
 
     case CardIdentStateDone:
@@ -788,6 +845,10 @@ drv_status_t usdhc_read_blocks(uintptr_t dma_address, uint32_t sector_number, ui
     case DataStateInit:
         // TODO(#187): We shouldn't need to do this for every command I think.
         status = send_command(SD_CMD16_SET_BLOCKLEN, SD_BLOCK_SIZE);
+        if (status == DrvIrqWait) {
+            return DrvIrqWait;
+        }
+        driver_state.command = (struct command_state) {};
         if (status != DrvSuccess) {
             return status;
         }
@@ -803,7 +864,6 @@ drv_status_t usdhc_read_blocks(uintptr_t dma_address, uint32_t sector_number, ui
         usdhc_regs->blk_att |= ((uint32_t)sector_count << USDHC_BLK_ATT_BLKCNT_SHIFT);
 
         driver_state.data_transfer = DataStateSend;
-        driver_state.command = (struct command_state) {};
         fallthrough;
 
     case DataStateSend:
@@ -819,12 +879,15 @@ drv_status_t usdhc_read_blocks(uintptr_t dma_address, uint32_t sector_number, ui
             data_address = sector_number * SD_BLOCK_SIZE;
         }
         status = send_command(SD_CMD18_READ_MULTIPLE_BLOCK, data_address);
+        if (status == DrvIrqWait) {
+            return DrvIrqWait;
+        }
+        driver_state.command = (struct command_state) {};
         if (status != DrvSuccess) {
             return status;
         }
 
         card_info.card_state = CardStateData;
-        driver_state.command = (struct command_state) {};
         card_info.card_state = CardStateTran;
         return DrvSuccess;
 
@@ -855,6 +918,10 @@ drv_status_t usdhc_write_blocks(uintptr_t dma_address, uint32_t sector_number, u
     case DataStateInit:
         // TODO(#187): We shouldn't need to do this for every command I think.
         status = send_command(SD_CMD16_SET_BLOCKLEN, SD_BLOCK_SIZE);
+        if (status == DrvIrqWait) {
+            return DrvIrqWait;
+        }
+        driver_state.command = (struct command_state) {};
         if (status != DrvSuccess) {
             return status;
         }
@@ -870,7 +937,6 @@ drv_status_t usdhc_write_blocks(uintptr_t dma_address, uint32_t sector_number, u
         usdhc_regs->blk_att |= ((uint32_t)sector_count << USDHC_BLK_ATT_BLKCNT_SHIFT);
 
         driver_state.data_transfer = DataStateSend;
-        driver_state.command = (struct command_state) {};
         fallthrough;
 
     case DataStateSend:
@@ -886,12 +952,15 @@ drv_status_t usdhc_write_blocks(uintptr_t dma_address, uint32_t sector_number, u
             data_address = sector_number * SD_BLOCK_SIZE;
         }
         status = send_command(SD_CMD25_WRITE_MULTIPLE_BLOCK, data_address);
+        if (status == DrvIrqWait) {
+            return DrvIrqWait;
+        }
+        driver_state.command = (struct command_state) {};
         if (status != DrvSuccess) {
             return status;
         }
 
         card_info.card_state = CardStateRcv;
-        driver_state.command = (struct command_state) {};
         card_info.card_state = CardStateTran;
 
         return DrvSuccess;
@@ -977,151 +1046,262 @@ void setup_blk_storage_info()
         break;
     }
 
-    LOG_DRIVER("Card size (blocks): %lu\n", blk_storage_info->capacity);
-
-    __atomic_store_n(&blk_storage_info->ready, true, __ATOMIC_RELEASE);
-    LOG_DRIVER("Driver initialisation complete\n");
+    blk_storage_notify_ready(blk_storage_info, CHANNEL_BLK_STATE, true);
 }
 
-void handle_clients(void)
+drv_status_t usdhc_init(void)
 {
-    static blk_req_code_t req_code;
-    static uintptr_t req_offset;
-    static uint32_t req_block_number;
-    static uint16_t req_count;
-    static uint32_t req_id;
-    int err;
+    drv_status_t status;
 
-    // TODO(#187): Handle overflow with this multiplication...?
-    uint32_t block_to_sectors = BLK_TRANSFER_SIZE / SD_BLOCK_SIZE;
+    /* If we were already initialised, driver_state.init == InitDone,
+       and so this function is a no-op. */
 
-    switch (driver_state.clients) {
-    case ClientStateIdle:
-        err = blk_dequeue_req(&blk_queue, &req_code, &req_offset, &req_block_number, &req_count, &req_id);
-        if (err == -1) {
-            // no requests to handle
-            return;
-        }
+    switch (driver_state.init) {
+    case InitReset:
+        usdhc_reset();
 
-        LOG_DRIVER("Received command: code=%d, offset=0x%lx, block_number=%d, count=%d, id=%d\n",
-                   req_code, req_offset, req_block_number, req_count, req_id);
-
-        driver_state.clients = ClientStateInflight;
+        driver_state.init = InitCardIdent;
         fallthrough;
 
-    case ClientStateInflight: {
-        uint16_t success_count = 0;
-        drv_status_t status;
-
-        switch (req_code) {
-        case BLK_REQ_READ:
-            status = usdhc_read_blocks(req_offset, req_block_number * block_to_sectors,
-                                       req_count * block_to_sectors);
-            if (status == DrvIrqWait) {
-                return;
-            }
-            driver_state.data_transfer = DataStateInit;
-
-            success_count = 1;
-            break;
-
-        case BLK_REQ_WRITE:
-            status = usdhc_write_blocks(req_offset, req_block_number * block_to_sectors,
-                                        req_count * block_to_sectors);
-            if (status == DrvIrqWait) {
-                return;
-            }
-            driver_state.data_transfer = DataStateInit;
-
-            success_count = 1;
-            break;
-
-        case BLK_REQ_FLUSH:
-        case BLK_REQ_BARRIER:
-            /* No-ops. */
-            status = DrvSuccess;
-            success_count = req_count;
-            break;
-
-        default:
-            LOG_DRIVER_ERR("Unknown command code: %d\n", req_code);
-            return;
+    case InitCardIdent:
+        status = perform_card_identification_and_select();
+        if (status == DrvIrqWait) {
+            return DrvIrqWait;
+        }
+        driver_state.card_ident = DRIVER_STATE_INIT;
+        if (status != DrvSuccess) {
+            return status;
         }
 
-        int err = blk_enqueue_resp(&blk_queue, drv_to_blk_status(status), success_count, req_id);
-        assert(!err);
-        LOG_DRIVER("Enqueued response: status=%d, success_count=%d, id=%d\n", drv_to_blk_status(status), success_count, req_id);
-        microkit_notify(CHANNEL_CLIENT);
+        driver_state.init = InitDone;
+        fallthrough;
 
-        driver_state.clients = ClientStateIdle;
-        return handle_clients();
-    }
+    case InitDone:
+        LOG_DRIVER("Card initialised\n");
+        return DrvSuccess;
 
     default:
-        assert(!"unreachable");
+        /* unreachable */
+        return DrvIrqWait;
     }
 }
 
-void usdhc_executor(bool is_irq)
+void handle_client_device_inactive(void)
 {
-    if (driver_state.executor == ExecutorStateInit && !is_irq) {
-        /* Ignore client requests until we're ready (at which point we will process them) */
+    while (!blk_queue_empty_req(&blk_queue)) {
+        blk_req_code_t code;
+        uintptr_t paddr;
+        uint32_t block_number;
+        uint16_t count;
+        uint32_t id;
+        int err = blk_dequeue_req(&blk_queue, &code, &paddr, &block_number, &count, &id);
+        assert(!err); /* shouldn't be empty */
+
+        err = blk_enqueue_resp(&blk_queue, BLK_RESP_ERR_NO_DEVICE, 0, id);
+        if (err) {
+            /* response queue is full */
+            break;
+        }
+    }
+
+    microkit_notify(CHANNEL_BLK_QUEUE);
+}
+
+void handle_client(bool was_irq)
+{
+    /* should never run during a status transition (bringup/teardown) */
+    assert(!(driver_status == DrvStatusBringup || driver_status == DrvStatusTeardown));
+
+    if (was_irq == false) {
+        if (driver_state.blk_req.inflight) {
+            /* Only handle block queue notifications when idle */
+            return;
+        }
+
+        /* if we're inactive (by choice or by recognition),
+           or if there's no card (but we haven't yet propagated this change to the state) */
+        if (driver_status == DrvStatusInactive || !gpio_card_detected()) {
+            handle_client_device_inactive();
+            return;
+        }
+
+        int err = blk_dequeue_req(&blk_queue, &driver_state.blk_req.code, &driver_state.blk_req.paddr,
+                                  &driver_state.blk_req.blk_number, &driver_state.blk_req.blk_count,
+                                  &driver_state.blk_req.id);
+        if (err == -1) {
+            /* no client requests; we probably handled it already */
+            return;
+        }
+
+        driver_state.blk_req.inflight = true;
+        LOG_DRIVER("Received command: code=%d, paddr=0x%lx, block_number=%d, count=%d, id=%d\n",
+                   driver_state.blk_req.code, driver_state.blk_req.paddr, driver_state.blk_req.blk_number,
+                   driver_state.blk_req.blk_count, driver_state.blk_req.id);
+    }
+
+    /* Should never get IRQs without inflight requests
+       ... but if we do, it's because we reset the driver state from
+           card removal and we got a delayed IRQ from the kernel */
+    if (!driver_state.blk_req.inflight) {
         return;
     }
 
-    drv_status_t status;
-    switch (driver_state.executor) {
-    case ExecutorStateInit:
-        status = perform_card_identification_and_select();
-        if (status != DrvSuccess) {
-            return;
-        }
-        setup_blk_storage_info();
-
-        driver_state.executor = ExecutorStateActive;
-        fallthrough;
-
-    case ExecutorStateActive:
-        handle_clients();
-        // We always stay in the Active state now.
+    blk_resp_status_t response_status;
+    uint16_t success_count;
+    switch (driver_state.blk_req.code) {
+    case BLK_REQ_FLUSH:
+    case BLK_REQ_BARRIER:
+        /* No-ops. */
+        response_status = BLK_RESP_OK;
+        success_count = 0;
         break;
 
-    default:
-        assert(!"unreachable");
+    case BLK_REQ_READ: {
+        drv_status_t status = usdhc_read_blocks(driver_state.blk_req.paddr,
+                                                driver_state.blk_req.blk_number * SDDF_BLOCKS_TO_SD_BLOCKS,
+                                                driver_state.blk_req.blk_count * SDDF_BLOCKS_TO_SD_BLOCKS);
+        if (status == DrvIrqWait) {
+            return;
+        }
+        driver_state.data_transfer = DRIVER_STATE_INIT;
+        if (status == DrvErrorInternal) {
+            assert("TODO; retry?");
+        }
+
+        response_status = drv_to_blk_status(status);
+        success_count = driver_state.blk_req.blk_count;
+        break;
     }
+
+    case BLK_REQ_WRITE: {
+        drv_status_t status = usdhc_write_blocks(driver_state.blk_req.paddr,
+                                                 driver_state.blk_req.blk_number * SDDF_BLOCKS_TO_SD_BLOCKS,
+                                                 driver_state.blk_req.blk_count * SDDF_BLOCKS_TO_SD_BLOCKS);
+        if (status == DrvIrqWait) {
+            return;
+        }
+        driver_state.data_transfer = DRIVER_STATE_INIT;
+        if (status == DrvErrorInternal) {
+            assert("TODO; retry?");
+        }
+
+        response_status = drv_to_blk_status(status);
+        success_count = driver_state.blk_req.blk_count;
+        break;
+    }
+
+    default: {
+        success_count = 0;
+        response_status = BLK_RESP_ERR_INVALID_PARAM;
+        break;
+    }
+    }
+
+    int err = blk_enqueue_resp(&blk_queue, response_status, success_count, driver_state.blk_req.id);
+    assert(!err);
+    LOG_DRIVER("Enqueued response: status=%d, success_count=%d, id=%d\n", response_status, success_count,
+               driver_state.blk_req.id);
+    microkit_notify(CHANNEL_BLK_QUEUE);
+
+    driver_state.blk_req.inflight = false;
+
+    /* Tail-call to handle another request */
+    return handle_client(/* was_irq: */ false);
+}
+
+void do_bringup(void)
+{
+    assert(driver_status == DrvStatusBringup);
+
+    drv_status_t status = usdhc_init();
+    if (status == DrvIrqWait) {
+        return;
+    }
+    driver_state.init = DRIVER_STATE_INIT;
+    if (status != DrvSuccess) {
+        // TODO: Notify the client about the failure...?
+        clear_card_state();
+        driver_status = DrvStatusInactive;
+        LOG_DRIVER_ERR("Failed to initialise SD card\n");
+        return;
+    }
+
+    setup_blk_storage_info();
+
+    // TODO: Other info?
+    LOG_DRIVER("Card Ready, with size size (blocks): %lu\n", blk_storage_info->capacity);
+
+    /* handle any client requests that happened while initialising */
+    driver_status = DrvStatusActive;
+    handle_client(/* was_irq: */ false);
+}
+
+void do_teardown(void)
+{
+    assert(driver_status == DrvStatusTeardown);
+
+    /* TODO: There's no documentation in the SD specifications or iMX8 specification
+     *       about what we actually have to do here....
+     *       There's some notes about disabling clocks & SD bus power in [SD-HOST]
+     *       (see my Week 8 Research Notes) but nothing useful for us.
+     */
+
+    stop_operations_and_clear_card_state();
+    blk_storage_notify_ready(blk_storage_info, CHANNEL_BLK_STATE, false);
+
+    /* handle any client requests that happened while tearing down */
+    driver_status = DrvStatusInactive;
+    handle_client(/* was_irq: */ false);
 }
 
 void notified(microkit_channel ch)
 {
+    if (driver_status == DrvStatusBringup) {
+        if (ch == CHANNEL_USDHC_IRQ) {
+            do_bringup();
+            microkit_irq_ack(ch);
+        } else {
+            /* ignore other channels */
+        }
+
+        return;
+    } else if (driver_status == DrvStatusTeardown) {
+        if (ch == CHANNEL_USDHC_IRQ) {
+            do_teardown();
+            microkit_irq_ack(ch);
+        } else {
+            /* ignore other channels */
+        }
+
+        return;
+    } /* else in inactive or active */
+
     switch (ch) {
     case CHANNEL_USDHC_IRQ:
-        usdhc_executor(true);
+        handle_client(/* was_irq: */ true);
+        microkit_irq_ack(ch);
         break;
 
-    case CHANNEL_CLIENT:
-        usdhc_executor(false);
+    case CHANNEL_BLK_QUEUE:
+        handle_client(/* was_irq: */ false);
         break;
 
     case CHANNEL_TIMER:
-        LOG_DRIVER("got timer interrupt -- UNHANDLED\n");
-        assert(false);
+        // TODO: ifdef POLL_REQUIRED
+        handle_card_detect_irq();
         break;
 
+    case CHANNEL_BLK_STATE: /* shouldn't ever happen */
     default:
         LOG_DRIVER_ERR("notification on unknown channel: %d\n", ch);
         break;
-    }
-
-    if (ch == CHANNEL_USDHC_IRQ) {
-        microkit_irq_ack(ch);
     }
 }
 
 void init()
 {
-    reset_driver_and_card_state();
-
     LOG_DRIVER("Beginning driver initialisation...\n");
+    stop_operations_and_clear_card_state();
 
     /* Setup the sDDF block queue */
     blk_queue_init(&blk_queue, blk_req_queue, blk_resp_queue, BLK_QUEUE_CAPACITY_DRIV);
@@ -1129,6 +1309,58 @@ void init()
     /* Make sure we have DMA support. */
     assert(usdhc_regs->host_ctrl_cap & USDHC_HOST_CTRL_CAP_DMAS);
 
-    usdhc_reset();
-    usdhc_executor(true);
+    /* start from the detect-changed handler, which should kick off init
+       if it's possible */
+    handle_card_detect_irq();
+}
+
+/////   Polling - as we don't have card detect interrupts (or a GPIO driver)
+#define POLL_REQUIRED  (true)
+#define POLL_FREQUENCY (1 * NS_IN_S)
+
+#if POLL_REQUIRED
+static bool card_detect_at_last_check = false;
+
+static inline bool card_detect_did_change(void)
+{
+    if (gpio_card_detected()) {
+        return !card_detect_at_last_check;
+    } else {
+        return card_detect_at_last_check;
+    }
+}
+#endif
+
+void handle_card_detect_irq()
+{
+#if POLL_REQUIRED
+    sddf_timer_set_timeout(CHANNEL_TIMER, POLL_FREQUENCY);
+
+    if (!card_detect_did_change()) {
+        return;
+    }
+#endif
+
+    card_detect_at_last_check = gpio_card_detected();
+    if (card_detect_at_last_check) {
+        /* don't if already bringup. however, do if we're active
+           -> we got notified of a change so might have to reinitialise */
+        if (driver_status != DrvStatusBringup) {
+            driver_status = DrvStatusBringup;
+            do_bringup();
+        }
+    } else {
+        /* don't start if we're already teardown, and don't bother if we're already down */
+        if (driver_status != DrvStatusTeardown && driver_status != DrvStatusInactive) {
+            driver_status = DrvStatusTeardown;
+            do_teardown();
+        }
+    }
+}
+
+/* The reset_driver_and_card_state() function generates a call to memset
+   but we don't have those provided as we are in -ffreestanding */
+void *memset(void *s, int c, size_t n)
+{
+    return sddf_memset(s, c, n);
 }

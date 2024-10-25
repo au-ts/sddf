@@ -79,7 +79,7 @@ static void request_mbr()
     err = blk_enqueue_req(&drv_h, BLK_REQ_READ, mbr_paddr, 0, 1, state.mbr_req_id);
     assert(!err);
 
-    microkit_deferred_notify(DRIVER_CH);
+    microkit_deferred_notify(DRIVER_BLK_QUEUE_CH);
 }
 
 static bool handle_mbr_reply()
