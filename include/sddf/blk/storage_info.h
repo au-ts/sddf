@@ -30,6 +30,8 @@ typedef struct blk_storage_info {
     /* total capacity of the device, specified in BLK_TRANSFER_SIZE sized units. */
     uint64_t capacity;
 } blk_storage_info_t;
+_Static_assert(sizeof(blk_storage_info_t) <= BLK_STORAGE_INFO_REGION_SIZE,
+               "struct blk_storage_info must be smaller than the region size");
 
 /**
  * Load from shared memory whether the block storage device is ready.
