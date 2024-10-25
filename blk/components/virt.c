@@ -7,27 +7,13 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <sddf/blk/queue.h>
-#include <sddf/blk/msdos_mbr.h>
 #include <sddf/util/cache.h>
 #include <sddf/util/ialloc.h>
 #include <sddf/util/printf.h>
 #include <sddf/util/string.h>
 #include <sddf/util/util.h>
-#include <blk_config.h>
 
-/* Uncomment this to enable debug logging */
-// #define DEBUG_BLK_VIRT
-
-#if defined(DEBUG_BLK_VIRT)
-#define LOG_BLK_VIRT(...) do{ sddf_dprintf("BLK_VIRT|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
-#else
-#define LOG_BLK_VIRT(...) do{}while(0)
-#endif
-#define LOG_BLK_VIRT_ERR(...) do{ sddf_dprintf("BLK_VIRT|ERROR: "); sddf_dprintf(__VA_ARGS__); }while(0)
-
-
-#define DRIVER_CH 0
-#define CLI_CH_OFFSET 1
+#include "virt.h"
 
 /* Microkit patched variables */
 blk_storage_info_t *blk_driver_storage_info;
@@ -49,8 +35,6 @@ blk_queue_handle_t drv_h;
 typedef struct client {
     blk_queue_handle_t queue_h;
     microkit_channel ch;
-    uint32_t start_sector;
-    uint32_t sectors;
     uintptr_t data_paddr;
 } client_t;
 client_t clients[BLK_NUM_CLIENTS];
@@ -66,105 +50,16 @@ typedef struct reqbk {
 static reqbk_t reqsbk[BLK_QUEUE_CAPACITY_DRIV];
 
 /* Index allocator for driver request id */
-static ialloc_t ialloc;
+ialloc_t ialloc;
 static uint32_t ialloc_idxlist[BLK_QUEUE_CAPACITY_DRIV];
 
-/* MS-DOS Master boot record */
-struct msdos_mbr msdos_mbr;
+static enum {
+    VirtInactive,
+    VirtBringup,
+    VirtReady,
+} virt_status = VirtInactive;
 
-/* The virtualiser is not initialised until we can read the MBR and populate the block device configuration. */
-bool initialised = false;
-
-static void partitions_init()
-{
-    if (msdos_mbr.signature != MSDOS_MBR_SIGNATURE) {
-        LOG_BLK_VIRT_ERR("Invalid MBR signature\n");
-        return;
-    }
-
-    /* Validate partition and assign to client */
-    for (int client = 0; client < BLK_NUM_CLIENTS; client++) {
-        size_t client_partition = blk_partition_mapping[client];
-
-        if (msdos_mbr.partitions[client_partition].type == MSDOS_MBR_PARTITION_TYPE_EMPTY) {
-            /* Partition does not exist */
-            LOG_BLK_VIRT_ERR(
-                "Invalid client partition mapping for client %d: partition: %zu, partition does not exist\n", client,
-                client_partition);
-            return;
-        }
-
-        if (msdos_mbr.partitions[client_partition].lba_start % (BLK_TRANSFER_SIZE / MSDOS_MBR_SECTOR_SIZE) != 0) {
-            /* Partition start sector is not aligned to sDDF transfer size */
-            LOG_BLK_VIRT_ERR("Partition %d start sector %d not aligned to sDDF transfer size\n", (int)client_partition,
-                             msdos_mbr.partitions[client_partition].lba_start);
-            return;
-        }
-
-        /* We have a valid partition now. */
-        clients[client].start_sector = msdos_mbr.partitions[client_partition].lba_start;
-        clients[client].sectors = msdos_mbr.partitions[client_partition].sectors;
-    }
-
-    for (int i = 0; i < BLK_NUM_CLIENTS; i++) {
-        blk_storage_info_t *curr_blk_storage_info = blk_virt_cli_storage_info(blk_client_storage_info, i);
-        curr_blk_storage_info->sector_size = blk_driver_storage_info->sector_size;
-        curr_blk_storage_info->capacity = clients[i].sectors / (BLK_TRANSFER_SIZE / MSDOS_MBR_SECTOR_SIZE);
-        curr_blk_storage_info->read_only = false;
-        __atomic_store_n(&curr_blk_storage_info->ready, true, __ATOMIC_RELEASE);
-    }
-}
-
-static void request_mbr()
-{
-    int err = 0;
-    uintptr_t mbr_paddr = blk_data_paddr_driver;
-    uintptr_t mbr_vaddr = blk_driver_data;
-
-    uint32_t mbr_req_id = 0;
-    err = ialloc_alloc(&ialloc, &mbr_req_id);
-    assert(!err);
-    reqsbk[mbr_req_id] = (reqbk_t) { 0, 0, mbr_vaddr, 1, 0 };
-
-    /* Virt-to-driver data region needs to be big enough to transfer MBR data */
-    assert(BLK_DATA_REGION_SIZE_DRIV >= BLK_TRANSFER_SIZE);
-    err = blk_enqueue_req(&drv_h, BLK_REQ_READ, mbr_paddr, 0, 1, mbr_req_id);
-    assert(!err);
-
-    microkit_deferred_notify(DRIVER_CH);
-}
-
-static bool handle_mbr_reply()
-{
-    int err = 0;
-    if (blk_queue_empty_resp(&drv_h)) {
-        LOG_BLK_VIRT(
-            "Notified by driver but queue is empty, expecting a response to a BLK_REQ_READ request into sector 0\n");
-        return false;
-    }
-
-    blk_resp_status_t drv_status;
-    uint16_t drv_success_count;
-    uint32_t drv_resp_id;
-    err = blk_dequeue_resp(&drv_h, &drv_status, &drv_success_count, &drv_resp_id);
-    assert(!err);
-
-    reqbk_t mbr_bk = reqsbk[drv_resp_id];
-    err = ialloc_free(&ialloc, drv_resp_id);
-    assert(!err);
-
-    if (drv_status != BLK_RESP_OK) {
-        LOG_BLK_VIRT_ERR("Failed to read sector 0 from driver\n");
-        return false;
-    }
-
-    /* TODO: This is a raw seL4 system call because Microkit does not (currently)
-     * include a corresponding libmicrokit API. */
-    seL4_ARM_VSpace_Invalidate_Data(3, mbr_bk.vaddr, mbr_bk.vaddr + (BLK_TRANSFER_SIZE * mbr_bk.count));
-    sddf_memcpy(&msdos_mbr, (void *)mbr_bk.vaddr, sizeof(struct msdos_mbr));
-
-    return true;
-}
+static void handle_driver_state();
 
 void init(void)
 {
@@ -192,10 +87,47 @@ void init(void)
     /* Initialise index allocator */
     ialloc_init(&ialloc, ialloc_idxlist, BLK_QUEUE_CAPACITY_DRIV);
 
-    request_mbr();
+    handle_driver_state();
 }
 
-static void handle_driver()
+static void notify_clients_state()
+{
+    bool driver_ready = blk_storage_is_ready(blk_driver_storage_info);
+    for (int i = 0; i < BLK_NUM_CLIENTS; i++) {
+        blk_storage_info_t *cli_storage_info = blk_virt_cli_storage_info(blk_client_storage_info, i);
+
+        __atomic_store_n(&cli_storage_info->ready, driver_ready, __ATOMIC_RELEASE);
+    }
+}
+
+static void handle_driver_state()
+{
+    bool driver_ready = blk_storage_is_ready(blk_driver_storage_info);
+
+    /* As per the documentation, if we receive a BLK_STATE_CH notification
+       we must treat it as if the device went In -> Out -> In even if we only
+       ever see the In state.
+       This actually makes our lives easier, because of instead of 4 states we
+       only have two ( {drv_ready, us_ready}  ->   {drv_ready} ).
+    */
+
+    if (driver_ready) {
+        policy_reset();
+        virt_status = VirtBringup;
+        bool done = policy_init();
+        if (done) {
+            /* keep in sync with notified() */
+            virt_status = VirtReady;
+            notify_clients_state();
+        }
+    } else {
+        virt_status = VirtInactive;
+        policy_reset();
+        notify_clients_state();
+    }
+}
+
+static void handle_driver_queue()
 {
     bool client_notify[BLK_NUM_CLIENTS] = { 0 };
 
@@ -277,19 +209,14 @@ static bool handle_client(int cli_id)
         assert(!err);
 
         uint32_t drv_block_number = 0;
-        drv_block_number = cli_block_number + (clients[cli_id].start_sector / (BLK_TRANSFER_SIZE / MSDOS_MBR_SECTOR_SIZE));
 
         blk_resp_status_t resp_status = BLK_RESP_ERR_UNSPEC;
 
         switch (cli_code) {
         case BLK_REQ_READ:
         case BLK_REQ_WRITE: {
-            unsigned long client_sectors = clients[cli_id].sectors / (BLK_TRANSFER_SIZE / MSDOS_MBR_SECTOR_SIZE);
-            unsigned long client_start_sector = clients[cli_id].start_sector / (BLK_TRANSFER_SIZE / MSDOS_MBR_SECTOR_SIZE);
-            if (drv_block_number < client_start_sector || drv_block_number + cli_count > client_start_sector + client_sectors) {
-                /* Requested block number out of bounds */
-                LOG_BLK_VIRT_ERR("client %d request for block %d is out of bounds\n", cli_id, cli_block_number);
-                resp_status = BLK_RESP_ERR_INVALID_PARAM;
+            resp_status = get_drv_block_number(cli_block_number, cli_count, cli_id, &drv_block_number);
+            if (resp_status != BLK_RESP_OK) {
                 goto req_fail;
             }
 
@@ -373,17 +300,27 @@ static void handle_clients()
 
 void notified(microkit_channel ch)
 {
-    if (initialised == false) {
-        bool success = handle_mbr_reply();
-        if (success) {
-            partitions_init();
-            initialised = true;
+    if (virt_status == VirtBringup) {
+        if (ch != DRIVER_CH) {
+            /* ignore client requests */
+            return;
+        }
+
+        bool done = policy_init();
+        if (done) {
+            /* keep in sync with handle_driver_state() */
+            virt_status = VirtReady;
+            notify_clients_state();
         };
+
+        return;
+    } else if (virt_status == VirtInactive) {
+        // TODO: Respond with GONE?
         return;
     }
 
     if (ch == DRIVER_CH) {
-        handle_driver();
+        handle_driver_queue();
         handle_clients();
     } else {
         handle_clients();
