@@ -41,7 +41,7 @@
 
 /*
  * This is the size of the region that holds virtIO specific metadata, such as the virtq
- * and list of virtIO request headers. This much match the size of the region in the
+ * and list of virtIO request headers. This must match the size of the region in the
  * system description.
  */
 #define VIRTIO_REGION_SIZE 0x200000
