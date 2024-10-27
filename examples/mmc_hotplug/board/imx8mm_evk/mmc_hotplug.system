@@ -39,7 +39,6 @@
         <map mr="blk_driver_req"          vaddr="0x40200000" perms="rw" cached="false" setvar_vaddr="blk_req_queue"    />
         <map mr="blk_driver_resp"         vaddr="0x40400000" perms="rw" cached="false" setvar_vaddr="blk_resp_queue"   />
 
-        <!-- GPIO Messing -->
         <map mr="gpio1" vaddr="0x4_500_000" perms="r" cached="false" setvar_vaddr="gpio1_regs" />
     </protection_domain>
 

@@ -57,7 +57,6 @@ volatile imx_usdhc_regs_t *usdhc_regs;
 blk_storage_info_t *blk_storage_info;
 blk_req_queue_t *blk_req_queue;
 blk_resp_queue_t *blk_resp_queue;
-uintptr_t blk_data;
 
 /* Make sure to update drv_to_blk_status() as well */
 typedef enum {
@@ -1302,6 +1301,12 @@ void notified(microkit_channel ch)
 void init()
 {
     LOG_DRIVER("Beginning driver initialisation...\n");
+
+    assert(gpio1_regs != NULL);
+    assert(usdhc_regs != NULL);
+    assert(blk_storage_info != NULL);
+    assert(blk_req_queue != NULL);
+
     stop_operations_and_clear_card_state();
 
     /* Setup the sDDF block queue */

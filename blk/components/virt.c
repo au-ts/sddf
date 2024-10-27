@@ -77,8 +77,10 @@ void init(void)
 
     /* TODO: make data paddr handling system agnostic */
     assert(BLK_NUM_CLIENTS <= 2 && BLK_NUM_CLIENTS >= 1);
+    assert(blk_client0_data_paddr != 0);
     clients[0].data_paddr = blk_client0_data_paddr;
     if (BLK_NUM_CLIENTS > 1) {
+        assert(blk_client1_data_paddr != 0);
         clients[1].data_paddr = blk_client1_data_paddr;
     }
 
