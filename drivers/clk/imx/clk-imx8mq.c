@@ -279,700 +279,700 @@ static struct clk_parent_data imx8mq_audio_ahb_sels[] = {
     { .name = "video_pll1_out", },
 };
 
-/* static struct clk_parent_data imx8mq_dsi_ahb_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys2_pll_100m", }, */
-/*     { .name = "sys1_pll_80m", }, */
-/*     { .name = "sys1_pll_800m", }, */
-/*     { .name = "sys2_pll_1000m", }, */
-/*     { .name = "sys3_pll_out", }, */
-/*     { .name = "clk_ext3", }, */
-/*     { .name = "audio_pll2_out", }, */
-/* }; */
+static struct clk_parent_data imx8mq_dsi_ahb_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys2_pll_100m", },
+    { .name = "sys1_pll_80m", },
+    { .name = "sys1_pll_800m", },
+    { .name = "sys2_pll_1000m", },
+    { .name = "sys3_pll_out", },
+    { .name = "clk_ext3", },
+    { .name = "audio_pll2_out", },
+};
 
-/* static struct clk_parent_data imx8mq_dram_alt_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys1_pll_800m", }, */
-/*     { .name = "sys1_pll_100m", }, */
-/*     { .name = "sys2_pll_500m", }, */
-/*     { .name = "sys2_pll_250m", }, */
-/*     { .name = "sys1_pll_400m", }, */
-/*     { .name = "audio_pll1_out", }, */
-/*     { .name = "sys1_pll_266m", }, */
-/* }; */
+static struct clk_parent_data imx8mq_dram_alt_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys1_pll_800m", },
+    { .name = "sys1_pll_100m", },
+    { .name = "sys2_pll_500m", },
+    { .name = "sys2_pll_250m", },
+    { .name = "sys1_pll_400m", },
+    { .name = "audio_pll1_out", },
+    { .name = "sys1_pll_266m", },
+};
 
-/* static struct clk_parent_data imx8mq_dram_apb_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys2_pll_200m", }, */
-/*     { .name = "sys1_pll_40m", }, */
-/*     { .name = "sys1_pll_160m", }, */
-/*     { .name = "sys1_pll_800m", }, */
-/*     { .name = "sys3_pll_out", }, */
-/*     { .name = "sys2_pll_250m", }, */
-/*     { .name = "audio_pll2_out", }, */
-/* }; */
+static struct clk_parent_data imx8mq_dram_apb_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys2_pll_200m", },
+    { .name = "sys1_pll_40m", },
+    { .name = "sys1_pll_160m", },
+    { .name = "sys1_pll_800m", },
+    { .name = "sys3_pll_out", },
+    { .name = "sys2_pll_250m", },
+    { .name = "audio_pll2_out", },
+};
 
-/* static struct clk_parent_data imx8mq_vpu_g1_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "vpu_pll_out", }, */
-/*     { .name = "sys1_pll_800m", }, */
-/*     { .name = "sys2_pll_1000m", }, */
-/*     { .name = "sys1_pll_100m", }, */
-/*     { .name = "sys2_pll_125m", }, */
-/*     { .name = "sys3_pll_out", }, */
-/*     { .name = "audio_pll1_out", }, */
-/* }; */
+static struct clk_parent_data imx8mq_vpu_g1_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "vpu_pll_out", },
+    { .name = "sys1_pll_800m", },
+    { .name = "sys2_pll_1000m", },
+    { .name = "sys1_pll_100m", },
+    { .name = "sys2_pll_125m", },
+    { .name = "sys3_pll_out", },
+    { .name = "audio_pll1_out", },
+};
 
-/* static struct clk_parent_data imx8mq_vpu_g2_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "vpu_pll_out", }, */
-/*     { .name = "sys1_pll_800m", }, */
-/*     { .name = "sys2_pll_1000m", }, */
-/*     { .name = "sys1_pll_100m", }, */
-/*     { .name = "sys2_pll_125m", }, */
-/*     { .name = "sys3_pll_out", }, */
-/*     { .name = "audio_pll1_out", }, */
-/* }; */
+static struct clk_parent_data imx8mq_vpu_g2_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "vpu_pll_out", },
+    { .name = "sys1_pll_800m", },
+    { .name = "sys2_pll_1000m", },
+    { .name = "sys1_pll_100m", },
+    { .name = "sys2_pll_125m", },
+    { .name = "sys3_pll_out", },
+    { .name = "audio_pll1_out", },
+};
 
-/* static struct clk_parent_data imx8mq_disp_dtrc_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "vpu_pll_out", }, */
-/*     { .name = "sys1_pll_800m", }, */
-/*     { .name = "sys2_pll_1000m", }, */
-/*     { .name = "sys1_pll_160m", }, */
-/*     { .name = "sys2_pll_100m", }, */
-/*     { .name = "sys3_pll_out", }, */
-/*     { .name = "audio_pll2_out", }, */
-/* }; */
+static struct clk_parent_data imx8mq_disp_dtrc_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "vpu_pll_out", },
+    { .name = "sys1_pll_800m", },
+    { .name = "sys2_pll_1000m", },
+    { .name = "sys1_pll_160m", },
+    { .name = "sys2_pll_100m", },
+    { .name = "sys3_pll_out", },
+    { .name = "audio_pll2_out", },
+};
 
-/* static struct clk_parent_data imx8mq_disp_dc8000_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "vpu_pll_out", }, */
-/*     { .name = "sys1_pll_800m", }, */
-/*     { .name = "sys2_pll_1000m", }, */
-/*     { .name = "sys1_pll_160m", }, */
-/*     { .name = "sys2_pll_100m", }, */
-/*     { .name = "sys3_pll_out", }, */
-/*     { .name = "audio_pll2_out", }, */
-/* }; */
+static struct clk_parent_data imx8mq_disp_dc8000_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "vpu_pll_out", },
+    { .name = "sys1_pll_800m", },
+    { .name = "sys2_pll_1000m", },
+    { .name = "sys1_pll_160m", },
+    { .name = "sys2_pll_100m", },
+    { .name = "sys3_pll_out", },
+    { .name = "audio_pll2_out", },
+};
 
-/* static struct clk_parent_data imx8mq_pcie1_ctrl_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys2_pll_250m", }, */
-/*     { .name = "sys2_pll_200m", }, */
-/*     { .name = "sys1_pll_266m", }, */
-/*     { .name = "sys1_pll_800m", }, */
-/*     { .name = "sys2_pll_500m", }, */
-/*     { .name = "sys2_pll_333m", }, */
-/*     { .name = "sys3_pll_out", }, */
-/* }; */
+static struct clk_parent_data imx8mq_pcie1_ctrl_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys2_pll_250m", },
+    { .name = "sys2_pll_200m", },
+    { .name = "sys1_pll_266m", },
+    { .name = "sys1_pll_800m", },
+    { .name = "sys2_pll_500m", },
+    { .name = "sys2_pll_333m", },
+    { .name = "sys3_pll_out", },
+};
 
-/* static struct clk_parent_data imx8mq_pcie1_phy_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys2_pll_100m", }, */
-/*     { .name = "sys2_pll_500m", }, */
-/*     { .name = "clk_ext1", }, */
-/*     { .name = "clk_ext2", }, */
-/*     { .name = "clk_ext3", }, */
-/*     { .name = "clk_ext4", }, */
-/* }; */
+static struct clk_parent_data imx8mq_pcie1_phy_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys2_pll_100m", },
+    { .name = "sys2_pll_500m", },
+    { .name = "clk_ext1", },
+    { .name = "clk_ext2", },
+    { .name = "clk_ext3", },
+    { .name = "clk_ext4", },
+};
 
-/* static struct clk_parent_data imx8mq_pcie1_aux_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys2_pll_200m", }, */
-/*     { .name = "sys2_pll_50m", }, */
-/*     { .name = "sys3_pll_out", }, */
-/*     { .name = "sys2_pll_100m", }, */
-/*     { .name = "sys1_pll_80m", }, */
-/*     { .name = "sys1_pll_160m", }, */
-/*     { .name = "sys1_pll_200m", }, */
-/* }; */
+static struct clk_parent_data imx8mq_pcie1_aux_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys2_pll_200m", },
+    { .name = "sys2_pll_50m", },
+    { .name = "sys3_pll_out", },
+    { .name = "sys2_pll_100m", },
+    { .name = "sys1_pll_80m", },
+    { .name = "sys1_pll_160m", },
+    { .name = "sys1_pll_200m", },
+};
 
-/* static struct clk_parent_data imx8mq_dc_pixel_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "video_pll1_out", }, */
-/*     { .name = "audio_pll2_out", }, */
-/*     { .name = "audio_pll1_out", }, */
-/*     { .name = "sys1_pll_800m", }, */
-/*     { .name = "sys2_pll_1000m", }, */
-/*     { .name = "sys3_pll_out", }, */
-/*     { .name = "clk_ext4", }, */
-/* }; */
+static struct clk_parent_data imx8mq_dc_pixel_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "video_pll1_out", },
+    { .name = "audio_pll2_out", },
+    { .name = "audio_pll1_out", },
+    { .name = "sys1_pll_800m", },
+    { .name = "sys2_pll_1000m", },
+    { .name = "sys3_pll_out", },
+    { .name = "clk_ext4", },
+};
 
-/* static struct clk_parent_data imx8mq_lcdif_pixel_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "video_pll1_out", }, */
-/*     { .name = "audio_pll2_out", }, */
-/*     { .name = "audio_pll1_out", }, */
-/*     { .name = "sys1_pll_800m", }, */
-/*     { .name = "sys2_pll_1000m", }, */
-/*     { .name = "sys3_pll_out", }, */
-/*     { .name = "clk_ext4", }, */
-/* }; */
+static struct clk_parent_data imx8mq_lcdif_pixel_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "video_pll1_out", },
+    { .name = "audio_pll2_out", },
+    { .name = "audio_pll1_out", },
+    { .name = "sys1_pll_800m", },
+    { .name = "sys2_pll_1000m", },
+    { .name = "sys3_pll_out", },
+    { .name = "clk_ext4", },
+};
 
-/* static struct clk_parent_data imx8mq_sai1_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "audio_pll1_out", }, */
-/*     { .name = "audio_pll2_out", }, */
-/*     { .name = "video_pll1_out", }, */
-/*     { .name = "sys1_pll_133m", }, */
-/*     { .name = "osc_27m", }, */
-/*     { .name = "clk_ext1", }, */
-/*     { .name = "clk_ext2", }, */
-/* }; */
+static struct clk_parent_data imx8mq_sai1_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "audio_pll1_out", },
+    { .name = "audio_pll2_out", },
+    { .name = "video_pll1_out", },
+    { .name = "sys1_pll_133m", },
+    { .name = "osc_27m", },
+    { .name = "clk_ext1", },
+    { .name = "clk_ext2", },
+};
 
-/* static struct clk_parent_data imx8mq_sai2_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "audio_pll1_out", }, */
-/*     { .name = "audio_pll2_out", }, */
-/*     { .name = "video_pll1_out", }, */
-/*     { .name = "sys1_pll_133m", }, */
-/*     { .name = "osc_27m", }, */
-/*     { .name = "clk_ext2", }, */
-/*     { .name = "clk_ext3", }, */
-/* }; */
+static struct clk_parent_data imx8mq_sai2_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "audio_pll1_out", },
+    { .name = "audio_pll2_out", },
+    { .name = "video_pll1_out", },
+    { .name = "sys1_pll_133m", },
+    { .name = "osc_27m", },
+    { .name = "clk_ext2", },
+    { .name = "clk_ext3", },
+};
 
-/* static struct clk_parent_data imx8mq_sai3_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "audio_pll1_out", }, */
-/*     { .name = "audio_pll2_out", }, */
-/*     { .name = "video_pll1_out", }, */
-/*     { .name = "sys1_pll_133m", }, */
-/*     { .name = "osc_27m", }, */
-/*     { .name = "clk_ext3", }, */
-/*     { .name = "clk_ext4", }, */
-/* }; */
+static struct clk_parent_data imx8mq_sai3_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "audio_pll1_out", },
+    { .name = "audio_pll2_out", },
+    { .name = "video_pll1_out", },
+    { .name = "sys1_pll_133m", },
+    { .name = "osc_27m", },
+    { .name = "clk_ext3", },
+    { .name = "clk_ext4", },
+};
 
-/* static struct clk_parent_data imx8mq_sai4_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "audio_pll1_out", }, */
-/*     { .name = "audio_pll2_out", }, */
-/*     { .name = "video_pll1_out", }, */
-/*     { .name = "sys1_pll_133m", }, */
-/*     { .name = "osc_27m", }, */
-/*     { .name = "clk_ext1", }, */
-/*     { .name = "clk_ext2", }, */
-/* }; */
+static struct clk_parent_data imx8mq_sai4_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "audio_pll1_out", },
+    { .name = "audio_pll2_out", },
+    { .name = "video_pll1_out", },
+    { .name = "sys1_pll_133m", },
+    { .name = "osc_27m", },
+    { .name = "clk_ext1", },
+    { .name = "clk_ext2", },
+};
 
-/* static struct clk_parent_data imx8mq_sai5_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "audio_pll1_out", }, */
-/*     { .name = "audio_pll2_out", }, */
-/*     { .name = "video_pll1_out", }, */
-/*     { .name = "sys1_pll_133m", }, */
-/*     { .name = "osc_27m", }, */
-/*     { .name = "clk_ext2", }, */
-/*     { .name = "clk_ext3", }, */
-/* }; */
+static struct clk_parent_data imx8mq_sai5_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "audio_pll1_out", },
+    { .name = "audio_pll2_out", },
+    { .name = "video_pll1_out", },
+    { .name = "sys1_pll_133m", },
+    { .name = "osc_27m", },
+    { .name = "clk_ext2", },
+    { .name = "clk_ext3", },
+};
 
-/* static struct clk_parent_data imx8mq_sai6_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "audio_pll1_out", }, */
-/*     { .name = "audio_pll2_out", }, */
-/*     { .name = "video_pll1_out", }, */
-/*     { .name = "sys1_pll_133m", }, */
-/*     { .name = "osc_27m", }, */
-/*     { .name = "clk_ext3", }, */
-/*     { .name = "clk_ext4", }, */
-/* }; */
+static struct clk_parent_data imx8mq_sai6_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "audio_pll1_out", },
+    { .name = "audio_pll2_out", },
+    { .name = "video_pll1_out", },
+    { .name = "sys1_pll_133m", },
+    { .name = "osc_27m", },
+    { .name = "clk_ext3", },
+    { .name = "clk_ext4", },
+};
 
-/* static struct clk_parent_data imx8mq_spdif1_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "audio_pll1_out", }, */
-/*     { .name = "audio_pll2_out", }, */
-/*     { .name = "video_pll1_out", }, */
-/*     { .name = "sys1_pll_133m", }, */
-/*     { .name = "osc_27m", }, */
-/*     { .name = "clk_ext2", }, */
-/*     { .name = "clk_ext3", }, */
-/* }; */
+static struct clk_parent_data imx8mq_spdif1_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "audio_pll1_out", },
+    { .name = "audio_pll2_out", },
+    { .name = "video_pll1_out", },
+    { .name = "sys1_pll_133m", },
+    { .name = "osc_27m", },
+    { .name = "clk_ext2", },
+    { .name = "clk_ext3", },
+};
 
-/* static struct clk_parent_data imx8mq_spdif2_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "audio_pll1_out", }, */
-/*     { .name = "audio_pll2_out", }, */
-/*     { .name = "video_pll1_out", }, */
-/*     { .name = "sys1_pll_133m", }, */
-/*     { .name = "osc_27m", }, */
-/*     { .name = "clk_ext3", }, */
-/*     { .name = "clk_ext4", }, */
-/* }; */
+static struct clk_parent_data imx8mq_spdif2_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "audio_pll1_out", },
+    { .name = "audio_pll2_out", },
+    { .name = "video_pll1_out", },
+    { .name = "sys1_pll_133m", },
+    { .name = "osc_27m", },
+    { .name = "clk_ext3", },
+    { .name = "clk_ext4", },
+};
 
-/* static struct clk_parent_data imx8mq_enet_ref_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys2_pll_125m", }, */
-/*     { .name = "sys2_pll_500m", }, */
-/*     { .name = "sys2_pll_100m", }, */
-/*     { .name = "sys1_pll_160m", }, */
-/*     { .name = "audio_pll1_out", }, */
-/*     { .name = "video_pll1_out", }, */
-/*     { .name = "clk_ext4", }, */
-/* }; */
+static struct clk_parent_data imx8mq_enet_ref_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys2_pll_125m", },
+    { .name = "sys2_pll_500m", },
+    { .name = "sys2_pll_100m", },
+    { .name = "sys1_pll_160m", },
+    { .name = "audio_pll1_out", },
+    { .name = "video_pll1_out", },
+    { .name = "clk_ext4", },
+};
 
-/* static struct clk_parent_data imx8mq_enet_timer_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys2_pll_100m", }, */
-/*     { .name = "audio_pll1_out", }, */
-/*     { .name = "clk_ext1", }, */
-/*     { .name = "clk_ext2", }, */
-/*     { .name = "clk_ext3", }, */
-/*     { .name = "clk_ext4", }, */
-/*     { .name = "video_pll1_out", }, */
-/* }; */
+static struct clk_parent_data imx8mq_enet_timer_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys2_pll_100m", },
+    { .name = "audio_pll1_out", },
+    { .name = "clk_ext1", },
+    { .name = "clk_ext2", },
+    { .name = "clk_ext3", },
+    { .name = "clk_ext4", },
+    { .name = "video_pll1_out", },
+};
 
-/* static struct clk_parent_data imx8mq_enet_phy_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys2_pll_50m", }, */
-/*     { .name = "sys2_pll_125m", }, */
-/*     { .name = "sys2_pll_500m", }, */
-/*     { .name = "audio_pll1_out", }, */
-/*     { .name = "video_pll1_out", }, */
-/*     { .name = "audio_pll2_out", }, */
-/* }; */
+static struct clk_parent_data imx8mq_enet_phy_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys2_pll_50m", },
+    { .name = "sys2_pll_125m", },
+    { .name = "sys2_pll_500m", },
+    { .name = "audio_pll1_out", },
+    { .name = "video_pll1_out", },
+    { .name = "audio_pll2_out", },
+};
 
-/* static struct clk_parent_data imx8mq_nand_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys2_pll_500m", }, */
-/*     { .name = "audio_pll1_out", }, */
-/*     { .name = "sys1_pll_400m", }, */
-/*     { .name = "audio_pll2_out", }, */
-/*     { .name = "sys3_pll_out", }, */
-/*     { .name = "sys2_pll_250m", }, */
-/*     { .name = "video_pll1_out", }, */
-/* }; */
+static struct clk_parent_data imx8mq_nand_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys2_pll_500m", },
+    { .name = "audio_pll1_out", },
+    { .name = "sys1_pll_400m", },
+    { .name = "audio_pll2_out", },
+    { .name = "sys3_pll_out", },
+    { .name = "sys2_pll_250m", },
+    { .name = "video_pll1_out", },
+};
 
-/* static struct clk_parent_data imx8mq_qspi_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys1_pll_400m", }, */
-/*     { .name = "sys1_pll_800m", }, */
-/*     { .name = "sys2_pll_500m", }, */
-/*     { .name = "audio_pll2_out", }, */
-/*     { .name = "sys1_pll_266m", }, */
-/*     { .name = "sys3_pll_out", }, */
-/*     { .name = "sys1_pll_100m", }, */
-/* }; */
+static struct clk_parent_data imx8mq_qspi_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys1_pll_400m", },
+    { .name = "sys1_pll_800m", },
+    { .name = "sys2_pll_500m", },
+    { .name = "audio_pll2_out", },
+    { .name = "sys1_pll_266m", },
+    { .name = "sys3_pll_out", },
+    { .name = "sys1_pll_100m", },
+};
 
-/* static struct clk_parent_data imx8mq_usdhc1_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys1_pll_400m", }, */
-/*     { .name = "sys1_pll_800m", }, */
-/*     { .name = "sys2_pll_500m", }, */
-/*     { .name = "sys3_pll_out", }, */
-/*     { .name = "sys1_pll_266m", }, */
-/*     { .name = "audio_pll2_out", }, */
-/*     { .name = "sys1_pll_100m", }, */
-/* }; */
+static struct clk_parent_data imx8mq_usdhc1_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys1_pll_400m", },
+    { .name = "sys1_pll_800m", },
+    { .name = "sys2_pll_500m", },
+    { .name = "sys3_pll_out", },
+    { .name = "sys1_pll_266m", },
+    { .name = "audio_pll2_out", },
+    { .name = "sys1_pll_100m", },
+};
 
-/* static struct clk_parent_data imx8mq_usdhc2_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys1_pll_400m", }, */
-/*     { .name = "sys1_pll_800m", }, */
-/*     { .name = "sys2_pll_500m", }, */
-/*     { .name = "sys3_pll_out", }, */
-/*     { .name = "sys1_pll_266m", }, */
-/*     { .name = "audio_pll2_out", }, */
-/*     { .name = "sys1_pll_100m", }, */
-/* }; */
+static struct clk_parent_data imx8mq_usdhc2_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys1_pll_400m", },
+    { .name = "sys1_pll_800m", },
+    { .name = "sys2_pll_500m", },
+    { .name = "sys3_pll_out", },
+    { .name = "sys1_pll_266m", },
+    { .name = "audio_pll2_out", },
+    { .name = "sys1_pll_100m", },
+};
 
-/* static struct clk_parent_data imx8mq_i2c1_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys1_pll_160m", }, */
-/*     { .name = "sys2_pll_50m", }, */
-/*     { .name = "sys3_pll_out", }, */
-/*     { .name = "audio_pll1_out", }, */
-/*     { .name = "video_pll1_out", }, */
-/*     { .name = "audio_pll2_out", }, */
-/*     { .name = "sys1_pll_133m", }, */
-/* }; */
+static struct clk_parent_data imx8mq_i2c1_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys1_pll_160m", },
+    { .name = "sys2_pll_50m", },
+    { .name = "sys3_pll_out", },
+    { .name = "audio_pll1_out", },
+    { .name = "video_pll1_out", },
+    { .name = "audio_pll2_out", },
+    { .name = "sys1_pll_133m", },
+};
 
-/* static struct clk_parent_data imx8mq_i2c2_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys1_pll_160m", }, */
-/*     { .name = "sys2_pll_50m", }, */
-/*     { .name = "sys3_pll_out", }, */
-/*     { .name = "audio_pll1_out", }, */
-/*     { .name = "video_pll1_out", }, */
-/*     { .name = "audio_pll2_out", }, */
-/*     { .name = "sys1_pll_133m", }, */
-/* }; */
+static struct clk_parent_data imx8mq_i2c2_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys1_pll_160m", },
+    { .name = "sys2_pll_50m", },
+    { .name = "sys3_pll_out", },
+    { .name = "audio_pll1_out", },
+    { .name = "video_pll1_out", },
+    { .name = "audio_pll2_out", },
+    { .name = "sys1_pll_133m", },
+};
 
-/* static struct clk_parent_data imx8mq_i2c3_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys1_pll_160m", }, */
-/*     { .name = "sys2_pll_50m", }, */
-/*     { .name = "sys3_pll_out", }, */
-/*     { .name = "audio_pll1_out", }, */
-/*     { .name = "video_pll1_out", }, */
-/*     { .name = "audio_pll2_out", }, */
-/*     { .name = "sys1_pll_133m", }, */
-/* }; */
+static struct clk_parent_data imx8mq_i2c3_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys1_pll_160m", },
+    { .name = "sys2_pll_50m", },
+    { .name = "sys3_pll_out", },
+    { .name = "audio_pll1_out", },
+    { .name = "video_pll1_out", },
+    { .name = "audio_pll2_out", },
+    { .name = "sys1_pll_133m", },
+};
 
-/* static struct clk_parent_data imx8mq_i2c4_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys1_pll_160m", }, */
-/*     { .name = "sys2_pll_50m", }, */
-/*     { .name = "sys3_pll_out", }, */
-/*     { .name = "audio_pll1_out", }, */
-/*     { .name = "video_pll1_out", }, */
-/*     { .name = "audio_pll2_out", }, */
-/*     { .name = "sys1_pll_133m", }, */
-/* }; */
+static struct clk_parent_data imx8mq_i2c4_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys1_pll_160m", },
+    { .name = "sys2_pll_50m", },
+    { .name = "sys3_pll_out", },
+    { .name = "audio_pll1_out", },
+    { .name = "video_pll1_out", },
+    { .name = "audio_pll2_out", },
+    { .name = "sys1_pll_133m", },
+};
 
-/* static struct clk_parent_data imx8mq_uart1_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys1_pll_80m", }, */
-/*     { .name = "sys2_pll_200m", }, */
-/*     { .name = "sys2_pll_100m", }, */
-/*     { .name = "sys3_pll_out", }, */
-/*     { .name = "clk_ext2", }, */
-/*     { .name = "clk_ext4", }, */
-/*     { .name = "audio_pll2_out", }, */
-/* }; */
+static struct clk_parent_data imx8mq_uart1_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys1_pll_80m", },
+    { .name = "sys2_pll_200m", },
+    { .name = "sys2_pll_100m", },
+    { .name = "sys3_pll_out", },
+    { .name = "clk_ext2", },
+    { .name = "clk_ext4", },
+    { .name = "audio_pll2_out", },
+};
 
-/* static struct clk_parent_data imx8mq_uart2_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys1_pll_80m", }, */
-/*     { .name = "sys2_pll_200m", }, */
-/*     { .name = "sys2_pll_100m", }, */
-/*     { .name = "sys3_pll_out", }, */
-/*     { .name = "clk_ext2", }, */
-/*     { .name = "clk_ext3", }, */
-/*     { .name = "audio_pll2_out", }, */
-/* }; */
+static struct clk_parent_data imx8mq_uart2_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys1_pll_80m", },
+    { .name = "sys2_pll_200m", },
+    { .name = "sys2_pll_100m", },
+    { .name = "sys3_pll_out", },
+    { .name = "clk_ext2", },
+    { .name = "clk_ext3", },
+    { .name = "audio_pll2_out", },
+};
 
-/* static struct clk_parent_data imx8mq_uart3_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys1_pll_80m", }, */
-/*     { .name = "sys2_pll_200m", }, */
-/*     { .name = "sys2_pll_100m", }, */
-/*     { .name = "sys3_pll_out", }, */
-/*     { .name = "clk_ext2", }, */
-/*     { .name = "clk_ext4", }, */
-/*     { .name = "audio_pll2_out", }, */
-/* }; */
+static struct clk_parent_data imx8mq_uart3_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys1_pll_80m", },
+    { .name = "sys2_pll_200m", },
+    { .name = "sys2_pll_100m", },
+    { .name = "sys3_pll_out", },
+    { .name = "clk_ext2", },
+    { .name = "clk_ext4", },
+    { .name = "audio_pll2_out", },
+};
 
-/* static struct clk_parent_data imx8mq_uart4_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys1_pll_80m", }, */
-/*     { .name = "sys2_pll_200m", }, */
-/*     { .name = "sys2_pll_100m", }, */
-/*     { .name = "sys3_pll_out", }, */
-/*     { .name = "clk_ext2", }, */
-/*     { .name = "clk_ext3", }, */
-/*     { .name = "audio_pll2_out", }, */
-/* }; */
+static struct clk_parent_data imx8mq_uart4_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys1_pll_80m", },
+    { .name = "sys2_pll_200m", },
+    { .name = "sys2_pll_100m", },
+    { .name = "sys3_pll_out", },
+    { .name = "clk_ext2", },
+    { .name = "clk_ext3", },
+    { .name = "audio_pll2_out", },
+};
 
-/* static struct clk_parent_data imx8mq_usb_core_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys1_pll_100m", }, */
-/*     { .name = "sys1_pll_40m", }, */
-/*     { .name = "sys2_pll_100m", }, */
-/*     { .name = "sys2_pll_200m", }, */
-/*     { .name = "clk_ext2", }, */
-/*     { .name = "clk_ext3", }, */
-/*     { .name = "audio_pll2_out", }, */
-/* }; */
+static struct clk_parent_data imx8mq_usb_core_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys1_pll_100m", },
+    { .name = "sys1_pll_40m", },
+    { .name = "sys2_pll_100m", },
+    { .name = "sys2_pll_200m", },
+    { .name = "clk_ext2", },
+    { .name = "clk_ext3", },
+    { .name = "audio_pll2_out", },
+};
 
-/* static struct clk_parent_data imx8mq_usb_phy_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys1_pll_100m", }, */
-/*     { .name = "sys1_pll_40m", }, */
-/*     { .name = "sys2_pll_100m", }, */
-/*     { .name = "sys2_pll_200m", }, */
-/*     { .name = "clk_ext2", }, */
-/*     { .name = "clk_ext3", }, */
-/*     { .name = "audio_pll2_out", }, */
-/* }; */
+static struct clk_parent_data imx8mq_usb_phy_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys1_pll_100m", },
+    { .name = "sys1_pll_40m", },
+    { .name = "sys2_pll_100m", },
+    { .name = "sys2_pll_200m", },
+    { .name = "clk_ext2", },
+    { .name = "clk_ext3", },
+    { .name = "audio_pll2_out", },
+};
 
-/* static struct clk_parent_data imx8mq_gic_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys2_pll_200m", }, */
-/*     { .name = "sys1_pll_40m", }, */
-/*     { .name = "sys2_pll_100m", }, */
-/*     { .name = "sys2_pll_200m", }, */
-/*     { .name = "clk_ext2", }, */
-/*     { .name = "clk_ext3", }, */
-/*     { .name = "audio_pll2_out", }, */
-/* }; */
+static struct clk_parent_data imx8mq_gic_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys2_pll_200m", },
+    { .name = "sys1_pll_40m", },
+    { .name = "sys2_pll_100m", },
+    { .name = "sys2_pll_200m", },
+    { .name = "clk_ext2", },
+    { .name = "clk_ext3", },
+    { .name = "audio_pll2_out", },
+};
 
-/* static struct clk_parent_data imx8mq_ecspi1_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys2_pll_200m", }, */
-/*     { .name = "sys1_pll_40m", }, */
-/*     { .name = "sys1_pll_160m", }, */
-/*     { .name = "sys1_pll_800m", }, */
-/*     { .name = "sys3_pll_out", }, */
-/*     { .name = "sys2_pll_250m", }, */
-/*     { .name = "audio_pll2_out", }, */
-/* }; */
+static struct clk_parent_data imx8mq_ecspi1_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys2_pll_200m", },
+    { .name = "sys1_pll_40m", },
+    { .name = "sys1_pll_160m", },
+    { .name = "sys1_pll_800m", },
+    { .name = "sys3_pll_out", },
+    { .name = "sys2_pll_250m", },
+    { .name = "audio_pll2_out", },
+};
 
-/* static struct clk_parent_data imx8mq_ecspi2_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys2_pll_200m", }, */
-/*     { .name = "sys1_pll_40m", }, */
-/*     { .name = "sys1_pll_160m", }, */
-/*     { .name = "sys1_pll_800m", }, */
-/*     { .name = "sys3_pll_out", }, */
-/*     { .name = "sys2_pll_250m", }, */
-/*     { .name = "audio_pll2_out", }, */
-/* }; */
+static struct clk_parent_data imx8mq_ecspi2_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys2_pll_200m", },
+    { .name = "sys1_pll_40m", },
+    { .name = "sys1_pll_160m", },
+    { .name = "sys1_pll_800m", },
+    { .name = "sys3_pll_out", },
+    { .name = "sys2_pll_250m", },
+    { .name = "audio_pll2_out", },
+};
 
-/* static struct clk_parent_data imx8mq_pwm1_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys2_pll_100m", }, */
-/*     { .name = "sys1_pll_160m", }, */
-/*     { .name = "sys1_pll_40m", }, */
-/*     { .name = "sys3_pll_out", }, */
-/*     { .name = "clk_ext1", }, */
-/*     { .name = "sys1_pll_80m", }, */
-/*     { .name = "video_pll1_out", }, */
-/* }; */
+static struct clk_parent_data imx8mq_pwm1_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys2_pll_100m", },
+    { .name = "sys1_pll_160m", },
+    { .name = "sys1_pll_40m", },
+    { .name = "sys3_pll_out", },
+    { .name = "clk_ext1", },
+    { .name = "sys1_pll_80m", },
+    { .name = "video_pll1_out", },
+};
 
-/* static struct clk_parent_data imx8mq_pwm2_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys2_pll_100m", }, */
-/*     { .name = "sys1_pll_160m", }, */
-/*     { .name = "sys1_pll_40m", }, */
-/*     { .name = "sys3_pll_out", }, */
-/*     { .name = "clk_ext1", }, */
-/*     { .name = "sys1_pll_80m", }, */
-/*     { .name = "video_pll1_out", }, */
-/* }; */
+static struct clk_parent_data imx8mq_pwm2_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys2_pll_100m", },
+    { .name = "sys1_pll_160m", },
+    { .name = "sys1_pll_40m", },
+    { .name = "sys3_pll_out", },
+    { .name = "clk_ext1", },
+    { .name = "sys1_pll_80m", },
+    { .name = "video_pll1_out", },
+};
 
-/* static struct clk_parent_data imx8mq_pwm3_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys2_pll_100m", }, */
-/*     { .name = "sys1_pll_160m", }, */
-/*     { .name = "sys1_pll_40m", }, */
-/*     { .name = "sys3_pll_out", }, */
-/*     { .name = "clk_ext2", }, */
-/*     { .name = "sys1_pll_80m", }, */
-/*     { .name = "video_pll1_out", }, */
-/* }; */
+static struct clk_parent_data imx8mq_pwm3_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys2_pll_100m", },
+    { .name = "sys1_pll_160m", },
+    { .name = "sys1_pll_40m", },
+    { .name = "sys3_pll_out", },
+    { .name = "clk_ext2", },
+    { .name = "sys1_pll_80m", },
+    { .name = "video_pll1_out", },
+};
 
-/* static struct clk_parent_data imx8mq_pwm4_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys2_pll_100m", }, */
-/*     { .name = "sys1_pll_160m", }, */
-/*     { .name = "sys1_pll_40m", }, */
-/*     { .name = "sys3_pll_out", }, */
-/*     { .name = "clk_ext2", }, */
-/*     { .name = "sys1_pll_80m", }, */
-/*     { .name = "video_pll1_out", }, */
-/* }; */
+static struct clk_parent_data imx8mq_pwm4_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys2_pll_100m", },
+    { .name = "sys1_pll_160m", },
+    { .name = "sys1_pll_40m", },
+    { .name = "sys3_pll_out", },
+    { .name = "clk_ext2", },
+    { .name = "sys1_pll_80m", },
+    { .name = "video_pll1_out", },
+};
 
-/* static struct clk_parent_data imx8mq_gpt1_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys2_pll_100m", }, */
-/*     { .name = "sys1_pll_400m", }, */
-/*     { .name = "sys1_pll_40m", }, */
-/*     { .name = "sys1_pll_80m", }, */
-/*     { .name = "audio_pll1_out", }, */
-/*     { .name = "clk_ext1", }, */
-/* }; */
+static struct clk_parent_data imx8mq_gpt1_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys2_pll_100m", },
+    { .name = "sys1_pll_400m", },
+    { .name = "sys1_pll_40m", },
+    { .name = "sys1_pll_80m", },
+    { .name = "audio_pll1_out", },
+    { .name = "clk_ext1", },
+};
 
-/* static struct clk_parent_data imx8mq_wdog_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys1_pll_133m", }, */
-/*     { .name = "sys1_pll_160m", }, */
-/*     { .name = "vpu_pll_out", }, */
-/*     { .name = "sys2_pll_125m", }, */
-/*     { .name = "sys3_pll_out", }, */
-/*     { .name = "sys1_pll_80m", }, */
-/*     { .name = "sys2_pll_166m", }, */
-/* }; */
+static struct clk_parent_data imx8mq_wdog_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys1_pll_133m", },
+    { .name = "sys1_pll_160m", },
+    { .name = "vpu_pll_out", },
+    { .name = "sys2_pll_125m", },
+    { .name = "sys3_pll_out", },
+    { .name = "sys1_pll_80m", },
+    { .name = "sys2_pll_166m", },
+};
 
-/* static struct clk_parent_data imx8mq_wrclk_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys1_pll_40m", }, */
-/*     { .name = "vpu_pll_out", }, */
-/*     { .name = "sys3_pll_out", }, */
-/*     { .name = "sys2_pll_200m", }, */
-/*     { .name = "sys1_pll_266m", }, */
-/*     { .name = "sys2_pll_500m", }, */
-/*     { .name = "sys1_pll_100m", }, */
-/* }; */
+static struct clk_parent_data imx8mq_wrclk_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys1_pll_40m", },
+    { .name = "vpu_pll_out", },
+    { .name = "sys3_pll_out", },
+    { .name = "sys2_pll_200m", },
+    { .name = "sys1_pll_266m", },
+    { .name = "sys2_pll_500m", },
+    { .name = "sys1_pll_100m", },
+};
 
-/* static struct clk_parent_data imx8mq_dsi_core_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys1_pll_266m", }, */
-/*     { .name = "sys2_pll_250m", }, */
-/*     { .name = "sys1_pll_800m", }, */
-/*     { .name = "sys2_pll_1000m", }, */
-/*     { .name = "sys3_pll_out", }, */
-/*     { .name = "audio_pll2_out", }, */
-/*     { .name = "video_pll1_out", }, */
-/* }; */
+static struct clk_parent_data imx8mq_dsi_core_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys1_pll_266m", },
+    { .name = "sys2_pll_250m", },
+    { .name = "sys1_pll_800m", },
+    { .name = "sys2_pll_1000m", },
+    { .name = "sys3_pll_out", },
+    { .name = "audio_pll2_out", },
+    { .name = "video_pll1_out", },
+};
 
-/* static struct clk_parent_data imx8mq_dsi_phy_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys2_pll_125m", }, */
-/*     { .name = "sys2_pll_100m", }, */
-/*     { .name = "sys1_pll_800m", }, */
-/*     { .name = "sys2_pll_1000m", }, */
-/*     { .name = "clk_ext2", }, */
-/*     { .name = "audio_pll2_out", }, */
-/*     { .name = "video_pll1_out", }, */
-/* }; */
+static struct clk_parent_data imx8mq_dsi_phy_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys2_pll_125m", },
+    { .name = "sys2_pll_100m", },
+    { .name = "sys1_pll_800m", },
+    { .name = "sys2_pll_1000m", },
+    { .name = "clk_ext2", },
+    { .name = "audio_pll2_out", },
+    { .name = "video_pll1_out", },
+};
 
-/* static struct clk_parent_data imx8mq_dsi_dbi_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys1_pll_266m", }, */
-/*     { .name = "sys2_pll_100m", }, */
-/*     { .name = "sys1_pll_800m", }, */
-/*     { .name = "sys2_pll_1000m", }, */
-/*     { .name = "sys3_pll_out", }, */
-/*     { .name = "audio_pll2_out", }, */
-/*     { .name = "video_pll1_out", }, */
-/* }; */
+static struct clk_parent_data imx8mq_dsi_dbi_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys1_pll_266m", },
+    { .name = "sys2_pll_100m", },
+    { .name = "sys1_pll_800m", },
+    { .name = "sys2_pll_1000m", },
+    { .name = "sys3_pll_out", },
+    { .name = "audio_pll2_out", },
+    { .name = "video_pll1_out", },
+};
 
-/* static struct clk_parent_data imx8mq_dsi_esc_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys2_pll_100m", }, */
-/*     { .name = "sys1_pll_80m", }, */
-/*     { .name = "sys1_pll_800m", }, */
-/*     { .name = "sys2_pll_1000m", }, */
-/*     { .name = "sys3_pll_out", }, */
-/*     { .name = "clk_ext3", }, */
-/*     { .name = "audio_pll2_out", }, */
-/* }; */
+static struct clk_parent_data imx8mq_dsi_esc_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys2_pll_100m", },
+    { .name = "sys1_pll_80m", },
+    { .name = "sys1_pll_800m", },
+    { .name = "sys2_pll_1000m", },
+    { .name = "sys3_pll_out", },
+    { .name = "clk_ext3", },
+    { .name = "audio_pll2_out", },
+};
 
-/* static struct clk_parent_data imx8mq_csi1_core_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys1_pll_266m", }, */
-/*     { .name = "sys2_pll_250m", }, */
-/*     { .name = "sys1_pll_800m", }, */
-/*     { .name = "sys2_pll_1000m", }, */
-/*     { .name = "sys3_pll_out", }, */
-/*     { .name = "audio_pll2_out", }, */
-/*     { .name = "video_pll1_out", }, */
-/* }; */
+static struct clk_parent_data imx8mq_csi1_core_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys1_pll_266m", },
+    { .name = "sys2_pll_250m", },
+    { .name = "sys1_pll_800m", },
+    { .name = "sys2_pll_1000m", },
+    { .name = "sys3_pll_out", },
+    { .name = "audio_pll2_out", },
+    { .name = "video_pll1_out", },
+};
 
-/* static struct clk_parent_data imx8mq_csi1_phy_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys2_pll_125m", }, */
-/*     { .name = "sys2_pll_100m", }, */
-/*     { .name = "sys1_pll_800m", }, */
-/*     { .name = "sys2_pll_1000m", }, */
-/*     { .name = "clk_ext2", }, */
-/*     { .name = "audio_pll2_out", }, */
-/*     { .name = "video_pll1_out", }, */
-/* }; */
+static struct clk_parent_data imx8mq_csi1_phy_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys2_pll_125m", },
+    { .name = "sys2_pll_100m", },
+    { .name = "sys1_pll_800m", },
+    { .name = "sys2_pll_1000m", },
+    { .name = "clk_ext2", },
+    { .name = "audio_pll2_out", },
+    { .name = "video_pll1_out", },
+};
 
-/* static struct clk_parent_data imx8mq_csi1_esc_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys2_pll_100m", }, */
-/*     { .name = "sys1_pll_80m", }, */
-/*     { .name = "sys1_pll_800m", }, */
-/*     { .name = "sys2_pll_1000m", }, */
-/*     { .name = "sys3_pll_out", }, */
-/*     { .name = "clk_ext3", }, */
-/*     { .name = "audio_pll2_out", }, */
-/* }; */
+static struct clk_parent_data imx8mq_csi1_esc_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys2_pll_100m", },
+    { .name = "sys1_pll_80m", },
+    { .name = "sys1_pll_800m", },
+    { .name = "sys2_pll_1000m", },
+    { .name = "sys3_pll_out", },
+    { .name = "clk_ext3", },
+    { .name = "audio_pll2_out", },
+};
 
-/* static struct clk_parent_data imx8mq_csi2_core_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys1_pll_266m", }, */
-/*     { .name = "sys2_pll_250m", }, */
-/*     { .name = "sys1_pll_800m", }, */
-/*     { .name = "sys2_pll_1000m", }, */
-/*     { .name = "sys3_pll_out", }, */
-/*     { .name = "audio_pll2_out", }, */
-/*     { .name = "video_pll1_out", }, */
-/* }; */
+static struct clk_parent_data imx8mq_csi2_core_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys1_pll_266m", },
+    { .name = "sys2_pll_250m", },
+    { .name = "sys1_pll_800m", },
+    { .name = "sys2_pll_1000m", },
+    { .name = "sys3_pll_out", },
+    { .name = "audio_pll2_out", },
+    { .name = "video_pll1_out", },
+};
 
-/* static struct clk_parent_data imx8mq_csi2_phy_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys2_pll_125m", }, */
-/*     { .name = "sys2_pll_100m", }, */
-/*     { .name = "sys1_pll_800m", }, */
-/*     { .name = "sys2_pll_1000m", }, */
-/*     { .name = "clk_ext2", }, */
-/*     { .name = "audio_pll2_out", }, */
-/*     { .name = "video_pll1_out", }, */
-/* }; */
+static struct clk_parent_data imx8mq_csi2_phy_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys2_pll_125m", },
+    { .name = "sys2_pll_100m", },
+    { .name = "sys1_pll_800m", },
+    { .name = "sys2_pll_1000m", },
+    { .name = "clk_ext2", },
+    { .name = "audio_pll2_out", },
+    { .name = "video_pll1_out", },
+};
 
-/* static struct clk_parent_data imx8mq_csi2_esc_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys2_pll_100m", }, */
-/*     { .name = "sys1_pll_80m", }, */
-/*     { .name = "sys1_pll_800m", }, */
-/*     { .name = "sys2_pll_1000m", }, */
-/*     { .name = "sys3_pll_out", }, */
-/*     { .name = "clk_ext3", }, */
-/*     { .name = "audio_pll2_out", }, */
-/* }; */
+static struct clk_parent_data imx8mq_csi2_esc_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys2_pll_100m", },
+    { .name = "sys1_pll_80m", },
+    { .name = "sys1_pll_800m", },
+    { .name = "sys2_pll_1000m", },
+    { .name = "sys3_pll_out", },
+    { .name = "clk_ext3", },
+    { .name = "audio_pll2_out", },
+};
 
-/* static struct clk_parent_data imx8mq_pcie2_ctrl_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys2_pll_250m", }, */
-/*     { .name = "sys2_pll_200m", }, */
-/*     { .name = "sys1_pll_266m", }, */
-/*     { .name = "sys1_pll_800m", }, */
-/*     { .name = "sys2_pll_500m", }, */
-/*     { .name = "sys2_pll_333m", }, */
-/*     { .name = "sys3_pll_out", }, */
-/* }; */
+static struct clk_parent_data imx8mq_pcie2_ctrl_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys2_pll_250m", },
+    { .name = "sys2_pll_200m", },
+    { .name = "sys1_pll_266m", },
+    { .name = "sys1_pll_800m", },
+    { .name = "sys2_pll_500m", },
+    { .name = "sys2_pll_333m", },
+    { .name = "sys3_pll_out", },
+};
 
-/* static struct clk_parent_data imx8mq_pcie2_phy_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys2_pll_100m", }, */
-/*     { .name = "sys2_pll_500m", }, */
-/*     { .name = "clk_ext1", }, */
-/*     { .name = "clk_ext2", }, */
-/*     { .name = "clk_ext3", }, */
-/*     { .name = "clk_ext4", }, */
-/*     { .name = "sys1_pll_400m", }, */
-/* }; */
+static struct clk_parent_data imx8mq_pcie2_phy_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys2_pll_100m", },
+    { .name = "sys2_pll_500m", },
+    { .name = "clk_ext1", },
+    { .name = "clk_ext2", },
+    { .name = "clk_ext3", },
+    { .name = "clk_ext4", },
+    { .name = "sys1_pll_400m", },
+};
 
-/* static struct clk_parent_data imx8mq_pcie2_aux_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys2_pll_200m", }, */
-/*     { .name = "sys2_pll_50m", }, */
-/*     { .name = "sys3_pll_out", }, */
-/*     { .name = "sys2_pll_100m", }, */
-/*     { .name = "sys1_pll_80m", }, */
-/*     { .name = "sys1_pll_160m", }, */
-/*     { .name = "sys1_pll_200m", }, */
-/* }; */
+static struct clk_parent_data imx8mq_pcie2_aux_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys2_pll_200m", },
+    { .name = "sys2_pll_50m", },
+    { .name = "sys3_pll_out", },
+    { .name = "sys2_pll_100m", },
+    { .name = "sys1_pll_80m", },
+    { .name = "sys1_pll_160m", },
+    { .name = "sys1_pll_200m", },
+};
 
-/* static struct clk_parent_data imx8mq_ecspi3_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys2_pll_200m", }, */
-/*     { .name = "sys1_pll_40m", }, */
-/*     { .name = "sys1_pll_160m", }, */
-/*     { .name = "sys1_pll_800m", }, */
-/*     { .name = "sys3_pll_out", }, */
-/*     { .name = "sys2_pll_250m", }, */
-/*     { .name = "audio_pll2_out", }, */
-/* }; */
+static struct clk_parent_data imx8mq_ecspi3_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys2_pll_200m", },
+    { .name = "sys1_pll_40m", },
+    { .name = "sys1_pll_160m", },
+    { .name = "sys1_pll_800m", },
+    { .name = "sys3_pll_out", },
+    { .name = "sys2_pll_250m", },
+    { .name = "audio_pll2_out", },
+};
 
 static struct clk_parent_data imx8mq_dram_core_sels[] = {
     { .name = "dram_pll_out", },
     { .name = "dram_alt_root", },
 };
 
-/* static struct clk_parent_data imx8mq_clko1_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys1_pll_800m", }, */
-/*     { .name = "osc_27m", }, */
-/*     { .name = "sys1_pll_200m", }, */
-/*     { .name = "audio_pll2_out", }, */
-/*     { .name = "sys2_pll_500m", }, */
-/*     { .name = "vpu_pll_out", }, */
-/*     { .name = "sys1_pll_80m", }, */
-/* }; */
+static struct clk_parent_data imx8mq_clko1_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys1_pll_800m", },
+    { .name = "osc_27m", },
+    { .name = "sys1_pll_200m", },
+    { .name = "audio_pll2_out", },
+    { .name = "sys2_pll_500m", },
+    { .name = "vpu_pll_out", },
+    { .name = "sys1_pll_80m", },
+};
 
-/* static struct clk_parent_data imx8mq_clko2_sels[] = { */
-/*     { .name = "osc_25m", }, */
-/*     { .name = "sys2_pll_200m", }, */
-/*     { .name = "sys1_pll_400m", }, */
-/*     { .name = "sys2_pll_166m", }, */
-/*     { .name = "sys3_pll_out", }, */
-/*     { .name = "audio_pll1_out", }, */
-/*     { .name = "video_pll1_out", }, */
-/*     { .name = "ckil", }, */
-/* }; */
+static struct clk_parent_data imx8mq_clko2_sels[] = {
+    { .name = "osc_25m", },
+    { .name = "sys2_pll_200m", },
+    { .name = "sys1_pll_400m", },
+    { .name = "sys2_pll_166m", },
+    { .name = "sys3_pll_out", },
+    { .name = "audio_pll1_out", },
+    { .name = "video_pll1_out", },
+    { .name = "ckil", },
+};
 
 static struct clk_parent_data pllout_monitor_sels[] = {
     { .name = "osc_25m", },
@@ -1125,8 +1125,96 @@ static IMX_CLK_DIV2(ipg_audio_root, { &audio_ahb }, CCM_BASE, 0x9180, 0, 1);
  * as div value should always be read from hardware
  */
 static IMX_CLK_MUX2_FLAGS(dram_core_clk, CCM_BASE, 0x9800, 24, 1, imx8mq_dram_core_sels, ARRAY_SIZE(imx8mq_dram_core_sels), CLK_IS_CRITICAL);
-/* imx8m_clk_hw_fw_managed_composite("dram_alt", imx8mq_dram_alt_sels, base + 0xa000); */
-/* imx8m_clk_hw_fw_managed_composite_critical("dram_apb", imx8mq_dram_apb_sels, base + 0xa080); */
+static IMX_CLK_COMPOSITE_FW_MANAGED(dram_alt, imx8mq_dram_alt_sels, CCM_BASE, 0xa000);
+static IMX_CLK_COMPOSITE_FW_MANAGED_CRITICAL(dram_apb, imx8mq_dram_apb_sels, CCM_BASE, 0xa080);
+
+/* IP */
+static IMX_CLK_COMPOSITE(vpu_g1, imx8mq_vpu_g1_sels,  CCM_BASE, 0xa100);
+static IMX_CLK_COMPOSITE(vpu_g2, imx8mq_vpu_g2_sels,  CCM_BASE, 0xa180);
+static IMX_CLK_COMPOSITE(disp_dtrc, imx8mq_disp_dtrc_sels,  CCM_BASE, 0xa200);
+static IMX_CLK_COMPOSITE(disp_dc8000, imx8mq_disp_dc8000_sels,  CCM_BASE, 0xa280);
+static IMX_CLK_COMPOSITE(pcie1_ctrl, imx8mq_pcie1_ctrl_sels,  CCM_BASE, 0xa300);
+static IMX_CLK_COMPOSITE(pcie1_phy, imx8mq_pcie1_phy_sels,  CCM_BASE, 0xa380);
+static IMX_CLK_COMPOSITE(pcie1_aux, imx8mq_pcie1_aux_sels,  CCM_BASE, 0xa400);
+static IMX_CLK_COMPOSITE(dc_pixel, imx8mq_dc_pixel_sels,  CCM_BASE, 0xa480);
+static IMX_CLK_COMPOSITE(lcdif_pixel, imx8mq_lcdif_pixel_sels,  CCM_BASE, 0xa500);
+static IMX_CLK_COMPOSITE(sai1, imx8mq_sai1_sels,  CCM_BASE, 0xa580);
+static IMX_CLK_COMPOSITE(sai2, imx8mq_sai2_sels,  CCM_BASE, 0xa600);
+static IMX_CLK_COMPOSITE(sai3, imx8mq_sai3_sels,  CCM_BASE, 0xa680);
+static IMX_CLK_COMPOSITE(sai4, imx8mq_sai4_sels,  CCM_BASE, 0xa700);
+static IMX_CLK_COMPOSITE(sai5, imx8mq_sai5_sels,  CCM_BASE, 0xa780);
+static IMX_CLK_COMPOSITE(sai6, imx8mq_sai6_sels,  CCM_BASE, 0xa800);
+static IMX_CLK_COMPOSITE(spdif1, imx8mq_spdif1_sels,  CCM_BASE, 0xa880);
+static IMX_CLK_COMPOSITE(spdif2, imx8mq_spdif2_sels,  CCM_BASE, 0xa900);
+static IMX_CLK_COMPOSITE(enet_ref, imx8mq_enet_ref_sels,  CCM_BASE, 0xa980);
+static IMX_CLK_COMPOSITE(enet_timer, imx8mq_enet_timer_sels,  CCM_BASE, 0xaa00);
+static IMX_CLK_COMPOSITE(enet_phy, imx8mq_enet_phy_sels,  CCM_BASE, 0xaa80);
+static IMX_CLK_COMPOSITE(nand, imx8mq_nand_sels,  CCM_BASE, 0xab00);
+static IMX_CLK_COMPOSITE(qspi, imx8mq_qspi_sels,  CCM_BASE, 0xab80);
+static IMX_CLK_COMPOSITE(usdhc1, imx8mq_usdhc1_sels,  CCM_BASE, 0xac00);
+static IMX_CLK_COMPOSITE(usdhc2, imx8mq_usdhc2_sels,  CCM_BASE, 0xac80);
+static IMX_CLK_COMPOSITE(i2c1, imx8mq_i2c1_sels,  CCM_BASE, 0xad00);
+static IMX_CLK_COMPOSITE(i2c2, imx8mq_i2c2_sels,  CCM_BASE, 0xad80);
+static IMX_CLK_COMPOSITE(i2c3, imx8mq_i2c3_sels,  CCM_BASE, 0xae00);
+static IMX_CLK_COMPOSITE(i2c4, imx8mq_i2c4_sels,  CCM_BASE, 0xae80);
+static IMX_CLK_COMPOSITE(uart1, imx8mq_uart1_sels,  CCM_BASE, 0xaf00);
+static IMX_CLK_COMPOSITE(uart2, imx8mq_uart2_sels,  CCM_BASE, 0xaf80);
+static IMX_CLK_COMPOSITE(uart3, imx8mq_uart3_sels,  CCM_BASE, 0xb000);
+static IMX_CLK_COMPOSITE(uart4, imx8mq_uart4_sels,  CCM_BASE, 0xb080);
+static IMX_CLK_COMPOSITE(usb_core_ref, imx8mq_usb_core_sels,  CCM_BASE, 0xb100);
+static IMX_CLK_COMPOSITE(usb_phy_ref, imx8mq_usb_phy_sels,  CCM_BASE, 0xb180);
+static IMX_CLK_COMPOSITE(gic, imx8mq_gic_sels,  CCM_BASE, 0xb200);
+static IMX_CLK_COMPOSITE(ecspi1, imx8mq_ecspi1_sels,  CCM_BASE, 0xb280);
+static IMX_CLK_COMPOSITE(ecspi2, imx8mq_ecspi2_sels,  CCM_BASE, 0xb300);
+static IMX_CLK_COMPOSITE(pwm1, imx8mq_pwm1_sels,  CCM_BASE, 0xb380);
+static IMX_CLK_COMPOSITE(pwm2, imx8mq_pwm2_sels,  CCM_BASE, 0xb400);
+static IMX_CLK_COMPOSITE(pwm3, imx8mq_pwm3_sels,  CCM_BASE, 0xb480);
+static IMX_CLK_COMPOSITE(pwm4, imx8mq_pwm4_sels,  CCM_BASE, 0xb500);
+static IMX_CLK_COMPOSITE(gpt1, imx8mq_gpt1_sels,  CCM_BASE, 0xb580);
+static IMX_CLK_COMPOSITE(wdog, imx8mq_wdog_sels,  CCM_BASE, 0xb900);
+static IMX_CLK_COMPOSITE(wrclk, imx8mq_wrclk_sels,  CCM_BASE, 0xb980);
+static IMX_CLK_COMPOSITE(clko1, imx8mq_clko1_sels,  CCM_BASE, 0xba00);
+static IMX_CLK_COMPOSITE(clko2, imx8mq_clko2_sels,  CCM_BASE, 0xba80);
+static IMX_CLK_COMPOSITE(dsi_core, imx8mq_dsi_core_sels,  CCM_BASE, 0xbb00);
+static IMX_CLK_COMPOSITE(dsi_phy_ref, imx8mq_dsi_phy_sels,  CCM_BASE, 0xbb80);
+static IMX_CLK_COMPOSITE(dsi_dbi, imx8mq_dsi_dbi_sels,  CCM_BASE, 0xbc00);
+static IMX_CLK_COMPOSITE(dsi_esc, imx8mq_dsi_esc_sels,  CCM_BASE, 0xbc80);
+static IMX_CLK_COMPOSITE(dsi_ahb, imx8mq_dsi_ahb_sels,  CCM_BASE, 0x9200);
+static IMX_CLK_DIV2(dsi_ipg_div, { &dsi_ahb },  CCM_BASE, 0x9280, 0, 6);
+static IMX_CLK_COMPOSITE(csi1_core, imx8mq_csi1_core_sels,  CCM_BASE, 0xbd00);
+static IMX_CLK_COMPOSITE(csi1_phy_ref, imx8mq_csi1_phy_sels,  CCM_BASE, 0xbd80);
+static IMX_CLK_COMPOSITE(csi1_esc, imx8mq_csi1_esc_sels,  CCM_BASE, 0xbe00);
+static IMX_CLK_COMPOSITE(csi2_core, imx8mq_csi2_core_sels,  CCM_BASE, 0xbe80);
+static IMX_CLK_COMPOSITE(csi2_phy_ref, imx8mq_csi2_phy_sels,  CCM_BASE, 0xbf00);
+static IMX_CLK_COMPOSITE(csi2_esc, imx8mq_csi2_esc_sels,  CCM_BASE, 0xbf80);
+static IMX_CLK_COMPOSITE(pcie2_ctrl, imx8mq_pcie2_ctrl_sels,  CCM_BASE, 0xc000);
+static IMX_CLK_COMPOSITE(pcie2_phy, imx8mq_pcie2_phy_sels,  CCM_BASE, 0xc080);
+static IMX_CLK_COMPOSITE(pcie2_aux, imx8mq_pcie2_aux_sels,  CCM_BASE, 0xc100);
+static IMX_CLK_COMPOSITE(ecspi3, imx8mq_ecspi3_sels,  CCM_BASE, 0xc180);
+
+static IMX_CLK_GATE4(ecspi1_root_clk, { &ecspi1 }, CCM_BASE, 0x4070, 0);
+static IMX_CLK_GATE4(ecspi2_root_clk, { &ecspi2 }, CCM_BASE, 0x4080, 0);
+static IMX_CLK_GATE4(ecspi3_root_clk, { &ecspi3 }, CCM_BASE, 0x4090, 0);
+static IMX_CLK_GATE4(enet1_root_clk, { &enet_axi }, CCM_BASE, 0x40a0, 0);
+static IMX_CLK_GATE4(gpio1_root_clk, { &ipg_root }, CCM_BASE, 0x40b0, 0);
+static IMX_CLK_GATE4(gpio2_root_clk, { &ipg_root }, CCM_BASE, 0x40c0, 0);
+static IMX_CLK_GATE4(gpio3_root_clk, { &ipg_root }, CCM_BASE, 0x40d0, 0);
+static IMX_CLK_GATE4(gpio4_root_clk, { &ipg_root }, CCM_BASE, 0x40e0, 0);
+static IMX_CLK_GATE4(gpio5_root_clk, { &ipg_root }, CCM_BASE, 0x40f0, 0);
+static IMX_CLK_GATE4(gpt1_root_clk, { &gpt1 }, CCM_BASE, 0x4100, 0);
+static IMX_CLK_GATE4(i2c1_root_clk, { &i2c1 }, CCM_BASE, 0x4170, 0);
+static IMX_CLK_GATE4(i2c2_root_clk, { &i2c2 }, CCM_BASE, 0x4180, 0);
+static IMX_CLK_GATE4(i2c3_root_clk, { &i2c3 }, CCM_BASE, 0x4190, 0);
+static IMX_CLK_GATE4(i2c4_root_clk, { &i2c4 }, CCM_BASE, 0x41a0, 0);
+static IMX_CLK_GATE4(mu_root_clk, { &ipg_root }, CCM_BASE, 0x4210, 0);
+static IMX_CLK_GATE4(ocotp_root_clk, { &ipg_root }, CCM_BASE, 0x4220, 0);
+static IMX_CLK_GATE4(pcie1_root_clk, { &pcie1_ctrl }, CCM_BASE, 0x4250, 0);
+static IMX_CLK_GATE4(pcie2_root_clk, { &pcie2_ctrl }, CCM_BASE, 0x4640, 0);
+static IMX_CLK_GATE4(pwm1_root_clk, { &pwm1 }, CCM_BASE, 0x4280, 0);
+static IMX_CLK_GATE4(pwm2_root_clk, { &pwm2 }, CCM_BASE, 0x4290, 0);
+static IMX_CLK_GATE4(pwm3_root_clk, { &pwm3 }, CCM_BASE, 0x42a0, 0);
+static IMX_CLK_GATE4(pwm4_root_clk, { &pwm4 }, CCM_BASE, 0x42b0, 0);
+static IMX_CLK_GATE4(qspi_root_clk, { &qspi }, CCM_BASE, 0x42f0, 0);
 
 static struct clk *imx8mq_clks[] = {
     [IMX8MQ_CLK_DUMMY]              = &dummy,
@@ -1243,6 +1331,93 @@ static struct clk *imx8mq_clks[] = {
     [IMX8MQ_CLK_IPG_ROOT]           = &ipg_root,
     [IMX8MQ_CLK_IPG_AUDIO_ROOT]     = &ipg_audio_root,
     [IMX8MQ_CLK_DRAM_CORE]          = &dram_core_clk,
+    [IMX8MQ_CLK_DRAM_ALT]           = &dram_alt,
+    [IMX8MQ_CLK_DRAM_APB]           = &dram_apb,
+    [IMX8MQ_CLK_VPU_G1]             = &vpu_g1,
+    [IMX8MQ_CLK_VPU_G2]             = &vpu_g2,
+    [IMX8MQ_CLK_DISP_DTRC]          = &disp_dtrc,
+    [IMX8MQ_CLK_DISP_DC8000]        = &disp_dc8000,
+    [IMX8MQ_CLK_PCIE1_CTRL]         = &pcie1_ctrl,
+    [IMX8MQ_CLK_PCIE1_PHY]          = &pcie1_phy,
+    [IMX8MQ_CLK_PCIE1_AUX]          = &pcie1_aux,
+    [IMX8MQ_CLK_DC_PIXEL]           = &dc_pixel,
+    [IMX8MQ_CLK_LCDIF_PIXEL]        = &lcdif_pixel,
+    [IMX8MQ_CLK_SAI1]               = &sai1,
+    [IMX8MQ_CLK_SAI2]               = &sai2,
+    [IMX8MQ_CLK_SAI3]               = &sai3,
+    [IMX8MQ_CLK_SAI4]               = &sai4,
+    [IMX8MQ_CLK_SAI5]               = &sai5,
+    [IMX8MQ_CLK_SAI6]               = &sai6,
+    [IMX8MQ_CLK_SPDIF1]             = &spdif1,
+    [IMX8MQ_CLK_SPDIF2]             = &spdif2,
+    [IMX8MQ_CLK_ENET_REF]           = &enet_ref,
+    [IMX8MQ_CLK_ENET_TIMER]         = &enet_timer,
+    [IMX8MQ_CLK_ENET_PHY_REF]       = &enet_phy,
+    [IMX8MQ_CLK_NAND]               = &nand,
+    [IMX8MQ_CLK_QSPI]               = &qspi,
+    [IMX8MQ_CLK_USDHC1]             = &usdhc1,
+    [IMX8MQ_CLK_USDHC2]             = &usdhc2,
+    [IMX8MQ_CLK_I2C1]               = &i2c1,
+    [IMX8MQ_CLK_I2C2]               = &i2c2,
+    [IMX8MQ_CLK_I2C3]               = &i2c3,
+    [IMX8MQ_CLK_I2C4]               = &i2c4,
+    [IMX8MQ_CLK_UART1]              = &uart1,
+    [IMX8MQ_CLK_UART2]              = &uart2,
+    [IMX8MQ_CLK_UART3]              = &uart3,
+    [IMX8MQ_CLK_UART4]              = &uart4,
+    [IMX8MQ_CLK_USB_CORE_REF]       = &usb_core_ref,
+    [IMX8MQ_CLK_USB_PHY_REF]        = &usb_phy_ref,
+    [IMX8MQ_CLK_GIC]                = &gic,
+    [IMX8MQ_CLK_ECSPI1]             = &ecspi1,
+    [IMX8MQ_CLK_ECSPI2]             = &ecspi2,
+    [IMX8MQ_CLK_PWM1]               = &pwm1,
+    [IMX8MQ_CLK_PWM2]               = &pwm2,
+    [IMX8MQ_CLK_PWM3]               = &pwm3,
+    [IMX8MQ_CLK_PWM4]               = &pwm4,
+    [IMX8MQ_CLK_GPT1]               = &gpt1,
+    [IMX8MQ_CLK_WDOG]               = &wdog,
+    [IMX8MQ_CLK_WRCLK]              = &wrclk,
+    [IMX8MQ_CLK_CLKO1]              = &clko1,
+    [IMX8MQ_CLK_CLKO2]              = &clko2,
+    [IMX8MQ_CLK_DSI_CORE]           = &dsi_core,
+    [IMX8MQ_CLK_DSI_PHY_REF]        = &dsi_phy_ref,
+    [IMX8MQ_CLK_DSI_DBI]            = &dsi_dbi,
+    [IMX8MQ_CLK_DSI_ESC]            = &dsi_esc,
+    [IMX8MQ_CLK_DSI_AHB]            = &dsi_ahb,
+    [IMX8MQ_CLK_DSI_IPG_DIV]        = &dsi_ipg_div,
+    [IMX8MQ_CLK_CSI1_CORE]          = &csi1_core,
+    [IMX8MQ_CLK_CSI1_PHY_REF]       = &csi1_phy_ref,
+    [IMX8MQ_CLK_CSI1_ESC]           = &csi1_esc,
+    [IMX8MQ_CLK_CSI2_CORE]          = &csi2_core,
+    [IMX8MQ_CLK_CSI2_PHY_REF]       = &csi2_phy_ref,
+    [IMX8MQ_CLK_CSI2_ESC]           = &csi2_esc,
+    [IMX8MQ_CLK_PCIE2_CTRL]         = &pcie2_ctrl,
+    [IMX8MQ_CLK_PCIE2_PHY]          = &pcie2_phy,
+    [IMX8MQ_CLK_PCIE2_AUX]          = &pcie2_aux,
+    [IMX8MQ_CLK_ECSPI3]             = &ecspi3,
+    [IMX8MQ_CLK_ECSPI1_ROOT]        = &ecspi1_root_clk,
+    [IMX8MQ_CLK_ECSPI2_ROOT]        = &ecspi2_root_clk,
+    [IMX8MQ_CLK_ECSPI3_ROOT]        = &ecspi3_root_clk,
+    [IMX8MQ_CLK_ENET1_ROOT]         = &enet1_root_clk,
+    [IMX8MQ_CLK_GPIO1_ROOT]         = &gpio1_root_clk,
+    [IMX8MQ_CLK_GPIO2_ROOT]         = &gpio2_root_clk,
+    [IMX8MQ_CLK_GPIO3_ROOT]         = &gpio3_root_clk,
+    [IMX8MQ_CLK_GPIO4_ROOT]         = &gpio4_root_clk,
+    [IMX8MQ_CLK_GPIO5_ROOT]         = &gpio5_root_clk,
+    [IMX8MQ_CLK_GPT1_ROOT]          = &gpt1_root_clk,
+    [IMX8MQ_CLK_I2C1_ROOT]          = &i2c1_root_clk,
+    [IMX8MQ_CLK_I2C2_ROOT]          = &i2c2_root_clk,
+    [IMX8MQ_CLK_I2C3_ROOT]          = &i2c3_root_clk,
+    [IMX8MQ_CLK_I2C4_ROOT]          = &i2c4_root_clk,
+    [IMX8MQ_CLK_MU_ROOT]            = &mu_root_clk,
+    [IMX8MQ_CLK_OCOTP_ROOT]         = &ocotp_root_clk,
+    [IMX8MQ_CLK_PCIE1_ROOT]         = &pcie1_root_clk,
+    [IMX8MQ_CLK_PCIE2_ROOT]         = &pcie2_root_clk,
+    [IMX8MQ_CLK_PWM1_ROOT]          = &pwm1_root_clk,
+    [IMX8MQ_CLK_PWM2_ROOT]          = &pwm2_root_clk,
+    [IMX8MQ_CLK_PWM3_ROOT]          = &pwm3_root_clk,
+    [IMX8MQ_CLK_PWM4_ROOT]          = &pwm4_root_clk,
+    [IMX8MQ_CLK_QSPI_ROOT]          = &qspi_root_clk,
 };
 
 struct clk **get_clk_list(void)
