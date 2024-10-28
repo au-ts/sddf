@@ -290,9 +290,6 @@ static drv_status_t handle_interrupt_status(sd_cmd_t cmd)
     /* Important Note: INT_STATUS register is of the W1C (write 1 to clear) type */
     uint32_t int_status = usdhc_regs->int_status;
 
-    /* !cmd.data_present => !(int_status & USDHC_INT_STATUS_TC) */
-    assert(cmd.data_present || !(int_status & USDHC_INT_STATUS_TC));
-
     /* If any bits aside from Command Complete / Transfer Complete are set... */
     if (int_status & ~(USDHC_INT_STATUS_CC | USDHC_INT_STATUS_TC)) {
         /* [IMX8MDQLQRM] Tables 10-44, 10-45, 10-46.
@@ -300,8 +297,19 @@ static drv_status_t handle_interrupt_status(sd_cmd_t cmd)
             TODO: Map the specific errors to something sensible.
             TODO: Run the RST_C / RST_D to reset the comamnd/ data inhibit?
                 & Follow the proper [SD-HOST] error handling flow.
+
+            NOTE: As we don't do this, any errors cause the driver to
+                  continuously error with 'Could not send a command as CMD/DATA-inhibit
+                  fields were set' for any further commands.
          */
         LOG_DRIVER("-> received error response\n");
+
+        if (int_status & USDHC_INT_STATUS_DMAE) {
+            /* DMA error ==> probably a virtualiser error because of an
+               incorrect memory address. */
+            LOG_DRIVER_ERR("DMA error encountered: DS_ADDR: 0x%x\n", usdhc_regs->ds_addr);
+        }
+
         usdhc_regs->int_status = 0xffffffff;
 
         if (!gpio_card_detected()) {
@@ -313,6 +321,9 @@ static drv_status_t handle_interrupt_status(sd_cmd_t cmd)
 
         return DrvErrorInternal;
     }
+
+    /* !cmd.data_present => !(int_status & USDHC_INT_STATUS_TC) */
+    assert(cmd.data_present || !(int_status & USDHC_INT_STATUS_TC));
 
     if (int_status & USDHC_INT_STATUS_CC) {
         LOG_DRIVER("-> received response\n");
