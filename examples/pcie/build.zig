@@ -128,6 +128,7 @@ pub fn build(b: *std.Build) void {
     const system_description_path = b.fmt("board/{s}/pcie.system", .{microkit_board});
     const final_image_dest = b.getInstallPath(.bin, "./loader.img");
     const microkit_tool_cmd = b.addSystemCommand(&[_][]const u8{ microkit_tool, system_description_path, "--search-path", b.getInstallPath(.bin, ""), "--board", microkit_board, "--config", microkit_config, "-o", final_image_dest, "-r", b.getInstallPath(.prefix, "./report.txt") });
+    microkit_tool_cmd.setEnvironmentVariable("MICROKIT_SDK", microkit_sdk);
     microkit_tool_cmd.step.dependOn(b.getInstallStep());
     microkit_tool_cmd.step.dependOn(&driver_install.step);
     const microkit_step = b.step("microkit", "Compile and build the final bootable image");
