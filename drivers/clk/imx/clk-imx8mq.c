@@ -1216,6 +1216,47 @@ static IMX_CLK_GATE4(pwm3_root_clk, { &pwm3 }, CCM_BASE, 0x42a0, 0);
 static IMX_CLK_GATE4(pwm4_root_clk, { &pwm4 }, CCM_BASE, 0x42b0, 0);
 static IMX_CLK_GATE4(qspi_root_clk, { &qspi }, CCM_BASE, 0x42f0, 0);
 
+static IMX_CLK_GATE2_SHARED2(nand_root_clk, { &nand }, CCM_BASE, 0x4300, 0, &share_count_nand);
+static IMX_CLK_GATE2_SHARED2(nand_usdhc_rawnand_clk, { &nand_usdhc_bus }, CCM_BASE, 0x4300, 0, &share_count_nand);
+static IMX_CLK_GATE2_SHARED2(sai1_root_clk, { &sai1 }, CCM_BASE, 0x4330, 0, &share_count_sai1);
+static IMX_CLK_GATE2_SHARED2(sai1_ipg_clk, { &ipg_audio_root }, CCM_BASE, 0x4330, 0, &share_count_sai1);
+static IMX_CLK_GATE2_SHARED2(sai2_root_clk, { &sai2 }, CCM_BASE, 0x4340, 0, &share_count_sai2);
+static IMX_CLK_GATE2_SHARED2(sai2_ipg_clk, { &ipg_root }, CCM_BASE, 0x4340, 0, &share_count_sai2);
+static IMX_CLK_GATE2_SHARED2(sai3_root_clk, { &sai3 }, CCM_BASE, 0x4350, 0, &share_count_sai3);
+static IMX_CLK_GATE2_SHARED2(sai3_ipg_clk, { &ipg_root }, CCM_BASE, 0x4350, 0, &share_count_sai3);
+static IMX_CLK_GATE2_SHARED2(sai4_root_clk, { &sai4 }, CCM_BASE, 0x4360, 0, &share_count_sai4);
+static IMX_CLK_GATE2_SHARED2(sai4_ipg_clk, { &ipg_audio_root }, CCM_BASE, 0x4360, 0, &share_count_sai4);
+static IMX_CLK_GATE2_SHARED2(sai5_root_clk, { &sai5 }, CCM_BASE, 0x4370, 0, &share_count_sai5);
+static IMX_CLK_GATE2_SHARED2(sai5_ipg_clk, { &ipg_audio_root }, CCM_BASE, 0x4370, 0, &share_count_sai5);
+static IMX_CLK_GATE2_SHARED2(sai6_root_clk, { &sai6 }, CCM_BASE, 0x4380, 0, &share_count_sai6);
+static IMX_CLK_GATE2_SHARED2(sai6_ipg_clk, { &ipg_audio_root }, CCM_BASE, 0x4380, 0, &share_count_sai6);
+static IMX_CLK_GATE4(uart1_root_clk, { &uart1 }, CCM_BASE, 0x4490, 0);
+static IMX_CLK_GATE4(uart2_root_clk, { &uart2 }, CCM_BASE, 0x44a0, 0);
+static IMX_CLK_GATE4(uart3_root_clk, { &uart3 }, CCM_BASE, 0x44b0, 0);
+static IMX_CLK_GATE4(uart4_root_clk, { &uart4 }, CCM_BASE, 0x44c0, 0);
+static IMX_CLK_GATE4(usb1_ctrl_root_clk, { &usb_bus }, CCM_BASE, 0x44d0, 0);
+static IMX_CLK_GATE4(usb2_ctrl_root_clk, { &usb_bus }, CCM_BASE, 0x44e0, 0);
+static IMX_CLK_GATE4(usb1_phy_root_clk, { &usb_phy_ref }, CCM_BASE, 0x44f0, 0);
+static IMX_CLK_GATE4(usb2_phy_root_clk, { &usb_phy_ref }, CCM_BASE, 0x4500, 0);
+static IMX_CLK_GATE4(usdhc1_root_clk, { &usdhc1 }, CCM_BASE, 0x4510, 0);
+static IMX_CLK_GATE4(usdhc2_root_clk, { &usdhc2 }, CCM_BASE, 0x4520, 0);
+static IMX_CLK_GATE4(wdog1_root_clk, { &wdog }, CCM_BASE, 0x4530, 0);
+static IMX_CLK_GATE4(wdog2_root_clk, { &wdog }, CCM_BASE, 0x4540, 0);
+static IMX_CLK_GATE4(wdog3_root_clk, { &wdog }, CCM_BASE, 0x4550, 0);
+static IMX_CLK_GATE2_FLAGS(vpu_g1_root_clk, { &vpu_g1 }, CCM_BASE, 0x4560, 0, CLK_SET_RATE_PARENT | CLK_OPS_PARENT_ENABLE);
+static IMX_CLK_GATE4(gpu_root_clk, { &gpu_core }, CCM_BASE, 0x4570, 0);
+static IMX_CLK_GATE2_FLAGS(vpu_g2_root_clk, { &vpu_g2 }, CCM_BASE, 0x45a0, 0, CLK_SET_RATE_PARENT | CLK_OPS_PARENT_ENABLE);
+static IMX_CLK_GATE2_SHARED2(disp_root_clk, { &disp_dc8000 }, CCM_BASE, 0x45d0, 0, &share_count_dcss);
+static IMX_CLK_GATE2_SHARED2(disp_axi_root_clk, { &disp_axi }, CCM_BASE, 0x45d0, 0, &share_count_dcss);
+static IMX_CLK_GATE2_SHARED2(disp_apb_root_clk, { &disp_apb }, CCM_BASE, 0x45d0, 0, &share_count_dcss);
+static IMX_CLK_GATE2_SHARED2(disp_rtrm_root_clk, { &disp_rtrm }, CCM_BASE, 0x45d0, 0, &share_count_dcss);
+static IMX_CLK_GATE4(tmu_root_clk, { &ipg_root }, CCM_BASE, 0x4620, 0);
+static IMX_CLK_GATE2_FLAGS(vpu_dec_root_clk, { &vpu_bus }, CCM_BASE, 0x4630, 0, CLK_SET_RATE_PARENT | CLK_OPS_PARENT_ENABLE);
+static IMX_CLK_GATE4(csi1_root_clk, { &csi1_core }, CCM_BASE, 0x4650, 0);
+static IMX_CLK_GATE4(csi2_root_clk, { &csi2_core }, CCM_BASE, 0x4660, 0);
+static IMX_CLK_GATE4(sdma1_clk, { &ipg_root }, CCM_BASE, 0x43a0, 0);
+static IMX_CLK_GATE4(sdma2_clk, { &ipg_audio_root }, CCM_BASE, 0x43b0, 0);
+
 static struct clk *imx8mq_clks[] = {
     [IMX8MQ_CLK_DUMMY]              = &dummy,
     [IMX8MQ_CLK_32K]                = &ckil,
@@ -1418,6 +1459,46 @@ static struct clk *imx8mq_clks[] = {
     [IMX8MQ_CLK_PWM3_ROOT]          = &pwm3_root_clk,
     [IMX8MQ_CLK_PWM4_ROOT]          = &pwm4_root_clk,
     [IMX8MQ_CLK_QSPI_ROOT]          = &qspi_root_clk,
+    [IMX8MQ_CLK_RAWNAND_ROOT]       = &nand_root_clk,
+    [IMX8MQ_CLK_NAND_USDHC_BUS_RAWNAND_CLK] = &nand_usdhc_rawnand_clk,
+    [IMX8MQ_CLK_SAI1_ROOT]          = &sai1_root_clk,
+    [IMX8MQ_CLK_SAI1_IPG]           = &sai1_ipg_clk,
+    [IMX8MQ_CLK_SAI2_ROOT]          = &sai2_root_clk,
+    [IMX8MQ_CLK_SAI2_IPG]           = &sai2_ipg_clk,
+    [IMX8MQ_CLK_SAI3_ROOT]          = &sai3_root_clk,
+    [IMX8MQ_CLK_SAI3_IPG]           = &sai3_ipg_clk,
+    [IMX8MQ_CLK_SAI4_ROOT]          = &sai4_root_clk,
+    [IMX8MQ_CLK_SAI4_IPG]           = &sai4_ipg_clk,
+    [IMX8MQ_CLK_SAI5_ROOT]          = &sai5_root_clk,
+    [IMX8MQ_CLK_SAI5_IPG]           = &sai5_ipg_clk,
+    [IMX8MQ_CLK_SAI6_ROOT]          = &sai6_root_clk,
+    [IMX8MQ_CLK_SAI6_IPG]           = &sai6_ipg_clk,
+    [IMX8MQ_CLK_UART1_ROOT]         = &uart1_root_clk,
+    [IMX8MQ_CLK_UART2_ROOT]         = &uart2_root_clk,
+    [IMX8MQ_CLK_UART3_ROOT]         = &uart3_root_clk,
+    [IMX8MQ_CLK_UART4_ROOT]         = &uart4_root_clk,
+    [IMX8MQ_CLK_USB1_CTRL_ROOT]     = &usb1_ctrl_root_clk,
+    [IMX8MQ_CLK_USB2_CTRL_ROOT]     = &usb2_ctrl_root_clk,
+    [IMX8MQ_CLK_USB1_PHY_ROOT]      = &usb1_phy_root_clk,
+    [IMX8MQ_CLK_USB2_PHY_ROOT]      = &usb2_phy_root_clk,
+    [IMX8MQ_CLK_USDHC1_ROOT]        = &usdhc1_root_clk,
+    [IMX8MQ_CLK_USDHC2_ROOT]        = &usdhc2_root_clk,
+    [IMX8MQ_CLK_WDOG1_ROOT]         = &wdog1_root_clk,
+    [IMX8MQ_CLK_WDOG2_ROOT]         = &wdog2_root_clk,
+    [IMX8MQ_CLK_WDOG3_ROOT]         = &wdog3_root_clk,
+    [IMX8MQ_CLK_VPU_G1_ROOT]        = &vpu_g1_root_clk,
+    [IMX8MQ_CLK_GPU_ROOT]           = &gpu_root_clk,
+    [IMX8MQ_CLK_VPU_G2_ROOT]        = &vpu_g2_root_clk,
+    [IMX8MQ_CLK_DISP_ROOT]          = &disp_root_clk,
+    [IMX8MQ_CLK_DISP_AXI_ROOT]      = &disp_axi_root_clk,
+    [IMX8MQ_CLK_DISP_APB_ROOT]      = &disp_apb_root_clk,
+    [IMX8MQ_CLK_DISP_RTRM_ROOT]     = &disp_rtrm_root_clk,
+    [IMX8MQ_CLK_TMU_ROOT]           = &tmu_root_clk,
+    [IMX8MQ_CLK_VPU_DEC_ROOT]       = &vpu_dec_root_clk,
+    [IMX8MQ_CLK_CSI1_ROOT]          = &csi1_root_clk,
+    [IMX8MQ_CLK_CSI2_ROOT]          = &csi2_root_clk,
+    [IMX8MQ_CLK_SDMA1_ROOT]         = &sdma1_clk,
+    [IMX8MQ_CLK_SDMA2_ROOT]         = &sdma2_clk,
 };
 
 struct clk **get_clk_list(void)
