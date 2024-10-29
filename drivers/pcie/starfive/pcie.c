@@ -19,7 +19,12 @@ void nvme_init();
     See [PCIe-2.0] §7.22
 */
 uintptr_t pcie_config;
+// TODO: different for most platforms
+#if defined(CONFIG_PLAT_ROCKPRO64)
+#define PCIE_CONFIG_SIZE (0x1000000 - 0x800000)
+#else
 #define PCIE_CONFIG_SIZE 0x1000000
+#endif
 
 /* bus between [0, 256)
    device between [0, 31)
@@ -53,6 +58,14 @@ void device_print(uint8_t bus, uint8_t device, uint8_t function)
         return;
     }
 
+#if defined(CONFIG_PLAT_ROCKPRO64)
+    // https://github.com/torvalds/linux/commit/d84c572de1a360501d2e439ac632126f5facf59d
+    if (bus == 0 && device > 0) {
+        return;
+    }
+#endif
+
+#if defined(CONFIG_PLAT_STAR64)
     /*
         See: plda_pcie_addr_valid() in U-Boot
         https://lore.kernel.org/u-boot/20230423105859.125764-2-minda.chen@starfivetech.com/
@@ -67,16 +80,22 @@ void device_print(uint8_t bus, uint8_t device, uint8_t function)
     if (bus == 1 && device > 0) {
         return;
     }
+#endif
 
     sddf_dprintf("\nB.D:F: %02x:%02x.%01x\n", bus, device, function);
-    // enable bus mastering... and memory accesses
-    header->command |= BIT(2) | BIT(1);
     sddf_dprintf("vendor ID: 0x%04x\n", header->vendor_id);
     sddf_dprintf("device ID: 0x%04x\n", header->device_id);
     sddf_dprintf("command register: 0x%04x\n", header->command);
     sddf_dprintf("status register: 0x%04x\n", header->status);
     sddf_dprintf("revision ID: 0x%02x\n", header->revision_id);
     sddf_dprintf("base-class code: 0x%02x | sub-class code: 0x%02x\n", header->base_class_code, header->subclass_code);
+
+    // rockchip is ?????
+#if !defined(CONFIG_PLAT_ROCKPRO64)
+    // enable bus mastering... and memory accesses
+    header->command |= BIT(2) | BIT(1);
+#endif
+    sddf_dprintf("enabled bus master and memory access\n");
     if (header->base_class_code == 0x1 && header->subclass_code == 0x8 && !found_nvme) {
         sddf_dprintf("FOUND NVME!!!\n");
         found_nvme = true;
