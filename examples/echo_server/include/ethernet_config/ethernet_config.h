@@ -39,6 +39,9 @@
 #elif defined(CONFIG_PLAT_IMX8MP_EVK)
 #define MAC_ADDR_CLI0                       0x525401000009
 #define MAC_ADDR_CLI1                       0x52540100000A
+#elif defined (CONFIG_PLAT_STAR64)
+#define MAC_ADDR_CLI0                       0x52540100000B
+#define MAC_ADDR_CLI1                       0x52540100000C
 #else
 #error "Must define MAC addresses for clients in ethernet config"
 #endif
