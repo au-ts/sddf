@@ -65,8 +65,8 @@
         <map mr="client_pn532_request_region" vaddr="0x4_001_000" perms="rw" />
         <map mr="client_pn532_response_region" vaddr="0x5_001_000" perms="rw" />
 
-        <map mr="driver_request_region" vaddr="0x6_000_000" perms="rw" setvar_vaddr="driver_request_region" />
-        <map mr="driver_response_region" vaddr="0x7_000_000" perms="rw" setvar_vaddr="driver_response_region" />
+        <map mr="driver_request_region" vaddr="0x6_000_000" perms="rw" />
+        <map mr="driver_response_region" vaddr="0x7_000_000" perms="rw" />
     </protection_domain>
 
     <protection_domain name="client_ds3231" priority="1">
@@ -103,7 +103,7 @@
 
     <channel>
         <end pd="driver" id="0" />
-        <end pd="virt" id="2" />
+        <end pd="virt" id="61" />
     </channel>
 
     <channel>
