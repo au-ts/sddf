@@ -268,7 +268,7 @@ void init()
 {
     sddf_dprintf("pcie driver starting!\n");
 
-#if 1
+#if 0
     for (uint8_t bus = 0; bus <= 255; bus++) {
         for (uint8_t device = 0; device < 32; device++) {
             for (uint8_t function = 0; function < 8; function++) {
@@ -288,8 +288,8 @@ out:
     sddf_dprintf("\n\nPCIE_ENUM_COMPLETE\n");
 #endif
 
-    assert(found_nvme);
-    print_pci_info(nvme_bus, nvme_device, nvme_function, false);
+    // assert(found_nvme);
+    // print_pci_info(nvme_bus, nvme_device, nvme_function, false);
     nvme_init();
 }
 
@@ -302,7 +302,7 @@ void notified(microkit_channel ch)
 
     if (i <= 3 /* keep i nsync with nvme_continue */) {
         /* this shows asserted on all platforms, as you would expect */
-        print_pci_info(nvme_bus, nvme_device, nvme_function, /* don't ack? */ false);
+        // print_pci_info(nvme_bus, nvme_device, nvme_function, /* don't ack? */ false);
 
         sddf_dprintf("\nacking (%u)\n", i);
         /* this usually acknowledges the CQ doorbell, causing interrupts to disappear
@@ -325,7 +325,7 @@ void notified(microkit_channel ch)
 
            AND!!! on Star64 RISCV this shows "none" but we still get interrupts!!
         */
-        print_pci_info(nvme_bus, nvme_device, nvme_function, /* don't ack? */ false);
+        // print_pci_info(nvme_bus, nvme_device, nvme_function, /* don't ack? */ false);
     } else if (i < 10) {
         sddf_dprintf("\nYou should not see this message -- trying to ACK again\n");
         microkit_irq_ack(ch);
