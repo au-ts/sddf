@@ -30,7 +30,8 @@ const targets = [_]Target{
         .board = MicrokitBoard.rockpro64,
         .zig_target = std.Target.Query{
             .cpu_arch = .aarch64,
-            .cpu_model = .{ .explicit = &std.Target.arm.cpu.cortex_a53 },
+            .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a53 },
+            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{ .strict_align }),
             .os_tag = .freestanding,
             .abi = .none,
         },
