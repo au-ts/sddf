@@ -19,7 +19,7 @@ ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
 else ifeq ($(strip $(MICROKIT_BOARD)), maaxboard)
 	ARCH := aarch64
   DTS_FILE := $(TOP)/dts/maaxboard.dts
-	SYSTEM_FILE := ${TOP}/board/imx/clk.system
+	SYSTEM_FILE := ${TOP}/board/maaxboard/clk.system
 	DRIVER_DIR := imx
 	CPU := cortex-a53
 else
