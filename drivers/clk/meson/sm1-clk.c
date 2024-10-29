@@ -983,12 +983,12 @@ static CLK_MUX(g12a_mali, HHI_MALI_CLK_CNTL, 1, 31, 0, 0, g12a_mali_parent_table
 static CLK_DIV_RO(g12a_ts_div, HHI_TS_CLK_CNTL, 0, 8, 0, { &g12a_ts_div }, 1, 0);
 static CLK_GATE(g12a_ts, HHI_TS_CLK_CNTL, 8, 0, { &g12a_ts_div }, 1, 0);
 static const struct clk_parent_data spicc_sclk_parent_data[] = {
-	{ .name = "xtal", },
-	{ .clk = &g12a_clk81 },
-	{ .clk = &g12a_fclk_div4 },
-	{ .clk = &g12a_fclk_div3 },
-	{ .clk = &g12a_fclk_div5 },
-	{ .clk = &g12a_fclk_div7 },
+    { .name = "xtal", },
+    { .clk = &g12a_clk81 },
+    { .clk = &g12a_fclk_div4 },
+    { .clk = &g12a_fclk_div3 },
+    { .clk = &g12a_fclk_div5 },
+    { .clk = &g12a_fclk_div7 },
 };
 
 static CLK_MUX(g12a_spicc0_sclk_sel, HHI_SPICC_CLK_CNTL, 7, 7, 0, 0, spicc_sclk_parent_data, 0, 0);
@@ -998,14 +998,14 @@ static CLK_MUX(g12a_spicc1_sclk_sel, HHI_SPICC_CLK_CNTL, 7, 23, 0, 0, spicc_sclk
 static CLK_DIV(g12a_spicc1_sclk_div, HHI_SPICC_CLK_CNTL, 16, 6, 0, { &g12a_spicc1_sclk_sel }, 1, 0);
 static CLK_GATE(g12a_spicc1_sclk, HHI_SPICC_CLK_CNTL, 22, 0, { &g12a_spicc1_sclk_div }, 1, 0);
 static const struct clk_parent_data nna_clk_parent_data[] = {
-	{ .name = "xtal", },
-	{ .clk = &g12a_gp0_pll, },
-	{ .clk = &g12a_hifi_pll, },
-	{ .clk = &g12a_fclk_div2p5, },
-	{ .clk = &g12a_fclk_div3, },
-	{ .clk = &g12a_fclk_div4, },
-	{ .clk = &g12a_fclk_div5, },
-	{ .clk = &g12a_fclk_div7 },
+    { .name = "xtal", },
+    { .clk = &g12a_gp0_pll, },
+    { .clk = &g12a_hifi_pll, },
+    { .clk = &g12a_fclk_div2p5, },
+    { .clk = &g12a_fclk_div3, },
+    { .clk = &g12a_fclk_div4, },
+    { .clk = &g12a_fclk_div5, },
+    { .clk = &g12a_fclk_div7 },
 };
 static CLK_MUX(sm1_nna_axi_clk_sel, HHI_NNA_CLK_CNTL, 7, 9, 0, 0, nna_clk_parent_data, 0, 0);
 static CLK_DIV(sm1_nna_axi_clk_div, HHI_NNA_CLK_CNTL, 0, 7, 0, { &sm1_nna_axi_clk_sel }, 1, 0);

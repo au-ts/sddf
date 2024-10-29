@@ -1257,6 +1257,15 @@ static IMX_CLK_GATE4(csi2_root_clk, { &csi2_core }, CCM_BASE, 0x4660, 0);
 static IMX_CLK_GATE4(sdma1_clk, { &ipg_root }, CCM_BASE, 0x43a0, 0);
 static IMX_CLK_GATE4(sdma2_clk, { &ipg_audio_root }, CCM_BASE, 0x43b0, 0);
 
+static IMX_CLK_FIXED_FACTOR(gpt_3m, { &osc_25m }, 1, 8);
+static IMX_CLK_FIXED_FACTOR(dram_alt_root, { &dram_alt }, 1, 4);
+
+/* hws[IMX8MQ_CLK_ARM] = imx_clk_hw_cpu("arm", "arm_a53_core", */
+/*   hws[IMX8MQ_CLK_A53_CORE]->clk, */
+/*   hws[IMX8MQ_CLK_A53_CORE]->clk, */
+/*   hws[IMX8MQ_ARM_PLL_OUT]->clk, */
+/*   hws[IMX8MQ_CLK_A53_DIV]->clk); */
+
 static struct clk *imx8mq_clks[] = {
     [IMX8MQ_CLK_DUMMY]              = &dummy,
     [IMX8MQ_CLK_32K]                = &ckil,
@@ -1499,6 +1508,8 @@ static struct clk *imx8mq_clks[] = {
     [IMX8MQ_CLK_CSI2_ROOT]          = &csi2_root_clk,
     [IMX8MQ_CLK_SDMA1_ROOT]         = &sdma1_clk,
     [IMX8MQ_CLK_SDMA2_ROOT]         = &sdma2_clk,
+    [IMX8MQ_GPT_3M_CLK]             = &gpt_3m,
+    [IMX8MQ_CLK_DRAM_ALT_ROOT]      = &dram_alt_root,
 };
 
 struct clk **get_clk_list(void)

@@ -325,7 +325,6 @@ static int clk_source_set_rate(const struct clk *clk, uint32_t rate, uint32_t pa
     return 0;
 }
 
-
 static unsigned long clk_source_get_rate(const struct clk *clk,
                                 unsigned long prate)
 {
