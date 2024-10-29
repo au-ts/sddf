@@ -21,7 +21,7 @@
 #include <g12a-bindings.h>  /* clock id bindings*/
 
 // Logging
-#define DEBUG_DRIVER
+// #define DEBUG_DRIVER
 
 #ifdef DEBUG_DRIVER
 #define LOG_CLK(...) do{ sddf_dprintf("CLK DRIVER|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
