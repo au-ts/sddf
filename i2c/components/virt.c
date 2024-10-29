@@ -29,33 +29,36 @@
  * what happens...
  */
 
-#define NUM_CLIENTS 1
-#define DRIVER_CH 1
+#define DRIVER_CH 61
+#define MAX_CLIENTS 61
 
-#if DRIVER_CH < NUM_CLIENTS
-#error "DRIVER_CH must be higher than client channels"
-#endif
+typedef struct client_config {
+    i2c_queue_t *request_queue;
+    i2c_queue_t *response_queue;
+    uint64_t driver_data_offset;
+    uint64_t data_size;
+} client_config_t;
 
-uintptr_t driver_data_offsets[NUM_CLIENTS] = { 0 }; // change if NUM_CLIENTS changes
-size_t client_data_sizes[NUM_CLIENTS] = { 0x1000 }; // change if NUM_CLIENTS changes
+typedef struct config {
+    i2c_queue_t *driver_request_queue;
+    i2c_queue_t *driver_response_queue;
+    uint64_t num_clients;
+    client_config_t clients[MAX_CLIENTS];
+} config_t;
 
-i2c_queue_handle_t client_queues[NUM_CLIENTS];
+config_t config;
+
+i2c_queue_handle_t client_queues[MAX_CLIENTS];
 i2c_queue_handle_t driver_queue;
-
-uintptr_t client_request_regions[NUM_CLIENTS] = { 0x4000000 }; // change if NUM_CLIENTS changes
-uintptr_t client_response_regions[NUM_CLIENTS] = { 0x5000000 }; // change if NUM_CLIENTS changes
 
 // Security list: owner of each i2c address on the bus
 int security_list[I2C_BUS_ADDRESS_MAX + 1];
-
-uintptr_t driver_response_region; // mapped memory
-uintptr_t driver_request_region; // mapped memory
 
 void process_request(microkit_channel ch)
 {
     LOG_VIRTUALISER("processing client %d\n", ch);
     bool enqueued = false;
-    assert(ch < NUM_CLIENTS);
+    assert(ch < config.num_clients);
 
     /* Do not process the request if we cannot pass it to the driver */
     while (!i2c_queue_empty(client_queues[ch].request) && !i2c_queue_full(driver_queue.request)) {
@@ -74,14 +77,14 @@ void process_request(microkit_channel ch)
             continue;
         }
 
-        if (offset > client_data_sizes[ch]) {
+        if (offset > config.clients[ch].data_size) {
             LOG_VIRTUALISER_ERR("invalid offset (0x%lx) given by client 0x%x. Max offset is 0x%lx\n", offset, ch,
-                                client_data_sizes[ch]);
+                                config.clients[ch].data_size);
             continue;
         }
 
         // Now we need to convert the offset into an offset the driver can use in its address space.
-        size_t driver_offset = driver_data_offsets[ch] + offset;
+        size_t driver_offset = config.clients[ch].driver_data_offset + offset;
         err = i2c_enqueue_request(driver_queue, bus_address, driver_offset, len);
         /* If this assert fails we have a race as the driver should only ever be dequeuing */
         assert(!err);
@@ -120,7 +123,7 @@ void process_response()
             continue;
         }
 
-        size_t client_offset = driver_offset - driver_data_offsets[ch];
+        size_t client_offset = driver_offset - config.clients[ch].driver_data_offset;
         /* There is no point checking if the enqueue succeeds or not. */
         i2c_enqueue_response(client_queues[ch], bus_address, client_offset, len);
 
@@ -130,16 +133,35 @@ void process_response()
 
 void init(void)
 {
+    config = (config_t) {
+        .driver_request_queue = (void *)0x6000000,
+        .driver_response_queue = (void *)0x7000000,
+        .num_clients = 2,
+        .clients = {
+            [0] = {
+                .request_queue = (void *)0x4000000,
+                .response_queue = (void *)0x5000000,
+                .driver_data_offset = 0x0,
+                .data_size = 0x1000,
+            },
+            [1] = {
+                .request_queue = (void *)0x4001000,
+                .response_queue = (void *)0x5001000,
+                .driver_data_offset = 0x1000,
+                .data_size = 0x1000,
+            },
+        },
+    };
+
+    assert(config.num_clients);
+
     LOG_VIRTUALISER("initialising\n");
     for (int i = 0; i < I2C_BUS_ADDRESS_MAX + 1; i++) {
         security_list[i] = BUS_UNCLAIMED;
     }
-    assert(driver_request_region);
-    assert(driver_response_region);
-    driver_queue = i2c_queue_init((i2c_queue_t *) driver_request_region, (i2c_queue_t *) driver_response_region);
-    for (int i = 0; i < NUM_CLIENTS; i++) {
-        client_queues[i] = i2c_queue_init((i2c_queue_t *) client_request_regions[i],
-                                          (i2c_queue_t *) client_response_regions[i]);
+    driver_queue = i2c_queue_init(config.driver_request_queue, config.driver_response_queue);
+    for (int i = 0; i < config.num_clients; i++) {
+        client_queues[i] = i2c_queue_init(config.clients[i].request_queue, config.clients[i].response_queue);
     }
 }
 
