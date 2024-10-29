@@ -138,6 +138,7 @@ pub fn build(b: *std.Build) void {
     });
     microkit_tool_cmd.step.dependOn(b.getInstallStep());
     microkit_tool_cmd.step.dependOn(&driver_install.step);
+    microkit_tool_cmd.setEnvironmentVariable("MICROKIT_SDK", microkit_sdk);
     const microkit_step = b.step("microkit", "Compile and build the final bootable image");
     microkit_step.dependOn(&microkit_tool_cmd.step);
     b.default_step = microkit_step;
@@ -163,4 +164,3 @@ pub fn build(b: *std.Build) void {
         simulate_step.dependOn(&qemu_cmd.step);
     }
 }
-

@@ -134,6 +134,7 @@ pub fn build(b: *std.Build) void {
         "-r", b.getInstallPath(.prefix, "./report.txt")
     });
     microkit_tool_cmd.step.dependOn(b.getInstallStep());
+    microkit_tool_cmd.setEnvironmentVariable("MICROKIT_SDK", microkit_sdk);
 
     const microkit_step = b.step("microkit", "Compile and build the final bootable image");
     microkit_step.dependOn(&blk_driver_install.step);
