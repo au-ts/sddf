@@ -18,7 +18,7 @@ const targets = [_]Target{
         .board = .qemu_virt_aarch64,
         .zig_target = std.Target.Query{
             .cpu_arch = .aarch64,
-            .cpu_model = .{ .explicit = &std.Target.arm.cpu.cortex_a53 },
+            .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a53 },
             .os_tag = .freestanding,
             .abi = .none,
         },
