@@ -309,7 +309,7 @@ const struct clk_ops meson_clk_pcie_pll_ops = {
     .recalc_rate    = meson_clk_pll_recalc_rate,
     /* .determine_rate    = meson_clk_pll_determine_rate, */
     .is_enabled    = meson_clk_pll_is_enabled,
-    /* .enable        = meson_clk_pcie_pll_enable, */
+    .enable        = meson_clk_pcie_pll_enable,
     .disable    = meson_clk_pll_disable
 };
 
