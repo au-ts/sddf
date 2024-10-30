@@ -23,7 +23,7 @@ void init(void)
 #ifdef TEST_BOARD_maaxboard
     sddf_dprintf("Test board: maaxboard\n");
 
-    uint32_t ret = sddf_clk_enable(CLK_DRIVER_CH, 144);
+    uint32_t ret = sddf_clk_enable(CLK_DRIVER_CH, 27);
     sddf_dprintf("ret_val: %x\n", ret);
 
 #elif TEST_BOARD_odroidc4

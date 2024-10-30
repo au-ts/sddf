@@ -5,15 +5,15 @@
     SPDX-License-Identifier: BSD-2-Clause
 -->
 <system>
-    <memory_region name="clk" size="0x1000" phys_addr="0x30360000"/>
-    <!-- <memory_region name="msr_clk" size="0x1000" phys_addr="0xFFD18000"/> -->
+    <memory_region name="clk_ccm" size="0x1000" phys_addr="0x30380000"/>
+    <memory_region name="clk_ccm_analog" size="0x1000" phys_addr="0x30360000"/>
     <!-- <memory_region name="timer_registers" size="0x1000" phys_addr="0xFFD0F000" /> -->
 
     <protection_domain name="clk_driver" priority="254" pp="true" passive="true" stack_size="0x5000">
         <program_image path="clk_driver.elf"/>
 
-        <map mr="clk" vaddr="0x3_200_000" perms="rw" setvar_vaddr="clk_regs" cached="false" />
-        <!-- <map mr="msr_clk" vaddr="0x3_300_000" perms="rw" setvar_vaddr="msr_clk_base" cached="false" /> -->
+        <map mr="clk_ccm" vaddr="0x3_200_000" perms="rw" setvar_vaddr="ccm_base" cached="false" />
+        <map mr="clk_ccm_analog" vaddr="0x3_300_000" perms="rw" setvar_vaddr="ccm_analog_base" cached="false" />
     </protection_domain>
 
     <!-- <protection_domain name="timer" priority="254" pp="true" passive="true"> -->

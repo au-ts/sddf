@@ -1,3 +1,11 @@
+/*
+ * Copyright 2024, UNSW
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
+ * Terry Bai: tianyi.bai@unsw.edu.au
+ */
+
 #include <microkit.h>
 #include <stdint.h>
 #include <sddf/util/printf.h>
@@ -26,14 +34,21 @@
 
 struct clk **clk_list;
 
-uintptr_t clk_regs;
-uintptr_t msr_clk_base;
+uintptr_t ccm_base;
+uintptr_t ccm_analog_base;
 
 void clk_probe(struct clk *clk_list[])
 {
     int i;
     for (i = 0; i < NUM_CLK_LIST; i++) {
-        clk_list[i]->base = (uint64_t)clk_regs;
+        if (!clk_list[i]) {
+            continue;
+        }
+        if (clk_list[i]->base == CCM_BASE) {
+            clk_list[i]->base = ccm_base;
+        } else if (clk_list[i]->base == CCM_ANALOG_BASE) {
+            clk_list[i]->base = ccm_analog_base;
+        }
         if (clk_list[i] && clk_list[i]->hw.init->ops->init) {
             clk_list[i]->hw.init->ops->init(clk_list[i]);
             LOG_DRIVER("Initialise %s\n", clk_list[i]->hw.init->name);
@@ -135,9 +150,10 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
-    sddf_dprintf("clk_regs: 0x%lx\n", clk_regs);
 
     clk_list = get_clk_list();
+
+    clk_probe(clk_list);
 
     for (int i = 0; i < NUM_DEVICE_CLKS; i++) {
         uint32_t idx = clk_configs[i].clk_id;

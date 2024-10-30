@@ -2,6 +2,9 @@
 
 #include <stdint.h>
 
+#define CCM_BASE 0x1234
+#define CCM_ANALOG_BASE 0x5678
+
 #define PCG_PREDIV_SHIFT    16
 #define PCG_PREDIV_WIDTH    3
 #define PCG_PREDIV_MAX      8

@@ -13,8 +13,6 @@
 #include <clk-operations.h>
 #include <sddf/util/printf.h>
 
-#define CCM_BASE 0x30380000
-#define CCM_ANALOG_BASE 0x30360000
 
 static struct clk_parent_data pll_ref_sels[] = {
     { .name = "osc_25m", },
@@ -1266,7 +1264,7 @@ static IMX_CLK_FIXED_FACTOR(dram_alt_root, { &dram_alt }, 1, 4);
 /*   hws[IMX8MQ_ARM_PLL_OUT]->clk, */
 /*   hws[IMX8MQ_CLK_A53_DIV]->clk); */
 
-static struct clk *imx8mq_clks[] = {
+static struct clk *imx8mq_clks[IMX8MQ_CLK_END] = {
     [IMX8MQ_CLK_DUMMY]              = &dummy,
     [IMX8MQ_CLK_32K]                = &ckil,
     [IMX8MQ_CLK_25M]                = &osc_25m,
@@ -1517,5 +1515,6 @@ struct clk **get_clk_list(void)
     sddf_dprintf("get clk list\n");
 
     (void)arm_pll_ref_div;
+
     return imx8mq_clks;
 }
