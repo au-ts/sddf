@@ -227,11 +227,6 @@ struct clk _name = {                                                \
     },                                                              \
 }
 
-/* #define IMX_COMPOSITE_CLK_FLAGS_DEFAULT \ */
-    /* (CLK_SET_RATE_NO_REPARENT | CLK_OPS_PARENT_ENABLE) */
-/* #define IMX_COMPOSITE_CLK_FLAGS_CRITICAL \ */
-    /* (IMX_COMPOSITE_CLK_FLAGS_DEFAULT | CLK_IS_CRITICAL) */
-
 #define IMX_CLK_COMPOSITE_CORE(_name, _parent_data, _base, _offset) \
 struct clk _name = {                                                \
     .base = (_base),                                                \

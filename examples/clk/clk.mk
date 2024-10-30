@@ -72,7 +72,7 @@ include ${TIMER_DRIVER}/timer_driver.mk
 include ${CLK_DRIVER}/clk_driver.mk
 
 client.o: ${TOP}/client.c
-	$(CC) -c $(CFLAGS) $(CHIP_HEADER_INC) $< -o client.o
+	$(CC) -c $(CFLAGS) $(CHIP_HEADER_INC) -DTEST_BOARD_${MICROKIT_BOARD} $< -o client.o
 
 client.elf: client.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@

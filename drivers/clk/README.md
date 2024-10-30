@@ -56,3 +56,259 @@ See `include/sddf/clk/client.h` for more details.
 
 ## iMX8-*
 
+**VMM Changes**
+> The VMM library then calls into the Pinmux or Clock drivers to see if what has been requested is compatible with what actually has been set.
+
+We check if the requested values are compatible with what actually has been set in VMM. For clock requests, the VMM hands over the faulting information to the handler in clock driver via RPC.
+
+In GPU driver in Linux codebase, there are some non-standard clock configurations (writing registers without requesting clock driver) implemented by the SoC manufactorer, so we define a set of registers that Framebuffer Driver VM allows to write to. This will be fixed by intercepting the clock requests and dynamically adjusting clocks for the consumers.
+
+**Next Steps**
+> The system we’ve designed is intended to set all pinmux and clocks at boot time, and never allow them to be changed at runtime. This is adequate for many devices.
+
+
+
+
+
+
+## Notes
+
+HHI_SYS_PLL_CNTL0 - 0xff63c2f4
+- sys_pll_dco
+- sys_pll
+
+HI_MALI_CLK_CNTL - 0x0xff63c1b0
+- g12a_mali_0_sel
+- g12a_mali_0_div
+- g12a_mali_0
+- g12a_mali_1_sel
+- g12a_mali_1_div
+- g12a_mali_1
+- g12a_mali
+
+HHI_HDMI_PHY_CNTL0 - 0xff63c3a0
+- 
+
+HHI_SYS_CPU_CLK_CNTL0 - 0xff63c19c
+- g12a_cpu_clk
+- g12a_cpu_clk_dyn
+- g12a_cpu_postmux0
+- g12a_cpu_postmux1
+- g12a_cpu_mux0_div
+- g12a_cpu_mux1_div
+- g12a_cpu_premux0
+- g12a_cpu_premux1
+
+HHI_HDMI_PLL_CNTL0 - 0xff63c320
+- 
+
+CLK DRIVER|INFO: write 0x100 to 0xff63c1b0
+CLK DRIVER|INFO: write 0xa4020000 to 0xff63c19c
+CLK DRIVER|INFO: write 0xf80204c8 to 0xff63c2f4
+CLK DRIVER|INFO: write 0x280204c8 to 0xff63c2f4
+CLK DRIVER|INFO: write 0x2802049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x3802049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x1802049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0xd801049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x4020800 to 0xff63c19c
+CLK DRIVER|INFO: write 0x0 to 0xff63c3a0
+
+CLK DRIVER|INFO: write 0xa4020000 to 0xff63c19c
+CLK DRIVER|INFO: write 0xf801049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x2801049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x28010496 to 0xff63c2f4
+CLK DRIVER|INFO: write 0x38010496 to 0xff63c2f4
+CLK DRIVER|INFO: write 0x18010496 to 0xff63c2f4
+CLK DRIVER|INFO: write 0x4020800 to 0xff63c19c
+
+CLK DRIVER|INFO: write 0xa4000800 to 0xff63c19c
+CLK DRIVER|INFO: write 0xa4000c00 to 0xff63c19c
+CLK DRIVER|INFO: write 0xc4000c01 to 0xff63c19c
+CLK DRIVER|INFO: write 0xc4000801 to 0xff63c19c
+CLK DRIVER|INFO: write 0xa4000001 to 0xff63c19c
+CLK DRIVER|INFO: write 0x1 to 0xff63c19c
+
+CLK DRIVER|INFO: write 0xf8010496 to 0xff63c2f4
+CLK DRIVER|INFO: write 0x28010496 to 0xff63c2f4
+CLK DRIVER|INFO: write 0x2801049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x3801049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x1801049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x801 to 0xff63c19c
+
+CLK DRIVER|INFO: write 0xb3a047b to 0xff63c320
+CLK DRIVER|INFO: write 0xbb3a047b to 0xff63c320
+CLK DRIVER|INFO: write 0x18000 to 0xff63c324
+CLK DRIVER|INFO: write 0xa691c00 to 0xff63c32c
+CLK DRIVER|INFO: write 0x33771290 to 0xff63c330
+CLK DRIVER|INFO: write 0x39270000 to 0xff63c334
+CLK DRIVER|INFO: write 0x50540000 to 0xff63c338
+CLK DRIVER|INFO: write 0x1b3a047b to 0xff63c320
+CLK DRIVER|INFO: write 0xdb38047b to 0xff63c320
+CLK DRIVER|INFO: write 0xdb34047b to 0xff63c320
+CLK DRIVER|INFO: write 0xdb14047b to 0xff63c320
+CLK DRIVER|INFO: write 0x2739c to 0xff63c1a0
+CLK DRIVER|INFO: write 0x739c to 0xff63c1a0
+CLK DRIVER|INFO: write 0x0 to 0xff63c1a0
+CLK DRIVER|INFO: write 0x20000 to 0xff63c1a0
+CLK DRIVER|INFO: write 0x28000 to 0xff63c1a0
+CLK DRIVER|INFO: write 0x2f39c to 0xff63c1a0
+CLK DRIVER|INFO: write 0x2739c to 0xff63c1a0
+CLK DRIVER|INFO: write 0xa739c to 0xff63c1a0
+CLK DRIVER|INFO: write 0x33eb4242 to 0xff63c3a0
+CLK DRIVER|INFO: write 0x3900000 to 0xff63c3a4
+CLK DRIVER|INFO: write 0x80000001 to 0xff63c19c
+CLK DRIVER|INFO: write 0xf801049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x2801049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x280104ea to 0xff63c2f4
+CLK DRIVER|INFO: write 0x380104ea to 0xff63c2f4
+CLK DRIVER|INFO: write 0x180104ea to 0xff63c2f4
+CLK DRIVER|INFO: write 0xd80204ea to 0xff63c2f4
+CLK DRIVER|INFO: write 0x801 to 0xff63c19c
+CLK DRIVER|INFO: write 0x80000001 to 0xff63c19c
+CLK DRIVER|INFO: write 0xf80204ea to 0xff63c2f4
+CLK DRIVER|INFO: write 0x280204ea to 0xff63c2f4
+CLK DRIVER|INFO: write 0x2802049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x3802049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x1802049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0xd801049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x801 to 0xff63c19c
+CLK DRIVER|INFO: write 0x390000f to 0xff63c3a4
+CLK DRIVER|INFO: write 0x390000e to 0xff63c3a4
+CLK DRIVER|INFO: write 0x390000f to 0xff63c3a4
+CLK DRIVER|INFO: write 0x390000e to 0xff63c3a4
+CLK DRIVER|INFO: write 0x390000f to 0xff63c3a4
+CLK DRIVER|INFO: write 0x390000e to 0xff63c3a4
+CLK DRIVER|INFO: write 0x80000001 to 0xff63c19c
+CLK DRIVER|INFO: write 0x801 to 0xff63c19c
+CLK DRIVER|INFO: write 0x80000001 to 0xff63c19c
+CLK DRIVER|INFO: write 0xf801049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x2801049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x2801048e to 0xff63c2f4
+CLK DRIVER|INFO: write 0x3801048e to 0xff63c2f4
+CLK DRIVER|INFO: write 0x1801048e to 0xff63c2f4
+CLK DRIVER|INFO: write 0x801 to 0xff63c19c
+CLK DRIVER|INFO: write 0x80000001 to 0xff63c19c
+CLK DRIVER|INFO: write 0xf801048e to 0xff63c2f4
+CLK DRIVER|INFO: write 0x2801048e to 0xff63c2f4
+CLK DRIVER|INFO: write 0x2801049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x3801049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x1801049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x801 to 0xff63c19c
+CLK DRIVER|INFO: write 0x80000001 to 0xff63c19c
+CLK DRIVER|INFO: write 0xf801049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x2801049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x280104fa to 0xff63c2f4
+CLK DRIVER|INFO: write 0x380104fa to 0xff63c2f4
+CLK DRIVER|INFO: write 0x180104fa to 0xff63c2f4
+CLK DRIVER|INFO: write 0xd80204fa to 0xff63c2f4
+CLK DRIVER|INFO: write 0x801 to 0xff63c19c
+CLK DRIVER|INFO: write 0x80000001 to 0xff63c19c
+CLK DRIVER|INFO: write 0xf80204fa to 0xff63c2f4
+CLK DRIVER|INFO: write 0x280204fa to 0xff63c2f4
+CLK DRIVER|INFO: write 0x2802049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x3802049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x1802049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0xd801049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x801 to 0xff63c19c
+CLK DRIVER|INFO: write 0x80000001 to 0xff63c19c
+
+CLK DRIVER|INFO: write 0x80000001 to 0xff63c19c
+CLK DRIVER|INFO: write 0xf801049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x2801049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x280104c8 to 0xff63c2f4
+CLK DRIVER|INFO: write 0x380104c8 to 0xff63c2f4
+CLK DRIVER|INFO: write 0x180104c8 to 0xff63c2f4
+CLK DRIVER|INFO: write 0xd80204c8 to 0xff63c2f4
+CLK DRIVER|INFO: write 0x801 to 0xff63c19c
+CLK DRIVER|INFO: write 0x80000001 to 0xff63c19c
+CLK DRIVER|INFO: write 0xf80204c8 to 0xff63c2f4
+CLK DRIVER|INFO: write 0x280204c8 to 0xff63c2f4
+CLK DRIVER|INFO: write 0x2802049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x3802049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x1802049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0xd801049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x801 to 0xff63c19c
+CLK DRIVER|INFO: write 0x80000001 to 0xff63c19c
+CLK DRIVER|INFO: write 0xf801049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x2801049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x2801048e to 0xff63c2f4
+CLK DRIVER|INFO: write 0x3801048e to 0xff63c2f4
+CLK DRIVER|INFO: write 0x1801048e to 0xff63c2f4
+CLK DRIVER|INFO: write 0x801 to 0xff63c19c
+CLK DRIVER|INFO: write 0x80000001 to 0xff63c19c
+CLK DRIVER|INFO: write 0xf801048e to 0xff63c2f4
+CLK DRIVER|INFO: write 0x2801048e to 0xff63c2f4
+CLK DRIVER|INFO: write 0x2801049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x3801049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x1801049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x801 to 0xff63c19c
+CLK DRIVER|INFO: write 0x80000001 to 0xff63c19c
+
+CLK DRIVER|INFO: write 0x801 to 0xff63c19c
+CLK DRIVER|INFO: write 0x33eb4242 to 0xff63c3a0
+CLK DRIVER|INFO: write 0x3900000 to 0xff63c3a4
+
+CLK DRIVER|INFO: write 0x80000001 to 0xff63c19c
+CLK DRIVER|INFO: write 0xf801049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x2801049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x280104c8 to 0xff63c2f4
+CLK DRIVER|INFO: write 0x380104c8 to 0xff63c2f4
+CLK DRIVER|INFO: write 0x180104c8 to 0xff63c2f4
+CLK DRIVER|INFO: write 0xd80204c8 to 0xff63c2f4
+CLK DRIVER|INFO: write 0x801 to 0xff63c19c
+CLK DRIVER|INFO: write 0x80000001 to 0xff63c19c
+CLK DRIVER|INFO: write 0xf80204c8 to 0xff63c2f4
+CLK DRIVER|INFO: write 0x280204c8 to 0xff63c2f4
+CLK DRIVER|INFO: write 0x2802049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x3802049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x1802049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0xd801049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x801 to 0xff63c19c
+CLK DRIVER|INFO: write 0x390000f to 0xff63c3a4
+CLK DRIVER|INFO: write 0x390000e to 0xff63c3a4
+CLK DRIVER|INFO: write 0x390000f to 0xff63c3a4
+CLK DRIVER|INFO: write 0x390000e to 0xff63c3a4
+CLK DRIVER|INFO: write 0x390000f to 0xff63c3a4
+CLK DRIVER|INFO: write 0x390000e to 0xff63c3a4
+
+CLK DRIVER|INFO: write 0x0 to 0xff63c3a0
+CLK DRIVER|INFO: write 0xb3a04aa to 0xff63c320
+CLK DRIVER|INFO: write 0xbb3a04aa to 0xff63c320
+CLK DRIVER|INFO: write 0x5555 to 0xff63c324
+CLK DRIVER|INFO: write 0x1b3a04aa to 0xff63c320
+CLK DRIVER|INFO: write 0xdb3604aa to 0xff63c320
+CLK DRIVER|INFO: write 0xdb0604aa to 0xff63c320
+CLK DRIVER|INFO: write 0x2739c to 0xff63c1a0
+CLK DRIVER|INFO: write 0x739c to 0xff63c1a0
+CLK DRIVER|INFO: write 0x0 to 0xff63c1a0
+CLK DRIVER|INFO: write 0x20000 to 0xff63c1a0
+CLK DRIVER|INFO: write 0x28000 to 0xff63c1a0
+CLK DRIVER|INFO: write 0x2f39c to 0xff63c1a0
+CLK DRIVER|INFO: write 0x2739c to 0xff63c1a0
+CLK DRIVER|INFO: write 0xa739c to 0xff63c1a0
+
+
+CLK DRIVER|INFO: write 0x80000001 to 0xff63c19c
+CLK DRIVER|INFO: write 0xf801049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x2801049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x280104ea to 0xff63c2f4
+CLK DRIVER|INFO: write 0x380104ea to 0xff63c2f4
+CLK DRIVER|INFO: write 0x180104ea to 0xff63c2f4
+CLK DRIVER|INFO: write 0xd80204ea to 0xff63c2f4
+CLK DRIVER|INFO: write 0x801 to 0xff63c19c
+CLK DRIVER|INFO: write 0x80000001 to 0xff63c19c
+CLK DRIVER|INFO: write 0xf80204ea to 0xff63c2f4
+CLK DRIVER|INFO: write 0x280204ea to 0xff63c2f4
+CLK DRIVER|INFO: write 0x2802049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x3802049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x1802049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0xd801049f to 0xff63c2f4
+CLK DRIVER|INFO: write 0x801 to 0xff63c19c
+CLK DRIVER|INFO: write 0x390000f to 0xff63c3a4
+CLK DRIVER|INFO: write 0x390000e to 0xff63c3a4
+CLK DRIVER|INFO: write 0x390000f to 0xff63c3a4
+CLK DRIVER|INFO: write 0x390000e to 0xff63c3a4
+CLK DRIVER|INFO: write 0x390000f to 0xff63c3a4
+CLK DRIVER|INFO: write 0x390000e to 0xff63c3a4
+
+CLK DRIVER|INFO: write 0x80000001 to 0xff63c19c

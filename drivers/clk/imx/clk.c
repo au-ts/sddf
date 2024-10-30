@@ -20,6 +20,8 @@
 
 #define LOG_DRIVER_ERR(...) do{ sddf_printf("CLK DRIVER|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
+#define CLIENT_CH 0
+
 #define NUM_CLK_LIST IMX8MQ_CLK_END
 
 struct clk **clk_list;
