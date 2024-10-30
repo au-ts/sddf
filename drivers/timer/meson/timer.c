@@ -8,10 +8,8 @@
 #include <sddf/util/printf.h>
 #include <sddf/timer/protocol.h>
 
-uintptr_t gpt_regs;
-
-#define IRQ_CH 0
-#define MAX_TIMEOUTS 6
+#define IRQ_CH 61
+#define MAX_CLIENTS 61
 
 #define TIMER_REG_START   0x140    // TIMER_MUX
 
@@ -49,10 +47,17 @@ struct timer_regs {
 
 volatile struct timer_regs *regs;
 
+typedef struct config {
+    void *gpt_regs;
+    uint8_t num_clients;
+} config_t;
+
+config_t config;
+
 /* Right now, we only service a single timeout per client.
  * This timeout array indicates when a timeout should occur,
  * indexed by client ID. */
-static uint64_t timeouts[MAX_TIMEOUTS];
+static uint64_t timeouts[MAX_CLIENTS];
 
 static uint64_t get_ticks(void)
 {
@@ -69,7 +74,7 @@ static uint64_t get_ticks(void)
 
 static void process_timeouts(uint64_t curr_time)
 {
-    for (int i = 0; i < MAX_TIMEOUTS; i++) {
+    for (int i = 0; i < config.num_clients; i++) {
         if (timeouts[i] <= curr_time) {
             microkit_notify(i);
             timeouts[i] = UINT64_MAX;
@@ -77,13 +82,13 @@ static void process_timeouts(uint64_t curr_time)
     }
 
     uint64_t next_timeout = UINT64_MAX;
-    for (int i = 0; i < MAX_TIMEOUTS; i++) {
+    for (int i = 0; i < config.num_clients; i++) {
         if (timeouts[i] < next_timeout) {
             next_timeout = timeouts[i];
         }
     }
 
-    if (next_timeout != UINT64_MAX) {
+    if (next_timeout != config.num_clients) {
         regs->mux &= ~TIMER_A_MODE;
         regs->timer_a = next_timeout - curr_time;
         regs->mux |= TIMER_A_EN;
@@ -130,11 +135,16 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
 
 void init(void)
 {
-    for (int i = 0; i < MAX_TIMEOUTS; i++) {
+    config = (config_t) {
+        .gpt_regs = (void *)0x2000000,
+        .num_clients = 2,
+    };
+
+    for (int i = 0; i < config.num_clients; i++) {
         timeouts[i] = UINT64_MAX;
     }
 
-    regs = (void *)(gpt_regs + TIMER_REG_START);
+    regs = (void *)(config.gpt_regs + TIMER_REG_START);
 
     /* Start timer E acts as a clock, while timer A can be used for timeouts from clients */
     regs->mux = TIMER_A_EN | (TIMESTAMP_TIMEBASE_1_US << TIMER_E_INPUT_CLK) |

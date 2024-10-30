@@ -37,17 +37,16 @@
     <protection_domain name="driver" priority="100">
         <program_image path="i2c_driver.elf"/>
 
-		<map mr="driver_request_region" vaddr="0x4_000_000" perms="rw" setvar_vaddr="request_region" />
-        <map mr="driver_response_region" vaddr="0x5_000_000" perms="rw" setvar_vaddr="response_region" />
+	<map mr="driver_request_region" vaddr="0x4_000_000" perms="rw" />
+        <map mr="driver_response_region" vaddr="0x5_000_000" perms="rw" />
 
-        <map mr="i2c_bus" vaddr="0x3_000_000" perms="rw" setvar_vaddr="i2c_regs" cached="false" />
+        <map mr="i2c_bus" vaddr="0x3_000_000" perms="rw" cached="false" />
 
-        <map mr="gpio" vaddr="0x3_100_000" perms="rw" setvar_vaddr="gpio_regs" cached="false" />
-        <map mr="clk" vaddr="0x3_200_000" perms="rw" setvar_vaddr="clk_regs" cached="false" />
+        <map mr="gpio" vaddr="0x3_100_000" perms="rw" cached="false" />
+        <map mr="clk" vaddr="0x3_200_000" perms="rw" cached="false" />
 
         <map mr="client_ds3231_data_region" vaddr="0x10_000_000" perms="rw" />
         <map mr="client_pn532_data_region" vaddr="0x10_001_000" perms="rw" />
-
 
         <!-- IRQs for the particular I2C bus we are using -->
         <!-- Main interrupt -->
@@ -87,8 +86,8 @@
 
     <protection_domain name="timer" priority="254" pp="true" passive="true">
         <program_image path="timer_driver.elf" />
-        <map mr="timer_registers" vaddr="0x2_000_000" perms="rw" cached="false" setvar_vaddr="gpt_regs" />
-        <irq irq="42" id="0" trigger="edge" /> <!-- timer interrupt for timer A -->
+        <map mr="timer_registers" vaddr="0x2_000_000" perms="rw" cached="false" />
+        <irq irq="42" id="61" trigger="edge" /> <!-- timer interrupt for timer A -->
     </protection_domain>
 
     <channel>
@@ -107,7 +106,7 @@
     </channel>
 
     <channel>
-        <end pd="timer" id="2" />
+        <end pd="timer" id="0" />
         <end pd="client_ds3231" id="1" />
     </channel>
 
