@@ -7,13 +7,45 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <sddf/blk/queue.h>
+#include <sddf/blk/storage_info.h>
 #include <sddf/blk/msdos_mbr.h>
 #include <sddf/util/cache.h>
 #include <sddf/util/ialloc.h>
 #include <sddf/util/printf.h>
 #include <sddf/util/string.h>
 #include <sddf/util/util.h>
-#include <blk_config.h>
+#include "data.h"
+
+#define BLK_QUEUE_CAPACITY_DRIV 1024
+#define MAX_NUM_CLIENTS 62
+
+struct config_client {
+    blk_req_queue_t *req_queue;
+    blk_resp_queue_t *resp_queue;
+    blk_storage_info_t *storage_info;
+    uint64_t data_vaddr;
+    uint64_t data_paddr;
+    uint64_t data_size;
+    uint64_t queue_capacity;
+    uint32_t partition;
+};
+
+struct config_driver {
+    blk_storage_info_t *storage_info;
+    blk_req_queue_t *req_queue;
+    blk_resp_queue_t *resp_queue;
+    uint64_t data_vaddr;
+    uint64_t data_paddr;
+    uint64_t data_size;
+};
+
+struct config {
+    uint64_t num_clients;
+    struct config_driver driver;
+    struct config_client clients[MAX_NUM_CLIENTS];
+};
+
+struct config config;
 
 /* Uncomment this to enable debug logging */
 // #define DEBUG_BLK_VIRT
@@ -25,22 +57,37 @@
 #endif
 #define LOG_BLK_VIRT_ERR(...) do{ sddf_dprintf("BLK_VIRT|ERROR: "); sddf_dprintf(__VA_ARGS__); }while(0)
 
+void config_debug_print(struct config *config) {
+    LOG_BLK_VIRT("dumping config:\n");
+    sddf_dprintf("num_clients: %lu\n", config->num_clients);
+    sddf_dprintf("driver_storage_info: %p\n", config->driver.storage_info);
+    sddf_dprintf("driver_req_queue: %p\n", config->driver.req_queue);
+    sddf_dprintf("driver_resp_queue: %p\n", config->driver.resp_queue);
+    sddf_dprintf("driver_data_vaddr: 0x%lx\n", config->driver.data_vaddr);
+    sddf_dprintf("driver_data_paddr: 0x%lx\n", config->driver.data_paddr);
+    for (int i = 0; i < config->num_clients; i++) {
+        struct config_client *client = &config->clients[i];
+        sddf_dprintf("client[%d]: req_queue: %p\n", i, client->req_queue);
+        sddf_dprintf("client[%d]: resp_queue: %p\n", i, client->resp_queue);
+    }
+}
+
 
 #define DRIVER_CH 0
 #define CLI_CH_OFFSET 1
 
 /* Microkit patched variables */
-blk_storage_info_t *blk_driver_storage_info;
-blk_req_queue_t *blk_driver_req_queue;
-blk_resp_queue_t *blk_driver_resp_queue;
-uintptr_t blk_driver_data;
-uintptr_t blk_data_paddr_driver;
-blk_storage_info_t *blk_client_storage_info;
-blk_req_queue_t *blk_client_req_queue;
-blk_resp_queue_t *blk_client_resp_queue;
-uintptr_t blk_client_data;
-uintptr_t blk_client0_data_paddr;
-uintptr_t blk_client1_data_paddr;
+// blk_storage_info_t *blk_driver_storage_info;
+// blk_req_queue_t *blk_driver_req_queue;
+// blk_resp_queue_t *blk_driver_resp_queue;
+// uintptr_t blk_driver_data;
+// uintptr_t blk_data_paddr_driver;
+// blk_storage_info_t *blk_client_storage_info;
+// blk_req_queue_t *blk_client_req_queue;
+// blk_resp_queue_t *blk_client_resp_queue;
+// uintptr_t blk_client_data;
+// uintptr_t blk_client0_data_paddr;
+// uintptr_t blk_client1_data_paddr;
 
 /* Driver queue handle */
 blk_queue_handle_t drv_h;
@@ -51,9 +98,8 @@ typedef struct client {
     microkit_channel ch;
     uint32_t start_sector;
     uint32_t sectors;
-    uintptr_t data_paddr;
 } client_t;
-client_t clients[BLK_NUM_CLIENTS];
+client_t clients[MAX_NUM_CLIENTS];
 
 /* Request info to be bookkept from client */
 typedef struct reqbk {
@@ -83,13 +129,14 @@ static void partitions_init()
     }
 
     /* Validate partition and assign to client */
-    for (int client = 0; client < BLK_NUM_CLIENTS; client++) {
-        size_t client_partition = blk_partition_mapping[client];
+    for (int i = 0; i < config.num_clients; i++) {
+        struct config_client *client = &config.clients[i];
+        size_t client_partition = client->partition;
 
         if (msdos_mbr.partitions[client_partition].type == MSDOS_MBR_PARTITION_TYPE_EMPTY) {
             /* Partition does not exist */
             LOG_BLK_VIRT_ERR(
-                "Invalid client partition mapping for client %d: partition: %zu, partition does not exist\n", client,
+                "Invalid client partition mapping for client %d: partition: %zu, partition does not exist\n", i,
                 client_partition);
             return;
         }
@@ -102,13 +149,11 @@ static void partitions_init()
         }
 
         /* We have a valid partition now. */
-        clients[client].start_sector = msdos_mbr.partitions[client_partition].lba_start;
-        clients[client].sectors = msdos_mbr.partitions[client_partition].sectors;
-    }
+        clients[i].start_sector = msdos_mbr.partitions[client_partition].lba_start;
+        clients[i].sectors = msdos_mbr.partitions[client_partition].sectors;
 
-    for (int i = 0; i < BLK_NUM_CLIENTS; i++) {
-        blk_storage_info_t *curr_blk_storage_info = blk_virt_cli_storage_info(blk_client_storage_info, i);
-        curr_blk_storage_info->sector_size = blk_driver_storage_info->sector_size;
+        blk_storage_info_t *curr_blk_storage_info = client->storage_info;
+        curr_blk_storage_info->sector_size = config.driver.storage_info->sector_size;
         curr_blk_storage_info->capacity = clients[i].sectors / (BLK_TRANSFER_SIZE / MSDOS_MBR_SECTOR_SIZE);
         curr_blk_storage_info->read_only = false;
         __atomic_store_n(&curr_blk_storage_info->ready, true, __ATOMIC_RELEASE);
@@ -118,8 +163,8 @@ static void partitions_init()
 static void request_mbr()
 {
     int err = 0;
-    uintptr_t mbr_paddr = blk_data_paddr_driver;
-    uintptr_t mbr_vaddr = blk_driver_data;
+    uintptr_t mbr_paddr = config.driver.data_paddr;
+    uintptr_t mbr_vaddr = config.driver.data_vaddr;
 
     uint32_t mbr_req_id = 0;
     err = ialloc_alloc(&ialloc, &mbr_req_id);
@@ -127,7 +172,7 @@ static void request_mbr()
     reqsbk[mbr_req_id] = (reqbk_t) { 0, 0, mbr_vaddr, 1, 0 };
 
     /* Virt-to-driver data region needs to be big enough to transfer MBR data */
-    assert(BLK_DATA_REGION_SIZE_DRIV >= BLK_TRANSFER_SIZE);
+    assert(config.driver.data_size >= BLK_TRANSFER_SIZE);
     err = blk_enqueue_req(&drv_h, BLK_REQ_READ, mbr_paddr, 0, 1, mbr_req_id);
     assert(!err);
 
@@ -168,26 +213,23 @@ static bool handle_mbr_reply()
 
 void init(void)
 {
-    while (!blk_storage_is_ready(blk_driver_storage_info));
+    sddf_memcpy(&config, block_data, block_data_len);
+    config_debug_print(&config);
+
+    while (!blk_storage_is_ready(config.driver.storage_info));
 
     /* Initialise client queues */
-    for (int i = 0; i < BLK_NUM_CLIENTS; i++) {
-        blk_req_queue_t *curr_req = blk_virt_cli_req_queue(blk_client_req_queue, i);
-        blk_resp_queue_t *curr_resp = blk_virt_cli_resp_queue(blk_client_resp_queue, i);
-        uint32_t queue_capacity = blk_virt_cli_queue_capacity(i);
+    for (int i = 0; i < config.num_clients; i++) {
+        struct config_client *client = &config.clients[i];
+        blk_req_queue_t *curr_req = client->req_queue;
+        blk_resp_queue_t *curr_resp = client->resp_queue;
+        uint32_t queue_capacity = client->queue_capacity;
         blk_queue_init(&clients[i].queue_h, curr_req, curr_resp, queue_capacity);
         clients[i].ch = CLI_CH_OFFSET + i;
     }
 
-    /* TODO: make data paddr handling system agnostic */
-    assert(BLK_NUM_CLIENTS <= 2 && BLK_NUM_CLIENTS >= 1);
-    clients[0].data_paddr = blk_client0_data_paddr;
-    if (BLK_NUM_CLIENTS > 1) {
-        clients[1].data_paddr = blk_client1_data_paddr;
-    }
-
     /* Initialise driver queue */
-    blk_queue_init(&drv_h, blk_driver_req_queue, blk_driver_resp_queue, BLK_QUEUE_CAPACITY_DRIV);
+    blk_queue_init(&drv_h, config.driver.req_queue, config.driver.resp_queue, BLK_QUEUE_CAPACITY_DRIV);
 
     /* Initialise index allocator */
     ialloc_init(&ialloc, ialloc_idxlist, BLK_QUEUE_CAPACITY_DRIV);
@@ -197,7 +239,7 @@ void init(void)
 
 static void handle_driver()
 {
-    bool client_notify[BLK_NUM_CLIENTS] = { 0 };
+    bool client_notify[MAX_NUM_CLIENTS] = { 0 };
 
     blk_resp_status_t drv_status = 0;
     uint16_t drv_success_count = 0;
@@ -243,7 +285,7 @@ static void handle_driver()
     }
 
     /* Notify corresponding client if a response was enqueued */
-    for (int i = 0; i < BLK_NUM_CLIENTS; i++) {
+    for (int i = 0; i < config.num_clients; i++) {
         if (client_notify[i]) {
             microkit_notify(clients[i].ch);
         }
@@ -254,8 +296,8 @@ static bool handle_client(int cli_id)
 {
     int err = 0;
     blk_queue_handle_t h = clients[cli_id].queue_h;
-    uintptr_t cli_data_base = blk_virt_cli_data_region(blk_client_data, cli_id);
-    uint64_t cli_data_region_size = blk_virt_cli_data_region_size(cli_id);
+    uintptr_t cli_data_base = config.clients[cli_id].data_paddr;
+    uint64_t cli_data_region_size = config.clients[cli_id].data_size;
 
     blk_req_code_t cli_code = 0;
     uintptr_t cli_offset = 0;
@@ -306,7 +348,7 @@ static bool handle_client(int cli_id)
                 goto req_fail;
             }
 
-            if ((clients[cli_id].data_paddr + cli_offset) % BLK_TRANSFER_SIZE != 0) {
+            if ((cli_data_base + cli_offset) % BLK_TRANSFER_SIZE != 0) {
                 LOG_BLK_VIRT_ERR(
                     "client %d requested dma address is not aligned to page size (same as blk transfer size)\n",
                     cli_id);
@@ -335,7 +377,7 @@ static bool handle_client(int cli_id)
         assert(!err);
         reqsbk[drv_req_id] = (reqbk_t) { cli_id, cli_req_id, cli_data_base + cli_offset, cli_count, cli_code };
 
-        err = blk_enqueue_req(&drv_h, cli_code, clients[cli_id].data_paddr + cli_offset, drv_block_number, cli_count,
+        err = blk_enqueue_req(&drv_h, cli_code, cli_data_base + cli_offset, drv_block_number, cli_count,
                               drv_req_id);
         assert(!err);
         driver_notify = true;
@@ -360,7 +402,7 @@ static bool handle_client(int cli_id)
 static void handle_clients()
 {
     bool driver_notify = false;
-    for (int i = 0; i < BLK_NUM_CLIENTS; i++) {
+    for (int i = 0; i < config.num_clients; i++) {
         if (handle_client(i)) {
             driver_notify = true;
         }
