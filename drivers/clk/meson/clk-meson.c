@@ -478,8 +478,19 @@ const struct clk_ops meson_vclk_div_ops = {
     .is_enabled = meson_vclk_div_is_enabled,
 };
 
+static unsigned long meson_clk_cpu_dyndiv_recalc_rate(const struct clk *clk,
+                                unsigned long prate)
+{
+    struct meson_clk_cpu_dyndiv_data *data = (struct meson_clk_cpu_dyndiv_data *)(clk->data);
+    uint32_t div = meson_parm_read(clk->base, data->div);
+
+    div += 1;
+
+    return DIV_ROUND_UP_ULL((uint64_t)prate, div);
+}
+
 const struct clk_ops meson_clk_cpu_dyndiv_ops = {
-    /* .recalc_rate = meson_clk_cpu_dyndiv_recalc_rate, */
+    .recalc_rate = meson_clk_cpu_dyndiv_recalc_rate,
     /* .determine_rate = meson_clk_cpu_dyndiv_determine_rate, */
     /* .set_rate = meson_clk_cpu_dyndiv_set_rate, */
 };
