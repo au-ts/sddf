@@ -19,6 +19,14 @@
 
 #define PCG_CGC_SHIFT       28
 
+struct clk_gate2 {
+    uint8_t bit_idx;
+    uint8_t cgr_val;
+    uint8_t cgr_mask;
+    uint8_t flags;
+    uint32_t *share_count;
+};
+
 struct clk_frac_pll_data {
     uint32_t offset;
 };
@@ -84,6 +92,7 @@ struct clk_common_slice_data {
     uint8_t postdiv_width;
 };
 
+extern const struct clk_ops clk_gate2_ops;
 extern const struct clk_ops clk_frac_pll_ops;
 extern const struct clk_ops clk_sscg_pll_ops;
 extern const struct clk_ops clk_core_slice_ops;
@@ -201,10 +210,22 @@ struct clk _name = {                                                \
 }
 
 #define IMX_CLK_GATE2_FLAGS(_name, _parent_clks, _base, _offset, _shift, _flags)  \
-CLK_GATE(_name, _offset, _shift, 0, _parent_clks, 1, _flags)
+struct clk _name = {                                                \
+    .base = (_base),                                                \
+    .data = &(struct clk_gate_data) {                               \
+        .offset = (_offset),                                        \
+        .bit_idx = (_shift),                                        \
+    },                                                              \
+    .hw.init = &(struct clk_init_data) {                            \
+        .name = #_name,                                             \
+        .ops = &clk_gate2_ops,                                      \
+        .parent_clks = (const struct clk *[]) _parent_clks,         \
+        .num_parents = 1,                                           \
+    },                                                              \
+}
 
 #define IMX_CLK_GATE2_SHARED2(_name, _parent_clks, _base, _offset, _shift, _shared_count)  \
-CLK_GATE(_name, _offset, _shift, 0, _parent_clks, 1, 0)
+IMX_CLK_GATE2_FLAGS(_name, _parent_clks, _base, _offset, _shift, 0)
 
 #define IMX_CLK_GATE4(_name, _parent_clks, _base, _offset, _shift)  \
 CLK_GATE(_name, _offset, _shift, 0, _parent_clks, 1, CLK_OPS_PARENT_ENABLE)
