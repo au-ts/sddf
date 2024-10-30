@@ -1514,7 +1514,5 @@ struct clk **get_clk_list(void)
 {
     sddf_dprintf("get clk list\n");
 
-    (void)arm_pll_ref_div;
-
     return imx8mq_clks;
 }
