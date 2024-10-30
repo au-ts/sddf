@@ -9,19 +9,30 @@
 #include <sddf/serial/queue.h>
 #include <sddf/util/string.h>
 #include <sddf/util/printf.h>
-#include <serial_config.h>
 
-#define DRIVER_CH 0
-#define CLIENT_OFFSET 1
+#define MAX_CLIENTS (MICROKIT_MAX_CHANNELS - 1)
+#define DRIVER_CH MAX_CLIENTS
 
-serial_queue_t *rx_queue_drv;
-serial_queue_t *rx_queue_cli0;
+typedef struct config_client {
+    void *rx_queue;
+    void *rx_data;
+    uint64_t rx_capacity;
+} config_client_t;
 
-char *rx_data_drv;
-char *rx_data_cli0;
+typedef struct config {
+    void *rx_queue_drv;
+    void *rx_data_drv;
+    uint64_t rx_capacity_drv;
+    char switch_char;
+    char terminate_num_char;
+    uint64_t num_clients;
+    config_client_t clients[MAX_CLIENTS];
+} config_t;
+
+config_t config;
 
 serial_queue_handle_t rx_queue_handle_drv;
-serial_queue_handle_t rx_queue_handle_cli[SERIAL_NUM_CLIENTS];
+serial_queue_handle_t rx_queue_handle_cli[MAX_CLIENTS];
 
 #define MAX_CLI_BASE_10 4
 typedef enum mode {normal, switched, number} mode_t;
@@ -48,15 +59,12 @@ void rx_return(void)
         while (!serial_dequeue(&rx_queue_handle_drv, &rx_queue_handle_drv.queue->head, &c)) {
             switch (current_mode) {
             case normal:
-                switch (c) {
-                case SERIAL_SWITCH_CHAR:
+                if (c == config.switch_char) {
                     current_mode = switched;
-                    break;
-                default:
+                } else {
                     if (!serial_enqueue(&rx_queue_handle_cli[current_client], &local_tail, c)) {
                         transferred = true;
                     }
-                    break;
                 }
                 break;
             case switched:
@@ -65,7 +73,7 @@ void rx_return(void)
                     next_client_index ++;
                     current_mode = number;
                 } else {
-                    if (c == SERIAL_SWITCH_CHAR) {
+                    if (c == config.switch_char) {
                         if (!serial_enqueue(&rx_queue_handle_cli[current_client], &local_tail, c)) {
                             transferred = true;
                         }
@@ -76,13 +84,13 @@ void rx_return(void)
                 }
                 break;
             default:
-                if (c == SERIAL_TERMINATE_NUM) {
+                if (c == config.terminate_num_char) {
                     int input_number = sddf_atoi(next_client);
-                    if (input_number >= 0 && input_number < SERIAL_NUM_CLIENTS) {
+                    if (input_number >= 0 && input_number < config.num_clients) {
                         if (transferred && serial_require_producer_signal(&rx_queue_handle_cli[current_client])) {
                             serial_update_visible_tail(&rx_queue_handle_cli[current_client], local_tail);
                             serial_cancel_producer_signal(&rx_queue_handle_cli[current_client]);
-                            microkit_notify(current_client + CLIENT_OFFSET);
+                            microkit_notify(current_client);
                         }
                         current_client = (uint32_t)input_number;
                         local_tail = rx_queue_handle_cli[current_client].queue->tail;
@@ -122,14 +130,29 @@ void rx_return(void)
 
     if (transferred && serial_require_producer_signal(&rx_queue_handle_cli[current_client])) {
         serial_cancel_producer_signal(&rx_queue_handle_cli[current_client]);
-        microkit_notify(current_client + CLIENT_OFFSET);
+        microkit_notify(current_client);
     }
 }
 
 void init(void)
 {
-    serial_queue_init(&rx_queue_handle_drv, rx_queue_drv, SERIAL_RX_DATA_REGION_CAPACITY_DRIV, rx_data_drv);
-    serial_virt_queue_init_sys(microkit_name, rx_queue_handle_cli, rx_queue_cli0, rx_data_cli0);
+    config.rx_queue_drv = (void *)0x4000000;
+    config.rx_data_drv = (void *)0x4003000;
+    config.rx_capacity_drv = 0x2000;
+    config.switch_char = 28;
+    config.terminate_num_char = '\r';
+    config.num_clients = 2;
+    config.clients[0].rx_queue = (void *)0x4001000;
+    config.clients[0].rx_data = (void *)0x4005000;
+    config.clients[0].rx_capacity = 0x2000;
+    config.clients[1].rx_queue = (void *)0x4002000;
+    config.clients[1].rx_data = (void *)0x4007000;
+    config.clients[0].rx_capacity = 0x2000;
+
+    serial_queue_init(&rx_queue_handle_drv, config.rx_queue_drv, config.rx_capacity_drv, config.rx_data_drv);
+    for (uint64_t i = 0; i < config.num_clients; i++) {
+        serial_queue_init(&rx_queue_handle_cli[i], config.clients[i].rx_queue, config.clients[i].rx_capacity, config.clients[i].rx_data);
+    }
 }
 
 void notified(microkit_channel ch)
