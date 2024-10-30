@@ -23,8 +23,8 @@
 #define VIRT_CH 0
 
 blk_storage_info_t *blk_storage_info;
-uintptr_t blk_request;
-uintptr_t blk_response;
+blk_req_queue_t *blk_req_queue;
+blk_resp_queue_t *blk_resp_queue;
 uintptr_t blk_data;
 
 static blk_queue_handle_t blk_queue;
@@ -120,7 +120,7 @@ void init(void)
 {
     LOG_CLIENT("starting\n");
 
-    blk_queue_init(&blk_queue, (blk_req_queue_t *)blk_request, (blk_resp_queue_t *)blk_response, QUEUE_SIZE);
+    blk_queue_init(&blk_queue, blk_req_queue, blk_resp_queue, QUEUE_SIZE);
 
     /* Want to print out configuration information, so wait until the config is ready. */
     while (!blk_storage_is_ready(blk_storage_info));
