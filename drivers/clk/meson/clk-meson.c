@@ -285,13 +285,32 @@ const struct clk_ops meson_clk_mpll_ops = {
     .init = mpll_init,
 };
 
+static int meson_clk_pcie_pll_enable(struct clk *clk)
+{
+    struct meson_clk_pll_data *data = (struct meson_clk_pll_data *)(clk->data);
+    int retries = 10;
+    int delay = 5000;
+
+    do {
+        meson_clk_pll_init(clk);
+        do {
+            if (meson_parm_read(clk->base, data->l)) {
+                return 0;
+            }
+            delay_us(20);
+        } while (--delay);
+    } while (--retries);
+
+    return -1;
+}
+
 const struct clk_ops meson_clk_pcie_pll_ops = {
     .init           = meson_clk_pll_init,
-    /* .recalc_rate    = meson_clk_pll_recalc_rate, */
+    .recalc_rate    = meson_clk_pll_recalc_rate,
     /* .determine_rate    = meson_clk_pll_determine_rate, */
-    /* .is_enabled    = meson_clk_pll_is_enabled, */
+    .is_enabled    = meson_clk_pll_is_enabled,
     /* .enable        = meson_clk_pcie_pll_enable, */
-    /* .disable    = meson_clk_pll_disable */
+    .disable    = meson_clk_pll_disable
 };
 
 struct vid_pll_div {
