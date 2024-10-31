@@ -8,6 +8,7 @@
 #include <microkit.h>
 #include <sddf/util/printf.h>
 #include <uart.h>
+#include "config.h"
 
 #define IRQ_CH 0
 #define TX_CH  1
@@ -30,6 +31,7 @@ config_t config;
 serial_queue_handle_t rx_queue_handle;
 serial_queue_handle_t tx_queue_handle;
 
+void *uart_base;
 volatile pl011_uart_regs_t *uart_regs;
 
 /*
@@ -131,7 +133,7 @@ static void handle_irq(void)
 
 static void uart_setup(void)
 {
-    uart_regs = config.uart_regs;
+    uart_regs = uart_base;
 
     /* Wait for UART to finish transmitting. */
     while (uart_regs->fr & PL011_FR_UART_BUSY);
@@ -178,17 +180,17 @@ static void uart_setup(void)
 
 void init(void)
 {
-    config = (config_t) {
-        .uart_regs = (void *)0x5000000,
-        .rx_queue = (void *)0x4000000,
-        .tx_queue = (void *)0x4001000,
-        .rx_data = (void *)0x4002000,
-        .tx_data = (void *)0x4004000,
-        .rx_capacity = 0x2000,
-        .tx_capacity = 0x2000,
-        .default_baud = 115200,
-        .rx_enabled = true,
-    };
+    sddf_memcpy(&config, serial_driver_data, serial_driver_data_len);
+    // config = (config_t) {
+    //     .rx_queue = (void *)0x4000000,
+    //     .tx_queue = (void *)0x4001000,
+    //     .rx_data = (void *)0x4002000,
+    //     .tx_data = (void *)0x4004000,
+    //     .rx_capacity = 0x2000,
+    //     .tx_capacity = 0x2000,
+    //     .default_baud = 115200,
+    //     .rx_enabled = true,
+    // };
 
     uart_setup();
 
