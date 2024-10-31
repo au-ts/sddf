@@ -7,35 +7,16 @@
 #include <stdint.h>
 #include <microkit.h>
 #include <sddf/serial/queue.h>
+#include <sddf/serial/config.h>
 #include <sddf/util/printf.h>
 #include "virt_tx_config.h"
 
-#define MAX_CLIENTS (MICROKIT_MAX_CHANNELS - 1)
 #define DRIVER_CH 0
 #define CLIENT_OFFSET 1
 #define NAME_MAX 128
 #define BEGIN_STR_MAX 128
 
-typedef struct config_client {
-    char name[NAME_MAX];
-    void *tx_queue;
-    void *tx_data;
-    uint64_t tx_capacity;
-} config_client_t;
-
-typedef struct config {
-    void *tx_queue_drv;
-    void *tx_data_drv;
-    uint64_t tx_capacity_drv;
-    char begin_str[BEGIN_STR_MAX];
-    uint64_t begin_str_len;
-    bool enable_colour;
-    bool enable_rx;
-    uint64_t num_clients;
-    config_client_t clients[MAX_CLIENTS];
-} config_t;
-
-config_t config;
+serial_virt_tx_config_t config;
 
 /* When we have more clients than colours, we re-use the colours. */
 const char *colours[] = {
@@ -57,15 +38,15 @@ const char *colours[] = {
 #define COLOUR_END "\x1b[0m"
 #define COLOUR_END_LEN 4
 
-char client_names[NAME_MAX][MAX_CLIENTS];
+char client_names[NAME_MAX][SDDF_SERIAL_MAX_CLIENTS];
 
 serial_queue_handle_t tx_queue_handle_drv;
-serial_queue_handle_t tx_queue_handle_cli[MAX_CLIENTS];
+serial_queue_handle_t tx_queue_handle_cli[SDDF_SERIAL_MAX_CLIENTS];
 
-#define TX_PENDING_MAX (MAX_CLIENTS + 1)
+#define TX_PENDING_MAX (SDDF_SERIAL_MAX_CLIENTS + 1)
 typedef struct tx_pending {
     uint32_t queue[TX_PENDING_MAX];
-    bool clients_pending[MAX_CLIENTS];
+    bool clients_pending[SDDF_SERIAL_MAX_CLIENTS];
     uint32_t head;
     uint32_t tail;
 } tx_pending_t;
@@ -149,7 +130,7 @@ void tx_return(void)
     }
 
     uint32_t client;
-    bool notify_client[MAX_CLIENTS] = {false};
+    bool notify_client[SDDF_SERIAL_MAX_CLIENTS] = {false};
     bool transferred = false;
     for (uint32_t req = 0; req < num_pending_tx; req++) {
         tx_pending_pop(&client);
@@ -238,8 +219,8 @@ void init(void)
     // config.clients[1].tx_capacity = 0x2000;
     
     sddf_dprintf("DRIVER_CH = %d\n", DRIVER_CH);
-    sddf_dprintf("config.tx_queue_drv = 0x%lx\n", config.tx_queue_drv);
-    sddf_dprintf("config.tx_data_drv = 0x%lx\n", config.tx_data_drv);
+    sddf_dprintf("config.tx_queue_drv = 0x%p\n", config.tx_queue_drv);
+    sddf_dprintf("config.tx_data_drv = 0x%p\n", config.tx_data_drv);
     sddf_dprintf("config.tx_capacity_drv = 0x%x\n", config.tx_capacity_drv);
     sddf_dprintf("config.begin_str = %s", config.begin_str);
     sddf_dprintf("config.begin_str_len = %d\n", config.begin_str_len);
@@ -248,14 +229,14 @@ void init(void)
     sddf_dprintf("config.num_clients = %d\n", config.num_clients);
     for (int i = 0; i < config.num_clients; i++) {
         sddf_dprintf("config.clients[%d].name = %s\n", i, config.clients[i].name);
-        sddf_dprintf("config.clients[%d].tx_queue = 0x%lx\n", i, config.clients[i].tx_queue);
-        sddf_dprintf("config.clients[%d].tx_data = 0x%lx\n", i, config.clients[i].tx_data);
+        sddf_dprintf("config.clients[%d].tx_queue = 0x%p\n", i, config.clients[i].tx_queue);
+        sddf_dprintf("config.clients[%d].tx_data = 0x%p\n", i, config.clients[i].tx_data);
         sddf_dprintf("config.clients[%d].tx_capacity = 0x%x\n", i, config.clients[i].tx_capacity);
     }
 
     serial_queue_init(&tx_queue_handle_drv, config.tx_queue_drv, config.tx_capacity_drv, config.tx_data_drv);
     for (uint64_t i = 0; i < config.num_clients; i++) {
-        config_client_t *client = &config.clients[i];
+        serial_virt_tx_client_config_t *client = &config.clients[i];
         serial_queue_init(&tx_queue_handle_cli[i], client->tx_queue, client->tx_capacity, client->tx_data);
     }
 
