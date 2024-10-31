@@ -1,5 +1,24 @@
 # Clock Driver
 
+## Progress
+
+- [ ] clock driver for odroidc4
+  - [x] clock component definitions
+  - [x] component operations except for determine_rate()
+  - [x] user interfaces to dynamically enable/disable clocks
+  - [x] clock measurement with built-in module
+  - [ ] ajdust rate requests with `determine_rate()` or `round_rate()` implementation
+  - [ ] case tests
+- [ ] clock driver for maaxboard
+  - [x] clock component definitions
+  - [ ] basic component operations except for determine_rate()
+  - [ ] user interfaces to dynamically enable/disable clocks
+  - [ ] case tests
+- [x] extracting clock configurations from device tree with python script
+- [x] configure necessary clocks at boot time
+- [ ] using zig or rust to replace python script
+- [ ] intercept clock requests in driver VM
+
 ## Overview
 
 Each SoC has a tree of gates, multiplexers, dividers, and phase-locked-loops
