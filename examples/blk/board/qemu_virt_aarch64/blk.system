@@ -1,24 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <system>
-    <memory_region name="virtio_blk_regs" size="0x1000" page_size="0x1000" phys_addr="0xa003000" />
-    <memory_region name="blk_virtio_headers" size="0x10000" page_size="0x1000" />
-    <memory_region name="blk_driver_metadata" size="0x200000" page_size="0x200000" />
-    <memory_region name="blk_driver_config" size="0x1000" page_size="0x1000" />
-    <memory_region name="blk_driver_request" size="0x200000" page_size="0x200000" />
-    <memory_region name="blk_driver_response" size="0x200000" page_size="0x200000" />
-    <memory_region name="blk_driver_data" size="0x200000" page_size="0x200000" phys_addr="0x9fe00000" />
-    <memory_region name="blk_client_client_config" size="0x1000" page_size="0x1000" />
-    <memory_region name="blk_client_client_request" size="0x200000" page_size="0x200000" />
-    <memory_region name="blk_client_client_response" size="0x200000" page_size="0x200000" />
-    <memory_region name="blk_client_client_data" size="0x200000" page_size="0x200000" phys_addr="0x9fc00000" />
-    <protection_domain name="client" priority="100" budget="100" period="100" passive="false" pp="false" stack_size="0x1000">
+    <memory_region name="virtio_blk_regs" size="0x1000" phys_addr="0xa003000" />
+    <memory_region name="blk_virtio_headers" size="0x10000" />
+    <memory_region name="blk_driver_metadata" size="0x200000" />
+    <memory_region name="blk_driver_config" size="0x1000" />
+    <memory_region name="blk_driver_request" size="0x200000" />
+    <memory_region name="blk_driver_response" size="0x200000" />
+    <memory_region name="blk_driver_data" size="0x200000" phys_addr="0x9fe00000" page_size="0x1000" />
+    <memory_region name="blk_client_client_config" size="0x1000" />
+    <memory_region name="blk_client_client_request" size="0x200000" />
+    <memory_region name="blk_client_client_response" size="0x200000" />
+    <memory_region name="blk_client_client_data" size="0x200000" phys_addr="0x9fc00000" page_size="0x1000" />
+    <protection_domain name="client" priority="100" budget="100" period="100" passive="false" stack_size="0x1000">
         <program_image path="client.elf" />
         <map mr="blk_client_client_config" vaddr="0x20000000" perms="r" cached="true" setvar_vaddr="blk_storage_info" />
         <map mr="blk_client_client_request" vaddr="0x20200000" perms="rw" cached="true" setvar_vaddr="blk_req_queue" />
         <map mr="blk_client_client_response" vaddr="0x20400000" perms="rw" cached="true" setvar_vaddr="blk_resp_queue" />
         <map mr="blk_client_client_data" vaddr="0x20600000" perms="rw" cached="true" setvar_vaddr="blk_data" />
     </protection_domain>
-    <protection_domain name="blk_driver" priority="100" budget="100" period="100" passive="false" pp="false" stack_size="0x1000">
+    <protection_domain name="blk_driver" priority="100" budget="100" period="100" passive="false" stack_size="0x1000">
         <program_image path="blk_driver.elf" />
         <map mr="virtio_blk_regs" vaddr="0x20000000" perms="rw" cached="false" setvar_vaddr="blk_regs" />
         <map mr="blk_virtio_headers" vaddr="0x20001000" perms="rw" cached="false" setvar_vaddr="virtio_headers_vaddr" />
@@ -30,7 +30,7 @@
         <setvar symbol="virtio_headers_paddr" region_paddr="blk_virtio_headers" />
         <setvar symbol="requests_paddr" region_paddr="blk_driver_metadata" />
     </protection_domain>
-    <protection_domain name="blk_virt" priority="100" budget="100" period="100" passive="false" pp="false" stack_size="0x1000">
+    <protection_domain name="blk_virt" priority="100" budget="100" period="100" passive="false" stack_size="0x1000">
         <program_image path="blk_virt.elf" />
         <map mr="blk_driver_config" vaddr="0x20000000" perms="r" cached="true" />
         <map mr="blk_driver_request" vaddr="0x20200000" perms="rw" cached="true" />
@@ -42,11 +42,11 @@
         <map mr="blk_client_client_data" vaddr="0x20e00000" perms="rw" cached="true" />
     </protection_domain>
     <channel>
-        <end pd="blk_virt" id="0" />
-        <end pd="blk_driver" id="1" />
+        <end pd="blk_virt" id="0" notify="true" pp="false" />
+        <end pd="blk_driver" id="1" notify="true" pp="false" />
     </channel>
     <channel>
-        <end pd="blk_virt" id="1" />
-        <end pd="client" id="0" />
+        <end pd="blk_virt" id="1" notify="true" pp="false" />
+        <end pd="client" id="0" notify="true" pp="false" />
     </channel>
 </system>
