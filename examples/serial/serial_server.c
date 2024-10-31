@@ -11,11 +11,11 @@
 #define TX_CH 0
 #define RX_CH 1
 
-serial_queue_t *rx_queue;
-serial_queue_t *tx_queue;
+serial_queue_t *serial_rx_queue;
+serial_queue_t *serial_tx_queue;
 
-char *rx_data;
-char *tx_data;
+char *serial_rx_data;
+char *serial_tx_data;
 
 serial_queue_handle_t rx_queue_handle;
 serial_queue_handle_t tx_queue_handle;
@@ -24,7 +24,7 @@ uint32_t local_head;
 
 void init(void)
 {
-    serial_cli_queue_init_sys(microkit_name, &rx_queue_handle, rx_queue, rx_data, &tx_queue_handle, tx_queue, tx_data);
+    serial_cli_queue_init_sys(microkit_name, &rx_queue_handle, serial_rx_queue, serial_rx_data, &tx_queue_handle, serial_tx_queue, serial_tx_data);
     serial_putchar_init(TX_CH, &tx_queue_handle);
     sddf_printf("Hello world! I am %s.\nPlease give me character!\n", microkit_name);
 }
