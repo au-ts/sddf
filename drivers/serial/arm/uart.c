@@ -9,7 +9,7 @@
 #include <sddf/util/printf.h>
 #include <sddf/serial/config.h>
 #include <uart.h>
-#include "config.h"
+#include "driver_config.h"
 
 #define IRQ_CH 0
 #define TX_CH  1
