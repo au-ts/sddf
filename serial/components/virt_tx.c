@@ -8,9 +8,11 @@
 #include <microkit.h>
 #include <sddf/serial/queue.h>
 #include <sddf/util/printf.h>
+#include "virt_tx_config.h"
 
 #define MAX_CLIENTS (MICROKIT_MAX_CHANNELS - 1)
-#define DRIVER_CH MAX_CLIENTS
+#define DRIVER_CH 0
+#define CLIENT_OFFSET 1
 #define NAME_MAX 128
 #define BEGIN_STR_MAX 128
 
@@ -25,11 +27,11 @@ typedef struct config {
     void *tx_queue_drv;
     void *tx_data_drv;
     uint64_t tx_capacity_drv;
-    uint64_t num_clients;
     char begin_str[BEGIN_STR_MAX];
     uint64_t begin_str_len;
     bool enable_colour;
     bool enable_rx;
+    uint64_t num_clients;
     config_client_t clients[MAX_CLIENTS];
 } config_t;
 
@@ -176,7 +178,7 @@ void tx_return(void)
     for (uint32_t client = 0; client < config.num_clients; client++) {
         if (notify_client[client] && serial_require_consumer_signal(&tx_queue_handle_cli[client])) {
             serial_cancel_consumer_signal(&tx_queue_handle_cli[client]);
-            microkit_notify(client);
+            microkit_notify(CLIENT_OFFSET + client);
         }
     }
 }
@@ -188,7 +190,7 @@ void tx_provide(microkit_channel ch)
         return;
     }
 
-    uint32_t active_client = ch;
+    uint32_t active_client = ch - CLIENT_OFFSET;
     bool transferred = false;
     bool reprocess = true;
     while (reprocess) {
@@ -216,22 +218,40 @@ void tx_provide(microkit_channel ch)
 
 void init(void)
 {
-    config.tx_queue_drv = (void *)0x4000000;
-    config.tx_data_drv = (void *)0x4003000;
-    config.tx_capacity_drv = 0x2000;
-    sddf_memcpy(config.begin_str, "Begin input\n", 13);
-    config.begin_str_len = 13;
-    config.enable_colour = true;
-    config.enable_rx = true;
-    config.num_clients = 2;
-    sddf_memcpy(config.clients[0].name, "client0", 8);
-    config.clients[0].tx_queue = (void *)0x4001000;
-    config.clients[0].tx_data = (void *)0x4007000;
-    config.clients[0].tx_capacity = 0x2000;
-    sddf_memcpy(config.clients[1].name, "client1", 8);
-    config.clients[1].tx_queue = (void *)0x4002000;
-    config.clients[1].tx_data = (void *)0x4009000;
-    config.clients[1].tx_capacity = 0x2000;
+    sddf_memcpy(&config, serial_virt_tx_data, serial_virt_tx_data_len);
+
+    // config.tx_queue_drv = (void *)0x4000000;
+    // config.tx_data_drv = (void *)0x4003000;
+    // config.tx_capacity_drv = 0x2000;
+    // sddf_memcpy(config.begin_str, "Begin input\n", 13);
+    // config.begin_str_len = 13;
+    // config.enable_colour = true;
+    // config.enable_rx = true;
+    // config.num_clients = 2;
+    // sddf_memcpy(config.clients[0].name, "client0", 8);
+    // config.clients[0].tx_queue = (void *)0x4001000;
+    // config.clients[0].tx_data = (void *)0x4007000;
+    // config.clients[0].tx_capacity = 0x2000;
+    // sddf_memcpy(config.clients[1].name, "client1", 8);
+    // config.clients[1].tx_queue = (void *)0x4002000;
+    // config.clients[1].tx_data = (void *)0x4009000;
+    // config.clients[1].tx_capacity = 0x2000;
+    
+    sddf_dprintf("DRIVER_CH = %d\n", DRIVER_CH);
+    sddf_dprintf("config.tx_queue_drv = 0x%lx\n", config.tx_queue_drv);
+    sddf_dprintf("config.tx_data_drv = 0x%lx\n", config.tx_data_drv);
+    sddf_dprintf("config.tx_capacity_drv = 0x%x\n", config.tx_capacity_drv);
+    sddf_dprintf("config.begin_str = %s", config.begin_str);
+    sddf_dprintf("config.begin_str_len = %d\n", config.begin_str_len);
+    sddf_dprintf("config.enable_colour = %d\n", config.enable_colour);
+    sddf_dprintf("config.enable_rx = %d\n", config.enable_rx);
+    sddf_dprintf("config.num_clients = %d\n", config.num_clients);
+    for (int i = 0; i < config.num_clients; i++) {
+        sddf_dprintf("config.clients[%d].name = %s\n", i, config.clients[i].name);
+        sddf_dprintf("config.clients[%d].tx_queue = 0x%lx\n", i, config.clients[i].tx_queue);
+        sddf_dprintf("config.clients[%d].tx_data = 0x%lx\n", i, config.clients[i].tx_data);
+        sddf_dprintf("config.clients[%d].tx_capacity = 0x%x\n", i, config.clients[i].tx_capacity);
+    }
 
     serial_queue_init(&tx_queue_handle_drv, config.tx_queue_drv, config.tx_capacity_drv, config.tx_data_drv);
     for (uint64_t i = 0; i < config.num_clients; i++) {
@@ -241,8 +261,8 @@ void init(void)
 
     if (config.enable_rx) {
         /* Print a deterministic string to allow console input to begin */
-        sddf_memcpy(tx_queue_handle_drv.data_region, config.begin_str, config.begin_str_len);
-        serial_update_visible_tail(&tx_queue_handle_drv, config.begin_str_len);
+        sddf_memcpy(tx_queue_handle_drv.data_region, config.begin_str, config.begin_str_len + 1);
+        serial_update_visible_tail(&tx_queue_handle_drv, config.begin_str_len + 1);
         microkit_notify(DRIVER_CH);
     }
 

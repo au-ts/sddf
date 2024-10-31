@@ -6,16 +6,22 @@
 #include <microkit.h>
 #include <sddf/serial/queue.h>
 #include <sddf/util/printf.h>
-#include <serial_config.h>
+#include "client_config.h"
 
 #define TX_CH 0
 #define RX_CH 1
 
-serial_queue_t *serial_rx_queue;
-serial_queue_t *serial_tx_queue;
+typedef struct serial_client_config {
+    void *rx_queue;
+    void *rx_data;
+    uint64_t rx_capacity;
 
-char *serial_rx_data;
-char *serial_tx_data;
+    void *tx_queue;
+    void *tx_data;
+    uint64_t tx_capacity;
+} serial_client_config_t;
+
+serial_client_config_t config;
 
 serial_queue_handle_t rx_queue_handle;
 serial_queue_handle_t tx_queue_handle;
@@ -24,7 +30,16 @@ uint32_t local_head;
 
 void init(void)
 {
-    serial_cli_queue_init_sys(microkit_name, &rx_queue_handle, serial_rx_queue, serial_rx_data, &tx_queue_handle, serial_tx_queue, serial_tx_data);
+    config.rx_queue = (void *)0x20010000;
+    config.rx_data = (void *)0x20000000;
+    config.rx_capacity = 0x10000;
+    config.tx_queue = (void *)0x20021000;
+    config.tx_data = (void *)0x20011000;
+    config.tx_capacity = 0x10000;
+
+    serial_queue_init(&rx_queue_handle, config.rx_queue, config.rx_capacity, config.rx_data);
+    serial_queue_init(&tx_queue_handle, config.tx_queue, config.tx_capacity, config.tx_data);
+
     serial_putchar_init(TX_CH, &tx_queue_handle);
     sddf_printf("Hello world! I am %s.\nPlease give me character!\n", microkit_name);
 }

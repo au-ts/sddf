@@ -9,9 +9,11 @@
 #include <sddf/serial/queue.h>
 #include <sddf/util/string.h>
 #include <sddf/util/printf.h>
+#include "virt_rx_config.h"
 
 #define MAX_CLIENTS (MICROKIT_MAX_CHANNELS - 1)
-#define DRIVER_CH MAX_CLIENTS
+#define DRIVER_CH 0
+#define CLIENT_OFFSET 1
 
 typedef struct config_client {
     void *rx_queue;
@@ -90,7 +92,7 @@ void rx_return(void)
                         if (transferred && serial_require_producer_signal(&rx_queue_handle_cli[current_client])) {
                             serial_update_visible_tail(&rx_queue_handle_cli[current_client], local_tail);
                             serial_cancel_producer_signal(&rx_queue_handle_cli[current_client]);
-                            microkit_notify(current_client);
+                            microkit_notify(CLIENT_OFFSET + current_client);
                         }
                         current_client = (uint32_t)input_number;
                         local_tail = rx_queue_handle_cli[current_client].queue->tail;
@@ -130,24 +132,26 @@ void rx_return(void)
 
     if (transferred && serial_require_producer_signal(&rx_queue_handle_cli[current_client])) {
         serial_cancel_producer_signal(&rx_queue_handle_cli[current_client]);
-        microkit_notify(current_client);
+        microkit_notify(CLIENT_OFFSET + current_client);
     }
 }
 
 void init(void)
 {
-    config.rx_queue_drv = (void *)0x4000000;
-    config.rx_data_drv = (void *)0x4003000;
-    config.rx_capacity_drv = 0x2000;
-    config.switch_char = 28;
-    config.terminate_num_char = '\r';
-    config.num_clients = 2;
-    config.clients[0].rx_queue = (void *)0x4001000;
-    config.clients[0].rx_data = (void *)0x4005000;
-    config.clients[0].rx_capacity = 0x2000;
-    config.clients[1].rx_queue = (void *)0x4002000;
-    config.clients[1].rx_data = (void *)0x4007000;
-    config.clients[0].rx_capacity = 0x2000;
+    sddf_memcpy(&config, serial_virt_rx_data, serial_virt_rx_data_len);
+
+    // config.rx_queue_drv = (void *)0x4000000;
+    // config.rx_data_drv = (void *)0x4003000;
+    // config.rx_capacity_drv = 0x2000;
+    // config.switch_char = 28;
+    // config.terminate_num_char = '\r';
+    // config.num_clients = 2;
+    // config.clients[0].rx_queue = (void *)0x4001000;
+    // config.clients[0].rx_data = (void *)0x4005000;
+    // config.clients[0].rx_capacity = 0x2000;
+    // config.clients[1].rx_queue = (void *)0x4002000;
+    // config.clients[1].rx_data = (void *)0x4007000;
+    // config.clients[0].rx_capacity = 0x2000;
 
     serial_queue_init(&rx_queue_handle_drv, config.rx_queue_drv, config.rx_capacity_drv, config.rx_data_drv);
     for (uint64_t i = 0; i < config.num_clients; i++) {
