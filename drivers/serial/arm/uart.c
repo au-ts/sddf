@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <microkit.h>
 #include <sddf/util/printf.h>
+#include <sddf/serial/config.h>
 #include <uart.h>
 #include "config.h"
 
@@ -14,19 +15,7 @@
 #define TX_CH  1
 #define RX_CH  2
 
-typedef struct config {
-    void *uart_regs;
-    void *rx_queue;
-    void *tx_queue;
-    void *rx_data;
-    void *tx_data;
-    uint64_t rx_capacity;
-    uint64_t tx_capacity;
-    uint64_t default_baud;
-    bool rx_enabled;
-} config_t;
-
-config_t config;
+serial_driver_config_t config;
 
 serial_queue_handle_t rx_queue_handle;
 serial_queue_handle_t tx_queue_handle;

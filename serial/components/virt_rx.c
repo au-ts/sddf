@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <microkit.h>
 #include <sddf/serial/queue.h>
+#include <sddf/serial/config.h>
 #include <sddf/util/string.h>
 #include <sddf/util/printf.h>
 #include "virt_rx_config.h"
@@ -15,23 +16,7 @@
 #define DRIVER_CH 0
 #define CLIENT_OFFSET 1
 
-typedef struct config_client {
-    void *rx_queue;
-    void *rx_data;
-    uint64_t rx_capacity;
-} config_client_t;
-
-typedef struct config {
-    void *rx_queue_drv;
-    void *rx_data_drv;
-    uint64_t rx_capacity_drv;
-    char switch_char;
-    char terminate_num_char;
-    uint64_t num_clients;
-    config_client_t clients[MAX_CLIENTS];
-} config_t;
-
-config_t config;
+serial_virt_rx_config_t config;
 
 serial_queue_handle_t rx_queue_handle_drv;
 serial_queue_handle_t rx_queue_handle_cli[MAX_CLIENTS];
