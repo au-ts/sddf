@@ -30,12 +30,7 @@ uint32_t local_head;
 
 void init(void)
 {
-    config.rx_queue = (void *)0x20010000;
-    config.rx_data = (void *)0x20000000;
-    config.rx_capacity = 0x10000;
-    config.tx_queue = (void *)0x20021000;
-    config.tx_data = (void *)0x20011000;
-    config.tx_capacity = 0x10000;
+    sddf_memcpy(&config, client0_data, client0_data_len);
 
     serial_queue_init(&rx_queue_handle, config.rx_queue, config.rx_capacity, config.rx_data);
     serial_queue_init(&tx_queue_handle, config.tx_queue, config.tx_capacity, config.tx_data);
