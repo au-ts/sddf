@@ -82,9 +82,6 @@ pub fn build(b: *std.Build) void {
     meta.root_module.addImport("sdf", sdfgen_dep.module("sdf"));
     const meta_run = b.addRunArtifact(meta);
 
-    const meta_step = b.step("meta", "Run metaprogram");
-    meta_step.dependOn(&meta_run.step);
-
     const sdf_file = meta_run.captureStdOut();
 
     const blk_virt_data = b.path("blk_virt.data");
@@ -92,9 +89,13 @@ pub fn build(b: *std.Build) void {
     const blk_virt_data_to_header = b.addSystemCommand(&[_][]const u8{
         "xxd", "-n", "block_data", "-i"
     });
+    blk_virt_data_to_header.step.dependOn(&meta_run.step);
     blk_virt_data_to_header.addFileArg(blk_virt_data);
     blk_virt_data_to_header.addFileInput(blk_virt_data);
     const blk_virt_header = blk_virt_data_to_header.captureStdOut();
+
+    const meta_step = b.step("meta", "Run metaprogram");
+    meta_step.dependOn(&blk_virt_data_to_header.step);
 
     const sddf_dep = b.dependency("sddf", .{
         .target = target,
@@ -102,7 +103,7 @@ pub fn build(b: *std.Build) void {
         .libmicrokit = @as([]const u8, libmicrokit),
         .libmicrokit_include = @as([]const u8, libmicrokit_include),
         .libmicrokit_linker_script = @as([]const u8, libmicrokit_linker_script),
-        .blk_config_include = b.getInstallPath(.prefix, "data.h"),
+        .blk_config_include = b.getInstallPath(.prefix, ""),
     });
 
     const blk_driver_class = switch (microkit_board_option.?) {
