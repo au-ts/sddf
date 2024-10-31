@@ -1,16 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <system>
-    <memory_region name="virtio_blk_regs" size="0x1000" page_size="0x1000" phys_addr="0xa003000" />
-    <memory_region name="blk_virtio_headers" size="0x10000" page_size="0x1000" />
-    <memory_region name="blk_driver_metadata" size="0x200000" page_size="0x200000" />
-    <memory_region name="blk_driver_config" size="0x1000" page_size="0x1000" />
-    <memory_region name="blk_driver_request" size="0x200000" page_size="0x200000" />
-    <memory_region name="blk_driver_response" size="0x200000" page_size="0x200000" />
-    <memory_region name="blk_driver_data" size="0x200000" page_size="0x200000" phys_addr="0x9fe00000" />
-    <memory_region name="blk_client_client_config" size="0x1000" page_size="0x1000" />
-    <memory_region name="blk_client_client_request" size="0x200000" page_size="0x200000" />
-    <memory_region name="blk_client_client_response" size="0x200000" page_size="0x200000" />
-    <memory_region name="blk_client_client_data" size="0x200000" page_size="0x200000" phys_addr="0x9fc00000" />
+    <memory_region name="virtio_blk_regs" size="0x1000" phys_addr="0xa003000" />
+    <memory_region name="blk_virtio_headers" size="0x10000" />
+    <memory_region name="blk_driver_metadata" size="0x200000" />
+    <memory_region name="blk_driver_config" size="0x1000" />
+    <memory_region name="blk_driver_request" size="0x200000" />
+    <memory_region name="blk_driver_response" size="0x200000" />
+    <memory_region name="blk_driver_data" size="0x200000" phys_addr="0x9fe00000" page_size="0x1000" />
+    <memory_region name="blk_client_client_config" size="0x1000" />
+    <memory_region name="blk_client_client_request" size="0x200000" />
+    <memory_region name="blk_client_client_response" size="0x200000" />
+    <memory_region name="blk_client_client_data" size="0x200000" phys_addr="0x9fc00000" page_size="0x1000" />
     <protection_domain name="client" priority="100" budget="100" period="100" passive="false" stack_size="0x1000">
         <program_image path="client.elf" />
         <map mr="blk_client_client_config" vaddr="0x20000000" perms="r" cached="true" setvar_vaddr="blk_storage_info" />
