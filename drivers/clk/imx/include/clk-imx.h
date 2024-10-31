@@ -2,6 +2,10 @@
 
 #include <stdint.h>
 
+/* These two magic numbers are used to define static clock
+ * structures at compile time, and will be replaced with
+ * real base addresses in clk_probe().
+ */
 #define CCM_BASE 0x1234
 #define CCM_ANALOG_BASE 0x5678
 

@@ -285,6 +285,7 @@ static int clk_mux_set_parent(struct clk *clk, uint8_t index)
         unsigned int val = data->table[index];
         regmap_mux_update_bits(clk->base, data->offset, data->shift, data->mask, val);
     }
+    /* TODO: handle cases without table given */
 
     return 0;
 }

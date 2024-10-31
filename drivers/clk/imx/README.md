@@ -3,15 +3,13 @@
 ## Overview
 
 This directory contains necessary files of implementing clock driver for
-iMX8M* boards.
+iMX8M* boards. The datasheet gives clear descriptions of every type of
+clock components as well as the programming guide.
 
-## Concepts
+## Clock components
 
-Internal Peripheral Gate (IPG) is a clock soure that provides the base 
-timing signal for various internal peripherals within the SoC.
+### Bus clock slice
 
-Low Power Clock Gating (LPCG) is used to manage on-chip peripheral clocks.
-Clock root should stop if the LPCG is configured not to shutdown. 
 
 ## Usage
 
