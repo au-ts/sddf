@@ -5,21 +5,12 @@
 
 #include <microkit.h>
 #include <sddf/serial/queue.h>
+#include <sddf/serial/config.h>
 #include <sddf/util/printf.h>
 #include "client_config.h"
 
 #define TX_CH 0
 #define RX_CH 1
-
-typedef struct serial_client_config {
-    void *rx_queue;
-    void *rx_data;
-    uint64_t rx_capacity;
-
-    void *tx_queue;
-    void *tx_data;
-    uint64_t tx_capacity;
-} serial_client_config_t;
 
 serial_client_config_t config;
 
