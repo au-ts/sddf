@@ -37,6 +37,7 @@ struct clk_frac_pll_data {
 
 struct clk_sscg_pll_data {
     /* struct clk_sscg_pll_setup setup; */
+    uint32_t offset;
     uint8_t parent;
     uint8_t bypass1;
     uint8_t bypass2;
@@ -242,6 +243,7 @@ CLK_FIXED_FACTOR(_name, _mult, _div, 0, _parent_clks, 1, CLK_SET_RATE_PARENT)
 struct clk _name = {                                                \
     .base = (_base),                                                \
     .data = &(struct clk_sscg_pll_data) {                           \
+        .offset = (_offset),                                        \
         .parent = (_parent),                                        \
         .bypass1 = (_bypass1),                                      \
         .bypass2 = (_bypass2),                                      \

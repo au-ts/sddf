@@ -76,10 +76,51 @@ const struct clk_ops clk_frac_pll_ops = {
     /* .set_rate    = clk_pll_set_rate, */
 };
 
-static unsigned long clk_pll_recalc_rate(const struct clk *clk,
+static unsigned long clk_sscg_pll_recalc_rate(const struct clk *clk,
                                 unsigned long prate)
 {
     struct clk_sscg_pll_data *data = (struct clk_sscg_pll_data *)(clk->data);
+    uint64_t temp_rate = prate;
+
+    uint32_t divr1 = regmap_read_bits(clk->base, data->offset + 0x8, 25, 3);
+    uint32_t divr2 = regmap_read_bits(clk->base, data->offset + 0x8, 19, 6);
+    uint32_t divf1 = regmap_read_bits(clk->base, data->offset + 0x8, 13, 6);
+    uint32_t divf2 = regmap_read_bits(clk->base, data->offset + 0x8, 7, 6);
+    uint32_t divq = regmap_read_bits(clk->base, data->offset + 0x8, 1, 6);
+
+    if (regmap_read_bits(clk->base, data->offset, 4, 1)) {
+        temp_rate = prate;
+    } else if (regmap_read_bits(clk->base, data->offset, 5, 1)) {
+        temp_rate *= divf2;
+        do_div(temp_rate, (divr2 + 1) * (divq + 1));
+    } else {
+        temp_rate *= 2;
+        temp_rate *= (divf1 + 1) * (divf2 + 1);
+        do_div(temp_rate, (divr1 + 1) * (divr2 + 1) * (divq + 1));
+    }
+
+    return 0;
+}
+
+static uint8_t clk_sscg_pll_get_parent(const struct clk *clk)
+{
+    struct clk_sscg_pll_data *data = (struct clk_sscg_pll_data *)(clk->data);
+    uint8_t ret = 0;
+
+    if (regmap_read_bits(clk->base, data->offset, 4, 1)) {
+        ret = data->bypass2;
+    } else if (regmap_read_bits(clk->base, data->offset, 5, 1)) {
+        ret = data->bypass1;
+    }
+
+    return ret;
+}
+
+static int clk_sscg_pll_set_parent(struct clk *clk, uint8_t index)
+{
+    /* struct clk_sscg_pll_data *data = (struct clk_sscg_pll_data *)(clk->data); */
+
+    /* TODO: This operation is based on `setup.bypass` instead of index passed from callee */
 
     return 0;
 }
