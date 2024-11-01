@@ -85,6 +85,7 @@ pub fn build(b: *std.Build) !void {
     });
     const meta_options = b.addOptions();
     meta_options.addOption(usize, "num_clients", num_clients);
+    meta_options.addOption([]const u8, "output", b.getInstallPath(.prefix, ""));
     meta.root_module.addOptions("config", meta_options);
     meta.root_module.addImport("sdf", sdfgen_dep.module("sdf"));
     const meta_run = b.addRunArtifact(meta);
@@ -99,13 +100,13 @@ pub fn build(b: *std.Build) !void {
     var config_headers = try std.ArrayList(LazyPath).initCapacity(b.allocator, config_data.len);
     defer config_headers.deinit();
     inline for (config_data) |config| {
-        const data = b.path(config[0]);
+        const data = b.getInstallPath(.prefix, config[0]);
         const data_to_header = b.addSystemCommand(&[_][]const u8{
             "xxd", "-n", config[2], "-i"
         });
         data_to_header.step.dependOn(&meta_run.step);
-        data_to_header.addFileArg(data);
-        data_to_header.addFileInput(data);
+        data_to_header.addFileArg(.{ .cwd_relative = data });
+        data_to_header.addFileInput(.{ .cwd_relative = data });
         const header = data_to_header.captureStdOut();
 
         config_headers.appendAssumeCapacity(header);
