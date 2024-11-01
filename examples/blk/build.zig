@@ -92,7 +92,7 @@ pub fn build(b: *std.Build) !void {
     const sdf_file = meta_run.captureStdOut();
 
     const config_data = .{
-        .{ "client.data", "client_config.h", "client_data" },
+        .{ "client0.data", "client_config.h", "client_data" },
         .{ "blk_virt.data", "virt_config.h", "virt_data" },
     };
 
