@@ -5,7 +5,6 @@
 #define SDDF_SERIAL_BEGIN_STR_MAX_LEN 128
 
 typedef struct serial_driver_config {
-    void *uart_regs;
     void *rx_queue;
     void *tx_queue;
     void *rx_data;
