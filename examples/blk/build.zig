@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: BSD-2-Clause
 //
 const std = @import("std");
+const LazyPath = std.Build.LazyPath;
 
 const MicrokitBoard = enum {
     qemu_virt_aarch64
@@ -39,7 +40,7 @@ fn findTarget(board: MicrokitBoard) std.Target.Query {
 
 const ConfigOptions = enum { debug, release, benchmark };
 
-pub fn build(b: *std.Build) void {
+pub fn build(b: *std.Build) !void {
     const optimize = b.standardOptimizeOption(.{});
 
     // Getting the path to the Microkit SDK before doing anything else
@@ -78,24 +79,38 @@ pub fn build(b: *std.Build) void {
         .name = "meta",
         .root_source_file = b.path("meta.zig"),
         .target = b.graph.host,
+        .optimize = .ReleaseSafe,
     });
     meta.root_module.addImport("sdf", sdfgen_dep.module("sdf"));
     const meta_run = b.addRunArtifact(meta);
 
     const sdf_file = meta_run.captureStdOut();
 
-    const blk_virt_data = b.path("blk_virt.data");
+    const config_data = .{
+        .{ "client.data", "client_config.h", "client_data" },
+        .{ "blk_virt.data", "virt_config.h", "virt_data" },
+    };
 
-    const blk_virt_data_to_header = b.addSystemCommand(&[_][]const u8{
-        "xxd", "-n", "block_data", "-i"
-    });
-    blk_virt_data_to_header.step.dependOn(&meta_run.step);
-    blk_virt_data_to_header.addFileArg(blk_virt_data);
-    blk_virt_data_to_header.addFileInput(blk_virt_data);
-    const blk_virt_header = blk_virt_data_to_header.captureStdOut();
+    var config_headers = try std.ArrayList(LazyPath).initCapacity(b.allocator, config_data.len);
+    defer config_headers.deinit();
+    inline for (config_data) |config| {
+        const data = b.path(config[0]);
+        const data_to_header = b.addSystemCommand(&[_][]const u8{
+            "xxd", "-n", config[2], "-i"
+        });
+        data_to_header.step.dependOn(&meta_run.step);
+        data_to_header.addFileArg(data);
+        data_to_header.addFileInput(data);
+        const header = data_to_header.captureStdOut();
+
+        config_headers.appendAssumeCapacity(header);
+    }
 
     const meta_step = b.step("meta", "Run metaprogram");
-    meta_step.dependOn(&blk_virt_data_to_header.step);
+    inline for (config_data, 0..) |config, i| {
+        meta_step.dependOn(&b.addInstallFileWithDir(config_headers.items[i], .prefix, config[1]).step);
+    }
+    meta_step.dependOn(&meta_run.step);
 
     const sddf_dep = b.dependency("sddf", .{
         .target = target,
@@ -120,8 +135,10 @@ pub fn build(b: *std.Build) void {
     client.addCSourceFiles(.{
         .files = &.{ "client.c" },
     });
-    // For blk_config.h
-    client.addIncludePath(b.path(""));
+
+    // For client configuration
+    client.step.dependOn(meta_step);
+    client.addIncludePath(.{ .cwd_relative = b.getInstallPath(.prefix, "") });
 
     client.addIncludePath(sddf_dep.path("include"));
     client.linkLibrary(sddf_dep.artifact("util"));
@@ -151,7 +168,6 @@ pub fn build(b: *std.Build) void {
         "-o", final_image_dest,
         "-r", b.getInstallPath(.prefix, "./report.txt")
     });
-    b.getInstallStep().dependOn(&b.addInstallFileWithDir(blk_virt_header, .prefix, "data.h").step);
     microkit_tool_cmd.step.dependOn(b.getInstallStep());
     microkit_tool_cmd.setEnvironmentVariable("MICROKIT_SDK", microkit_sdk);
     microkit_tool_cmd.step.dependOn(&b.addInstallFileWithDir(sdf_file, .prefix, "block.system").step);
