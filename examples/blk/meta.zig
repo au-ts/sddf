@@ -45,7 +45,7 @@ pub fn main() !void {
 
     _ = try blk_system.connect();
 
-    try blk_system.serialiseConfig("blk_virt.data");
+    try blk_system.serialiseConfig(config.output);
 
     try sdf.print();
 }
