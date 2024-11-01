@@ -138,6 +138,9 @@ pub fn build(b: *std.Build) !void {
     }
 
     const meta_step = b.step("meta", "Run metaprogram");
+    inline for (config_data, 0..) |config, i| {
+        meta_step.dependOn(&b.addInstallFileWithDir(config_headers.items[i], .prefix, config[1]).step);
+    }
     meta_step.dependOn(&meta_run.step);
 
     const sddf_dep = b.dependency("sddf", .{
@@ -174,6 +177,7 @@ pub fn build(b: *std.Build) !void {
         .strip = false,
     });
 
+    serial_server.step.dependOn(meta_step);
     // TODO: sort out, serial_server should depend on meta as well
     serial_server.addIncludePath(config_headers.items[0]);
     serial_server.addIncludePath(.{ .cwd_relative = b.getInstallPath(.prefix, "")});
@@ -203,9 +207,6 @@ pub fn build(b: *std.Build) !void {
     microkit_tool_cmd.step.dependOn(&driver_install.step);
     microkit_tool_cmd.setEnvironmentVariable("MICROKIT_SDK", microkit_sdk);
     microkit_tool_cmd.step.dependOn(&b.addInstallFileWithDir(sdf_file, .prefix, "serial.system").step);
-    inline for (config_data, 0..) |config, i| {
-        microkit_tool_cmd.step.dependOn(&b.addInstallFileWithDir(config_headers.items[i], .prefix, config[1]).step);
-    }
     // Add the "microkit" step, and make it the default step when we execute `zig build`>
     const microkit_step = b.step("microkit", "Compile and build the final bootable image");
     microkit_step.dependOn(&microkit_tool_cmd.step);
