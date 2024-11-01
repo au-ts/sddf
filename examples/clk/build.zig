@@ -4,7 +4,7 @@
 //
 const std = @import("std");
 
-const MicrokitBoard = enum { odroidc4 };
+const MicrokitBoard = enum { odroidc4, maaxboard };
 
 const Target = struct {
     board: MicrokitBoard,
@@ -17,6 +17,15 @@ const targets = [_]Target{
         .zig_target = std.Target.Query{
             .cpu_arch = .aarch64,
             .cpu_model = .{ .explicit = &std.Target.arm.cpu.cortex_a55 },
+            .os_tag = .freestanding,
+            .abi = .none,
+        },
+    },
+    .{
+        .board = MicrokitBoard.maaxboard,
+        .zig_target = std.Target.Query{
+            .cpu_arch = .aarch64,
+            .cpu_model = .{ .explicit = &std.Target.arm.cpu.cortex_a53 },
             .os_tag = .freestanding,
             .abi = .none,
         },
@@ -87,10 +96,12 @@ pub fn build(b: *std.Build) void {
 
     const timer_driver_class = switch (microkit_board_option.?) {
         .odroidc4 => "meson",
+        .maaxboard => "imx",
     };
 
     const clk_driver_class = switch (microkit_board_option.?) {
         .odroidc4 => "meson",
+        .maaxboard => "imx",
     };
     const clk_driver = sddf_dep.artifact(b.fmt("driver_clk_{s}.elf", .{clk_driver_class}));
     const clk_driver_install = b.addInstallArtifact(clk_driver, .{ .dest_sub_path = "clk_driver.elf" });
@@ -107,6 +118,7 @@ pub fn build(b: *std.Build) void {
         .strip = false,
     });
     client.addCSourceFile(.{ .file = b.path("client.c") });
+    client.defineCMacro(b.fmt("TEST_BOARD_{s}", .{ microkit_board }), "1");
     client.addIncludePath(sddf_dep.path("include"));
     client.linkLibrary(sddf_dep.artifact("util"));
     client.linkLibrary(sddf_dep.artifact("util_putchar_debug"));

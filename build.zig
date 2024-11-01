@@ -28,6 +28,7 @@ const DriverClass = struct {
 
     const Clock = enum {
         meson,
+        imx,
     };
 
     const I2cHost = enum {
@@ -216,22 +217,35 @@ fn addClockDriver(
         .optimize = optimize,
         .strip = false,
     });
-    const source = b.fmt("drivers/clk/{s}/clk.c", .{ @tagName(class) });
-    driver.addCSourceFile(.{
-        .file = b.path(source),
-    });
-    driver.addCSourceFile(.{
-        .file = b.path(b.fmt("drivers/clk/{s}/clk-meson.c", .{ @tagName(class) }))
-    });
-    driver.addCSourceFile(.{
-        .file = b.path(b.fmt("drivers/clk/{s}/clk-measure.c", .{ @tagName(class) }))
-    });
-    driver.addCSourceFile(.{
-        .file = b.path(b.fmt("drivers/clk/{s}/sm1-clk.c", .{ @tagName(class) }))
-    });
-    driver.addCSourceFile(.{
-        .file = b.path("drivers/clk/clk-operations.c")
-    });
+
+    switch (class) {
+        .meson => {
+            const files: []const []const u8 = &.{
+                "drivers/clk/meson/clk.c",
+                "drivers/clk/meson/clk-meson.c",
+                "drivers/clk/meson/clk-measure.c",
+                "drivers/clk/meson/sm1-clk.c",
+            };
+            driver.addCSourceFiles(.{ .files = files });
+        },
+        .imx => {
+            const files: []const []const u8 = &.{
+                "drivers/clk/imx/clk.c",
+                "drivers/clk/imx/clk-imx.c",
+                "drivers/clk/imx/clk-imx8mq.c",
+            };
+            driver.addCSourceFiles(.{ .files = files });
+        },
+    }
+
+    const common_src_files = .{ "clk-operations.c" };
+
+    inline for (common_src_files) |f| {
+        driver.addCSourceFile(.{
+            .file = b.path(b.fmt("drivers/clk/{s}", .{ f }))
+        });
+    }
+
     driver.addIncludePath(clk_config_include);
     driver.addIncludePath(b.path("include"));
     driver.addIncludePath(b.path("drivers/clk"));
