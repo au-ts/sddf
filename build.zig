@@ -39,6 +39,10 @@ const DriverClass = struct {
         };
     };
 
+    const Clock = enum {
+        meson,
+    };
+
     const I2cHost = enum {
         meson,
         opentitan,
@@ -332,6 +336,48 @@ fn addNvmeBlockDriver(
     driver.addIncludePath(b.path("include"));
     driver.addIncludePath(b.path("include/sddf/util/custom_libc"));
     driver.addIncludePath(b.path("include/microkit"));
+    driver.linkLibrary(util);
+
+    return driver;
+}
+
+fn addClockDriver(
+    b: *std.Build,
+    clk_config_include: LazyPath,
+    util: *std.Build.Step.Compile,
+    class: DriverClass.Clock,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+) *std.Build.Step.Compile {
+    const driver = addPd(b, .{
+        .name = b.fmt("driver_clk_{s}.elf", .{@tagName(class)}),
+        .target = target,
+        .optimize = optimize,
+        .strip = false,
+    });
+
+    switch (class) {
+        .meson => {
+            const files: []const []const u8 = &.{
+                "drivers/clk/meson/clk.c",
+                "drivers/clk/meson/clk-meson.c",
+                "drivers/clk/meson/clk-measure.c",
+                "drivers/clk/meson/sm1-clk.c",
+            };
+            driver.addCSourceFiles(.{ .files = files });
+        },
+    }
+
+    const common_src_files = .{"clk-operations.c"};
+
+    inline for (common_src_files) |f| {
+        driver.addCSourceFile(.{ .file = b.path(b.fmt("drivers/clk/{s}", .{f})) });
+    }
+
+    driver.addIncludePath(clk_config_include);
+    driver.addIncludePath(b.path("include"));
+    driver.addIncludePath(b.path("drivers/clk"));
+    driver.addIncludePath(b.path(b.fmt("drivers/clk/{s}/include", .{@tagName(class)})));
     driver.linkLibrary(util);
 
     return driver;
@@ -797,5 +843,21 @@ pub fn build(b: *std.Build) !void {
         net_copy.linkLibrary(util);
         net_copy.linkLibrary(util_putchar_debug);
         b.installArtifact(net_copy);
+    }
+
+    // Clock drivers
+    inline for (std.meta.fields(DriverClass.Clock)) |class| {
+        const driver = addClockDriver(b, clk_client_include, util, @enumFromInt(class.value), target, optimize);
+        driver.linkLibrary(util_putchar_debug);
+
+        const clk_config = b.addSystemCommand(&.{
+            "python",
+            b.fmt("drivers/clk/{s}/create_clk_config.py", .{class.name}),
+            dtb_path,
+            clk_conf_include_option,
+        }); // Creates a system command which runs the python interpreter
+        driver.step.dependOn(&clk_config.step);
+
+        b.installArtifact(driver);
     }
 }
