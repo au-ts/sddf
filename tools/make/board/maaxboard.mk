@@ -18,5 +18,6 @@ PWM_DRIV_DIR := imx
 PINCTRL_DRIV_DIR := imx
 TMU_DRIV_DIR := imx8mq
 PMIC_DRIV_DIR := bd71837amwv
+CLK_DRIV_DIR := ${PLATFORM}
 
 CPU := cortex-a53
