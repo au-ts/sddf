@@ -178,7 +178,6 @@ pub fn build(b: *std.Build) !void {
     });
 
     serial_server.step.dependOn(meta_step);
-    // TODO: sort out, serial_server should depend on meta as well
     serial_server.addIncludePath(config_headers.items[0]);
     serial_server.addIncludePath(.{ .cwd_relative = b.getInstallPath(.prefix, "")});
     serial_server.addCSourceFile(.{ .file = b.path("serial_server.c") });
