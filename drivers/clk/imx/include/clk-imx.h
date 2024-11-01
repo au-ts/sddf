@@ -233,7 +233,7 @@ struct clk _name = {                                                \
 IMX_CLK_GATE2_FLAGS(_name, _parent_clks, _base, _offset, _shift, 0)
 
 #define IMX_CLK_GATE4(_name, _parent_clks, _base, _offset, _shift)  \
-CLK_GATE(_name, _offset, _shift, 0, _parent_clks, 1, CLK_OPS_PARENT_ENABLE)
+IMX_CLK_GATE2_FLAGS(_name, _parent_clks, _base, _offset, _shift, 0)
 
 #define IMX_CLK_FIXED_FACTOR(_name, _parent_clks, _mult, _div)      \
 CLK_FIXED_FACTOR(_name, _mult, _div, 0, _parent_clks, 1, CLK_SET_RATE_PARENT)
