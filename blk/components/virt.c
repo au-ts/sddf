@@ -14,7 +14,7 @@
 #include <sddf/util/printf.h>
 #include <sddf/util/string.h>
 #include <sddf/util/util.h>
-#include "data.h"
+#include "virt_config.h"
 
 #define BLK_QUEUE_CAPACITY_DRIV 1024
 #define MAX_NUM_CLIENTS 62
@@ -213,7 +213,7 @@ static bool handle_mbr_reply()
 
 void init(void)
 {
-    sddf_memcpy(&config, block_data, block_data_len);
+    sddf_memcpy(&config, virt_data, virt_data_len);
     config_debug_print(&config);
 
     while (!blk_storage_is_ready(config.driver.storage_info));
