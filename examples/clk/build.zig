@@ -77,7 +77,7 @@ pub fn build(b: *std.Build) void {
 
     const dtb_arg = b.option([]const u8, "dtb", "Path to DTB file");
     if (dtb_arg == null) {
-        std.log.err("Missing -Dsdk=/path/to/dtb argument being passed\n", .{});
+        std.log.err("Missing -Ddtb=/path/to/dtb argument being passed\n", .{});
         std.posix.exit(1);
     }
     const dtb_path = std.Build.LazyPath{ .cwd_relative = dtb_arg.? };
