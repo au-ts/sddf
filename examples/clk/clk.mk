@@ -16,6 +16,12 @@ ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
 	ARCH := aarch64
 	DRIVER_DIR := meson
 	CPU := cortex-a55
+else ifeq ($(strip $(MICROKIT_BOARD)), maaxboard)
+	ARCH := aarch64
+  DTS_FILE := $(TOP)/dts/maaxboard.dts
+	SYSTEM_FILE := ${TOP}/board/maaxboard/clk.system
+	DRIVER_DIR := imx
+	CPU := cortex-a53
 else
 $(error Unsupported MICROKIT_BOARD given)
 endif

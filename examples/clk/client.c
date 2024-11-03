@@ -14,7 +14,7 @@
 void init(void)
 {
     sddf_dprintf("--------------------\n");
-    sddf_dprintf("Clock driver test\n");
+    sddf_dprintf("Clock Driver Test\n");
 
 #ifdef TEST_BOARD_odroidc4
     sddf_dprintf("Test board: odroidc4\n");
@@ -30,7 +30,14 @@ void init(void)
 
     ret = sddf_clk_set_rate(CLK_DRIVER_CH, 10, 150000000);
     sddf_dprintf("ret_val: %x\n", ret);
-#elif
+
+#elif TEST_BOARD_maaxboard
+    sddf_dprintf("Test board: maaxboard\n");
+
+    uint32_t ret = sddf_clk_enable(CLK_DRIVER_CH, 196);
+    sddf_dprintf("ret_val: %x\n", ret);
+
+#else
     sddf_dprintf("No tests for the target board\n", ret);
 #endif
 
