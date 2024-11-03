@@ -2,15 +2,13 @@
 
 # Copyright 2024, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
-#
-# The template is stolen from Bill's pinmux driver
 
 import os
 import sys
 from typing import List
 from devicetree import edtlib, dtlib
 
-supported_compat_str_board = { "hardkernel,odroid-c4" }
+supported_compat_str_board = { "hardkernel,odroid-c4", "fsl,imx8mm-evk", "fsl,imx8mq" }
 
 debug_parser = True
 clock_list = {}
@@ -67,7 +65,8 @@ def extract_clocks(dt: dtlib.DT, node: dtlib.Node) -> List:
         for clk_id in clock_ids:
             add_clock(clk_id, 0, 0)
         for pnode in pnodes:
-            extract_clocks(dt, pnode)
+            if pnode != node:
+                extract_clocks(dt, pnode)
 
     if "max-frequency" in props:
         max_frequency = node.props["max-frequency"].to_nums()
@@ -79,7 +78,8 @@ def extract_clocks(dt: dtlib.DT, node: dtlib.Node) -> List:
             if (clk_rate):
                 add_clock(clk_id, clk_rate, 0)
         for pnode in pnodes:
-            extract_clocks(dt, pnode)
+            if pnode != node:
+                extract_clocks(dt, pnode)
 
     if "assigned-clocks" in props and "assigned-clock-parents" in props:
         assigned_clocks, pnodes = parse_clock_list(devicetree, node.props["assigned-clocks"].to_nums())
@@ -88,11 +88,11 @@ def extract_clocks(dt: dtlib.DT, node: dtlib.Node) -> List:
             if (pclk_id):
                 add_clock(clk_id, 0, pclk_id)
         for pnode in pnodes:
-            extract_clocks(dt, pnode)
+            if pnode != node:
+                extract_clocks(dt, pnode)
         for pnode in ppnodes:
-            extract_clocks(dt, pnode)
-
-    return enabled_clks
+            if pnode != node:
+                extract_clocks(dt, pnode)
 
 def write_configs_to_headerfile(path: str) -> None:
     with open(path + '/clk_config.h', "w") as f:
@@ -106,6 +106,7 @@ def write_configs_to_headerfile(path: str) -> None:
         f.write("static struct clk_cfg clk_configs[] = {{\n{}\n}};".format(",\n".join(clk_cfg_strs)))
 
 if __name__ == "__main__":
+    supported = False
     devicetree = dtlib.DT(sys.argv[1], force=True)
     for compat_str in devicetree.root.props["compatible"].to_strings():
         if compat_str in supported_compat_str_board:
@@ -116,7 +117,6 @@ if __name__ == "__main__":
         log_error_parser("this board is not supported.")
         exit(1)
 
-    enabled_clks = []
 
     for node in devicetree.node_iter():
         props = list(node.props.keys())

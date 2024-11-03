@@ -28,6 +28,7 @@ const DriverClass = struct {
 
     const Clock = enum {
         meson,
+        imx,
     };
 
     const I2cHost = enum {
@@ -228,6 +229,14 @@ fn addClockDriver(
                 "drivers/clk/meson/clk-meson.c",
                 "drivers/clk/meson/clk-measure.c",
                 "drivers/clk/meson/sm1-clk.c",
+            };
+            driver.addCSourceFiles(.{ .files = files });
+        },
+        .imx => {
+            const files: []const []const u8 = &.{
+                "drivers/clk/imx/clk.c",
+                "drivers/clk/imx/clk-imx.c",
+                "drivers/clk/imx/clk-imx8mq.c",
             };
             driver.addCSourceFiles(.{ .files = files });
         },
@@ -512,7 +521,7 @@ pub fn build(b: *std.Build) void {
 
        const clk_config = b.addSystemCommand(&.{
            "python",
-           b.fmt("drivers/clk/{s}/create_clk_config.py", .{ class.name }),
+           "drivers/clk/create_clk_config.py",
            dtb_path,
            clk_conf_include_option,
         }); // Creates a system command which runs the python interpreter
