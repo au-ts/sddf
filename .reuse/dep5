@@ -3,6 +3,7 @@ Upstream-Name: seL4 Device Driver Framework
 Source: https://github.com/au-ts/sddf
 
 Files:
+    flake.lock
     CHANGES.md
     build.zig.zon
     examples/i2c/build.zig.zon
