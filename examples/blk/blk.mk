@@ -16,7 +16,7 @@ $(error SDDF must be specified)
 endif
 
 ifeq ($(strip $(TOOLCHAIN)),)
-	TOOLCHAIN := aarch64-none-elf
+	TOOLCHAIN := clang
 endif
 
 ifeq ($(strip $(TOOLCHAIN)), clang)
