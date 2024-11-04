@@ -35,8 +35,7 @@ const struct clk_ops clk_gate2_ops = {
     .is_enabled = clk_gate2_is_enabled,
 };
 
-static unsigned long clk_pll_recalc_rate(const struct clk *clk,
-                                unsigned long prate)
+static unsigned long clk_pll_recalc_rate(const struct clk *clk, unsigned long prate)
 {
     /* TODO: This function is derived from Linux codebase, but seems wrong
      * according to the datasheet as PLL_REFCLK_DIV_VAL[5:10] is never used. */
@@ -46,7 +45,7 @@ static unsigned long clk_pll_recalc_rate(const struct clk *clk,
 
     /* Output Divider value is (n + 1) * 2 */
     uint32_t output_div_val = regmap_read_bits(clk->base, data->offset, 0, 5);
-    output_div_val = (output_div_val + 1 ) * 2;
+    output_div_val = (output_div_val + 1) * 2;
 
     /* Valid Frac Divider value is 1 to 2^24 */
     uint32_t frac_div_val = regmap_read_bits(clk->base, data->offset + 0x4, 7, 24);
@@ -76,8 +75,7 @@ const struct clk_ops clk_frac_pll_ops = {
     /* .set_rate    = clk_pll_set_rate, */
 };
 
-static unsigned long clk_sscg_pll_recalc_rate(const struct clk *clk,
-                                unsigned long prate)
+static unsigned long clk_sscg_pll_recalc_rate(const struct clk *clk, unsigned long prate)
 {
     struct clk_sscg_pll_data *data = (struct clk_sscg_pll_data *)(clk->data);
     uint64_t temp_rate = prate;
@@ -136,8 +134,7 @@ const struct clk_ops clk_sscg_pll_ops = {
     /* .determine_rate = clk_sscg_pll_determine_rate, */
 };
 
-static unsigned long imx8m_clk_core_slice_recalc_rate(const struct clk *clk,
-                                unsigned long prate)
+static unsigned long imx8m_clk_core_slice_recalc_rate(const struct clk *clk, unsigned long prate)
 {
     struct clk_core_slice_data *data = (struct clk_core_slice_data *)(clk->data);
 
@@ -182,8 +179,7 @@ const struct clk_ops clk_core_slice_ops = {
     .set_parent = imx8m_clk_core_slice_set_parent,
 };
 
-static unsigned long imx8m_clk_common_slice_recalc_rate(const struct clk *clk,
-                                unsigned long prate)
+static unsigned long imx8m_clk_common_slice_recalc_rate(const struct clk *clk, unsigned long prate)
 {
     struct clk_common_slice_data *data = (struct clk_common_slice_data *)(clk->data);
 
@@ -232,8 +228,7 @@ const struct clk_ops clk_common_slice_ops = {
     .set_parent = imx8m_clk_common_slice_set_parent,
 };
 
-static unsigned long imx8m_clk_bus_slice_recalc_rate(const struct clk *clk,
-                                unsigned long prate)
+static unsigned long imx8m_clk_bus_slice_recalc_rate(const struct clk *clk, unsigned long prate)
 {
     struct clk_bus_slice_data *data = (struct clk_bus_slice_data *)(clk->data);
 
