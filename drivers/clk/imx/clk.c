@@ -145,7 +145,6 @@ uint32_t clk_set_rate(struct clk *clk, uint32_t rate)
 
 void notified(microkit_channel ch)
 {
-
 }
 
 void init(void)
@@ -171,52 +170,53 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
     /* TODO: Check if the channel is valid */
     switch (microkit_msginfo_get_label(msginfo)) {
 
-        case SDDF_CLK_ENABLE: {
-            if (argc != 1) {
-                LOG_DRIVER_ERR("Incorrect number of arguments %u != 1\n", argc);
-                ret = CLK_INCORRECT_ARGS;
-                break;
-            }
-            uint32_t clk_id = (uint32_t)microkit_mr_get(SDDF_CLK_PARAM_ID);
-            LOG_DRIVER("get request clk_enable(%d)\n", clk_id);
-            ret = clk_enable(clk_list[clk_id]);
+    case SDDF_CLK_ENABLE: {
+        if (argc != 1) {
+            LOG_DRIVER_ERR("Incorrect number of arguments %u != 1\n", argc);
+            ret = CLK_INCORRECT_ARGS;
             break;
         }
-        case SDDF_CLK_DISABLE: {
-            if (argc != 1) {
-                LOG_DRIVER_ERR("Incorrect number of arguments %u != 1\n", argc);
-                ret = CLK_INCORRECT_ARGS;
-                break;
-            }
-            uint32_t clk_id = (uint32_t)microkit_mr_get(SDDF_CLK_PARAM_ID);
-            LOG_DRIVER("get request clk_disable(%d)\n", clk_id);
-            ret = clk_disable(clk_list[clk_id]);
+        uint32_t clk_id = (uint32_t)microkit_mr_get(SDDF_CLK_PARAM_ID);
+        LOG_DRIVER("get request clk_enable(%d)\n", clk_id);
+        ret = clk_enable(clk_list[clk_id]);
+        break;
+    }
+    case SDDF_CLK_DISABLE: {
+        if (argc != 1) {
+            LOG_DRIVER_ERR("Incorrect number of arguments %u != 1\n", argc);
+            ret = CLK_INCORRECT_ARGS;
             break;
         }
-        case SDDF_CLK_GET_RATE: {
-            if (argc != 1) {
-                LOG_DRIVER_ERR("Incorrect number of arguments %u != 1\n", argc);
-                ret = CLK_INCORRECT_ARGS;
-                break;
-            }
-            uint32_t clk_id = (uint32_t)microkit_mr_get(SDDF_CLK_PARAM_ID);
-            ret = clk_get_rate(clk_list[clk_id]);
+        uint32_t clk_id = (uint32_t)microkit_mr_get(SDDF_CLK_PARAM_ID);
+        LOG_DRIVER("get request clk_disable(%d)\n", clk_id);
+        ret = clk_disable(clk_list[clk_id]);
+        break;
+    }
+    case SDDF_CLK_GET_RATE: {
+        if (argc != 1) {
+            LOG_DRIVER_ERR("Incorrect number of arguments %u != 1\n", argc);
+            ret = CLK_INCORRECT_ARGS;
             break;
         }
-        case SDDF_CLK_SET_RATE: {
-            if (argc != 2) {
-                LOG_DRIVER_ERR("Incorrect number of arguments %u != 1\n", argc);
-                ret = CLK_INCORRECT_ARGS;
-                break;
-            }
-            uint32_t clk_id = (uint32_t)microkit_mr_get(SDDF_CLK_PARAM_ID);
-            uint32_t rate = (uint32_t)microkit_mr_get(SDDF_CLK_PARAM_RATE);
-            ret = clk_set_rate(clk_list[clk_id], rate);
+        uint32_t clk_id = (uint32_t)microkit_mr_get(SDDF_CLK_PARAM_ID);
+        ret = clk_get_rate(clk_list[clk_id]);
+        break;
+    }
+    case SDDF_CLK_SET_RATE: {
+        if (argc != 2) {
+            LOG_DRIVER_ERR("Incorrect number of arguments %u != 1\n", argc);
+            ret = CLK_INCORRECT_ARGS;
             break;
         }
-        default:
-            LOG_DRIVER_ERR("Unknown request %lu to clockk driver from channel %u\n", microkit_msginfo_get_label(msginfo), ch);
-            ret = 5;
+        uint32_t clk_id = (uint32_t)microkit_mr_get(SDDF_CLK_PARAM_ID);
+        uint32_t rate = (uint32_t)microkit_mr_get(SDDF_CLK_PARAM_RATE);
+        ret = clk_set_rate(clk_list[clk_id], rate);
+        break;
+    }
+    default:
+        LOG_DRIVER_ERR("Unknown request %lu to clockk driver from channel %u\n", microkit_msginfo_get_label(msginfo),
+                       ch);
+        ret = 5;
     }
     return microkit_msginfo_new(ret, 0);
 }
