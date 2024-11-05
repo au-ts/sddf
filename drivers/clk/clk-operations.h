@@ -9,6 +9,9 @@
 
 #define CLK_INCORRECT_ARGS 1
 #define CLK_INVALID_OP 2
+#define CLK_INVALID_ID 3
+#define CLK_UNKNOWN_REQ 4
+#define CLK_UNKNOWN_TARGET 5
 
 int reg_write(uint64_t base, uint32_t offset, uint32_t val);
 int regmap_update_bits(uint64_t base, uint32_t offset, uint8_t shift, uint8_t width, uint32_t val);

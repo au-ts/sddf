@@ -2906,7 +2906,5 @@ static struct clk *imx8mq_clks[IMX8MQ_CLK_END] = {
 
 struct clk **get_clk_list(void)
 {
-    sddf_dprintf("get clk list\n");
-
     return imx8mq_clks;
 }
