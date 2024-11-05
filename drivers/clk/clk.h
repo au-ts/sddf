@@ -372,7 +372,7 @@ const struct clk *get_parent(const struct clk *clk);
  * @clk:    pointer to the current clk
  *
  */
-unsigned long clk_get_rate(const struct clk *clk);
+uint32_t clk_get_rate(const struct clk *clk, uint64_t *rate);
 
 /**
  * function clk_enable() - enable the target clock signal
@@ -393,5 +393,7 @@ uint32_t clk_disable(struct clk *clk);
  * the target clock
  *
  * @clk:    pointer to the current clk
+ * @req_rate:    request rate
+ * @rate:   pointer to result variable
  */
-uint32_t clk_set_rate(struct clk *clk, uint32_t rate);
+uint32_t clk_set_rate(struct clk *clk, uint64_t req_rate, uint64_t *rate);
