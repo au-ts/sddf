@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Copyright 2024, UNSW
+
+    SPDX-License-Identifier: BSD-2-Clause
+-->
+<system>
+    <!-- https://github.com/seL4/seL4/blob/master/tools/dts/imx8mm-evk.dts#L1719-L1745 -->
+    <!-- https://github.com/torvalds/linux/blob/master/arch/arm64/boot/dts/freescale/imx8mm.dtsi#L1341-L1373 -->
+    <!-- 2.1.2 Cortex-A53 Memory Map of the IMX8MM manual, PCIe1 REG  -->
+    <memory_region name="pcie_config" phys_addr="0x33800000" size="0x10000" />
+    <!-- <memory_region name="pcie_config" phys_addr="0x1ff00000" size="0x10000" /> -->
+
+    <!-- we just pick this arbitarily from the non-preferectable memory range of dtsi -->
+    <memory_region name="nvme_regs" phys_addr="0x18000000" size="0x4000" />
+
+    <!-- NVMe Queues -->
+    <memory_region name="nvme_asq"                          size="0x1000" />
+    <memory_region name="nvme_acq"                          size="0x1000" />
+    <memory_region name="nvme_io_sq"                        size="0x1000" />
+    <memory_region name="nvme_io_cq"                        size="0x1000" />
+
+    <memory_region name="data_region" size="0x10_000" />
+
+    <protection_domain name="pcie" priority="254" stack_size="0x2000">
+        <!-- <map mr="pcie_regs" vaddr="0x1000_0000" perms="rw" cached="false" setvar_vaddr="pcie_regs" /> -->
+        <map mr="pcie_config" vaddr="0x2000_0000" perms="rw" cached="false" setvar_vaddr="pcie_config" />
+        <!-- table 7-1 ARM domain interrupt; also DTS; level - high. -->
+        <irq irq="154" id="0" trigger="level" /> <!-- 122 + 32 -->
+        <irq irq="155" id="1" trigger="level" /> <!-- 123 + 32 -->
+        <irq irq="156" id="2" trigger="level" /> <!-- 124 + 32 -->
+        <irq irq="157" id="3" trigger="level" /> <!-- 125 + 32 -->
+        <!-- 126 is reserved -->
+        <irq irq="160" id="4" trigger="level" /> <!-- 127 + 32 -->
+
+        <map mr="nvme_regs" vaddr="0x3000_0000" perms="rw" cached="false" setvar_vaddr="nvme_controller" />
+        <setvar symbol="nvme_controller_paddr" region_paddr="nvme_regs" />
+        <!-- TODO: cached? -->
+        <map mr="nvme_asq"  vaddr="0x3001_0000" perms="rw" cached="false" setvar_vaddr="nvme_asq_region" />
+        <setvar symbol="nvme_asq_region_paddr" region_paddr="nvme_asq" />
+        <map mr="nvme_acq"  vaddr="0x3002_0000" perms="rw" cached="false" setvar_vaddr="nvme_acq_region" />
+        <setvar symbol="nvme_acq_region_paddr" region_paddr="nvme_acq" />
+
+        <map mr="nvme_io_sq"  vaddr="0x3003_0000" perms="rw" cached="false" setvar_vaddr="nvme_io_sq_region" />
+        <setvar symbol="nvme_io_sq_region_paddr" region_paddr="nvme_io_sq" />
+        <map mr="nvme_io_cq"  vaddr="0x3004_0000" perms="rw" cached="false" setvar_vaddr="nvme_io_cq_region" />
+        <setvar symbol="nvme_io_cq_region_paddr" region_paddr="nvme_io_cq" />
+
+        <map mr="data_region" vaddr="0x3005_0000" perms="rw" cached="false" setvar_vaddr="data_region" />
+        <setvar symbol="data_region_paddr" region_paddr="data_region" />
+
+        <program_image path="pcie_driver.elf" />
+    </protection_domain>
+</system>
