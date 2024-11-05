@@ -25,11 +25,15 @@ void init(void)
     ret = sddf_clk_disable(CLK_DRIVER_CH, 24);
     sddf_dprintf("ret_val: %x\n", ret);
 
-    ret = sddf_clk_get_rate(CLK_DRIVER_CH, 10);
-    sddf_dprintf("ret_val: %x\n", ret);
+    uint64_t rate = 0;
+    ret = sddf_clk_get_rate(CLK_DRIVER_CH, 10, &rate);
+    sddf_dprintf("err: %d rate: %lu\n", ret, rate);
 
-    ret = sddf_clk_set_rate(CLK_DRIVER_CH, 10, 150000000);
-    sddf_dprintf("ret_val: %x\n", ret);
+    ret = sddf_clk_set_rate(CLK_DRIVER_CH, 10, 150000000, &rate);
+    sddf_dprintf("err: %d, rate: %lu\n", ret, rate);
+
+    ret = sddf_clk_get_rate(CLK_DRIVER_CH, 187, &rate);
+    sddf_dprintf("err: %d, rate: %lu\n", ret, rate);
 
 #elif TEST_BOARD_maaxboard
     sddf_dprintf("Test board: maaxboard\n");

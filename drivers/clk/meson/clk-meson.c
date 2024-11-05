@@ -348,11 +348,12 @@ static unsigned long meson_vid_pll_div_recalc_rate(const struct clk *clk, unsign
     for (i = 0; i < ARRAY_SIZE(vid_pll_div_table); ++i) {
         if (vid_pll_div_table[i].shift_val == shift_val && vid_pll_div_table[i].shift_sel == shift_sel) {
             div = &vid_pll_div_table[i];
-            break;
+            return DIV_ROUND_UP_ULL(prate * div->multiplier, div->divider);
         }
     }
 
-    return DIV_ROUND_UP_ULL(prate * div->multiplier, div->divider);
+    /* Return 0 if the vid pll is not configured */
+    return 0;
 }
 
 const struct clk_ops meson_vid_pll_div_ro_ops = {
