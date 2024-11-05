@@ -81,10 +81,7 @@ include ${BLK_COMPONENTS}/blk_components.mk
 
 ${IMAGES}: libsddf_util_debug.a
 
-basic_data.h: ${TOP}/basic_data.txt
-	xxd -n basic_data -i ${TOP}/basic_data.txt > basic_data.h
-
-client.o: ${TOP}/client.c basic_data.h
+client.o: ${TOP}/client.c ${TOP}/basic_data.h
 	$(CC) -c $(CFLAGS) -I. $< -o client.o
 client.elf: client.o
 	$(LD) $(LDFLAGS) $< $(LIBS) -o $@

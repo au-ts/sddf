@@ -82,13 +82,6 @@ pub fn build(b: *std.Build) void {
         .qemu_virt_aarch64 => "virtio",
     };
 
-    const client_data_cmd = b.addSystemCommand(&[_][]const u8{
-        "xxd", "-n", "basic_data", "-i"
-    });
-    client_data_cmd.addFileArg(b.path("basic_data.txt"));
-    client_data_cmd.addFileInput(b.path("basic_data.txt"));
-    const client_data = client_data_cmd.addOutputFileArg("basic_data.h");
-
     const client = b.addExecutable(.{
         .name = "client.elf",
         .target = target,
@@ -101,10 +94,6 @@ pub fn build(b: *std.Build) void {
     });
     // For blk_config.h
     client.addIncludePath(b.path(""));
-
-    // For the generated client data
-    client.step.dependOn(&client_data_cmd.step);
-    client.addIncludePath(client_data.dirname());
 
     client.addIncludePath(sddf_dep.path("include"));
     client.linkLibrary(sddf_dep.artifact("util"));
