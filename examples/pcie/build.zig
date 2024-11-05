@@ -5,10 +5,11 @@
 const std = @import("std");
 
 const MicrokitBoard = enum {
-    star64,
-    rockpro64,
-    qemu_virt_aarch64,
-    qemu_virt_riscv64,
+    star64, // interrupts dodgy
+    rockpro64, // not working
+    imx8mm_evk,
+    qemu_virt_aarch64, // works
+    qemu_virt_riscv64, // interrupts dodgy
 };
 
 const Target = struct {
@@ -28,6 +29,16 @@ const targets = [_]Target{
     },
     .{
         .board = MicrokitBoard.rockpro64,
+        .zig_target = std.Target.Query{
+            .cpu_arch = .aarch64,
+            .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a53 },
+//            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{ .strict_align }),
+            .os_tag = .freestanding,
+            .abi = .none,
+        },
+    },
+    .{
+        .board = MicrokitBoard.imx8mm_evk,
         .zig_target = std.Target.Query{
             .cpu_arch = .aarch64,
             .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a53 },
@@ -110,6 +121,7 @@ pub fn build(b: *std.Build) void {
     const driver_class = switch (microkit_board_option.?) {
         .star64 => "starfive",
         .rockpro64 => "starfive", // hack
+        .imx8mm_evk => "starfive", // hack
         .qemu_virt_aarch64 => "starfive", // hack
         .qemu_virt_riscv64 => "starfive", // hack
     };
