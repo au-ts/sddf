@@ -10,6 +10,7 @@ Files:
     examples/timer/build.zig.zon
     examples/blk/build.zig.zon
     examples/blk/basic_data.txt
+    examples/blk/basic_data.h
 Copyright: UNSW
 License: BSD-2-Clause
 
