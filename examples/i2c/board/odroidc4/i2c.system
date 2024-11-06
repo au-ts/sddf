@@ -1,117 +1,52 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
-    Copyright 2024, UNSW
-
-    SPDX-License-Identifier: BSD-2-Clause
--->
 <system>
-    <!--
-        These memory regions are required for initialisation. In the future
-        we will have separate drivers to initialise the clocks etc
-     -->
-    <memory_region name="gpio" size="0x4000" phys_addr="0xFF634000"/>
-    <memory_region name="clk" size="0x1000" phys_addr="0xFF63C000"/>
-
-    <memory_region name="i2c_bus" size="0x1000" phys_addr="0xFFD1D000"/>
-
-    <!--
-	    This system transfers minimal data over I2C and so a data region size of
-        0x1000 is more than enough for our use-case.
-    -->
-
-    <memory_region name="client_ds3231_request_region" size="0x1_000"/>
-    <memory_region name="client_ds3231_response_region" size="0x1_000"/>
-
-    <memory_region name="client_pn532_request_region" size="0x1_000"/>
-    <memory_region name="client_pn532_response_region" size="0x1_000"/>
-
-    <memory_region name="driver_request_region" size="0x1_000"/>
-    <memory_region name="driver_response_region" size="0x1_000"/>
-
-    <memory_region name="client_ds3231_data_region" size="0x1_000"/>
-    <memory_region name="client_pn532_data_region" size="0x1_000"/>
-
-
-    <memory_region name="timer_registers" size="0x1000" phys_addr="0xffd0f000" />
-
-    <protection_domain name="driver" priority="100">
-        <program_image path="i2c_driver.elf"/>
-
-	<map mr="driver_request_region" vaddr="0x4_000_000" perms="rw" />
-        <map mr="driver_response_region" vaddr="0x5_000_000" perms="rw" />
-
-        <map mr="i2c_bus" vaddr="0x3_000_000" perms="rw" cached="false" />
-
-        <map mr="gpio" vaddr="0x3_100_000" perms="rw" cached="false" />
-        <map mr="clk" vaddr="0x3_200_000" perms="rw" cached="false" />
-
-        <map mr="client_ds3231_data_region" vaddr="0x10_000_000" perms="rw" />
-        <map mr="client_pn532_data_region" vaddr="0x10_001_000" perms="rw" />
-
-        <!-- IRQs for the particular I2C bus we are using -->
-        <!-- Main interrupt -->
-        <irq irq="247" id="1" trigger="edge"/>
-        <!-- TO interrupt (timeout?) -->
-        <irq irq="126" id="2" trigger="edge"/>
-    </protection_domain>
-
-    <protection_domain name="virt" priority="99" pp="true">
-        <program_image path="i2c_virt.elf" />
-
-        <map mr="client_ds3231_request_region" vaddr="0x4_000_000" perms="rw" />
-        <map mr="client_ds3231_response_region" vaddr="0x5_000_000" perms="rw" />
-
-        <map mr="client_pn532_request_region" vaddr="0x4_001_000" perms="rw" />
-        <map mr="client_pn532_response_region" vaddr="0x5_001_000" perms="rw" />
-
-        <map mr="driver_request_region" vaddr="0x6_000_000" perms="rw" />
-        <map mr="driver_response_region" vaddr="0x7_000_000" perms="rw" />
-    </protection_domain>
-
-    <protection_domain name="client_ds3231" priority="1">
+    <memory_region name="clk" size="0x1000" phys_addr="0xff63c000" />
+    <memory_region name="gpio" size="0x4000" phys_addr="0xff634000" />
+    <memory_region name="meson_i2c_regs" size="0x1000" phys_addr="0xffd1d000" />
+    <memory_region name="i2c_driver_request" size="0x1000" />
+    <memory_region name="i2c_driver_response" size="0x1000" />
+    <memory_region name="i2c_client_request_client_ds3231" size="0x1000" />
+    <memory_region name="i2c_client_response_client_ds3231" size="0x1000" />
+    <memory_region name="i2c_client_data_client_ds3231" size="0x1000" />
+    <memory_region name="meson_timer_regs" size="0x1000" phys_addr="0xffd0f000" />
+    <protection_domain name="client_ds3231" priority="1" budget="100" period="100" passive="false" stack_size="0x1000">
         <program_image path="client_ds3231.elf" />
-
-        <map mr="client_ds3231_request_region" vaddr="0x4_000_000" perms="rw" setvar_vaddr="request_region" />
-        <map mr="client_ds3231_response_region" vaddr="0x5_000_000" perms="rw" setvar_vaddr="response_region" />
-        <map mr="client_ds3231_data_region" vaddr="0x6_000_000" perms="rw" setvar_vaddr="data_region" />
+        <map mr="i2c_client_request_client_ds3231" vaddr="0x10000000" perms="rw" cached="true" />
+        <map mr="i2c_client_response_client_ds3231" vaddr="0x10001000" perms="rw" cached="true" />
+        <map mr="i2c_client_data_client_ds3231" vaddr="0x10002000" perms="rw" cached="true" />
     </protection_domain>
-
-    <protection_domain name="client_pn532" priority="1">
-        <program_image path="client_pn532.elf" />
-
-        <map mr="client_pn532_request_region" vaddr="0x4_000_000" perms="rw" setvar_vaddr="request_region" />
-        <map mr="client_pn532_response_region" vaddr="0x5_000_000" perms="rw" setvar_vaddr="response_region" />
-        <map mr="client_pn532_data_region" vaddr="0x6_000_000" perms="rw" setvar_vaddr="data_region" />
+    <protection_domain name="i2c_driver" priority="100" budget="100" period="100" passive="false" stack_size="0x1000">
+        <program_image path="i2c_driver.elf" />
+        <map mr="clk" vaddr="0x20000000" perms="rw" cached="false" setvar_vaddr="clk_regs" />
+        <map mr="gpio" vaddr="0x20001000" perms="rw" cached="false" setvar_vaddr="gpio_regs" />
+        <map mr="meson_i2c_regs" vaddr="0x20005000" perms="rw" cached="false" setvar_vaddr="i2c_regs" />
+        <map mr="i2c_driver_request" vaddr="0x4000000" perms="rw" cached="true" />
+        <map mr="i2c_driver_response" vaddr="0x4001000" perms="rw" cached="true" />
+        <map mr="i2c_client_data_client_ds3231" vaddr="0x10000000" perms="rw" cached="true" />
+        <irq irq="247" trigger="edge" id="0" />
     </protection_domain>
-
-    <protection_domain name="timer" priority="254" pp="true" passive="true">
+    <protection_domain name="i2c_virt" priority="99" budget="100" period="100" passive="false" stack_size="0x1000">
+        <program_image path="i2c_virt.elf" />
+        <map mr="i2c_driver_request" vaddr="0x10000000" perms="rw" cached="true" />
+        <map mr="i2c_driver_response" vaddr="0x10001000" perms="rw" cached="true" />
+        <map mr="i2c_client_request_client_ds3231" vaddr="0x4000000" perms="rw" cached="true" />
+        <map mr="i2c_client_response_client_ds3231" vaddr="0x5000000" perms="rw" cached="true" />
+    </protection_domain>
+    <protection_domain name="timer_driver" priority="101" budget="100" period="100" passive="true" stack_size="0x1000">
         <program_image path="timer_driver.elf" />
-        <map mr="timer_registers" vaddr="0x2_000_000" perms="rw" cached="false" />
-        <irq irq="42" id="61" trigger="edge" /> <!-- timer interrupt for timer A -->
+        <map mr="meson_timer_regs" vaddr="0x20000000" perms="rw" cached="false" setvar_vaddr="gpt_regs" />
+        <irq irq="42" trigger="edge" id="0" />
     </protection_domain>
-
     <channel>
-        <end pd="client_ds3231" id="0" />
-        <end pd="virt" id="0" />
+        <end pd="i2c_virt" id="0" notify="true" pp="false" />
+        <end pd="client_ds3231" id="0" notify="true" pp="true" />
     </channel>
-
     <channel>
-        <end pd="client_pn532" id="0" />
-        <end pd="virt" id="1" />
+        <end pd="i2c_driver" id="1" notify="true" pp="false" />
+        <end pd="i2c_virt" id="1" notify="true" pp="false" />
     </channel>
-
     <channel>
-        <end pd="driver" id="0" />
-        <end pd="virt" id="61" />
-    </channel>
-
-    <channel>
-        <end pd="timer" id="0" />
-        <end pd="client_ds3231" id="1" />
-    </channel>
-
-    <channel>
-        <end pd="timer" id="1" />
-        <end pd="client_pn532" id="1" />
+        <end pd="timer_driver" id="1" notify="true" pp="false" />
+        <end pd="client_ds3231" id="1" notify="true" pp="true" />
     </channel>
 </system>
