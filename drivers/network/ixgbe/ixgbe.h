@@ -68,6 +68,7 @@ declare_array_register(DEVICE_BASE, SRRCTL, 0x01014, 64, 0x40);
 declare_array_register(DEVICE_BASE, RXPBSIZE, 0x03C00, 8, 0x4);
 declare_array_register(DEVICE_BASE, DCA_RXCTRL, 0x0100C, 64, 0x40);
 declare_array_register(DEVICE_BASE, RXDCTL, 0x01028, 64, 0x40);
+declare_array_register(DEVICE_BASE, RSCCTL, 0x0102C, 64, 0x40);
 declare_array_register(DEVICE_BASE, TDBAL, 0x06000, 64, 0x40);
 declare_array_register(DEVICE_BASE, TDBAH, 0x06004, 64, 0x40);
 declare_array_register(DEVICE_BASE, TDLEN, 0x06008, 64, 0x40);
@@ -81,6 +82,7 @@ declare_array_register(DEVICE_BASE, EITR, 0x00820, 24, 0x4);
 declare_array_register(DEVICE_BASE, QPTC, 0x08680, 16, 0x4);
 declare_array_register(DEVICE_BASE, RAL, 0x0A200, 128, 0x8);
 declare_array_register(DEVICE_BASE, RAH, 0x0A204, 128, 0x8);
+declare_array_register(DEVICE_BASE, RSCINT, 0x12000, 128, 0x4);
 
 // Queue Packets Received Count 
 declare_array_register(DEVICE_BASE, QPRC, 0x01030, 16, 0x40);
@@ -128,8 +130,19 @@ const uint64_t IXGBE_RTTDCS_ARBDIS = 0x00000040; /* DCB arbiter disable */
 
 const uint64_t IXGBE_DMATXCTL_TE = 0x1; /* Transmit Enable */
 
-const uint64_t IXGBE_RXDCTL_ENABLE = 0x02000000; /* Ena specific Rx Queue */
-const uint64_t IXGBE_TXDCTL_ENABLE = 0x02000000; /* Ena specific Tx Queue */
+const uint64_t IXGBE_RXDCTL_ENABLE = 0x02000000; /* Ena specific Rx Queue, bit 25 */
+const uint64_t IXGBE_TXDCTL_ENABLE = 0x02000000; /* Ena specific Tx Queue, bit 25 */
+
+const uint64_t IXGBE_RSCINT_RSCEN = 0x00000001; /* RSC Enable */
+const uint64_t IXGBE_RSCCTL_RSCEN = 0x00000001; /* RSC Enable */
+
+/* RSCCTL bit 3:2 Maximum descriptors per large receive */
+const uint64_t IXGBE_RSCCTL_MAXDESC_1 = 0x0;    /* 00b = Maximum Descriptors 1 */
+const uint64_t IXGBE_RSCCTL_MAXDESC_4 = 0x4;    /* 01b = Maximum Descriptors 4 */
+const uint64_t IXGBE_RSCCTL_MAXDESC_8 = 0x8;    /* 10b = Maximum Descriptors 8 */
+const uint64_t IXGBE_RSCCTL_MAXDESC_16 = 0xc;   /* 11b = Maximum Descriptors 16 */
+
+const uint64_t IXGBE_EITR_ITR_INTERVAL = 0x00000008; /* bit 3 */
 
 const uint64_t IXGBE_FCTRL_MPE = 0x00000100; /* Multicast Promiscuous Ena*/
 const uint64_t IXGBE_FCTRL_UPE = 0x00000200; /* Unicast Promiscuous Ena */

@@ -99,6 +99,9 @@ uint64_t eth_pcount_rx_start;
 uint64_t eth_rx_irq_count_start;
 uint64_t eth_irq_count_start;
 uint64_t eth_tx_ntfn_count_start;
+uint64_t eth_tx_notified_start;
+uint64_t eth_rx_notified_start;
+uint64_t eth_rx_notify_start;
 
 uint64_t eth_notified_start;
 uint64_t eth_idle_notified_start;
@@ -186,7 +189,9 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
             eth_pcount_rx_start = bench->eth_pcount_rx;
             eth_irq_count_start = bench->eth_irq_count;
             eth_rx_irq_count_start = bench->eth_rx_irq_count;
-            eth_tx_ntfn_count_start = bench->eth_tx_ntfn_count;
+            eth_tx_notified_start = bench->eth_tx_notified;
+            eth_rx_notified_start = bench->eth_rx_notified;
+            eth_rx_notify_start = bench->eth_rx_notify;
             
             lwip_pcount_tx_start = bench->lwip_pcount_tx;
             lwip_pcount_rx_start = bench->lwip_pcount_rx;
@@ -234,7 +239,9 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
         uint64_t eth_pcount_rx = bench->eth_pcount_rx - eth_pcount_rx_start;
         uint64_t eth_rx_irq_count = bench->eth_rx_irq_count - eth_rx_irq_count_start;
         uint64_t eth_irq_count = bench->eth_irq_count - eth_irq_count_start;
-        uint64_t eth_tx_ntfn_count = bench->eth_tx_ntfn_count - eth_tx_ntfn_count_start;
+        uint64_t eth_tx_notified = bench->eth_tx_notified - eth_tx_notified_start;
+        uint64_t eth_rx_notified = bench->eth_rx_notified - eth_rx_notified_start;
+        uint64_t eth_rx_notify = bench->eth_rx_notify - eth_rx_notify_start;
 
         uint64_t lwip_pcount_tx = bench->lwip_pcount_tx - lwip_pcount_tx_start;
         uint64_t lwip_pcount_rx = bench->lwip_pcount_rx - lwip_pcount_rx_start;
@@ -243,11 +250,12 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
         uint64_t lwip_rx_notified = bench->lwip_rx_notified - lwip_rx_notified_start;
         uint64_t lwip_tx_notified = bench->lwip_tx_notified - lwip_tx_notified_start;
 
-        printf("NIC RX pk,NIC RX dropped pk,driver RX pk,driver TX pk,driver IRQ,driver RX IRQ,driver TX ntfn,client0 RX pk,client0 TX pk,client0 RX notify,client0 TX notify,client0 RX notified,client0 TX notified\n");
+        printf("NIC RX pk,NIC RX dropped pk,driver RX pk,driver TX pk,driver IRQ,driver RX IRQ,driver TX notified,,driver RX notified,driver RX notify,client0 RX pk,client0 TX pk,client0 RX notify,client0 TX notify,client0 RX notified,client0 TX notified\n");
 
-        printf("%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,\n",
+        printf("%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,\n",
                bench->hw_pcount_rx, bench->hw_pcount_rx_dropped,
-               eth_pcount_rx, eth_pcount_tx, eth_irq_count, eth_rx_irq_count, eth_tx_ntfn_count,
+               eth_pcount_rx, eth_pcount_tx, eth_irq_count, eth_rx_irq_count,
+               eth_tx_notified, eth_rx_notified, eth_rx_notify,
                lwip_pcount_rx, lwip_pcount_tx,
                lwip_rx_notify, lwip_tx_notify, lwip_rx_notified, lwip_tx_notified);
 

@@ -73,7 +73,10 @@ import json
 # TotalUtilisation:  708185834
 # }
 colors = ['purple', 'blue', 'green', 'red', 'cyan', 'magenta', 'orange', 'yellow', 'black', 'teal', 'pink', 'brown', 'olive']
-throughputs = [500000000, 750000000, 1000000000, 1250000000, 1500000000, 1750000000, 2000000000, 2250000000, 2500000000, 2750000000, 3000000000, 3200000000, 4000000000]
+# throughputs = [1000000000, 1500000000, 2000000000, 2500000000, 3000000000, 4000000000, 5000000000, 6000000000]
+# packet_counts = [1898605, 2747630, 3547205, 4119567, 4490493, 5876291, 7003901, 8071105]
+throughputs = [1000000000, 1500000000, 2000000000, 2500000000, 3000000000, 4000000000, 5000000000, 6000000000, 7000000000, 8000000000, 9000000000, 10000000000]
+packet_counts = [1898453, 2747696, 3596253, 4445775, 5294585, 6987257, 7750625, 8709628, 9344493, 9976027, 10886587, 11233325]
 file = sys.argv[1]
 with open(file, "r") as f:
     
@@ -205,12 +208,12 @@ with open(file, "r") as f:
     plt.figure(figsize=(8, 6))
 
     for key in scheds:
-        plt.plot(throughputs, scheds[key], color=colors[color_idx], label=key + ' Number Schedules')
+        plt.plot(throughputs, list(map(lambda x,y: x / y, scheds[key], packet_counts)), color=colors[color_idx], label=key + ' Packets/Woken time')
         color_idx += 1
 
-    plt.title('Requested Throughput' + ' vs ' + 'Number Schedules')
+    plt.title('Requested Throughput' + ' vs ' + 'Packets/Woken time')
     plt.xlabel('Requested Throughput')
-    plt.ylabel('Number Schedules')
+    plt.ylabel('Number Woken')
     plt.grid(True)
     plt.legend()
 

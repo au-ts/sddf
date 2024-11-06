@@ -30,6 +30,13 @@
 #define TIMER_CH 3
 #define COUNTER_CH 4
 
+#define RX_IRQ  1
+
+// Minimum inter-interrupt interval specified in 2.048 us units
+// at 1 GbE and 10 GbE link
+#define IRQ_INTERVAL 8
+// #define IRQ_INTERVAL 9
+
 const uint64_t hw_rx_ring_paddr = 0x10000000;
 const uint64_t hw_rx_ring_vaddr = 0x2200000;
 const uint64_t hw_tx_ring_paddr = 0x10004000;
@@ -47,8 +54,8 @@ const uint64_t ONE_MS_IN_NS = 1000000;
 
 #define NUM_TX_DESCS 512llu
 #define NUM_RX_DESCS 512llu
-// #define NUM_TX_DESCS 1024llu
-// #define NUM_RX_DESCS 1024llu
+// #define NUM_TX_DESCS 256llu
+// #define NUM_RX_DESCS 256llu
 #define TX_CLEAN_BATCH 32llu
 
 struct ixgbe_device {
@@ -161,7 +168,6 @@ tx_provide(void)
         if (provided) {
             THREAD_MEMORY_RELEASE();
             set_reg(TDT(0), device.tx_tail);
-            bench->eth_tx_ntfn_count++;
         }
 
         request_signal(tx_ring.used_ring);
@@ -298,6 +304,7 @@ static void rx_return(void)
 
     if (packets_transferred && require_signal(rx_ring.used_ring)) {
         cancel_signal(rx_ring.used_ring);
+        bench->eth_rx_notify++;
         microkit_notify(RX_CH);
     }
 
@@ -324,10 +331,10 @@ disable_interrupts(void)
 void
 enable_interrupts(void)
 {
-    set_reg(IVAR(0), 1 | BIT(7) | (2 << 8) | BIT(15));
+    set_reg(IVAR(0), RX_IRQ | BIT(7) | (2 << 8) | BIT(15));
 
     set_reg(EIAC, 0);
-    // set_reg(EITR(0), 0x028);
+    set_reg(EITR(0), IXGBE_EITR_ITR_INTERVAL * IRQ_INTERVAL);
     clear_interrupts();
     // uint32_t mask = get_reg(EIMS);
     // mask |= ~BIT(31);
@@ -520,6 +527,12 @@ init_1(void)
             set_reg(SRRCTL(i), (get_reg(SRRCTL(i)) & ~IXGBE_SRRCTL_DESCTYPE_MASK) | IXGBE_SRRCTL_DESCTYPE_ADV_ONEBUF);
             set_reg(SRRCTL(i), get_reg(SRRCTL(i)) | IXGBE_SRRCTL_DROP_EN);
 
+            // RSC is enabled in the destination receive queue by the RSCCTL.RSCEN.
+            // In this case, software must set the SRRCTL.DESCTYPE field in the 
+            // relevant queues to advanced descriptor modes
+            // set_reg(RSCCTL(i), IXGBE_RSCCTL_RSCEN | IXGBE_RSCCTL_MAXDESC_8);
+            // while ((get_reg(RSCCTL(i)) & IXGBE_RSCCTL_RSCEN) == 0);
+
             set_reg(RDBAL(i), hw_rx_ring_paddr & 0xFFFFFFFFull);
             set_reg(RDBAH(i), hw_rx_ring_paddr >> 32);
             set_reg(RDLEN(i), NUM_RX_DESCS * sizeof (ixgbe_adv_rx_desc_t));
@@ -528,6 +541,13 @@ init_1(void)
         }
 
         set_reg(CTRL_EXT, IXGBE_CTRL_EXT_NS_DIS);
+
+        // RSC is further enabled by the RSCINT.RSCEN for the receive queues
+        // associated to the interrupts defined by the RSCINT registers
+        // set_reg(RSCINT(RX_IRQ), IXGBE_RSCINT_RSCEN);
+        // while ((get_reg(RSCINT(RX_IRQ)) & IXGBE_RSCINT_RSCEN) == 0);
+
+        // whyyyyy are you not working???
 
         // for (int i = 0; i < 1; i++) {
         //     clear_flags(DCA_RXCTRL(i), 1 << 12);
@@ -568,7 +588,7 @@ init_1(void)
         set_reg(TDH(0), 0);
         set_reg(TDT(0), 0);
 
-        printf("tx ring %lu phys addr: 0x%lx\n", i, hw_tx_ring_paddr);
+        // printf("tx ring %lu phys addr: 0x%lx\n", i, hw_tx_ring_paddr);
         set_reg(TDLEN(i), NUM_TX_DESCS * sizeof (ixgbe_adv_tx_desc_t));
 
         // descriptor writeback magic values, important to get good performance and low PCIe overhead
@@ -708,12 +728,6 @@ notified(microkit_channel ch)
         bench->eth_irq_count++;
         uint32_t cause = get_reg(EICR);
         clear_flags(EICR, cause);
-        // if (cause && BIT(0)) {
-            // rx_return();
-            // rx_provide();
-            // tx_return();
-            // tx_provide();
-        // }
         rx_return();
         rx_provide();
         if (achieved_something) {
@@ -732,17 +746,15 @@ notified(microkit_channel ch)
         break;
     }
     case RX_CH:
+        bench->eth_rx_notified++;
         if (device.init_stage == 4) {
-            // enable_interrupts();
             rx_return();
             rx_provide();
         }
         break;
     case TX_CH:
-        bench->eth_tx_ntfn_count++;
-
+        bench->eth_tx_notified++;
         if (device.init_stage == 4) {
-            // enable_interrupts();
             tx_provide();
         }
         break;

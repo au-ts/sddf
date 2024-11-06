@@ -135,7 +135,7 @@ void rx_provide(void)
 
     if (notify_drv && require_signal(state.rx_ring_drv.free_ring)) {
         cancel_signal(state.rx_ring_drv.free_ring);
-        microkit_notify(DRIVER_CH);
+        microkit_notify_delayed(DRIVER_CH);
     }
 }
 
