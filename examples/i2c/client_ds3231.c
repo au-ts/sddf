@@ -10,8 +10,10 @@
 #include <sddf/timer/client.h>
 #include <sddf/i2c/queue.h>
 #include <sddf/i2c/client.h>
+#include <sddf/i2c/config.h>
 #include <sddf/i2c/devices/ds3231/ds3231.h>
 #include "client.h"
+#include "ds3231_config.h"
 
 // #define DEBUG_CLIENT
 
@@ -31,10 +33,10 @@
 #define USING_HALT(...) do{ while(1); }while(0)
 #endif
 
-uintptr_t data_region;
-uintptr_t request_region;
-uintptr_t response_region;
+i2c_client_config_t config;
+
 i2c_queue_handle_t queue;
+uintptr_t data_region;
 
 cothread_t t_event;
 cothread_t t_main;
@@ -124,7 +126,10 @@ void init(void)
 {
     LOG_CLIENT("init\n");
 
-    queue = i2c_queue_init((i2c_queue_t *) request_region, (i2c_queue_t *) response_region);
+    sddf_memcpy(&config, i2c_client_ds3231_data, i2c_client_ds3231_data_len);
+    data_region = config.data_region;
+
+    queue = i2c_queue_init(config.request_region, config.response_region);
 
     bool claimed = i2c_bus_claim(I2C_VIRTUALISER_CH, DS3231_I2C_BUS_ADDRESS);
     if (!claimed) {

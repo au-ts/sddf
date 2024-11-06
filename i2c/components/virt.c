@@ -6,8 +6,10 @@
 #include <microkit.h>
 #include <sddf/i2c/queue.h>
 #include <sddf/i2c/client.h>
+#include <sddf/i2c/config.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
+#include "config.h"
 
 // #define DEBUG_VIRTUALISER
 
@@ -29,26 +31,16 @@
  * what happens...
  */
 
-#define DRIVER_CH 61
-#define MAX_CLIENTS 61
+#define NUM_CLIENTS 1
+#define DRIVER_CH 1
 
-typedef struct client_config {
-    i2c_queue_t *request_queue;
-    i2c_queue_t *response_queue;
-    uint64_t driver_data_offset;
-    uint64_t data_size;
-} client_config_t;
+#if DRIVER_CH < NUM_CLIENTS
+#error "DRIVER_CH must be higher than client channels"
+#endif
 
-typedef struct config {
-    i2c_queue_t *driver_request_queue;
-    i2c_queue_t *driver_response_queue;
-    uint64_t num_clients;
-    client_config_t clients[MAX_CLIENTS];
-} config_t;
+i2c_virt_config_t config;
 
-config_t config;
-
-i2c_queue_handle_t client_queues[MAX_CLIENTS];
+i2c_queue_handle_t client_queues[NUM_CLIENTS];
 i2c_queue_handle_t driver_queue;
 
 // Security list: owner of each i2c address on the bus
@@ -56,9 +48,8 @@ int security_list[I2C_BUS_ADDRESS_MAX + 1];
 
 void process_request(microkit_channel ch)
 {
-    LOG_VIRTUALISER("processing client %d\n", ch);
     bool enqueued = false;
-    assert(ch < config.num_clients);
+    assert(ch < NUM_CLIENTS);
 
     /* Do not process the request if we cannot pass it to the driver */
     while (!i2c_queue_empty(client_queues[ch].request) && !i2c_queue_full(driver_queue.request)) {
@@ -133,27 +124,7 @@ void process_response()
 
 void init(void)
 {
-    config = (config_t) {
-        .driver_request_queue = (void *)0x6000000,
-        .driver_response_queue = (void *)0x7000000,
-        .num_clients = 2,
-        .clients = {
-            [0] = {
-                .request_queue = (void *)0x4000000,
-                .response_queue = (void *)0x5000000,
-                .driver_data_offset = 0x0,
-                .data_size = 0x1000,
-            },
-            [1] = {
-                .request_queue = (void *)0x4001000,
-                .response_queue = (void *)0x5001000,
-                .driver_data_offset = 0x1000,
-                .data_size = 0x1000,
-            },
-        },
-    };
-
-    assert(config.num_clients);
+    sddf_memcpy(&config, i2c_virt_data, i2c_virt_data_len);
 
     LOG_VIRTUALISER("initialising\n");
     for (int i = 0; i < I2C_BUS_ADDRESS_MAX + 1; i++) {
@@ -161,7 +132,8 @@ void init(void)
     }
     driver_queue = i2c_queue_init(config.driver_request_queue, config.driver_response_queue);
     for (int i = 0; i < config.num_clients; i++) {
-        client_queues[i] = i2c_queue_init(config.clients[i].request_queue, config.clients[i].response_queue);
+        client_queues[i] = i2c_queue_init(config.clients[i].request_queue,
+                                          config.clients[i].response_queue);
     }
 }
 
