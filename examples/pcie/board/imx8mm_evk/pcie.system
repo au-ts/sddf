@@ -12,7 +12,8 @@
     <!-- <memory_region name="pcie_config" phys_addr="0x1ff00000" size="0x10000" /> -->
 
     <!-- we just pick this arbitarily from the non-preferectable memory range of dtsi -->
-    <memory_region name="nvme_regs" phys_addr="0x18000000" size="0x4000" />
+    <!-- it's also what uboot uses -->
+    <memory_region name="nvme_regs" phys_addr="0x1820_0000" size="0x4000" />
 
     <!-- NVMe Queues -->
     <memory_region name="nvme_asq"                          size="0x1000" />
