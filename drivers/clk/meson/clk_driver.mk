@@ -22,7 +22,7 @@ $(CLK_DRIVER_OBJS): ${CLK_DRIVER_COMMON_DIR}/*.c ${CLK_DRIVER_DIR}/*.c $(CLK_CON
         -I${UART_DRIVER_DIR}/include \
         -I${CLK_DRIVER_COMMON_DIR} $^
 
-$(CLK_CONFIG_HEADER): $(DTS_FILE)
+$(CLK_CONFIG_HEADER): $(DTS_FILE) $(CLK_DRIVER_COMMON_DIR)/create_clk_config.py
 	$(PYTHON) $(CLK_DRIVER_COMMON_DIR)/create_clk_config.py $(DTS_FILE) $(BUILD_DIR)
 
 clean::

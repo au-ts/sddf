@@ -83,7 +83,8 @@ const struct clk *get_parent(const struct clk *clk)
 
         if (parent_data.clk) {
             return parent_data.clk;
-        } else if (parent_data.name) {
+        }
+        if (parent_data.name) {
             return get_clk_by_name(parent_data.name);
         }
     }
@@ -169,7 +170,8 @@ uint32_t clk_set_rate(struct clk *clk, uint64_t req_rate, uint64_t *rate)
     if (clk->hw.init->ops->set_rate) {
         *rate = clk->hw.init->ops->set_rate(clk, req_rate, prate);
         return 0;
-    } else if (pclk && pclk->hw.init->ops->set_rate) {
+    }
+    if (pclk && pclk->hw.init->ops->set_rate) {
         const struct clk *ppclk = get_parent(pclk);
         uint64_t pprate = 0;
         uint32_t err = clk_get_rate(ppclk, &pprate);
@@ -195,9 +197,11 @@ int clk_msr_stat()
         if (clk_list[i]) {
             err = clk_get_rate(clk_list[i], &rate);
             if (err) {
-                LOG_DRIVER_ERR("Failed to get rate of %s: -%u\n", clk_list[i]->hw.init->name, err);
+                LOG_DRIVER_ERR("Failed to get rate of %s: -%u\n",
+                               clk_list[i]->hw.init->name, err);
             }
-            LOG_DRIVER("[%4d][%10luHz] %s\n", i, rate, clk_list[i]->hw.init->name);
+            LOG_DRIVER("[%4d][%10luHz] %s\n", i, rate,
+                       clk_list[i]->hw.init->name);
         }
     }
     LOG_DRIVER("-----------------------------\n");

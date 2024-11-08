@@ -1,11 +1,12 @@
 
-/* SPDX-License-Identifier: GPL-2.0 */
+/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  *  Copyright (c) 2010-2011 Jeremy Kerr <jeremy.kerr@canonical.com>
  *  Copyright (C) 2011-2012 Linaro Ltd <mturquette@linaro.org>
  *
  *  This file is derived from:
- *    https://github.com/torvalds/linux/blob/6485cf5ea253d40d507cd71253c9568c5470cd27/include/linux/clk-provider.h
+ *    https://github.com/torvalds/linux/blob/
+ *      6485cf5ea253d40d507cd71253c9568c5470cd27/include/linux/clk-provider.h
  */
 
 #pragma once
@@ -164,7 +165,8 @@ struct clk_hw {
 struct clk_ops {
     uint8_t (*get_parent)(const struct clk *clk);
     int (*set_parent)(struct clk *clk, uint8_t index);
-    unsigned long (*recalc_rate)(const struct clk *clk, unsigned long parent_rate);
+    unsigned long (*recalc_rate)(const struct clk *clk,
+                                 unsigned long parent_rate);
     int (*set_rate)(const struct clk *clk, uint32_t rate, uint32_t parent_rate);
     void (*init)(struct clk *clk);
     int (*enable)(struct clk *clk);
@@ -236,9 +238,6 @@ struct clk_source_data {
  *    of this register, and mask of gate bits are in higher 16-bit of this
  *    register.  While setting the gate bits, higher 16-bit should also be
  *    updated to indicate changing gate bits.
- * CLK_GATE_BIG_ENDIAN - by default little endian register accesses are used for
- *    the gate register.  Setting this flag makes the register accesses big
- *    endian.
  */
 struct clk_gate_data {
     uint32_t offset;
@@ -281,9 +280,6 @@ struct clk_gate_data {
  * CLK_DIVIDER_MAX_AT_ZERO - For dividers which are like CLK_DIVIDER_ONE_BASED
  *    except when the value read from the register is zero, the divisor is
  *    2^width of the field.
- * CLK_DIVIDER_BIG_ENDIAN - By default little endian register accesses are used
- *    for the divider register.  Setting this flag makes the register accesses
- *    big endian.
  */
 struct clk_div_data {
     uint32_t offset;

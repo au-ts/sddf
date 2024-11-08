@@ -1,3 +1,36 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Copyright (C) 2010-2011 Canonical Ltd <jeremy.kerr@canonical.com>
+ * Copyright (C) 2011-2012 Mike Turquette, Linaro Ltd <mturquette@linaro.org>
+ *
+ * Gated clock implementation
+ * Source: https://github.com/torvalds/linux/blob/
+ *   cfaaa7d010d1fc58f9717fcc8591201e741d2d49/drivers/clk/imx/clk-gate2.c
+ */
+
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Copyright 2018 NXP.
+ *
+ * Source: https://github.com/torvalds/linux/blob/
+ *   cfaaa7d010d1fc58f9717fcc8591201e741d2d49/drivers/clk/imx/clk-frac-pll.c
+ */
+
+// SPDX-License-Identifier: GPL-2.0-only OR MIT
+/*
+ * Copyright 2018 NXP.
+ *
+ * Source: https://github.com/torvalds/linux/blob/
+ *   cfaaa7d010d1fc58f9717fcc8591201e741d2d49/drivers/clk/imx/clk-sscg-pll.c
+ */
+
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Copyright 2018 NXP
+ *
+ * Source: https://github.com/torvalds/linux/blob/
+ *   cfaaa7d010d1fc58f9717fcc8591201e741d2d49/drivers/clk/imx/clk-composite-8m.c
+ */
 #pragma once
 
 #include <stdint.h>
@@ -121,36 +154,41 @@ struct clk _name = {                                        \
 #define IMX_CLK_FIXED(_name, _rate)                         \
 IMX_CLK_SOURCE(_name, _rate)
 
-#define IMX_CLK_MUX_FLAGS(_name, _base, _offset, _shift, _width, _parent_data, _num_parents, _init_flags)  \
-struct clk _name = {                                        \
-    .base = (_base),                                        \
-    .data = &(struct clk_mux_data) {                        \
-        .offset = (_offset),                                \
-        .mask = MASK(_width),                               \
-        .shift = (_shift),                                  \
-    },                                                      \
-    .hw.init = &(struct clk_init_data) {                    \
-        .name = #_name,                                     \
-        .ops = &clk_mux_ops,                                \
-        .parent_data = (_parent_data),                      \
-        .num_parents = (_num_parents),                      \
-        .flags = (_init_flags),                             \
-    },                                                      \
+#define IMX_CLK_MUX_FLAGS(_name, _base, _offset, _shift, _width, _parent_data, \
+                          _num_parents, _init_flags) \
+struct clk _name = {                                               \
+    .base = (_base),                                               \
+    .data = &(struct clk_mux_data) {                               \
+        .offset = (_offset),                                       \
+        .mask = MASK(_width),                                      \
+        .shift = (_shift),                                         \
+    },                                                             \
+    .hw.init = &(struct clk_init_data) {                           \
+        .name = #_name,                                            \
+        .ops = &clk_mux_ops,                                       \
+        .parent_data = (_parent_data),                             \
+        .num_parents = (_num_parents),                             \
+        .flags = (_init_flags),                                    \
+    },                                                             \
 }
 
-#define IMX_CLK_MUX(_name, _base, _offset, _shift, _width, _parent_data, _num_parents)               \
-IMX_CLK_MUX_FLAGS(_name, _base, _offset, _shift, _width,    \
+#define IMX_CLK_MUX(_name, _base, _offset, _shift, _width, _parent_data,       \
+                    _num_parents)                     \
+IMX_CLK_MUX_FLAGS(_name, _base, _offset, _shift, _width,           \
             _parent_data, _num_parents, 0)
 
-#define IMX_CLK_MUX2(_name, _base, _offset, _shift, _width, _parent_data, _num_parents)               \
+#define IMX_CLK_MUX2(_name, _base, _offset, _shift, _width, _parent_data,      \
+                     _num_parents)            \
 IMX_CLK_MUX_FLAGS(_name, _base, _offset, _shift, _width,    \
             _parent_data, _num_parents, CLK_OPS_PARENT_ENABLE)
 
-#define IMX_CLK_MUX2_FLAGS(_name, _base, _offset, _shift, _width, _parent_data, _num_parents, _flags)      \
-IMX_CLK_MUX_FLAGS(_name, _base, _offset, _shift, _width,     \
+#define IMX_CLK_MUX2_FLAGS(_name, _base, _offset, _shift, _width,              \
+                           _parent_data, _num_parents, _flags)    \
+IMX_CLK_MUX_FLAGS(_name, _base, _offset, _shift, _width,          \
             _parent_data, _num_parents, _flags | CLK_OPS_PARENT_ENABLE)
 
-#define IMX_CLK_DIV_FLAGS(_name, _parent_clks, _base, _offset, _shift, _width, _flags)                 \
+#define IMX_CLK_DIV_FLAGS(_name, _parent_clks, _base, _offset, _shift, _width, \
+                          _flags)  \
 struct clk _name = {                                        \
     .base = (_base),                                        \
     .data = &(struct clk_div_data) {                        \
@@ -167,25 +205,25 @@ struct clk _name = {                                        \
     },                                                      \
 }
 
-#define IMX_CLK_DIV(_name, _parent_clks, _base, _offset, _shift, _width)                         \
+#define IMX_CLK_DIV(_name, _parent_clks, _base, _offset, _shift, _width) \
 IMX_CLK_DIV_FLAGS(_name, _parent_clks, _base, _offset, _shift, _width, 0)
 
-#define IMX_CLK_DIV2(_name, _parent_clks, _base, _offset, _shift, _width)                         \
-IMX_CLK_DIV_FLAGS(_name, _parent_clks, _base, _offset, _shift, \
+#define IMX_CLK_DIV2(_name, _parent_clks, _base, _offset, _shift, _width) \
+IMX_CLK_DIV_FLAGS(_name, _parent_clks, _base, _offset, _shift,            \
                   _width, CLK_SET_RATE_PARENT | CLK_OPS_PARENT_ENABLE)
 
 #define IMX_CLK_FRAC_PLL(_name, _parent_clks, _base, _offset)  \
-struct clk _name = {                                        \
-    .base = (_base),                                        \
-    .data = &(struct clk_frac_pll_data) {                   \
-        .offset = (_offset),                                \
-    },                                                      \
-    .hw.init = &(struct clk_init_data) {                    \
-        .name = #_name,                                     \
-        .ops = &clk_frac_pll_ops,                           \
-        .parent_clks = (const struct clk *[]) _parent_clks, \
-        .num_parents = 1,                                   \
-    },                                                      \
+struct clk _name = {                                           \
+    .base = (_base),                                           \
+    .data = &(struct clk_frac_pll_data) {                      \
+        .offset = (_offset),                                   \
+    },                                                         \
+    .hw.init = &(struct clk_init_data) {                       \
+        .name = #_name,                                        \
+        .ops = &clk_frac_pll_ops,                              \
+        .parent_clks = (const struct clk *[]) _parent_clks,    \
+        .num_parents = 1,                                      \
+    },                                                         \
 }
 
 #define IMX_CLK_GATE1(_name, _parent_clks, _base, _offset, _shift)  \
@@ -206,7 +244,8 @@ struct clk _name = {                                                \
     },                                                              \
 }
 
-#define IMX_CLK_GATE2_FLAGS(_name, _parent_clks, _base, _offset, _shift, _flags)  \
+#define IMX_CLK_GATE2_FLAGS(_name, _parent_clks, _base, _offset, _shift,       \
+                            _flags) \
 struct clk _name = {                                                \
     .base = (_base),                                                \
     .data = &(struct clk_gate_data) {                               \
@@ -221,16 +260,18 @@ struct clk _name = {                                                \
     },                                                              \
 }
 
-#define IMX_CLK_GATE2_SHARED2(_name, _parent_clks, _base, _offset, _shift, _shared_count)  \
+#define IMX_CLK_GATE2_SHARED2(_name, _parent_clks, _base, _offset, _shift,     \
+                              _shared_count)                               \
 IMX_CLK_GATE2_FLAGS(_name, _parent_clks, _base, _offset, _shift, 0)
 
-#define IMX_CLK_GATE4(_name, _parent_clks, _base, _offset, _shift)  \
+#define IMX_CLK_GATE4(_name, _parent_clks, _base, _offset, _shift) \
 IMX_CLK_GATE2_FLAGS(_name, _parent_clks, _base, _offset, _shift, 0)
 
 #define IMX_CLK_FIXED_FACTOR(_name, _parent_clks, _mult, _div)      \
 CLK_FIXED_FACTOR(_name, _mult, _div, 0, _parent_clks, 1, CLK_SET_RATE_PARENT)
 
-#define IMX_CLK_SSCG_PLL(_name, _parent_data, _num_parents, _parent, _bypass1, _bypass2, _base, _offset, _flags) \
+#define IMX_CLK_SSCG_PLL(_name, _parent_data, _num_parents, _parent, _bypass1, \
+                         _bypass2, _base, _offset, _flags)          \
 struct clk _name = {                                                \
     .base = (_base),                                                \
     .data = &(struct clk_sscg_pll_data) {                           \
@@ -277,8 +318,8 @@ struct clk _name = {                                                \
         .offset = (_offset),                                        \
         .mux_shift = PCG_PCS_SHIFT,                                 \
         .mux_mask = PCG_PCS_MASK,                                   \
-        .prevdiv_shift = PCG_PREDIV_SHIFT,                         \
-        .prevdiv_width = PCG_PREDIV_WIDTH,                         \
+        .prevdiv_shift = PCG_PREDIV_SHIFT,                          \
+        .prevdiv_width = PCG_PREDIV_WIDTH,                          \
         .postdiv_shift = PCG_DIV_SHIFT,                             \
         .postdiv_width = PCG_DIV_WIDTH,                             \
         .gate_shift = PCG_CGC_SHIFT,                                \
@@ -294,7 +335,7 @@ struct clk _name = {                                                \
     },                                                              \
 }
 
-#define IMX_CLK_COMPOSITE_FLAGS(_name, _parent_data, _base, _offset, _flags)           \
+#define IMX_CLK_COMPOSITE_FLAGS(_name, _parent_data, _base, _offset, _flags) \
 struct clk _name = {                                                \
     .base = (_base),                                                \
     .data = &(struct clk_common_slice_data) {                       \
@@ -324,9 +365,13 @@ IMX_CLK_COMPOSITE_FLAGS(_name, _parent_data, _base, _offset,        \
                         CLK_OPS_PARENT_ENABLE)
 
 #define IMX_CLK_COMPOSITE_FW_MANAGED(_name, _parent_data, _base, _offset)  \
-IMX_CLK_COMPOSITE_FLAGS(_name, _parent_data, _base, _offset,        \
-                        (CLK_SET_RATE_NO_REPARENT | CLK_OPS_PARENT_ENABLE | CLK_GET_RATE_NOCACHE))
+IMX_CLK_COMPOSITE_FLAGS(_name, _parent_data, _base, _offset,               \
+                        (CLK_SET_RATE_NO_REPARENT | CLK_OPS_PARENT_ENABLE  \
+                         | CLK_GET_RATE_NOCACHE))
 
-#define IMX_CLK_COMPOSITE_FW_MANAGED_CRITICAL(_name, _parent_data, _base, _offset)  \
-IMX_CLK_COMPOSITE_FLAGS(_name, _parent_data, _base, _offset,        \
-                        (CLK_SET_RATE_NO_REPARENT | CLK_OPS_PARENT_ENABLE | CLK_GET_RATE_NOCACHE | CLK_IS_CRITICAL))
+#define IMX_CLK_COMPOSITE_FW_MANAGED_CRITICAL(_name, _parent_data, _base,      \
+                                              _offset)                     \
+IMX_CLK_COMPOSITE_FLAGS(_name, _parent_data, _base, _offset,               \
+                        (CLK_SET_RATE_NO_REPARENT |                        \
+                         CLK_OPS_PARENT_ENABLE |                           \
+                         CLK_GET_RATE_NOCACHE | CLK_IS_CRITICAL))

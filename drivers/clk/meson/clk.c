@@ -15,10 +15,10 @@
 
 #include <clk.h>            /* common definitions and interfaces */
 #include <clk-operations.h> /* ops of common clocks e.g., div, mux, fixed factor, and gate*/
-#include <clk-measure.h>    /* implementation of clock measurements */
-#include <clk-meson.h>      /* operations for meson-specific clocks */
-#include <g12a-regs.h>      /* offsets of control registers */
-#include <g12a-bindings.h>  /* clock id bindings*/
+#include <clk-measure.h> /* implementation of clock measurements */
+#include <clk-meson.h> /* operations for meson-specific clocks */
+#include <g12a-regs.h> /* offsets of control registers */
+#include <g12a-bindings.h> /* clock id bindings*/
 
 // Logging
 /* #define DEBUG_DRIVER */
@@ -162,18 +162,17 @@ uint32_t clk_set_rate(struct clk *clk, uint64_t req_rate, uint64_t *rate)
         clk->hw.init->ops->set_rate(clk, req_rate, prate);
         *rate = req_rate;
         return 0;
-    } else {
-        if (pclk->hw.init->ops->set_rate) {
-            const struct clk *ppclk = get_parent(pclk);
-            uint64_t pprate = 0;
-            uint32_t err = clk_get_rate(ppclk, &pprate);
-            if (!err) {
-                pclk->hw.init->ops->set_rate(pclk, prate, pprate);
-                *rate = req_rate;
-                return 0;
-            }
-            return err;
+    }
+    if (pclk->hw.init->ops->set_rate) {
+        const struct clk *ppclk = get_parent(pclk);
+        uint64_t pprate = 0;
+        uint32_t err = clk_get_rate(ppclk, &pprate);
+        if (!err) {
+            pclk->hw.init->ops->set_rate(pclk, prate, pprate);
+            *rate = req_rate;
+            return 0;
         }
+        return err;
     }
 
     return CLK_INVALID_OP;
@@ -193,8 +192,8 @@ int clk_msr_stat()
     for (i = 0; i < NUM_CLK_LIST; i++) {
         err = clk_get_rate(clk_list[i], &rate);
         if (err) {
-            LOG_DRIVER("Failed to get rate of %s: -%u\n", clk_list[i]->hw.init->name, err);
-
+            LOG_DRIVER("Failed to get rate of %s: -%u\n",
+                       clk_list[i]->hw.init->name, err);
         }
         LOG_DRIVER("[%4d][%4luHz] %s\n", i, rate, clk_list[i]->hw.init->name);
     }
@@ -224,7 +223,6 @@ void init(void)
     clk_probe(clk_list);
     clk_msr_stat();
 
-
     for (int i = 0; i < NUM_DEVICE_CLKS; i++) {
         struct clk *clk = clk_list[clk_configs[i].clk_id];
 
@@ -238,11 +236,11 @@ void init(void)
             uint64_t rate = 0;
             uint32_t err = clk_set_rate(clk, clk_configs[i].frequency, &rate);
             if (err) {
-                LOG_DRIVER_ERR("Failed to set rate [%d] for clk_id: %d\n", clk_configs[i].frequency, clk_configs[i].clk_id);
+                LOG_DRIVER_ERR("Failed to set rate [%d] for clk_id: %d\n",
+                               clk_configs[i].frequency, clk_configs[i].clk_id);
             }
         }
     }
-
 }
 
 microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
@@ -304,8 +302,8 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
         break;
     }
     default:
-        LOG_DRIVER_ERR("Unknown request %lu to clockk driver from channel %u\n", microkit_msginfo_get_label(msginfo),
-                       ch);
+        LOG_DRIVER_ERR("Unknown request %lu to clockk driver from channel %u\n",
+                       microkit_msginfo_get_label(msginfo), ch);
         err = CLK_UNKNOWN_REQ;
     }
     return microkit_msginfo_new(err, ret_num);
