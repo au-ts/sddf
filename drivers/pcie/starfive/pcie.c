@@ -25,6 +25,8 @@ uintptr_t pcie_config;
 #define PCIE_CONFIG_SIZE 0x10000
 #elif defined(CONFIG_PLAT_STAR64)
 #define PCIE_CONFIG_SIZE 0x1000000
+#elif defined(CONFIG_PLAT_QEMU_RISCV_VIRT)
+#define PCIE_CONFIG_SIZE 0x1000000
 #else
 #error "unknown pcie config region size"
 #endif
