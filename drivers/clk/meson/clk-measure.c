@@ -1,4 +1,4 @@
-/*
+/* SPDX-License-Identifier: GPL-2.0-or-later
  *
  * This program is derived from:
  *   https://github.com/hardkernel/u-boot/blob/odroidg12-v2015.01/arch/arm/cpu/armv8/g12a/clock.c
@@ -185,14 +185,14 @@ unsigned long clk_msr(unsigned long clk_mux)
     /* Disable interrupts */
     *mclk_reg0 = regval;
 
-    regval |= duration;               /* 64uS is enough for measure the frequence? */
+    regval |= duration; /* 64uS is enough for measure the frequence? */
     *mclk_reg0 = regval;
 
-    regval |= (clk_mux << 20);        /* Select MUX */
+    regval |= (clk_mux << 20); /* Select MUX */
     *mclk_reg0 = regval;
 
-    regval |= (1 << 19);              /* enable the clock */
-    regval |= (1 << 16);              /* enable measuring */
+    regval |= (1 << 19); /* enable the clock */
+    regval |= (1 << 16); /* enable measuring */
     *mclk_reg0 = regval;
 
     regval = *mclk_reg0;
@@ -202,7 +202,7 @@ unsigned long clk_msr(unsigned long clk_mux)
 
     /* TODO: Check the busy bit */
     /* if (regval & (1 << 31)) */
-        /* sddf_dprintf("CLK | ERR: The clock measure logic is busy\n"); */
+    /* sddf_dprintf("CLK | ERR: The clock measure logic is busy\n"); */
 
     /* Wait for the measurement to be done */
     while (true) {
@@ -213,15 +213,16 @@ unsigned long clk_msr(unsigned long clk_mux)
         }
         /* TODO: Could be optimised via timeouts */
         /* if (sleep_us) */
-            /* udelay(sleep_us); */
+        /* udelay(sleep_us); */
     }
 
-    regval &= ~(1 << 16);             /* disable measuring */
+    regval &= ~(1 << 16); /* disable measuring */
     *mclk_reg0 = regval;
 
     uint32_t msr_val = *mclk_reg2;
 
-    return DIV_ROUND_CLOSEST_ULL((msr_val & ((1 << 19) - 1)) * 1000000ULL, duration);
+    return DIV_ROUND_CLOSEST_ULL((msr_val & ((1 << 19) - 1)) * 1000000ULL,
+                                 duration);
 }
 
 const char *const *get_msr_clk_list(void)

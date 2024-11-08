@@ -9,7 +9,7 @@
 
 #define DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
 
-#define do_div(n, base) ({                               \
+#define do_div(n, base) ({                              \
     uint32_t __base = (base);                           \
     uint32_t __rem;                                     \
     __rem = ((uint64_t)(n)) % __base;                   \

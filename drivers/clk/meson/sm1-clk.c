@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0+
+// SPDX-License-Identifier: GPL-2.0-or-later
 /*
  * Amlogic Meson-G12A Clock Controller Driver
  *
@@ -71,7 +71,8 @@ static struct clk g12a_fixed_pll_dco = {
         .num_parents = 1,
     },
 };
-static CLK_DIV_RO(g12a_fixed_pll, HHI_FIX_PLL_CNTL0, 16, 2, CLK_DIVIDER_POWER_OF_TWO, { &g12a_fixed_pll_dco }, 1, 0);
+static CLK_DIV_RO(g12a_fixed_pll, HHI_FIX_PLL_CNTL0, 16, 2,
+                  CLK_DIVIDER_POWER_OF_TWO, { &g12a_fixed_pll_dco }, 1, 0);
 static struct clk g12a_sys_pll_dco = {
     .data = &(struct meson_clk_pll_data){
         .en = {
@@ -113,13 +114,18 @@ static struct clk g12a_sys_pll_dco = {
         .flags = CLK_IS_CRITICAL,
     },
 };
-static CLK_DIV(g12a_sys_pll, HHI_SYS_PLL_CNTL0, 16, 3, CLK_DIVIDER_POWER_OF_TWO, { &g12a_sys_pll_dco }, 1, 0);
-static CLK_GATE_RO(g12a_sys_pll_div16_en, HHI_SYS_CPU_CLK_CNTL1, 24, 0, { &g12a_sys_pll }, 1, 0);
-static CLK_FIXED_FACTOR(g12a_sys_pll_div16, 1, 16, 0, { &g12a_sys_pll_div16_en }, 1, 0);
+static CLK_DIV(g12a_sys_pll, HHI_SYS_PLL_CNTL0, 16, 3, CLK_DIVIDER_POWER_OF_TWO,
+               { &g12a_sys_pll_dco }, 1, 0);
+static CLK_GATE_RO(g12a_sys_pll_div16_en, HHI_SYS_CPU_CLK_CNTL1, 24, 0,
+                   { &g12a_sys_pll }, 1, 0);
+static CLK_FIXED_FACTOR(g12a_sys_pll_div16, 1, 16, 0,
+                        { &g12a_sys_pll_div16_en }, 1, 0);
 static CLK_FIXED_FACTOR(g12a_fclk_div2_div, 1, 2, 0, { &g12a_fixed_pll }, 1, 0);
-static CLK_GATE(g12a_fclk_div2, HHI_FIX_PLL_CNTL1, 24, 0, { &g12a_fclk_div2_div }, 1, 0);
+static CLK_GATE(g12a_fclk_div2, HHI_FIX_PLL_CNTL1, 24, 0,
+                { &g12a_fclk_div2_div }, 1, 0);
 static CLK_FIXED_FACTOR(g12a_fclk_div3_div, 1, 3, 0, { &g12a_fixed_pll }, 1, 0);
-static CLK_GATE(g12a_fclk_div3, HHI_FIX_PLL_CNTL1, 20, 0, { &g12a_fclk_div3_div }, 1, 0);
+static CLK_GATE(g12a_fclk_div3, HHI_FIX_PLL_CNTL1, 20, 0,
+                { &g12a_fclk_div3_div }, 1, 0);
 const struct clk_parent_data g12a_cpu_clk_premux0_parent_table[] = {
     {
         .name = "xtal",
@@ -127,8 +133,8 @@ const struct clk_parent_data g12a_cpu_clk_premux0_parent_table[] = {
     { .clk = &g12a_fclk_div2 },
     { .clk = &g12a_fclk_div3 },
 };
-static CLK_MUX(g12a_cpu_clk_premux0, HHI_SYS_CPU_CLK_CNTL0, 0x3, 0, 0, CLK_MUX_ROUND_CLOSEST,
-               g12a_cpu_clk_premux0_parent_table, 3, 0);
+static CLK_MUX(g12a_cpu_clk_premux0, HHI_SYS_CPU_CLK_CNTL0, 0x3, 0, 0,
+               CLK_MUX_ROUND_CLOSEST, g12a_cpu_clk_premux0_parent_table, 3, 0);
 const struct clk_parent_data g12a_cpu_clk_premux1_parent_table[] = {
     {
         .name = "xtal",
@@ -136,7 +142,8 @@ const struct clk_parent_data g12a_cpu_clk_premux1_parent_table[] = {
     { .clk = &g12a_fclk_div2 },
     { .clk = &g12a_fclk_div3 },
 };
-static CLK_MUX(g12a_cpu_clk_premux1, HHI_SYS_CPU_CLK_CNTL0, 0x3, 16, 0, 0, g12a_cpu_clk_premux1_parent_table, 3, 0);
+static CLK_MUX(g12a_cpu_clk_premux1, HHI_SYS_CPU_CLK_CNTL0, 0x3, 16, 0, 0,
+               g12a_cpu_clk_premux1_parent_table, 3, 0);
 static struct clk g12a_cpu_clk_mux0_div = {
     .data = &(struct meson_clk_cpu_dyndiv_data){
         .div = {
@@ -164,30 +171,36 @@ const struct clk_parent_data g12a_cpu_clk_postmux0_parent_table[] = {
     { .clk = &g12a_cpu_clk_premux0 },
     { .clk = &g12a_cpu_clk_mux0_div },
 };
-static CLK_MUX(g12a_cpu_clk_postmux0, HHI_SYS_CPU_CLK_CNTL0, 0x1, 2, 0, CLK_MUX_ROUND_CLOSEST,
-               g12a_cpu_clk_postmux0_parent_table, 2, 0);
-static CLK_DIV_RO(g12a_cpu_clk_mux1_div, HHI_SYS_CPU_CLK_CNTL0, 20, 6, 0, { &g12a_cpu_clk_premux1 }, 1, 0);
+static CLK_MUX(g12a_cpu_clk_postmux0, HHI_SYS_CPU_CLK_CNTL0, 0x1, 2, 0,
+               CLK_MUX_ROUND_CLOSEST, g12a_cpu_clk_postmux0_parent_table, 2, 0);
+static CLK_DIV_RO(g12a_cpu_clk_mux1_div, HHI_SYS_CPU_CLK_CNTL0, 20, 6, 0,
+                  { &g12a_cpu_clk_premux1 }, 1, 0);
 const struct clk_parent_data g12a_cpu_clk_postmux1_parent_table[] = {
     { .clk = &g12a_cpu_clk_premux1 },
     { .clk = &g12a_cpu_clk_mux1_div },
 };
-static CLK_MUX(g12a_cpu_clk_postmux1, HHI_SYS_CPU_CLK_CNTL0, 0x1, 18, 0, 0, g12a_cpu_clk_postmux1_parent_table, 2, 0);
+static CLK_MUX(g12a_cpu_clk_postmux1, HHI_SYS_CPU_CLK_CNTL0, 0x1, 18, 0, 0,
+               g12a_cpu_clk_postmux1_parent_table, 2, 0);
 const struct clk_parent_data g12a_cpu_clk_dyn_parent_table[] = {
     { .clk = &g12a_cpu_clk_postmux0 },
     { .clk = &g12a_cpu_clk_postmux1 },
 };
-static CLK_MUX(g12a_cpu_clk_dyn, HHI_SYS_CPU_CLK_CNTL0, 0x1, 10, 0, CLK_MUX_ROUND_CLOSEST,
-               g12a_cpu_clk_dyn_parent_table, 2, 0);
+static CLK_MUX(g12a_cpu_clk_dyn, HHI_SYS_CPU_CLK_CNTL0, 0x1, 10, 0,
+               CLK_MUX_ROUND_CLOSEST, g12a_cpu_clk_dyn_parent_table, 2, 0);
 const struct clk_parent_data g12a_cpu_clk_parent_table[] = {
     { .clk = &g12a_cpu_clk_dyn },
     { .clk = &g12a_sys_pll },
 };
-static CLK_MUX(g12a_cpu_clk, HHI_SYS_CPU_CLK_CNTL0, 0x1, 11, 0, CLK_MUX_ROUND_CLOSEST, g12a_cpu_clk_parent_table, 2, 0);
+static CLK_MUX(g12a_cpu_clk, HHI_SYS_CPU_CLK_CNTL0, 0x1, 11, 0,
+               CLK_MUX_ROUND_CLOSEST, g12a_cpu_clk_parent_table, 2, 0);
 
 static const struct reg_sequence g12a_gp0_init_regs[] = {
-    { .reg = HHI_GP0_PLL_CNTL1, .def = 0x00000000 }, { .reg = HHI_GP0_PLL_CNTL2, .def = 0x00000000 },
-    { .reg = HHI_GP0_PLL_CNTL3, .def = 0x48681c00 }, { .reg = HHI_GP0_PLL_CNTL4, .def = 0x33771290 },
-    { .reg = HHI_GP0_PLL_CNTL5, .def = 0x39272000 }, { .reg = HHI_GP0_PLL_CNTL6, .def = 0x56540000 },
+    { .reg = HHI_GP0_PLL_CNTL1, .def = 0x00000000 },
+    { .reg = HHI_GP0_PLL_CNTL2, .def = 0x00000000 },
+    { .reg = HHI_GP0_PLL_CNTL3, .def = 0x48681c00 },
+    { .reg = HHI_GP0_PLL_CNTL4, .def = 0x33771290 },
+    { .reg = HHI_GP0_PLL_CNTL5, .def = 0x39272000 },
+    { .reg = HHI_GP0_PLL_CNTL6, .def = 0x56540000 },
 };
 static struct clk g12a_gp0_pll_dco = {
     .data = &(struct meson_clk_pll_data){
@@ -235,7 +248,8 @@ static struct clk g12a_gp0_pll_dco = {
         .num_parents = 1,
     },
 };
-static CLK_DIV(g12a_gp0_pll, HHI_GP0_PLL_CNTL0, 16, 3, (CLK_DIVIDER_POWER_OF_TWO | CLK_DIVIDER_ROUND_CLOSEST),
+static CLK_DIV(g12a_gp0_pll, HHI_GP0_PLL_CNTL0, 16, 3,
+               (CLK_DIVIDER_POWER_OF_TWO | CLK_DIVIDER_ROUND_CLOSEST),
                { &g12a_gp0_pll_dco }, 1, 0);
 static struct clk sm1_gp1_pll_dco = {
     .data = &(struct meson_clk_pll_data){
@@ -281,7 +295,8 @@ static struct clk sm1_gp1_pll_dco = {
         .flags = CLK_IS_CRITICAL,
     },
 };
-static CLK_DIV_RO(sm1_gp1_pll, HHI_GP1_PLL_CNTL0, 16, 3, (CLK_DIVIDER_POWER_OF_TWO | CLK_DIVIDER_ROUND_CLOSEST),
+static CLK_DIV_RO(sm1_gp1_pll, HHI_GP1_PLL_CNTL0, 16, 3,
+                  (CLK_DIVIDER_POWER_OF_TWO | CLK_DIVIDER_ROUND_CLOSEST),
                   { &sm1_gp1_pll_dco }, 1, 0);
 
 const struct clk_parent_data sm1_dsu_clk_premux0_parent_table[] = {
@@ -292,7 +307,8 @@ const struct clk_parent_data sm1_dsu_clk_premux0_parent_table[] = {
     { .clk = &g12a_fclk_div3 },
     { .clk = &sm1_gp1_pll },
 };
-static CLK_MUX_RO(sm1_dsu_clk_premux0, HHI_SYS_CPU_CLK_CNTL5, 0x3, 0, 0, 0, sm1_dsu_clk_premux0_parent_table, 4, 0);
+static CLK_MUX_RO(sm1_dsu_clk_premux0, HHI_SYS_CPU_CLK_CNTL5, 0x3, 0, 0, 0,
+                  sm1_dsu_clk_premux0_parent_table, 4, 0);
 const struct clk_parent_data sm1_dsu_clk_premux1_parent_table[] = {
     {
         .name = "xtal",
@@ -301,16 +317,20 @@ const struct clk_parent_data sm1_dsu_clk_premux1_parent_table[] = {
     { .clk = &g12a_fclk_div3 },
     { .clk = &sm1_gp1_pll },
 };
-static CLK_MUX_RO(sm1_dsu_clk_premux1, HHI_SYS_CPU_CLK_CNTL5, 0x3, 16, 0, 0, sm1_dsu_clk_premux1_parent_table, 4, 0);
-static CLK_DIV_RO(sm1_dsu_clk_mux0_div, HHI_SYS_CPU_CLK_CNTL5, 4, 6, 0, { &sm1_dsu_clk_premux0 }, 1, 0);
+static CLK_MUX_RO(sm1_dsu_clk_premux1, HHI_SYS_CPU_CLK_CNTL5, 0x3, 16, 0, 0,
+                  sm1_dsu_clk_premux1_parent_table, 4, 0);
+static CLK_DIV_RO(sm1_dsu_clk_mux0_div, HHI_SYS_CPU_CLK_CNTL5, 4, 6, 0,
+                  { &sm1_dsu_clk_premux0 }, 1, 0);
 const struct clk_parent_data sm1_dsu_clk_postmux0_parent_table[] = {
     {
         .clk = &sm1_dsu_clk_premux0,
     },
     { .clk = &sm1_dsu_clk_mux0_div },
 };
-static CLK_MUX_RO(sm1_dsu_clk_postmux0, HHI_SYS_CPU_CLK_CNTL5, 0x1, 2, 0, 0, sm1_dsu_clk_postmux0_parent_table, 2, 0);
-static CLK_DIV_RO(sm1_dsu_clk_mux1_div, HHI_SYS_CPU_CLK_CNTL5, 20, 6, 0, { &sm1_dsu_clk_premux1 }, 1, 0);
+static CLK_MUX_RO(sm1_dsu_clk_postmux0, HHI_SYS_CPU_CLK_CNTL5, 0x1, 2, 0, 0,
+                  sm1_dsu_clk_postmux0_parent_table, 2, 0);
+static CLK_DIV_RO(sm1_dsu_clk_mux1_div, HHI_SYS_CPU_CLK_CNTL5, 20, 6, 0,
+                  { &sm1_dsu_clk_premux1 }, 1, 0);
 
 const struct clk_parent_data sm1_dsu_clk_postmux1_parent_table[] = {
     {
@@ -318,7 +338,8 @@ const struct clk_parent_data sm1_dsu_clk_postmux1_parent_table[] = {
     },
     { .clk = &sm1_dsu_clk_mux1_div },
 };
-static CLK_MUX_RO(sm1_dsu_clk_postmux1, HHI_SYS_CPU_CLK_CNTL5, 0x1, 18, 0, 0, sm1_dsu_clk_postmux1_parent_table, 2, 0);
+static CLK_MUX_RO(sm1_dsu_clk_postmux1, HHI_SYS_CPU_CLK_CNTL5, 0x1, 18, 0, 0,
+                  sm1_dsu_clk_postmux1_parent_table, 2, 0);
 const struct clk_parent_data sm1_dsu_clk_dyn_parent_table[] = {
     {
         .clk = &sm1_dsu_clk_premux0,
@@ -327,7 +348,8 @@ const struct clk_parent_data sm1_dsu_clk_dyn_parent_table[] = {
         .clk = &sm1_dsu_clk_postmux1,
     },
 };
-static CLK_MUX_RO(sm1_dsu_clk_dyn, HHI_SYS_CPU_CLK_CNTL5, 0x1, 10, 0, 0, sm1_dsu_clk_dyn_parent_table, 2, 0);
+static CLK_MUX_RO(sm1_dsu_clk_dyn, HHI_SYS_CPU_CLK_CNTL5, 0x1, 10, 0, 0,
+                  sm1_dsu_clk_dyn_parent_table, 2, 0);
 const struct clk_parent_data sm1_dsu_final_clk_parent_table[] = {
     {
         .clk = &sm1_dsu_clk_dyn,
@@ -336,15 +358,19 @@ const struct clk_parent_data sm1_dsu_final_clk_parent_table[] = {
         .clk = &g12a_sys_pll,
     },
 };
-static CLK_MUX_RO(sm1_dsu_final_clk, HHI_SYS_CPU_CLK_CNTL5, 0x1, 11, 0, 0, sm1_dsu_final_clk_parent_table, 2, 0);
+static CLK_MUX_RO(sm1_dsu_final_clk, HHI_SYS_CPU_CLK_CNTL5, 0x1, 11, 0, 0,
+                  sm1_dsu_final_clk_parent_table, 2, 0);
 const struct clk_parent_data sm1_cpu_clk_parent_table[] = {
     {
         .clk = &g12a_cpu_clk,
     },
 };
-static CLK_MUX_RO(sm1_cpu1_clk, HHI_SYS_CPU_CLK_CNTL6, 0x1, 24, 0, 0, sm1_cpu_clk_parent_table, 1, 0);
-static CLK_MUX_RO(sm1_cpu2_clk, HHI_SYS_CPU_CLK_CNTL6, 0x1, 25, 0, 0, sm1_cpu_clk_parent_table, 1, 0);
-static CLK_MUX_RO(sm1_cpu3_clk, HHI_SYS_CPU_CLK_CNTL6, 0x1, 26, 0, 0, sm1_cpu_clk_parent_table, 1, 0);
+static CLK_MUX_RO(sm1_cpu1_clk, HHI_SYS_CPU_CLK_CNTL6, 0x1, 24, 0, 0,
+                  sm1_cpu_clk_parent_table, 1, 0);
+static CLK_MUX_RO(sm1_cpu2_clk, HHI_SYS_CPU_CLK_CNTL6, 0x1, 25, 0, 0,
+                  sm1_cpu_clk_parent_table, 1, 0);
+static CLK_MUX_RO(sm1_cpu3_clk, HHI_SYS_CPU_CLK_CNTL6, 0x1, 26, 0, 0,
+                  sm1_cpu_clk_parent_table, 1, 0);
 const struct clk_parent_data sm1_dsu_clk_parent_table[] = {
     {
         .clk = &g12a_cpu_clk,
@@ -353,23 +379,37 @@ const struct clk_parent_data sm1_dsu_clk_parent_table[] = {
         .clk = &sm1_dsu_final_clk,
     },
 };
-static CLK_MUX_RO(sm1_dsu_clk, HHI_SYS_CPU_CLK_CNTL6, 0x1, 27, 0, 0, sm1_dsu_clk_parent_table, 2, 0);
-static CLK_GATE_RO(g12a_cpu_clk_div16_en, HHI_SYS_CPU_CLK_CNTL1, 1, 0, { &g12a_cpu_clk }, 1, 0);
-static CLK_FIXED_FACTOR(g12a_cpu_clk_div16, 1, 16, 0, { &g12a_cpu_clk_div16_en }, 1, 0);
-static CLK_DIV_RO(g12a_cpu_clk_apb_div, HHI_SYS_CPU_CLK_CNTL1, 3, 3, CLK_DIVIDER_POWER_OF_TWO, { &g12a_cpu_clk }, 1, 0);
-static CLK_GATE_RO(g12a_cpu_clk_apb, HHI_SYS_CPU_CLK_CNTL1, 1, 0, { &g12a_cpu_clk_apb_div }, 1, 0);
-static CLK_DIV_RO(g12a_cpu_clk_atb_div, HHI_SYS_CPU_CLK_CNTL1, 6, 3, CLK_DIVIDER_POWER_OF_TWO, { &g12a_cpu_clk }, 1, 0);
-static CLK_GATE_RO(g12a_cpu_clk_atb, HHI_SYS_CPU_CLK_CNTL1, 17, 0, { &g12a_cpu_clk_atb_div }, 1, 0);
-static CLK_DIV_RO(g12a_cpu_clk_axi_div, HHI_SYS_CPU_CLK_CNTL1, 9, 3, CLK_DIVIDER_POWER_OF_TWO, { &g12a_cpu_clk }, 1, 0);
-static CLK_GATE_RO(g12a_cpu_clk_axi, HHI_SYS_CPU_CLK_CNTL1, 18, 0, { &g12a_cpu_clk_axi_div }, 1, 0);
+static CLK_MUX_RO(sm1_dsu_clk, HHI_SYS_CPU_CLK_CNTL6, 0x1, 27, 0, 0,
+                  sm1_dsu_clk_parent_table, 2, 0);
+static CLK_GATE_RO(g12a_cpu_clk_div16_en, HHI_SYS_CPU_CLK_CNTL1, 1, 0,
+                   { &g12a_cpu_clk }, 1, 0);
+static CLK_FIXED_FACTOR(g12a_cpu_clk_div16, 1, 16, 0,
+                        { &g12a_cpu_clk_div16_en }, 1, 0);
+static CLK_DIV_RO(g12a_cpu_clk_apb_div, HHI_SYS_CPU_CLK_CNTL1, 3, 3,
+                  CLK_DIVIDER_POWER_OF_TWO, { &g12a_cpu_clk }, 1, 0);
+static CLK_GATE_RO(g12a_cpu_clk_apb, HHI_SYS_CPU_CLK_CNTL1, 1, 0,
+                   { &g12a_cpu_clk_apb_div }, 1, 0);
+static CLK_DIV_RO(g12a_cpu_clk_atb_div, HHI_SYS_CPU_CLK_CNTL1, 6, 3,
+                  CLK_DIVIDER_POWER_OF_TWO, { &g12a_cpu_clk }, 1, 0);
+static CLK_GATE_RO(g12a_cpu_clk_atb, HHI_SYS_CPU_CLK_CNTL1, 17, 0,
+                   { &g12a_cpu_clk_atb_div }, 1, 0);
+static CLK_DIV_RO(g12a_cpu_clk_axi_div, HHI_SYS_CPU_CLK_CNTL1, 9, 3,
+                  CLK_DIVIDER_POWER_OF_TWO, { &g12a_cpu_clk }, 1, 0);
+static CLK_GATE_RO(g12a_cpu_clk_axi, HHI_SYS_CPU_CLK_CNTL1, 18, 0,
+                   { &g12a_cpu_clk_axi_div }, 1, 0);
 /* TODO: special case, ignore its parent clk at the moment */
-static CLK_DIV_RO(g12a_cpu_clk_trace_div, HHI_SYS_CPU_CLK_CNTL1, 20, 3, CLK_DIVIDER_POWER_OF_TWO, {}, 0, 0);
-static CLK_GATE_RO(g12a_cpu_clk_trace, HHI_SYS_CPU_CLK_CNTL1, 23, 0, { &g12a_cpu_clk_trace_div }, 1, 0);
+static CLK_DIV_RO(g12a_cpu_clk_trace_div, HHI_SYS_CPU_CLK_CNTL1, 20, 3,
+                  CLK_DIVIDER_POWER_OF_TWO, {}, 0, 0);
+static CLK_GATE_RO(g12a_cpu_clk_trace, HHI_SYS_CPU_CLK_CNTL1, 23, 0,
+                   { &g12a_cpu_clk_trace_div }, 1, 0);
 
 static const struct reg_sequence g12a_hifi_init_regs[] = {
-    { .reg = HHI_HIFI_PLL_CNTL1, .def = 0x00000000 }, { .reg = HHI_HIFI_PLL_CNTL2, .def = 0x00000000 },
-    { .reg = HHI_HIFI_PLL_CNTL3, .def = 0x6a285c00 }, { .reg = HHI_HIFI_PLL_CNTL4, .def = 0x65771290 },
-    { .reg = HHI_HIFI_PLL_CNTL5, .def = 0x39272000 }, { .reg = HHI_HIFI_PLL_CNTL6, .def = 0x56540000 },
+    { .reg = HHI_HIFI_PLL_CNTL1, .def = 0x00000000 },
+    { .reg = HHI_HIFI_PLL_CNTL2, .def = 0x00000000 },
+    { .reg = HHI_HIFI_PLL_CNTL3, .def = 0x6a285c00 },
+    { .reg = HHI_HIFI_PLL_CNTL4, .def = 0x65771290 },
+    { .reg = HHI_HIFI_PLL_CNTL5, .def = 0x39272000 },
+    { .reg = HHI_HIFI_PLL_CNTL6, .def = 0x56540000 },
 };
 
 static struct clk g12a_hifi_pll_dco = {
@@ -419,7 +459,8 @@ static struct clk g12a_hifi_pll_dco = {
         .num_parents = 1,
     },
 };
-static CLK_DIV(g12a_hifi_pll, HHI_HIFI_PLL_CNTL0, 16, 2, (CLK_DIVIDER_POWER_OF_TWO | CLK_DIVIDER_ROUND_CLOSEST),
+static CLK_DIV(g12a_hifi_pll, HHI_HIFI_PLL_CNTL0, 16, 2,
+               (CLK_DIVIDER_POWER_OF_TWO | CLK_DIVIDER_ROUND_CLOSEST),
                { &g12a_hifi_pll_dco }, 1, 0);
 
 /*
@@ -491,10 +532,12 @@ static struct clk g12a_pcie_pll_dco = {
         .num_parents = 1,
     },
 };
-static CLK_FIXED_FACTOR(g12a_pcie_pll_dco_div2, 1, 2, 0, { &g12a_pcie_pll_dco }, 1, 0);
+static CLK_FIXED_FACTOR(g12a_pcie_pll_dco_div2, 1, 2, 0, { &g12a_pcie_pll_dco },
+                        1, 0);
 static CLK_DIV(g12a_pcie_pll_od, HHI_PCIE_PLL_CNTL0, 16, 5,
-               CLK_DIVIDER_ROUND_CLOSEST | CLK_DIVIDER_ONE_BASED | CLK_DIVIDER_ALLOW_ZERO, { &g12a_pcie_pll_dco_div2 },
-               1, 0);
+               CLK_DIVIDER_ROUND_CLOSEST | CLK_DIVIDER_ONE_BASED
+                   | CLK_DIVIDER_ALLOW_ZERO,
+               { &g12a_pcie_pll_dco_div2 }, 1, 0);
 static CLK_FIXED_FACTOR(g12a_pcie_pll, 1, 2, 0, { &g12a_pcie_pll_od }, 1, 0);
 static struct clk g12a_hdmi_pll_dco = {
     .data = &(struct meson_clk_pll_data){
@@ -543,26 +586,37 @@ static struct clk g12a_hdmi_pll_dco = {
         .flags = CLK_GET_RATE_NOCACHE,
     },
 };
-static CLK_DIV_RO(g12a_hdmi_pll_od, HHI_HDMI_PLL_CNTL0, 16, 2, CLK_DIVIDER_POWER_OF_TWO, { &g12a_hdmi_pll_dco }, 1, 0);
-static CLK_DIV_RO(g12a_hdmi_pll_od2, HHI_HDMI_PLL_CNTL0, 18, 2, CLK_DIVIDER_POWER_OF_TWO, { &g12a_hdmi_pll_od }, 1, 0);
-static CLK_DIV_RO(g12a_hdmi_pll, HHI_HDMI_PLL_CNTL0, 20, 2, CLK_DIVIDER_POWER_OF_TWO, { &g12a_hdmi_pll_od2 }, 1, 0);
+static CLK_DIV_RO(g12a_hdmi_pll_od, HHI_HDMI_PLL_CNTL0, 16, 2,
+                  CLK_DIVIDER_POWER_OF_TWO, { &g12a_hdmi_pll_dco }, 1, 0);
+static CLK_DIV_RO(g12a_hdmi_pll_od2, HHI_HDMI_PLL_CNTL0, 18, 2,
+                  CLK_DIVIDER_POWER_OF_TWO, { &g12a_hdmi_pll_od }, 1, 0);
+static CLK_DIV_RO(g12a_hdmi_pll, HHI_HDMI_PLL_CNTL0, 20, 2,
+                  CLK_DIVIDER_POWER_OF_TWO, { &g12a_hdmi_pll_od2 }, 1, 0);
 static CLK_FIXED_FACTOR(g12a_fclk_div4_div, 1, 4, 0, { &g12a_fixed_pll }, 1, 0);
-static CLK_GATE(g12a_fclk_div4, HHI_FIX_PLL_CNTL1, 21, 0, { &g12a_fclk_div4_div }, 1, 0);
+static CLK_GATE(g12a_fclk_div4, HHI_FIX_PLL_CNTL1, 21, 0,
+                { &g12a_fclk_div4_div }, 1, 0);
 static CLK_FIXED_FACTOR(g12a_fclk_div5_div, 1, 5, 0, { &g12a_fixed_pll }, 1, 0);
-static CLK_GATE(g12a_fclk_div5, HHI_FIX_PLL_CNTL1, 22, 0, { &g12a_fclk_div5_div }, 1, 0);
+static CLK_GATE(g12a_fclk_div5, HHI_FIX_PLL_CNTL1, 22, 0,
+                { &g12a_fclk_div5_div }, 1, 0);
 static CLK_FIXED_FACTOR(g12a_fclk_div7_div, 1, 7, 0, { &g12a_fixed_pll }, 1, 0);
-static CLK_GATE(g12a_fclk_div7, HHI_FIX_PLL_CNTL1, 23, 0, { &g12a_fclk_div7_div }, 1, 0);
-static CLK_FIXED_FACTOR(g12a_fclk_div2p5_div, 1, 5, 0, { &g12a_fixed_pll_dco }, 1, 0);
-static CLK_GATE(g12a_fclk_div2p5, HHI_FIX_PLL_CNTL1, 25, 0, { &g12a_fclk_div2p5_div }, 1, 0);
-static CLK_FIXED_FACTOR(g12a_mpll_50m_div, 1, 80, 0, { &g12a_fixed_pll_dco }, 1, 0);
+static CLK_GATE(g12a_fclk_div7, HHI_FIX_PLL_CNTL1, 23, 0,
+                { &g12a_fclk_div7_div }, 1, 0);
+static CLK_FIXED_FACTOR(g12a_fclk_div2p5_div, 1, 5, 0, { &g12a_fixed_pll_dco },
+                        1, 0);
+static CLK_GATE(g12a_fclk_div2p5, HHI_FIX_PLL_CNTL1, 25, 0,
+                { &g12a_fclk_div2p5_div }, 1, 0);
+static CLK_FIXED_FACTOR(g12a_mpll_50m_div, 1, 80, 0, { &g12a_fixed_pll_dco }, 1,
+                        0);
 const static struct clk_parent_data g12a_mpll_50m_parent_table[] = {
     {
         .name = "xtal",
     },
     { .clk = &g12a_mpll_50m_div },
 };
-static CLK_MUX_RO(g12a_mpll_50m, HHI_FIX_PLL_CNTL3, 0x1, 5, 0, 0, g12a_mpll_50m_parent_table, 2, 0);
-static CLK_FIXED_FACTOR(g12a_mpll_prediv, 1, 2, 0, { &g12a_fixed_pll_dco }, 1, 0);
+static CLK_MUX_RO(g12a_mpll_50m, HHI_FIX_PLL_CNTL3, 0x1, 5, 0, 0,
+                  g12a_mpll_50m_parent_table, 2, 0);
+static CLK_FIXED_FACTOR(g12a_mpll_prediv, 1, 2, 0, { &g12a_fixed_pll_dco }, 1,
+                        0);
 
 static const struct reg_sequence g12a_mpll0_init_regs[] = {
     { .reg = HHI_MPLL_CNTL2, .def = 0x40000033 },
@@ -733,10 +787,13 @@ static const struct clk_parent_data clk81_parent_data[] = {
     { .clk = &g12a_fclk_div3 },
     { .clk = &g12a_fclk_div5 },
 };
-static CLK_MUX_RO(g12a_mpeg_clk_sel, HHI_MPEG_CLK_CNTL, 0x7, 12, mux_table_clk81, 0, clk81_parent_data,
+static CLK_MUX_RO(g12a_mpeg_clk_sel, HHI_MPEG_CLK_CNTL, 0x7, 12,
+                  mux_table_clk81, 0, clk81_parent_data,
                   ARRAY_SIZE(clk81_parent_data), 0);
-static CLK_DIV(g12a_mpeg_clk_div, HHI_MPEG_CLK_CNTL, 0, 7, 0, { &g12a_mpeg_clk_sel }, 1, 0);
-static CLK_GATE(g12a_clk81, HHI_MPEG_CLK_CNTL, 7, 0, { &g12a_mpeg_clk_div }, 1, 0);
+static CLK_DIV(g12a_mpeg_clk_div, HHI_MPEG_CLK_CNTL, 0, 7, 0,
+               { &g12a_mpeg_clk_sel }, 1, 0);
+static CLK_GATE(g12a_clk81, HHI_MPEG_CLK_CNTL, 7, 0, { &g12a_mpeg_clk_div }, 1,
+                0);
 static const struct clk_parent_data g12a_sd_emmc_clk0_parent_data[] = {
     {
         .name = "xtal",
@@ -746,18 +803,24 @@ static const struct clk_parent_data g12a_sd_emmc_clk0_parent_data[] = {
     { .clk = &g12a_fclk_div5 },
     { .clk = &g12a_fclk_div7 },
 };
-static CLK_MUX(g12a_sd_emmc_a_clk0_sel, HHI_SD_EMMC_CLK_CNTL, 0x7, 9, 0, 0, g12a_sd_emmc_clk0_parent_data, 0,
-               CLK_SET_RATE_PARENT);
-static CLK_DIV(g12a_sd_emmc_a_clk0_div, HHI_SD_EMMC_CLK_CNTL, 0, 7, 0, { &g12a_sd_emmc_a_clk0_sel }, 1, 0);
-static CLK_GATE(g12a_sd_emmc_a_clk0, HHI_SD_EMMC_CLK_CNTL, 7, 0, { &g12a_sd_emmc_a_clk0_div }, 1, 0);
-static CLK_MUX(g12a_sd_emmc_b_clk0_sel, HHI_SD_EMMC_CLK_CNTL, 0x7, 25, 0, 0, g12a_sd_emmc_clk0_parent_data, 0,
-               CLK_SET_RATE_PARENT);
-static CLK_DIV(g12a_sd_emmc_b_clk0_div, HHI_SD_EMMC_CLK_CNTL, 16, 7, 0, { &g12a_sd_emmc_b_clk0_sel }, 1, 0);
-static CLK_GATE(g12a_sd_emmc_b_clk0, HHI_SD_EMMC_CLK_CNTL, 23, 0, { &g12a_sd_emmc_b_clk0_div }, 1, 0);
-static CLK_MUX(g12a_sd_emmc_c_clk0_sel, HHI_NAND_CLK_CNTL, 0x7, 9, 0, 0, g12a_sd_emmc_clk0_parent_data, 0,
-               CLK_SET_RATE_PARENT);
-static CLK_DIV(g12a_sd_emmc_c_clk0_div, HHI_NAND_CLK_CNTL, 0, 7, 0, { &g12a_sd_emmc_c_clk0_sel }, 1, 0);
-static CLK_GATE(g12a_sd_emmc_c_clk0, HHI_NAND_CLK_CNTL, 7, 0, { &g12a_sd_emmc_c_clk0_div }, 1, 0);
+static CLK_MUX(g12a_sd_emmc_a_clk0_sel, HHI_SD_EMMC_CLK_CNTL, 0x7, 9, 0, 0,
+               g12a_sd_emmc_clk0_parent_data, 0, CLK_SET_RATE_PARENT);
+static CLK_DIV(g12a_sd_emmc_a_clk0_div, HHI_SD_EMMC_CLK_CNTL, 0, 7, 0,
+               { &g12a_sd_emmc_a_clk0_sel }, 1, 0);
+static CLK_GATE(g12a_sd_emmc_a_clk0, HHI_SD_EMMC_CLK_CNTL, 7, 0,
+                { &g12a_sd_emmc_a_clk0_div }, 1, 0);
+static CLK_MUX(g12a_sd_emmc_b_clk0_sel, HHI_SD_EMMC_CLK_CNTL, 0x7, 25, 0, 0,
+               g12a_sd_emmc_clk0_parent_data, 0, CLK_SET_RATE_PARENT);
+static CLK_DIV(g12a_sd_emmc_b_clk0_div, HHI_SD_EMMC_CLK_CNTL, 16, 7, 0,
+               { &g12a_sd_emmc_b_clk0_sel }, 1, 0);
+static CLK_GATE(g12a_sd_emmc_b_clk0, HHI_SD_EMMC_CLK_CNTL, 23, 0,
+                { &g12a_sd_emmc_b_clk0_div }, 1, 0);
+static CLK_MUX(g12a_sd_emmc_c_clk0_sel, HHI_NAND_CLK_CNTL, 0x7, 9, 0, 0,
+               g12a_sd_emmc_clk0_parent_data, 0, CLK_SET_RATE_PARENT);
+static CLK_DIV(g12a_sd_emmc_c_clk0_div, HHI_NAND_CLK_CNTL, 0, 7, 0,
+               { &g12a_sd_emmc_c_clk0_sel }, 1, 0);
+static CLK_GATE(g12a_sd_emmc_c_clk0, HHI_NAND_CLK_CNTL, 7, 0,
+                { &g12a_sd_emmc_c_clk0_div }, 1, 0);
 static struct clk g12a_vid_pll_div = {
     .data = &(struct meson_vid_pll_div_data){
         .val = {
@@ -788,9 +851,11 @@ static const struct clk_parent_data g12a_vid_pll_parent_table[] = {
     },
 };
 
-static CLK_MUX(g12a_vid_pll_sel, HHI_VID_PLL_CLK_DIV, 0x1, 18, 0, 0, g12a_vid_pll_parent_table, 0,
+static CLK_MUX(g12a_vid_pll_sel, HHI_VID_PLL_CLK_DIV, 0x1, 18, 0, 0,
+               g12a_vid_pll_parent_table, 0,
                CLK_SET_RATE_NO_REPARENT | CLK_GET_RATE_NOCACHE);
-static CLK_GATE(g12a_vid_pll, HHI_VID_PLL_CLK_DIV, 19, 0, { &g12a_vid_pll_sel }, 1, 0);
+static CLK_GATE(g12a_vid_pll, HHI_VID_PLL_CLK_DIV, 19, 0, { &g12a_vid_pll_sel },
+                1, 0);
 const static struct clk_parent_data g12a_vpu_sel_parent_table[] = {
     {
         .clk = &g12a_fclk_div3,
@@ -817,17 +882,22 @@ const static struct clk_parent_data g12a_vpu_sel_parent_table[] = {
         .clk = &g12a_gp0_pll,
     },
 };
-static CLK_MUX(g12a_vpu_0_sel, HHI_VPU_CLK_CNTL, 0x7, 9, 0, 0, g12a_vpu_sel_parent_table, 0, CLK_SET_RATE_NO_REPARENT);
-static CLK_DIV(g12a_vpu_0_div, HHI_VPU_CLK_CNTL, 0, 7, 0, { &g12a_vpu_0_sel }, 1, 0);
+static CLK_MUX(g12a_vpu_0_sel, HHI_VPU_CLK_CNTL, 0x7, 9, 0, 0,
+               g12a_vpu_sel_parent_table, 0, CLK_SET_RATE_NO_REPARENT);
+static CLK_DIV(g12a_vpu_0_div, HHI_VPU_CLK_CNTL, 0, 7, 0, { &g12a_vpu_0_sel },
+               1, 0);
 static CLK_GATE(g12a_vpu_0, HHI_VPU_CLK_CNTL, 8, 0, { &g12a_vpu_0_div }, 1, 0);
-static CLK_MUX(g12a_vpu_1_sel, HHI_VPU_CLK_CNTL, 0x7, 25, 0, 0, g12a_vpu_sel_parent_table, 0, CLK_SET_RATE_NO_REPARENT);
-static CLK_DIV(g12a_vpu_1_div, HHI_VPU_CLK_CNTL, 16, 7, 0, { &g12a_vpu_1_sel }, 1, 0);
+static CLK_MUX(g12a_vpu_1_sel, HHI_VPU_CLK_CNTL, 0x7, 25, 0, 0,
+               g12a_vpu_sel_parent_table, 0, CLK_SET_RATE_NO_REPARENT);
+static CLK_DIV(g12a_vpu_1_div, HHI_VPU_CLK_CNTL, 16, 7, 0, { &g12a_vpu_1_sel },
+               1, 0);
 static CLK_GATE(g12a_vpu_1, HHI_VPU_CLK_CNTL, 24, 0, { &g12a_vpu_1_div }, 1, 0);
 const struct clk_parent_data g12a_vpu_parent_table[] = {
     { .clk = &g12a_vpu_0 },
     { .clk = &g12a_vpu_1 },
 };
-static CLK_MUX(g12a_vpu, HHI_VPU_CLK_CNTL, 1, 31, 0, 0, g12a_vpu_parent_table, 2, 0);
+static CLK_MUX(g12a_vpu, HHI_VPU_CLK_CNTL, 1, 31, 0, 0, g12a_vpu_parent_table,
+               2, 0);
 static const struct clk_parent_data g12a_vdec_parent_table[] = {
     {
         .clk = &g12a_fclk_div2p5,
@@ -852,19 +922,27 @@ static const struct clk_parent_data g12a_vdec_parent_table[] = {
     },
 };
 
-static CLK_MUX(g12a_vdec_1_sel, HHI_VDEC_CLK_CNTL, 0x7, 9, 0, CLK_MUX_ROUND_CLOSEST, g12a_vdec_parent_table, 0,
+static CLK_MUX(g12a_vdec_1_sel, HHI_VDEC_CLK_CNTL, 0x7, 9, 0,
+               CLK_MUX_ROUND_CLOSEST, g12a_vdec_parent_table, 0,
                CLK_SET_RATE_PARENT);
-static CLK_DIV(g12a_vdec_1_div, HHI_VDEC_CLK_CNTL, 0, 7, CLK_DIVIDER_ROUND_CLOSEST, { &g12a_vdec_1_sel }, 1, 0);
-static CLK_GATE(g12a_vdec_1, HHI_VDEC_CLK_CNTL, 8, 0, { &g12a_vdec_1_div }, 1, 0);
-static CLK_MUX(g12a_vdec_hevcf_sel, HHI_VDEC2_CLK_CNTL, 0x7, 9, 0, CLK_MUX_ROUND_CLOSEST, g12a_vdec_parent_table, 0,
+static CLK_DIV(g12a_vdec_1_div, HHI_VDEC_CLK_CNTL, 0, 7,
+               CLK_DIVIDER_ROUND_CLOSEST, { &g12a_vdec_1_sel }, 1, 0);
+static CLK_GATE(g12a_vdec_1, HHI_VDEC_CLK_CNTL, 8, 0, { &g12a_vdec_1_div }, 1,
+                0);
+static CLK_MUX(g12a_vdec_hevcf_sel, HHI_VDEC2_CLK_CNTL, 0x7, 9, 0,
+               CLK_MUX_ROUND_CLOSEST, g12a_vdec_parent_table, 0,
                CLK_SET_RATE_PARENT);
-static CLK_DIV(g12a_vdec_hevcf_div, HHI_VDEC2_CLK_CNTL, 0, 7, CLK_DIVIDER_ROUND_CLOSEST, { &g12a_vdec_hevcf_sel }, 1,
-               0);
-static CLK_GATE(g12a_vdec_hevcf, HHI_VDEC2_CLK_CNTL, 8, 0, { &g12a_vdec_hevcf_div }, 1, 0);
-static CLK_MUX(g12a_vdec_hevc_sel, HHI_VDEC2_CLK_CNTL, 0x7, 25, 0, CLK_MUX_ROUND_CLOSEST, g12a_vdec_parent_table, 0,
+static CLK_DIV(g12a_vdec_hevcf_div, HHI_VDEC2_CLK_CNTL, 0, 7,
+               CLK_DIVIDER_ROUND_CLOSEST, { &g12a_vdec_hevcf_sel }, 1, 0);
+static CLK_GATE(g12a_vdec_hevcf, HHI_VDEC2_CLK_CNTL, 8, 0,
+                { &g12a_vdec_hevcf_div }, 1, 0);
+static CLK_MUX(g12a_vdec_hevc_sel, HHI_VDEC2_CLK_CNTL, 0x7, 25, 0,
+               CLK_MUX_ROUND_CLOSEST, g12a_vdec_parent_table, 0,
                CLK_SET_RATE_PARENT);
-static CLK_DIV(g12a_vdec_hevc_div, HHI_VDEC2_CLK_CNTL, 16, 7, CLK_DIVIDER_ROUND_CLOSEST, { &g12a_vdec_hevc_sel }, 1, 0);
-static CLK_GATE(g12a_vdec_hevc, HHI_VDEC2_CLK_CNTL, 24, 0, { &g12a_vdec_hevc_div }, 1, 0);
+static CLK_DIV(g12a_vdec_hevc_div, HHI_VDEC2_CLK_CNTL, 16, 7,
+               CLK_DIVIDER_ROUND_CLOSEST, { &g12a_vdec_hevc_sel }, 1, 0);
+static CLK_GATE(g12a_vdec_hevc, HHI_VDEC2_CLK_CNTL, 24, 0,
+                { &g12a_vdec_hevc_div }, 1, 0);
 static const struct clk_parent_data g12a_vapb_parent_table[] = {
     {
         .clk = &g12a_fclk_div4,
@@ -891,17 +969,24 @@ static const struct clk_parent_data g12a_vapb_parent_table[] = {
         .clk = &g12a_fclk_div2p5,
     },
 };
-static CLK_MUX(g12a_vapb_0_sel, HHI_VAPBCLK_CNTL, 0x3, 9, 0, 0, g12a_vapb_parent_table, 0, CLK_SET_RATE_NO_REPARENT);
-static CLK_DIV(g12a_vapb_0_div, HHI_VAPBCLK_CNTL, 0, 7, 0, { &g12a_vapb_0_sel }, 1, 0);
-static CLK_GATE(g12a_vapb_0, HHI_VAPBCLK_CNTL, 8, 0, { &g12a_vapb_0_div }, 1, 0);
-static CLK_MUX(g12a_vapb_1_sel, HHI_VAPBCLK_CNTL, 0x3, 25, 0, 0, g12a_vapb_parent_table, 0, CLK_SET_RATE_NO_REPARENT);
-static CLK_DIV(g12a_vapb_1_div, HHI_VAPBCLK_CNTL, 16, 7, 0, { &g12a_vapb_1_sel }, 1, 0);
-static CLK_GATE(g12a_vapb_1, HHI_VAPBCLK_CNTL, 24, 0, { &g12a_vapb_1_div }, 1, 0);
+static CLK_MUX(g12a_vapb_0_sel, HHI_VAPBCLK_CNTL, 0x3, 9, 0, 0,
+               g12a_vapb_parent_table, 0, CLK_SET_RATE_NO_REPARENT);
+static CLK_DIV(g12a_vapb_0_div, HHI_VAPBCLK_CNTL, 0, 7, 0, { &g12a_vapb_0_sel },
+               1, 0);
+static CLK_GATE(g12a_vapb_0, HHI_VAPBCLK_CNTL, 8, 0, { &g12a_vapb_0_div }, 1,
+                0);
+static CLK_MUX(g12a_vapb_1_sel, HHI_VAPBCLK_CNTL, 0x3, 25, 0, 0,
+               g12a_vapb_parent_table, 0, CLK_SET_RATE_NO_REPARENT);
+static CLK_DIV(g12a_vapb_1_div, HHI_VAPBCLK_CNTL, 16, 7, 0,
+               { &g12a_vapb_1_sel }, 1, 0);
+static CLK_GATE(g12a_vapb_1, HHI_VAPBCLK_CNTL, 24, 0, { &g12a_vapb_1_div }, 1,
+                0);
 const struct clk_parent_data g12a_vapb_sel_parent_table[] = {
     { .clk = &g12a_vapb_0 },
     { .clk = &g12a_vapb_1 },
 };
-static CLK_MUX(g12a_vapb_sel, HHI_VAPBCLK_CNTL, 1, 31, 0, 0, g12a_vapb_sel_parent_table, 2, 0);
+static CLK_MUX(g12a_vapb_sel, HHI_VAPBCLK_CNTL, 1, 31, 0, 0,
+               g12a_vapb_sel_parent_table, 2, 0);
 static CLK_GATE(g12a_vapb, HHI_VAPBCLK_CNTL, 30, 0, { &g12a_vapb_sel }, 1, 0);
 static const struct clk_parent_data g12a_vclk_parent_table[] = {
     {
@@ -929,12 +1014,17 @@ static const struct clk_parent_data g12a_vclk_parent_table[] = {
         .clk = &g12a_fclk_div7,
     },
 };
-static CLK_MUX(g12a_vclk_sel, HHI_VID_CLK_CNTL, 0x7, 16, 0, 0, g12a_vclk_parent_table, 0,
+static CLK_MUX(g12a_vclk_sel, HHI_VID_CLK_CNTL, 0x7, 16, 0, 0,
+               g12a_vclk_parent_table, 0,
                CLK_SET_RATE_NO_REPARENT | CLK_GET_RATE_NOCACHE);
-static CLK_MUX(g12a_vclk2_sel, HHI_VIID_CLK_CNTL, 0x7, 16, 0, 0, g12a_vclk_parent_table, 0, CLK_SET_RATE_NO_REPARENT);
-static CLK_GATE(g12a_vclk_input, HHI_VID_CLK_DIV, 16, 0, { &g12a_vclk_sel }, 1, 0);
-static CLK_GATE(g12a_vclk2_input, HHI_VIID_CLK_DIV, 16, 0, { &g12a_vclk2_sel }, 1, 0);
-static CLK_DIV(g12a_vclk_div, HHI_VID_CLK_DIV, 0, 8, 0, { &g12a_vclk_input }, 1, 0);
+static CLK_MUX(g12a_vclk2_sel, HHI_VIID_CLK_CNTL, 0x7, 16, 0, 0,
+               g12a_vclk_parent_table, 0, CLK_SET_RATE_NO_REPARENT);
+static CLK_GATE(g12a_vclk_input, HHI_VID_CLK_DIV, 16, 0, { &g12a_vclk_sel }, 1,
+                0);
+static CLK_GATE(g12a_vclk2_input, HHI_VIID_CLK_DIV, 16, 0, { &g12a_vclk2_sel },
+                1, 0);
+static CLK_DIV(g12a_vclk_div, HHI_VID_CLK_DIV, 0, 8, 0, { &g12a_vclk_input }, 1,
+               0);
 static struct clk g12a_vclk2_div = {
     .data = &(struct meson_vclk_div_data){
         .div = {
@@ -987,23 +1077,37 @@ static struct clk g12a_vclk2 = {
     },
 };
 static CLK_GATE(g12a_vclk_div1, HHI_VID_CLK_CNTL, 0, 0, { &g12a_vclk }, 1, 0);
-static CLK_GATE(g12a_vclk_div2_en, HHI_VID_CLK_CNTL, 1, 0, { &g12a_vclk }, 1, 0);
-static CLK_GATE(g12a_vclk_div4_en, HHI_VID_CLK_CNTL, 2, 0, { &g12a_vclk }, 1, 0);
-static CLK_GATE(g12a_vclk_div6_en, HHI_VID_CLK_CNTL, 3, 0, { &g12a_vclk }, 1, 0);
-static CLK_GATE(g12a_vclk_div12_en, HHI_VID_CLK_CNTL, 4, 0, { &g12a_vclk }, 1, 0);
-static CLK_GATE(g12a_vclk2_div1, HHI_VIID_CLK_CNTL, 0, 0, { &g12a_vclk2 }, 1, 0);
-static CLK_GATE(g12a_vclk2_div2_en, HHI_VIID_CLK_CNTL, 1, 0, { &g12a_vclk2 }, 1, 0);
-static CLK_GATE(g12a_vclk2_div4_en, HHI_VIID_CLK_CNTL, 2, 0, { &g12a_vclk2 }, 1, 0);
-static CLK_GATE(g12a_vclk2_div6_en, HHI_VIID_CLK_CNTL, 3, 0, { &g12a_vclk2 }, 1, 0);
-static CLK_GATE(g12a_vclk2_div12_en, HHI_VIID_CLK_CNTL, 4, 0, { &g12a_vclk2 }, 1, 0);
+static CLK_GATE(g12a_vclk_div2_en, HHI_VID_CLK_CNTL, 1, 0, { &g12a_vclk }, 1,
+                0);
+static CLK_GATE(g12a_vclk_div4_en, HHI_VID_CLK_CNTL, 2, 0, { &g12a_vclk }, 1,
+                0);
+static CLK_GATE(g12a_vclk_div6_en, HHI_VID_CLK_CNTL, 3, 0, { &g12a_vclk }, 1,
+                0);
+static CLK_GATE(g12a_vclk_div12_en, HHI_VID_CLK_CNTL, 4, 0, { &g12a_vclk }, 1,
+                0);
+static CLK_GATE(g12a_vclk2_div1, HHI_VIID_CLK_CNTL, 0, 0, { &g12a_vclk2 }, 1,
+                0);
+static CLK_GATE(g12a_vclk2_div2_en, HHI_VIID_CLK_CNTL, 1, 0, { &g12a_vclk2 }, 1,
+                0);
+static CLK_GATE(g12a_vclk2_div4_en, HHI_VIID_CLK_CNTL, 2, 0, { &g12a_vclk2 }, 1,
+                0);
+static CLK_GATE(g12a_vclk2_div6_en, HHI_VIID_CLK_CNTL, 3, 0, { &g12a_vclk2 }, 1,
+                0);
+static CLK_GATE(g12a_vclk2_div12_en, HHI_VIID_CLK_CNTL, 4, 0, { &g12a_vclk2 },
+                1, 0);
 static CLK_FIXED_FACTOR(g12a_vclk_div2, 1, 2, 0, { &g12a_vclk_div2_en }, 1, 0);
 static CLK_FIXED_FACTOR(g12a_vclk_div4, 1, 4, 0, { &g12a_vclk_div4_en }, 1, 0);
 static CLK_FIXED_FACTOR(g12a_vclk_div6, 1, 6, 0, { &g12a_vclk_div6_en }, 1, 0);
-static CLK_FIXED_FACTOR(g12a_vclk_div12, 1, 12, 0, { &g12a_vclk_div12_en }, 1, 0);
-static CLK_FIXED_FACTOR(g12a_vclk2_div2, 1, 2, 0, { &g12a_vclk2_div2_en }, 1, 0);
-static CLK_FIXED_FACTOR(g12a_vclk2_div4, 1, 4, 0, { &g12a_vclk2_div4_en }, 1, 0);
-static CLK_FIXED_FACTOR(g12a_vclk2_div6, 1, 6, 0, { &g12a_vclk2_div6_en }, 1, 0);
-static CLK_FIXED_FACTOR(g12a_vclk2_div12, 1, 12, 0, { &g12a_vclk2_div12_en }, 1, 0);
+static CLK_FIXED_FACTOR(g12a_vclk_div12, 1, 12, 0, { &g12a_vclk_div12_en }, 1,
+                        0);
+static CLK_FIXED_FACTOR(g12a_vclk2_div2, 1, 2, 0, { &g12a_vclk2_div2_en }, 1,
+                        0);
+static CLK_FIXED_FACTOR(g12a_vclk2_div4, 1, 4, 0, { &g12a_vclk2_div4_en }, 1,
+                        0);
+static CLK_FIXED_FACTOR(g12a_vclk2_div6, 1, 6, 0, { &g12a_vclk2_div6_en }, 1,
+                        0);
+static CLK_FIXED_FACTOR(g12a_vclk2_div12, 1, 12, 0, { &g12a_vclk2_div12_en }, 1,
+                        0);
 static uint32_t mux_table_cts_sel[] = { 0, 1, 2, 3, 4, 8, 9, 10, 11, 12 };
 static const struct clk_parent_data g12a_cts_parent_table[] = {
     {
@@ -1037,14 +1141,18 @@ static const struct clk_parent_data g12a_cts_parent_table[] = {
         .clk = &g12a_vclk2_div12,
     },
 };
-static CLK_MUX(g12a_cts_enci_sel, HHI_VID_CLK_DIV, 0xf, 28, mux_table_cts_sel, 0, g12a_cts_parent_table,
-               ARRAY_SIZE(g12a_cts_parent_table), CLK_SET_RATE_NO_REPARENT | CLK_GET_RATE_NOCACHE);
-static CLK_MUX(g12a_cts_encp_sel, HHI_VID_CLK_DIV, 0xf, 20, mux_table_cts_sel, 0, g12a_cts_parent_table,
-               ARRAY_SIZE(g12a_cts_parent_table), CLK_SET_RATE_NO_REPARENT | CLK_GET_RATE_NOCACHE);
-static CLK_MUX(g12a_cts_encl_sel, HHI_VIID_CLK_DIV, 0xf, 12, mux_table_cts_sel, 0, g12a_cts_parent_table,
-               ARRAY_SIZE(g12a_cts_parent_table), CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT);
-static CLK_MUX(g12a_cts_vdac_sel, HHI_VIID_CLK_DIV, 0xf, 28, mux_table_cts_sel, 0, g12a_cts_parent_table,
-               ARRAY_SIZE(g12a_cts_parent_table), CLK_SET_RATE_NO_REPARENT | CLK_GET_RATE_NOCACHE);
+static CLK_MUX(g12a_cts_enci_sel, HHI_VID_CLK_DIV, 0xf, 28, mux_table_cts_sel,
+               0, g12a_cts_parent_table, ARRAY_SIZE(g12a_cts_parent_table),
+               CLK_SET_RATE_NO_REPARENT | CLK_GET_RATE_NOCACHE);
+static CLK_MUX(g12a_cts_encp_sel, HHI_VID_CLK_DIV, 0xf, 20, mux_table_cts_sel,
+               0, g12a_cts_parent_table, ARRAY_SIZE(g12a_cts_parent_table),
+               CLK_SET_RATE_NO_REPARENT | CLK_GET_RATE_NOCACHE);
+static CLK_MUX(g12a_cts_encl_sel, HHI_VIID_CLK_DIV, 0xf, 12, mux_table_cts_sel,
+               0, g12a_cts_parent_table, ARRAY_SIZE(g12a_cts_parent_table),
+               CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT);
+static CLK_MUX(g12a_cts_vdac_sel, HHI_VIID_CLK_DIV, 0xf, 28, mux_table_cts_sel,
+               0, g12a_cts_parent_table, ARRAY_SIZE(g12a_cts_parent_table),
+               CLK_SET_RATE_NO_REPARENT | CLK_GET_RATE_NOCACHE);
 static uint32_t mux_table_hdmi_tx_sel[] = { 0, 1, 2, 3, 4, 8, 9, 10, 11, 12 };
 static const struct clk_parent_data g12a_cts_hdmi_tx_parent_table[] = {
     {
@@ -1078,13 +1186,20 @@ static const struct clk_parent_data g12a_cts_hdmi_tx_parent_table[] = {
         .clk = &g12a_vclk2_div12,
     },
 };
-static CLK_MUX(g12a_hdmi_tx_sel, HHI_HDMI_CLK_CNTL, 0xf, 16, mux_table_hdmi_tx_sel, 0, g12a_cts_hdmi_tx_parent_table,
-               ARRAY_SIZE(g12a_cts_hdmi_tx_parent_table), CLK_SET_RATE_NO_REPARENT | CLK_GET_RATE_NOCACHE);
-static CLK_GATE(g12a_cts_enci, HHI_VID_CLK_CNTL2, 0, 0, { &g12a_cts_enci_sel }, 1, 0);
-static CLK_GATE(g12a_cts_encp, HHI_VID_CLK_CNTL2, 2, 0, { &g12a_cts_encp_sel }, 1, 0);
-static CLK_GATE(g12a_cts_encl, HHI_VID_CLK_CNTL2, 3, 0, { &g12a_cts_encl_sel }, 1, 0);
-static CLK_GATE(g12a_cts_vdac, HHI_VID_CLK_CNTL2, 4, 0, { &g12a_cts_vdac_sel }, 1, 0);
-static CLK_GATE(g12a_hdmi_tx, HHI_VID_CLK_CNTL2, 5, 0, { &g12a_hdmi_tx_sel }, 1, 0);
+static CLK_MUX(g12a_hdmi_tx_sel, HHI_HDMI_CLK_CNTL, 0xf, 16,
+               mux_table_hdmi_tx_sel, 0, g12a_cts_hdmi_tx_parent_table,
+               ARRAY_SIZE(g12a_cts_hdmi_tx_parent_table),
+               CLK_SET_RATE_NO_REPARENT | CLK_GET_RATE_NOCACHE);
+static CLK_GATE(g12a_cts_enci, HHI_VID_CLK_CNTL2, 0, 0, { &g12a_cts_enci_sel },
+                1, 0);
+static CLK_GATE(g12a_cts_encp, HHI_VID_CLK_CNTL2, 2, 0, { &g12a_cts_encp_sel },
+                1, 0);
+static CLK_GATE(g12a_cts_encl, HHI_VID_CLK_CNTL2, 3, 0, { &g12a_cts_encl_sel },
+                1, 0);
+static CLK_GATE(g12a_cts_vdac, HHI_VID_CLK_CNTL2, 4, 0, { &g12a_cts_vdac_sel },
+                1, 0);
+static CLK_GATE(g12a_hdmi_tx, HHI_VID_CLK_CNTL2, 5, 0, { &g12a_hdmi_tx_sel }, 1,
+                0);
 static const struct clk_parent_data g12a_mipi_dsi_pxclk_parent_table[] = {
     {
         .clk = &g12a_vid_pll,
@@ -1111,11 +1226,14 @@ static const struct clk_parent_data g12a_mipi_dsi_pxclk_parent_table[] = {
         .clk = &g12a_fclk_div7,
     },
 };
-static CLK_MUX(g12a_mipi_dsi_pxclk_sel, HHI_MIPIDSI_PHY_CLK_CNTL, 0x7, 12, 0, CLK_MUX_ROUND_CLOSEST,
-               g12a_mipi_dsi_pxclk_parent_table, ARRAY_SIZE(g12a_mipi_dsi_pxclk_parent_table),
+static CLK_MUX(g12a_mipi_dsi_pxclk_sel, HHI_MIPIDSI_PHY_CLK_CNTL, 0x7, 12, 0,
+               CLK_MUX_ROUND_CLOSEST, g12a_mipi_dsi_pxclk_parent_table,
+               ARRAY_SIZE(g12a_mipi_dsi_pxclk_parent_table),
                CLK_SET_RATE_NO_REPARENT | CLK_SET_RATE_PARENT);
-static CLK_DIV(g12a_mipi_dsi_pxclk_div, HHI_MIPIDSI_PHY_CLK_CNTL, 0, 7, 0, { &g12a_mipi_dsi_pxclk_sel }, 1, 0);
-static CLK_GATE(g12a_mipi_dsi_pxclk, HHI_MIPIDSI_PHY_CLK_CNTL, 8, 0, { &g12a_mipi_dsi_pxclk_div }, 1, 0);
+static CLK_DIV(g12a_mipi_dsi_pxclk_div, HHI_MIPIDSI_PHY_CLK_CNTL, 0, 7, 0,
+               { &g12a_mipi_dsi_pxclk_sel }, 1, 0);
+static CLK_GATE(g12a_mipi_dsi_pxclk, HHI_MIPIDSI_PHY_CLK_CNTL, 8, 0,
+                { &g12a_mipi_dsi_pxclk_div }, 1, 0);
 static const struct clk_parent_data g12a_hdmi_parent_table[] = {
     {
         .name = "xtal",
@@ -1124,9 +1242,12 @@ static const struct clk_parent_data g12a_hdmi_parent_table[] = {
     { .clk = &g12a_fclk_div3 },
     { .clk = &g12a_fclk_div5 },
 };
-static CLK_MUX(g12a_hdmi_sel, HHI_HDMI_CLK_CNTL, 0x3, 9, 0, CLK_MUX_ROUND_CLOSEST, g12a_hdmi_parent_table,
-               ARRAY_SIZE(g12a_hdmi_parent_table), CLK_SET_RATE_NO_REPARENT | CLK_GET_RATE_NOCACHE);
-static CLK_DIV(g12a_hdmi_div, HHI_HDMI_CLK_CNTL, 0, 7, 0, { &g12a_hdmi_sel }, 1, 0);
+static CLK_MUX(g12a_hdmi_sel, HHI_HDMI_CLK_CNTL, 0x3, 9, 0,
+               CLK_MUX_ROUND_CLOSEST, g12a_hdmi_parent_table,
+               ARRAY_SIZE(g12a_hdmi_parent_table),
+               CLK_SET_RATE_NO_REPARENT | CLK_GET_RATE_NOCACHE);
+static CLK_DIV(g12a_hdmi_div, HHI_HDMI_CLK_CNTL, 0, 7, 0, { &g12a_hdmi_sel }, 1,
+               0);
 static CLK_GATE(g12a_hdmi, HHI_HDMI_CLK_CNTL, 8, 0, { &g12a_hdmi_div }, 1, 0);
 static const struct clk_parent_data g12a_mali_0_1_parent_data[] = {
     {
@@ -1140,12 +1261,18 @@ static const struct clk_parent_data g12a_mali_0_1_parent_data[] = {
     { .clk = &g12a_fclk_div5 },
     { .clk = &g12a_fclk_div7 },
 };
-static CLK_MUX(g12a_mali_0_sel, HHI_MALI_CLK_CNTL, 0x7, 9, 0, 0, g12a_mali_0_1_parent_data, 8, 0);
-static CLK_DIV(g12a_mali_0_div, HHI_MALI_CLK_CNTL, 0, 7, 0, { &g12a_mali_0_sel }, 1, 0);
-static CLK_GATE(g12a_mali_0, HHI_MALI_CLK_CNTL, 8, 0, { &g12a_mali_0_div }, 1, 0);
-static CLK_MUX(g12a_mali_1_sel, HHI_MALI_CLK_CNTL, 0x7, 25, 0, 0, g12a_mali_0_1_parent_data, 8, 0);
-static CLK_DIV(g12a_mali_1_div, HHI_MALI_CLK_CNTL, 16, 7, 0, { &g12a_mali_1_sel }, 1, 0);
-static CLK_GATE(g12a_mali_1, HHI_MALI_CLK_CNTL, 24, 0, { &g12a_mali_1_div }, 1, 0);
+static CLK_MUX(g12a_mali_0_sel, HHI_MALI_CLK_CNTL, 0x7, 9, 0, 0,
+               g12a_mali_0_1_parent_data, 8, 0);
+static CLK_DIV(g12a_mali_0_div, HHI_MALI_CLK_CNTL, 0, 7, 0,
+               { &g12a_mali_0_sel }, 1, 0);
+static CLK_GATE(g12a_mali_0, HHI_MALI_CLK_CNTL, 8, 0, { &g12a_mali_0_div }, 1,
+                0);
+static CLK_MUX(g12a_mali_1_sel, HHI_MALI_CLK_CNTL, 0x7, 25, 0, 0,
+               g12a_mali_0_1_parent_data, 8, 0);
+static CLK_DIV(g12a_mali_1_div, HHI_MALI_CLK_CNTL, 16, 7, 0,
+               { &g12a_mali_1_sel }, 1, 0);
+static CLK_GATE(g12a_mali_1, HHI_MALI_CLK_CNTL, 24, 0, { &g12a_mali_1_div }, 1,
+                0);
 static const struct clk_parent_data g12a_mali_parent_table[] = {
     {
         .clk = &g12a_mali_0,
@@ -1154,8 +1281,10 @@ static const struct clk_parent_data g12a_mali_parent_table[] = {
         .clk = &g12a_mali_1,
     },
 };
-static CLK_MUX(g12a_mali, HHI_MALI_CLK_CNTL, 1, 31, 0, 0, g12a_mali_parent_table, 2, CLK_SET_RATE_PARENT);
-static CLK_DIV_RO(g12a_ts_div, HHI_TS_CLK_CNTL, 0, 8, 0, { &g12a_ts_div }, 1, 0);
+static CLK_MUX(g12a_mali, HHI_MALI_CLK_CNTL, 1, 31, 0, 0,
+               g12a_mali_parent_table, 2, CLK_SET_RATE_PARENT);
+static CLK_DIV_RO(g12a_ts_div, HHI_TS_CLK_CNTL, 0, 8, 0, { &g12a_ts_div }, 1,
+                  0);
 static CLK_GATE(g12a_ts, HHI_TS_CLK_CNTL, 8, 0, { &g12a_ts_div }, 1, 0);
 static const struct clk_parent_data spicc_sclk_parent_data[] = {
     {
@@ -1168,12 +1297,18 @@ static const struct clk_parent_data spicc_sclk_parent_data[] = {
     { .clk = &g12a_fclk_div7 },
 };
 
-static CLK_MUX(g12a_spicc0_sclk_sel, HHI_SPICC_CLK_CNTL, 7, 7, 0, 0, spicc_sclk_parent_data, 0, 0);
-static CLK_DIV(g12a_spicc0_sclk_div, HHI_SPICC_CLK_CNTL, 0, 6, 0, { &g12a_spicc0_sclk_sel }, 1, 0);
-static CLK_GATE(g12a_spicc0_sclk, HHI_SPICC_CLK_CNTL, 6, 0, { &g12a_spicc0_sclk_div }, 1, 0);
-static CLK_MUX(g12a_spicc1_sclk_sel, HHI_SPICC_CLK_CNTL, 7, 23, 0, 0, spicc_sclk_parent_data, 0, 0);
-static CLK_DIV(g12a_spicc1_sclk_div, HHI_SPICC_CLK_CNTL, 16, 6, 0, { &g12a_spicc1_sclk_sel }, 1, 0);
-static CLK_GATE(g12a_spicc1_sclk, HHI_SPICC_CLK_CNTL, 22, 0, { &g12a_spicc1_sclk_div }, 1, 0);
+static CLK_MUX(g12a_spicc0_sclk_sel, HHI_SPICC_CLK_CNTL, 7, 7, 0, 0,
+               spicc_sclk_parent_data, 0, 0);
+static CLK_DIV(g12a_spicc0_sclk_div, HHI_SPICC_CLK_CNTL, 0, 6, 0,
+               { &g12a_spicc0_sclk_sel }, 1, 0);
+static CLK_GATE(g12a_spicc0_sclk, HHI_SPICC_CLK_CNTL, 6, 0,
+                { &g12a_spicc0_sclk_div }, 1, 0);
+static CLK_MUX(g12a_spicc1_sclk_sel, HHI_SPICC_CLK_CNTL, 7, 23, 0, 0,
+               spicc_sclk_parent_data, 0, 0);
+static CLK_DIV(g12a_spicc1_sclk_div, HHI_SPICC_CLK_CNTL, 16, 6, 0,
+               { &g12a_spicc1_sclk_sel }, 1, 0);
+static CLK_GATE(g12a_spicc1_sclk, HHI_SPICC_CLK_CNTL, 22, 0,
+                { &g12a_spicc1_sclk_div }, 1, 0);
 static const struct clk_parent_data nna_clk_parent_data[] = {
     {
         .name = "xtal",
@@ -1198,12 +1333,18 @@ static const struct clk_parent_data nna_clk_parent_data[] = {
     },
     { .clk = &g12a_fclk_div7 },
 };
-static CLK_MUX(sm1_nna_axi_clk_sel, HHI_NNA_CLK_CNTL, 7, 9, 0, 0, nna_clk_parent_data, 0, 0);
-static CLK_DIV(sm1_nna_axi_clk_div, HHI_NNA_CLK_CNTL, 0, 7, 0, { &sm1_nna_axi_clk_sel }, 1, 0);
-static CLK_GATE(sm1_nna_axi_clk, HHI_NNA_CLK_CNTL, 8, 0, { &sm1_nna_axi_clk_div }, 1, 0);
-static CLK_MUX(sm1_nna_core_clk_sel, HHI_NNA_CLK_CNTL, 7, 25, 0, 0, nna_clk_parent_data, 0, 0);
-static CLK_DIV(sm1_nna_core_clk_div, HHI_NNA_CLK_CNTL, 16, 7, 0, { &sm1_nna_core_clk_sel }, 1, 0);
-static CLK_GATE(sm1_nna_core_clk, HHI_NNA_CLK_CNTL, 24, 0, { &sm1_nna_core_clk_div }, 1, 0);
+static CLK_MUX(sm1_nna_axi_clk_sel, HHI_NNA_CLK_CNTL, 7, 9, 0, 0,
+               nna_clk_parent_data, 0, 0);
+static CLK_DIV(sm1_nna_axi_clk_div, HHI_NNA_CLK_CNTL, 0, 7, 0,
+               { &sm1_nna_axi_clk_sel }, 1, 0);
+static CLK_GATE(sm1_nna_axi_clk, HHI_NNA_CLK_CNTL, 8, 0,
+                { &sm1_nna_axi_clk_div }, 1, 0);
+static CLK_MUX(sm1_nna_core_clk_sel, HHI_NNA_CLK_CNTL, 7, 25, 0, 0,
+               nna_clk_parent_data, 0, 0);
+static CLK_DIV(sm1_nna_core_clk_div, HHI_NNA_CLK_CNTL, 16, 7, 0,
+               { &sm1_nna_core_clk_sel }, 1, 0);
+static CLK_GATE(sm1_nna_core_clk, HHI_NNA_CLK_CNTL, 24, 0,
+                { &sm1_nna_core_clk_div }, 1, 0);
 
 /* Everything Else (EE) domain gates */
 static MESON_CLK81_GATE(g12a_ddr, HHI_GCLK_MPEG0, 0);
