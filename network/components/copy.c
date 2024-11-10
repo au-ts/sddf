@@ -6,24 +6,15 @@
 #include <stdbool.h>
 #include <microkit.h>
 #include <sddf/network/queue.h>
+#include <sddf/network/config.h>
 #include <sddf/util/string.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
-#include <ethernet_config.h>
 
-#define VIRT_RX_CH 0
-#define CLIENT_CH 1
+net_copy_config_t config;
 
 net_queue_handle_t rx_queue_virt;
 net_queue_handle_t rx_queue_cli;
-
-net_queue_t *rx_free_virt;
-net_queue_t *rx_active_virt;
-net_queue_t *rx_free_cli;
-net_queue_t *rx_active_cli;
-
-uintptr_t virt_buffer_data_region;
-uintptr_t cli_buffer_data_region;
 
 void rx_return(void)
 {
@@ -46,8 +37,8 @@ void rx_return(void)
             err = net_dequeue_active(&rx_queue_virt, &virt_buffer);
             assert(!err);
 
-            uintptr_t cli_addr = cli_buffer_data_region + cli_buffer.io_or_offset;
-            uintptr_t virt_addr = virt_buffer_data_region + virt_buffer.io_or_offset;
+            uintptr_t cli_addr = config.cli_data + cli_buffer.io_or_offset;
+            uintptr_t virt_addr = config.virt_data + virt_buffer.io_or_offset;
 
             sddf_memcpy((void *)cli_addr, (void *)virt_addr, virt_buffer.len);
             cli_buffer.len = virt_buffer.len;
@@ -82,12 +73,12 @@ void rx_return(void)
 
     if (enqueued && net_require_signal_active(&rx_queue_cli)) {
         net_cancel_signal_active(&rx_queue_cli);
-        microkit_notify(CLIENT_CH);
+        microkit_notify(config.cli_id);
     }
 
     if (enqueued && net_require_signal_free(&rx_queue_virt)) {
         net_cancel_signal_free(&rx_queue_virt);
-        microkit_deferred_notify(VIRT_RX_CH);
+        microkit_deferred_notify(config.virt_id);
     }
 }
 
@@ -98,12 +89,9 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
-    size_t cli_queue_capacity, virt_queue_capacity = 0;
-    net_copy_queue_capacity(microkit_name, &cli_queue_capacity, &virt_queue_capacity);
-
     /* Set up the queues */
-    net_queue_init(&rx_queue_cli, rx_free_cli, rx_active_cli, cli_queue_capacity);
-    net_queue_init(&rx_queue_virt, rx_free_virt, rx_active_virt, virt_queue_capacity);
+    net_queue_init(&rx_queue_cli, config.cli_free, config.cli_active, config.cli_capacity);
+    net_queue_init(&rx_queue_virt, config.virt_free, config.virt_active, config.virt_capacity);
 
     net_buffers_init(&rx_queue_cli, 0);
 }
