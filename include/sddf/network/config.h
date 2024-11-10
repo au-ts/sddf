@@ -20,9 +20,9 @@ typedef struct net_virt_tx_client_config {
     void *free;
     void *active;
     size_t capacity;
-    uint8_t id;
     uintptr_t buffer_data_region_vaddr;
     uintptr_t buffer_data_region_paddr;
+    uint8_t id;
 } net_virt_tx_client_config_t;
 
 typedef struct net_virt_tx_config {
