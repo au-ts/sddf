@@ -62,7 +62,7 @@ typedef struct net_copy_config {
  	size_t cli_capacity;
  	uintptr_t virt_data;
  	uintptr_t cli_data;
-
+ 
  	uint8_t virt_id;
  	uint8_t cli_id;
 } net_copy_config_t;
