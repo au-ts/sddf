@@ -9,8 +9,8 @@ typedef struct net_driver_config {
     void *rx_active;
     void *tx_free;
     void *tx_active;
-    size_t rx_queue_size;
-    size_t tx_queue_size;
+    size_t rx_capacity;
+    size_t tx_capacity;
 
     uint8_t tx_id;
     uint8_t rx_id;
