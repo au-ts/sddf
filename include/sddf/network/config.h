@@ -70,3 +70,19 @@ typedef struct net_copy_config {
  	uint8_t virt_id;
  	uint8_t cli_id;
 } net_copy_config_t;
+
+typedef struct net_client_config {
+    void *rx_free;
+    void *rx_active;
+    size_t rx_capacity;
+
+    void *tx_free;
+    void *tx_active;
+    size_t tx_capacity;
+
+    uintptr_t rx_buffer_data_region;
+    uintptr_t tx_buffer_data_region;
+
+    uint8_t rx_ch;
+    uint8_t tx_ch;
+} net_client_config_t;
