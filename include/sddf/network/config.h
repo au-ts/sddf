@@ -30,26 +30,30 @@ typedef struct net_virt_tx_config {
     uint64_t tx_active_drv;
     uint64_t drv_queue_capacity;
     uint8_t drv_id;
-    uint8_t num_network_clients;
+    uint8_t num_clients;
     net_virt_tx_client_config_t clients[SDDF_NET_MAX_CLIENTS];
 } net_virt_tx_config_t;
 
 typedef struct net_virt_rx_config_client {
-    uint64_t rx_free;
-    uint64_t rx_active;
-    uint64_t queue_capacity;
-    uint64_t mac_addr;
+    uint64_t free;
+    uint64_t active;
+    uint64_t capacity;
+    uint8_t mac_addr[6];
     uint8_t client_id;
 } net_virt_rx_config_client_t;
 
 typedef struct net_virt_rx_config {
-    uint64_t rx_free_drv;
-    uint64_t rx_active_drv;
-    uint64_t drv_queue_capacity;
+    uint64_t free_drv;
+    uint64_t active_drv;
+    uint64_t capacity_drv;
     uint64_t buffer_data_vaddr;
     uint64_t buffer_data_paddr;
+    // The system designer must allocate a buffer metadata region for internal
+    // use by the RX virtualiser. The size of this region must be at least
+    // 4*drv_queue_capacity. It must be mapped R-W and zero-initialised.
+    void *buffer_metadata;
     uint8_t driver_id;
-    uint8_t num_network_clients;
+    uint8_t num_clients;
     net_virt_rx_config_client_t clients[SDDF_NET_MAX_CLIENTS];
 } net_virt_rx_config_t;
 
