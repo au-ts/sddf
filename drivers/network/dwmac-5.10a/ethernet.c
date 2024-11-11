@@ -91,8 +91,6 @@ static void update_ring_slot(hw_ring_t *ring, unsigned int idx, uint32_t d0, uin
     d->d3 = d3;
 }
 
-size_t free_dequeued = 0;
-
 static void rx_provide()
 {
     bool reprocess = true;
@@ -101,7 +99,6 @@ static void rx_provide()
             net_buff_desc_t buffer;
             int err = net_dequeue_free(&rx_queue, &buffer);
             assert(!err);
-            free_dequeued += 1;
 
             uint32_t idx = rx.tail % rx.capacity;
             rx.descr_mdata[idx] = buffer;
@@ -109,14 +106,17 @@ static void rx_provide()
                             (uint32_t) (buffer.io_or_offset >> 32), 0, (uint32_t) (DESC_RXSTS_OWNBYDMA | DESC_RXSTS_BUFFER1_ADDR_VALID | DESC_RXSTS_IOC));
             /* We will update the hardware register that stores the tail address. This tells
             the device that we have new descriptors to use. */
-            THREAD_MEMORY_RELEASE();
             *DMA_REG(DMA_CHAN_RX_TAIL_ADDR(0)) = rx_desc_base + sizeof(struct descriptor) * rx.tail;
             rx.tail++;
         }
 
-        net_request_signal_free(&rx_queue);
+        /* Only request a notification from virtualiser if HW ring not full */
+        if (!hw_ring_full(&rx)) {
+            net_request_signal_free(&rx_queue);
+        } else {
+            net_cancel_signal_free(&rx_queue);
+        }
         reprocess = false;
-
 
         if (!net_queue_empty_free(&rx_queue) && !hw_ring_full(&rx)) {
             net_cancel_signal_free(&rx_queue);
@@ -136,6 +136,10 @@ static void rx_return(void)
             break;
         }
 
+        if (d->d3 & (1 << 21)) {
+            sddf_dprintf("This packet has an overflow error\n");
+        }
+
         THREAD_MEMORY_ACQUIRE();
 
         net_buff_desc_t buffer = rx.descr_mdata[idx];
@@ -153,8 +157,7 @@ static void rx_return(void)
             // rx.head = (rx.head + 1) % RX_COUNT;
             rx.tail++;
         } else {
-            /* Read 0-14 bits to get length of received packet, manual pg 4081, table 11-152, RDES3 Normal Descriptor */
-            buffer.len = (d->d3 & 0x7FFF); 
+            buffer.len = (d->d3 & 0x7FFF);
             int err = net_enqueue_active(&rx_queue, buffer);
             assert(!err);
             packets_transferred = true;
@@ -173,7 +176,6 @@ static void rx_return(void)
 static void tx_provide(void)
 {
     bool reprocess = true;
-    int i = 0;
     while (reprocess) {
         while (!(hw_ring_full(&tx)) && !net_queue_empty_active(&tx_queue)) {
             net_buff_desc_t buffer;
@@ -193,7 +195,6 @@ static void tx_provide(void)
             update_ring_slot(&tx, idx, buffer.io_or_offset & 0xffffffff, buffer.io_or_offset >> 32, tdes2, tdes3);
 
             tx.tail++;
-            i++;
             /* Set the tail in hardware to the latest tail we have inserted in.
              * This tells the hardware that it has new buffers to send.
              * NOTE: Setting this on every enqueued packet for sanity, change this to once per bactch.
@@ -239,12 +240,36 @@ static void tx_return(void)
 
 static void handle_irq()
 {
+    /* This is the case of the RGMII PHY interface going up, to clear this interrupt,
+    we need to read the PHYIF_CONTROL_STATUS register. */
+    if (*MAC_REG(GMAC_INT_STATUS) == 1) {
+        volatile int phy_status = *MAC_REG(GMAC_PHYIF_CONTROL_STATUS);
+        sddf_dprintf("We received a phy_status interrupt\n");
+    } else if (*MAC_REG(GMAC_INT_STATUS) == 0b100000) {
+        sddf_dprintf("This is the value of the LPI status register: %b\n", *MAC_REG(GMAC_LPI_CTRL_STATUS));
+    } else if (*MAC_REG(GMAC_INT_STATUS) == 0b100000000000000) {
+        sddf_dprintf("This is the value of the receive transmit status register: %b\n", *MAC_REG(GMAC_RX_TX_STATUS));
+    } else if (*MAC_REG(GMAC_INT_STATUS) != 0) {
+        sddf_dprintf("This is the value of the MAC interrupt status: %b\n", *MAC_REG(GMAC_INT_STATUS));
+    }
+
+    if (*MTL_REG(MTL_INT_STATUS) == 1) {
+        uint32_t chan_intr = *MTL_REG(MTL_CHAN_INT_CTRL(0));
+        sddf_dprintf("This is the value of the MTL Queue 0 Interrupt Control Status %b\n", chan_intr);
+        *MTL_REG(MTL_CHAN_INT_CTRL(0)) = chan_intr | (1 << 16);
+        return;
+    } else if (*MTL_REG(MTL_INT_STATUS) != 0) {
+        sddf_dprintf("This is the value of the MTL interrupt status: %b\n", *MTL_REG(MTL_INT_STATUS));
+    }
+
     uint32_t e = *DMA_REG(DMA_CHAN_STATUS(0));
     *DMA_REG(DMA_CHAN_STATUS(0)) &= e;
 
     while (e & DMA_CHAN_INTR_DEFAULT_MASK) {
+
         if (e & DMA_CHAN_INTR_ENA_RIE) {
             rx_return();
+            rx_provide();
         }
         if (e & DMA_CHAN_INTR_ENA_TIE) {
             tx_return();
@@ -252,7 +277,7 @@ static void handle_irq()
         }
         if (e & DMA_CHAN_INTR_ABNORMAL) {
             if (e & DMA_CHAN_INTR_ENA_FBE) {
-                sddf_dprintf("Ethernet device fatal bus error\n");
+                sddf_dprintf("Ethernet device fatal bus error: %b\n", e);
             }
         }
         e = *DMA_REG(DMA_CHAN_STATUS(0));
@@ -275,7 +300,8 @@ static void eth_init()
     }
 
     /* Configure MTL */
-
+    // Explicitly DISABLE all MTL interrupts
+    *MTL_REG(MTL_CHAN_INT_CTRL(0)) = 0;
     // Enable store and forward mode for TX, and enable the TX queue.
     *MTL_REG(MTL_CHAN_TX_OP_MODE(0)) |= MTL_OP_MODE_TSF | MTL_OP_MODE_TXQ_ENABLE;
 
@@ -298,19 +324,60 @@ static void eth_init()
     // These values are expressed as: Log2(FIFO_SIZE) -7
     tx_fifo_sz = (val >> 6) & 0x1f;
     rx_fifo_sz = (val >> 0) & 0x1f;
-
     /* r/tx_fifo_sz is encoded as log2(n / 128). Undo that by shifting */
     tx_fifo_sz = 128 << tx_fifo_sz;
     rx_fifo_sz = 128 << rx_fifo_sz;
-
+    sddf_dprintf("This is the size of the rx fifo: %d\n", rx_fifo_sz);
     /* r/tqs is encoded as (n / 256) - 1 */
     uint32_t tqs = tx_fifo_sz / 256 - 1;
     uint32_t rqs = rx_fifo_sz / 256 - 1;
 
     *MTL_REG(MTL_CHAN_TX_OP_MODE(0)) &= ~(MTL_OP_MODE_TQS_MASK);
     *MTL_REG(MTL_CHAN_TX_OP_MODE(0)) |= tqs << MTL_OP_MODE_TQS_SHIFT;
+    // The RQS should be already configured if we are only using 1 queue.
     *MTL_REG(MTL_CHAN_RX_OP_MODE(0)) &= ~(MTL_OP_MODE_RQS_MASK);
     *MTL_REG(MTL_CHAN_RX_OP_MODE(0)) |= rqs << MTL_OP_MODE_RQS_SHIFT;
+
+    // These flow control setting are taken from uboot
+	if (rqs >= ((4096 / 256) - 1)) {
+        sddf_dprintf("We are setting up flow control\n");
+		uint32_t rfd, rfa;
+
+        *MTL_REG(MTL_CHAN_RX_OP_MODE(0)) |= MTL_OP_MODE_EHFC;
+		/*
+		 * Set Threshold for Activating Flow Contol space for min 2
+		 * frames ie, (1500 * 1) = 1500 bytes.
+		 *
+		 * Set Threshold for Deactivating Flow Contol for space of
+		 * min 1 frame (frame size 1500bytes) in receive fifo
+		 */
+		if (rqs == ((4096 / 256) - 1)) {
+			/*
+			 * This violates the above formula because of FIFO size
+			 * limit therefore overflow may occur inspite of this.
+			 */
+			rfd = 0x3;	/* Full-3K */
+			rfa = 0x1;	/* Full-1.5K */
+		} else if (rqs == ((8192 / 256) - 1)) {
+			rfd = 0x6;	/* Full-4K */
+			rfa = 0xa;	/* Full-6K */
+		} else if (rqs == ((16384 / 256) - 1)) {
+			rfd = 0x6;	/* Full-4K */
+			rfa = 0x12;	/* Full-10K */
+		} else {
+			rfd = 0x6;	/* Full-4K */
+			rfa = 0x1E;	/* Full-16K */
+		}
+
+        *MTL_REG(MTL_CHAN_RX_OP_MODE(0)) &= ~((MTL_OP_MODE_RFD_MASK) |
+                                            (MTL_OP_MODE_RFA_MASK));
+
+	    *MTL_REG(MTL_CHAN_RX_OP_MODE(0)) |= ((rfd << MTL_OP_MODE_RFD_SHIFT) |
+                                            (rfa << MTL_OP_MODE_RFA_SHIFT));
+    } else {
+        sddf_dprintf("We are not setting up flow control\n");
+    }
+
 
     // NOTE - more stuff in dwc_eth_qos that we are skipping regarding to tuning the tqs
 
@@ -318,6 +385,13 @@ static void eth_init()
     *MAC_REG(GMAC_RXQ_CTRL0) &= GMAC_RX_QUEUE_CLEAR(0);
     *MAC_REG(GMAC_RXQ_CTRL0) |= GMAC_RX_DCB_QUEUE_ENABLE(0);
 
+    // Enable flow control in the MAC
+
+    // Set the pause time
+    *MAC_REG(GMAC_QX_TX_FLOW_CTRL(0)) |= 0xffff << GMAC_TX_FLOW_CTRL_PT_SHIFT;
+    *MAC_REG(GMAC_TXQ_PRTY_MAP0) = 0;
+    *MAC_REG(GMAC_QX_TX_FLOW_CTRL(0)) |= GMAC_TX_FLOW_CTRL_TFE;
+    *MAC_REG(GMAC_RX_FLOW_CTRL) |= 1;
     uint32_t filter = *MAC_REG(GMAC_PACKET_FILTER);
 
     // Reset all filter flags.
@@ -344,6 +418,12 @@ static void eth_init()
     // Enable checksum offload
     conf |= GMAC_CONFIG_IPC;
 
+    conf |= GMAC_CONFIG_GPSLCE |
+			GMAC_CONFIG_WD |
+			GMAC_CONFIG_JD |
+			GMAC_CONFIG_JE,
+			GMAC_CONFIG_CST |
+			GMAC_CONFIG_ACS;
     // Setting the speed of our device to 1000mbps
     conf &= ~( GMAC_CONFIG_PS | GMAC_CONFIG_FES);
     *MAC_REG(GMAC_CONFIG) = conf;
@@ -386,6 +466,10 @@ static void eth_init()
     // Enable interrupts.
     *DMA_REG(DMA_CHAN_INTR_ENA(0)) = DMA_CHAN_INTR_NORMAL;
 
+    *MAC_REG(GMAC_INT_EN) = 0;
+    sddf_dprintf("This is the value of the mac interrupt enable register: %b\n", *MAC_REG(GMAC_INT_EN));
+
+    sddf_dprintf("This is the value of DMA_SYSBUS_MODE: %b\n", *DMA_REG(DMA_SYS_BUS_MODE));
     // Populate the rx and tx hardware rings.
     rx_provide();
     tx_provide();
@@ -452,8 +536,8 @@ void init(void)
         sddf_dprintf("PHY device is operating in half duplex mode\n");
     }
 
-    net_queue_init(&rx_queue, (net_queue_t *)rx_free, (net_queue_t *)rx_active, NET_RX_QUEUE_SIZE_DRIV);
-    net_queue_init(&tx_queue, (net_queue_t *)tx_free, (net_queue_t *)tx_active, NET_TX_QUEUE_SIZE_DRIV);
+    net_queue_init(&rx_queue, (net_queue_t *)rx_free, (net_queue_t *)rx_active, NET_RX_QUEUE_CAPACITY_DRIV);
+    net_queue_init(&tx_queue, (net_queue_t *)tx_free, (net_queue_t *)tx_active, NET_TX_QUEUE_CAPACITY_DRIV);
 
     eth_setup();
 

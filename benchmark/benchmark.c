@@ -16,7 +16,6 @@
 #include <serial_config.h>
 #include <ethernet_config.h>
 
-#ifdef CONFIG_ARCH_ARM
 #define LOG_BUFFER_CAP 7
 
 /* Notification channels and TCB CAP offsets - ensure these align with .system file! */
@@ -202,6 +201,7 @@ void notified(microkit_channel ch)
 {
     switch (ch) {
     case START:
+        sddf_dprintf("In start of notified benchmark.c\n");
 #ifdef MICROKIT_CONFIG_benchmark
         sel4bench_reset_counters();
         THREAD_MEMORY_RELEASE();
@@ -218,6 +218,8 @@ void notified(microkit_channel ch)
 
         break;
     case STOP:
+        sddf_dprintf("In stop of notified benchmark.c\n");
+
 #ifdef MICROKIT_CONFIG_benchmark
         sel4bench_get_counters(benchmark_bf, &counter_values[0]);
         sel4bench_stop_counters(benchmark_bf);
@@ -303,6 +305,7 @@ void init(void)
 #endif
 
     /* Notify the idle thread that the sel4bench library is initialised. */
+    sddf_dprintf("attempting to notify the init channel\n");
     microkit_notify(INIT);
 
 #ifdef CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES
@@ -355,11 +358,3 @@ seL4_Bool fault(microkit_child id, microkit_msginfo msginfo, microkit_msginfo *r
 
     return seL4_False;
 }
-#endif
-
-#ifdef CONFIG_ARCH_RISCV
-
-void init(void) {}
-void notified(microkit_channel ch) {}
-
-#endif

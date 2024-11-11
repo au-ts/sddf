@@ -18,7 +18,7 @@ ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
 	export TIMER_DRV_DIR := meson
 	export CPU := cortex-a55
 	export ARCH := aarch64
-else ifneq ($(filter $(strip $(MICROKIT_BOARD)),imx8mm_evk imx8mp_evk maaxboard),)
+else ifneq ($(filter $(strip $(MICROKIT_BOARD)),imx8mm_evk maaxboard),)
 	export DRIV_DIR := imx
 	export UART_DRIV_DIR := imx
 	export TIMER_DRV_DIR := imx
@@ -36,6 +36,12 @@ else ifeq ($(strip $(MICROKIT_BOARD)), star64)
 	export UART_DRIV_DIR := snps
 	export TIMER_DRV_DIR := jh7110
 	export ARCH := riscv64
+else ifeq ($(strip $(MICROKIT_BOARD)), imx8mp_evk)
+	export DRIV_DIR := dwmac-5.10a
+	export UART_DRIV_DIR := imx
+	export TIMER_DRV_DIR := imx
+	export CPU := cortex-a53
+	export ARCH := aarch64
 else
 $(error Unsupported MICROKIT_BOARD given)
 endif

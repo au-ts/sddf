@@ -372,10 +372,11 @@ void notified(microkit_channel ch)
         sddf_dprintf("LWIP|LOG: received notification on unexpected channel: %u\n", ch);
         break;
     }
-
     if (notify_rx && net_require_signal_free(&state.rx_queue)) {
         net_cancel_signal_free(&state.rx_queue);
         notify_rx = false;
+        // sddf_dprintf("going to notify rx lwip\n");
+
         if (!microkit_have_signal) {
             microkit_deferred_notify(RX_CH);
         } else if (microkit_signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + RX_CH) {
@@ -386,6 +387,8 @@ void notified(microkit_channel ch)
     if (notify_tx && net_require_signal_active(&state.tx_queue)) {
         net_cancel_signal_active(&state.tx_queue);
         notify_tx = false;
+        // sddf_dprintf("going to notify tx lwip\n");
+
         if (!microkit_have_signal) {
             microkit_deferred_notify(TX_CH);
         } else if (microkit_signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + TX_CH) {

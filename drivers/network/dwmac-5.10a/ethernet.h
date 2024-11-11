@@ -31,6 +31,8 @@ register map outlined in the imx8mp TRM. */
 #define GMAC_RXQ_CTRL3			0x000000ac
 #define GMAC_INT_STATUS			0x000000b0
 #define GMAC_INT_EN			0x000000b4
+#define GMAC_RX_TX_STATUS  		0x000000b8
+#define GMAC_LPI_CTRL_STATUS 	0x000000d0
 #define GMAC_1US_TIC_COUNTER		0x000000dc
 #define GMAC_PCS_BASE			0x000000e0
 #define GMAC_PHYIF_CONTROL_STATUS	0x000000f8
@@ -172,8 +174,11 @@ register map outlined in the imx8mp TRM. */
 #define GMAC_CONFIG_IPC			BIT(27)
 #define GMAC_CONFIG_IPG			GENMASK(26, 24)
 #define GMAC_CONFIG_IPG_SHIFT		24
+#define GMAC_CONFIG_GPSLCE		BIT(23)
 #define GMAC_CONFIG_2K			BIT(22)
+#define GMAC_CONFIG_CST			BIT(21)
 #define GMAC_CONFIG_ACS			BIT(20)
+#define GMAC_CONFIG_WD			BIT(19)
 #define GMAC_CONFIG_BE			BIT(18)
 #define GMAC_CONFIG_JD			BIT(17)
 #define GMAC_CONFIG_JE			BIT(16)
