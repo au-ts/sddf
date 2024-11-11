@@ -1,0 +1,27 @@
+{
+    "name": "jh7110_timer",
+    "compatible": [
+        "starfive,jh7110-timer"
+    ],
+    "resources": {
+        "device_regions": [
+            {
+                "name": "regs",
+                "perms": "rw",
+                "setvar_vaddr": "timer_base",
+                "size": 4096,
+                "dt_index": 0
+            }
+        ],
+        "irqs": [
+            {
+                "channel_id": 0,
+                "dt_index": 0
+            },
+            {
+                "channel_id": 1,
+                "dt_index": 1
+            }
+        ]
+    }
+}
