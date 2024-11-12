@@ -7,56 +7,75 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/24.05";
-    utils.url = "github:numtide/flake-utils";
     zig-overlay.url = "github:mitchellh/zig-overlay";
   };
 
-  outputs = { self, nixpkgs, zig-overlay, ... }@inputs: inputs.utils.lib.eachSystem [
-    "x86_64-linux"
-    "aarch64-linux"
-    "x86_64-darwin"
-    "aarch64-darwin"
-  ]
-    (system:
-      let
-        pkgs = import nixpkgs {
-          inherit system;
-        };
+  outputs = { nixpkgs, zig-overlay, ... }:
+    let
+      microkit-version = "1.4.1";
+      microkit-platforms = {
+        aarch64-darwin = "macos-aarch64";
+        x86_64-darwin = "macos-x86-64";
+        x86_64-linux = "linux-x86-64";
+      };
 
-        llvm = pkgs.llvmPackages_18;
-        zig = zig-overlay.packages.${system}."0.13.0";
-      in
-      {
-        # Shell for developing sDDF.
-        # Includes dependencies for building sDDF and its
-        # examples.
-        devShells.default = pkgs.mkShell rec {
-          name = "dev";
+      forAllSystems = with nixpkgs.lib; genAttrs (builtins.attrNames microkit-platforms);
+    in
+    {
+      # Shell for developing sDDF.
+      # Includes dependencies for building sDDF and its
+      # examples.
+      devShells = forAllSystems
+        (system: {
+          default =
+            let
+              pkgs = import nixpkgs {
+                inherit system;
+              };
 
-          nativeBuildInputs = with pkgs; [
-            pkgsCross.aarch64-embedded.stdenv.cc.bintools
-            pkgsCross.aarch64-embedded.stdenv.cc
-            zig
-            qemu
-            gnumake
-            dosfstools
-            imagemagick
-            # for git-clang-format.
-            llvm.libclang.python
-          ];
+              llvm = pkgs.llvmPackages_18;
+              zig = zig-overlay.packages.${system}."0.13.0";
+            in
+            pkgs.mkShell rec {
+              name = "sddf-dev";
 
-          buildInputs = with pkgs; [
-            llvm.clang
-            llvm.lld
-            llvm.libllvm
-          ];
+              microkit-platform = microkit-platforms.${system} or (throw "Unsupported system: ${system}");
 
-          # To avoid compile errors since Nix adds extra arguments that are not used
-          # by us.
-          env.NIX_CFLAGS_COMPILE = "-Wno-unused-command-line-argument";
-          # To avoid Nix adding compiler flags that are not available on a freestanding
-          # environment.
-          hardeningDisable = [ "all" ];
-        };
-      });
+              env.MICROKIT_SDK = pkgs.fetchzip {
+                url = "https://github.com/seL4/microkit/releases/download/${microkit-version}/microkit-sdk-${microkit-version}-${microkit-platform}.tar.gz";
+                hash = {
+                  aarch64-darwin = "sha256-QMgIpQYGFeu7Rm+KNS9vijAksuW4WXf+TJnLVtto6Lw=";
+                  x86_64-darwin = "sha256-9WHEVkmSEijBiVsCWRcoSBhu4TPPzItTAx/P70/7UyM=";
+                  x86_64-linux = "sha256-VpljwkGAPl/vkTBFoG6j2ivD9CMy+u3TI7pwdlz+Zho=";
+                }.${system} or (throw "Unsupported system: ${system}");
+              };
+
+              nativeBuildInputs = with pkgs; [
+                pkgsCross.aarch64-embedded.stdenv.cc.bintools
+                pkgsCross.aarch64-embedded.stdenv.cc
+                zig
+                qemu
+                gnumake
+                dosfstools
+                imagemagick
+
+                # for git-clang-format.
+                llvm.libclang.python
+              ];
+
+              buildInputs = [
+                llvm.clang
+                llvm.lld
+                llvm.libllvm
+              ];
+
+              # To avoid compile errors since Nix adds extra arguments that are not used
+              # by us.
+              env.NIX_CFLAGS_COMPILE = "-Wno-unused-command-line-argument";
+              # To avoid Nix adding compiler flags that are not available on a freestanding
+              # environment.
+              hardeningDisable = [ "all" ];
+            };
+        });
+    };
 }
