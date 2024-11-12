@@ -63,6 +63,8 @@ There is a Nix flake available in the repository, so you can get a development s
 nix develop
 ```
 
+Note that this will set the `MICROKIT_SDK` environment variable to the SDK path.
+
 ## Examples
 
 You can find examples making use of the sDDF in the `examples/` directory. Each example has its
