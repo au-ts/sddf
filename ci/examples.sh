@@ -26,6 +26,7 @@ I2C=true
 SERIAL=true
 TIMER=true
 BLK=true
+GPU=true
 
 build_network_echo_server_make() {
     BOARD=$1
@@ -155,6 +156,31 @@ build_blk_zig() {
     popd
 }
 
+build_gpu_make() {
+    BOARD=$1
+    CONFIG=$2
+    echo "CI|INFO: building gpu example with Make, board: ${BOARD}, config: ${CONFIG}"
+    BUILD_DIR="${PWD}/${CI_BUILD_DIR}/examples/gpu/make/${BOARD}/${CONFIG}"
+    rm -rf ${BUILD_DIR}
+    mkdir -p ${BUILD_DIR}
+    make -j${NUM_JOBS} -C ${SDDF}/examples/gpu \
+        BUILD_DIR=${BUILD_DIR} \
+        MICROKIT_CONFIG=${CONFIG} \
+        MICROKIT_SDK=${SDK_PATH} \
+        MICROKIT_BOARD=${BOARD}
+}
+
+build_gpu_zig() {
+    BOARD=$1
+    CONFIG=$2
+    echo "CI|INFO: building gpu example with Zig, board: ${BOARD}, config: ${CONFIG}"
+    BUILD_DIR="${PWD}/${CI_BUILD_DIR}/examples/gpu/zig/${BOARD}/${CONFIG}"
+    rm -rf ${BUILD_DIR}
+    pushd ${SDDF}/examples/gpu
+    zig build -Dsdk=${SDK_PATH} -Dboard=${BOARD} -Dconfig=${CONFIG} -p ${BUILD_DIR}
+    popd
+}
+
 network() {
     BOARDS=("odroidc4" "imx8mm_evk" "maaxboard" "qemu_virt_aarch64")
     CONFIGS=("debug" "release" "benchmark")
@@ -231,6 +257,19 @@ blk() {
     done
 }
 
+gpu() {
+    BOARDS=("qemu_virt_aarch64")
+    CONFIGS=("debug" "release")
+    for BOARD in "${BOARDS[@]}"
+    do
+        for CONFIG in "${CONFIGS[@]}"
+        do
+            build_gpu_make ${BOARD} ${CONFIG}
+            build_gpu_zig ${BOARD} ${CONFIG}
+        done
+    done
+}
+
 # Only run the examples that have been enabled
 $NETWORK && network
 $I2C && i2c
@@ -238,6 +277,7 @@ $TIMER && timer
 $SERIAL && serial
 $MMC && mmc
 $BLK && blk
+$GPU && gpu
 
 echo ""
 echo "CI|INFO: Passed all sDDF tests"
