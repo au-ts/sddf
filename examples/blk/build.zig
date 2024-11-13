@@ -136,8 +136,10 @@ pub fn build(b: *std.Build) void {
     const loader_arg = b.fmt("loader,file={s},addr=0x70000000,cpu-num=0", .{ final_image_dest });
     if (std.mem.eql(u8, microkit_board, "qemu_virt_aarch64")) {
         const create_disk_cmd = b.addSystemCommand(&[_][]const u8{
-            "bash", "mkvirtdisk",
+            "bash",
         });
+        create_disk_cmd.addFileArg(b.path("mkvirtdisk"));
+        create_disk_cmd.addFileInput(b.path("mkvirtdisk"));
         const disk = create_disk_cmd.addOutputFileArg("disk");
         create_disk_cmd.addArgs(&[_][]const u8{
             "1", "512", b.fmt("{}", .{ 1024 * 1024 * 16 }),
