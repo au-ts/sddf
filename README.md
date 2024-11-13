@@ -63,7 +63,8 @@ There is a Nix flake available in the repository, so you can get a development s
 nix develop
 ```
 
-Note that this will set the `MICROKIT_SDK` environment variable to the SDK path.
+Note that this will set the `MICROKIT_SDK` environment variable to the SDK path, you do not
+need to download the Microkit SDK manually.
 
 ## Examples
 
