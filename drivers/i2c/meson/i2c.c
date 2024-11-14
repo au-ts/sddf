@@ -414,7 +414,8 @@ static inline void i2c_load_tokens(volatile struct i2c_regs *regs)
                    request_data_offset, tk_offset, wdata_offset, rdata_offset);
 
         // Discover next operation
-        uint8_t meson_token, data;
+        uint8_t meson_token;
+        uint32_t data;
         if (i2c_ifState.rw_remaining == 0) {
             LOG_DRIVER("Accepting new token...\n");
             // Get meson_token if no read/write is in progress.
