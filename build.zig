@@ -366,8 +366,8 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
         .strip = false,
     });
-    blk_virt.addCSourceFile(.{
-        .file = b.path("blk/components/virt.c"),
+    blk_virt.addCSourceFiles(.{
+        .files = &. { "blk/components/virt.c", "blk/components/partitioning.c" },
     });
     blk_virt.addIncludePath(b.path("include"));
     blk_virt.addIncludePath(b.path("include/microkit"));
