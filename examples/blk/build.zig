@@ -138,8 +138,9 @@ pub fn build(b: *std.Build) void {
         const create_disk_cmd = b.addSystemCommand(&[_][]const u8{
             "bash",
         });
-        create_disk_cmd.addFileArg(b.path("mkvirtdisk"));
-        create_disk_cmd.addFileInput(b.path("mkvirtdisk"));
+        const mkvirtdisk = sddf_dep.path("tools/mkvirtdisk");
+        create_disk_cmd.addFileArg(mkvirtdisk);
+        create_disk_cmd.addFileInput(mkvirtdisk);
         const disk = create_disk_cmd.addOutputFileArg("disk");
         create_disk_cmd.addArgs(&[_][]const u8{
             "1", "512", b.fmt("{}", .{ 1024 * 1024 * 16 }),
