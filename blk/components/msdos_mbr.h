@@ -33,3 +33,4 @@ struct msdos_mbr {
 } __attribute__((packed));
 
 #define MSDOS_MBR_PARTITION_TYPE_EMPTY 0x00
+#define MSDOS_MBR_PARTITION_TYPE_GPT 0xEE
