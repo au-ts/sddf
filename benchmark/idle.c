@@ -6,14 +6,18 @@
 #include <stdint.h>
 #include <microkit.h>
 #include <sddf/benchmark/sel4bench.h>
+#include <sddf/util/util.h>
 #include <sddf/util/fence.h>
 #include <sddf/util/printf.h>
 #include <sddf/benchmark/bench.h>
+#include <sddf/benchmark/config.h>
 
-#define INIT 3
+#include "benchmark_idle_config.h"
+
 #define MAGIC_CYCLES 150
 
-uintptr_t cyclecounters_vaddr;
+benchmark_idle_config_t config;
+
 struct bench *b;
 
 void count_idle(void)
@@ -37,17 +41,16 @@ void count_idle(void)
 
 void notified(microkit_channel ch)
 {
-    switch(ch) {
-        case INIT:
-            count_idle();
-            break;
-        default:
-            sddf_dprintf("Idle thread notified on unexpected channel: %u\n", ch);
+    if (ch == config.init_channel) {
+        count_idle();
+    } else {
+        sddf_dprintf("Idle thread notified on unexpected channel: %u\n", ch);
     }
 }
 
 void init(void)
 {
-    b = (void *)cyclecounters_vaddr;
+    sddf_memcpy(&config, benchmark_idle_config_data, benchmark_idle_config_data_len);
+    b = (void *)config.cycle_counters;
     return;
 }
