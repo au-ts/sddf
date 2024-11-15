@@ -10,6 +10,8 @@
 #include <sddf/serial/config.h>
 #include "uart.h"
 
+#include "driver_config.h"
+
 #define IRQ_CH 0
 
 serial_driver_config_t config;
@@ -93,7 +95,7 @@ static void tx_provide(void)
 
     if (transferred && serial_require_consumer_signal(&tx_queue_handle)) {
         serial_cancel_consumer_signal(&tx_queue_handle);
-        microkit_notify(config.tx_ch);
+        microkit_notify(config.tx_id);
     }
 }
 
@@ -124,7 +126,7 @@ static void rx_return(void)
 
     if (enqueued && serial_require_producer_signal(&rx_queue_handle)) {
         serial_cancel_producer_signal(&rx_queue_handle);
-        microkit_notify(config.rx_ch);
+        microkit_notify(config.rx_id);
     }
 }
 
@@ -176,7 +178,7 @@ static void uart_setup(void)
     uart_clock.crystal_clock = true;
     uart_clock.reference_clock_frequency = UART_XTAL_REF_CLK;
     uart_clock.crystal_clock_divider = 1;
-    set_baud(UART_DEFAULT_BAUD);
+    set_baud(config.default_baud);
 
     uint32_t irqc = uart_regs->irqc;
     /* Enable receive interrupts every byte */
@@ -197,12 +199,14 @@ static void uart_setup(void)
 
 void init(void)
 {
+    sddf_memcpy(&config, serial_driver_data, serial_driver_data_len);
+
     uart_setup();
 
-#if !SERIAL_TX_ONLY
-    serial_queue_init(&rx_queue_handle, rx_queue, SERIAL_RX_DATA_REGION_CAPACITY_DRIV, rx_data);
-#endif
-    serial_queue_init(&tx_queue_handle, tx_queue, SERIAL_TX_DATA_REGION_CAPACITY_DRIV, tx_data);
+    if (config.rx_enabled) {
+        serial_queue_init(&rx_queue_handle, config.rx_queue, config.rx_capacity, config.rx_data);
+    }
+    serial_queue_init(&tx_queue_handle, config.tx_queue, config.tx_capacity, config.tx_data);
 }
 
 void notified(microkit_channel ch)
@@ -210,9 +214,9 @@ void notified(microkit_channel ch)
     if (ch == IRQ_CH) {
         handle_irq();
         microkit_deferred_irq_ack(ch);
-    } else if (ch == config.tx_ch) {
+    } else if (ch == config.tx_id) {
         tx_provide();
-    } else if (ch == config.rx_ch) {
+    } else if (ch == config.rx_id) {
         uart_regs->cr |= AML_UART_RX_INT_EN;
         rx_return();
     } else {
