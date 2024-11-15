@@ -16,6 +16,7 @@
 #include <sddf/timer/client.h>
 #include <sddf/timer/config.h>
 #include <sddf/benchmark/sel4bench.h>
+#include <sddf/benchmark/config.h>
 #include <string.h>
 #include "lwip/init.h"
 #include "netif/etharp.h"
@@ -31,10 +32,12 @@
 #include "net_client_config.h"
 #include "timer_client_config.h"
 #include "serial_client_config.h"
+#include "benchmark_client_config.h"
 
 serial_client_config_t serial_config;
 timer_client_config_t timer_config;
 net_client_config_t net_config;
+benchmark_client_config_t benchmark_config;
 
 serial_queue_handle_t serial_tx_queue_handle;
 
@@ -283,6 +286,7 @@ void init(void)
     sddf_memcpy(&net_config, net_client_client0_data, net_client_client0_data_len);
     sddf_memcpy(&timer_config, timer_client_client0_data, timer_client_client0_data_len);
     sddf_memcpy(&serial_config, serial_client_client0_data, serial_client_client0_data_len);
+    sddf_memcpy(&benchmark_config, benchmark_client_config_data, benchmark_client_config_data_len);
 
     serial_queue_init(&serial_tx_queue_handle, serial_config.tx_queue, serial_config.tx_capacity, serial_config.tx_data);
     serial_putchar_init(serial_config.tx_id, &serial_tx_queue_handle);
