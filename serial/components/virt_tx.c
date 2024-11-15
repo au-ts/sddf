@@ -151,7 +151,7 @@ void tx_return(void)
 
     if (transferred && serial_require_producer_signal(&tx_queue_handle_drv)) {
         serial_cancel_producer_signal(&tx_queue_handle_drv);
-        microkit_notify(config.driver_ch);
+        microkit_notify(config.driver_id);
     }
 
     for (uint32_t client = 0; client < config.num_clients; client++) {
@@ -193,7 +193,7 @@ void tx_provide(microkit_channel ch)
 
     if (transferred && serial_require_producer_signal(&tx_queue_handle_drv)) {
         serial_cancel_producer_signal(&tx_queue_handle_drv);
-        microkit_notify(config.driver_ch);
+        microkit_notify(config.driver_id);
     }
 
     if (transferred && serial_require_consumer_signal(&tx_queue_handle_cli[active_client])) {
@@ -223,21 +223,21 @@ void init(void)
     // config.clients[1].tx_data = (void *)0x4009000;
     // config.clients[1].tx_capacity = 0x2000;
     
-    sddf_dprintf("DRIVER_CH = %d\n", config.driver_ch);
-    sddf_dprintf("config.tx_queue_drv = 0x%p\n", config.tx_queue_drv);
-    sddf_dprintf("config.tx_data_drv = 0x%p\n", config.tx_data_drv);
-    sddf_dprintf("config.tx_capacity_drv = 0x%x\n", config.tx_capacity_drv);
-    sddf_dprintf("config.begin_str = %s", config.begin_str);
-    sddf_dprintf("config.begin_str_len = %d\n", config.begin_str_len);
-    sddf_dprintf("config.enable_colour = %d\n", config.enable_colour);
-    sddf_dprintf("config.enable_rx = %d\n", config.enable_rx);
-    sddf_dprintf("config.num_clients = %d\n", config.num_clients);
-    for (int i = 0; i < config.num_clients; i++) {
-        sddf_dprintf("config.clients[%d].name = %s\n", i, config.clients[i].name);
-        sddf_dprintf("config.clients[%d].tx_queue = 0x%p\n", i, config.clients[i].tx_queue);
-        sddf_dprintf("config.clients[%d].tx_data = 0x%p\n", i, config.clients[i].tx_data);
-        sddf_dprintf("config.clients[%d].tx_capacity = 0x%x\n", i, config.clients[i].tx_capacity);
-    }
+    // sddf_dprintf("DRIVER_CH = %d\n", config.driver_id);
+    // sddf_dprintf("config.tx_queue_drv = 0x%p\n", config.tx_queue_drv);
+    // sddf_dprintf("config.tx_data_drv = 0x%p\n", config.tx_data_drv);
+    // sddf_dprintf("config.tx_capacity_drv = 0x%lx\n", config.tx_capacity_drv);
+    // sddf_dprintf("config.begin_str = %s", config.begin_str);
+    // sddf_dprintf("config.begin_str_len = %lx\n", config.begin_str_len);
+    // sddf_dprintf("config.enable_colour = %d\n", config.enable_colour);
+    // sddf_dprintf("config.enable_rx = %d\n", config.enable_rx);
+    // sddf_dprintf("config.num_clients = %d\n", config.num_clients);
+    // for (int i = 0; i < config.num_clients; i++) {
+    //     sddf_dprintf("config.clients[%d].name = %s\n", i, config.clients[i].name);
+    //     sddf_dprintf("config.clients[%d].tx_queue = 0x%p\n", i, config.clients[i].tx_queue);
+    //     sddf_dprintf("config.clients[%d].tx_data = 0x%p\n", i, config.clients[i].tx_data);
+    //     sddf_dprintf("config.clients[%d].tx_capacity = 0x%x\n", i, config.clients[i].tx_capacity);
+    // }
 
     serial_queue_init(&tx_queue_handle_drv, config.tx_queue_drv, config.tx_capacity_drv, config.tx_data_drv);
     for (uint64_t i = 0; i < config.num_clients; i++) {
@@ -249,7 +249,7 @@ void init(void)
         /* Print a deterministic string to allow console input to begin */
         sddf_memcpy(tx_queue_handle_drv.data_region, config.begin_str, config.begin_str_len + 1);
         serial_update_visible_tail(&tx_queue_handle_drv, config.begin_str_len + 1);
-        microkit_notify(config.driver_ch);
+        microkit_notify(config.driver_id);
     }
 
     if (config.enable_colour) {
@@ -264,7 +264,7 @@ void init(void)
 
 void notified(microkit_channel ch)
 {
-    if (ch == config.driver_ch) {
+    if (ch == config.driver_id) {
         tx_return();
     } else {
         tx_provide(ch);
