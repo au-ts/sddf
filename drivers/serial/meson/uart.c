@@ -7,18 +7,12 @@
 #include <stdint.h>
 #include <microkit.h>
 #include <sddf/util/printf.h>
-#include <serial_config.h>
+#include <sddf/serial/config.h>
 #include "uart.h"
 
 #define IRQ_CH 0
-#define TX_CH  1
-#define RX_CH  2
 
-serial_queue_t *rx_queue;
-serial_queue_t *tx_queue;
-
-char *rx_data;
-char *tx_data;
+serial_driver_config_t config;
 
 serial_queue_handle_t rx_queue_handle;
 serial_queue_handle_t tx_queue_handle;
@@ -99,7 +93,7 @@ static void tx_provide(void)
 
     if (transferred && serial_require_consumer_signal(&tx_queue_handle)) {
         serial_cancel_consumer_signal(&tx_queue_handle);
-        microkit_notify(TX_CH);
+        microkit_notify(config.tx_ch);
     }
 }
 
@@ -130,7 +124,7 @@ static void rx_return(void)
 
     if (enqueued && serial_require_producer_signal(&rx_queue_handle)) {
         serial_cancel_producer_signal(&rx_queue_handle);
-        microkit_notify(RX_CH);
+        microkit_notify(config.rx_ch);
     }
 }
 
@@ -213,20 +207,15 @@ void init(void)
 
 void notified(microkit_channel ch)
 {
-    switch (ch) {
-    case IRQ_CH:
+    if (ch == IRQ_CH) {
         handle_irq();
         microkit_deferred_irq_ack(ch);
-        break;
-    case TX_CH:
+    } else if (ch == config.tx_ch) {
         tx_provide();
-        break;
-    case RX_CH:
+    } else if (ch == config.rx_ch) {
         uart_regs->cr |= AML_UART_RX_INT_EN;
         rx_return();
-        break;
-    default:
+    } else {
         sddf_dprintf("UART|LOG: received notification on unexpected channel: %u\n", ch);
-        break;
     }
 }
