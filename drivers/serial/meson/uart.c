@@ -182,11 +182,11 @@ static void uart_setup(void)
 
     uint32_t irqc = uart_regs->irqc;
     /* Enable receive interrupts every byte */
-#if !SERIAL_TX_ONLY
-    irqc &= ~AML_UART_RECV_IRQ_MASK;
-    irqc |= AML_UART_RECV_IRQ(1);
-    cr |= (AML_UART_RX_INT_EN | AML_UART_RX_EN);
-#endif
+    if (config.rx_enabled) {
+        irqc &= ~AML_UART_RECV_IRQ_MASK;
+        irqc |= AML_UART_RECV_IRQ(1);
+        cr |= (AML_UART_RX_INT_EN | AML_UART_RX_EN);
+    }
 
     /* Enable transmit interrupts if the write fifo drops below one byte - used when the write fifo becomes full */
     irqc &= ~AML_UART_XMIT_IRQ_MASK;
