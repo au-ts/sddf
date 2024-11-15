@@ -27,6 +27,8 @@
 #include "lwip/dhcp.h"
 
 #include "echo.h"
+#include "net_client_config.h"
+#include "serial_client_config.h"
 
 #define SERIAL_TX_CH 0
 #define TIMER  1

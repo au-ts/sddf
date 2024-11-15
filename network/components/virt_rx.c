@@ -14,6 +14,8 @@
 #include <sddf/util/printf.h>
 #include <sddf/util/cache.h>
 
+#include "net_virt_rx_config.h"
+
 /* Used to signify that a packet has come in for the broadcast address and does not match with
  * any particular client. */
 #define BROADCAST_ID (-2)
@@ -190,6 +192,8 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
+    sddf_memcpy(&config, net_virt_rx_data, net_virt_rx_data_len);
+
     /* Set up client queues */
     for (int i = 0; i < config.num_clients; i++) {
         net_queue_init(&state.rx_queue_clients[i], config.clients[i].free, config.clients[i].active, config.clients[i].capacity);

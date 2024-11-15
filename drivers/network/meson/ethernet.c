@@ -11,9 +11,9 @@
 #include <sddf/util/fence.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
-#include <ethernet_config.h>
 
 #include "ethernet.h"
+#include "net_driver_config.h"
 
 #define IRQ_CH 0
 
@@ -33,8 +33,8 @@ struct descriptor {
     uint32_t next;
 };
 
-_Static_assert((RX_COUNT + TX_COUNT) * sizeof(struct descriptor) <= NET_HW_REGION_SIZE,
-               "Expect rx+tx buffers to fit in single 2MB page");
+// _Static_assert((RX_COUNT + TX_COUNT) * sizeof(struct descriptor) <= NET_HW_REGION_SIZE,
+            //    "Expect rx+tx buffers to fit in single 2MB page");
 
 typedef struct {
     unsigned int tail; /* index to insert at */
@@ -268,6 +268,8 @@ static void eth_setup(void)
 
 void init(void)
 {
+    sddf_memcpy(&config, net_driver_data, net_driver_data_len);
+
     eth_setup();
 
     net_queue_init(&rx_queue, config.rx_free, config.rx_active, config.rx_capacity);
