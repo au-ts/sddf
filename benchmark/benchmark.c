@@ -10,11 +10,15 @@
 #include <sddf/benchmark/bench.h>
 #include <sddf/benchmark/sel4bench.h>
 #include <sddf/serial/queue.h>
+#include <sddf/serial/config.h>
 #include <sddf/util/fence.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
-#include <serial_config.h>
 #include <ethernet_config.h>
+
+#include "serial_client_config.h"
+
+serial_client_config_t serial_config;
 
 #define LOG_BUFFER_CAP 7
 
@@ -36,10 +40,6 @@
 ccnt_t counter_values[8];
 counter_bitfield_t benchmark_bf;
 
-#define SERIAL_TX_CH 0
-
-char *serial_tx_data;
-serial_queue_t *serial_tx_queue;
 serial_queue_handle_t serial_tx_queue_handle;
 
 #ifdef CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES
@@ -196,6 +196,9 @@ static inline void seL4_BenchmarkTrackDumpSummary(benchmark_track_kernel_entry_t
 
 void notified(microkit_channel ch)
 {
+    if (ch == serial_config.tx_id) {
+        return;
+    }
     switch (ch) {
     case START:
 #ifdef MICROKIT_CONFIG_benchmark
@@ -265,9 +268,6 @@ void notified(microkit_channel ch)
 #endif
 
         break;
-    case SERIAL_TX_CH:
-        // Nothing to do
-        break;
     default:
         sddf_printf("Bench thread notified on unexpected channel\n");
     }
@@ -275,8 +275,10 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
-    serial_cli_queue_init_sys(microkit_name, NULL, NULL, NULL, &serial_tx_queue_handle, serial_tx_queue, serial_tx_data);
-    serial_putchar_init(SERIAL_TX_CH, &serial_tx_queue_handle);
+    sddf_memcpy(&serial_config, serial_client_bench_data, serial_client_bench_data_len);
+
+    serial_queue_init(&serial_tx_queue_handle, serial_config.tx_queue, serial_config.tx_capacity, serial_config.tx_data);
+    serial_putchar_init(serial_config.tx_id, &serial_tx_queue_handle);
 #ifdef MICROKIT_CONFIG_benchmark
     sel4bench_init();
     seL4_Word n_counters = sel4bench_get_num_counters();
