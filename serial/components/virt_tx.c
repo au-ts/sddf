@@ -11,8 +11,6 @@
 #include <sddf/util/printf.h>
 #include "virt_tx_config.h"
 
-#define DRIVER_CH 0
-#define CLIENT_OFFSET 1
 #define NAME_MAX 128
 #define BEGIN_STR_MAX 128
 
@@ -153,25 +151,32 @@ void tx_return(void)
 
     if (transferred && serial_require_producer_signal(&tx_queue_handle_drv)) {
         serial_cancel_producer_signal(&tx_queue_handle_drv);
-        microkit_notify(DRIVER_CH);
+        microkit_notify(config.driver_ch);
     }
 
     for (uint32_t client = 0; client < config.num_clients; client++) {
         if (notify_client[client] && serial_require_consumer_signal(&tx_queue_handle_cli[client])) {
             serial_cancel_consumer_signal(&tx_queue_handle_cli[client]);
-            microkit_notify(CLIENT_OFFSET + client);
+            microkit_notify(config.clients[client].id);
         }
     }
 }
 
 void tx_provide(microkit_channel ch)
 {
-    if (ch > config.num_clients) {
+    uint32_t active_client = SDDF_SERIAL_MAX_CLIENTS;
+    for (int i = 0; i < config.num_clients; i++) {
+        if (ch == config.clients[i].id) {
+            active_client = i;
+            break;
+        }
+    }
+
+    if (ch == SDDF_SERIAL_MAX_CLIENTS) {
         sddf_dprintf("VIRT_TX|LOG: Received notification from unknown channel %u\n", ch);
         return;
     }
 
-    uint32_t active_client = ch - CLIENT_OFFSET;
     bool transferred = false;
     bool reprocess = true;
     while (reprocess) {
@@ -188,7 +193,7 @@ void tx_provide(microkit_channel ch)
 
     if (transferred && serial_require_producer_signal(&tx_queue_handle_drv)) {
         serial_cancel_producer_signal(&tx_queue_handle_drv);
-        microkit_notify(DRIVER_CH);
+        microkit_notify(config.driver_ch);
     }
 
     if (transferred && serial_require_consumer_signal(&tx_queue_handle_cli[active_client])) {
@@ -218,7 +223,7 @@ void init(void)
     // config.clients[1].tx_data = (void *)0x4009000;
     // config.clients[1].tx_capacity = 0x2000;
     
-    sddf_dprintf("DRIVER_CH = %d\n", DRIVER_CH);
+    sddf_dprintf("DRIVER_CH = %d\n", config.driver_ch);
     sddf_dprintf("config.tx_queue_drv = 0x%p\n", config.tx_queue_drv);
     sddf_dprintf("config.tx_data_drv = 0x%p\n", config.tx_data_drv);
     sddf_dprintf("config.tx_capacity_drv = 0x%x\n", config.tx_capacity_drv);
@@ -244,7 +249,7 @@ void init(void)
         /* Print a deterministic string to allow console input to begin */
         sddf_memcpy(tx_queue_handle_drv.data_region, config.begin_str, config.begin_str_len + 1);
         serial_update_visible_tail(&tx_queue_handle_drv, config.begin_str_len + 1);
-        microkit_notify(DRIVER_CH);
+        microkit_notify(config.driver_ch);
     }
 
     if (config.enable_colour) {
@@ -259,12 +264,9 @@ void init(void)
 
 void notified(microkit_channel ch)
 {
-    switch (ch) {
-    case DRIVER_CH:
+    if (ch == config.driver_ch) {
         tx_return();
-        break;
-    default:
+    } else {
         tx_provide(ch);
-        break;
     }
 }
