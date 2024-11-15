@@ -10,6 +10,8 @@
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 
+#include "net_virt_tx_config.h"
+
 net_virt_tx_config_t config;
 
 typedef struct state {
@@ -119,6 +121,8 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
+    sddf_memcpy(&config, net_virt_tx_data, net_virt_tx_data_len);
+
     /* Set up driver queues */
     net_queue_init(&state.tx_queue_drv, config.free_drv, config.active_drv, config.capacity_drv);
 
