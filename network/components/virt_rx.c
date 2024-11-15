@@ -194,6 +194,8 @@ void init(void)
 {
     sddf_memcpy(&config, net_virt_rx_data, net_virt_rx_data_len);
 
+    buffer_refs = config.buffer_metadata;
+
     /* Set up client queues */
     for (int i = 0; i < config.num_clients; i++) {
         net_queue_init(&state.rx_queue_clients[i], config.clients[i].free, config.clients[i].active, config.clients[i].capacity);
