@@ -14,7 +14,6 @@
 #include <sddf/util/fence.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
-#include <ethernet_config.h>
 
 #include "serial_client_config.h"
 
@@ -68,28 +67,28 @@ static void print_pdid_name(uint64_t pd_id)
 {
     switch (pd_id) {
     case PD_ETH_ID:
-        sddf_printf(NET_DRIVER_NAME);
+        sddf_printf("net driver");
         break;
     case PD_VIRT_RX_ID:
-        sddf_printf(NET_VIRT_RX_NAME);
+        sddf_printf("virt rx");
         break;
     case PD_VIRT_TX_ID:
-        sddf_printf(NET_VIRT_TX_NAME);
+        sddf_printf("virt tx");
         break;
     case PD_COPY_ID:
-        sddf_printf(NET_COPY0_NAME);
+        sddf_printf("copy 0");
         break;
     case PD_COPY1_ID:
-        sddf_printf(NET_COPY1_NAME);
+        sddf_printf("copy 1");
         break;
     case PD_LWIP_ID:
-        sddf_printf(NET_CLI0_NAME);
+        sddf_printf("cli 0");
         break;
     case PD_LWIP1_ID:
-        sddf_printf(NET_CLI1_NAME);
+        sddf_printf("cli 1");
         break;
     case PD_TIMER_ID:
-        sddf_printf(NET_TIMER_NAME);
+        sddf_printf("timer");
         break;
     default:
         sddf_printf("unknown");
