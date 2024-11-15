@@ -7,13 +7,13 @@ typedef struct net_driver_config {
     uintptr_t hw_ring_buffer_paddr;
     void *rx_free;
     void *rx_active;
+    size_t rx_capacity;
     void *tx_free;
     void *tx_active;
-    size_t rx_capacity;
     size_t tx_capacity;
 
-    uint8_t tx_id;
     uint8_t rx_id;
+    uint8_t tx_id;
 } net_driver_config_t;
 
 typedef struct net_virt_tx_client_config {
@@ -46,8 +46,8 @@ typedef struct net_virt_rx_config {
     void *free_drv;
     void *active_drv;
     uint64_t capacity_drv;
-    uintptr_t buffer_data_vaddr;
     uintptr_t buffer_data_paddr;
+    uintptr_t buffer_data_vaddr;
     // The system designer must allocate a buffer metadata region for internal
     // use by the RX virtualiser. The size of this region must be at least
     // 4*drv_queue_capacity. It must be mapped R-W and zero-initialised.
@@ -83,6 +83,8 @@ typedef struct net_client_config {
     uintptr_t rx_buffer_data_region;
     uintptr_t tx_buffer_data_region;
 
-    uint8_t rx_ch;
-    uint8_t tx_ch;
+    uint8_t rx_id;
+    uint8_t tx_id;
+
+    uint8_t mac_addr[6];
 } net_client_config_t;
