@@ -33,9 +33,6 @@
 #define PD_LWIP1_ID     7
 #define PD_TIMER_ID     8
 
-uintptr_t uart_base;
-uintptr_t cyclecounters_vaddr;
-
 ccnt_t counter_values[8];
 counter_bitfield_t benchmark_bf;
 
