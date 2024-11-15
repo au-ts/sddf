@@ -12,14 +12,10 @@
 #include <sddf/util/printf.h>
 #include "virt_rx_config.h"
 
-#define MAX_CLIENTS (MICROKIT_MAX_CHANNELS - 1)
-#define DRIVER_CH 0
-#define CLIENT_OFFSET 1
-
 serial_virt_rx_config_t config;
 
 serial_queue_handle_t rx_queue_handle_drv;
-serial_queue_handle_t rx_queue_handle_cli[MAX_CLIENTS];
+serial_queue_handle_t rx_queue_handle_cli[SDDF_SERIAL_MAX_CLIENTS];
 
 #define MAX_CLI_BASE_10 4
 typedef enum mode {normal, switched, number} mode_t;
@@ -77,7 +73,7 @@ void rx_return(void)
                         if (transferred && serial_require_producer_signal(&rx_queue_handle_cli[current_client])) {
                             serial_update_visible_tail(&rx_queue_handle_cli[current_client], local_tail);
                             serial_cancel_producer_signal(&rx_queue_handle_cli[current_client]);
-                            microkit_notify(CLIENT_OFFSET + current_client);
+                            microkit_notify(config.clients[current_client].id);
                         }
                         current_client = (uint32_t)input_number;
                         local_tail = rx_queue_handle_cli[current_client].queue->tail;
@@ -112,31 +108,18 @@ void rx_return(void)
     if (!serial_queue_full(&rx_queue_handle_drv, rx_queue_handle_drv.queue->tail)
         && serial_require_consumer_signal(&rx_queue_handle_drv)) {
         serial_cancel_consumer_signal(&rx_queue_handle_drv);
-        microkit_notify(DRIVER_CH);
+        microkit_notify(config.driver_id);
     }
 
     if (transferred && serial_require_producer_signal(&rx_queue_handle_cli[current_client])) {
         serial_cancel_producer_signal(&rx_queue_handle_cli[current_client]);
-        microkit_notify(CLIENT_OFFSET + current_client);
+        microkit_notify(config.clients[current_client].id);
     }
 }
 
 void init(void)
 {
     sddf_memcpy(&config, serial_virt_rx_data, serial_virt_rx_data_len);
-
-    // config.rx_queue_drv = (void *)0x4000000;
-    // config.rx_data_drv = (void *)0x4003000;
-    // config.rx_capacity_drv = 0x2000;
-    // config.switch_char = 28;
-    // config.terminate_num_char = '\r';
-    // config.num_clients = 2;
-    // config.clients[0].rx_queue = (void *)0x4001000;
-    // config.clients[0].rx_data = (void *)0x4005000;
-    // config.clients[0].rx_capacity = 0x2000;
-    // config.clients[1].rx_queue = (void *)0x4002000;
-    // config.clients[1].rx_data = (void *)0x4007000;
-    // config.clients[0].rx_capacity = 0x2000;
 
     serial_queue_init(&rx_queue_handle_drv, config.rx_queue_drv, config.rx_capacity_drv, config.rx_data_drv);
     for (uint64_t i = 0; i < config.num_clients; i++) {
@@ -146,12 +129,9 @@ void init(void)
 
 void notified(microkit_channel ch)
 {
-    switch (ch) {
-    case DRIVER_CH:
+    if (ch == config.driver_id) {
         rx_return();
-        break;
-    default:
+    } else {
         sddf_dprintf("VIRT_RX|LOG: received notification on unexpected channel: %u\n", ch);
-        break;
     }
 }
