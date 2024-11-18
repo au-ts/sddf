@@ -221,8 +221,7 @@ unsigned long clk_msr(unsigned long clk_mux)
 
     uint32_t msr_val = *mclk_reg2;
 
-    return DIV_ROUND_CLOSEST_ULL((msr_val & ((1 << 19) - 1)) * 1000000ULL,
-                                 duration);
+    return DIV_ROUND_CLOSEST_ULL((msr_val & ((1 << 19) - 1)) * 1000000ULL, duration);
 }
 
 const char *const *get_msr_clk_list(void)

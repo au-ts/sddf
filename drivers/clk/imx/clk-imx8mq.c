@@ -2382,88 +2382,58 @@ static IMX_CLK_SOURCE(clk_ext2, 0x7ed6b40);
 static IMX_CLK_SOURCE(clk_ext3, 0x7ed6b40);
 static IMX_CLK_SOURCE(clk_ext4, 0x7ed6b40);
 
-static IMX_CLK_MUX(arm_pll_ref_sel, CCM_ANALOG_BASE, 0x28, 16, 2, pll_ref_sels,
-                   ARRAY_SIZE(pll_ref_sels));
-static IMX_CLK_MUX(gpu_pll_ref_sel, CCM_ANALOG_BASE, 0x18, 16, 2, pll_ref_sels,
-                   ARRAY_SIZE(pll_ref_sels));
-static IMX_CLK_MUX(vpu_pll_ref_sel, CCM_ANALOG_BASE, 0x20, 16, 2, pll_ref_sels,
-                   ARRAY_SIZE(pll_ref_sels));
-static IMX_CLK_MUX(audio_pll1_ref_sel, CCM_ANALOG_BASE, 0x0, 16, 2,
-                   pll_ref_sels, ARRAY_SIZE(pll_ref_sels));
-static IMX_CLK_MUX(audio_pll2_ref_sel, CCM_ANALOG_BASE, 0x8, 16, 2,
-                   pll_ref_sels, ARRAY_SIZE(pll_ref_sels));
-static IMX_CLK_MUX(video_pll1_ref_sel, CCM_ANALOG_BASE, 0x10, 16, 2,
-                   pll_ref_sels, ARRAY_SIZE(pll_ref_sels));
-static IMX_CLK_MUX(sys3_pll1_ref_sel, CCM_ANALOG_BASE, 0x48, 0, 2, pll_ref_sels,
-                   ARRAY_SIZE(pll_ref_sels));
-static IMX_CLK_MUX(dram_pll1_ref_sel, CCM_ANALOG_BASE, 0x60, 0, 2, pll_ref_sels,
-                   ARRAY_SIZE(pll_ref_sels));
-static IMX_CLK_MUX(video2_pll1_ref_sel, CCM_ANALOG_BASE, 0x54, 0, 2,
-                   pll_ref_sels, ARRAY_SIZE(pll_ref_sels));
+static IMX_CLK_MUX(arm_pll_ref_sel, CCM_ANALOG_BASE, 0x28, 16, 2, pll_ref_sels, ARRAY_SIZE(pll_ref_sels));
+static IMX_CLK_MUX(gpu_pll_ref_sel, CCM_ANALOG_BASE, 0x18, 16, 2, pll_ref_sels, ARRAY_SIZE(pll_ref_sels));
+static IMX_CLK_MUX(vpu_pll_ref_sel, CCM_ANALOG_BASE, 0x20, 16, 2, pll_ref_sels, ARRAY_SIZE(pll_ref_sels));
+static IMX_CLK_MUX(audio_pll1_ref_sel, CCM_ANALOG_BASE, 0x0, 16, 2, pll_ref_sels, ARRAY_SIZE(pll_ref_sels));
+static IMX_CLK_MUX(audio_pll2_ref_sel, CCM_ANALOG_BASE, 0x8, 16, 2, pll_ref_sels, ARRAY_SIZE(pll_ref_sels));
+static IMX_CLK_MUX(video_pll1_ref_sel, CCM_ANALOG_BASE, 0x10, 16, 2, pll_ref_sels, ARRAY_SIZE(pll_ref_sels));
+static IMX_CLK_MUX(sys3_pll1_ref_sel, CCM_ANALOG_BASE, 0x48, 0, 2, pll_ref_sels, ARRAY_SIZE(pll_ref_sels));
+static IMX_CLK_MUX(dram_pll1_ref_sel, CCM_ANALOG_BASE, 0x60, 0, 2, pll_ref_sels, ARRAY_SIZE(pll_ref_sels));
+static IMX_CLK_MUX(video2_pll1_ref_sel, CCM_ANALOG_BASE, 0x54, 0, 2, pll_ref_sels, ARRAY_SIZE(pll_ref_sels));
 
-static IMX_CLK_DIV(arm_pll_ref_div, { &arm_pll_ref_sel }, CCM_ANALOG_BASE, 0x28,
-                   5, 6);
-static IMX_CLK_DIV(gpu_pll_ref_div, { &gpu_pll_ref_sel }, CCM_ANALOG_BASE, 0x18,
-                   5, 6);
-static IMX_CLK_DIV(vpu_pll_ref_div, { &vpu_pll_ref_sel }, CCM_ANALOG_BASE, 0x20,
-                   5, 6);
-static IMX_CLK_DIV(audio_pll1_ref_div, { &audio_pll1_ref_sel }, CCM_ANALOG_BASE,
-                   0x0, 5, 6);
-static IMX_CLK_DIV(audio_pll2_ref_div, { &audio_pll2_ref_sel }, CCM_ANALOG_BASE,
-                   0x8, 5, 6);
-static IMX_CLK_DIV(video_pll1_ref_div, { &video_pll1_ref_sel }, CCM_ANALOG_BASE,
-                   0x10, 5, 6);
+static IMX_CLK_DIV(arm_pll_ref_div, { &arm_pll_ref_sel }, CCM_ANALOG_BASE, 0x28, 5, 6);
+static IMX_CLK_DIV(gpu_pll_ref_div, { &gpu_pll_ref_sel }, CCM_ANALOG_BASE, 0x18, 5, 6);
+static IMX_CLK_DIV(vpu_pll_ref_div, { &vpu_pll_ref_sel }, CCM_ANALOG_BASE, 0x20, 5, 6);
+static IMX_CLK_DIV(audio_pll1_ref_div, { &audio_pll1_ref_sel }, CCM_ANALOG_BASE, 0x0, 5, 6);
+static IMX_CLK_DIV(audio_pll2_ref_div, { &audio_pll2_ref_sel }, CCM_ANALOG_BASE, 0x8, 5, 6);
+static IMX_CLK_DIV(video_pll1_ref_div, { &video_pll1_ref_sel }, CCM_ANALOG_BASE, 0x10, 5, 6);
 
 static IMX_CLK_FRAC_PLL(arm_pll, { &arm_pll_ref_div }, CCM_ANALOG_BASE, 0x28);
 static IMX_CLK_FRAC_PLL(gpu_pll, { &gpu_pll_ref_div }, CCM_ANALOG_BASE, 0x18);
 static IMX_CLK_FRAC_PLL(vpu_pll, { &vpu_pll_ref_div }, CCM_ANALOG_BASE, 0x20);
-static IMX_CLK_FRAC_PLL(audio_pll1, { &audio_pll1_ref_div }, CCM_ANALOG_BASE,
-                        0x0);
-static IMX_CLK_FRAC_PLL(audio_pll2, { &audio_pll2_ref_div }, CCM_ANALOG_BASE,
-                        0x8);
-static IMX_CLK_FRAC_PLL(video_pll1, { &video_pll1_ref_div }, CCM_ANALOG_BASE,
-                        0x10);
+static IMX_CLK_FRAC_PLL(audio_pll1, { &audio_pll1_ref_div }, CCM_ANALOG_BASE, 0x0);
+static IMX_CLK_FRAC_PLL(audio_pll2, { &audio_pll2_ref_div }, CCM_ANALOG_BASE, 0x8);
+static IMX_CLK_FRAC_PLL(video_pll1, { &video_pll1_ref_div }, CCM_ANALOG_BASE, 0x10);
 
 /* PLL bypass out */
-static IMX_CLK_MUX_FLAGS(arm_pll_bypass, CCM_ANALOG_BASE, 0x28, 14, 1,
-                         arm_pll_bypass_sels, ARRAY_SIZE(arm_pll_bypass_sels),
-                         CLK_SET_RATE_PARENT);
-static IMX_CLK_MUX(gpu_pll_bypass, CCM_ANALOG_BASE, 0x18, 14, 1,
-                   gpu_pll_bypass_sels, ARRAY_SIZE(gpu_pll_bypass_sels));
-static IMX_CLK_MUX(vpu_pll_bypass, CCM_ANALOG_BASE, 0x20, 14, 1,
-                   vpu_pll_bypass_sels, ARRAY_SIZE(vpu_pll_bypass_sels));
-static IMX_CLK_MUX(audio_pll1_bypass, CCM_ANALOG_BASE, 0x0, 14, 1,
-                   audio_pll1_bypass_sels, ARRAY_SIZE(audio_pll1_bypass_sels));
-static IMX_CLK_MUX(audio_pll2_bypass, CCM_ANALOG_BASE, 0x8, 14, 1,
-                   audio_pll2_bypass_sels, ARRAY_SIZE(audio_pll2_bypass_sels));
-static IMX_CLK_MUX(video_pll1_bypass, CCM_ANALOG_BASE, 0x10, 14, 1,
-                   video_pll1_bypass_sels, ARRAY_SIZE(video_pll1_bypass_sels));
+static IMX_CLK_MUX_FLAGS(arm_pll_bypass, CCM_ANALOG_BASE, 0x28, 14, 1, arm_pll_bypass_sels,
+                         ARRAY_SIZE(arm_pll_bypass_sels), CLK_SET_RATE_PARENT);
+static IMX_CLK_MUX(gpu_pll_bypass, CCM_ANALOG_BASE, 0x18, 14, 1, gpu_pll_bypass_sels, ARRAY_SIZE(gpu_pll_bypass_sels));
+static IMX_CLK_MUX(vpu_pll_bypass, CCM_ANALOG_BASE, 0x20, 14, 1, vpu_pll_bypass_sels, ARRAY_SIZE(vpu_pll_bypass_sels));
+static IMX_CLK_MUX(audio_pll1_bypass, CCM_ANALOG_BASE, 0x0, 14, 1, audio_pll1_bypass_sels,
+                   ARRAY_SIZE(audio_pll1_bypass_sels));
+static IMX_CLK_MUX(audio_pll2_bypass, CCM_ANALOG_BASE, 0x8, 14, 1, audio_pll2_bypass_sels,
+                   ARRAY_SIZE(audio_pll2_bypass_sels));
+static IMX_CLK_MUX(video_pll1_bypass, CCM_ANALOG_BASE, 0x10, 14, 1, video_pll1_bypass_sels,
+                   ARRAY_SIZE(video_pll1_bypass_sels));
 
 /* PLL OUT GATE */
-static IMX_CLK_GATE(arm_pll_out, { &arm_pll_bypass }, CCM_ANALOG_BASE, 0x28,
-                    21);
-static IMX_CLK_GATE(gpu_pll_out, { &gpu_pll_bypass }, CCM_ANALOG_BASE, 0x18,
-                    21);
-static IMX_CLK_GATE(vpu_pll_out, { &vpu_pll_bypass }, CCM_ANALOG_BASE, 0x20,
-                    21);
-static IMX_CLK_GATE(audio_pll1_out, { &audio_pll1_bypass }, CCM_ANALOG_BASE,
-                    0x0, 21);
-static IMX_CLK_GATE(audio_pll2_out, { &audio_pll2_bypass }, CCM_ANALOG_BASE,
-                    0x8, 21);
-static IMX_CLK_GATE(video_pll1_out, { &video_pll1_bypass }, CCM_ANALOG_BASE,
-                    0x10, 21);
+static IMX_CLK_GATE(arm_pll_out, { &arm_pll_bypass }, CCM_ANALOG_BASE, 0x28, 21);
+static IMX_CLK_GATE(gpu_pll_out, { &gpu_pll_bypass }, CCM_ANALOG_BASE, 0x18, 21);
+static IMX_CLK_GATE(vpu_pll_out, { &vpu_pll_bypass }, CCM_ANALOG_BASE, 0x20, 21);
+static IMX_CLK_GATE(audio_pll1_out, { &audio_pll1_bypass }, CCM_ANALOG_BASE, 0x0, 21);
+static IMX_CLK_GATE(audio_pll2_out, { &audio_pll2_bypass }, CCM_ANALOG_BASE, 0x8, 21);
+static IMX_CLK_GATE(video_pll1_out, { &video_pll1_bypass }, CCM_ANALOG_BASE, 0x10, 21);
 
 static IMX_CLK_FIXED(sys1_pll_out, 800000000);
 static IMX_CLK_FIXED(sys2_pll_out, 1000000000);
-static IMX_CLK_SSCG_PLL(sys3_pll_out, sys3_pll_out_sels,
-                        ARRAY_SIZE(sys3_pll_out_sels), 0, 0, 0, CCM_ANALOG_BASE,
-                        0x48, CLK_IS_CRITICAL);
-static IMX_CLK_SSCG_PLL(dram_pll_out, dram_pll_out_sels,
-                        ARRAY_SIZE(dram_pll_out_sels), 0, 0, 0, CCM_ANALOG_BASE,
-                        0x60, CLK_IS_CRITICAL | CLK_GET_RATE_NOCACHE);
-static IMX_CLK_SSCG_PLL(video2_pll_out, video2_pll_out_sels,
-                        ARRAY_SIZE(video2_pll_out_sels), 0, 0, 0,
-                        CCM_ANALOG_BASE, 0x54, 0);
+static IMX_CLK_SSCG_PLL(sys3_pll_out, sys3_pll_out_sels, ARRAY_SIZE(sys3_pll_out_sels), 0, 0, 0, CCM_ANALOG_BASE, 0x48,
+                        CLK_IS_CRITICAL);
+static IMX_CLK_SSCG_PLL(dram_pll_out, dram_pll_out_sels, ARRAY_SIZE(dram_pll_out_sels), 0, 0, 0, CCM_ANALOG_BASE, 0x60,
+                        CLK_IS_CRITICAL | CLK_GET_RATE_NOCACHE);
+static IMX_CLK_SSCG_PLL(video2_pll_out, video2_pll_out_sels, ARRAY_SIZE(video2_pll_out_sels), 0, 0, 0, CCM_ANALOG_BASE,
+                        0x54, 0);
 
 /* SYS PLL1 fixed output */
 static IMX_CLK_FIXED_FACTOR(sys1_pll_40m, { &sys1_pll_out }, 1, 20);
@@ -2487,56 +2457,40 @@ static IMX_CLK_FIXED_FACTOR(sys2_pll_333m, { &sys2_pll_out }, 1, 3);
 static IMX_CLK_FIXED_FACTOR(sys2_pll_500m, { &sys2_pll_out }, 1, 2);
 static IMX_CLK_FIXED_FACTOR(sys2_pll_1000m, { &sys2_pll_out }, 1, 1);
 
-static IMX_CLK_DIV(audio_pll1_out_monitor, { &audio_pll1_bypass },
-                   CCM_ANALOG_BASE, 0x78, 0, 3);
-static IMX_CLK_DIV(audio_pll2_out_monitor, { &audio_pll2_bypass },
-                   CCM_ANALOG_BASE, 0x78, 4, 3);
-static IMX_CLK_DIV(video_pll1_out_monitor, { &video_pll1_bypass },
-                   CCM_ANALOG_BASE, 0x78, 8, 3);
-static IMX_CLK_DIV(gpu_pll_out_monitor, { &gpu_pll_bypass }, CCM_ANALOG_BASE,
-                   0x78, 12, 3);
-static IMX_CLK_DIV(vpu_pll_out_monitor, { &vpu_pll_bypass }, CCM_ANALOG_BASE,
-                   0x78, 16, 3);
-static IMX_CLK_DIV(arm_pll_out_monitor, { &arm_pll_bypass }, CCM_ANALOG_BASE,
-                   0x78, 20, 3);
-static IMX_CLK_DIV(sys_pll1_out_monitor, { &sys1_pll_out }, CCM_ANALOG_BASE,
-                   0x7c, 0, 3);
-static IMX_CLK_DIV(sys_pll2_out_monitor, { &sys2_pll_out }, CCM_ANALOG_BASE,
-                   0x7c, 4, 3);
-static IMX_CLK_DIV(sys_pll3_out_monitor, { &sys3_pll_out }, CCM_ANALOG_BASE,
-                   0x7c, 8, 3);
-static IMX_CLK_DIV(dram_pll_out_monitor, { &dram_pll_out }, CCM_ANALOG_BASE,
-                   0x7c, 12, 3);
-static IMX_CLK_DIV(video_pll2_out_monitor, { &video2_pll_out }, CCM_ANALOG_BASE,
-                   0x7c, 16, 3);
-static IMX_CLK_MUX(pllout_monitor_sel, CCM_ANALOG_BASE, 0x74, 0, 4,
-                   pllout_monitor_sels, ARRAY_SIZE(pllout_monitor_sels));
-static IMX_CLK_GATE(pllout_monitor_clk2, { &pllout_monitor_sel },
-                    CCM_ANALOG_BASE, 0x74, 4);
+static IMX_CLK_DIV(audio_pll1_out_monitor, { &audio_pll1_bypass }, CCM_ANALOG_BASE, 0x78, 0, 3);
+static IMX_CLK_DIV(audio_pll2_out_monitor, { &audio_pll2_bypass }, CCM_ANALOG_BASE, 0x78, 4, 3);
+static IMX_CLK_DIV(video_pll1_out_monitor, { &video_pll1_bypass }, CCM_ANALOG_BASE, 0x78, 8, 3);
+static IMX_CLK_DIV(gpu_pll_out_monitor, { &gpu_pll_bypass }, CCM_ANALOG_BASE, 0x78, 12, 3);
+static IMX_CLK_DIV(vpu_pll_out_monitor, { &vpu_pll_bypass }, CCM_ANALOG_BASE, 0x78, 16, 3);
+static IMX_CLK_DIV(arm_pll_out_monitor, { &arm_pll_bypass }, CCM_ANALOG_BASE, 0x78, 20, 3);
+static IMX_CLK_DIV(sys_pll1_out_monitor, { &sys1_pll_out }, CCM_ANALOG_BASE, 0x7c, 0, 3);
+static IMX_CLK_DIV(sys_pll2_out_monitor, { &sys2_pll_out }, CCM_ANALOG_BASE, 0x7c, 4, 3);
+static IMX_CLK_DIV(sys_pll3_out_monitor, { &sys3_pll_out }, CCM_ANALOG_BASE, 0x7c, 8, 3);
+static IMX_CLK_DIV(dram_pll_out_monitor, { &dram_pll_out }, CCM_ANALOG_BASE, 0x7c, 12, 3);
+static IMX_CLK_DIV(video_pll2_out_monitor, { &video2_pll_out }, CCM_ANALOG_BASE, 0x7c, 16, 3);
+static IMX_CLK_MUX(pllout_monitor_sel, CCM_ANALOG_BASE, 0x74, 0, 4, pllout_monitor_sels,
+                   ARRAY_SIZE(pllout_monitor_sels));
+static IMX_CLK_GATE(pllout_monitor_clk2, { &pllout_monitor_sel }, CCM_ANALOG_BASE, 0x74, 4);
 
 /* CORE */
 static IMX_CLK_COMPOSITE_CORE(arm_a53_div, imx8mq_a53_sels, CCM_BASE, 0x8000);
 
-static IMX_CLK_COMPOSITE_CORE(arm_m4_core, imx8mq_arm_m4_sels, CCM_BASE,
-                              0x8080);
+static IMX_CLK_COMPOSITE_CORE(arm_m4_core, imx8mq_arm_m4_sels, CCM_BASE, 0x8080);
 static IMX_CLK_COMPOSITE_CORE(vpu_core, imx8mq_vpu_sels, CCM_BASE, 0x8100);
 static IMX_CLK_COMPOSITE_CORE(gpu_core, imx8mq_gpu_core_sels, CCM_BASE, 0x8180);
 static IMX_CLK_COMPOSITE(gpu_shader, imx8mq_gpu_shader_sels, CCM_BASE, 0x8200);
 
 /* CORE SEL */
-static IMX_CLK_MUX2(arm_a53_core, CCM_BASE, 0x9880, 24, 1, imx8mq_a53_core_sels,
-                    ARRAY_SIZE(imx8mq_a53_core_sels));
+static IMX_CLK_MUX2(arm_a53_core, CCM_BASE, 0x9880, 24, 1, imx8mq_a53_core_sels, ARRAY_SIZE(imx8mq_a53_core_sels));
 
 /* BUS */
 static IMX_CLK_COMPOSITE_BUS(main_axi, imx8mq_main_axi_sels, CCM_BASE, 0x8800);
 static IMX_CLK_COMPOSITE_BUS(enet_axi, imx8mq_enet_axi_sels, CCM_BASE, 0x8880);
-static IMX_CLK_COMPOSITE_BUS(nand_usdhc_bus, imx8mq_nand_usdhc_sels, CCM_BASE,
-                             0x8900);
+static IMX_CLK_COMPOSITE_BUS(nand_usdhc_bus, imx8mq_nand_usdhc_sels, CCM_BASE, 0x8900);
 static IMX_CLK_COMPOSITE_BUS(vpu_bus, imx8mq_vpu_bus_sels, CCM_BASE, 0x8980);
 static IMX_CLK_COMPOSITE_BUS(disp_axi, imx8mq_disp_axi_sels, CCM_BASE, 0x8a00);
 static IMX_CLK_COMPOSITE_BUS(disp_apb, imx8mq_disp_apb_sels, CCM_BASE, 0x8a80);
-static IMX_CLK_COMPOSITE_BUS(disp_rtrm, imx8mq_disp_rtrm_sels, CCM_BASE,
-                             0x8b00);
+static IMX_CLK_COMPOSITE_BUS(disp_rtrm, imx8mq_disp_rtrm_sels, CCM_BASE, 0x8b00);
 static IMX_CLK_COMPOSITE_BUS(usb_bus, imx8mq_usb_bus_sels, CCM_BASE, 0x8b80);
 static IMX_CLK_COMPOSITE_BUS(gpu_axi, imx8mq_gpu_axi_sels, CCM_BASE, 0x8c00);
 static IMX_CLK_COMPOSITE_BUS(gpu_ahb, imx8mq_gpu_ahb_sels, CCM_BASE, 0x8c80);
@@ -2546,8 +2500,7 @@ static IMX_CLK_COMPOSITE_BUS(noc_apb, imx8mq_noc_apb_sels, CCM_BASE, 0x8d80);
 /* AHB */
 /* AHB clock is used by the AHB bus therefore marked as critical */
 static IMX_CLK_COMPOSITE_BUS(ahb, imx8mq_ahb_sels, CCM_BASE, 0x9000);
-static IMX_CLK_COMPOSITE_BUS(audio_ahb, imx8mq_audio_ahb_sels, CCM_BASE,
-                             0x9100);
+static IMX_CLK_COMPOSITE_BUS(audio_ahb, imx8mq_audio_ahb_sels, CCM_BASE, 0x9100);
 
 /* IPG */
 static IMX_CLK_DIV2(ipg_root, { &ahb }, CCM_BASE, 0x9080, 0, 1);
@@ -2558,26 +2511,21 @@ static IMX_CLK_DIV2(ipg_audio_root, { &audio_ahb }, CCM_BASE, 0x9180, 0, 1);
  * The fw_managed helper sets GET_RATE_NOCACHE and clears SET_PARENT_GATE
  * as div value should always be read from hardware
  */
-static IMX_CLK_MUX2_FLAGS(dram_core_clk, CCM_BASE, 0x9800, 24, 1,
-                          imx8mq_dram_core_sels,
+static IMX_CLK_MUX2_FLAGS(dram_core_clk, CCM_BASE, 0x9800, 24, 1, imx8mq_dram_core_sels,
                           ARRAY_SIZE(imx8mq_dram_core_sels), CLK_IS_CRITICAL);
-static IMX_CLK_COMPOSITE_FW_MANAGED(dram_alt, imx8mq_dram_alt_sels, CCM_BASE,
-                                    0xa000);
-static IMX_CLK_COMPOSITE_FW_MANAGED_CRITICAL(dram_apb, imx8mq_dram_apb_sels,
-                                             CCM_BASE, 0xa080);
+static IMX_CLK_COMPOSITE_FW_MANAGED(dram_alt, imx8mq_dram_alt_sels, CCM_BASE, 0xa000);
+static IMX_CLK_COMPOSITE_FW_MANAGED_CRITICAL(dram_apb, imx8mq_dram_apb_sels, CCM_BASE, 0xa080);
 
 /* IP */
 static IMX_CLK_COMPOSITE(vpu_g1, imx8mq_vpu_g1_sels, CCM_BASE, 0xa100);
 static IMX_CLK_COMPOSITE(vpu_g2, imx8mq_vpu_g2_sels, CCM_BASE, 0xa180);
 static IMX_CLK_COMPOSITE(disp_dtrc, imx8mq_disp_dtrc_sels, CCM_BASE, 0xa200);
-static IMX_CLK_COMPOSITE(disp_dc8000, imx8mq_disp_dc8000_sels, CCM_BASE,
-                         0xa280);
+static IMX_CLK_COMPOSITE(disp_dc8000, imx8mq_disp_dc8000_sels, CCM_BASE, 0xa280);
 static IMX_CLK_COMPOSITE(pcie1_ctrl, imx8mq_pcie1_ctrl_sels, CCM_BASE, 0xa300);
 static IMX_CLK_COMPOSITE(pcie1_phy, imx8mq_pcie1_phy_sels, CCM_BASE, 0xa380);
 static IMX_CLK_COMPOSITE(pcie1_aux, imx8mq_pcie1_aux_sels, CCM_BASE, 0xa400);
 static IMX_CLK_COMPOSITE(dc_pixel, imx8mq_dc_pixel_sels, CCM_BASE, 0xa480);
-static IMX_CLK_COMPOSITE(lcdif_pixel, imx8mq_lcdif_pixel_sels, CCM_BASE,
-                         0xa500);
+static IMX_CLK_COMPOSITE(lcdif_pixel, imx8mq_lcdif_pixel_sels, CCM_BASE, 0xa500);
 static IMX_CLK_COMPOSITE(sai1, imx8mq_sai1_sels, CCM_BASE, 0xa580);
 static IMX_CLK_COMPOSITE(sai2, imx8mq_sai2_sels, CCM_BASE, 0xa600);
 static IMX_CLK_COMPOSITE(sai3, imx8mq_sai3_sels, CCM_BASE, 0xa680);
@@ -2656,34 +2604,20 @@ static IMX_CLK_GATE4(pwm3_root_clk, { &pwm3 }, CCM_BASE, 0x42a0, 0);
 static IMX_CLK_GATE4(pwm4_root_clk, { &pwm4 }, CCM_BASE, 0x42b0, 0);
 static IMX_CLK_GATE4(qspi_root_clk, { &qspi }, CCM_BASE, 0x42f0, 0);
 
-static IMX_CLK_GATE2_SHARED2(nand_root_clk, { &nand }, CCM_BASE, 0x4300, 0,
-                             &share_count_nand);
-static IMX_CLK_GATE2_SHARED2(nand_usdhc_rawnand_clk, { &nand_usdhc_bus },
-                             CCM_BASE, 0x4300, 0, &share_count_nand);
-static IMX_CLK_GATE2_SHARED2(sai1_root_clk, { &sai1 }, CCM_BASE, 0x4330, 0,
-                             &share_count_sai1);
-static IMX_CLK_GATE2_SHARED2(sai1_ipg_clk, { &ipg_audio_root }, CCM_BASE,
-                             0x4330, 0, &share_count_sai1);
-static IMX_CLK_GATE2_SHARED2(sai2_root_clk, { &sai2 }, CCM_BASE, 0x4340, 0,
-                             &share_count_sai2);
-static IMX_CLK_GATE2_SHARED2(sai2_ipg_clk, { &ipg_root }, CCM_BASE, 0x4340, 0,
-                             &share_count_sai2);
-static IMX_CLK_GATE2_SHARED2(sai3_root_clk, { &sai3 }, CCM_BASE, 0x4350, 0,
-                             &share_count_sai3);
-static IMX_CLK_GATE2_SHARED2(sai3_ipg_clk, { &ipg_root }, CCM_BASE, 0x4350, 0,
-                             &share_count_sai3);
-static IMX_CLK_GATE2_SHARED2(sai4_root_clk, { &sai4 }, CCM_BASE, 0x4360, 0,
-                             &share_count_sai4);
-static IMX_CLK_GATE2_SHARED2(sai4_ipg_clk, { &ipg_audio_root }, CCM_BASE,
-                             0x4360, 0, &share_count_sai4);
-static IMX_CLK_GATE2_SHARED2(sai5_root_clk, { &sai5 }, CCM_BASE, 0x4370, 0,
-                             &share_count_sai5);
-static IMX_CLK_GATE2_SHARED2(sai5_ipg_clk, { &ipg_audio_root }, CCM_BASE,
-                             0x4370, 0, &share_count_sai5);
-static IMX_CLK_GATE2_SHARED2(sai6_root_clk, { &sai6 }, CCM_BASE, 0x4380, 0,
-                             &share_count_sai6);
-static IMX_CLK_GATE2_SHARED2(sai6_ipg_clk, { &ipg_audio_root }, CCM_BASE,
-                             0x4380, 0, &share_count_sai6);
+static IMX_CLK_GATE2_SHARED2(nand_root_clk, { &nand }, CCM_BASE, 0x4300, 0, &share_count_nand);
+static IMX_CLK_GATE2_SHARED2(nand_usdhc_rawnand_clk, { &nand_usdhc_bus }, CCM_BASE, 0x4300, 0, &share_count_nand);
+static IMX_CLK_GATE2_SHARED2(sai1_root_clk, { &sai1 }, CCM_BASE, 0x4330, 0, &share_count_sai1);
+static IMX_CLK_GATE2_SHARED2(sai1_ipg_clk, { &ipg_audio_root }, CCM_BASE, 0x4330, 0, &share_count_sai1);
+static IMX_CLK_GATE2_SHARED2(sai2_root_clk, { &sai2 }, CCM_BASE, 0x4340, 0, &share_count_sai2);
+static IMX_CLK_GATE2_SHARED2(sai2_ipg_clk, { &ipg_root }, CCM_BASE, 0x4340, 0, &share_count_sai2);
+static IMX_CLK_GATE2_SHARED2(sai3_root_clk, { &sai3 }, CCM_BASE, 0x4350, 0, &share_count_sai3);
+static IMX_CLK_GATE2_SHARED2(sai3_ipg_clk, { &ipg_root }, CCM_BASE, 0x4350, 0, &share_count_sai3);
+static IMX_CLK_GATE2_SHARED2(sai4_root_clk, { &sai4 }, CCM_BASE, 0x4360, 0, &share_count_sai4);
+static IMX_CLK_GATE2_SHARED2(sai4_ipg_clk, { &ipg_audio_root }, CCM_BASE, 0x4360, 0, &share_count_sai4);
+static IMX_CLK_GATE2_SHARED2(sai5_root_clk, { &sai5 }, CCM_BASE, 0x4370, 0, &share_count_sai5);
+static IMX_CLK_GATE2_SHARED2(sai5_ipg_clk, { &ipg_audio_root }, CCM_BASE, 0x4370, 0, &share_count_sai5);
+static IMX_CLK_GATE2_SHARED2(sai6_root_clk, { &sai6 }, CCM_BASE, 0x4380, 0, &share_count_sai6);
+static IMX_CLK_GATE2_SHARED2(sai6_ipg_clk, { &ipg_audio_root }, CCM_BASE, 0x4380, 0, &share_count_sai6);
 static IMX_CLK_GATE4(uart1_root_clk, { &uart1 }, CCM_BASE, 0x4490, 0);
 static IMX_CLK_GATE4(uart2_root_clk, { &uart2 }, CCM_BASE, 0x44a0, 0);
 static IMX_CLK_GATE4(uart3_root_clk, { &uart3 }, CCM_BASE, 0x44b0, 0);
@@ -2702,14 +2636,10 @@ static IMX_CLK_GATE2_FLAGS(vpu_g1_root_clk, { &vpu_g1 }, CCM_BASE, 0x4560, 0,
 static IMX_CLK_GATE4(gpu_root_clk, { &gpu_core }, CCM_BASE, 0x4570, 0);
 static IMX_CLK_GATE2_FLAGS(vpu_g2_root_clk, { &vpu_g2 }, CCM_BASE, 0x45a0, 0,
                            CLK_SET_RATE_PARENT | CLK_OPS_PARENT_ENABLE);
-static IMX_CLK_GATE2_SHARED2(disp_root_clk, { &disp_dc8000 }, CCM_BASE, 0x45d0,
-                             0, &share_count_dcss);
-static IMX_CLK_GATE2_SHARED2(disp_axi_root_clk, { &disp_axi }, CCM_BASE, 0x45d0,
-                             0, &share_count_dcss);
-static IMX_CLK_GATE2_SHARED2(disp_apb_root_clk, { &disp_apb }, CCM_BASE, 0x45d0,
-                             0, &share_count_dcss);
-static IMX_CLK_GATE2_SHARED2(disp_rtrm_root_clk, { &disp_rtrm }, CCM_BASE,
-                             0x45d0, 0, &share_count_dcss);
+static IMX_CLK_GATE2_SHARED2(disp_root_clk, { &disp_dc8000 }, CCM_BASE, 0x45d0, 0, &share_count_dcss);
+static IMX_CLK_GATE2_SHARED2(disp_axi_root_clk, { &disp_axi }, CCM_BASE, 0x45d0, 0, &share_count_dcss);
+static IMX_CLK_GATE2_SHARED2(disp_apb_root_clk, { &disp_apb }, CCM_BASE, 0x45d0, 0, &share_count_dcss);
+static IMX_CLK_GATE2_SHARED2(disp_rtrm_root_clk, { &disp_rtrm }, CCM_BASE, 0x45d0, 0, &share_count_dcss);
 static IMX_CLK_GATE4(tmu_root_clk, { &ipg_root }, CCM_BASE, 0x4620, 0);
 static IMX_CLK_GATE2_FLAGS(vpu_dec_root_clk, { &vpu_bus }, CCM_BASE, 0x4630, 0,
                            CLK_SET_RATE_PARENT | CLK_OPS_PARENT_ENABLE);

@@ -93,8 +93,7 @@ void delay_us(uint32_t us)
     }
 }
 
-int regmap_multi_reg_write(uint64_t base, const struct reg_sequence *regs,
-                           int num_regs)
+int regmap_multi_reg_write(uint64_t base, const struct reg_sequence *regs, int num_regs)
 {
     int i;
     for (i = 0; i < num_regs; i++) {
@@ -109,41 +108,32 @@ int regmap_multi_reg_write(uint64_t base, const struct reg_sequence *regs,
 static void meson_clk_pll_init(struct clk *clk)
 {
     struct meson_clk_pll_data *data = (struct meson_clk_pll_data *)(clk->data);
-    if ((data->flags & CLK_MESON_PLL_NOINIT_ENABLED)
-        && clk->hw.init->ops->is_enabled(clk))
+    if ((data->flags & CLK_MESON_PLL_NOINIT_ENABLED) && clk->hw.init->ops->is_enabled(clk))
         return;
 
     if (data->init_count) {
         /* Set the reset bit */
-        regmap_update_bits(clk->base, data->rst.reg_off, data->rst.shift,
-                           data->rst.width, 1);
+        regmap_update_bits(clk->base, data->rst.reg_off, data->rst.shift, data->rst.width, 1);
 
         regmap_multi_reg_write(clk->base, data->init_regs, data->init_count);
 
         /* Clear the reset bit */
-        regmap_update_bits(clk->base, data->rst.reg_off, data->rst.shift,
-                           data->rst.width, 0);
+        regmap_update_bits(clk->base, data->rst.reg_off, data->rst.shift, data->rst.width, 0);
     }
 }
 
-static unsigned long meson_clk_pll_recalc_rate(const struct clk *clk,
-                                               unsigned long parent_rate)
+static unsigned long meson_clk_pll_recalc_rate(const struct clk *clk, unsigned long parent_rate)
 {
     struct meson_clk_pll_data *data = (struct meson_clk_pll_data *)(clk->data);
     uint32_t n, m, frac;
 
-    n = regmap_read_bits(clk->base, data->n.reg_off, data->n.shift,
-                         data->n.width);
+    n = regmap_read_bits(clk->base, data->n.reg_off, data->n.shift, data->n.width);
     if (n == 0)
         return 0;
 
-    m = regmap_read_bits(clk->base, data->m.reg_off, data->m.shift,
-                         data->m.width);
+    m = regmap_read_bits(clk->base, data->m.reg_off, data->m.shift, data->m.width);
 
-    frac = data->frac.width
-             ? regmap_read_bits(clk->base, data->frac.reg_off, data->frac.shift,
-                                data->frac.width)
-             : 0;
+    frac = data->frac.width ? regmap_read_bits(clk->base, data->frac.reg_off, data->frac.shift, data->frac.width) : 0;
 
     uint64_t rate = (uint64_t)parent_rate * m;
 
@@ -163,8 +153,7 @@ static int meson_clk_pll_is_enabled(struct clk *clk)
         return 0;
     }
 
-    if (!meson_parm_read(clk->base, data->en)
-        || !meson_parm_read(clk->base, data->l)) {
+    if (!meson_parm_read(clk->base, data->en) || !meson_parm_read(clk->base, data->l)) {
         return 0;
     }
 
@@ -178,15 +167,11 @@ static int meson_clk_pll_enable(struct clk *clk)
     if (meson_clk_pll_is_enabled(clk))
         return 0;
 
-    regmap_update_bits(clk->base, data->rst.reg_off, data->rst.shift,
-                       data->rst.width, 1);
-    regmap_update_bits(clk->base, data->en.reg_off, data->en.shift,
-                       data->en.width, 1);
-    regmap_update_bits(clk->base, data->rst.reg_off, data->rst.shift,
-                       data->rst.width, 1);
+    regmap_update_bits(clk->base, data->rst.reg_off, data->rst.shift, data->rst.width, 1);
+    regmap_update_bits(clk->base, data->en.reg_off, data->en.shift, data->en.width, 1);
+    regmap_update_bits(clk->base, data->rst.reg_off, data->rst.shift, data->rst.width, 1);
 
-    regmap_update_bits(clk->base, data->current_en.reg_off,
-                       data->current_en.shift, data->current_en.width, 1);
+    regmap_update_bits(clk->base, data->current_en.reg_off, data->current_en.shift, data->current_en.width, 1);
     return 0;
 }
 
@@ -194,22 +179,18 @@ static int meson_clk_pll_disable(struct clk *clk)
 {
     struct meson_clk_pll_data *data = (struct meson_clk_pll_data *)(clk->data);
 
-    regmap_update_bits(clk->base, data->rst.reg_off, data->rst.shift,
-                       data->rst.width, 1);
-    regmap_update_bits(clk->base, data->en.reg_off, data->en.shift,
-                       data->en.width, 0);
+    regmap_update_bits(clk->base, data->rst.reg_off, data->rst.shift, data->rst.width, 1);
+    regmap_update_bits(clk->base, data->en.reg_off, data->en.shift, data->en.width, 0);
     return 0;
 }
 
-const struct clk_ops meson_clk_pll_ops = {
-    .init = meson_clk_pll_init,
-    .recalc_rate = meson_clk_pll_recalc_rate,
+const struct clk_ops meson_clk_pll_ops = { .init = meson_clk_pll_init,
+                                           .recalc_rate = meson_clk_pll_recalc_rate,
     /* .determine_rate = meson_clk_pll_determine_rate, */
     /* .set_rate       = meson_clk_pll_set_rate, */
-    .is_enabled = meson_clk_pll_is_enabled,
-    .enable = meson_clk_pll_enable,
-    .disable = meson_clk_pll_disable
-};
+                                           .is_enabled = meson_clk_pll_is_enabled,
+                                           .enable = meson_clk_pll_enable,
+                                           .disable = meson_clk_pll_disable };
 
 const struct clk_ops meson_clk_pll_ro_ops = {
     .recalc_rate = meson_clk_pll_recalc_rate,
@@ -220,17 +201,13 @@ const struct clk_ops meson_clk_pll_ro_ops = {
 #define N2_MIN 4
 #define N2_MAX 511
 
-static unsigned long mpll_recalc_rate(const struct clk *clk,
-                                      unsigned long prate)
+static uint64_t mpll_recalc_rate(const struct clk *clk, uint64_t prate)
 {
-    struct meson_clk_mpll_data *data =
-        (struct meson_clk_mpll_data *)(clk->data);
+    struct meson_clk_mpll_data *data = (struct meson_clk_mpll_data *)(clk->data);
     uint32_t sdm, n2;
 
-    sdm = regmap_read_bits(clk->base, data->sdm.reg_off, data->sdm.shift,
-                           data->sdm.width);
-    n2 = regmap_read_bits(clk->base, data->n2.reg_off, data->n2.shift,
-                          data->n2.width);
+    sdm = regmap_read_bits(clk->base, data->sdm.reg_off, data->sdm.shift, data->sdm.width);
+    n2 = regmap_read_bits(clk->base, data->n2.reg_off, data->n2.shift, data->n2.width);
 
     uint32_t divisor = (SDM_DEN * n2) + sdm;
     if (n2 < N2_MIN)
@@ -239,11 +216,9 @@ static unsigned long mpll_recalc_rate(const struct clk *clk,
     return DIV_ROUND_UP_ULL((uint64_t)prate * SDM_DEN, divisor);
 }
 
-static int mpll_set_rate(const struct clk *clk, uint32_t rate,
-                         uint32_t parent_rate)
+static int mpll_set_rate(const struct clk *clk, uint64_t rate, uint64_t parent_rate)
 {
-    struct meson_clk_mpll_data *data =
-        (struct meson_clk_mpll_data *)(clk->data);
+    struct meson_clk_mpll_data *data = (struct meson_clk_mpll_data *)(clk->data);
     uint64_t div = parent_rate;
     uint64_t frac = do_div(div, rate);
     uint32_t sdm, n2;
@@ -270,30 +245,25 @@ static int mpll_set_rate(const struct clk *clk, uint32_t rate,
         n2 = div;
     }
 
-    regmap_update_bits(clk->base, data->sdm.reg_off, data->sdm.shift,
-                       data->sdm.width, sdm);
-    regmap_update_bits(clk->base, data->n2.reg_off, data->n2.shift,
-                       data->n2.width, n2);
+    regmap_update_bits(clk->base, data->sdm.reg_off, data->sdm.shift, data->sdm.width, sdm);
+    regmap_update_bits(clk->base, data->n2.reg_off, data->n2.shift, data->n2.width, n2);
 
     return 0;
 }
 
 static void mpll_init(struct clk *clk)
 {
-    struct meson_clk_mpll_data *data =
-        (struct meson_clk_mpll_data *)(clk->data);
+    struct meson_clk_mpll_data *data = (struct meson_clk_mpll_data *)(clk->data);
     if (data->init_count) {
         regmap_multi_reg_write(clk->base, data->init_regs, data->init_count);
     }
 
     /* Enable the fractional part */
-    regmap_update_bits(clk->base, data->sdm_en.reg_off, data->sdm_en.shift,
-                       data->sdm_en.width, 1);
+    regmap_update_bits(clk->base, data->sdm_en.reg_off, data->sdm_en.shift, data->sdm_en.width, 1);
 
     /* Set spread spectrum if possible */
-    unsigned int ss = data->flags & CLK_MESON_MPLL_SPREAD_SPECTRUM ? 1 : 0;
-    regmap_update_bits(clk->base, data->ssen.reg_off, data->ssen.shift,
-                       data->ssen.width, ss);
+    uint32_t ss = data->flags & CLK_MESON_MPLL_SPREAD_SPECTRUM ? 1 : 0;
+    regmap_update_bits(clk->base, data->ssen.reg_off, data->ssen.shift, data->ssen.width, ss);
 }
 
 const struct clk_ops meson_clk_mpll_ops = {
@@ -322,14 +292,12 @@ static int meson_clk_pcie_pll_enable(struct clk *clk)
     return -1;
 }
 
-const struct clk_ops meson_clk_pcie_pll_ops = {
-    .init = meson_clk_pll_init,
-    .recalc_rate = meson_clk_pll_recalc_rate,
+const struct clk_ops meson_clk_pcie_pll_ops = { .init = meson_clk_pll_init,
+                                                .recalc_rate = meson_clk_pll_recalc_rate,
     /* .determine_rate    = meson_clk_pll_determine_rate, */
-    .is_enabled = meson_clk_pll_is_enabled,
-    .enable = meson_clk_pcie_pll_enable,
-    .disable = meson_clk_pll_disable
-};
+                                                .is_enabled = meson_clk_pll_is_enabled,
+                                                .enable = meson_clk_pcie_pll_enable,
+                                                .disable = meson_clk_pll_disable };
 
 struct vid_pll_div {
     unsigned int shift_val;
@@ -363,24 +331,19 @@ static const struct vid_pll_div vid_pll_div_table[] = {
     VID_PLL_DIV(0x7f80, 2, 15, 1), /* 15/1 => /15 */
 };
 
-static unsigned long meson_vid_pll_div_recalc_rate(const struct clk *clk,
-                                                   unsigned long prate)
+static unsigned long meson_vid_pll_div_recalc_rate(const struct clk *clk, unsigned long prate)
 {
-    struct meson_vid_pll_div_data *data =
-        (struct meson_vid_pll_div_data *)(clk->data);
+    struct meson_vid_pll_div_data *data = (struct meson_vid_pll_div_data *)(clk->data);
     const struct vid_pll_div *div;
     uint32_t shift_val, shift_sel;
 
-    shift_val = regmap_read_bits(clk->base, data->val.reg_off, data->val.shift,
-                                 data->val.width);
-    shift_sel = regmap_read_bits(clk->base, data->sel.reg_off, data->sel.shift,
-                                 data->sel.width);
+    shift_val = regmap_read_bits(clk->base, data->val.reg_off, data->val.shift, data->val.width);
+    shift_sel = regmap_read_bits(clk->base, data->sel.reg_off, data->sel.shift, data->sel.width);
 
     int i;
 
     for (i = 0; i < ARRAY_SIZE(vid_pll_div_table); ++i) {
-        if (vid_pll_div_table[i].shift_val == shift_val
-            && vid_pll_div_table[i].shift_sel == shift_sel) {
+        if (vid_pll_div_table[i].shift_val == shift_val && vid_pll_div_table[i].shift_sel == shift_sel) {
             div = &vid_pll_div_table[i];
             return DIV_ROUND_UP_ULL(prate * div->multiplier, div->divider);
         }
@@ -396,37 +359,29 @@ const struct clk_ops meson_vid_pll_div_ro_ops = {
 
 static int meson_vclk_gate_enable(struct clk *clk)
 {
-    struct meson_vclk_gate_data *data =
-        (struct meson_vclk_gate_data *)(clk->data);
+    struct meson_vclk_gate_data *data = (struct meson_vclk_gate_data *)(clk->data);
 
-    regmap_update_bits(clk->base, data->enable.reg_off, data->enable.shift,
-                       data->enable.width, 1);
+    regmap_update_bits(clk->base, data->enable.reg_off, data->enable.shift, data->enable.width, 1);
 
     /* Do a reset pulse */
-    regmap_update_bits(clk->base, data->reset.reg_off, data->reset.shift,
-                       data->reset.width, 1);
-    regmap_update_bits(clk->base, data->reset.reg_off, data->reset.shift,
-                       data->reset.width, 0);
+    regmap_update_bits(clk->base, data->reset.reg_off, data->reset.shift, data->reset.width, 1);
+    regmap_update_bits(clk->base, data->reset.reg_off, data->reset.shift, data->reset.width, 0);
 
     return 0;
 }
 
 static int meson_vclk_gate_disable(struct clk *clk)
 {
-    struct meson_vclk_gate_data *data =
-        (struct meson_vclk_gate_data *)(clk->data);
+    struct meson_vclk_gate_data *data = (struct meson_vclk_gate_data *)(clk->data);
 
-    regmap_update_bits(clk->base, data->enable.reg_off, data->enable.shift,
-                       data->enable.width, 0);
+    regmap_update_bits(clk->base, data->enable.reg_off, data->enable.shift, data->enable.width, 0);
     return 0;
 }
 
 static int meson_vclk_gate_is_enabled(struct clk *clk)
 {
-    struct meson_vclk_gate_data *data =
-        (struct meson_vclk_gate_data *)(clk->data);
-    return regmap_read_bits(clk->base, data->enable.reg_off, data->enable.shift,
-                            data->enable.width);
+    struct meson_vclk_gate_data *data = (struct meson_vclk_gate_data *)(clk->data);
+    return regmap_read_bits(clk->base, data->enable.reg_off, data->enable.shift, data->enable.width);
 }
 
 const struct clk_ops meson_vclk_gate_ops = {
@@ -435,13 +390,10 @@ const struct clk_ops meson_vclk_gate_ops = {
     .is_enabled = meson_vclk_gate_is_enabled,
 };
 
-static unsigned long meson_vclk_div_recalc_rate(const struct clk *clk,
-                                                unsigned long prate)
+static unsigned long meson_vclk_div_recalc_rate(const struct clk *clk, unsigned long prate)
 {
-    struct meson_vclk_div_data *data =
-        (struct meson_vclk_div_data *)(clk->data);
-    uint32_t div = regmap_read_bits(clk->base, data->div.reg_off,
-                                    data->div.shift, data->div.width);
+    struct meson_vclk_div_data *data = (struct meson_vclk_div_data *)(clk->data);
+    uint32_t div = regmap_read_bits(clk->base, data->div.reg_off, data->div.shift, data->div.width);
 
     /* TODO: Need to verify the following cases */
     if (data->flags & CLK_DIVIDER_ONE_BASED) {
@@ -457,11 +409,9 @@ static unsigned long meson_vclk_div_recalc_rate(const struct clk *clk,
     return DIV_ROUND_UP_ULL((uint64_t)prate, div);
 }
 
-static int meson_vclk_div_set_rate(const struct clk *clk, uint32_t rate,
-                                   uint32_t parent_rate)
+static int meson_vclk_div_set_rate(const struct clk *clk, uint64_t rate, uint64_t parent_rate)
 {
-    struct meson_vclk_div_data *data =
-        (struct meson_vclk_div_data *)(clk->data);
+    struct meson_vclk_div_data *data = (struct meson_vclk_div_data *)(clk->data);
 
     uint32_t div = DIV_ROUND_UP(parent_rate, rate);
 
@@ -475,41 +425,32 @@ static int meson_vclk_div_set_rate(const struct clk *clk, uint32_t rate,
     } else {
         div -= 1;
     }
-    return regmap_update_bits(clk->base, data->div.reg_off, data->div.shift,
-                              data->div.width, div);
+    return regmap_update_bits(clk->base, data->div.reg_off, data->div.shift, data->div.width, div);
 }
 
 static int meson_vclk_div_enable(struct clk *clk)
 {
-    struct meson_vclk_div_data *data =
-        (struct meson_vclk_div_data *)(clk->data);
+    struct meson_vclk_div_data *data = (struct meson_vclk_div_data *)(clk->data);
 
-    regmap_update_bits(clk->base, data->reset.reg_off, data->reset.shift,
-                       data->reset.width, 0);
-    regmap_update_bits(clk->base, data->enable.reg_off, data->enable.shift,
-                       data->enable.width, 1);
+    regmap_update_bits(clk->base, data->reset.reg_off, data->reset.shift, data->reset.width, 0);
+    regmap_update_bits(clk->base, data->enable.reg_off, data->enable.shift, data->enable.width, 1);
 
     return 0;
 }
 
 static int meson_vclk_div_disable(struct clk *clk)
 {
-    struct meson_vclk_div_data *data =
-        (struct meson_vclk_div_data *)(clk->data);
+    struct meson_vclk_div_data *data = (struct meson_vclk_div_data *)(clk->data);
 
-    regmap_update_bits(clk->base, data->enable.reg_off, data->enable.shift,
-                       data->enable.width, 0);
-    regmap_update_bits(clk->base, data->reset.reg_off, data->reset.shift,
-                       data->reset.width, 1);
+    regmap_update_bits(clk->base, data->enable.reg_off, data->enable.shift, data->enable.width, 0);
+    regmap_update_bits(clk->base, data->reset.reg_off, data->reset.shift, data->reset.width, 1);
     return 0;
 }
 
 static int meson_vclk_div_is_enabled(struct clk *clk)
 {
-    struct meson_vclk_div_data *data =
-        (struct meson_vclk_div_data *)(clk->data);
-    return regmap_read_bits(clk->base, data->enable.reg_off, data->enable.shift,
-                            data->enable.width);
+    struct meson_vclk_div_data *data = (struct meson_vclk_div_data *)(clk->data);
+    return regmap_read_bits(clk->base, data->enable.reg_off, data->enable.shift, data->enable.width);
 }
 
 const struct clk_ops meson_vclk_div_ops = {
@@ -521,11 +462,9 @@ const struct clk_ops meson_vclk_div_ops = {
     .is_enabled = meson_vclk_div_is_enabled,
 };
 
-static unsigned long meson_clk_cpu_dyndiv_recalc_rate(const struct clk *clk,
-                                                      unsigned long prate)
+static unsigned long meson_clk_cpu_dyndiv_recalc_rate(const struct clk *clk, unsigned long prate)
 {
-    struct meson_clk_cpu_dyndiv_data *data =
-        (struct meson_clk_cpu_dyndiv_data *)(clk->data);
+    struct meson_clk_cpu_dyndiv_data *data = (struct meson_clk_cpu_dyndiv_data *)(clk->data);
     uint32_t div = meson_parm_read(clk->base, data->div);
 
     div += 1;

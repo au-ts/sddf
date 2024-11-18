@@ -90,14 +90,14 @@ const struct clk *get_parent(const struct clk *clk)
 
 /* TODO: Should be just read from the structure, but need to update everytime when */
 /*     related clocks are modified */
-uint32_t clk_get_rate(const struct clk *clk, unsigned long *rate)
+int clk_get_rate(const struct clk *clk, uint64_t *rate)
 {
     if (!clk)
         return CLK_UNKNOWN_TARGET;
 
     const struct clk_init_data *init = (struct clk_init_data *)clk->hw.init;
-    unsigned long parent_rate = 0;
-    uint32_t err = 0;
+    uint64_t parent_rate = 0;
+    int err = 0;
 
     const struct clk *parent_clk = get_parent(clk);
     if (parent_clk) {
@@ -115,7 +115,7 @@ uint32_t clk_get_rate(const struct clk *clk, unsigned long *rate)
     return 0;
 }
 
-uint32_t clk_enable(struct clk *clk)
+int clk_enable(struct clk *clk)
 {
     if (!clk)
         return CLK_UNKNOWN_TARGET;
@@ -127,7 +127,7 @@ uint32_t clk_enable(struct clk *clk)
     return CLK_INVALID_OP;
 }
 
-uint32_t clk_disable(struct clk *clk)
+int clk_disable(struct clk *clk)
 {
     if (!clk)
         return CLK_UNKNOWN_TARGET;
@@ -139,7 +139,7 @@ uint32_t clk_disable(struct clk *clk)
     return CLK_INVALID_OP;
 }
 
-uint32_t clk_set_rate(struct clk *clk, uint64_t req_rate, uint64_t *rate)
+int clk_set_rate(struct clk *clk, uint64_t req_rate, uint64_t *rate)
 {
     if (!clk)
         return CLK_UNKNOWN_TARGET;
@@ -152,7 +152,7 @@ uint32_t clk_set_rate(struct clk *clk, uint64_t req_rate, uint64_t *rate)
 
     const struct clk *pclk = get_parent(clk);
     uint64_t prate = 0;
-    uint32_t err = clk_get_rate(pclk, &prate);
+    int err = clk_get_rate(pclk, &prate);
     if (err) {
         LOG_DRIVER_ERR("Failed to get parent clock's rate\n");
         return err;
@@ -166,7 +166,7 @@ uint32_t clk_set_rate(struct clk *clk, uint64_t req_rate, uint64_t *rate)
     if (pclk->hw.init->ops->set_rate) {
         const struct clk *ppclk = get_parent(pclk);
         uint64_t pprate = 0;
-        uint32_t err = clk_get_rate(ppclk, &pprate);
+        int err = clk_get_rate(ppclk, &pprate);
         if (!err) {
             pclk->hw.init->ops->set_rate(pclk, prate, pprate);
             *rate = req_rate;
@@ -184,7 +184,7 @@ int clk_msr_stat()
     unsigned long clk_freq;
     int i = 0;
     uint64_t rate = 0;
-    uint32_t err;
+    int err;
 
     const char *const *clk_msr_list = get_msr_clk_list();
 
@@ -192,8 +192,7 @@ int clk_msr_stat()
     for (i = 0; i < NUM_CLK_LIST; i++) {
         err = clk_get_rate(clk_list[i], &rate);
         if (err) {
-            LOG_DRIVER("Failed to get rate of %s: -%u\n",
-                       clk_list[i]->hw.init->name, err);
+            LOG_DRIVER("Failed to get rate of %s: -%u\n", clk_list[i]->hw.init->name, err);
         }
         LOG_DRIVER("[%4d][%4luHz] %s\n", i, rate, clk_list[i]->hw.init->name);
     }
@@ -234,10 +233,10 @@ void init(void)
         /* Set rate for the target clock */
         if (clk_configs[i].frequency > 0) {
             uint64_t rate = 0;
-            uint32_t err = clk_set_rate(clk, clk_configs[i].frequency, &rate);
+            int err = clk_set_rate(clk, clk_configs[i].frequency, &rate);
             if (err) {
-                LOG_DRIVER_ERR("Failed to set rate [%d] for clk_id: %d\n",
-                               clk_configs[i].frequency, clk_configs[i].clk_id);
+                LOG_DRIVER_ERR("Failed to set rate [%d] for clk_id: %d\n", clk_configs[i].frequency,
+                               clk_configs[i].clk_id);
             }
         }
     }
@@ -245,7 +244,7 @@ void init(void)
 
 microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
 {
-    uint32_t err = 0;
+    int err = 0;
     uint32_t ret_num = 0;
     uint32_t argc = microkit_msginfo_get_count(msginfo);
 
@@ -302,8 +301,8 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
         break;
     }
     default:
-        LOG_DRIVER_ERR("Unknown request %lu to clockk driver from channel %u\n",
-                       microkit_msginfo_get_label(msginfo), ch);
+        LOG_DRIVER_ERR("Unknown request %lu to clockk driver from channel %u\n", microkit_msginfo_get_label(msginfo),
+                       ch);
         err = CLK_UNKNOWN_REQ;
     }
     return microkit_msginfo_new(err, ret_num);

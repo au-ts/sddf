@@ -70,8 +70,7 @@ struct clk_init_data;
  * clk_foo's clk_ops
  *
  * @init: pointer to struct clk_init_data that contains the init data shared
- * with the common clock framework. This pointer will be set to NULL once
- * a clk_register() variant is called on this clk_hw pointer.
+ * with the common clock framework.
  */
 struct clk_hw {
     struct clk *clk;
@@ -82,20 +81,6 @@ struct clk_hw {
  * struct clk_ops -  Callback operations for hardware clocks; these are to
  * be provided by the clock implementation, and will be called by drivers
  * through the clk_* api.
- *
- * @prepare:    Prepare the clock for enabling. This must not return until
- *        the clock is fully prepared, and it's safe to call clk_enable.
- *        This callback is intended to allow clock implementations to
- *        do any initialisation that may sleep. Called with
- *        prepare_lock held.
- *
- * @unprepare:    Release the clock from its prepared state. This will typically
- *        undo any work done in the @prepare callback. Called with
- *        prepare_lock held.
- *
- * @is_prepared: Queries the hardware to determine if the clock is prepared.
- *        This function is allowed to sleep. Optional, if this op is not
- *        set then the prepare count will be used.
  *
  * @enable:    Enable the clock atomically. This must not return until the
  *        clock is generating a valid clock signal, usable by consumer
@@ -108,11 +93,6 @@ struct clk_hw {
  * @is_enabled:    Queries the hardware to determine if the clock is enabled.
  *        This function must not sleep. Optional, if this op is not
  *        set then the enable count will be used.
- *
- * @disable_unused: Disable the clock atomically.  Only called from
- *        clk_disable_unused for gate clocks with special needs.
- *        Called with enable_lock held.  This function must not
- *        sleep.
  *
  * @recalc_rate: Recalculate the rate of this clock, by querying hardware. The
  *        parent rate is an input parameter.  It is up to the caller to
@@ -165,9 +145,8 @@ struct clk_hw {
 struct clk_ops {
     uint8_t (*get_parent)(const struct clk *clk);
     int (*set_parent)(struct clk *clk, uint8_t index);
-    unsigned long (*recalc_rate)(const struct clk *clk,
-                                 unsigned long parent_rate);
-    int (*set_rate)(const struct clk *clk, uint32_t rate, uint32_t parent_rate);
+    uint64_t (*recalc_rate)(const struct clk *clk, uint64_t parent_rate);
+    int (*set_rate)(const struct clk *clk, uint64_t rate, uint64_t parent_rate);
     void (*init)(struct clk *clk);
     int (*enable)(struct clk *clk);
     int (*disable)(struct clk *clk);
@@ -334,9 +313,6 @@ struct clk_fixed_factor_data {
  *     .get_parent clk_op.
  * CLK_MUX_ROUND_CLOSEST - Use the parent rate that is closest to the desired
  *    frequency.
- * CLK_MUX_BIG_ENDIAN - By default little endian register accesses are used for
- *    the mux register.  Setting this flag makes the register accesses big
- *    endian.
  */
 struct clk_mux_data {
     uint32_t offset;
@@ -368,21 +344,21 @@ const struct clk *get_parent(const struct clk *clk);
  * @clk:    pointer to the current clk
  *
  */
-uint32_t clk_get_rate(const struct clk *clk, uint64_t *rate);
+int clk_get_rate(const struct clk *clk, uint64_t *rate);
 
 /**
  * function clk_enable() - enable the target clock signal
  *
  * @clk:    pointer to the current clk
  */
-uint32_t clk_enable(struct clk *clk);
+int clk_enable(struct clk *clk);
 
 /**
  * function clk_disable() - disable the target clock signal
  *
  * @clk:    pointer to the current clk
  */
-uint32_t clk_disable(struct clk *clk);
+int clk_disable(struct clk *clk);
 
 /**
  * function clk_set_rate() - set the nearest rate to the requested rate for
@@ -392,4 +368,4 @@ uint32_t clk_disable(struct clk *clk);
  * @req_rate:    request rate
  * @rate:   pointer to result variable
  */
-uint32_t clk_set_rate(struct clk *clk, uint64_t req_rate, uint64_t *rate);
+int clk_set_rate(struct clk *clk, uint64_t req_rate, uint64_t *rate);

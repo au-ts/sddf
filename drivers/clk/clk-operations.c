@@ -122,13 +122,11 @@ const struct clk_ops clk_gate_ro_ops = {
     .is_enabled = clk_gate_is_enabled,
 };
 
-static inline unsigned long clk_div_recalc_rate(const struct clk *clk,
-                                                unsigned long prate)
+static inline uint64_t clk_div_recalc_rate(const struct clk *clk, uint64_t prate)
 {
 
     struct clk_div_data *data = (struct clk_div_data *)(clk->data);
-    uint32_t div = regmap_read_bits(clk->base, data->offset, data->shift,
-                                    data->width);
+    uint32_t div = regmap_read_bits(clk->base, data->offset, data->shift, data->width);
 
     /* TODO: Need to verify the following cases */
     if (data->flags & CLK_DIVIDER_ONE_BASED) {
@@ -144,8 +142,7 @@ static inline unsigned long clk_div_recalc_rate(const struct clk *clk,
     return DIV_ROUND_UP_ULL((uint64_t)prate, div);
 }
 
-static inline int clk_div_set_rate(const struct clk *clk, uint32_t rate,
-                                   uint32_t parent_rate)
+static inline int clk_div_set_rate(const struct clk *clk, uint64_t rate, uint64_t parent_rate)
 {
     struct clk_div_data *data = (struct clk_div_data *)(clk->data);
     uint32_t div = DIV_ROUND_UP(parent_rate, rate);
@@ -160,8 +157,7 @@ static inline int clk_div_set_rate(const struct clk *clk, uint32_t rate,
     } else {
         div -= 1;
     }
-    return regmap_update_bits(clk->base, data->offset, data->shift, data->width,
-                              div);
+    return regmap_update_bits(clk->base, data->offset, data->shift, data->width, div);
 }
 
 const struct clk_ops clk_divider_ops = {
@@ -180,8 +176,7 @@ static inline uint8_t clk_mux_get_parent(const struct clk *clk)
 {
     struct clk_mux_data *data = (struct clk_mux_data *)(clk->data);
     uint32_t num_parents = clk->hw.init->num_parents;
-    uint32_t val = regmap_mux_read_bits(clk->base, data->offset, data->shift,
-                                        data->mask);
+    uint32_t val = regmap_mux_read_bits(clk->base, data->offset, data->shift, data->mask);
 
     if (data->table) {
         int i;
@@ -212,12 +207,10 @@ static inline int clk_mux_set_parent(struct clk *clk, uint8_t index)
     struct clk_mux_data *data = (struct clk_mux_data *)(clk->data);
 
     if (data->table) {
-        unsigned int val = data->table[index];
-        regmap_mux_update_bits(clk->base, data->offset, data->shift, data->mask,
-                               val);
+        uint32_t val = data->table[index];
+        regmap_mux_update_bits(clk->base, data->offset, data->shift, data->mask, val);
     }
-    regmap_mux_update_bits(clk->base, data->offset, data->shift, data->mask,
-                           index);
+    regmap_mux_update_bits(clk->base, data->offset, data->shift, data->mask, index);
 
     return 0;
 }
@@ -231,16 +224,14 @@ const struct clk_ops clk_mux_ro_ops = {
     .get_parent = clk_mux_get_parent,
 };
 
-static inline unsigned long clk_factor_recalc_rate(const struct clk *clk,
-                                                   unsigned long parent_rate)
+static inline uint64_t clk_factor_recalc_rate(const struct clk *clk, uint64_t parent_rate)
 {
-    struct clk_fixed_factor_data *data =
-        (struct clk_fixed_factor_data *)(clk->data);
-    unsigned long long int rate;
+    struct clk_fixed_factor_data *data = (struct clk_fixed_factor_data *)(clk->data);
+    uint64_t rate;
 
-    rate = (unsigned long long int)parent_rate * data->mult;
+    rate = (uint64_t)parent_rate * data->mult;
     do_div(rate, data->div);
-    return (unsigned long)rate;
+    return (uint64_t)rate;
 }
 
 const struct clk_ops clk_fixed_factor_ops = {
@@ -250,8 +241,7 @@ const struct clk_ops clk_fixed_factor_ops = {
     /* .recalc_accuracy = clk_factor_recalc_accuracy, */
 };
 
-static inline int clk_source_set_rate(const struct clk *clk, uint32_t rate,
-                                      uint32_t parent_rate)
+static inline int clk_source_set_rate(const struct clk *clk, uint64_t rate, uint64_t parent_rate)
 {
     struct clk_source_data *data = (struct clk_source_data *)(clk->data);
     data->rate = rate;
@@ -259,8 +249,7 @@ static inline int clk_source_set_rate(const struct clk *clk, uint32_t rate,
     return 0;
 }
 
-static inline unsigned long clk_source_get_rate(const struct clk *clk,
-                                                unsigned long prate)
+static inline uint64_t clk_source_get_rate(const struct clk *clk, uint64_t prate)
 {
     struct clk_source_data *data = (struct clk_source_data *)(clk->data);
 
