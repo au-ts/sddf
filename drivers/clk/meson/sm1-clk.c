@@ -13,7 +13,7 @@
  */
 
 #include <clk.h>
-#include <utils.h>
+#include <clk_utils.h>
 #include <g12a-bindings.h>
 #include <g12a-regs.h>
 #include <clk-meson.h>

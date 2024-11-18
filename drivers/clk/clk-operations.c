@@ -82,19 +82,20 @@
 #include <clk-operations.h>
 #include <sddf/timer/client.h>
 #include <sddf/util/printf.h>
+#include <clk_utils.h>
 
 static inline int clk_gate_enable(struct clk *clk)
 {
     struct clk_gate_data *data = (struct clk_gate_data *)(clk->data);
 
-    return regmap_update_bits(clk->base, data->offset, data->bit_idx, 1, 1);
+    return regmap_update_bits(clk->base, data->offset, data->bit_idx, MASK(1), 1);
 }
 
 static inline int clk_gate_disable(struct clk *clk)
 {
     struct clk_gate_data *data = (struct clk_gate_data *)(clk->data);
 
-    regmap_update_bits(clk->base, data->offset, data->bit_idx, 1, 0);
+    regmap_update_bits(clk->base, data->offset, data->bit_idx, MASK(1), 0);
     return 0;
 }
 
@@ -109,7 +110,7 @@ static inline int clk_gate_is_enabled(struct clk *clk)
     /* val &= BIT(gate->bit_idx); */
     /* return val ? 1 : 0; */
 
-    return regmap_read_bits(clk->base, data->offset, data->bit_idx, 1);
+    return regmap_read_bits(clk->base, data->offset, data->bit_idx, MASK(1));
 }
 
 const struct clk_ops clk_gate_ops = {
@@ -126,7 +127,7 @@ static inline uint64_t clk_div_recalc_rate(const struct clk *clk, uint64_t prate
 {
 
     struct clk_div_data *data = (struct clk_div_data *)(clk->data);
-    uint32_t div = regmap_read_bits(clk->base, data->offset, data->shift, data->width);
+    uint32_t div = regmap_read_bits(clk->base, data->offset, data->shift, MASK(data->width));
 
     /* TODO: Need to verify the following cases */
     if (data->flags & CLK_DIVIDER_ONE_BASED) {
@@ -157,7 +158,7 @@ static inline int clk_div_set_rate(const struct clk *clk, uint64_t rate, uint64_
     } else {
         div -= 1;
     }
-    return regmap_update_bits(clk->base, data->offset, data->shift, data->width, div);
+    return regmap_update_bits(clk->base, data->offset, data->shift, MASK(data->width), div);
 }
 
 const struct clk_ops clk_divider_ops = {
@@ -176,7 +177,7 @@ static inline uint8_t clk_mux_get_parent(const struct clk *clk)
 {
     struct clk_mux_data *data = (struct clk_mux_data *)(clk->data);
     uint32_t num_parents = clk->hw.init->num_parents;
-    uint32_t val = regmap_mux_read_bits(clk->base, data->offset, data->shift, data->mask);
+    uint32_t val = regmap_read_bits(clk->base, data->offset, data->shift, data->mask);
 
     if (data->table) {
         int i;
@@ -208,9 +209,9 @@ static inline int clk_mux_set_parent(struct clk *clk, uint8_t index)
 
     if (data->table) {
         uint32_t val = data->table[index];
-        regmap_mux_update_bits(clk->base, data->offset, data->shift, data->mask, val);
+        regmap_update_bits(clk->base, data->offset, data->shift, data->mask, val);
     }
-    regmap_mux_update_bits(clk->base, data->offset, data->shift, data->mask, index);
+    regmap_update_bits(clk->base, data->offset, data->shift, data->mask, index);
 
     return 0;
 }

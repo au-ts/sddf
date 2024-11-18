@@ -6,7 +6,7 @@
 #pragma once
 
 #include <clk.h>
-#include <utils.h>
+#include <clk_utils.h>
 
 #define CLK_INCORRECT_ARGS -1
 #define CLK_INVALID_OP -2
@@ -22,31 +22,7 @@ static inline int reg_write(uint64_t base, uint32_t offset, uint32_t val)
     return 0;
 }
 
-static inline int regmap_update_bits(uint64_t base, uint32_t offset, uint8_t shift, uint8_t width, uint32_t val)
-{
-    volatile uint32_t *clk_reg = ((void *)base + offset);
-    uint32_t reg_val = *clk_reg;
-
-    reg_val &= ~(MASK(width) << shift);
-    reg_val |= ((MASK(width) & val) << shift);
-
-    *clk_reg = reg_val;
-
-    return 0;
-}
-
-static inline uint32_t regmap_read_bits(uint64_t base, uint32_t offset, uint8_t shift, uint8_t width)
-{
-    volatile uint32_t *clk_reg = ((void *)base + offset);
-    uint32_t reg_val = *clk_reg;
-
-    reg_val >>= shift;
-    reg_val &= MASK(width);
-
-    return reg_val;
-}
-
-static inline int regmap_mux_update_bits(uint64_t base, uint32_t offset, uint8_t shift, uint32_t mask, uint32_t val)
+static inline int regmap_update_bits(uint64_t base, uint32_t offset, uint8_t shift, uint32_t mask, uint32_t val)
 {
     volatile uint32_t *clk_reg = ((void *)base + offset);
     uint32_t reg_val = *clk_reg;
@@ -59,7 +35,7 @@ static inline int regmap_mux_update_bits(uint64_t base, uint32_t offset, uint8_t
     return 0;
 }
 
-static inline uint32_t regmap_mux_read_bits(uint64_t base, uint32_t offset, uint8_t shift, uint32_t mask)
+static inline uint32_t regmap_read_bits(uint64_t base, uint32_t offset, uint8_t shift, uint32_t mask)
 {
     volatile uint32_t *clk_reg = ((void *)base + offset);
     uint32_t reg_val = *clk_reg;
