@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: BSD-2-Clause
 //
 const std = @import("std");
+const LazyPath = std.Build.LazyPath;
 
 const MicrokitBoard = enum { qemu_virt_aarch64, odroidc4, maaxboard, star64 };
 
@@ -66,7 +67,7 @@ fn findTarget(board: MicrokitBoard) std.Target.Query {
 
 const ConfigOptions = enum { debug, release, benchmark };
 
-pub fn build(b: *std.Build) void {
+pub fn build(b: *std.Build) !void {
     const optimize = b.standardOptimizeOption(.{});
 
     // Getting the path to the Microkit SDK before doing anything else
@@ -98,13 +99,54 @@ pub fn build(b: *std.Build) void {
     const libmicrokit_include = b.fmt("{s}/include", .{microkit_board_dir});
     const libmicrokit_linker_script = b.fmt("{s}/lib/microkit.ld", .{microkit_board_dir});
 
+    const sdfgen_dep = b.dependency("sdfgen", .{
+        .target = b.graph.host,
+        .optimize = optimize,
+    });
+
+    const meta = b.addExecutable(.{
+        .name = "meta",
+        .root_source_file = b.path("meta.zig"),
+        .target = b.graph.host,
+        .optimize = .ReleaseSafe,
+    });
+    meta.root_module.addImport("sdf", sdfgen_dep.module("sdf"));
+    const meta_run = b.addRunArtifact(meta);
+
+    const sdf_file = meta_run.captureStdOut();
+
+    const config_data = .{
+        .{ "client0.data", "client_config.h", "client0_data" },
+        .{ "serial_virt_tx.data", "virt_tx_config.h", "serial_virt_tx_data" },
+        .{ "serial_virt_rx.data", "virt_rx_config.h", "serial_virt_rx_data" },
+        .{ "serial_driver.data", "driver_config.h", "serial_driver_data" },
+    };
+
+    var config_headers = try std.ArrayList(LazyPath).initCapacity(b.allocator, config_data.len);
+    defer config_headers.deinit();
+    inline for (config_data) |config| {
+        const data = b.path(config[0]);
+        const data_to_header = b.addSystemCommand(&[_][]const u8{
+            "xxd", "-n", config[2], "-i"
+        });
+        data_to_header.step.dependOn(&meta_run.step);
+        data_to_header.addFileArg(data);
+        data_to_header.addFileInput(data);
+        const header = data_to_header.captureStdOut();
+
+        config_headers.appendAssumeCapacity(header);
+    }
+
+    const meta_step = b.step("meta", "Run metaprogram");
+    meta_step.dependOn(&meta_run.step);
+
     const sddf_dep = b.dependency("sddf", .{
         .target = target,
         .optimize = optimize,
         .libmicrokit = @as([]const u8, libmicrokit),
         .libmicrokit_include = @as([]const u8, libmicrokit_include),
         .libmicrokit_linker_script = @as([]const u8, libmicrokit_linker_script),
-        .serial_config_include = @as([]const u8, "include/serial_config"),
+        .serial_config_include = b.getInstallPath(.prefix, ""),
     });
 
     const driver_class = switch (microkit_board_option.?) {
@@ -132,6 +174,9 @@ pub fn build(b: *std.Build) void {
         .strip = false,
     });
 
+    // TODO: sort out, serial_server should depend on meta as well
+    serial_server.addIncludePath(config_headers.items[0]);
+    serial_server.addIncludePath(.{ .cwd_relative = b.getInstallPath(.prefix, "")});
     serial_server.addCSourceFile(.{ .file = b.path("serial_server.c") });
     serial_server.addIncludePath(sddf_dep.path("include"));
     serial_server.addIncludePath(b.path("include/serial_config"));
@@ -144,11 +189,10 @@ pub fn build(b: *std.Build) void {
 
     b.installArtifact(serial_server);
 
-    const system_description_path = b.fmt("board/{s}/serial.system", .{microkit_board});
     const final_image_dest = b.getInstallPath(.bin, "./loader.img");
     const microkit_tool_cmd = b.addSystemCommand(&[_][]const u8{
         microkit_tool,
-        system_description_path,
+        b.getInstallPath(.prefix, "serial.system"),
         "--search-path", b.getInstallPath(.bin, ""),
         "--board", microkit_board,
         "--config", microkit_config,
@@ -158,6 +202,10 @@ pub fn build(b: *std.Build) void {
     microkit_tool_cmd.step.dependOn(b.getInstallStep());
     microkit_tool_cmd.step.dependOn(&driver_install.step);
     microkit_tool_cmd.setEnvironmentVariable("MICROKIT_SDK", microkit_sdk);
+    microkit_tool_cmd.step.dependOn(&b.addInstallFileWithDir(sdf_file, .prefix, "serial.system").step);
+    inline for (config_data, 0..) |config, i| {
+        microkit_tool_cmd.step.dependOn(&b.addInstallFileWithDir(config_headers.items[i], .prefix, config[1]).step);
+    }
     // Add the "microkit" step, and make it the default step when we execute `zig build`>
     const microkit_step = b.step("microkit", "Compile and build the final bootable image");
     microkit_step.dependOn(&microkit_tool_cmd.step);
