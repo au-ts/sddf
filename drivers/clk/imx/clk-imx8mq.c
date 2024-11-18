@@ -5,7 +5,7 @@
  */
 
 #include <clk.h>
-#include <utils.h>
+#include <clk_utils.h>
 #include <imx8mq-bindings.h>
 #include <clk-imx.h>
 #include <sddf/util/util.h>
