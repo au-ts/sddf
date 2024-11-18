@@ -69,13 +69,41 @@ pub fn build(b: *std.Build) void {
     const libmicrokit_include = b.fmt("{s}/include", .{microkit_board_dir});
     const libmicrokit_linker_script = b.fmt("{s}/lib/microkit.ld", .{microkit_board_dir});
 
+    const sdfgen_dep = b.dependency("sdfgen", .{
+        .target = b.graph.host,
+        .optimize = optimize,
+    });
+
+    const meta = b.addExecutable(.{
+        .name = "meta",
+        .root_source_file = b.path("meta.zig"),
+        .target = b.graph.host,
+    });
+    meta.root_module.addImport("sdf", sdfgen_dep.module("sdf"));
+    const meta_run = b.addRunArtifact(meta);
+
+    const sdf_file = meta_run.captureStdOut();
+
+    const blk_virt_data = b.path("blk_virt.data");
+
+    const blk_virt_data_to_header = b.addSystemCommand(&[_][]const u8{
+        "xxd", "-n", "block_data", "-i"
+    });
+    blk_virt_data_to_header.step.dependOn(&meta_run.step);
+    blk_virt_data_to_header.addFileArg(blk_virt_data);
+    blk_virt_data_to_header.addFileInput(blk_virt_data);
+    const blk_virt_header = blk_virt_data_to_header.captureStdOut();
+
+    const meta_step = b.step("meta", "Run metaprogram");
+    meta_step.dependOn(&blk_virt_data_to_header.step);
+
     const sddf_dep = b.dependency("sddf", .{
         .target = target,
         .optimize = optimize,
         .libmicrokit = @as([]const u8, libmicrokit),
         .libmicrokit_include = @as([]const u8, libmicrokit_include),
         .libmicrokit_linker_script = @as([]const u8, libmicrokit_linker_script),
-        .blk_config_include = @as([]const u8, ""),
+        .blk_config_include = b.getInstallPath(.prefix, ""),
     });
 
     const blk_driver_class = switch (microkit_board_option.?) {
@@ -112,19 +140,21 @@ pub fn build(b: *std.Build) void {
     // Because our SDF expects a different ELF name for the block driver, we have this extra step.
     const blk_driver_install = b.addInstallArtifact(blk_driver, .{ .dest_sub_path = "blk_driver.elf" });
 
-    const system_description_path = b.fmt("board/{s}/blk.system", .{microkit_board});
     const final_image_dest = b.getInstallPath(.bin, "./loader.img");
     const microkit_tool_cmd = b.addSystemCommand(&[_][]const u8{
         microkit_tool,
-        system_description_path,
+        // TODO: is this correct?
+        b.getInstallPath(.prefix, "block.system"),
         "--search-path", b.getInstallPath(.bin, ""),
         "--board", microkit_board,
         "--config", microkit_config,
         "-o", final_image_dest,
         "-r", b.getInstallPath(.prefix, "./report.txt")
     });
+    b.getInstallStep().dependOn(&b.addInstallFileWithDir(blk_virt_header, .prefix, "data.h").step);
     microkit_tool_cmd.step.dependOn(b.getInstallStep());
     microkit_tool_cmd.setEnvironmentVariable("MICROKIT_SDK", microkit_sdk);
+    microkit_tool_cmd.step.dependOn(&b.addInstallFileWithDir(sdf_file, .prefix, "block.system").step);
 
     const microkit_step = b.step("microkit", "Compile and build the final bootable image");
     microkit_step.dependOn(&blk_driver_install.step);
