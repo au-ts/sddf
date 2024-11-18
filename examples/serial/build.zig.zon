@@ -6,6 +6,9 @@
         .sddf = .{
             .path = "../../"
         },
+        .sdfgen = .{
+            .path = "../../../"
+        }
     },
     .paths = .{
         "build.zig",
