@@ -43,6 +43,8 @@ const ConfigOptions = enum { debug, release, benchmark };
 pub fn build(b: *std.Build) !void {
     const optimize = b.standardOptimizeOption(.{});
 
+    const num_clients = b.option(usize, "num-clients", "Number of client PDs") orelse 1;
+
     // Getting the path to the Microkit SDK before doing anything else
     const microkit_sdk_arg = b.option([]const u8, "sdk", "Path to Microkit SDK");
     if (microkit_sdk_arg == null) {
@@ -81,6 +83,9 @@ pub fn build(b: *std.Build) !void {
         .target = b.graph.host,
         .optimize = .ReleaseSafe,
     });
+    const meta_options = b.addOptions();
+    meta_options.addOption(usize, "num_clients", num_clients);
+    meta.root_module.addOptions("config", meta_options);
     meta.root_module.addImport("sdf", sdfgen_dep.module("sdf"));
     const meta_run = b.addRunArtifact(meta);
 
@@ -111,6 +116,7 @@ pub fn build(b: *std.Build) !void {
         meta_step.dependOn(&b.addInstallFileWithDir(config_headers.items[i], .prefix, config[1]).step);
     }
     meta_step.dependOn(&meta_run.step);
+    meta_step.dependOn(&b.addInstallFileWithDir(sdf_file, .prefix, "block.system").step);
 
     const sddf_dep = b.dependency("sddf", .{
         .target = target,
@@ -189,7 +195,7 @@ pub fn build(b: *std.Build) !void {
         create_disk_cmd.addFileInput(mkvirtdisk);
         const disk = create_disk_cmd.addOutputFileArg("disk");
         create_disk_cmd.addArgs(&[_][]const u8{
-            "1", "512", b.fmt("{}", .{ 1024 * 1024 * 16 }),
+            b.fmt("{}", .{ num_clients }), "512", b.fmt("{}", .{ 1024 * 1024 * 16 }),
         });
         const disk_install = b.addInstallFile(disk, "disk");
         disk_install.step.dependOn(&create_disk_cmd.step);
