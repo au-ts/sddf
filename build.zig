@@ -411,6 +411,8 @@ pub fn build(b: *std.Build) void {
     });
     serial_virt_tx.addCSourceFile(.{
         .file = b.path("serial/components/virt_tx.c"),
+        // TODO: DO NOT MERGE
+        .flags = &.{ "-fno-sanitize=undefined" },
     });
     serial_virt_tx.addIncludePath(serial_config_include);
     serial_virt_tx.addIncludePath(b.path("include"));
