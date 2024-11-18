@@ -22,7 +22,7 @@
 
 #include <clk-measure.h>
 #include <clk-operations.h>
-#include <utils.h>
+#include <clk_utils.h>
 #include <sddf/util/printf.h>
 #include <sddf/timer/client.h>
 
