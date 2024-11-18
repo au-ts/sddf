@@ -28,19 +28,18 @@ pub fn main() !void {
 
     const blk_node = blob.child("virtio_mmio@a003e00").?;
 
-    var blk_driver = Pd.create(allocator, "blk_driver", "blk_driver.elf");
+    var blk_driver = Pd.create(allocator, "blk_driver", "blk_driver.elf", .{});
     sdf.addProtectionDomain(&blk_driver);
-    var blk_virt = Pd.create(allocator, "blk_virt", "blk_virt.elf");
+    var blk_virt = Pd.create(allocator, "blk_virt", "blk_virt.elf", .{ .stack_size = 0x2000 });
     sdf.addProtectionDomain(&blk_virt);
 
     var blk_system = sddf.BlockSystem.init(allocator, &sdf, blk_node, &blk_driver, &blk_virt, .{});
 
-
     for (0..config.num_clients) |i| {
         const client = try allocator.create(Pd);
-        client.* = Pd.create(allocator, fmt(allocator, "client{}", .{ i }), "client.elf");
+        client.* = Pd.create(allocator, fmt(allocator, "client{}", .{ i }), "client.elf", .{});
         sdf.addProtectionDomain(client);
-        blk_system.addClient(client);
+        blk_system.addClient(client, @intCast(i));
     }
 
     _ = try blk_system.connect();
