@@ -9,11 +9,10 @@
 #include <sddf/util/printf.h>
 #include <sddf/serial/config.h>
 #include <uart.h>
+
 #include "driver_config.h"
 
 #define IRQ_CH 0
-#define TX_CH  1
-#define RX_CH  2
 
 serial_driver_config_t config;
 
@@ -71,7 +70,7 @@ static void tx_provide(void)
 
     if (transferred && serial_require_consumer_signal(&tx_queue_handle)) {
         serial_cancel_consumer_signal(&tx_queue_handle);
-        microkit_notify(TX_CH);
+        microkit_notify(config.tx_id);
     }
 }
 
@@ -102,7 +101,7 @@ static void rx_return(void)
 
     if (enqueued && serial_require_producer_signal(&rx_queue_handle)) {
         serial_cancel_producer_signal(&rx_queue_handle);
-        microkit_notify(RX_CH);
+        microkit_notify(config.rx_id);
     }
 }
 
@@ -170,16 +169,6 @@ static void uart_setup(void)
 void init(void)
 {
     sddf_memcpy(&config, serial_driver_data, serial_driver_data_len);
-    // config = (config_t) {
-    //     .rx_queue = (void *)0x4000000,
-    //     .tx_queue = (void *)0x4001000,
-    //     .rx_data = (void *)0x4002000,
-    //     .tx_data = (void *)0x4004000,
-    //     .rx_capacity = 0x2000,
-    //     .tx_capacity = 0x2000,
-    //     .default_baud = 115200,
-    //     .rx_enabled = true,
-    // };
 
     uart_setup();
 
