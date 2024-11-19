@@ -62,6 +62,7 @@ void clk_probe(struct clk *clk_list[])
         } else if (clk_list[i]->base == CCM_ANALOG_BASE) {
             clk_list[i]->base = ccm_analog_base;
         }
+
         if (clk_list[i] && init_data->ops->init) {
             init_data->ops->init(clk_list[i]);
             LOG_DRIVER("Initialise %s\n", init_data->name);
@@ -78,7 +79,11 @@ const struct clk *get_parent(const struct clk *clk)
     uint32_t num_parents = init->num_parents;
 
     if (init->parent_data) {
-        uint8_t parent_idx = num_parents > 1 ? init->ops->get_parent(clk) : 0;
+        uint8_t parent_idx = 0;
+        int err = num_parents > 1 ? init->ops->get_parent(clk, &parent_idx) : 0;
+        if (err)
+            return NULL;
+
         struct clk_parent_data parent_data = init->parent_data[parent_idx];
 
         if (parent_data.clk) {
@@ -94,6 +99,58 @@ const struct clk *get_parent(const struct clk *clk)
     }
 
     return NULL;
+}
+
+int clk_get_parent_id(const struct clk *clk, uint32_t *parent_clk_id)
+{
+    if (!clk)
+        return CLK_UNKNOWN_TARGET;
+
+    const struct clk *pclk = get_parent(clk);
+
+    if (pclk == NULL)
+        return CLK_INVALID_OP;
+
+    for (int i = 0; i < NUM_CLK_LIST; i++) {
+        if (pclk == clk_list[i]) {
+            *parent_clk_id = i;
+            return 0;
+        }
+    }
+
+    return CLK_UNKNOWN_TARGET;
+}
+
+/* The user needs to know which parent clock the value represents, and check
+ * if the target parent clock is configured correctly with clk_get_parent() */
+int clk_set_parent_by_val(struct clk *clk, uint32_t parent_idx)
+{
+    if (!clk)
+        return CLK_UNKNOWN_TARGET;
+
+    const struct clk_init_data *init = (struct clk_init_data *)clk->hw.init;
+    if (init->ops->set_parent) {
+        init->ops->set_parent(clk, parent_idx);
+        return 0;
+    }
+    LOG_DRIVER_ERR("clock \"%s\" has no set_parent() interface\n", init->name);
+    return CLK_INVALID_OP;
+}
+
+int clk_set_parent_by_id(struct clk *clk, uint32_t pclk_id)
+{
+    const struct clk *pclk = clk_list[pclk_id];
+    const struct clk_init_data *init = (struct clk_init_data *)clk->hw.init;
+    uint32_t num_parents = init->num_parents;
+    for (int i = 0; i < num_parents; i++) {
+        if (init->parent_clks && init->parent_clks[i] == pclk) {
+            return clk_set_parent_by_val(clk, i);
+        } else if (get_clk_by_name(init->parent_data[i].name) == pclk) {
+            return clk_set_parent_by_val(clk, i);
+        }
+    }
+
+    return CLK_UNKNOWN_TARGET;
 }
 
 /* TODO: Should be just read from the structure, but need to update everytime when */
@@ -215,6 +272,7 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
+    int err = 0;
     clk_list = get_clk_list();
 
     clk_probe(clk_list);
@@ -222,11 +280,18 @@ void init(void)
 
     for (int i = 0; i < NUM_DEVICE_CLKS; i++) {
         struct clk *clk = clk_list[clk_configs[i].clk_id];
-        LOG_DRIVER("clk_id: %d\n", clk_configs[i].clk_id);
+
         /* Enable the clock */
         clk_enable(clk);
 
-        /* TODO: Set parent */
+        /* Set parent for clocks as configured in device tree */
+        if (clk_configs[i].pclk_id) {
+            err = clk_set_parent_by_id(clk, clk_configs[i].pclk_id);
+            if (err) {
+                LOG_DRIVER_ERR("Failed to set parent %u for clock %u: err - %d\n", clk_configs[i].pclk_id,
+                               clk_configs[i].clk_id, err);
+            }
+        }
 
         /* TODO: Set rate for the target clock */
         /* if (clk_configs[i].frequency > 0) { */
@@ -244,6 +309,7 @@ void init(void)
 microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
 {
     int err = 0;
+    uint32_t ret_num = 0;
     uint32_t argc = microkit_msginfo_get_count(msginfo);
 
     /* TODO: Check if the channel is valid */
@@ -280,6 +346,8 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
         uint32_t clk_id = (uint32_t)microkit_mr_get(SDDF_CLK_PARAM_ID);
         uint64_t rate = 0;
         err = clk_get_rate(clk_list[clk_id], &rate);
+        microkit_mr_set(0, rate);
+        ret_num = 1;
         break;
     }
     case SDDF_CLK_SET_RATE: {
@@ -292,6 +360,34 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
         uint64_t req_rate = (uint32_t)microkit_mr_get(SDDF_CLK_PARAM_RATE);
         uint64_t rate = 0;
         err = clk_set_rate(clk_list[clk_id], req_rate, &rate);
+        microkit_mr_set(0, rate);
+        ret_num = 1;
+        break;
+    }
+    case SDDF_CLK_GET_PARENT: {
+        if (argc != 1) {
+            LOG_DRIVER_ERR("Incorrect number of arguments %u != 1\n", argc);
+            err = CLK_INCORRECT_ARGS;
+            break;
+        }
+        uint32_t clk_id = (uint32_t)microkit_mr_get(SDDF_CLK_PARAM_ID);
+        uint32_t pclk_id = 0;
+        err = clk_get_parent_id(clk_list[clk_id], &pclk_id);
+        microkit_mr_set(0, pclk_id);
+        ret_num = 1;
+        break;
+    }
+    case SDDF_CLK_SET_PARENT: {
+        if (argc != 2) {
+            LOG_DRIVER_ERR("Incorrect number of arguments %u != 1\n", argc);
+            err = CLK_INCORRECT_ARGS;
+            break;
+        }
+        uint32_t clk_id = (uint32_t)microkit_mr_get(SDDF_CLK_PARAM_ID);
+        uint32_t pclk_idx = (uint32_t)microkit_mr_get(SDDF_CLK_PARAM_PCLK_IDX);
+        err = clk_set_parent_by_val(clk_list[clk_id], pclk_idx);
+        microkit_mr_set(0, pclk_idx);
+        ret_num = 1;
         break;
     }
     default:
@@ -299,5 +395,5 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
                        ch);
         err = CLK_UNKNOWN_REQ;
     }
-    return microkit_msginfo_new(err, 0);
+    return microkit_msginfo_new(err, ret_num);
 }

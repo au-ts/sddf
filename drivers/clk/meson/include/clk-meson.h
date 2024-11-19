@@ -171,5 +171,4 @@ struct clk _name = {                                         \
     },                                                       \
 }
 
-extern const struct clk g12a_xtal;
 struct clk **get_clk_list(void);
