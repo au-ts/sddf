@@ -35,6 +35,25 @@
 
               llvm = pkgs.llvmPackages_18;
               zig = zig-overlay.packages.${system}."0.13.0";
+
+              pysdfgen = with pkgs.python313Packages;
+                buildPythonPackage rec {
+                  pname = "pysdfgen";
+                  version = "0.0.4";
+                  src = pkgs.fetchFromGitHub {
+                    owner = "au-ts";
+                    repo = "microkit_sdf_gen";
+                    rev = "master";
+                    hash = "sha256-RXR63KpBgSFURaEOFQBt6ASqsQ3K6uWZtBsSYs1x8Ls=";
+                  };
+
+                  meta = with lib; {
+                    homepage = "https://github.com/au-ts/microkit_sdf_gen";
+                    maintainers = with maintainers; [ Ivan-Velickovic ];
+                  };
+
+                  nativeBuildInputs = [ zig ];
+                };
             in
             # mkShellNoCC, because we do not want the cc from stdenv to leak into this shell
             pkgs.mkShellNoCC rec {
@@ -86,6 +105,9 @@
                 llvm.libclang.python
                 llvm.lld
                 llvm.libllvm
+                python313
+                dtc
+                pysdfgen
               ];
 
               # To avoid Nix adding compiler flags that are not available on a freestanding
