@@ -8,9 +8,10 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/24.05";
     zig-overlay.url = "github:mitchellh/zig-overlay";
+    sdfgen.url = "github:au-ts/microkit_sdf_gen";
   };
 
-  outputs = { nixpkgs, zig-overlay, ... }:
+  outputs = { nixpkgs, zig-overlay, sdfgen, ... }:
     let
       microkit-version = "1.4.1-dev.54+a8b7894";
       microkit-platforms = {
@@ -34,7 +35,13 @@
               };
 
               llvm = pkgs.llvmPackages_18;
-              zig = zig-overlay.packages.${system}."0.13.0";
+              zig = zig-overlay.packages.${system}."master";
+
+              pysdfgen = sdfgen.packages.${system}.pysdfgen.override { zig = zig; pythonPackages = pkgs.python312Packages; };
+
+              pythonTool = pkgs.python312.withPackages (ps: [
+                pysdfgen
+              ]);
             in
             # mkShellNoCC, because we do not want the cc from stdenv to leak into this shell
             pkgs.mkShellNoCC rec {
@@ -86,6 +93,8 @@
                 llvm.libclang.python
                 llvm.lld
                 llvm.libllvm
+                dtc
+                pythonTool
               ];
 
               # To avoid Nix adding compiler flags that are not available on a freestanding
