@@ -134,18 +134,17 @@ static uint64_t clk_sscg_pll_recalc_rate(const struct clk *clk, uint64_t prate)
     return 0;
 }
 
-static uint8_t clk_sscg_pll_get_parent(const struct clk *clk)
+static int clk_sscg_pll_get_parent(const struct clk *clk, uint8_t *index)
 {
     struct clk_sscg_pll_data *data = (struct clk_sscg_pll_data *)(clk->data);
-    uint8_t ret = 0;
 
     if (regmap_read_bits(clk->base, data->offset, 4, MASK(1))) {
-        ret = data->bypass2;
+        *index = data->bypass2;
     } else if (regmap_read_bits(clk->base, data->offset, 5, MASK(1))) {
-        ret = data->bypass1;
+        *index = data->bypass1;
     }
 
-    return ret;
+    return 0;
 }
 
 static int clk_sscg_pll_set_parent(struct clk *clk, uint8_t index)
@@ -178,7 +177,7 @@ static uint64_t imx8m_clk_core_slice_recalc_rate(const struct clk *clk, uint64_t
     return DIV_ROUND_UP_ULL((uint64_t)prate, div_val + 1);
 }
 
-static uint8_t imx8m_clk_core_slice_get_parent(const struct clk *clk)
+static int imx8m_clk_core_slice_get_parent(const struct clk *clk, uint8_t *index)
 {
     struct clk_core_slice_data *data = (struct clk_core_slice_data *)(clk->data);
 
@@ -186,9 +185,10 @@ static uint8_t imx8m_clk_core_slice_get_parent(const struct clk *clk)
     uint32_t val = regmap_read_bits(clk->base, data->offset, data->mux_shift, data->mux_mask);
 
     if (val >= num_parents)
-        return -1;
+        return CLK_UNKNOWN_TARGET;
 
-    return val;
+    *index = val;
+    return 0;
 }
 
 static int imx8m_clk_core_slice_set_parent(struct clk *clk, uint8_t index)
@@ -227,7 +227,7 @@ static uint64_t imx8m_clk_common_slice_recalc_rate(const struct clk *clk, uint64
     return DIV_ROUND_UP_ULL((uint64_t)prediv_rate, postdiv_val + 1);
 }
 
-static uint8_t imx8m_clk_common_slice_get_parent(const struct clk *clk)
+static int imx8m_clk_common_slice_get_parent(const struct clk *clk, uint8_t *index)
 {
     struct clk_common_slice_data *data = (struct clk_common_slice_data *)(clk->data);
 
@@ -235,9 +235,10 @@ static uint8_t imx8m_clk_common_slice_get_parent(const struct clk *clk)
     uint32_t val = regmap_read_bits(clk->base, data->offset, data->mux_shift, data->mux_mask);
 
     if (val >= num_parents)
-        return -1;
+        return CLK_UNKNOWN_TARGET;
 
-    return val;
+    *index = val;
+    return 0;
 }
 
 static int imx8m_clk_common_slice_set_parent(struct clk *clk, uint8_t index)
@@ -276,7 +277,7 @@ static uint64_t imx8m_clk_bus_slice_recalc_rate(const struct clk *clk, uint64_t 
     return DIV_ROUND_UP_ULL((uint64_t)prediv_rate, postdiv_val + 1);
 }
 
-static uint8_t imx8m_clk_bus_slice_get_parent(const struct clk *clk)
+static int imx8m_clk_bus_slice_get_parent(const struct clk *clk, uint8_t *index)
 {
     struct clk_bus_slice_data *data = (struct clk_bus_slice_data *)(clk->data);
 
@@ -284,9 +285,10 @@ static uint8_t imx8m_clk_bus_slice_get_parent(const struct clk *clk)
     uint32_t val = regmap_read_bits(clk->base, data->offset, data->mux_shift, data->mux_mask);
 
     if (val >= num_parents)
-        return -1;
+        return CLK_UNKNOWN_TARGET;
 
-    return val;
+    *index = val;
+    return 0;
 }
 
 static int imx8m_clk_bus_slice_set_parent(struct clk *clk, uint8_t index)

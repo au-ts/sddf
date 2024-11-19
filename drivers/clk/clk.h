@@ -143,7 +143,7 @@ struct clk_hw {
  *
  */
 struct clk_ops {
-    uint8_t (*get_parent)(const struct clk *clk);
+    int (*get_parent)(const struct clk *clk, uint8_t *index);
     int (*set_parent)(struct clk *clk, uint8_t index);
     uint64_t (*recalc_rate)(const struct clk *clk, uint64_t parent_rate);
     int (*set_rate)(const struct clk *clk, uint64_t rate, uint64_t parent_rate);

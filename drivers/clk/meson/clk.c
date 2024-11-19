@@ -31,7 +31,7 @@
 
 #define LOG_DRIVER_ERR(...) do{ sddf_printf("CLK DRIVER|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
-#define NUM_CLK_LIST CLKID_PCIE_PLL
+#define NUM_CLK_LIST 280
 
 #define I2C_CLK_OFFSET 320
 #define I2C_CLK_BIT (1 << 9) // bit 9
@@ -40,6 +40,16 @@ uintptr_t clk_regs;
 uintptr_t msr_clk_base;
 
 struct clk **clk_list;
+
+struct clk *get_clk_by_name(const char *name)
+{
+    for (int i = 0; i < NUM_CLK_LIST; i++) {
+        if (clk_list[i] && sddf_strcmp(clk_list[i]->hw.init->name, name) == 0) {
+            return clk_list[i];
+        }
+    }
+    return NULL;
+}
 
 /* TODO: Should be configured with init_regs */
 /* static struct clk_cfg fixed_clk_configs[] = { */
@@ -54,8 +64,10 @@ void clk_probe(struct clk *clk_list[])
 {
     int i;
     for (i = 0; i < NUM_CLK_LIST; i++) {
+        if (!clk_list[i])
+            continue;
         clk_list[i]->base = (uint64_t)clk_regs;
-        if (clk_list[i] && clk_list[i]->hw.init->ops->init) {
+        if (clk_list[i]->hw.init->ops->init) {
             clk_list[i]->hw.init->ops->init(clk_list[i]);
             LOG_DRIVER("Initialise %s\n", clk_list[i]->hw.init->name);
         }
@@ -71,13 +83,17 @@ const struct clk *get_parent(const struct clk *clk)
     uint32_t num_parents = init->num_parents;
 
     if (init->parent_data) {
-        uint8_t parent_idx = num_parents > 1 ? init->ops->get_parent(clk) : 0;
+        uint8_t parent_idx = 0;
+        int err = num_parents > 1 ? init->ops->get_parent(clk, &parent_idx) : 0;
+        if (err)
+            return NULL;
+
         struct clk_parent_data parent_data = init->parent_data[parent_idx];
 
         if (parent_data.clk) {
             return parent_data.clk;
         } else if (sddf_strcmp(parent_data.name, "xtal") == 0) {
-            return &g12a_xtal;
+            return clk_list[CLKID_G12A_XTAL];
         }
     }
 
@@ -86,6 +102,57 @@ const struct clk *get_parent(const struct clk *clk)
     }
 
     return NULL;
+}
+
+int clk_get_parent_id(const struct clk *clk, uint32_t *parent_clk_id)
+{
+    if (!clk)
+        return CLK_UNKNOWN_TARGET;
+
+    const struct clk *pclk = get_parent(clk);
+
+    if (pclk == NULL)
+        return CLK_INVALID_OP;
+
+    for (int i = 0; i < NUM_CLK_LIST; i++) {
+        if (pclk == clk_list[i]) {
+            *parent_clk_id = i;
+            return 0;
+        }
+    }
+
+    return CLK_UNKNOWN_TARGET;
+}
+
+/* The user needs to know which parent clock the value represents, and check
+ * if the target parent clock is configured correctly with clk_get_parent() */
+int clk_set_parent_by_val(struct clk *clk, uint32_t parent_idx)
+{
+    if (!clk)
+        return CLK_UNKNOWN_TARGET;
+
+    const struct clk_init_data *init = (struct clk_init_data *)clk->hw.init;
+    if (init->ops->set_parent) {
+        init->ops->set_parent(clk, parent_idx);
+        return 0;
+    }
+    return CLK_INVALID_OP;
+}
+
+int clk_set_parent_by_id(struct clk *clk, uint32_t pclk_id)
+{
+    const struct clk *pclk = clk_list[pclk_id];
+    const struct clk_init_data *init = (struct clk_init_data *)clk->hw.init;
+    uint32_t num_parents = init->num_parents;
+    for (int i = 0; i < num_parents; i++) {
+        if (init->parent_clks && init->parent_clks[i] == pclk) {
+            return clk_set_parent_by_val(clk, i);
+        } else if (get_clk_by_name(init->parent_data[i].name) == pclk) {
+            return clk_set_parent_by_val(clk, i);
+        }
+    }
+
+    return CLK_UNKNOWN_TARGET;
 }
 
 /* TODO: Should be just read from the structure, but need to update everytime when */
@@ -217,6 +284,7 @@ void init(void)
 {
     LOG_DRIVER("Clock driver initialising...\n");
 
+    int err = 0;
     clk_list = get_clk_list();
 
     clk_probe(clk_list);
@@ -228,7 +296,14 @@ void init(void)
         /* Enable the clock */
         clk_enable(clk);
 
-        /* TODO: Set parent */
+        /* Set parent for clocks as configured in device tree */
+        if (clk_configs[i].pclk_id) {
+            err = clk_set_parent_by_id(clk, clk_configs[i].pclk_id);
+            if (err) {
+                LOG_DRIVER_ERR("Failed to set parent %u for clock %u: err - %d\n", clk_configs[i].pclk_id,
+                               clk_configs[i].clk_id, err);
+            }
+        }
 
         /* Set rate for the target clock */
         if (clk_configs[i].frequency > 0) {
@@ -298,6 +373,30 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
         err = clk_set_rate(clk_list[clk_id], req_rate, &rate);
         microkit_mr_set(0, rate);
         ret_num = 1;
+        break;
+    }
+    case SDDF_CLK_GET_PARENT: {
+        if (argc != 1) {
+            LOG_DRIVER_ERR("Incorrect number of arguments %u != 1\n", argc);
+            err = CLK_INCORRECT_ARGS;
+            break;
+        }
+        uint32_t clk_id = (uint32_t)microkit_mr_get(SDDF_CLK_PARAM_ID);
+        uint32_t pclk_id = 0;
+        err = clk_get_parent_id(clk_list[clk_id], &pclk_id);
+        microkit_mr_set(0, pclk_id);
+        ret_num = 1;
+        break;
+    }
+    case SDDF_CLK_SET_PARENT: {
+        if (argc != 2) {
+            LOG_DRIVER_ERR("Incorrect number of arguments %u != 1\n", argc);
+            err = CLK_INCORRECT_ARGS;
+            break;
+        }
+        uint32_t clk_id = (uint32_t)microkit_mr_get(SDDF_CLK_PARAM_ID);
+        uint32_t pclk_idx = (uint32_t)microkit_mr_get(SDDF_CLK_PARAM_PCLK_IDX);
+        err = clk_set_parent_by_val(clk_list[clk_id], pclk_idx);
         break;
     }
     default:
