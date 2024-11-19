@@ -13,10 +13,11 @@
 #include <sddf/util/printf.h>
 
 #include "ethernet.h"
-
-net_driver_config_t config;
+#include "net_driver_config.h"
 
 #define IRQ_CH 0
+
+net_driver_config_t config;
 
 #define RX_COUNT 256
 #define TX_COUNT 256
@@ -293,6 +294,8 @@ static void eth_setup(void)
 
 void init(void)
 {
+    sddf_memcpy(&config, net_driver_data, net_driver_data_len);
+
     eth_setup();
 
     net_queue_init(&rx_queue, config.rx_free, config.rx_active, config.rx_capacity);
