@@ -6,21 +6,18 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <microkit.h>
+#include <sddf/serial/config.h>
 #include <sddf/serial/queue.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 #include <serial_config.h>
 #include "uart.h"
 
+#include "driver_config.h"
+
 #define IRQ_CH 0
-#define TX_CH  1
-#define RX_CH  2
 
-serial_queue_t *rx_queue;
-serial_queue_t *tx_queue;
-
-char *rx_data;
-char *tx_data;
+serial_driver_config_t config;
 
 serial_queue_handle_t rx_queue_handle;
 serial_queue_handle_t tx_queue_handle;
@@ -83,7 +80,7 @@ static void tx_provide(void)
 
     if (transferred && serial_require_consumer_signal(&tx_queue_handle)) {
         serial_cancel_consumer_signal(&tx_queue_handle);
-        microkit_notify(TX_CH);
+        microkit_notify(config.tx_id);
     }
 }
 
@@ -118,7 +115,7 @@ static void rx_return(void)
 
     if (enqueued && serial_require_producer_signal(&rx_queue_handle)) {
         serial_cancel_producer_signal(&rx_queue_handle);
-        microkit_notify(RX_CH);
+        microkit_notify(config.rx_id);
     }
 }
 
@@ -164,32 +161,27 @@ void init(void)
     *REG_PTR(UART_IIR) = 0x1;
 
     /* Set the baud rate */
-    set_baud(UART_DEFAULT_BAUD);
+    set_baud(config.default_baud);
 
     /* Enable both Recieve Data Available and Transmit Holding Register Empty IRQs. */
     *REG_PTR(UART_IER) = (UART_IER_ERBFI | UART_IER_ETBEI);
 
-#if !SERIAL_TX_ONLY
-    serial_queue_init(&rx_queue_handle, rx_queue, SERIAL_RX_DATA_REGION_CAPACITY_DRIV, rx_data);
-#endif
-    serial_queue_init(&tx_queue_handle, tx_queue, SERIAL_TX_DATA_REGION_CAPACITY_DRIV, tx_data);
+    if (config.rx_enabled) {
+        serial_queue_init(&rx_queue_handle, config.rx_queue, config.rx_capacity, config.rx_data);
+    }
+    serial_queue_init(&tx_queue_handle, config.tx_queue, config.tx_capacity, config.tx_data);
 }
 
 void notified(microkit_channel ch)
 {
-    switch (ch) {
-    case IRQ_CH:
+    if (ch == IRQ_CH) {
         handle_irq();
         microkit_deferred_irq_ack(IRQ_CH);
-        return;
-    case TX_CH:
+    } else if (ch == config.tx_id) {
         tx_provide();
-        break;
-    case RX_CH:
+    } else if (ch == config.rx_id) {
         rx_return();
-        break;
-    default:
+    } else {
         LOG_DRIVER("received notification on unexpected channel\n");
-        break;
     }
 }
