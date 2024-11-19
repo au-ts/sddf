@@ -6,20 +6,20 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <microkit.h>
+#include <sddf/device/resources.h>
 #include <sddf/util/printf.h>
 #include <sddf/serial/config.h>
 #include "uart.h"
 
+#include "device_resources.h"
 #include "driver_config.h"
 
-#define IRQ_CH 0
-
+device_resources_t device_resources;
 serial_driver_config_t config;
 
 serial_queue_handle_t rx_queue_handle;
 serial_queue_handle_t tx_queue_handle;
 
-uintptr_t uart_base;
 volatile meson_uart_regs_t *uart_regs;
 struct uart_clock_state uart_clock;
 
@@ -153,7 +153,7 @@ static void handle_irq(void)
 
 static void uart_setup(void)
 {
-    uart_regs = (meson_uart_regs_t *)(uart_base + UART_REGS_OFFSET);
+    uart_regs = (meson_uart_regs_t *)((uintptr_t)device_resources.regions[0].vaddr + UART_REGS_OFFSET);
 
     /* Wait until receive and transmit state machines are no longer busy */
     while (uart_regs->sr & (AML_UART_TX_BUSY | AML_UART_RX_BUSY));
@@ -199,6 +199,7 @@ static void uart_setup(void)
 
 void init(void)
 {
+    sddf_memcpy(&device_resources, device_resources_data, device_resources_data_len);
     sddf_memcpy(&config, serial_driver_data, serial_driver_data_len);
 
     uart_setup();
@@ -211,7 +212,7 @@ void init(void)
 
 void notified(microkit_channel ch)
 {
-    if (ch == IRQ_CH) {
+    if (ch == device_resources.irqs[0].id) {
         handle_irq();
         microkit_deferred_irq_ack(ch);
     } else if (ch == config.tx_id) {
