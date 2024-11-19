@@ -6,20 +6,16 @@
 #include "sddf/util/util.h"
 #include <microkit.h>
 #include <sddf/util/printf.h>
+#include <sddf/serial/config.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <serial_config.h>
 #include <uart.h>
 
+#include "driver_config.h"
+
 #define IRQ_CH 0
-#define TX_CH  1
-#define RX_CH  2
 
-serial_queue_t *rx_queue;
-serial_queue_t *tx_queue;
-
-char *rx_data;
-char *tx_data;
+serial_driver_config_t config;
 
 serial_queue_handle_t rx_queue_handle;
 serial_queue_handle_t tx_queue_handle;
@@ -76,7 +72,7 @@ static void tx_provide(void)
 
     if (transferred && serial_require_consumer_signal(&tx_queue_handle)) {
         serial_cancel_consumer_signal(&tx_queue_handle);
-        microkit_notify(TX_CH);
+        microkit_notify(config.tx_id);
     }
 }
 
@@ -107,7 +103,7 @@ static void rx_return(void)
 
     if (enqueued && serial_require_producer_signal(&rx_queue_handle)) {
         serial_cancel_producer_signal(&rx_queue_handle);
-        microkit_notify(RX_CH);
+        microkit_notify(config.rx_id);
     }
 }
 
@@ -141,9 +137,9 @@ static void uart_setup(void)
 
     /* Enable transmit and receive */
     uart_regs->cr2 |= UART_CR2_TX_EN;
-#if !SERIAL_TX_ONLY
-    uart_regs->cr2 |= UART_CR2_RX_EN;
-#endif
+    if (config.rx_enabled) {
+        uart_regs->cr2 |= UART_CR2_RX_EN;
+    }
 
     /* Configure stop bit length to 1 */
     uart_regs->cr2 &= ~(UART_CR2_STOP_BITS);
@@ -152,7 +148,7 @@ static void uart_setup(void)
     uart_regs->cr2 |= UART_CR2_WORD_SZE;
 
     /* Configure the reference clock and baud rate. Difficult to use automatic detection here as it requires the next incoming character to be 'a' or 'A'. */
-    set_baud(UART_DEFAULT_BAUD);
+    set_baud(config.default_baud);
 
     /* Disable escape sequence, parity checking and aging rx data interrupts. */
     uart_regs->cr2 &= ~UART_CR2_PARITY_EN;
@@ -161,47 +157,44 @@ static void uart_setup(void)
 
     uint32_t fcr = uart_regs->fcr;
     /* Enable receive interrupts every byte */
-#if !SERIAL_TX_ONLY
-    fcr &= ~UART_FCR_RXTL_MASK;
-    fcr |= (1 << UART_FCR_RXTL_SHFT);
-#endif
+    if (config.rx_enabled) {
+        fcr &= ~UART_FCR_RXTL_MASK;
+        fcr |= (1 << UART_FCR_RXTL_SHFT);
+    }
 
     /* Enable transmit interrupts if the write fifo drops below one byte - used when the write fifo becomes full */
     fcr &= ~UART_FCR_TXTL_MASK;
     fcr |= (2 << UART_FCR_TXTL_SHFT);
 
     uart_regs->fcr = fcr;
-#if !SERIAL_TX_ONLY
-    uart_regs->cr1 |= UART_CR1_RX_READY_INT;
-#endif
+    if (config.rx_enabled) {
+        uart_regs->cr1 |= UART_CR1_RX_READY_INT;
+    }
 }
 
 void init(void)
 {
+    sddf_memcpy(&config, serial_driver_data, serial_driver_data_len);
+
     uart_setup();
 
-#if !SERIAL_TX_ONLY
-    serial_queue_init(&rx_queue_handle, rx_queue, SERIAL_RX_DATA_REGION_CAPACITY_DRIV, rx_data);
-#endif
-    serial_queue_init(&tx_queue_handle, tx_queue, SERIAL_TX_DATA_REGION_CAPACITY_DRIV, tx_data);
+    if (config.rx_enabled) {
+        serial_queue_init(&rx_queue_handle, config.rx_queue, config.rx_capacity, config.rx_data);
+    }
+    serial_queue_init(&tx_queue_handle, config.tx_queue, config.tx_capacity, config.tx_data);
 }
 
 void notified(microkit_channel ch)
 {
-    switch (ch) {
-    case IRQ_CH:
+    if (ch == IRQ_CH) {
         handle_irq();
         microkit_deferred_irq_ack(ch);
-        break;
-    case TX_CH:
+    } else if (ch == config.tx_id) {
         tx_provide();
-        break;
-    case RX_CH:
+    } else if (ch == config.rx_id) {
         uart_regs->cr1 |= UART_CR1_RX_READY_INT;
         rx_return();
-        break;
-    default:
+    } else {
         sddf_dprintf("UART|LOG: received notification on unexpected channel: %u\n", ch);
-        break;
     }
 }
