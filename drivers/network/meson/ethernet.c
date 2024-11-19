@@ -6,6 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <microkit.h>
+#include <sddf/device/resources.h>
 #include <sddf/network/queue.h>
 #include <sddf/network/config.h>
 #include <sddf/util/fence.h>
@@ -14,9 +15,9 @@
 
 #include "ethernet.h"
 #include "net_driver_config.h"
+#include "device_resources.h"
 
-#define IRQ_CH 0
-
+device_resources_t device_resources;
 net_driver_config_t config;
 
 #define RX_COUNT 256
@@ -225,6 +226,7 @@ static void handle_irq()
 
 static void eth_setup(void)
 {
+    eth_mac = device_resources.regions[0].vaddr;
     eth_dma = (void *)((uintptr_t)eth_mac + DMA_REG_OFFSET);
     uint32_t l = eth_mac->macaddr0lo;
     uint32_t h = eth_mac->macaddr0hi;
@@ -269,6 +271,7 @@ static void eth_setup(void)
 void init(void)
 {
     sddf_memcpy(&config, net_driver_data, net_driver_data_len);
+    sddf_memcpy(&device_resources, device_resources_data, device_resources_data_len);
 
     eth_setup();
 
@@ -288,12 +291,12 @@ void init(void)
     eth_mac->conf |= RX_ENABLE | TX_ENABLE;
     eth_dma->opmode |= TXSTART | RXSTART;
 
-    microkit_irq_ack(IRQ_CH);
+    microkit_irq_ack(device_resources.irqs[0].id);
 }
 
 void notified(microkit_channel ch)
 {
-    if (ch == IRQ_CH) {
+    if (ch == device_resources.irqs[0].id) {
         handle_irq();
         microkit_deferred_irq_ack(ch);
     } else if (ch == config.rx_id) {
