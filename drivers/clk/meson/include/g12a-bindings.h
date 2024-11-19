@@ -290,4 +290,6 @@
 #define CLKID_MIPI_ISP_CSI_PHY0			277
 #define CLKID_MIPI_ISP_CSI_PHY1			278
 
+#define CLKID_G12A_XTAL			279
+
 #endif /* __G12A_CLKC_H */

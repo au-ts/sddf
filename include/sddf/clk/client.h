@@ -79,3 +79,38 @@ static inline int sddf_clk_set_rate(microkit_channel channel, uint32_t clk_id, u
     *rate = microkit_mr_get(0);
     return (int)microkit_msginfo_get_label(msginfo);
 }
+
+/**
+ * Send a clock get_parent request via PPC into the passive clock driver.
+ * Use the label to indicate this request.
+ * @param channel of clock driver.
+ * @param pointer to result (i.e. pclk_id)
+ */
+static inline int sddf_clk_get_parent(microkit_channel channel, uint32_t clk_id, uint32_t *pclk_id)
+{
+    microkit_msginfo msginfo = microkit_msginfo_new(SDDF_CLK_GET_PARENT, 1);
+    microkit_mr_set(SDDF_CLK_PARAM_ID, clk_id);
+
+    msginfo = microkit_ppcall(channel, msginfo);
+
+    *pclk_id = microkit_mr_get(0);
+    return (int)microkit_msginfo_get_label(msginfo);
+}
+
+/**
+ * Send a clock set_parent request via PPC into the passive clock driver.
+ * Use the label to indicate this request.
+ * @param channel of clock driver.
+ * @param identifier of target clock.
+ * @param indice of target clock.
+ */
+static inline int sddf_clk_set_parent(microkit_channel channel, uint32_t clk_id, uint32_t parent_idx)
+{
+    microkit_msginfo msginfo = microkit_msginfo_new(SDDF_CLK_SET_PARENT, 2);
+    microkit_mr_set(SDDF_CLK_PARAM_ID, clk_id);
+    microkit_mr_set(SDDF_CLK_PARAM_PCLK_IDX, parent_idx);
+
+    msginfo = microkit_ppcall(channel, msginfo);
+
+    return (int)microkit_msginfo_get_label(msginfo);
+}

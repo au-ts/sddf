@@ -20,14 +20,14 @@
 #include <clk-operations.h>
 #include <sddf/util/util.h>
 
-const struct clk g12a_xtal = { .data =
-                                   &(struct clk_source_data) {
-                                       .rate = 24000000,
-                                   },
-                               .hw.init = &(struct clk_init_data) {
-                                   .name = "xtal",
-                                   .ops = &clk_source_ops,
-                               } };
+static struct clk g12a_xtal = { .data =
+                                    &(struct clk_source_data) {
+                                        .rate = 24000000,
+                                    },
+                                .hw.init = &(struct clk_init_data) {
+                                    .name = "xtal",
+                                    .ops = &clk_source_ops,
+                                } };
 
 static struct clk g12a_fixed_pll_dco = {
     .data = &(struct meson_clk_pll_data){
@@ -746,15 +746,15 @@ static const struct clk_parent_data g12a_sd_emmc_clk0_parent_data[] = {
     { .clk = &g12a_fclk_div5 },
     { .clk = &g12a_fclk_div7 },
 };
-static CLK_MUX(g12a_sd_emmc_a_clk0_sel, HHI_SD_EMMC_CLK_CNTL, 0x7, 9, 0, 0, g12a_sd_emmc_clk0_parent_data, 0,
+static CLK_MUX(g12a_sd_emmc_a_clk0_sel, HHI_SD_EMMC_CLK_CNTL, 0x7, 9, 0, 0, g12a_sd_emmc_clk0_parent_data, 5,
                CLK_SET_RATE_PARENT);
 static CLK_DIV(g12a_sd_emmc_a_clk0_div, HHI_SD_EMMC_CLK_CNTL, 0, 7, 0, { &g12a_sd_emmc_a_clk0_sel }, 1, 0);
 static CLK_GATE(g12a_sd_emmc_a_clk0, HHI_SD_EMMC_CLK_CNTL, 7, 0, { &g12a_sd_emmc_a_clk0_div }, 1, 0);
-static CLK_MUX(g12a_sd_emmc_b_clk0_sel, HHI_SD_EMMC_CLK_CNTL, 0x7, 25, 0, 0, g12a_sd_emmc_clk0_parent_data, 0,
+static CLK_MUX(g12a_sd_emmc_b_clk0_sel, HHI_SD_EMMC_CLK_CNTL, 0x7, 25, 0, 0, g12a_sd_emmc_clk0_parent_data, 5,
                CLK_SET_RATE_PARENT);
 static CLK_DIV(g12a_sd_emmc_b_clk0_div, HHI_SD_EMMC_CLK_CNTL, 16, 7, 0, { &g12a_sd_emmc_b_clk0_sel }, 1, 0);
 static CLK_GATE(g12a_sd_emmc_b_clk0, HHI_SD_EMMC_CLK_CNTL, 23, 0, { &g12a_sd_emmc_b_clk0_div }, 1, 0);
-static CLK_MUX(g12a_sd_emmc_c_clk0_sel, HHI_NAND_CLK_CNTL, 0x7, 9, 0, 0, g12a_sd_emmc_clk0_parent_data, 0,
+static CLK_MUX(g12a_sd_emmc_c_clk0_sel, HHI_NAND_CLK_CNTL, 0x7, 9, 0, 0, g12a_sd_emmc_clk0_parent_data, 5,
                CLK_SET_RATE_PARENT);
 static CLK_DIV(g12a_sd_emmc_c_clk0_div, HHI_NAND_CLK_CNTL, 0, 7, 0, { &g12a_sd_emmc_c_clk0_sel }, 1, 0);
 static CLK_GATE(g12a_sd_emmc_c_clk0, HHI_NAND_CLK_CNTL, 7, 0, { &g12a_sd_emmc_c_clk0_div }, 1, 0);
@@ -852,16 +852,16 @@ static const struct clk_parent_data g12a_vdec_parent_table[] = {
     },
 };
 
-static CLK_MUX(g12a_vdec_1_sel, HHI_VDEC_CLK_CNTL, 0x7, 9, 0, CLK_MUX_ROUND_CLOSEST, g12a_vdec_parent_table, 0,
+static CLK_MUX(g12a_vdec_1_sel, HHI_VDEC_CLK_CNTL, 0x7, 9, 0, CLK_MUX_ROUND_CLOSEST, g12a_vdec_parent_table, 7,
                CLK_SET_RATE_PARENT);
 static CLK_DIV(g12a_vdec_1_div, HHI_VDEC_CLK_CNTL, 0, 7, CLK_DIVIDER_ROUND_CLOSEST, { &g12a_vdec_1_sel }, 1, 0);
 static CLK_GATE(g12a_vdec_1, HHI_VDEC_CLK_CNTL, 8, 0, { &g12a_vdec_1_div }, 1, 0);
-static CLK_MUX(g12a_vdec_hevcf_sel, HHI_VDEC2_CLK_CNTL, 0x7, 9, 0, CLK_MUX_ROUND_CLOSEST, g12a_vdec_parent_table, 0,
+static CLK_MUX(g12a_vdec_hevcf_sel, HHI_VDEC2_CLK_CNTL, 0x7, 9, 0, CLK_MUX_ROUND_CLOSEST, g12a_vdec_parent_table, 7,
                CLK_SET_RATE_PARENT);
 static CLK_DIV(g12a_vdec_hevcf_div, HHI_VDEC2_CLK_CNTL, 0, 7, CLK_DIVIDER_ROUND_CLOSEST, { &g12a_vdec_hevcf_sel }, 1,
                0);
 static CLK_GATE(g12a_vdec_hevcf, HHI_VDEC2_CLK_CNTL, 8, 0, { &g12a_vdec_hevcf_div }, 1, 0);
-static CLK_MUX(g12a_vdec_hevc_sel, HHI_VDEC2_CLK_CNTL, 0x7, 25, 0, CLK_MUX_ROUND_CLOSEST, g12a_vdec_parent_table, 0,
+static CLK_MUX(g12a_vdec_hevc_sel, HHI_VDEC2_CLK_CNTL, 0x7, 25, 0, CLK_MUX_ROUND_CLOSEST, g12a_vdec_parent_table, 7,
                CLK_SET_RATE_PARENT);
 static CLK_DIV(g12a_vdec_hevc_div, HHI_VDEC2_CLK_CNTL, 16, 7, CLK_DIVIDER_ROUND_CLOSEST, { &g12a_vdec_hevc_sel }, 1, 0);
 static CLK_GATE(g12a_vdec_hevc, HHI_VDEC2_CLK_CNTL, 24, 0, { &g12a_vdec_hevc_div }, 1, 0);
@@ -891,10 +891,10 @@ static const struct clk_parent_data g12a_vapb_parent_table[] = {
         .clk = &g12a_fclk_div2p5,
     },
 };
-static CLK_MUX(g12a_vapb_0_sel, HHI_VAPBCLK_CNTL, 0x3, 9, 0, 0, g12a_vapb_parent_table, 0, CLK_SET_RATE_NO_REPARENT);
+static CLK_MUX(g12a_vapb_0_sel, HHI_VAPBCLK_CNTL, 0x3, 9, 0, 0, g12a_vapb_parent_table, 8, CLK_SET_RATE_NO_REPARENT);
 static CLK_DIV(g12a_vapb_0_div, HHI_VAPBCLK_CNTL, 0, 7, 0, { &g12a_vapb_0_sel }, 1, 0);
 static CLK_GATE(g12a_vapb_0, HHI_VAPBCLK_CNTL, 8, 0, { &g12a_vapb_0_div }, 1, 0);
-static CLK_MUX(g12a_vapb_1_sel, HHI_VAPBCLK_CNTL, 0x3, 25, 0, 0, g12a_vapb_parent_table, 0, CLK_SET_RATE_NO_REPARENT);
+static CLK_MUX(g12a_vapb_1_sel, HHI_VAPBCLK_CNTL, 0x3, 25, 0, 0, g12a_vapb_parent_table, 8, CLK_SET_RATE_NO_REPARENT);
 static CLK_DIV(g12a_vapb_1_div, HHI_VAPBCLK_CNTL, 16, 7, 0, { &g12a_vapb_1_sel }, 1, 0);
 static CLK_GATE(g12a_vapb_1, HHI_VAPBCLK_CNTL, 24, 0, { &g12a_vapb_1_div }, 1, 0);
 const struct clk_parent_data g12a_vapb_sel_parent_table[] = {
@@ -929,9 +929,9 @@ static const struct clk_parent_data g12a_vclk_parent_table[] = {
         .clk = &g12a_fclk_div7,
     },
 };
-static CLK_MUX(g12a_vclk_sel, HHI_VID_CLK_CNTL, 0x7, 16, 0, 0, g12a_vclk_parent_table, 0,
+static CLK_MUX(g12a_vclk_sel, HHI_VID_CLK_CNTL, 0x7, 16, 0, 0, g12a_vclk_parent_table, 8,
                CLK_SET_RATE_NO_REPARENT | CLK_GET_RATE_NOCACHE);
-static CLK_MUX(g12a_vclk2_sel, HHI_VIID_CLK_CNTL, 0x7, 16, 0, 0, g12a_vclk_parent_table, 0, CLK_SET_RATE_NO_REPARENT);
+static CLK_MUX(g12a_vclk2_sel, HHI_VIID_CLK_CNTL, 0x7, 16, 0, 0, g12a_vclk_parent_table, 8, CLK_SET_RATE_NO_REPARENT);
 static CLK_GATE(g12a_vclk_input, HHI_VID_CLK_DIV, 16, 0, { &g12a_vclk_sel }, 1, 0);
 static CLK_GATE(g12a_vclk2_input, HHI_VIID_CLK_DIV, 16, 0, { &g12a_vclk2_sel }, 1, 0);
 static CLK_DIV(g12a_vclk_div, HHI_VID_CLK_DIV, 0, 8, 0, { &g12a_vclk_input }, 1, 0);
@@ -1168,10 +1168,10 @@ static const struct clk_parent_data spicc_sclk_parent_data[] = {
     { .clk = &g12a_fclk_div7 },
 };
 
-static CLK_MUX(g12a_spicc0_sclk_sel, HHI_SPICC_CLK_CNTL, 7, 7, 0, 0, spicc_sclk_parent_data, 0, 0);
+static CLK_MUX(g12a_spicc0_sclk_sel, HHI_SPICC_CLK_CNTL, 7, 7, 0, 0, spicc_sclk_parent_data, 6, 0);
 static CLK_DIV(g12a_spicc0_sclk_div, HHI_SPICC_CLK_CNTL, 0, 6, 0, { &g12a_spicc0_sclk_sel }, 1, 0);
 static CLK_GATE(g12a_spicc0_sclk, HHI_SPICC_CLK_CNTL, 6, 0, { &g12a_spicc0_sclk_div }, 1, 0);
-static CLK_MUX(g12a_spicc1_sclk_sel, HHI_SPICC_CLK_CNTL, 7, 23, 0, 0, spicc_sclk_parent_data, 0, 0);
+static CLK_MUX(g12a_spicc1_sclk_sel, HHI_SPICC_CLK_CNTL, 7, 23, 0, 0, spicc_sclk_parent_data, 6, 0);
 static CLK_DIV(g12a_spicc1_sclk_div, HHI_SPICC_CLK_CNTL, 16, 6, 0, { &g12a_spicc1_sclk_sel }, 1, 0);
 static CLK_GATE(g12a_spicc1_sclk, HHI_SPICC_CLK_CNTL, 22, 0, { &g12a_spicc1_sclk_div }, 1, 0);
 static const struct clk_parent_data nna_clk_parent_data[] = {
@@ -1198,10 +1198,10 @@ static const struct clk_parent_data nna_clk_parent_data[] = {
     },
     { .clk = &g12a_fclk_div7 },
 };
-static CLK_MUX(sm1_nna_axi_clk_sel, HHI_NNA_CLK_CNTL, 7, 9, 0, 0, nna_clk_parent_data, 0, 0);
+static CLK_MUX(sm1_nna_axi_clk_sel, HHI_NNA_CLK_CNTL, 7, 9, 0, 0, nna_clk_parent_data, 8, 0);
 static CLK_DIV(sm1_nna_axi_clk_div, HHI_NNA_CLK_CNTL, 0, 7, 0, { &sm1_nna_axi_clk_sel }, 1, 0);
 static CLK_GATE(sm1_nna_axi_clk, HHI_NNA_CLK_CNTL, 8, 0, { &sm1_nna_axi_clk_div }, 1, 0);
-static CLK_MUX(sm1_nna_core_clk_sel, HHI_NNA_CLK_CNTL, 7, 25, 0, 0, nna_clk_parent_data, 0, 0);
+static CLK_MUX(sm1_nna_core_clk_sel, HHI_NNA_CLK_CNTL, 7, 25, 0, 0, nna_clk_parent_data, 8, 0);
 static CLK_DIV(sm1_nna_core_clk_div, HHI_NNA_CLK_CNTL, 16, 7, 0, { &sm1_nna_core_clk_sel }, 1, 0);
 static CLK_GATE(sm1_nna_core_clk, HHI_NNA_CLK_CNTL, 24, 0, { &sm1_nna_core_clk_div }, 1, 0);
 
@@ -1525,6 +1525,7 @@ static struct clk *sm1_clks[] = {
     [CLKID_MIPI_DSI_PXCLK_SEL] = &g12a_mipi_dsi_pxclk_sel,
     [CLKID_MIPI_DSI_PXCLK_DIV] = &g12a_mipi_dsi_pxclk_div,
     [CLKID_MIPI_DSI_PXCLK] = &g12a_mipi_dsi_pxclk,
+    [CLKID_G12A_XTAL] = &g12a_xtal,
 };
 
 struct clk **get_clk_list(void)

@@ -173,7 +173,7 @@ const struct clk_ops clk_divider_ro_ops = {
     /* .determine_rate = clk_div_determine_rate, */
 };
 
-static inline uint8_t clk_mux_get_parent(const struct clk *clk)
+static inline int clk_mux_get_parent(const struct clk *clk, uint8_t *index)
 {
     struct clk_mux_data *data = (struct clk_mux_data *)(clk->data);
     uint32_t num_parents = clk->hw.init->num_parents;
@@ -182,11 +182,12 @@ static inline uint8_t clk_mux_get_parent(const struct clk *clk)
     if (data->table) {
         int i;
         for (i = 0; i < num_parents; i++) {
-            if (data->table[i] == val)
-                return i;
+            if (data->table[i] == val) {
+                *index = i;
+                return 0;
+            }
         }
-        return -1;
-        /* return -EINVAL; */
+        return CLK_UNKNOWN_TARGET;
     }
 
     /* if (val && (flags & CLK_MUX_INDEX_BIT)) */
@@ -196,10 +197,9 @@ static inline uint8_t clk_mux_get_parent(const struct clk *clk)
     /*     val--; */
 
     if (val >= num_parents)
-        /* return -EINVAL; */
-        return -1;
+        return CLK_UNKNOWN_TARGET;
 
-    /* return val; */
+    *index = val;
     return 0;
 }
 
@@ -209,11 +209,10 @@ static inline int clk_mux_set_parent(struct clk *clk, uint8_t index)
 
     if (data->table) {
         uint32_t val = data->table[index];
-        regmap_update_bits(clk->base, data->offset, data->shift, data->mask, val);
+        return regmap_update_bits(clk->base, data->offset, data->shift, data->mask, val);
     }
-    regmap_update_bits(clk->base, data->offset, data->shift, data->mask, index);
 
-    return 0;
+    return regmap_update_bits(clk->base, data->offset, data->shift, data->mask, index);
 }
 
 const struct clk_ops clk_mux_ops = {

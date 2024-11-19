@@ -67,20 +67,59 @@ void init(void)
         sddf_dprintf("The rate of clock %u: %lu\n", clk_id_to_get_rate, rate);
     }
 
+    uint32_t clk_id_to_test_parent = 63;
+    uint32_t parent_id = 0;
+    ret = sddf_clk_get_parent(CLK_DRIVER_CH, clk_id_to_test_parent, &parent_id);
+    if (ret) {
+        sddf_dprintf("Failed to get the parent of clock %u: err - %d\n", clk_id_to_test_parent, ret);
+    } else {
+        sddf_dprintf("The parent of clock %u: %u\n", clk_id_to_test_parent, parent_id);
+    }
+
+    uint32_t pclk_idx = 3;
+    ret = sddf_clk_set_parent(CLK_DRIVER_CH, clk_id_to_test_parent, pclk_idx);
+    if (ret) {
+        sddf_dprintf("Failed to set the parent of clock %u: err - %d\n", clk_id_to_test_parent, ret);
+    } else {
+        ret = sddf_clk_get_parent(CLK_DRIVER_CH, clk_id_to_test_parent, &parent_id);
+        sddf_dprintf("The parent of clock %u has been set to: %u\n", clk_id_to_test_parent, parent_id);
+    }
+
 #elif TEST_BOARD_maaxboard
     sddf_dprintf("Test board: maaxboard\n");
+    int ret = 0;
 
     /**
      * IMX8MQ_CLK_SAI1_ROOT = 196
+     * IMX8MQ_CLK_I2C1      = 144
      *
      * see `sddf/drivers/clk/imx/include/imx8mq-bindings.h` for more clock indices.
      * */
+
     uint32_t clk_id_to_enable = 196;
-    int ret = sddf_clk_enable(CLK_DRIVER_CH, clk_id_to_enable);
+    ret = sddf_clk_enable(CLK_DRIVER_CH, clk_id_to_enable);
     if (ret) {
         sddf_dprintf("Failed to enable clock %u: err - %d\n", clk_id_to_enable, ret);
     } else {
         sddf_dprintf("Successfully enabled clock %u\n", clk_id_to_enable);
+    }
+
+    uint32_t clk_id_to_test_parent = 144;
+    uint32_t parent_id = 0;
+    ret = sddf_clk_get_parent(CLK_DRIVER_CH, clk_id_to_test_parent, &parent_id);
+    if (ret) {
+        sddf_dprintf("Failed to get the parent of clock %u: err - %d\n", clk_id_to_test_parent, ret);
+    } else {
+        sddf_dprintf("The parent of clock %u: %u\n", clk_id_to_test_parent, parent_id);
+    }
+
+    uint32_t pclk_idx = 3;
+    ret = sddf_clk_set_parent(CLK_DRIVER_CH, clk_id_to_test_parent, pclk_idx);
+    if (ret) {
+        sddf_dprintf("Failed to set the parent of clock %u: err - %d\n", clk_id_to_test_parent, ret);
+    } else {
+        ret = sddf_clk_get_parent(CLK_DRIVER_CH, clk_id_to_test_parent, &parent_id);
+        sddf_dprintf("The parent of clock %u has been set to: %u\n", clk_id_to_test_parent, parent_id);
     }
 
 #else
