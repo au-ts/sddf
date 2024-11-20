@@ -4,7 +4,6 @@
  */
 
 #include <string.h>
-#include <microkit.h>
 
 #include "echo.h"
 #include "lwip/ip.h"
