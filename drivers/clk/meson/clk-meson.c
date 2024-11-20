@@ -73,24 +73,11 @@
 #include <clk_utils.h>
 #include <clk-operations.h>
 #include <clk-meson.h>
-#include <sddf/timer/client.h>
 #include <sddf/util/printf.h>
-
-#define TIMER_CH 1
 
 static inline uint32_t meson_parm_read(uint64_t base, struct parm parm)
 {
     return regmap_read_bits(base, parm.reg_off, parm.shift, MASK(parm.width));
-}
-
-/* TODO: Replace this doggy delay() with a standard interface */
-void delay_us(uint32_t us)
-{
-    uint64_t start_time = sddf_timer_time_now(TIMER_CH);
-    uint64_t now_time = start_time;
-    while (now_time - start_time < us) {
-        now_time = sddf_timer_time_now(TIMER_CH);
-    }
 }
 
 int regmap_multi_reg_write(uint64_t base, const struct reg_sequence *regs, int num_regs)
@@ -185,13 +172,15 @@ static int meson_clk_pll_disable(struct clk *clk)
     return 0;
 }
 
-const struct clk_ops meson_clk_pll_ops = { .init = meson_clk_pll_init,
-                                           .recalc_rate = meson_clk_pll_recalc_rate,
+const struct clk_ops meson_clk_pll_ops = {
+    .init = meson_clk_pll_init,
+    .recalc_rate = meson_clk_pll_recalc_rate,
     /* .determine_rate = meson_clk_pll_determine_rate, */
     /* .set_rate       = meson_clk_pll_set_rate, */
-                                           .is_enabled = meson_clk_pll_is_enabled,
-                                           .enable = meson_clk_pll_enable,
-                                           .disable = meson_clk_pll_disable };
+    .is_enabled = meson_clk_pll_is_enabled,
+    .enable = meson_clk_pll_enable,
+    .disable = meson_clk_pll_disable,
+};
 
 const struct clk_ops meson_clk_pll_ro_ops = {
     .recalc_rate = meson_clk_pll_recalc_rate,
@@ -293,12 +282,14 @@ static int meson_clk_pcie_pll_enable(struct clk *clk)
     return -1;
 }
 
-const struct clk_ops meson_clk_pcie_pll_ops = { .init = meson_clk_pll_init,
-                                                .recalc_rate = meson_clk_pll_recalc_rate,
+const struct clk_ops meson_clk_pcie_pll_ops = {
+    .init = meson_clk_pll_init,
+    .recalc_rate = meson_clk_pll_recalc_rate,
     /* .determine_rate    = meson_clk_pll_determine_rate, */
-                                                .is_enabled = meson_clk_pll_is_enabled,
-                                                .enable = meson_clk_pcie_pll_enable,
-                                                .disable = meson_clk_pll_disable };
+    .is_enabled = meson_clk_pll_is_enabled,
+    .enable = meson_clk_pcie_pll_enable,
+    .disable = meson_clk_pll_disable,
+};
 
 struct vid_pll_div {
     unsigned int shift_val;

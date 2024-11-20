@@ -293,16 +293,15 @@ void init(void)
             }
         }
 
-        /* TODO: Set rate for the target clock */
-        /* if (clk_configs[i].frequency > 0) { */
-        /*     LOG_DRIVER("set rate for %s\n", clk->hw.init->name); */
-        /*     uint64_t rate = 0; */
-        /*     uint32_t err = clk_set_rate(clk, clk_configs[i].frequency, &rate); */
-        /*     if (err) { */
-        /*         LOG_DRIVER_ERR("Failed to set rate [%d] for clk_id: %d\n", clk_configs[i].frequency, clk_configs[i].clk_id); */
-        /*     } */
-        /*     LOG_DRIVER("------------------\n"); */
-        /* } */
+        if (clk_configs[i].frequency > 0) {
+            LOG_DRIVER("set rate for %s\n", clk->hw.init->name);
+            uint64_t rate = 0;
+            uint32_t err = clk_set_rate(clk, clk_configs[i].frequency, &rate);
+            if (err) {
+                LOG_DRIVER_ERR("Failed to set rate [%d] for clk_id: %d\n", clk_configs[i].frequency,
+                               clk_configs[i].clk_id);
+            }
+        }
     }
 }
 

@@ -7,6 +7,8 @@
 
 #define MASK(width)  ((1UL << width) - 1)
 
+#define abs(x) ( ( (x) < 0) ? -(x) : (x) )
+
 #define DIV_ROUND_UP(n, d) (((n) + (d) - 1) / (d))
 
 #define do_div(n, base) ({                              \
