@@ -5,6 +5,7 @@
 
 #include <string.h>
 #include <microkit.h>
+#include <sel4/benchmark_utilisation_types.h>
 
 #include "lwip/ip.h"
 #include "lwip/pbuf.h"
@@ -21,7 +22,7 @@
 
 #define MAX_PACKET_SIZE 0x1000
 
-uintptr_t cyclecounters_vaddr;
+uintptr_t cyclecounters_vaddr = 0x5010000;
 
 /* This file implements a TCP based utilization measurment process that starts
  * and stops utilization measurements based on a client's requests.
@@ -137,18 +138,18 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
         error = tcp_write(pcb, OK, strlen(OK), TCP_WRITE_FLAG_COPY);
         if (error) sddf_dprintf("Failed to send OK message through utilization peer\n");
     } else if (msg_match(data_packet_str, START)) {
-        sddf_printf("%s measurement starting... \n", microkit_name);
-        if (!strcmp(microkit_name, "client0")) {
+        sddf_printf("%s measurement starting... \n", "client0");
+        if (!strcmp("client0", "client0")) {
             start = __atomic_load_n(&bench->ts, __ATOMIC_RELAXED);
             idle_ccount_start = __atomic_load_n(&bench->ccount, __ATOMIC_RELAXED);
             microkit_notify(START_PMU);
         }
     } else if (msg_match(data_packet_str, STOP)) {
-        sddf_printf("%s measurement finished \n", microkit_name);
+        sddf_printf("%s measurement finished \n", "client0");
 
         uint64_t total = 0, idle = 0;
 
-        if (!strcmp(microkit_name, "client0")) {
+        if (!strcmp("client0", "client0")) {
             total = __atomic_load_n(&bench->ts, __ATOMIC_RELAXED) - start;
             idle = __atomic_load_n(&bench->ccount, __ATOMIC_RELAXED) - idle_ccount_start;
         }
@@ -174,7 +175,7 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
         error = tcp_write(pcb, buffer, strlen(buffer) + 1, TCP_WRITE_FLAG_COPY);
         tcp_shutdown(pcb, 0, 1);
 
-        if (!strcmp(microkit_name, "client0")) microkit_notify(STOP_PMU);
+        if (!strcmp("client0", "client0")) microkit_notify(STOP_PMU);
     } else if (msg_match(data_packet_str, QUIT)) {
         /* Do nothing for now */
     } else {

@@ -35,6 +35,16 @@ else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
 	export TIMER_DRV_DIR := arm
 	export CPU := cortex-a53
 	QEMU := qemu-system-aarch64
+else ifeq ($(strip $(MICROKIT_BOARD)), vb_105)
+	export DRIV_DIR := ixgbe
+	export UART_DRIV_DIR := pc99
+	export TIMER_DRV_DIR := hpet
+	export TOOLCHAIN := zig
+	export CC := $(TOOLCHAIN) cc
+	export LD := $(TOOLCHAIN) cc
+	export AS := $(TOOLCHAIN) as
+	export AR := $(TOOLCHAIN) ar
+	export RANLIB := $(TOOLCHAIN) ranlib
 else
 $(error Unsupported MICROKIT_BOARD given)
 endif
@@ -42,11 +52,11 @@ endif
 export BUILD_DIR:=$(abspath ${BUILD_DIR})
 export MICROKIT_SDK:=$(abspath ${MICROKIT_SDK})
 
-export CC := $(TOOLCHAIN)-gcc
-export LD := $(TOOLCHAIN)-ld
-export AS := $(TOOLCHAIN)-as
-export AR := $(TOOLCHAIN)-ar
-export RANLIB := $(TOOLCHAIN)-ranlib
+# export CC := $(TOOLCHAIN)-gcc
+# export LD := $(TOOLCHAIN)-ld
+# export AS := $(TOOLCHAIN)-as
+# export AR := $(TOOLCHAIN)-ar
+# export RANLIB := $(TOOLCHAIN)-ranlib
 export MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 export SDDF=$(abspath ../..)
 export ECHO_INCLUDE:=$(abspath .)/include

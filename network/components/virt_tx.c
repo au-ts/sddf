@@ -13,14 +13,13 @@
 #define DRIVER 0
 #define CLIENT_CH 1
 
-net_queue_t *tx_free_drv;
-net_queue_t *tx_active_drv;
-net_queue_t *tx_free_cli0;
-net_queue_t *tx_active_cli0;
+net_queue_t *tx_free_drv = (net_queue_t *)0x2000000;
+net_queue_t *tx_active_drv = (net_queue_t *)0x2200000;
+net_queue_t *tx_free_cli0 = (net_queue_t *)0x2400000;
+net_queue_t *tx_active_cli0 = (net_queue_t *)0x2600000;
 
-uintptr_t buffer_data_region_cli0_vaddr;
-uintptr_t buffer_data_region_cli0_paddr;
-uintptr_t buffer_data_region_cli1_paddr;
+uintptr_t buffer_data_region_cli0_vaddr = 0x2c00000;
+uintptr_t buffer_data_region_cli0_paddr = 0x11200000;
 
 typedef struct state {
     net_queue_handle_t tx_queue_drv;
@@ -84,7 +83,7 @@ void tx_provide(void)
 
     if (enqueued && net_require_signal_active(&state.tx_queue_drv)) {
         net_cancel_signal_active(&state.tx_queue_drv);
-        microkit_deferred_notify(DRIVER);
+        microkit_notify_delayed(DRIVER);
     }
 }
 
@@ -137,8 +136,8 @@ void init(void)
     /* Setup client queues and state */
     net_queue_info_t queue_info[NUM_NETWORK_CLIENTS] = {0};
     uintptr_t client_vaddrs[NUM_NETWORK_CLIENTS] = {0};
-    net_virt_queue_info(microkit_name, tx_free_cli0, tx_active_cli0, queue_info);
-    net_mem_region_vaddr(microkit_name, client_vaddrs, buffer_data_region_cli0_vaddr);
+    net_virt_queue_info("net_virt_tx", tx_free_cli0, tx_active_cli0, queue_info);
+    net_mem_region_vaddr("net_virt_tx", client_vaddrs, buffer_data_region_cli0_vaddr);
 
     for (int i = 0; i < NUM_NETWORK_CLIENTS; i++) {
         net_queue_init(&state.tx_queue_clients[i], queue_info[i].free, queue_info[i].active, queue_info[i].capacity);

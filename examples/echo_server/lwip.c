@@ -12,7 +12,12 @@
 #include <sddf/network/util.h>
 #include <sddf/serial/queue.h>
 #include <sddf/timer/client.h>
-#include <sddf/benchmark/sel4bench.h>
+#ifdef CONFIG_ARCH_X86_64
+#include <sddf/benchmark/x86/sel4bench.h>
+#else
+#include <sddf/benchmark/arm/sel4bench.h>
+#endif
+#include <sddf/benchmark/bench.h>
 #include <serial_config.h>
 #include <ethernet_config.h>
 #include <string.h>
@@ -33,19 +38,19 @@
 #define RX_CH  2
 #define TX_CH  3
 
-char *serial_tx_data;
-serial_queue_t *serial_tx_queue;
+char *serial_tx_data = (char *)0x4001000;
+serial_queue_t *serial_tx_queue = (serial_queue_t *)0x4000000;
 serial_queue_handle_t serial_tx_queue_handle;
 
 #define LWIP_TICK_MS 100
 #define NUM_PBUFFS NET_MAX_CLIENT_QUEUE_CAPACITY
 
-net_queue_t *rx_free;
-net_queue_t *rx_active;
-net_queue_t *tx_free;
-net_queue_t *tx_active;
-uintptr_t rx_buffer_data_region;
-uintptr_t tx_buffer_data_region;
+net_queue_t *rx_free = (net_queue_t *)0x2000000;
+net_queue_t *rx_active = (net_queue_t *)0x2200000;
+net_queue_t *tx_free = (net_queue_t *)0x2400000;
+net_queue_t *tx_active = (net_queue_t *)0x2600000;
+uintptr_t rx_buffer_data_region = 0x2800000;
+uintptr_t tx_buffer_data_region = 0x2a00000;
 
 /* Booleans to indicate whether packets have been enqueued during notification handling */
 static bool notify_tx;
@@ -279,18 +284,18 @@ static err_t ethernet_init(struct netif *netif)
 static void netif_status_callback(struct netif *netif)
 {
     if (dhcp_supplied_address(netif)) {
-        sddf_printf("LWIP|NOTICE: DHCP request for %s returned IP address: %s\n", microkit_name,
+        sddf_printf("LWIP|NOTICE: DHCP request for %s returned IP address: %s\n", "client0",
                     ip4addr_ntoa(netif_ip4_addr(netif)));
     }
 }
 
 void init(void)
 {
-    serial_cli_queue_init_sys(microkit_name, NULL, NULL, NULL, &serial_tx_queue_handle, serial_tx_queue, serial_tx_data);
+    serial_cli_queue_init_sys("client0", NULL, NULL, NULL, &serial_tx_queue_handle, serial_tx_queue, serial_tx_data);
     serial_putchar_init(SERIAL_TX_CH, &serial_tx_queue_handle);
 
     size_t rx_capacity, tx_capacity;
-    net_cli_queue_capacity(microkit_name, &rx_capacity, &tx_capacity);
+    net_cli_queue_capacity("client0", &rx_capacity, &tx_capacity);
     net_queue_init(&state.rx_queue, rx_free, rx_active, rx_capacity);
     net_queue_init(&state.tx_queue, tx_free, tx_active, tx_capacity);
     net_buffers_init(&state.tx_queue, 0);
@@ -300,7 +305,7 @@ void init(void)
 
     LWIP_MEMPOOL_INIT(RX_POOL);
 
-    uint64_t mac_addr = net_cli_mac_addr(microkit_name);
+    uint64_t mac_addr = net_cli_mac_addr("client0");
     net_set_mac_addr(state.mac, mac_addr);
 
     /* Set dummy IP configuration values to get lwIP bootstrapped  */
@@ -333,9 +338,9 @@ void init(void)
     if (notify_rx && net_require_signal_free(&state.rx_queue)) {
         net_cancel_signal_free(&state.rx_queue);
         notify_rx = false;
-        if (!microkit_have_signal) {
-            microkit_deferred_notify(RX_CH);
-        } else if (microkit_signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + RX_CH) {
+        if (!have_signal) {
+            microkit_notify(RX_CH);
+        } else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + RX_CH) {
             microkit_notify(RX_CH);
         }
     }
@@ -343,9 +348,9 @@ void init(void)
     if (notify_tx && net_require_signal_active(&state.tx_queue)) {
         net_cancel_signal_active(&state.tx_queue);
         notify_tx = false;
-        if (!microkit_have_signal) {
-            microkit_deferred_notify(TX_CH);
-        } else if (microkit_signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + TX_CH) {
+        if (!have_signal) {
+            microkit_notify(TX_CH);
+        } else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + TX_CH) {
             microkit_notify(TX_CH);
         }
     }
@@ -376,9 +381,9 @@ void notified(microkit_channel ch)
     if (notify_rx && net_require_signal_free(&state.rx_queue)) {
         net_cancel_signal_free(&state.rx_queue);
         notify_rx = false;
-        if (!microkit_have_signal) {
-            microkit_deferred_notify(RX_CH);
-        } else if (microkit_signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + RX_CH) {
+        if (!have_signal) {
+            microkit_notify(RX_CH);
+        } else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + RX_CH) {
             microkit_notify(RX_CH);
         }
     }
@@ -386,9 +391,9 @@ void notified(microkit_channel ch)
     if (notify_tx && net_require_signal_active(&state.tx_queue)) {
         net_cancel_signal_active(&state.tx_queue);
         notify_tx = false;
-        if (!microkit_have_signal) {
-            microkit_deferred_notify(TX_CH);
-        } else if (microkit_signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + TX_CH) {
+        if (!have_signal) {
+            microkit_notify(TX_CH);
+        } else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + TX_CH) {
             microkit_notify(TX_CH);
         }
     }

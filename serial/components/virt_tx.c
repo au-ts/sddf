@@ -13,11 +13,11 @@
 #define DRIVER_CH 0
 #define CLIENT_OFFSET 1
 
-serial_queue_t *tx_queue_drv;
-serial_queue_t *tx_queue_cli0;
+serial_queue_t *tx_queue_drv = (serial_queue_t *)0x4000000;
+serial_queue_t *tx_queue_cli0 = (serial_queue_t *)0x4001000;
 
-char *tx_data_drv;
-char *tx_data_cli0;
+char *tx_data_drv = (char *)0x4004000;
+char *tx_data_cli0 = (char *)0x4008000;
 
 #if SERIAL_WITH_COLOUR
 
@@ -204,7 +204,7 @@ void tx_provide(microkit_channel ch)
 void init(void)
 {
     serial_queue_init(&tx_queue_handle_drv, tx_queue_drv, SERIAL_TX_DATA_REGION_CAPACITY_DRIV, tx_data_drv);
-    serial_virt_queue_init_sys(microkit_name, tx_queue_handle_cli, tx_queue_cli0, tx_data_cli0);
+    serial_virt_queue_init_sys("serial_virt_tx", tx_queue_handle_cli, tx_queue_cli0, tx_data_cli0);
 
 #if !SERIAL_TX_ONLY
     /* Print a deterministic string to allow console input to begin */

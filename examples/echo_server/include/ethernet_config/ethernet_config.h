@@ -10,7 +10,7 @@
 #include <sddf/network/queue.h>
 #include <sddf/util/util.h>
 
-#define NUM_NETWORK_CLIENTS 2
+#define NUM_NETWORK_CLIENTS 1
 
 #define NET_CLI0_NAME "client0"
 #define NET_CLI1_NAME "client1"
@@ -39,6 +39,9 @@
 #elif defined(CONFIG_PLAT_IMX8MP_EVK)
 #define MAC_ADDR_CLI0                       0x525401000009
 #define MAC_ADDR_CLI1                       0x52540100000A
+#elif defined(CONFIG_PLAT_PC99)
+#define MAC_ADDR_CLI0                       0x5254010000a5
+#define MAC_ADDR_CLI1                       0x5254010000a6
 #else
 #error "Must define MAC addresses for clients in ethernet config"
 #endif
@@ -98,7 +101,6 @@ static inline void net_virt_mac_addrs(char *pd_name, uint64_t macs[NUM_NETWORK_C
 {
     if (!sddf_strcmp(pd_name, NET_VIRT_RX_NAME)) {
         macs[0] = MAC_ADDR_CLI0;
-        macs[1] = MAC_ADDR_CLI1;
     }
 }
 
@@ -136,15 +138,9 @@ static inline void net_virt_queue_info(char *pd_name, net_queue_t *cli0_free, ne
     if (!sddf_strcmp(pd_name, NET_VIRT_RX_NAME)) {
         ret[0] =
             (net_queue_info_t) { .free = cli0_free, .active = cli0_active, .capacity = NET_RX_QUEUE_CAPACITY_COPY0 };
-        ret[1] = (net_queue_info_t) { .free = (net_queue_t *)((uintptr_t)cli0_free + 2 * NET_DATA_REGION_SIZE),
-                                      .active = (net_queue_t *)((uintptr_t)cli0_active + 2 * NET_DATA_REGION_SIZE),
-                                      .capacity = NET_RX_QUEUE_CAPACITY_COPY1 };
     } else if (!sddf_strcmp(pd_name, NET_VIRT_TX_NAME)) {
         ret[0] =
             (net_queue_info_t) { .free = cli0_free, .active = cli0_active, .capacity = NET_TX_QUEUE_CAPACITY_CLI0 };
-        ret[1] = (net_queue_info_t) { .free = (net_queue_t *)((uintptr_t)cli0_free + 2 * NET_DATA_REGION_SIZE),
-                                      .active = (net_queue_t *)((uintptr_t)cli0_active + 2 * NET_DATA_REGION_SIZE),
-                                      .capacity = NET_TX_QUEUE_CAPACITY_CLI1 };
     }
 }
 
@@ -153,6 +149,5 @@ static inline void net_mem_region_vaddr(char *pd_name, uintptr_t mem_regions[NUM
 {
     if (!sddf_strcmp(pd_name, NET_VIRT_TX_NAME)) {
         mem_regions[0] = start_region;
-        mem_regions[1] = start_region + NET_DATA_REGION_SIZE;
     }
 }

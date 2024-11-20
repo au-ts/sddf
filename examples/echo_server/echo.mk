@@ -27,14 +27,16 @@ REPORT_FILE := report.txt
 vpath %.c ${SDDF} ${ECHO_SERVER}
 
 IMAGES := eth_driver.elf lwip.elf benchmark.elf idle.elf network_virt_rx.elf\
-	  network_virt_tx.elf copy.elf timer_driver.elf uart_driver.elf serial_virt_tx.elf
+	  network_virt_tx.elf timer_driver.elf uart_driver.elf serial_virt_tx.elf
 
-CFLAGS := -mcpu=$(CPU) \
-	  -mstrict-align \
+TARGET := x86_64-freestanding
+CFLAGS := -target $(TARGET) \
+	  -nostdlib \
 	  -ffreestanding \
 	  -g3 -O3 -Wall \
 	  -Wno-unused-function \
 	  -DMICROKIT_CONFIG_$(MICROKIT_CONFIG) \
+	  -I${ECHO_INCLUDE}/libc \
 	  -I$(BOARD_DIR)/include \
 	  -I$(SDDF)/include \
 	  -I${ECHO_INCLUDE}/lwip \
@@ -45,8 +47,8 @@ CFLAGS := -mcpu=$(CPU) \
 	  -MD \
 	  -MP
 
-LDFLAGS := -L$(BOARD_DIR)/lib -L${LIBC}
-LIBS := --start-group -lmicrokit -Tmicrokit.ld -lc libsddf_util_debug.a --end-group
+LDFLAGS := -L$(BOARD_DIR)/lib -nostdlib -target $(TARGET)
+LIBS := -lmicrokit -Tmicrokit.ld $(SDDF)/lib/libc.a libsddf_util_debug.a
 
 CHECK_FLAGS_BOARD_MD5:=.board_cflags-$(shell echo -- ${CFLAGS} ${BOARD} ${MICROKIT_CONFIG} | shasum | sed 's/ *-//')
 
@@ -87,8 +89,7 @@ ${BUILD_DIR}/${LWIPDIRS}:
 ${IMAGES}: libsddf_util_debug.a
 
 ${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
-	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
-
+	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --capdl --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
 
 include ${SDDF}/util/util.mk
 include ${SDDF}/network/components/network_components.mk

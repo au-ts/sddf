@@ -23,14 +23,14 @@
 #define BROADCAST_ID (NUM_NETWORK_CLIENTS + 1)
 
 /* Queue regions */
-net_queue_t *rx_free_drv;
-net_queue_t *rx_active_drv;
-net_queue_t *rx_free_cli0;
-net_queue_t *rx_active_cli0;
+net_queue_t *rx_free_drv = (net_queue_t *)0x2000000;
+net_queue_t *rx_active_drv = (net_queue_t *)0x2200000;
+net_queue_t *rx_free_cli0 = (net_queue_t *)0x2400000;
+net_queue_t *rx_active_cli0 = (net_queue_t *)0x2600000;
 
 /* Buffer data regions */
-uintptr_t buffer_data_vaddr;
-uintptr_t buffer_data_paddr;
+uintptr_t buffer_data_vaddr = 0x2c00000;
+uintptr_t buffer_data_paddr = 0x11000000;
 
 /* In order to handle broadcast packets where the same buffer is given to multiple clients
   * we keep track of a reference count of each buffer and only hand it back to the driver once
@@ -190,7 +190,7 @@ void rx_provide(void)
 
     if (notify_drv && net_require_signal_free(&state.rx_queue_drv)) {
         net_cancel_signal_free(&state.rx_queue_drv);
-        microkit_deferred_notify(DRIVER_CH);
+        microkit_notify_delayed(DRIVER_CH);
         notify_drv = false;
     }
 }
@@ -206,8 +206,8 @@ void init(void)
     uint64_t macs[NUM_NETWORK_CLIENTS] = {0};
     net_queue_info_t queue_info[NUM_NETWORK_CLIENTS] = {0};
 
-    net_virt_mac_addrs(microkit_name, macs);
-    net_virt_queue_info(microkit_name, rx_free_cli0, rx_active_cli0, queue_info);
+    net_virt_mac_addrs("net_virt_rx", macs);
+    net_virt_queue_info("net_virt_rx", rx_free_cli0, rx_active_cli0, queue_info);
 
     /* Set up client queues */
     for (int i = 0; i < NUM_NETWORK_CLIENTS; i++) {
@@ -221,6 +221,6 @@ void init(void)
 
     if (net_require_signal_free(&state.rx_queue_drv)) {
         net_cancel_signal_free(&state.rx_queue_drv);
-        microkit_deferred_notify(DRIVER_CH);
+        microkit_notify_delayed(DRIVER_CH);
     }
 }

@@ -8,7 +8,11 @@
 #include <sel4/benchmark_track_types.h>
 #include <sel4/benchmark_utilisation_types.h>
 #include <sddf/benchmark/bench.h>
-#include <sddf/benchmark/sel4bench.h>
+#ifdef CONFIG_ARCH_X86_64
+#include <sddf/benchmark/x86/sel4bench.h>
+#else
+#include <sddf/benchmark/arm/sel4bench.h>
+#endif
 #include <sddf/serial/queue.h>
 #include <sddf/util/fence.h>
 #include <sddf/util/util.h>
@@ -27,22 +31,16 @@
 #define PD_ETH_ID       1
 #define PD_VIRT_RX_ID    2
 #define PD_VIRT_TX_ID    3
-#define PD_COPY_ID      4
-#define PD_COPY1_ID     5
-#define PD_LWIP_ID      6
-#define PD_LWIP1_ID     7
-#define PD_TIMER_ID     8
-
-uintptr_t uart_base;
-uintptr_t cyclecounters_vaddr;
+#define PD_LWIP_ID      4
+#define PD_TIMER_ID     5
 
 ccnt_t counter_values[8];
 counter_bitfield_t benchmark_bf;
 
 #define SERIAL_TX_CH 0
 
-char *serial_tx_data;
-serial_queue_t *serial_tx_queue;
+char *serial_tx_data = (char *)0x4002000;
+serial_queue_t *serial_tx_queue = (serial_queue_t *)0x4001000;
 serial_queue_handle_t serial_tx_queue_handle;
 
 #ifdef CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES
@@ -79,17 +77,8 @@ static void print_pdid_name(uint64_t pd_id)
     case PD_VIRT_TX_ID:
         sddf_printf(NET_VIRT_TX_NAME);
         break;
-    case PD_COPY_ID:
-        sddf_printf(NET_COPY0_NAME);
-        break;
-    case PD_COPY1_ID:
-        sddf_printf(NET_COPY1_NAME);
-        break;
     case PD_LWIP_ID:
         sddf_printf(NET_CLI0_NAME);
-        break;
-    case PD_LWIP1_ID:
-        sddf_printf(NET_CLI1_NAME);
         break;
     case PD_TIMER_ID:
         sddf_printf(NET_TIMER_NAME);
@@ -107,10 +96,7 @@ static void microkit_benchmark_start(void)
     seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_ETH_ID);
     seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_VIRT_RX_ID);
     seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_VIRT_TX_ID);
-    seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_COPY_ID);
-    seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_COPY1_ID);
     seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_LWIP_ID);
-    seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_LWIP1_ID);
     seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_TIMER_ID);
     seL4_BenchmarkResetLog();
 }
@@ -150,7 +136,7 @@ static void print_benchmark_details(uint64_t pd_id, uint64_t kernel_util, uint64
         sddf_printf(" (%lx)\n", pd_id);
     }
     sddf_printf("{\nKernelUtilisation:  %lx\nKernelEntries:  %lx\nNumberSchedules:  %lx\nTotalUtilisation:  %lx\n}\n",
-                kernel_util, kernel_entries, number_schedules, total_util);
+            kernel_util, kernel_entries, number_schedules, total_util);
 }
 #endif
 
@@ -202,9 +188,9 @@ void notified(microkit_channel ch)
     switch (ch) {
     case START:
 #ifdef MICROKIT_CONFIG_benchmark
-        sel4bench_reset_counters();
-        THREAD_MEMORY_RELEASE();
-        sel4bench_start_counters(benchmark_bf);
+            sel4bench_reset_counters();
+            THREAD_MEMORY_RELEASE();
+            sel4bench_start_counters(benchmark_bf);
 
 #ifdef CONFIG_BENCHMARK_TRACK_UTILISATION
         microkit_benchmark_start();
@@ -245,17 +231,8 @@ void notified(microkit_channel ch)
         microkit_benchmark_stop_tcb(PD_VIRT_TX_ID, &total, &number_schedules, &kernel, &entries);
         print_benchmark_details(PD_VIRT_TX_ID, kernel, entries, number_schedules, total);
 
-        microkit_benchmark_stop_tcb(PD_COPY_ID, &total, &number_schedules, &kernel, &entries);
-        print_benchmark_details(PD_COPY_ID, kernel, entries, number_schedules, total);
-
-        microkit_benchmark_stop_tcb(PD_COPY1_ID, &total, &number_schedules, &kernel, &entries);
-        print_benchmark_details(PD_COPY1_ID, kernel, entries, number_schedules, total);
-
         microkit_benchmark_stop_tcb(PD_LWIP_ID, &total, &number_schedules, &kernel, &entries);
         print_benchmark_details(PD_LWIP_ID, kernel, entries, number_schedules, total);
-
-        microkit_benchmark_stop_tcb(PD_LWIP1_ID, &total, &number_schedules, &kernel, &entries);
-        print_benchmark_details(PD_LWIP1_ID, kernel, entries, number_schedules, total);
 
         microkit_benchmark_stop_tcb(PD_TIMER_ID, &total, &number_schedules, &kernel, &entries);
         print_benchmark_details(PD_TIMER_ID, kernel, entries, number_schedules, total);
@@ -278,7 +255,7 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
-    serial_cli_queue_init_sys(microkit_name, NULL, NULL, NULL, &serial_tx_queue_handle, serial_tx_queue, serial_tx_data);
+    serial_cli_queue_init_sys("bench", NULL, NULL, NULL, &serial_tx_queue_handle, serial_tx_queue, serial_tx_data);
     serial_putchar_init(SERIAL_TX_CH, &serial_tx_queue_handle);
 #ifdef MICROKIT_CONFIG_benchmark
     sel4bench_init();
@@ -314,43 +291,43 @@ void init(void)
 #endif
 }
 
-seL4_Bool fault(microkit_child id, microkit_msginfo msginfo, microkit_msginfo *reply_msginfo)
+void fault(microkit_channel id, microkit_msginfo msginfo)
 {
     sddf_printf("BENCH|LOG: Faulting PD ");
     print_pdid_name(id);
     sddf_printf(" (%x)\n", id);
 
-    seL4_UserContext regs;
-    seL4_TCB_ReadRegisters(BASE_TCB_CAP + id, false, 0, sizeof(seL4_UserContext) / sizeof(seL4_Word), &regs);
-    sddf_printf("Registers: \npc : %lx\nspsr : %lx\nx0 : %lx\nx1 : %lx\nx2 : %lx\nx3 : %lx\nx4 : %lx\nx5 : %lx\nx6 : %lx\nx7 : %lx\n",
-                regs.pc, regs.spsr, regs.x0, regs.x1, regs.x2, regs.x3, regs.x4, regs.x5, regs.x6, regs.x7);
+    // seL4_UserContext regs;
+    // seL4_TCB_ReadRegisters(BASE_TCB_CAP + id, false, 0, sizeof(seL4_UserContext) / sizeof(seL4_Word), &regs);
+    // sddf_printf("Registers: \npc : %lx\nspsr : %lx\nx0 : %lx\nx1 : %lx\nx2 : %lx\nx3 : %lx\nx4 : %lx\nx5 : %lx\nx6 : %lx\nx7 : %lx\n",
+    //             regs.pc, regs.spsr, regs.x0, regs.x1, regs.x2, regs.x3, regs.x4, regs.x5, regs.x6, regs.x7);
 
-    switch (microkit_msginfo_get_label(msginfo)) {
-    case seL4_Fault_CapFault: {
-        uint64_t ip = seL4_GetMR(seL4_CapFault_IP);
-        uint64_t fault_addr = seL4_GetMR(seL4_CapFault_Addr);
-        uint64_t in_recv_phase = seL4_GetMR(seL4_CapFault_InRecvPhase);
-        sddf_printf("CapFault: ip=%lx  fault_addr=%lx  in_recv_phase=%s\n", ip, fault_addr,
-                    (in_recv_phase == 0 ? "false" : "true"));
-        break;
-    }
-    case seL4_Fault_UserException: {
-        sddf_printf("UserException\n");
-        break;
-    }
-    case seL4_Fault_VMFault: {
-        uint64_t ip = seL4_GetMR(seL4_VMFault_IP);
-        uint64_t fault_addr = seL4_GetMR(seL4_VMFault_Addr);
-        uint64_t is_instruction = seL4_GetMR(seL4_VMFault_PrefetchFault);
-        uint64_t fsr = seL4_GetMR(seL4_VMFault_FSR);
-        sddf_printf("VMFault: ip=%lx  fault_addr=%lx  fsr=%lx %s\n", ip, fault_addr, fsr,
-                    (is_instruction ? "(instruction fault)" : "(data fault)"));
-        break;
-    }
-    default:
-        sddf_printf("Unknown fault\n");
-        break;
-    }
+    // switch (microkit_msginfo_get_label(msginfo)) {
+    // case seL4_Fault_CapFault: {
+    //     uint64_t ip = seL4_GetMR(seL4_CapFault_IP);
+    //     uint64_t fault_addr = seL4_GetMR(seL4_CapFault_Addr);
+    //     uint64_t in_recv_phase = seL4_GetMR(seL4_CapFault_InRecvPhase);
+    //     sddf_printf("CapFault: ip=%lx  fault_addr=%lx  in_recv_phase=%s\n", ip, fault_addr,
+    //                 (in_recv_phase == 0 ? "false" : "true"));
+    //     break;
+    // }
+    // case seL4_Fault_UserException: {
+    //     sddf_printf("UserException\n");
+    //     break;
+    // }
+    // case seL4_Fault_VMFault: {
+    //     uint64_t ip = seL4_GetMR(seL4_VMFault_IP);
+    //     uint64_t fault_addr = seL4_GetMR(seL4_VMFault_Addr);
+    //     uint64_t is_instruction = seL4_GetMR(seL4_VMFault_PrefetchFault);
+    //     uint64_t fsr = seL4_GetMR(seL4_VMFault_FSR);
+    //     sddf_printf("VMFault: ip=%lx  fault_addr=%lx  fsr=%lx %s\n", ip, fault_addr, fsr,
+    //                 (is_instruction ? "(instruction fault)" : "(data fault)"));
+    //     break;
+    // }
+    // default:
+    //     sddf_printf("Unknown fault\n");
+    //     break;
+    // }
 
-    return seL4_False;
+    // return seL4_False;
 }

@@ -5,15 +5,23 @@
 
 #include <stdint.h>
 #include <microkit.h>
-#include <sddf/benchmark/sel4bench.h>
+#ifdef CONFIG_ARCH_X86_64
+#include <sddf/benchmark/x86/sel4bench.h>
+#else 
+#include <sddf/benchmark/arm/sel4bench.h>
+#endif
 #include <sddf/util/fence.h>
 #include <sddf/util/printf.h>
 #include <sddf/benchmark/bench.h>
 
 #define INIT 3
+#ifdef CONFIG_ARCH_X86_64
 #define MAGIC_CYCLES 150
+#else
+#define MAGIC_CYCLES 150
+#endif
 
-uintptr_t cyclecounters_vaddr;
+uintptr_t cyclecounters_vaddr = 0x5010000;
 struct bench *b;
 
 void count_idle(void)
