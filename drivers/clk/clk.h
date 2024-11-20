@@ -13,6 +13,8 @@
 
 #include <stdint.h>
 
+#define TIMER_CH 1
+
 /*
  * flags used across common struct clk.  these flags should only affect the
  * top-level framework.  custom flags for dealing with hardware specifics

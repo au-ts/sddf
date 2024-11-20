@@ -7,12 +7,24 @@
 
 #include <clk.h>
 #include <clk_utils.h>
+#include <sddf/timer/client.h>
 
 #define CLK_INCORRECT_ARGS -1
 #define CLK_INVALID_OP -2
 #define CLK_INVALID_ID -3
 #define CLK_UNKNOWN_REQ -4
 #define CLK_UNKNOWN_TARGET -5
+#define CLK_FAILED_OP -6
+
+/* TODO: Replace this doggy delay() with a standard interface */
+static inline void delay_us(uint32_t us)
+{
+    uint64_t start_time = sddf_timer_time_now(TIMER_CH);
+    uint64_t now_time = start_time;
+    while (now_time - start_time < us) {
+        now_time = sddf_timer_time_now(TIMER_CH);
+    }
+}
 
 static inline int reg_write(uint64_t base, uint32_t offset, uint32_t val)
 {
