@@ -7,7 +7,6 @@
         "device_regions": [],
         "irqs": [
             {
-                "channel_id": 0,
                 "dt_index": 1
             }
         ]
