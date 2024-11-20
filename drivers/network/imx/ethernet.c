@@ -6,6 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <microkit.h>
+#include <sddf/device/resources.h>
 #include <sddf/network/queue.h>
 #include <sddf/network/config.h>
 #include <sddf/util/util.h>
@@ -14,9 +15,9 @@
 
 #include "ethernet.h"
 #include "net_driver_config.h"
+#include "device_resources.h"
 
-#define IRQ_CH 0
-
+device_resources_t device_resources;
 net_driver_config_t config;
 
 #define RX_COUNT 256
@@ -214,6 +215,8 @@ static void handle_irq(void)
 
 static void eth_setup(void)
 {
+    eth = device_resources.regions[0].vaddr;
+
     uint32_t l = eth->palr;
     uint32_t h = eth->paur;
 
@@ -295,6 +298,7 @@ static void eth_setup(void)
 void init(void)
 {
     sddf_memcpy(&config, net_driver_data, net_driver_data_len);
+    sddf_memcpy(&device_resources, device_resources_data, device_resources_data_len);
 
     eth_setup();
 
@@ -307,7 +311,7 @@ void init(void)
 
 void notified(microkit_channel ch)
 {
-    if (ch == IRQ_CH) {
+    if (ch == device_resources.irqs[0].id) {
         handle_irq();
         /*
          * Delay calling into the kernel to ack the IRQ until the next loop

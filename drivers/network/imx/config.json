@@ -8,14 +8,12 @@
             {
                 "name": "regs",
                 "perms": "rw",
-                "setvar_vaddr": "eth",
                 "size": 65536,
                 "dt_index": 0
             }
         ],
         "irqs": [
             {
-                "channel_id": 0,
                 "dt_index": 2
             }
         ]
