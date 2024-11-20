@@ -14,8 +14,11 @@
 
 #include <stdint.h>
 #include <microkit.h>
+#include <sddf/device/resources.h>
 #include <sddf/util/printf.h>
 #include <sddf/timer/protocol.h>
+
+#include "device_resources.h"
 
 #define GPT_STATUS_REGISTER_CLEAR 0x3F
 #define CR 0
@@ -31,11 +34,10 @@
 
 #define MAX_TIMEOUTS 6
 
-#define IRQ_CH 0
-
 #define GPT_FREQ   (12u)
 
-uintptr_t gpt_regs;
+device_resources_t device_resources;
+
 static volatile uint32_t *gpt;
 static uint32_t overflow_count;
 static uint64_t timeouts[MAX_TIMEOUTS];
@@ -78,7 +80,7 @@ static void process_timeouts(uint64_t curr_time)
 
 void notified(microkit_channel ch)
 {
-    if (ch != IRQ_CH) {
+    if (ch != device_resources.irqs[0].id) {
         sddf_dprintf("TIMER DRIVER|LOG: unexpected notification from channel %u\n", ch);
         return;
     }
@@ -130,7 +132,7 @@ void init(void)
         timeouts[i] = UINT64_MAX;
     }
 
-    gpt = (volatile uint32_t *) gpt_regs;
+    gpt = (volatile uint32_t *) device_resources.regions[0].vaddr;
 
     /* Disable GPT. */
     gpt[CR] = 0;
