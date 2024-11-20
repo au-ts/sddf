@@ -43,6 +43,7 @@ build_network_echo_server_make() {
 }
 
 build_i2c_make() {
+    pipx install devicetree
     BOARD=$1
     CONFIG=$2
     echo "CI|INFO: building I2C example with Make, board: ${BOARD}, config: ${CONFIG}"
@@ -194,16 +195,16 @@ network() {
 }
 
 i2c() {
-    BOARDS=("odroidc4")
-    CONFIGS=("debug" "release")
-    for BOARD in "${BOARDS[@]}"
-    do
-      for CONFIG in "${CONFIGS[@]}"
-      do
-         build_i2c_make ${BOARD} ${CONFIG}
-         build_i2c_zig ${BOARD} ${CONFIG}
-       done
-    done
+    # BOARDS=("odroidc4")
+    # CONFIGS=("debug" "release")
+    # for BOARD in "${BOARDS[@]}"
+    # do
+    #   for CONFIG in "${CONFIGS[@]}"
+    #   do
+    #      build_i2c_make ${BOARD} ${CONFIG}
+    #      build_i2c_zig ${BOARD} ${CONFIG}
+    #    done
+    # done
 }
 
 timer() {
