@@ -15,6 +15,17 @@
 
 #define TIMER_CH 1
 
+// Logging
+/* #define DEBUG_DRIVER */
+
+#ifdef DEBUG_DRIVER
+#define LOG_DRIVER(...) do{ sddf_dprintf("CLK DRIVER|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
+#else
+#define LOG_DRIVER(...) do{}while(0)
+#endif
+
+#define LOG_DRIVER_ERR(...) do{ sddf_printf("CLK DRIVER|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
+
 /*
  * flags used across common struct clk.  these flags should only affect the
  * top-level framework.  custom flags for dealing with hardware specifics
@@ -325,6 +336,15 @@ struct clk_mux_data {
 };
 
 /**
+ * function clk_msr_stat() - measure clock rates
+ *
+ * @clk_list:    array of pointers to the clocks on SoC
+ *
+ * All parent clocks will be parsed by name and bound to the struct clk
+ */
+int clk_msr_stat(struct clk *clk_list[]);
+
+/**
  * function clk_probe() - initialise all clocks
  *
  * @clk_list:    array of pointers to the clocks on SoC
@@ -332,6 +352,13 @@ struct clk_mux_data {
  * All parent clocks will be parsed by name and bound to the struct clk
  */
 void clk_probe(struct clk *clk_list[]);
+
+/**
+ * function get_clk_list() - initialise all clocks
+ *
+ * get a list of clock components for specific board
+ */
+struct clk **get_clk_list();
 
 /**
  * function get_parent() - get the current parent clk

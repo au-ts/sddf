@@ -7,8 +7,7 @@
  * Source: https://github.com/torvalds/linux/blob/20371ba120635d9ab7fc7670497105af8f33eb08/include/dt-bindings/clock/g12a-clkc.h
  */
 
-#ifndef __G12A_CLKC_H
-#define __G12A_CLKC_H
+#pragma once
 
 #define CLKID_SYS_PLL				0
 #define CLKID_FIXED_PLL				1
@@ -291,5 +290,3 @@
 #define CLKID_MIPI_ISP_CSI_PHY1			278
 
 #define CLKID_G12A_XTAL			279
-
-#endif /* __G12A_CLKC_H */
