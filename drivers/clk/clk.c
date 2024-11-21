@@ -11,14 +11,21 @@
 #include <sddf/util/string.h>
 #include <sddf/util/printf.h>
 #include <sddf/clk/protocol.h>
-#include <clk_config.h>
-
 #include <clk.h>            /* common definitions and interfaces */
 #include <clk-operations.h> /* ops of common clocks e.g., div, mux, fixed factor, and gate*/
-#include <clk-measure.h> /* implementation of clock measurements */
-#include <clk-meson.h> /* operations for meson-specific clocks */
-#include <g12a-regs.h> /* offsets of control registers */
-#include <g12a-bindings.h> /* clock id bindings*/
+#include <clk_config.h>     /* configuration parsed from device tree */
+
+#ifdef BOARD_CLASS_meson
+#include <clk-meson.h>      /* operations for meson-specific clocks */
+#include <clk-measure.h>    /* implementation of clock measurements */
+#include <clk-sm1.h>       /* g12a-specific definitions */
+#include <g12a-regs.h>      /* offsets of control registers */
+#elif BOARD_CLASS_imx
+#include <clk-imx.h>        /* operations for imx-specific clocks */
+#include <clk-imx8mq.h>     /* imx8mq-specific definitions */
+#else
+#error "The platform is not supported!\n"
+#endif
 
 // Logging
 /* #define DEBUG_DRIVER */
@@ -31,13 +38,11 @@
 
 #define LOG_DRIVER_ERR(...) do{ sddf_printf("CLK DRIVER|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
-#define NUM_CLK_LIST 280
+#ifndef NUM_CLK_LIST
+#error "Constant \"NUM_CLK_LIST\" should be defined\n")
+#endif
 
-#define I2C_CLK_OFFSET 320
-#define I2C_CLK_BIT (1 << 9) // bit 9
-
-uintptr_t clk_regs;
-uintptr_t msr_clk_base;
+#define CLIENT_CH 0
 
 struct clk **clk_list;
 
@@ -49,29 +54,6 @@ struct clk *get_clk_by_name(const char *name)
         }
     }
     return NULL;
-}
-
-/* TODO: Should be configured with init_regs */
-/* static struct clk_cfg fixed_clk_configs[] = { */
-/*     { .clk_id = CLKID_FCLK_DIV2_DIV, .frequency = 1000000000 }, */
-/*     { .clk_id = CLKID_FCLK_DIV3_DIV, .frequency = 666666667 }, */
-/*     { .clk_id = CLKID_FCLK_DIV4_DIV, .frequency = 500000000 }, */
-/*     { .clk_id = CLKID_FCLK_DIV5_DIV, .frequency = 400000000 }, */
-/*     { .clk_id = CLKID_FCLK_DIV7_DIV, .frequency = 285700000 }, */
-/* } */
-
-void clk_probe(struct clk *clk_list[])
-{
-    int i;
-    for (i = 0; i < NUM_CLK_LIST; i++) {
-        if (!clk_list[i])
-            continue;
-        clk_list[i]->base = (uint64_t)clk_regs;
-        if (clk_list[i]->hw.init->ops->init) {
-            clk_list[i]->hw.init->ops->init(clk_list[i]);
-            LOG_DRIVER("Initialise %s\n", clk_list[i]->hw.init->name);
-        }
-    }
 }
 
 const struct clk *get_parent(const struct clk *clk)
@@ -92,8 +74,9 @@ const struct clk *get_parent(const struct clk *clk)
 
         if (parent_data.clk) {
             return parent_data.clk;
-        } else if (sddf_strcmp(parent_data.name, "xtal") == 0) {
-            return clk_list[CLKID_G12A_XTAL];
+        }
+        if (parent_data.name) {
+            return get_clk_by_name(parent_data.name);
         }
     }
 
@@ -136,6 +119,7 @@ int clk_set_parent_by_val(struct clk *clk, uint32_t parent_idx)
         init->ops->set_parent(clk, parent_idx);
         return 0;
     }
+    LOG_DRIVER_ERR("clock \"%s\" has no set_parent() interface\n", init->name);
     return CLK_INVALID_OP;
 }
 
@@ -167,6 +151,7 @@ int clk_get_rate(const struct clk *clk, uint64_t *rate)
     int err = 0;
 
     const struct clk *parent_clk = get_parent(clk);
+
     if (parent_clk) {
         err = clk_get_rate(parent_clk, &parent_rate);
     }
@@ -226,17 +211,15 @@ int clk_set_rate(struct clk *clk, uint64_t req_rate, uint64_t *rate)
     }
 
     if (clk->hw.init->ops->set_rate) {
-        clk->hw.init->ops->set_rate(clk, req_rate, prate);
-        *rate = req_rate;
+        *rate = clk->hw.init->ops->set_rate(clk, req_rate, prate);
         return 0;
     }
-    if (pclk->hw.init->ops->set_rate) {
+    if (pclk && pclk->hw.init->ops->set_rate) {
         const struct clk *ppclk = get_parent(pclk);
         uint64_t pprate = 0;
         int err = clk_get_rate(ppclk, &pprate);
         if (!err) {
             pclk->hw.init->ops->set_rate(pclk, prate, pprate);
-            *rate = req_rate;
             return 0;
         }
         return err;
@@ -245,50 +228,17 @@ int clk_set_rate(struct clk *clk, uint64_t req_rate, uint64_t *rate)
     return CLK_INVALID_OP;
 }
 
-int clk_msr_stat()
-{
-#ifdef DEBUG_DRIVER
-    unsigned long clk_freq;
-    int i = 0;
-    uint64_t rate = 0;
-    int err;
-
-    const char *const *clk_msr_list = get_msr_clk_list();
-
-    LOG_DRIVER("-------Expected clock rates------\n");
-    for (i = 0; i < NUM_CLK_LIST; i++) {
-        err = clk_get_rate(clk_list[i], &rate);
-        if (err) {
-            LOG_DRIVER("Failed to get rate of %s: -%u\n", clk_list[i]->hw.init->name, err);
-        }
-        LOG_DRIVER("[%4d][%4luHz] %s\n", i, rate, clk_list[i]->hw.init->name);
-    }
-    LOG_DRIVER("---------------------------------\n");
-    LOG_DRIVER("---------Clock measurement-------\n");
-    for (i = 0; i < 128; i++) {
-        clk_freq = clk_msr(i);
-        LOG_DRIVER("[%4d][%4ldHz] %s\n", i, clk_freq, clk_msr_list[i]);
-    }
-    LOG_DRIVER("-----------------------------\n");
-
-#endif
-
-    return 0;
-}
-
 void notified(microkit_channel ch)
 {
 }
 
 void init(void)
 {
-    LOG_DRIVER("Clock driver initialising...\n");
-
     int err = 0;
     clk_list = get_clk_list();
 
     clk_probe(clk_list);
-    clk_msr_stat();
+    clk_msr_stat(clk_list);
 
     for (int i = 0; i < NUM_DEVICE_CLKS; i++) {
         struct clk *clk = clk_list[clk_configs[i].clk_id];
@@ -305,10 +255,10 @@ void init(void)
             }
         }
 
-        /* Set rate for the target clock */
         if (clk_configs[i].frequency > 0) {
+            LOG_DRIVER("set rate for %s\n", clk->hw.init->name);
             uint64_t rate = 0;
-            int err = clk_set_rate(clk, clk_configs[i].frequency, &rate);
+            uint32_t err = clk_set_rate(clk, clk_configs[i].frequency, &rate);
             if (err) {
                 LOG_DRIVER_ERR("Failed to set rate [%d] for clk_id: %d\n", clk_configs[i].frequency,
                                clk_configs[i].clk_id);
@@ -368,7 +318,7 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
             break;
         }
         uint32_t clk_id = (uint32_t)microkit_mr_get(SDDF_CLK_PARAM_ID);
-        uint32_t req_rate = (uint32_t)microkit_mr_get(SDDF_CLK_PARAM_RATE);
+        uint64_t req_rate = (uint32_t)microkit_mr_get(SDDF_CLK_PARAM_RATE);
         uint64_t rate = 0;
         err = clk_set_rate(clk_list[clk_id], req_rate, &rate);
         microkit_mr_set(0, rate);
@@ -397,6 +347,8 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
         uint32_t clk_id = (uint32_t)microkit_mr_get(SDDF_CLK_PARAM_ID);
         uint32_t pclk_idx = (uint32_t)microkit_mr_get(SDDF_CLK_PARAM_PCLK_IDX);
         err = clk_set_parent_by_val(clk_list[clk_id], pclk_idx);
+        microkit_mr_set(0, pclk_idx);
+        ret_num = 1;
         break;
     }
     default:
