@@ -225,7 +225,6 @@ fn addClockDriver(
     switch (class) {
         .meson => {
             const files: []const []const u8 = &.{
-                "drivers/clk/meson/clk.c",
                 "drivers/clk/meson/clk-meson.c",
                 "drivers/clk/meson/clk-measure.c",
                 "drivers/clk/meson/sm1-clk.c",
@@ -234,7 +233,6 @@ fn addClockDriver(
         },
         .imx => {
             const files: []const []const u8 = &.{
-                "drivers/clk/imx/clk.c",
                 "drivers/clk/imx/clk-imx.c",
                 "drivers/clk/imx/clk-imx8mq.c",
             };
@@ -242,7 +240,10 @@ fn addClockDriver(
         },
     }
 
-    const common_src_files = .{ "clk-operations.c" };
+    const common_src_files = .{
+        "clk-operations.c",
+        "clk.c",
+    };
 
     inline for (common_src_files) |f| {
         driver.addCSourceFile(.{
@@ -250,6 +251,7 @@ fn addClockDriver(
         });
     }
 
+    driver.defineCMacro(b.fmt("BOARD_CLASS_{s}", .{ @tagName(class) }), "1");
     driver.addIncludePath(clk_config_include);
     driver.addIncludePath(b.path("include"));
     driver.addIncludePath(b.path("drivers/clk"));
@@ -523,9 +525,9 @@ pub fn build(b: *std.Build) void {
            "python",
            "drivers/clk/create_clk_config.py",
            dtb_path,
-           clk_conf_include_option,
         }); // Creates a system command which runs the python interpreter
-        driver.step.dependOn(&clk_config.step);
+        const clk_config_include = clk_config.addOutputDirectoryArg("test");
+        driver.addIncludePath(clk_config_include);
 
         b.installArtifact(driver);
     }

@@ -15,12 +15,14 @@ ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
 	SYSTEM_FILE := ${TOP}/board/odroidc4/clk.system
 	ARCH := aarch64
 	DRIVER_DIR := meson
+  DRIVER_CLASS := meson
 	CPU := cortex-a55
 else ifeq ($(strip $(MICROKIT_BOARD)), maaxboard)
 	ARCH := aarch64
   DTS_FILE := $(TOP)/dts/maaxboard.dts
 	SYSTEM_FILE := ${TOP}/board/maaxboard/clk.system
 	DRIVER_DIR := imx
+  DRIVER_CLASS := imx
 	CPU := cortex-a53
 else
 $(error Unsupported MICROKIT_BOARD given)
@@ -52,7 +54,8 @@ CFLAGS := -mcpu=$(CPU) \
 		  -I$(BOARD_DIR)/include \
 		  -I$(SDDF)/include \
 		  -I$(LIBMICROKITCO_PATH) \
-		  -I$(TOP)
+		  -I$(TOP) \
+      -DBOARD_CLASS_$(DRIVER_CLASS)
 
 LDFLAGS := -L$(BOARD_DIR)/lib -L.
 LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group

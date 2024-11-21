@@ -14,11 +14,15 @@
 
 #include <clk.h>
 #include <clk_utils.h>
-#include <g12a-bindings.h>
 #include <g12a-regs.h>
 #include <clk-meson.h>
+#include <clk-sm1.h>
 #include <clk-operations.h>
 #include <sddf/util/util.h>
+#include <sddf/clk/g12a-bindings.h>
+
+uintptr_t clk_regs;
+uintptr_t msr_clk_base;
 
 static struct clk g12a_xtal = { .data =
                                     &(struct clk_source_data) {
@@ -1527,6 +1531,60 @@ static struct clk *sm1_clks[] = {
     [CLKID_MIPI_DSI_PXCLK] = &g12a_mipi_dsi_pxclk,
     [CLKID_G12A_XTAL] = &g12a_xtal,
 };
+
+int clk_msr_stat(struct clk *clk_list[])
+{
+#ifdef DEBUG_DRIVER
+    unsigned long clk_freq;
+    int i = 0;
+    uint64_t rate = 0;
+    int err;
+
+    const char *const *clk_msr_list = get_msr_clk_list();
+
+    LOG_DRIVER("-------Expected clock rates------\n");
+    for (i = 0; i < NUM_CLK_LIST; i++) {
+        err = clk_get_rate(clk_list[i], &rate);
+        if (err) {
+            LOG_DRIVER("Failed to get rate of %s: -%u\n", clk_list[i]->hw.init->name, err);
+        }
+        LOG_DRIVER("[%4d][%4luHz] %s\n", i, rate, clk_list[i]->hw.init->name);
+    }
+    LOG_DRIVER("---------------------------------\n");
+    LOG_DRIVER("---------Clock measurement-------\n");
+    for (i = 0; i < 128; i++) {
+        clk_freq = clk_msr(i);
+        LOG_DRIVER("[%4d][%4ldHz] %s\n", i, clk_freq, clk_msr_list[i]);
+    }
+    LOG_DRIVER("-----------------------------\n");
+
+#endif
+
+    return 0;
+}
+
+/* TODO: Should be configured with init_regs */
+/* static struct clk_cfg fixed_clk_configs[] = { */
+/*     { .clk_id = CLKID_FCLK_DIV2_DIV, .frequency = 1000000000 }, */
+/*     { .clk_id = CLKID_FCLK_DIV3_DIV, .frequency = 666666667 }, */
+/*     { .clk_id = CLKID_FCLK_DIV4_DIV, .frequency = 500000000 }, */
+/*     { .clk_id = CLKID_FCLK_DIV5_DIV, .frequency = 400000000 }, */
+/*     { .clk_id = CLKID_FCLK_DIV7_DIV, .frequency = 285700000 }, */
+/* } */
+
+void clk_probe(struct clk *clk_list[])
+{
+    int i;
+    for (i = 0; i < NUM_CLK_LIST; i++) {
+        if (!clk_list[i])
+            continue;
+        clk_list[i]->base = (uint64_t)clk_regs;
+        if (clk_list[i]->hw.init->ops->init) {
+            clk_list[i]->hw.init->ops->init(clk_list[i]);
+            LOG_DRIVER("Initialise %s\n", clk_list[i]->hw.init->name);
+        }
+    }
+}
 
 struct clk **get_clk_list(void)
 {

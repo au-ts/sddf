@@ -6,11 +6,14 @@
 
 #include <clk.h>
 #include <clk_utils.h>
-#include <imx8mq-bindings.h>
 #include <clk-imx.h>
 #include <sddf/util/util.h>
 #include <clk-operations.h>
 #include <sddf/util/printf.h>
+#include <clk-imx8mq.h>
+
+uintptr_t ccm_base;
+uintptr_t ccm_analog_base;
 
 static struct clk_parent_data pll_ref_sels[] = {
     {
@@ -2903,7 +2906,52 @@ static struct clk *imx8mq_clks[IMX8MQ_CLK_END] = {
     [IMX8MQ_CLK_DRAM_ALT_ROOT] = &dram_alt_root,
 };
 
+int clk_msr_stat(struct clk *clk_list[])
+{
+#ifdef DEBUG_DRIVER
+    int i;
+    uint64_t rate = 0;
+    int err;
+
+    LOG_DRIVER("-------Expected clock rates------\n");
+    for (i = 0; i < NUM_CLK_LIST; i++) {
+        if (clk_list[i]) {
+            err = clk_get_rate(clk_list[i], &rate);
+            if (err) {
+                LOG_DRIVER_ERR("Failed to get rate of %s: -%u\n", clk_list[i]->hw.init->name, err);
+                return err;
+            }
+            LOG_DRIVER("[%4d][%10luHz] %s\n", i, rate, clk_list[i]->hw.init->name);
+        }
+    }
+    LOG_DRIVER("-----------------------------\n");
+#endif
+
+    return 0;
+}
+
 struct clk **get_clk_list(void)
 {
     return imx8mq_clks;
+}
+
+void clk_probe(struct clk *clk_list[])
+{
+    for (int i = 0; i < NUM_CLK_LIST; i++) {
+        if (!clk_list[i]) {
+            continue;
+        }
+
+        struct clk_init_data *init_data = clk_list[i]->hw.init;
+
+        if (clk_list[i]->base == CCM_BASE) {
+            clk_list[i]->base = ccm_base;
+        } else if (clk_list[i]->base == CCM_ANALOG_BASE) {
+            clk_list[i]->base = ccm_analog_base;
+        }
+
+        if (clk_list[i] && init_data->ops->init) {
+            init_data->ops->init(clk_list[i]);
+        }
+    }
 }

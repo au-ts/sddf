@@ -11,6 +11,14 @@
 
 #define CLK_DRIVER_CH 0
 
+#ifdef TEST_BOARD_odroidc4
+#include <sddf/clk/g12a-bindings.h>
+#elif TEST_BOARD_maaxboard
+#include <sddf/clk/imx8mq-bindings.h>
+#else
+#error "The target board is not supported\n"
+#endif
+
 void init(void)
 {
     sddf_dprintf("--------------------\n");
@@ -27,7 +35,7 @@ void init(void)
      * see `sddf/drivers/clk/meson/include/g12a-bindings.h` for more clock indices.
      *
      **/
-    uint32_t clk_id_to_enable = 10;
+    uint32_t clk_id_to_enable = CLKID_CLK81;
     int ret = sddf_clk_enable(CLK_DRIVER_CH, clk_id_to_enable);
     if (ret) {
         sddf_dprintf("Failed to enable clock %u: err - %d\n", clk_id_to_enable, ret);
@@ -35,7 +43,7 @@ void init(void)
         sddf_dprintf("Successfully enabled clock %u\n", clk_id_to_enable);
     }
 
-    uint32_t clk_id_to_disable = 24;
+    uint32_t clk_id_to_disable = CLKID_I2C;
     ret = sddf_clk_disable(CLK_DRIVER_CH, clk_id_to_disable);
     if (ret) {
         sddf_dprintf("Failed to disable clock %u: err - %d\n", clk_id_to_enable, ret);
@@ -44,7 +52,7 @@ void init(void)
     }
 
     uint64_t rate = 0;
-    uint32_t clk_id_to_set_rate = 10;
+    uint32_t clk_id_to_set_rate = CLKID_CLK81;
     ret = sddf_clk_get_rate(CLK_DRIVER_CH, clk_id_to_set_rate, &rate);
     if (ret) {
         sddf_dprintf("Failed to get the rate of clock %u: err - %d\n", clk_id_to_set_rate, ret);
@@ -59,7 +67,7 @@ void init(void)
         sddf_dprintf("Set the rate of clock %u to %lu\n", ret, rate);
     }
 
-    uint32_t clk_id_to_get_rate = 187;
+    uint32_t clk_id_to_get_rate = CLKID_CPU_CLK;
     ret = sddf_clk_get_rate(CLK_DRIVER_CH, clk_id_to_get_rate, &rate);
     if (ret) {
         sddf_dprintf("Failed to get the rate of clock %u: err - %d\n", clk_id_to_get_rate, ret);
@@ -67,7 +75,7 @@ void init(void)
         sddf_dprintf("The rate of clock %u: %lu\n", clk_id_to_get_rate, rate);
     }
 
-    uint32_t clk_id_to_test_parent = 63;
+    uint32_t clk_id_to_test_parent = CLKID_SD_EMMC_A_CLK0_SEL;
     uint32_t parent_id = 0;
     ret = sddf_clk_get_parent(CLK_DRIVER_CH, clk_id_to_test_parent, &parent_id);
     if (ret) {
@@ -96,7 +104,7 @@ void init(void)
      * see `sddf/drivers/clk/imx/include/imx8mq-bindings.h` for more clock indices.
      * */
 
-    uint32_t clk_id_to_enable = 196;
+    uint32_t clk_id_to_enable = IMX8MQ_CLK_SAI1_ROOT;
     ret = sddf_clk_enable(CLK_DRIVER_CH, clk_id_to_enable);
     if (ret) {
         sddf_dprintf("Failed to enable clock %u: err - %d\n", clk_id_to_enable, ret);
@@ -104,7 +112,7 @@ void init(void)
         sddf_dprintf("Successfully enabled clock %u\n", clk_id_to_enable);
     }
 
-    uint32_t clk_id_to_test_parent = 144;
+    uint32_t clk_id_to_test_parent = IMX8MQ_CLK_I2C1;
     uint32_t parent_id = 0;
     ret = sddf_clk_get_parent(CLK_DRIVER_CH, clk_id_to_test_parent, &parent_id);
     if (ret) {
