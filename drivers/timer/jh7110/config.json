@@ -8,8 +8,8 @@
             {
                 "name": "regs",
                 "perms": "rw",
-                "setvar_vaddr": "timer_base",
                 "size": 4096,
+                "dt_index": 0
             }
         ],
         "irqs": [
