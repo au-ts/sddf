@@ -195,6 +195,8 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
 
 void init(void)
 {
+    sddf_memcpy(&device_resources, device_resources_data, device_resources_data_len);
+
     for (int i = 0; i < MAX_TIMEOUTS; i++) {
         timeouts[i] = UINT64_MAX;
     }
