@@ -1,3 +1,5 @@
+#include <stdint.h>
+
 #define DEVICE_MAX_REGIONS 64
 #define DEVICE_MAX_IRQS 64
 
