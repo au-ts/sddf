@@ -12,6 +12,8 @@
 
 #include <microkit.h>
 #include <sddf/i2c/queue.h>
+#include <sddf/clk/client.h>
+#include <sddf/clk/g12a-bindings.h>
 #include "driver.h"
 
 #ifndef I2C_BUS_NUM
@@ -21,6 +23,7 @@
 #define VIRTUALISER_CH 0
 #define IRQ_CH 1
 #define IRQ_TIMEOUT_CH 2
+#define CLK_DRIVER_CH 3
 
 // #define DEBUG_DRIVER
 
@@ -45,7 +48,6 @@ struct i2c_regs {
 
 // Hardware memory
 uintptr_t gpio_regs;
-uintptr_t clk_regs;
 uintptr_t i2c_regs;
 
 // Driver state for each interface
@@ -166,12 +168,10 @@ static inline void i2c_setup()
     // volatile uint32_t *pad_ds5a_ptr     = ((void*)gpio_mem + GPIO_DS_5A*4);
     volatile uint32_t *pad_bias2_ptr    = ((void *)gpio_mem + GPIO_BIAS_2_EN * 4);
     // volatile uint32_t *pad_bias5_ptr    = ((void*)gpio_mem + GPIO_BIAS_5_EN*4);
-    volatile uint32_t *clk81_ptr        = ((void *)clk_regs + I2C_CLK_OFFSET);
 
     // Read existing register values
     uint32_t pinmux5 = *pinmux5_ptr;
     // uint32_t pinmuxE = *pinmuxE_ptr;
-    uint32_t clk81 = *clk81_ptr;
 
     // Common values
     const uint8_t ds = 3;    // 3 mA
@@ -239,12 +239,9 @@ static inline void i2c_setup()
 #endif /* I2C_BUS_NUM */
 
     // Enable i2c by removing clock gate
-    clk81 |= (I2C_CLK81_BIT);
-    *clk81_ptr = clk81;
-
-    // Check that registers actually changed
-    if (!(*clk81_ptr & I2C_CLK81_BIT)) {
-        LOG_DRIVER_ERR("failed to toggle clock!\n");
+    int err = sddf_clk_enable(CLK_DRIVER_CH, CLKID_I2C);
+    if (err) {
+        LOG_DRIVER_ERR("failed to toggle clock! err - %d\n", err);
     }
 
     // Initialise fields

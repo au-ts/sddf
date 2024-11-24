@@ -14,7 +14,7 @@ ifeq ($(strip $(TOOLCHAIN)),)
 	export LIBC := $(dir $(realpath $(shell aarch64-none-elf-gcc --print-file-name libc.a)))
 endif
 
-export BUILD_DIR ?= build
+export BUILD_DIR ?= $(SDDF)/examples/i2c/build
 export MICROKIT_CONFIG ?= debug
 export MICROKIT_BOARD ?= odroidc4
 

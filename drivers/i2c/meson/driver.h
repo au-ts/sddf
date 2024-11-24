@@ -15,7 +15,6 @@
 #include <stdint.h>
 #include <sddf/util/printf.h>
 #include "gpio.h"
-#include "clk.h"
 
 #define DATA_REGIONS_START 0x10000000
 

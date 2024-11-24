@@ -29,6 +29,7 @@ LD := $(TOOLCHAIN)-ld
 AS := $(TOOLCHAIN)-as
 AR := $(TOOLCHAIN)-ar
 RANLIB := $(TOOLCHAIN)-ranlib
+PYTHON := python3
 
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 
@@ -36,12 +37,14 @@ UTIL := $(SDDF)/util
 LIBCO := $(SDDF)/libco
 TOP := ${SDDF}/examples/i2c
 I2C := $(SDDF)/i2c
+DTS_FILE := $(TOP)/dts/odroidc4.dts
+CLK_DRIVER := $(SDDF)/drivers/clk/$(PLATFORM)
 I2C_DRIVER := $(SDDF)/drivers/i2c/${PLATFORM}
 TIMER_DRIVER := $(SDDF)/drivers/timer/${PLATFORM}
 PN532_DRIVER := $(SDDF)/i2c/devices/pn532
 DS3231_DRIVER := $(SDDF)/i2c/devices/ds3231
 
-IMAGES := i2c_virt.elf i2c_driver.elf client_pn532.elf client_ds3231.elf timer_driver.elf
+IMAGES := i2c_virt.elf i2c_driver.elf client_pn532.elf client_ds3231.elf timer_driver.elf clk_driver.elf
 CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall -Wno-unused-function -I${TOP}
 LDFLAGS := -L$(BOARD_DIR)/lib -L$(SDDF)/lib -L${LIBC}
 LIBS := --start-group -lmicrokit -Tmicrokit.ld -lc libsddf_util_debug.a --end-group
@@ -53,6 +56,7 @@ SYSTEM_FILE = ${TOP}/board/$(MICROKIT_BOARD)/i2c.system
 CFLAGS += -I$(BOARD_DIR)/include \
 	-I$(SDDF)/include \
 	-I$(LIBCO) \
+	-DBOARD_CLASS_$(PLATFORM) \
 	-MD \
 	-MP
 
@@ -90,6 +94,7 @@ include ${SDDF}/util/util.mk
 include ${I2C}/components/i2c_virt.mk
 include ${TIMER_DRIVER}/timer_driver.mk
 include ${LIBCO}/libco.mk
+include ${CLK_DRIVER}/clk_driver.mk
 include ${I2C_DRIVER}/i2c_driver.mk
 include ${PN532_DRIVER}/pn532.mk
 include ${DS3231_DRIVER}/ds3231.mk

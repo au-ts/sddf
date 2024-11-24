@@ -31,8 +31,13 @@
     <memory_region name="client_ds3231_data_region" size="0x1_000"/>
     <memory_region name="client_pn532_data_region" size="0x1_000"/>
 
-
     <memory_region name="timer_registers" size="0x1000" phys_addr="0xffd0f000" />
+
+    <protection_domain name="clk_driver" priority="254" pp="true" passive="true">
+        <program_image path="clk_driver.elf"/>
+
+        <map mr="clk" vaddr="0x3_200_000" perms="rw" setvar_vaddr="clk_regs" cached="false" />
+    </protection_domain>
 
     <protection_domain name="driver" priority="100">
         <program_image path="i2c_driver.elf"/>
@@ -43,7 +48,6 @@
         <map mr="i2c_bus" vaddr="0x3_000_000" perms="rw" setvar_vaddr="i2c_regs" cached="false" />
 
         <map mr="gpio" vaddr="0x3_100_000" perms="rw" setvar_vaddr="gpio_regs" cached="false" />
-        <map mr="clk" vaddr="0x3_200_000" perms="rw" setvar_vaddr="clk_regs" cached="false" />
 
         <map mr="client_ds3231_data_region" vaddr="0x10_000_000" perms="rw" />
         <map mr="client_pn532_data_region" vaddr="0x10_001_000" perms="rw" />
@@ -90,6 +94,16 @@
         <map mr="timer_registers" vaddr="0x2_000_000" perms="rw" cached="false" setvar_vaddr="gpt_regs" />
         <irq irq="42" id="0" trigger="edge" /> <!-- timer interrupt for timer A -->
     </protection_domain>
+
+    <channel>
+        <end pd="clk_driver" id="0" />
+        <end pd="driver" id="3" />
+    </channel>
+
+    <channel>
+        <end pd="timer" id="3" />
+        <end pd="clk_driver" id="1" />
+    </channel>
 
     <channel>
         <end pd="client_ds3231" id="0" />
