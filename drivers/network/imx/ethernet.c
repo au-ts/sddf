@@ -221,8 +221,8 @@ static void eth_setup(void)
     uint32_t h = eth->paur;
 
     /* Set up HW rings */
-    rx.descr = (volatile struct descriptor *)config.hw_ring_buffer_vaddr;
-    tx.descr = (volatile struct descriptor *)(config.hw_ring_buffer_vaddr + (sizeof(struct descriptor) * RX_COUNT));
+    rx.descr = (volatile struct descriptor *)device_resources.regions[1].vaddr;
+    tx.descr = (volatile struct descriptor *)device_resources.regions[2].vaddr;
 
     /* Perform reset */
     eth->ecr = ECR_RESET;
@@ -273,8 +273,8 @@ static void eth_setup(void)
     eth->tacc = TACC_PROCHK | TACC_IPCHK;
 
     /* Set RDSR */
-    eth->rdsr = config.hw_ring_buffer_paddr;
-    eth->tdsr = config.hw_ring_buffer_paddr + (sizeof(struct descriptor) * RX_COUNT);
+    eth->rdsr = device_resources.regions[1].paddr;
+    eth->tdsr = device_resources.regions[2].paddr;
 
     /* Size of max eth packet size */
     eth->mrbr = MAX_PACKET_SIZE;
