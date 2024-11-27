@@ -5,12 +5,11 @@
 
 typedef struct device_region_resource {
     void *vaddr;
+    uint64_t paddr;
     uint64_t size;
-    uint8_t dt_index;
 } device_region_resource_t;
 
 typedef struct device_irq_resource {
-    uint8_t dt_index;
     uint8_t id;
 } device_irq_resource_t;
 

@@ -231,10 +231,11 @@ static void eth_setup(void)
     uint32_t l = eth_mac->macaddr0lo;
     uint32_t h = eth_mac->macaddr0hi;
 
-    assert((config.hw_ring_buffer_paddr & 0xFFFFFFFF) == config.hw_ring_buffer_paddr);
+    assert((device_resources.regions[1].paddr & 0xFFFFFFFF) == device_resources.regions[1].paddr);
+    assert((device_resources.regions[2].paddr & 0xFFFFFFFF) == device_resources.regions[2].paddr);
 
-    rx.descr = (volatile struct descriptor *)config.hw_ring_buffer_vaddr;
-    tx.descr = (volatile struct descriptor *)(config.hw_ring_buffer_vaddr + (sizeof(struct descriptor) * RX_COUNT));
+    rx.descr = (volatile struct descriptor *)device_resources.regions[1].vaddr;
+    tx.descr = (volatile struct descriptor *)device_resources.regions[2].vaddr;
 
     /* Perform reset */
     eth_dma->busmode |= DMAMAC_SWRST;
@@ -258,8 +259,8 @@ static void eth_setup(void)
     eth_dma->opmode = STOREFORWARD | EN_FLOWCTL | (0 << FLOWCTL_SHFT) | (1 < DISFLOWCTL_SHFT) | TX_OPSCND;
     eth_mac->conf = FULLDPLXMODE;
 
-    eth_dma->rxdesclistaddr = config.hw_ring_buffer_paddr;
-    eth_dma->txdesclistaddr = config.hw_ring_buffer_paddr + (sizeof(struct descriptor) * RX_COUNT);
+    eth_dma->rxdesclistaddr = device_resources.regions[1].paddr;
+    eth_dma->txdesclistaddr = device_resources.regions[2].paddr;
 
     eth_mac->framefilt |= PMSCUOUS_MODE;
 
