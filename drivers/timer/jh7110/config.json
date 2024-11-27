@@ -4,7 +4,7 @@
         "starfive,jh7110-timer"
     ],
     "resources": {
-        "device_regions": [
+        "regions": [
             {
                 "name": "regs",
                 "perms": "rw",

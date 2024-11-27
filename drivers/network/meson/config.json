@@ -4,12 +4,20 @@
         "amlogic,meson-g12a-dwmac"
     ],
     "resources": {
-        "device_regions": [
+        "regions": [
             {
                 "name": "regs",
                 "perms": "rw",
                 "size": 65536,
                 "dt_index": 0
+            },
+            {
+                "name": "device_rx_ring",
+                "size": 32768
+            },
+            {
+                "name": "device_tx_ring",
+                "size": 32768
             }
         ],
         "irqs": [

@@ -4,7 +4,7 @@
         "arm,armv8-timer"
     ],
     "resources": {
-        "device_regions": [],
+        "regions": [],
         "irqs": [
             {
                 "dt_index": 1

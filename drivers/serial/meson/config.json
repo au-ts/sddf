@@ -5,7 +5,7 @@
         "amlogic,meson-ao-uart"
     ],
     "resources": {
-        "device_regions": [
+        "regions": [
             {
                 "name": "regs",
                 "perms": "rw",
