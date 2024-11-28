@@ -15,8 +15,8 @@
 #include <ethernet_config.h>
 
 
-#ifndef DEFAULT_RxV_CHANNEL
-#define DEFAULT_RxV_CHANNEL
+#ifndef DEFAULT_Rx_CLIENT
+#define DEFAULT_Rx_CLIENT (-1)
 #endif
 
 /* Notification channels */
@@ -79,7 +79,7 @@ int get_mac_addr_match(struct ethernet_header *buffer)
         return BROADCAST_ID;
     }
 
-    return DEFAULT_RxV_CHANNEL;
+    return DEFAULT_Rx_CLIENT;
 }
 
 void rx_return(void)
