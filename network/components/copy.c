@@ -39,8 +39,8 @@ void rx_return(void)
             err = net_dequeue_active(&rx_queue_virt, &virt_buffer);
             assert(!err);
 
-            uintptr_t cli_addr = config.cli_data + cli_buffer.io_or_offset;
-            uintptr_t virt_addr = config.virt_data + virt_buffer.io_or_offset;
+            uintptr_t cli_addr = config.client_data.vaddr + cli_buffer.io_or_offset;
+            uintptr_t virt_addr = config.device_data.vaddr + virt_buffer.io_or_offset;
 
             sddf_memcpy((void *)cli_addr, (void *)virt_addr, virt_buffer.len);
             cli_buffer.len = virt_buffer.len;
@@ -75,12 +75,12 @@ void rx_return(void)
 
     if (enqueued && net_require_signal_active(&rx_queue_cli)) {
         net_cancel_signal_active(&rx_queue_cli);
-        microkit_notify(config.cli_id);
+        microkit_notify(config.client.id);
     }
 
     if (enqueued && net_require_signal_free(&rx_queue_virt)) {
         net_cancel_signal_free(&rx_queue_virt);
-        microkit_deferred_notify(config.virt_id);
+        microkit_deferred_notify(config.virt_rx.id);
     }
 }
 
@@ -94,8 +94,8 @@ void init(void)
     sddf_memcpy(&config, eth_copy_client0_data, eth_copy_client0_data_len);
 
     /* Set up the queues */
-    net_queue_init(&rx_queue_cli, config.cli_free, config.cli_active, config.cli_capacity);
-    net_queue_init(&rx_queue_virt, config.virt_free, config.virt_active, config.virt_capacity);
+    net_queue_init(&rx_queue_cli, config.client.free_queue.vaddr, config.client.active_queue.vaddr, config.client.num_buffers);
+    net_queue_init(&rx_queue_virt, config.virt_rx.free_queue.vaddr, config.virt_rx.active_queue.vaddr, config.virt_rx.num_buffers);
 
     net_buffers_init(&rx_queue_cli, 0);
 }

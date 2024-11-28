@@ -120,7 +120,7 @@ static struct pbuf *create_interface_buffer(uint64_t offset, size_t length)
                length,
                PBUF_REF,
                &custom_pbuf_offset->custom,
-               (void *)(offset + net_config.rx_buffer_data_region),
+               (void *)(offset + net_config.rx_data.vaddr),
                NET_BUFFER_SIZE
            );
 }
@@ -166,7 +166,7 @@ static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
     int err = net_dequeue_free(&state.tx_queue, &buffer);
     assert(!err);
 
-    uintptr_t frame = buffer.io_or_offset + net_config.tx_buffer_data_region;
+    uintptr_t frame = buffer.io_or_offset + net_config.tx_data.vaddr;
     uint16_t copied = 0;
     for (struct pbuf *curr = p; curr != NULL; curr = curr->next) {
         memcpy((void *)(frame + copied), curr->payload, curr->len);
@@ -291,8 +291,8 @@ void init(void)
     serial_queue_init(&serial_tx_queue_handle, serial_config.tx_queue, serial_config.tx_capacity, serial_config.tx_data);
     serial_putchar_init(serial_config.tx_id, &serial_tx_queue_handle);
 
-    net_queue_init(&state.rx_queue, net_config.rx_free, net_config.rx_active, net_config.rx_capacity);
-    net_queue_init(&state.tx_queue, net_config.tx_free, net_config.tx_active, net_config.tx_capacity);
+    net_queue_init(&state.rx_queue, net_config.rx.free_queue.vaddr, net_config.rx.active_queue.vaddr, net_config.rx.num_buffers);
+    net_queue_init(&state.tx_queue, net_config.tx.free_queue.vaddr, net_config.tx.active_queue.vaddr, net_config.tx.num_buffers);
     net_buffers_init(&state.tx_queue, 0);
 
     lwip_init();
@@ -333,9 +333,9 @@ void init(void)
         net_cancel_signal_free(&state.rx_queue);
         notify_rx = false;
         if (!microkit_have_signal) {
-            microkit_deferred_notify(net_config.rx_id);
-        } else if (microkit_signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + net_config.rx_id) {
-            microkit_notify(net_config.rx_id);
+            microkit_deferred_notify(net_config.rx.id);
+        } else if (microkit_signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + net_config.rx.id) {
+            microkit_notify(net_config.rx.id);
         }
     }
 
@@ -343,18 +343,18 @@ void init(void)
         net_cancel_signal_active(&state.tx_queue);
         notify_tx = false;
         if (!microkit_have_signal) {
-            microkit_deferred_notify(net_config.tx_id);
-        } else if (microkit_signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + net_config.tx_id) {
-            microkit_notify(net_config.tx_id);
+            microkit_deferred_notify(net_config.tx.id);
+        } else if (microkit_signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + net_config.tx.id) {
+            microkit_notify(net_config.tx.id);
         }
     }
 }
 
 void notified(microkit_channel ch)
 {
-    if (ch == net_config.rx_id) {
+    if (ch == net_config.rx.id) {
         receive();
-    } else if (ch == net_config.tx_id) {
+    } else if (ch == net_config.tx.id) {
         transmit();
         receive();
     } else if (ch == timer_config.driver_id) {
@@ -370,9 +370,9 @@ void notified(microkit_channel ch)
         net_cancel_signal_free(&state.rx_queue);
         notify_rx = false;
         if (!microkit_have_signal) {
-            microkit_deferred_notify(net_config.rx_id);
-        } else if (microkit_signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + net_config.rx_id) {
-            microkit_notify(net_config.rx_id);
+            microkit_deferred_notify(net_config.rx.id);
+        } else if (microkit_signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + net_config.rx.id) {
+            microkit_notify(net_config.rx.id);
         }
     }
 
@@ -380,9 +380,9 @@ void notified(microkit_channel ch)
         net_cancel_signal_active(&state.tx_queue);
         notify_tx = false;
         if (!microkit_have_signal) {
-            microkit_deferred_notify(net_config.tx_id);
-        } else if (microkit_signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + net_config.tx_id) {
-            microkit_notify(net_config.tx_id);
+            microkit_deferred_notify(net_config.tx.id);
+        } else if (microkit_signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + net_config.tx.id) {
+            microkit_notify(net_config.tx.id);
         }
     }
 }

@@ -1,90 +1,63 @@
+#pragma once
+
 #include <microkit.h>
+#include <sddf/resources/common.h>
 
 #define SDDF_NET_MAX_CLIENTS (MICROKIT_MAX_CHANNELS - 1)
 
-typedef struct net_driver_config {
-    uintptr_t hw_ring_buffer_vaddr;
-    uintptr_t hw_ring_buffer_paddr;
-    void *rx_free;
-    void *rx_active;
-    size_t rx_capacity;
-    void *tx_free;
-    void *tx_active;
-    size_t tx_capacity;
+typedef struct net_connection_resource {
+    region_resource_t free_queue;
+    region_resource_t active_queue;
+    uint16_t num_buffers;
+    uint8_t id;
+} net_connection_resource_t;
 
-    uint8_t rx_id;
-    uint8_t tx_id;
+typedef struct net_driver_config {
+    net_connection_resource_t virt_rx;
+    net_connection_resource_t virt_tx;
 } net_driver_config_t;
 
 typedef struct net_virt_tx_client_config {
-    void *free;
-    void *active;
-    size_t capacity;
-    uintptr_t buffer_data_region_vaddr;
-    uintptr_t buffer_data_region_paddr;
-    uint8_t id;
+    net_connection_resource_t conn;
+    region_resource_t data;
 } net_virt_tx_client_config_t;
 
 typedef struct net_virt_tx_config {
-    void *free_drv;
-    void *active_drv;
-    size_t capacity_drv;
-    uint8_t drv_id;
-    uint8_t num_clients;
+    net_connection_resource_t driver;
     net_virt_tx_client_config_t clients[SDDF_NET_MAX_CLIENTS];
+    uint8_t num_clients;
 } net_virt_tx_config_t;
 
 typedef struct net_virt_rx_config_client {
-    void *free;
-    void *active;
-    uint64_t capacity;
+    net_connection_resource_t conn;
     uint8_t mac_addr[6];
-    uint8_t client_id;
 } net_virt_rx_config_client_t;
 
 typedef struct net_virt_rx_config {
-    void *free_drv;
-    void *active_drv;
-    uint64_t capacity_drv;
-    uintptr_t buffer_data_paddr;
-    uintptr_t buffer_data_vaddr;
+    net_connection_resource_t driver;
+    region_resource_t data;
     // The system designer must allocate a buffer metadata region for internal
     // use by the RX virtualiser. The size of this region must be at least
     // 4*drv_queue_capacity. It must be mapped R-W and zero-initialised.
-    void *buffer_metadata;
-    uint8_t driver_id;
-    uint8_t num_clients;
+    region_resource_t buffer_metadata;
     net_virt_rx_config_client_t clients[SDDF_NET_MAX_CLIENTS];
+    uint8_t num_clients;
 } net_virt_rx_config_t;
 
 typedef struct net_copy_config {
- 	void *virt_free;
- 	void *virt_active;
- 	size_t virt_capacity;
- 	void *cli_free;
- 	void *cli_active;
- 	size_t cli_capacity;
- 	uintptr_t virt_data;
- 	uintptr_t cli_data;
- 
- 	uint8_t virt_id;
- 	uint8_t cli_id;
+    net_connection_resource_t virt_rx;
+    region_resource_t device_data;
+
+    net_connection_resource_t client;
+    region_resource_t client_data;
 } net_copy_config_t;
 
 typedef struct net_client_config {
-    void *rx_free;
-    void *rx_active;
-    size_t rx_capacity;
+    net_connection_resource_t rx;
+    region_resource_t rx_data;
 
-    void *tx_free;
-    void *tx_active;
-    size_t tx_capacity;
-
-    uintptr_t rx_buffer_data_region;
-    uintptr_t tx_buffer_data_region;
-
-    uint8_t rx_id;
-    uint8_t tx_id;
+    net_connection_resource_t tx;
+    region_resource_t tx_data;
 
     uint8_t mac_addr[6];
 } net_client_config_t;
