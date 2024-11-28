@@ -76,8 +76,8 @@ void rx_return(void)
             int err = net_dequeue_active(&state.rx_queue_drv, &buffer);
             assert(!err);
 
-            buffer.io_or_offset = buffer.io_or_offset - config.buffer_data_paddr;
-            uintptr_t buffer_vaddr = buffer.io_or_offset + config.buffer_data_vaddr;
+            buffer.io_or_offset = buffer.io_or_offset - config.data.paddr;
+            uintptr_t buffer_vaddr = buffer.io_or_offset + config.data.vaddr;
 
             // Cache invalidate after DMA write, so we don't read stale data.
             // This must be performed after the DMA write to avoid reading
@@ -113,7 +113,7 @@ void rx_return(void)
                 assert(!err);
                 notify_clients[client] = true;
             } else {
-                buffer.io_or_offset = buffer.io_or_offset + config.buffer_data_paddr;
+                buffer.io_or_offset = buffer.io_or_offset + config.data.paddr;
                 err = net_enqueue_free(&state.rx_queue_drv, buffer);
                 assert(!err);
                 notify_drv = true;
@@ -131,7 +131,7 @@ void rx_return(void)
     for (int client = 0; client < config.num_clients; client++) {
         if (notify_clients[client] && net_require_signal_active(&state.rx_queue_clients[client])) {
             net_cancel_signal_active(&state.rx_queue_clients[client]);
-            microkit_notify(config.clients[client].client_id);
+            microkit_notify(config.clients[client].conn.id);
         }
     }
 }
@@ -161,7 +161,7 @@ void rx_provide(void)
                 // the DMA region is only mapped in read only. This avoids the
                 // case where pending writes are only written to the buffer
                 // memory after DMA has occured.
-                buffer.io_or_offset = buffer.io_or_offset + config.buffer_data_paddr;
+                buffer.io_or_offset = buffer.io_or_offset + config.data.paddr;
                 err = net_enqueue_free(&state.rx_queue_drv, buffer);
                 assert(!err);
                 notify_drv = true;
@@ -179,7 +179,7 @@ void rx_provide(void)
 
     if (notify_drv && net_require_signal_free(&state.rx_queue_drv)) {
         net_cancel_signal_free(&state.rx_queue_drv);
-        microkit_deferred_notify(config.driver_id);
+        microkit_deferred_notify(config.driver.id);
         notify_drv = false;
     }
 }
@@ -194,19 +194,19 @@ void init(void)
 {
     sddf_memcpy(&config, net_virt_rx_data, net_virt_rx_data_len);
 
-    buffer_refs = config.buffer_metadata;
+    buffer_refs = config.buffer_metadata.vaddr;
 
     /* Set up client queues */
     for (int i = 0; i < config.num_clients; i++) {
-        net_queue_init(&state.rx_queue_clients[i], config.clients[i].free, config.clients[i].active, config.clients[i].capacity);
+        net_queue_init(&state.rx_queue_clients[i], config.clients[i].conn.free_queue.vaddr, config.clients[i].conn.active_queue.vaddr, config.clients[i].conn.num_buffers);
     }
 
     /* Set up driver queues */
-    net_queue_init(&state.rx_queue_drv, config.free_drv, config.active_drv, config.capacity_drv);
-    net_buffers_init(&state.rx_queue_drv, config.buffer_data_paddr);
+    net_queue_init(&state.rx_queue_drv, config.driver.free_queue.vaddr, config.driver.active_queue.vaddr, config.driver.num_buffers);
+    net_buffers_init(&state.rx_queue_drv, config.data.paddr);
 
     if (net_require_signal_free(&state.rx_queue_drv)) {
         net_cancel_signal_free(&state.rx_queue_drv);
-        microkit_deferred_notify(config.driver_id);
+        microkit_deferred_notify(config.driver.id);
     }
 }
