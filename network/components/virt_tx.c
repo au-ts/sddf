@@ -24,9 +24,9 @@ state_t state;
 int extract_offset(uintptr_t *phys)
 {
     for (int client = 0; client < config.num_clients; client++) {
-        if (*phys >= config.clients[client].buffer_data_region_paddr
-            && *phys < config.clients[client].buffer_data_region_paddr + state.tx_queue_clients[client].capacity * NET_BUFFER_SIZE) {
-            *phys = *phys - config.clients[client].buffer_data_region_paddr;
+        if (*phys >= config.clients[client].data.paddr
+            && *phys < config.clients[client].data.paddr + state.tx_queue_clients[client].capacity * NET_BUFFER_SIZE) {
+            *phys = *phys - config.clients[client].data.paddr;
             return client;
         }
     }
@@ -53,10 +53,10 @@ void tx_provide(void)
                     continue;
                 }
 
-                cache_clean(buffer.io_or_offset + config.clients[client].buffer_data_region_vaddr,
-                            buffer.io_or_offset + config.clients[client].buffer_data_region_vaddr + buffer.len);
+                cache_clean(buffer.io_or_offset + config.clients[client].data.vaddr,
+                            buffer.io_or_offset + config.clients[client].data.vaddr + buffer.len);
 
-                buffer.io_or_offset = buffer.io_or_offset + config.clients[client].buffer_data_region_paddr;
+                buffer.io_or_offset = buffer.io_or_offset + config.clients[client].data.paddr;
                 err = net_enqueue_active(&state.tx_queue_drv, buffer);
                 assert(!err);
                 enqueued = true;
@@ -74,7 +74,7 @@ void tx_provide(void)
 
     if (enqueued && net_require_signal_active(&state.tx_queue_drv)) {
         net_cancel_signal_active(&state.tx_queue_drv);
-        microkit_deferred_notify(config.drv_id);
+        microkit_deferred_notify(config.driver.id);
     }
 }
 
@@ -108,7 +108,7 @@ void tx_return(void)
     for (int client = 0; client < config.num_clients; client++) {
         if (notify_clients[client] && net_require_signal_free(&state.tx_queue_clients[client])) {
             net_cancel_signal_free(&state.tx_queue_clients[client]);
-            microkit_notify(config.clients[client].id);
+            microkit_notify(config.clients[client].conn.id);
         }
     }
 }
@@ -124,10 +124,10 @@ void init(void)
     sddf_memcpy(&config, net_virt_tx_data, net_virt_tx_data_len);
 
     /* Set up driver queues */
-    net_queue_init(&state.tx_queue_drv, config.free_drv, config.active_drv, config.capacity_drv);
+    net_queue_init(&state.tx_queue_drv, config.driver.free_queue.vaddr, config.driver.active_queue.vaddr, config.driver.num_buffers);
 
     for (int i = 0; i < config.num_clients; i++) {
-        net_queue_init(&state.tx_queue_clients[i], config.clients[i].free, config.clients[i].active, config.clients[i].capacity);
+        net_queue_init(&state.tx_queue_clients[i], config.clients[i].conn.free_queue.vaddr, config.clients[i].conn.active_queue.vaddr, config.clients[i].conn.num_buffers);
     }
 
     tx_provide();
