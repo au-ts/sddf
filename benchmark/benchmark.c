@@ -133,9 +133,9 @@ static void print_benchmark_details(uint64_t pd_id, uint64_t kernel_util, uint64
     } else {
         sddf_printf("Utilisation details for PD: ");
         print_pdid_name(pd_id);
-        sddf_printf(" (%lx)\n", pd_id);
+        sddf_printf(" (%lu)\n", pd_id);
     }
-    sddf_printf("{\nKernelUtilisation:  %lx\nKernelEntries:  %lx\nNumberSchedules:  %lx\nTotalUtilisation:  %lx\n}\n",
+    sddf_printf("{\nKernelUtilisation:  %lu\nKernelEntries:  %lu\nNumberSchedules:  %lu\nTotalUtilisation:  %lu\n}\n",
             kernel_util, kernel_entries, number_schedules, total_util);
 }
 #endif
@@ -173,12 +173,12 @@ static inline void seL4_BenchmarkTrackDumpSummary(benchmark_track_kernel_entry_t
         index++;
     }
 
-    sddf_printf("Number of system call invocations  %llx and fastpaths  %llx\n", syscall_entries, fastpaths);
-    sddf_printf("Number of interrupt invocations  %llx\n", interrupt_entries);
-    sddf_printf("Number of user-level faults  %llx\n", userlevelfault_entries);
-    sddf_printf("Number of VM faults  %llx\n", vmfault_entries);
-    sddf_printf("Number of debug faults  %llx\n", debug_fault);
-    sddf_printf("Number of others  %llx\n", other);
+    sddf_printf("Number of system call invocations  %llu and fastpaths  %llu\n", syscall_entries, fastpaths);
+    sddf_printf("Number of interrupt invocations  %llu\n", interrupt_entries);
+    sddf_printf("Number of user-level faults  %llu\n", userlevelfault_entries);
+    sddf_printf("Number of VM faults  %llu\n", vmfault_entries);
+    sddf_printf("Number of debug faults  %llu\n", debug_fault);
+    sddf_printf("Number of others  %llu\n", other);
 }
 #endif
 
@@ -209,7 +209,7 @@ void notified(microkit_channel ch)
 
         sddf_printf("{\n");
         for (int i = 0; i < ARRAY_SIZE(benchmarking_events); i++) {
-            sddf_printf("%s: %lX\n", counter_names[i], counter_values[i]);
+            sddf_printf("%s: %lu\n", counter_names[i], counter_values[i]);
         }
         sddf_printf("}\n");
 #endif
@@ -240,7 +240,7 @@ void notified(microkit_channel ch)
 
 #ifdef CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES
         entries = seL4_BenchmarkFinalizeLog();
-        sddf_printf("KernelEntries:  %llx\n", entries);
+        sddf_printf("KernelEntries:  %llu\n", entries);
         seL4_BenchmarkTrackDumpSummary(log_buffer, entries);
 #endif
 
@@ -284,7 +284,7 @@ void init(void)
 #ifdef CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES
     int res_buf = seL4_BenchmarkSetLogBuffer(LOG_BUFFER_CAP);
     if (res_buf) {
-        sddf_printf("Could not set log buffer:  %llx\n", res_buf);
+        sddf_printf("Could not set log buffer:  %llu\n", res_buf);
     } else {
         sddf_printf("Log buffer set\n");
     }
@@ -299,7 +299,7 @@ void fault(microkit_channel id, microkit_msginfo msginfo)
 
     // seL4_UserContext regs;
     // seL4_TCB_ReadRegisters(BASE_TCB_CAP + id, false, 0, sizeof(seL4_UserContext) / sizeof(seL4_Word), &regs);
-    // sddf_printf("Registers: \npc : %lx\nspsr : %lx\nx0 : %lx\nx1 : %lx\nx2 : %lx\nx3 : %lx\nx4 : %lx\nx5 : %lx\nx6 : %lx\nx7 : %lx\n",
+    // sddf_printf("Registers: \npc : %lu\nspsr : %lu\nx0 : %lu\nx1 : %lu\nx2 : %lu\nx3 : %lu\nx4 : %lu\nx5 : %lu\nx6 : %lu\nx7 : %lu\n",
     //             regs.pc, regs.spsr, regs.x0, regs.x1, regs.x2, regs.x3, regs.x4, regs.x5, regs.x6, regs.x7);
 
     // switch (microkit_msginfo_get_label(msginfo)) {
@@ -307,7 +307,7 @@ void fault(microkit_channel id, microkit_msginfo msginfo)
     //     uint64_t ip = seL4_GetMR(seL4_CapFault_IP);
     //     uint64_t fault_addr = seL4_GetMR(seL4_CapFault_Addr);
     //     uint64_t in_recv_phase = seL4_GetMR(seL4_CapFault_InRecvPhase);
-    //     sddf_printf("CapFault: ip=%lx  fault_addr=%lx  in_recv_phase=%s\n", ip, fault_addr,
+    //     sddf_printf("CapFault: ip=%lu  fault_addr=%lu  in_recv_phase=%s\n", ip, fault_addr,
     //                 (in_recv_phase == 0 ? "false" : "true"));
     //     break;
     // }
@@ -320,7 +320,7 @@ void fault(microkit_channel id, microkit_msginfo msginfo)
     //     uint64_t fault_addr = seL4_GetMR(seL4_VMFault_Addr);
     //     uint64_t is_instruction = seL4_GetMR(seL4_VMFault_PrefetchFault);
     //     uint64_t fsr = seL4_GetMR(seL4_VMFault_FSR);
-    //     sddf_printf("VMFault: ip=%lx  fault_addr=%lx  fsr=%lx %s\n", ip, fault_addr, fsr,
+    //     sddf_printf("VMFault: ip=%lu  fault_addr=%lu  fsr=%lu %s\n", ip, fault_addr, fsr,
     //                 (is_instruction ? "(instruction fault)" : "(data fault)"));
     //     break;
     // }

@@ -23,6 +23,7 @@
 
 #define RX_IRQ  1
 #define IRQ_INTERVAL 9
+// #define IRQ_INTERVAL 10
 
 const uint64_t hw_rx_ring_paddr = 0x10000000;
 const uint64_t hw_rx_ring_vaddr = 0x2200000;

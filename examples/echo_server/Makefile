@@ -35,7 +35,7 @@ else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
 	export TIMER_DRV_DIR := arm
 	export CPU := cortex-a53
 	QEMU := qemu-system-aarch64
-else ifeq ($(strip $(MICROKIT_BOARD)), vb_105)
+else ifneq ($(filter $(strip $(MICROKIT_BOARD)),vb_105 vb_105_smp),)
 	export DRIV_DIR := ixgbe
 	export UART_DRIV_DIR := pc99
 	export TIMER_DRV_DIR := hpet
