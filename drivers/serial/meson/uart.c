@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <microkit.h>
-#include <sddf/device/resources.h>
+#include <sddf/resources/device.h>
 #include <sddf/util/printf.h>
 #include <sddf/serial/config.h>
 #include "uart.h"
