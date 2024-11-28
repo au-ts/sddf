@@ -23,7 +23,7 @@ jobs:
           wget https://github.com/seL4/microkit/releases/download/1.4.1/microkit-sdk-1.4.1-linux-x86-64.tar.gz
           tar xf microkit-sdk-1.4.1-linux-x86-64.tar.gz
       - name: Install dependencies (via apt)
-        run: sudo apt update && sudo apt install -y make llvm lld xxd
+        run: sudo apt update && sudo apt install -y make llvm lld imagemagick
       - name: Download and install AArch64 GCC toolchain
         run: |
           wget -O aarch64-toolchain.tar.xz https://trustworthy.systems/Downloads/microkit/arm-gnu-toolchain-12.3.rel1-x86_64-aarch64-none-elf.tar.xz
@@ -35,6 +35,17 @@ jobs:
           version: 0.13.0
       - name: Build and run examples
         run: ./ci/examples.sh ${PWD}/microkit-sdk-1.4.1
+        shell: bash
+  build_linux_x86_64_nix:
+    name: Linux x86-64 (Nix)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Nix
+        uses: cachix/install-nix-action@v27
+      - name: Build and run examples
+        run: nix develop -c bash -c './ci/examples.sh $MICROKIT_SDK'
         shell: bash
   build_macos_arm64:
     name: macOS ARM64
@@ -48,7 +59,7 @@ jobs:
           tar xf microkit-sdk-1.4.1-macos-aarch64.tar.gz
       - name: Install dependencies (via Homebrew)
         run: |
-          brew install llvm lld make
+          brew install llvm lld make imagemagick
           echo "/opt/homebrew/opt/llvm/bin:$PATH" >> $GITHUB_PATH
       - name: Install Zig
         uses: mlugg/setup-zig@v1.2.0

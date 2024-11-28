@@ -18,8 +18,7 @@ const targets = [_]Target{
         .board = .qemu_virt_aarch64,
         .zig_target = std.Target.Query{
             .cpu_arch = .aarch64,
-            .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a53 },
-            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{ .strict_align }),
+            .cpu_model = .{ .explicit = &std.Target.arm.cpu.cortex_a53 },
             .os_tag = .freestanding,
             .abi = .none,
         },
@@ -54,14 +53,9 @@ pub fn build(b: *std.Build) void {
     const microkit_config = @tagName(microkit_config_option);
 
     // Get the Microkit SDK board we want to target
-    const microkit_board_option = b.option(MicrokitBoard, "board", "Microkit board to target");
-
-    if (microkit_board_option == null) {
-        std.log.err("Missing -Dboard=<BOARD> argument being passed\n", .{});
-        std.posix.exit(1);
-    }
-    const target = b.resolveTargetQuery(findTarget(microkit_board_option.?));
-    const microkit_board = @tagName(microkit_board_option.?);
+    const microkit_board_option = b.option(MicrokitBoard, "board", "Microkit board to target") orelse MicrokitBoard.qemu_virt_aarch64;
+    const target = b.resolveTargetQuery(findTarget(microkit_board_option));
+    const microkit_board = @tagName(microkit_board_option);
 
     const microkit_board_dir = b.fmt("{s}/board/{s}/{s}", .{ microkit_sdk, microkit_board, microkit_config });
     const microkit_tool = b.fmt("{s}/bin/microkit", .{microkit_sdk});
@@ -75,12 +69,28 @@ pub fn build(b: *std.Build) void {
         .libmicrokit = @as([]const u8, libmicrokit),
         .libmicrokit_include = @as([]const u8, libmicrokit_include),
         .libmicrokit_linker_script = @as([]const u8, libmicrokit_linker_script),
-        .blk_config_include = @as([]const u8, ""),
+        .gpu_config_include = @as([]const u8, "include"),
     });
 
-    const blk_driver_class = switch (microkit_board_option.?) {
+    const gpu_driver_class = switch (microkit_board_option) {
         .qemu_virt_aarch64 => "virtio",
     };
+
+    const timer_driver_class = switch (microkit_board_option) {
+        .qemu_virt_aarch64 => "arm",
+    };
+
+    const fb_img = b.path("fb_img.jpeg");
+    const fb_img_width = 300;
+    const fb_img_height = 400;
+    const fb_img_cmd = b.addSystemCommand(&[_][]const u8{
+        "convert",
+        "-auto-orient",
+        "-depth", "8",
+        "-size", b.fmt("{any}x{any}", .{fb_img_width, fb_img_height}),
+    });
+    fb_img_cmd.addFileArg(fb_img);
+    const fb_img_bgra = fb_img_cmd.addOutputFileArg("fb_img.bgra");
 
     const client = b.addExecutable(.{
         .name = "client.elf",
@@ -89,11 +99,20 @@ pub fn build(b: *std.Build) void {
         .strip = false,
     });
 
+    client.step.dependOn(&b.addInstallFileWithDir(fb_img_bgra, .prefix, "fb_img.bgra").step);
+    const fb_img_bgra_path = b.getInstallPath(.prefix, "fb_img.bgra");
+
     client.addCSourceFiles(.{
-        .files = &.{ "client.c" },
+        .files = &.{ "client.c", "fb_img.S" },
+        .flags = &.{
+            b.fmt("-DFB_IMG_WIDTH={any}", .{fb_img_width}),
+            b.fmt("-DFB_IMG_HEIGHT={any}", .{fb_img_height}),
+            b.fmt("-DFB_IMG_PATH=\"{s}\"", .{fb_img_bgra_path}),
+        },
     });
-    // For blk_config.h
-    client.addIncludePath(b.path(""));
+
+    // For gpu_config.h
+    client.addIncludePath(b.path("include"));
 
     client.addIncludePath(sddf_dep.path("include"));
     client.linkLibrary(sddf_dep.artifact("util"));
@@ -103,16 +122,20 @@ pub fn build(b: *std.Build) void {
     client.addObjectFile(.{ .cwd_relative = libmicrokit });
     client.setLinkerScriptPath(.{ .cwd_relative = libmicrokit_linker_script });
 
-    const blk_driver = sddf_dep.artifact(b.fmt("driver_blk_{s}.elf", .{ blk_driver_class }));
-
     b.installArtifact(client);
-    b.installArtifact(blk_driver);
-    b.installArtifact(sddf_dep.artifact("blk_virt.elf"));
+    b.installArtifact(sddf_dep.artifact("gpu_virt.elf"));
 
-    // Because our SDF expects a different ELF name for the block driver, we have this extra step.
-    const blk_driver_install = b.addInstallArtifact(blk_driver, .{ .dest_sub_path = "blk_driver.elf" });
+    const gpu_driver = sddf_dep.artifact(b.fmt("driver_gpu_{s}.elf", .{ gpu_driver_class }));
+    // Because our SDF expects a different ELF name for the gpu driver, we have this extra step.
+    const gpu_driver_install = b.addInstallArtifact(gpu_driver, .{ .dest_sub_path = "gpu_driver.elf" });
+    b.getInstallStep().dependOn(&gpu_driver_install.step);
 
-    const system_description_path = b.fmt("board/{s}/blk.system", .{microkit_board});
+    const timer_driver = sddf_dep.artifact(b.fmt("driver_timer_{s}.elf", .{ timer_driver_class }));
+    // Same thing here, a different ELF name for the timer driver
+    const timer_driver_install = b.addInstallArtifact(timer_driver, .{ .dest_sub_path = "timer_driver.elf" });
+    b.getInstallStep().dependOn(&timer_driver_install.step);
+
+    const system_description_path = b.fmt("board/{s}/gpu.system", .{microkit_board});
     const final_image_dest = b.getInstallPath(.bin, "./loader.img");
     const microkit_tool_cmd = b.addSystemCommand(&[_][]const u8{
         microkit_tool,
@@ -124,10 +147,8 @@ pub fn build(b: *std.Build) void {
         "-r", b.getInstallPath(.prefix, "./report.txt")
     });
     microkit_tool_cmd.step.dependOn(b.getInstallStep());
-    microkit_tool_cmd.setEnvironmentVariable("MICROKIT_SDK", microkit_sdk);
 
     const microkit_step = b.step("microkit", "Compile and build the final bootable image");
-    microkit_step.dependOn(&blk_driver_install.step);
     microkit_step.dependOn(&microkit_tool_cmd.step);
     b.default_step = microkit_step;
 
@@ -135,35 +156,19 @@ pub fn build(b: *std.Build) void {
     // which we only want to do when we have a board that we can actually simulate.
     const loader_arg = b.fmt("loader,file={s},addr=0x70000000,cpu-num=0", .{ final_image_dest });
     if (std.mem.eql(u8, microkit_board, "qemu_virt_aarch64")) {
-        const create_disk_cmd = b.addSystemCommand(&[_][]const u8{
-            "bash",
-        });
-        const mkvirtdisk = sddf_dep.path("tools/mkvirtdisk");
-        create_disk_cmd.addFileArg(mkvirtdisk);
-        create_disk_cmd.addFileInput(mkvirtdisk);
-        const disk = create_disk_cmd.addOutputFileArg("disk");
-        create_disk_cmd.addArgs(&[_][]const u8{
-            "1", "512", b.fmt("{}", .{ 1024 * 1024 * 16 }),
-        });
-        const disk_install = b.addInstallFile(disk, "disk");
-        disk_install.step.dependOn(&create_disk_cmd.step);
-
         const qemu_cmd = b.addSystemCommand(&[_][]const u8{
             "qemu-system-aarch64",
-            "-machine", "virt,virtualization=on,highmem=off,secure=off",
+            "-machine", "virt,virtualization=on",
             "-cpu", "cortex-a53",
             "-serial", "mon:stdio",
             "-device", loader_arg,
-            "-m", "2G",
-            "-nographic",
+            "-m", "size=2G",
+            "-device", "virtio-gpu-device,edid=off,blob=off,max_outputs=1,indirect_desc=off,event_idx=off",
             "-global", "virtio-mmio.force-legacy=false",
             "-d", "guest_errors",
-            "-drive", b.fmt("file={s},if=none,format=raw,id=hd", .{ b.getInstallPath(.prefix, "disk") }),
-            "-device", "virtio-blk-device,drive=hd",
-            // "--trace", "events=/tmp/events",
+            // "--trace", "enable=virtio*",
         });
         qemu_cmd.step.dependOn(b.default_step);
-        qemu_cmd.step.dependOn(&disk_install.step);
         const simulate_step = b.step("qemu", "Simulate the image using QEMU");
         simulate_step.dependOn(&qemu_cmd.step);
     }

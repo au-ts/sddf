@@ -42,6 +42,10 @@ const DriverClass = struct {
         ds3231,
         pn532,
     };
+
+    const Gpu = enum {
+        virtio,
+    };
 };
 
 const util_src = [_][]const u8{
@@ -250,6 +254,32 @@ fn addNetworkDriver(
     return driver;
 }
 
+fn addGpuDriver(
+    b: *std.Build,
+    gpu_config_include: LazyPath,
+    util: *std.Build.Step.Compile,
+    class: DriverClass.Gpu,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+) *std.Build.Step.Compile {
+    const driver = addPd(b, .{
+        .name = b.fmt("driver_gpu_{s}.elf", .{ @tagName(class) }),
+        .target = target,
+        .optimize = optimize,
+        .strip = false,
+    });
+    const source = b.fmt("drivers/gpu/{s}/gpu.c", .{ @tagName(class) });
+    driver.addCSourceFile(.{
+        .file = b.path(source),
+    });
+    driver.addIncludePath(gpu_config_include);
+    driver.addIncludePath(b.path(b.fmt("drivers/gpu/{s}/", .{ @tagName(class) })));
+    driver.addIncludePath(b.path("include"));
+    driver.linkLibrary(util);
+
+    return driver;
+}
+
 fn addPd(b: *std.Build, options: std.Build.ExecutableOptions) *std.Build.Step.Compile {
     const pd = b.addExecutable(options);
     pd.addObjectFile(libmicrokit);
@@ -270,6 +300,7 @@ pub fn build(b: *std.Build) void {
     const serial_config_include_option = b.option([]const u8, "serial_config_include", "Include path to serial config header") orelse "";
     const net_config_include_option = b.option([]const u8, "net_config_include", "Include path to network config header") orelse "";
     const i2c_client_include_option = b.option([]const u8, "i2c_client_include", "Include path to client config header") orelse "";
+    const gpu_config_include_option = b.option([]const u8, "gpu_config_include", "Include path to gpu config header") orelse "";
 
     // TODO: Right now this is not super ideal. What's happening is that we do not
     // always need a serial config include, but we must always specify it
@@ -280,6 +311,7 @@ pub fn build(b: *std.Build) void {
     const blk_config_include = LazyPath{ .cwd_relative = blk_config_include_opt };
     const net_config_include = LazyPath{ .cwd_relative = net_config_include_option };
     const i2c_client_include = LazyPath{ .cwd_relative = i2c_client_include_option };
+    const gpu_config_include = LazyPath{ .cwd_relative = gpu_config_include_option };
     // libmicrokit
     // We're declaring explicitly here instead of with anonymous structs due to a bug. See https://github.com/ziglang/zig/issues/19832
     libmicrokit = LazyPath{ .cwd_relative = libmicrokit_opt.? };
@@ -388,6 +420,29 @@ pub fn build(b: *std.Build) void {
     // UART drivers
     inline for (std.meta.fields(DriverClass.Uart)) |class| {
         const driver = addUartDriver(b, serial_config_include, util, @enumFromInt(class.value), target, optimize);
+        driver.linkLibrary(util_putchar_debug);
+        b.installArtifact(driver);
+    }
+
+    // Gpu components
+    const gpu_virt = addPd(b, .{
+        .name = "gpu_virt.elf",
+        .target = target,
+        .optimize = optimize,
+        .strip = false,
+    });
+    gpu_virt.addCSourceFile(.{
+        .file = b.path("gpu/components/virt.c"),
+    });
+    gpu_virt.addIncludePath(gpu_config_include);
+    gpu_virt.addIncludePath(b.path("include"));
+    gpu_virt.linkLibrary(util);
+    gpu_virt.linkLibrary(util_putchar_debug);
+    b.installArtifact(gpu_virt);
+
+    // Gpu drivers
+    inline for (std.meta.fields(DriverClass.Gpu)) |class| {
+        const driver = addGpuDriver(b, gpu_config_include, util, @enumFromInt(class.value), target, optimize);
         driver.linkLibrary(util_putchar_debug);
         b.installArtifact(driver);
     }

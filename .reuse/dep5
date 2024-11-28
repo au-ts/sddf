@@ -3,6 +3,7 @@ Upstream-Name: seL4 Device Driver Framework
 Source: https://github.com/au-ts/sddf
 
 Files:
+    flake.lock
     CHANGES.md
     build.zig.zon
     examples/i2c/build.zig.zon
@@ -11,8 +12,14 @@ Files:
     examples/blk/build.zig.zon
     examples/blk/basic_data.txt
     examples/blk/basic_data.h
+    examples/gpu/build.zig.zon
 Copyright: UNSW
 License: BSD-2-Clause
+
+Files:
+    examples/gpu/fb_img.jpeg
+Copyright: UNSW
+License: CC-BY-SA-4.0
 
 Files: libco/*
 Copyright: byuu and the higan team

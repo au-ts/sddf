@@ -27,28 +27,51 @@ The latest design documentation can be found [here](https://trustworthy.systems/
 More information about the sDDF project can be found on the Trustworthy Systems website
 [here](https://trustworthy.systems/projects/drivers/).
 
-## Building and running examples
+## Dependencies
+
+* Microkit SDK 1.4.1
+* GNU Make
+* Clang and LLVM bintools
+
+The Microkit SDK can be acquired from [here](https://github.com/seL4/microkit/releases/tag/1.4.1).
+
+sDDF is primarily compiled via Makefiles, but the [Zig](https://ziglang.org) build system is also
+available. If you are intending on using Zig instead of Make, please see https://ziglang.org/download/.
+
+See the instructions below for installing the rest of the dependencies based on your
+machine:
+
+### apt
+
+On apt based Linux distributions run the following commands:
+
+```sh
+sudo apt install make llvm lld
+```
+
+### Homebrew
+
+On macOS, you can install the dependencies via Homebrew:
+```sh
+brew install llvm lld make
+```
+
+### Nix
+
+There is a Nix flake available in the repository, so you can get a development shell via:
+```sh
+nix develop
+```
+
+Note that this will set the `MICROKIT_SDK` environment variable to the SDK path, you do not
+need to download the Microkit SDK manually.
+
+## Examples
 
 You can find examples making use of the sDDF in the `examples/` directory. Each example has its
 own README for how to build and run it.
 
-## Dependencies
-
-### Toolchain
-
-Any C toolchain should work but most testing and experimentation is currently performed with
-the `aarch64-none-elf` GCC toolchain distributed by ARM. You can download it from
-[here](https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads).
-
-The specific version used for testing is:
-`aarch64-none-elf-gcc (GNU Toolchain for the A-profile Architecture 10.2-2020.11 (arm-10.16)) 10.2.1 20201103`.
-
-### Microkit SDK
-
-The sDDF is built using the [seL4 Microkit](https://github.com/seL4/microkit) (version 1.4.1).
-
-You can download version 1.4.1 of Microkit SDK from
-[here](https://github.com/seL4/microkit/releases/tag/1.4.1).
+Note that some examples may have dependencies in addition to the ones listed in this README.
 
 ## Developing sDDF
 
