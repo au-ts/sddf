@@ -24,9 +24,9 @@ state_t state;
 int extract_offset(uintptr_t *phys)
 {
     for (int client = 0; client < config.num_clients; client++) {
-        if (*phys >= config.clients[client].data.paddr
-            && *phys < config.clients[client].data.paddr + state.tx_queue_clients[client].capacity * NET_BUFFER_SIZE) {
-            *phys = *phys - config.clients[client].data.paddr;
+        if (*phys >= config.clients[client].data.io_addr
+            && *phys < config.clients[client].data.io_addr + state.tx_queue_clients[client].capacity * NET_BUFFER_SIZE) {
+            *phys = *phys - config.clients[client].data.io_addr;
             return client;
         }
     }
@@ -53,10 +53,10 @@ void tx_provide(void)
                     continue;
                 }
 
-                cache_clean(buffer.io_or_offset + config.clients[client].data.vaddr,
-                            buffer.io_or_offset + config.clients[client].data.vaddr + buffer.len);
+                cache_clean(buffer.io_or_offset + config.clients[client].data.region.vaddr,
+                            buffer.io_or_offset + config.clients[client].data.region.vaddr + buffer.len);
 
-                buffer.io_or_offset = buffer.io_or_offset + config.clients[client].data.paddr;
+                buffer.io_or_offset = buffer.io_or_offset + config.clients[client].data.io_addr;
                 err = net_enqueue_active(&state.tx_queue_drv, buffer);
                 assert(!err);
                 enqueued = true;

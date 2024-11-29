@@ -138,7 +138,7 @@ void init(void)
         timeouts[i] = UINT64_MAX;
     }
 
-    regs = (void *)((uintptr_t)device_resources.regions[0].vaddr + TIMER_REG_START);
+    regs = (void *)((uintptr_t)device_resources.regions[0].region.vaddr + TIMER_REG_START);
 
     /* Start timer E acts as a clock, while timer A can be used for timeouts from clients */
     regs->mux = TIMER_A_EN | (TIMESTAMP_TIMEBASE_1_US << TIMER_E_INPUT_CLK) |

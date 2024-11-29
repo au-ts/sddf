@@ -2,6 +2,7 @@
 
 #include <microkit.h>
 #include <sddf/resources/common.h>
+#include <sddf/resources/device.h>
 
 #define SDDF_NET_MAX_CLIENTS (MICROKIT_MAX_CHANNELS - 1)
 
@@ -19,7 +20,7 @@ typedef struct net_driver_config {
 
 typedef struct net_virt_tx_client_config {
     net_connection_resource_t conn;
-    region_resource_t data;
+    device_region_resource_t data;
 } net_virt_tx_client_config_t;
 
 typedef struct net_virt_tx_config {
@@ -35,7 +36,7 @@ typedef struct net_virt_rx_config_client {
 
 typedef struct net_virt_rx_config {
     net_connection_resource_t driver;
-    region_resource_t data;
+    device_region_resource_t data;
     // The system designer must allocate a buffer metadata region for internal
     // use by the RX virtualiser. The size of this region must be at least
     // 4*drv_queue_capacity. It must be mapped R-W and zero-initialised.
