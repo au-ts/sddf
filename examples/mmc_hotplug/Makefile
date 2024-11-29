@@ -27,8 +27,8 @@ all: ${IMAGE_FILE}
 ${IMAGE_FILE} ${REPORT_FILE} clean clobber: ${BUILD_DIR}/Makefile FORCE
 	${MAKE} -C ${BUILD_DIR} $(notdir $@)
 
-${BUILD_DIR}/Makefile: mmc.mk
+${BUILD_DIR}/Makefile: mmc_hotplug.mk
 	mkdir -p ${BUILD_DIR}
-	cp mmc.mk $@
+	cp mmc_hotplug.mk $@
 
 FORCE:
