@@ -76,8 +76,8 @@ void rx_return(void)
             int err = net_dequeue_active(&state.rx_queue_drv, &buffer);
             assert(!err);
 
-            buffer.io_or_offset = buffer.io_or_offset - config.data.paddr;
-            uintptr_t buffer_vaddr = buffer.io_or_offset + config.data.vaddr;
+            buffer.io_or_offset = buffer.io_or_offset - config.data.io_addr;
+            uintptr_t buffer_vaddr = buffer.io_or_offset + config.data.region.vaddr;
 
             // Cache invalidate after DMA write, so we don't read stale data.
             // This must be performed after the DMA write to avoid reading
@@ -113,7 +113,7 @@ void rx_return(void)
                 assert(!err);
                 notify_clients[client] = true;
             } else {
-                buffer.io_or_offset = buffer.io_or_offset + config.data.paddr;
+                buffer.io_or_offset = buffer.io_or_offset + config.data.io_addr;
                 err = net_enqueue_free(&state.rx_queue_drv, buffer);
                 assert(!err);
                 notify_drv = true;
@@ -161,7 +161,7 @@ void rx_provide(void)
                 // the DMA region is only mapped in read only. This avoids the
                 // case where pending writes are only written to the buffer
                 // memory after DMA has occured.
-                buffer.io_or_offset = buffer.io_or_offset + config.data.paddr;
+                buffer.io_or_offset = buffer.io_or_offset + config.data.io_addr;
                 err = net_enqueue_free(&state.rx_queue_drv, buffer);
                 assert(!err);
                 notify_drv = true;
@@ -203,7 +203,7 @@ void init(void)
 
     /* Set up driver queues */
     net_queue_init(&state.rx_queue_drv, config.driver.free_queue.vaddr, config.driver.active_queue.vaddr, config.driver.num_buffers);
-    net_buffers_init(&state.rx_queue_drv, config.data.paddr);
+    net_buffers_init(&state.rx_queue_drv, config.data.io_addr);
 
     if (net_require_signal_free(&state.rx_queue_drv)) {
         net_cancel_signal_free(&state.rx_queue_drv);

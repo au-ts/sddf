@@ -226,16 +226,16 @@ static void handle_irq()
 
 static void eth_setup(void)
 {
-    eth_mac = device_resources.regions[0].vaddr;
+    eth_mac = device_resources.regions[0].region.vaddr;
     eth_dma = (void *)((uintptr_t)eth_mac + DMA_REG_OFFSET);
     uint32_t l = eth_mac->macaddr0lo;
     uint32_t h = eth_mac->macaddr0hi;
 
-    assert((device_resources.regions[1].paddr & 0xFFFFFFFF) == device_resources.regions[1].paddr);
-    assert((device_resources.regions[2].paddr & 0xFFFFFFFF) == device_resources.regions[2].paddr);
+    assert((device_resources.regions[1].io_addr & 0xFFFFFFFF) == device_resources.regions[1].io_addr);
+    assert((device_resources.regions[2].io_addr & 0xFFFFFFFF) == device_resources.regions[2].io_addr);
 
-    rx.descr = (volatile struct descriptor *)device_resources.regions[1].vaddr;
-    tx.descr = (volatile struct descriptor *)device_resources.regions[2].vaddr;
+    rx.descr = (volatile struct descriptor *)device_resources.regions[1].region.vaddr;
+    tx.descr = (volatile struct descriptor *)device_resources.regions[2].region.vaddr;
 
     /* Perform reset */
     eth_dma->busmode |= DMAMAC_SWRST;
@@ -259,8 +259,8 @@ static void eth_setup(void)
     eth_dma->opmode = STOREFORWARD | EN_FLOWCTL | (0 << FLOWCTL_SHFT) | (1 < DISFLOWCTL_SHFT) | TX_OPSCND;
     eth_mac->conf = FULLDPLXMODE;
 
-    eth_dma->rxdesclistaddr = device_resources.regions[1].paddr;
-    eth_dma->txdesclistaddr = device_resources.regions[2].paddr;
+    eth_dma->rxdesclistaddr = device_resources.regions[1].io_addr;
+    eth_dma->txdesclistaddr = device_resources.regions[2].io_addr;
 
     eth_mac->framefilt |= PMSCUOUS_MODE;
 
