@@ -26,6 +26,11 @@ const DriverClass = struct {
         virtio
     };
 
+    const Clock = enum {
+        meson,
+        imx,
+    };
+
     const I2cHost = enum {
         meson,
     };
@@ -202,6 +207,60 @@ fn addBlockDriver(
     return driver;
 }
 
+fn addClockDriver(
+    b: *std.Build,
+    clk_config_include: LazyPath,
+    util: *std.Build.Step.Compile,
+    class: DriverClass.Clock,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+) *std.Build.Step.Compile {
+    const driver = addPd(b, .{
+        .name = b.fmt("driver_clk_{s}.elf", .{@tagName(class)}),
+        .target = target,
+        .optimize = optimize,
+        .strip = false,
+    });
+
+    switch (class) {
+        .meson => {
+            const files: []const []const u8 = &.{
+                "drivers/clk/meson/clk-meson.c",
+                "drivers/clk/meson/clk-measure.c",
+                "drivers/clk/meson/sm1-clk.c",
+            };
+            driver.addCSourceFiles(.{ .files = files });
+        },
+        .imx => {
+            const files: []const []const u8 = &.{
+                "drivers/clk/imx/clk-imx.c",
+                "drivers/clk/imx/clk-imx8mq.c",
+            };
+            driver.addCSourceFiles(.{ .files = files });
+        },
+    }
+
+    const common_src_files = .{
+        "clk-operations.c",
+        "clk.c",
+    };
+
+    inline for (common_src_files) |f| {
+        driver.addCSourceFile(.{
+            .file = b.path(b.fmt("drivers/clk/{s}", .{ f }))
+        });
+    }
+
+    driver.defineCMacro(b.fmt("BOARD_CLASS_{s}", .{ @tagName(class) }), "1");
+    driver.addIncludePath(clk_config_include);
+    driver.addIncludePath(b.path("include"));
+    driver.addIncludePath(b.path("drivers/clk"));
+    driver.addIncludePath(b.path(b.fmt("drivers/clk/{s}/include", .{@tagName(class)})));
+    driver.linkLibrary(util);
+
+    return driver;
+}
+
 fn addMmcDriver(
     b: *std.Build,
     blk_config_include: LazyPath,
@@ -301,6 +360,8 @@ pub fn build(b: *std.Build) void {
     const net_config_include_option = b.option([]const u8, "net_config_include", "Include path to network config header") orelse "";
     const i2c_client_include_option = b.option([]const u8, "i2c_client_include", "Include path to client config header") orelse "";
     const gpu_config_include_option = b.option([]const u8, "gpu_config_include", "Include path to gpu config header") orelse "";
+    const clk_conf_include_option = b.option([]const u8, "clk_conf_include", "Include path to client config header") orelse "";
+    const dtb_path = b.option([]const u8, "dtb_path", "Path to the DTB file") orelse "";
 
     // TODO: Right now this is not super ideal. What's happening is that we do not
     // always need a serial config include, but we must always specify it
@@ -312,6 +373,7 @@ pub fn build(b: *std.Build) void {
     const net_config_include = LazyPath{ .cwd_relative = net_config_include_option };
     const i2c_client_include = LazyPath{ .cwd_relative = i2c_client_include_option };
     const gpu_config_include = LazyPath{ .cwd_relative = gpu_config_include_option };
+    const clk_client_include = LazyPath{ .cwd_relative = clk_conf_include_option };
     // libmicrokit
     // We're declaring explicitly here instead of with anonymous structs due to a bug. See https://github.com/ziglang/zig/issues/19832
     libmicrokit = LazyPath{ .cwd_relative = libmicrokit_opt.? };
@@ -451,6 +513,22 @@ pub fn build(b: *std.Build) void {
     inline for (std.meta.fields(DriverClass.Timer)) |class| {
         const driver = addTimerDriver(b, util, @enumFromInt(class.value), target, optimize);
         driver.linkLibrary(util_putchar_debug);
+        b.installArtifact(driver);
+    }
+
+    // Clock drivers
+    inline for (std.meta.fields(DriverClass.Clock)) |class| {
+        const driver = addClockDriver(b, clk_client_include, util, @enumFromInt(class.value), target, optimize);
+        driver.linkLibrary(util_putchar_debug);
+
+       const clk_config = b.addSystemCommand(&.{
+           "python",
+           "drivers/clk/create_clk_config.py",
+           dtb_path,
+        }); // Creates a system command which runs the python interpreter
+        const clk_config_include = clk_config.addOutputDirectoryArg("test");
+        driver.addIncludePath(clk_config_include);
+
         b.installArtifact(driver);
     }
 
