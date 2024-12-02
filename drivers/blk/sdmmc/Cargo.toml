@@ -8,8 +8,8 @@ sel4-microkit = { git = "https://github.com/seL4/rust-sel4.git", rev = "d3790bfd
 # Change it to based on 
 # sdmmc_hal = { path = "sdmmc_hal/meson", features = ["sel4-microkit"] }
 # sdmmc_protocol = { path = "sdmmc_protocol" }
-sdmmc_hal = { features = ["sel4-microkit"], git = "https://github.com/Cheng-Li1/sdcard-emmc-rs", rev = "8f6a7b95c757eed67745772274144b734c5f384d" }
-sdmmc_protocol = { git = "https://github.com/Cheng-Li1/sdcard-emmc-rs", rev = "8f6a7b95c757eed67745772274144b734c5f384d" }
+sdmmc_hal = { features = ["sel4-microkit"], git = "https://github.com/Cheng-Li1/sdcard-emmc-rs", rev = "1e5e95ac27862d8e4d2c386e5392d3217b7dbb7b" }
+sdmmc_protocol = { git = "https://github.com/Cheng-Li1/sdcard-emmc-rs", rev = "1e5e95ac27862d8e4d2c386e5392d3217b7dbb7b" }
 
 [build]
 build = "build.rs"
