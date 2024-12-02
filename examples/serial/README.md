@@ -18,6 +18,7 @@ make MICROKIT_SDK=<path/to/sdk> MICROKIT_BOARD=<board> MICROKIT_CONFIG=<debug/re
 
 Currently the options for `MICROKIT_BOARD` are:
 * odroidc4
+* odroidc2
 * imx8mm_evk
 * maaxboard
 * qemu_virt_aarch64

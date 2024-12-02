@@ -32,6 +32,10 @@ ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
 	ARCH := aarch64
 	DRIVER_DIR := meson
 	CPU := cortex-a55
+else ifeq ($(strip $(MICROKIT_BOARD)), odroidc2)
+	ARCH := aarch64
+	DRIVER_DIR := meson
+	CPU := cortex-a53
 else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
 	ARCH := aarch64
 	DRIVER_DIR := arm

@@ -45,6 +45,12 @@ static void set_baud(unsigned long baud)
     uint16_t clock_div = 1;
     uint32_t baud_register = AML_UART_BAUD_USE;
     if (uart_clock.crystal_clock) {
+        #if defined(CONFIG_PLAT_ODROIDC2)
+        /* Odroidc2 hasn't clock divider option */
+        baud_register |= AML_UART_BAUD_XTAL;
+        clock_div = 3;
+        ref_clock_ticks_per_symbol /= 3;
+        #elif defined(CONFIG_PLAT_ODROIDC4)
         baud_register |= AML_UART_BAUD_XTAL;
         if (ref_clock_ticks_per_symbol % 3 == 0) {
             clock_div = 3;
@@ -56,6 +62,8 @@ static void set_baud(unsigned long baud)
         } else {
             baud_register |= AML_UART_BAUD_XTAL_DIV3;
         }
+        #endif
+
     }
 
     /* UART does not support baud rates this slow. */
