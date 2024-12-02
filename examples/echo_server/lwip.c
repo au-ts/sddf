@@ -288,8 +288,8 @@ void init(void)
     sddf_memcpy(&serial_config, serial_client_client0_data, serial_client_client0_data_len);
     sddf_memcpy(&benchmark_config, benchmark_client_config_data, benchmark_client_config_data_len);
 
-    serial_queue_init(&serial_tx_queue_handle, serial_config.tx_queue, serial_config.tx_capacity, serial_config.tx_data);
-    serial_putchar_init(serial_config.tx_id, &serial_tx_queue_handle);
+    serial_queue_init(&serial_tx_queue_handle, serial_config.tx.queue.vaddr, serial_config.tx.data.size, serial_config.tx.data.vaddr);
+    serial_putchar_init(serial_config.tx.id, &serial_tx_queue_handle);
 
     net_queue_init(&state.rx_queue, net_config.rx.free_queue.vaddr, net_config.rx.active_queue.vaddr, net_config.rx.num_buffers);
     net_queue_init(&state.tx_queue, net_config.tx.free_queue.vaddr, net_config.tx.active_queue.vaddr, net_config.tx.num_buffers);
@@ -360,7 +360,7 @@ void notified(microkit_channel ch)
     } else if (ch == timer_config.driver_id) {
         sys_check_timeouts();
         set_timeout();
-    } else if (ch == serial_config.tx_id) {
+    } else if (ch == serial_config.tx.id) {
         // Nothing to do
     } else {
         sddf_dprintf("LWIP|LOG: received notification on unexpected channel: %u\n", ch);
