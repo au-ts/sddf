@@ -1,5 +1,5 @@
 import argparse
-from sdfgen import SystemDescription, ProtectionDomain, Sddf, DeviceTree, LionsOS, Channel
+from sdfgen import SystemDescription, ProtectionDomain, Sddf, DeviceTree
 
 PLATFORMS = [
     {
@@ -29,7 +29,7 @@ def generate_sdf(sdf):
     for pd in pds:
         sdf.add_pd(pd)
 
-    blk_system.connect()
+    assert blk_system.connect()
 
     print(sdf.xml())
 
