@@ -11,6 +11,7 @@
 #include <sddf/util/printf.h>
 #include <ethernet_config.h>
 #include <sddf/timer/client.h>
+#include <sddf/benchmark/bench.h>
 
 #include "ixgbe.h"
 
@@ -20,8 +21,12 @@
 #define TX_CH 1
 #define RX_CH 2
 #define TIMER_CH 3
+#define COUNTER_CH 4
 
 #define RX_IRQ  1
+
+// Minimum inter-interrupt interval specified in 2.048 us units
+// at 1 GbE and 10 GbE link
 #define IRQ_INTERVAL 9
 // #define IRQ_INTERVAL 10
 
@@ -34,6 +39,10 @@ net_queue_t *rx_free = (net_queue_t *)0x2400000;
 net_queue_t *rx_active = (net_queue_t *)0x2600000;
 net_queue_t *tx_free = (net_queue_t *)0x2800000;
 net_queue_t *tx_active = (net_queue_t *)0x2a00000;
+
+// @jade: all the benchmarking infrastructure should be guarded by ifdefs
+struct bench *bench = (void *)(uintptr_t)0x5010000;
+static bool achieved_something;
 
 const uint64_t ONE_MS_IN_NS = 1000000;
 
@@ -116,9 +125,15 @@ void tx_provide(void)
         bool provided = false;
 
         while (!(hw_tx_ring_full()) && !net_queue_empty_active(&tx_queue)) {
+
+            // we have a packet to process, that's an achievement!
+            achieved_something = true;
+            
             net_buff_desc_t buffer;
             int err = net_dequeue_active(&tx_queue, &buffer);
             assert(!err);
+
+            bench->eth_pcount_tx++;
 
             volatile ixgbe_adv_tx_desc_t *desc = &device.tx_ring[device.tx_tail];
             desc->read.buffer_addr = buffer.io_or_offset;
@@ -146,6 +161,7 @@ void tx_provide(void)
         net_request_signal_active(&tx_queue);
         reprocess = false;
 
+        // @jade: we optimised this on RX, should we do it on TX as well?
         if (!hw_tx_ring_full() && !net_queue_empty_active(&tx_queue)) {
             net_cancel_signal_active(&tx_queue);
             reprocess = true;
@@ -157,6 +173,8 @@ void tx_return(void)
 {
     bool enqueued = false;
     while (!hw_tx_ring_empty()) {
+        // we are putting a buffer back into TX free queue, an achievement!
+        achieved_something = true;
 
         /* Ensure that this buffer has been sent by the device */
         ixgbe_adv_tx_desc_wb_t hw_desc = device.tx_ring[device.tx_head].wb;
@@ -185,9 +203,14 @@ void rx_provide(void)
         bool provided = false;
 
         while (!hw_rx_ring_full() && !net_queue_empty_free(&rx_queue)) {
+            // we have a packet to process, that's an achievement!
+            achieved_something = true;
+
             net_buff_desc_t buffer;
             int err = net_dequeue_free(&rx_queue, &buffer);
             assert(!err);
+            
+            bench->eth_pcount_rx++;
 
             volatile ixgbe_adv_rx_desc_t *desc = &device.rx_ring[device.rx_tail];
             desc->read.pkt_addr = buffer.io_or_offset;
@@ -206,10 +229,10 @@ void rx_provide(void)
             set_reg(RDT(0), device.rx_tail);
         }
 
-        /* Only request a notification from multiplexer if HW ring not full */
+        /* Only request a notification from multiplexer if HW ring is empty */
         if (hw_rx_ring_empty()) {
+            bench->eth_request_signal_rx++;
             net_request_signal_free(&rx_queue);
-            // disable_interrupts();
         } else {
             net_cancel_signal_free(&rx_queue);
         }
@@ -218,7 +241,6 @@ void rx_provide(void)
         if (!net_queue_empty_free(&rx_queue) && !hw_rx_ring_full()) {
             net_cancel_signal_free(&rx_queue);
             reprocess = true;
-            // enable_interrupts();
         }
     }
 }
@@ -227,6 +249,8 @@ static void rx_return(void)
 {
     bool packets_transferred = false;
     while (!hw_rx_ring_empty()) {
+        // we are putting a buffer back into RX active queue, an achievement!
+        achieved_something = true;
 
         /* If buffer slot is still empty, we have processed all packets the device has filled */
         ixgbe_adv_rx_desc_wb_t desc = device.rx_ring[device.rx_head].wb;
@@ -244,6 +268,7 @@ static void rx_return(void)
 
     if (packets_transferred && net_require_signal_active(&rx_queue)) {
         net_cancel_signal_active(&rx_queue);
+        bench->eth_rx_notify++;
         microkit_notify(RX_CH);
     }
 }
@@ -270,6 +295,9 @@ void enable_interrupts(void)
     clear_interrupts();
     // uint32_t mask = get_reg(EIMS);
     // mask |= ~BIT(31);
+
+    // bit 15:0 for Receive/Transmit Queue Interrupts. We only enable those IRQs
+    // because the driver doesn't know how to handle IRQs caused by other reasons.
     // set_reg(EIMS, ~BIT(31));
     // set_reg(EIMS, BIT(1));
     set_reg(EIMS, 0xff);
@@ -595,6 +623,7 @@ print_interrupt_regs(void)
 void
 notified(microkit_channel ch)
 {
+    achieved_something = false;
     print_interrupt_regs();
     // sddf_dprintf("PCI interrupt pending? %d\n", get_reg16(ECAM + 0x6) & BIT(3) != 0);
     // sddf_dprintf("vendor id: %x\n", get_reg(ECAM));
@@ -608,6 +637,13 @@ notified(microkit_channel ch)
 
         // set EICS
     switch (ch) {
+    case COUNTER_CH:
+        uint64_t packets_count = get_reg(QPRC(0));
+        bench->hw_pcount_rx = packets_count;
+
+        uint64_t dropped_packets_count = get_reg(QPRDC(0));
+        bench->hw_pcount_rx_dropped = dropped_packets_count;
+        break;
     case TIMER_CH:
         if (device.init_stage == 0) {
             init_1();
@@ -625,10 +661,14 @@ notified(microkit_channel ch)
         // }
         break;
     case IRQ_CH: {
+        bench->eth_irq_count++;
         uint32_t cause = get_reg(EICR);
         clear_flags(EICR, cause);
             rx_return();
             rx_provide();
+        if (achieved_something) {
+            bench->eth_rx_irq_count++;
+        }
             tx_return();
             tx_provide();
         // uint32_t cause = get_reg(EICR);
@@ -642,13 +682,29 @@ notified(microkit_channel ch)
         break;
     }
     case RX_CH:
+        bench->eth_rx_notified++;
         if (device.init_stage == 4) {
+            uint16_t curr_length = net_queue_length(rx_queue.free);
+            bench->eth_rx_free_capacity += curr_length;
+            if (curr_length > bench->eth_rx_free_max_capacity) {
+                bench->eth_rx_free_max_capacity = curr_length;
+            }
+            if (curr_length < bench->eth_rx_free_min_capacity) {
+                bench->eth_rx_free_min_capacity = curr_length;
+            }
             rx_provide();
+        }
+        if (!achieved_something) {
+            bench->eth_idle_rx_notified++;
         }
         break;
     case TX_CH:
+        bench->eth_tx_notified++;
         if (device.init_stage == 4) {
             tx_provide();
+        }
+        if (!achieved_something) {
+            bench->eth_idle_tx_notified++;
         }
         break;
     default:

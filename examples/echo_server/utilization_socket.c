@@ -19,6 +19,7 @@
 
 #define START_PMU 4
 #define STOP_PMU 5
+#define STOP_COUNTER 9
 
 #define MAX_PACKET_SIZE 0x1000
 
@@ -81,6 +82,18 @@ struct bench *bench;
 uint64_t start;
 uint64_t idle_ccount_start;
 
+uint64_t eth_pcount_tx_start;
+uint64_t eth_pcount_rx_start;
+uint64_t eth_rx_irq_count_start;
+uint64_t eth_irq_count_start;
+uint64_t eth_rx_notified_start;
+uint64_t eth_idle_rx_notified_start;
+uint64_t eth_tx_notified_start;
+uint64_t eth_idle_tx_notified_start;
+uint64_t eth_rx_notify_start;
+uint64_t eth_request_signal_rx_start;
+uint64_t eth_rx_free_capacity_start;
+
 char data_packet_str[MAX_PACKET_SIZE];
 
 
@@ -142,9 +155,29 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
         if (!strcmp("client0", "client0")) {
             start = __atomic_load_n(&bench->ts, __ATOMIC_RELAXED);
             idle_ccount_start = __atomic_load_n(&bench->ccount, __ATOMIC_RELAXED);
+            eth_pcount_tx_start = __atomic_load_n(&bench->eth_pcount_tx, __ATOMIC_RELAXED);
+            eth_pcount_rx_start = __atomic_load_n(&bench->eth_pcount_rx, __ATOMIC_RELAXED);
+            eth_rx_irq_count_start = __atomic_load_n(&bench->eth_rx_irq_count, __ATOMIC_RELAXED);
+            eth_irq_count_start = __atomic_load_n(&bench->eth_irq_count, __ATOMIC_RELAXED);
+            eth_rx_notified_start = __atomic_load_n(&bench->eth_rx_notified, __ATOMIC_RELAXED);
+            eth_idle_rx_notified_start = __atomic_load_n(&bench->eth_idle_rx_notified, __ATOMIC_RELAXED);
+            eth_tx_notified_start = __atomic_load_n(&bench->eth_tx_notified, __ATOMIC_RELAXED);
+            eth_idle_tx_notified_start = __atomic_load_n(&bench->eth_idle_tx_notified, __ATOMIC_RELAXED);
+            eth_rx_notify_start = __atomic_load_n(&bench->eth_rx_notify, __ATOMIC_RELAXED);
+            eth_request_signal_rx_start = __atomic_load_n(&bench->eth_request_signal_rx, __ATOMIC_RELAXED);
+            eth_rx_free_capacity_start = __atomic_load_n(&bench->eth_rx_free_capacity, __ATOMIC_RELAXED);
+
+            __atomic_store_n(&bench->eth_rx_free_min_capacity, 512, __ATOMIC_RELAXED);
+            __atomic_store_n(&bench->eth_rx_free_max_capacity, 0, __ATOMIC_RELAXED);
+
             microkit_notify(START_PMU);
         }
     } else if (msg_match(data_packet_str, STOP)) {
+        if (!strcmp("client0", "client0")) {
+            microkit_notify(STOP_PMU);
+            microkit_notify(STOP_COUNTER);
+        }
+
         sddf_printf("%s measurement finished \n", "client0");
 
         uint64_t total = 0, idle = 0;
@@ -175,7 +208,41 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
         error = tcp_write(pcb, buffer, strlen(buffer) + 1, TCP_WRITE_FLAG_COPY);
         tcp_shutdown(pcb, 0, 1);
 
-        if (!strcmp("client0", "client0")) microkit_notify(STOP_PMU);
+        if (!strcmp("client0", "client0")) {
+            uint64_t eth_pcount_tx = __atomic_load_n(&bench->eth_pcount_tx, __ATOMIC_RELAXED) - eth_pcount_tx_start;
+            uint64_t eth_pcount_rx = __atomic_load_n(&bench->eth_pcount_rx, __ATOMIC_RELAXED) - eth_pcount_rx_start;
+            uint64_t eth_rx_irq_count = __atomic_load_n(&bench->eth_rx_irq_count, __ATOMIC_RELAXED) - eth_rx_irq_count_start;
+            uint64_t eth_irq_count = __atomic_load_n(&bench->eth_irq_count, __ATOMIC_RELAXED) - eth_irq_count_start;
+            uint64_t eth_rx_notified = __atomic_load_n(&bench->eth_rx_notified, __ATOMIC_RELAXED) - eth_rx_notified_start;
+            uint64_t eth_idle_rx_notified = __atomic_load_n(&bench->eth_idle_rx_notified, __ATOMIC_RELAXED) - eth_idle_rx_notified_start;
+            uint64_t eth_tx_notified = __atomic_load_n(&bench->eth_tx_notified, __ATOMIC_RELAXED) - eth_tx_notified_start;
+            uint64_t eth_idle_tx_notified = __atomic_load_n(&bench->eth_idle_tx_notified, __ATOMIC_RELAXED) - eth_idle_tx_notified_start;
+            uint64_t eth_rx_notify = __atomic_load_n(&bench->eth_rx_notify, __ATOMIC_RELAXED) - eth_rx_notify_start;
+            uint64_t eth_request_signal_rx = __atomic_load_n(&bench->eth_request_signal_rx, __ATOMIC_RELAXED) - eth_request_signal_rx_start;
+            uint64_t eth_rx_free_capacity = __atomic_load_n(&bench->eth_rx_free_capacity, __ATOMIC_RELAXED) - eth_rx_free_capacity_start;
+            uint64_t eth_rx_free_min_capacity = __atomic_load_n(&bench->eth_rx_free_min_capacity, __ATOMIC_RELAXED);
+            uint64_t eth_rx_free_max_capacity = __atomic_load_n(&bench->eth_rx_free_max_capacity, __ATOMIC_RELAXED);
+        
+            uint64_t avg_capacity;
+            if (eth_rx_notified) {
+                avg_capacity = eth_rx_free_capacity / eth_rx_notified;
+            } else {
+                avg_capacity = 0;
+            }
+
+            sddf_printf("NIC RX pk,NIC RX dropped pk,driver RX pk,driver TX pk,driver RX IRQ,driver IRQ,");
+            sddf_printf("driver RX notified,driver RX idle notified,driver TX notified,driver TX idle notified,driver RX notify,driver RX Request,");
+            sddf_printf("driver rx free avg buf,driver rx free min buf,driver rx free max buf\n");
+
+            sddf_printf("%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,\n",
+                        bench->hw_pcount_rx, bench->hw_pcount_rx_dropped,
+                        eth_pcount_tx, eth_pcount_rx,
+                        eth_rx_irq_count, eth_irq_count,
+                        eth_rx_notified, eth_idle_rx_notified, eth_tx_notified, eth_idle_tx_notified,
+                        eth_rx_notify, eth_request_signal_rx,
+                        avg_capacity, eth_rx_free_min_capacity, eth_rx_free_max_capacity);
+        }
+
     } else if (msg_match(data_packet_str, QUIT)) {
         /* Do nothing for now */
     } else {
