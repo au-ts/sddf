@@ -158,7 +158,7 @@ static inline void seL4_BenchmarkTrackDumpSummary(benchmark_track_kernel_entry_t
 
 void notified(microkit_channel ch)
 {
-    if (ch == serial_config.tx_id) {
+    if (ch == serial_config.tx.id) {
         return;
     } else if (ch == config.start_channel) {
 #ifdef MICROKIT_CONFIG_benchmark
@@ -215,8 +215,8 @@ void init(void)
     sddf_memcpy(&serial_config, serial_client_bench_data, serial_client_bench_data_len);
     sddf_memcpy(&config, benchmark_config_data, benchmark_config_data_len);
 
-    serial_queue_init(&serial_tx_queue_handle, serial_config.tx_queue, serial_config.tx_capacity, serial_config.tx_data);
-    serial_putchar_init(serial_config.tx_id, &serial_tx_queue_handle);
+    serial_queue_init(&serial_tx_queue_handle, serial_config.tx.queue.vaddr, serial_config.tx.data.size, serial_config.tx.data.vaddr);
+    serial_putchar_init(serial_config.tx.id, &serial_tx_queue_handle);
 
 #ifdef MICROKIT_CONFIG_benchmark
     sddf_printf("MICROKIT_CONFIG_benchmark defined\n");
