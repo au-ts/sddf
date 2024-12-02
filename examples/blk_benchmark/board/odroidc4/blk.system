@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+ Copyright 2024, UNSW
+
+ SPDX-License-Identifier: BSD-2-Clause
+-->
+<system>
+    <memory_region name="blk_driver_config" size="0x1000" page_size="0x1000" />
+    <memory_region name="blk_driver_request" size="0x200_000" page_size="0x200_000"/>
+    <memory_region name="blk_driver_response" size="0x200_000" page_size="0x200_000"/>
+    
+    <!-- <memory_region name="blk_driver_data" size="0x200_000" page_size="0x200_000" /> -->
+
+
+    <!-- <memory_region name="blk_client_config" size="0x1000" page_size="0x1000" />
+    <memory_region name="blk_client_request" size="0x200_000" page_size="0x200_000"/>
+    <memory_region name="blk_client_response" size="0x200_000" page_size="0x200_000"/> -->
+
+    <memory_region name="blk_client_data" size="0x10_000_000" page_size="0x200_000" />
+
+    <memory_region name="sdio" size="0x1_000" phys_addr="0xffe05000" />
+    <memory_region name="gpio" size="0x1_000" phys_addr="0xff800000"/>
+    <memory_region name="timer" size="0x1_000" phys_addr="0xffd0f000" />
+
+    <memory_region name="data_region" size="0x1000" phys_addr="0xf5500000" />
+
+    <protection_domain name="driver" priority="110">
+        <program_image path="sdmmc_driver.elf" />
+        <map mr="sdio" vaddr="0xffe05000" perms="rw" cached="false" />
+        <map mr="gpio" vaddr="0xff800000" perms="rw" cached="false" />
+
+        <map mr="data_region" vaddr="0xf5500000" perms="rw" cached="false" />
+
+        <!-- sDDF block -->
+        <map mr="blk_driver_config" vaddr="0x40_000_000" perms="rw" cached="false" setvar_vaddr="blk_config"     />
+        <map mr="blk_driver_request"    vaddr="0x40_200_000" perms="rw" cached="false" setvar_vaddr="blk_req_queue"  />
+        <map mr="blk_driver_response"   vaddr="0x40_400_000" perms="rw" cached="false" setvar_vaddr="blk_resp_queue" />
+        <irq irq="222" id="1"/>
+    </protection_domain>
+
+    <protection_domain name="client" priority="1">
+        <program_image path="client.elf" />
+        <!-- The client should not be able to write to the config page -->
+        <map mr="blk_driver_config" vaddr="0x40_000_000" perms="r" cached="false" setvar_vaddr="blk_storage_info" />
+
+        <map mr="blk_driver_request" vaddr="0x40_200_000" perms="rw" cached="false" setvar_vaddr="blk_request" />
+        <map mr="blk_driver_response" vaddr="0x40_400_000" perms="rw" cached="false" setvar_vaddr="blk_response" />
+        <map mr="blk_client_data" vaddr="0x40_800_000" perms="rw" cached="true" setvar_vaddr="blk_data" />
+
+        <setvar symbol="blk_data_paddr" region_paddr="blk_client_data" />
+    </protection_domain>
+
+    <protection_domain name="timer" priority="150" pp="true" passive="true">
+        <program_image path="timer_driver.elf" />
+        <map mr="timer" vaddr="0x2_000_000" perms="rw" cached="false" setvar_vaddr="gpt_regs" />
+        <irq irq="42" id="0" trigger="edge" /> <!-- timer interrupt -->
+    </protection_domain>
+
+    <channel>
+        <end pd="client" id="0" />
+        <end pd="driver" id="0" />
+    </channel>
+
+    <channel>
+        <end pd="timer" id="1" />
+        <end pd="client" id="1" />
+    </channel>
+</system>
