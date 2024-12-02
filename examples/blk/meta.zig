@@ -30,7 +30,7 @@ pub fn main() !void {
 
     var blk_driver = Pd.create(allocator, "blk_driver", "blk_driver.elf", .{});
     sdf.addProtectionDomain(&blk_driver);
-    var blk_virt = Pd.create(allocator, "blk_virt", "blk_virt.elf", .{ .stack_size = 0x2000 });
+    var blk_virt = Pd.create(allocator, "blk_virt", "blk_virt_test.elf", .{ .stack_size = 0x2000 });
     sdf.addProtectionDomain(&blk_virt);
 
     var blk_system = sddf.BlockSystem.init(allocator, &sdf, blk_node, &blk_driver, &blk_virt, .{});

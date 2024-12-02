@@ -1,5 +1,5 @@
 import argparse
-from sdfgen import SystemDescription, ProtectionDomain, Sddf, DeviceTree, LionsOS, Channel
+from sdfgen import SystemDescription, ProtectionDomain, Sddf, DeviceTree
 
 PLATFORMS = [
     {
