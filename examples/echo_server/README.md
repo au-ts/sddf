@@ -31,6 +31,7 @@ The following platforms are supported:
 * imx8mp_evk
 * maaxboard
 * odroidc4
+* odroidc2
 * qemu_virt_aarch64
 
 ```sh
