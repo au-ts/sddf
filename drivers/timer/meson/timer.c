@@ -21,7 +21,6 @@ uintptr_t gpt_regs;
 #error "Unexpected platform used with timer meson driver"
 #endif
 
-
 #define TIMER_A_INPUT_CLK 0
 #define TIMER_E_INPUT_CLK 8
 #define TIMER_A_EN      (1 << 16)
