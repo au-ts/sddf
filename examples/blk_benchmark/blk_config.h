@@ -13,7 +13,7 @@
 
 #define BLK_NAME_CLI0                           "client"
 
-#define BLK_QUEUE_CAPACITY_CLI0                 1024
+#define BLK_QUEUE_CAPACITY_CLI0                 512
 #define BLK_QUEUE_CAPACITY_DRIV                 BLK_QUEUE_CAPACITY_CLI0
 
 #define BLK_QUEUE_REGION_SIZE                   0x200000
@@ -25,7 +25,7 @@
 
 /* Mapping from client index to disk partition that the client will have access to. */
 // Please ensure this point to a partition that you do not mind to courrupt as the example involves write data to that component
-static const int blk_partition_mapping[BLK_NUM_CLIENTS] = { 0 };
+static const int blk_partition_mapping[BLK_NUM_CLIENTS] = { 2 };
 
 static inline blk_storage_info_t *blk_virt_cli_storage_info(blk_storage_info_t *info, unsigned int id)
 {
