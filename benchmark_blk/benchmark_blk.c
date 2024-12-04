@@ -13,8 +13,6 @@
 #include <sddf/util/fence.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
-#include <serial_config.h>
-#include <ethernet_config.h>
 
 #define LOG_BUFFER_CAP 7
 
@@ -23,15 +21,16 @@
 #define STOP 2
 #define INIT 3
 
+// ID's of protection domains (must align with the system description file
 #define PD_TOTAL        0
-#define PD_ETH_ID       1
-#define PD_VIRT_RX_ID    2
-#define PD_VIRT_TX_ID    3
-#define PD_COPY_ID      4
-#define PD_COPY1_ID     5
-#define PD_LWIP_ID      6
-#define PD_LWIP1_ID     7
-#define PD_TIMER_ID     8
+#define PD_BLK_ID       1
+#define PD_VIRT_ID      2
+#define PD_CLIENT_ID    3
+
+// Human-readable names of the PDs XXX for ethernet bench this is in ethernet_config.h
+#define BLK_DRIVER_NAME "blk_driver"
+#define BLK_VIRTUALISER_NAME "virt"
+#define BLK_CLIENT_NAME "client0"
 
 uintptr_t uart_base;
 uintptr_t cyclecounters_vaddr;
@@ -70,29 +69,14 @@ event_id_t benchmarking_events[] = {
 static void print_pdid_name(uint64_t pd_id)
 {
     switch (pd_id) {
-    case PD_ETH_ID:
-        sddf_printf(NET_DRIVER_NAME);
+    case PD_BLK_ID:
+        sddf_printf(BLK_DRIVER_NAME);
         break;
-    case PD_VIRT_RX_ID:
-        sddf_printf(NET_VIRT_RX_NAME);
+    case PD_VIRT_ID:
+        sddf_printf(BLK_VIRTUALISER_NAME);
         break;
-    case PD_VIRT_TX_ID:
-        sddf_printf(NET_VIRT_TX_NAME);
-        break;
-    case PD_COPY_ID:
-        sddf_printf(NET_COPY0_NAME);
-        break;
-    case PD_COPY1_ID:
-        sddf_printf(NET_COPY1_NAME);
-        break;
-    case PD_LWIP_ID:
-        sddf_printf(NET_CLI0_NAME);
-        break;
-    case PD_LWIP1_ID:
-        sddf_printf(NET_CLI1_NAME);
-        break;
-    case PD_TIMER_ID:
-        sddf_printf(NET_TIMER_NAME);
+    case PD_CLIENT_ID:
+        sddf_printf(BLK_CLIENT_NAME);
         break;
     default:
         sddf_printf("unknown");
@@ -104,14 +88,9 @@ static void print_pdid_name(uint64_t pd_id)
 static void microkit_benchmark_start(void)
 {
     seL4_BenchmarkResetThreadUtilisation(TCB_CAP);
-    seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_ETH_ID);
-    seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_VIRT_RX_ID);
-    seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_VIRT_TX_ID);
-    seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_COPY_ID);
-    seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_COPY1_ID);
-    seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_LWIP_ID);
-    seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_LWIP1_ID);
-    seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_TIMER_ID);
+    seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_BLK_ID);
+    seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_VIRT_ID);
+    seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_CLIENT_ID);
     seL4_BenchmarkResetLog();
 }
 
