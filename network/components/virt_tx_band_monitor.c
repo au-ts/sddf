@@ -16,6 +16,7 @@
 #define DRIVER 0
 #define TIMER 1
 #define CLIENT_CH 2
+#define GOD 4
 
 net_queue_t *tx_free_drv;
 net_queue_t *tx_active_drv;
@@ -153,6 +154,10 @@ void notified(microkit_channel ch)
     current_tick = sddf_timer_time_now(TIMER) / TIME_WINDOW;
     tx_return();
     tx_provide();
+
+    if (signal_god) {
+        microkit_notify(GOD);
+    }
 }
 
 void init(void)
