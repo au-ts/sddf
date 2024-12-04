@@ -26,7 +26,7 @@ net_queue_t *tx_active_cli0;
 uintptr_t buffer_data_region_cli0_vaddr;
 uintptr_t buffer_data_region_cli0_paddr;
 uintptr_t buffer_data_region_cli1_paddr;
-
+uint32_t signal_count = 0;
 #define TIME_WINDOW (10 * NS_IN_MS)
 uint64_t current_tick = 0;
 bool signal_god = false;
@@ -92,7 +92,11 @@ void tx_provide(void)
                 err = net_enqueue_active(&state.tx_queue_drv, buffer);
                 assert(!err);
                 state.client_usage[client].curr_bits += (buffer.len * 8);
-                if (state.client_usage[client].curr_bits >= state.client_usage[client].max_bits) {
+                // if (state.client_usage[client].curr_bits >= state.client_usage[client].max_bits) {
+                //     signal_god = true;
+                // }
+                signal_count++;
+                if (signal_count >= 100) {
                     signal_god = true;
                 }
                 enqueued = true;
@@ -162,6 +166,7 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
+    microkit_dbg_puts("In band monitor init\n");
     /* Set up driver queues */
     net_queue_init(&state.tx_queue_drv, tx_free_drv, tx_active_drv, NET_TX_QUEUE_CAPACITY_DRIV);
 

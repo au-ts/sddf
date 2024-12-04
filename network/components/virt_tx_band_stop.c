@@ -156,6 +156,7 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
+    microkit_dbg_puts("In band stop\n");
     /* Set up driver queues */
     net_queue_init(&state.tx_queue_drv, tx_free_drv, tx_active_drv, NET_TX_QUEUE_CAPACITY_DRIV);
 

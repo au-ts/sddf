@@ -26,8 +26,9 @@ REPORT_FILE := report.txt
 
 vpath %.c ${SDDF} ${ECHO_SERVER}
 
-IMAGES := eth_driver.elf lwip.elf benchmark.elf idle.elf network_virt_rx.elf\
-	  network_virt_tx.elf copy.elf timer_driver.elf uart_driver.elf serial_virt_tx.elf
+IMAGES := eth_driver.elf lwip.elf benchmark.elf idle.elf network_virt_rx.elf network_virt_tx_swapper.elf \
+	  network_virt_tx_band_monitor.elf network_virt_tx_band_stop.elf copy.elf timer_driver.elf uart_driver.elf serial_virt_tx.elf \
+
 
 CFLAGS := -mcpu=$(CPU) \
 	  -mstrict-align \
