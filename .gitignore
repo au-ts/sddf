@@ -18,3 +18,5 @@ zig-out/
 venv/
 target/
 Cargo.lock
+.clangd
+*.swp
