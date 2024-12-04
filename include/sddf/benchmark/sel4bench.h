@@ -65,7 +65,10 @@ typedef uint64_t ccnt_t;
         asm volatile("msr  " reg ", %0" :: "r" (_v)); \
     }while(0)
 
-#define PMU_READ(reg, v) asm volatile("mrs %0, " reg :  "=r"(v))
+#define PMU_READ(reg, v)                        \
+    seL4_Word _v;                               \
+    asm volatile("mrs %0, " reg :  "=r"(_v));    \
+    v = (seL4_Word) _v;
 
 #define SEL4BENCH_READ_CCNT(var) PMU_READ(PMCCNTR, var);
 
