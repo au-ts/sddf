@@ -1,11 +1,12 @@
 import argparse
 import struct
-from sdfgen import SystemDescription, ProtectionDomain, Sddf, DeviceTree
+from sdfgen import SystemDescription, Sddf, DeviceTree
+ProtectionDomain = SystemDescription.ProtectionDomain
 
 PLATFORMS = [
     {
         "name": "qemu_virt_aarch64",
-        "arch": 1,
+        "arch": SystemDescription.Arch.AARCH64,
         "paddr_top": 0xa_000_000,
         "timer_device_node": "timer",
         "uart_device_node": "pl011@9000000",
@@ -13,7 +14,7 @@ PLATFORMS = [
     },
     {
         "name": "odroidc4",
-        "arch": 1,
+        "arch": SystemDescription.Arch.AARCH64,
         "paddr_top": 0x80000000,
         "timer_device_node": "soc/bus@ffd00000/watchdog@f0d0",
         "uart_device_node": "soc/bus@ff800000/serial@3000",
@@ -21,7 +22,7 @@ PLATFORMS = [
     },
     {
         "name": "maaxboard",
-        "arch": 1,
+        "arch": SystemDescription.Arch.AARCH64,
         "paddr_top": 0xa0000000,
         "timer_device_node": "soc@0/bus@30000000/timer@302d0000",
         "uart_device_node": "soc@0/bus@30800000/serial@30860000",
@@ -111,7 +112,6 @@ def generate_sdf():
     net_system.add_client_with_copier(client, client_net_copier, (0xf, 0x1f, 0x2f, 0x3f, 0x4f, 0x5f))
 
     # Benchmark specific resources
-
 
     bench_idle = ProtectionDomain("bench_idle", "idle.elf")
     bench = ProtectionDomain("bench", "benchmark.elf")

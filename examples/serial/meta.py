@@ -1,31 +1,21 @@
 import argparse
+from typing import Dict, List, Any
 from sdfgen import SystemDescription, ProtectionDomain, Sddf, DeviceTree
 
-PLATFORMS = [
-    {
-        "name": "qemu_virt_aarch64",
-        "arch": 1,
-        "paddr_top": 0xa_000_000,
-        "serial_device_node": "pl011@9000000",
-    },
-    {
-        "name": "odroidc4",
-        "arch": 1,
-        "paddr_top": 0x80000000,
-        "serial_device_node": "soc/bus@ff800000/serial@3000",
-    },
-    {
-        "name": "maaxboard",
-        "arch": 1,
-        "paddr_top": 0xa0000000,
-        "serial_device_node": "soc@0/bus@30800000/serial@30860000",
-    },
-    {
-        "name": "star64",
-        "arch": 3,
-        "paddr_top": 0x100000000,
-        "serial_device_node": "soc/serial@10000000",
-    },
+
+class Platform:
+    def __init__(self, name: str, arch: SystemDescription.Arch, paddr_top: int, serial_device_node: str):
+        self.name = name
+        self.arch = arch
+        self.paddr_top = paddr_top
+        self.serial_device_node = serial_device_node
+
+
+PLATFORMS: List[Platform] = [
+    Platform("qemu_virt_aarch64", SystemDescription.Arch.AARCH64, 0xa_000_000, "pl011@9000000"),
+    Platform("odroidc4", SystemDescription.Arch.AARCH64, 0x80000000, "soc/bus@ff800000/serial@3000"),
+    Platform("maaxboard", SystemDescription.Arch.AARCH64, 0xa_000_000, "soc@0/bus@30800000/serial@30860000"),
+    Platform("star64", SystemDescription.Arch.RISCV64, 0x100000000, "soc/serial@10000000"),
 ]
 
 def generate_sdf():
@@ -34,7 +24,7 @@ def generate_sdf():
     serial_virt_rx = ProtectionDomain("serial_virt_rx", "serial_virt_rx.elf", priority=199)
     client = ProtectionDomain("client", "client.elf", priority=1)
 
-    serial_node = dtb.node(platform["serial_device_node"])
+    serial_node = dtb.node(platform.serial_device_node)
     assert serial_node is not None
 
     serial_system = Sddf.Serial(sdf, serial_node, serial_driver, serial_virt_tx, serial_virt_rx)
@@ -58,17 +48,16 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--dtbs", required=True)
     parser.add_argument("--sddf", required=True)
-    parser.add_argument("--platform", required=True, choices=[p["name"] for p in PLATFORMS])
+    parser.add_argument("--platform", required=True, choices=[p.name for p in PLATFORMS])
 
     args = parser.parse_args()
 
-    platform = next(filter(lambda p: p["name"] == args.platform, PLATFORMS))
-    platform_name = platform["name"]
+    platform = next(filter(lambda p: p.name == args.platform, PLATFORMS))
 
-    sdf = SystemDescription(platform["arch"], platform["paddr_top"])
+    sdf = SystemDescription(platform.arch, platform.paddr_top)
     sddf = Sddf(args.sddf)
 
-    with open(args.dtbs + f"/{platform_name}.dtb", "rb") as f:
+    with open(args.dtbs + f"/{platform.name}.dtb", "rb") as f:
         dtb = DeviceTree(f.read())
 
     generate_sdf()
