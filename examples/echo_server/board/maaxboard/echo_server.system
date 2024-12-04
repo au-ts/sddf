@@ -253,12 +253,12 @@
     </channel>
 
     <channel>
-        <end pd="net_virt_tx" id="1" />
+        <end pd="net_virt_tx" id="2" />
         <end pd="client0" id="3" />
     </channel>
 
     <channel>
-        <end pd="net_virt_tx" id="2" />
+        <end pd="net_virt_tx" id="3" />
         <end pd="client1" id="3" />
     </channel>
 
@@ -285,6 +285,11 @@
     <channel>
         <end pd="timer" id="2" />
         <end pd="client1" id="1" />
+    </channel>
+
+    <channel>
+        <end pd="timer" id="3" />
+        <end pd="net_virt_tx" id="1" />
     </channel>
 
 </system>
