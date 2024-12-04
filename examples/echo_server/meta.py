@@ -109,7 +109,7 @@ def generate_sdf():
 
     serial_system.add_client(client)
     timer_system.add_client(client)
-    net_system.add_client_with_copier(client, client_net_copier, (0xf, 0x1f, 0x2f, 0x3f, 0x4f, 0x5f))
+    net_system.add_client_with_copier(client, client_net_copier, mac_addr=(0xf, 0x1f, 0x2f, 0x3f, 0x4f, 0x5f))
 
     # Benchmark specific resources
 
