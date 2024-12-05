@@ -154,5 +154,18 @@
         <end pd="bench" id="0"/>
     </channel>
     <!-- end of serial uart channels -->
+    <channel>
+        <end pd="client" id="2" /> <!-- start PMU channel -->
+        <end pd="bench" id="1" />
+    </channel>
+
+    <channel>
+        <end pd="client" id="3" /> <!-- stop PMU channel -->
+        <end pd="bench" id="2" />
+    </channel>
+    <channel>
+        <end pd="client" id="4" /> <!-- Benchmark run start channel -->
+        <end pd="bench" id="3" />
+    </channel>
     <!-- TODO add channels for client to start/stop benchmarks -->
 </system>
