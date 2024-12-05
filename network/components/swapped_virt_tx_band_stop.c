@@ -168,6 +168,8 @@ void notified(microkit_channel ch)
 void init(void)
 {
     cache_clean_and_invalidate(pd_code, pd_code + 0x5000);
+    seL4_ARM_VSpace_Unify_Instruction(3, 0x200000, 0x205000);
+
     for (int i = 0; i < 10; i++) {
         sddf_dprintf("This is the start of band stop at %d: %x\n", i, pd_code[i]);
     }

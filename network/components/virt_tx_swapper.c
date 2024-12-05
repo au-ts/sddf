@@ -19,20 +19,25 @@ void notified(microkit_channel ch)
 {
     microkit_dbg_puts("Swapping out the elfs!\n");
     microkit_pd_stop(0);
+    uint64_t elf_hash = 0;
 
     for (int i = 0; i < 0x5000; i++) {
-        pd_code[i] = elf_a[i];
+        // pd_code[i] = elf_a[i];
+        elf_hash += elf_a[i];
+        pd_code[i] = 0;
     }
+
+    sddf_dprintf("This is the total of the elf hash: %lld\n", elf_hash);
 
     for (int i = 0; i < 10; i++) {
         sddf_dprintf("This is %d of pd_code: 0x%x\n", i, pd_code[i]);
     }
 
     cache_clean_and_invalidate(pd_code, pd_code + 0x5000);
-
+    seL4_ARM_VSpace_Unify_Instruction(3, 0x200000, 0x205000);
     seL4_Error err;
     seL4_UserContext ctxt = {0};
-    ctxt.pc = 0x900000;
+    ctxt.pc = 0x10000000;
     ctxt.sp = 0x0000010000000000;
     err = seL4_TCB_WriteRegisters(
               BASE_TCB_CAP + 0,

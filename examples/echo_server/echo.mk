@@ -27,7 +27,7 @@ REPORT_FILE := report.txt
 vpath %.c ${SDDF} ${ECHO_SERVER}
 
 IMAGES := eth_driver.elf lwip.elf benchmark.elf idle.elf network_virt_rx.elf network_virt_tx_swapper.elf \
-	  network_virt_tx_band_monitor.elf network_virt_tx_band_stop.elf copy.elf timer_driver.elf uart_driver.elf serial_virt_tx.elf \
+	  network_virt_tx_band_monitor.elf swap_virt_tx_band_stop.elf copy.elf timer_driver.elf uart_driver.elf serial_virt_tx.elf \
 
 
 CFLAGS := -mcpu=$(CPU) \
@@ -107,7 +107,7 @@ qemu: $(IMAGE_FILE)
 			-m size=2G \
 			-nographic \
 			-device virtio-net-device,netdev=netdev0 \
-			-netdev user,id=netdev0,hostfwd=tcp::1236-:1236,hostfwd=tcp::1237-:1237,hostfwd=udp::1235-:1235 \
+			-netdev user,id=netdev0,hostfwd=tcp::1236-:1236,hostfwd=tcp::1237-:1237,hostfwd=udp::1235-10.0.2.15:1235 \
 			-global virtio-mmio.force-legacy=false \
 			-d guest_errors
 

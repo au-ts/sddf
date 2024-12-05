@@ -59,7 +59,7 @@
 
     <!-- For virt_tx swapping -->
     <memory_region name="pd_code" size="0x20_000" />
-    <memory_region name="net_virt_tx_band_stop" size="0x20000" pd="net_virt_tx" elf="network_virt_tx_band_stop.elf" />
+    <memory_region name="net_virt_tx_band_stop" size="0x20000" pd="net_virt_tx" elf="swap_virt_tx_band_stop.elf" />
 
 
     <protection_domain name="benchIdle" priority="1" >
@@ -159,7 +159,7 @@
 
             <protection_domain name="net_virt_tx" priority="100" budget="20000" id="0">
                 <program_image path="network_virt_tx_band_monitor.elf" />
-                <map mr="pd_code" vaddr="0x900_000" perms="rwx" setvar_vaddr="pd_code"/>
+                <map mr="pd_code" vaddr="0x10_000_000" perms="rwx" setvar_vaddr="pd_code"/>
 
                 <map mr="net_tx_free_drv" vaddr="0x2_000_000" perms="rw" cached="true" setvar_vaddr="tx_free_drv" />
                 <map mr="net_tx_active_drv" vaddr="0x2_200_000" perms="rw" cached="true" setvar_vaddr="tx_active_drv" />

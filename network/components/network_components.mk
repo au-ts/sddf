@@ -33,7 +33,17 @@ ${NETWORK_COMPONENT_OBJ}: |network/components
 ${NETWORK_COMPONENT_OBJ}: ${CHECK_NETWORK_FLAGS_MD5}
 ${NETWORK_COMPONENT_OBJ}: CFLAGS+=${CFLAGS_network}
 
-network/components/network_virt_%.o: ${SDDF}/network/components/virt_%.c 
+SWAP_LDFLAGS := -L$(BOARD_DIR)/lib -L$(ECHO_SERVER) -L${LIBC}
+
+SWAP_LIBS := --start-group -lmicrokit -Tmicrokit_custom_elf.ld -lc libsddf_util_debug.a --end-group
+
+network/components/swap_virt_tx_band_stop.o: ${SDDF}/network/components/swapped_virt_tx_band_stop.c
+	${CC} ${CFLAGS} -c -o $@ $<
+
+swap_virt_tx_band_stop.elf: network/components/swap_virt_tx_band_stop.o
+	${LD} ${SWAP_LDFLAGS} -o $@ $< ${SWAP_LIBS}
+
+network/components/network_virt_%.o: ${SDDF}/network/components/virt_%.c
 	${CC} ${CFLAGS} -c -o $@ $<
 
 %.elf: network/components/%.o

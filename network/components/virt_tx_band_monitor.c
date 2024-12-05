@@ -94,13 +94,14 @@ void tx_provide(void)
                 err = net_enqueue_active(&state.tx_queue_drv, buffer);
                 assert(!err);
                 state.client_usage[client].curr_bits += (buffer.len * 8);
-                if (state.client_usage[client].curr_bits >= state.client_usage[client].max_bits) {
-                    signal_god = true;
-                }
-                // signal_count++;
-                // if (signal_count >= 100) {
+                // if (state.client_usage[client].curr_bits >= state.client_usage[client].max_bits) {
                 //     signal_god = true;
                 // }
+                signal_count++;
+                if (signal_count >= 100) {
+                    sddf_dprintf("We are singlaling god\n");
+                    signal_god = true;
+                }
                 enqueued = true;
             }
 
@@ -169,6 +170,8 @@ void notified(microkit_channel ch)
 void init(void)
 {
     cache_clean_and_invalidate(pd_code, pd_code + 0x5000);
+    seL4_ARM_VSpace_Unify_Instruction(3, 0x200000, 0x205000);
+
     for (int i = 0; i < 10; i++) {
         sddf_dprintf("This is the start of band monitor at %d: %x\n", i, pd_code[i]);
     }
