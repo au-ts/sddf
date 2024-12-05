@@ -25,7 +25,7 @@ benchmark_blk:
 
 
 # TODO: Once Serial is sorted, change from LIBUTIL_DBG to LIBUTIL and ensure that gets built too (otherwise PD will fail)
-benchmark_blk.elf: $(BENCH_OBJS) ${LIBUTIL_DBG}
+benchmark_blk.elf: $(BENCH_OBJS) ${LIBUTIL}
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 idle.elf: $(IDLE_OBJS) ${LIBUTIL_DBG}

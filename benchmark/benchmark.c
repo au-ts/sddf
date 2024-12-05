@@ -229,6 +229,7 @@ void init(void)
         sddf_printf("BENCH|LOG: Log buffer set\n");
     }
 #endif
+    sddf_printf("BENCH|LOG init bench\n");
 }
 
 seL4_Bool fault(microkit_child id, microkit_msginfo msginfo, microkit_msginfo *reply_msginfo)
