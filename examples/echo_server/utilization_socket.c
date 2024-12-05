@@ -14,9 +14,11 @@
 #include <sddf/util/util.h>
 #include <sddf/benchmark/bench.h>
 #include <sddf/util/printf.h>
+#include <sddf/timer/client.h>
 
 #include "echo.h"
 
+#define TIMER  1
 #define START_PMU 4
 #define STOP_PMU 5
 #define STOP_COUNTER 9
@@ -151,7 +153,8 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
         error = tcp_write(pcb, OK, strlen(OK), TCP_WRITE_FLAG_COPY);
         if (error) sddf_dprintf("Failed to send OK message through utilization peer\n");
     } else if (msg_match(data_packet_str, START)) {
-        sddf_printf("%s measurement starting... \n", "client0");
+        uint64_t now = sddf_timer_time_now(TIMER);
+        sddf_printf("%s measurement starting at %lu ... \n", "client0", now);
         if (!strcmp("client0", "client0")) {
             start = __atomic_load_n(&bench->ts, __ATOMIC_RELAXED);
             idle_ccount_start = __atomic_load_n(&bench->ccount, __ATOMIC_RELAXED);
@@ -177,8 +180,8 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
             microkit_notify(STOP_PMU);
             microkit_notify(STOP_COUNTER);
         }
-
-        sddf_printf("%s measurement finished \n", "client0");
+        uint64_t now = sddf_timer_time_now(TIMER);
+        sddf_printf("%s measurement finished at: %lu\n", "client0", now);
 
         uint64_t total = 0, idle = 0;
 
