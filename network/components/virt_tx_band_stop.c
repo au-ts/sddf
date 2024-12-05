@@ -58,7 +58,7 @@ int extract_offset(uintptr_t *phys)
 
 void tx_provide(void)
 {
-    sddf_dprintf("In band stop tx provide\n");
+    // sddf_dprintf("In band stop tx provide\n");
     bool enqueued = false;
     uint32_t buffers_provided = 0;
     for (int client = 0; client < NUM_NETWORK_CLIENTS; client++) {
@@ -110,7 +110,7 @@ void tx_provide(void)
         }
     }
 
-    sddf_dprintf("In provide, we provided: %d buffers\n", buffers_provided);
+    // sddf_dprintf("In provide, we provided: %d buffers\n", buffers_provided);
 
     if (enqueued && net_require_signal_active(&state.tx_queue_drv)) {
         net_cancel_signal_active(&state.tx_queue_drv);
@@ -120,7 +120,7 @@ void tx_provide(void)
 
 void tx_return(void)
 {
-    sddf_dprintf("In band stop tx return\n");
+    // sddf_dprintf("In band stop tx return\n");
     uint32_t buffers_returned = 0;
     bool reprocess = true;
     bool notify_clients[NUM_NETWORK_CLIENTS] = {false};
@@ -154,12 +154,12 @@ void tx_return(void)
             microkit_notify(client + CLIENT_CH);
         }
     }
-    sddf_dprintf("This is how many buffers we returned in tx_return: %d\n", buffers_returned);
+    // sddf_dprintf("This is how many buffers we returned in tx_return: %d\n", buffers_returned);
 }
 
 void notified(microkit_channel ch)
 {
-    sddf_dprintf("we are in notified in virt_tx_band_stop on ch: %d\n", ch);
+    // sddf_dprintf("we are in notified in virt_tx_band_stop on ch: %d\n", ch);
     current_tick = sddf_timer_time_now(TIMER) / TIME_WINDOW;
     tx_return();
     tx_provide();
@@ -196,4 +196,5 @@ void init(void)
     state.client_usage[1].max_bits = 2000000;
 
     tx_provide();
+    tx_return();
 }
