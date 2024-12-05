@@ -40,6 +40,7 @@ CFLAGS := -mcpu=$(CPU) \
 		  -g3 \
 		  -O3 \
 		  -Wall -Wno-unused-function -Werror -Wno-unused-command-line-argument \
+		  -DMICROKIT_CONFIG_${MICROKIT_CONFIG} \
 		  -I$(BOARD_DIR)/include \
 		  -I$(SDDF)/include \
 		  -I$(CONFIGS_INCLUDE) \

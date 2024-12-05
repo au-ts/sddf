@@ -17,11 +17,12 @@
 
 #define LOG_BUFFER_CAP 7
 
+
 /* Notification channels and TCB CAP offsets - ensure these align with .system file! */
+#define SERIAL_TX_CH 0
 #define START 1
 #define STOP 2
-#define INIT 3
-
+#define BENCH_RUN_CH 3
 // ID's of protection domains (must align with the system description file
 #define PD_TOTAL        0
 #define PD_BLK_ID       1
@@ -38,8 +39,6 @@ uintptr_t cyclecounters_vaddr;
 
 ccnt_t counter_values[8];
 counter_bitfield_t benchmark_bf;
-
-#define SERIAL_TX_CH 0
 
 char *serial_tx_data;
 serial_queue_t *serial_tx_queue;
@@ -182,6 +181,7 @@ void notified(microkit_channel ch)
     switch (ch) {
     case START:
 #ifdef MICROKIT_CONFIG_benchmark
+        // TODO sample the clock cycles, to later get a total amount of cycles spent during a benchmark
         sel4bench_reset_counters();
         THREAD_MEMORY_RELEASE();
         sel4bench_start_counters(benchmark_bf);
@@ -198,6 +198,7 @@ void notified(microkit_channel ch)
         break;
     case STOP:
 #ifdef MICROKIT_CONFIG_benchmark
+        // TODO sample the clock cycles and subtract the START clock cycles, log the overall cycles spent during benchmark (compute latency and throughput with that?)
         sel4bench_get_counters(benchmark_bf, &counter_values[0]);
         sel4bench_stop_counters(benchmark_bf);
 
@@ -268,7 +269,10 @@ void init(void)
 #endif
 
     /* Notify the idle thread that the sel4bench library is initialised. */
+    // XXX add back in when measuring IDLE CPU time
     //microkit_notify(INIT);
+    /* Notify the client to start the benchmark run */
+    microkit_notify(BENCH_RUN_CH);
 
 #ifdef CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES
     int res_buf = seL4_BenchmarkSetLogBuffer(LOG_BUFFER_CAP);
