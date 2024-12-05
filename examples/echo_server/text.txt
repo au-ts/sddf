@@ -1,0 +1,698 @@
+
+build/network_virt_tx_swapper.elf:     file format elf64-littleaarch64
+
+
+Disassembly of section .text:
+
+0000000000200000 <_start>:
+.section ".text.start"
+
+.global _start;
+.type _start, %function;
+_start:
+    b main
+  200000:	14000084 	b	200210 <main>
+	...
+
+0000000000200010 <init>:
+
+char *pd_code;
+
+void init(void)
+{
+    microkit_dbg_puts("ELF TESTER starting\n");
+  200010:	90000000 	adrp	x0, 200000 <_start>
+  200014:	9114a000 	add	x0, x0, #0x528
+  200018:	140000e2 	b	2003a0 <microkit_dbg_puts>
+  20001c:	d503201f 	nop
+
+0000000000200020 <notified>:
+}
+
+int pd = 0;
+
+void notified(microkit_channel ch)
+{
+  200020:	a9be7bfd 	stp	x29, x30, [sp, #-32]!
+    microkit_dbg_puts("Swapping out the elfs!\n");
+  200024:	90000000 	adrp	x0, 200000 <_start>
+  200028:	91150000 	add	x0, x0, #0x540
+{
+  20002c:	910003fd 	mov	x29, sp
+  200030:	a90153f3 	stp	x19, x20, [sp, #16]
+    microkit_dbg_puts("Swapping out the elfs!\n");
+  200034:	940000db 	bl	2003a0 <microkit_dbg_puts>
+
+static inline void arm_sys_send_recv(seL4_Word sys, seL4_Word dest, seL4_Word *out_badge, seL4_Word info_arg,
+                                     seL4_Word *out_info, seL4_Word *in_out_mr0, seL4_Word *in_out_mr1, seL4_Word *in_out_mr2, seL4_Word *in_out_mr3,
+                                     LIBSEL4_UNUSED seL4_Word reply)
+{
+    register seL4_Word destptr asm("x0") = dest;
+  200038:	d2801940 	mov	x0, #0xca                  	// #202
+    register seL4_Word info asm("x1") = info_arg;
+  20003c:	d2980001 	mov	x1, #0xc000                	// #49152
+
+    /* Load beginning of the message into registers. */
+    register seL4_Word msg0 asm("x2") = *in_out_mr0;
+  200040:	d2800002 	mov	x2, #0x0                   	// #0
+    register seL4_Word msg1 asm("x3") = *in_out_mr1;
+  200044:	d2800003 	mov	x3, #0x0                   	// #0
+    register seL4_Word msg2 asm("x4") = *in_out_mr2;
+  200048:	d2800004 	mov	x4, #0x0                   	// #0
+    register seL4_Word msg3 asm("x5") = *in_out_mr3;
+  20004c:	d2800005 	mov	x5, #0x0                   	// #0
+    MCS_PARAM_DECL("x6");
+  200050:	d2800006 	mov	x6, #0x0                   	// #0
+
+    /* Perform the system call. */
+    register seL4_Word scno asm("x7") = sys;
+  200054:	92800007 	mov	x7, #0xffffffffffffffff    	// #-1
+    asm volatile(
+  200058:	d4000001 	svc	#0x0
+        : "r"(scno) MCS_PARAM
+        : "memory"
+    );
+    *out_info = info;
+    *out_badge = destptr;
+    *in_out_mr0 = msg0;
+  20005c:	b0000014 	adrp	x20, 201000 <__sel4_ipc_buffer>
+	output_tag = seL4_CallWithMRs(_service, tag,
+		&mr0, &mr1, &mr2, &mr3);
+	result = (seL4_Error) seL4_MessageInfo_get_label(output_tag);
+
+	/* Unmarshal registers into IPC buffer on error. */
+	if (result != seL4_NoError) {
+  200060:	f2747c3f 	tst	x1, #0xffffffff000
+  200064:	54000140 	b.eq	20008c <notified+0x6c>  // b.none
+    return;
+}
+
+LIBSEL4_INLINE_FUNC seL4_IPCBuffer *seL4_GetIPCBuffer(void)
+{
+    return __sel4_ipc_buffer;
+  200068:	d34cfc33 	lsr	x19, x1, #12
+static inline void microkit_pd_stop(microkit_child pd)
+{
+    seL4_Error err;
+    err = seL4_TCB_Suspend(BASE_TCB_CAP + pd);
+    if (err != seL4_NoError) {
+        microkit_dbg_puts("microkit_pd_stop: error writing TCB registers\n");
+  20006c:	90000000 	adrp	x0, 200000 <_start>
+  200070:	91156000 	add	x0, x0, #0x558
+  200074:	f9400281 	ldr	x1, [x20]
+    return seL4_GetIPCBuffer()->msg[i];
+}
+
+LIBSEL4_INLINE_FUNC void seL4_SetMR(int i, seL4_Word mr)
+{
+    seL4_GetIPCBuffer()->msg[i] = mr;
+  200078:	a9008c22 	stp	x2, x3, [x1, #8]
+  20007c:	a9019424 	stp	x4, x5, [x1, #24]
+  200080:	940000c8 	bl	2003a0 <microkit_dbg_puts>
+    int *x = (int *)(seL4_Word) err;
+  200084:	92407e61 	and	x1, x19, #0xffffffff
+    *x = 0;
+  200088:	b900003f 	str	wzr, [x1]
+    microkit_pd_stop(0);
+
+    for (int i = 0; i < 0x30000; i++) {
+  20008c:	b0000001 	adrp	x1, 201000 <__sel4_ipc_buffer>
+  200090:	91004021 	add	x1, x1, #0x10
+{
+  200094:	d2800000 	mov	x0, #0x0                   	// #0
+        pd_code[i] = elf_b[i];
+  200098:	a9400823 	ldp	x3, x2, [x1]
+  20009c:	38606863 	ldrb	w3, [x3, x0]
+  2000a0:	38206843 	strb	w3, [x2, x0]
+    for (int i = 0; i < 0x30000; i++) {
+  2000a4:	91000400 	add	x0, x0, #0x1
+  2000a8:	f140c01f 	cmp	x0, #0x30, lsl #12
+  2000ac:	54ffff61 	b.ne	200098 <notified+0x78>  // b.any
+    }
+
+    microkit_dbg_puts("Finished copying the elf\n");
+  2000b0:	90000000 	adrp	x0, 200000 <_start>
+  2000b4:	91162000 	add	x0, x0, #0x588
+  2000b8:	940000ba 	bl	2003a0 <microkit_dbg_puts>
+    return __sel4_ipc_buffer;
+  2000bc:	f9400288 	ldr	x8, [x20]
+    register seL4_Word destptr asm("x0") = dest;
+  2000c0:	d2801940 	mov	x0, #0xca                  	// #202
+    register seL4_Word info asm("x1") = info_arg;
+  2000c4:	d28604c1 	mov	x1, #0x3026                	// #12326
+    register seL4_Word msg0 asm("x2") = *in_out_mr0;
+  2000c8:	d2800022 	mov	x2, #0x1                   	// #1
+    register seL4_Word msg1 asm("x3") = *in_out_mr1;
+  2000cc:	d2800043 	mov	x3, #0x2                   	// #2
+    register seL4_Word msg2 asm("x4") = *in_out_mr2;
+  2000d0:	d2a00404 	mov	x4, #0x200000              	// #2097152
+    seL4_GetIPCBuffer()->msg[i] = mr;
+  2000d4:	a902fd1f 	stp	xzr, xzr, [x8, #40]
+    register seL4_Word msg3 asm("x5") = *in_out_mr3;
+  2000d8:	d2c02005 	mov	x5, #0x10000000000         	// #1099511627776
+    MCS_PARAM_DECL("x6");
+  2000dc:	d2800006 	mov	x6, #0x0                   	// #0
+  2000e0:	a903fd1f 	stp	xzr, xzr, [x8, #56]
+    register seL4_Word scno asm("x7") = sys;
+  2000e4:	92800007 	mov	x7, #0xffffffffffffffff    	// #-1
+  2000e8:	a904fd1f 	stp	xzr, xzr, [x8, #72]
+  2000ec:	a905fd1f 	stp	xzr, xzr, [x8, #88]
+  2000f0:	a906fd1f 	stp	xzr, xzr, [x8, #104]
+  2000f4:	a907fd1f 	stp	xzr, xzr, [x8, #120]
+  2000f8:	a908fd1f 	stp	xzr, xzr, [x8, #136]
+  2000fc:	a909fd1f 	stp	xzr, xzr, [x8, #152]
+  200100:	a90afd1f 	stp	xzr, xzr, [x8, #168]
+  200104:	a90bfd1f 	stp	xzr, xzr, [x8, #184]
+  200108:	a90cfd1f 	stp	xzr, xzr, [x8, #200]
+  20010c:	a90dfd1f 	stp	xzr, xzr, [x8, #216]
+  200110:	a90efd1f 	stp	xzr, xzr, [x8, #232]
+  200114:	a90ffd1f 	stp	xzr, xzr, [x8, #248]
+  200118:	a910fd1f 	stp	xzr, xzr, [x8, #264]
+  20011c:	a911fd1f 	stp	xzr, xzr, [x8, #280]
+  200120:	a912fd1f 	stp	xzr, xzr, [x8, #296]
+    asm volatile(
+  200124:	d4000001 	svc	#0x0
+	if (result != seL4_NoError) {
+  200128:	f2747c3f 	tst	x1, #0xffffffff000
+  20012c:	54000120 	b.eq	200150 <notified+0x130>  // b.none
+    return __sel4_ipc_buffer;
+  200130:	f9400281 	ldr	x1, [x20]
+              0, /* No flags */
+              2, /* writing 1 register */
+              &ctxt
+          );
+    if (err != seL4_NoError) {
+        microkit_dbg_puts("uh oh\n");
+  200134:	90000000 	adrp	x0, 200000 <_start>
+  200138:	9116a000 	add	x0, x0, #0x5a8
+    }
+}
+  20013c:	a94153f3 	ldp	x19, x20, [sp, #16]
+    seL4_GetIPCBuffer()->msg[i] = mr;
+  200140:	a9008c22 	stp	x2, x3, [x1, #8]
+  200144:	a9019424 	stp	x4, x5, [x1, #24]
+  200148:	a8c27bfd 	ldp	x29, x30, [sp], #32
+        microkit_dbg_puts("uh oh\n");
+  20014c:	14000095 	b	2003a0 <microkit_dbg_puts>
+}
+  200150:	a94153f3 	ldp	x19, x20, [sp, #16]
+  200154:	a8c27bfd 	ldp	x29, x30, [sp], #32
+  200158:	d65f03c0 	ret
+  20015c:	d503201f 	nop
+
+0000000000200160 <fault>:
+
+seL4_Bool fault(microkit_child child, microkit_msginfo msginfo, microkit_msginfo *reply_msginfo)
+{
+  200160:	a9bf7bfd 	stp	x29, x30, [sp, #-16]!
+}
+
+LIBSEL4_INLINE_FUNC seL4_Uint64 CONST
+seL4_MessageInfo_get_label(seL4_MessageInfo_t seL4_MessageInfo) {
+    seL4_Uint64 ret;
+    ret = (seL4_MessageInfo.words[0] & 0xfffffffffffff000ull) >> 12;
+  200164:	d34cfc21 	lsr	x1, x1, #12
+    seL4_Word label = microkit_msginfo_get_label(msginfo);
+    switch (label) {
+  200168:	f100183f 	cmp	x1, #0x6
+{
+  20016c:	910003fd 	mov	x29, sp
+    switch (label) {
+  200170:	540000e0 	b.eq	20018c <fault+0x2c>  // b.none
+            seL4_Word ip = seL4_GetMR(seL4_VMFault_IP);
+            seL4_Word fault_addr = seL4_GetMR(seL4_VMFault_Addr);
+            break;
+        }
+        default:
+            microkit_dbg_puts("unknown\n");
+  200174:	90000000 	adrp	x0, 200000 <_start>
+  200178:	91170000 	add	x0, x0, #0x5c0
+  20017c:	94000089 	bl	2003a0 <microkit_dbg_puts>
+            break;
+    }
+    return seL4_False;
+}
+  200180:	52800000 	mov	w0, #0x0                   	// #0
+  200184:	a8c17bfd 	ldp	x29, x30, [sp], #16
+  200188:	d65f03c0 	ret
+            microkit_dbg_puts("got vm fault\n");
+  20018c:	90000000 	adrp	x0, 200000 <_start>
+  200190:	9116c000 	add	x0, x0, #0x5b0
+  200194:	94000083 	bl	2003a0 <microkit_dbg_puts>
+}
+  200198:	52800000 	mov	w0, #0x0                   	// #0
+  20019c:	a8c17bfd 	ldp	x29, x30, [sp], #16
+  2001a0:	d65f03c0 	ret
+	...
+
+00000000002001b0 <protected>:
+
+extern const void (*const __init_array_start [])(void);
+extern const void (*const __init_array_end [])(void);
+
+__attribute__((weak)) microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
+{
+  2001b0:	a9bf7bfd 	stp	x29, x30, [sp, #-16]!
+    microkit_dbg_puts(microkit_name);
+  2001b4:	b0000000 	adrp	x0, 201000 <__sel4_ipc_buffer>
+  2001b8:	9100c000 	add	x0, x0, #0x30
+{
+  2001bc:	910003fd 	mov	x29, sp
+    microkit_dbg_puts(microkit_name);
+  2001c0:	94000078 	bl	2003a0 <microkit_dbg_puts>
+    microkit_dbg_puts(" is missing the 'protected' entry point\n");
+  2001c4:	90000000 	adrp	x0, 200000 <_start>
+  2001c8:	91174000 	add	x0, x0, #0x5d0
+  2001cc:	94000075 	bl	2003a0 <microkit_dbg_puts>
+     * Actually derference 'err' which means the crash reporting will have
+     * `err` as the fault address. A bit of a cute hack. Not a good long term
+     * solution but good for now.
+     */
+    int *x = (int *)(seL4_Word) err;
+    *x = 0;
+  2001d0:	d2800000 	mov	x0, #0x0                   	// #0
+  2001d4:	b900001f 	str	wzr, [x0]
+  2001d8:	d4207d00 	brk	#0x3e8
+  2001dc:	d503201f 	nop
+    microkit_internal_crash(0);
+    return seL4_MessageInfo_new(0, 0, 0, 0);
+}
+
+__attribute__((weak)) seL4_Bool fault(microkit_child child, microkit_msginfo msginfo, microkit_msginfo *reply_msginfo)
+{
+  2001e0:	a9bf7bfd 	stp	x29, x30, [sp, #-16]!
+    microkit_dbg_puts(microkit_name);
+  2001e4:	b0000000 	adrp	x0, 201000 <__sel4_ipc_buffer>
+  2001e8:	9100c000 	add	x0, x0, #0x30
+{
+  2001ec:	910003fd 	mov	x29, sp
+    microkit_dbg_puts(microkit_name);
+  2001f0:	9400006c 	bl	2003a0 <microkit_dbg_puts>
+    microkit_dbg_puts(" is missing the 'fault' entry point\n");
+  2001f4:	90000000 	adrp	x0, 200000 <_start>
+  2001f8:	91180000 	add	x0, x0, #0x600
+  2001fc:	94000069 	bl	2003a0 <microkit_dbg_puts>
+  200200:	d2800000 	mov	x0, #0x0                   	// #0
+  200204:	b900001f 	str	wzr, [x0]
+  200208:	d4207d00 	brk	#0x3e8
+  20020c:	00000000 	udf	#0
+
+0000000000200210 <main>:
+        }
+    }
+}
+
+void main(void)
+{
+  200210:	a9bc7bfd 	stp	x29, x30, [sp, #-64]!
+    size_t count = __init_array_end - __init_array_start;
+  200214:	b0000000 	adrp	x0, 201000 <__sel4_ipc_buffer>
+  200218:	91000000 	add	x0, x0, #0x0
+{
+  20021c:	910003fd 	mov	x29, sp
+  200220:	a90153f3 	stp	x19, x20, [sp, #16]
+    size_t count = __init_array_end - __init_array_start;
+  200224:	b0000014 	adrp	x20, 201000 <__sel4_ipc_buffer>
+  200228:	91000294 	add	x20, x20, #0x0
+{
+  20022c:	a9025bf5 	stp	x21, x22, [sp, #32]
+    for (size_t i = 0; i < count; i++) {
+  200230:	eb140015 	subs	x21, x0, x20
+  200234:	54000100 	b.eq	200254 <main+0x44>  // b.none
+  200238:	9343feb5 	asr	x21, x21, #3
+  20023c:	d2800013 	mov	x19, #0x0                   	// #0
+        __init_array_start[i]();
+  200240:	f8737a80 	ldr	x0, [x20, x19, lsl #3]
+    for (size_t i = 0; i < count; i++) {
+  200244:	91000673 	add	x19, x19, #0x1
+        __init_array_start[i]();
+  200248:	d63f0000 	blr	x0
+    for (size_t i = 0; i < count; i++) {
+  20024c:	eb1302bf 	cmp	x21, x19
+  200250:	54ffff88 	b.hi	200240 <main+0x30>  // b.pmore
+     * If we are passive, now our initialisation is complete we can
+     * signal the monitor to unbind our scheduling context and bind
+     * it to our notification object.
+     * We delay this signal so we are ready waiting on a recv() syscall
+     */
+    if (microkit_passive) {
+  200254:	b0000016 	adrp	x22, 201000 <__sel4_ipc_buffer>
+  200258:	9100c2d6 	add	x22, x22, #0x30
+    init();
+  20025c:	97ffff6d 	bl	200010 <init>
+    if (microkit_passive) {
+  200260:	394102c0 	ldrb	w0, [x22, #64]
+  200264:	340000a0 	cbz	w0, 200278 <main+0x68>
+        microkit_have_signal = seL4_True;
+  200268:	52800021 	mov	w1, #0x1                   	// #1
+        microkit_signal_msg = seL4_MessageInfo_new(0, 0, 0, 0);
+        microkit_signal_cap = MONITOR_EP;
+  20026c:	d28000a0 	mov	x0, #0x5                   	// #5
+        microkit_have_signal = seL4_True;
+  200270:	390106c1 	strb	w1, [x22, #65]
+        microkit_signal_cap = MONITOR_EP;
+  200274:	a90482df 	stp	xzr, x0, [x22, #72]
+  200278:	b0000015 	adrp	x21, 201000 <__sel4_ipc_buffer>
+  20027c:	910002b5 	add	x21, x21, #0x0
+    for (size_t i = 0; i < count; i++) {
+  200280:	52800000 	mov	w0, #0x0                   	// #0
+  200284:	d503201f 	nop
+        if (have_reply) {
+  200288:	35000220 	cbnz	w0, 2002cc <main+0xbc>
+        } else if (microkit_have_signal) {
+  20028c:	39c106c0 	ldrsb	w0, [x22, #65]
+  200290:	350004e0 	cbnz	w0, 20032c <main+0x11c>
+    register seL4_Word src_and_badge asm("x0") = src;
+  200294:	d2800020 	mov	x0, #0x1                   	// #1
+    MCS_PARAM_DECL("x6");
+  200298:	d2800086 	mov	x6, #0x4                   	// #4
+    register seL4_Word scno asm("x7") = sys;
+  20029c:	928000c7 	mov	x7, #0xfffffffffffffff9    	// #-7
+    asm volatile(
+  2002a0:	d4000001 	svc	#0x0
+    return __sel4_ipc_buffer;
+  2002a4:	f94002a6 	ldr	x6, [x21]
+    *out_badge = src_and_badge;
+  2002a8:	aa0003f3 	mov	x19, x0
+    seL4_GetIPCBuffer()->msg[i] = mr;
+  2002ac:	a9008cc2 	stp	x2, x3, [x6, #8]
+  2002b0:	a90194c4 	stp	x4, x5, [x6, #24]
+        if (is_fault) {
+  2002b4:	b7f00313 	tbnz	x19, #62, 200314 <main+0x104>
+            unsigned int idx = 0;
+  2002b8:	52800014 	mov	w20, #0x0                   	// #0
+        } else if (is_endpoint) {
+  2002bc:	b6f801b3 	tbz	x19, #63, 2002f0 <main+0xe0>
+            reply_tag = protected(badge & CHANNEL_MASK, tag);
+  2002c0:	12001660 	and	w0, w19, #0x3f
+  2002c4:	97ffffbb 	bl	2001b0 <protected>
+  2002c8:	f9001fe0 	str	x0, [sp, #56]
+    return __sel4_ipc_buffer;
+  2002cc:	f94002a5 	ldr	x5, [x21]
+    register seL4_Word destptr asm("x0") = dest;
+  2002d0:	d2800020 	mov	x0, #0x1                   	// #1
+    register seL4_Word info asm("x1") = info_arg;
+  2002d4:	f9401fe1 	ldr	x1, [sp, #56]
+    MCS_PARAM_DECL("x6");
+  2002d8:	d2800086 	mov	x6, #0x4                   	// #4
+    register seL4_Word msg1 asm("x3") = *in_out_mr1;
+  2002dc:	a9408ca2 	ldp	x2, x3, [x5, #8]
+    register seL4_Word scno asm("x7") = sys;
+  2002e0:	92800027 	mov	x7, #0xfffffffffffffffe    	// #-2
+    register seL4_Word msg3 asm("x5") = *in_out_mr3;
+  2002e4:	a94194a4 	ldp	x4, x5, [x5, #24]
+    asm volatile(
+  2002e8:	d4000001 	svc	#0x0
+    *out_info = info;
+  2002ec:	17ffffee 	b	2002a4 <main+0x94>
+                if (badge & 1) {
+  2002f0:	370000d3 	tbnz	w19, #0, 200308 <main+0xf8>
+  2002f4:	d503201f 	nop
+                badge >>= 1;
+  2002f8:	d341fe73 	lsr	x19, x19, #1
+                idx++;
+  2002fc:	11000694 	add	w20, w20, #0x1
+            } while (badge != 0);
+  200300:	b4fffc73 	cbz	x19, 20028c <main+0x7c>
+                if (badge & 1) {
+  200304:	3607ffb3 	tbz	w19, #0, 2002f8 <main+0xe8>
+                    notified(idx);
+  200308:	2a1403e0 	mov	w0, w20
+  20030c:	97ffff45 	bl	200020 <notified>
+  200310:	17fffffa 	b	2002f8 <main+0xe8>
+            seL4_Bool reply_to_fault = fault(badge & PD_MASK, tag, &reply_tag);
+  200314:	12001e60 	and	w0, w19, #0xff
+  200318:	9100e3e2 	add	x2, sp, #0x38
+  20031c:	97ffff91 	bl	200160 <fault>
+            if (reply_to_fault) {
+  200320:	72001c1f 	tst	w0, #0xff
+  200324:	1a9f07e0 	cset	w0, ne	// ne = any
+  200328:	17ffffd8 	b	200288 <main+0x78>
+  20032c:	f94002a5 	ldr	x5, [x21]
+static inline void arm_sys_nbsend_recv(seL4_Word sys, seL4_Word dest, seL4_Word src, seL4_Word *out_badge,
+                                       seL4_Word info_arg,
+                                       seL4_Word *out_info, seL4_Word *in_out_mr0, seL4_Word *in_out_mr1, seL4_Word *in_out_mr2,
+                                       seL4_Word *in_out_mr3, seL4_Word reply)
+{
+    register seL4_Word src_and_badge asm("x0") = src;
+  200330:	d2800020 	mov	x0, #0x1                   	// #1
+    register seL4_Word msg1 asm("x3") = *in_out_mr1;
+    register seL4_Word msg2 asm("x4") = *in_out_mr2;
+    register seL4_Word msg3 asm("x5") = *in_out_mr3;
+
+    register seL4_Word reply_reg asm("x6") = reply;
+    register seL4_Word dest_reg asm("x8") = dest;
+  200334:	a944a2c1 	ldp	x1, x8, [x22, #72]
+    register seL4_Word reply_reg asm("x6") = reply;
+  200338:	d2800086 	mov	x6, #0x4                   	// #4
+    register seL4_Word msg1 asm("x3") = *in_out_mr1;
+  20033c:	a9408ca2 	ldp	x2, x3, [x5, #8]
+
+    /* Perform the system call. */
+    register seL4_Word scno asm("x7") = sys;
+  200340:	92800047 	mov	x7, #0xfffffffffffffffd    	// #-3
+    register seL4_Word msg3 asm("x5") = *in_out_mr3;
+  200344:	a94194a4 	ldp	x4, x5, [x5, #24]
+    asm volatile(
+  200348:	d4000001 	svc	#0x0
+  20034c:	f94002a6 	ldr	x6, [x21]
+        "+r"(src_and_badge), "+r"(info)
+        : "r"(scno), "r"(reply_reg), "r"(dest_reg)
+        : "memory"
+    );
+
+    *out_badge = src_and_badge;
+  200350:	aa0003f3 	mov	x19, x0
+            microkit_have_signal = seL4_False;
+  200354:	390106df 	strb	wzr, [x22, #65]
+    seL4_GetIPCBuffer()->msg[i] = mr;
+  200358:	a9008cc2 	stp	x2, x3, [x6, #8]
+  20035c:	a90194c4 	stp	x4, x5, [x6, #24]
+  200360:	17ffffd5 	b	2002b4 <main+0xa4>
+	...
+
+0000000000200370 <microkit_dbg_putc>:
+    register seL4_Word info asm("x1") = info_arg;
+  200370:	d2800001 	mov	x1, #0x0                   	// #0
+    seL4_Word unused2 = 0;
+    seL4_Word unused3 = 0;
+    seL4_Word unused4 = 0;
+    seL4_Word unused5 = 0;
+
+    arm_sys_send_recv(seL4_SysDebugPutChar, c, &unused0, 0, &unused1, &unused2, &unused3, &unused4, &unused5, 0);
+  200374:	92401c00 	and	x0, x0, #0xff
+    register seL4_Word msg0 asm("x2") = *in_out_mr0;
+  200378:	d2800002 	mov	x2, #0x0                   	// #0
+    register seL4_Word msg1 asm("x3") = *in_out_mr1;
+  20037c:	d2800003 	mov	x3, #0x0                   	// #0
+    register seL4_Word msg2 asm("x4") = *in_out_mr2;
+  200380:	d2800004 	mov	x4, #0x0                   	// #0
+    register seL4_Word msg3 asm("x5") = *in_out_mr3;
+  200384:	d2800005 	mov	x5, #0x0                   	// #0
+    MCS_PARAM_DECL("x6");
+  200388:	d2800006 	mov	x6, #0x0                   	// #0
+    register seL4_Word scno asm("x7") = sys;
+  20038c:	92800167 	mov	x7, #0xfffffffffffffff4    	// #-12
+    asm volatile(
+  200390:	d4000001 	svc	#0x0
+microkit_dbg_putc(int c)
+{
+#if defined(CONFIG_PRINTING)
+    seL4_DebugPutChar(c);
+#endif
+}
+  200394:	d65f03c0 	ret
+  200398:	d503201f 	nop
+  20039c:	d503201f 	nop
+
+00000000002003a0 <microkit_dbg_puts>:
+
+
+
+void
+microkit_dbg_puts(const char *s)
+{
+  2003a0:	aa0003e8 	mov	x8, x0
+    while (*s) {
+  2003a4:	39400000 	ldrb	w0, [x0]
+  2003a8:	34000180 	cbz	w0, 2003d8 <microkit_dbg_puts+0x38>
+  2003ac:	d503201f 	nop
+    register seL4_Word info asm("x1") = info_arg;
+  2003b0:	d2800001 	mov	x1, #0x0                   	// #0
+    register seL4_Word msg0 asm("x2") = *in_out_mr0;
+  2003b4:	d2800002 	mov	x2, #0x0                   	// #0
+    register seL4_Word msg1 asm("x3") = *in_out_mr1;
+  2003b8:	d2800003 	mov	x3, #0x0                   	// #0
+    register seL4_Word msg2 asm("x4") = *in_out_mr2;
+  2003bc:	d2800004 	mov	x4, #0x0                   	// #0
+    register seL4_Word msg3 asm("x5") = *in_out_mr3;
+  2003c0:	d2800005 	mov	x5, #0x0                   	// #0
+    MCS_PARAM_DECL("x6");
+  2003c4:	d2800006 	mov	x6, #0x0                   	// #0
+    register seL4_Word scno asm("x7") = sys;
+  2003c8:	92800167 	mov	x7, #0xfffffffffffffff4    	// #-12
+    asm volatile(
+  2003cc:	d4000001 	svc	#0x0
+  2003d0:	38401d00 	ldrb	w0, [x8, #1]!
+  2003d4:	35fffee0 	cbnz	w0, 2003b0 <microkit_dbg_puts+0x10>
+        microkit_dbg_putc(*s);
+        s++;
+    }
+}
+  2003d8:	d65f03c0 	ret
+  2003dc:	d503201f 	nop
+
+00000000002003e0 <__assert_fail>:
+
+
+void
+__assert_fail(const char  *str, const char *file, int line, const char *function)
+{
+  2003e0:	9000000b 	adrp	x11, 200000 <_start>
+  2003e4:	9118a16b 	add	x11, x11, #0x628
+  2003e8:	aa0103e9 	mov	x9, x1
+  2003ec:	aa0303e8 	mov	x8, x3
+  2003f0:	aa0003ea 	mov	x10, x0
+    while (*s) {
+  2003f4:	d2800c20 	mov	x0, #0x61                  	// #97
+    register seL4_Word info asm("x1") = info_arg;
+  2003f8:	d2800001 	mov	x1, #0x0                   	// #0
+    register seL4_Word msg0 asm("x2") = *in_out_mr0;
+  2003fc:	d2800002 	mov	x2, #0x0                   	// #0
+    register seL4_Word msg1 asm("x3") = *in_out_mr1;
+  200400:	d2800003 	mov	x3, #0x0                   	// #0
+    register seL4_Word msg2 asm("x4") = *in_out_mr2;
+  200404:	d2800004 	mov	x4, #0x0                   	// #0
+    register seL4_Word msg3 asm("x5") = *in_out_mr3;
+  200408:	d2800005 	mov	x5, #0x0                   	// #0
+    MCS_PARAM_DECL("x6");
+  20040c:	d2800006 	mov	x6, #0x0                   	// #0
+    register seL4_Word scno asm("x7") = sys;
+  200410:	92800167 	mov	x7, #0xfffffffffffffff4    	// #-12
+    asm volatile(
+  200414:	d4000001 	svc	#0x0
+  200418:	38401d60 	ldrb	w0, [x11, #1]!
+  20041c:	35fffee0 	cbnz	w0, 2003f8 <__assert_fail+0x18>
+  200420:	39400140 	ldrb	w0, [x10]
+  200424:	34000160 	cbz	w0, 200450 <__assert_fail+0x70>
+    register seL4_Word info asm("x1") = info_arg;
+  200428:	d2800001 	mov	x1, #0x0                   	// #0
+    register seL4_Word msg0 asm("x2") = *in_out_mr0;
+  20042c:	d2800002 	mov	x2, #0x0                   	// #0
+    register seL4_Word msg1 asm("x3") = *in_out_mr1;
+  200430:	d2800003 	mov	x3, #0x0                   	// #0
+    register seL4_Word msg2 asm("x4") = *in_out_mr2;
+  200434:	d2800004 	mov	x4, #0x0                   	// #0
+    register seL4_Word msg3 asm("x5") = *in_out_mr3;
+  200438:	d2800005 	mov	x5, #0x0                   	// #0
+    MCS_PARAM_DECL("x6");
+  20043c:	d2800006 	mov	x6, #0x0                   	// #0
+    register seL4_Word scno asm("x7") = sys;
+  200440:	92800167 	mov	x7, #0xfffffffffffffff4    	// #-12
+    asm volatile(
+  200444:	d4000001 	svc	#0x0
+  200448:	38401d40 	ldrb	w0, [x10, #1]!
+  20044c:	35fffee0 	cbnz	w0, 200428 <__assert_fail+0x48>
+    register seL4_Word destptr asm("x0") = dest;
+  200450:	d2800400 	mov	x0, #0x20                  	// #32
+    register seL4_Word info asm("x1") = info_arg;
+  200454:	d2800001 	mov	x1, #0x0                   	// #0
+    register seL4_Word msg0 asm("x2") = *in_out_mr0;
+  200458:	d2800002 	mov	x2, #0x0                   	// #0
+    register seL4_Word msg1 asm("x3") = *in_out_mr1;
+  20045c:	d2800003 	mov	x3, #0x0                   	// #0
+    register seL4_Word msg2 asm("x4") = *in_out_mr2;
+  200460:	d2800004 	mov	x4, #0x0                   	// #0
+    register seL4_Word msg3 asm("x5") = *in_out_mr3;
+  200464:	d2800005 	mov	x5, #0x0                   	// #0
+    MCS_PARAM_DECL("x6");
+  200468:	d2800006 	mov	x6, #0x0                   	// #0
+    register seL4_Word scno asm("x7") = sys;
+  20046c:	92800167 	mov	x7, #0xfffffffffffffff4    	// #-12
+    asm volatile(
+  200470:	d4000001 	svc	#0x0
+  200474:	39400120 	ldrb	w0, [x9]
+  200478:	34000180 	cbz	w0, 2004a8 <__assert_fail+0xc8>
+  20047c:	d503201f 	nop
+    register seL4_Word info asm("x1") = info_arg;
+  200480:	d2800001 	mov	x1, #0x0                   	// #0
+    register seL4_Word msg0 asm("x2") = *in_out_mr0;
+  200484:	d2800002 	mov	x2, #0x0                   	// #0
+    register seL4_Word msg1 asm("x3") = *in_out_mr1;
+  200488:	d2800003 	mov	x3, #0x0                   	// #0
+    register seL4_Word msg2 asm("x4") = *in_out_mr2;
+  20048c:	d2800004 	mov	x4, #0x0                   	// #0
+    register seL4_Word msg3 asm("x5") = *in_out_mr3;
+  200490:	d2800005 	mov	x5, #0x0                   	// #0
+    MCS_PARAM_DECL("x6");
+  200494:	d2800006 	mov	x6, #0x0                   	// #0
+    register seL4_Word scno asm("x7") = sys;
+  200498:	92800167 	mov	x7, #0xfffffffffffffff4    	// #-12
+    asm volatile(
+  20049c:	d4000001 	svc	#0x0
+  2004a0:	38401d20 	ldrb	w0, [x9, #1]!
+  2004a4:	35fffee0 	cbnz	w0, 200480 <__assert_fail+0xa0>
+    register seL4_Word destptr asm("x0") = dest;
+  2004a8:	d2800400 	mov	x0, #0x20                  	// #32
+    register seL4_Word info asm("x1") = info_arg;
+  2004ac:	d2800001 	mov	x1, #0x0                   	// #0
+    register seL4_Word msg0 asm("x2") = *in_out_mr0;
+  2004b0:	d2800002 	mov	x2, #0x0                   	// #0
+    register seL4_Word msg1 asm("x3") = *in_out_mr1;
+  2004b4:	d2800003 	mov	x3, #0x0                   	// #0
+    register seL4_Word msg2 asm("x4") = *in_out_mr2;
+  2004b8:	d2800004 	mov	x4, #0x0                   	// #0
+    register seL4_Word msg3 asm("x5") = *in_out_mr3;
+  2004bc:	d2800005 	mov	x5, #0x0                   	// #0
+    MCS_PARAM_DECL("x6");
+  2004c0:	d2800006 	mov	x6, #0x0                   	// #0
+    register seL4_Word scno asm("x7") = sys;
+  2004c4:	92800167 	mov	x7, #0xfffffffffffffff4    	// #-12
+    asm volatile(
+  2004c8:	d4000001 	svc	#0x0
+  2004cc:	39400100 	ldrb	w0, [x8]
+  2004d0:	34000180 	cbz	w0, 200500 <__assert_fail+0x120>
+  2004d4:	d503201f 	nop
+    register seL4_Word info asm("x1") = info_arg;
+  2004d8:	d2800001 	mov	x1, #0x0                   	// #0
+    register seL4_Word msg0 asm("x2") = *in_out_mr0;
+  2004dc:	d2800002 	mov	x2, #0x0                   	// #0
+    register seL4_Word msg1 asm("x3") = *in_out_mr1;
+  2004e0:	d2800003 	mov	x3, #0x0                   	// #0
+    register seL4_Word msg2 asm("x4") = *in_out_mr2;
+  2004e4:	d2800004 	mov	x4, #0x0                   	// #0
+    register seL4_Word msg3 asm("x5") = *in_out_mr3;
+  2004e8:	d2800005 	mov	x5, #0x0                   	// #0
+    MCS_PARAM_DECL("x6");
+  2004ec:	d2800006 	mov	x6, #0x0                   	// #0
+    register seL4_Word scno asm("x7") = sys;
+  2004f0:	92800167 	mov	x7, #0xfffffffffffffff4    	// #-12
+    asm volatile(
+  2004f4:	d4000001 	svc	#0x0
+  2004f8:	38401d00 	ldrb	w0, [x8, #1]!
+  2004fc:	35fffee0 	cbnz	w0, 2004d8 <__assert_fail+0xf8>
+    register seL4_Word destptr asm("x0") = dest;
+  200500:	d2800140 	mov	x0, #0xa                   	// #10
+    register seL4_Word info asm("x1") = info_arg;
+  200504:	d2800001 	mov	x1, #0x0                   	// #0
+    register seL4_Word msg0 asm("x2") = *in_out_mr0;
+  200508:	d2800002 	mov	x2, #0x0                   	// #0
+    register seL4_Word msg1 asm("x3") = *in_out_mr1;
+  20050c:	d2800003 	mov	x3, #0x0                   	// #0
+    register seL4_Word msg2 asm("x4") = *in_out_mr2;
+  200510:	d2800004 	mov	x4, #0x0                   	// #0
+    register seL4_Word msg3 asm("x5") = *in_out_mr3;
+  200514:	d2800005 	mov	x5, #0x0                   	// #0
+    MCS_PARAM_DECL("x6");
+  200518:	d2800006 	mov	x6, #0x0                   	// #0
+    register seL4_Word scno asm("x7") = sys;
+  20051c:	92800167 	mov	x7, #0xfffffffffffffff4    	// #-12
+    asm volatile(
+  200520:	d4000001 	svc	#0x0
+    microkit_dbg_puts(" ");
+    microkit_dbg_puts(file);
+    microkit_dbg_puts(" ");
+    microkit_dbg_puts(function);
+    microkit_dbg_puts("\n");
+}
+  200524:	d65f03c0 	ret
