@@ -18,6 +18,8 @@
 #define CLIENT_CH 2
 #define GOD 4
 
+char *pd_code;
+
 net_queue_t *tx_free_drv;
 net_queue_t *tx_active_drv;
 net_queue_t *tx_free_cli0;
@@ -92,9 +94,9 @@ void tx_provide(void)
                 err = net_enqueue_active(&state.tx_queue_drv, buffer);
                 assert(!err);
                 state.client_usage[client].curr_bits += (buffer.len * 8);
-                // if (state.client_usage[client].curr_bits >= state.client_usage[client].max_bits) {
-                //     signal_god = true;
-                // }
+                if (state.client_usage[client].curr_bits >= state.client_usage[client].max_bits) {
+                    signal_god = true;
+                }
                 signal_count++;
                 if (signal_count >= 100) {
                     signal_god = true;
@@ -166,6 +168,11 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
+    cache_clean_and_invalidate(pd_code, pd_code + 0x5000);
+    for (int i = 0; i < 10; i++) {
+        sddf_dprintf("This is the start of band monitor at %d: %x\n", i, pd_code[i]);
+    }
+
     microkit_dbg_puts("In band monitor init\n");
     /* Set up driver queues */
     net_queue_init(&state.tx_queue_drv, tx_free_drv, tx_active_drv, NET_TX_QUEUE_CAPACITY_DRIV);
