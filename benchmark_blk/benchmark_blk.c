@@ -13,6 +13,7 @@
 #include <sddf/util/fence.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
+#include <serial_config.h>
 
 #define LOG_BUFFER_CAP 7
 
@@ -215,29 +216,14 @@ void notified(microkit_channel ch)
         microkit_benchmark_stop(&total, &number_schedules, &kernel, &entries);
         print_benchmark_details(PD_TOTAL, kernel, entries, number_schedules, total);
 
-        microkit_benchmark_stop_tcb(PD_ETH_ID, &total, &number_schedules, &kernel, &entries);
-        print_benchmark_details(PD_ETH_ID, kernel, entries, number_schedules, total);
+        microkit_benchmark_stop_tcb(PD_BLK_ID, &total, &number_schedules, &kernel, &entries);
+        print_benchmark_details(PD_BLK_ID, kernel, entries, number_schedules, total);
 
-        microkit_benchmark_stop_tcb(PD_VIRT_RX_ID, &total, &number_schedules, &kernel, &entries);
-        print_benchmark_details(PD_VIRT_RX_ID, kernel, entries, number_schedules, total);
+        microkit_benchmark_stop_tcb(PD_VIRT_ID, &total, &number_schedules, &kernel, &entries);
+        print_benchmark_details(PD_VIRT_ID, kernel, entries, number_schedules, total);
 
-        microkit_benchmark_stop_tcb(PD_VIRT_TX_ID, &total, &number_schedules, &kernel, &entries);
-        print_benchmark_details(PD_VIRT_TX_ID, kernel, entries, number_schedules, total);
-
-        microkit_benchmark_stop_tcb(PD_COPY_ID, &total, &number_schedules, &kernel, &entries);
-        print_benchmark_details(PD_COPY_ID, kernel, entries, number_schedules, total);
-
-        microkit_benchmark_stop_tcb(PD_COPY1_ID, &total, &number_schedules, &kernel, &entries);
-        print_benchmark_details(PD_COPY1_ID, kernel, entries, number_schedules, total);
-
-        microkit_benchmark_stop_tcb(PD_LWIP_ID, &total, &number_schedules, &kernel, &entries);
-        print_benchmark_details(PD_LWIP_ID, kernel, entries, number_schedules, total);
-
-        microkit_benchmark_stop_tcb(PD_LWIP1_ID, &total, &number_schedules, &kernel, &entries);
-        print_benchmark_details(PD_LWIP1_ID, kernel, entries, number_schedules, total);
-
-        microkit_benchmark_stop_tcb(PD_TIMER_ID, &total, &number_schedules, &kernel, &entries);
-        print_benchmark_details(PD_TIMER_ID, kernel, entries, number_schedules, total);
+        microkit_benchmark_stop_tcb(PD_CLIENT_ID, &total, &number_schedules, &kernel, &entries);
+        print_benchmark_details(PD_CLIENT_ID, kernel, entries, number_schedules, total);
 #endif
 
 #ifdef CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES
@@ -257,9 +243,9 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
-    sddf_printf("BENCH| LOG Bench thread init!");
-    //serial_cli_queue_init_sys(microkit_name, NULL, NULL, NULL, &serial_tx_queue_handle, serial_tx_queue, serial_tx_data);
-    //serial_putchar_init(SERIAL_TX_CH, &serial_tx_queue_handle);
+    serial_cli_queue_init_sys(microkit_name, NULL, NULL, NULL, &serial_tx_queue_handle, serial_tx_queue, serial_tx_data);
+    serial_putchar_init(SERIAL_TX_CH, &serial_tx_queue_handle);
+    sddf_printf("BENCH| LOG Bench thread init!\n");
 #ifdef MICROKIT_CONFIG_benchmark
     sel4bench_init();
     seL4_Word n_counters = sel4bench_get_num_counters();
