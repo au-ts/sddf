@@ -8,8 +8,19 @@ ifeq ($(strip $(MICROKIT_SDK)),)
 $(error MICROKIT_SDK must be specified)
 endif
 
+ifeq ($(strip $(TOOLCHAIN)),)
+	TOOLCHAIN := aarch64-none-elf
+	export TOOLCHAIN := aarch64-none-elf
+	export LIBC := $(dir $(realpath $(shell aarch64-none-elf-gcc --print-file-name libc.a)))
+endif
+
 ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
 	export MICROKIT_BOARD
+	export DRIV_DIR := virtio
+	export UART_DRIV_DIR := arm
+	export BLK_DRIVER_DIR := virtio
+	export CPU := cortex-a53
+	export QEMU := qemu-system-aarch64
 else
 $(error Unsupported MICROKIT_BOARD given)
 endif
@@ -18,6 +29,11 @@ export MICROKIT_CONFIG ?= debug
 export SDDF=$(abspath ../..)
 export BUILD_DIR:=$(abspath ${BUILD_DIR})
 export override MICROKIT_SDK:=$(abspath ${MICROKIT_SDK})
+export CC := $(TOOLCHAIN)-gcc
+export LD := $(TOOLCHAIN)-ld
+export AS := $(TOOLCHAIN)-as
+export AR := $(TOOLCHAIN)-ar
+export RANLIB := $(TOOLCHAIN)-ranlib
 
 IMAGE_FILE:= ${BUILD_DIR}/loader.img
 REPORT_FILE:= ${BUILD_DIR}/report.txt

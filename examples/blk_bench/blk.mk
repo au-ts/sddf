@@ -15,43 +15,24 @@ ifeq ($(strip $(SDDF)),)
 $(error SDDF must be specified)
 endif
 
-ifeq ($(strip $(TOOLCHAIN)),)
-	TOOLCHAIN := clang
-endif
-
-ifeq ($(strip $(TOOLCHAIN)), clang)
-	CC := clang -target aarch64-none-elf
-	LD := ld.lld
-	AR := llvm-ar
-	RANLIB := llvm-ranlib
-else
-	CC := $(TOOLCHAIN)-gcc
-	LD := $(TOOLCHAIN)-ld
-	AS := $(TOOLCHAIN)-as
-	AR := $(TOOLCHAIN)-ar
-	RANLIB := $(TOOLCHAIN)-ranlib
-endif
-
-QEMU := qemu-system-aarch64
-
 
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
-BENCHMARK:=$(SDDF)/benchmark_blk
+BLK_BENCHMARK := ${SDDF}/examples/blk_bench
+BENCHMARK := $(SDDF)/benchmark_blk
+SERIAL_COMPONENTS := $(SDDF)/serial/components
+UART_DRIVER := $(SDDF)/drivers/serial/$(UART_DRIV_DIR)
+SERIAL_CONFIG_INCLUDE := ${BLK_BENCHMARK}/include/serial_config
 
-TOP := ${SDDF}/examples/blk_bench
-CONFIGS_INCLUDE := ${TOP}
-
-# Platform specific
-BLK_DRIVER_DIR := virtio
-CPU := cortex-a53
-
+CONFIGS_INCLUDE := ${BLK_BENCHMARK}
 
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
-SYSTEM_FILE  := ${TOP}/board/$(MICROKIT_BOARD)/blk.system
+SYSTEM_FILE  := ${BLK_BENCHMARK}/board/$(MICROKIT_BOARD)/blk.system
 IMAGE_FILE   := loader.img
 REPORT_FILE  := report.txt
 
-IMAGES := blk_driver.elf client.elf blk_virt.elf benchmark_blk.elf idle.elf
+IMAGES := blk_driver.elf client.elf blk_virt.elf benchmark_blk.elf idle.elf\
+		  uart_driver.elf serial_virt_tx.elf
+
 CFLAGS := -mcpu=$(CPU) \
 		  -mstrict-align \
 		  -nostdlib \
@@ -61,8 +42,9 @@ CFLAGS := -mcpu=$(CPU) \
 		  -Wall -Wno-unused-function -Werror -Wno-unused-command-line-argument \
 		  -I$(BOARD_DIR)/include \
 		  -I$(SDDF)/include \
-		  -I$(CONFIGS_INCLUDE)
-LDFLAGS := -L$(BOARD_DIR)/lib
+		  -I$(CONFIGS_INCLUDE) \
+		  -I$(SERIAL_CONFIG_INCLUDE)
+LDFLAGS := -L$(BOARD_DIR)/lib -L${LIBC}
 LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
 
 CHECK_FLAGS_BOARD_MD5:=.board_cflags-$(shell echo -- ${CFLAGS} ${BOARD} ${MICROKIT_CONFIG} | shasum | sed 's/ *-//')
@@ -78,8 +60,6 @@ BLK_DRIVER   := $(SDDF)/drivers/blk/${BLK_DRIVER_DIR}
 
 BLK_COMPONENTS := $(SDDF)/blk/components
 
-#OBJS := {}
-#DEPS := $(filter %.d,$(OBJS:.o=.d))
 all: $(IMAGE_FILE)
 
 include ${BENCHMARK}/benchmark.mk
@@ -87,13 +67,15 @@ include ${BLK_DRIVER}/blk_driver.mk
 
 include ${SDDF}/util/util.mk
 include ${BLK_COMPONENTS}/blk_components.mk
+include ${UART_DRIVER}/uart_driver.mk
+include ${SERIAL_COMPONENTS}/serial_components.mk
 
 ${IMAGES}: libsddf_util_debug.a
 
-client.o: ${TOP}/client.c ${TOP}/basic_data.h
+client.o: ${BLK_BENCHMARK}/client.c ${BLK_BENCHMARK}/basic_data.h
 	$(CC) -c $(CFLAGS) -I. $< -o client.o
-client.elf: client.o
-	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
+client.elf: client.o libsddf_util.a
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)

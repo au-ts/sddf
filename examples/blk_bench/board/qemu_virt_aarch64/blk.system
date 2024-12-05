@@ -6,6 +6,7 @@
 -->
 <system>
     <!-- Device registers -->
+    <memory_region name="uart" size="0x1_000" phys_addr="0x9000000" />
     <memory_region name="blk_regs" size="0x10_000" phys_addr="0xa003000" />
     <!-- Needed specifically for the virtIO block driver -->
     <!-- TODO: make this one region -->
@@ -21,6 +22,18 @@
     <memory_region name="blk_client_request" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="blk_client_response" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="blk_client_data" size="0x200_000" page_size="0x200_000" />
+
+    <!-- shared memory for serial data regions (printing to serial console, benchmark build)  -->
+    <memory_region name="serial_tx_data_driver" size="0x4_000" />
+    <!-- <memory_region name="serial_tx_data_blkvirt" size="0x2_000" /> -->
+    <memory_region name="serial_tx_data_client0" size="0x2_000" />
+    <memory_region name="serial_tx_data_bench" size="0x2_000" />
+
+    <!-- shared memory for serial queue regions -->
+    <memory_region name="serial_tx_queue_driver" size="0x1_000" />
+    <!-- <memory_region name="serial_tx_queue_blkvirt" size="0x1_000" /> -->
+    <memory_region name="serial_tx_queue_client0" size="0x1_000" />
+    <memory_region name="serial_tx_queue_bench" size="0x1_000" />
 
     <!-- shared memory for PMU counters
     <memory_region name="cyclecounters" size="0x1000" />-->
@@ -39,10 +52,12 @@
     </protection_domain>
     -->
 
-    <protection_domain name="bench" priority="101" >
+    <protection_domain name="bench" priority="102" >
         <program_image path="benchmark_blk.elf" />
 
-        <protection_domain name="driver" id="1" priority="100">
+        <map mr="serial_tx_queue_bench" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="serial_tx_queue" />
+        <map mr="serial_tx_data_bench" vaddr="0x4_002_000" perms="rw" cached="true" setvar_vaddr="serial_tx_data" />
+        <protection_domain name="driver" id="1" priority="101">
             <program_image path="blk_driver.elf" />
             <map mr="blk_regs" vaddr="0x2_000_000" perms="rw" cached="false" setvar_vaddr="blk_regs"/>
             <setvar symbol="virtio_headers_paddr" region_paddr="blk_virtio_headers" />
@@ -58,7 +73,30 @@
             <irq irq="79" id="0" trigger="edge" />
         </protection_domain>
 
-        <protection_domain name="virt" id="2" priority="99">
+        <protection_domain name="uart" priority="100" id="4">
+            <program_image path="uart_driver.elf" />
+
+            <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
+            <map mr="serial_tx_queue_driver" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="tx_queue" />
+            <map mr="serial_tx_data_driver" vaddr="0x4_002_000" perms="rw" cached="true" setvar_vaddr="tx_data" />
+
+            <irq irq="33" id="0" /> <!-- UART interrupt -->
+        </protection_domain>
+
+        <protection_domain name="serial_virt_tx" id="5"  priority="99">
+            <program_image path="serial_virt_tx.elf" />
+            <map mr="serial_tx_queue_driver" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="tx_queue_drv" />
+            <map mr="serial_tx_queue_client0" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="tx_queue_cli0" />
+            <!-- serial_tx_queue_bench is client1 in this case -->
+            <map mr="serial_tx_queue_bench" vaddr="0x4_002_000" perms="rw" cached="true"/>
+
+            <map mr="serial_tx_data_driver" vaddr="0x4_003_000" perms="rw" cached="true" setvar_vaddr="tx_data_drv" />
+            <map mr="serial_tx_data_client0" vaddr="0x4_007_000" perms="r" cached="true" setvar_vaddr="tx_data_cli0" />
+            <!-- serial_tx_data_bench is client1 in this case -->
+            <map mr="serial_tx_data_bench" vaddr="0x4_009_000" perms="r" cached="true"/>
+        </protection_domain>
+
+        <protection_domain name="blk_virt" id="2" priority="99">
             <program_image path="blk_virt.elf" />
 
             <map mr="blk_driver_storage_info" vaddr="0x40000000" perms="rw" cached="false" setvar_vaddr="blk_driver_storage_info"     />
@@ -83,17 +121,38 @@
             <map mr="blk_client_request" vaddr="0x40_200_000" perms="rw" cached="true" setvar_vaddr="blk_request" />
             <map mr="blk_client_response" vaddr="0x40_400_000" perms="rw" cached="true" setvar_vaddr="blk_response" />
             <map mr="blk_client_data" vaddr="0x40_800_000" perms="rw" cached="true" setvar_vaddr="blk_data" />
+
+            <!-- for printing to serial console, benchmark build -->
+            <map mr="serial_tx_queue_client0" vaddr="0x40_A00_000" perms="rw" cached="true" setvar_vaddr="serial_tx_queue" />
+            <map mr="serial_tx_data_client0" vaddr="0x40_A01_000" perms="rw" cached="true" setvar_vaddr="serial_tx_data" />
         </protection_domain>
     </protection_domain>
 
     <channel>
         <end pd="client" id="0" />
-        <end pd="virt" id="1" />
+        <end pd="blk_virt" id="1" />
     </channel>
 
     <channel>
-        <end pd="virt" id="0" />
+        <end pd="blk_virt" id="0" />
         <end pd="driver" id="1" />
     </channel>
 
+    <!-- serial uart channels -->
+    <channel>
+        <end pd="uart" id="1"/>
+        <end pd="serial_virt_tx" id="0"/>
+    </channel>
+
+    <channel>
+        <end pd="serial_virt_tx" id="1"/>
+        <end pd="client" id="1"/>
+    </channel>
+
+   <channel>
+        <end pd="serial_virt_tx" id="2"/>
+        <end pd="bench" id="0"/>
+    </channel>
+    <!-- end of serial uart channels -->
+    <!-- TODO add channels for client to start/stop benchmarks -->
 </system>

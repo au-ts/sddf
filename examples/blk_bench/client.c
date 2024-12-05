@@ -9,6 +9,8 @@
 #include <sddf/util/string.h>
 #include <sddf/blk/queue.h>
 #include <sddf/blk/storage_info.h>
+#include <sddf/serial/queue.h>
+#include <serial_config.h>
 
 /*
  * Add benchmarking specific functions for controlling PMU.
@@ -20,13 +22,19 @@
  * to write to the block device
  */
 #include "basic_data.h"
-#include "sddf/util/fence.h"
+//#include "sddf/util/fence.h"
 
-#define LOG_CLIENT(...) do{ sddf_dprintf("CLIENT|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
+#define LOG_CLIENT(...) do{ sddf_printf("CLIENT|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
 #define LOG_CLIENT_ERR(...) do{ sddf_printf("CLIENT|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
 #define QUEUE_SIZE 128
 #define VIRT_CH 0
+#define SERIAL_TX_CH 1
+
+
+char *serial_tx_data;
+serial_queue_t *serial_tx_queue;
+serial_queue_handle_t serial_tx_queue_handle;
 
 blk_storage_info_t *blk_storage_info;
 uintptr_t blk_request;
@@ -63,7 +71,7 @@ bool test_basic()
         // XXX: szymix testign
         char extra_text[50] = "random text to be added";
         sddf_memcpy(data_dest+basic_data_len, extra_text, 50);
-        LOG_CLIENT("Copied in some more data!");
+        LOG_CLIENT("Copied in some more data!\n");
         // XXX: end szymix testing
 
         int err = blk_enqueue_req(&blk_queue, BLK_REQ_WRITE, 0, 0, 2, 0);
@@ -123,16 +131,16 @@ bool test_basic()
         // XXX: prints up to 4140  (BLK_TRANSFER_SIZE//90 *90 + 90)  character (1 block and a bit)
         for (int i = 0; i < BLK_TRANSFER_SIZE; i += 90) {
             for (int j = 0; j < 90; j++) {
-                sddf_dprintf("%c", read_data[i + j]);
+                sddf_printf("%c", read_data[i + j]);
             }
         }
         // read the rest of the second block
         for (int i = 4140; i < 2*BLK_TRANSFER_SIZE; i += 90) {
             for (int j = 0; j < 90; j++) {
-                sddf_dprintf("%c", read_data[i + j]);
+                sddf_printf("%c", read_data[i + j]);
             }
         }
-        sddf_dprintf("\n");
+        sddf_printf("\n");
 
         LOG_CLIENT("basic: successfully finished!\n");
 
@@ -148,7 +156,10 @@ bool test_basic()
 
 void init(void)
 {
-    LOG_CLIENT("starting\n");
+    serial_cli_queue_init_sys(microkit_name, NULL, NULL, NULL, &serial_tx_queue_handle, serial_tx_queue, serial_tx_data);
+    serial_putchar_init(SERIAL_TX_CH, &serial_tx_queue_handle);
+
+    LOG_CLIENT("starting.\n");
 
     blk_queue_init(&blk_queue, (blk_req_queue_t *)blk_request, (blk_resp_queue_t *)blk_response, QUEUE_SIZE);
 
@@ -159,22 +170,6 @@ void init(void)
     LOG_CLIENT("device size: 0x%lx bytes\n", blk_storage_info->capacity * BLK_TRANSFER_SIZE);
 
     LOG_CLIENT("Initialise benchmarking, start all counterrs..\n");
-    //sel4bench_init();
-    //seL4_Word n_counters = sel4bench_get_num_counters();
-
-    //counter_bitfield_t mask = 0;
-
-    //for (seL4_Word counter = 0; counter < n_counters; counter++) {
-    //    if (counter >= ARRAY_SIZE(benchmarking_events)) {
-    //        break;
-    //    }
-    //    sel4bench_set_count_event(counter, benchmarking_events[counter]);
-    //    mask |= BIT(counter);
-    //}
-
-    //sel4bench_reset_counters();
-    //sel4bench_start_counters(mask);
-    //benchmark_bf = mask;
 
     test_basic();
     microkit_notify(VIRT_CH);
@@ -182,9 +177,17 @@ void init(void)
 
 void notified(microkit_channel ch)
 {
-    assert(ch == VIRT_CH);
-
-    if (!test_basic()) {
-        microkit_notify(VIRT_CH);
+    switch (ch) {
+        case VIRT_CH:
+            if (!test_basic()) {
+                microkit_notify(VIRT_CH);
+            }
+            break;
+        case SERIAL_TX_CH:
+            // Nothing to do
+            break;
+        default:
+            LOG_CLIENT_ERR("received notification on unexpected channel: %u\n", ch);
+            break;
     }
 }

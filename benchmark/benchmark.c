@@ -151,6 +151,7 @@ static void benchmark_init(void)
         sddf_printf("BENCH|LOG: Log buffer set\n");
     }
 #endif
+    sddf_printf("BENCH|LOG init bench\n");
 }
 
 static void benchmark_start(void)
