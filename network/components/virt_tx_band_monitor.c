@@ -97,10 +97,10 @@ void tx_provide(void)
                 if (state.client_usage[client].curr_bits >= state.client_usage[client].max_bits) {
                     signal_god = true;
                 }
-                signal_count++;
-                if (signal_count >= 100) {
-                    signal_god = true;
-                }
+                // signal_count++;
+                // if (signal_count >= 100) {
+                //     signal_god = true;
+                // }
                 enqueued = true;
             }
 
