@@ -110,9 +110,9 @@ void tx_provide(void)
         }
     }
 
-    // sddf_dprintf("In provide, we provided: %d buffers\n", buffers_provided);
-
+    // sddf_dprintf("This is the value of enqueued: %d ---- This is the value of net require signal: %d\n", enqueued, net_require_signal_active(&state.tx_queue_drv));
     if (enqueued && net_require_signal_active(&state.tx_queue_drv)) {
+        // sddf_dprintf("Notifying driver\n");
         net_cancel_signal_active(&state.tx_queue_drv);
         microkit_deferred_notify(DRIVER);
     }
@@ -159,7 +159,6 @@ void tx_return(void)
 
 void notified(microkit_channel ch)
 {
-    // sddf_dprintf("we are in notified in virt_tx_band_stop on ch: %d\n", ch);
     current_tick = sddf_timer_time_now(TIMER) / TIME_WINDOW;
     tx_return();
     tx_provide();
@@ -199,4 +198,7 @@ void init(void)
 
     tx_provide();
     tx_return();
+
+
+    microkit_deferred_notify(DRIVER);
 }

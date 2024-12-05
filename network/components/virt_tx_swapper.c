@@ -22,9 +22,8 @@ void notified(microkit_channel ch)
     uint64_t elf_hash = 0;
 
     for (int i = 0; i < 0x5000; i++) {
-        // pd_code[i] = elf_a[i];
+        pd_code[i] = elf_a[i];
         elf_hash += elf_a[i];
-        pd_code[i] = 0;
     }
 
     sddf_dprintf("This is the total of the elf hash: %lld\n", elf_hash);
@@ -63,7 +62,7 @@ seL4_Bool fault(microkit_child child, microkit_msginfo msginfo, microkit_msginfo
             break;
         }
         default:
-            microkit_dbg_puts("unknown\n");
+            sddf_dprintf("unknown fault: %d\n", label);
             break;
     }
     return seL4_False;
