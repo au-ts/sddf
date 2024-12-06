@@ -1,0 +1,3 @@
+[submodule "examples/echo_server/libvmm"]
+	path = examples/echo_server/libvmm
+	url = https://github.com/au-ts/libvmm
