@@ -31,8 +31,15 @@ SYSTEM_FILE  := ${BLK_BENCHMARK}/board/$(MICROKIT_BOARD)/blk.system
 IMAGE_FILE   := loader.img
 REPORT_FILE  := report.txt
 
-IMAGES := blk_driver.elf client.elf blk_virt.elf benchmark_blk.elf idle.elf\
+IMAGES := client.elf blk_virt.elf benchmark_blk.elf idle.elf\
 		  uart_driver.elf serial_virt_tx.elf
+ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
+	IMAGES += sdmmc_driver.elf
+else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
+	IMAGES += blk_driver.elf
+else
+	$(error Unsupported MICROKIT_BOARD given)
+endif
 
 CFLAGS := -mcpu=$(CPU) \
 		  -mstrict-align \
@@ -66,7 +73,7 @@ BLK_COMPONENTS := $(SDDF)/blk/components
 all: $(IMAGE_FILE)
 
 include ${BENCHMARK}/benchmark.mk
-include ${BLK_DRIVER}/blk_driver.mk
+include ${BLK_DRIVER}/${BLK_DRIVER_MK}
 
 include ${SDDF}/util/util.mk
 include ${BLK_COMPONENTS}/blk_components.mk

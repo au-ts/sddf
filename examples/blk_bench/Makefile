@@ -14,16 +14,23 @@ ifeq ($(strip $(TOOLCHAIN)),)
 	export LIBC := $(dir $(realpath $(shell aarch64-none-elf-gcc --print-file-name libc.a)))
 endif
 
-ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
+ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
 	export MICROKIT_BOARD
-	export DRIV_DIR := virtio
+	export UART_DRIV_DIR := arm
+	export BLK_DRIVER_DIR := sdmmc
+	export CPU := cortex-a53
+	export BLK_DRIVER_MK := sdmmc_driver.mk
+else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
+	export MICROKIT_BOARD
 	export UART_DRIV_DIR := arm
 	export BLK_DRIVER_DIR := virtio
 	export CPU := cortex-a53
 	export QEMU := qemu-system-aarch64
+	export BLK_DRIVER_MK := blk_driver.mk
 else
-$(error Unsupported MICROKIT_BOARD given)
+	$(error Unsupported MICROKIT_BOARD given)
 endif
+
 BUILD_DIR ?= build
 export MICROKIT_CONFIG ?= debug
 export SDDF=$(abspath ../..)
