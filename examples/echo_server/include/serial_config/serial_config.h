@@ -11,7 +11,7 @@
 #include <stdint.h>
 
 /* Number of clients that can be connected to the serial server. */
-#define SERIAL_NUM_CLIENTS 3
+#define SERIAL_NUM_CLIENTS 4
 
 /* Only support transmission and not receive. */
 #define SERIAL_TX_ONLY 1
@@ -31,6 +31,7 @@
 #define SERIAL_CLI0_NAME "client0"
 #define SERIAL_CLI1_NAME "client1"
 #define SERIAL_CLI2_NAME "bench"
+#define SERIAL_CLI3_NAME "client_vmm"
 #define SERIAL_VIRT_TX_NAME "serial_virt_tx"
 
 #define SERIAL_QUEUE_SIZE                              0x1000
@@ -40,6 +41,7 @@
 #define SERIAL_TX_DATA_REGION_CAPACITY_CLI0            SERIAL_DATA_REGION_CAPACITY
 #define SERIAL_TX_DATA_REGION_CAPACITY_CLI1            SERIAL_DATA_REGION_CAPACITY
 #define SERIAL_TX_DATA_REGION_CAPACITY_CLI2            SERIAL_DATA_REGION_CAPACITY
+#define SERIAL_TX_DATA_REGION_CAPACITY_CLI3            SERIAL_DATA_REGION_CAPACITY
 
 #define SERIAL_MAX_CLIENT_TX_DATA_CAPACITY MAX(SERIAL_TX_DATA_REGION_CAPACITY_CLI2, MAX(SERIAL_TX_DATA_REGION_CAPACITY_CLI0, SERIAL_TX_DATA_REGION_CAPACITY_CLI1))
 #if SERIAL_WITH_COLOUR
@@ -61,6 +63,8 @@ static inline void serial_cli_queue_init_sys(char *pd_name, serial_queue_handle_
         serial_queue_init(tx_queue_handle, tx_queue, SERIAL_TX_DATA_REGION_CAPACITY_CLI1, tx_data);
     } else if (!sddf_strcmp(pd_name, SERIAL_CLI2_NAME)) {
         serial_queue_init(tx_queue_handle, tx_queue, SERIAL_TX_DATA_REGION_CAPACITY_CLI2, tx_data);
+    } else if (!sddf_strcmp(pd_name, SERIAL_CLI3_NAME)) {
+        serial_queue_init(tx_queue_handle, tx_queue, SERIAL_TX_DATA_REGION_CAPACITY_CLI3, tx_data);
     }
 }
 
@@ -74,6 +78,9 @@ static inline void serial_virt_queue_init_sys(char *pd_name, serial_queue_handle
         serial_queue_init(&cli_queue_handle[2], (serial_queue_t *)((uintptr_t)cli_queue + 2 * SERIAL_QUEUE_SIZE),
                           SERIAL_TX_DATA_REGION_CAPACITY_CLI2,
                           cli_data + SERIAL_TX_DATA_REGION_CAPACITY_CLI0 + SERIAL_TX_DATA_REGION_CAPACITY_CLI1);
+        serial_queue_init(&cli_queue_handle[3], (serial_queue_t *)((uintptr_t)cli_queue + 3 * SERIAL_QUEUE_SIZE),
+                          SERIAL_TX_DATA_REGION_CAPACITY_CLI3,
+                          cli_data + SERIAL_TX_DATA_REGION_CAPACITY_CLI0 + SERIAL_TX_DATA_REGION_CAPACITY_CLI1 + SERIAL_TX_DATA_REGION_CAPACITY_CLI2);
     }
 }
 
@@ -83,5 +90,6 @@ static inline void serial_channel_names_init(char **client_names)
     client_names[0] = SERIAL_CLI0_NAME;
     client_names[1] = SERIAL_CLI1_NAME;
     client_names[2] = SERIAL_CLI2_NAME;
+    client_names[3] = SERIAL_CLI3_NAME;
 }
 #endif

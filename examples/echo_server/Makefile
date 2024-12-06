@@ -41,6 +41,7 @@ endif
 
 export BUILD_DIR:=$(abspath ${BUILD_DIR})
 export MICROKIT_SDK:=$(abspath ${MICROKIT_SDK})
+export LIBVMM=$(abspath libvmm)
 
 export CC := $(TOOLCHAIN)-gcc
 export LD := $(TOOLCHAIN)-ld

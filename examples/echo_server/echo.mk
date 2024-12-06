@@ -5,6 +5,7 @@
 #
 
 QEMU := qemu-system-aarch64
+DTC := dtc
 
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 ECHO_SERVER:=${SDDF}/examples/echo_server
@@ -24,9 +25,12 @@ SYSTEM_FILE := ${ECHO_SERVER}/board/$(MICROKIT_BOARD)/echo_server.system
 IMAGE_FILE := loader.img
 REPORT_FILE := report.txt
 
-vpath %.c ${SDDF} ${ECHO_SERVER}
+LINUX_DIR := ${ECHO_SERVER}/board/$(MICROKIT_BOARD)/linux
+CLIENT_VM_USERLEVEL := ${ECHO_SERVER}/linux_iperf.sh
 
-IMAGES := eth_driver.elf lwip.elf benchmark.elf idle.elf network_virt_rx.elf network_virt_tx_swapper.elf \
+vpath %.c ${SDDF} ${ECHO_SERVER} ${LIBVMM}
+
+IMAGES := client_vmm.elf eth_driver.elf lwip.elf benchmark.elf idle.elf network_virt_rx.elf network_virt_tx_swapper.elf \
 	  network_virt_tx_band_monitor.elf swap_virt_tx_band_stop.elf copy.elf timer_driver.elf uart_driver.elf serial_virt_tx.elf \
 
 
@@ -36,6 +40,7 @@ CFLAGS := -mcpu=$(CPU) \
 	  -g3 -O3 -Wall \
 	  -Wno-unused-function \
 	  -DMICROKIT_CONFIG_$(MICROKIT_CONFIG) \
+	  -DBOARD_$(MICROKIT_BOARD) \
 	  -I$(BOARD_DIR)/include \
 	  -I$(SDDF)/include \
 	  -I${ECHO_INCLUDE}/lwip \
@@ -90,7 +95,32 @@ ${IMAGES}: libsddf_util_debug.a
 ${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
 
+client_vmm.elf: vmm.o images.o libvmm.a
+	aarch64-none-elf-ranlib libvmm.a
+	$(LD) $(LDFLAGS) $^ $(LIBS) libvmm.a -o $@
 
+rootfs.cpio.gz: $(LINUX_DIR)/rootfs.cpio.gz
+	$(LIBVMM)/tools/packrootfs $(LINUX_DIR)/rootfs.cpio.gz \
+		/tmp/rootfs -o $@ \
+		--startup $(CLIENT_VM_USERLEVEL)
+
+vm.dts: $(LINUX_DIR)/linux.dts $(LINUX_DIR)/overlay.dts
+	$(LIBVMM)/tools/dtscat $^ > $@
+
+vm.dtb: vm.dts
+	$(DTC) -q -I dts -O dtb $< > $@
+
+client_vmm.o: $(ECHO_SERVER)/vmm.c $(CHECK_FLAGS_BOARD_MD5)
+	$(CC) $(CFLAGS) -I$(LIBVMM)/include -c -o $@ $<
+
+images.o: $(LIBVMM)/tools/package_guest_images.S $(LINUX_DIR)/linux vm.dtb rootfs.cpio.gz
+	$(CC) -c -g3 -x assembler-with-cpp \
+					-DGUEST_KERNEL_IMAGE_PATH=\"$(LINUX_DIR)/linux\" \
+					-DGUEST_DTB_IMAGE_PATH=\"vm.dtb\" \
+					-DGUEST_INITRD_IMAGE_PATH=\"rootfs.cpio.gz\" \
+					$(LIBVMM)/tools/package_guest_images.S -o $@
+
+include ${LIBVMM}/vmm.mk
 include ${SDDF}/util/util.mk
 include ${SDDF}/network/components/network_components.mk
 include ${ETHERNET_DRIVER}/eth_driver.mk
