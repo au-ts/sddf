@@ -37,41 +37,30 @@
     <!-- shared memory for PMU counters
     <memory_region name="cyclecounters" size="0x1000" />-->
 
-    <!-- XXX: BENCHMARKING SPECIFIC COMPONENTS
-        For now, setting idle.elf prio to minimal (as per echo_server example)
-        and benchmark.elf to highest of all PDs (as per echo_server example)
-    `benchmark` is the parent PD of all other PDs (apart from idle), meaning it can access and modify their TCBs (afaik) -->
-    <!-- idle.elf is the euqivalent of Linux's idle CPU task, which gets scheduled at lowest priority
-        when there is no other work to be done. It updates a cycle counter on a shared mr region so the system
-    can track how long it spends being "idle"
-    <protection_domain name="benchIdle" priority="1" >
-        <program_image path="idle.elf" />
-        benchmark.c puts PMU data in here for client.c to collect
-        <map mr="cyclecounters" vaddr="0x5_010_000" perms="rw" cached="true" setvar_vaddr="cyclecounters_vaddr" />
-    </protection_domain>
-    -->
 
-    <protection_domain name="bench" priority="102" >
+    <protection_domain name="bench" priority="103" >
         <program_image path="benchmark_blk.elf" />
 
         <map mr="serial_tx_queue_bench" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="serial_tx_queue" />
         <map mr="serial_tx_data_bench" vaddr="0x4_002_000" perms="rw" cached="true" setvar_vaddr="serial_tx_data" />
 
-        <protection_domain name="driver" priority="101">
+        <!--
+        <protection_domain name="driver" id="1" priority="102">
             <program_image path="sdmmc_driver.elf" />
             <map mr="sdio" vaddr="0xffe05000" perms="rw" cached="false" />
             <map mr="gpio" vaddr="0xff800000" perms="rw" cached="false" />
 
             <map mr="data_region" vaddr="0xf5500000" perms="rw" cached="false" />
 
-            <!-- sDDF block -->
+            < sDDF block 
             <map mr="blk_driver_storage_info" vaddr="0x40_000_000" perms="rw" cached="false" setvar_vaddr="blk_config"     />
             <map mr="blk_driver_request"    vaddr="0x40_200_000" perms="rw" cached="false" setvar_vaddr="blk_req_queue"  />
             <map mr="blk_driver_response"   vaddr="0x40_400_000" perms="rw" cached="false" setvar_vaddr="blk_resp_queue" />
             <irq irq="222" id="1"/>
         </protection_domain>
+        -->
         
-        <protection_domain name="uart" priority="100" id="4">
+        <protection_domain name="uart" priority="254" id="4">
             <program_image path="uart_driver.elf" />
 
             <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
@@ -81,7 +70,7 @@
             <irq irq="225" id="0" trigger="edge" /> <!-- UART interrupt -->
         </protection_domain>
 
-        <protection_domain name="serial_virt_tx" id="5"  priority="99">
+        <protection_domain name="serial_virt_tx" id="5"  priority="253">
             <program_image path="serial_virt_tx.elf" />
             <map mr="serial_tx_queue_driver" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="tx_queue_drv" />
             <map mr="serial_tx_queue_client0" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="tx_queue_cli0" />
@@ -94,7 +83,7 @@
             <map mr="serial_tx_data_bench" vaddr="0x4_009_000" perms="r" cached="true"/>
         </protection_domain>
 
-        <protection_domain name="blk_virt" id="2" priority="99">
+        <protection_domain name="blk_virt" id="2" priority="100">
             <program_image path="blk_virt.elf" />
 
             <map mr="blk_driver_storage_info" vaddr="0x40000000" perms="rw" cached="false" setvar_vaddr="blk_driver_storage_info"     />
@@ -126,6 +115,7 @@
         </protection_domain>
     </protection_domain>
 
+    <!--
     <channel>
         <end pd="client" id="0" />
         <end pd="blk_virt" id="1" />
@@ -133,8 +123,9 @@
 
     <channel>
         <end pd="blk_virt" id="0" />
-        <end pd="driver" id="1" />
+        <end pd="driver" id="0" />
     </channel>
+    -->
 
     <!-- serial uart channels -->
     <channel>

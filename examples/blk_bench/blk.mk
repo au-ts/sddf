@@ -31,10 +31,10 @@ SYSTEM_FILE  := ${BLK_BENCHMARK}/board/$(MICROKIT_BOARD)/blk.system
 IMAGE_FILE   := loader.img
 REPORT_FILE  := report.txt
 
-IMAGES := client.elf blk_virt.elf benchmark_blk.elf idle.elf\
+IMAGES := client.elf blk_virt.elf benchmark_blk.elf \
 		  uart_driver.elf serial_virt_tx.elf
 ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
-	IMAGES += sdmmc_driver.elf
+	#IMAGES += sdmmc_driver.elf
 else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
 	IMAGES += blk_driver.elf
 else
@@ -47,7 +47,7 @@ CFLAGS := -mcpu=$(CPU) \
 		  -ffreestanding \
 		  -g3 \
 		  -O3 \
-		  -Wall -Wno-unused-function -Werror -Wno-unused-command-line-argument \
+		  -Wall -Wno-unused-function \
 		  -DMICROKIT_CONFIG_${MICROKIT_CONFIG} \
 		  -I$(BOARD_DIR)/include \
 		  -I$(SDDF)/include \
@@ -55,7 +55,7 @@ CFLAGS := -mcpu=$(CPU) \
 		  -I$(SERIAL_CONFIG_INCLUDE) \
 		  -I$(BENCHMARK_CONFIG_INCLUDE)
 LDFLAGS := -L$(BOARD_DIR)/lib -L${LIBC}
-LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
+LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util.a --end-group
 
 CHECK_FLAGS_BOARD_MD5:=.board_cflags-$(shell echo -- ${CFLAGS} ${BOARD} ${MICROKIT_CONFIG} | shasum | sed 's/ *-//')
 
@@ -80,7 +80,7 @@ include ${BLK_COMPONENTS}/blk_components.mk
 include ${UART_DRIVER}/uart_driver.mk
 include ${SERIAL_COMPONENTS}/serial_components.mk
 
-${IMAGES}: libsddf_util_debug.a
+${IMAGES}: libsddf_util.a
 
 client.o: ${BLK_BENCHMARK}/client.c ${BLK_BENCHMARK}/basic_data.h
 	$(CC) -c $(CFLAGS) -I. $< -o client.o
