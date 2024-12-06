@@ -14,6 +14,9 @@
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 #include <serial_config.h>
+/* headers only for benchmarking constants */
+#include <sddf/blk/queue.h>
+#include <benchmark_config.h>
 
 #define LOG_BUFFER_CAP 7
 
@@ -39,6 +42,10 @@ uintptr_t cyclecounters_vaddr;
 
 ccnt_t counter_values[8];
 counter_bitfield_t benchmark_bf;
+// benchmark run tracking vars
+ccnt_t ccounter_benchmark_start;
+ccnt_t ccounter_benchmark_stop;
+uint8_t benchmark_size_idx = 0;
 
 char *serial_tx_data;
 serial_queue_t *serial_tx_queue;
@@ -181,7 +188,8 @@ void notified(microkit_channel ch)
     switch (ch) {
     case START:
 #ifdef MICROKIT_CONFIG_benchmark
-        // TODO sample the clock cycles, to later get a total amount of cycles spent during a benchmark
+        /* sample the clock cycles, to later get a total amount of cycles spent during a benchmark */
+        ccounter_benchmark_start = sel4bench_get_cycle_count();
         sel4bench_reset_counters();
         THREAD_MEMORY_RELEASE();
         sel4bench_start_counters(benchmark_bf);
@@ -199,6 +207,7 @@ void notified(microkit_channel ch)
     case STOP:
 #ifdef MICROKIT_CONFIG_benchmark
         // TODO sample the clock cycles and subtract the START clock cycles, log the overall cycles spent during benchmark (compute latency and throughput with that?)
+        ccounter_benchmark_stop = sel4bench_get_cycle_count();
         sel4bench_get_counters(benchmark_bf, &counter_values[0]);
         sel4bench_stop_counters(benchmark_bf);
 
@@ -206,7 +215,21 @@ void notified(microkit_channel ch)
         for (int i = 0; i < ARRAY_SIZE(benchmarking_events); i++) {
             sddf_printf("%s: %lX\n", counter_names[i], counter_values[i]);
         }
+        /* Get the total cycle count spent during benchmark, compute cycles/KiB */
+        sddf_printf("total cycles: %ld\n", ccounter_benchmark_stop-ccounter_benchmark_start);
+        double cycles_per_kib = (ccounter_benchmark_stop - ccounter_benchmark_start) / \
+                                (BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx] * BLK_TRANSFER_SIZE \
+                                 * QUEUE_SIZE / 1024);
+        double cycles_per_mib = (ccounter_benchmark_stop - ccounter_benchmark_start) / \
+                                (BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx] * BLK_TRANSFER_SIZE \
+                                 * QUEUE_SIZE / 1024 / 1024);
+        benchmark_size_idx = (benchmark_size_idx + 1) % BENCHMARK_RUN_COUNT;
+        sddf_printf("Benchmark_Size_idx; %d\n", benchmark_size_idx);
+        sddf_printf("Cycles per KiB (decimal): %f\n", cycles_per_kib);
+        sddf_printf("Cycles per MiB (decimal): %f\n", cycles_per_mib);
         sddf_printf("}\n");
+        // TODO start next benchmark -> kick the client
+        microkit_notify(BENCH_RUN_CH);
 #endif
 
 #ifdef CONFIG_BENCHMARK_TRACK_UTILISATION
