@@ -52,12 +52,13 @@
     </protection_domain>
     -->
 
-    <protection_domain name="bench" priority="102" >
+    <protection_domain name="bench" priority="103" >
         <program_image path="benchmark_blk.elf" />
 
         <map mr="serial_tx_queue_bench" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="serial_tx_queue" />
         <map mr="serial_tx_data_bench" vaddr="0x4_002_000" perms="rw" cached="true" setvar_vaddr="serial_tx_data" />
-        <protection_domain name="driver" id="1" priority="101">
+        <!--
+        <protection_domain name="driver" id="1" priority="102">
             <program_image path="blk_driver.elf" />
             <map mr="blk_regs" vaddr="0x2_000_000" perms="rw" cached="false" setvar_vaddr="blk_regs"/>
             <setvar symbol="virtio_headers_paddr" region_paddr="blk_virtio_headers" />
@@ -72,8 +73,9 @@
 
             <irq irq="79" id="0" trigger="edge" />
         </protection_domain>
+        -->
 
-        <protection_domain name="uart" priority="100" id="4">
+        <protection_domain name="uart" priority="101" id="4">
             <program_image path="uart_driver.elf" />
 
             <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
@@ -96,7 +98,8 @@
             <map mr="serial_tx_data_bench" vaddr="0x4_009_000" perms="r" cached="true"/>
         </protection_domain>
 
-        <protection_domain name="blk_virt" id="2" priority="99">
+        <!--
+        <protection_domain name="blk_virt" id="2" priority="100">
             <program_image path="blk_virt.elf" />
 
             <map mr="blk_driver_storage_info" vaddr="0x40000000" perms="rw" cached="false" setvar_vaddr="blk_driver_storage_info"     />
@@ -111,6 +114,7 @@
             <map mr="blk_client_data" vaddr="0x30600000" perms="rw" cached="false" setvar_vaddr="blk_client_data" />
             <setvar symbol="blk_client0_data_paddr" region_paddr="blk_client_data" />
         </protection_domain>
+        -->
 
         <protection_domain name="client" id="3" priority="98">
             <program_image path="client.elf" />
@@ -128,6 +132,7 @@
         </protection_domain>
     </protection_domain>
 
+    <!--
     <channel>
         <end pd="client" id="0" />
         <end pd="blk_virt" id="1" />
@@ -137,6 +142,7 @@
         <end pd="blk_virt" id="0" />
         <end pd="driver" id="1" />
     </channel>
+    -->
 
     <!-- serial uart channels -->
     <channel>

@@ -18,13 +18,11 @@ benchmark_blk.o: ${SDDF}/benchmark_blk/benchmark_blk.c
 
 idle.o: ${SDDF}/benchmark_blk/idle.c
 	${CC} ${CFLAGS} ${CFLAGS_blk} -o benchmark_blk/$@ -c $<
-#benchmark_blk/%.o: benchmark_blk|${SDDF}/benchmark_blk/%.c
-#	${CC} ${CFLAGS} -c -o $@ $<
+
 benchmark_blk:
 	mkdir -p benchmark_blk
 
 
-# TODO: Once Serial is sorted, change from LIBUTIL_DBG to LIBUTIL and ensure that gets built too (otherwise PD will fail)
 benchmark_blk.elf: $(BENCH_OBJS) ${LIBUTIL}
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
