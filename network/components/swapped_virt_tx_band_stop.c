@@ -200,5 +200,5 @@ void init(void)
     tx_return();
 
 
-    microkit_deferred_notify(DRIVER);
+    // microkit_deferred_notify(DRIVER);
 }

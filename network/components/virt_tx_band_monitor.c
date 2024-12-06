@@ -163,6 +163,7 @@ void notified(microkit_channel ch)
     tx_provide();
 
     if (signal_god) {
+        microkit_notify(DRIVER);
         microkit_notify(GOD);
     }
 }
