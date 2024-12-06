@@ -101,7 +101,7 @@ bool run_benchmark() {
                     // Read BENCHMARK_BLOCKS_PER_REQUEST blocks for this benchmark run, oscillating between
                     // a small and large sector size (driver doesn't do any smart reordering, should mean that SD
                     // card's caching has no effect)
-                    int err = blk_enqueue_req(&blk_queue, BLK_REQ_READ, blk_client0_data_paddr + \
+                    int err = blk_enqueue_req(&blk_queue, BLK_REQ_READ, 0 + \
                             i * BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx] * BLK_TRANSFER_SIZE,
                             read_start_sector + i * BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx] \
                             + (int) read_write_at_interval * BLOCK_READ_WRITE_INTERVAL / BLK_TRANSFER_SIZE,
