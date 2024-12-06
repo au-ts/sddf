@@ -22,6 +22,7 @@ BENCHMARK := $(SDDF)/benchmark_blk
 SERIAL_COMPONENTS := $(SDDF)/serial/components
 UART_DRIVER := $(SDDF)/drivers/serial/$(UART_DRIV_DIR)
 SERIAL_CONFIG_INCLUDE := ${BLK_BENCHMARK}/include/serial_config
+BENCHMARK_CONFIG_INCLUDE := ${BLK_BENCHMARK}/include/benchmark_config
 
 CONFIGS_INCLUDE := ${BLK_BENCHMARK}
 
@@ -44,7 +45,8 @@ CFLAGS := -mcpu=$(CPU) \
 		  -I$(BOARD_DIR)/include \
 		  -I$(SDDF)/include \
 		  -I$(CONFIGS_INCLUDE) \
-		  -I$(SERIAL_CONFIG_INCLUDE)
+		  -I$(SERIAL_CONFIG_INCLUDE) \
+		  -I$(BENCHMARK_CONFIG_INCLUDE)
 LDFLAGS := -L$(BOARD_DIR)/lib -L${LIBC}
 LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
 
