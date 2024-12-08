@@ -217,7 +217,7 @@
         <map mr="serial_tx_queue_client4" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="serial_tx_queue" />
         <map mr="serial_tx_data_client4" vaddr="0x4_002_000" perms="rw" cached="true" setvar_vaddr="serial_tx_data" />
 
-        <protection_domain name="uart" priority="100" id="9">
+        <protection_domain name="uart" priority="100" id="9" cpu="2">
             <program_image path="uart_driver.elf" />
 
             <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
@@ -228,7 +228,7 @@
             <irq irq="59" id="0" /> <!-- UART interrupt -->
         </protection_domain>
 
-        <protection_domain name="serial_virt_tx" priority="99" id="10">
+        <protection_domain name="serial_virt_tx" priority="99" id="10" cpu="2">
             <program_image path="serial_virt_tx.elf" />
             <map mr="serial_tx_queue_driver" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="tx_queue_drv" />
             <map mr="serial_tx_queue_client0" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="tx_queue_cli0" />
