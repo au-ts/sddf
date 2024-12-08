@@ -35,7 +35,7 @@ else ifneq ($(filter $(strip $(MICROKIT_BOARD)),imx8mm_evk imx8mp_evk maaxboard)
 	export UART_DRIV_DIR := imx
 	export TIMER_DRV_DIR := imx
 	export CPU := cortex-a53
-else ifeq ($(strip $(MICROKIT_BOARD)), imx8mm_evk_4_cores)
+else ifneq ($(filter $(strip $(MICROKIT_BOARD)),imx8mm_evk_4_cores maaxboard_4_cores),)
 	export DRIV_DIR := imx
 	export UART_DRIV_DIR := imx
 	export TIMER_DRV_DIR := imx
