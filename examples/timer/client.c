@@ -9,9 +9,9 @@
 #include <sddf/timer/config.h>
 #include <sddf/util/printf.h>
 
-#include "timer_client_config.h"
-
+__attribute__((__section__(".sddf_config")))
 timer_client_config_t timer_config;
+
 microkit_channel timer_channel;
 
 void notified(microkit_channel ch)
@@ -31,7 +31,6 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
-    sddf_memcpy(&timer_config, timer_client_client_data, timer_client_client_data_len);
     timer_channel = timer_config.driver_id;
 
     // lets get the time!
