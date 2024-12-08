@@ -4,6 +4,7 @@ from sdfgen import SystemDescription, Sddf, DeviceTree
 
 ProtectionDomain = SystemDescription.ProtectionDomain
 
+# TODO: remove platform, it should be board instead to be consistne tiwth Microkit
 
 class Platform:
     def __init__(self, name: str, arch: SystemDescription.Arch, paddr_top: int, timer_device_node: str):
