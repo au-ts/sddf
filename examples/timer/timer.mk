@@ -8,16 +8,20 @@ ifeq ($(strip $(MICROKIT_SDK)),)
 $(error MICROKIT_SDK must be specified)
 endif
 
+METAPROGRAM := $(TOP)/meta.py
+
 BUILD_DIR ?= build
 # By default we make a debug build so that the client debug prints can be seen.
 MICROKIT_CONFIG ?= debug
 
 QEMU := qemu-system-aarch64
+PYTHON := /Users/ivanv/ts/microkit_sdf_gen/venv/bin/python
 
 CC := clang
 LD := ld.lld
 AR := llvm-ar
 RANLIB := llvm-ranlib
+OBJCOPY := llvm-objcopy
 
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 
@@ -44,8 +48,8 @@ LDFLAGS := -L$(BOARD_DIR)/lib
 LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
 
 IMAGE_FILE := loader.img
+SYSTEM_FILE := timer.system
 REPORT_FILE := report.txt
-SYSTEM_FILE := ${TOP}/board/$(MICROKIT_BOARD)/timer.system
 CLIENT_OBJS := client.o
 TIMER_DRIVER := $(SDDF)/drivers/timer/$(TIMER_DRIVER_DIR)
 
@@ -66,7 +70,12 @@ client.o: ${TOP}/client.c
 client.elf: client.o
 	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
 
-$(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
+$(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES)
+	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --platform $(MICROKIT_BOARD) --dtbs /Users/ivanv/ts/microkit_sdf_gen/zig-out/dtb --output .
+	$(OBJCOPY) --update-section .sddf_config=timer_driver_device_resources.data timer_driver.elf
+	$(OBJCOPY) --update-section .sddf_config=timer_client_client.data client.elf
+
+$(IMAGE_FILE) $(REPORT_FILE): $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
 
 qemu: $(IMAGE_FILE)

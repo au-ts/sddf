@@ -9,8 +9,7 @@
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 #include <sddf/util/udivmodti4.h>
-
-#include "device_resources.h"
+#include <sddf/resources/device.h>
 
 #if !(CONFIG_EXPORT_PCNT_USER && CONFIG_EXPORT_PTMR_USER)
 #error "ARM generic timer is not exported by seL4"
@@ -40,6 +39,7 @@ static uint64_t timer_freq;
 /* frequency of the timer */
 #define CNTFRQ "cntfrq_el0"
 
+__attribute__((__section__(".sddf_config")))
 device_resources_t device_resources;
 
 static inline uint64_t get_ticks(void)
@@ -152,8 +152,6 @@ static void process_timeouts(uint64_t curr_time)
 
 void init()
 {
-    sddf_memcpy(&device_resources, device_resources_data, device_resources_data_len);
-
     for (int i = 0; i < MAX_TIMEOUTS; i++) {
         timeouts[i] = UINT64_MAX;
     }
