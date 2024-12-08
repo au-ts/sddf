@@ -32,6 +32,8 @@ More information about the sDDF project can be found on the Trustworthy Systems 
 * Microkit SDK 1.4.1
 * GNU Make
 * Clang and LLVM bintools
+* Device Tree Compiler
+* Python (3.9 or higher)
 
 The Microkit SDK can be acquired from [here](https://github.com/seL4/microkit/releases/tag/1.4.1).
 
@@ -46,14 +48,20 @@ machine:
 On apt based Linux distributions run the following commands:
 
 ```sh
-sudo apt install make llvm lld
+sudo apt install make llvm lld device-tree-compiler python3 python3-venv
+python3 -m venv venv
+./venv/bin/pip install sdfgen
+source ./venv/bin/activate
 ```
 
 ### Homebrew
 
 On macOS, you can install the dependencies via Homebrew:
 ```sh
-brew install llvm lld make
+brew install llvm lld make dtc python3
+python3 -m venv venv
+./venv/bin/pip install sdfgen
+source ./venv/bin/activate
 ```
 
 ### Nix
