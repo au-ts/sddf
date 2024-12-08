@@ -15,7 +15,7 @@ BUILD_DIR ?= build
 MICROKIT_CONFIG ?= debug
 
 QEMU := qemu-system-aarch64
-PYTHON := /Users/ivanv/ts/microkit_sdf_gen/venv/bin/python
+PYTHON ?= python3
 
 CC := clang
 LD := ld.lld
