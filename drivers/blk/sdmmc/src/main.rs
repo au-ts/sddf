@@ -151,10 +151,10 @@ impl<T: SdmmcHardware + 'static> Handler for HandlerImpl<T> {
             );
             return Ok(());
         }
-        debug_println!(
-            "SDMMC_DRIVER: Received notif from: {}",
-            channel.index()
-        );
+        //debug_println!(
+        //    "SDMMC_DRIVER: Received notif from: {}",
+        //    channel.index()
+        //);
 
         let mut notify_virt: bool = false;
 
