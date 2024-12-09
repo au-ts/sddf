@@ -52,9 +52,9 @@
             <map mr="data_region" vaddr="0xf5500000" perms="rw" cached="false" />
 
             <!-- sDDF block -->
-            <map mr="blk_driver_storage_info" vaddr="0x40_000_000" perms="rw" cached="false" setvar_vaddr="blk_config"     />
-            <map mr="blk_driver_request"    vaddr="0x40_200_000" perms="rw" cached="false" setvar_vaddr="blk_req_queue"  />
-            <map mr="blk_driver_response"   vaddr="0x40_400_000" perms="rw" cached="false" setvar_vaddr="blk_resp_queue" />
+            <map mr="blk_driver_storage_info" vaddr="0x40_000_000" perms="rw" cached="true" setvar_vaddr="blk_config"     />
+            <map mr="blk_driver_request"    vaddr="0x40_200_000" perms="rw" cached="true" setvar_vaddr="blk_req_queue"  />
+            <map mr="blk_driver_response"   vaddr="0x40_400_000" perms="rw" cached="true" setvar_vaddr="blk_resp_queue" />
             <irq irq="222" id="1"/>
         </protection_domain>
         
@@ -84,16 +84,16 @@
         <protection_domain name="blk_virt" id="2" priority="100">
             <program_image path="blk_virt.elf" />
 
-            <map mr="blk_driver_storage_info" vaddr="0x40000000" perms="rw" cached="false" setvar_vaddr="blk_driver_storage_info"     />
-            <map mr="blk_driver_request" vaddr="0x40200000" perms="rw" cached="false" setvar_vaddr="blk_driver_req_queue"  />
-            <map mr="blk_driver_response" vaddr="0x40400000" perms="rw" cached="false" setvar_vaddr="blk_driver_resp_queue" />
-            <map mr="blk_driver_data" vaddr="0x40600000" perms="rw" cached="false" setvar_vaddr="blk_driver_data" />
+            <map mr="blk_driver_storage_info" vaddr="0x40000000" perms="rw" cached="true" setvar_vaddr="blk_driver_storage_info"     />
+            <map mr="blk_driver_request" vaddr="0x40200000" perms="rw" cached="true" setvar_vaddr="blk_driver_req_queue"  />
+            <map mr="blk_driver_response" vaddr="0x40400000" perms="rw" cached="true" setvar_vaddr="blk_driver_resp_queue" />
+            <map mr="blk_driver_data" vaddr="0x40600000" perms="rw" cached="true" setvar_vaddr="blk_driver_data" />
             <setvar symbol="blk_data_paddr_driver" region_paddr="blk_driver_data" />
 
             <map mr="blk_client_storage_info" vaddr="0x30000000" perms="rw" cached="true" setvar_vaddr="blk_client_storage_info"     />
-            <map mr="blk_client_request" vaddr="0x30200000" perms="rw" cached="false" setvar_vaddr="blk_client_req_queue"  />
-            <map mr="blk_client_response" vaddr="0x30400000" perms="rw" cached="false" setvar_vaddr="blk_client_resp_queue" />
-            <map mr="blk_client_data" vaddr="0x30600000" perms="rw" cached="false" setvar_vaddr="blk_client_data" />
+            <map mr="blk_client_request" vaddr="0x30200000" perms="rw" cached="true" setvar_vaddr="blk_client_req_queue"  />
+            <map mr="blk_client_response" vaddr="0x30400000" perms="rw" cached="true" setvar_vaddr="blk_client_resp_queue" />
+            <map mr="blk_client_data" vaddr="0x30600000" perms="rw" cached="true" setvar_vaddr="blk_client_data" />
             <setvar symbol="blk_client0_data_paddr" region_paddr="blk_client_data" />
         </protection_domain>
 
