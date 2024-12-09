@@ -7,6 +7,8 @@
 <system>
     <!-- Device registers -->
     <memory_region name="uart" size="0x1_000" phys_addr="0xff803000" />
+    <memory_region name="timer_registers" size="0x10_000" phys_addr="0xffd0f000" />
+
     <!-- Odroid c4 sdmmc specifc driver mem regs -->
     <memory_region name="sdio" size="0x1_000" phys_addr="0xffe05000" />
     <memory_region name="gpio" size="0x1_000" phys_addr="0xff800000"/>
@@ -15,12 +17,12 @@
     <memory_region name="blk_driver_storage_info" size="0x1000" page_size="0x1000" />
     <memory_region name="blk_driver_request" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="blk_driver_response" size="0x200_000" page_size="0x200_000"/>
-    <memory_region name="blk_driver_data" size="0x200_000" page_size="0x200_000" />
+    <memory_region name="blk_driver_data" size="0x800_000" page_size="0x200_000" />
 
     <memory_region name="blk_client_storage_info" size="0x1000" page_size="0x1000" />
     <memory_region name="blk_client_request" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="blk_client_response" size="0x200_000" page_size="0x200_000"/>
-    <memory_region name="blk_client_data" size="0x200_000" page_size="0x200_000" />
+    <memory_region name="blk_client_data" size="0x800_000" page_size="0x200_000" />
 
     <!-- shared memory for serial data regions (printing to serial console, benchmark build)  -->
     <memory_region name="serial_tx_data_driver" size="0x4_000" />
@@ -36,6 +38,14 @@
 
     <!-- shared memory for PMU counters
     <memory_region name="cyclecounters" size="0x1000" />-->
+
+    <!-- The timer driver should run at higher priority than its clients.
+        As a passive server, PPC into the driver will be fastpathed. -->
+    <protection_domain name="timer" priority="254" pp="true" passive="true">
+        <program_image path="timer_driver.elf" />
+        <map mr="timer_registers" vaddr="0x2_000_000" perms="rw" cached="false" setvar_vaddr="gpt_regs" />
+        <irq irq="42" id="0" trigger="edge" /> <!-- timer interrupt for timer A -->
+    </protection_domain>
 
 
     <protection_domain name="bench" priority="103" >
@@ -105,7 +115,7 @@
 
             <map mr="blk_client_request" vaddr="0x40_200_000" perms="rw" cached="true" setvar_vaddr="blk_request" />
             <map mr="blk_client_response" vaddr="0x40_400_000" perms="rw" cached="true" setvar_vaddr="blk_response" />
-            <map mr="blk_client_data" vaddr="0x40_800_000" perms="rw" cached="true" setvar_vaddr="blk_data" />
+            <map mr="blk_client_data" vaddr="0x50_800_000" perms="rw" cached="true" setvar_vaddr="blk_data" />
 
             <!-- for printing to serial console, benchmark build -->
             <map mr="serial_tx_queue_client0" vaddr="0x40_A00_000" perms="rw" cached="true" setvar_vaddr="serial_tx_queue" />
@@ -151,5 +161,10 @@
     <channel>
         <end pd="client" id="4" /> <!-- Benchmark run start channel -->
         <end pd="bench" id="3" />
+    </channel>
+
+    <channel>
+        <end pd="timer" id="1" />
+        <end pd="bench" id="4" /> <!-- Should this number change, so should TIMER_CH in timer.h -->
     </channel>
 </system>
