@@ -3,8 +3,6 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-#define QUEUE_SIZE 512 
-
 // Values in terms of include/sddf//blk/queue.h: BLK_TRANSFER_SIZE
 // decided on runs: 4KiB, 32KiB, 256KiB, 2MiB, 16MiB and 128MiB
 #define BENCHMARK_BLOCKS_PER_REQUEST (uint32_t[]) {8, 1}//, 64, 512}
