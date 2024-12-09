@@ -20,9 +20,6 @@
 #define BLK_DATA_REGION_SIZE_CLI0               BLK_QUEUE_REGION_SIZE
 #define BLK_DATA_REGION_SIZE_DRIV               BLK_QUEUE_REGION_SIZE
 
-#define BLK_QUEUE_REGION_SIZE_CLI0              BLK_QUEUE_REGION_SIZE
-#define BLK_QUEUE_REGION_SIZE_DRIV              BLK_QUEUE_REGION_SIZE
-
 /* Mapping from client index to disk partition that the client will have access to. */
 static const int blk_partition_mapping[BLK_NUM_CLIENTS] = { 0 };
 
