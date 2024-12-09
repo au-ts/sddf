@@ -21,6 +21,7 @@ BLK_BENCHMARK := ${SDDF}/examples/blk_bench
 BENCHMARK := $(SDDF)/benchmark_blk
 SERIAL_COMPONENTS := $(SDDF)/serial/components
 UART_DRIVER := $(SDDF)/drivers/serial/$(UART_DRIV_DIR)
+TIMER_DRIVER := $(SDDF)/drivers/timer/$(TIMER_DRIV_DIR)
 SERIAL_CONFIG_INCLUDE := ${BLK_BENCHMARK}/include/serial_config
 BENCHMARK_CONFIG_INCLUDE := ${BLK_BENCHMARK}/include/benchmark_config
 
@@ -32,7 +33,7 @@ IMAGE_FILE   := loader.img
 REPORT_FILE  := report.txt
 
 IMAGES := client.elf blk_virt.elf benchmark_blk.elf \
-		  uart_driver.elf serial_virt_tx.elf
+		  uart_driver.elf serial_virt_tx.elf timer_driver.elf
 ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
 	IMAGES += sdmmc_driver.elf
 else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
@@ -78,6 +79,7 @@ include ${BLK_DRIVER}/${BLK_DRIVER_MK}
 include ${SDDF}/util/util.mk
 include ${BLK_COMPONENTS}/blk_components.mk
 include ${UART_DRIVER}/uart_driver.mk
+include ${TIMER_DRIVER}/timer_driver.mk
 include ${SERIAL_COMPONENTS}/serial_components.mk
 
 ${IMAGES}: libsddf_util.a

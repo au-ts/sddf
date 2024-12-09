@@ -17,12 +17,14 @@ endif
 ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
 	export MICROKIT_BOARD
 	export UART_DRIV_DIR := meson
+	export TIMER_DRIV_DIR := meson
 	export BLK_DRIVER_DIR := sdmmc
 	export CPU := cortex-a53
 	export BLK_DRIVER_MK := sdmmc_driver.mk
 else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
 	export MICROKIT_BOARD
 	export UART_DRIV_DIR := arm
+	export TIMER_DRIV_DIR := arm
 	export BLK_DRIVER_DIR := virtio
 	export CPU := cortex-a53
 	export QEMU := qemu-system-aarch64

@@ -4,13 +4,17 @@
  */
 
 #define QUEUE_SIZE 512 
+#define REQUEST_COUNT 256
 
 // Values in terms of include/sddf//blk/queue.h: BLK_TRANSFER_SIZE
 // decided on runs: 4KiB, 32KiB, 256KiB, 2MiB, 16MiB and 128MiB
-#define BENCHMARK_BLOCKS_PER_REQUEST (uint32_t[]) {1, 8, 64, 512, 4096, 32768}
+#define BENCHMARK_BLOCKS_PER_REQUEST (uint32_t[]) {1, 8}//, 64}
+//, 512, 4096, 32768}
 #define BENCHMARK_RUN_COUNT ((int) sizeof(BENCHMARK_BLOCKS_PER_REQUEST)/sizeof(uint32_t))
 // 1 MiB interval to counter the caching of block device's sequential READs
 // XXX and to counter the batching of WRITE commits
 #define BLOCK_READ_WRITE_INTERVAL 0x100000
 
 // TODO: add defines for default clock speed for odroid c4's CPU, to compute throughput in terms of time
+// in MHz
+#define ODROID_CPU_CLKFREQ 1200
