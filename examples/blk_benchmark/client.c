@@ -15,7 +15,6 @@
 #define LOG_CLIENT(...) do{ sddf_dprintf("CLIENT|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
 #define LOG_CLIENT_ERR(...) do{ sddf_printf("CLIENT|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
-#define QUEUE_SIZE 512
 #define VIRT_CH 0
 #define TIMER   1
 
@@ -132,7 +131,7 @@ void init(void)
 {
     LOG_CLIENT("starting\n");
 
-    blk_queue_init(&blk_queue, (blk_req_queue_t *)blk_request, (blk_resp_queue_t *)blk_response, QUEUE_SIZE);
+    blk_queue_init(&blk_queue, (blk_req_queue_t *)blk_request, (blk_resp_queue_t *)blk_response, blk_cli_queue_capacity(pd_name));
 
     /* Want to print out configuration information, so wait until the config is ready. */
     while (!blk_storage_is_ready(blk_storage_info));
