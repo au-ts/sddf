@@ -224,14 +224,14 @@ void notified(microkit_channel ch)
         /* Get the total cycle count spent during benchmark, compute cycles/KiB */
         sddf_printf("Total time (ns): %ld\n", timer_end-timer_start);
         sddf_printf("speed (MiB/s: %f\n", ((double) BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx] * BLK_TRANSFER_SIZE * \
-                REQUEST_COUNT / (1024. * 1024.)) / ((double) (timer_end-timer_start)/1e9));
+                REQUEST_COUNT[benchmark_size_idx] / (1024. * 1024.)) / ((double) (timer_end-timer_start)/1e9));
         sddf_printf("total cycles: %ld\n", ccounter_benchmark_stop-ccounter_benchmark_start);
         double cycles_per_kib = (ccounter_benchmark_stop - ccounter_benchmark_start) / \
                                 (BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx] * BLK_TRANSFER_SIZE \
-                                 * REQUEST_COUNT / 1024);
+                                 * REQUEST_COUNT[benchmark_size_idx] / 1024);
         double cycles_per_mib = (ccounter_benchmark_stop - ccounter_benchmark_start) / \
                                 (BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx] * BLK_TRANSFER_SIZE \
-                                 * REQUEST_COUNT / 1024 / 1024);
+                                 * REQUEST_COUNT[benchmark_size_idx] / 1024 / 1024);
         benchmark_size_idx = (benchmark_size_idx + 1) % BENCHMARK_RUN_COUNT;
         sddf_printf("Benchmark_Size_idx; %d\n", benchmark_size_idx);
         sddf_printf("Cycles per KiB (decimal): %f\n", cycles_per_kib);
