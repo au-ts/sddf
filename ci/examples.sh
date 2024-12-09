@@ -245,7 +245,7 @@ mmc() {
 }
 
 blk() {
-    BOARDS=("qemu_virt_aarch64")
+    BOARDS=("qemu_virt_aarch64" "odroidc4")
     CONFIGS=("debug" "release")
     for BOARD in "${BOARDS[@]}"
     do

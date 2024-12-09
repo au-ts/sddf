@@ -16,7 +16,7 @@ $(error SDDF must be specified)
 endif
 
 ifeq ($(strip $(TOOLCHAIN)),)
-	TOOLCHAIN := clang
+	TOOLCHAIN := aarch64-none-elf
 endif
 
 ifeq ($(strip $(TOOLCHAIN)), clang)
@@ -39,19 +39,20 @@ MICROKIT_CONFIG ?= debug
 
 TIMER_DRIVER_DIR := arm
 
-TOP := ${SDDF}/examples/blk
+TOP := ${SDDF}/examples/blk_benchmark
 CONFIGS_INCLUDE := ${TOP}
 
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 
-IMAGES := client.elf blk_virt.elf
+IMAGES := client.elf blk_virt.elf timer_driver.elf
 
 ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
 	IMAGES += sdmmc_driver.elf
 	BLK_DRIVER_DIR := sdmmc
 	BLK_DRIVER_MK := sdmmc_driver.mk
+	TIMER_DRIVER_DIR := meson
 	CPU := cortex-a53
 else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
 	IMAGES += blk_driver.elf
@@ -63,7 +64,7 @@ else
 	$(error Unsupported MICROKIT_BOARD given)
 endif
 
-CFLAGS := -mcpu=$(CPU) \
+# CFLAGS := -mcpu=$(CPU) \
 		  -mstrict-align \
 		  -nostdlib \
 		  -ffreestanding \
@@ -73,6 +74,17 @@ CFLAGS := -mcpu=$(CPU) \
 		  -I$(BOARD_DIR)/include \
 		  -I$(SDDF)/include \
 		  -I$(CONFIGS_INCLUDE)
+
+CFLAGS := -mcpu=$(CPU) \
+		  -mstrict-align \
+		  -nostdlib \
+		  -ffreestanding \
+		  -g3 \
+		  -O3 \
+		  -I$(BOARD_DIR)/include \
+		  -I$(SDDF)/include \
+		  -I$(CONFIGS_INCLUDE)
+
 LDFLAGS := -L$(BOARD_DIR)/lib
 LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
 
@@ -95,7 +107,7 @@ include ${BLK_COMPONENTS}/blk_components.mk
 
 ${IMAGES}: libsddf_util_debug.a
 
-client.o: ${TOP}/client.c ${TOP}/basic_data.h
+client.o: ${TOP}/client.c
 	$(CC) -c $(CFLAGS) -I. $< -o client.o
 client.elf: client.o
 	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
@@ -104,7 +116,7 @@ $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
 
 qemu_disk:
-	$(SDDF)/tools/mkvirtdisk mydisk 1 512 16777216
+	../mkvirtdisk mydisk 1 512 16777216
 
 qemu: ${IMAGE_FILE} qemu_disk
 	$(QEMU) -machine virt,virtualization=on \
