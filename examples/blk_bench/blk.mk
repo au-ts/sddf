@@ -56,7 +56,7 @@ CFLAGS := -mcpu=$(CPU) \
 		  -I$(SERIAL_CONFIG_INCLUDE) \
 		  -I$(BENCHMARK_CONFIG_INCLUDE)
 LDFLAGS := -L$(BOARD_DIR)/lib
-LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util.a --end-group
+LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
 
 CHECK_FLAGS_BOARD_MD5:=.board_cflags-$(shell echo -- ${CFLAGS} ${BOARD} ${MICROKIT_CONFIG} | shasum | sed 's/ *-//')
 
@@ -82,11 +82,11 @@ include ${UART_DRIVER}/uart_driver.mk
 include ${TIMER_DRIVER}/timer_driver.mk
 include ${SERIAL_COMPONENTS}/serial_components.mk
 
-${IMAGES}: libsddf_util.a
+${IMAGES}: libsddf_util_debug.a
 
 client.o: ${BLK_BENCHMARK}/client.c ${BLK_BENCHMARK}/basic_data.h
 	$(CC) -c $(CFLAGS) -I. $< -o client.o
-client.elf: client.o libsddf_util.a
+client.elf: client.o libsddf_util_debug.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
