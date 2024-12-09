@@ -16,7 +16,7 @@ endif
 
 ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
 	export MICROKIT_BOARD
-	export UART_DRIV_DIR := arm
+	export UART_DRIV_DIR := meson
 	export BLK_DRIVER_DIR := sdmmc
 	export CPU := cortex-a53
 	export BLK_DRIVER_MK := sdmmc_driver.mk
