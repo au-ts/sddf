@@ -34,7 +34,7 @@ REPORT_FILE  := report.txt
 IMAGES := client.elf blk_virt.elf benchmark_blk.elf \
 		  uart_driver.elf serial_virt_tx.elf
 ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
-	#IMAGES += sdmmc_driver.elf
+	IMAGES += sdmmc_driver.elf
 else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
 	IMAGES += blk_driver.elf
 else
