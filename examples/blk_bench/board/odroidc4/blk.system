@@ -44,7 +44,6 @@
         <map mr="serial_tx_queue_bench" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="serial_tx_queue" />
         <map mr="serial_tx_data_bench" vaddr="0x4_002_000" perms="rw" cached="true" setvar_vaddr="serial_tx_data" />
 
-        <!--
         <protection_domain name="driver" id="1" priority="102">
             <program_image path="sdmmc_driver.elf" />
             <map mr="sdio" vaddr="0xffe05000" perms="rw" cached="false" />
@@ -52,13 +51,12 @@
 
             <map mr="data_region" vaddr="0xf5500000" perms="rw" cached="false" />
 
-            < sDDF block 
+            <!-- sDDF block -->
             <map mr="blk_driver_storage_info" vaddr="0x40_000_000" perms="rw" cached="false" setvar_vaddr="blk_config"     />
             <map mr="blk_driver_request"    vaddr="0x40_200_000" perms="rw" cached="false" setvar_vaddr="blk_req_queue"  />
             <map mr="blk_driver_response"   vaddr="0x40_400_000" perms="rw" cached="false" setvar_vaddr="blk_resp_queue" />
             <irq irq="222" id="1"/>
         </protection_domain>
-        -->
         
         <protection_domain name="uart" priority="254" id="4">
             <program_image path="uart_driver.elf" />
@@ -115,7 +113,6 @@
         </protection_domain>
     </protection_domain>
 
-    <!--
     <channel>
         <end pd="client" id="0" />
         <end pd="blk_virt" id="1" />
@@ -125,7 +122,6 @@
         <end pd="blk_virt" id="0" />
         <end pd="driver" id="0" />
     </channel>
-    -->
 
     <!-- serial uart channels -->
     <channel>
@@ -156,5 +152,4 @@
         <end pd="client" id="4" /> <!-- Benchmark run start channel -->
         <end pd="bench" id="3" />
     </channel>
-    <!-- TODO add channels for client to start/stop benchmarks -->
 </system>

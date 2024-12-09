@@ -70,21 +70,20 @@ bool run_benchmark() {
     switch(run_benchmark_state) {
         case START_BENCHMARK:
             /* make sure the driver is working properly */
-            // TODO: uncomment once sdmmc driver does not rely on debug prints
             if (!virtualiser_replied) {
                 LOG_CLIENT("run_benchmark: START state,verifying if a simple read succeeds...\n");
-                //int err = blk_enqueue_req(&blk_queue, BLK_REQ_READ, 0x10000, 0, 2, 0);
-                //assert(!err);
-                //microkit_notify(VIRT_CH);
+                int err = blk_enqueue_req(&blk_queue, BLK_REQ_READ, 0x10000, 0, 2, 0);
+                assert(!err);
+                microkit_notify(VIRT_CH);
             } else {
-                //blk_resp_status_t status = -1;
-                //uint16_t count = -1;
-                //uint32_t id = -1;
-                //int err = blk_dequeue_resp(&blk_queue, &status, &count, &id);
-                //assert(!err);
-                //assert(status == BLK_RESP_OK);
-                //assert(count == 2);
-                //assert(id == 0);
+                blk_resp_status_t status = -1;
+                uint16_t count = -1;
+                uint32_t id = -1;
+                int err = blk_dequeue_resp(&blk_queue, &status, &count, &id);
+                assert(!err);
+                assert(status == BLK_RESP_OK);
+                assert(count == 2);
+                assert(id == 0);
                 LOG_CLIENT("run_benchmark: simple read successful.\n");
                 run_benchmark_state = THROUGHPUT_RANDOM_READ;
                 virtualiser_replied = false;
@@ -95,8 +94,6 @@ bool run_benchmark() {
         case THROUGHPUT_RANDOM_READ:
             /* Perform QUEUE_SIZE random READs, from 4KiB write size up to 128MiB (x8 at each step) */
             // XXX can "simulate" random reads, by interleaving reads at 2 distant offsets (see Cheng's sdmmc_rust branch)
-            // TODO: uncomment once sdmmc driver does not rely on debug pritns
-            /*
             if (!virtualiser_replied) {
                 LOG_CLIENT("run_benchmark: THROUGHPUT_RANDOM_READ: %d requests of %d transfer blocks at a time.\n",
                         QUEUE_SIZE, BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx]);
@@ -130,7 +127,6 @@ bool run_benchmark() {
                 }
                 virtualiser_replied = false;
             }
-            */
             break;
         case THROUGHPUT_WRITE:
             /* Perform QUEUE_SIZE WRITEs, from 4KiB write size up to 128MiB (x8 at each step) */
@@ -159,13 +155,14 @@ void init(void)
 
     LOG_CLIENT("starting.\n");
 
-    //blk_queue_init(&blk_queue, (blk_req_queue_t *)blk_request, (blk_resp_queue_t *)blk_response, QUEUE_SIZE);
+    blk_queue_init(&blk_queue, (blk_req_queue_t *)blk_request, (blk_resp_queue_t *)blk_response, QUEUE_SIZE);
 
     /* Want to print out configuration information, so wait until the config is ready. */
-    //while (!blk_storage_is_ready(blk_storage_info));
-    //LOG_CLIENT("device config ready\n");
+    LOG_CLIENT("check if device config ready\n");
+    while (!blk_storage_is_ready(blk_storage_info));
+    LOG_CLIENT("device config ready\n");
 
-    //LOG_CLIENT("device size: 0x%lx bytes\n", blk_storage_info->capacity * BLK_TRANSFER_SIZE);
+    LOG_CLIENT("device size: 0x%lx bytes\n", blk_storage_info->capacity * BLK_TRANSFER_SIZE);
 }
 
 void notified(microkit_channel ch)
@@ -183,10 +180,8 @@ void notified(microkit_channel ch)
             break;
         case BENCH_RUN_CH:
             // TODO: Start the required benchmark
-            // Spin in case blk_driver not ready yet
             virtualiser_replied = false;
             LOG_CLIENT("client notified to start bench.\n");
-            while (!blk_storage_is_ready(blk_storage_info));
             run_benchmark();
             break;
         default:
