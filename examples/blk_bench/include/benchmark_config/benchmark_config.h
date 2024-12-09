@@ -12,7 +12,7 @@
 #define BENCHMARK_RUN_COUNT ((int) sizeof(BENCHMARK_BLOCKS_PER_REQUEST)/sizeof(uint32_t))
 // 1 MiB interval to counter the caching of block device's sequential READs
 // XXX and to counter the batching of WRITE commits
-#define BLOCK_READ_WRITE_INTERVAL 0x100000
+#define BLOCK_READ_WRITE_INTERVAL 0x1600000
 
 // TODO: add defines for default clock speed for odroid c4's CPU, to compute throughput in terms of time
 // in MHz
