@@ -56,4 +56,6 @@ ${BUILD_DIR}/Makefile: blk.mk
 	mkdir -p ${BUILD_DIR}
 	cp blk.mk $@
 
+clean_benchmark_config::
+	rm -rf build/benchmark_blk* build/client*
 FORCE:
