@@ -34,6 +34,7 @@ CFLAGS := -mcpu=$(CPU) \
 	  -ffreestanding \
 	  -g3 -O3 -Wall \
 	  -Wno-unused-function \
+	  -DMICROKIT \
 	  -DMICROKIT_CONFIG_$(MICROKIT_CONFIG) \
 	  -I$(BOARD_DIR)/include \
 	  -I$(SDDF)/include \
@@ -100,7 +101,7 @@ include ${SERIAL_COMPONENTS}/serial_components.mk
 
 qemu: $(IMAGE_FILE)
 	$(QEMU) -machine virt,virtualization=on \
-			-cpu cortex-a53 \
+			-cpu cortex-a57 \
 			-serial mon:stdio \
 			-device loader,file=$(IMAGE_FILE),addr=0x70000000,cpu-num=0 \
 			-m size=2G \

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-#include <microkit.h>
+#include <sel4/sel4.h>
 #include <stdint.h>
 #include <sddf/util/cache.h>
 #include <sddf/util/util.h>
