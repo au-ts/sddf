@@ -11,6 +11,7 @@
 //#define REQUEST_COUNT (uint32_t[]) {256, 256, 32, 4, 1}
 #define REQUEST_COUNT (uint32_t[]) {256, 256, 256, 256, 256}
 #define BENCHMARK_RUN_COUNT ((int) sizeof(BENCHMARK_BLOCKS_PER_REQUEST)/sizeof(uint32_t))
+#define BENCHMARK_INDIVIDUAL_RUN_REPEATS 3
 // 1 MiB interval to counter the caching of block device's sequential READs
 // XXX and to counter the batching of WRITE commits
 #define BLOCK_READ_WRITE_INTERVAL 0x1600000
@@ -22,7 +23,9 @@
 // benchmark runs
 enum run_benchmark_state {
     START_BENCHMARK,
+    THROUGHPUT_SEQUENTIAL_READ,
     THROUGHPUT_RANDOM_READ,
+    THROUGHPUT_SEQUENTIAL_WRITE,
     THROUGHPUT_RANDOM_WRITE,
     LATENCY_READ,
     LATENCY_WRITE,
