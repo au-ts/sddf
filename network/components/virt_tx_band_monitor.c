@@ -28,13 +28,13 @@ net_queue_t *tx_active_cli0;
 uintptr_t buffer_data_region_cli0_vaddr;
 uintptr_t buffer_data_region_cli0_paddr;
 uintptr_t buffer_data_region_cli1_paddr;
-uint32_t signal_count = 0;
+
 #define TIME_WINDOW (10 * NS_IN_MS)
-uint64_t current_tick = 0;
+#define TICKS_PER_S (NS_IN_S / TIME_WINDOW)
+
 bool signal_god = false;
 
 typedef struct client_usage {
-    uint64_t last_tick;
     uint64_t curr_bits;
     uint64_t max_bits;
 } client_usage_t;
@@ -66,11 +66,6 @@ void tx_provide(void)
     bool enqueued = false;
     for (int client = 0; client < NUM_NETWORK_CLIENTS; client++) {
 
-        if (state.client_usage[client].last_tick != current_tick) {
-            state.client_usage[client].curr_bits = 0;
-            state.client_usage[client].last_tick = current_tick;
-        }
-
         bool reprocess = true;
         while (reprocess) {
             while (!net_queue_empty_active(&state.tx_queue_clients[client])) {
@@ -94,12 +89,7 @@ void tx_provide(void)
                 err = net_enqueue_active(&state.tx_queue_drv, buffer);
                 assert(!err);
                 state.client_usage[client].curr_bits += (buffer.len * 8);
-                // if (state.client_usage[client].curr_bits >= state.client_usage[client].max_bits) {
-                //     signal_god = true;
-                // }
-                signal_count++;
-                if (signal_count >= 100) {
-                    sddf_dprintf("We are singlaling god\n");
+                if (state.client_usage[client].curr_bits >= state.client_usage[client].max_bits) {
                     signal_god = true;
                 }
                 enqueued = true;
@@ -158,7 +148,12 @@ void tx_return(void)
 
 void notified(microkit_channel ch)
 {
-    current_tick = sddf_timer_time_now(TIMER) / TIME_WINDOW;
+    if (ch == TIMER) {
+        for (int client = 0; client < NUM_NETWORK_CLIENTS; client++) {
+            state.client_usage[client].curr_bits = 0;
+        }
+        sddf_timer_set_timeout(TIMER, TIME_WINDOW);
+    }
     tx_return();
     tx_provide();
 
@@ -173,11 +168,6 @@ void init(void)
     cache_clean_and_invalidate(pd_code, pd_code + 0x5000);
     seL4_ARM_VSpace_Unify_Instruction(3, 0x200000, 0x205000);
 
-    for (int i = 0; i < 10; i++) {
-        sddf_dprintf("This is the start of band monitor at %d: %x\n", i, pd_code[i]);
-    }
-
-    microkit_dbg_puts("In band monitor init\n");
     /* Set up driver queues */
     net_queue_init(&state.tx_queue_drv, tx_free_drv, tx_active_drv, NET_TX_QUEUE_CAPACITY_DRIV);
 
@@ -197,8 +187,10 @@ void init(void)
     state.buffer_region_paddrs[1] = buffer_data_region_cli1_paddr;
 #endif
 
-    state.client_usage[0].max_bits = 2000000;
-    state.client_usage[1].max_bits = 2000000;
+    state.client_usage[0].max_bits = 800000000 / TICKS_PER_S;
+    state.client_usage[1].max_bits = 50000000 / TICKS_PER_S;
 
     tx_provide();
+
+    sddf_timer_set_timeout(TIMER, TIME_WINDOW);
 }

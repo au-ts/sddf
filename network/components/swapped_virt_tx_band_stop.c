@@ -15,6 +15,7 @@
 #define DRIVER 0
 #define TIMER 1
 #define CLIENT_CH 2
+
 char *pd_code;
 
 net_queue_t *tx_free_drv;
@@ -27,9 +28,9 @@ uintptr_t buffer_data_region_cli0_paddr;
 uintptr_t buffer_data_region_cli1_paddr;
 
 #define TIME_WINDOW (10 * NS_IN_MS)
-uint64_t current_tick = 0;
+#define TICKS_PER_S (NS_IN_S / TIME_WINDOW)
+
 typedef struct client_usage {
-    uint64_t last_tick;
     uint64_t curr_bits;
     uint64_t max_bits;
 } client_usage_t;
@@ -58,14 +59,11 @@ int extract_offset(uintptr_t *phys)
 
 void tx_provide(void)
 {
-    // sddf_dprintf("In band stop tx provide\n");
     bool enqueued = false;
-    uint32_t buffers_provided = 0;
     for (int client = 0; client < NUM_NETWORK_CLIENTS; client++) {
 
-        if (state.client_usage[client].last_tick != current_tick) {
-            state.client_usage[client].curr_bits = 0;
-            state.client_usage[client].last_tick = current_tick;
+        if (state.client_usage[client].curr_bits >= state.client_usage[client].max_bits) {
+            continue;
         }
 
         bool reprocess = true;
@@ -93,26 +91,22 @@ void tx_provide(void)
                 assert(!err);
                 state.client_usage[client].curr_bits += (buffer.len * 8);
                 enqueued = true;
-                buffers_provided++;
             }
 
-            net_request_signal_active(&state.tx_queue_clients[client]);
             reprocess = false;
 
-            if (!net_queue_empty_active(&state.tx_queue_clients[client])) {
-                net_cancel_signal_active(&state.tx_queue_clients[client]);
-                if (state.client_usage[client].curr_bits < state.client_usage[client].max_bits) {
+            if (state.client_usage[client].curr_bits < state.client_usage[client].max_bits) {
+                net_request_signal_active(&state.tx_queue_clients[client]);
+
+                if (!net_queue_empty_active(&state.tx_queue_clients[client])) {
+                    net_cancel_signal_active(&state.tx_queue_clients[client]);
                     reprocess = true;
-                } else {
-                    sddf_timer_set_timeout(TIMER, TIME_WINDOW);
                 }
             }
         }
     }
 
-    // sddf_dprintf("This is the value of enqueued: %d ---- This is the value of net require signal: %d\n", enqueued, net_require_signal_active(&state.tx_queue_drv));
     if (enqueued && net_require_signal_active(&state.tx_queue_drv)) {
-        // sddf_dprintf("Notifying driver\n");
         net_cancel_signal_active(&state.tx_queue_drv);
         microkit_deferred_notify(DRIVER);
     }
@@ -120,8 +114,6 @@ void tx_provide(void)
 
 void tx_return(void)
 {
-    // sddf_dprintf("In band stop tx return\n");
-    uint32_t buffers_returned = 0;
     bool reprocess = true;
     bool notify_clients[NUM_NETWORK_CLIENTS] = {false};
     while (reprocess) {
@@ -138,7 +130,6 @@ void tx_return(void)
             notify_clients[client] = true;
         }
 
-        buffers_returned++;
         net_request_signal_free(&state.tx_queue_drv);
         reprocess = false;
 
@@ -154,12 +145,17 @@ void tx_return(void)
             microkit_notify(client + CLIENT_CH);
         }
     }
-    // sddf_dprintf("This is how many buffers we returned in tx_return: %d\n", buffers_returned);
 }
 
 void notified(microkit_channel ch)
 {
-    current_tick = sddf_timer_time_now(TIMER) / TIME_WINDOW;
+    if (ch == TIMER) {
+        for (int client = 0; client < NUM_NETWORK_CLIENTS; client++) {
+            state.client_usage[client].curr_bits = 0;
+        }
+        sddf_timer_set_timeout(TIMER, TIME_WINDOW);
+    }
+
     tx_return();
     tx_provide();
 }
@@ -169,11 +165,6 @@ void init(void)
     cache_clean_and_invalidate(pd_code, pd_code + 0x5000);
     seL4_ARM_VSpace_Unify_Instruction(3, 0x200000, 0x205000);
 
-    for (int i = 0; i < 10; i++) {
-        sddf_dprintf("This is the start of band stop at %d: %x\n", i, pd_code[i]);
-    }
-
-    microkit_dbg_puts("In band stop\n");
     /* Set up driver queues */
     net_queue_init(&state.tx_queue_drv, tx_free_drv, tx_active_drv, NET_TX_QUEUE_CAPACITY_DRIV);
 
@@ -193,12 +184,11 @@ void init(void)
     state.buffer_region_paddrs[1] = buffer_data_region_cli1_paddr;
 #endif
 
-    state.client_usage[0].max_bits = 2000000;
-    state.client_usage[1].max_bits = 2000000;
+    state.client_usage[0].max_bits = 800000000 / TICKS_PER_S;
+    state.client_usage[1].max_bits = 200000000 / TICKS_PER_S;
 
     tx_provide();
     tx_return();
 
-
-    // microkit_deferred_notify(DRIVER);
+    sddf_timer_set_timeout(TIMER, TIME_WINDOW);
 }
