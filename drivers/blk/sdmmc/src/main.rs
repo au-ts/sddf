@@ -262,6 +262,10 @@ impl<T: SdmmcHardware + 'static> Handler for HandlerImpl<T> {
                     }
                     _ => {
                         // For other request, enqueue response
+                        match request.request_code {
+                            BlkOp::BlkReqRead | BlkOp::BlkReqWrite => {},
+                            _ => panic!("uh oh\n"),
+                        }
                         notify_virt = true;
                         unsafe {
                             blk_enqueue_resp_helper(BlkStatus::BlkRespOk, 0, request.id);
