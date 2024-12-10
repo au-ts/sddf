@@ -84,7 +84,7 @@ bool run_benchmark() {
             } else {
                 dequeue_and_validate(2);
                 LOG_CLIENT("run_benchmark: simple read successful.\n");
-                run_benchmark_state = THROUGHPUT_RANDOM_WRITE;
+                run_benchmark_state = THROUGHPUT_RANDOM_READ;
                 virtualiser_replied = false;
                 run_benchmark();
             }
