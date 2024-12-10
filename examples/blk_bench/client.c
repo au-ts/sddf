@@ -71,6 +71,8 @@ uint8_t benchmark_size_idx = 0;
  // only read/write 1024*1024 sectors in (4GiB in), Avoid U-Boot
  // continuosly advance read start to avoid caching benefits
 uint64_t start_sector = 1024*1024;
+// write at 16 GiB in
+uint64_t write_start_sector = 4*1024*1024;
 
 bool run_benchmark() {
     switch(run_benchmark_state) {
@@ -146,7 +148,7 @@ bool run_benchmark() {
             if (!virtualiser_replied) {
                 LOG_CLIENT("run_benchmark: THROUGHPUT_RANDOM_WRITE: %d requests of %d transfer blocks at a time.\n"
                         "Writing start sector: %lu\n", REQUEST_COUNT[benchmark_size_idx],
-                        BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx], start_sector);
+                        BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx], write_start_sector);
                 if (blk_queue_length_req(&blk_queue) != 0 || blk_queue_length_resp(&blk_queue) != 0)
                     panic("blk response or request queue not empty!");
                 for (uint32_t i = 0; i != REQUEST_COUNT[benchmark_size_idx]; ++i) {
@@ -155,7 +157,7 @@ bool run_benchmark() {
                      */
                     // TODO: check how big internal SD card "caches"/"pre-commit bins" are so it always commits the WRITE
                     uintptr_t io_or_offset = 0; // always writing the same data
-                    uint32_t block_number = start_sector + i * BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx] + \
+                    uint32_t block_number = write_start_sector + i * BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx] + \
                                          i * BLOCK_READ_WRITE_INTERVAL / BLK_TRANSFER_SIZE;
                     uint16_t count = BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx];
                     int err = blk_enqueue_req(&blk_queue, BLK_REQ_WRITE, io_or_offset, block_number, count, i);
