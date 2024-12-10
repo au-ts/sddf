@@ -17,13 +17,13 @@
 net_queue_handle_t rx_queue_virt;
 net_queue_handle_t rx_queue_cli;
 
-net_queue_t *rx_free_virt;
-net_queue_t *rx_active_virt;
-net_queue_t *rx_free_cli;
-net_queue_t *rx_active_cli;
+net_queue_t *rx_free_virt = (net_queue_t *)0x2000000;
+net_queue_t *rx_active_virt = (net_queue_t *)0x2200000;
+net_queue_t *rx_free_cli = (net_queue_t *)0x2400000;
+net_queue_t *rx_active_cli = (net_queue_t *)0x2600000;
 
-uintptr_t virt_buffer_data_region;
-uintptr_t cli_buffer_data_region;
+uintptr_t virt_buffer_data_region = 0x2800000;
+uintptr_t cli_buffer_data_region = 0x2a00000;
 
 void rx_return(void)
 {
@@ -85,9 +85,9 @@ void rx_return(void)
         microkit_notify(CLIENT_CH);
     }
 
-    if (enqueued && net_require_signal_free(&rx_queue_virt)) {
+    if (enqueued && (net_queue_length(rx_queue_virt.free) >= 32) && net_require_signal_free(&rx_queue_virt)) {
         net_cancel_signal_free(&rx_queue_virt);
-        microkit_deferred_notify(VIRT_RX_CH);
+        microkit_notify_delayed(VIRT_RX_CH);
     }
 }
 
@@ -99,7 +99,7 @@ void notified(microkit_channel ch)
 void init(void)
 {
     size_t cli_queue_capacity, virt_queue_capacity = 0;
-    net_copy_queue_capacity(microkit_name, &cli_queue_capacity, &virt_queue_capacity);
+    net_copy_queue_capacity("copy0", &cli_queue_capacity, &virt_queue_capacity);
 
     /* Set up the queues */
     net_queue_init(&rx_queue_cli, rx_free_cli, rx_active_cli, cli_queue_capacity);

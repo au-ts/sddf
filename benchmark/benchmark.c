@@ -33,6 +33,7 @@
 #define PD_VIRT_TX_ID    3
 #define PD_LWIP_ID      4
 #define PD_TIMER_ID     5
+#define PD_COPY0_ID      8
 
 ccnt_t counter_values[8];
 counter_bitfield_t benchmark_bf;
@@ -83,6 +84,9 @@ static void print_pdid_name(uint64_t pd_id)
     case PD_TIMER_ID:
         sddf_printf(NET_TIMER_NAME);
         break;
+    case PD_COPY0_ID:
+        sddf_printf(NET_COPY0_NAME);
+        break;
     default:
         sddf_printf("unknown");
         break;
@@ -98,6 +102,7 @@ static void microkit_benchmark_start(void)
     seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_VIRT_TX_ID);
     seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_LWIP_ID);
     seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_TIMER_ID);
+    seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_COPY0_ID);
     seL4_BenchmarkResetLog();
 }
 
@@ -236,6 +241,9 @@ void notified(microkit_channel ch)
 
         microkit_benchmark_stop_tcb(PD_TIMER_ID, &total, &number_schedules, &kernel, &entries);
         print_benchmark_details(PD_TIMER_ID, kernel, entries, number_schedules, total);
+
+        microkit_benchmark_stop_tcb(PD_COPY0_ID, &total, &number_schedules, &kernel, &entries);
+        print_benchmark_details(PD_COPY0_ID, kernel, entries, number_schedules, total);
 #endif
 
 #ifdef CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES
