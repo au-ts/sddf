@@ -21,7 +21,7 @@
 __attribute__((__section__(".blk_virt_config"))) blk_virt_config_t config;
 
 /* Uncomment this to enable debug logging */
-#define DEBUG_BLK_VIRT
+//#define DEBUG_BLK_VIRT
 
 #if defined(DEBUG_BLK_VIRT)
 #define LOG_BLK_VIRT(...) do{ sddf_dprintf("BLK_VIRT|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
