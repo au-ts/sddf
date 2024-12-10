@@ -71,8 +71,10 @@ uint8_t benchmark_size_idx = 0;
  // only read/write 1024*1024 sectors in (4GiB in), Avoid U-Boot
  // continuosly advance read start to avoid caching benefits
 uint64_t read_start_sector = 1024*1024;
-// write at 16 GiB in
-uint64_t write_start_sector = 4*1024*1024;
+// write at 20 GiB in
+uint64_t write_start_sector = 5*1024*1024;
+// Step thats taken every benchmark_size idx increase (so we write to diff regions)
+uint64_t step_every_benchmark_size_increase = 256*1024;
 int benchmark_run_idx = 0;
 
 void handle_random_operations_run(blk_req_code_t request_code, uint32_t start_sector, uint32_t interval, char* run_type, enum run_benchmark_state next_state);
@@ -149,8 +151,9 @@ void handle_random_operations_run(blk_req_code_t request_code, uint32_t start_se
              */
             // XXX always reading to the SAME address space in the shared memory region
             uintptr_t io_or_offset = 0;//i * BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx] * BLK_TRANSFER_SIZE;
-            uint32_t block_number = start_sector + i * BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx] + \
-                                 i * interval / BLK_TRANSFER_SIZE;
+            uint32_t block_number = start_sector + benchmark_size_idx * step_every_benchmark_size_increase\
+                                    + i * BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx] + \
+                                    i * interval / BLK_TRANSFER_SIZE;
             uint16_t count = BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx];
             //sddf_printf("client: io_or_offset 0x%lx, block_number: %d, count: %d\n", io_or_offset, block_number, count);
 
