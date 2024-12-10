@@ -82,12 +82,17 @@ event_id_t benchmarking_events[] = {
     SEL4BENCH_EVENT_BRANCH_MISPREDICT,
 };
 
-double benchmark_speed_res_seq_read[BENCHMARK_RUN_COUNT];
-double benchmark_speed_res_rand_read[BENCHMARK_RUN_COUNT];
-double benchmark_speed_res_seq_write[BENCHMARK_RUN_COUNT];
-double benchmark_speed_res_rand_write[BENCHMARK_RUN_COUNT];
+double benchmark_speed_res_seq_read[BENCHMARK_RUN_COUNT*BENCHMARK_INDIVIDUAL_RUN_REPEATS];
+double benchmark_speed_res_rand_read[BENCHMARK_RUN_COUNT*BENCHMARK_INDIVIDUAL_RUN_REPEATS];
+double benchmark_speed_res_seq_write[BENCHMARK_RUN_COUNT*BENCHMARK_INDIVIDUAL_RUN_REPEATS];
+double benchmark_speed_res_rand_write[BENCHMARK_RUN_COUNT*BENCHMARK_INDIVIDUAL_RUN_REPEATS];
+
+uint64_t benchmark_time_res_seq_read[BENCHMARK_RUN_COUNT*BENCHMARK_INDIVIDUAL_RUN_REPEATS];
+uint64_t benchmark_time_res_rand_read[BENCHMARK_RUN_COUNT*BENCHMARK_INDIVIDUAL_RUN_REPEATS];
+uint64_t benchmark_time_res_seq_write[BENCHMARK_RUN_COUNT*BENCHMARK_INDIVIDUAL_RUN_REPEATS];
+uint64_t benchmark_time_res_rand_write[BENCHMARK_RUN_COUNT*BENCHMARK_INDIVIDUAL_RUN_REPEATS];
 enum run_benchmark_state run_benchmark_state = THROUGHPUT_RANDOM_READ;
-int repeat_write = BENCHMARK_INDIVIDUAL_RUN_REPEATS;
+int benchmark_run_idx = 0;
 
 static void print_pdid_name(uint64_t pd_id)
 {
@@ -198,6 +203,40 @@ static inline void seL4_BenchmarkTrackDumpSummary(benchmark_track_kernel_entry_t
 }
 #endif
 
+void print_all_benchmark_results(enum run_benchmark_state print_state) {
+    double* speed_res_table;
+    uint64_t* time_res_table;
+    const char* run_name = human_readable_run_benchmark_state[print_state];
+    switch (print_state) {
+        case THROUGHPUT_RANDOM_READ:
+            speed_res_table = benchmark_speed_res_rand_read;
+            time_res_table = benchmark_time_res_rand_read;
+            break;
+        case THROUGHPUT_RANDOM_WRITE:
+            speed_res_table = benchmark_speed_res_rand_write;
+            time_res_table = benchmark_time_res_rand_write;
+            break;
+        case THROUGHPUT_SEQUENTIAL_READ:
+            speed_res_table = benchmark_speed_res_seq_read;
+            time_res_table = benchmark_time_res_seq_read;
+            break;
+        case THROUGHPUT_SEQUENTIAL_WRITE:
+            speed_res_table = benchmark_speed_res_seq_write;
+            time_res_table = benchmark_time_res_seq_write;
+            break;
+        default:
+            panic("BENCHMARK: Error, unimplemented benchmark state transition");
+    }
+    sddf_printf("%s results:\n", run_name);
+    for (int j = 0; j != BENCHMARK_INDIVIDUAL_RUN_REPEATS; ++j) {
+        sddf_printf("Run idx: %d/%d\n", j+1, BENCHMARK_INDIVIDUAL_RUN_REPEATS);
+        for (int i = 0; i != BENCHMARK_RUN_COUNT; ++i) {
+            sddf_printf("Number of requests: %d, size of 1 request: 0x%x B, speed: %.2f MiB/s time: %lu\n",
+                    REQUEST_COUNT[i], BENCHMARK_BLOCKS_PER_REQUEST[i] * BLK_TRANSFER_SIZE,
+                    speed_res_table[i + j*BENCHMARK_RUN_COUNT], time_res_table[i + j*BENCHMARK_RUN_COUNT]);
+        }
+    }
+}
 
 void notified(microkit_channel ch)
 {
@@ -233,22 +272,28 @@ void notified(microkit_channel ch)
             sddf_printf("%s: %lX\n", counter_names[i], counter_values[i]);
         }
         /* Get the total cycle count spent during benchmark, compute cycles/KiB */
-        sddf_printf("Total time (ns): %ld\n", timer_end-timer_start);
+        uint64_t elapsed_time = timer_end-timer_start;
+        sddf_printf("Total time (ns): %ld\n", elapsed_time);
         double speed = ((double) BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx] * BLK_TRANSFER_SIZE * \
-                REQUEST_COUNT[benchmark_size_idx] / (1024. * 1024.)) / ((double) (timer_end-timer_start)/1e9);
+                REQUEST_COUNT[benchmark_size_idx] / (1024. * 1024.)) / ((double) (elapsed_time)/1e9);
         sddf_printf("speed (MiB/s: %f\n", speed);
+        int run_offset = benchmark_run_idx * BENCHMARK_RUN_COUNT;
         switch (run_benchmark_state) {
             case THROUGHPUT_RANDOM_READ:
-                benchmark_speed_res_rand_read[benchmark_size_idx] = speed;
+                benchmark_speed_res_rand_read[benchmark_size_idx + run_offset] = speed;
+                benchmark_time_res_rand_read[benchmark_size_idx + run_offset] = elapsed_time; 
                 break;
             case THROUGHPUT_SEQUENTIAL_READ:
-                benchmark_speed_res_seq_read[benchmark_size_idx] = speed;
+                benchmark_speed_res_seq_read[benchmark_size_idx + run_offset] = speed;
+                benchmark_time_res_seq_read[benchmark_size_idx + run_offset] = elapsed_time; 
                 break;
             case THROUGHPUT_RANDOM_WRITE:
-                benchmark_speed_res_rand_write[benchmark_size_idx] = speed;
+                benchmark_speed_res_rand_write[benchmark_size_idx + run_offset] = speed;
+                benchmark_time_res_rand_write[benchmark_size_idx + run_offset] = elapsed_time; 
                 break;
             case THROUGHPUT_SEQUENTIAL_WRITE:
-                benchmark_speed_res_seq_write[benchmark_size_idx] = speed;
+                benchmark_speed_res_seq_write[benchmark_size_idx + run_offset] = speed;
+                benchmark_time_res_seq_write[benchmark_size_idx + run_offset] = elapsed_time; 
                 break;
             default:
                 panic("BENCHMARK: Error, unimplemented benchmark state for speed measuring.");
@@ -291,40 +336,49 @@ void notified(microkit_channel ch)
 #ifdef MICROKIT_CONFIG_benchmark
         benchmark_size_idx = benchmark_size_idx + 1;
         // Print out results:
-        if (run_benchmark_state == THROUGHPUT_RANDOM_READ) {
-            sddf_printf("Random read results:\n");
-            for (int i = 0; i != benchmark_size_idx; ++i) {
-                sddf_printf("Number of requests: %d, size of 1 request: 0x%x B, speed: %.2f MiB/s\n",  REQUEST_COUNT[i],
-                        BENCHMARK_BLOCKS_PER_REQUEST[i] * BLK_TRANSFER_SIZE, benchmark_speed_res_rand_read[i]);
-            }
-        }
-        else if (run_benchmark_state == THROUGHPUT_RANDOM_WRITE) {
-            sddf_printf("Random read results:\n");
-            for (int i = 0; i != BENCHMARK_RUN_COUNT; ++i) {
-                sddf_printf("Number of requests: %d, size of 1 request: 0x%x B, speed: %.2f MiB/s\n",  REQUEST_COUNT[i],
-                        BENCHMARK_BLOCKS_PER_REQUEST[i] * BLK_TRANSFER_SIZE, benchmark_speed_res_rand_read[i]);
-            }
-            sddf_printf("Random write results:\n");
-            for (int i = 0; i != benchmark_size_idx; ++i) {
-                sddf_printf("Number of requests: %d, size of 1 request: 0x%x B, speed: %.2f MiB/s\n",  REQUEST_COUNT[i],
-                        BENCHMARK_BLOCKS_PER_REQUEST[i] * BLK_TRANSFER_SIZE, benchmark_speed_res_rand_write[i]);
-            }
+        switch (run_benchmark_state) {
+            case THROUGHPUT_RANDOM_READ:
+                print_all_benchmark_results(THROUGHPUT_RANDOM_READ);
+                break;
+            case THROUGHPUT_RANDOM_WRITE:
+                print_all_benchmark_results(THROUGHPUT_RANDOM_READ);
+                print_all_benchmark_results(THROUGHPUT_RANDOM_WRITE);
+                break;
+            case THROUGHPUT_SEQUENTIAL_READ:
+                print_all_benchmark_results(THROUGHPUT_RANDOM_READ);
+                print_all_benchmark_results(THROUGHPUT_RANDOM_WRITE);
+                print_all_benchmark_results(THROUGHPUT_SEQUENTIAL_READ);
+                break;
+            case THROUGHPUT_SEQUENTIAL_WRITE:
+                print_all_benchmark_results(THROUGHPUT_RANDOM_READ);
+                print_all_benchmark_results(THROUGHPUT_RANDOM_WRITE);
+                print_all_benchmark_results(THROUGHPUT_SEQUENTIAL_READ);
+                print_all_benchmark_results(THROUGHPUT_SEQUENTIAL_WRITE);
+                break;
+            default:
+                panic("BENCHMARK: Error, unimplemented benchmark state transition");
         }
         benchmark_size_idx %= BENCHMARK_RUN_COUNT;
-        if (benchmark_size_idx == 0)
-            switch (run_benchmark_state) {
-                case THROUGHPUT_RANDOM_READ:
-                    run_benchmark_state = THROUGHPUT_RANDOM_WRITE;
-                    break;
-                case THROUGHPUT_RANDOM_WRITE:
-                    //--repeat_write;
-                    //if (repeat_write == 0)
-                    //    run_benchmark_state = LATENCY_READ;
-                    run_benchmark_state = LATENCY_READ;
-                    break;
-                default:
-                    panic("BENCHMARK: Error, unimplemented benchmark state transition");
-            }
+        if (benchmark_size_idx == 0) {
+            benchmark_run_idx = (benchmark_run_idx + 1) % BENCHMARK_INDIVIDUAL_RUN_REPEATS;
+            if (benchmark_run_idx == 0)
+                switch (run_benchmark_state) {
+                    case THROUGHPUT_RANDOM_READ:
+                        run_benchmark_state = THROUGHPUT_RANDOM_WRITE;
+                        break;
+                    case THROUGHPUT_RANDOM_WRITE:
+                        run_benchmark_state = THROUGHPUT_SEQUENTIAL_READ;
+                        break;
+                    case THROUGHPUT_SEQUENTIAL_READ:
+                        run_benchmark_state = THROUGHPUT_SEQUENTIAL_WRITE;
+                        break;
+                    case THROUGHPUT_SEQUENTIAL_WRITE:
+                        run_benchmark_state = LATENCY_READ;
+                        break;
+                    default:
+                        panic("BENCHMARK: Error, unimplemented benchmark state transition");
+                }
+        }
 #endif
 
         // run next benchmark
