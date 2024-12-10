@@ -73,7 +73,7 @@ uint8_t benchmark_size_idx = 0;
 uint64_t read_start_sector = 1024*1024;
 // write at 16 GiB in
 uint64_t write_start_sector = 4*1024*1024;
-int repeat_write = BENCHMARK_INDIVIDUAL_RUN_REPEATS;
+int benchmark_run_idx = 0;
 
 void handle_random_operations_run(blk_req_code_t request_code, uint32_t start_sector, uint32_t interval, char* run_type, enum run_benchmark_state next_state);
 
@@ -94,8 +94,6 @@ bool run_benchmark() {
                 run_benchmark();
             }
             break;
-        case THROUGHPUT_SEQUENTIAL_READ:
-            break;
         case THROUGHPUT_RANDOM_READ:
             /* Perform REQUEST_COUNT[benchmark_size_idx] random READs, from 4KiB write size up to 8MiB */
             handle_random_operations_run(BLK_REQ_READ, read_start_sector, BLOCK_READ_WRITE_INTERVAL, "RANDOM_READ", THROUGHPUT_RANDOM_WRITE);
@@ -108,14 +106,17 @@ bool run_benchmark() {
                     blk_data[i] = i % 255;
                 }
 
-            handle_random_operations_run(BLK_REQ_WRITE, write_start_sector, BLOCK_READ_WRITE_INTERVAL, "RANDOM_WRITE", LATENCY_READ);
-            //    if (benchmark_size_idx == 0) {
-            //        // cycled through all BENCHMARK_BLOCKS_PER_REQUEST, start next benchmark
-            //        --repeat_write;
-            //        sddf_printf("run_benchmark: finished all BENCHMARK_BLOCKS_PER_REQUEST for THROUGHPUT_RANDOM_WRITE. Repeats left: %d\n", repeat_write);
-            //        if (repeat_write == 0) {
-            //        run_benchmark_state = LATENCY_READ;
-            //        }
+            handle_random_operations_run(BLK_REQ_WRITE, write_start_sector, BLOCK_READ_WRITE_INTERVAL, "RANDOM_WRITE", THROUGHPUT_SEQUENTIAL_READ);
+            break;
+        case THROUGHPUT_SEQUENTIAL_READ:
+            handle_random_operations_run(BLK_REQ_READ, read_start_sector, 0, "SEQUENTIAL_READ", THROUGHPUT_SEQUENTIAL_WRITE);
+            break;
+        case THROUGHPUT_SEQUENTIAL_WRITE:
+            if (benchmark_size_idx == 0)
+                for (int i = 0; i < BLK_DATA_REGION_SIZE_CLI0; ++i) {
+                    blk_data[i] = i % 255;
+                }
+            handle_random_operations_run(BLK_REQ_WRITE, write_start_sector, 0, "SEQUENTIAL_WRITE", LATENCY_READ);
             break;
         case LATENCY_READ:
             // Perform QUEUE_SIZE random reads, only measure latency of each read
@@ -137,7 +138,7 @@ bool run_benchmark() {
 void handle_random_operations_run(blk_req_code_t request_code, uint32_t start_sector, uint32_t interval, char* run_type, enum run_benchmark_state next_state) {
     if (!virtualiser_replied) {
         LOG_CLIENT("run_benchmark: THROUGHPUT_%s: %d requests of %d transfer blocks at a time.\n"
-                "Reading start sector: %lu\n", run_type, REQUEST_COUNT[benchmark_size_idx],
+                "Reading start sector: %u\n", run_type, REQUEST_COUNT[benchmark_size_idx],
                 BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx], start_sector);
         if (blk_queue_length_req(&blk_queue) != 0 || blk_queue_length_resp(&blk_queue) != 0)
             panic("blk response or request queue not empty!");
@@ -170,9 +171,13 @@ void handle_random_operations_run(blk_req_code_t request_code, uint32_t start_se
         sddf_printf("queue size after dequeue: %d\n", blk_queue_length_resp(&blk_queue));
         benchmark_size_idx = (benchmark_size_idx + 1) % BENCHMARK_RUN_COUNT;
         if (benchmark_size_idx == 0) {
-            // cycled through all BENCHMARK_BLOCKS_PER_REQUEST, start next benchmark
-            run_benchmark_state = next_state;
-            sddf_printf("run_benchmark: finished all BENCHMARK_BLOCKS_PER_REQUEST for THROUGHPUT_%s\n", run_type);
+            benchmark_run_idx = (benchmark_run_idx + 1) % BENCHMARK_INDIVIDUAL_RUN_REPEATS;
+            if (benchmark_run_idx == 0) {
+                run_benchmark_state = next_state;
+                sddf_printf("run_benchmark: finished all BENCHMARK_BLOCKS_PER_REQUEST for THROUGHPUT_%s\n", run_type);
+            } else {
+                sddf_printf("run_benchmark: finished %d/%d run for THROUGHPUT_%s\n", benchmark_run_idx, BENCHMARK_INDIVIDUAL_RUN_REPEATS, run_type);
+            }
         }
         virtualiser_replied = false;
     }
