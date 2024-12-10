@@ -38,34 +38,39 @@ serial_queue_handle_t serial_tx_queue_handle;
 blk_storage_info_t *blk_storage_info;
 uintptr_t blk_request;
 uintptr_t blk_response;
-uintptr_t blk_data;
+char* blk_data;
 uintptr_t blk_client0_data_paddr;
 
 static blk_queue_handle_t blk_queue;
 
-enum run_benchmark_state {
-    START_BENCHMARK,
-    THROUGHPUT_RANDOM_READ,
-    THROUGHPUT_WRITE,
-    LATENCY_READ,
-    LATENCY_WRITE,
-};
+void panic(char* reason) {
+    LOG_CLIENT("Panic! %s\n", reason);
+    __builtin_trap();
+}
 
-enum test_basic_state {
-    START,
-    WRITE,
-    READ,
-    FINISH,
-};
+void dequeue_and_validate(uint16_t exp_count) {
+    blk_resp_status_t status;
+    uint16_t count;
+    uint32_t id;
+    int err = blk_dequeue_resp(&blk_queue, &status, &count, &id);
+    if (err)
+        panic("could not dequeue");
+    if (status != BLK_RESP_OK)
+        panic("invalid resp status");
+    if (count != exp_count)
+        panic("invalid count");
+    // XXX cant validate ID, as requesrts can be out of order, would need to dequeue and check all
+    //if (id != exp_id)
+    //    panic("invalid id");
+}
 
 
-enum test_basic_state test_basic_state = START;
 enum run_benchmark_state run_benchmark_state = START_BENCHMARK;
 bool virtualiser_replied = false;
 uint8_t benchmark_size_idx = 0;
- // only read 1024 sectors in, Avoid U-Boot
+ // only read/write 1024*1024 sectors in (4GiB in), Avoid U-Boot
  // continuosly advance read start to avoid caching benefits
-uint64_t read_start_sector = 1024;
+uint64_t start_sector = 1024*1024;
 
 bool run_benchmark() {
     switch(run_benchmark_state) {
@@ -77,41 +82,32 @@ bool run_benchmark() {
                 assert(!err);
                 microkit_notify(VIRT_CH);
             } else {
-                blk_resp_status_t status = -1;
-                uint16_t count = -1;
-                uint32_t id = -1;
-                int err = blk_dequeue_resp(&blk_queue, &status, &count, &id);
-                assert(!err);
-                assert(status == BLK_RESP_OK);
-                assert(count == 2);
-                assert(id == 0);
+                dequeue_and_validate(2);
                 LOG_CLIENT("run_benchmark: simple read successful.\n");
-                run_benchmark_state = THROUGHPUT_RANDOM_READ;
+                run_benchmark_state = THROUGHPUT_RANDOM_WRITE;
                 virtualiser_replied = false;
-                // TODO schedule the first benchmark now
                 run_benchmark();
             }
             break;
         case THROUGHPUT_RANDOM_READ:
-            /* Perform QUEUE_SIZE random READs, from 4KiB write size up to 128MiB (x8 at each step) */
-            // XXX can "simulate" random reads, by interleaving reads at 2 distant offsets (see Cheng's sdmmc_rust branch)
+            /* Perform REQUEST_COUNT[benchmark_size_idx] random READs, from 4KiB write size up to 8MiB */
             if (!virtualiser_replied) {
                 LOG_CLIENT("run_benchmark: THROUGHPUT_RANDOM_READ: %d requests of %d transfer blocks at a time.\n"
                         "Reading start sector: %lu\n", REQUEST_COUNT[benchmark_size_idx],
-                        BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx], read_start_sector);
-                assert(blk_queue_length_req(&blk_queue) == 0);
-                assert(blk_queue_length_resp(&blk_queue) == 0);
+                        BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx], start_sector);
+                if (blk_queue_length_req(&blk_queue) != 0 || blk_queue_length_resp(&blk_queue) != 0)
+                    panic("blk response or request queue not empty!");
                 for (uint32_t i = 0; i != REQUEST_COUNT[benchmark_size_idx]; ++i) {
-                    // Read BENCHMARK_BLOCKS_PER_REQUEST blocks for this benchmark run, oscillating between
-                    // a small and large sector size (driver doesn't do any smart reordering, should mean that SD
-                    // card's caching has no effect)
-                    //sddf_printf("Enqueued: offset: 0x%x, block number: %lu, count: %d, id: %d\n", i * BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx] * BLK_TRANSFER_SIZE, read_start_sector + i * BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx] + i \
-                    //        * BLOCK_READ_WRITE_INTERVAL / BLK_TRANSFER_SIZE, BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx], i);
-                    uintptr_t io_or_offset = i * BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx] * BLK_TRANSFER_SIZE;
-                    uint32_t block_number = read_start_sector + i * BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx] + \
+                    /* Read BENCHMARK_BLOCKS_PER_REQUEST blocks for this benchmark run, stepping by
+                     * size of request + 16 MiB (driver doesn't do any smart reordering, should mean that SD
+                     * card's caching has no effect)
+                     */
+                    // XXX always reading to the SAME address space in the shared memory region
+                    uintptr_t io_or_offset = 0;//i * BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx] * BLK_TRANSFER_SIZE;
+                    uint32_t block_number = start_sector + i * BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx] + \
                                          i * BLOCK_READ_WRITE_INTERVAL / BLK_TRANSFER_SIZE;
                     uint16_t count = BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx];
-                    sddf_printf("client: io_or_offset 0x%lx, block_number: %d, count: %d\n", io_or_offset, block_number, count);
+                    //sddf_printf("client: io_or_offset 0x%lx, block_number: %d, count: %d\n", io_or_offset, block_number, count);
 
                     int err = blk_enqueue_req(&blk_queue, BLK_REQ_READ, io_or_offset, block_number, count, i);
                     assert(!err);
@@ -125,34 +121,65 @@ bool run_benchmark() {
                 // clean up the queue
                 sddf_printf("queue size before dequeue: %d\n", blk_queue_length_resp(&blk_queue));
                 for (uint32_t i = 0; i != REQUEST_COUNT[benchmark_size_idx]; ++i) {
-                    blk_resp_status_t status = -1;
-                    uint16_t count = -1;
-                    uint16_t expected_count = BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx];
-                    uint32_t id = -1;
-                    int err = blk_dequeue_resp(&blk_queue, &status, &count, &id);
-                    assert(!err);
-                    if (status != BLK_RESP_OK) {
-                        sddf_printf("error: %d\n", status);
-                    }
-                    assert(status == BLK_RESP_OK);
-                    assert(count == expected_count);
-                    //sddf_printf("count %d. id %d\n", count, id);
+                    dequeue_and_validate(BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx]);
                 }
                 sddf_printf("queue size after dequeue: %d\n", blk_queue_length_resp(&blk_queue));
                 benchmark_size_idx = (benchmark_size_idx + 1) % BENCHMARK_RUN_COUNT;
-                // XXX maybe this needs to happen as atomic before notifying `bench` to avoid a race of bench starting another run before this one is finished
-                sddf_printf("benchmark_size_idx: %d\n", benchmark_size_idx);
-                sddf_printf("BENCHMARK_RUN_COUNT: %ld\n", BENCHMARK_RUN_COUNT);
                 if (benchmark_size_idx == 0) {
                     // cycled through all BENCHMARK_BLOCKS_PER_REQUEST, start next benchmark
-                    run_benchmark_state = THROUGHPUT_WRITE;
+                    run_benchmark_state = THROUGHPUT_RANDOM_WRITE;
                     sddf_printf("run_benchmark: finished all BENCHMARK_BLOCKS_PER_REQUEST for THROUGHPUT_RANDOM_READ\n");
                 }
                 virtualiser_replied = false;
             }
+
             break;
-        case THROUGHPUT_WRITE:
+        case THROUGHPUT_RANDOM_WRITE:
             /* Perform QUEUE_SIZE WRITEs, from 4KiB write size up to 128MiB (x8 at each step) */
+            // write out garbage for the WRITE_REQUESTs
+            if (benchmark_size_idx == 0)
+                for (int i = 0; i < BLK_DATA_REGION_SIZE_CLI0; ++i) {
+                    blk_data[i] = i % 255;
+                }
+
+            // XXX only do a single "write" run for now -> check if it works
+            if (!virtualiser_replied) {
+                LOG_CLIENT("run_benchmark: THROUGHPUT_RANDOM_WRITE: %d requests of %d transfer blocks at a time.\n"
+                        "Writing start sector: %lu\n", REQUEST_COUNT[benchmark_size_idx],
+                        BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx], start_sector);
+                if (blk_queue_length_req(&blk_queue) != 0 || blk_queue_length_resp(&blk_queue) != 0)
+                    panic("blk response or request queue not empty!");
+                for (uint32_t i = 0; i != REQUEST_COUNT[benchmark_size_idx]; ++i) {
+                    /* Write BENCHMARK_BLOCKS_PER_REQUEST blocks for this benchmark run, stepping by
+                     * size of request + 16 MiB (should mean that the SD card always commits writes?)
+                     */
+                    // TODO: check how big internal SD card "caches"/"pre-commit bins" are so it always commits the WRITE
+                    uintptr_t io_or_offset = 0; // always writing the same data
+                    uint32_t block_number = start_sector + i * BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx] + \
+                                         i * BLOCK_READ_WRITE_INTERVAL / BLK_TRANSFER_SIZE;
+                    uint16_t count = BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx];
+                    int err = blk_enqueue_req(&blk_queue, BLK_REQ_WRITE, io_or_offset, block_number, count, i);
+                    assert(!err);
+                }
+                // start the PMU and notify the virtualiser to start processing the input queue
+                microkit_notify(START_PMU);
+                microkit_notify(VIRT_CH);
+            } else if (blk_queue_length_resp(&blk_queue) == REQUEST_COUNT[benchmark_size_idx] ) {
+                microkit_notify(STOP_PMU);
+                // clean up the queue
+                sddf_printf("queue size before dequeue: %d\n", blk_queue_length_resp(&blk_queue));
+                for (uint32_t i = 0; i != REQUEST_COUNT[benchmark_size_idx]; ++i) {
+                    dequeue_and_validate(BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx]);
+                }
+                sddf_printf("queue size after dequeue: %d\n", blk_queue_length_resp(&blk_queue));
+                benchmark_size_idx = (benchmark_size_idx + 1) % BENCHMARK_RUN_COUNT;
+                if (benchmark_size_idx == 0) {
+                    // cycled through all BENCHMARK_BLOCKS_PER_REQUEST, start next benchmark
+                    run_benchmark_state = LATENCY_READ;
+                    sddf_printf("run_benchmark: finished all BENCHMARK_BLOCKS_PER_REQUEST for THROUGHPUT_RANDOM_WRITE\n");
+                }
+                virtualiser_replied = false;
+            }
             break;
         case LATENCY_READ:
             // Perform QUEUE_SIZE random reads, only measure latency of each read

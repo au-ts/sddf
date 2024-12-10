@@ -77,6 +77,10 @@ event_id_t benchmarking_events[] = {
     SEL4BENCH_EVENT_BRANCH_MISPREDICT,
 };
 
+double benchmark_speed_res_read[BENCHMARK_RUN_COUNT];
+double benchmark_speed_res_write[BENCHMARK_RUN_COUNT];
+enum run_benchmark_state run_benchmark_state = THROUGHPUT_RANDOM_READ;
+
 static void print_pdid_name(uint64_t pd_id)
 {
     switch (pd_id) {
@@ -223,8 +227,13 @@ void notified(microkit_channel ch)
         }
         /* Get the total cycle count spent during benchmark, compute cycles/KiB */
         sddf_printf("Total time (ns): %ld\n", timer_end-timer_start);
-        sddf_printf("speed (MiB/s: %f\n", ((double) BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx] * BLK_TRANSFER_SIZE * \
-                REQUEST_COUNT[benchmark_size_idx] / (1024. * 1024.)) / ((double) (timer_end-timer_start)/1e9));
+        double speed = ((double) BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx] * BLK_TRANSFER_SIZE * \
+                REQUEST_COUNT[benchmark_size_idx] / (1024. * 1024.)) / ((double) (timer_end-timer_start)/1e9);
+        sddf_printf("speed (MiB/s: %f\n", speed);
+        if (run_benchmark_state == THROUGHPUT_RANDOM_READ)
+            benchmark_speed_res_read[benchmark_size_idx] = speed;
+        else if (run_benchmark_state == THROUGHPUT_RANDOM_WRITE)
+            benchmark_speed_res_write[benchmark_size_idx] = speed;
         sddf_printf("total cycles: %ld\n", ccounter_benchmark_stop-ccounter_benchmark_start);
         double cycles_per_kib = (ccounter_benchmark_stop - ccounter_benchmark_start) / \
                                 (BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx] * BLK_TRANSFER_SIZE \
@@ -232,15 +241,11 @@ void notified(microkit_channel ch)
         double cycles_per_mib = (ccounter_benchmark_stop - ccounter_benchmark_start) / \
                                 (BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx] * BLK_TRANSFER_SIZE \
                                  * REQUEST_COUNT[benchmark_size_idx] / 1024 / 1024);
-        benchmark_size_idx = (benchmark_size_idx + 1) % BENCHMARK_RUN_COUNT;
         sddf_printf("Benchmark_Size_idx; %d\n", benchmark_size_idx);
         sddf_printf("Cycles per KiB (decimal): %f\n", cycles_per_kib);
         sddf_printf("Cycles per MiB (decimal): %f\n", cycles_per_mib);
         sddf_printf("}\n");
-        // TODO start next benchmark -> kick the client
 #endif
-        microkit_notify(BENCH_RUN_CH);
-
 #ifdef CONFIG_BENCHMARK_TRACK_UTILISATION
         uint64_t total;
         uint64_t kernel;
@@ -264,7 +269,45 @@ void notified(microkit_channel ch)
         sddf_printf("KernelEntries:  %llx\n", entries);
         seL4_BenchmarkTrackDumpSummary(log_buffer, entries);
 #endif
+#ifdef MICROKIT_CONFIG_benchmark
+        benchmark_size_idx = benchmark_size_idx + 1;
+        // Print out results:
+        if (run_benchmark_state == THROUGHPUT_RANDOM_READ) {
+            sddf_printf("Random read results:\n");
+            for (int i = 0; i != benchmark_size_idx; ++i) {
+                sddf_printf("Number of requests: %d, size of 1 request: 0x%x B, speed: %.2f MiB/s\n",  REQUEST_COUNT[i],
+                        BENCHMARK_BLOCKS_PER_REQUEST[i] * BLK_TRANSFER_SIZE, benchmark_speed_res_read[i]);
+            }
+        }
+        else if (run_benchmark_state == THROUGHPUT_RANDOM_WRITE) {
+            sddf_printf("Random read results:\n");
+            for (int i = 0; i != BENCHMARK_RUN_COUNT; ++i) {
+                sddf_printf("Number of requests: %d, size of 1 request: 0x%x B, speed: %.2f MiB/s\n",  REQUEST_COUNT[i],
+                        BENCHMARK_BLOCKS_PER_REQUEST[i] * BLK_TRANSFER_SIZE, benchmark_speed_res_read[i]);
+            }
+            sddf_printf("Random write results:\n");
+            for (int i = 0; i != benchmark_size_idx; ++i) {
+                sddf_printf("Number of requests: %d, size of 1 request: 0x%x B, speed: %.2f MiB/s\n",  REQUEST_COUNT[i],
+                        BENCHMARK_BLOCKS_PER_REQUEST[i] * BLK_TRANSFER_SIZE, benchmark_speed_res_write[i]);
+            }
+        }
+        benchmark_size_idx %= BENCHMARK_RUN_COUNT;
+        if (benchmark_size_idx == 0)
+            switch (run_benchmark_state) {
+                case THROUGHPUT_RANDOM_READ:
+                    run_benchmark_state = THROUGHPUT_RANDOM_WRITE;
+                    break;
+                case THROUGHPUT_RANDOM_WRITE:
+                    run_benchmark_state = LATENCY_READ;
+                    break;
+                default:
+                    sddf_printf("BENCHMARK: Error, unimplemented benchmark state transition");
+                    __builtin_trap();
+            }
+#endif
 
+        // run next benchmark
+        microkit_notify(BENCH_RUN_CH);
         break;
     case SERIAL_TX_CH:
         // Nothing to do
