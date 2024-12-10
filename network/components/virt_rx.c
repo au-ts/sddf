@@ -47,6 +47,7 @@ state_t state;
 
 /* Boolean to indicate whether a packet has been enqueued into the driver's free queue during notification handling */
 static bool notify_drv;
+#define RX_SIGNAL_THRESHOLD 32
 
 /* Return the client ID if the Mac address is a match to a client, return the broadcast ID if MAC address
   is a broadcast address. */
@@ -189,7 +190,7 @@ void rx_provide(void)
     }
 
     // if (notify_drv && net_require_signal_free(&state.rx_queue_drv)) {
-    if ((net_queue_length(state.rx_queue_drv.free) >= 32) && net_require_signal_free(&state.rx_queue_drv)) {
+    if ((net_queue_length(state.rx_queue_drv.free) >= RX_SIGNAL_THRESHOLD) && net_require_signal_free(&state.rx_queue_drv)) {
         net_cancel_signal_free(&state.rx_queue_drv);
         microkit_notify_delayed(DRIVER_CH);
         notify_drv = false;
