@@ -131,7 +131,7 @@ void init(void)
         timeouts[i] = UINT64_MAX;
     }
 
-    gpt = (volatile uint32_t *) device_resources.regions[0].vaddr;
+    gpt = (volatile uint32_t *) device_resources.regions[0].region.vaddr;
 
     /* Disable GPT. */
     gpt[CR] = 0;
