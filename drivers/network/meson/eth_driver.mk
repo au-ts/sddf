@@ -19,11 +19,11 @@ ${CHECK_NETDRV_FLAGS_MD5}:
 	-rm -f .netdrv_cflags-*
 	touch $@
 
-eth_driver.elf: meson/ethernet.o
+eth_driver.elf: network/meson/ethernet.o
 	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
 
-meson/ethernet.o: ${ETHERNET_DRIVER_DIR}/ethernet.c ${CHECK_NETDRV_FLAGS_MD5}
-	mkdir -p meson
+network/meson/ethernet.o: ${ETHERNET_DRIVER_DIR}/ethernet.c ${CHECK_NETDRV_FLAGS_MD5}
+	mkdir -p network/meson
 	${CC} -c ${CFLAGS} ${CFLAGS_network} -I ${ETHERNET_DRIVER_DIR} -o $@ $<
 
 -include meson/ethernet.d
