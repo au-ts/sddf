@@ -23,19 +23,22 @@ def generate_sdf():
     serial_driver = ProtectionDomain("serial_driver", "uart_driver.elf", priority=200)
     serial_virt_tx = ProtectionDomain("serial_virt_tx", "serial_virt_tx.elf", priority=199)
     serial_virt_rx = ProtectionDomain("serial_virt_rx", "serial_virt_rx.elf", priority=199)
-    client = ProtectionDomain("client", "client.elf", priority=1)
+    client0 = ProtectionDomain("client0", "client0.elf", priority=1)
+    client1 = ProtectionDomain("client1", "client1.elf", priority=1)
 
     serial_node = dtb.node(platform.serial_device_node)
     assert serial_node is not None
 
     serial_system = Sddf.Serial(sdf, serial_node, serial_driver, serial_virt_tx, serial_virt_rx)
-    serial_system.add_client(client)
+    serial_system.add_client(client0)
+    serial_system.add_client(client1)
 
     pds = [
         serial_driver,
         serial_virt_tx,
         serial_virt_rx,
-        client,
+        client0,
+        client1,
     ]
     for pd in pds:
         sdf.add_pd(pd)
