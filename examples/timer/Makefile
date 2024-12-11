@@ -25,6 +25,10 @@ else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
 else ifeq ($(strip $(MICROKIT_BOARD)), star64)
 	export ARCH := riscv64
 	export TIMER_DRIVER_DIR := jh7110
+else ifeq ($(strip $(MICROKIT_BOARD)), maaxboard)
+	export ARCH := aarch64
+	export TIMER_DRIVER_DIR := imx
+	export CPU := cortex-a53
 else
 $(error Unsupported MICROKIT_BOARD given)
 endif

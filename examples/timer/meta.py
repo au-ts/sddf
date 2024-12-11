@@ -18,6 +18,7 @@ PLATFORMS: List[Platform] = [
     Platform("qemu_virt_aarch64", SystemDescription.Arch.AARCH64, 0xa_000_000, "timer"),
     Platform("odroidc4", SystemDescription.Arch.AARCH64, 0x80000000, "soc/bus@ffd00000/watchdog@f0d0"),
     Platform("star64", SystemDescription.Arch.RISCV64, 0x100000000, "soc/timer@13050000"),
+    Platform("maaxboard", SystemDescription.Arch.AARCH64, 0xa0000000, "soc@0/bus@30000000/timer@302d0000"),
 ]
 
 
@@ -63,4 +64,3 @@ if __name__ == '__main__':
         dtb = DeviceTree(f.read())
 
     generate_sdf(args.output, dtb)
-
