@@ -9,7 +9,6 @@
 #include <sddf/i2c/config.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
-#include "config.h"
 
 // #define DEBUG_VIRTUALISER
 
@@ -34,6 +33,7 @@
 #define DRIVER_CH 0
 #define CLIENT_CH_OFFSET 1
 
+__attribute__((__section__(".i2c_virt_config")))
 i2c_virt_config_t config;
 
 i2c_queue_handle_t client_queues[SDDF_I2C_MAX_CLIENTS];
@@ -120,8 +120,6 @@ void process_response()
 
 void init(void)
 {
-    sddf_memcpy(&config, i2c_virt_data, i2c_virt_data_len);
-
     LOG_VIRTUALISER("initialising\n");
     for (int i = 0; i < I2C_BUS_ADDRESS_MAX + 1; i++) {
         security_list[i] = BUS_UNCLAIMED;

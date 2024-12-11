@@ -13,10 +13,9 @@
 #include <serial_config.h>
 #include "uart.h"
 
-#include "driver_config.h"
-
 #define IRQ_CH 0
 
+__attribute__((__section__(".serial_driver_config")))
 serial_driver_config_t config;
 
 serial_queue_handle_t rx_queue_handle;
