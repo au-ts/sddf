@@ -8,6 +8,16 @@ ifeq ($(strip $(MICROKIT_SDK)),)
 $(error MICROKIT_SDK must be specified)
 endif
 
+ifeq ($(strip $(PYTHON)),)
+$(error PYTHON must be specified)
+endif
+export override PYTHON:=$(abspath ${PYTHON})
+
+ifeq ($(strip $(DTBS)),)
+$(error DTBS must be specified)
+endif
+export override DTBS:=$(abspath ${DTBS})
+
 ifeq ($(strip $(MICROKIT_BOARD)),)
 $(error MICROKIT_BOARD must be specified)
 endif
