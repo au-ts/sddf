@@ -204,39 +204,6 @@ void tx_provide(microkit_channel ch)
 
 void init(void)
 {
-    // config.tx_queue_drv = (void *)0x4000000;
-    // config.tx_data_drv = (void *)0x4003000;
-    // config.tx_capacity_drv = 0x2000;
-    // sddf_memcpy(config.begin_str, "Begin input\n", 13);
-    // config.begin_str_len = 13;
-    // config.enable_colour = true;
-    // config.enable_rx = true;
-    // config.num_clients = 2;
-    // sddf_memcpy(config.clients[0].name, "client0", 8);
-    // config.clients[0].tx_queue = (void *)0x4001000;
-    // config.clients[0].tx_data = (void *)0x4007000;
-    // config.clients[0].tx_capacity = 0x2000;
-    // sddf_memcpy(config.clients[1].name, "client1", 8);
-    // config.clients[1].tx_queue = (void *)0x4002000;
-    // config.clients[1].tx_data = (void *)0x4009000;
-    // config.clients[1].tx_capacity = 0x2000;
-    
-    // sddf_dprintf("DRIVER_CH = %d\n", config.driver_id);
-    // sddf_dprintf("config.tx_queue_drv = 0x%p\n", config.tx_queue_drv);
-    // sddf_dprintf("config.tx_data_drv = 0x%p\n", config.tx_data_drv);
-    // sddf_dprintf("config.tx_capacity_drv = 0x%lx\n", config.tx_capacity_drv);
-    // sddf_dprintf("config.begin_str = %s", config.begin_str);
-    // sddf_dprintf("config.begin_str_len = %lx\n", config.begin_str_len);
-    // sddf_dprintf("config.enable_colour = %d\n", config.enable_colour);
-    // sddf_dprintf("config.enable_rx = %d\n", config.enable_rx);
-    // sddf_dprintf("config.num_clients = %d\n", config.num_clients);
-    // for (int i = 0; i < config.num_clients; i++) {
-    //     sddf_dprintf("config.clients[%d].name = %s\n", i, config.clients[i].name);
-    //     sddf_dprintf("config.clients[%d].tx_queue = 0x%p\n", i, config.clients[i].tx_queue);
-    //     sddf_dprintf("config.clients[%d].tx_data = 0x%p\n", i, config.clients[i].tx_data);
-    //     sddf_dprintf("config.clients[%d].tx_capacity = 0x%x\n", i, config.clients[i].tx_capacity);
-    // }
-
     serial_queue_init(&tx_queue_handle_drv, config.driver.queue.vaddr, config.driver.data.size, config.driver.data.vaddr);
     for (uint64_t i = 0; i < config.num_clients; i++) {
         serial_virt_tx_client_config_t *client = &config.clients[i];
