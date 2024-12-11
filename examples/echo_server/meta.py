@@ -140,6 +140,9 @@ def generate_sdf(output: str):
     net_system.connect()
     timer_system.connect()
 
+    serial_system.serialise_config(output)
+    net_system.serialise_config(output)
+    timer_system.serialise_config(output)
 
     with open(output + "echo_server.system", "w+") as f:
         f.write(sdf.xml())
