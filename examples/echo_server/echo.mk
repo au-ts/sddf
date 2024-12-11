@@ -6,6 +6,8 @@
 
 QEMU := qemu-system-aarch64
 
+METAPROGRAM := $(TOP)/meta.py
+
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 ECHO_SERVER:=${SDDF}/examples/echo_server
 LWIPDIR:=network/ipstacks/lwip/src
@@ -85,6 +87,11 @@ ${BUILD_DIR}/${LWIPDIRS}:
 # Need to build libsddf_util_debug.a because it's included in LIBS
 # for the unimplemented libc dependencies
 ${IMAGES}: libsddf_util_debug.a
+
+$(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES)
+	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --platform $(MICROKIT_BOARD) --dtbs $(DTBS) --output resources
+	$(OBJCOPY) --update-section .sddf_config=timer_driver_device_resources.data timer_driver.elf
+	$(OBJCOPY) --update-section .sddf_config=timer_client_client.data client.elf
 
 ${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
