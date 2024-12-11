@@ -7,8 +7,8 @@
 #include <sddf/serial/queue.h>
 #include <sddf/serial/config.h>
 #include <sddf/util/printf.h>
-#include "client_config.h"
 
+__attribute__((__section__(".serial_client_config")))
 serial_client_config_t config;
 
 serial_queue_handle_t rx_queue_handle;
@@ -18,8 +18,6 @@ uint32_t local_head;
 
 void init(void)
 {
-    sddf_memcpy(&config, client0_data, client0_data_len);
-
     serial_queue_init(&rx_queue_handle, config.rx.queue.vaddr, config.rx.data.size, config.rx.data.vaddr);
     serial_queue_init(&tx_queue_handle, config.tx.queue.vaddr, config.tx.data.size, config.tx.data.vaddr);
 
