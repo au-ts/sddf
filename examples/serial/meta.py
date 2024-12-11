@@ -1,7 +1,8 @@
 import argparse
 from typing import Dict, List, Any
-from sdfgen import SystemDescription, ProtectionDomain, Sddf, DeviceTree
+from sdfgen import SystemDescription, Sddf, DeviceTree
 
+ProtectionDomain = SystemDescription.ProtectionDomain
 
 class Platform:
     def __init__(self, name: str, arch: SystemDescription.Arch, paddr_top: int, serial_device_node: str):
