@@ -9,9 +9,6 @@
 #include <sddf/util/printf.h>
 #include "client_config.h"
 
-#define TX_CH 0
-#define RX_CH 1
-
 serial_client_config_t config;
 
 serial_queue_handle_t rx_queue_handle;
@@ -23,10 +20,10 @@ void init(void)
 {
     sddf_memcpy(&config, client0_data, client0_data_len);
 
-    serial_queue_init(&rx_queue_handle, config.rx_queue, config.rx_capacity, config.rx_data);
-    serial_queue_init(&tx_queue_handle, config.tx_queue, config.tx_capacity, config.tx_data);
+    serial_queue_init(&rx_queue_handle, config.rx.queue.vaddr, config.rx.data.size, config.rx.data.vaddr);
+    serial_queue_init(&tx_queue_handle, config.tx.queue.vaddr, config.tx.data.size, config.tx.data.vaddr);
 
-    serial_putchar_init(TX_CH, &tx_queue_handle);
+    serial_putchar_init(config.tx.id, &tx_queue_handle);
     sddf_printf("Hello world! I am %s.\nPlease give me character!\n", microkit_name);
 }
 
