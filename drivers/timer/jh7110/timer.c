@@ -10,8 +10,6 @@
 #include <sddf/util/printf.h>
 #include <sddf/timer/protocol.h>
 
-#include "device_resources.h"
-
 /*
  * The JH7110 SoC contains a timer with four 32-bit counters. Each one of these
  * counters is referred to as a "channel". These are not to be confused with
@@ -59,6 +57,7 @@ typedef struct {
     uint32_t intmask;   /* 0x24: Timer interrupt mask register. */
 } starfive_timer_regs_t;
 
+__attribute__((__section__(".device_resources")))
 device_resources_t device_resources;
 
 static volatile starfive_timer_regs_t *counter_regs;
@@ -195,8 +194,6 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
 
 void init(void)
 {
-    sddf_memcpy(&device_resources, device_resources_data, device_resources_data_len);
-
     for (int i = 0; i < MAX_TIMEOUTS; i++) {
         timeouts[i] = UINT64_MAX;
     }

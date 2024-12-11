@@ -10,10 +10,9 @@
 #include <sddf/serial/config.h>
 #include <uart.h>
 
-#include "driver_config.h"
-
 #define IRQ_CH 0
 
+__attribute__((__section__(".serial_driver_config")))
 serial_driver_config_t config;
 
 serial_queue_handle_t rx_queue_handle;
@@ -168,8 +167,6 @@ static void uart_setup(void)
 
 void init(void)
 {
-    sddf_memcpy(&config, serial_driver_data, serial_driver_data_len);
-
     uart_setup();
 
     if (config.rx_enabled) {

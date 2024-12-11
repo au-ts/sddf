@@ -14,10 +14,11 @@
 #include <sddf/util/printf.h>
 
 #include "ethernet.h"
-#include "net_driver_config.h"
-#include "device_resources.h"
 
+__attribute__((__section__(".device_resources")))
 device_resources_t device_resources;
+
+__attribute__((__section__(".net_driver_config")))
 net_driver_config_t config;
 
 #define RX_COUNT 256
@@ -271,9 +272,6 @@ static void eth_setup(void)
 
 void init(void)
 {
-    sddf_memcpy(&config, net_driver_data, net_driver_data_len);
-    sddf_memcpy(&device_resources, device_resources_data, device_resources_data_len);
-
     eth_setup();
 
     net_queue_init(&rx_queue, config.virt_rx.free_queue.vaddr, config.virt_rx.active_queue.vaddr, config.virt_rx.num_buffers);

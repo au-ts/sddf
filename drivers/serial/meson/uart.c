@@ -11,10 +11,10 @@
 #include <sddf/serial/config.h>
 #include "uart.h"
 
-#include "device_resources.h"
-#include "driver_config.h"
-
+__attribute__((__section__(".device_resources")))
 device_resources_t device_resources;
+
+__attribute__((__section__(".serial_driver_config")))
 serial_driver_config_t config;
 
 serial_queue_handle_t rx_queue_handle;
@@ -199,9 +199,6 @@ static void uart_setup(void)
 
 void init(void)
 {
-    sddf_memcpy(&device_resources, device_resources_data, device_resources_data_len);
-    sddf_memcpy(&config, serial_driver_data, serial_driver_data_len);
-
     uart_setup();
 
     if (config.rx_enabled) {

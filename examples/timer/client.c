@@ -9,7 +9,7 @@
 #include <sddf/timer/config.h>
 #include <sddf/util/printf.h>
 
-__attribute__((__section__(".sddf_config")))
+__attribute__((__section__(".timer_client_config")))
 timer_client_config_t timer_config;
 
 microkit_channel timer_channel;

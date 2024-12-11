@@ -14,7 +14,6 @@
 #include <sddf/i2c/queue.h>
 #include <sddf/i2c/config.h>
 #include "driver.h"
-#include "config.h"
 
 #ifndef I2C_BUS_NUM
 #error "I2C_BUS_NUM must be defined!"
@@ -45,6 +44,7 @@ struct i2c_regs {
     uint32_t rdata1;        // where read data gets put for a response by i2c
 };
 
+__attribute__((__section__(".i2c_driver_config")))
 i2c_driver_config_t config;
 
 // Hardware memory
@@ -506,8 +506,6 @@ static inline void i2c_load_tokens(volatile struct i2c_regs *regs)
 
 void init(void)
 {
-    sddf_memcpy(&config, i2c_driver_data, i2c_driver_data_len);
-
     i2c_setup();
     queue_handle = i2c_queue_init(config.request_region, config.response_region);
 

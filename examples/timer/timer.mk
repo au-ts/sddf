@@ -72,8 +72,8 @@ client.elf: client.o
 
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES)
 	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --platform $(MICROKIT_BOARD) --dtbs /Users/ivanv/ts/microkit_sdf_gen/zig-out/dtb --output .
-	$(OBJCOPY) --update-section .sddf_config=timer_driver_device_resources.data timer_driver.elf
-	$(OBJCOPY) --update-section .sddf_config=timer_client_client.data client.elf
+	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
+	$(OBJCOPY) --update-section .timer_client_config=timer_client_client.data client.elf
 
 $(IMAGE_FILE) $(REPORT_FILE): $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
