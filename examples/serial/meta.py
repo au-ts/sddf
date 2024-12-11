@@ -20,7 +20,7 @@ PLATFORMS: List[Platform] = [
 ]
 
 def generate_sdf():
-    serial_driver = ProtectionDomain("serial_driver", "serial_driver.elf", priority=200)
+    serial_driver = ProtectionDomain("serial_driver", "uart_driver.elf", priority=200)
     serial_virt_tx = ProtectionDomain("serial_virt_tx", "serial_virt_tx.elf", priority=199)
     serial_virt_rx = ProtectionDomain("serial_virt_rx", "serial_virt_rx.elf", priority=199)
     client = ProtectionDomain("client", "client.elf", priority=1)
