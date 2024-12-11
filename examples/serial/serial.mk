@@ -52,15 +52,16 @@ $(error Unsupported MICROKIT_BOARD given)
 endif
 
 TOP := ${SDDF}/examples/serial
+METAPROGRAM := $(TOP)/meta.py
 UTIL := $(SDDF)/util
 SERIAL_COMPONENTS := $(SDDF)/serial/components
 UART_DRIVER := $(SDDF)/drivers/serial/$(DRIVER_DIR)
 SERIAL_CONFIG_INCLUDE:=${TOP}/include/serial_config
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
-SYSTEM_FILE := ${TOP}/board/$(MICROKIT_BOARD)/serial.system
+SYSTEM_FILE := serial.system
 
 IMAGES := uart_driver.elf \
-	  serial_server.elf \
+	  client0.elf client1.elf \
 	  serial_virt_tx.elf serial_virt_rx.elf
 CFLAGS := -ffreestanding \
 	  -g3 -O3 -Wall \
@@ -103,6 +104,15 @@ serial_server.elf: serial_server.o libsddf_util.a
 
 serial_server.o: ${TOP}/serial_server.c ${CHECK_FLAGS_BOARD_MD5}
 	$(CC) $(CFLAGS) -c -o $@ $<
+
+client0.elf client1.elf: serial_server.elf
+	cp serial_server.elf $@
+
+$(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES)
+	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --platform $(MICROKIT_BOARD) --dtbs $(DTBS) --output .
+	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data uart_driver.elf
+	$(OBJCOPY) --update-section .serial_client_config=serial_client_client0.data client0.elf
+	$(OBJCOPY) --update-section .serial_client_config=serial_client_client1.data client1.elf
 
 $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	MICROKIT_SDK=${MICROKIT_SDK} $(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
