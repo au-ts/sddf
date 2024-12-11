@@ -172,7 +172,7 @@ void tx_provide(microkit_channel ch)
         }
     }
 
-    if (ch == SDDF_SERIAL_MAX_CLIENTS) {
+    if (active_client == SDDF_SERIAL_MAX_CLIENTS) {
         sddf_dprintf("VIRT_TX|LOG: Received notification from unknown channel %u\n", ch);
         return;
     }
