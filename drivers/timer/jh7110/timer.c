@@ -201,7 +201,7 @@ void init(void)
     counter_irq = device_resources.irqs[0].id;
     timeout_irq = device_resources.irqs[1].id;
 
-    uintptr_t timer_base = (uintptr_t)device_resources.regions[0].vaddr;
+    uintptr_t timer_base = (uintptr_t)device_resources.regions[0].region.vaddr;
     counter_regs = (volatile starfive_timer_regs_t *)timer_base;
     timeout_regs = (volatile starfive_timer_regs_t *)(timer_base
                                                       + STARFIVE_TIMER_CHANNEL_REGS_SIZE * STARFIVE_TIMER_CHANNEL);
