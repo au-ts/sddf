@@ -44,6 +44,7 @@ def generate_sdf(output):
         sdf.add_pd(pd)
 
     serial_system.connect()
+    serial_system.serialise_config(output)
 
     with open(output + "/serial.system", "w+") as f:
         f.write(sdf.xml())
