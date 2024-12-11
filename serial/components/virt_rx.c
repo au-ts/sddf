@@ -108,7 +108,7 @@ void rx_return(void)
     if (!serial_queue_full(&rx_queue_handle_drv, rx_queue_handle_drv.queue->tail)
         && serial_require_consumer_signal(&rx_queue_handle_drv)) {
         serial_cancel_consumer_signal(&rx_queue_handle_drv);
-        microkit_notify(config.driver_id);
+        microkit_notify(config.driver.id);
     }
 
     if (transferred && serial_require_producer_signal(&rx_queue_handle_cli[current_client])) {
@@ -119,15 +119,15 @@ void rx_return(void)
 
 void init(void)
 {
-    serial_queue_init(&rx_queue_handle_drv, config.rx_queue_drv, config.rx_capacity_drv, config.rx_data_drv);
+    serial_queue_init(&rx_queue_handle_drv, config.driver.queue.vaddr, config.driver.data.size, config.driver.data.vaddr);
     for (uint64_t i = 0; i < config.num_clients; i++) {
-        serial_queue_init(&rx_queue_handle_cli[i], config.clients[i].rx_queue, config.clients[i].rx_capacity, config.clients[i].rx_data);
+        serial_queue_init(&rx_queue_handle_cli[i], config.clients[i].queue.vaddr, config.clients[i].data.size, config.clients[i].data.vaddr);
     }
 }
 
 void notified(microkit_channel ch)
 {
-    if (ch == config.driver_id) {
+    if (ch == config.driver.id) {
         rx_return();
     } else {
         sddf_dprintf("VIRT_RX|LOG: received notification on unexpected channel: %u\n", ch);
