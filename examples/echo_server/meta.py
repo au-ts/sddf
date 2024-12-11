@@ -83,7 +83,7 @@ class BenchmarkClientConfig:
 
 
 
-def generate_sdf():
+def generate_sdf(output: str):
     uart_node = dtb.node(platform["uart_device_node"])
     assert uart_node is not None
     ethernet_node = dtb.node(platform["ethernet_device_node"])
@@ -140,8 +140,9 @@ def generate_sdf():
     net_system.connect()
     timer_system.connect()
 
-    print(sdf.xml())
 
+    with open(output + "echo_server.system", "w+") as f:
+        f.write(sdf.xml())
 
 
 if __name__ == '__main__':
@@ -149,6 +150,7 @@ if __name__ == '__main__':
     parser.add_argument("--dtbs", required=True)
     parser.add_argument("--sddf", required=True)
     parser.add_argument("--platform", required=True, choices=[p["name"] for p in PLATFORMS])
+    parser.add_argument("--output", required=True)
 
     args = parser.parse_args()
 
@@ -161,4 +163,4 @@ if __name__ == '__main__':
     with open(args.dtbs + f"/{platform_name}.dtb", "rb") as f:
         dtb = DeviceTree(f.read())
 
-    generate_sdf()
+    generate_sdf(args.output)
