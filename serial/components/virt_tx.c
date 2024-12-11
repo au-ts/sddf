@@ -9,11 +9,11 @@
 #include <sddf/serial/queue.h>
 #include <sddf/serial/config.h>
 #include <sddf/util/printf.h>
-#include "virt_tx_config.h"
 
 #define NAME_MAX 128
 #define BEGIN_STR_MAX 128
 
+__attribute__((__section__(".serial_virt_tx_config")))
 serial_virt_tx_config_t config;
 
 /* When we have more clients than colours, we re-use the colours. */
@@ -204,8 +204,6 @@ void tx_provide(microkit_channel ch)
 
 void init(void)
 {
-    sddf_memcpy(&config, serial_virt_tx_data, serial_virt_tx_data_len);
-
     // config.tx_queue_drv = (void *)0x4000000;
     // config.tx_data_drv = (void *)0x4003000;
     // config.tx_capacity_drv = 0x2000;

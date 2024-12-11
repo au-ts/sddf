@@ -29,14 +29,17 @@
 #include "lwip/dhcp.h"
 
 #include "echo.h"
-#include "net_client_config.h"
-#include "timer_client_config.h"
-#include "serial_client_config.h"
-#include "benchmark_client_config.h"
 
+__attribute__((__section__(".serial_client_config")))
 serial_client_config_t serial_config;
+
+__attribute__((__section__(".timer_client_config")))
 timer_client_config_t timer_config;
+
+__attribute__((__section__(".net_client_config")))
 net_client_config_t net_config;
+
+__attribute__((__section__(".benchmark_client_config")))
 benchmark_client_config_t benchmark_config;
 
 serial_queue_handle_t serial_tx_queue_handle;
@@ -283,11 +286,6 @@ static void netif_status_callback(struct netif *netif)
 
 void init(void)
 {
-    sddf_memcpy(&net_config, net_client_client0_data, net_client_client0_data_len);
-    sddf_memcpy(&timer_config, timer_client_client0_data, timer_client_client0_data_len);
-    sddf_memcpy(&serial_config, serial_client_client0_data, serial_client_client0_data_len);
-    sddf_memcpy(&benchmark_config, benchmark_client_config_data, benchmark_client_config_data_len);
-
     serial_queue_init(&serial_tx_queue_handle, serial_config.tx.queue.vaddr, serial_config.tx.data.size, serial_config.tx.data.vaddr);
     serial_putchar_init(serial_config.tx.id, &serial_tx_queue_handle);
 

@@ -9,8 +9,6 @@
 #include <sddf/util/printf.h>
 #include <sddf/timer/protocol.h>
 
-#include "device_resources.h"
-
 #define MAX_TIMEOUTS 6
 
 #define TIMER_REG_START   0x140    // TIMER_MUX
@@ -31,6 +29,7 @@
 #define TIMEOUT_TIMEBASE_100_US 0b10
 #define TIMEOUT_TIMEBASE_1_MS   0b11
 
+__attribute__((__section__(".device_resources")))
 device_resources_t device_resources;
 
 struct timer_regs {
@@ -132,8 +131,6 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
 
 void init(void)
 {
-    sddf_memcpy(&device_resources, device_resources_data, device_resources_data_len);
-
     for (int i = 0; i < MAX_TIMEOUTS; i++) {
         timeouts[i] = UINT64_MAX;
     }

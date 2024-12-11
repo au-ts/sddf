@@ -14,12 +14,11 @@
 #include <sddf/util/printf.h>
 #include <sddf/util/cache.h>
 
-#include "net_virt_rx_config.h"
-
 /* Used to signify that a packet has come in for the broadcast address and does not match with
  * any particular client. */
 #define BROADCAST_ID (-2)
 
+__attribute__((__section__(".net_virt_rx_config")))
 net_virt_rx_config_t config;
 
 /* In order to handle broadcast packets where the same buffer is given to multiple clients
@@ -192,8 +191,6 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
-    sddf_memcpy(&config, net_virt_rx_data, net_virt_rx_data_len);
-
     buffer_refs = config.buffer_metadata.vaddr;
 
     /* Set up client queues */

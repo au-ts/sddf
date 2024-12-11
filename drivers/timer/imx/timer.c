@@ -18,8 +18,6 @@
 #include <sddf/util/printf.h>
 #include <sddf/timer/protocol.h>
 
-#include "device_resources.h"
-
 #define GPT_STATUS_REGISTER_CLEAR 0x3F
 #define CR 0
 #define PR 1
@@ -36,6 +34,7 @@
 
 #define GPT_FREQ   (12u)
 
+__attribute__((__section__(".device_resources")))
 device_resources_t device_resources;
 
 static volatile uint32_t *gpt;
@@ -128,8 +127,6 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
 
 void init(void)
 {
-    sddf_memcpy(&device_resources, device_resources_data, device_resources_data_len);
-
     for (int i = 0; i < MAX_TIMEOUTS; i++) {
         timeouts[i] = UINT64_MAX;
     }

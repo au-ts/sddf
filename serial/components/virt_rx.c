@@ -10,8 +10,8 @@
 #include <sddf/serial/config.h>
 #include <sddf/util/string.h>
 #include <sddf/util/printf.h>
-#include "virt_rx_config.h"
 
+__attribute__((__section__(".serial_virt_rx_config")))
 serial_virt_rx_config_t config;
 
 serial_queue_handle_t rx_queue_handle_drv;
@@ -119,8 +119,6 @@ void rx_return(void)
 
 void init(void)
 {
-    sddf_memcpy(&config, serial_virt_rx_data, serial_virt_rx_data_len);
-
     serial_queue_init(&rx_queue_handle_drv, config.rx_queue_drv, config.rx_capacity_drv, config.rx_data_drv);
     for (uint64_t i = 0; i < config.num_clients; i++) {
         serial_queue_init(&rx_queue_handle_cli[i], config.clients[i].rx_queue, config.clients[i].rx_capacity, config.clients[i].rx_data);
