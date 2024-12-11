@@ -138,8 +138,10 @@ def generate_sdf():
     # Connect everything up together
     serial_system.connect()
     net_system.connect()
+    timer_system.connect()
 
     print(sdf.xml())
+
 
 
 if __name__ == '__main__':
