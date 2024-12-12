@@ -36,8 +36,8 @@
     <memory_region name="serial_tx_queue_client0" size="0x1_000" />
     <memory_region name="serial_tx_queue_bench" size="0x1_000" />
 
-    <!-- shared memory for PMU counters
-    <memory_region name="cyclecounters" size="0x1000" />-->
+    <!-- shared memory for PMU counters -->
+    <memory_region name="cyclecounters" size="0x1000" />
 
     <!-- The timer driver should run at higher priority than its clients.
         As a passive server, PPC into the driver will be fastpathed. -->
@@ -54,6 +54,11 @@
         <map mr="serial_tx_queue_bench" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="serial_tx_queue" />
         <map mr="serial_tx_data_bench" vaddr="0x4_002_000" perms="rw" cached="true" setvar_vaddr="serial_tx_data" />
 
+        <!-- Note: to use cycle count from PMU for the bench PD, the idle thread NEEDS to be a child of the bench PD, so cycles spent in that PD also increment the bench PD's cycle count -->
+        <protection_domain name="benchIdle" id="6" priority="1" >
+            <program_image path="idle.elf" />
+            <map mr="cyclecounters" vaddr="0x5_010_000" perms="rw" cached="true" setvar_vaddr="cyclecounters_vaddr" />
+        </protection_domain>
         <protection_domain name="driver" id="1" priority="102">
             <program_image path="sdmmc_driver.elf" />
             <map mr="sdio" vaddr="0xffe05000" perms="rw" cached="false" />
@@ -166,5 +171,10 @@
     <channel>
         <end pd="timer" id="1" />
         <end pd="bench" id="4" /> <!-- Should this number change, so should TIMER_CH in timer.h -->
+    </channel>
+
+    <channel>
+        <end pd="benchIdle" id="3" />
+        <end pd="bench" id="5" /> <!-- Should this number change, so should TIMER_CH in timer.h -->
     </channel>
 </system>
