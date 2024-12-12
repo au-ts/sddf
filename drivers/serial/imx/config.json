@@ -1,7 +1,8 @@
 {
     "name": "imx8mq_uart",
     "compatible": [
-        "fsl,imx8mq-uart"
+        "fsl,imx8mq-uart",
+        "fsl,imx8mm-uart"
     ],
     "resources": {
         "regions": [
