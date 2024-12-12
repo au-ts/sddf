@@ -30,6 +30,7 @@ AR := llvm-ar
 RANLIB := llvm-ranlib
 OBJCOPY := llvm-objcopy
 
+PYTHON ?= python3
 DTC := dtc
 
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
