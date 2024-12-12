@@ -14,6 +14,7 @@ BUILD_DIR ?= build
 # By default we make a debug build so that the client debug prints can be seen.
 MICROKIT_CONFIG ?= debug
 
+DTC := dtc
 QEMU := qemu-system-aarch64
 PYTHON ?= python3
 
@@ -48,6 +49,8 @@ LDFLAGS := -L$(BOARD_DIR)/lib
 LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
 
 IMAGE_FILE := loader.img
+DTS := $(SDDF)/dts/$(MICROKIT_BOARD).dts
+DTB := $(MICROKIT_BOARD).dtb
 SYSTEM_FILE := timer.system
 REPORT_FILE := report.txt
 CLIENT_OBJS := client.o
@@ -70,8 +73,11 @@ client.o: ${TOP}/client.c
 client.elf: client.o
 	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
 
-$(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES)
-	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --platform $(MICROKIT_BOARD) --dtbs /Users/ivanv/ts/microkit_sdf_gen/zig-out/dtb --output .
+$(DTB): $(DTS)
+	dtc -q -I dts -O dtb $(DTS) > $(DTB)
+
+$(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
+	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --platform $(MICROKIT_BOARD) --dtbs . --output . --sdf $(SYSTEM_FILE)
 	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
 	$(OBJCOPY) --update-section .timer_client_config=timer_client_client.data client.elf
 
