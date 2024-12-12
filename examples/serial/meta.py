@@ -16,6 +16,7 @@ PLATFORMS: List[Platform] = [
     Platform("qemu_virt_aarch64", SystemDescription.Arch.AARCH64, 0xa_000_000, "pl011@9000000"),
     Platform("odroidc4", SystemDescription.Arch.AARCH64, 0x80000000, "soc/bus@ff800000/serial@3000"),
     Platform("maaxboard", SystemDescription.Arch.AARCH64, 0xa_000_000, "soc@0/bus@30800000/serial@30860000"),
+    Platform("imx8mm_evk", SystemDescription.Arch.AARCH64, 0xa_000_000, "soc@0/bus@30800000/spba-bus@30800000/serial@30890000"),
     Platform("star64", SystemDescription.Arch.RISCV64, 0x100000000, "soc/serial@10000000"),
 ]
 
@@ -43,8 +44,8 @@ def generate_sdf(sdf_file: str, output_dir: str, dtb: DeviceTree):
     for pd in pds:
         sdf.add_pd(pd)
 
-    serial_system.connect()
-    serial_system.serialise_config(output_dir)
+    assert serial_system.connect()
+    assert serial_system.serialise_config(output_dir)
 
     with open(f"{output_dir}/{sdf_file}", "w+") as f:
         f.write(sdf.xml())
