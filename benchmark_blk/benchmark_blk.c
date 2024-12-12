@@ -28,16 +28,23 @@
 #define STOP 2
 #define BENCH_RUN_CH 3
 #define TIMER_CH 4
+#define IDLE_INIT_CH 5
 // ID's of protection domains (must align with the system description file
 #define PD_TOTAL        0
 #define PD_BLK_ID       1
 #define PD_VIRT_ID      2
 #define PD_CLIENT_ID    3
+#define PD_UART_ID      4
+#define PD_UART_VIRT_ID 5
+#define PD_IDLE_ID      6
 
 // Human-readable names of the PDs XXX for ethernet bench this is in ethernet_config.h
 #define BLK_DRIVER_NAME "blk_driver"
 #define BLK_VIRTUALISER_NAME "virt"
 #define BLK_CLIENT_NAME "client0"
+#define BLK_UART_NAME "uart"
+#define BLK_UART_VIRT_NAME "virt_uart"
+#define BLK_IDLE_NAME "idle"
 
 uintptr_t uart_base;
 uintptr_t cyclecounters_vaddr;
@@ -91,6 +98,12 @@ uint64_t benchmark_time_res_seq_read[BENCHMARK_RUN_COUNT*BENCHMARK_INDIVIDUAL_RU
 uint64_t benchmark_time_res_rand_read[BENCHMARK_RUN_COUNT*BENCHMARK_INDIVIDUAL_RUN_REPEATS];
 uint64_t benchmark_time_res_seq_write[BENCHMARK_RUN_COUNT*BENCHMARK_INDIVIDUAL_RUN_REPEATS];
 uint64_t benchmark_time_res_rand_write[BENCHMARK_RUN_COUNT*BENCHMARK_INDIVIDUAL_RUN_REPEATS];
+
+
+float benchmark_cpuutil_res_seq_read[BENCHMARK_RUN_COUNT*BENCHMARK_INDIVIDUAL_RUN_REPEATS];
+float benchmark_cpuutil_res_rand_read[BENCHMARK_RUN_COUNT*BENCHMARK_INDIVIDUAL_RUN_REPEATS];
+float benchmark_cpuutil_res_seq_write[BENCHMARK_RUN_COUNT*BENCHMARK_INDIVIDUAL_RUN_REPEATS];
+float benchmark_cpuutil_res_rand_write[BENCHMARK_RUN_COUNT*BENCHMARK_INDIVIDUAL_RUN_REPEATS];
 enum run_benchmark_state run_benchmark_state = THROUGHPUT_RANDOM_READ;
 int benchmark_run_idx = 0;
 
@@ -106,6 +119,15 @@ static void print_pdid_name(uint64_t pd_id)
     case PD_CLIENT_ID:
         sddf_printf(BLK_CLIENT_NAME);
         break;
+    case PD_UART_ID:
+        sddf_printf(BLK_UART_NAME);
+        break;
+    case PD_UART_VIRT_ID:
+        sddf_printf(BLK_UART_VIRT_NAME);
+        break;
+    case PD_IDLE_ID:
+        sddf_printf(BLK_IDLE_NAME);
+        break;
     default:
         sddf_printf("unknown");
         break;
@@ -119,6 +141,9 @@ static void microkit_benchmark_start(void)
     seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_BLK_ID);
     seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_VIRT_ID);
     seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_CLIENT_ID);
+    seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_UART_ID);
+    seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_UART_VIRT_ID);
+    seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + PD_IDLE_ID);
     seL4_BenchmarkResetLog();
 }
 
@@ -206,23 +231,28 @@ static inline void seL4_BenchmarkTrackDumpSummary(benchmark_track_kernel_entry_t
 void print_all_benchmark_results(enum run_benchmark_state print_state) {
     double* speed_res_table;
     uint64_t* time_res_table;
+    float* cpuutil_res_table;
     const char* run_name = human_readable_run_benchmark_state[print_state];
     switch (print_state) {
         case THROUGHPUT_RANDOM_READ:
             speed_res_table = benchmark_speed_res_rand_read;
             time_res_table = benchmark_time_res_rand_read;
+            cpuutil_res_table = benchmark_cpuutil_res_rand_read;
             break;
         case THROUGHPUT_RANDOM_WRITE:
             speed_res_table = benchmark_speed_res_rand_write;
             time_res_table = benchmark_time_res_rand_write;
+            cpuutil_res_table = benchmark_cpuutil_res_rand_write;
             break;
         case THROUGHPUT_SEQUENTIAL_READ:
             speed_res_table = benchmark_speed_res_seq_read;
             time_res_table = benchmark_time_res_seq_read;
+            cpuutil_res_table = benchmark_cpuutil_res_seq_read;
             break;
         case THROUGHPUT_SEQUENTIAL_WRITE:
             speed_res_table = benchmark_speed_res_seq_write;
             time_res_table = benchmark_time_res_seq_write;
+            cpuutil_res_table = benchmark_cpuutil_res_seq_write;
             break;
         default:
             panic("BENCHMARK: Error, unimplemented benchmark state transition");
@@ -231,9 +261,10 @@ void print_all_benchmark_results(enum run_benchmark_state print_state) {
     for (int j = 0; j != BENCHMARK_INDIVIDUAL_RUN_REPEATS; ++j) {
         sddf_printf("Run idx: %d/%d\n", j+1, BENCHMARK_INDIVIDUAL_RUN_REPEATS);
         for (int i = 0; i != BENCHMARK_RUN_COUNT; ++i) {
-            sddf_printf("Number of requests: %d, size of 1 request: 0x%x B, speed: %.2f MiB/s time: %lu\n",
+            sddf_printf("No of requests: %d, size of 1 request: 0x%x B, speed: %.2f MiB/s, time: %lu ns, cpu_util: %.2f perc\n",
                     REQUEST_COUNT[i], BENCHMARK_BLOCKS_PER_REQUEST[i] * BLK_TRANSFER_SIZE,
-                    speed_res_table[i + j*BENCHMARK_RUN_COUNT], time_res_table[i + j*BENCHMARK_RUN_COUNT]);
+                    speed_res_table[i + j*BENCHMARK_RUN_COUNT], time_res_table[i + j*BENCHMARK_RUN_COUNT],
+                    cpuutil_res_table[i + j*BENCHMARK_RUN_COUNT]);
         }
     }
 }
@@ -266,6 +297,38 @@ void notified(microkit_channel ch)
         ccounter_benchmark_stop = sel4bench_get_cycle_count();
         sel4bench_get_counters(benchmark_bf, &counter_values[0]);
         sel4bench_stop_counters(benchmark_bf);
+        uint64_t cycles_PD_TOTAL = 0;
+        uint64_t cycles_PD_BLK_VIRT = 0;
+#ifdef CONFIG_BENCHMARK_TRACK_UTILISATION
+        uint64_t total;
+        uint64_t kernel;
+        uint64_t entries;
+        uint64_t number_schedules;
+        microkit_benchmark_stop(&total, &number_schedules, &kernel, &entries);
+        print_benchmark_details(PD_TOTAL, kernel, entries, number_schedules, total);
+        cycles_PD_TOTAL = total;
+
+        microkit_benchmark_stop_tcb(PD_BLK_ID, &total, &number_schedules, &kernel, &entries);
+        print_benchmark_details(PD_BLK_ID, kernel, entries, number_schedules, total);
+        cycles_PD_BLK_VIRT += total;
+
+        microkit_benchmark_stop_tcb(PD_VIRT_ID, &total, &number_schedules, &kernel, &entries);
+        print_benchmark_details(PD_VIRT_ID, kernel, entries, number_schedules, total);
+        cycles_PD_BLK_VIRT += total;
+
+        microkit_benchmark_stop_tcb(PD_CLIENT_ID, &total, &number_schedules, &kernel, &entries);
+        print_benchmark_details(PD_CLIENT_ID, kernel, entries, number_schedules, total);
+        cycles_PD_BLK_VIRT += total;
+
+        microkit_benchmark_stop_tcb(PD_UART_ID, &total, &number_schedules, &kernel, &entries);
+        print_benchmark_details(PD_UART_ID, kernel, entries, number_schedules, total);
+
+        microkit_benchmark_stop_tcb(PD_UART_VIRT_ID, &total, &number_schedules, &kernel, &entries);
+        print_benchmark_details(PD_UART_VIRT_ID, kernel, entries, number_schedules, total);
+
+        microkit_benchmark_stop_tcb(PD_IDLE_ID, &total, &number_schedules, &kernel, &entries);
+        print_benchmark_details(PD_IDLE_ID, kernel, entries, number_schedules, total);
+#endif
 
         sddf_printf("{\n");
         for (int i = 0; i < ARRAY_SIZE(benchmarking_events); i++) {
@@ -277,28 +340,33 @@ void notified(microkit_channel ch)
         double speed = ((double) BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx] * BLK_TRANSFER_SIZE * \
                 REQUEST_COUNT[benchmark_size_idx] / (1024. * 1024.)) / ((double) (elapsed_time)/1e9);
         sddf_printf("speed (MiB/s: %f\n", speed);
+        float cpuutil = (float) (((double) cycles_PD_BLK_VIRT /  cycles_PD_TOTAL) * 100);
         int run_offset = benchmark_run_idx * BENCHMARK_RUN_COUNT;
         switch (run_benchmark_state) {
             case THROUGHPUT_RANDOM_READ:
                 benchmark_speed_res_rand_read[benchmark_size_idx + run_offset] = speed;
                 benchmark_time_res_rand_read[benchmark_size_idx + run_offset] = elapsed_time; 
+                benchmark_cpuutil_res_rand_read[benchmark_size_idx + run_offset] = cpuutil;
                 break;
             case THROUGHPUT_SEQUENTIAL_READ:
                 benchmark_speed_res_seq_read[benchmark_size_idx + run_offset] = speed;
                 benchmark_time_res_seq_read[benchmark_size_idx + run_offset] = elapsed_time; 
+                benchmark_cpuutil_res_seq_read[benchmark_size_idx + run_offset] = cpuutil;
                 break;
             case THROUGHPUT_RANDOM_WRITE:
                 benchmark_speed_res_rand_write[benchmark_size_idx + run_offset] = speed;
                 benchmark_time_res_rand_write[benchmark_size_idx + run_offset] = elapsed_time; 
+                benchmark_cpuutil_res_rand_write[benchmark_size_idx + run_offset] = cpuutil;
                 break;
             case THROUGHPUT_SEQUENTIAL_WRITE:
                 benchmark_speed_res_seq_write[benchmark_size_idx + run_offset] = speed;
                 benchmark_time_res_seq_write[benchmark_size_idx + run_offset] = elapsed_time; 
+                benchmark_cpuutil_res_seq_write[benchmark_size_idx + run_offset] = cpuutil;
                 break;
             default:
                 panic("BENCHMARK: Error, unimplemented benchmark state for speed measuring.");
         }
-        sddf_printf("total cycles: %ld\n", ccounter_benchmark_stop-ccounter_benchmark_start);
+        sddf_printf("total cycles: 0x%lx\n", ccounter_benchmark_stop-ccounter_benchmark_start);
         double cycles_per_kib = (ccounter_benchmark_stop - ccounter_benchmark_start) / \
                                 (BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx] * BLK_TRANSFER_SIZE \
                                  * REQUEST_COUNT[benchmark_size_idx] / 1024);
@@ -309,23 +377,6 @@ void notified(microkit_channel ch)
         sddf_printf("Cycles per KiB (decimal): %f\n", cycles_per_kib);
         sddf_printf("Cycles per MiB (decimal): %f\n", cycles_per_mib);
         sddf_printf("}\n");
-#endif
-#ifdef CONFIG_BENCHMARK_TRACK_UTILISATION
-        uint64_t total;
-        uint64_t kernel;
-        uint64_t entries;
-        uint64_t number_schedules;
-        microkit_benchmark_stop(&total, &number_schedules, &kernel, &entries);
-        print_benchmark_details(PD_TOTAL, kernel, entries, number_schedules, total);
-
-        microkit_benchmark_stop_tcb(PD_BLK_ID, &total, &number_schedules, &kernel, &entries);
-        print_benchmark_details(PD_BLK_ID, kernel, entries, number_schedules, total);
-
-        microkit_benchmark_stop_tcb(PD_VIRT_ID, &total, &number_schedules, &kernel, &entries);
-        print_benchmark_details(PD_VIRT_ID, kernel, entries, number_schedules, total);
-
-        microkit_benchmark_stop_tcb(PD_CLIENT_ID, &total, &number_schedules, &kernel, &entries);
-        print_benchmark_details(PD_CLIENT_ID, kernel, entries, number_schedules, total);
 #endif
 
 #ifdef CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES
@@ -419,8 +470,7 @@ void init(void)
 #endif
 
     /* Notify the idle thread that the sel4bench library is initialised. */
-    // XXX add back in when measuring IDLE CPU time
-    //microkit_notify(INIT);
+    microkit_notify(IDLE_INIT_CH);
     /* Notify the client to start the benchmark run */
     microkit_notify(BENCH_RUN_CH);
 
