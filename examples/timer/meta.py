@@ -39,8 +39,8 @@ def generate_sdf(output: str, dtb: DeviceTree):
     for pd in pds:
         sdf.add_pd(pd)
 
-    timer_system.connect()
-    timer_system.serialise_config(output)
+    assert timer_system.connect()
+    assert timer_system.serialise_config(output)
 
     with open(output + "/timer.system", "w+") as f:
         f.write(sdf.xml())
