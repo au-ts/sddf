@@ -32,13 +32,14 @@ else
 	RANLIB := $(TOOLCHAIN)-ranlib
 endif
 
+DTC := dtc
 QEMU := qemu-system-aarch64
+PYTHON ?= python3
 
 BUILD_DIR ?= build
 MICROKIT_CONFIG ?= debug
 
 BLK_DRIVER_DIR := virtio
-TIMER_DRIVER_DIR := arm
 CPU := cortex-a53
 
 TOP := ${SDDF}/examples/blk
@@ -48,7 +49,7 @@ MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 
-IMAGES := blk_driver.elf timer_driver.elf client.elf blk_virt.elf
+IMAGES := blk_driver.elf client.elf blk_virt.elf
 CFLAGS := -mcpu=$(CPU) \
 		  -mstrict-align \
 		  -nostdlib \
@@ -64,17 +65,18 @@ LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
 
 IMAGE_FILE   := loader.img
 REPORT_FILE  := report.txt
-SYSTEM_FILE  := ${TOP}/board/$(MICROKIT_BOARD)/blk.system
+SYSTEM_FILE := blk.system
+DTS := $(SDDF)/dts/$(MICROKIT_BOARD).dts
+DTB := $(MICROKIT_BOARD).dtb
+METAPROGRAM := $(TOP)/meta.py
 
 BLK_DRIVER   := $(SDDF)/drivers/blk/${BLK_DRIVER_DIR}
-TIMER_DRIVER := $(SDDF)/drivers/timer/${TIMER_DRIVER_DIR}
 
 BLK_COMPONENTS := $(SDDF)/blk/components
 
 all: $(IMAGE_FILE)
 
 include ${BLK_DRIVER}/blk_driver.mk
-include ${TIMER_DRIVER}/timer_driver.mk
 
 include ${SDDF}/util/util.mk
 include ${BLK_COMPONENTS}/blk_components.mk
@@ -85,6 +87,15 @@ client.o: ${TOP}/client.c ${TOP}/basic_data.h
 	$(CC) -c $(CFLAGS) -I. $< -o client.o
 client.elf: client.o
 	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
+
+$(DTB): $(DTS)
+	dtc -q -I dts -O dtb $(DTS) > $(DTB)
+
+$(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
+	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --platform $(MICROKIT_BOARD) --dtbs . --output . --sdf $(SYSTEM_FILE)
+	$(OBJCOPY) --update-section .device_resources=blk_driver_device_resources.data blk_driver.elf
+	$(OBJCOPY) --update-section .blk_virt_config=blk_virt.data blk_virt.elf
+	$(OBJCOPY) --update-section .blk_client_config=blk_client_client.data client.elf
 
 $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)

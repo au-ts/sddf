@@ -8,9 +8,16 @@
             {
                 "name": "regs",
                 "perms": "rw",
-                "setvar_vaddr": "blk_regs",
                 "size": 4096,
                 "dt_index": 0
+            },
+            {
+                "name": "virtio_headers",
+                "size": 65536
+            },
+            {
+                "name": "virtio_metadata",
+                "size": 2097152
             }
         ],
         "irqs": [
