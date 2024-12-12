@@ -128,7 +128,11 @@ void tx_return(void)
     }
 
     uint32_t client;
-    bool notify_client[SDDF_SERIAL_MAX_CLIENTS] = {false};
+    // TODO: `= {false};` gets optimised into memset
+    bool notify_client[SDDF_SERIAL_MAX_CLIENTS];
+    for (int i = 0; i < SDDF_SERIAL_MAX_CLIENTS; i++) {
+        notify_client[i] = false;
+    }
     bool transferred = false;
     for (uint32_t req = 0; req < num_pending_tx; req++) {
         tx_pending_pop(&client);

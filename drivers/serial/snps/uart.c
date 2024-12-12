@@ -10,13 +10,16 @@
 #include <sddf/serial/queue.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
-#include <serial_config.h>
+#include <sddf/resources/device.h>
 #include "uart.h"
 
 #define IRQ_CH 0
 
 __attribute__((__section__(".serial_driver_config")))
 serial_driver_config_t config;
+
+__attribute__((__section__(".device_resources")))
+device_resources_t device_resources;
 
 serial_queue_handle_t rx_queue_handle;
 serial_queue_handle_t tx_queue_handle;
@@ -79,7 +82,7 @@ static void tx_provide(void)
 
     if (transferred && serial_require_consumer_signal(&tx_queue_handle)) {
         serial_cancel_consumer_signal(&tx_queue_handle);
-        microkit_notify(config.tx_id);
+        microkit_notify(config.tx.id);
     }
 }
 
@@ -114,7 +117,7 @@ static void rx_return(void)
 
     if (enqueued && serial_require_producer_signal(&rx_queue_handle)) {
         serial_cancel_producer_signal(&rx_queue_handle);
-        microkit_notify(config.rx_id);
+        microkit_notify(config.rx.id);
     }
 }
 
@@ -141,6 +144,8 @@ void init(void)
 {
     LOG_DRIVER("initialising\n");
 
+    uart_base = (uintptr_t) device_resources.regions[0].region.vaddr;
+
     /* Ensure that the FIFO's are empty */
     while (!(*REG_PTR(UART_LSR) & UART_LSR_THRE));
 
@@ -166,9 +171,9 @@ void init(void)
     *REG_PTR(UART_IER) = (UART_IER_ERBFI | UART_IER_ETBEI);
 
     if (config.rx_enabled) {
-        serial_queue_init(&rx_queue_handle, config.rx_queue, config.rx_capacity, config.rx_data);
+        serial_queue_init(&rx_queue_handle, config.rx.queue.vaddr, config.rx.queue.size, config.rx.data.vaddr);
     }
-    serial_queue_init(&tx_queue_handle, config.tx_queue, config.tx_capacity, config.tx_data);
+    serial_queue_init(&tx_queue_handle, config.tx.queue.vaddr, config.tx.queue.size, config.tx.data.vaddr);
 }
 
 void notified(microkit_channel ch)
