@@ -3,6 +3,7 @@
     .version = "0.1.0",
 
     .paths = .{
+        "dts",
         "drivers",
         "benchmark",
         "blk",
