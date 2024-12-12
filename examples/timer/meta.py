@@ -22,7 +22,7 @@ PLATFORMS: List[Platform] = [
 ]
 
 
-def generate_sdf(output: str, dtb: DeviceTree):
+def generate_sdf(sdf_file: str, output_dir: str, dtb: DeviceTree):
     timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=200)
     client = ProtectionDomain("client", "client.elf", priority=1)
 
@@ -40,9 +40,9 @@ def generate_sdf(output: str, dtb: DeviceTree):
         sdf.add_pd(pd)
 
     assert timer_system.connect()
-    assert timer_system.serialise_config(output)
+    assert timer_system.serialise_config(output_dir)
 
-    with open(output + "/timer.system", "w+") as f:
+    with open(f"{output_dir}/{sdf_file}", "w+") as f:
         f.write(sdf.xml())
 
 
@@ -52,6 +52,7 @@ if __name__ == '__main__':
     parser.add_argument("--sddf", required=True)
     parser.add_argument("--platform", required=True, choices=[p.name for p in PLATFORMS])
     parser.add_argument("--output", required=True)
+    parser.add_argument("--sdf", required=True)
 
     args = parser.parse_args()
 
@@ -63,4 +64,4 @@ if __name__ == '__main__':
     with open(args.dtbs + f"/{platform.name}.dtb", "rb") as f:
         dtb = DeviceTree(f.read())
 
-    generate_sdf(args.output, dtb)
+    generate_sdf(args.sdf, args.output, dtb)
