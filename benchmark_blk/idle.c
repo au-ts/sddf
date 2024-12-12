@@ -22,6 +22,12 @@ void count_idle(void)
     b->prev = sel4bench_get_cycle_count();
     b->ccount = 0;
 
+    /*
+     * NOTE: for block benchmarking, the idle thread is only used as a "busy loop" sitting as a child
+     * PD of the `bench` PD, so its PMU cycle counter gets incremented when the CPU is idle. For that purpose,
+     * the PD running the idle.elf binary should have the LOWEST possible priority, so it is only scheduled when 
+     * driver, virtualiser and the client have nothing to  do (e.g. waiting for I/O).
+     */
     while (1) {
         __atomic_store_n(&b->ts, (uint64_t)sel4bench_get_cycle_count(), __ATOMIC_RELAXED);
         uint64_t diff = b->ts - b->prev;

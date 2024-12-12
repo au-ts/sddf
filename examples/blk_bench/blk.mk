@@ -32,7 +32,7 @@ SYSTEM_FILE  := ${BLK_BENCHMARK}/board/$(MICROKIT_BOARD)/blk.system
 IMAGE_FILE   := loader.img
 REPORT_FILE  := report.txt
 
-IMAGES := client.elf blk_virt.elf benchmark_blk.elf \
+IMAGES := client.elf blk_virt.elf benchmark_blk.elf idle.elf \
 		  uart_driver.elf serial_virt_tx.elf timer_driver.elf
 ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
 	IMAGES += sdmmc_driver.elf
