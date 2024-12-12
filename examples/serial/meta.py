@@ -19,7 +19,7 @@ PLATFORMS: List[Platform] = [
     Platform("star64", SystemDescription.Arch.RISCV64, 0x100000000, "soc/serial@10000000"),
 ]
 
-def generate_sdf(output):
+def generate_sdf(sdf_file: str, output_dir: str, dtb: DeviceTree):
     serial_driver = ProtectionDomain("serial_driver", "uart_driver.elf", priority=200)
     serial_virt_tx = ProtectionDomain("serial_virt_tx", "serial_virt_tx.elf", priority=199)
     serial_virt_rx = ProtectionDomain("serial_virt_rx", "serial_virt_rx.elf", priority=199)
@@ -44,9 +44,9 @@ def generate_sdf(output):
         sdf.add_pd(pd)
 
     serial_system.connect()
-    serial_system.serialise_config(output)
+    serial_system.serialise_config(output_dir)
 
-    with open(output + "/serial.system", "w+") as f:
+    with open(f"{output_dir}/{sdf_file}", "w+") as f:
         f.write(sdf.xml())
 
 
@@ -56,6 +56,7 @@ if __name__ == '__main__':
     parser.add_argument("--sddf", required=True)
     parser.add_argument("--platform", required=True, choices=[p.name for p in PLATFORMS])
     parser.add_argument("--output", required=True)
+    parser.add_argument("--sdf", required=True)
 
     args = parser.parse_args()
 
@@ -67,4 +68,4 @@ if __name__ == '__main__':
     with open(args.dtbs + f"/{platform.name}.dtb", "rb") as f:
         dtb = DeviceTree(f.read())
 
-    generate_sdf(args.output)
+    generate_sdf(args.sdf, args.output, dtb)

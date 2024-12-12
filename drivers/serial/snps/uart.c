@@ -176,9 +176,9 @@ void notified(microkit_channel ch)
     if (ch == IRQ_CH) {
         handle_irq();
         microkit_deferred_irq_ack(IRQ_CH);
-    } else if (ch == config.tx_id) {
+    } else if (ch == config.tx.id) {
         tx_provide();
-    } else if (ch == config.rx_id) {
+    } else if (ch == config.rx.id) {
         rx_return();
     } else {
         LOG_DRIVER("received notification on unexpected channel\n");

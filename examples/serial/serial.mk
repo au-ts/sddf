@@ -25,6 +25,9 @@ LD := ld.lld
 AS := llvm-as
 AR := llvm-ar
 RANLIB := llvm-ranlib
+OBJCOPY := llvm-objcopy
+DTC := dtc
+PYTHON ?= python3
 
 MICROKIT_TOOL := $(MICROKIT_SDK)/bin/microkit
 
@@ -59,6 +62,8 @@ UART_DRIVER := $(SDDF)/drivers/serial/$(DRIVER_DIR)
 SERIAL_CONFIG_INCLUDE:=${TOP}/include/serial_config
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 SYSTEM_FILE := serial.system
+DTS := $(SDDF)/dts/$(MICROKIT_BOARD).dts
+DTB := $(MICROKIT_BOARD).dtb
 
 IMAGES := uart_driver.elf \
 	  client0.elf client1.elf \
@@ -108,9 +113,15 @@ serial_server.o: ${TOP}/serial_server.c ${CHECK_FLAGS_BOARD_MD5}
 client0.elf client1.elf: serial_server.elf
 	cp serial_server.elf $@
 
-$(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES)
-	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --platform $(MICROKIT_BOARD) --dtbs $(DTBS) --output .
+$(DTB): $(DTS)
+	dtc -q -I dts -O dtb $(DTS) > $(DTB)
+
+$(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
+	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --platform $(MICROKIT_BOARD) --dtbs . --output . --sdf $(SYSTEM_FILE)
 	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data uart_driver.elf
+	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data uart_driver.elf
+	$(OBJCOPY) --update-section .serial_virt_rx_config=serial_virt_rx.data serial_virt_rx.elf
+	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx.data serial_virt_tx.elf
 	$(OBJCOPY) --update-section .serial_client_config=serial_client_client0.data client0.elf
 	$(OBJCOPY) --update-section .serial_client_config=serial_client_client1.data client1.elf
 
