@@ -12,16 +12,6 @@ $(error MICROKIT_SDK must be specified)
 endif
 export override MICROKIT_SDK:=$(abspath ${MICROKIT_SDK})
 
-ifeq ($(strip $(PYTHON)),)
-$(error PYTHON must be specified)
-endif
-export override PYTHON:=$(abspath ${PYTHON})
-
-ifeq ($(strip $(DTBS)),)
-$(error DTBS must be specified)
-endif
-export override DTBS:=$(abspath ${DTBS})
-
 ifeq ($(strip $(TOOLCHAIN)),)
 	TOOLCHAIN := aarch64-none-elf
 	export TOOLCHAIN := aarch64-none-elf
