@@ -10,15 +10,15 @@
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 
-// #define DEBUG_VIRTUALISER
+// #define DEBUG_VIRT
 
-#ifdef DEBUG_VIRTUALISER
-#define LOG_VIRTUALISER(...) do{ sddf_dprintf("I2C VIRTUALISER|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
+#ifdef DEBUG_VIRT
+#define LOG_VIRT(...) do{ sddf_dprintf("I2C VIRT|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
 #else
-#define LOG_VIRTUALISER(...) do{}while(0)
+#define LOG_VIRT(...) do{}while(0)
 #endif
 
-#define LOG_VIRTUALISER_ERR(...) do{ sddf_printf("I2C VIRTUALISER|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
+#define LOG_VIRT_ERR(...) do{ sddf_printf("I2C VIRT|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
 #define BUS_UNCLAIMED (-1)
 
@@ -54,18 +54,18 @@ void process_request(uint32_t client_id)
         unsigned int len = 0;
         int err = i2c_dequeue_request(client_queues[client_id], &bus_address, &offset, &len);
         if (err) {
-            LOG_VIRTUALISER_ERR("could not dequeue from request queue\n");
+            LOG_VIRT_ERR("could not dequeue from request queue\n");
             return;
         }
 
         // Check that client can actually access bus
         if (bus_address > I2C_BUS_ADDRESS_MAX || security_list[bus_address] != client_id) {
-            LOG_VIRTUALISER_ERR("invalid bus address (0x%lx) requested by client 0x%x\n", bus_address, client_id);
+            LOG_VIRT_ERR("invalid bus address (0x%lx) requested by client 0x%x\n", bus_address, client_id);
             continue;
         }
 
         if (offset > config.clients[client_id].data_size) {
-            LOG_VIRTUALISER_ERR("invalid offset (0x%lx) given by client %u. Max offset is 0x%lx\n", offset, client_id,
+            LOG_VIRT_ERR("invalid offset (0x%lx) given by client %u. Max offset is 0x%lx\n", offset, client_id,
                                 config.clients[client_id].data_size);
             continue;
         }
@@ -120,7 +120,7 @@ void process_response()
 
 void init(void)
 {
-    LOG_VIRTUALISER("initialising\n");
+    LOG_VIRT("initialising\n");
     for (int i = 0; i < I2C_BUS_ADDRESS_MAX + 1; i++) {
         security_list[i] = BUS_UNCLAIMED;
     }
@@ -147,12 +147,12 @@ seL4_MessageInfo_t protected(microkit_channel ch, seL4_MessageInfo_t msginfo)
     uint32_t client_id = ch - CLIENT_CH_OFFSET;
 
     if (label != I2C_BUS_CLAIM && label != I2C_BUS_RELEASE) {
-        LOG_VIRTUALISER_ERR("unknown label (0x%lx) given by client on channel 0x%x\n", label, ch);
+        LOG_VIRT_ERR("unknown label (0x%lx) given by client on channel 0x%x\n", label, ch);
         return microkit_msginfo_new(I2C_FAILURE, 0);
     }
 
     if (bus > I2C_BUS_ADDRESS_MAX) {
-        LOG_VIRTUALISER_ERR("invalid bus address (0x%lx) given by client on "
+        LOG_VIRT_ERR("invalid bus address (0x%lx) given by client on "
                             "channel 0x%x. Max bus address is 0x%x\n", bus, ch, I2C_BUS_ADDRESS_MAX);
         return microkit_msginfo_new(I2C_FAILURE, 0);
     }
@@ -161,7 +161,7 @@ seL4_MessageInfo_t protected(microkit_channel ch, seL4_MessageInfo_t msginfo)
     case I2C_BUS_CLAIM:
         // We have a valid bus address, we need to make sure no one else has claimed it.
         if (security_list[bus] != BUS_UNCLAIMED) {
-            LOG_VIRTUALISER_ERR("bus address 0x%lx already claimed, cannot claim for channel 0x%x\n", bus, ch);
+            LOG_VIRT_ERR("bus address 0x%lx already claimed, cannot claim for channel 0x%x\n", bus, ch);
             return microkit_msginfo_new(I2C_FAILURE, 0);
         }
 
@@ -169,14 +169,14 @@ seL4_MessageInfo_t protected(microkit_channel ch, seL4_MessageInfo_t msginfo)
         break;
     case I2C_BUS_RELEASE:
         if (security_list[bus] != client_id) {
-            LOG_VIRTUALISER_ERR("bus address 0x%lx is not claimed by channel 0x%x\n", bus, ch);
+            LOG_VIRT_ERR("bus address 0x%lx is not claimed by channel 0x%x\n", bus, ch);
             return microkit_msginfo_new(I2C_FAILURE, 0);
         }
 
         security_list[bus] = BUS_UNCLAIMED;
         break;
     default:
-        LOG_VIRTUALISER_ERR("reached unreachable case\n");
+        LOG_VIRT_ERR("reached unreachable case\n");
         return microkit_msginfo_new(I2C_FAILURE, 0);
     }
 
