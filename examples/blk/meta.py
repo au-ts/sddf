@@ -1,25 +1,34 @@
 import argparse
-from sdfgen import SystemDescription, ProtectionDomain, Sddf, DeviceTree
+from typing import Dict, List, Any
+from sdfgen import SystemDescription, Sddf, DeviceTree
 
-PLATFORMS = [
-    {
-        "name": "qemu_virt_aarch64",
-        "arch": 1,
-        "paddr_top": 0xa_000_000,
-        "blk_device_node": "virtio_mmio@a003e00",
-    }
+ProtectionDomain = SystemDescription.ProtectionDomain
+
+# TODO: remove platform, it should be board instead to be consistne tiwth Microkit
+
+class Platform:
+    def __init__(self, name: str, arch: SystemDescription.Arch, paddr_top: int, blk_device_node: str):
+        self.name = name
+        self.arch = arch
+        self.paddr_top = paddr_top
+        self.blk_device_node = blk_device_node
+
+
+PLATFORMS: List[Platform] = [
+    Platform("qemu_virt_aarch64", SystemDescription.Arch.AARCH64, 0x6_0000_000, "virtio_mmio@a003e00"),
 ]
 
-def generate_sdf(sdf):
+
+def generate_sdf(sdf_file: str, output_dir: str, dtb: DeviceTree):
     blk_driver = ProtectionDomain("blk_driver", "blk_driver.elf", priority=200)
     blk_virt = ProtectionDomain("blk_virt", "blk_virt.elf", priority=199)
     client = ProtectionDomain("client", "client.elf", priority=1)
 
-    blk_node = dtb.node(platform["blk_device_node"])
+    blk_node = dtb.node(platform.blk_device_node)
     assert blk_node is not None
 
     blk_system = Sddf.Block(sdf, blk_node, blk_driver, blk_virt)
-    blk_system.add_client(client)
+    blk_system.add_client(client, partition=0)
 
     pds = [
         blk_driver,
@@ -30,25 +39,28 @@ def generate_sdf(sdf):
         sdf.add_pd(pd)
 
     assert blk_system.connect()
+    assert blk_system.serialise_config(output_dir)
 
-    print(sdf.xml())
+    with open(f"{output_dir}/{sdf_file}", "w+") as f:
+        f.write(sdf.xml())
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--dtbs", required=True)
     parser.add_argument("--sddf", required=True)
-    parser.add_argument("--platform", required=True, choices=[p["name"] for p in PLATFORMS])
+    parser.add_argument("--platform", required=True, choices=[p.name for p in PLATFORMS])
+    parser.add_argument("--output", required=True)
+    parser.add_argument("--sdf", required=True)
 
     args = parser.parse_args()
 
-    platform = next(filter(lambda p: p["name"] == args.platform, PLATFORMS))
-    platform_name = platform["name"]
+    platform = next(filter(lambda p: p.name == args.platform, PLATFORMS))
 
-    sdf = SystemDescription(platform["arch"], platform["paddr_top"])
+    sdf = SystemDescription(platform.arch, platform.paddr_top)
     sddf = Sddf(args.sddf)
 
-    with open(args.dtbs + f"/{platform_name}.dtb", "rb") as f:
+    with open(args.dtbs + f"/{platform.name}.dtb", "rb") as f:
         dtb = DeviceTree(f.read())
 
-    generate_sdf(sdf)
+    generate_sdf(args.sdf, args.output, dtb)
