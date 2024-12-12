@@ -22,6 +22,7 @@
 #include <sddf/virtio/virtio_queue.h>
 #include <sddf/blk/queue.h>
 #include <sddf/blk/storage_info.h>
+#include <sddf/resources/device.h>
 #include "block.h"
 
 #define IRQ_CH 0
@@ -46,8 +47,6 @@
  */
 #define VIRTIO_REGION_SIZE 0x200000
 
-uintptr_t blk_regs;
-
 blk_storage_info_t *blk_storage_info;
 blk_req_queue_t *blk_req_queue;
 blk_resp_queue_t *blk_resp_queue;
@@ -61,7 +60,6 @@ static volatile struct virtq virtq;
 static blk_queue_handle_t blk_queue;
 
 uintptr_t virtio_headers_paddr;
-uintptr_t virtio_headers_vaddr;
 static struct virtio_blk_req *virtio_headers;
 
 /*
@@ -81,6 +79,9 @@ uint16_t last_seen_used = 0;
 
 /* Block device configuration, populated during initiliastion. */
 volatile struct virtio_blk_config *virtio_config;
+
+__attribute__((__section__(".device_resources")))
+device_resources_t device_resources;
 
 void handle_response()
 {
@@ -310,8 +311,6 @@ void virtio_blk_init(void)
 
     ialloc_init(&ialloc_desc, descriptors, QUEUE_SIZE);
 
-    virtio_headers = (struct virtio_blk_req *) virtio_headers_vaddr;
-
     /* First reset the device */
     regs->Status = 0;
     /* Set the ACKNOWLEDGE bit to say we have noticed the device */
@@ -392,7 +391,17 @@ void virtio_blk_init(void)
 
 void init(void)
 {
-    regs = (volatile virtio_mmio_regs_t *)(blk_regs + VIRTIO_MMIO_BLK_OFFSET);
+    regs = (volatile virtio_mmio_regs_t *)(device_resources.regions[0].region.vaddr + VIRTIO_MMIO_BLK_OFFSET);
+    requests_paddr = device_resources.regions[2].io_addr;
+    requests_vaddr = (uintptr_t)device_resources.regions[2].region.vaddr;
+    virtio_headers_paddr = (uintptr_t)device_resources.regions[1].io_addr;
+    virtio_headers = (struct virtio_blk_req *) device_resources.regions[1].region.vaddr;
+
+    assert(virtio_headers_paddr);
+    assert(virtio_headers);
+    assert(requests_paddr);
+    assert(requests_vaddr);
+
     virtio_blk_init();
 
     blk_queue_init(&blk_queue, blk_req_queue, blk_resp_queue, QUEUE_SIZE);
