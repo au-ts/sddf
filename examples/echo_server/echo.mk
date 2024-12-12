@@ -5,6 +5,8 @@
 #
 
 QEMU := qemu-system-aarch64
+DTC := dtc
+PYTHON ?= python3
 
 METAPROGRAM := $(TOP)/meta.py
 
@@ -22,9 +24,12 @@ TIMER_DRIVER:=$(SDDF)/drivers/timer/$(TIMER_DRV_DIR)
 NETWORK_COMPONENTS:=$(SDDF)/network/components
 
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
-SYSTEM_FILE := ${ECHO_SERVER}/board/$(MICROKIT_BOARD)/echo_server.system
 IMAGE_FILE := loader.img
 REPORT_FILE := report.txt
+SYSTEM_FILE := echo_server.system
+DTS := $(SDDF)/dts/$(MICROKIT_BOARD).dts
+DTB := $(MICROKIT_BOARD).dtb
+METAPROGRAM := $(TOP)/meta.py
 
 vpath %.c ${SDDF} ${ECHO_SERVER}
 
@@ -88,8 +93,11 @@ ${BUILD_DIR}/${LWIPDIRS}:
 # for the unimplemented libc dependencies
 ${IMAGES}: libsddf_util_debug.a
 
-$(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES)
-	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --platform $(MICROKIT_BOARD) --dtbs $(DTBS) --output resources
+$(DTB): $(DTS)
+	dtc -q -I dts -O dtb $(DTS) > $(DTB)
+
+$(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
+	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --platform $(MICROKIT_BOARD) --dtbs . --output . --sdf $(SYSTEM_FILE)
 	$(OBJCOPY) --update-section .sddf_config=timer_driver_device_resources.data timer_driver.elf
 	$(OBJCOPY) --update-section .sddf_config=timer_client_client.data client.elf
 
