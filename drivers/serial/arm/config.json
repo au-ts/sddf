@@ -8,7 +8,6 @@
             {
                 "name": "regs",
                 "perms": "rw",
-                "setvar_vaddr": "uart_base",
                 "size": 4096,
                 "dt_index": 0
             }
