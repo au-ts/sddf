@@ -154,7 +154,7 @@ static uint8_t process_return_buffer(struct response *response)
 uint8_t read_ack_frame(size_t retries)
 {
     LOG_PN532("reading ack frame\n");
-    uint8_t error;
+    uint8_t error = I2C_ERR_OK;
     size_t attempts = 0;
     while (attempts < retries) {
         struct request req = {};

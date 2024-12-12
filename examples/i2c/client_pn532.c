@@ -12,7 +12,6 @@
 #include <sddf/i2c/config.h>
 #include <sddf/i2c/devices/pn532/pn532.h>
 #include "client.h"
-#include "pn532_config.h"
 
 // #define DEBUG_CLIENT
 
@@ -68,9 +67,11 @@ bool read_passive_target_id(uint8_t card_baud_rate, uint8_t *uid_buf, uint8_t *u
         return false;
     }
 
+#ifdef DEBUG_CLIENT
     uint16_t sens_res = response[2];
     sens_res <<= 8;
     sens_res |= response[3];
+#endif
 
     LOG_CLIENT("ATQA: 0x%lx\n", sens_res);
     LOG_CLIENT("SAK: 0x%lx\n", response[4]);
@@ -196,8 +197,7 @@ void init(void)
 {
     LOG_CLIENT("init\n");
 
-    sddf_memcpy(&config, i2c_client_pn532_data, i2c_client_pn532_data_len);
-    data_region = config.data_region;
+    data_region = (uintptr_t) config.data_region;
 
     queue = i2c_queue_init(config.request_region, config.response_region);
 

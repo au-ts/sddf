@@ -13,7 +13,6 @@
 #include <sddf/i2c/config.h>
 #include <sddf/i2c/devices/ds3231/ds3231.h>
 #include "client.h"
-#include "ds3231_config.h"
 
 // #define DEBUG_CLIENT
 
@@ -126,8 +125,7 @@ void init(void)
 {
     LOG_CLIENT("init\n");
 
-    sddf_memcpy(&config, i2c_client_ds3231_data, i2c_client_ds3231_data_len);
-    data_region = config.data_region;
+    data_region = (uintptr_t) config.data_region;
 
     queue = i2c_queue_init(config.request_region, config.response_region);
 

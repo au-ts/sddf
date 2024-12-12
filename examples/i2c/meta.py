@@ -1,6 +1,8 @@
 import argparse
 from typing import Dict, List, Any
-from sdfgen import SystemDescription, ProtectionDomain, Sddf, DeviceTree
+from sdfgen import SystemDescription, Sddf, DeviceTree
+
+ProtectionDomain = SystemDescription.ProtectionDomain
 
 
 class Platform:
@@ -15,7 +17,7 @@ PLATFORMS: List[Platform] = [
     Platform("odroidc4", SystemDescription.Arch.AARCH64, 0x80000000, "soc/bus@ffd00000/i2c@1d000"),
 ]
 
-def generate_sdf():
+def generate_sdf(sdf_file: str, output_dir: str, dtb: DeviceTree):
     i2c_driver = ProtectionDomain("i2c_driver", "i2c_driver.elf", priority=3)
     i2c_virt = ProtectionDomain("i2c_virt", "i2c_virt.elf", priority=2)
     client = ProtectionDomain("client", "client.elf", priority=1)
@@ -34,9 +36,10 @@ def generate_sdf():
     for pd in pds:
         sdf.add_pd(pd)
 
-    i2c_system.connect()
+    assert i2c_system.connect()
+    assert i2c_system.serialise_config(output_dir)
 
-    with open(output + "/i2c.system", "w+") as f:
+    with open(f"{output_dir}/{sdf_file}", "w+") as f:
         f.write(sdf.xml())
 
 
@@ -46,6 +49,7 @@ if __name__ == '__main__':
     parser.add_argument("--sddf", required=True)
     parser.add_argument("--platform", required=True, choices=[p.name for p in PLATFORMS])
     parser.add_argument("--output", required=True)
+    parser.add_argument("--sdf", required=True)
 
     args = parser.parse_args()
 
@@ -57,4 +61,4 @@ if __name__ == '__main__':
     with open(args.dtbs + f"/{platform.name}.dtb", "rb") as f:
         dtb = DeviceTree(f.read())
 
-    generate_sdf()
+    generate_sdf(args.sdf, args.output, dtb)

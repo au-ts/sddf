@@ -13,6 +13,7 @@
 #include <microkit.h>
 #include <sddf/i2c/queue.h>
 #include <sddf/i2c/config.h>
+#include <sddf/resources/device.h>
 #include "driver.h"
 
 #ifndef I2C_BUS_NUM
@@ -46,6 +47,9 @@ struct i2c_regs {
 
 __attribute__((__section__(".i2c_driver_config")))
 i2c_driver_config_t config;
+
+__attribute__((__section__(".device_resources")))
+device_resources_t device_resources;
 
 // Hardware memory
 uintptr_t gpio_regs;
