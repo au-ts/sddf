@@ -85,10 +85,14 @@ $(DTB): $(DTS)
 
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --platform $(MICROKIT_BOARD) --dtbs . --output . --sdf $(SYSTEM_FILE)
+	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
 	$(OBJCOPY) --update-section .device_resources=i2c_driver_device_resources.data i2c_driver.elf
+	$(OBJCOPY) --update-section .i2c_driver_config=i2c_driver.data i2c_driver.elf
 	$(OBJCOPY) --update-section .i2c_virt_config=i2c_virt.data i2c_virt.elf
 	$(OBJCOPY) --update-section .i2c_client_config=i2c_client_client_ds3231.data client_ds3231.elf
-	$(OBJCOPY) --update-section .i2c_client_config=i2c_client_client_ds3231.data client_ds3231.elf
+	$(OBJCOPY) --update-section .timer_client_config=timer_client_client_ds3231.data client_ds3231.elf
+	$(OBJCOPY) --update-section .i2c_client_config=i2c_client_client_pn532.data client_pn532.elf
+	$(OBJCOPY) --update-section .timer_client_config=timer_client_client_pn532.data client_pn532.elf
 
 $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)

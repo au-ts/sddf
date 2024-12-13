@@ -7,6 +7,7 @@ typedef struct i2c_driver_config {
     void *request_region;
     void *response_region;
     void *data_region;
+    uint8_t virt_id;
 } i2c_driver_config_t;
 
 typedef struct i2c_virt_client_config {
@@ -19,6 +20,7 @@ typedef struct i2c_virt_client_config {
 typedef struct i2c_virt_config {
     void *driver_request_queue;
     void *driver_response_queue;
+    uint8_t driver_id;
     uint64_t num_clients;
     i2c_virt_client_config_t clients[SDDF_I2C_MAX_CLIENTS];
 } i2c_virt_config_t;
@@ -27,4 +29,5 @@ typedef struct i2c_client_config {
     void *request_region;
     void *response_region;
     void *data_region;
+    uint8_t virt_id;
 } i2c_client_config_t;

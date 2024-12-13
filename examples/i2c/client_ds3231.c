@@ -120,7 +120,7 @@ bool delay_ms(size_t milliseconds)
         return false;
     }
 
-    sddf_timer_set_timeout(TIMER_CH, time_ns);
+    sddf_timer_set_timeout(timer_config.driver_id, time_ns);
     co_switch(t_event);
 
     return true;
@@ -134,7 +134,7 @@ void init(void)
 
     queue = i2c_queue_init(i2c_config.request_region, i2c_config.response_region);
 
-    bool claimed = i2c_bus_claim(I2C_VIRTUALISER_CH, DS3231_I2C_BUS_ADDRESS);
+    bool claimed = i2c_bus_claim(i2c_config.virt_id, DS3231_I2C_BUS_ADDRESS);
     if (!claimed) {
         LOG_CLIENT_ERR("failed to claim DS3231 bus\n");
         return;
@@ -152,14 +152,9 @@ void init(void)
 
 void notified(microkit_channel ch)
 {
-    switch (ch) {
-    case I2C_VIRTUALISER_CH:
+    if (ch == i2c_config.virt_id || ch == timer_config.driver_id) {
         co_switch(t_main);
-        break;
-    case TIMER_CH:
-        co_switch(t_main);
-        break;
-    default:
+    } else {
         LOG_CLIENT_ERR("Unknown channel 0x%x!\n", ch);
     }
 }

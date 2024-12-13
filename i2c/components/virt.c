@@ -22,15 +22,6 @@
 
 #define BUS_UNCLAIMED (-1)
 
-/*
- * Note that we have a fundamental assumption that the regions of memory for a
- * client are indexed the same as the channel number. E.g the first client
- * request region virtual address is channel number 0.
- * We believe this restriction should not be too restrictive, but we will see
- * what happens...
- */
-
-#define DRIVER_CH 0
 #define CLIENT_CH_OFFSET 1
 
 __attribute__((__section__(".i2c_virt_config")))
@@ -80,7 +71,7 @@ void process_request(uint32_t client_id)
     }
 
     if (enqueued) {
-        microkit_deferred_notify(DRIVER_CH);
+        microkit_deferred_notify(config.driver_id);
     }
 }
 
@@ -120,6 +111,7 @@ void process_response()
 
 void init(void)
 {
+    assert(config.driver_id == 0);
     LOG_VIRT("initialising\n");
     for (int i = 0; i < I2C_BUS_ADDRESS_MAX + 1; i++) {
         security_list[i] = BUS_UNCLAIMED;
@@ -133,7 +125,7 @@ void init(void)
 
 void notified(microkit_channel ch)
 {
-    if (ch == DRIVER_CH) {
+    if (ch == config.driver_id) {
         process_response();
     } else {
         process_request(ch - CLIENT_CH_OFFSET);
