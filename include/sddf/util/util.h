@@ -19,6 +19,7 @@
 // [high, low]
 #define BIT_MASK_RANGE(high, low) \
     (((1UL << ((high) - (low) + 1)) - 1) << (low))
+#define BIT_MASK(start, end) (((1U << (end)) - 1U) & ~((1U << (start)) - 1U)) // [start, end)
 
 #ifdef __GNUC__
 #define likely(x)   __builtin_expect(!!(x), 1)
