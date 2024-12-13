@@ -7,6 +7,7 @@
 #include <libco.h>
 #include <sddf/util/printf.h>
 #include <sddf/timer/client.h>
+#include <sddf/timer/config.h>
 #include <sddf/i2c/queue.h>
 #include <sddf/i2c/client.h>
 #include <sddf/i2c/config.h>
@@ -30,7 +31,11 @@
 #define USING_HALT(...) do{ while(1); }while(0)
 #endif
 
-i2c_client_config_t config;
+__attribute__((__section__(".i2c_client_config")))
+i2c_client_config_t i2c_config;
+
+__attribute__((__section__(".timer_client_config")))
+timer_client_config_t timer_config;
 
 i2c_queue_handle_t queue;
 uintptr_t data_region;
@@ -187,7 +192,7 @@ bool delay_ms(size_t milliseconds)
         return false;
     }
 
-    sddf_timer_set_timeout(TIMER_CH, time_ns);
+    sddf_timer_set_timeout(timer_config.driver_id, time_ns);
     co_switch(t_event);
 
     return true;
@@ -197,11 +202,11 @@ void init(void)
 {
     LOG_CLIENT("init\n");
 
-    data_region = (uintptr_t) config.data_region;
+    data_region = (uintptr_t) i2c_config.data_region;
 
-    queue = i2c_queue_init(config.request_region, config.response_region);
+    queue = i2c_queue_init(i2c_config.request_region, i2c_config.response_region);
 
-    bool claimed = i2c_bus_claim(I2C_VIRTUALISER_CH, PN532_I2C_BUS_ADDRESS);
+    bool claimed = i2c_bus_claim(i2c_config.virt_id, PN532_I2C_BUS_ADDRESS);
     if (!claimed) {
         LOG_CLIENT_ERR("failed to claim PN532 bus\n");
         return;
@@ -218,14 +223,9 @@ void init(void)
 
 void notified(microkit_channel ch)
 {
-    switch (ch) {
-    case I2C_VIRTUALISER_CH:
+    if (ch == i2c_config.virt_id || ch == timer_config.driver_id) {
         co_switch(t_main);
-        break;
-    case TIMER_CH:
-        co_switch(t_main);
-        break;
-    default:
+    } else {
         LOG_CLIENT_ERR("Unknown channel 0x%x!\n", ch);
     }
 }

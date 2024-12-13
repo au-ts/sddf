@@ -10,6 +10,7 @@
 #include <sddf/timer/client.h>
 #include <sddf/i2c/queue.h>
 #include <sddf/i2c/client.h>
+#include <sddf/i2c/config.h>
 #include <client.h>
 #include <sddf/i2c/devices/ds3231/ds3231.h>
 
@@ -48,6 +49,8 @@ struct response {
    to be global variables than constantly pass them around. */
 extern i2c_queue_handle_t queue;
 extern uintptr_t data_region;
+
+extern i2c_client_config_t i2c_config;
 
 /* Below is a simple API for quickly making requests and sending them off as well
  * as reading from the responses.
@@ -119,7 +122,7 @@ void request_send(struct request *req)
         LOG_DS3231_ERR("failed to enqueue request buffer!\n");
     }
 
-    microkit_notify(I2C_VIRTUALISER_CH);
+    microkit_notify(i2c_config.virt_id);
 }
 
 static uint8_t process_return_buffer(struct response *response)

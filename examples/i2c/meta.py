@@ -24,7 +24,7 @@ def generate_sdf(sdf_file: str, output_dir: str, dtb: DeviceTree):
     timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=4)
     i2c_driver = ProtectionDomain("i2c_driver", "i2c_driver.elf", priority=3)
     i2c_virt = ProtectionDomain("i2c_virt", "i2c_virt.elf", priority=2)
-    client_pn532 = ProtectionDomain("client_pn532", "client_ds3231.elf", priority=1)
+    client_pn532 = ProtectionDomain("client_pn532", "client_pn532.elf", priority=1)
     client_ds3231 = ProtectionDomain("client_ds3231", "client_ds3231.elf", priority=1)
 
     clk_mr = MemoryRegion("clk", 0x1000, paddr=0xff63c000)
@@ -45,7 +45,7 @@ def generate_sdf(sdf_file: str, output_dir: str, dtb: DeviceTree):
     i2c_system.add_client(client_ds3231)
 
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
-    # DS3231 requires setting timeouts
+    timer_system.add_client(client_pn532)
     timer_system.add_client(client_ds3231)
 
     pds = [

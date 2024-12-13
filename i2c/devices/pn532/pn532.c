@@ -8,6 +8,7 @@
 #include <sddf/util/printf.h>
 #include <sddf/timer/client.h>
 #include <sddf/i2c/queue.h>
+#include <sddf/i2c/config.h>
 #include <sddf/i2c/devices/pn532/pn532.h>
 #include "client.h"
 
@@ -29,6 +30,8 @@
 
 extern cothread_t t_event;
 extern cothread_t t_main;
+
+extern i2c_client_config_t i2c_config;
 
 struct request {
     uint8_t *buffer;
@@ -123,7 +126,7 @@ void request_send(struct request *req)
         LOG_PN532_ERR("failed to enqueue request buffer!\n");
     }
 
-    microkit_notify(I2C_VIRTUALISER_CH);
+    microkit_notify(i2c_config.virt_id);
 }
 
 static uint8_t process_return_buffer(struct response *response)
