@@ -20,7 +20,7 @@ PLATFORMS: List[Platform] = [
     Platform("star64", SystemDescription.Arch.RISCV64, 0x100000000, "soc/serial@10000000"),
 ]
 
-def generate_sdf(sdf_file: str, output_dir: str, dtb: DeviceTree):
+def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     serial_driver = ProtectionDomain("serial_driver", "uart_driver.elf", priority=200)
     serial_virt_tx = ProtectionDomain("serial_virt_tx", "serial_virt_tx.elf", priority=199)
     serial_virt_rx = ProtectionDomain("serial_virt_rx", "serial_virt_rx.elf", priority=199)
@@ -30,7 +30,7 @@ def generate_sdf(sdf_file: str, output_dir: str, dtb: DeviceTree):
     serial_node = dtb.node(platform.serial_device_node)
     assert serial_node is not None
 
-    serial_system = Sddf.Serial(sdf, serial_node, serial_driver, serial_virt_tx, serial_virt_rx)
+    serial_system = Sddf.Serial(sdf, serial_node, serial_driver, serial_virt_tx, virt_rx=serial_virt_rx)
     serial_system.add_client(client0)
     serial_system.add_client(client1)
 
@@ -69,4 +69,4 @@ if __name__ == '__main__':
     with open(args.dtbs + f"/{platform.name}.dtb", "rb") as f:
         dtb = DeviceTree(f.read())
 
-    generate_sdf(args.sdf, args.output, dtb)
+    generate(args.sdf, args.output, dtb)
