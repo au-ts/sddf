@@ -12,10 +12,9 @@
 #include <sddf/benchmark/bench.h>
 #include <sddf/benchmark/config.h>
 
-#include "benchmark_idle_config.h"
-
 #define MAGIC_CYCLES 150
 
+__attribute__((__section__(".benchmark_config")))
 benchmark_idle_config_t config;
 
 struct bench *b;
@@ -50,7 +49,6 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
-    sddf_memcpy(&config, benchmark_idle_config_data, benchmark_idle_config_data_len);
     b = (void *)config.cycle_counters;
     return;
 }

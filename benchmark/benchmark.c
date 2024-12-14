@@ -16,12 +16,12 @@
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 
-#include "serial_client_config.h"
-#include "benchmark_config.h"
-
 #define LOG_BUFFER_CAP 7
 
-benchmark_config_t config;
+__attribute__((__section__(".benchmark_config")))
+benchmark_config_t benchmark_config;
+
+__attribute__((__section__(".serial_client_config")))
 serial_client_config_t serial_config;
 
 ccnt_t counter_values[8];
@@ -53,9 +53,9 @@ event_id_t benchmarking_events[] = {
 
 static char *child_name(uint64_t child_id)
 {
-    for (uint64_t i = 0; i < config.num_children; i++) {
-        if (child_id == config.children[i].child_id) {
-            return config.children[i].name;
+    for (uint64_t i = 0; i < benchmark_config.num_children; i++) {
+        if (child_id == benchmark_config.children[i].child_id) {
+            return benchmark_config.children[i].name;
         }
     }
     return "unknown child PD";
@@ -160,7 +160,7 @@ void notified(microkit_channel ch)
 {
     if (ch == serial_config.tx.id) {
         return;
-    } else if (ch == config.start_channel) {
+    } else if (ch == benchmark_config.start_channel) {
 #ifdef MICROKIT_CONFIG_benchmark
         sel4bench_reset_counters();
         THREAD_MEMORY_RELEASE();
@@ -174,7 +174,7 @@ void notified(microkit_channel ch)
         seL4_BenchmarkResetLog();
 #endif
 #endif
-    } else if (ch == config.stop_channel) {
+    } else if (ch == benchmark_config.stop_channel) {
 #ifdef MICROKIT_CONFIG_benchmark
         sel4bench_get_counters(benchmark_bf, &counter_values[0]);
         sel4bench_stop_counters(benchmark_bf);
@@ -212,9 +212,6 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
-    sddf_memcpy(&serial_config, serial_client_bench_data, serial_client_bench_data_len);
-    sddf_memcpy(&config, benchmark_config_data, benchmark_config_data_len);
-
     serial_queue_init(&serial_tx_queue_handle, serial_config.tx.queue.vaddr, serial_config.tx.data.size, serial_config.tx.data.vaddr);
     serial_putchar_init(serial_config.tx.id, &serial_tx_queue_handle);
 
@@ -250,7 +247,7 @@ void init(void)
 #endif
 
     /* Notify the idle thread that the sel4bench library is initialised. */
-    microkit_notify(config.init_channel);
+    microkit_notify(benchmark_config.init_channel);
 
 #ifdef CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES
     int res_buf = seL4_BenchmarkSetLogBuffer(LOG_BUFFER_CAP);

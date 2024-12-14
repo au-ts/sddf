@@ -38,10 +38,10 @@ void rx_return(void)
             err = net_dequeue_active(&rx_queue_virt, &virt_buffer);
             assert(!err);
 
-            uintptr_t cli_addr = config.client_data.vaddr + cli_buffer.io_or_offset;
-            uintptr_t virt_addr = config.device_data.vaddr + virt_buffer.io_or_offset;
+            void *cli_addr = config.client_data.vaddr + cli_buffer.io_or_offset;
+            void *virt_addr = config.device_data.vaddr + virt_buffer.io_or_offset;
 
-            sddf_memcpy((void *)cli_addr, (void *)virt_addr, virt_buffer.len);
+            sddf_memcpy(cli_addr, virt_addr, virt_buffer.len);
             cli_buffer.len = virt_buffer.len;
             virt_buffer.len = 0;
 
