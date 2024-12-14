@@ -47,6 +47,7 @@ export LD := $(TOOLCHAIN)-ld
 export AS := $(TOOLCHAIN)-as
 export AR := $(TOOLCHAIN)-ar
 export RANLIB := $(TOOLCHAIN)-ranlib
+export OBJCOPY := $(TOOLCHAIN)-objcopy
 export MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 export SDDF=$(abspath ../..)
 export ECHO_INCLUDE:=$(abspath .)/include

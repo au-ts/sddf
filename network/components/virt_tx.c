@@ -52,8 +52,8 @@ void tx_provide(void)
                     continue;
                 }
 
-                cache_clean(buffer.io_or_offset + config.clients[client].data.region.vaddr,
-                            buffer.io_or_offset + config.clients[client].data.region.vaddr + buffer.len);
+                uintptr_t buffer_vaddr = buffer.io_or_offset + (uintptr_t)config.clients[client].data.region.vaddr;
+                cache_clean(buffer_vaddr, buffer_vaddr + buffer.len);
 
                 buffer.io_or_offset = buffer.io_or_offset + config.clients[client].data.io_addr;
                 err = net_enqueue_active(&state.tx_queue_drv, buffer);

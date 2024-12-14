@@ -169,10 +169,10 @@ static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
     int err = net_dequeue_free(&state.tx_queue, &buffer);
     assert(!err);
 
-    uintptr_t frame = buffer.io_or_offset + net_config.tx_data.vaddr;
+    void *frame = buffer.io_or_offset + net_config.tx_data.vaddr;
     uint16_t copied = 0;
     for (struct pbuf *curr = p; curr != NULL; curr = curr->next) {
-        memcpy((void *)(frame + copied), curr->payload, curr->len);
+        memcpy(frame + copied, curr->payload, curr->len);
         copied += curr->len;
     }
 

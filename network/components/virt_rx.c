@@ -76,7 +76,7 @@ void rx_return(void)
             assert(!err);
 
             buffer.io_or_offset = buffer.io_or_offset - config.data.io_addr;
-            uintptr_t buffer_vaddr = buffer.io_or_offset + config.data.region.vaddr;
+            uintptr_t buffer_vaddr = buffer.io_or_offset + (uintptr_t)config.data.region.vaddr;
 
             // Cache invalidate after DMA write, so we don't read stale data.
             // This must be performed after the DMA write to avoid reading

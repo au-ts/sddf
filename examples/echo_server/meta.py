@@ -1,33 +1,25 @@
 import argparse
-import struct
+from typing import Dict, List, Any, Tuple
 from sdfgen import SystemDescription, Sddf, DeviceTree
-ProtectionDomain = SystemDescription.ProtectionDomain
 
-PLATFORMS = [
-    {
-        "name": "qemu_virt_aarch64",
-        "arch": SystemDescription.Arch.AARCH64,
-        "paddr_top": 0xa_000_000,
-        "timer_device_node": "timer",
-        "uart_device_node": "pl011@9000000",
-        "ethernet_device_node": "virtio_mmio@a003e00",
-    },
-    {
-        "name": "odroidc4",
-        "arch": SystemDescription.Arch.AARCH64,
-        "paddr_top": 0x80000000,
-        "timer_device_node": "soc/bus@ffd00000/watchdog@f0d0",
-        "uart_device_node": "soc/bus@ff800000/serial@3000",
-        "ethernet_device_node": "soc/ethernet@ff3f0000",
-    },
-    {
-        "name": "maaxboard",
-        "arch": SystemDescription.Arch.AARCH64,
-        "paddr_top": 0xa0000000,
-        "timer_device_node": "soc@0/bus@30000000/timer@302d0000",
-        "uart_device_node": "soc@0/bus@30800000/serial@30860000",
-        "ethernet_device_node": "soc@0/bus@30800000/ethernet@30be0000",
-    },
+ProtectionDomain = SystemDescription.ProtectionDomain
+MemoryRegion = SystemDescription.MemoryRegion
+Map = SystemDescription.Map
+
+class Platform:
+    def __init__(self, name: str, arch: SystemDescription.Arch, paddr_top: int, serial: str, timer: str, ethernet: str):
+        self.name = name
+        self.arch = arch
+        self.paddr_top = paddr_top
+        self.serial = serial
+        self.timer = timer
+        self.ethernet = ethernet
+
+# TODO: add QEMU virt RISC-V, i.MX8MM-EVK, i.MX8MQ-EVK, i.MX8MP-EVK
+PLATFORMS: List[Platform] = [
+    Platform("qemu_virt_aarch64", SystemDescription.Arch.AARCH64, 0x6_0000_000, "pl011@9000000", "timer", "virtio_mmio@a003e00"),
+    Platform("odroidc4", SystemDescription.Arch.AARCH64, 0x40000000, "soc/bus@ff800000/serial@3000", "soc/bus@ffd00000/watchdog@f0d0", "soc/ethernet@ff3f0000"),
+    # Platform("maaxboard", SystemDescription.Arch.AARCH64, 0xa_000_000, "soc@0/bus@30800000/serial@30860000"),
 ]
 
 # Classes to serialise into custom configuration for the benchmarking
@@ -36,7 +28,7 @@ PLATFORMS = [
 # integers.
 
 class BenchmarkIdleConfig:
-    def __init__(self, cycle_counters, ch_init):
+    def __init__(self, cycle_counters: int, ch_init: int):
         self.cycle_counters = cycle_counters
         self.ch_init = ch_init
 
@@ -46,15 +38,13 @@ class BenchmarkIdleConfig:
             void *;
             uint8_t;
         }
-
-        Little endian. Pointers are 64-bit integers.
     '''
     def serialise(self) -> bytes:
         struct.pack(">qc", self.cycle_counters, self.ch_init)
 
 
 class BenchmarkClientConfig:
-    def __init__(self, cycle_counters, ch_start, ch_stop):
+    def __init__(self, cycle_counters: int, ch_start: int, ch_stop: int):
         self.cycle_counters = cycle_counters
         self.ch_start = ch_start
         self.ch_stop = ch_stop
@@ -71,45 +61,52 @@ class BenchmarkClientConfig:
         return struct.pack(">qcc", self.cycle_counters, self.ch_start, self.ch_stop)
 
 
-# class BenchmarkConfig:
-#     def __init__(self, ch_start, ch_stop, ch_init, children):
-#         self.ch_start = ch_start
-#         self.ch_stop = ch_stop
-#         self.ch_init = ch_init
-#         self.children = children
+class BenchmarkConfig:
+    def __init__(self, ch_start: int, ch_stop: int, ch_init: int, children: List[Tuple[int, str]]):
+        self.ch_start = ch_start
+        self.ch_stop = ch_stop
+        self.ch_init = ch_init
+        self.children = children
 
 
-#     def serialise(self) -> bytes:
+    def serialise(self) -> bytes:
+        pack_str = ">cccq"
+        for child in self.children:
+            c_name = self.name.encode("utf-8")
 
 
 
-def generate_sdf(output: str):
-    uart_node = dtb.node(platform["uart_device_node"])
+def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
+    uart_node = dtb.node(platform.serial)
     assert uart_node is not None
-    ethernet_node = dtb.node(platform["ethernet_device_node"])
+    ethernet_node = dtb.node(platform.ethernet)
     assert ethernet_node is not None
-    timer_node = dtb.node(platform["timer_device_node"])
+    timer_node = dtb.node(platform.timer)
     assert uart_node is not None
 
     timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf")
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
 
-    serial_driver = ProtectionDomain("serial_driver", "serial_driver.elf", priority=200)
+    uart_driver = ProtectionDomain("uart_driver", "uart_driver.elf", priority=200)
     serial_virt_tx = ProtectionDomain("serial_virt_tx", "serial_virt_tx.elf", priority=199)
-    serial_virt_rx = ProtectionDomain("serial_virt_rx", "serial_virt_rx.elf", priority=199)
-    serial_system = Sddf.Serial(sdf, uart_node, serial_driver, serial_virt_tx, serial_virt_rx)
+    serial_system = Sddf.Serial(sdf, uart_node, uart_driver, serial_virt_tx)
 
-    ethernet_driver = ProtectionDomain("ethernet_driver", "ethernet_driver.elf")
-    net_virt_tx = ProtectionDomain("net_virt_tx", "net_virt_tx.elf")
-    net_virt_rx = ProtectionDomain("net_virt_tx", "net_virt_tx.elf")
+    ethernet_driver = ProtectionDomain("ethernet_driver", "eth_driver.elf")
+    net_virt_tx = ProtectionDomain("net_virt_tx", "network_virt_tx.elf")
+    net_virt_rx = ProtectionDomain("net_virt_rx", "network_virt_rx.elf")
     net_system = Sddf.Network(sdf, ethernet_node, ethernet_driver, net_virt_tx, net_virt_rx)
 
-    client = ProtectionDomain("client", "lwip.elf", priority=1)
-    client_net_copier = ProtectionDomain("client_net_copier", "client_net_copier.elf", priority=1)
+    client0 = ProtectionDomain("client0", "lwip0.elf", priority=1)
+    client0_net_copier = ProtectionDomain("client0_net_copier", "network_copy0.elf", priority=1)
+    client1 = ProtectionDomain("client1", "lwip1.elf", priority=1)
+    client1_net_copier = ProtectionDomain("client1_net_copier", "network_copy1.elf", priority=1)
 
-    serial_system.add_client(client)
-    timer_system.add_client(client)
-    net_system.add_client_with_copier(client, client_net_copier, mac_addr="0f:1f:2f:3f:4f:5f")
+    serial_system.add_client(client0)
+    serial_system.add_client(client1)
+    timer_system.add_client(client0)
+    timer_system.add_client(client1)
+    net_system.add_client_with_copier(client0, client0_net_copier, mac_addr="0f:1f:2f:3f:4f:5f")
+    net_system.add_client_with_copier(client1, client1_net_copier, mac_addr="0f:1f:2f:3f:4f:6f")
 
     # Benchmark specific resources
 
@@ -117,34 +114,40 @@ def generate_sdf(output: str):
     bench = ProtectionDomain("bench", "benchmark.elf")
 
     benchmark_pds = [
-        serial_driver,
+        uart_driver,
         serial_virt_tx,
-        serial_virt_rx,
         ethernet_driver,
         net_virt_tx,
         net_virt_rx,
-        client,
-        client_net_copier,
+        client0,
+        client0_net_copier,
+        client1,
+        client1_net_copier,
+        timer_driver,
     ]
     pds = [
         bench_idle,
         bench,
     ]
+    # benchmark_children = []
+    # for pd in benchmark_pds:
+    #     child_id = bench.add_child_pd(pd)
+    #     benchmark_children.append((child_id, pd.name))
+    # for pd in pds:
+        # sdf.add_pd(pd)
     for pd in benchmark_pds:
-        print(bench.add_child_pd(pd))
-    for pd in pds:
         sdf.add_pd(pd)
 
-    # Connect everything up together
-    serial_system.connect()
-    net_system.connect()
-    timer_system.connect()
+    # Need to add channels between benchmark and benchmark client
 
-    serial_system.serialise_config(output)
-    net_system.serialise_config(output)
-    timer_system.serialise_config(output)
+    assert serial_system.connect()
+    assert serial_system.serialise_config(output_dir)
+    assert net_system.connect()
+    assert net_system.serialise_config(output_dir)
+    assert timer_system.connect()
+    assert timer_system.serialise_config(output_dir)
 
-    with open(output + "echo_server.system", "w+") as f:
+    with open(f"{output_dir}/{sdf_file}", "w+") as f:
         f.write(sdf.xml())
 
 
@@ -152,18 +155,18 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--dtbs", required=True)
     parser.add_argument("--sddf", required=True)
-    parser.add_argument("--platform", required=True, choices=[p["name"] for p in PLATFORMS])
+    parser.add_argument("--platform", required=True, choices=[p.name for p in PLATFORMS])
     parser.add_argument("--output", required=True)
+    parser.add_argument("--sdf", required=True)
 
     args = parser.parse_args()
 
-    platform = next(filter(lambda p: p["name"] == args.platform, PLATFORMS))
-    platform_name = platform["name"]
+    platform = next(filter(lambda p: p.name == args.platform, PLATFORMS))
 
-    sdf = SystemDescription(platform["arch"], platform["paddr_top"])
+    sdf = SystemDescription(platform.arch, platform.paddr_top)
     sddf = Sddf(args.sddf)
 
-    with open(args.dtbs + f"/{platform_name}.dtb", "rb") as f:
+    with open(args.dtbs + f"/{platform.name}.dtb", "rb") as f:
         dtb = DeviceTree(f.read())
 
-    generate_sdf(args.output)
+    generate(args.sdf, args.output, dtb)
