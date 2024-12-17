@@ -100,22 +100,22 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     timer_node = dtb.node(platform.timer)
     assert uart_node is not None
 
-    timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf")
+    timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=101)
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
 
-    uart_driver = ProtectionDomain("uart_driver", "uart_driver.elf", priority=200)
-    serial_virt_tx = ProtectionDomain("serial_virt_tx", "serial_virt_tx.elf", priority=199)
+    uart_driver = ProtectionDomain("uart_driver", "uart_driver.elf", priority=100)
+    serial_virt_tx = ProtectionDomain("serial_virt_tx", "serial_virt_tx.elf", priority=99)
     serial_system = Sddf.Serial(sdf, uart_node, uart_driver, serial_virt_tx)
 
-    ethernet_driver = ProtectionDomain("ethernet_driver", "eth_driver.elf")
-    net_virt_tx = ProtectionDomain("net_virt_tx", "network_virt_tx.elf")
-    net_virt_rx = ProtectionDomain("net_virt_rx", "network_virt_rx.elf")
+    ethernet_driver = ProtectionDomain("ethernet_driver", "eth_driver.elf", priority=101)
+    net_virt_tx = ProtectionDomain("net_virt_tx", "network_virt_tx.elf", priority=100, budget=20000)
+    net_virt_rx = ProtectionDomain("net_virt_rx", "network_virt_rx.elf", priority=99)
     net_system = Sddf.Network(sdf, ethernet_node, ethernet_driver, net_virt_tx, net_virt_rx)
 
-    client0 = ProtectionDomain("client0", "lwip0.elf", priority=1)
-    client0_net_copier = ProtectionDomain("client0_net_copier", "network_copy0.elf", priority=1)
-    client1 = ProtectionDomain("client1", "lwip1.elf", priority=1)
-    client1_net_copier = ProtectionDomain("client1_net_copier", "network_copy1.elf", priority=1)
+    client0 = ProtectionDomain("client0", "lwip0.elf", priority=98, budget=20000)
+    client0_net_copier = ProtectionDomain("client0_net_copier", "network_copy0.elf", priority=97, budget=20000)
+    client1 = ProtectionDomain("client1", "lwip1.elf", priority=98, budget=20000)
+    client1_net_copier = ProtectionDomain("client1_net_copier", "network_copy1.elf", priority=97, budget=20000)
 
     serial_system.add_client(client0)
     serial_system.add_client(client1)
@@ -126,8 +126,8 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
     # Benchmark specific resources
 
-    bench_idle = ProtectionDomain("bench_idle", "idle.elf")
-    bench = ProtectionDomain("bench", "benchmark.elf")
+    bench_idle = ProtectionDomain("bench_idle", "idle.elf", priority=1)
+    bench = ProtectionDomain("bench", "benchmark.elf", priority=254)
 
     serial_system.add_client(bench)
 
