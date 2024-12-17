@@ -132,7 +132,7 @@ static void rx_return(void)
 
     if (packets_transferred && net_require_signal_active(&rx_queue)) {
         net_cancel_signal_active(&rx_queue);
-        microkit_notify(config.rx_id);
+        microkit_notify(config.virt_rx.id);
     }
 }
 
@@ -188,7 +188,7 @@ static void tx_return(void)
 
     if (enqueued && net_require_signal_free(&tx_queue)) {
         net_cancel_signal_free(&tx_queue);
-        microkit_notify(config.tx_id);
+        microkit_notify(config.virt_tx.id);
     }
 }
 
@@ -216,14 +216,14 @@ static void handle_irq(void)
 
 static void eth_setup(void)
 {
-    eth = device_resources.regions[0].vaddr;
+    eth = device_resources.regions[0].region.vaddr;
 
     uint32_t l = eth->palr;
     uint32_t h = eth->paur;
 
     /* Set up HW rings */
-    rx.descr = (volatile struct descriptor *)device_resources.regions[1].vaddr;
-    tx.descr = (volatile struct descriptor *)device_resources.regions[2].vaddr;
+    rx.descr = (volatile struct descriptor *)device_resources.regions[1].region.vaddr;
+    tx.descr = (volatile struct descriptor *)device_resources.regions[2].region.vaddr;
 
     /* Perform reset */
     eth->ecr = ECR_RESET;
@@ -274,8 +274,8 @@ static void eth_setup(void)
     eth->tacc = TACC_PROCHK | TACC_IPCHK;
 
     /* Set RDSR */
-    eth->rdsr = device_resources.regions[1].paddr;
-    eth->tdsr = device_resources.regions[2].paddr;
+    eth->rdsr = device_resources.regions[1].io_addr;
+    eth->tdsr = device_resources.regions[2].io_addr;
 
     /* Size of max eth packet size */
     eth->mrbr = MAX_PACKET_SIZE;
@@ -300,8 +300,8 @@ void init(void)
 {
     eth_setup();
 
-    net_queue_init(&rx_queue, config.rx_free, config.rx_active, config.rx_capacity);
-    net_queue_init(&tx_queue, config.tx_free, config.tx_active, config.tx_capacity);
+    net_queue_init(&rx_queue, config.virt_rx.free_queue.vaddr, config.virt_rx.active_queue.vaddr, config.virt_rx.num_buffers);
+    net_queue_init(&tx_queue, config.virt_tx.free_queue.vaddr, config.virt_tx.active_queue.vaddr, config.virt_tx.num_buffers);
 
     rx_provide();
     tx_provide();
@@ -316,9 +316,9 @@ void notified(microkit_channel ch)
          * in the microkit event handler loop.
          */
         microkit_deferred_irq_ack(ch);
-    } else if (ch == config.rx_id) {
+    } else if (ch == config.virt_rx.id) {
         rx_provide();
-    } else if (ch == config.tx_id) {
+    } else if (ch == config.virt_tx.id) {
         tx_provide();
     } else {
         sddf_dprintf("ETH|LOG: received notification on unexpected channel: %u\n", ch);
