@@ -11,7 +11,7 @@ typedef struct benchmark_config {
     uint8_t start_channel;
     uint8_t stop_channel;
     uint8_t init_channel;
-    uint64_t num_children;
+    uint8_t num_children;
     benchmark_child_config_t children[BENCHMARK_MAX_CHILDREN];
 } benchmark_config_t;
 
