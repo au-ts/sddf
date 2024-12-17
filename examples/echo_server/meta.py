@@ -1,10 +1,12 @@
 import argparse
+import struct
 from typing import Dict, List, Any, Tuple
 from sdfgen import SystemDescription, Sddf, DeviceTree
 
 ProtectionDomain = SystemDescription.ProtectionDomain
 MemoryRegion = SystemDescription.MemoryRegion
 Map = SystemDescription.Map
+Channel = SystemDescription.Channel
 
 class Platform:
     def __init__(self, name: str, arch: SystemDescription.Arch, paddr_top: int, serial: str, timer: str, ethernet: str):
@@ -22,10 +24,13 @@ PLATFORMS: List[Platform] = [
     # Platform("maaxboard", SystemDescription.Arch.AARCH64, 0xa_000_000, "soc@0/bus@30800000/serial@30860000"),
 ]
 
-# Classes to serialise into custom configuration for the benchmarking
-# component.
-# All serialised definitions are little endian and pointers are 64-bit
-# integers.
+def uint8(n: int) -> bytes:
+    return n.to_bytes(1, "little")
+
+"""
+Below are classes to serialise into custom configuration for the benchmarking component.
+All serialised definitions are little endian and pointers are 64-bit integers.
+"""
 
 class BenchmarkIdleConfig:
     def __init__(self, cycle_counters: int, ch_init: int):
@@ -40,7 +45,7 @@ class BenchmarkIdleConfig:
         }
     '''
     def serialise(self) -> bytes:
-        struct.pack(">qc", self.cycle_counters, self.ch_init)
+        return struct.pack(">qc", self.cycle_counters, self.ch_init.to_bytes(1, "little"))
 
 
 class BenchmarkClientConfig:
@@ -58,7 +63,7 @@ class BenchmarkClientConfig:
         }
     '''
     def serialise(self) -> bytes:
-        return struct.pack(">qcc", self.cycle_counters, self.ch_start, self.ch_stop)
+        return struct.pack(">qcc", self.cycle_counters, self.ch_start.to_bytes(1, "little"), self.ch_stop.to_bytes(1, "little"))
 
 
 class BenchmarkConfig:
@@ -70,10 +75,21 @@ class BenchmarkConfig:
 
 
     def serialise(self) -> bytes:
-        pack_str = ">cccq"
+        child_config_format = "c" * 65
+        pack_str = ">cccc" + child_config_format * 64
+        child_bytes = bytearray()
         for child in self.children:
-            c_name = self.name.encode("utf-8")
+            c_name = child[1].encode("utf-8")
+            c_name_padded = c_name.ljust(64, b'\0')
+            assert len(c_name_padded) == 64
+            child_bytes.extend(c_name_padded)
+            child_bytes.extend(child[0].to_bytes(1, "little"))
 
+        child_bytes = child_bytes.ljust(64 * 65, b'\0')
+
+        child_bytes = [x.to_bytes(1, "little") for x in child_bytes]
+
+        return struct.pack(pack_str, uint8(self.ch_start), uint8(self.ch_stop), uint8(self.ch_init), len(self.children).to_bytes(1, "little"), *child_bytes)
 
 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
@@ -113,6 +129,8 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     bench_idle = ProtectionDomain("bench_idle", "idle.elf")
     bench = ProtectionDomain("bench", "benchmark.elf")
 
+    serial_system.add_client(bench)
+
     benchmark_pds = [
         uart_driver,
         serial_virt_tx,
@@ -129,16 +147,33 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
         bench_idle,
         bench,
     ]
-    # benchmark_children = []
-    # for pd in benchmark_pds:
-    #     child_id = bench.add_child_pd(pd)
-    #     benchmark_children.append((child_id, pd.name))
-    # for pd in pds:
-        # sdf.add_pd(pd)
+    bench_children = []
     for pd in benchmark_pds:
+        child_id = bench.add_child_pd(pd)
+        bench_children.append((child_id, pd.name))
+    for pd in pds:
         sdf.add_pd(pd)
 
-    # Need to add channels between benchmark and benchmark client
+    # Benchmark START channel
+    bench_start_ch = Channel(client0, bench)
+    sdf.add_channel(bench_start_ch)
+    # Benchmark STOP channel
+    bench_stop_ch = Channel(client0, bench)
+    sdf.add_channel(bench_stop_ch)
+
+    bench_idle_ch = Channel(bench_idle, bench)
+    sdf.add_channel(bench_idle_ch)
+
+    cycle_counters_mr = MemoryRegion("cycle_counters", 0x1000)
+    sdf.add_mr(cycle_counters_mr)
+
+    bench_idle.add_map(Map(cycle_counters_mr, 0x5_000_000, perms=Map.Perms(r=True, w=True)))
+    client0.add_map(Map(cycle_counters_mr, 0x20_000_000, perms=Map.Perms(r=True, w=True)))
+    bench_idle_config = BenchmarkIdleConfig(0x5_000_000, bench_idle_ch.pd_a_id)
+
+    bench_client_config = BenchmarkClientConfig(0x20_000_000, bench_start_ch.pd_a_id, bench_stop_ch.pd_a_id)
+
+    benchmark_config = BenchmarkConfig(bench_start_ch.pd_b_id, bench_stop_ch.pd_b_id, bench_idle_ch.pd_b_id, bench_children)
 
     assert serial_system.connect()
     assert serial_system.serialise_config(output_dir)
@@ -146,6 +181,15 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     assert net_system.serialise_config(output_dir)
     assert timer_system.connect()
     assert timer_system.serialise_config(output_dir)
+
+    with open(f"{output_dir}/benchmark_config.data", "wb+") as f:
+        f.write(benchmark_config.serialise())
+
+    with open(f"{output_dir}/benchmark_idle_config.data", "wb+") as f:
+        f.write(bench_idle_config.serialise())
+
+    with open(f"{output_dir}/benchmark_client_config.data", "wb+") as f:
+        f.write(bench_client_config.serialise())
 
     with open(f"{output_dir}/{sdf_file}", "w+") as f:
         f.write(sdf.xml())
