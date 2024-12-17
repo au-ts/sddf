@@ -65,8 +65,8 @@ static char *child_name(uint64_t child_id)
 static void microkit_benchmark_start(void)
 {
     seL4_BenchmarkResetThreadUtilisation(TCB_CAP);
-    for (uint64_t i = 0; i < config.num_children; i++) {
-        seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + config.children[i].child_id);
+    for (uint64_t i = 0; i < benchmark_config.num_children; i++) {
+        seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + benchmark_config.children[i].child_id);
     }
     seL4_BenchmarkResetLog();
 }
@@ -193,8 +193,8 @@ void notified(microkit_channel ch)
         uint64_t number_schedules;
         microkit_benchmark_stop(&total, &number_schedules, &kernel, &entries);
         print_total_utilisation_details(kernel, entries, number_schedules, total);
-        for (uint64_t i = 0; i < config.num_children; i++) {
-            uint64_t child_id = config.children[i].child_id;
+        for (uint8_t i = 0; i < benchmark_config.num_children; i++) {
+            uint8_t child_id = benchmark_config.children[i].child_id;
             microkit_benchmark_stop_tcb(child_id, &total, &number_schedules, &kernel, &entries);
             print_pd_utilisation_details(child_id, kernel, entries, number_schedules, total);
         }
