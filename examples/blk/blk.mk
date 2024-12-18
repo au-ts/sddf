@@ -24,12 +24,14 @@ ifeq ($(strip $(TOOLCHAIN)), clang)
 	LD := ld.lld
 	AR := llvm-ar
 	RANLIB := llvm-ranlib
+	OBJCOPY := llvm-objcopy
 else
 	CC := $(TOOLCHAIN)-gcc
 	LD := $(TOOLCHAIN)-ld
 	AS := $(TOOLCHAIN)-as
 	AR := $(TOOLCHAIN)-ar
 	RANLIB := $(TOOLCHAIN)-ranlib
+	OBJCOPY := $(TOOLCHAIN)-objcopy
 endif
 
 DTC := dtc
