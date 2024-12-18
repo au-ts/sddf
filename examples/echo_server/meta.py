@@ -21,7 +21,7 @@ class Platform:
 PLATFORMS: List[Platform] = [
     Platform("qemu_virt_aarch64", SystemDescription.Arch.AARCH64, 0x6_0000_000, "pl011@9000000", "timer", "virtio_mmio@a003e00"),
     Platform("odroidc4", SystemDescription.Arch.AARCH64, 0x60000000, "soc/bus@ff800000/serial@3000", "soc/bus@ffd00000/watchdog@f0d0", "soc/ethernet@ff3f0000"),
-    Platform("maaxboard", SystemDescription.Arch.AARCH64, 0x40000000, "soc@0/bus@30800000/serial@30860000", "soc@0/bus@30000000/timer@302d0000", "soc@0/bus@30800000/ethernet@30be0000"),
+    Platform("maaxboard", SystemDescription.Arch.AARCH64, 0x70000000, "soc@0/bus@30800000/serial@30860000", "soc@0/bus@30000000/timer@302d0000", "soc@0/bus@30800000/ethernet@30be0000"),
 ]
 
 def uint8(n: int) -> bytes:
@@ -107,7 +107,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     serial_virt_tx = ProtectionDomain("serial_virt_tx", "serial_virt_tx.elf", priority=99)
     serial_system = Sddf.Serial(sdf, uart_node, uart_driver, serial_virt_tx)
 
-    ethernet_driver = ProtectionDomain("ethernet_driver", "eth_driver.elf", priority=101)
+    ethernet_driver = ProtectionDomain("ethernet_driver", "eth_driver.elf", priority=101, budget=100, period=400)
     net_virt_tx = ProtectionDomain("net_virt_tx", "network_virt_tx.elf", priority=100, budget=20000)
     net_virt_rx = ProtectionDomain("net_virt_rx", "network_virt_rx.elf", priority=99)
     net_system = Sddf.Network(sdf, ethernet_node, ethernet_driver, net_virt_tx, net_virt_rx)
