@@ -1,7 +1,9 @@
 {
     "name": "imx_timer",
     "compatible": [
-        "fsl,imx8mq-gpt"
+        "fsl,imx8mm-gpt",
+        "fsl,imx8mq-gpt",
+        "fsl,imx8mp-gpt"
     ],
     "resources": {
         "regions": [

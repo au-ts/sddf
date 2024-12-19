@@ -17,11 +17,13 @@ class Platform:
         self.timer = timer
         self.ethernet = ethernet
 
-# TODO: add QEMU virt RISC-V, i.MX8MM-EVK, i.MX8MQ-EVK, i.MX8MP-EVK
 PLATFORMS: List[Platform] = [
     Platform("qemu_virt_aarch64", SystemDescription.Arch.AARCH64, 0x6_0000_000, "pl011@9000000", "timer", "virtio_mmio@a003e00"),
     Platform("odroidc4", SystemDescription.Arch.AARCH64, 0x60000000, "soc/bus@ff800000/serial@3000", "soc/bus@ffd00000/watchdog@f0d0", "soc/ethernet@ff3f0000"),
     Platform("maaxboard", SystemDescription.Arch.AARCH64, 0x70000000, "soc@0/bus@30800000/serial@30860000", "soc@0/bus@30000000/timer@302d0000", "soc@0/bus@30800000/ethernet@30be0000"),
+    Platform("imx8mm_evk", SystemDescription.Arch.AARCH64, 0x70000000, "soc@0/bus@30800000/spba-bus@30800000/serial@30890000", "soc@0/bus@30000000/timer@302d0000", "soc@0/bus@30800000/ethernet@30be0000"),
+    Platform("imx8mp_evk", SystemDescription.Arch.AARCH64, 0x70000000, "soc@0/bus@30800000/spba-bus@30800000/serial@30860000", "soc@0/bus@30000000/timer@302d0000", "soc@0/bus@30800000/ethernet@30be0000"),
+    Platform("imx8mq_evk", SystemDescription.Arch.AARCH64, 0x70000000, "soc@0/bus@30800000/serial@30860000", "soc@0/bus@30000000/timer@302d0000", "soc@0/bus@30800000/ethernet@30be0000"),
 ]
 
 """

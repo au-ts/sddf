@@ -540,6 +540,12 @@
 				phandle = <0x11>;
 			};
 
+			timer@302d0000 {
+				compatible = "fsl,imx8mm-gpt";
+				reg = <0x302d0000 0x10000>;
+				interrupts = <0x00 0x37 0x04>;
+			};
+
 			dma-controller@302b0000 {
 				compatible = "fsl,imx8mm-sdma", "fsl,imx8mq-sdma";
 				reg = <0x302b0000 0x10000>;
