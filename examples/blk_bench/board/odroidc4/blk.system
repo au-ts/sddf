@@ -39,13 +39,6 @@
     <!-- shared memory for PMU counters -->
     <memory_region name="cyclecounters" size="0x1000" />
 
-    <!-- The timer driver should run at higher priority than its clients.
-        As a passive server, PPC into the driver will be fastpathed. -->
-    <protection_domain name="timer" priority="254" pp="true" passive="true">
-        <program_image path="timer_driver.elf" />
-        <map mr="timer_registers" vaddr="0x2_000_000" perms="rw" cached="false" setvar_vaddr="gpt_regs" />
-        <irq irq="42" id="0" trigger="edge" /> <!-- timer interrupt for timer A -->
-    </protection_domain>
 
 
     <protection_domain name="bench" priority="103" >
@@ -54,6 +47,13 @@
         <map mr="serial_tx_queue_bench" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="serial_tx_queue" />
         <map mr="serial_tx_data_bench" vaddr="0x4_002_000" perms="rw" cached="true" setvar_vaddr="serial_tx_data" />
 
+        <!-- The timer driver should run at higher priority than its clients.
+            As a passive server, PPC into the driver will be fastpathed. -->
+        <protection_domain name="timer" priority="254" pp="true" passive="true" id="7">
+            <program_image path="timer_driver.elf" />
+            <map mr="timer_registers" vaddr="0x2_000_000" perms="rw" cached="false" setvar_vaddr="gpt_regs" />
+            <irq irq="42" id="0" trigger="edge" /> <!-- timer interrupt for timer A -->
+        </protection_domain>
         <!-- Note: to use cycle count from PMU for the bench PD, the idle thread NEEDS to be a child of the bench PD, so cycles spent in that PD also increment the bench PD's cycle count -->
         <protection_domain name="benchIdle" id="6" priority="1" >
             <program_image path="idle.elf" />
