@@ -160,7 +160,7 @@ void notified(microkit_channel ch)
 {
     if (ch == serial_config.tx.id) {
         return;
-    } else if (ch == benchmark_config.start_channel) {
+    } else if (ch == benchmark_config.start_ch) {
 #ifdef MICROKIT_CONFIG_benchmark
         sel4bench_reset_counters();
         THREAD_MEMORY_RELEASE();
@@ -174,7 +174,7 @@ void notified(microkit_channel ch)
         seL4_BenchmarkResetLog();
 #endif
 #endif
-    } else if (ch == benchmark_config.stop_channel) {
+    } else if (ch == benchmark_config.stop_ch) {
 #ifdef MICROKIT_CONFIG_benchmark
         sel4bench_get_counters(benchmark_bf, &counter_values[0]);
         sel4bench_stop_counters(benchmark_bf);
@@ -247,7 +247,7 @@ void init(void)
 #endif
 
     /* Notify the idle thread that the sel4bench library is initialised. */
-    microkit_notify(benchmark_config.init_channel);
+    microkit_notify(benchmark_config.init_ch);
 
 #ifdef CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES
     int res_buf = seL4_BenchmarkSetLogBuffer(LOG_BUFFER_CAP);

@@ -24,9 +24,6 @@ PLATFORMS: List[Platform] = [
     Platform("maaxboard", SystemDescription.Arch.AARCH64, 0x70000000, "soc@0/bus@30800000/serial@30860000", "soc@0/bus@30000000/timer@302d0000", "soc@0/bus@30800000/ethernet@30be0000"),
 ]
 
-def uint8(n: int) -> bytes:
-    return n.to_bytes(1, "little")
-
 """
 Below are classes to serialise into custom configuration for the benchmarking component.
 All serialised definitions are little endian and pointers are 64-bit integers.
@@ -63,7 +60,7 @@ class BenchmarkClientConfig:
         }
     '''
     def serialise(self) -> bytes:
-        return struct.pack(">qcc", self.cycle_counters, self.ch_start.to_bytes(1, "little"), self.ch_stop.to_bytes(1, "little"))
+        return struct.pack(">qBB", self.cycle_counters, self.ch_start, self.ch_stop)
 
 
 class BenchmarkConfig:
@@ -76,7 +73,7 @@ class BenchmarkConfig:
 
     def serialise(self) -> bytes:
         child_config_format = "c" * 65
-        pack_str = ">cccc" + child_config_format * 64
+        pack_str = ">BBBB" + child_config_format * 64
         child_bytes = bytearray()
         for child in self.children:
             c_name = child[1].encode("utf-8")
@@ -89,7 +86,7 @@ class BenchmarkConfig:
 
         child_bytes = [x.to_bytes(1, "little") for x in child_bytes]
 
-        return struct.pack(pack_str, uint8(self.ch_start), uint8(self.ch_stop), uint8(self.ch_init), len(self.children).to_bytes(1, "little"), *child_bytes)
+        return struct.pack(pack_str, self.ch_start, self.ch_stop, self.ch_init, len(self.children), *child_bytes)
 
 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
