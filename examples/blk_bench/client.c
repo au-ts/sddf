@@ -21,8 +21,15 @@
 #include "basic_data.h"
 //#include "sddf/util/fence.h"
 
+//#define DO_LOG_DEBUG
+
+#ifdef DO_LOG_DEBUG
 #define LOG_CLIENT(...) do{ sddf_printf("CLIENT|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
 #define LOG_CLIENT_ERR(...) do{ sddf_printf("CLIENT|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
+#else
+#define LOG_CLIENT(...)
+#define LOG_CLIENT_ERR(...)
+#endif
 
 #define VIRT_CH 0
 #define SERIAL_TX_CH 1
@@ -98,7 +105,7 @@ bool run_benchmark() {
             break;
         case THROUGHPUT_RANDOM_READ:
             /* Perform REQUEST_COUNT[benchmark_size_idx] random READs, from 4KiB write size up to 8MiB */
-            handle_random_operations_run(BLK_REQ_READ, read_start_sector, BLOCK_READ_WRITE_INTERVAL, "RANDOM_READ", THROUGHPUT_RANDOM_WRITE);
+            handle_random_operations_run(BLK_REQ_READ, read_start_sector, BLOCK_READ_WRITE_INTERVAL, "RANDOM_READ", LATENCY_READ);
             break;
         case THROUGHPUT_RANDOM_WRITE:
             /* Perform QUEUE_SIZE WRITEs, from 4KiB write size up to 128MiB (x8 at each step) */
@@ -155,7 +162,6 @@ void handle_random_operations_run(blk_req_code_t request_code, uint32_t start_se
                                     + i * BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx] + \
                                     i * interval / BLK_TRANSFER_SIZE;
             uint16_t count = BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx];
-            //sddf_printf("client: io_or_offset 0x%lx, block_number: %d, count: %d\n", io_or_offset, block_number, count);
 
             int err = blk_enqueue_req(&blk_queue, request_code, io_or_offset, block_number, count, i);
             assert(!err);
@@ -167,19 +173,17 @@ void handle_random_operations_run(blk_req_code_t request_code, uint32_t start_se
         // virtualiser replied -> queue processed!
         microkit_notify(STOP_PMU);
         // clean up the queue
-        sddf_printf("queue size before dequeue: %d\n", blk_queue_length_resp(&blk_queue));
         for (uint32_t i = 0; i != REQUEST_COUNT[benchmark_size_idx]; ++i) {
             dequeue_and_validate(BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx]);
         }
-        sddf_printf("queue size after dequeue: %d\n", blk_queue_length_resp(&blk_queue));
         benchmark_size_idx = (benchmark_size_idx + 1) % BENCHMARK_RUN_COUNT;
         if (benchmark_size_idx == 0) {
             benchmark_run_idx = (benchmark_run_idx + 1) % BENCHMARK_INDIVIDUAL_RUN_REPEATS;
             if (benchmark_run_idx == 0) {
                 run_benchmark_state = next_state;
-                sddf_printf("run_benchmark: finished all BENCHMARK_BLOCKS_PER_REQUEST for THROUGHPUT_%s\n", run_type);
+                LOG_CLIENT("run_benchmark: finished all BENCHMARK_BLOCKS_PER_REQUEST for THROUGHPUT_%s\n", run_type);
             } else {
-                sddf_printf("run_benchmark: finished %d/%d run for THROUGHPUT_%s\n", benchmark_run_idx, BENCHMARK_INDIVIDUAL_RUN_REPEATS, run_type);
+                LOG_CLIENT("run_benchmark: finished %d/%d run for THROUGHPUT_%s\n", benchmark_run_idx, BENCHMARK_INDIVIDUAL_RUN_REPEATS, run_type);
             }
         }
         virtualiser_replied = false;
