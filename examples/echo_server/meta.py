@@ -42,7 +42,7 @@ class BenchmarkIdleConfig:
         }
     '''
     def serialise(self) -> bytes:
-        return struct.pack(">qc", self.cycle_counters, self.ch_init.to_bytes(1, "little"))
+        return struct.pack("<qc", self.cycle_counters, self.ch_init.to_bytes(1, "little"))
 
 
 class BenchmarkClientConfig:
@@ -60,7 +60,7 @@ class BenchmarkClientConfig:
         }
     '''
     def serialise(self) -> bytes:
-        return struct.pack(">qBB", self.cycle_counters, self.ch_start, self.ch_stop)
+        return struct.pack("<qBB", self.cycle_counters, self.ch_start, self.ch_stop)
 
 
 class BenchmarkConfig:
@@ -73,7 +73,7 @@ class BenchmarkConfig:
 
     def serialise(self) -> bytes:
         child_config_format = "c" * 65
-        pack_str = ">BBBB" + child_config_format * 64
+        pack_str = "<BBBB" + child_config_format * 64
         child_bytes = bytearray()
         for child in self.children:
             c_name = child[1].encode("utf-8")
