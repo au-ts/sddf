@@ -112,17 +112,17 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     net_virt_rx = ProtectionDomain("net_virt_rx", "network_virt_rx.elf", priority=99)
     net_system = Sddf.Network(sdf, ethernet_node, ethernet_driver, net_virt_tx, net_virt_rx)
 
-    client0 = ProtectionDomain("client0", "lwip0.elf", priority=98, budget=20000)
-    client0_net_copier = ProtectionDomain("client0_net_copier", "network_copy0.elf", priority=97, budget=20000)
-    client1 = ProtectionDomain("client1", "lwip1.elf", priority=98, budget=20000)
-    client1_net_copier = ProtectionDomain("client1_net_copier", "network_copy1.elf", priority=97, budget=20000)
+    client0 = ProtectionDomain("client0", "lwip0.elf", priority=97, budget=20000)
+    client0_net_copier = ProtectionDomain("client0_net_copier", "network_copy0.elf", priority=98, budget=20000)
+    client1 = ProtectionDomain("client1", "lwip1.elf", priority=97, budget=20000)
+    client1_net_copier = ProtectionDomain("client1_net_copier", "network_copy1.elf", priority=98, budget=20000)
 
     serial_system.add_client(client0)
     serial_system.add_client(client1)
     timer_system.add_client(client0)
     timer_system.add_client(client1)
-    net_system.add_client_with_copier(client0, client0_net_copier, mac_addr="0f:1f:2f:3f:4f:5f")
-    net_system.add_client_with_copier(client1, client1_net_copier, mac_addr="0f:1f:2f:3f:4f:6f")
+    net_system.add_client_with_copier(client0, client0_net_copier, mac_addr="52:54:01:00:00:05")
+    net_system.add_client_with_copier(client1, client1_net_copier, mac_addr="52:54:01:00:00:06")
 
     # Benchmark specific resources
 
