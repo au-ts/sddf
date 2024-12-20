@@ -105,7 +105,11 @@ typedef struct benchmark_run_resuls {
     uint64_t no_schedules_virtualiser;
     uint64_t no_schedules_client;
     uint64_t no_schedules_idle;
-
+    /* cycles per PD */
+    uint64_t cycles_driver;
+    uint64_t cycles_virtualiser;
+    uint64_t cycles_client;
+    uint64_t cycles_idle;
 } benchmark_run_resuls_t;
 
 benchmark_run_resuls_t benchmark_run_results_rand_read[BENCHMARK_RUN_COUNT*BENCHMARK_INDIVIDUAL_RUN_REPEATS];
@@ -260,7 +264,8 @@ void print_all_benchmark_results(enum run_benchmark_state print_state) {
         for (int i = 0; i != BENCHMARK_RUN_COUNT; ++i) {
             sddf_printf("No. rqs: %d, rq size: 0x%x B, speed: %.2f MiB/s,"
                     " speed_ccount: %.2f MiB/s, time: %lu ms, time_ccount: %lu ms, cpu_util: %.2f perc, "
-                    "ctxt_sw/rq: driv: %.2f, virt: %.2f, cli %.2f, idle: %.2f\n",
+                    "ctxt_sw/rq: driv: %.2f, virt: %.2f, cli %.2f, idle: %.2f"
+                    ", cyc_driv: 0x%lx, cyc_virt: 0x%lx, cyc_cli: 0x%lx, cyc_idle: 0x%lx\n",
                     REQUEST_COUNT[i],
                     BENCHMARK_BLOCKS_PER_REQUEST[i] * BLK_TRANSFER_SIZE,
                     bench_results[i + j*BENCHMARK_RUN_COUNT].speed,
@@ -271,7 +276,11 @@ void print_all_benchmark_results(enum run_benchmark_state print_state) {
                     (float) bench_results[i + j*BENCHMARK_RUN_COUNT].no_schedules_driver/REQUEST_COUNT[i],
                     (float) bench_results[i + j*BENCHMARK_RUN_COUNT].no_schedules_virtualiser/REQUEST_COUNT[i],
                     (float) bench_results[i + j*BENCHMARK_RUN_COUNT].no_schedules_client/REQUEST_COUNT[i],
-                    (float) bench_results[i + j*BENCHMARK_RUN_COUNT].no_schedules_idle/REQUEST_COUNT[i]);
+                    (float) bench_results[i + j*BENCHMARK_RUN_COUNT].no_schedules_idle/REQUEST_COUNT[i],
+                    bench_results[i + j*BENCHMARK_RUN_COUNT].cycles_driver,
+                    bench_results[i + j*BENCHMARK_RUN_COUNT].cycles_virtualiser,
+                    bench_results[i + j*BENCHMARK_RUN_COUNT].cycles_client,
+                    bench_results[i + j*BENCHMARK_RUN_COUNT].cycles_idle);
         }
     }
 }
@@ -341,18 +350,21 @@ void notified(microkit_channel ch) {
         cycles_PD_BLK_VIRT_CLI += total;
         cycles_summed += total;
         bench_results[benchmark_size_idx + run_offset].no_schedules_driver = number_schedules;
+        bench_results[benchmark_size_idx + run_offset].cycles_driver = total;
 
         microkit_benchmark_stop_tcb(PD_VIRT_ID, &total, &number_schedules, &kernel, &entries);
         print_benchmark_details(PD_VIRT_ID, kernel, entries, number_schedules, total);
         cycles_PD_BLK_VIRT_CLI += total;
         cycles_summed += total;
         bench_results[benchmark_size_idx + run_offset].no_schedules_virtualiser = number_schedules;
+        bench_results[benchmark_size_idx + run_offset].cycles_virtualiser = total;
 
         microkit_benchmark_stop_tcb(PD_CLIENT_ID, &total, &number_schedules, &kernel, &entries);
         print_benchmark_details(PD_CLIENT_ID, kernel, entries, number_schedules, total);
         cycles_PD_BLK_VIRT_CLI += total;
         cycles_summed += total;
         bench_results[benchmark_size_idx + run_offset].no_schedules_client = number_schedules;
+        bench_results[benchmark_size_idx + run_offset].cycles_client = total;
 
         microkit_benchmark_stop_tcb(PD_UART_ID, &total, &number_schedules, &kernel, &entries);
         print_benchmark_details(PD_UART_ID, kernel, entries, number_schedules, total);
@@ -366,6 +378,7 @@ void notified(microkit_channel ch) {
         print_benchmark_details(PD_IDLE_ID, kernel, entries, number_schedules, total);
         cycles_summed += total;
         bench_results[benchmark_size_idx + run_offset].no_schedules_idle = number_schedules;
+        bench_results[benchmark_size_idx + run_offset].cycles_idle = total;
 
         microkit_benchmark_stop_tcb(PD_TIMER_ID, &total, &number_schedules, &kernel, &entries);
         print_benchmark_details(PD_TIMER_ID, kernel, entries, number_schedules, total);
@@ -383,6 +396,9 @@ void notified(microkit_channel ch) {
                 REQUEST_COUNT[benchmark_size_idx] / (1024. * 1024.)) / ((double) (elapsed_time)*1e-9);
         sddf_printf("speed (MiB/s: %f\n", speed);
         float cpuutil = (float) (((double) cycles_PD_BLK_VIRT_CLI /  cycles_PD_TOTAL) * 100);
+        sddf_printf("old cpuutil: %f\n", cpuutil);
+        cpuutil = (float) (((double) (cycles_PD_TOTAL - bench_results[benchmark_size_idx + run_offset].cycles_idle) /  cycles_PD_TOTAL) * 100);
+        sddf_printf("new cpuutil: %f\n", cpuutil);
         /* compute MiB/s based on cyclecount (NOTE: using hardcoded CPU freq, as per uboot) */
 #ifdef MICROKIT_BOARD_odroidc4
         /* formula: amount of data transferred / (cycles_PD_TOTAL / ODROID_CPU_CLKFREQ_MHZ) */
