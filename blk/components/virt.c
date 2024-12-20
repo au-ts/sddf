@@ -159,10 +159,8 @@ static bool handle_mbr_reply()
         return false;
     }
 
-    /* TODO: This is a raw seL4 system call because Microkit does not (currently)
-     * include a corresponding libmicrokit API. */
 #ifdef CONFIG_ARCH_ARM
-    seL4_ARM_VSpace_Invalidate_Data(3, mbr_bk.vaddr, mbr_bk.vaddr + (BLK_TRANSFER_SIZE * mbr_bk.count));
+    cache_clean_and_invalidate(mbr_bk.vaddr, mbr_bk.vaddr + (BLK_TRANSFER_SIZE * mbr_bk.count));
 #endif
     sddf_memcpy(&msdos_mbr, (void *)mbr_bk.vaddr, sizeof(struct msdos_mbr));
 
@@ -218,10 +216,8 @@ static void handle_driver()
         case BLK_REQ_READ:
             if (drv_status == BLK_RESP_OK) {
                 /* Invalidate cache */
-                /* TODO: This is a raw seL4 system call because Microkit does not (currently)
-                    * include a corresponding libmicrokit API. */
 #ifdef CONFIG_ARCH_ARM
-                seL4_ARM_VSpace_Invalidate_Data(3, reqbk.vaddr, reqbk.vaddr + (BLK_TRANSFER_SIZE * reqbk.count));
+                cache_clean_and_invalidate(reqbk.vaddr, reqbk.vaddr + (BLK_TRANSFER_SIZE * reqbk.count));
 #endif
             }
             break;
