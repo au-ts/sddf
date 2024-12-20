@@ -4,9 +4,7 @@ from sdfgen import SystemDescription, Sddf, DeviceTree
 
 ProtectionDomain = SystemDescription.ProtectionDomain
 
-# TODO: remove platform, it should be board instead to be consistne tiwth Microkit
-
-class Platform:
+class Board:
     def __init__(self, name: str, arch: SystemDescription.Arch, paddr_top: int, timer_device_node: str):
         self.name = name
         self.arch = arch
@@ -14,11 +12,11 @@ class Platform:
         self.timer_device_node = timer_device_node
 
 
-PLATFORMS: List[Platform] = [
-    Platform("qemu_virt_aarch64", SystemDescription.Arch.AARCH64, 0xa_000_000, "timer"),
-    Platform("odroidc4", SystemDescription.Arch.AARCH64, 0x80000000, "soc/bus@ffd00000/watchdog@f0d0"),
-    Platform("star64", SystemDescription.Arch.RISCV64, 0x100000000, "soc/timer@13050000"),
-    Platform("maaxboard", SystemDescription.Arch.AARCH64, 0xa0000000, "soc@0/bus@30000000/timer@302d0000"),
+BOARDS: List[Board] = [
+    Board("qemu_virt_aarch64", SystemDescription.Arch.AARCH64, 0xa_000_000, "timer"),
+    Board("odroidc4", SystemDescription.Arch.AARCH64, 0x80000000, "soc/bus@ffd00000/watchdog@f0d0"),
+    Board("star64", SystemDescription.Arch.RISCV64, 0x100000000, "soc/timer@13050000"),
+    Board("maaxboard", SystemDescription.Arch.AARCH64, 0xa0000000, "soc@0/bus@30000000/timer@302d0000"),
 ]
 
 
@@ -26,7 +24,7 @@ def generate_sdf(sdf_file: str, output_dir: str, dtb: DeviceTree):
     timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=200)
     client = ProtectionDomain("client", "client.elf", priority=1)
 
-    timer_node = dtb.node(platform.timer_device_node)
+    timer_node = dtb.node(board.timer_device_node)
     assert timer_node is not None
 
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
@@ -48,20 +46,20 @@ def generate_sdf(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dtbs", required=True)
+    parser.add_argument("--dtb", required=True)
     parser.add_argument("--sddf", required=True)
-    parser.add_argument("--platform", required=True, choices=[p.name for p in PLATFORMS])
+    parser.add_argument("--board", required=True, choices=[b.name for b in BOARDS])
     parser.add_argument("--output", required=True)
     parser.add_argument("--sdf", required=True)
 
     args = parser.parse_args()
 
-    platform = next(filter(lambda p: p.name == args.platform, PLATFORMS))
+    board = next(filter(lambda p: p.name == args.board, BOARDS))
 
-    sdf = SystemDescription(platform.arch, platform.paddr_top)
+    sdf = SystemDescription(board.arch, board.paddr_top)
     sddf = Sddf(args.sddf)
 
-    with open(args.dtbs + f"/{platform.name}.dtb", "rb") as f:
+    with open(args.dtb, "rb") as f:
         dtb = DeviceTree(f.read())
 
     generate_sdf(args.sdf, args.output, dtb)
