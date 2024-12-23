@@ -59,8 +59,8 @@ void cache_clean_and_invalidate(unsigned long start, unsigned long end)
     for (index = LINE_INDEX(start); index < LINE_INDEX(end_rounded); index++) {
         vaddr = index << CONFIG_L1_CACHE_LINE_SIZE_BITS;
         asm volatile("dc civac, %0" : : "r"(vaddr));
-        asm volatile("dsb sy" ::: "memory");
     }
+        asm volatile("dsb sy" ::: "memory");
 #endif
 }
 
@@ -87,7 +87,7 @@ void cache_clean(unsigned long start, unsigned long end)
     for (index = LINE_INDEX(start); index < LINE_INDEX(end_rounded); index++) {
         vaddr = index << CONFIG_L1_CACHE_LINE_SIZE_BITS;
         asm volatile("dc cvac, %0" : : "r"(vaddr));
-        asm volatile("dmb sy" ::: "memory");
     }
+        asm volatile("dmb sy" ::: "memory");
 #endif
 }
