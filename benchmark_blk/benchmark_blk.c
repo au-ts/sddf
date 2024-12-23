@@ -484,8 +484,8 @@ void notified(microkit_channel ch) {
 #endif
 
         /* spin to let UART flush its content */
-        uint64_t timeout_duration = 1e9;
-        sddf_printf("benchmark: wait for UART to print out its msgs. Timing out for: %lu ms.\n", timeout_duration/1000);
+        uint64_t timeout_duration = 3e9;
+        sddf_printf("benchmark: wait for UART to print out its msgs. Timing out for: %f ms.\n", timeout_duration/1e6);
         sddf_timer_set_timeout(TIMER_CH, timeout_duration);
         break;
     case SERIAL_TX_CH:
