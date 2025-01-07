@@ -57,37 +57,8 @@ struct config config;
 #endif
 #define LOG_BLK_VIRT_ERR(...) do{ sddf_dprintf("BLK_VIRT|ERROR: "); sddf_dprintf(__VA_ARGS__); }while(0)
 
-void config_debug_print(struct config *config) {
-    LOG_BLK_VIRT("dumping config:\n");
-    sddf_dprintf("num_clients: %lu\n", config->num_clients);
-    sddf_dprintf("driver_storage_info: %p\n", config->driver.storage_info);
-    sddf_dprintf("driver_req_queue: %p\n", config->driver.req_queue);
-    sddf_dprintf("driver_resp_queue: %p\n", config->driver.resp_queue);
-    sddf_dprintf("driver_data_vaddr: 0x%lx\n", config->driver.data_vaddr);
-    sddf_dprintf("driver_data_paddr: 0x%lx\n", config->driver.data_paddr);
-    for (int i = 0; i < config->num_clients; i++) {
-        struct config_client *client = &config->clients[i];
-        sddf_dprintf("client[%d]: req_queue: %p\n", i, client->req_queue);
-        sddf_dprintf("client[%d]: resp_queue: %p\n", i, client->resp_queue);
-    }
-}
-
-
 #define DRIVER_CH 0
 #define CLI_CH_OFFSET 1
-
-/* Microkit patched variables */
-// blk_storage_info_t *blk_driver_storage_info;
-// blk_req_queue_t *blk_driver_req_queue;
-// blk_resp_queue_t *blk_driver_resp_queue;
-// uintptr_t blk_driver_data;
-// uintptr_t blk_data_paddr_driver;
-// blk_storage_info_t *blk_client_storage_info;
-// blk_req_queue_t *blk_client_req_queue;
-// blk_resp_queue_t *blk_client_resp_queue;
-// uintptr_t blk_client_data;
-// uintptr_t blk_client0_data_paddr;
-// uintptr_t blk_client1_data_paddr;
 
 /* Driver queue handle */
 blk_queue_handle_t drv_h;
@@ -213,8 +184,6 @@ static bool handle_mbr_reply()
 
 void init(void)
 {
-    config_debug_print(&config);
-
     while (!blk_storage_is_ready(config.driver.storage_info));
 
     /* Initialise client queues */
