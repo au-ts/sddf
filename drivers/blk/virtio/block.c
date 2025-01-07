@@ -28,15 +28,6 @@
 #define IRQ_CH 0
 #define VIRT_CH 1
 
-/*
- * This offset is the default for QEMU, but can change depending on
- * the configuration of QEMU and what other virtIO devices are being
- * used.
- */
-#ifndef VIRTIO_MMIO_BLK_OFFSET
-#define VIRTIO_MMIO_BLK_OFFSET (0xe00)
-#endif
-
 #define QUEUE_SIZE 1024
 #define VIRTQ_NUM_REQUESTS QUEUE_SIZE
 
@@ -391,7 +382,7 @@ void virtio_blk_init(void)
 
 void init(void)
 {
-    regs = (volatile virtio_mmio_regs_t *)(device_resources.regions[0].region.vaddr + VIRTIO_MMIO_BLK_OFFSET);
+    regs = (volatile virtio_mmio_regs_t *)device_resources.regions[0].region.vaddr;
     requests_paddr = device_resources.regions[2].io_addr;
     requests_vaddr = (uintptr_t)device_resources.regions[2].region.vaddr;
     virtio_headers_paddr = (uintptr_t)device_resources.regions[1].io_addr;
