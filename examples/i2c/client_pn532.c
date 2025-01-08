@@ -12,7 +12,8 @@
 #include <sddf/i2c/client.h>
 #include <sddf/i2c/config.h>
 #include <sddf/i2c/devices/pn532/pn532.h>
-#include "client.h"
+
+bool delay_ms(size_t milliseconds);
 
 // #define DEBUG_CLIENT
 

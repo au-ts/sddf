@@ -11,7 +11,6 @@
 #include <sddf/i2c/queue.h>
 #include <sddf/i2c/client.h>
 #include <sddf/i2c/config.h>
-#include <client.h>
 #include <sddf/i2c/devices/ds3231/ds3231.h>
 
 // #define DEBUG_DS3231
@@ -24,6 +23,7 @@
 
 #define LOG_DS3231_ERR(...) do{ sddf_printf("DS3231|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
+bool delay_ms(size_t milliseconds);
 
 extern cothread_t t_event;
 extern cothread_t t_main;

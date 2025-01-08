@@ -13,7 +13,6 @@
 #include <sddf/i2c/client.h>
 #include <sddf/i2c/config.h>
 #include <sddf/i2c/devices/ds3231/ds3231.h>
-#include "client.h"
 
 // #define DEBUG_CLIENT
 
@@ -24,6 +23,7 @@
 #endif
 #define LOG_CLIENT_ERR(...) do{ sddf_printf("DS3231_CLIENT|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
+bool delay_ms(size_t milliseconds);
 
 #define DS_3231_ON
 
