@@ -30,17 +30,13 @@
 
 #include "echo.h"
 
-__attribute__((__section__(".serial_client_config")))
-serial_client_config_t serial_config;
+__attribute__((__section__(".serial_client_config"))) serial_client_config_t serial_config;
 
-__attribute__((__section__(".timer_client_config")))
-timer_client_config_t timer_config;
+__attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
 
-__attribute__((__section__(".net_client_config")))
-net_client_config_t net_config;
+__attribute__((__section__(".net_client_config"))) net_client_config_t net_config;
 
-__attribute__((__section__(".benchmark_client_config")))
-benchmark_client_config_t benchmark_config;
+__attribute__((__section__(".benchmark_client_config"))) benchmark_client_config_t benchmark_config;
 
 serial_queue_handle_t serial_tx_queue_handle;
 
@@ -118,14 +114,8 @@ static struct pbuf *create_interface_buffer(uint64_t offset, size_t length)
     custom_pbuf_offset->offset = offset;
     custom_pbuf_offset->custom.custom_free_function = interface_free_buffer;
 
-    return pbuf_alloced_custom(
-               PBUF_RAW,
-               length,
-               PBUF_REF,
-               &custom_pbuf_offset->custom,
-               (void *)(offset + net_config.rx_data.vaddr),
-               NET_BUFFER_SIZE
-           );
+    return pbuf_alloced_custom(PBUF_RAW, length, PBUF_REF, &custom_pbuf_offset->custom,
+                               (void *)(offset + net_config.rx_data.vaddr), NET_BUFFER_SIZE);
 }
 
 /**
@@ -286,11 +276,14 @@ static void netif_status_callback(struct netif *netif)
 
 void init(void)
 {
-    serial_queue_init(&serial_tx_queue_handle, serial_config.tx.queue.vaddr, serial_config.tx.data.size, serial_config.tx.data.vaddr);
+    serial_queue_init(&serial_tx_queue_handle, serial_config.tx.queue.vaddr, serial_config.tx.data.size,
+                      serial_config.tx.data.vaddr);
     serial_putchar_init(serial_config.tx.id, &serial_tx_queue_handle);
 
-    net_queue_init(&state.rx_queue, net_config.rx.free_queue.vaddr, net_config.rx.active_queue.vaddr, net_config.rx.num_buffers);
-    net_queue_init(&state.tx_queue, net_config.tx.free_queue.vaddr, net_config.tx.active_queue.vaddr, net_config.tx.num_buffers);
+    net_queue_init(&state.rx_queue, net_config.rx.free_queue.vaddr, net_config.rx.active_queue.vaddr,
+                   net_config.rx.num_buffers);
+    net_queue_init(&state.tx_queue, net_config.tx.free_queue.vaddr, net_config.tx.active_queue.vaddr,
+                   net_config.tx.num_buffers);
     net_buffers_init(&state.tx_queue, 0);
 
     lwip_init();

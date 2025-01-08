@@ -172,7 +172,8 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
         error = tcp_write(pcb, buffer, strlen(buffer) + 1, TCP_WRITE_FLAG_COPY);
         tcp_shutdown(pcb, 0, 1);
 
-        if (!strcmp(microkit_name, "client0")) microkit_notify(bench_stop_ch);
+        if (!strcmp(microkit_name, "client0"))
+            microkit_notify(bench_stop_ch);
     } else if (msg_match(data_packet_str, QUIT)) {
         /* Do nothing for now */
     } else {
