@@ -71,8 +71,7 @@ uint16_t last_seen_used = 0;
 /* Block device configuration, populated during initiliastion. */
 volatile struct virtio_blk_config *virtio_config;
 
-__attribute__((__section__(".device_resources")))
-device_resources_t device_resources;
+__attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
 void handle_response(void)
 {
@@ -386,7 +385,7 @@ void init(void)
     requests_paddr = device_resources.regions[2].io_addr;
     requests_vaddr = (uintptr_t)device_resources.regions[2].region.vaddr;
     virtio_headers_paddr = (uintptr_t)device_resources.regions[1].io_addr;
-    virtio_headers = (struct virtio_blk_req *) device_resources.regions[1].region.vaddr;
+    virtio_headers = (struct virtio_blk_req *)device_resources.regions[1].region.vaddr;
 
     assert(virtio_headers_paddr);
     assert(virtio_headers);
