@@ -10,8 +10,7 @@
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 
-__attribute__((__section__(".net_virt_tx_config")))
-net_virt_tx_config_t config;
+__attribute__((__section__(".net_virt_tx_config"))) net_virt_tx_config_t config;
 
 typedef struct state {
     net_queue_handle_t tx_queue_drv;
@@ -24,7 +23,8 @@ int extract_offset(uintptr_t *phys)
 {
     for (int client = 0; client < config.num_clients; client++) {
         if (*phys >= config.clients[client].data.io_addr
-            && *phys < config.clients[client].data.io_addr + state.tx_queue_clients[client].capacity * NET_BUFFER_SIZE) {
+            && *phys
+                   < config.clients[client].data.io_addr + state.tx_queue_clients[client].capacity * NET_BUFFER_SIZE) {
             *phys = *phys - config.clients[client].data.io_addr;
             return client;
         }
@@ -80,7 +80,7 @@ void tx_provide(void)
 void tx_return(void)
 {
     bool reprocess = true;
-    bool notify_clients[SDDF_NET_MAX_CLIENTS] = {false};
+    bool notify_clients[SDDF_NET_MAX_CLIENTS] = { false };
     while (reprocess) {
         while (!net_queue_empty_free(&state.tx_queue_drv)) {
             net_buff_desc_t buffer;
@@ -121,10 +121,12 @@ void notified(microkit_channel ch)
 void init(void)
 {
     /* Set up driver queues */
-    net_queue_init(&state.tx_queue_drv, config.driver.free_queue.vaddr, config.driver.active_queue.vaddr, config.driver.num_buffers);
+    net_queue_init(&state.tx_queue_drv, config.driver.free_queue.vaddr, config.driver.active_queue.vaddr,
+                   config.driver.num_buffers);
 
     for (int i = 0; i < config.num_clients; i++) {
-        net_queue_init(&state.tx_queue_clients[i], config.clients[i].conn.free_queue.vaddr, config.clients[i].conn.active_queue.vaddr, config.clients[i].conn.num_buffers);
+        net_queue_init(&state.tx_queue_clients[i], config.clients[i].conn.free_queue.vaddr,
+                       config.clients[i].conn.active_queue.vaddr, config.clients[i].conn.num_buffers);
     }
 
     tx_provide();

@@ -18,8 +18,7 @@
  * any particular client. */
 #define BROADCAST_ID (-2)
 
-__attribute__((__section__(".net_virt_rx_config")))
-net_virt_rx_config_t config;
+__attribute__((__section__(".net_virt_rx_config"))) net_virt_rx_config_t config;
 
 /* In order to handle broadcast packets where the same buffer is given to multiple clients
   * we keep track of a reference count of each buffer and only hand it back to the driver once
@@ -68,7 +67,7 @@ int get_mac_addr_match(struct ethernet_header *buffer)
 void rx_return(void)
 {
     bool reprocess = true;
-    bool notify_clients[SDDF_NET_MAX_CLIENTS] = {false};
+    bool notify_clients[SDDF_NET_MAX_CLIENTS] = { false };
     while (reprocess) {
         while (!net_queue_empty_active(&state.rx_queue_drv)) {
             net_buff_desc_t buffer;
@@ -195,11 +194,13 @@ void init(void)
 
     /* Set up client queues */
     for (int i = 0; i < config.num_clients; i++) {
-        net_queue_init(&state.rx_queue_clients[i], config.clients[i].conn.free_queue.vaddr, config.clients[i].conn.active_queue.vaddr, config.clients[i].conn.num_buffers);
+        net_queue_init(&state.rx_queue_clients[i], config.clients[i].conn.free_queue.vaddr,
+                       config.clients[i].conn.active_queue.vaddr, config.clients[i].conn.num_buffers);
     }
 
     /* Set up driver queues */
-    net_queue_init(&state.rx_queue_drv, config.driver.free_queue.vaddr, config.driver.active_queue.vaddr, config.driver.num_buffers);
+    net_queue_init(&state.rx_queue_drv, config.driver.free_queue.vaddr, config.driver.active_queue.vaddr,
+                   config.driver.num_buffers);
     net_buffers_init(&state.rx_queue_drv, config.data.io_addr);
 
     if (net_require_signal_free(&state.rx_queue_drv)) {

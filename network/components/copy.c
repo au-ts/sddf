@@ -11,8 +11,7 @@
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 
-__attribute__((__section__(".net_copy_config")))
-net_copy_config_t config;
+__attribute__((__section__(".net_copy_config"))) net_copy_config_t config;
 
 net_queue_handle_t rx_queue_virt;
 net_queue_handle_t rx_queue_cli;
@@ -91,8 +90,10 @@ void notified(microkit_channel ch)
 void init(void)
 {
     /* Set up the queues */
-    net_queue_init(&rx_queue_cli, config.client.free_queue.vaddr, config.client.active_queue.vaddr, config.client.num_buffers);
-    net_queue_init(&rx_queue_virt, config.virt_rx.free_queue.vaddr, config.virt_rx.active_queue.vaddr, config.virt_rx.num_buffers);
+    net_queue_init(&rx_queue_cli, config.client.free_queue.vaddr, config.client.active_queue.vaddr,
+                   config.client.num_buffers);
+    net_queue_init(&rx_queue_virt, config.virt_rx.free_queue.vaddr, config.virt_rx.active_queue.vaddr,
+                   config.virt_rx.num_buffers);
 
     net_buffers_init(&rx_queue_cli, 0);
 }
