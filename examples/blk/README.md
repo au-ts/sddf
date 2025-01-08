@@ -11,6 +11,7 @@ with block devices in sDDF.
 
 The following platforms are supported:
 * qemu_virt_aarch64
+* qemu_virt_riscv64
 
 Note that this example depends on `dosfstools`.
 
