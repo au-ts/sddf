@@ -33,11 +33,9 @@ bool delay_ms(size_t milliseconds);
 #define USING_HALT(...) do{ while(1); }while(0)
 #endif
 
-__attribute__((__section__(".i2c_client_config")))
-i2c_client_config_t i2c_config;
+__attribute__((__section__(".i2c_client_config"))) i2c_client_config_t i2c_config;
 
-__attribute__((__section__(".timer_client_config")))
-timer_client_config_t timer_config;
+__attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
 
 i2c_queue_handle_t queue;
 uintptr_t data_region;
@@ -130,7 +128,7 @@ void init(void)
 {
     LOG_CLIENT("init\n");
 
-    data_region = (uintptr_t) i2c_config.data_region;
+    data_region = (uintptr_t)i2c_config.data_region;
 
     queue = i2c_queue_init(i2c_config.request_region, i2c_config.response_region);
 
