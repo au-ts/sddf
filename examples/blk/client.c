@@ -24,8 +24,7 @@
 
 static blk_queue_handle_t blk_queue;
 
-__attribute__((__section__(".blk_client_config")))
-struct blk_client_config config;
+__attribute__((__section__(".blk_client_config"))) struct blk_client_config config;
 
 enum test_basic_state {
     START,
