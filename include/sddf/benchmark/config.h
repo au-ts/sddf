@@ -1,3 +1,8 @@
+/*
+ * Copyright 2025, UNSW
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
 #include <microkit.h>
 
 #define BENCHMARK_MAX_CHILDREN 64 // TODO: is there an upper bound?
