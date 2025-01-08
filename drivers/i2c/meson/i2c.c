@@ -41,11 +41,9 @@ struct i2c_regs {
     uint32_t rdata1;        // where read data gets put for a response by i2c
 };
 
-__attribute__((__section__(".i2c_driver_config")))
-i2c_driver_config_t config;
+__attribute__((__section__(".i2c_driver_config"))) i2c_driver_config_t config;
 
-__attribute__((__section__(".device_resources")))
-device_resources_t device_resources;
+__attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
 // Hardware memory
 uintptr_t clk_regs = 0x30000000;
@@ -505,7 +503,7 @@ static inline void i2c_load_tokens()
 
 void init(void)
 {
-    regs = (volatile struct i2c_regs *) device_resources.regions[0].region.vaddr;
+    regs = (volatile struct i2c_regs *)device_resources.regions[0].region.vaddr;
     i2c_setup();
     queue_handle = i2c_queue_init(config.request_region, config.response_region);
 
@@ -553,7 +551,7 @@ static inline void handle_request(void)
 
         LOG_DRIVER("Loading request for bus address 0x%x of size %zu\n", bus_address, size);
 
-        i2c_ifState.curr_data = (i2c_token_t *) config.data_region + offset;
+        i2c_ifState.curr_data = (i2c_token_t *)config.data_region + offset;
         i2c_ifState.addr = bus_address;
         i2c_ifState.curr_request_len = size;
         i2c_ifState.remaining = size;
@@ -645,7 +643,7 @@ static void handle_response(void)
         LOG_DRIVER("enguing response with size: %d\n\n", i2c_ifState.curr_response_len + RESPONSE_DATA_OFFSET);
         // response length is + 2 (RESPONSE_DATA_OFFSET = 2) because of the error tokens at the start
         int ret = i2c_enqueue_response(queue_handle, i2c_ifState.addr,
-                                       (size_t) i2c_ifState.curr_data - (uintptr_t)config.data_region,
+                                       (size_t)i2c_ifState.curr_data - (uintptr_t)config.data_region,
                                        i2c_ifState.curr_response_len + RESPONSE_DATA_OFFSET);
         if (ret) {
             LOG_DRIVER_ERR("Failed to enqueue response\n");
