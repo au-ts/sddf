@@ -82,7 +82,7 @@ uint16_t last_seen_used = 0;
 /* Block device configuration, populated during initiliastion. */
 volatile struct virtio_blk_config *virtio_config;
 
-void handle_response()
+void handle_response(void)
 {
     bool notify = false;
 
@@ -272,7 +272,7 @@ void handle_request()
     }
 }
 
-void handle_irq()
+void handle_irq(void)
 {
     uint32_t irq_status = regs->InterruptStatus;
     if (irq_status & VIRTIO_MMIO_IRQ_VQUEUE) {
