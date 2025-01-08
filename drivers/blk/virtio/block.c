@@ -74,7 +74,7 @@ volatile struct virtio_blk_config *virtio_config;
 __attribute__((__section__(".device_resources")))
 device_resources_t device_resources;
 
-void handle_response()
+void handle_response(void)
 {
     bool notify = false;
 
@@ -264,7 +264,7 @@ void handle_request()
     }
 }
 
-void handle_irq()
+void handle_irq(void)
 {
     uint32_t irq_status = regs->InterruptStatus;
     if (irq_status & VIRTIO_MMIO_IRQ_VQUEUE) {
