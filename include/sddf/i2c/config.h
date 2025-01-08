@@ -1,3 +1,8 @@
+/*
+ * Copyright 2025, UNSW
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
 #include <microkit.h>
 
 #define SDDF_I2C_MAX_CLIENTS (MICROKIT_MAX_CHANNELS - 1)
