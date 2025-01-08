@@ -20,8 +20,8 @@ jobs:
         uses: actions/checkout@v4
       - name: Download Microkit SDK
         run: |
-          wget https://github.com/seL4/microkit/releases/download/1.4.1/microkit-sdk-1.4.1-linux-x86-64.tar.gz
-          tar xf microkit-sdk-1.4.1-linux-x86-64.tar.gz
+          wget https://trustworthy.systems/Downloads/microkit/microkit-sdk-1.4.1-dev.54+a8b7894-linux-x86-64.tar.gz
+          tar xf microkit-sdk-1.4.1-dev.54+a8b7894-linux-x86-64.tar.gz
       - name: Install dependencies (via apt)
         run: sudo apt update && sudo apt install -y make llvm lld imagemagick
       - name: Download and install AArch64 GCC toolchain
@@ -34,7 +34,7 @@ jobs:
         with:
           version: 0.13.0
       - name: Build and run examples
-        run: ./ci/examples.sh ${PWD}/microkit-sdk-1.4.1
+        run: ./ci/examples.sh ${PWD}/microkit-sdk-1.4.1-dev.54+a8b7894-linux-x86-64
         shell: bash
   build_linux_x86_64_nix:
     name: Linux x86-64 (Nix)
@@ -55,8 +55,8 @@ jobs:
         uses: actions/checkout@v4
       - name: Download Microkit SDK
         run: |
-          wget https://github.com/seL4/microkit/releases/download/1.4.1/microkit-sdk-1.4.1-macos-aarch64.tar.gz
-          tar xf microkit-sdk-1.4.1-macos-aarch64.tar.gz
+          wget https://trustworthy.systems/Downloads/microkit/microkit-sdk-1.4.1-dev.54+a8b7894-macos-aarch64.tar.gz
+          tar xf microkit-sdk-1.4.1-dev.54+a8b7894-macos-aarch64.tar.gz
       - name: Install dependencies (via Homebrew)
         run: |
           brew install llvm lld make imagemagick
@@ -71,5 +71,5 @@ jobs:
           tar xf aarch64-toolchain.tar.xz
           echo "$(pwd)/arm-gnu-toolchain-12.3.rel1-darwin-arm64-aarch64-none-elf/bin" >> $GITHUB_PATH
       - name: Build and run examples
-        run: ./ci/examples.sh ${PWD}/microkit-sdk-1.4.1
+        run: ./ci/examples.sh ${PWD}/microkit-sdk-1.4.1-dev.54+a8b7894-macos-aarch64
         shell: bash
