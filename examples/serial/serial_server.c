@@ -8,8 +8,7 @@
 #include <sddf/serial/config.h>
 #include <sddf/util/printf.h>
 
-__attribute__((__section__(".serial_client_config")))
-serial_client_config_t config;
+__attribute__((__section__(".serial_client_config"))) serial_client_config_t config;
 
 serial_queue_handle_t rx_queue_handle;
 serial_queue_handle_t tx_queue_handle;
