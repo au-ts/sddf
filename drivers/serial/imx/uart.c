@@ -12,11 +12,9 @@
 #include <stdint.h>
 #include <uart.h>
 
-__attribute__((__section__(".device_resources")))
-device_resources_t device_resources;
+__attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
-__attribute__((__section__(".serial_driver_config")))
-serial_driver_config_t config;
+__attribute__((__section__(".serial_driver_config"))) serial_driver_config_t config;
 
 serial_queue_handle_t rx_queue_handle;
 serial_queue_handle_t tx_queue_handle;
@@ -130,7 +128,7 @@ static void handle_irq(void)
 
 static void uart_setup(void)
 {
-    uart_regs = (imx_uart_regs_t *) device_resources.regions[0].region.vaddr;
+    uart_regs = (imx_uart_regs_t *)device_resources.regions[0].region.vaddr;
 
     /* Enable the UART */
     uart_regs->cr1 |= UART_CR1_UART_EN;

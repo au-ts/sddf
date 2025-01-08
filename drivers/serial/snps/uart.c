@@ -13,11 +13,9 @@
 #include <sddf/resources/device.h>
 #include "uart.h"
 
-__attribute__((__section__(".serial_driver_config")))
-serial_driver_config_t config;
+__attribute__((__section__(".serial_driver_config"))) serial_driver_config_t config;
 
-__attribute__((__section__(".device_resources")))
-device_resources_t device_resources;
+__attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
 serial_queue_handle_t rx_queue_handle;
 serial_queue_handle_t tx_queue_handle;
@@ -142,7 +140,7 @@ void init(void)
 {
     LOG_DRIVER("initialising\n");
 
-    uart_base = (uintptr_t) device_resources.regions[0].region.vaddr;
+    uart_base = (uintptr_t)device_resources.regions[0].region.vaddr;
 
     /* Ensure that the FIFO's are empty */
     while (!(*REG_PTR(UART_LSR) & UART_LSR_THRE));

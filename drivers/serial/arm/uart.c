@@ -13,11 +13,9 @@
 
 #define IRQ_CH 0
 
-__attribute__((__section__(".serial_driver_config")))
-serial_driver_config_t config;
+__attribute__((__section__(".serial_driver_config"))) serial_driver_config_t config;
 
-__attribute__((__section__(".device_resources")))
-device_resources_t device_resources;
+__attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
 serial_queue_handle_t rx_queue_handle;
 serial_queue_handle_t tx_queue_handle;
