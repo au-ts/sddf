@@ -34,8 +34,7 @@
 
 #define GPT_FREQ   (12u)
 
-__attribute__((__section__(".device_resources")))
-device_resources_t device_resources;
+__attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
 static volatile uint32_t *gpt;
 static uint32_t overflow_count;
@@ -132,7 +131,7 @@ void init(void)
         timeouts[i] = UINT64_MAX;
     }
 
-    gpt = (volatile uint32_t *) device_resources.regions[0].region.vaddr;
+    gpt = (volatile uint32_t *)device_resources.regions[0].region.vaddr;
 
     /* Disable GPT. */
     gpt[CR] = 0;

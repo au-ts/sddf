@@ -29,8 +29,7 @@
 #define TIMEOUT_TIMEBASE_100_US 0b10
 #define TIMEOUT_TIMEBASE_1_MS   0b11
 
-__attribute__((__section__(".device_resources")))
-device_resources_t device_resources;
+__attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
 struct timer_regs {
     uint32_t mux;

@@ -57,8 +57,7 @@ typedef struct {
     uint32_t intmask;   /* 0x24: Timer interrupt mask register. */
 } starfive_timer_regs_t;
 
-__attribute__((__section__(".device_resources")))
-device_resources_t device_resources;
+__attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
 static volatile starfive_timer_regs_t *counter_regs;
 static volatile starfive_timer_regs_t *timeout_regs;

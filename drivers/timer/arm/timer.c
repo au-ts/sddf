@@ -39,8 +39,7 @@ static uint64_t timer_freq;
 /* frequency of the timer */
 #define CNTFRQ "cntfrq_el0"
 
-__attribute__((__section__(".device_resources")))
-device_resources_t device_resources;
+__attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
 static inline uint64_t get_ticks(void)
 {
