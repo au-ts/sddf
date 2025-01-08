@@ -28,11 +28,9 @@
 
 #include "ethernet.h"
 
-__attribute__((__section__(".device_resources")))
-device_resources_t device_resources;
+__attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
-__attribute__((__section__(".net_driver_config")))
-net_driver_config_t config;
+__attribute__((__section__(".net_driver_config"))) net_driver_config_t config;
 
 /*
  * The 'hardware' ring buffer region is used to store the virtIO virtqs
@@ -441,14 +439,16 @@ static void eth_setup(void)
 void init(void)
 {
     regs = (volatile virtio_mmio_regs_t *)device_resources.regions[0].region.vaddr;
-    hw_ring_buffer_vaddr = (uintptr_t) device_resources.regions[1].region.vaddr;
+    hw_ring_buffer_vaddr = (uintptr_t)device_resources.regions[1].region.vaddr;
     hw_ring_buffer_paddr = device_resources.regions[1].io_addr;
 
     ialloc_init(&rx_ialloc_desc, rx_descriptors, RX_COUNT);
     ialloc_init(&tx_ialloc_desc, tx_descriptors, TX_COUNT);
 
-    net_queue_init(&rx_queue, config.virt_rx.free_queue.vaddr, config.virt_rx.active_queue.vaddr, config.virt_rx.num_buffers);
-    net_queue_init(&tx_queue, config.virt_tx.free_queue.vaddr, config.virt_tx.active_queue.vaddr, config.virt_tx.num_buffers);
+    net_queue_init(&rx_queue, config.virt_rx.free_queue.vaddr, config.virt_rx.active_queue.vaddr,
+                   config.virt_rx.num_buffers);
+    net_queue_init(&tx_queue, config.virt_tx.free_queue.vaddr, config.virt_tx.active_queue.vaddr,
+                   config.virt_tx.num_buffers);
 
     eth_setup();
 

@@ -15,11 +15,9 @@
 
 #include "ethernet.h"
 
-__attribute__((__section__(".device_resources")))
-device_resources_t device_resources;
+__attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
-__attribute__((__section__(".net_driver_config")))
-net_driver_config_t config;
+__attribute__((__section__(".net_driver_config"))) net_driver_config_t config;
 
 #define RX_COUNT 256
 #define TX_COUNT 256
@@ -300,8 +298,10 @@ void init(void)
 {
     eth_setup();
 
-    net_queue_init(&rx_queue, config.virt_rx.free_queue.vaddr, config.virt_rx.active_queue.vaddr, config.virt_rx.num_buffers);
-    net_queue_init(&tx_queue, config.virt_tx.free_queue.vaddr, config.virt_tx.active_queue.vaddr, config.virt_tx.num_buffers);
+    net_queue_init(&rx_queue, config.virt_rx.free_queue.vaddr, config.virt_rx.active_queue.vaddr,
+                   config.virt_rx.num_buffers);
+    net_queue_init(&tx_queue, config.virt_tx.free_queue.vaddr, config.virt_tx.active_queue.vaddr,
+                   config.virt_tx.num_buffers);
 
     rx_provide();
     tx_provide();
