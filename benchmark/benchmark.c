@@ -18,11 +18,9 @@
 
 #define LOG_BUFFER_CAP 7
 
-__attribute__((__section__(".benchmark_config")))
-benchmark_config_t benchmark_config;
+__attribute__((__section__(".benchmark_config"))) benchmark_config_t benchmark_config;
 
-__attribute__((__section__(".serial_client_config")))
-serial_client_config_t serial_config;
+__attribute__((__section__(".serial_client_config"))) serial_client_config_t serial_config;
 
 ccnt_t counter_values[8];
 counter_bitfield_t benchmark_bf;
@@ -95,18 +93,22 @@ static void microkit_benchmark_stop_tcb(uint64_t pd_id, uint64_t *total, uint64_
     *entries = buffer[BENCHMARK_TCB_NUMBER_KERNEL_ENTRIES];
 }
 
-static void print_utilisation_details(uint64_t kernel_util, uint64_t kernel_entries, uint64_t number_schedules, uint64_t total_util)
+static void print_utilisation_details(uint64_t kernel_util, uint64_t kernel_entries, uint64_t number_schedules,
+                                      uint64_t total_util)
 {
-    sddf_printf("{\nKernelUtilisation:  %lx\nKernelEntries:  %lx\nNumberSchedules:  %lx\nTotalUtilisation:  %lx\n}\n", kernel_util, kernel_entries, number_schedules, total_util);
+    sddf_printf("{\nKernelUtilisation:  %lx\nKernelEntries:  %lx\nNumberSchedules:  %lx\nTotalUtilisation:  %lx\n}\n",
+                kernel_util, kernel_entries, number_schedules, total_util);
 }
 
-static void print_total_utilisation_details(uint64_t kernel_util, uint64_t kernel_entries, uint64_t number_schedules, uint64_t total_util)
+static void print_total_utilisation_details(uint64_t kernel_util, uint64_t kernel_entries, uint64_t number_schedules,
+                                            uint64_t total_util)
 {
     sddf_printf("Total utilisation details: \n");
     print_utilisation_details(kernel_util, kernel_entries, number_schedules, total_util);
 }
 
-static void print_pd_utilisation_details(uint64_t pd_id, uint64_t kernel_util, uint64_t kernel_entries, uint64_t number_schedules, uint64_t total_util)
+static void print_pd_utilisation_details(uint64_t pd_id, uint64_t kernel_util, uint64_t kernel_entries,
+                                         uint64_t number_schedules, uint64_t total_util)
 {
     sddf_printf("Utilisation details for PD: %s (%lu)\n", child_name(pd_id), pd_id);
     print_utilisation_details(kernel_util, kernel_entries, number_schedules, total_util);
@@ -212,7 +214,8 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
-    serial_queue_init(&serial_tx_queue_handle, serial_config.tx.queue.vaddr, serial_config.tx.data.size, serial_config.tx.data.vaddr);
+    serial_queue_init(&serial_tx_queue_handle, serial_config.tx.queue.vaddr, serial_config.tx.data.size,
+                      serial_config.tx.data.vaddr);
     serial_putchar_init(serial_config.tx.id, &serial_tx_queue_handle);
 
 #ifdef MICROKIT_CONFIG_benchmark

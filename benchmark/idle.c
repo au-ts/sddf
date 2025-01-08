@@ -14,8 +14,7 @@
 
 #define MAGIC_CYCLES 150
 
-__attribute__((__section__(".benchmark_config")))
-benchmark_idle_config_t config;
+__attribute__((__section__(".benchmark_config"))) benchmark_idle_config_t config;
 
 struct bench *b;
 
