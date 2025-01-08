@@ -1,3 +1,5 @@
+# Copyright 2025, UNSW
+# SPDX-License-Identifier: BSD-2-Clause
 import argparse
 from typing import Dict, List, Any
 from sdfgen import SystemDescription, Sddf, DeviceTree
