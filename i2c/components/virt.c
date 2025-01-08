@@ -24,8 +24,7 @@
 
 #define CLIENT_CH_OFFSET 1
 
-__attribute__((__section__(".i2c_virt_config")))
-i2c_virt_config_t config;
+__attribute__((__section__(".i2c_virt_config"))) i2c_virt_config_t config;
 
 i2c_queue_handle_t client_queues[SDDF_I2C_MAX_CLIENTS];
 i2c_queue_handle_t driver_queue;
@@ -57,7 +56,7 @@ void process_request(uint32_t client_id)
 
         if (offset > config.clients[client_id].data_size) {
             LOG_VIRT_ERR("invalid offset (0x%lx) given by client %u. Max offset is 0x%lx\n", offset, client_id,
-                                config.clients[client_id].data_size);
+                         config.clients[client_id].data_size);
             continue;
         }
 
@@ -118,8 +117,7 @@ void init(void)
     }
     driver_queue = i2c_queue_init(config.driver_request_queue, config.driver_response_queue);
     for (int i = 0; i < config.num_clients; i++) {
-        client_queues[i] = i2c_queue_init(config.clients[i].request_queue,
-                                          config.clients[i].response_queue);
+        client_queues[i] = i2c_queue_init(config.clients[i].request_queue, config.clients[i].response_queue);
     }
 }
 
@@ -145,7 +143,8 @@ seL4_MessageInfo_t protected(microkit_channel ch, seL4_MessageInfo_t msginfo)
 
     if (bus > I2C_BUS_ADDRESS_MAX) {
         LOG_VIRT_ERR("invalid bus address (0x%lx) given by client on "
-                            "channel 0x%x. Max bus address is 0x%x\n", bus, ch, I2C_BUS_ADDRESS_MAX);
+                     "channel 0x%x. Max bus address is 0x%x\n",
+                     bus, ch, I2C_BUS_ADDRESS_MAX);
         return microkit_msginfo_new(I2C_FAILURE, 0);
     }
 
