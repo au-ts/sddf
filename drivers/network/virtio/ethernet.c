@@ -35,15 +35,6 @@ __attribute__((__section__(".net_driver_config")))
 net_driver_config_t config;
 
 /*
- * This default is based on the default QEMU setup but could change
- * depending on the instantiation of QEMU or wherever this driver is
- * being used.
- */
-#ifndef VIRTIO_MMIO_NET_OFFSET
-#define VIRTIO_MMIO_NET_OFFSET (0xe00)
-#endif
-
-/*
  * The 'hardware' ring buffer region is used to store the virtIO virtqs
  * as well as the RX and TX virtIO headers.
  */
@@ -449,7 +440,7 @@ static void eth_setup(void)
 
 void init(void)
 {
-    regs = (volatile virtio_mmio_regs_t *)(device_resources.regions[0].region.vaddr + VIRTIO_MMIO_NET_OFFSET);
+    regs = (volatile virtio_mmio_regs_t *)device_resources.regions[0].region.vaddr;
     hw_ring_buffer_vaddr = (uintptr_t) device_resources.regions[1].region.vaddr;
     hw_ring_buffer_paddr = device_resources.regions[1].io_addr;
 
