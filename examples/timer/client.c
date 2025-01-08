@@ -27,6 +27,7 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
+    sddf_printf("CLIENT|INFO: starting\n");
     // lets get the time!
     uint64_t time = sddf_timer_time_now(TIMER_CHANNEL);
     sddf_printf("CLIENT|INFO: The time now is: %lu\n", time);
