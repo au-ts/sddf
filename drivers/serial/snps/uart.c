@@ -13,8 +13,6 @@
 #include <sddf/resources/device.h>
 #include "uart.h"
 
-#define IRQ_CH 0
-
 __attribute__((__section__(".serial_driver_config")))
 serial_driver_config_t config;
 
@@ -178,7 +176,7 @@ void init(void)
 
 void notified(microkit_channel ch)
 {
-    if (ch == IRQ_CH) {
+    if (ch == device_resources.irqs[0].id) {
         handle_irq();
         microkit_deferred_irq_ack(IRQ_CH);
     } else if (ch == config.tx.id) {
