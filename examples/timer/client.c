@@ -31,6 +31,7 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
+    sddf_printf("CLIENT|INFO: starting\n");
     timer_channel = timer_config.driver_id;
 
     // lets get the time!
