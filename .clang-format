@@ -31,3 +31,7 @@ BreakBeforeBinaryOperators: NonAssignment
 AlignOperands: AlignAfterOperator
 # try not to break around =
 PenaltyBreakAssignment: 50
+
+---
+Language: Json
+IndentWidth:    4
