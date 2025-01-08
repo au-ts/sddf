@@ -7,7 +7,7 @@ MemoryRegion = SystemDescription.MemoryRegion
 Map = SystemDescription.Map
 
 
-class Platform:
+class Board:
     def __init__(self, name: str, arch: SystemDescription.Arch, paddr_top: int, i2c_device_node: str, timer_device_node: str):
         self.name = name
         self.arch = arch
@@ -16,17 +16,19 @@ class Platform:
         self.timer_device_node = timer_device_node
 
 
-PLATFORMS: List[Platform] = [
-    Platform("odroidc4", SystemDescription.Arch.AARCH64, 0x80000000, "soc/bus@ffd00000/i2c@1d000", "soc/bus@ffd00000/watchdog@f0d0"),
+BOARDS: List[Board] = [
+    Board("odroidc4", SystemDescription.Arch.AARCH64, 0x80000000, "soc/bus@ffd00000/i2c@1d000", "soc/bus@ffd00000/watchdog@f0d0"),
 ]
 
-def generate_sdf(sdf_file: str, output_dir: str, dtb: DeviceTree):
+def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=4)
     i2c_driver = ProtectionDomain("i2c_driver", "i2c_driver.elf", priority=3)
     i2c_virt = ProtectionDomain("i2c_virt", "i2c_virt.elf", priority=2)
     client_pn532 = ProtectionDomain("client_pn532", "client_pn532.elf", priority=1)
     client_ds3231 = ProtectionDomain("client_ds3231", "client_ds3231.elf", priority=1)
 
+    # Right now we do not have separate clk and GPIO drivers and so our I2C driver does manual
+    # clk/GPIO setup for I2C.
     clk_mr = MemoryRegion("clk", 0x1000, paddr=0xff63c000)
     gpio_mr = MemoryRegion("gpio", 0x1000, paddr=0xff634000)
     sdf.add_mr(clk_mr)
@@ -35,9 +37,9 @@ def generate_sdf(sdf_file: str, output_dir: str, dtb: DeviceTree):
     i2c_driver.add_map(Map(clk_mr, 0x30_000_000, Map.Perms(r=True, w=True), cached=False))
     i2c_driver.add_map(Map(gpio_mr, 0x30_100_000, Map.Perms(r=True, w=True), cached=False))
 
-    i2c_node = dtb.node(platform.i2c_device_node)
+    i2c_node = dtb.node(board.i2c_device_node)
     assert i2c_node is not None
-    timer_node = dtb.node(platform.timer_device_node)
+    timer_node = dtb.node(board.timer_device_node)
     assert timer_node is not None
 
     i2c_system = Sddf.I2c(sdf, i2c_node, i2c_driver, i2c_virt)
@@ -69,20 +71,20 @@ def generate_sdf(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dtbs", required=True)
+    parser.add_argument("--dtb", required=True)
     parser.add_argument("--sddf", required=True)
-    parser.add_argument("--platform", required=True, choices=[p.name for p in PLATFORMS])
+    parser.add_argument("--board", required=True, choices=[b.name for b in BOARDS])
     parser.add_argument("--output", required=True)
     parser.add_argument("--sdf", required=True)
 
     args = parser.parse_args()
 
-    platform = next(filter(lambda p: p.name == args.platform, PLATFORMS))
+    board = next(filter(lambda b: b.name == args.board, BOARDS))
 
-    sdf = SystemDescription(platform.arch, platform.paddr_top)
+    sdf = SystemDescription(board.arch, board.paddr_top)
     sddf = Sddf(args.sddf)
 
-    with open(args.dtbs + f"/{platform.name}.dtb", "rb") as f:
+    with open(args.dtb, "rb") as f:
         dtb = DeviceTree(f.read())
 
-    generate_sdf(args.sdf, args.output, dtb)
+    generate(args.sdf, args.output, dtb)

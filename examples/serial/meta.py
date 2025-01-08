@@ -24,6 +24,7 @@ BOARDS: List[Board] = [
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     serial_driver = ProtectionDomain("serial_driver", "uart_driver.elf", priority=200)
     serial_virt_tx = ProtectionDomain("serial_virt_tx", "serial_virt_tx.elf", priority=199)
+    # Increase the stack size as running with UBSAN uses more stack space than normal.
     serial_virt_rx = ProtectionDomain("serial_virt_rx", "serial_virt_rx.elf", priority=199, stack_size=0x2000)
     client0 = ProtectionDomain("client0", "client0.elf", priority=1)
     client1 = ProtectionDomain("client1", "client1.elf", priority=1)
@@ -56,13 +57,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--dtb", required=True)
     parser.add_argument("--sddf", required=True)
-    parser.add_argument("--board", required=True, choices=[p.name for p in BOARDS])
+    parser.add_argument("--board", required=True, choices=[b.name for b in BOARDS])
     parser.add_argument("--output", required=True)
     parser.add_argument("--sdf", required=True)
 
     args = parser.parse_args()
 
-    board = next(filter(lambda p: p.name == args.board, BOARDS))
+    board = next(filter(lambda b: b.name == args.board, BOARDS))
 
     sdf = SystemDescription(board.arch, board.paddr_top)
     sddf = Sddf(args.sddf)
