@@ -13,8 +13,7 @@
 #define NAME_MAX 128
 #define BEGIN_STR_MAX 128
 
-__attribute__((__section__(".serial_virt_tx_config")))
-serial_virt_tx_config_t config;
+__attribute__((__section__(".serial_virt_tx_config"))) serial_virt_tx_config_t config;
 
 /* When we have more clients than colours, we re-use the colours. */
 const char *colours[] = {
@@ -111,8 +110,8 @@ bool process_tx_queue(uint32_t client)
 
     if (config.enable_colour) {
         const char *client_colour = colours[client % ARRAY_SIZE(colours)];
-        serial_transfer_all_with_colour(handle, &tx_queue_handle_drv, client_colour, COLOUR_BEGIN_LEN,
-                                        COLOUR_END, COLOUR_END_LEN);
+        serial_transfer_all_with_colour(handle, &tx_queue_handle_drv, client_colour, COLOUR_BEGIN_LEN, COLOUR_END,
+                                        COLOUR_END_LEN);
     } else {
         serial_transfer_all(handle, &tx_queue_handle_drv);
     }
@@ -208,10 +207,12 @@ void tx_provide(microkit_channel ch)
 
 void init(void)
 {
-    serial_queue_init(&tx_queue_handle_drv, config.driver.queue.vaddr, config.driver.data.size, config.driver.data.vaddr);
+    serial_queue_init(&tx_queue_handle_drv, config.driver.queue.vaddr, config.driver.data.size,
+                      config.driver.data.vaddr);
     for (uint64_t i = 0; i < config.num_clients; i++) {
         serial_virt_tx_client_config_t *client = &config.clients[i];
-        serial_queue_init(&tx_queue_handle_cli[i], client->conn.queue.vaddr, client->conn.data.size, client->conn.data.vaddr);
+        serial_queue_init(&tx_queue_handle_cli[i], client->conn.queue.vaddr, client->conn.data.size,
+                          client->conn.data.vaddr);
     }
 
     if (config.enable_rx) {

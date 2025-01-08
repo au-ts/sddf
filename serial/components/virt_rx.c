@@ -11,8 +11,7 @@
 #include <sddf/util/string.h>
 #include <sddf/util/printf.h>
 
-__attribute__((__section__(".serial_virt_rx_config")))
-serial_virt_rx_config_t config;
+__attribute__((__section__(".serial_virt_rx_config"))) serial_virt_rx_config_t config;
 
 serial_queue_handle_t rx_queue_handle_drv;
 serial_queue_handle_t rx_queue_handle_cli[SDDF_SERIAL_MAX_CLIENTS];
@@ -119,9 +118,11 @@ void rx_return(void)
 
 void init(void)
 {
-    serial_queue_init(&rx_queue_handle_drv, config.driver.queue.vaddr, config.driver.data.size, config.driver.data.vaddr);
+    serial_queue_init(&rx_queue_handle_drv, config.driver.queue.vaddr, config.driver.data.size,
+                      config.driver.data.vaddr);
     for (uint64_t i = 0; i < config.num_clients; i++) {
-        serial_queue_init(&rx_queue_handle_cli[i], config.clients[i].queue.vaddr, config.clients[i].data.size, config.clients[i].data.vaddr);
+        serial_queue_init(&rx_queue_handle_cli[i], config.clients[i].queue.vaddr, config.clients[i].data.size,
+                          config.clients[i].data.vaddr);
     }
 }
 
