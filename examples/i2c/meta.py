@@ -43,8 +43,8 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     assert timer_node is not None
 
     i2c_system = Sddf.I2c(sdf, i2c_node, i2c_driver, i2c_virt)
-    i2c_system.add_client(client_pn532)
     i2c_system.add_client(client_ds3231)
+    i2c_system.add_client(client_pn532)
 
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
     timer_system.add_client(client_pn532)
