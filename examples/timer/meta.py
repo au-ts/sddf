@@ -2,6 +2,7 @@ import argparse
 from typing import Dict, List, Any
 from sdfgen import SystemDescription, Sddf, DeviceTree
 
+Arch = SystemDescription.Arch
 ProtectionDomain = SystemDescription.ProtectionDomain
 
 class Board:
@@ -13,15 +14,18 @@ class Board:
 
 
 BOARDS: List[Board] = [
-    Board("qemu_virt_aarch64", SystemDescription.Arch.AARCH64, 0xa_000_000, "timer"),
-    Board("odroidc4", SystemDescription.Arch.AARCH64, 0x80000000, "soc/bus@ffd00000/watchdog@f0d0"),
-    Board("star64", SystemDescription.Arch.RISCV64, 0x100000000, "soc/timer@13050000"),
-    Board("maaxboard", SystemDescription.Arch.AARCH64, 0xa0000000, "soc@0/bus@30000000/timer@302d0000"),
+    Board("qemu_virt_aarch64", Arch.AARCH64, 0xa_000_000, "timer"),
+    Board("odroidc4", Arch.AARCH64, 0x80000000, "soc/bus@ffd00000/watchdog@f0d0"),
+    Board("star64", Arch.RISCV64, 0x100000000, "soc/timer@13050000"),
+    Board("maaxboard", Arch.AARCH64, 0xa0000000, "soc@0/bus@30000000/timer@302d0000"),
+    Board("imx8mm_evk", Arch.AARCH64, 0xa0000000, "soc@0/bus@30000000/timer@302d0000"),
+    Board("imx8mp_evk", Arch.AARCH64, 0xa0000000, "soc@0/bus@30000000/timer@302d0000"),
+    Board("imx8mq_evk", Arch.AARCH64, 0xa0000000, "soc@0/bus@30000000/timer@302d0000"),
 ]
 
 
 def generate_sdf(sdf_file: str, output_dir: str, dtb: DeviceTree):
-    timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=200)
+    timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=254)
     client = ProtectionDomain("client", "client.elf", priority=1)
 
     timer_node = dtb.node(board.timer_device_node)
