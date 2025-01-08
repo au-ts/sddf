@@ -119,6 +119,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
     client0_mac_addr = f"52:54:01:00:00:{hex(random.randint(0, 0xff))[2:]}"
     client1_mac_addr = f"52:54:01:00:00:{hex(random.randint(0, 0xff))[2:]}"
+    assert client0_mac_addr != client1_mac_addr
 
     serial_system.add_client(client0)
     serial_system.add_client(client1)
