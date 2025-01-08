@@ -1,5 +1,6 @@
 import argparse
 import struct
+import random
 from typing import Dict, List, Any, Tuple
 from sdfgen import SystemDescription, Sddf, DeviceTree
 
@@ -22,7 +23,7 @@ PLATFORMS: List[Platform] = [
     Platform("odroidc4", SystemDescription.Arch.AARCH64, 0x60000000, "soc/bus@ff800000/serial@3000", "soc/bus@ffd00000/watchdog@f0d0", "soc/ethernet@ff3f0000"),
     Platform("maaxboard", SystemDescription.Arch.AARCH64, 0x70000000, "soc@0/bus@30800000/serial@30860000", "soc@0/bus@30000000/timer@302d0000", "soc@0/bus@30800000/ethernet@30be0000"),
     Platform("imx8mm_evk", SystemDescription.Arch.AARCH64, 0x70000000, "soc@0/bus@30800000/spba-bus@30800000/serial@30890000", "soc@0/bus@30000000/timer@302d0000", "soc@0/bus@30800000/ethernet@30be0000"),
-    Platform("imx8mp_evk", SystemDescription.Arch.AARCH64, 0x70000000, "soc@0/bus@30800000/spba-bus@30800000/serial@30860000", "soc@0/bus@30000000/timer@302d0000", "soc@0/bus@30800000/ethernet@30be0000"),
+    Platform("imx8mp_evk", SystemDescription.Arch.AARCH64, 0x70000000, "soc@0/bus@30800000/spba-bus@30800000/serial@30890000", "soc@0/bus@30000000/timer@302d0000", "soc@0/bus@30800000/ethernet@30be0000"),
     Platform("imx8mq_evk", SystemDescription.Arch.AARCH64, 0x70000000, "soc@0/bus@30800000/serial@30860000", "soc@0/bus@30000000/timer@302d0000", "soc@0/bus@30800000/ethernet@30be0000"),
 ]
 
@@ -116,12 +117,15 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     client1 = ProtectionDomain("client1", "lwip1.elf", priority=97, budget=20000)
     client1_net_copier = ProtectionDomain("client1_net_copier", "network_copy1.elf", priority=98, budget=20000)
 
+    client0_mac_addr = f"52:54:01:00:00:{hex(random.randint(0, 0xff))[2:]}"
+    client1_mac_addr = f"52:54:01:00:00:{hex(random.randint(0, 0xff))[2:]}"
+
     serial_system.add_client(client0)
     serial_system.add_client(client1)
     timer_system.add_client(client0)
     timer_system.add_client(client1)
-    net_system.add_client_with_copier(client0, client0_net_copier, mac_addr="52:54:01:00:00:05")
-    net_system.add_client_with_copier(client1, client1_net_copier, mac_addr="52:54:01:00:00:06")
+    net_system.add_client_with_copier(client0, client0_net_copier, mac_addr=client0_mac_addr)
+    net_system.add_client_with_copier(client1, client1_net_copier, mac_addr=client1_mac_addr)
 
     # Benchmark specific resources
 
