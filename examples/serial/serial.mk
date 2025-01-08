@@ -50,6 +50,9 @@ else ifeq ($(strip $(MICROKIT_BOARD)), imx8mm_evk)
 else ifeq ($(strip $(MICROKIT_BOARD)), star64)
 	ARCH := riscv64
 	DRIVER_DIR := snps
+else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_riscv64)
+	ARCH := riscv64
+	DRIVER_DIR := ns16550a
 else
 $(error Unsupported MICROKIT_BOARD given)
 endif

@@ -5,7 +5,7 @@
 const std = @import("std");
 const LazyPath = std.Build.LazyPath;
 
-const MicrokitBoard = enum { qemu_virt_aarch64, odroidc4, maaxboard, star64 };
+const MicrokitBoard = enum { qemu_virt_aarch64, qemu_virt_riscv64, odroidc4, maaxboard, star64 };
 
 const Target = struct {
     board: MicrokitBoard,
@@ -52,6 +52,15 @@ const targets = [_]Target{
             .abi = .none,
         }
     },
+    .{
+        .board = MicrokitBoard.qemu_virt_riscv64,
+        .zig_target = std.Target.Query{
+            .cpu_arch = .riscv64,
+            .cpu_model = .{ .explicit = &std.Target.riscv.cpu.baseline_rv64 },
+            .os_tag = .freestanding,
+            .abi = .none,
+        }
+    },
 };
 
 fn findTarget(board: MicrokitBoard) std.Target.Query {
@@ -67,8 +76,25 @@ fn findTarget(board: MicrokitBoard) std.Target.Query {
 
 const ConfigOptions = enum { debug, release, benchmark };
 
+fn updateSectionObjcopy(b: *std.Build, section: []const u8, data_output: std.Build.LazyPath, data: []const u8, elf: []const u8) *std.Build.Step.Run {
+    const run_objcopy = b.addSystemCommand(&[_][]const u8{
+        "llvm-objcopy",
+    });
+    run_objcopy.addArg("--update-section");
+    const data_full_path = data_output.join(b.allocator, data) catch @panic("OOM");
+    run_objcopy.addPrefixedFileArg(b.fmt("{s}=", .{ section }), data_full_path);
+    run_objcopy.addFileArg(.{ .cwd_relative = b.getInstallPath(.bin, elf) });
+
+    // We need the ELFs we talk about to be in the install directory first.
+    run_objcopy.step.dependOn(b.getInstallStep());
+
+    return run_objcopy;
+}
+
 pub fn build(b: *std.Build) !void {
     const optimize = b.standardOptimizeOption(.{});
+
+    const python = b.option([]const u8, "python", "Path to Python to use") orelse "python3";
 
     // Getting the path to the Microkit SDK before doing anything else
     const microkit_sdk_arg = b.option([]const u8, "sdk", "Path to Microkit SDK");
@@ -99,50 +125,6 @@ pub fn build(b: *std.Build) !void {
     const libmicrokit_include = b.fmt("{s}/include", .{microkit_board_dir});
     const libmicrokit_linker_script = b.fmt("{s}/lib/microkit.ld", .{microkit_board_dir});
 
-    const sdfgen_dep = b.dependency("sdfgen", .{
-        .target = b.graph.host,
-        .optimize = optimize,
-    });
-
-    const meta = b.addExecutable(.{
-        .name = "meta",
-        .root_source_file = b.path("meta.zig"),
-        .target = b.graph.host,
-        .optimize = .ReleaseSafe,
-    });
-    meta.root_module.addImport("sdf", sdfgen_dep.module("sdf"));
-    const meta_run = b.addRunArtifact(meta);
-
-    const sdf_file = meta_run.captureStdOut();
-
-    const config_data = .{
-        .{ "client0.data", "client_config.h", "client0_data" },
-        .{ "serial_virt_tx.data", "virt_tx_config.h", "serial_virt_tx_data" },
-        .{ "serial_virt_rx.data", "virt_rx_config.h", "serial_virt_rx_data" },
-        .{ "serial_driver.data", "driver_config.h", "serial_driver_data" },
-    };
-
-    var config_headers = try std.ArrayList(LazyPath).initCapacity(b.allocator, config_data.len);
-    defer config_headers.deinit();
-    inline for (config_data) |config| {
-        const data = b.path(config[0]);
-        const data_to_header = b.addSystemCommand(&[_][]const u8{
-            "xxd", "-n", config[2], "-i"
-        });
-        data_to_header.step.dependOn(&meta_run.step);
-        data_to_header.addFileArg(data);
-        data_to_header.addFileInput(data);
-        const header = data_to_header.captureStdOut();
-
-        config_headers.appendAssumeCapacity(header);
-    }
-
-    const meta_step = b.step("meta", "Run metaprogram");
-    inline for (config_data, 0..) |config, i| {
-        meta_step.dependOn(&b.addInstallFileWithDir(config_headers.items[i], .prefix, config[1]).step);
-    }
-    meta_step.dependOn(&meta_run.step);
-
     const sddf_dep = b.dependency("sddf", .{
         .target = target,
         .optimize = optimize,
@@ -154,6 +136,7 @@ pub fn build(b: *std.Build) !void {
 
     const driver_class = switch (microkit_board_option.?) {
         .qemu_virt_aarch64 => "arm",
+        .qemu_virt_riscv64 => "ns16550a",
         .odroidc4 => "meson",
         .maaxboard => "imx",
         .star64 => "snps",
@@ -176,13 +159,11 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
         .strip = false,
     });
+    const serial_server1_install = b.addInstallArtifact(serial_server, .{ .dest_sub_path = "client0.elf" });
+    const serial_server2_install = b.addInstallArtifact(serial_server, .{ .dest_sub_path = "client1.elf" });
 
-    serial_server.step.dependOn(meta_step);
-    serial_server.addIncludePath(config_headers.items[0]);
-    serial_server.addIncludePath(.{ .cwd_relative = b.getInstallPath(.prefix, "")});
     serial_server.addCSourceFile(.{ .file = b.path("serial_server.c") });
     serial_server.addIncludePath(sddf_dep.path("include"));
-    serial_server.addIncludePath(b.path("include/serial_config"));
     serial_server.linkLibrary(sddf_dep.artifact("util"));
     serial_server.linkLibrary(sddf_dep.artifact("util_putchar_serial"));
 
@@ -192,20 +173,64 @@ pub fn build(b: *std.Build) !void {
 
     b.installArtifact(serial_server);
 
+    // For compiling the DTS into a DTB
+    const dts = sddf_dep.path(b.fmt("dts/{s}.dts", .{ microkit_board }));
+    const dtc_cmd = b.addSystemCommand(&[_][]const u8{
+        "dtc", "-q", "-I", "dts", "-O", "dtb"
+    });
+    dtc_cmd.addFileInput(dts);
+    dtc_cmd.addFileArg(dts);
+    const dtb = dtc_cmd.captureStdOut();
+
+    // Run the metaprogram to get sDDF configuration binary files and the SDF file.
+    const metaprogram = b.path("meta.py");
+    const run_metaprogram = b.addSystemCommand(&[_][]const u8{
+        python,
+    });
+    run_metaprogram.addFileArg(metaprogram);
+    run_metaprogram.addFileInput(metaprogram);
+    run_metaprogram.addPrefixedDirectoryArg("--sddf=", sddf_dep.path(""));
+    run_metaprogram.addPrefixedDirectoryArg("--dtb=", dtb);
+    const meta_output = run_metaprogram.addPrefixedOutputDirectoryArg("--output=", "meta_output");
+    run_metaprogram.addArg("--board");
+    run_metaprogram.addArg(microkit_board);
+    run_metaprogram.addArg("--sdf");
+    run_metaprogram.addArg("serial.system");
+
+    const meta_output_install = b.addInstallDirectory(.{
+        .source_dir = meta_output,
+        .install_dir = .prefix,
+        .install_subdir = "meta_output",
+    });
+
+    const serial_server1_objcopy = updateSectionObjcopy(b, ".serial_client_config", meta_output, "serial_client_client0.data", "client0.elf");
+    serial_server1_objcopy.step.dependOn(&serial_server1_install.step);
+    const serial_server2_objcopy = updateSectionObjcopy(b, ".serial_client_config", meta_output, "serial_client_client1.data", "client1.elf");
+    serial_server2_objcopy.step.dependOn(&serial_server2_install.step);
+    const driver_resources_objcopy = updateSectionObjcopy(b, ".device_resources", meta_output, "serial_driver_device_resources.data", "uart_driver.elf");
+    driver_resources_objcopy.step.dependOn(&driver_install.step);
+    const driver_config_objcopy = updateSectionObjcopy(b, ".serial_driver_config", meta_output, "serial_driver_config.data", "uart_driver.elf");
+    driver_config_objcopy.step.dependOn(&driver_install.step);
+    const virt_rx_objcopy = updateSectionObjcopy(b, ".serial_virt_rx_config", meta_output, "serial_virt_rx.data", "serial_virt_rx.elf");
+    const virt_tx_objcopy = updateSectionObjcopy(b, ".serial_virt_tx_config", meta_output, "serial_virt_tx.data", "serial_virt_tx.elf");
+    const objcopys = &.{ serial_server1_objcopy, serial_server2_objcopy, virt_rx_objcopy, virt_tx_objcopy, driver_resources_objcopy, driver_config_objcopy };
+
     const final_image_dest = b.getInstallPath(.bin, "./loader.img");
     const microkit_tool_cmd = b.addSystemCommand(&[_][]const u8{
         microkit_tool,
-        b.getInstallPath(.prefix, "serial.system"),
+        b.getInstallPath(.{ .custom = "meta_output" }, "serial.system"),
         "--search-path", b.getInstallPath(.bin, ""),
         "--board", microkit_board,
         "--config", microkit_config,
         "-o", final_image_dest,
         "-r", b.getInstallPath(.prefix, "./report.txt")
     });
+    inline for (objcopys) |objcopy| {
+        microkit_tool_cmd.step.dependOn(&objcopy.step);
+    }
+    microkit_tool_cmd.step.dependOn(&meta_output_install.step);
     microkit_tool_cmd.step.dependOn(b.getInstallStep());
-    microkit_tool_cmd.step.dependOn(&driver_install.step);
     microkit_tool_cmd.setEnvironmentVariable("MICROKIT_SDK", microkit_sdk);
-    microkit_tool_cmd.step.dependOn(&b.addInstallFileWithDir(sdf_file, .prefix, "serial.system").step);
     // Add the "microkit" step, and make it the default step when we execute `zig build`>
     const microkit_step = b.step("microkit", "Compile and build the final bootable image");
     microkit_step.dependOn(&microkit_tool_cmd.step);
@@ -213,8 +238,8 @@ pub fn build(b: *std.Build) !void {
 
     // This is setting up a `qemu` command for running the system using QEMU,
     // which we only want to do when we have a board that we can actually simulate.
-    const loader_arg = b.fmt("loader,file={s},addr=0x70000000,cpu-num=0", .{final_image_dest});
-    if (std.mem.eql(u8, microkit_board, "qemu_virt_aarch64")) {
+    if (microkit_board_option.? == .qemu_virt_aarch64) {
+        const loader_arg = b.fmt("loader,file={s},addr=0x70000000,cpu-num=0", .{final_image_dest});
         const qemu_cmd = b.addSystemCommand(&[_][]const u8{
             "qemu-system-aarch64",
             "-machine",
@@ -225,6 +250,22 @@ pub fn build(b: *std.Build) !void {
             "mon:stdio",
             "-device",
             loader_arg,
+            "-m",
+            "2G",
+            "-nographic",
+        });
+        qemu_cmd.step.dependOn(b.default_step);
+        const simulate_step = b.step("qemu", "Simulate the image using QEMU");
+        simulate_step.dependOn(&qemu_cmd.step);
+    } else if (microkit_board_option.? == .qemu_virt_riscv64) {
+        const qemu_cmd = b.addSystemCommand(&[_][]const u8{
+            "qemu-system-riscv64",
+            "-machine",
+            "virt",
+            "-serial",
+            "mon:stdio",
+            "-kernel",
+            final_image_dest,
             "-m",
             "2G",
             "-nographic",
