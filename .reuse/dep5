@@ -13,6 +13,20 @@ Files:
     examples/blk/basic_data.txt
     examples/blk/basic_data.h
     examples/gpu/build.zig.zon
+    drivers/blk/mmc/imx/config.json
+    drivers/blk/virtio/config.json
+    drivers/i2c/meson/config.json
+    drivers/network/imx/config.json
+    drivers/network/meson/config.json
+    drivers/network/virtio/config.json
+    drivers/serial/arm/config.json
+    drivers/serial/imx/config.json
+    drivers/serial/meson/config.json
+    drivers/serial/snps/config.json
+    drivers/timer/arm/config.json
+    drivers/timer/imx/config.json
+    drivers/timer/jh7110/config.json
+    drivers/timer/meson/config.json
 Copyright: UNSW
 License: BSD-2-Clause
 
