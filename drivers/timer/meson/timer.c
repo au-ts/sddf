@@ -11,7 +11,7 @@
 
 #define MAX_TIMEOUTS 6
 
-#define TIMER_REG_START   0x140    // TIMER_MUX
+#define TIMER_REG_START   0x70    // TIMER_MUX
 
 #define TIMER_A_INPUT_CLK 0
 #define TIMER_E_INPUT_CLK 8
