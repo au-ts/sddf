@@ -555,7 +555,7 @@
 			reg = <0x30000000 0x400000>;
 			#address-cells = <0x01>;
 			#size-cells = <0x01>;
-			ranges = <0x30000000 0x30000000 0x400000>;
+			ranges;
 
 			sai@30010000 {
 				#sound-dai-cells = <0x00>;

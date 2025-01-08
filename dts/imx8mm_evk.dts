@@ -310,7 +310,7 @@
 			reg = <0x30000000 0x400000>;
 			#address-cells = <0x01>;
 			#size-cells = <0x01>;
-			ranges = <0x30000000 0x30000000 0x400000>;
+			ranges;
 
 			spba-bus@30000000 {
 				compatible = "fsl,spba-bus", "simple-bus";
