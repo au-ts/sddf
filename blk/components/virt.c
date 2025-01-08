@@ -44,8 +44,7 @@ struct config {
     struct config_client clients[MAX_NUM_CLIENTS];
 };
 
-__attribute__((__section__(".blk_virt_config")))
-struct config config;
+__attribute__((__section__(".blk_virt_config"))) struct config config;
 
 /* Uncomment this to enable debug logging */
 // #define DEBUG_BLK_VIRT
@@ -349,8 +348,7 @@ static bool handle_client(int cli_id)
         assert(!err);
         reqsbk[drv_req_id] = (reqbk_t) { cli_id, cli_req_id, cli_data_base + cli_offset, cli_count, cli_code };
 
-        err = blk_enqueue_req(&drv_h, cli_code, cli_data_base + cli_offset, drv_block_number, cli_count,
-                              drv_req_id);
+        err = blk_enqueue_req(&drv_h, cli_code, cli_data_base + cli_offset, drv_block_number, cli_count, drv_req_id);
         assert(!err);
         driver_notify = true;
         continue;
