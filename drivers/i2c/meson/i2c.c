@@ -49,7 +49,7 @@ uintptr_t clk_regs;
 uintptr_t i2c_regs;
 
 // Driver state for each interface
-volatile i2c_ifState_t i2c_ifState;
+static i2c_ifState_t i2c_ifState;
 
 i2c_queue_handle_t queue_handle;
 
