@@ -1,22 +1,34 @@
 # Copyright 2025, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
 import argparse
-from typing import Dict, List, Any
+from typing import List
+from dataclasses import dataclass
 from sdfgen import SystemDescription, Sddf, DeviceTree
 
 ProtectionDomain = SystemDescription.ProtectionDomain
 
-class Board:
-    def __init__(self, name: str, arch: SystemDescription.Arch, paddr_top: int, blk_device_node: str):
-        self.name = name
-        self.arch = arch
-        self.paddr_top = paddr_top
-        self.blk_device_node = blk_device_node
 
-# TODO: should be able to derive arch from board?
+@dataclass
+class Board:
+    name: str
+    arch: SystemDescription.Arch
+    paddr_top: int
+    blk: str
+
+
 BOARDS: List[Board] = [
-    Board("qemu_virt_aarch64", SystemDescription.Arch.AARCH64, 0x6_0000_000, "virtio_mmio@a003e00"),
-    Board("qemu_virt_riscv64", SystemDescription.Arch.RISCV64, 0xa_0000_000, "soc/virtio_mmio@10008000"),
+    Board(
+        name="qemu_virt_aarch64",
+        arch=SystemDescription.Arch.AARCH64,
+        paddr_top=0x6_0000_000,
+        blk="virtio_mmio@a003e00"
+    ),
+    Board(
+        name="qemu_virt_riscv64",
+        arch=SystemDescription.Arch.RISCV64,
+        paddr_top=0xa_0000_000,
+        blk="soc/virtio_mmio@10008000"
+    ),
 ]
 
 
@@ -25,7 +37,7 @@ def generate_sdf(sdf_file: str, output_dir: str, dtb: DeviceTree):
     blk_virt = ProtectionDomain("blk_virt", "blk_virt.elf", priority=199, stack_size=0x2000)
     client = ProtectionDomain("client", "client.elf", priority=1)
 
-    blk_node = dtb.node(board.blk_device_node)
+    blk_node = dtb.node(board.blk)
     assert blk_node is not None
 
     blk_system = Sddf.Block(sdf, blk_node, blk_driver, blk_virt)
