@@ -3,7 +3,8 @@
 import argparse
 import struct
 import random
-from typing import Dict, List, Any, Tuple
+from dataclasses import dataclass
+from typing import List, Tuple
 from sdfgen import SystemDescription, Sddf, DeviceTree
 
 ProtectionDomain = SystemDescription.ProtectionDomain
@@ -11,28 +12,73 @@ MemoryRegion = SystemDescription.MemoryRegion
 Map = SystemDescription.Map
 Channel = SystemDescription.Channel
 
-class Platform:
-    def __init__(self, name: str, arch: SystemDescription.Arch, paddr_top: int, serial: str, timer: str, ethernet: str):
-        self.name = name
-        self.arch = arch
-        self.paddr_top = paddr_top
-        self.serial = serial
-        self.timer = timer
-        self.ethernet = ethernet
 
-PLATFORMS: List[Platform] = [
-    Platform("qemu_virt_aarch64", SystemDescription.Arch.AARCH64, 0x6_0000_000, "pl011@9000000", "timer", "virtio_mmio@a003e00"),
-    Platform("odroidc4", SystemDescription.Arch.AARCH64, 0x60000000, "soc/bus@ff800000/serial@3000", "soc/bus@ffd00000/watchdog@f0d0", "soc/ethernet@ff3f0000"),
-    Platform("maaxboard", SystemDescription.Arch.AARCH64, 0x70000000, "soc@0/bus@30800000/serial@30860000", "soc@0/bus@30000000/timer@302d0000", "soc@0/bus@30800000/ethernet@30be0000"),
-    Platform("imx8mm_evk", SystemDescription.Arch.AARCH64, 0x70000000, "soc@0/bus@30800000/spba-bus@30800000/serial@30890000", "soc@0/bus@30000000/timer@302d0000", "soc@0/bus@30800000/ethernet@30be0000"),
-    Platform("imx8mp_evk", SystemDescription.Arch.AARCH64, 0x70000000, "soc@0/bus@30800000/spba-bus@30800000/serial@30890000", "soc@0/bus@30000000/timer@302d0000", "soc@0/bus@30800000/ethernet@30be0000"),
-    Platform("imx8mq_evk", SystemDescription.Arch.AARCH64, 0x70000000, "soc@0/bus@30800000/serial@30860000", "soc@0/bus@30000000/timer@302d0000", "soc@0/bus@30800000/ethernet@30be0000"),
+@dataclass
+class Board:
+    name: str
+    arch: SystemDescription.Arch
+    paddr_top: int
+    serial: str
+    timer: str
+    ethernet: str
+
+
+BOARDS: List[Board] = [
+    Board(
+        name="qemu_virt_aarch64",
+        arch=SystemDescription.Arch.AARCH64,
+        paddr_top=0x6_0000_000,
+        serial="pl011@9000000",
+        timer="timer",
+        ethernet="virtio_mmio@a003e00"
+    ),
+    Board(
+        name="odroidc4",
+        arch=SystemDescription.Arch.AARCH64,
+        paddr_top=0x60000000,
+        serial="soc/bus@ff800000/serial@3000",
+        timer="soc/bus@ffd00000/watchdog@f0d0",
+        ethernet="soc/ethernet@ff3f0000"
+    ),
+    Board(
+        name="maaxboard",
+        arch=SystemDescription.Arch.AARCH64,
+        paddr_top=0x70000000,
+        serial="soc@0/bus@30800000/serial@30860000",
+        timer="soc@0/bus@30000000/timer@302d0000",
+        ethernet="soc@0/bus@30800000/ethernet@30be0000"
+    ),
+    Board(
+        name="imx8mm_evk",
+        arch=SystemDescription.Arch.AARCH64,
+        paddr_top=0x70000000,
+        serial="soc@0/bus@30800000/spba-bus@30800000/serial@30890000",
+        timer="soc@0/bus@30000000/timer@302d0000",
+        ethernet="soc@0/bus@30800000/ethernet@30be0000"
+    ),
+    Board(
+        name="imx8mp_evk",
+        arch=SystemDescription.Arch.AARCH64,
+        paddr_top=0x70000000,
+        serial="soc@0/bus@30800000/spba-bus@30800000/serial@30890000",
+        timer="soc@0/bus@30000000/timer@302d0000",
+        ethernet="soc@0/bus@30800000/ethernet@30be0000"
+    ),
+    Board(
+        name="imx8mq_evk",
+        arch=SystemDescription.Arch.AARCH64,
+        paddr_top=0x70000000,
+        serial="soc@0/bus@30800000/serial@30860000",
+        timer="soc@0/bus@30000000/timer@302d0000",
+        ethernet="soc@0/bus@30800000/ethernet@30be0000"
+    ),
 ]
 
 """
 Below are classes to serialise into custom configuration for the benchmarking component.
 All serialised definitions are little endian and pointers are 64-bit integers.
 """
+
 
 class BenchmarkIdleConfig:
     def __init__(self, cycle_counters: int, ch_init: int):
@@ -75,7 +121,6 @@ class BenchmarkConfig:
         self.ch_init = ch_init
         self.children = children
 
-
     def serialise(self) -> bytes:
         child_config_format = "c" * 65
         pack_str = "<BBBB" + child_config_format * 64
@@ -89,17 +134,20 @@ class BenchmarkConfig:
 
         child_bytes = child_bytes.ljust(64 * 65, b'\0')
 
-        child_bytes = [x.to_bytes(1, "little") for x in child_bytes]
+        child_bytes_list = [x.to_bytes(1, "little") for x in child_bytes]
 
-        return struct.pack(pack_str, self.ch_start, self.ch_stop, self.ch_init, len(self.children), *child_bytes)
+        return struct.pack(
+            pack_str, self.ch_start, self.ch_stop,
+            self.ch_init, len(self.children), *child_bytes_list
+        )
 
 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
-    uart_node = dtb.node(platform.serial)
+    uart_node = dtb.node(board.serial)
     assert uart_node is not None
-    ethernet_node = dtb.node(platform.ethernet)
+    ethernet_node = dtb.node(board.ethernet)
     assert ethernet_node is not None
-    timer_node = dtb.node(platform.timer)
+    timer_node = dtb.node(board.timer)
     assert uart_node is not None
 
     timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=101)
@@ -109,18 +157,24 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     serial_virt_tx = ProtectionDomain("serial_virt_tx", "serial_virt_tx.elf", priority=99)
     serial_system = Sddf.Serial(sdf, uart_node, uart_driver, serial_virt_tx)
 
-    ethernet_driver = ProtectionDomain("ethernet_driver", "eth_driver.elf", priority=101, budget=100, period=400)
+    ethernet_driver = ProtectionDomain(
+        "ethernet_driver", "eth_driver.elf", priority=101, budget=100, period=400
+    )
     net_virt_tx = ProtectionDomain("net_virt_tx", "network_virt_tx.elf", priority=100, budget=20000)
     net_virt_rx = ProtectionDomain("net_virt_rx", "network_virt_rx.elf", priority=99)
     net_system = Sddf.Network(sdf, ethernet_node, ethernet_driver, net_virt_tx, net_virt_rx)
 
     client0 = ProtectionDomain("client0", "lwip0.elf", priority=97, budget=20000)
-    client0_net_copier = ProtectionDomain("client0_net_copier", "network_copy0.elf", priority=98, budget=20000)
+    client0_net_copier = ProtectionDomain(
+        "client0_net_copier", "network_copy0.elf", priority=98, budget=20000
+    )
     client1 = ProtectionDomain("client1", "lwip1.elf", priority=97, budget=20000)
-    client1_net_copier = ProtectionDomain("client1_net_copier", "network_copy1.elf", priority=98, budget=20000)
+    client1_net_copier = ProtectionDomain(
+        "client1_net_copier", "network_copy1.elf", priority=98, budget=20000
+    )
 
-    client0_mac_addr = f"52:54:01:00:00:{hex(random.randint(0, 0xff))[2:]}"
-    client1_mac_addr = f"52:54:01:00:00:{hex(random.randint(0, 0xff))[2:]}"
+    client0_mac_addr = f"52:54:01:00:00:{hex(random.randint(0, 0xff))[2:]:0>2}"
+    client1_mac_addr = f"52:54:01:00:00:{hex(random.randint(0, 0xff))[2:]:0>2}"
     assert client0_mac_addr != client1_mac_addr
 
     serial_system.add_client(client0)
@@ -177,9 +231,18 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     client0.add_map(Map(cycle_counters_mr, 0x20_000_000, perms=Map.Perms(r=True, w=True)))
     bench_idle_config = BenchmarkIdleConfig(0x5_000_000, bench_idle_ch.pd_a_id)
 
-    bench_client_config = BenchmarkClientConfig(0x20_000_000, bench_start_ch.pd_a_id, bench_stop_ch.pd_a_id)
+    bench_client_config = BenchmarkClientConfig(
+        0x20_000_000,
+        bench_start_ch.pd_a_id,
+        bench_stop_ch.pd_a_id
+    )
 
-    benchmark_config = BenchmarkConfig(bench_start_ch.pd_b_id, bench_stop_ch.pd_b_id, bench_idle_ch.pd_b_id, bench_children)
+    benchmark_config = BenchmarkConfig(
+        bench_start_ch.pd_b_id,
+        bench_stop_ch.pd_b_id,
+        bench_idle_ch.pd_b_id,
+        bench_children
+    )
 
     assert serial_system.connect()
     assert serial_system.serialise_config(output_dir)
@@ -203,20 +266,20 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dtbs", required=True)
+    parser.add_argument("--dtb", required=True)
     parser.add_argument("--sddf", required=True)
-    parser.add_argument("--platform", required=True, choices=[p.name for p in PLATFORMS])
+    parser.add_argument("--board", required=True, choices=[b.name for b in BOARDS])
     parser.add_argument("--output", required=True)
     parser.add_argument("--sdf", required=True)
 
     args = parser.parse_args()
 
-    platform = next(filter(lambda p: p.name == args.platform, PLATFORMS))
+    board = next(filter(lambda p: p.name == args.board, BOARDS))
 
-    sdf = SystemDescription(platform.arch, platform.paddr_top)
+    sdf = SystemDescription(board.arch, board.paddr_top)
     sddf = Sddf(args.sddf)
 
-    with open(args.dtbs + f"/{platform.name}.dtb", "rb") as f:
+    with open(args.dtb, "rb") as f:
         dtb = DeviceTree(f.read())
 
     generate(args.sdf, args.output, dtb)
