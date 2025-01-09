@@ -1,7 +1,8 @@
 # Copyright 2025, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
 import argparse
-from typing import Dict, List, Any
+from typing import List
+from dataclasses import dataclass
 from sdfgen import SystemDescription, Sddf, DeviceTree
 
 ProtectionDomain = SystemDescription.ProtectionDomain
@@ -9,18 +10,25 @@ MemoryRegion = SystemDescription.MemoryRegion
 Map = SystemDescription.Map
 
 
+@dataclass
 class Board:
-    def __init__(self, name: str, arch: SystemDescription.Arch, paddr_top: int, i2c_device_node: str, timer_device_node: str):
-        self.name = name
-        self.arch = arch
-        self.paddr_top = paddr_top
-        self.i2c_device_node = i2c_device_node
-        self.timer_device_node = timer_device_node
+    name: str
+    arch: SystemDescription.Arch
+    paddr_top: int
+    i2c: str
+    timer: str
 
 
 BOARDS: List[Board] = [
-    Board("odroidc4", SystemDescription.Arch.AARCH64, 0x80000000, "soc/bus@ffd00000/i2c@1d000", "soc/bus@ffd00000/watchdog@f0d0"),
+    Board(
+        name="odroidc4",
+        arch=SystemDescription.Arch.AARCH64,
+        paddr_top=0x80000000,
+        i2c="soc/bus@ffd00000/i2c@1d000",
+        timer="soc/bus@ffd00000/watchdog@f0d0",
+    ),
 ]
+
 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=4)
@@ -39,9 +47,9 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     i2c_driver.add_map(Map(clk_mr, 0x30_000_000, Map.Perms(r=True, w=True), cached=False))
     i2c_driver.add_map(Map(gpio_mr, 0x30_100_000, Map.Perms(r=True, w=True), cached=False))
 
-    i2c_node = dtb.node(board.i2c_device_node)
+    i2c_node = dtb.node(board.i2c)
     assert i2c_node is not None
-    timer_node = dtb.node(board.timer_device_node)
+    timer_node = dtb.node(board.timer)
     assert timer_node is not None
 
     i2c_system = Sddf.I2c(sdf, i2c_node, i2c_driver, i2c_virt)
