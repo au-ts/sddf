@@ -1,40 +1,69 @@
 # Copyright 2025, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
 import argparse
-from typing import Dict, List, Any
+from typing import List
+from dataclasses import dataclass
 from sdfgen import SystemDescription, Sddf, DeviceTree
 
 ProtectionDomain = SystemDescription.ProtectionDomain
 
+
+@dataclass
 class Board:
-    def __init__(self, name: str, arch: SystemDescription.Arch, paddr_top: int, serial_device_node: str):
-        self.name = name
-        self.arch = arch
-        self.paddr_top = paddr_top
-        self.serial_device_node = serial_device_node
+    name: str
+    arch: SystemDescription.Arch
+    paddr_top: int
+    serial: str
 
 
 BOARDS: List[Board] = [
-    Board("qemu_virt_aarch64", SystemDescription.Arch.AARCH64, 0xa_000_000, "pl011@9000000"),
-    Board("qemu_virt_riscv64", SystemDescription.Arch.RISCV64, 0xa000_0000, "soc/serial@10000000"),
-    Board("odroidc4", SystemDescription.Arch.AARCH64, 0x80000000, "soc/bus@ff800000/serial@3000"),
-    Board("maaxboard", SystemDescription.Arch.AARCH64, 0xa_000_000, "soc@0/bus@30800000/serial@30860000"),
-    Board("imx8mm_evk", SystemDescription.Arch.AARCH64, 0xa_000_000, "soc@0/bus@30800000/spba-bus@30800000/serial@30890000"),
-    Board("star64", SystemDescription.Arch.RISCV64, 0x100000000, "soc/serial@10000000"),
+    Board(
+        name="qemu_virt_aarch64",
+        arch=SystemDescription.Arch.AARCH64,
+        paddr_top=0xa_000_000,
+        serial="pl011@9000000"
+    ),
+    Board(
+        name="odroidc4",
+        arch=SystemDescription.Arch.AARCH64,
+        paddr_top=0x80000000,
+        serial="soc/bus@ff800000/serial@3000"
+    ),
+    Board(
+        name="maaxboard",
+        arch=SystemDescription.Arch.AARCH64,
+        paddr_top=0xa_000_000,
+        serial="soc@0/bus@30800000/serial@30860000"
+    ),
+    Board(
+        name="imx8mm_evk",
+        arch=SystemDescription.Arch.AARCH64,
+        paddr_top=0xa_000_000,
+        serial="soc@0/bus@30800000/spba-bus@30800000/serial@30890000"
+    ),
+    Board(
+        name="star64",
+        arch=SystemDescription.Arch.RISCV64,
+        paddr_top=0x100000000,
+        serial="soc/serial@10000000"
+    ),
 ]
+
 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     serial_driver = ProtectionDomain("serial_driver", "uart_driver.elf", priority=200)
     serial_virt_tx = ProtectionDomain("serial_virt_tx", "serial_virt_tx.elf", priority=199)
     # Increase the stack size as running with UBSAN uses more stack space than normal.
-    serial_virt_rx = ProtectionDomain("serial_virt_rx", "serial_virt_rx.elf", priority=199, stack_size=0x2000)
+    serial_virt_rx = ProtectionDomain("serial_virt_rx", "serial_virt_rx.elf",
+                                      priority=199, stack_size=0x2000)
     client0 = ProtectionDomain("client0", "client0.elf", priority=1)
     client1 = ProtectionDomain("client1", "client1.elf", priority=1)
 
-    serial_node = dtb.node(board.serial_device_node)
+    serial_node = dtb.node(board.serial)
     assert serial_node is not None
 
-    serial_system = Sddf.Serial(sdf, serial_node, serial_driver, serial_virt_tx, virt_rx=serial_virt_rx)
+    serial_system = Sddf.Serial(sdf, serial_node, serial_driver,
+                                serial_virt_tx, virt_rx=serial_virt_rx)
     serial_system.add_client(client0)
     serial_system.add_client(client1)
 
