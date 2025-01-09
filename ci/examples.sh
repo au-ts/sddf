@@ -245,7 +245,7 @@ mmc() {
 }
 
 blk() {
-    BOARDS=("qemu_virt_aarch64" "qemu_virt_riscv64")
+    BOARDS=("qemu_virt_aarch64")
     CONFIGS=("debug" "release")
     for BOARD in "${BOARDS[@]}"
     do
