@@ -32,7 +32,7 @@ jobs:
       - name: Install Zig
         uses: mlugg/setup-zig@v1.2.0
         with:
-          version: 0.13.0
+          version: master
       - name: Install Python dependencies
         run: pip3 install -i https://test.pypi.org/simple/ sdfgen
       - name: Build and run examples
@@ -66,7 +66,7 @@ jobs:
       - name: Install Zig
         uses: mlugg/setup-zig@v1.2.0
         with:
-          version: 0.13.0
+          version: master
       - name: Install Python dependencies
         run: pipx install -i https://test.pypi.org/simple/ sdfgen
       - name: Download and install AArch64 GCC toolchain
