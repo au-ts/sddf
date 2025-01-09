@@ -131,7 +131,6 @@ pub fn build(b: *std.Build) !void {
         .libmicrokit = @as([]const u8, libmicrokit),
         .libmicrokit_include = @as([]const u8, libmicrokit_include),
         .libmicrokit_linker_script = @as([]const u8, libmicrokit_linker_script),
-        .serial_config_include = b.getInstallPath(.prefix, ""),
     });
 
     const driver_class = switch (microkit_board_option.?) {
