@@ -16,10 +16,8 @@ LWIPDIR:=network/ipstacks/lwip/src
 BENCHMARK:=$(SDDF)/benchmark
 UTIL:=$(SDDF)/util
 ETHERNET_DRIVER:=$(SDDF)/drivers/network/$(DRIV_DIR)
-ETHERNET_CONFIG_INCLUDE:=${ECHO_SERVER}/include/ethernet_config
 SERIAL_COMPONENTS := $(SDDF)/serial/components
 UART_DRIVER := $(SDDF)/drivers/serial/$(UART_DRIV_DIR)
-SERIAL_CONFIG_INCLUDE:=${ECHO_SERVER}/include/serial_config
 TIMER_DRIVER:=$(SDDF)/drivers/timer/$(TIMER_DRV_DIR)
 NETWORK_COMPONENTS:=$(SDDF)/network/components
 
@@ -45,8 +43,6 @@ CFLAGS := -mcpu=$(CPU) \
 	  -I$(BOARD_DIR)/include \
 	  -I$(SDDF)/include \
 	  -I${ECHO_INCLUDE}/lwip \
-	  -I${ETHERNET_CONFIG_INCLUDE} \
-	  -I$(SERIAL_CONFIG_INCLUDE) \
 	  -I${SDDF}/$(LWIPDIR)/include \
 	  -I${SDDF}/$(LWIPDIR)/include/ipv4 \
 	  -MD \
@@ -99,7 +95,7 @@ $(DTB): $(DTS)
 	dtc -q -I dts -O dtb $(DTS) > $(DTB)
 
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
-	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --platform $(MICROKIT_BOARD) --dtbs . --output . --sdf $(SYSTEM_FILE)
+	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE)
 	$(OBJCOPY) --update-section .device_resources=uart_driver_device_resources.data uart_driver.elf
 	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data uart_driver.elf
 	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx.data serial_virt_tx.elf
