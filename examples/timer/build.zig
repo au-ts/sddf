@@ -230,7 +230,7 @@ pub fn build(b: *std.Build) !void {
 
     const client_objcopy = updateSectionObjcopy(b, ".timer_client_config", meta_output, "timer_client_client.data", "client.elf");
     const driver_objcopy = updateSectionObjcopy(b, ".device_resources", meta_output, "timer_driver_device_resources.data", "timer_driver.elf");
-    driver_objcopy.dependOn(&driver_install.step);
+    driver_objcopy.step.dependOn(&driver_install.step);
     const objcopys = &.{ client_objcopy, driver_objcopy };
 
     const final_image_dest = b.getInstallPath(.bin, "./loader.img");
