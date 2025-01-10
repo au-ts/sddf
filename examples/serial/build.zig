@@ -94,7 +94,8 @@ fn updateSectionObjcopy(b: *std.Build, section: []const u8, data_output: std.Bui
 pub fn build(b: *std.Build) !void {
     const optimize = b.standardOptimizeOption(.{});
 
-    const python = b.option([]const u8, "python", "Path to Python to use") orelse "python3";
+    const default_python = if (std.posix.getenv("PYTHON")) |p| p else "python3";
+    const python = b.option([]const u8, "python", "Path to Python to use") orelse default_python;
 
     // Getting the path to the Microkit SDK before doing anything else
     const microkit_sdk_arg = b.option([]const u8, "sdk", "Path to Microkit SDK");
