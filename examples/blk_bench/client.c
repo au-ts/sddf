@@ -86,6 +86,8 @@ int benchmark_run_idx = 0;
 
 void handle_random_operations_run(blk_req_code_t request_code, uint32_t start_sector, uint32_t interval, char* run_type, enum run_benchmark_state next_state);
 
+/* tracks if dummy data for writing to block device is populated in shared memory region */
+bool dummy_write_data_populated = false;
 bool run_benchmark() {
     switch(run_benchmark_state) {
         case START_BENCHMARK:
@@ -105,29 +107,38 @@ bool run_benchmark() {
             break;
         case THROUGHPUT_RANDOM_READ:
             /* Perform REQUEST_COUNT[benchmark_size_idx] random READs, from 4KiB write size up to 8MiB */
-            handle_random_operations_run(BLK_REQ_READ, read_start_sector, BLOCK_READ_WRITE_INTERVAL, "RANDOM_READ", LATENCY_READ);
+            dummy_write_data_populated = false;
+            handle_random_operations_run(BLK_REQ_READ, read_start_sector, BLOCK_READ_WRITE_INTERVAL, "RANDOM_READ", THROUGHPUT_RANDOM_WRITE);
             break;
         case THROUGHPUT_RANDOM_WRITE:
             /* Perform QUEUE_SIZE WRITEs, from 4KiB write size up to 128MiB (x8 at each step) */
-            // write out garbage for the WRITE_REQUESTs
-            if (benchmark_size_idx == 0)
+            // write out garbage for the WRITE_REQUESTs ONLY at the beginning of this benchmark type
+            if (!dummy_write_data_populated)
+            {
                 for (int i = 0; i < BLK_DATA_REGION_SIZE_CLI0; ++i) {
                     blk_data[i] = i % 255;
                 }
+                dummy_write_data_populated = true;
+            }
 
             handle_random_operations_run(BLK_REQ_WRITE, write_start_sector, BLOCK_READ_WRITE_INTERVAL, "RANDOM_WRITE", THROUGHPUT_SEQUENTIAL_READ);
             break;
         case THROUGHPUT_SEQUENTIAL_READ:
+            dummy_write_data_populated = false;
             handle_random_operations_run(BLK_REQ_READ, read_start_sector, 0, "SEQUENTIAL_READ", THROUGHPUT_SEQUENTIAL_WRITE);
             break;
         case THROUGHPUT_SEQUENTIAL_WRITE:
-            if (benchmark_size_idx == 0)
+            if (!dummy_write_data_populated)
+            {
                 for (int i = 0; i < BLK_DATA_REGION_SIZE_CLI0; ++i) {
                     blk_data[i] = i % 255;
                 }
+                dummy_write_data_populated = true;
+            }
             handle_random_operations_run(BLK_REQ_WRITE, write_start_sector, 0, "SEQUENTIAL_WRITE", LATENCY_READ);
             break;
         case LATENCY_READ:
+            dummy_write_data_populated = false;
             // Perform QUEUE_SIZE random reads, only measure latency of each read
             // XXX to verify: will latency differ with request read size? or will it be constant
             // XXX if varies, maybe can be merged into THROUGHPUT_RANDOM_READ
