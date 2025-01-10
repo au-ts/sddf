@@ -45,7 +45,7 @@ void rx_return(void)
     uint32_t local_tail = rx_queue_handle_cli[current_client].queue->tail;
     char c = '\0';
     while (reprocess) {
-        while (!serial_dequeue(&rx_queue_handle_drv, &rx_queue_handle_drv.queue->head, &c)) {
+        while (!serial_dequeue(&rx_queue_handle_drv, NULL, &c)) {
             switch (current_mode) {
             case normal:
                 switch (c) {
