@@ -10,20 +10,14 @@
 #include <sddf/serial/queue.h>
 #include <stdint.h>
 
-/* Number of clients that can be connected to the serial server. */
-#define SERIAL_NUM_CLIENTS 3
+/* Number of clients capable of transmission. */
+#define SERIAL_NUM_TX_CLIENTS 3
 
-/* Only support transmission and not receive. */
-#define SERIAL_TX_ONLY 1
+/* Number of clients capable of reception. */
+#define SERIAL_NUM_RX_CLIENTS 0
 
 /* Associate a colour with each client's output. */
 #define SERIAL_WITH_COLOUR 1
-
-/* Control character to switch input stream - ctrl \. To input character input twice. */
-#define SERIAL_SWITCH_CHAR 28
-
-/* Control character to terminate client number input. */
-#define SERIAL_TERMINATE_NUM '\r'
 
 /* Default baud rate of the uart device */
 #define UART_DEFAULT_BAUD 115200

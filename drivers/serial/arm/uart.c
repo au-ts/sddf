@@ -149,7 +149,7 @@ static void uart_setup(void)
     uart_regs->lcr_h |= PL011_LCR_PARTY_EN;
 
     /* Enable receive interrupts when FIFO level exceeds 1/8 or after 32 ticks */
-#if !SERIAL_TX_ONLY
+#if SERIAL_NUM_RX_CLIENTS > 0
     uart_regs->ifls &= ~(PL011_IFLS_RX_MASK << PL011_IFLS_RX_SHFT);
     uart_regs->imsc |= (PL011_IMSC_RX_TIMEOUT | PL011_IMSC_RX_INT);
 #endif
@@ -165,7 +165,7 @@ static void uart_setup(void)
     uart_regs->tcr |= PL011_CR_TX_EN;
 
     /* Enable receive */
-#if !SERIAL_TX_ONLY
+#if SERIAL_NUM_RX_CLIENTS > 0
     uart_regs->tcr |= PL011_CR_RX_EN;
 #endif
 }
@@ -174,7 +174,7 @@ void init(void)
 {
     uart_setup();
 
-#if !SERIAL_TX_ONLY
+#if SERIAL_NUM_RX_CLIENTS > 0
     serial_queue_init(&rx_queue_handle, rx_queue, SERIAL_RX_DATA_REGION_CAPACITY_DRIV, rx_data);
 #endif
     serial_queue_init(&tx_queue_handle, tx_queue, SERIAL_TX_DATA_REGION_CAPACITY_DRIV, tx_data);
