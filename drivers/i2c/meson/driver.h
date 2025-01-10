@@ -17,8 +17,6 @@
 #include "gpio.h"
 #include "clk.h"
 
-#define DATA_REGIONS_START 0x10000000
-
 enum data_direction {
     DATA_DIRECTION_WRITE = 0x0,
     DATA_DIRECTION_READ = 0x1

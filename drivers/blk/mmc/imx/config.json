@@ -1,0 +1,23 @@
+{
+    "name": "imx8_usdhc",
+    "compatible": [
+        "fsl,imx8mq-usdhc"
+    ],
+    "resources": {
+        "regions": [
+            {
+                "name": "regs",
+                "perms": "rw",
+                "setvar_vaddr": "usdhc_regs",
+                "size": 4096,
+                "dt_index": 0
+            }
+        ],
+        "irqs": [
+            {
+                "channel_id": 1,
+                "dt_index": 0
+            }
+        ]
+    }
+}

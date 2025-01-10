@@ -9,6 +9,7 @@
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 #include <sddf/util/udivmodti4.h>
+#include <sddf/resources/device.h>
 
 #if !(CONFIG_EXPORT_PCNT_USER && CONFIG_EXPORT_PTMR_USER)
 #error "ARM generic timer is not exported by seL4"
@@ -16,7 +17,6 @@
 
 static uint64_t timer_freq;
 
-#define IRQ_CH 0
 #define MAX_TIMEOUTS 6
 
 #define GENERIC_TIMER_ENABLE (1 << 0)
@@ -38,6 +38,8 @@ static uint64_t timer_freq;
 #define CNTPCT "cntpct_el0"
 /* frequency of the timer */
 #define CNTFRQ "cntfrq_el0"
+
+__attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
 static inline uint64_t get_ticks(void)
 {
@@ -160,7 +162,7 @@ void init()
 
 void notified(microkit_channel ch)
 {
-    assert(ch == IRQ_CH);
+    assert(ch == device_resources.irqs[0].id);
     microkit_deferred_irq_ack(ch);
 
     generic_timer_set_compare(UINT64_MAX);

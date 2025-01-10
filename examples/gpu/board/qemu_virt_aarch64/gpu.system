@@ -35,7 +35,7 @@
         <irq irq="79" id="0" trigger="edge" />
     </protection_domain>
 
-    <protection_domain name="timer_driver" priority="254" pp="true" passive="true">
+    <protection_domain name="timer_driver" priority="254" passive="true">
         <program_image path="timer_driver.elf" />
         <irq irq="30" id="0" />
     </protection_domain>
@@ -67,7 +67,7 @@
     </channel>
 
     <channel>
-        <end pd="client" id="1" />
+        <end pd="client" id="1" pp="true" />
         <end pd="timer_driver" id="1" />
     </channel>
 

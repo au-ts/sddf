@@ -5,6 +5,10 @@
 #
 
 QEMU := qemu-system-aarch64
+DTC := dtc
+PYTHON ?= python3
+
+METAPROGRAM := $(TOP)/meta.py
 
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 ECHO_SERVER:=${SDDF}/examples/echo_server
@@ -12,22 +16,23 @@ LWIPDIR:=network/ipstacks/lwip/src
 BENCHMARK:=$(SDDF)/benchmark
 UTIL:=$(SDDF)/util
 ETHERNET_DRIVER:=$(SDDF)/drivers/network/$(DRIV_DIR)
-ETHERNET_CONFIG_INCLUDE:=${ECHO_SERVER}/include/ethernet_config
 SERIAL_COMPONENTS := $(SDDF)/serial/components
 UART_DRIVER := $(SDDF)/drivers/serial/$(UART_DRIV_DIR)
-SERIAL_CONFIG_INCLUDE:=${ECHO_SERVER}/include/serial_config
 TIMER_DRIVER:=$(SDDF)/drivers/timer/$(TIMER_DRV_DIR)
 NETWORK_COMPONENTS:=$(SDDF)/network/components
 
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
-SYSTEM_FILE := ${ECHO_SERVER}/board/$(MICROKIT_BOARD)/echo_server.system
 IMAGE_FILE := loader.img
 REPORT_FILE := report.txt
+SYSTEM_FILE := echo_server.system
+DTS := $(SDDF)/dts/$(MICROKIT_BOARD).dts
+DTB := $(MICROKIT_BOARD).dtb
+METAPROGRAM := $(TOP)/meta.py
 
 vpath %.c ${SDDF} ${ECHO_SERVER}
 
-IMAGES := eth_driver.elf lwip.elf benchmark.elf idle.elf network_virt_rx.elf\
-	  network_virt_tx.elf copy.elf timer_driver.elf uart_driver.elf serial_virt_tx.elf
+IMAGES := eth_driver.elf lwip0.elf lwip1.elf benchmark.elf idle.elf network_virt_rx.elf\
+	  network_virt_tx.elf network_copy.elf timer_driver.elf uart_driver.elf serial_virt_tx.elf
 
 CFLAGS := -mcpu=$(CPU) \
 	  -mstrict-align \
@@ -38,8 +43,6 @@ CFLAGS := -mcpu=$(CPU) \
 	  -I$(BOARD_DIR)/include \
 	  -I$(SDDF)/include \
 	  -I${ECHO_INCLUDE}/lwip \
-	  -I${ETHERNET_CONFIG_INCLUDE} \
-	  -I$(SERIAL_CONFIG_INCLUDE) \
 	  -I${SDDF}/$(LWIPDIR)/include \
 	  -I${SDDF}/$(LWIPDIR)/include/ipv4 \
 	  -MD \
@@ -74,7 +77,9 @@ DEPS := $(filter %.d,$(OBJS:.o=.d))
 all: loader.img
 
 ${LWIP_OBJS}: ${CHECK_FLAGS_BOARD_MD5}
-lwip.elf: $(LWIP_OBJS) libsddf_util.a
+lwip0.elf: $(LWIP_OBJS) libsddf_util.a
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+lwip1.elf: $(LWIP_OBJS) libsddf_util.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 LWIPDIRS := $(addprefix ${LWIPDIR}/, core/ipv4 netif api)
@@ -85,6 +90,32 @@ ${BUILD_DIR}/${LWIPDIRS}:
 # Need to build libsddf_util_debug.a because it's included in LIBS
 # for the unimplemented libc dependencies
 ${IMAGES}: libsddf_util_debug.a
+
+$(DTB): $(DTS)
+	dtc -q -I dts -O dtb $(DTS) > $(DTB)
+
+$(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
+	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE)
+	$(OBJCOPY) --update-section .device_resources=uart_driver_device_resources.data uart_driver.elf
+	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data uart_driver.elf
+	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx.data serial_virt_tx.elf
+	$(OBJCOPY) --update-section .device_resources=ethernet_driver_device_resources.data eth_driver.elf
+	$(OBJCOPY) --update-section .net_driver_config=net_driver.data eth_driver.elf
+	$(OBJCOPY) --update-section .net_virt_rx_config=net_virt_rx.data network_virt_rx.elf
+	$(OBJCOPY) --update-section .net_virt_tx_config=net_virt_tx.data network_virt_tx.elf
+	$(OBJCOPY) --update-section .net_copy_config=net_copy_client0_net_copier.data network_copy.elf network_copy0.elf
+	$(OBJCOPY) --update-section .net_copy_config=net_copy_client1_net_copier.data network_copy.elf network_copy1.elf
+	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
+	$(OBJCOPY) --update-section .timer_client_config=timer_client_client0.data lwip0.elf
+	$(OBJCOPY) --update-section .net_client_config=net_client_client0.data lwip0.elf
+	$(OBJCOPY) --update-section .serial_client_config=serial_client_client0.data lwip0.elf
+	$(OBJCOPY) --update-section .timer_client_config=timer_client_client1.data lwip1.elf
+	$(OBJCOPY) --update-section .net_client_config=net_client_client1.data lwip1.elf
+	$(OBJCOPY) --update-section .serial_client_config=serial_client_client1.data lwip1.elf
+	$(OBJCOPY) --update-section .serial_client_config=serial_client_bench.data benchmark.elf
+	$(OBJCOPY) --update-section .benchmark_config=benchmark_config.data benchmark.elf
+	$(OBJCOPY) --update-section .benchmark_client_config=benchmark_client_config.data lwip0.elf
+	$(OBJCOPY) --update-section .benchmark_config=benchmark_idle_config.data idle.elf
 
 ${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)

@@ -7,19 +7,13 @@
 #include <stdint.h>
 #include <microkit.h>
 #include <sddf/serial/queue.h>
+#include <sddf/serial/config.h>
 #include <sddf/util/printf.h>
-#include <serial_config.h>
 
-#define DRIVER_CH 0
-#define CLIENT_OFFSET 1
+#define NAME_MAX 128
+#define BEGIN_STR_MAX 128
 
-serial_queue_t *tx_queue_drv;
-serial_queue_t *tx_queue_cli0;
-
-char *tx_data_drv;
-char *tx_data_cli0;
-
-#if SERIAL_WITH_COLOUR
+__attribute__((__section__(".serial_virt_tx_config"))) serial_virt_tx_config_t config;
 
 /* When we have more clients than colours, we re-use the colours. */
 const char *colours[] = {
@@ -41,17 +35,15 @@ const char *colours[] = {
 #define COLOUR_END "\x1b[0m"
 #define COLOUR_END_LEN 4
 
-char *client_names[SERIAL_NUM_CLIENTS];
-
-#endif
+char client_names[NAME_MAX][SDDF_SERIAL_MAX_CLIENTS];
 
 serial_queue_handle_t tx_queue_handle_drv;
-serial_queue_handle_t tx_queue_handle_cli[SERIAL_NUM_CLIENTS];
+serial_queue_handle_t tx_queue_handle_cli[SDDF_SERIAL_MAX_CLIENTS];
 
-#define TX_PENDING_LEN (SERIAL_NUM_CLIENTS + 1)
+#define TX_PENDING_MAX (SDDF_SERIAL_MAX_CLIENTS + 1)
 typedef struct tx_pending {
-    uint32_t queue[TX_PENDING_LEN];
-    bool clients_pending[SERIAL_NUM_CLIENTS];
+    uint32_t queue[TX_PENDING_MAX];
+    bool clients_pending[SDDF_SERIAL_MAX_CLIENTS];
     uint32_t head;
     uint32_t tail;
 } tx_pending_t;
@@ -60,7 +52,7 @@ tx_pending_t tx_pending;
 
 static uint32_t tx_pending_length(void)
 {
-    return (TX_PENDING_LEN + tx_pending.tail - tx_pending.head) % TX_PENDING_LEN;
+    return (TX_PENDING_MAX + tx_pending.tail - tx_pending.head) % TX_PENDING_MAX;
 }
 
 static void tx_pending_push(uint32_t client)
@@ -71,11 +63,11 @@ static void tx_pending_push(uint32_t client)
     }
 
     /* Ensure the pending queue is not already full */
-    assert(tx_pending_length() < SERIAL_NUM_CLIENTS);
+    assert(tx_pending_length() < config.num_clients);
 
     tx_pending.queue[tx_pending.tail] = client;
     tx_pending.clients_pending[client] = true;
-    tx_pending.tail = (tx_pending.tail + 1) % TX_PENDING_LEN;
+    tx_pending.tail = (tx_pending.tail + 1) % TX_PENDING_MAX;
 }
 
 static void tx_pending_pop(uint32_t *client)
@@ -85,7 +77,7 @@ static void tx_pending_pop(uint32_t *client)
 
     *client = tx_pending.queue[tx_pending.head];
     tx_pending.clients_pending[*client] = false;
-    tx_pending.head = (tx_pending.head + 1) % TX_PENDING_LEN;
+    tx_pending.head = (tx_pending.head + 1) % TX_PENDING_MAX;
 }
 
 bool process_tx_queue(uint32_t client)
@@ -98,11 +90,11 @@ bool process_tx_queue(uint32_t client)
     }
 
     uint32_t length = serial_queue_length(handle);
-#if SERIAL_WITH_COLOUR
-    const char *client_colour = colours[client % ARRAY_SIZE(colours)];
-    assert(COLOUR_BEGIN_LEN == sddf_strlen(client_colour));
-    length += COLOUR_BEGIN_LEN + COLOUR_END_LEN;
-#endif
+    if (config.enable_colour) {
+        const char *client_colour = colours[client % ARRAY_SIZE(colours)];
+        assert(COLOUR_BEGIN_LEN == sddf_strlen(client_colour));
+        length += COLOUR_BEGIN_LEN + COLOUR_END_LEN;
+    }
 
     /* Not enough space to transmit string to virtualiser. Continue later */
     if (length > serial_queue_free(&tx_queue_handle_drv)) {
@@ -116,12 +108,13 @@ bool process_tx_queue(uint32_t client)
         return false;
     }
 
-#if SERIAL_WITH_COLOUR
-    serial_transfer_all_with_colour(handle, &tx_queue_handle_drv, client_colour, COLOUR_BEGIN_LEN,
-                                    COLOUR_END, COLOUR_END_LEN);
-#else
-    serial_transfer_all(handle, &tx_queue_handle_drv);
-#endif
+    if (config.enable_colour) {
+        const char *client_colour = colours[client % ARRAY_SIZE(colours)];
+        serial_transfer_all_with_colour(handle, &tx_queue_handle_drv, client_colour, COLOUR_BEGIN_LEN, COLOUR_END,
+                                        COLOUR_END_LEN);
+    } else {
+        serial_transfer_all(handle, &tx_queue_handle_drv);
+    }
     serial_request_producer_signal(handle);
     return true;
 }
@@ -134,7 +127,11 @@ void tx_return(void)
     }
 
     uint32_t client;
-    bool notify_client[SERIAL_NUM_CLIENTS] = {false};
+    // TODO: `= {false};` gets optimised into memset
+    bool notify_client[SDDF_SERIAL_MAX_CLIENTS];
+    for (int i = 0; i < SDDF_SERIAL_MAX_CLIENTS; i++) {
+        notify_client[i] = false;
+    }
     bool transferred = false;
     for (uint32_t req = 0; req < num_pending_tx; req++) {
         tx_pending_pop(&client);
@@ -157,25 +154,32 @@ void tx_return(void)
 
     if (transferred && serial_require_producer_signal(&tx_queue_handle_drv)) {
         serial_cancel_producer_signal(&tx_queue_handle_drv);
-        microkit_notify(DRIVER_CH);
+        microkit_notify(config.driver.id);
     }
 
-    for (uint32_t client = 0; client < SERIAL_NUM_CLIENTS; client++) {
+    for (uint32_t client = 0; client < config.num_clients; client++) {
         if (notify_client[client] && serial_require_consumer_signal(&tx_queue_handle_cli[client])) {
             serial_cancel_consumer_signal(&tx_queue_handle_cli[client]);
-            microkit_notify(client + CLIENT_OFFSET);
+            microkit_notify(config.clients[client].conn.id);
         }
     }
 }
 
 void tx_provide(microkit_channel ch)
 {
-    if (ch > SERIAL_NUM_CLIENTS) {
+    uint32_t active_client = SDDF_SERIAL_MAX_CLIENTS;
+    for (int i = 0; i < config.num_clients; i++) {
+        if (ch == config.clients[i].conn.id) {
+            active_client = i;
+            break;
+        }
+    }
+
+    if (active_client == SDDF_SERIAL_MAX_CLIENTS) {
         sddf_dprintf("VIRT_TX|LOG: Received notification from unknown channel %u\n", ch);
         return;
     }
 
-    uint32_t active_client = ch - CLIENT_OFFSET;
     bool transferred = false;
     bool reprocess = true;
     while (reprocess) {
@@ -192,7 +196,7 @@ void tx_provide(microkit_channel ch)
 
     if (transferred && serial_require_producer_signal(&tx_queue_handle_drv)) {
         serial_cancel_producer_signal(&tx_queue_handle_drv);
-        microkit_notify(DRIVER_CH);
+        microkit_notify(config.driver.id);
     }
 
     if (transferred && serial_require_consumer_signal(&tx_queue_handle_cli[active_client])) {
@@ -203,32 +207,36 @@ void tx_provide(microkit_channel ch)
 
 void init(void)
 {
-    serial_queue_init(&tx_queue_handle_drv, tx_queue_drv, SERIAL_TX_DATA_REGION_CAPACITY_DRIV, tx_data_drv);
-    serial_virt_queue_init_sys(microkit_name, tx_queue_handle_cli, tx_queue_cli0, tx_data_cli0);
-
-#if !SERIAL_TX_ONLY
-    /* Print a deterministic string to allow console input to begin */
-    sddf_memcpy(tx_queue_handle_drv.data_region, SERIAL_CONSOLE_BEGIN_STRING, SERIAL_CONSOLE_BEGIN_STRING_LEN);
-    serial_update_visible_tail(&tx_queue_handle_drv, SERIAL_CONSOLE_BEGIN_STRING_LEN);
-    microkit_notify(DRIVER_CH);
-#endif
-
-#if SERIAL_WITH_COLOUR
-    serial_channel_names_init(client_names);
-    for (uint32_t i = 0; i < SERIAL_NUM_CLIENTS; i++) {
-        sddf_dprintf("%s'%s' is client %u%s\n", colours[i % ARRAY_SIZE(colours)], client_names[i], i, COLOUR_END);
+    serial_queue_init(&tx_queue_handle_drv, config.driver.queue.vaddr, config.driver.data.size,
+                      config.driver.data.vaddr);
+    for (uint64_t i = 0; i < config.num_clients; i++) {
+        serial_virt_tx_client_config_t *client = &config.clients[i];
+        serial_queue_init(&tx_queue_handle_cli[i], client->conn.queue.vaddr, client->conn.data.size,
+                          client->conn.data.vaddr);
     }
-#endif
+
+    if (config.enable_rx) {
+        /* Print a deterministic string to allow console input to begin */
+        sddf_memcpy(tx_queue_handle_drv.data_region, config.begin_str, config.begin_str_len + 1);
+        serial_update_visible_tail(&tx_queue_handle_drv, config.begin_str_len + 1);
+        microkit_notify(config.driver.id);
+    }
+
+    if (config.enable_colour) {
+        for (uint64_t i = 0; i < config.num_clients; i++) {
+            for (int j = 0; j < NAME_MAX; j++) {
+                sddf_memcpy(client_names[i], config.clients[i].name, sizeof client_names[i]);
+            }
+            sddf_dprintf("%s'%s' is client %lu%s\n", colours[i % ARRAY_SIZE(colours)], client_names[i], i, COLOUR_END);
+        }
+    }
 }
 
 void notified(microkit_channel ch)
 {
-    switch (ch) {
-    case DRIVER_CH:
+    if (ch == config.driver.id) {
         tx_return();
-        break;
-    default:
+    } else {
         tx_provide(ch);
-        break;
     }
 }

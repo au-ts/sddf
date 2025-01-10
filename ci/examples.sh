@@ -275,7 +275,7 @@ $NETWORK && network
 $I2C && i2c
 $TIMER && timer
 $SERIAL && serial
-$MMC && mmc
+# $MMC && mmc
 $BLK && blk
 $GPU && gpu
 
