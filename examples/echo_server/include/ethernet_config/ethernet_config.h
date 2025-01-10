@@ -8,6 +8,7 @@
 #include <microkit.h>
 #include <sddf/util/string.h>
 #include <sddf/network/queue.h>
+#include <sddf/network/util.h>
 #include <sddf/util/util.h>
 
 #define NUM_NETWORK_CLIENTS 2
