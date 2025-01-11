@@ -19,6 +19,7 @@ make MICROKIT_SDK=<path/to/sdk> MICROKIT_BOARD=<board>
 
 Currently the options for `MICROKIT_BOARD` are:
 * odroidc4
+* odroidc2
 * qemu_virt_aarch64
 
 After building, the system image to load will be `build/loader.img`.

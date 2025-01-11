@@ -30,6 +30,9 @@
 #elif defined(CONFIG_PLAT_ODROIDC4)
 #define MAC_ADDR_CLI0                       0x525401000003
 #define MAC_ADDR_CLI1                       0x525401000004
+#elif defined(CONFIG_PLAT_ODROIDC2)
+#define MAC_ADDR_CLI0                       0x001e063609ae
+#define MAC_ADDR_CLI1                       0x001e063609ae
 #elif defined(CONFIG_PLAT_MAAXBOARD)
 #define MAC_ADDR_CLI0                       0x525401000005
 #define MAC_ADDR_CLI1                       0x525401000006
@@ -39,6 +42,9 @@
 #elif defined(CONFIG_PLAT_IMX8MP_EVK)
 #define MAC_ADDR_CLI0                       0x525401000009
 #define MAC_ADDR_CLI1                       0x52540100000A
+#elif defined(CONFIG_PLAT_ODROIDC2)
+#define MAC_ADDR_CLI0                       0x52540100000B
+#define MAC_ADDR_CLI1                       0x52540100000C
 #else
 #error "Must define MAC addresses for clients in ethernet config"
 #endif
