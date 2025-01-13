@@ -12,7 +12,6 @@ $(error MICROKIT_SDK must be specified)
 endif
 export override MICROKIT_SDK:=$(abspath ${MICROKIT_SDK})
 
-
 ifeq ($(strip $(TOOLCHAIN)),)
 	TOOLCHAIN := aarch64-none-elf
 	export TOOLCHAIN := aarch64-none-elf
@@ -24,7 +23,7 @@ ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
 	export UART_DRIV_DIR := meson
 	export TIMER_DRV_DIR := meson
 	export CPU := cortex-a55
-else ifneq ($(filter $(strip $(MICROKIT_BOARD)),imx8mm_evk imx8mp_evk maaxboard),)
+else ifneq ($(filter $(strip $(MICROKIT_BOARD)),imx8mm_evk imx8mp_evk imx8mq_evk maaxboard),)
 	export DRIV_DIR := imx
 	export UART_DRIV_DIR := imx
 	export TIMER_DRV_DIR := imx
@@ -41,12 +40,14 @@ endif
 
 export BUILD_DIR:=$(abspath ${BUILD_DIR})
 export MICROKIT_SDK:=$(abspath ${MICROKIT_SDK})
+export TOP := $(abspath $(dir ${MAKEFILE_LIST}))
 
 export CC := $(TOOLCHAIN)-gcc
 export LD := $(TOOLCHAIN)-ld
 export AS := $(TOOLCHAIN)-as
 export AR := $(TOOLCHAIN)-ar
 export RANLIB := $(TOOLCHAIN)-ranlib
+export OBJCOPY := $(TOOLCHAIN)-objcopy
 export MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 export SDDF=$(abspath ../..)
 export ECHO_INCLUDE:=$(abspath .)/include

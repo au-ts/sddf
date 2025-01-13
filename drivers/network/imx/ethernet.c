@@ -6,32 +6,22 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <microkit.h>
+#include <sddf/resources/device.h>
 #include <sddf/network/queue.h>
+#include <sddf/network/config.h>
 #include <sddf/util/util.h>
 #include <sddf/util/fence.h>
 #include <sddf/util/printf.h>
-#include <ethernet_config.h>
 
 #include "ethernet.h"
 
-#define IRQ_CH 0
-#define TX_CH  1
-#define RX_CH  2
+__attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
-uintptr_t hw_ring_buffer_vaddr;
-uintptr_t hw_ring_buffer_paddr;
-
-net_queue_t *rx_free;
-net_queue_t *rx_active;
-net_queue_t *tx_free;
-net_queue_t *tx_active;
+__attribute__((__section__(".net_driver_config"))) net_driver_config_t config;
 
 #define RX_COUNT 256
 #define TX_COUNT 256
 #define MAX_COUNT MAX(RX_COUNT, TX_COUNT)
-
-_Static_assert((RX_COUNT + TX_COUNT) * 2 * NET_BUFFER_SIZE <= NET_DATA_REGION_SIZE,
-               "Expect rx+tx buffers to fit in single 2MB page");
 
 /* HW ring descriptor (shared with device) */
 struct descriptor {
@@ -137,7 +127,7 @@ static void rx_return(void)
 
     if (packets_transferred && net_require_signal_active(&rx_queue)) {
         net_cancel_signal_active(&rx_queue);
-        microkit_notify(RX_CH);
+        microkit_notify(config.virt_rx.id);
     }
 }
 
@@ -193,7 +183,7 @@ static void tx_return(void)
 
     if (enqueued && net_require_signal_free(&tx_queue)) {
         net_cancel_signal_free(&tx_queue);
-        microkit_notify(TX_CH);
+        microkit_notify(config.virt_tx.id);
     }
 }
 
@@ -221,12 +211,14 @@ static void handle_irq(void)
 
 static void eth_setup(void)
 {
+    eth = device_resources.regions[0].region.vaddr;
+
     uint32_t l = eth->palr;
     uint32_t h = eth->paur;
 
     /* Set up HW rings */
-    rx.descr = (volatile struct descriptor *)hw_ring_buffer_vaddr;
-    tx.descr = (volatile struct descriptor *)(hw_ring_buffer_vaddr + (sizeof(struct descriptor) * RX_COUNT));
+    rx.descr = (volatile struct descriptor *)device_resources.regions[1].region.vaddr;
+    tx.descr = (volatile struct descriptor *)device_resources.regions[2].region.vaddr;
 
     /* Perform reset */
     eth->ecr = ECR_RESET;
@@ -277,8 +269,8 @@ static void eth_setup(void)
     eth->tacc = TACC_PROCHK | TACC_IPCHK;
 
     /* Set RDSR */
-    eth->rdsr = hw_ring_buffer_paddr;
-    eth->tdsr = hw_ring_buffer_paddr + (sizeof(struct descriptor) * RX_COUNT);
+    eth->rdsr = device_resources.regions[1].io_addr;
+    eth->tdsr = device_resources.regions[2].io_addr;
 
     /* Size of max eth packet size */
     eth->mrbr = MAX_PACKET_SIZE;
@@ -301,10 +293,18 @@ static void eth_setup(void)
 
 void init(void)
 {
+    assert(device_resources.num_irqs == 1);
+    assert(device_resources.num_regions == 3);
+    // All buffers should fit within our DMA region
+    assert(RX_COUNT * sizeof(struct descriptor) <= device_resources.regions[1].region.size);
+    assert(TX_COUNT * sizeof(struct descriptor) <= device_resources.regions[2].region.size);
+
     eth_setup();
 
-    net_queue_init(&rx_queue, rx_free, rx_active, NET_RX_QUEUE_CAPACITY_DRIV);
-    net_queue_init(&tx_queue, tx_free, tx_active, NET_TX_QUEUE_CAPACITY_DRIV);
+    net_queue_init(&rx_queue, config.virt_rx.free_queue.vaddr, config.virt_rx.active_queue.vaddr,
+                   config.virt_rx.num_buffers);
+    net_queue_init(&tx_queue, config.virt_tx.free_queue.vaddr, config.virt_tx.active_queue.vaddr,
+                   config.virt_tx.num_buffers);
 
     rx_provide();
     tx_provide();
@@ -312,23 +312,18 @@ void init(void)
 
 void notified(microkit_channel ch)
 {
-    switch (ch) {
-    case IRQ_CH:
+    if (ch == device_resources.irqs[0].id) {
         handle_irq();
         /*
          * Delay calling into the kernel to ack the IRQ until the next loop
          * in the microkit event handler loop.
          */
         microkit_deferred_irq_ack(ch);
-        break;
-    case RX_CH:
+    } else if (ch == config.virt_rx.id) {
         rx_provide();
-        break;
-    case TX_CH:
+    } else if (ch == config.virt_tx.id) {
         tx_provide();
-        break;
-    default:
+    } else {
         sddf_dprintf("ETH|LOG: received notification on unexpected channel: %u\n", ch);
-        break;
     }
 }

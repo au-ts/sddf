@@ -16,12 +16,7 @@
 
 #include "echo.h"
 
-#define START_PMU 4
-#define STOP_PMU 5
-
 #define MAX_PACKET_SIZE 0x1000
-
-uintptr_t cyclecounters_vaddr;
 
 /* This file implements a TCP based utilization measurment process that starts
  * and stops utilization measurements based on a client's requests.
@@ -76,6 +71,9 @@ static struct tcp_pcb *utiliz_socket;
 
 
 struct bench *bench;
+
+microkit_channel bench_start_ch;
+microkit_channel bench_stop_ch;
 
 uint64_t start;
 uint64_t idle_ccount_start;
@@ -137,11 +135,11 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
         error = tcp_write(pcb, OK, strlen(OK), TCP_WRITE_FLAG_COPY);
         if (error) sddf_dprintf("Failed to send OK message through utilization peer\n");
     } else if (msg_match(data_packet_str, START)) {
-        sddf_printf("%s measurement starting... \n", microkit_name);
+        sddf_printf("%s measurement starting...\n", microkit_name);
         if (!strcmp(microkit_name, "client0")) {
             start = __atomic_load_n(&bench->ts, __ATOMIC_RELAXED);
             idle_ccount_start = __atomic_load_n(&bench->ccount, __ATOMIC_RELAXED);
-            microkit_notify(START_PMU);
+            microkit_notify(bench_start_ch);
         }
     } else if (msg_match(data_packet_str, STOP)) {
         sddf_printf("%s measurement finished \n", microkit_name);
@@ -170,11 +168,12 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
         strcat(buffer, ibuf);
         strcat(buffer, ",");
         strcat(buffer, tbuf);
-        
+
         error = tcp_write(pcb, buffer, strlen(buffer) + 1, TCP_WRITE_FLAG_COPY);
         tcp_shutdown(pcb, 0, 1);
 
-        if (!strcmp(microkit_name, "client0")) microkit_notify(STOP_PMU);
+        if (!strcmp(microkit_name, "client0"))
+            microkit_notify(bench_stop_ch);
     } else if (msg_match(data_packet_str, QUIT)) {
         /* Do nothing for now */
     } else {
@@ -197,9 +196,10 @@ static err_t utilization_accept_callback(void *arg, struct tcp_pcb *newpcb, err_
     return ERR_OK;
 }
 
-int setup_utilization_socket(void)
+int setup_utilization_socket(void *cycle_counters, microkit_channel start_ch, microkit_channel stop_ch)
 {
-    bench = (void *)cyclecounters_vaddr;
+    bench = cycle_counters;
+    bench_start_ch = start_ch;
     utiliz_socket = tcp_new_ip_type(IPADDR_TYPE_V4);
     if (utiliz_socket == NULL) {
         sddf_dprintf("Failed to open a socket for listening!\n");

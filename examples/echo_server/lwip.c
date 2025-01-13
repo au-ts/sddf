@@ -9,12 +9,14 @@
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 #include <sddf/network/queue.h>
+#include <sddf/network/config.h>
 #include <sddf/network/util.h>
 #include <sddf/serial/queue.h>
+#include <sddf/serial/config.h>
 #include <sddf/timer/client.h>
+#include <sddf/timer/config.h>
 #include <sddf/benchmark/sel4bench.h>
-#include <serial_config.h>
-#include <ethernet_config.h>
+#include <sddf/benchmark/config.h>
 #include <string.h>
 #include "lwip/init.h"
 #include "netif/etharp.h"
@@ -28,24 +30,18 @@
 
 #include "echo.h"
 
-#define SERIAL_TX_CH 0
-#define TIMER  1
-#define RX_CH  2
-#define TX_CH  3
+__attribute__((__section__(".serial_client_config"))) serial_client_config_t serial_config;
 
-char *serial_tx_data;
-serial_queue_t *serial_tx_queue;
+__attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
+
+__attribute__((__section__(".net_client_config"))) net_client_config_t net_config;
+
+__attribute__((__section__(".benchmark_client_config"))) benchmark_client_config_t benchmark_config;
+
 serial_queue_handle_t serial_tx_queue_handle;
 
 #define LWIP_TICK_MS 100
-#define NUM_PBUFFS NET_MAX_CLIENT_QUEUE_CAPACITY
-
-net_queue_t *rx_free;
-net_queue_t *rx_active;
-net_queue_t *tx_free;
-net_queue_t *tx_active;
-uintptr_t rx_buffer_data_region;
-uintptr_t tx_buffer_data_region;
+#define NUM_PBUFFS 512 // TODO: make dynamic
 
 /* Booleans to indicate whether packets have been enqueued during notification handling */
 static bool notify_tx;
@@ -77,12 +73,12 @@ state_t state;
 
 void set_timeout(void)
 {
-    sddf_timer_set_timeout(TIMER, LWIP_TICK_MS * NS_IN_MS);
+    sddf_timer_set_timeout(timer_config.driver_id, LWIP_TICK_MS * NS_IN_MS);
 }
 
 uint32_t sys_now(void)
 {
-    return sddf_timer_time_now(TIMER) / NS_IN_MS;
+    return sddf_timer_time_now(timer_config.driver_id) / NS_IN_MS;
 }
 
 /**
@@ -118,14 +114,8 @@ static struct pbuf *create_interface_buffer(uint64_t offset, size_t length)
     custom_pbuf_offset->offset = offset;
     custom_pbuf_offset->custom.custom_free_function = interface_free_buffer;
 
-    return pbuf_alloced_custom(
-               PBUF_RAW,
-               length,
-               PBUF_REF,
-               &custom_pbuf_offset->custom,
-               (void *)(offset + rx_buffer_data_region),
-               NET_BUFFER_SIZE
-           );
+    return pbuf_alloced_custom(PBUF_RAW, length, PBUF_REF, &custom_pbuf_offset->custom,
+                               (void *)(offset + net_config.rx_data.vaddr), NET_BUFFER_SIZE);
 }
 
 /**
@@ -169,10 +159,10 @@ static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
     int err = net_dequeue_free(&state.tx_queue, &buffer);
     assert(!err);
 
-    uintptr_t frame = buffer.io_or_offset + tx_buffer_data_region;
+    void *frame = buffer.io_or_offset + net_config.tx_data.vaddr;
     uint16_t copied = 0;
     for (struct pbuf *curr = p; curr != NULL; curr = curr->next) {
-        memcpy((void *)(frame + copied), curr->payload, curr->len);
+        memcpy(frame + copied, curr->payload, curr->len);
         copied += curr->len;
     }
 
@@ -286,13 +276,14 @@ static void netif_status_callback(struct netif *netif)
 
 void init(void)
 {
-    serial_cli_queue_init_sys(microkit_name, NULL, NULL, NULL, &serial_tx_queue_handle, serial_tx_queue, serial_tx_data);
-    serial_putchar_init(SERIAL_TX_CH, &serial_tx_queue_handle);
+    serial_queue_init(&serial_tx_queue_handle, serial_config.tx.queue.vaddr, serial_config.tx.data.size,
+                      serial_config.tx.data.vaddr);
+    serial_putchar_init(serial_config.tx.id, &serial_tx_queue_handle);
 
-    size_t rx_capacity, tx_capacity;
-    net_cli_queue_capacity(microkit_name, &rx_capacity, &tx_capacity);
-    net_queue_init(&state.rx_queue, rx_free, rx_active, rx_capacity);
-    net_queue_init(&state.tx_queue, tx_free, tx_active, tx_capacity);
+    net_queue_init(&state.rx_queue, net_config.rx.free_queue.vaddr, net_config.rx.active_queue.vaddr,
+                   net_config.rx.num_buffers);
+    net_queue_init(&state.tx_queue, net_config.tx.free_queue.vaddr, net_config.tx.active_queue.vaddr,
+                   net_config.tx.num_buffers);
     net_buffers_init(&state.tx_queue, 0);
 
     lwip_init();
@@ -300,8 +291,7 @@ void init(void)
 
     LWIP_MEMPOOL_INIT(RX_POOL);
 
-    uint64_t mac_addr = net_cli_mac_addr(microkit_name);
-    net_set_mac_addr(state.mac, mac_addr);
+    sddf_memcpy(state.mac, net_config.mac_addr, 6);
 
     /* Set dummy IP configuration values to get lwIP bootstrapped  */
     struct ip4_addr netmask, ipaddr, gw, multicast;
@@ -327,16 +317,16 @@ void init(void)
     }
 
     setup_udp_socket();
-    setup_utilization_socket();
+    setup_utilization_socket(benchmark_config.cycle_counters, benchmark_config.start_ch, benchmark_config.stop_ch);
     setup_tcp_socket();
 
     if (notify_rx && net_require_signal_free(&state.rx_queue)) {
         net_cancel_signal_free(&state.rx_queue);
         notify_rx = false;
         if (!microkit_have_signal) {
-            microkit_deferred_notify(RX_CH);
-        } else if (microkit_signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + RX_CH) {
-            microkit_notify(RX_CH);
+            microkit_deferred_notify(net_config.rx.id);
+        } else if (microkit_signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + net_config.rx.id) {
+            microkit_notify(net_config.rx.id);
         }
     }
 
@@ -344,42 +334,36 @@ void init(void)
         net_cancel_signal_active(&state.tx_queue);
         notify_tx = false;
         if (!microkit_have_signal) {
-            microkit_deferred_notify(TX_CH);
-        } else if (microkit_signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + TX_CH) {
-            microkit_notify(TX_CH);
+            microkit_deferred_notify(net_config.tx.id);
+        } else if (microkit_signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + net_config.tx.id) {
+            microkit_notify(net_config.tx.id);
         }
     }
 }
 
 void notified(microkit_channel ch)
 {
-    switch (ch) {
-    case RX_CH:
+    if (ch == net_config.rx.id) {
         receive();
-        break;
-    case TIMER:
-        sys_check_timeouts();
-        set_timeout();
-        break;
-    case TX_CH:
+    } else if (ch == net_config.tx.id) {
         transmit();
         receive();
-        break;
-    case SERIAL_TX_CH:
+    } else if (ch == timer_config.driver_id) {
+        sys_check_timeouts();
+        set_timeout();
+    } else if (ch == serial_config.tx.id) {
         // Nothing to do
-        break;
-    default:
+    } else {
         sddf_dprintf("LWIP|LOG: received notification on unexpected channel: %u\n", ch);
-        break;
     }
 
     if (notify_rx && net_require_signal_free(&state.rx_queue)) {
         net_cancel_signal_free(&state.rx_queue);
         notify_rx = false;
         if (!microkit_have_signal) {
-            microkit_deferred_notify(RX_CH);
-        } else if (microkit_signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + RX_CH) {
-            microkit_notify(RX_CH);
+            microkit_deferred_notify(net_config.rx.id);
+        } else if (microkit_signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + net_config.rx.id) {
+            microkit_notify(net_config.rx.id);
         }
     }
 
@@ -387,9 +371,9 @@ void notified(microkit_channel ch)
         net_cancel_signal_active(&state.tx_queue);
         notify_tx = false;
         if (!microkit_have_signal) {
-            microkit_deferred_notify(TX_CH);
-        } else if (microkit_signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + TX_CH) {
-            microkit_notify(TX_CH);
+            microkit_deferred_notify(net_config.tx.id);
+        } else if (microkit_signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + net_config.tx.id) {
+            microkit_notify(net_config.tx.id);
         }
     }
 }

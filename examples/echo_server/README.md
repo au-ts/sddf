@@ -29,6 +29,7 @@ the `aarch64-none-elf` GCC toolchain distributed by ARM. You can download it fro
 The following platforms are supported:
 * imx8mm_evk
 * imx8mp_evk
+* imx8mq_evk
 * maaxboard
 * odroidc4
 * qemu_virt_aarch64

@@ -8,10 +8,6 @@ ifeq ($(strip $(MICROKIT_INCLUDE)),)
 $(error MICROKIT_INCLUDE must be specified)
 endif
 
-ifeq ($(strip $(ETHERNET_CONFIG_INCLUDE)),)
-$(error ETHERNET_CONFIG_INCLUDE must be specified)
-endif
-
 BUILD_DIR ?= .
 
 TOOLCHAIN := clang
@@ -25,7 +21,6 @@ CFLAGS := \
 	-ffreestanding \
 	-Wno-unused-function \
 	-I$(MICROKIT_INCLUDE) \
-	-I$(ETHERNET_CONFIG_INCLUDE) \
 	-I$(SDDF)/include
 
 all: $(BUILD_DIR)/ethernet.o
