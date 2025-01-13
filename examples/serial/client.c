@@ -32,7 +32,7 @@ void notified(microkit_channel ch)
     bool reprocess = true;
     char c;
     while (reprocess) {
-        while (!serial_dequeue(&rx_queue_handle, &rx_queue_handle.queue->head, &c)) {
+        while (!serial_dequeue(&rx_queue_handle, NULL, &c)) {
             if (c == '\r') {
                 sddf_putchar_unbuffered('\\');
                 sddf_putchar_unbuffered('r');

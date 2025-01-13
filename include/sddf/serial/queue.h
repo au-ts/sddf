@@ -62,6 +62,7 @@ static inline int serial_queue_full(serial_queue_handle_t *queue_handle, uint32_
  * @param queue_handle queue to enqueue into.
  * @param local_tail address of the tail to be incremented. This allows for clients to
  *                      enqueue multiple characters before making the changes visible.
+ *                      Leave NULL to increment shared queue tail.
  * @param character character to be enqueued.
  *
  * @return -1 when queue is empty, 0 on success.
@@ -69,12 +70,14 @@ static inline int serial_queue_full(serial_queue_handle_t *queue_handle, uint32_
 static inline int serial_enqueue(serial_queue_handle_t *queue_handle, uint32_t *local_tail,
                                  char character)
 {
-    if (serial_queue_full(queue_handle, *local_tail)) {
+    uint32_t *tail = (local_tail == NULL) ? &queue_handle->queue->tail : local_tail;
+
+    if (serial_queue_full(queue_handle, *tail)) {
         return -1;
     }
 
-    queue_handle->data_region[*local_tail % queue_handle->capacity] = character;
-    (*local_tail)++;
+    queue_handle->data_region[*tail % queue_handle->capacity] = character;
+    (*tail)++;
 
     return 0;
 }
@@ -85,6 +88,7 @@ static inline int serial_enqueue(serial_queue_handle_t *queue_handle, uint32_t *
  * @param queue_handle queue to dequeue from.
  * @param local_head address of the head to be incremented. This allows for clients to
  *                      dequeue multiple characters before making the changes visible.
+ *                      Leave NULL to increment shared queue head.
  * @param character character to copy into.
  *
  * @return -1 when queue is empty, 0 on success.
@@ -92,12 +96,14 @@ static inline int serial_enqueue(serial_queue_handle_t *queue_handle, uint32_t *
 static inline int serial_dequeue(serial_queue_handle_t *queue_handle, uint32_t *local_head,
                                  char *character)
 {
-    if (serial_queue_empty(queue_handle, *local_head)) {
+    uint32_t *head = (local_head == NULL) ? &queue_handle->queue->head : local_head;
+
+    if (serial_queue_empty(queue_handle, *head)) {
         return -1;
     }
 
-    *character = queue_handle->data_region[*local_head % queue_handle->capacity];
-    (*local_head)++;
+    *character = queue_handle->data_region[*head % queue_handle->capacity];
+    (*head)++;
 
     return 0;
 }
