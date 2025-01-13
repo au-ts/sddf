@@ -1,0 +1,21 @@
+{
+    "name": "meson_timer",
+    "compatible": [
+        "amlogic,meson-gxbb-wdt"
+    ],
+    "resources": {
+        "regions": [
+            {
+                "name": "regs",
+                "perms": "rw",
+                "size": 4096,
+                "dt_index": 0
+            }
+        ],
+        "irqs": [
+            {
+                "dt_index": 0
+            }
+        ]
+    }
+}

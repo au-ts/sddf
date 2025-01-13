@@ -5,6 +5,7 @@
 
 #include <stdint.h>
 #include <microkit.h>
+#include <sddf/resources/device.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 #include <sddf/timer/protocol.h>
@@ -26,9 +27,6 @@
 #if STARFIVE_TIMER_CHANNEL >= STARFIVE_TIMER_NUM_CHANNELS
 #error "Invalid StarFive timer device channel"
 #endif
-
-#define COUNTER_IRQ_CH 0
-#define TIMEOUT_IRQ_CH 1
 
 #define CLIENT_CH_START 2
 #define MAX_TIMEOUTS 6
@@ -59,9 +57,12 @@ typedef struct {
     uint32_t intmask;   /* 0x24: Timer interrupt mask register. */
 } starfive_timer_regs_t;
 
-uintptr_t timer_base;
+__attribute__((__section__(".device_resources"))) device_resources_t device_resources;
+
 static volatile starfive_timer_regs_t *counter_regs;
 static volatile starfive_timer_regs_t *timeout_regs;
+microkit_channel counter_irq;
+microkit_channel timeout_irq;
 
 /* Keep track of how many timer overflows have occured.
  * Used as the most significant segment of ticks.
@@ -137,8 +138,7 @@ static void process_timeouts(uint64_t curr_time)
 
 void notified(microkit_channel ch)
 {
-    switch (ch) {
-    case COUNTER_IRQ_CH: {
+    if (ch == counter_irq) {
         counter_timer_elapses += 1;
         while (counter_regs->intclr & STARFIVE_TIMER_INTCLR_BUSY) {
             /*
@@ -147,9 +147,7 @@ void notified(microkit_channel ch)
             */
         }
         counter_regs->intclr = 1;
-        break;
-    }
-    case TIMEOUT_IRQ_CH: {
+    } else if (ch == timeout_irq) {
         timeout_timer_elapses += 1;
         while (timeout_regs->intclr & STARFIVE_TIMER_INTCLR_BUSY) {
             /*
@@ -161,13 +159,9 @@ void notified(microkit_channel ch)
 
         uint64_t curr_time = get_ticks_in_ns();
         process_timeouts(curr_time);
-
-        break;
-    }
-    default: {
+    } else {
         sddf_dprintf("TIMER DRIVER|LOG: unexpected notification from channel %u\n", ch);
         return;
-    }
     }
 
     microkit_deferred_irq_ack(ch);
@@ -203,6 +197,10 @@ void init(void)
         timeouts[i] = UINT64_MAX;
     }
 
+    counter_irq = device_resources.irqs[0].id;
+    timeout_irq = device_resources.irqs[1].id;
+
+    uintptr_t timer_base = (uintptr_t)device_resources.regions[0].region.vaddr;
     counter_regs = (volatile starfive_timer_regs_t *)timer_base;
     timeout_regs = (volatile starfive_timer_regs_t *)(timer_base
                                                       + STARFIVE_TIMER_CHANNEL_REGS_SIZE * STARFIVE_TIMER_CHANNEL);

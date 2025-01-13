@@ -8,6 +8,10 @@ const MicrokitBoard = enum {
     qemu_virt_aarch64,
     odroidc4,
     star64,
+    maaxboard,
+    imx8mm_evk,
+    imx8mp_evk,
+    imx8mq_evk,
 };
 
 const Target = struct {
@@ -37,6 +41,56 @@ const targets = [_]Target{
         },
     },
     .{
+        .board = MicrokitBoard.maaxboard,
+        .zig_target = std.Target.Query{
+            .cpu_arch = .aarch64,
+            .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a53 },
+            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{ .strict_align }),
+            .os_tag = .freestanding,
+            .abi = .none,
+        },
+    },
+    .{
+        .board = MicrokitBoard.maaxboard,
+        .zig_target = std.Target.Query{
+            .cpu_arch = .aarch64,
+            .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a53 },
+            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{ .strict_align }),
+            .os_tag = .freestanding,
+            .abi = .none,
+        },
+    },
+    .{
+        .board = MicrokitBoard.imx8mm_evk,
+        .zig_target = std.Target.Query{
+            .cpu_arch = .aarch64,
+            .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a53 },
+            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{ .strict_align }),
+            .os_tag = .freestanding,
+            .abi = .none,
+        },
+    },
+    .{
+        .board = MicrokitBoard.imx8mp_evk,
+        .zig_target = std.Target.Query{
+            .cpu_arch = .aarch64,
+            .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a53 },
+            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{ .strict_align }),
+            .os_tag = .freestanding,
+            .abi = .none,
+        },
+    },
+    .{
+        .board = MicrokitBoard.imx8mq_evk,
+        .zig_target = std.Target.Query{
+            .cpu_arch = .aarch64,
+            .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a53 },
+            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{ .strict_align }),
+            .os_tag = .freestanding,
+            .abi = .none,
+        },
+    },
+    .{
         .board = MicrokitBoard.star64,
         .zig_target = std.Target.Query{
             .cpu_arch = .riscv64,
@@ -60,10 +114,27 @@ fn findTarget(board: MicrokitBoard) std.Target.Query {
 
 const ConfigOptions = enum { debug, release, benchmark };
 
-pub fn build(b: *std.Build) void {
+fn updateSectionObjcopy(b: *std.Build, section: []const u8, data_output: std.Build.LazyPath, data: []const u8, elf: []const u8) *std.Build.Step.Run {
+    const run_objcopy = b.addSystemCommand(&[_][]const u8{
+        "llvm-objcopy",
+    });
+    run_objcopy.addArg("--update-section");
+    const data_full_path = data_output.join(b.allocator, data) catch @panic("OOM");
+    run_objcopy.addPrefixedFileArg(b.fmt("{s}=", .{ section }), data_full_path);
+    run_objcopy.addFileArg(.{ .cwd_relative = b.getInstallPath(.bin, elf) });
+
+    // We need the ELFs we talk about to be in the install directory first.
+    run_objcopy.step.dependOn(b.getInstallStep());
+
+    return run_objcopy;
+}
+
+pub fn build(b: *std.Build) !void {
     const optimize = b.standardOptimizeOption(.{});
 
-    // Getting the path to the Microkit SDK before doing anything else
+    const default_python = if (std.posix.getenv("PYTHON")) |p| p else "python3";
+    const python = b.option([]const u8, "python", "Path to Python to use") orelse default_python;
+
     const microkit_sdk_arg = b.option([]const u8, "sdk", "Path to Microkit SDK");
     if (microkit_sdk_arg == null) {
         std.log.err("Missing -Dsdk=/path/to/sdk argument being passed\n", .{});
@@ -102,6 +173,7 @@ pub fn build(b: *std.Build) void {
         .qemu_virt_aarch64 => "arm",
         .odroidc4 => "meson",
         .star64 => "jh7110",
+        .maaxboard, .imx8mm_evk, .imx8mp_evk, .imx8mq_evk => "imx",
     };
 
     const driver = sddf_dep.artifact(b.fmt("driver_timer_{s}.elf", .{ driver_class }));
@@ -127,19 +199,56 @@ pub fn build(b: *std.Build) void {
 
     b.installArtifact(client);
 
-    const system_description_path = b.fmt("board/{s}/timer.system", .{microkit_board});
+    // For compiling the DTS into a DTB
+    const dts = sddf_dep.path(b.fmt("dts/{s}.dts", .{ microkit_board }));
+    const dtc_cmd = b.addSystemCommand(&[_][]const u8{
+        "dtc", "-q", "-I", "dts", "-O", "dtb"
+    });
+    dtc_cmd.addFileInput(dts);
+    dtc_cmd.addFileArg(dts);
+    const dtb = dtc_cmd.captureStdOut();
+
+    // Run the metaprogram to get sDDF configuration binary files and the SDF file.
+    const metaprogram = b.path("meta.py");
+    const run_metaprogram = b.addSystemCommand(&[_][]const u8{
+        python,
+    });
+    run_metaprogram.addFileArg(metaprogram);
+    run_metaprogram.addFileInput(metaprogram);
+    run_metaprogram.addPrefixedDirectoryArg("--sddf=", sddf_dep.path(""));
+    run_metaprogram.addPrefixedDirectoryArg("--dtb=", dtb);
+    const meta_output = run_metaprogram.addPrefixedOutputDirectoryArg("--output=", "meta_output");
+    run_metaprogram.addArg("--board");
+    run_metaprogram.addArg(microkit_board);
+    run_metaprogram.addArg("--sdf");
+    run_metaprogram.addArg("timer.system");
+
+    const meta_output_install = b.addInstallDirectory(.{
+        .source_dir = meta_output,
+        .install_dir = .prefix,
+        .install_subdir = "meta_output",
+    });
+
+    const client_objcopy = updateSectionObjcopy(b, ".timer_client_config", meta_output, "timer_client_client.data", "client.elf");
+    const driver_objcopy = updateSectionObjcopy(b, ".device_resources", meta_output, "timer_driver_device_resources.data", "timer_driver.elf");
+    driver_objcopy.step.dependOn(&driver_install.step);
+    const objcopys = &.{ client_objcopy, driver_objcopy };
+
     const final_image_dest = b.getInstallPath(.bin, "./loader.img");
     const microkit_tool_cmd = b.addSystemCommand(&[_][]const u8{
         microkit_tool,
-        system_description_path,
+        b.getInstallPath(.{ .custom = "meta_output" }, "timer.system"),
         "--search-path", b.getInstallPath(.bin, ""),
         "--board", microkit_board,
         "--config", microkit_config,
         "-o", final_image_dest,
         "-r", b.getInstallPath(.prefix, "./report.txt")
     });
+    inline for (objcopys) |objcopy| {
+        microkit_tool_cmd.step.dependOn(&objcopy.step);
+    }
+    microkit_tool_cmd.step.dependOn(&meta_output_install.step);
     microkit_tool_cmd.step.dependOn(b.getInstallStep());
-    microkit_tool_cmd.step.dependOn(&driver_install.step);
     microkit_tool_cmd.setEnvironmentVariable("MICROKIT_SDK", microkit_sdk);
     const microkit_step = b.step("microkit", "Compile and build the final bootable image");
     microkit_step.dependOn(&microkit_tool_cmd.step);
