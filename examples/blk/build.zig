@@ -101,7 +101,7 @@ pub fn build(b: *std.Build) void {
 
     client.addIncludePath(.{ .cwd_relative = libmicrokit_include });
     client.addObjectFile(.{ .cwd_relative = libmicrokit });
-    client.setLinkerScriptPath(.{ .cwd_relative = libmicrokit_linker_script });
+    client.setLinkerScript(.{ .cwd_relative = libmicrokit_linker_script });
 
     const blk_driver = sddf_dep.artifact(b.fmt("driver_blk_{s}.elf", .{ blk_driver_class }));
 

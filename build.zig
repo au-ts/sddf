@@ -283,7 +283,7 @@ fn addGpuDriver(
 fn addPd(b: *std.Build, options: std.Build.ExecutableOptions) *std.Build.Step.Compile {
     const pd = b.addExecutable(options);
     pd.addObjectFile(libmicrokit);
-    pd.setLinkerScriptPath(libmicrokit_linker_script);
+    pd.setLinkerScript(libmicrokit_linker_script);
     pd.addIncludePath(libmicrokit_include);
 
     return pd;

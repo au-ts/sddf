@@ -134,7 +134,7 @@ pub fn build(b: *std.Build) void {
 
     client_pn532.addIncludePath(.{ .cwd_relative = libmicrokit_include });
     client_pn532.addObjectFile(.{ .cwd_relative = libmicrokit });
-    client_pn532.setLinkerScriptPath(.{ .cwd_relative = libmicrokit_linker_script });
+    client_pn532.setLinkerScript(.{ .cwd_relative = libmicrokit_linker_script });
 
     b.installArtifact(client_pn532);
 
@@ -143,7 +143,7 @@ pub fn build(b: *std.Build) void {
 
     client_ds3231.addIncludePath(.{ .cwd_relative = libmicrokit_include });
     client_ds3231.addObjectFile(.{ .cwd_relative = libmicrokit });
-    client_ds3231.setLinkerScriptPath(.{ .cwd_relative = libmicrokit_linker_script });
+    client_ds3231.setLinkerScript(.{ .cwd_relative = libmicrokit_linker_script });
 
     b.installArtifact(client_ds3231);
 

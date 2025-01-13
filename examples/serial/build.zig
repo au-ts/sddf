@@ -140,7 +140,7 @@ pub fn build(b: *std.Build) void {
 
     serial_server.addIncludePath(.{ .cwd_relative = libmicrokit_include });
     serial_server.addObjectFile(.{ .cwd_relative = libmicrokit });
-    serial_server.setLinkerScriptPath(.{ .cwd_relative = libmicrokit_linker_script });
+    serial_server.setLinkerScript(.{ .cwd_relative = libmicrokit_linker_script });
 
     b.installArtifact(serial_server);
 

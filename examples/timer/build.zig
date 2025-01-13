@@ -123,7 +123,7 @@ pub fn build(b: *std.Build) void {
 
     client.addIncludePath(.{ .cwd_relative = libmicrokit_include });
     client.addObjectFile(.{ .cwd_relative = libmicrokit });
-    client.setLinkerScriptPath(.{ .cwd_relative = libmicrokit_linker_script });
+    client.setLinkerScript(.{ .cwd_relative = libmicrokit_linker_script });
 
     b.installArtifact(client);
 
