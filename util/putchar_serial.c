@@ -17,8 +17,7 @@ static uint32_t local_tail;
 /* Ensure to call serial_putchar_init during initialisation. Multiplexes output based on \n or when buffer is full. */
 void _sddf_putchar(char character)
 {
-    if (serial_queue_full(tx_queue_handle, local_tail) ||
-        (character == '\n' && serial_queue_full(tx_queue_handle, local_tail + 1))) {
+    if (serial_queue_full(tx_queue_handle, local_tail) || serial_queue_full(tx_queue_handle, local_tail + 1)) {
         return;
     }
 
@@ -28,7 +27,8 @@ void _sddf_putchar(char character)
     serial_enqueue_local(tx_queue_handle, &local_tail, character);
 
     /* Make changes visible to virtualiser if character is flush or if queue is now filled */
-    if (serial_queue_full(tx_queue_handle, local_tail) || character == FLUSH_CHAR) {
+    if (serial_queue_full(tx_queue_handle, local_tail) || serial_queue_full(tx_queue_handle, local_tail + 1)
+        || character == FLUSH_CHAR) {
         serial_update_shared_tail(tx_queue_handle, local_tail);
         microkit_notify(tx_ch);
     }
@@ -41,7 +41,6 @@ void sddf_putchar_unbuffered(char character)
     }
 
     serial_enqueue_local(tx_queue_handle, &local_tail, character);
-
     serial_update_shared_tail(tx_queue_handle, local_tail);
     microkit_notify(tx_ch);
 }
