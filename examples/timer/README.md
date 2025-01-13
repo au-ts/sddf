@@ -18,8 +18,13 @@ make MICROKIT_SDK=<path/to/sdk> MICROKIT_BOARD=<board>
 ```
 
 Currently the options for `MICROKIT_BOARD` are:
+* imx8mm_evk
+* imx8mp_evk
+* imx8mq_evk
+* maaxboard
 * odroidc4
 * qemu_virt_aarch64
+* star64
 
 After building, the system image to load will be `build/loader.img`.
 
