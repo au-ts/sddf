@@ -174,7 +174,6 @@ fn addI2cDriverHost(
 
 fn addBlockDriver(
     b: *std.Build,
-    blk_config_include: LazyPath,
     util: *std.Build.Step.Compile,
     class: DriverClass.Block,
     target: std.Build.ResolvedTarget,
@@ -190,7 +189,6 @@ fn addBlockDriver(
     driver.addCSourceFile(.{
         .file = b.path(source),
     });
-    driver.addIncludePath(blk_config_include);
     driver.addIncludePath(b.path(b.fmt("drivers/blk/{s}/", .{ @tagName(class) })));
     driver.addIncludePath(b.path("include"));
     driver.linkLibrary(util);
@@ -200,7 +198,6 @@ fn addBlockDriver(
 
 fn addMmcDriver(
     b: *std.Build,
-    blk_config_include: LazyPath,
     util: *std.Build.Step.Compile,
     class: DriverClass.Mmc,
     target: std.Build.ResolvedTarget,
@@ -216,7 +213,6 @@ fn addMmcDriver(
     driver.addCSourceFile(.{
         .file = b.path(source),
     });
-    driver.addIncludePath(blk_config_include);
     driver.addIncludePath(b.path(b.fmt("drivers/blk/mmc/{s}/", .{ @tagName(class) })));
     driver.addIncludePath(b.path("include"));
     driver.linkLibrary(util);
@@ -292,7 +288,6 @@ pub fn build(b: *std.Build) void {
     const libmicrokit_opt = b.option([]const u8, "libmicrokit", "Path to libmicrokit.a") orelse null;
     const libmicrokit_include_opt = b.option([]const u8, "libmicrokit_include", "Path to the libmicrokit include directory") orelse null;
     const libmicrokit_linker_script_opt = b.option([]const u8, "libmicrokit_linker_script", "Path to the libmicrokit linker script") orelse null;
-    const blk_config_include_opt = b.option([]const u8, "blk_config_include", "Include path to block config header") orelse "";
     const net_config_include_option = b.option([]const u8, "net_config_include", "Include path to network config header") orelse "";
     const gpu_config_include_option = b.option([]const u8, "gpu_config_include", "Include path to gpu config header") orelse "";
 
@@ -301,7 +296,6 @@ pub fn build(b: *std.Build) void {
     // as a build option. What we do instead is just make the include path an
     // empty string if it has not been provided, which could be an annoying to
     // debug error if you do need a serial config but forgot to pass one in.
-    const blk_config_include = LazyPath{ .cwd_relative = blk_config_include_opt };
     const net_config_include = LazyPath{ .cwd_relative = net_config_include_option };
     const gpu_config_include = LazyPath{ .cwd_relative = gpu_config_include_option };
     // libmicrokit
@@ -360,7 +354,6 @@ pub fn build(b: *std.Build) void {
     blk_virt.addCSourceFile(.{
         .file = b.path("blk/components/virt.c"),
     });
-    blk_virt.addIncludePath(blk_config_include);
     blk_virt.addIncludePath(b.path("include"));
     blk_virt.linkLibrary(util);
     blk_virt.linkLibrary(util_putchar_debug);
@@ -368,12 +361,12 @@ pub fn build(b: *std.Build) void {
 
     // Block drivers
     inline for (std.meta.fields(DriverClass.Block)) |class| {
-        const driver = addBlockDriver(b, blk_config_include, util, @enumFromInt(class.value), target, optimize);
+        const driver = addBlockDriver(b, util, @enumFromInt(class.value), target, optimize);
         driver.linkLibrary(util_putchar_debug);
         b.installArtifact(driver);
     }
     inline for (std.meta.fields(DriverClass.Mmc)) |class| {
-        const driver = addMmcDriver(b, blk_config_include, util, @enumFromInt(class.value), target, optimize);
+        const driver = addMmcDriver(b, util, @enumFromInt(class.value), target, optimize);
         driver.linkLibrary(util_putchar_debug);
         b.installArtifact(driver);
     }
