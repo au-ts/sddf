@@ -8,8 +8,8 @@
 #include <sddf/util/printf.h>
 #include <sddf/timer/client.h>
 #include <sddf/i2c/queue.h>
+#include <sddf/i2c/config.h>
 #include <sddf/i2c/devices/pn532/pn532.h>
-#include "client.h"
 
 //#define DEBUG_PN532
 
@@ -29,6 +29,8 @@
 
 extern cothread_t t_event;
 extern cothread_t t_main;
+
+extern i2c_client_config_t i2c_config;
 
 struct request {
     uint8_t *buffer;
@@ -123,7 +125,7 @@ void request_send(struct request *req)
         LOG_PN532_ERR("failed to enqueue request buffer!\n");
     }
 
-    microkit_notify(I2C_VIRTUALISER_CH);
+    microkit_notify(i2c_config.virt.id);
 }
 
 static uint8_t process_return_buffer(struct response *response)
@@ -154,7 +156,7 @@ static uint8_t process_return_buffer(struct response *response)
 uint8_t read_ack_frame(size_t retries)
 {
     LOG_PN532("reading ack frame\n");
-    uint8_t error;
+    uint8_t error = I2C_ERR_OK;
     size_t attempts = 0;
     while (attempts < retries) {
         struct request req = {};

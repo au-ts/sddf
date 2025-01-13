@@ -12,15 +12,13 @@
 
 #include <microkit.h>
 #include <sddf/i2c/queue.h>
+#include <sddf/i2c/config.h>
+#include <sddf/resources/device.h>
 #include "driver.h"
 
 #ifndef I2C_BUS_NUM
 #error "I2C_BUS_NUM must be defined!"
 #endif
-
-#define VIRTUALISER_CH 0
-#define IRQ_CH 1
-#define IRQ_TIMEOUT_CH 2
 
 // #define DEBUG_DRIVER
 
@@ -43,18 +41,20 @@ struct i2c_regs {
     uint32_t rdata1;        // where read data gets put for a response by i2c
 };
 
+__attribute__((__section__(".i2c_driver_config"))) i2c_driver_config_t config;
+
+__attribute__((__section__(".device_resources"))) device_resources_t device_resources;
+
 // Hardware memory
-uintptr_t gpio_regs;
-uintptr_t clk_regs;
-uintptr_t i2c_regs;
+uintptr_t clk_regs = 0x30000000;
+uintptr_t gpio_regs = 0x30100000;
+
+volatile struct i2c_regs *regs;
 
 // Driver state for each interface
 static i2c_ifState_t i2c_ifState;
 
 i2c_queue_handle_t queue_handle;
-
-uintptr_t request_region;
-uintptr_t response_region;
 
 char *meson_token_to_str(uint8_t token)
 {
@@ -81,7 +81,7 @@ char *meson_token_to_str(uint8_t token)
 /**
  * Prints the registers of the i2c interface
  */
-static inline void i2c_dump(volatile struct i2c_regs *regs)
+static inline void i2c_dump(void)
 {
 #ifdef DEBUG_DRIVER
     LOG_DRIVER("dumping interface state...\n");
@@ -150,11 +150,9 @@ static inline void i2c_dump(volatile struct i2c_regs *regs)
 /**
  * Initialise the i2c master interfaces.
 */
-static inline void i2c_setup()
+static inline void i2c_setup(void)
 {
     LOG_DRIVER("initialising i2c master interfaces...\n");
-
-    volatile struct i2c_regs *regs = (volatile struct i2c_regs *) i2c_regs;
 
     // Note: this is hacky - should do this using a GPIO driver.
     // Set up pinmux
@@ -302,7 +300,7 @@ static inline void i2c_setup()
  * Also gets bytes read and curr token (curr token can be used to find the error location)
  * @return error bit - if the i2c device generates a NACK during writing
  */
-static inline bool i2c_get_error(volatile struct i2c_regs *regs, uint8_t *bytes_read, uint8_t *curr_token)
+static inline bool i2c_get_error(uint8_t *bytes_read, uint8_t *curr_token)
 {
     volatile uint32_t ctl = regs->ctl;
     bool err = ctl & (1 << 3);   // bit 3 -> set if error
@@ -315,7 +313,7 @@ static inline bool i2c_get_error(volatile struct i2c_regs *regs, uint8_t *bytes_
 /**
  * Restarts the list processor
  */
-static inline int i2c_start(volatile struct i2c_regs *regs)
+static inline int i2c_start(void)
 {
     LOG_DRIVER("LIST PROCESSOR START\n");
     regs->ctl &= ~0x1;
@@ -330,7 +328,7 @@ static inline int i2c_start(volatile struct i2c_regs *regs)
 /**
  * Aborts the current operation by generating an I2C STOP command on the I2C bus
  */
-static inline int i2c_halt(volatile struct i2c_regs *regs)
+static inline int i2c_halt(void)
 {
     LOG_DRIVER("LIST PROCESSOR HALT\n");
     regs->ctl &= ~0x1;
@@ -369,7 +367,7 @@ static inline uint8_t i2c_token_convert(i2c_token_t token)
  * Loads tokens onto specified i2c interface registers
  * This function resets interface registers before uploading data
  */
-static inline void i2c_load_tokens(volatile struct i2c_regs *regs)
+static inline void i2c_load_tokens(void)
 {
     LOG_DRIVER("starting token load\n");
     i2c_token_t *tokens = i2c_ifState.curr_data;
@@ -497,16 +495,20 @@ static inline void i2c_load_tokens(volatile struct i2c_regs *regs)
     i2c_ifState.remaining = i2c_ifState.curr_request_len - request_data_offset;
 
     LOG_DRIVER("Tokens loaded. %zu remain for this request\n", i2c_ifState.remaining);
-    i2c_dump(regs);
+    i2c_dump();
 
     // Start list processor
-    i2c_start(regs);
+    i2c_start();
 }
 
 void init(void)
 {
+    assert(device_resources.num_irqs == 2);
+    assert(device_resources.num_regions == 1);
+
+    regs = (volatile struct i2c_regs *)device_resources.regions[0].region.vaddr;
     i2c_setup();
-    queue_handle = i2c_queue_init((i2c_queue_t *) request_region, (i2c_queue_t *) response_region);
+    queue_handle = i2c_queue_init(config.virt.req_queue.vaddr, config.virt.resp_queue.vaddr);
 
     // Set up driver state
     i2c_ifState.curr_data = NULL;
@@ -522,7 +524,6 @@ void init(void)
 static inline void handle_request(void)
 {
     LOG_DRIVER("handling request\n");
-    volatile struct i2c_regs *regs = (volatile struct i2c_regs *) i2c_regs;
     if (!i2c_queue_empty(queue_handle.request)) {
         // If this interface is busy, skip notification and
         // set notified flag for later processing
@@ -553,13 +554,13 @@ static inline void handle_request(void)
 
         LOG_DRIVER("Loading request for bus address 0x%x of size %zu\n", bus_address, size);
 
-        i2c_ifState.curr_data = (i2c_token_t *) DATA_REGIONS_START + offset;
+        i2c_ifState.curr_data = (i2c_token_t *)config.virt.data.vaddr + offset;
         i2c_ifState.addr = bus_address;
         i2c_ifState.curr_request_len = size;
         i2c_ifState.remaining = size;
         i2c_ifState.notified = 0;
 
-        i2c_load_tokens(regs);
+        i2c_load_tokens();
     } else {
         LOG_DRIVER("called but no work available: resetting notified flag\n");
         // If nothing needs to be done, clear notified flag if it was set.
@@ -584,14 +585,13 @@ static void handle_response_timeout(void)
 static void handle_response(void)
 {
     LOG_DRIVER("handling transfer complete IRQ\n");
-    volatile struct i2c_regs *regs = (volatile struct i2c_regs *)i2c_regs;
 
-    i2c_dump(regs);
+    i2c_dump();
 
     // Get result
     uint8_t curr_token = 0;
     uint8_t bytes_read = 0;
-    bool write_error = i2c_get_error(regs, &bytes_read, &curr_token);
+    bool write_error = i2c_get_error(&bytes_read, &curr_token);
 
     // Prepare to extract data from the interface.
     // INVARIANT: request data is always smaller than returned data to allow
@@ -646,7 +646,7 @@ static void handle_response(void)
         LOG_DRIVER("enguing response with size: %d\n\n", i2c_ifState.curr_response_len + RESPONSE_DATA_OFFSET);
         // response length is + 2 (RESPONSE_DATA_OFFSET = 2) because of the error tokens at the start
         int ret = i2c_enqueue_response(queue_handle, i2c_ifState.addr,
-                                       (size_t) i2c_ifState.curr_data - DATA_REGIONS_START,
+                                       (size_t)i2c_ifState.curr_data - (uintptr_t)config.virt.data.vaddr,
                                        i2c_ifState.curr_response_len + RESPONSE_DATA_OFFSET);
         if (ret) {
             LOG_DRIVER_ERR("Failed to enqueue response\n");
@@ -660,16 +660,16 @@ static void handle_response(void)
         i2c_ifState.remaining = 0;
         i2c_ifState.addr = 0;
 
-        microkit_notify(VIRTUALISER_CH);
+        microkit_notify(config.virt.id);
 
-        i2c_halt(regs); // stop condition
+        i2c_halt(); // stop condition
     }
 
     // If the driver was notified while this transaction was in progress, immediately start working on the next one.
     // OR if there is still more work to do in current request, crack on with it.
     if (i2c_ifState.remaining) {
         LOG_DRIVER("Still work to do, starting next batch of tokens in request\n");
-        i2c_load_tokens(regs); // results in a repeated start condition
+        i2c_load_tokens(); // results in a repeated start condition
     } else if (i2c_ifState.notified) {
         LOG_DRIVER("Was notified during transaction. Starting next client request immediately!\n");
         handle_request();
@@ -678,20 +678,16 @@ static void handle_response(void)
 
 void notified(microkit_channel ch)
 {
-    switch (ch) {
-    case VIRTUALISER_CH:
+    if (ch == config.virt.id) {
         handle_request();
-        break;
-    case IRQ_CH:
+    } else if (ch == device_resources.irqs[0].id) {
         handle_response();
         microkit_irq_ack(ch);
-        break;
-    case IRQ_TIMEOUT_CH:
+    } else if (ch == device_resources.irqs[1].id) {
+        /* Timeout IRQ */
         handle_response_timeout();
         microkit_irq_ack(ch);
-        break;
-
-    default:
-        microkit_dbg_puts("DRIVER|ERROR: unexpected notification!\n");
+    } else {
+        LOG_DRIVER_ERR("unexpected notification on channel %d\n", ch);
     }
 }
