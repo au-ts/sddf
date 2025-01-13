@@ -245,7 +245,6 @@ pub fn build(b: *std.Build) !void {
 
         const blk_device_args = &.{
             "-global", "virtio-mmio.force-legacy=false",
-            "-d", "guest_errors",
             "-drive", b.fmt("file={s},if=none,format=raw,id=hd", .{ b.getInstallPath(.prefix, "disk") }),
             "-device", "virtio-blk-device,drive=hd",
         };
