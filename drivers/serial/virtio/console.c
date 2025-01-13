@@ -111,8 +111,7 @@ static void tx_provide(void)
     bool transferred = false;
     while (reprocess) {
         char c;
-        while (!virtio_avail_full_tx(&tx_virtq)
-               && !serial_dequeue(&tx_queue_handle, &tx_queue_handle.queue->head, &c)) {
+        while (!virtio_avail_full_tx(&tx_virtq) && !serial_dequeue(&tx_queue_handle, NULL, &c)) {
 
                 /* First, allocate somewhere to put the character */
             uint32_t char_idx = -1;
@@ -250,7 +249,7 @@ static void rx_return(void)
             assert(!(pkt.flags & VIRTQ_DESC_F_NEXT));
 
             uint32_t char_idx = addr - virtio_rx_char_paddr;
-            serial_enqueue(&rx_queue_handle, &rx_queue_handle.queue->tail, virtio_rx_char[char_idx]);
+            serial_enqueue(&rx_queue_handle, NULL, virtio_rx_char[char_idx]);
 
                 /* Free the packet descriptor */
             int err = ialloc_free(&rx_ialloc_desc, pkt_used.id);
