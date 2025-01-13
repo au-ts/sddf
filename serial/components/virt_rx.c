@@ -21,7 +21,7 @@ char *rx_data_drv;
 char *rx_data_cli0;
 
 serial_queue_handle_t rx_queue_handle_drv;
-serial_queue_handle_t rx_queue_handle_cli[SERIAL_NUM_CLIENTS];
+serial_queue_handle_t rx_queue_handle_cli[SERIAL_NUM_RX_CLIENTS];
 
 #define MAX_CLI_BASE_10 4
 typedef enum mode {normal, switched, number} mode_t;
@@ -78,7 +78,7 @@ void rx_return(void)
             default:
                 if (c == SERIAL_TERMINATE_NUM) {
                     int input_number = sddf_atoi(next_client);
-                    if (input_number >= 0 && input_number < SERIAL_NUM_CLIENTS) {
+                    if (input_number >= 0 && input_number < SERIAL_NUM_RX_CLIENTS) {
                         if (transferred && serial_require_producer_signal(&rx_queue_handle_cli[current_client])) {
                             serial_update_visible_tail(&rx_queue_handle_cli[current_client], local_tail);
                             serial_cancel_producer_signal(&rx_queue_handle_cli[current_client]);

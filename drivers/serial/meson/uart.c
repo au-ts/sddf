@@ -186,7 +186,7 @@ static void uart_setup(void)
 
     uint32_t irqc = uart_regs->irqc;
     /* Enable receive interrupts every byte */
-#if !SERIAL_TX_ONLY
+#if SERIAL_NUM_RX_CLIENTS > 0
     irqc &= ~AML_UART_RECV_IRQ_MASK;
     irqc |= AML_UART_RECV_IRQ(1);
     cr |= (AML_UART_RX_INT_EN | AML_UART_RX_EN);
@@ -205,7 +205,7 @@ void init(void)
 {
     uart_setup();
 
-#if !SERIAL_TX_ONLY
+#if SERIAL_NUM_RX_CLIENTS > 0
     serial_queue_init(&rx_queue_handle, rx_queue, SERIAL_RX_DATA_REGION_CAPACITY_DRIV, rx_data);
 #endif
     serial_queue_init(&tx_queue_handle, tx_queue, SERIAL_TX_DATA_REGION_CAPACITY_DRIV, tx_data);

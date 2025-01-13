@@ -140,7 +140,7 @@ static void uart_setup(void)
 
     /* Enable transmit and receive */
     uart_regs->cr2 |= UART_CR2_TX_EN;
-#if !SERIAL_TX_ONLY
+#if SERIAL_NUM_RX_CLIENTS > 0
     uart_regs->cr2 |= UART_CR2_RX_EN;
 #endif
 
@@ -160,7 +160,7 @@ static void uart_setup(void)
 
     uint32_t fcr = uart_regs->fcr;
     /* Enable receive interrupts every byte */
-#if !SERIAL_TX_ONLY
+#if SERIAL_NUM_RX_CLIENTS > 0
     fcr &= ~UART_FCR_RXTL_MASK;
     fcr |= (1 << UART_FCR_RXTL_SHFT);
 #endif
@@ -170,7 +170,7 @@ static void uart_setup(void)
     fcr |= (2 << UART_FCR_TXTL_SHFT);
 
     uart_regs->fcr = fcr;
-#if !SERIAL_TX_ONLY
+#if SERIAL_NUM_RX_CLIENTS > 0
     uart_regs->cr1 |= UART_CR1_RX_READY_INT;
 #endif
 }
@@ -179,7 +179,7 @@ void init(void)
 {
     uart_setup();
 
-#if !SERIAL_TX_ONLY
+#if SERIAL_NUM_RX_CLIENTS > 0
     serial_queue_init(&rx_queue_handle, rx_queue, SERIAL_RX_DATA_REGION_CAPACITY_DRIV, rx_data);
 #endif
     serial_queue_init(&tx_queue_handle, tx_queue, SERIAL_TX_DATA_REGION_CAPACITY_DRIV, tx_data);
