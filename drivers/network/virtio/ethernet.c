@@ -17,30 +17,21 @@
 #include <stdint.h>
 #include <microkit.h>
 #include <sddf/network/queue.h>
+#include <sddf/network/config.h>
 #include <sddf/util/fence.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 #include <sddf/util/ialloc.h>
 #include <sddf/virtio/virtio.h>
 #include <sddf/virtio/virtio_queue.h>
-#include <ethernet_config.h>
+#include <sddf/resources/device.h>
 
 #include "ethernet.h"
 
-/*
- * This default is based on the default QEMU setup but could change
- * depending on the instantiation of QEMU or wherever this driver is
- * being used.
- */
-#ifndef VIRTIO_MMIO_NET_OFFSET
-#define VIRTIO_MMIO_NET_OFFSET (0xe00)
-#endif
+__attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
-#define IRQ_CH 0
-#define TX_CH  1
-#define RX_CH  2
+__attribute__((__section__(".net_driver_config"))) net_driver_config_t config;
 
-uintptr_t eth_regs;
 /*
  * The 'hardware' ring buffer region is used to store the virtIO virtqs
  * as well as the RX and TX virtIO headers.
@@ -191,7 +182,7 @@ static void rx_return(void)
     if (packets_transferred > 0 && net_require_signal_active(&rx_queue)) {
         LOG_DRIVER("signalling RX\n");
         net_cancel_signal_active(&rx_queue);
-        microkit_notify(RX_CH);
+        microkit_notify(config.virt_rx.id);
     }
 }
 
@@ -291,7 +282,7 @@ static void tx_return(void)
 
     if (enqueued > 0 && net_require_signal_free(&tx_queue)) {
         net_cancel_signal_free(&tx_queue);
-        microkit_notify(TX_CH);
+        microkit_notify(config.virt_tx.id);
     }
 }
 
@@ -447,34 +438,33 @@ static void eth_setup(void)
 
 void init(void)
 {
-    regs = (volatile virtio_mmio_regs_t *)(eth_regs + VIRTIO_MMIO_NET_OFFSET);
+    regs = (volatile virtio_mmio_regs_t *)device_resources.regions[0].region.vaddr;
+    hw_ring_buffer_vaddr = (uintptr_t)device_resources.regions[1].region.vaddr;
+    hw_ring_buffer_paddr = device_resources.regions[1].io_addr;
 
     ialloc_init(&rx_ialloc_desc, rx_descriptors, RX_COUNT);
     ialloc_init(&tx_ialloc_desc, tx_descriptors, TX_COUNT);
 
-    net_queue_init(&rx_queue, rx_free, rx_active, NET_RX_QUEUE_CAPACITY_DRIV);
-    net_queue_init(&tx_queue, tx_free, tx_active, NET_TX_QUEUE_CAPACITY_DRIV);
+    net_queue_init(&rx_queue, config.virt_rx.free_queue.vaddr, config.virt_rx.active_queue.vaddr,
+                   config.virt_rx.num_buffers);
+    net_queue_init(&tx_queue, config.virt_tx.free_queue.vaddr, config.virt_tx.active_queue.vaddr,
+                   config.virt_tx.num_buffers);
 
     eth_setup();
 
-    microkit_irq_ack(IRQ_CH);
+    microkit_irq_ack(device_resources.irqs[0].id);
 }
 
 void notified(microkit_channel ch)
 {
-    switch (ch) {
-    case IRQ_CH:
+    if (ch == device_resources.irqs[0].id) {
         handle_irq();
         microkit_deferred_irq_ack(ch);
-        break;
-    case RX_CH:
+    } else if (ch == config.virt_rx.id) {
         rx_provide();
-        break;
-    case TX_CH:
+    } else if (ch == config.virt_tx.id) {
         tx_provide();
-        break;
-    default:
+    } else {
         LOG_DRIVER_ERR("received notification on unexpected channel %u\n", ch);
-        break;
     }
 }

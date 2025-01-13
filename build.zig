@@ -222,7 +222,6 @@ fn addMmcDriver(
 
 fn addNetworkDriver(
     b: *std.Build,
-    net_config_include: LazyPath,
     util: *std.Build.Step.Compile,
     class: DriverClass.Network,
     target: std.Build.ResolvedTarget,
@@ -238,7 +237,6 @@ fn addNetworkDriver(
     driver.addCSourceFile(.{
         .file = b.path(source),
     });
-    driver.addIncludePath(net_config_include);
     driver.addIncludePath(b.path(b.fmt("drivers/network/{s}/", .{ @tagName(class) })));
     driver.addIncludePath(b.path("include"));
     driver.linkLibrary(util);
@@ -288,7 +286,6 @@ pub fn build(b: *std.Build) void {
     const libmicrokit_opt = b.option([]const u8, "libmicrokit", "Path to libmicrokit.a") orelse null;
     const libmicrokit_include_opt = b.option([]const u8, "libmicrokit_include", "Path to the libmicrokit include directory") orelse null;
     const libmicrokit_linker_script_opt = b.option([]const u8, "libmicrokit_linker_script", "Path to the libmicrokit linker script") orelse null;
-    const net_config_include_option = b.option([]const u8, "net_config_include", "Include path to network config header") orelse "";
     const gpu_config_include_option = b.option([]const u8, "gpu_config_include", "Include path to gpu config header") orelse "";
 
     // TODO: Right now this is not super ideal. What's happening is that we do not
@@ -296,7 +293,6 @@ pub fn build(b: *std.Build) void {
     // as a build option. What we do instead is just make the include path an
     // empty string if it has not been provided, which could be an annoying to
     // debug error if you do need a serial config but forgot to pass one in.
-    const net_config_include = LazyPath{ .cwd_relative = net_config_include_option };
     const gpu_config_include = LazyPath{ .cwd_relative = gpu_config_include_option };
     // libmicrokit
     // We're declaring explicitly here instead of with anonymous structs due to a bug. See https://github.com/ziglang/zig/issues/19832
@@ -467,7 +463,7 @@ pub fn build(b: *std.Build) void {
 
     // Network drivers
     inline for (std.meta.fields(DriverClass.Network)) |class| {
-        const driver = addNetworkDriver(b, net_config_include, util, @enumFromInt(class.value), target, optimize);
+        const driver = addNetworkDriver(b, util, @enumFromInt(class.value), target, optimize);
         driver.linkLibrary(util_putchar_debug);
         b.installArtifact(driver);
     }
@@ -482,7 +478,6 @@ pub fn build(b: *std.Build) void {
     net_virt_rx.addCSourceFile(.{
         .file = b.path("network/components/virt_rx.c"),
     });
-    net_virt_rx.addIncludePath(net_config_include);
     net_virt_rx.addIncludePath(b.path("include"));
     net_virt_rx.linkLibrary(util);
     net_virt_rx.linkLibrary(util_putchar_debug);
@@ -497,7 +492,6 @@ pub fn build(b: *std.Build) void {
     net_virt_tx.addCSourceFile(.{
         .file = b.path("network/components/virt_tx.c"),
     });
-    net_virt_tx.addIncludePath(net_config_include);
     net_virt_tx.addIncludePath(b.path("include"));
     net_virt_tx.linkLibrary(util);
     net_virt_tx.linkLibrary(util_putchar_debug);
@@ -512,7 +506,6 @@ pub fn build(b: *std.Build) void {
     net_copy.addCSourceFile(.{
         .file = b.path("network/components/copy.c"),
     });
-    net_copy.addIncludePath(net_config_include);
     net_copy.addIncludePath(b.path("include"));
     net_copy.linkLibrary(util);
     net_copy.linkLibrary(util_putchar_debug);
