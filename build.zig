@@ -126,7 +126,6 @@ fn addI2cDriverDevice(
     device: DriverClass.I2cDevice,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
-    i2c_client_include: LazyPath,
 ) *std.Build.Step.Compile {
     const driver = b.addStaticLibrary(.{
         .name = b.fmt("driver_i2c_device_{s}", .{@tagName(device)}),
@@ -143,7 +142,6 @@ fn addI2cDriverDevice(
     driver.addIncludePath(b.path("include"));
     driver.linkLibrary(util);
     driver.addIncludePath(b.path("libco"));
-    driver.addIncludePath(i2c_client_include);
 
     return driver;
 }
@@ -296,7 +294,6 @@ pub fn build(b: *std.Build) void {
     const libmicrokit_linker_script_opt = b.option([]const u8, "libmicrokit_linker_script", "Path to the libmicrokit linker script") orelse null;
     const blk_config_include_opt = b.option([]const u8, "blk_config_include", "Include path to block config header") orelse "";
     const net_config_include_option = b.option([]const u8, "net_config_include", "Include path to network config header") orelse "";
-    const i2c_client_include_option = b.option([]const u8, "i2c_client_include", "Include path to client config header") orelse "";
     const gpu_config_include_option = b.option([]const u8, "gpu_config_include", "Include path to gpu config header") orelse "";
 
     // TODO: Right now this is not super ideal. What's happening is that we do not
@@ -306,7 +303,6 @@ pub fn build(b: *std.Build) void {
     // debug error if you do need a serial config but forgot to pass one in.
     const blk_config_include = LazyPath{ .cwd_relative = blk_config_include_opt };
     const net_config_include = LazyPath{ .cwd_relative = net_config_include_option };
-    const i2c_client_include = LazyPath{ .cwd_relative = i2c_client_include_option };
     const gpu_config_include = LazyPath{ .cwd_relative = gpu_config_include_option };
     // libmicrokit
     // We're declaring explicitly here instead of with anonymous structs due to a bug. See https://github.com/ziglang/zig/issues/19832
@@ -471,7 +467,7 @@ pub fn build(b: *std.Build) void {
     }
 
     inline for (std.meta.fields(DriverClass.I2cDevice)) |device| {
-        const driver = addI2cDriverDevice(b, util, @enumFromInt(device.value), target, optimize, i2c_client_include);
+        const driver = addI2cDriverDevice(b, util, @enumFromInt(device.value), target, optimize);
         driver.linkLibrary(util_putchar_debug);
         b.installArtifact(driver);
     }

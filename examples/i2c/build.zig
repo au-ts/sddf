@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: BSD-2-Clause
 //
 const std = @import("std");
+const Step = std.Build.Step;
 
 const MicrokitBoard = enum { odroidc4 };
 
@@ -37,8 +38,26 @@ fn findTarget(board: MicrokitBoard) std.Target.Query {
 
 const ConfigOptions = enum { debug, release, benchmark };
 
+fn updateSectionObjcopy(b: *std.Build, section: []const u8, data_output: std.Build.LazyPath, data: []const u8, elf: []const u8) *Step.Run {
+    const run_objcopy = b.addSystemCommand(&[_][]const u8{
+        "llvm-objcopy",
+    });
+    run_objcopy.addArg("--update-section");
+    const data_full_path = data_output.join(b.allocator, data) catch @panic("OOM");
+    run_objcopy.addPrefixedFileArg(b.fmt("{s}=", .{ section }), data_full_path);
+    run_objcopy.addFileArg(.{ .cwd_relative = b.getInstallPath(.bin, elf) });
+
+    // We need the ELFs we talk about to be in the install directory first.
+    run_objcopy.step.dependOn(b.getInstallStep());
+
+    return run_objcopy;
+}
+
 pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
+
+    const default_python = if (std.posix.getenv("PYTHON")) |p| p else "python3";
+    const python = b.option([]const u8, "python", "Path to Python to use") orelse default_python;
 
     // Getting the path to the Microkit SDK before doing anything else
     const microkit_sdk_arg = b.option([]const u8, "sdk", "Path to Microkit SDK");
@@ -73,7 +92,6 @@ pub fn build(b: *std.Build) void {
         .libmicrokit = @as([]const u8, libmicrokit),
         .libmicrokit_include = @as([]const u8, libmicrokit_include),
         .libmicrokit_linker_script = @as([]const u8, libmicrokit_linker_script),
-        .i2c_client_include = @as([]const u8, ""),
     });
 
     const i2c_driver_class = switch (microkit_board_option.?) {
@@ -136,8 +154,6 @@ pub fn build(b: *std.Build) void {
     client_pn532.addObjectFile(.{ .cwd_relative = libmicrokit });
     client_pn532.setLinkerScript(.{ .cwd_relative = libmicrokit_linker_script });
 
-    b.installArtifact(client_pn532);
-
     client_ds3231.addIncludePath(sddf_dep.path("libco"));
     client_ds3231.addCSourceFile(.{ .file = sddf_dep.path("libco/libco.c") });
 
@@ -145,16 +161,77 @@ pub fn build(b: *std.Build) void {
     client_ds3231.addObjectFile(.{ .cwd_relative = libmicrokit });
     client_ds3231.setLinkerScript(.{ .cwd_relative = libmicrokit_linker_script });
 
+    b.installArtifact(client_pn532);
     b.installArtifact(client_ds3231);
-
     b.installArtifact(sddf_dep.artifact("i2c_virt.elf"));
 
-    const system_description_path = b.fmt("board/{s}/i2c.system", .{microkit_board});
+    // For compiling the DTS into a DTB
+    const dts = sddf_dep.path(b.fmt("dts/{s}.dts", .{ microkit_board }));
+    const dtc_cmd = b.addSystemCommand(&[_][]const u8{
+        "dtc", "-q", "-I", "dts", "-O", "dtb"
+    });
+    dtc_cmd.addFileInput(dts);
+    dtc_cmd.addFileArg(dts);
+    const dtb = dtc_cmd.captureStdOut();
+
+    // Run the metaprogram to get sDDF configuration binary files and the SDF file.
+    const metaprogram = b.path("meta.py");
+    const run_metaprogram = b.addSystemCommand(&[_][]const u8{
+        python,
+    });
+    run_metaprogram.addFileArg(metaprogram);
+    run_metaprogram.addFileInput(metaprogram);
+    run_metaprogram.addPrefixedDirectoryArg("--sddf=", sddf_dep.path(""));
+    run_metaprogram.addPrefixedDirectoryArg("--dtb=", dtb);
+    const meta_output = run_metaprogram.addPrefixedOutputDirectoryArg("--output=", "meta_output");
+    run_metaprogram.addArg("--board");
+    run_metaprogram.addArg(microkit_board);
+    run_metaprogram.addArg("--sdf");
+    run_metaprogram.addArg("i2c.system");
+
+    const meta_output_install = b.addInstallDirectory(.{
+        .source_dir = meta_output,
+        .install_dir = .prefix,
+        .install_subdir = "meta_output",
+    });
+
+    const timer_driver_objcopy = updateSectionObjcopy(b, ".device_resources", meta_output, "timer_driver_device_resources.data", "timer_driver.elf");
+    timer_driver_objcopy.step.dependOn(&timer_driver_install.step);
+    const i2c_driver_device_objcopy = updateSectionObjcopy(b, ".device_resources", meta_output, "i2c_driver_device_resources.data", "i2c_driver.elf");
+    i2c_driver_device_objcopy.step.dependOn(&i2c_driver_install.step);
+    const i2c_driver_config_objcopy = updateSectionObjcopy(b, ".i2c_driver_config", meta_output, "i2c_driver.data", "i2c_driver.elf");
+    i2c_driver_config_objcopy.step.dependOn(&i2c_driver_install.step);
+    const i2c_virt_objcopy = updateSectionObjcopy(b, ".i2c_virt_config", meta_output, "i2c_virt.data", "i2c_virt.elf");
+    const client_ds3231_i2c_objcopy = updateSectionObjcopy(b, ".i2c_client_config", meta_output, "i2c_client_client_ds3231.data", "client_ds3231.elf");
+    const client_ds3231_timer_objcopy = updateSectionObjcopy(b, ".timer_client_config", meta_output, "timer_client_client_ds3231.data", "client_ds3231.elf");
+    const client_pn532_i2c_objcopy = updateSectionObjcopy(b, ".i2c_client_config", meta_output, "i2c_client_client_pn532.data", "client_pn532.elf");
+    const client_pn532_timer_objcopy = updateSectionObjcopy(b, ".timer_client_config", meta_output, "timer_client_client_pn532.data", "client_pn532.elf");
+    const objcopys = &.{
+        client_ds3231_i2c_objcopy,
+        client_ds3231_timer_objcopy,
+        client_pn532_i2c_objcopy,
+        client_pn532_timer_objcopy,
+        i2c_virt_objcopy,
+        i2c_driver_device_objcopy,
+        i2c_driver_config_objcopy,
+        timer_driver_objcopy
+    };
+
     const final_image_dest = b.getInstallPath(.bin, "./loader.img");
-    const microkit_tool_cmd = b.addSystemCommand(&[_][]const u8{ microkit_tool, system_description_path, "--search-path", b.getInstallPath(.bin, ""), "--board", microkit_board, "--config", microkit_config, "-o", final_image_dest, "-r", b.getInstallPath(.prefix, "./report.txt") });
+    const microkit_tool_cmd = b.addSystemCommand(&[_][]const u8{
+        microkit_tool,
+        b.getInstallPath(.{ .custom = "meta_output" }, "i2c.system"),
+        "--search-path", b.getInstallPath(.bin, ""),
+        "--board", microkit_board,
+        "--config", microkit_config,
+        "-o", final_image_dest,
+        "-r", b.getInstallPath(.prefix, "./report.txt")
+    });
+    inline for (objcopys) |objcopy| {
+        microkit_tool_cmd.step.dependOn(&objcopy.step);
+    }
+    microkit_tool_cmd.step.dependOn(&meta_output_install.step);
     microkit_tool_cmd.step.dependOn(b.getInstallStep());
-    microkit_tool_cmd.step.dependOn(&i2c_driver_install.step);
-    microkit_tool_cmd.step.dependOn(&timer_driver_install.step);
     microkit_tool_cmd.setEnvironmentVariable("MICROKIT_SDK", microkit_sdk);
     const microkit_step = b.step("microkit", "Compile and build the final bootable image");
     microkit_step.dependOn(&microkit_tool_cmd.step);

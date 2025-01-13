@@ -6,81 +6,62 @@
 #include <microkit.h>
 #include <sddf/i2c/queue.h>
 #include <sddf/i2c/client.h>
+#include <sddf/i2c/config.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 
-// #define DEBUG_VIRTUALISER
+// #define DEBUG_VIRT
 
-#ifdef DEBUG_VIRTUALISER
-#define LOG_VIRTUALISER(...) do{ sddf_dprintf("I2C VIRTUALISER|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
+#ifdef DEBUG_VIRT
+#define LOG_VIRT(...) do{ sddf_dprintf("I2C VIRT|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
 #else
-#define LOG_VIRTUALISER(...) do{}while(0)
+#define LOG_VIRT(...) do{}while(0)
 #endif
 
-#define LOG_VIRTUALISER_ERR(...) do{ sddf_printf("I2C VIRTUALISER|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
+#define LOG_VIRT_ERR(...) do{ sddf_printf("I2C VIRT|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
 #define BUS_UNCLAIMED (-1)
 
-/*
- * Note that we have a fundamental assumption that the regions of memory for a
- * client are indexed the same as the channel number. E.g the first client
- * request region virtual address is channel number 0.
- * We believe this restriction should not be too restrictive, but we will see
- * what happens...
- */
+#define CLIENT_CH_OFFSET 1
 
-#define NUM_CLIENTS 2
-#define DRIVER_CH 2
+__attribute__((__section__(".i2c_virt_config"))) i2c_virt_config_t config;
 
-#if DRIVER_CH < NUM_CLIENTS
-#error "DRIVER_CH must be higher than client channels"
-#endif
-
-uintptr_t driver_data_offsets[NUM_CLIENTS] = { 0, 0x1000 }; // change if NUM_CLIENTS changes
-size_t client_data_sizes[NUM_CLIENTS] = { 0x1000, 0x1000 }; // change if NUM_CLIENTS changes
-
-i2c_queue_handle_t client_queues[NUM_CLIENTS];
+i2c_queue_handle_t client_queues[SDDF_I2C_MAX_CLIENTS];
 i2c_queue_handle_t driver_queue;
-
-uintptr_t client_request_regions[NUM_CLIENTS] = { 0x4000000, 0x4001000 }; // change if NUM_CLIENTS changes
-uintptr_t client_response_regions[NUM_CLIENTS] = { 0x5000000, 0x5001000 }; // change if NUM_CLIENTS changes
 
 // Security list: owner of each i2c address on the bus
 int security_list[I2C_BUS_ADDRESS_MAX + 1];
 
-uintptr_t driver_response_region; // mapped memory
-uintptr_t driver_request_region; // mapped memory
-
-void process_request(microkit_channel ch)
+void process_request(uint32_t client_id)
 {
     bool enqueued = false;
-    assert(ch < NUM_CLIENTS);
+    assert(client_id < config.num_clients);
 
     /* Do not process the request if we cannot pass it to the driver */
-    while (!i2c_queue_empty(client_queues[ch].request) && !i2c_queue_full(driver_queue.request)) {
+    while (!i2c_queue_empty(client_queues[client_id].request) && !i2c_queue_full(driver_queue.request)) {
         size_t offset = 0;
         size_t bus_address = 0;
         unsigned int len = 0;
-        int err = i2c_dequeue_request(client_queues[ch], &bus_address, &offset, &len);
+        int err = i2c_dequeue_request(client_queues[client_id], &bus_address, &offset, &len);
         if (err) {
-            LOG_VIRTUALISER_ERR("could not dequeue from request queue\n");
+            LOG_VIRT_ERR("could not dequeue from request queue\n");
             return;
         }
 
         // Check that client can actually access bus
-        if (bus_address > I2C_BUS_ADDRESS_MAX || security_list[bus_address] != ch) {
-            LOG_VIRTUALISER_ERR("invalid bus address (0x%lx) requested by client 0x%x\n", bus_address, ch);
+        if (bus_address > I2C_BUS_ADDRESS_MAX || security_list[bus_address] != client_id) {
+            LOG_VIRT_ERR("invalid bus address (0x%lx) requested by client 0x%x\n", bus_address, client_id);
             continue;
         }
 
-        if (offset > client_data_sizes[ch]) {
-            LOG_VIRTUALISER_ERR("invalid offset (0x%lx) given by client 0x%x. Max offset is 0x%lx\n", offset, ch,
-                                client_data_sizes[ch]);
+        if (offset > config.clients[client_id].conn.data.size) {
+            LOG_VIRT_ERR("invalid offset (0x%lx) given by client %u. Max offset is 0x%lx\n", offset, client_id,
+                         config.clients[client_id].conn.data.size);
             continue;
         }
 
         // Now we need to convert the offset into an offset the driver can use in its address space.
-        size_t driver_offset = driver_data_offsets[ch] + offset;
+        size_t driver_offset = config.clients[client_id].driver_data_offset + offset;
         err = i2c_enqueue_request(driver_queue, bus_address, driver_offset, len);
         /* If this assert fails we have a race as the driver should only ever be dequeuing */
         assert(!err);
@@ -89,7 +70,7 @@ void process_request(microkit_channel ch)
     }
 
     if (enqueued) {
-        microkit_deferred_notify(DRIVER_CH);
+        microkit_deferred_notify(config.driver.conn.id);
     }
 }
 
@@ -112,40 +93,41 @@ void process_response()
          * from the driver's response queue */
         assert(!err);
 
-        size_t ch = security_list[bus_address];
-        if (ch == BUS_UNCLAIMED) {
+        size_t client_id = security_list[bus_address];
+        if (client_id == BUS_UNCLAIMED) {
             /* The client has released the bus before receiving all their responses, so we simply
              * drop the response. */
             continue;
         }
 
-        size_t client_offset = driver_offset - driver_data_offsets[ch];
+        size_t client_offset = driver_offset - config.clients[client_id].driver_data_offset;
         /* There is no point checking if the enqueue succeeds or not. */
-        i2c_enqueue_response(client_queues[ch], bus_address, client_offset, len);
+        i2c_enqueue_response(client_queues[client_id], bus_address, client_offset, len);
 
-        microkit_notify(ch);
+        microkit_notify(CLIENT_CH_OFFSET + client_id);
     }
 }
 
 void init(void)
 {
-    LOG_VIRTUALISER("initialising\n");
+    assert(config.driver.conn.id == 0);
+    LOG_VIRT("initialising\n");
     for (int i = 0; i < I2C_BUS_ADDRESS_MAX + 1; i++) {
         security_list[i] = BUS_UNCLAIMED;
     }
-    driver_queue = i2c_queue_init((i2c_queue_t *) driver_request_region, (i2c_queue_t *) driver_response_region);
-    for (int i = 0; i < NUM_CLIENTS; i++) {
-        client_queues[i] = i2c_queue_init((i2c_queue_t *) client_request_regions[i],
-                                          (i2c_queue_t *) client_response_regions[i]);
+    driver_queue = i2c_queue_init(config.driver.conn.req_queue.vaddr, config.driver.conn.resp_queue.vaddr);
+    for (int i = 0; i < config.num_clients; i++) {
+        client_queues[i] = i2c_queue_init(config.clients[i].conn.req_queue.vaddr,
+                                          config.clients[i].conn.resp_queue.vaddr);
     }
 }
 
 void notified(microkit_channel ch)
 {
-    if (ch == DRIVER_CH) {
+    if (ch == config.driver.conn.id) {
         process_response();
     } else {
-        process_request(ch);
+        process_request(ch - CLIENT_CH_OFFSET);
     }
 }
 
@@ -153,15 +135,17 @@ seL4_MessageInfo_t protected(microkit_channel ch, seL4_MessageInfo_t msginfo)
 {
     size_t label = microkit_msginfo_get_label(msginfo);
     size_t bus = microkit_mr_get(I2C_BUS_SLOT);
+    uint32_t client_id = ch - CLIENT_CH_OFFSET;
 
     if (label != I2C_BUS_CLAIM && label != I2C_BUS_RELEASE) {
-        LOG_VIRTUALISER_ERR("unknown label (0x%lx) given by client on channel 0x%x\n", label, ch);
+        LOG_VIRT_ERR("unknown label (0x%lx) given by client on channel 0x%x\n", label, ch);
         return microkit_msginfo_new(I2C_FAILURE, 0);
     }
 
     if (bus > I2C_BUS_ADDRESS_MAX) {
-        LOG_VIRTUALISER_ERR("invalid bus address (0x%lx) given by client on "
-                            "channel 0x%x. Max bus address is 0x%x\n", bus, ch, I2C_BUS_ADDRESS_MAX);
+        LOG_VIRT_ERR("invalid bus address (0x%lx) given by client on "
+                     "channel 0x%x. Max bus address is 0x%x\n",
+                     bus, ch, I2C_BUS_ADDRESS_MAX);
         return microkit_msginfo_new(I2C_FAILURE, 0);
     }
 
@@ -169,22 +153,22 @@ seL4_MessageInfo_t protected(microkit_channel ch, seL4_MessageInfo_t msginfo)
     case I2C_BUS_CLAIM:
         // We have a valid bus address, we need to make sure no one else has claimed it.
         if (security_list[bus] != BUS_UNCLAIMED) {
-            LOG_VIRTUALISER_ERR("bus address 0x%lx already claimed, cannot claim for channel 0x%x\n", bus, ch);
+            LOG_VIRT_ERR("bus address 0x%lx already claimed, cannot claim for channel 0x%x\n", bus, ch);
             return microkit_msginfo_new(I2C_FAILURE, 0);
         }
 
-        security_list[bus] = ch;
+        security_list[bus] = client_id;
         break;
     case I2C_BUS_RELEASE:
-        if (security_list[bus] != ch) {
-            LOG_VIRTUALISER_ERR("bus address 0x%lx is not claimed by channel 0x%x\n", bus, ch);
+        if (security_list[bus] != client_id) {
+            LOG_VIRT_ERR("bus address 0x%lx is not claimed by channel 0x%x\n", bus, ch);
             return microkit_msginfo_new(I2C_FAILURE, 0);
         }
 
         security_list[bus] = BUS_UNCLAIMED;
         break;
     default:
-        LOG_VIRTUALISER_ERR("reached unreachable case\n");
+        LOG_VIRT_ERR("reached unreachable case\n");
         return microkit_msginfo_new(I2C_FAILURE, 0);
     }
 

@@ -7,10 +7,13 @@
 #include <libco.h>
 #include <sddf/util/printf.h>
 #include <sddf/timer/client.h>
+#include <sddf/timer/config.h>
 #include <sddf/i2c/queue.h>
 #include <sddf/i2c/client.h>
+#include <sddf/i2c/config.h>
 #include <sddf/i2c/devices/pn532/pn532.h>
-#include "client.h"
+
+bool delay_ms(size_t milliseconds);
 
 // #define DEBUG_CLIENT
 
@@ -29,10 +32,12 @@
 #define USING_HALT(...) do{ while(1); }while(0)
 #endif
 
-uintptr_t data_region;
-uintptr_t request_region;
-uintptr_t response_region;
+__attribute__((__section__(".i2c_client_config"))) i2c_client_config_t i2c_config;
+
+__attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
+
 i2c_queue_handle_t queue;
+uintptr_t data_region;
 
 cothread_t t_event;
 cothread_t t_main;
@@ -66,9 +71,11 @@ bool read_passive_target_id(uint8_t card_baud_rate, uint8_t *uid_buf, uint8_t *u
         return false;
     }
 
+#ifdef DEBUG_CLIENT
     uint16_t sens_res = response[2];
     sens_res <<= 8;
     sens_res |= response[3];
+#endif
 
     LOG_CLIENT("ATQA: 0x%lx\n", sens_res);
     LOG_CLIENT("SAK: 0x%lx\n", response[4]);
@@ -184,7 +191,7 @@ bool delay_ms(size_t milliseconds)
         return false;
     }
 
-    sddf_timer_set_timeout(TIMER_CH, time_ns);
+    sddf_timer_set_timeout(timer_config.driver_id, time_ns);
     co_switch(t_event);
 
     return true;
@@ -194,9 +201,11 @@ void init(void)
 {
     LOG_CLIENT("init\n");
 
-    queue = i2c_queue_init((i2c_queue_t *) request_region, (i2c_queue_t *) response_region);
+    data_region = (uintptr_t)i2c_config.virt.data.vaddr;
 
-    bool claimed = i2c_bus_claim(I2C_VIRTUALISER_CH, PN532_I2C_BUS_ADDRESS);
+    queue = i2c_queue_init(i2c_config.virt.req_queue.vaddr, i2c_config.virt.resp_queue.vaddr);
+
+    bool claimed = i2c_bus_claim(i2c_config.virt.id, PN532_I2C_BUS_ADDRESS);
     if (!claimed) {
         LOG_CLIENT_ERR("failed to claim PN532 bus\n");
         return;
@@ -213,14 +222,9 @@ void init(void)
 
 void notified(microkit_channel ch)
 {
-    switch (ch) {
-    case I2C_VIRTUALISER_CH:
+    if (ch == i2c_config.virt.id || ch == timer_config.driver_id) {
         co_switch(t_main);
-        break;
-    case TIMER_CH:
-        co_switch(t_main);
-        break;
-    default:
+    } else {
         LOG_CLIENT_ERR("Unknown channel 0x%x!\n", ch);
     }
 }

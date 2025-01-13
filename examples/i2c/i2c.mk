@@ -12,7 +12,7 @@ $(error MICROKIT_SDK must be specified)
 endif
 
 ifeq ($(strip $(TOOLCHAIN)),)
-	TOOLCHAIN := aarch64-none-elf
+	TOOLCHAIN := clang
 endif
 
 ifeq (${MICROKIT_BOARD},odroidc4)
@@ -24,11 +24,14 @@ endif
 
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 
-CC := $(TOOLCHAIN)-gcc
-LD := $(TOOLCHAIN)-ld
-AS := $(TOOLCHAIN)-as
-AR := $(TOOLCHAIN)-ar
-RANLIB := $(TOOLCHAIN)-ranlib
+CC := clang -target aarch64-none-elf
+LD := ld.lld
+AR := llvm-ar
+RANLIB := llvm-ranlib
+OBJCOPY := llvm-objcopy
+
+PYTHON ?= python3
+DTC := dtc
 
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 
@@ -43,12 +46,16 @@ DS3231_DRIVER := $(SDDF)/i2c/devices/ds3231
 
 IMAGES := i2c_virt.elf i2c_driver.elf client_pn532.elf client_ds3231.elf timer_driver.elf
 CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall -Wno-unused-function -I${TOP}
-LDFLAGS := -L$(BOARD_DIR)/lib -L$(SDDF)/lib -L${LIBC}
-LIBS := --start-group -lmicrokit -Tmicrokit.ld -lc libsddf_util_debug.a --end-group
+LDFLAGS := -L$(BOARD_DIR)/lib
+LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
 
 IMAGE_FILE = loader.img
 REPORT_FILE = report.txt
-SYSTEM_FILE = ${TOP}/board/$(MICROKIT_BOARD)/i2c.system
+SYSTEM_FILE = i2c.system
+
+DTS := $(SDDF)/dts/$(MICROKIT_BOARD).dts
+DTB := $(MICROKIT_BOARD).dtb
+METAPROGRAM := $(TOP)/meta.py
 
 CFLAGS += -I$(BOARD_DIR)/include \
 	-I$(SDDF)/include \
@@ -72,6 +79,20 @@ client_pn532.elf: $(CLIENT_PN532_OBJS) libco.a
 
 client_ds3231.elf: $(CLIENT_DS3231_OBJS) libco.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+
+$(DTB): $(DTS)
+	$(DTC) -q -I dts -O dtb $(DTS) > $(DTB)
+
+$(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
+	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE)
+	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
+	$(OBJCOPY) --update-section .device_resources=i2c_driver_device_resources.data i2c_driver.elf
+	$(OBJCOPY) --update-section .i2c_driver_config=i2c_driver.data i2c_driver.elf
+	$(OBJCOPY) --update-section .i2c_virt_config=i2c_virt.data i2c_virt.elf
+	$(OBJCOPY) --update-section .i2c_client_config=i2c_client_client_ds3231.data client_ds3231.elf
+	$(OBJCOPY) --update-section .timer_client_config=timer_client_client_ds3231.data client_ds3231.elf
+	$(OBJCOPY) --update-section .i2c_client_config=i2c_client_client_pn532.data client_pn532.elf
+	$(OBJCOPY) --update-section .timer_client_config=timer_client_client_pn532.data client_pn532.elf
 
 $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
