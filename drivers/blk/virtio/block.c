@@ -21,20 +21,10 @@
 #include <sddf/virtio/virtio.h>
 #include <sddf/virtio/virtio_queue.h>
 #include <sddf/blk/queue.h>
+#include <sddf/blk/config.h>
 #include <sddf/blk/storage_info.h>
+#include <sddf/resources/device.h>
 #include "block.h"
-
-#define IRQ_CH 0
-#define VIRT_CH 1
-
-/*
- * This offset is the default for QEMU, but can change depending on
- * the configuration of QEMU and what other virtIO devices are being
- * used.
- */
-#ifndef VIRTIO_MMIO_BLK_OFFSET
-#define VIRTIO_MMIO_BLK_OFFSET (0xe00)
-#endif
 
 #define QUEUE_SIZE 1024
 #define VIRTQ_NUM_REQUESTS QUEUE_SIZE
@@ -46,12 +36,6 @@
  */
 #define VIRTIO_REGION_SIZE 0x200000
 
-uintptr_t blk_regs;
-
-blk_storage_info_t *blk_storage_info;
-blk_req_queue_t *blk_req_queue;
-blk_resp_queue_t *blk_resp_queue;
-
 uintptr_t requests_paddr;
 uintptr_t requests_vaddr;
 
@@ -61,7 +45,6 @@ static volatile struct virtq virtq;
 static blk_queue_handle_t blk_queue;
 
 uintptr_t virtio_headers_paddr;
-uintptr_t virtio_headers_vaddr;
 static struct virtio_blk_req *virtio_headers;
 
 /*
@@ -81,6 +64,9 @@ uint16_t last_seen_used = 0;
 
 /* Block device configuration, populated during initiliastion. */
 volatile struct virtio_blk_config *virtio_config;
+
+__attribute__((__section__(".device_resources"))) device_resources_t device_resources;
+__attribute__((__section__(".blk_driver_config"))) blk_driver_config_t config;
 
 void handle_response(void)
 {
@@ -132,7 +118,7 @@ void handle_response(void)
     }
 
     if (notify) {
-        microkit_notify(VIRT_CH);
+        microkit_notify(config.virt.id);
     }
 
     last_seen_used = i;
@@ -251,13 +237,13 @@ void handle_request()
         case BLK_REQ_FLUSH: {
             int err = blk_enqueue_resp(&blk_queue, BLK_RESP_OK, 0, id);
             assert(!err);
-            microkit_notify(VIRT_CH);
+            microkit_notify(config.virt.id);
             break;
         }
         case BLK_REQ_BARRIER: {
             int err = blk_enqueue_resp(&blk_queue, BLK_RESP_OK, 0, id);
             assert(!err);
-            microkit_notify(VIRT_CH);
+            microkit_notify(config.virt.id);
             break;
         }
         default:
@@ -310,8 +296,6 @@ void virtio_blk_init(void)
 
     ialloc_init(&ialloc_desc, descriptors, QUEUE_SIZE);
 
-    virtio_headers = (struct virtio_blk_req *) virtio_headers_vaddr;
-
     /* First reset the device */
     regs->Status = 0;
     /* Set the ACKNOWLEDGE bit to say we have noticed the device */
@@ -332,16 +316,17 @@ void virtio_blk_init(void)
     }
 
     /* This driver does not support Read-Only devices, so we always leave this as false */
-    blk_storage_info->read_only = false;
-    blk_storage_info->capacity = (virtio_config->capacity * VIRTIO_BLK_SECTOR_SIZE) / BLK_TRANSFER_SIZE;
-    blk_storage_info->cylinders = virtio_config->geometry.cylinders;
-    blk_storage_info->heads = virtio_config->geometry.heads;
-    blk_storage_info->blocks = virtio_config->geometry.sectors;
-    blk_storage_info->block_size = 1;
-    blk_storage_info->sector_size = VIRTIO_BLK_SECTOR_SIZE;
+    blk_storage_info_t *storage_info = config.virt.storage_info.vaddr;
+    storage_info->read_only = false;
+    storage_info->capacity = (virtio_config->capacity * VIRTIO_BLK_SECTOR_SIZE) / BLK_TRANSFER_SIZE;
+    storage_info->cylinders = virtio_config->geometry.cylinders;
+    storage_info->heads = virtio_config->geometry.heads;
+    storage_info->blocks = virtio_config->geometry.sectors;
+    storage_info->block_size = 1;
+    storage_info->sector_size = VIRTIO_BLK_SECTOR_SIZE;
 
     /* Finished populating configuration */
-    __atomic_store_n(&blk_storage_info->ready, true, __ATOMIC_RELEASE);
+    __atomic_store_n(&storage_info->ready, true, __ATOMIC_RELEASE);
 
 #ifdef DEBUG_DRIVER
     uint32_t features_low = regs->DeviceFeatures;
@@ -392,16 +377,28 @@ void virtio_blk_init(void)
 
 void init(void)
 {
-    regs = (volatile virtio_mmio_regs_t *)(blk_regs + VIRTIO_MMIO_BLK_OFFSET);
+    assert(device_resources.num_irqs == 1);
+    assert(device_resources.num_regions == 3);
+
+    regs = (volatile virtio_mmio_regs_t *)device_resources.regions[0].region.vaddr;
+    requests_paddr = device_resources.regions[2].io_addr;
+    requests_vaddr = (uintptr_t)device_resources.regions[2].region.vaddr;
+    virtio_headers_paddr = (uintptr_t)device_resources.regions[1].io_addr;
+    virtio_headers = (struct virtio_blk_req *)device_resources.regions[1].region.vaddr;
+
+    assert(virtio_headers_paddr);
+    assert(virtio_headers);
+    assert(requests_paddr);
+    assert(requests_vaddr);
+
     virtio_blk_init();
 
-    blk_queue_init(&blk_queue, blk_req_queue, blk_resp_queue, QUEUE_SIZE);
+    blk_queue_init(&blk_queue, config.virt.req_queue.vaddr, config.virt.resp_queue.vaddr, config.virt.num_buffers);
 }
 
 void notified(microkit_channel ch)
 {
-    switch (ch) {
-    case IRQ_CH:
+    if (ch == device_resources.irqs[0].id) {
         handle_irq();
         microkit_deferred_irq_ack(ch);
         /*
@@ -410,11 +407,9 @@ void notified(microkit_channel ch)
          * we have received a response and have resources freed.
          */
         handle_request();
-        break;
-    case VIRT_CH:
+    } else if (ch == config.virt.id) {
         handle_request();
-        break;
-    default:
+    } else {
         LOG_DRIVER_ERR("received notification from unknown channel: 0x%x\n", ch);
     }
 }

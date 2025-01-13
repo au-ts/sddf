@@ -3,9 +3,12 @@
 // SPDX-License-Identifier: BSD-2-Clause
 //
 const std = @import("std");
+const Step = std.Build.Step;
+const LazyPath = std.Build.LazyPath;
 
 const MicrokitBoard = enum {
-    qemu_virt_aarch64
+    qemu_virt_aarch64,
+    qemu_virt_riscv64,
 };
 
 const Target = struct {
@@ -24,6 +27,15 @@ const targets = [_]Target{
             .abi = .none,
         },
     },
+    .{
+        .board = MicrokitBoard.qemu_virt_riscv64,
+        .zig_target = std.Target.Query{
+            .cpu_arch = .riscv64,
+            .cpu_model = .{ .explicit = &std.Target.riscv.cpu.baseline_rv64 },
+            .os_tag = .freestanding,
+            .abi = .none,
+        }
+    },
 };
 
 fn findTarget(board: MicrokitBoard) std.Target.Query {
@@ -39,8 +51,28 @@ fn findTarget(board: MicrokitBoard) std.Target.Query {
 
 const ConfigOptions = enum { debug, release, benchmark };
 
-pub fn build(b: *std.Build) void {
+fn updateSectionObjcopy(b: *std.Build, section: []const u8, data_output: std.Build.LazyPath, data: []const u8, elf: []const u8) *Step.Run {
+    const run_objcopy = b.addSystemCommand(&[_][]const u8{
+        "llvm-objcopy",
+    });
+    run_objcopy.addArg("--update-section");
+    const data_full_path = data_output.join(b.allocator, data) catch @panic("OOM");
+    run_objcopy.addPrefixedFileArg(b.fmt("{s}=", .{ section }), data_full_path);
+    run_objcopy.addFileArg(.{ .cwd_relative = b.getInstallPath(.bin, elf) });
+
+    // We need the ELFs we talk about to be in the install directory first.
+    run_objcopy.step.dependOn(b.getInstallStep());
+
+    return run_objcopy;
+}
+
+pub fn build(b: *std.Build) !void {
     const optimize = b.standardOptimizeOption(.{});
+
+    const default_python = if (std.posix.getenv("PYTHON")) |p| p else "python3";
+    const python = b.option([]const u8, "python", "Path to Python to use") orelse default_python;
+
+    const num_clients = b.option(usize, "num-clients", "Number of client PDs") orelse 1;
 
     // Getting the path to the Microkit SDK before doing anything else
     const microkit_sdk_arg = b.option([]const u8, "sdk", "Path to Microkit SDK");
@@ -75,11 +107,10 @@ pub fn build(b: *std.Build) void {
         .libmicrokit = @as([]const u8, libmicrokit),
         .libmicrokit_include = @as([]const u8, libmicrokit_include),
         .libmicrokit_linker_script = @as([]const u8, libmicrokit_linker_script),
-        .blk_config_include = @as([]const u8, ""),
     });
 
     const blk_driver_class = switch (microkit_board_option.?) {
-        .qemu_virt_aarch64 => "virtio",
+        .qemu_virt_aarch64, .qemu_virt_riscv64 => "virtio",
     };
 
     const client = b.addExecutable(.{
@@ -92,8 +123,6 @@ pub fn build(b: *std.Build) void {
     client.addCSourceFiles(.{
         .files = &.{ "client.c" },
     });
-    // For blk_config.h
-    client.addIncludePath(b.path(""));
 
     client.addIncludePath(sddf_dep.path("include"));
     client.linkLibrary(sddf_dep.artifact("util"));
@@ -110,31 +139,70 @@ pub fn build(b: *std.Build) void {
     b.installArtifact(sddf_dep.artifact("blk_virt.elf"));
 
     // Because our SDF expects a different ELF name for the block driver, we have this extra step.
-    const blk_driver_install = b.addInstallArtifact(blk_driver, .{ .dest_sub_path = "blk_driver.elf" });
+    const driver_install = b.addInstallArtifact(blk_driver, .{ .dest_sub_path = "blk_driver.elf" });
 
-    const system_description_path = b.fmt("board/{s}/blk.system", .{microkit_board});
+    // For compiling the DTS into a DTB
+    const dts = sddf_dep.path(b.fmt("dts/{s}.dts", .{ microkit_board }));
+    const dtc_cmd = b.addSystemCommand(&[_][]const u8{
+        "dtc", "-q", "-I", "dts", "-O", "dtb"
+    });
+    dtc_cmd.addFileInput(dts);
+    dtc_cmd.addFileArg(dts);
+    const dtb = dtc_cmd.captureStdOut();
+
+    // Run the metaprogram to get sDDF configuration binary files and the SDF file.
+    const metaprogram = b.path("meta.py");
+    const run_metaprogram = b.addSystemCommand(&[_][]const u8{
+        python,
+    });
+    run_metaprogram.addFileArg(metaprogram);
+    run_metaprogram.addFileInput(metaprogram);
+    run_metaprogram.addPrefixedDirectoryArg("--sddf=", sddf_dep.path(""));
+    run_metaprogram.addPrefixedDirectoryArg("--dtb=", dtb);
+    const meta_output = run_metaprogram.addPrefixedOutputDirectoryArg("--output=", "meta_output");
+    run_metaprogram.addArg("--board");
+    run_metaprogram.addArg(microkit_board);
+    run_metaprogram.addArg("--sdf");
+    run_metaprogram.addArg("blk.system");
+
+    const meta_output_install = b.addInstallDirectory(.{
+        .source_dir = meta_output,
+        .install_dir = .prefix,
+        .install_subdir = "meta_output",
+    });
+
+    const client_objcopy = updateSectionObjcopy(b, ".blk_client_config", meta_output, "blk_client_client.data", "client.elf");
+    const virt_objcopy = updateSectionObjcopy(b, ".blk_virt_config", meta_output, "blk_virt.data", "blk_virt.elf");
+    const driver_resources_objcopy = updateSectionObjcopy(b, ".device_resources", meta_output, "blk_driver_device_resources.data", "blk_driver.elf");
+    const driver_config_objcopy = updateSectionObjcopy(b, ".blk_driver_config", meta_output, "blk_driver.data", "blk_driver.elf");
+    driver_resources_objcopy.step.dependOn(&driver_install.step);
+    driver_config_objcopy.step.dependOn(&driver_install.step);
+    const objcopys = &.{ client_objcopy, virt_objcopy, driver_resources_objcopy, driver_config_objcopy };
+
     const final_image_dest = b.getInstallPath(.bin, "./loader.img");
     const microkit_tool_cmd = b.addSystemCommand(&[_][]const u8{
         microkit_tool,
-        system_description_path,
+        b.getInstallPath(.{ .custom = "meta_output" }, "blk.system"),
         "--search-path", b.getInstallPath(.bin, ""),
         "--board", microkit_board,
         "--config", microkit_config,
         "-o", final_image_dest,
         "-r", b.getInstallPath(.prefix, "./report.txt")
     });
+    inline for (objcopys) |objcopy| {
+        microkit_tool_cmd.step.dependOn(&objcopy.step);
+    }
+    microkit_tool_cmd.step.dependOn(&meta_output_install.step);
     microkit_tool_cmd.step.dependOn(b.getInstallStep());
     microkit_tool_cmd.setEnvironmentVariable("MICROKIT_SDK", microkit_sdk);
 
     const microkit_step = b.step("microkit", "Compile and build the final bootable image");
-    microkit_step.dependOn(&blk_driver_install.step);
     microkit_step.dependOn(&microkit_tool_cmd.step);
     b.default_step = microkit_step;
 
     // This is setting up a `qemu` command for running the system using QEMU,
     // which we only want to do when we have a board that we can actually simulate.
-    const loader_arg = b.fmt("loader,file={s},addr=0x70000000,cpu-num=0", .{ final_image_dest });
-    if (std.mem.eql(u8, microkit_board, "qemu_virt_aarch64")) {
+    if (microkit_board_option.? == .qemu_virt_aarch64 or microkit_board_option.? == .qemu_virt_riscv64) {
         const create_disk_cmd = b.addSystemCommand(&[_][]const u8{
             "bash",
         });
@@ -143,27 +211,49 @@ pub fn build(b: *std.Build) void {
         create_disk_cmd.addFileInput(mkvirtdisk);
         const disk = create_disk_cmd.addOutputFileArg("disk");
         create_disk_cmd.addArgs(&[_][]const u8{
-            "1", "512", b.fmt("{}", .{ 1024 * 1024 * 16 }),
+            b.fmt("{}", .{ num_clients }), "512", b.fmt("{}", .{ 1024 * 1024 * 16 }),
         });
         const disk_install = b.addInstallFile(disk, "disk");
         disk_install.step.dependOn(&create_disk_cmd.step);
 
-        const qemu_cmd = b.addSystemCommand(&[_][]const u8{
-            "qemu-system-aarch64",
-            "-machine", "virt,virtualization=on,highmem=off,secure=off",
-            "-cpu", "cortex-a53",
-            "-serial", "mon:stdio",
-            "-device", loader_arg,
-            "-m", "2G",
-            "-nographic",
+        var qemu_cmd: *Step.Run = undefined;
+        if (microkit_board_option.? == .qemu_virt_aarch64) {
+            const loader_arg = b.fmt("loader,file={s},addr=0x70000000,cpu-num=0", .{ final_image_dest });
+            qemu_cmd = b.addSystemCommand(&[_][]const u8{
+                "qemu-system-aarch64",
+                "-machine", "virt,virtualization=on,highmem=off,secure=off",
+                "-cpu", "cortex-a53",
+                "-serial", "mon:stdio",
+                "-device", loader_arg,
+                "-m", "2G",
+                "-nographic",
+            });
+        } else if (microkit_board_option.? == .qemu_virt_riscv64) {
+            qemu_cmd = b.addSystemCommand(&[_][]const u8{
+                "qemu-system-riscv64",
+                "-machine",
+                "virt",
+                "-serial",
+                "mon:stdio",
+                "-kernel",
+                final_image_dest,
+                "-m",
+                "2G",
+                "-nographic",
+            });
+        }
+
+        const blk_device_args = &.{
             "-global", "virtio-mmio.force-legacy=false",
             "-d", "guest_errors",
             "-drive", b.fmt("file={s},if=none,format=raw,id=hd", .{ b.getInstallPath(.prefix, "disk") }),
             "-device", "virtio-blk-device,drive=hd",
-            // "--trace", "events=/tmp/events",
-        });
+        };
+        qemu_cmd.addArgs(blk_device_args);
+
         qemu_cmd.step.dependOn(b.default_step);
         qemu_cmd.step.dependOn(&disk_install.step);
+
         const simulate_step = b.step("qemu", "Simulate the image using QEMU");
         simulate_step.dependOn(&qemu_cmd.step);
     }
