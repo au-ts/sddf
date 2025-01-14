@@ -10,14 +10,6 @@
 #include <sddf/util/util.h>
 #include <sddf/serial/queue.h>
 
-#if defined(CONFIG_PLAT_ODROIDC2)
-#define UART_REGS_OFFSET (0x4c0)
-#elif defined(CONFIG_PLAT_ODROIDC4)
-#define UART_REGS_OFFSET (0x0)
-#else
-#error "Unexpected platform used with UART meson driver"
-#endif
-
 /* The driver is based on the Amlogic S905X3 Data Sheet Revision 02.
 The following register descriptions and layout are from section 13.5.4.*/
 
