@@ -21,6 +21,7 @@ Currently the options for `MICROKIT_BOARD` are:
 * imx8mm_evk
 * maaxboard
 * qemu_virt_aarch64
+* star64
 
 After building, the system image to load will be `build/loader.img`.
 
@@ -110,7 +111,7 @@ serial queue(s) by calling `serial_cli_queue_init_sys` as well as `serial_putcha
 allows them to also use `sddf_putchar_unbuffered`.
 
 ## Example
-The serial server example system contains two clients which can both receive serial data as well
+The serial example system contains two clients which can both receive serial data as well
 as transmit. By default, the example has SERIAL_WITH_COLOUR enabled so each client prints with a
 different colour. Each client boots up and prints a hello world message when initialisation is
 completed, and waits for input. When a character is received, each client will re-transmit the

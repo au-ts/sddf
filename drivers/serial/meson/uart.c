@@ -6,24 +6,18 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <microkit.h>
+#include <sddf/resources/device.h>
 #include <sddf/util/printf.h>
-#include <serial_config.h>
+#include <sddf/serial/config.h>
 #include "uart.h"
 
-#define IRQ_CH 0
-#define TX_CH  1
-#define RX_CH  2
+__attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
-serial_queue_t *rx_queue;
-serial_queue_t *tx_queue;
-
-char *rx_data;
-char *tx_data;
+__attribute__((__section__(".serial_driver_config"))) serial_driver_config_t config;
 
 serial_queue_handle_t rx_queue_handle;
 serial_queue_handle_t tx_queue_handle;
 
-uintptr_t uart_base;
 volatile meson_uart_regs_t *uart_regs;
 struct uart_clock_state uart_clock;
 
@@ -99,7 +93,7 @@ static void tx_provide(void)
 
     if (transferred && serial_require_consumer_signal(&tx_queue_handle)) {
         serial_cancel_consumer_signal(&tx_queue_handle);
-        microkit_notify(TX_CH);
+        microkit_notify(config.tx.id);
     }
 }
 
@@ -130,7 +124,7 @@ static void rx_return(void)
 
     if (enqueued && serial_require_producer_signal(&rx_queue_handle)) {
         serial_cancel_producer_signal(&rx_queue_handle);
-        microkit_notify(RX_CH);
+        microkit_notify(config.rx.id);
     }
 }
 
@@ -157,7 +151,7 @@ static void handle_irq(void)
 
 static void uart_setup(void)
 {
-    uart_regs = (meson_uart_regs_t *)(uart_base + UART_REGS_OFFSET);
+    uart_regs = (meson_uart_regs_t *)((uintptr_t)device_resources.regions[0].region.vaddr + UART_REGS_OFFSET);
 
     /* Wait until receive and transmit state machines are no longer busy */
     while (uart_regs->sr & (AML_UART_TX_BUSY | AML_UART_RX_BUSY));
@@ -182,15 +176,15 @@ static void uart_setup(void)
     uart_clock.crystal_clock = true;
     uart_clock.reference_clock_frequency = UART_XTAL_REF_CLK;
     uart_clock.crystal_clock_divider = 1;
-    set_baud(UART_DEFAULT_BAUD);
+    set_baud(config.default_baud);
 
     uint32_t irqc = uart_regs->irqc;
     /* Enable receive interrupts every byte */
-#if !SERIAL_TX_ONLY
-    irqc &= ~AML_UART_RECV_IRQ_MASK;
-    irqc |= AML_UART_RECV_IRQ(1);
-    cr |= (AML_UART_RX_INT_EN | AML_UART_RX_EN);
-#endif
+    if (config.rx_enabled) {
+        irqc &= ~AML_UART_RECV_IRQ_MASK;
+        irqc |= AML_UART_RECV_IRQ(1);
+        cr |= (AML_UART_RX_INT_EN | AML_UART_RX_EN);
+    }
 
     /* Enable transmit interrupts if the write fifo drops below one byte - used when the write fifo becomes full */
     irqc &= ~AML_UART_XMIT_IRQ_MASK;
@@ -205,28 +199,23 @@ void init(void)
 {
     uart_setup();
 
-#if !SERIAL_TX_ONLY
-    serial_queue_init(&rx_queue_handle, rx_queue, SERIAL_RX_DATA_REGION_CAPACITY_DRIV, rx_data);
-#endif
-    serial_queue_init(&tx_queue_handle, tx_queue, SERIAL_TX_DATA_REGION_CAPACITY_DRIV, tx_data);
+    if (config.rx_enabled) {
+        serial_queue_init(&rx_queue_handle, config.rx.queue.vaddr, config.rx.data.size, config.rx.data.vaddr);
+    }
+    serial_queue_init(&tx_queue_handle, config.tx.queue.vaddr, config.tx.data.size, config.tx.data.vaddr);
 }
 
 void notified(microkit_channel ch)
 {
-    switch (ch) {
-    case IRQ_CH:
+    if (ch == device_resources.irqs[0].id) {
         handle_irq();
         microkit_deferred_irq_ack(ch);
-        break;
-    case TX_CH:
+    } else if (ch == config.tx.id) {
         tx_provide();
-        break;
-    case RX_CH:
+    } else if (ch == config.rx.id) {
         uart_regs->cr |= AML_UART_RX_INT_EN;
         rx_return();
-        break;
-    default:
+    } else {
         sddf_dprintf("UART|LOG: received notification on unexpected channel: %u\n", ch);
-        break;
     }
 }

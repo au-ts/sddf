@@ -5,17 +5,10 @@
 
 #include <microkit.h>
 #include <sddf/serial/queue.h>
+#include <sddf/serial/config.h>
 #include <sddf/util/printf.h>
-#include <serial_config.h>
 
-#define TX_CH 0
-#define RX_CH 1
-
-serial_queue_t *rx_queue;
-serial_queue_t *tx_queue;
-
-char *rx_data;
-char *tx_data;
+__attribute__((__section__(".serial_client_config"))) serial_client_config_t config;
 
 serial_queue_handle_t rx_queue_handle;
 serial_queue_handle_t tx_queue_handle;
@@ -24,8 +17,10 @@ uint32_t local_head;
 
 void init(void)
 {
-    serial_cli_queue_init_sys(microkit_name, &rx_queue_handle, rx_queue, rx_data, &tx_queue_handle, tx_queue, tx_data);
-    serial_putchar_init(TX_CH, &tx_queue_handle);
+    serial_queue_init(&rx_queue_handle, config.rx.queue.vaddr, config.rx.data.size, config.rx.data.vaddr);
+    serial_queue_init(&tx_queue_handle, config.tx.queue.vaddr, config.tx.data.size, config.tx.data.vaddr);
+
+    serial_putchar_init(config.tx.id, &tx_queue_handle);
     sddf_printf("Hello world! I am %s.\nPlease give me character!\n", microkit_name);
 }
 
@@ -42,7 +37,7 @@ void notified(microkit_channel ch)
             } else {
                 sddf_putchar_unbuffered(c);
             }
-            char_count ++;
+            char_count++;
             if (char_count % 10 == 0) {
                 sddf_printf("\n%s has received %u characters so far!\n", microkit_name, char_count);
             }

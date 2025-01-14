@@ -74,7 +74,6 @@ var libmicrokit_include: std.Build.LazyPath = undefined;
 
 fn addUartDriver(
     b: *std.Build,
-    serial_config_include: LazyPath,
     util: *std.Build.Step.Compile,
     class: DriverClass.Uart,
     target: std.Build.ResolvedTarget,
@@ -93,7 +92,6 @@ fn addUartDriver(
     });
     driver.addIncludePath(b.path("include"));
     driver.addIncludePath(b.path(driver_include));
-    driver.addIncludePath(serial_config_include);
     driver.linkLibrary(util);
 
     return driver;
@@ -297,7 +295,6 @@ pub fn build(b: *std.Build) void {
     const libmicrokit_include_opt = b.option([]const u8, "libmicrokit_include", "Path to the libmicrokit include directory") orelse null;
     const libmicrokit_linker_script_opt = b.option([]const u8, "libmicrokit_linker_script", "Path to the libmicrokit linker script") orelse null;
     const blk_config_include_opt = b.option([]const u8, "blk_config_include", "Include path to block config header") orelse "";
-    const serial_config_include_option = b.option([]const u8, "serial_config_include", "Include path to serial config header") orelse "";
     const net_config_include_option = b.option([]const u8, "net_config_include", "Include path to network config header") orelse "";
     const i2c_client_include_option = b.option([]const u8, "i2c_client_include", "Include path to client config header") orelse "";
     const gpu_config_include_option = b.option([]const u8, "gpu_config_include", "Include path to gpu config header") orelse "";
@@ -307,7 +304,6 @@ pub fn build(b: *std.Build) void {
     // as a build option. What we do instead is just make the include path an
     // empty string if it has not been provided, which could be an annoying to
     // debug error if you do need a serial config but forgot to pass one in.
-    const serial_config_include = LazyPath{ .cwd_relative = serial_config_include_option };
     const blk_config_include = LazyPath{ .cwd_relative = blk_config_include_opt };
     const net_config_include = LazyPath{ .cwd_relative = net_config_include_option };
     const i2c_client_include = LazyPath{ .cwd_relative = i2c_client_include_option };
@@ -396,7 +392,6 @@ pub fn build(b: *std.Build) void {
     serial_virt_rx.addCSourceFile(.{
         .file = b.path("serial/components/virt_rx.c"),
     });
-    serial_virt_rx.addIncludePath(serial_config_include);
     serial_virt_rx.addIncludePath(b.path("include"));
     serial_virt_rx.linkLibrary(util);
     serial_virt_rx.linkLibrary(util_putchar_debug);
@@ -411,7 +406,6 @@ pub fn build(b: *std.Build) void {
     serial_virt_tx.addCSourceFile(.{
         .file = b.path("serial/components/virt_tx.c"),
     });
-    serial_virt_tx.addIncludePath(serial_config_include);
     serial_virt_tx.addIncludePath(b.path("include"));
     serial_virt_tx.linkLibrary(util);
     serial_virt_tx.linkLibrary(util_putchar_debug);
@@ -419,7 +413,7 @@ pub fn build(b: *std.Build) void {
 
     // UART drivers
     inline for (std.meta.fields(DriverClass.Uart)) |class| {
-        const driver = addUartDriver(b, serial_config_include, util, @enumFromInt(class.value), target, optimize);
+        const driver = addUartDriver(b, util, @enumFromInt(class.value), target, optimize);
         driver.linkLibrary(util_putchar_debug);
         b.installArtifact(driver);
     }
