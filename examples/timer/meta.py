@@ -24,6 +24,12 @@ BOARDS: List[Board] = [
         timer="timer"
     ),
     Board(
+        name="odroidc2",
+        arch=SystemDescription.Arch.AARCH64,
+        paddr_top=0x80000000,
+        timer="soc/bus@c1100000/watchdog@98d0"
+    ),
+    Board(
         name="odroidc4",
         arch=SystemDescription.Arch.AARCH64,
         paddr_top=0x80000000,
