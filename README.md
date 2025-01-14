@@ -29,16 +29,17 @@ More information about the sDDF project can be found on the Trustworthy Systems 
 
 ## Dependencies
 
-* Microkit SDK 1.4.1
+* Microkit SDK 1.4.1-dev.54+a8b7894
 * GNU Make
 * Clang and LLVM bintools
 * Device Tree Compiler
 * Python (3.9 or higher)
 
-The Microkit SDK can be acquired from [here](https://github.com/seL4/microkit/releases/tag/1.4.1).
-
 sDDF is primarily compiled via Makefiles, but the [Zig](https://ziglang.org) build system is also
 available. If you are intending on using Zig instead of Make, please see https://ziglang.org/download/.
+
+The Microkit SDK right now is pinned to a pre-release version, this is
+temporary until the next release of Microkit.
 
 See the instructions below for installing the rest of the dependencies based on your
 machine:
@@ -50,8 +51,15 @@ On apt based Linux distributions run the following commands:
 ```sh
 sudo apt install make llvm lld device-tree-compiler python3 python3-venv
 python3 -m venv venv
-./venv/bin/pip install sdfgen
+./venv/bin/pip install sdfgen==0.12.2
 source ./venv/bin/activate
+```
+
+#### Microkit SDK
+
+```sh
+wget https://trustworthy.systems/Downloads/microkit/microkit-sdk-1.4.1-dev.54+a8b7894-linux-x86-64.tar.gz
+tar xf microkit-sdk-1.4.1-dev.54+a8b7894-linux-x86-64.tar.gz
 ```
 
 ### Homebrew
@@ -60,8 +68,22 @@ On macOS, you can install the dependencies via Homebrew:
 ```sh
 brew install llvm lld make dtc python3
 python3 -m venv venv
-./venv/bin/pip install sdfgen
+./venv/bin/pip install sdfgen==0.12.2
 source ./venv/bin/activate
+```
+
+#### Microkit SDK
+
+For Apple Silicon:
+```sh
+wget https://trustworthy.systems/Downloads/microkit/microkit-sdk-1.4.1-dev.54+a8b7894-macos-aarch64.tar.gz
+tar xf microkit-sdk-1.4.1-dev.54+a8b7894-macos-aarch64.tar.gz
+```
+
+For Intel:
+```sh
+wget https://trustworthy.systems/Downloads/microkit/microkit-sdk-1.4.1-dev.54+a8b7894-macos-x86-64.tar.gz
+tar xf microkit-sdk-1.4.1-dev.54+a8b7894-macos-x86-64.tar.gz
 ```
 
 ### Nix
