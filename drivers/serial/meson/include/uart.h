@@ -10,8 +10,14 @@
 #include <sddf/util/util.h>
 #include <sddf/serial/queue.h>
 
-/* The driver is based on the Amlogic S905X3 Data Sheet Revision 02.
-The following register descriptions and layout are from section 13.5.4.*/
+/* Odroidc4 : The driver is based on the Amlogic S905X3 Data Sheet Revision 02.
+The following register descriptions and layout are from section 13.5.4.
+
+Odroidc2: The driver is based on the Amlogic S905 Data Sheet Revision 1.1.4.
+The following register descriptions and layout are from section 41.4.
+
+Care! Both drivers look identical but the clock divider options in the reg5 register are different.
+*/
 
 struct meson_uart_regs {
     uint8_t wfifo;                                      /* 0x000 Write Data */
