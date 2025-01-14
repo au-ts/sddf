@@ -7,23 +7,17 @@
 #include <stdint.h>
 #include <microkit.h>
 #include <sddf/util/printf.h>
-#include <serial_config.h>
+#include <sddf/resources/device.h>
+#include <sddf/serial/config.h>
 #include <uart.h>
 
-#define IRQ_CH 0
-#define TX_CH  1
-#define RX_CH  2
+__attribute__((__section__(".serial_driver_config"))) serial_driver_config_t config;
 
-serial_queue_t *rx_queue;
-serial_queue_t *tx_queue;
-
-char *rx_data;
-char *tx_data;
+__attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
 serial_queue_handle_t rx_queue_handle;
 serial_queue_handle_t tx_queue_handle;
 
-uintptr_t uart_base;
 volatile pl011_uart_regs_t *uart_regs;
 
 /*
@@ -74,7 +68,7 @@ static void tx_provide(void)
 
     if (transferred && serial_require_consumer_signal(&tx_queue_handle)) {
         serial_cancel_consumer_signal(&tx_queue_handle);
-        microkit_notify(TX_CH);
+        microkit_notify(config.tx.id);
     }
 }
 
@@ -105,7 +99,7 @@ static void rx_return(void)
 
     if (enqueued && serial_require_producer_signal(&rx_queue_handle)) {
         serial_cancel_producer_signal(&rx_queue_handle);
-        microkit_notify(RX_CH);
+        microkit_notify(config.rx.id);
     }
 }
 
@@ -125,8 +119,6 @@ static void handle_irq(void)
 
 static void uart_setup(void)
 {
-    uart_regs = (pl011_uart_regs_t *) uart_base;
-
     /* Wait for UART to finish transmitting. */
     while (uart_regs->fr & PL011_FR_UART_BUSY);
 
@@ -140,7 +132,7 @@ static void uart_setup(void)
     uart_regs->lcr_h |= (0b11 < PL011_LCR_WLEN_SHFT);
 
     /* Configure the reference clock and baud rate. Difficult to use automatic detection here as it requires the next incoming character to be 'a' or 'A'. */
-    set_baud(UART_DEFAULT_BAUD);
+    set_baud(config.default_baud);
 
     /* Enable FIFOs */
     uart_regs->lcr_h |= PL011_LCR_FIFO_EN;
@@ -149,10 +141,10 @@ static void uart_setup(void)
     uart_regs->lcr_h |= PL011_LCR_PARTY_EN;
 
     /* Enable receive interrupts when FIFO level exceeds 1/8 or after 32 ticks */
-#if !SERIAL_TX_ONLY
-    uart_regs->ifls &= ~(PL011_IFLS_RX_MASK << PL011_IFLS_RX_SHFT);
-    uart_regs->imsc |= (PL011_IMSC_RX_TIMEOUT | PL011_IMSC_RX_INT);
-#endif
+    if (config.rx_enabled) {
+        uart_regs->ifls &= ~(PL011_IFLS_RX_MASK << PL011_IFLS_RX_SHFT);
+        uart_regs->imsc |= (PL011_IMSC_RX_TIMEOUT | PL011_IMSC_RX_INT);
+    }
 
     /* Enable transmit interrupts if the FIFO drops below 1/8 - used when the write fifo becomes full */
     uart_regs->ifls &= ~(PL011_IFLS_TX_MASK << PL011_IFLS_TX_SHFT);
@@ -165,37 +157,34 @@ static void uart_setup(void)
     uart_regs->tcr |= PL011_CR_TX_EN;
 
     /* Enable receive */
-#if !SERIAL_TX_ONLY
-    uart_regs->tcr |= PL011_CR_RX_EN;
-#endif
+    if (config.rx_enabled) {
+        uart_regs->tcr |= PL011_CR_RX_EN;
+    }
 }
 
 void init(void)
 {
+    uart_regs = device_resources.regions[0].region.vaddr;
+
     uart_setup();
 
-#if !SERIAL_TX_ONLY
-    serial_queue_init(&rx_queue_handle, rx_queue, SERIAL_RX_DATA_REGION_CAPACITY_DRIV, rx_data);
-#endif
-    serial_queue_init(&tx_queue_handle, tx_queue, SERIAL_TX_DATA_REGION_CAPACITY_DRIV, tx_data);
+    if (config.rx_enabled) {
+        serial_queue_init(&rx_queue_handle, config.rx.queue.vaddr, config.rx.queue.size, config.rx.data.vaddr);
+    }
+    serial_queue_init(&tx_queue_handle, config.tx.queue.vaddr, config.tx.queue.size, config.tx.data.vaddr);
 }
 
 void notified(microkit_channel ch)
 {
-    switch (ch) {
-    case IRQ_CH:
+    if (ch == device_resources.irqs[0].id) {
         handle_irq();
         microkit_deferred_irq_ack(ch);
-        break;
-    case TX_CH:
+    } else if (ch == config.tx.id) {
         tx_provide();
-        break;
-    case RX_CH:
+    } else if (ch == config.rx.id) {
         uart_regs->imsc |= (PL011_IMSC_RX_TIMEOUT | PL011_IMSC_RX_INT);
         rx_return();
-        break;
-    default:
+    } else {
         sddf_dprintf("UART|LOG: received notification on unexpected channel: %u\n", ch);
-        break;
     }
 }

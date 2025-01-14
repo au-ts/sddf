@@ -1,0 +1,51 @@
+/*
+ * Copyright 2025, UNSW
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+#include <microkit.h>
+#include <sddf/resources/common.h>
+
+#define SDDF_SERIAL_MAX_CLIENTS (MICROKIT_MAX_CHANNELS - 1)
+#define SDDF_SERIAL_BEGIN_STR_MAX_LEN 128
+
+typedef struct serial_connection_resource {
+    region_resource_t queue;
+    region_resource_t data;
+    uint8_t id;
+} serial_connection_resource_t;
+
+typedef struct serial_driver_config {
+    serial_connection_resource_t rx;
+    serial_connection_resource_t tx;
+    uint64_t default_baud;
+    bool rx_enabled;
+} serial_driver_config_t;
+
+typedef struct serial_virt_rx_config {
+    serial_connection_resource_t driver;
+    serial_connection_resource_t clients[SDDF_SERIAL_MAX_CLIENTS];
+    uint8_t num_clients;
+    char switch_char;
+    char terminate_num_char;
+} serial_virt_rx_config_t;
+
+typedef struct serial_virt_tx_client_config {
+    serial_connection_resource_t conn;
+    char name[MICROKIT_PD_NAME_LENGTH];
+} serial_virt_tx_client_config_t;
+
+typedef struct serial_virt_tx_config {
+    serial_connection_resource_t driver;
+    serial_virt_tx_client_config_t clients[SDDF_SERIAL_MAX_CLIENTS];
+    uint8_t num_clients;
+    char begin_str[SDDF_SERIAL_BEGIN_STR_MAX_LEN];
+    uint8_t begin_str_len;
+    bool enable_colour;
+    bool enable_rx;
+} serial_virt_tx_config_t;
+
+typedef struct serial_client_config {
+    serial_connection_resource_t rx;
+    serial_connection_resource_t tx;
+} serial_client_config_t;
