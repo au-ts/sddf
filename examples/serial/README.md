@@ -17,6 +17,7 @@ make MICROKIT_SDK=<path/to/sdk> MICROKIT_BOARD=<board> MICROKIT_CONFIG=<debug/re
 ```
 
 Currently the options for `MICROKIT_BOARD` are:
+* odroidc2
 * odroidc4
 * imx8mm_evk
 * maaxboard
