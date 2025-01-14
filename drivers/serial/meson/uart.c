@@ -151,7 +151,7 @@ static void handle_irq(void)
 
 static void uart_setup(void)
 {
-    uart_regs = (meson_uart_regs_t *)((uintptr_t)device_resources.regions[0].region.vaddr + UART_REGS_OFFSET);
+    uart_regs = (meson_uart_regs_t *)device_resources.regions[0].region.vaddr;
 
     /* Wait until receive and transmit state machines are no longer busy */
     while (uart_regs->sr & (AML_UART_TX_BUSY | AML_UART_RX_BUSY));
