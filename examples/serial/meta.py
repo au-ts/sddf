@@ -24,6 +24,12 @@ BOARDS: List[Board] = [
         serial="pl011@9000000"
     ),
     Board(
+        name="odroidc2",
+        arch=SystemDescription.Arch.AARCH64,
+        paddr_top=0x80000000,
+        serial="soc/bus@c8100000/serial@4c0"
+    ),
+    Board(
         name="odroidc4",
         arch=SystemDescription.Arch.AARCH64,
         paddr_top=0x80000000,
