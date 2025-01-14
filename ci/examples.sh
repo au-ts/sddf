@@ -182,7 +182,7 @@ build_gpu_zig() {
 }
 
 network() {
-    BOARDS=("odroidc4" "imx8mm_evk" "maaxboard" "qemu_virt_aarch64")
+    BOARDS=("imx8mm_evk" "imx8mp_evk" "imx8mq_evk" "maaxboard" "odroidc4" "qemu_virt_aarch64")
     CONFIGS=("debug" "release" "benchmark")
     for BOARD in "${BOARDS[@]}"
     do
@@ -207,7 +207,7 @@ i2c() {
 }
 
 timer() {
-    BOARDS=("odroidc4" "qemu_virt_aarch64" "star64")
+    BOARDS=("imx8mm_evk" "imx8mp_evk" "imx8mq_evk" "maaxboard" "odroidc4" "qemu_virt_aarch64" "star64")
     CONFIGS=("debug" "release")
     for BOARD in "${BOARDS[@]}"
     do
@@ -220,7 +220,7 @@ timer() {
 }
 
 serial() {
-    BOARDS=("odroidc4" "qemu_virt_aarch64" "maaxboard")
+    BOARDS=("imx8mm_evk" "maaxboard" "odroidc4" "qemu_virt_aarch64" "star64")
     CONFIGS=("debug" "release")
     for BOARD in "${BOARDS[@]}"
     do
