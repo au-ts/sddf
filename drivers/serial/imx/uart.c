@@ -101,7 +101,7 @@ static void rx_return(void)
 
     if (enqueued && serial_require_producer_signal(&rx_queue_handle)) {
         serial_cancel_producer_signal(&rx_queue_handle);
-        microkit_notify(config.tx.id);
+        microkit_notify(config.rx.id);
     }
 }
 
