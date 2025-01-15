@@ -73,29 +73,18 @@ static void set_baud(unsigned long baud)
 
 static void tx_provide(void)
 {
-    bool reprocess = true;
     bool transferred = false;
-    while (reprocess) {
-        char c;
-        while (!(uart_regs->sr & AML_UART_TX_FULL) && !serial_dequeue(&tx_queue_handle, &c)) {
-            uart_regs->wfifo = (uint32_t)c;
-            transferred = true;
-        }
+    char c;
+    while (!(uart_regs->sr & AML_UART_TX_FULL) && !serial_dequeue(&tx_queue_handle, &c)) {
+        uart_regs->wfifo = (uint32_t)c;
+        transferred = true;
+    }
 
-        serial_request_producer_signal(&tx_queue_handle);
-        /* If transmit fifo is full and there is data remaining to be sent, enable interrupt when fifo is no longer full */
-        if (uart_regs->sr & AML_UART_TX_FULL && !serial_queue_empty(&tx_queue_handle, tx_queue_handle.queue->head)) {
-            uart_regs->cr |= AML_UART_TX_INT_EN;
-        } else {
-            uart_regs->cr &= ~AML_UART_TX_INT_EN;
-        }
-        reprocess = false;
-
-        if (!(uart_regs->sr & AML_UART_TX_FULL) && !serial_queue_empty(&tx_queue_handle, tx_queue_handle.queue->head)) {
-            serial_cancel_producer_signal(&tx_queue_handle);
-            uart_regs->cr &= ~AML_UART_TX_INT_EN;
-            reprocess = true;
-        }
+    /* If transmit fifo is full and there is data remaining to be sent, enable interrupt when fifo is no longer full */
+    if (uart_regs->sr & AML_UART_TX_FULL && !serial_queue_empty(&tx_queue_handle, tx_queue_handle.queue->head)) {
+        uart_regs->cr |= AML_UART_TX_INT_EN;
+    } else {
+        uart_regs->cr &= ~AML_UART_TX_INT_EN;
     }
 
     if (transferred && serial_require_consumer_signal(&tx_queue_handle)) {
@@ -116,7 +105,7 @@ static void rx_return(void)
         }
 
         if (!(uart_regs->sr & AML_UART_RX_EMPTY) && serial_queue_full(&rx_queue_handle, rx_queue_handle.queue->tail)) {
-            /* Disable rx interrupts until virtualisers queue is no longer empty. */
+            /* Disable rx interrupts until virtualisers queue is no longer full. */
             uart_regs->cr &= ~AML_UART_RX_INT_EN;
             serial_request_consumer_signal(&rx_queue_handle);
         }
@@ -129,8 +118,7 @@ static void rx_return(void)
         }
     }
 
-    if (enqueued && serial_require_producer_signal(&rx_queue_handle)) {
-        serial_cancel_producer_signal(&rx_queue_handle);
+    if (enqueued) {
         microkit_notify(config.rx.id);
     }
 }

@@ -107,49 +107,38 @@ volatile virtio_mmio_regs_t *uart_regs;
 
 static void tx_provide(void)
 {
-    bool reprocess = true;
     bool transferred = false;
-    while (reprocess) {
-        char c;
-        while (!virtio_avail_full_tx(&tx_virtq) && !serial_dequeue(&tx_queue_handle, &c)) {
+    char c;
+    while (!virtio_avail_full_tx(&tx_virtq) && !serial_dequeue(&tx_queue_handle, &c)) {
 
-                /* First, allocate somewhere to put the character */
-            uint32_t char_idx = -1;
-            int err = ialloc_alloc(&tx_char_ialloc_desc, &char_idx);
-            assert(!err && char_idx != -1);
+        /* First, allocate somewhere to put the character */
+        uint32_t char_idx = -1;
+        int err = ialloc_alloc(&tx_char_ialloc_desc, &char_idx);
+        assert(!err && char_idx != -1);
 
-            /* Now we need to a descriptor to put into the virtIO ring */
-            uint32_t pkt_desc_idx = -1;
-            err = ialloc_alloc(&tx_ialloc_desc, &pkt_desc_idx);
-            assert(!err && pkt_desc_idx != -1);
+        /* Now we need to a descriptor to put into the virtIO ring */
+        uint32_t pkt_desc_idx = -1;
+        err = ialloc_alloc(&tx_ialloc_desc, &pkt_desc_idx);
+        assert(!err && pkt_desc_idx != -1);
 
-            /* We should not run out of descriptors assuming that the avail ring is not full. */
-            assert(pkt_desc_idx < tx_virtq.num);
+        /* We should not run out of descriptors assuming that the avail ring is not full. */
+        assert(pkt_desc_idx < tx_virtq.num);
 
-            /* Put the character into the data region */
-            virtio_tx_char[char_idx] = c;
+        /* Put the character into the data region */
+        virtio_tx_char[char_idx] = c;
 
-            /* Set up the packet */
-            tx_virtq.desc[pkt_desc_idx].addr = virtio_tx_char_paddr + char_idx;
-            tx_virtq.desc[pkt_desc_idx].len = 1;
-            tx_virtq.desc[pkt_desc_idx].flags = 0;
+        /* Set up the packet */
+        tx_virtq.desc[pkt_desc_idx].addr = virtio_tx_char_paddr + char_idx;
+        tx_virtq.desc[pkt_desc_idx].len = 1;
+        tx_virtq.desc[pkt_desc_idx].flags = 0;
 
-            /* Enqueue the packet */
-            tx_virtq.avail->ring[tx_virtq.avail->idx % tx_virtq.num] = pkt_desc_idx;
+        /* Enqueue the packet */
+        tx_virtq.avail->ring[tx_virtq.avail->idx % tx_virtq.num] = pkt_desc_idx;
 
-            tx_virtq.avail->idx++;
-            tx_last_desc_idx += 1;
+        tx_virtq.avail->idx++;
+        tx_last_desc_idx += 1;
 
-            transferred = true;
-        }
-
-        serial_request_producer_signal(&tx_queue_handle);
-        reprocess = false;
-
-        if (!virtio_avail_full_tx(&tx_virtq) && !serial_queue_empty(&tx_queue_handle, tx_queue_handle.queue->head)) {
-            serial_cancel_producer_signal(&tx_queue_handle);
-            reprocess = true;
-        }
+        transferred = true;
     }
 
     if (transferred) {
@@ -165,7 +154,7 @@ static void tx_provide(void)
 
 static void tx_return(void)
 {
-        /* After the tx has been processed, we need to free the packet/character allocation */
+    /* After the tx has been processed, we need to free the packet/character allocation */
     uint16_t enqueued = 0;
     uint16_t i = tx_last_seen_used;
     uint16_t curr_idx = tx_virtq.used->idx;
@@ -197,7 +186,7 @@ static void tx_return(void)
 
 static void rx_provide(void)
 {
-        /* Fill up the virtio available ring buffer */
+    /* Fill up the virtio available ring buffer */
     bool transferred = false;
     while (!virtio_avail_full_rx(&rx_virtq)) {
         // Allocate a desc entry for the packet and the character
@@ -278,8 +267,7 @@ static void rx_return(void)
 
     rx_last_seen_used += transferred;
 
-    if (transferred > 0 && serial_require_producer_signal(&rx_queue_handle)) {
-        serial_cancel_producer_signal(&rx_queue_handle);
+    if (transferred > 0) {
         microkit_notify(RX_CH);
     }
 }

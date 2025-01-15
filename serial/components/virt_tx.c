@@ -85,7 +85,6 @@ bool process_tx_queue(uint32_t client)
     serial_queue_handle_t *handle = &tx_queue_handle_cli[client];
 
     if (serial_queue_empty(handle, handle->queue->head)) {
-        serial_request_producer_signal(handle);
         return false;
     }
 
@@ -102,9 +101,6 @@ bool process_tx_queue(uint32_t client)
 
         /* Request signal from the driver when data has been consumed */
         serial_request_consumer_signal(&tx_queue_handle_drv);
-
-        /* Cancel further signals from this client */
-        serial_cancel_producer_signal(handle);
         return false;
     }
 
@@ -115,7 +111,7 @@ bool process_tx_queue(uint32_t client)
     } else {
         serial_transfer_all(&tx_queue_handle_drv, handle);
     }
-    serial_request_producer_signal(handle);
+
     return true;
 }
 
@@ -135,25 +131,11 @@ void tx_return(void)
     bool transferred = false;
     for (uint32_t req = 0; req < num_pending_tx; req++) {
         tx_pending_pop(&client);
-        bool reprocess = true;
-        bool client_transferred = false;
-        while (reprocess) {
-            client_transferred |= process_tx_queue(client);
-            reprocess = false;
-
-            /* If more data is available, re-process unless it has been pushed to pending transmits */
-            if (!serial_queue_empty(&tx_queue_handle_cli[client], tx_queue_handle_cli[client].queue->head)
-                && !tx_pending.clients_pending[client]) {
-                serial_cancel_producer_signal(&tx_queue_handle_cli[client]);
-                reprocess = true;
-            }
-        }
-        transferred |= client_transferred;
-        notify_client[client] = client_transferred;
+        notify_client[client] = process_tx_queue(client);
+        transferred |= notify_client[client];
     }
 
-    if (transferred && serial_require_producer_signal(&tx_queue_handle_drv)) {
-        serial_cancel_producer_signal(&tx_queue_handle_drv);
+    if (transferred) {
         microkit_notify(config.driver.id);
     }
 
@@ -180,22 +162,8 @@ void tx_provide(microkit_channel ch)
         return;
     }
 
-    bool transferred = false;
-    bool reprocess = true;
-    while (reprocess) {
-        transferred |= process_tx_queue(active_client);
-        reprocess = false;
-
-        /* If more data is available, re-process unless it has been pushed to pending transmits */
-        if (!serial_queue_empty(&tx_queue_handle_cli[active_client], tx_queue_handle_cli[active_client].queue->head)
-            && !tx_pending.clients_pending[active_client]) {
-            serial_cancel_producer_signal(&tx_queue_handle_cli[active_client]);
-            reprocess = true;
-        }
-    }
-
-    if (transferred && serial_require_producer_signal(&tx_queue_handle_drv)) {
-        serial_cancel_producer_signal(&tx_queue_handle_drv);
+    bool transferred = process_tx_queue(active_client);
+    if (transferred) {
         microkit_notify(config.driver.id);
     }
 

@@ -41,29 +41,18 @@ static void set_baud(long bps)
 
 static void tx_provide(void)
 {
-    bool reprocess = true;
     bool transferred = false;
-    while (reprocess) {
-        char c;
-        while (!(uart_regs->fr & PL011_FR_TXFF) && !serial_dequeue(&tx_queue_handle, &c)) {
-            uart_regs->dr = (uint32_t)c;
-            transferred = true;
-        }
+    char c;
+    while (!(uart_regs->fr & PL011_FR_TXFF) && !serial_dequeue(&tx_queue_handle, &c)) {
+        uart_regs->dr = (uint32_t)c;
+        transferred = true;
+    }
 
-        serial_request_producer_signal(&tx_queue_handle);
-        /* If transmit fifo is full and there is data remaining to be sent, enable interrupt when fifo is no longer full */
-        if (uart_regs->fr & PL011_FR_TXFF && !serial_queue_empty(&tx_queue_handle, tx_queue_handle.queue->head)) {
-            uart_regs->imsc |= PL011_IMSC_TX_INT;
-        } else {
-            uart_regs->imsc &= ~PL011_IMSC_TX_INT;
-        }
-        reprocess = false;
-
-        if (!(uart_regs->fr & PL011_FR_TXFF) && !serial_queue_empty(&tx_queue_handle, tx_queue_handle.queue->head)) {
-            serial_cancel_producer_signal(&tx_queue_handle);
-            uart_regs->imsc &= ~PL011_IMSC_TX_INT;
-            reprocess = true;
-        }
+    /* If transmit fifo is full and there is data remaining to be sent, enable interrupt when fifo is no longer full */
+    if (uart_regs->fr & PL011_FR_TXFF && !serial_queue_empty(&tx_queue_handle, tx_queue_handle.queue->head)) {
+        uart_regs->imsc |= PL011_IMSC_TX_INT;
+    } else {
+        uart_regs->imsc &= ~PL011_IMSC_TX_INT;
     }
 
     if (transferred && serial_require_consumer_signal(&tx_queue_handle)) {
@@ -84,7 +73,7 @@ static void rx_return(void)
         }
 
         if (!(uart_regs->fr & PL011_FR_RXFE) && serial_queue_full(&rx_queue_handle, rx_queue_handle.queue->tail)) {
-            /* Disable rx interrupts until virtualisers queue is no longer empty. */
+            /* Disable rx interrupts until virtualisers queue is no longer full. */
             uart_regs->imsc &= ~(PL011_IMSC_RX_TIMEOUT | PL011_IMSC_RX_INT);
             serial_request_consumer_signal(&rx_queue_handle);
         }
@@ -97,8 +86,7 @@ static void rx_return(void)
         }
     }
 
-    if (enqueued && serial_require_producer_signal(&rx_queue_handle)) {
-        serial_cancel_producer_signal(&rx_queue_handle);
+    if (enqueued) {
         microkit_notify(config.rx.id);
     }
 }
