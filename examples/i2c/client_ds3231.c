@@ -128,8 +128,9 @@ void init(void)
 {
     LOG_CLIENT("init\n");
 
-    data_region = (uintptr_t)i2c_config.virt.data.vaddr;
+    assert(i2c_config_check_magic((void *)&i2c_config));
 
+    data_region = (uintptr_t)i2c_config.virt.data.vaddr;
     queue = i2c_queue_init(i2c_config.virt.req_queue.vaddr, i2c_config.virt.resp_queue.vaddr);
 
     bool claimed = i2c_bus_claim(i2c_config.virt.id, DS3231_I2C_BUS_ADDRESS);

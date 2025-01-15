@@ -160,6 +160,8 @@ static bool handle_mbr_reply()
 
 void init(void)
 {
+    assert(blk_config_check_magic((void *)&config));
+
     blk_storage_info_t *driver_storage_info = config.driver.conn.storage_info.vaddr;
     while (!blk_storage_is_ready(driver_storage_info));
 

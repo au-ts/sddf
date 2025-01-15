@@ -190,6 +190,8 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
+    assert(net_config_check_magic((void *)&config));
+
     buffer_refs = config.buffer_metadata.vaddr;
 
     /* Set up client queues */

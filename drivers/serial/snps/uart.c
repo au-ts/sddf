@@ -140,6 +140,11 @@ void init(void)
 {
     LOG_DRIVER("initialising\n");
 
+    assert(serial_config_check_magic((void *)&config));
+    assert(device_resources_check_magic(&device_resources));
+    assert(device_resources.num_irqs == 1);
+    assert(device_resources.num_regions == 1);
+
     uart_base = (uintptr_t)device_resources.regions[0].region.vaddr;
 
     /* Ensure that the FIFO's are empty */

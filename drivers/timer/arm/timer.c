@@ -151,6 +151,10 @@ static void process_timeouts(uint64_t curr_time)
 
 void init()
 {
+    assert(device_resources_check_magic(&device_resources));
+    assert(device_resources.num_irqs == 1);
+    assert(device_resources.num_regions == 0);
+
     for (int i = 0; i < MAX_TIMEOUTS; i++) {
         timeouts[i] = UINT64_MAX;
     }

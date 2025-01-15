@@ -11,6 +11,9 @@
 
 #define SDDF_NET_MAX_CLIENTS (MICROKIT_MAX_CHANNELS - 1)
 
+#define SDDF_NET_MAGIC_LEN 5
+static char SDDF_NET_MAGIC[SDDF_NET_MAGIC_LEN] = { 's', 'D', 'D', 'F', 0x5 };
+
 typedef struct net_connection_resource {
     region_resource_t free_queue;
     region_resource_t active_queue;
@@ -19,6 +22,7 @@ typedef struct net_connection_resource {
 } net_connection_resource_t;
 
 typedef struct net_driver_config {
+    char magic[SDDF_NET_MAGIC_LEN];
     net_connection_resource_t virt_rx;
     net_connection_resource_t virt_tx;
 } net_driver_config_t;
@@ -29,6 +33,7 @@ typedef struct net_virt_tx_client_config {
 } net_virt_tx_client_config_t;
 
 typedef struct net_virt_tx_config {
+    char magic[SDDF_NET_MAGIC_LEN];
     net_connection_resource_t driver;
     net_virt_tx_client_config_t clients[SDDF_NET_MAX_CLIENTS];
     uint8_t num_clients;
@@ -40,6 +45,7 @@ typedef struct net_virt_rx_config_client {
 } net_virt_rx_config_client_t;
 
 typedef struct net_virt_rx_config {
+    char magic[SDDF_NET_MAGIC_LEN];
     net_connection_resource_t driver;
     device_region_resource_t data;
     // The system designer must allocate a buffer metadata region for internal
@@ -51,6 +57,7 @@ typedef struct net_virt_rx_config {
 } net_virt_rx_config_t;
 
 typedef struct net_copy_config {
+    char magic[SDDF_NET_MAGIC_LEN];
     net_connection_resource_t virt_rx;
     region_resource_t device_data;
 
@@ -59,6 +66,7 @@ typedef struct net_copy_config {
 } net_copy_config_t;
 
 typedef struct net_client_config {
+    char magic[SDDF_NET_MAGIC_LEN];
     net_connection_resource_t rx;
     region_resource_t rx_data;
 
@@ -67,3 +75,15 @@ typedef struct net_client_config {
 
     uint8_t mac_addr[6];
 } net_client_config_t;
+
+static bool net_config_check_magic(void *config)
+{
+    char *magic = (char *)config;
+    for (int i = 0; i < SDDF_NET_MAGIC_LEN; i++) {
+        if (magic[i] != SDDF_NET_MAGIC[i]) {
+            return false;
+        }
+    }
+
+    return true;
+}

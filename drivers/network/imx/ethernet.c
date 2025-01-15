@@ -293,6 +293,8 @@ static void eth_setup(void)
 
 void init(void)
 {
+    assert(net_config_check_magic((void *)&config));
+    assert(device_resources_check_magic(&device_resources));
     assert(device_resources.num_irqs == 1);
     assert(device_resources.num_regions == 3);
     // All buffers should fit within our DMA region

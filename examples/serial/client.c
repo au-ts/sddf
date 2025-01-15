@@ -17,6 +17,8 @@ uint32_t local_head;
 
 void init(void)
 {
+    assert(serial_config_check_magic((void *)&config));
+
     serial_queue_init(&rx_queue_handle, config.rx.queue.vaddr, config.rx.data.size, config.rx.data.vaddr);
     serial_queue_init(&tx_queue_handle, config.tx.queue.vaddr, config.tx.data.size, config.tx.data.vaddr);
 

@@ -9,6 +9,9 @@
 #define SDDF_SERIAL_MAX_CLIENTS (MICROKIT_MAX_CHANNELS - 1)
 #define SDDF_SERIAL_BEGIN_STR_MAX_LEN 128
 
+#define SDDF_SERIAL_MAGIC_LEN 5
+static char SDDF_SERIAL_MAGIC[SDDF_SERIAL_MAGIC_LEN] = { 's', 'D', 'D', 'F', 0x3 };
+
 typedef struct serial_connection_resource {
     region_resource_t queue;
     region_resource_t data;
@@ -16,6 +19,7 @@ typedef struct serial_connection_resource {
 } serial_connection_resource_t;
 
 typedef struct serial_driver_config {
+    char magic[SDDF_SERIAL_MAGIC_LEN];
     serial_connection_resource_t rx;
     serial_connection_resource_t tx;
     uint64_t default_baud;
@@ -23,6 +27,7 @@ typedef struct serial_driver_config {
 } serial_driver_config_t;
 
 typedef struct serial_virt_rx_config {
+    char magic[SDDF_SERIAL_MAGIC_LEN];
     serial_connection_resource_t driver;
     serial_connection_resource_t clients[SDDF_SERIAL_MAX_CLIENTS];
     uint8_t num_clients;
@@ -36,6 +41,7 @@ typedef struct serial_virt_tx_client_config {
 } serial_virt_tx_client_config_t;
 
 typedef struct serial_virt_tx_config {
+    char magic[SDDF_SERIAL_MAGIC_LEN];
     serial_connection_resource_t driver;
     serial_virt_tx_client_config_t clients[SDDF_SERIAL_MAX_CLIENTS];
     uint8_t num_clients;
@@ -46,6 +52,19 @@ typedef struct serial_virt_tx_config {
 } serial_virt_tx_config_t;
 
 typedef struct serial_client_config {
+    char magic[SDDF_SERIAL_MAGIC_LEN];
     serial_connection_resource_t rx;
     serial_connection_resource_t tx;
 } serial_client_config_t;
+
+static bool serial_config_check_magic(void *config)
+{
+    char *magic = (char *)config;
+    for (int i = 0; i < SDDF_SERIAL_MAGIC_LEN; i++) {
+        if (magic[i] != SDDF_SERIAL_MAGIC[i]) {
+            return false;
+        }
+    }
+
+    return true;
+}
