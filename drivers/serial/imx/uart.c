@@ -46,7 +46,7 @@ static void tx_provide(void)
     bool transferred = false;
     while (reprocess) {
         char c;
-        while (!(uart_regs->ts & UART_TST_TX_FIFO_FULL) && !serial_dequeue(&tx_queue_handle, NULL, &c)) {
+        while (!(uart_regs->ts & UART_TST_TX_FIFO_FULL) && !serial_dequeue(&tx_queue_handle, &c)) {
             uart_regs->txd = (uint32_t)c;
             transferred = true;
         }
@@ -80,7 +80,7 @@ static void rx_return(void)
     while (reprocess) {
         while (!(uart_regs->ts & UART_TST_RX_FIFO_EMPTY) && !serial_queue_full(&rx_queue_handle, rx_queue_handle.queue->tail)) {
             char c = (char) uart_regs->rxd;
-            serial_enqueue(&rx_queue_handle, NULL, c);
+            serial_enqueue(&rx_queue_handle, c);
             enqueued = true;
         }
 

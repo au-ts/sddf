@@ -111,7 +111,7 @@ bool process_tx_queue(uint32_t client)
     if (config.enable_colour) {
         const char *client_colour = colours[client % ARRAY_SIZE(colours)];
         serial_transfer_all_colour(&tx_queue_handle_drv, handle, client_colour, COLOUR_BEGIN_LEN, COLOUR_END,
-                                        COLOUR_END_LEN);
+                                   COLOUR_END_LEN);
     } else {
         serial_transfer_all(&tx_queue_handle_drv, handle);
     }

@@ -69,20 +69,17 @@ static inline int serial_queue_full(serial_queue_handle_t *queue_handle, uint32_
 }
 
 /**
- * Enqueue a char into a queue.
+ * Enqueue a character into a queue. Update the shared tail so the character
+ * is visible to the consumer.
  *
  * @param queue_handle queue to enqueue into.
- * @param local_tail address of the tail to be incremented. This allows for clients to
- *                      enqueue multiple characters before making the changes visible.
- *                      Leave NULL to increment shared queue tail.
  * @param character character to be enqueued.
  *
- * @return -1 when queue is empty, 0 on success.
+ * @return -1 when queue is full, 0 on success.
  */
-static inline int serial_enqueue(serial_queue_handle_t *queue_handle, uint32_t *local_tail,
-                                 char character)
+static inline int serial_enqueue(serial_queue_handle_t *queue_handle, char character)
 {
-    uint32_t *tail = (local_tail == NULL) ? &queue_handle->queue->tail : local_tail;
+    uint32_t *tail = &queue_handle->queue->tail;
 
     if (serial_queue_full(queue_handle, *tail)) {
         return -1;
@@ -95,20 +92,39 @@ static inline int serial_enqueue(serial_queue_handle_t *queue_handle, uint32_t *
 }
 
 /**
- * Dequeue a char from a queue.
+ * Enqueue a character locally into a queue. Update a local tail variable so the
+ * character is not visible to the consumer.
+ *
+ * @param queue_handle queue to enqueue into.
+ * @param local_tail address of the tail to be used and incremented.
+ * @param character character to be enqueued.
+ *
+ * @return -1 when queue is full, 0 on success.
+ */
+static inline int serial_enqueue_local(serial_queue_handle_t *queue_handle, uint32_t *local_tail, char character)
+{
+    if (serial_queue_full(queue_handle, *local_tail)) {
+        return -1;
+    }
+
+    queue_handle->data_region[*local_tail % queue_handle->capacity] = character;
+    (*local_tail)++;
+
+    return 0;
+}
+
+/**
+ * Dequeue a character from a queue. Update the shared head so the removal of the
+ * character is visible to the producer.
  *
  * @param queue_handle queue to dequeue from.
- * @param local_head address of the head to be incremented. This allows for clients to
- *                      dequeue multiple characters before making the changes visible.
- *                      Leave NULL to increment shared queue head.
- * @param character character to copy into.
+ * @param character address of character to copy into.
  *
  * @return -1 when queue is empty, 0 on success.
  */
-static inline int serial_dequeue(serial_queue_handle_t *queue_handle, uint32_t *local_head,
-                                 char *character)
+static inline int serial_dequeue(serial_queue_handle_t *queue_handle, char *character)
 {
-    uint32_t *head = (local_head == NULL) ? &queue_handle->queue->head : local_head;
+    uint32_t *head = &queue_handle->queue->head;
 
     if (serial_queue_empty(queue_handle, *head)) {
         return -1;
@@ -121,14 +137,35 @@ static inline int serial_dequeue(serial_queue_handle_t *queue_handle, uint32_t *
 }
 
 /**
+ * Dequeue a character locally from a queue. Update a local head variable so the
+ * removal of the character is not visible to the producer.
+ *
+ * @param queue_handle queue to dequeue from.
+ * @param local_head address of the head to be used and incremented.
+ * @param character character to copy into.
+ *
+ * @return -1 when queue is empty, 0 on success.
+ */
+static inline int serial_dequeue_local(serial_queue_handle_t *queue_handle, uint32_t *local_head, char *character)
+{
+    if (serial_queue_empty(queue_handle, *local_head)) {
+        return -1;
+    }
+
+    *character = queue_handle->data_region[*local_head % queue_handle->capacity];
+    (*local_head)++;
+
+    return 0;
+}
+
+/**
  * Update the value of the tail in the shared data structure to make
  * locally enqueued data visible.
  *
  * @param queue_handle queue to update.
  * @param local_tail tail which points to the last character enqueued.
  */
-static inline void serial_update_shared_tail(serial_queue_handle_t *queue_handle,
-                                              uint32_t local_tail)
+static inline void serial_update_shared_tail(serial_queue_handle_t *queue_handle, uint32_t local_tail)
 {
     uint32_t current_length = serial_queue_length(queue_handle);
     uint32_t new_length = local_tail - queue_handle->queue->head;
@@ -153,8 +190,7 @@ static inline void serial_update_shared_tail(serial_queue_handle_t *queue_handle
  * @param queue_handle queue to update.
  * @param local_head head which points to the next character to dequeue.
  */
-static inline void serial_update_shared_head(serial_queue_handle_t *queue_handle,
-                                              uint32_t local_head)
+static inline void serial_update_shared_head(serial_queue_handle_t *queue_handle, uint32_t local_head)
 {
     uint32_t current_length = serial_queue_length(queue_handle);
     uint32_t new_length = queue_handle->queue->tail - local_head;
@@ -219,9 +255,7 @@ static inline uint32_t serial_queue_contiguous_free(serial_queue_handle_t *queue
  *
  * @return Number of characters actually enqueued.
  */
-static inline uint32_t serial_enqueue_batch(serial_queue_handle_t *queue_handle,
-                                            uint32_t num,
-                                            const char *src)
+static inline uint32_t serial_enqueue_batch(serial_queue_handle_t *queue_handle, uint32_t num, const char *src)
 {
     char *dst = queue_handle->data_region + (queue_handle->queue->tail % queue_handle->capacity);
     uint32_t avail = serial_queue_free(queue_handle);
@@ -254,13 +288,13 @@ static inline uint32_t serial_enqueue_batch(serial_queue_handle_t *queue_handle,
 static inline void serial_transfer_all(serial_queue_handle_t *free_queue_handle,
                                        serial_queue_handle_t *active_queue_handle)
 {
-    assert(serial_queue_length(active_queue_handle)
-           <= serial_queue_free(free_queue_handle));
+    assert(serial_queue_length(active_queue_handle) <= serial_queue_free(free_queue_handle));
 
     /* Copy in contiguous chunks */
     while (serial_queue_length(active_queue_handle)) {
         uint32_t num_active = serial_queue_contiguous_length(active_queue_handle);
-        char *src = active_queue_handle->data_region + (active_queue_handle->queue->head % active_queue_handle->capacity);
+        char *src = active_queue_handle->data_region
+                  + (active_queue_handle->queue->head % active_queue_handle->capacity);
 
         uint32_t transferred = serial_enqueue_batch(free_queue_handle, num_active, src);
         assert(transferred == num_active);
@@ -282,11 +316,8 @@ static inline void serial_transfer_all(serial_queue_handle_t *free_queue_handle,
  * @param col_end_len length of end string.
  */
 static inline void serial_transfer_all_colour(serial_queue_handle_t *free_queue_handle,
-                                              serial_queue_handle_t *active_queue_handle,
-                                              const char *col_start,
-                                              uint16_t col_start_len,
-                                              const char *col_end,
-                                              uint16_t col_end_len)
+                                              serial_queue_handle_t *active_queue_handle, const char *col_start,
+                                              uint16_t col_start_len, const char *col_end, uint16_t col_end_len)
 {
     assert(serial_queue_length(active_queue_handle) + col_start_len + col_end_len
            <= serial_queue_free(free_queue_handle));
