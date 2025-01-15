@@ -5,8 +5,6 @@
 #
 # Include this snippet in your project Makefile to build
 #    the Synopsis DesignWare ABP UART driver
-# Requires uart_base to be set to the mapped address of the UART
-#    registers in the system description file
 
 UART_DRIVER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 

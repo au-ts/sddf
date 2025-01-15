@@ -6,8 +6,6 @@
 # Include this snippet in your project Makefile to build
 # the IMX8 UART driver.
 # Assumes libsddf_util_debug.a is in ${LIBS}.
-# Requires uart_regs to be set to the mapped base of the UART registers
-# in the system description file.
 
 UART_DRIVER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 

@@ -8,8 +8,6 @@
 #
 # NOTES:
 #  Generates timer_driver.elf
-#  Expects system file to set variable 'gpt_regs' to the address of
-#     the timer registers (physical address 0xffd0f000 on a meson-g12 SoC)
 #  Expects libsddf_util_debug.a in ${LIBS}
 
 TIMER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
