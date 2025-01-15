@@ -10,10 +10,6 @@
 #  Generates i2c_driver.elf
 #  Requires libsddf_util_debug.a in ${LIBS}
 #  Has one parameter: I2C_BUS_NUM to select which bus is being driven
-#  Needs three variables set in system description file:
-#  i2c_bus --- the i2c controller
-#  gpio --- the GPIO registers for the pinmux
-#  clk --- the clock registers
 
 I2C_DRIVER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 

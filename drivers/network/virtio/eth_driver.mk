@@ -7,9 +7,7 @@
 # the VirtIO driver
 #
 # NOTES:
-#   Generates eth.elf
-#   Needs the appropriate VirtIO-MMIO region to be set in System Description File.
-# 	This can be dependent on how many VirtIO MMIO devices exist within your system.
+#   Generates eth_driver.elf
 #   Assumes libsddf_util_debug.a is in LIBS
 
 ETHERNET_DRIVER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))

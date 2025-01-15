@@ -5,7 +5,6 @@
 #
 # Include this snippet in your project Makefile to build the virtIO block driver.
 # Assumes libsddf_util_debug.a is in ${LIBS}.
-# Expects the 'blk_regs' variable to be set by the Microkit SDF
 
 VIRTIO_BLK_DRIVER_DIR := $(realpath $(dir $(lastword $(MAKEFILE_LIST))))
 
