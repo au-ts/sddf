@@ -8,16 +8,20 @@ For example, for a random write, with single request size of 2 MiB:
     randomwrite_2M
 
 The program will always output a single header file: 'converted_benchmark_traces.h', with 4 2D arrays of request offsets, 1 for each of the following: random read, random write, sequential read, sequential write.
-"""
+NOTE: the request offsets are in terms of the sDDF defined include/sddf//blk/queue.h: BLK_TRANSFER_SIZE."""
 import argparse
 import os
+from datetime import datetime, UTC
 #from os import listdir
 
 SD_PHYSICAL_BLOCK_SIZE = 512
+SDDF_BLK_TRANSFER_SIZE = 4096
 SUPPORTED_BENCHMARKS = ["randomread", "randomwrite", "read", "write"]
 SUPPORTED_UNITS = ["K", "M", "G", "T"]
 
-c_header_string = "#include <stdint.h>\n\n"
+c_header_string = f"/*\n* Generated on: {datetime.now(UTC)} (UTC).\n* Generated with " \
+        "fio_trace2cheader.py\n*/\n"
+c_header_string += "#include <stdint.h>\n\n"
 random_read_traces = {}
 random_write_traces = {}
 sequential_read_traces = {}
@@ -110,7 +114,9 @@ if __name__ == "__main__":
                 if request_size_bytes is None:
                     # Update request_size_bytes on the first valid read/write request, assumes all are equal size
                     request_size_bytes = int(line.split(" ")[4])
-                offset = int(line.split(" ")[3]) // SD_PHYSICAL_BLOCK_SIZE
+                offset_bytes = int(line.split(" ")[3])
+                assert offset_bytes % SDDF_BLK_TRANSFER_SIZE == 0, f"FIO offset for request: '{line}' in file: {file} is not aligned to SDDF_BLK_TRANSFER_SIZE: {SDDF_BLK_TRANSFER_SIZE}. sDDF requires write/read request alignment to SDDF_BLK_TRANSFER_SIZE."
+                offset = offset_bytes // SDDF_BLK_TRANSFER_SIZE
                 try:
                     trace_dict[request_size_bytes].append(offset)
                 except KeyError:
@@ -123,6 +129,7 @@ if __name__ == "__main__":
     # TODO: extract benchmark sizes and write a #define BENCHMARK_BLOCKS_PER_REQUEST (in terms of 4096 BLK_TRANSFER_SIZE)
     # TODO: extract request counts for each size (assume equal across all benchmark types, can validate), and define a #define REQUEST_COUNT array
 
+    #c_header_string += f"#define REQUEST_COUNT {ra}\n"
     append_traces_to_write(random_read_traces, "RANDOM_READ")
     append_traces_to_write(random_write_traces, "RANDOM_WRITE")
     append_traces_to_write(sequential_read_traces, "SEQUENTIAL_READ")
