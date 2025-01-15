@@ -147,7 +147,7 @@ static inline bool blk_queue_full_resp(blk_queue_handle_t *h)
  *
  * @return number of elements in the queue.
  */
-static inline int blk_queue_length_req(blk_queue_handle_t *h)
+static inline uint32_t blk_queue_length_req(blk_queue_handle_t *h)
 {
     return (h->req_queue->tail - h->req_queue->head);
 }
@@ -159,7 +159,7 @@ static inline int blk_queue_length_req(blk_queue_handle_t *h)
  *
  * @return number of elements in the queue.
  */
-static inline int blk_queue_length_resp(blk_queue_handle_t *h)
+static inline uint32_t blk_queue_length_resp(blk_queue_handle_t *h)
 {
     return (h->resp_queue->tail - h->resp_queue->head);
 }
