@@ -8,8 +8,6 @@
 #
 # NOTES:
 #  Generates timer_driver.elf
-#  Expects variable gpt_regs to be set in the system description file to the
-#      mapped address of the timer registers.
 #  Expects libsddf_util_debug.a to be in ${LIBS}
 
 TIMER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))

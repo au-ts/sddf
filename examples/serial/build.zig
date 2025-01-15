@@ -5,7 +5,7 @@
 const std = @import("std");
 const LazyPath = std.Build.LazyPath;
 
-const MicrokitBoard = enum { qemu_virt_aarch64, odroidc4, maaxboard, imx8mm_evk, star64 };
+const MicrokitBoard = enum { qemu_virt_aarch64, odroidc2, odroidc4, maaxboard, imx8mm_evk, star64 };
 
 const Target = struct {
     board: MicrokitBoard,
@@ -15,6 +15,16 @@ const Target = struct {
 const targets = [_]Target{
     .{
         .board = MicrokitBoard.qemu_virt_aarch64,
+        .zig_target = std.Target.Query{
+            .cpu_arch = .aarch64,
+            .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a53 },
+            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{ .strict_align }),
+            .os_tag = .freestanding,
+            .abi = .none,
+        },
+    },
+    .{
+        .board = MicrokitBoard.odroidc2,
         .zig_target = std.Target.Query{
             .cpu_arch = .aarch64,
             .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a53 },
@@ -137,7 +147,7 @@ pub fn build(b: *std.Build) !void {
 
     const driver_class = switch (microkit_board_option.?) {
         .qemu_virt_aarch64 => "arm",
-        .odroidc4 => "meson",
+        .odroidc2, .odroidc4 => "meson",
         .maaxboard, .imx8mm_evk => "imx",
         .star64 => "snps",
     };

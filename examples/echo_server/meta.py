@@ -33,6 +33,14 @@ BOARDS: List[Board] = [
         ethernet="virtio_mmio@a003e00"
     ),
     Board(
+        name="odroidc2",
+        arch=SystemDescription.Arch.AARCH64,
+        paddr_top=0x60000000,
+        serial="soc/bus@c8100000/serial@4c0",
+        timer="soc/bus@c1100000/watchdog@98d0",
+        ethernet="soc/ethernet@c9410000"
+    ),
+    Board(
         name="odroidc4",
         arch=SystemDescription.Arch.AARCH64,
         paddr_top=0x60000000,

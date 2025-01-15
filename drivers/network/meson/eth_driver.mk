@@ -8,7 +8,6 @@
 #
 # NOTES:
 #   Generates eth_driver.elf
-#   Needs eth_regs to be set in System Description File
 #   Assumes libsddf_util_debug.a is in LIBS
 
 ETHERNET_DRIVER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))

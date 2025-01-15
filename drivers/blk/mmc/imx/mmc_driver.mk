@@ -5,8 +5,6 @@
 #
 # Include this snippet in your project Makefile to build the IMX8 uSDHC driver.
 # Assumes libsddf_util_debug.a is in ${LIBS}.
-# Requires usdhc_regs to be set to the mapped base of the uSDHC registers
-# in the system description file.
 
 USDHC_DRIVER_DIR := $(realpath $(dir $(lastword $(MAKEFILE_LIST))))
 
