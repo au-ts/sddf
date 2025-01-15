@@ -70,7 +70,7 @@ void rx_return(void)
                     int input_number = sddf_atoi(next_client);
                     if (input_number >= 0 && input_number < config.num_clients) {
                         if (transferred && serial_require_producer_signal(&rx_queue_handle_cli[current_client])) {
-                            serial_update_visible_tail(&rx_queue_handle_cli[current_client], local_tail);
+                            serial_update_shared_tail(&rx_queue_handle_cli[current_client], local_tail);
                             serial_cancel_producer_signal(&rx_queue_handle_cli[current_client]);
                             microkit_notify(config.clients[current_client].id);
                         }
@@ -94,7 +94,7 @@ void rx_return(void)
             }
         }
 
-        serial_update_visible_tail(&rx_queue_handle_cli[current_client], local_tail);
+        serial_update_shared_tail(&rx_queue_handle_cli[current_client], local_tail);
         serial_request_producer_signal(&rx_queue_handle_drv);
         reprocess = false;
 

@@ -29,7 +29,7 @@ void _sddf_putchar(char character)
 
     /* Make changes visible to virtualiser if character is flush or if queue is now filled */
     if (serial_queue_full(tx_queue_handle, local_tail) || character == FLUSH_CHAR) {
-        serial_update_visible_tail(tx_queue_handle, local_tail);
+        serial_update_shared_tail(tx_queue_handle, local_tail);
         if (serial_require_producer_signal(tx_queue_handle)) {
             serial_cancel_producer_signal(tx_queue_handle);
             microkit_notify(tx_ch);
@@ -45,7 +45,7 @@ void sddf_putchar_unbuffered(char character)
 
     serial_enqueue(tx_queue_handle, &local_tail, character);
 
-    serial_update_visible_tail(tx_queue_handle, local_tail);
+    serial_update_shared_tail(tx_queue_handle, local_tail);
     if (serial_require_producer_signal(tx_queue_handle)) {
         serial_cancel_producer_signal(tx_queue_handle);
         microkit_notify(tx_ch);
