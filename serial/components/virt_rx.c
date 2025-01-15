@@ -33,85 +33,72 @@ void reset_state(void)
 
 void rx_return(void)
 {
-    bool reprocess = true;
     bool transferred = false;
     uint32_t local_tail = rx_queue_handle_cli[current_client].queue->tail;
     char c = '\0';
-    while (reprocess) {
-        while (!serial_dequeue(&rx_queue_handle_drv, &c)) {
-            switch (current_mode) {
-            case normal:
+    while (!serial_dequeue(&rx_queue_handle_drv, &c)) {
+        switch (current_mode) {
+        case normal:
+            if (c == config.switch_char) {
+                current_mode = switched;
+            } else {
+                if (!serial_enqueue_local(&rx_queue_handle_cli[current_client], &local_tail, c)) {
+                    transferred = true;
+                }
+            }
+            break;
+        case switched:
+            if (sddf_isdigit(c)) {
+                next_client[next_client_index] = c;
+                next_client_index++;
+                current_mode = number;
+            } else {
                 if (c == config.switch_char) {
-                    current_mode = switched;
-                } else {
                     if (!serial_enqueue_local(&rx_queue_handle_cli[current_client], &local_tail, c)) {
                         transferred = true;
                     }
-                }
-                break;
-            case switched:
-                if (sddf_isdigit(c)) {
-                    next_client[next_client_index] = c;
-                    next_client_index ++;
-                    current_mode = number;
                 } else {
-                    if (c == config.switch_char) {
-                        if (!serial_enqueue_local(&rx_queue_handle_cli[current_client], &local_tail, c)) {
-                            transferred = true;
-                        }
-                    } else {
-                        sddf_dprintf("VIRT_RX|LOG: User entered an invalid digit %c\n", c);
-                    }
-                    reset_state();
+                    sddf_dprintf("VIRT_RX|LOG: User entered an invalid digit %c\n", c);
                 }
-                break;
-            default:
-                if (c == config.terminate_num_char) {
-                    int input_number = sddf_atoi(next_client);
-                    if (input_number >= 0 && input_number < config.num_clients) {
-                        if (transferred && serial_require_producer_signal(&rx_queue_handle_cli[current_client])) {
-                            serial_update_shared_tail(&rx_queue_handle_cli[current_client], local_tail);
-                            serial_cancel_producer_signal(&rx_queue_handle_cli[current_client]);
-                            microkit_notify(config.clients[current_client].id);
-                        }
-                        current_client = (uint32_t)input_number;
-                        local_tail = rx_queue_handle_cli[current_client].queue->tail;
-                        transferred = false;
-                        sddf_dprintf("VIRT_RX|LOG: switching to client %d\n", input_number);
-                    } else {
-                        sddf_dprintf("VIRT_RX|LOG: User requested to switch to an invalid client %d\n", input_number);
-                    }
-                    reset_state();
-                } else if (next_client_index < MAX_CLI_BASE_10 && sddf_isdigit((int)c)) {
-                    next_client[next_client_index] = c;
-                    next_client_index ++;
-                } else {
-                    sddf_dprintf("VIRT_RX|LOG: User entered too many (%u < %u) or invalid digit (%c)\n", next_client_index + 1,
-                                 MAX_CLI_BASE_10, c);
-                    reset_state();
-                }
-                break;
+                reset_state();
             }
-        }
-
-        serial_update_shared_tail(&rx_queue_handle_cli[current_client], local_tail);
-        serial_request_producer_signal(&rx_queue_handle_drv);
-        reprocess = false;
-
-        if (!serial_queue_empty(&rx_queue_handle_drv, rx_queue_handle_drv.queue->head)) {
-            serial_cancel_producer_signal(&rx_queue_handle_drv);
-            reprocess = true;
+            break;
+        default:
+            if (c == config.terminate_num_char) {
+                int input_number = sddf_atoi(next_client);
+                if (input_number >= 0 && input_number < config.num_clients) {
+                    if (transferred) {
+                        serial_update_shared_tail(&rx_queue_handle_cli[current_client], local_tail);
+                        microkit_notify(config.clients[current_client].id);
+                    }
+                    current_client = (uint32_t)input_number;
+                    local_tail = rx_queue_handle_cli[current_client].queue->tail;
+                    transferred = false;
+                    sddf_dprintf("VIRT_RX|LOG: switching to client %d\n", input_number);
+                } else {
+                    sddf_dprintf("VIRT_RX|LOG: User requested to switch to an invalid client %d\n", input_number);
+                }
+                reset_state();
+            } else if (next_client_index < MAX_CLI_BASE_10 && sddf_isdigit((int)c)) {
+                next_client[next_client_index] = c;
+                next_client_index++;
+            } else {
+                sddf_dprintf("VIRT_RX|LOG: User entered too many (%u < %u) or invalid digit (%c)\n",
+                             next_client_index + 1, MAX_CLI_BASE_10, c);
+                reset_state();
+            }
+            break;
         }
     }
 
+    serial_update_shared_tail(&rx_queue_handle_cli[current_client], local_tail);
     if (!serial_queue_full(&rx_queue_handle_drv, rx_queue_handle_drv.queue->tail)
         && serial_require_consumer_signal(&rx_queue_handle_drv)) {
         serial_cancel_consumer_signal(&rx_queue_handle_drv);
         microkit_notify(config.driver.id);
     }
 
-    if (transferred && serial_require_producer_signal(&rx_queue_handle_cli[current_client])) {
-        serial_cancel_producer_signal(&rx_queue_handle_cli[current_client]);
+    if (transferred) {
         microkit_notify(config.clients[current_client].id);
     }
 }

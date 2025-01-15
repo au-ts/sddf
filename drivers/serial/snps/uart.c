@@ -47,32 +47,19 @@ static void set_baud(unsigned long baud)
 
 static void tx_provide(void)
 {
-    bool reprocess = true;
     bool transferred = false;
-    while (reprocess) {
-        char c;
+    char c;
+    while ((*REG_PTR(UART_LSR) & UART_LSR_THRE) && !serial_dequeue(&tx_queue_handle, &c)) {
+        *REG_PTR(UART_THR) = c;
+        transferred = true;
+    }
 
-        while ((*REG_PTR(UART_LSR) & UART_LSR_THRE) && !serial_dequeue(&tx_queue_handle, &c)) {
-            *REG_PTR(UART_THR) = c;
-            transferred = true;
-        }
-
-        serial_request_producer_signal(&tx_queue_handle);
-        /* If transmit FIFO is full and we still have data to be sent, enable TX IRQ */
-        if ((*REG_PTR(UART_LSR) & UART_LSR_THRE) == 0
-            && !serial_queue_empty(&tx_queue_handle, tx_queue_handle.queue->head)) {
-            *REG_PTR(UART_IER) |= UART_IER_ETBEI;
-        } else {
-            *REG_PTR(UART_IER) &= ~UART_IER_ETBEI;
-        }
-        reprocess = false;
-
-        if ((*REG_PTR(UART_LSR) & UART_LSR_THRE)
-            && !serial_queue_empty(&tx_queue_handle, tx_queue_handle.queue->head)) {
-            serial_cancel_producer_signal(&tx_queue_handle);
-            *REG_PTR(UART_IER) &= ~UART_IER_ETBEI;
-            reprocess = true;
-        }
+    /* If transmit FIFO is full and we still have data to be sent, enable TX IRQ */
+    if ((*REG_PTR(UART_LSR) & UART_LSR_THRE) == 0
+        && !serial_queue_empty(&tx_queue_handle, tx_queue_handle.queue->head)) {
+        *REG_PTR(UART_IER) |= UART_IER_ETBEI;
+    } else {
+        *REG_PTR(UART_IER) &= ~UART_IER_ETBEI;
     }
 
     if (transferred && serial_require_consumer_signal(&tx_queue_handle)) {
@@ -110,8 +97,7 @@ static void rx_return(void)
         }
     }
 
-    if (enqueued && serial_require_producer_signal(&rx_queue_handle)) {
-        serial_cancel_producer_signal(&rx_queue_handle);
+    if (enqueued) {
         microkit_notify(config.rx.id);
     }
 }

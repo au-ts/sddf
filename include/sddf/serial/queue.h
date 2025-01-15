@@ -18,8 +18,6 @@ typedef struct serial_queue {
     uint32_t tail;
     /* index to remove from */
     uint32_t head;
-    /* flag to indicate whether consumer requires signalling */
-    uint32_t consumer_signalled;
     /* flag to indicate whether producer requires signalling */
     uint32_t producer_signalled;
 } serial_queue_t;
@@ -364,19 +362,6 @@ static inline void serial_request_consumer_signal(serial_queue_handle_t *queue_h
 }
 
 /**
- * Indicate to producer of the queue that consumer requires signalling.
- *
- * @param queue queue handle of queue that requires signalling upon enqueuing.
- */
-static inline void serial_request_producer_signal(serial_queue_handle_t *queue_handle)
-{
-    queue_handle->queue->consumer_signalled = 0;
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
-    THREAD_MEMORY_RELEASE();
-#endif
-}
-
-/**
  * Indicate that producer has been signalled.
  *
  * @param queue queue handle of the queue that has been signalled.
@@ -390,19 +375,6 @@ static inline void serial_cancel_consumer_signal(serial_queue_handle_t *queue_ha
 }
 
 /**
- * Indicate that consumer has been signalled.
- *
- * @param queue queue handle of the queue that has been signalled.
- */
-static inline void serial_cancel_producer_signal(serial_queue_handle_t *queue_handle)
-{
-    queue_handle->queue->consumer_signalled = 1;
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
-    THREAD_MEMORY_RELEASE();
-#endif
-}
-
-/**
  * Producer of the queue requires signalling.
  *
  * @param queue queue handle of the queue to check.
@@ -410,14 +382,4 @@ static inline void serial_cancel_producer_signal(serial_queue_handle_t *queue_ha
 static inline bool serial_require_consumer_signal(serial_queue_handle_t *queue_handle)
 {
     return !queue_handle->queue->producer_signalled;
-}
-
-/**
- * Consumer of the queue requires signalling.
- *
- * @param queue queue handle of the queue to check.
- */
-static inline bool serial_require_producer_signal(serial_queue_handle_t *queue_handle)
-{
-    return !queue_handle->queue->consumer_signalled;
 }

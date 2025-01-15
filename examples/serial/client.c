@@ -29,28 +29,17 @@ void init(void)
 uint16_t char_count;
 void notified(microkit_channel ch)
 {
-    bool reprocess = true;
     char c;
-    while (reprocess) {
-        while (!serial_dequeue(&rx_queue_handle, &c)) {
-            if (c == '\r') {
-                sddf_putchar_unbuffered('\\');
-                sddf_putchar_unbuffered('r');
-            } else {
-                sddf_putchar_unbuffered(c);
-            }
-            char_count++;
-            if (char_count % 10 == 0) {
-                sddf_printf("\n%s has received %u characters so far!\n", microkit_name, char_count);
-            }
+    while (!serial_dequeue(&rx_queue_handle, &c)) {
+        if (c == '\r') {
+            sddf_putchar_unbuffered('\\');
+            sddf_putchar_unbuffered('r');
+        } else {
+            sddf_putchar_unbuffered(c);
         }
-
-        serial_request_producer_signal(&rx_queue_handle);
-        reprocess = false;
-
-        if (!serial_queue_empty(&rx_queue_handle, rx_queue_handle.queue->head)) {
-            serial_cancel_producer_signal(&rx_queue_handle);
-            reprocess = true;
+        char_count++;
+        if (char_count % 10 == 0) {
+            sddf_printf("\n%s has received %u characters so far!\n", microkit_name, char_count);
         }
     }
 }
