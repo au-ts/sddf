@@ -438,6 +438,11 @@ static void eth_setup(void)
 
 void init(void)
 {
+    assert(net_config_check_magic((void *)&config));
+    assert(device_resources_check_magic(&device_resources));
+    assert(device_resources.num_irqs == 1);
+    assert(device_resources.num_regions == 2);
+
     regs = (volatile virtio_mmio_regs_t *)device_resources.regions[0].region.vaddr;
     hw_ring_buffer_vaddr = (uintptr_t)device_resources.regions[1].region.vaddr;
     hw_ring_buffer_paddr = device_resources.regions[1].io_addr;

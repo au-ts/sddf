@@ -164,6 +164,11 @@ static void uart_setup(void)
 
 void init(void)
 {
+    assert(serial_config_check_magic((void *)&config));
+    assert(device_resources_check_magic(&device_resources));
+    assert(device_resources.num_irqs == 1);
+    assert(device_resources.num_regions == 1);
+
     uart_regs = device_resources.regions[0].region.vaddr;
 
     uart_setup();

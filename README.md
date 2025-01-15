@@ -51,7 +51,7 @@ On apt based Linux distributions run the following commands:
 ```sh
 sudo apt install make llvm lld device-tree-compiler python3 python3-venv
 python3 -m venv venv
-./venv/bin/pip install sdfgen==0.12.2
+./venv/bin/pip install sdfgen==0.13.0
 source ./venv/bin/activate
 ```
 
@@ -68,7 +68,7 @@ On macOS, you can install the dependencies via Homebrew:
 ```sh
 brew install llvm lld make dtc python3
 python3 -m venv venv
-./venv/bin/pip install sdfgen==0.12.2
+./venv/bin/pip install sdfgen==0.13.0
 source ./venv/bin/activate
 ```
 

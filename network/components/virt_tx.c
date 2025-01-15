@@ -120,6 +120,8 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
+    assert(net_config_check_magic((void *)&config));
+
     /* Set up driver queues */
     net_queue_init(&state.tx_queue_drv, config.driver.free_queue.vaddr, config.driver.active_queue.vaddr,
                    config.driver.num_buffers);

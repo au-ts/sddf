@@ -9,7 +9,7 @@
 #include <sddf/timer/config.h>
 #include <sddf/util/printf.h>
 
-__attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
+__attribute__((__section__(".timer_client_config"))) timer_client_config_t config;
 
 microkit_channel timer_channel;
 
@@ -31,7 +31,10 @@ void notified(microkit_channel ch)
 void init(void)
 {
     sddf_printf("CLIENT|INFO: starting\n");
-    timer_channel = timer_config.driver_id;
+
+    assert(timer_config_check_magic((void *)&config));
+
+    timer_channel = config.driver_id;
 
     // lets get the time!
     uint64_t time = sddf_timer_time_now(timer_channel);

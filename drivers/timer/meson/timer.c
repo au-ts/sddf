@@ -130,6 +130,10 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
 
 void init(void)
 {
+    assert(device_resources_check_magic(&device_resources));
+    assert(device_resources.num_irqs == 1);
+    assert(device_resources.num_regions == 1);
+
     for (int i = 0; i < MAX_TIMEOUTS; i++) {
         timeouts[i] = UINT64_MAX;
     }

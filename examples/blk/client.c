@@ -115,6 +115,8 @@ void init(void)
 {
     LOG_CLIENT("starting\n");
 
+    assert(blk_config_check_magic((void *)&config));
+
     blk_queue_init(&blk_queue, config.virt.req_queue.vaddr, config.virt.resp_queue.vaddr, config.virt.num_buffers);
 
     /* Want to print out configuration information, so wait until the config is ready. */
