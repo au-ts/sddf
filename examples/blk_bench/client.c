@@ -12,6 +12,7 @@
 #include <sddf/serial/queue.h>
 #include <serial_config.h>
 #include <benchmark_config.h>
+#include <benchmark_traces.h>
 #include <blk_config.h>
 
 /*
@@ -75,16 +76,9 @@ void dequeue_and_validate(uint16_t exp_count) {
 enum run_benchmark_state run_benchmark_state = START_BENCHMARK;
 bool virtualiser_replied = false;
 uint8_t benchmark_size_idx = 0;
- // only read/write 1024*1024 sectors in (4GiB in), Avoid U-Boot
- // continuosly advance read start to avoid caching benefits
-uint64_t read_start_sector = 1024*1024;
-// write at 20 GiB in
-uint64_t write_start_sector = 5*1024*1024;
-// Step thats taken every benchmark_size idx increase (so we write to diff regions)
-uint64_t step_every_benchmark_size_increase = 256*1024;
 int benchmark_run_idx = 0;
 
-void handle_random_operations_run(blk_req_code_t request_code, uint32_t start_sector, uint32_t interval, char* run_type, enum run_benchmark_state next_state);
+void handle_random_operations_run(blk_req_code_t request_code, const uint32_t* request_offsets_arr, char* run_type, enum run_benchmark_state next_state);
 
 /* tracks if dummy data for writing to block device is populated in shared memory region */
 bool dummy_write_data_populated = false;
@@ -108,7 +102,7 @@ bool run_benchmark() {
         case THROUGHPUT_RANDOM_READ:
             /* Perform REQUEST_COUNT[benchmark_size_idx] random READs, from 4KiB write size up to 8MiB */
             dummy_write_data_populated = false;
-            handle_random_operations_run(BLK_REQ_READ, read_start_sector, BLOCK_READ_WRITE_INTERVAL, "RANDOM_READ", THROUGHPUT_RANDOM_WRITE);
+            handle_random_operations_run(BLK_REQ_READ, RANDOM_READ_OFFSETS_ARR[benchmark_size_idx], "RANDOM_READ", THROUGHPUT_RANDOM_WRITE);
             break;
         case THROUGHPUT_RANDOM_WRITE:
             /* Perform QUEUE_SIZE WRITEs, from 4KiB write size up to 128MiB (x8 at each step) */
@@ -121,11 +115,11 @@ bool run_benchmark() {
                 dummy_write_data_populated = true;
             }
 
-            handle_random_operations_run(BLK_REQ_WRITE, write_start_sector, BLOCK_READ_WRITE_INTERVAL, "RANDOM_WRITE", THROUGHPUT_SEQUENTIAL_READ);
+            handle_random_operations_run(BLK_REQ_WRITE, RANDOM_WRITE_OFFSETS_ARR[benchmark_size_idx], "RANDOM_WRITE", THROUGHPUT_SEQUENTIAL_READ);
             break;
         case THROUGHPUT_SEQUENTIAL_READ:
             dummy_write_data_populated = false;
-            handle_random_operations_run(BLK_REQ_READ, read_start_sector, 0, "SEQUENTIAL_READ", THROUGHPUT_SEQUENTIAL_WRITE);
+            handle_random_operations_run(BLK_REQ_READ, SEQUENTIAL_READ_OFFSETS_ARR[benchmark_size_idx], "SEQUENITAL_READ", THROUGHPUT_SEQUENTIAL_WRITE);
             break;
         case THROUGHPUT_SEQUENTIAL_WRITE:
             if (!dummy_write_data_populated)
@@ -135,7 +129,7 @@ bool run_benchmark() {
                 }
                 dummy_write_data_populated = true;
             }
-            handle_random_operations_run(BLK_REQ_WRITE, write_start_sector, 0, "SEQUENTIAL_WRITE", LATENCY_READ);
+            handle_random_operations_run(BLK_REQ_WRITE, SEQUENTIAL_WRITE_OFFSETS_ARR[benchmark_size_idx], "SEQUENITAL_WRITE", LATENCY_READ);
             break;
         case LATENCY_READ:
             dummy_write_data_populated = false;
@@ -155,25 +149,27 @@ bool run_benchmark() {
     return false;
 }
 
-void handle_random_operations_run(blk_req_code_t request_code, uint32_t start_sector, uint32_t interval, char* run_type, enum run_benchmark_state next_state) {
+void handle_random_operations_run(blk_req_code_t request_code, const uint32_t* request_offsets_arr, char* run_type, enum run_benchmark_state next_state) {
     if (!virtualiser_replied) {
-        LOG_CLIENT("run_benchmark: THROUGHPUT_%s: %d requests of %d transfer blocks at a time.\n"
-                "Reading start sector: %u\n", run_type, REQUEST_COUNT[benchmark_size_idx],
-                BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx], start_sector);
+        LOG_CLIENT("run_benchmark: THROUGHPUT_%s: %d requests of %d transfer blocks at a time.\n",
+                run_type, REQUEST_COUNT[benchmark_size_idx],
+                BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx]);
         if (blk_queue_length_req(&blk_queue) != 0 || blk_queue_length_resp(&blk_queue) != 0)
             panic("blk response or request queue not empty!");
         for (uint32_t i = 0; i != REQUEST_COUNT[benchmark_size_idx]; ++i) {
-            /* Read or WRITE BENCHMARK_BLOCKS_PER_REQUEST blocks for this benchmark run, stepping by
-             * size of request + 16 MiB (driver doesn't do any smart reordering, should mean that SD
-             * card's caching has no effect)
+            /* Read or WRITE BENCHMARK_BLOCKS_PER_REQUEST blocks for this benchmark run,
+             * Replaying the trace workload from the benchmark_traces.h generated file.
              */
             // XXX always reading to the SAME address space in the shared memory region
             uintptr_t io_or_offset = 0;//i * BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx] * BLK_TRANSFER_SIZE;
-            uint32_t block_number = start_sector + benchmark_size_idx * step_every_benchmark_size_increase\
-                                    + i * BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx] + \
-                                    i * interval / BLK_TRANSFER_SIZE;
+            /*
+             * NOTE: block_number is in terms of TRANSFER_SIZE, and its the offset from the start of
+             * the partition belonging to the client. Virtualiser will then add the required offset
+             * so driver gets the exact offset into the SD card in terms of no of TRANSFER_SIZE chunks
+             */
+            uint32_t block_number = request_offsets_arr[i];
             uint16_t count = BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx];
-
+            LOG_CLIENT("block number: %d, count: %d\n", block_number, count);
             int err = blk_enqueue_req(&blk_queue, request_code, io_or_offset, block_number, count, i);
             assert(!err);
         }
