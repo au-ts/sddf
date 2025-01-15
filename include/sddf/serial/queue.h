@@ -211,131 +211,96 @@ static inline uint32_t serial_queue_contiguous_free(serial_queue_handle_t *queue
 }
 
 /**
- * Enqueue many characters contiguously onto a queue.
+ * Enqueue a buffer of contiguous characters into a queue.
  *
- * @param qh Pointer to handle for queue
- * @param n number of characters to enqueue
- * @param src pointer to characters to be transferred
+ * @param queue_handle queue to be filled with data.
+ * @param num number of characters to enqueue.
+ * @param src pointer to characters to be transferred.
  *
- * @return number of characters actually enqueued.
+ * @return Number of characters actually enqueued.
  */
-static inline uint32_t serial_enqueue_batch(serial_queue_handle_t *qh,
-                                            uint32_t n,
+static inline uint32_t serial_enqueue_batch(serial_queue_handle_t *queue_handle,
+                                            uint32_t num,
                                             const char *src)
 {
-    char *p = qh->data_region + (qh->queue->tail % qh->capacity);
-    uint32_t avail = serial_queue_free(qh);
-    uint32_t n_prewrap;
-    uint32_t n_postwrap;
+    char *dst = queue_handle->data_region + (queue_handle->queue->tail % queue_handle->capacity);
+    uint32_t avail = serial_queue_free(queue_handle);
+    uint32_t num_prewrap;
+    uint32_t num_postwrap;
 
-    n = MIN(n, avail);
-    n_prewrap = serial_queue_contiguous_free(qh);
-    n_prewrap = MIN(n, n_prewrap);
-    n_postwrap = n - n_prewrap;
+    num = MIN(num, avail);
+    num_prewrap = serial_queue_contiguous_free(queue_handle);
+    num_prewrap = MIN(num, num_prewrap);
+    num_postwrap = num - num_prewrap;
 
-    sddf_memcpy(p, src, n_prewrap);
-    if (n_postwrap) {
-        sddf_memcpy(qh->data_region, src + n_prewrap, n_postwrap);
+    sddf_memcpy(dst, src, num_prewrap);
+    if (num_postwrap) {
+        sddf_memcpy(queue_handle->data_region, src + num_prewrap, num_postwrap);
     }
 
-    serial_update_visible_tail(qh, qh->queue->tail + n);
+    serial_update_shared_tail(queue_handle, queue_handle->queue->tail + num);
 
-    return n;
+    return num;
 }
 
 /**
- * Transfer all data from consume queue to produce queue. Assumes there
+ * Transfer all data from a consumer queue to a producer queue. Assumes there
  * is enough free space in the free queue to fit all data in the active
  * queue.
  *
- * @param active_queue_handle queue to remove from.
- * @param free_queue_handle queue to insert into.
+ * @param free_queue_handle queue to produce into.
+ * @param active_queue_handle queue to consume.
  */
-static inline void serial_transfer_all(serial_queue_handle_t *active_queue_handle,
-                                       serial_queue_handle_t *free_queue_handle)
+static inline void serial_transfer_all(serial_queue_handle_t *free_queue_handle,
+                                       serial_queue_handle_t *active_queue_handle)
 {
-    assert(serial_queue_length(active_queue_handle) <= serial_queue_free(free_queue_handle));
+    assert(serial_queue_length(active_queue_handle)
+           <= serial_queue_free(free_queue_handle));
 
+    /* Copy in contiguous chunks */
     while (serial_queue_length(active_queue_handle)) {
-        /* Copy all contigous data */
-        uint32_t active = serial_queue_contiguous_length(active_queue_handle);
-        uint32_t free = serial_queue_contiguous_free(free_queue_handle);
-        uint32_t to_transfer = (active < free) ? active : free;
+        uint32_t num_active = serial_queue_contiguous_length(active_queue_handle);
+        char *src = active_queue_handle->data_region + (active_queue_handle->queue->head % active_queue_handle->capacity);
 
-        sddf_memcpy(free_queue_handle->data_region + (free_queue_handle->queue->tail % free_queue_handle->capacity),
-                    active_queue_handle->data_region
-                        + (active_queue_handle->queue->head % active_queue_handle->capacity),
-                    to_transfer);
+        uint32_t transferred = serial_enqueue_batch(free_queue_handle, num_active, src);
+        assert(transferred == num_active);
 
-        /* Make copy visible */
-        serial_update_visible_tail(free_queue_handle, free_queue_handle->queue->tail + to_transfer);
-        serial_update_visible_head(active_queue_handle, active_queue_handle->queue->head + to_transfer);
+        serial_update_shared_head(active_queue_handle, active_queue_handle->queue->head + num_active);
     }
 }
 
 /**
- * Transfer all data from consume queue to produce queue and add colour start and end codes
- * before and after the data. Assumes there is enough free space in the free queue to fit
+ * Transfer all data from a consumer queue to a producer queue, adding colour codes
+ * before and after. Assumes there is enough free space in the free queue to fit
  * all data in the active.
  *
- * @param active_queue_handle queue to remove from.
- * @param free_queue_handle queue to insert into.
- * @param colour_start colour string to be printed at the start.
- * @param colour_start_len length of colour start string.
- * @param colour_end colour string to be printed at the end.
- * @param colour_end_len length of colour end string.
+ * @param free_queue_handle queue to produce into.
+ * @param active_queue_handle queue to consume.
+ * @param col_start colour code start string.
+ * @param col_start_len length of start string.
+ * @param col_end colour code end string.
+ * @param col_end_len length of end string.
  */
-static inline void serial_transfer_all_with_colour(serial_queue_handle_t *active_queue_handle,
-                                                   serial_queue_handle_t *free_queue_handle,
-                                                   const char *colour_start,
-                                                   uint16_t colour_start_len,
-                                                   const char *colour_end,
-                                                   uint16_t colour_end_len)
+static inline void serial_transfer_all_colour(serial_queue_handle_t *free_queue_handle,
+                                              serial_queue_handle_t *active_queue_handle,
+                                              const char *col_start,
+                                              uint16_t col_start_len,
+                                              const char *col_end,
+                                              uint16_t col_end_len)
 {
-    assert(serial_queue_length(active_queue_handle) + colour_start_len + colour_end_len
+    assert(serial_queue_length(active_queue_handle) + col_start_len + col_end_len
            <= serial_queue_free(free_queue_handle));
 
-    uint16_t colour_transferred = 0;
-    while (colour_transferred < colour_start_len) {
-        uint32_t remaining = colour_start_len - colour_transferred;
-        uint32_t free = serial_queue_contiguous_free(free_queue_handle);
-        uint32_t to_transfer = (remaining < free) ? remaining : free;
+    /* Transfer col_start string */
+    uint32_t transferred = serial_enqueue_batch(free_queue_handle, col_start_len, col_start);
+    assert(transferred == col_start_len);
 
-        sddf_memcpy(free_queue_handle->data_region + (free_queue_handle->queue->tail % free_queue_handle->capacity),
-                    colour_start + colour_transferred, to_transfer);
+    /* Transfer active data */
+    serial_transfer_all(free_queue_handle, active_queue_handle);
 
-        serial_update_visible_tail(free_queue_handle, free_queue_handle->queue->tail + to_transfer);
-        colour_transferred += to_transfer;
-    }
-
-    while (serial_queue_length(active_queue_handle)) {
-        /* Copy all contigous data */
-        uint32_t active = serial_queue_contiguous_length(active_queue_handle);
-        uint32_t free = serial_queue_contiguous_free(free_queue_handle);
-        uint32_t to_transfer = (active < free) ? active : free;
-
-        sddf_memcpy(free_queue_handle->data_region + (free_queue_handle->queue->tail % free_queue_handle->capacity),
-                    active_queue_handle->data_region
-                        + (active_queue_handle->queue->head % active_queue_handle->capacity),
-                    to_transfer);
-
-        /* Make copy visible */
-        serial_update_visible_tail(free_queue_handle, free_queue_handle->queue->tail + to_transfer);
-        serial_update_visible_head(active_queue_handle, active_queue_handle->queue->head + to_transfer);
-    }
-
-    colour_transferred = 0;
-    while (colour_transferred < colour_end_len) {
-        uint32_t remaining = colour_end_len - colour_transferred;
-        uint32_t free = serial_queue_contiguous_free(free_queue_handle);
-        uint32_t to_transfer = (remaining < free) ? remaining : free;
-
-        sddf_memcpy(free_queue_handle->data_region + (free_queue_handle->queue->tail % free_queue_handle->capacity),
-                    colour_end + colour_transferred, to_transfer);
-
-        serial_update_visible_tail(free_queue_handle, free_queue_handle->queue->tail + to_transfer);
-        colour_transferred += to_transfer;
-    }
+    /* Transfer col_end string */
+    transferred = serial_enqueue_batch(free_queue_handle, col_end_len, col_end);
+    assert(transferred == col_end_len);
 }
 
 /**
