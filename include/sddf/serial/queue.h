@@ -31,6 +31,18 @@ typedef struct serial_queue_handle {
 } serial_queue_handle_t;
 
 /**
+ * Return the number of bytes of data stored in the queue.
+ *
+ * @param queue_handle queue containing the data.
+ *
+ * @return The bytes of data stored in the queue.
+ */
+static inline uint32_t serial_queue_length(serial_queue_handle_t *queue_handle)
+{
+    return queue_handle->queue->tail - queue_handle->queue->head;
+}
+
+/**
  * Check if the queue is empty.
  *
  * @param queue_handle queue to check.
@@ -115,28 +127,17 @@ static inline int serial_dequeue(serial_queue_handle_t *queue_handle, uint32_t *
  * @param queue_handle queue to update.
  * @param local_tail tail which points to the last character enqueued.
  */
-static inline void serial_update_visible_tail(serial_queue_handle_t *queue_handle,
+static inline void serial_update_shared_tail(serial_queue_handle_t *queue_handle,
                                               uint32_t local_tail)
 {
-    uint32_t head = queue_handle->queue->head;
-    uint32_t tail = queue_handle->queue->tail;
-    uint32_t max_tail = head + queue_handle->capacity;
+    uint32_t current_length = serial_queue_length(queue_handle);
+    uint32_t new_length = local_tail - queue_handle->queue->head;
 
     /* Ensure updates to tail don't overwrite existing data */
-    if (head <= tail) {
-        assert(local_tail >= tail || local_tail < head);
-    } else {
-        /* tail < head */
-        assert(local_tail >= tail && local_tail < head);
-    }
+    assert(new_length >= current_length);
 
     /* Ensure updates to tail don't exceed capacity restraints */
-    if (head <= max_tail) {
-        assert(local_tail <= max_tail);
-    } else {
-        /* max_tail < head */
-        assert(local_tail >= head || local_tail <= max_tail);
-    }
+    assert(new_length <= queue_handle->capacity);
 
 #ifdef CONFIG_ENABLE_SMP_SUPPORT
     THREAD_MEMORY_RELEASE();
@@ -147,42 +148,25 @@ static inline void serial_update_visible_tail(serial_queue_handle_t *queue_handl
 
 /**
  * Update the value of the head in the shared data structure to make
- * locally dequeued data visible.
+ * local dequeues visible.
  *
  * @param queue_handle queue to update.
  * @param local_head head which points to the next character to dequeue.
  */
-static inline void serial_update_visible_head(serial_queue_handle_t *queue_handle,
+static inline void serial_update_shared_head(serial_queue_handle_t *queue_handle,
                                               uint32_t local_head)
 {
-    uint32_t head = queue_handle->queue->head;
-    uint32_t tail = queue_handle->queue->tail;
+    uint32_t current_length = serial_queue_length(queue_handle);
+    uint32_t new_length = queue_handle->queue->tail - local_head;
 
-    /* Ensure updates to head don't corrupt queue capacity constraints */
-    if (head <= tail) {
-        assert(local_head >= head && local_head <= tail);
-    } else {
-        /* head > tail */
-        assert(local_head >= head || local_head <= tail);
-    }
+    /* Ensure updates to head don't corrupt queue or capacity constraints */
+    assert(new_length <= current_length);
 
 #ifdef CONFIG_ENABLE_SMP_SUPPORT
     THREAD_MEMORY_RELEASE();
 #endif
 
     queue_handle->queue->head = local_head;
-}
-
-/**
- * Return the number of bytes of data stored in the queue.
- *
- * @param queue_handle queue containing the data.
- *
- * @return The bytes of data stored in the queue.
- */
-static inline uint32_t serial_queue_length(serial_queue_handle_t *queue_handle)
-{
-    return queue_handle->queue->tail - queue_handle->queue->head;
 }
 
 /**

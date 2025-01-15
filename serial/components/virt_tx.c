@@ -220,7 +220,7 @@ void init(void)
     if (config.enable_rx) {
         /* Print a deterministic string to allow console input to begin */
         sddf_memcpy(tx_queue_handle_drv.data_region, config.begin_str, config.begin_str_len + 1);
-        serial_update_visible_tail(&tx_queue_handle_drv, config.begin_str_len + 1);
+        serial_update_shared_tail(&tx_queue_handle_drv, config.begin_str_len + 1);
         microkit_notify(config.driver.id);
     }
 
