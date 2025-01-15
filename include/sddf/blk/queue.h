@@ -125,7 +125,7 @@ static inline bool blk_queue_empty_resp(blk_queue_handle_t *h)
  */
 static inline bool blk_queue_full_req(blk_queue_handle_t *h)
 {
-    return h->req_queue->tail - h->req_queue->head + 1 == h->capacity;
+    return h->req_queue->tail - h->req_queue->head == h->capacity;
 }
 
 /**
@@ -137,7 +137,7 @@ static inline bool blk_queue_full_req(blk_queue_handle_t *h)
  */
 static inline bool blk_queue_full_resp(blk_queue_handle_t *h)
 {
-    return h->resp_queue->tail - h->resp_queue->head + 1 == h->capacity;
+    return h->resp_queue->tail - h->resp_queue->head == h->capacity;
 }
 
 /**
