@@ -52,7 +52,7 @@ static void tx_provide(void)
     while (reprocess) {
         char c;
 
-        while ((*REG_PTR(UART_LSR) & UART_LSR_THRE) && !serial_dequeue(&tx_queue_handle, NULL, &c)) {
+        while ((*REG_PTR(UART_LSR) & UART_LSR_THRE) && !serial_dequeue(&tx_queue_handle, &c)) {
             *REG_PTR(UART_THR) = c;
             transferred = true;
         }
@@ -89,7 +89,7 @@ static void rx_return(void)
         while ((*REG_PTR(UART_LSR) & UART_LSR_DR)
                && !serial_queue_full(&rx_queue_handle, rx_queue_handle.queue->tail)) {
             char c = *REG_PTR(UART_RBR);
-            int err = serial_enqueue(&rx_queue_handle, NULL, c);
+            int err = serial_enqueue(&rx_queue_handle, c);
             assert(!err);
             enqueued = true;
         }

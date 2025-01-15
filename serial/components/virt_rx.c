@@ -38,13 +38,13 @@ void rx_return(void)
     uint32_t local_tail = rx_queue_handle_cli[current_client].queue->tail;
     char c = '\0';
     while (reprocess) {
-        while (!serial_dequeue(&rx_queue_handle_drv, NULL, &c)) {
+        while (!serial_dequeue(&rx_queue_handle_drv, &c)) {
             switch (current_mode) {
             case normal:
                 if (c == config.switch_char) {
                     current_mode = switched;
                 } else {
-                    if (!serial_enqueue(&rx_queue_handle_cli[current_client], &local_tail, c)) {
+                    if (!serial_enqueue_local(&rx_queue_handle_cli[current_client], &local_tail, c)) {
                         transferred = true;
                     }
                 }
@@ -56,7 +56,7 @@ void rx_return(void)
                     current_mode = number;
                 } else {
                     if (c == config.switch_char) {
-                        if (!serial_enqueue(&rx_queue_handle_cli[current_client], &local_tail, c)) {
+                        if (!serial_enqueue_local(&rx_queue_handle_cli[current_client], &local_tail, c)) {
                             transferred = true;
                         }
                     } else {

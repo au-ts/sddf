@@ -23,9 +23,9 @@ void _sddf_putchar(char character)
     }
 
     if (character == '\n') {
-        serial_enqueue(tx_queue_handle, &local_tail, '\r');
+        serial_enqueue_local(tx_queue_handle, &local_tail, '\r');
     }
-    serial_enqueue(tx_queue_handle, &local_tail, character);
+    serial_enqueue_local(tx_queue_handle, &local_tail, character);
 
     /* Make changes visible to virtualiser if character is flush or if queue is now filled */
     if (serial_queue_full(tx_queue_handle, local_tail) || character == FLUSH_CHAR) {
@@ -43,7 +43,7 @@ void sddf_putchar_unbuffered(char character)
         return;
     }
 
-    serial_enqueue(tx_queue_handle, &local_tail, character);
+    serial_enqueue_local(tx_queue_handle, &local_tail, character);
 
     serial_update_shared_tail(tx_queue_handle, local_tail);
     if (serial_require_producer_signal(tx_queue_handle)) {
