@@ -13,13 +13,13 @@ device class for sDDF.
 Please feel free to open an issue on GitHub if there is something missing or
 something is not clear.
 
-### Examples
+## Examples
 
 For each device class in sDDF, we have an example system in `examples/` to
 show how to use the device class as a client as well as how to hook everything
 up.
 
-## The metaprogram
+### The metaprogram
 
 Common to each example is a 'metaprogram'. It is responsible for generating
 certain artefacts that each sDDF component is expecting as well as the Microkit
@@ -47,7 +47,7 @@ what language you use is up to you.
 You can find more details in the [repository](https://github.com/au-ts/microkit_sdf_gen)
 and an API reference for the Python package [here](https://au-ts.github.io/microkit_sdf_gen/).
 
-## Adding a new board
+### Adding a new board
 
 The first step is to figure out whether the devices you want to make use of
 with your board have corresponding drivers in sDDF already.
