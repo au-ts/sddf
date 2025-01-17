@@ -200,6 +200,7 @@ int setup_utilization_socket(void *cycle_counters, microkit_channel start_ch, mi
 {
     bench = cycle_counters;
     bench_start_ch = start_ch;
+    bench_stop_ch = stop_ch;
     utiliz_socket = tcp_new_ip_type(IPADDR_TYPE_V4);
     if (utiliz_socket == NULL) {
         sddf_dprintf("Failed to open a socket for listening!\n");
