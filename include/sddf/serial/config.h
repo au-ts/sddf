@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 #include <microkit.h>
+#include <stdbool.h>
+#include <stdint.h>
 #include <sddf/resources/common.h>
 
 #define SDDF_SERIAL_MAX_CLIENTS (MICROKIT_MAX_CHANNELS - 1)

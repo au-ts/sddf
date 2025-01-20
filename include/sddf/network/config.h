@@ -6,6 +6,8 @@
 #pragma once
 
 #include <microkit.h>
+#include <stdbool.h>
+#include <stdint.h>
 #include <sddf/resources/common.h>
 #include <sddf/resources/device.h>
 

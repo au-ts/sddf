@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 #include <stdbool.h>
+#include <stdint.h>
 #include <microkit.h>
 #include <sddf/resources/common.h>
 #include <sddf/resources/device.h>

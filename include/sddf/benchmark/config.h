@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 #include <microkit.h>
+#include <stdint.h>
 
 #define BENCHMARK_MAX_CHILDREN 64 // TODO: is there an upper bound?
 
