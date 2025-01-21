@@ -30,16 +30,12 @@ __attribute__((__section__(".blk_virt_config"))) blk_virt_config_t config;
 #endif
 #define LOG_BLK_VIRT_ERR(...) do{ sddf_dprintf("BLK_VIRT|ERROR: "); sddf_dprintf(__VA_ARGS__); }while(0)
 
-#define DRIVER_CH 0
-#define CLI_CH_OFFSET 1
-
 /* Driver queue handle */
 blk_queue_handle_t drv_h;
 
 /* Client specific info */
 typedef struct client {
     blk_queue_handle_t queue_h;
-    microkit_channel ch;
     uint32_t start_sector;
     uint32_t sectors;
 } client_t;
@@ -121,7 +117,7 @@ static void request_mbr()
     err = blk_enqueue_req(&drv_h, BLK_REQ_READ, mbr_paddr, 0, 1, mbr_req_id);
     assert(!err);
 
-    microkit_deferred_notify(DRIVER_CH);
+    microkit_deferred_notify(config.driver.conn.id);
 }
 
 static bool handle_mbr_reply()
@@ -172,7 +168,6 @@ void init(void)
         blk_resp_queue_t *curr_resp = client->conn.resp_queue.vaddr;
         uint32_t queue_capacity = client->conn.num_buffers;
         blk_queue_init(&clients[i].queue_h, curr_req, curr_resp, queue_capacity);
-        clients[i].ch = CLI_CH_OFFSET + i;
     }
 
     /* Initialise driver queue */
@@ -238,7 +233,7 @@ static void handle_driver()
     /* Notify corresponding client if a response was enqueued */
     for (int i = 0; i < config.num_clients; i++) {
         if (client_notify[i]) {
-            microkit_notify(clients[i].ch);
+            microkit_notify(config.clients[i].conn.id);
         }
     }
 }
@@ -343,7 +338,7 @@ static bool handle_client(int cli_id)
     }
 
     if (client_notify) {
-        microkit_notify(clients[cli_id].ch);
+        microkit_notify(config.clients[cli_id].conn.id);
     }
 
     return driver_notify;
@@ -359,7 +354,7 @@ static void handle_clients()
     }
 
     if (driver_notify) {
-        microkit_notify(DRIVER_CH);
+        microkit_notify(config.driver.conn.id);
     }
 }
 
@@ -374,7 +369,7 @@ void notified(microkit_channel ch)
         return;
     }
 
-    if (ch == DRIVER_CH) {
+    if (ch == config.driver.conn.id) {
         handle_driver();
         handle_clients();
     } else {
