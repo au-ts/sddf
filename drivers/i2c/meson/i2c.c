@@ -503,7 +503,7 @@ static inline void i2c_load_tokens(void)
 
 void init(void)
 {
-    assert(i2c_config_check_magic((void *)&config));
+    assert(i2c_config_check_magic(&config));
     assert(device_resources_check_magic(&device_resources));
     assert(device_resources.num_irqs == 2);
     assert(device_resources.num_regions == 1);

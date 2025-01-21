@@ -190,7 +190,7 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
-    assert(net_config_check_magic((void *)&config));
+    assert(net_config_check_magic(&config));
 
     buffer_refs = config.buffer_metadata.vaddr;
 

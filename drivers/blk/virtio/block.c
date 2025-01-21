@@ -377,7 +377,7 @@ void virtio_blk_init(void)
 
 void init(void)
 {
-    assert(blk_config_check_magic((void *)&config));
+    assert(blk_config_check_magic(&config));
     assert(device_resources_check_magic(&device_resources));
     assert(device_resources.num_irqs == 1);
     assert(device_resources.num_regions == 3);

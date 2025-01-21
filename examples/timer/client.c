@@ -32,7 +32,7 @@ void init(void)
 {
     sddf_printf("CLIENT|INFO: starting\n");
 
-    assert(timer_config_check_magic((void *)&config));
+    assert(timer_config_check_magic(&config));
 
     timer_channel = config.driver_id;
 
