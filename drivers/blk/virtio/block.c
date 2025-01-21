@@ -29,13 +29,6 @@
 #define QUEUE_SIZE 1024
 #define VIRTQ_NUM_REQUESTS QUEUE_SIZE
 
-/*
- * This is the size of the region that holds virtIO specific metadata, such as the virtq
- * and list of virtIO request headers. This must match the size of the region in the
- * system description.
- */
-#define VIRTIO_REGION_SIZE 0x200000
-
 uintptr_t requests_paddr;
 uintptr_t requests_vaddr;
 
@@ -352,7 +345,9 @@ void virtio_blk_init(void)
     size_t used_off = ALIGN(avail_off + (6 + 2 * VIRTQ_NUM_REQUESTS), 4);
     size_t size = used_off + (6 + 8 * VIRTQ_NUM_REQUESTS);
 
-    assert(size <= VIRTIO_REGION_SIZE);
+    // Make sure that the metadata region is able to fit all the virtIO specific
+    // extra data.
+    assert(size <= device_resources.regions[2].region.size);
 
     virtq.num = VIRTQ_NUM_REQUESTS;
     virtq.desc = (struct virtq_desc *)(requests_vaddr + desc_off);
