@@ -172,9 +172,9 @@ void init(void)
     *REG_PTR(UART_IER) = (UART_IER_ERBFI | UART_IER_ETBEI);
 
     if (config.rx_enabled) {
-        serial_queue_init(&rx_queue_handle, config.rx.queue.vaddr, config.rx.queue.size, config.rx.data.vaddr);
+        serial_queue_init(&rx_queue_handle, config.rx.queue.vaddr, config.rx.data.size, config.rx.data.vaddr);
     }
-    serial_queue_init(&tx_queue_handle, config.tx.queue.vaddr, config.tx.queue.size, config.tx.data.vaddr);
+    serial_queue_init(&tx_queue_handle, config.tx.queue.vaddr, config.tx.data.size, config.tx.data.vaddr);
 }
 
 void notified(microkit_channel ch)
