@@ -110,7 +110,7 @@ void process_response()
 
 void init(void)
 {
-    assert(i2c_config_check_magic((void *)&config));
+    assert(i2c_config_check_magic(&config));
     assert(config.driver.conn.id == 0);
     LOG_VIRT("initialising\n");
     for (int i = 0; i < I2C_BUS_ADDRESS_MAX + 1; i++) {
