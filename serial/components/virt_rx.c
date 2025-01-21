@@ -118,6 +118,8 @@ void rx_return(void)
 
 void init(void)
 {
+    assert(serial_config_check_magic(&config));
+
     serial_queue_init(&rx_queue_handle_drv, config.driver.queue.vaddr, config.driver.data.size,
                       config.driver.data.vaddr);
     for (uint64_t i = 0; i < config.num_clients; i++) {
