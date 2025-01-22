@@ -17,12 +17,12 @@
     <memory_region name="blk_driver_storage_info" size="0x1000" page_size="0x1000" />
     <memory_region name="blk_driver_request" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="blk_driver_response" size="0x200_000" page_size="0x200_000"/>
-    <memory_region name="blk_driver_data" size="0x800_000" page_size="0x200_000" />
+    <memory_region name="blk_driver_data" size="0xa00_000" page_size="0x200_000" />
 
     <memory_region name="blk_client_storage_info" size="0x1000" page_size="0x1000" />
     <memory_region name="blk_client_request" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="blk_client_response" size="0x200_000" page_size="0x200_000"/>
-    <memory_region name="blk_client_data" size="0x800_000" page_size="0x200_000" />
+    <memory_region name="blk_client_data" size="0xa00_000" page_size="0x200_000" />
 
     <!-- shared memory for serial data regions (printing to serial console, benchmark build)  -->
     <memory_region name="serial_tx_data_driver" size="0x8_000" />
