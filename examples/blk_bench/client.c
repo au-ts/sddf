@@ -31,6 +31,7 @@
 #define LOG_CLIENT(...)
 #define LOG_CLIENT_ERR(...)
 #endif
+#define panic(...) do{ sddf_printf("CLIENT|Panic! "); sddf_printf(__VA_ARGS__); __builtin_trap(); } while(0)
 
 #define VIRT_CH 0
 #define SERIAL_TX_CH 1
@@ -51,10 +52,13 @@ uintptr_t blk_client0_data_paddr;
 
 static blk_queue_handle_t blk_queue;
 
-void panic(char* reason) {
-    LOG_CLIENT("Panic! %s\n", reason);
-    __builtin_trap();
-}
+enum run_benchmark_state run_benchmark_state = START_BENCHMARK;
+bool virtualiser_replied = false;
+uint8_t benchmark_size_idx = 0;
+int benchmark_run_idx = 0;
+#ifdef VALIDATE_IO_OPERATIONS
+uint16_t validation_req_idx = 0;
+#endif
 
 void dequeue_and_validate(uint16_t exp_count) {
     blk_resp_status_t status;
@@ -62,23 +66,76 @@ void dequeue_and_validate(uint16_t exp_count) {
     uint32_t id;
     int err = blk_dequeue_resp(&blk_queue, &status, &count, &id);
     if (err)
-        panic("could not dequeue");
+        panic("could not dequeue\n");
     if (status != BLK_RESP_OK)
-        panic("invalid resp status");
+        panic("invalid resp status\n");
     if (count != exp_count)
-        panic("invalid count");
+        panic("invalid count\n");
     // XXX cant validate ID, as requesrts can be out of order, would need to dequeue and check all
     //if (id != exp_id)
     //    panic("invalid id");
 }
 
+#ifdef VALIDATE_IO_OPERATIONS
+void fill_blk_data(const uint32_t *offsets_array, uint16_t max_num_reqs, uint16_t max_req_size_blocks) {
+    // Fills the blk_data region with a repeating pattern of block offsets.
+    // This pattern repeats until max request size can be satifisfied + BLK_TRANSFER_SIZE*REQUEST_COUNT
+    // TODO: for now, assumes constant REQUEST_COUNT for all requests, divisible by 4 (sizeof(uint32_t)
+    uint32_t *blk_data_32 = ((uint32_t*) blk_data);
+    for (uint32_t i = 0; i < (int) ((max_req_size_blocks + max_num_reqs)*BLK_TRANSFER_SIZE/sizeof(uint32_t)); ++i) {
+        blk_data_32[i] = offsets_array[i % max_num_reqs];
+    }
+}
 
-enum run_benchmark_state run_benchmark_state = START_BENCHMARK;
-bool virtualiser_replied = false;
-uint8_t benchmark_size_idx = 0;
-int benchmark_run_idx = 0;
+void validate_write_data(const uint32_t *offsets_array, uint16_t arr_offset) {
+    // assumes blocks were filled in with fill_blk_data()
+    if (!virtualiser_replied) {
+        int err = blk_enqueue_req(&blk_queue, BLK_REQ_READ, 0x0, offsets_array[arr_offset], BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx], 0);
+        assert(!err);
+        microkit_notify(VIRT_CH);
+    } else {
+        if (blk_queue_length_resp(&blk_queue) != 0) {
+            dequeue_and_validate(BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx]);
+            uint32_t *blk_data_32 = ((uint32_t*) blk_data);
+            for (uint32_t i = 0; i < (int) ((BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx]*BLK_TRANSFER_SIZE)/sizeof(uint32_t)); ++i) {
+                if (blk_data_32[i] != offsets_array[(i + (int) (arr_offset*BLK_TRANSFER_SIZE/sizeof(uint32_t))) % REQUEST_COUNT[benchmark_size_idx]]) {
+                    panic("Wrong value read back during validation\n"
+                          "validation_req_idx: %d, arr_offset: %d. Expected val: %d, read val: %d. Stage: %s\n",
+                          validation_req_idx, i,
+                          offsets_array[(i + (int) (arr_offset*BLK_TRANSFER_SIZE/sizeof(uint32_t))) % REQUEST_COUNT[benchmark_size_idx]],
+                          blk_data_32[i], human_readable_run_benchmark_state[run_benchmark_state]);
+                }
+            }
+            sddf_printf("validated blocks in request: %d\n", arr_offset);
+        } else {
+            /* potentially race cond from previous request chain -> received ping from virt after processing all response queue */
+            virtualiser_replied = false;
+        }
+    }
+}
+#endif
 
-void handle_random_operations_run(blk_req_code_t request_code, const uint32_t* request_offsets_arr, char* run_type, enum run_benchmark_state next_state);
+void advance_benchmark_idx_and_stage(enum run_benchmark_state current_state, enum run_benchmark_state next_state) {
+    /* by default, remain at current state (or for validation stage -> return to appropriate benchmark) */
+    run_benchmark_state = current_state;
+    benchmark_size_idx = (benchmark_size_idx + 1) % BENCHMARK_RUN_COUNT;
+    if (benchmark_size_idx == 0) {
+#ifndef VALIDATE_IO_OPERATIONS
+        benchmark_run_idx = (benchmark_run_idx + 1) % BENCHMARK_INDIVIDUAL_RUN_REPEATS;
+#else
+        /* If VALIDATE_IO_OPERATIONS, only do a single run iteration for each benchmark size */
+        benchmark_run_idx = 0;
+#endif
+        if (benchmark_run_idx == 0) {
+            LOG_CLIENT("run_benchmark: finished all BENCHMARK_BLOCKS_PER_REQUEST for %s\n", human_readable_run_benchmark_state[run_benchmark_state]);
+            run_benchmark_state = next_state;
+        } else {
+            LOG_CLIENT("run_benchmark: finished %d/%d run for %s\n", benchmark_run_idx, BENCHMARK_INDIVIDUAL_RUN_REPEATS, human_readable_run_benchmark_state[run_benchmark_state]);
+        }
+    }
+}
+
+void handle_random_operations_run(blk_req_code_t request_code, const uint32_t* request_offsets_arr, enum run_benchmark_state next_state);
 
 /* tracks if dummy data for writing to block device is populated in shared memory region */
 bool dummy_write_data_populated = false;
@@ -86,6 +143,7 @@ bool run_benchmark() {
     switch(run_benchmark_state) {
         case START_BENCHMARK:
             /* make sure the driver is working properly */
+#ifndef VALIDATE_IO_OPERATIONS
             if (!virtualiser_replied) {
                 LOG_CLIENT("run_benchmark: START state,verifying if a simple read succeeds...\n");
                 int err = blk_enqueue_req(&blk_queue, BLK_REQ_READ, 0x10000, 0, 2, 0);
@@ -98,15 +156,21 @@ bool run_benchmark() {
                 virtualiser_replied = false;
                 run_benchmark();
             }
+#else
+            run_benchmark_state = THROUGHPUT_RANDOM_WRITE;
+            virtualiser_replied = false;
+            run_benchmark();
+#endif
             break;
         case THROUGHPUT_RANDOM_READ:
             /* Perform REQUEST_COUNT[benchmark_size_idx] random READs, from 4KiB write size up to 8MiB */
             dummy_write_data_populated = false;
-            handle_random_operations_run(BLK_REQ_READ, RANDOM_READ_OFFSETS_ARR[benchmark_size_idx], "RANDOM_READ", THROUGHPUT_RANDOM_WRITE);
+            handle_random_operations_run(BLK_REQ_READ, RANDOM_READ_OFFSETS_ARR[benchmark_size_idx], THROUGHPUT_RANDOM_WRITE);
             break;
         case THROUGHPUT_RANDOM_WRITE:
-            /* Perform QUEUE_SIZE WRITEs, from 4KiB write size up to 128MiB (x8 at each step) */
-            // write out garbage for the WRITE_REQUESTs ONLY at the beginning of this benchmark type
+            /* Perform REQUEST_COUNT[benchmark_size_idx] WRITEs, from 4KiB write size up to 128MiB (x8 at each step) */
+#ifndef VALIDATE_IO_OPERATIONS
+            /* write out garbage for the WRITE_REQUESTs ONLY at the beginning of this benchmark type */
             if (!dummy_write_data_populated)
             {
                 for (int i = 0; i < BLK_DATA_REGION_SIZE_CLI0; ++i) {
@@ -114,14 +178,34 @@ bool run_benchmark() {
                 }
                 dummy_write_data_populated = true;
             }
-
-            handle_random_operations_run(BLK_REQ_WRITE, RANDOM_WRITE_OFFSETS_ARR[benchmark_size_idx], "RANDOM_WRITE", THROUGHPUT_SEQUENTIAL_READ);
+#else
+            fill_blk_data(RANDOM_WRITE_OFFSETS_ARR[benchmark_size_idx],  REQUEST_COUNT[benchmark_size_idx], BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx]);
+#endif
+            handle_random_operations_run(BLK_REQ_WRITE, RANDOM_WRITE_OFFSETS_ARR[benchmark_size_idx], THROUGHPUT_SEQUENTIAL_READ);
+            break;
+        case VALIDATE_RANDOM_WRITE:
+#ifdef VALIDATE_IO_OPERATIONS
+            validate_write_data(RANDOM_WRITE_OFFSETS_ARR[benchmark_size_idx], validation_req_idx);
+            if(virtualiser_replied) {
+                /* Validated req id: validation_req_idx. Increment */
+                ++validation_req_idx;
+                virtualiser_replied = false;
+                if (validation_req_idx == REQUEST_COUNT[benchmark_size_idx]) {
+                    validation_req_idx = 0;
+                    advance_benchmark_idx_and_stage(THROUGHPUT_RANDOM_WRITE, THROUGHPUT_SEQUENTIAL_WRITE);
+                }
+                run_benchmark();
+            }
+#else
+            panic("Validation stage reached with VALIDATE_IO_OPERATIONS not being defined!\n");
+#endif
             break;
         case THROUGHPUT_SEQUENTIAL_READ:
             dummy_write_data_populated = false;
-            handle_random_operations_run(BLK_REQ_READ, SEQUENTIAL_READ_OFFSETS_ARR[benchmark_size_idx], "SEQUENITAL_READ", THROUGHPUT_SEQUENTIAL_WRITE);
+            handle_random_operations_run(BLK_REQ_READ, SEQUENTIAL_READ_OFFSETS_ARR[benchmark_size_idx], THROUGHPUT_SEQUENTIAL_WRITE);
             break;
         case THROUGHPUT_SEQUENTIAL_WRITE:
+#ifndef VALIDATE_IO_OPERATIONS
             if (!dummy_write_data_populated)
             {
                 for (int i = 0; i < BLK_DATA_REGION_SIZE_CLI0; ++i) {
@@ -129,7 +213,27 @@ bool run_benchmark() {
                 }
                 dummy_write_data_populated = true;
             }
-            handle_random_operations_run(BLK_REQ_WRITE, SEQUENTIAL_WRITE_OFFSETS_ARR[benchmark_size_idx], "SEQUENITAL_WRITE", LATENCY_READ);
+#else
+            fill_blk_data(SEQUENTIAL_WRITE_OFFSETS_ARR[benchmark_size_idx],  REQUEST_COUNT[benchmark_size_idx], BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx]);
+#endif
+            handle_random_operations_run(BLK_REQ_WRITE, SEQUENTIAL_WRITE_OFFSETS_ARR[benchmark_size_idx], LATENCY_READ);
+            break;
+        case VALIDATE_SEQUENTIAL_WRITE:
+#ifdef VALIDATE_IO_OPERATIONS
+            validate_write_data(SEQUENTIAL_WRITE_OFFSETS_ARR[benchmark_size_idx], validation_req_idx);
+            if(virtualiser_replied) {
+                /* Validated req id: validation_req_idx. Increment */
+                ++validation_req_idx;
+                virtualiser_replied = false;
+                if (validation_req_idx == REQUEST_COUNT[benchmark_size_idx]) {
+                    validation_req_idx = 0;
+                    advance_benchmark_idx_and_stage(THROUGHPUT_SEQUENTIAL_WRITE, LATENCY_READ);
+                }
+                run_benchmark();
+            }
+#else
+            panic("Validation stage reached with VALIDATE_IO_OPERATIONS not being defined!\n");
+#endif
             break;
         case LATENCY_READ:
             dummy_write_data_populated = false;
@@ -149,19 +253,21 @@ bool run_benchmark() {
     return false;
 }
 
-void handle_random_operations_run(blk_req_code_t request_code, const uint32_t* request_offsets_arr, char* run_type, enum run_benchmark_state next_state) {
+void handle_random_operations_run(blk_req_code_t request_code, const uint32_t* request_offsets_arr, enum run_benchmark_state next_state) {
     if (!virtualiser_replied) {
-        LOG_CLIENT("run_benchmark: THROUGHPUT_%s: %d requests of %d transfer blocks at a time.\n",
-                run_type, REQUEST_COUNT[benchmark_size_idx],
+        LOG_CLIENT("run_benchmark: %s: %d requests of %d transfer blocks at a time.\n",
+                human_readable_run_benchmark_state[run_benchmark_state], REQUEST_COUNT[benchmark_size_idx],
                 BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx]);
         if (blk_queue_length_req(&blk_queue) != 0 || blk_queue_length_resp(&blk_queue) != 0)
             panic("blk response or request queue not empty!");
         for (uint32_t i = 0; i != REQUEST_COUNT[benchmark_size_idx]; ++i) {
             /* Read or WRITE BENCHMARK_BLOCKS_PER_REQUEST blocks for this benchmark run,
              * Replaying the trace workload from the benchmark_traces.h generated file.
+             * XXX reading/writing to overlapping memory addresses (does not matter for benchmarking,
+             * for validation need to read one block at a time) For validation purposes, read/write address
+             * is increasing by 1 page at each step (enforced page alignment).
              */
-            // XXX always reading to the SAME address space in the shared memory region
-            uintptr_t io_or_offset = 0;//i * BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx] * BLK_TRANSFER_SIZE;
+            uintptr_t io_or_offset = BLK_TRANSFER_SIZE*i;
             /*
              * NOTE: block_number is in terms of TRANSFER_SIZE, and its the offset from the start of
              * the partition belonging to the client. Virtualiser will then add the required offset
@@ -169,7 +275,7 @@ void handle_random_operations_run(blk_req_code_t request_code, const uint32_t* r
              */
             uint32_t block_number = request_offsets_arr[i];
             uint16_t count = BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx];
-            LOG_CLIENT("block number: %d, count: %d\n", block_number, count);
+            //LOG_CLIENT("offset: %d, block num: %d, count: %d\n", io_or_offset, block_number, count);
             int err = blk_enqueue_req(&blk_queue, request_code, io_or_offset, block_number, count, i);
             assert(!err);
         }
@@ -181,19 +287,27 @@ void handle_random_operations_run(blk_req_code_t request_code, const uint32_t* r
         microkit_notify(STOP_PMU);
         // clean up the queue
         for (uint32_t i = 0; i != REQUEST_COUNT[benchmark_size_idx]; ++i) {
-            dequeue_and_validate(BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx]);
-        }
-        benchmark_size_idx = (benchmark_size_idx + 1) % BENCHMARK_RUN_COUNT;
-        if (benchmark_size_idx == 0) {
-            benchmark_run_idx = (benchmark_run_idx + 1) % BENCHMARK_INDIVIDUAL_RUN_REPEATS;
-            if (benchmark_run_idx == 0) {
-                run_benchmark_state = next_state;
-                LOG_CLIENT("run_benchmark: finished all BENCHMARK_BLOCKS_PER_REQUEST for THROUGHPUT_%s\n", run_type);
-            } else {
-                LOG_CLIENT("run_benchmark: finished %d/%d run for THROUGHPUT_%s\n", benchmark_run_idx, BENCHMARK_INDIVIDUAL_RUN_REPEATS, run_type);
-            }
+            uint16_t count = BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx];
+            dequeue_and_validate(count);
         }
         virtualiser_replied = false;
+#ifdef VALIDATE_IO_OPERATIONS
+        /* If validating, step to the appropriate Validation stage (either for RANDOM WRITE or SEQUENTIAL) */
+        switch (run_benchmark_state) {
+            case THROUGHPUT_RANDOM_WRITE:
+                run_benchmark_state = VALIDATE_RANDOM_WRITE;
+                break;
+            case THROUGHPUT_SEQUENTIAL_WRITE:
+                run_benchmark_state = VALIDATE_SEQUENTIAL_WRITE;
+                break;
+            default:
+                LOG_CLIENT("CURRENT STAGE: %s\n", human_readable_run_benchmark_state[run_benchmark_state]);
+                panic("Unimplemented IO operation validation stage for current benchmark stage.\n");
+        }
+#else
+        /* Otherwise, step to the next iteration/next stage */
+        advance_benchmark_idx_and_stage(run_benchmark_state, next_state);
+#endif
     }
 }
 
@@ -224,7 +338,7 @@ void notified(microkit_channel ch)
     switch (ch) {
         case VIRT_CH:
             //LOG_CLIENT("notified from virtualiser %u\n", ch);
-            // Virtualiser replied, handle appropriately
+            /* Virtualiser replied, handle appropriately */
             virtualiser_replied = true;
             run_benchmark();
             break;
@@ -232,7 +346,6 @@ void notified(microkit_channel ch)
             // Nothing to do
             break;
         case BENCH_RUN_CH:
-            // TODO: Start the required benchmark
             virtualiser_replied = false;
             LOG_CLIENT("client notified to start bench.\n");
             run_benchmark();
