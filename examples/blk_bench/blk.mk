@@ -57,7 +57,12 @@ CFLAGS := -mcpu=$(CPU) \
 		  -I$(SERIAL_CONFIG_INCLUDE) \
 		  -I$(BENCHMARK_CONFIG_INCLUDE)
 LDFLAGS := -L$(BOARD_DIR)/lib
-LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util.a --end-group
+LIBS := --start-group -lmicrokit -Tmicrokit.ld
+ifeq ($(strip $(MICROKIT_CONFIG)), debug)
+	LIBS += libsddf_util_debug.a --end-group
+else
+	LIBS +=  libsddf_util.a  --end-group
+endif
 
 CHECK_FLAGS_BOARD_MD5:=.board_cflags-$(shell echo -- ${CFLAGS} ${BOARD} ${MICROKIT_CONFIG} | shasum | sed 's/ *-//')
 
@@ -83,12 +88,21 @@ include ${UART_DRIVER}/uart_driver.mk
 include ${TIMER_DRIVER}/timer_driver.mk
 include ${SERIAL_COMPONENTS}/serial_components.mk
 
+ifeq ($(strip $(MICROKIT_CONFIG)), debug)
+${IMAGES}: libsddf_util_debug.a
+else
 ${IMAGES}: libsddf_util.a
+endif
 
 client.o: ${BLK_BENCHMARK}/client.c ${BLK_BENCHMARK}/basic_data.h
 	$(CC) -c $(CFLAGS) -I. $< -o client.o
+ifeq ($(strip $(MICROKIT_CONFIG)), debug)
+client.elf: client.o libsddf_util_debug.a
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+else
 client.elf: client.o libsddf_util.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+endif
 
 $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
