@@ -292,7 +292,7 @@ void notified(microkit_channel ch) {
         microkit_notify(BENCH_RUN_CH);
         break;
     case START:
-#ifdef MICROKIT_CONFIG_benchmark
+#if defined(MICROKIT_CONFIG_benchmark) && !defined(VALIDATE_IO_OPERATIONS)
         /* sample the clock cycles, to later get a total amount of cycles spent during a benchmark */
         ccounter_benchmark_start = sel4bench_get_cycle_count();
         timer_start = sddf_timer_time_now(TIMER_CH);
@@ -310,7 +310,7 @@ void notified(microkit_channel ch) {
 #endif
         break;
     case STOP:
-#ifdef MICROKIT_CONFIG_benchmark
+#if defined(MICROKIT_CONFIG_benchmark) && !defined(VALIDATE_IO_OPERATIONS)
         timer_end = sddf_timer_time_now(TIMER_CH);
         ccounter_benchmark_stop = sel4bench_get_cycle_count();
         sel4bench_get_counters(benchmark_bf, &counter_values[0]);
@@ -428,14 +428,12 @@ void notified(microkit_channel ch) {
         sddf_printf("Cycles per KiB (decimal): %f\n", cycles_per_kib);
         sddf_printf("Cycles per MiB (decimal): %f\n", cycles_per_mib);
         sddf_printf("}\n");
-#endif
 
 #ifdef CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES
         entries = seL4_BenchmarkFinalizeLog();
         sddf_printf("KernelEntries:  %llx\n", entries);
         seL4_BenchmarkTrackDumpSummary(log_buffer, entries);
 #endif
-#ifdef MICROKIT_CONFIG_benchmark
         benchmark_size_idx = benchmark_size_idx + 1;
         // Print out results:
         switch (run_benchmark_state) {
