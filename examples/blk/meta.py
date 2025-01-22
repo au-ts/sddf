@@ -40,7 +40,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     blk_node = dtb.node(board.blk)
     assert blk_node is not None
 
-    blk_system = Sddf.Block(sdf, blk_node, blk_driver, blk_virt)
+    blk_system = Sddf.Blk(sdf, blk_node, blk_driver, blk_virt)
     blk_system.add_client(client, partition=0)
 
     pds = [

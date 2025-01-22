@@ -70,11 +70,11 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1736867362,
-        "narHash": "sha256-i/UJ5I7HoqmFMwZEH6vAvBxOrjjOJNU739lnZnhUln8=",
+        "lastModified": 1737569578,
+        "narHash": "sha256-6qY0pk2QmUtBT9Mywdvif0i/CLVgpCjMUn6g9vB+f3M=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "9c6b49aeac36e2ed73a8c472f1546f6d9cf1addc",
+        "rev": "47addd76727f42d351590c905d9d1905ca895b82",
         "type": "github"
       },
       "original": {
@@ -146,15 +146,16 @@
         "zig-overlay": "zig-overlay"
       },
       "locked": {
-        "lastModified": 1736922685,
-        "narHash": "sha256-hUUFhZeT/Db0kTEIAC0rQLau71qWABTiLps6GU2GggM=",
+        "lastModified": 1737679018,
+        "narHash": "sha256-Jprz+xzEPkav+Cu7VqJ2wMnZ6Z9Izb8hZ8fjsvz0swQ=",
         "owner": "au-ts",
         "repo": "microkit_sdf_gen",
-        "rev": "edc8f90c37a4a7bbee018cd3a3ce0a023242c902",
+        "rev": "494b32931e96d16334bf7551d803705c01be5ed5",
         "type": "github"
       },
       "original": {
         "owner": "au-ts",
+        "ref": "0.15.0",
         "repo": "microkit_sdf_gen",
         "type": "github"
       }
@@ -229,11 +230,11 @@
         "nixpkgs": "nixpkgs_3"
       },
       "locked": {
-        "lastModified": 1736728343,
-        "narHash": "sha256-oH0O4gD75BzY0mD2RraYR3DvJCdL70bya/1eFrc4UdM=",
+        "lastModified": 1737419334,
+        "narHash": "sha256-xEQ+2zoihSR8TSHH5KMceReUd9Ae2tPNLFoQviGpaAg=",
         "owner": "mitchellh",
         "repo": "zig-overlay",
-        "rev": "e268e975027e0d48493344ee12278a81c85e057e",
+        "rev": "11ba4193561b6096b2c72174163940a50251a99c",
         "type": "github"
       },
       "original": {
@@ -249,11 +250,11 @@
         "nixpkgs": "nixpkgs_4"
       },
       "locked": {
-        "lastModified": 1736987349,
-        "narHash": "sha256-c+mcMUSTzdb8etXa6HyHFWlEonB3+b59t33Ff3ckz+Y=",
+        "lastModified": 1737419334,
+        "narHash": "sha256-xEQ+2zoihSR8TSHH5KMceReUd9Ae2tPNLFoQviGpaAg=",
         "owner": "mitchellh",
         "repo": "zig-overlay",
-        "rev": "40609a6d6b637a7ae706da422bcdad8367039cd6",
+        "rev": "11ba4193561b6096b2c72174163940a50251a99c",
         "type": "github"
       },
       "original": {
