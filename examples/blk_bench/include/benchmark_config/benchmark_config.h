@@ -16,6 +16,8 @@
 // 16 MiB interval to counter the caching of block device's sequential READs
 // XXX and to counter the batching of WRITE commits
 #define BLOCK_READ_WRITE_INTERVAL 0x1000000
+// comment out when benchmarking, if defined: performs validation of all IO operations (using RANDOM_WRITE and SEQUENTIAL_WRITE traces and reading them back)
+//#define VALIDATE_IO_OPERATIONS
 
 // TODO: add defines for default clock speed for odroid c4's CPU, to compute throughput in terms of time
 // in MHz
@@ -30,6 +32,8 @@ enum run_benchmark_state {
     THROUGHPUT_SEQUENTIAL_WRITE,
     LATENCY_READ,
     LATENCY_WRITE,
+    VALIDATE_RANDOM_WRITE,
+    VALIDATE_SEQUENTIAL_WRITE,
 };
 const char* human_readable_run_benchmark_state[] = {
     "START_BENCHMARK",
@@ -39,4 +43,6 @@ const char* human_readable_run_benchmark_state[] = {
     "THROUGHPUT_SEQUENTIAL_WRITE",
     "LATENCY_READ",
     "LATENCY_WRITE",
+    "VALIDATE_RANDOM_WRITE",
+    "VALIDATE_SEQUENTIAL_WRITE",
 };
