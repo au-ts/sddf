@@ -16,7 +16,7 @@
 #define BLK_QUEUE_CAPACITY_CLI0                 1024
 #define BLK_QUEUE_CAPACITY_DRIV                 BLK_QUEUE_CAPACITY_CLI0
 
-#define BLK_QUEUE_REGION_SIZE                   0x800000
+#define BLK_QUEUE_REGION_SIZE                   0xa00000
 #define BLK_DATA_REGION_SIZE_CLI0               BLK_QUEUE_REGION_SIZE
 #define BLK_DATA_REGION_SIZE_DRIV               BLK_QUEUE_REGION_SIZE
 
