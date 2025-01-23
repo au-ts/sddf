@@ -128,7 +128,7 @@ void handle_request()
     while (!blk_queue_empty_req(&blk_queue) && ialloc_num_free(&ialloc_desc) >= 3) {
         blk_req_code_t req_code;
         uintptr_t phys_addr;
-        uint32_t block_number;
+        uint64_t block_number;
         uint16_t count;
         uint32_t id;
         int err = blk_dequeue_req(&blk_queue, &req_code, &phys_addr, &block_number, &count, &id);
