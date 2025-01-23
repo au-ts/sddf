@@ -975,7 +975,7 @@ void handle_clients(void)
 {
     static blk_req_code_t req_code;
     static uintptr_t req_offset;
-    static uint32_t req_block_number;
+    static uint64_t req_block_number;
     static uint16_t req_count;
     static uint32_t req_id;
     int err;
@@ -991,7 +991,7 @@ void handle_clients(void)
             return;
         }
 
-        LOG_DRIVER("Received command: code=%d, offset=0x%lx, block_number=%d, count=%d, id=%d\n",
+        LOG_DRIVER("Received command: code=%d, offset=0x%lx, block_number=%lu, count=%d, id=%d\n",
                    req_code, req_offset, req_block_number, req_count, req_id);
 
         driver_state.clients = ClientStateInflight;

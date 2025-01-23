@@ -40,7 +40,7 @@ typedef enum blk_resp_status {
 typedef struct blk_req {
     blk_req_code_t code; /* request code */
     uint64_t io_or_offset; /* offset of buffer within buffer memory region or io address of buffer */
-    uint32_t block_number; /* block number to read/write to */
+    uint64_t block_number; /* block number to read/write to */
     uint16_t count; /* number of blocks to read/write */
     uint32_t id; /* stores request ID */
 } blk_req_t;
@@ -179,7 +179,7 @@ static inline uint32_t blk_queue_length_resp(blk_queue_handle_t *h)
 static inline int blk_enqueue_req(blk_queue_handle_t *h,
                                   blk_req_code_t code,
                                   uintptr_t io_or_offset,
-                                  uint32_t block_number,
+                                  uint64_t block_number,
                                   uint16_t count,
                                   uint32_t id)
 {
@@ -253,7 +253,7 @@ static inline int blk_enqueue_resp(blk_queue_handle_t *h,
 static inline int blk_dequeue_req(blk_queue_handle_t *h,
                                   blk_req_code_t *code,
                                   uintptr_t *io_or_offset,
-                                  uint32_t *block_number,
+                                  uint64_t *block_number,
                                   uint16_t *count,
                                   uint32_t *id)
 {

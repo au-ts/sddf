@@ -261,7 +261,7 @@ static bool handle_client(int cli_id)
 
     blk_req_code_t cli_code = 0;
     uintptr_t cli_offset = 0;
-    uint32_t cli_block_number = 0;
+    uint64_t cli_block_number = 0;
     uint16_t cli_count = 0;
     uint32_t cli_req_id = 0;
 
@@ -278,7 +278,7 @@ static bool handle_client(int cli_id)
         err = blk_dequeue_req(&h, &cli_code, &cli_offset, &cli_block_number, &cli_count, &cli_req_id);
         assert(!err);
 
-        uint32_t drv_block_number = 0;
+        uint64_t drv_block_number = 0;
         drv_block_number = cli_block_number + (clients[cli_id].start_sector / (BLK_TRANSFER_SIZE / MSDOS_MBR_SECTOR_SIZE));
 
         blk_resp_status_t resp_status = BLK_RESP_ERR_UNSPEC;
