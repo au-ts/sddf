@@ -3,7 +3,7 @@
 #
 # SPDX-License-Identifier: BSD-2-Clause
 #
-# This Makefile snippet builds the sound RX and TX virtualisers
+# This Makefile snippet builds the sound virtualiser
 # it should be included into your project Makefile
 #
 # NOTES:
