@@ -133,7 +133,7 @@ static int notified_by_client(int client)
         }
 
         if (pcm.io_or_offset % SOUND_PCM_BUFFER_SIZE ||
-            pcm.io_or_offset >= SOUND_PCM_BUFFER_SIZE * client_queues->pcm_req.size ||
+            pcm.io_or_offset >= SOUND_PCM_BUFFER_SIZE * client_queues->pcm_req.capacity ||
             pcm.len > SOUND_PCM_BUFFER_SIZE) {
             sddf_dprintf("SND VIRT|ERR: [client %d] invalid PCM buffer bounds\n", client);
             respond_to_pcm(client_queues, &pcm, SOUND_S_BAD_MSG);
@@ -217,7 +217,7 @@ int notified_by_driver(void)
         uintptr_t paddr = pcm.io_or_offset;
 
         if (paddr < data_region_paddr ||
-            paddr >= data_region_paddr + SOUND_PCM_BUFFER_SIZE * client_queues->pcm_res.size ||
+            paddr >= data_region_paddr + SOUND_PCM_BUFFER_SIZE * client_queues->pcm_res.capacity ||
             pcm.len > SOUND_PCM_BUFFER_SIZE) {
             sddf_dprintf("SND VIRT|ERR: invalid PCM buffer bounds from driver\n");
             continue;
@@ -260,24 +260,24 @@ void init(void)
                       (void *)c0_cmd_res,
                       (void *)c0_pcm_req,
                       (void *)c0_pcm_res,
-                      SOUND_CMD_QUEUE_SIZE,
-                      SOUND_PCM_QUEUE_SIZE);
+                      SOUND_CMD_QUEUE_CAPACITY,
+                      SOUND_PCM_QUEUE_CAPACITY);
 
     sound_queues_init(&clients[1],
                       (void *)c1_cmd_req,
                       (void *)c1_cmd_res,
                       (void *)c1_pcm_req,
                       (void *)c1_pcm_res,
-                      SOUND_CMD_QUEUE_SIZE,
-                      SOUND_PCM_QUEUE_SIZE);
+                      SOUND_CMD_QUEUE_CAPACITY,
+                      SOUND_PCM_QUEUE_CAPACITY);
 
     sound_queues_init(&driver_queues,
                       (void *)drv_cmd_req,
                       (void *)drv_cmd_res,
                       (void *)drv_pcm_req,
                       (void *)drv_pcm_res,
-                      SOUND_CMD_QUEUE_SIZE,
-                      SOUND_PCM_QUEUE_SIZE);
+                      SOUND_CMD_QUEUE_CAPACITY,
+                      SOUND_PCM_QUEUE_CAPACITY);
     sound_queues_init_buffers(&driver_queues);
 
     for (int i = 0; i < MAX_STREAMS; i++) {
