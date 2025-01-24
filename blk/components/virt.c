@@ -61,6 +61,19 @@ struct msdos_mbr msdos_mbr;
 /* The virtualiser is not initialised until we can read the MBR and populate the block device configuration. */
 bool initialised = false;
 
+static void partitions_dump()
+{
+    sddf_dprintf("the following partitions exist:\n");
+    for (int i = 0; i < MSDOS_MBR_MAX_PRIMARY_PARTITIONS; i++) {
+        sddf_dprintf("partition %d: type: 0x%lx", i, msdos_mbr.partitions[i].type);
+        if (msdos_mbr.partitions[i].type == MSDOS_MBR_PARTITION_TYPE_EMPTY) {
+            sddf_dprintf(" (empty)\n");
+        } else {
+            sddf_dprintf("\n");
+        }
+    }
+}
+
 static void partitions_init()
 {
     if (msdos_mbr.signature != MSDOS_MBR_SIGNATURE) {
@@ -78,6 +91,7 @@ static void partitions_init()
             LOG_BLK_VIRT_ERR(
                 "Invalid client partition mapping for client %d: partition: %zu, partition does not exist\n", i,
                 client_partition);
+            partitions_dump();
             return;
         }
 
