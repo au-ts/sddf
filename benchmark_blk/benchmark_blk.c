@@ -58,11 +58,13 @@ ccnt_t ccounter_benchmark_start;
 ccnt_t ccounter_benchmark_stop;
 uint64_t timer_start;
 uint64_t timer_end;
+uint64_t timeout_uart = 6e9;
 uint8_t benchmark_size_idx = 0;
 
 char *serial_tx_data;
 serial_queue_t *serial_tx_queue;
 serial_queue_handle_t serial_tx_queue_handle;
+bool printing_results_timeout = false;
 
 #ifdef CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES
 benchmark_track_kernel_entry_t *log_buffer;
@@ -186,15 +188,15 @@ static void microkit_benchmark_stop_tcb(uint64_t pd_id, uint64_t *total, uint64_
 
 static void print_benchmark_details(uint64_t pd_id, uint64_t kernel_util, uint64_t kernel_entries,
                                     uint64_t number_schedules, uint64_t total_util) {
-    if (pd_id == PD_TOTAL) {
-        sddf_printf("Total utilisation details: \n");
-    } else {
-        sddf_printf("Utilisation details for PD: ");
-        print_pdid_name(pd_id);
-        sddf_printf(" (%lx)\n", pd_id);
-    }
-    sddf_printf("{\nKernelUtilisation:  %lx\nKernelEntries:  %lx\nNumberSchedules:  %lx\nTotalUtilisation:  %lx\n}\n",
-                kernel_util, kernel_entries, number_schedules, total_util);
+//    if (pd_id == PD_TOTAL) {
+//        sddf_printf("Total utilisation details: \n");
+//    } else {
+//        sddf_printf("Utilisation details for PD: ");
+//        print_pdid_name(pd_id);
+//        sddf_printf(" (%lx)\n", pd_id);
+//    }
+//    sddf_printf("{\nKernelUtilisation:  %lx\nKernelEntries:  %lx\nNumberSchedules:  %lx\nTotalUtilisation:  %lx\n}\n",
+//                kernel_util, kernel_entries, number_schedules, total_util);
 }
 #endif
 
@@ -239,7 +241,7 @@ static inline void seL4_BenchmarkTrackDumpSummary(benchmark_track_kernel_entry_t
 }
 #endif
 
-void print_all_benchmark_results(enum run_benchmark_state print_state) {
+void print_benchmark_results_for_state(enum run_benchmark_state print_state) {
     benchmark_run_resuls_t* bench_results;
     const char* run_name = human_readable_run_benchmark_state[print_state];
     switch (print_state) {
@@ -264,8 +266,7 @@ void print_all_benchmark_results(enum run_benchmark_state print_state) {
         for (int i = 0; i != BENCHMARK_RUN_COUNT; ++i) {
             sddf_printf("No. rqs: %d, rq size: 0x%x B, speed: %.2f MiB/s,"
                     " speed_ccount: %.2f MiB/s, time: %lu ms, time_ccount: %lu ms, cpu_util: %.2f perc, "
-                    "ctxt_sw/rq: driv: %.2f, virt: %.2f, cli %.2f, idle: %.2f"
-                    ", cyc_driv: 0x%lx, cyc_virt: 0x%lx, cyc_cli: 0x%lx, cyc_idle: 0x%lx\n",
+                    "cyc_driv: 0x%lx, cyc_virt: 0x%lx, cyc_cli: 0x%lx, cyc_idle: 0x%lx\n",
                     REQUEST_COUNT[i],
                     BENCHMARK_BLOCKS_PER_REQUEST[i] * BLK_TRANSFER_SIZE,
                     bench_results[i + j*BENCHMARK_RUN_COUNT].speed,
@@ -273,10 +274,6 @@ void print_all_benchmark_results(enum run_benchmark_state print_state) {
                     (unsigned long) (bench_results[i + j*BENCHMARK_RUN_COUNT].time/1e6),
                     (unsigned long) (bench_results[i + j*BENCHMARK_RUN_COUNT].time_ccount/1e6),
                     bench_results[i + j*BENCHMARK_RUN_COUNT].cpuutil,
-                    (float) bench_results[i + j*BENCHMARK_RUN_COUNT].no_schedules_driver/REQUEST_COUNT[i],
-                    (float) bench_results[i + j*BENCHMARK_RUN_COUNT].no_schedules_virtualiser/REQUEST_COUNT[i],
-                    (float) bench_results[i + j*BENCHMARK_RUN_COUNT].no_schedules_client/REQUEST_COUNT[i],
-                    (float) bench_results[i + j*BENCHMARK_RUN_COUNT].no_schedules_idle/REQUEST_COUNT[i],
                     bench_results[i + j*BENCHMARK_RUN_COUNT].cycles_driver,
                     bench_results[i + j*BENCHMARK_RUN_COUNT].cycles_virtualiser,
                     bench_results[i + j*BENCHMARK_RUN_COUNT].cycles_client,
@@ -285,11 +282,34 @@ void print_all_benchmark_results(enum run_benchmark_state print_state) {
     }
 }
 
+void print_all_benchmark_results() {
+    /*
+     * Splits printing full results in half, adding a 6 second timeout in the middle,
+     * to allow the uart driver to catch up. Timeout added, as increasing memory region for the uart driver
+     * no longer solved uart hanging/garbling the output.
+     */
+    if (!printing_results_timeout) {
+        print_benchmark_results_for_state(THROUGHPUT_RANDOM_READ);
+        print_benchmark_results_for_state(THROUGHPUT_RANDOM_WRITE);
+        printing_results_timeout = true;
+        sddf_timer_set_timeout(TIMER_CH, 6e9);
+    } else {
+        printing_results_timeout = false;
+        print_benchmark_results_for_state(THROUGHPUT_SEQUENTIAL_READ);
+        print_benchmark_results_for_state(THROUGHPUT_SEQUENTIAL_WRITE);
+    }
+}
+
 void notified(microkit_channel ch) {
     switch (ch) {
     case TIMER_CH:
-        /* Timeout for UART to flush complete, run next benchmark */
-        microkit_notify(BENCH_RUN_CH);
+        if (printing_results_timeout) {
+            /* All benchmark results printed flood the uart, split in half so timing out after first half */
+            print_all_benchmark_results();
+        } else {
+            /* Timeout for UART to flush complete, run next benchmark */
+            microkit_notify(BENCH_RUN_CH);
+        }
         break;
     case START:
 #if defined(MICROKIT_CONFIG_benchmark) && !defined(VALIDATE_IO_OPERATIONS)
@@ -385,20 +405,20 @@ void notified(microkit_channel ch) {
         cycles_summed += total;
 #endif
 
-        sddf_printf("{\n");
-        for (int i = 0; i < ARRAY_SIZE(benchmarking_events); i++) {
-            sddf_printf("%s: %lX\n", counter_names[i], counter_values[i]);
-        }
+        //sddf_printf("{\n");
+        //for (int i = 0; i < ARRAY_SIZE(benchmarking_events); i++) {
+        //    sddf_printf("%s: %lX\n", counter_names[i], counter_values[i]);
+        //}
         /* Get the total cycle count spent during benchmark, compute cycles/KiB */
         uint64_t elapsed_time = timer_end-timer_start;
-        sddf_printf("Total time (ns): %ld\n", elapsed_time);
+        //sddf_printf("Total time (ns): %ld\n", elapsed_time);
         double speed = ((double) BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx] * BLK_TRANSFER_SIZE * \
                 REQUEST_COUNT[benchmark_size_idx] / (1024. * 1024.)) / ((double) (elapsed_time)*1e-9);
-        sddf_printf("speed (MiB/s: %f\n", speed);
+        //sddf_printf("speed (MiB/s: %f\n", speed);
         float cpuutil = (float) (((double) cycles_PD_BLK_VIRT_CLI /  cycles_PD_TOTAL) * 100);
-        sddf_printf("old cpuutil: %f\n", cpuutil);
+        //sddf_printf("old cpuutil: %f\n", cpuutil);
         cpuutil = (float) (((double) (cycles_PD_TOTAL - bench_results[benchmark_size_idx + run_offset].cycles_idle) /  cycles_PD_TOTAL) * 100);
-        sddf_printf("new cpuutil: %f\n", cpuutil);
+        //sddf_printf("new cpuutil: %f\n", cpuutil);
         /* compute MiB/s based on cyclecount (NOTE: using hardcoded CPU freq, as per uboot) */
 #ifdef MICROKIT_BOARD_odroidc4
         /* formula: amount of data transferred / (cycles_PD_TOTAL / ODROID_CPU_CLKFREQ_MHZ) */
@@ -416,18 +436,9 @@ void notified(microkit_channel ch) {
         bench_results[benchmark_size_idx + run_offset].time_ccount = elapsed_time_ccount;
         bench_results[benchmark_size_idx + run_offset].cpuutil = cpuutil;
 
-        sddf_printf("total cycles: 0x%lx\n", ccounter_benchmark_stop-ccounter_benchmark_start);
-        sddf_printf("PMU measured total: 0x%lx, PMU measured sum rest: 0x%lx, diff: 0x%lx\n", cycles_PD_TOTAL, cycles_summed, cycles_PD_TOTAL-cycles_summed);
-        double cycles_per_kib = (ccounter_benchmark_stop - ccounter_benchmark_start) / \
-                                (BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx] * BLK_TRANSFER_SIZE \
-                                 * REQUEST_COUNT[benchmark_size_idx] / 1024);
-        double cycles_per_mib = (ccounter_benchmark_stop - ccounter_benchmark_start) / \
-                                (BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx] * BLK_TRANSFER_SIZE \
-                                 * REQUEST_COUNT[benchmark_size_idx] / 1024 / 1024);
-        sddf_printf("Benchmark_Size_idx; %d\n", benchmark_size_idx);
-        sddf_printf("Cycles per KiB (decimal): %f\n", cycles_per_kib);
-        sddf_printf("Cycles per MiB (decimal): %f\n", cycles_per_mib);
-        sddf_printf("}\n");
+        //sddf_printf("total cycles: 0x%lx\n", ccounter_benchmark_stop-ccounter_benchmark_start);
+        //sddf_printf("PMU measured total: 0x%lx, PMU measured sum rest: 0x%lx, diff: 0x%lx\n", cycles_PD_TOTAL, cycles_summed, cycles_PD_TOTAL-cycles_summed);
+        //sddf_printf("}\n");
 
 #ifdef CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES
         entries = seL4_BenchmarkFinalizeLog();
@@ -438,22 +449,26 @@ void notified(microkit_channel ch) {
         // Print out results:
         switch (run_benchmark_state) {
             case THROUGHPUT_RANDOM_READ:
-                print_all_benchmark_results(THROUGHPUT_RANDOM_READ);
+                print_benchmark_results_for_state(THROUGHPUT_RANDOM_READ);
                 break;
             case THROUGHPUT_RANDOM_WRITE:
-                print_all_benchmark_results(THROUGHPUT_RANDOM_READ);
-                print_all_benchmark_results(THROUGHPUT_RANDOM_WRITE);
+                //print_benchmark_results_for_state(THROUGHPUT_RANDOM_READ);
+                print_benchmark_results_for_state(THROUGHPUT_RANDOM_WRITE);
                 break;
             case THROUGHPUT_SEQUENTIAL_READ:
-                print_all_benchmark_results(THROUGHPUT_RANDOM_READ);
-                print_all_benchmark_results(THROUGHPUT_RANDOM_WRITE);
-                print_all_benchmark_results(THROUGHPUT_SEQUENTIAL_READ);
+                //print_benchmark_results_for_state(THROUGHPUT_RANDOM_READ);
+                //print_benchmark_results_for_state(THROUGHPUT_RANDOM_WRITE);
+                print_benchmark_results_for_state(THROUGHPUT_SEQUENTIAL_READ);
                 break;
             case THROUGHPUT_SEQUENTIAL_WRITE:
-                print_all_benchmark_results(THROUGHPUT_RANDOM_READ);
-                print_all_benchmark_results(THROUGHPUT_RANDOM_WRITE);
-                print_all_benchmark_results(THROUGHPUT_SEQUENTIAL_READ);
-                print_all_benchmark_results(THROUGHPUT_SEQUENTIAL_WRITE);
+                // XXX: only for the last run repeat of sequential write, print ALL results
+                if (benchmark_size_idx % BENCHMARK_RUN_COUNT == 0 && \
+                        (benchmark_run_idx + 1) % BENCHMARK_INDIVIDUAL_RUN_REPEATS == 0) {
+                    sddf_printf("BENCH|Finished all Benchmarks, printing all results!\n");
+                    print_all_benchmark_results();
+                } else {
+                    print_benchmark_results_for_state(THROUGHPUT_SEQUENTIAL_WRITE);
+                }
                 break;
             default:
                 panic("BENCHMARK: Error, unimplemented benchmark state transition");
@@ -482,9 +497,8 @@ void notified(microkit_channel ch) {
 #endif
 
         /* spin to let UART flush its content */
-        uint64_t timeout_duration = 3e9;
-        sddf_printf("benchmark: wait for UART to print out its msgs. Timing out for: %f ms.\n", timeout_duration/1e6);
-        sddf_timer_set_timeout(TIMER_CH, timeout_duration);
+        sddf_printf("benchmark: wait for UART to print out its msgs. Timing out for: %f ms.\n", timeout_uart/1e6);
+        sddf_timer_set_timeout(TIMER_CH, timeout_uart);
         break;
     case SERIAL_TX_CH:
         // Nothing to do
