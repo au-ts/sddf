@@ -25,10 +25,10 @@
     <memory_region name="blk_client_data" size="0xa00_000" page_size="0x200_000" />
 
     <!-- shared memory for serial data regions (printing to serial console, benchmark build)  -->
-    <memory_region name="serial_tx_data_driver" size="0x8_000" />
+    <memory_region name="serial_tx_data_driver" size="0x18_000" />
     <!-- <memory_region name="serial_tx_data_blkvirt" size="0x2_000" /> -->
-    <memory_region name="serial_tx_data_client0" size="0x4_000" />
-    <memory_region name="serial_tx_data_bench" size="0x4_000" />
+    <memory_region name="serial_tx_data_client0" size="0xc_000" />
+    <memory_region name="serial_tx_data_bench" size="0xc_000" />
 
     <!-- shared memory for serial queue regions -->
     <memory_region name="serial_tx_queue_driver" size="0x1_000" />
@@ -91,9 +91,9 @@
             <map mr="serial_tx_queue_bench" vaddr="0x4_002_000" perms="rw" cached="true"/>
 
             <map mr="serial_tx_data_driver" vaddr="0x4_003_000" perms="rw" cached="true" setvar_vaddr="tx_data_drv" />
-            <map mr="serial_tx_data_client0" vaddr="0x4_00b_000" perms="r" cached="true" setvar_vaddr="tx_data_cli0" />
+            <map mr="serial_tx_data_client0" vaddr="0x4_01b_000" perms="r" cached="true" setvar_vaddr="tx_data_cli0" />
             <!-- serial_tx_data_bench is client1 in this case -->
-            <map mr="serial_tx_data_bench" vaddr="0x4_00f_000" perms="r" cached="true"/>
+            <map mr="serial_tx_data_bench" vaddr="0x4_027_000" perms="r" cached="true"/>
         </protection_domain>
 
         <protection_domain name="blk_virt" id="2" priority="100">
