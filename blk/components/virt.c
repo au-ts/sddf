@@ -65,7 +65,7 @@ static void partitions_dump()
 {
     sddf_dprintf("the following partitions exist:\n");
     for (int i = 0; i < MSDOS_MBR_MAX_PRIMARY_PARTITIONS; i++) {
-        sddf_dprintf("partition %d: type: 0x%lx", i, msdos_mbr.partitions[i].type);
+        sddf_dprintf("partition %d: type: 0x%hhx", i, msdos_mbr.partitions[i].type);
         if (msdos_mbr.partitions[i].type == MSDOS_MBR_PARTITION_TYPE_EMPTY) {
             sddf_dprintf(" (empty)\n");
         } else {
@@ -290,7 +290,7 @@ static bool handle_client(int cli_id)
             unsigned long client_start_sector = clients[cli_id].start_sector / (BLK_TRANSFER_SIZE / MSDOS_MBR_SECTOR_SIZE);
             if (drv_block_number < client_start_sector || drv_block_number + cli_count > client_start_sector + client_sectors) {
                 /* Requested block number out of bounds */
-                LOG_BLK_VIRT_ERR("client %d request for block %d is out of bounds\n", cli_id, cli_block_number);
+                LOG_BLK_VIRT_ERR("client %d request for block %lu is out of bounds\n", cli_id, cli_block_number);
                 resp_status = BLK_RESP_ERR_INVALID_PARAM;
                 goto req_fail;
             }
