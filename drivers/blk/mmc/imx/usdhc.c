@@ -991,8 +991,8 @@ void handle_clients(void)
             return;
         }
 
-        LOG_DRIVER("Received command: code=%d, offset=0x%lx, block_number=%lu, count=%d, id=%d\n",
-                   req_code, req_offset, req_block_number, req_count, req_id);
+        LOG_DRIVER("Received command: code=%d, offset=0x%lx, block_number=%lu, count=%d, id=%d\n", req_code, req_offset,
+                   req_block_number, req_count, req_id);
 
         driver_state.clients = ClientStateInflight;
         fallthrough;
