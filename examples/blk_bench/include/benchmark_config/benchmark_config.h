@@ -1,5 +1,5 @@
 /*
- * Copyright 2024, UNSW
+ * Copyright 2025, UNSW
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
@@ -12,16 +12,14 @@
 #define REQUEST_COUNT (uint16_t[]) {256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256}
 //#define REQUEST_COUNT (uint32_t[]) {10, 10, 10, 10, 10}
 #define BENCHMARK_RUN_COUNT ((int) sizeof(BENCHMARK_BLOCKS_PER_REQUEST)/sizeof(uint16_t))
-#define BENCHMARK_INDIVIDUAL_RUN_REPEATS 3
-// 16 MiB interval to counter the caching of block device's sequential READs
-// XXX and to counter the batching of WRITE commits
-#define BLOCK_READ_WRITE_INTERVAL 0x1000000
+#define BENCHMARK_INDIVIDUAL_RUN_REPEATS 10
 // comment out when benchmarking, if defined: performs validation of all IO operations (using RANDOM_WRITE and SEQUENTIAL_WRITE traces and reading them back)
 //#define VALIDATE_IO_OPERATIONS
 
 // TODO: add defines for default clock speed for odroid c4's CPU, to compute throughput in terms of time
 // in MHz
-#define ODROID_CPU_CLKFREQ_MHZ 1200
+//#define ODROID_CPU_CLKFREQ_MHZ 1200
+#define ODROID_CPU_CLKFREQ_MHZ 1000
 
 // benchmark runs
 enum run_benchmark_state {
