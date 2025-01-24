@@ -176,12 +176,8 @@ static inline uint32_t blk_queue_length_resp(blk_queue_handle_t *h)
  *
  * @return -1 when request queue is full, 0 on success.
  */
-static inline int blk_enqueue_req(blk_queue_handle_t *h,
-                                  blk_req_code_t code,
-                                  uintptr_t io_or_offset,
-                                  uint64_t block_number,
-                                  uint16_t count,
-                                  uint32_t id)
+static inline int blk_enqueue_req(blk_queue_handle_t *h, blk_req_code_t code, uintptr_t io_or_offset,
+                                  uint64_t block_number, uint16_t count, uint32_t id)
 {
     struct blk_req *brp;
     struct blk_req_queue *brqp;
@@ -250,12 +246,8 @@ static inline int blk_enqueue_resp(blk_queue_handle_t *h,
  *
  * @return -1 when request queue is empty, 0 on success.
  */
-static inline int blk_dequeue_req(blk_queue_handle_t *h,
-                                  blk_req_code_t *code,
-                                  uintptr_t *io_or_offset,
-                                  uint64_t *block_number,
-                                  uint16_t *count,
-                                  uint32_t *id)
+static inline int blk_dequeue_req(blk_queue_handle_t *h, blk_req_code_t *code, uintptr_t *io_or_offset,
+                                  uint64_t *block_number, uint16_t *count, uint32_t *id)
 {
     struct blk_req *brp;
     struct blk_req_queue *brqp;
