@@ -198,7 +198,8 @@ void init(void)
 
 static void handle_driver()
 {
-    bool client_notify[SDDF_BLK_MAX_CLIENTS] = { 0 };
+    bool client_notify[SDDF_BLK_MAX_CLIENTS];
+    sddf_memset(client_notify, 0, SDDF_BLK_MAX_CLIENTS);
 
     blk_resp_status_t drv_status = 0;
     uint16_t drv_success_count = 0;

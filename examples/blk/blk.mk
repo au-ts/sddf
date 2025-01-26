@@ -20,7 +20,7 @@ ifeq ($(strip $(TOOLCHAIN)),)
 endif
 
 ifeq ($(strip $(TOOLCHAIN)), clang)
-	CC := clang -target aarch64-none-elf
+	CC := clang
 	LD := ld.lld
 	AR := llvm-ar
 	RANLIB := llvm-ranlib
@@ -40,15 +40,30 @@ ifdef PARTITION
 	PARTITION_ARG := --partition $(PARTITION)
 endif
 
+IMAGE_FILE := loader.img
+REPORT_FILE  := report.txt
+SYSTEM_FILE := blk.system
+
+ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
+	ARCH := aarch64
+	BLK_DRIVER_DIR := virtio
+	CPU := cortex-a53
+	QEMU := qemu-system-aarch64
+	QEMU_ARCH_ARGS := -machine virt,virtualization=on -cpu cortex-a53 -device loader,file=$(IMAGE_FILE),addr=0x70000000,cpu-num=0
+else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_riscv64)
+	ARCH := riscv64
+	BLK_DRIVER_DIR := virtio
+	QEMU := qemu-system-riscv64
+	QEMU_ARCH_ARGS := -machine virt -kernel $(IMAGE_FILE)
+else
+$(error Unsupported MICROKIT_BOARD given)
+endif
+
 DTC := dtc
-QEMU := qemu-system-aarch64
 PYTHON ?= python3
 
 BUILD_DIR ?= build
 MICROKIT_CONFIG ?= debug
-
-BLK_DRIVER_DIR := virtio
-CPU := cortex-a53
 
 TOP := ${SDDF}/examples/blk
 CONFIGS_INCLUDE := ${TOP}
@@ -58,9 +73,7 @@ MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 
 IMAGES := blk_driver.elf client.elf blk_virt.elf
-CFLAGS := -mcpu=$(CPU) \
-		  -mstrict-align \
-		  -nostdlib \
+CFLAGS := -nostdlib \
 		  -ffreestanding \
 		  -g3 \
 		  -O3 \
@@ -71,9 +84,12 @@ CFLAGS := -mcpu=$(CPU) \
 LDFLAGS := -L$(BOARD_DIR)/lib
 LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
 
-IMAGE_FILE   := loader.img
-REPORT_FILE  := report.txt
-SYSTEM_FILE := blk.system
+ifeq ($(ARCH),aarch64)
+	CFLAGS += -mcpu=$(CPU) -target aarch64-none-elf
+else ifeq ($(ARCH),riscv64)
+	CFLAGS += -march=rv64imafdc -target riscv64-none-elf
+endif
+
 DTS := $(SDDF)/dts/$(MICROKIT_BOARD).dts
 DTB := $(MICROKIT_BOARD).dtb
 METAPROGRAM := $(TOP)/meta.py
@@ -113,12 +129,11 @@ qemu_disk:
 	$(SDDF)/tools/mkvirtdisk disk 1 512 16777216
 
 qemu: ${IMAGE_FILE} qemu_disk
-	$(QEMU) -machine virt,virtualization=on \
-			-cpu cortex-a53 \
+	$(QEMU) $(QEMU_ARCH_ARGS) \
 			-serial mon:stdio \
-			-device loader,file=$(IMAGE_FILE),addr=0x70000000,cpu-num=0 \
 			-m size=2G \
 			-nographic \
+            -d guest_errors \
             -global virtio-mmio.force-legacy=false \
             -drive file=disk,if=none,format=raw,id=hd \
             -device virtio-blk-device,drive=hd
