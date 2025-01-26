@@ -110,7 +110,7 @@ $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
 
 qemu_disk:
-	$(SDDF)/tools/mkvirtdisk mydisk 1 512 16777216
+	$(SDDF)/tools/mkvirtdisk disk 1 512 16777216
 
 qemu: ${IMAGE_FILE} qemu_disk
 	$(QEMU) -machine virt,virtualization=on \
@@ -120,8 +120,7 @@ qemu: ${IMAGE_FILE} qemu_disk
 			-m size=2G \
 			-nographic \
             -global virtio-mmio.force-legacy=false \
-            -d guest_errors \
-            -drive file=mydisk,if=none,format=raw,id=hd \
+            -drive file=disk,if=none,format=raw,id=hd \
             -device virtio-blk-device,drive=hd
 
 clean::
