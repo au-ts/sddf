@@ -260,7 +260,7 @@ pub fn build(b: *std.Build) !void {
             const loader_arg = b.fmt("loader,file={s},addr=0x70000000,cpu-num=0", .{ final_image_dest });
             qemu_cmd = b.addSystemCommand(&[_][]const u8{
                 "qemu-system-aarch64",
-                "-machine", "virt,virtualization=on,highmem=off,secure=off",
+                "-machine", "virt,virtualization=on",
                 "-cpu", "cortex-a53",
                 "-serial", "mon:stdio",
                 "-device", loader_arg,
