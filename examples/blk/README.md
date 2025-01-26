@@ -37,7 +37,11 @@ make MICROKIT_SDK=<path/to/sdk> MICROKIT_BOARD=<board> [PARTITION=<partition>]
 
 After building, the system image to load will be `build/loader.img`.
 
-If you wish to simulate on the QEMU virt AArch64 platform, you can append `qemu` to your make command.
+If you wish to simulate on the QEMU virt AArch64/RISCV-64 platform, you can append
+`qemu` to your make command like so:
+```sh
+make MICROKIT_SDK=<path/to/sdk> MICROKIT_BOARD=<board> qemu
+```
 
 ### Zig
 
