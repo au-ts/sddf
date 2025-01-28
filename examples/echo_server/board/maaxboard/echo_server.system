@@ -15,13 +15,21 @@
     <!-- DMA and virtualised DMA regions -->
     <memory_region name="net_rx_buffer_data_region" size="0x200_000" page_size="0x200_000" /> <!-- Must be mapped read-only! -->
     <memory_region name="net_tx_buffer_data_region_cli0" size="0x200_000" page_size="0x200_000" />
+    <memory_region name="net_rx_buffer_data_region_cli0" size="0x200_000" page_size="0x200_000" />
     <memory_region name="net_tx_buffer_data_region_cli1" size="0x200_000" page_size="0x200_000" />
+    <memory_region name="net_rx_buffer_data_region_cli1" size="0x200_000" page_size="0x200_000" />
 
     <!-- shared memory for driver/virt queue mechanism -->
     <memory_region name="net_rx_free_drv" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="net_rx_active_drv" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="net_tx_free_drv" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="net_tx_active_drv" size="0x200_000" page_size="0x200_000"/>
+
+    <!-- shared memory for virt_rx/copy queue mechanism -->
+    <!-- <memory_region name="net_rx_free_copy0" size="0x200_000" page_size="0x200_000"/> -->
+    <!-- <memory_region name="net_rx_active_copy0" size="0x200_000" page_size="0x200_000"/> -->
+    <!-- <memory_region name="net_rx_free_copy1" size="0x200_000" page_size="0x200_000"/> -->
+    <!-- <memory_region name="net_rx_active_copy1" size="0x200_000" page_size="0x200_000"/> -->
 
     <!-- shared memory for copy/lwip queue mechanism -->
     <memory_region name="net_rx_free_cli0" size="0x200_000" page_size="0x200_000"/>
@@ -121,6 +129,14 @@
             <setvar symbol="buffer_data_paddr" region_paddr="net_rx_buffer_data_region" />
         </protection_domain>
 
+        <protection_domain name="null0" priority="98" budget="20000" id="4">
+            <program_image path="null.elf" />
+        </protection_domain>
+
+        <protection_domain name="null1" priority="96" budget="20000" id="5">
+            <program_image path="null.elf" />
+        </protection_domain>
+
         <protection_domain name="net_virt_tx" priority="100" budget="20000" id="3">
             <program_image path="network_virt_tx.elf" />
             <map mr="net_tx_free_drv" vaddr="0x2_000_000" perms="rw" cached="true" setvar_vaddr="tx_free_drv" />
@@ -203,11 +219,21 @@
 
     <channel>
         <end pd="net_virt_rx" id="1" />
-        <end pd="client0" id="2" />
+        <end pd="null0" id="0" />
     </channel>
 
     <channel>
         <end pd="net_virt_rx" id="2" />
+        <end pd="null1" id="0" />
+    </channel>
+
+    <channel>
+        <end pd="null0" id="1" />
+        <end pd="client0" id="2" />
+    </channel>
+
+    <channel>
+        <end pd="null1" id="1" />
         <end pd="client1" id="2" />
     </channel>
 
