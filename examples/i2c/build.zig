@@ -126,6 +126,7 @@ pub fn build(b: *std.Build) void {
         .files = &.{"client_pn532.c"},
     });
     client_pn532.addIncludePath(sddf_dep.path("include"));
+    client_pn532.addIncludePath(sddf_dep.path("include/microkit"));
     client_pn532.linkLibrary(sddf_dep.artifact("util"));
     client_pn532.linkLibrary(sddf_dep.artifact("util_putchar_debug"));
     client_pn532.linkLibrary(pn532_driver);
@@ -141,6 +142,7 @@ pub fn build(b: *std.Build) void {
         .files = &.{"client_ds3231.c"},
     });
     client_ds3231.addIncludePath(sddf_dep.path("include"));
+    client_ds3231.addIncludePath(sddf_dep.path("include/microkit"));
     client_ds3231.linkLibrary(sddf_dep.artifact("util"));
     client_ds3231.linkLibrary(sddf_dep.artifact("util_putchar_debug"));
     client_ds3231.linkLibrary(ds3231_driver);

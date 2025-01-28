@@ -16,7 +16,7 @@
  * may be needed if instead this driver was to be used in a different environment.
  */
 
-#include <microkit.h>
+#include <os/sddf.h>
 #include <sddf/util/ialloc.h>
 #include <sddf/virtio/virtio.h>
 #include <sddf/virtio/virtio_queue.h>
@@ -36,15 +36,6 @@ uintptr_t hw_ring_buffer_paddr;
 /* The number of entries in each virtqueue */
 #define RX_COUNT 512
 #define TX_COUNT 512
-
-/*
- * This default is based on the default QEMU setup but could change
- * depending on the instantiation of QEMU or wherever this driver is
- * being used.
- */
-#ifndef VIRTIO_MMIO_CONSOLE_OFFSET
-#define VIRTIO_MMIO_CONSOLE_OFFSET (0xe00)
-#endif
 
 #define VIRTIO_SERIAL_RX_QUEUE 0
 #define VIRTIO_SERIAL_TX_QUEUE 1
@@ -100,8 +91,6 @@ static inline bool virtio_avail_full_tx(struct virtq *virtq)
     return tx_last_desc_idx >= tx_virtq.num;
 }
 
-/* The virtio MMIO region */
-uintptr_t uart_base;
 volatile virtio_mmio_regs_t *uart_regs;
 
 static void tx_provide(void)
@@ -146,7 +135,7 @@ static void tx_provide(void)
         uart_regs->QueueNotify = VIRTIO_SERIAL_TX_QUEUE;
         if (serial_require_consumer_signal(&tx_queue_handle)) {
             serial_cancel_consumer_signal(&tx_queue_handle);
-            microkit_notify(config.tx.id);
+            sddf_notify(config.tx.id);
         }
     }
 }
@@ -267,7 +256,7 @@ static void rx_return(void)
     rx_last_seen_used += transferred;
 
     if (transferred > 0) {
-        microkit_notify(config.rx.id);
+        sddf_notify(config.rx.id);
     }
 }
 
@@ -419,14 +408,14 @@ void init()
     }
     serial_queue_init(&tx_queue_handle, config.tx.queue.vaddr, config.tx.data.size, config.tx.data.vaddr);
 
-    microkit_irq_ack(device_resources.irqs[0].id);
+    sddf_irq_ack(device_resources.irqs[0].id);
 }
 
-void notified(microkit_channel ch)
+void notified(sddf_channel ch)
 {
     if (ch == device_resources.irqs[0].id) {
         handle_irq();
-        microkit_deferred_irq_ack(ch);
+        sddf_deferred_irq_ack(ch);
     } else if (ch == config.tx.id) {
         tx_provide();
     } else if (ch == config.rx.id) {

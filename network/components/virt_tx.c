@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-#include <microkit.h>
+#include <os/sddf.h>
 #include <sddf/network/queue.h>
 #include <sddf/network/config.h>
 #include <sddf/util/cache.h>
@@ -73,7 +73,7 @@ void tx_provide(void)
 
     if (enqueued && net_require_signal_active(&state.tx_queue_drv)) {
         net_cancel_signal_active(&state.tx_queue_drv);
-        microkit_deferred_notify(config.driver.id);
+        sddf_deferred_notify(config.driver.id);
     }
 }
 
@@ -107,12 +107,12 @@ void tx_return(void)
     for (int client = 0; client < config.num_clients; client++) {
         if (notify_clients[client] && net_require_signal_free(&state.tx_queue_clients[client])) {
             net_cancel_signal_free(&state.tx_queue_clients[client]);
-            microkit_notify(config.clients[client].conn.id);
+            sddf_notify(config.clients[client].conn.id);
         }
     }
 }
 
-void notified(microkit_channel ch)
+void notified(sddf_channel ch)
 {
     tx_return();
     tx_provide();

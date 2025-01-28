@@ -8,7 +8,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <sddf/util/util.h>
-#include <microkit.h>
+#include <os/sddf.h>
 
 /* This library contains a selection of libseL4bench used for sDDF benchmarking. libsel4bench can be found here:
 https://github.com/seL4/seL4_libs

@@ -215,6 +215,7 @@ pub fn build(b: *std.Build) !void {
 
     client.addCSourceFile(.{ .file = b.path("client.c") });
     client.addIncludePath(sddf_dep.path("include"));
+    client.addIncludePath(sddf_dep.path("include/microkit"));
     client.linkLibrary(sddf_dep.artifact("util"));
     client.linkLibrary(sddf_dep.artifact("util_putchar_serial"));
 

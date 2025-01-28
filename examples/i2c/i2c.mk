@@ -59,6 +59,7 @@ METAPROGRAM := $(TOP)/meta.py
 
 CFLAGS += -I$(BOARD_DIR)/include \
 	-I$(SDDF)/include \
+	-I$(SDDF)/include/microkit \
 	-I$(LIBCO) \
 	-MD \
 	-MP

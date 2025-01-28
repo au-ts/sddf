@@ -5,7 +5,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <microkit.h>
+#include <os/sddf.h>
 #include <sddf/serial/queue.h>
 #include <sddf/serial/config.h>
 #include <sddf/util/string.h>
@@ -69,7 +69,7 @@ void rx_return(void)
                 if (input_number >= 0 && input_number < config.num_clients) {
                     if (transferred) {
                         serial_update_shared_tail(&rx_queue_handle_cli[current_client], local_tail);
-                        microkit_notify(config.clients[current_client].id);
+                        sddf_notify(config.clients[current_client].id);
                     }
                     current_client = (uint32_t)input_number;
                     local_tail = rx_queue_handle_cli[current_client].queue->tail;
@@ -95,11 +95,11 @@ void rx_return(void)
     if (!serial_queue_full(&rx_queue_handle_drv, rx_queue_handle_drv.queue->tail)
         && serial_require_consumer_signal(&rx_queue_handle_drv)) {
         serial_cancel_consumer_signal(&rx_queue_handle_drv);
-        microkit_notify(config.driver.id);
+        sddf_notify(config.driver.id);
     }
 
     if (transferred) {
-        microkit_notify(config.clients[current_client].id);
+        sddf_notify(config.clients[current_client].id);
     }
 }
 
@@ -115,7 +115,7 @@ void init(void)
     }
 }
 
-void notified(microkit_channel ch)
+void notified(sddf_channel ch)
 {
     if (ch == config.driver.id) {
         rx_return();

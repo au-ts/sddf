@@ -77,6 +77,7 @@ CFLAGS := -mcpu=${CPU} \
 		  -Wall -Wno-unused-function -Werror -Wno-unused-command-line-argument \
 		  -I${BOARD_DIR}/include \
 		  -I${SDDF}/include \
+		  -I${SDDF}/include/microkit \
 		  -I${PROJECT_INCLUDE}
 ifneq ($(strip ${BLOB}), 0)
 CFLAGS_gpu := -DGPU_BLOB_SUPPORT

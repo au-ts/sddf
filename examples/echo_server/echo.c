@@ -4,7 +4,7 @@
  */
 #include <stdbool.h>
 #include <stdint.h>
-#include <microkit.h>
+#include <os/sddf.h>
 #include <sddf/util/util.h>
 #include <sddf/util/string.h>
 #include <sddf/util/printf.h>
@@ -41,14 +41,14 @@ struct pbuf *head;
 struct pbuf *tail;
 
 /**
- * Netif status callback function that output's client's Microkit name and
+ * Netif status callback function that output's client's name and
  * obtained IP address.
  *
  * @param ip_addr ip address of the client.
  */
 void netif_status_callback(char *ip_addr)
 {
-    sddf_printf("DHCP request finished, IP address for netif %s is: %s\n", microkit_name, ip_addr);
+    sddf_printf("DHCP request finished, IP address for netif %s is: %s\n", pd_name, ip_addr);
 }
 
 /**
@@ -141,7 +141,7 @@ void init(void)
     sddf_lwip_maybe_notify();
 }
 
-void notified(microkit_channel ch)
+void notified(sddf_channel ch)
 {
     if (ch == net_config.rx.id) {
         sddf_lwip_process_rx();

@@ -148,6 +148,7 @@ pub fn build(b: *std.Build) !void {
     });
 
     client.addIncludePath(sddf_dep.path("include"));
+    client.addIncludePath(sddf_dep.path("include/microkit"));
     client.linkLibrary(sddf_dep.artifact("util"));
     client.linkLibrary(sddf_dep.artifact("util_putchar_debug"));
 
