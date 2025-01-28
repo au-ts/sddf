@@ -98,6 +98,7 @@ fn addSerialDriver(
         .file = b.path(source),
     });
     driver.addIncludePath(b.path("include"));
+    driver.addIncludePath(b.path("include/microkit"));
     driver.addIncludePath(b.path(driver_include));
     driver.linkLibrary(util);
 
@@ -122,6 +123,7 @@ fn addTimerDriver(
         .file = b.path(source),
     });
     driver.addIncludePath(b.path("include"));
+    driver.addIncludePath(b.path("include/microkit"));
     driver.linkLibrary(util);
 
     return driver;
@@ -147,6 +149,7 @@ fn addI2cDriverDevice(
     });
     driver.addIncludePath(b.path(b.fmt("i2c/devices/{s}/", .{@tagName(device)})));
     driver.addIncludePath(b.path("include"));
+    driver.addIncludePath(b.path("include/microkit"));
     driver.linkLibrary(util);
     driver.addIncludePath(b.path("libco"));
 
@@ -174,6 +177,7 @@ fn addI2cDriverHost(
     });
     driver.addIncludePath(b.path(b.fmt("drivers/i2c/{s}/", .{@tagName(class)})));
     driver.addIncludePath(b.path("include"));
+    driver.addIncludePath(b.path("include/microkit"));
     driver.linkLibrary(util);
 
     return driver;
@@ -198,6 +202,7 @@ fn addBlockDriver(
     });
     driver.addIncludePath(b.path(b.fmt("drivers/blk/{s}/", .{ @tagName(class) })));
     driver.addIncludePath(b.path("include"));
+    driver.addIncludePath(b.path("include/microkit"));
     driver.linkLibrary(util);
 
     return driver;
@@ -222,6 +227,7 @@ fn addMmcDriver(
     });
     driver.addIncludePath(b.path(b.fmt("drivers/blk/mmc/{s}/", .{ @tagName(class) })));
     driver.addIncludePath(b.path("include"));
+    driver.addIncludePath(b.path("include/microkit"));
     driver.linkLibrary(util);
 
     return driver;
@@ -246,6 +252,7 @@ fn addNetworkDriver(
     });
     driver.addIncludePath(b.path(b.fmt("drivers/network/{s}/", .{ @tagName(class) })));
     driver.addIncludePath(b.path("include"));
+    driver.addIncludePath(b.path("include/microkit"));
     driver.linkLibrary(util);
 
     return driver;
@@ -272,6 +279,7 @@ fn addGpuDriver(
     driver.addIncludePath(gpu_config_include);
     driver.addIncludePath(b.path(b.fmt("drivers/gpu/{s}/", .{ @tagName(class) })));
     driver.addIncludePath(b.path("include"));
+    driver.addIncludePath(b.path("include/microkit"));
     driver.linkLibrary(util);
 
     return driver;
@@ -317,6 +325,7 @@ pub fn build(b: *std.Build) void {
         .files = &util_src,
     });
     util.addIncludePath(b.path("include"));
+    util.addIncludePath(b.path("include/microkit"));
     util.addIncludePath(libmicrokit_include);
     util.installHeadersDirectory(b.path("include"), "", .{});
     b.installArtifact(util);
@@ -330,6 +339,7 @@ pub fn build(b: *std.Build) void {
         .files = &util_putchar_serial_src,
     });
     util_putchar_serial.addIncludePath(b.path("include"));
+    util_putchar_serial.addIncludePath(b.path("include/microkit"));
     util_putchar_serial.addIncludePath(libmicrokit_include);
     util_putchar_serial.installHeadersDirectory(b.path("include"), "", .{});
     b.installArtifact(util_putchar_serial);
@@ -343,6 +353,7 @@ pub fn build(b: *std.Build) void {
         .files = &util_putchar_debug_src,
     });
     util_putchar_debug.addIncludePath(b.path("include"));
+    util_putchar_debug.addIncludePath(b.path("include/microkit"));
     util_putchar_debug.addIncludePath(libmicrokit_include);
     util_putchar_debug.installHeadersDirectory(b.path("include"), "", .{});
     b.installArtifact(util_putchar_debug);
@@ -358,6 +369,7 @@ pub fn build(b: *std.Build) void {
         .file = b.path("blk/components/virt.c"),
     });
     blk_virt.addIncludePath(b.path("include"));
+    blk_virt.addIncludePath(b.path("include/microkit"));
     blk_virt.linkLibrary(util);
     blk_virt.linkLibrary(util_putchar_debug);
     b.installArtifact(blk_virt);
@@ -385,6 +397,7 @@ pub fn build(b: *std.Build) void {
         .file = b.path("serial/components/virt_rx.c"),
     });
     serial_virt_rx.addIncludePath(b.path("include"));
+    serial_virt_rx.addIncludePath(b.path("include/microkit"));
     serial_virt_rx.linkLibrary(util);
     serial_virt_rx.linkLibrary(util_putchar_debug);
     b.installArtifact(serial_virt_rx);
@@ -399,6 +412,7 @@ pub fn build(b: *std.Build) void {
         .file = b.path("serial/components/virt_tx.c"),
     });
     serial_virt_tx.addIncludePath(b.path("include"));
+    serial_virt_tx.addIncludePath(b.path("include/microkit"));
     serial_virt_tx.linkLibrary(util);
     serial_virt_tx.linkLibrary(util_putchar_debug);
     b.installArtifact(serial_virt_tx);
@@ -422,6 +436,7 @@ pub fn build(b: *std.Build) void {
     });
     gpu_virt.addIncludePath(gpu_config_include);
     gpu_virt.addIncludePath(b.path("include"));
+    gpu_virt.addIncludePath(b.path("include/microkit"));
     gpu_virt.linkLibrary(util);
     gpu_virt.linkLibrary(util_putchar_debug);
     b.installArtifact(gpu_virt);
@@ -451,6 +466,7 @@ pub fn build(b: *std.Build) void {
         .file = b.path("i2c/components/virt.c"),
     });
     i2c_virt.addIncludePath(b.path("include"));
+    i2c_virt.addIncludePath(b.path("include/microkit"));
     i2c_virt.linkLibrary(util);
     i2c_virt.linkLibrary(util_putchar_debug);
     b.installArtifact(i2c_virt);
@@ -486,6 +502,7 @@ pub fn build(b: *std.Build) void {
         .file = b.path("network/components/virt_rx.c"),
     });
     net_virt_rx.addIncludePath(b.path("include"));
+    net_virt_rx.addIncludePath(b.path("include/microkit"));
     net_virt_rx.linkLibrary(util);
     net_virt_rx.linkLibrary(util_putchar_debug);
     b.installArtifact(net_virt_rx);
@@ -500,6 +517,7 @@ pub fn build(b: *std.Build) void {
         .file = b.path("network/components/virt_tx.c"),
     });
     net_virt_tx.addIncludePath(b.path("include"));
+    net_virt_tx.addIncludePath(b.path("include/microkit"));
     net_virt_tx.linkLibrary(util);
     net_virt_tx.linkLibrary(util_putchar_debug);
     b.installArtifact(net_virt_tx);
@@ -514,6 +532,7 @@ pub fn build(b: *std.Build) void {
         .file = b.path("network/components/copy.c"),
     });
     net_copy.addIncludePath(b.path("include"));
+    net_copy.addIncludePath(b.path("include/microkit"));
     net_copy.linkLibrary(util);
     net_copy.linkLibrary(util_putchar_debug);
     b.installArtifact(net_copy);

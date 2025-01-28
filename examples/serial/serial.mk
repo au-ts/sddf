@@ -89,7 +89,8 @@ else ifeq ($(ARCH),riscv64)
 endif
 CFLAGS += -I$(BOARD_DIR)/include \
 	-I${TOP}/include	\
-	-I$(SDDF)/include \
+	-I${SDDF}/include \
+	-I${SDDF}/include/microkit \
 	$(CFLAGS_ARCH)
 
 CHECK_FLAGS_BOARD_MD5:=.board_cflags-$(shell echo -- ${CFLAGS} ${BOARD} ${MICROKIT_CONFIG} | shasum | sed 's/ *-//')

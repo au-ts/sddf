@@ -5,7 +5,7 @@
  */
 #pragma once
 
-#include <microkit.h>
+#include <os/sddf.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <sddf/resources/common.h>
@@ -41,7 +41,7 @@ typedef struct serial_virt_rx_config {
 
 typedef struct serial_virt_tx_client_config {
     serial_connection_resource_t conn;
-    char name[MICROKIT_PD_NAME_LENGTH];
+    char name[SDDF_NAME_LENGTH];
 } serial_virt_tx_client_config_t;
 
 typedef struct serial_virt_tx_config {

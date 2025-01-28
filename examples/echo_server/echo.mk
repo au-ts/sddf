@@ -42,6 +42,7 @@ CFLAGS := -mcpu=$(CPU) \
 	  -Wno-unused-function \
 	  -DMICROKIT_CONFIG_$(MICROKIT_CONFIG) \
 	  -I$(BOARD_DIR)/include \
+	  -I$(SDDF)/include/microkit \
 	  -I$(SDDF)/include \
 	  -I${ECHO_INCLUDE}/lwip \
 	  -I${SDDF}/$(LWIPDIR)/include \

@@ -5,13 +5,13 @@
  */
 #pragma once
 
-#include <microkit.h>
+#include <os/sddf.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <sddf/resources/common.h>
 #include <sddf/resources/device.h>
 
-#define SDDF_NET_MAX_CLIENTS (MICROKIT_MAX_CHANNELS - 1)
+#define SDDF_NET_MAX_CLIENTS 64
 
 #define SDDF_NET_MAGIC_LEN 5
 static char SDDF_NET_MAGIC[SDDF_NET_MAGIC_LEN] = { 's', 'D', 'D', 'F', 0x5 };

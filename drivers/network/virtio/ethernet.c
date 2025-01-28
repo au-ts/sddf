@@ -13,9 +13,9 @@
  * simulator such as QEMU, things like memory fences when touching device registers
  * may be needed if instead this driver was to be used in a different environment.
  */
+
 #include <stdbool.h>
 #include <stdint.h>
-#include <microkit.h>
 #include <sddf/network/queue.h>
 #include <sddf/network/config.h>
 #include <sddf/util/fence.h>
@@ -182,7 +182,7 @@ static void rx_return(void)
     if (packets_transferred > 0 && net_require_signal_active(&rx_queue)) {
         LOG_DRIVER("signalling RX\n");
         net_cancel_signal_active(&rx_queue);
-        microkit_notify(config.virt_rx.id);
+        sddf_notify(config.virt_rx.id);
     }
 }
 
@@ -282,7 +282,7 @@ static void tx_return(void)
 
     if (enqueued > 0 && net_require_signal_free(&tx_queue)) {
         net_cancel_signal_free(&tx_queue);
-        microkit_notify(config.virt_tx.id);
+        sddf_notify(config.virt_tx.id);
     }
 }
 
@@ -457,14 +457,14 @@ void init(void)
 
     eth_setup();
 
-    microkit_irq_ack(device_resources.irqs[0].id);
+    sddf_irq_ack(device_resources.irqs[0].id);
 }
 
-void notified(microkit_channel ch)
+void notified(sddf_channel ch)
 {
     if (ch == device_resources.irqs[0].id) {
         handle_irq();
-        microkit_deferred_irq_ack(ch);
+        sddf_deferred_irq_ack(ch);
     } else if (ch == config.virt_rx.id) {
         rx_provide();
     } else if (ch == config.virt_tx.id) {
