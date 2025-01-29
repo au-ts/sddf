@@ -43,7 +43,11 @@ enum i2c_token {
     I2C_TOKEN_START = 0x1,
     /* ADDRESS WRITE: Address target and unset READ bit.
      * The byte immediately following this token is an integer (N) length of the succeeding
+<<<<<<< HEAD
        write. Max 255. The next N bytes are the payload. */
+=======
+       write. Max 255 (1<<8)-1. The next N bytes are the payload. */
+>>>>>>> 9546da75 (WIP cheshire I2C)
     I2C_TOKEN_ADDR_WRITE = 0x2,
     /* ADDRESS READ: Address target and set READ bit. This is the final READ in a chain.
      * The byte immediately following this token is an integer (N) length of the desired read.

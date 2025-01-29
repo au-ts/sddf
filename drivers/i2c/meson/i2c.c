@@ -420,7 +420,8 @@ static inline void i2c_load_tokens(void)
             meson_token = i2c_token_convert(raw_token);
 
             // Grab buffer length, if appropriate.
-            if (raw_token == I2C_TOKEN_ADDR_WRITE || raw_token == I2C_TOKEN_ADDR_READ) {
+            if (raw_token == I2C_TOKEN_ADDR_WRITE || raw_token == I2C_TOKEN_ADDR_READ ||
+                raw_token == I2C_TOKEN_ADDR_READC) {
                 LOG_DRIVER("Beginning RW operation!\n");
                 // R/W buffer incoming: |RD/WR|LEN|DATA0|DATA1| ... |DATA[LEN-1]|
                 uint8_t buff_length = tokens[request_data_offset + 1];
@@ -434,7 +435,6 @@ static inline void i2c_load_tokens(void)
                 } else {
                     i2c_ifState.data_direction = DATA_DIRECTION_READC;
                 }
-
                 LOG_DRIVER("DD=%d    REM=%d\n", i2c_ifState.data_direction, i2c_ifState.rw_remaining);
 
                 // IMPORTANT: skip buffer length byte!
