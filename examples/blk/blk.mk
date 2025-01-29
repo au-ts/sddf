@@ -34,6 +34,12 @@ else
 	OBJCOPY := $(TOOLCHAIN)-objcopy
 endif
 
+# Allow to user to specify a custom partition
+PARTITION :=
+ifdef PARTITION
+	PARTITION_ARG := --partition $(PARTITION)
+endif
+
 DTC := dtc
 QEMU := qemu-system-aarch64
 PYTHON ?= python3
@@ -94,7 +100,7 @@ $(DTB): $(DTS)
 	dtc -q -I dts -O dtb $(DTS) > $(DTB)
 
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
-	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE)
+	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE) $(PARTITION_ARG)
 	$(OBJCOPY) --update-section .device_resources=blk_driver_device_resources.data blk_driver.elf
 	$(OBJCOPY) --update-section .blk_driver_config=blk_driver.data blk_driver.elf
 	$(OBJCOPY) --update-section .blk_virt_config=blk_virt.data blk_virt.elf

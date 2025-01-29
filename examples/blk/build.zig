@@ -8,6 +8,7 @@ const LazyPath = std.Build.LazyPath;
 
 const MicrokitBoard = enum {
     qemu_virt_aarch64,
+    maaxboard,
     qemu_virt_riscv64,
 };
 
@@ -19,6 +20,16 @@ const Target = struct {
 const targets = [_]Target{
     .{
         .board = .qemu_virt_aarch64,
+        .zig_target = std.Target.Query{
+            .cpu_arch = .aarch64,
+            .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a53 },
+            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{ .strict_align }),
+            .os_tag = .freestanding,
+            .abi = .none,
+        },
+    },
+    .{
+        .board = .maaxboard,
         .zig_target = std.Target.Query{
             .cpu_arch = .aarch64,
             .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a53 },
@@ -72,7 +83,7 @@ pub fn build(b: *std.Build) !void {
     const default_python = if (std.posix.getenv("PYTHON")) |p| p else "python3";
     const python = b.option([]const u8, "python", "Path to Python to use") orelse default_python;
 
-    const num_clients = b.option(usize, "num-clients", "Number of client PDs") orelse 1;
+    const partition = b.option(usize, "partition", "Block device partition for client to use") orelse null;
 
     // Getting the path to the Microkit SDK before doing anything else
     const microkit_sdk_arg = b.option([]const u8, "sdk", "Path to Microkit SDK");
@@ -109,8 +120,20 @@ pub fn build(b: *std.Build) !void {
         .libmicrokit_linker_script = @as([]const u8, libmicrokit_linker_script),
     });
 
+    const timer_driver_class = switch (microkit_board_option.?) {
+        .maaxboard => "imx",
+        else => null,
+    };
+    var timer_driver_install: ?*Step.InstallArtifact = null;
+    if (timer_driver_class) |c| {
+        const driver = sddf_dep.artifact(b.fmt("driver_timer_{s}.elf", .{ c }));
+        // To match what our SDF expects
+        timer_driver_install = b.addInstallArtifact(driver, .{ .dest_sub_path = "timer_driver.elf" });
+    }
+
     const blk_driver_class = switch (microkit_board_option.?) {
         .qemu_virt_aarch64, .qemu_virt_riscv64 => "virtio",
+        .maaxboard => "mmc_imx",
     };
 
     const client = b.addExecutable(.{
@@ -139,7 +162,7 @@ pub fn build(b: *std.Build) !void {
     b.installArtifact(sddf_dep.artifact("blk_virt.elf"));
 
     // Because our SDF expects a different ELF name for the block driver, we have this extra step.
-    const driver_install = b.addInstallArtifact(blk_driver, .{ .dest_sub_path = "blk_driver.elf" });
+    const blk_driver_install = b.addInstallArtifact(blk_driver, .{ .dest_sub_path = "blk_driver.elf" });
 
     // For compiling the DTS into a DTB
     const dts = sddf_dep.path(b.fmt("dts/{s}.dts", .{ microkit_board }));
@@ -164,6 +187,11 @@ pub fn build(b: *std.Build) !void {
     run_metaprogram.addArg(microkit_board);
     run_metaprogram.addArg("--sdf");
     run_metaprogram.addArg("blk.system");
+    if (partition) |p| {
+        run_metaprogram.addArg("--partition");
+        run_metaprogram.addArg(b.fmt("{}", .{ p }));
+    }
+    _ = try run_metaprogram.step.addDirectoryWatchInput(sddf_dep.path(""));
 
     const meta_output_install = b.addInstallDirectory(.{
         .source_dir = meta_output,
@@ -175,9 +203,20 @@ pub fn build(b: *std.Build) !void {
     const virt_objcopy = updateSectionObjcopy(b, ".blk_virt_config", meta_output, "blk_virt.data", "blk_virt.elf");
     const driver_resources_objcopy = updateSectionObjcopy(b, ".device_resources", meta_output, "blk_driver_device_resources.data", "blk_driver.elf");
     const driver_config_objcopy = updateSectionObjcopy(b, ".blk_driver_config", meta_output, "blk_driver.data", "blk_driver.elf");
-    driver_resources_objcopy.step.dependOn(&driver_install.step);
-    driver_config_objcopy.step.dependOn(&driver_install.step);
-    const objcopys = &.{ client_objcopy, virt_objcopy, driver_resources_objcopy, driver_config_objcopy };
+    driver_resources_objcopy.step.dependOn(&blk_driver_install.step);
+    driver_config_objcopy.step.dependOn(&blk_driver_install.step);
+    const blk_objcopys = .{ client_objcopy, virt_objcopy, driver_resources_objcopy, driver_config_objcopy };
+    const objcopys = blk: {
+        if (timer_driver_install != null) {
+            const blk_driver_timer_objcopy = updateSectionObjcopy(b, ".timer_client_config", meta_output, "timer_client_blk_driver.data", "blk_driver.elf");
+            blk_driver_timer_objcopy.step.dependOn(&blk_driver_install.step);
+            const timer_driver_objcopy = updateSectionObjcopy(b, ".device_resources", meta_output, "timer_driver_device_resources.data", "timer_driver.elf");
+            timer_driver_objcopy.step.dependOn(&timer_driver_install.?.step);
+            break :blk &(blk_objcopys ++ .{ blk_driver_timer_objcopy, timer_driver_objcopy });
+        } else {
+            break :blk &blk_objcopys;
+        }
+    };
 
     const final_image_dest = b.getInstallPath(.bin, "./loader.img");
     const microkit_tool_cmd = b.addSystemCommand(&[_][]const u8{
@@ -189,7 +228,7 @@ pub fn build(b: *std.Build) !void {
         "-o", final_image_dest,
         "-r", b.getInstallPath(.prefix, "./report.txt")
     });
-    inline for (objcopys) |objcopy| {
+    for (objcopys) |objcopy| {
         microkit_tool_cmd.step.dependOn(&objcopy.step);
     }
     microkit_tool_cmd.step.dependOn(&meta_output_install.step);
@@ -211,7 +250,7 @@ pub fn build(b: *std.Build) !void {
         create_disk_cmd.addFileInput(mkvirtdisk);
         const disk = create_disk_cmd.addOutputFileArg("disk");
         create_disk_cmd.addArgs(&[_][]const u8{
-            b.fmt("{}", .{ num_clients }), "512", b.fmt("{}", .{ 1024 * 1024 * 16 }),
+            "1", "512", b.fmt("{}", .{ 1024 * 1024 * 16 }),
         });
         const disk_install = b.addInstallFile(disk, "disk");
         disk_install.step.dependOn(&create_disk_cmd.step);
