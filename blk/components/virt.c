@@ -86,7 +86,7 @@ static void partitions_init()
         blk_virt_config_client_t *client = &config.clients[i];
         size_t client_partition = client->partition;
 
-        if (msdos_mbr.partitions[client_partition].type == MSDOS_MBR_PARTITION_TYPE_EMPTY) {
+        if (client_partition >= MSDOS_MBR_MAX_PRIMARY_PARTITIONS || msdos_mbr.partitions[client_partition].type == MSDOS_MBR_PARTITION_TYPE_EMPTY) {
             /* Partition does not exist */
             LOG_BLK_VIRT_ERR(
                 "Invalid client partition mapping for client %d: partition: %zu, partition does not exist\n", i,
