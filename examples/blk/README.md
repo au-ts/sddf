@@ -10,6 +10,7 @@ with block devices in sDDF.
 ## Building
 
 The following platforms are supported:
+* maaxboard
 * qemu_virt_aarch64
 * qemu_virt_riscv64
 
@@ -18,10 +19,20 @@ Note that this example depends on `dosfstools`.
 For `apt` users: `sudo apt-get install dosfstools`.
 For Homebrew users: `brew install dosfstools`.
 
+### Block device setup
+
+If you are going to run the example on hardware, you must setup the block device
+with certain partitioning.
+
+For the MaaXBoard, the example system expects to use the 4th partition (index 3)
+of the microSD card using MBR partitioning. The example will read **and write to
+the partition** so make sure you do not have any important data on it. If you want
+to specify a custom partition, you can do so when following the build steps below.
+
 ### Make
 
 ```sh
-make MICROKIT_SDK=<path/to/sdk> MICROKIT_BOARD=<board>
+make MICROKIT_SDK=<path/to/sdk> MICROKIT_BOARD=<board> [PARTITION=<partition>]
 ```
 
 After building, the system image to load will be `build/loader.img`.
@@ -32,7 +43,7 @@ If you wish to simulate on the QEMU virt AArch64 platform, you can append `qemu`
 
 You can also build this example with the Zig build system:
 ```sh
-zig build -Dsdk=/path/to/sdk -Dboard=<board>
+zig build -Dsdk=/path/to/sdk -Dboard=<board> [-Dpartition=<partition>]
 ```
 
 The options for `<board>` are the same as the Makefile.

@@ -117,20 +117,6 @@ build_serial_zig() {
     popd
 }
 
-build_mmc_make() {
-    BOARD=$1
-    CONFIG=$2
-    echo "CI|INFO: building mmc example with Make, board: ${BOARD}, config: ${CONFIG}"
-    BUILD_DIR="${PWD}/${CI_BUILD_DIR}/examples/mmc/make/${BOARD}/${CONFIG}"
-    rm -rf ${BUILD_DIR}
-    mkdir -p ${BUILD_DIR}
-    make -j${NUM_JOBS} -C ${SDDF}/examples/mmc \
-        BUILD_DIR=${BUILD_DIR} \
-        MICROKIT_CONFIG=${CONFIG} \
-        MICROKIT_SDK=${SDK_PATH} \
-        MICROKIT_BOARD=${BOARD}
-}
-
 build_blk_make() {
     BOARD=$1
     CONFIG=$2
@@ -232,18 +218,6 @@ serial() {
     done
 }
 
-mmc() {
-    BOARDS=("maaxboard" "imx8mm_evk")
-    CONFIGS=("debug" "release")
-    for BOARD in "${BOARDS[@]}"
-    do
-        for CONFIG in "${CONFIGS[@]}"
-        do
-            build_mmc_make ${BOARD} ${CONFIG}
-        done
-    done
-}
-
 blk() {
     BOARDS=("qemu_virt_aarch64")
     CONFIGS=("debug" "release")
@@ -275,7 +249,6 @@ $NETWORK && network
 $I2C && i2c
 $TIMER && timer
 $SERIAL && serial
-# $MMC && mmc
 $BLK && blk
 $GPU && gpu
 

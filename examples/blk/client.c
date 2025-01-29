@@ -24,9 +24,12 @@ static blk_queue_handle_t blk_queue;
 
 __attribute__((__section__(".blk_client_config"))) blk_client_config_t config;
 
+/* Use the start of the partition for testing. */
+#define REQUEST_BLK_NUMBER 0
+#define REQUEST_NUM_BLOCKS 2
+
 enum test_basic_state {
     START,
-    WRITE,
     READ,
     FINISH,
 };
@@ -45,7 +48,7 @@ bool test_basic()
         char *data_dest = (char *)config.data.vaddr;
         sddf_memcpy(data_dest, basic_data, basic_data_len);
 
-        int err = blk_enqueue_req(&blk_queue, BLK_REQ_WRITE, 0, 0, 2, 0);
+        int err = blk_enqueue_req(&blk_queue, BLK_REQ_WRITE, 0, REQUEST_BLK_NUMBER, REQUEST_NUM_BLOCKS, 0);
         assert(!err);
 
         test_basic_state = READ;
@@ -61,12 +64,12 @@ bool test_basic()
         int err = blk_dequeue_resp(&blk_queue, &status, &count, &id);
         assert(!err);
         assert(status == BLK_RESP_OK);
-        assert(count == 2);
+        assert(count == REQUEST_NUM_BLOCKS);
         assert(id == 0);
 
-        // Setup the read
-        // We do the read at a different offset into the data region
-        err = blk_enqueue_req(&blk_queue, BLK_REQ_READ, 0x10000, 0, 2, 0);
+        /* We do the read at a different offset into the data region from the previous request */
+        uintptr_t offset = REQUEST_NUM_BLOCKS * BLK_TRANSFER_SIZE;
+        err = blk_enqueue_req(&blk_queue, BLK_REQ_READ, offset, REQUEST_BLK_NUMBER, REQUEST_NUM_BLOCKS, 0);
         assert(!err);
 
         test_basic_state = FINISH;
@@ -81,11 +84,11 @@ bool test_basic()
         int err = blk_dequeue_resp(&blk_queue, &status, &count, &id);
         assert(!err);
         assert(status == BLK_RESP_OK);
-        assert(count == 2);
+        assert(count == REQUEST_NUM_BLOCKS);
         assert(id == 0);
 
         // Check that the read went okay
-        char *read_data = (char *)(config.data.vaddr + 0x10000);
+        char *read_data = (char *)(config.data.vaddr + (REQUEST_NUM_BLOCKS * BLK_TRANSFER_SIZE));
         for (int i = 0; i < basic_data_len; i++) {
             if (read_data[i] != basic_data[i]) {
                 LOG_CLIENT_ERR("basic: mismatch in bytes at position %d\n", i);
@@ -119,12 +122,15 @@ void init(void)
 
     blk_queue_init(&blk_queue, config.virt.req_queue.vaddr, config.virt.resp_queue.vaddr, config.virt.num_buffers);
 
-    /* Want to print out configuration information, so wait until the config is ready. */
+    /* Want to print out the storage info, so spin until the it is ready. */
     blk_storage_info_t *storage_info = config.virt.storage_info.vaddr;
     while (!blk_storage_is_ready(storage_info));
     LOG_CLIENT("device config ready\n");
-
     LOG_CLIENT("device size: 0x%lx bytes\n", storage_info->capacity * BLK_TRANSFER_SIZE);
+
+    /* Before proceeding, check that the offset into the device we will
+     * do I/O on is sane. */
+    assert(REQUEST_BLK_NUMBER < storage_info->capacity - REQUEST_NUM_BLOCKS);
 
     test_basic();
     microkit_notify(config.virt.id);
