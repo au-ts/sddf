@@ -6,12 +6,12 @@
 #include "usdhc.h"
 
 #include <microkit.h>
+#include <sddf/blk/config.h>
 #include <sddf/blk/queue.h>
 #include <sddf/blk/storage_info.h>
 #include <sddf/util/printf.h>
+#include <sddf/timer/config.h>
 #include <sddf/timer/client.h>
-
-#include "blk_config.h"
 
 // #define DEBUG_DRIVER
 
@@ -22,10 +22,6 @@
 #endif
 
 #define LOG_DRIVER_ERR(...) do{ sddf_printf("uSDHC DRIVER|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
-
-#define CHANNEL_CLIENT    0
-#define CHANNEL_USDHC_IRQ 1
-#define CHANNEL_TIMER     2
 
 #define INT_STATUSES_ENABLED ( \
     USDHC_INT_STATUS_EN_CCSEN   | USDHC_INT_STATUS_EN_TCSEN                                  \
@@ -52,10 +48,10 @@
 
 blk_queue_handle_t blk_queue;
 volatile imx_usdhc_regs_t *usdhc_regs;
-blk_storage_info_t *blk_storage_info;
-blk_req_queue_t *blk_req_queue;
-blk_resp_queue_t *blk_resp_queue;
-uintptr_t blk_data;
+
+__attribute__((__section__(".device_resources"))) device_resources_t device_resources;
+__attribute__((__section__(".blk_driver_config"))) blk_driver_config_t blk_config;
+__attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
 
 /* Make sure to update drv_to_blk_status() as well */
 typedef enum {
@@ -429,7 +425,7 @@ static void set_clock_frequency_registers(sd_clock_freq_t frequency)
 
 static bool has_timed_out(uint64_t start, uint32_t timeout)
 {
-    return (sddf_timer_time_now(CHANNEL_TIMER) - start) > timeout;
+    return (sddf_timer_time_now(timer_config.driver_id) - start) > timeout;
 }
 
 /**
@@ -443,7 +439,7 @@ static bool has_timed_out(uint64_t start, uint32_t timeout)
  */
 void wait_clock_stable()
 {
-    uint64_t start = sddf_timer_time_now(CHANNEL_TIMER);
+    uint64_t start = sddf_timer_time_now(timer_config.driver_id);
     while (!(usdhc_regs->pres_state & USDHC_PRES_STATE_SDSTB)) {
         if (has_timed_out(start, SD_CLOCK_STABLE_TIMEOUT)) {
             LOG_DRIVER_ERR("internal clock never stabilised...\n");
@@ -654,7 +650,7 @@ drv_status_t perform_card_identification_and_select()
            > starts from the first ACMD41 which is set voltage window in the argument.
         */
         if (driver_state.card_init_start_time == DRIVER_STATE_INIT) {
-            driver_state.card_init_start_time = sddf_timer_time_now(CHANNEL_TIMER);
+            driver_state.card_init_start_time = sddf_timer_time_now(timer_config.driver_id);
         }
 
         do {
@@ -892,11 +888,12 @@ drv_status_t usdhc_write_blocks(uintptr_t dma_address, uint32_t sector_number, u
 
 void setup_blk_storage_info()
 {
-    assert(!blk_storage_info->ready);
+    blk_storage_info_t *storage_info = blk_config.virt.storage_info.vaddr;
+    assert(!storage_info->ready);
 
-    blk_storage_info->sector_size = SD_BLOCK_SIZE;
-    // blk_storage_info->read_only = /* TODO(#187): look at write protect flag */
-    blk_storage_info->block_size = 1;
+    storage_info->sector_size = SD_BLOCK_SIZE;
+    // storage_info->read_only = /* TODO(#187): look at write protect flag */
+    storage_info->block_size = 1;
 
     __uint128_t csd = ((__uint128_t)card_info.csd[0] << 96)
                       | ((__uint128_t)card_info.csd[1] << 64)
@@ -931,7 +928,7 @@ void setup_blk_storage_info()
         uint32_t mult = 1 << (c_size_mult + 2);
         uint32_t block_nr = (c_size + 1) * mult;
         uint32_t block_len = 1 << read_bl_len;
-        blk_storage_info->capacity = block_nr * block_len / BLK_TRANSFER_SIZE;
+        storage_info->capacity = block_nr * block_len / BLK_TRANSFER_SIZE;
         break;
     }
 
@@ -943,7 +940,7 @@ void setup_blk_storage_info()
            >             memory capacity = (C_SIZE+1) * 512KByte
         */
         uint32_t c_size = (csd & SD_CSD_V2_C_SIZE_MASK) >> SD_CSD_V2_C_SIZE_SHIFT;
-        blk_storage_info->capacity = (c_size + 1) * (512 * 1024) / BLK_TRANSFER_SIZE;
+        storage_info->capacity = (c_size + 1) * (512 * 1024) / BLK_TRANSFER_SIZE;
         break;
     }
 
@@ -955,7 +952,7 @@ void setup_blk_storage_info()
            >             memory capacity = (C_SIZE+1) * 512KByte
         */
         uint32_t c_size = (csd & SD_CSD_V3_C_SIZE_MASK) >> SD_CSD_V3_C_SIZE_SHIFT;
-        blk_storage_info->capacity = (c_size + 1) * (512 * 1024) / BLK_TRANSFER_SIZE;
+        storage_info->capacity = (c_size + 1) * (512 * 1024) / BLK_TRANSFER_SIZE;
         break;
     }
 
@@ -965,9 +962,9 @@ void setup_blk_storage_info()
         break;
     }
 
-    LOG_DRIVER("Card size (blocks): %lu\n", blk_storage_info->capacity);
+    LOG_DRIVER("Card size (blocks): %lu\n", storage_info->capacity);
 
-    __atomic_store_n(&blk_storage_info->ready, true, __ATOMIC_RELEASE);
+    __atomic_store_n(&storage_info->ready, true, __ATOMIC_RELEASE);
     LOG_DRIVER("Driver initialisation complete\n");
 }
 
@@ -1039,7 +1036,7 @@ void handle_clients(void)
         int err = blk_enqueue_resp(&blk_queue, drv_to_blk_status(status), success_count, req_id);
         assert(!err);
         LOG_DRIVER("Enqueued response: status=%d, success_count=%d, id=%d\n", drv_to_blk_status(status), success_count, req_id);
-        microkit_notify(CHANNEL_CLIENT);
+        microkit_notify(blk_config.virt.id);
 
         driver_state.clients = ClientStateIdle;
         return handle_clients();
@@ -1081,38 +1078,36 @@ void usdhc_executor(bool is_irq)
 
 void notified(microkit_channel ch)
 {
-    switch (ch) {
-    case CHANNEL_USDHC_IRQ:
+    if (ch == device_resources.irqs[0].id) {
         usdhc_executor(true);
-        break;
-
-    case CHANNEL_CLIENT:
+    } else if (ch == blk_config.virt.id) {
         usdhc_executor(false);
-        break;
-
-    case CHANNEL_TIMER:
+    } else if (ch == timer_config.driver_id) {
         LOG_DRIVER("got timer interrupt -- UNHANDLED\n");
         assert(false);
-        break;
-
-    default:
+    } else {
         LOG_DRIVER_ERR("notification on unknown channel: %d\n", ch);
-        break;
     }
 
-    if (ch == CHANNEL_USDHC_IRQ) {
+    if (ch == device_resources.irqs[0].id) {
         microkit_irq_ack(ch);
     }
 }
 
 void init()
 {
+    assert(device_resources.num_regions == 1);
+    assert(device_resources.num_irqs == 1);
+
+    usdhc_regs = device_resources.regions[0].region.vaddr;
+
     reset_driver_and_card_state();
 
     LOG_DRIVER("Beginning driver initialisation...\n");
 
     /* Setup the sDDF block queue */
-    blk_queue_init(&blk_queue, blk_req_queue, blk_resp_queue, BLK_QUEUE_CAPACITY_DRIV);
+    blk_queue_init(&blk_queue, blk_config.virt.req_queue.vaddr, blk_config.virt.resp_queue.vaddr,
+                   blk_config.virt.num_buffers);
 
     /* Make sure we have DMA support. */
     assert(usdhc_regs->host_ctrl_cap & USDHC_HOST_CTRL_CAP_DMAS);
