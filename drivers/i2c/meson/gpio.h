@@ -9,10 +9,10 @@
 // generic GPIO driver in the sDDF in the future.
 // Matt Rossouw (matthew.rossouw@unsw.edu.au)
 // 08/2023
+#pragma once
 
 #include <sddf/util/util.h>
 
-#pragma once
 #define GPIO_OFFSET 1024
 
 // Pinmux

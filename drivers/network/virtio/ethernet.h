@@ -2,6 +2,7 @@
  * Copyright 2024, UNSW
  * SPDX-License-Identifier: BSD-2-Clause
  */
+#pragma once
 
 #include <stdint.h>
 #include <sddf/util/printf.h>
@@ -197,4 +198,3 @@ static void virtio_net_print_features(uint64_t features)
         sddf_printf("    VIRTIO_NET_F_SPEED_DUPLEX\n");
     }
 }
-
