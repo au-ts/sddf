@@ -256,7 +256,8 @@ static bool handle_client(int cli_id)
 {
     int err = 0;
     blk_queue_handle_t h = clients[cli_id].queue_h;
-    uintptr_t cli_data_base = config.clients[cli_id].data.io_addr;
+    uintptr_t cli_data_base_paddr = config.clients[cli_id].data.io_addr;
+    uintptr_t cli_data_base_vaddr = (uintptr_t)config.clients[cli_id].data.region.vaddr;
     uint64_t cli_data_region_size = config.clients[cli_id].data.region.size;
 
     blk_req_code_t cli_code = 0;
@@ -308,7 +309,7 @@ static bool handle_client(int cli_id)
                 goto req_fail;
             }
 
-            if ((cli_data_base + cli_offset) % BLK_TRANSFER_SIZE != 0) {
+            if ((cli_data_base_vaddr + cli_offset) % BLK_TRANSFER_SIZE != 0) {
                 LOG_BLK_VIRT_ERR(
                     "client %d requested dma address is not aligned to page size (same as blk transfer size)\n",
                     cli_id);
@@ -328,16 +329,16 @@ static bool handle_client(int cli_id)
         }
 
         if (cli_code == BLK_REQ_WRITE) {
-            cache_clean(cli_data_base + cli_offset, cli_data_base + cli_offset + (BLK_TRANSFER_SIZE * cli_count));
+            cache_clean(cli_data_base_vaddr + cli_offset, cli_data_base_vaddr + cli_offset + (BLK_TRANSFER_SIZE * cli_count));
         }
 
         /* Bookkeep client request and generate driver req id */
         uint32_t drv_req_id = 0;
         err = ialloc_alloc(&ialloc, &drv_req_id);
         assert(!err);
-        reqsbk[drv_req_id] = (reqbk_t) { cli_id, cli_req_id, cli_data_base + cli_offset, cli_count, cli_code };
+        reqsbk[drv_req_id] = (reqbk_t) { cli_id, cli_req_id, cli_data_base_vaddr + cli_offset, cli_count, cli_code };
 
-        err = blk_enqueue_req(&drv_h, cli_code, cli_data_base + cli_offset, drv_block_number, cli_count, drv_req_id);
+        err = blk_enqueue_req(&drv_h, cli_code, cli_data_base_paddr + cli_offset, drv_block_number, cli_count, drv_req_id);
         assert(!err);
         driver_notify = true;
         continue;
