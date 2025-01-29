@@ -86,7 +86,8 @@ static void partitions_init()
         blk_virt_config_client_t *client = &config.clients[i];
         size_t client_partition = client->partition;
 
-        if (client_partition >= MSDOS_MBR_MAX_PRIMARY_PARTITIONS || msdos_mbr.partitions[client_partition].type == MSDOS_MBR_PARTITION_TYPE_EMPTY) {
+        if (client_partition >= MSDOS_MBR_MAX_PRIMARY_PARTITIONS
+            || msdos_mbr.partitions[client_partition].type == MSDOS_MBR_PARTITION_TYPE_EMPTY) {
             /* Partition does not exist */
             LOG_BLK_VIRT_ERR(
                 "Invalid client partition mapping for client %d: partition: %zu, partition does not exist\n", i,
@@ -329,7 +330,8 @@ static bool handle_client(int cli_id)
         }
 
         if (cli_code == BLK_REQ_WRITE) {
-            cache_clean(cli_data_base_vaddr + cli_offset, cli_data_base_vaddr + cli_offset + (BLK_TRANSFER_SIZE * cli_count));
+            cache_clean(cli_data_base_vaddr + cli_offset,
+                        cli_data_base_vaddr + cli_offset + (BLK_TRANSFER_SIZE * cli_count));
         }
 
         /* Bookkeep client request and generate driver req id */
@@ -338,7 +340,8 @@ static bool handle_client(int cli_id)
         assert(!err);
         reqsbk[drv_req_id] = (reqbk_t) { cli_id, cli_req_id, cli_data_base_vaddr + cli_offset, cli_count, cli_code };
 
-        err = blk_enqueue_req(&drv_h, cli_code, cli_data_base_paddr + cli_offset, drv_block_number, cli_count, drv_req_id);
+        err = blk_enqueue_req(&drv_h, cli_code, cli_data_base_paddr + cli_offset, drv_block_number, cli_count,
+                              drv_req_id);
         assert(!err);
         driver_notify = true;
         continue;
