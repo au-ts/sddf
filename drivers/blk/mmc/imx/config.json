@@ -8,14 +8,12 @@
             {
                 "name": "regs",
                 "perms": "rw",
-                "setvar_vaddr": "usdhc_regs",
-                "size": 4096,
+                "size": 65536,
                 "dt_index": 0
             }
         ],
         "irqs": [
             {
-                "channel_id": 1,
                 "dt_index": 0
             }
         ]
