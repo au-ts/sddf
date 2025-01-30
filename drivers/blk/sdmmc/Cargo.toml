@@ -5,8 +5,8 @@ edition = "2021"
 
 [dependencies]
 sel4-microkit = { git = "https://github.com/seL4/rust-sel4.git", rev = "5b9ebfd0a3a9805f28cc9222cd558e8d56a3919d" }
-sdmmc_hal = { path = "sdmmc_hal/meson" }
-sdmmc_protocol = { path = "sdmmc_protocol", features = ["sel4-microkit"] }
+sdmmc_hal = { features = ["sel4-microkit"], git = "https://github.com/Cheng-Li1/sdcard-emmc-rs", rev = "7a350842ea4bd0ea66949441ae786aead8fc4c83" }
+sdmmc_protocol = { features = ["sel4-microkit"], git = "https://github.com/Cheng-Li1/sdcard-emmc-rs", rev = "7a350842ea4bd0ea66949441ae786aead8fc4c83" }
 
 [build]
 build = "build.rs"
