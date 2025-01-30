@@ -219,7 +219,7 @@ serial() {
 }
 
 blk() {
-    BOARDS=("qemu_virt_aarch64")
+    BOARDS=("qemu_virt_aarch64" "qemu_virt_riscv64" "maaxboard")
     CONFIGS=("debug" "release")
     for BOARD in "${BOARDS[@]}"
     do
