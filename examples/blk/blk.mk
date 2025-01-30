@@ -55,6 +55,11 @@ else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_riscv64)
 	BLK_DRIVER_DIR := virtio
 	QEMU := qemu-system-riscv64
 	QEMU_ARCH_ARGS := -machine virt -kernel $(IMAGE_FILE)
+else ifeq ($(strip $(MICROKIT_BOARD)), maaxboard)
+	ARCH := aarch64
+	CPU := cortex-a53
+	BLK_DRIVER_DIR := mmc/imx
+	TIMER_DRIVER_DIR := imx
 else
 $(error Unsupported MICROKIT_BOARD given)
 endif
@@ -101,6 +106,11 @@ BLK_COMPONENTS := $(SDDF)/blk/components
 all: $(IMAGE_FILE)
 
 include ${BLK_DRIVER}/blk_driver.mk
+
+ifdef TIMER_DRIVER_DIR
+include $(SDDF)/drivers/timer/$(TIMER_DRIVER_DIR)/timer_driver.mk
+IMAGES += timer_driver.elf
+endif
 
 include ${SDDF}/util/util.mk
 include ${BLK_COMPONENTS}/blk_components.mk
