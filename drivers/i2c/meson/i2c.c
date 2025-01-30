@@ -350,10 +350,9 @@ static inline uint8_t i2c_token_convert(i2c_token_t token)
     case I2C_TOKEN_START:
         return MESON_I2C_TOKEN_START;
     case I2C_TOKEN_ADDR_WRITE:
-        i2c_ifState.data_direction = DATA_DIRECTION_WRITE;
         return MESON_I2C_TOKEN_ADDR_WRITE;
     case I2C_TOKEN_ADDR_READ:
-        i2c_ifState.data_direction = DATA_DIRECTION_READ;
+    case I2C_TOKEN_ADDR_READC:
         return MESON_I2C_TOKEN_ADDR_READ;
     case I2C_TOKEN_STOP:
         return MESON_I2C_TOKEN_STOP;
@@ -417,18 +416,24 @@ static inline void i2c_load_tokens(void)
         if (i2c_ifState.rw_remaining == 0) {
             LOG_DRIVER("Accepting new token...\n");
             // Get meson_token if no read/write is in progress.
-            meson_token = i2c_token_convert(tokens[request_data_offset]);
+            i2c_token_t raw_token = tokens[request_data_offset];
+            meson_token = i2c_token_convert(raw_token);
 
             // Grab buffer length, if appropriate.
-            if (meson_token == MESON_I2C_TOKEN_ADDR_WRITE || meson_token == MESON_I2C_TOKEN_ADDR_READ) {
+            if (raw_token == I2C_TOKEN_ADDR_WRITE || raw_token == I2C_TOKEN_ADDR_READ) {
                 LOG_DRIVER("Beginning RW operation!\n");
                 // R/W buffer incoming: |RD/WR|LEN|DATA0|DATA1| ... |DATA[LEN-1]|
                 uint8_t buff_length = tokens[request_data_offset + 1];
 
                 // Set interface state
                 i2c_ifState.rw_remaining = buff_length;
-                i2c_ifState.data_direction = (meson_token == MESON_I2C_TOKEN_ADDR_WRITE)
-                                             ? DATA_DIRECTION_WRITE : DATA_DIRECTION_READ;
+                if (raw_token == I2C_TOKEN_ADDR_WRITE) {
+                    i2c_ifState.data_direction = DATA_DIRECTION_WRITE;
+                } else if (raw_token == I2C_TOKEN_ADDR_READ) {
+                    i2c_ifState.data_direction = DATA_DIRECTION_READ;
+                } else {
+                    i2c_ifState.data_direction = DATA_DIRECTION_READC;
+                }
 
                 LOG_DRIVER("DD=%d    REM=%d\n", i2c_ifState.data_direction, i2c_ifState.rw_remaining);
 
@@ -443,7 +448,6 @@ static inline void i2c_load_tokens(void)
             if (i2c_ifState.rw_remaining == 1 && i2c_ifState.data_direction == DATA_DIRECTION_READ) {
                 // Write data end on last byte of a read.
                 meson_token = MESON_I2C_TOKEN_DATA_END;
-                // TODO: @mattr potential fencepost error? Seems correct to me though.
             } else {
                 meson_token = MESON_I2C_TOKEN_DATA;
             }
@@ -454,11 +458,8 @@ static inline void i2c_load_tokens(void)
             i2c_ifState.rw_remaining--;
         }
 
-
-
         LOG_DRIVER("meson_token: 0x%lx, request_data_offset : 0x%lx, tk_offset: 0x%lx, wdata_offset: 0x%lx, rdata_offset: 0x%lx\n",
                    meson_token, request_data_offset, tk_offset, wdata_offset, rdata_offset);
-
 
         if (tk_offset < 8) {
             regs->tk_list0 |= (meson_token << (tk_offset * 4));
@@ -481,7 +482,7 @@ static inline void i2c_load_tokens(void)
 
         /* If data token and we are reading, increment counter of rdata */
         if ((meson_token == MESON_I2C_TOKEN_DATA || meson_token == MESON_I2C_TOKEN_DATA_END)
-            && i2c_ifState.data_direction == DATA_DIRECTION_READ) {
+            && (i2c_ifState.data_direction & 0x1) == DATA_DIRECTION_READ) {
             rdata_offset++;
         }
 
