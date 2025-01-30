@@ -366,8 +366,8 @@ void sddf_lwip_init(lib_sddf_lwip_config_t *lib_sddf_lwip_config, net_client_con
     sddf_state.tx_queue = tx_queue;
     sddf_state.rx_ch = net_config->rx.id;
     sddf_state.tx_ch = net_config->tx.id;
-    sddf_state.rx_buffer_data_region = net_config->rx_data.vaddr;
-    sddf_state.tx_buffer_data_region = net_config->tx_data.vaddr;
+    sddf_state.rx_buffer_data_region = (uintptr_t)net_config->rx_data.vaddr;
+    sddf_state.tx_buffer_data_region = (uintptr_t)net_config->tx_data.vaddr;
     sddf_state.timer_ch = timer_config->driver_id;
 
     /* Initialise lwip state */
