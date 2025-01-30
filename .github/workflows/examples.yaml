@@ -36,7 +36,7 @@ jobs:
       - name: Setup pyenv
         run: |
           python3 -m venv venv
-          ./venv/bin/pip install sdfgen==0.15.0
+          ./venv/bin/pip install sdfgen==0.16.1
       - name: Build and run examples
         run: ./ci/examples.sh ${PWD}/microkit-sdk-1.4.1-dev.54+a8b7894-linux-x86-64
         shell: bash
@@ -74,7 +74,7 @@ jobs:
       - name: Setup pyenv
         run: |
           python3 -m venv venv
-          ./venv/bin/pip install sdfgen
+          ./venv/bin/pip install sdfgen==0.16.1
       - name: Download and install AArch64 GCC toolchain
         run: |
           wget -O aarch64-toolchain.tar.xz https://trustworthy.systems/Downloads/microkit/arm-gnu-toolchain-12.3.rel1-darwin-arm64-aarch64-none-elf.tar.xz
