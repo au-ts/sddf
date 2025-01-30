@@ -1,0 +1,49 @@
+{
+    // "core_allocations": {
+    //     "timer_driver": 0,
+    //     "uart_driver": 0,
+    //     "serial_virt_tx": 0,
+    // }
+    "core_allocations": [
+        {
+            "name": "timer_driver",
+            "core": "0"
+        },
+        {
+            "name": "uart_driver",
+            "core": "0"
+        },
+        {
+            "name": "serial_virt_tx",
+            "core": "0"
+        },
+        {
+            "name": "ethernet_driver",
+            "core": "3"
+        },
+        {
+            "name": "net_virt_tx",
+            "core": "0"
+        },
+        {
+            "name": "net_virt_rx",
+            "core": "0"
+        },
+        {
+            "name": "client0",
+            "core": "0"
+        },
+        {
+            "name": "client0_net_copier",
+            "core": "0"
+        },
+        {
+            "name": "client1",
+            "core": "0"
+        },
+        {
+            "name": "client1_net_copier",
+            "core": "0"
+        }
+    ]
+}

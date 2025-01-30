@@ -12,6 +12,7 @@
 
 #include <sddf/util/util.h>
 #include <sddf/benchmark/bench.h>
+#include <sddf/benchmark/config.h>
 #include <sddf/util/printf.h>
 
 #include "echo.h"
@@ -69,17 +70,12 @@ static struct tcp_pcb *utiliz_socket;
     "Content-length: "STR(x)"\n"\
     ","STR(y)","STR(z)
 
+benchmark_client_config_t *bench;
 
-struct bench *bench;
-
-microkit_channel bench_start_ch;
-microkit_channel bench_stop_ch;
-
-uint64_t start;
-uint64_t idle_ccount_start;
+uint64_t core_ccount_start[BENCHMARK_MAX_CORES];
+uint64_t idle_ccount_start[BENCHMARK_MAX_CORES];
 
 char data_packet_str[MAX_PACKET_SIZE];
-
 
 static inline void my_reverse(char s[])
 {
@@ -137,9 +133,12 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
     } else if (msg_match(data_packet_str, START)) {
         sddf_printf("%s measurement starting...\n", microkit_name);
         if (!strcmp(microkit_name, "client0")) {
-            start = __atomic_load_n(&bench->ts, __ATOMIC_RELAXED);
-            idle_ccount_start = __atomic_load_n(&bench->ccount, __ATOMIC_RELAXED);
-            microkit_notify(bench_start_ch);
+            for (uint8_t i = 0; i < bench->num_cores; i++) {
+                struct bench *ccounts = (struct bench *)bench->core_ccounts[i];
+                core_ccount_start[i] = __atomic_load_n(&ccounts->ts, __ATOMIC_RELAXED);
+                idle_ccount_start[i] = __atomic_load_n(&ccounts->ccount, __ATOMIC_RELAXED);
+            }
+            microkit_notify(bench->start_ch);
         }
     } else if (msg_match(data_packet_str, STOP)) {
         sddf_printf("%s measurement finished \n", microkit_name);
@@ -147,8 +146,11 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
         uint64_t total = 0, idle = 0;
 
         if (!strcmp(microkit_name, "client0")) {
-            total = __atomic_load_n(&bench->ts, __ATOMIC_RELAXED) - start;
-            idle = __atomic_load_n(&bench->ccount, __ATOMIC_RELAXED) - idle_ccount_start;
+            for (uint8_t i = 0; i < bench->num_cores; i++) {
+                struct bench *ccounts = (struct bench *)bench->core_ccounts[i];
+                total += __atomic_load_n(&ccounts->ts, __ATOMIC_RELAXED) - core_ccount_start[i];
+                idle += __atomic_load_n(&ccounts->ccount, __ATOMIC_RELAXED) - idle_ccount_start[i];
+            }
         }
 
         char tbuf[21];
@@ -172,8 +174,9 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
         error = tcp_write(pcb, buffer, strlen(buffer) + 1, TCP_WRITE_FLAG_COPY);
         tcp_shutdown(pcb, 0, 1);
 
-        if (!strcmp(microkit_name, "client0"))
-            microkit_notify(bench_stop_ch);
+        if (!strcmp(microkit_name, "client0")) {
+            microkit_notify(bench->stop_ch);
+        }
     } else if (msg_match(data_packet_str, QUIT)) {
         /* Do nothing for now */
     } else {
@@ -196,11 +199,10 @@ static err_t utilization_accept_callback(void *arg, struct tcp_pcb *newpcb, err_
     return ERR_OK;
 }
 
-int setup_utilization_socket(void *cycle_counters, microkit_channel start_ch, microkit_channel stop_ch)
+int setup_utilization_socket(void *benchmark_config)
 {
-    bench = cycle_counters;
-    bench_start_ch = start_ch;
-    bench_stop_ch = stop_ch;
+    bench = (benchmark_client_config_t *)benchmark_config;
+    
     utiliz_socket = tcp_new_ip_type(IPADDR_TYPE_V4);
     if (utiliz_socket == NULL) {
         sddf_dprintf("Failed to open a socket for listening!\n");

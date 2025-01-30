@@ -3,6 +3,7 @@
 import argparse
 import struct
 import random
+import json
 from dataclasses import dataclass
 from typing import List, Tuple
 from sdfgen import SystemDescription, Sddf, DeviceTree
@@ -12,6 +13,8 @@ MemoryRegion = SystemDescription.MemoryRegion
 Map = SystemDescription.Map
 Channel = SystemDescription.Channel
 
+# Should this be hard coded?
+max_cores = 4
 
 @dataclass
 class Board:
@@ -101,37 +104,45 @@ class BenchmarkIdleConfig:
         }
     '''
     def serialise(self) -> bytes:
-        return struct.pack("<qc", self.cycle_counters, self.ch_init.to_bytes(1, "little"))
+        return struct.pack("<qB", self.cycle_counters, self.ch_init)
 
 
 class BenchmarkClientConfig:
-    def __init__(self, cycle_counters: int, ch_start: int, ch_stop: int):
-        self.cycle_counters = cycle_counters
+    def __init__(self, ch_start: int, ch_stop: int, num_cores: int, cycle_counters: List[int]):
         self.ch_start = ch_start
         self.ch_stop = ch_stop
-
+        self.num_cores = num_cores
+        self.cycle_counters = cycle_counters
     '''
         Matches struct definition:
         {
+            uint8_t;
+            uint8_t;
+            uint8_t;
             void *;
-            uint8_t;
-            uint8_t;
         }
     '''
     def serialise(self) -> bytes:
-        return struct.pack("<qBB", self.cycle_counters, self.ch_start, self.ch_stop)
+        pack_str = "<BBB" + "q" * max_cores
+        for i in range(max_cores - len(self.cycle_counters)):
+            self.cycle_counters.append(0)
+        return struct.pack(pack_str, self.ch_start, self.ch_stop, self.num_cores, *self.cycle_counters)
 
 
 class BenchmarkConfig:
-    def __init__(self, ch_start: int, ch_stop: int, ch_init: int, children: List[Tuple[int, str]]):
-        self.ch_start = ch_start
-        self.ch_stop = ch_stop
+    def __init__(self, ch_rx_start: int, ch_tx_start: int, ch_rx_stop: int, ch_tx_stop: int, ch_init: int, core: int, last_core: bool, children: List[Tuple[int, str]]):
+        self.ch_rx_start = ch_rx_start
+        self.ch_tx_start = ch_tx_start
+        self.ch_rx_stop = ch_rx_stop
+        self.ch_tx_stop = ch_tx_stop
         self.ch_init = ch_init
+        self.core = core
+        self.last_core = last_core
         self.children = children
 
     def serialise(self) -> bytes:
         child_config_format = "c" * 65
-        pack_str = "<BBBB" + child_config_format * 64
+        pack_str = "<BBBBBB?B" + child_config_format * 64
         child_bytes = bytearray()
         for child in self.children:
             c_name = child[1].encode("utf-8")
@@ -145,12 +156,13 @@ class BenchmarkConfig:
         child_bytes_list = [x.to_bytes(1, "little") for x in child_bytes]
 
         return struct.pack(
-            pack_str, self.ch_start, self.ch_stop,
-            self.ch_init, len(self.children), *child_bytes_list
+            pack_str, self.ch_rx_start, self.ch_tx_start,
+            self.ch_rx_stop, self.ch_tx_stop, self.ch_init, 
+            self.core, self.last_core, len(self.children), *child_bytes_list
         )
 
-
-def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
+# fix lambda type
+def generate(sdf_file: str, output_dir: str, dtb: DeviceTree, get_pd_core):
     uart_node = dtb.node(board.serial)
     assert uart_node is not None
     ethernet_node = dtb.node(board.ethernet)
@@ -158,27 +170,28 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     timer_node = dtb.node(board.timer)
     assert uart_node is not None
 
-    timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=101)
+    timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=101, cpu=get_pd_core("timer_driver"))
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
 
-    uart_driver = ProtectionDomain("uart_driver", "uart_driver.elf", priority=100)
-    serial_virt_tx = ProtectionDomain("serial_virt_tx", "serial_virt_tx.elf", priority=99)
+    uart_driver = ProtectionDomain("uart_driver", "uart_driver.elf", priority=100, cpu=get_pd_core("uart_driver"))
+    serial_virt_tx = ProtectionDomain("serial_virt_tx", "serial_virt_tx.elf", priority=99, cpu=get_pd_core("serial_virt_tx"))
     serial_system = Sddf.Serial(sdf, uart_node, uart_driver, serial_virt_tx)
 
     ethernet_driver = ProtectionDomain(
-        "ethernet_driver", "eth_driver.elf", priority=101, budget=100, period=400
+        "ethernet_driver", "eth_driver.elf", priority=101, budget=100, period=400, cpu=get_pd_core("ethernet_driver")
     )
-    net_virt_tx = ProtectionDomain("net_virt_tx", "network_virt_tx.elf", priority=100, budget=20000)
-    net_virt_rx = ProtectionDomain("net_virt_rx", "network_virt_rx.elf", priority=99)
+
+    net_virt_tx = ProtectionDomain("net_virt_tx", "network_virt_tx.elf", priority=100, budget=20000, cpu=get_pd_core("net_virt_tx"))
+    net_virt_rx = ProtectionDomain("net_virt_rx", "network_virt_rx.elf", priority=99, cpu=get_pd_core("net_virt_rx"))
     net_system = Sddf.Net(sdf, ethernet_node, ethernet_driver, net_virt_tx, net_virt_rx)
 
-    client0 = ProtectionDomain("client0", "lwip0.elf", priority=97, budget=20000)
+    client0 = ProtectionDomain("client0", "lwip0.elf", priority=97, budget=20000, cpu=get_pd_core("client0"))
     client0_net_copier = ProtectionDomain(
-        "client0_net_copier", "network_copy0.elf", priority=98, budget=20000
+        "client0_net_copier", "network_copy0.elf", priority=98, budget=20000, cpu=get_pd_core("client0_net_copier")
     )
-    client1 = ProtectionDomain("client1", "lwip1.elf", priority=97, budget=20000)
+    client1 = ProtectionDomain("client1", "lwip1.elf", priority=97, budget=20000, cpu=get_pd_core("client1"))
     client1_net_copier = ProtectionDomain(
-        "client1_net_copier", "network_copy1.elf", priority=98, budget=20000
+        "client1_net_copier", "network_copy1.elf", priority=98, budget=20000, cpu=get_pd_core("client1_net_copier")
     )
 
     mac_random_part = random.randint(0, 0xfe)
@@ -193,14 +206,8 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     net_system.add_client_with_copier(client0, client0_net_copier, mac_addr=client0_mac_addr)
     net_system.add_client_with_copier(client1, client1_net_copier, mac_addr=client1_mac_addr)
 
-    # Benchmark specific resources
-
-    bench_idle = ProtectionDomain("bench_idle", "idle.elf", priority=1)
-    bench = ProtectionDomain("bench", "benchmark.elf", priority=254)
-
-    serial_system.add_client(bench)
-
-    benchmark_pds = [
+    # Echo server protection domains
+    child_pds = [
         uart_driver,
         serial_virt_tx,
         ethernet_driver,
@@ -212,46 +219,103 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
         client1_net_copier,
         timer_driver,
     ]
-    pds = [
-        bench_idle,
-        bench,
-    ]
-    bench_children = []
-    for pd in benchmark_pds:
-        child_id = bench.add_child_pd(pd)
-        bench_children.append((child_id, pd.name))
-    for pd in pds:
-        sdf.add_pd(pd)
 
-    # Benchmark START channel
-    bench_start_ch = Channel(client0, bench)
-    sdf.add_channel(bench_start_ch)
-    # Benchmark STOP channel
-    bench_stop_ch = Channel(client0, bench)
-    sdf.add_channel(bench_stop_ch)
+    # Sort into cores
+    core_to_pds = {}
+    for pd in child_pds:
+        core = get_pd_core(pd.name)
+        if core in core_to_pds:
+            core_to_pds[core].append(pd)
+        else:
+            core_to_pds[core] = [pd]
 
-    bench_idle_ch = Channel(bench_idle, bench)
-    sdf.add_channel(bench_idle_ch)
+    # Allocate benchmark resources
+    cores = []
+    last_bench_pd = 0
+    last_bench_idle_channel = 0
+    last_bench_start_channel = 0
+    last_bench_stop_channel = 0
+    last_bench_children = 0
+    bench_idle_configs = []
+    bench_configs = []
+    for core in sorted(core_to_pds):
+        cores.append(core)
+        
+        # Create bench and idle pds for each active core
+        bench_idle = ProtectionDomain("bench_idle" + str(core), "idle.elf", priority=1, cpu=core)
+        sdf.add_pd(bench_idle)
 
-    cycle_counters_mr = MemoryRegion("cycle_counters", 0x1000)
-    sdf.add_mr(cycle_counters_mr)
+        bench = ProtectionDomain("bench" + str(core), "benchmark.elf", priority=254, cpu=core)
+        sdf.add_pd(bench)
 
-    bench_idle.add_map(Map(cycle_counters_mr, 0x5_000_000, perms=Map.Perms(r=True, w=True)))
-    client0.add_map(Map(cycle_counters_mr, 0x20_000_000, perms=Map.Perms(r=True, w=True)))
-    bench_idle_config = BenchmarkIdleConfig(0x5_000_000, bench_idle_ch.pd_a_id)
+        serial_system.add_client(bench)
 
-    bench_client_config = BenchmarkClientConfig(
-        0x20_000_000,
-        bench_start_ch.pd_a_id,
-        bench_stop_ch.pd_a_id
-    )
+        # Create formatted list of children
+        bench_children = []
+        for pd in core_to_pds[core]:
+            child_id = bench.add_child_pd(pd)
+            bench_children.append((child_id, pd.name))
 
-    benchmark_config = BenchmarkConfig(
-        bench_start_ch.pd_b_id,
-        bench_stop_ch.pd_b_id,
-        bench_idle_ch.pd_b_id,
-        bench_children
-    )
+        # Benchmark idle channels
+        bench_idle_ch = Channel(bench_idle, bench)
+        sdf.add_channel(bench_idle_ch)
+
+        # Benchmark start and stop channels
+        if last_bench_pd == 0:
+            start_ch = Channel(client0, bench)
+            stop_ch = Channel(client0, bench)
+        else:
+            start_ch = Channel(last_bench_pd, bench)
+            stop_ch = Channel(last_bench_pd, bench)
+
+        sdf.add_channel(start_ch)
+        sdf.add_channel(stop_ch)
+
+        # Add cycle counter memory regions for client and bench_idles
+        cycle_counters_mr = MemoryRegion("cycle_counters" + str(core), 0x1000)
+        sdf.add_mr(cycle_counters_mr)
+        bench_idle.add_map(Map(cycle_counters_mr, 0x5_000_000, perms=Map.Perms(r=True, w=True)))
+        client_cycle_count_vaddr = 0x20_000_000 + 0x1000 * (len(cores) - 1)
+        client0.add_map(Map(cycle_counters_mr, client_cycle_count_vaddr, perms=Map.Perms(r=True, w=False)))
+
+        # Create configs
+        bench_idle_configs.append( BenchmarkIdleConfig(0x5_000_000, bench_idle_ch.pd_a_id))
+        if last_bench_pd != 0:
+            bench_configs.append(BenchmarkConfig(
+                last_bench_start_channel.pd_b_id,
+                start_ch.pd_a_id,
+                last_bench_stop_channel.pd_b_id,
+                stop_ch.pd_a_id,
+                last_bench_idle_channel.pd_b_id,
+                cores[-2],
+                False,
+                last_bench_children
+            ))
+        else:
+            bench_client_config = BenchmarkClientConfig(
+                start_ch.pd_a_id,
+                stop_ch.pd_a_id,
+                len(core_to_pds),
+                list(((0x20_000_000 + 0x1000 * i) for i in range(len(core_to_pds))))
+            )
+        
+        last_bench_pd = bench
+        last_bench_idle_channel = bench_idle_ch
+        last_bench_start_channel = start_ch
+        last_bench_stop_channel = stop_ch
+        last_bench_children = bench_children
+    
+    # Create last bench config
+    bench_configs.append(BenchmarkConfig(
+        last_bench_start_channel.pd_b_id,
+        0,
+        last_bench_stop_channel.pd_b_id,
+        0,
+        last_bench_idle_channel.pd_b_id,
+        cores[-1],
+        True,
+        last_bench_children
+    ))
 
     assert serial_system.connect()
     assert serial_system.serialise_config(output_dir)
@@ -260,11 +324,13 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     assert timer_system.connect()
     assert timer_system.serialise_config(output_dir)
 
-    with open(f"{output_dir}/benchmark_config.data", "wb+") as f:
-        f.write(benchmark_config.serialise())
+    for i in range(len(cores)):
+        core = cores[i]
+        with open(f"{output_dir}/benchmark_config" + str(core) + ".data", "wb+") as f:
+            f.write(bench_configs[i].serialise())
 
-    with open(f"{output_dir}/benchmark_idle_config.data", "wb+") as f:
-        f.write(bench_idle_config.serialise())
+        with open(f"{output_dir}/benchmark_idle_config" + str(core) + ".data", "wb+") as f:
+            f.write(bench_configs[i].serialise())
 
     with open(f"{output_dir}/benchmark_client_config.data", "wb+") as f:
         f.write(bench_client_config.serialise())
@@ -280,6 +346,7 @@ if __name__ == '__main__':
     parser.add_argument("--board", required=True, choices=[b.name for b in BOARDS])
     parser.add_argument("--output", required=True)
     parser.add_argument("--sdf", required=True)
+    parser.add_argument("--smp", required=False)
 
     args = parser.parse_args()
 
@@ -288,7 +355,17 @@ if __name__ == '__main__':
     sdf = SystemDescription(board.arch, board.paddr_top)
     sddf = Sddf(args.sddf)
 
+    if args.smp:
+        with open(args.smp, "r") as core_alloc:
+            core_json = json.load(core_alloc)
+        pd_to_core = {}
+        for pd in core_json["core_allocations"]:
+            pd_to_core[pd["name"]] = int(pd["core"])
+        get_pd_core = lambda name: pd_to_core[name]
+    else:
+        get_pd_core = lambda name: 0
+    
     with open(args.dtb, "rb") as f:
         dtb = DeviceTree(f.read())
 
-    generate(args.sdf, args.output, dtb)
+    generate(args.sdf, args.output, dtb, get_pd_core)

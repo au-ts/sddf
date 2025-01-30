@@ -43,6 +43,19 @@ else
 $(error Unsupported MICROKIT_BOARD given)
 endif
 
+ifneq ($(strip $(SMP_CONFIG)),)
+	ifneq ($(filter $(strip $(MICROKIT_BOARD)),imx8mp_evk imx8mq_evk odroidc2 qemu_virt_aarch64),)
+$(error MICROKIT_BOARD does not support SMP)
+	endif
+	ifeq ($(wildcard $(SMP_CONFIG)),)
+$(error Must specify a valid core configuration file)
+	endif
+	override SMP_CONFIG:=$(abspath $(SMP_CONFIG))
+	export MICROKIT_BOARD_SMP:=$(addsuffix _4_cores,$(strip $(MICROKIT_BOARD)))
+else
+	export MICROKIT_BOARD_SMP:=$(strip $(MICROKIT_BOARD))
+endif
+
 export BUILD_DIR:=$(abspath ${BUILD_DIR})
 export MICROKIT_SDK:=$(abspath ${MICROKIT_SDK})
 export TOP := $(abspath $(dir ${MAKEFILE_LIST}))
@@ -63,7 +76,7 @@ REPORT_FILE := $(BUILD_DIR)/report.txt
 all: ${IMAGE_FILE}
 
 qemu ${IMAGE_FILE} ${REPORT_FILE} clean clobber: ${BUILD_DIR}/Makefile FORCE
-	${MAKE}  -C ${BUILD_DIR} MICROKIT_SDK=${MICROKIT_SDK} $(notdir $@)
+	${MAKE}  -C ${BUILD_DIR} MICROKIT_SDK=${MICROKIT_SDK} SMP_CONFIG=${SMP_CONFIG} $(notdir $@)
 
 ${BUILD_DIR}/Makefile: echo.mk
 	mkdir -p ${BUILD_DIR}
