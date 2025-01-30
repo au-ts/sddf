@@ -31,8 +31,9 @@ METAPROGRAM := $(TOP)/meta.py
 
 vpath %.c ${SDDF} ${ECHO_SERVER}
 
-IMAGES := eth_driver.elf lwip0.elf lwip1.elf benchmark.elf idle.elf network_virt_rx.elf\
-	  network_virt_tx.elf network_copy.elf timer_driver.elf serial_driver.elf serial_virt_tx.elf
+IMAGES := eth_driver.elf echo0.elf echo1.elf benchmark.elf idle.elf network_virt_rx.elf\
+	  network_virt_tx.elf network_copy0.elf network_copy1.elf timer_driver.elf\
+	  serial_driver.elf serial_virt_tx.elf
 
 CFLAGS := -mcpu=$(CPU) \
 	  -mstrict-align \
@@ -51,7 +52,7 @@ CFLAGS := -mcpu=$(CPU) \
 LDFLAGS := -L$(BOARD_DIR)/lib -L${LIBC}
 LIBS := --start-group -lmicrokit -Tmicrokit.ld -lc libsddf_util_debug.a --end-group
 
-CHECK_FLAGS_BOARD_MD5:=.board_cflags-$(shell echo -- ${CFLAGS} ${BOARD} ${MICROKIT_CONFIG} | shasum | sed 's/ *-//')
+CHECK_FLAGS_BOARD_MD5 := .board_cflags-$(shell echo -- ${CFLAGS} ${BOARD} ${MICROKIT_CONFIG} | shasum | sed 's/ *-//')
 
 ${CHECK_FLAGS_BOARD_MD5}:
 	-rm -f .board_cflags-*
@@ -60,32 +61,19 @@ ${CHECK_FLAGS_BOARD_MD5}:
 %.elf: %.o
 	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
 
-include ${SDDF}/${LWIPDIR}/Filelists.mk
-
-# NETIFFILES: Files implementing various generic network interface functions
-# Override version in Filelists.mk
-NETIFFILES:=$(LWIPDIR)/netif/ethernet.c
-
-# LWIPFILES: All the above.
-LWIPFILES=lwip.c $(COREFILES) $(CORE4FILES) $(NETIFFILES)
-LWIP_OBJS := $(LWIPFILES:.c=.o) lwip.o utilization_socket.o \
+ECHO_OBJS := echo.o utilization_socket.o \
 	     udp_echo_socket.o tcp_echo_socket.o
 
-OBJS := $(LWIP_OBJS)
-DEPS := $(filter %.d,$(OBJS:.o=.d))
+DEPS := $(ECHO_OBJS:.o=.d)
 
 all: loader.img
 
-${LWIP_OBJS}: ${CHECK_FLAGS_BOARD_MD5}
-lwip0.elf: $(LWIP_OBJS) libsddf_util.a
-	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
-lwip1.elf: $(LWIP_OBJS) libsddf_util.a
+${ECHO_OBJS}: ${CHECK_FLAGS_BOARD_MD5}
+echo0.elf echo1.elf: $(ECHO_OBJS) libsddf_util.a lib_sddf_lwip_echo.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-LWIPDIRS := $(addprefix ${LWIPDIR}/, core/ipv4 netif api)
-${LWIP_OBJS}: |${BUILD_DIR}/${LWIPDIRS}
-${BUILD_DIR}/${LWIPDIRS}:
-	mkdir -p $@
+network_copy0.elf network_copy1.elf: network_copy.elf
+	cp $< $@
 
 # Need to build libsddf_util_debug.a because it's included in LIBS
 # for the unimplemented libc dependencies
@@ -106,16 +94,18 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(OBJCOPY) --update-section .net_copy_config=net_copy_client0_net_copier.data network_copy.elf network_copy0.elf
 	$(OBJCOPY) --update-section .net_copy_config=net_copy_client1_net_copier.data network_copy.elf network_copy1.elf
 	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
-	$(OBJCOPY) --update-section .timer_client_config=timer_client_client0.data lwip0.elf
-	$(OBJCOPY) --update-section .net_client_config=net_client_client0.data lwip0.elf
-	$(OBJCOPY) --update-section .serial_client_config=serial_client_client0.data lwip0.elf
-	$(OBJCOPY) --update-section .timer_client_config=timer_client_client1.data lwip1.elf
-	$(OBJCOPY) --update-section .net_client_config=net_client_client1.data lwip1.elf
-	$(OBJCOPY) --update-section .serial_client_config=serial_client_client1.data lwip1.elf
+	$(OBJCOPY) --update-section .timer_client_config=timer_client_client0.data echo0.elf
+	$(OBJCOPY) --update-section .net_client_config=net_client_client0.data echo0.elf
+	$(OBJCOPY) --update-section .serial_client_config=serial_client_client0.data echo0.elf
+	$(OBJCOPY) --update-section .timer_client_config=timer_client_client1.data echo1.elf
+	$(OBJCOPY) --update-section .net_client_config=net_client_client1.data echo1.elf
+	$(OBJCOPY) --update-section .serial_client_config=serial_client_client1.data echo1.elf
 	$(OBJCOPY) --update-section .serial_client_config=serial_client_bench.data benchmark.elf
 	$(OBJCOPY) --update-section .benchmark_config=benchmark_config.data benchmark.elf
-	$(OBJCOPY) --update-section .benchmark_client_config=benchmark_client_config.data lwip0.elf
+	$(OBJCOPY) --update-section .benchmark_client_config=benchmark_client_config.data echo0.elf
 	$(OBJCOPY) --update-section .benchmark_config=benchmark_idle_config.data idle.elf
+	$(OBJCOPY) --update-section .lib_sddf_lwip_config=lib_sddf_lwip_config_client0.data echo0.elf
+	$(OBJCOPY) --update-section .lib_sddf_lwip_config=lib_sddf_lwip_config_client1.data echo1.elf
 
 ${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
@@ -123,6 +113,7 @@ ${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 
 include ${SDDF}/util/util.mk
 include ${SDDF}/network/components/network_components.mk
+include ${SDDF}/network/lib_sddf_lwip/lib_sddf_lwip.mk
 include ${ETHERNET_DRIVER}/eth_driver.mk
 include ${BENCHMARK}/benchmark.mk
 include ${TIMER_DRIVER}/timer_driver.mk
