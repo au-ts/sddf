@@ -319,6 +319,8 @@ static bool handle_client(int cli_id)
         }
         case BLK_REQ_FLUSH:
         case BLK_REQ_BARRIER:
+        case BLK_REQ_SD_OFF:
+        case BLK_REQ_SD_ON:
             break;
         default:
             /* Invalid request code given */
