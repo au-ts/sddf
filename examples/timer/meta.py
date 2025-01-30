@@ -89,7 +89,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     assert timer_system.serialise_config(output_dir)
 
     with open(f"{output_dir}/{sdf_file}", "w+") as f:
-        f.write(sdf.xml())
+        f.write(sdf.render())
 
 
 if __name__ == '__main__':
