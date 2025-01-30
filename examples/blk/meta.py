@@ -16,6 +16,8 @@ class Board:
     blk: str
     # Default partition if the user has not specified one
     partition: int
+    # Some block drivers need a timer driver as well, the example
+    # itself does not need a timer driver.
     timer: Optional[str]
 
 
