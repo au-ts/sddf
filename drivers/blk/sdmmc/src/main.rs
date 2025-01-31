@@ -9,13 +9,15 @@ use core::{
     future::Future,
     pin::Pin,
     task::{Context, Poll, RawWaker, RawWakerVTable, Waker},
+    hint,
 };
 
 use alloc::boxed::Box;
 use sddf_blk::{
     blk_dequeue_req_helper, blk_enqueue_resp_helper, blk_queue_empty_req_helper,
     blk_queue_full_resp_helper, blk_queue_init_helper, BlkOp, BlkRequest, BlkStatus,
-    blk_device_regs_vaddr, blk_device_init_data_vaddr, blk_device_init_data_ioaddr
+    blk_device_regs_vaddr, blk_device_init_data_vaddr, blk_device_init_data_ioaddr,
+    blk_queue_set_ready,
 };
 use sdmmc_hal::meson_gx_mmc::SdmmcMesonHardware;
 
@@ -261,11 +263,74 @@ impl<T: SdmmcHardware + 'static> Handler for HandlerImpl<T> {
                         break;
                     }
                     BlkOp::BlkReqSDOff => {
+                        #[inline]
+                        pub fn program_wait_unreliable(time_ns: u64) {
+                            for _ in 0..time_ns {
+                                hint::spin_loop(); // Use spin loop hint to reduce contention during the wait
+                            }
+                        }
                         let _ = self.sdmmc.as_mut().unwrap().hardware.sdmmc_set_power(MmcPowerMode::Off);
-                        debug_println!("DRIV| Turning sd card off!\n");
+                        /* Set the device to !ready state, while its off */
+                        unsafe {
+                            if blk_queue_set_ready(false) {
+                                panic!("DRIV| Block device still ready, after setting to off!");
+                            }
+                        }
+                        let sleep_t = 1_000_000_000;
+                        debug_println!("DRIV| Turning sd card off! For {} ns\n", sleep_t);
+                        program_wait_unreliable(sleep_t);
+                        debug_println!("DRIV| Done sleeping\n");
                     }
                     BlkOp::BlkReqSDOn => {
+                        #[inline]
+                        pub fn program_wait_unreliable(time_ns: u64) {
+                            for _ in 0..time_ns {
+                                hint::spin_loop(); // Use spin loop hint to reduce contention during the wait
+                            }
+                        }
+                        // Set the power to On
                         let _ = self.sdmmc.as_mut().unwrap().hardware.sdmmc_set_power(MmcPowerMode::On);
+                        // Replicate portion of the init() function, to reinitialise the SD card
+                        // *********** void init() *****************
+                        let unsafe_stolen_memory: &mut [u8; 64];
+
+                        // This line of code actually is very unsafe!
+                        // Considering the memory is stolen from the memory that has sdcard registers mapped in
+                        unsafe {
+                            let stolen_memory_addr = 0xf5500000 as *mut [u8; 64];
+                            assert!(stolen_memory_addr as usize % 8 == 0);
+                            unsafe_stolen_memory = &mut (*stolen_memory_addr);
+                        }
+                        unsafe {
+                            blk_queue_init_helper();
+                        }
+                        // XXX: change to expect, in case on sdmmc -> better error msg
+                        let _ = self.sdmmc.as_mut().unwrap().hardware.sdmmc_init();
+                   self.sdmmc.as_mut().unwrap()
+                        .setup_card()
+                        .unwrap_or_else(|error| panic!("SDMMC: Error at setup {:?}", error));
+
+                    let mut test: u32 = 0;
+                    let _ = self.sdmmc.as_mut().unwrap().enable_interrupt(&mut test);
+
+                   self.sdmmc.as_mut().unwrap()
+                        .tune_performance(Some((
+                            unsafe_stolen_memory,
+                            dummy_cache_invalidate_function,
+                        )))
+                        .unwrap_or_else(|error| panic!("SDMMC: Error at tuning performance {:?}", error));
+
+                    unsafe {
+                        print_one_block(unsafe_stolen_memory.as_ptr(), 64);
+                    }
+
+                    let mut irq_to_enable = MMC_INTERRUPT_ERROR | MMC_INTERRUPT_END_OF_CHAIN;
+
+                    // Should always succeed, at least for odroid C4
+                    let _ = self.sdmmc.as_mut().unwrap().enable_interrupt(&mut irq_to_enable);
+                        debug_println!("driv| waiting for 100_000_000ns!\n");
+
+                        program_wait_unreliable(10_000_000);
                         debug_println!("DRIV| Turning sd card on!\n");
                     }
                     _ => {

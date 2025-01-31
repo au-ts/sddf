@@ -30,6 +30,12 @@ uint64_t blk_device_init_data_ioaddr() {
     return (uint64_t)device_resources.regions[1].io_addr;
 }
 
+/* Sets the blk_config->ready shared variable and returns currently set value */
+bool blk_queue_set_ready(bool ready) {
+    blk_config->ready = ready;
+    return blk_config->ready;
+}
+
 uint8_t blk_queue_empty_req_helper() {
     return blk_queue_empty_req(&blk_queue);
 }

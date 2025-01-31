@@ -1,5 +1,6 @@
 unsafe extern "C" {
     pub unsafe fn blk_queue_init_helper();
+    pub unsafe fn blk_queue_set_ready(ready: bool) -> bool;
 
     pub unsafe fn blk_device_regs_vaddr() -> u64;
     pub unsafe fn blk_device_init_data_vaddr() -> u64;
