@@ -6,9 +6,11 @@
   description = "A flake for building sDDF";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     zig-overlay.url = "github:mitchellh/zig-overlay";
+    zig-overlay.inputs.nixpkgs.follows = "nixpkgs";
     sdfgen.url = "github:au-ts/microkit_sdf_gen/0.16.1";
+    sdfgen.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs = { nixpkgs, zig-overlay, sdfgen, ... }:
