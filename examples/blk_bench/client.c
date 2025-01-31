@@ -146,7 +146,12 @@ bool run_benchmark() {
 #ifndef VALIDATE_IO_OPERATIONS
             if (!virtualiser_replied) {
                 LOG_CLIENT("run_benchmark: START state,verifying if a simple read succeeds...\n");
-                int err = blk_enqueue_req(&blk_queue, BLK_REQ_READ, 0x10000, 0, 2, 0);
+                //XXX: change after sd card power cycle add
+                int err = blk_enqueue_req(&blk_queue, BLK_REQ_SD_OFF, 0, 0, 0, 0);
+                assert(!err);
+                err = blk_enqueue_req(&blk_queue, BLK_REQ_SD_ON, 0, 0, 0, 0);
+                assert(!err);
+                err = blk_enqueue_req(&blk_queue, BLK_REQ_READ, 0x10000, 0, 2, 1);
                 assert(!err);
                 microkit_notify(VIRT_CH);
             } else {
