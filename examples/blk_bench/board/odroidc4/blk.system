@@ -116,7 +116,7 @@
             <program_image path="client.elf" />
 
             <!-- The client should not be able to write to the config page -->
-            <map mr="blk_client_storage_info" vaddr="0x40_000_000" perms="r" cached="true" setvar_vaddr="blk_storage_info" />
+            <map mr="blk_client_storage_info" vaddr="0x40_000_000" perms="rw" cached="true" setvar_vaddr="blk_storage_info" />
 
             <map mr="blk_client_request" vaddr="0x40_200_000" perms="rw" cached="true" setvar_vaddr="blk_request" />
             <map mr="blk_client_response" vaddr="0x40_400_000" perms="rw" cached="true" setvar_vaddr="blk_response" />
@@ -170,11 +170,16 @@
 
     <channel>
         <end pd="timer" id="1" />
-        <end pd="bench" id="4" /> <!-- Should this number change, so should TIMER_CH in timer.h -->
+        <end pd="bench" id="4" />
+    </channel>
+
+    <channel>
+        <end pd="timer" id="2" />
+        <end pd="client" id="5" />
     </channel>
 
     <channel>
         <end pd="benchIdle" id="3" />
-        <end pd="bench" id="5" /> <!-- Should this number change, so should TIMER_CH in timer.h -->
+        <end pd="bench" id="5" />
     </channel>
 </system>
