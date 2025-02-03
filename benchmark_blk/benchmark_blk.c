@@ -58,7 +58,7 @@ ccnt_t ccounter_benchmark_start;
 ccnt_t ccounter_benchmark_stop;
 uint64_t timer_start;
 uint64_t timer_end;
-uint64_t timeout_uart = 6e9;
+uint64_t timeout_uart = 11e9;
 uint8_t benchmark_size_idx = 0;
 
 char *serial_tx_data;
@@ -480,15 +480,21 @@ void notified(microkit_channel ch) {
                 switch (run_benchmark_state) {
                     case THROUGHPUT_RANDOM_READ:
                         run_benchmark_state = THROUGHPUT_RANDOM_WRITE;
+                        /* >10s timeout for write benchmarks -> sd card power cycling */
+                        timeout_uart = 11e9;
                         break;
                     case THROUGHPUT_RANDOM_WRITE:
                         run_benchmark_state = THROUGHPUT_SEQUENTIAL_READ;
+                        timeout_uart = 6e9;
                         break;
                     case THROUGHPUT_SEQUENTIAL_READ:
                         run_benchmark_state = THROUGHPUT_SEQUENTIAL_WRITE;
+                        /* >10s timeout for write benchmarks -> sd card power cycling */
+                        timeout_uart = 11e9;
                         break;
                     case THROUGHPUT_SEQUENTIAL_WRITE:
                         run_benchmark_state = LATENCY_READ;
+                        timeout_uart = 6e9;
                         break;
                     default:
                         panic("BENCHMARK: Error, unimplemented benchmark state transition");

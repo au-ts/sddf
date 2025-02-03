@@ -9,7 +9,6 @@ use core::{
     future::Future,
     pin::Pin,
     task::{Context, Poll, RawWaker, RawWakerVTable, Waker},
-    hint,
 };
 
 use alloc::boxed::Box;
@@ -263,12 +262,6 @@ impl<T: SdmmcHardware + 'static> Handler for HandlerImpl<T> {
                         break;
                     }
                     BlkOp::BlkReqSDOff => {
-                        #[inline]
-                        pub fn program_wait_unreliable(time_ns: u64) {
-                            for _ in 0..time_ns {
-                                hint::spin_loop(); // Use spin loop hint to reduce contention during the wait
-                            }
-                        }
                         let _ = self.sdmmc.as_mut().unwrap().hardware.sdmmc_set_power(MmcPowerMode::Off);
                         /* Set the device to !ready state, while its off */
                         unsafe {
@@ -276,18 +269,9 @@ impl<T: SdmmcHardware + 'static> Handler for HandlerImpl<T> {
                                 panic!("DRIV| Block device still ready, after setting to off!");
                             }
                         }
-                        let sleep_t = 1_000_000_000;
-                        debug_println!("DRIV| Turning sd card off! For {} ns\n", sleep_t);
-                        program_wait_unreliable(sleep_t);
-                        debug_println!("DRIV| Done sleeping\n");
+                        debug_println!("DRIV| Turning sd card off!\n");
                     }
                     BlkOp::BlkReqSDOn => {
-                        #[inline]
-                        pub fn program_wait_unreliable(time_ns: u64) {
-                            for _ in 0..time_ns {
-                                hint::spin_loop(); // Use spin loop hint to reduce contention during the wait
-                            }
-                        }
                         // Set the power to On
                         let _ = self.sdmmc.as_mut().unwrap().hardware.sdmmc_set_power(MmcPowerMode::On);
                         // Replicate portion of the init() function, to reinitialise the SD card
@@ -328,9 +312,6 @@ impl<T: SdmmcHardware + 'static> Handler for HandlerImpl<T> {
 
                     // Should always succeed, at least for odroid C4
                     let _ = self.sdmmc.as_mut().unwrap().enable_interrupt(&mut irq_to_enable);
-                        debug_println!("driv| waiting for 100_000_000ns!\n");
-
-                        program_wait_unreliable(10_000_000);
                         debug_println!("DRIV| Turning sd card on!\n");
                     }
                     _ => {
