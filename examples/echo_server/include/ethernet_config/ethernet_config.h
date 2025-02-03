@@ -13,7 +13,7 @@
 #define NUM_NETWORK_CLIENTS 2
 
 #define NET_CLI0_NAME "client0"
-#define NET_CLI1_NAME "client_vmm"
+#define NET_CLI1_NAME "client1"
 #define NET_COPY0_NAME "copy0"
 #define NET_COPY1_NAME "copy1"
 #define NET_VIRT_RX_NAME "net_virt_rx"
