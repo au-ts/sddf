@@ -144,7 +144,7 @@ void receive(void)
             /* Check if packet is an ARP request */
             struct ethernet_header *ethhdr = (struct ethernet_header *)(rx_buffer_data_region + buffer.io_or_offset);
             if (ethhdr->type == HTONS(ETH_TYPE_ARP)) {
-                struct arp_packet *pkt = (struct arp_packet *)addr;
+                struct arp_packet *pkt = (struct arp_packet *)ethhdr;
                 /* Check if it's a probe, ignore announcements */
                 if (pkt->opcode == HTONS(ETHARP_OPCODE_REQUEST)) {
                     /* Check it it's for a client */
@@ -222,3 +222,4 @@ void init(void)
 
     ethernet_arp_mac_addr_init_sys(microkit_name, (uint8_t *) mac_addrs);
 }
+setenv bootcmd 'dhcp; tftpboot 0x41000000 /iotgate2/loader.img; go 0x41000000'

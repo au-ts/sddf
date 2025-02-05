@@ -1,493 +1,135 @@
 #pragma once
 
-/* These definitions are taken from the Linux kernel. These are in reference to
-the dwmac4 header files. */
-
-#include <stdint.h>
-
-#define GENMASK(h, l) (((~0UL) << (l)) & (~0UL >> (sizeof(long) * 8 - 1 - (h))))
-
-#define MAX_RX_FRAME_SZ             (0x600)             /* Maximum size of a received packet. */
-
-/* These register definitions are from the dwmac4.h. These are inline with the
-register map outlined in the imx8mp TRM. */
-
-/* --------- MAC registers --------- */
-#define GMAC_CONFIG			0x00000000
-#define GMAC_EXT_CONFIG			0x00000004
-#define GMAC_PACKET_FILTER		0x00000008
-#define GMAC_HASH_TAB(x)		(0x10 + (x) * 4)
-#define GMAC_VLAN_TAG			0x00000050
-#define GMAC_VLAN_TAG_DATA		0x00000054
-#define GMAC_VLAN_HASH_TABLE		0x00000058
-#define GMAC_RX_FLOW_CTRL		0x00000090
-#define GMAC_VLAN_INCL			0x00000060
-#define GMAC_QX_TX_FLOW_CTRL(x)		(0x70 + x * 4)
-#define GMAC_TXQ_PRTY_MAP0		0x98
-#define GMAC_TXQ_PRTY_MAP1		0x9C
-#define GMAC_RXQ_CTRL0			0x000000a0
-#define GMAC_RXQ_CTRL1			0x000000a4
-#define GMAC_RXQ_CTRL2			0x000000a8
-#define GMAC_RXQ_CTRL3			0x000000ac
-#define GMAC_INT_STATUS			0x000000b0
-#define GMAC_INT_EN			0x000000b4
-#define GMAC_1US_TIC_COUNTER		0x000000dc
-#define GMAC_PCS_BASE			0x000000e0
-#define GMAC_PHYIF_CONTROL_STATUS	0x000000f8
-#define GMAC_PMT			0x000000c0
-#define GMAC_DEBUG			0x00000114
-#define GMAC_HW_FEATURE0		0x0000011c
-#define GMAC_HW_FEATURE1		0x00000120
-#define GMAC_HW_FEATURE2		0x00000124
-#define GMAC_HW_FEATURE3		0x00000128
-#define GMAC_MDIO_ADDR			0x00000200
-#define GMAC_MDIO_DATA			0x00000204
-#define GMAC_GPIO_STATUS		0x0000020C
-#define GMAC_ARP_ADDR			0x00000210
-#define GMAC_ADDR_HIGH(reg)		(0x300 + reg * 8)
-#define GMAC_ADDR_LOW(reg)		(0x304 + reg * 8)
-#define GMAC_L3L4_CTRL(reg)		(0x900 + (reg) * 0x30)
-#define GMAC_L4_ADDR(reg)		(0x904 + (reg) * 0x30)
-#define GMAC_L3_ADDR0(reg)		(0x910 + (reg) * 0x30)
-#define GMAC_L3_ADDR1(reg)		(0x914 + (reg) * 0x30)
-#define GMAC_TIMESTAMP_STATUS		0x00000b20
-
-/* RX Queues Routing */
-#define GMAC_RXQCTRL_AVCPQ_MASK		GENMASK(2, 0)
-#define GMAC_RXQCTRL_AVCPQ_SHIFT	0
-#define GMAC_RXQCTRL_PTPQ_MASK		GENMASK(6, 4)
-#define GMAC_RXQCTRL_PTPQ_SHIFT		4
-#define GMAC_RXQCTRL_DCBCPQ_MASK	GENMASK(10, 8)
-#define GMAC_RXQCTRL_DCBCPQ_SHIFT	8
-#define GMAC_RXQCTRL_UPQ_MASK		GENMASK(14, 12)
-#define GMAC_RXQCTRL_UPQ_SHIFT		12
-#define GMAC_RXQCTRL_MCBCQ_MASK		GENMASK(18, 16)
-#define GMAC_RXQCTRL_MCBCQ_SHIFT	16
-#define GMAC_RXQCTRL_MCBCQEN		BIT(20)
-#define GMAC_RXQCTRL_MCBCQEN_SHIFT	20
-#define GMAC_RXQCTRL_TACPQE		BIT(21)
-#define GMAC_RXQCTRL_TACPQE_SHIFT	21
-#define GMAC_RXQCTRL_FPRQ		GENMASK(26, 24)
-#define GMAC_RXQCTRL_FPRQ_SHIFT		24
-
-/* MAC Packet Filtering */
-#define GMAC_PACKET_FILTER_PR		BIT(0)
-#define GMAC_PACKET_FILTER_HMC		BIT(2)
-#define GMAC_PACKET_FILTER_PM		BIT(4)
-#define GMAC_PACKET_FILTER_PCF		BIT(7)
-#define GMAC_PACKET_FILTER_HPF		BIT(10)
-#define GMAC_PACKET_FILTER_VTFE		BIT(16)
-#define GMAC_PACKET_FILTER_IPFE		BIT(20)
-#define GMAC_PACKET_FILTER_RA		BIT(31)
-
-#define GMAC_MAX_PERFECT_ADDRESSES	128
-
-/* MAC VLAN */
-#define GMAC_VLAN_EDVLP			BIT(26)
-#define GMAC_VLAN_VTHM			BIT(25)
-#define GMAC_VLAN_DOVLTC		BIT(20)
-#define GMAC_VLAN_ESVL			BIT(18)
-#define GMAC_VLAN_ETV			BIT(16)
-#define GMAC_VLAN_VID			GENMASK(15, 0)
-#define GMAC_VLAN_VLTI			BIT(20)
-#define GMAC_VLAN_CSVL			BIT(19)
-#define GMAC_VLAN_VLC			GENMASK(17, 16)
-#define GMAC_VLAN_VLC_SHIFT		16
-#define GMAC_VLAN_VLHT			GENMASK(15, 0)
-
-/* MAC VLAN Tag */
-#define GMAC_VLAN_TAG_VID		GENMASK(15, 0)
-#define GMAC_VLAN_TAG_ETV		BIT(16)
-
-/* MAC VLAN Tag Control */
-#define GMAC_VLAN_TAG_CTRL_OB		BIT(0)
-#define GMAC_VLAN_TAG_CTRL_CT		BIT(1)
-#define GMAC_VLAN_TAG_CTRL_OFS_MASK	GENMASK(6, 2)
-#define GMAC_VLAN_TAG_CTRL_OFS_SHIFT	2
-#define GMAC_VLAN_TAG_CTRL_EVLS_MASK	GENMASK(22, 21)
-#define GMAC_VLAN_TAG_CTRL_EVLS_SHIFT	21
-#define GMAC_VLAN_TAG_CTRL_EVLRXS	BIT(24)
-
-#define GMAC_VLAN_TAG_STRIP_NONE	(0x0 << GMAC_VLAN_TAG_CTRL_EVLS_SHIFT)
-#define GMAC_VLAN_TAG_STRIP_PASS	(0x1 << GMAC_VLAN_TAG_CTRL_EVLS_SHIFT)
-#define GMAC_VLAN_TAG_STRIP_FAIL	(0x2 << GMAC_VLAN_TAG_CTRL_EVLS_SHIFT)
-#define GMAC_VLAN_TAG_STRIP_ALL		(0x3 << GMAC_VLAN_TAG_CTRL_EVLS_SHIFT)
-
-/* MAC VLAN Tag Data/Filter */
-#define GMAC_VLAN_TAG_DATA_VID		GENMASK(15, 0)
-#define GMAC_VLAN_TAG_DATA_VEN		BIT(16)
-#define GMAC_VLAN_TAG_DATA_ETV		BIT(17)
-
-/* MAC RX Queue Enable */
-#define GMAC_RX_QUEUE_CLEAR(queue)	~(GENMASK(1, 0) << ((queue) * 2))
-#define GMAC_RX_AV_QUEUE_ENABLE(queue)	BIT((queue) * 2)
-#define GMAC_RX_DCB_QUEUE_ENABLE(queue)	BIT(((queue) * 2) + 1)
-
-/* MAC Flow Control RX */
-#define GMAC_RX_FLOW_CTRL_RFE		BIT(0)
-
-/* RX Queues Priorities */
-#define GMAC_RXQCTRL_PSRQX_MASK(x)	GENMASK(7 + ((x) * 8), 0 + ((x) * 8))
-#define GMAC_RXQCTRL_PSRQX_SHIFT(x)	((x) * 8)
-
-/* TX Queues Priorities */
-#define GMAC_TXQCTRL_PSTQX_MASK(x)	GENMASK(7 + ((x) * 8), 0 + ((x) * 8))
-#define GMAC_TXQCTRL_PSTQX_SHIFT(x)	((x) * 8)
-
-/* MAC Flow Control TX */
-#define GMAC_TX_FLOW_CTRL_TFE		BIT(1)
-#define GMAC_TX_FLOW_CTRL_PT_SHIFT	16
-
-/*  MAC Interrupt bitmap*/
-#define GMAC_INT_RGSMIIS		BIT(0)
-#define GMAC_INT_PCS_LINK		BIT(1)
-#define GMAC_INT_PCS_ANE		BIT(2)
-#define GMAC_INT_PCS_PHYIS		BIT(3)
-#define GMAC_INT_PMT_EN			BIT(4)
-#define GMAC_INT_LPI_EN			BIT(5)
-#define GMAC_INT_TSIE			BIT(12)
-
-#define	GMAC_PCS_IRQ_DEFAULT	(GMAC_INT_RGSMIIS | GMAC_INT_PCS_LINK |	\
-				 GMAC_INT_PCS_ANE)
-
-#define	GMAC_INT_DEFAULT_ENABLE	(GMAC_INT_PMT_EN | GMAC_INT_LPI_EN | \
-				 GMAC_INT_TSIE)
-
-/* MAC Debug bitmap */
-#define GMAC_DEBUG_TFCSTS_MASK		GENMASK(18, 17)
-#define GMAC_DEBUG_TFCSTS_SHIFT		17
-#define GMAC_DEBUG_TFCSTS_IDLE		0
-#define GMAC_DEBUG_TFCSTS_WAIT		1
-#define GMAC_DEBUG_TFCSTS_GEN_PAUSE	2
-#define GMAC_DEBUG_TFCSTS_XFER		3
-#define GMAC_DEBUG_TPESTS		BIT(16)
-#define GMAC_DEBUG_RFCFCSTS_MASK	GENMASK(2, 1)
-#define GMAC_DEBUG_RFCFCSTS_SHIFT	1
-#define GMAC_DEBUG_RPESTS		BIT(0)
-
-/* MAC config */
-#define GMAC_CONFIG_ARPEN		BIT(31)
-#define GMAC_CONFIG_SARC		GENMASK(30, 28)
-#define GMAC_CONFIG_SARC_SHIFT		28
-#define GMAC_CONFIG_IPC			BIT(27)
-#define GMAC_CONFIG_IPG			GENMASK(26, 24)
-#define GMAC_CONFIG_IPG_SHIFT		24
-#define GMAC_CONFIG_2K			BIT(22)
-#define GMAC_CONFIG_ACS			BIT(20)
-#define GMAC_CONFIG_BE			BIT(18)
-#define GMAC_CONFIG_JD			BIT(17)
-#define GMAC_CONFIG_JE			BIT(16)
-#define GMAC_CONFIG_PS			BIT(15)
-#define GMAC_CONFIG_FES			BIT(14)
-#define GMAC_CONFIG_FES_SHIFT		14
-#define GMAC_CONFIG_DM			BIT(13)
-#define GMAC_CONFIG_LM			BIT(12)
-#define GMAC_CONFIG_DCRS		BIT(9)
-#define GMAC_CONFIG_TE			BIT(1)
-#define GMAC_CONFIG_RE			BIT(0)
-
-/* MAC extended config */
-#define GMAC_CONFIG_EIPG		GENMASK(29, 25)
-#define GMAC_CONFIG_EIPG_SHIFT		25
-#define GMAC_CONFIG_EIPG_EN		BIT(24)
-#define GMAC_CONFIG_HDSMS		GENMASK(22, 20)
-#define GMAC_CONFIG_HDSMS_SHIFT		20
-#define GMAC_CONFIG_HDSMS_256		(0x2 << GMAC_CONFIG_HDSMS_SHIFT)
-
-/* MAC HW features0 bitmap */
-#define GMAC_HW_FEAT_SAVLANINS		BIT(27)
-#define GMAC_HW_FEAT_ADDMAC		BIT(18)
-#define GMAC_HW_FEAT_RXCOESEL		BIT(16)
-#define GMAC_HW_FEAT_TXCOSEL		BIT(14)
-#define GMAC_HW_FEAT_EEESEL		BIT(13)
-#define GMAC_HW_FEAT_TSSEL		BIT(12)
-#define GMAC_HW_FEAT_ARPOFFSEL		BIT(9)
-#define GMAC_HW_FEAT_MMCSEL		BIT(8)
-#define GMAC_HW_FEAT_MGKSEL		BIT(7)
-#define GMAC_HW_FEAT_RWKSEL		BIT(6)
-#define GMAC_HW_FEAT_SMASEL		BIT(5)
-#define GMAC_HW_FEAT_VLHASH		BIT(4)
-#define GMAC_HW_FEAT_PCSSEL		BIT(3)
-#define GMAC_HW_FEAT_HDSEL		BIT(2)
-#define GMAC_HW_FEAT_GMIISEL		BIT(1)
-#define GMAC_HW_FEAT_MIISEL		BIT(0)
-
-/* MAC HW features1 bitmap */
-#define GMAC_HW_FEAT_L3L4FNUM		GENMASK(30, 27)
-#define GMAC_HW_HASH_TB_SZ		GENMASK(25, 24)
-#define GMAC_HW_FEAT_AVSEL		BIT(20)
-#define GMAC_HW_TSOEN			BIT(18)
-#define GMAC_HW_FEAT_SPHEN		BIT(17)
-#define GMAC_HW_ADDR64			GENMASK(15, 14)
-#define GMAC_HW_TXFIFOSIZE		GENMASK(10, 6)
-#define GMAC_HW_RXFIFOSIZE		GENMASK(4, 0)
-
-/* MAC HW features2 bitmap */
-#define GMAC_HW_FEAT_AUXSNAPNUM		GENMASK(30, 28)
-#define GMAC_HW_FEAT_PPSOUTNUM		GENMASK(26, 24)
-#define GMAC_HW_FEAT_TXCHCNT		GENMASK(21, 18)
-#define GMAC_HW_FEAT_RXCHCNT		GENMASK(15, 12)
-#define GMAC_HW_FEAT_TXQCNT		GENMASK(9, 6)
-#define GMAC_HW_FEAT_RXQCNT		GENMASK(3, 0)
-
-/* MAC HW features3 bitmap */
-#define GMAC_HW_FEAT_ASP		GENMASK(29, 28)
-#define GMAC_HW_FEAT_TBSSEL		BIT(27)
-#define GMAC_HW_FEAT_FPESEL		BIT(26)
-#define GMAC_HW_FEAT_ESTWID		GENMASK(21, 20)
-#define GMAC_HW_FEAT_ESTDEP		GENMASK(19, 17)
-#define GMAC_HW_FEAT_ESTSEL		BIT(16)
-#define GMAC_HW_FEAT_FRPES		GENMASK(14, 13)
-#define GMAC_HW_FEAT_FRPBS		GENMASK(12, 11)
-#define GMAC_HW_FEAT_FRPSEL		BIT(10)
-#define GMAC_HW_FEAT_DVLAN		BIT(5)
-#define GMAC_HW_FEAT_NRVF		GENMASK(2, 0)
-
-/* GMAC GPIO Status reg */
-#define GMAC_GPO0			BIT(16)
-#define GMAC_GPO1			BIT(17)
-#define GMAC_GPO2			BIT(18)
-#define GMAC_GPO3			BIT(19)
-
-/* MAC HW ADDR regs */
-#define GMAC_HI_DCS			GENMASK(18, 16)
-#define GMAC_HI_DCS_SHIFT		16
-#define GMAC_HI_REG_AE			BIT(31)
-
-/* L3/L4 Filters regs */
-#define GMAC_L4DPIM0			BIT(21)
-#define GMAC_L4DPM0			BIT(20)
-#define GMAC_L4SPIM0			BIT(19)
-#define GMAC_L4SPM0			BIT(18)
-#define GMAC_L4PEN0			BIT(16)
-#define GMAC_L3DAIM0			BIT(5)
-#define GMAC_L3DAM0			BIT(4)
-#define GMAC_L3SAIM0			BIT(3)
-#define GMAC_L3SAM0			BIT(2)
-#define GMAC_L3PEN0			BIT(0)
-#define GMAC_L4DP0			GENMASK(31, 16)
-#define GMAC_L4DP0_SHIFT		16
-#define GMAC_L4SP0			GENMASK(15, 0)
-
-/* MAC Timestamp Status */
-#define GMAC_TIMESTAMP_AUXTSTRIG	BIT(2)
-#define GMAC_TIMESTAMP_ATSNS_MASK	GENMASK(29, 25)
-#define GMAC_TIMESTAMP_ATSNS_SHIFT	25
-
-/* --------- MTL registers --------- */
-#define MTL_OPERATION_MODE		0x00000c00
-#define MTL_FRPE			BIT(15)
-#define MTL_OPERATION_SCHALG_MASK	GENMASK(6, 5)
-#define MTL_OPERATION_SCHALG_WRR	(0x0 << 5)
-#define MTL_OPERATION_SCHALG_WFQ	(0x1 << 5)
-#define MTL_OPERATION_SCHALG_DWRR	(0x2 << 5)
-#define MTL_OPERATION_SCHALG_SP		(0x3 << 5)
-#define MTL_OPERATION_RAA		BIT(2)
-#define MTL_OPERATION_RAA_SP		(0x0 << 2)
-#define MTL_OPERATION_RAA_WSP		(0x1 << 2)
-
-#define MTL_INT_STATUS			0x00000c20
-#define MTL_INT_QX(x)			BIT(x)
-
-#define MTL_RXQ_DMA_MAP0		0x00000c30 /* queue 0 to 3 */
-#define MTL_RXQ_DMA_MAP1		0x00000c34 /* queue 4 to 7 */
-#define MTL_RXQ_DMA_QXMDMACH_MASK(x)	(0xf << 8 * (x))
-#define MTL_RXQ_DMA_QXMDMACH(chan, q)	((chan) << (8 * (q)))
-
-#define MTL_CHAN_BASE_ADDR		0x00000d00
-#define MTL_CHAN_BASE_OFFSET		0x40
-
-#define MTL_CHAN_TX_OP_MODE(x)	MTL_CHAN_BASE_ADDR + (x * MTL_CHAN_BASE_OFFSET)
-#define MTL_CHAN_TX_DEBUG(x)	(MTL_CHAN_BASE_ADDR + (x * MTL_CHAN_BASE_OFFSET) + 0x8)
-#define MTL_CHAN_INT_CTRL(x)	(MTL_CHAN_BASE_ADDR + (x * MTL_CHAN_BASE_OFFSET) + 0x2c)
-#define MTL_CHAN_RX_OP_MODE(x)	(MTL_CHAN_BASE_ADDR + (x * MTL_CHAN_BASE_OFFSET) + 0x30)
-#define MTL_CHAN_RX_DEBUG(x)	(MTL_CHAN_BASE_ADDR + (x * MTL_CHAN_BASE_OFFSET) + 0x38)
-
-#define MTL_OP_MODE_RSF			BIT(5)
-#define MTL_OP_MODE_TXQ_ENABLE_MASK		GENMASK(3, 2)
-#define MTL_OP_MODE_TXQ_ENABLE_AV		BIT(2)
-#define MTL_OP_MODE_TXQ_ENABLE		BIT(3)
-#define MTL_OP_MODE_TSF			BIT(1)
-
-#define MTL_OP_MODE_TQS_MASK		GENMASK(24, 16)
-#define MTL_OP_MODE_TQS_SHIFT		16
-
-#define MTL_OP_MODE_TTC_MASK		0x70
-#define MTL_OP_MODE_TTC_SHIFT		4
-
-#define MTL_OP_MODE_TTC_32		0
-#define MTL_OP_MODE_TTC_64		(1 << MTL_OP_MODE_TTC_SHIFT)
-#define MTL_OP_MODE_TTC_96		(2 << MTL_OP_MODE_TTC_SHIFT)
-#define MTL_OP_MODE_TTC_128		(3 << MTL_OP_MODE_TTC_SHIFT)
-#define MTL_OP_MODE_TTC_192		(4 << MTL_OP_MODE_TTC_SHIFT)
-#define MTL_OP_MODE_TTC_256		(5 << MTL_OP_MODE_TTC_SHIFT)
-#define MTL_OP_MODE_TTC_384		(6 << MTL_OP_MODE_TTC_SHIFT)
-#define MTL_OP_MODE_TTC_512		(7 << MTL_OP_MODE_TTC_SHIFT)
-
-#define MTL_OP_MODE_RQS_MASK		GENMASK(29, 20)
-#define MTL_OP_MODE_RQS_SHIFT		20
-
-#define MTL_OP_MODE_RFD_MASK		GENMASK(19, 14)
-#define MTL_OP_MODE_RFD_SHIFT		14
-
-#define MTL_OP_MODE_RFA_MASK		GENMASK(13, 8)
-#define MTL_OP_MODE_RFA_SHIFT		8
-
-#define MTL_OP_MODE_EHFC		BIT(7)
-
-#define MTL_OP_MODE_RTC_MASK		0x18
-#define MTL_OP_MODE_RTC_SHIFT		3
-
-#define MTL_OP_MODE_RTC_32		(1 << MTL_OP_MODE_RTC_SHIFT)
-#define MTL_OP_MODE_RTC_64		0
-#define MTL_OP_MODE_RTC_96		(2 << MTL_OP_MODE_RTC_SHIFT)
-#define MTL_OP_MODE_RTC_128		(3 << MTL_OP_MODE_RTC_SHIFT)
-
-/* --------- DMA registers --------- */
-
-#define DMA_BUS_MODE			0x00001000
-#define DMA_SYS_BUS_MODE		0x00001004
-#define DMA_STATUS			0x00001008
-#define DMA_DEBUG_STATUS_0		0x0000100c
-#define DMA_DEBUG_STATUS_1		0x00001010
-#define DMA_DEBUG_STATUS_2		0x00001014
-#define DMA_AXI_BUS_MODE		0x00001028
-#define DMA_TBS_CTRL			0x00001050
-
-/* DMA Bus Mode bitmap */
-#define DMA_BUS_MODE_DCHE		BIT(19)
-#define DMA_BUS_MODE_INTM_MASK		GENMASK(17, 16)
-#define DMA_BUS_MODE_INTM_SHIFT		16
-#define DMA_BUS_MODE_INTM_MODE1		0x1
-#define DMA_BUS_MODE_SFT_RESET		BIT(0)
-
-/* DMA SYS Bus Mode bitmap */
-#define DMA_BUS_MODE_SPH		BIT(24)
-#define DMA_BUS_MODE_PBL		BIT(16)
-#define DMA_BUS_MODE_PBL_SHIFT		16
-#define DMA_BUS_MODE_RPBL_SHIFT		16
-#define DMA_BUS_MODE_MB			BIT(14)
-#define DMA_BUS_MODE_FB			BIT(0)
-
-/* DMA Interrupt top status */
-#define DMA_STATUS_MAC			BIT(17)
-#define DMA_STATUS_MTL			BIT(16)
-#define DMA_STATUS_CHAN7		BIT(7)
-#define DMA_STATUS_CHAN6		BIT(6)
-#define DMA_STATUS_CHAN5		BIT(5)
-#define DMA_STATUS_CHAN4		BIT(4)
-#define DMA_STATUS_CHAN3		BIT(3)
-#define DMA_STATUS_CHAN2		BIT(2)
-#define DMA_STATUS_CHAN1		BIT(1)
-#define DMA_STATUS_CHAN0		BIT(0)
-
-/* DMA debug status bitmap */
-#define DMA_DEBUG_STATUS_TS_MASK	0xf
-#define DMA_DEBUG_STATUS_RS_MASK	0xf
-
-/* DMA AXI bitmap */
-#define DMA_AXI_EN_LPI			BIT(31)
-#define DMA_AXI_LPI_XIT_FRM		BIT(30)
-#define DMA_AXI_WR_OSR_LMT		GENMASK(27, 24)
-#define DMA_AXI_WR_OSR_LMT_SHIFT	24
-#define DMA_AXI_RD_OSR_LMT		GENMASK(19, 16)
-#define DMA_AXI_RD_OSR_LMT_SHIFT	16
-
-#define DMA_AXI_OSR_MAX			0xf
-#define DMA_AXI_MAX_OSR_LIMIT ((DMA_AXI_OSR_MAX << DMA_AXI_WR_OSR_LMT_SHIFT) | \
-				(DMA_AXI_OSR_MAX << DMA_AXI_RD_OSR_LMT_SHIFT))
-
-#define DMA_SYS_BUS_MB			BIT(14)
-#define DMA_AXI_1KBBE			BIT(13)
-#define DMA_SYS_BUS_AAL			BIT(12)
-#define DMA_SYS_BUS_EAME		BIT(11)
-#define DMA_AXI_BLEN256			BIT(7)
-#define DMA_AXI_BLEN128			BIT(6)
-#define DMA_AXI_BLEN64			BIT(5)
-#define DMA_AXI_BLEN32			BIT(4)
-#define DMA_AXI_BLEN16			BIT(3)
-#define DMA_AXI_BLEN8			BIT(2)
-#define DMA_AXI_BLEN4			BIT(1)
-#define DMA_SYS_BUS_FB			BIT(0)
-
-#define DMA_BURST_LEN_DEFAULT		(DMA_AXI_BLEN256 | DMA_AXI_BLEN128 | \
-					DMA_AXI_BLEN64 | DMA_AXI_BLEN32 | \
-					DMA_AXI_BLEN16 | DMA_AXI_BLEN8 | \
-					DMA_AXI_BLEN4)
-
-#define DMA_AXI_BURST_LEN_MASK		0x000000FE
-
-/* DMA TBS Control */
-#define DMA_TBS_FTOS			GENMASK(31, 8)
-#define DMA_TBS_FTOV			BIT(0)
-#define DMA_TBS_DEF_FTOS		(DMA_TBS_FTOS | DMA_TBS_FTOV)
-
-/* Following DMA defines are channel-oriented */
-#define DMA_CHAN_BASE_ADDR		0x00001100
-#define DMA_CHAN_BASE_OFFSET		0x80
-#define DMA_CHAN_CONTROL(x)             DMA_CHAN_BASE_ADDR + (x * DMA_CHAN_BASE_OFFSET)
-#define DMA_CHAN_TX_CONTROL(x)	        (DMA_CHAN_BASE_ADDR + (x * DMA_CHAN_BASE_OFFSET) + 0x4)
-#define DMA_CHAN_RX_CONTROL(x)	        (DMA_CHAN_BASE_ADDR + (x * DMA_CHAN_BASE_OFFSET) + 0x8)
-#define DMA_CHAN_TX_BASE_ADDR_HI(x)	    (DMA_CHAN_BASE_ADDR + (x * DMA_CHAN_BASE_OFFSET) + 0x10)
-#define DMA_CHAN_TX_BASE_ADDR(x)	    (DMA_CHAN_BASE_ADDR + (x * DMA_CHAN_BASE_OFFSET) + 0x14)
-#define DMA_CHAN_RX_BASE_ADDR_HI(x)	    (DMA_CHAN_BASE_ADDR + (x * DMA_CHAN_BASE_OFFSET) + 0x18)
-#define DMA_CHAN_RX_BASE_ADDR(x)	    (DMA_CHAN_BASE_ADDR + (x * DMA_CHAN_BASE_OFFSET) + 0x1c)
-#define DMA_CHAN_TX_TAIL_ADDR(x)	    (DMA_CHAN_BASE_ADDR + (x * DMA_CHAN_BASE_OFFSET) + 0x20)
-#define DMA_CHAN_RX_TAIL_ADDR(x)	    (DMA_CHAN_BASE_ADDR + (x * DMA_CHAN_BASE_OFFSET) + 0x28)
-#define DMA_CHAN_TX_RING_LEN(x)	        (DMA_CHAN_BASE_ADDR + (x * DMA_CHAN_BASE_OFFSET) + 0x2c)
-#define DMA_CHAN_RX_RING_LEN(x)	        (DMA_CHAN_BASE_ADDR + (x * DMA_CHAN_BASE_OFFSET) + 0x30)
-#define DMA_CHAN_INTR_ENA(x)	        (DMA_CHAN_BASE_ADDR + (x * DMA_CHAN_BASE_OFFSET) + 0x34)
-#define DMA_CHAN_RX_WATCHDOG(x)	        (DMA_CHAN_BASE_ADDR + (x * DMA_CHAN_BASE_OFFSET) + 0x38)
-#define DMA_CHAN_SLOT_CTRL_STATUS(x)	(DMA_CHAN_BASE_ADDR + (x * DMA_CHAN_BASE_OFFSET) + 0x3c)
-#define DMA_CHAN_CUR_TX_DESC(x)	        (DMA_CHAN_BASE_ADDR + (x * DMA_CHAN_BASE_OFFSET) + 0x44)
-#define DMA_CHAN_CUR_RX_DESC(x)	        (DMA_CHAN_BASE_ADDR + (x * DMA_CHAN_BASE_OFFSET) + 0x4c)
-#define DMA_CHAN_CUR_TX_BUF_ADDR(x)	    (DMA_CHAN_BASE_ADDR + (x * DMA_CHAN_BASE_OFFSET) + 0x54)
-#define DMA_CHAN_CUR_RX_BUF_ADDR(x)	    (DMA_CHAN_BASE_ADDR + (x * DMA_CHAN_BASE_OFFSET) + 0x5c)
-#define DMA_CHAN_STATUS(x)	            (DMA_CHAN_BASE_ADDR + (x * DMA_CHAN_BASE_OFFSET) + 0x60)
-
-/* DMA Control X */
-#define DMA_CONTROL_SPH			BIT(24)
-#define DMA_CONTROL_MSS_MASK		GENMASK(13, 0)
-
-/* DMA Tx Channel X Control register defines */
-#define DMA_CONTROL_EDSE		BIT(28)
-#define DMA_CONTROL_TSE			BIT(12)
-#define DMA_CONTROL_OSP			BIT(4)
-#define DMA_CONTROL_ST			BIT(0)
-
-/* DMA Rx Channel X Control register defines */
-#define DMA_CONTROL_SR			BIT(0)
-#define DMA_RBSZ_MASK			GENMASK(14, 1)
-#define DMA_RBSZ_SHIFT			1
-
-/* Interrupt enable bits per channel */
-#define DMA_CHAN_INTR_ENA_NIE		BIT(16)
-#define DMA_CHAN_INTR_ENA_AIE		BIT(15)
-#define DMA_CHAN_INTR_ENA_NIE_4_10	BIT(15)
-#define DMA_CHAN_INTR_ENA_AIE_4_10	BIT(14)
-#define DMA_CHAN_INTR_ENA_CDE		BIT(13)
-#define DMA_CHAN_INTR_ENA_FBE		BIT(12)
-#define DMA_CHAN_INTR_ENA_ERE		BIT(11)
-#define DMA_CHAN_INTR_ENA_ETE		BIT(10)
-#define DMA_CHAN_INTR_ENA_RWE		BIT(9)
-#define DMA_CHAN_INTR_ENA_RSE		BIT(8)
-#define DMA_CHAN_INTR_ENA_RBUE		BIT(7)
-#define DMA_CHAN_INTR_ENA_RIE		BIT(6)
-#define DMA_CHAN_INTR_ENA_TBUE		BIT(2)
-#define DMA_CHAN_INTR_ENA_TSE		BIT(1)
-#define DMA_CHAN_INTR_ENA_TIE		BIT(0)
-
-#define DMA_CHAN_INTR_NORMAL		(DMA_CHAN_INTR_ENA_NIE_4_10 | \
-					 DMA_CHAN_INTR_ENA_RIE | \
-					 DMA_CHAN_INTR_ENA_TIE)
-
-#define DMA_CHAN_INTR_ABNORMAL	(DMA_CHAN_INTR_ENA_AIE_4_10 | \
-					 DMA_CHAN_INTR_ENA_FBE)
-
-#define DMA_CHAN_INTR_DEFAULT_MASK	(DMA_CHAN_INTR_NORMAL | \
-					 DMA_CHAN_INTR_ABNORMAL)
-
-/* Descriptor definitions */
+/* This register description is from the iMX8MP TRM. */
+
+/* NOTE: This is a subset of the registers available. */
+
+/* Helper macros */
+
+#define BIT(x) (1U << x)
+#define MAC_REG(x) ((volatile uint32_t *)(eth_regs + x))
+#define MTL_REG(x) ((volatile uint32_t *)(eth_regs + x))
+#define DMA_REG(x) ((volatile uint32_t *)(eth_regs + x))
+#define MAX_RX_FRAME_SZ             (0x600)
+
+/* MAC Registers */
+
+#define MAC_CONFIGURATION           0x0         /* Establishes the operating mode of the MAC. */
+#define MAC_PACKET_FILTER           0x8         /* Contains the filter controls for receiving packets. */
+#define MAC_Q0_TX_FLOW_CTRL         0x70        /* Controls the generation and reception of the Control (pause command) packets by the flow control module to the MAC.*/
+#define MAC_RX_FLOW_CTRL            0x90        /* Controls the pausing of MAC transmit based on the received Pause packet. */
+#define MAC_TXQ_PRTY_MAP0           0x98        /* Contains the priority values assigned to the tx queues. */
+#define MAC_RXQ_CTRL0               0xA0        /* Controls the queue management in the MAC receiver. */
+#define MAC_INTERRUPT_STATUS        0xB0        /* Contains the status of interrupts. */
+#define MAC_INTERRUPT_ENABLE        0xB4        /* Contains the mask for generating the interrupts. */
+#define MAC_PHYIF_CONTROL_STATUS    0xF8        /* Indicates the status signals received by the interface from the PHY. */
+#define MAC_HW_FEATURE1             0x120       /* Indicates the presence of first set of the optional features of this device. */
+#define MAC_ADDRESS0_HIGH           0x300       /* Holds the upper 16 bits of the first 6-byte MAC address. */
+#define MAC_ADDRESS0_LOW            0x304       /* Holds the lower 32 bits of the first 6-byte MAC address.*/
+
+/* MAC Configuration Bits */
+#define MAC_CONFIG_RE               BIT(0)      /* Receiver enable. 0 = disabled, 1 = enabled. */
+#define MAC_CONFIG_TE               BIT(1)      /* Transmitter enable. 0 = disabled, 1 = enabled. */
+#define MAC_CONFIG_DM               BIT(13)     /* Duplex mode. 0 = Half-duplex, 1 = Full-duplex. */
+#define MAC_CONFIG_FES              BIT(14)     /* This bit, in conjunction with PS selects the speed. */
+#define MAC_CONFIG_PS               BIT(15)     /* Port select, selects the ethernet line speed. Used in conjunction with FES. */
+#define MAC_CONFIG_JE               BIT(16)     /* Jumbo packet enable, allows packet size of 9018 bytes. 0 = disabled, 1 = enabled. */
+#define MAC_CONFIG_JB               BIT(17)     /* Jabber disable. 0 = enabled, 1 = disabled. */
+#define MAC_CONFIG_WB               BIT(19)     /* Watchdog disable. 0 = enabled, 1 = disabled. */
+#define MAC_CONFIG_ACS              BIT(20)     /* Automatic PAD or CRC stripping. 0 = disabled, 1 = enabled. */
+#define MAC_CONFIG_CST              BIT(21)     /* CRC stripping for Type packets. 0 = disabled, 1 = enabled. */
+#define MAC_CONFIG_GPSLCE           BIT(23)     /* Giant packet size limit control enable. 0 = disabled, 1 = enabled. */
+#define MAC_CONFIG_IPC              BIT(27)     /* Checksum offload. 0 = disabled, 1 = enabled. */
+
+/* MAC Packet Filter Bits */
+
+#define MAC_PACKET_FILTER_PR        BIT(0)      /* Promiscuous mode. */
+
+/* MAC Receive Queue Control 0 Bits */
+
+#define MAC_RXQ_CTRL0_Q0_CLEAR      (BIT(0) | BIT(1))   /* Clear the bits of the RXQ0EN field. */
+#define MAC_RXQ_CTRL0_Q0_DCB_GEN_EN BIT(1)      /* Queue enabled for DCB/Generic. */
+
+/* MAC Phy Control Bits */
+
+#define MAC_PHYIF_CONTROL_LINKSTS	BIT(19)		/* Link status, indicates if the link is up (0b1) or down (0b0). */
+
+/* MTL Registers */
+
+#define MTL_OPERATION_MODE          0xC00       /* Establishes the tx and rx operating modes and command. */
+#define MTL_RXQ_DMA_MAP0            0xC30       /* Receive Queue and DMA channel mapping 0 register. */
+#define MTL_TXQ0_OPERATION_MODE     0xD00       /* Establishes the tx queue 0 operating modes and commands. */
+#define MTL_TXQ0_DEBUG              0xD08       /* Gives the debug status of various blocks related to the transmit queue 0. */
+#define MTL_Q0_INT_CTRL_STATUS      0xD2C       /* Contains the interrupt enable and status bits for the queue 0 interrupts. */
+#define MTL_RXQ0_OPERATION_MODE     0xD30       /* Establishes the receive queue operating modes and command. */
+#define MTL_RXQ0_DEBUG              0xD38       /* Gives the debug status of various blocks related ot the receive queue 0. */
+#define MTL_RXQ0_CONTROL            0xD3C       /* Controls the receive arbitration and passing of the recv'd packets to the app. */
+
+/* MTL RXQ DMA Map 0 Bits */
+
+#define MTL_RXQ_DMA_MAP0_Q0_MDMACH_MASK  (BIT(0) | BIT(1) | BIT(2)) /* Mask the bits of the Q0MDMACH field (Bits 2 - 0). */
+#define MTL_RXQ_DMA_MAP0_Q0_DMA0   ~(MTL_RXQ_DMA_MAP0_Q0_MDMACH_MASK) /* Bits 000 of this field maps MTL queue 0 to DMA channel 0. */
+
+/* MTL TXQ0 Operation Mode Bits */
+
+#define MTL_TXQ_OP_MODE_TSF         BIT(1)      /* Transmit store and forward enable. */
+#define MTL_TXQ_OP_MODE_TXQEN       BIT(3)      /* Transmit queue enable. */
+#define MTL_TXQ_OP_MODE_TQS_POS     16          /* The position of the TQS field to bit shift with. */
+#define MTL_TXQ_OP_MODE_TQS_MASK    (0b11111 << MTL_TXQ_OP_MODE_TQS_POS) /* Mask for the TQS field. */
+
+/* MTL RXQ0 Control Bits */
+
+#define MTL_RXQ_OP_MODE_RSF         BIT(5)      /* Receive queue store and forward mode. */
+#define MTL_RXQ_OP_MODE_RQS_POS     20          /* The position of the RQS field to bit shift with. */
+#define MTL_RXQ_OP_MODE_RQS_MASK    (0b11111 << MTL_RXQ_OP_MODE_RQS_POS) /* Mask for the RQS field. */
+
+/* DMA Registers */
+
+#define DMA_MODE                    0x1000      /* Establishes the bus operating modes for the DMA. */
+#define DMA_CH0_TX_CONTROL          0x1104      /* Controls the Tx features such as PBL, TCP segmentation and Tx channel weights. */
+#define DMA_CH0_RX_CONTROL          0x1108      /* Controls the Rx features such as PBL, buffer size and extended status. */
+#define DMA_CH0_TXDESC_LIST_ADDR    0x1114      /* Points the DMA to the start of the tx descriptor list. Can only write to this register when tx is stopped. */
+#define DMA_CH0_RXDESC_LIST_ADDR    0x111C      /* Points the DMA to the start of the rx descriptor list. Can only write to this register when rx is sopped. */
+#define DMA_CH0_TXDESC_TAIL_PTR     0x1120      /* Points to an offset from the base and indicates the location of the last valid tx descriptor. */
+#define DMA_CH0_RXDESC_TAIL_PTR     0x1128      /* Points to an offset from the base and indicates the location of the last valid rx descriptor. */
+#define DMA_CH0_TXDESC_RING_LENGTH	0x112C		/* Contains the length of the transmit descriptor ring. */
+#define DMA_CH0_RXDESC_RING_LENGTH	0x1130		/* Contains the length of the receive descriptor ring. */
+#define DMA_CH0_INTERRUPT_EN        0x1134      /* Enables the interrupts that are reported by the DMA_CH0_STATUS register. */
+#define DMA_CH0_STATUS              0x1160      /* Software must read this register to get the status during the ISR to determine the status of the DMA device. */
+
+/* DMA Mode Bits */
+
+#define DMA_MODE_SWR                BIT(0)      /* Software reset when this bit is set. */
+
+/* DMA CH0 Tx Control Bits */
+
+#define DMA_CH0_TX_CONTROL_ST       BIT(0)      /* Start or stop transmission. When set, tx is placed in the 'Running' state. */
+#define DMA_CH0_TX_CONTROL_OSF      BIT(4)      /* Operate on second packet when this bit is set. */
+
+/* DMA CH0 Rx Control Bits */
+
+#define DMA_CH0_RX_CONTROL_SR       BIT(0)      /* Start or stop receive. When this bit is set DMA attempts to acquire a rx descriptor. */
+#define DMA_CH0_RX_RBSZ_POS         1           /* The position of the RBSZ field to use for bit shifting. */
+#define DMA_CH0_RX_RBSZ_MASK        (0b11111111111111 << DMA_CH0_RX_RBSZ_POS) /* Mask for the RBSZ field. */
+
+/* DMA CH0 Interrupt Enable Bits */
+
+#define DMA_CH0_INTERRUPT_EN_TIE    BIT(0)      /* Transmit interrupt enable. */
+#define DMA_CH0_INTERRUPT_EN_TBUE   BIT(1)      /* Transmit buffer unavailable. Needs to be set with NIE. */
+#define DMA_CH0_INTERRUPT_EN_RIE    BIT(6)      /* Receive interrupt enable. */
+#define DMA_CH0_INTERRUPT_EN_RBUE   BIT(7)      /* Receive buffer unavailable. Needs to be set with AIE. */
+#define DMA_CH0_INTERRUPT_EN_RSE    BIT(8)      /* Receive stopped enable. Needs to be set with AIE. */
+#define DMA_CH0_INTERRUPT_EN_RWTE   BIT(9)      /* Receive watchdog timeout enable. Needs to be set with AIE. */
+#define DMA_CH0_INTERRUPT_EN_ETIE   BIT(10)     /* Early transmit interrupt enable. Needs to be set with AIE. */
+#define DMA_CH0_INTERRUPT_EN_ERIE   BIT(11)     /* Early receive interrupt enable. Needs to be set with NIE. */
+#define DMA_CH0_INTERRUPT_EN_FBEE   BIT(12)     /* Fatal bus error enable. Needs to be set with AIE. */
+#define DMA_CH0_INTERRUPT_EN_CDEE   BIT(13)     /* Context descriptor error enable. Needs to be set with AIE. */
+#define DMA_CH0_INTERRUPT_EN_AIE    BIT(14)     /* Abnormal interrupt summary enable. */
+#define DMA_CH0_INTERRUPT_EN_NIE    BIT(15)     /* Normal interrupt summary enable. */
+
+#define DMA_INTR_NORMAL (DMA_CH0_INTERRUPT_EN_TIE | DMA_CH0_INTERRUPT_EN_RIE | DMA_CH0_INTERRUPT_EN_NIE)
+#define DMA_INTR_ABNORMAL (DMA_CH0_INTERRUPT_EN_FBEE | DMA_CH0_INTERRUPT_EN_AIE)
+#define DMA_INTR_MASK (DMA_INTR_NORMAL | DMA_INTR_ABNORMAL)
 
 /* Rx status bit definitions */
 #define DESC_RXSTS_OWNBYDMA         (1 << 31)           /* Descriptor is owned by the DMA of the GMAC Subsystem. */
@@ -536,20 +178,3 @@ register map outlined in the imx8mp TRM. */
 #define DESC_TXCTRL_SIZE2SHFT		(11)
 #define DESC_TXCTRL_SIZE1MASK		(0x7FF)
 #define DESC_TXCTRL_SIZE1SHFT		(0)
-
-/* SGMII/RGMII status register */
-#define GMAC_PHYIF_CTRLSTATUS_TC		BIT(0)
-#define GMAC_PHYIF_CTRLSTATUS_LUD		BIT(1)
-#define GMAC_PHYIF_CTRLSTATUS_SMIDRXS		BIT(4)
-#define GMAC_PHYIF_CTRLSTATUS_LNKMOD		BIT(16)
-#define GMAC_PHYIF_CTRLSTATUS_SPEED		GENMASK(18, 17)
-#define GMAC_PHYIF_CTRLSTATUS_SPEED_SHIFT	17
-#define GMAC_PHYIF_CTRLSTATUS_LNKSTS		BIT(19)
-#define GMAC_PHYIF_CTRLSTATUS_JABTO		BIT(20)
-#define GMAC_PHYIF_CTRLSTATUS_FALSECARDET	BIT(21)
-/* LNKMOD */
-#define GMAC_PHYIF_CTRLSTATUS_LNKMOD_MASK	0x1
-/* LNKSPEED */
-#define GMAC_PHYIF_CTRLSTATUS_SPEED_125		0x2
-#define GMAC_PHYIF_CTRLSTATUS_SPEED_25		0x1
-#define GMAC_PHYIF_CTRLSTATUS_SPEED_2_5		0x0

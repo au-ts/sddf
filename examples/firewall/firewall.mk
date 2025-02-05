@@ -29,8 +29,9 @@ METAPROGRAM := $(TOP)/meta.py
 
 vpath %.c ${SDDF} ${FIREWALL}
 
-IMAGES := eth_driver.elf network_virt_rx.elf proxy_arp.elf \
-	  network_virt_tx.elf network_copy.elf timer_driver.elf uart_driver.elf serial_virt_tx.elf
+IMAGES := eth_driver.elf network_virt_rx.elf network_virt_tx.elf network_copy.elf \
+		  timer_driver.elf uart_driver.elf serial_virt_tx.elf \
+		  proxy_arp.elf internal_arp.elf routing.elf
 
 CFLAGS := -mcpu=$(CPU) \
 	  -mstrict-align \
