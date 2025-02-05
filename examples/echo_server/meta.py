@@ -172,11 +172,11 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     net_virt_rx = ProtectionDomain("net_virt_rx", "network_virt_rx.elf", priority=99)
     net_system = Sddf.Net(sdf, ethernet_node, ethernet_driver, net_virt_tx, net_virt_rx)
 
-    client0 = ProtectionDomain("client0", "lwip0.elf", priority=97, budget=20000)
+    client0 = ProtectionDomain("client0", "echo0.elf", priority=97, budget=20000)
     client0_net_copier = ProtectionDomain(
         "client0_net_copier", "network_copy0.elf", priority=98, budget=20000
     )
-    client1 = ProtectionDomain("client1", "lwip1.elf", priority=97, budget=20000)
+    client1 = ProtectionDomain("client1", "echo1.elf", priority=97, budget=20000)
     client1_net_copier = ProtectionDomain(
         "client1_net_copier", "network_copy1.elf", priority=98, budget=20000
     )
@@ -192,6 +192,9 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     timer_system.add_client(client1)
     net_system.add_client_with_copier(client0, client0_net_copier, mac_addr=client0_mac_addr)
     net_system.add_client_with_copier(client1, client1_net_copier, mac_addr=client1_mac_addr)
+
+    client0_lib_sddf_lwip = Sddf.Lwip(sdf, net_system, client0)
+    client1_lib_sddf_lwip = Sddf.Lwip(sdf, net_system, client1)
 
     # Benchmark specific resources
 
@@ -259,6 +262,10 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     assert net_system.serialise_config(output_dir)
     assert timer_system.connect()
     assert timer_system.serialise_config(output_dir)
+    assert client0_lib_sddf_lwip.connect()
+    assert client0_lib_sddf_lwip.serialise_config(output_dir)
+    assert client1_lib_sddf_lwip.connect()
+    assert client1_lib_sddf_lwip.serialise_config(output_dir)
 
     with open(f"{output_dir}/benchmark_config.data", "wb+") as f:
         f.write(benchmark_config.serialise())

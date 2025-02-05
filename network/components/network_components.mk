@@ -46,10 +46,11 @@ network/components/network_arp.o: ${SDDF}/network/components/arp.c
 	${LD} ${LDFLAGS} -o $@ $< ${LIBS}
 
 clean::
-	rm -f network_virt_[rt]x.[od] network_copy.[od] network_arp.[od]
+	${RM} -f network_virt_[rt]x.[od] network_copy.[od] network_arp.[od]
 
 clobber::
-	rm -f ${IMAGES}
+	${RM} -f ${NETWORK_IMAGES}
+	rmdir network/components
 
 network/components:
 	mkdir -p $@
