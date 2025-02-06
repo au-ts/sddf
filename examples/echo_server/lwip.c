@@ -31,11 +31,8 @@
 #include "echo.h"
 
 __attribute__((__section__(".serial_client_config"))) serial_client_config_t serial_config;
-
 __attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
-
 __attribute__((__section__(".net_client_config"))) net_client_config_t net_config;
-
 __attribute__((__section__(".benchmark_client_config"))) benchmark_client_config_t benchmark_config;
 
 serial_queue_handle_t serial_tx_queue_handle;
@@ -276,6 +273,10 @@ static void netif_status_callback(struct netif *netif)
 
 void init(void)
 {
+    assert(serial_config_check_magic(&serial_config));
+    assert(net_config_check_magic(&net_config));
+    assert(timer_config_check_magic(&timer_config));
+
     serial_queue_init(&serial_tx_queue_handle, serial_config.tx.queue.vaddr, serial_config.tx.data.size,
                       serial_config.tx.data.vaddr);
     serial_putchar_init(serial_config.tx.id, &serial_tx_queue_handle);
