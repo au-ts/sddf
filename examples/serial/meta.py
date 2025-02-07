@@ -20,7 +20,7 @@ BOARDS: List[Board] = [
     Board(
         name="qemu_virt_aarch64",
         arch=SystemDescription.Arch.AARCH64,
-        paddr_top=0xa_000_000,
+        paddr_top=0x6_0000_000,
         serial="pl011@9000000"
     ),
     Board(
