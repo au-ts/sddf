@@ -17,7 +17,7 @@ BENCHMARK:=$(SDDF)/benchmark
 UTIL:=$(SDDF)/util
 ETHERNET_DRIVER:=$(SDDF)/drivers/network/$(DRIV_DIR)
 SERIAL_COMPONENTS := $(SDDF)/serial/components
-UART_DRIVER := $(SDDF)/drivers/serial/$(UART_DRIV_DIR)
+SERIAL_DRIVER := $(SDDF)/drivers/serial/$(SERIAL_DRIV_DIR)
 TIMER_DRIVER:=$(SDDF)/drivers/timer/$(TIMER_DRV_DIR)
 NETWORK_COMPONENTS:=$(SDDF)/network/components
 
@@ -32,7 +32,7 @@ METAPROGRAM := $(TOP)/meta.py
 vpath %.c ${SDDF} ${ECHO_SERVER}
 
 IMAGES := eth_driver.elf lwip0.elf lwip1.elf benchmark.elf idle.elf network_virt_rx.elf\
-	  network_virt_tx.elf network_copy.elf timer_driver.elf uart_driver.elf serial_virt_tx.elf
+	  network_virt_tx.elf network_copy.elf timer_driver.elf serial_driver.elf serial_virt_tx.elf
 
 CFLAGS := -mcpu=$(CPU) \
 	  -mstrict-align \
@@ -96,8 +96,8 @@ $(DTB): $(DTS)
 
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE)
-	$(OBJCOPY) --update-section .device_resources=uart_driver_device_resources.data uart_driver.elf
-	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data uart_driver.elf
+	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
+	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx.data serial_virt_tx.elf
 	$(OBJCOPY) --update-section .device_resources=ethernet_driver_device_resources.data eth_driver.elf
 	$(OBJCOPY) --update-section .net_driver_config=net_driver.data eth_driver.elf
@@ -126,7 +126,7 @@ include ${SDDF}/network/components/network_components.mk
 include ${ETHERNET_DRIVER}/eth_driver.mk
 include ${BENCHMARK}/benchmark.mk
 include ${TIMER_DRIVER}/timer_driver.mk
-include ${UART_DRIVER}/uart_driver.mk
+include ${SERIAL_DRIVER}/serial_driver.mk
 include ${SERIAL_COMPONENTS}/serial_components.mk
 
 qemu: $(IMAGE_FILE)

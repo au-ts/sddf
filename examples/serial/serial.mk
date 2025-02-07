@@ -68,7 +68,7 @@ SYSTEM_FILE := serial.system
 DTS := $(SDDF)/dts/$(MICROKIT_BOARD).dts
 DTB := $(MICROKIT_BOARD).dtb
 
-IMAGES := uart_driver.elf \
+IMAGES := serial_driver.elf \
 	  client0.elf client1.elf \
 	  serial_virt_tx.elf serial_virt_rx.elf
 CFLAGS := -ffreestanding \
@@ -100,7 +100,7 @@ ${CHECK_FLAGS_BOARD_MD5}:
 ${IMAGES}: libsddf_util_debug.a ${CHECK_FLAGS_BOARD_MD5}
 
 include ${SDDF}/util/util.mk
-include ${UART_DRIVER}/uart_driver.mk
+include ${UART_DRIVER}/serial_driver.mk
 include ${SERIAL_COMPONENTS}/serial_components.mk
 
 %.elf: %.o
@@ -120,8 +120,8 @@ $(DTB): $(DTS)
 
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE)
-	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data uart_driver.elf
-	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data uart_driver.elf
+	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
+	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_virt_rx_config=serial_virt_rx.data serial_virt_rx.elf
 	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx.data serial_virt_tx.elf
 	$(OBJCOPY) --update-section .serial_client_config=serial_client_client0.data client0.elf

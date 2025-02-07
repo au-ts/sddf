@@ -7,21 +7,21 @@
 # the IMX8 UART driver.
 # Assumes libsddf_util_debug.a is in ${LIBS}.
 
-UART_DRIVER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
+SERIAL_DRIVER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 
-uart_driver.elf: serial/imx/uart_driver.o
+serial_driver.elf: serial/imx/serial_driver.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-serial/imx/uart_driver.o: ${UART_DRIVER_DIR}/uart.c |serial/imx
-	$(CC) -c $(CFLAGS) -I${UART_DRIVER_DIR}/include -o $@ $< 
+serial/imx/serial_driver.o: ${SERIAL_DRIVER_DIR}/uart.c |serial/imx
+	$(CC) -c $(CFLAGS) -I${SERIAL_DRIVER_DIR}/include -o $@ $<
 
--include uart_driver.d
+-include serial_driver.d
 
 serial/imx:
 	mkdir -p $@
 
 clean::
-	rm -f serial/imx/uart_driver.[do]
+	rm -f serial/imx/serial_driver.[do]
 
 clobber::
 	rm -rf serial
