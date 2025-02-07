@@ -152,10 +152,10 @@ pub fn build(b: *std.Build) !void {
         .star64 => "snps",
     };
 
-    const driver = sddf_dep.artifact(b.fmt("driver_uart_{s}.elf", .{ driver_class }));
+    const driver = sddf_dep.artifact(b.fmt("driver_serial_{s}.elf", .{ driver_class }));
     // This is required because the SDF file is expecting a different name to the artifact we
     // are dealing with.
-    const driver_install = b.addInstallArtifact(driver, .{ .dest_sub_path = "uart_driver.elf" });
+    const driver_install = b.addInstallArtifact(driver, .{ .dest_sub_path = "serial_driver.elf" });
 
     const virt_rx = sddf_dep.artifact("serial_virt_rx.elf");
     b.installArtifact(virt_rx);
@@ -217,9 +217,9 @@ pub fn build(b: *std.Build) !void {
     client1_objcopy.step.dependOn(&client1_install.step);
     const client2_objcopy = updateSectionObjcopy(b, ".serial_client_config", meta_output, "serial_client_client1.data", "client1.elf");
     client2_objcopy.step.dependOn(&client2_install.step);
-    const driver_resources_objcopy = updateSectionObjcopy(b, ".device_resources", meta_output, "serial_driver_device_resources.data", "uart_driver.elf");
+    const driver_resources_objcopy = updateSectionObjcopy(b, ".device_resources", meta_output, "serial_driver_device_resources.data", "serial_driver.elf");
     driver_resources_objcopy.step.dependOn(&driver_install.step);
-    const driver_config_objcopy = updateSectionObjcopy(b, ".serial_driver_config", meta_output, "serial_driver_config.data", "uart_driver.elf");
+    const driver_config_objcopy = updateSectionObjcopy(b, ".serial_driver_config", meta_output, "serial_driver_config.data", "serial_driver.elf");
     driver_config_objcopy.step.dependOn(&driver_install.step);
     const virt_rx_objcopy = updateSectionObjcopy(b, ".serial_virt_rx_config", meta_output, "serial_virt_rx.data", "serial_virt_rx.elf");
     const virt_tx_objcopy = updateSectionObjcopy(b, ".serial_virt_tx_config", meta_output, "serial_virt_tx.data", "serial_virt_tx.elf");

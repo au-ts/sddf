@@ -6,7 +6,7 @@ const std = @import("std");
 const LazyPath = std.Build.LazyPath;
 
 const DriverClass = struct {
-    const Uart = enum {
+    const Serial = enum {
         arm,
         meson,
         imx,
@@ -72,15 +72,15 @@ var libmicrokit: std.Build.LazyPath = undefined;
 var libmicrokit_linker_script: std.Build.LazyPath = undefined;
 var libmicrokit_include: std.Build.LazyPath = undefined;
 
-fn addUartDriver(
+fn addSerialDriver(
     b: *std.Build,
     util: *std.Build.Step.Compile,
-    class: DriverClass.Uart,
+    class: DriverClass.Serial,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
 ) *std.Build.Step.Compile {
     const driver = addPd(b, .{
-        .name = b.fmt("driver_uart_{s}.elf", .{@tagName(class)}),
+        .name = b.fmt("driver_serial_{s}.elf", .{@tagName(class)}),
         .target = target,
         .optimize = optimize,
         .strip = false,
@@ -396,9 +396,9 @@ pub fn build(b: *std.Build) void {
     serial_virt_tx.linkLibrary(util_putchar_debug);
     b.installArtifact(serial_virt_tx);
 
-    // UART drivers
-    inline for (std.meta.fields(DriverClass.Uart)) |class| {
-        const driver = addUartDriver(b, util, @enumFromInt(class.value), target, optimize);
+    // Serial drivers
+    inline for (std.meta.fields(DriverClass.Serial)) |class| {
+        const driver = addSerialDriver(b, util, @enumFromInt(class.value), target, optimize);
         driver.linkLibrary(util_putchar_debug);
         b.installArtifact(driver);
     }
