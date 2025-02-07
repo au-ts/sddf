@@ -16,6 +16,7 @@ LWIPDIR:=network/ipstacks/lwip/src
 BENCHMARK:=$(SDDF)/benchmark
 UTIL:=$(SDDF)/util
 ETHERNET_DRIVER:=$(SDDF)/drivers/network/$(DRIV_DIR)
+ETHERNET_DRIVER_DWMAC:=$(SDDF)/drivers/network/dwmac-5.10a
 SERIAL_COMPONENTS := $(SDDF)/serial/components
 UART_DRIVER := $(SDDF)/drivers/serial/$(UART_DRIV_DIR)
 TIMER_DRIVER:=$(SDDF)/drivers/timer/$(TIMER_DRV_DIR)
@@ -31,7 +32,7 @@ METAPROGRAM := $(TOP)/meta.py
 
 vpath %.c ${SDDF} ${ECHO_SERVER}
 
-IMAGES := eth_driver.elf lwip0.elf lwip1.elf benchmark.elf idle.elf network_virt_rx.elf\
+IMAGES := eth_driver.elf eth_driver_dwmac.elf lwip0.elf lwip1.elf benchmark.elf idle.elf network_virt_rx.elf\
 	  network_virt_tx.elf network_copy.elf timer_driver.elf uart_driver.elf serial_virt_tx.elf
 
 CFLAGS := -mcpu=$(CPU) \
@@ -100,11 +101,17 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data uart_driver.elf
 	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx.data serial_virt_tx.elf
 	$(OBJCOPY) --update-section .device_resources=ethernet_driver_device_resources.data eth_driver.elf
-	$(OBJCOPY) --update-section .net_driver_config=net_driver.data eth_driver.elf
-	$(OBJCOPY) --update-section .net_virt_rx_config=net_virt_rx.data network_virt_rx.elf
-	$(OBJCOPY) --update-section .net_virt_tx_config=net_virt_tx.data network_virt_tx.elf
+	$(OBJCOPY) --update-section .net_driver_config=net_ethernet_driver.data eth_driver.elf
+	$(OBJCOPY) --update-section .device_resources=ethernet_driver_dwmac_device_resources.data eth_driver_dwmac.elf
+	$(OBJCOPY) --update-section .net_driver_config=net_ethernet_driver_dwmac.data eth_driver_dwmac.elf
+
+	$(OBJCOPY) --update-section .net_virt_rx_config=net_net_virt_rx.data network_virt_rx.elf
+	$(OBJCOPY) --update-section .net_virt_rx_config=net_net_virt_rx_1.data network_virt_rx.elf network_virt_rx_1.elf
+	$(OBJCOPY) --update-section .net_virt_tx_config=net_net_virt_tx.data network_virt_tx.elf
+	$(OBJCOPY) --update-section .net_virt_tx_config=net_net_virt_tx_1.data network_virt_tx.elf network_virt_tx_1.elf
 	$(OBJCOPY) --update-section .net_copy_config=net_copy_client0_net_copier.data network_copy.elf network_copy0.elf
 	$(OBJCOPY) --update-section .net_copy_config=net_copy_client1_net_copier.data network_copy.elf network_copy1.elf
+
 	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
 	$(OBJCOPY) --update-section .timer_client_config=timer_client_client0.data lwip0.elf
 	$(OBJCOPY) --update-section .net_client_config=net_client_client0.data lwip0.elf
@@ -124,6 +131,7 @@ ${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 include ${SDDF}/util/util.mk
 include ${SDDF}/network/components/network_components.mk
 include ${ETHERNET_DRIVER}/eth_driver.mk
+include ${ETHERNET_DRIVER_DWMAC}/eth_driver.mk
 include ${BENCHMARK}/benchmark.mk
 include ${TIMER_DRIVER}/timer_driver.mk
 include ${UART_DRIVER}/uart_driver.mk

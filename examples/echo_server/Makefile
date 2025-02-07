@@ -29,7 +29,7 @@ else ifeq ($(strip $(MICROKIT_BOARD)), odroidc2)
 	export TIMER_DRV_DIR := meson
 	export CPU := cortex-a53
 else ifneq ($(filter $(strip $(MICROKIT_BOARD)),imx8mm_evk imx8mp_evk imx8mq_evk maaxboard),)
-	export DRIV_DIR := dwmac-5.10a
+	export DRIV_DIR := imx
 	export UART_DRIV_DIR := imx
 	export TIMER_DRV_DIR := imx
 	export CPU := cortex-a53

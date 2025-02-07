@@ -21,65 +21,67 @@ class Board:
     serial: str
     timer: str
     ethernet: str
+    ethernet1: str
 
 
 BOARDS: List[Board] = [
-    Board(
-        name="qemu_virt_aarch64",
-        arch=SystemDescription.Arch.AARCH64,
-        paddr_top=0x6_0000_000,
-        serial="pl011@9000000",
-        timer="timer",
-        ethernet="virtio_mmio@a003e00"
-    ),
-    Board(
-        name="odroidc2",
-        arch=SystemDescription.Arch.AARCH64,
-        paddr_top=0x60000000,
-        serial="soc/bus@c8100000/serial@4c0",
-        timer="soc/bus@c1100000/watchdog@98d0",
-        ethernet="soc/ethernet@c9410000"
-    ),
-    Board(
-        name="odroidc4",
-        arch=SystemDescription.Arch.AARCH64,
-        paddr_top=0x60000000,
-        serial="soc/bus@ff800000/serial@3000",
-        timer="soc/bus@ffd00000/watchdog@f0d0",
-        ethernet="soc/ethernet@ff3f0000"
-    ),
-    Board(
-        name="maaxboard",
-        arch=SystemDescription.Arch.AARCH64,
-        paddr_top=0x70000000,
-        serial="soc@0/bus@30800000/serial@30860000",
-        timer="soc@0/bus@30000000/timer@302d0000",
-        ethernet="soc@0/bus@30800000/ethernet@30be0000"
-    ),
-    Board(
-        name="imx8mm_evk",
-        arch=SystemDescription.Arch.AARCH64,
-        paddr_top=0x70000000,
-        serial="soc@0/bus@30800000/spba-bus@30800000/serial@30890000",
-        timer="soc@0/bus@30000000/timer@302d0000",
-        ethernet="soc@0/bus@30800000/ethernet@30be0000"
-    ),
+    # Board(
+    #     name="qemu_virt_aarch64",
+    #     arch=SystemDescription.Arch.AARCH64,
+    #     paddr_top=0x6_0000_000,
+    #     serial="pl011@9000000",
+    #     timer="timer",
+    #     ethernet="virtio_mmio@a003e00"
+    # ),
+    # Board(
+    #     name="odroidc2",
+    #     arch=SystemDescription.Arch.AARCH64,
+    #     paddr_top=0x60000000,
+    #     serial="soc/bus@c8100000/serial@4c0",
+    #     timer="soc/bus@c1100000/watchdog@98d0",
+    #     ethernet="soc/ethernet@c9410000"
+    # ),
+    # Board(
+    #     name="odroidc4",
+    #     arch=SystemDescription.Arch.AARCH64,
+    #     paddr_top=0x60000000,
+    #     serial="soc/bus@ff800000/serial@3000",
+    #     timer="soc/bus@ffd00000/watchdog@f0d0",
+    #     ethernet="soc/ethernet@ff3f0000"
+    # ),
+    # Board(
+    #     name="maaxboard",
+    #     arch=SystemDescription.Arch.AARCH64,
+    #     paddr_top=0x70000000,
+    #     serial="soc@0/bus@30800000/serial@30860000",
+    #     timer="soc@0/bus@30000000/timer@302d0000",
+    #     ethernet="soc@0/bus@30800000/ethernet@30be0000"
+    # ),
+    # Board(
+    #     name="imx8mm_evk",
+    #     arch=SystemDescription.Arch.AARCH64,
+    #     paddr_top=0x70000000,
+    #     serial="soc@0/bus@30800000/spba-bus@30800000/serial@30890000",
+    #     timer="soc@0/bus@30000000/timer@302d0000",
+    #     ethernet="soc@0/bus@30800000/ethernet@30be0000"
+    # ),
     Board(
         name="imx8mp_evk",
         arch=SystemDescription.Arch.AARCH64,
         paddr_top=0x70000000,
         serial="soc@0/bus@30800000/spba-bus@30800000/serial@30890000",
         timer="soc@0/bus@30000000/timer@302d0000",
-        ethernet="soc@0/bus@30800000/ethernet@30bf0000"
+        ethernet="soc@0/bus@30800000/ethernet@30be0000",
+        ethernet1="soc@0/bus@30800000/ethernet@30bf0000"
     ),
-    Board(
-        name="imx8mq_evk",
-        arch=SystemDescription.Arch.AARCH64,
-        paddr_top=0x70000000,
-        serial="soc@0/bus@30800000/serial@30860000",
-        timer="soc@0/bus@30000000/timer@302d0000",
-        ethernet="soc@0/bus@30800000/ethernet@30be0000"
-    ),
+    # Board(
+    #     name="imx8mq_evk",
+    #     arch=SystemDescription.Arch.AARCH64,
+    #     paddr_top=0x70000000,
+    #     serial="soc@0/bus@30800000/serial@30860000",
+    #     timer="soc@0/bus@30000000/timer@302d0000",
+    #     ethernet="soc@0/bus@30800000/ethernet@30be0000"
+    # ),
 ]
 
 """
@@ -157,6 +159,8 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     assert ethernet_node is not None
     timer_node = dtb.node(board.timer)
     assert uart_node is not None
+    ethernet_node1 = dtb.node(board.ethernet1)
+    assert ethernet_node1 is not None
 
     timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=101)
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
@@ -168,9 +172,16 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     ethernet_driver = ProtectionDomain(
         "ethernet_driver", "eth_driver.elf", priority=101, budget=100, period=400
     )
+    ethernet_driver1 = ProtectionDomain(
+        "ethernet_driver_dwmac", "eth_driver_dwmac.elf", priority=101, budget=100, period=400
+    )
     net_virt_tx = ProtectionDomain("net_virt_tx", "network_virt_tx.elf", priority=100, budget=20000)
     net_virt_rx = ProtectionDomain("net_virt_rx", "network_virt_rx.elf", priority=99)
-    net_system = Sddf.Network(sdf, ethernet_node, ethernet_driver, net_virt_tx, net_virt_rx)
+    net_virt_tx1 = ProtectionDomain("net_virt_tx_1", "network_virt_tx_1.elf", priority=100, budget=20000)
+    net_virt_rx1 = ProtectionDomain("net_virt_rx_1", "network_virt_rx_1.elf", priority=99)
+
+    net_system = Sddf.Net(sdf, ethernet_node, ethernet_driver, net_virt_tx, net_virt_rx)
+    net_system2 = Sddf.Net(sdf, ethernet_node1, ethernet_driver1, net_virt_tx1, net_virt_rx1)
 
     client0 = ProtectionDomain("client0", "lwip0.elf", priority=97, budget=20000)
     client0_net_copier = ProtectionDomain(
@@ -191,7 +202,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     timer_system.add_client(client0)
     timer_system.add_client(client1)
     net_system.add_client_with_copier(client0, client0_net_copier, mac_addr=client0_mac_addr)
-    net_system.add_client_with_copier(client1, client1_net_copier, mac_addr=client1_mac_addr)
+    net_system2.add_client_with_copier(client1, client1_net_copier, mac_addr=client1_mac_addr)
 
     # Benchmark specific resources
 
@@ -204,8 +215,11 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
         uart_driver,
         serial_virt_tx,
         ethernet_driver,
+        ethernet_driver1,
         net_virt_tx,
+        net_virt_tx1,
         net_virt_rx,
+        net_virt_rx1,
         client0,
         client0_net_copier,
         client1,
@@ -257,6 +271,8 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     assert serial_system.serialise_config(output_dir)
     assert net_system.connect()
     assert net_system.serialise_config(output_dir)
+    assert net_system2.connect()
+    assert net_system2.serialise_config(output_dir)
     assert timer_system.connect()
     assert timer_system.serialise_config(output_dir)
 
@@ -270,7 +286,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
         f.write(bench_client_config.serialise())
 
     with open(f"{output_dir}/{sdf_file}", "w+") as f:
-        f.write(sdf.xml())
+        f.write(sdf.render())
 
 
 if __name__ == '__main__':
