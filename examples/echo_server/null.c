@@ -14,8 +14,15 @@
 #define VIRT_RX_CH 0
 #define CLIENT_CH 1
 
+uintptr_t invocation_counter_vaddr;
+uint64_t *invocation_counter;
+
 void notified(microkit_channel ch)
 {
+    if (invocation_counter_vaddr) {
+        (*invocation_counter)++;
+    }
+
     /* This copier only passes notification between VIRT_RX and CLIENT */
     switch (ch) {
     case CLIENT_CH:
@@ -31,5 +38,7 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
+    invocation_counter = (uint64_t *)invocation_counter_vaddr;
+
     // Do nothing
 }

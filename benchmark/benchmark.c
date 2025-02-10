@@ -67,8 +67,8 @@ event_id_t benchmarking_events[] = {
     SEL4BENCH_EVENT_BRANCH_MISPREDICT,
 };
 
-uintptr_t copier_invocation_counter_vaddr;
-uint64_t *copier_invocation_counter;
+uintptr_t null_invocation_counter_vaddr;
+uint64_t *null_invocation_counter;
 
 static void print_pdid_name(uint64_t pd_id)
 {
@@ -263,9 +263,9 @@ void notified(microkit_channel ch)
         microkit_benchmark_stop_tcb(PD_TIMER_ID, &total, &number_schedules, &kernel, &entries);
         print_benchmark_details(PD_TIMER_ID, kernel, entries, number_schedules, total);
 
-        if (copier_invocation_counter_vaddr) {
-            sddf_printf("Invocation number of the copier: %lx\n", *copier_invocation_counter);
-            *copier_invocation_counter = 0;
+        if (null_invocation_counter_vaddr) {
+            sddf_printf("Invocation number of the null: %lx\n", *null_invocation_counter);
+            *null_invocation_counter = 0;
         }
 #endif
 
@@ -309,7 +309,7 @@ void init(void)
     sddf_dprintf("BENCH|LOG: Bench running in debug mode, no access to counters\n");
 #endif
 
-    copier_invocation_counter = (uint64_t *)copier_invocation_counter_vaddr;
+    null_invocation_counter = (uint64_t *)null_invocation_counter_vaddr;
     /* Notify the idle thread that the sel4bench library is initialised. */
     microkit_notify(INIT);
 

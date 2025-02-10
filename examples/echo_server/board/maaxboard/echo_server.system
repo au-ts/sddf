@@ -59,7 +59,8 @@
 
     <memory_region name="copier0_invocation_counter" size="0x1000"/>
     <memory_region name="copier1_invocation_counter" size="0x1000"/>
-    <memory_region name="null_invocation_counter" size="0x1000"/>
+    <memory_region name="null0_invocation_counter" size="0x1000"/>
+    <memory_region name="null1_invocation_counter" size="0x1000"/>
 
     <protection_domain name="benchIdle" priority="1" >
         <program_image path="idle.elf" />
@@ -73,7 +74,7 @@
         <map mr="serial_tx_queue_client2" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="serial_tx_queue" />
         <map mr="serial_tx_data_client2" vaddr="0x4_002_000" perms="rw" cached="true" setvar_vaddr="serial_tx_data" />
 
-        <map mr="copier0_invocation_counter" vaddr="0x5_000_000" perms="rw" cached="true" setvar_vaddr="copier_invocation_counter_vaddr" />
+        <map mr="null0_invocation_counter" vaddr="0x5_000_000" perms="rw" cached="true" setvar_vaddr="null_invocation_counter_vaddr" />
 
         <protection_domain name="eth" priority="101" id="1" budget="100" period="400">
             <program_image path="eth_driver.elf" />
@@ -131,10 +132,12 @@
 
         <protection_domain name="null0" priority="98" budget="20000" id="4">
             <program_image path="null.elf" />
+            <map mr="null0_invocation_counter" vaddr="0x2_000_000" perms="rw" cached="true" setvar_vaddr="invocation_counter_vaddr" />
         </protection_domain>
 
         <protection_domain name="null1" priority="96" budget="20000" id="5">
             <program_image path="null.elf" />
+            <map mr="null1_invocation_counter" vaddr="0x2_000_000" perms="rw" cached="true" setvar_vaddr="invocation_counter_vaddr" />
         </protection_domain>
 
         <protection_domain name="net_virt_tx" priority="100" budget="20000" id="3">
