@@ -67,6 +67,8 @@ event_id_t benchmarking_events[] = {
     SEL4BENCH_EVENT_BRANCH_MISPREDICT,
 };
 
+uintptr_t copier_invocation_counter_vaddr;
+uint64_t *copier_invocation_counter;
 uintptr_t null_invocation_counter_vaddr;
 uint64_t *null_invocation_counter;
 
@@ -267,6 +269,10 @@ void notified(microkit_channel ch)
             sddf_printf("Invocation number of the null: %lx\n", *null_invocation_counter);
             *null_invocation_counter = 0;
         }
+        if (copier_invocation_counter_vaddr) {
+            sddf_printf("Invocation number of the copier: %lx\n", *copier_invocation_counter);
+            *copier_invocation_counter = 0;
+        }
 #endif
 
 #ifdef CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES
@@ -310,6 +316,7 @@ void init(void)
 #endif
 
     null_invocation_counter = (uint64_t *)null_invocation_counter_vaddr;
+    copier_invocation_counter = (uint64_t *)copier_invocation_counter_vaddr;
     /* Notify the idle thread that the sel4bench library is initialised. */
     microkit_notify(INIT);
 

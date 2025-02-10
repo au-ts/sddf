@@ -69,6 +69,9 @@
         <map mr="serial_tx_queue_client2" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="serial_tx_queue" />
         <map mr="serial_tx_data_client2" vaddr="0x4_002_000" perms="rw" cached="true" setvar_vaddr="serial_tx_data" />
 
+        <map mr="null0_invocation_counter" vaddr="0x5_000_000" perms="rw" cached="true" setvar_vaddr="null_invocation_counter_vaddr" />
+        <map mr="copier0_invocation_counter" vaddr="0x5_100_000" perms="rw" cached="true" setvar_vaddr="copier_invocation_counter_vaddr" />
+
         <protection_domain name="eth" priority="101" id="1" budget="100" period="400">
             <program_image path="eth_driver.elf" />
             <map mr="eth0" vaddr="0x2_000_000" perms="rw" cached="false" setvar_vaddr="eth"/>
@@ -133,6 +136,8 @@
 
             <map mr="net_rx_buffer_data_region" vaddr="0x2_800_000" perms="rw" cached="true" setvar_vaddr="virt_buffer_data_region" />
             <map mr="net_rx_buffer_data_region_cli0" vaddr="0x2_a00_000" perms="rw" cached="true" setvar_vaddr="cli_buffer_data_region" />
+
+            <map mr="copier0_invocation_counter" vaddr="0x5_100_000" perms="rw" cached="true" setvar_vaddr="invocation_counter_vaddr" />
         </protection_domain>
 
         <protection_domain name="copy1" priority="95" budget="20000" id="5">
@@ -145,6 +150,8 @@
 
             <map mr="net_rx_buffer_data_region" vaddr="0x2_800_000" perms="r" cached="true" setvar_vaddr="virt_buffer_data_region" />
             <map mr="net_rx_buffer_data_region_cli1" vaddr="0x2_a00_000" perms="rw" cached="true" setvar_vaddr="cli_buffer_data_region" />
+
+            <map mr="copier1_invocation_counter" vaddr="0x5_100_000" perms="rw" cached="true" setvar_vaddr="invocation_counter_vaddr" />
         </protection_domain>
 
         <protection_domain name="null0" priority="97" budget="20000" id="11">
