@@ -25,6 +25,9 @@ net_queue_t *rx_active_cli;
 uintptr_t virt_buffer_data_region;
 uintptr_t cli_buffer_data_region;
 
+uintptr_t invocation_counter_vaddr;
+uint64_t *invocation_counter;
+
 void rx_return(void)
 {
     bool enqueued = false;
@@ -93,6 +96,7 @@ void rx_return(void)
 
 void notified(microkit_channel ch)
 {
+    (*invocation_counter)++;
     rx_return();
 }
 
@@ -106,4 +110,5 @@ void init(void)
     net_queue_init(&rx_queue_virt, rx_free_virt, rx_active_virt, virt_queue_capacity);
 
     net_buffers_init(&rx_queue_cli, 0);
+    invocation_counter = (uint64_t *)invocation_counter_vaddr;
 }
