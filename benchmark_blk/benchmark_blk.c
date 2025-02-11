@@ -485,7 +485,8 @@ void notified(microkit_channel ch) {
                         break;
                     case THROUGHPUT_RANDOM_WRITE:
                         run_benchmark_state = THROUGHPUT_SEQUENTIAL_READ;
-                        timeout_uart = 6e9;
+                        /* >10s timeout for read benchmarks also -> sd card power cycling */
+                        timeout_uart = 11e9;
                         break;
                     case THROUGHPUT_SEQUENTIAL_READ:
                         run_benchmark_state = THROUGHPUT_SEQUENTIAL_WRITE;
@@ -494,7 +495,6 @@ void notified(microkit_channel ch) {
                         break;
                     case THROUGHPUT_SEQUENTIAL_WRITE:
                         run_benchmark_state = LATENCY_READ;
-                        timeout_uart = 6e9;
                         break;
                     default:
                         panic("BENCHMARK: Error, unimplemented benchmark state transition");
