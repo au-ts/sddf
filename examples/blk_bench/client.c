@@ -305,7 +305,7 @@ void handle_random_operations_run(blk_req_code_t request_code, const uint32_t* r
             uint16_t count = BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx];
             dequeue_and_validate(count);
         }
-        if (request_code == BLK_REQ_WRITE) {
+        if (request_code == BLK_REQ_WRITE || request_code == BLK_REQ_READ) {
             /*
              * Power cycle SD card for 10s, to reset the write loci: https://trustworthy.systems/publications/nicta_slides/8311.pdf (slide 20)
              * The 10s timeout is handled by benchmark_blk.c, after receiving STOP_PMU channel notification.
