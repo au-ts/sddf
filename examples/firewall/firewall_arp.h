@@ -1,35 +1,24 @@
 #pragma once
 
 #include <stdint.h>
-#include <sddf/arpwork/util.h>
 
 #define MAX_ARP_ENTRIES 512
 #define ARP_BUFFER_SIZE 128
 
 typedef struct arp_entry {
-    uint32_t ip_addr;
     uint8_t mac_addr[ETH_HWADDR_LEN];
     /* @kwinter: Add a timeout for stale ARP entiries*/
     // uint32_t timeout;
     bool valid;
 } arp_entry_t;
 
-static inline uint8_t* get_entry(arp_entry_t *arp_table, uint32_t ip) {
-    for (int i = 0; i < MAX_ARP_ENTRIES; i++) {
-        if (ip == arp_table[i].ip_addr) {
-            return arp_table[i].mac_addr;
-        }
-    }
-    return NULL;
-}
-
 /* These are the structs that will live inside the buffer list. */
 
 typedef struct arp_request {
     uint32_t ip_addr;
+    uint8_t mac_addr[ETH_HWADDR_LEN];
     /* If valid is false on reply, drop the packet. */
     bool valid;
-    uint8_t mac_addr;
 } arp_request_t;
 
 typedef struct arp_queue {
@@ -38,14 +27,14 @@ typedef struct arp_queue {
     /* index to remove from */
     uint16_t head;
    /* buffer descripter array */
-    arp_request_t queue[];
+    arp_request_t queue[MAX_ARP_ENTRIES];
 } arp_queue_t;
 
 typedef struct arp_queue_handle {
     /* arp requests */
-    arp_queue_t *request;
+    arp_queue_t request;
     /* responses to arp requests */
-    arp_queue_t *response;
+    arp_queue_t response;
     /* capacity of the queues */
     uint32_t capacity;
 } arp_queue_handle_t;
@@ -55,7 +44,7 @@ typedef struct arp_queue_handle {
  *
  * @param queue queue handle for the queue to get the length of.
  *
- * @return number of buffers enqueued into a queue.
+ * @return number of queue enqueued into a queue.
  */
 static inline uint16_t arp_queue_length(arp_queue_t *queue)
 {
@@ -71,7 +60,7 @@ static inline uint16_t arp_queue_length(arp_queue_t *queue)
  */
 static inline bool arp_queue_empty_request(arp_queue_handle_t *queue)
 {
-    return queue->request->tail - queue->request->head == 0;
+    return queue->request.tail - queue->request.head == 0;
 }
 
 /**
@@ -83,7 +72,7 @@ static inline bool arp_queue_empty_request(arp_queue_handle_t *queue)
  */
 static inline bool arp_queue_empty_response(arp_queue_handle_t *queue)
 {
-    return queue->response->tail - queue->response->head == 0;
+    return queue->response.tail - queue->response.head == 0;
 }
 
 /**
@@ -95,7 +84,7 @@ static inline bool arp_queue_empty_response(arp_queue_handle_t *queue)
  */
 static inline bool arp_queue_full_request(arp_queue_handle_t *queue)
 {
-    return queue->request->tail - queue->request->head == queue->capacity;
+    return queue->request.tail - queue->request.head == queue->capacity;
 }
 
 /**
@@ -107,7 +96,7 @@ static inline bool arp_queue_full_request(arp_queue_handle_t *queue)
  */
 static inline bool arp_queue_full_active(arp_queue_handle_t *queue)
 {
-    return queue->response->tail - queue->response->head == queue->capacity;
+    return queue->response.tail - queue->response.head == queue->capacity;
 }
 
 /**
@@ -124,11 +113,10 @@ static inline int arp_enqueue_request(arp_queue_handle_t *queue, arp_request_t r
         return -1;
     }
 
-    queue->request->buffers[queue->request->tail % queue->capacity] = request;
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
-    THREAD_MEMORY_RELEASE();
-#endif
-    queue->request->tail++;
+    arp_request_t req = queue->request.queue[queue->request.tail % queue->capacity];
+    sddf_memcpy(&req, &request, sizeof(arp_request_t));
+
+    queue->request.tail++;
 
     return 0;
 }
@@ -141,17 +129,16 @@ static inline int arp_enqueue_request(arp_queue_handle_t *queue, arp_request_t r
  *
  * @return -1 when queue is full, 0 on success.
  */
-static inline int arp_enqueue_resposne(arp_queue_handle_t *queue, arp_request_t response)
+static inline int arp_enqueue_response(arp_queue_handle_t *queue, arp_request_t response)
 {
     if (arp_queue_full_active(queue)) {
         return -1;
     }
 
-    queue->response->buffers[queue->response->tail % queue->capacity] = response;
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
-    THREAD_MEMORY_RELEASE();
-#endif
-    queue->response->tail++;
+    arp_request_t resp = queue->response.queue[queue->response.tail % queue->capacity];
+    sddf_memcpy(&resp, &response, sizeof(arp_request_t));
+
+    queue->response.tail++;
 
     return 0;
 }
@@ -166,15 +153,14 @@ static inline int arp_enqueue_resposne(arp_queue_handle_t *queue, arp_request_t 
  */
 static inline int arp_dequeue_request(arp_queue_handle_t *queue, arp_request_t *request)
 {
-    if (arp_queue_empty_free(queue)) {
+    if (arp_queue_empty_request(queue)) {
         return -1;
     }
 
-    *request = queue->request->buffers[queue->request->head % queue->capacity];
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
-    THREAD_MEMORY_RELEASE();
-#endif
-    queue->request->head++;
+    arp_request_t req = queue->request.queue[queue->request.head % queue->capacity];
+    sddf_memcpy(request, &req, sizeof(arp_request_t));
+
+    queue->request.head++;
 
     return 0;
 }
@@ -187,17 +173,16 @@ static inline int arp_dequeue_request(arp_queue_handle_t *queue, arp_request_t *
  *
  * @return -1 when queue is empty, 0 on success.
  */
-static inline int arp_dequeue_response(arp_queue_handle_t *queue, arp_request_t *reponse)
+static inline int arp_dequeue_response(arp_queue_handle_t *queue, arp_request_t *response)
 {
-    if (arp_queue_empty_active(queue)) {
+    if (arp_queue_empty_response(queue)) {
         return -1;
     }
 
-    *reponse = queue->reponse->buffers[queue->reponse->head % queue->capacity];
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
-    THREAD_MEMORY_RELEASE();
-#endif
-    queue->reponse->head++;
+    arp_request_t resp = queue->response.queue[queue->response.head % queue->capacity];
+    sddf_memcpy(response, &resp, sizeof(arp_request_t));
+
+    queue->response.head++;
 
     return 0;
 }
@@ -210,24 +195,21 @@ static inline int arp_dequeue_response(arp_queue_handle_t *queue, arp_request_t 
  * @param active pointer to active queue in shared memory.
  * @param capacity capacity of the free and active queues.
  */
-static inline void arp_queue_init(arp_queue_handle_t *queue, arp_queue_t *request, arp_queue_t *response, uint32_t capacity)
+static inline void arp_handle_init(arp_queue_handle_t *queue, uint32_t capacity)
 {
-    queue->request = request;
-    queue->response = response;
     queue->capacity = capacity;
 }
 
 /**
- * Initialise the request queue by filling with all request buffers.
+ * Initialise the request queue by filling with all request queue.
  *
  * @param queue queue handle to use.
  * @param base_addr start of the memory region the offsets are applied to (only used between virt and driver)
  */
-static inline void arp_buffers_init(arp_queue_handle_t *queue, uintptr_t base_addr)
-{
-    for (uint32_t i = 0; i < queue->capacity; i++) {
-        arp_request_t buffer = {(ARP_BUFFER_SIZE * i) + base_addr, 0};
-        int err = arp_enqueue_free(queue, buffer);
-        assert(!err);
-    }
-}
+// static inline void arp_queue_init(arp_queue_handle_t *queue, uintptr_t base_addr)
+// {
+//     for (uint32_t i = 0; i < queue->capacity; i++) {
+//         queue->request[i] = {0};
+//         queue->response[i] = {0};
+//     }
+// }

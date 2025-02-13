@@ -5,7 +5,7 @@ import struct
 import random
 from dataclasses import dataclass
 from typing import List, Tuple
-from sdfgen import SystemDescription, Sddf, DeviceTree
+from sdfgen import SystemDescription, Sddf, DeviceTree, LionsOs
 
 ProtectionDomain = SystemDescription.ProtectionDomain
 MemoryRegion = SystemDescription.MemoryRegion
@@ -21,6 +21,7 @@ class Board:
     serial: str
     timer: str
     ethernet: str
+    ethernet1: str
 
 
 BOARDS: List[Board] = [
@@ -30,16 +31,18 @@ BOARDS: List[Board] = [
         paddr_top=0x70000000,
         serial="soc@0/bus@30800000/spba-bus@30800000/serial@30890000",
         timer="soc@0/bus@30000000/timer@302d0000",
-        ethernet1="soc@0/bus@30800000/ethernet@30be0000"
-        ethernet2="soc@0/bus@30800000/ethernet@30bf0000"
+        ethernet="soc@0/bus@30800000/ethernet@30be0000",
+        ethernet1="soc@0/bus@30800000/ethernet@30bf0000"
     ),
 ]
 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     uart_node = dtb.node(board.serial)
     assert uart_node is not None
-    ethernet_node = dtb.node(board.ethernet2)
+    ethernet_node = dtb.node(board.ethernet)
     assert ethernet_node is not None
+    ethernet_node1 = dtb.node(board.ethernet1)
+    assert ethernet_node1 is not None
     timer_node = dtb.node(board.timer)
     assert uart_node is not None
 
@@ -53,80 +56,61 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     ethernet_driver = ProtectionDomain(
         "ethernet_driver", "eth_driver.elf", priority=101, budget=100, period=400
     )
+    ethernet_driver1 = ProtectionDomain(
+        "ethernet_driver_dwmac", "eth_driver_dwmac.elf", priority=101, budget=100, period=400
+    )
+
     net_virt_tx = ProtectionDomain("net_virt_tx", "network_virt_tx.elf", priority=100, budget=20000)
     net_virt_rx = ProtectionDomain("net_virt_rx", "network_virt_rx.elf", priority=99)
-    net_system = Sddf.Network(sdf, ethernet_node, ethernet_driver, net_virt_tx, net_virt_rx)
+    net_virt_tx1 = ProtectionDomain("net_virt_tx_1", "network_virt_tx_1.elf", priority=100, budget=20000)
+    net_virt_rx1 = ProtectionDomain("net_virt_rx_1", "network_virt_rx_1.elf", priority=99)
 
-    proxy_arp = ProtectionDomain("proxy_arp", "proxy_arp.elf", priority=97, budget=20000)
-    proxy_arp_net_copier = ProtectionDomain(
-        "proxy_arp_net_copier", "network_copy.elf", priority=98, budget=20000
-    )
+    net_system = Sddf.Net(sdf, ethernet_node, ethernet_driver, net_virt_tx, net_virt_rx)
+    net_system2 = Sddf.Net(sdf, ethernet_node1, ethernet_driver1, net_virt_tx1, net_virt_rx1)
 
     routing = ProtectionDomain("routing", "routing.elf", priority=97, budget=20000)
-    routing_net_copier = ProtectionDomain(
-        "routing_net_copier", "network_copy0.elf", priority=98, budget=20000
-    )
-
-    internal_arp = ProtectionDomain("internal_arp", "internal_arp.elf", priority=95, budget=20000)
-    internal_arp_net_copier = ProtectionDomain(
-        "internal_arp_net_copier", "network_copy1.elf", priority=96, budget=20000
-    )
-
-    mac_random_part = random.randint(0, 0xfe)
-    proxy_arp_mac_addr = f"52:54:01:00:00:{hex(mac_random_part)[2:]:0>2}"
-    # @kwinter: Is there anyway to get the MAC addr of the routing component in the proxy arp component?
-    routing_mac_addr = f"52:54:01:00:00:{hex(mac_random_part)[2:]:0>2}"
-    internal_arp_mac_addr = f"52:54:01:00:00:{hex(mac_random_part)[2:]:0>2}"
-
-    serial_system.add_client(proxy_arp)
-    net_system.add_client_with_copier(proxy_arp, proxy_arp_net_copier, mac_addr=proxy_arp_mac_addr)
+    arp_responder = ProtectionDomain("arp_responder", "arp_responder.elf", priority=95, budget=20000)
+    arp_requester = ProtectionDomain("arp_requester", "arp_requester.elf", priority=98, budget=20000)
+    firewall = LionsOs.Firewall(sdf, net_system, net_system2, routing, arp_responder, arp_requester)
 
     # @kwinter: These need to be added to second net_system
     serial_system.add_client(routing)
-    net_system.add_client_with_copier(routing, routing_net_copier, mac_addr=routing_mac_addr)
 
-    serial_system.add_client(internal_arp)
+    serial_system.add_client(arp_responder)
     # @kwinter: Internal arp needs timer to handle stale ARP cache entries.
-    timer_system.add_client(internal_arp)
-    net_system.add_client_with_copier(internal_arp, internal_arp_net_copier, mac_addr=internal_arp_mac_addr)
+    timer_system.add_client(arp_requester)
 
     pds = [
         uart_driver,
         serial_virt_tx,
         ethernet_driver,
+        ethernet_driver1,
         net_virt_tx,
+        net_virt_tx1,
         net_virt_rx,
-        proxy_arp,
-        proxy_arp_net_copier,
+        net_virt_rx1,
         routing,
-        routing_net_copier,
-        internal_arp,
-        internal_arp_net_copier,
+        arp_responder,
+        arp_requester,
         timer_driver,
     ]
 
     for pd in pds:
         sdf.add_pd(pd)
 
-    routing_table = MemoryRegion("routing_table", 0x4000)
-    sdf.add_mr(routing_table)
-    routing.add_map(Map(routing_table, 0x3_000_000, perms=Map.Perms(r=True, w=True)))
-    proxy_arp.add_map(Map(routing_table, 0x10_000_000, perms=Map.Perms(r=True, w=False)))
-
-    arp_table = MemoryRegion("arp_table", 0x4000)
-    sdf.add_mr(arp_table)
-    routing.add_map(Map(arp_table, 0x3_500_000, perms=Map.Perms(r=True, w=False)))
-    internal_arp.add_map(Map(arp_table, 0x10_500_000, perms=Map.Perms(r=True, w=True)))
-
+    assert firewall.connect()
+    assert firewall.serialise_config(output_dir)
     assert serial_system.connect()
     assert serial_system.serialise_config(output_dir)
     assert net_system.connect()
     assert net_system.serialise_config(output_dir)
+    assert net_system2.connect()
+    assert net_system2.serialise_config(output_dir)
     assert timer_system.connect()
     assert timer_system.serialise_config(output_dir)
 
     with open(f"{output_dir}/{sdf_file}", "w+") as f:
-        f.write(sdf.xml())
+        f.write(sdf.render())
 
 
 if __name__ == '__main__':

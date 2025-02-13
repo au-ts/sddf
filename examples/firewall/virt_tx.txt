@@ -1,0 +1,3791 @@
+
+build/network_virt_tx.elf:     file format elf64-littleaarch64
+
+
+Disassembly of section .text:
+
+0000000000200000 <_start>:
+  200000:	1400092c 	b	2024b0 <main>
+	...
+
+0000000000200010 <extract_offset>:
+
+state_t state;
+
+int extract_offset(uintptr_t *phys)
+{
+    for (int client = 0; client < config.num_clients; client++) {
+  200010:	f0000001 	adrp	x1, 203000 <__sel4_ipc_buffer>
+  200014:	91002021 	add	x1, x1, #0x8
+{
+  200018:	aa0003e7 	mov	x7, x0
+    for (int client = 0; client < config.num_clients; client++) {
+  20001c:	397dc026 	ldrb	w6, [x1, #3952]
+  200020:	34000266 	cbz	w6, 20006c <extract_offset+0x5c>
+        if (*phys >= config.clients[client].data.io_addr
+  200024:	f94000e5 	ldr	x5, [x7]
+  200028:	f0000003 	adrp	x3, 203000 <__sel4_ipc_buffer>
+  20002c:	913e0063 	add	x3, x3, #0xf80
+    for (int client = 0; client < config.num_clients; client++) {
+  200030:	52800000 	mov	w0, #0x0                   	// #0
+  200034:	d503201f 	nop
+        if (*phys >= config.clients[client].data.io_addr
+  200038:	f9403424 	ldr	x4, [x1, #104]
+    for (int client = 0; client < config.num_clients; client++) {
+  20003c:	91010021 	add	x1, x1, #0x40
+        if (*phys >= config.clients[client].data.io_addr
+  200040:	eb0400bf 	cmp	x5, x4
+  200044:	540000c3 	b.cc	20005c <extract_offset+0x4c>  // b.lo, b.ul, b.last
+            && *phys
+                   < config.clients[client].data.io_addr + state.tx_queue_clients[client].capacity * NET_BUFFER_SIZE) {
+  200048:	b9402862 	ldr	w2, [x3, #40]
+  20004c:	53155042 	lsl	w2, w2, #11
+  200050:	8b040042 	add	x2, x2, x4
+            && *phys
+  200054:	eb0200bf 	cmp	x5, x2
+  200058:	540000e3 	b.cc	200074 <extract_offset+0x64>  // b.lo, b.ul, b.last
+    for (int client = 0; client < config.num_clients; client++) {
+  20005c:	11000400 	add	w0, w0, #0x1
+  200060:	91006063 	add	x3, x3, #0x18
+  200064:	6b0000df 	cmp	w6, w0
+  200068:	54fffe81 	b.ne	200038 <extract_offset+0x28>  // b.any
+            *phys = *phys - config.clients[client].data.io_addr;
+            return client;
+        }
+    }
+    return -1;
+  20006c:	12800000 	mov	w0, #0xffffffff            	// #-1
+}
+  200070:	d65f03c0 	ret
+            *phys = *phys - config.clients[client].data.io_addr;
+  200074:	cb0400a5 	sub	x5, x5, x4
+  200078:	f90000e5 	str	x5, [x7]
+}
+  20007c:	d65f03c0 	ret
+
+0000000000200080 <tx_provide>:
+
+void tx_provide(void)
+{
+  200080:	a9ba7bfd 	stp	x29, x30, [sp, #-96]!
+  200084:	910003fd 	mov	x29, sp
+  200088:	a9046bf9 	stp	x25, x26, [sp, #64]
+    bool enqueued = false;
+    for (int client = 0; client < config.num_clients; client++) {
+  20008c:	f0000019 	adrp	x25, 203000 <__sel4_ipc_buffer>
+  200090:	91002339 	add	x25, x25, #0x8
+  200094:	397dc320 	ldrb	w0, [x25, #3952]
+  200098:	340009a0 	cbz	w0, 2001cc <tx_provide+0x14c>
+  20009c:	a9025bf5 	stp	x21, x22, [sp, #32]
+  2000a0:	f0000016 	adrp	x22, 203000 <__sel4_ipc_buffer>
+  2000a4:	913e02d6 	add	x22, x22, #0xf80
+  2000a8:	a90153f3 	stp	x19, x20, [sp, #16]
+                int err = net_dequeue_active(&state.tx_queue_clients[client], &buffer);
+                assert(!err);
+
+                if (buffer.io_or_offset % NET_BUFFER_SIZE
+                    || buffer.io_or_offset >= NET_BUFFER_SIZE * state.tx_queue_clients[client].capacity) {
+                    sddf_dprintf("VIRT_TX|LOG: Client provided offset %lx which is not buffer aligned or outside of buffer region\n",
+  2000ac:	d0000014 	adrp	x20, 202000 <_vsnprintf+0xc30>
+  2000b0:	91240294 	add	x20, x20, #0x900
+  2000b4:	aa1903f3 	mov	x19, x25
+  2000b8:	a90573fb 	stp	x27, x28, [sp, #80]
+  2000bc:	aa1603fb 	mov	x27, x22
+{
+    if (net_queue_full_free(queue)) {
+        return -1;
+    }
+
+    queue->free->buffers[queue->free->tail % queue->capacity] = buffer;
+  2000c0:	d2800115 	mov	x21, #0x8                   	// #8
+  2000c4:	a90363f7 	stp	x23, x24, [sp, #48]
+    for (int client = 0; client < config.num_clients; client++) {
+  2000c8:	52800018 	mov	w24, #0x0                   	// #0
+    bool enqueued = false;
+  2000cc:	52800017 	mov	w23, #0x0                   	// #0
+    return queue->active->tail - queue->active->head == 0;
+  2000d0:	f9401362 	ldr	x2, [x27, #32]
+  2000d4:	79400443 	ldrh	w3, [x2, #2]
+            while (!net_queue_empty_active(&state.tx_queue_clients[client])) {
+  2000d8:	79400041 	ldrh	w1, [x2]
+  2000dc:	6b03003f 	cmp	w1, w3
+  2000e0:	540005a0 	b.eq	200194 <tx_provide+0x114>  // b.none
+  2000e4:	d503201f 	nop
+{
+    if (net_queue_empty_active(queue)) {
+        return -1;
+    }
+
+    *buffer = queue->active->buffers[queue->active->head % queue->capacity];
+  2000e8:	b9402b64 	ldr	w4, [x27, #40]
+#ifdef CONFIG_ENABLE_SMP_SUPPORT
+    THREAD_MEMORY_RELEASE();
+#endif
+    queue->active->head++;
+  2000ec:	11000466 	add	w6, w3, #0x1
+                    sddf_dprintf("VIRT_TX|LOG: Client provided offset %lx which is not buffer aligned or outside of buffer region\n",
+  2000f0:	aa1403e0 	mov	x0, x20
+                    || buffer.io_or_offset >= NET_BUFFER_SIZE * state.tx_queue_clients[client].capacity) {
+  2000f4:	53155085 	lsl	w5, w4, #11
+    *buffer = queue->active->buffers[queue->active->head % queue->capacity];
+  2000f8:	1ac40861 	udiv	w1, w3, w4
+  2000fc:	1b048c21 	msub	w1, w1, w4, w3
+  200100:	8b011041 	add	x1, x2, x1, lsl #4
+  200104:	f940043a 	ldr	x26, [x1, #8]
+  200108:	7940203c 	ldrh	w28, [x1, #16]
+    queue->active->head++;
+  20010c:	79000446 	strh	w6, [x2, #2]
+                    sddf_dprintf("VIRT_TX|LOG: Client provided offset %lx which is not buffer aligned or outside of buffer region\n",
+  200110:	aa1a03e1 	mov	x1, x26
+                if (buffer.io_or_offset % NET_BUFFER_SIZE
+  200114:	92402b42 	and	x2, x26, #0x7ff
+                    || buffer.io_or_offset >= NET_BUFFER_SIZE * state.tx_queue_clients[client].capacity) {
+  200118:	eb1a00bf 	cmp	x5, x26
+                if (buffer.io_or_offset % NET_BUFFER_SIZE
+  20011c:	b50005e2 	cbnz	x2, 2001d8 <tx_provide+0x158>
+                    || buffer.io_or_offset >= NET_BUFFER_SIZE * state.tx_queue_clients[client].capacity) {
+  200120:	540005c9 	b.ls	2001d8 <tx_provide+0x158>  // b.plast
+                    err = net_enqueue_free(&state.tx_queue_clients[client], buffer);
+                    assert(!err);
+                    continue;
+                }
+
+                uintptr_t buffer_vaddr = buffer.io_or_offset + (uintptr_t)config.clients[client].data.region.vaddr;
+  200124:	f9402e60 	ldr	x0, [x19, #88]
+  200128:	8b1a0000 	add	x0, x0, x26
+                cache_clean(buffer_vaddr, buffer_vaddr + buffer.len);
+  20012c:	8b3c2001 	add	x1, x0, w28, uxth
+  200130:	9400015c 	bl	2006a0 <cache_clean>
+    return queue->active->tail - queue->active->head == queue->capacity;
+  200134:	f94006c1 	ldr	x1, [x22, #8]
+
+                buffer.io_or_offset = buffer.io_or_offset + config.clients[client].data.io_addr;
+  200138:	f9403664 	ldr	x4, [x19, #104]
+  20013c:	79400022 	ldrh	w2, [x1]
+  200140:	79400420 	ldrh	w0, [x1, #2]
+  200144:	8b04035a 	add	x26, x26, x4
+  200148:	b94012c3 	ldr	w3, [x22, #16]
+    queue->active->tail++;
+  20014c:	11000444 	add	w4, w2, #0x1
+    return queue->active->tail - queue->active->head == queue->capacity;
+  200150:	4b000040 	sub	w0, w2, w0
+    if (net_queue_full_active(queue)) {
+  200154:	6b03001f 	cmp	w0, w3
+  200158:	54000960 	b.eq	200284 <tx_provide+0x204>  // b.none
+    queue->active->buffers[queue->active->tail % queue->capacity] = buffer;
+  20015c:	1ac30840 	udiv	w0, w2, w3
+  200160:	1b038800 	msub	w0, w0, w3, w2
+  200164:	8b2052a0 	add	x0, x21, w0, uxtw #4
+  200168:	8b000022 	add	x2, x1, x0
+  20016c:	f820683a 	str	x26, [x1, x0]
+  200170:	7900105c 	strh	w28, [x2, #8]
+    queue->active->tail++;
+  200174:	79000024 	strh	w4, [x1]
+                err = net_enqueue_active(&state.tx_queue_drv, buffer);
+                assert(!err);
+                enqueued = true;
+  200178:	52800037 	mov	w23, #0x1                   	// #1
+    return queue->active->tail - queue->active->head == 0;
+  20017c:	f9401362 	ldr	x2, [x27, #32]
+  200180:	79400443 	ldrh	w3, [x2, #2]
+            while (!net_queue_empty_active(&state.tx_queue_clients[client])) {
+  200184:	79400040 	ldrh	w0, [x2]
+  200188:	6b03001f 	cmp	w0, w3
+  20018c:	54fffae1 	b.ne	2000e8 <tx_provide+0x68>  // b.any
+    for (int client = 0; client < config.num_clients; client++) {
+  200190:	397dc320 	ldrb	w0, [x25, #3952]
+ *
+ * @param queue queue handle of active queue that requires signalling upon enqueuing.
+ */
+static inline void net_request_signal_active(net_queue_handle_t *queue)
+{
+    queue->active->consumer_signalled = 0;
+  200194:	b900045f 	str	wzr, [x2, #4]
+  200198:	11000718 	add	w24, w24, #0x1
+  20019c:	6b18001f 	cmp	w0, w24
+  2001a0:	9100637b 	add	x27, x27, #0x18
+  2001a4:	91010273 	add	x19, x19, #0x40
+  2001a8:	54fff94c 	b.gt	2000d0 <tx_provide+0x50>
+                reprocess = true;
+            }
+        }
+    }
+
+    if (enqueued && net_require_signal_active(&state.tx_queue_drv)) {
+  2001ac:	34000097 	cbz	w23, 2001bc <tx_provide+0x13c>
+ *
+ * @param queue queue handle of the active queue to check.
+ */
+static inline bool net_require_signal_active(net_queue_handle_t *queue)
+{
+    return !queue->active->consumer_signalled;
+  2001b0:	f94006c0 	ldr	x0, [x22, #8]
+  2001b4:	b9400401 	ldr	w1, [x0, #4]
+  2001b8:	34000321 	cbz	w1, 20021c <tx_provide+0x19c>
+  2001bc:	a94153f3 	ldp	x19, x20, [sp, #16]
+  2001c0:	a9425bf5 	ldp	x21, x22, [sp, #32]
+  2001c4:	a94363f7 	ldp	x23, x24, [sp, #48]
+  2001c8:	a94573fb 	ldp	x27, x28, [sp, #80]
+        net_cancel_signal_active(&state.tx_queue_drv);
+        microkit_deferred_notify(config.driver.id);
+    }
+}
+  2001cc:	a9446bf9 	ldp	x25, x26, [sp, #64]
+  2001d0:	a8c67bfd 	ldp	x29, x30, [sp], #96
+  2001d4:	d65f03c0 	ret
+                    sddf_dprintf("VIRT_TX|LOG: Client provided offset %lx which is not buffer aligned or outside of buffer region\n",
+  2001d8:	940007be 	bl	2020d0 <sddf_printf_>
+    return queue->free->tail - queue->free->head == queue->capacity;
+  2001dc:	f9400f61 	ldr	x1, [x27, #24]
+  2001e0:	b9402b63 	ldr	w3, [x27, #40]
+  2001e4:	79400022 	ldrh	w2, [x1]
+  2001e8:	79400420 	ldrh	w0, [x1, #2]
+    queue->free->tail++;
+  2001ec:	11000444 	add	w4, w2, #0x1
+    return queue->free->tail - queue->free->head == queue->capacity;
+  2001f0:	4b000040 	sub	w0, w2, w0
+    if (net_queue_full_free(queue)) {
+  2001f4:	6b03001f 	cmp	w0, w3
+  2001f8:	54000340 	b.eq	200260 <tx_provide+0x1e0>  // b.none
+    queue->free->buffers[queue->free->tail % queue->capacity] = buffer;
+  2001fc:	1ac30840 	udiv	w0, w2, w3
+  200200:	1b038800 	msub	w0, w0, w3, w2
+  200204:	8b2052a0 	add	x0, x21, w0, uxtw #4
+  200208:	8b000022 	add	x2, x1, x0
+  20020c:	f820683a 	str	x26, [x1, x0]
+  200210:	7900105c 	strh	w28, [x2, #8]
+    queue->free->tail++;
+  200214:	79000024 	strh	w4, [x1]
+                    assert(!err);
+  200218:	17ffffd9 	b	20017c <tx_provide+0xfc>
+
+static inline void microkit_deferred_notify(microkit_channel ch)
+{
+    microkit_have_signal = seL4_True;
+    microkit_signal_msg = seL4_MessageInfo_new(0, 0, 0, 0);
+    microkit_signal_cap = (BASE_OUTPUT_NOTIFICATION_CAP + ch);
+  20021c:	a94153f3 	ldp	x19, x20, [sp, #16]
+    queue->active->consumer_signalled = 1;
+  200220:	52800021 	mov	w1, #0x1                   	// #1
+  200224:	a9425bf5 	ldp	x21, x22, [sp, #32]
+  200228:	b0000022 	adrp	x2, 205000 <string_buffer+0xaa0>
+  20022c:	a94363f7 	ldp	x23, x24, [sp, #48]
+    microkit_have_signal = seL4_True;
+  200230:	b0000024 	adrp	x4, 205000 <string_buffer+0xaa0>
+    microkit_signal_cap = (BASE_OUTPUT_NOTIFICATION_CAP + ch);
+  200234:	a94573fb 	ldp	x27, x28, [sp, #80]
+  200238:	b9000401 	str	w1, [x0, #4]
+    microkit_signal_msg = seL4_MessageInfo_new(0, 0, 0, 0);
+  20023c:	b0000023 	adrp	x3, 205000 <string_buffer+0xaa0>
+    microkit_have_signal = seL4_True;
+  200240:	3916c481 	strb	w1, [x4, #1457]
+    microkit_signal_cap = (BASE_OUTPUT_NOTIFICATION_CAP + ch);
+  200244:	3940ab20 	ldrb	w0, [x25, #42]
+}
+  200248:	a9446bf9 	ldp	x25, x26, [sp, #64]
+  20024c:	91002800 	add	x0, x0, #0xa
+  200250:	a8c67bfd 	ldp	x29, x30, [sp], #96
+    microkit_signal_msg = seL4_MessageInfo_new(0, 0, 0, 0);
+  200254:	f902dc7f 	str	xzr, [x3, #1464]
+    microkit_signal_cap = (BASE_OUTPUT_NOTIFICATION_CAP + ch);
+  200258:	f902e040 	str	x0, [x2, #1472]
+  20025c:	d65f03c0 	ret
+                    assert(!err);
+  200260:	d0000003 	adrp	x3, 202000 <_vsnprintf+0xc30>
+  200264:	d0000001 	adrp	x1, 202000 <_vsnprintf+0xc30>
+  200268:	911f2063 	add	x3, x3, #0x7c8
+  20026c:	9125a021 	add	x1, x1, #0x968
+  200270:	d0000000 	adrp	x0, 202000 <_vsnprintf+0xc30>
+  200274:	52800662 	mov	w2, #0x33                  	// #51
+  200278:	9126a000 	add	x0, x0, #0x9a8
+  20027c:	94000851 	bl	2023c0 <_assert_fail>
+  200280:	17ffffbf 	b	20017c <tx_provide+0xfc>
+                assert(!err);
+  200284:	d0000003 	adrp	x3, 202000 <_vsnprintf+0xc30>
+  200288:	d0000001 	adrp	x1, 202000 <_vsnprintf+0xc30>
+  20028c:	911f2063 	add	x3, x3, #0x7c8
+  200290:	9125a021 	add	x1, x1, #0x968
+  200294:	d0000000 	adrp	x0, 202000 <_vsnprintf+0xc30>
+  200298:	52800782 	mov	w2, #0x3c                  	// #60
+  20029c:	9126a000 	add	x0, x0, #0x9a8
+  2002a0:	94000848 	bl	2023c0 <_assert_fail>
+  2002a4:	17ffffb5 	b	200178 <tx_provide+0xf8>
+  2002a8:	d503201f 	nop
+  2002ac:	d503201f 	nop
+
+00000000002002b0 <tx_return>:
+
+void tx_return(void)
+{
+  2002b0:	a9b67bfd 	stp	x29, x30, [sp, #-160]!
+  2002b4:	910003fd 	mov	x29, sp
+  2002b8:	a90153f3 	stp	x19, x20, [sp, #16]
+    return queue->free->tail - queue->free->head == 0;
+  2002bc:	f0000014 	adrp	x20, 203000 <__sel4_ipc_buffer>
+  2002c0:	f947c281 	ldr	x1, [x20, #3968]
+  2002c4:	a9046bf9 	stp	x25, x26, [sp, #64]
+  2002c8:	f0000019 	adrp	x25, 203000 <__sel4_ipc_buffer>
+  2002cc:	91002339 	add	x25, x25, #0x8
+    bool reprocess = true;
+    bool notify_clients[SDDF_NET_MAX_CLIENTS] = { false };
+  2002d0:	a9067fff 	stp	xzr, xzr, [sp, #96]
+  2002d4:	79400422 	ldrh	w2, [x1, #2]
+    while (reprocess) {
+        while (!net_queue_empty_free(&state.tx_queue_drv)) {
+  2002d8:	79400020 	ldrh	w0, [x1]
+    bool notify_clients[SDDF_NET_MAX_CLIENTS] = { false };
+  2002dc:	a9077fff 	stp	xzr, xzr, [sp, #112]
+        while (!net_queue_empty_free(&state.tx_queue_drv)) {
+  2002e0:	6b02001f 	cmp	w0, w2
+    bool notify_clients[SDDF_NET_MAX_CLIENTS] = { false };
+  2002e4:	a9087fff 	stp	xzr, xzr, [sp, #128]
+  2002e8:	f9004bff 	str	xzr, [sp, #144]
+  2002ec:	b9009bff 	str	wzr, [sp, #152]
+  2002f0:	390273ff 	strb	wzr, [sp, #156]
+        while (!net_queue_empty_free(&state.tx_queue_drv)) {
+  2002f4:	540009c0 	b.eq	20042c <tx_return+0x17c>  // b.none
+  2002f8:	a9025bf5 	stp	x21, x22, [sp, #32]
+            net_buff_desc_t buffer;
+            int err = net_dequeue_free(&state.tx_queue_drv, &buffer);
+            assert(!err);
+
+            int client = extract_offset(&buffer.io_or_offset);
+            assert(client >= 0);
+  2002fc:	d0000015 	adrp	x21, 202000 <_vsnprintf+0xc30>
+  200300:	911f22b5 	add	x21, x21, #0x7c8
+  200304:	f0000019 	adrp	x25, 203000 <__sel4_ipc_buffer>
+  200308:	91002339 	add	x25, x25, #0x8
+  20030c:	910042b5 	add	x21, x21, #0x10
+  200310:	913e029a 	add	x26, x20, #0xf80
+  200314:	910183f6 	add	x22, sp, #0x60
+  200318:	a90363f7 	stp	x23, x24, [sp, #48]
+  20031c:	d0000017 	adrp	x23, 202000 <_vsnprintf+0xc30>
+  200320:	9125a2f7 	add	x23, x23, #0x968
+  200324:	f9002bfb 	str	x27, [sp, #80]
+    *buffer = queue->free->buffers[queue->free->head % queue->capacity];
+  200328:	b9401344 	ldr	w4, [x26, #16]
+  20032c:	d2800103 	mov	x3, #0x8                   	// #8
+    queue->free->head++;
+  200330:	11000445 	add	w5, w2, #0x1
+    *buffer = queue->free->buffers[queue->free->head % queue->capacity];
+  200334:	1ac40840 	udiv	w0, w2, w4
+  200338:	1b048800 	msub	w0, w0, w4, w2
+  20033c:	8b205062 	add	x2, x3, w0, uxtw #4
+  200340:	8b205020 	add	x0, x1, w0, uxtw #4
+  200344:	f8626838 	ldr	x24, [x1, x2]
+  200348:	7940201b 	ldrh	w27, [x0, #16]
+    queue->free->head++;
+  20034c:	79000425 	strh	w5, [x1, #2]
+    for (int client = 0; client < config.num_clients; client++) {
+  200350:	397dc325 	ldrb	w5, [x25, #3952]
+  200354:	34000245 	cbz	w5, 20039c <tx_return+0xec>
+  200358:	aa1903e0 	mov	x0, x25
+  20035c:	aa1a03e2 	mov	x2, x26
+  200360:	52800013 	mov	w19, #0x0                   	// #0
+  200364:	d503201f 	nop
+        if (*phys >= config.clients[client].data.io_addr
+  200368:	f9403401 	ldr	x1, [x0, #104]
+    for (int client = 0; client < config.num_clients; client++) {
+  20036c:	91010000 	add	x0, x0, #0x40
+        if (*phys >= config.clients[client].data.io_addr
+  200370:	eb01031f 	cmp	x24, x1
+  200374:	540000c3 	b.cc	20038c <tx_return+0xdc>  // b.lo, b.ul, b.last
+                   < config.clients[client].data.io_addr + state.tx_queue_clients[client].capacity * NET_BUFFER_SIZE) {
+  200378:	b9402844 	ldr	w4, [x2, #40]
+  20037c:	53155083 	lsl	w3, w4, #11
+  200380:	8b010063 	add	x3, x3, x1
+            && *phys
+  200384:	eb03031f 	cmp	x24, x3
+  200388:	54000903 	b.cc	2004a8 <tx_return+0x1f8>  // b.lo, b.ul, b.last
+    for (int client = 0; client < config.num_clients; client++) {
+  20038c:	11000673 	add	w19, w19, #0x1
+  200390:	91006042 	add	x2, x2, #0x18
+  200394:	6b05027f 	cmp	w19, w5
+  200398:	54fffe81 	b.ne	200368 <tx_return+0xb8>  // b.any
+            assert(client >= 0);
+  20039c:	aa1503e3 	mov	x3, x21
+  2003a0:	aa1703e1 	mov	x1, x23
+  2003a4:	d0000000 	adrp	x0, 202000 <_vsnprintf+0xc30>
+  2003a8:	52800b62 	mov	w2, #0x5b                  	// #91
+  2003ac:	9126c000 	add	x0, x0, #0x9b0
+  2003b0:	94000804 	bl	2023c0 <_assert_fail>
+    return queue->free->tail - queue->free->head == queue->capacity;
+  2003b4:	b9401344 	ldr	w4, [x26, #16]
+  2003b8:	12800013 	mov	w19, #0xffffffff            	// #-1
+  2003bc:	93407e60 	sxtw	x0, w19
+  2003c0:	d2800301 	mov	x1, #0x18                  	// #24
+  2003c4:	9b016800 	madd	x0, x0, x1, x26
+  2003c8:	f9400c02 	ldr	x2, [x0, #24]
+  2003cc:	79400043 	ldrh	w3, [x2]
+  2003d0:	79400440 	ldrh	w0, [x2, #2]
+  2003d4:	4b000060 	sub	w0, w3, w0
+    if (net_queue_full_free(queue)) {
+  2003d8:	6b04001f 	cmp	w0, w4
+  2003dc:	540006a0 	b.eq	2004b0 <tx_return+0x200>  // b.none
+    queue->free->buffers[queue->free->tail % queue->capacity] = buffer;
+  2003e0:	1ac40860 	udiv	w0, w3, w4
+  2003e4:	d2800105 	mov	x5, #0x8                   	// #8
+    queue->free->tail++;
+  2003e8:	11000466 	add	w6, w3, #0x1
+
+            err = net_enqueue_free(&state.tx_queue_clients[client], buffer);
+            assert(!err);
+            notify_clients[client] = true;
+  2003ec:	52800027 	mov	w7, #0x1                   	// #1
+    return queue->free->tail - queue->free->head == 0;
+  2003f0:	f9400341 	ldr	x1, [x26]
+  2003f4:	3833cac7 	strb	w7, [x22, w19, sxtw]
+    queue->free->buffers[queue->free->tail % queue->capacity] = buffer;
+  2003f8:	1b048c00 	msub	w0, w0, w4, w3
+  2003fc:	8b2050a3 	add	x3, x5, w0, uxtw #4
+  200400:	8b205040 	add	x0, x2, w0, uxtw #4
+  200404:	f8236858 	str	x24, [x2, x3]
+  200408:	7900201b 	strh	w27, [x0, #16]
+    queue->free->tail++;
+  20040c:	79000046 	strh	w6, [x2]
+    return queue->free->tail - queue->free->head == 0;
+  200410:	79400422 	ldrh	w2, [x1, #2]
+        while (!net_queue_empty_free(&state.tx_queue_drv)) {
+  200414:	79400020 	ldrh	w0, [x1]
+  200418:	6b02001f 	cmp	w0, w2
+  20041c:	54fff861 	b.ne	200328 <tx_return+0x78>  // b.any
+  200420:	a9425bf5 	ldp	x21, x22, [sp, #32]
+  200424:	a94363f7 	ldp	x23, x24, [sp, #48]
+  200428:	f9402bfb 	ldr	x27, [sp, #80]
+    queue->free->consumer_signalled = 0;
+  20042c:	b900043f 	str	wzr, [x1, #4]
+            net_cancel_signal_free(&state.tx_queue_drv);
+            reprocess = true;
+        }
+    }
+
+    for (int client = 0; client < config.num_clients; client++) {
+  200430:	397dc325 	ldrb	w5, [x25, #3952]
+  200434:	34000325 	cbz	w5, 200498 <tx_return+0x1e8>
+  200438:	913e0294 	add	x20, x20, #0xf80
+  20043c:	910183e3 	add	x3, sp, #0x60
+  200440:	aa1903e4 	mov	x4, x25
+  200444:	52800002 	mov	w2, #0x0                   	// #0
+    queue->free->consumer_signalled = 1;
+  200448:	52800028 	mov	w8, #0x1                   	// #1
+  20044c:	d503201f 	nop
+        if (notify_clients[client] && net_require_signal_free(&state.tx_queue_clients[client])) {
+  200450:	39400060 	ldrb	w0, [x3]
+  200454:	36000160 	tbz	w0, #0, 200480 <tx_return+0x1d0>
+    return !queue->free->consumer_signalled;
+  200458:	f9400e80 	ldr	x0, [x20, #24]
+#endif
+
+static inline void arm_sys_send_null(seL4_Word sys, seL4_Word src, seL4_Word info_arg)
+{
+    register seL4_Word destptr asm("x0") = src;
+    register seL4_Word info asm("x1") = info_arg;
+  20045c:	d2800001 	mov	x1, #0x0                   	// #0
+
+    /* Perform the system call. */
+    register seL4_Word scno asm("x7") = sys;
+  200460:	92800087 	mov	x7, #0xfffffffffffffffb    	// #-5
+  200464:	b9400406 	ldr	w6, [x0, #4]
+  200468:	350000c6 	cbnz	w6, 200480 <tx_return+0x1d0>
+    queue->free->consumer_signalled = 1;
+  20046c:	b9000408 	str	w8, [x0, #4]
+    seL4_Signal(BASE_OUTPUT_NOTIFICATION_CAP + ch);
+  200470:	39414880 	ldrb	w0, [x4, #82]
+  200474:	91002800 	add	x0, x0, #0xa
+    asm volatile(
+  200478:	d4000001 	svc	#0x0
+    for (int client = 0; client < config.num_clients; client++) {
+  20047c:	397dc325 	ldrb	w5, [x25, #3952]
+  200480:	11000442 	add	w2, w2, #0x1
+  200484:	91000463 	add	x3, x3, #0x1
+  200488:	6b0200bf 	cmp	w5, w2
+  20048c:	91010084 	add	x4, x4, #0x40
+  200490:	91006294 	add	x20, x20, #0x18
+  200494:	54fffdec 	b.gt	200450 <tx_return+0x1a0>
+            net_cancel_signal_free(&state.tx_queue_clients[client]);
+            microkit_notify(config.clients[client].conn.id);
+        }
+    }
+}
+  200498:	a94153f3 	ldp	x19, x20, [sp, #16]
+  20049c:	a9446bf9 	ldp	x25, x26, [sp, #64]
+  2004a0:	a8ca7bfd 	ldp	x29, x30, [sp], #160
+  2004a4:	d65f03c0 	ret
+            *phys = *phys - config.clients[client].data.io_addr;
+  2004a8:	cb010318 	sub	x24, x24, x1
+            assert(client >= 0);
+  2004ac:	17ffffc4 	b	2003bc <tx_return+0x10c>
+            assert(!err);
+  2004b0:	d0000003 	adrp	x3, 202000 <_vsnprintf+0xc30>
+  2004b4:	911f2063 	add	x3, x3, #0x7c8
+  2004b8:	52800bc2 	mov	w2, #0x5e                  	// #94
+  2004bc:	91004063 	add	x3, x3, #0x10
+  2004c0:	d0000001 	adrp	x1, 202000 <_vsnprintf+0xc30>
+  2004c4:	d0000000 	adrp	x0, 202000 <_vsnprintf+0xc30>
+  2004c8:	9125a021 	add	x1, x1, #0x968
+  2004cc:	9126a000 	add	x0, x0, #0x9a8
+  2004d0:	940007bc 	bl	2023c0 <_assert_fail>
+    return queue->free->tail - queue->free->head == 0;
+  2004d4:	f9400341 	ldr	x1, [x26]
+            notify_clients[client] = true;
+  2004d8:	52800020 	mov	w0, #0x1                   	// #1
+  2004dc:	3833cac0 	strb	w0, [x22, w19, sxtw]
+  2004e0:	79400422 	ldrh	w2, [x1, #2]
+        while (!net_queue_empty_free(&state.tx_queue_drv)) {
+  2004e4:	79400020 	ldrh	w0, [x1]
+  2004e8:	6b02001f 	cmp	w0, w2
+  2004ec:	54fff1e1 	b.ne	200328 <tx_return+0x78>  // b.any
+  2004f0:	17ffffcc 	b	200420 <tx_return+0x170>
+  2004f4:	d503201f 	nop
+  2004f8:	d503201f 	nop
+  2004fc:	d503201f 	nop
+
+0000000000200500 <notified>:
+
+void notified(microkit_channel ch)
+{
+  200500:	a9bf7bfd 	stp	x29, x30, [sp, #-16]!
+  200504:	910003fd 	mov	x29, sp
+    tx_return();
+  200508:	97ffff6a 	bl	2002b0 <tx_return>
+    tx_provide();
+}
+  20050c:	a8c17bfd 	ldp	x29, x30, [sp], #16
+    tx_provide();
+  200510:	17fffedc 	b	200080 <tx_provide>
+  200514:	d503201f 	nop
+  200518:	d503201f 	nop
+  20051c:	d503201f 	nop
+
+0000000000200520 <init>:
+
+void init(void)
+{
+  200520:	a9be7bfd 	stp	x29, x30, [sp, #-32]!
+  200524:	910003fd 	mov	x29, sp
+  200528:	f9000bf3 	str	x19, [sp, #16]
+
+static bool net_config_check_magic(void *config)
+{
+    char *magic = (char *)config;
+    for (int i = 0; i < SDDF_NET_MAGIC_LEN; i++) {
+        if (magic[i] != SDDF_NET_MAGIC[i]) {
+  20052c:	f0000000 	adrp	x0, 203000 <__sel4_ipc_buffer>
+  200530:	91002013 	add	x19, x0, #0x8
+  200534:	39402000 	ldrb	w0, [x0, #8]
+  200538:	7101cc1f 	cmp	w0, #0x73
+  20053c:	54000541 	b.ne	2005e4 <init+0xc4>  // b.any
+  200540:	39400660 	ldrb	w0, [x19, #1]
+  200544:	7101101f 	cmp	w0, #0x44
+  200548:	540004e1 	b.ne	2005e4 <init+0xc4>  // b.any
+  20054c:	39400a60 	ldrb	w0, [x19, #2]
+  200550:	7101101f 	cmp	w0, #0x44
+  200554:	54000481 	b.ne	2005e4 <init+0xc4>  // b.any
+  200558:	39400e60 	ldrb	w0, [x19, #3]
+  20055c:	7101181f 	cmp	w0, #0x46
+  200560:	54000421 	b.ne	2005e4 <init+0xc4>  // b.any
+  200564:	39401260 	ldrb	w0, [x19, #4]
+  200568:	7100141f 	cmp	w0, #0x5
+  20056c:	540003c1 	b.ne	2005e4 <init+0xc4>  // b.any
+    queue->free = free;
+  200570:	f0000000 	adrp	x0, 203000 <__sel4_ipc_buffer>
+  200574:	913e0001 	add	x1, x0, #0xf80
+  200578:	f9400662 	ldr	x2, [x19, #8]
+  20057c:	f907c002 	str	x2, [x0, #3968]
+    assert(net_config_check_magic((void *)&config));
+
+    /* Set up driver queues */
+    net_queue_init(&state.tx_queue_drv, config.driver.free_queue.vaddr, config.driver.active_queue.vaddr,
+  200580:	f9400e60 	ldr	x0, [x19, #24]
+    queue->active = active;
+  200584:	f9000420 	str	x0, [x1, #8]
+                   config.driver.num_buffers);
+
+    for (int i = 0; i < config.num_clients; i++) {
+  200588:	397dc263 	ldrb	w3, [x19, #3952]
+    net_queue_init(&state.tx_queue_drv, config.driver.free_queue.vaddr, config.driver.active_queue.vaddr,
+  20058c:	79405260 	ldrh	w0, [x19, #40]
+    queue->capacity = capacity;
+  200590:	b9001020 	str	w0, [x1, #16]
+    for (int i = 0; i < config.num_clients; i++) {
+  200594:	34000223 	cbz	w3, 2005d8 <init+0xb8>
+  200598:	51000463 	sub	w3, w3, #0x1
+  20059c:	91010262 	add	x2, x19, #0x40
+  2005a0:	52800804 	mov	w4, #0x40                  	// #64
+  2005a4:	aa1303e0 	mov	x0, x19
+  2005a8:	9ba40863 	umaddl	x3, w3, w4, x2
+  2005ac:	d503201f 	nop
+    queue->free = free;
+  2005b0:	f9401802 	ldr	x2, [x0, #48]
+  2005b4:	f9000c22 	str	x2, [x1, #24]
+        net_queue_init(&state.tx_queue_clients[i], config.clients[i].conn.free_queue.vaddr,
+                       config.clients[i].conn.active_queue.vaddr, config.clients[i].conn.num_buffers);
+  2005b8:	f9402002 	ldr	x2, [x0, #64]
+    queue->active = active;
+  2005bc:	f9001022 	str	x2, [x1, #32]
+        net_queue_init(&state.tx_queue_clients[i], config.clients[i].conn.free_queue.vaddr,
+  2005c0:	7940a002 	ldrh	w2, [x0, #80]
+    for (int i = 0; i < config.num_clients; i++) {
+  2005c4:	91010000 	add	x0, x0, #0x40
+    queue->capacity = capacity;
+  2005c8:	b9002822 	str	w2, [x1, #40]
+  2005cc:	eb03001f 	cmp	x0, x3
+  2005d0:	91006021 	add	x1, x1, #0x18
+  2005d4:	54fffee1 	b.ne	2005b0 <init+0x90>  // b.any
+    }
+
+    tx_provide();
+}
+  2005d8:	f9400bf3 	ldr	x19, [sp, #16]
+  2005dc:	a8c27bfd 	ldp	x29, x30, [sp], #32
+    tx_provide();
+  2005e0:	17fffea8 	b	200080 <tx_provide>
+    assert(net_config_check_magic((void *)&config));
+  2005e4:	d0000003 	adrp	x3, 202000 <_vsnprintf+0xc30>
+  2005e8:	911f2063 	add	x3, x3, #0x7c8
+  2005ec:	91008063 	add	x3, x3, #0x20
+  2005f0:	d0000001 	adrp	x1, 202000 <_vsnprintf+0xc30>
+  2005f4:	d0000000 	adrp	x0, 202000 <_vsnprintf+0xc30>
+  2005f8:	9125a021 	add	x1, x1, #0x968
+  2005fc:	91270000 	add	x0, x0, #0x9c0
+  200600:	52800f62 	mov	w2, #0x7b                  	// #123
+  200604:	9400076f 	bl	2023c0 <_assert_fail>
+  200608:	17ffffda 	b	200570 <init+0x50>
+  20060c:	00000000 	udf	#0
+
+0000000000200610 <cache_clean_and_invalidate>:
+ *
+ * On ARM, this operation ultimately performs the 'dc civac' instruction.
+ * On RISC-V, this is a no-op.
+ */
+void cache_clean_and_invalidate(unsigned long start, unsigned long end)
+{
+  200610:	a9be7bfd 	stp	x29, x30, [sp, #-32]!
+#ifdef CONFIG_ARCH_AARCH64
+    unsigned long vaddr;
+    unsigned long index;
+
+    assert(start != end);
+  200614:	eb01001f 	cmp	x0, x1
+{
+  200618:	910003fd 	mov	x29, sp
+  20061c:	a90153f3 	stp	x19, x20, [sp, #16]
+  200620:	aa0003f3 	mov	x19, x0
+  200624:	aa0103f4 	mov	x20, x1
+    assert(start != end);
+  200628:	54000280 	b.eq	200678 <cache_clean_and_invalidate+0x68>  // b.none
+
+    /* If the end address is not on a cache line boundary, we want to perform
+     * the cache operation on that cache line as well. */
+    unsigned long end_rounded = ROUND_UP(end, 1 << CONFIG_L1_CACHE_LINE_SIZE_BITS);
+  20062c:	92401680 	and	x0, x20, #0x3f
+  200630:	d346fe81 	lsr	x1, x20, #6
+  200634:	f100001f 	cmp	x0, #0x0
+
+    for (index = LINE_INDEX(start); index < LINE_INDEX(end_rounded); index++) {
+  200638:	d346fe60 	lsr	x0, x19, #6
+    unsigned long end_rounded = ROUND_UP(end, 1 << CONFIG_L1_CACHE_LINE_SIZE_BITS);
+  20063c:	9a810421 	cinc	x1, x1, ne	// ne = any
+    for (index = LINE_INDEX(start); index < LINE_INDEX(end_rounded); index++) {
+  200640:	9240e421 	and	x1, x1, #0x3ffffffffffffff
+  200644:	eb01001f 	cmp	x0, x1
+  200648:	54000122 	b.cs	20066c <cache_clean_and_invalidate+0x5c>  // b.hs, b.nlast
+  20064c:	d37ae400 	lsl	x0, x0, #6
+  200650:	d37ae421 	lsl	x1, x1, #6
+  200654:	d503201f 	nop
+        vaddr = index << CONFIG_L1_CACHE_LINE_SIZE_BITS;
+        asm volatile("dc civac, %0" : : "r"(vaddr));
+  200658:	d50b7e20 	dc	civac, x0
+        asm volatile("dsb sy" ::: "memory");
+  20065c:	d5033f9f 	dsb	sy
+    for (index = LINE_INDEX(start); index < LINE_INDEX(end_rounded); index++) {
+  200660:	91010000 	add	x0, x0, #0x40
+  200664:	eb01001f 	cmp	x0, x1
+  200668:	54ffff81 	b.ne	200658 <cache_clean_and_invalidate+0x48>  // b.any
+    }
+#endif
+}
+  20066c:	a94153f3 	ldp	x19, x20, [sp, #16]
+  200670:	a8c27bfd 	ldp	x29, x30, [sp], #32
+  200674:	d65f03c0 	ret
+    assert(start != end);
+  200678:	d0000003 	adrp	x3, 202000 <_vsnprintf+0xc30>
+  20067c:	d0000001 	adrp	x1, 202000 <_vsnprintf+0xc30>
+  200680:	911fc063 	add	x3, x3, #0x7f0
+  200684:	9127a021 	add	x1, x1, #0x9e8
+  200688:	d0000000 	adrp	x0, 202000 <_vsnprintf+0xc30>
+  20068c:	528006a2 	mov	w2, #0x35                  	// #53
+  200690:	91286000 	add	x0, x0, #0xa18
+  200694:	9400074b 	bl	2023c0 <_assert_fail>
+  200698:	17ffffe5 	b	20062c <cache_clean_and_invalidate+0x1c>
+  20069c:	d503201f 	nop
+
+00000000002006a0 <cache_clean>:
+ *
+ * On ARM, this operation ultimately performs the 'dc cvac' instruction.
+ * On RISC-V, this is a no-op.
+ */
+void cache_clean(unsigned long start, unsigned long end)
+{
+  2006a0:	a9be7bfd 	stp	x29, x30, [sp, #-32]!
+#ifdef CONFIG_ARCH_AARCH64
+    unsigned long vaddr;
+    unsigned long index;
+
+    assert(start != end);
+  2006a4:	eb01001f 	cmp	x0, x1
+{
+  2006a8:	910003fd 	mov	x29, sp
+  2006ac:	a90153f3 	stp	x19, x20, [sp, #16]
+  2006b0:	aa0003f3 	mov	x19, x0
+  2006b4:	aa0103f4 	mov	x20, x1
+    assert(start != end);
+  2006b8:	54000280 	b.eq	200708 <cache_clean+0x68>  // b.none
+
+    /* If the end address is not on a cache line boundary, we want to perform
+     * the cache operation on that cache line as well. */
+    unsigned long end_rounded = ROUND_UP(end, 1 << CONFIG_L1_CACHE_LINE_SIZE_BITS);
+  2006bc:	92401680 	and	x0, x20, #0x3f
+  2006c0:	d346fe81 	lsr	x1, x20, #6
+  2006c4:	f100001f 	cmp	x0, #0x0
+
+    for (index = LINE_INDEX(start); index < LINE_INDEX(end_rounded); index++) {
+  2006c8:	d346fe60 	lsr	x0, x19, #6
+    unsigned long end_rounded = ROUND_UP(end, 1 << CONFIG_L1_CACHE_LINE_SIZE_BITS);
+  2006cc:	9a810421 	cinc	x1, x1, ne	// ne = any
+    for (index = LINE_INDEX(start); index < LINE_INDEX(end_rounded); index++) {
+  2006d0:	9240e421 	and	x1, x1, #0x3ffffffffffffff
+  2006d4:	eb01001f 	cmp	x0, x1
+  2006d8:	54000122 	b.cs	2006fc <cache_clean+0x5c>  // b.hs, b.nlast
+  2006dc:	d37ae400 	lsl	x0, x0, #6
+  2006e0:	d37ae421 	lsl	x1, x1, #6
+  2006e4:	d503201f 	nop
+        vaddr = index << CONFIG_L1_CACHE_LINE_SIZE_BITS;
+        asm volatile("dc cvac, %0" : : "r"(vaddr));
+  2006e8:	d50b7a20 	dc	cvac, x0
+        asm volatile("dmb sy" ::: "memory");
+  2006ec:	d5033fbf 	dmb	sy
+    for (index = LINE_INDEX(start); index < LINE_INDEX(end_rounded); index++) {
+  2006f0:	91010000 	add	x0, x0, #0x40
+  2006f4:	eb01001f 	cmp	x0, x1
+  2006f8:	54ffff81 	b.ne	2006e8 <cache_clean+0x48>  // b.any
+    }
+#endif
+}
+  2006fc:	a94153f3 	ldp	x19, x20, [sp, #16]
+  200700:	a8c27bfd 	ldp	x29, x30, [sp], #32
+  200704:	d65f03c0 	ret
+    assert(start != end);
+  200708:	d0000003 	adrp	x3, 202000 <_vsnprintf+0xc30>
+  20070c:	911fc063 	add	x3, x3, #0x7f0
+  200710:	91008063 	add	x3, x3, #0x20
+  200714:	d0000001 	adrp	x1, 202000 <_vsnprintf+0xc30>
+  200718:	d0000000 	adrp	x0, 202000 <_vsnprintf+0xc30>
+  20071c:	9127a021 	add	x1, x1, #0x9e8
+  200720:	91286000 	add	x0, x0, #0xa18
+  200724:	52800a22 	mov	w2, #0x51                  	// #81
+  200728:	94000726 	bl	2023c0 <_assert_fail>
+  20072c:	17ffffe4 	b	2006bc <cache_clean+0x1c>
+
+0000000000200730 <_out_buffer>:
+
+
+// internal buffer output
+static inline void _out_buffer(char character, void* buffer, size_t idx, size_t maxlen)
+{
+  if (idx < maxlen) {
+  200730:	eb03005f 	cmp	x2, x3
+{
+  200734:	12001c00 	and	w0, w0, #0xff
+  if (idx < maxlen) {
+  200738:	54000042 	b.cs	200740 <_out_buffer+0x10>  // b.hs, b.nlast
+    ((char*)buffer)[idx] = character;
+  20073c:	38226820 	strb	w0, [x1, x2]
+  }
+}
+  200740:	d65f03c0 	ret
+  200744:	d503201f 	nop
+  200748:	d503201f 	nop
+  20074c:	d503201f 	nop
+
+0000000000200750 <_out_null>:
+
+// internal null output
+static inline void _out_null(char character, void* buffer, size_t idx, size_t maxlen)
+{
+  (void)character; (void)buffer; (void)idx; (void)maxlen;
+}
+  200750:	d65f03c0 	ret
+  200754:	d503201f 	nop
+  200758:	d503201f 	nop
+  20075c:	d503201f 	nop
+
+0000000000200760 <_out_rev>:
+}
+
+
+// output the specified string in reverse, taking care of any zero-padding
+static size_t _out_rev(out_fct_type out, char* buffer, size_t idx, size_t maxlen, const char* buf, size_t len, unsigned int width, unsigned int flags)
+{
+  200760:	a9ba7bfd 	stp	x29, x30, [sp, #-96]!
+  200764:	910003fd 	mov	x29, sp
+  200768:	a90153f3 	stp	x19, x20, [sp, #16]
+  20076c:	aa0503f3 	mov	x19, x5
+  200770:	a9025bf5 	stp	x21, x22, [sp, #32]
+  200774:	aa0003f5 	mov	x21, x0
+  200778:	aa0103f6 	mov	x22, x1
+  20077c:	a90363f7 	stp	x23, x24, [sp, #48]
+  const size_t start_idx = idx;
+
+  // pad spaces up to given width
+  if (!(flags & FLAGS_LEFT) && !(flags & FLAGS_ZEROPAD)) {
+  200780:	120004e0 	and	w0, w7, #0x3
+{
+  200784:	aa0203f8 	mov	x24, x2
+  200788:	a9046bf9 	stp	x25, x26, [sp, #64]
+  20078c:	aa0303f7 	mov	x23, x3
+  200790:	aa0403f9 	mov	x25, x4
+  200794:	a90573fb 	stp	x27, x28, [sp, #80]
+  200798:	2a0603fa 	mov	w26, w6
+  20079c:	2a0703fb 	mov	w27, w7
+  if (!(flags & FLAGS_LEFT) && !(flags & FLAGS_ZEROPAD)) {
+  2007a0:	350005e0 	cbnz	w0, 20085c <_out_rev+0xfc>
+    for (size_t i = len; i < width; i++) {
+  2007a4:	2a1a03e0 	mov	w0, w26
+  2007a8:	aa0203f4 	mov	x20, x2
+  2007ac:	cb05001c 	sub	x28, x0, x5
+  2007b0:	eb0000bf 	cmp	x5, x0
+  2007b4:	8b02039c 	add	x28, x28, x2
+  2007b8:	540005a2 	b.cs	20086c <_out_rev+0x10c>  // b.hs, b.nlast
+  2007bc:	d503201f 	nop
+      out(' ', buffer, idx++, maxlen);
+  2007c0:	aa1403e2 	mov	x2, x20
+  2007c4:	aa1703e3 	mov	x3, x23
+  2007c8:	91000694 	add	x20, x20, #0x1
+  2007cc:	aa1603e1 	mov	x1, x22
+  2007d0:	52800400 	mov	w0, #0x20                  	// #32
+  2007d4:	d63f02a0 	blr	x21
+    for (size_t i = len; i < width; i++) {
+  2007d8:	eb1c029f 	cmp	x20, x28
+  2007dc:	54ffff21 	b.ne	2007c0 <_out_rev+0x60>  // b.any
+    }
+  }
+
+  // reverse string
+  while (len) {
+  2007e0:	b40002f3 	cbz	x19, 20083c <_out_rev+0xdc>
+  2007e4:	8b13039c 	add	x28, x28, x19
+  2007e8:	cb130382 	sub	x2, x28, x19
+    out(buf[--len], buffer, idx++, maxlen);
+  2007ec:	d1000673 	sub	x19, x19, #0x1
+  2007f0:	aa1c03f4 	mov	x20, x28
+  2007f4:	aa1703e3 	mov	x3, x23
+  2007f8:	aa1603e1 	mov	x1, x22
+  2007fc:	38736b20 	ldrb	w0, [x25, x19]
+  200800:	d63f02a0 	blr	x21
+  while (len) {
+  200804:	b5ffff33 	cbnz	x19, 2007e8 <_out_rev+0x88>
+  }
+
+  // append pad spaces up to given width
+  if (flags & FLAGS_LEFT) {
+  200808:	360801bb 	tbz	w27, #1, 20083c <_out_rev+0xdc>
+    while (idx - start_idx < width) {
+  20080c:	cb180298 	sub	x24, x20, x24
+  200810:	eb1a031f 	cmp	x24, x26
+  200814:	54000142 	b.cs	20083c <_out_rev+0xdc>  // b.hs, b.nlast
+      out(' ', buffer, idx++, maxlen);
+  200818:	aa1403e2 	mov	x2, x20
+  20081c:	aa1703e3 	mov	x3, x23
+  200820:	aa1603e1 	mov	x1, x22
+    while (idx - start_idx < width) {
+  200824:	91000718 	add	x24, x24, #0x1
+      out(' ', buffer, idx++, maxlen);
+  200828:	52800400 	mov	w0, #0x20                  	// #32
+  20082c:	d63f02a0 	blr	x21
+  200830:	91000694 	add	x20, x20, #0x1
+    while (idx - start_idx < width) {
+  200834:	eb1a031f 	cmp	x24, x26
+  200838:	54ffff03 	b.cc	200818 <_out_rev+0xb8>  // b.lo, b.ul, b.last
+    }
+  }
+
+  return idx;
+}
+  20083c:	a9425bf5 	ldp	x21, x22, [sp, #32]
+  200840:	aa1403e0 	mov	x0, x20
+  200844:	a94153f3 	ldp	x19, x20, [sp, #16]
+  200848:	a94363f7 	ldp	x23, x24, [sp, #48]
+  20084c:	a9446bf9 	ldp	x25, x26, [sp, #64]
+  200850:	a94573fb 	ldp	x27, x28, [sp, #80]
+  200854:	a8c67bfd 	ldp	x29, x30, [sp], #96
+  200858:	d65f03c0 	ret
+  while (len) {
+  20085c:	aa0203fc 	mov	x28, x2
+  200860:	aa0203f4 	mov	x20, x2
+  200864:	b5fffc05 	cbnz	x5, 2007e4 <_out_rev+0x84>
+  200868:	17ffffe8 	b	200808 <_out_rev+0xa8>
+  20086c:	aa0203fc 	mov	x28, x2
+  200870:	b5fffba5 	cbnz	x5, 2007e4 <_out_rev+0x84>
+  200874:	17fffff2 	b	20083c <_out_rev+0xdc>
+  200878:	d503201f 	nop
+  20087c:	d503201f 	nop
+
+0000000000200880 <_ntoa_long>:
+}
+
+
+// internal itoa for 'long' type
+static size_t _ntoa_long(out_fct_type out, char* buffer, size_t idx, size_t maxlen, unsigned long value, bool negative, unsigned long base, unsigned int prec, unsigned int width, unsigned int flags)
+{
+  200880:	a9bd7bfd 	stp	x29, x30, [sp, #-48]!
+  200884:	aa0603ea 	mov	x10, x6
+  200888:	aa0403e9 	mov	x9, x4
+  20088c:	910003fd 	mov	x29, sp
+  200890:	b9403be8 	ldr	w8, [sp, #56]
+  200894:	2a0703ee 	mov	w14, w7
+  200898:	b94033e6 	ldr	w6, [sp, #48]
+  20089c:	12001cb1 	and	w17, w5, #0xff
+  if (!value) {
+    flags &= ~FLAGS_HASH;
+  }
+
+  // write if precision != 0 and value is != 0
+  if (!(flags & FLAGS_PRECISION) || value) {
+  2008a0:	1216010f 	and	w15, w8, #0x400
+  if (!value) {
+  2008a4:	b4000744 	cbz	x4, 20098c <_ntoa_long+0x10c>
+  if (flags & FLAGS_HASH) {
+  2008a8:	121c0110 	and	w16, w8, #0x10
+  2008ac:	2a0803e7 	mov	w7, w8
+    do {
+      const char digit = (char)(value % base);
+  2008b0:	9aca092b 	udiv	x11, x9, x10
+      buf[len++] = digit < 10 ? '0' + digit : (flags & FLAGS_UPPERCASE ? 'A' : 'a') + digit - 10;
+  2008b4:	721b00e4 	ands	w4, w7, #0x20
+  2008b8:	52800c24 	mov	w4, #0x61                  	// #97
+  2008bc:	5280082c 	mov	w12, #0x41                  	// #65
+  2008c0:	1a84118c 	csel	w12, w12, w4, ne	// ne = any
+  2008c4:	d2800005 	mov	x5, #0x0                   	// #0
+  2008c8:	5100298c 	sub	w12, w12, #0xa
+  2008cc:	910043e4 	add	x4, sp, #0x10
+      const char digit = (char)(value % base);
+  2008d0:	9b0aa568 	msub	x8, x11, x10, x9
+      buf[len++] = digit < 10 ? '0' + digit : (flags & FLAGS_UPPERCASE ? 'A' : 'a') + digit - 10;
+  2008d4:	910004a5 	add	x5, x5, #0x1
+  2008d8:	f100251f 	cmp	x8, #0x9
+      const char digit = (char)(value % base);
+  2008dc:	12001d08 	and	w8, w8, #0xff
+      buf[len++] = digit < 10 ? '0' + digit : (flags & FLAGS_UPPERCASE ? 'A' : 'a') + digit - 10;
+  2008e0:	1100c10d 	add	w13, w8, #0x30
+  2008e4:	0b0c0108 	add	w8, w8, w12
+  2008e8:	54000208 	b.hi	200928 <_ntoa_long+0xa8>  // b.pmore
+  2008ec:	d503201f 	nop
+  2008f0:	8b050088 	add	x8, x4, x5
+      value /= base;
+    } while (value && (len < PRINTF_NTOA_BUFFER_SIZE));
+  2008f4:	f1007cbf 	cmp	x5, #0x1f
+  2008f8:	fa4a9120 	ccmp	x9, x10, #0x0, ls	// ls = plast
+      buf[len++] = digit < 10 ? '0' + digit : (flags & FLAGS_UPPERCASE ? 'A' : 'a') + digit - 10;
+  2008fc:	381ff10d 	sturb	w13, [x8, #-1]
+    } while (value && (len < PRINTF_NTOA_BUFFER_SIZE));
+  200900:	540001e3 	b.cc	20093c <_ntoa_long+0xbc>  // b.lo, b.ul, b.last
+      value /= base;
+  200904:	aa0b03e9 	mov	x9, x11
+      buf[len++] = digit < 10 ? '0' + digit : (flags & FLAGS_UPPERCASE ? 'A' : 'a') + digit - 10;
+  200908:	910004a5 	add	x5, x5, #0x1
+      const char digit = (char)(value % base);
+  20090c:	9aca092b 	udiv	x11, x9, x10
+  200910:	9b0aa568 	msub	x8, x11, x10, x9
+      buf[len++] = digit < 10 ? '0' + digit : (flags & FLAGS_UPPERCASE ? 'A' : 'a') + digit - 10;
+  200914:	f100251f 	cmp	x8, #0x9
+      const char digit = (char)(value % base);
+  200918:	12001d08 	and	w8, w8, #0xff
+      buf[len++] = digit < 10 ? '0' + digit : (flags & FLAGS_UPPERCASE ? 'A' : 'a') + digit - 10;
+  20091c:	1100c10d 	add	w13, w8, #0x30
+  200920:	0b0c0108 	add	w8, w8, w12
+  200924:	54fffe69 	b.ls	2008f0 <_ntoa_long+0x70>  // b.plast
+    } while (value && (len < PRINTF_NTOA_BUFFER_SIZE));
+  200928:	eb0a013f 	cmp	x9, x10
+      buf[len++] = digit < 10 ? '0' + digit : (flags & FLAGS_UPPERCASE ? 'A' : 'a') + digit - 10;
+  20092c:	8b050089 	add	x9, x4, x5
+    } while (value && (len < PRINTF_NTOA_BUFFER_SIZE));
+  200930:	fa5f28a2 	ccmp	x5, #0x1f, #0x2, cs	// cs = hs, nlast
+      buf[len++] = digit < 10 ? '0' + digit : (flags & FLAGS_UPPERCASE ? 'A' : 'a') + digit - 10;
+  200934:	381ff128 	sturb	w8, [x9, #-1]
+    } while (value && (len < PRINTF_NTOA_BUFFER_SIZE));
+  200938:	54fffe69 	b.ls	200904 <_ntoa_long+0x84>  // b.plast
+  if (!(flags & FLAGS_LEFT)) {
+  20093c:	36080367 	tbz	w7, #1, 2009a8 <_ntoa_long+0x128>
+  if (flags & FLAGS_HASH) {
+  200940:	34000af0 	cbz	w16, 200a9c <_ntoa_long+0x21c>
+    if (!(flags & FLAGS_PRECISION) && len && ((len == prec) || (len == width))) {
+  200944:	350008ef 	cbnz	w15, 200a60 <_ntoa_long+0x1e0>
+  200948:	2a0e03e9 	mov	w9, w14
+  20094c:	b5000825 	cbnz	x5, 200a50 <_ntoa_long+0x1d0>
+    if ((base == 16U) && !(flags & FLAGS_UPPERCASE) && (len < PRINTF_NTOA_BUFFER_SIZE)) {
+  200950:	f100415f 	cmp	x10, #0x10
+  200954:	54001460 	b.eq	200be0 <_ntoa_long+0x360>  // b.none
+    else if ((base == 2U) && (len < PRINTF_NTOA_BUFFER_SIZE)) {
+  200958:	f100095f 	cmp	x10, #0x2
+  20095c:	54001201 	b.ne	200b9c <_ntoa_long+0x31c>  // b.any
+  200960:	52800c48 	mov	w8, #0x62                  	// #98
+      buf[len++] = '0';
+  200964:	52800609 	mov	w9, #0x30                  	// #48
+  200968:	d2800045 	mov	x5, #0x2                   	// #2
+      buf[len++] = 'b';
+  20096c:	390043e8 	strb	w8, [sp, #16]
+      buf[len++] = '0';
+  200970:	390047e9 	strb	w9, [sp, #17]
+    if (negative) {
+  200974:	37000b71 	tbnz	w17, #0, 200ae0 <_ntoa_long+0x260>
+    else if (flags & FLAGS_PLUS) {
+  200978:	36100f87 	tbz	w7, #2, 200b68 <_ntoa_long+0x2e8>
+      buf[len++] = '+';  // ignore the space if the '+' exists
+  20097c:	52800568 	mov	w8, #0x2b                  	// #43
+  200980:	38256888 	strb	w8, [x4, x5]
+  200984:	910004a5 	add	x5, x5, #0x1
+  200988:	14000047 	b	200aa4 <_ntoa_long+0x224>
+    flags &= ~FLAGS_HASH;
+  20098c:	121b7907 	and	w7, w8, #0xffffffef
+  if (!(flags & FLAGS_PRECISION) || value) {
+  200990:	3400090f 	cbz	w15, 200ab0 <_ntoa_long+0x230>
+  if (!(flags & FLAGS_LEFT)) {
+  200994:	121f0110 	and	w16, w8, #0x2
+  200998:	37080c48 	tbnz	w8, #1, 200b20 <_ntoa_long+0x2a0>
+  20099c:	910043e4 	add	x4, sp, #0x10
+  size_t len = 0U;
+  2009a0:	d2800005 	mov	x5, #0x0                   	// #0
+  if (!(flags & FLAGS_PRECISION) || value) {
+  2009a4:	5280800f 	mov	w15, #0x400                 	// #1024
+    while ((len < prec) && (len < PRINTF_NTOA_BUFFER_SIZE)) {
+  2009a8:	2a0e03e9 	mov	w9, w14
+    if (width && (flags & FLAGS_ZEROPAD) && (negative || (flags & (FLAGS_PLUS | FLAGS_SPACE)))) {
+  2009ac:	350003e6 	cbnz	w6, 200a28 <_ntoa_long+0x1a8>
+    while ((len < prec) && (len < PRINTF_NTOA_BUFFER_SIZE)) {
+  2009b0:	eb05013f 	cmp	x9, x5
+  2009b4:	54fffc69 	b.ls	200940 <_ntoa_long+0xc0>  // b.plast
+  2009b8:	f10080bf 	cmp	x5, #0x20
+    if (width && (flags & FLAGS_ZEROPAD) && (negative || (flags & (FLAGS_PLUS | FLAGS_SPACE)))) {
+  2009bc:	120000ec 	and	w12, w7, #0x1
+    while ((len < prec) && (len < PRINTF_NTOA_BUFFER_SIZE)) {
+  2009c0:	54000400 	b.eq	200a40 <_ntoa_long+0x1c0>  // b.none
+      buf[len++] = '0';
+  2009c4:	5280060b 	mov	w11, #0x30                  	// #48
+  2009c8:	14000003 	b	2009d4 <_ntoa_long+0x154>
+    while ((len < prec) && (len < PRINTF_NTOA_BUFFER_SIZE)) {
+  2009cc:	f10080bf 	cmp	x5, #0x20
+  2009d0:	54000740 	b.eq	200ab8 <_ntoa_long+0x238>  // b.none
+      buf[len++] = '0';
+  2009d4:	910004a5 	add	x5, x5, #0x1
+  2009d8:	8b050088 	add	x8, x4, x5
+    while ((len < prec) && (len < PRINTF_NTOA_BUFFER_SIZE)) {
+  2009dc:	eb0900bf 	cmp	x5, x9
+      buf[len++] = '0';
+  2009e0:	381ff10b 	sturb	w11, [x8, #-1]
+    while ((len < prec) && (len < PRINTF_NTOA_BUFFER_SIZE)) {
+  2009e4:	54ffff43 	b.cc	2009cc <_ntoa_long+0x14c>  // b.lo, b.ul, b.last
+    while ((flags & FLAGS_ZEROPAD) && (len < width) && (len < PRINTF_NTOA_BUFFER_SIZE)) {
+  2009e8:	34fffacc 	cbz	w12, 200940 <_ntoa_long+0xc0>
+  2009ec:	2a0603eb 	mov	w11, w6
+  2009f0:	eb05017f 	cmp	x11, x5
+  2009f4:	54fffa69 	b.ls	200940 <_ntoa_long+0xc0>  // b.plast
+  2009f8:	f10080bf 	cmp	x5, #0x20
+      buf[len++] = '0';
+  2009fc:	5280060c 	mov	w12, #0x30                  	// #48
+    while ((flags & FLAGS_ZEROPAD) && (len < width) && (len < PRINTF_NTOA_BUFFER_SIZE)) {
+  200a00:	54000081 	b.ne	200a10 <_ntoa_long+0x190>  // b.any
+  200a04:	14000030 	b	200ac4 <_ntoa_long+0x244>
+  200a08:	f10080bf 	cmp	x5, #0x20
+  200a0c:	54000a80 	b.eq	200b5c <_ntoa_long+0x2dc>  // b.none
+      buf[len++] = '0';
+  200a10:	910004a5 	add	x5, x5, #0x1
+  200a14:	8b050088 	add	x8, x4, x5
+    while ((flags & FLAGS_ZEROPAD) && (len < width) && (len < PRINTF_NTOA_BUFFER_SIZE)) {
+  200a18:	eb0b00bf 	cmp	x5, x11
+      buf[len++] = '0';
+  200a1c:	381ff10c 	sturb	w12, [x8, #-1]
+    while ((flags & FLAGS_ZEROPAD) && (len < width) && (len < PRINTF_NTOA_BUFFER_SIZE)) {
+  200a20:	54ffff41 	b.ne	200a08 <_ntoa_long+0x188>  // b.any
+  200a24:	17ffffc7 	b	200940 <_ntoa_long+0xc0>
+    if (width && (flags & FLAGS_ZEROPAD) && (negative || (flags & (FLAGS_PLUS | FLAGS_SPACE)))) {
+  200a28:	120000ec 	and	w12, w7, #0x1
+  200a2c:	37000667 	tbnz	w7, #0, 200af8 <_ntoa_long+0x278>
+    while ((len < prec) && (len < PRINTF_NTOA_BUFFER_SIZE)) {
+  200a30:	eb05013f 	cmp	x9, x5
+  200a34:	54fff869 	b.ls	200940 <_ntoa_long+0xc0>  // b.plast
+  200a38:	f10080bf 	cmp	x5, #0x20
+  200a3c:	54fffc41 	b.ne	2009c4 <_ntoa_long+0x144>  // b.any
+  if (flags & FLAGS_HASH) {
+  200a40:	340004d0 	cbz	w16, 200ad8 <_ntoa_long+0x258>
+    if (!(flags & FLAGS_PRECISION) && len && ((len == prec) || (len == width))) {
+  200a44:	350004af 	cbnz	w15, 200ad8 <_ntoa_long+0x258>
+  200a48:	d2800405 	mov	x5, #0x20                  	// #32
+  200a4c:	d503201f 	nop
+  200a50:	eb05013f 	cmp	x9, x5
+  200a54:	54000720 	b.eq	200b38 <_ntoa_long+0x2b8>  // b.none
+  200a58:	eb2640bf 	cmp	x5, w6, uxtw
+  200a5c:	540006e0 	b.eq	200b38 <_ntoa_long+0x2b8>  // b.none
+    if ((base == 16U) && !(flags & FLAGS_UPPERCASE) && (len < PRINTF_NTOA_BUFFER_SIZE)) {
+  200a60:	f100415f 	cmp	x10, #0x10
+  200a64:	540008c0 	b.eq	200b7c <_ntoa_long+0x2fc>  // b.none
+    else if ((base == 2U) && (len < PRINTF_NTOA_BUFFER_SIZE)) {
+  200a68:	7100095f 	cmp	w10, #0x2
+  200a6c:	fa5f08a2 	ccmp	x5, #0x1f, #0x2, eq	// eq = none
+  200a70:	540000a8 	b.hi	200a84 <_ntoa_long+0x204>  // b.pmore
+      buf[len++] = 'b';
+  200a74:	aa0503e8 	mov	x8, x5
+  200a78:	910004a5 	add	x5, x5, #0x1
+  200a7c:	52800c49 	mov	w9, #0x62                  	// #98
+  200a80:	38286889 	strb	w9, [x4, x8]
+    if (len < PRINTF_NTOA_BUFFER_SIZE) {
+  200a84:	f10080bf 	cmp	x5, #0x20
+  200a88:	540000e0 	b.eq	200aa4 <_ntoa_long+0x224>  // b.none
+      buf[len++] = '0';
+  200a8c:	aa0503e8 	mov	x8, x5
+  200a90:	910004a5 	add	x5, x5, #0x1
+  200a94:	52800609 	mov	w9, #0x30                  	// #48
+  200a98:	38286889 	strb	w9, [x4, x8]
+  if (len < PRINTF_NTOA_BUFFER_SIZE) {
+  200a9c:	f10080bf 	cmp	x5, #0x20
+  200aa0:	54fff6a1 	b.ne	200974 <_ntoa_long+0xf4>  // b.any
+  return _out_rev(out, buffer, idx, maxlen, buf, len, width, flags);
+  200aa4:	97ffff2f 	bl	200760 <_out_rev>
+  }
+
+  return _ntoa_format(out, buffer, idx, maxlen, buf, len, negative, (unsigned int)base, prec, width, flags);
+}
+  200aa8:	a8c37bfd 	ldp	x29, x30, [sp], #48
+  200aac:	d65f03c0 	ret
+  if (!(flags & FLAGS_PRECISION) || value) {
+  200ab0:	52800010 	mov	w16, #0x0                   	// #0
+  200ab4:	17ffff7f 	b	2008b0 <_ntoa_long+0x30>
+    while ((flags & FLAGS_ZEROPAD) && (len < width) && (len < PRINTF_NTOA_BUFFER_SIZE)) {
+  200ab8:	3400052c 	cbz	w12, 200b5c <_ntoa_long+0x2dc>
+  200abc:	710080df 	cmp	w6, #0x20
+  200ac0:	540004e9 	b.ls	200b5c <_ntoa_long+0x2dc>  // b.plast
+  if (flags & FLAGS_HASH) {
+  200ac4:	d2800405 	mov	x5, #0x20                  	// #32
+  200ac8:	34fffef0 	cbz	w16, 200aa4 <_ntoa_long+0x224>
+    if (!(flags & FLAGS_PRECISION) && len && ((len == prec) || (len == width))) {
+  200acc:	34fffc2f 	cbz	w15, 200a50 <_ntoa_long+0x1d0>
+    if ((base == 16U) && !(flags & FLAGS_UPPERCASE) && (len < PRINTF_NTOA_BUFFER_SIZE)) {
+  200ad0:	f100415f 	cmp	x10, #0x10
+  200ad4:	54fffe81 	b.ne	200aa4 <_ntoa_long+0x224>  // b.any
+  200ad8:	d2800405 	mov	x5, #0x20                  	// #32
+  200adc:	17fffff2 	b	200aa4 <_ntoa_long+0x224>
+      buf[len++] = '-';
+  200ae0:	528005a8 	mov	w8, #0x2d                  	// #45
+  200ae4:	38256888 	strb	w8, [x4, x5]
+  200ae8:	910004a5 	add	x5, x5, #0x1
+  return _out_rev(out, buffer, idx, maxlen, buf, len, width, flags);
+  200aec:	97ffff1d 	bl	200760 <_out_rev>
+}
+  200af0:	a8c37bfd 	ldp	x29, x30, [sp], #48
+  200af4:	d65f03c0 	ret
+    if (width && (flags & FLAGS_ZEROPAD) && (negative || (flags & (FLAGS_PLUS | FLAGS_SPACE)))) {
+  200af8:	370001d1 	tbnz	w17, #0, 200b30 <_ntoa_long+0x2b0>
+  200afc:	721e04ff 	tst	w7, #0xc
+  200b00:	54000181 	b.ne	200b30 <_ntoa_long+0x2b0>  // b.any
+    while ((len < prec) && (len < PRINTF_NTOA_BUFFER_SIZE)) {
+  200b04:	eb05013f 	cmp	x9, x5
+  200b08:	54fff729 	b.ls	2009ec <_ntoa_long+0x16c>  // b.plast
+  200b0c:	f10080bf 	cmp	x5, #0x20
+  200b10:	54fff5a1 	b.ne	2009c4 <_ntoa_long+0x144>  // b.any
+    while ((flags & FLAGS_ZEROPAD) && (len < width) && (len < PRINTF_NTOA_BUFFER_SIZE)) {
+  200b14:	710080df 	cmp	w6, #0x20
+  200b18:	54fffd68 	b.hi	200ac4 <_ntoa_long+0x244>  // b.pmore
+  200b1c:	17ffffc9 	b	200a40 <_ntoa_long+0x1c0>
+  200b20:	910043e4 	add	x4, sp, #0x10
+  size_t len = 0U;
+  200b24:	d2800005 	mov	x5, #0x0                   	// #0
+    if (negative) {
+  200b28:	3607f291 	tbz	w17, #0, 200978 <_ntoa_long+0xf8>
+  200b2c:	17ffffed 	b	200ae0 <_ntoa_long+0x260>
+      width--;
+  200b30:	510004c6 	sub	w6, w6, #0x1
+  200b34:	17fffff4 	b	200b04 <_ntoa_long+0x284>
+      if (len && (base == 16U)) {
+  200b38:	f10004a8 	subs	x8, x5, #0x1
+  200b3c:	7a501940 	ccmp	w10, #0x10, #0x0, ne	// ne = any
+  200b40:	54000461 	b.ne	200bcc <_ntoa_long+0x34c>  // b.any
+        len--;
+  200b44:	d10008a5 	sub	x5, x5, #0x2
+    if ((base == 16U) && !(flags & FLAGS_UPPERCASE) && (len < PRINTF_NTOA_BUFFER_SIZE)) {
+  200b48:	36280567 	tbz	w7, #5, 200bf4 <_ntoa_long+0x374>
+      buf[len++] = 'X';
+  200b4c:	52800b09 	mov	w9, #0x58                  	// #88
+  200b50:	38256889 	strb	w9, [x4, x5]
+  200b54:	aa0803e5 	mov	x5, x8
+  200b58:	17ffffcd 	b	200a8c <_ntoa_long+0x20c>
+  if (flags & FLAGS_HASH) {
+  200b5c:	d2800405 	mov	x5, #0x20                  	// #32
+  200b60:	35ffef30 	cbnz	w16, 200944 <_ntoa_long+0xc4>
+  200b64:	17ffffd0 	b	200aa4 <_ntoa_long+0x224>
+    else if (flags & FLAGS_SPACE) {
+  200b68:	361ff9e7 	tbz	w7, #3, 200aa4 <_ntoa_long+0x224>
+      buf[len++] = ' ';
+  200b6c:	52800408 	mov	w8, #0x20                  	// #32
+  200b70:	38256888 	strb	w8, [x4, x5]
+  200b74:	910004a5 	add	x5, x5, #0x1
+  200b78:	17ffffcb 	b	200aa4 <_ntoa_long+0x224>
+    if ((base == 16U) && !(flags & FLAGS_UPPERCASE) && (len < PRINTF_NTOA_BUFFER_SIZE)) {
+  200b7c:	372801a7 	tbnz	w7, #5, 200bb0 <_ntoa_long+0x330>
+  200b80:	f10080bf 	cmp	x5, #0x20
+  200b84:	54fffaa0 	b.eq	200ad8 <_ntoa_long+0x258>  // b.none
+      buf[len++] = 'X';
+  200b88:	aa0503e8 	mov	x8, x5
+  200b8c:	910004a5 	add	x5, x5, #0x1
+      buf[len++] = 'x';
+  200b90:	52800f09 	mov	w9, #0x78                  	// #120
+  200b94:	38286889 	strb	w9, [x4, x8]
+  200b98:	17ffffbb 	b	200a84 <_ntoa_long+0x204>
+      buf[len++] = '0';
+  200b9c:	52800608 	mov	w8, #0x30                  	// #48
+  200ba0:	390043e8 	strb	w8, [sp, #16]
+  200ba4:	d2800025 	mov	x5, #0x1                   	// #1
+    if (negative) {
+  200ba8:	3607ee91 	tbz	w17, #0, 200978 <_ntoa_long+0xf8>
+  200bac:	17ffffcd 	b	200ae0 <_ntoa_long+0x260>
+    else if ((base == 16U) && (flags & FLAGS_UPPERCASE) && (len < PRINTF_NTOA_BUFFER_SIZE)) {
+  200bb0:	f10080bf 	cmp	x5, #0x20
+  200bb4:	54fff920 	b.eq	200ad8 <_ntoa_long+0x258>  // b.none
+      buf[len++] = 'X';
+  200bb8:	aa0503e8 	mov	x8, x5
+  200bbc:	910004a5 	add	x5, x5, #0x1
+  200bc0:	52800b09 	mov	w9, #0x58                  	// #88
+  200bc4:	38286889 	strb	w9, [x4, x8]
+  200bc8:	17ffffaf 	b	200a84 <_ntoa_long+0x204>
+    if ((base == 16U) && !(flags & FLAGS_UPPERCASE) && (len < PRINTF_NTOA_BUFFER_SIZE)) {
+  200bcc:	f100415f 	cmp	x10, #0x10
+  200bd0:	540001a0 	b.eq	200c04 <_ntoa_long+0x384>  // b.none
+    else if ((base == 2U) && (len < PRINTF_NTOA_BUFFER_SIZE)) {
+  200bd4:	f100095f 	cmp	x10, #0x2
+  200bd8:	54fff520 	b.eq	200a7c <_ntoa_long+0x1fc>  // b.none
+  200bdc:	17ffffae 	b	200a94 <_ntoa_long+0x214>
+    if ((base == 16U) && !(flags & FLAGS_UPPERCASE) && (len < PRINTF_NTOA_BUFFER_SIZE)) {
+  200be0:	721b00e5 	ands	w5, w7, #0x20
+  200be4:	52800b08 	mov	w8, #0x58                  	// #88
+  200be8:	52800f05 	mov	w5, #0x78                  	// #120
+  200bec:	1a851108 	csel	w8, w8, w5, ne	// ne = any
+  200bf0:	17ffff5d 	b	200964 <_ntoa_long+0xe4>
+      buf[len++] = 'x';
+  200bf4:	52800f09 	mov	w9, #0x78                  	// #120
+  200bf8:	38256889 	strb	w9, [x4, x5]
+      buf[len++] = 'X';
+  200bfc:	aa0803e5 	mov	x5, x8
+  200c00:	17ffffa3 	b	200a8c <_ntoa_long+0x20c>
+    if ((base == 16U) && !(flags & FLAGS_UPPERCASE) && (len < PRINTF_NTOA_BUFFER_SIZE)) {
+  200c04:	362ffc67 	tbz	w7, #5, 200b90 <_ntoa_long+0x310>
+  200c08:	17ffffee 	b	200bc0 <_ntoa_long+0x340>
+  200c0c:	d503201f 	nop
+
+0000000000200c10 <_out_char>:
+  if (character) {
+  200c10:	72001c00 	ands	w0, w0, #0xff
+  200c14:	54000041 	b.ne	200c1c <_out_char+0xc>  // b.any
+}
+  200c18:	d65f03c0 	ret
+    _sddf_putchar(character);
+  200c1c:	140005f5 	b	2023f0 <_sddf_putchar>
+
+0000000000200c20 <_out_fct>:
+  if (character) {
+  200c20:	72001c00 	ands	w0, w0, #0xff
+  200c24:	54000080 	b.eq	200c34 <_out_fct+0x14>  // b.none
+    ((out_fct_wrap_type*)buffer)->fct(character, ((out_fct_wrap_type*)buffer)->arg);
+  200c28:	a9400422 	ldp	x2, x1, [x1]
+  200c2c:	aa0203f0 	mov	x16, x2
+  200c30:	d61f0200 	br	x16
+}
+  200c34:	d65f03c0 	ret
+  200c38:	d503201f 	nop
+  200c3c:	d503201f 	nop
+
+0000000000200c40 <_ftoa>:
+
+  // powers of 10
+  static const double pow10[] = { 1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000 };
+
+  // test for special values
+  if (value != value)
+  200c40:	1e602000 	fcmp	d0, d0
+{
+  200c44:	2a0603e7 	mov	w7, w6
+  if (value != value)
+  200c48:	54000fa1 	b.ne	200e3c <_ftoa+0x1fc>  // b.any
+    return _out_rev(out, buffer, idx, maxlen, "nan", 3, width, flags);
+  if (value < -DBL_MAX)
+  200c4c:	92e00206 	mov	x6, #0xffefffffffffffff    	// #-4503599627370497
+  200c50:	9e6700c1 	fmov	d1, x6
+  200c54:	1e612010 	fcmpe	d0, d1
+  200c58:	54001324 	b.mi	200ebc <_ftoa+0x27c>  // b.first
+  200c5c:	aa0003ef 	mov	x15, x0
+    return _out_rev(out, buffer, idx, maxlen, "fni-", 4, width, flags);
+  if (value > DBL_MAX)
+  200c60:	92f00200 	mov	x0, #0x7fefffffffffffff    	// #9218868437227405311
+  200c64:	9e670001 	fmov	d1, x0
+  200c68:	aa0103f0 	mov	x16, x1
+  200c6c:	aa0203f1 	mov	x17, x2
+  200c70:	aa0303f2 	mov	x18, x3
+  200c74:	1e612010 	fcmpe	d0, d1
+  200c78:	54000ccc 	b.gt	200e10 <_ftoa+0x1d0>
+    return _out_rev(out, buffer, idx, maxlen, (flags & FLAGS_PLUS) ? "fni+" : "fni", (flags & FLAGS_PLUS) ? 4U : 3U, width, flags);
+
+  // test for very large values
+  // standard printf behavior is to print EVERY whole number digit -- which could be 100s of characters overflowing your buffers == bad
+  if ((value > PRINTF_MAX_FLOAT) || (value < -PRINTF_MAX_FLOAT)) {
+  200c7c:	d2d9aca0 	mov	x0, #0xcd6500000000        	// #225833675390976
+  200c80:	f2e839a0 	movk	x0, #0x41cd, lsl #48
+  200c84:	9e670001 	fmov	d1, x0
+  200c88:	1e612010 	fcmpe	d0, d1
+  200c8c:	540010cc 	b.gt	200ea4 <_ftoa+0x264>
+  200c90:	d2d9aca0 	mov	x0, #0xcd6500000000        	// #225833675390976
+  200c94:	f2f839a0 	movk	x0, #0xc1cd, lsl #48
+  200c98:	9e670001 	fmov	d1, x0
+  200c9c:	1e612010 	fcmpe	d0, d1
+  200ca0:	54001024 	b.mi	200ea4 <_ftoa+0x264>  // b.first
+#endif
+  }
+
+  // test for negative
+  bool negative = false;
+  if (value < 0) {
+  200ca4:	1e602018 	fcmpe	d0, #0.0
+{
+  200ca8:	a9bd7bfd 	stp	x29, x30, [sp, #-48]!
+  200cac:	910003fd 	mov	x29, sp
+  if (value < 0) {
+  200cb0:	54000e44 	b.mi	200e78 <_ftoa+0x238>  // b.first
+  bool negative = false;
+  200cb4:	52800003 	mov	w3, #0x0                   	// #0
+    negative = true;
+    value = 0 - value;
+  }
+
+  // set default precision, if not set explicitly
+  if (!(flags & FLAGS_PRECISION)) {
+  200cb8:	36500e87 	tbz	w7, #10, 200e88 <_ftoa+0x248>
+    prec = PRINTF_DEFAULT_FLOAT_PRECISION;
+  }
+  // limit precision to 9, cause a prec >= 10 can lead to overflow errors
+  while ((len < PRINTF_FTOA_BUFFER_SIZE) && (prec > 9U)) {
+  200cbc:	7100249f 	cmp	w4, #0x9
+  200cc0:	54001ac9 	b.ls	201018 <_ftoa+0x3d8>  // b.plast
+  200cc4:	910043ec 	add	x12, sp, #0x10
+  200cc8:	d2800008 	mov	x8, #0x0                   	// #0
+    buf[len++] = '0';
+  200ccc:	52800601 	mov	w1, #0x30                  	// #48
+  200cd0:	91000508 	add	x8, x8, #0x1
+    prec--;
+  200cd4:	51000484 	sub	w4, w4, #0x1
+    buf[len++] = '0';
+  200cd8:	8b080180 	add	x0, x12, x8
+  while ((len < PRINTF_FTOA_BUFFER_SIZE) && (prec > 9U)) {
+  200cdc:	f1007d1f 	cmp	x8, #0x1f
+  200ce0:	7a499880 	ccmp	w4, #0x9, #0x0, ls	// ls = plast
+    buf[len++] = '0';
+  200ce4:	381ff001 	sturb	w1, [x0, #-1]
+  while ((len < PRINTF_FTOA_BUFFER_SIZE) && (prec > 9U)) {
+  200ce8:	54ffff48 	b.hi	200cd0 <_ftoa+0x90>  // b.pmore
+  200cec:	d2d9aca0 	mov	x0, #0xcd6500000000        	// #225833675390976
+  200cf0:	f2e839a0 	movk	x0, #0x41cd, lsl #48
+  200cf4:	9e670002 	fmov	d2, x0
+  }
+
+  int whole = (int)value;
+  200cf8:	1e78000a 	fcvtzs	w10, d0
+  double tmp = (value - whole) * pow10[prec];
+  unsigned long frac = (unsigned long)tmp;
+  diff = tmp - frac;
+
+  if (diff > 0.5) {
+  200cfc:	1e6c1003 	fmov	d3, #5.000000000000000000e-01
+  double tmp = (value - whole) * pow10[prec];
+  200d00:	1e620141 	scvtf	d1, w10
+  200d04:	1e613801 	fsub	d1, d0, d1
+  200d08:	1e620821 	fmul	d1, d1, d2
+  unsigned long frac = (unsigned long)tmp;
+  200d0c:	9e79002e 	fcvtzu	x14, d1
+  diff = tmp - frac;
+  200d10:	9e6301c4 	ucvtf	d4, x14
+  200d14:	1e643821 	fsub	d1, d1, d4
+  if (diff > 0.5) {
+  200d18:	1e632030 	fcmpe	d1, d3
+  200d1c:	5400106c 	b.gt	200f28 <_ftoa+0x2e8>
+    if (frac >= pow10[prec]) {
+      frac = 0;
+      ++whole;
+    }
+  }
+  else if (diff < 0.5) {
+  200d20:	54000084 	b.mi	200d30 <_ftoa+0xf0>  // b.first
+  }
+  else if ((frac == 0U) || (frac & 1U)) {
+  200d24:	b50016ae 	cbnz	x14, 200ff8 <_ftoa+0x3b8>
+    // if halfway, round up if odd OR if last digit is 0
+    ++frac;
+  200d28:	910005ce 	add	x14, x14, #0x1
+  200d2c:	d503201f 	nop
+  }
+
+  if (prec == 0U) {
+  200d30:	35000d04 	cbnz	w4, 200ed0 <_ftoa+0x290>
+    diff = value - (double)whole;
+  200d34:	1e620142 	scvtf	d2, w10
+    if ((!(diff < 0.5) || (diff > 0.5)) && (whole & 1)) {
+  200d38:	1e6c1001 	fmov	d1, #5.000000000000000000e-01
+      // exactly 0.5 and ODD, then round up
+      // 1.5 -> 2, but 2.5 -> 2
+      ++whole;
+  200d3c:	12000140 	and	w0, w10, #0x1
+  200d40:	0b000140 	add	w0, w10, w0
+    diff = value - (double)whole;
+  200d44:	1e623800 	fsub	d0, d0, d2
+      ++whole;
+  200d48:	1e612010 	fcmpe	d0, d1
+  200d4c:	1a80414a 	csel	w10, w10, w0, mi	// mi = first
+    }
+  }
+
+  // do whole part, number is reversed
+  while (len < PRINTF_FTOA_BUFFER_SIZE) {
+    buf[len++] = (char)(48 + (whole % 10));
+  200d50:	528ccce1 	mov	w1, #0x6667                	// #26215
+  200d54:	72acccc1 	movk	w1, #0x6666, lsl #16
+  200d58:	52800142 	mov	w2, #0xa                   	// #10
+  200d5c:	1400000a 	b	200d84 <_ftoa+0x144>
+  200d60:	9362fd29 	asr	x9, x9, #34
+  200d64:	91000508 	add	x8, x8, #0x1
+  200d68:	4b8a7d29 	sub	w9, w9, w10, asr #31
+  200d6c:	8b080180 	add	x0, x12, x8
+  200d70:	1b02a92b 	msub	w11, w9, w2, w10
+    if (!(whole /= 10)) {
+  200d74:	2a0903ea 	mov	w10, w9
+    buf[len++] = (char)(48 + (whole % 10));
+  200d78:	1100c169 	add	w9, w11, #0x30
+  200d7c:	381ff009 	sturb	w9, [x0, #-1]
+    if (!(whole /= 10)) {
+  200d80:	34000e4a 	cbz	w10, 200f48 <_ftoa+0x308>
+    buf[len++] = (char)(48 + (whole % 10));
+  200d84:	9b217d49 	smull	x9, w10, w1
+  while (len < PRINTF_FTOA_BUFFER_SIZE) {
+  200d88:	f100811f 	cmp	x8, #0x20
+  200d8c:	54fffea1 	b.ne	200d60 <_ftoa+0x120>  // b.any
+      break;
+    }
+  }
+
+  // pad leading zeros
+  if (!(flags & FLAGS_LEFT) && (flags & FLAGS_ZEROPAD)) {
+  200d90:	120004e0 	and	w0, w7, #0x3
+  200d94:	7100041f 	cmp	w0, #0x1
+  200d98:	54000281 	b.ne	200de8 <_ftoa+0x1a8>  // b.any
+    if (width && (negative || (flags & (FLAGS_PLUS | FLAGS_SPACE)))) {
+  200d9c:	34000265 	cbz	w5, 200de8 <_ftoa+0x1a8>
+  200da0:	35001323 	cbnz	w3, 201004 <_ftoa+0x3c4>
+  200da4:	721e04ff 	tst	w7, #0xc
+  200da8:	540012e1 	b.ne	201004 <_ftoa+0x3c4>  // b.any
+      width--;
+    }
+    while ((len < width) && (len < PRINTF_FTOA_BUFFER_SIZE)) {
+  200dac:	2a0503e2 	mov	w2, w5
+  200db0:	eb02011f 	cmp	x8, x2
+  200db4:	54001002 	b.cs	200fb4 <_ftoa+0x374>  // b.hs, b.nlast
+  200db8:	f100811f 	cmp	x8, #0x20
+      buf[len++] = '0';
+  200dbc:	52800601 	mov	w1, #0x30                  	// #48
+    while ((len < width) && (len < PRINTF_FTOA_BUFFER_SIZE)) {
+  200dc0:	54000120 	b.eq	200de4 <_ftoa+0x1a4>  // b.none
+  200dc4:	d503201f 	nop
+      buf[len++] = '0';
+  200dc8:	91000508 	add	x8, x8, #0x1
+  200dcc:	8b080180 	add	x0, x12, x8
+    while ((len < width) && (len < PRINTF_FTOA_BUFFER_SIZE)) {
+  200dd0:	eb02011f 	cmp	x8, x2
+      buf[len++] = '0';
+  200dd4:	381ff001 	sturb	w1, [x0, #-1]
+    while ((len < width) && (len < PRINTF_FTOA_BUFFER_SIZE)) {
+  200dd8:	54000be0 	b.eq	200f54 <_ftoa+0x314>  // b.none
+  200ddc:	f100811f 	cmp	x8, #0x20
+  200de0:	54ffff41 	b.ne	200dc8 <_ftoa+0x188>  // b.any
+    }
+    else if (flags & FLAGS_PLUS) {
+      buf[len++] = '+';  // ignore the space if the '+' exists
+    }
+    else if (flags & FLAGS_SPACE) {
+      buf[len++] = ' ';
+  200de4:	d2800408 	mov	x8, #0x20                  	// #32
+    }
+  }
+
+  return _out_rev(out, buffer, idx, maxlen, buf, len, width, flags);
+  200de8:	2a0503e6 	mov	w6, w5
+  200dec:	aa0c03e4 	mov	x4, x12
+  200df0:	aa0803e5 	mov	x5, x8
+  200df4:	aa1203e3 	mov	x3, x18
+  200df8:	aa1103e2 	mov	x2, x17
+  200dfc:	aa1003e1 	mov	x1, x16
+  200e00:	aa0f03e0 	mov	x0, x15
+  200e04:	97fffe57 	bl	200760 <_out_rev>
+}
+  200e08:	a8c37bfd 	ldp	x29, x30, [sp], #48
+  200e0c:	d65f03c0 	ret
+    return _out_rev(out, buffer, idx, maxlen, (flags & FLAGS_PLUS) ? "fni+" : "fni", (flags & FLAGS_PLUS) ? 4U : 3U, width, flags);
+  200e10:	37100207 	tbnz	w7, #2, 200e50 <_ftoa+0x210>
+  200e14:	d2800060 	mov	x0, #0x3                   	// #3
+  200e18:	2a0503e6 	mov	w6, w5
+  200e1c:	d0000004 	adrp	x4, 202000 <_vsnprintf+0xc30>
+  200e20:	9128c084 	add	x4, x4, #0xa30
+  200e24:	aa0003e5 	mov	x5, x0
+  200e28:	aa1203e3 	mov	x3, x18
+  200e2c:	aa1103e2 	mov	x2, x17
+  200e30:	aa1003e1 	mov	x1, x16
+  200e34:	aa0f03e0 	mov	x0, x15
+  200e38:	17fffe4a 	b	200760 <_out_rev>
+    return _out_rev(out, buffer, idx, maxlen, "nan", 3, width, flags);
+  200e3c:	2a0503e6 	mov	w6, w5
+  200e40:	d0000004 	adrp	x4, 202000 <_vsnprintf+0xc30>
+  200e44:	d2800065 	mov	x5, #0x3                   	// #3
+  200e48:	9128e084 	add	x4, x4, #0xa38
+  200e4c:	17fffe45 	b	200760 <_out_rev>
+    return _out_rev(out, buffer, idx, maxlen, (flags & FLAGS_PLUS) ? "fni+" : "fni", (flags & FLAGS_PLUS) ? 4U : 3U, width, flags);
+  200e50:	d2800080 	mov	x0, #0x4                   	// #4
+  200e54:	2a0503e6 	mov	w6, w5
+  200e58:	d0000004 	adrp	x4, 202000 <_vsnprintf+0xc30>
+  200e5c:	9128a084 	add	x4, x4, #0xa28
+  200e60:	aa0003e5 	mov	x5, x0
+  200e64:	aa1203e3 	mov	x3, x18
+  200e68:	aa1103e2 	mov	x2, x17
+  200e6c:	aa1003e1 	mov	x1, x16
+  200e70:	aa0f03e0 	mov	x0, x15
+  200e74:	17fffe3b 	b	200760 <_out_rev>
+    value = 0 - value;
+  200e78:	2f00e401 	movi	d1, #0x0
+    negative = true;
+  200e7c:	52800023 	mov	w3, #0x1                   	// #1
+    value = 0 - value;
+  200e80:	1e603820 	fsub	d0, d1, d0
+  if (!(flags & FLAGS_PRECISION)) {
+  200e84:	3757f1c7 	tbnz	w7, #10, 200cbc <_ftoa+0x7c>
+  200e88:	d2d09000 	mov	x0, #0x848000000000        	// #145685290680320
+  200e8c:	910043ec 	add	x12, sp, #0x10
+  200e90:	f2e825c0 	movk	x0, #0x412e, lsl #48
+    prec = PRINTF_DEFAULT_FLOAT_PRECISION;
+  200e94:	528000c4 	mov	w4, #0x6                   	// #6
+  200e98:	9e670002 	fmov	d2, x0
+  200e9c:	d2800008 	mov	x8, #0x0                   	// #0
+  200ea0:	17ffff96 	b	200cf8 <_ftoa+0xb8>
+    return _etoa(out, buffer, idx, maxlen, value, prec, width, flags);
+  200ea4:	2a0703e6 	mov	w6, w7
+  200ea8:	aa1203e3 	mov	x3, x18
+  200eac:	aa1103e2 	mov	x2, x17
+  200eb0:	aa1003e1 	mov	x1, x16
+  200eb4:	aa0f03e0 	mov	x0, x15
+  200eb8:	14000062 	b	201040 <_etoa>
+    return _out_rev(out, buffer, idx, maxlen, "fni-", 4, width, flags);
+  200ebc:	2a0503e6 	mov	w6, w5
+  200ec0:	d0000004 	adrp	x4, 202000 <_vsnprintf+0xc30>
+  200ec4:	d2800085 	mov	x5, #0x4                   	// #4
+  200ec8:	91290084 	add	x4, x4, #0xa40
+  200ecc:	17fffe25 	b	200760 <_out_rev>
+  200ed0:	51008081 	sub	w1, w4, #0x20
+      buf[len++] = (char)(48U + (frac % 10U));
+  200ed4:	b202e7e2 	mov	x2, #0xcccccccccccccccc    	// #-3689348814741910324
+  200ed8:	0b080021 	add	w1, w1, w8
+  200edc:	f29999a2 	movk	x2, #0xcccd
+  200ee0:	1400000d 	b	200f14 <_ftoa+0x2d4>
+  200ee4:	d343fd6b 	lsr	x11, x11, #3
+      if (!(frac /= 10U)) {
+  200ee8:	f10025df 	cmp	x14, #0x9
+      --count;
+  200eec:	51000480 	sub	w0, w4, #0x1
+      buf[len++] = (char)(48U + (frac % 10U));
+  200ef0:	91000509 	add	x9, x8, #0x1
+  200ef4:	8b0b096d 	add	x13, x11, x11, lsl #2
+  200ef8:	cb0d05cd 	sub	x13, x14, x13, lsl #1
+      if (!(frac /= 10U)) {
+  200efc:	aa0b03ee 	mov	x14, x11
+      buf[len++] = (char)(48U + (frac % 10U));
+  200f00:	1100c1ab 	add	w11, w13, #0x30
+  200f04:	3828698b 	strb	w11, [x12, x8]
+      if (!(frac /= 10U)) {
+  200f08:	54000349 	b.ls	200f70 <_ftoa+0x330>  // b.plast
+      --count;
+  200f0c:	2a0003e4 	mov	w4, w0
+      buf[len++] = (char)(48U + (frac % 10U));
+  200f10:	aa0903e8 	mov	x8, x9
+  200f14:	9bc27dcb 	umulh	x11, x14, x2
+    while (len < PRINTF_FTOA_BUFFER_SIZE) {
+  200f18:	6b01009f 	cmp	w4, w1
+  200f1c:	54fffe41 	b.ne	200ee4 <_ftoa+0x2a4>  // b.any
+      buf[len++] = (char)(48U + (frac % 10U));
+  200f20:	d2800408 	mov	x8, #0x20                  	// #32
+  200f24:	17ffff8b 	b	200d50 <_ftoa+0x110>
+    ++frac;
+  200f28:	910005ce 	add	x14, x14, #0x1
+    if (frac >= pow10[prec]) {
+  200f2c:	9e6301c1 	ucvtf	d1, x14
+  200f30:	1e622030 	fcmpe	d1, d2
+  200f34:	5400004a 	b.ge	200f3c <_ftoa+0x2fc>  // b.tcont
+  200f38:	17ffff7e 	b	200d30 <_ftoa+0xf0>
+      ++whole;
+  200f3c:	1100054a 	add	w10, w10, #0x1
+      frac = 0;
+  200f40:	d280000e 	mov	x14, #0x0                   	// #0
+  200f44:	17ffff7b 	b	200d30 <_ftoa+0xf0>
+  if (!(flags & FLAGS_LEFT) && (flags & FLAGS_ZEROPAD)) {
+  200f48:	120004e0 	and	w0, w7, #0x3
+  200f4c:	7100041f 	cmp	w0, #0x1
+  200f50:	54000700 	b.eq	201030 <_ftoa+0x3f0>  // b.none
+  if (len < PRINTF_FTOA_BUFFER_SIZE) {
+  200f54:	f100811f 	cmp	x8, #0x20
+  200f58:	54fff480 	b.eq	200de8 <_ftoa+0x1a8>  // b.none
+    if (negative) {
+  200f5c:	34000323 	cbz	w3, 200fc0 <_ftoa+0x380>
+      buf[len++] = '-';
+  200f60:	528005a0 	mov	w0, #0x2d                  	// #45
+  200f64:	38286980 	strb	w0, [x12, x8]
+  200f68:	91000508 	add	x8, x8, #0x1
+  200f6c:	17ffff9f 	b	200de8 <_ftoa+0x1a8>
+    while ((len < PRINTF_FTOA_BUFFER_SIZE) && (count-- > 0U)) {
+  200f70:	f100813f 	cmp	x9, #0x20
+  200f74:	54fffd60 	b.eq	200f20 <_ftoa+0x2e0>  // b.none
+  200f78:	91000908 	add	x8, x8, #0x2
+  200f7c:	51000884 	sub	w4, w4, #0x2
+  200f80:	8b040108 	add	x8, x8, x4
+      buf[len++] = '0';
+  200f84:	52800601 	mov	w1, #0x30                  	// #48
+    while ((len < PRINTF_FTOA_BUFFER_SIZE) && (count-- > 0U)) {
+  200f88:	35000080 	cbnz	w0, 200f98 <_ftoa+0x358>
+  200f8c:	14000013 	b	200fd8 <_ftoa+0x398>
+  200f90:	eb08013f 	cmp	x9, x8
+  200f94:	54000220 	b.eq	200fd8 <_ftoa+0x398>  // b.none
+      buf[len++] = '0';
+  200f98:	91000529 	add	x9, x9, #0x1
+  200f9c:	8b090180 	add	x0, x12, x9
+    while ((len < PRINTF_FTOA_BUFFER_SIZE) && (count-- > 0U)) {
+  200fa0:	f100813f 	cmp	x9, #0x20
+      buf[len++] = '0';
+  200fa4:	381ff001 	sturb	w1, [x0, #-1]
+    while ((len < PRINTF_FTOA_BUFFER_SIZE) && (count-- > 0U)) {
+  200fa8:	54ffff41 	b.ne	200f90 <_ftoa+0x350>  // b.any
+      buf[len++] = (char)(48U + (frac % 10U));
+  200fac:	d2800408 	mov	x8, #0x20                  	// #32
+  200fb0:	17ffff68 	b	200d50 <_ftoa+0x110>
+  if (len < PRINTF_FTOA_BUFFER_SIZE) {
+  200fb4:	f100811f 	cmp	x8, #0x20
+  200fb8:	54fff180 	b.eq	200de8 <_ftoa+0x1a8>  // b.none
+  200fbc:	d503201f 	nop
+    else if (flags & FLAGS_PLUS) {
+  200fc0:	37100147 	tbnz	w7, #2, 200fe8 <_ftoa+0x3a8>
+    else if (flags & FLAGS_SPACE) {
+  200fc4:	361ff127 	tbz	w7, #3, 200de8 <_ftoa+0x1a8>
+      buf[len++] = ' ';
+  200fc8:	52800400 	mov	w0, #0x20                  	// #32
+  200fcc:	38286980 	strb	w0, [x12, x8]
+  200fd0:	91000508 	add	x8, x8, #0x1
+  200fd4:	17ffff85 	b	200de8 <_ftoa+0x1a8>
+      buf[len++] = '.';
+  200fd8:	528005c0 	mov	w0, #0x2e                  	// #46
+  200fdc:	91000528 	add	x8, x9, #0x1
+  200fe0:	38296980 	strb	w0, [x12, x9]
+  200fe4:	17ffff5b 	b	200d50 <_ftoa+0x110>
+      buf[len++] = '+';  // ignore the space if the '+' exists
+  200fe8:	52800560 	mov	w0, #0x2b                  	// #43
+  200fec:	38286980 	strb	w0, [x12, x8]
+  200ff0:	91000508 	add	x8, x8, #0x1
+  200ff4:	17ffff7d 	b	200de8 <_ftoa+0x1a8>
+  else if ((frac == 0U) || (frac & 1U)) {
+  200ff8:	3607e9ce 	tbz	w14, #0, 200d30 <_ftoa+0xf0>
+    ++frac;
+  200ffc:	910005ce 	add	x14, x14, #0x1
+  201000:	17ffff4c 	b	200d30 <_ftoa+0xf0>
+      width--;
+  201004:	510004a2 	sub	w2, w5, #0x1
+  201008:	aa0203e5 	mov	x5, x2
+    while ((len < width) && (len < PRINTF_FTOA_BUFFER_SIZE)) {
+  20100c:	eb08005f 	cmp	x2, x8
+  201010:	54ffed48 	b.hi	200db8 <_ftoa+0x178>  // b.pmore
+  201014:	17ffffd0 	b	200f54 <_ftoa+0x314>
+  double tmp = (value - whole) * pow10[prec];
+  201018:	b0000000 	adrp	x0, 202000 <_vsnprintf+0xc30>
+  20101c:	9122c000 	add	x0, x0, #0x8b0
+  201020:	910043ec 	add	x12, sp, #0x10
+  201024:	d2800008 	mov	x8, #0x0                   	// #0
+  201028:	fc645802 	ldr	d2, [x0, w4, uxtw #3]
+  20102c:	17ffff33 	b	200cf8 <_ftoa+0xb8>
+    if (width && (negative || (flags & (FLAGS_PLUS | FLAGS_SPACE)))) {
+  201030:	34fff925 	cbz	w5, 200f54 <_ftoa+0x314>
+  201034:	17ffff5b 	b	200da0 <_ftoa+0x160>
+  201038:	d503201f 	nop
+  20103c:	d503201f 	nop
+
+0000000000201040 <_etoa>:
+
+
+#if defined(PRINTF_SUPPORT_EXPONENTIAL)
+// internal ftoa variant for exponential floating-point type, contributed by Martijn Jasperse <m.jasperse@gmail.com>
+static size_t _etoa(out_fct_type out, char* buffer, size_t idx, size_t maxlen, double value, unsigned int prec, unsigned int width, unsigned int flags)
+{
+  201040:	d10203ff 	sub	sp, sp, #0x80
+  // check for NaN and special values
+  if ((value != value) || (value > DBL_MAX) || (value < -DBL_MAX)) {
+  201044:	1e602000 	fcmp	d0, d0
+{
+  201048:	a9017bfd 	stp	x29, x30, [sp, #16]
+  20104c:	910043fd 	add	x29, sp, #0x10
+  201050:	a90253f3 	stp	x19, x20, [sp, #32]
+  201054:	aa0203f3 	mov	x19, x2
+  201058:	2a0603f4 	mov	w20, w6
+  20105c:	a9035bf5 	stp	x21, x22, [sp, #48]
+  201060:	aa0003f6 	mov	x22, x0
+  201064:	a90463f7 	stp	x23, x24, [sp, #64]
+  201068:	aa0103f7 	mov	x23, x1
+  20106c:	aa0303f8 	mov	x24, x3
+  201070:	a90673fb 	stp	x27, x28, [sp, #96]
+  201074:	2a0503fb 	mov	w27, w5
+  if ((value != value) || (value > DBL_MAX) || (value < -DBL_MAX)) {
+  201078:	54001301 	b.ne	2012d8 <_etoa+0x298>  // b.any
+  20107c:	92f00200 	mov	x0, #0x7fefffffffffffff    	// #9218868437227405311
+  201080:	9e670001 	fmov	d1, x0
+  201084:	1e612010 	fcmpe	d0, d1
+  201088:	5400128c 	b.gt	2012d8 <_etoa+0x298>
+  20108c:	92e00200 	mov	x0, #0xffefffffffffffff    	// #-4503599627370497
+  201090:	9e670001 	fmov	d1, x0
+  201094:	1e612010 	fcmpe	d0, d1
+  201098:	54001204 	b.mi	2012d8 <_etoa+0x298>  // b.first
+    return _ftoa(out, buffer, idx, maxlen, value, prec, width, flags);
+  }
+
+  // determine the sign
+  const bool negative = value < 0;
+  if (negative) {
+  20109c:	1e602018 	fcmpe	d0, #0.0
+  2010a0:	1e614002 	fneg	d2, d0
+
+  conv.F = value;
+  int exp2 = (int)((conv.U >> 52U) & 0x07FFU) - 1023;           // effectively log2
+  conv.U = (conv.U & ((1ULL << 52U) - 1U)) | (1023ULL << 52U);  // drop the exponent so conv.F is now in [1,2)
+  // now approximate log10 from the log2 integer part and an expansion of ln around 1.5
+  int expval = (int)(0.1760912590558 + exp2 * 0.301029995663981 + (conv.F - 1.5) * 0.289529654602168);
+  2010a4:	b0000000 	adrp	x0, 202000 <_vsnprintf+0xc30>
+  2010a8:	fd457016 	ldr	d22, [x0, #2784]
+  2010ac:	b0000000 	adrp	x0, 202000 <_vsnprintf+0xc30>
+  2010b0:	fd457401 	ldr	d1, [x0, #2792]
+  2010b4:	b0000000 	adrp	x0, 202000 <_vsnprintf+0xc30>
+  2010b8:	fd457815 	ldr	d21, [x0, #2800]
+  2010bc:	1e604c42 	fcsel	d2, d2, d0, mi	// mi = first
+  // now we want to compute 10^expval but we want to be sure it won't overflow
+  exp2 = (int)(expval * 3.321928094887362 + 0.5);
+  2010c0:	b0000000 	adrp	x0, 202000 <_vsnprintf+0xc30>
+  2010c4:	fd457c14 	ldr	d20, [x0, #2808]
+  const double z  = expval * 2.302585092994046 - exp2 * 0.6931471805599453;
+  2010c8:	b0000000 	adrp	x0, 202000 <_vsnprintf+0xc30>
+  2010cc:	fd458013 	ldr	d19, [x0, #2816]
+  2010d0:	b0000000 	adrp	x0, 202000 <_vsnprintf+0xc30>
+  2010d4:	fd458412 	ldr	d18, [x0, #2824]
+  int expval = (int)(0.1760912590558 + exp2 * 0.301029995663981 + (conv.F - 1.5) * 0.289529654602168);
+  2010d8:	1e6f1018 	fmov	d24, #1.500000000000000000e+00
+  conv.F = value;
+  2010dc:	9e660040 	fmov	x0, d2
+  2010e0:	a9056bf9 	stp	x25, x26, [sp, #80]
+  exp2 = (int)(expval * 3.321928094887362 + 0.5);
+  2010e4:	1e6c1005 	fmov	d5, #5.000000000000000000e-01
+  const double z2 = z * z;
+  conv.U = (uint64_t)(exp2 + 1023) << 52U;
+  // compute exp(z) using continued fractions, see https://en.wikipedia.org/wiki/Exponential_function#Continued_fractions_for_ex
+  conv.F *= 1 + 2 * z / (2 - z + (z2 / (6 + (z2 / (10 + z2 / 14)))));
+  2010e8:	1e659003 	fmov	d3, #1.400000000000000000e+01
+  2010ec:	1e649007 	fmov	d7, #1.000000000000000000e+01
+  2010f0:	1e631011 	fmov	d17, #6.000000000000000000e+00
+  2010f4:	1e601006 	fmov	d6, #2.000000000000000000e+00
+  conv.U = (conv.U & ((1ULL << 52U) - 1U)) | (1023ULL << 52U);  // drop the exponent so conv.F is now in [1,2)
+  2010f8:	9240cc01 	and	x1, x0, #0xfffffffffffff
+  int exp2 = (int)((conv.U >> 52U) & 0x07FFU) - 1023;           // effectively log2
+  2010fc:	d374f800 	ubfx	x0, x0, #52, #11
+  201100:	510ffc00 	sub	w0, w0, #0x3ff
+  conv.U = (conv.U & ((1ULL << 52U) - 1U)) | (1023ULL << 52U);  // drop the exponent so conv.F is now in [1,2)
+  201104:	b24c2421 	orr	x1, x1, #0x3ff0000000000000
+  201108:	9e670024 	fmov	d4, x1
+  conv.F *= 1 + 2 * z / (2 - z + (z2 / (6 + (z2 / (10 + z2 / 14)))));
+  20110c:	1e6e1010 	fmov	d16, #1.000000000000000000e+00
+  int expval = (int)(0.1760912590558 + exp2 * 0.301029995663981 + (conv.F - 1.5) * 0.289529654602168);
+  201110:	1e620017 	scvtf	d23, w0
+    prec = PRINTF_DEFAULT_FLOAT_PRECISION;
+  201114:	721600c3 	ands	w3, w6, #0x400
+  int expval = (int)(0.1760912590558 + exp2 * 0.301029995663981 + (conv.F - 1.5) * 0.289529654602168);
+  201118:	1e783884 	fsub	d4, d4, d24
+    prec = PRINTF_DEFAULT_FLOAT_PRECISION;
+  20111c:	528000c2 	mov	w2, #0x6                   	// #6
+  201120:	1a821084 	csel	w4, w4, w2, ne	// ne = any
+  int expval = (int)(0.1760912590558 + exp2 * 0.301029995663981 + (conv.F - 1.5) * 0.289529654602168);
+  201124:	1f5606e1 	fmadd	d1, d23, d22, d1
+  201128:	1f550481 	fmadd	d1, d4, d21, d1
+  20112c:	1e780039 	fcvtzs	w25, d1
+  exp2 = (int)(expval * 3.321928094887362 + 0.5);
+  201130:	1e620324 	scvtf	d4, w25
+  201134:	1f541481 	fmadd	d1, d4, d20, d5
+  201138:	1e780020 	fcvtzs	w0, d1
+  const double z  = expval * 2.302585092994046 - exp2 * 0.6931471805599453;
+  20113c:	1e620001 	scvtf	d1, w0
+  conv.U = (uint64_t)(exp2 + 1023) << 52U;
+  201140:	110ffc00 	add	w0, w0, #0x3ff
+  201144:	9e670005 	fmov	d5, x0
+  201148:	5f7454a5 	shl	d5, d5, #52
+  const double z  = expval * 2.302585092994046 - exp2 * 0.6931471805599453;
+  20114c:	1e730821 	fmul	d1, d1, d19
+  201150:	1f728481 	fnmsub	d1, d4, d18, d1
+  const double z2 = z * z;
+  201154:	1e610824 	fmul	d4, d1, d1
+  conv.F *= 1 + 2 * z / (2 - z + (z2 / (6 + (z2 / (10 + z2 / 14)))));
+  201158:	1e6138c6 	fsub	d6, d6, d1
+  20115c:	1e612821 	fadd	d1, d1, d1
+  201160:	1e631883 	fdiv	d3, d4, d3
+  201164:	1e672863 	fadd	d3, d3, d7
+  201168:	1e631883 	fdiv	d3, d4, d3
+  20116c:	1e712863 	fadd	d3, d3, d17
+  201170:	1e631884 	fdiv	d4, d4, d3
+  201174:	1e662884 	fadd	d4, d4, d6
+  201178:	1e641821 	fdiv	d1, d1, d4
+  20117c:	1e702821 	fadd	d1, d1, d16
+  201180:	1e650821 	fmul	d1, d1, d5
+  // correct for rounding errors
+  if (value < conv.F) {
+  201184:	1e612050 	fcmpe	d2, d1
+  201188:	54000c24 	b.mi	20130c <_etoa+0x2cc>  // b.first
+    expval--;
+    conv.F /= 10;
+  }
+
+  // the exponent format is "%+03d" and largest value is "307", so set aside 4-5 characters
+  unsigned int minwidth = ((expval < 100) && (expval > -100)) ? 4U : 5U;
+  20118c:	11018f20 	add	w0, w25, #0x63
+  201190:	7103181f 	cmp	w0, #0xc6
+  201194:	1a9f97fc 	cset	w28, hi	// hi = pmore
+  201198:	1100139c 	add	w28, w28, #0x4
+
+  // in "%g" mode, "prec" is the number of *significant figures* not decimals
+  if (flags & FLAGS_ADAPT_EXP) {
+  20119c:	36580134 	tbz	w20, #11, 2011c0 <_etoa+0x180>
+    // do we want to fall-back to "%f" mode?
+    if ((value >= 1e-4) && (value < 1e6)) {
+  2011a0:	b0000000 	adrp	x0, 202000 <_vsnprintf+0xc30>
+  2011a4:	fd458803 	ldr	d3, [x0, #2832]
+  2011a8:	1e632050 	fcmpe	d2, d3
+  2011ac:	54000d2a 	b.ge	201350 <_etoa+0x310>  // b.tcont
+      minwidth = 0U;
+      expval   = 0;
+    }
+    else {
+      // we use one sigfig for the whole part
+      if ((prec > 0) && (flags & FLAGS_PRECISION)) {
+  2011b0:	34000084 	cbz	w4, 2011c0 <_etoa+0x180>
+        --prec;
+  2011b4:	7100007f 	cmp	w3, #0x0
+  2011b8:	1a9f07e0 	cset	w0, ne	// ne = any
+  2011bc:	4b000084 	sub	w4, w4, w0
+
+  // will everything fit?
+  unsigned int fwidth = width;
+  if (width > minwidth) {
+    // we didn't fall-back so subtract the characters required for the exponent
+    fwidth -= minwidth;
+  2011c0:	6b1c0365 	subs	w5, w27, w28
+  } else {
+    // not enough characters, so go back to default sizing
+    fwidth = 0U;
+  }
+  if ((flags & FLAGS_LEFT) && minwidth) {
+  2011c4:	121f0280 	and	w0, w20, #0x2
+    fwidth -= minwidth;
+  2011c8:	1a9f80a5 	csel	w5, w5, wzr, hi	// hi = pmore
+  if ((flags & FLAGS_LEFT) && minwidth) {
+  2011cc:	7100001f 	cmp	w0, #0x0
+  2011d0:	1a9f07e0 	cset	w0, ne	// ne = any
+  2011d4:	b9007fe0 	str	w0, [sp, #124]
+  2011d8:	1a9f00a5 	csel	w5, w5, wzr, eq	// eq = none
+    // if we're padding on the right, DON'T pad the floating part
+    fwidth = 0U;
+  }
+
+  // rescale the float value
+  if (expval) {
+  2011dc:	5280003a 	mov	w26, #0x1                   	// #1
+  2011e0:	34000059 	cbz	w25, 2011e8 <_etoa+0x1a8>
+    value /= conv.F;
+  2011e4:	1e611842 	fdiv	d2, d2, d1
+  }
+
+  // output the floating part
+  const size_t start_idx = idx;
+  idx = _ftoa(out, buffer, idx, maxlen, negative ? -value : value, prec, fwidth, flags & ~FLAGS_ADAPT_EXP);
+  2011e8:	1e602018 	fcmpe	d0, #0.0
+  2011ec:	54000ae4 	b.mi	201348 <_etoa+0x308>  // b.first
+  2011f0:	1e604040 	fmov	d0, d2
+  2011f4:	12147a86 	and	w6, w20, #0xfffff7ff
+  2011f8:	aa1803e3 	mov	x3, x24
+  2011fc:	aa1303e2 	mov	x2, x19
+  201200:	aa1703e1 	mov	x1, x23
+  201204:	aa1603e0 	mov	x0, x22
+  201208:	97fffe8e 	bl	200c40 <_ftoa>
+  20120c:	aa0003f5 	mov	x21, x0
+
+  // output the exponent part
+  if (minwidth) {
+  201210:	3400053a 	cbz	w26, 2012b4 <_etoa+0x274>
+    // output the exponential symbol
+    out((flags & FLAGS_UPPERCASE) ? 'E' : 'e', buffer, idx++, maxlen);
+  201214:	721b0294 	ands	w20, w20, #0x20
+  201218:	52800ca1 	mov	w1, #0x65                  	// #101
+  20121c:	aa1503e2 	mov	x2, x21
+  201220:	aa1803e3 	mov	x3, x24
+  201224:	528008a0 	mov	w0, #0x45                  	// #69
+  201228:	1a800020 	csel	w0, w1, w0, eq	// eq = none
+  20122c:	aa1703e1 	mov	x1, x23
+  201230:	d63f02c0 	blr	x22
+    // output the exponent value
+    idx = _ntoa_long(out, buffer, idx, maxlen, (expval < 0) ? -expval : expval, expval < 0, 10, 0, minwidth-1, FLAGS_ZEROPAD | FLAGS_PLUS);
+  201234:	7100033f 	cmp	w25, #0x0
+  201238:	528000a0 	mov	w0, #0x5                   	// #5
+  20123c:	5a99a724 	cneg	w4, w25, lt	// lt = tstop
+  201240:	5100079c 	sub	w28, w28, #0x1
+  201244:	b90003fc 	str	w28, [sp]
+    out((flags & FLAGS_UPPERCASE) ? 'E' : 'e', buffer, idx++, maxlen);
+  201248:	910006b4 	add	x20, x21, #0x1
+    idx = _ntoa_long(out, buffer, idx, maxlen, (expval < 0) ? -expval : expval, expval < 0, 10, 0, minwidth-1, FLAGS_ZEROPAD | FLAGS_PLUS);
+  20124c:	b9000be0 	str	w0, [sp, #8]
+  201250:	aa1403e2 	mov	x2, x20
+  201254:	93407c84 	sxtw	x4, w4
+  201258:	531f7f25 	lsr	w5, w25, #31
+  20125c:	aa1803e3 	mov	x3, x24
+  201260:	aa1703e1 	mov	x1, x23
+  201264:	aa1603e0 	mov	x0, x22
+  201268:	52800007 	mov	w7, #0x0                   	// #0
+  20126c:	d2800146 	mov	x6, #0xa                   	// #10
+  201270:	97fffd84 	bl	200880 <_ntoa_long>
+  201274:	aa0003f5 	mov	x21, x0
+    // might need to right-pad spaces
+    if (flags & FLAGS_LEFT) {
+  201278:	b9407fe0 	ldr	w0, [sp, #124]
+  20127c:	340001c0 	cbz	w0, 2012b4 <_etoa+0x274>
+      while (idx - start_idx < width) out(' ', buffer, idx++, maxlen);
+  201280:	cb1302b3 	sub	x19, x21, x19
+  201284:	eb1b027f 	cmp	x19, x27
+  201288:	54000162 	b.cs	2012b4 <_etoa+0x274>  // b.hs, b.nlast
+  20128c:	d503201f 	nop
+  201290:	aa1503e2 	mov	x2, x21
+  201294:	aa1803e3 	mov	x3, x24
+  201298:	aa1703e1 	mov	x1, x23
+  20129c:	91000673 	add	x19, x19, #0x1
+  2012a0:	52800400 	mov	w0, #0x20                  	// #32
+  2012a4:	d63f02c0 	blr	x22
+  2012a8:	910006b5 	add	x21, x21, #0x1
+  2012ac:	eb13037f 	cmp	x27, x19
+  2012b0:	54ffff08 	b.hi	201290 <_etoa+0x250>  // b.pmore
+    }
+  }
+  return idx;
+}
+  2012b4:	a9417bfd 	ldp	x29, x30, [sp, #16]
+  2012b8:	aa1503e0 	mov	x0, x21
+  2012bc:	a94253f3 	ldp	x19, x20, [sp, #32]
+  2012c0:	a9435bf5 	ldp	x21, x22, [sp, #48]
+  2012c4:	a94463f7 	ldp	x23, x24, [sp, #64]
+  2012c8:	a9456bf9 	ldp	x25, x26, [sp, #80]
+  2012cc:	a94673fb 	ldp	x27, x28, [sp, #96]
+  2012d0:	910203ff 	add	sp, sp, #0x80
+  2012d4:	d65f03c0 	ret
+    return _ftoa(out, buffer, idx, maxlen, value, prec, width, flags);
+  2012d8:	2a1403e6 	mov	w6, w20
+  2012dc:	2a1b03e5 	mov	w5, w27
+  2012e0:	aa1803e3 	mov	x3, x24
+  2012e4:	aa1303e2 	mov	x2, x19
+  2012e8:	aa1703e1 	mov	x1, x23
+  2012ec:	aa1603e0 	mov	x0, x22
+}
+  2012f0:	a9417bfd 	ldp	x29, x30, [sp, #16]
+  2012f4:	a94253f3 	ldp	x19, x20, [sp, #32]
+  2012f8:	a9435bf5 	ldp	x21, x22, [sp, #48]
+  2012fc:	a94463f7 	ldp	x23, x24, [sp, #64]
+  201300:	a94673fb 	ldp	x27, x28, [sp, #96]
+  201304:	910203ff 	add	sp, sp, #0x80
+  idx = _ftoa(out, buffer, idx, maxlen, negative ? -value : value, prec, fwidth, flags & ~FLAGS_ADAPT_EXP);
+  201308:	17fffe4e 	b	200c40 <_ftoa>
+    conv.F /= 10;
+  20130c:	1e671821 	fdiv	d1, d1, d7
+    expval--;
+  201310:	51000739 	sub	w25, w25, #0x1
+  unsigned int minwidth = ((expval < 100) && (expval > -100)) ? 4U : 5U;
+  201314:	11018f20 	add	w0, w25, #0x63
+  201318:	7103181f 	cmp	w0, #0xc6
+  20131c:	1a9f97fc 	cset	w28, hi	// hi = pmore
+  201320:	1100139c 	add	w28, w28, #0x4
+  if (flags & FLAGS_ADAPT_EXP) {
+  201324:	365ff4f4 	tbz	w20, #11, 2011c0 <_etoa+0x180>
+  201328:	17ffff9e 	b	2011a0 <_etoa+0x160>
+      flags |= FLAGS_PRECISION;   // make sure _ftoa respects precision
+  20132c:	2a0103f4 	mov	w20, w1
+    fwidth = 0U;
+  201330:	52800005 	mov	w5, #0x0                   	// #0
+      minwidth = 0U;
+  201334:	5280001c 	mov	w28, #0x0                   	// #0
+      expval   = 0;
+  201338:	52800019 	mov	w25, #0x0                   	// #0
+  if ((flags & FLAGS_LEFT) && minwidth) {
+  20133c:	5280001a 	mov	w26, #0x0                   	// #0
+  201340:	b9007fff 	str	wzr, [sp, #124]
+  201344:	d503201f 	nop
+  idx = _ftoa(out, buffer, idx, maxlen, negative ? -value : value, prec, fwidth, flags & ~FLAGS_ADAPT_EXP);
+  201348:	1e614042 	fneg	d2, d2
+  20134c:	17ffffa9 	b	2011f0 <_etoa+0x1b0>
+    if ((value >= 1e-4) && (value < 1e6)) {
+  201350:	d2d09000 	mov	x0, #0x848000000000        	// #145685290680320
+  201354:	f2e825c0 	movk	x0, #0x412e, lsl #48
+  201358:	9e670003 	fmov	d3, x0
+  20135c:	1e632050 	fcmpe	d2, d3
+  201360:	54000044 	b.mi	201368 <_etoa+0x328>  // b.first
+  201364:	17ffff93 	b	2011b0 <_etoa+0x170>
+        prec = (unsigned)((int)prec - expval - 1);
+  201368:	4b190080 	sub	w0, w4, w25
+  20136c:	6b04033f 	cmp	w25, w4
+  201370:	51000400 	sub	w0, w0, #0x1
+      flags |= FLAGS_PRECISION;   // make sure _ftoa respects precision
+  201374:	32160281 	orr	w1, w20, #0x400
+        prec = (unsigned)((int)prec - expval - 1);
+  201378:	1a9fb004 	csel	w4, w0, wzr, lt	// lt = tstop
+  if (width > minwidth) {
+  20137c:	350001bb 	cbnz	w27, 2013b0 <_etoa+0x370>
+  idx = _ftoa(out, buffer, idx, maxlen, negative ? -value : value, prec, fwidth, flags & ~FLAGS_ADAPT_EXP);
+  201380:	1e602018 	fcmpe	d0, #0.0
+  201384:	54fffd44 	b.mi	20132c <_etoa+0x2ec>  // b.first
+  201388:	12147a86 	and	w6, w20, #0xfffff7ff
+  20138c:	1e604040 	fmov	d0, d2
+  201390:	a9456bf9 	ldp	x25, x26, [sp, #80]
+  201394:	321600c6 	orr	w6, w6, #0x400
+  201398:	aa1803e3 	mov	x3, x24
+  20139c:	aa1303e2 	mov	x2, x19
+  2013a0:	aa1703e1 	mov	x1, x23
+  2013a4:	aa1603e0 	mov	x0, x22
+  2013a8:	52800005 	mov	w5, #0x0                   	// #0
+  2013ac:	17ffffd1 	b	2012f0 <_etoa+0x2b0>
+      flags |= FLAGS_PRECISION;   // make sure _ftoa respects precision
+  2013b0:	2a0103f4 	mov	w20, w1
+    fwidth -= minwidth;
+  2013b4:	2a1b03e5 	mov	w5, w27
+  if (width > minwidth) {
+  2013b8:	5280001a 	mov	w26, #0x0                   	// #0
+  2013bc:	52800019 	mov	w25, #0x0                   	// #0
+      minwidth = 0U;
+  2013c0:	5280001c 	mov	w28, #0x0                   	// #0
+  if (width > minwidth) {
+  2013c4:	b9007fff 	str	wzr, [sp, #124]
+  2013c8:	17ffff88 	b	2011e8 <_etoa+0x1a8>
+  2013cc:	d503201f 	nop
+
+00000000002013d0 <_vsnprintf>:
+#endif  // PRINTF_SUPPORT_FLOAT
+
+
+// internal vsnprintf
+static int _vsnprintf(out_fct_type out, char* buffer, const size_t maxlen, const char* format, va_list va)
+{
+  2013d0:	d102c3ff 	sub	sp, sp, #0xb0
+  unsigned int flags, width, precision, n;
+  size_t idx = 0U;
+
+  if (!buffer) {
+    // use null output function
+    out = _out_null;
+  2013d4:	f100003f 	cmp	x1, #0x0
+{
+  2013d8:	a9017bfd 	stp	x29, x30, [sp, #16]
+  2013dc:	910043fd 	add	x29, sp, #0x10
+  2013e0:	a90253f3 	stp	x19, x20, [sp, #32]
+    out = _out_null;
+  2013e4:	f0fffff3 	adrp	x19, 200000 <_start>
+  2013e8:	911d4273 	add	x19, x19, #0x750
+{
+  2013ec:	a9035bf5 	stp	x21, x22, [sp, #48]
+    out = _out_null;
+  2013f0:	9a800273 	csel	x19, x19, x0, eq	// eq = none
+{
+  2013f4:	aa0103f5 	mov	x21, x1
+  2013f8:	a90463f7 	stp	x23, x24, [sp, #64]
+  2013fc:	aa0203f4 	mov	x20, x2
+  201400:	a9056bf9 	stp	x25, x26, [sp, #80]
+  201404:	b940189a 	ldr	w26, [x4, #24]
+  201408:	a90673fb 	stp	x27, x28, [sp, #96]
+  }
+
+  while (*format)
+  20140c:	d280001c 	mov	x28, #0x0                   	// #0
+  201410:	f9400880 	ldr	x0, [x4, #16]
+  201414:	f9004fe0 	str	x0, [sp, #152]
+  201418:	39400061 	ldrb	w1, [x3]
+  20141c:	a9400897 	ldp	x23, x2, [x4]
+  201420:	f90047e2 	str	x2, [sp, #136]
+  201424:	b9401c80 	ldr	w0, [x4, #28]
+  201428:	b9007fe0 	str	w0, [sp, #124]
+  20142c:	34004001 	cbz	w1, 201c2c <_vsnprintf+0x85c>
+  201430:	aa0303fb 	mov	x27, x3
+  201434:	52800158 	mov	w24, #0xa                   	// #10
+  201438:	14000009 	b	20145c <_vsnprintf+0x8c>
+        out('%', buffer, idx++, maxlen);
+        format++;
+        break;
+
+      default :
+        out(*format, buffer, idx++, maxlen);
+  20143c:	91000796 	add	x22, x28, #0x1
+  201440:	aa1c03e2 	mov	x2, x28
+  201444:	aa1603fc 	mov	x28, x22
+  201448:	aa1403e3 	mov	x3, x20
+  20144c:	aa1503e1 	mov	x1, x21
+  201450:	d63f0260 	blr	x19
+  while (*format)
+  201454:	39400361 	ldrb	w1, [x27]
+  201458:	34001241 	cbz	w1, 2016a0 <_vsnprintf+0x2d0>
+      format++;
+  20145c:	9100077b 	add	x27, x27, #0x1
+      out(*format, buffer, idx++, maxlen);
+  201460:	2a0103e0 	mov	w0, w1
+    if (*format != '%') {
+  201464:	7100943f 	cmp	w1, #0x25
+  201468:	54fffea1 	b.ne	20143c <_vsnprintf+0x6c>  // b.any
+      switch (*format) {
+  20146c:	aa1b03e1 	mov	x1, x27
+    flags = 0U;
+  201470:	52800006 	mov	w6, #0x0                   	// #0
+      switch (*format) {
+  201474:	38401420 	ldrb	w0, [x1], #1
+  201478:	7100ac1f 	cmp	w0, #0x2b
+  20147c:	54000180 	b.eq	2014ac <_vsnprintf+0xdc>  // b.none
+  201480:	540001c8 	b.hi	2014b8 <_vsnprintf+0xe8>  // b.pmore
+  201484:	7100801f 	cmp	w0, #0x20
+  201488:	54000260 	b.eq	2014d4 <_vsnprintf+0x104>  // b.none
+  20148c:	71008c1f 	cmp	w0, #0x23
+  201490:	54000981 	b.ne	2015c0 <_vsnprintf+0x1f0>  // b.any
+        case '#': flags |= FLAGS_HASH;    format++; n = 1U; break;
+  201494:	321c00c6 	orr	w6, w6, #0x10
+  while (*format)
+  201498:	aa0103fb 	mov	x27, x1
+      switch (*format) {
+  20149c:	aa1b03e1 	mov	x1, x27
+  2014a0:	38401420 	ldrb	w0, [x1], #1
+  2014a4:	7100ac1f 	cmp	w0, #0x2b
+  2014a8:	54fffec1 	b.ne	201480 <_vsnprintf+0xb0>  // b.any
+        case '+': flags |= FLAGS_PLUS;    format++; n = 1U; break;
+  2014ac:	321e00c6 	orr	w6, w6, #0x4
+  while (*format)
+  2014b0:	aa0103fb 	mov	x27, x1
+  2014b4:	17fffffa 	b	20149c <_vsnprintf+0xcc>
+      switch (*format) {
+  2014b8:	7100b41f 	cmp	w0, #0x2d
+  2014bc:	54000120 	b.eq	2014e0 <_vsnprintf+0x110>  // b.none
+  2014c0:	7100c01f 	cmp	w0, #0x30
+  2014c4:	54000141 	b.ne	2014ec <_vsnprintf+0x11c>  // b.any
+        case '0': flags |= FLAGS_ZEROPAD; format++; n = 1U; break;
+  2014c8:	320000c6 	orr	w6, w6, #0x1
+  while (*format)
+  2014cc:	aa0103fb 	mov	x27, x1
+  2014d0:	17fffff3 	b	20149c <_vsnprintf+0xcc>
+        case ' ': flags |= FLAGS_SPACE;   format++; n = 1U; break;
+  2014d4:	321d00c6 	orr	w6, w6, #0x8
+  while (*format)
+  2014d8:	aa0103fb 	mov	x27, x1
+  2014dc:	17fffff0 	b	20149c <_vsnprintf+0xcc>
+        case '-': flags |= FLAGS_LEFT;    format++; n = 1U; break;
+  2014e0:	321f00c6 	orr	w6, w6, #0x2
+  while (*format)
+  2014e4:	aa0103fb 	mov	x27, x1
+  2014e8:	17ffffed 	b	20149c <_vsnprintf+0xcc>
+  return (ch >= '0') && (ch <= '9');
+  2014ec:	5100c002 	sub	w2, w0, #0x30
+  unsigned int i = 0U;
+  2014f0:	52800019 	mov	w25, #0x0                   	// #0
+    if (_is_digit(*format)) {
+  2014f4:	12001c42 	and	w2, w2, #0xff
+  2014f8:	7100245f 	cmp	w2, #0x9
+  2014fc:	54000148 	b.hi	201524 <_vsnprintf+0x154>  // b.pmore
+    i = i * 10U + (unsigned int)(*((*str)++) - '0');
+  201500:	1b180325 	madd	w5, w25, w24, w0
+  while (_is_digit(**str)) {
+  201504:	39400020 	ldrb	w0, [x1]
+    i = i * 10U + (unsigned int)(*((*str)++) - '0');
+  201508:	aa0103fb 	mov	x27, x1
+  20150c:	91000421 	add	x1, x1, #0x1
+  return (ch >= '0') && (ch <= '9');
+  201510:	5100c002 	sub	w2, w0, #0x30
+    i = i * 10U + (unsigned int)(*((*str)++) - '0');
+  201514:	5100c0b9 	sub	w25, w5, #0x30
+  while (_is_digit(**str)) {
+  201518:	12001c42 	and	w2, w2, #0xff
+  20151c:	7100245f 	cmp	w2, #0x9
+  201520:	54ffff09 	b.ls	201500 <_vsnprintf+0x130>  // b.plast
+    if (*format == '.') {
+  201524:	7100b81f 	cmp	w0, #0x2e
+    precision = 0U;
+  201528:	52800016 	mov	w22, #0x0                   	// #0
+    if (*format == '.') {
+  20152c:	540001a1 	b.ne	201560 <_vsnprintf+0x190>  // b.any
+      if (_is_digit(*format)) {
+  201530:	39400760 	ldrb	w0, [x27, #1]
+      flags |= FLAGS_PRECISION;
+  201534:	321600c6 	orr	w6, w6, #0x400
+      format++;
+  201538:	aa0103e2 	mov	x2, x1
+  return (ch >= '0') && (ch <= '9');
+  20153c:	5100c003 	sub	w3, w0, #0x30
+      if (_is_digit(*format)) {
+  201540:	12001c63 	and	w3, w3, #0xff
+  201544:	7100247f 	cmp	w3, #0x9
+  201548:	54002709 	b.ls	201a28 <_vsnprintf+0x658>  // b.plast
+      else if (*format == '*') {
+  20154c:	7100a81f 	cmp	w0, #0x2a
+  201550:	54002840 	b.eq	201a58 <_vsnprintf+0x688>  // b.none
+      format++;
+  201554:	aa0103fb 	mov	x27, x1
+  201558:	91000421 	add	x1, x1, #0x1
+  20155c:	d503201f 	nop
+    switch (*format) {
+  201560:	7101b01f 	cmp	w0, #0x6c
+        format++;
+  201564:	aa0103e2 	mov	x2, x1
+    switch (*format) {
+  201568:	54002060 	b.eq	201974 <_vsnprintf+0x5a4>  // b.none
+  20156c:	540004a8 	b.hi	201600 <_vsnprintf+0x230>  // b.pmore
+  201570:	7101a01f 	cmp	w0, #0x68
+  201574:	54001f60 	b.eq	201960 <_vsnprintf+0x590>  // b.none
+  201578:	7101a81f 	cmp	w0, #0x6a
+  20157c:	54002841 	b.ne	201a84 <_vsnprintf+0x6b4>  // b.any
+        if (*format == 'l') {
+  201580:	39400760 	ldrb	w0, [x27, #1]
+        flags |= (sizeof(size_t) == sizeof(long) ? FLAGS_LONG : FLAGS_LONG_LONG);
+  201584:	321800c6 	orr	w6, w6, #0x100
+        format++;
+  201588:	9100045b 	add	x27, x2, #0x1
+    switch (*format) {
+  20158c:	71019c1f 	cmp	w0, #0x67
+  201590:	54000428 	b.hi	201614 <_vsnprintf+0x244>  // b.pmore
+  201594:	7100901f 	cmp	w0, #0x24
+  201598:	54fff529 	b.ls	20143c <_vsnprintf+0x6c>  // b.plast
+  20159c:	51009401 	sub	w1, w0, #0x25
+  2015a0:	7101083f 	cmp	w1, #0x42
+  2015a4:	54fff4c8 	b.hi	20143c <_vsnprintf+0x6c>  // b.pmore
+  2015a8:	b0000002 	adrp	x2, 202000 <_vsnprintf+0xc30>
+  2015ac:	91208042 	add	x2, x2, #0x820
+  2015b0:	78615842 	ldrh	w2, [x2, w1, uxtw #1]
+  2015b4:	10000061 	adr	x1, 2015c0 <_vsnprintf+0x1f0>
+  2015b8:	8b22a822 	add	x2, x1, w2, sxth #2
+  2015bc:	d61f0040 	br	x2
+    else if (*format == '*') {
+  2015c0:	7100a81f 	cmp	w0, #0x2a
+    width = 0U;
+  2015c4:	52800019 	mov	w25, #0x0                   	// #0
+    precision = 0U;
+  2015c8:	52800016 	mov	w22, #0x0                   	// #0
+    else if (*format == '*') {
+  2015cc:	54fffca1 	b.ne	201560 <_vsnprintf+0x190>  // b.any
+      const int w = va_arg(va, int);
+  2015d0:	37f810fa 	tbnz	w26, #31, 2017ec <_vsnprintf+0x41c>
+  2015d4:	91002ee2 	add	x2, x23, #0xb
+  2015d8:	aa1703e0 	mov	x0, x23
+  2015dc:	927df057 	and	x23, x2, #0xfffffffffffffff8
+  2015e0:	b9400019 	ldr	w25, [x0]
+      if (w < 0) {
+  2015e4:	36f80079 	tbz	w25, #31, 2015f0 <_vsnprintf+0x220>
+        flags |= FLAGS_LEFT;    // reverse padding
+  2015e8:	321f00c6 	orr	w6, w6, #0x2
+        width = (unsigned int)-w;
+  2015ec:	4b1903f9 	neg	w25, w25
+    if (*format == '.') {
+  2015f0:	39400760 	ldrb	w0, [x27, #1]
+      format++;
+  2015f4:	aa0103fb 	mov	x27, x1
+  2015f8:	91000421 	add	x1, x1, #0x1
+  2015fc:	17ffffca 	b	201524 <_vsnprintf+0x154>
+    switch (*format) {
+  201600:	7101d01f 	cmp	w0, #0x74
+  201604:	54fffbe0 	b.eq	201580 <_vsnprintf+0x1b0>  // b.none
+  201608:	7101e81f 	cmp	w0, #0x7a
+  20160c:	54fffba0 	b.eq	201580 <_vsnprintf+0x1b0>  // b.none
+        format++;
+  201610:	aa0103fb 	mov	x27, x1
+    switch (*format) {
+  201614:	5101a401 	sub	w1, w0, #0x69
+  201618:	12001c21 	and	w1, w1, #0xff
+  20161c:	71003c3f 	cmp	w1, #0xf
+  201620:	54fff0e8 	b.hi	20143c <_vsnprintf+0x6c>  // b.pmore
+  201624:	d2800022 	mov	x2, #0x1                   	// #1
+  201628:	d2920823 	mov	x3, #0x9041                	// #36929
+  20162c:	9ac12042 	lsl	x2, x2, x1
+  201630:	ea03005f 	tst	x2, x3
+  201634:	54001ae1 	b.ne	201990 <_vsnprintf+0x5c0>  // b.any
+  201638:	7100283f 	cmp	w1, #0xa
+  20163c:	54000540 	b.eq	2016e4 <_vsnprintf+0x314>  // b.none
+  201640:	71001c3f 	cmp	w1, #0x7
+  201644:	54ffefc1 	b.ne	20143c <_vsnprintf+0x6c>  // b.any
+        flags |= FLAGS_ZEROPAD | FLAGS_UPPERCASE;
+  201648:	52800420 	mov	w0, #0x21                  	// #33
+  20164c:	2a0000c0 	orr	w0, w6, w0
+          idx = _ntoa_long_long(out, buffer, idx, maxlen, (uintptr_t)va_arg(va, void*), false, 16U, precision, width, flags);
+  201650:	37f8253a 	tbnz	w26, #31, 201af4 <_vsnprintf+0x724>
+  201654:	91003ee2 	add	x2, x23, #0xf
+  201658:	aa1703e1 	mov	x1, x23
+  20165c:	927df057 	and	x23, x2, #0xfffffffffffffff8
+  201660:	2a1603e7 	mov	w7, w22
+  201664:	aa1c03e2 	mov	x2, x28
+  201668:	f9400024 	ldr	x4, [x1]
+  20166c:	d2800206 	mov	x6, #0x10                  	// #16
+  201670:	52800201 	mov	w1, #0x10                  	// #16
+  201674:	b90003e1 	str	w1, [sp]
+  201678:	b9000be0 	str	w0, [sp, #8]
+  20167c:	52800005 	mov	w5, #0x0                   	// #0
+  201680:	aa1503e1 	mov	x1, x21
+  201684:	aa1403e3 	mov	x3, x20
+  201688:	aa1303e0 	mov	x0, x19
+  20168c:	97fffc7d 	bl	200880 <_ntoa_long>
+  while (*format)
+  201690:	39400361 	ldrb	w1, [x27]
+          idx = _ntoa_long_long(out, buffer, idx, maxlen, (uintptr_t)va_arg(va, void*), false, 16U, precision, width, flags);
+  201694:	aa0003fc 	mov	x28, x0
+  while (*format)
+  201698:	35ffee21 	cbnz	w1, 20145c <_vsnprintf+0x8c>
+  20169c:	d503201f 	nop
+
+  // termination
+  out((char)0, buffer, idx < maxlen ? idx : maxlen - 1U, maxlen);
+
+  // return written chars without terminating \0
+  return (int)idx;
+  2016a0:	2a1c03f6 	mov	w22, w28
+  out((char)0, buffer, idx < maxlen ? idx : maxlen - 1U, maxlen);
+  2016a4:	eb1c029f 	cmp	x20, x28
+  2016a8:	d1000682 	sub	x2, x20, #0x1
+  2016ac:	aa1503e1 	mov	x1, x21
+  2016b0:	9a9c9042 	csel	x2, x2, x28, ls	// ls = plast
+  2016b4:	aa1403e3 	mov	x3, x20
+  2016b8:	52800000 	mov	w0, #0x0                   	// #0
+  2016bc:	d63f0260 	blr	x19
+}
+  2016c0:	a9417bfd 	ldp	x29, x30, [sp, #16]
+  2016c4:	2a1603e0 	mov	w0, w22
+  2016c8:	a94253f3 	ldp	x19, x20, [sp, #32]
+  2016cc:	a9435bf5 	ldp	x21, x22, [sp, #48]
+  2016d0:	a94463f7 	ldp	x23, x24, [sp, #64]
+  2016d4:	a9456bf9 	ldp	x25, x26, [sp, #80]
+  2016d8:	a94673fb 	ldp	x27, x28, [sp, #96]
+  2016dc:	9102c3ff 	add	sp, sp, #0xb0
+  2016e0:	d65f03c0 	ret
+        const char* p = va_arg(va, char*);
+  2016e4:	37f8219a 	tbnz	w26, #31, 201b14 <_vsnprintf+0x744>
+  2016e8:	91003ee1 	add	x1, x23, #0xf
+  2016ec:	aa1703e0 	mov	x0, x23
+  2016f0:	927df037 	and	x23, x1, #0xfffffffffffffff8
+  2016f4:	f940000a 	ldr	x10, [x0]
+        unsigned int l = _strnlen_s(p, precision ? precision : (size_t)-1);
+  2016f8:	710002df 	cmp	w22, #0x0
+  2016fc:	2a1603e3 	mov	w3, w22
+  201700:	da9f1063 	csinv	x3, x3, xzr, ne	// ne = any
+  for (s = str; *s && maxsize--; ++s);
+  201704:	aa0a03e1 	mov	x1, x10
+  201708:	39400140 	ldrb	w0, [x10]
+  20170c:	8b030143 	add	x3, x10, x3
+  201710:	35000080 	cbnz	w0, 201720 <_vsnprintf+0x350>
+  201714:	140001e4 	b	201ea4 <_vsnprintf+0xad4>
+  201718:	eb03003f 	cmp	x1, x3
+  20171c:	54000060 	b.eq	201728 <_vsnprintf+0x358>  // b.none
+  201720:	38401c22 	ldrb	w2, [x1, #1]!
+  201724:	35ffffa2 	cbnz	w2, 201718 <_vsnprintf+0x348>
+  return (unsigned int)(s - str);
+  201728:	4b0a0021 	sub	w1, w1, w10
+  20172c:	b90093e1 	str	w1, [sp, #144]
+        if (flags & FLAGS_PRECISION) {
+  201730:	121600c1 	and	w1, w6, #0x400
+  201734:	b900abe1 	str	w1, [sp, #168]
+  201738:	365000a6 	tbz	w6, #10, 20174c <_vsnprintf+0x37c>
+          l = (l < precision ? l : precision);
+  20173c:	b94093e1 	ldr	w1, [sp, #144]
+  201740:	6b16003f 	cmp	w1, w22
+  201744:	1a969021 	csel	w1, w1, w22, ls	// ls = plast
+  201748:	b90093e1 	str	w1, [sp, #144]
+        if (!(flags & FLAGS_LEFT)) {
+  20174c:	121f00c1 	and	w1, w6, #0x2
+  201750:	b900afe1 	str	w1, [sp, #172]
+  201754:	36082866 	tbz	w6, #1, 201c60 <_vsnprintf+0x890>
+        while ((*p != 0) && (!(flags & FLAGS_PRECISION) || precision--)) {
+  201758:	34000280 	cbz	w0, 2017a8 <_vsnprintf+0x3d8>
+  20175c:	b940abe1 	ldr	w1, [sp, #168]
+  201760:	34002481 	cbz	w1, 201bf0 <_vsnprintf+0x820>
+  201764:	aa1c03e2 	mov	x2, x28
+  201768:	8b36439c 	add	x28, x28, w22, uxtw
+  20176c:	cb020141 	sub	x1, x10, x2
+  201770:	f90043e1 	str	x1, [sp, #128]
+  201774:	14000009 	b	201798 <_vsnprintf+0x3c8>
+          out(*(p++), buffer, idx++, maxlen);
+  201778:	91000456 	add	x22, x2, #0x1
+  20177c:	aa1403e3 	mov	x3, x20
+  201780:	aa1503e1 	mov	x1, x21
+  201784:	d63f0260 	blr	x19
+        while ((*p != 0) && (!(flags & FLAGS_PRECISION) || precision--)) {
+  201788:	f94043e0 	ldr	x0, [sp, #128]
+  20178c:	38766800 	ldrb	w0, [x0, x22]
+  201790:	34002420 	cbz	w0, 201c14 <_vsnprintf+0x844>
+          out(*(p++), buffer, idx++, maxlen);
+  201794:	aa1603e2 	mov	x2, x22
+        while ((*p != 0) && (!(flags & FLAGS_PRECISION) || precision--)) {
+  201798:	eb02039f 	cmp	x28, x2
+  20179c:	54fffee1 	b.ne	201778 <_vsnprintf+0x3a8>  // b.any
+        if (flags & FLAGS_LEFT) {
+  2017a0:	b940afe0 	ldr	w0, [sp, #172]
+  2017a4:	34ffe580 	cbz	w0, 201454 <_vsnprintf+0x84>
+          while (l++ < width) {
+  2017a8:	b94093e1 	ldr	w1, [sp, #144]
+  2017ac:	aa1c03f6 	mov	x22, x28
+  2017b0:	6b19003f 	cmp	w1, w25
+  2017b4:	54ffe502 	b.cs	201454 <_vsnprintf+0x84>  // b.hs, b.nlast
+  2017b8:	51000720 	sub	w0, w25, #0x1
+  2017bc:	91000789 	add	x9, x28, #0x1
+  2017c0:	4b010000 	sub	w0, w0, w1
+  2017c4:	8b09001c 	add	x28, x0, x9
+            out(' ', buffer, idx++, maxlen);
+  2017c8:	aa1603e2 	mov	x2, x22
+  2017cc:	aa1403e3 	mov	x3, x20
+  2017d0:	910006d6 	add	x22, x22, #0x1
+  2017d4:	aa1503e1 	mov	x1, x21
+  2017d8:	52800400 	mov	w0, #0x20                  	// #32
+  2017dc:	d63f0260 	blr	x19
+          while (l++ < width) {
+  2017e0:	eb1c02df 	cmp	x22, x28
+  2017e4:	54ffff21 	b.ne	2017c8 <_vsnprintf+0x3f8>  // b.any
+  2017e8:	17ffff1b 	b	201454 <_vsnprintf+0x84>
+      const int w = va_arg(va, int);
+  2017ec:	11002342 	add	w2, w26, #0x8
+  2017f0:	7100005f 	cmp	w2, #0x0
+  2017f4:	54001a0d 	b.le	201b34 <_vsnprintf+0x764>
+  2017f8:	91002ee3 	add	x3, x23, #0xb
+  2017fc:	aa1703e0 	mov	x0, x23
+  201800:	2a0203fa 	mov	w26, w2
+  201804:	927df077 	and	x23, x3, #0xfffffffffffffff8
+  201808:	17ffff76 	b	2015e0 <_vsnprintf+0x210>
+        if ((*format == 'E')||(*format == 'G')) flags |= FLAGS_UPPERCASE;
+  20180c:	121e7802 	and	w2, w0, #0xfffffffd
+        if ((*format == 'g')||(*format == 'G')) flags |= FLAGS_ADAPT_EXP;
+  201810:	121a7801 	and	w1, w0, #0xffffffdf
+        if ((*format == 'E')||(*format == 'G')) flags |= FLAGS_UPPERCASE;
+  201814:	7101145f 	cmp	w2, #0x45
+  201818:	1a9f17e0 	cset	w0, eq	// eq = none
+        if ((*format == 'g')||(*format == 'G')) flags |= FLAGS_ADAPT_EXP;
+  20181c:	71011c3f 	cmp	w1, #0x47
+  201820:	1a9f17e1 	cset	w1, eq	// eq = none
+  201824:	53155021 	lsl	w1, w1, #11
+        if ((*format == 'E')||(*format == 'G')) flags |= FLAGS_UPPERCASE;
+  201828:	2a001420 	orr	w0, w1, w0, lsl #5
+  20182c:	2a060006 	orr	w6, w0, w6
+        idx = _etoa(out, buffer, idx, maxlen, va_arg(va, double), precision, width, flags);
+  201830:	b9407fe0 	ldr	w0, [sp, #124]
+  201834:	37f812c0 	tbnz	w0, #31, 201a8c <_vsnprintf+0x6bc>
+  201838:	91003ee1 	add	x1, x23, #0xf
+  20183c:	aa1703e0 	mov	x0, x23
+  201840:	927df037 	and	x23, x1, #0xfffffffffffffff8
+  201844:	fd400000 	ldr	d0, [x0]
+  201848:	aa1c03e2 	mov	x2, x28
+  20184c:	2a1903e5 	mov	w5, w25
+  201850:	2a1603e4 	mov	w4, w22
+  201854:	aa1403e3 	mov	x3, x20
+  201858:	aa1503e1 	mov	x1, x21
+  20185c:	aa1303e0 	mov	x0, x19
+  201860:	97fffdf8 	bl	201040 <_etoa>
+  201864:	aa0003fc 	mov	x28, x0
+        break;
+  201868:	17fffefb 	b	201454 <_vsnprintf+0x84>
+        if (*format == 'F') flags |= FLAGS_UPPERCASE;
+  20186c:	7101181f 	cmp	w0, #0x46
+  201870:	321b00c0 	orr	w0, w6, #0x20
+  201874:	1a860006 	csel	w6, w0, w6, eq	// eq = none
+        idx = _ftoa(out, buffer, idx, maxlen, va_arg(va, double), precision, width, flags);
+  201878:	b9407fe0 	ldr	w0, [sp, #124]
+  20187c:	37f811a0 	tbnz	w0, #31, 201ab0 <_vsnprintf+0x6e0>
+  201880:	91003ee1 	add	x1, x23, #0xf
+  201884:	aa1703e0 	mov	x0, x23
+  201888:	927df037 	and	x23, x1, #0xfffffffffffffff8
+  20188c:	fd400000 	ldr	d0, [x0]
+  201890:	aa1c03e2 	mov	x2, x28
+  201894:	2a1903e5 	mov	w5, w25
+  201898:	2a1603e4 	mov	w4, w22
+  20189c:	aa1403e3 	mov	x3, x20
+  2018a0:	aa1503e1 	mov	x1, x21
+  2018a4:	aa1303e0 	mov	x0, x19
+  2018a8:	97fffce6 	bl	200c40 <_ftoa>
+  2018ac:	aa0003fc 	mov	x28, x0
+        break;
+  2018b0:	17fffee9 	b	201454 <_vsnprintf+0x84>
+        unsigned int l = 1U;
+  2018b4:	52800020 	mov	w0, #0x1                   	// #1
+  2018b8:	b90083e0 	str	w0, [sp, #128]
+        if (!(flags & FLAGS_LEFT)) {
+  2018bc:	121f00c0 	and	w0, w6, #0x2
+  2018c0:	b90093e0 	str	w0, [sp, #144]
+  2018c4:	36081406 	tbz	w6, #1, 201b44 <_vsnprintf+0x774>
+        out((char)va_arg(va, int), buffer, idx++, maxlen);
+  2018c8:	37f8107a 	tbnz	w26, #31, 201ad4 <_vsnprintf+0x704>
+  2018cc:	91002ee1 	add	x1, x23, #0xb
+  2018d0:	aa1703e0 	mov	x0, x23
+  2018d4:	927df037 	and	x23, x1, #0xfffffffffffffff8
+  2018d8:	39400000 	ldrb	w0, [x0]
+  2018dc:	aa1403e3 	mov	x3, x20
+  2018e0:	aa1c03e2 	mov	x2, x28
+  2018e4:	aa1503e1 	mov	x1, x21
+  2018e8:	91000796 	add	x22, x28, #0x1
+  2018ec:	d63f0260 	blr	x19
+        if (flags & FLAGS_LEFT) {
+  2018f0:	b94093e0 	ldr	w0, [sp, #144]
+  2018f4:	34000220 	cbz	w0, 201938 <_vsnprintf+0x568>
+          while (l++ < width) {
+  2018f8:	b94083e0 	ldr	w0, [sp, #128]
+  2018fc:	6b19001f 	cmp	w0, w25
+  201900:	540001c2 	b.cs	201938 <_vsnprintf+0x568>  // b.hs, b.nlast
+  201904:	51000725 	sub	w5, w25, #0x1
+  201908:	91000b89 	add	x9, x28, #0x2
+  20190c:	4b0000a0 	sub	w0, w5, w0
+  201910:	8b090019 	add	x25, x0, x9
+  201914:	d503201f 	nop
+            out(' ', buffer, idx++, maxlen);
+  201918:	aa1603e2 	mov	x2, x22
+  20191c:	aa1403e3 	mov	x3, x20
+  201920:	910006d6 	add	x22, x22, #0x1
+  201924:	aa1503e1 	mov	x1, x21
+  201928:	52800400 	mov	w0, #0x20                  	// #32
+  20192c:	d63f0260 	blr	x19
+          while (l++ < width) {
+  201930:	eb1902df 	cmp	x22, x25
+  201934:	54ffff21 	b.ne	201918 <_vsnprintf+0x548>  // b.any
+        out('%', buffer, idx++, maxlen);
+  201938:	aa1603fc 	mov	x28, x22
+        break;
+  20193c:	17fffec6 	b	201454 <_vsnprintf+0x84>
+        out('%', buffer, idx++, maxlen);
+  201940:	91000796 	add	x22, x28, #0x1
+  201944:	aa1c03e2 	mov	x2, x28
+  201948:	aa1403e3 	mov	x3, x20
+  20194c:	aa1503e1 	mov	x1, x21
+  201950:	528004a0 	mov	w0, #0x25                  	// #37
+  201954:	aa1603fc 	mov	x28, x22
+  201958:	d63f0260 	blr	x19
+        break;
+  20195c:	17fffebe 	b	201454 <_vsnprintf+0x84>
+        if (*format == 'h') {
+  201960:	39400760 	ldrb	w0, [x27, #1]
+  201964:	7101a01f 	cmp	w0, #0x68
+  201968:	540015a0 	b.eq	201c1c <_vsnprintf+0x84c>  // b.none
+        flags |= FLAGS_SHORT;
+  20196c:	321900c6 	orr	w6, w6, #0x80
+  201970:	17ffff06 	b	201588 <_vsnprintf+0x1b8>
+        if (*format == 'l') {
+  201974:	39400760 	ldrb	w0, [x27, #1]
+  201978:	7101b01f 	cmp	w0, #0x6c
+  20197c:	54ffe041 	b.ne	201584 <_vsnprintf+0x1b4>  // b.any
+    switch (*format) {
+  201980:	39400b60 	ldrb	w0, [x27, #2]
+          flags |= FLAGS_LONG_LONG;
+  201984:	321804c6 	orr	w6, w6, #0x300
+          format++;
+  201988:	91000b62 	add	x2, x27, #0x2
+  20198c:	17fffeff 	b	201588 <_vsnprintf+0x1b8>
+        if (*format == 'x' || *format == 'X') {
+  201990:	7101bc1f 	cmp	w0, #0x6f
+  201994:	54001020 	b.eq	201b98 <_vsnprintf+0x7c8>  // b.none
+  201998:	540019c8 	b.hi	201cd0 <_vsnprintf+0x900>  // b.pmore
+        if ((*format != 'i') && (*format != 'd')) {
+  20199c:	7101a41f 	cmp	w0, #0x69
+          flags &= ~FLAGS_HASH;   // no hash for dec format
+  2019a0:	121b78c1 	and	w1, w6, #0xffffffef
+        if ((*format != 'i') && (*format != 'd')) {
+  2019a4:	540038a1 	b.ne	2020b8 <_vsnprintf+0xce8>  // b.any
+        if (flags & FLAGS_PRECISION) {
+  2019a8:	d2800142 	mov	x2, #0xa                   	// #10
+  2019ac:	36500046 	tbz	w6, #10, 2019b4 <_vsnprintf+0x5e4>
+          flags &= ~FLAGS_ZEROPAD;
+  2019b0:	121f7821 	and	w1, w1, #0xfffffffe
+        if ((*format == 'i') || (*format == 'd')) {
+  2019b4:	7101a41f 	cmp	w0, #0x69
+  2019b8:	52800c83 	mov	w3, #0x64                  	// #100
+  2019bc:	7a431004 	ccmp	w0, w3, #0x4, ne	// ne = any
+  2019c0:	54000f41 	b.ne	201ba8 <_vsnprintf+0x7d8>  // b.any
+          if (flags & FLAGS_LONG_LONG) {
+  2019c4:	37481c21 	tbnz	w1, #9, 201d48 <_vsnprintf+0x978>
+          else if (flags & FLAGS_LONG) {
+  2019c8:	374021e1 	tbnz	w1, #8, 201e04 <_vsnprintf+0xa34>
+            const int value = (flags & FLAGS_CHAR) ? (char)va_arg(va, int) : (flags & FLAGS_SHORT) ? (short int)va_arg(va, int) : va_arg(va, int);
+  2019cc:	37301961 	tbnz	w1, #6, 201cf8 <_vsnprintf+0x928>
+  2019d0:	363826e1 	tbz	w1, #7, 201eac <_vsnprintf+0xadc>
+  2019d4:	37f830da 	tbnz	w26, #31, 201fec <_vsnprintf+0xc1c>
+  2019d8:	91002ee3 	add	x3, x23, #0xb
+  2019dc:	aa1703e0 	mov	x0, x23
+  2019e0:	927df077 	and	x23, x3, #0xfffffffffffffff8
+  2019e4:	79c00005 	ldrsh	w5, [x0]
+            idx = _ntoa_long(out, buffer, idx, maxlen, (unsigned int)(value > 0 ? value : 0 - value), value < 0, base, precision, width, flags);
+  2019e8:	710000bf 	cmp	w5, #0x0
+  2019ec:	5a85a4a4 	cneg	w4, w5, lt	// lt = tstop
+  2019f0:	12003c84 	and	w4, w4, #0xffff
+  2019f4:	aa0203e6 	mov	x6, x2
+  2019f8:	2a1603e7 	mov	w7, w22
+  2019fc:	531f7ca5 	lsr	w5, w5, #31
+  201a00:	93407c84 	sxtw	x4, w4
+  201a04:	aa1c03e2 	mov	x2, x28
+  201a08:	b90003f9 	str	w25, [sp]
+  201a0c:	b9000be1 	str	w1, [sp, #8]
+            idx = _ntoa_long(out, buffer, idx, maxlen, value, false, base, precision, width, flags);
+  201a10:	aa1403e3 	mov	x3, x20
+  201a14:	aa1503e1 	mov	x1, x21
+  201a18:	aa1303e0 	mov	x0, x19
+  201a1c:	97fffb99 	bl	200880 <_ntoa_long>
+  201a20:	aa0003fc 	mov	x28, x0
+        break;
+  201a24:	17fffe8c 	b	201454 <_vsnprintf+0x84>
+    i = i * 10U + (unsigned int)(*((*str)++) - '0');
+  201a28:	52800143 	mov	w3, #0xa                   	// #10
+  201a2c:	d503201f 	nop
+  201a30:	1b0302d6 	madd	w22, w22, w3, w0
+  while (_is_digit(**str)) {
+  201a34:	38401c40 	ldrb	w0, [x2, #1]!
+  return (ch >= '0') && (ch <= '9');
+  201a38:	5100c001 	sub	w1, w0, #0x30
+    i = i * 10U + (unsigned int)(*((*str)++) - '0');
+  201a3c:	5100c2d6 	sub	w22, w22, #0x30
+  while (_is_digit(**str)) {
+  201a40:	12001c21 	and	w1, w1, #0xff
+  201a44:	7100243f 	cmp	w1, #0x9
+  201a48:	54ffff49 	b.ls	201a30 <_vsnprintf+0x660>  // b.plast
+  201a4c:	aa0203fb 	mov	x27, x2
+  201a50:	91000441 	add	x1, x2, #0x1
+  201a54:	17fffec3 	b	201560 <_vsnprintf+0x190>
+        const int prec = (int)va_arg(va, int);
+  201a58:	37f80f5a 	tbnz	w26, #31, 201c40 <_vsnprintf+0x870>
+  201a5c:	91002ee1 	add	x1, x23, #0xb
+  201a60:	aa1703e0 	mov	x0, x23
+  201a64:	927df037 	and	x23, x1, #0xfffffffffffffff8
+        precision = prec > 0 ? (unsigned int)prec : 0U;
+  201a68:	b9400007 	ldr	w7, [x0]
+        format++;
+  201a6c:	91000b7b 	add	x27, x27, #0x2
+    switch (*format) {
+  201a70:	39400360 	ldrb	w0, [x27]
+  201a74:	91000761 	add	x1, x27, #0x1
+        precision = prec > 0 ? (unsigned int)prec : 0U;
+  201a78:	710000ff 	cmp	w7, #0x0
+  201a7c:	1a9fa0f6 	csel	w22, w7, wzr, ge	// ge = tcont
+        format++;
+  201a80:	17fffeb8 	b	201560 <_vsnprintf+0x190>
+    switch (*format) {
+  201a84:	aa1b03e2 	mov	x2, x27
+  201a88:	17fffec0 	b	201588 <_vsnprintf+0x1b8>
+        idx = _etoa(out, buffer, idx, maxlen, va_arg(va, double), precision, width, flags);
+  201a8c:	b9407fe0 	ldr	w0, [sp, #124]
+  201a90:	11004001 	add	w1, w0, #0x10
+  201a94:	7100003f 	cmp	w1, #0x0
+  201a98:	54001a2d 	b.le	201ddc <_vsnprintf+0xa0c>
+  201a9c:	91003ee2 	add	x2, x23, #0xf
+  201aa0:	aa1703e0 	mov	x0, x23
+  201aa4:	927df057 	and	x23, x2, #0xfffffffffffffff8
+  201aa8:	b9007fe1 	str	w1, [sp, #124]
+  201aac:	17ffff66 	b	201844 <_vsnprintf+0x474>
+        idx = _ftoa(out, buffer, idx, maxlen, va_arg(va, double), precision, width, flags);
+  201ab0:	b9407fe0 	ldr	w0, [sp, #124]
+  201ab4:	11004001 	add	w1, w0, #0x10
+  201ab8:	7100003f 	cmp	w1, #0x0
+  201abc:	540019ad 	b.le	201df0 <_vsnprintf+0xa20>
+  201ac0:	91003ee2 	add	x2, x23, #0xf
+  201ac4:	aa1703e0 	mov	x0, x23
+  201ac8:	927df057 	and	x23, x2, #0xfffffffffffffff8
+  201acc:	b9007fe1 	str	w1, [sp, #124]
+  201ad0:	17ffff6f 	b	20188c <_vsnprintf+0x4bc>
+        out((char)va_arg(va, int), buffer, idx++, maxlen);
+  201ad4:	11002341 	add	w1, w26, #0x8
+  201ad8:	7100003f 	cmp	w1, #0x0
+  201adc:	5400168d 	b.le	201dac <_vsnprintf+0x9dc>
+  201ae0:	91002ee2 	add	x2, x23, #0xb
+  201ae4:	aa1703e0 	mov	x0, x23
+  201ae8:	2a0103fa 	mov	w26, w1
+  201aec:	927df057 	and	x23, x2, #0xfffffffffffffff8
+  201af0:	17ffff7a 	b	2018d8 <_vsnprintf+0x508>
+          idx = _ntoa_long_long(out, buffer, idx, maxlen, (uintptr_t)va_arg(va, void*), false, 16U, precision, width, flags);
+  201af4:	11002342 	add	w2, w26, #0x8
+  201af8:	7100005f 	cmp	w2, #0x0
+  201afc:	5400168d 	b.le	201dcc <_vsnprintf+0x9fc>
+  201b00:	91003ee3 	add	x3, x23, #0xf
+  201b04:	aa1703e1 	mov	x1, x23
+  201b08:	2a0203fa 	mov	w26, w2
+  201b0c:	927df077 	and	x23, x3, #0xfffffffffffffff8
+  201b10:	17fffed4 	b	201660 <_vsnprintf+0x290>
+        const char* p = va_arg(va, char*);
+  201b14:	11002341 	add	w1, w26, #0x8
+  201b18:	7100003f 	cmp	w1, #0x0
+  201b1c:	5400150d 	b.le	201dbc <_vsnprintf+0x9ec>
+  201b20:	91003ee2 	add	x2, x23, #0xf
+  201b24:	aa1703e0 	mov	x0, x23
+  201b28:	2a0103fa 	mov	w26, w1
+  201b2c:	927df057 	and	x23, x2, #0xfffffffffffffff8
+  201b30:	17fffef1 	b	2016f4 <_vsnprintf+0x324>
+      const int w = va_arg(va, int);
+  201b34:	f94047e0 	ldr	x0, [sp, #136]
+  201b38:	8b3ac000 	add	x0, x0, w26, sxtw
+  201b3c:	2a0203fa 	mov	w26, w2
+  201b40:	17fffea8 	b	2015e0 <_vsnprintf+0x210>
+          while (l++ < width) {
+  201b44:	7100073f 	cmp	w25, #0x1
+  201b48:	54002209 	b.ls	201f88 <_vsnprintf+0xbb8>  // b.plast
+  201b4c:	91000784 	add	x4, x28, #0x1
+  201b50:	51000b36 	sub	w22, w25, #0x2
+  201b54:	8b160096 	add	x22, x4, x22
+  201b58:	14000003 	b	201b64 <_vsnprintf+0x794>
+  201b5c:	f94043e4 	ldr	x4, [sp, #128]
+  201b60:	91000484 	add	x4, x4, #0x1
+            out(' ', buffer, idx++, maxlen);
+  201b64:	f90043e4 	str	x4, [sp, #128]
+  201b68:	aa1c03e2 	mov	x2, x28
+  201b6c:	aa1403e3 	mov	x3, x20
+  201b70:	aa0403fc 	mov	x28, x4
+  201b74:	aa1503e1 	mov	x1, x21
+  201b78:	52800400 	mov	w0, #0x20                  	// #32
+  201b7c:	d63f0260 	blr	x19
+          while (l++ < width) {
+  201b80:	eb16039f 	cmp	x28, x22
+  201b84:	54fffec1 	b.ne	201b5c <_vsnprintf+0x78c>  // b.any
+  201b88:	11000720 	add	w0, w25, #0x1
+  201b8c:	b90083e0 	str	w0, [sp, #128]
+        out((char)va_arg(va, int), buffer, idx++, maxlen);
+  201b90:	36ffe9fa 	tbz	w26, #31, 2018cc <_vsnprintf+0x4fc>
+  201b94:	17ffffd0 	b	201ad4 <_vsnprintf+0x704>
+    switch (*format) {
+  201b98:	d2800102 	mov	x2, #0x8                   	// #8
+  201b9c:	d503201f 	nop
+          flags &= ~(FLAGS_PLUS | FLAGS_SPACE);
+  201ba0:	121c74c1 	and	w1, w6, #0xfffffff3
+        if (flags & FLAGS_PRECISION) {
+  201ba4:	3757f066 	tbnz	w6, #10, 2019b0 <_vsnprintf+0x5e0>
+          if (flags & FLAGS_LONG_LONG) {
+  201ba8:	37480ec1 	tbnz	w1, #9, 201d80 <_vsnprintf+0x9b0>
+          else if (flags & FLAGS_LONG) {
+  201bac:	37401481 	tbnz	w1, #8, 201e3c <_vsnprintf+0xa6c>
+            const unsigned int value = (flags & FLAGS_CHAR) ? (unsigned char)va_arg(va, unsigned int) : (flags & FLAGS_SHORT) ? (unsigned short int)va_arg(va, unsigned int) : va_arg(va, unsigned int);
+  201bb0:	37300b21 	tbnz	w1, #6, 201d14 <_vsnprintf+0x944>
+  201bb4:	363818c1 	tbz	w1, #7, 201ecc <_vsnprintf+0xafc>
+  201bb8:	37f822ba 	tbnz	w26, #31, 20200c <_vsnprintf+0xc3c>
+  201bbc:	aa1703e0 	mov	x0, x23
+  201bc0:	91002ee3 	add	x3, x23, #0xb
+  201bc4:	927df077 	and	x23, x3, #0xfffffffffffffff8
+  201bc8:	79400004 	ldrh	w4, [x0]
+  201bcc:	14000057 	b	201d28 <_vsnprintf+0x958>
+        if (*format == 'x' || *format == 'X') {
+  201bd0:	7101601f 	cmp	w0, #0x58
+  201bd4:	54000300 	b.eq	201c34 <_vsnprintf+0x864>  // b.none
+  201bd8:	7101881f 	cmp	w0, #0x62
+    switch (*format) {
+  201bdc:	d2800042 	mov	x2, #0x2                   	// #2
+  201be0:	54fffe00 	b.eq	201ba0 <_vsnprintf+0x7d0>  // b.none
+          flags &= ~FLAGS_HASH;   // no hash for dec format
+  201be4:	121b78c1 	and	w1, w6, #0xffffffef
+  201be8:	52800c80 	mov	w0, #0x64                  	// #100
+  201bec:	17ffff6f 	b	2019a8 <_vsnprintf+0x5d8>
+          out(*(p++), buffer, idx++, maxlen);
+  201bf0:	aa1c03f6 	mov	x22, x28
+  201bf4:	cb1c015c 	sub	x28, x10, x28
+  201bf8:	aa1603e2 	mov	x2, x22
+  201bfc:	910006d6 	add	x22, x22, #0x1
+  201c00:	aa1403e3 	mov	x3, x20
+  201c04:	aa1503e1 	mov	x1, x21
+  201c08:	d63f0260 	blr	x19
+        while ((*p != 0) && (!(flags & FLAGS_PRECISION) || precision--)) {
+  201c0c:	38766b80 	ldrb	w0, [x28, x22]
+  201c10:	35ffff40 	cbnz	w0, 201bf8 <_vsnprintf+0x828>
+          out(*(p++), buffer, idx++, maxlen);
+  201c14:	aa1603fc 	mov	x28, x22
+  201c18:	17fffee2 	b	2017a0 <_vsnprintf+0x3d0>
+    switch (*format) {
+  201c1c:	39400b60 	ldrb	w0, [x27, #2]
+          flags |= FLAGS_CHAR;
+  201c20:	321a04c6 	orr	w6, w6, #0xc0
+          format++;
+  201c24:	91000b62 	add	x2, x27, #0x2
+  201c28:	17fffe58 	b	201588 <_vsnprintf+0x1b8>
+  while (*format)
+  201c2c:	52800016 	mov	w22, #0x0                   	// #0
+  201c30:	17fffe9d 	b	2016a4 <_vsnprintf+0x2d4>
+          flags |= FLAGS_UPPERCASE;
+  201c34:	321b00c6 	orr	w6, w6, #0x20
+  201c38:	d2800202 	mov	x2, #0x10                  	// #16
+  201c3c:	17ffffd9 	b	201ba0 <_vsnprintf+0x7d0>
+        const int prec = (int)va_arg(va, int);
+  201c40:	11002341 	add	w1, w26, #0x8
+  201c44:	7100003f 	cmp	w1, #0x0
+  201c48:	5400050d 	b.le	201ce8 <_vsnprintf+0x918>
+  201c4c:	91002ee2 	add	x2, x23, #0xb
+  201c50:	aa1703e0 	mov	x0, x23
+  201c54:	2a0103fa 	mov	w26, w1
+  201c58:	927df057 	and	x23, x2, #0xfffffffffffffff8
+  201c5c:	17ffff83 	b	201a68 <_vsnprintf+0x698>
+          while (l++ < width) {
+  201c60:	b94093e1 	ldr	w1, [sp, #144]
+  201c64:	6b19003f 	cmp	w1, w25
+  201c68:	54001862 	b.cs	201f74 <_vsnprintf+0xba4>  // b.hs, b.nlast
+  201c6c:	51000720 	sub	w0, w25, #0x1
+  201c70:	91000784 	add	x4, x28, #0x1
+  201c74:	4b010000 	sub	w0, w0, w1
+  201c78:	8b040000 	add	x0, x0, x4
+  201c7c:	f90053e0 	str	x0, [sp, #160]
+  201c80:	14000003 	b	201c8c <_vsnprintf+0x8bc>
+  201c84:	f9404be4 	ldr	x4, [sp, #144]
+  201c88:	91000484 	add	x4, x4, #0x1
+  201c8c:	f90043ea 	str	x10, [sp, #128]
+            out(' ', buffer, idx++, maxlen);
+  201c90:	aa1c03e2 	mov	x2, x28
+  201c94:	f9004be4 	str	x4, [sp, #144]
+  201c98:	aa0403fc 	mov	x28, x4
+  201c9c:	52800400 	mov	w0, #0x20                  	// #32
+  201ca0:	aa1403e3 	mov	x3, x20
+  201ca4:	aa1503e1 	mov	x1, x21
+  201ca8:	d63f0260 	blr	x19
+          while (l++ < width) {
+  201cac:	f94053e0 	ldr	x0, [sp, #160]
+  201cb0:	f94043ea 	ldr	x10, [sp, #128]
+  201cb4:	eb00039f 	cmp	x28, x0
+  201cb8:	54fffe61 	b.ne	201c84 <_vsnprintf+0x8b4>  // b.any
+  201cbc:	11000720 	add	w0, w25, #0x1
+  201cc0:	b90093e0 	str	w0, [sp, #144]
+        while ((*p != 0) && (!(flags & FLAGS_PRECISION) || precision--)) {
+  201cc4:	39400140 	ldrb	w0, [x10]
+  201cc8:	35ffd4a0 	cbnz	w0, 20175c <_vsnprintf+0x38c>
+  201ccc:	17fffde2 	b	201454 <_vsnprintf+0x84>
+  201cd0:	7101e01f 	cmp	w0, #0x78
+    switch (*format) {
+  201cd4:	d2800202 	mov	x2, #0x10                  	// #16
+  201cd8:	54fff640 	b.eq	201ba0 <_vsnprintf+0x7d0>  // b.none
+          flags &= ~FLAGS_HASH;   // no hash for dec format
+  201cdc:	121b78c6 	and	w6, w6, #0xffffffef
+  201ce0:	d2800142 	mov	x2, #0xa                   	// #10
+  201ce4:	17ffffaf 	b	201ba0 <_vsnprintf+0x7d0>
+        const int prec = (int)va_arg(va, int);
+  201ce8:	f94047e0 	ldr	x0, [sp, #136]
+  201cec:	8b3ac000 	add	x0, x0, w26, sxtw
+  201cf0:	2a0103fa 	mov	w26, w1
+  201cf4:	17ffff5d 	b	201a68 <_vsnprintf+0x698>
+            const int value = (flags & FLAGS_CHAR) ? (char)va_arg(va, int) : (flags & FLAGS_SHORT) ? (short int)va_arg(va, int) : va_arg(va, int);
+  201cf8:	37f80f7a 	tbnz	w26, #31, 201ee4 <_vsnprintf+0xb14>
+  201cfc:	91002ee3 	add	x3, x23, #0xb
+  201d00:	aa1703e0 	mov	x0, x23
+  201d04:	927df077 	and	x23, x3, #0xfffffffffffffff8
+  201d08:	39400005 	ldrb	w5, [x0]
+  201d0c:	2a0503e4 	mov	w4, w5
+  201d10:	17ffff39 	b	2019f4 <_vsnprintf+0x624>
+            const unsigned int value = (flags & FLAGS_CHAR) ? (unsigned char)va_arg(va, unsigned int) : (flags & FLAGS_SHORT) ? (unsigned short int)va_arg(va, unsigned int) : va_arg(va, unsigned int);
+  201d14:	37f8109a 	tbnz	w26, #31, 201f24 <_vsnprintf+0xb54>
+  201d18:	91002ee3 	add	x3, x23, #0xb
+  201d1c:	aa1703e0 	mov	x0, x23
+  201d20:	927df077 	and	x23, x3, #0xfffffffffffffff8
+  201d24:	39400004 	ldrb	w4, [x0]
+            idx = _ntoa_long(out, buffer, idx, maxlen, value, false, base, precision, width, flags);
+  201d28:	2a1603e7 	mov	w7, w22
+  201d2c:	aa0203e6 	mov	x6, x2
+  201d30:	2a0403e4 	mov	w4, w4
+  201d34:	b90003f9 	str	w25, [sp]
+  201d38:	b9000be1 	str	w1, [sp, #8]
+  201d3c:	aa1c03e2 	mov	x2, x28
+  201d40:	52800005 	mov	w5, #0x0                   	// #0
+  201d44:	17ffff33 	b	201a10 <_vsnprintf+0x640>
+            const long long value = va_arg(va, long long);
+  201d48:	37f809fa 	tbnz	w26, #31, 201e84 <_vsnprintf+0xab4>
+  201d4c:	91003ee3 	add	x3, x23, #0xf
+  201d50:	aa1703e0 	mov	x0, x23
+  201d54:	927df077 	and	x23, x3, #0xfffffffffffffff8
+  201d58:	f9400005 	ldr	x5, [x0]
+            idx = _ntoa_long_long(out, buffer, idx, maxlen, (unsigned long long)(value > 0 ? value : 0 - value), value < 0, base, precision, width, flags);
+  201d5c:	aa0203e6 	mov	x6, x2
+  201d60:	2a1603e7 	mov	w7, w22
+  201d64:	aa1c03e2 	mov	x2, x28
+  201d68:	f10000bf 	cmp	x5, #0x0
+  201d6c:	b90003f9 	str	w25, [sp]
+  201d70:	da85a4a4 	cneg	x4, x5, lt	// lt = tstop
+  201d74:	d37ffca5 	lsr	x5, x5, #63
+  201d78:	b9000be1 	str	w1, [sp, #8]
+  201d7c:	17fffe41 	b	201680 <_vsnprintf+0x2b0>
+            idx = _ntoa_long_long(out, buffer, idx, maxlen, va_arg(va, unsigned long long), false, base, precision, width, flags);
+  201d80:	37f8073a 	tbnz	w26, #31, 201e64 <_vsnprintf+0xa94>
+  201d84:	91003ee3 	add	x3, x23, #0xf
+  201d88:	aa1703e0 	mov	x0, x23
+  201d8c:	927df077 	and	x23, x3, #0xfffffffffffffff8
+  201d90:	f9400004 	ldr	x4, [x0]
+  201d94:	aa0203e6 	mov	x6, x2
+  201d98:	2a1603e7 	mov	w7, w22
+  201d9c:	aa1c03e2 	mov	x2, x28
+  201da0:	b90003f9 	str	w25, [sp]
+  201da4:	b9000be1 	str	w1, [sp, #8]
+  201da8:	17fffe35 	b	20167c <_vsnprintf+0x2ac>
+        out((char)va_arg(va, int), buffer, idx++, maxlen);
+  201dac:	f94047e0 	ldr	x0, [sp, #136]
+  201db0:	8b3ac000 	add	x0, x0, w26, sxtw
+  201db4:	2a0103fa 	mov	w26, w1
+  201db8:	17fffec8 	b	2018d8 <_vsnprintf+0x508>
+        const char* p = va_arg(va, char*);
+  201dbc:	f94047e0 	ldr	x0, [sp, #136]
+  201dc0:	8b3ac000 	add	x0, x0, w26, sxtw
+  201dc4:	2a0103fa 	mov	w26, w1
+  201dc8:	17fffe4b 	b	2016f4 <_vsnprintf+0x324>
+          idx = _ntoa_long_long(out, buffer, idx, maxlen, (uintptr_t)va_arg(va, void*), false, 16U, precision, width, flags);
+  201dcc:	f94047e1 	ldr	x1, [sp, #136]
+  201dd0:	8b3ac021 	add	x1, x1, w26, sxtw
+  201dd4:	2a0203fa 	mov	w26, w2
+  201dd8:	17fffe22 	b	201660 <_vsnprintf+0x290>
+        idx = _etoa(out, buffer, idx, maxlen, va_arg(va, double), precision, width, flags);
+  201ddc:	f9404fe2 	ldr	x2, [sp, #152]
+  201de0:	b9407fe0 	ldr	w0, [sp, #124]
+  201de4:	b9007fe1 	str	w1, [sp, #124]
+  201de8:	8b20c040 	add	x0, x2, w0, sxtw
+  201dec:	17fffe96 	b	201844 <_vsnprintf+0x474>
+        idx = _ftoa(out, buffer, idx, maxlen, va_arg(va, double), precision, width, flags);
+  201df0:	f9404fe2 	ldr	x2, [sp, #152]
+  201df4:	b9407fe0 	ldr	w0, [sp, #124]
+  201df8:	b9007fe1 	str	w1, [sp, #124]
+  201dfc:	8b20c040 	add	x0, x2, w0, sxtw
+  201e00:	17fffea3 	b	20188c <_vsnprintf+0x4bc>
+            const long value = va_arg(va, long);
+  201e04:	37f80a1a 	tbnz	w26, #31, 201f44 <_vsnprintf+0xb74>
+  201e08:	91003ee3 	add	x3, x23, #0xf
+  201e0c:	aa1703e0 	mov	x0, x23
+  201e10:	927df077 	and	x23, x3, #0xfffffffffffffff8
+  201e14:	f9400005 	ldr	x5, [x0]
+            idx = _ntoa_long(out, buffer, idx, maxlen, (unsigned long)(value > 0 ? value : 0 - value), value < 0, base, precision, width, flags);
+  201e18:	aa0203e6 	mov	x6, x2
+  201e1c:	2a1603e7 	mov	w7, w22
+  201e20:	aa1c03e2 	mov	x2, x28
+  201e24:	f10000bf 	cmp	x5, #0x0
+  201e28:	b90003f9 	str	w25, [sp]
+  201e2c:	da85a4a4 	cneg	x4, x5, lt	// lt = tstop
+  201e30:	d37ffca5 	lsr	x5, x5, #63
+  201e34:	b9000be1 	str	w1, [sp, #8]
+  201e38:	17fffef6 	b	201a10 <_vsnprintf+0x640>
+            idx = _ntoa_long(out, buffer, idx, maxlen, va_arg(va, unsigned long), false, base, precision, width, flags);
+  201e3c:	37f8065a 	tbnz	w26, #31, 201f04 <_vsnprintf+0xb34>
+  201e40:	91003ee3 	add	x3, x23, #0xf
+  201e44:	aa1703e0 	mov	x0, x23
+  201e48:	927df077 	and	x23, x3, #0xfffffffffffffff8
+  201e4c:	f9400004 	ldr	x4, [x0]
+  201e50:	2a1603e7 	mov	w7, w22
+  201e54:	aa0203e6 	mov	x6, x2
+  201e58:	b90003f9 	str	w25, [sp]
+  201e5c:	b9000be1 	str	w1, [sp, #8]
+  201e60:	17ffffb7 	b	201d3c <_vsnprintf+0x96c>
+            idx = _ntoa_long_long(out, buffer, idx, maxlen, va_arg(va, unsigned long long), false, base, precision, width, flags);
+  201e64:	11002343 	add	w3, w26, #0x8
+  201e68:	7100007f 	cmp	w3, #0x0
+  201e6c:	5400096d 	b.le	201f98 <_vsnprintf+0xbc8>
+  201e70:	91003ee4 	add	x4, x23, #0xf
+  201e74:	aa1703e0 	mov	x0, x23
+  201e78:	2a0303fa 	mov	w26, w3
+  201e7c:	927df097 	and	x23, x4, #0xfffffffffffffff8
+  201e80:	17ffffc4 	b	201d90 <_vsnprintf+0x9c0>
+            const long long value = va_arg(va, long long);
+  201e84:	11002343 	add	w3, w26, #0x8
+  201e88:	7100007f 	cmp	w3, #0x0
+  201e8c:	540006cd 	b.le	201f64 <_vsnprintf+0xb94>
+  201e90:	91003ee4 	add	x4, x23, #0xf
+  201e94:	aa1703e0 	mov	x0, x23
+  201e98:	2a0303fa 	mov	w26, w3
+  201e9c:	927df097 	and	x23, x4, #0xfffffffffffffff8
+  201ea0:	17ffffae 	b	201d58 <_vsnprintf+0x988>
+  for (s = str; *s && maxsize--; ++s);
+  201ea4:	b90093ff 	str	wzr, [sp, #144]
+  201ea8:	17fffe22 	b	201730 <_vsnprintf+0x360>
+            const int value = (flags & FLAGS_CHAR) ? (char)va_arg(va, int) : (flags & FLAGS_SHORT) ? (short int)va_arg(va, int) : va_arg(va, int);
+  201eac:	37f80cba 	tbnz	w26, #31, 202040 <_vsnprintf+0xc70>
+  201eb0:	91002ee3 	add	x3, x23, #0xb
+  201eb4:	aa1703e0 	mov	x0, x23
+  201eb8:	927df077 	and	x23, x3, #0xfffffffffffffff8
+  201ebc:	b9400005 	ldr	w5, [x0]
+            idx = _ntoa_long(out, buffer, idx, maxlen, (unsigned int)(value > 0 ? value : 0 - value), value < 0, base, precision, width, flags);
+  201ec0:	710000bf 	cmp	w5, #0x0
+  201ec4:	5a85a4a4 	cneg	w4, w5, lt	// lt = tstop
+  201ec8:	17fffecb 	b	2019f4 <_vsnprintf+0x624>
+            const unsigned int value = (flags & FLAGS_CHAR) ? (unsigned char)va_arg(va, unsigned int) : (flags & FLAGS_SHORT) ? (unsigned short int)va_arg(va, unsigned int) : va_arg(va, unsigned int);
+  201ecc:	37f807fa 	tbnz	w26, #31, 201fc8 <_vsnprintf+0xbf8>
+  201ed0:	aa1703e0 	mov	x0, x23
+  201ed4:	91002ee3 	add	x3, x23, #0xb
+  201ed8:	927df077 	and	x23, x3, #0xfffffffffffffff8
+  201edc:	b9400004 	ldr	w4, [x0]
+  201ee0:	17ffff92 	b	201d28 <_vsnprintf+0x958>
+            const int value = (flags & FLAGS_CHAR) ? (char)va_arg(va, int) : (flags & FLAGS_SHORT) ? (short int)va_arg(va, int) : va_arg(va, int);
+  201ee4:	11002343 	add	w3, w26, #0x8
+  201ee8:	7100007f 	cmp	w3, #0x0
+  201eec:	540005ed 	b.le	201fa8 <_vsnprintf+0xbd8>
+  201ef0:	91002ee4 	add	x4, x23, #0xb
+  201ef4:	aa1703e0 	mov	x0, x23
+  201ef8:	2a0303fa 	mov	w26, w3
+  201efc:	927df097 	and	x23, x4, #0xfffffffffffffff8
+  201f00:	17ffff82 	b	201d08 <_vsnprintf+0x938>
+            idx = _ntoa_long(out, buffer, idx, maxlen, va_arg(va, unsigned long), false, base, precision, width, flags);
+  201f04:	11002343 	add	w3, w26, #0x8
+  201f08:	7100007f 	cmp	w3, #0x0
+  201f0c:	5400092d 	b.le	202030 <_vsnprintf+0xc60>
+  201f10:	91003ee4 	add	x4, x23, #0xf
+  201f14:	aa1703e0 	mov	x0, x23
+  201f18:	2a0303fa 	mov	w26, w3
+  201f1c:	927df097 	and	x23, x4, #0xfffffffffffffff8
+  201f20:	17ffffcb 	b	201e4c <_vsnprintf+0xa7c>
+            const unsigned int value = (flags & FLAGS_CHAR) ? (unsigned char)va_arg(va, unsigned int) : (flags & FLAGS_SHORT) ? (unsigned short int)va_arg(va, unsigned int) : va_arg(va, unsigned int);
+  201f24:	11002343 	add	w3, w26, #0x8
+  201f28:	7100007f 	cmp	w3, #0x0
+  201f2c:	540009ad 	b.le	202060 <_vsnprintf+0xc90>
+  201f30:	91002ee4 	add	x4, x23, #0xb
+  201f34:	aa1703e0 	mov	x0, x23
+  201f38:	2a0303fa 	mov	w26, w3
+  201f3c:	927df097 	and	x23, x4, #0xfffffffffffffff8
+  201f40:	17ffff79 	b	201d24 <_vsnprintf+0x954>
+            const long value = va_arg(va, long);
+  201f44:	11002343 	add	w3, w26, #0x8
+  201f48:	7100007f 	cmp	w3, #0x0
+  201f4c:	5400036d 	b.le	201fb8 <_vsnprintf+0xbe8>
+  201f50:	91003ee4 	add	x4, x23, #0xf
+  201f54:	aa1703e0 	mov	x0, x23
+  201f58:	2a0303fa 	mov	w26, w3
+  201f5c:	927df097 	and	x23, x4, #0xfffffffffffffff8
+  201f60:	17ffffad 	b	201e14 <_vsnprintf+0xa44>
+            const long long value = va_arg(va, long long);
+  201f64:	f94047e0 	ldr	x0, [sp, #136]
+  201f68:	8b3ac000 	add	x0, x0, w26, sxtw
+  201f6c:	2a0303fa 	mov	w26, w3
+  201f70:	17ffff7a 	b	201d58 <_vsnprintf+0x988>
+          while (l++ < width) {
+  201f74:	b94093e1 	ldr	w1, [sp, #144]
+  201f78:	11000421 	add	w1, w1, #0x1
+  201f7c:	b90093e1 	str	w1, [sp, #144]
+        while ((*p != 0) && (!(flags & FLAGS_PRECISION) || precision--)) {
+  201f80:	35ffbee0 	cbnz	w0, 20175c <_vsnprintf+0x38c>
+  201f84:	17fffd34 	b	201454 <_vsnprintf+0x84>
+          while (l++ < width) {
+  201f88:	52800040 	mov	w0, #0x2                   	// #2
+  201f8c:	b90083e0 	str	w0, [sp, #128]
+        out((char)va_arg(va, int), buffer, idx++, maxlen);
+  201f90:	36ffc9fa 	tbz	w26, #31, 2018cc <_vsnprintf+0x4fc>
+  201f94:	17fffed0 	b	201ad4 <_vsnprintf+0x704>
+            idx = _ntoa_long_long(out, buffer, idx, maxlen, va_arg(va, unsigned long long), false, base, precision, width, flags);
+  201f98:	f94047e0 	ldr	x0, [sp, #136]
+  201f9c:	8b3ac000 	add	x0, x0, w26, sxtw
+  201fa0:	2a0303fa 	mov	w26, w3
+  201fa4:	17ffff7b 	b	201d90 <_vsnprintf+0x9c0>
+            const int value = (flags & FLAGS_CHAR) ? (char)va_arg(va, int) : (flags & FLAGS_SHORT) ? (short int)va_arg(va, int) : va_arg(va, int);
+  201fa8:	f94047e0 	ldr	x0, [sp, #136]
+  201fac:	8b3ac000 	add	x0, x0, w26, sxtw
+  201fb0:	2a0303fa 	mov	w26, w3
+  201fb4:	17ffff55 	b	201d08 <_vsnprintf+0x938>
+            const long value = va_arg(va, long);
+  201fb8:	f94047e0 	ldr	x0, [sp, #136]
+  201fbc:	8b3ac000 	add	x0, x0, w26, sxtw
+  201fc0:	2a0303fa 	mov	w26, w3
+  201fc4:	17ffff94 	b	201e14 <_vsnprintf+0xa44>
+            const unsigned int value = (flags & FLAGS_CHAR) ? (unsigned char)va_arg(va, unsigned int) : (flags & FLAGS_SHORT) ? (unsigned short int)va_arg(va, unsigned int) : va_arg(va, unsigned int);
+  201fc8:	11002343 	add	w3, w26, #0x8
+  201fcc:	7100007f 	cmp	w3, #0x0
+  201fd0:	5400050d 	b.le	202070 <_vsnprintf+0xca0>
+  201fd4:	aa1703e0 	mov	x0, x23
+  201fd8:	91002ee4 	add	x4, x23, #0xb
+  201fdc:	927df097 	and	x23, x4, #0xfffffffffffffff8
+  201fe0:	2a0303fa 	mov	w26, w3
+  201fe4:	b9400004 	ldr	w4, [x0]
+  201fe8:	17ffff50 	b	201d28 <_vsnprintf+0x958>
+            const int value = (flags & FLAGS_CHAR) ? (char)va_arg(va, int) : (flags & FLAGS_SHORT) ? (short int)va_arg(va, int) : va_arg(va, int);
+  201fec:	11002343 	add	w3, w26, #0x8
+  201ff0:	7100007f 	cmp	w3, #0x0
+  201ff4:	5400048d 	b.le	202084 <_vsnprintf+0xcb4>
+  201ff8:	91002ee4 	add	x4, x23, #0xb
+  201ffc:	aa1703e0 	mov	x0, x23
+  202000:	2a0303fa 	mov	w26, w3
+  202004:	927df097 	and	x23, x4, #0xfffffffffffffff8
+  202008:	17fffe77 	b	2019e4 <_vsnprintf+0x614>
+            const unsigned int value = (flags & FLAGS_CHAR) ? (unsigned char)va_arg(va, unsigned int) : (flags & FLAGS_SHORT) ? (unsigned short int)va_arg(va, unsigned int) : va_arg(va, unsigned int);
+  20200c:	11002343 	add	w3, w26, #0x8
+  202010:	7100007f 	cmp	w3, #0x0
+  202014:	5400040d 	b.le	202094 <_vsnprintf+0xcc4>
+  202018:	aa1703e0 	mov	x0, x23
+  20201c:	91002ee4 	add	x4, x23, #0xb
+  202020:	927df097 	and	x23, x4, #0xfffffffffffffff8
+  202024:	2a0303fa 	mov	w26, w3
+  202028:	79400004 	ldrh	w4, [x0]
+  20202c:	17ffff3f 	b	201d28 <_vsnprintf+0x958>
+            idx = _ntoa_long(out, buffer, idx, maxlen, va_arg(va, unsigned long), false, base, precision, width, flags);
+  202030:	f94047e0 	ldr	x0, [sp, #136]
+  202034:	8b3ac000 	add	x0, x0, w26, sxtw
+  202038:	2a0303fa 	mov	w26, w3
+  20203c:	17ffff84 	b	201e4c <_vsnprintf+0xa7c>
+            const int value = (flags & FLAGS_CHAR) ? (char)va_arg(va, int) : (flags & FLAGS_SHORT) ? (short int)va_arg(va, int) : va_arg(va, int);
+  202040:	11002343 	add	w3, w26, #0x8
+  202044:	7100007f 	cmp	w3, #0x0
+  202048:	5400030d 	b.le	2020a8 <_vsnprintf+0xcd8>
+  20204c:	91002ee4 	add	x4, x23, #0xb
+  202050:	aa1703e0 	mov	x0, x23
+  202054:	2a0303fa 	mov	w26, w3
+  202058:	927df097 	and	x23, x4, #0xfffffffffffffff8
+  20205c:	17ffff98 	b	201ebc <_vsnprintf+0xaec>
+            const unsigned int value = (flags & FLAGS_CHAR) ? (unsigned char)va_arg(va, unsigned int) : (flags & FLAGS_SHORT) ? (unsigned short int)va_arg(va, unsigned int) : va_arg(va, unsigned int);
+  202060:	f94047e0 	ldr	x0, [sp, #136]
+  202064:	8b3ac000 	add	x0, x0, w26, sxtw
+  202068:	2a0303fa 	mov	w26, w3
+  20206c:	17ffff2e 	b	201d24 <_vsnprintf+0x954>
+  202070:	f94047e0 	ldr	x0, [sp, #136]
+  202074:	8b3ac000 	add	x0, x0, w26, sxtw
+  202078:	2a0303fa 	mov	w26, w3
+  20207c:	b9400004 	ldr	w4, [x0]
+  202080:	17ffff2a 	b	201d28 <_vsnprintf+0x958>
+            const int value = (flags & FLAGS_CHAR) ? (char)va_arg(va, int) : (flags & FLAGS_SHORT) ? (short int)va_arg(va, int) : va_arg(va, int);
+  202084:	f94047e0 	ldr	x0, [sp, #136]
+  202088:	8b3ac000 	add	x0, x0, w26, sxtw
+  20208c:	2a0303fa 	mov	w26, w3
+  202090:	17fffe55 	b	2019e4 <_vsnprintf+0x614>
+            const unsigned int value = (flags & FLAGS_CHAR) ? (unsigned char)va_arg(va, unsigned int) : (flags & FLAGS_SHORT) ? (unsigned short int)va_arg(va, unsigned int) : va_arg(va, unsigned int);
+  202094:	f94047e0 	ldr	x0, [sp, #136]
+  202098:	8b3ac000 	add	x0, x0, w26, sxtw
+  20209c:	2a0303fa 	mov	w26, w3
+  2020a0:	79400004 	ldrh	w4, [x0]
+  2020a4:	17ffff21 	b	201d28 <_vsnprintf+0x958>
+            const int value = (flags & FLAGS_CHAR) ? (char)va_arg(va, int) : (flags & FLAGS_SHORT) ? (short int)va_arg(va, int) : va_arg(va, int);
+  2020a8:	f94047e0 	ldr	x0, [sp, #136]
+  2020ac:	8b3ac000 	add	x0, x0, w26, sxtw
+  2020b0:	2a0303fa 	mov	w26, w3
+  2020b4:	17ffff82 	b	201ebc <_vsnprintf+0xaec>
+  2020b8:	2a0103e6 	mov	w6, w1
+  2020bc:	d2800142 	mov	x2, #0xa                   	// #10
+  2020c0:	17fffeb8 	b	201ba0 <_vsnprintf+0x7d0>
+  2020c4:	d503201f 	nop
+  2020c8:	d503201f 	nop
+  2020cc:	d503201f 	nop
+
+00000000002020d0 <sddf_printf_>:
+
+
+///////////////////////////////////////////////////////////////////////////////
+
+int sddf_printf_(const char* format, ...)
+{
+  2020d0:	a9ae7bfd 	stp	x29, x30, [sp, #-288]!
+  va_list va;
+  va_start(va, format);
+  2020d4:	12800fe9 	mov	w9, #0xffffff80            	// #-128
+  2020d8:	128006ea 	mov	w10, #0xffffffc8            	// #-56
+{
+  2020dc:	910003fd 	mov	x29, sp
+  va_start(va, format);
+  2020e0:	910383eb 	add	x11, sp, #0xe0
+  2020e4:	910483e8 	add	x8, sp, #0x120
+  2020e8:	a90423e8 	stp	x8, x8, [sp, #64]
+{
+  2020ec:	aa0003e8 	mov	x8, x0
+  char buffer[1];
+  const int ret = _vsnprintf(_out_char, buffer, (size_t)-1, format, va);
+  2020f0:	d0ffffe0 	adrp	x0, 200000 <_start>
+  2020f4:	91304000 	add	x0, x0, #0xc10
+  va_start(va, format);
+  2020f8:	f9002beb 	str	x11, [sp, #80]
+  2020fc:	290b27ea 	stp	w10, w9, [sp, #88]
+  const int ret = _vsnprintf(_out_char, buffer, (size_t)-1, format, va);
+  202100:	a94437ec 	ldp	x12, x13, [sp, #64]
+  202104:	a90137ec 	stp	x12, x13, [sp, #16]
+  202108:	a9452fea 	ldp	x10, x11, [sp, #80]
+  20210c:	a9022fea 	stp	x10, x11, [sp, #32]
+{
+  202110:	3d801be0 	str	q0, [sp, #96]
+  202114:	3d801fe1 	str	q1, [sp, #112]
+  202118:	3d8023e2 	str	q2, [sp, #128]
+  20211c:	3d8027e3 	str	q3, [sp, #144]
+  202120:	3d802be4 	str	q4, [sp, #160]
+  202124:	3d802fe5 	str	q5, [sp, #176]
+  202128:	3d8033e6 	str	q6, [sp, #192]
+  20212c:	3d8037e7 	str	q7, [sp, #208]
+  202130:	a90e8be1 	stp	x1, x2, [sp, #232]
+  const int ret = _vsnprintf(_out_char, buffer, (size_t)-1, format, va);
+  202134:	9100e3e1 	add	x1, sp, #0x38
+  202138:	92800002 	mov	x2, #0xffffffffffffffff    	// #-1
+{
+  20213c:	a90f93e3 	stp	x3, x4, [sp, #248]
+  const int ret = _vsnprintf(_out_char, buffer, (size_t)-1, format, va);
+  202140:	910043e4 	add	x4, sp, #0x10
+  202144:	aa0803e3 	mov	x3, x8
+{
+  202148:	a9109be5 	stp	x5, x6, [sp, #264]
+  20214c:	f9008fe7 	str	x7, [sp, #280]
+  const int ret = _vsnprintf(_out_char, buffer, (size_t)-1, format, va);
+  202150:	97fffca0 	bl	2013d0 <_vsnprintf>
+  va_end(va);
+  return ret;
+}
+  202154:	a8d27bfd 	ldp	x29, x30, [sp], #288
+  202158:	d65f03c0 	ret
+  20215c:	d503201f 	nop
+
+0000000000202160 <sddf_sprintf_>:
+
+
+int sddf_sprintf_(char* buffer, const char* format, ...)
+{
+  202160:	a9b07bfd 	stp	x29, x30, [sp, #-256]!
+  va_list va;
+  va_start(va, format);
+  202164:	12800fe9 	mov	w9, #0xffffff80            	// #-128
+  202168:	128005ea 	mov	w10, #0xffffffd0            	// #-48
+{
+  20216c:	910003fd 	mov	x29, sp
+  va_start(va, format);
+  202170:	910343e8 	add	x8, sp, #0xd0
+  202174:	910403eb 	add	x11, sp, #0x100
+  202178:	a9032feb 	stp	x11, x11, [sp, #48]
+  20217c:	f90023e8 	str	x8, [sp, #64]
+{
+  202180:	aa0103e8 	mov	x8, x1
+  va_start(va, format);
+  202184:	290927ea 	stp	w10, w9, [sp, #72]
+  const int ret = _vsnprintf(_out_buffer, buffer, (size_t)-1, format, va);
+  202188:	aa0003e1 	mov	x1, x0
+  20218c:	a94337ec 	ldp	x12, x13, [sp, #48]
+  202190:	d0ffffe0 	adrp	x0, 200000 <_start>
+  202194:	a9442fea 	ldp	x10, x11, [sp, #64]
+  202198:	911cc000 	add	x0, x0, #0x730
+  20219c:	a90137ec 	stp	x12, x13, [sp, #16]
+  2021a0:	a9022fea 	stp	x10, x11, [sp, #32]
+{
+  2021a4:	3d8017e0 	str	q0, [sp, #80]
+  2021a8:	3d801be1 	str	q1, [sp, #96]
+  2021ac:	3d801fe2 	str	q2, [sp, #112]
+  2021b0:	3d8023e3 	str	q3, [sp, #128]
+  2021b4:	3d8027e4 	str	q4, [sp, #144]
+  2021b8:	3d802be5 	str	q5, [sp, #160]
+  2021bc:	3d802fe6 	str	q6, [sp, #176]
+  2021c0:	3d8033e7 	str	q7, [sp, #192]
+  2021c4:	a90d0fe2 	stp	x2, x3, [sp, #208]
+  const int ret = _vsnprintf(_out_buffer, buffer, (size_t)-1, format, va);
+  2021c8:	aa0803e3 	mov	x3, x8
+  2021cc:	92800002 	mov	x2, #0xffffffffffffffff    	// #-1
+{
+  2021d0:	a90e17e4 	stp	x4, x5, [sp, #224]
+  const int ret = _vsnprintf(_out_buffer, buffer, (size_t)-1, format, va);
+  2021d4:	910043e4 	add	x4, sp, #0x10
+{
+  2021d8:	a90f1fe6 	stp	x6, x7, [sp, #240]
+  const int ret = _vsnprintf(_out_buffer, buffer, (size_t)-1, format, va);
+  2021dc:	97fffc7d 	bl	2013d0 <_vsnprintf>
+  va_end(va);
+  return ret;
+}
+  2021e0:	a8d07bfd 	ldp	x29, x30, [sp], #256
+  2021e4:	d65f03c0 	ret
+  2021e8:	d503201f 	nop
+  2021ec:	d503201f 	nop
+
+00000000002021f0 <sddf_snprintf_>:
+
+
+int sddf_snprintf_(char* buffer, size_t count, const char* format, ...)
+{
+  2021f0:	a9b07bfd 	stp	x29, x30, [sp, #-256]!
+  va_list va;
+  va_start(va, format);
+  2021f4:	128004e8 	mov	w8, #0xffffffd8            	// #-40
+  2021f8:	12800fea 	mov	w10, #0xffffff80            	// #-128
+{
+  2021fc:	910003fd 	mov	x29, sp
+  va_start(va, format);
+  202200:	910343e9 	add	x9, sp, #0xd0
+  202204:	910403eb 	add	x11, sp, #0x100
+  202208:	a9032feb 	stp	x11, x11, [sp, #48]
+  20220c:	f90023e9 	str	x9, [sp, #64]
+{
+  202210:	aa0103e9 	mov	x9, x1
+  va_start(va, format);
+  202214:	29092be8 	stp	w8, w10, [sp, #72]
+{
+  202218:	aa0203e8 	mov	x8, x2
+  const int ret = _vsnprintf(_out_buffer, buffer, count, format, va);
+  20221c:	a94337ec 	ldp	x12, x13, [sp, #48]
+  202220:	aa0003e1 	mov	x1, x0
+  202224:	a9442fea 	ldp	x10, x11, [sp, #64]
+  202228:	aa0903e2 	mov	x2, x9
+  20222c:	d0ffffe0 	adrp	x0, 200000 <_start>
+  202230:	911cc000 	add	x0, x0, #0x730
+  202234:	a90137ec 	stp	x12, x13, [sp, #16]
+  202238:	a9022fea 	stp	x10, x11, [sp, #32]
+{
+  20223c:	3d8017e0 	str	q0, [sp, #80]
+  202240:	3d801be1 	str	q1, [sp, #96]
+  202244:	3d801fe2 	str	q2, [sp, #112]
+  202248:	3d8023e3 	str	q3, [sp, #128]
+  20224c:	3d8027e4 	str	q4, [sp, #144]
+  202250:	3d802be5 	str	q5, [sp, #160]
+  202254:	3d802fe6 	str	q6, [sp, #176]
+  202258:	3d8033e7 	str	q7, [sp, #192]
+  20225c:	a90d93e3 	stp	x3, x4, [sp, #216]
+  const int ret = _vsnprintf(_out_buffer, buffer, count, format, va);
+  202260:	910043e4 	add	x4, sp, #0x10
+  202264:	aa0803e3 	mov	x3, x8
+{
+  202268:	a90e9be5 	stp	x5, x6, [sp, #232]
+  20226c:	f9007fe7 	str	x7, [sp, #248]
+  const int ret = _vsnprintf(_out_buffer, buffer, count, format, va);
+  202270:	97fffc58 	bl	2013d0 <_vsnprintf>
+  va_end(va);
+  return ret;
+}
+  202274:	a8d07bfd 	ldp	x29, x30, [sp], #256
+  202278:	d65f03c0 	ret
+  20227c:	d503201f 	nop
+
+0000000000202280 <sddf_vprintf_>:
+
+
+int sddf_vprintf_(const char* format, va_list va)
+{
+  202280:	aa0103e5 	mov	x5, x1
+  202284:	a9bc7bfd 	stp	x29, x30, [sp, #-64]!
+  char buffer[1];
+  return _vsnprintf(_out_char, buffer, (size_t)-1, format, va);
+  202288:	aa0003e3 	mov	x3, x0
+{
+  20228c:	910003fd 	mov	x29, sp
+  return _vsnprintf(_out_char, buffer, (size_t)-1, format, va);
+  202290:	a9401ca6 	ldp	x6, x7, [x5]
+  202294:	f9000be6 	str	x6, [sp, #16]
+  202298:	910043e4 	add	x4, sp, #0x10
+  20229c:	9100e3e1 	add	x1, sp, #0x38
+  2022a0:	f94008a6 	ldr	x6, [x5, #16]
+  2022a4:	f9000fe7 	str	x7, [sp, #24]
+  2022a8:	92800002 	mov	x2, #0xffffffffffffffff    	// #-1
+  2022ac:	d0ffffe0 	adrp	x0, 200000 <_start>
+  2022b0:	f9400ca5 	ldr	x5, [x5, #24]
+  2022b4:	91304000 	add	x0, x0, #0xc10
+  2022b8:	a90217e6 	stp	x6, x5, [sp, #32]
+  2022bc:	97fffc45 	bl	2013d0 <_vsnprintf>
+}
+  2022c0:	a8c47bfd 	ldp	x29, x30, [sp], #64
+  2022c4:	d65f03c0 	ret
+  2022c8:	d503201f 	nop
+  2022cc:	d503201f 	nop
+
+00000000002022d0 <sddf_vsnprintf_>:
+
+
+int sddf_vsnprintf_(char* buffer, size_t count, const char* format, va_list va)
+{
+  2022d0:	aa0303e5 	mov	x5, x3
+  2022d4:	a9bd7bfd 	stp	x29, x30, [sp, #-48]!
+  2022d8:	aa0103e4 	mov	x4, x1
+  2022dc:	910003fd 	mov	x29, sp
+  return _vsnprintf(_out_buffer, buffer, count, format, va);
+  2022e0:	a9401ca8 	ldp	x8, x7, [x5]
+  2022e4:	aa0003e1 	mov	x1, x0
+  2022e8:	a94114a6 	ldp	x6, x5, [x5, #16]
+  2022ec:	aa0203e3 	mov	x3, x2
+  2022f0:	d0ffffe0 	adrp	x0, 200000 <_start>
+  2022f4:	911cc000 	add	x0, x0, #0x730
+  2022f8:	aa0403e2 	mov	x2, x4
+  2022fc:	910043e4 	add	x4, sp, #0x10
+  202300:	a9011fe8 	stp	x8, x7, [sp, #16]
+  202304:	a90217e6 	stp	x6, x5, [sp, #32]
+  202308:	97fffc32 	bl	2013d0 <_vsnprintf>
+}
+  20230c:	a8c37bfd 	ldp	x29, x30, [sp], #48
+  202310:	d65f03c0 	ret
+  202314:	d503201f 	nop
+  202318:	d503201f 	nop
+  20231c:	d503201f 	nop
+
+0000000000202320 <sddf_fctprintf>:
+
+
+int sddf_fctprintf(void (*out)(char character, void* arg), void* arg, const char* format, ...)
+{
+  202320:	a9af7bfd 	stp	x29, x30, [sp, #-272]!
+  va_list va;
+  va_start(va, format);
+  202324:	12800feb 	mov	w11, #0xffffff80            	// #-128
+  202328:	128004e9 	mov	w9, #0xffffffd8            	// #-40
+{
+  20232c:	910003fd 	mov	x29, sp
+  va_start(va, format);
+  202330:	910383ea 	add	x10, sp, #0xe0
+  202334:	910443e8 	add	x8, sp, #0x110
+  202338:	a90423e8 	stp	x8, x8, [sp, #64]
+{
+  20233c:	aa0203e8 	mov	x8, x2
+  const out_fct_wrap_type out_fct_wrap = { out, arg };
+  const int ret = _vsnprintf(_out_fct, (char*)(uintptr_t)&out_fct_wrap, (size_t)-1, format, va);
+  202340:	92800002 	mov	x2, #0xffffffffffffffff    	// #-1
+  va_start(va, format);
+  202344:	f9002bea 	str	x10, [sp, #80]
+{
+  202348:	aa0003ea 	mov	x10, x0
+  va_start(va, format);
+  20234c:	290b2fe9 	stp	w9, w11, [sp, #88]
+{
+  202350:	aa0103e9 	mov	x9, x1
+  const int ret = _vsnprintf(_out_fct, (char*)(uintptr_t)&out_fct_wrap, (size_t)-1, format, va);
+  202354:	a9443fee 	ldp	x14, x15, [sp, #64]
+  202358:	9100c3e1 	add	x1, sp, #0x30
+  20235c:	a94537ec 	ldp	x12, x13, [sp, #80]
+  202360:	d0ffffe0 	adrp	x0, 200000 <_start>
+  202364:	91308000 	add	x0, x0, #0xc20
+  202368:	a9013fee 	stp	x14, x15, [sp, #16]
+  20236c:	a90237ec 	stp	x12, x13, [sp, #32]
+  const out_fct_wrap_type out_fct_wrap = { out, arg };
+  202370:	a90327ea 	stp	x10, x9, [sp, #48]
+{
+  202374:	3d801be0 	str	q0, [sp, #96]
+  202378:	3d801fe1 	str	q1, [sp, #112]
+  20237c:	3d8023e2 	str	q2, [sp, #128]
+  202380:	3d8027e3 	str	q3, [sp, #144]
+  202384:	3d802be4 	str	q4, [sp, #160]
+  202388:	3d802fe5 	str	q5, [sp, #176]
+  20238c:	3d8033e6 	str	q6, [sp, #192]
+  202390:	3d8037e7 	str	q7, [sp, #208]
+  202394:	a90e93e3 	stp	x3, x4, [sp, #232]
+  const int ret = _vsnprintf(_out_fct, (char*)(uintptr_t)&out_fct_wrap, (size_t)-1, format, va);
+  202398:	910043e4 	add	x4, sp, #0x10
+  20239c:	aa0803e3 	mov	x3, x8
+{
+  2023a0:	a90f9be5 	stp	x5, x6, [sp, #248]
+  2023a4:	f90087e7 	str	x7, [sp, #264]
+  const int ret = _vsnprintf(_out_fct, (char*)(uintptr_t)&out_fct_wrap, (size_t)-1, format, va);
+  2023a8:	97fffc0a 	bl	2013d0 <_vsnprintf>
+  va_end(va);
+  return ret;
+}
+  2023ac:	a8d17bfd 	ldp	x29, x30, [sp], #272
+  2023b0:	d65f03c0 	ret
+	...
+
+00000000002023c0 <_assert_fail>:
+ */
+
+#include <sddf/util/printf.h>
+
+void _assert_fail(const char  *assertion, const char  *file, unsigned int line, const char  *function)
+{
+  2023c0:	2a0203e5 	mov	w5, w2
+  2023c4:	a9bf7bfd 	stp	x29, x30, [sp, #-16]!
+  2023c8:	aa0103e4 	mov	x4, x1
+  2023cc:	910003fd 	mov	x29, sp
+    sddf_dprintf("Failed assertion '%s' at %s:%u in function %s\n", assertion, file, line, function);
+  2023d0:	aa0003e1 	mov	x1, x0
+  2023d4:	aa0403e2 	mov	x2, x4
+  2023d8:	aa0303e4 	mov	x4, x3
+  2023dc:	90000000 	adrp	x0, 202000 <_vsnprintf+0xc30>
+  2023e0:	91292000 	add	x0, x0, #0xa48
+  2023e4:	2a0503e3 	mov	w3, w5
+  2023e8:	97ffff3a 	bl	2020d0 <sddf_printf_>
+    __builtin_trap();
+  2023ec:	d4207d00 	brk	#0x3e8
+
+00000000002023f0 <_sddf_putchar>:
+
+static char string_buffer[MAX_STRING_LENGTH + 1];
+static uint32_t local_tail;
+
+void _sddf_putchar(char character)
+{
+  2023f0:	a9be7bfd 	stp	x29, x30, [sp, #-32]!
+    string_buffer[local_tail] = character;
+  2023f4:	d0000001 	adrp	x1, 204000 <state+0x80>
+  2023f8:	91158021 	add	x1, x1, #0x560
+{
+  2023fc:	910003fd 	mov	x29, sp
+  202400:	f9000bf3 	str	x19, [sp, #16]
+    string_buffer[local_tail] = character;
+  202404:	d0000013 	adrp	x19, 204000 <state+0x80>
+  202408:	b9455263 	ldr	w3, [x19, #1360]
+{
+  20240c:	12001c00 	and	w0, w0, #0xff
+    local_tail++;
+  202410:	11000462 	add	w2, w3, #0x1
+  202414:	b9055262 	str	w2, [x19, #1360]
+
+    if (character == FLUSH_CHAR || local_tail == MAX_STRING_LENGTH) {
+  202418:	7140045f 	cmp	w2, #0x1, lsl #12
+    string_buffer[local_tail] = character;
+  20241c:	38234820 	strb	w0, [x1, w3, uxtw]
+    if (character == FLUSH_CHAR || local_tail == MAX_STRING_LENGTH) {
+  202420:	7a4a1804 	ccmp	w0, #0xa, #0x4, ne	// ne = any
+  202424:	540000a1 	b.ne	202438 <_sddf_putchar+0x48>  // b.any
+        string_buffer[local_tail] = '\0';
+        microkit_dbg_puts(string_buffer);
+  202428:	aa0103e0 	mov	x0, x1
+        string_buffer[local_tail] = '\0';
+  20242c:	3822483f 	strb	wzr, [x1, w2, uxtw]
+        microkit_dbg_puts(string_buffer);
+  202430:	94000084 	bl	202640 <microkit_dbg_puts>
+        local_tail = 0;
+  202434:	b905527f 	str	wzr, [x19, #1360]
+    }
+  202438:	f9400bf3 	ldr	x19, [sp, #16]
+  20243c:	a8c27bfd 	ldp	x29, x30, [sp], #32
+  202440:	d65f03c0 	ret
+	...
+
+0000000000202450 <protected>:
+  202450:	a9bf7bfd 	stp	x29, x30, [sp, #-16]!
+  202454:	f0000000 	adrp	x0, 205000 <string_buffer+0xaa0>
+  202458:	9115c000 	add	x0, x0, #0x570
+  20245c:	910003fd 	mov	x29, sp
+  202460:	94000078 	bl	202640 <microkit_dbg_puts>
+  202464:	90000000 	adrp	x0, 202000 <_vsnprintf+0xc30>
+  202468:	9129e000 	add	x0, x0, #0xa78
+  20246c:	94000075 	bl	202640 <microkit_dbg_puts>
+  202470:	d2800000 	mov	x0, #0x0                   	// #0
+  202474:	b900001f 	str	wzr, [x0]
+  202478:	d4207d00 	brk	#0x3e8
+  20247c:	d503201f 	nop
+
+0000000000202480 <fault>:
+  202480:	a9bf7bfd 	stp	x29, x30, [sp, #-16]!
+  202484:	f0000000 	adrp	x0, 205000 <string_buffer+0xaa0>
+  202488:	9115c000 	add	x0, x0, #0x570
+  20248c:	910003fd 	mov	x29, sp
+  202490:	9400006c 	bl	202640 <microkit_dbg_puts>
+  202494:	90000000 	adrp	x0, 202000 <_vsnprintf+0xc30>
+  202498:	912aa000 	add	x0, x0, #0xaa8
+  20249c:	94000069 	bl	202640 <microkit_dbg_puts>
+  2024a0:	d2800000 	mov	x0, #0x0                   	// #0
+  2024a4:	b900001f 	str	wzr, [x0]
+  2024a8:	d4207d00 	brk	#0x3e8
+  2024ac:	00000000 	udf	#0
+
+00000000002024b0 <main>:
+  2024b0:	a9bc7bfd 	stp	x29, x30, [sp, #-64]!
+  2024b4:	b0000000 	adrp	x0, 203000 <__sel4_ipc_buffer>
+  2024b8:	91000000 	add	x0, x0, #0x0
+  2024bc:	910003fd 	mov	x29, sp
+  2024c0:	a90153f3 	stp	x19, x20, [sp, #16]
+  2024c4:	b0000014 	adrp	x20, 203000 <__sel4_ipc_buffer>
+  2024c8:	91000294 	add	x20, x20, #0x0
+  2024cc:	a9025bf5 	stp	x21, x22, [sp, #32]
+  2024d0:	eb140015 	subs	x21, x0, x20
+  2024d4:	54000100 	b.eq	2024f4 <main+0x44>  // b.none
+  2024d8:	9343feb5 	asr	x21, x21, #3
+  2024dc:	d2800013 	mov	x19, #0x0                   	// #0
+  2024e0:	f8737a80 	ldr	x0, [x20, x19, lsl #3]
+  2024e4:	91000673 	add	x19, x19, #0x1
+  2024e8:	d63f0000 	blr	x0
+  2024ec:	eb1302bf 	cmp	x21, x19
+  2024f0:	54ffff88 	b.hi	2024e0 <main+0x30>  // b.pmore
+  2024f4:	f0000016 	adrp	x22, 205000 <string_buffer+0xaa0>
+  2024f8:	9115c2d6 	add	x22, x22, #0x570
+  2024fc:	97fff809 	bl	200520 <init>
+  202500:	394102c0 	ldrb	w0, [x22, #64]
+  202504:	340000a0 	cbz	w0, 202518 <main+0x68>
+  202508:	52800021 	mov	w1, #0x1                   	// #1
+  20250c:	d28000a0 	mov	x0, #0x5                   	// #5
+  202510:	390106c1 	strb	w1, [x22, #65]
+  202514:	a90482df 	stp	xzr, x0, [x22, #72]
+  202518:	b0000015 	adrp	x21, 203000 <__sel4_ipc_buffer>
+  20251c:	910002b5 	add	x21, x21, #0x0
+  202520:	52800000 	mov	w0, #0x0                   	// #0
+  202524:	d503201f 	nop
+  202528:	35000220 	cbnz	w0, 20256c <main+0xbc>
+  20252c:	39c106c0 	ldrsb	w0, [x22, #65]
+  202530:	350004e0 	cbnz	w0, 2025cc <main+0x11c>
+  202534:	d2800020 	mov	x0, #0x1                   	// #1
+  202538:	d2800086 	mov	x6, #0x4                   	// #4
+  20253c:	928000c7 	mov	x7, #0xfffffffffffffff9    	// #-7
+  202540:	d4000001 	svc	#0x0
+  202544:	f94002a6 	ldr	x6, [x21]
+  202548:	aa0003f3 	mov	x19, x0
+  20254c:	a9008cc2 	stp	x2, x3, [x6, #8]
+  202550:	a90194c4 	stp	x4, x5, [x6, #24]
+  202554:	b7f00313 	tbnz	x19, #62, 2025b4 <main+0x104>
+  202558:	52800014 	mov	w20, #0x0                   	// #0
+  20255c:	b6f801b3 	tbz	x19, #63, 202590 <main+0xe0>
+  202560:	12001660 	and	w0, w19, #0x3f
+  202564:	97ffffbb 	bl	202450 <protected>
+  202568:	f9001fe0 	str	x0, [sp, #56]
+  20256c:	f94002a5 	ldr	x5, [x21]
+  202570:	d2800020 	mov	x0, #0x1                   	// #1
+  202574:	f9401fe1 	ldr	x1, [sp, #56]
+  202578:	d2800086 	mov	x6, #0x4                   	// #4
+  20257c:	a9408ca2 	ldp	x2, x3, [x5, #8]
+  202580:	92800027 	mov	x7, #0xfffffffffffffffe    	// #-2
+  202584:	a94194a4 	ldp	x4, x5, [x5, #24]
+  202588:	d4000001 	svc	#0x0
+  20258c:	17ffffee 	b	202544 <main+0x94>
+  202590:	370000d3 	tbnz	w19, #0, 2025a8 <main+0xf8>
+  202594:	d503201f 	nop
+  202598:	d341fe73 	lsr	x19, x19, #1
+  20259c:	11000694 	add	w20, w20, #0x1
+  2025a0:	b4fffc73 	cbz	x19, 20252c <main+0x7c>
+  2025a4:	3607ffb3 	tbz	w19, #0, 202598 <main+0xe8>
+  2025a8:	2a1403e0 	mov	w0, w20
+  2025ac:	97fff7d5 	bl	200500 <notified>
+  2025b0:	17fffffa 	b	202598 <main+0xe8>
+  2025b4:	12001e60 	and	w0, w19, #0xff
+  2025b8:	9100e3e2 	add	x2, sp, #0x38
+  2025bc:	97ffffb1 	bl	202480 <fault>
+  2025c0:	72001c1f 	tst	w0, #0xff
+  2025c4:	1a9f07e0 	cset	w0, ne	// ne = any
+  2025c8:	17ffffd8 	b	202528 <main+0x78>
+  2025cc:	f94002a5 	ldr	x5, [x21]
+  2025d0:	d2800020 	mov	x0, #0x1                   	// #1
+  2025d4:	a944a2c1 	ldp	x1, x8, [x22, #72]
+  2025d8:	d2800086 	mov	x6, #0x4                   	// #4
+  2025dc:	a9408ca2 	ldp	x2, x3, [x5, #8]
+  2025e0:	92800047 	mov	x7, #0xfffffffffffffffd    	// #-3
+  2025e4:	a94194a4 	ldp	x4, x5, [x5, #24]
+  2025e8:	d4000001 	svc	#0x0
+  2025ec:	f94002a6 	ldr	x6, [x21]
+  2025f0:	aa0003f3 	mov	x19, x0
+  2025f4:	390106df 	strb	wzr, [x22, #65]
+  2025f8:	a9008cc2 	stp	x2, x3, [x6, #8]
+  2025fc:	a90194c4 	stp	x4, x5, [x6, #24]
+  202600:	17ffffd5 	b	202554 <main+0xa4>
+	...
+
+0000000000202610 <microkit_dbg_putc>:
+  202610:	d2800001 	mov	x1, #0x0                   	// #0
+  202614:	92401c00 	and	x0, x0, #0xff
+  202618:	d2800002 	mov	x2, #0x0                   	// #0
+  20261c:	d2800003 	mov	x3, #0x0                   	// #0
+  202620:	d2800004 	mov	x4, #0x0                   	// #0
+  202624:	d2800005 	mov	x5, #0x0                   	// #0
+  202628:	d2800006 	mov	x6, #0x0                   	// #0
+  20262c:	92800167 	mov	x7, #0xfffffffffffffff4    	// #-12
+  202630:	d4000001 	svc	#0x0
+  202634:	d65f03c0 	ret
+  202638:	d503201f 	nop
+  20263c:	d503201f 	nop
+
+0000000000202640 <microkit_dbg_puts>:
+  202640:	aa0003e8 	mov	x8, x0
+  202644:	39400000 	ldrb	w0, [x0]
+  202648:	34000180 	cbz	w0, 202678 <microkit_dbg_puts+0x38>
+  20264c:	d503201f 	nop
+  202650:	d2800001 	mov	x1, #0x0                   	// #0
+  202654:	d2800002 	mov	x2, #0x0                   	// #0
+  202658:	d2800003 	mov	x3, #0x0                   	// #0
+  20265c:	d2800004 	mov	x4, #0x0                   	// #0
+  202660:	d2800005 	mov	x5, #0x0                   	// #0
+  202664:	d2800006 	mov	x6, #0x0                   	// #0
+  202668:	92800167 	mov	x7, #0xfffffffffffffff4    	// #-12
+  20266c:	d4000001 	svc	#0x0
+  202670:	38401d00 	ldrb	w0, [x8, #1]!
+  202674:	35fffee0 	cbnz	w0, 202650 <microkit_dbg_puts+0x10>
+  202678:	d65f03c0 	ret
+  20267c:	d503201f 	nop
+
+0000000000202680 <__assert_fail>:
+  202680:	9000000b 	adrp	x11, 202000 <_vsnprintf+0xc30>
+  202684:	912b416b 	add	x11, x11, #0xad0
+  202688:	aa0103e9 	mov	x9, x1
+  20268c:	aa0303e8 	mov	x8, x3
+  202690:	aa0003ea 	mov	x10, x0
+  202694:	d2800c20 	mov	x0, #0x61                  	// #97
+  202698:	d2800001 	mov	x1, #0x0                   	// #0
+  20269c:	d2800002 	mov	x2, #0x0                   	// #0
+  2026a0:	d2800003 	mov	x3, #0x0                   	// #0
+  2026a4:	d2800004 	mov	x4, #0x0                   	// #0
+  2026a8:	d2800005 	mov	x5, #0x0                   	// #0
+  2026ac:	d2800006 	mov	x6, #0x0                   	// #0
+  2026b0:	92800167 	mov	x7, #0xfffffffffffffff4    	// #-12
+  2026b4:	d4000001 	svc	#0x0
+  2026b8:	38401d60 	ldrb	w0, [x11, #1]!
+  2026bc:	35fffee0 	cbnz	w0, 202698 <__assert_fail+0x18>
+  2026c0:	39400140 	ldrb	w0, [x10]
+  2026c4:	34000160 	cbz	w0, 2026f0 <__assert_fail+0x70>
+  2026c8:	d2800001 	mov	x1, #0x0                   	// #0
+  2026cc:	d2800002 	mov	x2, #0x0                   	// #0
+  2026d0:	d2800003 	mov	x3, #0x0                   	// #0
+  2026d4:	d2800004 	mov	x4, #0x0                   	// #0
+  2026d8:	d2800005 	mov	x5, #0x0                   	// #0
+  2026dc:	d2800006 	mov	x6, #0x0                   	// #0
+  2026e0:	92800167 	mov	x7, #0xfffffffffffffff4    	// #-12
+  2026e4:	d4000001 	svc	#0x0
+  2026e8:	38401d40 	ldrb	w0, [x10, #1]!
+  2026ec:	35fffee0 	cbnz	w0, 2026c8 <__assert_fail+0x48>
+  2026f0:	d2800400 	mov	x0, #0x20                  	// #32
+  2026f4:	d2800001 	mov	x1, #0x0                   	// #0
+  2026f8:	d2800002 	mov	x2, #0x0                   	// #0
+  2026fc:	d2800003 	mov	x3, #0x0                   	// #0
+  202700:	d2800004 	mov	x4, #0x0                   	// #0
+  202704:	d2800005 	mov	x5, #0x0                   	// #0
+  202708:	d2800006 	mov	x6, #0x0                   	// #0
+  20270c:	92800167 	mov	x7, #0xfffffffffffffff4    	// #-12
+  202710:	d4000001 	svc	#0x0
+  202714:	39400120 	ldrb	w0, [x9]
+  202718:	34000180 	cbz	w0, 202748 <__assert_fail+0xc8>
+  20271c:	d503201f 	nop
+  202720:	d2800001 	mov	x1, #0x0                   	// #0
+  202724:	d2800002 	mov	x2, #0x0                   	// #0
+  202728:	d2800003 	mov	x3, #0x0                   	// #0
+  20272c:	d2800004 	mov	x4, #0x0                   	// #0
+  202730:	d2800005 	mov	x5, #0x0                   	// #0
+  202734:	d2800006 	mov	x6, #0x0                   	// #0
+  202738:	92800167 	mov	x7, #0xfffffffffffffff4    	// #-12
+  20273c:	d4000001 	svc	#0x0
+  202740:	38401d20 	ldrb	w0, [x9, #1]!
+  202744:	35fffee0 	cbnz	w0, 202720 <__assert_fail+0xa0>
+  202748:	d2800400 	mov	x0, #0x20                  	// #32
+  20274c:	d2800001 	mov	x1, #0x0                   	// #0
+  202750:	d2800002 	mov	x2, #0x0                   	// #0
+  202754:	d2800003 	mov	x3, #0x0                   	// #0
+  202758:	d2800004 	mov	x4, #0x0                   	// #0
+  20275c:	d2800005 	mov	x5, #0x0                   	// #0
+  202760:	d2800006 	mov	x6, #0x0                   	// #0
+  202764:	92800167 	mov	x7, #0xfffffffffffffff4    	// #-12
+  202768:	d4000001 	svc	#0x0
+  20276c:	39400100 	ldrb	w0, [x8]
+  202770:	34000180 	cbz	w0, 2027a0 <__assert_fail+0x120>
+  202774:	d503201f 	nop
+  202778:	d2800001 	mov	x1, #0x0                   	// #0
+  20277c:	d2800002 	mov	x2, #0x0                   	// #0
+  202780:	d2800003 	mov	x3, #0x0                   	// #0
+  202784:	d2800004 	mov	x4, #0x0                   	// #0
+  202788:	d2800005 	mov	x5, #0x0                   	// #0
+  20278c:	d2800006 	mov	x6, #0x0                   	// #0
+  202790:	92800167 	mov	x7, #0xfffffffffffffff4    	// #-12
+  202794:	d4000001 	svc	#0x0
+  202798:	38401d00 	ldrb	w0, [x8, #1]!
+  20279c:	35fffee0 	cbnz	w0, 202778 <__assert_fail+0xf8>
+  2027a0:	d2800140 	mov	x0, #0xa                   	// #10
+  2027a4:	d2800001 	mov	x1, #0x0                   	// #0
+  2027a8:	d2800002 	mov	x2, #0x0                   	// #0
+  2027ac:	d2800003 	mov	x3, #0x0                   	// #0
+  2027b0:	d2800004 	mov	x4, #0x0                   	// #0
+  2027b4:	d2800005 	mov	x5, #0x0                   	// #0
+  2027b8:	d2800006 	mov	x6, #0x0                   	// #0
+  2027bc:	92800167 	mov	x7, #0xfffffffffffffff4    	// #-12
+  2027c0:	d4000001 	svc	#0x0
+  2027c4:	d65f03c0 	ret
+
+00000000002027c8 <__FUNCTION__.3>:
+  2027c8:	705f7874 69766f72 00006564 00000000     tx_provide......
+
+00000000002027d8 <__FUNCTION__.1>:
+  2027d8:	725f7874 72757465 0000006e 00000000     tx_return.......
+
+00000000002027e8 <__FUNCTION__.0>:
+  2027e8:	74696e69 00000000                       init....
+
+00000000002027f0 <__FUNCTION__.1>:
+  2027f0:	68636163 6c635f65 5f6e6165 5f646e61     cache_clean_and_
+  202800:	61766e69 6164696c 00006574 00000000     invalidate......
+
+0000000000202810 <__FUNCTION__.0>:
+  202810:	68636163 6c635f65 006e6165 00000000     cache_clean.....
+  202820:	ff9f00e0 ff9fff9f ff9fff9f ff9fff9f     ................
+  202830:	ff9fff9f ff9fff9f ff9fff9f ff9fff9f     ................
+  202840:	ff9fff9f ff9fff9f ff9fff9f ff9fff9f     ................
+  202850:	ff9fff9f ff9fff9f ff9fff9f ff9fff9f     ................
+  202860:	00ab0093 ff9f0093 ff9fff9f ff9fff9f     ................
+  202870:	ff9fff9f ff9fff9f ff9fff9f ff9fff9f     ................
+  202880:	ff9fff9f 0184ff9f ff9fff9f ff9fff9f     ................
+  202890:	ff9fff9f ff9fff9f 0184ff9f 018400bd     ................
+  2028a0:	00ab0093 00000093 00000000 00000000     ................
+
+00000000002028b0 <pow10.0>:
+  2028b0:	00000000 3ff00000 00000000 40240000     .......?......$@
+  2028c0:	00000000 40590000 00000000 408f4000     ......Y@.....@.@
+  2028d0:	00000000 40c38800 00000000 40f86a00     .......@.....j.@
+  2028e0:	00000000 412e8480 00000000 416312d0     .......A......cA
+  2028f0:	00000000 4197d784 00000000 41cdcd65     .......A....e..A

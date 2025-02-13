@@ -14,3 +14,10 @@ typedef struct routing_entry {
     // hops to reach network_id.
     // uint16_t metric;
 } routing_entry_t;
+
+// Queue implementation for packets waiting in the router for ARP responses.
+typedef struct routing_queue_node {
+    uint32_t ip;
+    bool valid;
+    net_buff_desc_t *buffer;
+} routing_queue_node_t;

@@ -14,6 +14,7 @@ MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 FIREWALL:=${SDDF}/examples/firewall
 UTIL:=$(SDDF)/util
 ETHERNET_DRIVER:=$(SDDF)/drivers/network/$(DRIV_DIR)
+ETHERNET_DRIVER_DWMAC:=$(SDDF)/drivers/network/dwmac-5.10a
 SERIAL_COMPONENTS := $(SDDF)/serial/components
 UART_DRIVER := $(SDDF)/drivers/serial/$(UART_DRIV_DIR)
 TIMER_DRIVER:=$(SDDF)/drivers/timer/$(TIMER_DRV_DIR)
@@ -30,8 +31,9 @@ METAPROGRAM := $(TOP)/meta.py
 vpath %.c ${SDDF} ${FIREWALL}
 
 IMAGES := eth_driver.elf network_virt_rx.elf network_virt_tx.elf network_copy.elf \
+		  eth_driver_dwmac.elf network_virt_rx_1.elf network_virt_tx_1.elf \
 		  timer_driver.elf uart_driver.elf serial_virt_tx.elf \
-		  proxy_arp.elf internal_arp.elf routing.elf
+		  arp_requester.elf arp_responder.elf routing.elf
 
 CFLAGS := -mcpu=$(CPU) \
 	  -mstrict-align \
@@ -41,7 +43,7 @@ CFLAGS := -mcpu=$(CPU) \
 	  -DMICROKIT_CONFIG_$(MICROKIT_CONFIG) \
 	  -I$(BOARD_DIR)/include \
 	  -I$(SDDF)/include \
-	  -I${ECHO_INCLUDE}/lwip \
+	  -I${FIREWALL_INCLUDE}/lwip \
 	  -I${SDDF}/$(LWIPDIR)/include \
 	  -I${SDDF}/$(LWIPDIR)/include/ipv4 \
 	  -MD \
@@ -74,14 +76,22 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data uart_driver.elf
 	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx.data serial_virt_tx.elf
 	$(OBJCOPY) --update-section .device_resources=ethernet_driver_device_resources.data eth_driver.elf
-	$(OBJCOPY) --update-section .net_driver_config=net_driver.data eth_driver.elf
-	$(OBJCOPY) --update-section .net_virt_rx_config=net_virt_rx.data network_virt_rx.elf
-	$(OBJCOPY) --update-section .net_virt_tx_config=net_virt_tx.data network_virt_tx.elf
-	$(OBJCOPY) --update-section .net_copy_config=net_copy_proxy_arp_net_copier.data network_copy.elf network_copy0.elf
+	$(OBJCOPY) --update-section .net_driver_config=net_ethernet_driver.data eth_driver.elf
+	$(OBJCOPY) --update-section .device_resources=ethernet_driver_dwmac_device_resources.data eth_driver_dwmac.elf
+	$(OBJCOPY) --update-section .net_driver_config=net_ethernet_driver_dwmac.data eth_driver_dwmac.elf
+
+	$(OBJCOPY) --update-section .net_virt_rx_config=net_net_virt_rx.data network_virt_rx.elf
+	$(OBJCOPY) --update-section .net_virt_rx_config=net_net_virt_rx_1.data network_virt_rx.elf network_virt_rx_1.elf
+	$(OBJCOPY) --update-section .net_virt_tx_config=net_net_virt_tx.data network_virt_tx.elf
+	$(OBJCOPY) --update-section .net_virt_tx_config=net_net_virt_tx_1.data network_virt_tx.elf network_virt_tx_1.elf
+
 	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
-	$(OBJCOPY) --update-section .timer_client_config=timer_client_proxy_arp.data proxy_arp.elf
-	$(OBJCOPY) --update-section .net_client_config=net_client_proxy_arp.data proxy_arp.elf
-	$(OBJCOPY) --update-section .serial_client_config=serial_client_proxy_arp.data proxy_arp.elf
+	$(OBJCOPY) --update-section .net_client_config=net_ethernet@30be0000_client_arp_responder.data arp_responder.elf
+	$(OBJCOPY) --update-section .net1_client_config=net_ethernet@30be0000_client_routing.data routing.elf
+	$(OBJCOPY) --update-section .net2_client_config=net_ethernet@30bf0000_client_routing.data routing.elf
+	$(OBJCOPY) --update-section .router_config=router.data routing.elf
+	$(OBJCOPY) --update-section .net_client_config=net_ethernet@30bf0000_client_arp_requester.data arp_requester.elf
+	$(OBJCOPY) --update-section .arp_resources=arp_requester.data arp_requester.elf
 
 ${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
@@ -90,6 +100,7 @@ ${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 include ${SDDF}/util/util.mk
 include ${SDDF}/network/components/network_components.mk
 include ${ETHERNET_DRIVER}/eth_driver.mk
+include ${ETHERNET_DRIVER_DWMAC}/eth_driver.mk
 include ${TIMER_DRIVER}/timer_driver.mk
 include ${UART_DRIVER}/uart_driver.mk
 include ${SERIAL_COMPONENTS}/serial_components.mk

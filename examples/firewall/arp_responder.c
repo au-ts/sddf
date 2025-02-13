@@ -19,10 +19,6 @@
 
 #define NUM_ROUTES 1
 
-__attribute__((__section__(".serial_client_config"))) serial_client_config_t serial_config;
-
-__attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
-
 __attribute__((__section__(".net_client_config"))) net_client_config_t net_config;
 
 serial_queue_handle_t serial_tx_queue_handle;
@@ -40,22 +36,6 @@ net_queue_handle_t tx_queue;
 
 uint32_t ipv4_addrs[NUM_ROUTES];
 uint8_t mac_addr[ETH_HWADDR_LEN]= {0x52,0x54,0x01,0x00,0x00};
-struct __attribute__((__packed__)) arp_packet {
-    uint8_t ethdst_addr[ETH_HWADDR_LEN];
-    uint8_t ethsrc_addr[ETH_HWADDR_LEN];
-    uint16_t type;
-    uint16_t hwtype;
-    uint16_t proto;
-    uint8_t hwlen;
-    uint8_t protolen;
-    uint16_t opcode;
-    uint8_t hwsrc_addr[ETH_HWADDR_LEN];
-    uint32_t ipsrc_addr;
-    uint8_t hwdst_addr[ETH_HWADDR_LEN];
-    uint32_t ipdst_addr;
-    uint8_t padding[10];
-    uint32_t crc;
-};
 
 static char *ipaddr_to_string(uint32_t s_addr, char *buf, int buflen)
 {

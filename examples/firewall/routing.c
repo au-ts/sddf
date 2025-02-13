@@ -18,30 +18,38 @@
 #include <sddf/timer/client.h>
 #include <sddf/timer/config.h>
 #include <string.h>
+
 #include "routing.h"
-#include "arp.h"
+#include "firewall_arp.h"
+#include "hashmap.h"
+#include "config.h"
+
+__attribute__((__section__(".router_config"))) router_config_t router_config;
+// Net1_client config will be for the rx of NIC1
+__attribute__((__section__(".net1_client_config"))) net_client_config_t net1_config;
+// Net2_client config will be for the tx out of NIC2
+__attribute__((__section__(".net2_client_config"))) net_client_config_t net2_config;
 
 uintptr_t arp_region;
-arp_entry_t *arp_table;
-uintptr_t routing_region;
-routing_entry_t *routing_table;
+hashtable_t arp_table;
+routing_entry_t routing_table[NUM_ROUTES] = {{0}};
 
-uintptr_t arp_requests;
-uintptr_t arp_replies;
 /* Booleans to indicate whether packets have been enqueued during notification handling */
 static bool notify_tx;
 static bool notify_rx;
 
-net_queue_handle_t filt_rx_queue;
+net_queue_handle_t virt_rx_queue;
 net_queue_handle_t virt_tx_queue;
 
 /* This queue will hold packets that we need to generate an ARP request for. */
 net_queue_handle_t arp_waiting;
 /* This queue will hold all the ARP requests/responses that are needed by the
 packets in the arp_waiting queue. */
-arp_queue_handle_t arp_request;
-arp_queue_handle_t arp_response;
+arp_queue_handle_t arp_queries;
 
+/* @kwinter: For now, we are just going to have one packet waiting on an ARP reply for this
+    PoC. */
+routing_queue_node_t waiting_packet = {0};
 
 static char *ipaddr_to_string(uint32_t s_addr, char *buf, int buflen)
 {
@@ -82,24 +90,37 @@ void process_arp_waiting()
     responses we will drop the packets associated with the IP address. Otherwise
     we will substitute the MAC address in, and then send the packet out of the NIC. */
 
-    while (!arp_queue_empty_response(&arp_query)) {
+    while (!arp_queue_empty_response(&arp_queries)) {
         arp_request_t response;
-        int err = arp_dequeue_response(&arp_query, &response);
-
+        int err = arp_dequeue_response(&arp_queries, &response);
+        /* Check that we actually have a packet waiting. */
+        if (!waiting_packet.valid) {
+            sddf_dprintf("ROUTING|No packet waiting on ARP reply!\n");
+            continue;
+        }
         if (!response.valid) {
             // Find all packets with this IP address and drop them.
-            while(!net_queue_empty_free(&arp_waiting)) {
-                net_buff_desc_t buffer;
-                err = net_dequeue_free(&arp_waiting);
-                assert(!err);
-                // Check if the IP in this packet matches response.
-                buffer.len = 0;
-                err = net_enqueue_free(&filt_rx_queue, buffer);
-                assert(!err);
-            }
+            net_buff_desc_t *buffer = waiting_packet.buffer;
+            // Check if the IP in this packet matches response.
+            buffer->len = 0;
+            err = net_enqueue_free(&virt_rx_queue, *buffer);
+            assert(!err);
         } else {
-            // We managed to get a valid MAC address back. Process
-            // all packets with the associated IP address.
+            if (response.ip_addr == waiting_packet.ip) {
+                net_buff_desc_t *buffer = waiting_packet.buffer;
+                if (buffer->io_or_offset == 0) {
+                    sddf_dprintf("ROUTING|Error restoring buffer in process_arp_waiting()\n");
+                    return;
+                }
+                struct ipv4_packet *pkt = (struct ipv4_packet *)(net1_config.rx_data.vaddr + buffer->io_or_offset);
+                    // We should have the mac address. Replace the dest in the ethernet header.
+                    for (int i = 0; i < ETH_HWADDR_LEN; i++) {
+                        pkt->ethdst_addr[i] = response.mac_addr[i];
+                    }
+
+                    // TODO: replace the source MAC address with the MAC address of our NIC.
+
+            }
         }
     }
 
@@ -126,12 +147,12 @@ void route()
     bool transmitted = false;
     bool reprocess = true;
     while (reprocess) {
-        while (!net_queue_empty_active(&filt_rx_queue)) {
+        while (!net_queue_empty_active(&virt_rx_queue)) {
             net_buff_desc_t buffer;
-            int err = net_dequeue_active(&filt_rx_queue, &buffer);
+            int err = net_dequeue_active(&virt_rx_queue, &buffer);
             assert(!err);
 
-            struct ipv4_packet *pkt = (struct ethernet_header *)(net_config.rx_data.vaddr + buffer.io_or_offset);
+            struct ipv4_packet *pkt = (struct ethernet_header *)(net1_config.rx_data.vaddr + buffer.io_or_offset);
 
             /* Decrement the TTL field. IF it reaches 0 protocol is that we drop
              * the packet in this router.
@@ -150,9 +171,10 @@ void route()
                     nextIP = destIP;
                 }
                 uint8_t mac[ETH_HWADDR_LEN];
-                mac = get_entry(arp_table, nextIP);
-
-                if (mac == NULL) {
+                arp_entry_t hash_res;
+                hashtable_search(&arp_table, nextIP, &hash_res);
+                if (&hash_res == NULL) {
+                    sddf_dprintf("ROUTING|Unable to find hash entry")
                     /* In this case, the IP address is not in the ARP Tables.
                     *  We add an entry to the ARP request queue. This is where we
                     *  place the responses to the ARP requests, and if we get a
@@ -160,41 +182,44 @@ void route()
                     *  that are waiting in the queue.
                     */
 
-                    if (!arp_queue_empty_request(&arp_query)) {
+                    if (!arp_queue_empty_request(&arp_queries)) {
                             arp_request_t request;
-
-                            int ret = arp_dequeue_request(&arp_query, &request);
+                            int ret = arp_dequeue_request(&arp_queries, &request);
                             if (ret != 0) {
                                 sddf_dprintf("ROUTING| No room in ARP request queue!\n");
                             }
-
                             request.ip_addr = nextIP;
-                            ret = arp_enqueue_request(&arp_query, request);
+                            ret = arp_enqueue_request(&arp_queries, request);
                             if (ret != 0) {
                                 sddf_dprintf("ROUTING| Unable to enqueue into ARP request queue!\n");
                             }
-
                     } else {
                             sddf_dprintf("ROUTING| ARP request queue was empty!\n");
                     }
 
-                    // Add this packet to the ARP waiting queue.
-                    if (!net_queue_full_free(&arp_waiting)) {
-                        int ret = net_enqueue_free(&arp_waiting, buffer);
-                        assert(!ret);
-                    }
+                    // Add this packet to the ARP waiting node.
+                    waiting_packet.ip = nextIP;
+                    waiting_packet.buffer = &buffer;
+                    waiting_packet.valid = true;
+
                 } else {
                     // We should have the mac address. Replace the dest in the ethernet header.
                     for (int i = 0; i < ETH_HWADDR_LEN; i++) {
-                        pkt->ethdst_addr[i] = mac[i];
+                        pkt->ethdst_addr[i] = hash_res.mac_addr[i];
                     }
 
                     // TODO: replace the source MAC address with the MAC address of our NIC.
 
                     // Send the packet out to the network.
-                    net_buff_desc_t buffer;
+                    net_buff_desc_t buffer_tx;
                     int err = net_dequeue_free(&virt_tx_queue, &buffer);
                     assert(!err);
+
+                    // @kwinter: For now we are memcpy'ing the packet from our receive buffer
+                    // to the transmit buffer.
+                    // Also need to make sure that len here is the appropriate size.
+                    sddf_memcpy((net2_config.tx_data.vaddr + buffer_tx.io_or_offset), (net1_config.rx_data.vaddr + buffer.io_or_offset), buffer.len);
+
                     err = net_enqueue_active(&virt_tx_queue, buffer);
                     assert(!err);
                 }
@@ -202,42 +227,43 @@ void route()
             }
 
             buffer.len = 0;
-            err = net_enqueue_free(&filt_rx_queue, buffer);
+            err = net_enqueue_free(&virt_rx_queue, buffer);
             assert(!err);
         }
 
-        net_request_signal_active(&filt_rx_queue);
+        net_request_signal_active(&virt_rx_queue);
         reprocess = false;
 
-        if (!net_queue_empty_active(&filt_rx_queue)) {
-            net_cancel_signal_active(&filt_rx_queue);
+        if (!net_queue_empty_active(&virt_rx_queue)) {
+            net_cancel_signal_active(&virt_rx_queue);
             reprocess = true;
         }
     }
 
     if (transmitted && net_require_signal_active(&virt_tx_queue)) {
         net_cancel_signal_active(&virt_tx_queue);
-        microkit_deferred_notify(net_config.tx.id);
+        microkit_deferred_notify(net2_config.tx.id);
     }
 
 }
 
 void init(void)
 {
-    // Initialise the shared routing tables and zero them out.
-    routing_table =  (routing_entry_t *) routing_region;
-    sddf_memset((void *) routing_table, 0, (sizeof routing_entry_t) * NUM_ROUTES);
-    // The internal ARP component should initialise this region.
-    arp_table =  (arp_entry_t *) arp_region;
+    sddf_dprintf("Initialising our routing component\n");
+    // Init the hashtable here, as we are the first component that will
+    // ever access it.
+    hashtable_t *arp_table_vaddr = (hashtable_t*) router_config.router.arp_cache.vaddr;
+    arp_table = *arp_table_vaddr;
+    hashtable_init(&arp_table);
     // Init all net queues here as well as zero out the arp cache.
     /* @kwinter: Need to add a struct to meta.py defining all the regions our routing
         component might want to have access to. */
-
-    // net_queue_init(&filt_rx_queue, net_config.rx.free_queue.vaddr, net_config.rx.active_queue.vaddr,
-    //                net_config.rx.num_buffers);
-    // net_queue_init(&virt_tx_queue, net_config.tx.free_queue.vaddr, net_config.tx.active_queue.vaddr,
-    //                net_config.tx.num_buffers);
-    // net_buffers_init(&virt_tx_queue, 0);
+    sddf_dprintf("Routing, intialise virt queues\n");
+    net_queue_init(&virt_rx_queue, net1_config.rx.free_queue.vaddr, net1_config.rx.active_queue.vaddr,
+                   net1_config.rx.num_buffers);
+    net_queue_init(&virt_tx_queue, net2_config.tx.free_queue.vaddr, net2_config.tx.active_queue.vaddr,
+        net2_config.tx.num_buffers);
+    net_buffers_init(&virt_tx_queue, 0);
 
     /* @kwinter: We don't need this queue to be in shared memory. This queue just needs to be a temporary
      holding area while we wait for the ARP replies to come back. */
@@ -247,7 +273,7 @@ void init(void)
     // arp_queue_init(&arp_queue, net_config.tx.free_queue.vaddr, net_config.tx.active_queue.vaddr,
     //                net_config.tx.num_buffers);
     // net_buffers_init(&arp_queue, 0);
-
+    // sddf_dprintf("Finished init in the routing component.\n");
 }
 
 void notified(microkit_channel ch)

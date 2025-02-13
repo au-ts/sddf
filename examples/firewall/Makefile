@@ -39,6 +39,7 @@ export RANLIB := $(TOOLCHAIN)-ranlib
 export OBJCOPY := $(TOOLCHAIN)-objcopy
 export MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 export SDDF=$(abspath ../..)
+export FIREWALL_INCLUDE:=$(abspath .)/include
 
 IMAGE_FILE := $(BUILD_DIR)/loader.img
 REPORT_FILE := $(BUILD_DIR)/report.txt
