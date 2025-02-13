@@ -203,19 +203,16 @@ void rx_provide(void)
         bool provided = false;
 
         while (!hw_rx_ring_full() && !net_queue_empty_free(&rx_queue)) {
-            // we have a packet to process, that's an achievement!
-            achieved_something = true;
-
             net_buff_desc_t buffer;
             int err = net_dequeue_free(&rx_queue, &buffer);
             assert(!err);
-            
-            bench->eth_pcount_rx++;
 
             volatile ixgbe_adv_rx_desc_t *desc = &device.rx_ring[device.rx_tail];
             desc->read.pkt_addr = buffer.io_or_offset;
             desc->read.hdr_addr = 0;
 
+            // desc->wb.upper.status_error &= ~IXGBE_RXDADV_STAT_DD;
+            // desc->wb.upper.status_error &= ~IXGBE_RXDADV_STAT_EOP;
             THREAD_MEMORY_RELEASE();
 
             device.rx_descr_mdata[device.rx_tail] = buffer;
@@ -249,7 +246,7 @@ static void rx_return(void)
 {
     bool packets_transferred = false;
     while (!hw_rx_ring_empty()) {
-        // we are putting a buffer back into RX active queue, an achievement!
+        // @jade: why do we get into this loop all the time even when there is no packets in there?
         achieved_something = true;
 
         /* If buffer slot is still empty, we have processed all packets the device has filled */
@@ -261,6 +258,9 @@ static void rx_return(void)
         buffer.len = desc.upper.length;
         int err = net_enqueue_active(&rx_queue, buffer);
         assert(!err);
+        
+        // we are putting a buffer back into RX active queue, an achievement!
+        bench->eth_pcount_rx++;
 
         packets_transferred = true;
         device.rx_head = (device.rx_head + 1) % NUM_RX_DESCS;
@@ -290,6 +290,8 @@ void enable_interrupts(void)
     set_reg(IVAR(0), RX_IRQ | BIT(7) | (2 << 8) | BIT(15));
 
     set_reg(EIAC, 0);
+    // @jade: enable auto clear (actually, what is it?)
+    // set_reg(EIAC, BIT(0));
     set_reg(EITR(0), IXGBE_EITR_ITR_INTERVAL * IRQ_INTERVAL);
     // set_reg(EITR(0), 0x028);
     clear_interrupts();
@@ -662,6 +664,7 @@ notified(microkit_channel ch)
         break;
     case IRQ_CH: {
         bench->eth_irq_count++;
+        // write/read-to-clear
         uint32_t cause = get_reg(EICR);
         clear_flags(EICR, cause);
             rx_return();
