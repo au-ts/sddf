@@ -20,6 +20,10 @@ typedef struct arp_requester_config {
     arp_router_connection_resource_t router;
 } arp_requester_config_t;
 
+typedef struct arp_responder_config {
+    char magic[LIONS_FS_MAGIC_LEN];
+    uint32_t ip;
+} arp_responder_config_t;
 
 /* @kwinter: This is the same as the arp requester for now,
  but will change in the future when we need to connect it with

@@ -71,7 +71,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     routing = ProtectionDomain("routing", "routing.elf", priority=97, budget=20000)
     arp_responder = ProtectionDomain("arp_responder", "arp_responder.elf", priority=95, budget=20000)
     arp_requester = ProtectionDomain("arp_requester", "arp_requester.elf", priority=98, budget=20000)
-    firewall = LionsOs.Firewall(sdf, net_system, net_system2, routing, arp_responder, arp_requester)
+    firewall = LionsOs.Firewall(sdf, net_system, net_system2, routing, arp_responder, arp_requester, 157)
 
     # @kwinter: These need to be added to second net_system
     serial_system.add_client(routing)

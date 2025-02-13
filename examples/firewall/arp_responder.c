@@ -17,9 +17,13 @@
 #include <sddf/timer/config.h>
 #include <string.h>
 
+#include "config.h"
+
 #define NUM_ROUTES 1
 
 __attribute__((__section__(".net_client_config"))) net_client_config_t net_config;
+
+__attribute__((__section__(".arp_resources"))) arp_responder_config_t arp_config;
 
 serial_queue_handle_t serial_tx_queue_handle;
 
@@ -66,20 +70,6 @@ static char *ipaddr_to_string(uint32_t s_addr, char *buf, int buflen)
     }
     *--rp = 0;
     return buf;
-}
-
-static int match_ip_to_route(uint32_t addr)
-{
-
-    for (int i = 0; i < NUM_ROUTES; i++) {
-        if (ipv4_addrs[i] == addr) {
-            char buf[16];
-            sddf_printf("PROXY_ARP|NOTICE: match_ip_to_route address: %s\n", ipaddr_to_string(addr, buf, 16));
-            return i;
-        }
-    }
-
-    return -1;
 }
 
 static int arp_reply(const uint8_t ethsrc_addr[ETH_HWADDR_LEN],
@@ -137,8 +127,7 @@ void receive(void)
                 /* Check if it's a probe, ignore announcements */
                 if (pkt->opcode == HTONS(ETHARP_OPCODE_REQUEST)) {
                     /* Check it it's for a client */
-                    int client = match_ip_to_route(pkt->ipdst_addr);
-                    if (client >= 0) {
+                    if (pkt->ipdst_addr == arp_config.ip) {
                         /* Send a response */
                         if (!arp_reply(mac_addr, pkt->ethsrc_addr, mac_addr, pkt->ipdst_addr,
                                        pkt->hwsrc_addr, pkt->ipsrc_addr)) {
@@ -189,7 +178,7 @@ void init(void)
     // config file for the firewall.
 
     // 123.111.11.11 as uint32
-    ipv4_addrs[0] = 185298811;
+    // ipv4_addrs[0] = 185298811;
 }
 
 void notified(microkit_channel ch)
