@@ -30,6 +30,7 @@ static void set_baud(unsigned long baud)
     /*  Divisor Latch Access Bit (DLAB) of the LCR must be set.
     *   These registers share their address with the FIFO's.
     */
+    while (*REG_PTR(UART_USR) & 0x1);
 
     uint32_t lcr_val = *REG_PTR(UART_LCR);
 

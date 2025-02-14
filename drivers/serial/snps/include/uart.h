@@ -24,9 +24,16 @@
 }                           \
 )
 
+#if defined(CONFIG_PLAT_STAR64)
 /*  This reference clock value is taken from Pine64 u-boot.
     This value will be board specific. */
 #define UART_CLK 24000000
+#elif defined(CONFIG_PLAT_P550)
+/* From the DTS node */
+#define UART_CLK 0xbebc200
+#else
+#error "Unsupported platform"
+#endif
 
 /* UART Receive Buffer Register */
 #define UART_RBR 0x00
@@ -91,3 +98,5 @@ the IIR, but the IIR is read-only, and the FCR is write-only. */
 #define UART_DLL 0x00
 /* Divisor Latch Mask */
 #define DL_MASK 0xff
+
+#define UART_USR 0x7c
