@@ -21,6 +21,10 @@
 #include "hashmap.h"
 #include "config.h"
 
+__attribute__((__section__(".arp_resources"))) arp_requester_config_t arp_config;
+
+__attribute__((__section__(".net_client_config"))) net_client_config_t net_config;
+
 #define MAX_ARP_CACHE 64
 
 // typedef struct arp_entry {
@@ -34,9 +38,6 @@
 // This component needs to be connected to BOTH rx and tx of this
 // network subsystem.
 
-__attribute__((__section__(".arp_resources"))) arp_requester_config_t arp_config;
-
-__attribute__((__section__(".net_client_config"))) net_client_config_t net_config;
 
 hashtable_t arp_table;
 net_queue_handle_t virt_tx_queue;
@@ -150,12 +151,15 @@ void init(void)
     // @kwinter: We might want to do this initialisation ourselves. This
     // only needs to be the size of an ARP packet. However, the current implementation
     // will work, just not space efficient.
+    sddf_dprintf("This is the vaddr of the rx free queue: %p\n", net_config.rx.free_queue.vaddr);
+    assert(net_config_check_magic((void *)&net_config));
 
     net_queue_init(&virt_rx_queue, net_config.rx.free_queue.vaddr, net_config.rx.active_queue.vaddr,
-        net_config.rx.num_buffers);
+                   net_config.rx.num_buffers);
     net_queue_init(&virt_tx_queue, net_config.tx.free_queue.vaddr, net_config.tx.active_queue.vaddr,
-        net_config.tx.num_buffers);
+                   net_config.tx.num_buffers);
     net_buffers_init(&virt_tx_queue, 0);
+
     arp_queue_handle_t *arp_queue_pointer = (arp_queue_handle_t *) arp_config.router.arp_queue.vaddr;
     arp_query = *arp_queue_pointer;
     /* This hashtable will have been initialised by the router component. */
@@ -166,9 +170,9 @@ void init(void)
 void notified(microkit_channel ch)
 {
     // @kwinter: Get the appropriate channel number for the router
-    if (0) {
+    if (arp_config.router.id) {
         process_requests();
-    } if (1) {
+    } if (net_config.rx.id) {
         process_responses();
     }
 }

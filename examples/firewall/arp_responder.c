@@ -19,11 +19,11 @@
 
 #include "config.h"
 
-#define NUM_ROUTES 1
-
 __attribute__((__section__(".net_client_config"))) net_client_config_t net_config;
 
 __attribute__((__section__(".arp_resources"))) arp_responder_config_t arp_config;
+
+#define NUM_ROUTES 1
 
 serial_queue_handle_t serial_tx_queue_handle;
 
@@ -39,7 +39,10 @@ net_queue_handle_t rx_queue;
 net_queue_handle_t tx_queue;
 
 uint32_t ipv4_addrs[NUM_ROUTES];
-uint8_t mac_addr[ETH_HWADDR_LEN]= {0x52,0x54,0x01,0x00,0x00};
+
+// @kwinter: This mac address needs to be the mac address of the routing component.
+// Hardcoding this value for now.
+uint8_t mac_addr[ETH_HWADDR_LEN]= {0x52,0x54,0x01,0x00,0x78};
 
 static char *ipaddr_to_string(uint32_t s_addr, char *buf, int buflen)
 {
@@ -161,6 +164,7 @@ void receive(void)
 void init(void)
 {
     microkit_dbg_puts("We are initialising our proxy arp component!\n");
+    assert(net_config_check_magic((void *)&net_config));
     // @kwinter: For some reason we can't find the following functions.
     // Probably linking with the debug version of libsddf_util.a
 
@@ -176,7 +180,7 @@ void init(void)
     // Setup our known routes here. This will need to be
     // moved to the routing component or a generic header
     // config file for the firewall.
-
+    sddf_dprintf("This is the value of net config rx id: %d\n", net_config.rx.id);
     // 123.111.11.11 as uint32
     // ipv4_addrs[0] = 185298811;
 }
@@ -190,6 +194,8 @@ void notified(microkit_channel ch)
     // register with the routing client.
     if (ch == net_config.rx.id) {
         receive();
+    } else if (ch == net_config.tx.id) {
+        sddf_dprintf("Received a transmit notification!\n");
     } else {
         sddf_dprintf("PROXY|ARP: Received notification on invalid channel: %d!\n", ch);
     }

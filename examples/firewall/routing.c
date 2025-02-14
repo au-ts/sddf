@@ -252,6 +252,9 @@ void init(void)
     sddf_dprintf("Initialising our routing component\n");
     // Init the hashtable here, as we are the first component that will
     // ever access it.
+    assert(net_config_check_magic((void *)&net1_config));
+    assert(net_config_check_magic((void *)&net2_config));
+
     hashtable_t *arp_table_vaddr = (hashtable_t*) router_config.router.arp_cache.vaddr;
     arp_table = *arp_table_vaddr;
     hashtable_init(&arp_table);
@@ -265,23 +268,21 @@ void init(void)
         net2_config.tx.num_buffers);
     net_buffers_init(&virt_tx_queue, 0);
 
-    /* @kwinter: We don't need this queue to be in shared memory. This queue just needs to be a temporary
-     holding area while we wait for the ARP replies to come back. */
-
-    /* TODO: also need to add in the arp request/response queue structs into the meta.py. */
-
-    // arp_queue_init(&arp_queue, net_config.tx.free_queue.vaddr, net_config.tx.active_queue.vaddr,
-    //                net_config.tx.num_buffers);
     // net_buffers_init(&arp_queue, 0);
-    // sddf_dprintf("Finished init in the routing component.\n");
+
+    for (int i = 0; i < ETH_HWADDR_LEN; i++) {
+        sddf_dprintf("This is index %d: %d\n", i, net1_config.mac_addr[i]);
+    }
+
+    sddf_dprintf("Finished init in the routing component.\n");
 }
 
 void notified(microkit_channel ch)
 {
     // Popualate with the rx ch number
-    if (0) {
+    if (net1_config.rx.id) {
         route();
-    } else if (1) {
+    } else if (router_config.router.id) {
         /* This is the channel between the ARP component and the routing component. */
         process_arp_waiting();
     }

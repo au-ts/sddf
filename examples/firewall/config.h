@@ -18,11 +18,13 @@ typedef struct arp_router_connection_resource {
 typedef struct arp_requester_config {
     char magic[LIONS_FS_MAGIC_LEN];
     arp_router_connection_resource_t router;
+    uint8_t mac_addr[ETH_HWADDR_LEN];
 } arp_requester_config_t;
 
 typedef struct arp_responder_config {
     char magic[LIONS_FS_MAGIC_LEN];
     uint32_t ip;
+    uint8_t mac_addr[ETH_HWADDR_LEN];
 } arp_responder_config_t;
 
 /* @kwinter: This is the same as the arp requester for now,
@@ -31,4 +33,5 @@ typedef struct arp_responder_config {
 typedef struct router_config {
     char magic[LIONS_FS_MAGIC_LEN];
     arp_router_connection_resource_t router;
+    uint8_t mac_addr[ETH_HWADDR_LEN];
 } router_config_t;

@@ -71,7 +71,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     routing = ProtectionDomain("routing", "routing.elf", priority=97, budget=20000)
     arp_responder = ProtectionDomain("arp_responder", "arp_responder.elf", priority=95, budget=20000)
     arp_requester = ProtectionDomain("arp_requester", "arp_requester.elf", priority=98, budget=20000)
-    firewall = LionsOs.Firewall(sdf, net_system, net_system2, routing, arp_responder, arp_requester, 157)
+    firewall = LionsOs.Firewall(sdf, net_system, net_system2, routing, arp_responder, arp_requester, 168624327)
 
     # @kwinter: These need to be added to second net_system
     serial_system.add_client(routing)
@@ -98,7 +98,9 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     for pd in pds:
         sdf.add_pd(pd)
 
-    assert firewall.connect()
+    router_mac_addr = f"52:54:01:00:00:78"
+
+    assert firewall.connect(router_mac_addr, 168624327)
     assert firewall.serialise_config(output_dir)
     assert serial_system.connect()
     assert serial_system.serialise_config(output_dir)
