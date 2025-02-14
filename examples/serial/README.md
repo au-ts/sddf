@@ -17,10 +17,11 @@ make MICROKIT_SDK=<path/to/sdk> MICROKIT_BOARD=<board> MICROKIT_CONFIG=<debug/re
 ```
 
 Currently the options for `MICROKIT_BOARD` are:
-* odroidc2
-* odroidc4
+* hifive_p550
 * imx8mm_evk
 * maaxboard
+* odroidc2
+* odroidc4
 * qemu_virt_aarch64
 * qemu_virt_riscv64
 * star64
