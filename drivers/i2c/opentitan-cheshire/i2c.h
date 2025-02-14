@@ -10,6 +10,7 @@
 
 #include <cstdint>
 #include <stdint.h>
+#include <stdbool.h>
 
 typedef struct i2c_timing_params {
     uint32_t t_high_min;
@@ -22,6 +23,8 @@ typedef struct i2c_timing_params {
     uint32_t t_sto_min;
     uint32_t t_r;
     uint32_t t_f;
+    uint32_t t_h;
+    uint32_t t_l;
 } i2c_timing_params_t;
 
 #define KILO (1000)
@@ -52,6 +55,7 @@ enum I2C_SPEED_MODE {
 
 /* HW properties */
 #define OPENTITAN_I2C_FIFO_DEPTH    (64)
+#define OPENTITAN_I2C_READ_MAX      (64)
 
 /* Register definitions */
 // NOTE: I2C_BASE_ADDR must be defined by device_i2c.h for target platform.
@@ -146,17 +150,17 @@ enum I2C_SPEED_MODE {
 // 0:7 -> data byte, 8 -> START bit, 9 -> STOP bit, 10 -> READB, 11 -> RCONT, 12 -> NAKOK
 #define I2C_FDATA_FBYTE_MASK        (0xFF)
 #define I2C_FDATA_FBYTE_OFFSET      (0)
-#define I2C_FDATA_START_OFFSET  (1 << 8)
-#define I2C_FDATA_STOP_OFFSET   (1 << 9)
-#define I2C_FDATA_READB_OFFSET  (1 << 10)
-#define I2C_FDATA_RCONT_OFFSET  (1 << 11)
-#define I2C_FDATA_NAKOK_OFFSET  (1 << 12)
+#define I2C_FDATA_START_OFFSET      (8)
+#define I2C_FDATA_STOP_OFFSET       (9)
+#define I2C_FDATA_READB_OFFSET      (10)
+#define I2C_FDATA_RCONT_OFFSET      (11)
+#define I2C_FDATA_NAKOK_OFFSET      (12)
 typedef struct _fdata_fmt_flags {
-    bool start; // Send start signal before next byte
-    bool stop;  // Send stop signal after next byte (not valid if readb & rcont = 1)
-    bool readb; // Mark next byte to specify n. bytes to read instead of write
-    bool rcont; // If reading, request to continue reading after final byte of last read.
-    bool nakok; // Ignore target device NAKs for writes. Doesn't work with any reads.
+    uint32_t start; // Send start signal before next byte
+    uint32_t stop;  // Send stop signal after next byte (not valid if readb & rcont = 1)
+    uint32_t readb; // Mark next byte to specify n. bytes to read instead of write
+    uint32_t rcont; // If reading, request to continue reading after final byte of last read.
+    uint32_t nakok; // Ignore target device NAKs for writes. Doesn't work with any reads.
 } fdata_fmt_flags_t;
 
 // HOST_FIFO_STATUS
@@ -165,3 +169,96 @@ typedef struct _fdata_fmt_flags {
 #define I2C_HOST_FIFO_STATUS_FMTLVL_OFFSET  (0)
 #define I2C_HOST_FIFO_STATUS_RXLVL_MASK    (0xFFF)
 #define I2C_HOST_FIFO_STATUS_RXLVL_OFFSET  (16)
+
+// HOST_FIFO_CONFIG
+// 0:11 -> RX_THRESH, 16:27 -> FMT_THRESH
+#define I2C_HOST_FIFO_CONFIG_RXTHRESH_MASK  (0xFFF)
+#define I2C_HOST_FIFO_CONFIG_RXTHRESH_OFFSET    (0)
+#define I2C_HOST_FIFO_CONFIG_FMTTHRESH_MASK (0xFFF)
+#define I2C_HOST_FIFO_CONFIG_FMTTHRESH_OFFSET   (16)
+
+// INTR_STATE
+// 0 -> FMT_THRESHOLD, 1 -> RX_THRESHOLD, 2 -> ACQ_THRESHOLD, 3 -> RX_OVERFLOW,
+// 4 -> CONTROLLER_HALT, 5 -> SCL_INTERFERENCE, 6 -> SDA_INTERFERENCE, 7 -> STRETCH_TIMEOUT,
+// 8 -> SDA_UNSTABLE, 9 -> CMD_COMPLETE, 10 -> TX_STRETCH, 11 -> TX_THRESHOLD,
+// 12 -> ACQ_STRETCH, 13 -> UNEXP_STOP, 14 -> HOST_TIMEOUT
+#define I2C_INTR_STATE_FMT_THRESHOLD_BIT    (1 << 0)
+#define I2C_INTR_STATE_RX_THRESHOLD_BIT     (1 << 1)
+#define I2C_INTR_STATE_ACQ_THRESHOLD_BIT    (1 << 2)
+#define I2C_INTR_STATE_RX_OVERFLOW_BIT      (1 << 3)
+#define I2C_INTR_STATE_CONTROLLER_HALT_BIT  (1 << 4)
+#define I2C_INTR_STATE_SCL_INTERFERENCE_BIT (1 << 5)
+#define I2C_INTR_STATE_SDA_INTERFERENCE_BIT (1 << 6)
+#define I2C_INTR_STATE_STRETCH_TIMEOUT_BIT  (1 << 7)
+#define I2C_INTR_STATE_SDA_UNSTABLE_BIT     (1 << 8)
+#define I2C_INTR_STATE_CMD_COMPLETE_BIT     (1 << 9)
+#define I2C_INTR_STATE_TX_STRETCH_BIT       (1 << 10)
+#define I2C_INTR_STATE_TX_THRESHOLD_BIT     (1 << 11)
+#define I2C_INTR_STATE_ACQ_STRETCH_BIT      (1 << 12)
+#define I2C_INTR_STATE_UNEXP_STOP_BIT       (1 << 13)
+#define I2C_INTR_STATE_HOST_TIMEOUT         (1 << 14)
+
+// INTR_TEST
+// 0 -> FMT_THRESHOLD, 1 -> RX_THRESHOLD, 2 -> ACQ_THRESHOLD, 3 -> RX_OVERFLOW,
+// 4 -> CONTROLLER_HALT, 5 -> SCL_INTERFERENCE, 6 -> SDA_INTERFERENCE, 7 -> STRETCH_TIMEOUT,
+// 8 -> SDA_UNSTABLE, 9 -> CMD_COMPLETE, 10 -> TX_STRETCH, 11 -> TX_THRESHOLD,
+// 12 -> ACQ_STRETCH, 13 -> UNEXP_STOP, 14 -> HOST_TIMEOUT
+#define I2C_INTR_TEST_FMT_THRESHOLD_BIT    (1 << 0)
+#define I2C_INTR_TEST_RX_THRESHOLD_BIT     (1 << 1)
+#define I2C_INTR_TEST_ACQ_THRESHOLD_BIT    (1 << 2)
+#define I2C_INTR_TEST_RX_OVERFLOW_BIT      (1 << 3)
+#define I2C_INTR_TEST_CONTROLLER_HALT_BIT  (1 << 4)
+#define I2C_INTR_TEST_SCL_INTERFERENCE_BIT (1 << 5)
+#define I2C_INTR_TEST_SDA_INTERFERENCE_BIT (1 << 6)
+#define I2C_INTR_TEST_STRETCH_TIMEOUT_BIT  (1 << 7)
+#define I2C_INTR_TEST_SDA_UNSTABLE_BIT     (1 << 8)
+#define I2C_INTR_TEST_CMD_COMPLETE_BIT     (1 << 9)
+#define I2C_INTR_TEST_TX_STRETCH_BIT       (1 << 10)
+#define I2C_INTR_TEST_TX_THRESHOLD_BIT     (1 << 11)
+#define I2C_INTR_TEST_ACQ_STRETCH_BIT      (1 << 12)
+#define I2C_INTR_TEST_UNEXP_STOP_BIT       (1 << 13)
+#define I2C_INTR_TEST_HOST_TIMEOUT_BIT     (1 << 14)
+
+// INTR_ENABLE
+// 0 -> FMT_THRESHOLD, 1 -> RX_THRESHOLD, 2 -> ACQ_THRESHOLD, 3 -> RX_OVERFLOW,
+// 4 -> CONTROLLER_HALT, 5 -> SCL_INTERFERENCE, 6 -> SDA_INTERFERENCE, 7 -> STRETCH_TIMEOUT,
+// 8 -> SDA_UNSTABLE, 9 -> CMD_COMPLETE, 10 -> TX_STRETCH, 11 -> TX_THRESHOLD,
+// 12 -> ACQ_STRETCH, 13 -> UNEXP_STOP, 14 -> HOST_TIMEOUT
+#define I2C_INTR_ENABLE_FMT_THRESHOLD_BIT    (1 << 0)
+#define I2C_INTR_ENABLE_RX_THRESHOLD_BIT     (1 << 1)
+#define I2C_INTR_ENABLE_ACQ_THRESHOLD_BIT    (1 << 2)
+#define I2C_INTR_ENABLE_RX_OVERFLOW_BIT      (1 << 3)
+#define I2C_INTR_ENABLE_CONTROLLER_HALT_BIT  (1 << 4)
+#define I2C_INTR_ENABLE_SCL_INTERFERENCE_BIT (1 << 5)
+#define I2C_INTR_ENABLE_SDA_INTERFERENCE_BIT (1 << 6)
+#define I2C_INTR_ENABLE_STRETCH_TIMEOUT_BIT  (1 << 7)
+#define I2C_INTR_ENABLE_SDA_UNSTABLE_BIT     (1 << 8)
+#define I2C_INTR_ENABLE_CMD_COMPLETE_BIT     (1 << 9)
+#define I2C_INTR_ENABLE_TX_STRETCH_BIT       (1 << 10)
+#define I2C_INTR_ENABLE_TX_THRESHOLD_BIT     (1 << 11)
+#define I2C_INTR_ENABLE_ACQ_STRETCH_BIT      (1 << 12)
+#define I2C_INTR_ENABLE_UNEXP_STOP_BIT       (1 << 13)
+#define I2C_INTR_ENABLE_HOST_TIMEOUT_BIT     (1 << 14)
+
+// STATUS
+// 0 -> FMTFULL, 1 -> RXFULL, 2 -> FMTEMPTY, 3 -> HOSTIDLE,
+// 4 -> TARGETIDLE, 5 -> RXEMPTY, 6 -> TXFULL, 7 -> ACQFULL,
+// 8 -> TXEMPTY, 9 -> ACQEMPTY, 10 -> ACK_CTRL_STRETCH
+#define I2C_STATUS_FMTFULL_BIT           (1 << 0)
+#define I2C_STATUS_RXFULL_BIT            (1 << 1)
+#define I2C_STATUS_FMTEMPTY_BIT          (1 << 2)
+#define I2C_STATUS_HOSTIDLE_BIT          (1 << 3)
+#define I2C_STATUS_TARGETIDLE_BIT        (1 << 4)
+#define I2C_STATUS_RXEMPTY_BIT           (1 << 5)
+#define I2C_STATUS_TXFULL_BIT            (1 << 6)
+#define I2C_STATUS_ACQFULL_BIT           (1 << 7)
+#define I2C_STATUS_TXEMPTY_BIT           (1 << 8)
+#define I2C_STATUS_ACQEMPTY_BIT          (1 << 9)
+#define I2C_STATUS_ACK_CTRL_STRETCH_BIT  (1 << 10)
+
+// CONTROLLER_EVENTS
+// 0 -> NACK, 1 -> UNHANDLED_NACK_TIMEOUT, 2 -> BUS_TIMEOUT, 3 -> ARBITRATION_LOST
+#define I2C_CONTROLLER_EVENTS_NACK_BIT                     (1 << 0)
+#define I2C_CONTROLLER_EVENTS_UNHANDLED_NACK_TIMEOUT_BIT   (1 << 1)
+#define I2C_CONTROLLER_EVENTS_BUS_TIMEOUT_BIT              (1 << 2)
+#define I2C_CONTROLLER_EVENTS_ARBITRATION_LOST_BIT         (1 << 3)

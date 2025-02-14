@@ -28,6 +28,7 @@
 /* Start of payload bytes in response data (index of first non error byte that driver adds) */
 #define RESPONSE_DATA_OFFSET 2
 
+typedef uint8_t i2c_err_t;
 #define I2C_ERR_OK 0
 #define I2C_ERR_TIMEOUT 1
 #define I2C_ERR_NACK 2

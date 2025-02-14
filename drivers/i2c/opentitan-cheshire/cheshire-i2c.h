@@ -36,3 +36,7 @@
 #define DUTY_100X 46    // 46% duty cycle * 100 for neater arithmetic
 
 #define I2C_MAX_BUS_ADDRESS     (1 << 7)
+
+/* FIFO config */
+#define I2C_FMT_THRESHOLD       (1) // Only refill when FIFO is empty.
+#define I2C_RX_THRESHOLD        (1) // Extract as soon as data is available.
