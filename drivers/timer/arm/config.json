@@ -1,5 +1,4 @@
 {
-    "name": "arm_timer",
     "compatible": [
         "arm,armv8-timer"
     ],

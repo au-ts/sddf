@@ -1,5 +1,4 @@
 {
-    "name": "jh7110_timer",
     "compatible": [
         "starfive,jh7110-timer"
     ],

@@ -1,5 +1,4 @@
 {
-    "name": "meson_timer",
     "compatible": [
         "amlogic,meson-gxbb-wdt"
     ],

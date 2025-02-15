@@ -1,5 +1,4 @@
 {
-    "name": "virtio_blk",
     "compatible": [
         "virtio,mmio"
     ],

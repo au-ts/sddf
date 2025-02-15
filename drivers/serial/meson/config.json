@@ -1,5 +1,4 @@
 {
-    "name": "meson_uart",
     "compatible": [
         "amlogic,meson-gx-uart",
         "amlogic,meson-ao-uart"

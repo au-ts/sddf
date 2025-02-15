@@ -1,5 +1,4 @@
 {
-    "name": "imx8_usdhc",
     "compatible": [
         "fsl,imx8mq-usdhc"
     ],

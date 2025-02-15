@@ -1,5 +1,4 @@
 {
-    "name": "meson_i2c",
     "compatible": [
         "amlogic,meson-axg-i2c"
     ],

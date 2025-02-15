@@ -1,5 +1,4 @@
 {
-    "name": "snps_uart",
     "compatible": [
         "starfive,jh7110-uart"
     ],

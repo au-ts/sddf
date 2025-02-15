@@ -1,5 +1,4 @@
 {
-    "name": "virtio_net",
     "compatible": [
         "virtio,mmio"
     ],

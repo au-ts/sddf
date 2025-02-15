@@ -140,7 +140,6 @@ Below is what the configuration file looks like for the ARM PL011 UART device dr
 
 ```json
 {
-    "name": "arm_pl011_uart",
     "compatible": [
         "arm,pl011"
     ],
@@ -160,8 +159,6 @@ Below is what the configuration file looks like for the ARM PL011 UART device dr
     }
 }
 ```
-
-We specify a name to describe the driver.
 
 We specify a list of Device Tree compatible strings, in this case it is just
 `arm,pl011`.

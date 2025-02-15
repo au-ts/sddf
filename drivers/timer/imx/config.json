@@ -1,5 +1,4 @@
 {
-    "name": "imx_timer",
     "compatible": [
         "fsl,imx8mm-gpt",
         "fsl,imx8mq-gpt",

@@ -1,5 +1,4 @@
 {
-    "name": "meson_eth",
     "compatible": [
         "amlogic,meson-gxbb-dwmac",
         "amlogic,meson-g12a-dwmac"

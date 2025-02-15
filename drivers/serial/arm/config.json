@@ -1,5 +1,4 @@
 {
-    "name": "arm_pl011_uart",
     "compatible": [
         "arm,pl011"
     ],
