@@ -1,5 +1,4 @@
 {
-    "name": "imx8mq_eth",
     "compatible": [
         "fsl,imx8mq-fec"
     ],
