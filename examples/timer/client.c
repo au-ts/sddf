@@ -36,11 +36,11 @@ void init(void)
 
     timer_channel = config.driver_id;
 
-    // lets get the time!
+    // Get the current time!
     uint64_t time = sddf_timer_time_now(timer_channel);
     sddf_printf("CLIENT|INFO: The time now is: %lu\n", time);
 
-    // lets set a timeout
+    // Set a 1 second timeout!
     sddf_printf("CLIENT|INFO: Setting a time out for 1 second\n");
     sddf_timer_set_timeout(timer_channel, NS_IN_S);
 }
