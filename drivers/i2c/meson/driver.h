@@ -17,10 +17,10 @@
 #include "gpio.h"
 #include "clk.h"
 
-enum data_direction {
-    DATA_DIRECTION_WRITE = 0x0,
-    DATA_DIRECTION_READ = 0x1
-};
+typedef uint8_t data_direction_t;
+#define DATA_DIRECTION_WRITE    (0x0)
+#define DATA_DIRECTION_READ     (0x1)
+#define DATA_DIRECTION_READC    (0x3)   // Allows bitwise check for read or readc
 
 // Driver state
 typedef struct _i2c_ifState {
@@ -39,13 +39,10 @@ typedef struct _i2c_ifState {
        zero, no read/write is in progress and we can interpret the current byte as a token.*/
     uint8_t rw_remaining;
 
-    enum data_direction data_direction;
+    data_direction_t data_direction;
     /* I2C bus address of the current request being handled */
     size_t addr;
 } i2c_ifState_t;
-
-#define DATA_DIRECTION_WRITE (0x0)
-#define DATA_DIRECTION_READ (0x1)
 
 // Ctl register fields
 #define REG_CTRL_START      (BIT(0))
