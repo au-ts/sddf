@@ -160,7 +160,7 @@ void notified(microkit_channel ch)
         uint64_t curr_time = get_ticks_in_ns();
         process_timeouts(curr_time);
     } else {
-        sddf_dprintf("TIMER DRIVER|LOG: unexpected notification from channel %u\n", ch);
+        sddf_dprintf("TIMER DRIVER|ERROR: unexpected notification from channel %u\n", ch);
         return;
     }
 
@@ -183,7 +183,7 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
         break;
     }
     default:
-        sddf_dprintf("TIMER DRIVER|LOG: Unknown request %lu to timer from channel %u\n",
+        sddf_dprintf("TIMER DRIVER|ERROR: Unknown request %lu to timer from channel %u\n",
                      microkit_msginfo_get_label(msginfo), ch);
         break;
     }
