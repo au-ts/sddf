@@ -193,7 +193,7 @@ i2c() {
 }
 
 timer() {
-    BOARDS=("imx8mm_evk" "imx8mp_evk" "imx8mq_evk" "maaxboard" "odroidc2" "odroidc4" "qemu_virt_aarch64" "star64")
+    BOARDS=("hifive_p550" "imx8mm_evk" "imx8mp_evk" "imx8mq_evk" "maaxboard" "odroidc2" "odroidc4" "qemu_virt_aarch64" "star64")
     CONFIGS=("debug" "release")
     for BOARD in "${BOARDS[@]}"
     do
@@ -206,7 +206,7 @@ timer() {
 }
 
 serial() {
-    BOARDS=("imx8mm_evk" "maaxboard" "odroidc2" "odroidc4" "qemu_virt_aarch64" "star64")
+    BOARDS=("hifive_p550" "imx8mm_evk" "maaxboard" "odroidc2" "odroidc4" "qemu_virt_aarch64" "star64")
     CONFIGS=("debug" "release")
     for BOARD in "${BOARDS[@]}"
     do
