@@ -34,9 +34,7 @@ vpath %.c ${SDDF} ${ECHO_SERVER}
 IMAGES := eth_driver.elf lwip0.elf lwip1.elf benchmark.elf idle.elf network_virt_rx.elf\
 	  network_virt_tx.elf network_copy.elf timer_driver.elf serial_driver.elf serial_virt_tx.elf
 
-CFLAGS := -mcpu=$(CPU) \
-	  -mstrict-align \
-	  -ffreestanding \
+CFLAGS := -ffreestanding \
 	  -g3 -O3 -Wall \
 	  -Wno-unused-function \
 	  -DMICROKIT_CONFIG_$(MICROKIT_CONFIG) \
@@ -47,6 +45,12 @@ CFLAGS := -mcpu=$(CPU) \
 	  -I${SDDF}/$(LWIPDIR)/include/ipv4 \
 	  -MD \
 	  -MP
+
+ifeq ($(ARCH),aarch64)
+	CFLAGS += -mcpu=$(CPU) -mstrict-align
+else ifeq ($(ARCH),riscv64)
+	CFLAGS += -march=rv64imafdc
+endif
 
 LDFLAGS := -L$(BOARD_DIR)/lib -L${LIBC}
 LIBS := --start-group -lmicrokit -Tmicrokit.ld -lc libsddf_util_debug.a --end-group
