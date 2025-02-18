@@ -168,8 +168,6 @@ void init(void)
     timeout_timer_regs = device_resources.regions[0].region.vaddr + 0x14;
     regs_base = device_resources.regions[0].region.vaddr;
 
-    sddf_dprintf("starting!\n");
-
     for (int i = 0; i < MAX_TIMEOUTS; i++) {
         timeouts[i] = UINT64_MAX;
     }
