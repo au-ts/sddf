@@ -52,7 +52,7 @@ uintptr_t tx_desc_base;
 net_queue_handle_t rx_queue;
 net_queue_handle_t tx_queue;
 
-uintptr_t eth_regs;
+void *eth_regs;
 
 
 static inline bool hw_ring_full(hw_ring_t *ring)
@@ -402,7 +402,7 @@ void init(void)
     assert(RX_COUNT * sizeof(struct descriptor) <= device_resources.regions[1].region.size);
     assert(TX_COUNT * sizeof(struct descriptor) <= device_resources.regions[2].region.size);
 
-    eth_regs = (void *)device_resources.regions[0].region.vaddr;
+    eth_regs = device_resources.regions[0].region.vaddr;
 
     /* De-assert the reset signals that u-boot left asserted. */
 #ifdef CONFIG_PLAT_STAR64
