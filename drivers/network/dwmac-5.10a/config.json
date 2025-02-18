@@ -1,5 +1,4 @@
 {
-    "name": "dwmac-5.10a",
     "compatible": [
         "nxp,imx8mp-dwmac-eqos",
         "snps,dwmac-5.10a",
