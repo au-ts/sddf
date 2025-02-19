@@ -216,18 +216,6 @@ static FASTFN void sel4bench_init()
     sel4bench_private_write_cntens(BIT(SEL4BENCH_ARMV8A_COUNTER_CCNT));
 }
 
-static FASTFN ccnt_t sel4bench_get_cycle_count()
-{
-    ccnt_t val;
-    uint32_t enable_word = sel4bench_private_read_cntens(); //store running state
-
-    sel4bench_private_write_cntenc(BIT(SEL4BENCH_ARMV8A_COUNTER_CCNT)); //stop CCNT
-    SEL4BENCH_READ_CCNT(val); //read its value
-    sel4bench_private_write_cntens(enable_word); //start it again if it was running
-
-    return val;
-}
-
 /* being declared FASTFN allows this function (once inlined) to cache miss; I
  * think it's worthwhile in the general case, for performance reasons.
  * moreover, it's small enough that it'll be suitably aligned most of the time
