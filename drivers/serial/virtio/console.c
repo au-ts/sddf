@@ -20,13 +20,12 @@
 #include <sddf/util/ialloc.h>
 #include <sddf/virtio/virtio.h>
 #include <sddf/virtio/virtio_queue.h>
-#include <serial_config.h>
+#include <sddf/resources/device.h>
+#include <sddf/serial/config.h>
 #include "console.h"
 
-/* Channels */
-#define IRQ_CH 0
-#define TX_CH  1
-#define RX_CH  2
+__attribute__((__section__(".device_resources"))) device_resources_t device_resources;
+__attribute__((__section__(".serial_driver_config"))) serial_driver_config_t config;
 
 /*
  * The 'hardware' ring buffer region is used to store the virtIO virtqs
@@ -147,7 +146,7 @@ static void tx_provide(void)
         uart_regs->QueueNotify = VIRTIO_SERIAL_TX_QUEUE;
         if (serial_require_consumer_signal(&tx_queue_handle)) {
             serial_cancel_consumer_signal(&tx_queue_handle);
-            microkit_notify(TX_CH);
+            microkit_notify(config.tx.id);
         }
     }
 }
@@ -268,7 +267,7 @@ static void rx_return(void)
     rx_last_seen_used += transferred;
 
     if (transferred > 0) {
-        microkit_notify(RX_CH);
+        microkit_notify(config.rx.id);
     }
 }
 
@@ -395,7 +394,18 @@ static void handle_irq()
 
 void init()
 {
-    uart_regs = (volatile virtio_mmio_regs_t *)(uart_base + VIRTIO_MMIO_CONSOLE_OFFSET);
+    assert(serial_config_check_magic(&config));
+    assert(device_resources_check_magic(&device_resources));
+    assert(device_resources.num_irqs == 1);
+    assert(device_resources.num_regions == 4);
+
+    uart_regs = (volatile virtio_mmio_regs_t *)device_resources.regions[0].region.vaddr;
+    hw_ring_buffer_vaddr = (uintptr_t)device_resources.regions[1].region.vaddr;
+    hw_ring_buffer_paddr = device_resources.regions[1].io_addr;
+    virtio_rx_char = device_resources.regions[2].region.vaddr;
+    virtio_rx_char_paddr = device_resources.regions[2].io_addr;
+    virtio_tx_char = device_resources.regions[3].region.vaddr;
+    virtio_tx_char_paddr = device_resources.regions[3].io_addr;
 
     ialloc_init(&rx_ialloc_desc, rx_descriptors, RX_COUNT);
     ialloc_init(&tx_ialloc_desc, tx_descriptors, TX_COUNT);
@@ -404,29 +414,24 @@ void init()
 
     console_setup();
 
-#if !SERIAL_TX_ONLY
-    serial_queue_init(&rx_queue_handle, rx_queue, SERIAL_RX_DATA_REGION_CAPACITY_DRIV, rx_data);
-#endif
-    serial_queue_init(&tx_queue_handle, tx_queue, SERIAL_TX_DATA_REGION_CAPACITY_DRIV, tx_data);
+    if (config.rx_enabled) {
+        serial_queue_init(&rx_queue_handle, config.rx.queue.vaddr, config.rx.data.size, config.rx.data.vaddr);
+    }
+    serial_queue_init(&tx_queue_handle, config.tx.queue.vaddr, config.tx.data.size, config.tx.data.vaddr);
 
-    microkit_irq_ack(IRQ_CH);
+    microkit_irq_ack(device_resources.irqs[0].id);
 }
 
 void notified(microkit_channel ch)
 {
-    switch (ch) {
-    case IRQ_CH:
+    if (ch == device_resources.irqs[0].id) {
         handle_irq();
         microkit_deferred_irq_ack(ch);
-        break;
-    case TX_CH:
+    } else if (ch == config.tx.id) {
         tx_provide();
-        break;
-    case RX_CH:
+    } else if (ch == config.rx.id) {
         rx_return();
-        break;
-    default:
+    } else {
         LOG_DRIVER_ERR("received notification on unexpected channel: %u\n", ch);
-        break;
     }
 }

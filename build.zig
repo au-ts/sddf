@@ -11,6 +11,7 @@ const DriverClass = struct {
         meson,
         imx,
         snps,
+        virtio,
     };
 
     const Timer = enum {
@@ -85,7 +86,12 @@ fn addSerialDriver(
         .optimize = optimize,
         .strip = false,
     });
-    const source = b.fmt("drivers/serial/{s}/uart.c", .{@tagName(class)});
+
+    const source_name = switch (class) {
+        .virtio => "console.c",
+        else => "uart.c",
+    };
+    const source = b.fmt("drivers/serial/{s}/{s}", .{@tagName(class), source_name});
     const driver_include = b.fmt("drivers/serial/{s}/include", .{@tagName(class)});
     driver.addCSourceFile(.{
         .file = b.path(source),

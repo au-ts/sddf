@@ -23,6 +23,7 @@ Files:
     drivers/serial/imx/config.json
     drivers/serial/meson/config.json
     drivers/serial/snps/config.json
+    drivers/serial/virtio/config.json
     drivers/timer/arm/config.json
     drivers/timer/imx/config.json
     drivers/timer/jh7110/config.json
