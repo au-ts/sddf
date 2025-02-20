@@ -421,18 +421,18 @@ void init(void)
 #endif /* CONFIG_PLAT_STAR64 */
 
     // Check if the PHY device is up
-    uint32_t phy_stat = *MAC_REG(MAC_PHYIF_CONTROL_STATUS);
-    if (phy_stat & MAC_PHYIF_CONTROL_LINKSTS) {
-        sddf_dprintf("PHY device is up and running\n");
-    } else {
-        sddf_dprintf("PHY device is currently down\n");
-    }
+    // uint32_t phy_stat = *MAC_REG(MAC_PHYIF_CONTROL_STATUS);
+    // if (phy_stat & MAC_PHYIF_CONTROL_LINKSTS) {
+    //     sddf_dprintf("PHY device is up and running\n");
+    // } else {
+    //     sddf_dprintf("PHY device is currently down\n");
+    // }
 
-    if (phy_stat & BIT(16)) {
-        sddf_dprintf("PHY device is operating in full duplex mode\n");
-    } else {
-        sddf_dprintf("PHY device is operating in half duplex mode\n");
-    }
+    // if (phy_stat & BIT(16)) {
+    //     sddf_dprintf("PHY device is operating in full duplex mode\n");
+    // } else {
+    //     sddf_dprintf("PHY device is operating in half duplex mode\n");
+    // }
 
     net_queue_init(&rx_queue, config.virt_rx.free_queue.vaddr, config.virt_rx.active_queue.vaddr,
                    config.virt_rx.num_buffers);

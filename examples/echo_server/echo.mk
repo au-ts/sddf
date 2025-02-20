@@ -116,10 +116,10 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(OBJCOPY) --update-section .timer_client_config=timer_client_client1.data lwip1.elf
 	$(OBJCOPY) --update-section .net_client_config=net_client_client1.data lwip1.elf
 	$(OBJCOPY) --update-section .serial_client_config=serial_client_client1.data lwip1.elf
-	$(OBJCOPY) --update-section .serial_client_config=serial_client_bench.data benchmark.elf
-	$(OBJCOPY) --update-section .benchmark_config=benchmark_config.data benchmark.elf
-	$(OBJCOPY) --update-section .benchmark_client_config=benchmark_client_config.data lwip0.elf
-	$(OBJCOPY) --update-section .benchmark_config=benchmark_idle_config.data idle.elf
+# 	$(OBJCOPY) --update-section .serial_client_config=serial_client_bench.data benchmark.elf
+# 	$(OBJCOPY) --update-section .benchmark_config=benchmark_config.data benchmark.elf
+# 	$(OBJCOPY) --update-section .benchmark_client_config=benchmark_client_config.data lwip0.elf
+# 	$(OBJCOPY) --update-section .benchmark_config=benchmark_idle_config.data idle.elf
 
 ${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
