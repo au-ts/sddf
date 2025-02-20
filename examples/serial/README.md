@@ -22,12 +22,15 @@ Currently the options for `MICROKIT_BOARD` are:
 * imx8mm_evk
 * maaxboard
 * qemu_virt_aarch64
+* qemu_virt_riscv64
 * star64
 
 After building, the system image to load will be `build/loader.img`.
 
-If you wish to simulate on the QEMU virt AArch64 platform, you can append `qemu` to your make command
-after building for qemu_virt_aarch64.
+If you wish to simulate on one of the QEMU platforms (qemu_virt_aarch64 or qemu_virt_riscv64),
+you can append `qemu` to your make command to start QEMU after everything compiles.
+
+Note that for qemu_virt_riscv64, please see [specific instructions for running it](#virtio_console).
 
 ### Zig
 
@@ -44,6 +47,65 @@ zig build -Dsdk=/path/to/sdk -Dboard=qemu_virt_aarch64 qemu
 ```
 
 The final bootable image will be in `zig-out/bin/loader.img`.
+
+## Running
+
+When running the example you should the following output:
+```sh
+Begin input
+'client0' is client 0
+'client1' is client 1
+Hello world! I am client1.
+Please give me character!
+Hello world! I am client0.
+Please give me character!
+```
+
+Some of the output will be in red (client 0), some of it will be in green (client 1).
+When typing in characters into your terminal, you should see them be printed in the
+output, by default these will be red for client 0.
+
+To switch clients, enter:
+```sh
+CTRL + \ + <client number>
+```
+
+For example, to switch to client 1, enter:
+```sh
+CTRL + \ + 1
+```
+
+You should see the following output when doing so:
+```
+VIRT_RX|LOG: switching to client 1
+```
+
+### Running with virtIO console {#virtio_console}
+
+Currently, the qemu_virt_riscv64 platform uses the virtIO console device provided by
+QEMU for input/output in the example. This means that when you start the example, you
+only see debug output that goes to the default console:
+```sh
+'client0' is client 0
+'client1' is client 1
+```
+
+All the input/output instead happens via a tty device exposed by QEMU. When starting QEMU
+it will say what device virtIO console will be on, e.g:
+```
+char device redirected to /dev/ttys007 (label virtcon)
+```
+
+Instead of giving input to one of the clients via the stdio of QEMU, you will need to use a
+program such as `minicom`, `picocom` or `gtkterm` to interact with the serial device.
+
+For example:
+```sh
+picocom -b 115200 /dev/ttys007
+```
+
+Inputting characters should be visible, but debug output (i.e. from the virtualisers) will still be
+in the terminal where you started QEMU.
 
 ## Configuration
 

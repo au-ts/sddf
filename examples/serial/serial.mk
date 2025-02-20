@@ -17,8 +17,8 @@ endif
 
 BUILD_DIR ?= build
 MICROKIT_CONFIG ?= debug
-
-QEMU := qemu-system-aarch64
+IMAGE_FILE = loader.img
+REPORT_FILE = report.txt
 
 CC := clang
 LD := ld.lld
@@ -32,27 +32,32 @@ PYTHON ?= python3
 MICROKIT_TOOL := $(MICROKIT_SDK)/bin/microkit
 
 ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
-	ARCH := aarch64
 	DRIVER_DIR := meson
 	CPU := cortex-a55
 else ifeq ($(strip $(MICROKIT_BOARD)), odroidc2)
-	ARCH := aarch64
 	DRIVER_DIR := meson
 	CPU := cortex-a53
 else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
-	ARCH := aarch64
+	QEMU_ARCH_ARGS := -machine virt,virtualization=on \
+					  -cpu cortex-a53 \
+					  -device loader,file=$(IMAGE_FILE),addr=0x70000000,cpu-num=0
 	DRIVER_DIR := arm
 	CPU := cortex-a53
+else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_riscv64)
+	QEMU_ARCH_ARGS := -machine virt \
+					  -kernel $(IMAGE_FILE) \
+					  -global virtio-mmio.force-legacy=false \
+					  -device virtio-serial-device \
+					  -chardev pty,id=virtcon \
+					  -device virtconsole,chardev=virtcon
+	DRIVER_DIR := virtio
 else ifeq ($(strip $(MICROKIT_BOARD)), maaxboard)
-	ARCH := aarch64
 	DRIVER_DIR := imx
 	CPU := cortex-a53
 else ifeq ($(strip $(MICROKIT_BOARD)), imx8mm_evk)
-	ARCH := aarch64
 	DRIVER_DIR := imx
 	CPU := cortex-a53
 else ifeq ($(strip $(MICROKIT_BOARD)), star64)
-	ARCH := riscv64
 	DRIVER_DIR := snps
 else
 $(error Unsupported MICROKIT_BOARD given)
@@ -67,6 +72,8 @@ BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 SYSTEM_FILE := serial.system
 DTS := $(SDDF)/dts/$(MICROKIT_BOARD).dts
 DTB := $(MICROKIT_BOARD).dtb
+ARCH := ${shell grep 'CONFIG_SEL4_ARCH  ' $(BOARD_DIR)/include/kernel/gen_config.h | cut -d' ' -f4}
+QEMU := qemu-system-$(ARCH)
 
 IMAGES := serial_driver.elf \
 	  client0.elf client1.elf \
@@ -77,9 +84,6 @@ CFLAGS := -ffreestanding \
 	  -MD
 LDFLAGS := -L$(BOARD_DIR)/lib -L$(SDDF)/lib
 LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
-
-IMAGE_FILE = loader.img
-REPORT_FILE = report.txt
 
 ifeq ($(ARCH),aarch64)
 	CFLAGS += -mcpu=$(CPU) -mstrict-align -target aarch64-none-elf
@@ -131,8 +135,10 @@ $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	MICROKIT_SDK=${MICROKIT_SDK} $(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
 
 qemu: ${IMAGE_FILE}
-	$(QEMU) -machine virt,virtualization=on -cpu cortex-a53 -serial mon:stdio -device loader,file=$(IMAGE_FILE),addr=0x70000000,cpu-num=0 -m size=2G -nographic
-
+	$(QEMU) -serial mon:stdio \
+			-m size=2G \
+			-nographic \
+			$(QEMU_ARCH_ARGS)
 
 clean::
 	${RM} -f *.elf
