@@ -3,9 +3,18 @@
 // SPDX-License-Identifier: BSD-2-Clause
 //
 const std = @import("std");
+const Step = std.Build.Step;
 const LazyPath = std.Build.LazyPath;
 
-const MicrokitBoard = enum { qemu_virt_aarch64, odroidc2, odroidc4, maaxboard, imx8mm_evk, star64 };
+const MicrokitBoard = enum {
+    imx8mm_evk,
+    odroidc2,
+    odroidc4,
+    maaxboard,
+    qemu_virt_aarch64,
+    qemu_virt_riscv64,
+    star64,
+};
 
 const Target = struct {
     board: MicrokitBoard,
@@ -65,6 +74,15 @@ const targets = [_]Target{
     },
     .{
         .board = MicrokitBoard.star64,
+        .zig_target = std.Target.Query{
+            .cpu_arch = .riscv64,
+            .cpu_model = .{ .explicit = &std.Target.riscv.cpu.baseline_rv64 },
+            .os_tag = .freestanding,
+            .abi = .none,
+        }
+    },
+    .{
+        .board = MicrokitBoard.qemu_virt_riscv64,
         .zig_target = std.Target.Query{
             .cpu_arch = .riscv64,
             .cpu_model = .{ .explicit = &std.Target.riscv.cpu.baseline_rv64 },
@@ -150,6 +168,7 @@ pub fn build(b: *std.Build) !void {
         .odroidc2, .odroidc4 => "meson",
         .maaxboard, .imx8mm_evk => "imx",
         .star64 => "snps",
+        .qemu_virt_riscv64 => "virtio",
     };
 
     const driver = sddf_dep.artifact(b.fmt("driver_serial_{s}.elf", .{ driver_class }));
@@ -248,9 +267,10 @@ pub fn build(b: *std.Build) !void {
 
     // This is setting up a `qemu` command for running the system using QEMU,
     // which we only want to do when we have a board that we can actually simulate.
+    var qemu_cmd: ?*Step.Run = null;
     if (microkit_board_option.? == .qemu_virt_aarch64) {
         const loader_arg = b.fmt("loader,file={s},addr=0x70000000,cpu-num=0", .{final_image_dest});
-        const qemu_cmd = b.addSystemCommand(&[_][]const u8{
+        qemu_cmd = b.addSystemCommand(&[_][]const u8{
             "qemu-system-aarch64",
             "-machine",
             "virt,virtualization=on,highmem=off,secure=off",
@@ -264,8 +284,32 @@ pub fn build(b: *std.Build) !void {
             "2G",
             "-nographic",
         });
-        qemu_cmd.step.dependOn(b.default_step);
+    } else if (microkit_board_option.? == .qemu_virt_riscv64) {
+        qemu_cmd = b.addSystemCommand(&[_][]const u8{
+            "qemu-system-riscv64",
+            "-machine",
+            "virt",
+            "-serial",
+            "mon:stdio",
+            "-kernel",
+            final_image_dest,
+            "-m",
+            "2G",
+            "-global",
+            "virtio-mmio.force-legacy=false",
+            "-device",
+            "virtio-serial-device",
+            "-chardev",
+            "pty,id=virtcon",
+            "-device",
+            "virtconsole,chardev=virtcon",
+            "-nographic",
+        });
+    }
+
+    if (qemu_cmd) |cmd| {
+        cmd.step.dependOn(b.default_step);
         const simulate_step = b.step("qemu", "Simulate the image using QEMU");
-        simulate_step.dependOn(&qemu_cmd.step);
+        simulate_step.dependOn(&cmd.step);
     }
 }
