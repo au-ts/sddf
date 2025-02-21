@@ -270,7 +270,7 @@ pub fn build(b: *std.Build) !void {
         const qemu_cmd = b.addSystemCommand(&[_][]const u8{
             "qemu-system-aarch64",
             "-machine",
-            "virt,virtualization=on,highmem=off,secure=off",
+            "virt,virtualization=on",
             "-cpu",
             "cortex-a53",
             "-serial",
