@@ -6,9 +6,10 @@
 -->
 <system>
 
-    <memory_region name="gpio" size="0x4000" phys_addr="0xFF634000"/>
-    <memory_region name="gpio_ao" size="0x4000" phys_addr="0xFF800000"/>
-    <memory_region name="interupt_control" size="0x10000" phys_addr="0xFFD00000"/>
+    <!-- TODO: i changed the size of mem regions so may fail -->
+    <memory_region name="gpio" size="0x1_000" phys_addr="0xFF634000"/>
+    <memory_region name="gpio_ao" size="0x1_000" phys_addr="0xFF800000"/>
+    <memory_region name="interupt_control" size="0x4_000" phys_addr="0xFFD00000"/>
 
     <protection_domain name="driver" priority="100" pp="true">
         <program_image path="gpio_driver.elf"/>

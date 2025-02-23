@@ -88,8 +88,8 @@ void client_main(void) {
 
     LOG_CLIENT("Setting GPIO1 drive strength to 4000UA!\n");
     msginfo = microkit_msginfo_new(GPIO_SET_GPIO, 2);
-    microkit_mr_set(GPIO_REQ_CONFIG_SLOT, GPIO_DRIVE_STRENGTH);
-    microkit_mr_set(GPIO_REQ_VALUE_SLOT, GPIO_DS_4000UA);
+    microkit_mr_set(GPIO_REQ_CONFIG_SLOT, MESON_GPIO_DRIVE_STRENGTH);
+    microkit_mr_set(GPIO_REQ_VALUE_SLOT, MESON_GPIO_DS_4000UA);
     msginfo = microkit_ppcall(GPIO_DRIVER_CH_1, msginfo);
     if (microkit_msginfo_get_label(msginfo) == GPIO_FAILURE) {
         size_t error = microkit_mr_get(GPIO_RES_VALUE_SLOT);
@@ -99,7 +99,7 @@ void client_main(void) {
 
     LOG_CLIENT("Checking with get request!\n");
     msginfo = microkit_msginfo_new(GPIO_GET_GPIO, 1);
-    microkit_mr_set(GPIO_REQ_CONFIG_SLOT, GPIO_DRIVE_STRENGTH);
+    microkit_mr_set(GPIO_REQ_CONFIG_SLOT, MESON_GPIO_DRIVE_STRENGTH);
     msginfo = microkit_ppcall(GPIO_DRIVER_CH_1, msginfo);
     if (microkit_msginfo_get_label(msginfo) == GPIO_FAILURE) {
         size_t error = microkit_mr_get(GPIO_RES_VALUE_SLOT);
@@ -108,7 +108,7 @@ void client_main(void) {
     }
 
     value = microkit_mr_get(GPIO_RES_VALUE_SLOT);
-    if (value != GPIO_DS_4000UA) {
+    if (value != MESON_GPIO_DS_4000UA) {
         LOG_CLIENT_ERR("problem with output in driver!\n");
         while (1) {};
     }
@@ -169,8 +169,8 @@ void client_main(void) {
 
     LOG_CLIENT("Setting pull of GPIO2 to down!\n");
     msginfo = microkit_msginfo_new(GPIO_SET_GPIO, 2);
-    microkit_mr_set(GPIO_REQ_CONFIG_SLOT, GPIO_PULL);
-    microkit_mr_set(GPIO_REQ_VALUE_SLOT, GPIO_PULL_DOWN);
+    microkit_mr_set(GPIO_REQ_CONFIG_SLOT, MESON_GPIO_PULL);
+    microkit_mr_set(GPIO_REQ_VALUE_SLOT, MESON_GPIO_PULL_DOWN);
     msginfo = microkit_ppcall(GPIO_DRIVER_CH_2, msginfo);
     if (microkit_msginfo_get_label(msginfo) == GPIO_FAILURE) {
         size_t error = microkit_mr_get(GPIO_RES_VALUE_SLOT);
@@ -180,7 +180,7 @@ void client_main(void) {
 
     LOG_CLIENT("Checking with get request!\n");
     msginfo = microkit_msginfo_new(GPIO_GET_GPIO, 1);
-    microkit_mr_set(GPIO_REQ_CONFIG_SLOT, GPIO_PULL);
+    microkit_mr_set(GPIO_REQ_CONFIG_SLOT, MESON_GPIO_PULL);
     msginfo = microkit_ppcall(GPIO_DRIVER_CH_2, msginfo);
     if (microkit_msginfo_get_label(msginfo) == GPIO_FAILURE) {
         size_t error = microkit_mr_get(GPIO_RES_VALUE_SLOT);
@@ -189,15 +189,15 @@ void client_main(void) {
     }
 
     value = microkit_mr_get(GPIO_RES_VALUE_SLOT);
-    if (value != GPIO_PULL_DOWN) {
+    if (value != MESON_GPIO_PULL_DOWN) {
         LOG_CLIENT_ERR("problem with pull in driver!\n");
         while (1) {};
     }
 
     LOG_CLIENT("Setting gpio2s irq channel to be rising edge!\n");
     msginfo = microkit_msginfo_new(GPIO_SET_IRQ, 2);
-    microkit_mr_set(GPIO_REQ_CONFIG_SLOT, GPIO_IRQ_EDGE);
-    microkit_mr_set(GPIO_REQ_VALUE_SLOT, GPIO_IRQ_RISING);
+    microkit_mr_set(GPIO_REQ_CONFIG_SLOT, MESON_GPIO_IRQ_EDGE);
+    microkit_mr_set(GPIO_REQ_VALUE_SLOT, MESON_GPIO_IRQ_RISING);
     msginfo = microkit_ppcall(GPIO_DRIVER_CH_2, msginfo);
     if (microkit_msginfo_get_label(msginfo) == GPIO_FAILURE) {
         size_t error = microkit_mr_get(GPIO_RES_VALUE_SLOT);
@@ -207,7 +207,7 @@ void client_main(void) {
 
     LOG_CLIENT("Checking with get request!\n");
     msginfo = microkit_msginfo_new(GPIO_GET_IRQ, 1);
-    microkit_mr_set(GPIO_REQ_CONFIG_SLOT, GPIO_IRQ_EDGE);
+    microkit_mr_set(GPIO_REQ_CONFIG_SLOT, MESON_GPIO_IRQ_EDGE);
     msginfo = microkit_ppcall(GPIO_DRIVER_CH_2, msginfo);
     if (microkit_msginfo_get_label(msginfo) == GPIO_FAILURE) {
         size_t error = microkit_mr_get(GPIO_RES_VALUE_SLOT);
@@ -216,15 +216,15 @@ void client_main(void) {
     }
 
     value = microkit_mr_get(GPIO_RES_VALUE_SLOT);
-    if (value != GPIO_IRQ_RISING) {
+    if (value != MESON_GPIO_IRQ_RISING) {
         LOG_CLIENT_ERR("problem with pull in driver! %ld\n", value);
         while (1) {};
     }
 
     LOG_CLIENT("Setting gpio2s irq channel to have a filter!\n");
     msginfo = microkit_msginfo_new(GPIO_SET_IRQ, 2);
-    microkit_mr_set(GPIO_REQ_CONFIG_SLOT, GPIO_IRQ_FILTER);
-    microkit_mr_set(GPIO_REQ_VALUE_SLOT, GPIO_IRQ_FILTER_2331NS);
+    microkit_mr_set(GPIO_REQ_CONFIG_SLOT, MESON_GPIO_IRQ_FILTER);
+    microkit_mr_set(GPIO_REQ_VALUE_SLOT, MESON_GPIO_IRQ_FILTER_2331NS);
     msginfo = microkit_ppcall(GPIO_DRIVER_CH_2, msginfo);
     if (microkit_msginfo_get_label(msginfo) == GPIO_FAILURE) {
         size_t error = microkit_mr_get(GPIO_RES_VALUE_SLOT);
@@ -234,7 +234,7 @@ void client_main(void) {
 
     LOG_CLIENT("Checking with get request!\n");
     msginfo = microkit_msginfo_new(GPIO_GET_IRQ, 1);
-    microkit_mr_set(GPIO_REQ_CONFIG_SLOT, GPIO_IRQ_FILTER);
+    microkit_mr_set(GPIO_REQ_CONFIG_SLOT, MESON_GPIO_IRQ_FILTER);
     msginfo = microkit_ppcall(GPIO_DRIVER_CH_2, msginfo);
     if (microkit_msginfo_get_label(msginfo) == GPIO_FAILURE) {
         size_t error = microkit_mr_get(GPIO_RES_VALUE_SLOT);
@@ -243,7 +243,7 @@ void client_main(void) {
     }
 
     value = microkit_mr_get(GPIO_RES_VALUE_SLOT);
-    if (value != GPIO_IRQ_FILTER_2331NS) {
+    if (value != MESON_GPIO_IRQ_FILTER_2331NS) {
         LOG_CLIENT_ERR("problem with filter in driver!\n");
         while (1) {};
     }

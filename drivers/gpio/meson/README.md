@@ -14,8 +14,6 @@ When a digtial I/O pin is not being used for any specific purpose (i2c, uart) it
 # USAGE!!!!!!!!!!! (IMPORTANT)
 There must be a configuration file that contains gpio_channel_mappings.
 
-Once an IRQ is configured to a pin it may be notified during further initialisation when configuring inputs and filters etc... so take care.
-
 Some registers have undefined permissions so clients need to check with a get request after each set request to make sure what they are trying to do actually happens!!
 Or check the datasheet.
 
@@ -95,13 +93,11 @@ Each bank has an associated register(s) to configure the respective functionalit
 - PAD_PULL_UP is used to control GPIO PAD to be whether pull-up or pull-down.
 - PAD_DS is used to control drive strength {ds1, ds0}.
 
-There is also a lock register to lock the pin values of any of the GPIO_AO pins.
+There is also a lock register to lock the pin values of any of the GPIO_AO pins - **unimplemented**.
 
 ### GPIO IRQ Control
 
 #### IRQ sources
-There are 224 interupt sources on the OdroidC4.
-
 There are 8 interupt sources that can be configured to ANY of the pins in ANY of the GPIO banks.
 
 - 103 : gpio_irq[7]
@@ -129,4 +125,4 @@ For each of the 10 interrupt sources, there is an associated (part of) register 
 - FILTER_SEL is used to select a value for filtering for the interrupt.
 
 There is also a field specific to the 2 AO interupt sources:
-- GPIO_FILTER_USE_CLK is used to connect the input filter to the system clock. (This is unimplemented)
+- GPIO_FILTER_USE_CLK is used to connect the input filter to the system clock. **unimplemented**

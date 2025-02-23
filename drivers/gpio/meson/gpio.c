@@ -58,43 +58,43 @@ void notified(microkit_channel ch)
 {
     LOG_DRIVER("Driver Notified %d!\n", ch);
     switch (ch) {
-        case GPIO_IRQ_0:
+        case MESON_GPIO_IRQ_0:
             microkit_irq_ack(ch);
             microkit_notify(driver_to_client_channel_mappings[ch - MESON_GPIO_IRQ_CHANNEL_START]);
             break;
-        case GPIO_IRQ_1:
+        case MESON_GPIO_IRQ_1:
             microkit_irq_ack(ch);
             microkit_notify(driver_to_client_channel_mappings[ch - MESON_GPIO_IRQ_CHANNEL_START]);
             break;
-        case GPIO_IRQ_2:
+        case MESON_GPIO_IRQ_2:
             microkit_irq_ack(ch);
             microkit_notify(driver_to_client_channel_mappings[ch - MESON_GPIO_IRQ_CHANNEL_START]);
             break;
-        case GPIO_IRQ_3:
+        case MESON_GPIO_IRQ_3:
             microkit_irq_ack(ch);
             microkit_notify(driver_to_client_channel_mappings[ch - MESON_GPIO_IRQ_CHANNEL_START]);
             break;
-        case GPIO_IRQ_4:
+        case MESON_GPIO_IRQ_4:
             microkit_irq_ack(ch);
             microkit_notify(driver_to_client_channel_mappings[ch - MESON_GPIO_IRQ_CHANNEL_START]);
             break;
-        case GPIO_IRQ_5:
+        case MESON_GPIO_IRQ_5:
             microkit_irq_ack(ch);
             microkit_notify(driver_to_client_channel_mappings[ch - MESON_GPIO_IRQ_CHANNEL_START]);
             break;
-        case GPIO_IRQ_6:
+        case MESON_GPIO_IRQ_6:
             microkit_irq_ack(ch);
             microkit_notify(driver_to_client_channel_mappings[ch - MESON_GPIO_IRQ_CHANNEL_START]);
             break;
-        case GPIO_IRQ_7:
+        case MESON_GPIO_IRQ_7:
             microkit_irq_ack(ch);
             microkit_notify(driver_to_client_channel_mappings[ch - MESON_GPIO_IRQ_CHANNEL_START]);
             break;
-        case GPIO_AO_IRQ_0:
+        case MESON_GPIO_AO_IRQ_0:
             microkit_irq_ack(ch);
             microkit_notify(driver_to_client_channel_mappings[ch - MESON_GPIO_IRQ_CHANNEL_START]);
             break;
-        case GPIO_AO_IRQ_1:
+        case MESON_GPIO_AO_IRQ_1:
             microkit_irq_ack(ch);
             microkit_notify(driver_to_client_channel_mappings[ch - MESON_GPIO_IRQ_CHANNEL_START]);
             break;
@@ -104,16 +104,16 @@ void notified(microkit_channel ch)
 }
 
 static meson_gpio_bank_t meson_get_gpio_bank(size_t pin) {
-    if (pin < GPIO_Z) return GPIO_AO;
-    if (pin < GPIO_H) return GPIO_Z;
-    if (pin < BOOT) return GPIO_H;
-    if (pin < GPIO_C) return BOOT;
-    if (pin < GPIO_A) return GPIO_C;
-    if (pin < GPIO_X) return GPIO_A;
-    if (pin < GPIO_E) return GPIO_X;
-    if (pin < TEST_N) return GPIO_E;
-    if (pin < GPIO_ERROR_INVALID_PIN) return TEST_N;
-    return GPIO_ERROR_INVALID_PIN;
+    if (pin < MESON_GPIO_Z) return MESON_GPIO_AO;
+    if (pin < MESON_GPIO_H) return MESON_GPIO_Z;
+    if (pin < MESON_GPIO_BOOT) return MESON_GPIO_H;
+    if (pin < MESON_GPIO_C) return MESON_GPIO_BOOT;
+    if (pin < MESON_GPIO_A) return MESON_GPIO_C;
+    if (pin < MESON_GPIO_X) return MESON_GPIO_A;
+    if (pin < MESON_GPIO_E) return MESON_GPIO_X;
+    if (pin < MESON_GPIO_TEST_N) return MESON_GPIO_E;
+    if (pin < MESON_GPIO_ERROR_INVALID_PIN) return MESON_GPIO_TEST_N;
+    return MESON_GPIO_ERROR_INVALID_PIN;
 }
 
 // true if success | false if fail
@@ -162,7 +162,7 @@ static bool meson_irq_calc_reg_and_bits(meson_irq_reg_type_t function, size_t ch
 static bool meson_gpio_calc_reg_and_bits(meson_gpio_reg_type_t function, size_t pin, uint32_t *reg_offset, uint32_t *start_bit) {
     // check if pin is too high
     meson_gpio_bank_t bank = meson_get_gpio_bank(pin);
-    if (bank == GPIO_ERROR_INVALID_PIN) {
+    if (bank == MESON_GPIO_ERROR_INVALID_PIN) {
         return false;
     }
 
@@ -214,12 +214,13 @@ static bool meson_gpio_calc_reg_and_bits(meson_gpio_reg_type_t function, size_t 
 static volatile uint32_t *get_gpio_base_address(size_t pin) {
     meson_gpio_bank_t bank = meson_get_gpio_bank(pin);
 
-    if (bank == GPIO_AO) {
+    if (bank == MESON_GPIO_AO) {
         return (volatile uint32_t *)(gpio_ao_regs + GPIO_AO_REGS_BASE_ADDRESS_OFFSET);
-    } else {
-        return (volatile uint32_t *)(gpio_regs + GPIO_REGS_BASE_ADDRESS_OFFSET);
     }
+    return (volatile uint32_t *)(gpio_regs + GPIO_REGS_BASE_ADDRESS_OFFSET);
 }
+
+/* GETS */
 
 static void meson_get_gpio_output(size_t pin, size_t* label, size_t* response) {
     uint32_t reg_offset;
@@ -295,7 +296,7 @@ static void meson_get_gpio_pull(size_t pin, size_t* label, size_t* response) {
 
     if (value == 0) {
         *label = GPIO_SUCCESS;
-        *response = GPIO_NO_PULL;
+        *response = MESON_GPIO_NO_PULL;
         return;
     }
 
@@ -311,9 +312,9 @@ static void meson_get_gpio_pull(size_t pin, size_t* label, size_t* response) {
 
     *label = GPIO_SUCCESS;
     if (value == 0) {
-        *response = GPIO_PULL_DOWN;
+        *response = MESON_GPIO_PULL_DOWN;
     } else {
-       *response = GPIO_PULL_UP;
+       *response = MESON_GPIO_PULL_UP;
     }
 }
 
@@ -335,6 +336,8 @@ static void meson_get_gpio_drive_strength(size_t pin, size_t* label, size_t* res
     *label = GPIO_SUCCESS;
     *response = value;
 }
+
+/* SETS */
 
 static void meson_set_gpio_output(size_t pin, size_t value, size_t* label, size_t* response) {
     if (value != 0 && value != 1) {
@@ -387,7 +390,7 @@ static void meson_set_gpio_direction(size_t pin, size_t value, size_t* label, si
 }
 
 static void meson_set_gpio_pull(size_t pin, size_t value, size_t* label, size_t* response) {
-    if (value != GPIO_PULL_UP && value != GPIO_PULL_DOWN && value != GPIO_NO_PULL) {
+    if (value != MESON_GPIO_PULL_UP && value != MESON_GPIO_PULL_DOWN && value != MESON_GPIO_NO_PULL) {
         *label = GPIO_FAILURE;
         *response = GPIO_INVALID_VALUE;
         return;
@@ -406,10 +409,8 @@ static void meson_set_gpio_pull(size_t pin, size_t value, size_t* label, size_t*
 
     // set value
     *final_reg_address &= ~BIT(start_bit); // clear
-    if (value == GPIO_NO_PULL) {
+    if (value == MESON_GPIO_NO_PULL) {
         *label = GPIO_SUCCESS;
-        // print_reg(*final_reg_address);
-        // LOG_DRIVER("Start bit : %d, reg offset %lx \n", start_bit, reg_offset);
         return;
     }
 
@@ -424,7 +425,7 @@ static void meson_set_gpio_pull(size_t pin, size_t value, size_t* label, size_t*
 
     final_reg_address = ((void *)gpio_base_address + reg_offset * 4);
 
-    if (value == GPIO_PULL_DOWN) {
+    if (value == MESON_GPIO_PULL_DOWN) {
         *final_reg_address &= ~BIT(start_bit); // clear
     } else {
         *final_reg_address |= BIT(start_bit); // set
@@ -434,7 +435,7 @@ static void meson_set_gpio_pull(size_t pin, size_t value, size_t* label, size_t*
 }
 
 static void meson_set_gpio_drive_strength(size_t pin, size_t value, size_t* label, size_t* response) {
-    if (value != GPIO_DS_500UA && value != GPIO_DS_2500UA && value != GPIO_DS_3000UA && value != GPIO_DS_4000UA) {
+    if (value != MESON_GPIO_DS_500UA && value != MESON_GPIO_DS_2500UA && value != MESON_GPIO_DS_3000UA && value != MESON_GPIO_DS_4000UA) {
         *label = GPIO_FAILURE;
         *response = GPIO_INVALID_VALUE;
         return;
@@ -463,7 +464,7 @@ static void meson_get_irq_pin(size_t channel, size_t* label, size_t* response) {
     uint32_t start_bit;
 
     meson_irq_reg_type_t reg_type;
-    if (channel == GPIO_AO_IRQ_0 || channel == GPIO_AO_IRQ_1) {
+    if (channel ==  MESON_GPIO_AO_IRQ_0 || channel == MESON_GPIO_AO_IRQ_1) {
         reg_type = MESON_IRQ_REG_AOSEL;
     } else {
         reg_type = MESON_IRQ_REG_SEL;
@@ -502,7 +503,7 @@ static void meson_get_irq_edge(size_t channel, size_t* label, size_t* response) 
 
     if (value == 1) {
         *label = GPIO_SUCCESS;
-        *response = GPIO_IRQ_BOTH_RISING_FALLING;
+        *response = MESON_GPIO_IRQ_BOTH_RISING_FALLING;
         return;
     }
 
@@ -519,7 +520,7 @@ static void meson_get_irq_edge(size_t channel, size_t* label, size_t* response) 
 
     if (value == 0) {
         *label = GPIO_SUCCESS;
-        *response = GPIO_IRQ_LEVEL;
+        *response = MESON_GPIO_IRQ_LEVEL;
         return;
     }
 
@@ -536,9 +537,9 @@ static void meson_get_irq_edge(size_t channel, size_t* label, size_t* response) 
 
     *label = GPIO_SUCCESS;
     if (value == 1) {
-        *response = GPIO_IRQ_FALLING;
+        *response = MESON_GPIO_IRQ_FALLING;
     } else {
-       *response = GPIO_IRQ_RISING;
+       *response = MESON_GPIO_IRQ_RISING;
     }
 }
 
@@ -557,8 +558,8 @@ static void meson_get_irq_filter(size_t channel, size_t* label, size_t* response
 
     // get value
     uint32_t value = (*final_reg_address >> start_bit) & BIT_MASK(0, meson_irq_bit_strides[MESON_IRQ_REG_FIL]);
-    if ((channel == GPIO_AO_IRQ_0 || channel == GPIO_AO_IRQ_1) && value == 1) {
-        *response = GPIO_IRQ_FILTER_2600NS;
+    if ((channel == MESON_GPIO_AO_IRQ_0 || channel == MESON_GPIO_AO_IRQ_1) && value == 1) {
+        *response = MESON_GPIO_IRQ_FILTER_2600NS;
     } else {
         *response = value;
     }
@@ -568,9 +569,9 @@ static void meson_get_irq_filter(size_t channel, size_t* label, size_t* response
 
 static void meson_set_irq_pin(size_t channel, size_t value, size_t* label, size_t* response) {
     meson_irq_reg_type_t reg_type;
-    if (channel == GPIO_AO_IRQ_0 || channel == GPIO_AO_IRQ_1) {
+    if (channel == MESON_GPIO_AO_IRQ_0 || channel == MESON_GPIO_AO_IRQ_1) {
         meson_gpio_bank_t bank = meson_get_gpio_bank(value);
-        if (bank != GPIO_AO) {
+        if (bank != MESON_GPIO_AO) {
             *label = GPIO_FAILURE;
             *response = GPIO_INVALID_PIN_CONFIG_ENTRY;
             return;
@@ -578,7 +579,7 @@ static void meson_set_irq_pin(size_t channel, size_t value, size_t* label, size_
         reg_type = MESON_IRQ_REG_AOSEL;
     } else {
         meson_gpio_bank_t bank = meson_get_gpio_bank(value);
-        if (bank == GPIO_ERROR_INVALID_PIN || bank == TEST_N) {
+        if (bank == MESON_GPIO_ERROR_INVALID_PIN || bank == MESON_GPIO_TEST_N) {
             *label = GPIO_FAILURE;
             *response = GPIO_INVALID_PIN_CONFIG_ENTRY;
             return;
@@ -606,7 +607,7 @@ static void meson_set_irq_pin(size_t channel, size_t value, size_t* label, size_
 }
 
 static void meson_set_irq_edge(size_t channel, size_t value, size_t* label, size_t* response) {
-    if (value != GPIO_IRQ_BOTH_RISING_FALLING && value != GPIO_IRQ_RISING && value != GPIO_IRQ_FALLING && value != GPIO_IRQ_LEVEL) {
+    if (value != MESON_GPIO_IRQ_BOTH_RISING_FALLING && value != MESON_GPIO_IRQ_RISING && value != MESON_GPIO_IRQ_FALLING && value != MESON_GPIO_IRQ_LEVEL) {
         *label = GPIO_FAILURE;
         *response = GPIO_INVALID_VALUE;
         return;
@@ -627,7 +628,7 @@ static void meson_set_irq_edge(size_t channel, size_t value, size_t* label, size
 
     // set value
     *final_reg_address &= ~BIT(start_bit); // clear
-    if (value == GPIO_IRQ_BOTH_RISING_FALLING) {
+    if (value == MESON_GPIO_IRQ_BOTH_RISING_FALLING) {
         *final_reg_address |= BIT(start_bit); // set
         *label = GPIO_SUCCESS;
         return;
@@ -643,7 +644,7 @@ static void meson_set_irq_edge(size_t channel, size_t value, size_t* label, size
 
     // set value
     *final_reg_address &= ~BIT(start_bit); // clear
-    if (value == GPIO_IRQ_LEVEL) {
+    if (value == MESON_GPIO_IRQ_LEVEL) {
         *label = GPIO_SUCCESS;
         return;
     }
@@ -661,7 +662,7 @@ static void meson_set_irq_edge(size_t channel, size_t value, size_t* label, size
 
     // set value
     *final_reg_address &= ~BIT(start_bit); // clear
-    if (value == GPIO_IRQ_RISING) {
+    if (value == MESON_GPIO_IRQ_RISING) {
         return;
     }
     *final_reg_address |= BIT(start_bit); // set
@@ -680,12 +681,12 @@ static void meson_set_irq_filter(size_t channel, size_t value, size_t* label, si
     volatile uint32_t *irq_base_address = (void *)(interupt_control_regs + IRQ_CONTROL_REGS_BASE_ADDRESS_OFFSET);
     volatile uint32_t *final_reg_address = ((void *)irq_base_address + reg_offset * 4);
 
-    if (channel == GPIO_AO_IRQ_0 || channel == GPIO_AO_IRQ_1) {
-        if (value == GPIO_IRQ_FILTER_2600NS) {
+    if (channel == MESON_GPIO_AO_IRQ_0 || channel == MESON_GPIO_AO_IRQ_1) {
+        if (value == MESON_GPIO_IRQ_FILTER_2600NS) {
             *final_reg_address |= BIT(start_bit); // set
             *label = GPIO_SUCCESS;
             return;
-        } else if (value == GPIO_IRQ_FILTER_0NS) {
+        } else if (value == MESON_GPIO_IRQ_FILTER_0NS) {
             *final_reg_address &= ~BIT(start_bit); // clear
             *label = GPIO_SUCCESS;
             return;
@@ -696,7 +697,7 @@ static void meson_set_irq_filter(size_t channel, size_t value, size_t* label, si
         }
     }
 
-    if (!(value >= GPIO_IRQ_FILTER_0NS && value <= GPIO_IRQ_FILTER_2331NS)) {
+    if (!(value >= MESON_GPIO_IRQ_FILTER_0NS && value <= MESON_GPIO_IRQ_FILTER_2331NS)) {
         *label = GPIO_FAILURE;
         *response = GPIO_INVALID_VALUE;
     }
@@ -721,10 +722,10 @@ static seL4_MessageInfo_t handle_get_gpio_request(size_t pin, size_t config) {
         case GPIO_DIRECTION:
             meson_get_gpio_direction(pin, &label, &response);
             break;
-        case GPIO_PULL:
+        case MESON_GPIO_PULL:
             meson_get_gpio_pull(pin, &label, &response);
             break;
-        case GPIO_DRIVE_STRENGTH:
+        case MESON_GPIO_DRIVE_STRENGTH:
             meson_get_gpio_drive_strength(pin, &label, &response);
             break;
         default:
@@ -748,10 +749,10 @@ static seL4_MessageInfo_t handle_set_gpio_request(size_t pin, size_t config, siz
         case GPIO_DIRECTION:
             meson_set_gpio_direction(pin, value, &label, &response);
             break;
-        case GPIO_PULL:
+        case MESON_GPIO_PULL:
             meson_set_gpio_pull(pin, value, &label, &response);
             break;
-        case GPIO_DRIVE_STRENGTH:
+        case MESON_GPIO_DRIVE_STRENGTH:
             meson_set_gpio_drive_strength(pin, value, &label, &response);
             break;
         default:
@@ -778,10 +779,10 @@ static seL4_MessageInfo_t handle_get_irq_request(size_t channel, size_t config) 
         case GPIO_IRQ_PIN:
             meson_get_irq_pin(channel, &label, &response);
             break;
-        case GPIO_IRQ_EDGE:
+        case MESON_GPIO_IRQ_EDGE:
             meson_get_irq_edge(channel, &label, &response);
             break;
-        case GPIO_IRQ_FILTER:
+        case MESON_GPIO_IRQ_FILTER:
             meson_get_irq_filter(channel, &label, &response);
             break;
         default:
@@ -799,10 +800,10 @@ static seL4_MessageInfo_t handle_set_irq_request(size_t channel, size_t config, 
     size_t response;
 
     switch (config) {
-        case GPIO_IRQ_EDGE:
+        case MESON_GPIO_IRQ_EDGE:
             meson_set_irq_edge(channel, value, &label, &response);
             break;
-        case GPIO_IRQ_FILTER:
+        case MESON_GPIO_IRQ_FILTER:
             meson_set_irq_filter(channel, value, &label, &response);
             break;
         default:
@@ -914,22 +915,25 @@ void init(void)
     LOG_DRIVER("Driver Init!\n");
 
     /* Configure gpio channel mappings */
-    for (int i = 0; i < 52; i++) {
+    for (int i = 0; i < 62; i++) {
         /* Check if channel has been configured */
         if (gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_IRQ_CHANNEL_SLOT] != -1) {
-            int meson_channel = gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_IRQ_CHANNEL_SLOT];
+            int meson_device_channel = gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_IRQ_CHANNEL_SLOT];
 
-            /* Check if its a valid configuration */
-            if (meson_channel >= MESON_GPIO_IRQ_CHANNEL_START && meson_channel < MESON_GPIO_IRQ_CHANNEL_START + MESON_GPIO_IRQ_CHANNEL_COUNT) {
+            /* Check if its a valid irq configuration (its in range + corresponding device channel entry in table is uninitialised) */
+            if (meson_device_channel >= MESON_GPIO_IRQ_CHANNEL_START
+            && meson_device_channel < MESON_GPIO_IRQ_CHANNEL_START + MESON_GPIO_IRQ_CHANNEL_COUNT
+            && gpio_channel_mappings[meson_device_channel][GPIO_CHANNEL_MAPPING_GPIO_PIN_SLOT] == -1
+            && gpio_channel_mappings[meson_device_channel][GPIO_CHANNEL_MAPPING_IRQ_CHANNEL_SLOT] == -1) {
                 /* Configure with hardware */
                 size_t label;
                 size_t response;
-                meson_set_irq_pin(meson_channel, gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_GPIO_PIN_SLOT], &label, &response);
+                meson_set_irq_pin(meson_device_channel, gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_GPIO_PIN_SLOT], &label, &response);
                 if (label == GPIO_FAILURE) {
                     LOG_DRIVER_ERR("Failed to config gpio_channel_mappings[%d] with gpio_irq_error_t : %ld!\n", i, response);
                     while (1) {}
                 }
-                meson_get_irq_pin(meson_channel, &label, &response);
+                meson_get_irq_pin(meson_device_channel, &label, &response);
                 if (label == GPIO_FAILURE) {
                     LOG_DRIVER_ERR("Failed to config gpio_channel_mappings[%d] with gpio_irq_error_t : %ld!\n", i, response);
                     while (1) {}
@@ -940,10 +944,13 @@ void init(void)
                 }
 
                 /* Assign channel to the gpio pin */
-                driver_to_client_channel_mappings[meson_channel - MESON_GPIO_IRQ_CHANNEL_START] = gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_CLIENTS_CHANNEL_SLOT];
+                driver_to_client_channel_mappings[meson_device_channel - MESON_GPIO_IRQ_CHANNEL_START] = gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_CLIENTS_CHANNEL_SLOT];
 
                 /* ACK the IRQ so we can recieve further IRQs */
-                microkit_irq_ack(meson_channel);
+                microkit_irq_ack(meson_device_channel);
+            } else {
+                LOG_DRIVER_ERR("Failed to config irq meson_device_channel!\n");
+                while (1) {}
             }
         }
     }
