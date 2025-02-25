@@ -57,7 +57,7 @@ void process_requests()
         int err = arp_dequeue_request(arp_query, &request);
         assert(!err);
         if (request.valid != true) {
-            sddf_dprintf("ARP request was invalid!\n");
+            sddf_dprintf("ARP_REQUESTER|ARP request was invalid!\n");
         }
 
         // @kwinter: Need to drop this in favour of packet look up in waiting queue.
@@ -112,7 +112,7 @@ static int arp_reply(const uint8_t ethsrc_addr[ETH_HWADDR_LEN],
                      const uint8_t hwdst_addr[ETH_HWADDR_LEN], const uint32_t ipdst_addr)
 {
     if (net_queue_empty_free(&virt_tx_queue)) {
-        sddf_dprintf("PROXY_ARP|LOG: Transmit free queue empty or transmit active queue full. Dropping reply\n");
+        sddf_dprintf("ARP_REQUESTER|LOG: Transmit free queue empty or transmit active queue full. Dropping reply\n");
         return -1;
     }
 
@@ -165,10 +165,6 @@ void process_responses()
                 resp.ip_addr = pkt->ipsrc_addr;
                 sddf_memcpy(resp.mac_addr, pkt->hwsrc_addr, sizeof(uint8_t) * ETH_HWADDR_LEN);
                 resp.valid = true;
-                sddf_dprintf("PROCESSING RESPONSE, ADDING RESPONSE TO ARP QUEUE!\n");
-                for (int i = 0; i < 6; i++) {
-                    sddf_dprintf("ARP_REQUESTER|MAC[%d]: %x\n", i, pkt->hwsrc_addr[i] );
-                }
                 arp_enqueue_response(arp_query, &resp);
                 // We are also going to add the ip -> mac mapping to the ARP table.
                 arp_entry_t entry = {0};
@@ -219,15 +215,9 @@ void init(void)
 
 void notified(microkit_channel ch)
 {
-    // sddf_dprintf("This is the vaddr of the arp queue: %p\n", arp_config.router.arp_queue.vaddr);
-    // sddf_dprintf("This is the channel: %d\n", ch);
-    // @kwinter: Get the appropriate channel number for the router
-    // sddf_dprintf("This is the router id: %d and this sit the rx id: %d\n", arp_config.router.id, net_config.rx.id);
     if (ch == arp_config.router.id) {
-        // sddf_dprintf("Processing arp requests!\n");
         process_requests();
     } if (ch == net_config.rx.id) {
-        sddf_dprintf("Processing an arp response!\n");
         process_responses();
     }
 }

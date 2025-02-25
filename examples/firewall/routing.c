@@ -54,17 +54,10 @@ dev_info_t *device1_info;
 dev_info_t *device2_info;
 
 /* This code is taken from: https://gist.github.com/david-hoze/0c7021434796997a4ca42d7731a7073a*/
-uint16_t checksum(uint8_t *buf, uint16_t len, uint8_t type)
+uint16_t checksum(uint8_t *buf, uint16_t len)
 {
-        // type 0=ip 
-        //      1=udp
-        //      2=tcp
         uint32_t sum = 0;
 
-        //if(type==0){
-        //        // do not add anything
-        //}
-        // build the sum of 16bit words
         while(len >1){
                 sum += 0xFFFF & (*buf<<8|*(buf+1));
                 buf+=2;
@@ -72,7 +65,7 @@ uint16_t checksum(uint8_t *buf, uint16_t len, uint8_t type)
         }
         // if there is a byte left then add it (padded with zero)
         if (len){
-//--- made by SKA ---                sum += (0xFF & *buf)<<8;
+        //  sum += (0xFF & *buf)<<8;
                 sum += 0xFFFF & (*buf<<8|0x00);
         }
         // now calculate the sum over the bytes in the sum
@@ -97,19 +90,14 @@ void process_arp_waiting()
         int err = arp_dequeue_response(arp_queries, &response);
         /* Check that we actually have a packet waiting. */
         if (!waiting_packet.valid) {
-            sddf_dprintf("ROUTING|No packet waiting on ARP reply!\n");
             continue;
         }
-
-        char buf[16];
-        sddf_dprintf("ROUTING|This is the ip address if the response: %s\n", ipaddr_to_string(response.ip_addr, buf, 16));
 
         if (!response.valid && waiting_packet.valid) {
             // Find all packets with this IP address and drop them.
             // net_buff_desc_t buffer = waiting_packet.buffer;
             // Check if the IP in this packet matches response.
             waiting_packet.buffer.len = 0;
-            sddf_dprintf("DROPPING PACKETS FOR SOME REASON, MAY BE VM FAULTING HERE\n");
             err = net_enqueue_free(&virt_rx_queue, waiting_packet.buffer);
             assert(!err);
         } else {
@@ -119,26 +107,20 @@ void process_arp_waiting()
                     sddf_dprintf("ROUTING|Error restoring buffer in process_arp_waiting()\n");
                     return;
                 }
-                sddf_dprintf("We match the IP, we are now going to forward the packet!!!\n");
                 struct ipv4_packet *pkt = (struct ipv4_packet *)(net1_config.rx_data.vaddr + waiting_packet.buffer.io_or_offset);
-                sddf_dprintf("This is the address of pkt: %p\n", pkt);
-                sddf_dprintf("Copying dst addr into eth header\n");
                 sddf_memcpy(pkt->ethdst_addr, response.mac_addr, ETH_HWADDR_LEN);
-                sddf_dprintf("Copying serc addr into eth header\n");
                 sddf_memcpy(pkt->ethsrc_addr, device2_info->mac, ETH_HWADDR_LEN);
-                sddf_dprintf("Finished MAC address setup\n");
                 net_buff_desc_t buffer_tx;
                 int err = net_dequeue_free(&virt_tx_queue, &buffer_tx);
                 assert(!err);
                 pkt->check = 0;
-                pkt->check = checksum((uint8_t *)pkt, 20, 0);
+                pkt->check = checksum((uint8_t *)pkt, 20);
 
                 // @kwinter: For now we are memcpy'ing the packet from our receive buffer
                 // to the transmit buffer.
                 // Also need to make sure that len here is the appropriate size.
                 sddf_memcpy((net2_config.tx_data.vaddr + buffer_tx.io_or_offset), (net1_config.rx_data.vaddr + waiting_packet.buffer.io_or_offset), waiting_packet.buffer.len);
                 buffer_tx.len = waiting_packet.buffer.len;
-                sddf_dprintf("PROCESS_ARP_WAITING|This is the buffer len: 0x%x\n", buffer_tx.len);
                 err = net_enqueue_active(&virt_tx_queue, buffer_tx);
                 assert(!err);
                 waiting_packet.buffer.len = 0;
@@ -243,14 +225,8 @@ void route()
                     sddf_memcpy(&pkt->ethdst_addr, &hash_entry.mac_addr, ETH_HWADDR_LEN);
                     // TODO: replace the source MAC address with the MAC address of our NIC.
                     sddf_memcpy(&pkt->ethsrc_addr, device2_info->mac, ETH_HWADDR_LEN);
-                    sddf_dprintf("This is the ethdst and ethsrc addr: \n");
-                    for (int i = 0; i < 6; i++) {
-                        sddf_dprintf("MAC[%d]: 0x%x ---- 0x%x\n", i, pkt->ethdst_addr[i], pkt->ethsrc_addr[i]);
-                    }
-                    sddf_dprintf("This is the old checksum: 0x%x\n", pkt->check);
                     pkt->check = 0;
-                    pkt->check = checksum((uint8_t *)pkt, 20, 0);
-                    sddf_dprintf("This is the new checksum: 0x%x\n", pkt->check);
+                    pkt->check = checksum((uint8_t *)pkt, 20);
                     // Send the packet out to the network.
                     net_buff_desc_t buffer_tx;
                     int err = net_dequeue_free(&virt_tx_queue, &buffer_tx);
@@ -260,13 +236,8 @@ void route()
                     // to the transmit buffer.
                     // Also need to make sure that len here is the appropriate size.
                     sddf_memcpy((net2_config.tx_data.vaddr + buffer_tx.io_or_offset), (net1_config.rx_data.vaddr + buffer.io_or_offset), buffer.len + (sizeof(struct ipv4_packet)));
-                    sddf_dprintf("This is the destination address of the tx packet: \n");
                     struct ipv4_packet *test = (struct ipv4_packet *)(net2_config.tx_data.vaddr + buffer_tx.io_or_offset);
-                    for (int i = 0; i < 6; i++) {
-                        sddf_dprintf("ROUTING|MAC[%d]: 0x%x\n", i, test->ethdst_addr[i]);
-                    }
                     buffer_tx.len = buffer.len;
-                    sddf_dprintf("ROUTE|This is the buffer len: 0x%x\n", buffer_tx.len);
                     err = net_enqueue_active(&virt_tx_queue, buffer_tx);
                     transmitted = true;
 
@@ -276,11 +247,7 @@ void route()
                 err = net_enqueue_free(&virt_rx_queue, buffer);
                 assert(!err);
 
-            } else {
-                sddf_dprintf("We have got a different protocol\n");
             }
-
-
         }
 
         net_request_signal_active(&virt_rx_queue);
@@ -326,7 +293,6 @@ void init(void)
     device1_info = (dev_info_t *) net1_config.dev_info.vaddr;
     device2_info = (dev_info_t *) net2_config.dev_info.vaddr;
 
-    // Add just the default route? Actually just leave this empty and just send out the other end.
     // routing_table[0].network_id = 0;
     // routing_table[0].subnet_mask = 0xFFFFFF00;
     // routing_table[0].next_hop = 0;

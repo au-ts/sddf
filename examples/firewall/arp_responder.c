@@ -189,8 +189,6 @@ void notified(microkit_channel ch)
     // register with the routing client.
     if (ch == net_config.rx.id) {
         receive();
-    } else if (ch == net_config.tx.id) {
-        sddf_dprintf("Received a transmit notification!\n");
     } else {
         sddf_dprintf("PROXY|ARP: Received notification on invalid channel: %d!\n", ch);
     }
