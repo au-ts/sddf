@@ -26,6 +26,15 @@ class Board:
 
 BOARDS: List[Board] = [
     Board(
+        name="qemu_virt_aarch64",
+        arch=SystemDescription.Arch.AARCH64,
+        paddr_top=0x6_0000_000,
+        serial="pl011@9000000",
+        timer="timer",
+        ethernet="virtio_mmio@a003e00",
+        ethernet1="virtio_mmio@a002300"
+    ),
+    Board(
         name="imx8mp_evk",
         arch=SystemDescription.Arch.AARCH64,
         paddr_top=0x70000000,
@@ -65,13 +74,13 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     net_virt_tx1 = ProtectionDomain("net_virt_tx_1", "network_virt_tx_1.elf", priority=100, budget=20000)
     net_virt_rx1 = ProtectionDomain("net_virt_rx_1", "network_virt_rx_1.elf", priority=99)
 
-    net_system = Sddf.Net(sdf, ethernet_node, ethernet_driver, net_virt_tx, net_virt_rx)
-    net_system2 = Sddf.Net(sdf, ethernet_node1, ethernet_driver1, net_virt_tx1, net_virt_rx1)
+    net_system = Sddf.Net(sdf, ethernet_node1, ethernet_driver1, net_virt_tx1, net_virt_rx1)
+    net_system2 = Sddf.Net(sdf, ethernet_node, ethernet_driver, net_virt_tx, net_virt_rx)
 
     routing = ProtectionDomain("routing", "routing.elf", priority=97, budget=20000)
     arp_responder = ProtectionDomain("arp_responder", "arp_responder.elf", priority=95, budget=20000)
     arp_requester = ProtectionDomain("arp_requester", "arp_requester.elf", priority=98, budget=20000)
-    firewall = LionsOs.Firewall(sdf, net_system, net_system2, routing, arp_responder, arp_requester, 168624327)
+    firewall = LionsOs.Firewall(sdf, net_system, net_system2, routing, arp_responder, arp_requester, arp_requester, arp_requester, arp_requester)
 
     # @kwinter: These need to be added to second net_system
     serial_system.add_client(routing)
@@ -100,7 +109,8 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
     router_mac_addr = f"52:54:01:00:00:78"
 
-    assert firewall.connect(router_mac_addr, 168624327)
+    # Router MAC addr (soon to be deprecated), ip of NIC1, ip of NIC2
+    assert firewall.connect(router_mac_addr, 3338669322, 2205888)
     assert firewall.serialise_config(output_dir)
     assert serial_system.connect()
     assert serial_system.serialise_config(output_dir)

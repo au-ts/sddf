@@ -73,7 +73,7 @@
 /* MTL TXQ0 Operation Mode Bits */
 
 #define MTL_TXQ_OP_MODE_TSF         BIT(1)      /* Transmit store and forward enable. */
-#define MTL_TXQ_OP_MODE_TXQEN       BIT(3)      /* Transmit queue enable. */
+#define MTL_TXQ_OP_MODE_TXQEN       2 << 2     /* Transmit queue enable. */
 #define MTL_TXQ_OP_MODE_TQS_POS     16          /* The position of the TQS field to bit shift with. */
 #define MTL_TXQ_OP_MODE_TQS_MASK    (0b11111 << MTL_TXQ_OP_MODE_TQS_POS) /* Mask for the TQS field. */
 

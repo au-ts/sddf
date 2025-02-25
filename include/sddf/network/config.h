@@ -27,6 +27,7 @@ typedef struct net_driver_config {
     char magic[SDDF_NET_MAGIC_LEN];
     net_connection_resource_t virt_rx;
     net_connection_resource_t virt_tx;
+    region_resource_t dev_info;
 } net_driver_config_t;
 
 typedef struct net_virt_tx_client_config {
@@ -44,6 +45,10 @@ typedef struct net_virt_tx_config {
 typedef struct net_virt_rx_config_client {
     net_connection_resource_t conn;
     uint8_t mac_addr[6];
+    /* Adding this as a generic addition. We will by default
+    populate this with 0, if using a protocol based virt, we will
+    match with the first client with this protocol. */
+    uint16_t protocol;
 } net_virt_rx_config_client_t;
 
 typedef struct net_virt_rx_config {
@@ -76,7 +81,12 @@ typedef struct net_client_config {
     region_resource_t tx_data;
 
     uint8_t mac_addr[6];
+    region_resource_t dev_info;
 } net_client_config_t;
+
+typedef struct dev_info {
+    uint8_t mac[6];
+} dev_info_t;
 
 static bool net_config_check_magic(void *config)
 {

@@ -39,10 +39,7 @@ net_queue_handle_t rx_queue;
 net_queue_handle_t tx_queue;
 
 uint32_t ipv4_addrs[NUM_ROUTES];
-
-// @kwinter: This mac address needs to be the mac address of the routing component.
-// Hardcoding this value for now.
-uint8_t mac_addr[ETH_HWADDR_LEN]= {0x52,0x54,0x01,0x00,0x78};
+dev_info_t *device_info;
 
 static char *ipaddr_to_string(uint32_t s_addr, char *buf, int buflen)
 {
@@ -132,7 +129,7 @@ void receive(void)
                     /* Check it it's for a client */
                     if (pkt->ipdst_addr == arp_config.ip) {
                         /* Send a response */
-                        if (!arp_reply(mac_addr, pkt->ethsrc_addr, mac_addr, pkt->ipdst_addr,
+                        if (!arp_reply(device_info->mac, pkt->ethsrc_addr, device_info->mac, pkt->ipdst_addr,
                                        pkt->hwsrc_addr, pkt->ipsrc_addr)) {
                             transmitted = true;
                         }
@@ -180,9 +177,7 @@ void init(void)
     // Setup our known routes here. This will need to be
     // moved to the routing component or a generic header
     // config file for the firewall.
-    sddf_dprintf("This is the value of net config rx id: %d\n", net_config.rx.id);
-    // 123.111.11.11 as uint32
-    // ipv4_addrs[0] = 185298811;
+    device_info = (dev_info_t *)net_config.dev_info.vaddr;
 }
 
 void notified(microkit_channel ch)

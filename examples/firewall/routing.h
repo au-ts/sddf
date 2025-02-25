@@ -19,5 +19,5 @@ typedef struct routing_entry {
 typedef struct routing_queue_node {
     uint32_t ip;
     bool valid;
-    net_buff_desc_t *buffer;
+    net_buff_desc_t buffer;
 } routing_queue_node_t;

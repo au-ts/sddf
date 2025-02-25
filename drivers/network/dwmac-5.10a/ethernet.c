@@ -1,7 +1,7 @@
 /*
- * Copyright 2024, UNSW
- * SPDX-License-Identifier: BSD-2-Clause
- */
+* Copyright 2024, UNSW
+* SPDX-License-Identifier: BSD-2-Clause
+*/
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -9,6 +9,7 @@
 #include <sddf/resources/device.h>
 #include <sddf/network/queue.h>
 #include <sddf/network/config.h>
+#include <sddf/network/util.h>
 #include <sddf/util/util.h>
 #include <sddf/util/fence.h>
 #include <sddf/util/printf.h>
@@ -54,6 +55,7 @@ net_queue_handle_t tx_queue;
 
 uintptr_t eth_regs;
 
+dev_info_t *device_info;
 
 static inline bool hw_ring_full(hw_ring_t *ring)
 {
@@ -72,8 +74,8 @@ static void update_ring_slot(hw_ring_t *ring, unsigned int idx, uint32_t d0, uin
     d->d1 = d1;
     d->d2 = d2;
     /* Ensure all writes to the descriptor complete, before we set the flags
-     * that makes hardware aware of this slot.
-     */
+    * that makes hardware aware of this slot.
+    */
     THREAD_MEMORY_RELEASE();
     d->d3 = d3;
 }
@@ -93,8 +95,8 @@ static void rx_provide()
             uint32_t idx = rx.tail % rx.capacity;
             rx.descr_mdata[idx] = buffer;
             update_ring_slot(&rx, idx, (uint32_t)(buffer.io_or_offset & 0xffffffff),
-                             (uint32_t)(buffer.io_or_offset >> 32), 0,
-                             (uint32_t)(DESC_RXSTS_OWNBYDMA | DESC_RXSTS_BUFFER1_ADDR_VALID | DESC_RXSTS_IOC));
+                            (uint32_t)(buffer.io_or_offset >> 32), 0,
+                            (uint32_t)(DESC_RXSTS_OWNBYDMA | DESC_RXSTS_BUFFER1_ADDR_VALID | DESC_RXSTS_IOC));
             /* We will update the hardware register that stores the tail address. This tells
             the device that we have new descriptors to use. */
             THREAD_MEMORY_RELEASE();
@@ -131,8 +133,8 @@ static void rx_return(void)
             idx = rx.tail % rx.capacity;
             rx.descr_mdata[idx] = buffer;
             update_ring_slot(&rx, idx, (uint32_t)(buffer.io_or_offset & 0xffffffff),
-                             (uint32_t)(buffer.io_or_offset >> 32), 0,
-                             (uint32_t)(DESC_RXSTS_OWNBYDMA | DESC_RXSTS_BUFFER1_ADDR_VALID | DESC_RXSTS_IOC));
+                            (uint32_t)(buffer.io_or_offset >> 32), 0,
+                            (uint32_t)(DESC_RXSTS_OWNBYDMA | DESC_RXSTS_BUFFER1_ADDR_VALID | DESC_RXSTS_IOC));
 
             /* We will update the hardware register that stores the tail address. This tells
             the device that we have new descriptors to use. */
@@ -178,15 +180,15 @@ static void tx_provide(void)
             uint32_t tdes3 = (DESC_TXSTS_OWNBYDMA | DESC_TXCTRL_TXFIRST | DESC_TXCTRL_TXLAST | DESC_TXCTRL_TXCIC
                               | buffer.len);
             tx.descr_mdata[idx] = buffer;
-
+            sddf_dprintf("this is the buffer len in dwmac driver: %d\n", buffer.len);
             update_ring_slot(&tx, idx, buffer.io_or_offset & 0xffffffff, buffer.io_or_offset >> 32, tdes2, tdes3);
 
             tx.tail++;
             i++;
             /* Set the tail in hardware to the latest tail we have inserted in.
-             * This tells the hardware that it has new buffers to send.
-             * NOTE: Setting this on every enqueued packet for sanity, change this to once per bactch.
-             */
+            * This tells the hardware that it has new buffers to send.
+            * NOTE: Setting this on every enqueued packet for sanity, change this to once per bactch.
+            */
             *DMA_REG(DMA_CH0_TXDESC_TAIL_PTR) = tx_desc_base + sizeof(struct descriptor) * (idx);
         }
 
@@ -250,6 +252,9 @@ static void handle_irq()
 
 static void eth_init()
 {
+    uint32_t high = *MAC_REG(MAC_ADDRESS0_HIGH);
+    uint32_t low = *MAC_REG(MAC_ADDRESS0_LOW);
+    sddf_dprintf("This is the value of high: %x this is the value of low: %x\n", high, low);
     // Software reset -- This will reset the MAC internal registers.
     volatile uint32_t *mode = DMA_REG(DMA_MODE);
     *mode |= DMA_MODE_SWR;
@@ -322,7 +327,7 @@ static void eth_init()
     conf |= MAC_CONFIG_IPC;
 
     // Setting the speed of our device to 1000mbps
-    conf &= ~(MAC_CONFIG_PS | MAC_CONFIG_FES);
+    // conf &= ~(MAC_CONFIG_PS | MAC_CONFIG_FES);
     *MAC_REG(MAC_CONFIGURATION) = conf;
 
     // Set the MAC Address.
@@ -330,8 +335,12 @@ static void eth_init()
     /* NOTE: We are hardcoding this MAC address to the hardware MAC address of the
     Star64 in the TS machine queue. This address is resident the boards EEPROM, however,
     we need I2C to read from this ROM. */
-    *MAC_REG(MAC_ADDRESS0_HIGH) = 0x00005b75;
-    *MAC_REG(MAC_ADDRESS0_LOW) = 0x0039cf6c;
+    *MAC_REG(MAC_ADDRESS0_HIGH) = high;
+    *MAC_REG(MAC_ADDRESS0_LOW) = low;
+
+    /* Populate device info struct. */
+    uint64_t mac = ((uint64_t) high << 32) | (uint64_t)low;
+    net_set_mac_addr(device_info->mac, mac, 1);
 
     /* Configure DMA */
 
@@ -372,11 +381,11 @@ static void eth_init()
 
     /* TX tail pointer not written until we need to TX a packet */
     /*
-	 * Point RX tail pointer at last descriptor. Ideally, we'd point at the
-	 * first descriptor, implying all descriptors were available. However,
-	 * that's not distinguishable from none of the descriptors being
-	 * available.
-	 */
+    * Point RX tail pointer at last descriptor. Ideally, we'd point at the
+    * first descriptor, implying all descriptors were available. However,
+    * that's not distinguishable from none of the descriptors being
+    * available.
+    */
     *DMA_REG(DMA_CH0_RXDESC_TAIL_PTR) = rx_desc_base + (sizeof(struct descriptor) * (RX_COUNT - 1));
 }
 
@@ -403,7 +412,7 @@ void init(void)
     assert(TX_COUNT * sizeof(struct descriptor) <= device_resources.regions[2].region.size);
 
     eth_regs = (void *)device_resources.regions[0].region.vaddr;
-
+    device_info = (dev_info_t *)config.dev_info.vaddr;
     /* De-assert the reset signals that u-boot left asserted. */
 #ifdef CONFIG_PLAT_STAR64
     volatile uint32_t *reset_eth = (volatile uint32_t *)(resets + 0x38);
@@ -435,9 +444,9 @@ void init(void)
     }
 
     net_queue_init(&rx_queue, config.virt_rx.free_queue.vaddr, config.virt_rx.active_queue.vaddr,
-                   config.virt_rx.num_buffers);
+                config.virt_rx.num_buffers);
     net_queue_init(&tx_queue, config.virt_tx.free_queue.vaddr, config.virt_tx.active_queue.vaddr,
-                   config.virt_tx.num_buffers);
+                config.virt_tx.num_buffers);
     eth_setup();
 
     microkit_irq_ack(device_resources.irqs[0].id);

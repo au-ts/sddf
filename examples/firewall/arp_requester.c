@@ -26,20 +26,15 @@ __attribute__((__section__(".arp_resources"))) arp_requester_config_t arp_config
 __attribute__((__section__(".net_client_config"))) net_client_config_t net_config;
 
 #define MAX_ARP_CACHE 64
+#define LWIP_IANA_HWTYPE_ETHERNET 1
 
-// typedef struct arp_entry {
-//     uint32_t ip_addr;
-//     uint8_t mac_addr[ETH_HWADDR_LEN];
-//     /* @kwinter: Add a timeout for stale ARP entiries*/
-//     // uint32_t timeout;
-//     bool valid;
-// } arp_entry_t;
+uint8_t broadcast_mac_addr[ETH_HWADDR_LEN]= {0xFF, 0xFF,0xFF,0xFF,0xFF,0xFF};
+uint8_t mac_addr[ETH_HWADDR_LEN]= {0x52,0x54,0x01,0x00,0x00,0x78};
 
 // This component needs to be connected to BOTH rx and tx of this
 // network subsystem.
 
-
-hashtable_t arp_table;
+hashtable_t *arp_table;
 net_queue_handle_t virt_tx_queue;
 net_queue_handle_t virt_rx_queue;
 /* @kwinter: This needs to be placed in shared memory with the routing component
@@ -49,27 +44,37 @@ arp_entry_t arp_cache[MAX_ARP_CACHE];
 
 /* This queue will hold all the ARP requests/responses that are needed by the
 packets in the arp_waiting queue. */
-arp_queue_handle_t arp_query;
+arp_queue_handle_t *arp_query;
+
+dev_info_t *device_info;
 
 void process_requests()
 {
     bool transmitted = false;
     // Loop through and generate ARP requests.
-    while (!arp_queue_empty_request(&arp_query)) {
+    while (!arp_queue_empty_request(arp_query) && !net_queue_empty_free(&virt_tx_queue)) {
         arp_request_t request;
-        int err = arp_dequeue_request(&arp_query, &request);
+        int err = arp_dequeue_request(arp_query, &request);
         assert(!err);
+        if (request.valid != true) {
+            sddf_dprintf("ARP request was invalid!\n");
+        }
+
+        // @kwinter: Need to drop this in favour of packet look up in waiting queue.
+        if (request.ip_addr != IPV4_ADDR(192, 168, 33, 6)) {
+            return;
+        }
 
         // Generate the ARP request here.
         net_buff_desc_t buffer;
         err = net_dequeue_free(&virt_tx_queue, &buffer);
 
         struct arp_packet *pkt = (struct arp_packet *)(net_config.tx_data.vaddr + buffer.io_or_offset);
-
         // Set the destination MAC address as the broadcast MAC address.
-        for (int i = 0; i < ETH_HWADDR_LEN; i++) {
-            pkt->ethdst_addr[i] = 0xFF;
-        }
+        sddf_memcpy(&pkt->ethdst_addr, broadcast_mac_addr, ETH_HWADDR_LEN);
+        sddf_memcpy(&pkt->ethsrc_addr, device_info->mac, ETH_HWADDR_LEN);
+        sddf_memcpy(&pkt->hwsrc_addr, device_info->mac, ETH_HWADDR_LEN);
+
         // @kwinter: Need to be able to somehow get the MAC address from the driver.
         // memcpy(&reply->ethsrc_addr, ethsrc_addr, ETH_HWADDR_LEN);
 
@@ -80,25 +85,64 @@ void process_requests()
         pkt->protolen = IPV4_PROTO_LEN;
         pkt->opcode = HTONS(ETHARP_OPCODE_REQUEST);
 
-        // @kwinter: Need to somehow know our IP address here as well as MAC address.
-        // memcpy(&request->hwsrc_addr, hwsrc_addr, ETH_HWADDR_LEN);
-        // request->ipsrc_addr = ipsrc_addr;
-
         // Memset the hardware src addr to 0 for ARP requests.
-        memset(&pkt->hwdst_addr, 0, ETH_HWADDR_LEN);
+        sddf_memset(&pkt->hwdst_addr, 0, ETH_HWADDR_LEN);
+
         pkt->ipdst_addr = request.ip_addr;
-        memset(&pkt->padding, 0, 10);
+
+        pkt->ipsrc_addr = arp_config.ip;
+        sddf_memset(&pkt->padding, 0, 10);
 
         buffer.len = 56;
         err = net_enqueue_active(&virt_tx_queue, buffer);
         assert(!err);
         transmitted = true;
+        request.valid = false;
     }
     if (transmitted && net_require_signal_active(&virt_tx_queue)) {
         net_cancel_signal_active(&virt_tx_queue);
         // @kwinter: Figure out how to get the channel ID.
         microkit_deferred_notify(net_config.tx.id);
     }
+}
+
+static int arp_reply(const uint8_t ethsrc_addr[ETH_HWADDR_LEN],
+                     const uint8_t ethdst_addr[ETH_HWADDR_LEN],
+                     const uint8_t hwsrc_addr[ETH_HWADDR_LEN], const uint32_t ipsrc_addr,
+                     const uint8_t hwdst_addr[ETH_HWADDR_LEN], const uint32_t ipdst_addr)
+{
+    if (net_queue_empty_free(&virt_tx_queue)) {
+        sddf_dprintf("PROXY_ARP|LOG: Transmit free queue empty or transmit active queue full. Dropping reply\n");
+        return -1;
+    }
+
+    net_buff_desc_t buffer;
+    int err = net_dequeue_free(&virt_tx_queue, &buffer);
+    assert(!err);
+
+    struct arp_packet *reply = (struct arp_packet *)(net_config.tx_data.vaddr + buffer.io_or_offset);
+    memcpy(&reply->ethdst_addr, ethdst_addr, ETH_HWADDR_LEN);
+    memcpy(&reply->ethsrc_addr, ethsrc_addr, ETH_HWADDR_LEN);
+
+    reply->type = HTONS(ETH_TYPE_ARP);
+    reply->hwtype = HTONS(LWIP_IANA_HWTYPE_ETHERNET);
+    reply->proto = HTONS(ETH_TYPE_IP);
+    reply->hwlen = ETH_HWADDR_LEN;
+    reply->protolen = IPV4_PROTO_LEN;
+    reply->opcode = HTONS(ETHARP_OPCODE_REPLY);
+
+    memcpy(&reply->hwsrc_addr, hwsrc_addr, ETH_HWADDR_LEN);
+    reply->ipsrc_addr = ipsrc_addr;
+    memcpy(&reply->hwdst_addr, hwdst_addr, ETH_HWADDR_LEN);
+    reply->ipdst_addr = ipdst_addr;
+    memset(&reply->padding, 0, 10);
+
+    buffer.len = 56;
+    err = net_enqueue_active(&virt_tx_queue, buffer);
+    assert(!err);
+        microkit_deferred_notify(net_config.tx.id);
+
+    return 0;
 }
 
 void process_responses()
@@ -118,16 +162,25 @@ void process_responses()
                 // Decode the response data, and place it into the ARP response queue for the
                 // routing component.
                 arp_request_t resp = {0};
-                resp.ip_addr = pkt->ipdst_addr;
-                sddf_memcpy(resp.mac_addr, pkt->hwdst_addr, sizeof(uint8_t) * ETH_HWADDR_LEN);
+                resp.ip_addr = pkt->ipsrc_addr;
+                sddf_memcpy(resp.mac_addr, pkt->hwsrc_addr, sizeof(uint8_t) * ETH_HWADDR_LEN);
                 resp.valid = true;
-                arp_enqueue_response(&arp_query, resp);
+                sddf_dprintf("PROCESSING RESPONSE, ADDING RESPONSE TO ARP QUEUE!\n");
+                for (int i = 0; i < 6; i++) {
+                    sddf_dprintf("ARP_REQUESTER|MAC[%d]: %x\n", i, pkt->hwsrc_addr[i] );
+                }
+                arp_enqueue_response(arp_query, &resp);
                 // We are also going to add the ip -> mac mapping to the ARP table.
                 arp_entry_t entry = {0};
-                sddf_memcpy(resp.mac_addr, entry.mac_addr, sizeof(uint8_t) * ETH_HWADDR_LEN);
+                sddf_memcpy(entry.mac_addr, resp.mac_addr, sizeof(uint8_t) * ETH_HWADDR_LEN);
                 entry.valid = true;
-                hashtable_insert(&arp_table, resp.ip_addr, &entry);
+                hashtable_insert(arp_table, (uint32_t) resp.ip_addr, &entry);
                 signal = true;
+            } else {
+                // @kwinter: Choose the IP address properly for this node.
+                if (pkt->ipdst_addr == IPV4_ADDR(192, 168, 33, 0)) {
+                    arp_reply(mac_addr, pkt->ethsrc_addr, mac_addr, pkt->ipdst_addr, pkt->hwsrc_addr, pkt->ipsrc_addr);
+                }
             }
         }
 
@@ -138,8 +191,7 @@ void process_responses()
         net_request_signal_active(&virt_rx_queue);
     }
 
-    // @kwinter: Figure out how to get the channel for the routing ID.
-    // microkit_deferred_notify(ROUTING_ID);
+    microkit_deferred_notify(arp_config.router.id);
 }
 
 void init(void)
@@ -151,7 +203,6 @@ void init(void)
     // @kwinter: We might want to do this initialisation ourselves. This
     // only needs to be the size of an ARP packet. However, the current implementation
     // will work, just not space efficient.
-    sddf_dprintf("This is the vaddr of the rx free queue: %p\n", net_config.rx.free_queue.vaddr);
     assert(net_config_check_magic((void *)&net_config));
 
     net_queue_init(&virt_rx_queue, net_config.rx.free_queue.vaddr, net_config.rx.active_queue.vaddr,
@@ -160,19 +211,23 @@ void init(void)
                    net_config.tx.num_buffers);
     net_buffers_init(&virt_tx_queue, 0);
 
-    arp_queue_handle_t *arp_queue_pointer = (arp_queue_handle_t *) arp_config.router.arp_queue.vaddr;
-    arp_query = *arp_queue_pointer;
+    arp_query = (arp_queue_handle_t *) arp_config.router.arp_queue.vaddr;
     /* This hashtable will have been initialised by the router component. */
-    hashtable_t *arp_table_vaddr = (hashtable_t*) arp_config.router.arp_cache.vaddr;
-    arp_table = *arp_table_vaddr;
+    arp_table = (hashtable_t *) arp_config.router.arp_cache.vaddr;
+    device_info = (dev_info_t *) net_config.dev_info.vaddr;
 }
 
 void notified(microkit_channel ch)
 {
+    // sddf_dprintf("This is the vaddr of the arp queue: %p\n", arp_config.router.arp_queue.vaddr);
+    // sddf_dprintf("This is the channel: %d\n", ch);
     // @kwinter: Get the appropriate channel number for the router
-    if (arp_config.router.id) {
+    // sddf_dprintf("This is the router id: %d and this sit the rx id: %d\n", arp_config.router.id, net_config.rx.id);
+    if (ch == arp_config.router.id) {
+        // sddf_dprintf("Processing arp requests!\n");
         process_requests();
-    } if (net_config.rx.id) {
+    } if (ch == net_config.rx.id) {
+        sddf_dprintf("Processing an arp response!\n");
         process_responses();
     }
 }

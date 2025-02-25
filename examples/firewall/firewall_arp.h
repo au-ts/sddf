@@ -39,6 +39,37 @@ typedef struct arp_queue_handle {
     uint32_t capacity;
 } arp_queue_handle_t;
 
+static char *ipaddr_to_string(uint32_t s_addr, char *buf, int buflen)
+{
+    char inv[3], *rp;
+    uint8_t *ap, rem, n, i;
+    int len = 0;
+
+    rp = buf;
+    ap = (uint8_t *)&s_addr;
+    for (n = 0; n < 4; n++) {
+        i = 0;
+        do {
+            rem = *ap % (uint8_t)10;
+            *ap /= (uint8_t)10;
+            inv[i++] = (char)('0' + rem);
+        } while (*ap);
+        while (i--) {
+            if (len++ >= buflen) {
+                return NULL;
+            }
+            *rp++ = inv[i];
+        }
+        if (len++ >= buflen) {
+            return NULL;
+        }
+        *rp++ = '.';
+        ap++;
+    }
+    *--rp = 0;
+    return buf;
+}
+
 /**
  * Get the number of requests/responses enqueued into a queue.
  *
@@ -94,7 +125,7 @@ static inline bool arp_queue_full_request(arp_queue_handle_t *queue)
  *
  * @return true indicates the queue is full, false otherwise.
  */
-static inline bool arp_queue_full_active(arp_queue_handle_t *queue)
+static inline bool arp_queue_full_response(arp_queue_handle_t *queue)
 {
     return queue->response.tail - queue->response.head == queue->capacity;
 }
@@ -109,12 +140,11 @@ static inline bool arp_queue_full_active(arp_queue_handle_t *queue)
  */
 static inline int arp_enqueue_request(arp_queue_handle_t *queue, arp_request_t request)
 {
-    if (arp_queue_full_free(queue)) {
+    if (arp_queue_full_request(queue)) {
         return -1;
     }
 
-    arp_request_t req = queue->request.queue[queue->request.tail % queue->capacity];
-    sddf_memcpy(&req, &request, sizeof(arp_request_t));
+    sddf_memcpy(&queue->request.queue[queue->request.tail % queue->capacity], &request, sizeof(arp_request_t));
 
     queue->request.tail++;
 
@@ -129,14 +159,13 @@ static inline int arp_enqueue_request(arp_queue_handle_t *queue, arp_request_t r
  *
  * @return -1 when queue is full, 0 on success.
  */
-static inline int arp_enqueue_response(arp_queue_handle_t *queue, arp_request_t response)
+static inline int arp_enqueue_response(arp_queue_handle_t *queue, arp_request_t *response)
 {
-    if (arp_queue_full_active(queue)) {
+    if (arp_queue_full_response(queue)) {
         return -1;
     }
 
-    arp_request_t resp = queue->response.queue[queue->response.tail % queue->capacity];
-    sddf_memcpy(&resp, &response, sizeof(arp_request_t));
+    sddf_memcpy(&queue->response.queue[queue->response.tail % queue->capacity], response, sizeof(arp_request_t));
 
     queue->response.tail++;
 
@@ -154,12 +183,13 @@ static inline int arp_enqueue_response(arp_queue_handle_t *queue, arp_request_t 
 static inline int arp_dequeue_request(arp_queue_handle_t *queue, arp_request_t *request)
 {
     if (arp_queue_empty_request(queue)) {
+        sddf_dprintf("ARp queue was empty???????\n");
         return -1;
     }
 
-    arp_request_t req = queue->request.queue[queue->request.head % queue->capacity];
-    sddf_memcpy(request, &req, sizeof(arp_request_t));
+    sddf_memcpy(request, &queue->request.queue[queue->request.head % queue->capacity], sizeof(arp_request_t));
 
+    queue->request.queue[queue->request.head % queue->capacity].valid = false;
     queue->request.head++;
 
     return 0;
@@ -179,8 +209,7 @@ static inline int arp_dequeue_response(arp_queue_handle_t *queue, arp_request_t 
         return -1;
     }
 
-    arp_request_t resp = queue->response.queue[queue->response.head % queue->capacity];
-    sddf_memcpy(response, &resp, sizeof(arp_request_t));
+    sddf_memcpy(response, &queue->response.queue[queue->response.head % queue->capacity], sizeof(arp_request_t));
 
     queue->response.head++;
 
@@ -208,6 +237,7 @@ static inline void arp_handle_init(arp_queue_handle_t *queue, uint32_t capacity)
  */
 // static inline void arp_queue_init(arp_queue_handle_t *queue, uintptr_t base_addr)
 // {
+//     queue->tail = 0;
 //     for (uint32_t i = 0; i < queue->capacity; i++) {
 //         queue->request[i] = {0};
 //         queue->response[i] = {0};

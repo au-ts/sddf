@@ -15,7 +15,7 @@
 #define ETH_HWADDR_LEN 6
 #define ETHARP_OPCODE_REQUEST 1
 #define ETHARP_OPCODE_REPLY 2
-
+#define IPV4_ADDR(a, b, c, d) ((a) | ((b) << 8) | ((c) << 16) | ((uint32_t) (d) << 24))
 #define NET_BUFFER_SIZE 2048
 
 struct ethernet_address {
@@ -43,7 +43,7 @@ struct ipv4_packet {
   uint16_t check;
   uint32_t src_ip;
   uint32_t dst_ip;
-};
+}__attribute__((packed));
 
 struct __attribute__((__packed__)) arp_packet {
     uint8_t ethdst_addr[ETH_HWADDR_LEN];

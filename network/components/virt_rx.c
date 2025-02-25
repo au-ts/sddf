@@ -3,6 +3,9 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+/* This network virtualiser sorts incoming packets based on protocol to hand off to
+specific filtering components. */
+
 #include <stdbool.h>
 #include <stdint.h>
 #include <microkit.h>
@@ -64,6 +67,52 @@ int get_mac_addr_match(struct ethernet_header *buffer)
     return -1;
 }
 
+/* Returns the client ID if the protocol number is a match to the client. Handles ARP cases specially
+for requests/responses and does not use the standardised EthType protocol ID for these. */
+int get_protocol_match(struct ethernet_header *buffer)
+{
+
+    // @kwinter: For now we are using the range 0f 0x92 - 0xFC for non IP protocol
+    // IDs in our client info structs as these are currently unused in the IP standard.
+    // Maybe change this to something more robust in the future.
+
+    uint16_t ethtype = buffer->type;
+    uint16_t protocol;
+    if (ethtype == HTONS(ETH_TYPE_ARP)) {
+        // We filter here based on arp opcode
+        struct arp_packet *pkt = (struct arp_packet *) buffer;
+        // sddf_dprintf("WE HAVE AN ARP PACKET IN GET PROTOCOL MATCH!!!\n");
+        if (pkt->opcode == HTONS(ETHARP_OPCODE_REQUEST)) {
+            // Search for protocol num 0x92
+            // Requests should go to the arp responder component.
+            protocol = 0x92;
+        } else if (pkt->opcode == HTONS(ETHARP_OPCODE_REPLY)) {
+            // Search for protocol num 0x93
+            protocol = 0x92;
+        }
+    } else if (ethtype == HTONS(ETH_TYPE_IP)) {
+        // Then we filter based on IP protocol.
+        struct ipv4_packet *pkt = (struct ipv4_packet *) buffer;
+        // protocol = pkt->protocol;
+        // @kwinter: TODO: remove this, this should match with the router component for now.
+        protocol = 0;
+    } else {
+        return -1;
+    }
+
+    for (int client = 0; client < config.num_clients; client++) {
+        // First stage is EthType filtering
+        if (config.clients[client].protocol == protocol) {
+            // sddf_dprintf("\tWE FOUND A MATCH!\n");
+            return client;
+        }
+    }
+
+    // sddf_dprintf("VIRT_RX|Unable to find an appropriate filter for given protocol! 0x%x\n", protocol);
+    
+    return -4;
+}
+
 void rx_return(void)
 {
     bool reprocess = true;
@@ -87,7 +136,11 @@ void rx_return(void)
             //
             // [1]: https://developer.arm.com/documentation/ddi0595/2021-06/AArch64-Instructions/DC-IVAC--Data-or-unified-Cache-line-Invalidate-by-VA-to-PoC
             cache_clean_and_invalidate(buffer_vaddr, buffer_vaddr + buffer.len);
-            int client = get_mac_addr_match((struct ethernet_header *) buffer_vaddr);
+            // int client = get_mac_addr_match((struct ethernet_header *) buffer_vaddr);
+            int client = get_protocol_match((struct ethernet_header *) buffer_vaddr);
+            // if (client >= 0) {
+            //     sddf_dprintf("Getting a protocol match for client: %i\n", client);
+            // }
             if (client == BROADCAST_ID) {
                 int ref_index = buffer.io_or_offset / NET_BUFFER_SIZE;
                 assert(buffer_refs[ref_index] == 0);
@@ -208,5 +261,11 @@ void init(void)
     if (net_require_signal_free(&state.rx_queue_drv)) {
         net_cancel_signal_free(&state.rx_queue_drv);
         microkit_deferred_notify(config.driver.id);
+    }
+
+    sddf_dprintf("Checking protocol numbers in: %s\n", microkit_name);
+    // Check the protocol numbers:
+    for (int i = 0; i < config.num_clients; i++) {
+        sddf_dprintf("\tThis is the protocol of client %d: %x\n", i, config.clients[i].protocol);
     }
 }

@@ -30,8 +30,7 @@ __attribute__((__section__(".net1_client_config"))) net_client_config_t net1_con
 // Net2_client config will be for the tx out of NIC2
 __attribute__((__section__(".net2_client_config"))) net_client_config_t net2_config;
 
-uintptr_t arp_region;
-hashtable_t arp_table;
+hashtable_t *arp_table;
 routing_entry_t routing_table[NUM_ROUTES] = {{0}};
 
 /* Booleans to indicate whether packets have been enqueued during notification handling */
@@ -45,41 +44,44 @@ net_queue_handle_t virt_tx_queue;
 net_queue_handle_t arp_waiting;
 /* This queue will hold all the ARP requests/responses that are needed by the
 packets in the arp_waiting queue. */
-arp_queue_handle_t arp_queries;
+arp_queue_handle_t *arp_queries;
 
 /* @kwinter: For now, we are just going to have one packet waiting on an ARP reply for this
     PoC. */
 routing_queue_node_t waiting_packet = {0};
 
-static char *ipaddr_to_string(uint32_t s_addr, char *buf, int buflen)
-{
-    char inv[3], *rp;
-    uint8_t *ap, rem, n, i;
-    int len = 0;
+dev_info_t *device1_info;
+dev_info_t *device2_info;
 
-    rp = buf;
-    ap = (uint8_t *)&s_addr;
-    for (n = 0; n < 4; n++) {
-        i = 0;
-        do {
-            rem = *ap % (uint8_t)10;
-            *ap /= (uint8_t)10;
-            inv[i++] = (char)('0' + rem);
-        } while (*ap);
-        while (i--) {
-            if (len++ >= buflen) {
-                return NULL;
-            }
-            *rp++ = inv[i];
+/* This code is taken from: https://gist.github.com/david-hoze/0c7021434796997a4ca42d7731a7073a*/
+uint16_t checksum(uint8_t *buf, uint16_t len, uint8_t type)
+{
+        // type 0=ip 
+        //      1=udp
+        //      2=tcp
+        uint32_t sum = 0;
+
+        //if(type==0){
+        //        // do not add anything
+        //}
+        // build the sum of 16bit words
+        while(len >1){
+                sum += 0xFFFF & (*buf<<8|*(buf+1));
+                buf+=2;
+                len-=2;
         }
-        if (len++ >= buflen) {
-            return NULL;
+        // if there is a byte left then add it (padded with zero)
+        if (len){
+//--- made by SKA ---                sum += (0xFF & *buf)<<8;
+                sum += 0xFFFF & (*buf<<8|0x00);
         }
-        *rp++ = '.';
-        ap++;
-    }
-    *--rp = 0;
-    return buf;
+        // now calculate the sum over the bytes in the sum
+        // until the result is only 16bit long
+        while (sum>>16){
+                sum = (sum & 0xFFFF)+(sum >> 16);
+        }
+        // build 1's complement:
+        return( (uint16_t) sum ^ 0xFFFF);
 }
 
 // @kwinter: Want a better way of doing this process. We seem to be doing alot of duplicate
@@ -90,35 +92,59 @@ void process_arp_waiting()
     responses we will drop the packets associated with the IP address. Otherwise
     we will substitute the MAC address in, and then send the packet out of the NIC. */
 
-    while (!arp_queue_empty_response(&arp_queries)) {
+    while (!arp_queue_empty_response(arp_queries)) {
         arp_request_t response;
-        int err = arp_dequeue_response(&arp_queries, &response);
+        int err = arp_dequeue_response(arp_queries, &response);
         /* Check that we actually have a packet waiting. */
         if (!waiting_packet.valid) {
             sddf_dprintf("ROUTING|No packet waiting on ARP reply!\n");
             continue;
         }
-        if (!response.valid) {
+
+        char buf[16];
+        sddf_dprintf("ROUTING|This is the ip address if the response: %s\n", ipaddr_to_string(response.ip_addr, buf, 16));
+
+        if (!response.valid && waiting_packet.valid) {
             // Find all packets with this IP address and drop them.
-            net_buff_desc_t *buffer = waiting_packet.buffer;
+            // net_buff_desc_t buffer = waiting_packet.buffer;
             // Check if the IP in this packet matches response.
-            buffer->len = 0;
-            err = net_enqueue_free(&virt_rx_queue, *buffer);
+            waiting_packet.buffer.len = 0;
+            sddf_dprintf("DROPPING PACKETS FOR SOME REASON, MAY BE VM FAULTING HERE\n");
+            err = net_enqueue_free(&virt_rx_queue, waiting_packet.buffer);
             assert(!err);
         } else {
             if (response.ip_addr == waiting_packet.ip) {
-                net_buff_desc_t *buffer = waiting_packet.buffer;
-                if (buffer->io_or_offset == 0) {
+                // net_buff_desc_t buffer = waiting_packet.buffer;
+                if (waiting_packet.buffer.io_or_offset == 0) {
                     sddf_dprintf("ROUTING|Error restoring buffer in process_arp_waiting()\n");
                     return;
                 }
-                struct ipv4_packet *pkt = (struct ipv4_packet *)(net1_config.rx_data.vaddr + buffer->io_or_offset);
-                    // We should have the mac address. Replace the dest in the ethernet header.
-                    for (int i = 0; i < ETH_HWADDR_LEN; i++) {
-                        pkt->ethdst_addr[i] = response.mac_addr[i];
-                    }
+                sddf_dprintf("We match the IP, we are now going to forward the packet!!!\n");
+                struct ipv4_packet *pkt = (struct ipv4_packet *)(net1_config.rx_data.vaddr + waiting_packet.buffer.io_or_offset);
+                sddf_dprintf("This is the address of pkt: %p\n", pkt);
+                sddf_dprintf("Copying dst addr into eth header\n");
+                sddf_memcpy(pkt->ethdst_addr, response.mac_addr, ETH_HWADDR_LEN);
+                sddf_dprintf("Copying serc addr into eth header\n");
+                sddf_memcpy(pkt->ethsrc_addr, device2_info->mac, ETH_HWADDR_LEN);
+                sddf_dprintf("Finished MAC address setup\n");
+                net_buff_desc_t buffer_tx;
+                int err = net_dequeue_free(&virt_tx_queue, &buffer_tx);
+                assert(!err);
+                pkt->check = 0;
+                pkt->check = checksum((uint8_t *)pkt, 20, 0);
 
-                    // TODO: replace the source MAC address with the MAC address of our NIC.
+                // @kwinter: For now we are memcpy'ing the packet from our receive buffer
+                // to the transmit buffer.
+                // Also need to make sure that len here is the appropriate size.
+                sddf_memcpy((net2_config.tx_data.vaddr + buffer_tx.io_or_offset), (net1_config.rx_data.vaddr + waiting_packet.buffer.io_or_offset), waiting_packet.buffer.len);
+                buffer_tx.len = waiting_packet.buffer.len;
+                sddf_dprintf("PROCESS_ARP_WAITING|This is the buffer len: 0x%x\n", buffer_tx.len);
+                err = net_enqueue_active(&virt_tx_queue, buffer_tx);
+                assert(!err);
+                waiting_packet.buffer.len = 0;
+                err = net_enqueue_free(&virt_rx_queue, waiting_packet.buffer);
+                assert(!err);
+                microkit_deferred_notify(net2_config.tx.id);
 
             }
         }
@@ -152,7 +178,7 @@ void route()
             int err = net_dequeue_active(&virt_rx_queue, &buffer);
             assert(!err);
 
-            struct ipv4_packet *pkt = (struct ethernet_header *)(net1_config.rx_data.vaddr + buffer.io_or_offset);
+            struct ipv4_packet *pkt = (struct ipv4_packet *)(net1_config.rx_data.vaddr + buffer.io_or_offset);
 
             /* Decrement the TTL field. IF it reaches 0 protocol is that we drop
              * the packet in this router.
@@ -160,10 +186,16 @@ void route()
              * NOTE: We assume that if we get a packet other than an IPv4 packet, we drop.buffer
              * This edge case should be handled by a new protocol virtualiser.
              */
-            if (pkt->ttl > 1 && pkt->type == ETH_TYPE_IP) {
+            // if (pkt->ttl > 1 && pkt->type == ETH_TYPE_IP) {
+            if (pkt->type == HTONS(ETH_TYPE_IP)) {
+
                 pkt->ttl -= 1;
                 // This is where we will swap out the MAC address with the appropriate address
                 uint32_t destIP = pkt->dst_ip;
+                if (destIP != IPV4_ADDR(192,168,33,6)) {
+                    continue;
+                }
+
                 // From the destination IP, consult the routing tables to find the next hop address.
                 uint32_t nextIP = find_route(destIP);
                 if (nextIP == 0) {
@@ -171,10 +203,10 @@ void route()
                     nextIP = destIP;
                 }
                 uint8_t mac[ETH_HWADDR_LEN];
-                arp_entry_t hash_res;
-                hashtable_search(&arp_table, nextIP, &hash_res);
-                if (&hash_res == NULL) {
-                    sddf_dprintf("ROUTING|Unable to find hash entry")
+                arp_entry_t hash_entry;
+                int ret = hashtable_search(arp_table, (uint32_t) nextIP, &hash_entry);
+                if (ret == -1 && waiting_packet.valid == false) {
+                    hashtable_empty(arp_table);
                     /* In this case, the IP address is not in the ARP Tables.
                     *  We add an entry to the ARP request queue. This is where we
                     *  place the responses to the ARP requests, and if we get a
@@ -182,53 +214,73 @@ void route()
                     *  that are waiting in the queue.
                     */
 
-                    if (!arp_queue_empty_request(&arp_queries)) {
-                            arp_request_t request;
-                            int ret = arp_dequeue_request(&arp_queries, &request);
-                            if (ret != 0) {
-                                sddf_dprintf("ROUTING| No room in ARP request queue!\n");
-                            }
+                    if (!arp_queue_full_request(arp_queries)) {
+                            arp_request_t request = {0};
                             request.ip_addr = nextIP;
-                            ret = arp_enqueue_request(&arp_queries, request);
+                            request.valid = true;
+                            char buf[16];
+                            int ret = arp_enqueue_request(arp_queries, request);
                             if (ret != 0) {
                                 sddf_dprintf("ROUTING| Unable to enqueue into ARP request queue!\n");
                             }
                     } else {
-                            sddf_dprintf("ROUTING| ARP request queue was empty!\n");
+                            sddf_dprintf("ROUTING| ARP request queue was full!\n");
+                            buffer.len = 0;
+                            err = net_enqueue_free(&virt_rx_queue, buffer);
+                            assert(!err);
+                            continue;
                     }
 
                     // Add this packet to the ARP waiting node.
                     waiting_packet.ip = nextIP;
-                    waiting_packet.buffer = &buffer;
+                    sddf_memcpy(&waiting_packet.buffer, &buffer, sizeof(net_buff_desc_t));
+                    waiting_packet.buffer = buffer;
                     waiting_packet.valid = true;
-
+                    microkit_deferred_notify(router_config.router.id);
+                    continue;
                 } else {
                     // We should have the mac address. Replace the dest in the ethernet header.
-                    for (int i = 0; i < ETH_HWADDR_LEN; i++) {
-                        pkt->ethdst_addr[i] = hash_res.mac_addr[i];
-                    }
-
+                    sddf_memcpy(&pkt->ethdst_addr, &hash_entry.mac_addr, ETH_HWADDR_LEN);
                     // TODO: replace the source MAC address with the MAC address of our NIC.
-
+                    sddf_memcpy(&pkt->ethsrc_addr, device2_info->mac, ETH_HWADDR_LEN);
+                    sddf_dprintf("This is the ethdst and ethsrc addr: \n");
+                    for (int i = 0; i < 6; i++) {
+                        sddf_dprintf("MAC[%d]: 0x%x ---- 0x%x\n", i, pkt->ethdst_addr[i], pkt->ethsrc_addr[i]);
+                    }
+                    sddf_dprintf("This is the old checksum: 0x%x\n", pkt->check);
+                    pkt->check = 0;
+                    pkt->check = checksum((uint8_t *)pkt, 20, 0);
+                    sddf_dprintf("This is the new checksum: 0x%x\n", pkt->check);
                     // Send the packet out to the network.
                     net_buff_desc_t buffer_tx;
-                    int err = net_dequeue_free(&virt_tx_queue, &buffer);
+                    int err = net_dequeue_free(&virt_tx_queue, &buffer_tx);
                     assert(!err);
 
                     // @kwinter: For now we are memcpy'ing the packet from our receive buffer
                     // to the transmit buffer.
                     // Also need to make sure that len here is the appropriate size.
-                    sddf_memcpy((net2_config.tx_data.vaddr + buffer_tx.io_or_offset), (net1_config.rx_data.vaddr + buffer.io_or_offset), buffer.len);
+                    sddf_memcpy((net2_config.tx_data.vaddr + buffer_tx.io_or_offset), (net1_config.rx_data.vaddr + buffer.io_or_offset), buffer.len + (sizeof(struct ipv4_packet)));
+                    sddf_dprintf("This is the destination address of the tx packet: \n");
+                    struct ipv4_packet *test = (struct ipv4_packet *)(net2_config.tx_data.vaddr + buffer_tx.io_or_offset);
+                    for (int i = 0; i < 6; i++) {
+                        sddf_dprintf("ROUTING|MAC[%d]: 0x%x\n", i, test->ethdst_addr[i]);
+                    }
+                    buffer_tx.len = buffer.len;
+                    sddf_dprintf("ROUTE|This is the buffer len: 0x%x\n", buffer_tx.len);
+                    err = net_enqueue_active(&virt_tx_queue, buffer_tx);
+                    transmitted = true;
 
-                    err = net_enqueue_active(&virt_tx_queue, buffer);
                     assert(!err);
                 }
+                buffer.len = 0;
+                err = net_enqueue_free(&virt_rx_queue, buffer);
+                assert(!err);
 
+            } else {
+                sddf_dprintf("We have got a different protocol\n");
             }
 
-            buffer.len = 0;
-            err = net_enqueue_free(&virt_rx_queue, buffer);
-            assert(!err);
+
         }
 
         net_request_signal_active(&virt_rx_queue);
@@ -255,13 +307,11 @@ void init(void)
     assert(net_config_check_magic((void *)&net1_config));
     assert(net_config_check_magic((void *)&net2_config));
 
-    hashtable_t *arp_table_vaddr = (hashtable_t*) router_config.router.arp_cache.vaddr;
-    arp_table = *arp_table_vaddr;
-    hashtable_init(&arp_table);
+    arp_table = (hashtable_t*) router_config.router.arp_cache.vaddr;
+    hashtable_init(arp_table);
     // Init all net queues here as well as zero out the arp cache.
     /* @kwinter: Need to add a struct to meta.py defining all the regions our routing
         component might want to have access to. */
-    sddf_dprintf("Routing, intialise virt queues\n");
     net_queue_init(&virt_rx_queue, net1_config.rx.free_queue.vaddr, net1_config.rx.active_queue.vaddr,
                    net1_config.rx.num_buffers);
     net_queue_init(&virt_tx_queue, net2_config.tx.free_queue.vaddr, net2_config.tx.active_queue.vaddr,
@@ -270,19 +320,25 @@ void init(void)
 
     // net_buffers_init(&arp_queue, 0);
 
-    for (int i = 0; i < ETH_HWADDR_LEN; i++) {
-        sddf_dprintf("This is index %d: %d\n", i, net1_config.mac_addr[i]);
-    }
+    arp_queries = (arp_queue_handle_t *) router_config.router.arp_queue.vaddr;
+    arp_handle_init(arp_queries, 256);
 
+    device1_info = (dev_info_t *) net1_config.dev_info.vaddr;
+    device2_info = (dev_info_t *) net2_config.dev_info.vaddr;
+
+    // Add just the default route? Actually just leave this empty and just send out the other end.
+    // routing_table[0].network_id = 0;
+    // routing_table[0].subnet_mask = 0xFFFFFF00;
+    // routing_table[0].next_hop = 0;
     sddf_dprintf("Finished init in the routing component.\n");
 }
 
 void notified(microkit_channel ch)
 {
     // Popualate with the rx ch number
-    if (net1_config.rx.id) {
+    if (ch == net1_config.rx.id) {
         route();
-    } else if (router_config.router.id) {
+    } else if (ch == router_config.router.id) {
         /* This is the channel between the ARP component and the routing component. */
         process_arp_waiting();
     }

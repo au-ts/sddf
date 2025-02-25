@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include "firewall_arp.h"
 
-#define TABLE_SIZE 1024  // Size of the hash table (can be adjusted)
+#define TABLE_SIZE 100  // Size of the hash table (can be adjusted)
 #define MAX_ENTRIES 100  // Maximum number of entries in the hash table
 
 typedef struct entry {
@@ -55,13 +55,14 @@ void hashtable_insert(hashtable_t *table, uint32_t key, arp_entry_t *value) {
 }
 
 // Search for a value by key in the hash table
-void hashtable_search(hashtable_t *table, uint32_t key, arp_entry_t *value) {
+int hashtable_search(hashtable_t *table, uint32_t key, arp_entry_t *value) {
     uint32_t index = hash(key);
     uint32_t original_index = index;
 
     while (table->used[index]) {
         if (table->entries[index].key == key) {
             sddf_memcpy(value, &table->entries[index].value, sizeof(entry_t));
+            return 1;
         }
         index = (index + 1) % TABLE_SIZE;
         if (index == original_index) {
@@ -69,7 +70,7 @@ void hashtable_search(hashtable_t *table, uint32_t key, arp_entry_t *value) {
             break;
         }
     }
-    value = NULL;  // Not found
+    return -1;
 }
 
 // Remove a key-value pair from the hash table
@@ -89,4 +90,14 @@ void hashtable_remove(hashtable_t *table, uint32_t key) {
             break;
         }
     }
+}
+
+bool hashtable_empty(hashtable_t *table) {
+    bool empty = true;
+    for (int i = 0; i < TABLE_SIZE; i++) {
+        if (table->used[i] == 1) {
+            empty = false;
+        }
+    }
+    return empty;
 }
