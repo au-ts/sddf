@@ -42,15 +42,6 @@ uintptr_t hw_ring_buffer_paddr;
 #define RX_COUNT 512
 #define TX_COUNT 512
 
-/*
- * This default is based on the default QEMU setup but could change
- * depending on the instantiation of QEMU or wherever this driver is
- * being used.
- */
-#ifndef VIRTIO_MMIO_CONSOLE_OFFSET
-#define VIRTIO_MMIO_CONSOLE_OFFSET (0xe00)
-#endif
-
 #define VIRTIO_SERIAL_RX_QUEUE 0
 #define VIRTIO_SERIAL_TX_QUEUE 1
 
