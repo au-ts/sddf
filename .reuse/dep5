@@ -19,6 +19,7 @@ Files:
     drivers/network/imx/config.json
     drivers/network/meson/config.json
     drivers/network/virtio/config.json
+    drivers/network/dwmac-5.10a/config.json
     drivers/serial/arm/config.json
     drivers/serial/imx/config.json
     drivers/serial/meson/config.json
