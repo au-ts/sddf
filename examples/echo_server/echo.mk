@@ -21,7 +21,7 @@ SERIAL_DRIVER := $(SDDF)/drivers/serial/$(SERIAL_DRIV_DIR)
 TIMER_DRIVER:=$(SDDF)/drivers/timer/$(TIMER_DRV_DIR)
 NETWORK_COMPONENTS:=$(SDDF)/network/components
 
-BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
+BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD_SMP)/$(MICROKIT_CONFIG)
 IMAGE_FILE := loader.img
 REPORT_FILE := report.txt
 SYSTEM_FILE := echo_server.system
@@ -31,8 +31,11 @@ METAPROGRAM := $(TOP)/meta.py
 
 vpath %.c ${SDDF} ${ECHO_SERVER}
 
-IMAGES := eth_driver.elf lwip0.elf lwip1.elf benchmark.elf idle.elf network_virt_rx.elf\
-	  network_virt_tx.elf network_copy.elf timer_driver.elf serial_driver.elf serial_virt_tx.elf
+IMAGES := eth_driver.elf lwip0.elf lwip1.elf network_virt_rx.elf network_virt_tx.elf \
+			network_copy.elf timer_driver.elf serial_driver.elf serial_virt_tx.elf
+# core dependent bench PDs
+BENCH_IMAGES := benchmark0.elf idle0.elf benchmark1.elf idle1.elf benchmark2.elf idle2.elf benchmark3.elf idle3.elf
+IMAGES += ${BENCH_IMAGES}
 
 CFLAGS := -mcpu=$(CPU) \
 	  -mstrict-align \
@@ -95,7 +98,7 @@ $(DTB): $(DTS)
 	dtc -q -I dts -O dtb $(DTS) > $(DTB)
 
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
-	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE)
+	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE) $(SMP_ARG)
 	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx.data serial_virt_tx.elf
@@ -112,13 +115,26 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(OBJCOPY) --update-section .timer_client_config=timer_client_client1.data lwip1.elf
 	$(OBJCOPY) --update-section .net_client_config=net_client_client1.data lwip1.elf
 	$(OBJCOPY) --update-section .serial_client_config=serial_client_client1.data lwip1.elf
-	$(OBJCOPY) --update-section .serial_client_config=serial_client_bench.data benchmark.elf
-	$(OBJCOPY) --update-section .benchmark_config=benchmark_config.data benchmark.elf
 	$(OBJCOPY) --update-section .benchmark_client_config=benchmark_client_config.data lwip0.elf
-	$(OBJCOPY) --update-section .benchmark_config=benchmark_idle_config.data idle.elf
+# core 0 bench resources
+	$(OBJCOPY) --update-section .serial_client_config=serial_client_bench0.data benchmark0.elf
+	$(OBJCOPY) --update-section .benchmark_config=benchmark_config0.data benchmark0.elf
+	$(OBJCOPY) --update-section .benchmark_config=benchmark_idle_config0.data idle0.elf
+# core 1 bench resources
+	$(OBJCOPY) --update-section .serial_client_config=serial_client_bench1.data benchmark1.elf
+	$(OBJCOPY) --update-section .benchmark_config=benchmark_config1.data benchmark1.elf
+	$(OBJCOPY) --update-section .benchmark_config=benchmark_idle_config1.data idle1.elf
+# core 2 bench resources
+	$(OBJCOPY) --update-section .serial_client_config=serial_client_bench2.data benchmark2.elf
+	$(OBJCOPY) --update-section .benchmark_config=benchmark_config2.data benchmark2.elf
+	$(OBJCOPY) --update-section .benchmark_config=benchmark_idle_config2.data idle2.elf
+# core 3 bench resources
+	$(OBJCOPY) --update-section .serial_client_config=serial_client_bench3.data benchmark3.elf
+	$(OBJCOPY) --update-section .benchmark_config=benchmark_config3.data benchmark3.elf
+	$(OBJCOPY) --update-section .benchmark_config=benchmark_idle_config3.data idle3.elf
 
 ${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
-	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
+	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD_SMP) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
 
 
 include ${SDDF}/util/util.mk
