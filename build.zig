@@ -24,7 +24,8 @@ const DriverClass = struct {
     const Network = enum {
         imx,
         meson,
-        virtio
+        virtio,
+        @"dwmac-5.10a",
     };
 
     const I2cHost = enum {
