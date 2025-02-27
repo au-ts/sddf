@@ -171,6 +171,8 @@ void init(void)
 
     net_queue_init(&rx_queue, net_config.rx.free_queue.vaddr, net_config.rx.active_queue.vaddr,
                    net_config.rx.num_buffers);
+    sddf_dprintf("ARP_RESPONDER|This is the size of the active rx queue: %u\n", (uint16_t)net_queue_length(&rx_queue.active));
+
     net_queue_init(&tx_queue, net_config.tx.free_queue.vaddr, net_config.tx.active_queue.vaddr,
                    net_config.tx.num_buffers);
     net_buffers_init(&tx_queue, 0);

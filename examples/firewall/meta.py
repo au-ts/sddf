@@ -80,7 +80,9 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     routing = ProtectionDomain("routing", "routing.elf", priority=97, budget=20000)
     arp_responder = ProtectionDomain("arp_responder", "arp_responder.elf", priority=95, budget=20000)
     arp_requester = ProtectionDomain("arp_requester", "arp_requester.elf", priority=98, budget=20000)
-    firewall = LionsOs.Firewall(sdf, net_system, net_system2, routing, arp_responder, arp_requester, arp_requester, arp_requester, arp_requester)
+    firewall = LionsOs.Firewall(sdf, net_system, net_system2, routing, arp_responder, arp_requester)
+
+    icmp_filter = ProtectionDomain("icmp_filter", "icmp_filter.elf", priority=96, budget=20000)
 
     # @kwinter: These need to be added to second net_system
     serial_system.add_client(routing)
@@ -99,6 +101,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
         net_virt_rx,
         net_virt_rx1,
         routing,
+        icmp_filter,
         arp_responder,
         arp_requester,
         timer_driver,
@@ -111,6 +114,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
     # Router MAC addr (soon to be deprecated), ip of NIC1, ip of NIC2
     assert firewall.connect(router_mac_addr, 3338669322, 2205888)
+    firewall.add_filter(icmp_filter, 0x01)
     assert firewall.serialise_config(output_dir)
     assert serial_system.connect()
     assert serial_system.serialise_config(output_dir)

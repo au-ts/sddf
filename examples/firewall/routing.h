@@ -20,4 +20,5 @@ typedef struct routing_queue_node {
     uint32_t ip;
     bool valid;
     net_buff_desc_t buffer;
+    uint16_t filter;
 } routing_queue_node_t;

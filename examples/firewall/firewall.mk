@@ -33,7 +33,8 @@ vpath %.c ${SDDF} ${FIREWALL}
 IMAGES := eth_driver.elf network_virt_rx.elf network_virt_tx.elf network_copy.elf \
 		  eth_driver_dwmac.elf network_virt_rx_1.elf network_virt_tx_1.elf \
 		  timer_driver.elf uart_driver.elf serial_virt_tx.elf \
-		  arp_requester.elf arp_responder.elf routing.elf
+		  arp_requester.elf arp_responder.elf routing.elf \
+		  icmp_filter.elf
 
 CFLAGS := -mcpu=$(CPU) \
 	  -mstrict-align \
@@ -88,11 +89,13 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
 	$(OBJCOPY) --update-section .net_client_config=net_ethernet_driver_dwmac_client_arp_responder.data arp_responder.elf
 	$(OBJCOPY) --update-section .arp_resources=arp_responder.data arp_responder.elf
-	$(OBJCOPY) --update-section .net1_client_config=net_ethernet_driver_dwmac_client_routing.data routing.elf
 	$(OBJCOPY) --update-section .net2_client_config=net_ethernet_driver_client_routing.data routing.elf
 	$(OBJCOPY) --update-section .router_config=router.data routing.elf
 	$(OBJCOPY) --update-section .net_client_config=net_ethernet_driver_client_arp_requester.data arp_requester.elf
 	$(OBJCOPY) --update-section .arp_resources=arp_requester.data arp_requester.elf
+
+	$(OBJCOPY) --update-section .filter_config=firewall_filter_icmp_filter.data icmp_filter.elf
+	$(OBJCOPY) --update-section .net_client_config=net_ethernet_driver_dwmac_client_icmp_filter.data icmp_filter.elf
 
 ${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
