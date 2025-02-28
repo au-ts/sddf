@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from sdfgen import SystemDescription, Sddf, DeviceTree
 
 ProtectionDomain = SystemDescription.ProtectionDomain
-
+MemoryRegion = SystemDescription.MemoryRegion
+Map = SystemDescription.Map
 
 @dataclass
 class Board:
@@ -39,6 +40,14 @@ BOARDS: List[Board] = [
         timer="soc@0/bus@30000000/timer@302d0000",
     ),
     Board(
+        name="odroidc4",
+        arch=SystemDescription.Arch.AARCH64,
+        paddr_top=0x80000000,
+        partition=0,
+        blk="soc/sd@ffe05000",
+        timer=None,
+    ),
+    Board(
         name="qemu_virt_riscv64",
         arch=SystemDescription.Arch.RISCV64,
         paddr_top=0xa_0000_000,
@@ -67,6 +76,11 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     blk_system = Sddf.Blk(sdf, blk_node, blk_driver, blk_virt)
     partition = int(args.partition) if args.partition else board.partition
     blk_system.add_client(client, partition=partition)
+
+    if board.name == "odroidc4":
+        gpio_mr = MemoryRegion("gpio", 0x1000, paddr=0xff800000)
+        blk_driver.add_map(Map(gpio_mr, 0xff800000, Map.Perms(r=True, w=True), cached=False))
+        sdf.add_mr(gpio_mr)
 
     pds = [
         blk_driver,

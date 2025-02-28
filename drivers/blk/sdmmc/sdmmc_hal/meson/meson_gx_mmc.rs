@@ -9,8 +9,6 @@ use sdmmc_protocol::{sdmmc::{
     }, sdmmc_os::{debug_log, process_wait_unreliable}, sdmmc_traits::SdmmcHardware
 };
 
-const SDIO_BASE: u64 = 0xffe05000; // Base address from DTS
-
 // The always on gpio pin pull
 const AO_RTI_PIN_REGION_START: u64 = 0xff800014;
 const AO_RTI_PIN_REGION_END: u64 = 0xff800038;
@@ -183,8 +181,8 @@ struct MesonSdmmcRegisters {
 
 impl MesonSdmmcRegisters {
     /// This function is unsafe because it tries to
-    unsafe fn new() -> &'static mut MesonSdmmcRegisters {
-        &mut *(SDIO_BASE as *mut MesonSdmmcRegisters)
+    unsafe fn new(base: u64) -> &'static mut MesonSdmmcRegisters {
+        &mut *(base as *mut MesonSdmmcRegisters)
     }
 }
 
@@ -204,8 +202,8 @@ pub struct SdmmcMesonHardware {
 }
 
 impl SdmmcMesonHardware {
-    pub unsafe fn new() -> Self {
-        let register = MesonSdmmcRegisters::new();
+    pub unsafe fn new(base: u64) -> Self {
+        let register = MesonSdmmcRegisters::new(base);
 
         // TODO: Call reset function here
         SdmmcMesonHardware {

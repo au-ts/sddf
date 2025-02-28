@@ -1,5 +1,5 @@
 [package]
-name = "sdmmc_driver"
+name = "blk_driver"
 version = "0.1.0"
 edition = "2021"
 

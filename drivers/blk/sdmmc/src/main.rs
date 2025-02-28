@@ -15,6 +15,7 @@ use alloc::boxed::Box;
 use sddf_blk::{
     blk_dequeue_req_helper, blk_enqueue_resp_helper, blk_queue_empty_req_helper,
     blk_queue_full_resp_helper, blk_queue_init_helper, BlkOp, BlkRequest, BlkStatus,
+    blk_device_regs_vaddr, blk_device_init_data_vaddr, blk_device_init_data_ioaddr
 };
 use sdmmc_hal::meson_gx_mmc::SdmmcMesonHardware;
 
@@ -22,9 +23,8 @@ use sdmmc_protocol::sdmmc::{SdmmcError, SdmmcProtocol};
 use sdmmc_protocol::sdmmc_traits::SdmmcHardware;
 use sel4_microkit::{debug_print, debug_println, protection_domain, Channel, Handler, Infallible};
 
-const BLK_VIRTUALIZER: sel4_microkit::Channel = sel4_microkit::Channel::new(0);
-
-const INTERRUPT: sel4_microkit::Channel = sel4_microkit::Channel::new(1);
+const INTERRUPT: sel4_microkit::Channel = sel4_microkit::Channel::new(0);
+const BLK_VIRTUALIZER: sel4_microkit::Channel = sel4_microkit::Channel::new(1);
 
 const SDCARD_SECTOR_SIZE: u16 = 512;
 const SDDF_TRANSFER_SIZE: u16 = 4096;
@@ -73,14 +73,23 @@ fn init() -> HandlerImpl<SdmmcMesonHardware> {
     unsafe {
         blk_queue_init_helper();
     }
-    let meson_hal: SdmmcMesonHardware = unsafe { SdmmcMesonHardware::new() };
+    let regs_base = unsafe {
+        blk_device_regs_vaddr()
+    };
+    let meson_hal: SdmmcMesonHardware = unsafe { SdmmcMesonHardware::new(regs_base) };
 
     let unsafe_stolen_memory: &mut [u8; 64];
 
     // This line of code actually is very unsafe!
     // Considering the memory is stolen from the memory that has sdcard registers mapped in
+    let init_data_vaddr = unsafe {
+        blk_device_init_data_vaddr()
+    };
+    let init_data_ioaddr = unsafe {
+        blk_device_init_data_ioaddr()
+    };
     unsafe {
-        let stolen_memory_addr = 0xf5500000 as *mut [u8; 64];
+        let stolen_memory_addr = init_data_vaddr as *mut [u8; 64];
         assert!(stolen_memory_addr as usize % 8 == 0);
         unsafe_stolen_memory = &mut (*stolen_memory_addr);
     }
@@ -105,6 +114,7 @@ fn init() -> HandlerImpl<SdmmcMesonHardware> {
     sdmmc_host
         .tune_performance(Some((
             unsafe_stolen_memory,
+            init_data_ioaddr,
             dummy_cache_invalidate_function,
         )))
         .unwrap_or_else(|error| panic!("SDMMC: Error at tuning performance {:?}", error));
@@ -218,13 +228,13 @@ impl<T: SdmmcHardware + 'static> Handler for HandlerImpl<T> {
                     blk_dequeue_req_helper(
                         &mut request.request_code as *mut BlkOp,
                         &mut request.io_or_offset as *mut u64,
-                        &mut request.block_number as *mut u32,
+                        &mut request.block_number as *mut u64,
                         &mut request.count as *mut u16,
                         &mut request.id as *mut u32,
                     );
                 }
                 // TODO: Consider how to add integer overflow check here
-                request.block_number = request.block_number * SDDF_TO_REAL_SECTOR as u32;
+                request.block_number = request.block_number * SDDF_TO_REAL_SECTOR as u64;
                 request.count = request.count * SDDF_TO_REAL_SECTOR;
                 // Print the retrieved values
                 /*
