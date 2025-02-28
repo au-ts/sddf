@@ -237,7 +237,7 @@ pub struct MmcIos {
 pub struct HostInfo {
     pub max_frequency: u64,
     pub min_frequency: u64,
-    pub max_block_per_req: u32,
+    pub max_block_per_req: u16,
 }
 
 /// TODO: Add more variables for SdmmcProtocol to track the state of the sdmmc controller and card correctly
