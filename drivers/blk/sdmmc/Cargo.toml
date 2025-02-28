@@ -1,0 +1,12 @@
+[package]
+name = "sdmmc_driver"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+sel4-microkit = { git = "https://github.com/seL4/rust-sel4.git", rev = "d3790bfd15512e18659f9491c319867fabf9552d", package = "sel4-microkit" }
+sdmmc_hal = { path = "sdmmc_hal/meson" }
+sdmmc_protocol = { path = "sdmmc_protocol" }
+
+[build]
+build = "build.rs"

@@ -20,6 +20,8 @@ ci_logs/
 zig-out/
 .zig-cache/
 venv/
+target/
+Cargo.lock
 __pycache__
 .*.sw*
 *.dtb
