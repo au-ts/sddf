@@ -26,9 +26,9 @@ const BLK_VIRTUALIZER: sel4_microkit::Channel = sel4_microkit::Channel::new(0);
 
 const INTERRUPT: sel4_microkit::Channel = sel4_microkit::Channel::new(1);
 
-const SDCARD_SECTOR_SIZE: u32 = 512;
-const SDDF_TRANSFER_SIZE: u32 = 4096;
-const SDDF_TO_REAL_SECTOR: u32 = SDDF_TRANSFER_SIZE / SDCARD_SECTOR_SIZE;
+const SDCARD_SECTOR_SIZE: u16 = 512;
+const SDDF_TRANSFER_SIZE: u16 = 4096;
+const SDDF_TO_REAL_SECTOR: u16 = SDDF_TRANSFER_SIZE / SDCARD_SECTOR_SIZE;
 
 const RETRY_CHANCE: u16 = 5;
 
@@ -219,12 +219,12 @@ impl<T: SdmmcHardware + 'static> Handler for HandlerImpl<T> {
                         &mut request.request_code as *mut BlkOp,
                         &mut request.io_or_offset as *mut u64,
                         &mut request.block_number as *mut u32,
-                        &mut request.count as *mut u32,
+                        &mut request.count as *mut u16,
                         &mut request.id as *mut u32,
                     );
                 }
                 // TODO: Consider how to add integer overflow check here
-                request.block_number = request.block_number * SDDF_TO_REAL_SECTOR;
+                request.block_number = request.block_number * SDDF_TO_REAL_SECTOR as u32;
                 request.count = request.count * SDDF_TO_REAL_SECTOR;
                 // Print the retrieved values
                 /*
@@ -263,7 +263,7 @@ impl<T: SdmmcHardware + 'static> Handler for HandlerImpl<T> {
                         BlkOp::BlkReqRead => {
                             // TODO: The MAX_BLOCK_PER_TRANSFER is got by hackily get the defines in hardware layer which is wrong, check that to get properly from protocol layer
                             request.count_to_do = core::cmp::min(
-                                request.count as u32,
+                                request.count,
                                 sdmmc_hal::meson_gx_mmc::MAX_BLOCK_PER_TRANSFER,
                             );
                             if let Some(sdmmc) = self.sdmmc.take() {
@@ -280,7 +280,7 @@ impl<T: SdmmcHardware + 'static> Handler for HandlerImpl<T> {
                         BlkOp::BlkReqWrite => {
                             // TODO: The MAX_BLOCK_PER_TRANSFER is got by hackily get the defines in hardware layer which is wrong, check that to get properly from protocol layer
                             request.count_to_do = core::cmp::min(
-                                request.count as u32,
+                                request.count,
                                 sdmmc_hal::meson_gx_mmc::MAX_BLOCK_PER_TRANSFER,
                             );
                             if let Some(sdmmc) = self.sdmmc.take() {

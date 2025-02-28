@@ -34,7 +34,7 @@ uint8_t blk_enqueue_resp_helper(uint8_t status, uint16_t success, uint32_t id) {
     return 1;
 }
 
-uint8_t blk_dequeue_req_helper(uint8_t *code, uintptr_t *io_or_offset, uint32_t *block_number, uint32_t *count, uint32_t *id) {
+uint8_t blk_dequeue_req_helper(uint8_t *code, uintptr_t *io_or_offset, uint32_t *block_number, uint16_t *count, uint32_t *id) {
     // It would be better if we do not use int but use int8_t
     // uint16_t temp_count = 0;
     if (blk_dequeue_req(queue_handle, (blk_req_code_t *)code, io_or_offset, block_number, count, id) == 0) {
