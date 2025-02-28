@@ -15,13 +15,18 @@
     <memory_region name="blk_client_response" size="0x200_000" page_size="0x200_000"/>
     <memory_region name="blk_client_data" size="0x200_000" page_size="0x200_000" />
 
+    <memory_region name="gpio" size="0x1000" phys_addr="0xff800000"/>
     <memory_region name="sdio" size="0x1_000" phys_addr="0xffe05000" />
+
+    <memory_region name="data_region" size="0x10000" phys_addr="0xf5500000" />
 
     <protection_domain name="driver" priority="110">
         <program_image path="sdmmc_driver.elf" />
         <map mr="sdio" vaddr="0xffe05000" perms="rw" cached="false" />
+        <map mr="gpio" vaddr="0xff800000" perms="rw" cached="false" />
 
         <!-- sDDF block -->
+        <map mr="data_region" vaddr="0xf5500000" perms="rw" cached="false" />
         <map mr="blk_driver_config" vaddr="0x40000000" perms="rw" cached="false" setvar_vaddr="blk_config"     />
         <map mr="blk_driver_request"    vaddr="0x40200000" perms="rw" cached="false" setvar_vaddr="blk_req_queue"  />
         <map mr="blk_driver_response"   vaddr="0x40400000" perms="rw" cached="false" setvar_vaddr="blk_resp_queue" />
