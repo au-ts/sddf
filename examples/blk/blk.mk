@@ -85,8 +85,7 @@ SDDF_CUSTOM_LIBC := 1
 
 IMAGES := blk_driver.elf client.elf blk_virt.elf serial_virt_tx.elf serial_driver.elf
 
-CFLAGS := -mcpu=$(CPU) \
-		  -mstrict-align \
+CFLAGS := -mstrict-align \
 		  -nostdlib \
 		  -ffreestanding \
 		  -g3 \
