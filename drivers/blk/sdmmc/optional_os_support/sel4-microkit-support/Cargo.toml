@@ -1,0 +1,15 @@
+[package]
+name = "sel4-microkit-support"
+version = "0.1.0"
+edition = "2021"
+authors = ["Cheng Li 李澄 <lichengchaoreng@gmail.com>"]
+
+[lib]
+name = "sel4_microkit_support"
+path = "lib.rs"
+
+# Optional OS-specific crates can be included to enhance functionality, 
+# such as providing improved debugging output and more efficient sleep functions 
+# (as opposed to simple spin-wait).
+[dependencies]
+sel4-microkit = { git = "https://github.com/seL4/rust-sel4.git", rev = "5826be1a6c83803faeaa79cd9f164c26a5a32e7c" }
