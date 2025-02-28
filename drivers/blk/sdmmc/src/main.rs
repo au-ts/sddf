@@ -18,10 +18,8 @@ use sddf_blk::{
 };
 use sdmmc_hal::meson_gx_mmc::SdmmcMesonHardware;
 
-use sdmmc_protocol::sdmmc::{
-    sdmmc_capability::{MMC_INTERRUPT_END_OF_CHAIN, MMC_INTERRUPT_ERROR},
-    SdmmcHalError, SdmmcHardware, SdmmcProtocol,
-};
+use sdmmc_protocol::sdmmc::{SdmmcError, SdmmcProtocol};
+use sdmmc_protocol::sdmmc_traits::SdmmcHardware;
 use sel4_microkit::{debug_print, debug_println, protection_domain, Channel, Handler, Infallible};
 
 const BLK_VIRTUALIZER: sel4_microkit::Channel = sel4_microkit::Channel::new(0);
@@ -98,24 +96,10 @@ fn init() -> HandlerImpl<SdmmcMesonHardware> {
         .setup_card()
         .unwrap_or_else(|error| panic!("SDMMC: Error at setup {:?}", error));
 
-    let mut test: u32 = 0;
-    let _ = sdmmc_host.enable_interrupt(&mut test);
+    let _ = sdmmc_host.config_interrupt(false, false);
 
-    /*
-    unsafe {
-        unsafe_stolen_memory[0] = 1;
-        unsafe_stolen_memory[10] = 64;
-        unsafe_stolen_memory[53] = 98;
-
-        debug_println!("printing out memory have value written in it");
-
-        print_one_block(unsafe_stolen_memory.as_ptr(), 512);
-
-        assert!(unsafe_stolen_memory[0] == 1);
-        assert!(unsafe_stolen_memory[10] == 64);
-        assert!(unsafe_stolen_memory[53] == 98);
-    }
-    */
+    // Print out one block to check if read works
+    // sdmmc_host.test_read_one_block(0, 0xf5500000);
 
     // TODO: Should tuning be possible to fail?
     sdmmc_host
@@ -129,10 +113,8 @@ fn init() -> HandlerImpl<SdmmcMesonHardware> {
         print_one_block(unsafe_stolen_memory.as_ptr(), 64);
     }
 
-    let mut irq_to_enable = MMC_INTERRUPT_ERROR | MMC_INTERRUPT_END_OF_CHAIN;
-
     // Should always succeed, at least for odroid C4
-    let _ = sdmmc_host.enable_interrupt(&mut irq_to_enable);
+    let _ = sdmmc_host.config_interrupt(true, false);
     HandlerImpl {
         future: None,
         sdmmc: Some(sdmmc_host),
@@ -142,7 +124,7 @@ fn init() -> HandlerImpl<SdmmcMesonHardware> {
 }
 
 struct HandlerImpl<T: SdmmcHardware> {
-    future: Option<Pin<Box<dyn Future<Output = (Result<(), SdmmcHalError>, SdmmcProtocol<T>)>>>>,
+    future: Option<Pin<Box<dyn Future<Output = (Result<(), SdmmcError>, SdmmcProtocol<T>)>>>>,
     sdmmc: Option<SdmmcProtocol<T>>,
     request: Option<BlkRequest>,
     retry: u16,
@@ -241,15 +223,16 @@ impl<T: SdmmcHardware + 'static> Handler for HandlerImpl<T> {
                         &mut request.id as *mut u32,
                     );
                 }
+                // TODO: Consider how to add integer overflow check here
                 request.block_number = request.block_number * SDDF_TO_REAL_SECTOR;
                 request.count = request.count * SDDF_TO_REAL_SECTOR;
                 // Print the retrieved values
-                
-                // debug_println!("io_or_offset: 0x{:x}", request.io_or_offset);// Simple u64
-                // debug_println!("block_number: {}", request.block_number);    // Simple u32
-                // debug_println!("count: {}", request.count);                  // Simple u16
-                // debug_println!("id: {}", request.id);                        // Simple u32
-                
+                /*
+                debug_println!("io_or_offset: 0x{:x}", request.io_or_offset);// Simple u64
+                debug_println!("block_number: {}", request.block_number);    // Simple u32
+                debug_println!("count: {}", request.count);                  // Simple u16
+                debug_println!("id: {}", request.id);                        // Simple u32
+                */
                 match request.request_code {
                     BlkOp::BlkReqRead => {
                         // Reset retry chance here
@@ -321,9 +304,11 @@ impl<T: SdmmcHardware + 'static> Handler for HandlerImpl<T> {
                     if let Some(ref mut future) = self.future {
                         match future.as_mut().poll(&mut cx) {
                             Poll::Ready(_) => {
-                                panic!("SDMMC: The newly created future returned immediately! 
+                                panic!(
+                                    "SDMMC: The newly created future returned immediately! 
                                         Most likely the future contain an invalid request! 
-                                        Double check request sanitize process!")
+                                        Double check request sanitize process!"
+                                )
                             }
                             Poll::Pending => break 'process_notification,
                         }
