@@ -21,7 +21,7 @@ blk/sdmmc/meson/sddf_helper.o: $(SDMMC_DRIVER_DIR)/src/sddf_helper.c |blk/sdmmc/
 	$(CC) -c $(CFLAGS) $< -o $@
 
 blk/sdmmc/meson/libsddfblk.a: blk/sdmmc/meson/sddf_helper.o |blk/sdmmc/meson
-	ar rcs $@ $<
+	${AR} rcs $@ $<
 
 blk/sdmmc/meson:
 	mkdir -p $@
