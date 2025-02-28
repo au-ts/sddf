@@ -81,7 +81,7 @@ MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 
-IMAGES := client.elf blk_virt.elf
+IMAGES := blk_driver.elf client.elf blk_virt.elf
 
 CFLAGS := -mcpu=$(CPU) \
 		  -mstrict-align \
