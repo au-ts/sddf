@@ -4,7 +4,4 @@ fn main() {
 
     // Link the C library (static or dynamic). Adjust "static" or "dylib" as needed.
     println!("cargo:rustc-link-lib=static=sddfblk");
-
-    // If you need to specify the include directory for C headers:
-    // println!("cargo:include=path/to/your/c/include");
 }

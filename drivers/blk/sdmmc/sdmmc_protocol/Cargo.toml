@@ -2,7 +2,18 @@
 name = "sdmmc_protocol"
 version = "0.1.0"
 edition = "2021"
+authors = ["Cheng Li 李澄 <lichengchaoreng@gmail.com>"]
 
 [lib]
 name = "sdmmc_protocol"
 path = "lib.rs"
+
+[dependencies]
+bitflags = "2.6.0"
+sel4-microkit-support = { path = "../optional_os_support/sel4-microkit-support", optional = true }
+
+[features]
+# Feature Flags:
+# - sel4-microkit: Enables support for the optional `sel4-microkit` crate,
+#   adding seL4-specific functionalities such as debug output and optimized sleep functions.
+sel4-microkit = ["dep:sel4-microkit-support"]
