@@ -34,7 +34,7 @@ blk_driver.elf: $(BUILD_DIR) blk/sdmmc/meson/libsddfblk.a
 	echo "MICROKIT SDK config directory: $(microkit_sdk_config_dir)" && \
 	echo "SEl4 include directories: $(sel4_include_dirs)" && \
 	SEL4_INCLUDE_DIRS=$(abspath $(sel4_include_dirs)) \
-	cargo build	--release \
+	cargo build \
 		-Z build-std=core,alloc,compiler_builtins \
 		-Z build-std-features=compiler-builtins-mem \
 		--target-dir $(BUILD_DIR)/blk/sdmmc/meson/ \
