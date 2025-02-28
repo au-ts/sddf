@@ -1,3 +1,5 @@
+#![allow(dead_code)] // Allow dead code for the entire module
+
 // Define constants for MMC data flags
 pub const MMC_DATA_READ: u32 = 1;
 pub const MMC_DATA_WRITE: u32 = 2;
@@ -43,7 +45,49 @@ pub const SD_CMD_SWITCH_UHS18V: u32 = 11;
 
 pub const SD_CMD_APP_SET_BUS_WIDTH: u32 = 6;
 pub const SD_CMD_APP_SD_STATUS: u32 = 13;
+
 pub const SD_CMD_ERASE_WR_BLK_START: u32 = 32;
 pub const SD_CMD_ERASE_WR_BLK_END: u32 = 33;
+
+/*
+ * Erase/discard
+ */
+pub const SD_ERASE_ARG: u32 = 0x00000000;
+pub const SD_DISCARD_ARG: u32 = 0x00000001;
+
 pub const SD_CMD_APP_SEND_OP_COND: u32 = 41;
 pub const SD_CMD_APP_SEND_SCR: u32 = 51;
+
+pub const OCR_BUSY: u32 = 0x8000_0000;
+pub const OCR_XPC: u32 = 0x1000_0000;
+pub const OCR_HCS: u32 = 0x4000_0000;
+pub const OCR_S18R: u32 = 0x0100_0000;
+pub const OCR_VOLTAGE_MASK: u32 = 0x007F_FF80;
+pub const OCR_ACCESS_MODE: u32 = 0x6000_0000;
+
+// The index to get the speed class information from SD switch function cmd
+// Check Part 1 Physical Layer Simplified Specification Ver9.10 table 4-11 to see if I am wrong
+pub const SD_SWITCH_FUNCTION_GROUP_ONE: usize = 13;
+pub const SD_SWITCH_FUNCTION_GROUP_ONE_SET_LEGACY: u8 = 0x0;
+pub const SD_SWITCH_FUNCTION_GROUP_ONE_SET_SDHS: u8 = 0x1;
+pub const SD_SWITCH_FUNCTION_GROUP_ONE_SET_UHS_SDR12: u8 = 0x0;
+pub const SD_SWITCH_FUNCTION_GROUP_ONE_SET_UHS_SDR25: u8 = 0x1;
+pub const SD_SWITCH_FUNCTION_GROUP_ONE_SET_UHS_SDR50: u8 = 0x2;
+pub const SD_SWITCH_FUNCTION_GROUP_ONE_SET_UHS_SDR104: u8 = 0x3;
+pub const SD_SWITCH_FUNCTION_GROUP_ONE_SET_UHS_DDR50: u8 = 0x4;
+
+pub const SD_SWITCH_FUNCTION_GROUP_ONE_CHECK_LEGACY: u8 =
+    1 << SD_SWITCH_FUNCTION_GROUP_ONE_SET_LEGACY;
+pub const SD_SWITCH_FUNCTION_GROUP_ONE_CHECK_SDHS: u8 = 1 << SD_SWITCH_FUNCTION_GROUP_ONE_SET_SDHS;
+pub const SD_SWITCH_FUNCTION_GROUP_ONE_CHECK_UHS_SDR12: u8 =
+    1 << SD_SWITCH_FUNCTION_GROUP_ONE_SET_UHS_SDR12;
+pub const SD_SWITCH_FUNCTION_GROUP_ONE_CHECK_UHS_SDR25: u8 =
+    1 << SD_SWITCH_FUNCTION_GROUP_ONE_SET_UHS_SDR25;
+pub const SD_SWITCH_FUNCTION_GROUP_ONE_CHECK_UHS_SDR50: u8 =
+    1 << SD_SWITCH_FUNCTION_GROUP_ONE_SET_UHS_SDR50;
+pub const SD_SWITCH_FUNCTION_GROUP_ONE_CHECK_UHS_SDR104: u8 =
+    1 << SD_SWITCH_FUNCTION_GROUP_ONE_SET_UHS_SDR104;
+pub const SD_SWITCH_FUNCTION_GROUP_ONE_CHECK_UHS_DDR50: u8 =
+    1 << SD_SWITCH_FUNCTION_GROUP_ONE_SET_UHS_DDR50;
+
+pub const SD_SWITCH_FUNCTION_SELECTION_GROUP_ONE: usize = 16;

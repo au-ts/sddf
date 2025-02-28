@@ -2,11 +2,27 @@
 name = "sdmmc_hal"
 version = "0.1.0"
 edition = "2021"
+authors = ["Cheng Li 李澄 <lichengchaoreng@gmail.com>"]
 
 [lib]
 name = "sdmmc_hal"
 path = "lib.rs"
 
+# The Hardware Abstraction Layer (HAL) is designed to be:
+# - Bare-metal compatible
+# - Operating system (OS) agnostic
+# - Minimally dependent to ensure cross-platform flexibility
+#
+# Optional OS-specific crates can be included to enhance functionality, 
+# such as providing improved debugging output and more efficient sleep functions 
+# (as opposed to simple spin-wait).
+#
+# Required Dependencies:
+# - sdmmc_protocol: Essential for core functionality.
+#
+# Optional Dependencies:
+# - sel4-microkit: Provides additional support for debugging and optimized sleep functions 
+#   specifically on the seL4 microkernel platform.
+
 [dependencies]
 sdmmc_protocol = { path = "../../sdmmc_protocol" }
-sel4-microkit = { git = "https://github.com/seL4/rust-sel4.git", rev = "d3790bfd15512e18659f9491c319867fabf9552d", package = "sel4-microkit" }
