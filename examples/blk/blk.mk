@@ -83,8 +83,7 @@ BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 
 IMAGES := blk_driver.elf client.elf blk_virt.elf
 
-CFLAGS := -mcpu=$(CPU) \
-		  -mstrict-align \
+CFLAGS := -mstrict-align \
 		  -nostdlib \
 		  -ffreestanding \
 		  -g3 \
