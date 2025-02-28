@@ -1,66 +1,57 @@
-#include <sddf/blk/queue.h>
-#include <blk_config.h>
 #include <stdint.h>
+#include <sddf/blk/queue.h>
+#include <sddf/blk/config.h>
+#include <sddf/resources/device.h>
 
-blk_queue_handle_t queue_handle_memory;
-blk_queue_handle_t *queue_handle = &queue_handle_memory;
+__attribute__((__section__(".device_resources"))) device_resources_t device_resources;
+__attribute__((__section__(".blk_driver_config"))) blk_driver_config_t config;
 
-blk_req_queue_t *blk_req_queue;
-blk_resp_queue_t *blk_resp_queue;
-
-blk_storage_info_t *blk_config;
+blk_queue_handle_t blk_queue;
 
 void blk_queue_init_helper() {
-    blk_queue_init(queue_handle, blk_req_queue, blk_resp_queue, BLK_QUEUE_CAPACITY_DRIV);
-    blk_config->sector_size = 512;
-    blk_config->block_size = 1;
-    blk_config->capacity = 0xFFFFFFFFFF;
-    blk_config->ready = true;
+    blk_queue_init(&blk_queue, config.virt.req_queue.vaddr, config.virt.resp_queue.vaddr, config.virt.num_buffers);
+
+    blk_storage_info_t *storage_info = config.virt.storage_info.vaddr;
+    storage_info->sector_size = 512;
+    storage_info->block_size = 1;
+    storage_info->capacity = 0xFFFFFFFFFF;
+    storage_info->ready = true;
+}
+
+uint64_t blk_device_regs_vaddr() {
+    return (uint64_t)device_resources.regions[0].region.vaddr;
+}
+
+uint64_t blk_device_init_data_vaddr() {
+    return (uint64_t)device_resources.regions[1].region.vaddr;
+}
+
+uint64_t blk_device_init_data_ioaddr() {
+    return (uint64_t)device_resources.regions[1].io_addr;
 }
 
 uint8_t blk_queue_empty_req_helper() {
-    return blk_queue_empty_req(queue_handle);
+    return blk_queue_empty_req(&blk_queue);
 }
 
 uint8_t blk_queue_full_resp_helper() {
-    return blk_queue_full_resp(queue_handle);
+    return blk_queue_full_resp(&blk_queue);
 }
 
 uint8_t blk_enqueue_resp_helper(uint8_t status, uint16_t success, uint32_t id) {
     // It would be better if we do not use int but use int8_t
-    if (blk_enqueue_resp(queue_handle, status, success, id) == 0) {
+    if (blk_enqueue_resp(&blk_queue, status, success, id) == 0) {
         return 0;
     }
     return 1;
 }
 
-uint8_t blk_dequeue_req_helper(uint8_t *code, uintptr_t *io_or_offset, uint32_t *block_number, uint16_t *count, uint32_t *id) {
+uint8_t blk_dequeue_req_helper(uint8_t *code, uintptr_t *io_or_offset, uint64_t *block_number, uint16_t *count, uint32_t *id) {
     // It would be better if we do not use int but use int8_t
     // uint16_t temp_count = 0;
-    if (blk_dequeue_req(queue_handle, (blk_req_code_t *)code, io_or_offset, block_number, count, id) == 0) {
+    if (blk_dequeue_req(&blk_queue, (blk_req_code_t *)code, io_or_offset, block_number, count, id) == 0) {
         return 0;
     }
     // *count = temp_count;
     return 1;
 }
-
-/*
-uint8_t blk_dequeue_req_helper(uint8_t *code, uintptr_t *io_or_offset, uint32_t *block_number, uint16_t *count, uint32_t *id) {
- 
-    if (blk_dequeue_req(queue_handle, (blk_req_code_t *)code, io_or_offset, block_number, count, id) == 0) {
-        return 0;
-    }
-    return 1;
-}
-
-// Why this version does not work????
-uint8_t blk_dequeue_req_helper(uint8_t *code, uintptr_t *io_or_offset, uint32_t *block_number, uint32_t *count, uint32_t *id) {
-
-    uint16_t temp_count = 0;
-    if (blk_dequeue_req(queue_handle, (blk_req_code_t *)code, io_or_offset, block_number, &temp_count, id) == 0) {
-        return 0;
-    }
-    *count = temp_count;
-    return 1;
-}
-*/

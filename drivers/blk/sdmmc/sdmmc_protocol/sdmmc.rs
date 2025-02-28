@@ -599,7 +599,7 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
     /// - `Result<(), SdmmcError>`: `Ok(())` if tuning was successful, or an error otherwise.
     pub fn tune_performance(
         &mut self,
-        memory_and_invalidate_cache_fn: Option<(&mut [u8; 64], fn())>,
+        memory_and_invalidate_cache_fn: Option<(&mut [u8; 64], u64, fn())>,
     ) -> Result<(), SdmmcError> {
         // For testing
         let mmc_device = self.mmc_device.as_mut().ok_or(SdmmcError::ENOCARD)?;
@@ -789,13 +789,14 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
         &mut self,
         target: MmcTiming,
         memory: &mut [u8; 64],
+        memory_ioaddr: u64,
         invalidate_cache_fn: fn(),
     ) -> Result<(), SdmmcError> {
         let data: MmcData = MmcData {
             blocksize: 64,
             blockcnt: 1,
             flags: MmcDataFlag::SdmmcDataRead,
-            addr: memory.as_ptr() as u64,
+            addr: memory_ioaddr,
         };
 
         let mut resp: [u32; 4] = [0; 4];
@@ -833,13 +834,14 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
     fn sdcard_check_supported_speed_class(
         &mut self,
         memory: &mut [u8; 64],
+        memory_ioaddr: u64,
         invalidate_cache_fn: fn(),
     ) -> Result<(), SdmmcError> {
         let data: MmcData = MmcData {
             blocksize: 64,
             blockcnt: 1,
             flags: MmcDataFlag::SdmmcDataRead,
-            addr: memory.as_ptr() as u64,
+            addr: memory_ioaddr,
         };
 
         let mut resp: [u32; 4] = [0; 4];
@@ -893,7 +895,7 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
     /// Since we are using u8 here, the endianness does matter
     fn tune_sdcard_performance(
         &mut self,
-        memory_and_invalidate_cache_fn: Option<(&mut [u8; 64], fn())>,
+        memory_and_invalidate_cache_fn: Option<(&mut [u8; 64], u64, fn())>,
     ) -> Result<(), SdmmcError> {
         let mut resp: [u32; 4] = [0; 4];
 
@@ -933,7 +935,7 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
             // TODO: Change sdcard bus width here, or get rid of that field completely
         }
 
-        if let Some((memory, cache_invalidate_function)) = memory_and_invalidate_cache_fn {
+        if let Some((memory, memory_ioaddr, cache_invalidate_function)) = memory_and_invalidate_cache_fn {
             debug_log!("Checking supported speed classes\n");
             if let Some(MmcDevice::Sdcard(ref mut sdcard)) = self.mmc_device {
                 match self.mmc_ios.signal_voltage {
@@ -946,6 +948,7 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
                             // When the target speed is None, the sdcard_switch_speed update sdcard speed capability
                             self.sdcard_check_supported_speed_class(
                                 memory,
+                                memory_ioaddr,
                                 cache_invalidate_function,
                             )?;
                         }
@@ -958,6 +961,7 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
                         {
                             self.sdcard_check_supported_speed_class(
                                 memory,
+                                memory_ioaddr,
                                 cache_invalidate_function,
                             )?;
                         }
@@ -987,6 +991,7 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
                                 self.sdcard_switch_speed(
                                     MmcTiming::SdHs,
                                     memory,
+                                    memory_ioaddr,
                                     cache_invalidate_function,
                                 )?;
                                 timing = MmcTiming::SdHs;
@@ -1001,6 +1006,7 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
                                 self.sdcard_switch_speed(
                                     MmcTiming::UhsSdr104,
                                     memory,
+                                    memory_ioaddr,
                                     cache_invalidate_function,
                                 )?;
                                 timing = MmcTiming::UhsSdr104;
@@ -1015,6 +1021,7 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
                                 self.sdcard_switch_speed(
                                     MmcTiming::UhsDdr50,
                                     memory,
+                                    memory_ioaddr,
                                     cache_invalidate_function,
                                 )?;
                                 timing = MmcTiming::UhsDdr50;
@@ -1028,6 +1035,7 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
                                 self.sdcard_switch_speed(
                                     MmcTiming::UhsSdr50,
                                     memory,
+                                    memory_ioaddr,
                                     cache_invalidate_function,
                                 )?;
                                 timing = MmcTiming::UhsSdr50;
@@ -1041,6 +1049,7 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
                                 self.sdcard_switch_speed(
                                     MmcTiming::UhsSdr25,
                                     memory,
+                                    memory_ioaddr,
                                     cache_invalidate_function,
                                 )?;
                                 timing = MmcTiming::UhsSdr25;
@@ -1051,7 +1060,7 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
                     }
                 };
                 self.mmc_ios.clock = self.hardware.sdmmc_config_timing(timing)?;
-                self.process_sampling(memory.as_ptr() as u64, cache_invalidate_function)?;
+                self.process_sampling(memory_ioaddr, cache_invalidate_function)?;
 
                 debug_log!("Current frequency: {}Hz", self.mmc_ios.clock);
             } else {
