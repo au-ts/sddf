@@ -81,8 +81,7 @@ ARCH := ${shell grep 'CONFIG_SEL4_ARCH  ' $(BOARD_DIR)/include/kernel/gen_config
 
 IMAGES := blk_driver.elf client.elf blk_virt.elf
 
-CFLAGS := -mcpu=$(CPU) \
-		  -mstrict-align \
+CFLAGS := -mstrict-align \
 		  -nostdlib \
 		  -ffreestanding \
 		  -g3 \
