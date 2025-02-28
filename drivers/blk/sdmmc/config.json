@@ -1,0 +1,23 @@
+{
+    "compatible": [
+        "amlogic,meson-axg-mmc"
+    ],
+    "resources": {
+        "regions": [
+            {
+                "name": "regs",
+                "perms": "rw",
+                "dt_index": 0
+            },
+            {
+                "name": "init_data",
+                "size": 4096
+            }
+        ],
+        "irqs": [
+            {
+                "dt_index": 0
+            }
+        ]
+    }
+}
