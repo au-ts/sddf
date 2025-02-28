@@ -1,0 +1,8 @@
+[package]
+name = "sdmmc_protocol"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "sdmmc_protocol"
+path = "lib.rs"
