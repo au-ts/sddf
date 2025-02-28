@@ -120,7 +120,7 @@ const IRQ_EN_MASK: u32 = IRQ_ERR_MASK | IRQ_END_OF_CHAIN;
 
 const MESON_SDCARD_SECTOR_SIZE: u32 = 512;
 
-pub const MAX_BLOCK_PER_TRANSFER: u32 = 0x1FF;
+pub const MAX_BLOCK_PER_TRANSFER: u16 = 0x1FF;
 
 const WRITE_ADDR_UPPER: u32 = 0xFFFE0000;
 
@@ -634,7 +634,7 @@ impl SdmmcHardware for SdmmcMesonHardware {
             // TODO: Check what if the addr is u32::MAX, will the sdcard still working?
             if mmc_data.addr >= (WRITE_ADDR_UPPER as u64)
                 || mmc_data.blockcnt == 0
-                || mmc_data.blockcnt > MAX_BLOCK_PER_TRANSFER
+                || mmc_data.blockcnt > MAX_BLOCK_PER_TRANSFER as u32
             {
                 debug_log!("SDMMC: INVALID INPUT VARIABLE!");
                 return Err(SdmmcError::EINVAL);
