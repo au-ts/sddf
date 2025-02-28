@@ -79,7 +79,7 @@ MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 ARCH := ${shell grep 'CONFIG_SEL4_ARCH  ' $(BOARD_DIR)/include/kernel/gen_config.h | cut -d' ' -f4}
 
-IMAGES := client.elf blk_virt.elf
+IMAGES := blk_driver.elf client.elf blk_virt.elf
 
 CFLAGS := -mcpu=$(CPU) \
 		  -mstrict-align \
