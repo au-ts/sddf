@@ -148,7 +148,7 @@ void notified(microkit_channel ch)
 {
     if (ch == serial_config.tx.id) {
         return;
-    } else if (ch == benchmark_config.start_ch) {
+    } else if (ch == benchmark_config.rx_start_ch) {
 #if defined(MICROKIT_CONFIG_benchmark) && defined(CONFIG_ARCH_ARM)
         sel4bench_reset_counters();
         THREAD_MEMORY_RELEASE();
@@ -162,12 +162,15 @@ void notified(microkit_channel ch)
         seL4_BenchmarkResetLog();
 #endif
 #endif
-    } else if (ch == benchmark_config.stop_ch) {
+        if (!benchmark_config.last_core) {
+            microkit_notify(benchmark_config.tx_start_ch);
+        }
+    } else if (ch == benchmark_config.rx_stop_ch) {
 #if defined(MICROKIT_CONFIG_benchmark) && defined(CONFIG_ARCH_ARM)
         sel4bench_get_counters(benchmark_bf, &counter_values[0]);
         sel4bench_stop_counters(benchmark_bf);
 
-        sddf_printf("{\n");
+        sddf_printf("{CORE %u: \n", benchmark_config.core);
         for (int i = 0; i < ARRAY_SIZE(benchmarking_events); i++) {
             sddf_printf("%s: %lu\n", counter_names[i], counter_values[i]);
         }
@@ -183,6 +186,9 @@ void notified(microkit_channel ch)
         sddf_printf("KernelEntries:  %lu\n", entries);
         dump_log_summary(entries);
 #endif
+        if (!benchmark_config.last_core) {
+            microkit_notify(benchmark_config.tx_stop_ch);
+        }
     } else {
         sddf_printf("BENCH|LOG: Bench thread notified on unexpected channel %u\n", ch);
     }
