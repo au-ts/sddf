@@ -181,17 +181,12 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
         "client1_net_copier", "network_copy1.elf", priority=98, budget=20000
     )
 
-    mac_random_part = random.randint(0, 0xfe)
-    client0_mac_addr = f"52:54:01:00:00:{hex(mac_random_part)[2:]:0>2}"
-    client1_mac_addr = f"52:54:01:00:00:{hex(mac_random_part + 1)[2:]:0>2}"
-    assert client0_mac_addr != client1_mac_addr
-
     serial_system.add_client(client0)
     serial_system.add_client(client1)
     timer_system.add_client(client0)
     timer_system.add_client(client1)
-    net_system.add_client_with_copier(client0, client0_net_copier, mac_addr=client0_mac_addr)
-    net_system.add_client_with_copier(client1, client1_net_copier, mac_addr=client1_mac_addr)
+    net_system.add_client_with_copier(client0, client0_net_copier)
+    net_system.add_client_with_copier(client1, client1_net_copier)
 
     client0_lib_sddf_lwip = Sddf.Lwip(sdf, net_system, client0)
     client1_lib_sddf_lwip = Sddf.Lwip(sdf, net_system, client1)
