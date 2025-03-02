@@ -1,6 +1,6 @@
 .{
-    .name = "sddf_timer_example",
-    .version = "1.0.0",
+    .name = .sddf_timer_example,
+    .version = "0.0.0",
 
     .dependencies = .{
         .sddf = .{
@@ -10,6 +10,7 @@
     .paths = .{
         "build.zig",
         "build.zig.zon",
-    }
+    },
+    .fingerprint = 0x7ad8c3845bf479d0,
 }
 

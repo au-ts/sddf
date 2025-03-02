@@ -1,5 +1,5 @@
 .{
-    .name = "sddf",
+    .name = .sddf,
     .version = "0.0.0",
 
     .paths = .{
@@ -19,5 +19,6 @@
         "build.zig.zon",
         "LICENSE",
         "README.md"
-    }
+    },
+    .fingerprint = 0xb250d95cee7aa2e9,
 }

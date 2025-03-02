@@ -1,6 +1,6 @@
 .{
-    .name = "sddf_serial_example",
-    .version = "1.0.0",
+    .name = .sddf_serial_example,
+    .version = "0.0.0",
 
     .dependencies = .{
         .sddf = .{
@@ -10,5 +10,6 @@
     .paths = .{
         "build.zig",
         "build.zig.zon",
-    }
+    },
+    .fingerprint = 0xc011b2db3c1521be,
 }
