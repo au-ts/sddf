@@ -64,8 +64,9 @@ BOARDS: List[Board] = [
 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     serial_driver = ProtectionDomain("serial_driver", "serial_driver.elf", priority=200)
-    serial_virt_tx = ProtectionDomain("serial_virt_tx", "serial_virt_tx.elf", priority=199)
     # Increase the stack size as running with UBSAN uses more stack space than normal.
+    serial_virt_tx = ProtectionDomain("serial_virt_tx", "serial_virt_tx.elf",
+                                      priority=199, stack_size=0x2000)
     serial_virt_rx = ProtectionDomain("serial_virt_rx", "serial_virt_rx.elf",
                                       priority=199, stack_size=0x2000)
     client0 = ProtectionDomain("client0", "client0.elf", priority=1)
