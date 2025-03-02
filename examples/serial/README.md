@@ -10,13 +10,7 @@ This is an example to show multiple clients being used with a UART driver.
 
 ## Building
 
-### Make
-
-```sh
-make MICROKIT_SDK=<path/to/sdk> MICROKIT_BOARD=<board> MICROKIT_CONFIG=<debug/release/benchmark>
-```
-
-Currently the options for `MICROKIT_BOARD` are:
+The following platforms are supported:
 * odroidc2
 * odroidc4
 * imx8mm_evk
@@ -24,6 +18,12 @@ Currently the options for `MICROKIT_BOARD` are:
 * qemu_virt_aarch64
 * qemu_virt_riscv64
 * star64
+
+### Make
+
+```sh
+make MICROKIT_SDK=<path/to/sdk> MICROKIT_BOARD=<board> MICROKIT_CONFIG=<debug/release/benchmark>
+```
 
 After building, the system image to load will be `build/loader.img`.
 
