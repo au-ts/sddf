@@ -12,9 +12,6 @@
 #include <sddf/timer/config.h>
 #include "lwip/pbuf.h"
 
-#define SDDF_LIB_SDDF_LWIP_MAGIC_LEN 5
-static char SDDF_LIB_SDDF_LWIP_MAGIC[SDDF_NET_MAGIC_LEN] = { 's', 'D', 'D', 'F', 0x8 };
-
 /* Default ethernet MTU. */
 #define SDDF_LWIP_ETHER_MTU 1500
 
@@ -31,6 +28,8 @@ typedef enum {
     /* Could not resolve error. */
     SDDF_LWIP_ERR_UNHANDLED = -4
 } net_sddf_err_t;
+
+#define SDDF_LIB_SDDF_LWIP_MAGIC_LEN 5
 
 typedef struct lib_sddf_lwip_config {
     char magic[SDDF_LIB_SDDF_LWIP_MAGIC_LEN];
