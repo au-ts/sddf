@@ -84,7 +84,7 @@ pbuf_pool_t pbuf_pool_init(void *mem, size_t mem_size, size_t pbuf_count)
 {
     assert(mem != NULL);
     assert(pbuf_count != 0);
-    assert(pbuf_count == mem_size / sizeof(pbuf_custom_offset_t));
+    assert(pbuf_count <= mem_size / sizeof(pbuf_custom_offset_t));
 
     pbuf_pool_t pool = {
         .pbufs = mem,
