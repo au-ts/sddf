@@ -130,10 +130,7 @@ static void rx_return(void)
             eth_dma->rxpolldemand = POLL_DATA;
             rx.tail++;
         } else {
-            net_buff_desc_t buffer = {
-                d->addr, 
-                (d->status & DESC_RXSTS_LENMSK) >> DESC_RXSTS_LENSHFT
-            };
+            net_buff_desc_t buffer = { d->addr, (d->status & DESC_RXSTS_LENMSK) >> DESC_RXSTS_LENSHFT };
             int err = net_enqueue_active(&rx_queue, buffer);
             assert(!err);
             packets_transferred = true;
@@ -191,7 +188,7 @@ static void tx_return(void)
 
         THREAD_MEMORY_ACQUIRE();
 
-        net_buff_desc_t buffer = {d->addr, 0};
+        net_buff_desc_t buffer = { d->addr, 0 };
         int err = net_enqueue_free(&tx_queue, buffer);
         assert(!err);
         enqueued = true;

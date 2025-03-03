@@ -63,7 +63,8 @@ static inline bool hw_ring_empty(hw_ring_t *ring)
     return ring->tail - ring->head == 0;
 }
 
-static void update_ring_slot(hw_ring_t *ring, unsigned int idx, uint32_t addr_low, uint32_t addr_high, uint32_t cntl, uint32_t stat)
+static void update_ring_slot(hw_ring_t *ring, unsigned int idx, uint32_t addr_low, uint32_t addr_high, uint32_t cntl,
+                             uint32_t stat)
 {
     volatile struct descriptor *d = &(ring->descr[idx]);
     d->addr_low = addr_low;
@@ -86,8 +87,7 @@ static void rx_provide()
             assert(!err);
 
             uint32_t idx = rx.tail % rx.capacity;
-            update_ring_slot(&rx, idx, buffer.io_or_offset,
-                             buffer.io_or_offset >> 32, 0,
+            update_ring_slot(&rx, idx, buffer.io_or_offset, buffer.io_or_offset >> 32, 0,
                              DESC_RXSTS_OWNBYDMA | DESC_RXSTS_BUFFER1_ADDR_VALID | DESC_RXSTS_IOC);
             /* We will update the hardware register that stores the tail address. This tells
             the device that we have new descriptors to use. */
@@ -131,10 +131,7 @@ static void rx_return(void)
             rx.tail++;
         } else {
             /* Read 0-14 bits to get length of received packet, manual pg 4081, table 11-152, RDES3 Normal Descriptor */
-            net_buff_desc_t buffer = {
-                (uint64_t)d->addr_low | ((uint64_t d->addr_high) << 32),
-                d->stat & 0x7FFF
-            };
+            net_buff_desc_t buffer = { (uint64_t)d->addr_low | ((uint64_t d->addr_high) << 32), d->stat & 0x7FFF };
             int err = net_enqueue_active(&rx_queue, buffer);
             assert(!err);
             packets_transferred = true;
@@ -165,7 +162,7 @@ static void tx_provide(void)
             // For normal transmit descriptors, we need to give ownership to DMA, as well as indicate
             // that this is the first and last parts of the current packet.
             uint32_t stat = (DESC_TXSTS_OWNBYDMA | DESC_TXCTRL_TXFIRST | DESC_TXCTRL_TXLAST | DESC_TXCTRL_TXCIC
-                              | buffer.len);
+                             | buffer.len);
 
             update_ring_slot(&tx, idx, buffer.io_or_offset & 0xffffffff, buffer.io_or_offset >> 32, cntl, stat);
 
@@ -199,10 +196,7 @@ static void tx_return(void)
         }
         THREAD_MEMORY_ACQUIRE();
 
-        net_buff_desc_t buffer = {
-            (uint64_t)d->addr_low | ((uint64_t d->addr_high) << 32),
-            0
-        };
+        net_buff_desc_t buffer = { (uint64_t)d->addr_low | ((uint64_t d->addr_high) << 32), 0 };
         int err = net_enqueue_free(&tx_queue, buffer);
         assert(!err);
         enqueued = true;
