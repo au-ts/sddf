@@ -307,6 +307,7 @@ void init(void)
     pkt_waiting_queue.head = NULL;
     pkt_waiting_queue.tail = NULL;
 
+    llinit(&pkt_waiting_queue);
     // routing_table[0].network_id = 0;
     // routing_table[0].subnet_mask = 0xFFFFFF00;
     // routing_table[0].next_hop = 0;
