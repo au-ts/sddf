@@ -12,12 +12,14 @@ const DriverClass = struct {
         imx,
         snps,
         virtio,
+        zynqmp,
     };
 
     const Timer = enum {
         arm,
-        meson,
+        cdns,
         imx,
+        meson,
         jh7110,
         goldfish
     };
