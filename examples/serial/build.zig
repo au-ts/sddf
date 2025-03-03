@@ -14,6 +14,7 @@ const MicrokitBoard = enum {
     qemu_virt_aarch64,
     qemu_virt_riscv64,
     star64,
+    zcu102,
 };
 
 const Target = struct {
@@ -89,6 +90,16 @@ const targets = [_]Target{
             .os_tag = .freestanding,
             .abi = .none,
         }
+    },
+    .{
+        .board = MicrokitBoard.zcu102,
+        .zig_target = std.Target.Query{
+            .cpu_arch = .aarch64,
+            .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a53 },
+            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{ .strict_align }),
+            .os_tag = .freestanding,
+            .abi = .none,
+        },
     },
 };
 
@@ -169,6 +180,7 @@ pub fn build(b: *std.Build) !void {
         .maaxboard, .imx8mm_evk => "imx",
         .star64 => "snps",
         .qemu_virt_riscv64 => "virtio",
+        .zcu102 => "zynqmp",
     };
 
     const driver = sddf_dep.artifact(b.fmt("driver_serial_{s}.elf", .{ driver_class }));
