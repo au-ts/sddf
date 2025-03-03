@@ -219,7 +219,7 @@ serial() {
 }
 
 blk() {
-    BOARDS=("qemu_virt_aarch64" "qemu_virt_riscv64" "maaxboard")
+    BOARDS=("qemu_virt_aarch64" "qemu_virt_riscv64" "maaxboard" "odroidc4")
     CONFIGS=("debug" "release")
     for BOARD in "${BOARDS[@]}"
     do
