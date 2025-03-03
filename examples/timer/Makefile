@@ -29,6 +29,10 @@ else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
 else ifeq ($(strip $(MICROKIT_BOARD)), star64)
 	export ARCH := riscv64
 	export TIMER_DRIVER_DIR := jh7110
+else ifeq ($(strip $(MICROKIT_BOARD)), zcu102)
+	export ARCH := aarch64
+	export TIMER_DRIVER_DIR := cdns
+	export CPU := cortex-a53
 else ifneq ($(filter $(strip $(MICROKIT_BOARD)),imx8mm_evk imx8mp_evk imx8mq_evk maaxboard),)
 	export ARCH := aarch64
 	export TIMER_DRIVER_DIR := imx
