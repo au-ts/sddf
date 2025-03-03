@@ -98,7 +98,7 @@ $(foreach f,$(LIB_SDDF_LWIP_LWIP_FILES), \
 	$(eval \
 		lib_sddf_lwip_out%/$(f:.c=.o): $(SDDF)/network/ipstacks/lwip/src/$(f) ; \
 			mkdir -p $$(dir $$@); \
-			$$(CC) $$(CFLAGS) $$(LIB_SDDF_LWIP_CFLAGS$*) -I$$(SDDF)/network/ipstacks/lwip/src/include -c -o $$@ $$< \
+			$$(CC) $$(CFLAGS) $$(LIB_SDDF_LWIP_CFLAGS$$*) -I$$(SDDF)/network/ipstacks/lwip/src/include -c -o $$@ $$< \
 	) \
 )
 
