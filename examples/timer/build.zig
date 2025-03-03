@@ -15,6 +15,7 @@ const MicrokitBoard = enum {
     imx8mm_evk,
     imx8mp_evk,
     imx8mq_evk,
+    zcu102,
 };
 
 const Target = struct {
@@ -121,6 +122,16 @@ const targets = [_]Target{
             .abi = .none,
         },
     },
+    .{
+        .board = MicrokitBoard.zcu102,
+        .zig_target = std.Target.Query{
+            .cpu_arch = .aarch64,
+            .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a53 },
+            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{ .strict_align }),
+            .os_tag = .freestanding,
+            .abi = .none,
+        },
+    },
 };
 
 fn findTarget(board: MicrokitBoard) std.Target.Query {
@@ -197,6 +208,7 @@ pub fn build(b: *std.Build) !void {
         .odroidc2, .odroidc4 => "meson",
         .star64 => "jh7110",
         .maaxboard, .imx8mm_evk, .imx8mp_evk, .imx8mq_evk => "imx",
+        .zcu102 => "cdns",
     };
 
     const driver = sddf_dep.artifact(b.fmt("driver_timer_{s}.elf", .{ driver_class }));
