@@ -78,7 +78,7 @@ static int arp_reply(const uint8_t ethsrc_addr[ETH_HWADDR_LEN],
                      const uint8_t hwdst_addr[ETH_HWADDR_LEN], const uint32_t ipdst_addr)
 {
     if (net_queue_empty_free(&tx_queue)) {
-        sddf_dprintf("PROXY_ARP|LOG: Transmit free queue empty or transmit active queue full. Dropping reply\n");
+        sddf_dprintf("ARP_RESPONDER|LOG: Transmit free queue empty or transmit active queue full. Dropping reply\n");
         return -1;
     }
 
@@ -160,7 +160,6 @@ void receive(void)
 
 void init(void)
 {
-    microkit_dbg_puts("We are initialising our proxy arp component!\n");
     assert(net_config_check_magic((void *)&net_config));
     // @kwinter: For some reason we can't find the following functions.
     // Probably linking with the debug version of libsddf_util.a
@@ -192,6 +191,6 @@ void notified(microkit_channel ch)
     if (ch == net_config.rx.id) {
         receive();
     } else {
-        sddf_dprintf("PROXY|ARP: Received notification on invalid channel: %d!\n", ch);
+        sddf_dprintf("ARP_RESPONDER: Received notification on invalid channel: %d!\n", ch);
     }
 }
