@@ -36,7 +36,6 @@ void filter(void)
     bool transmitted = false;
     bool reprocess = true;
     while (reprocess) {
-        // @kwinter: Why is the rx queue immediately filled?
         while (!net_queue_empty_active(&rx_queue) && !net_queue_empty_free(&tx_queue)) {
             net_buff_desc_t rx_buffer;
             int err = net_dequeue_active(&rx_queue, &rx_buffer);

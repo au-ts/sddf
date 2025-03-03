@@ -89,7 +89,7 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
 	$(OBJCOPY) --update-section .net_client_config=net_ethernet_driver_dwmac_client_arp_responder.data arp_responder.elf
 	$(OBJCOPY) --update-section .arp_resources=arp_responder.data arp_responder.elf
-	$(OBJCOPY) --update-section .net2_client_config=net_ethernet_driver_client_routing.data routing.elf
+	$(OBJCOPY) --update-section .net_client_config=net_ethernet_driver_client_routing.data routing.elf
 	$(OBJCOPY) --update-section .router_config=router.data routing.elf
 	$(OBJCOPY) --update-section .net_client_config=net_ethernet_driver_client_arp_requester.data arp_requester.elf
 	$(OBJCOPY) --update-section .arp_resources=arp_requester.data arp_requester.elf

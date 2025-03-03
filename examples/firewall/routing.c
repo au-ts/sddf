@@ -23,9 +23,10 @@
 #include "firewall_arp.h"
 #include "hashmap.h"
 #include "config.h"
+#include "linkedlist.h"
 
 __attribute__((__section__(".router_config"))) router_config_t router_config;
-// Net2_client config will be for the tx out of NIC2
+
 __attribute__((__section__(".net_client_config"))) net_client_config_t net_config;
 
 hashtable_t *arp_table;
@@ -43,20 +44,49 @@ typedef struct state {
 
 state_t state;
 
+struct ll_info pkt_waiting_queue;
+
 /* This queue will hold packets that we need to generate an ARP request for. */
 net_queue_handle_t arp_waiting;
 /* This queue will hold all the ARP requests/responses that are needed by the
 packets in the arp_waiting queue. */
 arp_queue_handle_t *arp_queries;
 
-/* @kwinter: For now, we are just going to have one packet waiting on an ARP reply for this
-    PoC. */
-routing_queue_node_t waiting_packet = {0};
-
 dev_info_t *device_info;
 
-// @kwinter: Want a better way of doing this process. We seem to be doing alot of duplicate
-// work.
+void *ll_node_find(struct ll_info *info, uint32_t ip)
+{
+    // Loop through the waiting list
+    struct llnode_ptrs *curr = LLNODE_PTRS_CAST(info->head);
+    while (curr != NULL) {
+        // Cast to llnode_pkt_waiting
+        struct llnode_pkt_waiting *curr_node = (struct llnode_pkt_waiting *) curr;
+        if (curr_node->ip == ip) {
+            return (void *) curr;
+        }
+        curr = LLNODE_PTRS_CAST(curr->next);
+    }
+
+    return NULL;
+}
+
+/* Check if there is a packet with this IP address already waiting on an ARP reply. */
+bool check_waiting(struct ll_info *info, uint32_t ip)
+{
+    // Loop through the waiting list
+    struct llnode_ptrs *curr = LLNODE_PTRS_CAST(info->head);
+    while (curr != NULL) {
+        // Cast to llnode_pkt_waiting
+        struct llnode_pkt_waiting *curr_node = (struct llnode_pkt_waiting *) curr;
+        if (curr_node->ip == ip) {
+            return true;
+        }
+        curr = LLNODE_PTRS_CAST(curr->next);
+    }
+
+    return false;
+}
+
 void process_arp_waiting()
 {
     /* Loop through all of the ARP responses. If there are any invalid
@@ -67,19 +97,18 @@ void process_arp_waiting()
         arp_request_t response;
         int err = arp_dequeue_response(arp_queries, &response);
         /* Check that we actually have a packet waiting. */
-        if (!waiting_packet.valid) {
-            continue;
-        }
 
-        if (!response.valid && waiting_packet.valid) {
+        struct llnode_pkt_waiting *waiting_packet = (struct llnode_pkt_waiting *) ll_node_find(&pkt_waiting_queue, response.ip_addr);
+
+        if (!response.valid && waiting_packet->valid) {
             // Find all packets with this IP address and drop them.
             // Check if the IP in this packet matches response.
-            waiting_packet.buffer.len = 0;
-            err = net_enqueue_free(&state.filter_queue[waiting_packet.filter], waiting_packet.buffer);
+            waiting_packet->buffer.len = 0;
+            err = net_enqueue_free(&state.filter_queue[waiting_packet->filter], waiting_packet->buffer);
             assert(!err);
         } else {
-            if (response.ip_addr == waiting_packet.ip) {
-                struct ipv4_packet *pkt = (struct ipv4_packet *)(router_config.filters[waiting_packet.filter].data.vaddr + waiting_packet.buffer.io_or_offset);
+            if (response.ip_addr == waiting_packet->ip) {
+                struct ipv4_packet *pkt = (struct ipv4_packet *)(router_config.filters[waiting_packet->filter].data.vaddr + waiting_packet->buffer.io_or_offset);
                 sddf_memcpy(pkt->ethdst_addr, response.mac_addr, ETH_HWADDR_LEN);
                 sddf_memcpy(pkt->ethsrc_addr, device_info->mac, ETH_HWADDR_LEN);
                 net_buff_desc_t buffer_tx;
@@ -89,16 +118,18 @@ void process_arp_waiting()
 
                 // @kwinter: For now we are memcpy'ing the packet from our receive buffer
                 // to the transmit buffer.
-                sddf_memcpy((net_config.tx_data.vaddr + buffer_tx.io_or_offset), (router_config.filters[waiting_packet.filter].data.vaddr + waiting_packet.buffer.io_or_offset), waiting_packet.buffer.len);
-                buffer_tx.len = waiting_packet.buffer.len;
+                sddf_memcpy((net_config.tx_data.vaddr + buffer_tx.io_or_offset), (router_config.filters[waiting_packet->filter].data.vaddr + waiting_packet->buffer.io_or_offset), waiting_packet->buffer.len);
+                buffer_tx.len = waiting_packet->buffer.len;
                 err = net_enqueue_active(&virt_tx_queue, buffer_tx);
                 assert(!err);
-                waiting_packet.buffer.len = 0;
-                err = net_enqueue_free(&state.filter_queue[waiting_packet.filter], waiting_packet.buffer);
+                waiting_packet->buffer.len = 0;
+                err = net_enqueue_free(&state.filter_queue[waiting_packet->filter], waiting_packet->buffer);
                 assert(!err);
                 microkit_deferred_notify(net_config.tx.id);
             }
         }
+
+        llfree(&pkt_waiting_queue, (void *)waiting_packet);
     }
 
 }
@@ -117,6 +148,8 @@ uint32_t find_route(uint32_t ip)
     // If we have gotten here, assume on the default gateway.
     return 0;
 }
+
+
 
 void route()
 {
@@ -156,16 +189,14 @@ void route()
                     uint8_t mac[ETH_HWADDR_LEN];
                     arp_entry_t hash_entry;
                     int ret = hashtable_search(arp_table, (uint32_t) nextIP, &hash_entry);
-                    if (ret == -1 && waiting_packet.valid == false) {
-                        hashtable_empty(arp_table);
+                    if (ret == -1 && !llfull(&pkt_waiting_queue)) {
                         /* In this case, the IP address is not in the ARP Tables.
                         *  We add an entry to the ARP request queue. This is where we
                         *  place the responses to the ARP requests, and if we get a
                         *  timeout, we will then drop the packets associated with that IP address
                         *  that are waiting in the queue.
                         */
-
-                        if (!arp_queue_full_request(arp_queries)) {
+                        if (!arp_queue_full_request(arp_queries) && !check_waiting(&pkt_waiting_queue, destIP)) {
                                 arp_request_t request = {0};
                                 request.ip_addr = nextIP;
                                 request.valid = true;
@@ -182,12 +213,14 @@ void route()
                                 continue;
                         }
 
-                        // Add this packet to the ARP waiting node.
-                        waiting_packet.ip = nextIP;
-                        sddf_memcpy(&waiting_packet.buffer, &buffer, sizeof(net_buff_desc_t));
-                        waiting_packet.buffer = buffer;
-                        waiting_packet.valid = true;
-                        waiting_packet.filter = filter;
+                        // Add this packet to the ARP waiting queue
+                        struct llnode_pkt_waiting *waiting_packet = (struct llnode_pkt_waiting *) llalloc(&pkt_waiting_queue);
+                        waiting_packet->ip = nextIP;
+                        sddf_memcpy(&waiting_packet->buffer, &buffer, sizeof(net_buff_desc_t));
+                        waiting_packet->buffer = buffer;
+                        waiting_packet->valid = true;
+                        waiting_packet->filter = filter;
+                        llpush(&pkt_waiting_queue, (void *)waiting_packet);
                         microkit_deferred_notify(router_config.router.id);
                         continue;
                     } else {
@@ -264,6 +297,14 @@ void init(void)
     arp_handle_init(arp_queries, 256);
 
     device_info = (dev_info_t *) net_config.dev_info.vaddr;
+
+    // Init the waiting queue from a pool of memory
+    pkt_waiting_queue.llnode_pool = (uint8_t *) router_config.packet_queue.vaddr;
+    pkt_waiting_queue.pool_size = 10;
+    pkt_waiting_queue.node_size = sizeof(struct llnode_pkt_waiting);
+    pkt_waiting_queue.empty_head = NULL;
+    pkt_waiting_queue.head = NULL;
+    pkt_waiting_queue.tail = NULL;
 
     // routing_table[0].network_id = 0;
     // routing_table[0].subnet_mask = 0xFFFFFF00;

@@ -55,6 +55,7 @@ typedef struct arp_responder_config {
 
 typedef struct router_config {
     char magic[LIONS_FIREWALL_MAGIC_LEN];
+    region_resource_t packet_queue;
     arp_router_connection_resource_t router;
     uint8_t mac_addr[ETH_HWADDR_LEN];
     firewall_filter_info_t filters[LIONSOS_FIREWALL_MAX_FILTERS];

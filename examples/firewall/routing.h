@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include "linkedlist.h"
 
 #define NUM_ROUTES 10
 
@@ -16,9 +17,13 @@ typedef struct routing_entry {
 } routing_entry_t;
 
 // Queue implementation for packets waiting in the router for ARP responses.
-typedef struct routing_queue_node {
+typedef struct llnode_pkt_waiting {
+    /* First two nodes of the ll implementation must be next and prev.s */
+    void *next;
+    void *prev;
+
     uint32_t ip;
     bool valid;
     net_buff_desc_t buffer;
     uint16_t filter;
-} routing_queue_node_t;
+};
