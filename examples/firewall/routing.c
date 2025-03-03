@@ -171,7 +171,7 @@ void route()
                 * NOTE: We assume that if we get a packet other than an IPv4 packet, we drop.buffer
                 * This edge case should be handled by a new protocol virtualiser.
                 */
-                if (pkt->ttl > 1 && pkt->type == ETH_TYPE_IP) {
+                if (pkt->ttl > 1 && pkt->type == HTONS(ETH_TYPE_IP)) {
                     pkt->ttl -= 1;
                     // This is where we will swap out the MAC address with the appropriate address
                     uint32_t destIP = pkt->dst_ip;
@@ -250,12 +250,13 @@ void route()
                     err = net_enqueue_free(&state.filter_queue[filter], buffer);
                     assert(!err);
 
-                } else if (pkt->ttl <= 1) {
-                    // @kwinter: TODO - drop packet.
-                    sddf_dprintf("Time to live has expired for this packet!\n");
-                } else {
-                    sddf_dprintf("ROUTING|We got the worng kind of packet\n");
                 }
+                // else if (pkt->ttl <= 1) {
+                //     // @kwinter: TODO - drop packet.
+                //     sddf_dprintf("Time to live has expired for this packet!\n");
+                // } else {
+                //     sddf_dprintf("ROUTING|We got the worng kind of packet\n");
+                // }
             }
 
             net_request_signal_active(&state.filter_queue[filter]);

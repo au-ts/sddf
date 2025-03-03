@@ -83,6 +83,8 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     firewall = LionsOs.Firewall(sdf, net_system, net_system2, routing, arp_responder, arp_requester)
 
     icmp_filter = ProtectionDomain("icmp_filter", "icmp_filter.elf", priority=96, budget=20000)
+    udp_filter = ProtectionDomain("udp_filter", "udp_filter.elf", priority=96, budget=20000)
+    tcp_filter = ProtectionDomain("tcp_filter", "tcp_filter.elf", priority=96, budget=20000)
 
     # @kwinter: These need to be added to second net_system
     serial_system.add_client(routing)
@@ -102,6 +104,8 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
         net_virt_rx1,
         routing,
         icmp_filter,
+        udp_filter,
+        tcp_filter,
         arp_responder,
         arp_requester,
         timer_driver,
@@ -115,6 +119,8 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     # Router MAC addr (soon to be deprecated), ip of NIC1, ip of NIC2
     assert firewall.connect(router_mac_addr, 3338669322, 2205888)
     firewall.add_filter(icmp_filter, 0x01)
+    firewall.add_filter(udp_filter, 0x11)
+    firewall.add_filter(tcp_filter, 0x06)
     assert firewall.serialise_config(output_dir)
     assert serial_system.connect()
     assert serial_system.serialise_config(output_dir)

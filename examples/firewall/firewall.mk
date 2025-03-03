@@ -34,7 +34,7 @@ IMAGES := eth_driver.elf network_virt_rx.elf network_virt_tx.elf network_copy.el
 		  eth_driver_dwmac.elf network_virt_rx_1.elf network_virt_tx_1.elf \
 		  timer_driver.elf uart_driver.elf serial_virt_tx.elf \
 		  arp_requester.elf arp_responder.elf routing.elf \
-		  icmp_filter.elf
+		  icmp_filter.elf udp_filter.elf tcp_filter.elf
 
 CFLAGS := -mcpu=$(CPU) \
 	  -mstrict-align \
@@ -94,6 +94,12 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 
 	$(OBJCOPY) --update-section .filter_config=firewall_filter_icmp_filter.data icmp_filter.elf
 	$(OBJCOPY) --update-section .net_client_config=net_ethernet_driver_dwmac_client_icmp_filter.data icmp_filter.elf
+
+	$(OBJCOPY) --update-section .filter_config=firewall_filter_udp_filter.data udp_filter.elf
+	$(OBJCOPY) --update-section .net_client_config=net_ethernet_driver_dwmac_client_udp_filter.data udp_filter.elf
+
+	$(OBJCOPY) --update-section .filter_config=firewall_filter_tcp_filter.data tcp_filter.elf
+	$(OBJCOPY) --update-section .net_client_config=net_ethernet_driver_dwmac_client_tcp_filter.data tcp_filter.elf
 
 ${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
