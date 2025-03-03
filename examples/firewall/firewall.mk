@@ -44,9 +44,7 @@ CFLAGS := -mcpu=$(CPU) \
 	  -DMICROKIT_CONFIG_$(MICROKIT_CONFIG) \
 	  -I$(BOARD_DIR)/include \
 	  -I$(SDDF)/include \
-	  -I${FIREWALL_INCLUDE}/lwip \
-	  -I${SDDF}/$(LWIPDIR)/include \
-	  -I${SDDF}/$(LWIPDIR)/include/ipv4 \
+	  -I${FIREWALL}/include \
 	  -MD \
 	  -MP
 
