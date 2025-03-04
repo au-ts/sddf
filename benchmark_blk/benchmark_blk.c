@@ -314,7 +314,7 @@ void notified(microkit_channel ch) {
     case START:
 #if defined(MICROKIT_CONFIG_benchmark) && !defined(VALIDATE_IO_OPERATIONS)
         /* sample the clock cycles, to later get a total amount of cycles spent during a benchmark */
-        ccounter_benchmark_start = sel4bench_get_cycle_count();
+        SEL4BENCH_READ_CCNT(ccounter_benchmark_start);
         timer_start = sddf_timer_time_now(TIMER_CH);
         sel4bench_reset_counters();
         THREAD_MEMORY_RELEASE();
@@ -332,7 +332,7 @@ void notified(microkit_channel ch) {
     case STOP:
 #if defined(MICROKIT_CONFIG_benchmark) && !defined(VALIDATE_IO_OPERATIONS)
         timer_end = sddf_timer_time_now(TIMER_CH);
-        ccounter_benchmark_stop = sel4bench_get_cycle_count();
+        SEL4BENCH_READ_CCNT(ccounter_benchmark_stop);
         sel4bench_get_counters(benchmark_bf, &counter_values[0]);
         sel4bench_stop_counters(benchmark_bf);
         uint64_t cycles_PD_TOTAL = 0;

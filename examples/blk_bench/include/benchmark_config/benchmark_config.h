@@ -18,8 +18,7 @@
 
 // TODO: add defines for default clock speed for odroid c4's CPU, to compute throughput in terms of time
 // in MHz
-//#define ODROID_CPU_CLKFREQ_MHZ 1200
-#define ODROID_CPU_CLKFREQ_MHZ 1000
+#define ODROID_CPU_CLKFREQ_MHZ 1200
 
 // benchmark runs
 enum run_benchmark_state {
