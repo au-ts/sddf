@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Copyright 2025, UNSW
+    SPDX-License-Identifier: BSD-2-Clause
+-->
+<system>
+    <memory_region name="uart" size="0x1_000" phys_addr="0x30860000" />
+    <memory_region name="timer"  size="0x10_000" phys_addr="0x302d_0000" />
+    <memory_region name="usdhc1" size="0x10_000" phys_addr="0x30b4_0000" />
+
+    <!-- sDDF Block -->
+    <memory_region name="blk_driver_storage_info" size="0x1000"   page_size="0x1000"   />
+    <memory_region name="blk_driver_req"          size="0x200_000" page_size="0x200_000" />
+    <memory_region name="blk_driver_resp"         size="0x200_000" page_size="0x200_000" />
+    <memory_region name="blk_driver_data"         size="0xa00_000" page_size="0x200_000" />
+
+    <memory_region name="blk_client_storage_info" size="0x1000"   page_size="0x1000"   />
+    <memory_region name="blk_client_req"          size="0x200_000" page_size="0x200_000" />
+    <memory_region name="blk_client_resp"         size="0x200_000" page_size="0x200_000" />
+    <memory_region name="blk_client_data"         size="0xa00_000" page_size="0x200_000" />
+
+    <!-- shared memory for serial data regions (printing to serial console, benchmark build)  -->
+    <memory_region name="serial_tx_data_driver" size="0x18_000" />
+    <!-- <memory_region name="serial_tx_data_blkvirt" size="0x2_000" /> -->
+    <memory_region name="serial_tx_data_client0" size="0xc_000" />
+    <memory_region name="serial_tx_data_bench" size="0xc_000" />
+
+    <!-- shared memory for serial queue regions -->
+    <memory_region name="serial_tx_queue_driver" size="0x1_000" />
+    <!-- <memory_region name="serial_tx_queue_blkvirt" size="0x1_000" /> -->
+    <memory_region name="serial_tx_queue_client0" size="0x1_000" />
+    <memory_region name="serial_tx_queue_bench" size="0x1_000" />
+
+    <!-- shared memory for PMU counters (used by idle.elf) -->
+    <memory_region name="cyclecounters" size="0x1000" />
+
+    <protection_domain name="bench" priority="103" >
+        <program_image path="benchmark_blk.elf" />
+
+        <map mr="serial_tx_queue_bench" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="serial_tx_queue" />
+        <map mr="serial_tx_data_bench" vaddr="0x4_002_000" perms="rw" cached="true" setvar_vaddr="serial_tx_data" />
+
+        <!-- The timer driver should run at higher priority than its clients.
+            As a passive server, PPC into the driver will be fastpathed. -->
+        <protection_domain name="timer" priority="254" pp="true" passive="true" id="7">
+            <program_image path="timer_driver.elf" />
+            <map mr="timer" vaddr="0x2_000_000" perms="rw" cached="false" setvar_vaddr="gpt_regs" />
+            <irq irq="87" id="0" />
+        </protection_domain>
+
+        <protection_domain name="benchIdle" priority="1" id="6" >
+            <program_image path="idle.elf" />
+            <map mr="cyclecounters" vaddr="0x5_010_000" perms="rw" cached="true" setvar_vaddr="cyclecounters_vaddr" />
+        </protection_domain>
+        <protection_domain name="driver" priority="102" id="1" >
+            <program_image path="mmc_driver.elf" />
+            <map mr="usdhc1" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="usdhc_regs" />
+            <irq irq="54" id="1"  />
+
+            <!-- sDDF block -->
+            <map mr="blk_driver_storage_info" vaddr="0x40000000" perms="rw" cached="false" setvar_vaddr="blk_storage_info" />
+            <map mr="blk_driver_req"          vaddr="0x40200000" perms="rw" cached="false" setvar_vaddr="blk_req_queue"    />
+            <map mr="blk_driver_resp"         vaddr="0x40400000" perms="rw" cached="false" setvar_vaddr="blk_resp_queue"   />
+        </protection_domain>
+
+        <protection_domain name="uart" priority="254" id="4" >
+            <program_image path="uart_driver.elf" />
+
+            <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
+            <map mr="serial_tx_queue_driver" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="tx_queue" />
+
+            <map mr="serial_tx_data_driver" vaddr="0x4_004_000" perms="rw" cached="true" setvar_vaddr="tx_data" />
+
+            <irq irq="58" id="0" /> <!-- UART interrupt -->
+        </protection_domain>
+
+        <protection_domain name="serial_virt_tx" priority="253" id="5">
+            <program_image path="serial_virt_tx.elf" />
+            <map mr="serial_tx_queue_driver" vaddr="0x4_000_000" perms="rw" cached="true" setvar_vaddr="tx_queue_drv" />
+            <map mr="serial_tx_queue_client0" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="tx_queue_cli0" />
+            <!-- serial_tx_queue_bench is client1 in this case -->
+            <map mr="serial_tx_queue_bench" vaddr="0x4_002_000" perms="rw" cached="true"/>
+
+            <map mr="serial_tx_data_driver" vaddr="0x4_003_000" perms="rw" cached="true" setvar_vaddr="tx_data_drv" />
+            <map mr="serial_tx_data_client0" vaddr="0x4_01b_000" perms="r" cached="true" setvar_vaddr="tx_data_cli0" />
+            <!-- serial_tx_data_bench is client1 in this case -->
+            <map mr="serial_tx_data_bench" vaddr="0x4_027_000" perms="r" cached="true"/>
+        </protection_domain>
+
+        <protection_domain name="blk_virt" priority="100" id="2">
+            <program_image path="blk_virt.elf" />
+            <!-- XXX: Should this be cached or not??????? Its cached for odroidc4 SDF -->
+
+            <map mr="blk_driver_storage_info" vaddr="0x40000000" perms="rw" cached="false" setvar_vaddr="blk_driver_storage_info" />
+            <map mr="blk_driver_req"          vaddr="0x40200000" perms="rw" cached="false" setvar_vaddr="blk_driver_req_queue"    />
+            <map mr="blk_driver_resp"         vaddr="0x40400000" perms="rw" cached="false" setvar_vaddr="blk_driver_resp_queue"   />
+            <map mr="blk_driver_data"         vaddr="0x40600000" perms="rw" cached="false" setvar_vaddr="blk_driver_data"         />
+            <setvar symbol="blk_data_paddr_driver" region_paddr="blk_driver_data" />
+
+            <map mr="blk_client_storage_info" vaddr="0x30000000" perms="rw" cached="false" setvar_vaddr="blk_client_storage_info" />
+            <map mr="blk_client_req"          vaddr="0x30200000" perms="rw" cached="false" setvar_vaddr="blk_client_req_queue"    />
+            <map mr="blk_client_resp"         vaddr="0x30400000" perms="rw" cached="false" setvar_vaddr="blk_client_resp_queue"   />
+            <map mr="blk_client_data"         vaddr="0x30600000" perms="rw" cached="false" setvar_vaddr="blk_client_data"         />
+            <setvar symbol="blk_client0_data_paddr" region_paddr="blk_client_data" />
+        </protection_domain>
+
+        <protection_domain name="client" priority="98" id="3" >
+            <program_image path="client.elf" />
+
+            <!-- sDDF Block -->
+            <map mr="blk_client_storage_info" vaddr="0x30000000" perms="rw" cached="false" setvar_vaddr="blk_storage_info" />
+            <map mr="blk_client_req"          vaddr="0x30200000" perms="rw" cached="false" setvar_vaddr="blk_request"    />
+            <map mr="blk_client_resp"         vaddr="0x30400000" perms="rw" cached="false" setvar_vaddr="blk_response"   />
+            <map mr="blk_client_data"         vaddr="0x30600000" perms="rw" cached="false" setvar_vaddr="blk_data"         />
+
+            <!-- for printing to serial console, benchmark build -->
+            <map mr="serial_tx_queue_client0" vaddr="0x40_A00_000" perms="rw" cached="true" setvar_vaddr="serial_tx_queue" />
+            <map mr="serial_tx_data_client0" vaddr="0x40_A01_000" perms="rw" cached="true" setvar_vaddr="serial_tx_data" />
+        </protection_domain>
+    </protection_domain>
+
+
+    <channel>
+        <end pd="timer"      id="1" />
+        <end pd="driver" id="2" />
+    </channel>
+    <channel>
+        <end pd="client"     id="0" />
+        <end pd="blk_virt"   id="1" />
+    </channel>
+
+    <channel>
+        <end pd="driver" id="0" />
+        <end pd="blk_virt"   id="0" />
+    </channel>
+
+    <!-- serial uart channels -->
+    <channel>
+        <end pd="uart" id="1"/>
+        <end pd="serial_virt_tx" id="0"/>
+    </channel>
+
+    <channel>
+        <end pd="serial_virt_tx" id="1"/>
+        <end pd="client" id="1"/>
+    </channel>
+
+   <channel>
+        <end pd="serial_virt_tx" id="2"/>
+        <end pd="bench" id="0"/>
+    </channel>
+    <!-- end of serial uart channels -->
+    <channel>
+        <end pd="client" id="2" /> <!-- start PMU channel -->
+        <end pd="bench" id="1" />
+    </channel>
+
+    <channel>
+        <end pd="client" id="3" /> <!-- stop PMU channel -->
+        <end pd="bench" id="2" />
+    </channel>
+    <channel>
+        <end pd="client" id="4" /> <!-- Benchmark run start channel -->
+        <end pd="bench" id="3" />
+    </channel>
+
+    <channel>
+        <end pd="timer" id="2" />
+        <end pd="bench" id="4" />
+    </channel>
+
+    <channel>
+        <end pd="timer" id="3" />
+        <end pd="client" id="5" />
+    </channel>
+
+    <channel>
+        <end pd="benchIdle" id="3" />
+        <end pd="bench" id="5" />
+    </channel>
+
+</system>

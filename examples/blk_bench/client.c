@@ -142,10 +142,10 @@ void handle_random_operations_run(blk_req_code_t request_code, const uint32_t* r
 /* tracks if dummy data for writing to block device is populated in shared memory region */
 bool dummy_write_data_populated = false;
 bool run_benchmark() {
-    LOG_CLIENT("blk storage ready: %d\n", blk_storage_is_ready(blk_storage_info));
      if(!blk_storage_is_ready(blk_storage_info)) {
          /* If SD card is switched off (power cycle) - turn it back on and wait for it to be ready */
-         LOG_CLIENT("SD card was off at benchmark start, turning back on.");
+#if defined(MICROKIT_BOARD_odroidc4)
+        LOG_CLIENT("SD card was off at benchmark start, turning back on.\n");
         int err = blk_enqueue_req(&blk_queue, BLK_REQ_SD_ON, 0, 0, 0, 0);
         assert(!err);
         microkit_notify(VIRT_CH);
@@ -154,6 +154,11 @@ bool run_benchmark() {
         sddf_timer_set_timeout(TIMER_CH, 1e7);
         //while(!blk_storage_is_ready(blk_storage_info));
         return false;
+#elif defined(MICROKIT_BOARD_maaxboard)
+        panic("SD card off/not ready but power cycling not implemented for Maaxboard!\n");
+#else
+        panic("SD card off/not ready but power cycling not implemented for current board\n");
+#endif
      }
     switch(run_benchmark_state) {
         case START_BENCHMARK:
@@ -310,11 +315,17 @@ void handle_random_operations_run(blk_req_code_t request_code, const uint32_t* r
              * Power cycle SD card for 10s, to reset the write loci: https://trustworthy.systems/publications/nicta_slides/8311.pdf (slide 20)
              * The 10s timeout is handled by benchmark_blk.c, after receiving STOP_PMU channel notification.
              */
-            LOG_CLIENT("Powering off SD card.");
+#if defined(MICROKIT_BOARD_odroidc4)
+            LOG_CLIENT("Powering off SD card.\n");
             int err = blk_enqueue_req(&blk_queue, BLK_REQ_SD_OFF, 0, 0, 0, 0);
             __atomic_store_n(&blk_storage_info->ready, false, __ATOMIC_RELEASE);
             assert(!err);
             microkit_notify(VIRT_CH);
+#elif defined(MICROKIT_BOARD_maaxboard)
+            LOG_CLIENT("Power cycling not implemented for Maaxboard - performing benchmark without powercycling!.\n");
+#else
+            LOG_CLIENT("Power cycling not implemented for current board - performing benchmark without powercycling!.\n");
+#endif
         }
         virtualiser_replied = false;
 #ifdef VALIDATE_IO_OPERATIONS

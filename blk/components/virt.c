@@ -169,9 +169,7 @@ static bool handle_mbr_reply()
 
 void init(void)
 {
-    microkit_dbg_puts("Virt: got before.\n");
     while (!blk_storage_is_ready(blk_driver_storage_info));
-    microkit_dbg_puts("Virt: got here.\n");
 
     /* Initialise client queues */
     for (int i = 0; i < BLK_NUM_CLIENTS; i++) {
@@ -294,7 +292,6 @@ static bool handle_client(int cli_id)
                 goto req_fail;
             }
 
-            LOG_BLK_VIRT("Offset: 0x%x\n", cli_offset);
             if ((cli_offset + BLK_TRANSFER_SIZE * cli_count) > cli_data_region_size) {
                 /* Requested offset is out of bounds from client data region */
                 LOG_BLK_VIRT_ERR("client %d request offset 0x%lx is invalid\n", cli_id, cli_offset);

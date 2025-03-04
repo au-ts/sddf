@@ -21,8 +21,15 @@
 #define BLK_DATA_REGION_SIZE_DRIV               BLK_QUEUE_REGION_SIZE
 
 /* Mapping from client index to disk partition that the client will have access to. */
+#if defined(MICROKIT_BOARD_odroidc4)
 static const int blk_partition_mapping[BLK_NUM_CLIENTS] = { 0 };
-
+#elif defined(MICROKIT_BOARD_qemu_virt_aarch64)
+static const int blk_partition_mapping[BLK_NUM_CLIENTS] = { 0 };
+#elif defined(MICROKIT_BOARD_maaxboard)
+static const int blk_partition_mapping[BLK_NUM_CLIENTS] = { 2 };
+#else
+// XXX: should be defined for all boards, only these boards are supported, what to do?
+#endif
 static inline blk_storage_info_t *blk_virt_cli_storage_info(blk_storage_info_t *info, unsigned int id)
 {
     switch (id) {
