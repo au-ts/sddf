@@ -251,12 +251,6 @@ void route()
                     assert(!err);
 
                 }
-                // else if (pkt->ttl <= 1) {
-                //     // @kwinter: TODO - drop packet.
-                //     sddf_dprintf("Time to live has expired for this packet!\n");
-                // } else {
-                //     sddf_dprintf("ROUTING|We got the worng kind of packet\n");
-                // }
             }
 
             net_request_signal_active(&state.filter_queue[filter]);

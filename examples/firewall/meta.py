@@ -77,21 +77,28 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     net_system = Sddf.Net(sdf, ethernet_node1, ethernet_driver1, net_virt_tx1, net_virt_rx1)
     net_system2 = Sddf.Net(sdf, ethernet_node, ethernet_driver, net_virt_tx, net_virt_rx)
 
-    routing = ProtectionDomain("routing", "routing.elf", priority=97, budget=20000)
-    arp_responder = ProtectionDomain("arp_responder", "arp_responder.elf", priority=95, budget=20000)
-    arp_requester = ProtectionDomain("arp_requester", "arp_requester.elf", priority=98, budget=20000)
-    firewall = LionsOs.Firewall(sdf, net_system, net_system2, routing, arp_responder, arp_requester)
+    routing1 = ProtectionDomain("routing1", "routing.elf", priority=97, budget=20000)
+    arp_responder1 = ProtectionDomain("arp_responder1", "arp_responder.elf", priority=95, budget=20000)
+    arp_requester1 = ProtectionDomain("arp_requester1", "arp_requester.elf", priority=98, budget=20000)
+
+    routing2 = ProtectionDomain("routing2", "routing2.elf", priority=97, budget=20000)
+    arp_responder2 = ProtectionDomain("arp_responder2", "arp_responder2.elf", priority=95, budget=20000)
+    arp_requester2 = ProtectionDomain("arp_requester2", "arp_requester2.elf", priority=98, budget=20000)
+
+    firewall = LionsOs.Firewall(sdf, net_system, net_system2, routing1, routing2, arp_responder1, arp_responder2, arp_requester1, arp_requester2)
 
     icmp_filter = ProtectionDomain("icmp_filter", "icmp_filter.elf", priority=96, budget=20000)
     udp_filter = ProtectionDomain("udp_filter", "udp_filter.elf", priority=96, budget=20000)
     tcp_filter = ProtectionDomain("tcp_filter", "tcp_filter.elf", priority=96, budget=20000)
 
-    # @kwinter: These need to be added to second net_system
-    serial_system.add_client(routing)
+    icmp_filter2 = ProtectionDomain("icmp_filter2", "icmp_filter2.elf", priority=96, budget=20000)
 
-    serial_system.add_client(arp_responder)
+    # @kwinter: These need to be added to second net_system
+    serial_system.add_client(routing1)
+
+    serial_system.add_client(arp_responder1)
     # @kwinter: Internal arp needs timer to handle stale ARP cache entries.
-    timer_system.add_client(arp_requester)
+    timer_system.add_client(arp_requester1)
 
     pds = [
         uart_driver,
@@ -102,12 +109,16 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
         net_virt_tx1,
         net_virt_rx,
         net_virt_rx1,
-        routing,
+        routing1,
+        arp_responder1,
+        arp_requester1,
+        routing2,
+        arp_responder2,
+        arp_requester2,
         icmp_filter,
+        icmp_filter2,
         udp_filter,
         tcp_filter,
-        arp_responder,
-        arp_requester,
         timer_driver,
     ]
 
@@ -115,12 +126,13 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
         sdf.add_pd(pd)
 
     router_mac_addr = f"52:54:01:00:00:78"
-
+    firewall.add_filter(icmp_filter, 0x01, 1)
+    firewall.add_filter(udp_filter, 0x11, 1)
+    firewall.add_filter(tcp_filter, 0x06, 1)
+    firewall.add_filter(icmp_filter2, 0x01, 2)
     # Router MAC addr (soon to be deprecated), ip of NIC1, ip of NIC2
     assert firewall.connect(router_mac_addr, 3338669322, 2205888)
-    firewall.add_filter(icmp_filter, 0x01)
-    firewall.add_filter(udp_filter, 0x11)
-    firewall.add_filter(tcp_filter, 0x06)
+
     assert firewall.serialise_config(output_dir)
     assert serial_system.connect()
     assert serial_system.serialise_config(output_dir)

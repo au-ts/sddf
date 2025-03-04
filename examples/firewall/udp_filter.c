@@ -92,6 +92,7 @@ void init(void)
 void notified(microkit_channel ch)
 {
     if (ch == net_config.rx.id) {
+        sddf_dprintf("udp filter\n");
         filter();
     } else {
         sddf_dprintf("ICMP_FILTER|Received notification on unknown channel: %d!\n", ch);
