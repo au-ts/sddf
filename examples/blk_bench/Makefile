@@ -29,6 +29,13 @@ else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
 	export CPU := cortex-a53
 	export QEMU := qemu-system-aarch64
 	export BLK_DRIVER_MK := blk_driver.mk
+else ifeq ($(strip $(MICROKIT_BOARD)), maaxboard)
+	export MICROKIT_BOARD
+	export UART_DRIV_DIR := imx
+	export TIMER_DRIV_DIR := imx
+	export BLK_DRIVER_DIR := mmc/imx
+	export CPU := cortex-a53
+	export BLK_DRIVER_MK := mmc_driver.mk
 else
 	$(error Unsupported MICROKIT_BOARD given)
 endif

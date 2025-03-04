@@ -112,6 +112,7 @@ typedef struct benchmark_run_resuls {
     uint64_t cycles_virtualiser;
     uint64_t cycles_client;
     uint64_t cycles_idle;
+    uint64_t cycles_total;
 } benchmark_run_resuls_t;
 
 benchmark_run_resuls_t benchmark_run_results_rand_read[BENCHMARK_RUN_COUNT*BENCHMARK_INDIVIDUAL_RUN_REPEATS];
@@ -266,7 +267,7 @@ void print_benchmark_results_for_state(enum run_benchmark_state print_state) {
         for (int i = 0; i != BENCHMARK_RUN_COUNT; ++i) {
             sddf_printf("No. rqs: %d, rq size: 0x%x B, speed: %.2f MiB/s,"
                     " speed_ccount: %.2f MiB/s, time: %lu ms, time_ccount: %lu ms, cpu_util: %.2f perc, "
-                    "cyc_driv: 0x%lx, cyc_virt: 0x%lx, cyc_cli: 0x%lx, cyc_idle: 0x%lx\n",
+                    "cyc_driv: 0x%lx, cyc_virt: 0x%lx, cyc_cli: 0x%lx, cyc_idle: 0x%lx, cyc_total: 0x%lx\n",
                     REQUEST_COUNT[i],
                     BENCHMARK_BLOCKS_PER_REQUEST[i] * BLK_TRANSFER_SIZE,
                     bench_results[i + j*BENCHMARK_RUN_COUNT].speed,
@@ -277,7 +278,8 @@ void print_benchmark_results_for_state(enum run_benchmark_state print_state) {
                     bench_results[i + j*BENCHMARK_RUN_COUNT].cycles_driver,
                     bench_results[i + j*BENCHMARK_RUN_COUNT].cycles_virtualiser,
                     bench_results[i + j*BENCHMARK_RUN_COUNT].cycles_client,
-                    bench_results[i + j*BENCHMARK_RUN_COUNT].cycles_idle);
+                    bench_results[i + j*BENCHMARK_RUN_COUNT].cycles_idle,
+                    bench_results[i + j*BENCHMARK_RUN_COUNT].cycles_total);
         }
     }
 }
@@ -364,6 +366,7 @@ void notified(microkit_channel ch) {
         microkit_benchmark_stop(&total, &number_schedules, &kernel, &entries);
         print_benchmark_details(PD_TOTAL, kernel, entries, number_schedules, total);
         cycles_PD_TOTAL = total;
+        bench_results[benchmark_size_idx + run_offset].cycles_total = total;
 
         microkit_benchmark_stop_tcb(PD_BLK_ID, &total, &number_schedules, &kernel, &entries);
         print_benchmark_details(PD_BLK_ID, kernel, entries, number_schedules, total);
@@ -423,6 +426,11 @@ void notified(microkit_channel ch) {
 #ifdef MICROKIT_BOARD_odroidc4
         /* formula: amount of data transferred / (cycles_PD_TOTAL / ODROID_CPU_CLKFREQ_MHZ) */
         uint64_t elapsed_time_ccount = (uint64_t) (cycles_PD_TOTAL / (ODROID_CPU_CLKFREQ_MHZ) * 1e3);
+        double speed_ccount = ((double) BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx] * BLK_TRANSFER_SIZE * \
+                REQUEST_COUNT[benchmark_size_idx] / (1024. * 1024.)) / \
+                (elapsed_time_ccount *1e-9);
+#elif defined(MICROKIT_BOARD_maaxboard)
+        uint64_t elapsed_time_ccount = (uint64_t) (cycles_PD_TOTAL / (MAAXBOARD_CPU_CLKFREQ_MHZ) * 1e3);
         double speed_ccount = ((double) BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx] * BLK_TRANSFER_SIZE * \
                 REQUEST_COUNT[benchmark_size_idx] / (1024. * 1024.)) / \
                 (elapsed_time_ccount *1e-9);

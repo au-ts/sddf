@@ -38,6 +38,8 @@ ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
 	IMAGES += sdmmc_driver.elf
 else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
 	IMAGES += blk_driver.elf
+else ifeq ($(strip $(MICROKIT_BOARD)), maaxboard)
+	IMAGES += mmc_driver.elf
 else
 	$(error Unsupported MICROKIT_BOARD given)
 endif
