@@ -23,7 +23,7 @@
 #include "basic_data.h"
 //#include "sddf/util/fence.h"
 
-//#define DO_LOG_DEBUG
+#define DO_LOG_DEBUG
 
 #ifdef DO_LOG_DEBUG
 #define LOG_CLIENT(...) do{ sddf_printf("CLIENT|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
@@ -72,7 +72,7 @@ void dequeue_and_validate(uint16_t exp_count) {
     if (status != BLK_RESP_OK)
         panic("invalid resp status\n");
     if (count != exp_count)
-        panic("invalid count\n");
+        panic("invalid count. Blk_resp_queue length: %d, Expected: %d, received: %d\n",blk_queue_length_resp(&blk_queue),  exp_count, count);
     // XXX cant validate ID, as requesrts can be out of order, would need to dequeue and check all
     //if (id != exp_id)
     //    panic("invalid id");
@@ -166,7 +166,7 @@ bool run_benchmark() {
 #ifndef VALIDATE_IO_OPERATIONS
             if (!virtualiser_replied) {
                 LOG_CLIENT("run_benchmark: START state,verifying if a simple read succeeds...\n");
-                int err = blk_enqueue_req(&blk_queue, BLK_REQ_READ, 0x10000, 0, 2, 1);
+                int err = blk_enqueue_req(&blk_queue, BLK_REQ_READ, 0x00000, 0, 2, 1);
                 assert(!err);
                 microkit_notify(VIRT_CH);
             } else {
@@ -185,7 +185,7 @@ bool run_benchmark() {
         case THROUGHPUT_RANDOM_READ:
             /* Perform REQUEST_COUNT[benchmark_size_idx] random READs, from 4KiB write size up to 8MiB */
             dummy_write_data_populated = false;
-            handle_random_operations_run(BLK_REQ_READ, RANDOM_READ_OFFSETS_ARR[benchmark_size_idx], THROUGHPUT_RANDOM_WRITE);
+            handle_random_operations_run(BLK_REQ_READ, RANDOM_READ_OFFSETS_ARR[benchmark_size_idx], LATENCY_READ);
             break;
         case THROUGHPUT_RANDOM_WRITE:
             /* Perform REQUEST_COUNT[benchmark_size_idx] WRITEs, from 4KiB write size up to 128MiB (x8 at each step) */

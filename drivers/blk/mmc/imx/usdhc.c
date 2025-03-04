@@ -1010,7 +1010,7 @@ void handle_clients(void)
             }
             driver_state.data_transfer = DataStateInit;
 
-            success_count = 1;
+            success_count = req_count;
             break;
 
         case BLK_REQ_WRITE:
@@ -1021,7 +1021,7 @@ void handle_clients(void)
             }
             driver_state.data_transfer = DataStateInit;
 
-            success_count = 1;
+            success_count = req_count;
             break;
 
         case BLK_REQ_FLUSH:
