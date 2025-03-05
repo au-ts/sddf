@@ -37,9 +37,7 @@ uint8_t mac_addr[ETH_HWADDR_LEN]= {0x52,0x54,0x01,0x00,0x00,0x78};
 hashtable_t *arp_table;
 net_queue_handle_t virt_tx_queue;
 net_queue_handle_t virt_rx_queue;
-/* @kwinter: This needs to be placed in shared memory with the routing component
-to reduce ARP checking overhead. We should only invoke this component when we cannot
-make a match. */
+
 arp_entry_t arp_cache[MAX_ARP_CACHE];
 
 /* This queue will hold all the ARP requests/responses that are needed by the
@@ -60,11 +58,6 @@ void process_requests()
             sddf_dprintf("ARP_REQUESTER|ARP request was invalid!\n");
         }
 
-        // @kwinter: Need to drop this in favour of packet look up in waiting queue.
-        if (request.ip_addr != IPV4_ADDR(192, 168, 33, 6)) {
-            return;
-        }
-
         // Generate the ARP request here.
         net_buff_desc_t buffer;
         err = net_dequeue_free(&virt_tx_queue, &buffer);
@@ -74,9 +67,6 @@ void process_requests()
         sddf_memcpy(&pkt->ethdst_addr, broadcast_mac_addr, ETH_HWADDR_LEN);
         sddf_memcpy(&pkt->ethsrc_addr, device_info->mac, ETH_HWADDR_LEN);
         sddf_memcpy(&pkt->hwsrc_addr, device_info->mac, ETH_HWADDR_LEN);
-
-        // @kwinter: Need to be able to somehow get the MAC address from the driver.
-        // memcpy(&reply->ethsrc_addr, ethsrc_addr, ETH_HWADDR_LEN);
 
         pkt->type = HTONS(ETH_TYPE_ARP);
         pkt->hwtype = HTONS(ETH_HWTYPE);
@@ -101,48 +91,8 @@ void process_requests()
     }
     if (transmitted && net_require_signal_active(&virt_tx_queue)) {
         net_cancel_signal_active(&virt_tx_queue);
-        // @kwinter: Figure out how to get the channel ID.
         microkit_deferred_notify(net_config.tx.id);
     }
-}
-
-static int arp_reply(const uint8_t ethsrc_addr[ETH_HWADDR_LEN],
-                     const uint8_t ethdst_addr[ETH_HWADDR_LEN],
-                     const uint8_t hwsrc_addr[ETH_HWADDR_LEN], const uint32_t ipsrc_addr,
-                     const uint8_t hwdst_addr[ETH_HWADDR_LEN], const uint32_t ipdst_addr)
-{
-    if (net_queue_empty_free(&virt_tx_queue)) {
-        sddf_dprintf("ARP_REQUESTER|LOG: Transmit free queue empty or transmit active queue full. Dropping reply\n");
-        return -1;
-    }
-
-    net_buff_desc_t buffer;
-    int err = net_dequeue_free(&virt_tx_queue, &buffer);
-    assert(!err);
-
-    struct arp_packet *reply = (struct arp_packet *)(net_config.tx_data.vaddr + buffer.io_or_offset);
-    memcpy(&reply->ethdst_addr, ethdst_addr, ETH_HWADDR_LEN);
-    memcpy(&reply->ethsrc_addr, ethsrc_addr, ETH_HWADDR_LEN);
-
-    reply->type = HTONS(ETH_TYPE_ARP);
-    reply->hwtype = HTONS(LWIP_IANA_HWTYPE_ETHERNET);
-    reply->proto = HTONS(ETH_TYPE_IP);
-    reply->hwlen = ETH_HWADDR_LEN;
-    reply->protolen = IPV4_PROTO_LEN;
-    reply->opcode = HTONS(ETHARP_OPCODE_REPLY);
-
-    memcpy(&reply->hwsrc_addr, hwsrc_addr, ETH_HWADDR_LEN);
-    reply->ipsrc_addr = ipsrc_addr;
-    memcpy(&reply->hwdst_addr, hwdst_addr, ETH_HWADDR_LEN);
-    reply->ipdst_addr = ipdst_addr;
-    memset(&reply->padding, 0, 10);
-
-    buffer.len = 56;
-    err = net_enqueue_active(&virt_tx_queue, buffer);
-    assert(!err);
-        microkit_deferred_notify(net_config.tx.id);
-
-    return 0;
 }
 
 void process_responses()
@@ -172,11 +122,6 @@ void process_responses()
                 entry.valid = true;
                 hashtable_insert(arp_table, (uint32_t) resp.ip_addr, &entry);
                 signal = true;
-            } else {
-                // @kwinter: Choose the IP address properly for this node.
-                if (pkt->ipdst_addr == IPV4_ADDR(192, 168, 33, 0)) {
-                    arp_reply(mac_addr, pkt->ethsrc_addr, mac_addr, pkt->ipdst_addr, pkt->hwsrc_addr, pkt->ipsrc_addr);
-                }
             }
         }
 
@@ -192,13 +137,6 @@ void process_responses()
 
 void init(void)
 {
-    // Init all net queues here as well as zero out the arp cache.
-    // @kwinter: Figure out the appropriate data structures to use in the meta program.
-    // arp_queue_init(&arp_queue, net_config.tx.free_queue.vaddr, net_config.tx.active_queue.vaddr,
-    //                net_config.tx.num_buffers);
-    // @kwinter: We might want to do this initialisation ourselves. This
-    // only needs to be the size of an ARP packet. However, the current implementation
-    // will work, just not space efficient.
     assert(net_config_check_magic((void *)&net_config));
 
     net_queue_init(&virt_rx_queue, net_config.rx.free_queue.vaddr, net_config.rx.active_queue.vaddr,

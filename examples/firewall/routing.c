@@ -102,7 +102,6 @@ void process_arp_waiting()
 
         if (!response.valid && waiting_packet->valid) {
             // Find all packets with this IP address and drop them.
-            // Check if the IP in this packet matches response.
             waiting_packet->buffer.len = 0;
             err = net_enqueue_free(&state.filter_queue[waiting_packet->filter], waiting_packet->buffer);
             assert(!err);
@@ -158,7 +157,7 @@ void route()
     for (int filter = 0; filter < router_config.num_filters; filter++) {
         bool reprocess = true;
         while (reprocess) {
-            while (!net_queue_empty_active(&state.filter_queue[filter])) {
+            while (!net_queue_empty_active(&state.filter_queue[filter]) && !net_queue_empty_free(&virt_tx_queue)) {
                 net_buff_desc_t buffer;
                 int err = net_dequeue_active(&state.filter_queue[filter], &buffer);
                 assert(!err);
@@ -175,10 +174,6 @@ void route()
                     pkt->ttl -= 1;
                     // This is where we will swap out the MAC address with the appropriate address
                     uint32_t destIP = pkt->dst_ip;
-                    // @kwinter: Remove this debug filter
-                    if (destIP != IPV4_ADDR(192,168,33,6)) {
-                        continue;
-                    }
 
                     // From the destination IP, consult the routing tables to find the next hop address.
                     uint32_t nextIP = find_route(destIP);
@@ -197,20 +192,20 @@ void route()
                         *  that are waiting in the queue.
                         */
                         if (!arp_queue_full_request(arp_queries) && !check_waiting(&pkt_waiting_queue, destIP)) {
-                                arp_request_t request = {0};
-                                request.ip_addr = nextIP;
-                                request.valid = true;
-                                char buf[16];
-                                int ret = arp_enqueue_request(arp_queries, request);
-                                if (ret != 0) {
-                                    sddf_dprintf("ROUTING| Unable to enqueue into ARP request queue!\n");
-                                }
+                            arp_request_t request = {0};
+                            request.ip_addr = nextIP;
+                            request.valid = true;
+                            char buf[16];
+                            int ret = arp_enqueue_request(arp_queries, request);
+                            if (ret != 0) {
+                                sddf_dprintf("ROUTING| Unable to enqueue into ARP request queue!\n");
+                            }
                         } else {
-                                sddf_dprintf("ROUTING| ARP request queue was full!\n");
-                                buffer.len = 0;
-                                err = net_enqueue_free(&state.filter_queue[filter], buffer);
-                                assert(!err);
-                                continue;
+                            sddf_dprintf("ROUTING| ARP request queue was full!\n");
+                            buffer.len = 0;
+                            err = net_enqueue_free(&state.filter_queue[filter], buffer);
+                            assert(!err);
+                            continue;
                         }
 
                         // Add this packet to the ARP waiting queue
@@ -230,14 +225,11 @@ void route()
                         pkt->check = 0;
                         // Send the packet out to the network.
                         net_buff_desc_t buffer_tx;
-                        // @kwinter: TODO: This should be a predicate for out loop, that we have
-                        // room in the tx queue.
                         int err = net_dequeue_free(&virt_tx_queue, &buffer_tx);
                         assert(!err);
 
                         // @kwinter: For now we are memcpy'ing the packet from our receive buffer
                         // to the transmit buffer.
-                        // Also need to make sure that len here is the appropriate size.
                         sddf_memcpy((net_config.tx_data.vaddr + buffer_tx.io_or_offset), (router_config.filters[filter].data.vaddr + buffer.io_or_offset), buffer.len + (sizeof(struct ipv4_packet)));
                         struct ipv4_packet *test = (struct ipv4_packet *)(net_config.tx_data.vaddr + buffer_tx.io_or_offset);
                         buffer_tx.len = buffer.len;

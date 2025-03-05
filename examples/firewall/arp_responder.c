@@ -31,14 +31,10 @@ serial_queue_handle_t serial_tx_queue_handle;
 #define IPV4_PROTO_LEN 4
 #define PADDING_SIZE 10
 #define LWIP_IANA_HWTYPE_ETHERNET 1
-/* Booleans to indicate whether packets have been enqueued during notification handling */
-static bool notify_tx;
-static bool notify_rx;
 
 net_queue_handle_t rx_queue;
 net_queue_handle_t tx_queue;
 
-uint32_t ipv4_addrs[NUM_ROUTES];
 dev_info_t *device_info;
 
 static char *ipaddr_to_string(uint32_t s_addr, char *buf, int buflen)
@@ -161,12 +157,6 @@ void receive(void)
 void init(void)
 {
     assert(net_config_check_magic((void *)&net_config));
-    // @kwinter: For some reason we can't find the following functions.
-    // Probably linking with the debug version of libsddf_util.a
-
-    // serial_queue_init(&serial_tx_queue_handle, serial_config.tx.queue.vaddr, serial_config.tx.data.size,
-    //                   serial_config.tx.data.vaddr);
-    // serial_putchar_init(serial_config.tx.id, &serial_tx_queue_handle);
 
     net_queue_init(&rx_queue, net_config.rx.free_queue.vaddr, net_config.rx.active_queue.vaddr,
                    net_config.rx.num_buffers);
@@ -175,9 +165,7 @@ void init(void)
     net_queue_init(&tx_queue, net_config.tx.free_queue.vaddr, net_config.tx.active_queue.vaddr,
                    net_config.tx.num_buffers);
     net_buffers_init(&tx_queue, 0);
-    // Setup our known routes here. This will need to be
-    // moved to the routing component or a generic header
-    // config file for the firewall.
+
     device_info = (dev_info_t *)net_config.dev_info.vaddr;
 }
 
