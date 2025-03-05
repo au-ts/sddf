@@ -91,14 +91,14 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(OBJCOPY) --update-section .net_client_config=net_ethernet_driver_client_arp_responder2.data arp_responder.elf arp_responder2.elf
 	$(OBJCOPY) --update-section .arp_resources=arp_responder2.data arp_responder2.elf
 
-	$(OBJCOPY) --update-section .net_client_config=net_ethernet_driver_dwmac_client_routing1.data routing.elf
+	$(OBJCOPY) --update-section .net_client_config=net_ethernet_driver_client_routing1.data routing.elf
 	$(OBJCOPY) --update-section .router_config=router1.data routing.elf
-	$(OBJCOPY) --update-section .net_client_config=net_ethernet_driver_client_routing2.data routing.elf routing2.elf
+	$(OBJCOPY) --update-section .net_client_config=net_ethernet_driver_dwmac_client_routing2.data routing.elf routing2.elf
 	$(OBJCOPY) --update-section .router_config=router2.data routing2.elf
 
-	$(OBJCOPY) --update-section .net_client_config=net_ethernet_driver_dwmac_client_arp_requester1.data arp_requester.elf
+	$(OBJCOPY) --update-section .net_client_config=net_ethernet_driver_client_arp_requester1.data arp_requester.elf
 	$(OBJCOPY) --update-section .arp_resources=arp_requester1.data arp_requester.elf
-	$(OBJCOPY) --update-section .net_client_config=net_ethernet_driver_client_arp_requester2.data arp_requester.elf arp_requester2.elf
+	$(OBJCOPY) --update-section .net_client_config=net_ethernet_driver_dwmac_client_arp_requester2.data arp_requester.elf arp_requester2.elf
 	$(OBJCOPY) --update-section .arp_resources=arp_requester2.data arp_requester2.elf
 
 	$(OBJCOPY) --update-section .filter_config=firewall_filters1_icmp_filter.data icmp_filter.elf

@@ -81,17 +81,17 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     arp_responder1 = ProtectionDomain("arp_responder1", "arp_responder.elf", priority=95, budget=20000)
     arp_requester1 = ProtectionDomain("arp_requester1", "arp_requester.elf", priority=98, budget=20000)
 
-    routing2 = ProtectionDomain("routing2", "routing2.elf", priority=97, budget=20000)
-    arp_responder2 = ProtectionDomain("arp_responder2", "arp_responder2.elf", priority=95, budget=20000)
-    arp_requester2 = ProtectionDomain("arp_requester2", "arp_requester2.elf", priority=98, budget=20000)
+    routing2 = ProtectionDomain("routing2", "routing2.elf", priority=94, budget=20000)
+    arp_responder2 = ProtectionDomain("arp_responder2", "arp_responder2.elf", priority=93, budget=20000)
+    arp_requester2 = ProtectionDomain("arp_requester2", "arp_requester2.elf", priority=95, budget=20000)
 
     firewall = LionsOs.Firewall(sdf, net_system, net_system2, routing1, routing2, arp_responder1, arp_responder2, arp_requester1, arp_requester2)
 
-    icmp_filter = ProtectionDomain("icmp_filter", "icmp_filter.elf", priority=96, budget=20000)
-    udp_filter = ProtectionDomain("udp_filter", "udp_filter.elf", priority=96, budget=20000)
-    tcp_filter = ProtectionDomain("tcp_filter", "tcp_filter.elf", priority=96, budget=20000)
+    icmp_filter = ProtectionDomain("icmp_filter", "icmp_filter.elf", priority=90, budget=20000)
+    udp_filter = ProtectionDomain("udp_filter", "udp_filter.elf", priority=91, budget=20000)
+    tcp_filter = ProtectionDomain("tcp_filter", "tcp_filter.elf", priority=92, budget=20000)
 
-    icmp_filter2 = ProtectionDomain("icmp_filter2", "icmp_filter2.elf", priority=96, budget=20000)
+    icmp_filter2 = ProtectionDomain("icmp_filter2", "icmp_filter2.elf", priority=93, budget=20000)
 
     # @kwinter: These need to be added to second net_system
     serial_system.add_client(routing1)
