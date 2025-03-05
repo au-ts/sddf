@@ -37,7 +37,6 @@ typedef struct {
     uint32_t head; /* index to remove from */
     uint32_t capacity; /* capacity of the ring */
     volatile struct descriptor *descr; /* buffer descriptor array */
-    net_buff_desc_t descr_mdata[MAX_COUNT]; /* associated meta data array */
 } hw_ring_t;
 
 hw_ring_t rx; /* Rx NIC ring */
@@ -88,7 +87,6 @@ static void rx_provide(void)
             if (idx + 1 == rx.capacity) {
                 stat |= WRAP;
             }
-            rx.descr_mdata[idx] = buffer;
             update_ring_slot(&rx, idx, buffer.io_or_offset, 0, stat);
             rx.tail++;
             eth->rdar = RDAR_RDAR;
@@ -122,8 +120,7 @@ static void rx_return(void)
 
         THREAD_MEMORY_ACQUIRE();
 
-        net_buff_desc_t buffer = rx.descr_mdata[idx];
-        buffer.len = d->len;
+        net_buff_desc_t buffer = { d->addr, d->len };
         int err = net_enqueue_active(&rx_queue, buffer);
         assert(!err);
 
@@ -151,7 +148,6 @@ static void tx_provide(void)
             if (idx + 1 == tx.capacity) {
                 stat |= WRAP;
             }
-            tx.descr_mdata[idx] = buffer;
             update_ring_slot(&tx, idx, buffer.io_or_offset, buffer.len, stat);
             tx.tail++;
             eth->tdar = TDAR_TDAR;
@@ -180,8 +176,7 @@ static void tx_return(void)
 
         THREAD_MEMORY_ACQUIRE();
 
-        net_buff_desc_t buffer = tx.descr_mdata[idx];
-        buffer.len = 0;
+        net_buff_desc_t buffer = { d->addr, 0 };
         int err = net_enqueue_free(&tx_queue, buffer);
         assert(!err);
 
