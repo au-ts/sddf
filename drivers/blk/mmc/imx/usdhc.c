@@ -1099,6 +1099,9 @@ void init()
     assert(device_resources.num_regions == 1);
     assert(device_resources.num_irqs == 1);
 
+    assert(blk_config_check_magic(&blk_config));
+    assert(timer_config_check_magic(&timer_config));
+
     usdhc_regs = device_resources.regions[0].region.vaddr;
 
     reset_driver_and_card_state();
