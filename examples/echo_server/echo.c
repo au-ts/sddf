@@ -15,7 +15,6 @@
 #include <sddf/serial/config.h>
 #include <sddf/timer/client.h>
 #include <sddf/timer/config.h>
-#include <sddf/benchmark/sel4bench.h>
 #include <sddf/benchmark/config.h>
 #include "lwip/pbuf.h"
 

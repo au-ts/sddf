@@ -10,7 +10,6 @@
 #include "lwip/pbuf.h"
 #include "lwip/tcp.h"
 
-#include <sddf/util/util.h>
 #include <sddf/benchmark/bench.h>
 #include <sddf/util/printf.h>
 
