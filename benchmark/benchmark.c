@@ -70,7 +70,8 @@ static void print_total_util(uint64_t *buffer)
     uint64_t number_schedules = buffer[BENCHMARK_TOTAL_NUMBER_SCHEDULES];
     uint64_t kernel = buffer[BENCHMARK_TOTAL_KERNEL_UTILISATION];
     uint64_t entries = buffer[BENCHMARK_TOTAL_NUMBER_KERNEL_ENTRIES];
-    sddf_printf("Total utilisation details: \n{\nKernelUtilisation: %lu\nKernelEntries: %lu\nNumberSchedules: %lu\nTotalUtilisation: %lu\n}\n",
+    sddf_printf("Total utilisation details: \n{\nKernelUtilisation: %lu\nKernelEntries: %lu\nNumberSchedules: "
+                "%lu\nTotalUtilisation: %lu\n}\n",
                 kernel, entries, number_schedules, total);
 }
 
@@ -80,7 +81,8 @@ static void print_child_util(uint64_t *buffer, uint8_t id)
     uint64_t number_schedules = buffer[BENCHMARK_TCB_NUMBER_SCHEDULES];
     uint64_t kernel = buffer[BENCHMARK_TCB_KERNEL_UTILISATION];
     uint64_t entries = buffer[BENCHMARK_TCB_NUMBER_KERNEL_ENTRIES];
-    sddf_printf("Utilisation details for PD: %s (%u)\n{\nKernelUtilisation: %lu\nKernelEntries: %lu\nNumberSchedules: %lu\nTotalUtilisation: %lu\n}\n",
+    sddf_printf("Utilisation details for PD: %s (%u)\n{\nKernelUtilisation: %lu\nKernelEntries: %lu\nNumberSchedules: "
+                "%lu\nTotalUtilisation: %lu\n}\n",
                 child_name(id), id, kernel, entries, number_schedules, total);
 }
 
@@ -131,12 +133,13 @@ static void dump_log_summary(uint64_t log_size)
         index++;
     }
 
-    sddf_printf("Number of system call invocations  %llx and fastpaths  %llx\n", syscall_entries, fastpaths);
-    sddf_printf("Number of interrupt invocations  %llx\n", interrupt_entries);
-    sddf_printf("Number of user-level faults  %llx\n", userlevelfault_entries);
-    sddf_printf("Number of VM faults  %llx\n", vmfault_entries);
-    sddf_printf("Number of debug faults  %llx\n", debug_fault);
-    sddf_printf("Number of others  %llx\n", other);
+    sddf_printf("System call invocations %lu", syscall_entries);
+    sddf_printf("Fastpaths %lu\n", fastpaths);
+    sddf_printf("Interrupt invocations %lu\n", interrupt_entries);
+    sddf_printf("User-level faults %lu\n", userlevelfault_entries);
+    sddf_printf("VM faults %lu\n", vmfault_entries);
+    sddf_printf("Debug faults %lu\n", debug_fault);
+    sddf_printf("Others %lu\n", other);
 }
 #endif
 
@@ -166,7 +169,7 @@ void notified(microkit_channel ch)
 
         sddf_printf("{\n");
         for (int i = 0; i < ARRAY_SIZE(benchmarking_events); i++) {
-            sddf_printf("%s: %lX\n", counter_names[i], counter_values[i]);
+            sddf_printf("%s: %lu\n", counter_names[i], counter_values[i]);
         }
         sddf_printf("}\n");
 #endif
