@@ -204,20 +204,13 @@ void init(void)
 #ifdef MICROKIT_CONFIG_benchmark
     sel4bench_init();
     seL4_Word n_counters = sel4bench_get_num_counters();
-
-    counter_bitfield_t mask = 0;
-
-    for (seL4_Word counter = 0; counter < n_counters; counter++) {
-        if (counter >= ARRAY_SIZE(benchmarking_events)) {
-            break;
-        }
+    for (seL4_Word counter = 0; counter < MIN(n_counters, ARRAY_SIZE(benchmarking_events)); counter++) {
         sel4bench_set_count_event(counter, benchmarking_events[counter]);
-        mask |= BIT(counter);
+        benchmark_bf |= BIT(counter);
     }
 
     sel4bench_reset_counters();
-    sel4bench_start_counters(mask);
-    benchmark_bf = mask;
+    sel4bench_start_counters(benchmark_bf);
 #else
     sddf_dprintf("BENCH|LOG: Bench running in debug mode, no access to counters\n");
 #endif
