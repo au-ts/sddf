@@ -7,7 +7,6 @@
 #include <microkit.h>
 #include <sel4/benchmark_track_types.h>
 #include <sel4/benchmark_utilisation_types.h>
-#include <sddf/benchmark/bench.h>
 #include <sddf/benchmark/sel4bench.h>
 #include <sddf/benchmark/config.h>
 #include <sddf/serial/queue.h>
