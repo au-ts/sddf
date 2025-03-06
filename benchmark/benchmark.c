@@ -181,7 +181,7 @@ void notified(microkit_channel ch)
         dump_log_summary(entries);
 #endif
     } else {
-        sddf_printf("Bench thread notified on unexpected channel\n");
+        sddf_printf("BENCH|LOG: Bench thread notified on unexpected channel %u\n", ch);
     }
 }
 
@@ -192,13 +192,13 @@ void init(void)
     serial_putchar_init(serial_config.tx.id, &serial_tx_queue_handle);
 
 #ifdef MICROKIT_CONFIG_benchmark
-    sddf_printf("MICROKIT_CONFIG_benchmark defined\n");
+    sddf_printf("BENCH|LOG: MICROKIT_CONFIG_benchmark defined\n");
 #endif
 #ifdef CONFIG_BENCHMARK_TRACK_UTILISATION
-    sddf_printf("CONFIG_BENCHMARK_TRACK_UTILISATION defined\n");
+    sddf_printf("BENCH|LOG: CONFIG_BENCHMARK_TRACK_UTILISATION defined\n");
 #endif
 #ifdef CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES
-    sddf_printf("CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES defined\n");
+    sddf_printf("BENCH|LOG: CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES defined\n");
 #endif
 
 #ifdef MICROKIT_CONFIG_benchmark
@@ -228,9 +228,9 @@ void init(void)
 #ifdef CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES
     int res_buf = seL4_BenchmarkSetLogBuffer(LOG_BUFFER_CAP);
     if (res_buf) {
-        sddf_printf("Could not set log buffer:  %llx\n", res_buf);
+        sddf_printf("BENCH|ERROR: Could not set log buffer: %d\n", res_buf);
     } else {
-        sddf_printf("Log buffer set\n");
+        sddf_printf("BENCH|LOG: Log buffer set\n");
     }
 #endif
 }
