@@ -1,5 +1,5 @@
 /*
- * Copyright 2022, UNSW
+ * Copyright 2025, UNSW
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
@@ -9,11 +9,12 @@
 #include <sddf/util/fence.h>
 #include <sddf/util/printf.h>
 #include <sddf/benchmark/bench.h>
+#include <sddf/benchmark/config.h>
 
-#define INIT 3
 #define MAGIC_CYCLES 150
 
-uintptr_t cyclecounters_vaddr;
+__attribute__((__section__(".benchmark_config"))) benchmark_idle_config_t config;
+
 struct bench *b;
 
 void count_idle(void)
@@ -45,18 +46,16 @@ void count_idle(void)
 
 void notified(microkit_channel ch)
 {
-    switch(ch) {
-        case INIT:
-            count_idle();
-            break;
-        default:
-            sddf_dprintf("Idle thread notified on unexpected channel: %u\n", ch);
+    if (ch == config.init_channel) {
+        count_idle();
+    } else {
+        sddf_dprintf("Idle thread notified on unexpected channel: %u\n", ch);
     }
 }
 
 void init(void)
 {
-    b = (void *)cyclecounters_vaddr;
+    b = (void *)config.cycle_counters;
     sddf_printf("IDLE| idle thread starting\n");
     return;
 }

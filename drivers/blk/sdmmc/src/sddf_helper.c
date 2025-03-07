@@ -32,8 +32,9 @@ uint64_t blk_device_init_data_ioaddr() {
 
 /* Sets the blk_config->ready shared variable and returns currently set value */
 bool blk_queue_set_ready(bool ready) {
-    blk_config->ready = ready;
-    return blk_config->ready;
+    blk_storage_info_t *storage_info = config.virt.storage_info.vaddr;
+    storage_info->ready = ready;
+    return storage_info->ready;
 }
 
 uint8_t blk_queue_empty_req_helper() {

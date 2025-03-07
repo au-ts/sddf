@@ -23,6 +23,15 @@ typedef struct benchmark_config {
     benchmark_child_config_t children[BENCHMARK_MAX_CHILDREN];
 } benchmark_config_t;
 
+typedef struct benchmark_blk_config {
+    uint8_t start_ch;
+    uint8_t stop_ch;
+    uint8_t bench_run_ch;
+    uint8_t init_ch;
+    uint8_t num_children;
+    benchmark_child_config_t children[BENCHMARK_MAX_CHILDREN];
+} benchmark_blk_config_t;
+
 typedef struct benchmark_idle_config {
     void *cycle_counters;
     uint8_t init_channel;
@@ -33,3 +42,9 @@ typedef struct benchmark_client_config {
     uint8_t start_ch;
     uint8_t stop_ch;
 } benchmark_client_config_t;
+
+typedef struct benchmark_blk_client_config {
+    uint8_t start_ch;
+    uint8_t stop_ch;
+    uint8_t bench_run_ch;
+} benchmark_blk_client_config_t;
