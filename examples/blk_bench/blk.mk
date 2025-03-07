@@ -15,6 +15,8 @@ ifeq ($(strip $(SDDF)),)
 $(error SDDF must be specified)
 endif
 
+DTC := dtc
+PYTHON ?= python3
 
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 BLK_BENCHMARK := ${SDDF}/examples/blk_bench
@@ -28,21 +30,13 @@ BENCHMARK_CONFIG_INCLUDE := ${BLK_BENCHMARK}/include/benchmark_config
 CONFIGS_INCLUDE := ${BLK_BENCHMARK}
 
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
-SYSTEM_FILE  := ${BLK_BENCHMARK}/board/$(MICROKIT_BOARD)/blk.system
 IMAGE_FILE   := loader.img
 REPORT_FILE  := report.txt
+SYSTEM_FILE  := blk.system
 
 IMAGES := client.elf blk_virt.elf benchmark_blk.elf idle.elf \
-		  uart_driver.elf serial_virt_tx.elf timer_driver.elf
-ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
-	IMAGES += sdmmc_driver.elf
-else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
-	IMAGES += blk_driver.elf
-else ifeq ($(strip $(MICROKIT_BOARD)), maaxboard)
-	IMAGES += mmc_driver.elf
-else
-	$(error Unsupported MICROKIT_BOARD given)
-endif
+		  serial_driver.elf serial_virt_tx.elf timer_driver.elf \
+		  blk_driver.elf
 
 CFLAGS := -mcpu=$(CPU) \
 		  -mstrict-align \
@@ -50,7 +44,7 @@ CFLAGS := -mcpu=$(CPU) \
 		  -ffreestanding \
 		  -g3 \
 		  -O3 \
-		  -Wall -Wno-unused-function \
+		  -Wall -Wno-unused-function  -Werror -Wno-unused-command-line-argument \
 		  -DMICROKIT_CONFIG_${MICROKIT_CONFIG} \
 		  -DMICROKIT_BOARD_${MICROKIT_BOARD} \
 		  -I$(BOARD_DIR)/include \
@@ -65,6 +59,10 @@ ifeq ($(strip $(MICROKIT_CONFIG)), debug)
 else
 	LIBS +=  libsddf_util.a  --end-group
 endif
+
+DTS := $(SDDF)/dts/$(MICROKIT_BOARD).dts
+DTB := $(MICROKIT_BOARD).dtb
+METAPROGRAM := $(BLK_BENCHMARK)/meta.py
 
 CHECK_FLAGS_BOARD_MD5:=.board_cflags-$(shell echo -- ${CFLAGS} ${BOARD} ${MICROKIT_CONFIG} | shasum | sed 's/ *-//')
 
@@ -82,11 +80,11 @@ BLK_COMPONENTS := $(SDDF)/blk/components
 all: $(IMAGE_FILE)
 
 include ${BENCHMARK}/benchmark.mk
-include ${BLK_DRIVER}/${BLK_DRIVER_MK}
+include ${BLK_DRIVER}/blk_driver.mk
 
 include ${SDDF}/util/util.mk
 include ${BLK_COMPONENTS}/blk_components.mk
-include ${UART_DRIVER}/uart_driver.mk
+include ${UART_DRIVER}/serial_driver.mk
 include ${TIMER_DRIVER}/timer_driver.mk
 include ${SERIAL_COMPONENTS}/serial_components.mk
 
@@ -96,7 +94,7 @@ else
 ${IMAGES}: libsddf_util.a
 endif
 
-client.o: ${BLK_BENCHMARK}/client.c ${BLK_BENCHMARK}/basic_data.h
+client.o: ${BLK_BENCHMARK}/client.c
 	$(CC) -c $(CFLAGS) -I. $< -o client.o
 ifeq ($(strip $(MICROKIT_CONFIG)), debug)
 client.elf: client.o libsddf_util_debug.a
@@ -106,7 +104,31 @@ client.elf: client.o libsddf_util.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 endif
 
-$(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
+$(DTB): $(DTS)
+	dtc -q -I dts -O dtb $(DTS) > $(DTB)
+
+$(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
+	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE) $(PARTITION_ARG)
+	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
+	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data serial_driver.elf
+	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx.data serial_virt_tx.elf
+	$(OBJCOPY) --update-section .device_resources=blk_driver_device_resources.data blk_driver.elf
+	$(OBJCOPY) --update-section .blk_driver_config=blk_driver.data blk_driver.elf
+	$(OBJCOPY) --update-section .blk_virt_config=blk_virt.data blk_virt.elf
+	$(OBJCOPY) --update-section .blk_client_config=blk_client_client.data client.elf
+	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
+ifdef BLK_DRIV_USE_TIMER
+	$(OBJCOPY) --update-section .timer_client_config=timer_client_blk_driver.data blk_driver.elf
+endif
+	$(OBJCOPY) --update-section .timer_client_config=timer_client_client.data client.elf
+	$(OBJCOPY) --update-section .serial_client_config=serial_client_client.data client.elf
+	$(OBJCOPY) --update-section .timer_client_config=timer_client_bench.data benchmark_blk.elf
+	$(OBJCOPY) --update-section .serial_client_config=serial_client_bench.data benchmark_blk.elf
+	$(OBJCOPY) --update-section .benchmark_blk_config=benchmark_blk_config.data benchmark_blk.elf
+	$(OBJCOPY) --update-section .benchmark_blk_client_config=benchmark_blk_client_config.data client.elf
+	$(OBJCOPY) --update-section .benchmark_config=benchmark_idle_config.data idle.elf
+
+${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
 
 qemu_disk:

@@ -74,7 +74,7 @@
         </protection_domain>
         
         <protection_domain name="uart" priority="254" id="4">
-            <program_image path="uart_driver.elf" />
+            <program_image path="serial_driver.elf" />
 
             <map mr="uart" vaddr="0x5_000_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
             <map mr="serial_tx_queue_driver" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="tx_queue" />

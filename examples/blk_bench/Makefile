@@ -14,13 +14,18 @@ ifeq ($(strip $(TOOLCHAIN)),)
 	export LIBC := $(dir $(realpath $(shell aarch64-none-elf-gcc --print-file-name libc.a)))
 endif
 
+# Allow to user to specify a custom partition
+PARTITION :=
+ifdef PARTITION
+	PARTITION_ARG := --partition $(PARTITION)
+endif
+
 ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
 	export MICROKIT_BOARD
 	export UART_DRIV_DIR := meson
 	export TIMER_DRIV_DIR := meson
 	export BLK_DRIVER_DIR := sdmmc
 	export CPU := cortex-a53
-	export BLK_DRIVER_MK := sdmmc_driver.mk
 else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
 	export MICROKIT_BOARD
 	export UART_DRIV_DIR := arm
@@ -28,14 +33,13 @@ else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
 	export BLK_DRIVER_DIR := virtio
 	export CPU := cortex-a53
 	export QEMU := qemu-system-aarch64
-	export BLK_DRIVER_MK := blk_driver.mk
 else ifeq ($(strip $(MICROKIT_BOARD)), maaxboard)
 	export MICROKIT_BOARD
 	export UART_DRIV_DIR := imx
 	export TIMER_DRIV_DIR := imx
 	export BLK_DRIVER_DIR := mmc/imx
 	export CPU := cortex-a53
-	export BLK_DRIVER_MK := mmc_driver.mk
+	export BLK_DRIV_USE_TIMER := yes
 else
 	$(error Unsupported MICROKIT_BOARD given)
 endif
@@ -50,6 +54,7 @@ export LD := $(TOOLCHAIN)-ld
 export AS := $(TOOLCHAIN)-as
 export AR := $(TOOLCHAIN)-ar
 export RANLIB := $(TOOLCHAIN)-ranlib
+export OBJCOPY := $(TOOLCHAIN)-objcopy
 
 IMAGE_FILE:= ${BUILD_DIR}/loader.img
 REPORT_FILE:= ${BUILD_DIR}/report.txt
