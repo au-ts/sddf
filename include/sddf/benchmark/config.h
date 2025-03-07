@@ -65,6 +65,15 @@ typedef struct benchmark_config {
     uint8_t num_pmu_events;
 } benchmark_config_t;
 
+typedef struct benchmark_blk_config {
+    uint8_t start_ch;
+    uint8_t stop_ch;
+    uint8_t bench_run_ch;
+    uint8_t init_ch;
+    uint8_t num_children;
+    benchmark_child_config_t children[BENCHMARK_MAX_CHILDREN];
+} benchmark_blk_config_t;
+
 typedef struct benchmark_idle_config {
     /* Address to store the core's cycle counts. Shared with the benchmarking
     client PD. */
@@ -88,3 +97,9 @@ typedef struct benchmark_client_config {
     with the idle thread on that core. */
     void *core_ccounts[CONFIG_MAX_NUM_NODES];
 } benchmark_client_config_t;
+
+typedef struct benchmark_blk_client_config {
+    uint8_t start_ch;
+    uint8_t stop_ch;
+    uint8_t bench_run_ch;
+} benchmark_blk_client_config_t;
