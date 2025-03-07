@@ -142,6 +142,7 @@ typedef struct imx_usdhc_regs {
 #define USDHC_INT_STATUS_CIE   BIT(19) /* Command index error. */
 #define USDHC_INT_STATUS_DTOE  BIT(20) /* Data timeout error. */
 #define USDHC_INT_STATUS_AC12E BIT(24) /* Auto CMD12 error. */
+#define USDHC_INT_STATUS_DMAE  BIT(28) /* DMA error. */
 
 /* [IMX8MDQLQRM] Section 10.3.7.1.15 Interrupt Status Enable (used ones only) */
 #define USDHC_INT_STATUS_EN_CCSEN    BIT(0)   /* Command complete status enable */
