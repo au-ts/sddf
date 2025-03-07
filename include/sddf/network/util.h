@@ -13,12 +13,21 @@
 #define HTONS(x) ((uint16_t)((((x) & (uint16_t)0x00ffU) << 8) | (((x) & (uint16_t)0xff00U) >> 8)))
 #endif
 
-static void net_set_mac_addr(uint8_t *mac, uint64_t val)
+static void net_set_mac_addr(uint8_t *mac, uint64_t val, int order)
 {
-    mac[0] = val >> 40 & 0xff;
-    mac[1] = val >> 32 & 0xff;
-    mac[2] = val >> 24 & 0xff;
-    mac[3] = val >> 16 & 0xff;
-    mac[4] = val >> 8 & 0xff;
-    mac[5] = val & 0xff;
+    if (order == 0) {
+        mac[0] = val >> 40 & 0xff;
+        mac[1] = val >> 32 & 0xff;
+        mac[2] = val >> 24 & 0xff;
+        mac[3] = val >> 16 & 0xff;
+        mac[4] = val >> 8 & 0xff;
+        mac[5] = val & 0xff;
+    } else if (order == 1) {
+        mac[5] = val >> 40 & 0xff;
+        mac[4] = val >> 32 & 0xff;
+        mac[3] = val >> 24 & 0xff;
+        mac[2] = val >> 16 & 0xff;
+        mac[1] = val >> 8 & 0xff;
+        mac[0] = val & 0xff;
+    }
 }

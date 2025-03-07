@@ -9,6 +9,7 @@
 #include <sddf/resources/device.h>
 #include <sddf/network/queue.h>
 #include <sddf/network/config.h>
+#include <sddf/network/util.h>
 #include <sddf/util/util.h>
 #include <sddf/util/fence.h>
 #include <sddf/util/printf.h>
@@ -45,6 +46,8 @@ hw_ring_t tx; /* Tx NIC ring */
 
 net_queue_handle_t rx_queue;
 net_queue_handle_t tx_queue;
+
+dev_info_t *device_info;
 
 #define MAX_PACKET_SIZE     1536
 
@@ -264,6 +267,10 @@ static void eth_setup(void)
         eth->paur = h;
     }
 
+    /* Set mac address in device info region. */
+    uint64_t mac = ((uint64_t) (0x00000001) << 32) | (uint64_t)(0xc039d515);
+    net_set_mac_addr(device_info->mac, mac, 0);
+
     eth->opd = PAUSE_OPCODE_FIELD;
 
     /* coalesce transmit IRQs to batches of 128 */
@@ -310,7 +317,7 @@ void init(void)
     // All buffers should fit within our DMA region
     assert(RX_COUNT * sizeof(struct descriptor) <= device_resources.regions[1].region.size);
     assert(TX_COUNT * sizeof(struct descriptor) <= device_resources.regions[2].region.size);
-
+    device_info = (dev_info_t *)config.dev_info.vaddr;
     eth_setup();
 
     net_queue_init(&rx_queue, config.virt_rx.free_queue.vaddr, config.virt_rx.active_queue.vaddr,

@@ -1,7 +1,7 @@
 /*
- * Copyright 2024, UNSW
- * SPDX-License-Identifier: BSD-2-Clause
- */
+* Copyright 2024, UNSW
+* SPDX-License-Identifier: BSD-2-Clause
+*/
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -9,6 +9,7 @@
 #include <sddf/resources/device.h>
 #include <sddf/network/queue.h>
 #include <sddf/network/config.h>
+#include <sddf/network/util.h>
 #include <sddf/util/util.h>
 #include <sddf/util/fence.h>
 #include <sddf/util/printf.h>
@@ -53,6 +54,8 @@ net_queue_handle_t rx_queue;
 net_queue_handle_t tx_queue;
 
 uintptr_t eth_regs;
+
+dev_info_t *device_info;
 
 static inline bool hw_ring_full(hw_ring_t *ring)
 {
@@ -249,6 +252,9 @@ static void handle_irq()
 
 static void eth_init()
 {
+    uint32_t high = *MAC_REG(MAC_ADDRESS0_HIGH);
+    uint32_t low = *MAC_REG(MAC_ADDRESS0_LOW);
+    sddf_dprintf("This is the value of high: %x this is the value of low: %x\n", high, low);
     // Software reset -- This will reset the MAC internal registers.
     volatile uint32_t *mode = DMA_REG(DMA_MODE);
     *mode |= DMA_MODE_SWR;
@@ -329,8 +335,12 @@ static void eth_init()
     /* NOTE: We are hardcoding this MAC address to the hardware MAC address of the
     Star64 in the TS machine queue. This address is resident the boards EEPROM, however,
     we need I2C to read from this ROM. */
-    *MAC_REG(MAC_ADDRESS0_HIGH) = 0x00005b75;
-    *MAC_REG(MAC_ADDRESS0_LOW) = 0x0039cf6c;
+    *MAC_REG(MAC_ADDRESS0_HIGH) = high;
+    *MAC_REG(MAC_ADDRESS0_LOW) = low;
+
+    /* Populate device info struct. */
+    uint64_t mac = ((uint64_t) high << 32) | (uint64_t)low;
+    net_set_mac_addr(device_info->mac, mac, 1);
 
     /* Configure DMA */
 
@@ -402,7 +412,7 @@ void init(void)
     assert(TX_COUNT * sizeof(struct descriptor) <= device_resources.regions[2].region.size);
 
     eth_regs = (void *)device_resources.regions[0].region.vaddr;
-
+    device_info = (dev_info_t *)config.dev_info.vaddr;
     /* De-assert the reset signals that u-boot left asserted. */
 #ifdef CONFIG_PLAT_STAR64
     volatile uint32_t *reset_eth = (volatile uint32_t *)(resets + 0x38);
@@ -434,9 +444,9 @@ void init(void)
     }
 
     net_queue_init(&rx_queue, config.virt_rx.free_queue.vaddr, config.virt_rx.active_queue.vaddr,
-                   config.virt_rx.num_buffers);
+                config.virt_rx.num_buffers);
     net_queue_init(&tx_queue, config.virt_tx.free_queue.vaddr, config.virt_tx.active_queue.vaddr,
-                   config.virt_tx.num_buffers);
+                config.virt_tx.num_buffers);
     eth_setup();
 
     microkit_irq_ack(device_resources.irqs[0].id);
