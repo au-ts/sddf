@@ -45,18 +45,15 @@ REPORT_FILE  := report.txt
 SYSTEM_FILE := blk.system
 
 ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
-	ARCH := aarch64
 	BLK_DRIVER_DIR := virtio
 	CPU := cortex-a53
 	QEMU := qemu-system-aarch64
 	QEMU_ARCH_ARGS := -machine virt,virtualization=on -cpu cortex-a53 -device loader,file=$(IMAGE_FILE),addr=0x70000000,cpu-num=0
 else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_riscv64)
-	ARCH := riscv64
 	BLK_DRIVER_DIR := virtio
 	QEMU := qemu-system-riscv64
 	QEMU_ARCH_ARGS := -machine virt -kernel $(IMAGE_FILE)
 else ifeq ($(strip $(MICROKIT_BOARD)), maaxboard)
-	ARCH := aarch64
 	CPU := cortex-a53
 	BLK_DRIVER_DIR := mmc/imx
 	TIMER_DRIVER_DIR := imx
@@ -76,6 +73,7 @@ CONFIGS_INCLUDE := ${TOP}
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
+ARCH := ${shell grep 'CONFIG_SEL4_ARCH  ' $(BOARD_DIR)/include/kernel/gen_config.h | cut -d' ' -f4}
 
 IMAGES := blk_driver.elf client.elf blk_virt.elf
 CFLAGS := -nostdlib \
