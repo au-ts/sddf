@@ -29,7 +29,7 @@ More information about the sDDF project can be found on the Trustworthy Systems 
 
 ## Dependencies
 
-* Microkit SDK 1.4.1-dev.54+a8b7894
+* [Microkit SDK 2.0.0](https://github.com/seL4/microkit/releases/tag/2.0.0)
 * GNU Make
 * Clang and LLVM bintools
 * Device Tree Compiler
@@ -37,9 +37,6 @@ More information about the sDDF project can be found on the Trustworthy Systems 
 
 sDDF is primarily compiled via Makefiles, but the [Zig](https://ziglang.org) build system is also
 available. If you are intending on using Zig instead of Make, please see https://ziglang.org/download/.
-
-The Microkit SDK right now is pinned to a pre-release version, this is
-temporary until the next release of Microkit.
 
 See the instructions below for installing the rest of the dependencies based on your
 machine:
@@ -64,8 +61,8 @@ pip3 install --break-system-packages sdfgen==0.21.0
 #### Microkit SDK
 
 ```sh
-wget https://trustworthy.systems/Downloads/microkit/microkit-sdk-1.4.1-dev.54+a8b7894-linux-x86-64.tar.gz
-tar xf microkit-sdk-1.4.1-dev.54+a8b7894-linux-x86-64.tar.gz
+wget https://github.com/seL4/microkit/releases/download/2.0.0/microkit-sdk-2.0.0-linux-x86-64.tar.gz
+tar xf microkit-sdk-2.0.0-linux-x86-64.tar.gz
 ```
 
 ### Homebrew
@@ -88,14 +85,14 @@ pip3 install --break-system-packages sdfgen==0.21.0
 
 For Apple Silicon:
 ```sh
-wget https://trustworthy.systems/Downloads/microkit/microkit-sdk-1.4.1-dev.54+a8b7894-macos-aarch64.tar.gz
-tar xf microkit-sdk-1.4.1-dev.54+a8b7894-macos-aarch64.tar.gz
+wget https://github.com/seL4/microkit/releases/download/2.0.0/microkit-sdk-2.0.0-macos-aarch64.tar.gz
+tar xf microkit-sdk-2.0.0-macos-aarch64.tar.gz
 ```
 
 For Intel:
 ```sh
-wget https://trustworthy.systems/Downloads/microkit/microkit-sdk-1.4.1-dev.54+a8b7894-macos-x86-64.tar.gz
-tar xf microkit-sdk-1.4.1-dev.54+a8b7894-macos-x86-64.tar.gz
+wget https://github.com/seL4/microkit/releases/download/2.0.0/microkit-sdk-2.0.0-macos-x86-64.tar.gz
+tar xf microkit-sdk-2.0.0-macos-x86-64.tar.gz
 ```
 
 ### Nix

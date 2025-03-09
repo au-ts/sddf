@@ -156,7 +156,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     ethernet_node = dtb.node(board.ethernet)
     assert ethernet_node is not None
     timer_node = dtb.node(board.timer)
-    assert uart_node is not None
+    assert timer_node is not None
 
     timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=101)
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)

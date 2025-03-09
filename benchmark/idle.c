@@ -5,10 +5,10 @@
 
 #include <stdint.h>
 #include <microkit.h>
-#include <sddf/benchmark/sel4bench.h>
 #include <sddf/util/util.h>
 #include <sddf/util/fence.h>
 #include <sddf/util/printf.h>
+#include <sddf/benchmark/sel4bench.h>
 #include <sddf/benchmark/bench.h>
 #include <sddf/benchmark/config.h>
 

@@ -39,7 +39,6 @@ typedef struct {
     uint32_t head; /* index to remove from */
     uint32_t capacity; /* capacity of the ring */
     volatile struct descriptor *descr; /* buffer descriptor array */
-    net_buff_desc_t descr_mdata[MAX_COUNT]; /* associated meta data array */
 } hw_ring_t;
 
 hw_ring_t rx;
@@ -90,7 +89,6 @@ static void rx_provide()
                 cntl |= DESC_RXCTRL_RXRINGEND;
             }
 
-            rx.descr_mdata[idx] = buffer;
             update_ring_slot(&rx, idx, DESC_RXSTS_OWNBYDMA, cntl, buffer.io_or_offset, 0);
             eth_dma->rxpolldemand = POLL_DATA;
 
@@ -120,7 +118,6 @@ static void rx_return(void)
 
         THREAD_MEMORY_ACQUIRE();
 
-        net_buff_desc_t buffer = rx.descr_mdata[idx];
         if (d->status & DESC_RXSTS_ERROR) {
             sddf_dprintf("ETH|ERROR: RX descriptor returned with error status %x\n", d->status);
             idx = rx.tail % rx.capacity;
@@ -129,12 +126,11 @@ static void rx_return(void)
                 cntl |= DESC_RXCTRL_RXRINGEND;
             }
 
-            rx.descr_mdata[idx] = buffer;
-            update_ring_slot(&rx, idx, DESC_RXSTS_OWNBYDMA, cntl, buffer.io_or_offset, 0);
+            update_ring_slot(&rx, idx, DESC_RXSTS_OWNBYDMA, cntl, d->addr, 0);
             eth_dma->rxpolldemand = POLL_DATA;
             rx.tail++;
         } else {
-            buffer.len = (d->status & DESC_RXSTS_LENMSK) >> DESC_RXSTS_LENSHFT;
+            net_buff_desc_t buffer = { d->addr, (d->status & DESC_RXSTS_LENMSK) >> DESC_RXSTS_LENSHFT };
             int err = net_enqueue_active(&rx_queue, buffer);
             assert(!err);
             packets_transferred = true;
@@ -163,7 +159,6 @@ static void tx_provide(void)
             if (idx + 1 == tx.capacity) {
                 cntl |= DESC_TXCTRL_TXRINGEND;
             }
-            tx.descr_mdata[idx] = buffer;
             update_ring_slot(&tx, idx, DESC_TXSTS_OWNBYDMA, cntl, buffer.io_or_offset, 0);
 
             tx.tail++;
@@ -193,7 +188,7 @@ static void tx_return(void)
 
         THREAD_MEMORY_ACQUIRE();
 
-        net_buff_desc_t buffer = tx.descr_mdata[idx];
+        net_buff_desc_t buffer = { d->addr, 0 };
         int err = net_enqueue_free(&tx_queue, buffer);
         assert(!err);
         enqueued = true;
