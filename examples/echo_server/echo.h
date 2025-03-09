@@ -10,5 +10,5 @@
 #define TCP_ECHO_PORT 1237
 
 int setup_udp_socket(void);
-int setup_utilization_socket(void *cycle_counters, microkit_channel start_ch, microkit_channel stop_ch);
+int setup_utilization_socket(void *benchmark_config);
 int setup_tcp_socket(void);
