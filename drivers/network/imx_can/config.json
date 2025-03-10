@@ -1,3 +1,18 @@
 {
-    "comment": "TODO - fill this out"
+    "compatible": [
+        "fsl,imx8mp-flexcan"
+    ],
+    "resources": {
+        "regions": [
+            {
+                "name": "regs",
+                "dt_index": 0
+            }
+        ],
+        "irqs": [
+            {
+                "dt_index": 0
+            }
+        ]
+    }
 }
