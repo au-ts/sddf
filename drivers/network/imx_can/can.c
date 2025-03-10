@@ -41,6 +41,7 @@ static void can_setup(void) {
     soft_reset();
 
     /* Freeze */
+    freeze();
 }
 
 void init (void) {
@@ -53,6 +54,10 @@ void notified(microkit_channel ch) {
     ;
 }
 
+/*
+    TODO
+    > Atm none of the functions have any form of timeout or software error reporting - possibly should add this (similar to Linux kernel?)
+*/
 // Initially just boot the device and try to read and write one of the registers in the Module Configuration Register (MCR)
 
 // Implementation for initialisation
