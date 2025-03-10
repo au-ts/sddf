@@ -82,6 +82,7 @@ struct control_registers {
 // TODO - atm these are just left out but from 880-97C are 64, 32-bit Rx Individual Mask Registers
 
 /* FlexCAN Error Registers - these are for reading error occurrences */
+#define ERROR_REGISTER_OFFSET 0xAE0
 struct error_registers {
     uint32_t mecr;          /* AE0h Memory Error Control Register */
     uint32_t erriar;        /* AE4h Error Injection Address Register */
@@ -94,6 +95,7 @@ struct error_registers {
 }
 
 /* FlexCAN CANFD Registers - these are for enabling and using CANFD */
+#define CANFD_REGISTER_OFFSET 0xC00
 struct canfd_registers {
     uint32_t fdctrl;        /* C00h CAN FD Control Register */
     uint32_t fdcbt;         /* C04h CAN FD Bit Timing Register */

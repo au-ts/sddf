@@ -4,17 +4,48 @@
 
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
-volatile struct control_registers *can_regs;
+volatile struct control_registers *control_regs;
+volatile struct error_registers *error_regs;
+volatile struct canfd_registers *canfd_regs;
 
-static void can_setup(void) {
-    can_regs = device_resources.regions[0].region.vaddr;
+/* Specified in 11.8.2.11 - Reset */
+static void soft_reset(void) {
+    control_regs->mcr = MCR_SOFT_RESET;
+
+    // Spin until SOFT_RESET is deasserted (this happens when the reset completes)
+    while (control_regs->mcr & MCR_SOFT_RESET);
 }
 
+/* Specified in 11.8.2.1.1.1 */
+static void freeze(void) {
+    control_regs->mcr |= (MCR_HALT | MCR_FREEZE);
+    // Spin until FREEZE_ACK is asserted
+    while (!(control_registers->mcr & MCR_FREEZE_ACK));
+}
 
-// flexcan_chip_start << this function seems to be the equivalent for the linux kernel for starting FlexCAN
+/* Specified in 11.8.2.1.1.1 */
+static void unfreeze(void) {
+    control_regs->mcr &= ~MCR_HALT;
+    // Spin until FREEZE_ACK is deasserted
+    while (control_regs->mcr & MCR_FREEZE_ACK); 
+}
+
+/* Specified in 11.8.4.1 - FlexCAN Initialization Sequence */
+static void can_setup(void) {
+    /* Setup references to the different groups of registers */
+    control_regs = device_resources.regions[0].region.vaddr;
+    error_regs = device_resources.regions[0].region.vaddr + ERROR_REGISTER_OFFSET;
+    canfd_regs = device_resources.regions[0].region.vaddr + CANFD_REGISTER_OFFSET;
+
+    /* Reset */
+    soft_reset();
+
+    /* Freeze */
+}
+
 void init (void) {
-    // call all initialisation for the device / software interface here 
-
+    can_setup();
+    // call all initialisation for the device / software interface here
     // first thing is basically going to be reading and writing a register
 }
 
