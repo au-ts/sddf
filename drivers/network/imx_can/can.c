@@ -42,6 +42,9 @@ static void can_setup(void) {
 
     /* Freeze */
     freeze();
+
+    /* MCR Register Setup */
+    // TODO - stopped here -- following along the init process 
 }
 
 void init (void) {
