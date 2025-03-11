@@ -14,6 +14,7 @@
 #include <sddf/util/fence.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
+#include <sddf/util/string.h>
 /* headers only for benchmarking constants */
 #include <sddf/blk/queue.h>
 /* Needs to be included in the build dir, configures benchmarking params and constants */
@@ -95,6 +96,27 @@ benchmark_run_resuls_t benchmark_run_results_seq_write[BENCHMARK_RUN_COUNT*BENCH
 enum run_benchmark_state run_benchmark_state = THROUGHPUT_RANDOM_READ;
 int benchmark_run_idx = 0;
 
+benchmark_run_resuls_t *current_bench_results_state(enum run_benchmark_state bench_state) {
+    switch (bench_state) {
+        case THROUGHPUT_RANDOM_READ:
+            return benchmark_run_results_rand_read;
+            break;
+        case THROUGHPUT_RANDOM_WRITE:
+            return benchmark_run_results_rand_write;
+            break;
+        case THROUGHPUT_SEQUENTIAL_READ:
+            return benchmark_run_results_seq_read;
+            break;
+        case THROUGHPUT_SEQUENTIAL_WRITE:
+            return benchmark_run_results_seq_write;
+            break;
+        default:
+            panic("BENCHMARK: Error, unimplemented benchmark state transition\n");
+    }
+    panic("BENCHMARK: Should never get here.\n");
+    return NULL;
+}
+
 static char *child_name(uint64_t child_id)
 {
     for (uint64_t i = 0; i < benchmark_blk_config.num_children; i++) {
@@ -121,6 +143,8 @@ static void print_total_util(uint64_t *buffer)
     uint64_t number_schedules = buffer[BENCHMARK_TOTAL_NUMBER_SCHEDULES];
     uint64_t kernel = buffer[BENCHMARK_TOTAL_KERNEL_UTILISATION];
     uint64_t entries = buffer[BENCHMARK_TOTAL_NUMBER_KERNEL_ENTRIES];
+    int run_offset = benchmark_run_idx * BENCHMARK_RUN_COUNT;
+    benchmark_run_resuls_t* bench_results = current_bench_results_state(run_benchmark_state);
     bench_results[benchmark_size_idx + run_offset].cycles_total = total;
     sddf_printf("Total utilisation details: \n{\nKernelUtilisation: %lu\nKernelEntries: %lu\nNumberSchedules: "
                 "%lu\nTotalUtilisation: %lu\n}\n",
@@ -129,6 +153,8 @@ static void print_total_util(uint64_t *buffer)
 
 static void print_child_util(uint64_t *buffer, uint8_t id)
 {
+    int run_offset = benchmark_run_idx * BENCHMARK_RUN_COUNT;
+    benchmark_run_resuls_t* bench_results = current_bench_results_state(run_benchmark_state);
     uint64_t total = buffer[BENCHMARK_TCB_UTILISATION];
     uint64_t number_schedules = buffer[BENCHMARK_TCB_NUMBER_SCHEDULES];
     uint64_t kernel = buffer[BENCHMARK_TCB_KERNEL_UTILISATION];
@@ -137,26 +163,21 @@ static void print_child_util(uint64_t *buffer, uint8_t id)
                 "%lu\nTotalUtilisation: %lu\n}\n",
                 child_name(id), id, kernel, entries, number_schedules, total);
     // Update the across-benchmark tracked stats. TODO: atm this must match names in `meta.py`
-    switch(child_name(id)) {
-        case "client":
-            bench_results[benchmark_size_idx + run_offset].cycles_client = total;
-            bench_results[benchmark_size_idx + run_offset].no_schedules_client = total;
-            break;
-        case "blk_virt":
-            bench_results[benchmark_size_idx + run_offset].cycles_virtualiser = total;
-            bench_results[benchmark_size_idx + run_offset].no_schedules_virtualiser = total;
-            break;
-        case "blk_driver":
-            bench_results[benchmark_size_idx + run_offset].cycles_driver = total;
-            bench_results[benchmark_size_idx + run_offset].no_schedules_driver = total;
-            break;
-        case "bench_idle":
-            bench_results[benchmark_size_idx + run_offset].cycles_idle = total;
-            bench_results[benchmark_size_idx + run_offset].no_schedules_idle = total;
-            break;
-        default:
-            /* PD for which utilisation detauils are printed is not of interrest */
-            break;
+    char *pd_name = child_name(id);
+    if (sddf_strcmp("client", pd_name) == 0) {
+        bench_results[benchmark_size_idx + run_offset].cycles_client = total;
+        bench_results[benchmark_size_idx + run_offset].no_schedules_client = total;
+    } else if (sddf_strcmp("blk_virt", pd_name) == 0) {
+        bench_results[benchmark_size_idx + run_offset].cycles_virtualiser = total;
+        bench_results[benchmark_size_idx + run_offset].no_schedules_virtualiser = total;
+    } else if (sddf_strcmp("blk_driver", pd_name) == 0) {
+        bench_results[benchmark_size_idx + run_offset].cycles_driver = total;
+        bench_results[benchmark_size_idx + run_offset].no_schedules_driver = total;
+    } else if (sddf_strcmp("bench_idle", pd_name) == 0) {
+        bench_results[benchmark_size_idx + run_offset].cycles_idle = total;
+        bench_results[benchmark_size_idx + run_offset].no_schedules_idle = total;
+    } else {
+        /* PD for which utilisation detauils are printed is not of interrest */
     }
 }
 
@@ -219,24 +240,8 @@ static void dump_log_summary(uint64_t log_size)
 #endif
 
 void print_benchmark_results_for_state(enum run_benchmark_state print_state) {
-    benchmark_run_resuls_t* bench_results;
     const char* run_name = human_readable_run_benchmark_state[print_state];
-    switch (print_state) {
-        case THROUGHPUT_RANDOM_READ:
-            bench_results = benchmark_run_results_rand_read;
-            break;
-        case THROUGHPUT_RANDOM_WRITE:
-            bench_results = benchmark_run_results_rand_write;
-            break;
-        case THROUGHPUT_SEQUENTIAL_READ:
-            bench_results = benchmark_run_results_seq_read;
-            break;
-        case THROUGHPUT_SEQUENTIAL_WRITE:
-            bench_results = benchmark_run_results_seq_write;
-            break;
-        default:
-            panic("BENCHMARK: Error, unimplemented benchmark state transition");
-    }
+    benchmark_run_resuls_t* bench_results = current_bench_results_state(print_state);
     sddf_printf("%s results:\n", run_name);
     for (int j = 0; j != BENCHMARK_INDIVIDUAL_RUN_REPEATS; ++j) {
         sddf_printf("Run idx: %d/%d\n", j+1, BENCHMARK_INDIVIDUAL_RUN_REPEATS);
@@ -291,7 +296,7 @@ void notified(microkit_channel ch) {
 #if defined(MICROKIT_CONFIG_benchmark) && !defined(VALIDATE_IO_OPERATIONS)
         /* sample the clock cycles, to later get a total amount of cycles spent during a benchmark */
         SEL4BENCH_READ_CCNT(ccounter_benchmark_start);
-        timer_start = sddf_timer_time_now(TIMER_CH);
+        timer_start = sddf_timer_time_now(timer_config.driver_id);
         sel4bench_reset_counters();
         THREAD_MEMORY_RELEASE();
         sel4bench_start_counters(benchmark_bf);
@@ -329,10 +334,6 @@ void notified(microkit_channel ch) {
                 panic("BENCHMARK: Error, unimplemented benchmark state transition");
         }
 #ifdef CONFIG_BENCHMARK_TRACK_UTILISATION
-        uint64_t total;
-        uint64_t kernel;
-        uint64_t entries;
-        uint64_t number_schedules;
         stop_benchmark();
 #endif
 

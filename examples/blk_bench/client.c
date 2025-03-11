@@ -20,8 +20,6 @@
 #include <sddf/benchmark/config.h>
 #include <benchmark_config.h>
 #include <benchmark_traces.h>
-// XXX: How to set the SIZE of blk data memory region in meta.py??
-//#include <blk_config.h>
 
 #include <sddf/benchmark/config.h>
 
@@ -33,7 +31,7 @@ __attribute__((__section__(".benchmark_blk_client_config"))) benchmark_blk_clien
 
 __attribute__((__section__(".blk_client_config"))) blk_client_config_t blk_config;
 
-#define DO_LOG_DEBUG
+//#define DO_LOG_DEBUG
 
 #ifdef DO_LOG_DEBUG
 #define LOG_CLIENT(...) do{ sddf_printf("CLIENT|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
@@ -291,7 +289,7 @@ void handle_random_operations_run(blk_req_code_t request_code, const uint32_t* r
              */
             uint32_t block_number = request_offsets_arr[i];
             uint16_t count = BENCHMARK_BLOCKS_PER_REQUEST[benchmark_size_idx];
-            LOG_CLIENT("offset: %ld, block num: %d, count: %d\n", io_or_offset, block_number, count);
+            //LOG_CLIENT("offset: %ld, block num: %d, count: %d\n", io_or_offset, block_number, count);
             int err = blk_enqueue_req(&blk_queue, request_code, io_or_offset, block_number, count, i);
             assert(!err);
         }
