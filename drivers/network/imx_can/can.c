@@ -11,7 +11,6 @@ volatile struct canfd_registers *canfd_regs;
 /* Specified in 11.8.2.11 - Reset */
 static void soft_reset(void) {
     control_regs->mcr = MCR_SOFT_RESET;
-
     // Spin until SOFT_RESET is deasserted (this happens when the reset completes)
     while (control_regs->mcr & MCR_SOFT_RESET);
 }
