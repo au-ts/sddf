@@ -11,6 +11,11 @@ on:
   push:
     branches: [ "main" ]
 
+env:
+  MICROKIT_VERSION: 2.0.0
+  MICROKIT_URL: https://github.com/seL4/microkit/releases/download/2.0.0/microkit-sdk-2.0.0
+  SDFGEN_VERSION: 0.21.0
+
 jobs:
   build_linux_x86_64:
     name: Linux x86-64
@@ -20,8 +25,8 @@ jobs:
         uses: actions/checkout@v4
       - name: Download Microkit SDK
         run: |
-          wget https://github.com/seL4/microkit/releases/download/2.0.0/microkit-sdk-2.0.0-linux-x86-64.tar.gz
-          tar xf microkit-sdk-2.0.0-linux-x86-64.tar.gz
+          wget ${{ env.MICROKIT_URL }}-linux-x86-64.tar.gz
+          tar xf microkit-sdk-${{ env.MICROKIT_VERSION }}-linux-x86-64.tar.gz
       - name: Install dependencies (via apt)
         run: sudo apt update && sudo apt install -y make llvm lld imagemagick device-tree-compiler
       - name: Download and install AArch64 GCC toolchain
@@ -36,9 +41,9 @@ jobs:
       - name: Setup pyenv
         run: |
           python3 -m venv venv
-          ./venv/bin/pip install sdfgen==0.21.0
+          ./venv/bin/pip install --upgrade sdfgen==${{ env.SDFGEN_VERSION }}
       - name: Build and run examples
-        run: ./ci/examples.sh ${PWD}/microkit-sdk-2.0.0
+        run: ./ci/examples.sh ${PWD}/microkit-sdk-${{ env.MICROKIT_VERSION }}
         shell: bash
         env:
           PYTHON: ${{ github.workspace }}/venv/bin/python
@@ -61,8 +66,8 @@ jobs:
         uses: actions/checkout@v4
       - name: Download Microkit SDK
         run: |
-          wget https://github.com/seL4/microkit/releases/download/2.0.0/microkit-sdk-2.0.0-macos-aarch64.tar.gz
-          tar xf microkit-sdk-2.0.0-macos-aarch64.tar.gz
+          wget ${{ env.MICROKIT_URL }}-macos-aarch64.tar.gz
+          tar xf microkit-sdk-${{ env.MICROKIT_VERSION }}-macos-aarch64.tar.gz
       - name: Install dependencies (via Homebrew)
         run: |
           brew install llvm lld make imagemagick dtc
@@ -71,17 +76,17 @@ jobs:
         uses: mlugg/setup-zig@v1.2.0
         with:
           version: master
-      - name: Setup pyenv
-        run: |
-          python3 -m venv venv
-          ./venv/bin/pip install sdfgen==0.21.0
       - name: Download and install AArch64 GCC toolchain
         run: |
           wget -O aarch64-toolchain.tar.xz https://trustworthy.systems/Downloads/microkit/arm-gnu-toolchain-12.3.rel1-darwin-arm64-aarch64-none-elf.tar.xz
           tar xf aarch64-toolchain.tar.xz
           echo "$(pwd)/arm-gnu-toolchain-12.3.rel1-darwin-arm64-aarch64-none-elf/bin" >> $GITHUB_PATH
+      - name: Setup pyenv
+        run: |
+          python3 -m venv venv
+          ./venv/bin/pip install --upgrade sdfgen==${{ env.SDFGEN_VERSION }}
       - name: Build and run examples
-        run: ./ci/examples.sh ${PWD}/microkit-sdk-2.0.0
+        run: ./ci/examples.sh ${PWD}/microkit-sdk-${{ env.MICROKIT_VERSION }}
         shell: bash
         env:
           PYTHON: ${{ github.workspace }}/venv/bin/python
