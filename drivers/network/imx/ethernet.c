@@ -276,7 +276,7 @@ static void eth_setup(void)
     /* Do not forward frames with errors + check the csum */
     eth->racc = RACC_LINEDIS | RACC_IPDIS | RACC_PRODIS;
     /* Add the checksum for known IP protocols */
-    eth->tacc = TACC_PROCHK | TACC_IPCHK;
+    /* eth->tacc = TACC_PROCHK | TACC_IPCHK; */
 
     /* Set RDSR */
     eth->rdsr = device_resources.regions[1].io_addr;

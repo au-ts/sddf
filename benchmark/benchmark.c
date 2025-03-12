@@ -157,18 +157,28 @@ static inline void seL4_BenchmarkTrackDumpSummary(benchmark_track_kernel_entry_t
 }
 #endif
 
-
 void notified(microkit_channel ch)
 {
+    sddf_printf("[benchmark pd]: notified on channel %d, start_ch: %d\n", ch, benchmark_config.start_ch);
     if (ch == serial_config.tx.id) {
         return;
     } else if (ch == benchmark_config.start_ch) {
+        sddf_printf("[benchmark pd]: start ch\n");
+        /* sddf_printf("[benchmark pd]: start ch, %d, %d, %d, %d\n", */
+                    /* BENCHMARK_TCB_UTILISATION, */
+                    /* BENCHMARK_TCB_NUMBER_SCHEDULES, */
+                    /* BENCHMARK_TCB_KERNEL_UTILISATION, */
+                    /* BENCHMARK_TCB_NUMBER_KERNEL_ENTRIES); */
 #ifdef MICROKIT_CONFIG_benchmark
+
+        seL4_BenchmarkNullSyscall();
+
         sel4bench_reset_counters();
         THREAD_MEMORY_RELEASE();
         sel4bench_start_counters(benchmark_bf);
 
 #ifdef CONFIG_BENCHMARK_TRACK_UTILISATION
+        sddf_printf("start benchmark\n");
         microkit_benchmark_start();
 #endif
 
@@ -197,6 +207,7 @@ void notified(microkit_channel ch)
         print_total_utilisation_details(kernel, entries, number_schedules, total);
         for (uint8_t i = 0; i < benchmark_config.num_children; i++) {
             uint8_t child_id = benchmark_config.children[i].child_id;
+            sddf_printf("stop benchmark\n");
             microkit_benchmark_stop_tcb(child_id, &total, &number_schedules, &kernel, &entries);
             print_pd_utilisation_details(child_id, kernel, entries, number_schedules, total);
         }
@@ -260,6 +271,7 @@ void init(void)
         sddf_printf("Log buffer set\n");
     }
 #endif
+    sddf_printf("Benchmark is ready\n");
 }
 
 seL4_Bool fault(microkit_child id, microkit_msginfo msginfo, microkit_msginfo *reply_msginfo)
