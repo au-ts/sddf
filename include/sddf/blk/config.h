@@ -24,6 +24,7 @@ typedef struct blk_connection_resource {
     region_resource_t resp_queue;
     uint16_t num_buffers;
     uint8_t id;
+    uint8_t id_state;
 } blk_connection_resource_t;
 
 typedef struct blk_driver_config {
