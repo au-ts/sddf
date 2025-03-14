@@ -1,7 +1,7 @@
 /*
- * Copyright 2024, UNSW
- * SPDX-License-Identifier: BSD-2-Clause
- */
+* Copyright 2024, UNSW
+* SPDX-License-Identifier: BSD-2-Clause
+*/
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -40,6 +40,7 @@ typedef struct {
     uint32_t head; /* index to remove from */
     uint32_t capacity; /* capacity of the ring */
     volatile struct descriptor *descr; /* buffer descripter array */
+    net_buff_desc_t descr_mdata[MAX_COUNT]; /* associated meta data array */
 } hw_ring_t;
 
 hw_ring_t rx;
@@ -71,8 +72,8 @@ static void update_ring_slot(hw_ring_t *ring, unsigned int idx, uint32_t addr_lo
     d->addr_high = addr_high;
     d->des2 = des2;
     /* Ensure all writes to the descriptor complete, before we set the flags
-     * that makes hardware aware of this slot.
-     */
+    * that makes hardware aware of this slot.
+    */
     THREAD_MEMORY_RELEASE();
     d->des3 = des3;
 }
@@ -87,7 +88,8 @@ static void rx_provide()
             assert(!err);
 
             uint32_t idx = rx.tail % rx.capacity;
-            update_ring_slot(&rx, idx, buffer.io_or_offset, buffer.io_or_offset >> 32, 0,
+            rx.descr_mdata[idx] = buffer;
+            update_ring_slot(&rx, idx, (uint32_t)buffer.io_or_offset, buffer.io_or_offset >> 32, 0,
                              DESC_RXSTS_OWNBYDMA | DESC_RXSTS_BUFFER1_ADDR_VALID | DESC_RXSTS_IOC);
             /* We will update the hardware register that stores the tail address. This tells
             the device that we have new descriptors to use. */
@@ -119,11 +121,13 @@ static void rx_return(void)
 
         THREAD_MEMORY_ACQUIRE();
 
+        net_buff_desc_t buffer = rx.descr_mdata[idx];
         if (d->des3 & DESC_RXSTS_ERROR) {
             sddf_dprintf("ETH|ERROR: RX descriptor returned with error status %x\n", d->des3);
             idx = rx.tail % rx.capacity;
-            update_ring_slot(&rx, idx, d->addr_low, d->addr_high, 0,
-                             DESC_RXSTS_OWNBYDMA | DESC_RXSTS_BUFFER1_ADDR_VALID | DESC_RXSTS_IOC);
+            rx.descr_mdata[idx] = buffer;
+            update_ring_slot(&rx, idx, (uint32_t)buffer.io_or_offset, buffer.io_or_offset >> 32, 0,
+                DESC_RXSTS_OWNBYDMA | DESC_RXSTS_BUFFER1_ADDR_VALID | DESC_RXSTS_IOC);
 
             /* We will update the hardware register that stores the tail address. This tells
             the device that we have new descriptors to use. */
@@ -131,7 +135,7 @@ static void rx_return(void)
             rx.tail++;
         } else {
             /* Read 0-14 bits to get length of received packet, manual pg 4081, table 11-152, RDES3 Normal Descriptor */
-            net_buff_desc_t buffer = { (uint64_t)d->addr_low | (((uint64_t) d->addr_high) << 32), d->des3 & 0x7FFF };
+            buffer.len = (d->des3 & 0x7FFF);
             int err = net_enqueue_active(&rx_queue, buffer);
             assert(!err);
             packets_transferred = true;
@@ -162,15 +166,15 @@ static void tx_provide(void)
             // For normal transmit descriptors, we need to give ownership to DMA, as well as indicate
             // that this is the first and last parts of the current packet.
             uint32_t des3 = (DESC_TXSTS_OWNBYDMA | DESC_TXCTRL_TXFIRST | DESC_TXCTRL_TXLAST | DESC_TXCTRL_TXCIC
-                             | buffer.len);
-
-            update_ring_slot(&tx, idx, buffer.io_or_offset & 0xffffffff, buffer.io_or_offset >> 32, des2, des3);
+                              | buffer.len);
+            tx.descr_mdata[idx] = buffer;
+            update_ring_slot(&tx, idx, (uint32_t)buffer.io_or_offset, buffer.io_or_offset >> 32, des2, des3);
 
             tx.tail++;
             /* Set the tail in hardware to the latest tail we have inserted in.
-             * This tells the hardware that it has new buffers to send.
+            * This tells the hardware that it has new buffers to send.
              * NOTE: Setting this on every enqueued packet for sanity, change this to once per batch.
-             */
+            */
             *DMA_REG(DMA_CH0_TXDESC_TAIL_PTR) = tx_desc_base + sizeof(struct descriptor) * (idx);
         }
 
@@ -196,7 +200,7 @@ static void tx_return(void)
         }
         THREAD_MEMORY_ACQUIRE();
 
-        net_buff_desc_t buffer = { (uint64_t)d->addr_low | (((uint64_t) d->addr_high) << 32), 0 };
+        net_buff_desc_t buffer = tx.descr_mdata[idx];
         int err = net_enqueue_free(&tx_queue, buffer);
         assert(!err);
         enqueued = true;
@@ -356,11 +360,11 @@ static void eth_init()
 
     /* TX tail pointer not written until we need to TX a packet */
     /*
-	 * Point RX tail pointer at last descriptor. Ideally, we'd point at the
-	 * first descriptor, implying all descriptors were available. However,
-	 * that's not distinguishable from none of the descriptors being
-	 * available.
-	 */
+    * Point RX tail pointer at last descriptor. Ideally, we'd point at the
+    * first descriptor, implying all descriptors were available. However,
+    * that's not distinguishable from none of the descriptors being
+    * available.
+    */
     *DMA_REG(DMA_CH0_RXDESC_TAIL_PTR) = rx_desc_base + (sizeof(struct descriptor) * (RX_COUNT - 1));
 }
 
@@ -419,9 +423,9 @@ void init(void)
     }
 
     net_queue_init(&rx_queue, config.virt_rx.free_queue.vaddr, config.virt_rx.active_queue.vaddr,
-                   config.virt_rx.num_buffers);
+                config.virt_rx.num_buffers);
     net_queue_init(&tx_queue, config.virt_tx.free_queue.vaddr, config.virt_tx.active_queue.vaddr,
-                   config.virt_tx.num_buffers);
+                config.virt_tx.num_buffers);
     eth_setup();
 
     microkit_irq_ack(device_resources.irqs[0].id);
