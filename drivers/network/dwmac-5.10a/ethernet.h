@@ -10,7 +10,6 @@
 
 /* Helper macros */
 
-#define BIT(x) (1U << x)
 #define MAC_REG(x) ((volatile uint32_t *)(eth_regs + x))
 #define MTL_REG(x) ((volatile uint32_t *)(eth_regs + x))
 #define DMA_REG(x) ((volatile uint32_t *)(eth_regs + x))

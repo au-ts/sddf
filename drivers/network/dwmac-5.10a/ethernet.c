@@ -131,7 +131,7 @@ static void rx_return(void)
             rx.tail++;
         } else {
             /* Read 0-14 bits to get length of received packet, manual pg 4081, table 11-152, RDES3 Normal Descriptor */
-            net_buff_desc_t buffer = { (uint64_t)d->addr_low | ((uint64_t d->addr_high) << 32), d->des3 & 0x7FFF };
+            net_buff_desc_t buffer = { (uint64_t)d->addr_low | (((uint64_t) d->addr_high) << 32), d->des3 & 0x7FFF };
             int err = net_enqueue_active(&rx_queue, buffer);
             assert(!err);
             packets_transferred = true;
@@ -196,7 +196,7 @@ static void tx_return(void)
         }
         THREAD_MEMORY_ACQUIRE();
 
-        net_buff_desc_t buffer = { (uint64_t)d->addr_low | ((uint64_t d->addr_high) << 32), 0 };
+        net_buff_desc_t buffer = { (uint64_t)d->addr_low | (((uint64_t) d->addr_high) << 32), 0 };
         int err = net_enqueue_free(&tx_queue, buffer);
         assert(!err);
         enqueued = true;
@@ -386,7 +386,7 @@ void init(void)
     assert(RX_COUNT * sizeof(struct descriptor) <= device_resources.regions[1].region.size);
     assert(TX_COUNT * sizeof(struct descriptor) <= device_resources.regions[2].region.size);
 
-    eth_regs = (void *)device_resources.regions[0].region.vaddr;
+    eth_regs = (uintptr_t)device_resources.regions[0].region.vaddr;
 
     /* De-assert the reset signals that u-boot left asserted. */
 #ifdef CONFIG_PLAT_STAR64
