@@ -171,8 +171,6 @@ void notified(microkit_channel ch)
                     /* BENCHMARK_TCB_NUMBER_KERNEL_ENTRIES); */
 #ifdef MICROKIT_CONFIG_benchmark
 
-        seL4_BenchmarkNullSyscall();
-
         sel4bench_reset_counters();
         THREAD_MEMORY_RELEASE();
         sel4bench_start_counters(benchmark_bf);
