@@ -2,6 +2,12 @@
 
 #include "can.h"
 
+/*
+    TODO
+    > Atm none of the functions have any form of timeout or software error reporting - possibly should add this (similar to Linux kernel?)
+    > Don't offer any configuration options - e.g. using the mailboxes and not FIFO, etc
+*/
+
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
 volatile struct control_registers *control_regs;
@@ -10,31 +16,33 @@ volatile struct canfd_registers *canfd_regs;
 
 /* Specified in 11.8.2.11 - Reset */
 static void soft_reset(void) {
-    control_regs->mcr = MCR_SOFT_RESET;
+    control_regs->mcr = MCR_SOFTRST;
     // Spin until SOFT_RESET is deasserted (this happens when the reset completes)
-    while (control_regs->mcr & MCR_SOFT_RESET);
+    while (control_regs->mcr & MCR_SOFTRST);
 }
 
 /* Specified in 11.8.2.1.1.1 */
 static void freeze(void) {
-    control_regs->mcr |= (MCR_HALT | MCR_FREEZE);
+    control_regs->mcr |= (MCR_HALT | MCR_FRZ);
     // Spin until FREEZE_ACK is asserted
-    while (!(control_registers->mcr & MCR_FREEZE_ACK));
+    while (!(control_registers->mcr & MCR_FRZACK));
 }
 
 /* Specified in 11.8.2.1.1.1 */
 static void unfreeze(void) {
     control_regs->mcr &= ~MCR_HALT;
     // Spin until FREEZE_ACK is deasserted
-    while (control_regs->mcr & MCR_FREEZE_ACK); 
+    while (control_regs->mcr & MCR_FRZACK); 
 }
 
 /* Specified in 11.8.4.1 - FlexCAN Initialization Sequence */
-static void can_setup(void) {
+static void can_init(void) {
     /* Setup references to the different groups of registers */
     control_regs = device_resources.regions[0].region.vaddr;
     error_regs = device_resources.regions[0].region.vaddr + ERROR_REGISTER_OFFSET;
     canfd_regs = device_resources.regions[0].region.vaddr + CANFD_REGISTER_OFFSET;
+
+    /* TODO - note that the Linux kernel does some extra setup here - ram_init and bittiming -- not certain if these are necessary or extra features? */
 
     /* Reset */
     soft_reset();
@@ -42,24 +50,67 @@ static void can_setup(void) {
     /* Freeze */
     freeze();
 
-    /* MCR Register Setup */
-    // TODO - stopped here -- following along the init process 
+    /* Module Configuration Register (MCR) init */
+    mcr_init();
+
+    /*  */
 }
 
+/* Specified in 11.8.4.1 - FlexCAN Initialization Sequence */
+static void mcr_init(void) {
+    /* TODO -- stuff the Linux kernel sets (or doesnt)
+        - do I need to set max mailbox number here?
+        - do I need to modify access (i.e. SUPV?)
+        - do I need to set the ID acceptance mode? (IDAM)
+        - do I need to set abort mechanism? Linux seems to ignore AEN
+        - do I need the local priority bit? Linux also ignores this and it just adds backwards compatibility?
+     */
+
+    // Initial iteration only allows use of mailboxes and is fixed to normal mode
+
+    // Enable individual Rx matching
+    control_registers->mcr |= MCR_IRMQ;
+    // Enable warning interrupts
+    control_registers->mcr |= MCR_WRNEN;
+    // Disable self-reception of frames (this needs to be enabled for loopback mode to work)
+    control_registers->mcr |= MCR_SRXDIS;
+    // Disable Rx FIFO (thus we're using mailboxes)
+    control_registers->mcr &= ~MCR_RFEN;
+    // Enable the abort mechanism for Tx MBs 
+    control_registers->mcr |= MCR_AEN;
+    // Enable the local priority bit for backwards compatibility
+    control_registers->mcr |= MCR_LPRIOEN; 
+}
+
+/*
+    // CBT - can bit timing register --> linux does this but can't find the implementation
+    // CTRL1 - 
+
+     2. Initialize the Control 1 register (CTRL1) and optionally the CAN Bit Timing register
+    (CBT). Initialize also the CAN FD CAN Bit Timing register (FDCBT).
+    a. Determine the bit timing parameters: PROPSEG, PSEG1, PSEG2, and RJW.
+    b. Optionally determine the bit timing parameters: EPROPSEG, EPSEG1,
+    EPSEG2, and ERJW.
+    c. Determine the CAN FD bit timing parameters: FPROPSEG, FPSEG1, FPSEG2,
+    and FRJW.
+    d. Determine the bit rate by programming the PRESDIV field and optionally the
+    EPRESDIV field.
+    e. Determine the CAN FD bit rate by programming the FPRESDIV field.
+    f. Determine the internal arbitration mode (LBUF).
+*/
+
+// microkit init
 void init (void) {
-    can_setup();
+    can_init();
     // call all initialisation for the device / software interface here
     // first thing is basically going to be reading and writing a register
 }
 
+// microkit notified
 void notified(microkit_channel ch) {
     ;
 }
 
-/*
-    TODO
-    > Atm none of the functions have any form of timeout or software error reporting - possibly should add this (similar to Linux kernel?)
-*/
 // Initially just boot the device and try to read and write one of the registers in the Module Configuration Register (MCR)
 
 // Implementation for initialisation

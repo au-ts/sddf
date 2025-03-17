@@ -20,38 +20,51 @@
 */
 
 /* FlexCAN Module Configuration Register (MCR) - 11.8.5.2.2 */
-#define MCR_DISABLE         (1UL << 31) /* Module Disable -- Controls whether FlexCAN is enabled or not - 0b = Enable, 1b = Disable */
-#define MCR_FREEZE          (1UL << 30) /* Freeze Enable -- Specifies behaviour when MCR[HALT] is enabled - 0b = Won't enter freeze, 1b = Will enter freeze*/
-#define MCR_RX_FIFO         (1UL << 29) /* Rx FIFO Enable -- Specifies whether Rx FIFO is enabled or not - 0b = Disabled, 1b = Enabled */
-#define MCR_HALT            (1UL << 28) /* Halt FlexCAN -- Assertion puts FlexCAN into Freeze Mode - 0b = No freeze request, 1b = Freeze request */
-#define MCR_NOT_READY       (1UL << 27) /* FlexCAN Not Ready -- (Read-only) Indicates whether in operation mode or not. 0b = Normal, 1b = Not-operational */
-#define MCR_WAKE_INT_MASK   (1UL << 26) /* Wake Up Interrupt Mask -- Enables wake up interrupt generation - 0b = Disabled, 1b = Enabled */
-#define MCR_SOFT_RESET      (1UL << 25) /* Soft Reset -- On assertion resets internal state machines/registers - 0b = No request, 1b = Reset request */
-#define MCR_FREEZE_ACK      (1UL << 24) /* Freeze Mode Acknowledge -- (Read-only) Indicates if in freeze mode - 0b = Not in freeze, 1b = In freeze */
-#define MCR_SUPERVISOR      (1UL << 23) /* Supervisor Mode -- Configures FlexCAN to be in supervisor or user mode. ob = User mode, 1b = Supervisor mode */
-#define MCR_SELF_WAKE       (1UL << 22) /* Self Wake Up -- Enable self wake up when in low power mode - 0b = Disabled, 1b = Enabled */
-#define MCR_WARN_INT        (1UL << 21) /* Warning Interrupt Enable -- Enables generation of errors in status register - 0b - Disabled, 1b = Enabled */
-#define MCR_LOW_POWER_ACK   (1UL << 20) /* Low-Power Mode Acknowledge -- (Read-only) Indicates FlexCAN is in low-power mode - 0b = Not in mode, 1b = in mode */
-#define MCR_WAKE_SOURCE     (1UL << 19) /* Wake Up Source -- Whether low-pass filter applied to Rx - 0b = unfiltered, 1b = filtered */
-#define MCR_DOZE            (1UL << 18) /* Doze Mode Enable -- Determines whether can go low-power when Doze requested - 0b = Disabled, 1b = Enabled */
-#define MCR_SELF_RECEPTION  (1UL << 17) /* Self Reception Disable -- Whether FlexCAN receive frames transmitted by itself - 0b = Enabled, 1b = Disabled */
-#define MCR_RX_MASK_QUEUE   (1UL << 16) /* Individual Rx Masking and Queue Enable -- Determines matching scheme for Rx - 0b = Disabled, 1b = Enabled */
-#define MCR_DMA             (1UL << 15) /* DMA - Enable -- Controls whether DMA is enabled or not for Rx FIFO - 0b = Disabled, 1b = Enabled */
-#define MCR_RESERVED_0      (1UL << 14) /* Reserved */
-#define MCR_LOCAL_PRIORITY  (1UL << 13) /* Local Priority Enable -- Local priority control for backward compatibility - 0b = Disabled, 1b = Enabled */
-#define MCR_ABORT           (1UL << 12) /* Abort Enable -- Enables Tx abort mechanism - 0b = Disabled, 1b = Enabled */
-#define MCR_CAN_FD          (1UL << 11) /* CAN FD Operation Enable -- Enables CANFD operation - 0b = Disabled, 1b = Enabled */
-#define MCR_RESERVED_1      (1UL << 10) /* Reserved */
-#define MCR_ID_ACCEPT       (3UL << 8) /* ID Acceptance Mode - 2-bit field identifies format of Rx FIFO ID filter table elements - See docs for details*/
-#define MCR_RESERVED_2      (1UL << 7) /* Reserved */
-#define MCR_NUM_MB          (127UL << 0) /* Number Of The Last Message Buffer - 7-bit field defines number of last message buffers - See docs for details */
+#define MCR_MDIS            (1UL << 31)     /* Module Disable -- Controls whether FlexCAN is enabled or not - 0b = Enable, 1b = Disable */
+#define MCR_FRZ             (1UL << 30)     /* Freeze Enable -- Specifies behaviour when MCR[HALT] is enabled - 0b = Won't enter freeze, 1b = Will enter freeze*/
+#define MCR_RFEN            (1UL << 29)     /* Rx FIFO Enable -- Specifies whether Rx FIFO is enabled or not - 0b = Disabled, 1b = Enabled */
+#define MCR_HALT            (1UL << 28)     /* Halt FlexCAN -- Assertion puts FlexCAN into Freeze Mode - 0b = No freeze request, 1b = Freeze request */
+#define MCR_NOTRDY          (1UL << 27)     /* FlexCAN Not Ready -- (Read-only) Indicates whether in operation mode or not. 0b = Normal, 1b = Not-operational */
+#define MCR_WAKMSK          (1UL << 26)     /* Wake Up Interrupt Mask -- Enables wake up interrupt generation - 0b = Disabled, 1b = Enabled */
+#define MCR_SOFTRST         (1UL << 25)     /* Soft Reset -- On assertion resets internal state machines/registers - 0b = No request, 1b = Reset request */
+#define MCR_FRZACK          (1UL << 24)     /* Freeze Mode Acknowledge -- (Read-only) Indicates if in freeze mode - 0b = Not in freeze, 1b = In freeze */
+#define MCR_SUPV            (1UL << 23)     /* Supervisor Mode -- Configures FlexCAN to be in supervisor or user mode. ob = User mode, 1b = Supervisor mode */
+#define MCR_SLFWAK          (1UL << 22)     /* Self Wake Up -- Enable self wake up when in low power mode - 0b = Disabled, 1b = Enabled */
+#define MCR_WRNEN           (1UL << 21)     /* Warning Interrupt Enable -- Enables generation of errors in status register - 0b - Disabled, 1b = Enabled */
+#define MCR_LPMACK          (1UL << 20)     /* Low-Power Mode Acknowledge -- (Read-only) Indicates FlexCAN is in low-power mode - 0b = Not in mode, 1b = in mode */
+#define MCR_WAKSRC          (1UL << 19)     /* Wake Up Source -- Whether low-pass filter applied to Rx - 0b = unfiltered, 1b = filtered */
+#define MCR_DOZE            (1UL << 18)     /* Doze Mode Enable -- Determines whether can go low-power when Doze requested - 0b = Disabled, 1b = Enabled */
+#define MCR_SRXDIS          (1UL << 17)     /* Self Reception Disable -- Whether FlexCAN receive frames transmitted by itself - 0b = Enabled, 1b = Disabled */
+#define MCR_IRMQ            (1UL << 16)     /* Individual Rx Masking and Queue Enable -- Determines matching scheme for Rx - 0b = Disabled, 1b = Enabled */
+#define MCR_DMA             (1UL << 15)     /* DMA - Enable -- Controls whether DMA is enabled or not for Rx FIFO - 0b = Disabled, 1b = Enabled */
+#define MCR_RESERVED0       (1UL << 14)     /* Reserved */
+#define MCR_LPRIOEN         (1UL << 13)     /* Local Priority Enable -- Local priority control for backward compatibility - 0b = Disabled, 1b = Enabled */
+#define MCR_AEN             (1UL << 12)     /* Abort Enable -- Enables Tx abort mechanism - 0b = Disabled, 1b = Enabled */
+#define MCR_FDEN            (1UL << 11)     /* CAN FD Operation Enable -- Enables CANFD operation - 0b = Disabled, 1b = Enabled */
+#define MCR_RESERVED1       (1UL << 10)     /* Reserved */
+#define MCR_IDAM            (3UL << 8)      /* ID Acceptance Mode - 2-bit field identifies format of Rx FIFO ID filter table elements - See docs for details*/
+#define MCR_RESERVED2       (1UL << 7)      /* Reserved */
+#define MCR_MAXMB           (127UL << 0)    /* Number Of The Last Message Buffer - 7-bit field defines number of last message buffers - See docs for details */
 
-
-/* Can break these up into separate structs for different groupings of registers */
-/* Use reserved to pad out when there is a gap in the hex (the gap might be as other devices might use them but we don't)*/
-
-/* TODO - ATM these are organised as separate structs but really they're just offsets into memory -- should combine them into a megastruct as 
-the DTB treats them as a single region. Talk to Ivan about easiest/neatest way to do this */
+/* FlexCAN Control 1 Register (CTRL1) - 11.8.5.2.3 */
+#define CTRL1_PRESDIV       (255UL << 23)   /* Prescaler Division Factor */
+#define CTRL1_RJW           (3UL << 21)     /* Resync Jump Width */
+#define CTRL1_PSEG1         (7UL << 18)     /* Phase Segment 1 */
+#define CTRL1_PSEG2         (7UL << 15)     /* Phase Segment 2 */
+#define CTRL1_BOFFMSK       (1UL << 14)     /* Bus Off Interrupt Mask */
+#define CTRL1_ERRMSK        (1UL << 13)     /* Error Interrupt Mask */
+#define CTRL1_CLKSRC        (1UL << 12)     /* CAN Engine Clock Source */
+#define CTRL1_LPB           (1UL << 11)     /* Loop Back Mode */
+#define CTRL1_TWRNMSK       (1UL << 10)     /* Tx Warning Interrupt Mask */
+#define CTRL1_RWRNMSK       (1UL << 9)      /* Rx Warning Interrupt Mask */
+#define CTRL1_RESERVED0     (1UL << 8)      /* Reserved */
+#define CTRL1_RESERVED1     (1UL << 7)      /* Reserved */
+#define CTRL1_SMP           (1UL << 6)      /* CAN Bit Sampling */
+#define CTRL1_BOFFREC       (1UL << 5)      /* Bus Off Recovery */
+#define CTRL1_TSYN          (1UL << 4)      /* Timer Sync */
+#define CTRL1_LBUF          (1UL << 3)      /* Lowest Buffer Transmitted First */
+#define CTRL1_LOM           (1UL << 2)      /* Listen-Only Mode */
+#define CTRL1_PROPSEG       (3UL << 0)      /* Propagation Segment */
 
 /* FlexCAN Control Registers - these are mainly for configuring and interacting with the module. */
 struct control_registers {
