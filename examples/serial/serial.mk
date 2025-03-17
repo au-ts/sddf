@@ -59,6 +59,9 @@ else ifeq ($(strip $(MICROKIT_BOARD)), imx8mm_evk)
 	CPU := cortex-a53
 else ifeq ($(strip $(MICROKIT_BOARD)), star64)
 	DRIVER_DIR := snps
+else ifeq ($(strip $(MICROKIT_BOARD)), zcu102)
+	DRIVER_DIR := zynqmp
+	CPU := cortex-a53
 else
 $(error Unsupported MICROKIT_BOARD given)
 endif
