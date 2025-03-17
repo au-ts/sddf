@@ -10,10 +10,9 @@
 #include <sddf/serial/config.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <uart.h>
+// #include <uart.h>
 
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
-
 __attribute__((__section__(".serial_driver_config"))) serial_driver_config_t config;
 
 serial_queue_handle_t rx_queue_handle;
@@ -37,6 +36,7 @@ static void handle_irq(void)
 
 static void uart_setup(void)
 {
+    sddf_dprintf("uart driver starting\n");
 }
 
 void init(void)
