@@ -1,1 +1,0 @@
-// TODO write example here to test CAN driver

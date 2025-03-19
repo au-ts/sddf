@@ -1,1 +1,55 @@
-# TODO - I think this is the top-level makefile for the project
+#
+# Copyright 2024, UNSW
+#
+# SPDX-License-Identifier: BSD-2-Clause
+#
+
+ifeq ($(strip $(MICROKIT_SDK)),)
+$(error MICROKIT_SDK must be specified)
+endif
+override MICROKIT_SDK := $(abspath ${MICROKIT_SDK})
+
+BUILD_DIR ?= build
+# By default we make a debug build so that the client debug prints can be seen.
+MICROKIT_CONFIG ?= debug
+
+ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
+	export CAN_DRIVER_DIR := meson
+	export CPU := cortex-a55
+else ifeq ($(strip $(MICROKIT_BOARD)), odroidc2)
+	export CAN_DRIVER_DIR := meson
+	export CPU := cortex-a53
+else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
+	export CAN_DRIVER_DIR := arm
+	export CPU := cortex-a53
+	QEMU := qemu-system-aarch64
+else ifeq ($(strip $(MICROKIT_BOARD)), star64)
+	export CAN_DRIVER_DIR := jh7110
+else ifneq ($(filter $(strip $(MICROKIT_BOARD)),imx8mm_evk imx8mp_evk imx8mq_evk maaxboard),)
+	export CAN_DRIVER_DIR := imx_can
+	export CPU := cortex-a53
+else
+$(error Unsupported MICROKIT_BOARD given)
+endif
+
+CC := clang
+LD := ld.lld
+export MICROKIT_TOOL ?= $(abspath $(MICROKIT_SDK)/bin/microkit)
+
+export BOARD_DIR := $(abspath $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG))
+export SDDF := $(abspath ../..)
+export TOP:= $(abspath $(dir ${MAKEFILE_LIST}))
+export ARCH := ${shell grep 'CONFIG_SEL4_ARCH  ' $(BOARD_DIR)/include/kernel/gen_config.h | cut -d' ' -f4}
+IMAGE_FILE := $(BUILD_DIR)/loader.img
+REPORT_FILE := $(BUILD_DIR)/report.txt
+
+all: ${IMAGE_FILE}
+
+qemu ${IMAGE_FILE} ${REPORT_FILE} clean clobber: $(IMAGE_FILE) ${BUILD_DIR}/Makefile FORCE
+	${MAKE} -C ${BUILD_DIR} MICROKIT_SDK=${MICROKIT_SDK} $(notdir $@)
+
+${BUILD_DIR}/Makefile: can.mk
+	mkdir -p ${BUILD_DIR}
+	cp can.mk ${BUILD_DIR}/Makefile
+
+FORCE:
