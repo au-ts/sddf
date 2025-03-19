@@ -51,10 +51,7 @@ else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_riscv64)
 					  -chardev pty,id=virtcon \
 					  -device virtconsole,chardev=virtcon
 	DRIVER_DIR := virtio
-else ifeq ($(strip $(MICROKIT_BOARD)), maaxboard)
-	DRIVER_DIR := imx
-	CPU := cortex-a53
-else ifeq ($(strip $(MICROKIT_BOARD)), imx8mm_evk)
+else ifneq ($(filter $(strip $(MICROKIT_BOARD)),imx8mm_evk imx8mp_evk imx8mq_evk maaxboard),)
 	DRIVER_DIR := imx
 	CPU := cortex-a53
 else ifeq ($(strip $(MICROKIT_BOARD)), star64)

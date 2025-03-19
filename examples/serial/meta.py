@@ -54,6 +54,18 @@ BOARDS: List[Board] = [
         serial="soc@0/bus@30800000/spba-bus@30800000/serial@30890000"
     ),
     Board(
+        name="imx8mp_evk",
+        arch=SystemDescription.Arch.AARCH64,
+        paddr_top=0xa_000_000,
+        serial="soc@0/bus@30800000/spba-bus@30800000/serial@30890000"
+    ),
+    Board(
+        name="imx8mq_evk",
+        arch=SystemDescription.Arch.AARCH64,
+        paddr_top=0xa_000_000,
+        serial="soc@0/bus@30800000/serial@30860000",
+    ),
+    Board(
         name="star64",
         arch=SystemDescription.Arch.RISCV64,
         paddr_top=0x100000000,
