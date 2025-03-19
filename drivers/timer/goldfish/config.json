@@ -1,0 +1,18 @@
+{
+    "compatible": [
+        "google,goldfish-rtc"
+    ],
+    "resources": {
+        "regions": [
+            {
+                "name": "regs",
+                "dt_index": 0
+            }
+        ],
+        "irqs": [
+            {
+                "dt_index": 0
+            }
+        ]
+    }
+}
