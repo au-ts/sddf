@@ -89,7 +89,7 @@ struct control_registers {
     uint32_t rxfgmask;      /* 48h  Rx FIFO Global Mask Register */
     uint32_t rxfir;         /* 4Ch  Rx FIFO Information Register */
     uint32_t cbt;           /* 50h  CAN Bit Timing Register */
-}
+};
 
 /* FlexCAN Receive Mask Registers - these are used to specify IDs to filter for when receiving CAN messages */
 // TODO - atm these are just left out but from 880-97C are 64, 32-bit Rx Individual Mask Registers
@@ -105,7 +105,7 @@ struct error_registers {
     uint32_t rerrdr;        /* AF4h Error Report Data Register */
     uint32_t rerrsynr;      /* AF8h Error Report Syndrome Register */
     uint32_t errsr;         /* AFCh Error Status Register */
-}
+};
 
 /* FlexCAN CANFD Registers - these are for enabling and using CANFD */
 #define CANFD_REGISTER_OFFSET 0xC00
@@ -113,4 +113,4 @@ struct canfd_registers {
     uint32_t fdctrl;        /* C00h CAN FD Control Register */
     uint32_t fdcbt;         /* C04h CAN FD Bit Timing Register */
     uint32_t fdcrc;         /* C08h CAN FD CRC Register */
-}
+};
