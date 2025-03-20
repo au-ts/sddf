@@ -3,9 +3,11 @@
 // SPDX-License-Identifier: BSD-2-Clause
 //
 const std = @import("std");
+const Step = std.Build.Step;
 
 const MicrokitBoard = enum {
     qemu_virt_aarch64,
+    qemu_virt_riscv64,
     odroidc2,
     odroidc4,
     star64,
@@ -27,6 +29,15 @@ const targets = [_]Target{
             .cpu_arch = .aarch64,
             .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a53 },
             .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{ .strict_align }),
+            .os_tag = .freestanding,
+            .abi = .none,
+        },
+    },
+    .{
+        .board = MicrokitBoard.qemu_virt_riscv64,
+        .zig_target = std.Target.Query{
+            .cpu_arch = .riscv64,
+            .cpu_model = .{ .explicit = &std.Target.riscv.cpu.baseline_rv64 },
             .os_tag = .freestanding,
             .abi = .none,
         },
@@ -182,6 +193,7 @@ pub fn build(b: *std.Build) !void {
 
     const driver_class = switch (microkit_board_option.?) {
         .qemu_virt_aarch64 => "arm",
+        .qemu_virt_riscv64 => "goldfish",
         .odroidc2, .odroidc4 => "meson",
         .star64 => "jh7110",
         .maaxboard, .imx8mm_evk, .imx8mp_evk, .imx8mq_evk => "imx",
@@ -266,9 +278,12 @@ pub fn build(b: *std.Build) !void {
     microkit_step.dependOn(&microkit_tool_cmd.step);
     b.default_step = microkit_step;
 
-    const loader_arg = b.fmt("loader,file={s},addr=0x70000000,cpu-num=0", .{final_image_dest});
+    // This is setting up a `qemu` command for running the system using QEMU,
+    // which we only want to do when we have a board that we can actually simulate.
+    var qemu_cmd: ?*Step.Run = null;
     if (std.mem.eql(u8, microkit_board, "qemu_virt_aarch64")) {
-        const qemu_cmd = b.addSystemCommand(&[_][]const u8{
+        const loader_arg = b.fmt("loader,file={s},addr=0x70000000,cpu-num=0", .{final_image_dest});
+        qemu_cmd = b.addSystemCommand(&[_][]const u8{
             "qemu-system-aarch64",
             "-machine",
             "virt,virtualization=on",
@@ -282,8 +297,24 @@ pub fn build(b: *std.Build) !void {
             "2G",
             "-nographic",
         });
-        qemu_cmd.step.dependOn(b.default_step);
+    }  else if (microkit_board_option.? == .qemu_virt_riscv64) {
+        qemu_cmd = b.addSystemCommand(&[_][]const u8{
+            "qemu-system-riscv64",
+            "-machine",
+            "virt",
+            "-serial",
+            "mon:stdio",
+            "-kernel",
+            final_image_dest,
+            "-m",
+            "2G",
+            "-nographic",
+        });
+    }
+
+    if (qemu_cmd) |cmd| {
+        cmd.step.dependOn(b.default_step);
         const simulate_step = b.step("qemu", "Simulate the image using QEMU");
-        simulate_step.dependOn(&qemu_cmd.step);
+        simulate_step.dependOn(&cmd.step);
     }
 }
