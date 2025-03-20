@@ -35,9 +35,9 @@ pub struct BlkRequest {
     pub request_code: BlkOp,
     pub io_or_offset: u64,
     pub block_number: u64,
-    pub count: u16,
+    pub count: u32,
     // I suggest use u32 here and change the count to use u32 in sddf_blk
-    pub success_count: u16,
-    pub count_to_do: u16,
+    pub success_count: u32,
+    pub count_to_do: u32,
     pub id: u32,
 }

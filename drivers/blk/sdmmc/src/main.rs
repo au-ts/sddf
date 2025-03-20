@@ -52,9 +52,9 @@ macro_rules! maybe_extern_var {
 const INTERRUPT: sel4_microkit::Channel = sel4_microkit::Channel::new(0);
 const BLK_VIRTUALIZER: sel4_microkit::Channel = sel4_microkit::Channel::new(1);
 
-const SDCARD_SECTOR_SIZE: u16 = 512;
-const SDDF_TRANSFER_SIZE: u16 = 4096;
-const SDDF_TO_REAL_SECTOR: u16 = SDDF_TRANSFER_SIZE / SDCARD_SECTOR_SIZE;
+const SDCARD_SECTOR_SIZE: u32 = 512;
+const SDDF_TRANSFER_SIZE: u32 = 4096;
+const SDDF_TO_REAL_SECTOR: u32 = SDDF_TRANSFER_SIZE / SDCARD_SECTOR_SIZE;
 
 const RETRY_CHANCE: u16 = 5;
 
@@ -142,14 +142,16 @@ fn init() -> HandlerImpl<SdmmcMesonHardware> {
     // sdmmc_host.test_read_one_block(0, 0xf5500000);
 
     // TODO: Should tuning be possible to fail?
-    sdmmc_host
-        .tune_performance(Some((
+    unsafe {
+        sdmmc_host
+        .tune_performance(
             unsafe_stolen_memory,
-            init_data_ioaddr,
             dummy_cache_invalidate_function,
-        )))
+            init_data_ioaddr,
+        )
         .unwrap_or_else(|error| panic!("SDMMC: Error at tuning performance {:?}", error));
-
+    }
+    
     unsafe {
         print_one_block(unsafe_stolen_memory.as_ptr(), 64);
     }
@@ -211,9 +213,12 @@ impl<T: SdmmcHardware + 'static> Handler for HandlerImpl<T> {
                                     let resp_status = BlkStatus::BlkRespOk;
                                     notify_virt = true;
                                     unsafe {
+                                        // The using try_into() to convert u32 to u16 should not be necessary unless
+                                        // there are bugs in the code can it fail
+                                        // change it later
                                         blk_enqueue_resp_helper(
                                             resp_status,
-                                            request.success_count / SDDF_TO_REAL_SECTOR,
+                                            (request.success_count / SDDF_TO_REAL_SECTOR).try_into().unwrap(),
                                             request.id,
                                         );
                                     }
@@ -224,7 +229,7 @@ impl<T: SdmmcHardware + 'static> Handler for HandlerImpl<T> {
                                     unsafe {
                                         blk_enqueue_resp_helper(
                                             resp_status,
-                                            request.success_count / SDDF_TO_REAL_SECTOR,
+                                            (request.success_count / SDDF_TO_REAL_SECTOR).try_into().unwrap(),
                                             request.id,
                                         );
                                     }
@@ -255,18 +260,19 @@ impl<T: SdmmcHardware + 'static> Handler for HandlerImpl<T> {
                     count_to_do: 0,
                     id: 0,
                 };
+                let mut sddf_count: u16 = 0;
                 unsafe {
                     blk_dequeue_req_helper(
                         &mut request.request_code as *mut BlkOp,
                         &mut request.io_or_offset as *mut u64,
                         &mut request.block_number as *mut u64,
-                        &mut request.count as *mut u16,
+                        &mut sddf_count as *mut u16,
                         &mut request.id as *mut u32,
                     );
                 }
                 // TODO: Consider how to add integer overflow check here
                 request.block_number = request.block_number * SDDF_TO_REAL_SECTOR as u64;
-                request.count = request.count * SDDF_TO_REAL_SECTOR;
+                request.count = (sddf_count as u32) * SDDF_TO_REAL_SECTOR;
                 // Print the retrieved values
                 /*
                 debug_println!("io_or_offset: 0x{:x}", request.io_or_offset);// Simple u64
@@ -309,7 +315,7 @@ impl<T: SdmmcHardware + 'static> Handler for HandlerImpl<T> {
                             );
                             if let Some(sdmmc) = self.sdmmc.take() {
                                 self.future = Some(Box::pin(sdmmc.read_block(
-                                    request.count_to_do as u32,
+                                    request.count_to_do,
                                     request.block_number as u64 + request.success_count as u64,
                                     request.io_or_offset
                                         + request.success_count as u64 * SDCARD_SECTOR_SIZE as u64,
@@ -326,7 +332,7 @@ impl<T: SdmmcHardware + 'static> Handler for HandlerImpl<T> {
                             );
                             if let Some(sdmmc) = self.sdmmc.take() {
                                 self.future = Some(Box::pin(sdmmc.write_block(
-                                    request.count_to_do as u32,
+                                    request.count_to_do,
                                     request.block_number as u64 + request.success_count as u64,
                                     request.io_or_offset
                                         + request.success_count as u64 * SDCARD_SECTOR_SIZE as u64,
