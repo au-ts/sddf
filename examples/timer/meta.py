@@ -24,6 +24,12 @@ BOARDS: List[Board] = [
         timer="timer"
     ),
     Board(
+        name="qemu_virt_riscv64",
+        arch=SystemDescription.Arch.RISCV64,
+        paddr_top=0xa_0000_000,
+        timer="soc/rtc@101000",
+    ),
+    Board(
         name="odroidc2",
         arch=SystemDescription.Arch.AARCH64,
         paddr_top=0x80000000,

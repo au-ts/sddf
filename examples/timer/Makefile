@@ -12,6 +12,7 @@ override MICROKIT_SDK := $(abspath ${MICROKIT_SDK})
 BUILD_DIR ?= build
 # By default we make a debug build so that the client debug prints can be seen.
 MICROKIT_CONFIG ?= debug
+IMAGE_FILE := loader.img
 
 ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
 	export TIMER_DRIVER_DIR := meson
@@ -22,7 +23,12 @@ else ifeq ($(strip $(MICROKIT_BOARD)), odroidc2)
 else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
 	export TIMER_DRIVER_DIR := arm
 	export CPU := cortex-a53
-	QEMU := qemu-system-aarch64
+	export QEMU := qemu-system-aarch64
+	export QEMU_ARCH_ARGS := -machine virt,virtualization=on -cpu cortex-a53 -device loader,file=$(IMAGE_FILE),addr=0x70000000,cpu-num=0
+else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_riscv64)
+	export TIMER_DRIVER_DIR := goldfish
+	export QEMU := qemu-system-riscv64
+	export QEMU_ARCH_ARGS := -machine virt -kernel $(IMAGE_FILE)
 else ifeq ($(strip $(MICROKIT_BOARD)), star64)
 	export TIMER_DRIVER_DIR := jh7110
 else ifneq ($(filter $(strip $(MICROKIT_BOARD)),imx8mm_evk imx8mp_evk imx8mq_evk maaxboard),)

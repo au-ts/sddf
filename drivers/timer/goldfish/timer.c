@@ -67,7 +67,6 @@ static void process_timeouts(uint64_t curr_time)
 
     if (next_timeout != UINT64_MAX) {
         set_timeout(next_timeout);
-        sddf_printf("Is there a timeout: %d\n", timer_regs->TIMER_ALARM_STATUS);
     }
 
 }
