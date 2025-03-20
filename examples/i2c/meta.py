@@ -44,8 +44,8 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     sdf.add_mr(clk_mr)
     sdf.add_mr(gpio_mr)
 
-    i2c_driver.add_map(Map(clk_mr, 0x30_000_000, Map.Perms(r=True, w=True), cached=False))
-    i2c_driver.add_map(Map(gpio_mr, 0x30_100_000, Map.Perms(r=True, w=True), cached=False))
+    i2c_driver.add_map(Map(clk_mr, 0x30_000_000, "rw", cached=False))
+    i2c_driver.add_map(Map(gpio_mr, 0x30_100_000, "rw", cached=False))
 
     i2c_node = dtb.node(board.i2c)
     assert i2c_node is not None
