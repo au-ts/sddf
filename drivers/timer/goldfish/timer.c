@@ -11,9 +11,7 @@
 #include <sddf/util/udivmodti4.h>
 #include <sddf/resources/device.h>
 
-
 #define MAX_TIMEOUTS 6
-
 
 /* taken from: https://github.com/torvalds/linux/blob/master/include/clocksource/timer-goldfish.h */
 typedef struct {
@@ -28,23 +26,21 @@ typedef struct {
     uint32_t TIMER_CLEAR_INTERRUPT;     /* 0x1c: set to 1 to clear interrupt */
 } goldfish_timer_regs_t;
 
-
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 static volatile goldfish_timer_regs_t *timer_regs;
 
 static inline uint64_t get_ticks_in_ns(void)
 {
-    uint64_t time = (uint64_t) timer_regs->TIMER_TIME_LOW;
-    time |= ((uint64_t) timer_regs->TIMER_TIME_HIGH) << 32;
+    uint64_t time = (uint64_t)timer_regs->TIMER_TIME_LOW;
+    time |= ((uint64_t)timer_regs->TIMER_TIME_HIGH) << 32;
     return time;
 }
 
 void set_timeout(uint64_t timeout)
 {
-    timer_regs->TIMER_ALARM_HIGH = (uint32_t) (timeout >> 32);
-    timer_regs->TIMER_ALARM_LOW = (uint32_t) timeout;
+    timer_regs->TIMER_ALARM_HIGH = (uint32_t)(timeout >> 32);
+    timer_regs->TIMER_ALARM_LOW = (uint32_t)timeout;
     timer_regs->TIMER_IRQ_ENABLED = 1U;
-
 }
 
 static uint64_t timeouts[MAX_TIMEOUTS];
@@ -68,7 +64,6 @@ static void process_timeouts(uint64_t curr_time)
     if (next_timeout != UINT64_MAX) {
         set_timeout(next_timeout);
     }
-
 }
 
 void init()
@@ -76,7 +71,7 @@ void init()
     assert(device_resources_check_magic(&device_resources));
     assert(device_resources.num_irqs == 1);
     assert(device_resources.num_regions == 1);
-    timer_regs = (goldfish_timer_regs_t*) device_resources.regions[0].region.vaddr;
+    timer_regs = (goldfish_timer_regs_t *)device_resources.regions[0].region.vaddr;
 
     for (int i = 0; i < MAX_TIMEOUTS; i++) {
         timeouts[i] = UINT64_MAX;
@@ -110,8 +105,8 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
         break;
     }
     default:
-        sddf_dprintf("TIMER DRIVER|LOG: Unknown request %lu to timer from channel %u\n", microkit_msginfo_get_label(msginfo),
-                     ch);
+        sddf_dprintf("TIMER DRIVER|LOG: Unknown request %lu to timer from channel %u\n",
+                     microkit_msginfo_get_label(msginfo), ch);
         break;
     }
 
