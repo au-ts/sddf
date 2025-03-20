@@ -16,14 +16,14 @@
 /* taken from: https://github.com/torvalds/linux/blob/master/include/clocksource/timer-goldfish.h */
 typedef struct {
     /* Registers */
-    uint32_t timer_time_low;            /* 0x00: get low bits of current time and update timer_time_high */
-    uint32_t timer_time_high;           /* 0x04: get high bits of time at last timer_time_low read */
-    uint32_t timer_alarm_low;           /* 0x08: set low bits of alarm and activate it */
-    uint32_t timer_alarm_high;          /* 0x0c: set high bits of next alarm */
-    uint32_t timer_irq_enabled;         /* 0x10: set to 1 to enable alarm interrupt */
-    uint32_t timer_clear_alarm;         /* 0x14: set to 1 to disarm an existing alarm */
-    uint32_t timer_alarm_status;        /* 0x18: alarm status (1 running; 0 not) */
-    uint32_t timer_clear_interrupt;     /* 0x1c: set to 1 to clear interrupt */
+    uint32_t time_low;            /* 0x00: get low bits of current time and update time_high */
+    uint32_t time_high;           /* 0x04: get high bits of time at last time_low read */
+    uint32_t alarm_low;           /* 0x08: set low bits of alarm and activate it */
+    uint32_t alarm_high;          /* 0x0c: set high bits of next alarm */
+    uint32_t irq_enabled;         /* 0x10: set to 1 to enable alarm interrupt */
+    uint32_t clear_alarm;         /* 0x14: set to 1 to disarm an existing alarm */
+    uint32_t alarm_status;        /* 0x18: alarm status (1 running; 0 not) */
+    uint32_t clear_interrupt;     /* 0x1c: set to 1 to clear interrupt */
 } goldfish_timer_regs_t;
 
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
@@ -31,16 +31,16 @@ static volatile goldfish_timer_regs_t *timer_regs;
 
 static inline uint64_t get_ticks_in_ns(void)
 {
-    uint64_t time = (uint64_t)timer_regs->timer_time_low;
-    time |= ((uint64_t)timer_regs->timer_time_high) << 32;
+    uint64_t time = (uint64_t)timer_regs->time_low;
+    time |= ((uint64_t)timer_regs->time_high) << 32;
     return time;
 }
 
 void set_timeout(uint64_t timeout)
 {
-    timer_regs->timer_alarm_high = (uint32_t)(timeout >> 32);
-    timer_regs->timer_alarm_low = (uint32_t)timeout;
-    timer_regs->timer_irq_enabled = 1U;
+    timer_regs->alarm_high = (uint32_t)(timeout >> 32);
+    timer_regs->alarm_low = (uint32_t)timeout;
+    timer_regs->irq_enabled = 1U;
 }
 
 static uint64_t timeouts[MAX_TIMEOUTS];
@@ -84,7 +84,7 @@ void notified(microkit_channel ch)
     microkit_deferred_irq_ack(ch);
 
     /* Handled irq -> clear device interrupt */
-    timer_regs->timer_clear_interrupt = 1;
+    timer_regs->clear_interrupt = 1;
     uint64_t curr_time = get_ticks_in_ns();
     process_timeouts(curr_time);
 }
