@@ -12,7 +12,7 @@
 #include <sddf/resources/device.h>
 #include <sddf/i2c/queue.h>
 
-#define SDDF_I2C_MAX_CLIENTS (MICROKIT_MAX_CHANNELS - 1)
+#define SDDF_I2C_MAX_CLIENTS 64
 
 #define SDDF_I2C_MAGIC_LEN 5
 static char SDDF_I2C_MAGIC[SDDF_I2C_MAGIC_LEN] = { 's', 'D', 'D', 'F', 0x4 };

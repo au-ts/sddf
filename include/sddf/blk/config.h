@@ -13,7 +13,7 @@
 #include <sddf/blk/queue.h>
 #include <sddf/blk/storage_info.h>
 
-#define SDDF_BLK_MAX_CLIENTS (MICROKIT_MAX_CHANNELS - 1)
+#define SDDF_BLK_MAX_CLIENTS 64
 
 #define SDDF_BLK_MAGIC_LEN 5
 static char SDDF_BLK_MAGIC[SDDF_BLK_MAGIC_LEN] = { 's', 'D', 'D', 'F', 0x2 };
