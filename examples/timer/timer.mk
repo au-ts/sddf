@@ -15,7 +15,6 @@ BUILD_DIR ?= build
 MICROKIT_CONFIG ?= debug
 
 DTC := dtc
-QEMU := qemu-system-aarch64
 PYTHON ?= python3
 
 CC := clang
@@ -86,12 +85,11 @@ $(IMAGE_FILE) $(REPORT_FILE): $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
 
 qemu: $(IMAGE_FILE)
-	$(QEMU) -machine virt,virtualization=on \
-			-cpu cortex-a53 \
+	$(QEMU) $(QEMU_ARCH_ARGS) \
 			-serial mon:stdio \
-			-device loader,file=$(IMAGE_FILE),addr=0x70000000,cpu-num=0 \
 			-m size=2G \
-			-nographic
+			-nographic \
+			-d guest_errors
 
 clean::
 	rm -f client.o
