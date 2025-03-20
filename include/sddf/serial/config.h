@@ -10,7 +10,7 @@
 #include <stdint.h>
 #include <sddf/resources/common.h>
 
-#define SDDF_SERIAL_MAX_CLIENTS (MICROKIT_MAX_CHANNELS - 1)
+#define SDDF_SERIAL_MAX_CLIENTS 64
 #define SDDF_SERIAL_BEGIN_STR_MAX_LEN 128
 
 #define SDDF_SERIAL_MAGIC_LEN 5

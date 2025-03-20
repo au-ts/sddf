@@ -234,8 +234,8 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     cycle_counters_mr = MemoryRegion("cycle_counters", 0x1000)
     sdf.add_mr(cycle_counters_mr)
 
-    bench_idle.add_map(Map(cycle_counters_mr, 0x5_000_000, perms=Map.Perms(r=True, w=True)))
-    client0.add_map(Map(cycle_counters_mr, 0x20_000_000, perms=Map.Perms(r=True, w=True)))
+    bench_idle.add_map(Map(cycle_counters_mr, 0x5_000_000, perms="rw"))
+    client0.add_map(Map(cycle_counters_mr, 0x20_000_000, perms="rw"))
     bench_idle_config = BenchmarkIdleConfig(0x5_000_000, bench_idle_ch.pd_a_id)
 
     bench_client_config = BenchmarkClientConfig(
