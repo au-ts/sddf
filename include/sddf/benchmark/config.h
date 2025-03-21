@@ -3,6 +3,8 @@
  *
  * SPDX-License-Identifier: BSD-2-Clause
  */
+#pragma once
+
 #include <os/sddf.h>
 #include <stdint.h>
 

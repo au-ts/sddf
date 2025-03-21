@@ -5,6 +5,7 @@
  */
 #pragma once
 
+#include <os/sddf.h>
 #include <stdbool.h>
 #include <stdint.h>
 

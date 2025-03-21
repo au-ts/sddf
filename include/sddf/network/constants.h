@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <os/sddf.h>
 #include <stdint.h>
 
 #define ETH_TYPE_ARP 0x0806U
