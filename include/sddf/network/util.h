@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <os/sddf.h>
 #include <sddf/util/util.h>
 
 #if BYTE_ORDER == BIG_ENDIAN

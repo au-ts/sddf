@@ -2,6 +2,8 @@
  * Copyright 2024, UNSW
  * SPDX-License-Identifier: BSD-2-Clause
  */
+
+#include <os/sddf.h>
 #include <sddf/util/printf.h>
 
 /*

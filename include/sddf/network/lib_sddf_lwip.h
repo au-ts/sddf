@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include <microkit.h>
+#include <os/sddf.h>
 #include <sddf/resources/common.h>
 #include <sddf/network/queue.h>
 #include <sddf/network/config.h>
