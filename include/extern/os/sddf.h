@@ -12,8 +12,7 @@ typedef unsigned int sddf_channel;
 
 #define SDDF_NAME_LENGTH 64
 
-extern char *pd_name;
-
+extern char *sddf_get_pd_name();
 extern void sddf_irq_ack(sddf_channel id);
 extern void sddf_notify(sddf_channel id);
 extern void sddf_deferred_notify(sddf_channel id);

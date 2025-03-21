@@ -48,7 +48,7 @@ struct pbuf *tail;
  */
 void netif_status_callback(char *ip_addr)
 {
-    sddf_printf("DHCP request finished, IP address for netif %s is: %s\n", pd_name, ip_addr);
+    sddf_printf("DHCP request finished, IP address for netif %s is: %s\n", sddf_get_pd_name(), ip_addr);
 }
 
 /**

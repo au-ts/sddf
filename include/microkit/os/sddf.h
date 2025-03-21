@@ -13,7 +13,10 @@ typedef microkit_channel sddf_channel;
 
 #define SDDF_NAME_LENGTH MICROKIT_PD_NAME_LENGTH
 
-static __attribute__((unused)) char *pd_name = microkit_name;
+static inline char *sddf_get_pd_name()
+{
+    return microkit_name;
+}
 
 static inline void sddf_irq_ack(sddf_channel ch)
 {
