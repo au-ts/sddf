@@ -11,7 +11,7 @@
 * Add Nix flake for Nix users.
 * On ARM, make better use of memory barriers when doing cache maintenance
   [#348](https://github.com/au-ts/sddf/pull/348).
-  This significanlty reduces utilisation in our networking and block benchmarking.
+  This significantly reduces utilisation in our networking and block benchmarking.
 
 #### Metaprogram
 
