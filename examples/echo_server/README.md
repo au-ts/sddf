@@ -34,6 +34,7 @@ The following platforms are supported:
 * odroidc4
 * odroidc2
 * qemu_virt_aarch64
+* qemu_virt_riscv64
 
 ```sh
 make MICROKIT_BOARD=<board> MICROKIT_SDK=<path/to/sdk> MICROKIT_CONFIG=(benchmark/release/debug)
@@ -41,7 +42,8 @@ make MICROKIT_BOARD=<board> MICROKIT_SDK=<path/to/sdk> MICROKIT_CONFIG=(benchmar
 
 ## Benchmarking
 
-In order to run the benchmarks, set `MICROKIT_CONFIG=benchmark`. The system has
+In order to run the benchmarks, set `MICROKIT_CONFIG=benchmark`. Currently only Aarch64 boards have
+support for collecting of benchmarking data. The system has
 been designed to interact with [ipbench](https://sourceforge.net/projects/ipbench/)
 to take measurements.
 
@@ -49,3 +51,5 @@ Checks to make before benchmarking:
 * Turn off all debug prints.
 * Run with LWIP asserts turned off as well (`LWIP_NOASSERT`).
 * Make sure compiler optimisations are enabled.
+
+Note that for qemu_virt_riscv64, see instructions for accessing serial console in [serial example README](../serial/README.md).
