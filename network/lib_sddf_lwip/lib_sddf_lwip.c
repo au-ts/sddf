@@ -45,9 +45,9 @@ typedef struct sddf_state {
     /* sddf net tx queue handle. */
     net_queue_handle_t tx_queue;
     /* sddf channel for net rx virt. */
-    microkit_channel rx_ch;
+    sddf_channel rx_ch;
     /* sddf channel for net tx virt. */
-    microkit_channel tx_ch;
+    sddf_channel tx_ch;
     /* Base address of data region containing rx buffers. */
     uintptr_t rx_buffer_data_region;
     /* Base address of data region containing tx buffers. */
@@ -57,7 +57,7 @@ typedef struct sddf_state {
     /* Boolean indicating whether buffers have been given to tx virt. */
     bool notify_tx;
     /* sddf channel for timer. */
-    microkit_channel timer_ch;
+    sddf_channel timer_ch;
 } sddf_state_t;
 
 /* Wrapper over custom_pbuf structure to keep track of buffer's offset into data region. */
@@ -411,20 +411,22 @@ void sddf_lwip_maybe_notify()
     if (sddf_state.notify_rx && net_require_signal_free(&sddf_state.rx_queue)) {
         net_cancel_signal_free(&sddf_state.rx_queue);
         sddf_state.notify_rx = false;
-        if (!microkit_have_signal) {
-            microkit_deferred_notify(sddf_state.rx_ch);
-        } else if (microkit_signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + sddf_state.rx_ch) {
-            microkit_notify(sddf_state.rx_ch);
+        sddf_channel curr = sddf_deferred_notify_curr();
+        if (curr == -1) {
+            sddf_deferred_notify(sddf_state.rx_ch);
+        } else if (curr != sddf_state.rx_ch) {
+            sddf_notify(sddf_state.rx_ch);
         }
     }
 
     if (sddf_state.notify_tx && net_require_signal_active(&sddf_state.tx_queue)) {
         net_cancel_signal_active(&sddf_state.tx_queue);
         sddf_state.notify_tx = false;
-        if (!microkit_have_signal) {
-            microkit_deferred_notify(sddf_state.tx_ch);
-        } else if (microkit_signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + sddf_state.tx_ch) {
-            microkit_notify(sddf_state.tx_ch);
+        sddf_channel curr = sddf_deferred_notify_curr();
+        if (curr == -1) {
+            sddf_deferred_notify(sddf_state.tx_ch);
+        } else if (curr != sddf_state.tx_ch) {
+            sddf_notify(sddf_state.tx_ch);
         }
     }
 }
