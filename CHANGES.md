@@ -1,5 +1,121 @@
 # Revision history for sDDF
 
+## Release 0.6.0
+
+### General
+
+* Move to Microkit 2.0.1.
+* Better support for RISC-V platforms in general.
+* Add initial documentation for developing a new sDDF driver for
+  existing device classes.
+* Add Nix flake for Nix users.
+* On ARM, make better use of memory barriers when doing cache maintenance
+  ([#348](https://github.com/au-ts/sddf/pull/348)).
+  This significantly reduces utilisation in our networking and block benchmarking.
+
+#### Metaprogram
+
+One of the biggest changes in this release is moving all of our components
+to get their configuration info to be auto-generated. Previously, much of this
+was hard-coded which became difficult to maintain and did not scale.
+
+The tooling alleviates some of the friction with putting a system together, but
+is still experimental and undergoing active development.
+
+In the example systems you will see a metaprogram that is responsbile for declaring
+the system architecture and configuration of the system.
+
+You can find how to use the tooling by exploring the [example systems](https://github.com/au-ts/sddf/tree/0.6.0/examples)
+and reading the [developer docs](https://github.com/au-ts/sddf/tree/0.6.0/docs/developing.md).
+
+#### Support for other seL4-based OSes
+
+sDDF has been developed using the seL4 Microkit and so expects minimal wrappers
+over seL4 system calls which Microkit provides.
+
+Much of the sDDF code itself is generic and does not rely on a specific seL4 OS
+and so we have begun transitioning our sub-systems to be able to work on different
+seL4-based OSes. This is primarily motivated by another Trustworthy Systems
+project, the [Secure Multiserver Operating System (SMOS)](https://trustworthy.systems/projects/smos/)
+but also making sDDF available to others in the seL4 community.
+
+Not all of sDDF has undergone this transition, but we have made certain device
+clases and drivers 'agnostic' such as serial, timer, and network. For example, the
+[echo server system](https://github.com/au-ts/sddf/tree/0.6.0/examples/echo_server) works
+in a SMOS environment (note that SMOS is not open-source at this time).
+
+### Audio
+
+* Use 'capacity' instead of 'size' when referring to the maximum number
+  of entries in a given queue.
+
+### Block
+
+* Add block example that shows off basic usage of the block protocol.
+* Add initial i.MX8 uSDHC driver.
+    * Note that this is a fairly experimental driver and known not to
+      perform well. See [the tracking issue](https://github.com/au-ts/sddf/issues/187)
+      for more details.
+* Add virtIO driver for using virtual disks from QEMU.
+* Fix bugs with certain edge cases in virtualiser (e.g invalid requests).
+* Improve error codes given in response status.
+
+### GPU
+
+This release adds an initial design and implementation for 2D graphics.
+
+This device class is very experimental. We have an initial virtIO
+GPU driver and example system for use with QEMU but there are many
+open design questions to be resolved.
+
+### I<sup>2</sup>C
+
+* Various fixes to the Meson I2C host driver.
+* Improvements for the PN532 card-reader driver.
+* Add I2C driver for the DS3231 RTC device.
+
+### Network
+
+* Add Synposis DWMAC (5.10a) ethernet driver.
+* Add board support in echo server example for:
+    * i.MX8MP-EVK
+    * Odroid-C2
+* Introduce `lib_sddf_lwip` library to make it easier to write networking clients
+  when using lwIP.
+* Use 'capacity' instead of 'size' when referring to the maximum number
+  of entries in a given queue.
+* Fix queue library to use entire capacity of queue.
+    * A leftover artefact of a previous queue design meant that we were leaving
+      one entry in the queue always empty when that is no longer necessary.
+* Improve performance of virtIO network driver.
+    * See [here](https://github.com/au-ts/sddf/issues/113) for more details.
+* Fix drivers to use the entire hardware ring.
+
+### Serial
+
+* Add Synopsis DesignWare ABP UART driver.
+* Add virtIO console driver.
+* Add board support in serial example for:
+    * i.MX8MP-EVK
+    * i.MX8MQ-EVK
+    * Odroid-C2
+    * Pine64 Star64
+    * QEMU virt RISC-V (64-bit)
+* Various fixes and improvements to protocol and APIs.
+* Rename `uart_driver.elf` to `serial_driver.elf` for consistency.
+
+### Timer
+
+* Rename timer drivers from 'clock' to 'timer'.
+    * In the future we will have 'clk' drivers so this should make things less confusing.
+* Add StarFive JH7110 timer driver.
+* Add Google Goldfish RTC timer driver.
+* Add board support in timer example for:
+    * Odroid-C2
+    * Pine64 Star64
+    * QEMU virt RISC-V (64-bit)
+* Fix counter overflow in ARM timer driver.
+
 ## Release 0.5.0
 
 ### General
