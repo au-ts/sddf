@@ -40,6 +40,9 @@ TOOLCHAIN := $(TOOLCHAIN)
 # Echo server example relies on libc functionality, hence only works with GCC
 # instead of LLVM. See README for more details.
 LIBC := $(dir $(realpath $(shell $(TOOLCHAIN)-gcc --print-file-name libc.a)))
+ifeq ($(strip $(LIBC)),)
+$(error LIBC not found for the selected toolchain: $(TOOLCHAIN))
+endif
 
 CC := $(TOOLCHAIN)-gcc
 LD := $(TOOLCHAIN)-ld
