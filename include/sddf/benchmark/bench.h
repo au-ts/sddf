@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <stdint.h>
+
 struct bench {
     uint64_t ccount;
     uint64_t prev;
