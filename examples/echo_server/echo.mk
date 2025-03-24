@@ -37,12 +37,6 @@ $(error "Could not find a $(ARCH) cross-compiler")
 	endif
 endif
 TOOLCHAIN := $(TOOLCHAIN)
-# Echo server example relies on libc functionality, hence only works with GCC
-# instead of LLVM. See README for more details.
-LIBC := $(dir $(realpath $(shell $(TOOLCHAIN)-gcc --print-file-name libc.a)))
-ifeq ($(strip $(LIBC)),)
-$(error LIBC not found for the selected toolchain: $(TOOLCHAIN))
-endif
 
 CC := $(TOOLCHAIN)-gcc
 LD := $(TOOLCHAIN)-ld
@@ -114,12 +108,36 @@ IMAGES := eth_driver.elf echo0.elf echo1.elf benchmark.elf idle.elf network_virt
 	  serial_driver.elf serial_virt_tx.elf
 
 ifeq ($(ARCH),aarch64)
-	CFLAGS_ARCH := -mcpu=$(CPU) -mstrict-align -target aarch64-none-elf
+	CFLAGS_ARCH := -mcpu=$(CPU) -mstrict-align
 else ifeq ($(ARCH),riscv64)
-	CFLAGS_ARCH := -march=rv64imafdc -target riscv64-none-elf
+	CFLAGS_ARCH := -march=rv64imafdc -mabi=lp64d
 endif
 
-CFLAGS := -ffreestanding \
+# Echo server example relies on libc functionality, hence only works with GCC
+# instead of LLVM. See README for more details.
+# Additionally, on x86_64 debian/ubuntu the gcc-riscv64-unknown-elf package is distributed
+# without libc. Checks if `picolibc-riscv64-unknown-elf` is installed in that case, and uses it.
+LIBC := $(dir $(realpath $(shell $(TOOLCHAIN)-gcc --print-file-name libc.a)))
+LIBGCC := $(dir $(realpath $(shell $(TOOLCHAIN)-gcc --print-file-name libgcc.a)))
+PICOLIBC := $(dir $(realpath $(shell $(TOOLCHAIN)-gcc --print-file-name picolibc.specs)))
+
+ifneq ($(strip $(LIBC)),)
+	LIBC_FLAGS := -L${LIBC}
+else ifneq ($(strip $(PICOLIBC)),)
+	ifneq ($(strip $(LIBGCC)),)
+		CFLAGS_ARCH += -specs=picolibc.specs
+		LIBC_FLAGS := -L/usr/lib/picolibc/riscv64-unknown-elf/lib -L${LIBGCC}
+		LIBS_ARCH := -lgcc
+	else
+		$(error LIBGC not found when building for RISC-V with PICOLIBC for the selected toolchain: $(TOOLCHAIN))
+	endif
+else
+$(error LIBC not found for the selected toolchain: $(TOOLCHAIN))
+endif
+
+CFLAGS := $(CFLAGS_ARCH) \
+	  -nostdlib \
+	  -ffreestanding \
 	  -g3 -O3 -Wall \
 	  -Wno-unused-function \
 	  -DMICROKIT_CONFIG_$(MICROKIT_CONFIG) \
@@ -132,8 +150,8 @@ CFLAGS := -ffreestanding \
 	  -MD \
 	  -MP
 
-LDFLAGS := -L$(BOARD_DIR)/lib -L${LIBC}
-LIBS := --start-group -lmicrokit -Tmicrokit.ld -lc libsddf_util_debug.a --end-group
+LDFLAGS := -L$(BOARD_DIR)/lib ${LIBC_FLAGS}
+LIBS := --start-group -lmicrokit -Tmicrokit.ld ${LIBS_ARCH} -lc libsddf_util_debug.a --end-group
 
 CHECK_FLAGS_BOARD_MD5 := .board_cflags-$(shell echo -- ${CFLAGS} ${BOARD} ${MICROKIT_CONFIG} | shasum | sed 's/ *-//')
 
