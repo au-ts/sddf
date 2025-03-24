@@ -27,6 +27,7 @@ else ifeq ($(strip $(MICROKIT_BOARD)), star64)
 	export CAN_DRIVER_DIR := jh7110
 else ifneq ($(filter $(strip $(MICROKIT_BOARD)),imx8mm_evk imx8mp_evk imx8mq_evk maaxboard),)
 	export CAN_DRIVER_DIR := imx_can
+	export PINCTRL_DRIVER_DIR := imx
 	export CPU := cortex-a53
 else
 $(error Unsupported MICROKIT_BOARD given)

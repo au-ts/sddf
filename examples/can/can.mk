@@ -21,6 +21,8 @@ PYTHON ?= python3
 CC := clang
 LD := ld.lld
 AR := llvm-ar
+# in its current form, the pinctrl assembly data file cannot be compiled by LLVM-as yet
+AS := aarch64-none-elf-as
 RANLIB := llvm-ranlib
 OBJCOPY := llvm-objcopy
 
@@ -29,7 +31,7 @@ MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 UTIL := $(SDDF)/util
 
-IMAGES := can_driver.elf client.elf
+IMAGES := can_driver.elf pinctrl_driver.elf client.elf
 
 ifeq ($(ARCH),aarch64)
 	CFLAGS_ARCH := -mcpu=$(CPU) -mstrict-align -target aarch64-none-elf
@@ -43,7 +45,8 @@ CFLAGS := -nostdlib \
 		  -O3 \
 		  -Wall -Wno-unused-function -Werror -Wno-unused-command-line-argument \
 		  -I$(BOARD_DIR)/include \
-		  -I$(SDDF)/include \
+		  -I$(SDDF)/include/microkit \
+		  -I$(SDDF)/include/ \
 		  $(CFLAGS_ARCH)
 LDFLAGS := -L$(BOARD_DIR)/lib
 LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
@@ -55,6 +58,7 @@ SYSTEM_FILE := can.system
 REPORT_FILE := report.txt
 CLIENT_OBJS := client.o
 CAN_DRIVER := $(SDDF)/drivers/network/$(CAN_DRIVER_DIR)
+PINCTRL_DRIVER := ${SDDF}/drivers/pinctrl/${PINCTRL_DRIVER_DIR}
 
 all: $(IMAGE_FILE)
 CHECK_FLAGS_BOARD_MD5:=.board_cflags-$(shell echo -- ${CFLAGS} ${MICROKIT_BOARD} ${MICROKIT_CONFIG} | shasum | sed 's/ *-//')
@@ -63,7 +67,14 @@ ${CHECK_FLAGS_BOARD_MD5}:
 	-rm -f .board_cflags-*
 	touch $@
 
+# pinctrl specific makefile variables
+DTS_FILE = /Users/dreamliner787-9/Downloads/iotgate.dts 
+PINMUX_DEVICE = pinctrl
+SOC = imx8mp-evk
+
 include ${CAN_DRIVER}/can_driver.mk
+include ${PINCTRL_DRIVER}/pinctrl_driver.mk
+include ${}
 include ${SDDF}/util/util.mk
 
 ${IMAGES}: libsddf_util_debug.a

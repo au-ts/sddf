@@ -30,7 +30,12 @@ BOARDS: List[Board] = [
 
 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
-    can_driver = ProtectionDomain("can_driver", "can_driver.elf", priority=254)
+    pinctrl_driver = ProtectionDomain("pinctrl_driver", "pinctrl_driver.elf", priority=254)
+    pinctrl_mr = MemoryRegion("pinctrl", 0x10000, paddr=0x30330000)
+    pinctrl_driver.add_map(Map(pinctrl_mr, 0x30330000, "rw", cached=False))
+    sdf.add_mr(pinctrl_mr)
+
+    can_driver = ProtectionDomain("can_driver", "can_driver.elf", priority=253)
     client = ProtectionDomain("client", "client.elf", priority=1)
     
     # reg = <0x308c0000 0x10000>;
@@ -53,6 +58,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
     pds = [
         can_driver,
+        pinctrl_driver,
         client
     ]
     for pd in pds:
