@@ -8,11 +8,7 @@
 #include <sddf/util/printf.h>
 
 void init(void) {
-    sddf_printf("EXAMPLE STARTED!!!");
-    sddf_printf("EXAMPLE STARTED!!!");
-    sddf_printf("EXAMPLE STARTED!!!");
-    sddf_printf("EXAMPLE STARTED!!!");
-    sddf_printf("EXAMPLE STARTED!!!");
+    microkit_dbg_puts("Example started!\n");
 }
 
 void notified(microkit_channel ch) {

@@ -78,8 +78,9 @@ $(DTB): $(DTS)
 
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE)
-	$(OBJCOPY) --update-section .device_resources=can_driver_device_resources.data can_driver.elf
-	$(OBJCOPY) --update-section .can_client_config=can_client_client.data client.elf
+	# $(OBJCOPY) --update-section .device_resources=can_driver_device_resources.data can_driver.elf
+
+# $(OBJCOPY) --update-section .can_client_config=can_client_client.data client.elf
 
 $(IMAGE_FILE) $(REPORT_FILE): $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)

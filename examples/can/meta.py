@@ -6,6 +6,9 @@ from dataclasses import dataclass
 from sdfgen import SystemDescription, Sddf, DeviceTree
 
 ProtectionDomain = SystemDescription.ProtectionDomain
+MemoryRegion = SystemDescription.MemoryRegion
+Map = SystemDescription.Map
+Irq = SystemDescription.Irq
 
 
 @dataclass
@@ -21,7 +24,7 @@ BOARDS: List[Board] = [
         name="imx8mp_evk",
         arch=SystemDescription.Arch.AARCH64,
         paddr_top=0xa0000000,
-        can="soc@0/bus@30000000/timer@302d0000" # TODO - Is this from the symbol table?
+        can="soc@0/bus@30800000/spba-bus@30800000/can@308c0000" # This is from the symbol table under 'flexcan1'
     ),
 ]
 
@@ -29,12 +32,24 @@ BOARDS: List[Board] = [
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     can_driver = ProtectionDomain("can_driver", "can_driver.elf", priority=254)
     client = ProtectionDomain("client", "client.elf", priority=1)
+    
+    # reg = <0x308c0000 0x10000>;
+    can_mr = MemoryRegion("reg", 0x10000, paddr=0x308c0000)
 
-    can_node = dtb.node(board.can)
-    assert can_node is not None
+    # clocks
+    clock_mr = MemoryRegion("clock", 0x10000, paddr=0x30380000);
+    can_driver.add_map(Map(clock_mr, 0x2000000, "rw", cached=False));
+    sdf.add_mr(clock_mr)
+    
+    # interrupts = <0x00 0x8e 0x04>;
+    # => 0x8e = 142, then add 32 = 174 
+    # Note this defaults to level triggered
+    can_irq = Irq(174)
 
-    can_system = Sddf.Timer(sdf, can_node, can_driver) # TODO - do I need to setup a new class for this?
-    can_system.add_client(client)
+    can_driver.add_irq(can_irq)
+    can_driver.add_map(Map(can_mr, 0x1000000, "rw", cached=False)) # We set the vaddr for the device here - this is fixed and should map to the physical address of the device
+    
+    sdf.add_mr(can_mr)
 
     pds = [
         can_driver,
@@ -42,9 +57,6 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     ]
     for pd in pds:
         sdf.add_pd(pd)
-
-    assert can_system.connect()
-    assert can_system.serialise_config(output_dir)
 
     with open(f"{output_dir}/{sdf_file}", "w+") as f:
         f.write(sdf.render())
