@@ -11,8 +11,6 @@
     > Don't offer any configuration options - e.g. using the mailboxes and not FIFO, etc
 */
 
-__attribute__((__section__(".device_resources"))) device_resources_t device_resources;
-
 volatile struct control_registers *control_regs;
 volatile struct error_registers *error_regs;
 volatile struct canfd_registers *canfd_regs;
@@ -81,35 +79,82 @@ static void mcr_init(void) {
     f. Determine the internal arbitration mode (LBUF).
 */
 
+#define MYBIT(x, y) (x << y)
+
+// These are in order of hierarchy in the clock tree
+volatile struct clock_registers *clock_reg_can_mux;
+volatile struct clock_registers *clock_reg_ccgr53;
+
+static void can_clocks_enable(void) {
+    // TODO - need to map the clock registers to the system file so can access them
+
+    uint64_t vaddr_ccm_base = 0x2000000;
+    uint64_t vaddr_can_mux = vaddr_ccm_base + 0xa200; // TODO - define for offsets
+    uint64_t vaddr_ccgr53 = vaddr_ccm_base + 0x4350; // TODO - define for offsets
+    
+    volatile struct clock_registers * pll1 = (volatile struct clock_registers *) (vaddr_ccm_base + 0x0940);
+    clock_reg_can_mux = (volatile struct clock_registers *) vaddr_can_mux;
+    clock_reg_ccgr53 = (volatile struct clock_registers *) vaddr_ccgr53;
+
+    pll1->set = MYBIT(0x3, 0);
+    pll1->base = MYBIT(0x3, 0);
+    
+    // Disable the ccgr
+    clock_reg_ccgr53->clr = MYBIT(0x3, 0);
+
+    // Set the mux to select the 3rd parent
+    clock_reg_can_mux->base = MYBIT(0x3, 24);
+
+    // Enable the clock
+    clock_reg_can_mux->set = (MYBIT(0x1, 28) | MYBIT(0x2, 0));
+
+    clock_reg_ccgr53->set |= MYBIT(0x3, 0);
+
+    // print base and set of registers
+    sddf_dprintf("pll1 >> Base: %x , Set: %x\n", pll1->base, pll1->set);
+    sddf_dprintf("CCGR >> Base: %x , Set: %x\n", clock_reg_ccgr53->base, clock_reg_ccgr53->set);
+    sddf_dprintf("MUX >> Base: %x , Set: %x\n", clock_reg_can_mux->base, clock_reg_can_mux->set);
+}
+
 /* Specified in 11.8.4.1 - FlexCAN Initialization Sequence */
 static void can_init(void) {
     /* Setup references to the different groups of registers */
-    control_regs = device_resources.regions[0].region.vaddr;
-    error_regs = device_resources.regions[0].region.vaddr + ERROR_REGISTER_OFFSET;
-    canfd_regs = device_resources.regions[0].region.vaddr + CANFD_REGISTER_OFFSET;
+    uint64_t vaddr = 0x1000000;
+    control_regs = (volatile struct control_registers *) vaddr;
+    // error_regs = (volatile struct error_registers *) (vaddr + ERROR_REGISTER_OFFSET);
+    // canfd_regs = (volatile struct canfd_registers *) (vaddr + CANFD_REGISTER_OFFSET);
+
+    // Linux seems to first setup the clocks
+    // control_regs->ctrl1 |= CTRL1_CLKSRC;
+    // The cannode is connected to several pins (see DTS)
+    // Bill has a pinmux driver might be able to use for this?
+
+
+    // control_regs->mcr = (control_regs->mcr &= ~MCR_MDIS);
+    // sddf_dprintf("The value of the mcr reg is %u\n", control_regs->mcr);
+     // TODO - this bit enables/disables the module --> need to make sure its set first
 
     /* TODO - note that the Linux kernel does some extra setup here - ram_init and bittiming -- not certain if these are necessary or extra features? */
 
     /* Reset */
-    soft_reset();
+    // soft_reset();
 
-    /* Freeze */
-    freeze();
+    // /* Freeze */
+    // freeze();
 
-    /* Module Configuration Register (MCR) init */
-    mcr_init();
+    // /* Module Configuration Register (MCR) init */
+    // mcr_init();
 
     /*  */
 }
 
 // microkit init
 void init (void) {
-    sddf_printf("STARTING CAN DRIVER!\n");
-    sddf_printf("STARTING CAN DRIVER!\n");
-    sddf_printf("STARTING CAN DRIVER!\n");
-    sddf_printf("STARTING CAN DRIVER!\n");
-    sddf_printf("STARTING CAN DRIVER!\n");
-    // can_init();
+    sddf_printf("STARTING CAN DRIVER blah blah!\n");
+
+    can_clocks_enable();
+
+    can_init();
 
     // call all initialisation for the device / software interface here
     // first thing is basically going to be reading and writing a register

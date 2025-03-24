@@ -66,6 +66,14 @@
 #define CTRL1_LOM           (1UL << 2)      /* Listen-Only Mode */
 #define CTRL1_PROPSEG       (3UL << 0)      /* Propagation Segment */
 
+/* IMX8 Clock Registers */
+struct clock_registers {
+    uint32_t base;
+    uint32_t set;
+    uint32_t clr;
+    uint32_t tog;
+};
+
 /* FlexCAN Control Registers - these are mainly for configuring and interacting with the module. */
 struct control_registers {
     uint32_t mcr;           /* 0h   Module Configuration Register */
