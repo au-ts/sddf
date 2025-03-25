@@ -68,7 +68,7 @@ ${CHECK_FLAGS_BOARD_MD5}:
 	touch $@
 
 # pinctrl specific makefile variables
-DTS_FILE = /Users/dreamliner787-9/Downloads/iotgate.dts 
+DTS_FILE = $(DTS)
 PINMUX_DEVICE = pinctrl
 SOC = imx8mp-evk
 

@@ -56,10 +56,10 @@ pinctrl_driver.elf: pinctrl/pinctrl.o pinctrl/pinctrl_config_data.o
 pinctrl/pinctrl.o: $(PINCTRL_DIR)/pinctrl.c pinctrl
 	${CC} ${CFLAGS} ${CHIP_HEADER_INC} -DCONFIG_DEBUG_BUILD -DSOC_$(shell echo $(SOC) | tr a-z A-Z | tr - _) -c $< -o $@
 
-pinctrl/pinctrl_config_data.o: pinctrl/pinctrl_config_data.s
+pinctrl/pinctrl_config_data.o: pinctrl/pinctrl_config_data.S
 	${AS} ${ASFLAGS} $< -o $@
 
-pinctrl/pinctrl_config_data.s: ${DTS_FILE} ${PINCTRL_DIR}/create_pinctrl_config.py
+pinctrl/pinctrl_config_data.S: ${DTS_FILE} ${PINCTRL_DIR}/create_pinctrl_config.py
 	${PYTHON} ${PINCTRL_DIR}/create_pinctrl_config.py ${SOC} ${DTS_FILE} ${PINMUX_DEVICE} pinctrl
 
 pinctrl:
