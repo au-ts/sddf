@@ -103,8 +103,8 @@ struct imx_gpio_instance {
    uint32_t register_offset;
 };
 
-struct meson_gpio_function {
-   meson_gpio_reg_type_t function;
+struct imx_gpio_function {
+   imx_gpio_reg_type_t function;
    const struct imx_gpio_instance *instances;
 };
 
@@ -141,3 +141,30 @@ static const struct imx_gpio_function gpio_config_control[] = {
    }
 }
 
+typedef enum {
+    IMX_IRQ_REG_IMR = 0,
+    IMX_IRQ_FUNC_COUNT
+} imx_irq_reg_type_t;
+
+struct imx_gpio_instance {
+    imx_gpio_instance_t instance;
+    uint32_t register_offset;
+};
+
+struct imx_irq_function {
+    imx_irq_reg_type_t function;
+    const struct imx_gpio_instance *instances;
+};
+
+static const struct imx_irq_function irq_config_control[] = {
+    {
+        .function = IMX_IRQ_REG_IMR,
+        .instances = (const struct imx_gpio_instance[]){
+            { .instance = IMX_GPIO_INSTANCE_GPIO_1, .register_offset = GPIO1_IMR },
+            { .instance = IMX_GPIO_INSTANCE_GPIO_2, .register_offset = GPIO2_IMR },
+            { .instance = IMX_GPIO_INSTANCE_GPIO_3, .register_offset = GPIO3_IMR },
+            { .instance = IMX_GPIO_INSTANCE_GPIO_4, .register_offset = GPIO4_IMR },
+            { .instance = IMX_GPIO_INSTANCE_GPIO_5, .register_offset = GPIO5_IMR },
+        }
+    }
+}

@@ -30,6 +30,7 @@
 - Unused fields must be initialised to -1.
 - If a channel is used for device <=> driver communication leave it uninitialised here
     For example if theres entry { 1, GPIO_2, GPIO_IRQ_0}, then you must have the entry { 52, -1, -1 },
+    because channel 52 is for GPIO_IRQ_0.
 */
 static const int gpio_channel_mappings[GPIO_CHANNEL_MAPPING_ROWS][GPIO_CHANNEL_MAPPING_COLS] = {
     { 0, GPIO_1, -1 },

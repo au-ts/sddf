@@ -36,14 +36,14 @@ typedef enum {
 
 // these are the PREDFINED values used for device <=> driver communiation
 typedef enum {
-    IMX_GPIO_IRQ_AH_GPIO1_7 = IMX_GPIO_IRQ_CHANNEL_START,
-    IMX_GPIO_IRQ_AH_GPIO1_6,
-    IMX_GPIO_IRQ_AH_GPIO1_5,
-    IMX_GPIO_IRQ_AH_GPIO1_4,
-    IMX_GPIO_IRQ_AH_GPIO1_3,
-    IMX_GPIO_IRQ_AH_GPIO1_2,
+    IMX_GPIO_IRQ_AH_GPIO1_0 = IMX_GPIO_IRQ_CHANNEL_START,
     IMX_GPIO_IRQ_AH_GPIO1_1,
-    IMX_GPIO_IRQ_AH_GPIO1_0,
+    IMX_GPIO_IRQ_AH_GPIO1_2,
+    IMX_GPIO_IRQ_AH_GPIO1_3,
+    IMX_GPIO_IRQ_AH_GPIO1_4,
+    IMX_GPIO_IRQ_AH_GPIO1_5,
+    IMX_GPIO_IRQ_AH_GPIO1_6,
+    IMX_GPIO_IRQ_AH_GPIO1_7,
     // the following are combined signals!
     IMX_GPIO_IRQ_GPIO1_0_15,
     IMX_GPIO_IRQ_GPIO1_16_31,

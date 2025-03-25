@@ -29,6 +29,7 @@ uintptr_t gpio4_regs; // both gpio and irq regs
 uintptr_t gpio5_regs; // both gpio and irq regs
 
 /* Notifications should only come from device */
+/* TODO: */
 void notified(microkit_channel ch)
 {
     LOG_DRIVER("Driver Notified %d!\n", ch);
@@ -66,14 +67,9 @@ void notified(microkit_channel ch)
             microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
             break;
         case IMX_GPIO_IRQ_GPIO1_0_15:
+            // TODO: find the channels that set off the INT
+            notify_active_interupts_on_combined_interrupt_line(ch);
             microkit_irq_ack(ch);
-            // TODO:
-            // maybe if we loop throuhg and check which one set it off another one could have set it off as well and in that case
-            // we will miss any
-            // EXAMPLE:
-            // just say we recieve IRQ - we loop to gpio7 and find that ones condiiton is met, we are about to clear then
-            // then concurrently gpio1 irq goes off - it wont trigger the irq to fire as the conditon was already met from gpio7
-            microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
             break;
         case IMX_GPIO_IRQ_GPIO1_16_31:
             microkit_irq_ack(ch);
@@ -137,7 +133,7 @@ static volatile uint32_t *get_gpio_and_irq_base_address(size_t pin) {
 
 static bool imx_gpio_calc_reg_and_bits(imx_gpio_reg_type_t function, size_t pin, uint32_t *reg_offset, uint32_t *start_bit) {
     // check if pin is too high
-    imx_gpio_instance_t instance = imx_get_gpio_bank(pin);
+    imx_gpio_instance_t instance = imx_get_gpio_instance(pin);
     if (instance == IMX_GPIO_ERROR_INVALID_PIN) {
         return false;
     }
@@ -155,10 +151,34 @@ static bool imx_gpio_calc_reg_and_bits(imx_gpio_reg_type_t function, size_t pin,
                     *start_bit = (uint32_t)pin - (uint32_t)instance;
                 }
             }
-            return false;
         }
     }
-    return false;
+    return true;
+}
+
+static bool imx_irq_calc_reg_and_bits(imx_irq_reg_type_t function, size_t pin, uint32_t *reg_offset, uint32_t *start_bit) {
+    // check if pin is too high
+    imx_gpio_instance_t instance = imx_get_gpio_instance(pin);
+    if (instance == IMX_GPIO_ERROR_INVALID_PIN) {
+        return false;
+    }
+
+    // find function
+    for (int i = 0; i < IMX_IRQ_FUNC_COUNT; i++) {
+        if (irq_config_control[i].function == function) {
+
+            // find instance
+            for (int j = 0; j < IMX_GPIO_INSTANCE_COUNT; j++) {
+                if (irq_config_control[i].instances[j].instance == instance) {
+
+                    // find reg and bits
+                    *reg_offset = irq_config_control[i].instances[j].register_offset;
+                    *start_bit = (uint32_t)pin - (uint32_t)instance;
+                }
+            }
+        }
+    }
+    return true;
 }
 
 /* GETS */
@@ -220,8 +240,37 @@ static void imx_get_gpio_direction(size_t pin, size_t* label, size_t* response) 
     *response = value;
 }
 
-// TODO:
+static void imx_get_interrupt_channel_from_client_channel(size_t channel) {
+    int imx_device_channel = gpio_channel_mappings[channel][GPIO_CHANNEL_MAPPING_IRQ_CHANNEL_SLOT];
+
+}
+
 static void imx_get_irq_pin(size_t channel, size_t* label, size_t* response) {
+    // dont use the config file actually check in the registers as this is more useful
+    // you could just check the ocnfig file as the client anyway if you wanted
+
+    // since we can have combined GPIO for a channel,
+        // we need to check which one is configured to channel
+        // the only way to do that is through the config file
+        // OR we can useanother data structure
+        // i think using the config file is best because its only not used in emson because combinations dont exist
+        // so we could just hceck the register
+        // in this case theres literally no way to know
+        // i guess we should use BOTH the register and the config file to just double check
+
+
+
+    // so we have the clients channel so check which INT and pin its for
+    // now go and check the hardware is set to that
+
+    // probably need a function for this because it will get resued in the notified entry point
+    // int imx_device_channel = gpio_channel_mappings[channel][GPIO_CHANNEL_MAPPING_IRQ_CHANNEL_SLOT];
+    int gpio_pin = gpio_channel_mappings[channel][GPIO_CHANNEL_MAPPING_GPIO_PIN_SLOT];
+
+    // check that this bit is set in the IMR register
+
+    
+    
     // uint32_t reg_offset;
     // uint32_t start_bit;
 
@@ -363,44 +412,54 @@ static void imx_set_gpio_direction(size_t pin, size_t value, size_t* label, size
     *label = GPIO_SUCCESS;
 }
 
-// TODO:
 static void imx_set_irq_pin(size_t channel, size_t value, size_t* label, size_t* response) {
-    // meson_irq_reg_type_t reg_type;
-    // if (channel == MESON_GPIO_AO_IRQ_0 || channel == MESON_GPIO_AO_IRQ_1) {
-    //     meson_gpio_bank_t bank = meson_get_gpio_bank(value);
-    //     if (bank != MESON_GPIO_AO) {
-    //         *label = GPIO_FAILURE;
-    //         *response = GPIO_INVALID_PIN_CONFIG_ENTRY;
-    //         return;
-    //     }
-    //     reg_type = MESON_IRQ_REG_AOSEL;
-    // } else {
-    //     meson_gpio_bank_t bank = meson_get_gpio_bank(value);
-    //     if (bank == MESON_GPIO_ERROR_INVALID_PIN || bank == MESON_GPIO_TEST_N) {
-    //         *label = GPIO_FAILURE;
-    //         *response = GPIO_INVALID_PIN_CONFIG_ENTRY;
-    //         return;
-    //     }
-    //     reg_type = MESON_IRQ_REG_SEL;
-    // }
+    /* check if the value is a combined channel */
+    if (channel >= IMX_GPIO_IRQ_AH_GPIO1_7 && channel <= IMX_GPIO_IRQ_AH_GPIO1_0) {
+        /* check if this value (pin) can be configured to this channel */
+        if (value == channel - IMX_GPIO_IRQ_CHANNEL_START) {
+            *label = GPIO_FAILURE;
+            *response = GPIO_INVALID_PIN_CONFIG_ENTRY;
+            return;
+        } else {
+            /* no configuration is neccessary */
+            *label = GPIO_SUCCESS;
+            return;
+        }
+    }
 
-    // uint32_t reg_offset;
-    // uint32_t start_bit;
+    /* handling of the combined channels */
 
-    // if (!meson_irq_calc_reg_and_bits(reg_type, channel, &reg_offset, &start_bit)) {
-    //     *label = GPIO_FAILURE;
-    //     *response = GPIO_INVALID_CHANNEL_CONFIG_ENTRY;
-    //     return;
-    // }
+    size_t start_valid_pin = 16 * (channel - IMX_GPIO_IRQ_GPIO1_0_15);
+    size_t end_valid_pin = start_valid_pin + 15;
+    if (value < start_valid_pin || value > end_valid_pin) {
+        /* pin cannot be configured for this combined interrupt */
+        *label = GPIO_FAILURE;
+        *response = GPIO_INVALID_PIN_CONFIG_ENTRY;
+        return;
+    }
 
-    // volatile uint32_t *irq_base_address = (void *)(interupt_control_regs + IRQ_CONTROL_REGS_BASE_ADDRESS_OFFSET);
-    // volatile uint32_t *final_reg_address = ((void *)irq_base_address + reg_offset * 4);
+    /* set the mask so pin configures interrupts */
 
-    // // set value
-    // *final_reg_address &= ~BIT_MASK(start_bit, start_bit + meson_irq_bit_strides[reg_type]); // clear
-    // *final_reg_address |= (BIT_MASK(0, 0 + meson_irq_bit_strides[reg_type]) & value) << start_bit; // set
+    uint32_t reg_offset;
+    uint32_t start_bit;
 
-    // *label = GPIO_SUCCESS;
+    if (!imx_irq_calc_reg_and_bits(IMX_IRQ_REG_IMR, channel, &reg_offset, &start_bit)) {
+        *label = GPIO_FAILURE;
+        *response = GPIO_INVALID_CHANNEL_CONFIG_ENTRY;
+        return;
+    }
+
+    volatile uint32_t *irq_base_address = get_gpio_and_irq_base_address(value);
+    volatile uint32_t *final_reg_address = ((void *)irq_base_address + reg_offset);
+
+    // set value
+    if (value == GPIO_DIRECTION_INPUT) {
+        *final_reg_address &= ~BIT(start_bit); // clear
+    } else {
+        *final_reg_address |= BIT(start_bit); // set
+    }
+
+    *label = GPIO_SUCCESS;
 }
 
 // TODO:
@@ -653,69 +712,68 @@ seL4_MessageInfo_t protected(microkit_channel ch, seL4_MessageInfo_t msginfo)
 
 }
 
-// TODO:
-void init(void)
+static bool imx_is_valid_irq_config(int imx_device_channel) {
+    return (imx_device_channel >= IMX_GPIO_IRQ_CHANNEL_START
+        && imx_device_channel < IMX_GPIO_IRQ_CHANNEL_START + IMX_GPIO_IRQ_CHANNEL_COUNT
+        && gpio_channel_mappings[imx_device_channel][GPIO_CHANNEL_MAPPING_GPIO_PIN_SLOT] == -1
+        && gpio_channel_mappings[imx_device_channel][GPIO_CHANNEL_MAPPING_IRQ_CHANNEL_SLOT] == -1);
+}
 
+void init(void)
 {
     LOG_DRIVER("Driver Init!\n");
 
     /* Configure gpio channel mappings */
     for (int i = 0; i < 62; i++) {
-        /* Check if channel has been configured to a GPIO */
+        if (gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_GPIO_PIN_SLOT] == -1) {
+            continue;
+        }
 
-        /* TODO: we need to check if the GPIO has been assigned to another channel already */
+        int gpio_pin = gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_GPIO_PIN_SLOT];
+
+        /* If GPIO pin is configured make sure its only configured to a client channel once */
+        int count = 0;
+        for (int j = 0; j < 62; j++) {
+            if (gpio_pin == gpio_channel_mappings[j][GPIO_CHANNEL_MAPPING_GPIO_PIN_SLOT]) {
+                count++;
+            }
+        }
+
+        if (count != 1) {
+            LOG_DRIVER_ERR("Failed to config gpio_channel_mappings[%d] because GPIO pin is not configured ONLY ONCE\n", i, response);
+            while (1) {}
+        }
+
+        /* Check if IRQ has been configured for this GPIO */
         if (gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_IRQ_CHANNEL_SLOT] != -1) {
             int imx_device_channel = gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_IRQ_CHANNEL_SLOT];
 
             /* Check if its a valid irq configuration (its in range + corresponding device channel entry in table is uninitialised) */
-            if (imx_device_channel >= IMX_GPIO_IRQ_CHANNEL_START
-            && imx_device_channel < IMX_GPIO_IRQ_CHANNEL_START + IMX_GPIO_IRQ_CHANNEL_COUNT
-            && gpio_channel_mappings[imx_device_channel][GPIO_CHANNEL_MAPPING_GPIO_PIN_SLOT] == -1
-            && gpio_channel_mappings[imx_device_channel][GPIO_CHANNEL_MAPPING_IRQ_CHANNEL_SLOT] == -1) {
-                /* TODO: we need to check if the IRQ has been assigned to another channel (ie another GPIO pin)
-                
-                
-                /* Configure with hardware */
-                size_t label;
-                size_t response;
-                imx_set_irq_pin(imx_device_channel, gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_GPIO_PIN_SLOT], &label, &response);
-                if (label == GPIO_FAILURE) {
-                    LOG_DRIVER_ERR("Failed to config gpio_channel_mappings[%d] with gpio_irq_error_t : %ld!\n", i, response);
-                    while (1) {}
-                }
-                imx_get_irq_pin(imx_device_channel, &label, &response);
-                if (label == GPIO_FAILURE) {
-                    LOG_DRIVER_ERR("Failed to config gpio_channel_mappings[%d] with gpio_irq_error_t : %ld!\n", i, response);
-                    while (1) {}
-                }
-                if (response != gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_GPIO_PIN_SLOT]) {
-                    LOG_DRIVER_ERR("Pin was not configuured properly, response : %ld!\n", response);
-                    while (1) {}
-                }
-
-                /* Assign channel to the gpio pin */
-                driver_to_client_channel_mappings[imx_device_channel - IMX_GPIO_IRQ_CHANNEL_START] = gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_CLIENTS_CHANNEL_SLOT];
-
-                /* ACK the IRQ so we can recieve further IRQs */
-                microkit_irq_ack(imx_device_channel);
-            } else {
+            if (!imx_is_valid_irq_config(imx_device_channel)) {
                 LOG_DRIVER_ERR("Failed to config irq imx_device_channel!\n");
                 while (1) {}
             }
+
+            /* Configure with hardware */
+            size_t label;
+            size_t response;
+            imx_set_irq_pin(imx_device_channel, gpio_pin, &label, &response);
+            if (label == GPIO_FAILURE) {
+                LOG_DRIVER_ERR("Failed to config gpio_channel_mappings[%d] with gpio_irq_error_t : %ld!\n", i, response);
+                while (1) {}
+            }
+            imx_get_irq_pin(imx_device_channel, &label, &response);
+            if (label == GPIO_FAILURE) {
+                LOG_DRIVER_ERR("Failed to config gpio_channel_mappings[%d] with gpio_irq_error_t : %ld!\n", i, response);
+                while (1) {}
+            }
+            if (response != gpio_pin) {
+                LOG_DRIVER_ERR("Pin was not configuured properly, response : %ld!\n", response);
+                while (1) {}
+            }
+
+            /* ACK the IRQ so we can recieve further IRQs */
+            microkit_irq_ack(imx_device_channel);
         }
     }
 }
-
-
-
-
-
-
-// GPIO3 =>
-
-
-
-
-
-
-// GPIO12 => 

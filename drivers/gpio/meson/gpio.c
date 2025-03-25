@@ -910,48 +910,82 @@ seL4_MessageInfo_t protected(microkit_channel ch, seL4_MessageInfo_t msginfo)
     }
 }
 
+static bool meson_is_valid_irq_config(int meson_device_channel) {
+    return (meson_device_channel >= MESON_GPIO_IRQ_CHANNEL_START
+        && meson_device_channel < MESON_GPIO_IRQ_CHANNEL_START + MESON_GPIO_IRQ_CHANNEL_COUNT
+        && gpio_channel_mappings[meson_device_channel][GPIO_CHANNEL_MAPPING_GPIO_PIN_SLOT] == -1
+        && gpio_channel_mappings[meson_device_channel][GPIO_CHANNEL_MAPPING_IRQ_CHANNEL_SLOT] == -1);
+}
+
 void init(void)
 {
     LOG_DRIVER("Driver Init!\n");
 
     /* Configure gpio channel mappings */
     for (int i = 0; i < 62; i++) {
-        /* Check if channel has been configured */
+        if (gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_GPIO_PIN_SLOT] == -1) {
+            continue;
+        }
+
+        int gpio_pin = gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_GPIO_PIN_SLOT];
+
+        /* If GPIO pin is configured make sure its only configured to a client channel once */
+        int count = 0;
+        for (int j = 0; j < 62; j++) {
+            if (gpio_pin == gpio_channel_mappings[j][GPIO_CHANNEL_MAPPING_GPIO_PIN_SLOT]) {
+                count++;
+            }
+        }
+        if (count != 1) {
+            LOG_DRIVER_ERR("Failed to config gpio_channel_mappings[%d] because GPIO pin is not configured ONLY ONCE\n", i, response);
+            while (1) {}
+        }
+
+        /* Check if IRQ has been configured for this GPIO */
         if (gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_IRQ_CHANNEL_SLOT] != -1) {
             int meson_device_channel = gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_IRQ_CHANNEL_SLOT];
 
             /* Check if its a valid irq configuration (its in range + corresponding device channel entry in table is uninitialised) */
-            if (meson_device_channel >= MESON_GPIO_IRQ_CHANNEL_START
-            && meson_device_channel < MESON_GPIO_IRQ_CHANNEL_START + MESON_GPIO_IRQ_CHANNEL_COUNT
-            && gpio_channel_mappings[meson_device_channel][GPIO_CHANNEL_MAPPING_GPIO_PIN_SLOT] == -1
-            && gpio_channel_mappings[meson_device_channel][GPIO_CHANNEL_MAPPING_IRQ_CHANNEL_SLOT] == -1) {
-                /* Configure with hardware */
-                size_t label;
-                size_t response;
-                meson_set_irq_pin(meson_device_channel, gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_GPIO_PIN_SLOT], &label, &response);
-                if (label == GPIO_FAILURE) {
-                    LOG_DRIVER_ERR("Failed to config gpio_channel_mappings[%d] with gpio_irq_error_t : %ld!\n", i, response);
-                    while (1) {}
-                }
-                meson_get_irq_pin(meson_device_channel, &label, &response);
-                if (label == GPIO_FAILURE) {
-                    LOG_DRIVER_ERR("Failed to config gpio_channel_mappings[%d] with gpio_irq_error_t : %ld!\n", i, response);
-                    while (1) {}
-                }
-                if (response != gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_GPIO_PIN_SLOT]) {
-                    LOG_DRIVER_ERR("Pin was not configuured properly, response : %ld!\n", response);
-                    while (1) {}
-                }
-
-                /* Assign channel to the gpio pin */
-                driver_to_client_channel_mappings[meson_device_channel - MESON_GPIO_IRQ_CHANNEL_START] = gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_CLIENTS_CHANNEL_SLOT];
-
-                /* ACK the IRQ so we can recieve further IRQs */
-                microkit_irq_ack(meson_device_channel);
-            } else {
+            if (!meson_is_valid_irq_config(meson_device_channel)) {
                 LOG_DRIVER_ERR("Failed to config irq meson_device_channel!\n");
                 while (1) {}
             }
+
+            /* Ensure IRQ channel is not configured to another channel */
+            int count = 0;
+            for (int j = 0; j < 62; j++) {
+                if (meson_device_channel == gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_IRQ_CHANNEL_SLOT]) {
+                    count++;
+                }
+            }
+            if (count != 1) {
+                LOG_DRIVER_ERR("Failed to config gpio_channel_mappings[%d] because device IRQ is not configured ONLY ONCE\n", i, response);
+                while (1) {}
+            }
+
+            /* Configure with hardware */
+            size_t label;
+            size_t response;
+            meson_set_irq_pin(meson_device_channel, gpio_pin, &label, &response);
+            if (label == GPIO_FAILURE) {
+                LOG_DRIVER_ERR("Failed to config gpio_channel_mappings[%d] with gpio_irq_error_t : %ld!\n", i, response);
+                while (1) {}
+            }
+            meson_get_irq_pin(meson_device_channel, &label, &response);
+            if (label == GPIO_FAILURE) {
+                LOG_DRIVER_ERR("Failed to config gpio_channel_mappings[%d] with gpio_irq_error_t : %ld!\n", i, response);
+                while (1) {}
+            }
+            if (response != gpio_pin) {
+                LOG_DRIVER_ERR("Pin was not configuured properly, response : %ld!\n", response);
+                while (1) {}
+            }
+
+            /* Assign channel to the gpio pin */
+            driver_to_client_channel_mappings[meson_device_channel - MESON_GPIO_IRQ_CHANNEL_START] = gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_CLIENTS_CHANNEL_SLOT];
+
+            /* ACK the IRQ so we can recieve further IRQs */
+            microkit_irq_ack(meson_device_channel);
         }
     }
 }
