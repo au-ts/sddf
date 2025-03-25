@@ -45,7 +45,7 @@ static void co_entrypoint(cothread_t handle) {
   uintptr_t* buffer = (uintptr_t*)handle;
   void (*entrypoint)(void) = (void (*)(void))buffer[2];
   entrypoint();
-  *(int *)0;  /* Panic if cothread_t entrypoint returns */
+  __builtin_trap();  /* Panic if cothread_t entrypoint returns */
 }
 
 cothread_t co_active() {
