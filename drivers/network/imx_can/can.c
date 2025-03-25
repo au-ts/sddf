@@ -84,6 +84,8 @@ static void mcr_init(void) {
 // These are in order of hierarchy in the clock tree
 volatile struct clock_registers *clock_reg_can_mux;
 volatile struct clock_registers *clock_reg_ccgr53;
+volatile struct clock_registers *pll1;
+volatile struct clock_registers *clock_reg_ipg_root;
 
 static void can_clocks_enable(void) {
     // TODO - need to map the clock registers to the system file so can access them
@@ -91,8 +93,16 @@ static void can_clocks_enable(void) {
     uint64_t vaddr_ccm_base = 0x2000000;
     uint64_t vaddr_can_mux = vaddr_ccm_base + 0xa200; // TODO - define for offsets
     uint64_t vaddr_ccgr53 = vaddr_ccm_base + 0x4350; // TODO - define for offsets
+
+    // FlexCAN requires pll1 -- seems like from clock dump that it's available
+    // disable flexcan clock root
+    // set flexcan clock root to system pll1 divided by 5
+    // enable flexcan clock root
+
+    uint64_t vaddr_ipg_root = vaddr_ccm_base + 0x9000; 
+    clock_reg_ipg_root = (volatile struct clock_registers *) vaddr_ipg_root;
     
-    volatile struct clock_registers * pll1 = (volatile struct clock_registers *) (vaddr_ccm_base + 0x0940);
+    pll1 = (volatile struct clock_registers *) (vaddr_ccm_base + 0x0940);
     clock_reg_can_mux = (volatile struct clock_registers *) vaddr_can_mux;
     clock_reg_ccgr53 = (volatile struct clock_registers *) vaddr_ccgr53;
 
@@ -110,10 +120,14 @@ static void can_clocks_enable(void) {
 
     clock_reg_ccgr53->set |= MYBIT(0x3, 0);
 
+    clock_reg_ipg_root->set = MYBIT(0x3, 0);
+    clock_reg_ipg_root->base = MYBIT(0x1, 28);
+
     // print base and set of registers
     sddf_dprintf("pll1 >> Base: %x , Set: %x\n", pll1->base, pll1->set);
     sddf_dprintf("CCGR >> Base: %x , Set: %x\n", clock_reg_ccgr53->base, clock_reg_ccgr53->set);
     sddf_dprintf("MUX >> Base: %x , Set: %x\n", clock_reg_can_mux->base, clock_reg_can_mux->set);
+    sddf_dprintf("IPG >> Base: %x , Set: %x\n", clock_reg_ipg_root->base, clock_reg_ipg_root->set);
 }
 
 /* Specified in 11.8.4.1 - FlexCAN Initialization Sequence */
@@ -123,11 +137,10 @@ static void can_init(void) {
     control_regs = (volatile struct control_registers *) vaddr;
     // error_regs = (volatile struct error_registers *) (vaddr + ERROR_REGISTER_OFFSET);
     // canfd_regs = (volatile struct canfd_registers *) (vaddr + CANFD_REGISTER_OFFSET);
+    
+    // control_regs->mcr &= ~MCR_MDIS;
 
-    // Linux seems to first setup the clocks
-    // control_regs->ctrl1 |= CTRL1_CLKSRC;
-    // The cannode is connected to several pins (see DTS)
-    // Bill has a pinmux driver might be able to use for this?
+    sddf_dprintf("MCR register contains: %u\n", control_regs->mcr);
 
 
     // control_regs->mcr = (control_regs->mcr &= ~MCR_MDIS);
@@ -151,6 +164,14 @@ static void can_init(void) {
 // microkit init
 void init (void) {
     sddf_printf("STARTING CAN DRIVER blah blah!\n");
+
+    // Linux does the following before starting the initialisation process for flexcan
+    // flexcan_transceiver_enable -- power regulator enable?
+    // clocks enabled
+    // • 0xA40 ~ 0xA7F: PGC for NOC mix
+    // • 0xC00 ~ 0xC3F: PGC for MLMIX
+
+
 
     can_clocks_enable();
 
