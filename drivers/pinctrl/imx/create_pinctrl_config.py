@@ -110,8 +110,8 @@ if __name__ == "__main__":
             if errored:
                 exit(1)
 
-            with open(out_dir + "/pinctrl_config_data.s", "w") as file:
-                file.write(".section .data\n")
+            with open(out_dir + "/pinctrl_config_data.S", "w") as file:
+                file.write(".data\n")
 
                 file.write("\t.align 4\n")
                 file.write("\t.global num_iomuxc_configs\n")

@@ -21,8 +21,8 @@ PYTHON ?= python3
 CC := clang
 LD := ld.lld
 AR := llvm-ar
-# in its current form, the pinctrl assembly data file cannot be compiled by LLVM-as yet
-AS := aarch64-none-elf-as
+AS := clang
+ASFLAGS := -c -x assembler-with-cpp -target aarch64-none-elf
 RANLIB := llvm-ranlib
 OBJCOPY := llvm-objcopy
 
