@@ -28,137 +28,86 @@ uintptr_t gpio3_regs; // both gpio and irq regs
 uintptr_t gpio4_regs; // both gpio and irq regs
 uintptr_t gpio5_regs; // both gpio and irq regs
 
-
 /* Notifications should only come from device */
 void notified(microkit_channel ch)
 {
     LOG_DRIVER("Driver Notified %d!\n", ch);
     switch (ch) {
-        case IMX_GPIO_IRQ_0:
+        case IMX_GPIO_IRQ_AH_GPIO1_7:
             microkit_irq_ack(ch);
             microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
             break;
-        case IMX_GPIO_IRQ_1:
+        case IMX_GPIO_IRQ_AH_GPIO1_6:
             microkit_irq_ack(ch);
             microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
             break;
-        case IMX_GPIO_IRQ_2:
+        case IMX_GPIO_IRQ_AH_GPIO1_5:
             microkit_irq_ack(ch);
             microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
             break;
-        case IMX_GPIO_IRQ_3:
+        case IMX_GPIO_IRQ_AH_GPIO1_4:
             microkit_irq_ack(ch);
             microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
             break;
-        case IMX_GPIO_IRQ_4:
+        case IMX_GPIO_IRQ_AH_GPIO1_3:
             microkit_irq_ack(ch);
             microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
             break;
-        case IMX_GPIO_IRQ_5:
+        case IMX_GPIO_IRQ_AH_GPIO1_2:
             microkit_irq_ack(ch);
             microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
             break;
-        case IMX_GPIO_IRQ_6:
+        case IMX_GPIO_IRQ_AH_GPIO1_1:
             microkit_irq_ack(ch);
             microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
             break;
-        case IMX_GPIO_IRQ_7:
+        case IMX_GPIO_IRQ_AH_GPIO1_0:
             microkit_irq_ack(ch);
             microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
             break;
-        case IMX_GPIO_IRQ_8:
+        case IMX_GPIO_IRQ_GPIO1_0_15:
+            microkit_irq_ack(ch);
+            // TODO:
+            // maybe if we loop throuhg and check which one set it off another one could have set it off as well and in that case
+            // we will miss any
+            // EXAMPLE:
+            // just say we recieve IRQ - we loop to gpio7 and find that ones condiiton is met, we are about to clear then
+            // then concurrently gpio1 irq goes off - it wont trigger the irq to fire as the conditon was already met from gpio7
+            microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
+            break;
+        case IMX_GPIO_IRQ_GPIO1_16_31:
             microkit_irq_ack(ch);
             microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
             break;
-        case IMX_GPIO_IRQ_9:
+        case IMX_GPIO_IRQ_GPIO2_0_15:
             microkit_irq_ack(ch);
             microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
             break;
-        case IMX_GPIO_IRQ_10:
+        case IMX_GPIO_IRQ_GPIO2_16_31:
             microkit_irq_ack(ch);
             microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
             break;
-        case IMX_GPIO_IRQ_11:
+        case IMX_GPIO_IRQ_GPIO3_0_15:
             microkit_irq_ack(ch);
             microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
             break;
-        case IMX_GPIO_IRQ_12:
+        case IMX_GPIO_IRQ_GPIO3_16_31:
             microkit_irq_ack(ch);
             microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
             break;
-        case IMX_GPIO_IRQ_13:
+        case IMX_GPIO_IRQ_GPIO4_0_15:
             microkit_irq_ack(ch);
             microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
             break;
-        case IMX_GPIO_IRQ_14:
+        case IMX_GPIO_IRQ_GPIO4_16_31:
             microkit_irq_ack(ch);
             microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
             break;
-        case IMX_GPIO_IRQ_15:
+        case IMX_GPIO_IRQ_GPIO5_0_15:
             microkit_irq_ack(ch);
             microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
             break;
-        case IMX_GPIO_IRQ_16:
-            microkit_irq_ack(ch);
-            microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
-            break;
-        case IMX_GPIO_IRQ_17:
-            microkit_irq_ack(ch);
-            microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
-            break;
-        case IMX_GPIO_IRQ_18:
-            microkit_irq_ack(ch);
-            microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
-            break;
-        case IMX_GPIO_IRQ_19:
-            microkit_irq_ack(ch);
-            microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
-            break;
-        case IMX_GPIO_IRQ_20:
-            microkit_irq_ack(ch);
-            microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
-            break;
-        case IMX_GPIO_IRQ_21:
-            microkit_irq_ack(ch);
-            microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
-            break;
-        case IMX_GPIO_IRQ_22:
-            microkit_irq_ack(ch);
-            microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
-            break;
-        case IMX_GPIO_IRQ_23:
-            microkit_irq_ack(ch);
-            microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
-            break;
-        case IMX_GPIO_IRQ_24:
-            microkit_irq_ack(ch);
-            microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
-            break;
-        case IMX_GPIO_IRQ_25:
-            microkit_irq_ack(ch);
-            microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
-            break;
-        case IMX_GPIO_IRQ_26:
-            microkit_irq_ack(ch);
-            microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
-            break;
-        case IMX_GPIO_IRQ_27:
-            microkit_irq_ack(ch);
-            microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
-            break;
-        case IMX_GPIO_IRQ_28:
-            microkit_irq_ack(ch);
-            microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
-            break;
-        case IMX_GPIO_IRQ_29:
-            microkit_irq_ack(ch);
-            microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
-            break;
-        case IMX_GPIO_IRQ_30:
-            microkit_irq_ack(ch);
-            microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
-            break;
-        case IMX_GPIO_IRQ_31:
+        case IMX_GPIO_IRQ_GPIO5_16_31:
             microkit_irq_ack(ch);
             microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
             break;
@@ -704,7 +653,9 @@ seL4_MessageInfo_t protected(microkit_channel ch, seL4_MessageInfo_t msginfo)
 
 }
 
+// TODO:
 void init(void)
+
 {
     LOG_DRIVER("Driver Init!\n");
 
@@ -754,3 +705,17 @@ void init(void)
         }
     }
 }
+
+
+
+
+
+
+// GPIO3 =>
+
+
+
+
+
+
+// GPIO12 => 
