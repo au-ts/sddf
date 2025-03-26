@@ -1,25 +1,29 @@
 use core::fmt::{self, Write};
 
+use sel4_microkit_support::debug_log;
+
 use super::{
-    mmc_struct::{self, MmcState},
+    mmc_struct::{self, BlockTransmissionMode, MmcBusWidth, MmcState},
     sdmmc_capability::SdcardCapability,
-    SdmmcHardware, SdmmcProtocol,
+    SdmmcError, SdmmcHardware, SdmmcProtocol,
 };
 
-pub(crate) struct Sdcard {
-    pub card_id: u128,
-    pub manufacture_info: Cid,
-    pub card_specific_data: Csd,
-    pub card_version: SdVersion,
-    pub relative_card_addr: u16,
-    pub card_state: MmcState,
-    pub card_cap: SdcardCapability,
-    pub card_config: Option<Scr>,
+pub struct Sdcard {
+    pub(crate) card_id: u128,
+    pub(crate) manufacture_info: Cid,
+    pub(crate) card_specific_data: Csd,
+    pub(crate) card_version: SdVersion,
+    pub(crate) relative_card_addr: u16,
+    pub(crate) card_state: MmcState,
+    pub(crate) card_cap: SdcardCapability,
+    pub(crate) method: BlockTransmissionMode,
+    pub(crate) card_config: Option<Scr>,
 }
 
 /// Placeholder eMMC struct that is not implemented
 pub struct EMmc {
     pub card_id: u128,
+    pub method: BlockTransmissionMode,
 }
 
 // Beware this struct is meant to track the cmd set that the sdcard should support
@@ -28,14 +32,14 @@ pub struct EMmc {
 // The SD card specification is cumulative, meaning that if an SD card reports support for a
 // particular version (say 4.0), it implicitly supports all earlier versions as well.
 #[derive(Debug, PartialEq, Eq)]
-pub enum SdVersion {
+pub(crate) enum SdVersion {
     V1_0 = 1,
     V2_0 = 2,
     V3_0 = 3,
     V4_0 = 4,
 }
 
-pub struct Cid {
+pub(crate) struct Cid {
     manufacturer_id: u8,
     oem_id: u16,
     product_name: [u8; 5],
@@ -111,7 +115,7 @@ impl ToArray for Cid {
 }
 
 // This struct is super unreliable, I am thinking
-pub struct Csd {
+pub(crate) struct Csd {
     csd_structure: u8,
     card_capacity: u64,
     max_read_block_len: u16,
@@ -131,10 +135,11 @@ impl Csd {
         // Extract the CSD structure version
         let csd_structure = ((csd_combined >> 126) & 0x3) as u8; // Bits 126–127
         let sd_version = match csd_structure {
-            0 => SdVersion::V1_0,                             // CSD Version 1.0
-            1 => SdVersion::V2_0,                             // CSD Version 2.0
+            0 => SdVersion::V1_0, // CSD Version 1.0
+            1 => SdVersion::V2_0, // CSD Version 2.0
+            // Even if the parsing csd fails, it should not crash the driver completely
             _ => panic!("Unsupported CSD structure version"), // CSD structures beyond 2.0 are not supported here
-            // Actually SDUC card are using CSD 3.0 so maybe add something here later.
+                                                              // Actually SDUC card are using CSD 3.0 so maybe add something here later.
         };
 
         // Parse fields based on CSD version
@@ -189,14 +194,63 @@ impl Csd {
     }
 }
 
-pub struct Scr {
-    sd_spec: u8,
-    data_stat_after_erase: bool,
+pub(crate) struct Scr {
+    // Not extracted from Scr parsing yet
+    pub sd_spec: u32,
+    pub data_stat_after_erase: bool,
+    // Not extracted from Scr parsing yet
     sd_security: u8,
-    sd_bus_widths: u8,
-    sd_spec3: bool,
-    sd_spec4: bool,
-    supports_cmd23: bool,
+    pub sd_bus_width: MmcBusWidth,
+    pub support_speed_class_control: bool,
+    pub support_set_block_count: bool,
+    pub support_extersion_register_single_block: bool,
+    pub support_extersion_register_multi_block: bool,
+    pub support_security_transmission: bool,
+}
+
+impl Scr {
+    // Input variable: raw scr data
+    pub fn new(scr_raw: u64) -> Result<Scr, SdmmcError> {
+        if scr_raw & (0b1 << 48) != (0b1 << 48) {
+            return Err(SdmmcError::EINVAL);
+        }
+
+        let mut sd_bus_width: MmcBusWidth = MmcBusWidth::Width1;
+
+        if scr_raw & (0b1 << 50) == (0b1 << 50) {
+            sd_bus_width = MmcBusWidth::Width4;
+        }
+
+        // Extract bits 32-36 as a single value (5 bits = 0-31 range)
+        // Shift right 32 bits and mask with 0b11111 (31)
+        let command_support_bits = (scr_raw >> 32) & 0b11111;
+
+        // Convert to bool array
+        let mut supported_cmd: [bool; 5] = [false; 5];
+        for i in 0..5 {
+            supported_cmd[i] = (command_support_bits & (1 << i)) != 0;
+        }
+
+        debug_log!("Supported cmd: {:?}\n", supported_cmd);
+
+        let mut data_stat_after_erase: bool = false;
+        if scr_raw & (0b1 << 55) != 0 {
+            data_stat_after_erase = true;
+        }
+        debug_log!("Data status after erase: {:?}\n", data_stat_after_erase);
+
+        Ok(Scr {
+            sd_spec: 0,
+            data_stat_after_erase,
+            sd_security: 0,
+            sd_bus_width,
+            support_speed_class_control: supported_cmd[0],
+            support_set_block_count: supported_cmd[1],
+            support_extersion_register_single_block: supported_cmd[2],
+            support_extersion_register_multi_block: supported_cmd[3],
+            support_security_transmission: supported_cmd[4],
+        })
+    }
 }
 
 struct ArrayWriter<'a> {

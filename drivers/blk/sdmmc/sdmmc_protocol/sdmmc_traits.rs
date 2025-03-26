@@ -1,4 +1,16 @@
-use crate::sdmmc::{mmc_struct::{MmcBusWidth, MmcTiming, TuningState}, HostInfo, MmcData, MmcIos, MmcPowerMode, MmcSignalVoltage, SdmmcCmd, SdmmcError};
+use sel4_microkit_support::{debug_log, process_wait_unreliable};
+
+use crate::sdmmc::{
+    mmc_struct::{MmcBusWidth, MmcTiming, TuningState},
+    HostInfo, MmcData, MmcIos, MmcPowerMode, MmcSignalVoltage, SdmmcCmd, SdmmcError,
+};
+
+const POLLING_INTERVAL_TIME_US: u32 = 1024;
+const DATA_TRANSFER_POLLING_INTERVAL_TIME_US: u32 = 4096;
+// The polling chances before time out is deliberately being set to a large value
+//  as the host is supposed to catch thetimeout request and report to us
+const POLLING_CHANCE_BEFORE_TIME_OUT: u32 = 1024;
+const DATA_TRANSFER_POLLING_CHANCE_BEFORE_TIME_OUT: u32 = 2048;
 
 #[allow(unused_variables)]
 /// Program async Rust can be very dangerous if you do not know what is happening understand the hood
@@ -87,7 +99,11 @@ pub trait SdmmcHardware {
     }
 
     // Change the function signature to something like sdmmc_config_interrupt(&mut self, enable_irq: bool, enable_sdio_irq: bool);
-    fn sdmmc_config_interrupt(&mut self, enable_irq: bool, enable_sdio_irq: bool) -> Result<(), SdmmcError> {
+    fn sdmmc_config_interrupt(
+        &mut self,
+        enable_irq: bool,
+        enable_sdio_irq: bool,
+    ) -> Result<(), SdmmcError> {
         return Err(SdmmcError::ENOTIMPLEMENTED);
     }
 
@@ -106,39 +122,72 @@ pub trait SdmmcHardware {
     /// signals sent from the host to the SD card. This would ensure that the SD card reliably receives data, especially
     /// at high frequencies. However, output timing tends to be more stable, and a specific function for tuning host-to-card
     /// data timing is often not implemented or needed, as seen in the Linux driver.
-    ///
-    /// The cooperation between protocol layer and hardware layer by this function is like: the protocol layer send
-    /// the MMC_CMD_SEND_TUNING_BLOCK request. And if the result receive back is in error, the protocol layer will call this
-    /// tune_sampling function once again. If tune sampling has run out of option, return an error.
-    /// It is suggest that hardware layer also do some book keeping about the suitable delay to making the tuning
-    /// sampling process faster.
-    /// Performs sampling point tuning for the SD/MMC interface.
-    ///
-    /// The `TuningState` enum controls the tuning process, guiding the adjustments
-    /// of the sampling point to achieve reliable communication at high speeds.
-    ///
-    /// # Tuning Process
-    ///
-    /// - Before tuning begins, the protocol layer calls `sdmmc_tune_sampling`
-    ///   with the `TuningStart` state to initialize the tuning process.
-    /// - The protocol layer then attempts to verify if the current sampling adjustment is effective.
-    /// - If verification fails, the protocol layer calls `sdmmc_tune_sampling`
-    ///   with the `TuningContinue` state to adjust the sampling point further.
-    /// - This adjustment and verification process repeats until a reliable sampling
-    ///   point is found.
-    /// - Once a working delay is identified, the protocol layer calls
-    ///   `sdmmc_tune_sampling` with the `TuningComplete` state to finalize the tuning process.
-    ///
-    /// # Parameters
-    /// - `state`: The current tuning state, represented by the `TuningState` enum:
-    ///   - `TuningStart`: Initializes the tuning process.
-    ///   - `TuningContinue`: Adjusts the sampling point incrementally.
-    ///   - `TuningComplete`: Finalizes the tuning once a reliable sampling point is found.
-    ///
-    /// # Returns
-    /// - `Ok(())`: Indicates successful completion of the requested tuning step.
-    /// - `Err(SdmmcError)`: An error occurred during the tuning process.
-    fn sdmmc_tune_sampling(&mut self, state: TuningState) -> Result<(), SdmmcError> {
+    fn sdmmc_execute_tuning(&mut self, memory: *mut [u8; 64]) -> Result<(), SdmmcError> {
         return Err(SdmmcError::ENOTIMPLEMENTED);
+    }
+
+    fn sdmmc_host_reset(&mut self) -> Result<MmcIos, SdmmcError> {
+        return Err(SdmmcError::ENOTIMPLEMENTED);
+    }
+
+    fn sdmmc_do_request(
+        &mut self,
+        cmd: &SdmmcCmd,
+        data: Option<&MmcData>,
+        resp: &mut [u32; 4],
+        mut retry: u32,
+    ) -> Result<(), SdmmcError> {
+        'command_retry: loop {
+            // Send the command using send command function provided by the hardware layer
+            self.sdmmc_send_command(cmd, data)?;
+
+            let mut res: Result<(), SdmmcError>;
+
+            match data {
+                // The flow with data transfer
+                Some(_) => {
+                    for _ in 0..DATA_TRANSFER_POLLING_CHANCE_BEFORE_TIME_OUT {
+                        process_wait_unreliable(
+                            DATA_TRANSFER_POLLING_INTERVAL_TIME_US as u64 * 1000,
+                        );
+                        res = self.sdmmc_receive_response(cmd, resp);
+                        match res {
+                            Err(SdmmcError::ETIMEDOUT) => {
+                                if retry == 0 {
+                                    return Err(SdmmcError::ETIMEDOUT);
+                                }
+                                retry -= 1;
+                                continue 'command_retry;
+                            }
+                            Err(SdmmcError::EBUSY) => continue,
+                            Err(e) => return Err(e),
+                            Ok(_) => return Ok(()),
+                        }
+                    }
+                }
+                // The flow without data transfer
+                None => {
+                    for _ in 0..POLLING_CHANCE_BEFORE_TIME_OUT {
+                        process_wait_unreliable(POLLING_INTERVAL_TIME_US as u64 * 1000);
+                        res = self.sdmmc_receive_response(cmd, resp);
+                        match res {
+                            Err(SdmmcError::ETIMEDOUT) => {
+                                if retry == 0 {
+                                    return Err(SdmmcError::ETIMEDOUT);
+                                }
+                                retry -= 1;
+                                continue 'command_retry;
+                            }
+                            Err(SdmmcError::EBUSY) => continue,
+                            Err(e) => return Err(e),
+                            Ok(_) => return Ok(()),
+                        }
+                    }
+                }
+            }
+            break 'command_retry;
+        }
+        debug_log!("A timeout request not reported by the host, the host might be unreliable\n");
+        Err(SdmmcError::EUNDEFINED)
     }
 }
