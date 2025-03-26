@@ -1,18 +1,32 @@
 use core::{
     future::Future,
     pin::Pin,
+    sync::atomic::Ordering,
     task::{Context, Poll, Waker},
 };
 
-use mmc_struct::{MmcBusWidth, MmcDevice, MmcState, MmcTiming, TuningState};
-use sdcard::{Cid, Csd, Sdcard};
+use mmc_struct::{BlockTransmissionMode, MmcBusWidth, MmcDevice, MmcState, MmcTiming, TuningState};
+use sdcard::{Cid, Csd, Scr, Sdcard};
 use sdmmc_capability::{
     SdcardCapability, SdmmcHostCapability, MMC_CAP_4_BIT_DATA, MMC_CAP_VOLTAGE_TUNE, MMC_EMPTY_CAP,
     MMC_TIMING_LEGACY, MMC_TIMING_SD_HS, MMC_TIMING_UHS_DDR50, MMC_TIMING_UHS_SDR104,
-    MMC_TIMING_UHS_SDR12, MMC_TIMING_UHS_SDR25, MMC_TIMING_UHS_SDR50
+    MMC_TIMING_UHS_SDR12, MMC_TIMING_UHS_SDR25, MMC_TIMING_UHS_SDR50,
 };
 use sdmmc_constant::{
-    MMC_CMD_ALL_SEND_CID, MMC_CMD_APP_CMD, MMC_CMD_ERASE, MMC_CMD_GO_IDLE_STATE, MMC_CMD_READ_MULTIPLE_BLOCK, MMC_CMD_READ_SINGLE_BLOCK, MMC_CMD_SELECT_CARD, MMC_CMD_SEND_CSD, MMC_CMD_SET_BLOCK_COUNT, MMC_CMD_STOP_TRANSMISSION, MMC_CMD_WRITE_MULTIPLE_BLOCK, MMC_CMD_WRITE_SINGLE_BLOCK, OCR_BUSY, OCR_HCS, OCR_S18R, SD_CMD_APP_SEND_OP_COND, SD_CMD_APP_SET_BUS_WIDTH, SD_CMD_ERASE_WR_BLK_END, SD_CMD_ERASE_WR_BLK_START, SD_CMD_SEND_IF_COND, SD_CMD_SEND_RELATIVE_ADDR, SD_CMD_SWITCH_FUNC, SD_CMD_SWITCH_UHS18V, SD_ERASE_ARG, SD_SWITCH_FUNCTION_GROUP_ONE, SD_SWITCH_FUNCTION_GROUP_ONE_CHECK_SDHS, SD_SWITCH_FUNCTION_GROUP_ONE_CHECK_UHS_DDR50, SD_SWITCH_FUNCTION_GROUP_ONE_CHECK_UHS_SDR104, SD_SWITCH_FUNCTION_GROUP_ONE_CHECK_UHS_SDR12, SD_SWITCH_FUNCTION_GROUP_ONE_CHECK_UHS_SDR25, SD_SWITCH_FUNCTION_GROUP_ONE_CHECK_UHS_SDR50, SD_SWITCH_FUNCTION_GROUP_ONE_SET_LEGACY, SD_SWITCH_FUNCTION_GROUP_ONE_SET_SDHS, SD_SWITCH_FUNCTION_GROUP_ONE_SET_UHS_DDR50, SD_SWITCH_FUNCTION_GROUP_ONE_SET_UHS_SDR104, SD_SWITCH_FUNCTION_GROUP_ONE_SET_UHS_SDR12, SD_SWITCH_FUNCTION_GROUP_ONE_SET_UHS_SDR25, SD_SWITCH_FUNCTION_GROUP_ONE_SET_UHS_SDR50, SD_SWITCH_FUNCTION_SELECTION_GROUP_ONE
+    MMC_CMD_ALL_SEND_CID, MMC_CMD_APP_CMD, MMC_CMD_ERASE, MMC_CMD_GO_IDLE_STATE,
+    MMC_CMD_READ_MULTIPLE_BLOCK, MMC_CMD_READ_SINGLE_BLOCK, MMC_CMD_SELECT_CARD, MMC_CMD_SEND_CSD,
+    MMC_CMD_SET_BLOCK_COUNT, MMC_CMD_STOP_TRANSMISSION, MMC_CMD_WRITE_MULTIPLE_BLOCK,
+    MMC_CMD_WRITE_SINGLE_BLOCK, OCR_BUSY, OCR_HCS, OCR_S18R, SD_CMD_APP_SEND_OP_COND,
+    SD_CMD_APP_SET_BUS_WIDTH, SD_CMD_ERASE_WR_BLK_END, SD_CMD_ERASE_WR_BLK_START,
+    SD_CMD_SEND_IF_COND, SD_CMD_SEND_RELATIVE_ADDR, SD_CMD_SWITCH_FUNC, SD_CMD_SWITCH_UHS18V,
+    SD_ERASE_ARG, SD_SWITCH_FUNCTION_GROUP_ONE, SD_SWITCH_FUNCTION_GROUP_ONE_CHECK_SDHS,
+    SD_SWITCH_FUNCTION_GROUP_ONE_CHECK_UHS_DDR50, SD_SWITCH_FUNCTION_GROUP_ONE_CHECK_UHS_SDR104,
+    SD_SWITCH_FUNCTION_GROUP_ONE_CHECK_UHS_SDR12, SD_SWITCH_FUNCTION_GROUP_ONE_CHECK_UHS_SDR25,
+    SD_SWITCH_FUNCTION_GROUP_ONE_CHECK_UHS_SDR50, SD_SWITCH_FUNCTION_GROUP_ONE_SET_LEGACY,
+    SD_SWITCH_FUNCTION_GROUP_ONE_SET_SDHS, SD_SWITCH_FUNCTION_GROUP_ONE_SET_UHS_DDR50,
+    SD_SWITCH_FUNCTION_GROUP_ONE_SET_UHS_SDR104, SD_SWITCH_FUNCTION_GROUP_ONE_SET_UHS_SDR12,
+    SD_SWITCH_FUNCTION_GROUP_ONE_SET_UHS_SDR25, SD_SWITCH_FUNCTION_GROUP_ONE_SET_UHS_SDR50,
+    SD_SWITCH_FUNCTION_SELECTION_GROUP_ONE,
 };
 
 use crate::sdmmc_traits::SdmmcHardware;
@@ -20,7 +34,8 @@ use crate::sdmmc_traits::SdmmcHardware;
 use crate::sdmmc_os::{debug_log, process_wait_unreliable};
 
 pub mod mmc_struct;
-mod sdcard;
+pub mod sd_ops;
+pub mod sdcard;
 pub mod sdmmc_capability;
 mod sdmmc_constant;
 
@@ -51,6 +66,8 @@ pub enum SdmmcError {
     ETIMEDOUT,
     EINVAL,
     EIO,
+    // Error that I currently not sure how to deal with...
+    EUNKNOWN,
     EUNSUPPORTEDCARD,
     ENOTIMPLEMENTED,
     // This error should not be triggered unless there are bugs in program
@@ -170,23 +187,6 @@ pub struct MmcIos {
     ///   data transfer occurs at higher rates.
     pub clock: u64,
 
-    /// The voltage range (VDD) used for powering the SD/MMC card.
-    ///
-    /// - This field stores the selected voltage range in a bit-encoded format.
-    ///   It indicates the voltage level the card is operating at.
-    /// - Common voltage levels are 3.3V, 1.8V, and sometimes 1.2V (for eMMC).
-    /// - Cards often negotiate their operating voltage during initialization.
-    pub vdd: u32,
-
-    /// The power delay (in milliseconds) used after powering the card to ensure
-    /// stable operation.
-    ///
-    /// - After powering up the card, the host controller typically waits for a
-    ///   certain period before initiating communication to ensure that the card's
-    ///   power supply is stable.
-    /// - This delay ensures the card is ready to respond to commands.
-    pub power_delay_ms: u32,
-
     /// The current power supply mode for the SD/MMC card.
     ///
     /// - This field indicates whether the card is powered on, powered off, or
@@ -237,7 +237,23 @@ pub struct MmcIos {
 pub struct HostInfo {
     pub max_frequency: u64,
     pub min_frequency: u64,
-    pub max_block_per_req: u16,
+    pub max_block_per_req: u32,
+    /// The voltage range (VDD) used for powering the SD/MMC card.
+    ///
+    /// - This field stores the selected voltage range in a bit-encoded format.
+    ///   It indicates the voltage level the card is operating at.
+    /// - Common voltage levels are 3.3V, 1.8V, and sometimes 1.2V (for eMMC).
+    /// - Cards often negotiate their operating voltage during initialization.
+    pub vdd: u32,
+
+    /// The power delay (in milliseconds) used after powering the card to ensure
+    /// stable operation.
+    ///
+    /// - After powering up the card, the host controller typically waits for a
+    ///   certain period before initiating communication to ensure that the card's
+    ///   power supply is stable.
+    /// - This delay ensures the card is ready to respond to commands.
+    pub power_delay_ms: u32,
 }
 
 /// TODO: Add more variables for SdmmcProtocol to track the state of the sdmmc controller and card correctly
@@ -252,6 +268,8 @@ pub struct SdmmcProtocol<T: SdmmcHardware> {
 
     /// This mmc device is optional because there may not always be a card in the slot!
     mmc_device: Option<MmcDevice>,
+
+    private_memory: Option<*mut [u8; 64]>,
 }
 
 impl<T> Unpin for SdmmcProtocol<T> where T: Unpin + SdmmcHardware {}
@@ -266,6 +284,7 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
             host_info: info,
             host_capability: SdmmcHostCapability(cap),
             mmc_device: None,
+            private_memory: None,
         })
     }
 
@@ -294,7 +313,7 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
             cmdarg: 0x000001AA, // Voltage supply and check pattern
         };
 
-        let res = Self::send_cmd_and_receive_resp(&mut self.hardware, &cmd, None, &mut resp);
+        let res: Result<(), SdmmcError> = self.hardware.sdmmc_do_request(&cmd, None, &mut resp, 1);
 
         // If the result is OK and the resp is 0x1AA, the card we are initializing is a SDHC/SDXC
         // If the result is error, it is either the voltage not being set up correctly, which mean a bug in hardware layer
@@ -317,10 +336,10 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
             };
 
             // Send CMD55
-            let res = Self::send_cmd_and_receive_resp(&mut self.hardware, &cmd, None, &mut resp);
-            
+            let res = self.hardware.sdmmc_do_request(&cmd, None, &mut resp, 0);
+
             match res {
-                Ok(_) => {},
+                Ok(_) => {}
                 Err(SdmmcError::ETIMEDOUT) => return Err(SdmmcError::EUNSUPPORTEDCARD),
                 Err(_) => return res,
             }
@@ -338,7 +357,7 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
             // Right now we deliberately not set XPC bit for maximum compatibility
 
             // Change this when we decide to support spi or SDSC as well
-            cmd.cmdarg |= self.mmc_ios.vdd & 0xff8000;
+            cmd.cmdarg |= self.host_info.vdd & 0xff8000;
 
             if self
                 .host_capability
@@ -352,7 +371,7 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
             }
 
             // Send ACMD41
-            Self::send_cmd_and_receive_resp(&mut self.hardware, &cmd, None, &mut resp)?;
+            self.hardware.sdmmc_do_request(&cmd, None, &mut resp, 0)?;
 
             debug_log!("OCR: {:08x}\n", resp[0]);
 
@@ -371,20 +390,23 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
 
         // Checking if the host and card is eligible for voltage switch
         if self
-        .host_capability
-        .contains(sdmmc_capability::SdmmcHostCapability(MMC_TIMING_UHS_SDR12)) && voltage_switch == true 
-            && resp[0] & OCR_HCS == OCR_HCS && resp[0] & OCR_S18R == OCR_S18R {
+            .host_capability
+            .contains(sdmmc_capability::SdmmcHostCapability(MMC_TIMING_UHS_SDR12))
+            && voltage_switch == true
+            && resp[0] & OCR_HCS == OCR_HCS
+            && resp[0] & OCR_S18R == OCR_S18R
+        {
             // TODO: If the sdcard fail at this stage, a power circle and reinit should be performed
             self.tune_sdcard_switch_uhs18v()?;
             self.mmc_ios.signal_voltage = MmcSignalVoltage::Voltage180;
         }
-        
+
         Ok(())
     }
 
     fn sdmmc_power_cycle(&mut self) -> Result<(), SdmmcError> {
         self.hardware.sdmmc_set_power(MmcPowerMode::Off)?;
-        process_wait_unreliable(5_000_000);
+        process_wait_unreliable(self.host_info.power_delay_ms as u64 * 1_000_000);
 
         self.hardware.sdmmc_set_power(MmcPowerMode::On)?;
         process_wait_unreliable(1_000_000);
@@ -405,7 +427,7 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
             // TODO: Right now we know the power will always be up and this function should not be called
             // But when we encounter scenerio that may actually call this function, we should wait for the time specified in ios
             // Right now this whole power up related thing does not work
-            process_wait_unreliable(self.mmc_ios.power_delay_ms as u64 * 1000000);
+            process_wait_unreliable(self.host_info.power_delay_ms as u64 * 1_000_000);
 
             self.mmc_ios.power_mode = MmcPowerMode::On;
         }
@@ -425,28 +447,35 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
         // There could be more complex retry logic implemented in the future
         'sdcard_init: loop {
             match self.sdcard_init(voltage_switch) {
-                Ok(()) => {},
+                Ok(()) => {}
                 Err(SdmmcError::EUNSUPPORTEDCARD) => {
-                    break 'sdcard_init SdmmcError::EUNSUPPORTEDCARD;
-                },
+                    break 'sdcard_init;
+                }
                 Err(_) => {
                     if voltage_switch == true {
                         voltage_switch = false;
+
                         // Retry with voltage switch off
                         debug_log!("Try to init the card without voltage switch\n");
                         self.sdmmc_power_cycle()?;
+
+                        self.mmc_ios = self.hardware.sdmmc_host_reset()?;
+
+                        // One bug that does not break anything here is
+                        // sdmmc_host_reset will reset the clock to CardSetup timing and turn off the irq
+                        // But those variable in mmc_ios is not changed accordingly
+
                         continue 'sdcard_init;
-                    }
-                    else {
-                        break 'sdcard_init SdmmcError::ECARDINACTIVE;
+                    } else {
+                        break 'sdcard_init;
                     }
                 }
             }
-        
+
             let card: Sdcard = self.setup_sdcard_cont()?;
             self.mmc_device = Some(MmcDevice::Sdcard(card));
             return Ok(());
-        };
+        }
 
         // Unsupported card
         {
@@ -475,7 +504,7 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
             resp_type: MMC_RSP_R2,
             cmdarg: 0,
         };
-        Self::send_cmd_and_receive_resp(&mut self.hardware, &cmd, None, &mut resp)?;
+        self.hardware.sdmmc_do_request(&cmd, None, &mut resp, 1)?;
 
         let cid: Cid = Cid::new(resp);
 
@@ -500,7 +529,7 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
             cmdarg: 0,
         };
 
-        Self::send_cmd_and_receive_resp(&mut self.hardware, &cmd, None, &mut resp)?;
+        self.hardware.sdmmc_do_request(&cmd, None, &mut resp, 1)?;
 
         let rca: u16 = (resp[0] >> 16) as u16; // Store RCA from response
 
@@ -512,7 +541,8 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
             resp_type: MMC_RSP_R2,
             cmdarg: (rca as u32) << 16,
         };
-        Self::send_cmd_and_receive_resp(&mut self.hardware, &cmd, None, &mut resp)?;
+
+        self.hardware.sdmmc_do_request(&cmd, None, &mut resp, 1)?;
 
         debug_log!(
             "CSD: {:08x} {:08x} {:08x} {:08x}\n",
@@ -530,7 +560,8 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
             resp_type: MMC_RSP_R1,
             cmdarg: (rca as u32) << 16,
         };
-        Self::send_cmd_and_receive_resp(&mut self.hardware, &cmd, None, &mut resp)?;
+
+        self.hardware.sdmmc_do_request(&cmd, None, &mut resp, 1)?;
 
         // SDHC/SDXC default to 512 bytes sector size so I did not manually set it here
 
@@ -550,6 +581,7 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
             relative_card_addr: rca,
             card_state,
             card_cap: sdmmc_capability::SdcardCapability(MMC_EMPTY_CAP),
+            method: BlockTransmissionMode::StopTransmission,
             card_config: None,
         })
     }
@@ -559,6 +591,8 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
     /// Do NOT call this function again if your card is already tuned as this function is not that cheap!
     /// But you should call this function the card being turned into power saving mode
     /// `stolen_memory` is a specific memory region used to read data from the SD card through CMD6.
+    /// To use this function safely, the memory pointer passed in must be from a valid memory address
+    /// And must match the physical memory address that is being DMA into
     ///
     /// ### Important Considerations:
     ///
@@ -597,9 +631,12 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
     ///
     /// # Returns
     /// - `Result<(), SdmmcError>`: `Ok(())` if tuning was successful, or an error otherwise.
-    pub fn tune_performance(
+    /// UB here waiting to be fixed: memory being a mutable reference is also accessed by DMA
+    pub unsafe fn tune_performance(
         &mut self,
-        memory_and_invalidate_cache_fn: Option<(&mut [u8; 64], u64, fn())>,
+        memory: *mut [u8; 64],
+        cache_invalidate_function: fn(),
+        physical_memory_addr: u64,
     ) -> Result<(), SdmmcError> {
         // For testing
         let mmc_device = self.mmc_device.as_mut().ok_or(SdmmcError::ENOCARD)?;
@@ -607,10 +644,20 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
         // Turn down the clock frequency
         self.mmc_ios.clock = self.hardware.sdmmc_config_timing(MmcTiming::CardSetup)?;
 
+        // The private memory should be the physically memory
+        // However any attempt to dereference the pointer
+        // could crash the program if the driver don't have access
+        // to the phyical memory at the proper address
+        self.private_memory = Some(physical_memory_addr as *mut [u8; 64]);
+
         match mmc_device {
             MmcDevice::Sdcard(sdcard) => {
                 sdcard.card_state.timing = MmcTiming::CardSetup;
-                self.tune_sdcard_performance(memory_and_invalidate_cache_fn)
+                self.tune_sdcard_performance(
+                    memory,
+                    cache_invalidate_function,
+                    physical_memory_addr,
+                )
             }
             MmcDevice::EMmc(emmc) => Err(SdmmcError::ENOTIMPLEMENTED),
             MmcDevice::Unknown => Err(SdmmcError::ENOTIMPLEMENTED),
@@ -619,22 +666,6 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
 
     pub fn get_host_info(&mut self) -> HostInfo {
         self.host_info.clone()
-    }
-
-    /// Helper function to print out the content of one block
-    #[allow(dead_code)]
-    unsafe fn print_one_block(ptr: *const u8, num: usize) {
-        unsafe {
-            // Iterate over the number of bytes and print each one in hexadecimal format
-            for i in 0..num {
-                let byte = *ptr.add(i);
-                if i % 16 == 0 {
-                    debug_log!("\n{:04x}: ", i);
-                }
-                debug_log!("{:02x} ", byte);
-            }
-            debug_log!("\n");
-        }
     }
 
     pub fn test_read_one_block(&mut self, start_idx: u64, destination: u64) {
@@ -652,68 +683,13 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
             resp_type: MMC_RSP_R1,
             cmdarg: cmd_arg as u32,
         };
-        if let Err(error) =
-            Self::send_cmd_and_receive_resp(&mut self.hardware, &cmd, Some(&data), &mut resp)
+        if let Err(error) = self
+            .hardware
+            .sdmmc_do_request(&cmd, Some(&data), &mut resp, 0)
         {
             debug_log!("Error in reading\n");
         }
-        unsafe { Self::print_one_block(destination as *mut u8, 512) };
-    }
-
-    fn test_sampling(
-        &mut self,
-        memory_addr: u64,
-        cache_invalidate_function: fn(),
-    ) -> Result<(), SdmmcError> {
-        let mut resp: [u32; 4] = [0; 4];
-
-        let data = MmcData {
-            blocksize: 64,
-            blockcnt: 1,
-            flags: MmcDataFlag::SdmmcDataRead,
-            addr: memory_addr,
-        };
-
-        let cmd = SdmmcCmd {
-            cmdidx: SD_CMD_SWITCH_FUNC,
-            resp_type: MMC_RSP_R1,
-            cmdarg: 0x00FFFFFF,
-        };
-
-        Self::send_cmd_and_receive_resp(&mut self.hardware, &cmd, Some(&data), &mut resp)
-        // TODO: Add validate the content of data returned here, but it is optional because
-        // if there is not error it must has passed the CRC check!
-    }
-
-    fn process_sampling(
-        &mut self,
-        memory_addr: u64,
-        cache_invalidate_function: fn(),
-    ) -> Result<(), SdmmcError> {
-        self.hardware
-            .sdmmc_tune_sampling(TuningState::TuningStart)?;
-        loop {
-            // Call test_sampling
-            match self.test_sampling(memory_addr, cache_invalidate_function) {
-                Ok(_) => {
-                    self.hardware
-                        .sdmmc_tune_sampling(TuningState::TuningComplete)?;
-                    // If test_sampling succeeds, return Ok
-                    return Ok(());
-                }
-                Err(SdmmcError::EIO) => {
-                    // If test_sampling fails with EIO, try tuning the sampling point
-                    debug_log!("Try different sampling points\n");
-                    self.hardware
-                        .sdmmc_tune_sampling(TuningState::TuningContinue)?;
-                }
-                Err(e) => {
-                    // If test_sampling fails with an error other than EIO, return that error
-                    debug_log!("Tuning sampling fails\n");
-                    return Err(e);
-                }
-            }
-        }
+        unsafe { print_one_block(destination as *mut u8, 512) };
     }
 
     /// Switch voltage function
@@ -725,20 +701,22 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
             resp_type: MMC_RSP_R1,
             cmdarg: 0, // Argument for 4-bit mode (0 for 1-bit mode)
         };
-        Self::send_cmd_and_receive_resp(&mut self.hardware, &cmd, None, &mut resp)?;
+
+        self.hardware.sdmmc_do_request(&cmd, None, &mut resp, 0)?;
+
         debug_log!("Switch voltage prepared!\n");
 
         self.mmc_ios.clock = self.hardware.sdmmc_config_timing(MmcTiming::ClockStop)?;
 
         // TODO: figuring out the optimal delay
-        process_wait_unreliable(100000);
+        process_wait_unreliable(100_000);
 
         let mut signal: u8 = 0xFF;
 
         for _ in 0..100 {
             signal = self.hardware.sdmmc_read_datalanes()?;
             // TODO: figuring out the optimal delay
-            process_wait_unreliable(100000);
+            process_wait_unreliable(100_000);
             debug_log!("data signal value: 0b{:b}\n", signal);
             if signal & 0xF == 0x0 {
                 break;
@@ -771,7 +749,8 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
         }
 
         if signal & 0xF != 0xF {
-            self.hardware.sdmmc_set_signal_voltage(MmcSignalVoltage::Voltage330)?;
+            self.hardware
+                .sdmmc_set_signal_voltage(MmcSignalVoltage::Voltage330)?;
             process_wait_unreliable(1_000_000);
             return Err(SdmmcError::ECARDINACTIVE);
         }
@@ -785,18 +764,18 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
     /// Implement this sdcard switch function to avoid this hackiness!
     /// Like first get the speed classes the sdcard support by this function
     /// and then switch to the proper speed class!
-    fn sdcard_switch_speed(
+    unsafe fn sdcard_switch_speed(
         &mut self,
         target: MmcTiming,
-        memory: &mut [u8; 64],
-        memory_ioaddr: u64,
+        raw_memory: *mut [u8; 64],
         invalidate_cache_fn: fn(),
+        physical_memory_addr: u64,
     ) -> Result<(), SdmmcError> {
         let data: MmcData = MmcData {
             blocksize: 64,
             blockcnt: 1,
             flags: MmcDataFlag::SdmmcDataRead,
-            addr: memory_ioaddr,
+            addr: physical_memory_addr,
         };
 
         let mut resp: [u32; 4] = [0; 4];
@@ -818,52 +797,69 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
             resp_type: MMC_RSP_R1,
             cmdarg,
         };
-        Self::send_cmd_and_receive_resp(&mut self.hardware, &cmd, Some(&data), &mut resp)?;
+        self.hardware
+            .sdmmc_do_request(&cmd, Some(&data), &mut resp, 0)?;
+
+        // The use of fence here is actually wrong
+        // As the fence(Ordering::Acquire) on arm platform
+        // The cache maintenance instructions are not ordered 
+        // by the Load-Acquire and Store-Release instructions
+        // But I will just leave it here as I cannot figure out
+        // A more elegant way and code works fine anyway
+        core::sync::atomic::fence(Ordering::Acquire);
+
         // Error handling here
         invalidate_cache_fn();
+
         // Since we are using u8 here, the endianness does matter
         // 0xF indicate function switch error
-        // TODO: Double check here and deliberately trigger swithc error to see if the field
+        // TODO: Double check here and deliberately trigger switch error to see if the field
         // is being set to 0xF
-        if memory[SD_SWITCH_FUNCTION_SELECTION_GROUP_ONE] & 0xF == 0xF {
+        if unsafe { (*raw_memory)[SD_SWITCH_FUNCTION_SELECTION_GROUP_ONE] & 0xF == 0xF } {
             return Err(SdmmcError::EINVAL);
         }
         Ok(())
     }
 
-    fn sdcard_check_supported_speed_class(
+    /// Unsafe because trying to dereference raw pointer
+    unsafe fn sdcard_check_supported_speed_class(
         &mut self,
-        memory: &mut [u8; 64],
-        memory_ioaddr: u64,
+        raw_memory: *mut [u8; 64],
         invalidate_cache_fn: fn(),
+        physical_memory_addr: u64,
     ) -> Result<(), SdmmcError> {
         let data: MmcData = MmcData {
             blocksize: 64,
             blockcnt: 1,
             flags: MmcDataFlag::SdmmcDataRead,
-            addr: memory_ioaddr,
+            addr: physical_memory_addr,
         };
 
         let mut resp: [u32; 4] = [0; 4];
 
         let mut card_cap: SdcardCapability = sdmmc_capability::SdcardCapability(MMC_EMPTY_CAP);
-        let cmd = SdmmcCmd {
+        let cmd: SdmmcCmd = SdmmcCmd {
             cmdidx: SD_CMD_SWITCH_FUNC,
             resp_type: MMC_RSP_R1,
             cmdarg: 0x00FFFFFF,
         };
-        Self::send_cmd_and_receive_resp(&mut self.hardware, &cmd, Some(&data), &mut resp)?;
+
+        self.hardware
+            .sdmmc_do_request(&cmd, Some(&data), &mut resp, 0)?;
+
+        core::sync::atomic::fence(Ordering::Acquire);
+
         invalidate_cache_fn();
         // Typical speed class supported: 80 03
         match self.mmc_ios.signal_voltage {
             MmcSignalVoltage::Voltage330 => {
-                let speed_class_byte: u8 = memory[SD_SWITCH_FUNCTION_GROUP_ONE];
+                let speed_class_byte: u8 = unsafe { (*raw_memory)[SD_SWITCH_FUNCTION_GROUP_ONE] };
                 if speed_class_byte & SD_SWITCH_FUNCTION_GROUP_ONE_CHECK_SDHS != 0 {
                     card_cap.insert(sdmmc_capability::SdcardCapability(MMC_TIMING_SD_HS));
                 }
             }
             MmcSignalVoltage::Voltage180 => {
-                let speed_class_byte: u8 = memory[SD_SWITCH_FUNCTION_GROUP_ONE];
+                let speed_class_byte: u8 = unsafe { (*raw_memory)[SD_SWITCH_FUNCTION_GROUP_ONE] };
                 if speed_class_byte & SD_SWITCH_FUNCTION_GROUP_ONE_CHECK_UHS_SDR12 != 0 {
                     card_cap.insert(sdmmc_capability::SdcardCapability(MMC_TIMING_UHS_SDR12));
                 }
@@ -893,11 +889,32 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
     }
 
     /// Since we are using u8 here, the endianness does matter
+    /// I should change the process of access raw memory to using volatile read
     fn tune_sdcard_performance(
         &mut self,
-        memory_and_invalidate_cache_fn: Option<(&mut [u8; 64], u64, fn())>,
+        memory: *mut [u8; 64],
+        cache_invalidate_function: fn(),
+        physical_memory_addr: u64,
     ) -> Result<(), SdmmcError> {
         let mut resp: [u32; 4] = [0; 4];
+
+        if let Some(MmcDevice::Sdcard(ref mut sdcard)) = &mut self.mmc_device {
+            let scr: Scr = unsafe {
+                Sdcard::sdcard_get_configuration_register(
+                    &mut self.hardware,
+                    physical_memory_addr,
+                    memory,
+                    cache_invalidate_function,
+                    sdcard.relative_card_addr,
+                )?
+            };
+
+            if scr.support_set_block_count {
+                sdcard.method = BlockTransmissionMode::SetBlockCount;
+            }
+
+            sdcard.card_config = Some(scr);
+        }
 
         if self.mmc_ios.bus_width == MmcBusWidth::Width1
             && self
@@ -917,14 +934,14 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
                 resp_type: MMC_RSP_R1,
                 cmdarg: (relative_card_address as u32) << 16,
             };
-            Self::send_cmd_and_receive_resp(&mut self.hardware, &cmd, None, &mut resp)?;
+            self.hardware.sdmmc_do_request(&cmd, None, &mut resp, 0)?;
 
             let cmd = SdmmcCmd {
                 cmdidx: SD_CMD_APP_SET_BUS_WIDTH,
                 resp_type: MMC_RSP_R1,
                 cmdarg: 2, // Argument for 4-bit mode (0 for 1-bit mode)
             };
-            Self::send_cmd_and_receive_resp(&mut self.hardware, &cmd, None, &mut resp)?;
+            self.hardware.sdmmc_do_request(&cmd, None, &mut resp, 0)?;
 
             self.hardware.sdmmc_config_bus_width(MmcBusWidth::Width4)?;
 
@@ -935,148 +952,135 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
             // TODO: Change sdcard bus width here, or get rid of that field completely
         }
 
-        if let Some((memory, memory_ioaddr, cache_invalidate_function)) = memory_and_invalidate_cache_fn {
-            debug_log!("Checking supported speed classes\n");
-            if let Some(MmcDevice::Sdcard(ref mut sdcard)) = self.mmc_device {
-                match self.mmc_ios.signal_voltage {
-                    MmcSignalVoltage::Voltage330 => {
-                        sdcard.card_state.timing = MmcTiming::Legacy;
-                        if !sdcard
-                            .card_cap
-                            .contains(SdcardCapability(MMC_TIMING_LEGACY))
-                        {
-                            // When the target speed is None, the sdcard_switch_speed update sdcard speed capability
+        debug_log!("Checking supported speed classes\n");
+
+        if let Some(MmcDevice::Sdcard(ref mut sdcard)) = self.mmc_device {
+            match self.mmc_ios.signal_voltage {
+                MmcSignalVoltage::Voltage330 => {
+                    sdcard.card_state.timing = MmcTiming::Legacy;
+                    if !sdcard
+                        .card_cap
+                        .contains(SdcardCapability(MMC_TIMING_LEGACY))
+                    {
+                        // When the target speed is None, the sdcard_switch_speed update sdcard speed capability
+                        unsafe {
                             self.sdcard_check_supported_speed_class(
                                 memory,
-                                memory_ioaddr,
                                 cache_invalidate_function,
+                                physical_memory_addr,
                             )?;
+                        }
+                    }
+                }
+                MmcSignalVoltage::Voltage180 => {
+                    sdcard.card_state.timing = MmcTiming::UhsSdr12;
+                    if !sdcard
+                        .card_cap
+                        .contains(SdcardCapability(MMC_TIMING_UHS_SDR12))
+                    {
+                        unsafe {
+                            self.sdcard_check_supported_speed_class(
+                                memory,
+                                cache_invalidate_function,
+                                physical_memory_addr,
+                            )?;
+                        }
+                    }
+                }
+                MmcSignalVoltage::Voltage120 => return Err(SdmmcError::EUNDEFINED),
+            };
+        } else {
+            return Err(SdmmcError::EUNDEFINED);
+        }
+
+        let mut target_timing;
+        let sdcard_cap: SdcardCapability;
+        if let Some(MmcDevice::Sdcard(ref sdcard)) = self.mmc_device {
+            debug_log!("Switch to higher speed class\n");
+            sdcard_cap = sdcard.card_cap.clone();
+            target_timing = sdcard.card_state.timing;
+            // This 'tune_speed thing is a feature called labeled block in Rust
+            'tune_speed: {
+                match self.mmc_ios.signal_voltage {
+                    MmcSignalVoltage::Voltage330 => {
+                        if sdcard_cap.contains(SdcardCapability(MMC_TIMING_SD_HS))
+                            && self
+                                .host_capability
+                                .contains(SdmmcHostCapability(MMC_TIMING_SD_HS))
+                        {
+                            target_timing = MmcTiming::SdHs;
                         }
                     }
                     MmcSignalVoltage::Voltage180 => {
-                        sdcard.card_state.timing = MmcTiming::UhsSdr12;
-                        if !sdcard
-                            .card_cap
-                            .contains(SdcardCapability(MMC_TIMING_UHS_SDR12))
+                        if sdcard_cap.contains(SdcardCapability(MMC_TIMING_UHS_SDR104))
+                            && self
+                                .host_capability
+                                .contains(SdmmcHostCapability(MMC_TIMING_UHS_SDR104))
                         {
-                            self.sdcard_check_supported_speed_class(
-                                memory,
-                                memory_ioaddr,
-                                cache_invalidate_function,
-                            )?;
+                            target_timing = MmcTiming::UhsSdr104;
+                            // If the switch speed succeed, terminate the block
+                            break 'tune_speed;
+                        }
+                        if !sdcard_cap.contains(SdcardCapability(MMC_TIMING_UHS_DDR50))
+                            && self
+                                .host_capability
+                                .contains(SdmmcHostCapability(MMC_TIMING_UHS_DDR50))
+                        {
+                            target_timing = MmcTiming::UhsDdr50;
+                            break 'tune_speed;
+                        }
+                        if !sdcard_cap.contains(SdcardCapability(MMC_TIMING_UHS_SDR50))
+                            && self
+                                .host_capability
+                                .contains(SdmmcHostCapability(MMC_TIMING_UHS_SDR50))
+                        {
+                            target_timing = MmcTiming::UhsSdr50;
+                            break 'tune_speed;
+                        }
+                        if !sdcard_cap.contains(SdcardCapability(MMC_TIMING_UHS_SDR25))
+                            && self
+                                .host_capability
+                                .contains(SdmmcHostCapability(MMC_TIMING_UHS_SDR25))
+                        {
+                            target_timing = MmcTiming::UhsSdr25;
+                            break 'tune_speed;
                         }
                     }
                     MmcSignalVoltage::Voltage120 => return Err(SdmmcError::EUNDEFINED),
-                };
-            } else {
-                return Err(SdmmcError::EUNDEFINED);
+                }
+            };
+            unsafe {
+                self.sdcard_switch_speed(
+                    target_timing,
+                    memory,
+                    cache_invalidate_function,
+                    physical_memory_addr,
+                )?;
             }
+            self.mmc_ios.clock = self.hardware.sdmmc_config_timing(target_timing)?;
 
-            let mut timing;
-            let sdcard_cap: SdcardCapability;
-            if let Some(MmcDevice::Sdcard(ref sdcard)) = self.mmc_device {
-                debug_log!("Switch to higher speed class\n");
-                sdcard_cap = sdcard.card_cap.clone();
-                timing = sdcard.card_state.timing;
-                // This 'tune_speed thing is a feature called labeled block in Rust
-                'tune_speed: {
-                    match self.mmc_ios.signal_voltage {
-                        MmcSignalVoltage::Voltage330 => {
-                            if sdcard_cap.contains(SdcardCapability(MMC_TIMING_SD_HS))
-                                && self
-                                    .host_capability
-                                    .contains(SdmmcHostCapability(MMC_TIMING_SD_HS))
-                            {
-                                // When the target speed is Some, the sdcard_switch_speed try to switch the speed class to target
-                                self.sdcard_switch_speed(
-                                    MmcTiming::SdHs,
-                                    memory,
-                                    memory_ioaddr,
-                                    cache_invalidate_function,
-                                )?;
-                                timing = MmcTiming::SdHs;
-                            }
-                        }
-                        MmcSignalVoltage::Voltage180 => {
-                            if sdcard_cap.contains(SdcardCapability(MMC_TIMING_UHS_SDR104))
-                                && self
-                                    .host_capability
-                                    .contains(SdmmcHostCapability(MMC_TIMING_UHS_SDR104))
-                            {
-                                self.sdcard_switch_speed(
-                                    MmcTiming::UhsSdr104,
-                                    memory,
-                                    memory_ioaddr,
-                                    cache_invalidate_function,
-                                )?;
-                                timing = MmcTiming::UhsSdr104;
-                                // If the switch speed succeed, terminate the block
-                                break 'tune_speed;
-                            }
-                            if !sdcard_cap.contains(SdcardCapability(MMC_TIMING_UHS_DDR50))
-                                && self
-                                    .host_capability
-                                    .contains(SdmmcHostCapability(MMC_TIMING_UHS_DDR50))
-                            {
-                                self.sdcard_switch_speed(
-                                    MmcTiming::UhsDdr50,
-                                    memory,
-                                    memory_ioaddr,
-                                    cache_invalidate_function,
-                                )?;
-                                timing = MmcTiming::UhsDdr50;
-                                break 'tune_speed;
-                            }
-                            if !sdcard_cap.contains(SdcardCapability(MMC_TIMING_UHS_SDR50))
-                                && self
-                                    .host_capability
-                                    .contains(SdmmcHostCapability(MMC_TIMING_UHS_SDR50))
-                            {
-                                self.sdcard_switch_speed(
-                                    MmcTiming::UhsSdr50,
-                                    memory,
-                                    memory_ioaddr,
-                                    cache_invalidate_function,
-                                )?;
-                                timing = MmcTiming::UhsSdr50;
-                                break 'tune_speed;
-                            }
-                            if !sdcard_cap.contains(SdcardCapability(MMC_TIMING_UHS_SDR25))
-                                && self
-                                    .host_capability
-                                    .contains(SdmmcHostCapability(MMC_TIMING_UHS_SDR25))
-                            {
-                                self.sdcard_switch_speed(
-                                    MmcTiming::UhsSdr25,
-                                    memory,
-                                    memory_ioaddr,
-                                    cache_invalidate_function,
-                                )?;
-                                timing = MmcTiming::UhsSdr25;
-                                break 'tune_speed;
-                            }
-                        }
-                        MmcSignalVoltage::Voltage120 => return Err(SdmmcError::EUNDEFINED),
-                    }
-                };
-                self.mmc_ios.clock = self.hardware.sdmmc_config_timing(timing)?;
-                self.process_sampling(memory_ioaddr, cache_invalidate_function)?;
+            self.hardware
+                .sdmmc_execute_tuning(physical_memory_addr as *mut [u8; 64])?;
 
-                debug_log!("Current frequency: {}Hz", self.mmc_ios.clock);
-            } else {
-                return Err(SdmmcError::EUNDEFINED);
-            }
-            if let Some(MmcDevice::Sdcard(ref mut sdcard)) = self.mmc_device {
-                sdcard.card_state.timing = timing;
-            }
+            debug_log!("Current frequency: {}Hz\n", self.mmc_ios.clock);
+        } else {
+            return Err(SdmmcError::EUNDEFINED);
+        }
+        if let Some(MmcDevice::Sdcard(ref mut sdcard)) = self.mmc_device {
+            sdcard.card_state.timing = target_timing;
         }
 
         Ok(())
     }
 
-    pub fn config_interrupt(&mut self, enable_irq: bool, enable_sdio_irq: bool) -> Result<(), SdmmcError> {
+    pub fn config_interrupt(
+        &mut self,
+        enable_irq: bool,
+        enable_sdio_irq: bool,
+    ) -> Result<(), SdmmcError> {
         self.mmc_ios.enabled_irq = enable_irq | enable_sdio_irq;
-        self.hardware.sdmmc_config_interrupt(enable_irq, enable_sdio_irq)
+        self.hardware
+            .sdmmc_config_interrupt(enable_irq, enable_sdio_irq)
     }
 
     pub fn ack_interrupt(&mut self) -> Result<(), SdmmcError> {
@@ -1089,8 +1093,22 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
         start_idx: u64,
         destination: u64,
     ) -> (Result<(), SdmmcError>, SdmmcProtocol<T>) {
+        let trans_meth: BlockTransmissionMode = {
+            if let Some(ref device) = self.mmc_device {
+                match device {
+                    MmcDevice::Sdcard(sdcard) => sdcard.method.clone(),
+                    MmcDevice::EMmc(emmc) => emmc.method.clone(),
+                    MmcDevice::Unknown => return (Err(SdmmcError::EUNSUPPORTEDCARD), self),
+                }
+            } else {
+                return (Err(SdmmcError::ENOCARD), self);
+            }
+        };
+
         let mut cmd: SdmmcCmd;
         let mut res: Result<(), SdmmcError>;
+        let mut turing: bool = false;
+
         // TODO: Figure out a way to support cards with 4 KB sector size
         let data: MmcData = MmcData {
             blocksize: 512,
@@ -1099,6 +1117,7 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
             addr: destination,
         };
         let mut resp: [u32; 4] = [0; 4];
+
         // TODO: Add more validation check in the future
         // Like sdmmc card usually cannot transfer arbitrary number of blocks at once
 
@@ -1112,56 +1131,62 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
         // For now we default to assume the card is high_capacity
         // TODO: Fix it when we properly implement card boot up
         // TODO: If we boot the card by ourself or reset the card, remember to send block len cmd
-        let cmd_arg: u64 = start_idx;
-        if blockcnt == 1 {
-            cmd = SdmmcCmd {
-                cmdidx: MMC_CMD_READ_SINGLE_BLOCK,
-                resp_type: MMC_RSP_R1,
-                cmdarg: cmd_arg as u32,
-            };
-            let future = SdmmcCmdFuture::new(&mut self.hardware, &cmd, Some(&data), &mut resp);
-            res = future.await;
-
-            // TODO: Figure out a generic model for every sd controller, like what if the sd controller only send interrupt
-            // for read/write requests?
-            let _ = self.hardware.sdmmc_ack_interrupt();
-
-            return (res, self);
-        } else {
-            cmd = SdmmcCmd {
-                cmdidx: MMC_CMD_READ_MULTIPLE_BLOCK,
-                resp_type: MMC_RSP_R1,
-                cmdarg: cmd_arg as u32,
-            };
-            let future = SdmmcCmdFuture::new(&mut self.hardware, &cmd, Some(&data), &mut resp);
-            res = future.await;
-
-            // TODO: Figure out a generic model for every sd controller, like what if the sd controller only send interrupt
-            // for read/write requests?
-            // Should I use if statement to check whether to ack irq or not based on if irq is enabled or not?
-            let _ = self.hardware.sdmmc_ack_interrupt();
-
-            if let Ok(()) = res {
-                // Uboot code for determine response type in this case
-                // cmd.resp_type = (IS_SD(mmc) || write) ? MMC_RSP_R1b : MMC_RSP_R1;
-                // TODO: Add mmc checks here
+        loop {
+            if blockcnt == 1 {
                 cmd = SdmmcCmd {
-                    cmdidx: MMC_CMD_STOP_TRANSMISSION,
-                    resp_type: MMC_RSP_R1B,
-                    cmdarg: 0,
+                    cmdidx: MMC_CMD_READ_SINGLE_BLOCK,
+                    resp_type: MMC_RSP_R1,
+                    cmdarg: start_idx as u32,
                 };
-                let future = SdmmcCmdFuture::new(&mut self.hardware, &cmd, None, &mut resp);
-                res = future.await;
-
-                // TODO: Figure out a generic model for every sd controller, like what if the sd controller only send interrupt
-                // for read/write requests?
-                let _ = self.hardware.sdmmc_ack_interrupt();
-
-                return (res.map_err(|_| SdmmcError::ESTOPCMD), self);
+                res = Self::sdmmc_async_request(&mut self.hardware, &cmd, Some(&data), &mut resp)
+                    .await;
             } else {
-                return (res, self);
+                // TODO: Add if here to determine if the card support cmd23 or not to determine to use cmd23 or cmd12
+                // Set the expected number of blocks
+
+                cmd = SdmmcCmd {
+                    cmdidx: MMC_CMD_READ_MULTIPLE_BLOCK,
+                    resp_type: MMC_RSP_R1,
+                    cmdarg: start_idx as u32,
+                };
+
+                res = Self::sdmmc_multi_blocks_io(
+                    &mut self.hardware,
+                    &cmd,
+                    &data,
+                    &mut resp,
+                    trans_meth.clone(),
+                )
+                .await;
             }
+            match res {
+                Ok(()) => {}
+                Err(ref err) => {
+                    let stop_cmd: SdmmcCmd = SdmmcCmd {
+                        cmdidx: MMC_CMD_STOP_TRANSMISSION,
+                        resp_type: MMC_RSP_R1B,
+                        cmdarg: 0,
+                    };
+                    // Sending stop command manually regardless of whether it has been sent or not
+                    let _ =
+                        Self::sdmmc_async_request(&mut self.hardware, &stop_cmd, None, &mut resp)
+                            .await;
+
+                    if let SdmmcError::EIO = err {
+                        if let Some(memory) = self.private_memory {
+                            if turing == false {
+                                turing = true;
+                                if let Ok(()) = self.hardware.sdmmc_execute_tuning(memory) {
+                                    continue;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            break;
         }
+        (res, self)
     }
 
     // Almost the same with read_block aside from the cmd being sent is a bit different
@@ -1173,8 +1198,20 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
         start_idx: u64,
         source: u64,
     ) -> (Result<(), SdmmcError>, SdmmcProtocol<T>) {
-        let mut cmd: SdmmcCmd;
-        let mut res: Result<(), SdmmcError>;
+        let trans_meth: BlockTransmissionMode = {
+            if let Some(ref device) = self.mmc_device {
+                match device {
+                    MmcDevice::Sdcard(sdcard) => sdcard.method.clone(),
+                    MmcDevice::EMmc(emmc) => emmc.method.clone(),
+                    MmcDevice::Unknown => return (Err(SdmmcError::EUNSUPPORTEDCARD), self),
+                }
+            } else {
+                return (Err(SdmmcError::ENOCARD), self);
+            }
+        };
+
+        let cmd: SdmmcCmd;
+        let res: Result<(), SdmmcError>;
         // TODO: Figure out a way to support cards with 4 KB sector size
         let data: MmcData = MmcData {
             blocksize: 512,
@@ -1185,58 +1222,44 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
         let mut resp: [u32; 4] = [0; 4];
         // TODO: Add more validation check in the future
 
-        let cmd_arg: u64 = start_idx;
         if blockcnt == 1 {
             cmd = SdmmcCmd {
                 cmdidx: MMC_CMD_WRITE_SINGLE_BLOCK,
                 resp_type: MMC_RSP_R1,
-                cmdarg: cmd_arg as u32,
+                cmdarg: start_idx as u32,
             };
-            let future = SdmmcCmdFuture::new(&mut self.hardware, &cmd, Some(&data), &mut resp);
-            res = future.await;
-
-            // TODO: Figure out a generic model for every sd controller, like what if the sd controller only send interrupt
-            // for read/write requests?
-            let _ = self.hardware.sdmmc_ack_interrupt();
+            res = Self::sdmmc_async_request(&mut self.hardware, &cmd, Some(&data), &mut resp).await;
 
             return (res, self);
         } else {
             // TODO: Add if here to determine if the card support cmd23 or not to determine to use cmd23 or cmd12
             // Set the expected number of blocks
+
             cmd = SdmmcCmd {
-                cmdidx: MMC_CMD_SET_BLOCK_COUNT,
+                cmdidx: MMC_CMD_WRITE_MULTIPLE_BLOCK,
                 resp_type: MMC_RSP_R1,
-                cmdarg: blockcnt,  // block count for the upcoming CMD25 operation
+                cmdarg: start_idx as u32,
             };
 
-            let future = SdmmcCmdFuture::new(&mut self.hardware, &cmd, None, &mut resp);
-            res = future.await;
+            res =
+                Self::sdmmc_multi_blocks_io(&mut self.hardware, &cmd, &data, &mut resp, trans_meth)
+                    .await;
 
-            // TODO: Figure out a generic model for every sd controller, like what if the sd controller only send interrupt
-            // for read/write requests?
-            let _ = self.hardware.sdmmc_ack_interrupt();
-
-
-            if let Ok(()) = res {
-                // Uboot code for determine response type in this case
-                // cmd.resp_type = (IS_SD(mmc) || write) ? MMC_RSP_R1b : MMC_RSP_R1;
-                // TODO: Add mmc checks here
-                cmd = SdmmcCmd {
-                    cmdidx: MMC_CMD_WRITE_MULTIPLE_BLOCK,
-                    resp_type: MMC_RSP_R1,
-                    cmdarg: cmd_arg as u32,
-                };
-                let future = SdmmcCmdFuture::new(&mut self.hardware, &cmd, Some(&data), &mut resp);
-                res = future.await;
-
-                // TODO: Figure out a generic model for every sd controller, like what if the sd controller only send interrupt
-                // for read/write requests?
-                let _ = self.hardware.sdmmc_ack_interrupt();
-
-                return (res.map_err(|_| SdmmcError::ESTOPCMD), self);
-            } else {
-                return (res, self);
+            match res {
+                Ok(()) => {}
+                Err(_) => {
+                    let cmd: SdmmcCmd = SdmmcCmd {
+                        cmdidx: MMC_CMD_STOP_TRANSMISSION,
+                        resp_type: MMC_RSP_R1B,
+                        cmdarg: 0,
+                    };
+                    // Sending stop command manually regardless of whether it has been sent or not
+                    let _ =
+                        Self::sdmmc_async_request(&mut self.hardware, &cmd, None, &mut resp).await;
+                }
             }
+
+            return (res, self);
         }
     }
 
@@ -1258,9 +1281,7 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
             cmdarg: start_idx as u32,
         };
 
-        let future = SdmmcCmdFuture::new(&mut self.hardware, &cmd, None, &mut resp);
-
-        res = future.await;
+        res = Self::sdmmc_async_request(&mut self.hardware, &cmd, None, &mut resp).await;
 
         if let Err(_) = res {
             return (res, self);
@@ -1272,9 +1293,7 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
             cmdarg: end_idx as u32,
         };
 
-        let future = SdmmcCmdFuture::new(&mut self.hardware, &cmd, None, &mut resp);
-
-        res = future.await;
+        res = Self::sdmmc_async_request(&mut self.hardware, &cmd, None, &mut resp).await;
 
         if let Err(_) = res {
             return (res, self);
@@ -1286,67 +1305,80 @@ impl<T: SdmmcHardware> SdmmcProtocol<T> {
             cmdarg: SD_ERASE_ARG,
         };
 
-        let future = SdmmcCmdFuture::new(&mut self.hardware, &cmd, None, &mut resp);
+        res = Self::sdmmc_async_request(&mut self.hardware, &cmd, None, &mut resp).await;
 
-        res = future.await;
-
-        return (res, self)
+        return (res, self);
     }
 
-    // Not used right now, but would be useful in the future once we want to execute some command synchronously
-    fn send_cmd_and_receive_resp(
+    /// Function to execute one sdmmc request asynchronously
+    /// The resp could be used for future error parsing
+    async fn sdmmc_async_request(
         hardware: &mut T,
         cmd: &SdmmcCmd,
         data: Option<&MmcData>,
         resp: &mut [u32; 4],
     ) -> Result<(), SdmmcError> {
-        // TODO: Add temporarily disable interrupt here
+        // Send the command to the host sdcard
+        hardware.sdmmc_send_command(cmd, data)?;
+        // Wait until sdcard return the result to the driver
+        let res: Result<(), SdmmcError> = SdmmcCmdFuture::new(hardware, cmd, resp).await;
+        // Acknowledge interrupts
+        hardware.sdmmc_ack_interrupt()?;
 
-        // Send the command using the hardware layer
-        let mut res = hardware.sdmmc_send_command(cmd, data);
-        if res.is_err() {
-            return res;
-        }
+        res
+    }
 
-        res = Err(SdmmcError::ETIMEDOUT);
+    /// Change this function so that if a request report back error
+    /// MMC_CMD_STOP_TRANSMISSION must be sent in the end so the card
+    /// stop transmission correctly
+    async fn sdmmc_multi_blocks_io(
+        hardware: &mut T,
+        request_cmd: &SdmmcCmd,
+        data: &MmcData,
+        resp: &mut [u32; 4],
+        transmission_mode: BlockTransmissionMode,
+    ) -> Result<(), SdmmcError> {
+        // Trasmission stage
+        match transmission_mode {
+            BlockTransmissionMode::SetBlockCount => {
+                let cmd: SdmmcCmd = SdmmcCmd {
+                    cmdidx: MMC_CMD_SET_BLOCK_COUNT,
+                    resp_type: MMC_RSP_R1,
+                    cmdarg: data.blockcnt, // block count for the upcoming CMD25 operation
+                };
 
-        // TODO: Change it to use the sleep function provided by the hardware layer
-        // This is a busy poll retry, we could poll infinitely if we trust the device to be correct
-        let mut retry: u32 = 100_000_000;
+                Self::sdmmc_async_request(hardware, &cmd, None, resp).await?;
 
-        // sel4_microkit::debug_println!("Request sent! Let us wait!");
+                Self::sdmmc_async_request(hardware, &request_cmd, Some(&data), resp).await
+            }
+            BlockTransmissionMode::StopTransmission => {
+                let temp_res: Result<(), SdmmcError> =
+                    Self::sdmmc_async_request(hardware, &request_cmd, Some(&data), resp).await;
 
-        while retry > 0 {
-            // Try to receive the response
-            res = hardware.sdmmc_receive_response(cmd, resp);
+                // Uboot code for determine response type in this case
+                // cmd.resp_type = (IS_SD(mmc) || write) ? MMC_RSP_R1b : MMC_RSP_R1;
+                // TODO: Add mmc checks here
+                let cmd: SdmmcCmd = SdmmcCmd {
+                    cmdidx: MMC_CMD_STOP_TRANSMISSION,
+                    resp_type: MMC_RSP_R1B,
+                    cmdarg: 0,
+                };
 
-            if let Err(SdmmcError::EBUSY) = res {
-                // Busy response, retry
-                retry -= 1;
-                // hardware.sleep(1); // Placeholder: Implement a sleep function in SdmmcHardware trait
-            } else {
-                // If any other error or success, break the loop
-                break;
+                // Technically this command has very little possibility to fail
+                // Unless for hardware or environment issue
+                let _ = Self::sdmmc_async_request(hardware, &cmd, None, resp).await;
+
+                temp_res
+            }
+            BlockTransmissionMode::AutoStop => {
+                Self::sdmmc_async_request(hardware, &request_cmd, Some(&data), resp).await
             }
         }
-
-        if let Err(_) = res {
-            debug_log!("Resp[0] value {:08x}\n", resp[0]);
-        }
-
-        // TODO: Add renable interrupt here
-        res // Return the final result (Ok or Err)
     }
 }
-
 enum CmdState {
-    // Currently sending the command
-    // State at the start
-    NotSent,
     // Waiting for the response
     WaitingForResponse,
-    // Error encountered
-    Error,
     // Finished
     Finished,
 }
@@ -1354,7 +1386,6 @@ enum CmdState {
 pub struct SdmmcCmdFuture<'a, 'b, 'c> {
     hardware: &'a mut dyn SdmmcHardware,
     cmd: &'b SdmmcCmd,
-    data: Option<&'b MmcData>,
     waker: Option<Waker>,
     state: CmdState,
     response: &'c mut [u32; 4],
@@ -1364,15 +1395,13 @@ impl<'a, 'b, 'c> SdmmcCmdFuture<'a, 'b, 'c> {
     pub fn new(
         hardware: &'a mut dyn SdmmcHardware,
         cmd: &'b SdmmcCmd,
-        data: Option<&'b MmcData>,
         response: &'c mut [u32; 4],
     ) -> SdmmcCmdFuture<'a, 'b, 'c> {
         SdmmcCmdFuture {
             hardware,
             cmd,
-            data,
             waker: None,
-            state: CmdState::NotSent,
+            state: CmdState::WaitingForResponse,
             response,
         }
     }
@@ -1383,7 +1412,6 @@ impl<'a, 'b, 'c> SdmmcCmdFuture<'a, 'b, 'c> {
 /// We actually do not need an executor to execute the request
 /// The context can be ignored unless someone insist to use an executor for the requests
 /// So for now, the context is being stored in waker but this waker will not be used
-/// Beside, we are in no std environment and can barely use any locks
 impl<'a, 'b, 'c> Future for SdmmcCmdFuture<'a, 'b, 'c> {
     type Output = Result<(), SdmmcError>;
 
@@ -1395,26 +1423,8 @@ impl<'a, 'b, 'c> Future for SdmmcCmdFuture<'a, 'b, 'c> {
         self.waker = Some(cx.waker().clone());
 
         match self.state {
-            CmdState::NotSent => {
-                let res: Result<(), SdmmcError>;
-                {
-                    let this: &mut SdmmcCmdFuture<'a, 'b, 'c> = self.as_mut().get_mut();
-
-                    // Now, you can pass `&SdmmcCmd` to `sdmmc_send_command`
-                    let cmd: &SdmmcCmd = this.cmd;
-                    let data: Option<&MmcData> = this.data;
-                    res = this.hardware.sdmmc_send_command(cmd, data);
-                }
-                if let Ok(()) = res {
-                    self.state = CmdState::WaitingForResponse;
-                    return Poll::Pending;
-                } else {
-                    self.state = CmdState::Error;
-                    return Poll::Ready(res);
-                }
-            }
             CmdState::WaitingForResponse => {
-                let res;
+                let res: Result<(), SdmmcError>;
                 {
                     let this: &mut SdmmcCmdFuture<'a, 'b, 'c> = self.as_mut().get_mut();
                     let cmd: &SdmmcCmd = this.cmd;
@@ -1424,16 +1434,29 @@ impl<'a, 'b, 'c> Future for SdmmcCmdFuture<'a, 'b, 'c> {
                 }
                 if let Err(SdmmcError::EBUSY) = res {
                     return Poll::Pending;
-                } else if let Ok(()) = res {
-                    self.state = CmdState::Finished;
-                    return Poll::Ready(res);
                 } else {
-                    self.state = CmdState::Error;
+                    self.state = CmdState::Finished;
                     return Poll::Ready(res);
                 }
             }
-            CmdState::Error => return Poll::Ready(Err(SdmmcError::EUNDEFINED)),
+            // Despite the status is ready, the state machine get polled again
             CmdState::Finished => return Poll::Ready(Err(SdmmcError::EUNDEFINED)),
         }
+    }
+}
+
+/// Helper function to print out the content of one block
+#[allow(dead_code)]
+unsafe fn print_one_block(ptr: *const u8, num: usize) {
+    unsafe {
+        // Iterate over the number of bytes and print each one in hexadecimal format
+        for i in 0..num {
+            let byte = *ptr.add(i);
+            if i % 16 == 0 {
+                debug_log!("\n{:04x}: ", i);
+            }
+            debug_log!("{:02x} ", byte);
+        }
+        debug_log!("\n");
     }
 }
