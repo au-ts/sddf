@@ -29,7 +29,8 @@ uintptr_t gpio4_regs; // both gpio and irq regs
 uintptr_t gpio5_regs; // both gpio and irq regs
 
 /* Notifications should only come from device */
-/* TODO: */
+/* TODO: this should check the status of the ISR */
+// we should have a mapping still if we can and only use the PSR as a last resort
 void notified(microkit_channel ch)
 {
     LOG_DRIVER("Driver Notified %d!\n", ch);
@@ -166,13 +167,40 @@ static bool imx_gpio_and_irq_calculate_reg_and_bits(imx_gpio_and_irq_reg_type_t 
             for (int j = 0; j < IMX_GPIO_INSTANCE_COUNT; j++) {
                 if (gpio_and_irq_config_control[i].instances[j].instance == instance) {
                     // find reg and bits
-                    *reg_offset = gpio_and_irq_config_control[i].instances[j].register_offset;
-                    *start_bit = (uint32_t)pin - (uint32_t)instance;
+                    bool is_last = false;
+                    int k = 0;
+                    uint32_t bit_stride = imx_gpio_and_irq_bit_strides[function];
+
+                    // there will always be at least one register
+                    while (!is_last) {
+                        struct imx_gpio_and_irq_register_data reg_data = gpio_and_irq_config_control[i].instances[j].registers[k];
+                        is_last = reg_data.is_last;
+                        k++;
+
+                        uint32_t instance_pin_number = (uint32_t)(pin) - (uint32_t)instance;
+
+                        // see if the pin is in this register range
+                        if (instance_pin_number < reg_data.start_pin_number) {
+                            // we missed it
+                            return false;
+                        }
+
+                        uint32_t range = 32;
+                        range /= bit_stride;
+                        if (instance_pin_number > reg_data.start_pin_number + range - 1) {
+                            continue; // check next register
+                        }
+
+                        // its in this register so find what bits
+                        *reg_offset = reg_data.register_offset;
+                        *start_bit = (instance_pin_number - reg_data.start_pin_number /* get the amount of pins after start bit */) * bit_stride;
+                        return true;
+                    }
                 }
             }
         }
     }
-    return true;
+    return true; // never get here
 }
 
 /* GETS | GPIO */
@@ -271,7 +299,35 @@ static void imx_get_irq_pin(size_t pin, size_t* label, size_t* response) {
 
 // TODO:
 static void imx_get_irq_edge(size_t pin, size_t* label, size_t* response) {
-    
+    /* check if its combined (the only ones that can be configured in registers) */
+    if (!imx_check_irq_is_combined(imx_get_irq_from_config_file(pin))) {
+        *label = GPIO_FAILURE;
+        *response = GPIO_ERROR_UNSUPPORTED_IRQ_CONFIG;
+    }
+
+    /* Check IMR reg */
+    uint32_t reg_offset;
+    uint32_t start_bit;
+
+    if (!imx_gpio_and_irq_calculate_reg_and_bits(IMX_IRQ_REG_IMR, pin, &reg_offset, &start_bit)) {
+        *label = GPIO_FAILURE;
+        *response = GPIO_ERROR_UNSUPPORTED_PIN_CONFIG;
+        return;
+    }
+
+    volatile uint32_t *irq_base_address = imx_get_gpio_and_irq_base_address(value);
+    volatile uint32_t *final_reg_address = ((void *)irq_base_address + reg_offset);
+
+    uint32_t value = (*final_reg_address >> start_bit) & BIT(0);
+    if (value) { // its set
+        /* then we return the pin in the response */
+        *label = GPIO_SUCCESS;
+        *response = pin;
+    } else {
+        /* we return the error pin in the response because its equivalent to not being set */
+        *label = GPIO_FAILURE;
+        *response = IMX_GPIO_INVALID_PIN;
+    }
 }
 
 /* SETS | GPIO */
@@ -379,7 +435,11 @@ static void imx_set_irq_pin(size_t pin, size_t value, size_t* label, size_t* res
 
 // TODO:
 static void imx_set_irq_edge(size_t pin, size_t value, size_t* label, size_t* response) {
-    
+    /* check if its combined (the only ones that can be configured in registers) */
+    if (!imx_check_irq_is_combined(imx_get_irq_from_config_file(pin))) {
+        *label = GPIO_FAILURE;
+        *response = GPIO_ERROR_UNSUPPORTED_IRQ_CONFIG;
+    }
 }
 
 /* HANDLERS */

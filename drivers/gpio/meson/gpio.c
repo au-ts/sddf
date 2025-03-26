@@ -196,6 +196,7 @@ static bool meson_gpio_calculate_reg_off_and_start_bit(meson_gpio_reg_type_t fun
 
                         // see if the pin is in this register range
                         if (bank_pin_number < reg_data.start_pin_number) {
+                            // we missed it
                             return false;
                         }
 

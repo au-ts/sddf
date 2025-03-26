@@ -12,7 +12,7 @@
 #include <sddf/util/util.h>
 #include <sddf/gpio/meson/gpio.h>
 
-// because start is not page aligned
+/* because start is not page aligned */
 #define GPIO_REGS_BASE_ADDRESS_OFFSET           0x400
 #define GPIO_AO_REGS_BASE_ADDRESS_OFFSET        0x0
 #define IRQ_CONTROL_REGS_BASE_ADDRESS_OFFSET    0x0
@@ -23,7 +23,7 @@
 ================================================================================
 */
 
-// GPIOZ ( 0 - 15 pins ) // reg4
+// GPIOZ ( 0 - 15 pins ) | reg4
 #define PAD_PULL_UP_REG4          0x3e
 #define PAD_PULL_UP_EN_REG4       0x4c
 #define PREG_PAD_GPIO4_I          0x1e
@@ -31,7 +31,7 @@
 #define PREG_PAD_GPIO4_EN_N       0x1c
 #define PAD_DS_REG4A              0xd5
 
-// GPIOA ( 0 - 15 pins ) // reg5
+// GPIOA ( 0 - 15 pins ) | reg5
 #define PAD_PULL_UP_REG5          0x3f
 #define PAD_PULL_UP_EN_REG5       0x4d
 #define PREG_PAD_GPIO5_I          0x22
@@ -39,7 +39,7 @@
 #define PREG_PAD_GPIO5_EN_N       0x20
 #define PAD_DS_REG5A              0xd6
 
-// BOOT ( 0 - 15 pins ) // reg0
+// BOOT ( 0 - 15 pins ) | reg0
 #define PAD_PULL_UP_REG0          0x3a
 #define PAD_PULL_UP_EN_REG0       0x48
 #define PREG_PAD_GPIO0_I          0x12
@@ -47,7 +47,7 @@
 #define PREG_PAD_GPIO0_EN_N       0x10
 #define PAD_DS_REG0A              0xd0
 
-// GPIOC ( 0 - 7 pins ) // reg1
+// GPIOC ( 0 - 7 pins ) | reg1
 #define PAD_PULL_UP_REG1          0x3b
 #define PAD_PULL_UP_EN_REG1       0x49
 #define PREG_PAD_GPIO1_I          0x15
@@ -55,7 +55,7 @@
 #define PREG_PAD_GPIO1_EN_N       0x13
 #define PAD_DS_REG1A              0xd1
 
-// GPIOX ( 0 - 19 pins ) // reg2
+// GPIOX ( 0 - 19 pins ) | reg2
 #define PAD_PULL_UP_REG2          0x3c
 #define PAD_PULL_UP_EN_REG2       0x4a
 #define PREG_PAD_GPIO2_I          0x18
@@ -64,7 +64,7 @@
 #define PAD_DS_REG2A              0xd2
 #define PAD_DS_REG2B              0xd3
 
-// GPIOH ( 0 - 8 pins ) // reg3
+// GPIOH ( 0 - 8 pins ) | reg3
 #define PAD_PULL_UP_REG3          0x3d
 #define PAD_PULL_UP_EN_REG3       0x4b
 #define PREG_PAD_GPIO3_I          0x1b
@@ -72,7 +72,7 @@
 #define PREG_PAD_GPIO3_EN_N       0x19
 #define PAD_DS_REG3A              0xd4
 
-// GPIOAO ( 0 - 11 pins ) and  GPIOE ( 0 - 2 pins ) and TEST_N (0 - 0 pin)
+// GPIOAO ( 0 - 11 pins ) and GPIOE ( 0 - 2 pins ) and TEST_N (0 - 0 pin)
 #define AO_RTI_PULL_UP_REG        0x0b
 #define AO_RTI_PULL_UP_EN_REG     0x0c
 #define AO_GPIO_I                 0x0a
@@ -413,15 +413,15 @@ static const struct meson_irq_function irq_config_control[] = {
    {
       .function = MESON_IRQ_REG_FIL,
       .registers = (const struct meson_irq_register_data[]){
-         { .register_offset = GPIO_FILTER_SELECT, .start_bit = 0, .end_bit = 2, .start_irq_number = MESON_GPIO_IRQ_0, .is_last = true },
-         { .register_offset = GPIO_FILTER_SELECT, .start_bit = 4, .end_bit = 6, .start_irq_number = MESON_GPIO_IRQ_1, .is_last = true },
-         { .register_offset = GPIO_FILTER_SELECT, .start_bit = 8, .end_bit = 10, .start_irq_number = MESON_GPIO_IRQ_2, .is_last = true },
-         { .register_offset = GPIO_FILTER_SELECT, .start_bit = 12, .end_bit = 14, .start_irq_number = MESON_GPIO_IRQ_3, .is_last = true },
-         { .register_offset = GPIO_FILTER_SELECT, .start_bit = 16, .end_bit = 18, .start_irq_number = MESON_GPIO_IRQ_4, .is_last = true },
-         { .register_offset = GPIO_FILTER_SELECT, .start_bit = 20, .end_bit = 22, .start_irq_number = MESON_GPIO_IRQ_5, .is_last = true },
-         { .register_offset = GPIO_FILTER_SELECT, .start_bit = 24, .end_bit = 26, .start_irq_number = MESON_GPIO_IRQ_6, .is_last = true },
-         { .register_offset = GPIO_FILTER_SELECT, .start_bit = 28, .end_bit = 30, .start_irq_number = MESON_GPIO_IRQ_7, .is_last = true },
-         { .register_offset = AO_IRQ_GPIO_REG, .start_bit = 8, .end_bit = 10, .start_irq_number = MESON_GPIO_AO_IRQ_0, .is_last = true },
+         { .register_offset = GPIO_FILTER_SELECT, .start_bit = 0, .end_bit = 2, .start_irq_number = MESON_GPIO_IRQ_0, .is_last = false },
+         { .register_offset = GPIO_FILTER_SELECT, .start_bit = 4, .end_bit = 6, .start_irq_number = MESON_GPIO_IRQ_1, .is_last = false },
+         { .register_offset = GPIO_FILTER_SELECT, .start_bit = 8, .end_bit = 10, .start_irq_number = MESON_GPIO_IRQ_2, .is_last = false },
+         { .register_offset = GPIO_FILTER_SELECT, .start_bit = 12, .end_bit = 14, .start_irq_number = MESON_GPIO_IRQ_3, .is_last = false },
+         { .register_offset = GPIO_FILTER_SELECT, .start_bit = 16, .end_bit = 18, .start_irq_number = MESON_GPIO_IRQ_4, .is_last = false },
+         { .register_offset = GPIO_FILTER_SELECT, .start_bit = 20, .end_bit = 22, .start_irq_number = MESON_GPIO_IRQ_5, .is_last = false },
+         { .register_offset = GPIO_FILTER_SELECT, .start_bit = 24, .end_bit = 26, .start_irq_number = MESON_GPIO_IRQ_6, .is_last = false },
+         { .register_offset = GPIO_FILTER_SELECT, .start_bit = 28, .end_bit = 30, .start_irq_number = MESON_GPIO_IRQ_7, .is_last = false },
+         { .register_offset = AO_IRQ_GPIO_REG, .start_bit = 8, .end_bit = 10, .start_irq_number = MESON_GPIO_AO_IRQ_0, .is_last = false },
          { .register_offset = AO_IRQ_GPIO_REG, .start_bit = 12, .end_bit = 14, .start_irq_number = MESON_GPIO_AO_IRQ_1, .is_last = true },
       }
    },
