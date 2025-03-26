@@ -619,7 +619,11 @@ static void meson_set_irq_pin(size_t irq, size_t value, size_t* label, size_t* r
 }
 
 static void meson_set_irq_edge(size_t irq, size_t value, size_t* label, size_t* response) {
-    if (value != MESON_GPIO_IRQ_BOTH_RISING_FALLING && value != MESON_GPIO_IRQ_RISING && value != MESON_GPIO_IRQ_FALLING && value != MESON_GPIO_IRQ_LEVEL) {
+    if (value != MESON_GPIO_IRQ_BOTH_RISING_FALLING &&
+        value != MESON_GPIO_IRQ_RISING &&
+        value != MESON_GPIO_IRQ_FALLING &&
+        value != MESON_GPIO_IRQ_LEVEL)
+        {
         *label = GPIO_FAILURE;
         *response = GPIO_ERROR_INVALID_VALUE;
         return;

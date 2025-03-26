@@ -122,7 +122,7 @@ static imx_gpio_bank_t imx_get_gpio_instance(size_t pin) {
     return IMX_GPIO_INVALID_PIN;
 }
 
-static volatile uint32_t *imx_get_gpio_and_irq_base_address(size_t pin) {
+static volatile uint32_t *imx_get_gpio_and_gpio_and_irq_base_address(size_t pin) {
     imx_gpio_instance_t instance = imx_get_gpio_instance(pin);
 
     if (instance == IMX_GPIO_INSTANCE_GPIO_1) return (volatile uint32_t *)(gpio1_regs + 0 /*base address offest due to page alignmemt*/);
@@ -214,8 +214,8 @@ static void imx_get_gpio_output(size_t pin, size_t* label, size_t* response) {
         return;
     }
 
-    volatile uint32_t *gpio_base_address = imx_get_gpio_and_irq_base_address(pin);
-    volatile uint32_t *final_reg_address = ((void *)gpio_base_address + reg_offset);
+    volatile uint32_t *gpio_and_irq_base_address = imx_get_gpio_and_gpio_and_irq_base_address(pin);
+    volatile uint32_t *final_reg_address = ((void *)gpio_and_irq_base_address + reg_offset);
 
     // get value
     uint32_t value = (*final_reg_address >> start_bit) & BIT(0);
@@ -233,8 +233,8 @@ static void imx_get_gpio_input(size_t pin, size_t* label, size_t* response) {
         return;
     }
 
-    volatile uint32_t *gpio_base_address = imx_get_gpio_and_irq_base_address(pin);
-    volatile uint32_t *final_reg_address = ((void *)gpio_base_address + reg_offset);
+    volatile uint32_t *gpio_and_irq_base_address = imx_get_gpio_and_gpio_and_irq_base_address(pin);
+    volatile uint32_t *final_reg_address = ((void *)gpio_and_irq_base_address + reg_offset);
 
     // get value
     uint32_t value = (*final_reg_address >> start_bit) & BIT(0);
@@ -252,8 +252,8 @@ static void imx_get_gpio_direction(size_t pin, size_t* label, size_t* response) 
         return;
     }
 
-    volatile uint32_t *gpio_base_address = imx_get_gpio_and_irq_base_address(pin);
-    volatile uint32_t *final_reg_address = ((void *)gpio_base_address + reg_offset);
+    volatile uint32_t *gpio_and_irq_base_address = imx_get_gpio_and_gpio_and_irq_base_address(pin);
+    volatile uint32_t *final_reg_address = ((void *)gpio_and_irq_base_address + reg_offset);
 
     // get value
     uint32_t value = ((*final_reg_address >> start_bit) & BIT(0)) == 1 ? GPIO_DIRECTION_OUTPUT : GPIO_DIRECTION_INPUT;
@@ -282,8 +282,8 @@ static void imx_get_irq_pin(size_t pin, size_t* label, size_t* response) {
         return;
     }
 
-    volatile uint32_t *irq_base_address = imx_get_gpio_and_irq_base_address(value);
-    volatile uint32_t *final_reg_address = ((void *)irq_base_address + reg_offset);
+    volatile uint32_t *gpio_and_irq_base_address = imx_get_gpio_and_gpio_and_irq_base_address(value);
+    volatile uint32_t *final_reg_address = ((void *)gpio_and_irq_base_address + reg_offset);
 
     uint32_t value = (*final_reg_address >> start_bit) & BIT(0);
     if (value) { // its set
@@ -297,7 +297,6 @@ static void imx_get_irq_pin(size_t pin, size_t* label, size_t* response) {
     }
 }
 
-// TODO:
 static void imx_get_irq_edge(size_t pin, size_t* label, size_t* response) {
     /* check if its combined (the only ones that can be configured in registers) */
     if (!imx_check_irq_is_combined(imx_get_irq_from_config_file(pin))) {
@@ -305,28 +304,46 @@ static void imx_get_irq_edge(size_t pin, size_t* label, size_t* response) {
         *response = GPIO_ERROR_UNSUPPORTED_IRQ_CONFIG;
     }
 
-    /* Check IMR reg */
     uint32_t reg_offset;
     uint32_t start_bit;
 
-    if (!imx_gpio_and_irq_calculate_reg_and_bits(IMX_IRQ_REG_IMR, pin, &reg_offset, &start_bit)) {
+    if (!imx_gpio_and_irq_calculate_reg_and_bits(IMX_IRQ_EDGE_SEL, pin, &reg_offset, &start_bit)) {
         *label = GPIO_FAILURE;
-        *response = GPIO_ERROR_UNSUPPORTED_PIN_CONFIG;
+        *response = GPIO_ERROR_UNSUPPORTED_IRQ_CONFIG;
         return;
     }
 
-    volatile uint32_t *irq_base_address = imx_get_gpio_and_irq_base_address(value);
-    volatile uint32_t *final_reg_address = ((void *)irq_base_address + reg_offset);
+    volatile uint32_t *gpio_and_irq_base_address = imx_get_gpio_and_gpio_and_irq_base_address(value);
+    volatile uint32_t *final_reg_address = ((void *)gpio_and_irq_base_address + reg_offset);
 
+    // get value
     uint32_t value = (*final_reg_address >> start_bit) & BIT(0);
-    if (value) { // its set
-        /* then we return the pin in the response */
+
+    if (value == 1) {
         *label = GPIO_SUCCESS;
-        *response = pin;
-    } else {
-        /* we return the error pin in the response because its equivalent to not being set */
+        *response = IMX_GPIO_IRQ_ANY_EDGE;
+        return;
+    }
+
+    if (!imx_gpio_and_irq_calculate_reg_and_bits(IMX_IRQ_ICR, irq, &reg_offset, &start_bit)) {
         *label = GPIO_FAILURE;
-        *response = IMX_GPIO_INVALID_PIN;
+        *response = GPIO_ERROR_UNSUPPORTED_IRQ_CONFIG;
+        return;
+    }
+
+    final_reg_address = ((void *)gpio_and_irq_base_address + reg_offset);
+
+    value = (*final_reg_address >> start_bit) & BIT_MASK(0, imx_gpio_and_irq_bit_strides[IMX_IRQ_ICR]);
+
+    *label = GPIO_SUCCESS;
+    if (value == 0) {
+        *response = IMX_GPIO_IRQ_LOW_LEVEL;
+    } else if (value == 1) {
+        *response = IMX_GPIO_IRQ_HIGH_LEVEL;
+    } else if (value == 2) {
+        *response = IMX_GPIO_IRQ_RISING_EDGE;
+    } else {
+        *response = IMX_GPIO_IRQ_FALLING_EDGE;
     }
 }
 
@@ -347,8 +364,8 @@ static void imx_set_gpio_output(size_t pin, size_t value, size_t* label, size_t*
         return;
     }
 
-    volatile uint32_t *gpio_base_address = imx_get_gpio_and_irq_base_address(pin);
-    volatile uint32_t *final_reg_address = ((void *)gpio_base_address + reg_offset);
+    volatile uint32_t *gpio_and_irq_base_address = imx_get_gpio_and_gpio_and_irq_base_address(pin);
+    volatile uint32_t *final_reg_address = ((void *)gpio_and_irq_base_address + reg_offset);
 
     // set value
     *final_reg_address &= ~BIT(start_bit); // clear
@@ -372,8 +389,8 @@ static void imx_set_gpio_direction(size_t pin, size_t value, size_t* label, size
         return;
     }
 
-    volatile uint32_t *gpio_base_address = imx_get_gpio_and_irq_base_address(pin);
-    volatile uint32_t *final_reg_address = ((void *)gpio_base_address + reg_offset);
+    volatile uint32_t *gpio_and_irq_base_address = imx_get_gpio_and_gpio_and_irq_base_address(pin);
+    volatile uint32_t *final_reg_address = ((void *)gpio_and_irq_base_address + reg_offset);
 
     // set value
     if (value == GPIO_DIRECTION_INPUT) {
@@ -424,8 +441,8 @@ static void imx_set_irq_pin(size_t pin, size_t value, size_t* label, size_t* res
         return;
     }
 
-    volatile uint32_t *irq_base_address = imx_get_gpio_and_irq_base_address(value);
-    volatile uint32_t *final_reg_address = ((void *)irq_base_address + reg_offset);
+    volatile uint32_t *gpio_and_irq_base_address = imx_get_gpio_and_gpio_and_irq_base_address(value);
+    volatile uint32_t *final_reg_address = ((void *)gpio_and_irq_base_address + reg_offset);
 
     // set value
     *final_reg_address |= BIT(start_bit); // set
@@ -433,13 +450,57 @@ static void imx_set_irq_pin(size_t pin, size_t value, size_t* label, size_t* res
     *label = GPIO_SUCCESS;
 }
 
-// TODO:
 static void imx_set_irq_edge(size_t pin, size_t value, size_t* label, size_t* response) {
     /* check if its combined (the only ones that can be configured in registers) */
     if (!imx_check_irq_is_combined(imx_get_irq_from_config_file(pin))) {
         *label = GPIO_FAILURE;
         *response = GPIO_ERROR_UNSUPPORTED_IRQ_CONFIG;
     }
+
+    if (value != IMX_GPIO_IRQ_LOW_LEVEL &&
+        value != IMX_GPIO_IRQ_HIGH_LEVEL &&
+        value != IMX_GPIO_IRQ_RISING_EDGE &&
+        value != IMX_GPIO_IRQ_FALLING_EDGE &&
+        value != IMX_GPIO_IRQ_ANY_EDGE)
+    {
+        *label = GPIO_FAILURE;
+        *response = GPIO_ERROR_INVALID_VALUE;
+        return;
+    }
+
+    uint32_t reg_offset;
+    uint32_t start_bit;
+
+    if (!imx_gpio_and_irq_calculate_reg_and_bits(IMX_IRQ_EDGE_SEL, pin, &reg_offset, &start_bit)) {
+        *label = GPIO_FAILURE;
+        *response = GPIO_ERROR_UNSUPPORTED_IRQ_CONFIG;
+        return;
+    }
+
+    volatile uint32_t *gpio_and_irq_base_address = imx_get_gpio_and_gpio_and_irq_base_address(value);
+    volatile uint32_t *final_reg_address = ((void *)gpio_and_irq_base_address + reg_offset);
+
+    // set value
+    *final_reg_address &= ~BIT(start_bit); // clear
+    if (value == IMX_GPIO_IRQ_ANY_EDGE) {
+        *final_reg_address |= BIT(start_bit); // set
+        *label = GPIO_SUCCESS;
+        return;
+    }
+
+    if (!imx_gpio_and_irq_calculate_reg_and_bits(IMX_IRQ_ICR, pin, &reg_offset, &start_bit)) {
+        *label = GPIO_FAILURE;
+        *response = GPIO_ERROR_UNSUPPORTED_IRQ_CONFIG;
+        return;
+    }
+
+    final_reg_address = ((void *)gpio_and_irq_base_address + reg_offset);
+
+    // set value
+    *final_reg_address &= ~BIT_MASK(start_bit, start_bit + imx_gpio_and_irq_bit_strides[IMX_IRQ_ICR]); // clear
+    *final_reg_address |= (BIT_MASK(0, 0 + imx_gpio_and_irq_bit_strides[IMX_IRQ_ICR]) & value) << start_bit; // set
+
+    *label = GPIO_SUCCESS;
 }
 
 /* HANDLERS */

@@ -16,6 +16,7 @@ There must be a configuration file that contains gpio_channel_mappings.
 
 Some registers have undefined permissions so clients need to check with a get request after each set request to make sure what they are trying to do actually happens!!
 Or check the datasheet.
+We could make the driver check on each set request as well and return an error if its writes arent showing up.
 
 Out of the brought out pins, GPIOA pins don't seem to work for input :(
 
