@@ -143,7 +143,6 @@ qemu_disk:
 
 qemu: ${IMAGE_FILE} qemu_disk
 	$(QEMU) $(QEMU_ARCH_ARGS) \
-			--trace "virtio_*"\
 			-serial mon:stdio \
 			-m size=2G \
 			-nographic \

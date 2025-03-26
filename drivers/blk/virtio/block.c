@@ -67,6 +67,7 @@ void handle_response(void)
 
     uint16_t i = last_seen_used;
     uint16_t curr_idx = virtq.used->idx;
+
     while (i != curr_idx) {
         uint16_t virtq_idx = i % virtq.num;
         struct virtq_used_elem hdr_used = virtq.used->ring[virtq_idx];
@@ -77,7 +78,29 @@ void handle_response(void)
         LOG_DRIVER("flags: %d\n", virtq.desc[hdr_used.id].flags);
         struct virtio_blk_req *hdr = &virtio_headers[virtq_idx];
         virtio_blk_print_req(hdr);
-        assert(virtq.desc[hdr_used.id].flags & VIRTQ_DESC_F_NEXT);
+        // assert(virtq.desc[hdr_used.id].flags & VIRTQ_DESC_F_NEXT);
+
+        struct virtq_desc hdr_desc = virtq.desc[hdr_used.id];
+        LOG_DRIVER("response header addr: 0x%lx, len: %d\n", hdr_desc.addr, hdr_desc.len);
+
+        i += 1;
+    }
+
+    LOG_DRIVER("============\n");
+
+    i = last_seen_used;
+    curr_idx = virtq.used->idx;
+    while (i != curr_idx) {
+        uint16_t virtq_idx = i % virtq.num;
+        struct virtq_used_elem hdr_used = virtq.used->ring[virtq_idx];
+        /* if (hdr_used.len == 0) { */
+            /* continue; */
+        /* } */
+        LOG_DRIVER("curr_idx: %d, i: %d, virtq_idx: %d, hdr_used.id: %d, len: %d\n", curr_idx, i, virtq_idx, hdr_used.id, hdr_used.len);
+        LOG_DRIVER("flags: %d\n", virtq.desc[hdr_used.id].flags);
+        struct virtio_blk_req *hdr = &virtio_headers[virtq_idx];
+        virtio_blk_print_req(hdr);
+        // assert(virtq.desc[hdr_used.id].flags & VIRTQ_DESC_F_NEXT);
 
         struct virtq_desc hdr_desc = virtq.desc[hdr_used.id];
         LOG_DRIVER("response header addr: 0x%lx, len: %d\n", hdr_desc.addr, hdr_desc.len);
@@ -192,7 +215,7 @@ void handle_request()
             assert(!err && footer_desc_idx != -1);
 
             uint16_t data_flags = VIRTQ_DESC_F_NEXT;
-            uint16_t type;
+            uint32_t type;
             if (req_code == BLK_REQ_READ) {
                 type = VIRTIO_BLK_T_IN;
                 /* Doing a read request, so device needs to be able to write into the DMA region. */
@@ -225,7 +248,7 @@ void handle_request()
                 .flags = VIRTQ_DESC_F_WRITE,
             };
 
-            LOG_DRIVER("idx: %d, hdr_desc_idx: %d, dsec_flags: %d\n", virtq.avail->idx % virtq.num, hdr_desc_idx, virtq.desc[hdr_desc_idx].flags);
+            LOG_DRIVER("idx: %d, hdr_desc_idx: %d, hdr_desc_addr: 0x%lx, dsec_flags: %d\n", virtq.avail->idx % virtq.num, hdr_desc_idx, virtq.desc[hdr_desc_idx].addr, virtq.desc[hdr_desc_idx].flags);
             virtq.avail->ring[virtq.avail->idx % virtq.num] = hdr_desc_idx;
             virtq.avail->idx++;
             virtio_queue_notify = true;

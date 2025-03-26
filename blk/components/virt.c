@@ -175,7 +175,7 @@ static void validate_gpt_partitions()
             }
             gpt_header->crc32_header = reserved_crc32; // Recover the checksum field
 
-            seL4_ARM_VSpace_Invalidate_Data(3, gpt_bk.vaddr, gpt_bk.vaddr + (BLK_TRANSFER_SIZE * gpt_bk.count));
+            cache_clean_and_invalidate(gpt_bk.vaddr, gpt_bk.vaddr + (BLK_TRANSFER_SIZE * gpt_bk.count));
 
             uint32_t crc32_entry_array = calc_crc32((uint8_t *)gpt_table, gpt_table_size);
             if (crc32_entry_array != gpt_header->crc32_entry_array) {
@@ -186,8 +186,10 @@ static void validate_gpt_partitions()
             partition_table_ready = true;
 
         } else if (gpt_bk.code == GPT_PARTITION_INFO_MIRROR_CODE) {
-            err = seL4_ARM_VSpace_Invalidate_Data(3, gpt_bk.vaddr, gpt_bk.vaddr + (BLK_TRANSFER_SIZE * gpt_bk.count));
-            assert(!err);
+            // err = seL4_ARM_VSpace_Invalidate_Data(3, gpt_bk.vaddr, gpt_bk.vaddr + (BLK_TRANSFER_SIZE * gpt_bk.count));
+            // LOG_BLK_VIRT_ERR("vaddr: 0x%lx, end: 0x%lx, count: %d\n", gpt_bk.vaddr, gpt_bk.vaddr + (BLK_TRANSFER_SIZE * gpt_bk.count), gpt_bk.count);
+            // assert(err == seL4_NoError);
+            cache_clean_and_invalidate(gpt_bk.vaddr, gpt_bk.vaddr + (BLK_TRANSFER_SIZE * gpt_bk.count));
 
             gpt_mirror_header = (struct gpt_partition_header *)(gpt_bk.vaddr + gpt_bk.count * BLK_TRANSFER_SIZE
                                                                 - GPT_SECTOR_SIZE);
