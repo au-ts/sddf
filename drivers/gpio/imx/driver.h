@@ -95,8 +95,9 @@ typedef enum {
 	IMX_GPIO_REG_DR = 0,
 	IMX_GPIO_REG_GDIR,
     IMX_GPIO_REG_PSR,
-	IMX_GPIO_FUNC_COUNT,
-} imx_gpio_reg_type_t;
+    IMX_IRQ_REG_IMR
+	IMX_GPIO_AND_IRQ_FUNC_COUNT,
+} imx_gpio_and_irq_reg_type_t;
 
 struct imx_gpio_instance {
    imx_gpio_instance_t instance;
@@ -108,7 +109,7 @@ struct imx_gpio_function {
    const struct imx_gpio_instance *instances;
 };
 
-static const struct imx_gpio_function gpio_config_control[] = {
+static const struct imx_gpio_function gpio_and_irq_config_control[] = {
     {
         .function = IMX_GPIO_REG_DR,
         .instances = (const struct imx_gpio_instance[]){
@@ -138,25 +139,7 @@ static const struct imx_gpio_function gpio_config_control[] = {
             { .instance = IMX_GPIO_INSTANCE_GPIO_4, .register_offset = GPIO4_PSR },
             { .instance = IMX_GPIO_INSTANCE_GPIO_5, .register_offset = GPIO5_PSR },
         }
-   }
-}
-
-typedef enum {
-    IMX_IRQ_REG_IMR = 0,
-    IMX_IRQ_FUNC_COUNT
-} imx_irq_reg_type_t;
-
-struct imx_gpio_instance {
-    imx_gpio_instance_t instance;
-    uint32_t register_offset;
-};
-
-struct imx_irq_function {
-    imx_irq_reg_type_t function;
-    const struct imx_gpio_instance *instances;
-};
-
-static const struct imx_irq_function irq_config_control[] = {
+    },
     {
         .function = IMX_IRQ_REG_IMR,
         .instances = (const struct imx_gpio_instance[]){

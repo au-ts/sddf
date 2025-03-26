@@ -9,7 +9,7 @@
 #include <stdbool.h>
 #include <microkit.h>
 
-/* COMMON FORMAT FOR GPIO PPC REQUESTS/RESPONSES */
+/* COMMON FORMAT FOR ALL GPIO PPC REQUESTS/RESPONSES | PLATFORM INDEPENDENT */
 
 /*
 ================================================================================
@@ -29,7 +29,7 @@
 
 /*
 ================================================================================
-================================= REGISTERS  ===================================
+============================== ARGUEMENT POSITION  =============================
 ================================================================================
 */
 
@@ -43,23 +43,26 @@
 
 /*
 ================================================================================
-============================ PPC MESSAGE ARGUEMENTS  ===========================
+===================================  ERRORS  ===================================
 ================================================================================
 */
 
-/* ERROR ARGUEMENTS */
-
+// TODO: go and make sure drivers use these
 typedef enum {
-    GPIO_INVALID_NUM_ARGS,
-    GPIO_INVALID_LABEL,
-    GPIO_INVALID_CONFIG,
-    GPIO_INVALID_VALUE,
-    GPIO_INVALID_PIN_CONFIG_ENTRY,
-    GPIO_INVALID_CHANNEL_CONFIG_ENTRY,
-    GPIO_INVALID_MAPPING_ENTRY
+    GPIO_ERROR_INVALID_NUM_ARGS,       // Incorrect number of arguments
+    GPIO_ERROR_INVALID_LABEL,          // Incorrect GPIO label
+    GPIO_ERROR_INVALID_CONFIG,         // Invalid configuration
+    GPIO_ERROR_INVALID_VALUE,          // Invalid value
+    GPIO_ERROR_UNSUPPORTED_PIN_CONFIG, // Requested config not supported for this pin
+    GPIO_ERROR_UNSUPPORTED_IRQ_CONFIG, // Requested config not supported for this IRQ
+    GPIO_ERROR_PERMISSION_DENIED       // Operation not allowed due to config file restrictions
 } gpio_error_t;
 
-/* GPIO CONTROL ARGUEMENTS */
+/*
+================================================================================
+===============================  CONFIGURATIONS  ===============================
+================================================================================
+*/
 
 typedef enum {
     GPIO_OUTPUT = 0,
@@ -69,13 +72,17 @@ typedef enum {
 } gpio_config_t;
 
 typedef enum {
-    GPIO_DIRECTION_OUTPUT,
-    GPIO_DIRECTION_INPUT,
-} gpio_config_direction_t;
-
-/* GPIO IRQ CONTROL ARGUEMENTS */
-
-typedef enum {
     GPIO_IRQ_PIN,
     GPIO_IRQ_CONFIG_PLATFORM_SPECIFIC_START  // Marker for platform-specific commands
 } gpio_irq_config_t;
+
+/*
+================================================================================
+===================================  VALUES  ===================================
+================================================================================
+*/
+
+typedef enum {
+    GPIO_DIRECTION_OUTPUT,
+    GPIO_DIRECTION_INPUT,
+} gpio_config_direction_t;

@@ -18,7 +18,9 @@
 ================================================================================
 */
 
-#define IMX_GPIO_PIN_COUNT      160 // 5 * 32 (some actually dont exist though)
+// PIN NUMBER = BANK NAME + BANK PIN NUMBER
+
+#define IMX_GPIO_PIN_COUNT      160 // 5 * 32 (some actually dont exist though but you can still configure nothing)
 #define IMX_GPIO_INSTANCE_COUNT   5
 
 typedef enum {
@@ -27,14 +29,15 @@ typedef enum {
     IMX_GPIO_INSTANCE_GPIO_3  = 64,
     IMX_GPIO_INSTANCE_GPIO_4  = 96,
     IMX_GPIO_INSTANCE_GPIO_5  = 128,
-    IMX_GPIO_ERROR_INVALID_PIN = IMX_GPIO_PIN_COUNT
+    IMX_GPIO_INVALID_PIN = IMX_GPIO_PIN_COUNT
 } imx_gpio_instance_t;
 
-// we use channels 30 - 61 in the driver for device <=> driver irqs
+// we use channels 44 - 61 in the driver for device <=> driver irqs
 #define IMX_GPIO_IRQ_CHANNEL_START 44
 #define IMX_GPIO_IRQ_CHANNEL_COUNT 18
 
 // these are the PREDFINED values used for device <=> driver communiation
+// AH = Active High
 typedef enum {
     IMX_GPIO_IRQ_AH_GPIO1_0 = IMX_GPIO_IRQ_CHANNEL_START,
     IMX_GPIO_IRQ_AH_GPIO1_1,
@@ -59,16 +62,24 @@ typedef enum {
 
 /*
 ================================================================================
-=================================  FUNCTIONS  ==================================
+===============================  CONFIGURATIONS  ===============================
 ================================================================================
 */
 
+// TODO:
 // there are drive strengths and other things we can configure , like the SION stuff
+// typedef enum {} imx_gpio_config_t;
 
 typedef enum {
     IMX_GPIO_IRQ_EDGE = GPIO_IRQ_CONFIG_PLATFORM_SPECIFIC_START,
     IMX_GPIO_IRQ_STATUS
 } imx_gpio_irq_config_t;
+
+/*
+================================================================================
+===================================  VALUES  ===================================
+================================================================================
+*/
 
 typedef enum {
     IMX_GPIO_IRQ_LOW_LEVEL,

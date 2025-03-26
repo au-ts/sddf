@@ -116,10 +116,17 @@ static meson_gpio_bank_t meson_get_gpio_bank(size_t pin) {
     return MESON_GPIO_ERROR_INVALID_PIN;
 }
 
-// true if success | false if fail
-static bool meson_irq_calc_reg_and_bits(meson_irq_reg_type_t function, size_t channel, uint32_t *reg_offset, uint32_t *start_bit) {
+static bool meson_is_valid_irq_config(int irq) {
+    return (irq >= MESON_GPIO_IRQ_CHANNEL_START
+        && irq < MESON_GPIO_IRQ_CHANNEL_START + MESON_GPIO_IRQ_CHANNEL_COUNT
+        && gpio_channel_mappings[irq][GPIO_CHANNEL_MAPPING_GPIO_PIN_SLOT] == -1
+        && gpio_channel_mappings[irq][GPIO_CHANNEL_MAPPING_IRQ_SLOT] == -1);
+}
+
+/* true if success | false if fail */
+static bool meson_irq_calculate_reg_off_and_start_bit(meson_irq_reg_type_t function, size_t irq, uint32_t *reg_offset, uint32_t *start_bit) {
     // check if channel is too high
-    if (channel < MESON_GPIO_IRQ_CHANNEL_START || channel >= MESON_GPIO_IRQ_CHANNEL_START + MESON_GPIO_IRQ_CHANNEL_COUNT) {
+    if (irq < MESON_GPIO_IRQ_CHANNEL_START || irq >= MESON_GPIO_IRQ_CHANNEL_START + MESON_GPIO_IRQ_CHANNEL_COUNT) {
         return false;
     }
 
@@ -139,19 +146,19 @@ static bool meson_irq_calc_reg_and_bits(meson_irq_reg_type_t function, size_t ch
                 k++;
 
                 // see if the pin is in this register range
-                if ((uint32_t)channel < reg_data.start_channel_number) {
+                if ((uint32_t)irq < reg_data.start_irq_number) {
                     return false;
                 }
 
                 uint32_t range = reg_data.end_bit - reg_data.start_bit + 1;
                 range /= bit_stride;
-                if ((uint32_t)channel > reg_data.start_channel_number + range - 1) {
+                if ((uint32_t)irq > reg_data.start_irq_number + range - 1) {
                     continue; // check next register
                 }
 
                 // its in this register so find what bits
                 *reg_offset = reg_data.register_offset;
-                *start_bit = reg_data.start_bit + ((uint32_t)channel - reg_data.start_channel_number /* get the amount of channels after start bit */) * bit_stride;
+                *start_bit = reg_data.start_bit + ((uint32_t)irq - reg_data.start_irq_number /* get the amount of irqs after start bit */) * bit_stride;
                 return true;
             }
         }
@@ -159,7 +166,7 @@ static bool meson_irq_calc_reg_and_bits(meson_irq_reg_type_t function, size_t ch
     return false;
 }
 
-static bool meson_gpio_calc_reg_and_bits(meson_gpio_reg_type_t function, size_t pin, uint32_t *reg_offset, uint32_t *start_bit) {
+static bool meson_gpio_calculate_reg_off_and_start_bit(meson_gpio_reg_type_t function, size_t pin, uint32_t *reg_offset, uint32_t *start_bit) {
     // check if pin is too high
     meson_gpio_bank_t bank = meson_get_gpio_bank(pin);
     if (bank == MESON_GPIO_ERROR_INVALID_PIN) {
@@ -211,7 +218,7 @@ static bool meson_gpio_calc_reg_and_bits(meson_gpio_reg_type_t function, size_t 
     return false;
 }
 
-static volatile uint32_t *get_gpio_base_address(size_t pin) {
+static volatile uint32_t *meson_get_gpio_base_address(size_t pin) {
     meson_gpio_bank_t bank = meson_get_gpio_bank(pin);
 
     if (bank == MESON_GPIO_AO) {
@@ -220,18 +227,18 @@ static volatile uint32_t *get_gpio_base_address(size_t pin) {
     return (volatile uint32_t *)(gpio_regs + GPIO_REGS_BASE_ADDRESS_OFFSET);
 }
 
-/* GETS */
+/* GETS | GPIO */
 
 static void meson_get_gpio_output(size_t pin, size_t* label, size_t* response) {
     uint32_t reg_offset;
     uint32_t start_bit;
-    if (!meson_gpio_calc_reg_and_bits(MESON_GPIO_REG_OUT, pin, &reg_offset, &start_bit)) {
+    if (!meson_gpio_calculate_reg_off_and_start_bit(MESON_GPIO_REG_OUT, pin, &reg_offset, &start_bit)) {
         *label = GPIO_FAILURE;
-        *response = GPIO_INVALID_PIN_CONFIG_ENTRY;
+        *response = GPIO_ERROR_UNSUPPORTED_PIN_CONFIG;
         return;
     }
 
-    volatile uint32_t *gpio_base_address = get_gpio_base_address(pin);
+    volatile uint32_t *gpio_base_address = meson_get_gpio_base_address(pin);
     volatile uint32_t *final_reg_address = ((void *)gpio_base_address + reg_offset * 4);
 
     // get value
@@ -244,13 +251,13 @@ static void meson_get_gpio_output(size_t pin, size_t* label, size_t* response) {
 static void meson_get_gpio_input(size_t pin, size_t* label, size_t* response) {
     uint32_t reg_offset;
     uint32_t start_bit;
-    if (!meson_gpio_calc_reg_and_bits(MESON_GPIO_REG_IN, pin, &reg_offset, &start_bit)) {
+    if (!meson_gpio_calculate_reg_off_and_start_bit(MESON_GPIO_REG_IN, pin, &reg_offset, &start_bit)) {
         *label = GPIO_FAILURE;
-        *response = GPIO_INVALID_PIN_CONFIG_ENTRY;
+        *response = GPIO_ERROR_UNSUPPORTED_PIN_CONFIG;
         return;
     }
 
-    volatile uint32_t *gpio_base_address = get_gpio_base_address(pin);
+    volatile uint32_t *gpio_base_address = meson_get_gpio_base_address(pin);
     volatile uint32_t *final_reg_address = ((void *)gpio_base_address + reg_offset * 4);
 
     // get value
@@ -263,13 +270,13 @@ static void meson_get_gpio_input(size_t pin, size_t* label, size_t* response) {
 static void meson_get_gpio_direction(size_t pin, size_t* label, size_t* response) {
     uint32_t reg_offset;
     uint32_t start_bit;
-    if (!meson_gpio_calc_reg_and_bits(MESON_GPIO_REG_DIR, pin, &reg_offset, &start_bit)) {
+    if (!meson_gpio_calculate_reg_off_and_start_bit(MESON_GPIO_REG_DIR, pin, &reg_offset, &start_bit)) {
         *label = GPIO_FAILURE;
-        *response = GPIO_INVALID_PIN_CONFIG_ENTRY;
+        *response = GPIO_ERROR_UNSUPPORTED_PIN_CONFIG;
         return;
     }
 
-    volatile uint32_t *gpio_base_address = get_gpio_base_address(pin);
+    volatile uint32_t *gpio_base_address = meson_get_gpio_base_address(pin);
     volatile uint32_t *final_reg_address = ((void *)gpio_base_address + reg_offset * 4);
 
     // get value
@@ -282,13 +289,13 @@ static void meson_get_gpio_direction(size_t pin, size_t* label, size_t* response
 static void meson_get_gpio_pull(size_t pin, size_t* label, size_t* response) {
     uint32_t reg_offset;
     uint32_t start_bit;
-    if (!meson_gpio_calc_reg_and_bits(MESON_GPIO_REG_PULLEN, pin, &reg_offset, &start_bit)) {
+    if (!meson_gpio_calculate_reg_off_and_start_bit(MESON_GPIO_REG_PULLEN, pin, &reg_offset, &start_bit)) {
         *label = GPIO_FAILURE;
-        *response = GPIO_INVALID_PIN_CONFIG_ENTRY;
+        *response = GPIO_ERROR_UNSUPPORTED_PIN_CONFIG;
         return;
     }
 
-    volatile uint32_t *gpio_base_address = get_gpio_base_address(pin);
+    volatile uint32_t *gpio_base_address = meson_get_gpio_base_address(pin);
     volatile uint32_t *final_reg_address = ((void *)gpio_base_address + reg_offset * 4);
 
     // get value
@@ -300,9 +307,9 @@ static void meson_get_gpio_pull(size_t pin, size_t* label, size_t* response) {
         return;
     }
 
-    if (!meson_gpio_calc_reg_and_bits(MESON_GPIO_REG_PULL, pin, &reg_offset, &start_bit)) {
+    if (!meson_gpio_calculate_reg_off_and_start_bit(MESON_GPIO_REG_PULL, pin, &reg_offset, &start_bit)) {
         *label = GPIO_FAILURE;
-        *response = GPIO_INVALID_PIN_CONFIG_ENTRY;
+        *response = GPIO_ERROR_UNSUPPORTED_PIN_CONFIG;
         return;
     }
 
@@ -321,13 +328,13 @@ static void meson_get_gpio_pull(size_t pin, size_t* label, size_t* response) {
 static void meson_get_gpio_drive_strength(size_t pin, size_t* label, size_t* response) {
     uint32_t reg_offset;
     uint32_t start_bit;
-    if (!meson_gpio_calc_reg_and_bits(MESON_GPIO_REG_DS, pin, &reg_offset, &start_bit)) {
+    if (!meson_gpio_calculate_reg_off_and_start_bit(MESON_GPIO_REG_DS, pin, &reg_offset, &start_bit)) {
         *label = GPIO_FAILURE;
-        *response = GPIO_INVALID_PIN_CONFIG_ENTRY;
+        *response = GPIO_ERROR_UNSUPPORTED_PIN_CONFIG;
         return;
     }
 
-    volatile uint32_t *gpio_base_address = get_gpio_base_address(pin);
+    volatile uint32_t *gpio_base_address = meson_get_gpio_base_address(pin);
     volatile uint32_t *final_reg_address = ((void *)gpio_base_address + reg_offset * 4);
 
     // get value
@@ -337,24 +344,24 @@ static void meson_get_gpio_drive_strength(size_t pin, size_t* label, size_t* res
     *response = value;
 }
 
-/* SETS */
+/* SETS | GPIO */
 
 static void meson_set_gpio_output(size_t pin, size_t value, size_t* label, size_t* response) {
     if (value != 0 && value != 1) {
         *label = GPIO_FAILURE;
-        *response = GPIO_INVALID_VALUE;
+        *response = GPIO_ERROR_INVALID_VALUE;
         return;
     }
 
     uint32_t reg_offset;
     uint32_t start_bit;
-    if (!meson_gpio_calc_reg_and_bits(MESON_GPIO_REG_OUT, pin, &reg_offset, &start_bit)) {
+    if (!meson_gpio_calculate_reg_off_and_start_bit(MESON_GPIO_REG_OUT, pin, &reg_offset, &start_bit)) {
         *label = GPIO_FAILURE;
-        *response = GPIO_INVALID_PIN_CONFIG_ENTRY;
+        *response = GPIO_ERROR_UNSUPPORTED_PIN_CONFIG;
         return;
     }
 
-    volatile uint32_t *gpio_base_address = get_gpio_base_address(pin);
+    volatile uint32_t *gpio_base_address = meson_get_gpio_base_address(pin);
     volatile uint32_t *final_reg_address = ((void *)gpio_base_address + reg_offset * 4);
 
     // set value
@@ -367,19 +374,19 @@ static void meson_set_gpio_output(size_t pin, size_t value, size_t* label, size_
 static void meson_set_gpio_direction(size_t pin, size_t value, size_t* label, size_t* response) {
     if (value != GPIO_DIRECTION_OUTPUT && value != GPIO_DIRECTION_INPUT) {
         *label = GPIO_FAILURE;
-        *response = GPIO_INVALID_VALUE;
+        *response = GPIO_ERROR_INVALID_VALUE;
         return;
     }
 
     uint32_t reg_offset;
     uint32_t start_bit;
-    if (!meson_gpio_calc_reg_and_bits(MESON_GPIO_REG_DIR, pin, &reg_offset, &start_bit)) {
+    if (!meson_gpio_calculate_reg_off_and_start_bit(MESON_GPIO_REG_DIR, pin, &reg_offset, &start_bit)) {
         *label = GPIO_FAILURE;
-        *response = GPIO_INVALID_PIN_CONFIG_ENTRY;
+        *response = GPIO_ERROR_UNSUPPORTED_PIN_CONFIG;
         return;
     }
 
-    volatile uint32_t *gpio_base_address = get_gpio_base_address(pin);
+    volatile uint32_t *gpio_base_address = meson_get_gpio_base_address(pin);
     volatile uint32_t *final_reg_address = ((void *)gpio_base_address + reg_offset * 4);
 
     // set value
@@ -392,19 +399,19 @@ static void meson_set_gpio_direction(size_t pin, size_t value, size_t* label, si
 static void meson_set_gpio_pull(size_t pin, size_t value, size_t* label, size_t* response) {
     if (value != MESON_GPIO_PULL_UP && value != MESON_GPIO_PULL_DOWN && value != MESON_GPIO_NO_PULL) {
         *label = GPIO_FAILURE;
-        *response = GPIO_INVALID_VALUE;
+        *response = GPIO_ERROR_INVALID_VALUE;
         return;
     }
 
     uint32_t reg_offset;
     uint32_t start_bit;
-    if (!meson_gpio_calc_reg_and_bits(MESON_GPIO_REG_PULLEN, pin, &reg_offset, &start_bit)) {
+    if (!meson_gpio_calculate_reg_off_and_start_bit(MESON_GPIO_REG_PULLEN, pin, &reg_offset, &start_bit)) {
         *label = GPIO_FAILURE;
-        *response = GPIO_INVALID_PIN_CONFIG_ENTRY;
+        *response = GPIO_ERROR_UNSUPPORTED_PIN_CONFIG;
         return;
     }
 
-    volatile uint32_t *gpio_base_address = get_gpio_base_address(pin);
+    volatile uint32_t *gpio_base_address = meson_get_gpio_base_address(pin);
     volatile uint32_t *final_reg_address = ((void *)gpio_base_address + reg_offset * 4);
 
     // set value
@@ -417,9 +424,9 @@ static void meson_set_gpio_pull(size_t pin, size_t value, size_t* label, size_t*
     *final_reg_address |= BIT(start_bit); // set
 
     // need to change other register as well
-    if (!meson_gpio_calc_reg_and_bits(MESON_GPIO_REG_PULL, pin, &reg_offset, &start_bit)) {
+    if (!meson_gpio_calculate_reg_off_and_start_bit(MESON_GPIO_REG_PULL, pin, &reg_offset, &start_bit)) {
         *label = GPIO_FAILURE;
-        *response = GPIO_INVALID_PIN_CONFIG_ENTRY;
+        *response = GPIO_ERROR_UNSUPPORTED_PIN_CONFIG;
         return;
     }
 
@@ -437,19 +444,19 @@ static void meson_set_gpio_pull(size_t pin, size_t value, size_t* label, size_t*
 static void meson_set_gpio_drive_strength(size_t pin, size_t value, size_t* label, size_t* response) {
     if (value != MESON_GPIO_DS_500UA && value != MESON_GPIO_DS_2500UA && value != MESON_GPIO_DS_3000UA && value != MESON_GPIO_DS_4000UA) {
         *label = GPIO_FAILURE;
-        *response = GPIO_INVALID_VALUE;
+        *response = GPIO_ERROR_INVALID_VALUE;
         return;
     }
 
     uint32_t reg_offset;
     uint32_t start_bit;
-    if (!meson_gpio_calc_reg_and_bits(MESON_GPIO_REG_DS, pin, &reg_offset, &start_bit)) {
+    if (!meson_gpio_calculate_reg_off_and_start_bit(MESON_GPIO_REG_DS, pin, &reg_offset, &start_bit)) {
         *label = GPIO_FAILURE;
-        *response = GPIO_INVALID_PIN_CONFIG_ENTRY;
+        *response = GPIO_ERROR_UNSUPPORTED_PIN_CONFIG;
         return;
     }
 
-    volatile uint32_t *gpio_base_address = get_gpio_base_address(pin);
+    volatile uint32_t *gpio_base_address = meson_get_gpio_base_address(pin);
     volatile uint32_t *final_reg_address = ((void *)gpio_base_address + reg_offset * 4);
 
     // set value
@@ -459,20 +466,22 @@ static void meson_set_gpio_drive_strength(size_t pin, size_t value, size_t* labe
     *label = GPIO_SUCCESS;
 }
 
-static void meson_get_irq_pin(size_t channel, size_t* label, size_t* response) {
+/* GETS | IRQ */
+
+static void meson_get_irq_pin(size_t irq, size_t* label, size_t* response) {
     uint32_t reg_offset;
     uint32_t start_bit;
 
     meson_irq_reg_type_t reg_type;
-    if (channel ==  MESON_GPIO_AO_IRQ_0 || channel == MESON_GPIO_AO_IRQ_1) {
+    if (irq ==  MESON_GPIO_AO_IRQ_0 || irq == MESON_GPIO_AO_IRQ_1) {
         reg_type = MESON_IRQ_REG_AOSEL;
     } else {
         reg_type = MESON_IRQ_REG_SEL;
     }
 
-    if (!meson_irq_calc_reg_and_bits(reg_type, channel, &reg_offset, &start_bit)) {
+    if (!meson_irq_calculate_reg_off_and_start_bit(reg_type, irq, &reg_offset, &start_bit)) {
         *label = GPIO_FAILURE;
-        *response = GPIO_INVALID_CHANNEL_CONFIG_ENTRY;
+        *response = GPIO_ERROR_UNSUPPORTED_IRQ_CONFIG;
         return;
     }
 
@@ -486,12 +495,12 @@ static void meson_get_irq_pin(size_t channel, size_t* label, size_t* response) {
     *response = value;
 }
 
-static void meson_get_irq_edge(size_t channel, size_t* label, size_t* response) {
+static void meson_get_irq_edge(size_t irq, size_t* label, size_t* response) {
     uint32_t reg_offset;
     uint32_t start_bit;
-    if (!meson_irq_calc_reg_and_bits(MESON_IRQ_REG_BOTHEDGEEN, channel, &reg_offset, &start_bit)) {
+    if (!meson_irq_calculate_reg_off_and_start_bit(MESON_IRQ_REG_BOTHEDGEEN, irq, &reg_offset, &start_bit)) {
         *label = GPIO_FAILURE;
-        *response = GPIO_INVALID_CHANNEL_CONFIG_ENTRY;
+        *response = GPIO_ERROR_UNSUPPORTED_IRQ_CONFIG;
         return;
     }
 
@@ -507,9 +516,9 @@ static void meson_get_irq_edge(size_t channel, size_t* label, size_t* response) 
         return;
     }
 
-    if (!meson_irq_calc_reg_and_bits(MESON_IRQ_REG_EDGE, channel, &reg_offset, &start_bit)) {
+    if (!meson_irq_calculate_reg_off_and_start_bit(MESON_IRQ_REG_EDGE, irq, &reg_offset, &start_bit)) {
         *label = GPIO_FAILURE;
-        *response = GPIO_INVALID_CHANNEL_CONFIG_ENTRY;
+        *response = GPIO_ERROR_UNSUPPORTED_IRQ_CONFIG;
         return;
     }
 
@@ -524,9 +533,9 @@ static void meson_get_irq_edge(size_t channel, size_t* label, size_t* response) 
         return;
     }
 
-    if (!meson_irq_calc_reg_and_bits(MESON_IRQ_REG_POL, channel, &reg_offset, &start_bit)) {
+    if (!meson_irq_calculate_reg_off_and_start_bit(MESON_IRQ_REG_POL, irq, &reg_offset, &start_bit)) {
         *label = GPIO_FAILURE;
-        *response = GPIO_INVALID_CHANNEL_CONFIG_ENTRY;
+        *response = GPIO_ERROR_UNSUPPORTED_IRQ_CONFIG;
         return;
     }
 
@@ -543,13 +552,13 @@ static void meson_get_irq_edge(size_t channel, size_t* label, size_t* response) 
     }
 }
 
-static void meson_get_irq_filter(size_t channel, size_t* label, size_t* response) {
+static void meson_get_irq_filter(size_t irq, size_t* label, size_t* response) {
     uint32_t reg_offset;
     uint32_t start_bit;
 
-    if (!meson_irq_calc_reg_and_bits(MESON_IRQ_REG_FIL, channel, &reg_offset, &start_bit)) {
+    if (!meson_irq_calculate_reg_off_and_start_bit(MESON_IRQ_REG_FIL, irq, &reg_offset, &start_bit)) {
         *label = GPIO_FAILURE;
-        *response = GPIO_INVALID_CHANNEL_CONFIG_ENTRY;
+        *response = GPIO_ERROR_UNSUPPORTED_IRQ_CONFIG;
         return;
     }
 
@@ -558,7 +567,7 @@ static void meson_get_irq_filter(size_t channel, size_t* label, size_t* response
 
     // get value
     uint32_t value = (*final_reg_address >> start_bit) & BIT_MASK(0, meson_irq_bit_strides[MESON_IRQ_REG_FIL]);
-    if ((channel == MESON_GPIO_AO_IRQ_0 || channel == MESON_GPIO_AO_IRQ_1) && value == 1) {
+    if ((irq == MESON_GPIO_AO_IRQ_0 || irq == MESON_GPIO_AO_IRQ_1) && value == 1) {
         *response = MESON_GPIO_IRQ_FILTER_2600NS;
     } else {
         *response = value;
@@ -567,13 +576,15 @@ static void meson_get_irq_filter(size_t channel, size_t* label, size_t* response
     *label = GPIO_SUCCESS;
 }
 
-static void meson_set_irq_pin(size_t channel, size_t value, size_t* label, size_t* response) {
+/* SETS | IRQ */
+
+static void meson_set_irq_pin(size_t irq, size_t value, size_t* label, size_t* response) {
     meson_irq_reg_type_t reg_type;
-    if (channel == MESON_GPIO_AO_IRQ_0 || channel == MESON_GPIO_AO_IRQ_1) {
+    if (irq == MESON_GPIO_AO_IRQ_0 || irq == MESON_GPIO_AO_IRQ_1) {
         meson_gpio_bank_t bank = meson_get_gpio_bank(value);
         if (bank != MESON_GPIO_AO) {
             *label = GPIO_FAILURE;
-            *response = GPIO_INVALID_PIN_CONFIG_ENTRY;
+            *response = GPIO_ERROR_UNSUPPORTED_IRQ_CONFIG;
             return;
         }
         reg_type = MESON_IRQ_REG_AOSEL;
@@ -581,7 +592,7 @@ static void meson_set_irq_pin(size_t channel, size_t value, size_t* label, size_
         meson_gpio_bank_t bank = meson_get_gpio_bank(value);
         if (bank == MESON_GPIO_ERROR_INVALID_PIN || bank == MESON_GPIO_TEST_N) {
             *label = GPIO_FAILURE;
-            *response = GPIO_INVALID_PIN_CONFIG_ENTRY;
+            *response = GPIO_ERROR_UNSUPPORTED_IRQ_CONFIG;
             return;
         }
         reg_type = MESON_IRQ_REG_SEL;
@@ -590,9 +601,9 @@ static void meson_set_irq_pin(size_t channel, size_t value, size_t* label, size_
     uint32_t reg_offset;
     uint32_t start_bit;
 
-    if (!meson_irq_calc_reg_and_bits(reg_type, channel, &reg_offset, &start_bit)) {
+    if (!meson_irq_calculate_reg_off_and_start_bit(reg_type, irq, &reg_offset, &start_bit)) {
         *label = GPIO_FAILURE;
-        *response = GPIO_INVALID_CHANNEL_CONFIG_ENTRY;
+        *response = GPIO_ERROR_UNSUPPORTED_IRQ_CONFIG;
         return;
     }
 
@@ -606,10 +617,10 @@ static void meson_set_irq_pin(size_t channel, size_t value, size_t* label, size_
     *label = GPIO_SUCCESS;
 }
 
-static void meson_set_irq_edge(size_t channel, size_t value, size_t* label, size_t* response) {
+static void meson_set_irq_edge(size_t irq, size_t value, size_t* label, size_t* response) {
     if (value != MESON_GPIO_IRQ_BOTH_RISING_FALLING && value != MESON_GPIO_IRQ_RISING && value != MESON_GPIO_IRQ_FALLING && value != MESON_GPIO_IRQ_LEVEL) {
         *label = GPIO_FAILURE;
-        *response = GPIO_INVALID_VALUE;
+        *response = GPIO_ERROR_INVALID_VALUE;
         return;
     }
 
@@ -618,9 +629,9 @@ static void meson_set_irq_edge(size_t channel, size_t value, size_t* label, size
 
     uint32_t reg_offset;
     uint32_t start_bit;
-    if (!meson_irq_calc_reg_and_bits(MESON_IRQ_REG_BOTHEDGEEN, channel, &reg_offset, &start_bit)) {
+    if (!meson_irq_calculate_reg_off_and_start_bit(MESON_IRQ_REG_BOTHEDGEEN, irq, &reg_offset, &start_bit)) {
         *label = GPIO_FAILURE;
-        *response = GPIO_INVALID_CHANNEL_CONFIG_ENTRY;
+        *response = GPIO_ERROR_UNSUPPORTED_IRQ_CONFIG;
         return;
     }
 
@@ -634,9 +645,9 @@ static void meson_set_irq_edge(size_t channel, size_t value, size_t* label, size
         return;
     }
 
-    if (!meson_irq_calc_reg_and_bits(MESON_IRQ_REG_EDGE, channel, &reg_offset, &start_bit)) {
+    if (!meson_irq_calculate_reg_off_and_start_bit(MESON_IRQ_REG_EDGE, irq, &reg_offset, &start_bit)) {
         *label = GPIO_FAILURE;
-        *response = GPIO_INVALID_CHANNEL_CONFIG_ENTRY;
+        *response = GPIO_ERROR_UNSUPPORTED_IRQ_CONFIG;
         return;
     }
 
@@ -650,9 +661,9 @@ static void meson_set_irq_edge(size_t channel, size_t value, size_t* label, size
     }
     *final_reg_address |= BIT(start_bit); // set
 
-    if (!meson_irq_calc_reg_and_bits(MESON_IRQ_REG_POL, channel, &reg_offset, &start_bit)) {
+    if (!meson_irq_calculate_reg_off_and_start_bit(MESON_IRQ_REG_POL, irq, &reg_offset, &start_bit)) {
         *label = GPIO_FAILURE;
-        *response = GPIO_INVALID_CHANNEL_CONFIG_ENTRY;
+        *response = GPIO_ERROR_UNSUPPORTED_IRQ_CONFIG;
         return;
     }
 
@@ -668,20 +679,20 @@ static void meson_set_irq_edge(size_t channel, size_t value, size_t* label, size
     *final_reg_address |= BIT(start_bit); // set
 }
 
-static void meson_set_irq_filter(size_t channel, size_t value, size_t* label, size_t* response) {
+static void meson_set_irq_filter(size_t irq, size_t value, size_t* label, size_t* response) {
     uint32_t reg_offset;
     uint32_t start_bit;
 
-    if (!meson_irq_calc_reg_and_bits(MESON_IRQ_REG_FIL, channel, &reg_offset, &start_bit)) {
+    if (!meson_irq_calculate_reg_off_and_start_bit(MESON_IRQ_REG_FIL, irq, &reg_offset, &start_bit)) {
         *label = GPIO_FAILURE;
-        *response = GPIO_INVALID_CHANNEL_CONFIG_ENTRY;
+        *response = GPIO_ERROR_UNSUPPORTED_IRQ_CONFIG;
         return;
     }
 
     volatile uint32_t *irq_base_address = (void *)(interupt_control_regs + IRQ_CONTROL_REGS_BASE_ADDRESS_OFFSET);
     volatile uint32_t *final_reg_address = ((void *)irq_base_address + reg_offset * 4);
 
-    if (channel == MESON_GPIO_AO_IRQ_0 || channel == MESON_GPIO_AO_IRQ_1) {
+    if (irq == MESON_GPIO_AO_IRQ_0 || irq == MESON_GPIO_AO_IRQ_1) {
         if (value == MESON_GPIO_IRQ_FILTER_2600NS) {
             *final_reg_address |= BIT(start_bit); // set
             *label = GPIO_SUCCESS;
@@ -692,14 +703,14 @@ static void meson_set_irq_filter(size_t channel, size_t value, size_t* label, si
             return;
         } else {
             *label = GPIO_FAILURE;
-            *response = GPIO_INVALID_VALUE;
+            *response = GPIO_ERROR_INVALID_VALUE;
             return;
         }
     }
 
     if (!(value >= MESON_GPIO_IRQ_FILTER_0NS && value <= MESON_GPIO_IRQ_FILTER_2331NS)) {
         *label = GPIO_FAILURE;
-        *response = GPIO_INVALID_VALUE;
+        *response = GPIO_ERROR_INVALID_VALUE;
     }
 
     *final_reg_address &= ~BIT_MASK(start_bit, start_bit + meson_irq_bit_strides[MESON_IRQ_REG_FIL]); // clear
@@ -707,6 +718,8 @@ static void meson_set_irq_filter(size_t channel, size_t value, size_t* label, si
 
     *label = GPIO_SUCCESS;
 }
+
+/* HANDLERS */
 
 static seL4_MessageInfo_t handle_get_gpio_request(size_t pin, size_t config) {
     size_t label;
@@ -730,7 +743,7 @@ static seL4_MessageInfo_t handle_get_gpio_request(size_t pin, size_t config) {
             break;
         default:
             label = GPIO_FAILURE;
-            response = GPIO_INVALID_CONFIG;
+            response = GPIO_ERROR_INVALID_CONFIG;
     }
 
     seL4_MessageInfo_t message = microkit_msginfo_new(label, 1);
@@ -757,7 +770,7 @@ static seL4_MessageInfo_t handle_set_gpio_request(size_t pin, size_t config, siz
             break;
         default:
             label = GPIO_FAILURE;
-            response = GPIO_INVALID_CONFIG;
+            response = GPIO_ERROR_INVALID_CONFIG;
     }
 
     seL4_MessageInfo_t message;
@@ -771,23 +784,23 @@ static seL4_MessageInfo_t handle_set_gpio_request(size_t pin, size_t config, siz
     return message;
 }
 
-static seL4_MessageInfo_t handle_get_irq_request(size_t channel, size_t config) {
+static seL4_MessageInfo_t handle_get_irq_request(size_t irq, size_t config) {
     size_t label;
     size_t response;
 
     switch (config) {
         case GPIO_IRQ_PIN:
-            meson_get_irq_pin(channel, &label, &response);
+            meson_get_irq_pin(irq, &label, &response);
             break;
         case MESON_GPIO_IRQ_EDGE:
-            meson_get_irq_edge(channel, &label, &response);
+            meson_get_irq_edge(irq, &label, &response);
             break;
         case MESON_GPIO_IRQ_FILTER:
-            meson_get_irq_filter(channel, &label, &response);
+            meson_get_irq_filter(irq, &label, &response);
             break;
         default:
             label = GPIO_FAILURE;
-            response = GPIO_INVALID_CONFIG;
+            response = GPIO_ERROR_INVALID_CONFIG;
     }
 
     seL4_MessageInfo_t message = microkit_msginfo_new(label, 1);
@@ -795,20 +808,20 @@ static seL4_MessageInfo_t handle_get_irq_request(size_t channel, size_t config) 
     return message;
 }
 
-static seL4_MessageInfo_t handle_set_irq_request(size_t channel, size_t config, size_t value) {
+static seL4_MessageInfo_t handle_set_irq_request(size_t irq, size_t config, size_t value) {
     size_t label;
     size_t response;
 
     switch (config) {
         case MESON_GPIO_IRQ_EDGE:
-            meson_set_irq_edge(channel, value, &label, &response);
+            meson_set_irq_edge(irq, value, &label, &response);
             break;
         case MESON_GPIO_IRQ_FILTER:
-            meson_set_irq_filter(channel, value, &label, &response);
+            meson_set_irq_filter(irq, value, &label, &response);
             break;
         default:
             label = GPIO_FAILURE;
-            response = GPIO_INVALID_CONFIG;
+            response = GPIO_ERROR_INVALID_CONFIG;
     }
 
     seL4_MessageInfo_t message;
@@ -826,95 +839,92 @@ seL4_MessageInfo_t protected(microkit_channel ch, seL4_MessageInfo_t msginfo)
 {
     size_t label = microkit_msginfo_get_label(msginfo);
     size_t count = microkit_msginfo_get_count(msginfo);
-    size_t config, pin, meson_channel, value;
+    size_t config, pin, irq, value;
 
     switch (label) {
         case GPIO_GET_GPIO:
             if (count != 1) {
                 seL4_MessageInfo_t message = microkit_msginfo_new(GPIO_FAILURE, 1);
-                microkit_mr_set(GPIO_RES_VALUE_SLOT, (size_t)GPIO_INVALID_NUM_ARGS);
+                microkit_mr_set(GPIO_RES_VALUE_SLOT, (size_t)GPIO_ERROR_INVALID_NUM_ARGS);
                 return message;
             }
 
             /* Check GPIO mapping */
             if (gpio_channel_mappings[ch][GPIO_CHANNEL_MAPPING_GPIO_PIN_SLOT] < 0) {
                 seL4_MessageInfo_t message = microkit_msginfo_new(GPIO_FAILURE, 1);
-                microkit_mr_set(GPIO_RES_VALUE_SLOT, (size_t)GPIO_INVALID_MAPPING_ENTRY);
+                microkit_mr_set(GPIO_RES_VALUE_SLOT, (size_t)GPIO_ERROR_PERMISSION_DENIED);
                 return message;
             }
 
             config = microkit_mr_get(GPIO_REQ_CONFIG_SLOT);
             pin = gpio_channel_mappings[ch][GPIO_CHANNEL_MAPPING_GPIO_PIN_SLOT];
+
             return handle_get_gpio_request(pin, config);
 
         case GPIO_GET_IRQ:
             if (count != 1) {
                 seL4_MessageInfo_t message = microkit_msginfo_new(GPIO_FAILURE, 1);
-                microkit_mr_set(GPIO_RES_VALUE_SLOT, (size_t)GPIO_INVALID_NUM_ARGS);
+                microkit_mr_set(GPIO_RES_VALUE_SLOT, (size_t)GPIO_ERROR_INVALID_NUM_ARGS);
                 return message;
             }
 
             /* Check irq channel mapping */
-            if (gpio_channel_mappings[ch][GPIO_CHANNEL_MAPPING_IRQ_CHANNEL_SLOT] < 0) {
+            if (gpio_channel_mappings[ch][GPIO_CHANNEL_MAPPING_IRQ_SLOT] < 0) {
                 seL4_MessageInfo_t message = microkit_msginfo_new(GPIO_FAILURE, 1);
-                microkit_mr_set(GPIO_RES_VALUE_SLOT, (size_t)GPIO_INVALID_MAPPING_ENTRY);
+                microkit_mr_set(GPIO_RES_VALUE_SLOT, (size_t)GPIO_ERROR_PERMISSION_DENIED);
                 return message;
             }
 
             config = microkit_mr_get(GPIO_REQ_CONFIG_SLOT);
-            meson_channel = gpio_channel_mappings[ch][GPIO_CHANNEL_MAPPING_IRQ_CHANNEL_SLOT];
-            return handle_get_irq_request(meson_channel, config);
+            irq = gpio_channel_mappings[ch][GPIO_CHANNEL_MAPPING_IRQ_SLOT];
+
+            return handle_get_irq_request(irq, config);
 
         case GPIO_SET_GPIO:
             if (count != 2) {
                 seL4_MessageInfo_t message = microkit_msginfo_new(GPIO_FAILURE, 1);
-                microkit_mr_set(GPIO_RES_VALUE_SLOT, (size_t)GPIO_INVALID_NUM_ARGS);
+                microkit_mr_set(GPIO_RES_VALUE_SLOT, (size_t)GPIO_ERROR_INVALID_NUM_ARGS);
                 return message;
             }
 
             /* Check GPIO mapping */
             if (gpio_channel_mappings[ch][GPIO_CHANNEL_MAPPING_GPIO_PIN_SLOT] < 0) {
                 seL4_MessageInfo_t message = microkit_msginfo_new(GPIO_FAILURE, 1);
-                microkit_mr_set(GPIO_RES_VALUE_SLOT, (size_t)GPIO_INVALID_MAPPING_ENTRY);
+                microkit_mr_set(GPIO_RES_VALUE_SLOT, (size_t)GPIO_ERROR_PERMISSION_DENIED);
                 return message;
             }
 
             config = microkit_mr_get(GPIO_REQ_CONFIG_SLOT);
             pin = gpio_channel_mappings[ch][GPIO_CHANNEL_MAPPING_GPIO_PIN_SLOT];
             value = microkit_mr_get(GPIO_REQ_VALUE_SLOT);
+
             return handle_set_gpio_request(pin, config, value);
 
         case GPIO_SET_IRQ:
             if (count != 2) {
                 seL4_MessageInfo_t message = microkit_msginfo_new(GPIO_FAILURE, 1);
-                microkit_mr_set(GPIO_RES_VALUE_SLOT, (size_t)GPIO_INVALID_NUM_ARGS);
+                microkit_mr_set(GPIO_RES_VALUE_SLOT, (size_t)GPIO_ERROR_INVALID_NUM_ARGS);
                 return message;
             }
 
             /* Check irq channel mapping */
-            if (gpio_channel_mappings[ch][GPIO_CHANNEL_MAPPING_IRQ_CHANNEL_SLOT] < 0) {
+            if (gpio_channel_mappings[ch][GPIO_CHANNEL_MAPPING_IRQ_SLOT] < 0) {
                 seL4_MessageInfo_t message = microkit_msginfo_new(GPIO_FAILURE, 1);
-                microkit_mr_set(GPIO_RES_VALUE_SLOT, (size_t)GPIO_INVALID_MAPPING_ENTRY);
+                microkit_mr_set(GPIO_RES_VALUE_SLOT, (size_t)GPIO_ERROR_PERMISSION_DENIED);
                 return message;
             }
 
             config = microkit_mr_get(GPIO_REQ_CONFIG_SLOT);
-            meson_channel = gpio_channel_mappings[ch][GPIO_CHANNEL_MAPPING_IRQ_CHANNEL_SLOT];
+            irq = gpio_channel_mappings[ch][GPIO_CHANNEL_MAPPING_IRQ_SLOT];
             value = microkit_mr_get(GPIO_REQ_VALUE_SLOT);
-            return handle_set_irq_request(meson_channel, config, value);
+
+            return handle_set_irq_request(irq, config, value);
 
         default:
             seL4_MessageInfo_t message = microkit_msginfo_new(GPIO_FAILURE, 1);
-            microkit_mr_set(GPIO_RES_VALUE_SLOT, (size_t)GPIO_INVALID_LABEL);
+            microkit_mr_set(GPIO_RES_VALUE_SLOT, (size_t)GPIO_ERROR_INVALID_LABEL);
             return message;
     }
-}
-
-static bool meson_is_valid_irq_config(int meson_device_channel) {
-    return (meson_device_channel >= MESON_GPIO_IRQ_CHANNEL_START
-        && meson_device_channel < MESON_GPIO_IRQ_CHANNEL_START + MESON_GPIO_IRQ_CHANNEL_COUNT
-        && gpio_channel_mappings[meson_device_channel][GPIO_CHANNEL_MAPPING_GPIO_PIN_SLOT] == -1
-        && gpio_channel_mappings[meson_device_channel][GPIO_CHANNEL_MAPPING_IRQ_CHANNEL_SLOT] == -1);
 }
 
 void init(void)
@@ -923,7 +933,10 @@ void init(void)
 
     /* Configure gpio channel mappings */
     for (int i = 0; i < 62; i++) {
-        if (gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_GPIO_PIN_SLOT] == -1) {
+        if (gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_GPIO_PIN_SLOT] == -1 && gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_IRQ_SLOT] != -1) {
+            LOG_DRIVER_ERR("Failed to config gpio_channel_mappings[%d] because GPIO pin must be set if IRQ is set!\n", i);
+            while (1) {}
+        } else if (gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_GPIO_PIN_SLOT] == -1) {
             continue;
         }
 
@@ -937,41 +950,41 @@ void init(void)
             }
         }
         if (count != 1) {
-            LOG_DRIVER_ERR("Failed to config gpio_channel_mappings[%d] because GPIO pin is not configured ONLY ONCE\n", i, response);
+            LOG_DRIVER_ERR("Failed to config gpio_channel_mappings[%d] because GPIO pin is not configured ONLY ONCE\n", i);
             while (1) {}
         }
 
         /* Check if IRQ has been configured for this GPIO */
-        if (gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_IRQ_CHANNEL_SLOT] != -1) {
-            int meson_device_channel = gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_IRQ_CHANNEL_SLOT];
+        if (gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_IRQ_SLOT] != -1) {
+            int irq = gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_IRQ_SLOT];
 
             /* Check if its a valid irq configuration (its in range + corresponding device channel entry in table is uninitialised) */
-            if (!meson_is_valid_irq_config(meson_device_channel)) {
-                LOG_DRIVER_ERR("Failed to config irq meson_device_channel!\n");
+            if (!meson_is_valid_irq_config(irq)) {
+                LOG_DRIVER_ERR("Failed to config gpio_channel_mappings[%d] because failed to config irq!\n", i);
                 while (1) {}
             }
 
             /* Ensure IRQ channel is not configured to another channel */
             int count = 0;
             for (int j = 0; j < 62; j++) {
-                if (meson_device_channel == gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_IRQ_CHANNEL_SLOT]) {
+                if (irq == gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_IRQ_SLOT]) {
                     count++;
                 }
             }
             if (count != 1) {
-                LOG_DRIVER_ERR("Failed to config gpio_channel_mappings[%d] because device IRQ is not configured ONLY ONCE\n", i, response);
+                LOG_DRIVER_ERR("Failed to config gpio_channel_mappings[%d] because IRQ is not configured ONLY ONCE\n", i);
                 while (1) {}
             }
 
             /* Configure with hardware */
             size_t label;
             size_t response;
-            meson_set_irq_pin(meson_device_channel, gpio_pin, &label, &response);
+            meson_set_irq_pin(irq, gpio_pin, &label, &response);
             if (label == GPIO_FAILURE) {
                 LOG_DRIVER_ERR("Failed to config gpio_channel_mappings[%d] with gpio_irq_error_t : %ld!\n", i, response);
                 while (1) {}
             }
-            meson_get_irq_pin(meson_device_channel, &label, &response);
+            meson_get_irq_pin(irq, &label, &response);
             if (label == GPIO_FAILURE) {
                 LOG_DRIVER_ERR("Failed to config gpio_channel_mappings[%d] with gpio_irq_error_t : %ld!\n", i, response);
                 while (1) {}
@@ -982,10 +995,10 @@ void init(void)
             }
 
             /* Assign channel to the gpio pin */
-            driver_to_client_channel_mappings[meson_device_channel - MESON_GPIO_IRQ_CHANNEL_START] = gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_CLIENTS_CHANNEL_SLOT];
+            driver_to_client_channel_mappings[irq - MESON_GPIO_IRQ_CHANNEL_START] = gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_CLIENTS_CHANNEL_SLOT];
 
             /* ACK the IRQ so we can recieve further IRQs */
-            microkit_irq_ack(meson_device_channel);
+            microkit_irq_ack(irq);
         }
     }
 }

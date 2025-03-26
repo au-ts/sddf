@@ -22,7 +22,7 @@
 /* which gpio pin its for */
 #define GPIO_CHANNEL_MAPPING_GPIO_PIN_SLOT                  1
 /* which device irq channel its for (driver perspective) */
-#define GPIO_CHANNEL_MAPPING_IRQ_CHANNEL_SLOT               2
+#define GPIO_CHANNEL_MAPPING_IRQ_SLOT               2
 
 /*
 - GPIO Pin entries must use the scheme inside of sddf/include/gpio/{platform}/gpio.h.

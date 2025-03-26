@@ -372,14 +372,14 @@ static const uint32_t meson_irq_bit_strides[] = {
  * @register_offset:	   hardware offset from above
  * @start_bit:	         starting bit in the register (inclusive)
  * @end_bit:	         last bit in the register (inclusive)
- * @start_channel_number:	what channel number out of the channels is mapped to the starting bit
+ * @start_irq_number:	what channel number out of the channels is mapped to the starting bit
  * @is_last:	         if this is the last meson_irq_register_data struct in containing structs array
  */
 struct meson_irq_register_data {
    uint32_t register_offset;
    uint32_t start_bit;
    uint32_t end_bit;
-   uint32_t start_channel_number;
+   uint32_t start_irq_number;
    bool is_last;
 };
 
@@ -392,50 +392,50 @@ static const struct meson_irq_function irq_config_control[] = {
    {
       .function = MESON_IRQ_REG_BOTHEDGEEN,
       .registers = (const struct meson_irq_register_data[]){
-         { .register_offset = GPIO_INTERUPT_EDGE_AND_POLARITY, .start_bit = 24, .end_bit = 31, .start_channel_number = MESON_GPIO_IRQ_0, .is_last = false },
-         { .register_offset = AO_IRQ_GPIO_REG, .start_bit = 20, .end_bit = 21, .start_channel_number = MESON_GPIO_AO_IRQ_0, .is_last = true }
+         { .register_offset = GPIO_INTERUPT_EDGE_AND_POLARITY, .start_bit = 24, .end_bit = 31, .start_irq_number = MESON_GPIO_IRQ_0, .is_last = false },
+         { .register_offset = AO_IRQ_GPIO_REG, .start_bit = 20, .end_bit = 21, .start_irq_number = MESON_GPIO_AO_IRQ_0, .is_last = true }
       }
    },
    {
       .function = MESON_IRQ_REG_EDGE,
       .registers = (const struct meson_irq_register_data[]){
-         { .register_offset = GPIO_INTERUPT_EDGE_AND_POLARITY, .start_bit = 0, .end_bit = 7, .start_channel_number = MESON_GPIO_IRQ_0, .is_last = false },
-         { .register_offset = AO_IRQ_GPIO_REG, .start_bit = 18, .end_bit = 19, .start_channel_number = MESON_GPIO_AO_IRQ_0, .is_last = true }
+         { .register_offset = GPIO_INTERUPT_EDGE_AND_POLARITY, .start_bit = 0, .end_bit = 7, .start_irq_number = MESON_GPIO_IRQ_0, .is_last = false },
+         { .register_offset = AO_IRQ_GPIO_REG, .start_bit = 18, .end_bit = 19, .start_irq_number = MESON_GPIO_AO_IRQ_0, .is_last = true }
       }
    },
    {
       .function = MESON_IRQ_REG_POL,
       .registers = (const struct meson_irq_register_data[]){
-         { .register_offset = GPIO_INTERUPT_EDGE_AND_POLARITY, .start_bit = 16, .end_bit = 23, .start_channel_number = MESON_GPIO_IRQ_0, .is_last = false },
-         { .register_offset = AO_IRQ_GPIO_REG, .start_bit = 16, .end_bit = 17, .start_channel_number = MESON_GPIO_AO_IRQ_0, .is_last = true }
+         { .register_offset = GPIO_INTERUPT_EDGE_AND_POLARITY, .start_bit = 16, .end_bit = 23, .start_irq_number = MESON_GPIO_IRQ_0, .is_last = false },
+         { .register_offset = AO_IRQ_GPIO_REG, .start_bit = 16, .end_bit = 17, .start_irq_number = MESON_GPIO_AO_IRQ_0, .is_last = true }
       }
    },
    {
       .function = MESON_IRQ_REG_FIL,
       .registers = (const struct meson_irq_register_data[]){
-         { .register_offset = GPIO_FILTER_SELECT, .start_bit = 0, .end_bit = 2, .start_channel_number = MESON_GPIO_IRQ_0, .is_last = true },
-         { .register_offset = GPIO_FILTER_SELECT, .start_bit = 4, .end_bit = 6, .start_channel_number = MESON_GPIO_IRQ_1, .is_last = true },
-         { .register_offset = GPIO_FILTER_SELECT, .start_bit = 8, .end_bit = 10, .start_channel_number = MESON_GPIO_IRQ_2, .is_last = true },
-         { .register_offset = GPIO_FILTER_SELECT, .start_bit = 12, .end_bit = 14, .start_channel_number = MESON_GPIO_IRQ_3, .is_last = true },
-         { .register_offset = GPIO_FILTER_SELECT, .start_bit = 16, .end_bit = 18, .start_channel_number = MESON_GPIO_IRQ_4, .is_last = true },
-         { .register_offset = GPIO_FILTER_SELECT, .start_bit = 20, .end_bit = 22, .start_channel_number = MESON_GPIO_IRQ_5, .is_last = true },
-         { .register_offset = GPIO_FILTER_SELECT, .start_bit = 24, .end_bit = 26, .start_channel_number = MESON_GPIO_IRQ_6, .is_last = true },
-         { .register_offset = GPIO_FILTER_SELECT, .start_bit = 28, .end_bit = 30, .start_channel_number = MESON_GPIO_IRQ_7, .is_last = true },
-         { .register_offset = AO_IRQ_GPIO_REG, .start_bit = 8, .end_bit = 10, .start_channel_number = MESON_GPIO_AO_IRQ_0, .is_last = true },
-         { .register_offset = AO_IRQ_GPIO_REG, .start_bit = 12, .end_bit = 14, .start_channel_number = MESON_GPIO_AO_IRQ_1, .is_last = true },
+         { .register_offset = GPIO_FILTER_SELECT, .start_bit = 0, .end_bit = 2, .start_irq_number = MESON_GPIO_IRQ_0, .is_last = true },
+         { .register_offset = GPIO_FILTER_SELECT, .start_bit = 4, .end_bit = 6, .start_irq_number = MESON_GPIO_IRQ_1, .is_last = true },
+         { .register_offset = GPIO_FILTER_SELECT, .start_bit = 8, .end_bit = 10, .start_irq_number = MESON_GPIO_IRQ_2, .is_last = true },
+         { .register_offset = GPIO_FILTER_SELECT, .start_bit = 12, .end_bit = 14, .start_irq_number = MESON_GPIO_IRQ_3, .is_last = true },
+         { .register_offset = GPIO_FILTER_SELECT, .start_bit = 16, .end_bit = 18, .start_irq_number = MESON_GPIO_IRQ_4, .is_last = true },
+         { .register_offset = GPIO_FILTER_SELECT, .start_bit = 20, .end_bit = 22, .start_irq_number = MESON_GPIO_IRQ_5, .is_last = true },
+         { .register_offset = GPIO_FILTER_SELECT, .start_bit = 24, .end_bit = 26, .start_irq_number = MESON_GPIO_IRQ_6, .is_last = true },
+         { .register_offset = GPIO_FILTER_SELECT, .start_bit = 28, .end_bit = 30, .start_irq_number = MESON_GPIO_IRQ_7, .is_last = true },
+         { .register_offset = AO_IRQ_GPIO_REG, .start_bit = 8, .end_bit = 10, .start_irq_number = MESON_GPIO_AO_IRQ_0, .is_last = true },
+         { .register_offset = AO_IRQ_GPIO_REG, .start_bit = 12, .end_bit = 14, .start_irq_number = MESON_GPIO_AO_IRQ_1, .is_last = true },
       }
    },
    {
       .function = MESON_IRQ_REG_AOSEL,
       .registers = (const struct meson_irq_register_data[]){
-         { .register_offset = AO_IRQ_GPIO_REG, .start_bit = 0, .end_bit = 7, .start_channel_number = MESON_GPIO_AO_IRQ_0, .is_last = true }
+         { .register_offset = AO_IRQ_GPIO_REG, .start_bit = 0, .end_bit = 7, .start_irq_number = MESON_GPIO_AO_IRQ_0, .is_last = true }
       }
    },
    {
       .function = MESON_IRQ_REG_SEL,
       .registers = (const struct meson_irq_register_data[]){
-         { .register_offset = GPIO_0_3_PIN_SELECT, .start_bit = 0, .end_bit = 31, .start_channel_number = MESON_GPIO_IRQ_0, .is_last = false },
-         { .register_offset = GPIO_4_7_PIN_SELECT, .start_bit = 0, .end_bit = 31, .start_channel_number = MESON_GPIO_IRQ_4, .is_last = true }
+         { .register_offset = GPIO_0_3_PIN_SELECT, .start_bit = 0, .end_bit = 31, .start_irq_number = MESON_GPIO_IRQ_0, .is_last = false },
+         { .register_offset = GPIO_4_7_PIN_SELECT, .start_bit = 0, .end_bit = 31, .start_irq_number = MESON_GPIO_IRQ_4, .is_last = true }
       }
    }
 };
