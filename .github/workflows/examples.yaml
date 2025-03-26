@@ -57,7 +57,7 @@ jobs:
       - name: Setup Nix
         uses: cachix/install-nix-action@v27
       - name: Build and run examples
-        run: nix develop -c bash -c './ci/examples.sh $MICROKIT_SDK'
+        run: nix develop --ignore-environment -c bash -c './ci/examples.sh $MICROKIT_SDK'
         shell: bash
   build_macos_arm64:
     name: macOS ARM64
