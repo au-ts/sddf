@@ -76,15 +76,3 @@ void cache_clean(unsigned long start, unsigned long end)
 #error "Unknown architecture for cache_clean"
 #endif
 }
-
-void cache_invalidate(unsigned long start, unsigned long end)
-{
-#if defined(CONFIG_ARCH_AARCH64)
-    seL4_ARM_VSpace_Invalidate_Data(3, start, end);
-#elif defined(CONFIG_ARCH_RISCV)
-    /* While not all RISC-V platforms are DMA cache-cohernet,
-     * we assume we are targeting one that is and so there is nothing to do. */
-#else
-#error "Unknown architecture for cache_invalidate"
-#endif
-}

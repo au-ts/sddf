@@ -33,13 +33,3 @@ void cache_clean_and_invalidate(unsigned long start, unsigned long end);
  * On RISC-V, this is a no-op.
  */
 void cache_clean(unsigned long start, unsigned long end);
-
-/*
- * Invalidates from start to end. This is not inclusive.
- *
- * On ARM, this leads to seL4_ARM_VSpace_Invalidate_Data as it is not possible to invalidate
- * directly from user-space. Note that it may be more efficient to simply do a
- * cache_clean_and_invalidate instead as it will not result in a system call.
- * On RISC-V, this is a no-op.
- */
-void cache_invalidate(unsigned long start, unsigned long end);
