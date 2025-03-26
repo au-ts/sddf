@@ -18,6 +18,9 @@ fi
 
 CI_BUILD_DIR="ci_build"
 
+export ZIG_LOCAL_CACHE_DIR="${CI_BUILD_DIR}/zig-cache"
+export ZIG_GLOBAL_CACHE_DIR="${CI_BUILD_DIR}/zig-cache"
+
 [[ -z $SDK_PATH ]] && echo "usage: examples.sh [PATH TO SDK]" && exit 1
 [[ ! -d $SDK_PATH ]] && echo "The path to the SDK provided does not exist: '$SDK_PATH'" && exit 1
 

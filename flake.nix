@@ -70,6 +70,9 @@
                 gnumake
                 dosfstools
                 imagemagick
+                # for shasum
+                perl
+                which
 
                 (symlinkJoin {
                   name = "clang-complete";
