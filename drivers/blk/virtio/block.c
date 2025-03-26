@@ -70,16 +70,22 @@ void handle_response(void)
     while (i != curr_idx) {
         uint16_t virtq_idx = i % virtq.num;
         struct virtq_used_elem hdr_used = virtq.used->ring[virtq_idx];
+        /* if (hdr_used.len == 0) { */
+            /* continue; */
+        /* } */
+        LOG_DRIVER("curr_idx: %d, i: %d, virtq_idx: %d, hdr_used.id: %d, len: %d\n", curr_idx, i, virtq_idx, hdr_used.id, hdr_used.len);
+        LOG_DRIVER("flags: %d\n", virtq.desc[hdr_used.id].flags);
+        struct virtio_blk_req *hdr = &virtio_headers[virtq_idx];
+        virtio_blk_print_req(hdr);
         assert(virtq.desc[hdr_used.id].flags & VIRTQ_DESC_F_NEXT);
 
         struct virtq_desc hdr_desc = virtq.desc[hdr_used.id];
         LOG_DRIVER("response header addr: 0x%lx, len: %d\n", hdr_desc.addr, hdr_desc.len);
 
         assert(hdr_desc.len == VIRTIO_BLK_REQ_HDR_SIZE);
-        struct virtio_blk_req *hdr = &virtio_headers[virtq_idx];
-        virtio_blk_print_req(hdr);
 
         uint16_t data_desc_idx = virtq.desc[hdr_used.id].next;
+        LOG_DRIVER("data_desc_idx: %d\n", data_desc_idx);
         struct virtq_desc data_desc = virtq.desc[data_desc_idx % virtq.num];
         uint32_t data_len = data_desc.len;
 #ifdef DEBUG_DRIVER
@@ -166,10 +172,10 @@ void handle_request()
             assert(virtio_block_number + virtio_count <= virtio_config->capacity);
 
             if (req_code == BLK_REQ_READ) {
-                LOG_DRIVER("handling read request with physical address 0x%lx, block_number: 0x%x, count: 0x%x, id: 0x%x\n",
+                LOG_DRIVER("handling read request with physical address 0x%lx, block_number: 0x%lx, count: 0x%x, id: 0x%x\n",
                            phys_addr, block_number, count, id);
             } else {
-                LOG_DRIVER("handling write request with physical address 0x%lx, block_number: 0x%x, count: 0x%x, id: 0x%x\n",
+                LOG_DRIVER("handling write request with physical address 0x%lx, block_number: 0x%lx, count: 0x%x, id: 0x%x\n",
                            phys_addr, block_number, count, id);
             }
 
@@ -219,6 +225,7 @@ void handle_request()
                 .flags = VIRTQ_DESC_F_WRITE,
             };
 
+            LOG_DRIVER("idx: %d, hdr_desc_idx: %d, dsec_flags: %d\n", virtq.avail->idx % virtq.num, hdr_desc_idx, virtq.desc[hdr_desc_idx].flags);
             virtq.avail->ring[virtq.avail->idx % virtq.num] = hdr_desc_idx;
             virtq.avail->idx++;
             virtio_queue_notify = true;
@@ -405,6 +412,7 @@ void notified(microkit_channel ch)
          */
         handle_request();
     } else if (ch == config.virt.id) {
+        LOG_DRIVER("Notified by virt\n");
         handle_request();
     } else {
         LOG_DRIVER_ERR("received notification from unknown channel: 0x%x\n", ch);

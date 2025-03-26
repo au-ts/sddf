@@ -251,7 +251,7 @@ pub fn build(b: *std.Build) !void {
         create_disk_cmd.addFileInput(mkvirtdisk);
         const disk = create_disk_cmd.addOutputFileArg("disk");
         create_disk_cmd.addArgs(&[_][]const u8{
-            "1", "512", b.fmt("{}", .{ 1024 * 1024 * 16 }),
+            "1", "512", b.fmt("{}", .{ 1024 * 1024 * 16 }), "GPT",
         });
         const disk_install = b.addInstallFile(disk, "disk");
         disk_install.step.dependOn(&create_disk_cmd.step);
