@@ -95,13 +95,14 @@ if __name__ == '__main__':
     parser.add_argument("--board", required=True, choices=[b.name for b in BOARDS])
     parser.add_argument("--output", required=True)
     parser.add_argument("--sdf", required=True)
+    parser.add_argument("--search-path", nargs="+", required=True)
     parser.add_argument("--partition")
 
     args = parser.parse_args()
 
     board = next(filter(lambda b: b.name == args.board, BOARDS))
 
-    sdf = SystemDescription(board.arch, board.paddr_top)
+    sdf = SystemDescription(board.arch, args.search_path, board.paddr_top)
     sddf = Sddf(args.sddf)
 
     with open(args.dtb, "rb") as f:

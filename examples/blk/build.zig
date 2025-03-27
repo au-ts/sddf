@@ -62,21 +62,6 @@ fn findTarget(board: MicrokitBoard) std.Target.Query {
 
 const ConfigOptions = enum { debug, release, benchmark };
 
-fn updateSectionObjcopy(b: *std.Build, section: []const u8, data_output: std.Build.LazyPath, data: []const u8, elf: []const u8) *Step.Run {
-    const run_objcopy = b.addSystemCommand(&[_][]const u8{
-        "llvm-objcopy",
-    });
-    run_objcopy.addArg("--update-section");
-    const data_full_path = data_output.join(b.allocator, data) catch @panic("OOM");
-    run_objcopy.addPrefixedFileArg(b.fmt("{s}=", .{ section }), data_full_path);
-    run_objcopy.addFileArg(.{ .cwd_relative = b.getInstallPath(.bin, elf) });
-
-    // We need the ELFs we talk about to be in the install directory first.
-    run_objcopy.step.dependOn(b.getInstallStep());
-
-    return run_objcopy;
-}
-
 pub fn build(b: *std.Build) !void {
     const optimize = b.standardOptimizeOption(.{});
 
@@ -128,7 +113,7 @@ pub fn build(b: *std.Build) !void {
     if (timer_driver_class) |c| {
         const driver = sddf_dep.artifact(b.fmt("driver_timer_{s}.elf", .{ c }));
         // To match what our SDF expects
-        timer_driver_install = b.addInstallArtifact(driver, .{ .dest_sub_path = "timer_driver.elf" });
+        timer_driver_install = b.addInstallArtifact(driver, .{ .dest_dir = .{ .override = .bin }, .dest_sub_path = "timer_driver.elf" });
     }
 
     const blk_driver_class = switch (microkit_board_option.?) {
@@ -163,7 +148,7 @@ pub fn build(b: *std.Build) !void {
     b.installArtifact(sddf_dep.artifact("blk_virt.elf"));
 
     // Because our SDF expects a different ELF name for the block driver, we have this extra step.
-    const blk_driver_install = b.addInstallArtifact(blk_driver, .{ .dest_sub_path = "blk_driver.elf" });
+    const blk_driver_install = b.addInstallArtifact(blk_driver, .{ .dest_dir = .{ .override = .bin }, .dest_sub_path = "blk_driver.elf" });
 
     // For compiling the DTS into a DTB
     const dts = sddf_dep.path(b.fmt("dts/{s}.dts", .{ microkit_board }));
@@ -188,11 +173,18 @@ pub fn build(b: *std.Build) !void {
     run_metaprogram.addArg(microkit_board);
     run_metaprogram.addArg("--sdf");
     run_metaprogram.addArg("blk.system");
+    run_metaprogram.addArg("--search-path");
+    run_metaprogram.addArg(b.getInstallPath(.bin, ""));
     if (partition) |p| {
         run_metaprogram.addArg("--partition");
         run_metaprogram.addArg(b.fmt("{}", .{ p }));
     }
     _ = try run_metaprogram.step.addDirectoryWatchInput(sddf_dep.path(""));
+
+    run_metaprogram.step.dependOn(&blk_driver_install.step);
+    if (timer_driver_install) |i| {
+        run_metaprogram.step.dependOn(&i.step);
+    }
 
     const meta_output_install = b.addInstallDirectory(.{
         .source_dir = meta_output,
@@ -200,38 +192,16 @@ pub fn build(b: *std.Build) !void {
         .install_subdir = "meta_output",
     });
 
-    const client_objcopy = updateSectionObjcopy(b, ".blk_client_config", meta_output, "blk_client_client.data", "client.elf");
-    const virt_objcopy = updateSectionObjcopy(b, ".blk_virt_config", meta_output, "blk_virt.data", "blk_virt.elf");
-    const driver_resources_objcopy = updateSectionObjcopy(b, ".device_resources", meta_output, "blk_driver_device_resources.data", "blk_driver.elf");
-    const driver_config_objcopy = updateSectionObjcopy(b, ".blk_driver_config", meta_output, "blk_driver.data", "blk_driver.elf");
-    driver_resources_objcopy.step.dependOn(&blk_driver_install.step);
-    driver_config_objcopy.step.dependOn(&blk_driver_install.step);
-    const blk_objcopys = .{ client_objcopy, virt_objcopy, driver_resources_objcopy, driver_config_objcopy };
-    const objcopys = blk: {
-        if (timer_driver_install != null) {
-            const blk_driver_timer_objcopy = updateSectionObjcopy(b, ".timer_client_config", meta_output, "timer_client_blk_driver.data", "blk_driver.elf");
-            blk_driver_timer_objcopy.step.dependOn(&blk_driver_install.step);
-            const timer_driver_objcopy = updateSectionObjcopy(b, ".device_resources", meta_output, "timer_driver_device_resources.data", "timer_driver.elf");
-            timer_driver_objcopy.step.dependOn(&timer_driver_install.?.step);
-            break :blk &(blk_objcopys ++ .{ blk_driver_timer_objcopy, timer_driver_objcopy });
-        } else {
-            break :blk &blk_objcopys;
-        }
-    };
-
     const final_image_dest = b.getInstallPath(.bin, "./loader.img");
     const microkit_tool_cmd = b.addSystemCommand(&[_][]const u8{
         microkit_tool,
         b.getInstallPath(.{ .custom = "meta_output" }, "blk.system"),
-        "--search-path", b.getInstallPath(.bin, ""),
+        "--search-path", b.getInstallPath(.prefix, "meta_output"),
         "--board", microkit_board,
         "--config", microkit_config,
         "-o", final_image_dest,
         "-r", b.getInstallPath(.prefix, "./report.txt")
     });
-    for (objcopys) |objcopy| {
-        microkit_tool_cmd.step.dependOn(&objcopy.step);
-    }
     microkit_tool_cmd.step.dependOn(&meta_output_install.step);
     microkit_tool_cmd.step.dependOn(b.getInstallStep());
     microkit_tool_cmd.setEnvironmentVariable("MICROKIT_SDK", microkit_sdk);
