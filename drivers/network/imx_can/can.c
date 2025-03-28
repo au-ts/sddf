@@ -15,24 +15,31 @@ volatile struct control_registers *control_regs;
 volatile struct error_registers *error_regs;
 volatile struct canfd_registers *canfd_regs;
 
+/* Copied from flexcan-core.c in Linux kernel */
+static void module_enable(void) {
+    control_regs->mcr &= ~MCR_MDIS;
+    // Spins until the Low Power Mode Acknowledge is deasserted (when low power mode is exited)
+    while (control_regs->mcr & MCR_LPMACK);
+}
+
 /* Specified in 11.8.2.11 - Reset */
 static void soft_reset(void) {
     control_regs->mcr = MCR_SOFTRST;
-    // Spin until SOFT_RESET is deasserted (this happens when the reset completes)
+    // Spin until Soft Reset is deasserted (this happens when the reset completes)
     while (control_regs->mcr & MCR_SOFTRST);
 }
 
 /* Specified in 11.8.2.1.1.1 */
 static void freeze(void) {
     control_regs->mcr |= (MCR_HALT | MCR_FRZ);
-    // Spin until FREEZE_ACK is asserted
+    // Spin until Freeze Acknowledge is asserted
     while (!(control_regs->mcr & MCR_FRZACK));
 }
 
 /* Specified in 11.8.2.1.1.1 */
 static void unfreeze(void) {
     control_regs->mcr &= ~MCR_HALT;
-    // Spin until FREEZE_ACK is deasserted
+    // Spin until Freeze Acknowledge is deasserted
     while (control_regs->mcr & MCR_FRZACK); 
 }
 
@@ -42,19 +49,18 @@ static void mcr_init(void) {
         - do I need to set max mailbox number here?
         - do I need to modify access (i.e. SUPV?)
         - do I need to set the ID acceptance mode? (IDAM)
-        - do I need to set abort mechanism? Linux seems to ignore AEN
-        - do I need the local priority bit? Linux also ignores this and it just adds backwards compatibility?
+        - do I need to set abort mechanism? Linux seems to ignore AEN but I set here as per initialisation protocol
+        - do I need the local priority bit? Linux also ignores this and it just adds backwards compatibility? I set it as per protocol
      */
 
-    // Initial iteration only allows use of mailboxes and is fixed to normal mode
-
+    // Note: Initial iteration only allows use of mailboxes and is fixed to normal mode
     // Enable individual Rx matching
     control_regs->mcr |= MCR_IRMQ;
     // Enable warning interrupts
     control_regs->mcr |= MCR_WRNEN;
     // Disable self-reception of frames (this needs to be enabled for loopback mode to work)
     control_regs->mcr |= MCR_SRXDIS;
-    // Disable Rx FIFO (thus we're using mailboxes)
+    // Disable Rx FIFO (as we're using mailboxes)
     control_regs->mcr &= ~MCR_RFEN;
     // Enable the abort mechanism for Tx MBs 
     control_regs->mcr |= MCR_AEN;
@@ -62,21 +68,40 @@ static void mcr_init(void) {
     control_regs->mcr |= MCR_LPRIOEN; 
 }
 
-/*
-    // CBT - can bit timing register --> linux does this but can't find the implementation
-    // CTRL1 - 
+/* Specified in 11.8.4.1 - FlexCAN Initialization Sequence */
+static void ctrl_init(void) {
+    // We assume here we're not setting up CANFD so we ignore these registers for the moment
 
-     2. Initialize the Control 1 register (CTRL1) and optionally the CAN Bit Timing register
-    (CBT). Initialize also the CAN FD CAN Bit Timing register (FDCBT).
-    a. Determine the bit timing parameters: PROPSEG, PSEG1, PSEG2, and RJW.
-    b. Optionally determine the bit timing parameters: EPROPSEG, EPSEG1,
-    EPSEG2, and ERJW.
-    c. Determine the CAN FD bit timing parameters: FPROPSEG, FPSEG1, FPSEG2,
-    and FRJW.
-    d. Determine the bit rate by programming the PRESDIV field and optionally the
-    EPRESDIV field.
-    e. Determine the CAN FD bit rate by programming the FPRESDIV field.
-    f. Determine the internal arbitration mode (LBUF).
+    // Disable loopback mode, listen-only mode and use only a single sample for sampling mode
+    control_regs->ctrl1 &= ~(CTRL1_LPB | CTRL1_LOM | CTRL1_SMP);
+
+    // Reset bit timing parameters and bit rate
+    control_regs->ctrl1 &= ~(CTRL1_PRESDIV | CTRL1_RJW | CTRL1_PSEG1 | CTRL1_PSEG2 | CTRL1_PROPSEG);
+    
+    // TODO - Currently not sure what these should be. Linux reads them from the device configuration so here we just use 
+    // some dummy values for the moment -- doc here can help calculate and there also seems to be online calculators for this
+    // https://community.nxp.com/pwmxy87654/attachments/pwmxy87654/mpc5xxx%40tkb/292/1/FlexCAN%20bit%20timing.pdf
+    
+    // Set bit timing parameters and bit rate
+    control_regs->ctrl1 |= (CTRL1_PRESDIV | CTRL1_RJW | CTRL1_PSEG1 | CTRL1_PSEG2 | CTRL1_PROPSEG); // Note these are dummy values
+
+    // TODO up to 1522 from Linux kernel (The remainder of CTRL )
+
+
+}
+
+/*
+2. Initialize the Control 1 register (CTRL1) and optionally the CAN Bit Timing register
+(CBT). Initialize also the CAN FD CAN Bit Timing register (FDCBT).
+a. Determine the bit timing parameters: PROPSEG, PSEG1, PSEG2, and RJW.
+b. Optionally determine the bit timing parameters: EPROPSEG, EPSEG1,
+EPSEG2, and ERJW.
+c. Determine the CAN FD bit timing parameters: FPROPSEG, FPSEG1, FPSEG2,
+and FRJW.
+d. Determine the bit rate by programming the PRESDIV field and optionally the
+EPRESDIV field.
+e. Determine the CAN FD bit rate by programming the FPRESDIV field.
+f. Determine the internal arbitration mode (LBUF).
 */
 
 #define MYBIT(x, y) (x << y)
@@ -138,27 +163,25 @@ static void can_init(void) {
     // error_regs = (volatile struct error_registers *) (vaddr + ERROR_REGISTER_OFFSET);
     // canfd_regs = (volatile struct canfd_registers *) (vaddr + CANFD_REGISTER_OFFSET);
     
-    // control_regs->mcr &= ~MCR_MDIS;
+    /* Enable the module */
+    module_enable();
 
-    sddf_dprintf("MCR register contains: %u\n", control_regs->mcr);
+    /* Soft reset */
+    soft_reset();
 
-
-    // control_regs->mcr = (control_regs->mcr &= ~MCR_MDIS);
-    // sddf_dprintf("The value of the mcr reg is %u\n", control_regs->mcr);
-     // TODO - this bit enables/disables the module --> need to make sure its set first
-
-    /* TODO - note that the Linux kernel does some extra setup here - ram_init and bittiming -- not certain if these are necessary or extra features? */
-
-    /* Reset */
-    // soft_reset();
+    // TODO - Linux's implementation calls additional functions here
+    // First it calls flexcan_ram_init here to allow write access to certain addresses - not sure if I need this
+    // Second it calls flexcan_set_bittiming which sets up some information in the control register -- atm I've delayed bitttiming to within ctrl_init
+    // which is where the manual discusses the initialisation
 
     // /* Freeze */
-    // freeze();
+    freeze();
 
-    // /* Module Configuration Register (MCR) init */
-    // mcr_init();
+    /* Module Configuration Register (MCR) init */
+    mcr_init();
 
-    /*  */
+    /* Control1 Register (ctrl1) Init */
+    ctrl_init();
 }
 
 // microkit init

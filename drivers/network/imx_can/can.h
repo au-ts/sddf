@@ -47,24 +47,24 @@
 #define MCR_MAXMB           (127UL << 0)    /* Number Of The Last Message Buffer - 7-bit field defines number of last message buffers - See docs for details */
 
 /* FlexCAN Control 1 Register (CTRL1) - 11.8.5.2.3 */
-#define CTRL1_PRESDIV       (255UL << 23)   /* Prescaler Division Factor */
-#define CTRL1_RJW           (3UL << 21)     /* Resync Jump Width */
-#define CTRL1_PSEG1         (7UL << 18)     /* Phase Segment 1 */
-#define CTRL1_PSEG2         (7UL << 15)     /* Phase Segment 2 */
-#define CTRL1_BOFFMSK       (1UL << 14)     /* Bus Off Interrupt Mask */
-#define CTRL1_ERRMSK        (1UL << 13)     /* Error Interrupt Mask */
-#define CTRL1_CLKSRC        (1UL << 12)     /* CAN Engine Clock Source */
-#define CTRL1_LPB           (1UL << 11)     /* Loop Back Mode */
-#define CTRL1_TWRNMSK       (1UL << 10)     /* Tx Warning Interrupt Mask */
-#define CTRL1_RWRNMSK       (1UL << 9)      /* Rx Warning Interrupt Mask */
-#define CTRL1_RESERVED0     (1UL << 8)      /* Reserved */
-#define CTRL1_RESERVED1     (1UL << 7)      /* Reserved */
-#define CTRL1_SMP           (1UL << 6)      /* CAN Bit Sampling */
-#define CTRL1_BOFFREC       (1UL << 5)      /* Bus Off Recovery */
-#define CTRL1_TSYN          (1UL << 4)      /* Timer Sync */
-#define CTRL1_LBUF          (1UL << 3)      /* Lowest Buffer Transmitted First */
-#define CTRL1_LOM           (1UL << 2)      /* Listen-Only Mode */
-#define CTRL1_PROPSEG       (3UL << 0)      /* Propagation Segment */
+#define CTRL1_PRESDIV       (255UL << 24)   /* Prescaler Division Factor */ 
+#define CTRL1_RJW           (3UL << 22)     /* Resync Jump Width */
+#define CTRL1_PSEG1         (7UL << 19)     /* Phase Segment 1 */
+#define CTRL1_PSEG2         (7UL << 16)     /* Phase Segment 2 */
+#define CTRL1_BOFFMSK       (1UL << 15)     /* Bus Off Interrupt Mask */
+#define CTRL1_ERRMSK        (1UL << 14)     /* Error Interrupt Mask */
+#define CTRL1_CLKSRC        (1UL << 13)     /* CAN Engine Clock Source */
+#define CTRL1_LPB           (1UL << 12)     /* Loop Back Mode */
+#define CTRL1_TWRNMSK       (1UL << 11)     /* Tx Warning Interrupt Mask */
+#define CTRL1_RWRNMSK       (1UL << 10)      /* Rx Warning Interrupt Mask */
+#define CTRL1_RESERVED0     (1UL << 9)      /* Reserved */
+#define CTRL1_RESERVED1     (1UL << 8)      /* Reserved */
+#define CTRL1_SMP           (1UL << 7)      /* CAN Bit Sampling */
+#define CTRL1_BOFFREC       (1UL << 6)      /* Bus Off Recovery */
+#define CTRL1_TSYN          (1UL << 5)      /* Timer Sync */
+#define CTRL1_LBUF          (1UL << 4)      /* Lowest Buffer Transmitted First */
+#define CTRL1_LOM           (1UL << 3)      /* Listen-Only Mode */
+#define CTRL1_PROPSEG       (7UL << 0)      /* Propagation Segment */
 
 /* IMX8 Clock Registers */
 struct clock_registers {
