@@ -82,11 +82,14 @@ typedef enum {
     SendStateDone,
 } command_state_t;
 
+void handle_card_detect_irq();
+
 /* The current action-status of the driver */
 static enum {
     DrvStatusInactive,
     DrvStatusBringup,
     DrvStatusActive,
+    DrvStatusTeardown,
 } driver_status;
 
 static struct driver_state {
@@ -1072,8 +1075,8 @@ void setup_blk_storage_info()
 
     LOG_DRIVER("Card size (blocks): %lu\n", storage_info->capacity);
 
-    __atomic_store_n(&storage_info->ready, true, __ATOMIC_RELEASE);
     LOG_DRIVER("Driver initialisation complete\n");
+    blk_storage_notify_ready(storage_info, blk_config.virt.id_state, true);
 }
 
 drv_status_t usdhc_init(void)
@@ -1135,8 +1138,8 @@ void handle_client_device_inactive(void)
 
 void handle_client(bool was_irq)
 {
-    /* should never run during a status transition (bringup) */
-    assert(!(driver_status == DrvStatusBringup));
+    /* should never run during a status transition (bringup/teardown) */
+    assert(!(driver_status == DrvStatusBringup || driver_status == DrvStatusTeardown));
 
     if (was_irq == false) {
         if (driver_state.blk_req.inflight) {
@@ -1262,6 +1265,25 @@ void do_bringup(void)
     handle_client(/* was_irq: */ false);
 }
 
+void do_teardown(void)
+{
+    assert(driver_status == DrvStatusTeardown);
+
+    /* TODO: There's no documentation in the SD specifications or iMX8 specification
+     *       about what we actually have to do here....
+     *       There's some notes about disabling clocks & SD bus power in [SD-HOST]
+     *       (see my Week 8 Research Notes) but nothing useful for us.
+     */
+
+    stop_operations_and_clear_card_state();
+    blk_storage_info_t *storage_info = blk_config.virt.storage_info.vaddr;
+    blk_storage_notify_ready(storage_info, blk_config.virt.id_state, false);
+
+    /* handle any client requests that happened while tearing down */
+    driver_status = DrvStatusInactive;
+    handle_client(/* was_irq: */ false);
+}
+
 void notified(microkit_channel ch)
 {
     if (driver_status == DrvStatusBringup) {
@@ -1269,7 +1291,17 @@ void notified(microkit_channel ch)
             do_bringup();
             microkit_irq_ack(ch);
         } else {
-            LOG_DRIVER_ERR("notification on non-IRQ channel during bringup: %d\n", ch);
+            /* ignore other channels, because we don't want virt notifications
+               whilst bringup is occurring. */
+        }
+
+        return;
+    } else if (driver_status == DrvStatusTeardown) {
+        if (ch == device_resources.irqs[0].id) {
+            do_teardown();
+            microkit_irq_ack(ch);
+        } else {
+            /* ignore other channels */
         }
 
         return;
@@ -1281,8 +1313,8 @@ void notified(microkit_channel ch)
     } else if (ch == blk_config.virt.id) {
         handle_client(/* was_irq: */ false);
     } else if (ch == timer_config.driver_id) {
-        LOG_DRIVER_ERR("got impossible timer interrupt\n");
-        assert(!"unreachable");
+        // TODO: ifdef POLL_REQUIRED
+        handle_card_detect_irq();
     } else {
         LOG_DRIVER_ERR("notification on unknown channel: %d\n", ch);
     }
@@ -1308,6 +1340,58 @@ void init()
     /* Make sure we have DMA support. */
     assert(usdhc_regs->host_ctrl_cap & USDHC_HOST_CTRL_CAP_DMAS);
 
-    driver_status = DrvStatusBringup;
-    do_bringup();
+    /* start from the detect-changed handler, which should kick off init
+       if it's possible */
+    handle_card_detect_irq();
+}
+
+/////   Polling - as we don't have card detect interrupts (or a GPIO driver)
+#define POLL_REQUIRED  (true)
+#define POLL_FREQUENCY (1 * NS_IN_S)
+
+#if POLL_REQUIRED
+static bool card_detect_at_last_check = false;
+
+static inline bool card_detect_did_change(void)
+{
+    if (gpio_card_detected()) {
+        return !card_detect_at_last_check;
+    } else {
+        return card_detect_at_last_check;
+    }
+}
+#endif
+
+void handle_card_detect_irq()
+{
+#if POLL_REQUIRED
+    sddf_timer_set_timeout(timer_config.driver_id, POLL_FREQUENCY);
+
+    if (!card_detect_did_change()) {
+        return;
+    }
+#endif
+
+    card_detect_at_last_check = gpio_card_detected();
+    if (card_detect_at_last_check) {
+        /* don't if already bringup. however, do if we're active
+           -> we got notified of a change so might have to reinitialise */
+        if (driver_status != DrvStatusBringup) {
+            driver_status = DrvStatusBringup;
+            do_bringup();
+        }
+    } else {
+        /* don't start if we're already teardown, and don't bother if we're already down */
+        if (driver_status != DrvStatusTeardown && driver_status != DrvStatusInactive) {
+            driver_status = DrvStatusTeardown;
+            do_teardown();
+        }
+    }
+}
+
+/* The reset_driver_and_card_state() function generates a call to memset
+   but we don't have those provided as we are in -ffreestanding */
+void *memset(void *s, int c, size_t n)
+{
+    return sddf_memset(s, c, n);
 }
