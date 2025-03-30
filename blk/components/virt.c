@@ -29,13 +29,8 @@ __attribute__((__section__(".blk_virt_config"))) blk_virt_config_t config;
 
 /* Driver queue handle */
 blk_queue_handle_t drv_h;
-
-/* Client specific info */
-typedef struct client {
-    blk_queue_handle_t queue_h;
-    uintptr_t data_paddr;
-} client_t;
-client_t clients[SDDF_BLK_MAX_CLIENTS];
+/* Client queue handles */
+blk_queue_handle_t client_queues[SDDF_BLK_MAX_CLIENTS];
 
 /* Request info to be bookkept from client */
 typedef struct reqbk {
@@ -66,7 +61,7 @@ void init(void)
         blk_req_queue_t *curr_req = client->conn.req_queue.vaddr;
         blk_resp_queue_t *curr_resp = client->conn.resp_queue.vaddr;
         uint32_t queue_capacity = client->conn.num_buffers;
-        blk_queue_init(&clients[i].queue_h, curr_req, curr_resp, queue_capacity);
+        blk_queue_init(&client_queues[i], curr_req, curr_resp, queue_capacity);
     }
 
     /* Initialise driver queue */
@@ -118,12 +113,12 @@ static void handle_driver()
             assert(false);
         }
 
-        blk_queue_handle_t h = clients[reqbk.cli_id].queue_h;
+        blk_queue_handle_t *h = &client_queues[reqbk.cli_id];
 
         /* Response queue should never be full since number of inflight requests (ialloc size)
          * should always be less than or equal to resp queue capacity.
          */
-        err = blk_enqueue_resp(&h, drv_status, drv_success_count, reqbk.cli_req_id);
+        err = blk_enqueue_resp(h, drv_status, drv_success_count, reqbk.cli_req_id);
         assert(!err);
         client_notify[reqbk.cli_id] = true;
     }
@@ -139,7 +134,7 @@ static void handle_driver()
 static bool handle_client(int cli_id)
 {
     int err = 0;
-    blk_queue_handle_t h = clients[cli_id].queue_h;
+    blk_queue_handle_t h = client_queues[cli_id];
     uintptr_t cli_data_base_paddr = config.clients[cli_id].data.io_addr;
     uintptr_t cli_data_base_vaddr = (uintptr_t)config.clients[cli_id].data.region.vaddr;
     uint64_t cli_data_region_size = config.clients[cli_id].data.region.size;
