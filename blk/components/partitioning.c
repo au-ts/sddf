@@ -98,7 +98,7 @@ static bool gpt_partitions_init()
         blk_storage_info_t *driver_storage_info = config.driver.conn.storage_info.vaddr;
         client_storage_info->sector_size = driver_storage_info->sector_size;
         client_storage_info->capacity = clients[i].sectors / (BLK_TRANSFER_SIZE / MSDOS_MBR_SECTOR_SIZE);
-        client_storage_info->read_only = false;
+        client_storage_info->read_only = driver_storage_info->read_only;
         __atomic_store_n(&client_storage_info->ready, true, __ATOMIC_RELEASE);
     }
 
@@ -331,7 +331,7 @@ static bool mbr_handle_response()
     cache_clean_and_invalidate(mbr_state.req_addr, mbr_state.req_addr + (BLK_TRANSFER_SIZE * mbr_req_count));
     sddf_memcpy(&msdos_mbr, (void *)mbr_state.req_addr, sizeof(struct msdos_mbr));
 
-    /* There is only one partition entry in Protective MBR of the GPT parition schema */
+    /* There is only one partition entry in Protective MBR of the GPT partition schema */
     if (msdos_mbr.partitions[0].type == MSDOS_MBR_PARTITION_TYPE_GPT) {
         LOG_BLK_VIRT("Protective MBR of GPT is detected\n");
 
