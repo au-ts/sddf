@@ -310,7 +310,8 @@ typedef enum sd_card_state {
 typedef enum sd_clock_freq {
     /* [SD-PHY] 4.2.1 Card Reset "The cards are initialized... 400KHz clock frequency" */
     ClockSpeedIdentify_400KHz = 400 * KHZ,
-
-    // TODO: Higher speeds are currently never used.
-    // ClockSpeedDefaultSpeed_25MHz = 25 * MHZ,
+    /* [SD-PHY] 4.3 "In Data Transfer mode the host may operate the card in fPP frequency range "
+     * All card classes support Default Speed (25 MHz).
+     */
+    ClockSpeedDefaultSpeed_25MHz = 25 * MHZ,
 } sd_clock_freq_t;

@@ -108,6 +108,7 @@ static struct driver_state {
         CardIdentStateOpCond,
         CardIdentStateSendCid,
         CardIdentStateSendRca,
+        CardIdentStateFrequencyChange,
         CardIdentStateSendCsd,
         CardIdentStateCardSelect,
         CardIdentStateDone,
@@ -784,12 +785,14 @@ drv_status_t perform_card_identification_and_select()
 
         /* The card is now in the STANDBY state of the 'Data transfer mode' */
         card_info.card_state = CardStateStdby;
-        /* [SD-PHY] 4.3 Data Transfer Mode
-            > In Data Transfer Mode the host may operate the card in f_PP frequency range.
-
-            TODO(#187): Actually do `usdhc_change_clock_frequency(ClockSpeedDefault_25MHz)`
-         */
         driver_state.card_ident = CardIdentStateSendCsd;
+        fallthrough;
+
+    case CardIdentStateFrequencyChange:
+        /* [SD-PHY] 4.3 Data Transfer Mode
+         * > In Data Transfer Mode the host may operate the card in f_PP frequency range.
+         */
+        usdhc_change_clock_frequency(ClockSpeedDefaultSpeed_25MHz);
         fallthrough;
 
     case CardIdentStateSendCsd:
