@@ -349,16 +349,33 @@ drv_status_t send_command_inner(command_state_t *state, sd_cmd_t cmd, uint32_t c
     switch (*state) {
     case SendStateInit:
         /* [IMX8MDQLQRM] 10.3.7.1.5 Command Transfer Type
-           The host driver checks the Command Inhibit DAT field (PRES_STATE[CDIHB]) and
-           the \Command Inhibit CMD field (PRES_STATE[CIHB]) in the Present State register
-           before writing to this register.
-        */
+         * The host driver checks the Command Inhibit DAT field (PRES_STATE[CDIHB]) and
+         * the \Command Inhibit CMD field (PRES_STATE[CIHB]) in the Present State register
+         * before writing to this register.
+         *
+         * There seems to be an issue with this IMX8 uSDHC device, where even
+         * though the CC and TC interrupts have come in and been acknowledged,
+         * the Command/Data Inhibit flags are still set. They seem to disappear
+         * after a few reads, and can sometimes appear even after doing:
+         *
+         *    while inhibit;
+         *    if inhibit { print error }
+         *    send command;
+         *
+         * So there's something really strange going on. @peterc thinks that it
+         * can be the card pulling the CMD/DATA lines high and marking it as busy.
+         *
+         * References:
+         * - https://github.com/ARM-software/arm-trusted-firmware/blob/2377542785a13e776f1c52ffdeb22ef0e83873a5/drivers/imx/usdhc/imx_usdhc.c#L122-L125
+         * - https://github.com/zephyrproject-rtos/zephyr/pull/40522
+         * - https://patchwork.ozlabs.org/project/uboot/patch/1357665792-8141-1-git-send-email-l.majewski@samsung.com/
+         */
+#ifdef DEBUG_DRIVER
         if (usdhc_regs->pres_state & (USDHC_PRES_STATE_CIHB | USDHC_PRES_STATE_CDIHB)) {
-            LOG_DRIVER_ERR("Could not send a command as CMD/DATA-inhibit fields were set\n");
-            usdhc_debug();
-
-            return DrvErrorInternal;
+            LOG_DRIVER("CMD/DATA-inhibit fields were set when sending a command..."
+                       "sending anyway in the hope it goes away\n");
         }
+#endif
 
         *state = SendStateSend;
         fallthrough;
