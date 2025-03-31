@@ -9,6 +9,7 @@
 #include <sddf/blk/config.h>
 #include <sddf/blk/queue.h>
 #include <sddf/blk/storage_info.h>
+#include <sddf/hotplug/control.h>
 #include <sddf/util/printf.h>
 #include <sddf/timer/config.h>
 #include <sddf/timer/client.h>
@@ -82,11 +83,14 @@ typedef enum {
     SendStateDone,
 } command_state_t;
 
+void handle_card_detect_irq();
+
 /* The current action-status of the driver */
 static enum {
     DrvStatusInactive,
     DrvStatusBringup,
     DrvStatusActive,
+    DrvStatusTeardown,
 } driver_status;
 
 static struct driver_state {
@@ -257,13 +261,25 @@ static blk_resp_status_t drv_to_blk_status(drv_status_t status)
     }
 }
 
-static bool card_detected(void)
+volatile uint32_t *gpio1_regs;
+#if defined(CONFIG_PLAT_IMX8MM_EVK)
+#define GPIO_NUM    BIT(15)
+#elif defined(CONFIG_PLAT_MAAXBOARD)
+#define GPIO_NUM    BIT(6)
+#else
+#error "Unknown board type for GPIO card detect"
+#endif
+
+static bool gpio_card_detected(void)
 {
 #if 0
     /* This doesn't seem to ever work on this SOC; we need to use GPIO for CD */
     return usdhc_regs->pres_state & USDHC_PRES_STATE_CINST;
-#endif
+#elif 1
+    return !(*gpio1_regs & GPIO_NUM);
+#else
     return true;
+#endif
 }
 
 static drv_status_t handle_interrupt_status(sd_cmd_t cmd)
@@ -293,7 +309,7 @@ static drv_status_t handle_interrupt_status(sd_cmd_t cmd)
 
         usdhc_regs->int_status = 0xffffffff;
 
-        if (!card_detected()) {
+        if (!gpio_card_detected()) {
             /* If the card isn't detected, the error is because of that
                ... don't do anything with this aside from return an error,
                    though, as this is the wrong layer for that to make sense */
@@ -1060,8 +1076,8 @@ void setup_blk_storage_info()
 
     LOG_DRIVER("Card size (blocks): %lu\n", storage_info->capacity);
 
-    __atomic_store_n(&storage_info->ready, true, __ATOMIC_RELEASE);
     LOG_DRIVER("Driver initialisation complete\n");
+    blk_storage_notify_ready(storage_info, blk_config.virt.id_state, true);
 }
 
 drv_status_t usdhc_init(void)
@@ -1123,8 +1139,8 @@ void handle_client_device_inactive(void)
 
 void handle_client(bool was_irq)
 {
-    /* should never run during a status transition (bringup) */
-    assert(!(driver_status == DrvStatusBringup));
+    /* should never run during a status transition (bringup/teardown) */
+    assert(!(driver_status == DrvStatusBringup || driver_status == DrvStatusTeardown));
 
     if (was_irq == false) {
         if (driver_state.blk_req.inflight) {
@@ -1134,7 +1150,7 @@ void handle_client(bool was_irq)
 
         /* if we're inactive (by choice or by recognition),
            or if there's no card (but we haven't yet propagated this change to the state) */
-        if (driver_status == DrvStatusInactive || !card_detected()) {
+        if (driver_status == DrvStatusInactive || !gpio_card_detected()) {
             handle_client_device_inactive();
             return;
         }
@@ -1250,6 +1266,25 @@ void do_bringup(void)
     handle_client(/* was_irq: */ false);
 }
 
+void do_teardown(void)
+{
+    assert(driver_status == DrvStatusTeardown);
+
+    /* TODO: There's no documentation in the SD specifications or iMX8 specification
+     *       about what we actually have to do here....
+     *       There's some notes about disabling clocks & SD bus power in [SD-HOST]
+     *       (see my Week 8 Research Notes) but nothing useful for us.
+     */
+
+    stop_operations_and_clear_card_state();
+    blk_storage_info_t *storage_info = blk_config.virt.storage_info.vaddr;
+    blk_storage_notify_ready(storage_info, blk_config.virt.id_state, false);
+
+    /* handle any client requests that happened while tearing down */
+    driver_status = DrvStatusInactive;
+    handle_client(/* was_irq: */ false);
+}
+
 void notified(microkit_channel ch)
 {
     if (driver_status == DrvStatusBringup) {
@@ -1257,7 +1292,17 @@ void notified(microkit_channel ch)
             do_bringup();
             microkit_irq_ack(ch);
         } else {
-            LOG_DRIVER_ERR("notification on non-IRQ channel during bringup: %d\n", ch);
+            /* ignore other channels, because we don't want virt notifications
+               whilst bringup is occurring. */
+        }
+
+        return;
+    } else if (driver_status == DrvStatusTeardown) {
+        if (ch == device_resources.irqs[0].id) {
+            do_teardown();
+            microkit_irq_ack(ch);
+        } else {
+            /* ignore other channels */
         }
 
         return;
@@ -1269,8 +1314,8 @@ void notified(microkit_channel ch)
     } else if (ch == blk_config.virt.id) {
         handle_client(/* was_irq: */ false);
     } else if (ch == timer_config.driver_id) {
-        LOG_DRIVER_ERR("got impossible timer interrupt\n");
-        assert(!"unreachable");
+        // TODO: ifdef POLL_REQUIRED
+        handle_card_detect_irq();
     } else {
         LOG_DRIVER_ERR("notification on unknown channel: %d\n", ch);
     }
@@ -1296,6 +1341,105 @@ void init()
     /* Make sure we have DMA support. */
     assert(usdhc_regs->host_ctrl_cap & USDHC_HOST_CTRL_CAP_DMAS);
 
-    driver_status = DrvStatusBringup;
-    do_bringup();
+    /* start from the detect-changed handler, which should kick off init
+       if it's possible */
+    handle_card_detect_irq();
+}
+
+/////   Polling - as we don't have card detect interrupts (or a GPIO driver)
+#define POLL_REQUIRED  (true)
+#define POLL_FREQUENCY (1 * NS_IN_S)
+
+#if POLL_REQUIRED
+static bool card_detect_at_last_check = false;
+
+static inline bool card_detect_did_change(void)
+{
+    if (gpio_card_detected()) {
+        return !card_detect_at_last_check;
+    } else {
+        return card_detect_at_last_check;
+    }
+}
+#endif
+
+void handle_card_detect_irq()
+{
+#if POLL_REQUIRED
+    sddf_timer_set_timeout(timer_config.driver_id, POLL_FREQUENCY);
+
+    if (!card_detect_did_change()) {
+        return;
+    }
+#endif
+
+    card_detect_at_last_check = gpio_card_detected();
+    if (card_detect_at_last_check) {
+        /* don't if already bringup. however, do if we're active
+           -> we got notified of a change so might have to reinitialise */
+        if (driver_status != DrvStatusBringup) {
+            driver_status = DrvStatusBringup;
+            do_bringup();
+        }
+    } else {
+        /* don't start if we're already teardown, and don't bother if we're already down */
+        if (driver_status != DrvStatusTeardown && driver_status != DrvStatusInactive) {
+            driver_status = DrvStatusTeardown;
+            do_teardown();
+        }
+    }
+}
+
+/* The reset_driver_and_card_state() function generates a call to memset
+   but we don't have those provided as we are in -ffreestanding */
+void *memset(void *s, int c, size_t n)
+{
+    return sddf_memset(s, c, n);
+}
+
+seL4_MessageInfo_t protected(microkit_channel ch, seL4_MessageInfo_t msginfo)
+{
+    /* only the state channel should allow ppcalls. (can we enforce this?) */
+    assert(ch == blk_config.virt.id_state);
+
+    switch (microkit_msginfo_get_label(msginfo)) {
+    case SDDF_HOTPLUG_REQ_INSERT:
+        if (!gpio_card_detected()) {
+            return microkit_msginfo_new(SDDF_HOTPLUG_RESP_NO_DEV, 0);
+        }
+
+        if (driver_status == DrvStatusActive) {
+            return microkit_msginfo_new(SDDF_HOTPLUG_RESP_NOOP, 0);
+        } else if (driver_status == DrvStatusInactive) {
+
+            /* protected() invariant: do_bringup() should near-immediately
+               begin waiting for an IRQ, won't block for ages */
+            driver_status = DrvStatusBringup;
+            do_bringup();
+            return microkit_msginfo_new(SDDF_HOTPLUG_RESP_OK, 0);
+        } else if (driver_status == DrvStatusBringup) {
+            return microkit_msginfo_new(SDDF_HOTPLUG_RESP_OK, 0);
+        } else if (driver_status == DrvStatusTeardown) {
+            return microkit_msginfo_new(SDDF_HOTPLUG_RESP_INVALID_OPERATION, 0);
+        }
+
+    case SDDF_HOTPLUG_REQ_EJECT:
+        if (driver_status == DrvStatusActive) {
+            driver_status = DrvStatusTeardown;
+            do_teardown();
+            return microkit_msginfo_new(SDDF_HOTPLUG_RESP_OK, 0);
+        } else if (driver_status == DrvStatusInactive) {
+            /* already there */
+            return microkit_msginfo_new(SDDF_HOTPLUG_RESP_NOOP, 0);
+        } else if (driver_status == DrvStatusBringup) {
+            return microkit_msginfo_new(SDDF_HOTPLUG_RESP_INVALID_OPERATION, 0);
+        } else if (driver_status == DrvStatusTeardown) {
+            /* already in progress */
+            return microkit_msginfo_new(SDDF_HOTPLUG_RESP_OK, 0);
+        }
+
+    default:
+        LOG_DRIVER_ERR("Unhandled protected call message label\n");
+        return microkit_msginfo_new(SDDF_HOTPLUG_RESP_INVALID_OPERATION, 0);
+    }
 }
