@@ -8,7 +8,9 @@
 /*
     TODO
     > Atm none of the functions have any form of timeout or software error reporting - possibly should add this (similar to Linux kernel?)
-    > Don't offer any configuration options - e.g. using the mailboxes and not FIFO, etc
+    > Don't offer any configuration options atm - e.g. using the mailboxes and not FIFO, etc
+    > Make sure the regulator / transceiver is turned on or we won't be able to communicate with the bus
+
 */
 
 volatile struct control_registers *control_regs;
@@ -49,9 +51,9 @@ static void mcr_init(void) {
         - do I need to set max mailbox number here?
         - do I need to modify access (i.e. SUPV?)
         - do I need to set the ID acceptance mode? (IDAM)
-        - do I need to set abort mechanism? Linux seems to ignore AEN but I set here as per initialisation protocol
-        - do I need the local priority bit? Linux also ignores this and it just adds backwards compatibility? I set it as per protocol
      */
+
+
 
     // Note: Initial iteration only allows use of mailboxes and is fixed to normal mode
     // Enable individual Rx matching
@@ -70,39 +72,53 @@ static void mcr_init(void) {
 
 /* Specified in 11.8.4.1 - FlexCAN Initialization Sequence */
 static void ctrl_init(void) {
-    // We assume here we're not setting up CANFD so we ignore these registers for the moment
+    // Note: we assume here we're not setting up CANFD so we ignore these registers for the moment
 
-    // Disable loopback mode, listen-only mode and use only a single sample for sampling mode
+    // Disable loopback mode, listen-only mode and choose to use only a single sample for sampling mode
     control_regs->ctrl1 &= ~(CTRL1_LPB | CTRL1_LOM | CTRL1_SMP);
 
     // Reset bit timing parameters and bit rate
-    control_regs->ctrl1 &= ~(CTRL1_PRESDIV | CTRL1_RJW | CTRL1_PSEG1 | CTRL1_PSEG2 | CTRL1_PROPSEG);
+    control_regs->ctrl1 &= ~(CTRL1_PRESDIV(255UL) | CTRL1_RJW(3UL) | CTRL1_PSEG1(7UL) | CTRL1_PSEG2(7UL) | CTRL1_PROPSEG(7UL));
     
     // TODO - Currently not sure what these should be. Linux reads them from the device configuration so here we just use 
     // some dummy values for the moment -- doc here can help calculate and there also seems to be online calculators for this
     // https://community.nxp.com/pwmxy87654/attachments/pwmxy87654/mpc5xxx%40tkb/292/1/FlexCAN%20bit%20timing.pdf
     
-    // Set bit timing parameters and bit rate
-    control_regs->ctrl1 |= (CTRL1_PRESDIV | CTRL1_RJW | CTRL1_PSEG1 | CTRL1_PSEG2 | CTRL1_PROPSEG); // Note these are dummy values
+    // Set bit timing parameters and bit rate --  Note these are dummy values. Could look at flexcan_bittiming_const from flexcan_core.c
+    control_regs->ctrl1 |= (CTRL1_PRESDIV(255UL) | CTRL1_RJW(3UL) | CTRL1_PSEG1(7UL) | CTRL1_PSEG2(7UL) | CTRL1_PROPSEG(7UL));
 
-    // TODO up to 1522 from Linux kernel (The remainder of CTRL )
-
-
+    // Some extra ctrl configuration Linux does for FlexCAN
+    // Disable the timer sync feature
+    control_regs->ctrl1 &= ~CTRL1_TSYN;
+    // Disable auto busoff recovery + lowest buffer first + enable tx/rx warning/bus off interrupts 
+    control_regs->ctrl1 |= (CTRL1_BOFFREC | CTRL1_LBUF | CTRL1_TWRNMSK | CTRL1_RWRNMSK | CTRL1_BOFFMSK);
 }
 
-/*
-2. Initialize the Control 1 register (CTRL1) and optionally the CAN Bit Timing register
-(CBT). Initialize also the CAN FD CAN Bit Timing register (FDCBT).
-a. Determine the bit timing parameters: PROPSEG, PSEG1, PSEG2, and RJW.
-b. Optionally determine the bit timing parameters: EPROPSEG, EPSEG1,
-EPSEG2, and ERJW.
-c. Determine the CAN FD bit timing parameters: FPROPSEG, FPSEG1, FPSEG2,
-and FRJW.
-d. Determine the bit rate by programming the PRESDIV field and optionally the
-EPRESDIV field.
-e. Determine the CAN FD bit rate by programming the FPRESDIV field.
-f. Determine the internal arbitration mode (LBUF).
-*/
+#define CTRL2_ECRWRE    (1UL << 29) // Error correction configuration register write enable. Enables MECR to be updated 0 = disable update, 1 = enable update
+#define MECR_ECRWRDIS   (1UL << 31) // Error configuration register write disable. Disables write on this register 0 = write is enabled, 1 = write is disabled
+#define MECR_ECCDIS     (1UL << 8)  // Error correction disable. Disables memory detection and correction mechanism. 0 = enable correction, 1 = disable correction
+
+/* Specified in 11.8.2.14 -- Detection and correction of memory errors */
+static void err_disable(void) {
+    // TODO -- up to 1538 >> Err handling enabled??? Need to initialize all the ram for this?
+    // Linux initialises the ram in the call flexcan_ram_init
+
+    // I think initially we'll disable the error correction functionality and we can know this exists for later. MECR[ECCDIS] controls this.
+    // The protocol for disabling this is outlined in the above referenced section.
+    control_regs->ctrl2 |= CTRL2_ECRWRE; // Enables updating of MECR
+    error_regs->mecr &= ~MECR_ECRWRDIS; // Enables writing of MECR
+    error_regs->mecr |= MECR_ECCDIS; // Disables memory and error correction functionality
+    error_regs->mecr |= MECR_ECRWRDIS; // Disables writing to the MECR
+}
+
+static void message_buffer_init(void) {
+    /*
+        4. Initialize the message buffers.
+            a. The control and status word of all message buffers must be initialized.
+            b. If Rx FIFO was enabled, the ID filter table must be initialized.
+            c. Other entries in each message buffer should be initialized as required.
+    */
+}
 
 #define MYBIT(x, y) (x << y)
 
@@ -113,8 +129,6 @@ volatile struct clock_registers *pll1;
 volatile struct clock_registers *clock_reg_ipg_root;
 
 static void can_clocks_enable(void) {
-    // TODO - need to map the clock registers to the system file so can access them
-
     uint64_t vaddr_ccm_base = 0x2000000;
     uint64_t vaddr_can_mux = vaddr_ccm_base + 0xa200; // TODO - define for offsets
     uint64_t vaddr_ccgr53 = vaddr_ccm_base + 0x4350; // TODO - define for offsets
@@ -160,14 +174,18 @@ static void can_init(void) {
     /* Setup references to the different groups of registers */
     uint64_t vaddr = 0x1000000;
     control_regs = (volatile struct control_registers *) vaddr;
-    // error_regs = (volatile struct error_registers *) (vaddr + ERROR_REGISTER_OFFSET);
+    error_regs = (volatile struct error_registers *) (vaddr + ERROR_REGISTER_OFFSET);
     // canfd_regs = (volatile struct canfd_registers *) (vaddr + CANFD_REGISTER_OFFSET);
-    
-    /* Enable the module */
-    module_enable();
 
-    /* Soft reset */
-    soft_reset();
+    sddf_dprintf("The value in the ctrl1 register is: %u\n", control_regs->ctrl1);
+    sddf_dprintf("The value in the ctrl2 register is: %u\n", control_regs->ctrl2);
+    sddf_dprintf("The value in the error mecr register is: %u\n", error_regs->mecr);
+    
+    // /* Enable the module */
+    // module_enable();
+
+    // /* Soft reset */
+    // soft_reset();
 
     // TODO - Linux's implementation calls additional functions here
     // First it calls flexcan_ram_init here to allow write access to certain addresses - not sure if I need this
@@ -175,13 +193,21 @@ static void can_init(void) {
     // which is where the manual discusses the initialisation
 
     // /* Freeze */
-    freeze();
+    // freeze();
 
-    /* Module Configuration Register (MCR) init */
-    mcr_init();
+    // /* Module Configuration Register (MCR) init */
+    // mcr_init();
 
     /* Control1 Register (ctrl1) Init */
     ctrl_init();
+
+    /* Disable error correction */
+    // Note: We might enable this later but atm we're trying with this disabled for simplicity
+    err_disable();
+
+    sddf_dprintf("The value in the ctrl1 register after initialisation is: %u\n", control_regs->ctrl1);
+    sddf_dprintf("The value in the ctrl2 register after initialisation is: %u\n", control_regs->ctrl2);
+    sddf_dprintf("The value in the error mecr register after initialisation is: %u\n", error_regs->mecr);
 }
 
 // microkit init
@@ -190,13 +216,8 @@ void init (void) {
 
     // Linux does the following before starting the initialisation process for flexcan
     // flexcan_transceiver_enable -- power regulator enable?
-    // clocks enabled
-    // • 0xA40 ~ 0xA7F: PGC for NOC mix
-    // • 0xC00 ~ 0xC3F: PGC for MLMIX
 
-
-
-    can_clocks_enable();
+    // can_clocks_enable();
 
     can_init();
 
