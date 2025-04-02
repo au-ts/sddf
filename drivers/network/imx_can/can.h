@@ -20,31 +20,31 @@
 */
 
 /* FlexCAN Module Configuration Register (MCR) - 11.8.5.2.2 */
-#define MCR_MDIS            (1UL << 31)     /* Module Disable -- Controls whether FlexCAN is enabled or not - 0b = Enable, 1b = Disable */
-#define MCR_FRZ             (1UL << 30)     /* Freeze Enable -- Specifies behaviour when MCR[HALT] is enabled - 0b = Won't enter freeze, 1b = Will enter freeze*/
-#define MCR_RFEN            (1UL << 29)     /* Rx FIFO Enable -- Specifies whether Rx FIFO is enabled or not - 0b = Disabled, 1b = Enabled */
-#define MCR_HALT            (1UL << 28)     /* Halt FlexCAN -- Assertion puts FlexCAN into Freeze Mode - 0b = No freeze request, 1b = Freeze request */
-#define MCR_NOTRDY          (1UL << 27)     /* FlexCAN Not Ready -- (Read-only) Indicates whether in operation mode or not. 0b = Normal, 1b = Not-operational */
-#define MCR_WAKMSK          (1UL << 26)     /* Wake Up Interrupt Mask -- Enables wake up interrupt generation - 0b = Disabled, 1b = Enabled */
-#define MCR_SOFTRST         (1UL << 25)     /* Soft Reset -- On assertion resets internal state machines/registers - 0b = No request, 1b = Reset request */
-#define MCR_FRZACK          (1UL << 24)     /* Freeze Mode Acknowledge -- (Read-only) Indicates if in freeze mode - 0b = Not in freeze, 1b = In freeze */
-#define MCR_SUPV            (1UL << 23)     /* Supervisor Mode -- Configures FlexCAN to be in supervisor or user mode. ob = User mode, 1b = Supervisor mode */
-#define MCR_SLFWAK          (1UL << 22)     /* Self Wake Up -- Enable self wake up when in low power mode - 0b = Disabled, 1b = Enabled */
-#define MCR_WRNEN           (1UL << 21)     /* Warning Interrupt Enable -- Enables generation of errors in status register - 0b - Disabled, 1b = Enabled */
-#define MCR_LPMACK          (1UL << 20)     /* Low-Power Mode Acknowledge -- (Read-only) Indicates FlexCAN is in low-power mode - 0b = Not in mode, 1b = in mode */
-#define MCR_WAKSRC          (1UL << 19)     /* Wake Up Source -- Whether low-pass filter applied to Rx - 0b = unfiltered, 1b = filtered */
-#define MCR_DOZE            (1UL << 18)     /* Doze Mode Enable -- Determines whether can go low-power when Doze requested - 0b = Disabled, 1b = Enabled */
-#define MCR_SRXDIS          (1UL << 17)     /* Self Reception Disable -- Whether FlexCAN receive frames transmitted by itself - 0b = Enabled, 1b = Disabled */
-#define MCR_IRMQ            (1UL << 16)     /* Individual Rx Masking and Queue Enable -- Determines matching scheme for Rx - 0b = Disabled, 1b = Enabled */
-#define MCR_DMA             (1UL << 15)     /* DMA - Enable -- Controls whether DMA is enabled or not for Rx FIFO - 0b = Disabled, 1b = Enabled */
-#define MCR_RESERVED0       (1UL << 14)     /* Reserved */
-#define MCR_LPRIOEN         (1UL << 13)     /* Local Priority Enable -- Local priority control for backward compatibility - 0b = Disabled, 1b = Enabled */
-#define MCR_AEN             (1UL << 12)     /* Abort Enable -- Enables Tx abort mechanism - 0b = Disabled, 1b = Enabled */
-#define MCR_FDEN            (1UL << 11)     /* CAN FD Operation Enable -- Enables CANFD operation - 0b = Disabled, 1b = Enabled */
-#define MCR_RESERVED1       (1UL << 10)     /* Reserved */
-#define MCR_IDAM            (3UL << 8)      /* ID Acceptance Mode - 2-bit field identifies format of Rx FIFO ID filter table elements - See docs for details*/
-#define MCR_RESERVED2       (1UL << 7)      /* Reserved */
-#define MCR_MAXMB           (127UL << 0)    /* Number Of The Last Message Buffer - 7-bit field defines number of last message buffers - See docs for details */
+#define MCR_MDIS                (1UL << 31)             /* Module Disable -- Controls whether FlexCAN is enabled or not - 0b = Enable, 1b = Disable */
+#define MCR_FRZ                 (1UL << 30)             /* Freeze Enable -- Specifies behaviour when MCR[HALT] is enabled - 0b = Won't enter freeze, 1b = Will enter freeze*/
+#define MCR_RFEN                (1UL << 29)             /* Rx FIFO Enable -- Specifies whether Rx FIFO is enabled or not - 0b = Disabled, 1b = Enabled */
+#define MCR_HALT                (1UL << 28)             /* Halt FlexCAN -- Assertion puts FlexCAN into Freeze Mode - 0b = No freeze request, 1b = Freeze request */
+#define MCR_NOTRDY              (1UL << 27)             /* FlexCAN Not Ready -- (Read-only) Indicates whether in operation mode or not. 0b = Normal, 1b = Not-operational */
+#define MCR_WAKMSK              (1UL << 26)             /* Wake Up Interrupt Mask -- Enables wake up interrupt generation - 0b = Disabled, 1b = Enabled */
+#define MCR_SOFTRST             (1UL << 25)             /* Soft Reset -- On assertion resets internal state machines/registers - 0b = No request, 1b = Reset request */
+#define MCR_FRZACK              (1UL << 24)             /* Freeze Mode Acknowledge -- (Read-only) Indicates if in freeze mode - 0b = Not in freeze, 1b = In freeze */
+#define MCR_SUPV                (1UL << 23)             /* Supervisor Mode -- Configures FlexCAN to be in supervisor or user mode. ob = User mode, 1b = Supervisor mode */
+#define MCR_SLFWAK              (1UL << 22)             /* Self Wake Up -- Enable self wake up when in low power mode - 0b = Disabled, 1b = Enabled */
+#define MCR_WRNEN               (1UL << 21)             /* Warning Interrupt Enable -- Enables generation of errors in status register - 0b - Disabled, 1b = Enabled */
+#define MCR_LPMACK              (1UL << 20)             /* Low-Power Mode Acknowledge -- (Read-only) Indicates FlexCAN is in low-power mode - 0b = Not in mode, 1b = in mode */
+#define MCR_WAKSRC              (1UL << 19)             /* Wake Up Source -- Whether low-pass filter applied to Rx - 0b = unfiltered, 1b = filtered */
+#define MCR_DOZE                (1UL << 18)             /* Doze Mode Enable -- Determines whether can go low-power when Doze requested - 0b = Disabled, 1b = Enabled */
+#define MCR_SRXDIS              (1UL << 17)             /* Self Reception Disable -- Whether FlexCAN receive frames transmitted by itself - 0b = Enabled, 1b = Disabled */
+#define MCR_IRMQ                (1UL << 16)             /* Individual Rx Masking and Queue Enable -- Determines matching scheme for Rx - 0b = Disabled, 1b = Enabled */
+#define MCR_DMA                 (1UL << 15)             /* DMA - Enable -- Controls whether DMA is enabled or not for Rx FIFO - 0b = Disabled, 1b = Enabled */
+#define MCR_RESERVED0           (1UL << 14)             /* Reserved */
+#define MCR_LPRIOEN             (1UL << 13)             /* Local Priority Enable -- Local priority control for backward compatibility - 0b = Disabled, 1b = Enabled */
+#define MCR_AEN                 (1UL << 12)             /* Abort Enable -- Enables Tx abort mechanism - 0b = Disabled, 1b = Enabled */
+#define MCR_FDEN                (1UL << 11)             /* CAN FD Operation Enable -- Enables CANFD operation - 0b = Disabled, 1b = Enabled */
+#define MCR_RESERVED1           (1UL << 10)             /* Reserved */
+#define MCR_IDAM(x)             (((x) & 3UL) << 8)              /* ID Acceptance Mode - 2-bit field identifies format of Rx FIFO ID filter table elements - See docs for details*/
+#define MCR_RESERVED2           (1UL << 7)              /* Reserved */
+#define MCR_MAXMB(x)            (((x) & 127UL) << 0)    /* Number Of The Last Message Buffer - 7-bit field defines number of last message buffers - See docs for details */
 
 /* FlexCAN Control 1 Register (CTRL1) - 11.8.5.2.3 */
 #define CTRL1_PRESDIV(x)        (((x) & 255UL) << 24)   /* Prescaler Division Factor */ 

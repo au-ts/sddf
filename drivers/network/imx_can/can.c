@@ -47,32 +47,32 @@ static void unfreeze(void) {
 
 /* Specified in 11.8.4.1 - FlexCAN Initialization Sequence */
 static void mcr_init(void) {
-    /* TODO -- stuff the Linux kernel sets (or doesnt)
-        - do I need to set max mailbox number here?
-        - do I need to modify access (i.e. SUPV?)
-        - do I need to set the ID acceptance mode? (IDAM)
-     */
-
-
-
-    // Note: Initial iteration only allows use of mailboxes and is fixed to normal mode
-    // Enable individual Rx matching
-    control_regs->mcr |= MCR_IRMQ;
-    // Enable warning interrupts
+    // Set to value of last message buffer to be used in filter and arbitration process
+    control_regs->mcr &= ~MCR_MAXMB(0x7f); // First we clear it
+    control_regs->mcr |= MCR_MAXMB(0x7f); // Then we set it TODO: what should this value be if we want to use the FIFO? It says we need to consider that when setting this.
+    // Allow supervisor access so we can access the other registers when not in supervisor mode (i.e. userspace)
+    control_regs->mcr &= ~MCR_SUPV;
+    // Enables TWRNINT and RWRNINT flags in ESR1 to be raised. Else they're always 0.
     control_regs->mcr |= MCR_WRNEN;
+    // Enables individual Rx masking and queue features 
+    control_regs->mcr |= MCR_IRMQ; // TODO: Not certain whether I want this on or not for FIFO just yet. Look into it further.
     // Disable self-reception of frames (this needs to be enabled for loopback mode to work)
     control_regs->mcr |= MCR_SRXDIS;
-    // Disable Rx FIFO (as we're using mailboxes)
-    control_regs->mcr &= ~MCR_RFEN;
+    // Enable Rx FIFO
+    control_regs->mcr |= MCR_RFEN;
+    // Set the Rx FIFO filter table format
+    control_regs->mcr |= MCR_IDAM(0x2); // TODO: ATM just set this to format C but need to understand what the correct option is here 
     // Enable the abort mechanism for Tx MBs 
-    control_regs->mcr |= MCR_AEN;
+    control_regs->mcr |= MCR_AEN; // TODO: not sure why but linux doesn't enable this. Might be default enabled?
     // Enable the local priority bit for backwards compatibility
-    control_regs->mcr |= MCR_LPRIOEN; 
+    control_regs->mcr |= MCR_LPRIOEN; // TODO: not sure this should be enabled - try disabling if run into issues.
+    // Disable CANFD
+    control_regs->mcr &= ~MCR_FDEN;
 }
 
 /* Specified in 11.8.4.1 - FlexCAN Initialization Sequence */
 static void ctrl_init(void) {
-    // Note: we assume here we're not setting up CANFD so we ignore these registers for the moment
+    // Note: we assume here we're not setting up CANFD so we ignore any config for it atm
 
     // Disable loopback mode, listen-only mode and choose to use only a single sample for sampling mode
     control_regs->ctrl1 &= ~(CTRL1_LPB | CTRL1_LOM | CTRL1_SMP);
@@ -90,8 +90,15 @@ static void ctrl_init(void) {
     // Some extra ctrl configuration Linux does for FlexCAN
     // Disable the timer sync feature
     control_regs->ctrl1 &= ~CTRL1_TSYN;
-    // Disable auto busoff recovery + lowest buffer first + enable tx/rx warning/bus off interrupts 
-    control_regs->ctrl1 |= (CTRL1_BOFFREC | CTRL1_LBUF | CTRL1_TWRNMSK | CTRL1_RWRNMSK | CTRL1_BOFFMSK);
+    // Disable auto busoff recovery and choose the lowest buffer first in Tx
+    control_regs->ctrl1 |= (CTRL1_BOFFREC | CTRL1_LBUF);
+    // Enable error masks for TWRNINT, RWRNINT and BOFFINT in ESR1
+    control_regs->ctrl1 |= (CTRL1_TWRNMSK | CTRL1_RWRNMSK | CTRL1_BOFFMSK);
+    // Enable error mask for ERRINT in ESR1 as well (this seems to be depend on the flexcan core but we assume for the moment we'll need it)
+    control_regs->ctrl1 |= CTRL1_ERRMSK;
+
+    // After this linux saves the state in the control register, then disables all those error masks we just enabled
+    // I think I can then jump to line 1595 where we clear and invalidate unused mailboxes. The initialisation guide could be hten step 3 or 4. STOPPED HERE
 }
 
 #define CTRL2_ECRWRE    (1UL << 29) // Error correction configuration register write enable. Enables MECR to be updated 0 = disable update, 1 = enable update
