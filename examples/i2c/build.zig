@@ -4,6 +4,7 @@
 //
 const std = @import("std");
 const Step = std.Build.Step;
+const LazyPath = std.Build.LazyPath;
 
 const MicrokitBoard = enum { odroidc4 };
 
@@ -60,45 +61,40 @@ pub fn build(b: *std.Build) void {
     const python = b.option([]const u8, "python", "Path to Python to use") orelse default_python;
 
     // Getting the path to the Microkit SDK before doing anything else
-    const microkit_sdk_arg = b.option([]const u8, "sdk", "Path to Microkit SDK");
-    if (microkit_sdk_arg == null) {
+    const microkit_sdk = b.option(LazyPath, "sdk", "Path to Microkit SDK") orelse {
         std.log.err("Missing -Dsdk=/path/to/sdk argument being passed\n", .{});
         std.posix.exit(1);
-    }
-    const microkit_sdk = microkit_sdk_arg.?;
+    };
 
-    const microkit_config_option = b.option(ConfigOptions, "config", "Microkit config to build for") orelse ConfigOptions.debug;
-    const microkit_config = @tagName(microkit_config_option);
+    const microkit_config = b.option(ConfigOptions, "config", "Microkit config to build for") orelse ConfigOptions.debug;
 
     // Get the Microkit SDK board we want to target
-    const microkit_board_option = b.option(MicrokitBoard, "board", "Microkit board to target");
-
-    if (microkit_board_option == null) {
+    const microkit_board = b.option(MicrokitBoard, "board", "Microkit board to target") orelse {
         std.log.err("Missing -Dboard=<BOARD> argument being passed\n", .{});
         std.posix.exit(1);
-    }
-    const target = b.resolveTargetQuery(findTarget(microkit_board_option.?));
-    const microkit_board = @tagName(microkit_board_option.?);
+    };
 
-    const microkit_board_dir = b.fmt("{s}/board/{s}/{s}", .{ microkit_sdk, microkit_board, microkit_config });
-    const microkit_tool = b.fmt("{s}/bin/microkit", .{microkit_sdk});
-    const libmicrokit = b.fmt("{s}/lib/libmicrokit.a", .{microkit_board_dir});
-    const libmicrokit_include = b.fmt("{s}/include", .{microkit_board_dir});
-    const libmicrokit_linker_script = b.fmt("{s}/lib/microkit.ld", .{microkit_board_dir});
+    const target = b.resolveTargetQuery(findTarget(microkit_board));
+
+    const microkit_board_dir = microkit_sdk.path(b, b.fmt("board/{s}/{s}", .{ @tagName(microkit_board), @tagName(microkit_config) }));
+    const microkit_tool = microkit_sdk.path(b, "bin/microkit");
+    const libmicrokit = microkit_board_dir.path(b, "lib/libmicrokit.a");
+    const libmicrokit_include = microkit_board_dir.path(b, "include");
+    const libmicrokit_linker_script = microkit_board_dir.path(b, "lib/microkit.ld");
 
     const sddf_dep = b.dependency("sddf", .{
         .target = target,
         .optimize = optimize,
-        .libmicrokit = @as([]const u8, libmicrokit),
-        .libmicrokit_include = @as([]const u8, libmicrokit_include),
-        .libmicrokit_linker_script = @as([]const u8, libmicrokit_linker_script),
+        .libmicrokit = libmicrokit,
+        .libmicrokit_include = libmicrokit_include,
+        .libmicrokit_linker_script = libmicrokit_linker_script,
     });
 
-    const i2c_driver_class = switch (microkit_board_option.?) {
+    const i2c_driver_class = switch (microkit_board) {
         .odroidc4 => "meson",
     };
 
-    const timer_driver_class = switch (microkit_board_option.?) {
+    const timer_driver_class = switch (microkit_board) {
         .odroidc4 => "meson",
     };
 
@@ -152,26 +148,24 @@ pub fn build(b: *std.Build) void {
     client_pn532.addIncludePath(sddf_dep.path("libco"));
     client_pn532.addCSourceFile(.{ .file = sddf_dep.path("libco/libco.c") });
 
-    client_pn532.addIncludePath(.{ .cwd_relative = libmicrokit_include });
-    client_pn532.addObjectFile(.{ .cwd_relative = libmicrokit });
-    client_pn532.setLinkerScript(.{ .cwd_relative = libmicrokit_linker_script });
+    client_pn532.addIncludePath(libmicrokit_include);
+    client_pn532.addObjectFile(libmicrokit);
+    client_pn532.setLinkerScript(libmicrokit_linker_script);
 
     client_ds3231.addIncludePath(sddf_dep.path("libco"));
     client_ds3231.addCSourceFile(.{ .file = sddf_dep.path("libco/libco.c") });
 
-    client_ds3231.addIncludePath(.{ .cwd_relative = libmicrokit_include });
-    client_ds3231.addObjectFile(.{ .cwd_relative = libmicrokit });
-    client_ds3231.setLinkerScript(.{ .cwd_relative = libmicrokit_linker_script });
+    client_ds3231.addIncludePath(libmicrokit_include);
+    client_ds3231.addObjectFile(libmicrokit);
+    client_ds3231.setLinkerScript(libmicrokit_linker_script);
 
     b.installArtifact(client_pn532);
     b.installArtifact(client_ds3231);
     b.installArtifact(sddf_dep.artifact("i2c_virt.elf"));
 
     // For compiling the DTS into a DTB
-    const dts = sddf_dep.path(b.fmt("dts/{s}.dts", .{ microkit_board }));
-    const dtc_cmd = b.addSystemCommand(&[_][]const u8{
-        "dtc", "-q", "-I", "dts", "-O", "dtb"
-    });
+    const dts = sddf_dep.path(b.fmt("dts/{s}.dts", .{@tagName(microkit_board)}));
+    const dtc_cmd = b.addSystemCommand(&[_][]const u8{ "dtc", "-q", "-I", "dts", "-O", "dtb" });
     dtc_cmd.addFileInput(dts);
     dtc_cmd.addFileArg(dts);
     const dtb = dtc_cmd.captureStdOut();
@@ -187,7 +181,7 @@ pub fn build(b: *std.Build) void {
     run_metaprogram.addPrefixedDirectoryArg("--dtb=", dtb);
     const meta_output = run_metaprogram.addPrefixedOutputDirectoryArg("--output=", "meta_output");
     run_metaprogram.addArg("--board");
-    run_metaprogram.addArg(microkit_board);
+    run_metaprogram.addArg(@tagName(microkit_board));
     run_metaprogram.addArg("--sdf");
     run_metaprogram.addArg("i2c.system");
 
@@ -220,21 +214,23 @@ pub fn build(b: *std.Build) void {
     };
 
     const final_image_dest = b.getInstallPath(.bin, "./loader.img");
-    const microkit_tool_cmd = b.addSystemCommand(&[_][]const u8{
-        microkit_tool,
+
+    const microkit_tool_cmd = Step.Run.create(b, "run microkit tool");
+    microkit_tool_cmd.addFileArg(microkit_tool);
+    microkit_tool_cmd.addArgs(&[_][]const u8{
         b.getInstallPath(.{ .custom = "meta_output" }, "i2c.system"),
         "--search-path", b.getInstallPath(.bin, ""),
-        "--board", microkit_board,
-        "--config", microkit_config,
+        "--board", @tagName(microkit_board),
+        "--config", @tagName(microkit_config),
         "-o", final_image_dest,
-        "-r", b.getInstallPath(.prefix, "./report.txt")
+        "-r", b.getInstallPath(.prefix, "./report.txt"),
     });
     inline for (objcopys) |objcopy| {
         microkit_tool_cmd.step.dependOn(&objcopy.step);
     }
     microkit_tool_cmd.step.dependOn(&meta_output_install.step);
     microkit_tool_cmd.step.dependOn(b.getInstallStep());
-    microkit_tool_cmd.setEnvironmentVariable("MICROKIT_SDK", microkit_sdk);
+    microkit_tool_cmd.setEnvironmentVariable("MICROKIT_SDK", microkit_sdk.getPath3(b, null).toString(b.allocator) catch @panic("OOM"));
     const microkit_step = b.step("microkit", "Compile and build the final bootable image");
     microkit_step.dependOn(&microkit_tool_cmd.step);
     b.default_step = microkit_step;
