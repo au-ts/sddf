@@ -295,26 +295,20 @@ fn addPd(b: *std.Build, options: std.Build.ExecutableOptions) *std.Build.Step.Co
     return pd;
 }
 
-pub fn build(b: *std.Build) void {
+pub fn build(b: *std.Build) !void {
     const optimize = b.standardOptimizeOption(.{});
     const target = b.standardTargetOptions(.{});
 
-    const libmicrokit_opt = b.option([]const u8, "libmicrokit", "Path to libmicrokit.a") orelse null;
-    const libmicrokit_include_opt = b.option([]const u8, "libmicrokit_include", "Path to the libmicrokit include directory") orelse null;
-    const libmicrokit_linker_script_opt = b.option([]const u8, "libmicrokit_linker_script", "Path to the libmicrokit linker script") orelse null;
-    const gpu_config_include_option = b.option([]const u8, "gpu_config_include", "Include path to gpu config header") orelse "";
+    libmicrokit = b.option(LazyPath, "libmicrokit", "Path to libmicrokit.a") orelse return error.PathToLibmicrokitNotSpecified;
+    libmicrokit_include = b.option(LazyPath, "libmicrokit_include", "Path to the libmicrokit include directory") orelse return error.PathToLibmicrokitIncludeDirectoryNotSpecified;
+    libmicrokit_linker_script = b.option(LazyPath, "libmicrokit_linker_script", "Path to the libmicrokit linker script") orelse return error.PathToLibmicrokitLinkerScriptNotSpecified;
 
     // TODO: Right now this is not super ideal. What's happening is that we do not
     // always need a serial config include, but we must always specify it
     // as a build option. What we do instead is just make the include path an
     // empty string if it has not been provided, which could be an annoying to
     // debug error if you do need a serial config but forgot to pass one in.
-    const gpu_config_include = LazyPath{ .cwd_relative = gpu_config_include_option };
-    // libmicrokit
-    // We're declaring explicitly here instead of with anonymous structs due to a bug. See https://github.com/ziglang/zig/issues/19832
-    libmicrokit = LazyPath{ .cwd_relative = libmicrokit_opt.? };
-    libmicrokit_include = LazyPath{ .cwd_relative = libmicrokit_include_opt.? };
-    libmicrokit_linker_script = LazyPath{ .cwd_relative = libmicrokit_linker_script_opt.? };
+    const gpu_config_include = b.option(LazyPath, "gpu_config_include", "Include path to gpu config header") orelse LazyPath{ .cwd_relative = "" };
 
     // Util libraries
     const util = b.addStaticLibrary(.{
