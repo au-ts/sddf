@@ -42,7 +42,7 @@
 #define MCR_AEN                 (1UL << 12)             /* Abort Enable -- Enables Tx abort mechanism - 0b = Disabled, 1b = Enabled */
 #define MCR_FDEN                (1UL << 11)             /* CAN FD Operation Enable -- Enables CANFD operation - 0b = Disabled, 1b = Enabled */
 #define MCR_RESERVED1           (1UL << 10)             /* Reserved */
-#define MCR_IDAM(x)             (((x) & 3UL) << 8)              /* ID Acceptance Mode - 2-bit field identifies format of Rx FIFO ID filter table elements - See docs for details*/
+#define MCR_IDAM(x)             (((x) & 3UL) << 8)      /* ID Acceptance Mode - 2-bit field identifies format of Rx FIFO ID filter table elements - See docs for details*/
 #define MCR_RESERVED2           (1UL << 7)              /* Reserved */
 #define MCR_MAXMB(x)            (((x) & 127UL) << 0)    /* Number Of The Last Message Buffer - 7-bit field defines number of last message buffers - See docs for details */
 
@@ -65,6 +65,47 @@
 #define CTRL1_LBUF              (1UL << 4)              /* Lowest Buffer Transmitted First */
 #define CTRL1_LOM               (1UL << 3)              /* Listen-Only Mode */
 #define CTRL1_PROPSEG(x)        (((x) & 7UL) << 0)      /* Propagation Segment */
+
+/* Additional Initialisation Registers -- these are only used to disable error correction at the moment */
+#define CTRL2_ECRWRE    (1UL << 29) // Error correction configuration register write enable. Enables MECR to be updated 0 = disable update, 1 = enable update
+#define MECR_ECRWRDIS   (1UL << 31) // Error configuration register write disable. Disables write on this register 0 = write is enabled, 1 = write is disabled
+#define MECR_ECCDIS     (1UL << 8)  // Error correction disable. Disables memory detection and correction mechanism. 0 = enable correction, 1 = disable correction
+
+/* Message Buffer Structure - 11.8.5.3  */
+// Control bits
+#define MB_CTRL_EDL             (1UL << 31)             /* Extended Data Length -- Distinguishes between CAN and CANFD frames */
+#define MB_CTRL_BRS             (1UL << 30)             /* Bit Rate Switch -- Defines whether bit rate switch is in CANFD frame */
+#define MB_CTRL_ESI             (1UL << 29)             /* Error State Indicator -- Indicates if transmitting node is error active or error passive */
+#define MB_CTRL_RESERVED0       (1UL << 28)             /* Reserved */
+#define MB_CTRL_CODE(x)         (((x) & 15UL) << 24)    /* Message Buffer Code -- See below for details*/
+#define MB_CTRL_RESERVED1       (1UL << 23)             /* Reserved */
+#define MB_CTRL_SRR             (1UL << 22)             /* Substitute Remote Request -- Used only in extended format*/
+#define MB_CTRL_IDE             (1UL << 21)             /* ID Extended Bit -- Identifies whether frame is standard or extended */
+#define MB_CTRL_RTR             (1UL << 20)             /* Remote Transmission Request -- Used for arbitration (see Table 11-186 for details)*/
+#define MB_CTRL_DLC             (15UL << 16)            /* Length of Data Bytes -- Contains the length in bytes of the Rx or Tx data */
+#define MB_CTRL_TIMESTAMP       (65535UL << 0)          /* Free-Running Counter Time Stamp -- Copy of the free-running timer value at Rx or Tx time */
+// Id bits      
+#define MB_ID_PRIO              (7UL << 29)             /* Local Priority -- Only used for Tx */
+#define MB_ID_STD               (2047UL << 18)          /* Frame Identifier -- In standard only the 11 most significant bits are used */
+#define MB_ID_EXT               (262143UL << 0)         /* Extended Identifier -- If extended is used both the 11 top and 18 bottom bits used for identifier */
+
+/*
+    Message Buffer Codes (Rx) -- See Table 11-186 for further details
+    > 0000b: MB is inactive
+    > 0100b: MB is active and empty
+    > 0010b: MB is full
+    > 0110b: MB is full and contains an overrun (written over a previous buffer)
+    > 1010b: A frame configured to recognize remote request frame
+    > If Code[0] == 1, FlexCAN is updating the contents of the MB and the CPU must not access it
+*/
+
+/* Message Buffer Setup */
+#define FIFO_OUTPUT_BUFFER_OFFSET 0x80 // We read from message buffer 0 only for the FIFO 
+struct message_buffer {
+    uint32_t can_ctrl;
+    uint32_t can_id;
+    uint8_t data; // Note: this is fixed at 8 bytes as we're currently using standard CAN and not CANFD
+};
 
 /* IMX8 Clock Registers */
 struct clock_registers {
@@ -99,8 +140,10 @@ struct control_registers {
     uint32_t cbt;           /* 50h  CAN Bit Timing Register */
 };
 
-/* FlexCAN Receive Mask Registers - these are used to specify IDs to filter for when receiving CAN messages */
-// TODO - atm these are just left out but from 880-97C are 64, 32-bit Rx Individual Mask Registers
+#define ACCEPTANCE_FILTER_REGISTER_OFFSET 0x880
+struct acceptance_filter_registers {
+    uint32_t rxmir[64];     /* 880h - 97Ch  FlexCAN Receive Mask Registers - these are used to specify IDs to filter for when receiving CAN messages */
+};
 
 /* FlexCAN Error Registers - these are for reading error occurrences */
 #define ERROR_REGISTER_OFFSET 0xAE0

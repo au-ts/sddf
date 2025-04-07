@@ -16,6 +16,55 @@
 volatile struct control_registers *control_regs;
 volatile struct error_registers *error_regs;
 volatile struct canfd_registers *canfd_regs;
+volatile struct acceptance_filter_registers *filter_regs;
+volatile struct message_buffer *message_buffer;
+
+// TODO - look into reading from mailbox via FlexCAN mailbox read - flexcan_mailbox_read -- STOPPED ON IMPLEMENTING THE BELOW
+
+static void read_fifo(void) {
+    // read the FIFO output
+
+    // iflag1 contains the information about hte status of the FIFO buffers.
+    // buf5I indicates whethere there is something in the FIFO to be read or not
+    // buf6I indicates whether the FIFO is almost full
+    // buf7I indicates a FIFO overflow has occurred
+
+    /*
+        -- TODO - look at flexcan memory buffer memory map pg5104 to determine where the buffers are -- the following section RX FIFO Structure is also
+        worth looking at to understand this
+        -- TODO - how do I determine the difference between a tx and rx buffer??? can any buffer be either???
+        -- TODO - what is the expected size of the message buffer data region here??? We're not using canFD so it's presumably fixed to some size
+        -- Assume atm the data segment is a fixed size of 8 bytes??? Does that mean the next MB is immediately afterwards or do we leave a large gap??
+        in between????
+        -- Looks like can_ctrl consists of 32 bits of data related to the buffer
+        -- can_id is the identifier of the received message???
+        Linux structure of the message buffer 
+        // Structure of the message buffer
+        struct flexcan_mb {
+            u32 can_ctrl;
+            u32 can_id;
+            u32 data[];
+        };
+    */
+
+   // Linux references to the message buffer area! If I can even read this that would be a start
+   /*
+    	struct_group(init,
+		u8 mb[2][512];		// 0x80 - Not affected by Soft Reset
+		// FIFO-mode:
+		//  *			MB
+		//  * 0x080...0x08f	0	RX message buffer
+		//  * 0x090...0x0df	1-5	reserved
+		//  * 0x0e0...0x0ff	6-7	8 entry ID table
+		//  *				(mx25, mx28, mx35, mx53)
+		//  * 0x0e0...0x2df	6-7..37	8..128 entry ID table
+		//  *				size conf'ed via ctrl2::RFFN
+		//  *				(mx6, vf610)
+		 
+   
+   
+   */
+}
 
 /* Copied from flexcan-core.c in Linux kernel */
 static void module_enable(void) {
@@ -73,7 +122,6 @@ static void mcr_init(void) {
 /* Specified in 11.8.4.1 - FlexCAN Initialization Sequence */
 static void ctrl_init(void) {
     // Note: we assume here we're not setting up CANFD so we ignore any config for it atm
-
     // Disable loopback mode, listen-only mode and choose to use only a single sample for sampling mode
     control_regs->ctrl1 &= ~(CTRL1_LPB | CTRL1_LOM | CTRL1_SMP);
 
@@ -97,28 +145,40 @@ static void ctrl_init(void) {
     // Enable error mask for ERRINT in ESR1 as well (this seems to be depend on the flexcan core but we assume for the moment we'll need it)
     control_regs->ctrl1 |= CTRL1_ERRMSK;
 
-    // After this linux saves the state in the control register, then disables all those error masks we just enabled
-    // I think I can then jump to line 1595 where we clear and invalidate unused mailboxes. The initialisation guide could be hten step 3 or 4. STOPPED HERE
+    // After this linux saves the state in the control register, then disables all those error masks we just enabled. We're ignoring this for the moment.
 }
 
-#define CTRL2_ECRWRE    (1UL << 29) // Error correction configuration register write enable. Enables MECR to be updated 0 = disable update, 1 = enable update
-#define MECR_ECRWRDIS   (1UL << 31) // Error configuration register write disable. Disables write on this register 0 = write is enabled, 1 = write is disabled
-#define MECR_ECCDIS     (1UL << 8)  // Error correction disable. Disables memory detection and correction mechanism. 0 = enable correction, 1 = disable correction
 
 /* Specified in 11.8.2.14 -- Detection and correction of memory errors */
 static void err_disable(void) {
-    // TODO -- up to 1538 >> Err handling enabled??? Need to initialize all the ram for this?
-    // Linux initialises the ram in the call flexcan_ram_init
+    // Note: if we wanted to enable this we need to initialise the RAM. Linux initialises the ram in the call flexcan_ram_init
 
     // I think initially we'll disable the error correction functionality and we can know this exists for later. MECR[ECCDIS] controls this.
     // The protocol for disabling this is outlined in the above referenced section.
+    // Note: if this doesn't seem to work Linux does one extra step for disabling some extra registers which might be necessary?
     control_regs->ctrl2 |= CTRL2_ECRWRE; // Enables updating of MECR
     error_regs->mecr &= ~MECR_ECRWRDIS; // Enables writing of MECR
     error_regs->mecr |= MECR_ECCDIS; // Disables memory and error correction functionality
     error_regs->mecr |= MECR_ECRWRDIS; // Disables writing to the MECR
+    control_regs->ctrl2 &= ~CTRL2_ECRWRE; // Disable updating of MECR
 }
 
 static void message_buffer_init(void) {
+    // Linux first clears and invalidates all the message buffers that aren't used -- This is on line 1595-1599. It leaves the initial 8 alone as I assume
+    // these are used by the FIFO and then clears and invalidates the rest up to the maximum mailbox count.
+    // TODO - Do I need to invalidat all the unused mailboxes?
+    // TODO - Do I need to do any preparation for the mailboxes that are going to be used for RX FIFO?
+
+    // Set all the masks to 'I don't care' so we accept everything
+    control_regs->rxmgmask = 0x0;
+    control_regs->rx14mask = 0x0;
+    control_regs->rx15mask = 0x0;
+
+    // Set all the Rx filters to 'I don't care' so we accept everything
+    for (int i = 0; i < 16; i++ ) { // ATM We just fix this at 16 since we're using FIFO presumably we only use the lower 8 mailboxes so this shouldn't matter
+        filter_regs->rxmir[i] = 0x0;
+    }
+
     /*
         4. Initialize the message buffers.
             a. The control and status word of all message buffers must be initialized.
@@ -134,11 +194,13 @@ volatile struct clock_registers *clock_reg_can_mux;
 volatile struct clock_registers *clock_reg_ccgr53;
 volatile struct clock_registers *pll1;
 volatile struct clock_registers *clock_reg_ipg_root;
+#define CAN_CLOCK_MUX_REGISTER_OFFSET 0xa200
+#define CAN_CLOCK_CCGR53_REGISTER_OFFSET 0x4350
 
 static void can_clocks_enable(void) {
-    uint64_t vaddr_ccm_base = 0x2000000;
-    uint64_t vaddr_can_mux = vaddr_ccm_base + 0xa200; // TODO - define for offsets
-    uint64_t vaddr_ccgr53 = vaddr_ccm_base + 0x4350; // TODO - define for offsets
+    uint64_t vaddr_ccm_base = 0x2000000; // TODO - #define this
+    uint64_t vaddr_can_mux = vaddr_ccm_base + CAN_CLOCK_MUX_REGISTER_OFFSET;
+    uint64_t vaddr_ccgr53 = vaddr_ccm_base + CAN_CLOCK_CCGR53_REGISTER_OFFSET;
 
     // FlexCAN requires pll1 -- seems like from clock dump that it's available
     // disable flexcan clock root
@@ -179,9 +241,12 @@ static void can_clocks_enable(void) {
 /* Specified in 11.8.4.1 - FlexCAN Initialization Sequence */
 static void can_init(void) {
     /* Setup references to the different groups of registers */
-    uint64_t vaddr = 0x1000000;
+    uint64_t vaddr = 0x1000000; // TODO - #define this
     control_regs = (volatile struct control_registers *) vaddr;
+    filter_regs = (volatile struct acceptance_filter_registers *) (vaddr + ACCEPTANCE_FILTER_REGISTER_OFFSET);
     error_regs = (volatile struct error_registers *) (vaddr + ERROR_REGISTER_OFFSET);
+    message_buffer = (volatile struct message_buffer *) (vaddr + FIFO_OUTPUT_BUFFER_OFFSET);
+
     // canfd_regs = (volatile struct canfd_registers *) (vaddr + CANFD_REGISTER_OFFSET);
 
     sddf_dprintf("The value in the ctrl1 register is: %u\n", control_regs->ctrl1);
@@ -212,14 +277,20 @@ static void can_init(void) {
     // Note: We might enable this later but atm we're trying with this disabled for simplicity
     err_disable();
 
+    // 0x800c0080 --> 0x800c0080  
+
     sddf_dprintf("The value in the ctrl1 register after initialisation is: %u\n", control_regs->ctrl1);
     sddf_dprintf("The value in the ctrl2 register after initialisation is: %u\n", control_regs->ctrl2);
     sddf_dprintf("The value in the error mecr register after initialisation is: %u\n", error_regs->mecr);
+    sddf_dprintf("The value of the FIFO memory buffer ctrl is: %u\n", message_buffer->can_ctrl);
+    sddf_dprintf("The value of the FIFO memory buffer ctrl is: %u\n", message_buffer->can_ctrl);
+    sddf_dprintf("The value of the FIFO memory buffer id is: %u\n", message_buffer->can_id);
+    sddf_dprintf("The value of the FIFO memory buffer data is: %u\n", message_buffer->data);
 }
 
 // microkit init
 void init (void) {
-    sddf_printf("STARTING CAN DRIVER blah blah!\n");
+    sddf_dprintf("STARTING CAN DRIVER\n");
 
     // Linux does the following before starting the initialisation process for flexcan
     // flexcan_transceiver_enable -- power regulator enable?
@@ -234,52 +305,7 @@ void init (void) {
 
 // microkit notified
 void notified(microkit_channel ch) {
-    ;
+    // Whenever an interrupt is delivered we need to check here what kind of interrupt it was by looking at different registers
+    // and then ACKING it using irq_ack once we work out what it is.
+    sddf_dprintf("INTERRUPT RECEIEVED!");
 }
-
-// Initially just boot the device and try to read and write one of the registers in the Module Configuration Register (MCR)
-
-// Implementation for initialisation
-// Reset --> I think it's safe to assume booting is chip-level reset so we don't need to reset again on startup
-// Freeze --> before any initialisation can begin, need to set freeze mode
-// Init process
-
-// << INIT PROCESS >> 
-/*
-    For any configuration change/initialization it is required that FlexCAN be put into Freeze
-    mode (see Freeze mode). Note that the module needs to be initialized after every reset.
-    The following is a generic initialization sequence applicable to the FlexCAN module:
-    1. Initialize the Module Configuration register (MCR).
-    a. Enable the individual filtering per MB and reception queue features by setting
-    IRMQ.
-    b. Enable the warning interrupts by setting WRNEN.
-    c. If required, disable frame self reception by setting SRXDIS.
-    d. Enable the Rx FIFO by setting RFEN.
-    e. If Rx FIFO is enabled and DMA is required, set DMA.
-    f. Enable the abort mechanism by setting AEN.
-    g. Enable the local priority feature by setting LPRIOEN.
-    2. Initialize the Control 1 register (CTRL1) and optionally the CAN Bit Timing register
-    (CBT). Initialize also the CAN FD CAN Bit Timing register (FDCBT).
-    a. Determine the bit timing parameters: PROPSEG, PSEG1, PSEG2, and RJW.
-    b. Optionally determine the bit timing parameters: EPROPSEG, EPSEG1,
-    EPSEG2, and ERJW.
-    c. Determine the CAN FD bit timing parameters: FPROPSEG, FPSEG1, FPSEG2,
-    and FRJW.
-    d. Determine the bit rate by programming the PRESDIV field and optionally the
-    EPRESDIV field.
-    e. Determine the CAN FD bit rate by programming the FPRESDIV field.
-    f. Determine the internal arbitration mode (LBUF).
-    3. All FlexCAN memory must be initialized if Error Code Correction (ECC) is enabled.
-    See Detection and correction of memory errors.
-    4. Initialize the message buffers.
-    a. The control and status word of all message buffers must be initialized.
-    b. If Rx FIFO was enabled, the ID filter table must be initialized.
-    c. Other entries in each message buffer should be initialized as required.
-    5. Initialize the Rx Individual Mask registers (RXIMRn).
-    6. Set required interrupt mask bits in
-    • IMASK registers (for all MB interrupts)
-    • MCR register (for Wake-Up interrupt)
-    • CTRL1 / CTRL2 registers (for Bus Off and Error interrupts)
-    7. Negate MCR[HALT].
-    After the last step listed above, FlexCAN attempts to synchronize to the CAN bus.
-*/
