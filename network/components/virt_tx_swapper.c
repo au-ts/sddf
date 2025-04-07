@@ -30,7 +30,7 @@ void init(void)
 void notified(microkit_channel ch)
 {
     if (ch == 1) {
-        // sddf_printf("Swapping out the elfs!: %d\n", ch);
+        sddf_printf("Swapping out the elfs!: %d\n", ch);
         microkit_pd_stop(0);
 
         // uint64_t first_time = sddf_timer_time_now(TIMER);

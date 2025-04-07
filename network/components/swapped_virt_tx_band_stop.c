@@ -184,8 +184,8 @@ void init(void)
     state.buffer_region_paddrs[1] = buffer_data_region_cli1_paddr;
 #endif
 
-    state.client_usage[0].max_bits = 200000000 / TICKS_PER_S;
-    state.client_usage[1].max_bits = 300000000 / TICKS_PER_S;
+    state.client_usage[0].max_bits = 1000000000 / TICKS_PER_S;
+    state.client_usage[1].max_bits = 200000000 / TICKS_PER_S;
 
     tx_provide();
     tx_return();

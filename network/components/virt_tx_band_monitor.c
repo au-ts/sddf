@@ -34,6 +34,8 @@ uintptr_t buffer_data_region_cli1_paddr;
 
 bool signal_god = false;
 
+uintptr_t tx_count = 0;
+
 typedef struct client_usage {
     uint64_t curr_bits;
     uint64_t max_bits;
@@ -89,9 +91,13 @@ void tx_provide(void)
                 err = net_enqueue_active(&state.tx_queue_drv, buffer);
                 assert(!err);
                 state.client_usage[client].curr_bits += (buffer.len * 8);
+                tx_count++;
                 if (state.client_usage[client].curr_bits >= state.client_usage[client].max_bits) {
                     signal_god = true;
                 }
+                // if (tx_count >= 100) {
+                //     signal_god = true;
+                // }
                 enqueued = true;
             }
 
@@ -187,8 +193,8 @@ void init(void)
     state.buffer_region_paddrs[1] = buffer_data_region_cli1_paddr;
 #endif
 
-    state.client_usage[0].max_bits = 500000000 / TICKS_PER_S;
-    state.client_usage[1].max_bits = 700000000 / TICKS_PER_S;
+    state.client_usage[0].max_bits = 1000000000 / TICKS_PER_S;
+    state.client_usage[1].max_bits = 500000000 / TICKS_PER_S;
 
     tx_provide();
 
