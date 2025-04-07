@@ -87,6 +87,7 @@ typedef enum {
     IMX_IRQ_REG_IMR,
     IMX_IRQ_EDGE_SEL,
     IMX_IRQ_ICR,
+    IMX_IRQ_ISR,
 	IMX_GPIO_AND_IRQ_FUNC_COUNT,
 } imx_gpio_and_irq_reg_type_t;
 
@@ -96,7 +97,8 @@ static const uint32_t imx_gpio_and_irq_bit_strides[] = {
     1 /* IMX_GPIO_REG_PSR */,
     1 /* IMX_IRQ_REG_IMR */,
     1 /* IMX_IRQ_EDGE_SEL */,
-    2 /* IMX_IRQ_ICR */
+    2 /* IMX_IRQ_ICR */,
+    1 /* IMX_IRQ_ISR */
 };
 
 /**
@@ -245,6 +247,26 @@ static const struct imx_gpio_function gpio_and_irq_config_control[] = {
             { .instance = IMX_GPIO_INSTANCE_GPIO_5, .registers = (const struct imx_gpio_and_irq_register_data[]){
                 { .register_offset = GPIO5_ICR1, .start_pin_number = 0, .is_last = false },
                 { .register_offset = GPIO5_ICR2, .start_pin_number = 16, .is_last = true }
+            }},
+        }
+    },
+    {
+        .function = IMX_IRQ_ISR,
+        .instances = (const struct imx_gpio_instance[]){
+            { .instance = IMX_GPIO_INSTANCE_GPIO_1, .registers = (const struct imx_gpio_and_irq_register_data[]){
+                { .register_offset = GPIO1_ISR, .start_pin_number = 0, .is_last = true }
+            }},
+            { .instance = IMX_GPIO_INSTANCE_GPIO_2, .registers = (const struct imx_gpio_and_irq_register_data[]){
+                { .register_offset = GPIO2_ISR, .start_pin_number = 0, .is_last = true }
+            }},
+            { .instance = IMX_GPIO_INSTANCE_GPIO_3, .registers = (const struct imx_gpio_and_irq_register_data[]){
+                { .register_offset = GPIO3_ISR, .start_pin_number = 0, .is_last = true }
+            }},
+            { .instance = IMX_GPIO_INSTANCE_GPIO_4, .registers = (const struct imx_gpio_and_irq_register_data[]){
+                { .register_offset = GPIO4_ISR, .start_pin_number = 0, .is_last = true }
+            }},
+            { .instance = IMX_GPIO_INSTANCE_GPIO_5, .registers = (const struct imx_gpio_and_irq_register_data[]){
+                { .register_offset = GPIO5_ISR, .start_pin_number = 0, .is_last = true }
             }},
         }
     },

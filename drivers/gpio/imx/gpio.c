@@ -28,85 +28,71 @@ uintptr_t gpio3_regs; // both gpio and irq regs
 uintptr_t gpio4_regs; // both gpio and irq regs
 uintptr_t gpio5_regs; // both gpio and irq regs
 
+/* Channel Mappings (for O(1) notifying of forwardings IRQs from driver to client) */
+/* ONLY FOR SINGLE CHANNELS THOUGH */
+/* (imx_irq - MESON_GPIO_IRQ_CHANNEL_START) to index into array */
+int driver_to_client_channel_mappings_single_irq_line[IMX_GPIO_IRQ_AH_GPIO1_7 - IMX_GPIO_IRQ_AH_GPIO1_0] = {-1};
+
+/* For combined irq line */
+void notify_combined(microkit_channel ch) {
+    /* see which channels have configured this as there irq channel */
+    for (int i = 0; i < 62; i++) {
+        if (gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_IRQ_SLOT] == ch) {
+            int gpio_pin = gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_GPIO_PIN_SLOT];
+
+            /* see if the ISR for this pin has been flipped */
+            uint32_t reg_offset;
+            uint32_t start_bit;
+
+            if (!imx_gpio_and_irq_calculate_reg_and_bits(IMX_IRQ_ISR, gpio_pin, &reg_offset, &start_bit)) {
+                LOG_DRIVER_ERR("Something was not caught during initialisation!\n");
+                while (1) {};
+            }
+
+            volatile uint32_t *gpio_and_irq_base_address = imx_get_gpio_and_gpio_and_irq_base_address(gpio_pin);
+            volatile uint32_t *final_reg_address = ((void *)gpio_and_irq_base_address + reg_offset);
+
+            uint32_t value = (*final_reg_address >> start_bit) & BIT(0);
+            if (value) { // its set
+                /* forward to the client */
+                microkit_notify(gpio_channel_mappings[GPIO_CHANNEL_MAPPING_CLIENTS_CHANNEL_SLOT]);
+
+                /* clear the status flag by setting to 1 */
+                *final_reg_address &= BIT(start_bit);
+            }
+        }
+    }
+}
+
+
 /* Notifications should only come from device */
-/* TODO: this should check the status of the ISR */
-// we should have a mapping still if we can and only use the PSR as a last resort
 void notified(microkit_channel ch)
 {
     LOG_DRIVER("Driver Notified %d!\n", ch);
     switch (ch) {
         case IMX_GPIO_IRQ_AH_GPIO1_7:
-            microkit_irq_ack(ch);
-            microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
-            break;
         case IMX_GPIO_IRQ_AH_GPIO1_6:
-            microkit_irq_ack(ch);
-            microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
-            break;
         case IMX_GPIO_IRQ_AH_GPIO1_5:
-            microkit_irq_ack(ch);
-            microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
-            break;
         case IMX_GPIO_IRQ_AH_GPIO1_4:
-            microkit_irq_ack(ch);
-            microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
-            break;
         case IMX_GPIO_IRQ_AH_GPIO1_3:
-            microkit_irq_ack(ch);
-            microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
-            break;
         case IMX_GPIO_IRQ_AH_GPIO1_2:
-            microkit_irq_ack(ch);
-            microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
-            break;
         case IMX_GPIO_IRQ_AH_GPIO1_1:
-            microkit_irq_ack(ch);
-            microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
-            break;
         case IMX_GPIO_IRQ_AH_GPIO1_0:
             microkit_irq_ack(ch);
-            microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
+            microkit_notify(driver_to_client_channel_mappings_single_irq_line[ch - IMX_GPIO_IRQ_AH_GPIO1_0]);
             break;
         case IMX_GPIO_IRQ_GPIO1_0_15:
-            // TODO: find the channels that set off the INT
-            notify_active_interupts_on_combined_interrupt_line(ch);
-            microkit_irq_ack(ch);
-            break;
         case IMX_GPIO_IRQ_GPIO1_16_31:
-            microkit_irq_ack(ch);
-            microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
-            break;
         case IMX_GPIO_IRQ_GPIO2_0_15:
-            microkit_irq_ack(ch);
-            microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
-            break;
         case IMX_GPIO_IRQ_GPIO2_16_31:
-            microkit_irq_ack(ch);
-            microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
-            break;
         case IMX_GPIO_IRQ_GPIO3_0_15:
-            microkit_irq_ack(ch);
-            microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
-            break;
         case IMX_GPIO_IRQ_GPIO3_16_31:
-            microkit_irq_ack(ch);
-            microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
-            break;
         case IMX_GPIO_IRQ_GPIO4_0_15:
-            microkit_irq_ack(ch);
-            microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
-            break;
         case IMX_GPIO_IRQ_GPIO4_16_31:
-            microkit_irq_ack(ch);
-            microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
-            break;
         case IMX_GPIO_IRQ_GPIO5_0_15:
-            microkit_irq_ack(ch);
-            microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
-            break;
         case IMX_GPIO_IRQ_GPIO5_16_31:
             microkit_irq_ack(ch);
-            microkit_notify(driver_to_client_channel_mappings[ch - IMX_GPIO_IRQ_CHANNEL_START]);
+            notify_combined(ch);
             break;
         default:
             LOG_DRIVER_ERR("Unexpected notification from %d!\n", ch);
@@ -420,7 +406,6 @@ static void imx_set_irq_pin(size_t pin, size_t value, size_t* label, size_t* res
     }
 
     /* handling of the combined channels that requires actually interacting with hardware register */
-
     size_t start_valid_pin = 16 * (value - IMX_GPIO_IRQ_GPIO1_0_15);
     size_t end_valid_pin = start_valid_pin + 15;
     if (pin < start_valid_pin || pin > end_valid_pin) {
@@ -745,6 +730,11 @@ void init(void)
             if (label == GPIO_FAILURE && (response != GPIO_ERROR_UNSUPPORTED_IRQ_CONFIG)) {
                 LOG_DRIVER_ERR("Failed to config gpio_channel_mappings[%d] with gpio_irq_error_t : %ld!\n", i, response);
                 while (1) {}
+            }
+
+            /* Assign single channel to the gpio pin */
+            if (imx_check_irq_is_combined(irq)) {
+                driver_to_client_channel_mappings_single_irq_line[irq - IMX_GPIO_IRQ_AH_GPIO1_0] = gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_CLIENTS_CHANNEL_SLOT];
             }
 
             /* ACK the IRQ so we can recieve further IRQs */

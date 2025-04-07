@@ -27,7 +27,7 @@ uintptr_t gpio_ao_regs;
 uintptr_t interupt_control_regs;
 
 /* Channel Mappings (for O(1) notifying of forwardings IRQs from driver to client) */
-/* (meson_channel - MESON_GPIO_IRQ_CHANNEL_START) to index into array */
+/* (meson_irq - MESON_GPIO_IRQ_CHANNEL_START) to index into array */
 int driver_to_client_channel_mappings[MESON_GPIO_IRQ_CHANNEL_COUNT] = {-1};
 
 static void print_reg(uint32_t value) {
@@ -59,41 +59,14 @@ void notified(microkit_channel ch)
     LOG_DRIVER("Driver Notified %d!\n", ch);
     switch (ch) {
         case MESON_GPIO_IRQ_0:
-            microkit_irq_ack(ch);
-            microkit_notify(driver_to_client_channel_mappings[ch - MESON_GPIO_IRQ_CHANNEL_START]);
-            break;
         case MESON_GPIO_IRQ_1:
-            microkit_irq_ack(ch);
-            microkit_notify(driver_to_client_channel_mappings[ch - MESON_GPIO_IRQ_CHANNEL_START]);
-            break;
         case MESON_GPIO_IRQ_2:
-            microkit_irq_ack(ch);
-            microkit_notify(driver_to_client_channel_mappings[ch - MESON_GPIO_IRQ_CHANNEL_START]);
-            break;
         case MESON_GPIO_IRQ_3:
-            microkit_irq_ack(ch);
-            microkit_notify(driver_to_client_channel_mappings[ch - MESON_GPIO_IRQ_CHANNEL_START]);
-            break;
         case MESON_GPIO_IRQ_4:
-            microkit_irq_ack(ch);
-            microkit_notify(driver_to_client_channel_mappings[ch - MESON_GPIO_IRQ_CHANNEL_START]);
-            break;
         case MESON_GPIO_IRQ_5:
-            microkit_irq_ack(ch);
-            microkit_notify(driver_to_client_channel_mappings[ch - MESON_GPIO_IRQ_CHANNEL_START]);
-            break;
         case MESON_GPIO_IRQ_6:
-            microkit_irq_ack(ch);
-            microkit_notify(driver_to_client_channel_mappings[ch - MESON_GPIO_IRQ_CHANNEL_START]);
-            break;
         case MESON_GPIO_IRQ_7:
-            microkit_irq_ack(ch);
-            microkit_notify(driver_to_client_channel_mappings[ch - MESON_GPIO_IRQ_CHANNEL_START]);
-            break;
         case MESON_GPIO_AO_IRQ_0:
-            microkit_irq_ack(ch);
-            microkit_notify(driver_to_client_channel_mappings[ch - MESON_GPIO_IRQ_CHANNEL_START]);
-            break;
         case MESON_GPIO_AO_IRQ_1:
             microkit_irq_ack(ch);
             microkit_notify(driver_to_client_channel_mappings[ch - MESON_GPIO_IRQ_CHANNEL_START]);
