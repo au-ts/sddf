@@ -30,7 +30,7 @@
 #define ICR2 8
 #define CNT 9
 
-#define MAX_TIMEOUTS 6
+#define MAX_TIMEOUTS 65
 
 #define GPT_FREQ   (12u)
 

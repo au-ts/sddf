@@ -43,6 +43,14 @@ else
 $(error Unsupported MICROKIT_BOARD given)
 endif
 
+ifeq ($(strip $(NUM_CLIENTS)),)
+$(error NUM_CLIENTS must be specified)
+endif
+
+ifeq ($(strip $(TARGET_CLIENT)),)
+	export TARGET_CLIENT := 0
+endif
+
 export BUILD_DIR:=$(abspath ${BUILD_DIR})
 export MICROKIT_SDK:=$(abspath ${MICROKIT_SDK})
 export TOP := $(abspath $(dir ${MAKEFILE_LIST}))

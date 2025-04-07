@@ -12,7 +12,6 @@ MemoryRegion = SystemDescription.MemoryRegion
 Map = SystemDescription.Map
 Channel = SystemDescription.Channel
 
-
 @dataclass
 class Board:
     name: str
@@ -149,8 +148,7 @@ class BenchmarkConfig:
             self.ch_init, len(self.children), *child_bytes_list
         )
 
-
-def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
+def generate(sdf_file: str, output_dir: str, dtb: DeviceTree, num_clients: int, target_client: int):
     uart_node = dtb.node(board.serial)
     assert uart_node is not None
     ethernet_node = dtb.node(board.ethernet)
@@ -172,27 +170,6 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     net_virt_rx = ProtectionDomain("net_virt_rx", "network_virt_rx.elf", priority=99)
     net_system = Sddf.Net(sdf, ethernet_node, ethernet_driver, net_virt_tx, net_virt_rx)
 
-    client0 = ProtectionDomain("client0", "echo0.elf", priority=97, budget=20000)
-    client0_net_copier = ProtectionDomain(
-        "client0_net_copier", "network_copy0.elf", priority=98, budget=20000
-    )
-    client1 = ProtectionDomain("client1", "echo1.elf", priority=97, budget=20000)
-    client1_net_copier = ProtectionDomain(
-        "client1_net_copier", "network_copy1.elf", priority=98, budget=20000
-    )
-
-    serial_system.add_client(client0)
-    serial_system.add_client(client1)
-    timer_system.add_client(client0)
-    timer_system.add_client(client1)
-    net_system.add_client_with_copier(client0, client0_net_copier)
-    net_system.add_client_with_copier(client1, client1_net_copier)
-
-    client0_lib_sddf_lwip = Sddf.Lwip(sdf, net_system, client0)
-    client1_lib_sddf_lwip = Sddf.Lwip(sdf, net_system, client1)
-
-    # Benchmark specific resources
-
     bench_idle = ProtectionDomain("bench_idle", "idle.elf", priority=1)
     bench = ProtectionDomain("bench", "benchmark.elf", priority=254)
 
@@ -204,10 +181,6 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
         ethernet_driver,
         net_virt_tx,
         net_virt_rx,
-        client0,
-        client0_net_copier,
-        client1,
-        client1_net_copier,
         timer_driver,
     ]
     pds = [
@@ -221,21 +194,66 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     for pd in pds:
         sdf.add_pd(pd)
 
-    # Benchmark START channel
-    bench_start_ch = Channel(client0, bench)
-    sdf.add_channel(bench_start_ch)
-    # Benchmark STOP channel
-    bench_stop_ch = Channel(client0, bench)
-    sdf.add_channel(bench_stop_ch)
-
     bench_idle_ch = Channel(bench_idle, bench)
     sdf.add_channel(bench_idle_ch)
 
     cycle_counters_mr = MemoryRegion("cycle_counters", 0x1000)
     sdf.add_mr(cycle_counters_mr)
 
+    ip_collector = ProtectionDomain(f"ip_collector", f"ip_collector.elf", priority=100)
+    sdf.add_pd(ip_collector)
+    timer_system.add_client(ip_collector)
+    serial_system.add_client(ip_collector)
+    ip_pool_vaddr = 0x20_000_000
+    with open(f"{output_dir}/ip_collector_config.data", "wb+") as f:
+        f.write(struct.pack("<qB", ip_pool_vaddr, num_clients))
+
+    for i in range(num_clients):
+        # TODO: give different priorities to clients
+        client = ProtectionDomain(f"client{i}", f"echo{i}.elf", priority=97, budget=20000)
+        client_net_copier = ProtectionDomain(
+            f"client{i}_net_copier", f"network_copy{i}.elf", priority=98, budget=20000
+        )
+
+        if i == target_client:
+            client.add_map(Map(cycle_counters_mr, 0x20_000_000, perms="rw"))
+
+            # Benchmark START channel
+            bench_start_ch = Channel(client, bench)
+            sdf.add_channel(bench_start_ch)
+            # Benchmark STOP channel
+            bench_stop_ch = Channel(client, bench)
+            sdf.add_channel(bench_stop_ch)
+
+            child_id = bench.add_child_pd(client)
+            bench_children.append((child_id, client.name))
+
+            child_id = bench.add_child_pd(client_net_copier)
+            bench_children.append((child_id, client_net_copier.name))
+
+            serial_system.add_client(client)
+        else:
+            sdf.add_pd(client)
+            sdf.add_pd(client_net_copier)
+
+        # Create shared ip pool to mitigate necessity of connecting every client to serial subsystem
+        ip_mr = MemoryRegion(f"ip_pool_client{i}", 0x1000)
+        ip_vaddr = 0x30_000_000
+        sdf.add_mr(ip_mr)
+        client.add_map(Map(ip_mr, ip_vaddr, perms="rw"))
+        with open(f"{output_dir}/client_config_{i}.data", "wb+") as f:
+            f.write(struct.pack("<qB", ip_vaddr, i))
+
+        ip_collector.add_map(Map(ip_mr, ip_pool_vaddr + 0x1000 * i, perms="rw"))
+
+        timer_system.add_client(client)
+        net_system.add_client_with_copier(client, client_net_copier)
+
+        client_lib_sddf_lwip = Sddf.Lwip(sdf, net_system, client)
+        assert client_lib_sddf_lwip.connect()
+        assert client_lib_sddf_lwip.serialise_config(output_dir)
+
     bench_idle.add_map(Map(cycle_counters_mr, 0x5_000_000, perms="rw"))
-    client0.add_map(Map(cycle_counters_mr, 0x20_000_000, perms="rw"))
     bench_idle_config = BenchmarkIdleConfig(0x5_000_000, bench_idle_ch.pd_a_id)
 
     bench_client_config = BenchmarkClientConfig(
@@ -251,16 +269,13 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
         bench_children
     )
 
+
     assert serial_system.connect()
     assert serial_system.serialise_config(output_dir)
     assert net_system.connect()
     assert net_system.serialise_config(output_dir)
     assert timer_system.connect()
     assert timer_system.serialise_config(output_dir)
-    assert client0_lib_sddf_lwip.connect()
-    assert client0_lib_sddf_lwip.serialise_config(output_dir)
-    assert client1_lib_sddf_lwip.connect()
-    assert client1_lib_sddf_lwip.serialise_config(output_dir)
 
     with open(f"{output_dir}/benchmark_config.data", "wb+") as f:
         f.write(benchmark_config.serialise())
@@ -282,6 +297,8 @@ if __name__ == '__main__':
     parser.add_argument("--board", required=True, choices=[b.name for b in BOARDS])
     parser.add_argument("--output", required=True)
     parser.add_argument("--sdf", required=True)
+    parser.add_argument("--num-clients", required=True, type=int)
+    parser.add_argument("--target-client", required=True, type=int)
 
     args = parser.parse_args()
 
@@ -293,4 +310,4 @@ if __name__ == '__main__':
     with open(args.dtb, "rb") as f:
         dtb = DeviceTree(f.read())
 
-    generate(args.sdf, args.output, dtb)
+    generate(args.sdf, args.output, dtb, args.num_clients, args.target_client)

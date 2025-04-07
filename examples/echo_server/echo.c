@@ -30,6 +30,8 @@ __attribute__((__section__(".benchmark_client_config"))) benchmark_client_config
 
 __attribute__((__section__(".lib_sddf_lwip_config"))) lib_sddf_lwip_config_t lib_sddf_lwip_config;
 
+__attribute__((__section__(".client_config"))) client_config_t client_config;
+
 serial_queue_handle_t serial_tx_queue_handle;
 
 net_queue_handle_t net_rx_handle;
@@ -48,7 +50,15 @@ struct pbuf *tail;
  */
 void netif_status_callback(char *ip_addr)
 {
-    sddf_printf("DHCP request finished, IP address for netif %s is: %s\n", sddf_get_pd_name(), ip_addr);
+    char *ip_slot = (char *)(client_config.ip_vaddr);
+    int i = 0;
+    while (ip_addr[i]) {
+        ip_slot[i] = ip_addr[i];
+        i++;
+    }
+    ip_slot[i] = '\0';
+    cache_clean_and_invalidate(client_config.ip_vaddr, client_config.ip_vaddr + 0x1000);
+    /* sddf_printf("DHCP request finished, IP address for netif %s is: %s\n", sddf_get_pd_name(), ip_addr); */
 }
 
 /**
@@ -120,9 +130,11 @@ void transmit(void)
 
 void init(void)
 {
-    serial_queue_init(&serial_tx_queue_handle, serial_config.tx.queue.vaddr, serial_config.tx.data.size,
-                      serial_config.tx.data.vaddr);
-    serial_putchar_init(serial_config.tx.id, &serial_tx_queue_handle);
+    if (serial_config.tx.queue.vaddr) {
+        serial_queue_init(&serial_tx_queue_handle, serial_config.tx.queue.vaddr, serial_config.tx.data.size,
+                          serial_config.tx.data.vaddr);
+        serial_putchar_init(serial_config.tx.id, &serial_tx_queue_handle);
+    }
 
     net_queue_init(&net_rx_handle, net_config.rx.free_queue.vaddr, net_config.rx.active_queue.vaddr,
                    net_config.rx.num_buffers);
