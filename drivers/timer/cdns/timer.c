@@ -1,5 +1,6 @@
 /*
  * Copyright 2024, UNSW
+ * Copyright 2025, UNSW
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
@@ -12,7 +13,7 @@
 
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
-volatile uint32_t *regs;
+volatile void *regs;
 #define REG_PTR(off)     ((volatile uint32_t *)((regs) + (off)))
 
 #define REG_COUNTER_CTL 0x0C
@@ -67,18 +68,19 @@ void init()
         timeouts[i] = UINT64_MAX;
     }
 
-    regs = (volatile uint32_t *)device_resources.regions[0].region.vaddr;
-
-    sddf_dprintf("timer driver starting\n");
+    regs = device_resources.regions[0].region.vaddr;
 
     uint32_t ctrl = *REG_PTR(REG_COUNTER_CTL);
     if (ctrl & 0x1) {
-        sddf_dprintf("timer counter has started\n");
-    } else {
         sddf_dprintf("timer counter is not started\n");
+    } else {
+        sddf_dprintf("timer counter is started\n");
     }
 
-    // Reset counter
+    // Table 14-9
+    // stop timer
+    *REG_PTR(REG_COUNTER_CTL) = ctrl | BIT(0);
+    // Reset counter control reg
     *REG_PTR(REG_COUNTER_CTL) = 0x21;
     *REG_PTR(REG_COUNTER_CLK_CTL) = 0x0;
     *REG_PTR(REG_COUNTER_INTERVAL_COUNT) = 0x0;
@@ -86,18 +88,33 @@ void init()
     *REG_PTR(REG_COUNTER_MATCH2) = 0x0;
     *REG_PTR(REG_COUNTER_IER) = 0x0;
     *REG_PTR(REG_COUNTER_ISR) = 0x0;
-
+    // Reset counter
     *REG_PTR(REG_COUNTER_CTL) = ctrl | (1 << 4);
+    // Set up interval value
+    *REG_PTR(REG_COUNTER_IER) = 0x1;
+    // clock 100MHz ? below will tick every second
+    *REG_PTR(REG_COUNTER_INTERVAL_COUNT) = 0x5F5E100;
+    ctrl = ctrl | BIT(1);
+    // Enable interval mode
+    *REG_PTR(REG_COUNTER_CTL) = ctrl;
+    //Start the counter
+    *REG_PTR(REG_COUNTER_CTL) = ctrl ^ 0x1;
+    sddf_dprintf("start counter: 0x%x\n", ctrl ^ 0x1);
+    sddf_dprintf("REG_COUNTER_CTL is: 0x%x\n", *REG_PTR(REG_COUNTER_CTL));
 
-    for (int i = 0; i < 100; i++) {
-        sddf_dprintf("value: %d\n", *REG_PTR(REG_COUNTER_VALUE));
-    }
+    //for (int i = 0; i < 100; i++) {
+    sddf_dprintf("value: %d\n", *REG_PTR(REG_COUNTER_VALUE));
+    //}
 }
 
 void notified(microkit_channel ch)
 {
     assert(ch == device_resources.irqs[0].id);
     microkit_deferred_irq_ack(ch);
+    sddf_dprintf("Interrupt received!\n");
+    sddf_dprintf("Interrupt reg: 0x%x\n", *REG_PTR(REG_COUNTER_ISR));
+    sddf_dprintf("Interrupt reg: 0x%x\n", *REG_PTR(REG_COUNTER_ISR));
+    sddf_dprintf("counter val: 0x%x\n", *REG_PTR(REG_COUNTER_VALUE));
 }
 
 seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
