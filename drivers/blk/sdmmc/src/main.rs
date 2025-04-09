@@ -23,31 +23,6 @@ use sdmmc_hal::meson_gx_mmc::SdmmcMesonHardware;
 use sdmmc_protocol::sdmmc::{SdmmcError, SdmmcProtocol};
 use sdmmc_protocol::sdmmc_traits::SdmmcHardware;
 use sel4_microkit::{debug_print, debug_println, protection_domain, Channel, Handler, Infallible};
-/* XXX: Added to work with microkit 2.0 */
-
-use sel4_microkit::var;
-
-#[cfg(not(feature = "extern-symbols"))]
-macro_rules! maybe_extern_var {
-    ($symbol:ident: $ty:ty = $default:expr) => {
-        var! {
-            #[used(linker)]
-            $symbol: $ty = $default
-        }
-    };
-}
-
-#[cfg(feature = "extern-symbols")]
-macro_rules! maybe_extern_var {
-    ($symbol:ident: $ty:ty = $default:expr) => {{
-        extern "C" {
-            static $symbol: $ty;
-        }
-
-        unsafe { &$symbol }
-    }};
-}
-/* XXX: ^^^ Added to work with microkit 2.0 */
 
 const INTERRUPT: sel4_microkit::Channel = sel4_microkit::Channel::new(0);
 const BLK_VIRTUALIZER: sel4_microkit::Channel = sel4_microkit::Channel::new(1);
@@ -95,11 +70,6 @@ fn create_dummy_waker() -> Waker {
 
 #[protection_domain(heap_size = 0x10000)]
 fn init() -> HandlerImpl<SdmmcMesonHardware> {
-/* XXX: Added to work with microkit 2.0 */
-    maybe_extern_var!(microkit_irqs: u64 = 0);
-    maybe_extern_var!(microkit_notifications: u64 = 0);
-    maybe_extern_var!(microkit_pps: u64 = 0);
-/* XXX: Added to work with microkit 2.0 */
     debug_println!("Driver init!");
     unsafe {
         blk_queue_init_helper();
