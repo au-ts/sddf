@@ -244,6 +244,10 @@ seL4_Bool fault(microkit_child id, microkit_msginfo msginfo, microkit_msginfo *r
 #if defined(CONFIG_ARCH_ARM)
     sddf_printf("Registers: \npc : %lx\nspsr : %lx\nx0 : %lx\nx1 : %lx\nx2 : %lx\nx3 : %lx\nx4 : %lx\nx5 : %lx\nx6 : %lx\nx7 : %lx\n",
                 regs.pc, regs.spsr, regs.x0, regs.x1, regs.x2, regs.x3, regs.x4, regs.x5, regs.x6, regs.x7);
+#elif defined(CONFIG_ARCH_RISCV)
+    sddf_printf("Registers: \npc : %lx\nra : %lx\nsp : %lx\ngp : %lx\ns0 : %lx\ns1 : %lx\ns2 : %lx\ns3 : %lx\ns4 : "
+                "%lx\ns5 : %lx\n",
+                regs.pc, regs.ra, regs.sp, regs.gp, regs.s0, regs.s1, regs.s2, regs.s3, regs.s4, regs.s5);
 #else
     sddf_printf("Register reading not implemented for current ARCH.\n");
 #endif

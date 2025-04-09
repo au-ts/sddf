@@ -36,6 +36,14 @@ BOARDS: List[Board] = [
         ethernet="virtio_mmio@a003e00"
     ),
     Board(
+        name="qemu_virt_riscv64",
+        arch=SystemDescription.Arch.RISCV64,
+        paddr_top=0xa_0000_000,
+        serial="soc/serial@10000000",
+        timer="soc/rtc@101000",
+        ethernet="soc/virtio_mmio@10008000"
+    ),
+    Board(
         name="odroidc2",
         arch=SystemDescription.Arch.AARCH64,
         paddr_top=0x60000000,
