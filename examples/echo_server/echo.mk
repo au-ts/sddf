@@ -3,14 +3,91 @@
 #
 # SPDX-License-Identifier: BSD-2-Clause
 #
+# This Makefile is copied into the build directory
+# and operated on from there.
+#
 
-QEMU := qemu-system-aarch64
+ifeq ($(strip $(MICROKIT_SDK)),)
+$(error MICROKIT_SDK must be specified)
+endif
+
+ifeq ($(strip $(SDDF)),)
+$(error SDDF must be specified)
+endif
+
+BUILD_DIR ?= build
+MICROKIT_CONFIG ?= debug
+IMAGE_FILE = loader.img
+REPORT_FILE = report.txt
+
+BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
+ARCH := ${shell grep 'CONFIG_SEL4_ARCH  ' $(BOARD_DIR)/include/kernel/gen_config.h | cut -d' ' -f4}
+# Toolchain triples have inconsistent naming, below tries to automatically resolve that
+ifeq ($(strip $(TOOLCHAIN)),)
+	# Get whether the common toolchain triples exist
+	TOOLCHAIN_ARCH_NONE_ELF := $(shell command -v $(ARCH)-none-elf-gcc 2> /dev/null)
+	TOOLCHAIN_ARCH_UNKNOWN_ELF := $(shell command -v $(ARCH)-unknown-elf-gcc 2> /dev/null)
+	# Then check if they are defined and select the appropriate one
+	ifdef TOOLCHAIN_ARCH_NONE_ELF
+		TOOLCHAIN := $(ARCH)-none-elf
+	else ifdef TOOLCHAIN_ARCH_UNKNOWN_ELF
+		TOOLCHAIN := $(ARCH)-unknown-elf
+	else
+$(error "Could not find a $(ARCH) cross-compiler")
+	endif
+endif
+TOOLCHAIN := $(TOOLCHAIN)
+
+CC := $(TOOLCHAIN)-gcc
+LD := $(TOOLCHAIN)-ld
+AS := $(TOOLCHAIN)-as
+AR := $(TOOLCHAIN)-ar
+RANLIB := $(TOOLCHAIN)-ranlib
+OBJCOPY := $(TOOLCHAIN)-objcopy
 DTC := dtc
 PYTHON ?= python3
 
+MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
+
+ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
+	export DRIV_DIR := meson
+	export SERIAL_DRIV_DIR := meson
+	export TIMER_DRV_DIR := meson
+	export CPU := cortex-a55
+else ifeq ($(strip $(MICROKIT_BOARD)), odroidc2)
+	export DRIV_DIR := meson
+	export SERIAL_DRIV_DIR := meson
+	export TIMER_DRV_DIR := meson
+	export CPU := cortex-a53
+else ifneq ($(filter $(strip $(MICROKIT_BOARD)),imx8mm_evk imx8mp_evk imx8mq_evk maaxboard),)
+	export DRIV_DIR := imx
+	export SERIAL_DRIV_DIR := imx
+	export TIMER_DRV_DIR := imx
+	export CPU := cortex-a53
+else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
+	export DRIV_DIR := virtio
+	export SERIAL_DRIV_DIR := arm
+	export TIMER_DRV_DIR := arm
+	export CPU := cortex-a53
+	export QEMU := qemu-system-aarch64
+	export QEMU_ARCH_ARGS := -machine virt,virtualization=on -cpu cortex-a53 -device loader,file=$(IMAGE_FILE),addr=0x70000000,cpu-num=0
+else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_riscv64)
+	export DRIV_DIR := virtio
+	export SERIAL_DRIV_DIR := virtio
+	export TIMER_DRV_DIR := goldfish
+	export QEMU := qemu-system-riscv64
+	export QEMU_ARCH_ARGS := -machine virt -kernel $(IMAGE_FILE) \
+							-device virtio-serial-device \
+							-chardev pty,id=virtcon \
+							-device virtconsole,chardev=virtcon
+else
+$(error Unsupported MICROKIT_BOARD given)
+endif
+
+
+TOP := ${SDDF}/examples/echo_server
 METAPROGRAM := $(TOP)/meta.py
 
-MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 ECHO_SERVER:=${SDDF}/examples/echo_server
 LWIPDIR:=network/ipstacks/lwip/src
 BENCHMARK:=$(SDDF)/benchmark
@@ -20,14 +97,9 @@ SERIAL_COMPONENTS := $(SDDF)/serial/components
 SERIAL_DRIVER := $(SDDF)/drivers/serial/$(SERIAL_DRIV_DIR)
 TIMER_DRIVER:=$(SDDF)/drivers/timer/$(TIMER_DRV_DIR)
 NETWORK_COMPONENTS:=$(SDDF)/network/components
-
-BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
-IMAGE_FILE := loader.img
-REPORT_FILE := report.txt
 SYSTEM_FILE := echo_server.system
 DTS := $(SDDF)/dts/$(MICROKIT_BOARD).dts
 DTB := $(MICROKIT_BOARD).dtb
-METAPROGRAM := $(TOP)/meta.py
 
 vpath %.c ${SDDF} ${ECHO_SERVER}
 
@@ -121,10 +193,8 @@ include ${SERIAL_DRIVER}/serial_driver.mk
 include ${SERIAL_COMPONENTS}/serial_components.mk
 
 qemu: $(IMAGE_FILE)
-	$(QEMU) -machine virt,virtualization=on \
-			-cpu cortex-a53 \
+	$(QEMU) $(QEMU_ARCH_ARGS) \
 			-serial mon:stdio \
-			-device loader,file=$(IMAGE_FILE),addr=0x70000000,cpu-num=0 \
 			-m size=2G \
 			-nographic \
 			-device virtio-net-device,netdev=netdev0 \
