@@ -312,8 +312,10 @@ pub fn build(b: *std.Build) !void {
             "qemu-system-riscv64",
             "-machine",
             "virt",
+            "-mon",
+            "console",
             "-serial",
-            "mon:stdio",
+            "chardev:console",
             "-kernel",
             final_image_dest,
             "-m",
@@ -323,9 +325,9 @@ pub fn build(b: *std.Build) !void {
             "-device",
             "virtio-serial-device",
             "-chardev",
-            "pty,id=virtcon",
+            "stdio,id=console,mux=on,signal=off",
             "-device",
-            "virtconsole,chardev=virtcon",
+            "virtconsole,chardev=console",
             "-nographic",
         });
     }
