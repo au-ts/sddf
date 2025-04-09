@@ -39,7 +39,10 @@ endif
 TOOLCHAIN := $(TOOLCHAIN)
 
 CC := $(TOOLCHAIN)-gcc
-LD := $(TOOLCHAIN)-ld
+# Usually, we use the linker directly. Since we're linking against the libc
+# for the echo server, we want to use the compiler driver so it can add its
+# knowledge of where the libc is located.
+LD := $(CC)
 AS := $(TOOLCHAIN)-as
 AR := $(TOOLCHAIN)-ar
 RANLIB := $(TOOLCHAIN)-ranlib
@@ -70,16 +73,20 @@ else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
 	export TIMER_DRV_DIR := arm
 	export CPU := cortex-a53
 	export QEMU := qemu-system-aarch64
-	export QEMU_ARCH_ARGS := -machine virt,virtualization=on -cpu cortex-a53 -device loader,file=$(IMAGE_FILE),addr=0x70000000,cpu-num=0
+	export QEMU_ARCH_ARGS := -machine virt,virtualization=on -cpu cortex-a53 \
+						-device loader,file=$(IMAGE_FILE),addr=0x70000000,cpu-num=0 \
+						-serial mon:stdio
 else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_riscv64)
 	export DRIV_DIR := virtio
 	export SERIAL_DRIV_DIR := virtio
 	export TIMER_DRV_DIR := goldfish
 	export QEMU := qemu-system-riscv64
 	export QEMU_ARCH_ARGS := -machine virt -kernel $(IMAGE_FILE) \
+							-mon qemu_console \
+							-serial chardev:qemu_console \
 							-device virtio-serial-device \
-							-chardev pty,id=virtcon \
-							-device virtconsole,chardev=virtcon
+							-chardev stdio,id=qemu_console,mux=on,signal=off \
+							-device virtconsole,chardev=qemu_console
 else
 $(error Unsupported MICROKIT_BOARD given)
 endif
@@ -107,8 +114,31 @@ IMAGES := eth_driver.elf echo0.elf echo1.elf benchmark.elf idle.elf network_virt
 	  network_virt_tx.elf network_copy0.elf network_copy1.elf timer_driver.elf\
 	  serial_driver.elf serial_virt_tx.elf
 
-CFLAGS := -mcpu=$(CPU) \
-	  -mstrict-align \
+ifeq ($(ARCH),aarch64)
+	CFLAGS_ARCH := -mcpu=$(CPU) -mstrict-align
+else ifeq ($(ARCH),riscv64)
+	CFLAGS_ARCH := -march=rv64imafdc -mabi=lp64d
+endif
+
+# Echo server example relies on libc functionality, hence only works with GCC
+# instead of LLVM. See README for more details.
+# Additionally, on x86_64 debian/ubuntu the gcc-riscv64-unknown-elf package is distributed
+# without libc. Checks if `picolibc-riscv64-unknown-elf` is installed in that case, and uses it.
+LIBC := $(dir $(realpath $(shell $(CC) --print-file-name libc.a)))
+PICOLIBC := $(dir $(realpath $(shell $(CC) --print-file-name picolibc.specs)))
+ifneq ($(strip $(LIBC)),)
+	LDFLAGS_ARCH += -L$(LIBC)
+	LIBS_ARCH += -lc
+else ifneq ($(strip $(PICOLIBC)),)
+	CFLAGS_ARCH += -specs=picolibc.specs
+else
+	$(error LIBC not found for the selected toolchain: $(TOOLCHAIN))
+endif
+
+# Of note here is that we don't specify -nostdlib, as we want libc.
+# But we don't want crt0, so add -nostartfiles
+CFLAGS := $(CFLAGS_ARCH) \
+	  -nostartfiles \
 	  -ffreestanding \
 	  -g3 -O3 -Wall \
 	  -Wno-unused-function \
@@ -122,17 +152,14 @@ CFLAGS := -mcpu=$(CPU) \
 	  -MD \
 	  -MP
 
-LDFLAGS := -L$(BOARD_DIR)/lib -L${LIBC}
-LIBS := --start-group -lmicrokit -Tmicrokit.ld -lc libsddf_util_debug.a --end-group
+LDFLAGS := $(CFLAGS_ARCH) -nostartfiles -ffreestanding -L$(BOARD_DIR)/lib $(LDFLAGS_ARCH)
+LIBS := -Wl,--start-group -lmicrokit -Tmicrokit.ld ${LIBS_ARCH} libsddf_util_debug.a -Wl,--end-group
 
 CHECK_FLAGS_BOARD_MD5 := .board_cflags-$(shell echo -- ${CFLAGS} ${BOARD} ${MICROKIT_CONFIG} | shasum | sed 's/ *-//')
 
 ${CHECK_FLAGS_BOARD_MD5}:
 	-rm -f .board_cflags-*
 	touch $@
-
-%.elf: %.o
-	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
 
 ECHO_OBJS := echo.o utilization_socket.o \
 	     udp_echo_socket.o tcp_echo_socket.o
@@ -195,7 +222,6 @@ include ${SERIAL_COMPONENTS}/serial_components.mk
 
 qemu: $(IMAGE_FILE)
 	$(QEMU) $(QEMU_ARCH_ARGS) \
-			-serial mon:stdio \
 			-m size=2G \
 			-nographic \
 			-device virtio-net-device,netdev=netdev0 \
@@ -208,7 +234,6 @@ clean::
 	find . -name \*.[do] |xargs --no-run-if-empty rm
 
 clobber:: clean
-	rm -f *.a
 	rm -f ${IMAGE_FILE} ${REPORT_FILE}
 
 -include $(DEPS)
