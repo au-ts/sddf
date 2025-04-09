@@ -103,7 +103,7 @@ $(foreach f,$(LIB_SDDF_LWIP_LWIP_FILES), \
 )
 
 clean::
-	$(RM) -f lib_sddf_lwip_out*
+	$(RM) -f lib_sddf_lwip_out/*
 
 clobber:: clean
 	$(RM) -f lib_sddf_lwip*.a
