@@ -41,7 +41,8 @@ make MICROKIT_BOARD=<board> MICROKIT_SDK=<path/to/sdk> MICROKIT_CONFIG=(benchmar
 
 ## Benchmarking
 
-In order to run the benchmarks, set `MICROKIT_CONFIG=benchmark`. The system has
+In order to run the benchmarks, set `MICROKIT_CONFIG=benchmark`. Currently only Aarch64 boards have
+support for collecting of benchmarking data. The system has
 been designed to interact with [ipbench](https://sourceforge.net/projects/ipbench/)
 to take measurements.
 
