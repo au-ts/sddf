@@ -10,44 +10,56 @@
     > Atm none of the functions have any form of timeout or software error reporting - possibly should add this (similar to Linux kernel?)
     > Don't offer any configuration options atm - e.g. using the mailboxes and not FIFO, etc
     > Make sure the regulator / transceiver is turned on or we won't be able to communicate with the bus
-
+    > Do we need to turn on the clocks or are they already on?
 */
 
 volatile struct control_registers *control_regs;
 volatile struct error_registers *error_regs;
 volatile struct canfd_registers *canfd_regs;
 volatile struct acceptance_filter_registers *filter_regs;
-volatile struct message_buffer *message_buffer;
+volatile struct message_buffer *fifo_output_buffer;
 
-
-// TODO - What triggers this???
-// If IFLAG1[BUF51] is asserted, there is at least one frame available in the FIFO. An interrupt is generated for this if the corresponding mask bit enables it.
-// Upon receiving an interrupt and checking if IFLAG[BUF51] is asserted, we can call our read_fifo function that will actually do all the reading protocol.
-// If we have the corresponding interrupt bit mask we should also check if IFLAG1[BUF61] - Rx FIFO Warning is asserted. If it is we should clear it and probably read
-// If we have the corresponding interrupt bit mask we should also check if IFLAG1[BUF71] - Rx FIFO Overflow is asserted. If it is we should clear it and probably read
+/* Specified in 11.8.2.8 - Rx FIFO */
 static uint64_t read_fifo(void) {
     // Read the contents of RXFIR
     // TODO - at the moment we're trying to accept all messages so we ignore this. Need to update to report ID of found message.
 
     // Read the message
-    uint64_t message = message_buffer->data;
+    uint64_t message = fifo_output_buffer->data;
 
     // Check for overflow occurred
     if (control_regs->iflag1 & IFLAG1_BUF7I) {
         sddf_dprintf("Rx FIFO has overflowed!\n");
-        control_regs->iflag1 &= ~IFLAG1_BUF7I;
     }
 
     // Check for warning FIFO almost full
     if (control_regs->iflag1 & IFLAG1_BUF6I) {
         sddf_dprintf("Rx FIFO almost full!\n");
-        control_regs->iflag1 &= ~IFLAG1_BUF6I;
     }
 
-    // Clear the frame is available buffer - note that this will retrigger an interrupt if there's more unserviced buffers in the FIFO
-    control_regs->iflag1 &= ~IFLAG1_BUF5I;
+    // Clear the frame is available buffer (and other flags) - note that this will retrigger an interrupt if there's more unserviced buffers in the FIFO
+    control_regs->iflag1 &= ~(IFLAG1_BUF7I | IFLAG1_BUF6I | IFLAG1_BUF5I);
 
     return message;
+}
+
+static void handle_irq(microkit_channel ch) {
+    // At the moment this only handles receiving message interrupts
+
+    // Message available in the FIFO
+    if (control_regs->iflag1 & IFLAG1_BUF5I) {
+        // TODO - atm we just print out the message for debug purposes
+        uint64_t rx_message = read_fifo(); // Note: this will clear the necessary flags to make the FIFO available for reception
+        sddf_dprintf("FIFO READ - CONTENTS: %lu\n", rx_message);
+
+    } else {
+        sddf_dprintf("RECEVIED A DIFFERENT SORT OF INTERRUPT! NEED TO HANDLE THIS");
+        // Note there's currently a number of types of interrupts we're not handling
+        // See flexcan_irq from the linux kernel implementation for possibilities
+    }
+
+    // Ack the channel so we receive more interrupts
+    microkit_irq_ack(ch);
 }
 
 /* Copied from flexcan-core.c in Linux kernel */
@@ -229,46 +241,11 @@ static void can_init(void) {
     control_regs = (volatile struct control_registers *) vaddr;
     filter_regs = (volatile struct acceptance_filter_registers *) (vaddr + ACCEPTANCE_FILTER_REGISTER_OFFSET);
     error_regs = (volatile struct error_registers *) (vaddr + ERROR_REGISTER_OFFSET);
-    message_buffer = (volatile struct message_buffer *) (vaddr + FIFO_OUTPUT_BUFFER_OFFSET);
+    fifo_output_buffer = (volatile struct message_buffer *) (vaddr + FIFO_OUTPUT_BUFFER_OFFSET);
 
-    // canfd_regs = (volatile struct canfd_registers *) (vaddr + CANFD_REGISTER_OFFSET);
-
-    sddf_dprintf("The value in the ctrl1 register is: %u\n", control_regs->ctrl1);
-    sddf_dprintf("The value in the ctrl2 register is: %u\n", control_regs->ctrl2);
-    sddf_dprintf("The value in the error mecr register is: %u\n", error_regs->mecr);
-    
-    // /* Enable the module */
-    // module_enable();
-
-    // /* Soft reset */
-    // soft_reset();
-
-    // TODO - Linux's implementation calls additional functions here
-    // First it calls flexcan_ram_init here to allow write access to certain addresses - not sure if I need this
-    // Second it calls flexcan_set_bittiming which sets up some information in the control register -- atm I've delayed bitttiming to within ctrl_init
-    // which is where the manual discusses the initialisation
-
-    // /* Freeze */
-    // freeze();
-
-    // /* Module Configuration Register (MCR) init */
-    // mcr_init();
-
-    /* Control1 Register (ctrl1) Init */
-    ctrl_init();
-
-    /* Disable error correction */
-    // Note: We might enable this later but atm we're trying with this disabled for simplicity
-    err_disable();
-
-    // 0x800c0080 --> 0x800c0080  
-
-    sddf_dprintf("The value in the ctrl1 register after initialisation is: %u\n", control_regs->ctrl1);
-    sddf_dprintf("The value in the ctrl2 register after initialisation is: %u\n", control_regs->ctrl2);
-    sddf_dprintf("The value in the error mecr register after initialisation is: %u\n", error_regs->mecr);
-    sddf_dprintf("The value of the FIFO memory buffer ctrl is: %u\n", message_buffer->can_ctrl);
-    sddf_dprintf("The value of the FIFO memory buffer ctrl is: %u\n", message_buffer->can_ctrl);
-    sddf_dprintf("The value of the FIFO memory buffer id is: %u\n", message_buffer->can_id);
+    // NOTE: Most of the initialisation for this is handled in the loader atm. This currently just
+    // sets up the memory regions for different registers. The source of truth for initialisation is now
+    // the hack setup in the microkit loader.
 }
 
 // microkit init
@@ -279,12 +256,11 @@ void init (void) {
     // Testing: expect FIFO output to be empty at this point 
     uint64_t fifo_output_value = read_fifo();
 
-    sddf_dprintf("FIFO output on init: %lu\n", fifo_output_value);
+    sddf_dprintf("FIFO OUTPUT ON INIT: %lu\n", fifo_output_value);
 }
 
 // microkit notified
 void notified(microkit_channel ch) {
-    // Whenever an interrupt is delivered we need to check here what kind of interrupt it was by looking at different registers
-    // and then ACKING it using irq_ack once we work out what it is.
     sddf_dprintf("INTERRUPT RECEIEVED!");
+    handle_irq(ch);
 }
