@@ -6,6 +6,9 @@ import random
 from dataclasses import dataclass
 from typing import List, Tuple
 from sdfgen import SystemDescription, Sddf, DeviceTree
+from importlib.metadata import version
+
+assert version('sdfgen').split(".")[1] == "23", "Unexpected sdfgen version"
 
 ProtectionDomain = SystemDescription.ProtectionDomain
 MemoryRegion = SystemDescription.MemoryRegion

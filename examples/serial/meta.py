@@ -4,6 +4,9 @@ import argparse
 from typing import List
 from dataclasses import dataclass
 from sdfgen import SystemDescription, Sddf, DeviceTree
+from importlib.metadata import version
+
+assert version('sdfgen').split(".")[1] == "23", "Unexpected sdfgen version"
 
 ProtectionDomain = SystemDescription.ProtectionDomain
 
