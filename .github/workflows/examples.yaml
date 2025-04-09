@@ -29,7 +29,7 @@ jobs:
           wget ${{ env.MICROKIT_URL }}-linux-x86-64.tar.gz
           tar xf microkit-sdk-${{ env.MICROKIT_VERSION }}-linux-x86-64.tar.gz
       - name: Install dependencies (via apt)
-        run: sudo apt update && sudo apt install -y make llvm lld imagemagick device-tree-compiler
+        run: sudo apt update && sudo apt install -y make llvm lld imagemagick device-tree-compiler gcc-riscv64-unknown-elf picolibc-riscv64-unknown-elf
       - name: Download and install AArch64 GCC toolchain
         run: |
           wget -O aarch64-toolchain.tar.xz https://trustworthy.systems/Downloads/microkit/arm-gnu-toolchain-12.3.rel1-x86_64-aarch64-none-elf.tar.xz
@@ -72,6 +72,8 @@ jobs:
       - name: Install dependencies (via Homebrew)
         run: |
           brew install llvm lld make imagemagick dtc
+          brew tap riscv-software-src/riscv
+          brew install riscv-tools
           echo "/opt/homebrew/opt/llvm/bin:$PATH" >> $GITHUB_PATH
       - name: Install Zig
         uses: mlugg/setup-zig@v1.2.1
