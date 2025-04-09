@@ -66,6 +66,14 @@
 #define CTRL1_LOM               (1UL << 3)              /* Listen-Only Mode */
 #define CTRL1_PROPSEG(x)        (((x) & 7UL) << 0)      /* Propagation Segment */
 
+/* Interrupt Flags 1 Register (IFLAG1) - 11.8.5.2.13 */
+#define IFLAG1_BUF31TO8I    (16777215UL << 8)   /* Buffer MBi Interrupt -- Each bit flags the correpsonding message buffer interrupt for mb 8-31 */
+#define IFLAG1_BUF7I        (1UL << 7)          /* Buffer MB7 Interrupt OR Rx FIFO Overflow -- 0b = no overflow, 1b = overflow occurred */                    
+#define IFLAG1_BUF6I        (1UL << 6)          /* Buffer MB6 Interrupt OR Rx FIFO Warning -- 0b = no warning, 1b = warning FIFO almost full */
+#define IFLAG1_BUF5I        (1UL << 5)          /* Buffer MB5 Interrupt OR Frames available in Rx FIFO -- 0b = no frames, 1b = frames available */
+#define IFLAG1_BUF4TO1I     (15UL << 1)         /* Buffer MBi Interrupt OR Reserved -- these are reserved when FIFO in use */
+#define IFLAG1_BUF0I        (1UL << 0)          /* Buffer MB0 Interrupt OR Clear FIFO bit - when asserted (set to 1b) empties the FIFO */
+
 /* Additional Initialisation Registers -- these are only used to disable error correction at the moment */
 #define CTRL2_ECRWRE    (1UL << 29) // Error correction configuration register write enable. Enables MECR to be updated 0 = disable update, 1 = enable update
 #define MECR_ECRWRDIS   (1UL << 31) // Error configuration register write disable. Disables write on this register 0 = write is enabled, 1 = write is disabled
@@ -104,7 +112,7 @@
 struct message_buffer {
     uint32_t can_ctrl;
     uint32_t can_id;
-    uint8_t data; // Note: this is fixed at 8 bytes as we're currently using standard CAN and not CANFD
+    uint64_t data; // Note: this is fixed at 8 bytes as we're currently using standard CAN and not CANFD
 };
 
 /* IMX8 Clock Registers */

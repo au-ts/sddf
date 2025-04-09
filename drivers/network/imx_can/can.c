@@ -19,51 +19,35 @@ volatile struct canfd_registers *canfd_regs;
 volatile struct acceptance_filter_registers *filter_regs;
 volatile struct message_buffer *message_buffer;
 
-// TODO - look into reading from mailbox via FlexCAN mailbox read - flexcan_mailbox_read -- STOPPED ON IMPLEMENTING THE BELOW
 
-static void read_fifo(void) {
-    // read the FIFO output
+// TODO - What triggers this???
+// If IFLAG1[BUF51] is asserted, there is at least one frame available in the FIFO. An interrupt is generated for this if the corresponding mask bit enables it.
+// Upon receiving an interrupt and checking if IFLAG[BUF51] is asserted, we can call our read_fifo function that will actually do all the reading protocol.
+// If we have the corresponding interrupt bit mask we should also check if IFLAG1[BUF61] - Rx FIFO Warning is asserted. If it is we should clear it and probably read
+// If we have the corresponding interrupt bit mask we should also check if IFLAG1[BUF71] - Rx FIFO Overflow is asserted. If it is we should clear it and probably read
+static uint64_t read_fifo(void) {
+    // Read the contents of RXFIR
+    // TODO - at the moment we're trying to accept all messages so we ignore this. Need to update to report ID of found message.
 
-    // iflag1 contains the information about hte status of the FIFO buffers.
-    // buf5I indicates whethere there is something in the FIFO to be read or not
-    // buf6I indicates whether the FIFO is almost full
-    // buf7I indicates a FIFO overflow has occurred
+    // Read the message
+    uint64_t message = message_buffer->data;
 
-    /*
-        -- TODO - look at flexcan memory buffer memory map pg5104 to determine where the buffers are -- the following section RX FIFO Structure is also
-        worth looking at to understand this
-        -- TODO - how do I determine the difference between a tx and rx buffer??? can any buffer be either???
-        -- TODO - what is the expected size of the message buffer data region here??? We're not using canFD so it's presumably fixed to some size
-        -- Assume atm the data segment is a fixed size of 8 bytes??? Does that mean the next MB is immediately afterwards or do we leave a large gap??
-        in between????
-        -- Looks like can_ctrl consists of 32 bits of data related to the buffer
-        -- can_id is the identifier of the received message???
-        Linux structure of the message buffer 
-        // Structure of the message buffer
-        struct flexcan_mb {
-            u32 can_ctrl;
-            u32 can_id;
-            u32 data[];
-        };
-    */
+    // Check for overflow occurred
+    if (control_regs->iflag1 & IFLAG1_BUF7I) {
+        sddf_dprintf("Rx FIFO has overflowed!\n");
+        control_regs->iflag1 &= ~IFLAG1_BUF7I;
+    }
 
-   // Linux references to the message buffer area! If I can even read this that would be a start
-   /*
-    	struct_group(init,
-		u8 mb[2][512];		// 0x80 - Not affected by Soft Reset
-		// FIFO-mode:
-		//  *			MB
-		//  * 0x080...0x08f	0	RX message buffer
-		//  * 0x090...0x0df	1-5	reserved
-		//  * 0x0e0...0x0ff	6-7	8 entry ID table
-		//  *				(mx25, mx28, mx35, mx53)
-		//  * 0x0e0...0x2df	6-7..37	8..128 entry ID table
-		//  *				size conf'ed via ctrl2::RFFN
-		//  *				(mx6, vf610)
-		 
-   
-   
-   */
+    // Check for warning FIFO almost full
+    if (control_regs->iflag1 & IFLAG1_BUF6I) {
+        sddf_dprintf("Rx FIFO almost full!\n");
+        control_regs->iflag1 &= ~IFLAG1_BUF6I;
+    }
+
+    // Clear the frame is available buffer - note that this will retrigger an interrupt if there's more unserviced buffers in the FIFO
+    control_regs->iflag1 &= ~IFLAG1_BUF5I;
+
+    return message;
 }
 
 /* Copied from flexcan-core.c in Linux kernel */
@@ -285,22 +269,17 @@ static void can_init(void) {
     sddf_dprintf("The value of the FIFO memory buffer ctrl is: %u\n", message_buffer->can_ctrl);
     sddf_dprintf("The value of the FIFO memory buffer ctrl is: %u\n", message_buffer->can_ctrl);
     sddf_dprintf("The value of the FIFO memory buffer id is: %u\n", message_buffer->can_id);
-    sddf_dprintf("The value of the FIFO memory buffer data is: %u\n", message_buffer->data);
 }
 
 // microkit init
 void init (void) {
     sddf_dprintf("STARTING CAN DRIVER\n");
-
-    // Linux does the following before starting the initialisation process for flexcan
-    // flexcan_transceiver_enable -- power regulator enable?
-
-    // can_clocks_enable();
-
     can_init();
+    
+    // Testing: expect FIFO output to be empty at this point 
+    uint64_t fifo_output_value = read_fifo();
 
-    // call all initialisation for the device / software interface here
-    // first thing is basically going to be reading and writing a register
+    sddf_dprintf("FIFO output on init: %lu\n", fifo_output_value);
 }
 
 // microkit notified
