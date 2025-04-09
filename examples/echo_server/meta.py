@@ -10,6 +10,7 @@ from os import path
 from dataclasses import dataclass
 from typing import List, Tuple, Callable
 from sdfgen import SystemDescription, Sddf, DeviceTree
+from importlib.metadata import version
 
 ProtectionDomain = SystemDescription.ProtectionDomain
 MemoryRegion = SystemDescription.MemoryRegion
@@ -377,6 +378,9 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree, get_core: Callable
 
 
 if __name__ == '__main__':
+    # Ensure sdfgen tool version is up to date
+    assert(version('sdfgen').split(".")[1] == "23")
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--dtb", required=True)
     parser.add_argument("--sddf", required=True)
