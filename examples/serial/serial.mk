@@ -46,10 +46,12 @@ else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
 else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_riscv64)
 	QEMU_ARCH_ARGS := -machine virt \
 					  -kernel $(IMAGE_FILE) \
+					  -mon console \
+					  -serial chardev:console \
 					  -global virtio-mmio.force-legacy=false \
 					  -device virtio-serial-device \
-					  -chardev pty,id=virtcon \
-					  -device virtconsole,chardev=virtcon
+					  -chardev stdio,id=console,mux=on,signal=off \
+					  -device virtconsole,chardev=console
 	DRIVER_DIR := virtio
 else ifneq ($(filter $(strip $(MICROKIT_BOARD)),imx8mm_evk imx8mp_evk imx8mq_evk maaxboard),)
 	DRIVER_DIR := imx
@@ -133,10 +135,7 @@ $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	MICROKIT_SDK=${MICROKIT_SDK} $(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
 
 qemu: ${IMAGE_FILE}
-	$(QEMU) -serial mon:stdio \
-			-m size=2G \
-			-nographic \
-			$(QEMU_ARCH_ARGS)
+	$(QEMU) -m size=2G -nographic $(QEMU_ARCH_ARGS)
 
 clean::
 	${RM} -f *.elf
