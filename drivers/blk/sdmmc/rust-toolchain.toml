@@ -5,5 +5,6 @@
 #
 
 [toolchain]
-channel = "nightly-2024-10-26"
-components = [ "rustfmt", "rust-src", "rustc-dev", "llvm-tools-preview" ]
+channel = "nightly-2025-02-26"
+components = [ "rust-src", "rustc-dev", "llvm-tools-preview" ]
+profile = "default"
