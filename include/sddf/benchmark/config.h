@@ -10,7 +10,7 @@
 #include <stdbool.h>
 
 #define BENCHMARK_MAX_CHILDREN 64 // TODO: Can we have a higher upper bound on this?
-#define BENCHMARK_MAX_CORES 64
+#define BENCHMARK_MAX_CORES 64 // TODO: Hardcoded for now to make struct serialisation easier, eventually obtain from board config
 
 typedef struct benchmark_child_config {
     char name[SDDF_NAME_LENGTH];
