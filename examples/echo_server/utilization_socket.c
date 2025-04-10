@@ -95,6 +95,11 @@ uint64_t eth_idle_tx_notified_start;
 uint64_t eth_rx_notify_start;
 uint64_t eth_request_signal_rx_start;
 uint64_t eth_rx_free_capacity_start;
+uint64_t virt_rx_notify_start;
+uint64_t lwip_rx_notified_start;
+uint64_t lwip_tx_notified_start;
+uint64_t lwip_rx_notify_start;
+uint64_t lwip_tx_notify_start;
 
 char data_packet_str[MAX_PACKET_SIZE];
 
@@ -169,6 +174,11 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
             eth_rx_notify_start = __atomic_load_n(&bench->eth_rx_notify, __ATOMIC_RELAXED);
             eth_request_signal_rx_start = __atomic_load_n(&bench->eth_request_signal_rx, __ATOMIC_RELAXED);
             eth_rx_free_capacity_start = __atomic_load_n(&bench->eth_rx_free_capacity, __ATOMIC_RELAXED);
+            virt_rx_notify_start = __atomic_load_n(&bench->virt_rx_notify, __ATOMIC_RELAXED);
+            lwip_rx_notified_start = __atomic_load_n(&bench->lwip_rx_notified, __ATOMIC_RELAXED);
+            lwip_tx_notified_start = __atomic_load_n(&bench->lwip_tx_notified, __ATOMIC_RELAXED);
+            lwip_rx_notify_start = __atomic_load_n(&bench->lwip_rx_notify, __ATOMIC_RELAXED);
+            lwip_tx_notify_start = __atomic_load_n(&bench->lwip_tx_notify, __ATOMIC_RELAXED);
 
             __atomic_store_n(&bench->eth_rx_free_min_capacity, 512, __ATOMIC_RELAXED);
             __atomic_store_n(&bench->eth_rx_free_max_capacity, 0, __ATOMIC_RELAXED);
@@ -226,6 +236,12 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
             uint64_t eth_rx_free_min_capacity = __atomic_load_n(&bench->eth_rx_free_min_capacity, __ATOMIC_RELAXED);
             uint64_t eth_rx_free_max_capacity = __atomic_load_n(&bench->eth_rx_free_max_capacity, __ATOMIC_RELAXED);
         
+            uint64_t virt_rx_notify = __atomic_load_n(&bench->virt_rx_notify, __ATOMIC_RELAXED) - virt_rx_notify_start;
+            uint64_t lwip_rx_notified = __atomic_load_n(&bench->lwip_rx_notified, __ATOMIC_RELAXED) - lwip_rx_notified_start;
+            uint64_t lwip_tx_notified = __atomic_load_n(&bench->lwip_tx_notified, __ATOMIC_RELAXED) - lwip_tx_notified_start;
+            uint64_t lwip_rx_notify = __atomic_load_n(&bench->lwip_rx_notify, __ATOMIC_RELAXED) - lwip_rx_notify_start;
+            uint64_t lwip_tx_notify = __atomic_load_n(&bench->lwip_tx_notify, __ATOMIC_RELAXED) - lwip_tx_notify_start;
+
             uint64_t avg_capacity;
             if (eth_rx_notified) {
                 avg_capacity = eth_rx_free_capacity / eth_rx_notified;
@@ -235,15 +251,18 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
 
             sddf_printf("NIC RX pk,NIC RX dropped pk,driver RX pk,driver TX pk,driver RX IRQ,driver IRQ,");
             sddf_printf("driver RX notified,driver RX idle notified,driver TX notified,driver TX idle notified,driver RX notify,driver RX Request,");
-            sddf_printf("driver rx free avg buf,driver rx free min buf,driver rx free max buf\n");
+            sddf_printf("driver rx free avg buf,driver rx free min buf,driver rx free max buf,");
+            sddf_printf("virt rx notified, lwip rx notified, lwip tx notified, lwip rx notify, lwip tx notify\n");
 
-            sddf_printf("%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,\n",
+            sddf_printf("%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,\n",
                         bench->hw_pcount_rx, bench->hw_pcount_rx_dropped,
                         eth_pcount_tx, eth_pcount_rx,
                         eth_rx_irq_count, eth_irq_count,
                         eth_rx_notified, eth_idle_rx_notified, eth_tx_notified, eth_idle_tx_notified,
                         eth_rx_notify, eth_request_signal_rx,
-                        avg_capacity, eth_rx_free_min_capacity, eth_rx_free_max_capacity);
+                        avg_capacity, eth_rx_free_min_capacity, eth_rx_free_max_capacity, 
+                        virt_rx_notify, lwip_rx_notified, lwip_tx_notified, 
+                        lwip_rx_notify, lwip_tx_notify);
         }
 
     } else if (msg_match(data_packet_str, QUIT)) {

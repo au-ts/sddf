@@ -13,6 +13,7 @@
 #include <sddf/util/printf.h>
 #include <sddf/util/cache.h>
 #include <ethernet_config.h>
+#include <sddf/benchmark/bench.h>
 
 /* Notification channels */
 #define DRIVER_CH 0
@@ -31,6 +32,8 @@ net_queue_t *rx_active_cli0 = (net_queue_t *)0x2600000;
 /* Buffer data regions */
 uintptr_t buffer_data_vaddr = 0x2c00000;
 uintptr_t buffer_data_paddr = 0x11000000;
+
+struct bench *bench = (void *)(uintptr_t)0x5010000;
 
 /* In order to handle broadcast packets where the same buffer is given to multiple clients
   * we keep track of a reference count of each buffer and only hand it back to the driver once
@@ -143,6 +146,7 @@ void rx_return(void)
     for (int client = 0; client < NUM_NETWORK_CLIENTS; client++) {
         if (notify_clients[client] && net_require_signal_active(&state.rx_queue_clients[client])) {
             net_cancel_signal_active(&state.rx_queue_clients[client]);
+            bench->virt_rx_notify++;
             microkit_notify(client + CLIENT_CH);
         }
     }

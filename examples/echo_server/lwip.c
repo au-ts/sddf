@@ -52,6 +52,8 @@ net_queue_t *tx_active = (net_queue_t *)0x2600000;
 uintptr_t rx_buffer_data_region = 0x2800000;
 uintptr_t tx_buffer_data_region = 0x2a00000;
 
+static struct bench *bench = (void *)(uintptr_t)0x5010000;
+
 /* Booleans to indicate whether packets have been enqueued during notification handling */
 static bool notify_tx;
 static bool notify_rx;
@@ -154,6 +156,8 @@ void enqueue_pbufs(struct pbuf *p)
     pbuf_ref(p);
 }
 
+volatile char dummy_buffer[4096];
+
 /**
  * Insert pbuf into transmit active queue. If no free buffers available or transmit active queue is full,
  * stores pbuf to be sent upon buffers becoming available.
@@ -166,7 +170,9 @@ static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
     }
 
     if (net_queue_empty_free(&state.tx_queue)) {
-        enqueue_pbufs(p);
+        /* Indicate to the multiplexer that we require transmit free buffers */
+        net_request_signal_free(&state.tx_queue);
+        // enqueue_pbufs(p);
         return ERR_OK;
     }
 
@@ -182,6 +188,11 @@ static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
     }
 
     buffer.len = copied;
+
+    // for (int i = 0; i < 16; i++) {
+    //     memcpy((void *)dummy_buffer, (void *)buffer.io_or_offset + tx_buffer_data_region, buffer.len);
+    // }
+
     err = net_enqueue_active(&state.tx_queue, buffer);
     assert(!err);
 
@@ -234,6 +245,10 @@ void receive(void)
             net_buff_desc_t buffer;
             int err = net_dequeue_active(&state.rx_queue, &buffer);
             assert(!err);
+
+            // for (int i = 0; i < 16; i++) {
+            //     memcpy((void *)dummy_buffer, (void *)buffer.io_or_offset + rx_buffer_data_region, buffer.len);
+            // }
 
             struct pbuf *p = create_interface_buffer(buffer.io_or_offset, buffer.len);
             assert(p != NULL);
@@ -360,6 +375,7 @@ void notified(microkit_channel ch)
 {
     switch (ch) {
     case RX_CH:
+        bench->lwip_rx_notified++;
         receive();
         break;
     case TIMER:
@@ -367,6 +383,7 @@ void notified(microkit_channel ch)
         set_timeout();
         break;
     case TX_CH:
+        bench->lwip_tx_notified++;
         transmit();
         receive();
         break;
@@ -382,8 +399,10 @@ void notified(microkit_channel ch)
         net_cancel_signal_free(&state.rx_queue);
         notify_rx = false;
         if (!have_signal) {
+            bench->lwip_rx_notify++;
             microkit_notify(RX_CH);
         } else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + RX_CH) {
+            bench->lwip_rx_notify++;
             microkit_notify(RX_CH);
         }
     }
@@ -392,8 +411,10 @@ void notified(microkit_channel ch)
         net_cancel_signal_active(&state.tx_queue);
         notify_tx = false;
         if (!have_signal) {
+            bench->lwip_tx_notify++;
             microkit_notify(TX_CH);
         } else if (signal_cap != BASE_OUTPUT_NOTIFICATION_CAP + TX_CH) {
+            bench->lwip_tx_notify++;
             microkit_notify(TX_CH);
         }
     }

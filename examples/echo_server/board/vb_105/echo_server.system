@@ -108,6 +108,7 @@
 
             <map mr="net_rx_free_copy0" vaddr="0x2_400_000" perms="rw" cached="true" setvar_vaddr="rx_free_cli0" />
             <map mr="net_rx_active_copy0" vaddr="0x2_600_000" perms="rw" cached="true" setvar_vaddr="rx_active_cli0" />
+            <map mr="cyclecounters" vaddr="0x5_010_000" perms="rw" cached="true" setvar_vaddr="cyclecounters_vaddr" />
 
             <map mr="net_rx_buffer_data_region" vaddr="0x2_c00_000" perms="r" cached="true" setvar_vaddr="buffer_data_vaddr" />
         </protection_domain>

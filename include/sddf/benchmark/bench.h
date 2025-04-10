@@ -47,11 +47,13 @@ struct bench {
     uint64_t lwip_tx_notified;
     uint64_t lwip_idle_notified;
 
-    // rx mux
-    uint64_t rx_mux_notified;
-    uint64_t rx_mux_idle_notified;
+    // virt rx
+    uint64_t virt_rx_notify;
+    uint64_t virt_rx_notified;
+    uint64_t virt_rx_idle_notified;
 
-    // tx mux
-    uint64_t tx_mux_notified;
-    uint64_t tx_mux_idle_notified;
+    // virt tx
+    uint64_t virt_tx_notify;
+    uint64_t virt_tx_notified;
+    uint64_t virt_tx_idle_notified;
 };
