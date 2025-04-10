@@ -3,14 +3,98 @@
 #
 # SPDX-License-Identifier: BSD-2-Clause
 #
+# This Makefile is copied into the build directory
+# and operated on from there.
+#
 
-QEMU := qemu-system-aarch64
+ifeq ($(strip $(MICROKIT_SDK)),)
+$(error MICROKIT_SDK must be specified)
+endif
+
+ifeq ($(strip $(SDDF)),)
+$(error SDDF must be specified)
+endif
+
+BUILD_DIR ?= build
+MICROKIT_CONFIG ?= debug
+IMAGE_FILE = loader.img
+REPORT_FILE = report.txt
+
+BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
+ARCH := ${shell grep 'CONFIG_SEL4_ARCH  ' $(BOARD_DIR)/include/kernel/gen_config.h | cut -d' ' -f4}
+# Toolchain triples have inconsistent naming, below tries to automatically resolve that
+ifeq ($(strip $(TOOLCHAIN)),)
+	# Get whether the common toolchain triples exist
+	TOOLCHAIN_ARCH_NONE_ELF := $(shell command -v $(ARCH)-none-elf-gcc 2> /dev/null)
+	TOOLCHAIN_ARCH_UNKNOWN_ELF := $(shell command -v $(ARCH)-unknown-elf-gcc 2> /dev/null)
+	# Then check if they are defined and select the appropriate one
+	ifdef TOOLCHAIN_ARCH_NONE_ELF
+		TOOLCHAIN := $(ARCH)-none-elf
+	else ifdef TOOLCHAIN_ARCH_UNKNOWN_ELF
+		TOOLCHAIN := $(ARCH)-unknown-elf
+	else
+$(error "Could not find a $(ARCH) cross-compiler")
+	endif
+endif
+TOOLCHAIN := $(TOOLCHAIN)
+
+CC := $(TOOLCHAIN)-gcc
+# Usually, we use the linker directly. Since we're linking against the libc
+# for the echo server, we want to use the compiler driver so it can add its
+# knowledge of where the libc is located.
+LD := $(CC)
+AS := $(TOOLCHAIN)-as
+AR := $(TOOLCHAIN)-ar
+RANLIB := $(TOOLCHAIN)-ranlib
+OBJCOPY := $(TOOLCHAIN)-objcopy
 DTC := dtc
 PYTHON ?= python3
 
+MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
+
+ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
+	export DRIV_DIR := meson
+	export SERIAL_DRIV_DIR := meson
+	export TIMER_DRV_DIR := meson
+	export CPU := cortex-a55
+else ifeq ($(strip $(MICROKIT_BOARD)), odroidc2)
+	export DRIV_DIR := meson
+	export SERIAL_DRIV_DIR := meson
+	export TIMER_DRV_DIR := meson
+	export CPU := cortex-a53
+else ifneq ($(filter $(strip $(MICROKIT_BOARD)),imx8mm_evk imx8mp_evk imx8mq_evk maaxboard),)
+	export DRIV_DIR := imx
+	export SERIAL_DRIV_DIR := imx
+	export TIMER_DRV_DIR := imx
+	export CPU := cortex-a53
+else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
+	export DRIV_DIR := virtio
+	export SERIAL_DRIV_DIR := arm
+	export TIMER_DRV_DIR := arm
+	export CPU := cortex-a53
+	export QEMU := qemu-system-aarch64
+	export QEMU_ARCH_ARGS := -machine virt,virtualization=on -cpu cortex-a53 \
+						-device loader,file=$(IMAGE_FILE),addr=0x70000000,cpu-num=0 \
+						-serial mon:stdio
+else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_riscv64)
+	export DRIV_DIR := virtio
+	export SERIAL_DRIV_DIR := virtio
+	export TIMER_DRV_DIR := goldfish
+	export QEMU := qemu-system-riscv64
+	export QEMU_ARCH_ARGS := -machine virt -kernel $(IMAGE_FILE) \
+							-mon qemu_console \
+							-serial chardev:qemu_console \
+							-device virtio-serial-device \
+							-chardev stdio,id=qemu_console,mux=on,signal=off \
+							-device virtconsole,chardev=qemu_console
+else
+$(error Unsupported MICROKIT_BOARD given)
+endif
+
+
+TOP := ${SDDF}/examples/echo_server
 METAPROGRAM := $(TOP)/meta.py
 
-MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 ECHO_SERVER:=${SDDF}/examples/echo_server
 LWIPDIR:=network/ipstacks/lwip/src
 BENCHMARK:=$(SDDF)/benchmark
@@ -20,14 +104,9 @@ SERIAL_COMPONENTS := $(SDDF)/serial/components
 SERIAL_DRIVER := $(SDDF)/drivers/serial/$(SERIAL_DRIV_DIR)
 TIMER_DRIVER:=$(SDDF)/drivers/timer/$(TIMER_DRV_DIR)
 NETWORK_COMPONENTS:=$(SDDF)/network/components
-
-BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
-IMAGE_FILE := loader.img
-REPORT_FILE := report.txt
 SYSTEM_FILE := echo_server.system
 DTS := $(SDDF)/dts/$(MICROKIT_BOARD).dts
 DTB := $(MICROKIT_BOARD).dtb
-METAPROGRAM := $(TOP)/meta.py
 
 vpath %.c ${SDDF} ${ECHO_SERVER}
 
@@ -35,8 +114,31 @@ IMAGES := eth_driver.elf echo0.elf echo1.elf benchmark.elf idle.elf network_virt
 	  network_virt_tx.elf network_copy0.elf network_copy1.elf timer_driver.elf\
 	  serial_driver.elf serial_virt_tx.elf
 
-CFLAGS := -mcpu=$(CPU) \
-	  -mstrict-align \
+ifeq ($(ARCH),aarch64)
+	CFLAGS_ARCH := -mcpu=$(CPU) -mstrict-align
+else ifeq ($(ARCH),riscv64)
+	CFLAGS_ARCH := -march=rv64imafdc -mabi=lp64d
+endif
+
+# Echo server example relies on libc functionality, hence only works with GCC
+# instead of LLVM. See README for more details.
+# Additionally, on x86_64 debian/ubuntu the gcc-riscv64-unknown-elf package is distributed
+# without libc. Checks if `picolibc-riscv64-unknown-elf` is installed in that case, and uses it.
+LIBC := $(dir $(realpath $(shell $(CC) --print-file-name libc.a)))
+PICOLIBC := $(dir $(realpath $(shell $(CC) --print-file-name picolibc.specs)))
+ifneq ($(strip $(LIBC)),)
+	LDFLAGS_ARCH += -L$(LIBC)
+	LIBS_ARCH += -lc
+else ifneq ($(strip $(PICOLIBC)),)
+	CFLAGS_ARCH += -specs=picolibc.specs
+else
+	$(error LIBC not found for the selected toolchain: $(TOOLCHAIN))
+endif
+
+# Of note here is that we don't specify -nostdlib, as we want libc.
+# But we don't want crt0, so add -nostartfiles
+CFLAGS := $(CFLAGS_ARCH) \
+	  -nostartfiles \
 	  -ffreestanding \
 	  -g3 -O3 -Wall \
 	  -Wno-unused-function \
@@ -50,17 +152,14 @@ CFLAGS := -mcpu=$(CPU) \
 	  -MD \
 	  -MP
 
-LDFLAGS := -L$(BOARD_DIR)/lib -L${LIBC}
-LIBS := --start-group -lmicrokit -Tmicrokit.ld -lc libsddf_util_debug.a --end-group
+LDFLAGS := $(CFLAGS_ARCH) -nostartfiles -ffreestanding -L$(BOARD_DIR)/lib $(LDFLAGS_ARCH)
+LIBS := -Wl,--start-group -lmicrokit -Tmicrokit.ld ${LIBS_ARCH} libsddf_util_debug.a -Wl,--end-group
 
 CHECK_FLAGS_BOARD_MD5 := .board_cflags-$(shell echo -- ${CFLAGS} ${BOARD} ${MICROKIT_CONFIG} | shasum | sed 's/ *-//')
 
 ${CHECK_FLAGS_BOARD_MD5}:
 	-rm -f .board_cflags-*
 	touch $@
-
-%.elf: %.o
-	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
 
 ECHO_OBJS := echo.o utilization_socket.o \
 	     udp_echo_socket.o tcp_echo_socket.o
@@ -122,10 +221,7 @@ include ${SERIAL_DRIVER}/serial_driver.mk
 include ${SERIAL_COMPONENTS}/serial_components.mk
 
 qemu: $(IMAGE_FILE)
-	$(QEMU) -machine virt,virtualization=on \
-			-cpu cortex-a53 \
-			-serial mon:stdio \
-			-device loader,file=$(IMAGE_FILE),addr=0x70000000,cpu-num=0 \
+	$(QEMU) $(QEMU_ARCH_ARGS) \
 			-m size=2G \
 			-nographic \
 			-device virtio-net-device,netdev=netdev0 \
@@ -138,7 +234,6 @@ clean::
 	find . -name \*.[do] |xargs --no-run-if-empty rm
 
 clobber:: clean
-	rm -f *.a
 	rm -f ${IMAGE_FILE} ${REPORT_FILE}
 
 -include $(DEPS)
