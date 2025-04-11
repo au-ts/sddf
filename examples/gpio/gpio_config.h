@@ -9,8 +9,8 @@
 #include <sddf/gpio/meson/gpio.h>
 #include <sddf/gpio/imx/gpio.h>
 
-#define GPIO_1 (MESON_GPIO_X + 17)
-#define GPIO_2 (MESON_GPIO_X + 14)
+#define GPIO_1 (MESON_GPIO_A + 15)
+#define GPIO_2 (MESON_GPIO_A + 14)
 
 // WARNING : The GPIOA pins DO NOT work for input!!
 
@@ -34,7 +34,7 @@
 */
 static const int gpio_channel_mappings[GPIO_CHANNEL_MAPPING_ROWS][GPIO_CHANNEL_MAPPING_COLS] = {
     { 0, GPIO_1, -1 },
-    { 1, GPIO_2, MESON_GPIO_IRQ_0},
+    { 1, GPIO_2, MESON_GPIO_IRQ_1 },
     { 2, -1, -1 },
     { 3, -1, -1 },
     { 4, -1, -1 },

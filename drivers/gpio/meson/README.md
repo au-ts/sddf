@@ -50,7 +50,7 @@ There are also 2 AO interupt sources that can be configured to ONLY pins in the 
 - 239 : ao_gpio_irq1
 - 238 : ao_gpio_irq0
 
-Note: In theory since the input for the GPIO interrupt module comes directly from the I/O part of the pin, the pin doesn't neccessarily have to be configured as a GPIO pin and could be a UART TX pin driving the interrput source. During initialisation for an IRQ to be set a corresponding GPIO pin must also be set so to get this functionality you would perhaps need to not configure this as a GPIO in the pinmux.
+Note: In theory since the input for the GPIO interrupt module comes directly from the I/O part of the pin, the pin doesn't neccessarily have to be configured as a GPIO pin and could be a UART TX pin driving the interrput source. 
 
 ### Hardware Registers
 For each of the 10 interrupt sources, there is an associated (part of) register to configure the respective functionality:
@@ -64,6 +64,5 @@ There is also a field specific to the 2 AO interupt sources:
 - GPIO_FILTER_USE_CLK is used to connect the input filter to the system clock. **unimplemented**
 
 ## SPECIAL NOTES
-- Out of the brought out pins, GPIOA pins don't seem to work for input :(
-- All combinations of the other pins have been tested
+- Out of the brought out pins, you cant seem to configure the GPIOA pins to pull down :(
 

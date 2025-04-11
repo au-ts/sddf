@@ -6,10 +6,9 @@
 -->
 <system>
 
-    <!-- TODO: i changed the size of mem regions so may fail -->
     <memory_region name="gpio" size="0x1_000" phys_addr="0xFF634000"/>
     <memory_region name="gpio_ao" size="0x1_000" phys_addr="0xFF800000"/>
-    <memory_region name="interupt_control" size="0x4_000" phys_addr="0xFFD00000"/>
+    <memory_region name="interupt_control" size="0x10_000" phys_addr="0xFFD00000"/>
 
     <protection_domain name="driver" priority="100" pp="true">
         <program_image path="gpio_driver.elf"/>
@@ -19,7 +18,7 @@
         <map mr="interupt_control" vaddr="0x4_200_000" perms="rw" setvar_vaddr="interupt_control_regs" cached="false" />
 
         <!-- gpio_irq[0] -->
-        <irq irq="96" id="52" trigger="edge"/>
+        <irq irq="97" id="53" trigger="edge"/>
 
     </protection_domain>
 

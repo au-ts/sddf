@@ -201,8 +201,6 @@ static volatile uint32_t *meson_get_gpio_base_address(size_t pin) {
     return (volatile uint32_t *)(gpio_regs + GPIO_REGS_BASE_ADDRESS_OFFSET);
 }
 
-/* GETS | GPIO */
-
 static void meson_get_gpio_output(size_t pin, size_t* label, size_t* response) {
     uint32_t reg_offset;
     uint32_t start_bit;
@@ -215,7 +213,6 @@ static void meson_get_gpio_output(size_t pin, size_t* label, size_t* response) {
     volatile uint32_t *gpio_base_address = meson_get_gpio_base_address(pin);
     volatile uint32_t *final_reg_address = ((void *)gpio_base_address + reg_offset * 4);
 
-    // get value
     uint32_t value = (*final_reg_address >> start_bit) & BIT(0);
 
     *label = GPIO_SUCCESS;
@@ -234,7 +231,6 @@ static void meson_get_gpio_input(size_t pin, size_t* label, size_t* response) {
     volatile uint32_t *gpio_base_address = meson_get_gpio_base_address(pin);
     volatile uint32_t *final_reg_address = ((void *)gpio_base_address + reg_offset * 4);
 
-    // get value
     uint32_t value = (*final_reg_address >> start_bit) & BIT(0);
 
     *label = GPIO_SUCCESS;
@@ -253,9 +249,10 @@ static void meson_get_gpio_direction(size_t pin, size_t* label, size_t* response
     volatile uint32_t *gpio_base_address = meson_get_gpio_base_address(pin);
     volatile uint32_t *final_reg_address = ((void *)gpio_base_address + reg_offset * 4);
 
-    // get value
     uint32_t value = ((*final_reg_address >> start_bit) & BIT(0)) == 0 ? GPIO_DIRECTION_OUTPUT : GPIO_DIRECTION_INPUT;
-
+    LOG_DRIVER("meson_get_gpio_direction\n");
+    LOG_DRIVER("%#x\n", reg_offset); 
+    print_reg(*final_reg_address);
     *label = GPIO_SUCCESS;
     *response = value;
 }
@@ -272,14 +269,20 @@ static void meson_get_gpio_pull(size_t pin, size_t* label, size_t* response) {
     volatile uint32_t *gpio_base_address = meson_get_gpio_base_address(pin);
     volatile uint32_t *final_reg_address = ((void *)gpio_base_address + reg_offset * 4);
 
-    // get value
     uint32_t value = (*final_reg_address >> start_bit) & BIT(0);
 
     if (value == 0) {
         *label = GPIO_SUCCESS;
         *response = MESON_GPIO_NO_PULL;
+        LOG_DRIVER("meson_get_gpio_pull\n");
+        LOG_DRIVER("%#x\n", reg_offset); 
+        print_reg(*final_reg_address);
         return;
     }
+
+    LOG_DRIVER("meson_get_gpio_pull\n");
+    LOG_DRIVER("%#x\n", reg_offset); 
+    print_reg(*final_reg_address);
 
     if (!meson_gpio_calculate_reg_off_and_start_bit(MESON_GPIO_REG_PULL, pin, &reg_offset, &start_bit)) {
         *label = GPIO_FAILURE;
@@ -297,6 +300,9 @@ static void meson_get_gpio_pull(size_t pin, size_t* label, size_t* response) {
     } else {
        *response = MESON_GPIO_PULL_UP;
     }
+    LOG_DRIVER("meson_get_gpio_pull\n");
+    LOG_DRIVER("%#x\n", reg_offset); 
+    print_reg(*final_reg_address);
 }
 
 static void meson_get_gpio_drive_strength(size_t pin, size_t* label, size_t* response) {
@@ -311,14 +317,11 @@ static void meson_get_gpio_drive_strength(size_t pin, size_t* label, size_t* res
     volatile uint32_t *gpio_base_address = meson_get_gpio_base_address(pin);
     volatile uint32_t *final_reg_address = ((void *)gpio_base_address + reg_offset * 4);
 
-    // get value
     uint32_t value = (*final_reg_address >> start_bit) & BIT_MASK(0, meson_gpio_bit_strides[MESON_GPIO_REG_DS]);
 
     *label = GPIO_SUCCESS;
     *response = value;
 }
-
-/* SETS | GPIO */
 
 static void meson_set_gpio_output(size_t pin, size_t value, size_t* label, size_t* response) {
     if (value != 0 && value != 1) {
@@ -338,9 +341,8 @@ static void meson_set_gpio_output(size_t pin, size_t value, size_t* label, size_
     volatile uint32_t *gpio_base_address = meson_get_gpio_base_address(pin);
     volatile uint32_t *final_reg_address = ((void *)gpio_base_address + reg_offset * 4);
 
-    // set value
-    *final_reg_address &= ~BIT(start_bit); // clear
-    *final_reg_address |= (BIT(0) & value) << start_bit; // set
+    *final_reg_address &= ~BIT(start_bit);
+    *final_reg_address |= (BIT(0) & value) << start_bit; 
 
     *label = GPIO_SUCCESS;
 }
@@ -363,10 +365,11 @@ static void meson_set_gpio_direction(size_t pin, size_t value, size_t* label, si
     volatile uint32_t *gpio_base_address = meson_get_gpio_base_address(pin);
     volatile uint32_t *final_reg_address = ((void *)gpio_base_address + reg_offset * 4);
 
-    // set value
-    *final_reg_address &= ~BIT(start_bit); // clear
-    *final_reg_address |= (BIT(0) & value) << start_bit; // set
-
+    *final_reg_address &= ~BIT(start_bit);
+    *final_reg_address |= (BIT(0) & value) << start_bit;
+    LOG_DRIVER("meson_set_gpio_direction\n");
+    LOG_DRIVER("%#x\n", reg_offset); 
+    print_reg(*final_reg_address);
     *label = GPIO_SUCCESS;
 }
 
@@ -388,16 +391,20 @@ static void meson_set_gpio_pull(size_t pin, size_t value, size_t* label, size_t*
     volatile uint32_t *gpio_base_address = meson_get_gpio_base_address(pin);
     volatile uint32_t *final_reg_address = ((void *)gpio_base_address + reg_offset * 4);
 
-    // set value
-    *final_reg_address &= ~BIT(start_bit); // clear
+    *final_reg_address &= ~BIT(start_bit);
     if (value == MESON_GPIO_NO_PULL) {
         *label = GPIO_SUCCESS;
+        LOG_DRIVER("meson_set_gpio_pull\n");
+        LOG_DRIVER("%#x\n", reg_offset); 
+        print_reg(*final_reg_address);
         return;
     }
 
-    *final_reg_address |= BIT(start_bit); // set
+    *final_reg_address |= BIT(start_bit);
+    LOG_DRIVER("meson_set_gpio_pull\n");
+    LOG_DRIVER("%#x\n", reg_offset); 
+    print_reg(*final_reg_address);
 
-    // need to change other register as well
     if (!meson_gpio_calculate_reg_off_and_start_bit(MESON_GPIO_REG_PULL, pin, &reg_offset, &start_bit)) {
         *label = GPIO_FAILURE;
         *response = GPIO_ERROR_UNSUPPORTED_PIN_CONFIG;
@@ -405,12 +412,18 @@ static void meson_set_gpio_pull(size_t pin, size_t value, size_t* label, size_t*
     }
 
     final_reg_address = ((void *)gpio_base_address + reg_offset * 4);
+    LOG_DRIVER("meson_set_gpio_pull\n");
+    LOG_DRIVER("%#x\n", reg_offset); 
+    print_reg(*final_reg_address);
 
     if (value == MESON_GPIO_PULL_DOWN) {
-        *final_reg_address &= ~BIT(start_bit); // clear
+        *final_reg_address &= ~BIT(start_bit);
     } else {
-        *final_reg_address |= BIT(start_bit); // set
+        *final_reg_address |= BIT(start_bit); 
     }
+    LOG_DRIVER("meson_set_gpio_pull\n");
+    LOG_DRIVER("%#x\n", reg_offset); 
+    print_reg(*final_reg_address);
 
     *label = GPIO_SUCCESS;
 }
@@ -433,14 +446,11 @@ static void meson_set_gpio_drive_strength(size_t pin, size_t value, size_t* labe
     volatile uint32_t *gpio_base_address = meson_get_gpio_base_address(pin);
     volatile uint32_t *final_reg_address = ((void *)gpio_base_address + reg_offset * 4);
 
-    // set value
     *final_reg_address &= ~BIT_MASK(start_bit, start_bit + meson_gpio_bit_strides[MESON_GPIO_REG_DS]); // clear
     *final_reg_address |= (BIT_MASK(0, 0 + meson_gpio_bit_strides[MESON_GPIO_REG_DS]) & value) << start_bit; // set
 
     *label = GPIO_SUCCESS;
 }
-
-/* GETS | IRQ */
 
 static void meson_get_irq_pin(size_t irq, size_t* label, size_t* response) {
     uint32_t reg_offset;
@@ -462,7 +472,6 @@ static void meson_get_irq_pin(size_t irq, size_t* label, size_t* response) {
     volatile uint32_t *irq_base_address = (void *)(interupt_control_regs + IRQ_CONTROL_REGS_BASE_ADDRESS_OFFSET);
     volatile uint32_t *final_reg_address = ((void *)irq_base_address + reg_offset * 4);
 
-    // get value
     uint32_t value = (*final_reg_address >> start_bit) & BIT_MASK(0, meson_irq_bit_strides[reg_type]);
 
     *label = GPIO_SUCCESS;
@@ -481,7 +490,6 @@ static void meson_get_irq_edge(size_t irq, size_t* label, size_t* response) {
     volatile uint32_t *irq_base_address = (void *)(interupt_control_regs + IRQ_CONTROL_REGS_BASE_ADDRESS_OFFSET);
     volatile uint32_t *final_reg_address = ((void *)irq_base_address + reg_offset * 4);
 
-    // get value
     uint32_t value = (*final_reg_address >> start_bit) & BIT(0);
 
     if (value == 1) {
@@ -498,7 +506,6 @@ static void meson_get_irq_edge(size_t irq, size_t* label, size_t* response) {
 
     final_reg_address = ((void *)irq_base_address + reg_offset * 4);
 
-    // get value
     value = (*final_reg_address >> start_bit) & BIT(0);
 
     if (value == 0) {
@@ -515,7 +522,6 @@ static void meson_get_irq_edge(size_t irq, size_t* label, size_t* response) {
 
     final_reg_address = ((void *)irq_base_address + reg_offset * 4);
 
-    // get value
     value = (*final_reg_address >> start_bit) & BIT(0);
 
     *label = GPIO_SUCCESS;
@@ -539,7 +545,6 @@ static void meson_get_irq_filter(size_t irq, size_t* label, size_t* response) {
     volatile uint32_t *irq_base_address = (void *)(interupt_control_regs + IRQ_CONTROL_REGS_BASE_ADDRESS_OFFSET);
     volatile uint32_t *final_reg_address = ((void *)irq_base_address + reg_offset * 4);
 
-    // get value
     uint32_t value = (*final_reg_address >> start_bit) & BIT_MASK(0, meson_irq_bit_strides[MESON_IRQ_REG_FIL]);
     if ((irq == MESON_GPIO_AO_IRQ_0 || irq == MESON_GPIO_AO_IRQ_1) && value == 1) {
         *response = MESON_GPIO_IRQ_FILTER_2600NS;
@@ -549,8 +554,6 @@ static void meson_get_irq_filter(size_t irq, size_t* label, size_t* response) {
 
     *label = GPIO_SUCCESS;
 }
-
-/* SETS | IRQ */
 
 static void meson_set_irq_pin(size_t irq, size_t value, size_t* label, size_t* response) {
     meson_irq_reg_type_t reg_type;
@@ -571,7 +574,6 @@ static void meson_set_irq_pin(size_t irq, size_t value, size_t* label, size_t* r
         }
         reg_type = MESON_IRQ_REG_SEL;
     }
-
     uint32_t reg_offset;
     uint32_t start_bit;
 
@@ -584,7 +586,6 @@ static void meson_set_irq_pin(size_t irq, size_t value, size_t* label, size_t* r
     volatile uint32_t *irq_base_address = (void *)(interupt_control_regs + IRQ_CONTROL_REGS_BASE_ADDRESS_OFFSET);
     volatile uint32_t *final_reg_address = ((void *)irq_base_address + reg_offset * 4);
 
-    // set value
     *final_reg_address &= ~BIT_MASK(start_bit, start_bit + meson_irq_bit_strides[reg_type]); // clear
     *final_reg_address |= (BIT_MASK(0, 0 + meson_irq_bit_strides[reg_type]) & value) << start_bit; // set
 
@@ -615,10 +616,9 @@ static void meson_set_irq_edge(size_t irq, size_t value, size_t* label, size_t* 
 
     final_reg_address = ((void *)irq_base_address + reg_offset * 4);
 
-    // set value
-    *final_reg_address &= ~BIT(start_bit); // clear
+    *final_reg_address &= ~BIT(start_bit);
     if (value == MESON_GPIO_IRQ_BOTH_RISING_FALLING) {
-        *final_reg_address |= BIT(start_bit); // set
+        *final_reg_address |= BIT(start_bit); 
         *label = GPIO_SUCCESS;
         return;
     }
@@ -631,13 +631,12 @@ static void meson_set_irq_edge(size_t irq, size_t value, size_t* label, size_t* 
 
     final_reg_address = ((void *)irq_base_address + reg_offset * 4);
 
-    // set value
-    *final_reg_address &= ~BIT(start_bit); // clear
+    *final_reg_address &= ~BIT(start_bit);
     if (value == MESON_GPIO_IRQ_LEVEL) {
         *label = GPIO_SUCCESS;
         return;
     }
-    *final_reg_address |= BIT(start_bit); // set
+    *final_reg_address |= BIT(start_bit);
 
     if (!meson_irq_calculate_reg_off_and_start_bit(MESON_IRQ_REG_POL, irq, &reg_offset, &start_bit)) {
         *label = GPIO_FAILURE;
@@ -649,12 +648,11 @@ static void meson_set_irq_edge(size_t irq, size_t value, size_t* label, size_t* 
 
     *label = GPIO_SUCCESS;
 
-    // set value
-    *final_reg_address &= ~BIT(start_bit); // clear
+    *final_reg_address &= ~BIT(start_bit);
     if (value == MESON_GPIO_IRQ_RISING) {
         return;
     }
-    *final_reg_address |= BIT(start_bit); // set
+    *final_reg_address |= BIT(start_bit); 
 }
 
 static void meson_set_irq_filter(size_t irq, size_t value, size_t* label, size_t* response) {
@@ -672,11 +670,11 @@ static void meson_set_irq_filter(size_t irq, size_t value, size_t* label, size_t
 
     if (irq == MESON_GPIO_AO_IRQ_0 || irq == MESON_GPIO_AO_IRQ_1) {
         if (value == MESON_GPIO_IRQ_FILTER_2600NS) {
-            *final_reg_address |= BIT(start_bit); // set
+            *final_reg_address |= BIT(start_bit);
             *label = GPIO_SUCCESS;
             return;
         } else if (value == MESON_GPIO_IRQ_FILTER_0NS) {
-            *final_reg_address &= ~BIT(start_bit); // clear
+            *final_reg_address &= ~BIT(start_bit); 
             *label = GPIO_SUCCESS;
             return;
         } else {
@@ -935,17 +933,18 @@ void init(void)
         /* Check if IRQ has been configured for this GPIO */
         if (gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_IRQ_SLOT] != -1) {
             int irq = gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_IRQ_SLOT];
-
+            LOG_DRIVER("IRQ %d\n", irq);
             /* Check if its a valid irq configuration (its in range + corresponding device channel entry in table is uninitialised) */
             if (!meson_is_valid_irq_config(irq)) {
                 LOG_DRIVER_ERR("Failed to config gpio_channel_mappings[%d] because failed to config irq!\n", i);
                 while (1) {}
             }
+            LOG_DRIVER("IRQ %d\n", irq);
 
             /* Ensure IRQ channel is not configured to another channel */
             int count = 0;
             for (int j = 0; j < 62; j++) {
-                if (irq == gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_IRQ_SLOT]) {
+                if (irq == gpio_channel_mappings[j][GPIO_CHANNEL_MAPPING_IRQ_SLOT]) {
                     count++;
                 }
             }
@@ -953,6 +952,7 @@ void init(void)
                 LOG_DRIVER_ERR("Failed to config gpio_channel_mappings[%d] because IRQ is not configured ONLY ONCE\n", i);
                 while (1) {}
             }
+            LOG_DRIVER("IRQ %d\n", irq);
 
             /* Configure with hardware */
             size_t label;
@@ -971,6 +971,7 @@ void init(void)
                 LOG_DRIVER_ERR("Pin was not configuured properly, response : %ld!\n", response);
                 while (1) {}
             }
+            LOG_DRIVER("IRQ %d\n", irq);
 
             /* Assign channel to the gpio pin */
             driver_to_client_channel_mappings[irq - MESON_GPIO_IRQ_CHANNEL_START] = gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_CLIENTS_CHANNEL_SLOT];

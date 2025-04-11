@@ -14,7 +14,7 @@ When a digtial I/O pin is not being used for any specific purpose (i2c, uart) it
 # USAGE!!!!!!!!!!! (IMPORTANT)
 There must be a configuration file that contains gpio_channel_mappings.
 
-Some registers have undefined permissions so it is the clients responsibility to check with a get request after each set request to make sure what they are trying to do actually is reflected in the register!
+Some registers have undefined permissions so it is the clients responsibility to check with a GET request after each SET request to make sure what they are trying to do actually is reflected in the register!
 
 Or check the datasheet (its wrong though sometimes).
 

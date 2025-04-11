@@ -62,7 +62,7 @@ void client_main(void) {
     LOG_CLIENT("Setting GPIO1 to on!\n");
     msginfo = microkit_msginfo_new(GPIO_SET_GPIO, 2);
     microkit_mr_set(GPIO_REQ_CONFIG_SLOT, GPIO_OUTPUT);
-    microkit_mr_set(GPIO_REQ_VALUE_SLOT, 1);
+    microkit_mr_set(GPIO_REQ_VALUE_SLOT, 0);
     msginfo = microkit_ppcall(GPIO_DRIVER_CH_1, msginfo);
     if (microkit_msginfo_get_label(msginfo) == GPIO_FAILURE) {
         size_t error = microkit_mr_get(GPIO_RES_VALUE_SLOT);
@@ -81,7 +81,7 @@ void client_main(void) {
     }
 
     value = microkit_mr_get(GPIO_RES_VALUE_SLOT);
-    if (value != 1) {
+    if (value != 0) {
         LOG_CLIENT_ERR("problem with output in driver!\n");
         while (1) {};
     }
@@ -170,7 +170,7 @@ void client_main(void) {
     LOG_CLIENT("Setting pull of GPIO2 to down!\n");
     msginfo = microkit_msginfo_new(GPIO_SET_GPIO, 2);
     microkit_mr_set(GPIO_REQ_CONFIG_SLOT, MESON_GPIO_PULL);
-    microkit_mr_set(GPIO_REQ_VALUE_SLOT, MESON_GPIO_PULL_DOWN);
+    microkit_mr_set(GPIO_REQ_VALUE_SLOT, MESON_GPIO_NO_PULL);
     msginfo = microkit_ppcall(GPIO_DRIVER_CH_2, msginfo);
     if (microkit_msginfo_get_label(msginfo) == GPIO_FAILURE) {
         size_t error = microkit_mr_get(GPIO_RES_VALUE_SLOT);
@@ -189,7 +189,7 @@ void client_main(void) {
     }
 
     value = microkit_mr_get(GPIO_RES_VALUE_SLOT);
-    if (value != MESON_GPIO_PULL_DOWN) {
+    if (value != MESON_GPIO_NO_PULL) {
         LOG_CLIENT_ERR("problem with pull in driver!\n");
         while (1) {};
     }
@@ -279,19 +279,20 @@ void client_main(void) {
         }
     }
 
-    // /* Polling Loop , instead of IRQ based */
-    // while (true) {
+    /* Polling Loop , instead of IRQ based */
+    // while (1) {
     //     msginfo = microkit_msginfo_new(GPIO_GET_GPIO, 1);
     //     microkit_mr_set(GPIO_REQ_CONFIG_SLOT, GPIO_INPUT);
     //     msginfo = microkit_ppcall(GPIO_DRIVER_CH_2, msginfo);
     //     if (microkit_msginfo_get_label(msginfo) == GPIO_FAILURE) {
     //         size_t error = microkit_mr_get(GPIO_RES_VALUE_SLOT);
-    //         LOG_CLIENT_ERR("failed to get input of gpio with error %d!\n", error);
+    //         LOG_CLIENT_ERR("failed to get input of gpio with error %ld!\n", error);
     //         while (1) {};
     //     }
     //     value = microkit_mr_get(GPIO_RES_VALUE_SLOT);
-    //     LOG_CLIENT("%d!\n", value);
+    //     LOG_CLIENT("%ld!\n", value);
     // }
+    // while(1){}
 }
 
 void init(void) {

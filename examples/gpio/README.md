@@ -10,15 +10,15 @@ This example makes use two circuits. There is no debouncer added so it may not b
 
 ### Circuit 1:
 
-GPIO_H_5 --------|>|----[R]-------- GND
-                LED(2V)
+GPIO ---[R]--------|>|--------- GND
+                      LED(2V)
 
 Add appropriate resistance.
 
 ### Circuit 2:
 
-GPIO_X_17 ----[ ]---- VCC (3.3)
-          Button
+GPIO ----[ ]---- VCC (3.3)
+       Button
 
 ## Building
 
