@@ -23,7 +23,18 @@ serial_queue_handle_t tx_queue_handle;
 /* UART device registers */
 volatile uintptr_t uart_base;
 
-#define REG_PTR(off)     ((volatile uint32_t *)((uart_base) + (off)))
+/* TODO: Use the value from the device tree*/
+#if defined(CONFIG_PLAT_STAR64)
+#define REG_IO_WIDTH 4
+#define REG_SHIFT 2
+#define REG_PTR(off)     ((volatile uint32_t *)((uart_base) + (off << REG_SHIFT)))
+#elif defined(CONFIG_PLAT_QEMU_RISCV_VIRT)
+#define REG_IO_WIDTH 1
+#define REG_SHIFT 0
+#define REG_PTR(off)     ((volatile uint8_t *)((uart_base) + (off << REG_SHIFT)))
+#else
+#error "unknown platform reg-io-width"
+#endif
 
 static void set_baud(unsigned long baud)
 {
@@ -115,7 +126,7 @@ static void handle_irq(void)
     }
 
     if (line_status & UART_ABNORMAL) {
-        sddf_dprintf("UART|ERROR: Uart device encountered an error with status register %u\n", line_status);
+        LOG_DRIVER_ERR("device encountered an error with status register %u\n", line_status);
         /* Clear the UART errors */
         line_status |= UART_ABNORMAL;
     }
@@ -123,8 +134,6 @@ static void handle_irq(void)
 
 void init(void)
 {
-    LOG_DRIVER("initialising\n");
-
     assert(serial_config_check_magic(&config));
     assert(device_resources_check_magic(&device_resources));
     assert(device_resources.num_irqs == 1);
@@ -135,8 +144,10 @@ void init(void)
     /* Ensure that the FIFO's are empty */
     while (!(*REG_PTR(UART_LSR) & UART_LSR_THRE));
 
+#ifdef UART_DW_APB_SHADOW_REGISTERS
     /* Reset the UART device - this disables RX and TX */
     *REG_PTR(UART_SSR) |= UART_SSR_UR;
+#endif
 
     /* Setup the Modem Control Register */
     *REG_PTR(UART_MCR) |= (UART_MCR_DTR | UART_MCR_RTS);
@@ -153,7 +164,7 @@ void init(void)
     /* Set the baud rate */
     set_baud(config.default_baud);
 
-    /* Enable both Recieve Data Available and Transmit Holding Register Empty IRQs. */
+    /* Enable both Receive Data Available and Transmit Holding Register Empty IRQs. */
     *REG_PTR(UART_IER) = (UART_IER_ERBFI | UART_IER_ETBEI);
 
     if (config.rx_enabled) {
@@ -172,6 +183,6 @@ void notified(microkit_channel ch)
     } else if (ch == config.rx.id) {
         rx_return();
     } else {
-        LOG_DRIVER("received notification on unexpected channel\n");
+        LOG_DRIVER_ERR("received notification on unexpected channel\n");
     }
 }
