@@ -1,6 +1,7 @@
 {
     "compatible": [
-        "starfive,jh7110-uart"
+        "starfive,jh7110-uart",
+        "ns16550a"
     ],
     "resources": {
         "regions": [

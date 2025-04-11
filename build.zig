@@ -10,7 +10,7 @@ const DriverClass = struct {
         arm,
         meson,
         imx,
-        snps,
+        ns16550a,
         virtio,
     };
 
