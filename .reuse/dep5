@@ -23,7 +23,7 @@ Files:
     drivers/serial/arm/config.json
     drivers/serial/imx/config.json
     drivers/serial/meson/config.json
-    drivers/serial/snps/config.json
+    drivers/serial/ns16550a/config.json
     drivers/serial/virtio/config.json
     drivers/timer/arm/config.json
     drivers/timer/imx/config.json

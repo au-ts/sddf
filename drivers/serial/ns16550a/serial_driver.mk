@@ -8,18 +8,18 @@
 
 SERIAL_DRIVER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 
-serial_driver.elf: serial/snps/serial_driver.o
+serial_driver.elf: serial/ns16550a/serial_driver.o
 	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
 
-serial/snps/serial_driver.o: ${SERIAL_DRIVER_DIR}/uart.c |serial/snps
+serial/ns16550a/serial_driver.o: ${SERIAL_DRIVER_DIR}/uart.c |serial/ns16550a
 	$(CC) -c $(CFLAGS) -I${SERIAL_DRIVER_DIR}/include -o $@ $<
 
-serial/snps:
+serial/ns16550a:
 	mkdir -p $@
 
--include serial/snps/serial_driver.d
+-include serial/ns16550a/serial_driver.d
 
 clean::
-	rm -f serial/snps/serial_driver.[do]
+	rm -f serial/ns16550a/serial_driver.[do]
 clobber:: clean
 	rm -rf serial_driver.elf serial
