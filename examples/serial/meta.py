@@ -30,7 +30,7 @@ BOARDS: List[Board] = [
         name="qemu_virt_riscv64",
         arch=SystemDescription.Arch.RISCV64,
         paddr_top=0xa0000000,
-        serial="soc/virtio_mmio@10008000"
+        serial="soc/serial@10000000"
     ),
     Board(
         name="odroidc2",

@@ -44,20 +44,13 @@ else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
 	DRIVER_DIR := arm
 	CPU := cortex-a53
 else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_riscv64)
-	QEMU_ARCH_ARGS := -machine virt \
-					  -kernel $(IMAGE_FILE) \
-					  -mon console \
-					  -serial chardev:console \
-					  -global virtio-mmio.force-legacy=false \
-					  -device virtio-serial-device \
-					  -chardev stdio,id=console,mux=on,signal=off \
-					  -device virtconsole,chardev=console
-	DRIVER_DIR := virtio
+	QEMU_ARCH_ARGS := -machine virt -kernel $(IMAGE_FILE)
+	DRIVER_DIR := ns16550a
 else ifneq ($(filter $(strip $(MICROKIT_BOARD)),imx8mm_evk imx8mp_evk imx8mq_evk maaxboard),)
 	DRIVER_DIR := imx
 	CPU := cortex-a53
 else ifeq ($(strip $(MICROKIT_BOARD)), star64)
-	DRIVER_DIR := snps
+	DRIVER_DIR := ns16550a
 else
 $(error Unsupported MICROKIT_BOARD given)
 endif
@@ -135,7 +128,7 @@ $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	MICROKIT_SDK=${MICROKIT_SDK} $(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
 
 qemu: ${IMAGE_FILE}
-	$(QEMU) -m size=2G -nographic $(QEMU_ARCH_ARGS)
+	$(QEMU) -m size=2G -nographic -d guest_errors $(QEMU_ARCH_ARGS)
 
 clean::
 	${RM} -f *.elf

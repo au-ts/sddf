@@ -189,8 +189,7 @@ pub fn build(b: *std.Build) !void {
         .qemu_virt_aarch64 => "arm",
         .odroidc2, .odroidc4 => "meson",
         .maaxboard, .imx8mm_evk, .imx8mp_evk, .imx8mq_evk => "imx",
-        .star64 => "snps",
-        .qemu_virt_riscv64 => "virtio",
+        .star64, .qemu_virt_riscv64 => "ns16550a",
     };
 
     const driver = sddf_dep.artifact(b.fmt("driver_serial_{s}.elf", .{ driver_class }));
