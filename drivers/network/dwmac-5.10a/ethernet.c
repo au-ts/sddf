@@ -40,6 +40,7 @@ typedef struct {
     uint32_t head; /* index to remove from */
     uint32_t capacity; /* capacity of the ring */
     volatile struct descriptor *descr; /* buffer descripter array */
+    net_buff_desc_t descr_mdata[MAX_COUNT]; /* associated meta data array */
 } hw_ring_t;
 
 hw_ring_t rx;
@@ -87,7 +88,8 @@ static void rx_provide()
             assert(!err);
 
             uint32_t idx = rx.tail % rx.capacity;
-            update_ring_slot(&rx, idx, buffer.io_or_offset, buffer.io_or_offset >> 32, 0,
+            rx.descr_mdata[idx] = buffer;
+            update_ring_slot(&rx, idx, (uint32_t)buffer.io_or_offset, buffer.io_or_offset >> 32, 0,
                              DESC_RXSTS_OWNBYDMA | DESC_RXSTS_BUFFER1_ADDR_VALID | DESC_RXSTS_IOC);
             /* We will update the hardware register that stores the tail address. This tells
             the device that we have new descriptors to use. */
@@ -119,10 +121,12 @@ static void rx_return(void)
 
         THREAD_MEMORY_ACQUIRE();
 
+        net_buff_desc_t buffer = rx.descr_mdata[idx];
         if (d->des3 & DESC_RXSTS_ERROR) {
             sddf_dprintf("ETH|ERROR: RX descriptor returned with error status %x\n", d->des3);
             idx = rx.tail % rx.capacity;
-            update_ring_slot(&rx, idx, d->addr_low, d->addr_high, 0,
+            rx.descr_mdata[idx] = buffer;
+            update_ring_slot(&rx, idx, (uint32_t)buffer.io_or_offset, buffer.io_or_offset >> 32, 0,
                              DESC_RXSTS_OWNBYDMA | DESC_RXSTS_BUFFER1_ADDR_VALID | DESC_RXSTS_IOC);
 
             /* We will update the hardware register that stores the tail address. This tells
@@ -131,7 +135,7 @@ static void rx_return(void)
             rx.tail++;
         } else {
             /* Read 0-14 bits to get length of received packet, manual pg 4081, table 11-152, RDES3 Normal Descriptor */
-            net_buff_desc_t buffer = { (uint64_t)d->addr_low | ((uint64_t d->addr_high) << 32), d->des3 & 0x7FFF };
+            buffer.len = (d->des3 & 0x7FFF);
             int err = net_enqueue_active(&rx_queue, buffer);
             assert(!err);
             packets_transferred = true;
@@ -163,8 +167,8 @@ static void tx_provide(void)
             // that this is the first and last parts of the current packet.
             uint32_t des3 = (DESC_TXSTS_OWNBYDMA | DESC_TXCTRL_TXFIRST | DESC_TXCTRL_TXLAST | DESC_TXCTRL_TXCIC
                              | buffer.len);
-
-            update_ring_slot(&tx, idx, buffer.io_or_offset & 0xffffffff, buffer.io_or_offset >> 32, des2, des3);
+            tx.descr_mdata[idx] = buffer;
+            update_ring_slot(&tx, idx, (uint32_t)buffer.io_or_offset, buffer.io_or_offset >> 32, des2, des3);
 
             tx.tail++;
             /* Set the tail in hardware to the latest tail we have inserted in.
@@ -196,7 +200,7 @@ static void tx_return(void)
         }
         THREAD_MEMORY_ACQUIRE();
 
-        net_buff_desc_t buffer = { (uint64_t)d->addr_low | ((uint64_t d->addr_high) << 32), 0 };
+        net_buff_desc_t buffer = tx.descr_mdata[idx];
         int err = net_enqueue_free(&tx_queue, buffer);
         assert(!err);
         enqueued = true;
@@ -386,7 +390,7 @@ void init(void)
     assert(RX_COUNT * sizeof(struct descriptor) <= device_resources.regions[1].region.size);
     assert(TX_COUNT * sizeof(struct descriptor) <= device_resources.regions[2].region.size);
 
-    eth_regs = (void *)device_resources.regions[0].region.vaddr;
+    eth_regs = (uintptr_t)device_resources.regions[0].region.vaddr;
 
     /* De-assert the reset signals that u-boot left asserted. */
 #ifdef CONFIG_PLAT_STAR64
