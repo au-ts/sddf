@@ -26,7 +26,6 @@ __attribute__((__section__(".device_resources"))) device_resources_t device_reso
  * Cleanup hacks in code
  * More graceful error when user requests timeout greater than served by ZCU102_TIMER_MAX_TICKS (at 100MHz, 32-bit counter thats ~42s)
  */
-// TODO: setup to use 2 timers
 // 100 MHz frequency in LPD (low power domain clock), later need to read/set up specifc freq: https://github.com/seL4/util_libs/blob/9b8ea7dcf1d80b80b8b7a2a038e03ac10308f39b/libplatsupport/src/mach/zynq/timer.c#L135
 #define ZCU102_TIMER_TICKS_PER_SECOND 0x5F5E100
 
@@ -76,7 +75,7 @@ volatile zcu102_timer_regs_t *timer_regs;
 microkit_channel counter_irq;
 microkit_channel timeout_irq;
 
-// TODO: remove below?
+/* offset for the 2 interrupt channels */
 #define CLIENT_CH_START 2
 #define MAX_TIMEOUTS 6
 static uint64_t timeouts[MAX_TIMEOUTS];
@@ -92,14 +91,12 @@ static inline uint64_t get_ticks_in_ns(void)
         ++value_h;
         value_l = (uint64_t) timer_regs->cnt_val[TTC_COUNTER_TIMER];
         /*
-         * XXX: Weird behaviour: If overflow IRQ happens here (while handling TIMEOUT IRQ), and the IRQ status register for 
+         * XXX: Weird behaviour: If overflow IRQ happens here (while handling TIMEOUT IRQ), and the IRQ status register for
          * TTC_COUNTER_TIMER (the overflow one) gets read (cleared), sometimes the IRQ for overflow
          * gets delivered (notified() called), but sometimes not. Current solution is to increment the global counter_timer_elapses
          * in this function, and if during handling overflow IRQ the IRQ status register is cleared, do not increment.
          */
         ++counter_timer_elapses;
-        sddf_printf("RACE CONDITION: get_ticks_in_ns incrementing counter_timer_elapses\n");
-        sddf_printf("boop\n");
     }
     uint64_t value_ticks = (value_h << 32) | value_l;
 
@@ -203,22 +200,18 @@ void init()
     timer_regs->cnt_ctrl[TTC_COUNTER_TIMER] ^= ZCU102_TIMER_DISABLE;
 }
 
-uint64_t overflow_notif_count = 0;
 void notified(microkit_channel ch)
 {
     assert(ch == counter_irq || ch == timeout_irq);
     if (ch == counter_irq) {
-        ++overflow_notif_count;
         /* Overflow on timekeeping counter, interrupt cleared on read by device */
         if (timer_regs->int_sts[TTC_COUNTER_TIMER] & ZCU102_TIMER_ENABLE_OVERFLOW_INTERRUPT) {
             ++counter_timer_elapses;
-            sddf_dprintf("TIMER: overflow happends, counter_timer_elapses incremented. overflow_notif_count: %lu\n", overflow_notif_count);
         } else {
             /* 
-             * race condition: get_ticks_in_ns() was called from timeout_irq handling, and overflow timer 
+             * race condition: get_ticks_in_ns() was called from timeout_irq handling, and overflow timer
              * issued irq during handling, counter_timer_elapses already incremented
              */
-            sddf_dprintf("RACE CONDITION: counter_timer_elapses alread yincremented!\n");
         }
     } else if (ch == timeout_irq) {
         /* Timeout counter reached 0, stop the timeout timer */
