@@ -117,7 +117,7 @@ static void handle_irq(void)
 {
     uint32_t irq_status = *REG_PTR(UART_IIR);
     uint32_t line_status = *REG_PTR(UART_LSR);
-    if (irq_status & UART_IIR_RX) {
+    if (config.rx_enabled && irq_status & UART_IIR_RX) {
         rx_return();
     }
 
