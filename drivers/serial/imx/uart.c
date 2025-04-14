@@ -98,7 +98,7 @@ static void handle_irq(void)
     uint32_t uart_cr1 = uart_regs->cr1;
     while (uart_sr1 & UART_SR1_ABNORMAL || uart_sr1 & UART_SR1_RX_RDY
            || (uart_cr1 & UART_CR1_TX_READY_INT && uart_sr1 & UART_SR1_TX_RDY)) {
-        if (uart_sr1 & UART_SR1_RX_RDY) {
+        if (config.rx_enabled && uart_sr1 & UART_SR1_RX_RDY) {
             rx_return();
         }
         if (uart_cr1 & UART_CR1_TX_READY_INT && uart_sr1 & UART_SR1_TX_RDY) {

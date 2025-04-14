@@ -95,7 +95,7 @@ static void handle_irq(void)
 {
     uint32_t uart_int_reg = uart_regs->mis;
     while (uart_int_reg & (PL011_IMSC_RX_TIMEOUT | PL011_IMSC_RX_INT) || uart_int_reg & PL011_IMSC_TX_INT) {
-        if (uart_int_reg & (PL011_IMSC_RX_TIMEOUT | PL011_IMSC_RX_INT)) {
+        if (config.rx_enabled && uart_int_reg & (PL011_IMSC_RX_TIMEOUT | PL011_IMSC_RX_INT)) {
             rx_return();
         }
         if (uart_int_reg & PL011_IMSC_TX_INT) {

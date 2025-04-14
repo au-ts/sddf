@@ -129,7 +129,7 @@ static void handle_irq(void)
     uint32_t uart_cr = uart_regs->cr;
     while (uart_sr & UART_INTR_ABNORMAL || !(uart_sr & AML_UART_RX_EMPTY)
            || (uart_cr & AML_UART_TX_INT_EN && !(uart_sr & AML_UART_TX_FULL))) {
-        if (!(uart_sr & AML_UART_RX_EMPTY)) {
+        if (config.rx_enabled && !(uart_sr & AML_UART_RX_EMPTY)) {
             rx_return();
         }
         if (uart_cr & AML_UART_TX_INT_EN && !(uart_sr & AML_UART_TX_FULL)) {
