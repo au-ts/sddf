@@ -35,8 +35,6 @@ const char *colours[] = {
 #define COLOUR_END "\x1b[0m"
 #define COLOUR_END_LEN 4
 
-char client_names[NAME_MAX][SDDF_SERIAL_MAX_CLIENTS];
-
 serial_queue_handle_t tx_queue_handle_drv;
 serial_queue_handle_t tx_queue_handle_cli[SDDF_SERIAL_MAX_CLIENTS];
 
@@ -194,10 +192,8 @@ void init(void)
 
     if (config.enable_colour) {
         for (uint64_t i = 0; i < config.num_clients; i++) {
-            for (int j = 0; j < NAME_MAX; j++) {
-                sddf_memcpy(client_names[i], config.clients[i].name, sizeof client_names[i]);
-            }
-            sddf_dprintf("%s'%s' is client %lu%s\n", colours[i % ARRAY_SIZE(colours)], client_names[i], i, COLOUR_END);
+            sddf_dprintf("%s'%s' is client %lu%s\n", colours[i % ARRAY_SIZE(colours)], config.clients[i].name, i,
+                         COLOUR_END);
         }
     }
 }
