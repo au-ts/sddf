@@ -84,9 +84,10 @@ static uint64_t get_ticks_in_ns(void)
     uint64_t value_l = (uint64_t)(STARFIVE_TIMER_MAX_TICKS - counter_regs->value);
     uint64_t value_h = (uint64_t)counter_timer_elapses;
 
-    /* Include unhandled interrupt in value_h */
+    /* Account for potential pending counter IRQ */
     if (counter_regs->intclr == 1) {
         value_h += 1;
+        value_l = (uint64_t)(STARFIVE_TIMER_MAX_TICKS - counter_regs->value);
     }
 
     uint64_t value_ticks = (value_h << 32) | value_l;
