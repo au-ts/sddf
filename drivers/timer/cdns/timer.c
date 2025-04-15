@@ -13,7 +13,7 @@
 
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
-/* 
+/*
  * Zynq UltraScale+ MPSoC contains a timer (Cadence Triple Timer Clock) with 3 32-bit counters.
  * Only 2 of the 3 timers are used in this driver. All 3 timers by default are connected to
  * the 100MHz clock in the low power domain (LPD).
@@ -47,24 +47,22 @@ __attribute__((__section__(".device_resources"))) device_resources_t device_reso
 #define ZCU102_TIMER_ENABLE_OVERFLOW_INTERRUPT BIT(4)
 #define ZCU102_TIMER_ENABLE_EVNT_OVERFLOW_INTERRUPT BIT(5)
 
-
 typedef struct {
     /* Registers (for each of the 3 counters in the Triple Timer Clock)
      * NOTE: 0th timer is used as a general time counter, 1st timer is used as a timeout timer.
      * Last timer is unused. */
-    uint32_t clk_ctrl[3];       /* 0x00: clock control registers */
-    uint32_t cnt_ctrl[3];       /* 0x0C: counter control registers: Operational mode and reset */
-    uint32_t cnt_val[3];        /* 0x18: current counter values */
-    uint32_t interval_val[3];   /* 0x24: interval value (from which/to which the counter counts) */
-    uint32_t match_1[3];        /* 0x30: 1st match values */
-    uint32_t match_2[3];        /* 0x3C: 2nd match values */
-    uint32_t match_3[3];        /* 0x48: 3rd match values */
-    uint32_t int_sts[3];        /* 0x54: status for interval, match, overflow and event interrupts */
-    uint32_t int_en[3];         /* 0x60: enable interrupts */
-    uint32_t event_ctrl[3];     /* 0x6C: (not used) enable event timer, stop timer */
-    uint32_t event[3];          /* 0x78: (not used) width of external pulse */
+    uint32_t clk_ctrl[3];     /* 0x00: clock control registers */
+    uint32_t cnt_ctrl[3];     /* 0x0C: counter control registers: Operational mode and reset */
+    uint32_t cnt_val[3];      /* 0x18: current counter values */
+    uint32_t interval_val[3]; /* 0x24: interval value (from which/to which the counter counts) */
+    uint32_t match_1[3];      /* 0x30: 1st match values */
+    uint32_t match_2[3];      /* 0x3C: 2nd match values */
+    uint32_t match_3[3];      /* 0x48: 3rd match values */
+    uint32_t int_sts[3];      /* 0x54: status for interval, match, overflow and event interrupts */
+    uint32_t int_en[3];       /* 0x60: enable interrupts */
+    uint32_t event_ctrl[3];   /* 0x6C: (not used) enable event timer, stop timer */
+    uint32_t event[3];        /* 0x78: (not used) width of external pulse */
 } zcu102_timer_regs_t;
-
 
 /* Keeps track of how many counter timer overflows happens,
  * as the counter is 32-bit. This is used as high bits of
@@ -82,14 +80,14 @@ static uint64_t timeouts[MAX_TIMEOUTS];
 
 static inline uint64_t get_ticks_in_ns(void)
 {
-    uint64_t value_h = (uint64_t) counter_timer_elapses;
-    uint64_t value_l = (uint64_t) timer_regs->cnt_val[TTC_COUNTER_TIMER];
+    uint64_t value_h = (uint64_t)counter_timer_elapses;
+    uint64_t value_l = (uint64_t)timer_regs->cnt_val[TTC_COUNTER_TIMER];
 
     /* Include unhandled interrupt in value_h */
     // XXX: check if not race condition -> does reading (and therefore clearing) the interrupt register cancel the interrupt from being handled? Will counter_timer_elapses be incremented immediately after? (see below)
     if (timer_regs->int_sts[TTC_COUNTER_TIMER] & ZCU102_TIMER_ENABLE_OVERFLOW_INTERRUPT) {
         ++value_h;
-        value_l = (uint64_t) timer_regs->cnt_val[TTC_COUNTER_TIMER];
+        value_l = (uint64_t)timer_regs->cnt_val[TTC_COUNTER_TIMER];
         /*
          * XXX: Weird behaviour: If overflow IRQ happens here (while handling TIMEOUT IRQ), and the IRQ status register for
          * TTC_COUNTER_TIMER (the overflow one) gets read (cleared), sometimes the IRQ for overflow
@@ -119,10 +117,11 @@ void set_timeout(uint64_t ns)
 
     assert(num_ticks <= ZCU102_TIMER_MAX_TICKS);
     if (num_ticks > ZCU102_TIMER_MAX_TICKS) {
-        sddf_dprintf("ERROR: requested timeout num_ticks: 0x%lx exceeds counter resolution: 0x%x\n", num_ticks, ZCU102_TIMER_MAX_TICKS);
+        sddf_dprintf("ERROR: requested timeout num_ticks: 0x%lx exceeds counter resolution: 0x%x\n", num_ticks,
+                     ZCU102_TIMER_MAX_TICKS);
     }
-    timer_regs->interval_val[TTC_TIMEOUT_TIMER] = (uint32_t) num_ticks;
-    timer_regs->cnt_ctrl[TTC_TIMEOUT_TIMER] |=  ZCU102_TIMER_CNT_RESET;
+    timer_regs->interval_val[TTC_TIMEOUT_TIMER] = (uint32_t)num_ticks;
+    timer_regs->cnt_ctrl[TTC_TIMEOUT_TIMER] |= ZCU102_TIMER_CNT_RESET;
     timer_regs->cnt_ctrl[TTC_TIMEOUT_TIMER] ^= ZCU102_TIMER_DISABLE;
 }
 
@@ -158,7 +157,7 @@ void init()
         timeouts[i] = UINT64_MAX;
     }
 
-    timer_regs = (zcu102_timer_regs_t*) device_resources.regions[0].region.vaddr;
+    timer_regs = (zcu102_timer_regs_t *)device_resources.regions[0].region.vaddr;
     counter_irq = device_resources.irqs[TTC_COUNTER_TIMER].id;
     timeout_irq = device_resources.irqs[TTC_TIMEOUT_TIMER].id;
 
@@ -188,12 +187,11 @@ void init()
     timer_regs->cnt_ctrl[TTC_COUNTER_TIMER] |= ZCU102_TIMER_CNT_RESET;
     timer_regs->cnt_ctrl[TTC_TIMEOUT_TIMER] |= ZCU102_TIMER_CNT_RESET;
 
-
     /* Setup 0th timer as overflow timer */
     timer_regs->int_en[TTC_COUNTER_TIMER] = ZCU102_TIMER_ENABLE_OVERFLOW_INTERRUPT;
 
     /* Setup 1st timer as timeout timer, using interval mode */
-    timer_regs->int_en[TTC_TIMEOUT_TIMER] = ZCU102_TIMER_ENABLE_INTERVAL_INTERRUPT; 
+    timer_regs->int_en[TTC_TIMEOUT_TIMER] = ZCU102_TIMER_ENABLE_INTERVAL_INTERRUPT;
     timer_regs->cnt_ctrl[TTC_TIMEOUT_TIMER] |= ZCU102_TIMER_ENABLE_INTERVAL_MODE;
 
     /* Start the TTC_COUNTER_TIMER */
@@ -208,7 +206,7 @@ void notified(microkit_channel ch)
         if (timer_regs->int_sts[TTC_COUNTER_TIMER] & ZCU102_TIMER_ENABLE_OVERFLOW_INTERRUPT) {
             ++counter_timer_elapses;
         } else {
-            /* 
+            /*
              * race condition: get_ticks_in_ns() was called from timeout_irq handling, and overflow timer
              * issued irq during handling, counter_timer_elapses already incremented
              */
@@ -245,8 +243,8 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
         break;
     }
     default:
-        sddf_dprintf("TIMER DRIVER|LOG: Unknown request %lu to timer from channel %u\n", microkit_msginfo_get_label(msginfo),
-                     ch);
+        sddf_dprintf("TIMER DRIVER|LOG: Unknown request %lu to timer from channel %u\n",
+                     microkit_msginfo_get_label(msginfo), ch);
         break;
     }
 
