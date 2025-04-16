@@ -14,3 +14,4 @@ from .base import HardwareBackend, LockedBoardException
 from .streams import send_input, wait_for_output
 from .machine_queue import MachineQueueBackend
 from .qemu import QemuBackend
+from .tty import TtyBackend
