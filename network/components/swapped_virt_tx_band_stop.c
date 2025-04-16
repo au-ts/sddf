@@ -162,6 +162,7 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
+    sddf_dprintf("were in teh new virtualiser\n");
     cache_clean_and_invalidate(pd_code, pd_code + 0x5000);
     seL4_ARM_VSpace_Unify_Instruction(3, 0x200000, 0x205000);
 
