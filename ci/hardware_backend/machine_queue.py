@@ -37,7 +37,7 @@ class MachineQueueBackend(HardwareBackend):
         )
 
         stdout, _ = await lock_info.communicate()
-        assert b"LOCKED" in stdout or b"FREE" in stdout, "one of locked or free"
+        assert b"LOCKED" in stdout or b"FREE" in stdout, f"one of locked or free ({stdout})"
 
         return stdout
 
