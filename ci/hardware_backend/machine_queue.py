@@ -1,5 +1,8 @@
+#!/usr/bin/env python3
+# Copyright 2025, UNSW
+# SPDX-License-Identifier: BSD-2-Clause
+
 from signal import SIGHUP
-from subprocess import DEVNULL
 import asyncio
 from asyncio.subprocess import PIPE, STDOUT
 from pathlib import Path

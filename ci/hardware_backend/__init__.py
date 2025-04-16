@@ -1,3 +1,7 @@
+#!/usr/bin/env python3
+# Copyright 2025, UNSW
+# SPDX-License-Identifier: BSD-2-Clause
+
 """
 Set of "classes" (in the duck-typing way) that describe how we interact with the
 actual system that is running the test.
