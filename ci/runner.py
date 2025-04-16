@@ -11,7 +11,7 @@ QEMU.
 import asyncio
 import sys
 
-from hardware_backend import HardwareBackend
+from ci.hardware_backend import HardwareBackend
 
 
 async def runner(test, backend: HardwareBackend):

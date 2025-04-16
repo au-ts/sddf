@@ -5,8 +5,8 @@
 from pathlib import Path
 import unittest
 
-from hardware_backend import *
-from runner import runner
+from ci.hardware_backend import *
+from ci.runner import runner
 
 
 async def common(backend: HardwareBackend):
