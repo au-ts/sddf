@@ -22,8 +22,11 @@ class QemuBackend(HardwareBackend):
 
     async def stop(self):
         assert self.process is not None, "process not running"
-        self.process.terminate()
-        await self.process.wait()
+        try:
+            self.process.terminate()
+            await self.process.wait()
+        except ProcessLookupError:
+            pass
 
     @property
     def input_stream(self):
