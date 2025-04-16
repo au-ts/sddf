@@ -207,12 +207,12 @@ static void handle_irq()
     eth_dma->status &= e;
 
     while (e & DMA_INTR_MASK) {
-        if (e & DMA_INTR_RXF) {
-            rx_return();
-        }
         if (e & DMA_INTR_TXF) {
             tx_return();
             tx_provide();
+        }
+        if (e & DMA_INTR_RXF) {
+            rx_return();
         }
         if (e & DMA_INTR_ABNORMAL) {
             if (e & DMA_INTR_FBE) {

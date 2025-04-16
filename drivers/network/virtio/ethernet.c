@@ -293,9 +293,9 @@ static void handle_irq()
     if (irq_status & VIRTIO_MMIO_IRQ_VQUEUE) {
         // We don't know whether the IRQ is related to a change to the RX queue
         // or TX queue, so we check both.
-        rx_return();
         tx_return();
         tx_provide();
+        rx_return();
         // We have handled the used buffer notification
         regs->InterruptACK = VIRTIO_MMIO_IRQ_VQUEUE;
     }
