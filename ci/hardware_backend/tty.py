@@ -6,7 +6,7 @@ from .base import HardwareBackend
 
 
 class TtyBackend(HardwareBackend):
-    def __init__(self, path: str, baudrate = 115200):
+    def __init__(self, path: str, baudrate=115200):
         self.path = path
         self.baudrate = baudrate
 
@@ -16,7 +16,9 @@ class TtyBackend(HardwareBackend):
         try:
             import serial_asyncio_fast
         except ImportError:
-            raise ModuleNotFoundError("no module 'serial_asyncio_fast; install 'pyserial-asyncio-fast'")
+            raise ModuleNotFoundError(
+                "no module 'serial_asyncio_fast; install 'pyserial-asyncio-fast'"
+            )
 
     async def start(self):
         assert self.reader is None, "start() not previously called"
