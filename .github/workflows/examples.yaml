@@ -48,6 +48,13 @@ jobs:
         shell: bash
         env:
           PYTHON: ${{ github.workspace }}/venv/bin/python
+      - name: Archive image artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: loader-images
+          path: ci_build/**/loader.img
+          if-no-files-found: error
+
   build_linux_x86_64_nix:
     name: Linux x86-64 (Nix)
     runs-on: ubuntu-24.04
