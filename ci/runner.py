@@ -330,5 +330,5 @@ def cli(
     print("Failed tests:")
     print(list_test_cases(failing))
 
-    if len(passing) != 0:
+    if len(passing) != len(matrix):
         quit(1)
