@@ -35,6 +35,9 @@ async def wait_for_output(
     while True:
         # we read (at most) the size of text; we may get significantly less
         read = await backend.output_stream.read(len(text))
+        if read == b"":
+            raise EOFError()
+
         stdout.write(read)
         stdout.flush()
         buffer.extend(read)

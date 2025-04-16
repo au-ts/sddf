@@ -52,6 +52,10 @@ async def main(backend: str):
         # Reset coloured output.
         print("\x1b[0m\n")
         print("Task cancelled, exiting...", file=sys.stderr)
+    except EOFError:
+        print("\x1b[0m")
+        print("Error: EOF when reading from backend stream", file=sys.stderr)
+        quit(1)
     finally:
         await backend.stop()
 
