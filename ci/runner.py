@@ -11,9 +11,10 @@ from pathlib import Path
 import sys
 
 from hardware_backend import (
-    QemuBackend,
-    MachineQueueBackend,
     HardwareBackend,
+    MachineQueueBackend,
+    QemuBackend,
+    TtyBackend,
     send_input,
     wait_for_output,
 )
@@ -39,6 +40,8 @@ async def main(backend: str):
         backend = QemuBackend("make", "MICROKIT_BOARD=qemu_virt_riscv64", "qemu")
     elif backend == "machine_queue":
         backend = MachineQueueBackend(Path("./build/loader.img"), "odroidc4_1")
+    elif backend == "tty":
+        backend = TtyBackend("/dev/ttyUSB0")
     else:
         raise Exception("Unknown backend %s" % (backend))
 
@@ -57,7 +60,9 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--backend", choices=["qemu", "machine_queue"], required=True)
+    parser.add_argument(
+        "--backend", choices=["qemu", "machine_queue", "tty"], required=True
+    )
     args = parser.parse_args()
 
     asyncio.run(main(args.backend))
