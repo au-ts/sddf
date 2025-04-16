@@ -20,7 +20,12 @@ from typing import Literal
 
 from ci.hardware_backend import HardwareBackend
 from ci.hardware_backend.base import TestFailureException
+from ci.hardware_backend.machine_queue import MachineQueueBackend
 from ci.hardware_backend.qemu import QemuBackend
+
+
+# TODO: Handle timeout / lock failures gracefully (round robin + reasons)
+# tftp down prints out: console: Unable to connect to 10.13.1.202:3109
 
 
 # For Github Actions etc.
@@ -102,7 +107,17 @@ def get_default_backend(
             raise NotImplementedError(f"unknown qemu board {test_config.board}")
 
     else:
-        print(image)
+        MACHINE_QUEUE_MAPPING = {
+            "odroidc4": "odroidc4_1",
+            "imx8mm_evk": "imx8mm",
+            "imx8mp_evk": "iotgate1",
+            "imx8mq_evk": "imx8mq",
+            "maaxboard": "maaxboard2",
+        }
+        return MachineQueueBackend(
+            image.resolve(),
+            MACHINE_QUEUE_MAPPING.get(test_config.board, test_config.board),
+        )
 
 
 def matrix_product(**items):
