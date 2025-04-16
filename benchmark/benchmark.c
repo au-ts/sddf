@@ -89,12 +89,12 @@ static void print_child_util(uint64_t *buffer, uint8_t id)
 static void stop_benchmark(void)
 {
     seL4_BenchmarkFinalizeLog();
-    seL4_BenchmarkGetThreadUtilisation(TCB_CAP);
-    print_total_util((uint64_t *)&seL4_GetIPCBuffer()->msg[0]);
-    for (uint8_t i = 0; i < benchmark_config.num_children; i++) {
-        seL4_BenchmarkGetThreadUtilisation(BASE_TCB_CAP + benchmark_config.children[i].child_id);
-        print_child_util((uint64_t *)&seL4_GetIPCBuffer()->msg[0], benchmark_config.children[i].child_id);
-    }
+    /* seL4_BenchmarkGetThreadUtilisation(TCB_CAP); */
+    /* print_total_util((uint64_t *)&seL4_GetIPCBuffer()->msg[0]); */
+    /* for (uint8_t i = 0; i < benchmark_config.num_children; i++) { */
+    /*     seL4_BenchmarkGetThreadUtilisation(BASE_TCB_CAP + benchmark_config.children[i].child_id); */
+    /*     print_child_util((uint64_t *)&seL4_GetIPCBuffer()->msg[0], benchmark_config.children[i].child_id); */
+    /* } */
 }
 #endif
 
@@ -133,13 +133,13 @@ static void dump_log_summary(uint64_t log_size)
         index++;
     }
 
-    sddf_printf("System call invocations %lu", syscall_entries);
-    sddf_printf("Fastpaths %lu\n", fastpaths);
-    sddf_printf("Interrupt invocations %lu\n", interrupt_entries);
-    sddf_printf("User-level faults %lu\n", userlevelfault_entries);
-    sddf_printf("VM faults %lu\n", vmfault_entries);
-    sddf_printf("Debug faults %lu\n", debug_fault);
-    sddf_printf("Others %lu\n", other);
+    /* sddf_printf("System call invocations %lu", syscall_entries); */
+    /* sddf_printf("Fastpaths %lu\n", fastpaths); */
+    /* sddf_printf("Interrupt invocations %lu\n", interrupt_entries); */
+    /* sddf_printf("User-level faults %lu\n", userlevelfault_entries); */
+    /* sddf_printf("VM faults %lu\n", vmfault_entries); */
+    /* sddf_printf("Debug faults %lu\n", debug_fault); */
+    /* sddf_printf("Others %lu\n", other); */
 }
 #endif
 
@@ -167,11 +167,11 @@ void notified(microkit_channel ch)
         sel4bench_get_counters(benchmark_bf, &counter_values[0]);
         sel4bench_stop_counters(benchmark_bf);
 
-        sddf_printf("{\n");
-        for (int i = 0; i < ARRAY_SIZE(benchmarking_events); i++) {
-            sddf_printf("%s: %lu\n", counter_names[i], counter_values[i]);
-        }
-        sddf_printf("}\n");
+        /* sddf_printf("{\n"); */
+        /* for (int i = 0; i < ARRAY_SIZE(benchmarking_events); i++) { */
+        /*     sddf_printf("%s: %lu\n", counter_names[i], counter_values[i]); */
+        /* } */
+        /* sddf_printf("}\n"); */
 #endif
 
 #ifdef CONFIG_BENCHMARK_TRACK_UTILISATION
@@ -180,7 +180,7 @@ void notified(microkit_channel ch)
 
 #ifdef CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES
         uint64_t entries = seL4_BenchmarkFinalizeLog();
-        sddf_printf("KernelEntries:  %lu\n", entries);
+        /* sddf_printf("KernelEntries:  %lu\n", entries); */
         dump_log_summary(entries);
 #endif
     } else {

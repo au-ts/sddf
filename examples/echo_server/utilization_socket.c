@@ -134,14 +134,14 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
         error = tcp_write(pcb, OK, strlen(OK), TCP_WRITE_FLAG_COPY);
         if (error) sddf_dprintf("Failed to send OK message through utilization peer\n");
     } else if (msg_match(data_packet_str, START)) {
-        sddf_printf("%s measurement starting...\n", microkit_name);
+        /* sddf_printf("%s measurement starting...\n", microkit_name); */
         if (!strcmp(microkit_name, "client0")) {
             start = __atomic_load_n(&bench->ts, __ATOMIC_RELAXED);
             idle_ccount_start = __atomic_load_n(&bench->ccount, __ATOMIC_RELAXED);
             microkit_notify(bench_start_ch);
         }
     } else if (msg_match(data_packet_str, STOP)) {
-        sddf_printf("%s measurement finished \n", microkit_name);
+        /* sddf_printf("%s measurement finished \n", microkit_name); */
 
         uint64_t total = 0, idle = 0;
 
@@ -186,7 +186,7 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
 
 static err_t utilization_accept_callback(void *arg, struct tcp_pcb *newpcb, err_t err)
 {
-    sddf_printf("Utilization connection established!\n");
+    /* sddf_printf("Utilization connection established!\n"); */
     err_t error = tcp_write(newpcb, WHOAMI, strlen(WHOAMI), TCP_WRITE_FLAG_COPY);
     if (error) sddf_dprintf("Failed to send WHOAMI message through utilization peer\n");
     tcp_sent(newpcb, utilization_sent_callback);
