@@ -36,7 +36,7 @@ jobs:
           tar xf aarch64-toolchain.tar.xz
           echo "$(pwd)/arm-gnu-toolchain-12.3.rel1-x86_64-aarch64-none-elf/bin" >> $GITHUB_PATH
       - name: Install Zig
-        uses: mlugg/setup-zig@v1.2.0
+        uses: mlugg/setup-zig@v1.2.1
         with:
           version: ${{ env.ZIG_VERSION }}
       - name: Setup pyenv
@@ -74,7 +74,7 @@ jobs:
           brew install llvm lld make imagemagick dtc
           echo "/opt/homebrew/opt/llvm/bin:$PATH" >> $GITHUB_PATH
       - name: Install Zig
-        uses: mlugg/setup-zig@v1.2.0
+        uses: mlugg/setup-zig@v1.2.1
         with:
           version: ${{ env.ZIG_VERSION }}
       - name: Download and install AArch64 GCC toolchain
