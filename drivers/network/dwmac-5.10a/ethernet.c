@@ -215,12 +215,12 @@ static void handle_irq()
     *DMA_REG(DMA_CH0_STATUS) &= e;
 
     while (e & DMA_INTR_MASK) {
-        if (e & DMA_CH0_INTERRUPT_EN_RIE) {
-            rx_return();
-        }
         if (e & DMA_CH0_INTERRUPT_EN_TIE) {
             tx_return();
             tx_provide();
+        }
+        if (e & DMA_CH0_INTERRUPT_EN_RIE) {
+            rx_return();
         }
         if (e & DMA_INTR_ABNORMAL) {
             if (e & DMA_CH0_INTERRUPT_EN_FBEE) {
