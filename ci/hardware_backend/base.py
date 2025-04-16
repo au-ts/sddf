@@ -24,3 +24,6 @@ class HardwareBackend(ABC):
 
 class LockedBoardException(Exception):
     """Board is locked and we were told not to poll."""
+
+class TestFailureException(Exception):
+    """Test failed"""
