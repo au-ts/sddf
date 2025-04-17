@@ -143,13 +143,14 @@ static void dump_log_summary(uint64_t log_size)
 }
 #endif
 
-
 void notified(microkit_channel ch)
 {
     if (ch == serial_config.tx.id) {
         return;
     } else if (ch == benchmark_config.start_ch) {
 #if defined(MICROKIT_CONFIG_benchmark) && defined(CONFIG_ARCH_ARM)
+        seL4_BenchmarkNullSyscall();
+
         sel4bench_reset_counters();
         THREAD_MEMORY_RELEASE();
         sel4bench_start_counters(benchmark_bf);
@@ -222,7 +223,7 @@ void init(void)
 #endif
 
     /* Notify the idle thread that the sel4bench library is initialised. */
-    microkit_notify(benchmark_config.init_ch);
+    /* microkit_notify(benchmark_config.init_ch); */
 
 #ifdef CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES
     int res_buf = seL4_BenchmarkSetLogBuffer(LOG_BUFFER_CAP);
@@ -232,6 +233,7 @@ void init(void)
         sddf_printf("BENCH|LOG: Log buffer set\n");
     }
 #endif
+    sddf_printf("Benchmark is ready\n");
 }
 
 seL4_Bool fault(microkit_child id, microkit_msginfo msginfo, microkit_msginfo *reply_msginfo)
