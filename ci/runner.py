@@ -15,7 +15,6 @@ from dataclasses import dataclass
 import itertools
 import os
 from pathlib import Path
-import traceback
 from typing import Literal
 
 from ci.hardware_backend import HardwareBackend
@@ -56,10 +55,10 @@ async def runner(
         async with asyncio.timeout(TEST_TIMEOUT):
             await test(backend, test_config)
 
-    except EOFError:
+    except (EOFError, asyncio.IncompleteReadError):
         raise TestFailureException("EOF when reading from backend stream")
     finally:
-        clear_colour()
+        reset_terminal()
         await backend.stop()
 
 
@@ -215,12 +214,11 @@ def list_test_cases(matrix: list[TestConfig]):
     return "\n".join(lines)
 
 
-def clear_colour():
-    print("\x1b[0m", end="")
+def reset_terminal():
+    print("\n\x1b[0m", end="")
 
 
 def log_test_start(name: str):
-    clear_colour()
     if IS_CI:
         print(f"::group::{name}")
     else:
@@ -229,7 +227,6 @@ def log_test_start(name: str):
 
 def log_test_end():
     if IS_CI:
-        clear_colour()
         print(f"::endgroup::")
 
     print()
@@ -321,24 +318,24 @@ def cli(
         try:
             asyncio.run(runner(test, backend, test_config))
         except TestFailureException as e:
-            clear_colour()
+            reset_terminal()
             print(e)
             result = "fail"
         except TimeoutError as e:
-            clear_colour()
+            reset_terminal()
             print("Test timed out")
             result = "fail"
         except LockedBoardException as e:
             retry_lock_failures_queue.append(test_config)
-            clear_colour()
+            reset_terminal()
             print(e)
             result = "lock_failure"
         except KeyboardInterrupt:
-            clear_colour()
+            reset_terminal()
             print("Tests cancelled (SIGINT)")
             result = "interrupted"
         else:
-            clear_colour()
+            reset_terminal()
             result = "pass"
             print("Test passed")
 
@@ -354,11 +351,11 @@ def cli(
         match result:
             case "pass":
                 passing.append(test_config)
-            case "fail":
+            case "fail" | "interrupted":
                 failing.append(test_config)
             case "lock_failure":
                 lock_failures.append(test_config)
-            case "interrupted" | "not_run":
+            case "not_run":
                 not_run.append(test_config)
 
     print("==== Passing ====")
