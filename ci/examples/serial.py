@@ -2,6 +2,7 @@
 # Copyright 2025, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
 
+import asyncio
 from pathlib import Path
 import sys
 
@@ -27,19 +28,23 @@ TEST_MATRIX = matrix_product(
 
 
 async def test(backend: HardwareBackend, test_config: TestConfig):
+    # Unfortunately, this is also how we know once we've exited the boot-up stage.
+    # So if this is broken, we can't really use our shorter timeout.
     await wait_for_output(backend, b"Begin input\n")
-    await wait_for_output(backend, b"Please give me character!\r\n")
-    await wait_for_output(backend, b"Please give me character!\r\n")
 
-    await send_input(backend, b"1234567890")
-    await wait_for_output(backend, b"client0 has received 10 characters so far!\r\n")
+    async with asyncio.timeout(10):
+        await wait_for_output(backend, b"Please give me character!\r\n")
+        await wait_for_output(backend, b"Please give me character!\r\n")
 
-    # Switch to client 1.
-    await send_input(backend, b"\x1c1\r")
-    if test_config.config == "debug":
-        await wait_for_output(backend, b"switching to client 1\r\n")
-    await send_input(backend, b"1234567890")
-    await wait_for_output(backend, b"client1 has received 10 characters so far!\r\n")
+        await send_input(backend, b"1234567890")
+        await wait_for_output(backend, b"client0 has received 10 characters so far!\r\n")
+
+        # Switch to client 1.
+        await send_input(backend, b"\x1c1\r")
+        if test_config.config == "debug":
+            await wait_for_output(backend, b"switching to client 1\r\n")
+        await send_input(backend, b"1234567890")
+        await wait_for_output(backend, b"client1 has received 10 characters so far!\r\n")
 
 
 if __name__ == "__main__":

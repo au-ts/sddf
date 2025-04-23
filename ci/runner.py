@@ -10,13 +10,12 @@ QEMU.
 
 import argparse
 import asyncio
-from collections import deque
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 import itertools
 import os
 from pathlib import Path
-import sys
+import traceback
 from typing import Literal
 
 from ci.hardware_backend import HardwareBackend
@@ -34,6 +33,8 @@ IS_CI = bool(os.environ.get("CI"))
 
 LOADER_IMG = "loader.img"
 
+TEST_TIMEOUT = 60 * 60  # 60 min
+
 
 @dataclass(order=True, frozen=True)
 class TestConfig:
@@ -46,18 +47,19 @@ class TestConfig:
 
 
 async def runner(
-    test: Callable[[HardwareBackend], Awaitable[None]],
+    test: Callable[[HardwareBackend, TestConfig], Awaitable[None]],
     backend: HardwareBackend,
     test_config: TestConfig,
 ):
     await backend.start()
     try:
-        await test(backend, test_config)
+        async with asyncio.timeout(TEST_TIMEOUT):
+            await test(backend, test_config)
+
     except EOFError:
         raise TestFailureException("EOF when reading from backend stream")
     finally:
-        # reset coloured text.
-        print("\x1b[0m")
+        clear_colour()
         await backend.stop()
 
 
@@ -155,7 +157,7 @@ class _ListArg(argparse.Action):
             dest=dest,
             default=default,
             # can't use choices as this restricts to single items
-            metavar="{" + ",".join(sorted(default)) + "}"
+            metavar="{" + ",".join(sorted(default)) + "}",
         )
 
         self.kind: Literal["additive", "subtractive"] | None = None
@@ -232,7 +234,9 @@ def log_test_end():
 
     print()
 
+
 RESULT_KIND = Literal["pass", "fail", "not_run", "lock_failure", "interrupted"]
+
 
 def cli(
     test_name: str,
@@ -303,7 +307,6 @@ def cli(
         print(list_test_cases(matrix))
         return
 
-
     test_results: dict[TestConfig, RESULT_KIND] = {}
     retry_lock_failures_queue = []
 
@@ -320,6 +323,10 @@ def cli(
         except TestFailureException as e:
             clear_colour()
             print(e)
+            result = "fail"
+        except TimeoutError as e:
+            clear_colour()
+            print("Test timed out")
             result = "fail"
         except LockedBoardException as e:
             retry_lock_failures_queue.append(test_config)
@@ -358,10 +365,12 @@ def cli(
     print(list_test_cases(passing))
     print("==== Failed =====")
     print(list_test_cases(failing))
-    print("===== Cancelled (not run) =====")
-    print(list_test_cases(not_run))
-    print("===== Failed to acquire locks ====")
-    print(list_test_cases(lock_failures))
+    if len(not_run) != 0:
+        print("===== Cancelled (not run) =====")
+        print(list_test_cases(not_run))
+    if len(lock_failures) != 0:
+        print("===== Failed to acquire locks ====")
+        print(list_test_cases(lock_failures))
 
     if len(passing) != len(matrix):
         quit(1)

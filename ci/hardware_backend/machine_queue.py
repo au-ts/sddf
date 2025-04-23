@@ -11,7 +11,7 @@ import sys
 from .base import HardwareBackend, LockedBoardException
 
 # In case we somehow break and don't release the lock automatically.
-LOCK_TIMEOUT = 30 * 60  # 30 min
+LOCK_TIMEOUT = 60 * 60  # 60 min
 
 
 class MachineQueueBackend(HardwareBackend):
