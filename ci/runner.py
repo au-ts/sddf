@@ -154,7 +154,8 @@ class _ListArg(argparse.Action):
             option_strings=_option_strings,
             dest=dest,
             default=default,
-            choices=default,
+            # can't use choices as this restricts to single items
+            metavar="{" + ",".join(sorted(default)) + "}"
         )
 
         self.kind: Literal["additive", "subtractive"] | None = None
@@ -346,11 +347,11 @@ def cli(
         match result:
             case "pass":
                 passing.append(test_config)
-            case "fail" | "interrupted":
+            case "fail":
                 failing.append(test_config)
             case "lock_failure":
                 lock_failures.append(test_config)
-            case "not_run":
+            case "interrupted" | "not_run":
                 not_run.append(test_config)
 
     print("==== Passing ====")
