@@ -2,6 +2,7 @@
 # Copyright 2025, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
 
+import os
 from signal import SIGHUP
 import asyncio
 from asyncio.subprocess import PIPE, STDOUT
@@ -12,6 +13,8 @@ from .base import HardwareBackend, LockedBoardException
 
 # In case we somehow break and don't release the lock automatically.
 LOCK_TIMEOUT = 60 * 60  # 60 min
+# For Github Actions etc.
+IS_CI = bool(os.environ.get("CI"))
 
 
 class MachineQueueBackend(HardwareBackend):
@@ -22,7 +25,18 @@ class MachineQueueBackend(HardwareBackend):
         self.image_file = image_file
         self.board = board
         self.poll_lock = poll_lock
-        self.job_key = "julia: feel free to release this lock"
+        if IS_CI:
+            self.job_key = "-".join(
+                [
+                    os.environ.get("GITHUB_REPOSITORY", "hardware_ci"),
+                    os.environ.get("GITHUB_WORKFLOW", "??"),
+                    os.environ.get("GITHUB_RUN_ID", "??"),
+                    os.environ.get("GITHUB_JOB", "??"),
+                    os.environ.get("INPUT_INDEX", "$0")[1:],
+                ]
+            )
+        else:
+            self.job_key = "hardware_ci (testing at the moment, take the lock if @juliab holds this)"
 
         self.process = None
 
@@ -37,7 +51,9 @@ class MachineQueueBackend(HardwareBackend):
         )
 
         stdout, _ = await lock_info.communicate()
-        assert b"LOCKED" in stdout or b"FREE" in stdout, f"one of locked or free ({stdout})"
+        assert (
+            b"LOCKED" in stdout or b"FREE" in stdout
+        ), f"one of locked or free ({stdout})"
 
         return stdout
 
