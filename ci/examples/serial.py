@@ -26,24 +26,42 @@ TEST_MATRIX = matrix_product(
     config=("debug", "release"),
 )
 
+ANSI_RED   = b"\x1b[31m"
+ANSI_GREEN = b"\x1b[32m"
+ANSI_RESET = b"\x1b[0m"
+
+def colour_number(num: bytes, colour: bytes) -> bytes:
+    out = b""
+    for c in num:
+        out += (colour + bytes([c]) + ANSI_RESET)
+    return out
+
 
 async def test(backend: HardwareBackend, test_config: TestConfig):
     # Unfortunately, this is also how we know once we've exited the boot-up stage.
     # So if this is broken, we can't really use our shorter timeout.
     await wait_for_output(backend, b"Begin input\n")
 
+    # TODO: We really need some kind of colour (de)multiplexer....
+
     async with asyncio.timeout(10):
         await wait_for_output(backend, b"Please give me character!\r\n")
         await wait_for_output(backend, b"Please give me character!\r\n")
+        await wait_for_output(backend, ANSI_RESET)
 
         await send_input(backend, b"1234567890")
+        await expect_output(backend, colour_number(b"1234567890", ANSI_RED))
         await wait_for_output(backend, b"client0 has received 10 characters so far!\r\n")
+        await wait_for_output(backend, ANSI_RESET)
 
         # Switch to client 1.
         await send_input(backend, b"\x1c1\r")
+        # TODO: ???
         if test_config.config == "debug":
-            await wait_for_output(backend, b"switching to client 1\r\n")
+            await expect_output(backend, b"VIRT_RX|LOG: switching to client 1\r\n")
+
         await send_input(backend, b"1234567890")
+        await expect_output(backend, colour_number(b"1234567890", ANSI_GREEN))
         await wait_for_output(backend, b"client1 has received 10 characters so far!\r\n")
 
 
