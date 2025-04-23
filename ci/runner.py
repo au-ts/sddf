@@ -10,6 +10,7 @@ QEMU.
 
 import argparse
 import asyncio
+from collections import deque
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 import itertools
@@ -19,7 +20,7 @@ import sys
 from typing import Literal
 
 from ci.hardware_backend import HardwareBackend
-from ci.hardware_backend.base import TestFailureException
+from ci.hardware_backend.base import LockedBoardException, TestFailureException
 from ci.hardware_backend.machine_queue import MachineQueueBackend
 from ci.hardware_backend.qemu import QemuBackend
 
@@ -212,7 +213,7 @@ def list_test_cases(matrix: list[TestConfig]):
 
 
 def clear_colour():
-    print("\x1b[0m")
+    print("\x1b[0m", end="")
 
 
 def log_test_start(name: str):
@@ -223,16 +224,14 @@ def log_test_start(name: str):
         print(name)
 
 
-def log_test_end(success: bool):
-    clear_colour()
-    if success:
-        print("Test Succeeded")
-    else:
-        print("Test failed")
-
+def log_test_end():
     if IS_CI:
+        clear_colour()
         print(f"::endgroup::")
 
+    print()
+
+RESULT_KIND = Literal["pass", "fail", "not_run", "lock_failure", "interrupted"]
 
 def cli(
     test_name: str,
@@ -303,11 +302,13 @@ def cli(
         print(list_test_cases(matrix))
         return
 
-    test_results = []
 
-    incomplete = False
-    success = False
+    test_results: dict[TestConfig, RESULT_KIND] = {}
+    retry_lock_failures_queue = []
+
     for test_config in matrix:
+        result: RESULT_KIND = "not_run"
+
         log_test_start(
             f"Running {test_name} on {test_config.board} ({test_config.config}, built with {test_config.build_system})"
         )
@@ -315,37 +316,51 @@ def cli(
         backend = get_default_backend(test_config, Path("ci_build"))
         try:
             asyncio.run(runner(test, backend, test_config))
-            success = True
         except TestFailureException as e:
             clear_colour()
             print(e)
+            result = "fail"
+        except LockedBoardException as e:
+            retry_lock_failures_queue.append(test_config)
+            clear_colour()
+            print(e)
+            result = "lock_failure"
         except KeyboardInterrupt:
             clear_colour()
             print("Tests cancelled (SIGINT)")
-            incomplete = True
+            result = "interrupted"
+        else:
+            clear_colour()
+            result = "pass"
+            print("Test passed")
 
-        log_test_end(success)
-        test_results.append(success)
+        log_test_end()
+        test_results[test_config] = result
 
-        if incomplete or (not success and args.fast_fail):
-            incomplete = True
+        if result == "interrupted" or (result != "pass" and args.fast_fail):
             break
 
-    passing, failing = [], []
-    for test_config, success in zip(matrix, test_results):
-        if success:
-            passing.append(test_config)
-        else:
-            failing.append(test_config)
+    passing, failing, lock_failures, not_run = [], [], [], []
+    for test_config in matrix:
+        result = test_results.get(test_config, "not_run")
+        match result:
+            case "pass":
+                passing.append(test_config)
+            case "fail" | "interrupted":
+                failing.append(test_config)
+            case "lock_failure":
+                lock_failures.append(test_config)
+            case "not_run":
+                not_run.append(test_config)
 
-    print("Passing tests:")
+    print("==== Passing ====")
     print(list_test_cases(passing))
-    if incomplete:
-        print("Cancelled (not run) tests:")
-        cancelled = set(matrix) - set(passing) - set(failing)
-        print(list_test_cases(sorted(cancelled)))
-    print("Failed tests:")
+    print("==== Failed =====")
     print(list_test_cases(failing))
+    print("===== Cancelled (not run) =====")
+    print(list_test_cases(not_run))
+    print("===== Failed to acquire locks ====")
+    print(list_test_cases(lock_failures))
 
     if len(passing) != len(matrix):
         quit(1)
