@@ -2,10 +2,26 @@
 # Copyright 2025, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
 
+import asyncio
+import inspect
+from functools import wraps
 from io import BytesIO
 import sys
 
 from .base import HardwareBackend
+
+
+def _print_text_on_timeout(f):
+    @wraps(f)
+    async def wrapper(*args, **kwargs):
+        text = inspect.getcallargs(f, *args, **kwargs)["text"]
+        try:
+            return await f(*args, **kwargs)
+        except asyncio.CancelledError:
+            print("'{}' timed out whilst waiting for {}".format(f.__name__, text))
+            raise
+
+    return wrapper
 
 
 async def send_input(
@@ -17,6 +33,7 @@ async def send_input(
     await backend.input_stream.drain()
 
 
+@_print_text_on_timeout
 async def wait_for_output(
     backend: HardwareBackend, text: bytes, stdout: BytesIO = sys.stdout.buffer
 ) -> bytes:
