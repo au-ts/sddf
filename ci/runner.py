@@ -211,14 +211,14 @@ def list_test_cases(matrix: list[TestConfig]):
     return "\n".join(lines)
 
 
-def test_start(name: str):
+def log_test_start(name: str):
     if IS_CI:
         print(f"::group::{name}")
     else:
         print(name)
 
 
-def test_end(success: bool):
+def log_test_end(success: bool):
     if success:
         print("Test Succeeded")
     else:
@@ -299,30 +299,27 @@ def cli(
 
     test_results = []
 
-    loop = asyncio.get_event_loop()
-
     incomplete = False
     for test_config in matrix:
-        test_start(
+        log_test_start(
             f"Running {test_name} on {test_config.board} ({test_config.config}, built with {test_config.build_system})"
         )
         # TODO: override-backend
         backend = get_default_backend(test_config, Path("ci_build"))
         try:
-            loop.run_until_complete(runner(test, backend, test_config))
+            asyncio.run(runner(test, backend, test_config))
+            log_test_end(success)
         except TestFailureException as e:
             success = False
             print(e, file=sys.stderr)
         except KeyboardInterrupt:
             print("\x1b[0m")
-            print("Task cancelled (SIGINT)")
-            loop.stop()
+            print("Tests cancelled (SIGINT)")
             incomplete = True
             success = False
         else:
             success = True
 
-        test_end(success)
         test_results.append(success)
 
         if incomplete or (not success and args.fast_fail):
