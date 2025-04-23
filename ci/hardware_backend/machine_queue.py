@@ -46,7 +46,7 @@ class MachineQueueBackend(HardwareBackend):
 
         lock_info = await self._lock_info()
         if b"LOCKED" in lock_info and not self.poll_lock:
-            raise LockedBoardException(lock_info.decode())
+            raise LockedBoardException(lock_info.decode().strip())
 
         get_lock = await asyncio.create_subprocess_exec(
             # fmt: off
@@ -63,6 +63,7 @@ class MachineQueueBackend(HardwareBackend):
         return_code = await get_lock.wait()
         if return_code == 2:
             # Race condition, someone acquired the lock between our check and now.
+            # TODO: print who?
             raise LockedBoardException()
 
         assert return_code == 0, "couldn't lock board for unknown error"
