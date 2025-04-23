@@ -211,7 +211,12 @@ def list_test_cases(matrix: list[TestConfig]):
     return "\n".join(lines)
 
 
+def clear_colour():
+    print("\x1b[0m")
+
+
 def log_test_start(name: str):
+    clear_colour()
     if IS_CI:
         print(f"::group::{name}")
     else:
@@ -219,6 +224,7 @@ def log_test_start(name: str):
 
 
 def log_test_end(success: bool):
+    clear_colour()
     if success:
         print("Test Succeeded")
     else:
@@ -300,6 +306,7 @@ def cli(
     test_results = []
 
     incomplete = False
+    success = False
     for test_config in matrix:
         log_test_start(
             f"Running {test_name} on {test_config.board} ({test_config.config}, built with {test_config.build_system})"
@@ -308,18 +315,16 @@ def cli(
         backend = get_default_backend(test_config, Path("ci_build"))
         try:
             asyncio.run(runner(test, backend, test_config))
-            log_test_end(success)
+            success = True
         except TestFailureException as e:
-            success = False
-            print(e, file=sys.stderr)
+            clear_colour()
+            print(e)
         except KeyboardInterrupt:
-            print("\x1b[0m")
+            clear_colour()
             print("Tests cancelled (SIGINT)")
             incomplete = True
-            success = False
-        else:
-            success = True
 
+        log_test_end(success)
         test_results.append(success)
 
         if incomplete or (not success and args.fast_fail):
