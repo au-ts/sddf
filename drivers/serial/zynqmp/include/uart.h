@@ -37,13 +37,17 @@ struct zynqmp_uart_regs {
     uint32_t rxbs;      /* 0x048 RX FIFO Byte Status [11:0] */
     /* The rest of the registers are either reserved or not used */
 };
-// This variable will have the address of the UART device. Preset by SDDF.
-typedef volatile struct zynqmp_uart_regs zynqmp_uart_regs_t;
+typedef struct zynqmp_uart_regs zynqmp_uart_regs_t;
+
+/* 100MHz reference UART clock.
+Though if in doubt, type `clk dump` into the U-Boot shell, `uart0_ref` is your ref clock.
+*/
+#define ZYNQMP_UART_REF_CLOCK_RATE (100UL * 1000UL * 1000UL)
 
 #define ZYNQMP_UART_CHANNEL_STS_RXEMPTY (1 << 1)
 #define ZYNQMP_UART_CHANNEL_STS_RXFULL (1 << 2)
-#define ZYNQMP_UART_CHANNEL_STS_TXFULL (1 << 3)
-#define ZYNQMP_UART_CHANNEL_STS_TXEMPTY (1 << 4)
+#define ZYNQMP_UART_CHANNEL_STS_TXEMPTY (1 << 3)
+#define ZYNQMP_UART_CHANNEL_STS_TXFULL (1 << 4)
 #define ZYNQMP_UART_CHANNEL_STS_TXACTIVE (1 << 11)
 
 #define ZYNQMP_UART_CR_TX_DIS_SHIFT 5
@@ -97,4 +101,4 @@ typedef volatile struct zynqmp_uart_regs zynqmp_uart_regs_t;
 #define ZYNQMO_UART_IXR_RXFULL  0x00000004U /**< RX FIFO full interrupt. */
 #define ZYNQMO_UART_IXR_RXEMPTY 0x00000002U /**< RX FIFO empty interrupt. */
 #define ZYNQMO_UART_IXR_RXOVR   0x00000001U /**< RX FIFO trigger interrupt. */
-#define ZYNQMO_UART_IXR_MASK    0x00003FFFU /**< Valid bit mask */
+#define ZYNQMO_UART_IXR_MASK    0x00001FFFU /**< Valid bit mask */
