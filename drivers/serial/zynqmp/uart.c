@@ -114,7 +114,7 @@ static void compute_clk_divs(uint64_t clock_hz, uint64_t baudrate, uint16_t *cd,
 
     Baud rate = sel_clk / (CD * (BDIV + 1))
 
-    This function's goal is to calculate and set CD and BDIV. Where:
+    This function's goal is to calculate the CD and BDIV values for setting the baud rate. Where:
         sel_clk = clock_hz
         CD      = baud rate generator divisor value
         BDIV    = baud rate divider value
@@ -176,7 +176,8 @@ static void uart_setup(void)
     cr |= ZYNQMP_UART_CR_TX_DIS | ZYNQMP_UART_CR_RX_DIS;
     uart_regs->cr = cr;
 
-    /* Clear the mode register to make sure the clock isn't divided by 8 */
+    /* Clear the mode register to make sure the device is operating in normal mode
+     * and the clock isn't divided by 8 */
     uart_regs->mr = 0;
 
     /* Set the baud rate by programming the clock dividers */
@@ -198,9 +199,6 @@ static void uart_setup(void)
     /* Select 8 bytes character length. */
     uint32_t mr = uart_regs->mr;
     mr &= ~(0x3 << ZYNQMO_UART_MR_CHARLEN_SHIFT);
-
-    /* Make sure the input clock isn't divided by 8. */
-    mr |= ZYNQMO_UART_MR_CHMODE_NORM;
 
     /* No parity checks */
     mr |= ZYNQMO_UART_MR_PARITY_NONE;
