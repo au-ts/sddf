@@ -38,7 +38,7 @@ static void tx_provide(void)
 
     /* Send characters until the TX FIFO is full. */
     while (!(uart_regs->sr & ZYNQMP_UART_CHANNEL_STS_TXFULL) && !serial_dequeue(&tx_queue_handle, &c)) {
-        uart_regs->fifo = (uint32_t) c;
+        uart_regs->fifo = (uint32_t)c;
         transferred = true;
 
         /* If the TX FIFO becomes full, send us an interrupt when it is empty. */
@@ -158,7 +158,7 @@ static void compute_clk_divs(uint64_t clock_hz, uint64_t baudrate, uint16_t *cd,
     assert(computed_cd != 0 && computed_bdiv < 255);
 
     *cd = computed_cd;
-    *bdiv = (uint8_t) computed_bdiv;
+    *bdiv = (uint8_t)computed_bdiv;
 }
 
 static void uart_setup(void)
