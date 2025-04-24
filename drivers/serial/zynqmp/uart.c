@@ -3,13 +3,23 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+/*
+ * Documents referenced: Zynq UltraScale+ Device TRM, UG1085 (v2.5) March 21, 2025.
+ *                       Zynq UltraScale+ Devices Register Reference (UG1087) 
+ * U-Boot driver referenced: https://github.com/u-boot/u-boot/blob/master/drivers/serial/serial_zynq.c
+ * Linux driver referenced:  https://github.com/torvalds/linux/blob/master/drivers/tty/serial/xilinx_uartps.c
+ *
+ * All page referenced will be in terms of the TRM unless otherwise stated.
+ */
+
 #include <stdbool.h>
 #include <stdint.h>
 #include <microkit.h>
 #include <sddf/util/printf.h>
 #include <sddf/resources/device.h>
 #include <sddf/serial/config.h>
-#include <uart.h>
+// #include <uart.h>
+#include "include/uart.h"
 
 __attribute__((__section__(".serial_driver_config"))) serial_driver_config_t config;
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
@@ -19,89 +29,51 @@ serial_queue_handle_t tx_queue_handle;
 
 volatile zynqmp_uart_regs_t *uart_regs;
 
-/*
-* BaudDivInt + BaudDivFrac/64 = (RefFreq / (16 x BaudRate))
-*/
-static void set_baud(long bps)
-{
-    // Disable UART while configuring baud rate
-    // uart_regs->tcr &= ~(1 << 0);  // Clear UARTEN bit
-
-    // float baud_div = ZYNQMP_UART_REF_CLOCK / (16 * bps);
-    // uint32_t baud_div_int = (uint32_t)baud_div;
-    // uint32_t baud_div_frac = (uint32_t)((baud_div * 64) + 0.5);
-
-    // /* Minimum divide ratio possible is 1 */
-    // assert(baud_div_int >= 1);
-
-    // /* Maximum divide ratio is 0xFFFF */
-    // assert(baud_div_int < 0xFFFF || (baud_div_int == 0xFFFF && baud_div_frac == 0));
-
-    // uart_regs->ibrd = baud_div_int;
-    // uart_regs->fbrd = baud_div_frac;
-}
-
 static void tx_provide(void)
 {
-    // sddf_dprintf("UART|LOG: Inside tx_provide.\n");
-
     bool transferred = false;
     char c;
-    while (!(uart_regs->sr & UART_CHANNEL_STS_TXFULL) && !serial_dequeue(&tx_queue_handle, &c)) {
-        // sddf_dprintf("UART|LOG: Inside tx_provide and TX not full, sending %c\n", c);
-        uart_regs->fifo = (uint32_t)c;
+
+    /* Wait for the TX FIFO to drain before sending anything. */
+    while (!(uart_regs->sr & ZYNQMP_UART_CHANNEL_STS_TXFULL) && !serial_dequeue(&tx_queue_handle, &c)) {
+        uart_regs->fifo = (uint8_t) c;
+        /* Wait for the data to shift out */
+        while (uart_regs->sr & ZYNQMP_UART_CHANNEL_STS_TXACTIVE);
         transferred = true;
     }
 
-    /* If transmit fifo is full and there is data remaining to be sent, enable interrupt when fifo is no longer full */
-    if (uart_regs->sr & UART_CHANNEL_STS_TXFULL && !serial_queue_empty(&tx_queue_handle, tx_queue_handle.queue->head)) {
-        // sddf_dprintf("UART|LOG: Inside tx_provide and TX FIFO is full.\n");
-        uart_regs->cr &= ~UART_CR_TX_EN;
-        uart_regs->cr |= UART_CR_TX_DIS;
-    } else {
-        // sddf_dprintf("UART|LOG: Inside tx_provide and TX FIFO is NOT full but we are inside ELSE of IF.\n");
-        uart_regs->cr |= UART_CR_TX_EN;
-        uart_regs->cr &= ~UART_CR_TX_DIS;
-    }
+    /* Serial queue should be completely empty. */
+    assert(serial_queue_empty(&tx_queue_handle, tx_queue_handle.queue->head));
 
     if (transferred && serial_require_consumer_signal(&tx_queue_handle)) {
-        // sddf_dprintf("UART|LOG: Inside tx_provide and REQ CONS SIG.\n");
         serial_cancel_consumer_signal(&tx_queue_handle);
         microkit_notify(config.tx.id);
     }
-
-    // sddf_dprintf("UART|LOG: Finished tx_provide.\n");
 }
 
 static void rx_return(void)
 {
-    // sddf_dprintf("UART|LOG: Inside rx_return.\n");
-
-    // FIXME: My RX handler does NOT take TIMEOUT into account, should it?
-
     bool reprocess = true;
     bool enqueued = false;
+
     while (reprocess) {
-        while (!(uart_regs->sr & UART_CHANNEL_STS_RXEMPTY)
+        while (!(uart_regs->sr & ZYNQMP_UART_CHANNEL_STS_RXEMPTY)
                && !serial_queue_full(&rx_queue_handle, rx_queue_handle.queue->tail)) {
-            char c = (char)(uart_regs->fifo);
-            sddf_dprintf("UART|LOG: Got c: %c\n", c);
+            char c = (uint32_t)(uart_regs->fifo);
+            sddf_dprintf("got %c\n", c);
             serial_enqueue(&rx_queue_handle, c);
             enqueued = true;
         }
 
-        if (!(uart_regs->sr & UART_CHANNEL_STS_RXEMPTY) && serial_queue_full(&rx_queue_handle, rx_queue_handle.queue->tail)) {
-            /* Disable rx interrupts until virtualisers queue is no longer full. */
-            uart_regs->cr &= ~UART_CR_RX_EN;
-            uart_regs->cr |= UART_CR_RX_DIS;
+        if (!(uart_regs->sr & ZYNQMP_UART_CHANNEL_STS_RXEMPTY) && serial_queue_full(&rx_queue_handle, rx_queue_handle.queue->tail)) {
+            /* There's still data to receive but the RX queue is full. */
             serial_request_consumer_signal(&rx_queue_handle);
         }
         reprocess = false;
 
-        if (!(uart_regs->sr & UART_CHANNEL_STS_RXEMPTY) && !serial_queue_full(&rx_queue_handle, rx_queue_handle.queue->tail)) {
+        if (!(uart_regs->sr & ZYNQMP_UART_CHANNEL_STS_RXEMPTY) && !serial_queue_full(&rx_queue_handle, rx_queue_handle.queue->tail)) {
+            /* Oh wait, there's space available in the queue. */
             serial_cancel_consumer_signal(&rx_queue_handle);
-            uart_regs->cr |= UART_CR_RX_EN;
-            uart_regs->cr &= ~UART_CR_RX_DIS;
             reprocess = true;
         }
     }
@@ -111,149 +83,139 @@ static void rx_return(void)
     }
 }
 
-int uart_get_char()
-{
-    if (uart_regs->sr & 0x02U) {
-        return 0;
-    }
-
-    return uart_regs->fifo;
-}
-
-void uart_put_char(int ch)
-{
-    while (!(uart_regs->sr & UART_CHANNEL_STS_TXEMPTY));
-    uart_regs->fifo = ch;
-    if (ch == '\r') {
-        uart_put_char('\n');
-    }
-}
-
 static void handle_irq(void)
 {
-    // FIXME: Do I need to clear the interrupt status or not?
-    // uart_regs->isr = XUARTPS_IXR_RXOVR;
-    // XUARTPS_IXR_RXEMPTY |
-    // XUARTPS_IXR_RXFULL;
-
-    uint32_t uart_cr_reg = uart_regs->cr;
-    while (uart_cr_reg & UART_CR_RX_EN || uart_cr_reg & UART_CR_TX_EN) {
-        if (uart_cr_reg & UART_CR_RX_EN) {
-            rx_return();
-        }
-        if (uart_cr_reg & UART_CR_TX_EN) {
-            tx_provide();
-        }
-        uart_cr_reg = uart_regs->cr;
-    }
+    uint32_t prev = uart_regs->imr;
+    sddf_printf("int mask is %x, c_sts is %x\n", prev, uart_regs->sr);
+    uart_regs->idr = 0x1FFF;
+    rx_return();
+    uart_regs->ier = prev;
 }
 
-void uart_put_str(char *str)
+static void compute_clk_divs(uint64_t clock_hz, uint64_t baudrate, uint16_t *cd, uint8_t *bdiv)
 {
-    while (*str) {
-        uart_put_char(*str);
-        str++;
+    /* Page 589 of TRM
+
+    Baud rate = sel_clk / (CD * (BDIV + 1))
+    
+    This function's goal is to calculate and set CD and BDIV. Where:
+        sel_clk = clock_hz
+        CD      = baud rate generator divisor value
+        BDIV    = baud rate divider value
+
+    CD is used to derive the baud sample rate
+    CD and BDIV are used to derive the RX and TX baud rate.
+
+    */
+
+    /* BDIV can be programmed with a value between 4 and 255.
+       For the target bps, solve for the optimal baudgen divider (CD).
+       Take the first result that is <1% in error. So:
+
+       sel_clk = baud * (CD * (BDIV + 1))
+       CD * (BDIV + 1) = sel_clk / baud
+       CD = (sel_clk / baud) / (BDIV + 1)
+       
+       The U-Boot and Linux drivers take anything <3% in error. But the data sheet
+       shows that we can achieve <0.5% error for all common baud settings
+       so taking <1% in our driver.
+    */
+
+    /* Page 588, bdiv is 16 bits wide, cd is 8 bits */
+    uint16_t computed_bdiv = 4;
+    uint16_t computed_cd = 0;
+    double acceptable_error_rate = 0.01;
+    for (; computed_bdiv <= 255; computed_bdiv++) {
+        computed_cd = (clock_hz / (baudrate * 1.0)) / (computed_bdiv + 1);
+
+        /* If CD yields 0 or 1, go to the next possible BDIV because those are
+           reserved values. Register references, UG1087: "Baud_rate_gen (UART) Register Description"
+         */
+        if (computed_cd == 0 || computed_cd == 1) {
+            continue;
+        }
+
+        /* Now solve the equation. */
+        double actual_baud = clock_hz / ((computed_cd * (computed_bdiv + 1)) * 1.0);
+
+        /* Check error rate, take first result <1% error. */
+        double difference = ABS(actual_baud - baudrate);
+        double error_rate = difference / baudrate;
+        
+        if (error_rate < acceptable_error_rate) {
+            break;
+        }
     }
+
+    /* Should never trips, unless your uart clock or baud rate are incorrect */
+    assert(computed_cd != 0 && computed_bdiv < 255);
+
+    *cd = computed_cd;
+    *bdiv = (uint8_t) computed_bdiv;
 }
 
 static void uart_setup(void)
 {
-    uint32_t ctrl = uart_regs->cr;
-    uint32_t mode;
+    sddf_printf("uboot cd = %u, bdiv = %u\n", uart_regs->baudgen, uart_regs->bauddiv);
 
-    ctrl |= UART_CR_TX_EN;
-    ctrl |= UART_CR_RX_EN;
-    ctrl &= ~UART_CR_TX_DIS;
-    ctrl &= ~UART_CR_RX_DIS;
+    uint16_t cd;
+    uint8_t bdiv;
+    compute_clk_divs(100 * 1000 * 1000, config.default_baud, &cd, &bdiv);
 
-    uart_regs->cr = ctrl;
+    sddf_printf("our cd = %u, bdiv = %u\n", cd, bdiv);
 
-    // The following was adapted from Xilinx xuartps.c
+    /* Disable TX and RX before the UART registers can be reprogrammed (star at page 589).
+     * First clear the enable bit then set the disabled bit.
+     */
+    uint32_t cr = uart_regs->cr;
+    cr &= ~((uint32_t) (BIT(ZYNQMP_UART_CR_TX_EN_SHIFT) | BIT(ZYNQMP_UART_CR_RX_EN_SHIFT)));
+    cr |= ZYNQMP_UART_CR_TX_DIS | ZYNQMP_UART_CR_RX_DIS;
+    uart_regs->cr = cr;
 
-    mode = uart_regs->mr;
-    mode &= (~((XUARTPS_MR_CHARLEN_MASK |
-                XUARTPS_MR_STOPMODE_MASK |
-                XUARTPS_MR_PARITY_MASK)));
+    /* Program the clock dividers */
+    uart_regs->bauddiv = bdiv;
+    uart_regs->baudgen = cd;
 
-    mode |= (XUARTPS_MR_CHARLEN_8_BIT |
-             XUARTPS_MR_STOPMODE_1_BIT |
-             XUARTPS_MR_PARITY_NONE);
+    /* Reset TX and RX. */
+    uart_regs->cr |= ZYNQMP_UART_CR_TX_RST | ZYNQMP_UART_CR_RX_RST;
+    while (uart_regs->cr & (ZYNQMP_UART_CR_TX_RST | ZYNQMP_UART_CR_RX_RST));
 
-    uart_regs->mr = mode;
+    /* Clear the TX and RX disable bit. */
+    cr = uart_regs->cr;
+    cr &= ~((uint32_t) (BIT(ZYNQMP_UART_CR_TX_DIS_SHIFT) | BIT(ZYNQMP_UART_CR_RX_DIS_SHIFT)));
 
-    /* Set the RX FIFO trigger at 1 data byte */
-    uart_regs->rxwm = 0x01U;
+    /* Enable TX and RX. */
+    cr |= ZYNQMP_UART_CR_TX_EN | ZYNQMP_UART_CR_RX_EN;
+    uart_regs->cr = cr;
 
-    /* Set the RX timeout to 1 */
-    uart_regs->rxtout = 0x01U;
+    /* Select 8 bytes character length. */
+    uint32_t mr = uart_regs->mr;
+    mr &= ~(0x3 << ZYNQMO_UART_MR_CHARLEN_SHIFT);
 
-    // Enable interrupt when a new character is added to RX FIFO
-    uart_regs->ier =    XUARTPS_IXR_RXOVR;
-    // XUARTPS_IXR_RXEMPTY |
-    // XUARTPS_IXR_RXFULL;
+    /* Make sure the input clock isn't divided by 8. */
+    mr |= ZYNQMO_UART_MR_CHMODE_NORM;
 
-    uart_put_str("UART|LOG: Initialised UART!\n");
+    /* No parity checks */
+    mr |= ZYNQMO_UART_MR_PARITY_NONE;
 
-    // FIXME: Below is the code from ARM example driver,
-    // maybe incorporate setting baud properly later.
+    /* One stop bit to detect on RX and to generate on TX */
+    mr &= ~(0x3 << ZYNQMO_UART_MR_STOPMODE_SHIFT);
 
-    /* Wait for UART to finish transmitting. */
-    // while (uart_regs->fr & ZYNQMP_FR_UART_BUSY);
+    /* Put the UART device in normal operating mode */
+    mr &= ~(0x3 << ZYNQMO_UART_MR_CHMODE_SHIFT);
+    uart_regs->mr = mr;
 
-    /* Disable the UART - UART must be disabled before control registers are reprogrammed. */
-    // uart_regs->tcr &= ~(ZYNQMP_CR_RX_EN | ZYNQMP_CR_TX_EN | ZYNQMP_CR_UART_EN);
+    /* Turn off all the interrupts, then only turn on the ones we need. */
+    uart_regs->idr = 0xFFFF;
 
-    /* Configure stop bit length to 1 */
-    // uart_regs->lcr_h &= ~(ZYNQMP_LCR_2_STP_BITS);
-
-    /* Set data length to 8 */
-    // uart_regs->lcr_h |= (0b11 < ZYNQMP_LCR_WLEN_SHFT);
-
-    /* Configure the reference clock and baud rate. Difficult to use automatic detection here as it requires the next incoming character to be 'a' or 'A'. */
-    // set_baud(config.default_baud);
-
-    /* Enable FIFOs */
-    // uart_regs->lcr_h |= ZYNQMP_LCR_FIFO_EN;
-
-    /* Disable parity checking */
-    // uart_regs->lcr_h |= ZYNQMP_LCR_PARTY_EN;
-
-    /* Enable receive interrupts when FIFO level exceeds 1/8 or after 32 ticks */
-    /*
     if (config.rx_enabled) {
-    sddf_dprintf("UART|LOG: Enabling RX 1st!\n");
-        uart_regs->ifls &= ~(ZYNQMP_IFLS_RX_MASK << ZYNQMP_IFLS_RX_SHFT);
-        uart_regs->imsc |= (ZYNQMP_IMSC_RX_TIMEOUT | ZYNQMP_IMSC_RX_INT);
+        /* Generate an interrupt for every received byte. */
+        uart_regs->rxwm = 1;
+
+        /* Enable IRQ on every bytes received. */
+        uart_regs->ier |= ZYNQMO_UART_IXR_RXOVR;
     }
-    */
-
-    /* Enable transmit interrupts if the FIFO drops below 1/8 - used when the write fifo becomes full */
-    // uart_regs->ifls &= ~(ZYNQMP_IFLS_TX_MASK << ZYNQMP_IFLS_TX_SHFT);
-    // uart_regs->imsc |= ZYNQMP_IMSC_TX_INT;
-
-    /* Enable the UART */
-    // uart_regs->tcr |= ZYNQMP_CR_UART_EN;
-
-    /* Enable transmit */
-    // uart_regs->tcr |= ZYNQMP_CR_TX_EN;
-
-    /* Enable receive */
-    /*
-    if (config.rx_enabled) {
-        sddf_dprintf("UART|LOG: Enabling RX 2nd!\n");
-        uart_regs->tcr |= ZYNQMP_CR_RX_EN;
-    }
-    */
-
-    // NB! Below is JUNK.
-    // Configure Line Control Register:
-    // - 8-bit data length (WLEN = 11)
-    // - Enable FIFO (FEN = 1)
-    // - 1 stop bit, no parity
-    // uart_regs->lcr_h = (1 << 4) | (1 << 5) | (1 << 6);
-
-    // Enable UART, TX, and RX
-    // uart_regs->tcr = (1 << 0) | (1 << 8) | (1 << 9);
+    sddf_dprintf("UART|LOG: Initialised UART!\n");
 }
 
 void init(void)
@@ -280,13 +242,8 @@ void notified(microkit_channel ch)
         handle_irq();
         microkit_deferred_irq_ack(ch);
     } else if (ch == config.tx.id) {
-        sddf_dprintf("UART|LOG: In NOTIFIED: tx\n");
         tx_provide();
     } else if (ch == config.rx.id) {
-        sddf_dprintf("UART|LOG: In NOTIFIED: rx\n");
-        // FIXME: Enabling RX interrupt following ARM examine for UART.
-        uart_regs->cr |= UART_CR_RX_EN;
-        uart_regs->cr &= ~UART_CR_RX_DIS;
         rx_return();
     } else {
         sddf_dprintf("UART|LOG: received notification on unexpected channel: %u\n", ch);
