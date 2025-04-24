@@ -43,7 +43,11 @@ static void tx_provide(void)
 
         /* If the TX FIFO becomes full, send us an interrupt when it is empty. */
         if (uart_regs->sr & ZYNQMP_UART_CHANNEL_STS_TXFULL) {
-            uart_regs->ier = ZYNQMO_UART_IXR_TXEMPTY | ZYNQMO_UART_IXR_RXOVR;
+            if (config.rx_enabled) {
+                uart_regs->ier = ZYNQMO_UART_IXR_TXEMPTY | ZYNQMO_UART_IXR_RXOVR;
+            } else {
+                uart_regs->ier = ZYNQMO_UART_IXR_TXEMPTY;
+            }
             break;
         }
     }
