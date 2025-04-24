@@ -20,6 +20,7 @@ The following platforms are supported:
 * qemu_virt_aarch64
 * qemu_virt_riscv64
 * star64
+* zcu102
 
 ### Make
 
