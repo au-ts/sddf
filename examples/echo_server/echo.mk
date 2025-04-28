@@ -32,7 +32,7 @@ METAPROGRAM := $(TOP)/meta.py
 vpath %.c ${SDDF} ${ECHO_SERVER}
 
 IMAGES := eth_driver.elf echo0.elf echo1.elf benchmark.elf idle.elf network_virt_rx.elf\
-	  network_virt_tx.elf network_copy0.elf network_copy1.elf timer_driver.elf\
+	  network_virt_tx.elf network_copy.elf network_copy0.elf network_copy1.elf timer_driver.elf\
 	  serial_driver.elf serial_virt_tx.elf
 
 CFLAGS := -mcpu=$(CPU) \
@@ -53,7 +53,7 @@ CFLAGS := -mcpu=$(CPU) \
 LDFLAGS := -L$(BOARD_DIR)/lib -L${LIBC}
 LIBS := --start-group -lmicrokit -Tmicrokit.ld -lc libsddf_util_debug.a --end-group
 
-CHECK_FLAGS_BOARD_MD5 := .board_cflags-$(shell echo -- ${CFLAGS} ${BOARD} ${MICROKIT_CONFIG} | shasum | sed 's/ *-//')
+CHECK_FLAGS_BOARD_MD5 := .board_cflags-$(shell echo -- ${CFLAGS} ${MICROKIT_SDK} ${MICROKIT_BOARD} ${MICROKIT_CONFIG} | shasum | sed 's/ *-//')
 
 ${CHECK_FLAGS_BOARD_MD5}:
 	-rm -f .board_cflags-*
@@ -69,7 +69,6 @@ DEPS := $(ECHO_OBJS:.o=.d)
 
 all: loader.img
 
-${ECHO_OBJS}: ${CHECK_FLAGS_BOARD_MD5}
 echo0.elf echo1.elf: $(ECHO_OBJS) libsddf_util.a lib_sddf_lwip_echo.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
@@ -78,7 +77,7 @@ network_copy0.elf network_copy1.elf: network_copy.elf
 
 # Need to build libsddf_util_debug.a because it's included in LIBS
 # for the unimplemented libc dependencies
-${IMAGES}: libsddf_util_debug.a
+${IMAGES}: libsddf_util_debug.a ${CHECK_FLAGS_BOARD_MD5}
 
 $(DTB): $(DTS)
 	dtc -q -I dts -O dtb $(DTS) > $(DTB)
