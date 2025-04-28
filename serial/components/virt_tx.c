@@ -10,9 +10,6 @@
 #include <sddf/serial/config.h>
 #include <sddf/util/printf.h>
 
-#define NAME_MAX 128
-#define BEGIN_STR_MAX 128
-
 __attribute__((__section__(".serial_virt_tx_config"))) serial_virt_tx_config_t config;
 
 /* When we have more clients than colours, we re-use the colours. */
@@ -185,8 +182,9 @@ void init(void)
 
     if (config.enable_rx) {
         /* Print a deterministic string to allow console input to begin */
-        sddf_memcpy(tx_queue_handle_drv.data_region, config.begin_str, config.begin_str_len + 1);
-        serial_update_shared_tail(&tx_queue_handle_drv, config.begin_str_len + 1);
+        size_t begin_str_len = sddf_strlen(config.begin_str);
+        sddf_memcpy(tx_queue_handle_drv.data_region, config.begin_str, begin_str_len);
+        serial_update_shared_tail(&tx_queue_handle_drv, begin_str_len);
         sddf_notify(config.driver.id);
     }
 
