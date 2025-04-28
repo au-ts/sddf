@@ -40,7 +40,7 @@ def colour_number(num: bytes, colour: bytes) -> bytes:
 async def test(backend: HardwareBackend, test_config: TestConfig):
     # Unfortunately, this is also how we know once we've exited the boot-up stage.
     # So if this is broken, we can't really use our shorter timeout.
-    await wait_for_output(backend, b"Begin input\n")
+    await wait_for_output(backend, b"Begin input\r\n")
 
     # TODO: We really need some kind of colour (de)multiplexer....
 
