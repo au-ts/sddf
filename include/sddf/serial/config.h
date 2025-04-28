@@ -50,7 +50,6 @@ typedef struct serial_virt_tx_config {
     serial_virt_tx_client_config_t clients[SDDF_SERIAL_MAX_CLIENTS];
     uint8_t num_clients;
     char begin_str[SDDF_SERIAL_BEGIN_STR_MAX_LEN];
-    uint8_t begin_str_len;
     bool enable_colour;
     bool enable_rx;
 } serial_virt_tx_config_t;
