@@ -8,7 +8,8 @@ from functools import wraps
 from io import BytesIO
 import sys
 
-from .base import HardwareBackend, TestFailureException
+from .base import HardwareBackend
+from .common import reset_terminal, TestFailureException
 
 
 def _print_text_on_timeout(f):
@@ -18,8 +19,12 @@ def _print_text_on_timeout(f):
         try:
             return await f(*args, **kwargs)
         except asyncio.CancelledError:
-            # reset_terminal() TODO
-            print("'{}' was cancelled/timed out whilst waiting for {}".format(f.__name__, text))
+            reset_terminal()
+            print(
+                "'{}' was cancelled/timed out whilst waiting for {}".format(
+                    f.__name__, text
+                )
+            )
             raise
 
     return wrapper
@@ -87,7 +92,6 @@ async def expect_output(
 ) -> bytes:
     if len(text) == 0:
         raise ValueError("Text should be at least 1 byte")
-
 
     read = await backend.output_stream.readexactly(len(text))
     stdout.write(read)

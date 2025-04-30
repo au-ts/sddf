@@ -25,6 +25,7 @@ from ci.hardware_backend import (
     TestFailureException,
     MachineQueueBackend,
     QemuBackend,
+    reset_terminal,
 )
 
 # For Github Actions etc.
@@ -218,10 +219,6 @@ def list_test_cases(matrix: list[TestConfig]):
         )
 
     return "\n".join(lines)
-
-
-def reset_terminal():
-    print("\n\x1b[0m", end="")
 
 
 def log_test_start(name: str):

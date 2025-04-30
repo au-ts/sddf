@@ -20,10 +20,3 @@ class HardwareBackend(ABC):
     @property
     @abstractmethod
     def input_stream(self) -> StreamWriter: ...
-
-
-class LockedBoardException(Exception):
-    """Board is locked and we were told not to poll."""
-
-class TestFailureException(Exception):
-    """Test failed"""
