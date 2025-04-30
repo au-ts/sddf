@@ -1,0 +1,65 @@
+#!/usr/bin/env python3
+# Copyright 2025, UNSW
+# SPDX-License-Identifier: BSD-2-Clause
+
+import asyncio
+import functools
+import subprocess
+from pathlib import Path
+from tempfile import TemporaryDirectory
+import sys
+import tempfile
+
+sys.path.insert(1, Path(__file__).parents[2].as_posix())
+
+from ci.hardware_backend import *
+from ci.runner import TestConfig, cli, matrix_product
+
+TEST_MATRIX = matrix_product(
+    board=(
+        "maaxboard",
+        "qemu_virt_aarch64",
+        "qemu_virt_riscv64",
+    ),
+    # only prints output in debug mode
+    config=("debug",),
+)
+
+
+def backend_fn(
+    disks_dir: TemporaryDirectory, backend: HardwareBackend, test_config: TestConfig
+) -> HardwareBackend:
+    if isinstance(backend, QemuBackend):
+        (_, disk_path) = tempfile.mkstemp(dir=disks_dir)
+
+        subprocess.run(
+            ["./tools/mkvirtdisk", disk_path, "1", "512", "16777216", "GPT"],
+            check=True,
+            capture_output=True,
+        )
+
+        # fmt: off
+        backend.invocation_args.extend([
+            "-global", "virtio-mmio.force-legacy=false",
+            "-drive", "file={},if=none,format=raw,id=hd".format(disk_path),
+            "-device", "virtio-blk-device,drive=hd"
+        ])
+        # fmt: on
+
+    return backend
+
+
+async def test(backend: HardwareBackend, test_config: TestConfig):
+    await wait_for_output(backend, b"CLIENT|INFO: starting\r\n")
+
+    async with asyncio.timeout(10):
+        await wait_for_output(backend, b"device config ready\r\n")
+        await wait_for_output(backend, b"CLIENT|INFO: basic: FINISH state\r\n")
+        await wait_for_output(
+            backend, b"CLIENT|INFO: basic: successfully finished!\r\n"
+        )
+
+
+if __name__ == "__main__":
+    with tempfile.TemporaryDirectory(suffix="sddf_blk_disks") as qemu_disks_dir:
+        cli("blk", test, TEST_MATRIX, functools.partial(backend_fn, qemu_disks_dir))

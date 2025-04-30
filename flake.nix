@@ -75,6 +75,7 @@
                 # for shasum
                 perl
                 which
+                gptfdisk
 
                 (symlinkJoin {
                   name = "clang-complete";

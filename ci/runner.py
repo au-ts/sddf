@@ -245,9 +245,14 @@ def run_test_config(
     test_name: str,
     test_config: TestConfig,
     test_fn: Callable[[HardwareBackend], Awaitable[None]],
+    backend_fn: Callable[[HardwareBackend, TestConfig], HardwareBackend],
 ) -> RESULT_KIND:
+
     # TODO: override-backend
-    backend = get_default_backend(test_name, test_config, Path("ci_build"))
+    backend = backend_fn(
+        get_default_backend(test_name, test_config, Path("ci_build")), test_config
+    )
+
     try:
         asyncio.run(runner(test_fn, backend, test_config))
     except TestFailureException as e:
@@ -271,6 +276,9 @@ def cli(
     test_name: str,
     test_fn: Callable[[HardwareBackend], Awaitable[None]],
     matrix: list[TestConfig],
+    backend_fn: Callable[
+        [HardwareBackend, TestConfig], HardwareBackend
+    ] = lambda b, c: b,
 ):
     """
     test should raise an exception on failure.
@@ -345,7 +353,7 @@ def cli(
         log_test_start(
             f"Running {test_name} on {test_config.board} ({test_config.config}, built with {test_config.build_system})"
         )
-        result = run_test_config(test_name, test_config, test_fn)
+        result = run_test_config(test_name, test_config, test_fn, backend_fn)
         log_test_end()
 
         test_results[test_config] = result
