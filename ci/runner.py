@@ -10,11 +10,13 @@ QEMU.
 
 import argparse
 import asyncio
+from collections import defaultdict, deque
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 import itertools
 import os
 from pathlib import Path
+import time
 from typing import Literal
 
 from ci.hardware_backend import HardwareBackend
@@ -23,16 +25,16 @@ from ci.hardware_backend.machine_queue import MachineQueueBackend
 from ci.hardware_backend.qemu import QemuBackend
 
 
-# TODO: Handle timeout / lock failures gracefully (round robin + reasons)
-# tftp down prints out: console: Unable to connect to 10.13.1.202:3109
-
-
 # For Github Actions etc.
 IS_CI = bool(os.environ.get("CI"))
 
 LOADER_IMG = "loader.img"
 
 TEST_TIMEOUT = 60 * 60  # 60 min
+LOCK_RETRY_COUNT = 3
+# this is between each run over the lock failure tests; not per test.
+# prefer increase the retry count over this
+LOCK_RETRY_DELAY = 60  # 1 min
 
 
 @dataclass(order=True, frozen=True)
@@ -156,6 +158,8 @@ class _ListArg(argparse.Action):
             dest=dest,
             default=default,
             # can't use choices as this restricts to single items
+            # TODO oops: no verification that the argument is valid
+            #            without choices....
             metavar="{" + ",".join(sorted(default)) + "}",
         )
 
@@ -235,6 +239,35 @@ def log_test_end():
 RESULT_KIND = Literal["pass", "fail", "not_run", "lock_failure", "interrupted"]
 
 
+def run_test_config(
+    test_config: TestConfig, test: Callable[[HardwareBackend], Awaitable[None]]
+) -> RESULT_KIND:
+    # TODO: override-backend
+    backend = get_default_backend(test_config, Path("ci_build"))
+    try:
+        asyncio.run(runner(test, backend, test_config))
+    except TestFailureException as e:
+        reset_terminal()
+        print(e)
+        return "fail"
+    except TimeoutError as e:
+        reset_terminal()
+        print("Test timed out")
+        return "fail"
+    except LockedBoardException as e:
+        reset_terminal()
+        print(e)
+        return "lock_failure"
+    except KeyboardInterrupt:
+        reset_terminal()
+        print("Tests cancelled (SIGINT)")
+        return "interrupted"
+
+    reset_terminal()
+    print("Test passed")
+    return "pass"
+
+
 def cli(
     test_name: str,
     test: Callable[[HardwareBackend], Awaitable[None]],
@@ -288,16 +321,17 @@ def cli(
     if len(matrix) == 0:
         parser.error("applied filters result in zero selected tests")
 
-    if args.override_backend:
-        # TODO: Can we tell argparse about this?
-        args.single = True
-        assert False, "TODO"
-
     if args.single and len(matrix) != 1:
         parser.error(
             "requested --single but applied filters generated multiple cases: \n"
             + list_test_cases(matrix)
         )
+
+    if args.override_backend:
+        if not args.single:
+            parser.error("requested --override-backend but --single not specified")
+
+        assert False, "TODO"
 
     if args.dry_run:
         print("Would run the following test cases:")
@@ -305,45 +339,46 @@ def cli(
         return
 
     test_results: dict[TestConfig, RESULT_KIND] = {}
-    retry_lock_failures_queue = []
+    run_lock_retries = False
+    lock_failure_retry_queue: list[TestConfig] = []
 
     for test_config in matrix:
-        result: RESULT_KIND = "not_run"
-
         log_test_start(
             f"Running {test_name} on {test_config.board} ({test_config.config}, built with {test_config.build_system})"
         )
-        # TODO: override-backend
-        backend = get_default_backend(test_config, Path("ci_build"))
-        try:
-            asyncio.run(runner(test, backend, test_config))
-        except TestFailureException as e:
-            reset_terminal()
-            print(e)
-            result = "fail"
-        except TimeoutError as e:
-            reset_terminal()
-            print("Test timed out")
-            result = "fail"
-        except LockedBoardException as e:
-            retry_lock_failures_queue.append(test_config)
-            reset_terminal()
-            print(e)
-            result = "lock_failure"
-        except KeyboardInterrupt:
-            reset_terminal()
-            print("Tests cancelled (SIGINT)")
-            result = "interrupted"
-        else:
-            reset_terminal()
-            result = "pass"
-            print("Test passed")
-
+        result = run_test_config(test_config, test)
         log_test_end()
+
         test_results[test_config] = result
 
         if result == "interrupted" or (result != "pass" and args.fast_fail):
+            run_lock_retries = False
             break
+        elif result == "lock_failure":
+            run_lock_retries = True
+            lock_failure_retry_queue.append(test_config)
+
+    if run_lock_retries:
+        for retry in range(LOCK_RETRY_COUNT):
+            next_retry_queue: list[TestConfig] = []
+            print(
+                f"Retrying (retry {retry + 1}/{LOCK_RETRY_COUNT}); waiting for {LOCK_RETRY_DELAY}s"
+            )
+            time.sleep(LOCK_RETRY_DELAY)
+
+            for test_config in lock_failure_retry_queue:
+                log_test_start(
+                    f"Retrying {test_name} on {test_config.board} ({test_config.config}, built with {test_config.build_system})"
+                )
+                result = run_test_config(test_config, test)
+                log_test_end()
+
+                test_results[test_config] = result
+
+                if result == "lock_failure":
+                    next_retry_queue.append(test_config)
+
+            lock_failure_retry_queue = next_retry_queue
 
     passing, failing, lock_failures, not_run = [], [], [], []
     for test_config in matrix:
