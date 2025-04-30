@@ -355,6 +355,9 @@ def cli(
 
     if run_lock_retries:
         for retry in range(LOCK_RETRY_COUNT):
+            if len(lock_failure_retry_queue) == 0:
+                break
+
             next_retry_queue: list[TestConfig] = []
             print(
                 f"Retrying (retry {retry + 1}/{LOCK_RETRY_COUNT}); waiting for {LOCK_RETRY_DELAY}s"
