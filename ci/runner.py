@@ -240,37 +240,32 @@ RESULT_KIND = Literal["pass", "fail", "not_run", "lock_failure", "interrupted"]
 
 
 def run_test_config(
-    test_config: TestConfig, test: Callable[[HardwareBackend], Awaitable[None]]
+    test_config: TestConfig, test_fn: Callable[[HardwareBackend], Awaitable[None]]
 ) -> RESULT_KIND:
     # TODO: override-backend
     backend = get_default_backend(test_config, Path("ci_build"))
     try:
-        asyncio.run(runner(test, backend, test_config))
+        asyncio.run(runner(test_fn, backend, test_config))
     except TestFailureException as e:
-        reset_terminal()
         print(e)
         return "fail"
     except TimeoutError as e:
-        reset_terminal()
         print("Test timed out")
         return "fail"
     except LockedBoardException as e:
-        reset_terminal()
         print(e)
         return "lock_failure"
     except KeyboardInterrupt:
-        reset_terminal()
         print("Tests cancelled (SIGINT)")
         return "interrupted"
 
-    reset_terminal()
     print("Test passed")
     return "pass"
 
 
 def cli(
     test_name: str,
-    test: Callable[[HardwareBackend], Awaitable[None]],
+    test_fn: Callable[[HardwareBackend], Awaitable[None]],
     matrix: list[TestConfig],
 ):
     """
@@ -346,7 +341,7 @@ def cli(
         log_test_start(
             f"Running {test_name} on {test_config.board} ({test_config.config}, built with {test_config.build_system})"
         )
-        result = run_test_config(test_config, test)
+        result = run_test_config(test_config, test_fn)
         log_test_end()
 
         test_results[test_config] = result
@@ -370,7 +365,7 @@ def cli(
                 log_test_start(
                     f"Retrying {test_name} on {test_config.board} ({test_config.config}, built with {test_config.build_system})"
                 )
-                result = run_test_config(test_config, test)
+                result = run_test_config(test_config, test_fn)
                 log_test_end()
 
                 test_results[test_config] = result
