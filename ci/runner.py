@@ -393,15 +393,16 @@ def cli(
     passing, failing, lock_failures, not_run = [], [], [], []
     for test_config in matrix:
         result = test_results.get(test_config, "not_run")
-        match result:
-            case "pass":
-                passing.append(test_config)
-            case "fail" | "interrupted":
-                failing.append(test_config)
-            case "lock_failure":
-                lock_failures.append(test_config)
-            case "not_run":
-                not_run.append(test_config)
+        if result == "pass":
+            passing.append(test_config)
+        elif result == "fail" or result == "interrupted":
+            failing.append(test_config)
+        elif result == "lock_failure":
+            lock_failures.append(test_config)
+        elif result == "not_run":
+            not_run.append(test_config)
+        else:
+            assert False, "impossible"
 
     print("==== Passing ====")
     print(list_test_cases(passing))
