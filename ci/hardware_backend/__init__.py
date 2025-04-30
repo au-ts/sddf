@@ -14,7 +14,7 @@ In broad strokes, requirements of these backends are:
 """
 
 # Re-Exports
-from .base import HardwareBackend, LockedBoardException
+from .base import HardwareBackend, LockedBoardException, TestFailureException
 from .streams import send_input, wait_for_output, expect_output
 from .machine_queue import MachineQueueBackend
 from .qemu import QemuBackend

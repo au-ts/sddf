@@ -78,8 +78,7 @@ async def wait_for_output(
             # we can't find a match with text more than that far from the end.
             offset = len(buffer) + 1 - len(text)
 
-    chunk = buffer[: index + len(text)]
-    return bytes(chunk)
+    return buffer
 
 
 @_print_text_on_timeout
