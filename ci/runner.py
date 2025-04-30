@@ -19,11 +19,13 @@ from pathlib import Path
 import time
 from typing import Literal
 
-from ci.hardware_backend import HardwareBackend
-from ci.hardware_backend.base import LockedBoardException, TestFailureException
-from ci.hardware_backend.machine_queue import MachineQueueBackend
-from ci.hardware_backend.qemu import QemuBackend
-
+from ci.hardware_backend import (
+    HardwareBackend,
+    LockedBoardException,
+    TestFailureException,
+    MachineQueueBackend,
+    QemuBackend,
+)
 
 # For Github Actions etc.
 IS_CI = bool(os.environ.get("CI"))
@@ -65,13 +67,13 @@ async def runner(
 
 
 def get_default_backend(
-    test_config: TestConfig, ci_build_folder_root: Path
+    example_name: str, test_config: TestConfig, ci_build_folder_root: Path
 ) -> HardwareBackend:
 
     image = (
         ci_build_folder_root
         / "examples"
-        / "serial"
+        / example_name
         / test_config.build_system
         / test_config.board
         / test_config.config
@@ -240,14 +242,16 @@ RESULT_KIND = Literal["pass", "fail", "not_run", "lock_failure", "interrupted"]
 
 
 def run_test_config(
-    test_config: TestConfig, test_fn: Callable[[HardwareBackend], Awaitable[None]]
+    test_name: str,
+    test_config: TestConfig,
+    test_fn: Callable[[HardwareBackend], Awaitable[None]],
 ) -> RESULT_KIND:
     # TODO: override-backend
-    backend = get_default_backend(test_config, Path("ci_build"))
+    backend = get_default_backend(test_name, test_config, Path("ci_build"))
     try:
         asyncio.run(runner(test_fn, backend, test_config))
     except TestFailureException as e:
-        print(e)
+        print("Test failed:", e)
         return "fail"
     except TimeoutError as e:
         print("Test timed out")
@@ -341,7 +345,7 @@ def cli(
         log_test_start(
             f"Running {test_name} on {test_config.board} ({test_config.config}, built with {test_config.build_system})"
         )
-        result = run_test_config(test_config, test_fn)
+        result = run_test_config(test_name, test_config, test_fn)
         log_test_end()
 
         test_results[test_config] = result

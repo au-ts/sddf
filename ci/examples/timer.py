@@ -1,0 +1,66 @@
+#!/usr/bin/env python3
+# Copyright 2025, UNSW
+# SPDX-License-Identifier: BSD-2-Clause
+
+import asyncio
+from pathlib import Path
+import sys
+
+sys.path.insert(1, Path(__file__).parents[2].as_posix())
+
+from ci.hardware_backend import *
+from ci.runner import TestConfig, cli, matrix_product
+
+TEST_MATRIX = matrix_product(
+    board=(
+        "imx8mm_evk",
+        "imx8mq_evk",
+        "imx8mp_evk",
+        "maaxboard",
+        "odroidc2",
+        "odroidc4",
+        "qemu_virt_aarch64",
+        "qemu_virt_riscv64",
+        "star64",
+    ),
+    # timer only works in debug mode
+    config=("debug",),
+)
+
+DRIFT_THRESHOLD = 0.05  # 5 percent.
+TIME_MEASURE_COUNT = 5
+TIME_LENGTH = 1000**3  # 1 second in nanoseconds
+
+
+async def test(backend: HardwareBackend, test_config: TestConfig):
+    await wait_for_output(backend, b"CLIENT|INFO: starting\r\n")
+
+    async with asyncio.timeout(5 + TIME_MEASURE_COUNT):
+        await wait_for_output(backend, b"The time now is: ")
+        await wait_for_output(backend, b"Setting a time out for 1 second\r\n")
+
+        times: list[int] = []
+        for _ in range(TIME_MEASURE_COUNT):
+            await wait_for_output(backend, b"Got a timeout!\r\n")
+            # "CLIENT|INFO: Now the time (in nanoseconds) is: 1015768000"
+            line = await wait_for_output(backend, b"\r\n")
+            assert line.startswith(b"CLIENT|INFO: Now the time (in nanoseconds) is: ")
+            time = int(
+                line.replace(b"CLIENT|INFO: Now the time (in nanoseconds) is: ", b"")
+            )
+            times.append(time)
+
+    print(f"Times: {times}")
+
+    for i in range(1, len(times)):
+        delta_ns = times[i] - times[i - 1]
+        if abs(delta_ns - TIME_LENGTH) > (DRIFT_THRESHOLD * TIME_LENGTH):
+            raise TestFailureException(
+                f"time delta between t{i} and t{i-1} of {delta_ns}ns exceeds {DRIFT_THRESHOLD:.0%} threshold"
+            )
+
+    print(f"Deltas within {DRIFT_THRESHOLD:.0%} threshold")
+
+
+if __name__ == "__main__":
+    cli("timer", test, TEST_MATRIX)
