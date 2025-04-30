@@ -9,7 +9,8 @@ from asyncio.subprocess import PIPE, STDOUT
 from pathlib import Path
 import sys
 
-from .base import HardwareBackend, LockedBoardException
+from .base import HardwareBackend
+from .common import LockedBoardException
 
 # In case we somehow break and don't release the lock automatically.
 LOCK_TIMEOUT = 60 * 60  # 60 min
