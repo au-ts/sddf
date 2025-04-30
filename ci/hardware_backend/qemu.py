@@ -9,10 +9,10 @@ from .base import HardwareBackend
 
 
 class QemuBackend(HardwareBackend):
-    def __init__(self, invocation_exe: str, *invocation_args: list[str]):
+    def __init__(self, invocation_exe: str, *invocation_args: str):
         self.process = None
         self.invocation_exe = invocation_exe
-        self.invocation_args = invocation_args
+        self.invocation_args = list(invocation_args)
 
     async def start(self):
         assert self.process is None, "start() not previously called"
