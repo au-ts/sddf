@@ -34,11 +34,14 @@ BOARDS: List[Board] = [
 
 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
-    timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=4)
+    timer_driver = ProtectionDomain(
+        "timer_driver", "timer_driver.elf", priority=4)
     i2c_driver = ProtectionDomain("i2c_driver", "i2c_driver.elf", priority=3)
     i2c_virt = ProtectionDomain("i2c_virt", "i2c_virt.elf", priority=2)
-    client_pn532 = ProtectionDomain("client_pn532", "client_pn532.elf", priority=1)
-    client_ds3231 = ProtectionDomain("client_ds3231", "client_ds3231.elf", priority=1)
+    client_pn532 = ProtectionDomain(
+        "client_pn532", "client_pn532.elf", priority=1)
+    client_ds3231 = ProtectionDomain(
+        "client_ds3231", "client_ds3231.elf", priority=1)
 
     # Right now we do not have separate clk and GPIO drivers and so our I2C driver does manual
     # clk/GPIO setup for I2C.
@@ -86,7 +89,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--dtb", required=True)
     parser.add_argument("--sddf", required=True)
-    parser.add_argument("--board", required=True, choices=[b.name for b in BOARDS])
+    parser.add_argument("--board", required=True,
+                        choices=[b.name for b in BOARDS])
     parser.add_argument("--output", required=True)
     parser.add_argument("--sdf", required=True)
 
