@@ -16,18 +16,21 @@ __attribute__((__section__(".device_resources"))) device_resources_t device_reso
 /*
  * Zynq UltraScale+ MPSoC contains a timer (Cadence Triple Timer Clock) with 3 32-bit counters.
  * Only 2 of the 3 timers are used in this driver. All 3 timers by default are connected to
- * the 100MHz clock in the low power domain (LPD).
- * First timer: always on, keeps track of system running time.
- * Second timer: used for timing timeouts. Currently supports a maximum of ~42s timeout.
+ * the LSBUS clock in the Low Power Domain, (controlled by LPD_LSBUS_CTRL).
+ * By default, this clock is using IOPLL clock as source, and divides down by 15 to 100MHz.
+ * See: https://docs.amd.com/r/en-US/ug1087-zynq-ultrascale-registers/LPD_LSBUS_CTRL-CRL_APB-Register.
+ * You can read the IOPLL clk value in u-boot using `clk dump` and view the source and divider value for
+ * LSBUS by reading LPD_LSBUS_CTRL register.
  */
 /* TODO:
- * Ensure LPD clock is at 100MHz/Use a different clock
- * Downscale clock frequency (clk_ctrl) to allow longer timeouts (decreases timer accuracy)
- * Cleanup hacks in code
- * More graceful error when user requests timeout greater than served by ZCU102_TIMER_MAX_TICKS (at 100MHz, 32-bit counter thats ~42s)
+ * More graceful error when user requests timeout greater than served by ZCU102_TIMER_MAX_TICKS (at 25MHz (downscaled), 32-bit counter thats ~2min 51.799s)
+ * Allow timeouts greater than UINT32_MAX ticks
  */
-// 100 MHz frequency in LPD (low power domain clock), later need to read/set up specifc freq: https://github.com/seL4/util_libs/blob/9b8ea7dcf1d80b80b8b7a2a038e03ac10308f39b/libplatsupport/src/mach/zynq/timer.c#L135
-#define ZCU102_TIMER_TICKS_PER_SECOND 0x5F5E100
+
+/* prescale: rate = clk_src/[2^(N+1)] */
+#define ZCU102_TIMER_PRESCALE_VALUE 0x1
+/* 100MHz on the default source clock, scaled down to 25MHz */
+#define ZCU102_TIMER_TICKS_PER_SECOND 0x17D7840
 
 #define TTC_COUNTER_TIMER 0
 #define TTC_TIMEOUT_TIMER 1
@@ -35,6 +38,8 @@ __attribute__((__section__(".device_resources"))) device_resources_t device_reso
 #define ZCU102_TIMER_CTL_RESET 0x21
 #define ZCU102_TIMER_DISABLE 0x1
 #define ZCU102_TIMER_CNT_RESET BIT(4)
+/* Clock control values */
+#define ZCU102_TIMER_ENABLE_PRESCALE BIT(0)
 /* Counter control values */
 #define ZCU102_TIMER_ENABLE_INTERVAL_MODE BIT(1)
 #define ZCU102_TIMER_ENABLE_DECREMENT_MODE BIT(2)
@@ -84,7 +89,6 @@ static inline uint64_t get_ticks_in_ns(void)
     uint64_t value_l = (uint64_t)timer_regs->cnt_val[TTC_COUNTER_TIMER];
 
     /* Include unhandled interrupt in value_h */
-    // XXX: check if not race condition -> does reading (and therefore clearing) the interrupt register cancel the interrupt from being handled? Will counter_timer_elapses be incremented immediately after? (see below)
     if (timer_regs->int_sts[TTC_COUNTER_TIMER] & ZCU102_TIMER_ENABLE_OVERFLOW_INTERRUPT) {
         ++value_h;
         value_l = (uint64_t)timer_regs->cnt_val[TTC_COUNTER_TIMER];
@@ -194,6 +198,10 @@ void init()
     timer_regs->int_en[TTC_TIMEOUT_TIMER] = ZCU102_TIMER_ENABLE_INTERVAL_INTERRUPT;
     timer_regs->cnt_ctrl[TTC_TIMEOUT_TIMER] |= ZCU102_TIMER_ENABLE_INTERVAL_MODE;
 
+    /* Set up prescaler, divide down from 100MHz to ZCU102_TIMER_TICKS_PER_SECOND */
+    timer_regs->clk_ctrl[TTC_COUNTER_TIMER] = (ZCU102_TIMER_PRESCALE_VALUE << 1) | ZCU102_TIMER_ENABLE_PRESCALE;
+    timer_regs->clk_ctrl[TTC_TIMEOUT_TIMER] = (ZCU102_TIMER_PRESCALE_VALUE << 1) | ZCU102_TIMER_ENABLE_PRESCALE;
+
     /* Start the TTC_COUNTER_TIMER */
     timer_regs->cnt_ctrl[TTC_COUNTER_TIMER] ^= ZCU102_TIMER_DISABLE;
 }
@@ -213,7 +221,6 @@ void notified(microkit_channel ch)
         }
     } else if (ch == timeout_irq) {
         /* Timeout counter reached 0, stop the timeout timer */
-        // TODO: later: allow timeouts greater than UINT32_MAX ticks
         timer_regs->cnt_ctrl[TTC_TIMEOUT_TIMER] |= ZCU102_TIMER_DISABLE;
         uint64_t curr_time = get_ticks_in_ns();
         process_timeouts(curr_time);
