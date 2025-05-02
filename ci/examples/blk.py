@@ -28,7 +28,7 @@ TEST_MATRIX = matrix_product(
 
 
 def backend_fn(
-    disks_dir: TemporaryDirectory, test_config: TestConfig, loader_img: Path
+    disks_dir: str, test_config: TestConfig, loader_img: Path
 ) -> HardwareBackend:
     backend = standard_backend(test_config, loader_img)
 

@@ -7,13 +7,14 @@ from pathlib import Path
 from ci.lib.backends import HardwareBackend, QemuBackend, MachineQueueBackend
 from ci.lib.runner import TestConfig
 
-
-MACHINE_QUEUE_MAPPING = {
-    "odroidc4": "odroidc4_1",
-    "imx8mm_evk": "imx8mm",
-    "imx8mp_evk": "iotgate1",
-    "imx8mq_evk": "imx8mq",
-    "maaxboard": "maaxboard2",
+# The ordering in these lists defines an implicit ordering of which boards
+# to use for CI preferentially, though all will eventually be tried.
+MACHINE_QUEUE_MAPPING: dict[str, list[str]] = {
+    "odroidc4": ["odroidc4_1", "odroidc4_2"],
+    "imx8mm_evk": ["imx8mm"],
+    "imx8mp_evk": ["iotgate1"],
+    "imx8mq_evk": ["imx8mq", "imx8mq2"],
+    "maaxboard": ["maaxboard1", "maaxboard2"],
 }
 
 
@@ -54,7 +55,7 @@ def standard_backend(
                 "qemu-system-riscv64",
                 # fmt: off
                 "-machine", "virt",
-                "-kernel", loader_img.resolve(),
+                "-kernel", str(loader_img.resolve()),
                 # fmt: on
                 *QEMU_COMMON_FLAGS,
             )
@@ -72,7 +73,5 @@ def standard_backend(
             raise NotImplementedError(f"unknown qemu board {test_config.board}")
 
     else:
-        return MachineQueueBackend(
-            loader_img.resolve(),
-            MACHINE_QUEUE_MAPPING.get(test_config.board, test_config.board),
-        )
+        mq_boards: list[str] = MACHINE_QUEUE_MAPPING[test_config.board]
+        return MachineQueueBackend(loader_img.resolve(), mq_boards)

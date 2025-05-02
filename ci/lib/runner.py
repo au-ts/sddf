@@ -103,11 +103,11 @@ class _ListArg(argparse.Action):
 
         self.kind: Literal["additive", "subtractive"] | None = None
 
-    def __call__(self, parser, namespace, values, option_string=None):
-        values = set(values.split(","))
-        if option_string.startswith("--exclude"):
+    def __call__(self, parser, namespace, values: str, option_string: str): # type: ignore
+        values_set = set(values.split(","))
+        if option_string and option_string.startswith("--exclude"):
             kind = "subtractive"
-            values = self.default - values
+            values_set = self.default - values_set
         else:
             kind = "additive"
 
@@ -122,7 +122,7 @@ class _ListArg(argparse.Action):
                 ),
             )
 
-        setattr(namespace, self.dest, values)
+        setattr(namespace, self.dest, values_set)
 
 
 def _subset_test_matrix(
@@ -175,10 +175,15 @@ ResultKind = Literal["pass", "fail", "not_run", "lock_failure", "interrupted"]
 
 
 def run_test_config(
+    test_name: str,
     test_config: TestConfig,
-    backend: HardwareBackend,
-    test_fn: Callable[[HardwareBackend], Awaitable[None]],
+    test_fn: Callable[[HardwareBackend, TestConfig], Awaitable[None]],
+    backend_fn: Callable[[TestConfig, Path], HardwareBackend],
+    loader_img_fn: Callable[[str, TestConfig], Path],
 ) -> ResultKind:
+
+    loader_img = loader_img_fn(test_name, test_config)
+    backend = backend_fn(test_config, loader_img)
 
     try:
         asyncio.run(runner(test_fn, backend, test_config))
@@ -201,7 +206,7 @@ def run_test_config(
 
 def cli(
     test_name: str,
-    test_fn: Callable[[HardwareBackend], Awaitable[None]],
+    test_fn: Callable[[HardwareBackend, TestConfig], Awaitable[None]],
     matrix: list[TestConfig],
     backend_fn: Callable[[TestConfig, Path], HardwareBackend],
     loader_img_fn: Callable[[str, TestConfig], Path],
@@ -220,7 +225,9 @@ def cli(
         "--configs", default={test.config for test in matrix}, action=_ListArg
     )
     filters.add_argument(
-        "--build-systems", default={test.build_system for test in matrix}, action=_ListArg
+        "--build-systems",
+        default={test.build_system for test in matrix},
+        action=_ListArg,
     )
     filters.add_argument(
         "--only-qemu", action="store_true", help="select only QEMU tests"
@@ -274,6 +281,10 @@ def cli(
         print(list_test_cases(matrix))
         return
 
+    for test_config in matrix:
+        loader_img = loader_img_fn(test_name, test_config)
+        assert loader_img.exists(), f"loader image file {loader_img} does not exist"
+
     test_results: dict[TestConfig, ResultKind] = {}
     run_lock_retries = False
     lock_failure_retry_queue: list[TestConfig] = []
@@ -282,14 +293,9 @@ def cli(
         log_test_start(
             f"Running {test_name} on {test_config.board} ({test_config.config}, built with {test_config.build_system})"
         )
-
-        loader_img = loader_img_fn(test_name, test_config)
-        if loader_img.exists():
-            backend = backend_fn(test_config, loader_img)
-            result = run_test_config(test_config, backend, test_fn)
-        else:
-            print(f"Loader image file '{loader_img}' does not exist")
-            result = "fail"
+        result = run_test_config(
+            test_name, test_config, test_fn, backend_fn, loader_img_fn
+        )
         log_test_end()
 
         test_results[test_config] = result
@@ -316,7 +322,9 @@ def cli(
                 log_test_start(
                     f"Retrying {test_name} on {test_config.board} ({test_config.config}, built with {test_config.build_system})"
                 )
-                result = run_test_config(test_config, test_fn)
+                result = run_test_config(
+                    test_name, test_config, test_fn, backend_fn, loader_img_fn
+                )
                 log_test_end()
 
                 test_results[test_config] = result

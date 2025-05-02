@@ -60,10 +60,10 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
 
         try:
             # fmt: off
-            ip1 = re.search(rb"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", dhcp_client1).group(0).decode()
-            ip0 = re.search(rb"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", dhcp_client0).group(0).decode()
+            ip1 = re.search(rb"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", dhcp_client1).group(0).decode() # type: ignore
+            ip0 = re.search(rb"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", dhcp_client0).group(0).decode() # type: ignore
             # fmt: on
-        except IndexError:
+        except (IndexError, AttributeError):
             raise TestFailureException(
                 "could not find IP address in DHCP request result"
             )
