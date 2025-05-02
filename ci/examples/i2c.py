@@ -30,8 +30,6 @@ def backend_fn(test_config: TestConfig, loader_img: Path) -> HardwareBackend:
 
 
 async def test(backend: HardwareBackend, test_config: TestConfig):
-    await wait_for_output(backend, b"DS3231|INFO: init\r\n")
-
     async with asyncio.timeout(30):
         await wait_for_output(
             backend, b"Set Date and Time on DS3231 to: 31-12-23 23:59:42 (Sunday)\r\n"

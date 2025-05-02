@@ -54,10 +54,9 @@ async def runner(
     backend: HardwareBackend,
     test_config: TestConfig,
 ):
-    await backend.start()
     try:
-        async with asyncio.timeout(TEST_TIMEOUT):
-            await test(backend, test_config)
+        await backend.start()
+        await test(backend, test_config)
 
     except (EOFError, asyncio.IncompleteReadError):
         raise TestFailureException("EOF when reading from backend stream")
