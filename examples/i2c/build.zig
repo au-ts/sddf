@@ -98,6 +98,10 @@ pub fn build(b: *std.Build) void {
         .odroidc4 => "meson",
     };
 
+    const serial_driver_class = switch (microkit_board_option.?) {
+        .odroidc4 => "meson",
+    };
+
     const timer_driver_class = switch (microkit_board_option.?) {
         .odroidc4 => "meson",
     };
@@ -106,6 +110,11 @@ pub fn build(b: *std.Build) void {
     // This is required because the SDF file is expecting a different name to the artifact we
     // are dealing with.
     const timer_driver_install = b.addInstallArtifact(timer_driver, .{ .dest_sub_path = "timer_driver.elf" });
+
+    const serial_driver = sddf_dep.artifact(b.fmt("driver_serial_{s}.elf", .{serial_driver_class}));
+    // This is required because the SDF file is expecting a different name to the artifact we
+    // are dealing with.
+    const serial_driver_install = b.addInstallArtifact(serial_driver, .{ .dest_sub_path = "serial_driver.elf" });
 
     const pn532_driver = sddf_dep.artifact("driver_i2c_device_pn532");
     const ds3231_driver = sddf_dep.artifact("driver_i2c_device_ds3231");
@@ -128,7 +137,7 @@ pub fn build(b: *std.Build) void {
     client_pn532.addIncludePath(sddf_dep.path("include"));
     client_pn532.addIncludePath(sddf_dep.path("include/microkit"));
     client_pn532.linkLibrary(sddf_dep.artifact("util"));
-    client_pn532.linkLibrary(sddf_dep.artifact("util_putchar_debug"));
+    client_pn532.linkLibrary(sddf_dep.artifact("util_putchar_serial"));
     client_pn532.linkLibrary(pn532_driver);
 
     const client_ds3231 = b.addExecutable(.{
@@ -144,7 +153,7 @@ pub fn build(b: *std.Build) void {
     client_ds3231.addIncludePath(sddf_dep.path("include"));
     client_ds3231.addIncludePath(sddf_dep.path("include/microkit"));
     client_ds3231.linkLibrary(sddf_dep.artifact("util"));
-    client_ds3231.linkLibrary(sddf_dep.artifact("util_putchar_debug"));
+    client_ds3231.linkLibrary(sddf_dep.artifact("util_putchar_serial"));
     client_ds3231.linkLibrary(ds3231_driver);
 
     // Here we compile libco. Right now this is the only example that uses libco and so
@@ -166,6 +175,7 @@ pub fn build(b: *std.Build) void {
     b.installArtifact(client_pn532);
     b.installArtifact(client_ds3231);
     b.installArtifact(sddf_dep.artifact("i2c_virt.elf"));
+    b.installArtifact(sddf_dep.artifact("serial_virt_tx.elf"));
 
     // For compiling the DTS into a DTB
     const dts = sddf_dep.path(b.fmt("dts/{s}.dts", .{ microkit_board }));
@@ -197,18 +207,33 @@ pub fn build(b: *std.Build) void {
         .install_subdir = "meta_output",
     });
 
+    const serial_driver_resources_objcopy = updateSectionObjcopy(b, ".device_resources", meta_output, "serial_driver_device_resources.data", "serial_driver.elf");
+    const serial_driver_config_objcopy = updateSectionObjcopy(b, ".serial_driver_config", meta_output, "serial_driver_config.data", "serial_driver.elf");
+    const serial_virt_objcopy = updateSectionObjcopy(b, ".serial_virt_tx_config", meta_output, "serial_virt_tx.data", "serial_virt_tx.elf");
+    serial_driver_resources_objcopy.step.dependOn(&serial_driver_install.step);
+    serial_driver_config_objcopy.step.dependOn(&serial_driver_install.step);
+    const client_ds3231_serial_objcopy = updateSectionObjcopy(b, ".serial_client_config", meta_output, "serial_client_client_ds3231.data", "client_ds3231.elf");
+    const client_pn532_serial_objcopy = updateSectionObjcopy(b, ".serial_client_config", meta_output, "serial_client_client_pn532.data", "client_pn532.elf");
+
     const timer_driver_objcopy = updateSectionObjcopy(b, ".device_resources", meta_output, "timer_driver_device_resources.data", "timer_driver.elf");
     timer_driver_objcopy.step.dependOn(&timer_driver_install.step);
+    const client_ds3231_timer_objcopy = updateSectionObjcopy(b, ".timer_client_config", meta_output, "timer_client_client_ds3231.data", "client_ds3231.elf");
+    const client_pn532_timer_objcopy = updateSectionObjcopy(b, ".timer_client_config", meta_output, "timer_client_client_pn532.data", "client_pn532.elf");
+
     const i2c_driver_device_objcopy = updateSectionObjcopy(b, ".device_resources", meta_output, "i2c_driver_device_resources.data", "i2c_driver.elf");
     i2c_driver_device_objcopy.step.dependOn(&i2c_driver_install.step);
     const i2c_driver_config_objcopy = updateSectionObjcopy(b, ".i2c_driver_config", meta_output, "i2c_driver.data", "i2c_driver.elf");
     i2c_driver_config_objcopy.step.dependOn(&i2c_driver_install.step);
     const i2c_virt_objcopy = updateSectionObjcopy(b, ".i2c_virt_config", meta_output, "i2c_virt.data", "i2c_virt.elf");
     const client_ds3231_i2c_objcopy = updateSectionObjcopy(b, ".i2c_client_config", meta_output, "i2c_client_client_ds3231.data", "client_ds3231.elf");
-    const client_ds3231_timer_objcopy = updateSectionObjcopy(b, ".timer_client_config", meta_output, "timer_client_client_ds3231.data", "client_ds3231.elf");
     const client_pn532_i2c_objcopy = updateSectionObjcopy(b, ".i2c_client_config", meta_output, "i2c_client_client_pn532.data", "client_pn532.elf");
-    const client_pn532_timer_objcopy = updateSectionObjcopy(b, ".timer_client_config", meta_output, "timer_client_client_pn532.data", "client_pn532.elf");
+
     const objcopys = &.{
+        serial_driver_resources_objcopy,
+        serial_driver_config_objcopy,
+        serial_virt_objcopy,
+        client_ds3231_serial_objcopy,
+        client_pn532_serial_objcopy,
         client_ds3231_i2c_objcopy,
         client_ds3231_timer_objcopy,
         client_pn532_i2c_objcopy,
