@@ -18,27 +18,34 @@ instead of LLVM like all the other examples. As we use this example to perform b
 it is important that the functions that lwIP uses from the standard library are optimised
 rather than simple implementations.
 
-For now, we rely on the newlibc packaged with the embedded C toolchains.
+For now, we rely on the libc packaged with the embedded C toolchains.
 
-### For ARM boards
-The specific toolchain we use for testing and benchmarking the network sub-system is
-the `aarch64-none-elf` GCC toolchain distributed by ARM. You can download it from
+### ARM
+
+When targeting ARM boards, the specific toolchain we use for testing and benchmarking the echo
+server is the `aarch64-none-elf` GCC toolchain distributed by ARM. You can download it from
 [here](https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads).
 
-### For RISC-V boards
-The toolchain we use is the `riscv64-none-elf`/`riscv64-unknown-elf` GCC toolchain.
-As its not centrally distributed, below are OS specific instructions:
+### RISC-V
 
-#### MacOS
-With the [Homebrew](https://brew.sh/) package manager, you can do:
-
-    $ brew tap riscv-software-src/riscv
-    $ brew install riscv-tools
+When targeting RISC-V boards, we use the embedded GCC toolchain which is `riscv64-none-elf`
+or `riscv64-unknown-elf` depending on your environment. This toolchain is not distributed
+centrally so below are OS specific instructions:
 
 #### Linux (with apt)
-On a Debian-like system, you can do:
 
-    $ sudo apt install gcc-riscv64-unknown-elf picolibc-riscv64-unknown-elf
+On a Debian-like system, you can do:
+```sh
+sudo apt install gcc-riscv64-unknown-elf picolibc-riscv64-unknown-elf
+```
+
+#### macOS
+
+With Homebrew:
+```sh
+brew tap riscv-software-src/riscv
+brew install riscv-tools
+```
 
 ## Building
 
@@ -58,14 +65,15 @@ make MICROKIT_BOARD=<board> MICROKIT_SDK=<path/to/sdk> MICROKIT_CONFIG=(benchmar
 
 ## Benchmarking
 
-In order to run the benchmarks, set `MICROKIT_CONFIG=benchmark`. Currently only Aarch64 boards have
-support for collecting of benchmarking data. The system has
+In order to run the benchmarks, set `MICROKIT_CONFIG=benchmark`. The system has
 been designed to interact with [ipbench](https://sourceforge.net/projects/ipbench/)
 to take measurements.
+
+> [!NOTE]
+> Benchmarking is only supported for AArch64 boards, RISC-V benchmarking is not supported yet,
+> see https://github.com/au-ts/sddf/issues/421 for details.
 
 Checks to make before benchmarking:
 * Turn off all debug prints.
 * Run with LWIP asserts turned off as well (`LWIP_NOASSERT`).
 * Make sure compiler optimisations are enabled.
-
-Note that for qemu_virt_riscv64, see instructions for accessing serial console in [serial example README](../serial/README.md).
