@@ -51,7 +51,7 @@ DS3231_DRIVER := $(SDDF)/i2c/devices/ds3231
 IMAGES := i2c_virt.elf i2c_driver.elf client_pn532.elf client_ds3231.elf timer_driver.elf serial_driver.elf serial_virt_tx.elf
 CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall -Wno-unused-function -I${TOP}
 LDFLAGS := -L$(BOARD_DIR)/lib
-LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
+LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util.a --end-group
 
 IMAGE_FILE = loader.img
 REPORT_FILE = report.txt
