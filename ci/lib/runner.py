@@ -22,15 +22,11 @@ from .backends import (
     HardwareBackend,
     LockedBoardException,
     TestFailureException,
-    MachineQueueBackend,
-    QemuBackend,
     reset_terminal,
 )
 
 # For Github Actions etc.
 IS_CI = bool(os.environ.get("CI"))
-
-LOADER_IMG = "loader.img"
 
 TEST_TIMEOUT = 60 * 60  # 60 min
 LOCK_RETRY_COUNT = 3
@@ -64,66 +60,6 @@ async def runner(
     finally:
         reset_terminal()
         await backend.stop()
-
-
-def get_default_backend(
-    example_name: str, test_config: TestConfig, ci_build_folder_root: Path
-) -> HardwareBackend:
-
-    image = (
-        ci_build_folder_root
-        / "examples"
-        / example_name
-        / test_config.build_system
-        / test_config.board
-        / test_config.config
-        / LOADER_IMG
-    )
-
-    if test_config.is_qemu():
-        QEMU_COMMON_FLAGS = (
-            # fmt: off
-            "-m", "size=2G",
-            "-serial", "mon:stdio",
-            "-nographic",
-            "-d", "guest_errors",
-            # fmt: on
-        )
-
-        if test_config.board == "qemu_virt_riscv64":
-            return QemuBackend(
-                "qemu-system-riscv64",
-                # fmt: off
-                "-machine", "virt",
-                "-kernel", image.resolve(),
-                # fmt: on
-                *QEMU_COMMON_FLAGS,
-            )
-        elif test_config.board == "qemu_virt_aarch64":
-            return QemuBackend(
-                "qemu-system-aarch64",
-                # fmt: off
-                "-machine", "virt,virtualization=on",
-                "-cpu", "cortex-a53",
-                "-device", f"loader,file={image.resolve()},addr=0x70000000,cpu-num=0",
-                # fmt: on
-                *QEMU_COMMON_FLAGS,
-            )
-        else:
-            raise NotImplementedError(f"unknown qemu board {test_config.board}")
-
-    else:
-        MACHINE_QUEUE_MAPPING = {
-            "odroidc4": "odroidc4_1",
-            "imx8mm_evk": "imx8mm",
-            "imx8mp_evk": "iotgate1",
-            "imx8mq_evk": "imx8mq",
-            "maaxboard": "maaxboard2",
-        }
-        return MachineQueueBackend(
-            image.resolve(),
-            MACHINE_QUEUE_MAPPING.get(test_config.board, test_config.board),
-        )
 
 
 def matrix_product(**items):
@@ -234,20 +170,14 @@ def log_test_end():
     print()
 
 
-RESULT_KIND = Literal["pass", "fail", "not_run", "lock_failure", "interrupted"]
+ResultKind = Literal["pass", "fail", "not_run", "lock_failure", "interrupted"]
 
 
 def run_test_config(
-    test_name: str,
     test_config: TestConfig,
+    backend: HardwareBackend,
     test_fn: Callable[[HardwareBackend], Awaitable[None]],
-    backend_fn: Callable[[HardwareBackend, TestConfig], HardwareBackend],
-) -> RESULT_KIND:
-
-    # TODO: override-backend
-    backend = backend_fn(
-        get_default_backend(test_name, test_config, Path("ci_build")), test_config
-    )
+) -> ResultKind:
 
     try:
         asyncio.run(runner(test_fn, backend, test_config))
@@ -272,9 +202,8 @@ def cli(
     test_name: str,
     test_fn: Callable[[HardwareBackend], Awaitable[None]],
     matrix: list[TestConfig],
-    backend_fn: Callable[
-        [HardwareBackend, TestConfig], HardwareBackend
-    ] = lambda b, c: b,
+    backend_fn: Callable[[TestConfig, Path], HardwareBackend],
+    loader_img_fn: Callable[[str, TestConfig], Path],
 ):
     """
     test should raise an exception on failure.
@@ -341,7 +270,7 @@ def cli(
         print(list_test_cases(matrix))
         return
 
-    test_results: dict[TestConfig, RESULT_KIND] = {}
+    test_results: dict[TestConfig, ResultKind] = {}
     run_lock_retries = False
     lock_failure_retry_queue: list[TestConfig] = []
 
@@ -349,7 +278,11 @@ def cli(
         log_test_start(
             f"Running {test_name} on {test_config.board} ({test_config.config}, built with {test_config.build_system})"
         )
-        result = run_test_config(test_name, test_config, test_fn, backend_fn)
+
+        loader_img = loader_img_fn(test_name, test_config)
+        backend = backend_fn(test_config, loader_img)
+
+        result = run_test_config(test_config, backend, test_fn)
         log_test_end()
 
         test_results[test_config] = result

@@ -14,6 +14,7 @@ sys.path.insert(1, Path(__file__).parents[2].as_posix())
 
 from ci.lib.backends import *
 from ci.lib.runner import TestConfig, cli, matrix_product
+from ci.configs import standard_backend, standard_loader_img_path
 
 TEST_MATRIX = matrix_product(
     board=(
@@ -27,8 +28,10 @@ TEST_MATRIX = matrix_product(
 
 
 def backend_fn(
-    disks_dir: TemporaryDirectory, backend: HardwareBackend, test_config: TestConfig
+    disks_dir: TemporaryDirectory, test_config: TestConfig, loader_img: Path
 ) -> HardwareBackend:
+    backend = standard_backend(test_config, loader_img)
+
     if isinstance(backend, QemuBackend):
         (_, disk_path) = tempfile.mkstemp(dir=disks_dir)
 
@@ -62,4 +65,10 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
 
 if __name__ == "__main__":
     with tempfile.TemporaryDirectory(suffix="sddf_blk_disks") as qemu_disks_dir:
-        cli("blk", test, TEST_MATRIX, functools.partial(backend_fn, qemu_disks_dir))
+        cli(
+            "blk",
+            test,
+            TEST_MATRIX,
+            functools.partial(backend_fn, qemu_disks_dir),
+            standard_loader_img_path,
+        )
