@@ -22,6 +22,7 @@ TEST_MATRIX = matrix_product(
         "odroidc2",
         "odroidc4",
         "qemu_virt_aarch64",
+        "qemu_virt_riscv64",
     ),
     config=("debug", "release", "benchmark"),
 )
