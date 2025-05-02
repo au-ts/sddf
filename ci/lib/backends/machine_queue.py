@@ -60,6 +60,9 @@ class MachineQueueBackend(HardwareBackend):
         return stdout.decode().strip("\n")
 
     async def _find_available_board(self) -> str:
+        if len(self.boards) == 0:
+            raise LockedBoardException("no boards available")
+
         lock_infos = []
         for board in self.boards:
             lock_info = await self._lock_info(board)
