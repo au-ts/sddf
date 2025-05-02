@@ -34,18 +34,19 @@ static blk_queue_handle_t blk_queue;
 #define REQUEST_NUM_BLOCKS 2
 
 enum test_basic_state {
-    START,
-    READ,
-    FINISH,
+    STATE_START,
+    STATE_ENQUEUE_READ,
+    STATE_CHECK_READ,
+    STATE_FINISH,
 };
 
-enum test_basic_state test_basic_state = START;
+enum test_basic_state test_basic_state = STATE_START;
 
 bool test_basic()
 {
     switch (test_basic_state) {
-    case START: {
-        LOG_CLIENT("basic: START state\n");
+    case STATE_START: {
+        LOG_CLIENT("basic: STATE_START state\n");
         // We assume that the data fits into two blocks
         assert(basic_data_len <= BLK_TRANSFER_SIZE * 2);
 
@@ -56,12 +57,12 @@ bool test_basic()
         int err = blk_enqueue_req(&blk_queue, BLK_REQ_WRITE, 0, REQUEST_BLK_NUMBER, REQUEST_NUM_BLOCKS, 0);
         assert(!err);
 
-        test_basic_state = READ;
+        test_basic_state = STATE_ENQUEUE_READ;
 
         break;
     }
-    case READ: {
-        LOG_CLIENT("basic: READ state\n");
+    case STATE_ENQUEUE_READ: {
+        LOG_CLIENT("basic: STATE_ENQUEUE_READ state\n");
         /* Check that our previous write was successful */
         blk_resp_status_t status = -1;
         uint16_t count = -1;
@@ -77,12 +78,12 @@ bool test_basic()
         err = blk_enqueue_req(&blk_queue, BLK_REQ_READ, offset, REQUEST_BLK_NUMBER, REQUEST_NUM_BLOCKS, 0);
         assert(!err);
 
-        test_basic_state = FINISH;
+        test_basic_state = STATE_CHECK_READ;
 
         break;
     }
-    case FINISH: {
-        LOG_CLIENT("basic: FINISH state\n");
+    case STATE_CHECK_READ: {
+        LOG_CLIENT("basic: STATE_CHECK_READ state\n");
         blk_resp_status_t status = -1;
         uint16_t count = -1;
         uint32_t id = -1;
@@ -108,6 +109,8 @@ bool test_basic()
         sddf_printf("\n");
 
         LOG_CLIENT("basic: successfully finished!\n");
+
+        test_basic_state = STATE_FINISH;
 
         return true;
     }
@@ -150,7 +153,7 @@ void notified(microkit_channel ch)
 {
     assert(ch == blk_config.virt.id || ch == serial_config.tx.id);
 
-    if (!test_basic()) {
+    if (ch == blk_config.virt.id && !test_basic()) {
         microkit_notify(blk_config.virt.id);
     }
 }
