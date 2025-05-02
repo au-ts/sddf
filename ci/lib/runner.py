@@ -10,7 +10,6 @@ QEMU.
 
 import argparse
 import asyncio
-from collections import defaultdict, deque
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 import itertools
@@ -19,7 +18,7 @@ from pathlib import Path
 import time
 from typing import Literal
 
-from ci.hardware_backend import (
+from .backends import (
     HardwareBackend,
     LockedBoardException,
     TestFailureException,

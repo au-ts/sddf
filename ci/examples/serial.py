@@ -8,8 +8,8 @@ import sys
 
 sys.path.insert(1, Path(__file__).parents[2].as_posix())
 
-from ci.hardware_backend import *
-from ci.runner import TestConfig, cli, matrix_product
+from ci.lib.backends import *
+from ci.lib.runner import TestConfig, cli, matrix_product
 
 TEST_MATRIX = matrix_product(
     board=(
