@@ -10,10 +10,13 @@ from pathlib import Path
 import sys
 
 from .base import HardwareBackend
-from .common import LockedBoardException
+from .common import LockedBoardException, TestFailureException
+from .streams import wait_for_output
 
+BOOT_TIMEOUT = 2 * 60  # 2 minutes
 # In case we somehow break and don't release the lock automatically.
-LOCK_TIMEOUT = 60 * 60  # 60 min
+# TODO: inherit from somewhere else
+LOCK_TIMEOUT = 60 * 60  # 60 minutes
 # For Github Actions etc.
 IS_CI = bool(os.environ.get("CI"))
 
@@ -31,7 +34,8 @@ class MachineQueueBackend(HardwareBackend):
         if IS_CI:
             self.job_key = "-".join(
                 [
-                    os.environ.get("GITHUB_REPOSITORY", "hardware_ci"),
+                    "au_ts_ci",
+                    os.environ.get("GITHUB_REPOSITORY", "??"),
                     os.environ.get("GITHUB_WORKFLOW", "??"),
                     os.environ.get("GITHUB_RUN_ID", "??"),
                     os.environ.get("GITHUB_JOB", "??"),
@@ -39,7 +43,7 @@ class MachineQueueBackend(HardwareBackend):
                 ]
             )
         else:
-            self.job_key = "hardware_ci (testing at the moment, take the lock if @juliab holds this)"
+            self.job_key = "au_ts_ci (running locally)"
 
     @staticmethod
     async def _lock_info(board: str):
@@ -61,7 +65,7 @@ class MachineQueueBackend(HardwareBackend):
 
     async def _find_available_board(self) -> str:
         if len(self.boards) == 0:
-            raise LockedBoardException("no boards available")
+            raise TestFailureException("no boards available")
 
         lock_infos = []
         for board in self.boards:
@@ -144,8 +148,13 @@ class MachineQueueBackend(HardwareBackend):
             stderr=STDOUT,
         )
 
+        # NOTE: This includes the time for the machine queue to retry booting
+        #       a few times due to spurious failures that occur.
+        async with asyncio.timeout(BOOT_TIMEOUT):
+            await wait_for_output(self, b"## Starting application")
+
     async def stop(self):
-        assert self.process is not None
+        if self.process is None: return
 
         await self._release_lock()
 

@@ -45,9 +45,6 @@ def backend_fn(test_config: TestConfig, loader_img: Path) -> HardwareBackend:
 
 
 async def test(backend: HardwareBackend, test_config: TestConfig):
-    await wait_for_output(backend, b"echo client starting")
-    await wait_for_output(backend, b"echo client starting")
-
     async with asyncio.timeout(20):
         await wait_for_output(backend, b"DHCP request finished")
         dhcp_client1 = await wait_for_output(backend, b"\r\n")

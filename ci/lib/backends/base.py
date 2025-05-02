@@ -8,10 +8,12 @@ from asyncio import StreamReader, StreamWriter
 
 class HardwareBackend(ABC):
     @abstractmethod
-    async def start(self): ...
+    async def start(self):
+        """Start the hardware and wait for it to have booted"""
 
     @abstractmethod
-    async def stop(self): ...
+    async def stop(self):
+        """Stop the hardware"""
 
     @property
     @abstractmethod
