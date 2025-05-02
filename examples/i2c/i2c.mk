@@ -77,10 +77,10 @@ DEPS_DS3231 := $(CLIENT_DS3231_OBJS:.o=.d)
 VPATH:=${TOP}
 all: $(IMAGE_FILE)
 
-client_pn532.elf: $(CLIENT_PN532_OBJS) libco.a
+client_pn532.elf: $(CLIENT_PN532_OBJS) libco.a libsddf_util.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-client_ds3231.elf: $(CLIENT_DS3231_OBJS) libco.a
+client_ds3231.elf: $(CLIENT_DS3231_OBJS) libco.a libsddf_util.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(DTB): $(DTS)
