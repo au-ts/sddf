@@ -26,6 +26,7 @@ TEST_MATRIX = matrix_product(
     ),
     # timer only works in debug mode
     config=("debug",),
+    build_system=("make", "zig"),
 )
 
 DRIFT_THRESHOLD = 0.05  # 5 percent.

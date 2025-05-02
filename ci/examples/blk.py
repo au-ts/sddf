@@ -22,8 +22,8 @@ TEST_MATRIX = matrix_product(
         "qemu_virt_aarch64",
         "qemu_virt_riscv64",
     ),
-    # only prints output in debug mode
     config=("debug", "release"),
+    build_system=("make", "zig"),
 )
 
 

@@ -29,6 +29,7 @@ def standard_loader_img_path(
         / test_config.build_system
         / test_config.board
         / test_config.config
+        / ("bin" if test_config.build_system == "zig" else "")
         / "loader.img"
     )
 

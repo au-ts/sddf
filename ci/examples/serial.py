@@ -25,6 +25,7 @@ TEST_MATRIX = matrix_product(
         "star64",
     ),
     config=("debug", "release"),
+    build_system=("make", "zig"),
 )
 
 ANSI_RED   = b"\x1b[31m"
