@@ -519,8 +519,6 @@ void init(void)
     i2c_ifState.remaining = 0;
     i2c_ifState.notified = 0;
     i2c_ifState.addr = 0;
-
-    microkit_dbg_puts("Driver initialised.\n");
 }
 
 static inline void handle_request(void)

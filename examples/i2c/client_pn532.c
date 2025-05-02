@@ -208,7 +208,7 @@ void init(void)
                       serial_config.tx.data.vaddr);
     serial_putchar_init(serial_config.tx.id, &serial_tx_queue_handle);
 
-    LOG_CLIENT("init\n");
+    sddf_printf("PN532|INFO: init\n");
 
     assert(i2c_config_check_magic((void *)&i2c_config));
 
