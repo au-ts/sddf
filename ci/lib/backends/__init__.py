@@ -15,8 +15,25 @@ In broad strokes, requirements of these backends are:
 
 # Re-Exports
 from .base import HardwareBackend
-from .common import LockedBoardException, TestFailureException, reset_terminal
+from .common import (
+    LockedBoardException,
+    TestFailureException,
+    reset_terminal,
+    OUTPUT,
+    log_output_to_file,
+)
 from .streams import send_input, wait_for_output, expect_output
 from .machine_queue import MachineQueueBackend
 from .qemu import QemuBackend
 from .tty import TtyBackend
+
+# fmt: off
+__all__ = (
+    "HardwareBackend",
+    "LockedBoardException", "TestFailureException", "reset_terminal", "log_output_to_file", "OUTPUT",
+    "send_input", "wait_for_output", "expect_output",
+    "MachineQueueBackend",
+    "QemuBackend",
+    "TtyBackend",
+)
+# fmt: on

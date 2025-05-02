@@ -11,7 +11,9 @@ QEMU.
 import argparse
 import asyncio
 from collections.abc import Awaitable, Callable
+from contextlib import nullcontext
 from dataclasses import dataclass
+from datetime import datetime
 import itertools
 import os
 from pathlib import Path
@@ -23,6 +25,8 @@ from .backends import (
     LockedBoardException,
     TestFailureException,
     reset_terminal,
+    log_output_to_file,
+    OUTPUT,
 )
 
 # For Github Actions etc.
@@ -103,7 +107,7 @@ class _ListArg(argparse.Action):
 
         self.kind: Literal["additive", "subtractive"] | None = None
 
-    def __call__(self, parser, namespace, values: str, option_string: str): # type: ignore
+    def __call__(self, parser, namespace, values: str, option_string: str):  # type: ignore
         values_set = set(values.split(","))
         if option_string and option_string.startswith("--exclude"):
             kind = "subtractive"
@@ -142,7 +146,7 @@ def _subset_test_matrix(
     return list(filter(filter_check, matrix))
 
 
-def list_test_cases(matrix: list[TestConfig]):
+def _list_test_cases(matrix: list[TestConfig]):
     if len(matrix) == 0:
         return "   (none)"
 
@@ -157,14 +161,14 @@ def list_test_cases(matrix: list[TestConfig]):
     return "\n".join(lines)
 
 
-def log_test_start(name: str):
+def _log_test_start(name: str):
     if IS_CI:
         print(f"::group::{name}")
     else:
         print(name)
 
 
-def log_test_end():
+def _log_test_end():
     if IS_CI:
         print(f"::endgroup::")
 
@@ -180,27 +184,44 @@ def run_test_config(
     test_fn: Callable[[HardwareBackend, TestConfig], Awaitable[None]],
     backend_fn: Callable[[TestConfig, Path], HardwareBackend],
     loader_img_fn: Callable[[str, TestConfig], Path],
+    logs_dir: Path | None = None,
 ) -> ResultKind:
 
     loader_img = loader_img_fn(test_name, test_config)
     backend = backend_fn(test_config, loader_img)
 
+    if logs_dir:
+        log_file = (
+            logs_dir
+            / test_name
+            / test_config.board
+            / test_config.config
+            / test_config.build_system
+            / f"{datetime.now()}.log"
+        )
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+        log_file_cm = log_output_to_file(log_file)
+    else:
+        log_file_cm = nullcontext()
+
     try:
-        asyncio.run(runner(test_fn, backend, test_config))
+        with log_file_cm:
+            asyncio.run(runner(test_fn, backend, test_config))
+
     except TestFailureException as e:
-        print("Test failed:", e)
+        OUTPUT.write(f"Test failed: {e}")
         return "fail"
     except TimeoutError as e:
-        print("Test timed out")
+        OUTPUT.write("Test timed out")
         return "fail"
     except LockedBoardException as e:
         print(e)
         return "lock_failure"
     except KeyboardInterrupt:
-        print("Tests cancelled (SIGINT)")
+        OUTPUT.write("Tests cancelled (SIGINT)")
         return "interrupted"
 
-    print("Test passed")
+    OUTPUT.write("Test passed")
     return "pass"
 
 
@@ -253,6 +274,13 @@ def cli(
         action="store_true",
         help="force the use of a specific backend to run the test. requires --single",
     )
+    parser.add_argument(
+        "--logs-dir",
+        type=Path,
+        default=Path("ci_logs"),
+        action=argparse.BooleanOptionalAction,
+        help="save output to a log directory"
+    )
 
     args = parser.parse_args()
 
@@ -267,7 +295,7 @@ def cli(
     if args.single and len(matrix) != 1:
         parser.error(
             "requested --single but applied filters generated multiple cases: \n"
-            + list_test_cases(matrix)
+            + _list_test_cases(matrix)
         )
 
     if args.override_backend:
@@ -278,7 +306,7 @@ def cli(
 
     if args.dry_run:
         print("Would run the following test cases:")
-        print(list_test_cases(matrix))
+        print(_list_test_cases(matrix))
         return
 
     for test_config in matrix:
@@ -290,13 +318,13 @@ def cli(
     lock_failure_retry_queue: list[TestConfig] = []
 
     for test_config in matrix:
-        log_test_start(
+        _log_test_start(
             f"Running {test_name} on {test_config.board} ({test_config.config}, built with {test_config.build_system})"
         )
         result = run_test_config(
-            test_name, test_config, test_fn, backend_fn, loader_img_fn
+            test_name, test_config, test_fn, backend_fn, loader_img_fn, args.logs_dir
         )
-        log_test_end()
+        _log_test_end()
 
         test_results[test_config] = result
 
@@ -319,13 +347,18 @@ def cli(
             time.sleep(LOCK_RETRY_DELAY)
 
             for test_config in lock_failure_retry_queue:
-                log_test_start(
+                _log_test_start(
                     f"Retrying {test_name} on {test_config.board} ({test_config.config}, built with {test_config.build_system})"
                 )
                 result = run_test_config(
-                    test_name, test_config, test_fn, backend_fn, loader_img_fn
+                    test_name,
+                    test_config,
+                    test_fn,
+                    backend_fn,
+                    loader_img_fn,
+                    args.logs_dir,
                 )
-                log_test_end()
+                _log_test_end()
 
                 test_results[test_config] = result
 
@@ -349,15 +382,15 @@ def cli(
             assert False, "impossible"
 
     print("==== Passing ====")
-    print(list_test_cases(passing))
+    print(_list_test_cases(passing))
     print("==== Failed =====")
-    print(list_test_cases(failing))
+    print(_list_test_cases(failing))
     if len(not_run) != 0:
         print("===== Cancelled (not run) =====")
-        print(list_test_cases(not_run))
+        print(_list_test_cases(not_run))
     if len(lock_failures) != 0:
         print("===== Failed to acquire locks ====")
-        print(list_test_cases(lock_failures))
+        print(_list_test_cases(lock_failures))
 
     if len(passing) != len(matrix):
         quit(1)

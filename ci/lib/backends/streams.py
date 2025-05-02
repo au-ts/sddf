@@ -5,11 +5,9 @@
 import asyncio
 import inspect
 from functools import wraps
-from io import BytesIO
-import sys
 
 from .base import HardwareBackend
-from .common import reset_terminal, TestFailureException
+from .common import OUTPUT, reset_terminal, TestFailureException
 
 
 def _print_text_on_timeout(f):
@@ -30,19 +28,14 @@ def _print_text_on_timeout(f):
     return wrapper
 
 
-async def send_input(
-    backend: HardwareBackend, text: bytes, stdout: BytesIO = sys.stdout.buffer
-):
+async def send_input(backend: HardwareBackend, text: bytes):
     backend.input_stream.write(text)
-    stdout.write(text)
-    stdout.flush()
+    OUTPUT.write(text)
     await backend.input_stream.drain()
 
 
 @_print_text_on_timeout
-async def wait_for_output(
-    backend: HardwareBackend, text: bytes, stdout: BytesIO = sys.stdout.buffer
-) -> bytes:
+async def wait_for_output(backend: HardwareBackend, text: bytes) -> bytes:
     if len(text) == 0:
         raise ValueError("Text should be at least 1 byte")
 
@@ -68,8 +61,7 @@ async def wait_for_output(
         if read == b"":
             raise EOFError()
 
-        stdout.write(read)
-        stdout.flush()
+        OUTPUT.write(read)
         buffer.extend(read)
 
         # Check if we now have enough data in the buffer for `text` to fit.
@@ -87,15 +79,12 @@ async def wait_for_output(
 
 
 @_print_text_on_timeout
-async def expect_output(
-    backend: HardwareBackend, text: bytes, stdout: BytesIO = sys.stdout.buffer
-) -> bytes:
+async def expect_output(backend: HardwareBackend, text: bytes):
     if len(text) == 0:
         raise ValueError("Text should be at least 1 byte")
 
     read = await backend.output_stream.readexactly(len(text))
-    stdout.write(read)
-    stdout.flush()
+    OUTPUT.write(read)
 
     if text not in read:
         raise TestFailureException(
