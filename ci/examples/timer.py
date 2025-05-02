@@ -10,6 +10,7 @@ sys.path.insert(1, Path(__file__).parents[2].as_posix())
 
 from ci.lib.backends import *
 from ci.lib.runner import TestConfig, cli, matrix_product
+from ci.configs import standard_backend, standard_loader_img_path
 
 TEST_MATRIX = matrix_product(
     board=(
@@ -63,4 +64,4 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
 
 
 if __name__ == "__main__":
-    cli("timer", test, TEST_MATRIX)
+    cli("timer", test, TEST_MATRIX, standard_backend, standard_loader_img_path)

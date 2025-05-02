@@ -11,6 +11,7 @@ sys.path.insert(1, Path(__file__).parents[2].as_posix())
 
 from ci.lib.backends import *
 from ci.lib.runner import TestConfig, cli, matrix_product
+from ci.configs import standard_backend, standard_loader_img_path
 
 TEST_MATRIX = matrix_product(
     board=(
@@ -26,7 +27,9 @@ TEST_MATRIX = matrix_product(
 )
 
 
-def backend_fn(backend: HardwareBackend, test_config: TestConfig) -> HardwareBackend:
+def backend_fn(test_config: TestConfig, loader_img: Path) -> HardwareBackend:
+    backend = standard_backend(test_config, loader_img)
+
     if isinstance(backend, QemuBackend):
         # fmt: off
         backend.invocation_args.extend([
@@ -70,4 +73,4 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
 
 
 if __name__ == "__main__":
-    cli("echo_server", test, TEST_MATRIX, backend_fn)
+    cli("echo_server", test, TEST_MATRIX, backend_fn, standard_loader_img_path)
