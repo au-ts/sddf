@@ -23,7 +23,7 @@ TEST_MATRIX = matrix_product(
         "qemu_virt_riscv64",
     ),
     # only prints output in debug mode
-    config=("debug",),
+    config=("debug", "release"),
 )
 
 
@@ -57,7 +57,7 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
 
     async with asyncio.timeout(10):
         await wait_for_output(backend, b"device config ready\r\n")
-        await wait_for_output(backend, b"CLIENT|INFO: basic: FINISH state\r\n")
+        await wait_for_output(backend, b"basic: STATE_CHECK_READ state\r\n")
         await wait_for_output(
             backend, b"CLIENT|INFO: basic: successfully finished!\r\n"
         )
