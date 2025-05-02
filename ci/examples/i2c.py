@@ -14,7 +14,7 @@ from ci.lib.runner import TestConfig, cli, matrix_product
 TEST_MATRIX = matrix_product(
     board=("odroidc4",),
     # only prints output in debug mode
-    config=("debug",),
+    config=("debug", "release"),
 )
 
 
@@ -27,7 +27,7 @@ def backend_fn(backend: HardwareBackend, test_config: TestConfig) -> HardwareBac
 
 
 async def test(backend: HardwareBackend, test_config: TestConfig):
-    await wait_for_output(backend, b"Driver initialised.\r\n")
+    await wait_for_output(backend, b"PN532|INFO: init\r\n")
 
     async with asyncio.timeout(30):
         await wait_for_output(
