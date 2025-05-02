@@ -280,9 +280,12 @@ def cli(
         )
 
         loader_img = loader_img_fn(test_name, test_config)
-        backend = backend_fn(test_config, loader_img)
-
-        result = run_test_config(test_config, backend, test_fn)
+        if loader_img.exists():
+            backend = backend_fn(test_config, loader_img)
+            result = run_test_config(test_config, backend, test_fn)
+        else:
+            print(f"Loader image file '{loader_img}' does not exist")
+            result = "fail"
         log_test_end()
 
         test_results[test_config] = result
