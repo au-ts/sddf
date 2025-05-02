@@ -19,7 +19,7 @@ class Board:
     blk: str
     # Default partition if the user has not specified one
     partition: int
-    # Use actual serial driver for output in non-debug configurations
+    # Use actual serial driver for output, so we can test non-debug configurations
     serial: str
     # Some block drivers need a timer driver as well, the example
     # itself does not need a timer driver.

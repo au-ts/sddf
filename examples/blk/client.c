@@ -25,7 +25,7 @@
 __attribute__((__section__(".blk_client_config"))) blk_client_config_t blk_config;
 __attribute__((__section__(".serial_client_config"))) serial_client_config_t serial_config;
 
-static serial_queue_handle_t tx_queue_handle;
+static serial_queue_handle_t serial_tx_queue_handle;
 
 static blk_queue_handle_t blk_queue;
 
@@ -125,9 +125,9 @@ bool test_basic()
 void init(void)
 {
     assert(serial_config_check_magic(&serial_config));
-    serial_queue_init(&tx_queue_handle, serial_config.tx.queue.vaddr, serial_config.tx.data.size,
+    serial_queue_init(&serial_tx_queue_handle, serial_config.tx.queue.vaddr, serial_config.tx.data.size,
                       serial_config.tx.data.vaddr);
-    serial_putchar_init(serial_config.tx.id, &tx_queue_handle);
+    serial_putchar_init(serial_config.tx.id, &serial_tx_queue_handle);
 
     LOG_CLIENT("starting\n");
 
