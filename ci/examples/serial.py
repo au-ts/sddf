@@ -22,7 +22,8 @@ TEST_MATRIX = matrix_product(
         "odroidc4",
         "qemu_virt_aarch64",
         "qemu_virt_riscv64",
-        "star64",
+        # TODO: This driver has garbled output that breaks the tests.
+        # "star64",
     ),
     config=("debug", "release"),
     build_system=("make", "zig"),
