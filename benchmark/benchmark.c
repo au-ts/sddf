@@ -197,7 +197,6 @@ void init(void)
 #ifdef MICROKIT_CONFIG_benchmark
     sddf_printf("BENCH|LOG: MICROKIT_CONFIG_benchmark defined\n");
 #ifndef CONFIG_ARCH_ARM
-#warning "!!! System not running on ARM, benchmarking not implemented !!!"
     sddf_printf("BENCH|LOG: System not running on ARM, benchmarking not implemented.\n");
 #endif
 #endif
