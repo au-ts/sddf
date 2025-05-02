@@ -134,6 +134,7 @@ def _subset_test_matrix(
             [
                 (test_config.board in filters.boards),
                 (test_config.config in filters.configs),
+                (test_config.build_system in filters.build_systems),
                 (implies(filters.only_qemu, test_config.is_qemu())),
             ]
         )
@@ -217,6 +218,9 @@ def cli(
     )
     filters.add_argument(
         "--configs", default={test.config for test in matrix}, action=_ListArg
+    )
+    filters.add_argument(
+        "--build-systems", default={test.build_system for test in matrix}, action=_ListArg
     )
     filters.add_argument(
         "--only-qemu", action="store_true", help="select only QEMU tests"

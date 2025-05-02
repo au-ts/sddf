@@ -14,8 +14,8 @@ from ci.configs import standard_backend, standard_loader_img_path
 
 TEST_MATRIX = matrix_product(
     board=("odroidc4",),
-    # only prints output in debug mode
     config=("debug", "release"),
+    build_system=("make", "zig"),
 )
 
 
