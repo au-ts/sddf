@@ -171,8 +171,8 @@ build_gpu_zig() {
 }
 
 network() {
-    BOARDS=("qemu_virt_riscv64" "imx8mm_evk" "imx8mp_evk" "imx8mq_evk" "maaxboard" "odroidc2" "odroidc4" "qemu_virt_aarch64" "star64")
-    CONFIGS=("debug" "release" "benchmark")
+    mapfile -t BOARDS < <(python -c 'from ci.examples.echo_server import TEST_MATRIX; print("\n".join(set(c.board for c in TEST_MATRIX)))')
+    mapfile -t CONFIGS < <(python -c 'from ci.examples.echo_server import TEST_MATRIX; print("\n".join(set(c.config for c in TEST_MATRIX)))')
     for BOARD in "${BOARDS[@]}"
     do
       for CONFIG in "${CONFIGS[@]}"
@@ -183,8 +183,8 @@ network() {
 }
 
 i2c() {
-    BOARDS=("odroidc4")
-    CONFIGS=("debug" "release")
+    mapfile -t BOARDS < <(python -c 'from ci.examples.i2c import TEST_MATRIX; print("\n".join(set(c.board for c in TEST_MATRIX)))')
+    mapfile -t CONFIGS < <(python -c 'from ci.examples.i2c import TEST_MATRIX; print("\n".join(set(c.config for c in TEST_MATRIX)))')
     for BOARD in "${BOARDS[@]}"
     do
       for CONFIG in "${CONFIGS[@]}"
@@ -196,8 +196,8 @@ i2c() {
 }
 
 timer() {
-    BOARDS=("imx8mm_evk" "imx8mp_evk" "imx8mq_evk" "maaxboard" "odroidc2" "odroidc4" "qemu_virt_aarch64" "qemu_virt_riscv64" "star64")
-    CONFIGS=("debug" "release")
+    mapfile -t BOARDS < <(python -c 'from ci.examples.timer import TEST_MATRIX; print("\n".join(set(c.board for c in TEST_MATRIX)))')
+    mapfile -t CONFIGS < <(python -c 'from ci.examples.timer import TEST_MATRIX; print("\n".join(set(c.config for c in TEST_MATRIX)))')
     for BOARD in "${BOARDS[@]}"
     do
       for CONFIG in "${CONFIGS[@]}"
@@ -209,8 +209,8 @@ timer() {
 }
 
 serial() {
-    BOARDS=("imx8mm_evk" "imx8mq_evk" "imx8mp_evk" "maaxboard" "odroidc2" "odroidc4" "qemu_virt_aarch64" "qemu_virt_riscv64" "star64")
-    CONFIGS=("debug" "release")
+    mapfile -t BOARDS < <(python -c 'from ci.examples.serial import TEST_MATRIX; print("\n".join(set(c.board for c in TEST_MATRIX)))')
+    mapfile -t CONFIGS < <(python -c 'from ci.examples.serial import TEST_MATRIX; print("\n".join(set(c.config for c in TEST_MATRIX)))')
     for BOARD in "${BOARDS[@]}"
     do
       for CONFIG in "${CONFIGS[@]}"
@@ -222,8 +222,8 @@ serial() {
 }
 
 blk() {
-    BOARDS=("qemu_virt_aarch64" "qemu_virt_riscv64" "maaxboard")
-    CONFIGS=("debug" "release")
+    mapfile -t BOARDS < <(python -c 'from ci.examples.blk import TEST_MATRIX; print("\n".join(set(c.board for c in TEST_MATRIX)))')
+    mapfile -t CONFIGS < <(python -c 'from ci.examples.blk import TEST_MATRIX; print("\n".join(set(c.config for c in TEST_MATRIX)))')
     for BOARD in "${BOARDS[@]}"
     do
         for CONFIG in "${CONFIGS[@]}"
