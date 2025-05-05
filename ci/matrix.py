@@ -15,6 +15,7 @@ MACHINE_QUEUE_BOARDS: dict[str, list[str]] = {
     "odroidc2": ["odroidc2"],
     "odroidc4": ["odroidc4_1", "odroidc4_2"],
     "star64": ["star64"],
+    "zcu102": ["zcu102"],
 }
 
 EXAMPLES: dict[str, _ExampleMatrixType] = {
@@ -69,6 +70,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "qemu_virt_aarch64",
             "qemu_virt_riscv64",
             "star64",
+            "zcu102",
         ],
         "boards_test": [
             "imx8mm_evk",
@@ -80,6 +82,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "qemu_virt_aarch64",
             "qemu_virt_riscv64",
             "star64",
+            "zcu102",
         ],
     },
     "timer": {
