@@ -12,6 +12,7 @@ const DriverClass = struct {
         imx,
         ns16550a,
         virtio,
+        zynqmp,
     };
 
     const Timer = enum {
