@@ -15,6 +15,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <microkit.h>
+#include <sddf/util/util.h>
+#include <sddf/serial/queue.h>
 #include <sddf/util/printf.h>
 #include <sddf/resources/device.h>
 #include <sddf/serial/config.h>
@@ -41,7 +43,7 @@ static void tx_provide(void)
         uart_regs->fifo = (uint32_t)c;
         transferred = true;
 
-        /* If the TX FIFO becomes full, send us an interrupt when it is empty. */
+        /* If the TX FIFO becomes full, raise an interrupt when it is empty. */
         if (uart_regs->sr & ZYNQMP_UART_CHANNEL_STS_TXFULL) {
             if (config.rx_enabled) {
                 uart_regs->ier = ZYNQMO_UART_IXR_TXEMPTY | ZYNQMO_UART_IXR_RXOVR;
@@ -54,7 +56,7 @@ static void tx_provide(void)
 
     if (transferred && serial_require_consumer_signal(&tx_queue_handle)) {
         serial_cancel_consumer_signal(&tx_queue_handle);
-        microkit_notify(config.tx.id);
+        sddf_notify(config.tx.id);
     }
 }
 
@@ -81,14 +83,14 @@ static void rx_return(void)
 
         if (!(uart_regs->sr & ZYNQMP_UART_CHANNEL_STS_RXEMPTY)
             && !serial_queue_full(&rx_queue_handle, rx_queue_handle.queue->tail)) {
-            /* Oh wait, there's space available in the queue. */
+            /* There's more space available in the queue. */
             serial_cancel_consumer_signal(&rx_queue_handle);
             reprocess = true;
         }
     }
 
     if (enqueued) {
-        microkit_notify(config.rx.id);
+        sddf_notify(config.rx.id);
     }
 }
 
@@ -96,7 +98,7 @@ static void handle_irq(void)
 {
     uint32_t irq_status = uart_regs->isr;
     if (irq_status & ZYNQMO_UART_IXR_TXEMPTY) {
-        /* We previously requested the device to IRQ when the TX FIFO is empty because it became full
+        /* We previously requested the device to raise an IRQ when the TX FIFO is empty because it became full
            while sending stuff. Now continue to send stuff. */
         tx_provide();
     }
@@ -131,33 +133,34 @@ static void compute_clk_divs(uint64_t clock_hz, uint64_t baudrate, uint16_t *cd,
     CD = (sel_clk / baud) / (BDIV + 1)
     */
 
-    uint16_t computed_bdiv = 4; // Technically this is 8-bits wide but using 16-bits to prevent overflow in calculation.
-    uint16_t computed_cd = 0;
+    uint64_t computed_bdiv = ZYNQMP_UART_BDIV_MIN;
+    uint64_t computed_cd = 0;
     double acceptable_error_rate = 0.03;
-    for (; computed_bdiv <= 255; computed_bdiv++) {
-        computed_cd = (clock_hz / (baudrate * 1.0)) / (computed_bdiv + 1);
+    for (; computed_bdiv <= ZYNQMP_UART_BDIV_MAX; computed_bdiv++) {
+        uint64_t guessed_cd = (clock_hz / (baudrate * 1.0)) / (computed_bdiv + 1);
 
         /* If CD yields 0 or 1, go to the next possible BDIV because those are
            reserved values. Register references, UG1087: "Baud_rate_gen (UART) Register Description"
          */
-        if (computed_cd == 0 || computed_cd == 1) {
+        if (guessed_cd < ZYNQMP_UART_CD_MIN) {
             continue;
         }
 
         /* Now solve the equation. */
-        double actual_baud = clock_hz / ((computed_cd * (computed_bdiv + 1)) * 1.0);
+        double actual_baud = clock_hz / ((guessed_cd * (computed_bdiv + 1)) * 1.0);
 
         double difference = ABS(actual_baud - baudrate);
         double error_rate = difference / baudrate;
         if (error_rate < acceptable_error_rate) {
+            computed_cd = guessed_cd;
             break;
         }
     }
 
     /* Should never trips, unless your uart clock or baud rate are incorrect */
-    assert(computed_cd != 0 && computed_bdiv < 255);
+    assert(computed_cd >= ZYNQMP_UART_CD_MIN && computed_cd <= ZYNQMP_UART_CD_MAX);
 
-    *cd = computed_cd;
+    *cd = (uint16_t)computed_cd;
     *bdiv = (uint8_t)computed_bdiv;
 }
 
@@ -214,7 +217,7 @@ static void uart_setup(void)
     uart_regs->idr = ZYNQMO_UART_IXR_MASK;
 
     if (config.rx_enabled) {
-        /* Generate an interrupt for every received byte. */
+        /* Raise an interrupt for every received byte. */
         uart_regs->rxwm = 1;
 
         /* Enable IRQ on every bytes received. */
@@ -244,7 +247,7 @@ void notified(microkit_channel ch)
 {
     if (ch == device_resources.irqs[0].id) {
         handle_irq();
-        microkit_deferred_irq_ack(ch);
+        sddf_deferred_irq_ack(ch);
     } else if (ch == config.tx.id) {
         tx_provide();
     } else if (ch == config.rx.id) {
