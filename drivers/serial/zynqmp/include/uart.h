@@ -6,8 +6,7 @@
 #pragma once
 
 #include <stdint.h>
-#include <sddf/util/util.h>
-#include <sddf/serial/queue.h>
+#include <microkit.h>
 
 /*
 * The various constant definitions for xuart are from Xilinx BSP
@@ -39,10 +38,20 @@ struct zynqmp_uart_regs {
 };
 typedef struct zynqmp_uart_regs zynqmp_uart_regs_t;
 
-/* 100MHz reference UART clock.
-Though if in doubt, type `clk dump` into the U-Boot shell, `uart0_ref` is your ref clock.
+#if defined(CONFIG_PLAT_ZYNQMP)
+/* 100MHz reference UART clock on the zynqmp platform.
+   If in doubt, type `clk dump` into the U-Boot shell, `uart0_ref` is your ref clock.
 */
 #define ZYNQMP_UART_REF_CLOCK_RATE (100UL * 1000UL * 1000UL)
+#else
+#error "unknown UART clock"
+#endif
+
+/* Range of valid UART clock divisors */
+#define ZYNQMP_UART_CD_MIN   2
+#define ZYNQMP_UART_CD_MAX   65535
+#define ZYNQMP_UART_BDIV_MIN 4
+#define ZYNQMP_UART_BDIV_MAX 255
 
 #define ZYNQMP_UART_CHANNEL_STS_RXEMPTY (1 << 1)
 #define ZYNQMP_UART_CHANNEL_STS_RXFULL (1 << 2)
