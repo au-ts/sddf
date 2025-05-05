@@ -42,15 +42,14 @@ static void tx_provide(void)
     while (!(uart_regs->sr & ZYNQMP_UART_CHANNEL_STS_TXFULL) && !serial_dequeue(&tx_queue_handle, &c)) {
         uart_regs->fifo = (uint32_t)c;
         transferred = true;
+    }
 
-        /* If the TX FIFO becomes full, raise an interrupt when it is empty. */
-        if (uart_regs->sr & ZYNQMP_UART_CHANNEL_STS_TXFULL) {
-            if (config.rx_enabled) {
-                uart_regs->ier = ZYNQMO_UART_IXR_TXEMPTY | ZYNQMO_UART_IXR_RXOVR;
-            } else {
-                uart_regs->ier = ZYNQMO_UART_IXR_TXEMPTY;
-            }
-            break;
+    /* If the TX FIFO becomes full (even when we haven't send anything), raise an interrupt when it is empty. */
+    if (uart_regs->sr & ZYNQMP_UART_CHANNEL_STS_TXFULL) {
+        if (config.rx_enabled) {
+            uart_regs->ier = ZYNQMO_UART_IXR_TXEMPTY | ZYNQMO_UART_IXR_RXOVR;
+        } else {
+            uart_regs->ier = ZYNQMO_UART_IXR_TXEMPTY;
         }
     }
 
@@ -217,13 +216,12 @@ static void uart_setup(void)
     uart_regs->idr = ZYNQMO_UART_IXR_MASK;
 
     if (config.rx_enabled) {
-        /* Raise an interrupt for every received byte. */
+        /* Set the watermark to raise an interrupt for every received byte. */
         uart_regs->rxwm = 1;
 
         /* Enable IRQ on every bytes received. */
         uart_regs->ier = ZYNQMO_UART_IXR_RXOVR;
     }
-    sddf_dprintf("UART|LOG: Initialised UART with cr = %x, mr = %x\n", cr, mr);
 }
 
 void init(void)
