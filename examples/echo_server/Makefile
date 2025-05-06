@@ -16,6 +16,7 @@ BUILD_DIR ?= build
 export SDDF=$(abspath ../..)
 export BUILD_DIR:=$(abspath ${BUILD_DIR})
 export override MICROKIT_SDK:=$(abspath ${MICROKIT_SDK})
+override SMP_CONFIG:=$(abspath ${SMP_CONFIG})
 
 IMAGE_FILE := $(BUILD_DIR)/loader.img
 REPORT_FILE := $(BUILD_DIR)/report.txt
@@ -25,7 +26,7 @@ export ECHO_INCLUDE:=$(abspath .)/include
 all: ${IMAGE_FILE}
 
 qemu ${IMAGE_FILE} ${REPORT_FILE} clean clobber: ${BUILD_DIR}/Makefile FORCE
-	${MAKE}  -C ${BUILD_DIR} MICROKIT_SDK=${MICROKIT_SDK} $(notdir $@)
+	${MAKE}  -C ${BUILD_DIR} MICROKIT_SDK=${MICROKIT_SDK} SMP_CONFIG=${SMP_CONFIG} $(notdir $@)
 
 ${BUILD_DIR}/Makefile: echo.mk
 	mkdir -p ${BUILD_DIR}

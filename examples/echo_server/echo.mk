@@ -20,7 +20,20 @@ MICROKIT_CONFIG ?= debug
 IMAGE_FILE = loader.img
 REPORT_FILE = report.txt
 
-BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
+ifneq ($(strip $(SMP_CONFIG)),)
+	ifneq ($(filter $(strip $(MICROKIT_BOARD)),imx8mp_evk imx8mq_evk odroidc2 qemu_virt_aarch64),)
+$(error MICROKIT_BOARD does not support SMP)
+	endif
+	ifeq ($(wildcard $(SMP_CONFIG)),)
+$(error Must specify a valid core configuration file)
+	endif
+	export MICROKIT_BOARD_SMP := $(addsuffix _4_cores,$(strip $(MICROKIT_BOARD)))
+	export SMP_ARG := --smp $(abspath $(SMP_CONFIG))
+else
+	export MICROKIT_BOARD_SMP := $(strip $(MICROKIT_BOARD))
+endif
+
+BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD_SMP)/$(MICROKIT_CONFIG)
 ARCH := ${shell grep 'CONFIG_SEL4_ARCH  ' $(BOARD_DIR)/include/kernel/gen_config.h | cut -d' ' -f4}
 # Toolchain triples have inconsistent naming, below tries to automatically resolve that
 ifeq ($(strip $(TOOLCHAIN)),)
@@ -105,9 +118,8 @@ DTB := $(MICROKIT_BOARD).dtb
 
 vpath %.c ${SDDF} ${ECHO_SERVER}
 
-IMAGES := eth_driver.elf echo0.elf echo1.elf benchmark.elf idle.elf network_virt_rx.elf\
-	  network_virt_tx.elf network_copy.elf network_copy0.elf network_copy1.elf timer_driver.elf\
-	  serial_driver.elf serial_virt_tx.elf
+IMAGES := eth_driver.elf echo.elf benchmark.elf idle.elf network_virt_rx.elf\
+	  network_virt_tx.elf network_copy.elf timer_driver.elf serial_driver.elf serial_virt_tx.elf
 
 ifeq ($(ARCH),aarch64)
 	CFLAGS_ARCH := -mcpu=$(CPU) -mstrict-align
@@ -163,11 +175,8 @@ DEPS := $(ECHO_OBJS:.o=.d)
 
 all: loader.img
 
-echo0.elf echo1.elf: $(ECHO_OBJS) libsddf_util.a lib_sddf_lwip_echo.a
+echo.elf: $(ECHO_OBJS) libsddf_util.a lib_sddf_lwip_echo.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
-
-network_copy0.elf network_copy1.elf: network_copy.elf
-	cp $< $@
 
 # Need to build libsddf_util_debug.a because it's included in LIBS
 # for the unimplemented libc dependencies
@@ -177,7 +186,7 @@ $(DTB): $(DTS)
 	dtc -q -I dts -O dtb $(DTS) > $(DTB)
 
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
-	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE)
+	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) $(SMP_ARG)
 	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx.data serial_virt_tx.elf
@@ -194,15 +203,11 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(OBJCOPY) --update-section .timer_client_config=timer_client_client1.data echo1.elf
 	$(OBJCOPY) --update-section .net_client_config=net_client_client1.data echo1.elf
 	$(OBJCOPY) --update-section .serial_client_config=serial_client_client1.data echo1.elf
-	$(OBJCOPY) --update-section .serial_client_config=serial_client_bench.data benchmark.elf
-	$(OBJCOPY) --update-section .benchmark_config=benchmark_config.data benchmark.elf
-	$(OBJCOPY) --update-section .benchmark_client_config=benchmark_client_config.data echo0.elf
-	$(OBJCOPY) --update-section .benchmark_config=benchmark_idle_config.data idle.elf
 	$(OBJCOPY) --update-section .lib_sddf_lwip_config=lib_sddf_lwip_config_client0.data echo0.elf
 	$(OBJCOPY) --update-section .lib_sddf_lwip_config=lib_sddf_lwip_config_client1.data echo1.elf
 
 ${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
-	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
+	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD_SMP) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
 
 
 include ${SDDF}/util/util.mk
