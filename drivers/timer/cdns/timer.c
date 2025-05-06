@@ -17,20 +17,28 @@ __attribute__((__section__(".device_resources"))) device_resources_t device_reso
  * Zynq UltraScale+ MPSoC contains a timer (Cadence Triple Timer Clock) with 3 32-bit counters.
  * Only 2 of the 3 timers are used in this driver. All 3 timers by default are connected to
  * the LSBUS clock in the Low Power Domain, (controlled by LPD_LSBUS_CTRL).
- * By default, this clock is using IOPLL clock as source, and divides down by 15 to 100MHz.
- * See: https://docs.amd.com/r/en-US/ug1087-zynq-ultrascale-registers/LPD_LSBUS_CTRL-CRL_APB-Register.
- * You can read the IOPLL clk value in u-boot using `clk dump` and view the source and divider value for
- * LSBUS by reading LPD_LSBUS_CTRL register.
  */
 /* TODO:
  * More graceful error when user requests timeout greater than served by ZCU102_TIMER_MAX_TICKS (at 25MHz (downscaled), 32-bit counter thats ~2min 51.799s)
  * Allow timeouts greater than UINT32_MAX ticks
  */
 
+#define ZCU102_TIMER_MAX_PRESCALE 0xf
 /* prescale: rate = clk_src/[2^(N+1)] */
 #define ZCU102_TIMER_PRESCALE_VALUE 0x1
-/* 100MHz on the default source clock, scaled down to 25MHz */
-#define ZCU102_TIMER_TICKS_PER_SECOND 0x17D7840
+#if defined(CONFIG_PLAT_ZYNQMP)
+/*
+ * By default, the LSBUS clock is using IOPLL clock as source, and divides down by 15 to 100MHz.
+ * See: https://docs.amd.com/r/en-US/ug1087-zynq-ultrascale-registers/LPD_LSBUS_CTRL-CRL_APB-Register.
+ * You can read the IOPLL clk value in u-boot using `clk dump` and view the source and divider value for
+ * LSBUS by reading LPD_LSBUS_CTRL register.
+*/
+#define ZCU102_TIMER_REF_CLOCK_RATE (100UL * 1000UL * 1000UL)
+#else
+#error "unknown LSBUS clock frequency (timer device reference clock)"
+#endif
+/* default source clock, scaled down by a factor of 2^(ZCU102_TIMER_PRESCALE_VALUE+1) */
+#define ZCU102_TIMER_TICKS_PER_SECOND (ZCU102_TIMER_REF_CLOCK_RATE >> ((ZCU102_TIMER_PRESCALE_VALUE & ZCU102_TIMER_MAX_PRESCALE) + 1))
 
 #define TTC_COUNTER_TIMER 0
 #define TTC_TIMEOUT_TIMER 1
@@ -199,8 +207,10 @@ void init()
     timer_regs->cnt_ctrl[TTC_TIMEOUT_TIMER] |= ZCU102_TIMER_ENABLE_INTERVAL_MODE;
 
     /* Set up prescaler, divide down from 100MHz to ZCU102_TIMER_TICKS_PER_SECOND */
-    timer_regs->clk_ctrl[TTC_COUNTER_TIMER] = (ZCU102_TIMER_PRESCALE_VALUE << 1) | ZCU102_TIMER_ENABLE_PRESCALE;
-    timer_regs->clk_ctrl[TTC_TIMEOUT_TIMER] = (ZCU102_TIMER_PRESCALE_VALUE << 1) | ZCU102_TIMER_ENABLE_PRESCALE;
+    timer_regs->clk_ctrl[TTC_COUNTER_TIMER] = ((ZCU102_TIMER_PRESCALE_VALUE & ZCU102_TIMER_MAX_PRESCALE) << 1)
+                                            | ZCU102_TIMER_ENABLE_PRESCALE;
+    timer_regs->clk_ctrl[TTC_TIMEOUT_TIMER] = ((ZCU102_TIMER_PRESCALE_VALUE & ZCU102_TIMER_MAX_PRESCALE) << 1)
+                                            | ZCU102_TIMER_ENABLE_PRESCALE;
 
     /* Start the TTC_COUNTER_TIMER */
     timer_regs->cnt_ctrl[TTC_COUNTER_TIMER] ^= ZCU102_TIMER_DISABLE;
