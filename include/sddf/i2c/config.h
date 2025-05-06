@@ -37,7 +37,7 @@ typedef struct i2c_virt_client_config {
     i2c_connection_resource_t conn;
     size_t data_size;
     uintptr_t driver_data_vaddr;
-    uintptr_t driver_data_vaddr;
+    uintptr_t driver_meta_vaddr;
 } i2c_virt_client_config_t;
 
 // zig: Virt

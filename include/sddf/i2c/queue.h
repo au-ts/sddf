@@ -63,9 +63,9 @@ typedef struct i2c_queue_request {
     // for symmetry, and to avoid a copy.
 
     /* Start of data region of cmd_t list */
-    uintptr_t data_offset_vaddr;    // Client supplies offset into data, virt converts to ptr
+    uintptr_t data_vaddr;    // Client supplies offset into data, virt converts to ptr
     /* Start of meta region, pointed to by cmds in the data region */
-    uintptr_t meta_base;
+    uintptr_t meta_vaddr;
     /* Number of commands in list. Max 32 per transaction */
     uint8_t len;
     /* I2C bus address to operate on */
@@ -237,6 +237,7 @@ static inline int i2c_enqueue_response(i2c_queue_handle_t h, i2c_addr_t bus_addr
     queue->responses[index].bus_address = bus_address;
     queue->responses[index].error = error;
     queue->responses[index].err_cmd = err_cmd;
+    return 0;
 }
 
 /**
@@ -249,7 +250,8 @@ static inline int i2c_enqueue_response(i2c_queue_handle_t h, i2c_addr_t bus_addr
  *
  * @return -1 when queue is empty, 0 on success.
  */
-static inline int i2c_dequeue_request(i2c_queue_handle_t h, i2c_addr_t *bus_address, size_t *offset, uint16_t *len)
+static inline int i2c_dequeue_request(i2c_queue_handle_t h, i2c_addr_t *bus_address, uintptr_t *data_vaddr,
+                                      uintptr_t *meta_vaddr, uint16_t *len)
 {
     i2c_request_queue_t *queue = h.request;
     if (i2c_queue_empty(queue->ctrl)) {
@@ -258,7 +260,8 @@ static inline int i2c_dequeue_request(i2c_queue_handle_t h, i2c_addr_t *bus_addr
 
     size_t index = queue->ctrl.head % NUM_QUEUE_ENTRIES;
     *bus_address = queue->requests[index].bus_address;
-    *offset = queue->requests[index].offset;
+    *data_vaddr = queue->requests[index].data_vaddr;
+    *meta_vaddr = queue->requests[index].meta_vaddr;
     *len = queue->requests[index].len;
 
     THREAD_MEMORY_RELEASE();

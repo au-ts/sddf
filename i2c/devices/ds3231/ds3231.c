@@ -64,10 +64,9 @@ extern i2c_client_config_t i2c_config;
 
 void response_init(struct response *response)
 {
-    uintptr_t offset = 0;
-    unsigned int buffer_len = 0;
-    size_t bus_address = 0;
-    int ret = i2c_dequeue_response(queue, &bus_address, &offset, &buffer_len);
+    i2c_addr_t bus_address = 0;
+    i2c_err_t error = 0;
+    int ret = i2c_dequeue_response(queue, &bus_address, &error);
     if (ret) {
         LOG_DS3231_ERR("response_init could not dequeue used response buffer!\n");
         return;
