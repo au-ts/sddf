@@ -4,16 +4,15 @@
  */
 
 #pragma once
-// TODO: include references for the gem device, mainly zynqmp technical reference manual: https://docs.amd.com/v/u/en-US/ug1085-zynq-ultrascale-trm
-/* The reference manual used to acquire these values is:
+/* The reference manual used to acquire these values:
+ * Zynq UltraScale+ Device Technical Reference Manual
+ * Document number: UG1085
+ * Rev. 2.5, 21st March 2025
  *
- * i.MX 8M Mini Applications Processor Reference Manual.
- * Document number: IMX8MMRM.
- * Rev. 3, 11/2020.
- *
- * The ethernet device is described in section 11.5.
+ * The ethernet device is described in chapter 34
  */
 
+// TODO: remove below/replace with appropriate gem stuff
 #define ECR_RESET       (1UL)
 #define ECR_DBSWP       (1UL << 8) /* descriptor byte swapping enable */
 #define MIBC_DIS        (1UL << 31)
@@ -74,8 +73,49 @@
 #define ICFT(x)       (((x) & 0xff) << 20)
 #define RCR_MAX_FL(x) (((x) & 0x3fff) << 16) /* Maximum Frame Length */
 
-/* Hardware registers */
-// TODO: relace with appropriate regs for the gem device
+/* Hardware registers, sourced from U-boot driver and Technical Reference Manual */
+typedef struct zynqmp_gem_regs {
+    uint32_t nwctrl;                    /* 0x0 - Network Control reg */
+    uint32_t nwcfg;                     /* 0x4 - Network Config reg */
+    uint32_t nwsr;                      /* 0x8 - Network Status reg */
+    uint32_t reserved1;
+    uint32_t dmacr;                     /* 0x10 - DMA Control reg */
+    uint32_t txsr;                      /* 0x14 - TX Status reg */
+    uint32_t rxqbase;                   /* 0x18 - RX Queue Base address reg */
+    uint32_t txqbase;                   /* 0x1c - TX Queue Base address reg */
+    uint32_t rxsr;                      /* 0x20 - RX Status reg */
+    uint32_t reserved2[2];              /* 0x24, 0x28 - interrupt status, non priority queuing, interupt enable */
+    uint32_t idr;                       /* 0x2c - Interrupt Disable reg */
+    uint32_t reserved3;                 /* 0x30 - Current interrupt mask register */
+    uint32_t phymntnc;                  /* 0x34 - Phy Maintaince reg */
+    uint32_t reserved4[18];
+    uint32_t hashl;                     /* 0x80 - Hash Low address reg */
+    uint32_t hashh;                     /* 0x84 - Hash High address reg */
+#define LADDR_LOW    0
+#define LADDR_HIGH    1
+    uint32_t laddr[4][LADDR_HIGH + 1];  /* 0x8c - Specific1 addr low/high reg */
+    uint32_t match[4];                  /* 0xa8 - Type ID1 Match reg */
+    uint32_t reserved6[18];
+#define STAT_SIZE    44
+    uint32_t stat[STAT_SIZE];           /* 0x100 - Octects transmitted Low reg + stat regs */
+    uint32_t reserved9[20];
+    uint32_t pcscntrl;                  /* 0x200 - PCS control reg */
+    uint32_t pcsstatus;                 /* 0x204 - PCS status reg */
+    uint32_t rserved12[35];
+    uint32_t dcfg6;                     /* 0x294 - Design config reg6 */
+    uint32_t reserved7[106];
+    uint32_t transmit_q1_ptr;           /* 0x440 - Transmit priority queue 1 */
+    uint32_t reserved8[15];
+    uint32_t receive_q1_ptr;            /* 0x480 - Receive priority queue 1 */
+    uint32_t reserved10[17];
+    uint32_t upper_txqbase;             /* 0x4C8 - Upper tx_q base addr */
+    uint32_t reserved11[2];
+    uint32_t upper_rxqbase;             /* 0x4D4 - Upper rx_q base addr */
+    /* The rest - unused */
+} zynqmp_gem_regs_t;
+
+
+// TODO: remove below
 struct mib_regs {
     /* NOTE: Counter not implemented because it is not applicable (read 0 always).*/
     uint32_t rmon_t_drop;        /* 00 Register Count of frames not counted correctly */
@@ -144,85 +184,3 @@ struct mib_regs {
     uint32_t res1[7];
 };
 
-/* The ENET memory map can be found in Section 11.5.5 */
-// TODO: Replace with appropriate regs for the gem device
-struct enet_regs {
-    /* Configuration */
-    uint32_t res0[1];
-    uint32_t eir;    /* 004 Interrupt Event Register */
-    uint32_t eimr;   /* 008 Interrupt Mask Register */
-    uint32_t res1[1];
-    uint32_t rdar;   /* 010 Receive Descriptor Active Register */
-    uint32_t tdar;   /* 014 Transmit Descriptor Active Register */
-    uint32_t res2[3];
-    uint32_t ecr;    /* 024 Ethernet Control Register */
-    uint32_t res3[6];
-    uint32_t mmfr;   /* 040 MII Management Frame Register */
-    uint32_t mscr;   /* 044 MII Speed Control Register */
-    uint32_t res4[7];
-    uint32_t mibc;   /* 064 MIB Control Register */
-    uint32_t res5[7];
-    uint32_t rcr;    /* 084 Receive Control Register */
-    uint32_t res6[15];
-    uint32_t tcr;    /* 0C4 Transmit Control Register */
-    uint32_t res7[7];
-    uint32_t palr;   /* 0E4 Physical Address Lower Register */
-    uint32_t paur;   /* 0E8 Physical Address Upper Register */
-    uint32_t opd;    /* 0EC Opcode/Pause Duration Register */
-    uint32_t txic0;  /* 0xf0 Tx Interrupt Coalescing ring 0 */
-    uint32_t txic1;  /* 0xf4 Tx Interrupt Coalescing ring 1 */
-    uint32_t txic2;  /* 0xf8 Tx Interrupt Coalescing ring 2 */
-    uint32_t res8[1];
-    uint32_t rxic0;  /* 0x100 Rx Interrupt Coalescing ring 0 */
-    uint32_t rxic1;  /* 0x104 Rx Interrupt Coalescing ring 0 */
-    uint32_t rxic2;  /* 0x108 Rx Interrupt Coalescing ring 0 */
-    uint32_t res8a[3];
-    uint32_t iaur;   /* 118 Descriptor Individual Upper Address Register */
-    uint32_t ialr;   /* 11C Descriptor Individual Lower Address Register */
-    uint32_t gaur;   /* 120 Descriptor Group Upper Address Register */
-    uint32_t galr;   /* 124 Descriptor Group Lower Address Register */
-    uint32_t res9[7];
-    uint32_t tfwr;   /* 144 Transmit FIFO Watermark Register */
-    uint32_t res10[14];
-    uint32_t rdsr;   /* 180 Receive Descriptor Ring Start Register */
-    uint32_t tdsr;   /* 184 Transmit Buffer Descriptor Ring Start Register */
-    uint32_t mrbr;   /* 188 Maximum Receive Buffer Size Register */
-    uint32_t res12[1];
-    uint32_t rsfl;   /* 190 Receive FIFO Section Full Threshold */
-    uint32_t rsem;   /* 194 Receive FIFO Section Empty Threshold */
-    uint32_t raem;   /* 198 Receive FIFO Almost Empty Threshold */
-    uint32_t rafl;   /* 19C Receive FIFO Almost Full Threshold */
-    uint32_t tsem;   /* 1A0 Transmit FIFO Section Empty Threshold */
-    uint32_t taem;   /* 1A4 Transmit FIFO Almost Empty Threshold */
-    uint32_t tafl;   /* 1A8 Transmit FIFO Almost Full Threshold */
-    uint32_t tipg;   /* 1AC Transmit Inter-Packet Gap */
-    uint32_t ftrl;   /* 1B0 Frame Truncation Length */
-    uint32_t res13[3];
-    uint32_t tacc;   /* 1C0 Transmit Accelerator Function Configuration */
-    uint32_t racc;   /* 1C4 Receive Accelerator Function Configuration */
-    uint32_t res14[14];
-    /* 0x200: Statistics counters MIB block RFC 2819 */
-    struct mib_regs mib;
-    uint32_t res15[64];
-    /* 0x400: 1588 adjustable timer (TSM) and 1588 frame control */
-    uint32_t atcr;   /* 400 Timer Control Register */
-    uint32_t atvr;   /* 404 Timer Value Register */
-    uint32_t atoff;  /* 408 Timer Offset Register */
-    uint32_t atper;  /* 40C Timer Period Register */
-    uint32_t atcor;  /* 410 Timer Correction Register */
-    uint32_t atinc;  /* 414 Time-Stamping Clock Period Register */
-    uint32_t atstmp; /* 418 Timestamp of Last Transmitted Frame */
-    uint32_t res16[121];
-
-    /* 0x600: Capture/compare block */
-    uint32_t res17[1];
-    uint32_t tgsr;   /* 604 Timer Global Status Register */
-    uint32_t tcsr0;  /* 608 Timer Control Status Register */
-    uint32_t tccr0;  /* 60C Timer Compare Capture Register */
-    uint32_t tcsr1;  /* 610 Timer Control Status Register */
-    uint32_t tccr1;  /* 614 Timer Compare Capture Register */
-    uint32_t tcsr2;  /* 618 Timer Control Status Register */
-    uint32_t tccr2;  /* 61C Timer Compare Capture Register */
-    uint32_t tcsr3;  /* 620 Timer Control Status Register */
-    uint32_t tccr3;  /* 624 Timer Compare Capture Register */
-};
