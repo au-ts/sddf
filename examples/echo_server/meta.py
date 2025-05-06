@@ -98,7 +98,16 @@ BOARDS: List[Board] = [
         serial="soc/serial@10000000",
         timer="soc/timer@13050000",
         ethernet="soc/ethernet@16030000",
-    )
+    ),
+    Board(
+        name="zcu102",
+        arch=SystemDescription.Arch.AARCH64,
+        paddr_top=0xa0000000,
+        # TODO: add serial driver, update .mk and Makefile + zig file
+        serial="",
+        timer="axi/timer@ff140000",
+        ethernet="axi/ethernet@ff0e0000"
+    ),
 ]
 
 """
