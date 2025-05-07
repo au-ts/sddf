@@ -47,7 +47,7 @@ net_queue_handle_t tx_queue;
 
 #define MAX_PACKET_SIZE     1536
 
-volatile struct enet_regs *eth;
+volatile zynqmp_gem_regs_t *eth;
 
 static inline bool hw_ring_full(hw_ring_t *ring)
 {
@@ -227,6 +227,41 @@ static void eth_setup(void)
     tx.descr = (volatile struct descriptor *)device_resources.regions[2].region.vaddr;
     rx.capacity = RX_COUNT;
     tx.capacity = TX_COUNT;
+
+    /* Chapter 34: GEM Ethernet: programming steps */
+    /* Init controller */
+    eth->nwctrl = 0x0;
+    eth->nwctrl |= ZYNQ_GEM_NWCNTRL_CLEARSTAT;
+    eth->rxsr = ZYNQ_GEM_RXSR_CLEAR;
+    eth->txsr = ZYNQ_GEM_TXSR_CLEAR;
+    eth->idr = ZYNQ_GEM_IDR_CLEAR;
+    // XXX: need to reset receive_q-ptr too?
+    eth->receive_q1_ptr = 0x0;
+    eth->transmit_q1_ptr = 0x0;
+
+    // XXX: clear stat counters? clear phymntnc?
+
+    /* Controller config */
+    eth->nwcfg |= ZYNQ_GEM_NWCFG_INIT | ZYNQ_GEM_NWCFG_SPEED1000;
+    // XXX: clkrate setup??
+    // XXX: MDC clk division??
+    // XXX: set the MAC address? write to laddr?
+
+
+    /* I/O config */
+
+    /* PHY config */
+
+    /* Buffer descriptors config */
+
+    /* Interrupt config */
+
+
+    /* Controller enable */
+
+    /* ?? Transmitting frames */
+
+    /* ?? Receiving frames */
 }
 
 void init(void)

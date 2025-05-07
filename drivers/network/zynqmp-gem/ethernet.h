@@ -114,6 +114,30 @@ typedef struct zynqmp_gem_regs {
     /* The rest - unused */
 } zynqmp_gem_regs_t;
 
+/* nwcntrl: Network control register bitfields */
+#define ZYNQ_GEM_NWCNTRL_CLEARSTAT BIT(5)
+
+/* nwcfg: Network config register bitfields */
+#define ZYNQ_GEM_NWCFG_SPEED100     0x00000001 /* 100 Mbps operation */
+#define ZYNQ_GEM_NWCFG_SPEED1000    0x00000400 /* 1Gbps operation */
+#define ZYNQ_GEM_NWCFG_FDEN         0x00000002 /* Full Duplex mode */
+#define ZYNQ_GEM_NWCFG_FSREM        0x00020000 /* FCS removal */
+#define ZYNQ_GEM_NWCFG_SGMII_ENBL   0x08000000 /* SGMII Enable */
+#define ZYNQ_GEM_NWCFG_PCS_SEL    	0x00000800 /* PCS select */
+#define ZYNQ_GEM_DBUS_WIDTH         (1 << 21)  /* 64 bit bus */
+
+#define ZYNQ_GEM_NWCFG_INIT         (ZYNQ_GEM_DBUS_WIDTH | \
+                                    ZYNQ_GEM_NWCFG_FDEN | \
+                                    ZYNQ_GEM_NWCFG_FSREM)
+
+
+/* rxsr/txsr: Receive/Transmit status register bitfields */
+#define ZYNQ_GEM_RXSR_CLEAR 0xF
+#define ZYNQ_GEM_TXSR_CLEAR 0xFF
+
+/* idr/isr: Interrupt Disable/Status register bitfields */
+#define ZYNQ_GEM_IDR_CLEAR 0x7FFFEFF
+
 
 // TODO: remove below
 struct mib_regs {
