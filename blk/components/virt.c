@@ -46,14 +46,17 @@ static reqbk_t reqsbk[DRIVER_MAX_NUM_BUFFERS];
 ialloc_t ialloc;
 static uint32_t ialloc_idxlist[DRIVER_MAX_NUM_BUFFERS];
 
-bool initialised = false;
+static enum {
+    VirtInactive,
+    VirtBringup,
+    VirtReady
+} virt_status = VirtInactive;
+
+static void handle_driver_state(void);
 
 void init(void)
 {
     assert(blk_config_check_magic(&config));
-
-    blk_storage_info_t *driver_storage_info = config.driver.conn.storage_info.vaddr;
-    while (!blk_storage_is_ready(driver_storage_info));
 
     /* Initialise client queues */
     for (int i = 0; i < config.num_clients; i++) {
@@ -72,10 +75,48 @@ void init(void)
     /* Initialise index allocator */
     ialloc_init(&ialloc, ialloc_idxlist, DRIVER_MAX_NUM_BUFFERS);
 
-    virt_partition_init();
+    /* continued via driver block state ready notifications */
 }
 
-static void handle_driver()
+static void notify_clients_ready()
+{
+    bool driver_ready = blk_storage_is_ready(config.driver.conn.storage_info.vaddr);
+    for (int i = 0; i < config.num_clients; i++) {
+        blk_virt_config_client_t *client = &config.clients[i];
+        blk_storage_info_t *client_storage_info = client->conn.storage_info.vaddr;
+
+        blk_storage_notify_ready(client_storage_info, client->conn.id_state, driver_ready);
+    }
+}
+
+static void handle_driver_ready()
+{
+    bool driver_ready = blk_storage_is_ready(config.driver.conn.storage_info.vaddr);
+
+    /* As per the documentation, if we receive a BLK_STATE_CH notification
+       we must treat it as if the device went In -> Out -> In even if we only
+       ever see the In state.
+       This actually makes our lives easier, because of instead of 4 states we
+       only have two ( {drv_ready, us_ready}  ->   {drv_ready} ).
+    */
+
+    if (driver_ready) {
+        virt_partition_reset();
+        virt_status = VirtBringup;
+        bool done = virt_partition_init();
+        if (done) {
+            /* keep in sync with notified() */
+            virt_status = VirtReady;
+            notify_clients_ready();
+        }
+    } else {
+        virt_status = VirtInactive;
+        virt_partition_reset();
+        notify_clients_ready();
+    }
+}
+
+static void handle_driver_queue(void)
 {
     bool client_notify[SDDF_BLK_MAX_CLIENTS];
     sddf_memset(client_notify, 0, SDDF_BLK_MAX_CLIENTS);
@@ -251,15 +292,37 @@ static void handle_clients()
 
 void notified(microkit_channel ch)
 {
-    if (!initialised) {
-        /* Continue processing partitions until initialisation has finished. */
-        initialised = virt_partition_init();
+    if (ch == config.driver.conn.id_state) {
+        handle_driver_ready();
+        return;
+    }
+
+    if (virt_status == VirtBringup) {
+        /* ignore client requests */
+        if (ch != config.driver.conn.id) return;
+
+        bool done = virt_partition_init();
+        if (done) {
+            /* keep in sync with handle_driver_ready() */
+            virt_status = VirtReady;
+            notify_clients_ready();
+        }
+
+        return;
+    } else if (virt_status == VirtInactive) {
+        // TODO: Respond with GONE?
+        return;
     }
 
     if (ch == config.driver.conn.id) {
-        handle_driver();
+        handle_driver_queue();
         handle_clients();
     } else {
         handle_clients();
     }
+}
+
+microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
+{
+    return microkit_ppcall(config.driver.conn.id_state, msginfo);
 }

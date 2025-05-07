@@ -54,3 +54,9 @@ blk_resp_status_t get_drv_block_number(uint64_t cli_block_number, uint16_t cli_c
  *    fill the client storage info based on that.
  */
 bool virt_partition_init(void);
+
+/**
+ * Reset the state associated with block device partitions, so that we can
+ * initialise them again due to a device change.
+ */
+void virt_partition_reset(void);
