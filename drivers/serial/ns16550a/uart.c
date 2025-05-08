@@ -146,20 +146,17 @@ void init(void)
 
 #ifdef UART_DW_APB_SHADOW_REGISTERS
     /* Reset the UART device - this disables RX and TX */
-    *REG_PTR(UART_SSR) |= UART_SSR_UR;
+    *REG_PTR(UART_SRR) = UART_SRR_UR;
 #endif
 
     /* Setup the Modem Control Register */
-    *REG_PTR(UART_MCR) |= (UART_MCR_DTR | UART_MCR_RTS);
+    *REG_PTR(UART_MCR) = (UART_MCR_DTR | UART_MCR_RTS);
 
     /* Clear and enable the FIFO's*/
     *REG_PTR(UART_FCR) = UART_FCR_CE;
 
     /* Set defaults for the UART Line control register */
-    *REG_PTR(UART_LCR) |= UART_LCR_DEFAULT;
-
-    /* Reset IIR */
-    *REG_PTR(UART_IIR) = 0x1;
+    *REG_PTR(UART_LCR) = UART_LCR_DEFAULT;
 
     /* Set the baud rate */
     set_baud(config.default_baud);

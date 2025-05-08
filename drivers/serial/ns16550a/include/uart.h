@@ -118,7 +118,7 @@
  */
 #if defined(UART_DW_APB_SHADOW_REGISTERS)
 /* UART Software Reset Register */
-#define UART_SSR 0x22
+#define UART_SRR 0x22
 /* UART Reset */
-#define UART_SSR_UR (1 << 0)
+#define UART_SRR_UR (1 << 0)
 #endif
