@@ -52,7 +52,7 @@ ARCH := ${shell grep 'CONFIG_SEL4_ARCH  ' $(BOARD_DIR)/include/kernel/gen_config
 QEMU := qemu-system-$(ARCH)
 
 IMAGES := pinctrl_driver.elf serial_driver.elf \
-	  client.elf \
+	  serial_client.elf \
 	  serial_virt_tx.elf serial_virt_rx.elf
 CFLAGS := -ffreestanding \
 	  -g3 -O3 -Wall \
@@ -90,10 +90,10 @@ include ${SERIAL_COMPONENTS}/serial_components.mk
 %.elf: %.o
 	${LD} -o $@ ${LDFLAGS} $< ${LIBS}
 
-client.elf: client.o libsddf_util.a
+serial_client.elf: serial_client.o libsddf_util.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-client.o: ${TOP}/client.c ${CHECK_FLAGS_BOARD_MD5}
+serial_client.o: ${TOP}/serial_client.c ${CHECK_FLAGS_BOARD_MD5}
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(DTB): $(DTS)
@@ -101,11 +101,13 @@ $(DTB): $(DTS)
 
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE)
+	$(OBJCOPY) --update-section .device_resources=pinctrl_driver_device_resources.data pinctrl_driver.elf
+
 	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_virt_rx_config=serial_virt_rx.data serial_virt_rx.elf
 	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx.data serial_virt_tx.elf
-	$(OBJCOPY) --update-section .serial_client_config=serial_client_client.data client.elf
+	$(OBJCOPY) --update-section .serial_client_config=serial_client_serial_client.data serial_client.elf
 
 $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	MICROKIT_SDK=${MICROKIT_SDK} $(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
