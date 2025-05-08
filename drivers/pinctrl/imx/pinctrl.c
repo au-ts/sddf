@@ -15,7 +15,10 @@ U-Boot: drivers/pinctrl/nxp/pinctrl-imx.c
 #include <microkit.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <sddf/resources/device.h>
 #include <sddf/util/printf.h>
+
+__attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
 #define DEBUG_DRIVER
 
@@ -51,9 +54,6 @@ uintptr_t iomuxc_dev_base = 0x20000000;
 #define IOMUXC_GPR_EFFECTIVE_SIZE 0xC0 // Size of all registers inclusive
 uintptr_t iomuxc_gpr_base = 0x20010000;
 // The registers are only within iomuxc_gpr_base and iomuxc_gpr_base + IOMUXC_GPR_EFFECTIVE_SIZE
-
-// Phys and virt memory layout:
-// iomuxc_dev_base | ... | iomuxc_dev_base + 0xffff | iomuxc_gpr_base
 
 // From Linux's Documentation/devicetree/bindings/pinctrl/fsl,imx-pinctrl.txt
 // Special values for pad_setting:
@@ -248,12 +248,13 @@ void reset_pinmux()
 
 void init(void)
 {
-    LOG_DRIVER("starting\n");
-    if (iomuxc_gpr_base != iomuxc_dev_base + IOMUXC_DEVICE_SIZE) {
-        LOG_DRIVER_ERR(
-            "the GPR region must be mapped contiguously after the normal mux registers region in virtual memory\n");
-        while (true) {};
-    }
+    LOG_DRIVER("init()\n");
+
+    assert(device_resources_check_magic(&device_resources));
+    assert(device_resources.num_irqs == 0);
+    assert(device_resources.num_regions == 1);
+
+    iomuxc_dev_base = (uintptr_t) device_resources.regions[0].region.vaddr;
 
     debug_dts_print();
     process_dts_values_to_register_values();
