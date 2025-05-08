@@ -10,10 +10,12 @@ from importlib.metadata import version
 
 ProtectionDomain = SystemDescription.ProtectionDomain
 
+
 @dataclass
 class RegRegion:
     start_paddr: int
     size: int
+
 
 @dataclass
 class Board:
@@ -22,6 +24,7 @@ class Board:
     paddr_top: int
     serial: str
     pinctrl: str
+
 
 BOARDS: List[Board] = [
     Board(
