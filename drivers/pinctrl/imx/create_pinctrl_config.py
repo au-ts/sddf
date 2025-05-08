@@ -14,9 +14,11 @@ compatible_board_to_pinctrl_dev_path = {
 
 UINT32_T_SIZE = 4
 
+
 def get_value_from_bytes_array(byte_array: bytes, index: int):
     "Extracts a 4-byte integer value from a 'bytes' array at a certain index"
-    return int.from_bytes(byte_array[index*UINT32_T_SIZE : (index+1)* UINT32_T_SIZE], 'big', signed=False)
+    return int.from_bytes(byte_array[index*UINT32_T_SIZE: (index+1) * UINT32_T_SIZE], 'big', signed=False)
+
 
 def get_pinctrl_info(device_nodes, enabled_phandles):
 
@@ -27,7 +29,7 @@ def get_pinctrl_info(device_nodes, enabled_phandles):
         'input_reg': [],  # Offset of select input register
         'mux_val': [],    # Mux value to be applied to `mux_reg`
         'input_val': [],  # Input value to be applied to `input_reg`
-        'pad_setting': [] # Pad setting value to be applied to `conf_reg`
+        'pad_setting': []  # Pad setting value to be applied to `conf_reg`
     }
 
     device: dtlib.Node
@@ -106,11 +108,13 @@ if __name__ == "__main__":
     errored = False
     # This can happen on incorrectly encoded device trees where 1 register is specified twice.
     if len(set(pinmux_dict['mux_reg'])) != len(pinmux_dict['mux_reg']):
-        print(f"there were duplicate mux registers!: offsets are {[hex(n) for n in sorted(pinmux_dict['mux_reg'])]}")
+        print(
+            f"there were duplicate mux registers!: offsets are {[hex(n) for n in sorted(pinmux_dict['mux_reg'])]}")
         errored = True
 
     if len(set(pinmux_dict['conf_reg'])) != len(pinmux_dict['conf_reg']):
-        print(f"there were duplicate config registers!, offsets are {[hex(n) for n in sorted(pinmux_dict['conf_reg'])]}")
+        print(
+            f"there were duplicate config registers!, offsets are {[hex(n) for n in sorted(pinmux_dict['conf_reg'])]}")
         errored = True
 
     # There can be multiple zero offsets where the input settings are not defined
@@ -136,4 +140,5 @@ if __name__ == "__main__":
         file.write("iomuxc_configs:\n")
         for i in range(0, nums_pin_properties):
             file.write("\t.word ")
-            file.write(f"{pinmux_dict['mux_reg'][i]}, {pinmux_dict['conf_reg'][i]}, {pinmux_dict['input_reg'][i]}, {pinmux_dict['mux_val'][i]}, {pinmux_dict['input_val'][i]}, {pinmux_dict['pad_setting'][i]}\n")
+            file.write(
+                f"{pinmux_dict['mux_reg'][i]}, {pinmux_dict['conf_reg'][i]}, {pinmux_dict['input_reg'][i]}, {pinmux_dict['mux_val'][i]}, {pinmux_dict['input_val'][i]}, {pinmux_dict['pad_setting'][i]}\n")
