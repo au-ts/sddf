@@ -30,30 +30,14 @@ __attribute__((__section__(".device_resources"))) device_resources_t device_reso
 
 #define LOG_DRIVER_ERR(...) do{ sddf_printf("PINCTRL DRIVER|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
-#define BYTES_IN_32_BITS 4
-
-// Contains 32-bits wide registers to mux individual pads on the SoC.
-#define IOMUXC_DEVICE_SIZE 0x10000
-#define IOMUXC_DEVICE_BASE_PAD 0x14 // Distance between iomuxc_dev_base and first mux register
-
-// Size of all registers inclusive
-#ifdef SOC_IMX8MQ_EVK
-#define IOMUXC_DEVICE_EFFECTIVE_SIZE 0x520
-#endif
-#ifdef SOC_IMX8MM_EVK
-#define IOMUXC_DEVICE_EFFECTIVE_SIZE 0x538
-#endif
-
-uintptr_t iomuxc_dev_base = 0x20000000;
+uintptr_t iomuxc_dev_base;
 // The registers are only within iomuxc_dev_base + IOMUXC_DEVICE_BASE_PAD and
 // iomuxc_dev_base + IOMUXC_DEVICE_BASE_PAD + IOMUXC_DEVICE_EFFECTIVE_SIZE
 
+// @billn to fix once multi DT-nodes device works in sdfgen
 // General Purpose Registers: a memory region contiguous with the iomuxc device.
 // Contains control registers to pads that can't be mux'ed. E.g. HDMI, DDR, DSI, PCIe,...
-#define IOMUXC_GPR_SIZE 0x10000
-#define IOMUXC_GPR_EFFECTIVE_SIZE 0xC0 // Size of all registers inclusive
-uintptr_t iomuxc_gpr_base = 0x20010000;
-// The registers are only within iomuxc_gpr_base and iomuxc_gpr_base + IOMUXC_GPR_EFFECTIVE_SIZE
+// uintptr_t iomuxc_gpr_base;
 
 // From Linux's Documentation/devicetree/bindings/pinctrl/fsl,imx-pinctrl.txt
 // Special values for pad_setting:
@@ -81,26 +65,6 @@ typedef struct iomuxc_config {
 extern iomuxc_config_t iomuxc_configs[];
 extern const uint32_t num_iomuxc_configs;
 
-bool check_offset_bound(uint32_t offset)
-{
-    // if (offset >= IOMUXC_DEVICE_BASE_PAD
-    //     && offset <= IOMUXC_DEVICE_BASE_PAD + IOMUXC_DEVICE_EFFECTIVE_SIZE - BYTES_IN_32_BITS) {
-    //     // Offset valid in iomuxc_dev_base
-    //     return true;
-    // } else {
-    //     if (offset >= IOMUXC_DEVICE_SIZE
-    //         && offset <= IOMUXC_DEVICE_SIZE + IOMUXC_GPR_EFFECTIVE_SIZE - BYTES_IN_32_BITS) {
-    //         // Offset valid in iomuxc_gpr_base
-    //         return true;
-    //     }
-    // }
-
-    // LOG_DRIVER_ERR("offset is out of bound\n");
-    // return false;
-
-    return true;
-}
-
 bool check_offset_4_bytes_aligned(uint32_t offset)
 {
     if (offset % 4 == 0) {
@@ -113,37 +77,31 @@ bool check_offset_4_bytes_aligned(uint32_t offset)
 
 bool read_mux(uint32_t offset, uint32_t *ret)
 {
-    if (!check_offset_bound(offset) || !check_offset_4_bytes_aligned(offset)) {
+    // @billn: should really check the bound of the offset. to fix
+    if (!check_offset_4_bytes_aligned(offset)) {
         return false;
     }
 
     volatile uint32_t *mux_reg_vaddr = (uint32_t *)(iomuxc_dev_base + (uintptr_t)offset);
-
-    asm volatile("" : : : "memory");
     *ret = *mux_reg_vaddr;
-    asm volatile("" : : : "memory");
-
     return true;
 }
 
 bool set_mux(uint32_t offset, uint32_t val)
 {
-    if (!check_offset_bound(offset) || !check_offset_4_bytes_aligned(offset)) {
+    // @billn: should really check the bound of the offset. to fix
+    if (!check_offset_4_bytes_aligned(offset)) {
         return false;
     }
 
     volatile uint32_t *mux_reg_vaddr = (uint32_t *)(iomuxc_dev_base + (uintptr_t)offset);
-
-    asm volatile("" : : : "memory");
     *mux_reg_vaddr = val;
-    asm volatile("" : : : "memory");
 
-    // Make sure the write actually happened
+    // Make sure the register is programmed with the expected value
     if (*mux_reg_vaddr != val) {
         LOG_DRIVER_ERR("write was not completed, real != expected: %x != %x", *mux_reg_vaddr, val);
         return false;
     }
-
     return true;
 }
 
@@ -152,7 +110,7 @@ void debug_dts_print()
     LOG_DRIVER("nums of config is %u\n", num_iomuxc_configs);
     LOG_DRIVER("data dump begin...one pin per line\n");
     for (uint32_t i = 0; i < num_iomuxc_configs; i += 1) {
-        LOG_DRIVER("mux reg: 0x%x = %u, input reg: 0x%x = %u, pad conf reg: 0x%x = %u. ", iomuxc_configs[i].mux_reg,
+        LOG_DRIVER("mux reg: 0x%x = 0x%x, input reg: 0x%x = 0x%x, pad conf reg: 0x%x = 0x%x. ", iomuxc_configs[i].mux_reg,
                    iomuxc_configs[i].mux_val, iomuxc_configs[i].input_reg, iomuxc_configs[i].input_val,
                    iomuxc_configs[i].conf_reg, iomuxc_configs[i].pad_setting);
 
@@ -216,9 +174,6 @@ void process_dts_values_to_register_values()
                 while (true) {};
             }
         }
-
-        // All these value changes are saved into the info array so that
-        // a query DTS call returns the exact value what was written into memory.
     }
 }
 
@@ -248,8 +203,6 @@ void reset_pinmux()
 
 void init(void)
 {
-    LOG_DRIVER("init()\n");
-
     assert(device_resources_check_magic(&device_resources));
     assert(device_resources.num_irqs == 0);
     assert(device_resources.num_regions == 1);
@@ -267,36 +220,3 @@ void notified(microkit_channel ch)
 {
     LOG_DRIVER_ERR("received ntfn on unexpected channel %u\n", ch);
 }
-
-// microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
-// {
-//     switch (microkit_msginfo_get_label(msginfo)) {
-
-//     case SDDF_PINCTRL_READ_MUX: {
-//         if (microkit_msginfo_get_count(msginfo) != READ_MUX_REQ_NUM_ARGS) {
-//             LOG_DRIVER_ERR("Read mux PPC from channel %u does not have the correct number of arguments %lu != %d\n", ch,
-//                            microkit_msginfo_get_count(msginfo), READ_MUX_REQ_NUM_ARGS);
-//             return microkit_msginfo_new(SDDF_PINCTRL_INVALID_ARGS, 0);
-//         }
-
-//         sddf_pinctrl_chip_idx_t chip = (sddf_pinctrl_chip_idx_t)microkit_mr_get(READ_MUX_REQ_CHIP_IDX);
-//         if (chip >= PINCTRL_NUM_CHIPS) {
-//             LOG_DRIVER_ERR("Read mux PPC from channel %u gave an unknown chip index %d\n", ch, chip);
-//         }
-
-//         uint32_t reg_offset = (uint32_t)microkit_mr_get(READ_MUX_REQ_OFFSET);
-//         uint32_t reg_val;
-
-//         if (read_mux(reg_offset, &reg_val)) {
-//             microkit_mr_set(READ_MUX_RESP_VALUE, reg_val);
-//             return microkit_msginfo_new(SDDF_PINCTRL_SUCCESS, READ_MUX_RESP_NUM_RESULTS);
-//         } else {
-//             return microkit_msginfo_new(SDDF_PINCTRL_INVALID_ARGS, 0);
-//         }
-//     }
-
-//     default:
-//         LOG_DRIVER_ERR("Unknown request %lu to pinctrl from channel %u\n", microkit_msginfo_get_label(msginfo), ch);
-//         return microkit_msginfo_new(SDDF_PINCTRL_UNKNOWN_REQ, 0);
-//     }
-// }
