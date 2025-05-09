@@ -44,7 +44,7 @@ jobs:
           python3 -m venv venv
           ./venv/bin/pip install --upgrade sdfgen==${{ env.SDFGEN_VERSION }}
       - name: Build and run examples
-        run: ./ci/examples.sh ${PWD}/microkit-sdk-${{ env.MICROKIT_VERSION }}
+        run: ./ci/examples.sh ${PWD}/microkit-sdk-${{ env.MICROKIT_VERSION }} $(nproc)
         shell: bash
         env:
           PYTHON: ${{ github.workspace }}/venv/bin/python
@@ -57,7 +57,7 @@ jobs:
       - name: Setup Nix
         uses: cachix/install-nix-action@v27
       - name: Build and run examples
-        run: nix develop --ignore-environment -c bash -c './ci/examples.sh $MICROKIT_SDK'
+        run: nix develop --ignore-environment -c bash -c './ci/examples.sh $MICROKIT_SDK $(nproc)'
         shell: bash
   build_macos_arm64:
     name: macOS ARM64
@@ -89,7 +89,7 @@ jobs:
           python3 -m venv venv
           ./venv/bin/pip install --upgrade sdfgen==${{ env.SDFGEN_VERSION }}
       - name: Build and run examples
-        run: ./ci/examples.sh ${PWD}/microkit-sdk-${{ env.MICROKIT_VERSION }}
+        run: ./ci/examples.sh ${PWD}/microkit-sdk-${{ env.MICROKIT_VERSION }} $(nproc)
         shell: bash
         env:
           PYTHON: ${{ github.workspace }}/venv/bin/python
