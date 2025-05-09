@@ -82,6 +82,10 @@ else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_riscv64)
 	export TIMER_DRV_DIR := goldfish
 	export QEMU := qemu-system-riscv64
 	export QEMU_ARCH_ARGS := -machine virt -kernel $(IMAGE_FILE) -serial mon:stdio
+else ifeq ($(strip $(MICROKIT_BOARD)), star64)
+	export DRIV_DIR := dwmac-5.10a
+	export SERIAL_DRIV_DIR := ns16550a
+	export TIMER_DRV_DIR := jh7110
 else
 $(error Unsupported MICROKIT_BOARD given)
 endif

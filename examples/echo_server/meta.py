@@ -91,6 +91,14 @@ BOARDS: List[Board] = [
         timer="soc@0/bus@30000000/timer@302d0000",
         ethernet="soc@0/bus@30800000/ethernet@30be0000"
     ),
+    Board(
+        name="star64",
+        arch=SystemDescription.Arch.RISCV64,
+        paddr_top=0x100000000,
+        serial="soc/serial@10000000",
+        timer="soc/timer@13050000",
+        ethernet="soc/ethernet@16030000",
+    )
 ]
 
 """
@@ -179,6 +187,14 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     ethernet_driver = ProtectionDomain(
         "ethernet_driver", "eth_driver.elf", priority=101, budget=100, period=400
     )
+    if board.name == "star64":
+        # For ethernet reset, the Pine64 Star64 driver needs access to the
+        # clock controller. We do not have a clock driver for this platform so the
+        # ethernet driver does it directly.
+        clock_controller = MemoryRegion("clock_controller", 0x10_000, paddr=0x17000000)
+        sdf.add_mr(clock_controller)
+        ethernet_driver.add_map(Map(clock_controller, 0x3000000, perms="rw"))
+
     net_virt_tx = ProtectionDomain("net_virt_tx", "network_virt_tx.elf", priority=100, budget=20000)
     net_virt_rx = ProtectionDomain("net_virt_rx", "network_virt_rx.elf", priority=99)
     net_system = Sddf.Net(sdf, ethernet_node, ethernet_driver, net_virt_tx, net_virt_rx)
