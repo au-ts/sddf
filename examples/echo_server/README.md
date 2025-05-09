@@ -54,8 +54,8 @@ The following platforms are supported:
 * imx8mp_evk
 * imx8mq_evk
 * maaxboard
-* odroidc4
 * odroidc2
+* odroidc4
 * qemu_virt_aarch64
 * qemu_virt_riscv64
 * star64
