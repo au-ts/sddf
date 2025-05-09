@@ -58,6 +58,7 @@ The following platforms are supported:
 * odroidc2
 * qemu_virt_aarch64
 * qemu_virt_riscv64
+* star64
 
 ```sh
 make MICROKIT_BOARD=<board> MICROKIT_SDK=<path/to/sdk> MICROKIT_CONFIG=(benchmark/release/debug)
