@@ -87,11 +87,11 @@ endif
 LDFLAGS := -L${BOARD_DIR}/lib
 LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
 
-IMAGE_FILE   := loader.img
-REPORT_FILE  := report.txt
-SYSTEM_FILE  := ${TOP}/board/${MICROKIT_BOARD}/gpu.system
+IMAGE_FILE := loader.img
+REPORT_FILE := report.txt
+SYSTEM_FILE := ${TOP}/board/${MICROKIT_BOARD}/gpu.system
 
-GPU_DRIVER   := ${SDDF}/drivers/gpu/${GPU_DRIVER_DIR}
+GPU_DRIVER := ${SDDF}/drivers/gpu/${GPU_DRIVER_DIR}
 GPU_COMPONENTS := ${SDDF}/gpu/components
 TIMER_DRIVER := ${SDDF}/drivers/timer/${TIMER_DRIVER_DIR}
 
@@ -122,7 +122,7 @@ include ${TIMER_DRIVER}/timer_driver.mk
 
 ${IMAGES}: libsddf_util_debug.a
 
-CHECK_GPU_CLI_FLAGS_MD5:=.gpu_cli_cflags-$(shell echo -- ${CFLAGS} ${CFLAGS_gpu} | shasum | sed 's/ *-//')
+CHECK_GPU_CLI_FLAGS_MD5 := .gpu_cli_cflags-$(shell echo -- ${CFLAGS} ${CFLAGS_gpu} | shasum | sed 's/ *-//')
 
 ${CHECK_GPU_CLI_FLAGS_MD5}:
 	-rm -f .gpu_cli_cflags-*

@@ -41,25 +41,25 @@ PYTHON ?= python3
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 
 ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
-	export TIMER_DRIVER_DIR := meson
-	export CPU := cortex-a55
+	TIMER_DRIVER_DIR := meson
+	CPU := cortex-a55
 else ifeq ($(strip $(MICROKIT_BOARD)), odroidc2)
-	export TIMER_DRIVER_DIR := meson
-	export CPU := cortex-a53
+	TIMER_DRIVER_DIR := meson
+	CPU := cortex-a53
 else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
-	export TIMER_DRIVER_DIR := arm
-	export CPU := cortex-a53
-	export QEMU := qemu-system-aarch64
-	export QEMU_ARCH_ARGS := -machine virt,virtualization=on -cpu cortex-a53 -device loader,file=$(IMAGE_FILE),addr=0x70000000,cpu-num=0
+	TIMER_DRIVER_DIR := arm
+	CPU := cortex-a53
+	QEMU := qemu-system-aarch64
+	QEMU_ARCH_ARGS := -machine virt,virtualization=on -cpu cortex-a53 -device loader,file=$(IMAGE_FILE),addr=0x70000000,cpu-num=0
 else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_riscv64)
-	export TIMER_DRIVER_DIR := goldfish
-	export QEMU := qemu-system-riscv64
-	export QEMU_ARCH_ARGS := -machine virt -kernel $(IMAGE_FILE)
+	TIMER_DRIVER_DIR := goldfish
+	QEMU := qemu-system-riscv64
+	QEMU_ARCH_ARGS := -machine virt -kernel $(IMAGE_FILE)
 else ifeq ($(strip $(MICROKIT_BOARD)), star64)
-	export TIMER_DRIVER_DIR := jh7110
+	TIMER_DRIVER_DIR := jh7110
 else ifneq ($(filter $(strip $(MICROKIT_BOARD)),imx8mm_evk imx8mp_evk imx8mq_evk maaxboard),)
-	export TIMER_DRIVER_DIR := imx
-	export CPU := cortex-a53
+	TIMER_DRIVER_DIR := imx
+	CPU := cortex-a53
 else
 $(error Unsupported MICROKIT_BOARD given)
 endif

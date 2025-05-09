@@ -53,39 +53,39 @@ PYTHON ?= python3
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 
 ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
-	export DRIV_DIR := meson
-	export SERIAL_DRIV_DIR := meson
-	export TIMER_DRV_DIR := meson
-	export CPU := cortex-a55
+	DRIV_DIR := meson
+	SERIAL_DRIV_DIR := meson
+	TIMER_DRV_DIR := meson
+	CPU := cortex-a55
 else ifeq ($(strip $(MICROKIT_BOARD)), odroidc2)
-	export DRIV_DIR := meson
-	export SERIAL_DRIV_DIR := meson
-	export TIMER_DRV_DIR := meson
-	export CPU := cortex-a53
+	DRIV_DIR := meson
+	SERIAL_DRIV_DIR := meson
+	TIMER_DRV_DIR := meson
+	CPU := cortex-a53
 else ifneq ($(filter $(strip $(MICROKIT_BOARD)),imx8mm_evk imx8mp_evk imx8mq_evk maaxboard),)
-	export DRIV_DIR := imx
-	export SERIAL_DRIV_DIR := imx
-	export TIMER_DRV_DIR := imx
-	export CPU := cortex-a53
+	DRIV_DIR := imx
+	SERIAL_DRIV_DIR := imx
+	TIMER_DRV_DIR := imx
+	CPU := cortex-a53
 else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
-	export DRIV_DIR := virtio
-	export SERIAL_DRIV_DIR := arm
-	export TIMER_DRV_DIR := arm
-	export CPU := cortex-a53
-	export QEMU := qemu-system-aarch64
-	export QEMU_ARCH_ARGS := -machine virt,virtualization=on -cpu cortex-a53 \
-						-device loader,file=$(IMAGE_FILE),addr=0x70000000,cpu-num=0 \
-						-serial mon:stdio
+	DRIV_DIR := virtio
+	SERIAL_DRIV_DIR := arm
+	TIMER_DRV_DIR := arm
+	CPU := cortex-a53
+	QEMU := qemu-system-aarch64
+	QEMU_ARCH_ARGS := -machine virt,virtualization=on -cpu cortex-a53 \
+					  -device loader,file=$(IMAGE_FILE),addr=0x70000000,cpu-num=0 \
+					  -serial mon:stdio
 else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_riscv64)
-	export DRIV_DIR := virtio
-	export SERIAL_DRIV_DIR := ns16550a
-	export TIMER_DRV_DIR := goldfish
-	export QEMU := qemu-system-riscv64
-	export QEMU_ARCH_ARGS := -machine virt -kernel $(IMAGE_FILE) -serial mon:stdio
+	DRIV_DIR := virtio
+	SERIAL_DRIV_DIR := ns16550a
+	TIMER_DRV_DIR := goldfish
+	QEMU := qemu-system-riscv64
+	QEMU_ARCH_ARGS := -machine virt -kernel $(IMAGE_FILE) -serial mon:stdio
 else ifeq ($(strip $(MICROKIT_BOARD)), star64)
-	export DRIV_DIR := dwmac-5.10a
-	export SERIAL_DRIV_DIR := ns16550a
-	export TIMER_DRV_DIR := jh7110
+	DRIV_DIR := dwmac-5.10a
+	SERIAL_DRIV_DIR := ns16550a
+	TIMER_DRV_DIR := jh7110
 else
 $(error Unsupported MICROKIT_BOARD given)
 endif
@@ -94,15 +94,15 @@ endif
 TOP := ${SDDF}/examples/echo_server
 METAPROGRAM := $(TOP)/meta.py
 
-ECHO_SERVER:=${SDDF}/examples/echo_server
-LWIPDIR:=network/ipstacks/lwip/src
-BENCHMARK:=$(SDDF)/benchmark
-UTIL:=$(SDDF)/util
-ETHERNET_DRIVER:=$(SDDF)/drivers/network/$(DRIV_DIR)
+ECHO_SERVER := ${SDDF}/examples/echo_server
+LWIPDIR := network/ipstacks/lwip/src
+BENCHMARK := $(SDDF)/benchmark
+UTIL := $(SDDF)/util
+ETHERNET_DRIVER := $(SDDF)/drivers/network/$(DRIV_DIR)
 SERIAL_COMPONENTS := $(SDDF)/serial/components
 SERIAL_DRIVER := $(SDDF)/drivers/serial/$(SERIAL_DRIV_DIR)
-TIMER_DRIVER:=$(SDDF)/drivers/timer/$(TIMER_DRV_DIR)
-NETWORK_COMPONENTS:=$(SDDF)/network/components
+TIMER_DRIVER := $(SDDF)/drivers/timer/$(TIMER_DRV_DIR)
+NETWORK_COMPONENTS := $(SDDF)/network/components
 SYSTEM_FILE := echo_server.system
 DTS := $(SDDF)/dts/$(MICROKIT_BOARD).dts
 DTB := $(MICROKIT_BOARD).dtb
