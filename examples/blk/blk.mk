@@ -98,7 +98,7 @@ DTS := $(SDDF)/dts/$(MICROKIT_BOARD).dts
 DTB := $(MICROKIT_BOARD).dtb
 METAPROGRAM := $(TOP)/meta.py
 
-BLK_DRIVER   := $(SDDF)/drivers/blk/${BLK_DRIVER_DIR}
+BLK_DRIVER := $(SDDF)/drivers/blk/${BLK_DRIVER_DIR}
 
 BLK_COMPONENTS := $(SDDF)/blk/components
 
