@@ -25,6 +25,7 @@ Files:
     drivers/serial/meson/config.json
     drivers/serial/ns16550a/config.json
     drivers/serial/virtio/config.json
+    drivers/serial/zynqmp/config.json
     drivers/timer/arm/config.json
     drivers/timer/imx/config.json
     drivers/timer/jh7110/config.json
