@@ -26,6 +26,21 @@ compatible_board_to_pinctrl_dev_path: dict[str, str] = {
 
 UINT32_T_SIZE = 4
 
+class AssemblyStringAllocator:
+    # A simple class to manage the allocation of strings in the pinctrl data assembly file.
+    def __init__(self, label_prefix: str):
+        # Label -> string
+        self.allocated_strings: dict[str, str] = {}
+        self.watermark: int = 0
+        self.label_prefix: str = label_prefix
+
+    # Returns a label to the target string
+    def create_label(self, target: str) -> str:
+        if target not in self.allocated_strings:
+            self.allocated_strings[target] = f"{self.label_prefix}{str(self.watermark)}"
+            self.watermark += 1
+        return self.allocated_strings[target]
+
 class PinctrlRegisterData:
     def __init__(self, mux_reg: int, conf_reg: int, input_reg: int, mux_val: int, input_val: int, pad_setting: int):
         self.mux_reg = mux_reg
@@ -105,11 +120,10 @@ class PinctrlData:
         # Gather all the data we need for the assembly
         num_pins = 0
 
-        # There will two parts, the first part contains all the `iomuxc_config_t`
-        # and the second contains all the strings referenced by the first part.
+        assem_strs = AssemblyStringAllocator("iomuxc_config_str_")
+
+        # There will two parts, 1. write all the `iomuxc_config_t`
         iomuxc_configs = "iomuxc_configs:\n"
-        strings_def = "pinctrl_str_conf_name_default: .asciz \"default\"\n"
-        string_label_counter = 0
 
         for device in self.devices_with_pinctrl:
             for config in device.pinctrl_configs:
@@ -120,22 +134,16 @@ class PinctrlData:
 
                     # Take care of string data, first define the string, the reference them
                     # Device path:
-                    str_label = f"pinctrl_str_{string_label_counter}"
-                    strings_def += f"{str_label}: .asciz \"{device.device_node.path}\"\n"
-                    iomuxc_configs += f"\t.quad {str_label}, "
-                    string_label_counter += 1
-
+                    iomuxc_configs += f"\t.quad {assem_strs.create_label(device.device_node.path)}, "
                     # Config name:
-                    str_label = f"pinctrl_str_{string_label_counter}"
-                    strings_def += f"{str_label}: .asciz \"{config.name}\"\n"
-                    iomuxc_configs += f"{str_label}, "
-                    string_label_counter += 1
-
+                    iomuxc_configs += f"{assem_strs.create_label(config.name)}, "
                     # Group name:
-                    str_label = f"pinctrl_str_{string_label_counter}"
-                    strings_def += f"{str_label}: .asciz \"{config.config_node.name}\"\n"
-                    iomuxc_configs += f"{str_label}\n"
-                    string_label_counter += 1
+                    iomuxc_configs += f"{assem_strs.create_label(config.config_node.name)}\n"
+
+        # 2. all the strings referenced by 1.
+        strings_def = "pinctrl_str_conf_name_default: .asciz \"default\"\n"
+        for string in assem_strs.allocated_strings:
+            strings_def += f"{assem_strs.allocated_strings[string]}: .asciz \"{string}\"\n"
 
         with open(out_dir + "/pinctrl_config_data.s", "w") as file:
             file.write(".section .rodata\n")
