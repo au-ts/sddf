@@ -43,7 +43,7 @@ LOCK_RETRY_DELAY = 60  # 1 min
 class TestConfig:
     board: str
     config: str
-    build_system: str = "make"
+    build_system: str
 
     def is_qemu(self):
         return self.board.startswith("qemu")
@@ -76,7 +76,7 @@ def matrix_product(**items):
     ]
 
 
-class _ListArg(argparse.Action):
+class ArgparseActionList(argparse.Action):
     def __init__(
         self,
         option_strings,
@@ -239,15 +239,15 @@ def cli(
 
     filters = parser.add_argument_group(title="filters")
     filters.add_argument(
-        "--boards", default={test.board for test in matrix}, action=_ListArg
+        "--boards", default={test.board for test in matrix}, action=ArgparseActionList
     )
     filters.add_argument(
-        "--configs", default={test.config for test in matrix}, action=_ListArg
+        "--configs", default={test.config for test in matrix}, action=ArgparseActionList
     )
     filters.add_argument(
         "--build-systems",
         default={test.build_system for test in matrix},
-        action=_ListArg,
+        action=ArgparseActionList,
     )
     filters.add_argument(
         "--only-qemu", action="store_true", help="select only QEMU tests"
