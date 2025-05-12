@@ -10,17 +10,17 @@ sys.path.insert(1, Path(__file__).parents[2].as_posix())
 
 from ci.lib.backends import *
 from ci.lib.runner import TestConfig, cli, matrix_product
-from ci.configs import standard_backend, standard_loader_img_path
+from ci import common, matrix
 
 TEST_MATRIX = matrix_product(
-    board=("odroidc4",),
-    config=("debug", "release"),
-    build_system=("make", "zig"),
+    board=matrix.EXAMPLES["i2c"]["boards_test"],
+    config=matrix.EXAMPLES["i2c"]["configs"],
+    build_system=matrix.EXAMPLES["i2c"]["build_systems"],
 )
 
 
 def backend_fn(test_config: TestConfig, loader_img: Path) -> HardwareBackend:
-    backend = standard_backend(test_config, loader_img)
+    backend = common.backend_fn(test_config, loader_img)
 
     if isinstance(backend, MachineQueueBackend) and test_config.board == "odroidc4":
         # Only odroidc4_2 is connected to the I²C tests
@@ -40,4 +40,4 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
 
 
 if __name__ == "__main__":
-    cli("i2c", test, TEST_MATRIX, backend_fn, standard_loader_img_path)
+    cli("i2c", test, TEST_MATRIX, backend_fn, common.loader_img_path)

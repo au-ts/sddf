@@ -6,31 +6,27 @@ import asyncio
 import functools
 import subprocess
 from pathlib import Path
-from tempfile import TemporaryDirectory
 import sys
 import tempfile
+
 
 sys.path.insert(1, Path(__file__).parents[2].as_posix())
 
 from ci.lib.backends import *
 from ci.lib.runner import TestConfig, cli, matrix_product
-from ci.configs import standard_backend, standard_loader_img_path
+from ci import common, matrix
 
 TEST_MATRIX = matrix_product(
-    board=(
-        "maaxboard",
-        "qemu_virt_aarch64",
-        "qemu_virt_riscv64",
-    ),
-    config=("debug", "release"),
-    build_system=("make", "zig"),
+    board=matrix.EXAMPLES["blk"]["boards_test"],
+    config=matrix.EXAMPLES["blk"]["configs"],
+    build_system=matrix.EXAMPLES["blk"]["build_systems"],
 )
 
 
 def backend_fn(
     disks_dir: str, test_config: TestConfig, loader_img: Path
 ) -> HardwareBackend:
-    backend = standard_backend(test_config, loader_img)
+    backend = common.backend_fn(test_config, loader_img)
 
     if isinstance(backend, QemuBackend):
         (_, disk_path) = tempfile.mkstemp(dir=disks_dir)
@@ -69,5 +65,5 @@ if __name__ == "__main__":
             test,
             TEST_MATRIX,
             functools.partial(backend_fn, qemu_disks_dir),
-            standard_loader_img_path,
+            common.loader_img_path,
         )

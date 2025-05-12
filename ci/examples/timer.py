@@ -10,23 +10,12 @@ sys.path.insert(1, Path(__file__).parents[2].as_posix())
 
 from ci.lib.backends import *
 from ci.lib.runner import TestConfig, cli, matrix_product
-from ci.configs import standard_backend, standard_loader_img_path
+from ci import common, matrix
 
 TEST_MATRIX = matrix_product(
-    board=(
-        "imx8mm_evk",
-        "imx8mq_evk",
-        "imx8mp_evk",
-        "maaxboard",
-        "odroidc2",
-        "odroidc4",
-        "qemu_virt_aarch64",
-        "qemu_virt_riscv64",
-        "star64",
-    ),
-    # timer only works in debug mode
-    config=("debug",),
-    build_system=("make", "zig"),
+    board=matrix.EXAMPLES["timer"]["boards_test"],
+    config=matrix.EXAMPLES["timer"]["configs"],
+    build_system=matrix.EXAMPLES["timer"]["build_systems"],
 )
 
 DRIFT_THRESHOLD = 0.05  # 5 percent.
@@ -65,4 +54,4 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
 
 
 if __name__ == "__main__":
-    cli("timer", test, TEST_MATRIX, standard_backend, standard_loader_img_path)
+    cli("timer", test, TEST_MATRIX, common.backend_fn, common.loader_img_path)

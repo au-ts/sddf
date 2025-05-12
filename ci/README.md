@@ -13,12 +13,15 @@ Right now we only have build-time checks for all examples under `examples/`.
 This is a check that runs on each commit and pull request made to the repository.
 This check is required to pass for merging a pull request.
 
-You can reproduce what the CI runs with:
+You can reproduce what the CI builds with:
+
 ```sh
-./ci/examples.sh /path/to/sdk
+./ci/build.py /path/to/sdk
 ```
 
 You will need to provide the path to your Microkit SDK.
+
+The tests can be run SOMEHOW (TODO).
 
 ## Style
 

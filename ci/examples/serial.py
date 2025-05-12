@@ -10,23 +10,12 @@ sys.path.insert(1, Path(__file__).parents[2].as_posix())
 
 from ci.lib.backends import *
 from ci.lib.runner import TestConfig, cli, matrix_product
-from ci.configs import standard_backend, standard_loader_img_path
+from ci import common, matrix
 
 TEST_MATRIX = matrix_product(
-    board=(
-        "imx8mm_evk",
-        "imx8mq_evk",
-        "imx8mp_evk",
-        "maaxboard",
-        "odroidc2",
-        "odroidc4",
-        "qemu_virt_aarch64",
-        "qemu_virt_riscv64",
-        # TODO: This driver has garbled output that breaks the tests.
-        # "star64",
-    ),
-    config=("debug", "release"),
-    build_system=("make", "zig"),
+    board=matrix.EXAMPLES["serial"]["boards_test"],
+    config=matrix.EXAMPLES["serial"]["configs"],
+    build_system=matrix.EXAMPLES["serial"]["build_systems"],
 )
 
 ANSI_RED   = b"\x1b[31m"
@@ -66,4 +55,4 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
 
 
 if __name__ == "__main__":
-    cli("serial", test, TEST_MATRIX, standard_backend, standard_loader_img_path)
+    cli("serial", test, TEST_MATRIX, common.backend_fn, common.loader_img_path)

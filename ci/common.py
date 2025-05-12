@@ -3,42 +3,41 @@
 # SPDX-License-Identifier: BSD-2-Clause
 
 from pathlib import Path
+import sys
+
+sys.path.insert(1, Path(__file__).parents[1].as_posix())
 
 from ci.lib.backends import HardwareBackend, QemuBackend, MachineQueueBackend
 from ci.lib.runner import TestConfig
-
-# The ordering in these lists defines an implicit ordering of which boards
-# to use for CI preferentially, though all will eventually be tried.
-MACHINE_QUEUE_MAPPING: dict[str, list[str]] = {
-    "odroidc4": ["odroidc4_1", "odroidc4_2"],
-    "imx8mm_evk": ["imx8mm"],
-    # TODO: This is out of machine queue at the moment.
-    "imx8mp_evk": [],  # ["iotgate1"],
-    "imx8mq_evk": ["imx8mq", "imx8mq2"],
-    "maaxboard": ["maaxboard1", "maaxboard2"],
-    "odroidc2": ["odroidc2"],
-    "star64": ["star64"],
-}
+from ci.matrix import MACHINE_QUEUE_BOARDS
 
 
-def standard_loader_img_path(
-    example_name: str,
-    test_config: TestConfig,
-):
+CI_BUILD_DIR = Path(__file__).parents[1] / "ci_build"
+
+
+def example_build_path(example_name: str, test_config: TestConfig):
     return (
-        Path(__file__).parents[1]
-        / "ci_build"
+        CI_BUILD_DIR
         / "examples"
         / example_name
         / test_config.build_system
         / test_config.board
         / test_config.config
+    )
+
+
+def loader_img_path(
+    example_name: str,
+    test_config: TestConfig,
+):
+    return (
+        example_build_path(example_name, test_config)
         / ("bin" if test_config.build_system == "zig" else "")
         / "loader.img"
     )
 
 
-def standard_backend(
+def backend_fn(
     test_config: TestConfig,
     loader_img: Path,
 ) -> HardwareBackend:
@@ -76,5 +75,5 @@ def standard_backend(
             raise NotImplementedError(f"unknown qemu board {test_config.board}")
 
     else:
-        mq_boards: list[str] = MACHINE_QUEUE_MAPPING[test_config.board]
+        mq_boards: list[str] = MACHINE_QUEUE_BOARDS[test_config.board]
         return MachineQueueBackend(loader_img.resolve(), mq_boards)
