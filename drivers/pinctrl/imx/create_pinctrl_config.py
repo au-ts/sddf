@@ -26,6 +26,7 @@ compatible_board_to_pinctrl_dev_path: dict[str, str] = {
 
 UINT32_T_SIZE = 4
 
+
 class AssemblyStringAllocator:
     # A simple class to manage the allocation of strings in the pinctrl data assembly file.
     def __init__(self, label_prefix: str):
@@ -41,6 +42,7 @@ class AssemblyStringAllocator:
             self.watermark += 1
         return self.allocated_strings[target]
 
+
 class PinctrlRegisterData:
     def __init__(self, mux_reg: int, conf_reg: int, input_reg: int, mux_val: int, input_val: int, pad_setting: int):
         self.mux_reg = mux_reg
@@ -52,6 +54,7 @@ class PinctrlRegisterData:
 
     def __str__(self):
         return f"mux reg @ {hex(self.mux_reg)} = {hex(self.mux_val)}, conf reg @ {hex(self.conf_reg)} = {hex(self.pad_setting)}, input reg @ {hex(self.input_reg)} = {hex(self.input_val)}"
+
 
 class PinctrlConfigData:
     # Represent a singular pinctrl configuration of a device.
@@ -67,6 +70,7 @@ class PinctrlConfigData:
             serialised += str(reg) + "\n"
         return serialised
 
+
 class PinctrlDeviceData:
     # Represent a device that requires pinctrl configuration. For example, `mmc@30b40000` in maaxboard.dts.
 
@@ -75,12 +79,12 @@ class PinctrlDeviceData:
         # A device can have multiple different pin configurations it select from at runtime.
         # Though all devices that require pinctrl have a "default" config.
         self.pinctrl_configs: list[PinctrlConfigData] = []
-    
+
         # Make sure the given device have a need for pinctrl configuration
         assert "status" in device_node.props.keys()
         assert device_node.props["status"].to_string() == "okay"
         assert "pinctrl-0" in device_node.props.keys()
-        
+
         # Grab and parse all the possible pin configurations of this device.
         for config_idx, config_name in enumerate(device_node.props.get("pinctrl-names").to_strings()):
             target_prop: str = f"pinctrl-{config_idx}"
@@ -106,16 +110,16 @@ class PinctrlData:
         for dev in self.devices_with_pinctrl:
             serialised += str(dev)
         return serialised
-    
+
     def parse(self, dt: dtlib.DT, pinctrl_dev_path: str):
-        pinctrl_node = dt.get_node(pinctrl_dev_path) # This is `iomuxc@30330000`
+        pinctrl_node = dt.get_node(pinctrl_dev_path)  # This is `iomuxc@30330000`
         # Find all devices that need pinctrl configuration
         device_node: dtlib.Node
         for device_node in devicetree.node_iter():
             if "status" in device_node.props.keys() and device_node.props["status"].to_string() == "okay":
                 if "pinctrl-names" in device_node.props.keys():
                     self.devices_with_pinctrl.append(PinctrlDeviceData(pinctrl_node, device_node))
-    
+
     def to_assembler(self, out_dir: str):
         # Gather all the data we need for the assembly
         num_pins = 0
@@ -158,6 +162,7 @@ class PinctrlData:
             file.write(iomuxc_configs)
             file.write(strings_def)
 
+
 def get_value_from_bytes_array(byte_array: bytes, index: int) -> int:
     # Extracts a 4-byte integer value from a 'bytes' array at a certain index
     return int.from_bytes(byte_array[index*UINT32_T_SIZE: (index+1) * UINT32_T_SIZE], 'big', signed=False)
@@ -192,11 +197,13 @@ def get_pinctrl_info(pinctrl_device: dtlib.Node, target_pinctrl_config_phandle: 
                         mux_val |= MUX_SION
                         pad_setting &= ~PAD_SION
 
-                    regs.append(PinctrlRegisterData(mux_reg, conf_reg, input_reg, mux_val, input_val, pad_setting))
-                
+                    regs.append(PinctrlRegisterData(mux_reg, conf_reg,
+                                input_reg, mux_val, input_val, pad_setting))
+
                 return PinctrlConfigData(target_pinctrl_config_name, pinctrl_config_node, regs)
 
     return None
+
 
 if __name__ == "__main__":
 
@@ -226,21 +233,3 @@ if __name__ == "__main__":
     print(pinctrl_data)
 
     pinctrl_data.to_assembler(out_dir)
-
-    # nums_pin_properties = len(pinmux_dict['mux_reg'])
-    # print(f"writing pinctrl config data to {out_dir + '/pinctrl_config_data.s'}")
-    # with open(out_dir + "/pinctrl_config_data.s", "w") as file:
-    #     file.write(".section .data\n")
-
-    #     file.write("\t.align 4\n")
-    #     file.write("\t.global num_iomuxc_configs\n")
-    #     file.write("\t.global iomuxc_configs\n")
-
-    #     file.write("num_iomuxc_configs:\n")
-    #     file.write(f"\t.word {nums_pin_properties}\n")
-
-    #     file.write("iomuxc_configs:\n")
-    #     for i in range(0, nums_pin_properties):
-    #         file.write("\t.word ")
-    #         file.write(
-    #             f"{pinmux_dict['mux_reg'][i]}, {pinmux_dict['conf_reg'][i]}, {pinmux_dict['input_reg'][i]}, {pinmux_dict['mux_val'][i]}, {pinmux_dict['input_val'][i]}, {pinmux_dict['pad_setting'][i]}\n")
