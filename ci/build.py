@@ -90,7 +90,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if not args.no_clean:
-        shutil.rmtree(common.CI_BUILD_DIR)
+        try:
+            shutil.rmtree(common.CI_BUILD_DIR)
+        except FileNotFoundError:
+            pass
 
     for example_name, options in matrix.EXAMPLES.items():
         example_matrix = matrix_product(
