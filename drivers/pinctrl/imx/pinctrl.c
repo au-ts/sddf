@@ -53,8 +53,8 @@ typedef struct __attribute__((packed)) pinctrl_client_device_state {
 } pinctrl_client_device_state_t;
 
 typedef struct __attribute__((packed)) pinctrl_client_device_data {
-    const char *dev_dt_path;                      /* Device tree path of this particular device that needs pinctrl configuration */
-    const uint32_t num_states;                    /* Number of pinctrl states that this device requires as defined in the `pinctrl-names` prop */
+    const char *dev_dt_path;   /* Device tree path of this particular device that needs pinctrl configuration */
+    const uint32_t num_states; /* Number of pinctrl states this device requires as defined in the `pinctrl-names` prop */
     const pinctrl_client_device_state_t **states;
 } pinctrl_client_device_data_t;
 
@@ -107,25 +107,28 @@ void debug_print_pinctrl_config_data(void)
     LOG_DRIVER("STARTING PINCTRL CONFIG DUMP\n");
     LOG_DRIVER("Total %u devices need pinctrl configuration.\n", num_pinctrl_client_devices_configs);
     for (int i = 0; i < num_pinctrl_client_devices_configs; i++) {
-        LOG_DRIVER("** %s have the following %d states:\n", pinctrl_client_devices_configs[i].dev_dt_path, pinctrl_client_devices_configs[i].num_states);
+        LOG_DRIVER("** %s have the following %d states:\n", pinctrl_client_devices_configs[i].dev_dt_path,
+                   pinctrl_client_devices_configs[i].num_states);
         for (int j = 0; j < pinctrl_client_devices_configs[i].num_states; j++) {
-            LOG_DRIVER("* State '%s' at index %d have %u pins:\n", pinctrl_client_devices_configs[i].states[j]->state_name, j, pinctrl_client_devices_configs[i].states[j]->num_pins);
+            LOG_DRIVER("* State '%s' at index %d have %u pins:\n", pinctrl_client_devices_configs[i].states[j]->state_name, j,
+                       pinctrl_client_devices_configs[i].states[j]->num_pins);
             for (int k = 0; k < pinctrl_client_devices_configs[i].states[j]->num_pins; k++) {
                 LOG_DRIVER("mux reg: 0x%x = 0x%x, input reg: 0x%x = 0x%x, pad conf reg: 0x%x = 0x%x\n",
-                    pinctrl_client_devices_configs[i].states[j]->pins_reg[k].mux_reg,
-                    pinctrl_client_devices_configs[i].states[j]->pins_reg[k].mux_val,
-                    pinctrl_client_devices_configs[i].states[j]->pins_reg[k].input_reg,
-                    pinctrl_client_devices_configs[i].states[j]->pins_reg[k].input_val,
-                    pinctrl_client_devices_configs[i].states[j]->pins_reg[k].conf_reg,
-                    pinctrl_client_devices_configs[i].states[j]->pins_reg[k].pad_setting
-                );
+                           pinctrl_client_devices_configs[i].states[j]->pins_reg[k].mux_reg,
+                           pinctrl_client_devices_configs[i].states[j]->pins_reg[k].mux_val,
+                           pinctrl_client_devices_configs[i].states[j]->pins_reg[k].input_reg,
+                           pinctrl_client_devices_configs[i].states[j]->pins_reg[k].input_val,
+                           pinctrl_client_devices_configs[i].states[j]->pins_reg[k].conf_reg,
+                           pinctrl_client_devices_configs[i].states[j]->pins_reg[k].pad_setting
+                          );
             }
         }
     }
     LOG_DRIVER("---------------------------------------------------------------\n");
 }
 
-void pinctrl_set_state(pinctrl_client_device_state_t state) {
+void pinctrl_set_state(pinctrl_client_device_state_t state)
+{
     for (int j = 0; j < state.num_pins; j++) {
         // Write mux settings
         if (!set_mux(state.pins_reg[j].mux_reg, state.pins_reg[j].mux_val)) {
@@ -150,6 +153,7 @@ void pinctrl_set_state(pinctrl_client_device_state_t state) {
                 * input bits in general purpose register.
             */
             if (state.pins_reg[j].input_val >> 24 == 0xff) {
+                // @billn, sort out once https://github.com/au-ts/microkit_sdf_gen/pull/14 is merged.
                 // uint32_t val = iomuxc_configs[i].input_val;
                 // uint8_t select = val & 0xff;
                 // uint8_t width = (val >> 8) & 0xff;
@@ -196,7 +200,8 @@ void pinctrl_reset_all_default(void)
         pinctrl_client_device_state_t default_state = *(pinctrl_client_devices_configs[i].states[0]);
         assert(sddf_strcmp(default_state.state_name, "default") == 0);
 
-        LOG_DRIVER("Setting dev %s to default pinctrl config with total %u pins.\n", client_device.dev_dt_path, default_state.num_pins);
+        LOG_DRIVER("Setting dev %s to default pinctrl config with total %u pins.\n", client_device.dev_dt_path,
+                   default_state.num_pins);
         pinctrl_set_state(default_state);
     }
 }
