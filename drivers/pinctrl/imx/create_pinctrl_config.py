@@ -88,7 +88,7 @@ class AssemblyDataLabelAllocator:
     def __init__(self, label_prefix: str):
         self.watermark: int = -1
         self.label_prefix: str = label_prefix
-    
+
     def create_label(self) -> str:
         self.watermark += 1
         return self.label_prefix + str(self.watermark)
@@ -115,16 +115,16 @@ class AssemblyStringAllocator:
 class AssemblyDataObject:
     def __init__(self, label: str):
         self.data = f"{label}:\n"
-    
+
     def add_word(self, value):
         self.data += f"\t.word {str(value)}\n"
-    
+
     def add_quad(self, value):
         self.data += f"\t.quad {str(value)}\n"
 
     def add_ptr_from_label(self, label: str):
         self.data += f"\t.quad {label}\n"
-    
+
     def to_assembler(self) -> str:
         return self.data + "\n"
 
@@ -183,7 +183,7 @@ class PinctrlData:
                     asm_pin_regs[-1].add_word(pin.input_val)
                     asm_pin_regs[-1].add_word(pin.pad_setting)
                     num_pins += 1
-                    
+
                 # Now that we have the label to all the pins in this state, create the `pinctrl_client_device_state_t`
                 state_label = label_state_object_allocator.create_label()
                 asm_states.append(AssemblyDataObject(state_label))
@@ -217,7 +217,7 @@ class PinctrlData:
 
             file.write(f"pinctrl_config_data_magic:\n\t.quad {PINCTRL_CONFIG_DATA_MAGIC}\n")
             file.write(f"num_pinctrl_client_devices_configs:\n\t.word {num_devices}\n")
-            
+
             file.write(asm_devices.to_assembler())
             file.write(str_asm_allocator.to_assembler())
 
