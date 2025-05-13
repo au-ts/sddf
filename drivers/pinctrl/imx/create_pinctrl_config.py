@@ -58,11 +58,18 @@ class PinctrlStateData:
 class PinctrlClientDeviceData:
     # Represent a device that requires pinctrl configuration. For example, `mmc@30b40000` in maaxboard.dts.
 
-    def __init__(self, pinctrl_node: dtlib.Node, client_device_node: dtlib.Node):
+    def __init__(self, aliases_node: dtlib.Node, pinctrl_node: dtlib.Node, client_device_node: dtlib.Node):
         self.client_device_node: dtlib.Node = client_device_node
         # A device can have multiple different pin states it selects from at runtime.
         # Though all devices that require pinctrl have a "default" config.
         self.pinctrl_configs: list[PinctrlStateData] = []
+        self.alias: str = None
+
+        # Check and record whether this device have an alias
+        for alias_name in aliases_node.props:
+            if aliases_node.props.get(alias_name).to_string() == client_device_node.path:
+                self.alias = alias_name
+                break
 
         # Make sure the given device have a need for pinctrl configuration
         assert "status" in client_device_node.props.keys()
@@ -79,7 +86,7 @@ class PinctrlClientDeviceData:
             self.pinctrl_configs.append(config_data)
 
     def __str__(self):
-        serialised = f"** Device `{self.client_device_node.path}` have the following pinctrl configs:\n"
+        serialised = f"** Device `{self.client_device_node.path}` with alias {self.alias} have the following pinctrl configs:\n"
         for config in self.pinctrl_configs:
             serialised += str(config) + "\n"
         return serialised
@@ -140,12 +147,13 @@ class PinctrlData:
 
     def parse(self, dt: dtlib.DT, pinctrl_dev_path: str):
         pinctrl_node = dt.get_node(pinctrl_dev_path)  # This is the `iomuxc@30330000` node
+        aliases_node = dt.get_node("/aliases")
         # Find all devices that need pinctrl configuration
         device_node: dtlib.Node
         for device_node in devicetree.node_iter():
             if "status" in device_node.props.keys() and device_node.props["status"].to_string() == "okay":
                 if "pinctrl-names" in device_node.props.keys():
-                    self.devices_with_pinctrl.append(PinctrlClientDeviceData(pinctrl_node, device_node))
+                    self.devices_with_pinctrl.append(PinctrlClientDeviceData(aliases_node, pinctrl_node, device_node))
 
     def write_assembler(self, out_dir: str):
         # Gather all the data we need for the assembly
@@ -201,6 +209,10 @@ class PinctrlData:
 
             # Finally create the `pinctrl_client_device_data`
             asm_devices.add_ptr_from_label(str_asm_allocator.create_label_for_str(device.client_device_node.path))
+            if device.alias is not None:
+                asm_devices.add_ptr_from_label(str_asm_allocator.create_label_for_str(device.alias))
+            else:
+                asm_devices.add_ptr_from_label(str_asm_allocator.create_label_for_str(""))
             asm_devices.add_word(len(this_device_pinctrl_states_labels))
             asm_devices.add_ptr_from_label(states_array_label)
 

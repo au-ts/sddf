@@ -54,6 +54,7 @@ typedef struct __attribute__((packed)) pinctrl_client_device_state {
 
 typedef struct __attribute__((packed)) pinctrl_client_device_data {
     const char *dev_dt_path;   /* Device tree path of this particular device that needs pinctrl configuration */
+    const char *dev_dt_alias;
     const uint32_t num_states; /* Number of pinctrl states required as defined in the `pinctrl-names` prop */
     const pinctrl_client_device_state_t **states;
 } pinctrl_client_device_data_t;
@@ -107,7 +108,9 @@ void debug_print_pinctrl_config_data(void)
     LOG_DRIVER("STARTING PINCTRL CONFIG DUMP\n");
     LOG_DRIVER("Total %u devices need pinctrl configuration.\n", num_pinctrl_client_devices_configs);
     for (int i = 0; i < num_pinctrl_client_devices_configs; i++) {
-        LOG_DRIVER("** %s have the following %d states:\n", pinctrl_client_devices_configs[i].dev_dt_path,
+        LOG_DRIVER("** %s with alias %s have the following %d states:\n",
+                   pinctrl_client_devices_configs[i].dev_dt_path,
+                   pinctrl_client_devices_configs[i].dev_dt_alias,
                    pinctrl_client_devices_configs[i].num_states);
         for (int j = 0; j < pinctrl_client_devices_configs[i].num_states; j++) {
             LOG_DRIVER("* State '%s' at index %d have %u pins:\n",
