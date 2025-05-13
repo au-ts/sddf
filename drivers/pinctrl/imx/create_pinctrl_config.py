@@ -5,9 +5,7 @@ import sys
 from devicetree import dtlib
 
 # From Linux's Documentation/devicetree/bindings/pinctrl/fsl,imx-pinctrl.txt
-# Special values for pad_setting:
-# Indicate this pin does not need config
-NO_PAD_CTL = (1 << 31)
+
 # Software Input On Field.
 # Force the selected mux mode input path no matter of MUX_MODE functionality.
 # By default the input path is determined by functionality of the selected
