@@ -23,7 +23,7 @@ compatible_board_to_pinctrl_dev_path: dict[str, str] = {
 }
 
 UINT32_T_SIZE = 4
-PINCTRL_CONFIG_DATA_MAGIC = "0x696D70696E6D7578" # "impinmux"
+PINCTRL_CONFIG_DATA_MAGIC = "0x696D70696E6D7578"  # "impinmux"
 
 
 class PinctrlRegisterData:
@@ -91,6 +91,7 @@ class PinctrlClientDeviceData:
             serialised += str(config) + "\n"
         return serialised
 
+
 class AssemblyDataLabelAllocator:
     def __init__(self, label_prefix: str):
         self.watermark: int = -1
@@ -99,6 +100,7 @@ class AssemblyDataLabelAllocator:
     def create_label(self) -> str:
         self.watermark += 1
         return self.label_prefix + str(self.watermark)
+
 
 class AssemblyStringAllocator:
     # A simple class to manage the allocation of strings in the pinctrl data assembly file.
@@ -119,6 +121,7 @@ class AssemblyStringAllocator:
             asm_strs += f"{self.allocated_strings[string]}: .asciz \"{string}\"\n"
         return asm_strs
 
+
 class AssemblyDataObject:
     def __init__(self, label: str):
         self.data = f"{label}:\n"
@@ -134,6 +137,7 @@ class AssemblyDataObject:
 
     def to_assembler(self) -> str:
         return self.data + "\n"
+
 
 class PinctrlData:
     def __init__(self):
@@ -153,7 +157,8 @@ class PinctrlData:
         for device_node in devicetree.node_iter():
             if "status" in device_node.props.keys() and device_node.props["status"].to_string() == "okay":
                 if "pinctrl-names" in device_node.props.keys():
-                    self.devices_with_pinctrl.append(PinctrlClientDeviceData(aliases_node, pinctrl_node, device_node))
+                    self.devices_with_pinctrl.append(PinctrlClientDeviceData(
+                        aliases_node, pinctrl_node, device_node))
 
     def write_assembler(self, out_dir: str):
         # Gather all the data we need for the assembly
@@ -195,7 +200,8 @@ class PinctrlData:
                 # Now that we have the label to all the pins in this state, create the `pinctrl_client_device_state_t`
                 state_label = label_state_object_allocator.create_label()
                 asm_states.append(AssemblyDataObject(state_label))
-                asm_states[-1].add_ptr_from_label(str_asm_allocator.create_label_for_str(state.name))
+                asm_states[-1].add_ptr_from_label(
+                    str_asm_allocator.create_label_for_str(state.name))
                 asm_states[-1].add_word(num_pins)
                 asm_states[-1].add_ptr_from_label(state_pins_label)
 
@@ -208,7 +214,8 @@ class PinctrlData:
                 asm_states_arrays[-1].add_ptr_from_label(state_label)
 
             # Finally create the `pinctrl_client_device_data`
-            asm_devices.add_ptr_from_label(str_asm_allocator.create_label_for_str(device.client_device_node.path))
+            asm_devices.add_ptr_from_label(
+                str_asm_allocator.create_label_for_str(device.client_device_node.path))
             if device.alias is not None:
                 asm_devices.add_ptr_from_label(str_asm_allocator.create_label_for_str(device.alias))
             else:
