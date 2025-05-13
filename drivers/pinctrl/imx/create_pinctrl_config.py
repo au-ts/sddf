@@ -25,22 +25,7 @@ compatible_board_to_pinctrl_dev_path: dict[str, str] = {
 }
 
 UINT32_T_SIZE = 4
-
-
-class AssemblyStringAllocator:
-    # A simple class to manage the allocation of strings in the pinctrl data assembly file.
-    def __init__(self, label_prefix: str):
-        # Label -> string
-        self.allocated_strings: dict[str, str] = {}
-        self.watermark: int = 0
-        self.label_prefix: str = label_prefix
-
-    # Returns a label to the target string
-    def create_label(self, target: str) -> str:
-        if target not in self.allocated_strings:
-            self.allocated_strings[target] = f"{self.label_prefix}{str(self.watermark)}"
-            self.watermark += 1
-        return self.allocated_strings[target]
+PINCTRL_CONFIG_DATA_MAGIC = "0x696D70696E6D7578" # "impinmux"
 
 
 class PinctrlRegisterData:
@@ -56,54 +41,98 @@ class PinctrlRegisterData:
         return f"mux reg @ {hex(self.mux_reg)} = {hex(self.mux_val)}, conf reg @ {hex(self.conf_reg)} = {hex(self.pad_setting)}, input reg @ {hex(self.input_reg)} = {hex(self.input_val)}"
 
 
-class PinctrlConfigData:
-    # Represent a singular pinctrl configuration of a device.
+class PinctrlStateData:
+    # Represent a singular pinctrl state of a device.
 
-    def __init__(self, name: str, config_node: dtlib.Node, registers: list[PinctrlRegisterData]):
+    def __init__(self, name: str, index: int, config_node: dtlib.Node, registers: list[PinctrlRegisterData]):
         self.name = name
+        self.index = index
         self.config_node = config_node
         self.registers = registers
 
     def __str__(self):
-        serialised = f"* Config source name `{self.name}` with group name `{self.config_node.name}` and phandle {hex(self.config_node.props.get("phandle").to_num())} have registers:\n"
+        serialised = f"* Config source name `{self.name}` at index {self.index} with group name `{self.config_node.name}` and phandle {hex(self.config_node.props.get("phandle").to_num())} have registers:\n"
         for reg in self.registers:
             serialised += str(reg) + "\n"
         return serialised
 
 
-class PinctrlDeviceData:
+class PinctrlClientDeviceData:
     # Represent a device that requires pinctrl configuration. For example, `mmc@30b40000` in maaxboard.dts.
 
-    def __init__(self, pinctrl_node: dtlib.Node, device_node: dtlib.Node):
-        self.device_node: dtlib.Node = device_node
-        # A device can have multiple different pin configurations it select from at runtime.
+    def __init__(self, pinctrl_node: dtlib.Node, client_device_node: dtlib.Node):
+        self.client_device_node: dtlib.Node = client_device_node
+        # A device can have multiple different pin states it selects from at runtime.
         # Though all devices that require pinctrl have a "default" config.
-        self.pinctrl_configs: list[PinctrlConfigData] = []
+        self.pinctrl_configs: list[PinctrlStateData] = []
 
         # Make sure the given device have a need for pinctrl configuration
-        assert "status" in device_node.props.keys()
-        assert device_node.props["status"].to_string() == "okay"
-        assert "pinctrl-0" in device_node.props.keys()
+        assert "status" in client_device_node.props.keys()
+        assert client_device_node.props["status"].to_string() == "okay"
+        assert "pinctrl-0" in client_device_node.props.keys()
 
         # Grab and parse all the possible pin configurations of this device.
-        for config_idx, config_name in enumerate(device_node.props.get("pinctrl-names").to_strings()):
+        for config_idx, config_name in enumerate(client_device_node.props.get("pinctrl-names").to_strings()):
             target_prop: str = f"pinctrl-{config_idx}"
-            target_phandle: int = device_node.props.get(target_prop).to_num()
+            target_phandle: int = client_device_node.props.get(target_prop).to_num()
 
-            config_data = get_pinctrl_info(pinctrl_node, target_phandle, config_name)
+            config_data = get_pinctrl_info(pinctrl_node, target_phandle, config_name, config_idx)
             assert config_data is not None
             self.pinctrl_configs.append(config_data)
 
     def __str__(self):
-        serialised = f"** Device `{self.device_node.path}` have the following pinctrl configs:\n"
+        serialised = f"** Device `{self.client_device_node.path}` have the following pinctrl configs:\n"
         for config in self.pinctrl_configs:
             serialised += str(config) + "\n"
         return serialised
 
+class AssemblyDataLabelAllocator:
+    def __init__(self, label_prefix: str):
+        self.watermark: int = -1
+        self.label_prefix: str = label_prefix
+    
+    def create_label(self) -> str:
+        self.watermark += 1
+        return self.label_prefix + str(self.watermark)
+
+class AssemblyStringAllocator:
+    # A simple class to manage the allocation of strings in the pinctrl data assembly file.
+    def __init__(self, label_prefix: str):
+        self.label_allocator = AssemblyDataLabelAllocator(label_prefix)
+        # string -> label
+        self.allocated_strings: dict[str, str] = {}
+
+    # Returns a label to the target string
+    def create_label_for_str(self, target: str) -> str:
+        if target not in self.allocated_strings:
+            self.allocated_strings[target] = self.label_allocator.create_label()
+        return self.allocated_strings[target]
+
+    def to_assembler(self) -> str:
+        asm_strs = ""
+        for string in self.allocated_strings:
+            asm_strs += f"{self.allocated_strings[string]}: .asciz \"{string}\"\n"
+        return asm_strs
+
+class AssemblyDataObject:
+    def __init__(self, label: str):
+        self.data = f"{label}:\n"
+    
+    def add_word(self, value):
+        self.data += f"\t.word {str(value)}\n"
+    
+    def add_quad(self, value):
+        self.data += f"\t.quad {str(value)}\n"
+
+    def add_ptr_from_label(self, label: str):
+        self.data += f"\t.quad {label}\n"
+    
+    def to_assembler(self) -> str:
+        return self.data + "\n"
 
 class PinctrlData:
     def __init__(self):
-        self.devices_with_pinctrl: list[PinctrlDeviceData] = []
+        self.devices_with_pinctrl: list[PinctrlClientDeviceData] = []
 
     def __str__(self):
         serialised = ""
@@ -112,55 +141,91 @@ class PinctrlData:
         return serialised
 
     def parse(self, dt: dtlib.DT, pinctrl_dev_path: str):
-        pinctrl_node = dt.get_node(pinctrl_dev_path)  # This is `iomuxc@30330000`
+        pinctrl_node = dt.get_node(pinctrl_dev_path)  # This is the `iomuxc@30330000` node
         # Find all devices that need pinctrl configuration
         device_node: dtlib.Node
         for device_node in devicetree.node_iter():
             if "status" in device_node.props.keys() and device_node.props["status"].to_string() == "okay":
                 if "pinctrl-names" in device_node.props.keys():
-                    self.devices_with_pinctrl.append(PinctrlDeviceData(pinctrl_node, device_node))
+                    self.devices_with_pinctrl.append(PinctrlClientDeviceData(pinctrl_node, device_node))
 
-    def to_assembler(self, out_dir: str):
+    def write_assembler(self, out_dir: str):
         # Gather all the data we need for the assembly
-        num_pins = 0
+        num_devices = 0
 
-        assem_strs = AssemblyStringAllocator("iomuxc_config_str_")
+        # Manage allocation of strings and their labels in the assembly file to prevent duplication
+        str_asm_allocator = AssemblyStringAllocator("pinctrl_config_str_")
 
-        # There will two parts, 1. write all the `iomuxc_config_t`
-        iomuxc_configs = "iomuxc_configs:\n"
+        label_pin_regs_array_allocator = AssemblyDataLabelAllocator("pinctrl_config_pins_reg_")
+        asm_pin_regs: list[AssemblyDataObject] = []
 
+        label_state_object_allocator = AssemblyDataLabelAllocator("pinctrl_config_state_obj_")
+        asm_states: list[AssemblyDataObject] = []
+
+        label_states_array_allocator = AssemblyDataLabelAllocator("pinctrl_config_states_")
+        asm_states_arrays: list[AssemblyDataObject] = []
+
+        asm_devices = AssemblyDataObject("pinctrl_client_devices_configs")
+
+        # For every device requiring pinctrl config, write their `pinctrl_client_device_data_t` C struct
         for device in self.devices_with_pinctrl:
-            for config in device.pinctrl_configs:
-                for reg in config.registers:
+            # For every pinctrl state of this device, write its `pinctrl_client_device_state_t` C struct
+            this_device_pinctrl_states_labels: list[str] = []
+            for state in device.pinctrl_configs:
+                # For every pin in this state, write its `pinctrl_pin_register_t` C struct
+                state_pins_label = label_pin_regs_array_allocator.create_label()
+                asm_pin_regs.append(AssemblyDataObject(state_pins_label))
+
+                num_pins = 0
+                for pin in state.registers:
+                    asm_pin_regs[-1].add_word(pin.mux_reg)
+                    asm_pin_regs[-1].add_word(pin.conf_reg)
+                    asm_pin_regs[-1].add_word(pin.input_reg)
+                    asm_pin_regs[-1].add_word(pin.mux_val)
+                    asm_pin_regs[-1].add_word(pin.input_val)
+                    asm_pin_regs[-1].add_word(pin.pad_setting)
                     num_pins += 1
-                    # Write the numbers first
-                    iomuxc_configs += f"\t.word {str(reg.mux_reg)}, {str(reg.conf_reg)}, {str(reg.input_reg)}, {str(reg.mux_val)}, {str(reg.input_val)}, {str(reg.pad_setting)}, {str(config.config_node.props.get("phandle").to_num())}\n"
+                    
+                # Now that we have the label to all the pins in this state, create the `pinctrl_client_device_state_t`
+                state_label = label_state_object_allocator.create_label()
+                asm_states.append(AssemblyDataObject(state_label))
+                asm_states[-1].add_ptr_from_label(str_asm_allocator.create_label_for_str(state.name))
+                asm_states[-1].add_word(num_pins)
+                asm_states[-1].add_ptr_from_label(state_pins_label)
 
-                    # Take care of string data, first define the string, the reference them
-                    # Device path:
-                    iomuxc_configs += f"\t.quad {assem_strs.create_label(device.device_node.path)}, "
-                    # Config name:
-                    iomuxc_configs += f"{assem_strs.create_label(config.name)}, "
-                    # Group name:
-                    iomuxc_configs += f"{assem_strs.create_label(config.config_node.name)}\n"
+                this_device_pinctrl_states_labels.append(state_label)
 
-        # 2. all the strings referenced by 1.
-        strings_def = "pinctrl_str_conf_name_default: .asciz \"default\"\n"
-        for string in assem_strs.allocated_strings:
-            strings_def += f"{assem_strs.allocated_strings[string]}: .asciz \"{string}\"\n"
+            # We've encoded all the states and have their labels, create a states array (the `**state`)
+            states_array_label = label_states_array_allocator.create_label()
+            asm_states_arrays.append(AssemblyDataObject(states_array_label))
+            for state_label in this_device_pinctrl_states_labels:
+                asm_states_arrays[-1].add_ptr_from_label(state_label)
 
+            # Finally create the `pinctrl_client_device_data`
+            asm_devices.add_ptr_from_label(str_asm_allocator.create_label_for_str(device.client_device_node.path))
+            asm_devices.add_word(len(this_device_pinctrl_states_labels))
+            asm_devices.add_ptr_from_label(states_array_label)
+
+            num_devices += 1
+
+        # Write all the data to .s file
         with open(out_dir + "/pinctrl_config_data.s", "w") as file:
             file.write(".section .rodata\n")
 
             file.write("\t.align 4\n")
-            file.write("\t.global num_iomuxc_configs\n")
-            file.write("\t.global iomuxc_configs\n")
+            file.write("\t.global pinctrl_config_data_magic\n")
+            file.write("\t.global pinctrl_client_devices_configs\n")
+            file.write("\t.global num_pinctrl_client_devices_configs\n")
 
-            file.write("num_iomuxc_configs:\n")
-            file.write(f"\t.word {num_pins}\n")
+            file.write(f"pinctrl_config_data_magic:\n\t.quad {PINCTRL_CONFIG_DATA_MAGIC}\n")
+            file.write(f"num_pinctrl_client_devices_configs:\n\t.word {num_devices}\n")
+            
+            file.write(asm_devices.to_assembler())
+            file.write(str_asm_allocator.to_assembler())
 
-            file.write(iomuxc_configs)
-            file.write(strings_def)
+            [file.write(asm_pin_reg.to_assembler()) for asm_pin_reg in asm_pin_regs]
+            [file.write(asm_state.to_assembler()) for asm_state in asm_states]
+            [file.write(asm_states_array.to_assembler()) for asm_states_array in asm_states_arrays]
 
 
 def get_value_from_bytes_array(byte_array: bytes, index: int) -> int:
@@ -168,7 +233,7 @@ def get_value_from_bytes_array(byte_array: bytes, index: int) -> int:
     return int.from_bytes(byte_array[index*UINT32_T_SIZE: (index+1) * UINT32_T_SIZE], 'big', signed=False)
 
 
-def get_pinctrl_info(pinctrl_device: dtlib.Node, target_pinctrl_config_phandle: int, target_pinctrl_config_name: str) -> PinctrlConfigData:
+def get_pinctrl_info(pinctrl_device: dtlib.Node, target_pinctrl_config_phandle: int, target_pinctrl_config_name: str, target_pinctrl_config_index: int) -> PinctrlStateData:
     # pinctrl_device is the DT node to the pinctrl device that have all the configuration values.
     # And pinctrl_config_phandle is the phandle to the specific group inside pinctrl_device
 
@@ -200,7 +265,7 @@ def get_pinctrl_info(pinctrl_device: dtlib.Node, target_pinctrl_config_phandle: 
                     regs.append(PinctrlRegisterData(mux_reg, conf_reg,
                                 input_reg, mux_val, input_val, pad_setting))
 
-                return PinctrlConfigData(target_pinctrl_config_name, pinctrl_config_node, regs)
+                return PinctrlStateData(target_pinctrl_config_name, target_pinctrl_config_index, pinctrl_config_node, regs)
 
     return None
 
@@ -232,4 +297,4 @@ if __name__ == "__main__":
     pinctrl_data.parse(devicetree, compatible_board_to_pinctrl_dev_path[matched_compat_str])
     print(pinctrl_data)
 
-    pinctrl_data.to_assembler(out_dir)
+    pinctrl_data.write_assembler(out_dir)
