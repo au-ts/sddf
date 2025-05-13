@@ -108,10 +108,8 @@ void debug_print_pinctrl_config_data(void)
     LOG_DRIVER("STARTING PINCTRL CONFIG DUMP\n");
     LOG_DRIVER("Total %u devices need pinctrl configuration.\n", num_pinctrl_client_devices_configs);
     for (int i = 0; i < num_pinctrl_client_devices_configs; i++) {
-        LOG_DRIVER("** %s with alias %s have the following %d states:\n",
-                   pinctrl_client_devices_configs[i].dev_dt_path,
-                   pinctrl_client_devices_configs[i].dev_dt_alias,
-                   pinctrl_client_devices_configs[i].num_states);
+        LOG_DRIVER("** %s with alias %s have the following %d states:\n", pinctrl_client_devices_configs[i].dev_dt_path,
+                   pinctrl_client_devices_configs[i].dev_dt_alias, pinctrl_client_devices_configs[i].num_states);
         for (int j = 0; j < pinctrl_client_devices_configs[i].num_states; j++) {
             LOG_DRIVER("* State '%s' at index %d have %u pins:\n",
                        pinctrl_client_devices_configs[i].states[j]->state_name, j,
