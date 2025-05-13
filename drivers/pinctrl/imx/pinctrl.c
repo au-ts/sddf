@@ -54,7 +54,7 @@ typedef struct __attribute__((packed)) pinctrl_client_device_state {
 
 typedef struct __attribute__((packed)) pinctrl_client_device_data {
     const char *dev_dt_path;   /* Device tree path of this particular device that needs pinctrl configuration */
-    const uint32_t num_states; /* Number of pinctrl states this device requires as defined in the `pinctrl-names` prop */
+    const uint32_t num_states; /* Number of pinctrl states required as defined in the `pinctrl-names` prop */
     const pinctrl_client_device_state_t **states;
 } pinctrl_client_device_data_t;
 
@@ -110,7 +110,8 @@ void debug_print_pinctrl_config_data(void)
         LOG_DRIVER("** %s have the following %d states:\n", pinctrl_client_devices_configs[i].dev_dt_path,
                    pinctrl_client_devices_configs[i].num_states);
         for (int j = 0; j < pinctrl_client_devices_configs[i].num_states; j++) {
-            LOG_DRIVER("* State '%s' at index %d have %u pins:\n", pinctrl_client_devices_configs[i].states[j]->state_name, j,
+            LOG_DRIVER("* State '%s' at index %d have %u pins:\n",
+                       pinctrl_client_devices_configs[i].states[j]->state_name, j,
                        pinctrl_client_devices_configs[i].states[j]->num_pins);
             for (int k = 0; k < pinctrl_client_devices_configs[i].states[j]->num_pins; k++) {
                 LOG_DRIVER("mux reg: 0x%x = 0x%x, input reg: 0x%x = 0x%x, pad conf reg: 0x%x = 0x%x\n",
@@ -119,8 +120,7 @@ void debug_print_pinctrl_config_data(void)
                            pinctrl_client_devices_configs[i].states[j]->pins_reg[k].input_reg,
                            pinctrl_client_devices_configs[i].states[j]->pins_reg[k].input_val,
                            pinctrl_client_devices_configs[i].states[j]->pins_reg[k].conf_reg,
-                           pinctrl_client_devices_configs[i].states[j]->pins_reg[k].pad_setting
-                          );
+                           pinctrl_client_devices_configs[i].states[j]->pins_reg[k].pad_setting);
             }
         }
     }
@@ -215,7 +215,7 @@ void init(void)
     assert(pinctrl_config_data_magic == CONFIG_MAGIC);
     assert(num_pinctrl_client_devices_configs >= 1);
 
-    iomuxc_dev_base = (uintptr_t) device_resources.regions[0].region.vaddr;
+    iomuxc_dev_base = (uintptr_t)device_resources.regions[0].region.vaddr;
 
     debug_print_pinctrl_config_data();
     pinctrl_reset_all_default();
