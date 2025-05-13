@@ -72,9 +72,9 @@ class PinctrlClientDeviceData:
         # Grab and parse all the possible pin configurations of this device.
         for config_idx, config_name in enumerate(client_device_node.props.get("pinctrl-names").to_strings()):
             target_prop: str = f"pinctrl-{config_idx}"
-            target_phandle: int = client_device_node.props.get(target_prop).to_num()
+            target_phandles: list[int] = client_device_node.props.get(target_prop).to_nums()
 
-            config_data = get_pinctrl_info(pinctrl_node, target_phandle, config_name, config_idx)
+            config_data = get_pinctrl_info(pinctrl_node, target_phandles, config_name, config_idx)
             assert config_data is not None
             self.pinctrl_configs.append(config_data)
 
@@ -231,19 +231,19 @@ def get_value_from_bytes_array(byte_array: bytes, index: int) -> int:
     return int.from_bytes(byte_array[index*UINT32_T_SIZE: (index+1) * UINT32_T_SIZE], 'big', signed=False)
 
 
-def get_pinctrl_info(pinctrl_device: dtlib.Node, target_pinctrl_config_phandle: int, target_pinctrl_config_name: str, target_pinctrl_config_index: int) -> PinctrlStateData:
+def get_pinctrl_info(pinctrl_device: dtlib.Node, target_pinctrl_config_phandles: list[int], target_pinctrl_config_name: str, target_pinctrl_config_index: int) -> PinctrlStateData:
     # pinctrl_device is the DT node to the pinctrl device that have all the configuration values.
     # And pinctrl_config_phandle is the phandle to the specific group inside pinctrl_device
+
+    regs: list[PinctrlRegisterData] = []
 
     for pinctrl_config_node in pinctrl_device.node_iter():
         pinctrl_config_node_data = pinctrl_config_node.props.get('fsl,pins')
         if pinctrl_config_node_data != None:
             pinctrl_config_node_phandle = pinctrl_config_node.props.get("phandle").to_num()
-            if pinctrl_config_node_phandle == target_pinctrl_config_phandle:
+            if pinctrl_config_node_phandle in target_pinctrl_config_phandles:
                 # We only support the normal configuration, not the SCU configuration.
                 assert len(pinctrl_config_node_data.value) % 6 == 0
-
-                regs: list[PinctrlRegisterData] = []
 
                 # At this stage, we have the array of values
                 # Since each device configuration comes in a set of six values, we'll loop through in sets of 6
@@ -263,9 +263,10 @@ def get_pinctrl_info(pinctrl_device: dtlib.Node, target_pinctrl_config_phandle: 
                     regs.append(PinctrlRegisterData(mux_reg, conf_reg,
                                 input_reg, mux_val, input_val, pad_setting))
 
-                return PinctrlStateData(target_pinctrl_config_name, target_pinctrl_config_index, pinctrl_config_node, regs)
-
-    return None
+    if len(regs) > 0:
+        return PinctrlStateData(target_pinctrl_config_name, target_pinctrl_config_index, pinctrl_config_node, regs)
+    else:
+        return None
 
 
 if __name__ == "__main__":
