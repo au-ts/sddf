@@ -158,7 +158,7 @@ def _list_test_cases(matrix: list[TestConfig]):
 
 def _log_test_start(name: str):
     if IS_CI:
-        OUTPUT.write(f"::group::{name}")
+        OUTPUT.write(f"::group::{name}\n")
     else:
         log.info(name)
 
@@ -166,7 +166,7 @@ def _log_test_start(name: str):
 def _log_test_end(name: str):
     log.info(name)
     if IS_CI:
-        OUTPUT.write("::endgroup::")
+        OUTPUT.write("::endgroup::\n")
 
 
 ResultKind = Literal["pass", "fail", "not_run", "retry", "interrupted"]
