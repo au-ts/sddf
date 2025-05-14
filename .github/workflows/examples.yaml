@@ -43,7 +43,7 @@ jobs:
         run: |
           python3 -m venv venv
           ./venv/bin/pip install --upgrade sdfgen==${{ env.SDFGEN_VERSION }}
-      - name: Build and run examples
+      - name: Build examples
         run: ./ci/build.py ${PWD}/microkit-sdk-${{ env.MICROKIT_VERSION }} $(nproc)
         shell: bash
         env:
