@@ -101,7 +101,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
 
     parser.add_argument("microkit_sdk")
-    parser.add_argument("num_jobs", nargs="?", type=int, default=1)
+    parser.add_argument(
+        # len(os.sched_getaffinity(0)) matches behaviour of $(nproc)
+        "num_jobs", nargs="?", type=int, default=len(os.sched_getaffinity(0))
+    )
     parser.add_argument(
         "--examples",
         default=set(matrix.EXAMPLES.keys()),
@@ -118,6 +121,9 @@ if __name__ == "__main__":
             pass
 
     for example_name, options in matrix.EXAMPLES.items():
+        if example_name not in args.examples:
+            continue
+
         example_matrix = matrix_product(
             board=options["boards_build"],
             config=options["configs"],
