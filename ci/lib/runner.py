@@ -27,11 +27,11 @@ from .backends import (
     TestFailureException,
     reset_terminal,
     log_output_to_file,
-    OUTPUT,
 )
 
 # For Github Actions etc.
 IS_CI = bool(os.environ.get("CI"))
+
 
 @dataclass(order=True, frozen=True)
 class TestConfig:
@@ -164,7 +164,7 @@ def _log_test_start(name: str):
 def _log_test_end(name: str):
     log.info(name)
     if IS_CI:
-        print("::endgroup")
+        print("::endgroup::")
 
 
 ResultKind = Literal["pass", "fail", "not_run", "retry", "interrupted"]
@@ -189,7 +189,7 @@ def run_test_config(
             / test_config.board
             / test_config.config
             / test_config.build_system
-            / f"{datetime.now()}.log"
+            / f"{datetime.now().strftime("%Y-%m-%d_%H.%M.%S")}.log"
         )
         log_file.parent.mkdir(parents=True, exist_ok=True)
         log_file_cm = log_output_to_file(log_file)
@@ -356,9 +356,8 @@ def cli(
                 break
 
             for test_config in retry_queue:
-                _log_test_start(
-                    f"Retrying {test_name} on {test_config.board} ({test_config.config}, built with {test_config.build_system})"
-                )
+                fmt = f"{test_name} on {test_config.board} ({test_config.config}, built with {test_config.build_system})"
+                _log_test_start("Running " + fmt)
                 result = run_test_config(
                     test_name,
                     test_config,
@@ -367,7 +366,7 @@ def cli(
                     loader_img_fn,
                     args.logs_dir,
                 )
-                _log_test_end()
+                _log_test_end("Finished running " + fmt)
 
                 test_results[test_config] = result
 
