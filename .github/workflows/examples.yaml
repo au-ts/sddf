@@ -156,7 +156,7 @@ jobs:
       - name: Run tests
         run: |
           export PATH="$(pwd)/machine_queue":$PATH
-          ./ci/examples/serial.py --boards star64 --no-only-qemu
+          ./ci/examples/serial.py --boards maaxboard --no-only-qemu
       - name: Archive logs
         uses: actions/upload-artifact@v4
         with:
