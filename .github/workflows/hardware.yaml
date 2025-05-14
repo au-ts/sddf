@@ -8,12 +8,13 @@
 name: Hardware Runs
 
 on:
-  schedule:
-    # weekly, at 17:23 UTC Sunday (i.e. 03:23 AEST Monday)
-    - cron: "23 17 * * 0"
-  pull_request_target:
-    # run if the label is added
-    types: [synchronize, labeled]
+  pull_request:
+  # schedule:
+  #   # weekly, at 17:23 UTC Sunday (i.e. 03:23 AEST Monday)
+  #   - cron: "23 17 * * 0"
+  # pull_request_target:
+  #   # run if the label is added
+  #   types: [synchronize, labeled]
 
 # TODO: hardware_bench
 # TODO: Test matrix
