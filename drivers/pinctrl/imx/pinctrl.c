@@ -7,8 +7,9 @@
 Pinctrl driver for the iMX8 SoC based platforms.
 
 Documents referenced:
-Linux: Documentation/devicetree/bindings/pinctrl/fsl,imx-pinctrl.txt
-U-Boot: drivers/pinctrl/nxp/pinctrl-imx.c
+[1] Linux:  Documentation/devicetree/bindings/pinctrl/fsl,imx-pinctrl.txt
+[2] Linux:  drivers/pinctrl/freescale/pinctrl-imx.c
+[3] U-Boot: drivers/pinctrl/nxp/pinctrl-imx.c
 */
 
 #include <microkit.h>
@@ -32,7 +33,7 @@ __attribute__((__section__(".device_resources"))) device_resources_t device_reso
 
 uintptr_t iomuxc_dev_base;
 
-// From Linux's Documentation/devicetree/bindings/pinctrl/fsl,imx-pinctrl.txt
+// [1]
 // Special values for pad_setting:
 // Indicate this pin does not need config
 #define NO_PAD_CTL (1 << 31)
@@ -67,7 +68,6 @@ extern const uint32_t num_pinctrl_client_devices_configs;
 
 bool sanity_check_pinctrl_reg_offset(uint32_t offset)
 {
-    // @billn: should really check the bound of the offset. to fix
     if (offset % 4 == 0) {
         return true;
     } else {
@@ -131,60 +131,19 @@ void debug_print_pinctrl_config_data(void)
 void pinctrl_set_state(pinctrl_client_device_state_t state)
 {
     for (int j = 0; j < state.num_pins; j++) {
-        // Write mux settings
         if (!set_mux(state.pins_reg[j].mux_reg, state.pins_reg[j].mux_val)) {
             while (true) {};
         }
-
-        // Write input settings
         if (state.pins_reg[j].input_reg) {
-            /*
-                * If the select input value begins with 0xff,
-                * it's a quirky select input and the value should
-                * be interpreted as below.
-                *     31     23      15      7        0
-                *     | 0xff | shift | width | select |
-                * It's used to work around the problem that the
-                * select input for some pin is not implemented in
-                * the select input register but in some general
-                * purpose register. We encode the select input
-                * value, width and shift of the bit field into
-                * input_val cell of pin function ID in device tree,
-                * and then decode them here for setting up the select
-                * input bits in general purpose register.
-            */
-            if (state.pins_reg[j].input_val >> 24 == 0xff) {
-                // @billn, sort out once https://github.com/au-ts/microkit_sdf_gen/pull/14 is merged.
-                // uint32_t val = iomuxc_configs[i].input_val;
-                // uint8_t select = val & 0xff;
-                // uint8_t width = (val >> 8) & 0xff;
-                // uint8_t shift = (val >> 16) & 0xff;
-                // uint32_t mask = ((1 << width) - 1) << shift;
-                // /*
-                //     * The iomuxc_configs[i].input_reg here is actually some
-                //     * IOMUXC general purpose register, not
-                //     * regular select input register.
-                // */
-                // if (!read_mux(iomuxc_configs[i].input_reg, &val)) {
-                //     while (true) {};
-                // }
-                // val &= ~mask;
-                // val |= select << shift;
-                // iomuxc_configs[i].input_val = val;
-                // if (!set_mux(iomuxc_configs[i].input_reg, iomuxc_configs[i].input_val)) {
-                //     while (true) {};
-                // }
-
-                LOG_DRIVER("quirky\n");
-                while (1);
-            }
+            // We don't support "quirky" select input values of [2] (checkout tag v6.1, line 196).
+            // As it was only ever used in vendor kernels of old imx6 and imx7 boards and never made
+            // it to upstream Linux.
+            assert(state.pins_reg[j].input_val >> 24 != 0xff);
 
             if (!set_mux(state.pins_reg[j].input_reg, state.pins_reg[j].input_val)) {
                 while (true) {};
             }
         }
-
-        // Write pad settings
         if (!(state.pins_reg[j].pad_setting & NO_PAD_CTL)) {
             if (!set_mux(state.pins_reg[j].conf_reg, state.pins_reg[j].pad_setting)) {
                 while (true) {};
