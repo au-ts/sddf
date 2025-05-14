@@ -76,150 +76,156 @@ static void update_ring_slot(hw_ring_t *ring, unsigned int idx, uintptr_t phys,
 static void rx_provide(void)
 {
     // TODO: use correct registers for gem device
-    bool reprocess = true;
-    while (reprocess) {
-        while (!hw_ring_full(&rx) && !net_queue_empty_free(&rx_queue)) {
-            net_buff_desc_t buffer;
-            int err = net_dequeue_free(&rx_queue, &buffer);
-            assert(!err);
+    sddf_dprintf("rx_provide entry\n");
+    //bool reprocess = true;
+    //while (reprocess) {
+    //    while (!hw_ring_full(&rx) && !net_queue_empty_free(&rx_queue)) {
+    //        net_buff_desc_t buffer;
+    //        int err = net_dequeue_free(&rx_queue, &buffer);
+    //        assert(!err);
 
-            uint32_t idx = rx.tail % rx.capacity;
-            uint16_t stat = RXD_EMPTY;
-            if (idx + 1 == rx.capacity) {
-                stat |= WRAP;
-            }
-            update_ring_slot(&rx, idx, buffer.io_or_offset, 0, stat);
-            rx.tail++;
-            eth->rdar = RDAR_RDAR;
-        }
+    //        uint32_t idx = rx.tail % rx.capacity;
+    //        uint16_t stat = RXD_EMPTY;
+    //        if (idx + 1 == rx.capacity) {
+    //            stat |= WRAP;
+    //        }
+    //        update_ring_slot(&rx, idx, buffer.io_or_offset, 0, stat);
+    //        rx.tail++;
+    //        eth->rdar = RDAR_RDAR;
+    //    }
 
-        /* Only request a notification from virtualiser if HW ring not full */
-        if (!hw_ring_full(&rx)) {
-            net_request_signal_free(&rx_queue);
-        } else {
-            net_cancel_signal_free(&rx_queue);
-        }
-        reprocess = false;
+    //    /* Only request a notification from virtualiser if HW ring not full */
+    //    if (!hw_ring_full(&rx)) {
+    //        net_request_signal_free(&rx_queue);
+    //    } else {
+    //        net_cancel_signal_free(&rx_queue);
+    //    }
+    //    reprocess = false;
 
-        if (!net_queue_empty_free(&rx_queue) && !hw_ring_full(&rx)) {
-            net_cancel_signal_free(&rx_queue);
-            reprocess = true;
-        }
-    }
+    //    if (!net_queue_empty_free(&rx_queue) && !hw_ring_full(&rx)) {
+    //        net_cancel_signal_free(&rx_queue);
+    //        reprocess = true;
+    //    }
+    //}
 }
 
 static void rx_return(void)
 {
     // TODO: check if any updates needed
-    bool packets_transferred = false;
-    while (!hw_ring_empty(&rx)) {
-        /* If buffer slot is still empty, we have processed all packets the device has filled */
-        uint32_t idx = rx.head % rx.capacity;
-        volatile struct descriptor *d = &(rx.descr[idx]);
-        if (d->stat & RXD_EMPTY) {
-            break;
-        }
+    sddf_dprintf("rx_return entry\n");
+    //bool packets_transferred = false;
+    //while (!hw_ring_empty(&rx)) {
+    //    /* If buffer slot is still empty, we have processed all packets the device has filled */
+    //    uint32_t idx = rx.head % rx.capacity;
+    //    volatile struct descriptor *d = &(rx.descr[idx]);
+    //    if (d->stat & RXD_EMPTY) {
+    //        break;
+    //    }
 
-        THREAD_MEMORY_ACQUIRE();
+    //    THREAD_MEMORY_ACQUIRE();
 
-        net_buff_desc_t buffer = { d->addr, d->len };
-        int err = net_enqueue_active(&rx_queue, buffer);
-        assert(!err);
+    //    net_buff_desc_t buffer = { d->addr, d->len };
+    //    int err = net_enqueue_active(&rx_queue, buffer);
+    //    assert(!err);
 
-        packets_transferred = true;
-        rx.head++;
-    }
+    //    packets_transferred = true;
+    //    rx.head++;
+    //}
 
-    if (packets_transferred && net_require_signal_active(&rx_queue)) {
-        net_cancel_signal_active(&rx_queue);
-        microkit_notify(config.virt_rx.id);
-    }
+    //if (packets_transferred && net_require_signal_active(&rx_queue)) {
+    //    net_cancel_signal_active(&rx_queue);
+    //    microkit_notify(config.virt_rx.id);
+    //}
 }
 
 static void tx_provide(void)
 {
     // TODO: use correct registers for gem device
-    bool reprocess = true;
-    while (reprocess) {
-        while (!(hw_ring_full(&tx)) && !net_queue_empty_active(&tx_queue)) {
-            net_buff_desc_t buffer;
-            int err = net_dequeue_active(&tx_queue, &buffer);
-            assert(!err);
+    sddf_dprintf("tx_provide entry\n");
+    //bool reprocess = true;
+    //while (reprocess) {
+    //    while (!(hw_ring_full(&tx)) && !net_queue_empty_active(&tx_queue)) {
+    //        net_buff_desc_t buffer;
+    //        int err = net_dequeue_active(&tx_queue, &buffer);
+    //        assert(!err);
 
-            uint32_t idx = tx.tail % tx.capacity;
-            uint16_t stat = TXD_READY | TXD_ADDCRC | TXD_LAST;
-            if (idx + 1 == tx.capacity) {
-                stat |= WRAP;
-            }
-            update_ring_slot(&tx, idx, buffer.io_or_offset, buffer.len, stat);
-            tx.tail++;
-            eth->tdar = TDAR_TDAR;
-        }
+    //        uint32_t idx = tx.tail % tx.capacity;
+    //        uint16_t stat = TXD_READY | TXD_ADDCRC | TXD_LAST;
+    //        if (idx + 1 == tx.capacity) {
+    //            stat |= WRAP;
+    //        }
+    //        update_ring_slot(&tx, idx, buffer.io_or_offset, buffer.len, stat);
+    //        tx.tail++;
+    //        eth->tdar = TDAR_TDAR;
+    //    }
 
-        net_request_signal_active(&tx_queue);
-        reprocess = false;
+    //    net_request_signal_active(&tx_queue);
+    //    reprocess = false;
 
-        if (!hw_ring_full(&tx) && !net_queue_empty_active(&tx_queue)) {
-            net_cancel_signal_active(&tx_queue);
-            reprocess = true;
-        }
-    }
+    //    if (!hw_ring_full(&tx) && !net_queue_empty_active(&tx_queue)) {
+    //        net_cancel_signal_active(&tx_queue);
+    //        reprocess = true;
+    //    }
+    //}
 }
 
 static void tx_return(void)
 {
     // TODO: check if any updates needed
-    bool enqueued = false;
-    while (!hw_ring_empty(&tx)) {
-        /* Ensure that this buffer has been sent by the device */
-        uint32_t idx = tx.head % tx.capacity;
-        volatile struct descriptor *d = &(tx.descr[idx]);
-        if (d->stat & TXD_READY) {
-            break;
-        }
+    sddf_dprintf("tx_return entry\n");
+    //bool enqueued = false;
+    //while (!hw_ring_empty(&tx)) {
+    //    /* Ensure that this buffer has been sent by the device */
+    //    uint32_t idx = tx.head % tx.capacity;
+    //    volatile struct descriptor *d = &(tx.descr[idx]);
+    //    if (d->stat & TXD_READY) {
+    //        break;
+    //    }
 
-        THREAD_MEMORY_ACQUIRE();
+    //    THREAD_MEMORY_ACQUIRE();
 
-        net_buff_desc_t buffer = { d->addr, 0 };
-        int err = net_enqueue_free(&tx_queue, buffer);
-        assert(!err);
+    //    net_buff_desc_t buffer = { d->addr, 0 };
+    //    int err = net_enqueue_free(&tx_queue, buffer);
+    //    assert(!err);
 
-        enqueued = true;
-        tx.head++;
-    }
+    //    enqueued = true;
+    //    tx.head++;
+    //}
 
-    if (enqueued && net_require_signal_free(&tx_queue)) {
-        net_cancel_signal_free(&tx_queue);
-        microkit_notify(config.virt_tx.id);
-    }
+    //if (enqueued && net_require_signal_free(&tx_queue)) {
+    //    net_cancel_signal_free(&tx_queue);
+    //    microkit_notify(config.virt_tx.id);
+    //}
 }
 
 static void handle_irq(void)
 {
     // TODO: update to use correct registers and flags
-    uint32_t e = eth->eir & IRQ_MASK;
-    eth->eir = e;
+    sdddf_dprintf("handle_irq entry\n");
+    //uint32_t e = eth->eir & IRQ_MASK;
+    //eth->eir = e;
 
-    while (e & IRQ_MASK) {
-        if (e & NETIRQ_TXF) {
-            tx_return();
-            tx_provide();
-        }
-        if (e & NETIRQ_RXF) {
-            rx_return();
-            rx_provide();
-        }
-        if (e & NETIRQ_EBERR) {
-            sddf_dprintf("ETH|ERROR: System bus/uDMA %u\n", e);
-        }
-        e = eth->eir & IRQ_MASK;
-        eth->eir = e;
-    }
+    //while (e & IRQ_MASK) {
+    //    if (e & NETIRQ_TXF) {
+    //        tx_return();
+    //        tx_provide();
+    //    }
+    //    if (e & NETIRQ_RXF) {
+    //        rx_return();
+    //        rx_provide();
+    //    }
+    //    if (e & NETIRQ_EBERR) {
+    //        sddf_dprintf("ETH|ERROR: System bus/uDMA %u\n", e);
+    //    }
+    //    e = eth->eir & IRQ_MASK;
+    //    eth->eir = e;
+    //}
 }
 
 static void eth_setup(void)
 {
     // TODO: use correct registers and setup process
+    sddf_dprintf("eth_setup entry!\n");
     eth = device_resources.regions[0].region.vaddr;
 
     /* Set up HW rings */
@@ -229,9 +235,9 @@ static void eth_setup(void)
     tx.capacity = TX_COUNT;
 
     /* Chapter 34: GEM Ethernet: programming steps */
-    /* Init controller */
+    /* 1: Init controller */
     eth->nwctrl = 0x0;
-    eth->nwctrl |= ZYNQ_GEM_NWCNTRL_CLEARSTAT;
+    eth->nwctrl |= ZYNQ_GEM_NWCTRL_CLEARSTAT;
     eth->rxsr = ZYNQ_GEM_RXSR_CLEAR;
     eth->txsr = ZYNQ_GEM_TXSR_CLEAR;
     eth->idr = ZYNQ_GEM_IDR_CLEAR;
@@ -241,27 +247,34 @@ static void eth_setup(void)
 
     // XXX: clear stat counters? clear phymntnc?
 
-    /* Controller config */
+    /* 2: Controller config */
     eth->nwcfg |= ZYNQ_GEM_NWCFG_INIT | ZYNQ_GEM_NWCFG_SPEED1000;
+    // XXX: SGMII enable? https://github.com/u-boot/u-boot/blob/master/drivers/net/zynq_gem.c#L503
     // XXX: clkrate setup??
     // XXX: MDC clk division??
     // XXX: set the MAC address? write to laddr?
+    /* DMA config */
+    eth->dmacr = ZYNQ_GEM_DMACR_INIT;
+    /* enable MDIO, transmitter, receiver */
+    eth->nwctrl = ZYNQ_GEM_NWCTRL_MDEN_MASK | ZYNQ_GEM_NWCTRL_TXEN_MASK | ZYNQ_GEM_NWCTRL_RXEN_MASK;
+
+    /* 3: I/O config */
+    // XXX: skip for now, might need to configure clocks
+
+    /* 4: PHY config */
+    // XXX: assumed set up by u-boot? no driver for now.
+
+    /* 5: Buffer descriptors config */
+
+    /* 6: Interrupt config */
 
 
-    /* I/O config */
-
-    /* PHY config */
-
-    /* Buffer descriptors config */
-
-    /* Interrupt config */
-
-
-    /* Controller enable */
+    /* 7: Controller enable */
 
     /* ?? Transmitting frames */
 
     /* ?? Receiving frames */
+    sddf_dprintf("eth_setup exit!\n");
 }
 
 void init(void)

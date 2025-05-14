@@ -22,8 +22,7 @@
         ],
         "irqs": [
             {
-                // XXX: find the right one
-                "dt_index": 2
+                "dt_index": 0
             }
         ]
     }

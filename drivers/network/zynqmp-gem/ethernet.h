@@ -115,7 +115,11 @@ typedef struct zynqmp_gem_regs {
 } zynqmp_gem_regs_t;
 
 /* nwcntrl: Network control register bitfields */
-#define ZYNQ_GEM_NWCNTRL_CLEARSTAT BIT(5)
+#define ZYNQ_GEM_NWCTRL_CLEARSTAT BIT(5)
+#define ZYNQ_GEM_NWCTRL_TXEN_MASK       0x00000008 /* Enable transmit */
+#define ZYNQ_GEM_NWCTRL_RXEN_MASK       0x00000004 /* Enable receive */
+#define ZYNQ_GEM_NWCTRL_MDEN_MASK       0x00000010 /* Enable MDIO port */
+#define ZYNQ_GEM_NWCTRL_STARTTX_MASK    0x00000200 /* Start tx (tx_go) */
 
 /* nwcfg: Network config register bitfields */
 #define ZYNQ_GEM_NWCFG_SPEED100     0x00000001 /* 100 Mbps operation */
@@ -129,6 +133,23 @@ typedef struct zynqmp_gem_regs {
 #define ZYNQ_GEM_NWCFG_INIT         (ZYNQ_GEM_DBUS_WIDTH | \
                                     ZYNQ_GEM_NWCFG_FDEN | \
                                     ZYNQ_GEM_NWCFG_FSREM)
+
+/* dmacr: DMA config register bitfields */
+// TODO: revisit sizes of the DMA regions
+#define ZYNQ_GEM_DMACR_BLENGTH      0x00000004 /* INCR4 AHB bursts */
+/* Use full configured addressable space (8 Kb) */
+#define ZYNQ_GEM_DMACR_RXSIZE       0x00000300
+/* Use full configured addressable space (4 Kb) */
+#define ZYNQ_GEM_DMACR_TXSIZE       0x00000400
+/* Set with binary 00011000 to use 1536 byte(1*max length frame/buffer) */
+#define ZYNQ_GEM_DMACR_RXBUF        0x00180000
+# define ZYNQ_GEM_DMA_BUS_WIDTH	    BIT(30) /* 64 bit bus */
+
+#define ZYNQ_GEM_DMACR_INIT         (ZYNQ_GEM_DMACR_BLENGTH | \
+                    ZYNQ_GEM_DMACR_RXSIZE | \
+                    ZYNQ_GEM_DMACR_TXSIZE | \
+                    ZYNQ_GEM_DMACR_RXBUF | \
+                    ZYNQ_GEM_DMA_BUS_WIDTH)
 
 
 /* rxsr/txsr: Receive/Transmit status register bitfields */
