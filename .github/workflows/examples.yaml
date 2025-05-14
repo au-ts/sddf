@@ -126,6 +126,10 @@ jobs:
         with:
           name: loader-images
           path: ci_build
+      - name: Setup machine queue SSH key
+        run: .github/workflows/setup_ssh_key.sh
+        env:
+          MACHINE_QUEUE_KEY: ${{ secrets.MACHINE_QUEUE_KEY }}
       - name: Run tests
         run: |
           export PATH="$(pwd)/machine_queue":$PATH
