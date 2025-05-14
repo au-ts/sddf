@@ -78,8 +78,7 @@ def build(args: argparse.Namespace, example_name: str, test_config: TestConfig):
     )
 
     if test_config.build_system == "make":
-        # build_make(args, example_name, test_config)
-        ...
+        build_make(args, example_name, test_config)
     elif test_config.build_system == "zig":
         build_zig(args, example_name, test_config)
     else:
