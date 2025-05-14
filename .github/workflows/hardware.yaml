@@ -13,7 +13,7 @@ on:
     - cron: "23 17 * * 0"
   pull_request_target:
     # run if the label is added
-    types: [labeled]
+    types: [synchronized, labeled]
 
 # TODO: hardware_bench
 # TODO: Test matrix
@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-24.04
     if: ${{ github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'hardware-test') }}
     concurrency:
-      group: ${{ github.workflow }}-sddf-hardware-tests-${{ github.event.number }}-${{ strategy.job-indedx }}
+      group: ${{ github.workflow }}-sddf-hardware-tests-${{ github.event.number }}-${{ strategy.job-index }}
       cancel-in-progress: true
     steps:
       - name: Checkout sDDF repository
