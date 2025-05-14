@@ -48,7 +48,7 @@ def build_zig(args: argparse.Namespace, example_name: str, test_config: TestConf
 
     zig_env = os.environ.copy()
     zig_env["ZIG_GLOBAL_CACHE_DIR"] = str(common.CI_BUILD_DIR / "zig-cache")
-    zig_env["ZIG_LOCAL_CACHE_DIR"] = str(build_dir / "zig-cache")
+    zig_env["ZIG_LOCAL_CACHE_DIR"] = str(common.CI_BUILD_DIR / "zig-cache")
 
     with contextlib.chdir(example_dir):
         subprocess.run(
