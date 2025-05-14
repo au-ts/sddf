@@ -190,7 +190,7 @@ def run_test_config(
             / test_config.board
             / test_config.config
             / test_config.build_system
-            / f"{datetime.now().strftime("%Y-%m-%d_%H.%M.%S")}.log"
+            / f"{datetime.now().strftime('%Y-%m-%d_%H.%M.%S')}.log"
         )
         log_file.parent.mkdir(parents=True, exist_ok=True)
         log_file_cm = log_output_to_file(log_file)
