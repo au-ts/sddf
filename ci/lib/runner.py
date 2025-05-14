@@ -133,7 +133,8 @@ def _subset_test_matrix(
                 (test_config.board in filters.boards),
                 (test_config.config in filters.configs),
                 (test_config.build_system in filters.build_systems),
-                (implies(filters.only_qemu, test_config.is_qemu())),
+                (implies(filters.only_qemu is True, test_config.is_qemu())),
+                (implies(filters.only_qemu is False, not test_config.is_qemu())),
             ]
         )
 
@@ -244,7 +245,9 @@ def cli(
         action=ArgparseActionList,
     )
     filters.add_argument(
-        "--only-qemu", action="store_true", help="select only QEMU tests"
+        "--only-qemu",
+        action=argparse.BooleanOptionalAction,
+        help="select only QEMU tests",
     )
 
     parser.add_argument(

@@ -103,6 +103,31 @@ jobs:
         env:
           PYTHON: ${{ github.workspace }}/venv/bin/python
 
+  qemu-tests:
+    runs-on: ubuntu-24.04
+    needs: build_linux_x86_64_nix
+    steps:
+      - name: Checkout sDDF repository
+        uses: actions/checkout@v4
+      - name: Install dependencies (via apt)
+        run: sudo apt-get install qemu-system-arm qemu-system-misc
+      - name: Download images
+        uses: actions/download-artifact@v4
+        with:
+          name: loader-images
+          path: ci_build
+      - name: Run tests
+        run: |
+          export PATH="$(pwd)/machine_queue":$PATH
+          ./ci/examples/serial.py --only-qemu
+      - name: Archive logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-logs-qemu
+          path: ci_logs
+          if-no-files-found: error
+
+
 # TODO: cronjob
   hardware-tests:
     runs-on: ubuntu-24.04
@@ -119,8 +144,6 @@ jobs:
         with:
           repository: seL4/machine_queue
           path: machine_queue
-      - name: Install dependencies (via apt)
-        run: sudo apt-get install qemu-system-arm qemu-system-misc
       - name: Download images
         uses: actions/download-artifact@v4
         with:
@@ -133,10 +156,10 @@ jobs:
       - name: Run tests
         run: |
           export PATH="$(pwd)/machine_queue":$PATH
-          ./ci/examples/serial.py --boards qemu_virt_aarch64
+          ./ci/examples/serial.py --boards star64 --no-only-qemu
       - name: Archive logs
         uses: actions/upload-artifact@v4
         with:
-          name: ci-logs
+          name: ci-logs-hardware
           path: ci_logs
           if-no-files-found: error
