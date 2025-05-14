@@ -75,7 +75,7 @@ class MachineQueueBackend(HardwareBackend):
 
             lock_infos.append(lock_info)
 
-        raise LockedBoardException("\n".join(lock_infos))
+        raise LockedBoardException(lock_infos)
 
     async def _acquire_lock(self):
         assert self.chosen_board is not None
@@ -98,7 +98,7 @@ class MachineQueueBackend(HardwareBackend):
             # Race condition, someone acquired the lock between our search and now.
             # This should be rare, so let's just handle this with lock retries later.
             lock_info = await self._lock_info(self.chosen_board)
-            raise LockedBoardException(lock_info)
+            raise LockedBoardException([lock_info])
 
         assert return_code == 0, "board should have locked successfully; unknown error."
 

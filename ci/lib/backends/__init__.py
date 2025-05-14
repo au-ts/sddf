@@ -18,22 +18,32 @@ from .base import HardwareBackend
 from .common import (
     LockedBoardException,
     TestFailureException,
+    TestRetryException,
     reset_terminal,
-    OUTPUT,
     log_output_to_file,
+    OUTPUT,
 )
 from .streams import send_input, wait_for_output, expect_output
 from .machine_queue import MachineQueueBackend
 from .qemu import QemuBackend
 from .tty import TtyBackend
 
-# fmt: off
 __all__ = (
+    # .base
     "HardwareBackend",
-    "LockedBoardException", "TestFailureException", "reset_terminal", "log_output_to_file", "OUTPUT",
-    "send_input", "wait_for_output", "expect_output",
+    # .common
+    "LockedBoardException",
+    "TestFailureException",
+    "TestRetryException",
+    "reset_terminal",
+    "log_output_to_file",
+    "OUTPUT",
+    # .streams
+    "send_input",
+    "wait_for_output",
+    "expect_output",
+    # backends
     "MachineQueueBackend",
     "QemuBackend",
     "TtyBackend",
 )
-# fmt: on

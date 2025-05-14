@@ -22,7 +22,7 @@ from typing import Literal
 
 from .backends import (
     HardwareBackend,
-    LockedBoardException,
+    TestRetryException,
     TestFailureException,
     reset_terminal,
     log_output_to_file,
@@ -31,12 +31,6 @@ from .backends import (
 
 # For Github Actions etc.
 IS_CI = bool(os.environ.get("CI"))
-
-TEST_TIMEOUT = 60 * 60  # 60 min
-LOCK_RETRY_COUNT = 3
-# this is between each run over the lock failure tests; not per test.
-# prefer increase the retry count over this
-LOCK_RETRY_DELAY = 60  # 1 min
 
 
 @dataclass(order=True, frozen=True)
@@ -174,7 +168,7 @@ def _log_test_end():
     print()
 
 
-ResultKind = Literal["pass", "fail", "not_run", "lock_failure", "interrupted"]
+ResultKind = Literal["pass", "fail", "not_run", "retry", "interrupted"]
 
 
 def run_test_config(
@@ -208,19 +202,19 @@ def run_test_config(
             asyncio.run(runner(test_fn, backend, test_config))
 
     except TestFailureException as e:
-        OUTPUT.write(f"Test failed: {e}")
+        OUTPUT.write(f"Test failed: {e}\n")
         return "fail"
     except TimeoutError as e:
-        OUTPUT.write("Test timed out")
+        OUTPUT.write("Test timed out\n")
         return "fail"
-    except LockedBoardException as e:
-        print(e)
-        return "lock_failure"
+    except TestRetryException as e:
+        OUTPUT.write(f"Retrying later due to transient failure: {e}\n")
+        return "retry"
     except KeyboardInterrupt:
-        OUTPUT.write("Tests cancelled (SIGINT)")
+        OUTPUT.write("Tests cancelled (SIGINT)\n")
         return "interrupted"
 
-    OUTPUT.write("Test passed")
+    OUTPUT.write("Test passed\n")
     return "pass"
 
 
@@ -278,7 +272,22 @@ def cli(
         type=Path,
         default=Path("ci_logs"),
         action=argparse.BooleanOptionalAction,
-        help="save output to a log directory"
+        help="save output to a log directory",
+    )
+    parser.add_argument(
+        "--retry-count",
+        type=int,
+        default=5,
+        help=(
+            "number of times to retry tests due to transient failures (e.g. lock failures). "
+            "prefer increasing this over the delay between retries"
+        ),
+    )
+    parser.add_argument(
+        "--retry-delay",
+        type=int,
+        default=60,
+        help="time (seconds) to delay between transient failure retries. this is between ALL tests, not individual ones.",
     )
 
     args = parser.parse_args()
@@ -313,8 +322,8 @@ def cli(
         assert loader_img.exists(), f"loader image file {loader_img} does not exist"
 
     test_results: dict[TestConfig, ResultKind] = {}
-    run_lock_retries = False
-    lock_failure_retry_queue: list[TestConfig] = []
+    do_retries = False
+    retry_queue: list[TestConfig] = []
 
     for test_config in matrix:
         _log_test_start(
@@ -328,24 +337,27 @@ def cli(
         test_results[test_config] = result
 
         if result == "interrupted" or (result != "pass" and args.fast_fail):
-            run_lock_retries = False
+            do_retries = False
             break
-        elif result == "lock_failure":
-            run_lock_retries = True
-            lock_failure_retry_queue.append(test_config)
+        elif result == "retry":
+            do_retries = True
+            retry_queue.append(test_config)
 
-    if run_lock_retries:
-        for retry in range(LOCK_RETRY_COUNT):
-            if len(lock_failure_retry_queue) == 0:
+    if do_retries:
+        for retry in range(args.retry_count):
+            if len(retry_queue) == 0:
                 break
 
             next_retry_queue: list[TestConfig] = []
             print(
-                f"Retrying (retry {retry + 1}/{LOCK_RETRY_COUNT}); waiting for {LOCK_RETRY_DELAY}s"
+                f"Retrying (retry {retry + 1}/{args.retry_count}); waiting for {args.retry_delay}s"
             )
-            time.sleep(LOCK_RETRY_DELAY)
+            try:
+                time.sleep(args.retry_delay)
+            except KeyboardInterrupt:
+                break
 
-            for test_config in lock_failure_retry_queue:
+            for test_config in retry_queue:
                 _log_test_start(
                     f"Retrying {test_name} on {test_config.board} ({test_config.config}, built with {test_config.build_system})"
                 )
@@ -361,20 +373,20 @@ def cli(
 
                 test_results[test_config] = result
 
-                if result == "lock_failure":
+                if result == "retry":
                     next_retry_queue.append(test_config)
 
-            lock_failure_retry_queue = next_retry_queue
+            retry_queue = next_retry_queue
 
-    passing, failing, lock_failures, not_run = [], [], [], []
+    passing, failing, retry_failures, not_run = [], [], [], []
     for test_config in matrix:
         result = test_results.get(test_config, "not_run")
         if result == "pass":
             passing.append(test_config)
         elif result == "fail" or result == "interrupted":
             failing.append(test_config)
-        elif result == "lock_failure":
-            lock_failures.append(test_config)
+        elif result == "retry":
+            retry_failures.append(test_config)
         elif result == "not_run":
             not_run.append(test_config)
         else:
@@ -387,9 +399,9 @@ def cli(
     if len(not_run) != 0:
         print("===== Cancelled (not run) =====")
         print(_list_test_cases(not_run))
-    if len(lock_failures) != 0:
-        print("===== Failed to acquire locks ====")
-        print(_list_test_cases(lock_failures))
+    if len(retry_failures) != 0:
+        print("===== Transient failures remaining after multiple retries ====")
+        print(_list_test_cases(retry_failures))
 
     if len(passing) != len(matrix):
         quit(1)

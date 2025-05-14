@@ -4,6 +4,7 @@
 
 
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 import sys
 from typing import BinaryIO
@@ -13,8 +14,21 @@ def reset_terminal():
     print("\n\x1b[0m", end="")
 
 
-class LockedBoardException(Exception):
-    """Board is locked and we were told not to poll."""
+class TestRetryException(Exception):
+    """Test needs to be retried"""
+
+
+@dataclass
+class LockedBoardException(TestRetryException):
+    """Board is locked or otherwise unavailable"""
+
+    lock_failures: list[str]
+
+    def __str__(self) -> str:
+        out = self.__class__.__name__
+        for failure in self.lock_failures:
+            out += f"\n - {failure}"
+        return out
 
 
 class TestFailureException(Exception):
