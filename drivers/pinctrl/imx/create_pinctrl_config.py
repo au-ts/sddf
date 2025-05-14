@@ -4,8 +4,12 @@
 import sys
 from devicetree import dtlib
 
-# From Linux's Documentation/devicetree/bindings/pinctrl/fsl,imx-pinctrl.txt
+# Document referenced:
+# [1] Linux: Documentation/devicetree/bindings/pinctrl/fsl,imx-pinctrl.txt
+# [2] Linux: Documentation/devicetree/bindings/pinctrl/fsl,imx8mm-pinctrl.yaml
+# [3] Linux: drivers/pinctrl/freescale/pinctrl-imx.c
 
+# [1]
 # Software Input On Field.
 # Force the selected mux mode input path no matter of MUX_MODE functionality.
 # By default the input path is determined by functionality of the selected
@@ -264,6 +268,7 @@ def get_pinctrl_info(pinctrl_device: dtlib.Node, target_pinctrl_config_phandles:
                 # We only support the normal configuration, not the SCU configuration.
                 assert len(pinctrl_config_node_data.value) % 6 == 0
 
+                # [2]
                 # At this stage, we have the array of values
                 # Since each device configuration comes in a set of six values, we'll loop through in sets of 6
                 for i in range(len(pinctrl_config_node_data.value) // (6 * UINT32_T_SIZE)):
@@ -274,6 +279,7 @@ def get_pinctrl_info(pinctrl_device: dtlib.Node, target_pinctrl_config_phandles:
                     input_val = get_value_from_bytes_array(pinctrl_config_node_data.value, 6*i+4)
                     pad_setting = get_value_from_bytes_array(pinctrl_config_node_data.value, 6*i+5)
 
+                    # [3]: checkout tag v6.1 at line 557 
                     # For pins that have SION bit set in "pad_setting", set it in "mux_val" and clear it from "pad_setting"
                     if pad_setting & PAD_SION:
                         mux_val |= MUX_SION
