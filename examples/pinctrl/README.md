@@ -19,3 +19,5 @@ The following platforms are supported:
 * maaxboard
 
 For further details on building and running this example, please see the serial example.
+
+For further details on the pinctrl driver, please see `drivers/pinctrl/README.md`
