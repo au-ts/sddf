@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 
 import argparse
-import logging
+import log
 import os
 from pathlib import Path
 import shutil
@@ -15,8 +15,6 @@ sys.path.insert(1, Path(__file__).parents[1].as_posix())
 
 from ci.lib.runner import ArgparseActionList, TestConfig, matrix_product
 from ci import common, matrix
-
-logger = logging.getLogger("CI")
 
 
 def get_example_dir(example_name: str):
@@ -68,7 +66,7 @@ def build_zig(args: argparse.Namespace, example_name: str, test_config: TestConf
 
 
 def build(args: argparse.Namespace, example_name: str, test_config: TestConfig):
-    logger.info(
+    log.info(
         "building example '%s' for '%s' with microkit config '%s' and '%s'"
         % (
             example_name,

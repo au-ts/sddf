@@ -10,6 +10,7 @@ sys.path.insert(1, Path(__file__).parents[2].as_posix())
 
 from ci.lib.backends import *
 from ci.lib.runner import TestConfig, cli, matrix_product
+from ci.lib import log
 from ci import common, matrix
 
 TEST_MATRIX = matrix_product(
@@ -41,7 +42,7 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
             )
             times.append(time)
 
-    print(f"Times: {times}")
+    log.info(f"Times: {times}")
 
     for i in range(1, len(times)):
         delta_ns = times[i] - times[i - 1]
@@ -50,7 +51,7 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
                 f"time delta between t{i} and t{i-1} of {delta_ns}ns exceeds {DRIFT_THRESHOLD:.0%} threshold"
             )
 
-    print(f"Deltas within {DRIFT_THRESHOLD:.0%} threshold")
+    log.info(f"Deltas within {DRIFT_THRESHOLD:.0%} threshold")
 
 
 if __name__ == "__main__":

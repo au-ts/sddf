@@ -20,7 +20,6 @@ LOCK_TIMEOUT = 60 * 60  # 60 minutes
 # For Github Actions etc.
 IS_CI = bool(os.environ.get("CI"))
 
-
 class MachineQueueBackend(HardwareBackend):
     def __init__(self, image_file: Path, boards: list[str]):
         """
@@ -103,7 +102,7 @@ class MachineQueueBackend(HardwareBackend):
         assert return_code == 0, "board should have locked successfully; unknown error."
 
         lock_info = await self._lock_info(self.chosen_board)
-        print("Acquired lock:", lock_info, file=sys.stderr)
+        log.info("Acquired lock:", lock_info, file=sys.stderr)
 
     async def _release_lock(self):
         assert self.chosen_board is not None
@@ -126,7 +125,7 @@ class MachineQueueBackend(HardwareBackend):
         assert return_code == 0, "couldn't unlock board for unknown reason"
 
         lock_info = await self._lock_info(self.chosen_board)
-        print("Released lock:", lock_info, file=sys.stderr)
+        log.info("Released lock:", lock_info, file=sys.stderr)
 
     async def start(self):
         assert self.process is None, "start() should only be called once"

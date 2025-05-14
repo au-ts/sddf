@@ -20,6 +20,7 @@ from pathlib import Path
 import time
 from typing import Literal, Optional
 
+from . import log
 from .backends import (
     HardwareBackend,
     TestRetryException,
@@ -31,7 +32,6 @@ from .backends import (
 
 # For Github Actions etc.
 IS_CI = bool(os.environ.get("CI"))
-
 
 @dataclass(order=True, frozen=True)
 class TestConfig:
@@ -158,14 +158,13 @@ def _log_test_start(name: str):
     if IS_CI:
         print(f"::group::{name}")
     else:
-        print(name)
+        log.info(name)
 
 
-def _log_test_end():
+def _log_test_end(name: str):
+    log.info(name)
     if IS_CI:
         print("::endgroup")
-
-    print()
 
 
 ResultKind = Literal["pass", "fail", "not_run", "retry", "interrupted"]
@@ -202,19 +201,19 @@ def run_test_config(
             asyncio.run(runner(test_fn, backend, test_config))
 
     except TestFailureException as e:
-        OUTPUT.write(f"Test failed: {e}\n")
+        log.error(f"Test failed: {e}")
         return "fail"
     except (TimeoutError, asyncio.TimeoutError) as e:
-        OUTPUT.write("Test timed out\n")
+        log.error("Test timed out")
         return "fail"
     except TestRetryException as e:
-        OUTPUT.write(f"Retrying later due to transient failure: {e}\n")
+        log.info(f"Retrying later due to transient failure: {e}")
         return "retry"
     except KeyboardInterrupt:
-        OUTPUT.write("Tests cancelled (SIGINT)\n")
+        log.info("Tests cancelled (SIGINT)")
         return "interrupted"
 
-    OUTPUT.write("Test passed\n")
+    log.info(f"Test passed")
     return "pass"
 
 
@@ -326,13 +325,12 @@ def cli(
     retry_queue: list[TestConfig] = []
 
     for test_config in matrix:
-        _log_test_start(
-            f"Running {test_name} on {test_config.board} ({test_config.config}, built with {test_config.build_system})"
-        )
+        fmt = f"{test_name} on {test_config.board} ({test_config.config}, built with {test_config.build_system})"
+        _log_test_start("Running " + fmt)
         result = run_test_config(
             test_name, test_config, test_fn, backend_fn, loader_img_fn, args.logs_dir
         )
-        _log_test_end()
+        _log_test_end("Finished running " + fmt)
 
         test_results[test_config] = result
 
