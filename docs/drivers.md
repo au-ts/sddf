@@ -46,9 +46,9 @@ and a list of Device Tree compatible strings it is known to work with.
 ## Pinctrl
 
 * i.MX8 IOMUXC
-    * `fsl,imx8mm-iomuxc`, `fsl,imx8mm-iomuxc-gpr`
-    * `fsl,imx8mp-iomuxc`, `fsl,imx8mp-iomuxc-gpr`
-    * `fsl,imx8mq-iomuxc`, `fsl,imx8mq-iomuxc-gpr`
+    * `fsl,imx8mm-iomuxc`
+    * `fsl,imx8mp-iomuxc`
+    * `fsl,imx8mq-iomuxc`
 
 ## Serial
 
