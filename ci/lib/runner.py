@@ -18,7 +18,7 @@ import itertools
 import os
 from pathlib import Path
 import time
-from typing import Literal
+from typing import Literal, Optional
 
 from .backends import (
     HardwareBackend,
@@ -177,7 +177,7 @@ def run_test_config(
     test_fn: Callable[[HardwareBackend, TestConfig], Awaitable[None]],
     backend_fn: Callable[[TestConfig, Path], HardwareBackend],
     loader_img_fn: Callable[[str, TestConfig], Path],
-    logs_dir: Path | None = None,
+    logs_dir: Optional[Path] = None,
 ) -> ResultKind:
 
     loader_img = loader_img_fn(test_name, test_config)

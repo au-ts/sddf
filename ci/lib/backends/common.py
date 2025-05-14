@@ -7,7 +7,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 import sys
-from typing import BinaryIO
+from typing import BinaryIO, Union
 
 
 def reset_terminal():
@@ -40,7 +40,7 @@ class _TeeOut:
         self.stdio = stdio
         self.fileio: BinaryIO | None = None
 
-    def write(self, s: bytes | bytearray | str):
+    def write(self, s: Union[bytes, bytearray, str]):
         if isinstance(s, str):
             s = s.encode()
 
