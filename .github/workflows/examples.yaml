@@ -100,3 +100,28 @@ jobs:
         shell: bash
         env:
           PYTHON: ${{ github.workspace }}/venv/bin/python
+
+  hardware-tests:
+    runs-on: ubuntu-24.04
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'hardware-test') }}
+    needs: build_linux_x86_64
+    concurrency:
+      group: ${{ github.workflow }}-sddf-hardware-tests-${{ github.event.number }}-${{ strategy.job-index }}
+      cancel-in-progress: true
+    steps:
+      - name: Checkout sDDF repository
+        uses: actions/checkout@v4
+      - name: Get machine queue
+        uses: actions/checkout@v4
+        with:
+          repository: seL4/machine_queue
+          path: machine_queue
+      - name: Download images
+        uses: actions/download-artifact@v4
+        with:
+          name: loader-images
+      - name: Run tests
+        run: |
+          ls -l
+          export PATH="$(pwd)/machine_queue":$PATH
+          ./ci/examples/serial.py --boards qemu_virt_aarch64
