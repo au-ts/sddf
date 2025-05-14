@@ -27,6 +27,7 @@ from .backends import (
     TestFailureException,
     reset_terminal,
     log_output_to_file,
+    OUTPUT,
 )
 
 # For Github Actions etc.
@@ -156,7 +157,7 @@ def _list_test_cases(matrix: list[TestConfig]):
 
 def _log_test_start(name: str):
     if IS_CI:
-        print(f"::group::{name}")
+        OUTPUT.write(f"::group::{name}")
     else:
         log.info(name)
 
@@ -164,7 +165,7 @@ def _log_test_start(name: str):
 def _log_test_end(name: str):
     log.info(name)
     if IS_CI:
-        print("::endgroup::")
+        OUTPUT.write("::endgroup::")
 
 
 ResultKind = Literal["pass", "fail", "not_run", "retry", "interrupted"]
