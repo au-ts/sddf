@@ -146,6 +146,7 @@ pub fn build(b: *std.Build) void {
     client_ds3231.linkLibrary(sddf_dep.artifact("util"));
     client_ds3231.linkLibrary(sddf_dep.artifact("util_putchar_debug"));
     client_ds3231.linkLibrary(ds3231_driver);
+    client_ds3231.linkLibrary(sddf_dep.artifact("libi2c"));
 
     // Here we compile libco. Right now this is the only example that uses libco and so
     // we just compile it here instead of in a separate build.zig

@@ -480,6 +480,7 @@ pub fn build(b: *std.Build) void {
     libi2c.addIncludePath(b.path("include/sddf"));
     libi2c.addIncludePath(b.path("include/microkit"));
     libi2c.addIncludePath(b.path("include/"));
+    libi2c.addIncludePath(b.path("libco/"));
     libi2c.addIncludePath(libmicrokit_include);
     libi2c.installHeadersDirectory(b.path("include"), "", .{});
     b.installArtifact(libi2c);
