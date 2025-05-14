@@ -279,7 +279,7 @@ def get_pinctrl_info(pinctrl_device: dtlib.Node, target_pinctrl_config_phandles:
                     input_val = get_value_from_bytes_array(pinctrl_config_node_data.value, 6*i+4)
                     pad_setting = get_value_from_bytes_array(pinctrl_config_node_data.value, 6*i+5)
 
-                    # [3]: checkout tag v6.1 at line 557 
+                    # [3]: checkout tag v6.1 at line 557
                     # For pins that have SION bit set in "pad_setting", set it in "mux_val" and clear it from "pad_setting"
                     if pad_setting & PAD_SION:
                         mux_val |= MUX_SION
