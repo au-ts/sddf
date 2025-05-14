@@ -58,7 +58,7 @@ jobs:
       - name: Setup Nix
         uses: cachix/install-nix-action@v27
       - name: Build and run examples
-        run: nix develop --ignore-environment -c bash -c './ci/build.py $MICROKIT_SDK $(nproc) --examples i2c'
+        run: nix develop --ignore-environment -c bash -c './ci/build.py $MICROKIT_SDK $(nproc) --examples serial'
         shell: bash
       - name: Archive image artifacts
         uses: actions/upload-artifact@v4
@@ -117,6 +117,8 @@ jobs:
         with:
           repository: seL4/machine_queue
           path: machine_queue
+      - name: Install dependencies (via apt)
+        run: sudo apt-get install qemu-system-arm qemu-system-misc
       - name: Download images
         uses: actions/download-artifact@v4
         with:
@@ -124,6 +126,5 @@ jobs:
           path: ci_build
       - name: Run tests
         run: |
-          sudo apt-get install qemu-system-arm qemu-system-misc
           export PATH="$(pwd)/machine_queue":$PATH
-          ./ci/examples/i2c.py --boards qemu_virt_aarch64
+          ./ci/examples/serial.py --boards qemu_virt_aarch64
