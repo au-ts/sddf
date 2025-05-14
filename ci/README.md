@@ -52,7 +52,7 @@ require actual hardware.
 The below instrucitons are only for those who have access to Trustworthy Systems'
 machine queue setup.
 
-After you've run the [build script](#builds) you can run everythign with images with 
+After you've run the [build script](#builds) you can run everythign with images with
 ```sh
 ./ci/examples/timer
 ```
