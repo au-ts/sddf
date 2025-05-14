@@ -155,6 +155,7 @@ jobs:
           MACHINE_QUEUE_KEY: ${{ secrets.MACHINE_QUEUE_KEY }}
       - name: Run tests
         run: |
+          ssh -v tftp.keg.cse.unsw.edu.au
           export PATH="$(pwd)/machine_queue":$PATH
           ./ci/examples/timer.py --boards maaxboard --no-only-qemu
       - name: Archive logs
