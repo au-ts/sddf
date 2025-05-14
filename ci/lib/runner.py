@@ -163,7 +163,7 @@ def _log_test_start(name: str):
 
 def _log_test_end():
     if IS_CI:
-        print(f"::endgroup::")
+        print("::endgroup")
 
     print()
 
