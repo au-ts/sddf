@@ -102,10 +102,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
 
     parser.add_argument("microkit_sdk")
-    parser.add_argument(
-        # len(os.sched_getaffinity(0)) matches behaviour of $(nproc)
-        "num_jobs", nargs="?", type=int, default=len(os.sched_getaffinity(0))
-    )
+    parser.add_argument("num_jobs", nargs="?", type=int, default=os.cpu_count())
     parser.add_argument(
         "--examples",
         default=set(matrix.EXAMPLES.keys()),
