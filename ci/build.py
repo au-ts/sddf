@@ -19,6 +19,17 @@ from ci import common, matrix
 logger = logging.getLogger("CI")
 
 
+# python 3.11 backport
+@contextlib.contextmanager
+def chdir(path):
+    old_cwd = os.getcwd()
+    os.chdir(path)
+    try:
+        yield
+    finally:
+        os.chdir(old_cwd)
+
+
 def get_example_dir(example_name: str):
     SDDF = Path(__file__).parents[1]
     return SDDF / "examples" / example_name
@@ -50,7 +61,7 @@ def build_zig(args: argparse.Namespace, example_name: str, test_config: TestConf
     zig_env["ZIG_GLOBAL_CACHE_DIR"] = str(common.CI_BUILD_DIR / "zig-cache")
     zig_env["ZIG_LOCAL_CACHE_DIR"] = str(build_dir / "zig-cache")
 
-    with contextlib.chdir(example_dir):
+    with chdir(example_dir):
         subprocess.run(
             [
                 "zig",
