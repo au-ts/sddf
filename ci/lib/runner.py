@@ -204,7 +204,7 @@ def run_test_config(
     except TestFailureException as e:
         OUTPUT.write(f"Test failed: {e}\n")
         return "fail"
-    except TimeoutError as e:
+    except (TimeoutError, asyncio.TimeoutError) as e:
         OUTPUT.write("Test timed out\n")
         return "fail"
     except TestRetryException as e:

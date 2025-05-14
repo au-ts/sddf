@@ -13,6 +13,9 @@ In broad strokes, requirements of these backends are:
 - Can kill tests.
 """
 
+# Setup asyncio.timeout, contextlib.chdir
+from . import polyfills
+
 # Re-Exports
 from .base import HardwareBackend
 from .common import (
