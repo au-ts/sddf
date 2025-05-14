@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: BSD-2-Clause
 
 import argparse
-import log
 import os
 from pathlib import Path
 import shutil
@@ -14,6 +13,7 @@ import contextlib
 sys.path.insert(1, Path(__file__).parents[1].as_posix())
 
 from ci.lib.runner import ArgparseActionList, TestConfig, matrix_product
+from ci.lib import log
 from ci import common, matrix
 
 
@@ -85,7 +85,6 @@ def build(args: argparse.Namespace, example_name: str, test_config: TestConfig):
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
     parser = argparse.ArgumentParser(description=__doc__)
 
     parser.add_argument("microkit_sdk")
