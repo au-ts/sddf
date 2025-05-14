@@ -24,7 +24,7 @@ This driver is needed in two cases:
 2. Some of your device drivers need to be able to dynamically configure the pinctrl characteristics at run-time. For example, to switch the SD Card into a higher speed state on the i.MX8 and Meson platforms, the pinctrl registers must be reprogrammed to handle the higher speed.
 
 # Data Structure
-This section describe how the pinctrl data is organised by the Python script for the C driver.
+This section describe how the pinctrl data is encoded in the DTS and how it get organised by the Python script for the C driver. This information is universal to all platforms.
 
 At the top level, we have an array of all the client devices that needs the pinmux. For each device, they have multiple pinctrl states they can select from. And finally for each state, there are multiple pins configuration data that is linked to that state.
 
@@ -87,3 +87,6 @@ The pinctrl driver will always set the `default` configuration on boot up. Suppo
 
 # Supported Platforms
 Please see [drivers.md](../../docs/drivers.md).
+
+# Platform specific details
+Please see the README.md inside the respective platform's pinctrl folder.
