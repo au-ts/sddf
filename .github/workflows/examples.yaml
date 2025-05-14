@@ -149,12 +149,6 @@ jobs:
         with:
           name: loader-images
           path: ci_build
-      - name: setup upterm session
-        uses: lhotari/action-upterm@v1
-        with:
-          limit-access-to-users: Ivan-Velickovic,midnightveil
-        env:
-          MACHINE_QUEUE_KEY: ${{ secrets.MACHINE_QUEUE_KEY }}
       - name: Setup machine queue SSH key
         run: .github/workflows/setup_ssh_key.sh
         env:
