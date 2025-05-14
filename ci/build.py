@@ -94,7 +94,7 @@ if __name__ == "__main__":
         default=set(matrix.EXAMPLES.keys()),
         action=ArgparseActionList,
     )
-    parser.add_argument("--no-clean", action="store_true")
+    parser.add_argument("--no-clean", action="store_true", help="Do not remove any pre-existing CI build directory before building")
 
     args = parser.parse_args()
 
