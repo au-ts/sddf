@@ -88,6 +88,11 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
         # Only works in debug mode so as to not depend on serial
         "configs": ["debug"],
         "build_systems": ["make", "zig"],
+        # TODO:
+        # "tests_exclude": [
+        #     { "config": "release "},
+        #     { "config", "debug", "build": "zig", board: "odroid"}
+        # ],
         "boards_build": [
             "imx8mq_evk",
             "imx8mp_evk",
