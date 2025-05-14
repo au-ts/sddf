@@ -29,7 +29,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
         "configs": ["debug", "release"],
         "build_systems": ["make", "zig"],
         "boards_build": ["odroidc4"],
-        "boards_test": ["odroidc2"],
+        "boards_test": ["odroidc4"],
     },
     "echo_server": {
         "configs": ["debug", "release", "benchmark"],
