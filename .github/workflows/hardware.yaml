@@ -1,0 +1,44 @@
+# Copyright 2025, UNSW
+#
+# SPDX-License-Identifier: BSD-2-Clause
+#
+# Run ci tests on hardware.
+# Somewhat inspired by seL4/ci-actions sel4test-hw workflow.
+
+name: Hardware Runs
+
+on:
+  schedule:
+    # weekly, at 17:23 UTC Sunday (i.e. 03:23 AEST Monday)
+    - cron: "23 17 * * 0"
+  pull_request_target:
+    # run if the label is added
+    types: [labeled]
+
+# TODO: hardware_bench
+# TODO: Test matrix
+
+jobs:
+  hardware-tests:
+    runs-on: ubuntu-24.04
+    if: ${{ github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'hardware-test') }}
+    concurrency:
+      group: ${{ github.workflow }}-sddf-hardware-tests-${{ github.event.number }}-${{ strategy.job-indedx }}
+      cancel-in-progress: true
+    steps:
+      - name: Checkout sDDF repository
+        uses: actions/checkout@v4
+      - name: Get machine queue
+        uses: actions/checkout@v4
+        with:
+          repository: seL4/machine_queue
+          path: machine_queue
+      - name: Download images
+        uses: actions/download-artifact@v4
+        with:
+          name: loader-images
+      - name: Run tests
+        run: |
+          ls -l
+          export PATH="$(pwd)/machine_queue":$PATH
+          ./ci/examples/serial.py --boards qemu_virt_aarch64
