@@ -71,6 +71,7 @@ def build_zig(args: argparse.Namespace, example_name: str, test_config: TestConf
                 f"-Dconfig={test_config.config}",
                 "-p",
                 build_dir,
+                f"-j{args.num_jobs}"
             ],
             check=True,
             env=zig_env,
