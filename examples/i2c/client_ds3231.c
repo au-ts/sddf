@@ -13,6 +13,7 @@
 #include <sddf/i2c/client.h>
 #include <sddf/i2c/config.h>
 #include <sddf/i2c/devices/ds3231/ds3231.h>
+#include <sddf/i2c/libi2c.h>
 
 // #define DEBUG_CLIENT
 
@@ -39,6 +40,7 @@ __attribute__((__section__(".timer_client_config"))) timer_client_config_t timer
 
 i2c_queue_handle_t queue;
 uintptr_t data_region;
+libi2c_conf_t libi2c_conf;
 
 cothread_t t_event;
 cothread_t t_main;
@@ -130,7 +132,7 @@ void init(void)
 
     assert(i2c_config_check_magic((void *)&i2c_config));
 
-    data_region = (uintptr_t)i2c_config.virt.data.vaddr;
+    data_region = (uintptr_t)i2c_config.data.vaddr;
     queue = i2c_queue_init(i2c_config.virt.req_queue.vaddr, i2c_config.virt.resp_queue.vaddr);
 
     bool claimed = i2c_bus_claim(i2c_config.virt.id, DS3231_I2C_BUS_ADDRESS);
@@ -139,6 +141,9 @@ void init(void)
         return;
     }
     LOG_CLIENT("claimed DS3231 bus!\n");
+
+    /* Initialise libi2c for DS3231 */
+    libi2c_init(&libi2c_conf, &queue);
 
     /* Define the event loop/notified thread as the active co-routine */
     t_event = co_active();

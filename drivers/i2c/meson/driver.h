@@ -12,7 +12,6 @@
 
 #pragma once
 
-#include <cstddef>
 #include <stdint.h>
 #include <stdbool.h>
 #include <sddf/util/printf.h>
@@ -38,7 +37,7 @@ typedef struct i2c_driver_data {
     /* Number of bytes received back from hardware, used to track when a read request is done*/
     uint8_t bytes_read;
     /* I2C bus address of the current request being handled */
-    size_t addr;
+    i2c_addr_t addr;
     /* Is this cmd pending a start, address, subaddress (preceding read) or stop token? */
     bool await_start, await_addr, await_stop;   // Flags for single-token ops
     uint8_t await_wrrd;     // Countdown of steps for the wrrd op. 0 = nothing to do.
@@ -61,7 +60,7 @@ typedef struct fsm {
 } fsm_data_t;
 
 // Each state implements a single state function which is called by the FSM.
-typedef i2c_state_t i2c_state_func_t(fsm_data_t *fsm, i2c_driver_data_t *data);
+typedef void i2c_state_func_t(fsm_data_t *fsm, i2c_driver_data_t *data);
 
 
 // Prototype for FSM function
@@ -83,7 +82,7 @@ static void i2c_reset_state(i2c_driver_data_t *s) {
     s->err = I2C_ERR_OK;
 }
 
-#define NUM_WRRD_STEPS 2
+#define NUM_WRRD_STEPS 3    // Address, subaddress, START
 
 #define DATA_DIRECTION_WRITE (0x0)
 #define DATA_DIRECTION_READ (0x1)

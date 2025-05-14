@@ -18,7 +18,7 @@ const targets = [_]Target{
         .zig_target = std.Target.Query{
             .cpu_arch = .aarch64,
             .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a55 },
-            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{ .strict_align }),
+            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{.strict_align}),
             .os_tag = .freestanding,
             .abi = .none,
         },
@@ -44,7 +44,7 @@ fn updateSectionObjcopy(b: *std.Build, section: []const u8, data_output: std.Bui
     });
     run_objcopy.addArg("--update-section");
     const data_full_path = data_output.join(b.allocator, data) catch @panic("OOM");
-    run_objcopy.addPrefixedFileArg(b.fmt("{s}=", .{ section }), data_full_path);
+    run_objcopy.addPrefixedFileArg(b.fmt("{s}=", .{section}), data_full_path);
     run_objcopy.addFileArg(.{ .cwd_relative = b.getInstallPath(.bin, elf) });
 
     // We need the ELFs we talk about to be in the install directory first.
@@ -107,7 +107,7 @@ pub fn build(b: *std.Build) void {
     // are dealing with.
     const timer_driver_install = b.addInstallArtifact(timer_driver, .{ .dest_sub_path = "timer_driver.elf" });
 
-    const pn532_driver = sddf_dep.artifact("driver_i2c_device_pn532");
+    // const pn532_driver = sddf_dep.artifact("driver_i2c_device_pn532");
     const ds3231_driver = sddf_dep.artifact("driver_i2c_device_ds3231");
 
     const i2c_driver = sddf_dep.artifact(b.fmt("driver_i2c_{s}.elf", .{i2c_driver_class}));
@@ -115,21 +115,21 @@ pub fn build(b: *std.Build) void {
     // are dealing with.
     const i2c_driver_install = b.addInstallArtifact(i2c_driver, .{ .dest_sub_path = "i2c_driver.elf" });
 
-    const client_pn532 = b.addExecutable(.{
-        .name = "client_pn532.elf",
-        .target = target,
-        .optimize = optimize,
-        .strip = false,
-    });
+    // const client_pn532 = b.addExecutable(.{
+    //     .name = "client_pn532.elf",
+    //     .target = target,
+    //     .optimize = optimize,
+    //     .strip = false,
+    // });
 
-    client_pn532.addCSourceFiles(.{
-        .files = &.{"client_pn532.c"},
-    });
-    client_pn532.addIncludePath(sddf_dep.path("include"));
-    client_pn532.addIncludePath(sddf_dep.path("include/microkit"));
-    client_pn532.linkLibrary(sddf_dep.artifact("util"));
-    client_pn532.linkLibrary(sddf_dep.artifact("util_putchar_debug"));
-    client_pn532.linkLibrary(pn532_driver);
+    // client_pn532.addCSourceFiles(.{
+    //     .files = &.{"client_pn532.c"},
+    // });
+    // client_pn532.addIncludePath(sddf_dep.path("include"));
+    // client_pn532.addIncludePath(sddf_dep.path("include/microkit"));
+    // client_pn532.linkLibrary(sddf_dep.artifact("util"));
+    // client_pn532.linkLibrary(sddf_dep.artifact("util_putchar_debug"));
+    // client_pn532.linkLibrary(pn532_driver);
 
     const client_ds3231 = b.addExecutable(.{
         .name = "client_ds3231.elf",
@@ -149,12 +149,12 @@ pub fn build(b: *std.Build) void {
 
     // Here we compile libco. Right now this is the only example that uses libco and so
     // we just compile it here instead of in a separate build.zig
-    client_pn532.addIncludePath(sddf_dep.path("libco"));
-    client_pn532.addCSourceFile(.{ .file = sddf_dep.path("libco/libco.c") });
-
-    client_pn532.addIncludePath(.{ .cwd_relative = libmicrokit_include });
-    client_pn532.addObjectFile(.{ .cwd_relative = libmicrokit });
-    client_pn532.setLinkerScript(.{ .cwd_relative = libmicrokit_linker_script });
+    // client_pn532.addIncludePath(sddf_dep.path("libco"));
+    // client_pn532.addCSourceFile(.{ .file = sddf_dep.path("libco/libco.c") });
+    //
+    // client_pn532.addIncludePath(.{ .cwd_relative = libmicrokit_include });
+    // client_pn532.addObjectFile(.{ .cwd_relative = libmicrokit });
+    // client_pn532.setLinkerScript(.{ .cwd_relative = libmicrokit_linker_script });
 
     client_ds3231.addIncludePath(sddf_dep.path("libco"));
     client_ds3231.addCSourceFile(.{ .file = sddf_dep.path("libco/libco.c") });
@@ -163,15 +163,13 @@ pub fn build(b: *std.Build) void {
     client_ds3231.addObjectFile(.{ .cwd_relative = libmicrokit });
     client_ds3231.setLinkerScript(.{ .cwd_relative = libmicrokit_linker_script });
 
-    b.installArtifact(client_pn532);
+    // b.installArtifact(client_pn532);
     b.installArtifact(client_ds3231);
     b.installArtifact(sddf_dep.artifact("i2c_virt.elf"));
 
     // For compiling the DTS into a DTB
-    const dts = sddf_dep.path(b.fmt("dts/{s}.dts", .{ microkit_board }));
-    const dtc_cmd = b.addSystemCommand(&[_][]const u8{
-        "dtc", "-q", "-I", "dts", "-O", "dtb"
-    });
+    const dts = sddf_dep.path(b.fmt("dts/{s}.dts", .{microkit_board}));
+    const dtc_cmd = b.addSystemCommand(&[_][]const u8{ "dtc", "-q", "-I", "dts", "-O", "dtb" });
     dtc_cmd.addFileInput(dts);
     dtc_cmd.addFileArg(dts);
     const dtb = dtc_cmd.captureStdOut();
@@ -206,29 +204,21 @@ pub fn build(b: *std.Build) void {
     const i2c_virt_objcopy = updateSectionObjcopy(b, ".i2c_virt_config", meta_output, "i2c_virt.data", "i2c_virt.elf");
     const client_ds3231_i2c_objcopy = updateSectionObjcopy(b, ".i2c_client_config", meta_output, "i2c_client_client_ds3231.data", "client_ds3231.elf");
     const client_ds3231_timer_objcopy = updateSectionObjcopy(b, ".timer_client_config", meta_output, "timer_client_client_ds3231.data", "client_ds3231.elf");
-    const client_pn532_i2c_objcopy = updateSectionObjcopy(b, ".i2c_client_config", meta_output, "i2c_client_client_pn532.data", "client_pn532.elf");
-    const client_pn532_timer_objcopy = updateSectionObjcopy(b, ".timer_client_config", meta_output, "timer_client_client_pn532.data", "client_pn532.elf");
+    // const client_pn532_i2c_objcopy = updateSectionObjcopy(b, ".i2c_client_config", meta_output, "i2c_client_client_pn532.data", "client_pn532.elf");
+    // const client_pn532_timer_objcopy = updateSectionObjcopy(b, ".timer_client_config", meta_output, "timer_client_client_pn532.data", "client_pn532.elf");
     const objcopys = &.{
         client_ds3231_i2c_objcopy,
         client_ds3231_timer_objcopy,
-        client_pn532_i2c_objcopy,
-        client_pn532_timer_objcopy,
+        // client_pn532_i2c_objcopy,
+        // client_pn532_timer_objcopy,
         i2c_virt_objcopy,
         i2c_driver_device_objcopy,
         i2c_driver_config_objcopy,
-        timer_driver_objcopy
+        timer_driver_objcopy,
     };
 
     const final_image_dest = b.getInstallPath(.bin, "./loader.img");
-    const microkit_tool_cmd = b.addSystemCommand(&[_][]const u8{
-        microkit_tool,
-        b.getInstallPath(.{ .custom = "meta_output" }, "i2c.system"),
-        "--search-path", b.getInstallPath(.bin, ""),
-        "--board", microkit_board,
-        "--config", microkit_config,
-        "-o", final_image_dest,
-        "-r", b.getInstallPath(.prefix, "./report.txt")
-    });
+    const microkit_tool_cmd = b.addSystemCommand(&[_][]const u8{ microkit_tool, b.getInstallPath(.{ .custom = "meta_output" }, "i2c.system"), "--search-path", b.getInstallPath(.bin, ""), "--board", microkit_board, "--config", microkit_config, "-o", final_image_dest, "-r", b.getInstallPath(.prefix, "./report.txt") });
     inline for (objcopys) |objcopy| {
         microkit_tool_cmd.step.dependOn(&objcopy.step);
     }

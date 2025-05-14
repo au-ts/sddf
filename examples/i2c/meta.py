@@ -12,6 +12,9 @@ ProtectionDomain = SystemDescription.ProtectionDomain
 MemoryRegion = SystemDescription.MemoryRegion
 Map = SystemDescription.Map
 
+DS3231 = False
+PN532 = True
+
 
 @dataclass
 class Board:
@@ -38,10 +41,12 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
         "timer_driver", "timer_driver.elf", priority=4)
     i2c_driver = ProtectionDomain("i2c_driver", "i2c_driver.elf", priority=3)
     i2c_virt = ProtectionDomain("i2c_virt", "i2c_virt.elf", priority=2)
-    client_pn532 = ProtectionDomain(
-        "client_pn532", "client_pn532.elf", priority=1)
-    client_ds3231 = ProtectionDomain(
-        "client_ds3231", "client_ds3231.elf", priority=1)
+    if PN532:
+        client_pn532 = ProtectionDomain(
+            "client_pn532", "client_pn532.elf", priority=1)
+    if DS3231:
+        client_ds3231 = ProtectionDomain(
+            "client_ds3231", "client_ds3231.elf", priority=1)
 
     # Right now we do not have separate clk and GPIO drivers and so our I2C driver does manual
     # clk/GPIO setup for I2C.
@@ -59,13 +64,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     assert timer_node is not None
 
     i2c_system = Sddf.I2c(sdf, i2c_node, i2c_driver, i2c_virt)
-    i2c_system.add_client(client_ds3231)
-    i2c_system.add_client(client_pn532)
-
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
-    timer_system.add_client(client_pn532)
-    timer_system.add_client(client_ds3231)
-
     pds = [
         timer_driver,
         i2c_driver,
@@ -73,6 +72,15 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
         client_pn532,
         client_ds3231,
     ]
+    if DS3231:
+        i2c_system.add_client(client_ds3231)
+        timer_system.add_client(client_ds3231)
+        pds.append(client_ds3231)
+    if PN532:
+        i2c_system.add_client(client_pn532)
+        timer_system.add_client(client_pn532)
+        pds.append(client_pn532)
+
     for pd in pds:
         sdf.add_pd(pd)
 
