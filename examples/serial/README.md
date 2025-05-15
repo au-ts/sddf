@@ -11,12 +11,12 @@ This is a serial subsystem example demonstrating two receive and transmit client
 ## Building
 
 The following platforms are supported:
-* odroidc2
-* odroidc4
 * imx8mm_evk
 * imx8mp_evk
 * imx8mq_evk
 * maaxboard
+* odroidc2
+* odroidc4
 * qemu_virt_aarch64
 * qemu_virt_riscv64
 * star64
