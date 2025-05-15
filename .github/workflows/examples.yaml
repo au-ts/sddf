@@ -60,7 +60,7 @@ jobs:
       - name: Get nix dependencies
         run: nix develop -c bash -c 'echo Hello World'
       - name: Build examples
-        run: nix develop --ignore-environment -c bash -c './ci/build.py $MICROKIT_SDK $(nproc) --examples timer'
+        run: nix develop --ignore-environment -c bash -c './ci/build.py $MICROKIT_SDK $(nproc)'
       - name: Archive image artifacts
         uses: actions/upload-artifact@v4
         with:
