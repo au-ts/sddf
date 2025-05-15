@@ -51,7 +51,7 @@ jobs:
 
   build_linux_x86_64_nix:
     name: Build (Linux x86-64 Nix)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -103,8 +103,9 @@ jobs:
         env:
           PYTHON: ${{ github.workspace }}/venv/bin/python
 
-  qemu-tests:
-    runs-on: ubuntu-24.04
+  run_qemu:
+    name: Run (QEMU)
+    runs-on: ubuntu-latest
     needs: build_linux_x86_64_nix
     steps:
       - name: Checkout sDDF repository
@@ -129,8 +130,9 @@ jobs:
 
 
 # TODO: cronjob
-  hardware-tests:
-    runs-on: ubuntu-24.04
+  run_hardware:
+    name: Run (hardware)
+    runs-on: ubuntu-latest
     if: ${{ contains(github.event.pull_request.labels.*.name, 'hardware-test') }}
     needs: build_linux_x86_64_nix
     concurrency:
