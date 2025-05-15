@@ -112,6 +112,23 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "star64",
         ],
     },
+    "timer": {
+        # Only works in debug mode so as to not depend on serial
+        "configs": ["debug", "release"],
+        "build_systems": ["make"],
+        "boards_build": [
+            "imx8mm_evk",
+            "imx8mq_evk",
+            "imx8mp_evk",
+            "maaxboard",
+        ],
+        "boards_test": [
+            "imx8mm_evk",
+            "imx8mq_evk",
+            "imx8mp_evk",
+            "maaxboard",
+        ],
+    },
 }
 
 if TYPE_CHECKING:
