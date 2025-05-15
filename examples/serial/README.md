@@ -91,33 +91,6 @@ If in debug mode, you should see the following output when doing so:
 VIRT_RX|LOG: switching to client 1
 ```
 
-### Running with virtIO console {#virtio_console}
-
-Currently, the qemu_virt_riscv64 platform uses the virtIO console device provided by
-QEMU for input/output in the example. This means that when you start the example, you
-only see debug output that goes to the default console:
-```sh
-'client0' is client 0
-'client1' is client 1
-```
-
-All the input/output instead happens via a tty device exposed by QEMU. When starting QEMU
-it will say what device virtIO console will be on, e.g:
-```
-char device redirected to /dev/ttys007 (label virtcon)
-```
-
-Instead of giving input to one of the clients via the stdio of QEMU, you will need to use a
-program such as `minicom`, `picocom` or `gtkterm` to interact with the serial device.
-
-For example:
-```sh
-picocom -b 115200 /dev/ttys007
-```
-
-Inputting characters should be visible, but debug output (i.e. from the virtualisers) will still be
-in the terminal where you started QEMU.
-
 ## Description
 
 The serial server example system contains two clients which are both able to transmit and receive
