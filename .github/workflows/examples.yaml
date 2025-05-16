@@ -127,6 +127,7 @@ jobs:
           ./ci/examples/blk.py --only-qemu
           ./ci/examples/echo_server.py --only-qemu
       - name: Archive logs
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ci-logs-qemu
@@ -165,6 +166,7 @@ jobs:
           export PATH="$(pwd)/machine_queue":$PATH
           ./ci/examples/timer.py --boards maaxboard --no-only-qemu
       - name: Archive logs
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ci-logs-hardware
