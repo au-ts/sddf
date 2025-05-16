@@ -60,7 +60,7 @@ jobs:
       - name: Get nix dependencies
         run: nix develop -c bash -c 'echo Hello World'
       - name: Build examples
-        run: nix develop --ignore-environment -c bash -c './ci/build.py $MICROKIT_SDK $(nproc) --examples blk'
+        run: nix develop --ignore-environment -c bash -c 'CI=1 ./ci/build.py $MICROKIT_SDK $(nproc)'
       - name: Archive image artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -123,6 +123,9 @@ jobs:
         run: |
           export PATH="$(pwd)/machine_queue":$PATH
           ./ci/examples/blk.py --only-qemu
+          ./ci/examples/echo_server.py --only-qemu
+          ./ci/examples/serial.py --only-qemu
+          ./ci/examples/timer.py --only-qemu
       - name: Archive logs
         if: always()
         uses: actions/upload-artifact@v4
