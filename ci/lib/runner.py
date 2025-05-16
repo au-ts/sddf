@@ -335,7 +335,7 @@ def cli(
                 break
 
             next_retry_queue: list[TestConfig] = []
-            print(
+            log.info(
                 f"Retrying (retry {retry + 1}/{args.retry_count}); waiting for {args.retry_delay}s"
             )
             try:

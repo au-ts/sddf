@@ -10,16 +10,16 @@ IS_CI = bool(os.environ.get("CI"))
 
 
 def info(s):
-    OUTPUT.write("CI|INFO: " + s + "\n")
+    print("CI|INFO: " + s)
 
 
 def error(s):
-    OUTPUT.write("CI|ERROR: " + s + "\n")
+    print("CI|ERROR: " + s)
 
 
 def group_start(s):
     if IS_CI:
-        OUTPUT.write(f"::group::{s}\n")
+        print(f"::group::{s}")
     else:
         info(s)
 
@@ -27,4 +27,4 @@ def group_start(s):
 def group_end(s):
     info(s)
     if IS_CI:
-        OUTPUT.write("::endgroup::\n")
+        print("::endgroup::")
