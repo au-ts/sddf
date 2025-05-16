@@ -17,16 +17,6 @@
 
 __attribute__((__section__(".blk_virt_config"))) blk_virt_config_t config;
 
-/* Uncomment this to enable debug logging */
-/* #define DEBUG_BLK_VIRT */
-
-#if defined(DEBUG_BLK_VIRT)
-#define LOG_BLK_VIRT(...) do{ sddf_dprintf("BLK_VIRT|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
-#else
-#define LOG_BLK_VIRT(...) do{}while(0)
-#endif
-#define LOG_BLK_VIRT_ERR(...) do{ sddf_dprintf("BLK_VIRT|ERROR: "); sddf_dprintf(__VA_ARGS__); }while(0)
-
 /* Driver queue handle */
 blk_queue_handle_t drv_h;
 /* Client queue handles */

@@ -100,6 +100,7 @@ static bool gpt_partitions_init()
         client_storage_info->capacity = clients[i].sectors / (BLK_TRANSFER_SIZE / MSDOS_MBR_SECTOR_SIZE);
         client_storage_info->read_only = driver_storage_info->read_only;
         __atomic_store_n(&client_storage_info->ready, true, __ATOMIC_RELEASE);
+        microkit_dbg_puts("SETUP STORAGE INFO\n");
     }
 
     return true;
