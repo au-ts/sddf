@@ -166,10 +166,10 @@ void handle_request()
             assert(virtio_block_number + virtio_count <= virtio_config->capacity);
 
             if (req_code == BLK_REQ_READ) {
-                LOG_DRIVER("handling read request with physical address 0x%lx, block_number: 0x%x, count: 0x%x, id: 0x%x\n",
+                LOG_DRIVER("handling read request with physical address 0x%lx, block_number: 0x%lx, count: 0x%x, id: 0x%x\n",
                            phys_addr, block_number, count, id);
             } else {
-                LOG_DRIVER("handling write request with physical address 0x%lx, block_number: 0x%x, count: 0x%x, id: 0x%x\n",
+                LOG_DRIVER("handling write request with physical address 0x%lx, block_number: 0x%lx, count: 0x%x, id: 0x%x\n",
                            phys_addr, block_number, count, id);
             }
 
