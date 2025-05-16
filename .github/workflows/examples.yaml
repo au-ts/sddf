@@ -130,6 +130,9 @@ jobs:
           name: ci-logs-qemu
           path: ci_logs
           if-no-files-found: error
+      - name: setup revers essh
+        if: always()
+        uses: mxschmitt/action-tmate@v3
 
 
 # TODO: cronjob
