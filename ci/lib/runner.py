@@ -30,9 +30,6 @@ from .backends import (
     OUTPUT,
 )
 
-# For Github Actions etc.
-IS_CI = bool(os.environ.get("CI"))
-
 
 @dataclass(order=True, frozen=True)
 class TestConfig:
