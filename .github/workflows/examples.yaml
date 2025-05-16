@@ -110,10 +110,8 @@ jobs:
     steps:
       - name: Checkout sDDF repository
         uses: actions/checkout@v4
-      - name: Setup Nix
-        uses: cachix/install-nix-action@v27
-      - name: Install QEMU
-        run: nix-env -iA nixpkgs.qemu
+      - name: Install dependencies (via apt)
+        run: sudo apt-get install qemu-system-arm qemu-system-misc
       - name: Download images
         uses: actions/download-artifact@v4
         with:
