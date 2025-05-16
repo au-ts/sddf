@@ -156,19 +156,6 @@ def _list_test_cases(matrix: list[TestConfig]):
     return "\n".join(lines)
 
 
-def _log_test_start(name: str):
-    if IS_CI:
-        OUTPUT.write(f"::group::{name}\n")
-    else:
-        log.info(name)
-
-
-def _log_test_end(name: str):
-    log.info(name)
-    if IS_CI:
-        OUTPUT.write("::endgroup::\n")
-
-
 ResultKind = Literal["pass", "fail", "not_run", "retry", "interrupted"]
 
 
@@ -330,11 +317,11 @@ def cli(
 
     for test_config in matrix:
         fmt = f"{test_name} on {test_config.board} ({test_config.config}, built with {test_config.build_system})"
-        _log_test_start("Running " + fmt)
+        log.group_start("Running " + fmt)
         result = run_test_config(
             test_name, test_config, test_fn, backend_fn, loader_img_fn, args.logs_dir
         )
-        _log_test_end("Finished running " + fmt)
+        log.group_end("Finished running " + fmt)
 
         test_results[test_config] = result
 
@@ -361,7 +348,7 @@ def cli(
 
             for test_config in retry_queue:
                 fmt = f"{test_name} on {test_config.board} ({test_config.config}, built with {test_config.build_system})"
-                _log_test_start("Running " + fmt)
+                log.group_start("Running " + fmt)
                 result = run_test_config(
                     test_name,
                     test_config,
@@ -370,7 +357,7 @@ def cli(
                     loader_img_fn,
                     args.logs_dir,
                 )
-                _log_test_end("Finished running " + fmt)
+                log.group_end("Finished running " + fmt)
 
                 test_results[test_config] = result
 

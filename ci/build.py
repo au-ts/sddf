@@ -66,7 +66,7 @@ def build_zig(args: argparse.Namespace, example_name: str, test_config: TestConf
 
 
 def build(args: argparse.Namespace, example_name: str, test_config: TestConfig):
-    log.info(
+    log.group_start(
         "building example '%s' for '%s' with microkit config '%s' and '%s'"
         % (
             example_name,
@@ -82,6 +82,8 @@ def build(args: argparse.Namespace, example_name: str, test_config: TestConfig):
         build_zig(args, example_name, test_config)
     else:
         raise NotImplementedError(f"unknown build system '{test_config.build_system}'")
+
+    log.group_end("build finished")
 
 
 if __name__ == "__main__":
