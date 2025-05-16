@@ -132,8 +132,10 @@ void init(void)
     LOG_CLIENT("starting\n");
 
     assert(blk_config_check_magic(&blk_config));
+    LOG_CLIENT("config check\n");
     blk_queue_init(&blk_queue, blk_config.virt.req_queue.vaddr, blk_config.virt.resp_queue.vaddr,
                    blk_config.virt.num_buffers);
+    LOG_CLIENT("queue init\n");
 
     /* Want to print out the storage info, so spin until the it is ready. */
     blk_storage_info_t *storage_info = blk_config.virt.storage_info.vaddr;
