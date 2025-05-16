@@ -8,13 +8,13 @@ from typing import TYPE_CHECKING, Literal, TypedDict
 # The ordering in these lists defines an implicit ordering of which boards
 # to use for CI preferentially, though all will eventually be tried.
 MACHINE_QUEUE_BOARDS: dict[str, list[str]] = {
-    "odroidc4": ["odroidc4_1", "odroidc4_2"],
     "imx8mm_evk": ["imx8mm"],
     # TODO: This is out of machine queue at the moment.
     "imx8mp_evk": [],  # ["iotgate1"],
     "imx8mq_evk": ["imx8mq", "imx8mq2"],
     "maaxboard": ["maaxboard1", "maaxboard2"],
     "odroidc2": ["odroidc2"],
+    "odroidc4": ["odroidc4_1", "odroidc4_2"],
     "star64": ["star64"],
 }
 
