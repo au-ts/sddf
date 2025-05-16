@@ -89,7 +89,7 @@ CFLAGS := -nostdlib \
 		  -I$(SDDF)/include/microkit \
 		  -I$(CONFIGS_INCLUDE)
 LDFLAGS := -L$(BOARD_DIR)/lib
-LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util.a --end-group
+LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
 
 ifeq ($(ARCH),aarch64)
 	CFLAGS += -mcpu=$(CPU) -target aarch64-none-elf
@@ -118,12 +118,12 @@ include ${SDDF}/util/util.mk
 include ${SDDF}/blk/components/blk_components.mk
 include ${SDDF}/serial/components/serial_components.mk
 
-${IMAGES}: libsddf_util.a
+${IMAGES}: libsddf_util_debug.a
 
 client.o: ${TOP}/client.c ${TOP}/basic_data.h
 	$(CC) -c $(CFLAGS) -I. $< -o client.o
 client.elf: client.o libsddf_util.a
-	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(DTB): $(DTS)
 	dtc -q -I dts -O dtb $(DTS) > $(DTB)

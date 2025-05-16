@@ -68,7 +68,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
     serial_system = Sddf.Serial(sdf, serial_node, serial_driver, serial_virt_tx, enable_color=False)
 
-    blk_driver = ProtectionDomain("blk_driver", "blk_driver.elf", priority=200)
+    blk_driver = ProtectionDomain("blk_driver", "blk_driver.elf", priority=200, stack_size=0x2000)
     blk_virt = ProtectionDomain("blk_virt", "blk_virt.elf", priority=199, stack_size=0x2000)
     client = ProtectionDomain("client", "client.elf", priority=1)
 
