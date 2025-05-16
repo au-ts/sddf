@@ -215,6 +215,8 @@ static bool gpt_validate_partitions()
             }
 
             gpt_state.mirror_partition_table_ready = true;
+        } else {
+            LOG_BLK_VIRT_ERR("no matching gpt_resp_id\n");
         }
     }
 
