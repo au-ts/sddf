@@ -9,7 +9,6 @@ from pathlib import Path
 import sys
 import tempfile
 
-
 sys.path.insert(1, Path(__file__).parents[2].as_posix())
 
 from ci.lib.backends import *
@@ -22,6 +21,9 @@ TEST_MATRIX = matrix_product(
     build_system=matrix.EXAMPLES["blk"]["build_systems"],
 )
 
+SDDF = Path(__file__).parents[2]
+mkvirtdisk = (SDDF / "tools" / "mkvirtdisk").resolve()
+
 
 def backend_fn(
     disks_dir: str, test_config: TestConfig, loader_img: Path
@@ -32,7 +34,7 @@ def backend_fn(
         (_, disk_path) = tempfile.mkstemp(dir=disks_dir)
 
         subprocess.run(
-            ["./tools/mkvirtdisk", disk_path, "1", "512", "16777216", "MBR"],
+            [mkvirtdisk, disk_path, "1", "512", "16777216", "MBR"],
             check=True,
             capture_output=True,
         )
@@ -41,7 +43,7 @@ def backend_fn(
         backend.invocation_args.extend([
             "-global", "virtio-mmio.force-legacy=false",
             "-drive", "file={},if=none,format=raw,id=hd".format(disk_path),
-            "-device", "virtio-blk-device,drive=hd"
+            "-device", "virtio-blk-device,drive=hd",
         ])
         # fmt: on
 
