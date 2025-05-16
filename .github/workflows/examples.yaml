@@ -167,7 +167,10 @@ jobs:
       - name: Run tests
         run: |
           export PATH="$(pwd)/machine_queue":$PATH
-          ./ci/examples/timer.py --boards maaxboard --no-only-qemu
+          ./ci/examples/timer.py --no-only-qemu
+          ./ci/examples/serial.py --no-only-qemu
+          ./ci/examples/blk.py --no-only-qemu
+          ./ci/examples/echo_server.py --no-only-qemu
       - name: Archive logs
         if: always()
         uses: actions/upload-artifact@v4
