@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
 # Include this snippet in your project Makefile to build
-#    the PL011 UART driver
+# the PL011 UART driver
 
 SERIAL_DRIVER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 
