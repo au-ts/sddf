@@ -51,6 +51,7 @@ def backend_fn(
 async def test(backend: HardwareBackend, test_config: TestConfig):
     async with asyncio.timeout(10):
         await wait_for_output(backend, b"CLIENT|INFO: starting\r\n")
+    async with asyncio.timeout(10):
         await wait_for_output(backend, b"device config ready\r\n")
         await wait_for_output(backend, b"basic: STATE_CHECK_READ state\r\n")
         await wait_for_output(
