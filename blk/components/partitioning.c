@@ -100,6 +100,7 @@ static bool gpt_partitions_init()
         client_storage_info->capacity = clients[i].sectors / (BLK_TRANSFER_SIZE / MSDOS_MBR_SECTOR_SIZE);
         client_storage_info->read_only = driver_storage_info->read_only;
         __atomic_store_n(&client_storage_info->ready, true, __ATOMIC_RELEASE);
+        microkit_dbg_puts("SETUP STORAGE INFO\n");
     }
 
     return true;
@@ -214,6 +215,8 @@ static bool gpt_validate_partitions()
             }
 
             gpt_state.mirror_partition_table_ready = true;
+        } else {
+            LOG_BLK_VIRT_ERR("no matching gpt_resp_id\n");
         }
     }
 
@@ -400,23 +403,30 @@ blk_resp_status_t get_drv_block_number(uint64_t cli_block_number, uint16_t cli_c
 bool virt_partition_init(void)
 {
     if (!mbr_state.sent_request) {
+        LOG_BLK_VIRT("sending MBR request\n");
         mbr_request();
         return false;
     }
 
+    LOG_BLK_VIRT("MBR request already sent\n");
     bool success = false;
 
     if (gpt_state.sent_request) {
+        LOG_BLK_VIRT("GPT request already sent\n");
         /* need to validate partition header and table of a GPT disk */
         success = gpt_validate_partitions();
         if (success) {
+            LOG_BLK_VIRT("GPT partitions validated\n");
             success = gpt_partitions_init();
+            LOG_BLK_VIRT("GPT partitions initialised\n");
         }
         return success;
     }
 
     success = mbr_handle_response();
+    LOG_BLK_VIRT("MBR handle response called\n");
     if (success) {
+        LOG_BLK_VIRT("MBR partitions init\n");
         success = mbr_partitions_init();
     }
 

@@ -16,7 +16,9 @@ ifeq ($(strip $(TOOLCHAIN)),)
 endif
 
 ifeq (${MICROKIT_BOARD},odroidc4)
-	PLATFORM := meson
+	I2C_DRIVER_DIR := meson
+	TIMER_DRIVER_DIR := meson
+	SERIAL_DRIVER_DIR := meson
 	CPU := cortex-a55
 else
 $(error Unsupported MICROKIT_BOARD)
@@ -39,12 +41,14 @@ UTIL := $(SDDF)/util
 LIBCO := $(SDDF)/libco
 TOP := ${SDDF}/examples/i2c
 I2C := $(SDDF)/i2c
-I2C_DRIVER := $(SDDF)/drivers/i2c/${PLATFORM}
-TIMER_DRIVER := $(SDDF)/drivers/timer/${PLATFORM}
+SERIAL := $(SDDF)/serial
+I2C_DRIVER := $(SDDF)/drivers/i2c/${I2C_DRIVER_DIR}
+TIMER_DRIVER := $(SDDF)/drivers/timer/${TIMER_DRIVER_DIR}
+SERIAL_DRIVER := $(SDDF)/drivers/serial/${SERIAL_DRIVER_DIR}
 PN532_DRIVER := $(SDDF)/i2c/devices/pn532
 DS3231_DRIVER := $(SDDF)/i2c/devices/ds3231
 
-IMAGES := i2c_virt.elf i2c_driver.elf client_pn532.elf client_ds3231.elf timer_driver.elf
+IMAGES := i2c_virt.elf i2c_driver.elf client_pn532.elf client_ds3231.elf timer_driver.elf serial_driver.elf serial_virt_tx.elf
 CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall -Wno-unused-function -I${TOP}
 LDFLAGS := -L$(BOARD_DIR)/lib
 LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
@@ -64,8 +68,6 @@ CFLAGS += -I$(BOARD_DIR)/include \
 	-MD \
 	-MP
 
-COMMONFILES=libsddf_util_debug.a
-
 CLIENT_PN532_OBJS :=  pn532.o client_pn532.o
 DEPS_PN532 := $(CLIENT_PN532_OBJS:.o=.d)
 
@@ -75,10 +77,10 @@ DEPS_DS3231 := $(CLIENT_DS3231_OBJS:.o=.d)
 VPATH:=${TOP}
 all: $(IMAGE_FILE)
 
-client_pn532.elf: $(CLIENT_PN532_OBJS) libco.a
+client_pn532.elf: $(CLIENT_PN532_OBJS) libco.a libsddf_util.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-client_ds3231.elf: $(CLIENT_DS3231_OBJS) libco.a
+client_ds3231.elf: $(CLIENT_DS3231_OBJS) libco.a libsddf_util.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(DTB): $(DTS)
@@ -94,11 +96,16 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(OBJCOPY) --update-section .timer_client_config=timer_client_client_ds3231.data client_ds3231.elf
 	$(OBJCOPY) --update-section .i2c_client_config=i2c_client_client_pn532.data client_pn532.elf
 	$(OBJCOPY) --update-section .timer_client_config=timer_client_client_pn532.data client_pn532.elf
+	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
+	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data serial_driver.elf
+	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx.data serial_virt_tx.elf
+	$(OBJCOPY) --update-section .serial_client_config=serial_client_client_pn532.data client_pn532.elf
+	$(OBJCOPY) --update-section .serial_client_config=serial_client_client_ds3231.data client_ds3231.elf
 
 $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
 
-${IMAGES}: ${COMMONFILES}
+${IMAGES}: libsddf_util_debug.a
 .PHONY: all compile clean
 
 clean::
@@ -110,6 +117,8 @@ clobber:: clean
 
 include ${SDDF}/util/util.mk
 include ${I2C}/components/i2c_virt.mk
+include ${SERIAL}/components/serial_components.mk
+include ${SERIAL_DRIVER}/serial_driver.mk
 include ${TIMER_DRIVER}/timer_driver.mk
 include ${LIBCO}/libco.mk
 include ${I2C_DRIVER}/i2c_driver.mk

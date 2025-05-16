@@ -6,6 +6,8 @@
 #include <microkit.h>
 #include <libco.h>
 #include <sddf/util/printf.h>
+#include <sddf/serial/queue.h>
+#include <sddf/serial/config.h>
 #include <sddf/timer/client.h>
 #include <sddf/timer/config.h>
 #include <sddf/i2c/queue.h>
@@ -18,11 +20,11 @@ bool delay_ms(size_t milliseconds);
 // #define DEBUG_CLIENT
 
 #ifdef DEBUG_CLIENT
-#define LOG_CLIENT(...) do{ sddf_dprintf("CLIENT|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
+#define LOG_CLIENT(...) do{ sddf_printf("PN532|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
 #else
 #define LOG_CLIENT(...) do{}while(0)
 #endif
-#define LOG_CLIENT_ERR(...) do{ sddf_printf("CLIENT|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
+#define LOG_CLIENT_ERR(...) do{ sddf_printf("PN532|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
 #define PN_532_ON
 
@@ -33,8 +35,10 @@ bool delay_ms(size_t milliseconds);
 #endif
 
 __attribute__((__section__(".i2c_client_config"))) i2c_client_config_t i2c_config;
-
 __attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
+__attribute__((__section__(".serial_client_config"))) serial_client_config_t serial_config;
+
+static serial_queue_handle_t serial_tx_queue_handle;
 
 i2c_queue_handle_t queue;
 uintptr_t data_region;
@@ -199,7 +203,12 @@ bool delay_ms(size_t milliseconds)
 
 void init(void)
 {
-    LOG_CLIENT("init\n");
+    assert(serial_config_check_magic(&serial_config));
+    serial_queue_init(&serial_tx_queue_handle, serial_config.tx.queue.vaddr, serial_config.tx.data.size,
+                      serial_config.tx.data.vaddr);
+    serial_putchar_init(serial_config.tx.id, &serial_tx_queue_handle);
+
+    sddf_printf("PN532|INFO: init\n");
 
     assert(i2c_config_check_magic((void *)&i2c_config));
 
@@ -225,6 +234,8 @@ void notified(microkit_channel ch)
 {
     if (ch == i2c_config.virt.id || ch == timer_config.driver_id) {
         co_switch(t_main);
+    } else if (ch == serial_config.tx.id) {
+        // Nothing to do
     } else {
         LOG_CLIENT_ERR("Unknown channel 0x%x!\n", ch);
     }
