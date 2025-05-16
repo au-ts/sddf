@@ -6,6 +6,7 @@ import asyncio
 import inspect
 from functools import wraps
 
+from .. import log
 from .base import HardwareBackend
 from .common import OUTPUT, reset_terminal, TestFailureException
 
@@ -18,7 +19,7 @@ def _print_text_on_timeout(f):
             return await f(*args, **kwargs)
         except asyncio.CancelledError:
             reset_terminal()
-            print(
+            log.info(
                 "'{}' was cancelled/timed out whilst waiting for {}".format(
                     f.__name__, text
                 )

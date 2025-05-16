@@ -11,6 +11,7 @@ sys.path.insert(1, Path(__file__).parents[2].as_posix())
 
 from ci.lib.backends import *
 from ci.lib.runner import TestConfig, cli, matrix_product
+from ci.lib import log
 from ci import common, matrix
 
 TEST_MATRIX = matrix_product(
@@ -59,7 +60,7 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
             )
 
         reset_terminal()
-        print(f"client IPs: client1={ip1}, client0={ip0}")
+        log.info(f"client IPs: client1={ip1}, client0={ip0}")
 
 
 if __name__ == "__main__":

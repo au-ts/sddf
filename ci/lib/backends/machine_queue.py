@@ -25,7 +25,7 @@ IS_CI = bool(os.environ.get("CI"))
 class MachineQueueBackend(HardwareBackend):
     def __init__(self, image_file: Path, boards: list[str]):
         """
-        board should be given with underscores, e.g. odroidc4_1
+        boards is the list of valid boards used with mq.sh
         """
         self.image_file = image_file
         self.boards = boards
