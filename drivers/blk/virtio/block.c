@@ -255,8 +255,8 @@ void handle_irq(void)
 {
     uint32_t irq_status = regs->InterruptStatus;
     if (irq_status & VIRTIO_MMIO_IRQ_VQUEUE) {
-        handle_response();
         regs->InterruptACK = VIRTIO_MMIO_IRQ_VQUEUE;
+        handle_response();
     }
 
     if (irq_status & VIRTIO_MMIO_IRQ_CONFIG) {

@@ -784,8 +784,9 @@ static void handle_irq()
     uint32_t irq_status = regs->InterruptStatus;
     if (irq_status & VIRTIO_MMIO_IRQ_VQUEUE) {
         LOG_GPU_VIRTIO_DRIVER("Received virtqueue used buffer notification\n");
-        notify = handle_response();
+        // ACK before handling responses
         regs->InterruptACK = VIRTIO_MMIO_IRQ_VQUEUE;
+        notify = handle_response();
         /* Now that there are (maybe) some free descriptors, we want to handle any remaining
          * requests that we may have left in the queue before due to being
          * out of free descriptors.
