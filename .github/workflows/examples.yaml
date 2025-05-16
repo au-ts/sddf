@@ -111,7 +111,9 @@ jobs:
       - name: Checkout sDDF repository
         uses: actions/checkout@v4
       - name: Install dependencies (via apt)
-        run: sudo apt-get install qemu-system-arm qemu-system-misc
+        run: |
+          sudo rm /var/lib/man-db/auto-update # speedup
+          sudo apt-get install qemu-system-arm qemu-system-misc
       - name: Download images
         uses: actions/download-artifact@v4
         with:
