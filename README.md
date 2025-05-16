@@ -46,7 +46,7 @@ machine:
 On apt based Linux distributions run the following commands:
 
 ```sh
-sudo apt install make llvm lld device-tree-compiler python3 python3-pip
+sudo apt install make clang llvm lld device-tree-compiler python3 python3-pip
 pip3 install sdfgen==0.24.0
 ```
 
