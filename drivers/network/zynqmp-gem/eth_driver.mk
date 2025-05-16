@@ -17,8 +17,8 @@ ${CHECK_NETDRV_FLAGS_MD5}:
 	-rm -f .netdrv_cflags-*
 	touch $@
 
-eth_driver.elf: network/zynqmp-gem/ethernet.o
-	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
+eth_driver.elf: network/zynqmp-gem/ethernet.o libsddf_util.a
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 network/zynqmp-gem/ethernet.o: ${ETHERNET_DRIVER_DIR}/ethernet.c ${CHECK_NETDRV_FLAGS_MD5}
 	mkdir -p network/zynqmp-gem

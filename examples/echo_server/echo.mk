@@ -86,6 +86,11 @@ else ifeq ($(strip $(MICROKIT_BOARD)), star64)
 	export DRIV_DIR := dwmac-5.10a
 	export SERIAL_DRIV_DIR := ns16550a
 	export TIMER_DRV_DIR := jh7110
+else ifeq ($(strip $(MICROKIT_BOARD)), zcu102)
+	export DRIV_DIR := zynqmp-gem
+	export SERIAL_DRIV_DIR := zynqmp
+	export TIMER_DRV_DIR := cdns
+	export CPU := cortex-a53
 else
 $(error Unsupported MICROKIT_BOARD given)
 endif
@@ -187,6 +192,7 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx.data serial_virt_tx.elf
 	$(OBJCOPY) --update-section .device_resources=ethernet_driver_device_resources.data eth_driver.elf
 	$(OBJCOPY) --update-section .net_driver_config=net_driver.data eth_driver.elf
+	$(OBJCOPY) --update-section .serial_client_config=serial_client_ethernet_driver.data eth_driver.elf
 	$(OBJCOPY) --update-section .net_virt_rx_config=net_virt_rx.data network_virt_rx.elf
 	$(OBJCOPY) --update-section .net_virt_tx_config=net_virt_tx.data network_virt_tx.elf
 	$(OBJCOPY) --update-section .net_copy_config=net_copy_client0_net_copier.data network_copy.elf network_copy0.elf

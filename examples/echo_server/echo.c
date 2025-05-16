@@ -123,6 +123,10 @@ void init(void)
     serial_queue_init(&serial_tx_queue_handle, serial_config.tx.queue.vaddr, serial_config.tx.data.size,
                       serial_config.tx.data.vaddr);
     serial_putchar_init(serial_config.tx.id, &serial_tx_queue_handle);
+    sddf_printf("client hello\n");
+    sddf_printf("client hello 2\n");
+    sddf_printf("client hello 3\n");
+    sddf_printf("client hello 4\n");
 
     net_queue_init(&net_rx_handle, net_config.rx.free_queue.vaddr, net_config.rx.active_queue.vaddr,
                    net_config.rx.num_buffers);

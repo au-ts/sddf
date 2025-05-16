@@ -8,7 +8,7 @@
             {
                 "name": "regs",
                 "perms": "rw",
-                "size": 65536,
+                "size": 4096,
                 "dt_index": 0
             },
             {

@@ -104,7 +104,7 @@ BOARDS: List[Board] = [
         arch=SystemDescription.Arch.AARCH64,
         paddr_top=0xa0000000,
         # TODO: add serial driver, update .mk and Makefile + zig file
-        serial="",
+        serial="axi/serial@ff000000",
         timer="axi/timer@ff140000",
         ethernet="axi/ethernet@ff0e0000"
     ),
@@ -186,11 +186,11 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     timer_node = dtb.node(board.timer)
     assert timer_node is not None
 
-    timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=101)
+    timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=104)
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
 
-    uart_driver = ProtectionDomain("serial_driver", "serial_driver.elf", priority=100)
-    serial_virt_tx = ProtectionDomain("serial_virt_tx", "serial_virt_tx.elf", priority=99)
+    uart_driver = ProtectionDomain("serial_driver", "serial_driver.elf", priority=103)
+    serial_virt_tx = ProtectionDomain("serial_virt_tx", "serial_virt_tx.elf", priority=102)
     serial_system = Sddf.Serial(sdf, uart_node, uart_driver, serial_virt_tx)
 
     ethernet_driver = ProtectionDomain(
@@ -233,6 +233,9 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     bench = ProtectionDomain("bench", "benchmark.elf", priority=254)
 
     serial_system.add_client(bench)
+    if board.name == "zcu102":
+        print ("DEBUG XXXXXXXXXXXXXXXX: zcu102!!")
+        serial_system.add_client(ethernet_driver)
 
     benchmark_pds = [
         uart_driver,

@@ -12,12 +12,17 @@
 #include <sddf/util/util.h>
 #include <sddf/util/fence.h>
 #include <sddf/util/printf.h>
+#include <sddf/serial/queue.h>
+#include <sddf/serial/config.h>
 
 #include "ethernet.h"
 
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
 __attribute__((__section__(".net_driver_config"))) net_driver_config_t config;
+
+// TODO :remove
+__attribute__((__section__(".serial_client_config"))) serial_client_config_t serial_config;
 
 /* HW ring capacity must be a power of 2 */
 #define RX_COUNT 256
@@ -76,7 +81,7 @@ static void update_ring_slot(hw_ring_t *ring, unsigned int idx, uintptr_t phys,
 static void rx_provide(void)
 {
     // TODO: use correct registers for gem device
-    sddf_dprintf("rx_provide entry\n");
+    sddf_printf("rx_provide entry\n");
     //bool reprocess = true;
     //while (reprocess) {
     //    while (!hw_ring_full(&rx) && !net_queue_empty_free(&rx_queue)) {
@@ -112,7 +117,7 @@ static void rx_provide(void)
 static void rx_return(void)
 {
     // TODO: check if any updates needed
-    sddf_dprintf("rx_return entry\n");
+    sddf_printf("rx_return entry\n");
     //bool packets_transferred = false;
     //while (!hw_ring_empty(&rx)) {
     //    /* If buffer slot is still empty, we have processed all packets the device has filled */
@@ -141,7 +146,7 @@ static void rx_return(void)
 static void tx_provide(void)
 {
     // TODO: use correct registers for gem device
-    sddf_dprintf("tx_provide entry\n");
+    sddf_printf("tx_provide entry\n");
     //bool reprocess = true;
     //while (reprocess) {
     //    while (!(hw_ring_full(&tx)) && !net_queue_empty_active(&tx_queue)) {
@@ -172,7 +177,7 @@ static void tx_provide(void)
 static void tx_return(void)
 {
     // TODO: check if any updates needed
-    sddf_dprintf("tx_return entry\n");
+    sddf_printf("tx_return entry\n");
     //bool enqueued = false;
     //while (!hw_ring_empty(&tx)) {
     //    /* Ensure that this buffer has been sent by the device */
@@ -201,7 +206,7 @@ static void tx_return(void)
 static void handle_irq(void)
 {
     // TODO: update to use correct registers and flags
-    sdddf_dprintf("handle_irq entry\n");
+    sddf_printf("handle_irq entry\n");
     //uint32_t e = eth->eir & IRQ_MASK;
     //eth->eir = e;
 
@@ -225,7 +230,7 @@ static void handle_irq(void)
 static void eth_setup(void)
 {
     // TODO: use correct registers and setup process
-    sddf_dprintf("eth_setup entry!\n");
+    //sddf_dprintf("eth_setup entry!\n");
     eth = device_resources.regions[0].region.vaddr;
 
     /* Set up HW rings */
@@ -248,7 +253,9 @@ static void eth_setup(void)
     // XXX: clear stat counters? clear phymntnc?
 
     /* 2: Controller config */
-    eth->nwcfg |= ZYNQ_GEM_NWCFG_INIT | ZYNQ_GEM_NWCFG_SPEED1000;
+    // TODO: Debug: enable promiscuous mode (copy all frames)
+    #define ZYNQ_GEM_NWCFG_CPY_ALL_FRAMES BIT(4)
+    eth->nwcfg |= ZYNQ_GEM_NWCFG_INIT | ZYNQ_GEM_NWCFG_SPEED1000 | ZYNQ_GEM_NWCFG_CPY_ALL_FRAMES;
     // XXX: SGMII enable? https://github.com/u-boot/u-boot/blob/master/drivers/net/zynq_gem.c#L503
     // XXX: clkrate setup??
     // XXX: MDC clk division??
@@ -274,12 +281,15 @@ static void eth_setup(void)
     /* ?? Transmitting frames */
 
     /* ?? Receiving frames */
-    sddf_dprintf("eth_setup exit!\n");
+    sddf_printf("eth_setup exit!\n");
 }
 
+
+serial_queue_handle_t serial_tx_queue_handle;
 void init(void)
 {
-    // TODO: ensure correct initialissation
+    // TODO: ensure correct initialisation
+    assert(serial_config_check_magic(&serial_config)); // TODO: remove
     assert(net_config_check_magic(&config));
     assert(device_resources_check_magic(&device_resources));
     assert(device_resources.num_irqs == 1);
@@ -288,6 +298,12 @@ void init(void)
     assert(RX_COUNT * sizeof(struct descriptor) <= device_resources.regions[1].region.size);
     assert(TX_COUNT * sizeof(struct descriptor) <= device_resources.regions[2].region.size);
 
+    // TODO: remove:
+    serial_queue_init(&serial_tx_queue_handle, serial_config.tx.queue.vaddr, serial_config.tx.data.size,
+                      serial_config.tx.data.vaddr);
+    serial_putchar_init(serial_config.tx.id, &serial_tx_queue_handle);
+    //sddf_printf("ETH DRIVER: INIT!\n");
+
     eth_setup();
 
     net_queue_init(&rx_queue, config.virt_rx.free_queue.vaddr, config.virt_rx.active_queue.vaddr,
@@ -295,6 +311,7 @@ void init(void)
     net_queue_init(&tx_queue, config.virt_tx.free_queue.vaddr, config.virt_tx.active_queue.vaddr,
                    config.virt_tx.num_buffers);
 
+    sddf_printf("finish net queue init\n");
     rx_provide();
     tx_provide();
 }
