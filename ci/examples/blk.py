@@ -32,7 +32,7 @@ def backend_fn(
         (_, disk_path) = tempfile.mkstemp(dir=disks_dir)
 
         subprocess.run(
-            ["./tools/mkvirtdisk", disk_path, "1", "512", "16777216", "GPT"],
+            ["./tools/mkvirtdisk", disk_path, "1", "512", "16777216", "MBR"],
             check=True,
             capture_output=True,
         )
