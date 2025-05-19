@@ -13,7 +13,7 @@ Also known as a pinmux or pinctrl driver
 
 # Overview
 <!-- This paragraph is from Linux documentation -->
-A chip contains a limited number of pads as it is not feasable to have a one-to-one mapping between all pads and ports. Hence, most of the pads have multiple signal options. I.e. a pad can be connected to one of multiple ports at a given point in time as appropriate for the intended use case. These signal-to-pin and pin-to-signal options are selected by the input-output multiplexer called pinmux. The pinmux is also used to configure other pin characteristics, such as drive strength, bias, etc...
+A chip contains a limited number of pads as it is not feasable to have a one-to-one mapping between all pads and ports. Hence, most of the pads have multiple signal options. I.e. a pad can be connected to one of multiple ports at a given point in time as appropriate for the intended use case. These signal-to-pin and pin-to-signal options are selected by the input-output multiplexer called a pin controller or pinmux. The pin controller is also used to configure other electronic characteristics of a pin, such as drive strength, bias, etc. All of these configurations can be programmed in software by writing to the pin controller's registers.
 
 Before the pinctrl driver is built, a Python script will read the target board's device tree source file, extracting all the pinctrl settings and encodes them as binary values in an assembly file. Then the driver is built and linked with the pinctrl data assembly file, creating a complete pinctrl driver ELF image.
 
