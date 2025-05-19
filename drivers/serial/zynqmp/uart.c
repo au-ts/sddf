@@ -30,6 +30,19 @@ serial_queue_handle_t tx_queue_handle;
 
 volatile zynqmp_uart_regs_t *uart_regs;
 
+static void drv_putchar(const char c)
+{
+    uart_regs->fifo = (uint32_t)c;
+}
+
+static void tx_fifo_drain_wait(void)
+{
+    /* Wait for the TX FIFO to drain. */
+    while (!(uart_regs->sr & ZYNQMP_UART_CHANNEL_STS_TXEMPTY));
+    /* Wait for the Transmitter to finish sending the signals. */
+    while ((uart_regs->sr & ZYNQMP_UART_CHANNEL_STS_TXACTIVE));
+}
+
 static void tx_provide(void)
 {
     bool transferred = false;
@@ -40,7 +53,7 @@ static void tx_provide(void)
 
     /* Send characters until the TX FIFO is full. */
     while (!(uart_regs->sr & ZYNQMP_UART_CHANNEL_STS_TXFULL) && !serial_dequeue(&tx_queue_handle, &c)) {
-        uart_regs->fifo = (uint32_t)c;
+        drv_putchar(c);
         transferred = true;
     }
 
@@ -165,6 +178,9 @@ static void compute_clk_divs(uint64_t clock_hz, uint64_t baudrate, uint16_t *cd,
 
 static void uart_setup(void)
 {
+    /* Wait for any OS loader printings to complete before we reset the serial device. */
+    tx_fifo_drain_wait();
+
     /* Compute the correct clock dividers to set the baud rate. */
     uint16_t cd;
     uint8_t bdiv;
@@ -200,16 +216,16 @@ static void uart_setup(void)
 
     /* Select 8 bytes character length. */
     uint32_t mr = uart_regs->mr;
-    mr &= ~(0x3 << ZYNQMO_UART_MR_CHARLEN_SHIFT);
+    mr &= ~((BIT(0) | BIT(1)) << ZYNQMO_UART_MR_CHARLEN_SHIFT);
 
     /* No parity checks */
     mr |= ZYNQMO_UART_MR_PARITY_NONE;
 
     /* One stop bit to detect on RX and to generate on TX */
-    mr &= ~(0x3 << ZYNQMO_UART_MR_STOPMODE_SHIFT);
+    mr &= ~((BIT(0) | BIT(1)) << ZYNQMO_UART_MR_STOPMODE_SHIFT);
 
     /* Put the UART device in normal operating mode */
-    mr &= ~(0x3 << ZYNQMO_UART_MR_CHMODE_SHIFT);
+    mr &= ~((BIT(0) | BIT(1)) << ZYNQMO_UART_MR_CHMODE_SHIFT);
     uart_regs->mr = mr;
 
     /* Turn off all the interrupts, then only turn on the ones we need. */
