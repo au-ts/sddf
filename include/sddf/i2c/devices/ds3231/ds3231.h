@@ -65,7 +65,7 @@ enum ds3231_registers {                         // RANGE:
 #define DEFAULT_READ_ACK_FRAME_RETRIES (20)
 
 int ds3231_write(uint8_t *buffer, uint16_t buffer_len, size_t retries);
-int ds3231_read(uint8_t *buffer, uint16_t buffer_len, size_t retries);
+int ds3231_read(uint8_t *buffer, i2c_addr_t reg_addr, uint16_t buffer_len, size_t retries);
 
 // User Provided Functions
 int ds3231_get_time(uint8_t *seconds, uint8_t *minutes, uint8_t *hours, uint8_t *day_of_week, uint8_t *day,

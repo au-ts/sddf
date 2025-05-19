@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from sdfgen import SystemDescription, Sddf, DeviceTree
 from importlib.metadata import version
 
-assert version('sdfgen').split(".")[1] == "24", "Unexpected sdfgen version"
+print(f"sdfgen version: {version('sdfgen')}")
+# assert version('sdfgen').split(".")[1] == "24", "Unexpected sdfgen version"
 
 ProtectionDomain = SystemDescription.ProtectionDomain
 MemoryRegion = SystemDescription.MemoryRegion
@@ -14,6 +15,8 @@ Map = SystemDescription.Map
 
 DS3231 = False
 PN532 = True
+# DS3231 = True
+# PN532 = True
 
 
 @dataclass
@@ -39,11 +42,13 @@ BOARDS: List[Board] = [
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     timer_driver = ProtectionDomain(
         "timer_driver", "timer_driver.elf", priority=4)
-    i2c_driver = ProtectionDomain("i2c_driver", "i2c_driver.elf", priority=3)
-    i2c_virt = ProtectionDomain("i2c_virt", "i2c_virt.elf", priority=2)
+    i2c_driver = ProtectionDomain(
+        "i2c_driver", "i2c_driver.elf", priority=3, stack_size=16384)
+    i2c_virt = ProtectionDomain(
+        "i2c_virt", "i2c_virt.elf", priority=2, stack_size=16384)
     if PN532:
         client_pn532 = ProtectionDomain(
-            "client_pn532", "client_pn532.elf", priority=1)
+            "client_pn532", "client_pn532.elf", priority=1, stack_size=32768)
     if DS3231:
         client_ds3231 = ProtectionDomain(
             "client_ds3231", "client_ds3231.elf", priority=1)
@@ -69,8 +74,6 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
         timer_driver,
         i2c_driver,
         i2c_virt,
-        client_pn532,
-        client_ds3231,
     ]
     if DS3231:
         i2c_system.add_client(client_ds3231)

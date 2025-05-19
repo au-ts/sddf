@@ -6,6 +6,12 @@
 
 #include <sddf/i2c/libi2c.h>
 
+#ifdef DEBUG_LIBI2C
+#define LOG_LIBI2C(...) do{ sddf_dprintf("CLIENT|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
+#else
+#define LOG_LIBI2C(...) do{}while(0)
+#endif
+
 /**
  * Initialise libI2C and return the conf struct needed for all operations.
  */
@@ -100,12 +106,14 @@ static int __i2c_dispatch(libi2c_conf_t *conf, i2c_addr_t address, void *buf,
         return -1;
     }
     size_t meta_offset = (uint8_t *)buf - I2C_META_REGION;
+    i2c_err_t error = 0;
     cmd->offset = meta_offset;
     cmd->len = len;
     cmd->flag_mask = flag_mask;
 
     if (i2c_enqueue_request(*conf->handle, address, (uintptr_t)cmd, (uintptr_t)I2C_META_REGION, 1)) {
         LOG_LIBI2C_ERR("__i2c_dispatch failed to enqueue request!\n");
+        error = -1;
         goto i2c_dispatch_fail;
     }
     microkit_notify(i2c_config.virt.id);
@@ -114,19 +122,16 @@ static int __i2c_dispatch(libi2c_conf_t *conf, i2c_addr_t address, void *buf,
     co_switch(t_event);
 
     i2c_addr_t returned_addr = 0;
-    i2c_err_t error = 0;
     size_t err_cmd = 0;     // Irrelevant for single-command runs.
-    assert(returned_addr == address);   // If this ever fails, the protocol is broken or misused!
     if (i2c_dequeue_response(*conf->handle, &returned_addr, &error, &err_cmd)) {
         LOG_LIBI2C_ERR("__i2c_dispatch failed to dequeue response!\n");
+        error = -1;
         goto i2c_dispatch_fail;
     }
-
-    __libi2c_free_cmd(conf, cmd);
-    return error;
+    assert(returned_addr == address);   // If this ever fails, the protocol is broken or misused!
 i2c_dispatch_fail:
     __libi2c_free_cmd(conf, cmd);
-    return -1;
+    return error;
 }
 
 /**

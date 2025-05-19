@@ -74,8 +74,9 @@ void client_main(void)
         LOG_CLIENT_ERR("failed to find DS3231 on bus!\n");
         assert(false);
     }
+    LOG_CLIENT("ds3231 ACK! setting time\n");
 
-    if (ds3231_set_time(42, 59, 23, 7, 31, 12, 23)) {
+    if (ds3231_set_time(42, 59, 23, 7, 31, 5, 25)) {
         LOG_CLIENT_ERR("failed to set time on DS3231!\n");
         assert(false);
     }

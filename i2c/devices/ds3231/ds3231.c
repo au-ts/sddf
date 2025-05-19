@@ -64,7 +64,7 @@ int ds3231_write(uint8_t *buffer, uint16_t buffer_len, size_t retries)
         }
 
         int error = i2c_write(&libi2c_conf, DS3231_I2C_BUS_ADDRESS, meta_buf, buffer_len);
-        if (error) {
+        if (!error) {
             return error;
         }
 
@@ -72,18 +72,18 @@ int ds3231_write(uint8_t *buffer, uint16_t buffer_len, size_t retries)
         delay_ms(1);
     }
 }
-
 /**
   * Read from the DS3231 and store data in *meta_buffer. Must be allocated from
   * the META shared memory region mapped into the client.
   */
-int ds3231_read(uint8_t *meta_buffer, uint16_t buffer_len, size_t retries)
+int ds3231_read(uint8_t *meta_buffer, i2c_addr_t reg_addr, uint16_t buffer_len, size_t retries)
 {
     size_t attempts = 1;
     while (true) {
         if (attempts == retries) return -1;
-        int error = i2c_read(&libi2c_conf, DS3231_I2C_BUS_ADDRESS, (uint8_t *)(meta_buffer), buffer_len);
-        if (error) {
+        // Set register address
+        int error = i2c_writeread(&libi2c_conf, DS3231_I2C_BUS_ADDRESS, reg_addr, (uint8_t *)(meta_buffer), buffer_len);
+        if (!error) {
             return error;
         }
         attempts++;
@@ -95,13 +95,8 @@ int ds3231_get_time(uint8_t *second, uint8_t *minute, uint8_t *hour, uint8_t *da
                      uint8_t *month, uint8_t *year)
 {
     uint8_t *meta_buf = (uint8_t *)(I2C_META_REGION + DS3231_META_BASE);
-    meta_buf[0] = DS3231_REGISTER_SECONDS; // to tell ds3231 to start reading at register 0
-    uint8_t write_fail = ds3231_write(meta_buf, 1, DEFAULT_READ_ACK_FRAME_RETRIES);
-    if (write_fail) {
-        return -1;
-    }
 
-    uint8_t read_fail = ds3231_read(meta_buf, 7, DEFAULT_READ_RESPONSE_RETRIES);
+    uint8_t read_fail = ds3231_read(meta_buf, DS3231_REGISTER_SECONDS, 7, DEFAULT_READ_RESPONSE_RETRIES);
     if (read_fail) {
         return -1;
     }

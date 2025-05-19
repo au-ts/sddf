@@ -1,5 +1,5 @@
 /*
- * Copyright 2023, UNSW
+ * Copyright 2025, UNSW
  *
  * SPDX-License-Identifier: BSD-2-Clause
  */
@@ -7,8 +7,8 @@
 // Implementation of the i2c driver targeting the ODROID C4.
 // Each instance of this driver corresponds to one of the four
 // available i2c master interfaces on the device.
-// Matt Rossouw (matthew.rossouw@unsw.edu.au)
-// 08/2023
+// Lesley Rossouw (lesley.rossouw@unsw.edu.au)
+// 05/2025
 
 #include <microkit.h>
 #include <sddf/i2c/queue.h>
@@ -20,7 +20,7 @@
 #error "I2C_BUS_NUM must be defined!"
 #endif
 
-#define DEBUG_DRIVER
+// #define DEBUG_DRIVER
 
 #ifdef DEBUG_DRIVER
 #define LOG_DRIVER(...) do{ sddf_dprintf("I2C DRIVER|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
@@ -54,7 +54,9 @@ volatile struct i2c_regs *regs;
 // Driver state for each interface
 static i2c_driver_data_t driver_data;
 
+// Shared memory regions
 i2c_queue_handle_t queue_handle;
+uint8_t *meta;
 
 char *meson_token_to_str(uint8_t token)
 {
@@ -97,11 +99,31 @@ static inline char *state_to_str(i2c_state_t s) {
     }
 }
 
+static inline char *i2c_err_to_str(i2c_err_t err) {
+    switch (err) {
+        case I2C_ERR_OK:
+            return "I2C_ERR_OK";
+        case I2C_ERR_TIMEOUT:
+            return "I2C_ERR_TIMEOUT";
+        case I2C_ERR_NACK:
+            return "I2C_ERR_NACK";
+        case I2C_ERR_NOREAD:
+            return "I2C_ERR_NOREAD";
+        case I2C_ERR_BADSEQ:
+            return "I2C_ERR_BADSEQ";
+        case I2C_ERR_OTHER:
+            return "I2C_ERR_OTHER";
+        default:
+            return "Invalid error";
+    }
+}
+
 /**
  * Prints the registers of the i2c interface
  */
 static inline void i2c_dump(void)
 {
+// This makes actually debugging the driver impossible, so it's a separate #define.
 #ifdef DEBUG_DRIVERRRR
     LOG_DRIVER("dumping interface state...\n");
 
@@ -382,10 +404,12 @@ void init(void)
 
     regs = (volatile struct i2c_regs *)device_resources.regions[0].region.vaddr;
     i2c_setup();
-    queue_handle = i2c_queue_init(config.virt.req_queue.vaddr, config.virt.resp_queue.vaddr);
 
-    // Set up driver state
+    // Set up driver state and shared regions
     i2c_reset_state(&driver_data);
+    queue_handle = i2c_queue_init(config.virt.req_queue.vaddr, config.virt.resp_queue.vaddr);
+    meta = NULL;
+
 
     microkit_dbg_puts("Driver initialised.\n");
 }
@@ -418,7 +442,6 @@ void state_idle(fsm_data_t *fsm, i2c_driver_data_t *data) {
  * Successor(s): S_SEL_CMD (success), S_IDLE (fail)
  */
 void state_req(fsm_data_t *fsm, i2c_driver_data_t *data) {
-    LOG_DRIVER("S_REQ entry\n");
     // Pre-emptively set S_IDLE as next state in case any of the error checks fail.
     fsm->next_state = S_IDLE;
 
@@ -427,7 +450,6 @@ void state_req(fsm_data_t *fsm, i2c_driver_data_t *data) {
         LOG_DRIVER_ERR("State machine reached invalid state! In request state without work to do...");
         return;
     }
-    LOG_DRIVER("S_REQ: starting dequeue\n");
 
     // Get request from queue
     // Otherwise, begin work. Start by extracting the request
@@ -435,7 +457,7 @@ void state_req(fsm_data_t *fsm, i2c_driver_data_t *data) {
     uintptr_t meta_vaddr, data_vaddr;
     uint16_t size = 0;
     int err = i2c_dequeue_request(queue_handle, &bus_address, &data_vaddr, &meta_vaddr, &size);
-    LOG_DRIVER("New request: data->%p", (void*)(data_vaddr));
+    LOG_DRIVER("New request: data->%p\n", (void*)(data_vaddr));
     if (err) {
         LOG_DRIVER_ERR("fatal: failed to dequeue request\n");
         return;
@@ -456,7 +478,6 @@ void state_req(fsm_data_t *fsm, i2c_driver_data_t *data) {
     data->addr = bus_address;
     data->curr_request_len = size;
     fsm->next_state = S_SEL_CMD;
-    LOG_DRIVER("S_REQ: finished! Selecting command.\n");
     return;
 }
 
@@ -469,7 +490,6 @@ void state_req(fsm_data_t *fsm, i2c_driver_data_t *data) {
  * Sucessor(s): S_CMD, S_IDLE (fatal), S_RESPONSE (done or error)
  */
 void state_sel_cmd(fsm_data_t *fsm, i2c_driver_data_t *data) {
-    LOG_DRIVER("S_SEL_CMD entry\n");
     // If we're in this state, we know that either:
     // a. There's no active command (just started)
     // b. The previous command finished.
@@ -492,7 +512,8 @@ void state_sel_cmd(fsm_data_t *fsm, i2c_driver_data_t *data) {
         data->await_addr = !(cmd.flag_mask & I2C_FLAG_RSTART); // Don't send address if
                                                                // this is a repeat start
         // Set write-read counter if needed. Ignore WRRD if writing because it has no effect.
-        data->await_wrrd = cmd.flag_mask & (I2C_FLAG_WRRD | I2C_FLAG_READ) ? NUM_WRRD_STEPS : 0;
+        data->await_wrrd = (cmd.flag_mask & I2C_FLAG_WRRD) &&
+                           (cmd.flag_mask & I2C_FLAG_READ) ? NUM_WRRD_STEPS : 0;
         data->await_stop = cmd.flag_mask & I2C_FLAG_STOP;
         data->rw_idx = 0;
         data->active_cmd = &data->curr_data[data->req_idx];
@@ -500,14 +521,14 @@ void state_sel_cmd(fsm_data_t *fsm, i2c_driver_data_t *data) {
         LOG_DRIVER("## Command loaded (SEL_CMD) ##\n");
         LOG_DRIVER("\t len = %u\n", cmd.len);
         LOG_DRIVER("\t meta offset = %zu\n", cmd.offset);
-        LOG_DRIVER("\t FLAG_READ: %u\n", cmd.flag_mask&I2C_FLAG_READ);
-        LOG_DRIVER("\t FLAG_WRRD: %u\n", cmd.flag_mask&I2C_FLAG_WRRD);
-        LOG_DRIVER("\t FLAG_STOP: %u\n", cmd.flag_mask&I2C_FLAG_STOP);
-        LOG_DRIVER("\t FLAG_RSTART: %u\n", cmd.flag_mask&I2C_FLAG_RSTART);
+        LOG_DRIVER("\t FLAG_READ: %u\n", (cmd.flag_mask&I2C_FLAG_READ)!=0);
+        LOG_DRIVER("\t FLAG_WRRD: %u\n", (cmd.flag_mask&I2C_FLAG_WRRD)!=0);
+        LOG_DRIVER("\t FLAG_STOP: %u\n", (cmd.flag_mask&I2C_FLAG_STOP)!=0);
+        LOG_DRIVER("\t FLAG_RSTART: %u\n", (cmd.flag_mask&I2C_FLAG_RSTART)!=0);
 
         // Increment req idx for next time
         data->req_idx++;
-        if (data->req_idx == data->curr_request_len-1) LOG_DRIVER("Handling last cmd of request...");
+        if (data->req_idx == data->curr_request_len-1) LOG_DRIVER("Handling last cmd of request...\n");
         if (!data->err) fsm->next_state = S_CMD;
         else fsm->next_state = S_RESPONSE;  // If there's an error, give up on cmd entirely.
     } else {
@@ -528,16 +549,7 @@ void state_cmd(fsm_data_t *fsm, i2c_driver_data_t *data) {
     LOG_DRIVER("\t Address register: 0x%x\n", (regs->addr >> 1) & 0x7F);
     LOG_DRIVER("\t Should match data->addr = %x\n", data->addr);
 
-    // Debug: print command parameters
     i2c_cmd_t cmd = *data->active_cmd;
-    LOG_DRIVER("## Command loaded ##\n");
-    LOG_DRIVER("\t len = %u\n", cmd.len);
-    LOG_DRIVER("\t meta offset = %zu\n", cmd.offset);
-    LOG_DRIVER("\t FLAG_READ: %u\n", cmd.flag_mask&I2C_FLAG_READ);
-    LOG_DRIVER("\t FLAG_WRRD: %u\n", cmd.flag_mask&I2C_FLAG_WRRD);
-    LOG_DRIVER("\t FLAG_STOP: %u\n", cmd.flag_mask&I2C_FLAG_STOP);
-    LOG_DRIVER("\t FLAG_RSTART: %u\n", cmd.flag_mask&I2C_FLAG_RSTART);
-
     // Clear token buffer registers
     regs->tk_list0 = 0x0;
     regs->tk_list1 = 0x0;
@@ -567,7 +579,7 @@ void state_cmd(fsm_data_t *fsm, i2c_driver_data_t *data) {
         // Discover next operation
         uint8_t meson_token;
         uint32_t payload_byte;
-        uint8_t *meta = (uint8_t*)(data->meta_base + cmd.offset);
+        meta = (uint8_t*)(data->meta_base + cmd.offset);
 
         // Handle sending start condition
         if (data->await_start) {
@@ -614,6 +626,8 @@ void state_cmd(fsm_data_t *fsm, i2c_driver_data_t *data) {
                 // If we don't need a stop condition, skip final loop.
                 break;
             }
+            data->rw_idx++; // Hacky, but saves keeping an extra variable to track
+                            // stop condition between here and S_CMD_RET
 
         // Handle data transmission
         } else {
@@ -652,7 +666,7 @@ void state_cmd(fsm_data_t *fsm, i2c_driver_data_t *data) {
             } else {
                 regs->wdata1 |= (payload_byte << ((wdata_offset - 4) * 8));
             }
-            LOG_DRIVER("Injecting write payload: %u\n", payload_byte);
+            LOG_DRIVER("\tInjecting write payload: %x\n", payload_byte);
             wdata_offset++;
         }
 
@@ -663,7 +677,7 @@ void state_cmd(fsm_data_t *fsm, i2c_driver_data_t *data) {
             //       a single transaction as this is the limit of the hardware.
             rdata_offset++;
         }
-        LOG_DRIVER("Token loop complete: selected %s ...\n", meson_token_to_str(meson_token));
+        LOG_DRIVER("\t\t->> selected %s ...\n", meson_token_to_str(meson_token));
     }
     LOG_DRIVER("Tokens loaded. %u cmds remain for this request\n",
                data->curr_request_len - data->req_idx);
@@ -682,29 +696,28 @@ void state_cmd(fsm_data_t *fsm, i2c_driver_data_t *data) {
  * Sucessor(s): S_CMD (cmd not finished yet), S_SEL_CMD (cmd finished), S_RESP (error)
  */
 void state_cmd_ret(fsm_data_t *f, i2c_driver_data_t *data) {
-    LOG_DRIVER("S_CMD_RET entry\n");
     // Get result
     uint8_t curr_token = 0;
     uint8_t bytes_read = 0;
     bool write_error = i2c_get_error(&bytes_read, &curr_token);
-    uint8_t *meta = (uint8_t*)(data->meta_base);
+    meta = (uint8_t*)(data->meta_base + data->active_cmd->offset);
+    LOG_DRIVER("S_CMD_RET: returning with %u bytes read, halt token = %u\n",
+               bytes_read, curr_token);
 
     // If there was an error, cancel the rest of this transaction and load the
     // error information into the return buffer.
     if (write_error) {
-        LOG_DRIVER("error!\n");
         // handle_response_timeout already has error logic for timeout
         if (curr_token == MESON_I2C_TOKEN_ADDR_READ) {
             data->err = I2C_ERR_NOREAD;
-            LOG_DRIVER("I2C_ERR_NOREAD!\n");
         } else {
             data->err = I2C_ERR_NACK;
-            LOG_DRIVER("I2C_ERR_NACK!\n");
         }
         LOG_DRIVER("token that caused error: %d!\n", curr_token);
         f->next_state = S_RESPONSE;
 
     } else {
+        LOG_DRIVER("No error. Bytes read = %u\n", bytes_read);
         // Get bytes_read amount of read data,copy data into return buffer
         for (int i = 0; i < bytes_read; i++) {
             assert(cmd_is_read(*data->active_cmd)); // If we're here and we didn't read, die
@@ -712,14 +725,15 @@ void state_cmd_ret(fsm_data_t *f, i2c_driver_data_t *data) {
             if (i < 4) {
                 value = (regs->rdata0 >> (i * 8)) & 0xFF;
             } else if (i < 8) {
-                uint8_t value = (regs->rdata1 >> ((i - 4) * 8)) & 0xFF;
+                value = (regs->rdata1 >> ((i - 4) * 8)) & 0xFF;
             }
-            LOG_DRIVER("loading into meta at %d value 0x%x\n", data->bytes_read, value);
+            LOG_DRIVER("loading into meta at %d value 0x%x (0x%p)\n", data->bytes_read, value, &meta[data->bytes_read]);
             meta[data->bytes_read] = value;
             data->bytes_read++;
         }
         // Decide whether this is the end or to return back to sel_cmd
-        if (data->rw_idx >= data->active_cmd->len) f->next_state = S_SEL_CMD;
+        // Note: this isn't a signpost error. S_CMD runs for one round extra to send a STOP
+        if (data->rw_idx > data->active_cmd->len) f->next_state = S_SEL_CMD;
         else f->next_state = S_CMD;
     }
 }
@@ -743,9 +757,11 @@ void state_resp(fsm_data_t *f, i2c_driver_data_t *data) {
     // Handle failure
     int ret;
     if (data->err) {
+        LOG_DRIVER("Request failed with error %s\n", i2c_err_to_str(data->err));
         ret = i2c_enqueue_response(queue_handle, data->addr, data->err, data->req_idx);
         i2c_halt();
     } else {
+        LOG_DRIVER("Request returning with no error: address = %u, bytes_read = %u\n", data->addr, data->bytes_read);
         ret = i2c_enqueue_response(queue_handle, data->addr, data->err, 0);
     }
     f->next_state = S_IDLE;
@@ -771,13 +787,12 @@ i2c_state_func_t *i2c_state_table[NUM_STATES] = {
  * state functions to declare when the PD should go to sleep by setting yield to true.
  */
 void fsm(fsm_data_t *f) {
-    LOG_DRIVER("FSM: entry\n");
-    LOG_DRIVER("FSM: state = %u\n", f->curr_state);
     do {
+        LOG_DRIVER("FSM: %s\n", state_to_str(f->curr_state));
         // Run current state
         i2c_state_table[f->curr_state](&fsm_data, &driver_data);
         f->curr_state = f->next_state;
-        LOG_DRIVER("State: %s\n", state_to_str(f->curr_state));
+        LOG_DRIVER("Next state: %s\n", state_to_str(f->next_state));
     } while (!f->yield);
     // Always reset the yield flag when the FSM gives up. Whenever this function
     // returns the PD should have gone to sleep.
@@ -810,9 +825,9 @@ void notified(microkit_channel ch)
     } else if (ch == device_resources.irqs[1].id) {
         /* Timeout IRQ */
         LOG_DRIVER("Timeout!\n");
-        i2c_halt(); // Temporary!
-        /*handle_response_timeout();*/  // TODO: handle
-        microkit_irq_ack(ch);
+        /*i2c_halt(); // Temporary!*/
+        /*handle_response_timeout();  // TODO: handle*/
+         microkit_irq_ack(ch);
     } else {
         LOG_DRIVER_ERR("unexpected notification on channel %d\n", ch);
     }

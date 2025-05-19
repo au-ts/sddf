@@ -106,66 +106,67 @@ pub fn build(b: *std.Build) void {
     // This is required because the SDF file is expecting a different name to the artifact we
     // are dealing with.
     const timer_driver_install = b.addInstallArtifact(timer_driver, .{ .dest_sub_path = "timer_driver.elf" });
-
-    // const pn532_driver = sddf_dep.artifact("driver_i2c_device_pn532");
-    const ds3231_driver = sddf_dep.artifact("driver_i2c_device_ds3231");
+    //
+    const pn532_driver = sddf_dep.artifact("driver_i2c_device_pn532");
+    // const ds3231_driver = sddf_dep.artifact("driver_i2c_device_ds3231");
 
     const i2c_driver = sddf_dep.artifact(b.fmt("driver_i2c_{s}.elf", .{i2c_driver_class}));
     // This is required because the SDF file is expecting a different name to the artifact we
     // are dealing with.
     const i2c_driver_install = b.addInstallArtifact(i2c_driver, .{ .dest_sub_path = "i2c_driver.elf" });
 
-    // const client_pn532 = b.addExecutable(.{
-    //     .name = "client_pn532.elf",
-    //     .target = target,
-    //     .optimize = optimize,
-    //     .strip = false,
-    // });
-
-    // client_pn532.addCSourceFiles(.{
-    //     .files = &.{"client_pn532.c"},
-    // });
-    // client_pn532.addIncludePath(sddf_dep.path("include"));
-    // client_pn532.addIncludePath(sddf_dep.path("include/microkit"));
-    // client_pn532.linkLibrary(sddf_dep.artifact("util"));
-    // client_pn532.linkLibrary(sddf_dep.artifact("util_putchar_debug"));
-    // client_pn532.linkLibrary(pn532_driver);
-
-    const client_ds3231 = b.addExecutable(.{
-        .name = "client_ds3231.elf",
+    const client_pn532 = b.addExecutable(.{
+        .name = "client_pn532.elf",
         .target = target,
         .optimize = optimize,
         .strip = false,
     });
 
-    client_ds3231.addCSourceFiles(.{
-        .files = &.{"client_ds3231.c"},
+    client_pn532.addCSourceFiles(.{
+        .files = &.{"client_pn532.c"},
     });
-    client_ds3231.addIncludePath(sddf_dep.path("include"));
-    client_ds3231.addIncludePath(sddf_dep.path("include/microkit"));
-    client_ds3231.linkLibrary(sddf_dep.artifact("util"));
-    client_ds3231.linkLibrary(sddf_dep.artifact("util_putchar_debug"));
-    client_ds3231.linkLibrary(ds3231_driver);
-    client_ds3231.linkLibrary(sddf_dep.artifact("libi2c"));
+    client_pn532.addIncludePath(sddf_dep.path("include"));
+    client_pn532.addIncludePath(sddf_dep.path("include/microkit"));
+    client_pn532.linkLibrary(sddf_dep.artifact("util"));
+    client_pn532.linkLibrary(sddf_dep.artifact("util_putchar_debug"));
+    client_pn532.linkLibrary(pn532_driver);
+    client_pn532.linkLibrary(sddf_dep.artifact("libi2c"));
+
+    // const client_ds3231 = b.addExecutable(.{
+    //     .name = "client_ds3231.elf",
+    //     .target = target,
+    //     .optimize = optimize,
+    //     .strip = false,
+    // });
+    //
+    // client_ds3231.addCSourceFiles(.{
+    //     .files = &.{"client_ds3231.c"},
+    // });
+    // client_ds3231.addIncludePath(sddf_dep.path("include"));
+    // client_ds3231.addIncludePath(sddf_dep.path("include/microkit"));
+    // client_ds3231.linkLibrary(sddf_dep.artifact("util"));
+    // client_ds3231.linkLibrary(sddf_dep.artifact("util_putchar_debug"));
+    // client_ds3231.linkLibrary(ds3231_driver);
+    // client_ds3231.linkLibrary(sddf_dep.artifact("libi2c"));
 
     // Here we compile libco. Right now this is the only example that uses libco and so
     // we just compile it here instead of in a separate build.zig
-    // client_pn532.addIncludePath(sddf_dep.path("libco"));
-    // client_pn532.addCSourceFile(.{ .file = sddf_dep.path("libco/libco.c") });
+    client_pn532.addIncludePath(sddf_dep.path("libco"));
+    client_pn532.addCSourceFile(.{ .file = sddf_dep.path("libco/libco.c") });
+
+    client_pn532.addIncludePath(.{ .cwd_relative = libmicrokit_include });
+    client_pn532.addObjectFile(.{ .cwd_relative = libmicrokit });
+    client_pn532.setLinkerScript(.{ .cwd_relative = libmicrokit_linker_script });
+
+    // client_ds3231.addIncludePath(sddf_dep.path("libco"));
+    // client_ds3231.addCSourceFile(.{ .file = sddf_dep.path("libco/libco.c") });
     //
-    // client_pn532.addIncludePath(.{ .cwd_relative = libmicrokit_include });
-    // client_pn532.addObjectFile(.{ .cwd_relative = libmicrokit });
-    // client_pn532.setLinkerScript(.{ .cwd_relative = libmicrokit_linker_script });
+    // client_ds3231.addIncludePath(.{ .cwd_relative = libmicrokit_include });
+    // client_ds3231.addObjectFile(.{ .cwd_relative = libmicrokit });
+    // client_ds3231.setLinkerScript(.{ .cwd_relative = libmicrokit_linker_script });
 
-    client_ds3231.addIncludePath(sddf_dep.path("libco"));
-    client_ds3231.addCSourceFile(.{ .file = sddf_dep.path("libco/libco.c") });
-
-    client_ds3231.addIncludePath(.{ .cwd_relative = libmicrokit_include });
-    client_ds3231.addObjectFile(.{ .cwd_relative = libmicrokit });
-    client_ds3231.setLinkerScript(.{ .cwd_relative = libmicrokit_linker_script });
-
-    // b.installArtifact(client_pn532);
-    b.installArtifact(client_ds3231);
+    b.installArtifact(client_pn532);
+    // b.installArtifact(client_ds3231);
     b.installArtifact(sddf_dep.artifact("i2c_virt.elf"));
 
     // For compiling the DTS into a DTB
@@ -203,15 +204,15 @@ pub fn build(b: *std.Build) void {
     const i2c_driver_config_objcopy = updateSectionObjcopy(b, ".i2c_driver_config", meta_output, "i2c_driver.data", "i2c_driver.elf");
     i2c_driver_config_objcopy.step.dependOn(&i2c_driver_install.step);
     const i2c_virt_objcopy = updateSectionObjcopy(b, ".i2c_virt_config", meta_output, "i2c_virt.data", "i2c_virt.elf");
-    const client_ds3231_i2c_objcopy = updateSectionObjcopy(b, ".i2c_client_config", meta_output, "i2c_client_client_ds3231.data", "client_ds3231.elf");
-    const client_ds3231_timer_objcopy = updateSectionObjcopy(b, ".timer_client_config", meta_output, "timer_client_client_ds3231.data", "client_ds3231.elf");
-    // const client_pn532_i2c_objcopy = updateSectionObjcopy(b, ".i2c_client_config", meta_output, "i2c_client_client_pn532.data", "client_pn532.elf");
-    // const client_pn532_timer_objcopy = updateSectionObjcopy(b, ".timer_client_config", meta_output, "timer_client_client_pn532.data", "client_pn532.elf");
+    // const client_ds3231_i2c_objcopy = updateSectionObjcopy(b, ".i2c_client_config", meta_output, "i2c_client_client_ds3231.data", "client_ds3231.elf");
+    // const client_ds3231_timer_objcopy = updateSectionObjcopy(b, ".timer_client_config", meta_output, "timer_client_client_ds3231.data", "client_ds3231.elf");
+    const client_pn532_i2c_objcopy = updateSectionObjcopy(b, ".i2c_client_config", meta_output, "i2c_client_client_pn532.data", "client_pn532.elf");
+    const client_pn532_timer_objcopy = updateSectionObjcopy(b, ".timer_client_config", meta_output, "timer_client_client_pn532.data", "client_pn532.elf");
     const objcopys = &.{
-        client_ds3231_i2c_objcopy,
-        client_ds3231_timer_objcopy,
-        // client_pn532_i2c_objcopy,
-        // client_pn532_timer_objcopy,
+        // client_ds3231_i2c_objcopy,
+        // client_ds3231_timer_objcopy,
+        client_pn532_i2c_objcopy,
+        client_pn532_timer_objcopy,
         i2c_virt_objcopy,
         i2c_driver_device_objcopy,
         i2c_driver_config_objcopy,

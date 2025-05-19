@@ -10,7 +10,7 @@
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 
-#define DEBUG_VIRT
+// #define DEBUG_VIRT
 
 #ifdef DEBUG_VIRT
 #define LOG_VIRT(...) do{ sddf_dprintf("I2C VIRT|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
@@ -133,6 +133,7 @@ void init(void)
     }
     driver_queue = i2c_queue_init(config.driver.req_queue.vaddr, config.driver.resp_queue.vaddr);
     for (int i = 0; i < config.num_clients; i++) {
+        /*LOG_VIRT("Initialising client %d -> DATA region: %p\n", i, config.)*/
         client_queues[i] = i2c_queue_init(config.clients[i].conn.req_queue.vaddr,
                                           config.clients[i].conn.resp_queue.vaddr);
     }
