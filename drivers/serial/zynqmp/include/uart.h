@@ -7,6 +7,7 @@
 
 #include <stdint.h>
 #include <microkit.h>
+#include <sddf/util/util.h>
 
 /*
 * The various constant definitions for xuart are from Xilinx BSP
@@ -47,28 +48,31 @@ typedef struct zynqmp_uart_regs zynqmp_uart_regs_t;
 #error "unknown UART clock"
 #endif
 
-/* Range of valid UART clock divisors */
+/* Range of valid UART clock divisors inclusive */
 #define ZYNQMP_UART_CD_MIN   2
 #define ZYNQMP_UART_CD_MAX   65535
 #define ZYNQMP_UART_BDIV_MIN 4
 #define ZYNQMP_UART_BDIV_MAX 255
 
-#define ZYNQMP_UART_CHANNEL_STS_RXEMPTY (1 << 1)
-#define ZYNQMP_UART_CHANNEL_STS_RXFULL (1 << 2)
-#define ZYNQMP_UART_CHANNEL_STS_TXEMPTY (1 << 3)
-#define ZYNQMP_UART_CHANNEL_STS_TXFULL (1 << 4)
-#define ZYNQMP_UART_CHANNEL_STS_TXACTIVE (1 << 11)
+#define ZYNQMP_UART_CHANNEL_STS_RXEMPTY  BIT(1)
+#define ZYNQMP_UART_CHANNEL_STS_RXFULL   BIT(2)
+#define ZYNQMP_UART_CHANNEL_STS_TXEMPTY  BIT(3)
+#define ZYNQMP_UART_CHANNEL_STS_TXFULL   BIT(4)
+#define ZYNQMP_UART_CHANNEL_STS_TXACTIVE BIT(11)
+#define ZYNQMP_UART_CHANNEL_STS_TXNFULL  BIT(14)
 
-#define ZYNQMP_UART_CR_TX_DIS_SHIFT 5
-#define ZYNQMP_UART_CR_RX_DIS_SHIFT 3
-#define ZYNQMP_UART_CR_TX_EN_SHIFT 4
-#define ZYNQMP_UART_CR_RX_EN_SHIFT 2
-#define ZYNQMP_UART_CR_TX_EN        (1 << ZYNQMP_UART_CR_TX_EN_SHIFT)
-#define ZYNQMP_UART_CR_TX_DIS       (1 << ZYNQMP_UART_CR_TX_DIS_SHIFT)
-#define ZYNQMP_UART_CR_TX_RST       (1 << 1)
-#define ZYNQMP_UART_CR_RX_EN        (1 << ZYNQMP_UART_CR_RX_EN_SHIFT)
-#define ZYNQMP_UART_CR_RX_DIS       (1 << ZYNQMP_UART_CR_RX_DIS_SHIFT)
-#define ZYNQMP_UART_CR_RX_RST       (1 << 0)
+#define ZYNQMP_UART_CR_TX_DIS_SHIFT  5
+#define ZYNQMP_UART_CR_RX_DIS_SHIFT  3
+#define ZYNQMP_UART_CR_TX_EN_SHIFT   4
+#define ZYNQMP_UART_CR_RX_EN_SHIFT   2
+#define ZYNQMP_UART_CR_TX_RST_SHIFT  1
+#define ZYNQMP_UART_CR_RX_RST_SHIFT  0
+#define ZYNQMP_UART_CR_TX_EN         BIT(ZYNQMP_UART_CR_TX_EN_SHIFT)
+#define ZYNQMP_UART_CR_TX_DIS        BIT(ZYNQMP_UART_CR_TX_DIS_SHIFT)
+#define ZYNQMP_UART_CR_TX_RST        BIT(ZYNQMP_UART_CR_TX_RST_SHIFT)
+#define ZYNQMP_UART_CR_RX_EN         BIT(ZYNQMP_UART_CR_RX_EN_SHIFT)
+#define ZYNQMP_UART_CR_RX_DIS        BIT(ZYNQMP_UART_CR_RX_DIS_SHIFT)
+#define ZYNQMP_UART_CR_RX_RST        BIT(ZYNQMP_UART_CR_RX_RST_SHIFT)
 
 #define ZYNQMO_UART_MR_CCLK             0x00000400U /**< Input clock selection */
 #define ZYNQMO_UART_MR_CHMODE_R_LOOP    0x00000300U /**< Remote loopback mode */
