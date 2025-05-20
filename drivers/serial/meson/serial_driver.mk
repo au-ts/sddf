@@ -5,9 +5,6 @@
 #
 # Include this snippet in your project Makefile to build
 # the Meson UART driver.
-#
-# NOTES:
-#   Builds serial_driver.elf
 
 SERIAL_DRIVER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 
