@@ -1060,7 +1060,7 @@ void setup_blk_storage_info()
 
     LOG_DRIVER("Card size (blocks): %lu\n", storage_info->capacity);
 
-    __atomic_store_n(&storage_info->ready, true, __ATOMIC_RELEASE);
+    blk_storage_set_ready(storage_info, true);
     LOG_DRIVER("Driver initialisation complete\n");
 }
 
