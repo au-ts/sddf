@@ -35,14 +35,6 @@ static void drv_putchar(const char c)
     uart_regs->fifo = (uint32_t)c;
 }
 
-static void tx_fifo_drain_wait(void)
-{
-    /* Wait for the TX FIFO to drain. */
-    while (!(uart_regs->sr & ZYNQMP_UART_CHANNEL_STS_TXEMPTY));
-    /* Wait for the Transmitter to finish sending the signals. */
-    while ((uart_regs->sr & ZYNQMP_UART_CHANNEL_STS_TXACTIVE));
-}
-
 static void tx_provide(void)
 {
     bool transferred = false;
@@ -59,11 +51,9 @@ static void tx_provide(void)
 
     /* If the TX FIFO becomes full (even when we haven't send anything), raise an interrupt when it is empty. */
     if (uart_regs->sr & ZYNQMP_UART_CHANNEL_STS_TXFULL) {
-        if (config.rx_enabled) {
-            uart_regs->ier = ZYNQMO_UART_IXR_TXEMPTY | ZYNQMO_UART_IXR_RXOVR;
-        } else {
-            uart_regs->ier = ZYNQMO_UART_IXR_TXEMPTY;
-        }
+        uint32_t irq_mask = uart_regs->imr;
+        irq_mask |= ZYNQMO_UART_IXR_TXEMPTY;
+        uart_regs->ier = irq_mask;
     }
 
     if (transferred && serial_require_consumer_signal(&tx_queue_handle)) {
@@ -108,7 +98,9 @@ static void rx_return(void)
 
 static void handle_irq(void)
 {
+    /* Read and clear the IRQ status bits so we don't get infinitely interrupted. */
     uint32_t irq_status = uart_regs->isr;
+    uart_regs->isr = irq_status;
     if (irq_status & ZYNQMO_UART_IXR_TXEMPTY) {
         /* We previously requested the device to raise an IRQ when the TX FIFO is empty because it became full
            while sending stuff. Now continue to send stuff. */
@@ -118,8 +110,6 @@ static void handle_irq(void)
         /* The RX FIFO level has hit the watermark, in this case it is 1 byte. Process RX FIFO. */
         rx_return();
     }
-    /* Clear the IRQ status bits so we don't get infinitely interrupted. */
-    uart_regs->isr = ZYNQMO_UART_IXR_MASK;
 }
 
 static void compute_clk_divs(uint64_t clock_hz, uint64_t baudrate, uint16_t *cd, uint8_t *bdiv)
@@ -174,6 +164,14 @@ static void compute_clk_divs(uint64_t clock_hz, uint64_t baudrate, uint16_t *cd,
 
     *cd = (uint16_t)computed_cd;
     *bdiv = (uint8_t)computed_bdiv;
+}
+
+static void tx_fifo_drain_wait(void)
+{
+    /* Wait for the TX FIFO to drain. */
+    while (!(uart_regs->sr & ZYNQMP_UART_CHANNEL_STS_TXEMPTY));
+    /* Wait for the Transmitter to finish sending the signals. */
+    while ((uart_regs->sr & ZYNQMP_UART_CHANNEL_STS_TXACTIVE));
 }
 
 static void uart_setup(void)
