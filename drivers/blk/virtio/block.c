@@ -319,7 +319,7 @@ void virtio_blk_init(void)
     storage_info->sector_size = VIRTIO_BLK_SECTOR_SIZE;
 
     /* Finished populating configuration */
-    __atomic_store_n(&storage_info->ready, true, __ATOMIC_RELEASE);
+    blk_storage_set_ready(storage_info, true);
 
 #ifdef DEBUG_DRIVER
     uint32_t features_low = regs->DeviceFeatures;

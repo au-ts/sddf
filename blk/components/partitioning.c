@@ -99,7 +99,7 @@ static bool gpt_partitions_init()
         client_storage_info->sector_size = driver_storage_info->sector_size;
         client_storage_info->capacity = clients[i].sectors / (BLK_TRANSFER_SIZE / MSDOS_MBR_SECTOR_SIZE);
         client_storage_info->read_only = driver_storage_info->read_only;
-        __atomic_store_n(&client_storage_info->ready, true, __ATOMIC_RELEASE);
+        blk_storage_set_ready(client_storage_info, true);
     }
 
     return true;
@@ -274,7 +274,7 @@ static bool mbr_partitions_init(void)
         client_storage_info->sector_size = driver_storage_info->sector_size;
         client_storage_info->capacity = clients[i].sectors / (BLK_TRANSFER_SIZE / MSDOS_MBR_SECTOR_SIZE);
         client_storage_info->read_only = driver_storage_info->read_only;
-        __atomic_store_n(&client_storage_info->ready, true, __ATOMIC_RELEASE);
+        blk_storage_set_ready(client_storage_info, true);
     }
     return true;
 }
