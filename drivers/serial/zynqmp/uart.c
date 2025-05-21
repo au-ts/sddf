@@ -28,11 +28,19 @@ __attribute__((__section__(".device_resources"))) device_resources_t device_reso
 serial_queue_handle_t rx_queue_handle;
 serial_queue_handle_t tx_queue_handle;
 
-volatile zynqmp_uart_regs_t *uart_regs;
+/* UART device registers */
+volatile uintptr_t uart_base;
+
+#define REG_PTR(off)     ((volatile uint32_t *)(uart_base + off))
 
 static void drv_putchar(const char c)
 {
-    uart_regs->fifo = (uint32_t)c;
+    *REG_PTR(ZYNQMP_UART_FIFO) = (uint32_t)c;
+}
+
+static char drv_getchar(void)
+{
+    return (char) (*REG_PTR(ZYNQMP_UART_FIFO));
 }
 
 static void tx_provide(void)
@@ -41,19 +49,19 @@ static void tx_provide(void)
     char c;
 
     /* Turn off TX FIFO empty IRQ in case it was turned on previously. */
-    uart_regs->idr = ZYNQMO_UART_IXR_TXEMPTY;
+    *REG_PTR(ZYNQMP_UART_IDR) = ZYNQMP_UART_IXR_TXEMPTY;
 
     /* Send characters until the TX FIFO is full. */
-    while (!(uart_regs->sr & ZYNQMP_UART_CHANNEL_STS_TXFULL) && !serial_dequeue(&tx_queue_handle, &c)) {
+    while (!(*REG_PTR(ZYNQMP_UART_SR) & ZYNQMP_UART_CHANNEL_STS_TXFULL) && !serial_dequeue(&tx_queue_handle, &c)) {
         drv_putchar(c);
         transferred = true;
     }
 
     /* If the TX FIFO becomes full (even when we haven't send anything), raise an interrupt when it is empty. */
-    if (uart_regs->sr & ZYNQMP_UART_CHANNEL_STS_TXFULL) {
-        uint32_t irq_mask = uart_regs->imr;
-        irq_mask |= ZYNQMO_UART_IXR_TXEMPTY;
-        uart_regs->ier = irq_mask;
+    if (*REG_PTR(ZYNQMP_UART_SR) & ZYNQMP_UART_CHANNEL_STS_TXFULL) {
+        uint32_t irq_mask = *REG_PTR(ZYNQMP_UART_IMR);
+        irq_mask |= ZYNQMP_UART_IXR_TXEMPTY;
+        *REG_PTR(ZYNQMP_UART_IER) = irq_mask;
     }
 
     if (transferred && serial_require_consumer_signal(&tx_queue_handle)) {
@@ -69,21 +77,21 @@ static void rx_return(void)
 
     while (reprocess) {
         /* Read from RX FIFO until it is empty. */
-        while (!(uart_regs->sr & ZYNQMP_UART_CHANNEL_STS_RXEMPTY)
+        while (!(*REG_PTR(ZYNQMP_UART_SR) & ZYNQMP_UART_CHANNEL_STS_RXEMPTY)
                && !serial_queue_full(&rx_queue_handle, rx_queue_handle.queue->tail)) {
-            char c = uart_regs->fifo;
+            char c = drv_getchar();
             serial_enqueue(&rx_queue_handle, c);
             enqueued = true;
         }
 
-        if (!(uart_regs->sr & ZYNQMP_UART_CHANNEL_STS_RXEMPTY)
+        if (!(*REG_PTR(ZYNQMP_UART_SR) & ZYNQMP_UART_CHANNEL_STS_RXEMPTY)
             && serial_queue_full(&rx_queue_handle, rx_queue_handle.queue->tail)) {
             /* There's still data to receive but the RX queue is full. */
             serial_request_consumer_signal(&rx_queue_handle);
         }
         reprocess = false;
 
-        if (!(uart_regs->sr & ZYNQMP_UART_CHANNEL_STS_RXEMPTY)
+        if (!(*REG_PTR(ZYNQMP_UART_SR) & ZYNQMP_UART_CHANNEL_STS_RXEMPTY)
             && !serial_queue_full(&rx_queue_handle, rx_queue_handle.queue->tail)) {
             /* There's more space available in the queue. */
             serial_cancel_consumer_signal(&rx_queue_handle);
@@ -99,14 +107,14 @@ static void rx_return(void)
 static void handle_irq(void)
 {
     /* Read and clear the IRQ status bits so we don't get infinitely interrupted. */
-    uint32_t irq_status = uart_regs->isr;
-    uart_regs->isr = irq_status;
-    if (irq_status & ZYNQMO_UART_IXR_TXEMPTY) {
+    uint32_t irq_status = *REG_PTR(ZYNQMP_UART_ISR);
+    *REG_PTR(ZYNQMP_UART_ISR) = irq_status;
+    if (irq_status & ZYNQMP_UART_IXR_TXEMPTY) {
         /* We previously requested the device to raise an IRQ when the TX FIFO is empty because it became full
            while sending stuff. Now continue to send stuff. */
         tx_provide();
     }
-    if (irq_status & ZYNQMO_UART_IXR_RXOVR) {
+    if (irq_status & ZYNQMP_UART_IXR_RXOVR) {
         /* The RX FIFO level has hit the watermark, in this case it is 1 byte. Process RX FIFO. */
         rx_return();
     }
@@ -169,9 +177,9 @@ static void compute_clk_divs(uint64_t clock_hz, uint64_t baudrate, uint16_t *cd,
 static void tx_fifo_drain_wait(void)
 {
     /* Wait for the TX FIFO to drain. */
-    while (!(uart_regs->sr & ZYNQMP_UART_CHANNEL_STS_TXEMPTY));
+    while (!(*REG_PTR(ZYNQMP_UART_SR) & ZYNQMP_UART_CHANNEL_STS_TXEMPTY));
     /* Wait for the Transmitter to finish sending the signals. */
-    while ((uart_regs->sr & ZYNQMP_UART_CHANNEL_STS_TXACTIVE));
+    while ((*REG_PTR(ZYNQMP_UART_SR) & ZYNQMP_UART_CHANNEL_STS_TXACTIVE));
 }
 
 static void uart_setup(void)
@@ -187,54 +195,54 @@ static void uart_setup(void)
     /* Disable TX and RX before the UART registers can be reprogrammed (star at page 589).
      * First clear the enable bit then set the disabled bit.
      */
-    uint32_t cr = uart_regs->cr;
+    uint32_t cr = *REG_PTR(ZYNQMP_UART_CR);
     cr &= ~((uint32_t)(BIT(ZYNQMP_UART_CR_TX_EN_SHIFT) | BIT(ZYNQMP_UART_CR_RX_EN_SHIFT)));
     cr |= ZYNQMP_UART_CR_TX_DIS | ZYNQMP_UART_CR_RX_DIS;
-    uart_regs->cr = cr;
+    *REG_PTR(ZYNQMP_UART_CR) = cr;
 
     /* Clear the mode register to make sure the device is operating in normal mode
      * and the clock isn't divided by 8 */
-    uart_regs->mr = 0;
+    *REG_PTR(ZYNQMP_UART_MR) = 0;
 
     /* Set the baud rate by programming the clock dividers */
-    uart_regs->bauddiv = bdiv;
-    uart_regs->baudgen = cd;
+    *REG_PTR(ZYNQMP_UART_BAUDDIV) = bdiv;
+    *REG_PTR(ZYNQMP_UART_BAUDGEN) = cd;
 
-    /* Reset TX and RX. */
-    uart_regs->cr |= ZYNQMP_UART_CR_TX_RST | ZYNQMP_UART_CR_RX_RST;
-    while (uart_regs->cr & (ZYNQMP_UART_CR_TX_RST | ZYNQMP_UART_CR_RX_RST));
+    /* Reset TX and RX and wait for the reset to complete. */
+    *REG_PTR(ZYNQMP_UART_CR) |= ZYNQMP_UART_CR_TX_RST | ZYNQMP_UART_CR_RX_RST;
+    while (*REG_PTR(ZYNQMP_UART_CR) & (ZYNQMP_UART_CR_TX_RST | ZYNQMP_UART_CR_RX_RST));
 
     /* Clear the TX and RX disable bit. */
-    cr = uart_regs->cr;
+    cr = *REG_PTR(ZYNQMP_UART_CR);
     cr &= ~((uint32_t)(BIT(ZYNQMP_UART_CR_TX_DIS_SHIFT) | BIT(ZYNQMP_UART_CR_RX_DIS_SHIFT)));
 
     /* Enable TX and RX. */
     cr |= ZYNQMP_UART_CR_TX_EN | ZYNQMP_UART_CR_RX_EN;
-    uart_regs->cr = cr;
+    *REG_PTR(ZYNQMP_UART_CR) = cr;
 
     /* Select 8 bytes character length. */
-    uint32_t mr = uart_regs->mr;
-    mr &= ~((BIT(0) | BIT(1)) << ZYNQMO_UART_MR_CHARLEN_SHIFT);
+    uint32_t mr = *REG_PTR(ZYNQMP_UART_MR);
+    mr &= ~((BIT(0) | BIT(1)) << ZYNQMP_UART_MR_CHARLEN_SHIFT);
 
     /* No parity checks */
-    mr |= ZYNQMO_UART_MR_PARITY_NONE;
+    mr |= ZYNQMP_UART_MR_PARITY_NONE;
 
     /* One stop bit to detect on RX and to generate on TX */
-    mr &= ~((BIT(0) | BIT(1)) << ZYNQMO_UART_MR_STOPMODE_SHIFT);
+    mr &= ~((BIT(0) | BIT(1)) << ZYNQMP_UART_MR_STOPMODE_SHIFT);
 
     /* Put the UART device in normal operating mode */
-    mr &= ~((BIT(0) | BIT(1)) << ZYNQMO_UART_MR_CHMODE_SHIFT);
-    uart_regs->mr = mr;
+    mr &= ~((BIT(0) | BIT(1)) << ZYNQMP_UART_MR_CHMODE_SHIFT);
+    *REG_PTR(ZYNQMP_UART_MR) = mr;
 
     /* Turn off all the interrupts, then only turn on the ones we need. */
-    uart_regs->idr = ZYNQMO_UART_IXR_MASK;
+    *REG_PTR(ZYNQMP_UART_IDR) = ZYNQMP_UART_IXR_MASK;
 
     if (config.rx_enabled) {
         /* Set the watermark to raise an interrupt for every received byte. */
-        uart_regs->rxwm = 1;
+        *REG_PTR(ZYNQMP_UART_RXWM) = 1;
 
         /* Enable IRQ on every bytes received. */
-        uart_regs->ier = ZYNQMO_UART_IXR_RXOVR;
+        *REG_PTR(ZYNQMP_UART_IER) = ZYNQMP_UART_IXR_RXOVR;
     }
 }
 
@@ -245,7 +253,7 @@ void init(void)
     assert(device_resources.num_irqs == 1);
     assert(device_resources.num_regions == 1);
 
-    uart_regs = device_resources.regions[0].region.vaddr;
+    uart_base = (uintptr_t) device_resources.regions[0].region.vaddr;
 
     uart_setup();
 
