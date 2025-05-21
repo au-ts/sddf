@@ -49,8 +49,8 @@ static void set_baud(unsigned long baud)
     /* baud rate = (serial_clock_freq) / (16 * divisor) */
     uint16_t divisor = DIV_ROUND_CLOSEST(UART_CLK, 16 * baud);
 
-    *REG_PTR(UART_DLH) |= (divisor >> 8) & DL_MASK;
-    *REG_PTR(UART_DLL) |= divisor & DL_MASK;
+    *REG_PTR(UART_DLH) |= (divisor >> 8) & 0xff;
+    *REG_PTR(UART_DLL) |= divisor & 0xff;
 
     /* Restore the LCR */
     *REG_PTR(UART_LCR) = lcr_val;
@@ -125,6 +125,7 @@ static void handle_irq(void)
         tx_provide();
     }
 
+    #define UART_ABNORMAL (UART_LSR_PE | UART_LSR_FE | UART_LSR_RFE)
     if (line_status & UART_ABNORMAL) {
         LOG_DRIVER_ERR("device encountered an error with status register %u\n", line_status);
         /* Clear the UART errors */
@@ -144,7 +145,7 @@ void init(void)
     /* Ensure that the FIFO's are empty */
     while (!(*REG_PTR(UART_LSR) & UART_LSR_THRE));
 
-#ifdef UART_DW_APB_SHADOW_REGISTERS
+#if UART_DW_APB_SHADOW_REGISTERS
     /* Reset the UART device - this disables RX and TX */
     *REG_PTR(UART_SSR) |= UART_SSR_UR;
 #endif
@@ -152,11 +153,12 @@ void init(void)
     /* Setup the Modem Control Register */
     *REG_PTR(UART_MCR) |= (UART_MCR_DTR | UART_MCR_RTS);
 
-    /* Clear and enable the FIFO's*/
-    *REG_PTR(UART_FCR) = UART_FCR_CE;
+    /* Reset and enable the FIFO's*/
+    *REG_PTR(UART_FCR) = (UART_FCR_XFIFOR | UART_FCR_RFIFOR | UART_FCR_FIFOE);
 
-    /* Set defaults for the UART Line control register */
-    *REG_PTR(UART_LCR) |= UART_LCR_DEFAULT;
+    /* Set LCR format; 8 bit data length (bits 0-1), 1 stop bit (bit 2),
+       no parity, no break control. */
+    *REG_PTR(UART_LCR) = 0b00000011;
 
     /* Reset IIR */
     *REG_PTR(UART_IIR) = 0x1;
