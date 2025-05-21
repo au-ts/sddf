@@ -36,6 +36,55 @@ volatile uintptr_t uart_base;
 #error "unknown platform reg-io-width"
 #endif
 
+static inline bool tx_fifo_not_full(void)
+{
+#if UART_DW_APB_SHADOW_REGISTERS
+    /**
+     * On DesignWare APB-derived 16550a-like IPs, they provide a TFNF bit in
+     * the UART Status Register (USR).
+     */
+    return !!(*REG_PTR(UART_USR) & UART_USR_TFNF);
+#else
+    /**
+     * On a standard NS16550a UART IP, we don't have a "transmit FIFO (not) full"
+     * indicator bit. Instead we have a FIFO empty / holding register empty bit.
+     * This means that despite *notionally* having a TX FIFO, it is never filled
+     * more than 1 bit at a time. This makes the TX rather slow. If we only use
+     * this on our Star64, we see interleaved serial output in debug mode [1].
+     *
+     * Ref [2] also describes this similar issue, and demonstrates the "intended"
+     * use is to write a FIFO-size (i.e. 16 characters) at once to the UART THR.
+     * This is also what Zephyr [3] and Linux [4] do.
+     *
+     * However, as we run on top of seL4, we may be preempted at any time.
+     * Specifically, another process may use a debug print through OpenSBI's
+     * driver [5] which will write to the UART THR. Because a TX overrun on the
+     * NS16550a will corrupt what had previously been written (as opposed to
+     * not doing anything), we can't detect whether or not we would corrupt
+     * the serial output.
+     *
+     * It would be possible, if OpenSBI's driver handled "polling uart in an IRQ
+     * context" like Linux does [6], where it wants for the THR to empty both
+     * before *and* after emitting a character. However, this is not the case.
+     *
+     * @todo in release mode, openSBI's print output is never used by the kernel
+     *       at runtime, and so we could emit the whole FIFO-size at once.
+     *
+     * Hence, on standard ns16550a we are likely to see interleaved serial output
+     * because of how slow waiting for an interrupt for *every* output character
+     * is.
+     *
+     * [1]: https://github.com/au-ts/sddf/issues/411#issuecomment-2864845777
+     * [2]: https://www.ele.uva.es/~jesus/UltimatePutchar.pdf
+     * [3]: https://github.com/zephyrproject-rtos/zephyr/blob/zephyr-v3.5.0/drivers/serial/uart_ns16550.c#L773-L798
+     * [4]: https://github.com/torvalds/linux/blob/v6.14/drivers/tty/serial/8250/8250_port.c#L1794-L1855
+     * [5]: https://github.com/riscv-software-src/opensbi/blob/v1.6/lib/utils/serial/uart8250.c#L74-L80
+     * [6]: https://github.com/torvalds/linux/commit/f2d937f3bf00665ccf048b3b6616ef95859b0945
+     */
+    return !!(*REG_PTR(UART_LSR) & UART_LSR_THRE);
+#endif
+}
+
 static void set_baud(unsigned long baud)
 {
     /*  Divisor Latch Access Bit (DLAB) of the LCR must be set.
@@ -60,14 +109,13 @@ static void tx_provide(void)
 {
     bool transferred = false;
     char c;
-    while ((*REG_PTR(UART_LSR) & UART_LSR_THRE) && !serial_dequeue(&tx_queue_handle, &c)) {
+    while (tx_fifo_not_full() && !serial_dequeue(&tx_queue_handle, &c)) {
         *REG_PTR(UART_THR) = c;
         transferred = true;
     }
 
-    /* If transmit FIFO is full and we still have data to be sent, enable TX IRQ */
-    if ((*REG_PTR(UART_LSR) & UART_LSR_THRE) == 0
-        && !serial_queue_empty(&tx_queue_handle, tx_queue_handle.queue->head)) {
+    /* If we still have data to be sent after filling the FIFO, enable TX empty IRQ */
+    if (!serial_queue_empty(&tx_queue_handle, tx_queue_handle.queue->head)) {
         *REG_PTR(UART_IER) |= UART_IER_ETBEI;
     } else {
         *REG_PTR(UART_IER) &= ~UART_IER_ETBEI;
