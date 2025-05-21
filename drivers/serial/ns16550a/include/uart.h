@@ -35,6 +35,7 @@
  * https://github.com/qemu/qemu/blob/56c6e249b6988c1b6edc2dd34ebb0f1e570a1365/hw/riscv/virt.c#L966
  */
 #define UART_CLK 3686400
+#define UART_DW_APB_SHADOW_REGISTERS 0
 #else
 #error "unknown UART clock"
 #endif
@@ -56,69 +57,70 @@
 
 /* UART Divisor High Latch Register (R/W) */
 #define UART_DLH 0x01
-/* Divisor Latch Mask */
-#define DL_MASK 0xff
 
 /* UART Interrupt Enable Register (R/W) */
 #define UART_IER 0x01
 /* Enable Received Data Available Interrupt */
-#define UART_IER_ERBFI 0x1
+#define UART_IER_ERBFI BIT(0)
 /* Enable Transmit Holding Register Empty Interrupt */
-#define UART_IER_ETBEI 0x2
+#define UART_IER_ETBEI BIT(1)
 
 /* UART Interrupt Identity Register (R) */
 #define UART_IIR 0x02
 /* Transmit Holding Register Empty */
-#define UART_IIR_THR_EMPTY 0x2
+#define UART_IIR_THR_EMPTY BIT(1)
 /* Received Data Available */
-#define UART_IIR_RX 0x4
+#define UART_IIR_RX BIT(2)
 
 /* UART FIFO Control Register (W) */
 #define UART_FCR 0x02
-/* Transmit FIFO Reset */
-#define UART_FCR_XFIFOR (1 << 2)
-/* Receive FIFO Reset */
-#define UART_FCR_RFIFOR (1 << 1)
 /* FIFO Enable */
-#define UART_FCR_FIFOE (1 << 0)
-/* FIFO Clear and Enable */
-#define UART_FCR_CE (UART_FCR_XFIFOR | UART_FCR_RFIFOR | UART_FCR_FIFOE)
+#define UART_FCR_FIFOE BIT(0)
+/* Receive FIFO Reset */
+#define UART_FCR_RFIFOR BIT(1)
+/* Transmit FIFO Reset */
+#define UART_FCR_XFIFOR BIT(2)
 
-/* UART Line Control Register */
+/* UART Line Control Register (RW) */
 #define UART_LCR 0x03
-/* Default for LCR. 8 bit data length and 2 stop bits*/
-#define UART_LCR_DEFAULT 0x03
 /* Divisor Latch Access Bit */
-#define UART_LCR_DLAB (1 << 7)
+#define UART_LCR_DLAB BIT(7)
 
-/* UART Modem Control Register */
+/* UART Modem Control Register (RW) */
 #define UART_MCR 0x4
 /* Data Terminal Ready */
-#define UART_MCR_DTR (1 << 0)
+#define UART_MCR_DTR BIT(0)
 /* Request to Send */
-#define UART_MCR_RTS (1 << 1)
+#define UART_MCR_RTS BIT(1)
 
 /* UART Line Status Register (R) */
 #define UART_LSR 0x05
 /* Data Ready */
-#define UART_LSR_DR 0x1
-/* Transmit Holding Register Empty */
-#define UART_LSR_THRE 0x20
+#define UART_LSR_DR BIT(0)
 /* Parity Error Bit */
-#define UART_LSR_PE (1 << 2)
+#define UART_LSR_PE BIT(2)
 /* Framing Error Bit */
-#define UART_LSR_FE (1 << 3)
+#define UART_LSR_FE BIT(3)
+/* Transmit Holding Register Empty */
+#define UART_LSR_THRE BIT(5)
+/* Transmit FIFO and Transmit Shift register Empty */
+#define UART_LSR_TEMT BIT(6)
 /* Recv FIFO Error Bit */
-#define UART_LSR_RFE (1 << 7)
-/* Abnormal Status */
-#define UART_ABNORMAL (UART_LSR_PE | UART_LSR_FE | UART_LSR_RFE)
+#define UART_LSR_RFE BIT(7)
 
 /*
  * These registers are special to the DW APB UART implementation.
  */
-#if defined(UART_DW_APB_SHADOW_REGISTERS)
+#if UART_DW_APB_SHADOW_REGISTERS
 /* UART Software Reset Register */
 #define UART_SSR 0x22
 /* UART Reset */
-#define UART_SSR_UR (1 << 0)
+#define UART_SSR_UR BIT(0)
+
+/* UART Status Register (0x7C >> 2 = 0x1f) */
+#define UART_USR 0x1f
+/* UART BUSY */
+#define UART_USR_BUSY BIT(0)
+/* Transmit FIFO Not Full */
+#define UART_USR_TFNF BIT(1)
 #endif
