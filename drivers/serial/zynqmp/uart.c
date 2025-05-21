@@ -236,6 +236,7 @@ static void uart_setup(void)
 
     /* Turn off all the interrupts, then only turn on the ones we need. */
     *REG_PTR(ZYNQMP_UART_IDR) = ZYNQMP_UART_IXR_MASK;
+    *REG_PTR(ZYNQMP_UART_ISR) = ZYNQMP_UART_IXR_MASK;
 
     if (config.rx_enabled) {
         /* Set the watermark to raise an interrupt for every received byte. */
