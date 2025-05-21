@@ -142,13 +142,9 @@ void init(void)
 
     uart_base = (uintptr_t)device_resources.regions[0].region.vaddr;
 
-    /* Ensure that the FIFO's are empty */
-    while (!(*REG_PTR(UART_LSR) & UART_LSR_THRE));
 
-#if UART_DW_APB_SHADOW_REGISTERS
-    /* Reset the UART device - this disables RX and TX */
-    *REG_PTR(UART_SSR) |= UART_SSR_UR;
-#endif
+    /* Ensure that the FIFO's are empty */
+    while (!(*REG_PTR(UART_LSR) & (UART_LSR_THRE | UART_LSR_TEMT)));
 
     /* Setup the Modem Control Register */
     *REG_PTR(UART_MCR) |= (UART_MCR_DTR | UART_MCR_RTS);
