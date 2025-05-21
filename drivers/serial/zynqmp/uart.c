@@ -40,7 +40,7 @@ static void drv_putchar(const char c)
 
 static char drv_getchar(void)
 {
-    return (char) (*REG_PTR(ZYNQMP_UART_FIFO));
+    return (char)(*REG_PTR(ZYNQMP_UART_FIFO));
 }
 
 static void tx_provide(void)
@@ -253,7 +253,7 @@ void init(void)
     assert(device_resources.num_irqs == 1);
     assert(device_resources.num_regions == 1);
 
-    uart_base = (uintptr_t) device_resources.regions[0].region.vaddr;
+    uart_base = (uintptr_t)device_resources.regions[0].region.vaddr;
 
     uart_setup();
 
