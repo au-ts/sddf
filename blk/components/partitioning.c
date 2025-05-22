@@ -400,6 +400,7 @@ blk_resp_status_t get_drv_block_number(uint64_t cli_block_number, uint16_t cli_c
 bool virt_partition_init(void)
 {
     if (!mbr_state.sent_request) {
+        LOG_BLK_VIRT("sending MBR request\n");
         mbr_request();
         return false;
     }
@@ -407,9 +408,11 @@ bool virt_partition_init(void)
     bool success = false;
 
     if (gpt_state.sent_request) {
+        LOG_BLK_VIRT("validating GPT partitions\n");
         /* need to validate partition header and table of a GPT disk */
         success = gpt_validate_partitions();
         if (success) {
+            LOG_BLK_VIRT("initialising GPT partitions\n");
             success = gpt_partitions_init();
         }
         return success;
@@ -417,6 +420,7 @@ bool virt_partition_init(void)
 
     success = mbr_handle_response();
     if (success) {
+        LOG_BLK_VIRT("MBR partitioning detected\n");
         success = mbr_partitions_init();
     }
 

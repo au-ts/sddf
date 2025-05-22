@@ -17,16 +17,6 @@
 
 __attribute__((__section__(".blk_virt_config"))) blk_virt_config_t config;
 
-/* Uncomment this to enable debug logging */
-/* #define DEBUG_BLK_VIRT */
-
-#if defined(DEBUG_BLK_VIRT)
-#define LOG_BLK_VIRT(...) do{ sddf_dprintf("BLK_VIRT|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
-#else
-#define LOG_BLK_VIRT(...) do{}while(0)
-#endif
-#define LOG_BLK_VIRT_ERR(...) do{ sddf_dprintf("BLK_VIRT|ERROR: "); sddf_dprintf(__VA_ARGS__); }while(0)
-
 /* Driver queue handle */
 blk_queue_handle_t drv_h;
 /* Client queue handles */
@@ -97,8 +87,6 @@ static void handle_driver()
         case BLK_REQ_READ:
             if (drv_status == BLK_RESP_OK) {
                 /* Invalidate cache */
-                LOG_BLK_VIRT("start: 0x%lx, end: 0x%lx\n", reqbk.vaddr,
-                             reqbk.vaddr + (BLK_TRANSFER_SIZE * reqbk.count));
                 cache_clean_and_invalidate(reqbk.vaddr, reqbk.vaddr + (BLK_TRANSFER_SIZE * reqbk.count));
             }
             break;
@@ -253,6 +241,7 @@ void notified(microkit_channel ch)
 {
     if (!initialised) {
         /* Continue processing partitions until initialisation has finished. */
+        LOG_BLK_VIRT("initialising partitions\n");
         initialised = virt_partition_init();
     }
 
