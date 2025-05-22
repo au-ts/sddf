@@ -50,6 +50,7 @@ static void tx_provide(void)
 
     /* Turn off TX FIFO empty IRQ in case it was turned on previously. */
     *REG_PTR(ZYNQMP_UART_IDR) = ZYNQMP_UART_IXR_TXEMPTY;
+    *REG_PTR(ZYNQMP_UART_ISR) = ZYNQMP_UART_IXR_TXEMPTY;
 
     /* Send characters until the TX FIFO is full. */
     while (!(*REG_PTR(ZYNQMP_UART_SR) & ZYNQMP_UART_CHANNEL_STS_TXFULL) && !serial_dequeue(&tx_queue_handle, &c)) {
@@ -112,10 +113,12 @@ static void handle_irq(void)
     if (irq_status & ZYNQMP_UART_IXR_TXEMPTY) {
         /* We previously requested the device to raise an IRQ when the TX FIFO is empty because it became full
            while sending stuff. Now continue to send stuff. */
+        assert(*REG_PTR(ZYNQMP_UART_SR) & ZYNQMP_UART_IXR_TXEMPTY);
         tx_provide();
     }
     if (irq_status & ZYNQMP_UART_IXR_RXOVR) {
         /* The RX FIFO level has hit the watermark, in this case it is 1 byte. Process RX FIFO. */
+        assert(!(*REG_PTR(ZYNQMP_UART_SR) & ZYNQMP_UART_IXR_RXEMPTY));
         rx_return();
     }
 }
