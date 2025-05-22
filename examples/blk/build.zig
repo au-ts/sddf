@@ -85,42 +85,35 @@ pub fn build(b: *std.Build) !void {
 
     const partition = b.option(usize, "partition", "Block device partition for client to use") orelse null;
 
-    // Getting the path to the Microkit SDK before doing anything else
-    const microkit_sdk_arg = b.option([]const u8, "sdk", "Path to Microkit SDK");
-    if (microkit_sdk_arg == null) {
-        std.log.err("Missing -Dsdk=/path/to/sdk argument being passed\n", .{});
-        std.posix.exit(1);
-    }
-    const microkit_sdk = microkit_sdk_arg.?;
+    const microkit_sdk = b.option(LazyPath, "sdk", "Path to Microkit SDK") orelse {
+        std.log.err("Missing -Dsdk=<sdk> argument", .{});
+        return error.MissingSdkPath;
+    };
 
-    const microkit_config_option = b.option(ConfigOptions, "config", "Microkit config to build for") orelse ConfigOptions.debug;
+    const microkit_config_option = b.option(ConfigOptions, "config", "Microkit config to build for") orelse .debug;
     const microkit_config = @tagName(microkit_config_option);
 
-    // Get the Microkit SDK board we want to target
-    const microkit_board_option = b.option(MicrokitBoard, "board", "Microkit board to target");
+    const microkit_board_option = b.option(MicrokitBoard, "board", "Microkit board to target") orelse {
+        std.log.err("Missing -Dboard=<board> argument", .{});
+        return error.MissingBoard;
+    };
 
-    if (microkit_board_option == null) {
-        std.log.err("Missing -Dboard=<BOARD> argument being passed\n", .{});
-        std.posix.exit(1);
-    }
-    const target = b.resolveTargetQuery(findTarget(microkit_board_option.?));
-    const microkit_board = @tagName(microkit_board_option.?);
+    const target = b.resolveTargetQuery(findTarget(microkit_board_option));
+    const microkit_board = @tagName(microkit_board_option);
 
-    const microkit_board_dir = b.fmt("{s}/board/{s}/{s}", .{ microkit_sdk, microkit_board, microkit_config });
-    const microkit_tool = b.fmt("{s}/bin/microkit", .{microkit_sdk});
-    const libmicrokit = b.fmt("{s}/lib/libmicrokit.a", .{microkit_board_dir});
-    const libmicrokit_include = b.fmt("{s}/include", .{microkit_board_dir});
-    const libmicrokit_linker_script = b.fmt("{s}/lib/microkit.ld", .{microkit_board_dir});
+    const microkit_board_dir = microkit_sdk.path(b, "board").path(b, microkit_board).path(b, microkit_config);
+    const microkit_tool = microkit_sdk.path(b, "bin/microkit");
+    const libmicrokit = microkit_board_dir.path(b, "lib/libmicrokit.a");
+    const libmicrokit_include = microkit_board_dir.path(b, "include");
+    const libmicrokit_linker_script = microkit_board_dir.path(b, "lib/microkit.ld");
 
     const sddf_dep = b.dependency("sddf", .{
         .target = target,
         .optimize = optimize,
-        .libmicrokit = @as([]const u8, libmicrokit),
-        .libmicrokit_include = @as([]const u8, libmicrokit_include),
-        .libmicrokit_linker_script = @as([]const u8, libmicrokit_linker_script),
+        .microkit_board_dir = microkit_board_dir,
     });
 
-    const timer_driver_class = switch (microkit_board_option.?) {
+    const timer_driver_class = switch (microkit_board_option) {
         .maaxboard => "imx",
         else => null,
     };
@@ -131,12 +124,12 @@ pub fn build(b: *std.Build) !void {
         timer_driver_install = b.addInstallArtifact(driver, .{ .dest_sub_path = "timer_driver.elf" });
     }
 
-    const blk_driver_class = switch (microkit_board_option.?) {
+    const blk_driver_class = switch (microkit_board_option) {
         .qemu_virt_aarch64, .qemu_virt_riscv64 => "virtio",
         .maaxboard => "mmc_imx",
     };
 
-    const serial_driver_class = switch (microkit_board_option.?) {
+    const serial_driver_class = switch (microkit_board_option) {
         .qemu_virt_aarch64 => "arm",
         .qemu_virt_riscv64 => "ns16550a",
         .maaxboard => "imx",
@@ -158,9 +151,9 @@ pub fn build(b: *std.Build) !void {
     client.linkLibrary(sddf_dep.artifact("util"));
     client.linkLibrary(sddf_dep.artifact("util_putchar_serial"));
 
-    client.addIncludePath(.{ .cwd_relative = libmicrokit_include });
-    client.addObjectFile(.{ .cwd_relative = libmicrokit });
-    client.setLinkerScript(.{ .cwd_relative = libmicrokit_linker_script });
+    client.addIncludePath(libmicrokit_include);
+    client.addObjectFile(libmicrokit);
+    client.setLinkerScript(libmicrokit_linker_script);
 
     const blk_driver = sddf_dep.artifact(b.fmt("driver_blk_{s}.elf", .{ blk_driver_class }));
     const serial_driver = sddf_dep.artifact(b.fmt("driver_serial_{s}.elf", .{ serial_driver_class }));
@@ -247,8 +240,9 @@ pub fn build(b: *std.Build) !void {
     };
 
     const final_image_dest = b.getInstallPath(.bin, "./loader.img");
-    const microkit_tool_cmd = b.addSystemCommand(&[_][]const u8{
-        microkit_tool,
+    const microkit_tool_cmd = Step.Run.create(b, "run microkit tool");
+    microkit_tool_cmd.addFileArg(microkit_tool);
+    microkit_tool_cmd.addArgs(&[_][]const u8{
         b.getInstallPath(.{ .custom = "meta_output" }, "blk.system"),
         "--search-path", b.getInstallPath(.bin, ""),
         "--board", microkit_board,
@@ -261,7 +255,7 @@ pub fn build(b: *std.Build) !void {
     }
     microkit_tool_cmd.step.dependOn(&meta_output_install.step);
     microkit_tool_cmd.step.dependOn(b.getInstallStep());
-    microkit_tool_cmd.setEnvironmentVariable("MICROKIT_SDK", microkit_sdk);
+    microkit_tool_cmd.setEnvironmentVariable("MICROKIT_SDK", microkit_sdk.getPath3(b, null).toString(b.allocator) catch @panic("OOM"));
 
     const microkit_step = b.step("microkit", "Compile and build the final bootable image");
     microkit_step.dependOn(&microkit_tool_cmd.step);
@@ -269,7 +263,7 @@ pub fn build(b: *std.Build) !void {
 
     // This is setting up a `qemu` command for running the system using QEMU,
     // which we only want to do when we have a board that we can actually simulate.
-    if (microkit_board_option.? == .qemu_virt_aarch64 or microkit_board_option.? == .qemu_virt_riscv64) {
+    if (microkit_board_option == .qemu_virt_aarch64 or microkit_board_option == .qemu_virt_riscv64) {
         const create_disk_cmd = b.addSystemCommand(&[_][]const u8{
             "bash",
         });
@@ -284,7 +278,7 @@ pub fn build(b: *std.Build) !void {
         disk_install.step.dependOn(&create_disk_cmd.step);
 
         var qemu_cmd: *Step.Run = undefined;
-        if (microkit_board_option.? == .qemu_virt_aarch64) {
+        if (microkit_board_option == .qemu_virt_aarch64) {
             const loader_arg = b.fmt("loader,file={s},addr=0x70000000,cpu-num=0", .{ final_image_dest });
             qemu_cmd = b.addSystemCommand(&[_][]const u8{
                 "qemu-system-aarch64",
@@ -295,7 +289,7 @@ pub fn build(b: *std.Build) !void {
                 "-m", "2G",
                 "-nographic",
             });
-        } else if (microkit_board_option.? == .qemu_virt_riscv64) {
+        } else if (microkit_board_option == .qemu_virt_riscv64) {
             qemu_cmd = b.addSystemCommand(&[_][]const u8{
                 "qemu-system-riscv64",
                 "-machine",
