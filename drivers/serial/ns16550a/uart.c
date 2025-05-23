@@ -90,7 +90,6 @@ static inline bool rx_has_data(void)
     return !!(*REG_PTR(UART_LSR) & UART_LSR_DR);
 }
 
-// TODO: (entire) redo? very dodgy.
 static void set_baud(unsigned long baud)
 {
     /*  Divisor Latch Access Bit (DLAB) of the LCR must be set.
@@ -104,8 +103,8 @@ static void set_baud(unsigned long baud)
     /* baud rate = (serial_clock_freq) / (16 * divisor) */
     uint16_t divisor = DIV_ROUND_CLOSEST(UART_CLK, 16 * baud);
 
-    *REG_PTR(UART_DLH) |= (divisor >> 8) & 0xff;
-    *REG_PTR(UART_DLL) |= divisor & 0xff;
+    *REG_PTR(UART_DLH) = (divisor >> 8) & 0xff;
+    *REG_PTR(UART_DLL) = divisor & 0xff;
 
     /* Restore the LCR */
     *REG_PTR(UART_LCR) = lcr_val;
@@ -195,19 +194,19 @@ void init(void)
 
     uart_base = (uintptr_t)device_resources.regions[0].region.vaddr;
 
-    /* Disable all interrupts for now */
-    *REG_PTR(UART_IER) = 0;
-    /* Reset interrupt indications */
-    (void)*REG_PTR(UART_IIR);
-
     /* Ensure that the FIFO's are empty */
     while (!(*REG_PTR(UART_LSR) & (UART_LSR_THRE | UART_LSR_TEMT)));
 
+    /* Disable all interrupts for now */
+    *REG_PTR(UART_IER) = 0;
+
     /* Clear any error indication bits */
     (void)*REG_PTR(UART_LSR);
+    /* Reset interrupt indications. */
+    (void)*REG_PTR(UART_IIR);
 
     /* Setup the Modem Control Register */
-    *REG_PTR(UART_MCR) |= (UART_MCR_DTR | UART_MCR_RTS);
+    *REG_PTR(UART_MCR) = (UART_MCR_DTR | UART_MCR_RTS);
 
     /* Reset and enable the FIFO's*/
     *REG_PTR(UART_FCR) = (UART_FCR_XFIFOR | UART_FCR_RFIFOR | UART_FCR_FIFOE);
@@ -217,16 +216,24 @@ void init(void)
     *REG_PTR(UART_LCR) = 0b00000011;
 
     // /* Set the baud rate */
-    // // BROKEN af
-    // // set_baud(config.default_baud);
+    set_baud(config.default_baud);
 
     if (config.rx_enabled) {
-        /* Enable (only) the receive data available IRQ */
+        /* Enable (only) the receive data available IRQ
+           -> TX enabled as needed by tx_provide(). */
         *REG_PTR(UART_IER) = UART_IER_ERBFI;
 
         serial_queue_init(&rx_queue_handle, config.rx.queue.vaddr, config.rx.data.size, config.rx.data.vaddr);
     }
+
     serial_queue_init(&tx_queue_handle, config.tx.queue.vaddr, config.tx.data.size, config.tx.data.vaddr);
+
+#if UART_DW_APB_SHADOW_REGISTERS
+    /* Clear the USR busy bit
+        https://github.com/torvalds/linux/blob/v6.14/drivers/tty/serial/8250/8250_dw.c#L304-L306
+    */
+    (void)*REG_PTR(UART_USR);
+#endif
 }
 
 void notified(microkit_channel ch)
