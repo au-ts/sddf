@@ -85,6 +85,12 @@ static inline bool tx_fifo_not_full(void)
 #endif
 }
 
+static inline bool rx_has_data(void)
+{
+    return !!(*REG_PTR(UART_LSR) & UART_LSR_DR);
+}
+
+// TODO: (entire) redo? very dodgy.
 static void set_baud(unsigned long baud)
 {
     /*  Divisor Latch Access Bit (DLAB) of the LCR must be set.
@@ -132,8 +138,7 @@ static void rx_return(void)
     bool reprocess = true;
     bool enqueued = false;
     while (reprocess) {
-        while ((*REG_PTR(UART_LSR) & UART_LSR_DR)
-               && !serial_queue_full(&rx_queue_handle, rx_queue_handle.queue->tail)) {
+        while (rx_has_data() && !serial_queue_full(&rx_queue_handle, rx_queue_handle.queue->tail)) {
             char c = *REG_PTR(UART_RBR);
             int err = serial_enqueue(&rx_queue_handle, c);
             assert(!err);
@@ -142,14 +147,15 @@ static void rx_return(void)
 
         /* If we have more RX device data available, but no space in the queue with the virtualiser,
          * we disable RX IRQs until space becomes available. */
-        if ((*REG_PTR(UART_LSR) & UART_LSR_DR) && serial_queue_full(&rx_queue_handle, rx_queue_handle.queue->tail)) {
+        if (rx_has_data() && serial_queue_full(&rx_queue_handle, rx_queue_handle.queue->tail)) {
             *REG_PTR(UART_IER) &= ~UART_IER_ERBFI;
             serial_request_consumer_signal(&rx_queue_handle);
         }
+
         reprocess = false;
 
         /* While RX data is still available, we enable the RX IRQ and continue processing */
-        if ((*REG_PTR(UART_LSR) & UART_LSR_DR) && !serial_queue_full(&rx_queue_handle, rx_queue_handle.queue->tail)) {
+        if (rx_has_data() && !serial_queue_full(&rx_queue_handle, rx_queue_handle.queue->tail)) {
             serial_cancel_consumer_signal(&rx_queue_handle);
             *REG_PTR(UART_LSR) |= UART_IER_ERBFI;
             reprocess = true;
