@@ -67,9 +67,6 @@ static inline bool tx_fifo_not_full(void)
      * context" like Linux does [6], where it wants for the THR to empty both
      * before *and* after emitting a character. However, this is not the case.
      *
-     * @todo in release mode, openSBI's print output is never used by the kernel
-     *       at runtime, and so we could emit the whole FIFO-size at once.
-     *
      * Hence, on standard ns16550a we are likely to see interleaved serial output
      * because of how slow waiting for an interrupt for *every* output character
      * is.
@@ -230,8 +227,9 @@ void init(void)
 
 #if UART_DW_APB_SHADOW_REGISTERS
     /* Clear the USR busy bit
-        https://github.com/torvalds/linux/blob/v6.14/drivers/tty/serial/8250/8250_dw.c#L304-L306
-    */
+     * This must be done after enabling IRQs
+     * https://github.com/torvalds/linux/blob/v6.14/drivers/tty/serial/8250/8250_dw.c#L304-L306
+     */
     (void)*REG_PTR(UART_USR);
 #endif
 }
