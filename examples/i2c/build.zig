@@ -18,7 +18,7 @@ const targets = [_]Target{
         .zig_target = std.Target.Query{
             .cpu_arch = .aarch64,
             .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a55 },
-            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{ .strict_align }),
+            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{.strict_align}),
             .os_tag = .freestanding,
             .abi = .none,
         },
@@ -44,7 +44,7 @@ fn updateSectionObjcopy(b: *std.Build, section: []const u8, data_output: std.Bui
     });
     run_objcopy.addArg("--update-section");
     const data_full_path = data_output.join(b.allocator, data) catch @panic("OOM");
-    run_objcopy.addPrefixedFileArg(b.fmt("{s}=", .{ section }), data_full_path);
+    run_objcopy.addPrefixedFileArg(b.fmt("{s}=", .{section}), data_full_path);
     run_objcopy.addFileArg(.{ .cwd_relative = b.getInstallPath(.bin, elf) });
 
     // We need the ELFs we talk about to be in the install directory first.
@@ -110,7 +110,6 @@ pub fn build(b: *std.Build) void {
     // This is required because the SDF file is expecting a different name to the artifact we
     // are dealing with.
     const timer_driver_install = b.addInstallArtifact(timer_driver, .{ .dest_sub_path = "timer_driver.elf" });
-
     const serial_driver = sddf_dep.artifact(b.fmt("driver_serial_{s}.elf", .{serial_driver_class}));
     // This is required because the SDF file is expecting a different name to the artifact we
     // are dealing with.
@@ -139,6 +138,7 @@ pub fn build(b: *std.Build) void {
     client_pn532.linkLibrary(sddf_dep.artifact("util"));
     client_pn532.linkLibrary(sddf_dep.artifact("util_putchar_serial"));
     client_pn532.linkLibrary(pn532_driver);
+    client_pn532.linkLibrary(sddf_dep.artifact("libi2c"));
 
     const client_ds3231 = b.addExecutable(.{
         .name = "client_ds3231.elf",
@@ -155,6 +155,7 @@ pub fn build(b: *std.Build) void {
     client_ds3231.linkLibrary(sddf_dep.artifact("util"));
     client_ds3231.linkLibrary(sddf_dep.artifact("util_putchar_serial"));
     client_ds3231.linkLibrary(ds3231_driver);
+    client_ds3231.linkLibrary(sddf_dep.artifact("libi2c"));
 
     // Here we compile libco. Right now this is the only example that uses libco and so
     // we just compile it here instead of in a separate build.zig
@@ -178,10 +179,8 @@ pub fn build(b: *std.Build) void {
     b.installArtifact(sddf_dep.artifact("serial_virt_tx.elf"));
 
     // For compiling the DTS into a DTB
-    const dts = sddf_dep.path(b.fmt("dts/{s}.dts", .{ microkit_board }));
-    const dtc_cmd = b.addSystemCommand(&[_][]const u8{
-        "dtc", "-q", "-I", "dts", "-O", "dtb"
-    });
+    const dts = sddf_dep.path(b.fmt("dts/{s}.dts", .{microkit_board}));
+    const dtc_cmd = b.addSystemCommand(&[_][]const u8{ "dtc", "-q", "-I", "dts", "-O", "dtb" });
     dtc_cmd.addFileInput(dts);
     dtc_cmd.addFileArg(dts);
     const dtb = dtc_cmd.captureStdOut();
@@ -241,19 +240,11 @@ pub fn build(b: *std.Build) void {
         i2c_virt_objcopy,
         i2c_driver_device_objcopy,
         i2c_driver_config_objcopy,
-        timer_driver_objcopy
+        timer_driver_objcopy,
     };
 
     const final_image_dest = b.getInstallPath(.bin, "./loader.img");
-    const microkit_tool_cmd = b.addSystemCommand(&[_][]const u8{
-        microkit_tool,
-        b.getInstallPath(.{ .custom = "meta_output" }, "i2c.system"),
-        "--search-path", b.getInstallPath(.bin, ""),
-        "--board", microkit_board,
-        "--config", microkit_config,
-        "-o", final_image_dest,
-        "-r", b.getInstallPath(.prefix, "./report.txt")
-    });
+    const microkit_tool_cmd = b.addSystemCommand(&[_][]const u8{ microkit_tool, b.getInstallPath(.{ .custom = "meta_output" }, "i2c.system"), "--search-path", b.getInstallPath(.bin, ""), "--board", microkit_board, "--config", microkit_config, "-o", final_image_dest, "-r", b.getInstallPath(.prefix, "./report.txt") });
     inline for (objcopys) |objcopy| {
         microkit_tool_cmd.step.dependOn(&objcopy.step);
     }
