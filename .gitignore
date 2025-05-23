@@ -10,9 +10,11 @@ build/
 *.P
 *.d
 ci_build/
+ci_logs/
 *.orig
 *~
 .#*
 zig-out/
 .zig-cache/
 venv/
+__pycache__
