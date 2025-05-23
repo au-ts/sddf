@@ -47,17 +47,26 @@ boards.
 Simulation tests can be run on your development machine but hardware tests obviously
 require actual hardware.
 
-#### Machine Queue
-
-The below instrucitons are only for those who have access to Trustworthy Systems'
-machine queue setup.
-
-After you've run the [build script](#builds) you can run everythign with images with
-
-TODO: show better options/running isolated example
-TODO: talk about just running qemu
+After you've run the [build script](#builds) you can run everything with images with:
 ```sh
 ./ci/run.py
+```
+
+There are various options, such as running only a specific example:
+```sh
+./ci/run.py --example <EXAMPLE>
+```
+
+All the options can be found with:
+```sh
+./ci/run.py --help
+```
+
+#### Running with QEMU
+
+If you do not have access to hardware, you can run all the simulation tests with QEMU:
+```sh
+./ci/run.py --only-qemu
 ```
 
 ### Internals
