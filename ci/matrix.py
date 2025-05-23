@@ -79,8 +79,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "odroidc4",
             "qemu_virt_aarch64",
             "qemu_virt_riscv64",
-            # TODO: This driver has garbled output that breaks the tests.
-            # "star64",
+            "star64",
         ],
     },
     "timer": {
