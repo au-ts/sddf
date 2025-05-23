@@ -28,7 +28,7 @@
 #define LOG_DRIVER(...) do{}while(0)
 #endif
 
-#define LOG_DRIVER_ERR(...) do{ sddf_printf("I2C DRIVER|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
+#define LOG_DRIVER_ERR(...) do{ sddf_dprintf("I2C DRIVER|ERROR: "); sddf_dprintf(__VA_ARGS__); }while(0)
 
 struct i2c_regs {
     uint32_t ctl;           // control register
