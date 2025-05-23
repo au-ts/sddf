@@ -60,19 +60,34 @@
 
 /* UART Interrupt Enable Register (R/W) */
 #define UART_IER 0x01
-/* Enable Received Data Available Interrupt */
+/* Enable Received Data Available Interrupt, if FIFOs are enabled, the
+ * Character Timeout Interrupt. */
 #define UART_IER_ERBFI BIT(0)
 /* Enable Transmit Holding Register Empty Interrupt */
 #define UART_IER_ETBEI BIT(1)
 
 /* UART Interrupt Identity Register (R) */
 #define UART_IIR 0x02
-/* Interrupt ID Mask */
-#define UART_IIR_IID_MASK (0b1111)
-/* Interrupt ID = Transmit Holding Register Empty */
-#define UART_IIR_IID_THRE (0b0010)
-/* Interrupt Id = Received Data Available */
-#define UART_IIR_IID_DR (0b0100)
+/* Interrupt ID Mask.
+ * According to the DW_APB_UART manual, this is bits 3:0, i.e. should be 0b1111
+ * The UART_IER_ERBFI (received data available interrupt) also enables the
+ * character timeout interrupt, i.e. 0b1100 for the IID.
+ * Furthermore, the manual specifies that the priorities put the received data
+ * interrupt *above* the character timeout interrupt.
+ *
+ * However, QEMU seems to disagree, and places the timeout interrupt above the
+ * received data interrupt.
+ *
+ * It appears that Zephyr just ignores it, which seems suspicious. But so does
+ * Linux.
+ *
+ * ??
+ */
+#define UART_IIR_IID_MASK (0b0111)
+/* Interrupt ID = Transmit Holding Register Indicator */
+#define UART_IIR_IID_THRI (0b0010)
+/* Interrupt ID = Received Data Available */
+#define UART_IIR_IID_RDI (0b0100)
 
 /* UART FIFO Control Register (W) */
 #define UART_FCR 0x02
