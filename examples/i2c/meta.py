@@ -20,6 +20,8 @@ class Board:
     paddr_top: int
     i2c: str
     timer: str
+    # Use actual serial driver for output, so we can test non-debug configurations
+    serial: str
 
 
 BOARDS: List[Board] = [
@@ -29,11 +31,17 @@ BOARDS: List[Board] = [
         paddr_top=0x80000000,
         i2c="soc/bus@ffd00000/i2c@1d000",
         timer="soc/bus@ffd00000/watchdog@f0d0",
+        serial="soc/bus@ff800000/serial@3000",
     ),
 ]
 
 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
+    serial_driver = ProtectionDomain("serial_driver", "serial_driver.elf", priority=200)
+    # Increase the stack size as running with UBSAN uses more stack space than normal.
+    serial_virt_tx = ProtectionDomain("serial_virt_tx", "serial_virt_tx.elf",
+                                      priority=199, stack_size=0x2000)
+
     timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=4)
     i2c_driver = ProtectionDomain("i2c_driver", "i2c_driver.elf", priority=3)
     i2c_virt = ProtectionDomain("i2c_virt", "i2c_virt.elf", priority=2)
@@ -54,6 +62,8 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     assert i2c_node is not None
     timer_node = dtb.node(board.timer)
     assert timer_node is not None
+    serial_node = dtb.node(board.serial)
+    assert serial_node is not None
 
     i2c_system = Sddf.I2c(sdf, i2c_node, i2c_driver, i2c_virt)
     i2c_system.add_client(client_ds3231)
@@ -63,7 +73,13 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     timer_system.add_client(client_pn532)
     timer_system.add_client(client_ds3231)
 
+    serial_system = Sddf.Serial(sdf, serial_node, serial_driver, serial_virt_tx, enable_color=False)
+    serial_system.add_client(client_pn532)
+    serial_system.add_client(client_ds3231)
+
     pds = [
+        serial_driver,
+        serial_virt_tx,
         timer_driver,
         i2c_driver,
         i2c_virt,
@@ -75,6 +91,8 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
     assert i2c_system.connect()
     assert i2c_system.serialise_config(output_dir)
+    assert serial_system.connect()
+    assert serial_system.serialise_config(output_dir)
     assert timer_system.connect()
     assert timer_system.serialise_config(output_dir)
 
