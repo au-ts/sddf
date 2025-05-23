@@ -67,10 +67,12 @@
 
 /* UART Interrupt Identity Register (R) */
 #define UART_IIR 0x02
-/* Transmit Holding Register Empty */
-#define UART_IIR_THR_EMPTY BIT(1)
-/* Received Data Available */
-#define UART_IIR_RX BIT(2)
+/* Interrupt ID Mask */
+#define UART_IIR_IID_MASK (0b1111)
+/* Interrupt ID = Transmit Holding Register Empty */
+#define UART_IIR_IID_THRE (0b0010)
+/* Interrupt Id = Received Data Available */
+#define UART_IIR_IID_DR (0b0100)
 
 /* UART FIFO Control Register (W) */
 #define UART_FCR 0x02

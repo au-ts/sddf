@@ -157,7 +157,7 @@ static void rx_return(void)
         /* While RX data is still available, we enable the RX IRQ and continue processing */
         if (rx_has_data() && !serial_queue_full(&rx_queue_handle, rx_queue_handle.queue->tail)) {
             serial_cancel_consumer_signal(&rx_queue_handle);
-            *REG_PTR(UART_LSR) |= UART_IER_ERBFI;
+            *REG_PTR(UART_IER) |= UART_IER_ERBFI;
             reprocess = true;
         }
     }
@@ -169,21 +169,20 @@ static void rx_return(void)
 
 static void handle_irq(void)
 {
-    uint32_t irq_status = *REG_PTR(UART_IIR);
+    /* Reading this register auto-clears the error bits.
+       So we have to do this before rx_return() / tx_provide() which needs to
+       read LSR for THRE/DR. */
     uint32_t line_status = *REG_PTR(UART_LSR);
-    if (config.rx_enabled && irq_status & UART_IIR_RX) {
+    if (line_status & (UART_LSR_PE | UART_LSR_FE | UART_LSR_RFE)) {
+        LOG_DRIVER_ERR("LSR had error bits set %x\n", line_status);
+    }
+
+    /* IRQ ID is a priority-based *single* indication, not a bitvector */
+    uint8_t irq_id = *REG_PTR(UART_IIR) & UART_IIR_IID_MASK;
+    if (config.rx_enabled && irq_id == UART_IIR_IID_DR) {
         rx_return();
-    }
-
-    if (irq_status & UART_IIR_THR_EMPTY) {
+    } else if (irq_id == UART_IIR_IID_THRE) {
         tx_provide();
-    }
-
-    #define UART_ABNORMAL (UART_LSR_PE | UART_LSR_FE | UART_LSR_RFE)
-    if (line_status & UART_ABNORMAL) {
-        LOG_DRIVER_ERR("device encountered an error with status register %u\n", line_status);
-        /* Clear the UART errors */
-        line_status |= UART_ABNORMAL;
     }
 }
 
@@ -196,9 +195,16 @@ void init(void)
 
     uart_base = (uintptr_t)device_resources.regions[0].region.vaddr;
 
+    /* Disable all interrupts for now */
+    *REG_PTR(UART_IER) = 0;
+    /* Reset interrupt indications */
+    (void)*REG_PTR(UART_IIR);
 
     /* Ensure that the FIFO's are empty */
     while (!(*REG_PTR(UART_LSR) & (UART_LSR_THRE | UART_LSR_TEMT)));
+
+    /* Clear any error indication bits */
+    (void)*REG_PTR(UART_LSR);
 
     /* Setup the Modem Control Register */
     *REG_PTR(UART_MCR) |= (UART_MCR_DTR | UART_MCR_RTS);
@@ -210,16 +216,14 @@ void init(void)
        no parity, no break control. */
     *REG_PTR(UART_LCR) = 0b00000011;
 
-    /* Reset IIR */
-    *REG_PTR(UART_IIR) = 0x1;
-
-    /* Set the baud rate */
-    set_baud(config.default_baud);
-
-    /* Enable both Receive Data Available and Transmit Holding Register Empty IRQs. */
-    *REG_PTR(UART_IER) = (UART_IER_ERBFI | UART_IER_ETBEI);
+    // /* Set the baud rate */
+    // // BROKEN af
+    // // set_baud(config.default_baud);
 
     if (config.rx_enabled) {
+        /* Enable (only) the receive data available IRQ */
+        *REG_PTR(UART_IER) = UART_IER_ERBFI;
+
         serial_queue_init(&rx_queue_handle, config.rx.queue.vaddr, config.rx.data.size, config.rx.data.vaddr);
     }
     serial_queue_init(&tx_queue_handle, config.tx.queue.vaddr, config.tx.data.size, config.tx.data.vaddr);
