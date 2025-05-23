@@ -6,19 +6,65 @@
 
 # CI
 
-## Building examples
+## Testing code
 
-Right now we only have build-time checks for all examples under `examples/`.
+Each example system as part of CI is compiled and run either in a simulator (QEMU)
+or on real hardware (remotely in the Trustworthy Systems lab).
 
-This is a check that runs on each commit and pull request made to the repository.
-This check is required to pass for merging a pull request.
+On each commit and pull request, the build and simulation tests are checked.
+The hardware tests do not happen unless an explicit 'hardware test' label is added
+to a pull request. This is done to not overwhelm our supply of hardware.
 
-You can reproduce what the CI runs with:
+### Builds
+
+You can reproduce what the CI builds with:
+
 ```sh
-./ci/examples.sh /path/to/sdk
+./ci/build.py /path/to/sdk
 ```
 
 You will need to provide the path to your Microkit SDK.
+
+There are various options to speed up development, such as only compiling a particular
+example or for a particular baord.
+
+For example, if you were working on the timer example system, you might want to instead
+run:
+```sh
+./ci/build.py /path/to/sdk --examples timer
+```
+
+You are encouraged to explore all the script's options with:
+```sh
+./ci/build.py --help
+```
+
+### Runtime
+
+There are two kinds of runtime tests, simulation via QEMU and hardware tests on actual
+boards.
+
+Simulation tests can be run on your development machine but hardware tests obviously
+require actual hardware.
+
+#### Machine Queue
+
+The below instrucitons are only for those who have access to Trustworthy Systems'
+machine queue setup.
+
+After you've run the [build script](#builds) you can run everythign with images with
+
+TODO: show better options/running isolated example
+TODO: talk about just running qemu
+```sh
+./ci/run.py
+```
+
+### Internals
+
+TODO:
+* talk about matrix.py
+* talk about adding your own example.py script
 
 ## Style
 
