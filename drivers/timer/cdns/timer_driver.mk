@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
 # Include this snippet in your project Makefile to build
-# the ARM timer driver
+# the Candence timer driver
 #
 # NOTES:
 #  Generates timer_driver.elf
