@@ -15,7 +15,7 @@
 #include <sddf/i2c/client.h>
 #include <sddf/i2c/config.h>
 #include <sddf/i2c/devices/ds3231/ds3231.h>
-#include <sddf/i2c/libi2c.h>
+#include <sddf/i2c/libi2c_raw.h>
 
 // #define DEBUG_CLIENT
 

@@ -14,7 +14,7 @@
 #include <sddf/i2c/client.h>
 #include <sddf/i2c/config.h>
 #include <sddf/i2c/devices/pn532/pn532.h>
-#include <sddf/i2c/libi2c.h>
+#include <sddf/i2c/libi2c_raw.h>
 
 bool delay_ms(size_t milliseconds);
 

@@ -10,7 +10,7 @@
 #include <sddf/i2c/queue.h>
 #include <sddf/i2c/config.h>
 #include <sddf/i2c/devices/pn532/pn532.h>
-#include <sddf/i2c/libi2c.h>
+#include <sddf/i2c/libi2c_raw.h>
 
 // #define DEBUG_PN532
 

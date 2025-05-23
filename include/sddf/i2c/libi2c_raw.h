@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-// I2C interface library for clients using libmicrokitco.
+// I2C interface library for clients using libco on its own (see non-raw variant for libmicrokitco)
 // Provides helper functions for creating requests and handing them to the virtualiser.
 // Enables automatic allocation of command structs, but user is expected to perform management
 // of META region to supply buffers as this is not practical to generalise.
@@ -15,12 +15,20 @@
 //
 // See i2c/queue.h for details about the I2C transport layer.
 
+// WARNING:: the event cothread is assumed to be available whenever a blocking function is called!
+//           Be aware of possible danger if your client performs complex multitasking. This library
+//           also assumes that nothing else is using the DATA or META regions if in use.
+
 #pragma once
+#include <libco.h>
 #include <stdint.h>
 #include <sddf/i2c/queue.h>
 #include <sddf/util/printf.h>
 #include <sddf/i2c/config.h>
-#include <libmicrokitco.h>
+
+// Client must define and set up these cothreads for this interface to function.
+extern cothread_t t_event;
+extern cothread_t t_main;
 
 // Client must define this. E.g.
 // __attribute__((__section__(".i2c_client_config"))) i2c_client_config_t i2c_config;
@@ -48,6 +56,7 @@ extern i2c_client_config_t i2c_config;
 typedef struct libi2c_conf {
     i2c_queue_handle_t *handle;
     i2c_cmd_t *data_start;   // Pointer to first command in data region
+
 } libi2c_conf_t;
 
 int libi2c_init(libi2c_conf_t *conf_struct, i2c_queue_handle_t *queue_handle);
@@ -55,4 +64,3 @@ static i2c_cmd_t *__libi2c_alloc_cmd(libi2c_conf_t *conf);
 int i2c_write(libi2c_conf_t *conf, i2c_addr_t address, void *write_buf, uint16_t len);
 int i2c_read(libi2c_conf_t *conf, i2c_addr_t address, void *read_buf, uint16_t len);
 int i2c_writeread(libi2c_conf_t *conf, i2c_addr_t address, i2c_addr_t reg_address, void *read_buf, uint16_t len);
-int i2c_dispatch(libi2c_conf_t *conf, i2c_addr_t address, void *buf, uint16_t len, uint8_t flag_mask);
