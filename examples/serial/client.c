@@ -13,8 +13,6 @@ __attribute__((__section__(".serial_client_config"))) serial_client_config_t con
 serial_queue_handle_t rx_queue_handle;
 serial_queue_handle_t tx_queue_handle;
 
-uint32_t local_head;
-
 void init(void)
 {
     assert(serial_config_check_magic(&config));
