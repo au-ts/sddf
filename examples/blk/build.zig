@@ -136,6 +136,12 @@ pub fn build(b: *std.Build) !void {
         .maaxboard => "mmc_imx",
     };
 
+    const serial_driver_class = switch (microkit_board_option.?) {
+        .qemu_virt_aarch64 => "arm",
+        .qemu_virt_riscv64 => "ns16550a",
+        .maaxboard => "imx",
+    };
+
     const client = b.addExecutable(.{
         .name = "client.elf",
         .target = target,
@@ -150,20 +156,24 @@ pub fn build(b: *std.Build) !void {
     client.addIncludePath(sddf_dep.path("include"));
     client.addIncludePath(sddf_dep.path("include/microkit"));
     client.linkLibrary(sddf_dep.artifact("util"));
-    client.linkLibrary(sddf_dep.artifact("util_putchar_debug"));
+    client.linkLibrary(sddf_dep.artifact("util_putchar_serial"));
 
     client.addIncludePath(.{ .cwd_relative = libmicrokit_include });
     client.addObjectFile(.{ .cwd_relative = libmicrokit });
     client.setLinkerScript(.{ .cwd_relative = libmicrokit_linker_script });
 
     const blk_driver = sddf_dep.artifact(b.fmt("driver_blk_{s}.elf", .{ blk_driver_class }));
+    const serial_driver = sddf_dep.artifact(b.fmt("driver_serial_{s}.elf", .{ serial_driver_class }));
 
     b.installArtifact(client);
     b.installArtifact(blk_driver);
     b.installArtifact(sddf_dep.artifact("blk_virt.elf"));
+    b.installArtifact(sddf_dep.artifact("serial_virt_tx.elf"));
 
     // Because our SDF expects a different ELF name for the block driver, we have this extra step.
     const blk_driver_install = b.addInstallArtifact(blk_driver, .{ .dest_sub_path = "blk_driver.elf" });
+    // Because our SDF expects a different ELF name for the serial driver, we have this extra step.
+    const serial_driver_install = b.addInstallArtifact(serial_driver, .{ .dest_sub_path = "serial_driver.elf" });
 
     // For compiling the DTS into a DTB
     const dts = sddf_dep.path(b.fmt("dts/{s}.dts", .{ microkit_board }));
@@ -200,13 +210,30 @@ pub fn build(b: *std.Build) !void {
         .install_subdir = "meta_output",
     });
 
-    const client_objcopy = updateSectionObjcopy(b, ".blk_client_config", meta_output, "blk_client_client.data", "client.elf");
-    const virt_objcopy = updateSectionObjcopy(b, ".blk_virt_config", meta_output, "blk_virt.data", "blk_virt.elf");
-    const driver_resources_objcopy = updateSectionObjcopy(b, ".device_resources", meta_output, "blk_driver_device_resources.data", "blk_driver.elf");
-    const driver_config_objcopy = updateSectionObjcopy(b, ".blk_driver_config", meta_output, "blk_driver.data", "blk_driver.elf");
-    driver_resources_objcopy.step.dependOn(&blk_driver_install.step);
-    driver_config_objcopy.step.dependOn(&blk_driver_install.step);
-    const blk_objcopys = .{ client_objcopy, virt_objcopy, driver_resources_objcopy, driver_config_objcopy };
+    const blk_client_objcopy = updateSectionObjcopy(b, ".blk_client_config", meta_output, "blk_client_client.data", "client.elf");
+    const blk_virt_objcopy = updateSectionObjcopy(b, ".blk_virt_config", meta_output, "blk_virt.data", "blk_virt.elf");
+    const blk_driver_resources_objcopy = updateSectionObjcopy(b, ".device_resources", meta_output, "blk_driver_device_resources.data", "blk_driver.elf");
+    const blk_driver_config_objcopy = updateSectionObjcopy(b, ".blk_driver_config", meta_output, "blk_driver.data", "blk_driver.elf");
+    blk_driver_resources_objcopy.step.dependOn(&blk_driver_install.step);
+    blk_driver_config_objcopy.step.dependOn(&blk_driver_install.step);
+
+    const serial_client_objcopy = updateSectionObjcopy(b, ".serial_client_config", meta_output, "serial_client_client.data", "client.elf");
+    const serial_virt_objcopy = updateSectionObjcopy(b, ".serial_virt_tx_config", meta_output, "serial_virt_tx.data", "serial_virt_tx.elf");
+    const serial_driver_resources_objcopy = updateSectionObjcopy(b, ".device_resources", meta_output, "serial_driver_device_resources.data", "serial_driver.elf");
+    const serial_driver_config_objcopy = updateSectionObjcopy(b, ".serial_driver_config", meta_output, "serial_driver_config.data", "serial_driver.elf");
+    serial_driver_resources_objcopy.step.dependOn(&serial_driver_install.step);
+    serial_driver_config_objcopy.step.dependOn(&serial_driver_install.step);
+
+    const blk_objcopys = .{
+        blk_client_objcopy,
+        blk_virt_objcopy,
+        blk_driver_resources_objcopy,
+        blk_driver_config_objcopy,
+        serial_client_objcopy,
+        serial_virt_objcopy,
+        serial_driver_resources_objcopy,
+        serial_driver_config_objcopy
+    };
     const objcopys = blk: {
         if (timer_driver_install != null) {
             const blk_driver_timer_objcopy = updateSectionObjcopy(b, ".timer_client_config", meta_output, "timer_client_blk_driver.data", "blk_driver.elf");
