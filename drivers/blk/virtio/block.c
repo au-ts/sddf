@@ -83,8 +83,7 @@ void handle_response(void)
         struct virtq_desc data_desc = virtq.desc[data_desc_idx % virtq.num];
         uint32_t data_len = data_desc.len;
 #ifdef DEBUG_DRIVER
-        uint64_t data_addr = data_desc.addr;
-        LOG_DRIVER("response data addr: 0x%lx, data len: %d\n", data_addr, data_len);
+        LOG_DRIVER("response data addr: 0x%lx, data len: %d\n", data_desc.addr, data_len);
 #endif
 
         uint16_t footer_desc_idx = virtq.desc[data_desc_idx].next;
