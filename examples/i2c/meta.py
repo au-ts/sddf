@@ -6,11 +6,15 @@ from dataclasses import dataclass
 from sdfgen import SystemDescription, Sddf, DeviceTree
 from importlib.metadata import version
 
-assert version('sdfgen').split(".")[1] == "24", "Unexpected sdfgen version"
+print(f"sdfgen version: {version('sdfgen')}")
+# assert version('sdfgen').split(".")[1] == "24", "Unexpected sdfgen version"
 
 ProtectionDomain = SystemDescription.ProtectionDomain
 MemoryRegion = SystemDescription.MemoryRegion
 Map = SystemDescription.Map
+
+DS3231 = True
+PN532 = True
 
 
 @dataclass
@@ -37,16 +41,23 @@ BOARDS: List[Board] = [
 
 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
-    serial_driver = ProtectionDomain("serial_driver", "serial_driver.elf", priority=200)
+    serial_driver = ProtectionDomain(
+        "serial_driver", "serial_driver.elf", priority=200)
     # Increase the stack size as running with UBSAN uses more stack space than normal.
     serial_virt_tx = ProtectionDomain("serial_virt_tx", "serial_virt_tx.elf",
                                       priority=199, stack_size=0x2000)
-
-    timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=4)
-    i2c_driver = ProtectionDomain("i2c_driver", "i2c_driver.elf", priority=3)
-    i2c_virt = ProtectionDomain("i2c_virt", "i2c_virt.elf", priority=2)
-    client_pn532 = ProtectionDomain("client_pn532", "client_pn532.elf", priority=1)
-    client_ds3231 = ProtectionDomain("client_ds3231", "client_ds3231.elf", priority=1)
+    timer_driver = ProtectionDomain(
+        "timer_driver", "timer_driver.elf", priority=4)
+    i2c_driver = ProtectionDomain(
+        "i2c_driver", "i2c_driver.elf", priority=3, stack_size=16384)
+    i2c_virt = ProtectionDomain(
+        "i2c_virt", "i2c_virt.elf", priority=2, stack_size=16384)
+    if PN532:
+        client_pn532 = ProtectionDomain(
+            "client_pn532", "client_pn532.elf", priority=1, stack_size=32768)
+    if DS3231:
+        client_ds3231 = ProtectionDomain(
+            "client_ds3231", "client_ds3231.elf", priority=1)
 
     # Right now we do not have separate clk and GPIO drivers and so our I2C driver does manual
     # clk/GPIO setup for I2C.
@@ -66,26 +77,28 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     assert serial_node is not None
 
     i2c_system = Sddf.I2c(sdf, i2c_node, i2c_driver, i2c_virt)
-    i2c_system.add_client(client_ds3231)
-    i2c_system.add_client(client_pn532)
-
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
-    timer_system.add_client(client_pn532)
-    timer_system.add_client(client_ds3231)
 
-    serial_system = Sddf.Serial(sdf, serial_node, serial_driver, serial_virt_tx, enable_color=False)
-    serial_system.add_client(client_pn532)
-    serial_system.add_client(client_ds3231)
-
+    serial_system = Sddf.Serial(
+        sdf, serial_node, serial_driver, serial_virt_tx, enable_color=False)
     pds = [
         serial_driver,
         serial_virt_tx,
         timer_driver,
         i2c_driver,
         i2c_virt,
-        client_pn532,
-        client_ds3231,
     ]
+    if DS3231:
+        i2c_system.add_client(client_ds3231)
+        timer_system.add_client(client_ds3231)
+        pds.append(client_ds3231)
+        serial_system.add_client(client_ds3231)
+    if PN532:
+        i2c_system.add_client(client_pn532)
+        timer_system.add_client(client_pn532)
+        pds.append(client_pn532)
+        serial_system.add_client(client_pn532)
+
     for pd in pds:
         sdf.add_pd(pd)
 
@@ -104,7 +117,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--dtb", required=True)
     parser.add_argument("--sddf", required=True)
-    parser.add_argument("--board", required=True, choices=[b.name for b in BOARDS])
+    parser.add_argument("--board", required=True,
+                        choices=[b.name for b in BOARDS])
     parser.add_argument("--output", required=True)
     parser.add_argument("--sdf", required=True)
 

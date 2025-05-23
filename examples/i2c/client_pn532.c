@@ -14,6 +14,7 @@
 #include <sddf/i2c/client.h>
 #include <sddf/i2c/config.h>
 #include <sddf/i2c/devices/pn532/pn532.h>
+#include <sddf/i2c/libi2c.h>
 
 bool delay_ms(size_t milliseconds);
 
@@ -42,6 +43,7 @@ static serial_queue_handle_t serial_tx_queue_handle;
 
 i2c_queue_handle_t queue;
 uintptr_t data_region;
+libi2c_conf_t libi2c_conf;
 
 cothread_t t_event;
 cothread_t t_main;
@@ -49,7 +51,7 @@ cothread_t t_main;
 #define DEFAULT_READ_RESPONSE_RETRIES (256)
 #define DEFAULT_READ_ACK_FRAME_RETRIES (20)
 
-#define STACK_SIZE (4096)
+#define STACK_SIZE (16384)
 static char t_client_main_stack[STACK_SIZE];
 
 bool read_passive_target_id(uint8_t card_baud_rate, uint8_t *uid_buf, uint8_t *uid_buf_length, uint8_t timeout)
@@ -65,7 +67,7 @@ bool read_passive_target_id(uint8_t card_baud_rate, uint8_t *uid_buf, uint8_t *u
     uint8_t response[64];
     uint8_t read_fail = pn532_read_response(response, 64, DEFAULT_READ_RESPONSE_RETRIES);
     if (read_fail) {
-        // LOG_CLIENT_ERR("failed to read response for PN532_CMD_INLISTPASSIVETARGET!\n");
+        /*LOG_CLIENT_ERR("failed to read response for PN532_CMD_INLISTPASSIVETARGET!\n");*/
         // this is what fails when card times out
         return false;
     };
@@ -103,13 +105,17 @@ void client_main(void)
     LOG_CLIENT("client_main: started\n");
     uint8_t header[1];
     header[0] = PN532_CMD_GETFIRMWAREVERSION;
+    LOG_CLIENT("####### INITIAL WRITE COMMAND (get firmware version) #########\n");
     uint8_t write_fail = pn532_write_command(header, 1, NULL, 0, DEFAULT_READ_ACK_FRAME_RETRIES);
     if (write_fail) {
         LOG_CLIENT_ERR("failed to write PN532_CMD_GETFIRMWAREVERSION\n");
         assert(false);
+    } else {
+        LOG_CLIENT_ERR("\t\tFirmware version read success.\n");
     }
 
     uint8_t response_buffer[6];
+    LOG_CLIENT("####### INITIAL READ COMMAND (get firmware version) #########\n");
     uint8_t read_fail = pn532_read_response(response_buffer, 6, DEFAULT_READ_RESPONSE_RETRIES);
     if (read_fail) {
         LOG_CLIENT_ERR("failed to read response for PN532_CMD_GETFIRMWAREVERSION\n");
@@ -212,7 +218,7 @@ void init(void)
 
     assert(i2c_config_check_magic((void *)&i2c_config));
 
-    data_region = (uintptr_t)i2c_config.virt.data.vaddr;
+    data_region = (uintptr_t)i2c_config.data.vaddr;
     queue = i2c_queue_init(i2c_config.virt.req_queue.vaddr, i2c_config.virt.resp_queue.vaddr);
 
     bool claimed = i2c_bus_claim(i2c_config.virt.id, PN532_I2C_BUS_ADDRESS);
@@ -220,6 +226,8 @@ void init(void)
         LOG_CLIENT_ERR("failed to claim PN532 bus\n");
         return;
     }
+    /* Initialise libi2c for PN532 */
+    libi2c_init(&libi2c_conf, &queue);
 
     /* Define the event loop/notified thread as the active co-routine */
     t_event = co_active();
