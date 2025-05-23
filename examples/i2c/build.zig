@@ -132,7 +132,7 @@ pub fn build(b: *std.Build) !void {
     client_pn532.linkLibrary(sddf_dep.artifact("util"));
     client_pn532.linkLibrary(sddf_dep.artifact("util_putchar_serial"));
     client_pn532.linkLibrary(pn532_driver);
-    client_pn532.linkLibrary(sddf_dep.artifact("libi2c"));
+    client_pn532.linkLibrary(sddf_dep.artifact("libi2c_raw"));
 
     const client_ds3231 = b.addExecutable(.{
         .name = "client_ds3231.elf",
@@ -149,7 +149,7 @@ pub fn build(b: *std.Build) !void {
     client_ds3231.linkLibrary(sddf_dep.artifact("util"));
     client_ds3231.linkLibrary(sddf_dep.artifact("util_putchar_serial"));
     client_ds3231.linkLibrary(ds3231_driver);
-    client_ds3231.linkLibrary(sddf_dep.artifact("libi2c"));
+    client_ds3231.linkLibrary(sddf_dep.artifact("libi2c_raw"));
 
     // Here we compile libco. Right now this is the only example that uses libco and so
     // we just compile it here instead of in a separate build.zig

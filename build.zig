@@ -66,6 +66,7 @@ const util_putchar_serial_src = [_][]const u8{
 };
 
 const libi2c_src = [_][]const u8{"i2c/libi2c.c"};
+const libi2c_raw_src = [_][]const u8{"i2c/libi2c_raw.c"};
 
 var libmicrokit: std.Build.LazyPath = undefined;
 var libmicrokit_linker_script: std.Build.LazyPath = undefined;
@@ -482,6 +483,23 @@ pub fn build(b: *std.Build) !void {
         libi2c.addIncludePath(libmicrokit_include);
         libi2c.installHeadersDirectory(b.path("include"), "", .{});
         b.installArtifact(libi2c);
+
+        const libi2c_raw = b.addStaticLibrary(.{
+            .name = "libi2c_raw",
+            .target = target,
+            .optimize = optimize,
+        });
+        libi2c_raw.addCSourceFiles(.{
+            .files = &libi2c_raw_src,
+        });
+        libi2c_raw.addIncludePath(b.path("include/sddf/i2c"));
+        libi2c_raw.addIncludePath(b.path("include/sddf"));
+        libi2c_raw.addIncludePath(b.path("include/microkit"));
+        libi2c_raw.addIncludePath(b.path("include/"));
+        libi2c_raw.addIncludePath(b.path("libco/"));
+        libi2c_raw.addIncludePath(libmicrokit_include);
+        libi2c_raw.installHeadersDirectory(b.path("include"), "", .{});
+        b.installArtifact(libi2c_raw);
 
         // I2C drivers
         inline for (std.meta.fields(DriverClass.I2cHost)) |class| {

@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-#include <sddf/i2c/libi2c.h>
+#include <sddf/i2c/libi2c_raw.h>
 
 #ifdef DEBUG_LIBI2C
 #define LOG_LIBI2C(...) do{ sddf_dprintf("CLIENT|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
@@ -124,7 +124,7 @@ static int __i2c_dispatch(libi2c_conf_t *conf, i2c_addr_t address, void *buf, ui
     microkit_notify(i2c_config.virt.id);
 
     // Await response.
-    microkit_cothread_wait_on_channel(i2c_config.virt.id);
+    co_switch(t_event);
 
     i2c_addr_t returned_addr = 0;
     size_t err_cmd = 0;     // Irrelevant for single-command runs.
@@ -178,12 +178,4 @@ int i2c_writeread(libi2c_conf_t *conf, i2c_addr_t address, i2c_addr_t reg_addres
     ((i2c_addr_t *)read_buf)[0] = reg_address;
 
     return __i2c_dispatch(conf, address, read_buf, len, I2C_FLAG_STOP | I2C_FLAG_READ | I2C_FLAG_WRRD);
-}
-
-/**
- *  Perform a raw I2C dispatch with custom flags.
- */
-int i2c_dispatch(libi2c_conf_t *conf, i2c_addr_t address, void *buf, uint16_t len, uint8_t flag_mask)
-{
-    return __i2c_dispatch(conf, address, buf, len, flag_mask);
 }
