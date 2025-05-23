@@ -46,15 +46,18 @@ SYSTEM_FILE := blk.system
 
 ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
 	BLK_DRIVER_DIR := virtio
+	SERIAL_DRIVER_DIR := arm
 	CPU := cortex-a53
 	QEMU := qemu-system-aarch64
 	QEMU_ARCH_ARGS := -machine virt,virtualization=on -cpu cortex-a53 -device loader,file=$(IMAGE_FILE),addr=0x70000000,cpu-num=0
 else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_riscv64)
 	BLK_DRIVER_DIR := virtio
+	SERIAL_DRIVER_DIR := ns16550a
 	QEMU := qemu-system-riscv64
 	QEMU_ARCH_ARGS := -machine virt -kernel $(IMAGE_FILE)
 else ifeq ($(strip $(MICROKIT_BOARD)), maaxboard)
 	CPU := cortex-a53
+	SERIAL_DRIVER_DIR := imx
 	BLK_DRIVER_DIR := mmc/imx
 	TIMER_DRIVER_DIR := imx
 else
@@ -75,7 +78,7 @@ MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 ARCH := ${shell grep 'CONFIG_SEL4_ARCH  ' $(BOARD_DIR)/include/kernel/gen_config.h | cut -d' ' -f4}
 
-IMAGES := blk_driver.elf client.elf blk_virt.elf
+IMAGES := blk_driver.elf client.elf blk_virt.elf serial_virt_tx.elf serial_driver.elf
 CFLAGS := -nostdlib \
 		  -ffreestanding \
 		  -g3 \
@@ -98,28 +101,29 @@ DTS := $(SDDF)/dts/$(MICROKIT_BOARD).dts
 DTB := $(MICROKIT_BOARD).dtb
 METAPROGRAM := $(TOP)/meta.py
 
-BLK_DRIVER   := $(SDDF)/drivers/blk/${BLK_DRIVER_DIR}
-
-BLK_COMPONENTS := $(SDDF)/blk/components
+BLK_DRIVER := ${SDDF}/drivers/blk/${BLK_DRIVER_DIR}
+SERIAL_DRIVER := $(SDDF)/drivers/serial/${SERIAL_DRIVER_DIR}
 
 all: $(IMAGE_FILE)
 
-include ${BLK_DRIVER}/blk_driver.mk
+include ${SDDF}/drivers/blk/${BLK_DRIVER_DIR}/blk_driver.mk
+include ${SDDF}/drivers/serial/${SERIAL_DRIVER_DIR}/serial_driver.mk
 
 ifdef TIMER_DRIVER_DIR
-include $(SDDF)/drivers/timer/$(TIMER_DRIVER_DIR)/timer_driver.mk
+include ${SDDF}/drivers/timer/${TIMER_DRIVER_DIR}/timer_driver.mk
 IMAGES += timer_driver.elf
 endif
 
 include ${SDDF}/util/util.mk
-include ${BLK_COMPONENTS}/blk_components.mk
+include ${SDDF}/blk/components/blk_components.mk
+include ${SDDF}/serial/components/serial_components.mk
 
 ${IMAGES}: libsddf_util_debug.a
 
 client.o: ${TOP}/client.c ${TOP}/basic_data.h
 	$(CC) -c $(CFLAGS) -I. $< -o client.o
-client.elf: client.o
-	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
+client.elf: client.o libsddf_util.a
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(DTB): $(DTS)
 	dtc -q -I dts -O dtb $(DTS) > $(DTB)
@@ -134,6 +138,10 @@ endif
 	$(OBJCOPY) --update-section .blk_driver_config=blk_driver.data blk_driver.elf
 	$(OBJCOPY) --update-section .blk_virt_config=blk_virt.data blk_virt.elf
 	$(OBJCOPY) --update-section .blk_client_config=blk_client_client.data client.elf
+	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
+	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data serial_driver.elf
+	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx.data serial_virt_tx.elf
+	$(OBJCOPY) --update-section .serial_client_config=serial_client_client.data client.elf
 
 $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)

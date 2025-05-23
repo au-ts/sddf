@@ -19,6 +19,8 @@ class Board:
     blk: str
     # Default partition if the user has not specified one
     partition: int
+    # Use actual serial driver for output, so we can test non-debug configurations
+    serial: str
     # Some block drivers need a timer driver as well, the example
     # itself does not need a timer driver.
     timer: Optional[str]
@@ -31,6 +33,7 @@ BOARDS: List[Board] = [
         paddr_top=0x6_0000_000,
         partition=0,
         blk="virtio_mmio@a003e00",
+        serial="pl011@9000000",
         timer=None,
     ),
     Board(
@@ -40,6 +43,7 @@ BOARDS: List[Board] = [
         partition=2,
         blk="soc@0/bus@30800000/mmc@30b40000",
         timer="soc@0/bus@30000000/timer@302d0000",
+        serial="soc@0/bus@30800000/serial@30860000",
     ),
     Board(
         name="qemu_virt_riscv64",
@@ -47,13 +51,24 @@ BOARDS: List[Board] = [
         paddr_top=0xa_0000_000,
         partition=0,
         blk="soc/virtio_mmio@10008000",
+        serial="soc/serial@10000000",
         timer=None,
     ),
 ]
 
 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
-    blk_driver = ProtectionDomain("blk_driver", "blk_driver.elf", priority=200)
+    serial_driver = ProtectionDomain("serial_driver", "serial_driver.elf", priority=200)
+    # Increase the stack size as running with UBSAN uses more stack space than normal.
+    serial_virt_tx = ProtectionDomain("serial_virt_tx", "serial_virt_tx.elf",
+                                      priority=199, stack_size=0x2000)
+
+    serial_node = dtb.node(board.serial)
+    assert serial_node is not None
+
+    serial_system = Sddf.Serial(sdf, serial_node, serial_driver, serial_virt_tx, enable_color=False)
+
+    blk_driver = ProtectionDomain("blk_driver", "blk_driver.elf", priority=200, stack_size=0x2000)
     blk_virt = ProtectionDomain("blk_virt", "blk_virt.elf", priority=199, stack_size=0x2000)
     client = ProtectionDomain("client", "client.elf", priority=1)
 
@@ -71,7 +86,11 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     partition = int(args.partition) if args.partition else board.partition
     blk_system.add_client(client, partition=partition)
 
+    serial_system.add_client(client)
+
     pds = [
+        serial_driver,
+        serial_virt_tx,
         blk_driver,
         blk_virt,
         client
@@ -83,6 +102,8 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
     assert blk_system.connect()
     assert blk_system.serialise_config(output_dir)
+    assert serial_system.connect()
+    assert serial_system.serialise_config(output_dir)
     if board.timer:
         assert timer_system.connect()
         assert timer_system.serialise_config(output_dir)
