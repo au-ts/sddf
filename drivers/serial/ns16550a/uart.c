@@ -178,9 +178,9 @@ static void handle_irq(void)
 
     /* IRQ ID is a priority-based *single* indication, not a bitvector */
     uint8_t irq_id = *REG_PTR(UART_IIR) & UART_IIR_IID_MASK;
-    if (config.rx_enabled && irq_id == UART_IIR_IID_DR) {
+    if (config.rx_enabled && irq_id == UART_IIR_IID_RDI) {
         rx_return();
-    } else if (irq_id == UART_IIR_IID_THRE) {
+    } else if (irq_id == UART_IIR_IID_THRI) {
         tx_provide();
     }
 }
@@ -215,7 +215,7 @@ void init(void)
        no parity, no break control. */
     *REG_PTR(UART_LCR) = 0b00000011;
 
-    // /* Set the baud rate */
+    /* Set the baud rate */
     set_baud(config.default_baud);
 
     if (config.rx_enabled) {
