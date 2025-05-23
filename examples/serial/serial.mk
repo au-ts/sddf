@@ -128,7 +128,7 @@ $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	MICROKIT_SDK=${MICROKIT_SDK} $(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
 
 qemu: ${IMAGE_FILE}
-	$(QEMU) -m size=2G -nographic -d guest_errors $(QEMU_ARCH_ARGS)
+	$(QEMU) -m size=2G -nographic -serial mon:stdio -d guest_errors $(QEMU_ARCH_ARGS)
 
 clean::
 	${RM} -f *.elf
