@@ -1,0 +1,73 @@
+/*
+ * Copyright 2025, UNSW
+ *
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+#pragma once
+
+#include <stdbool.h>
+#include <stdint.h>
+#include <microkit.h>
+#include <sddf/resources/common.h>
+#include <sddf/resources/device.h>
+#include <sddf/spi/queue.h>
+
+// Not a hard limit, although it would be hard to go beyond this limit
+#define SDDF_SPI_MAX_CLIENTS 16
+
+#define SDDF_SPI_MAGIC_LEN 5
+static char SDDF_SPI_MAGIC[SDDF_SPI_MAGIC_LEN] = { 's', 'D', 'D', 'F', 0x4 };
+
+// zig; Connection
+typedef struct spi_connection_resource {
+    region_resource_t req_queue;
+    region_resource_t resp_queue;
+    uint16_t num_buffers;
+    uint8_t id;
+} spi_connection_resource_t;
+
+// zig: Driver
+typedef struct spi_driver_config {
+    char magic[SDDF_SPI_MAGIC_LEN];
+    spi_connection_resource_t virt;
+    size_t meta_size;   // Size of uniform meta regions
+} spi_driver_config_t;
+
+// zig: Virt.Client
+typedef struct spi_virt_client_config {
+    spi_connection_resource_t conn;
+    size_t data_size;
+    size_t meta_size;
+    uintptr_t driver_data_vaddr;
+    uintptr_t driver_meta_vaddr;
+    uintptr_t client_data_vaddr;
+    uintptr_t client_meta_vaddr;
+} spi_virt_client_config_t;
+
+// zig: Virt
+typedef struct spi_virt_config {
+    char magic[SDDF_SPI_MAGIC_LEN];
+    uint64_t num_clients;
+    spi_connection_resource_t driver;
+    spi_virt_client_config_t clients[SDDF_SPI_MAX_CLIENTS];
+} spi_virt_config_t;
+
+// zig: Client
+typedef struct spi_client_config {
+    char magic[SDDF_SPI_MAGIC_LEN];
+    spi_connection_resource_t virt;
+    region_resource_t data;
+    region_resource_t meta;
+} spi_client_config_t;
+
+static bool spi_config_check_magic(void *config)
+{
+    char *magic = (char *)config;
+    for (int i = 0; i < SDDF_SPI_MAGIC_LEN; i++) {
+        if (magic[i] != SDDF_SPI_MAGIC[i]) {
+            return false;
+        }
+    }
+
+    return true;
+}
