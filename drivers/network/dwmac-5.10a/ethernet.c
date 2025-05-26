@@ -236,8 +236,25 @@ static void handle_irq()
     }
 }
 
+/* On the JH7110 U-Boot asserts a reset signal that clears the MAC register values.
+ * For other SoCs we can re-use the MAC address that U-Boot has read from
+ * the EEPROM.
+ * See https://github.com/au-ts/sddf/issues/437 for more details.
+ */
+#if defined(CONFIG_PLAT_IMX8MP_EVK)
+#define USE_MAC_ADDR_REGS 1
+#elif defined(CONFIG_PLAT_STAR64)
+#define USE_MAC_ADDR_REGS 0
+#else
+#error "Unknown platform to handle MAC address for"
+#endif
+
 static void eth_init()
 {
+#if USE_MAC_ADDR_REGS
+    uint32_t mac_high = *MAC_REG(MAC_ADDRESS0_HIGH);
+    uint32_t mac_low = *MAC_REG(MAC_ADDRESS0_LOW);
+#endif
     // Software reset -- This will reset the MAC internal registers.
     volatile uint32_t *mode = DMA_REG(DMA_MODE);
     *mode |= DMA_MODE_SWR;
@@ -314,12 +331,15 @@ static void eth_init()
     *MAC_REG(MAC_CONFIGURATION) = conf;
 
     // Set the MAC Address.
-
-    /* NOTE: We are hardcoding this MAC address to the hardware MAC address of the
-    Star64 in the TS machine queue. This address is resident the boards EEPROM, however,
-    we need I2C to read from this ROM. */
+#if USE_MAC_ADDR_REGS
+    *MAC_REG(MAC_ADDRESS0_HIGH) = mac_high;
+    *MAC_REG(MAC_ADDRESS0_LOW) = mac_low;
+#else
+    /* Certain platforms require more work to read/set the hardware MAC address,
+     * see the definition of USE_MAC_ADDR_REGS for more details. */
     *MAC_REG(MAC_ADDRESS0_HIGH) = 0x00005b75;
     *MAC_REG(MAC_ADDRESS0_LOW) = 0x0039cf6c;
+#endif
 
     /* Configure DMA */
 
