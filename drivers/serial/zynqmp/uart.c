@@ -127,7 +127,8 @@ static void handle_irq(void)
            while doing work, now continue. */
         waiting_for_tx_to_finish = false;
 
-        /* Make sure the status register is consistent with our programming model. */
+        /* Make sure the status register is consistent with our programming model.
+         * If you use your OS' debug print that bypasses this driver, this assert will trip. */
         assert(*REG_PTR(ZYNQMP_UART_SR) & ZYNQMP_UART_IXR_TXEMPTY);
 
         /* Switch off the TX FIFO empty IRQ, only turn it on again when needed. */
