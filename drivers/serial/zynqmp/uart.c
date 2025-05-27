@@ -279,7 +279,6 @@ void init(void)
     assert(device_resources.num_regions == 1);
 
     uart_base = (uintptr_t)device_resources.regions[0].region.vaddr;
-
     uart_setup();
 
     if (config.rx_enabled) {
