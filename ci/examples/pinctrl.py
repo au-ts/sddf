@@ -30,28 +30,15 @@ def colour_number(num: bytes, colour: bytes) -> bytes:
 
 
 async def test(backend: HardwareBackend, test_config: TestConfig):
-    # TODO: We really need some kind of colour (de)multiplexer....
-
     async with asyncio.timeout(10):
         await wait_for_output(backend, b"Begin input\r\n")
-        await wait_for_output(backend, b"Please give me character!\r\n")
         await wait_for_output(backend, b"Please give me character!\r\n")
         await wait_for_output(backend, ANSI_RESET)
 
         await send_input(backend, b"1234567890")
         await expect_output(backend, colour_number(b"1234567890", ANSI_RED))
-        await wait_for_output(backend, b"client0 has received 10 characters so far!\r\n")
+        await wait_for_output(backend, b"serial_client has received 10 characters so far!\r\n")
         await wait_for_output(backend, ANSI_RESET)
-
-        # Switch to client 1.
-        await send_input(backend, b"\x1c1\r")
-        # TODO: ???
-        if test_config.config == "debug":
-            await expect_output(backend, b"VIRT_RX|LOG: switching to client 1\r\n")
-
-        await send_input(backend, b"1234567890")
-        await expect_output(backend, colour_number(b"1234567890", ANSI_GREEN))
-        await wait_for_output(backend, b"client1 has received 10 characters so far!\r\n")
 
 
 if __name__ == "__main__":

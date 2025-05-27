@@ -112,7 +112,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "star64",
         ],
     },
-    "timer": {
+    "pinctrl": {
         # Only works in debug mode so as to not depend on serial
         "configs": ["debug", "release"],
         "build_systems": ["make"],
