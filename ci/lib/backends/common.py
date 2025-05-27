@@ -49,6 +49,7 @@ class _TeeOut:
             self.fileio.write(s)
 
     # fmt: off
+    def close(self): return self.stdout.close()
     def flush(self): ...
     def readable(self): return False
     def writable(self): return True
