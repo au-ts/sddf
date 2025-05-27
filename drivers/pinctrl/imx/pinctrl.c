@@ -66,6 +66,11 @@ extern const uint64_t pinctrl_config_data_magic;
 extern const pinctrl_client_device_data_t pinctrl_client_devices_configs[];
 extern const uint32_t num_pinctrl_client_devices_configs;
 
+void *memcpy(void *dest, const void *src, size_t n)
+{
+    return sddf_memcpy(dest, src, n);
+}
+
 bool sanity_check_pinctrl_reg_offset(uint32_t offset)
 {
     if (offset % 4 == 0) {
