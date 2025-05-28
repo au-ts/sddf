@@ -15,6 +15,7 @@
 #include <sddf/i2c/config.h>
 #include <sddf/resources/device.h>
 #include "driver.h"
+#include <sddf/i2c/i2c_driver.h>
 
 #ifndef I2C_BUS_NUM
 #error "I2C_BUS_NUM must be defined!"
