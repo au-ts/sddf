@@ -17,6 +17,22 @@ endif
 
 PYTHONPATH := ${SDDF}/tools/meta:${PYTHONPATH}
 export PYTHONPATH
+# ifeq (${MICROKIT_BOARD},odroidc4)
+# 	I2C_DRIVER_DIR := meson
+# 	TIMER_DRIVER_DIR := meson
+# 	SERIAL_DRIVER_DIR := meson
+# 	CPU := cortex-a55
+# else ifeq (${MICROKIT_BOARD},cheshire)
+# 	I2C_DRIVER_DIR := opentitan-cheshire
+# 	TIMER_DRIVER_DIR := serengeti
+# 	SERIAL_DRIVER_DIR := ns16550a
+# else
+# $(error Unsupported MICROKIT_BOARD)
+# endif
+#
+# BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
+# ARCH := ${shell grep 'CONFIG_SEL4_ARCH  ' $(BOARD_DIR)/include/kernel/gen_config.h | cut -d' ' -f4}
+# SDDF_CUSTOM_LIBC := 1
 
 SUPPORTED_BOARDS := odroidc4
 
