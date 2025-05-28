@@ -1,0 +1,35 @@
+{
+    "compatible": [
+        "eth,i2c"
+    ],
+    "resources": {
+        "regions": [
+            {
+                "name": "regs",
+                "perms": "rw",
+                "size": 4096,
+                "dt_index": 0
+            }
+        ],
+        "irqs": [
+            {
+                "dt_index": 4
+            },
+            {
+                "dt_index": 0
+            },
+            {
+                "dt_index": 1
+            },
+            {
+                "dt_index": 9
+            },
+            {
+                "dt_index": 13
+            },
+            {
+                "dt_index": 14
+            }
+        ]
+    }
+}
