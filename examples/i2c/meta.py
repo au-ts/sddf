@@ -33,6 +33,12 @@ BOARDS: List[Board] = [
         timer="soc/bus@ffd00000/watchdog@f0d0",
         serial="soc/bus@ff800000/serial@3000",
     ),
+    Board(
+        name="cheshire",
+        arch=SystemDescription.Arch.RISCV64,
+        paddr_top=0x90000000,
+        timer="soc/timer@13050000"
+    ),
 ]
 
 

@@ -20,6 +20,10 @@ ifeq (${MICROKIT_BOARD},odroidc4)
 	TIMER_DRIVER_DIR := meson
 	SERIAL_DRIVER_DIR := meson
 	CPU := cortex-a55
+else ifeq (${MICROKIT_BOARD},cheshire)
+	I2C_DRIVER_DIR := opentitan-cheshire
+	TIMER_DRIVER_DIR := serengeti
+	SERIAL_DRIVER_DIR := ns16550a
 else
 $(error Unsupported MICROKIT_BOARD)
 endif
