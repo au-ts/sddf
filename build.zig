@@ -37,6 +37,7 @@ const DriverClass = struct {
 
     const I2cHost = enum {
         meson,
+        cheshire,
     };
 
     const Block = enum {

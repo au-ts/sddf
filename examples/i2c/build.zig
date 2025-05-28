@@ -6,7 +6,7 @@ const std = @import("std");
 const LazyPath = std.Build.LazyPath;
 const Step = std.Build.Step;
 
-const MicrokitBoard = enum { odroidc4 };
+const MicrokitBoard = enum { odroidc4, cheshire };
 
 const Target = struct {
     board: MicrokitBoard,
@@ -20,6 +20,15 @@ const targets = [_]Target{
             .cpu_arch = .aarch64,
             .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a55 },
             .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{.strict_align}),
+            .os_tag = .freestanding,
+            .abi = .none,
+        },
+    },
+    .{
+        .board = MicrokitBoard.cheshire,
+        .zig_target = std.Target.Query{
+            .cpu_arch = .riscv64,
+            .cpu_model = .{ .explicit = &std.Target.riscv.cpu.generic_rv64 },
             .os_tag = .freestanding,
             .abi = .none,
         },
