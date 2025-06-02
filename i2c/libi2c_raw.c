@@ -47,11 +47,9 @@ int libi2c_init(libi2c_conf_t *conf_struct, i2c_queue_handle_t *queue_handle)
 static i2c_cmd_t *__libi2c_alloc_cmd(libi2c_conf_t *conf)
 {
     // Find first non-zero byte in bitmask range
-    int victim_idx = -1;
     for (int i = 0; i < LIBI2C_BITMASK_SZ; i++) {
         uint8_t mask = I2C_DATA_REGION[i];
         if (I2C_DATA_REGION[i] != 0xFF) {
-            victim_idx = i;
             for (int bit = 0; bit < 8; bit++) {
                 if (!(mask & (1 << bit))) {
                     // Mark this bit as allocated
