@@ -16,7 +16,7 @@
 #define SDDF_SPI_MAX_CLIENTS 16
 
 #define SDDF_SPI_MAGIC_LEN 5
-static char SDDF_SPI_MAGIC[SDDF_SPI_MAGIC_LEN] = { 's', 'D', 'D', 'F', 0x4 };
+static char SDDF_SPI_MAGIC[SDDF_SPI_MAGIC_LEN] = { 's', 'D', 'D', 'F', 0x9 };
 
 // zig; Connection
 typedef struct spi_connection_resource {
@@ -30,6 +30,7 @@ typedef struct spi_connection_resource {
 typedef struct spi_driver_config {
     char magic[SDDF_SPI_MAGIC_LEN];
     spi_connection_resource_t virt;
+    // TODO: cross-checked w/ sddf.zig, don't see?
     size_t meta_size;   // Size of uniform meta regions
 } spi_driver_config_t;
 

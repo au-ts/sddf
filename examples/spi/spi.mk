@@ -52,11 +52,11 @@ UTIL := $(SDDF)/util
 SPI_DRIVER := $(SDDF)/drivers/spi/$(SPI_DRIVER_DIR)
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 SYSTEM_FILE := spi.system
-# DTS := $(SDDF)/dts/$(MICROKIT_BOARD).dts
-# DTB := $(MICROKIT_BOARD).dtb
+DTS := $(SDDF)/dts/$(MICROKIT_BOARD).dts
+DTB := $(MICROKIT_BOARD).dtb
 ARCH := ${shell grep 'CONFIG_SEL4_ARCH  ' $(BOARD_DIR)/include/kernel/gen_config.h | cut -d' ' -f4}
 
-IMAGES := spi_driver.elf client.elf
+IMAGES := spi_driver.elf spi_virt.elf client.elf
 
 ifeq ($(ARCH),aarch64)
 	CFLAGS_ARCH := -mcpu=$(CPU) -mstrict-align -target aarch64-none-elf
@@ -96,16 +96,20 @@ client.elf: client.o
 	$(LD) $(LDFLAGS) libsddf_util_debug.a $< $(LIBS) -o $@
 #TODO: unbodge the libsddf stuff ^
 
-# $(DTB): $(DTS)
-# dtc -q -I dts -O dtb $(DTS) > $(DTB)
+$(DTB): $(DTS)
+	dtc -q -I dts -O dtb $(DTS) > $(DTB)
 
-$(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
-	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --output . --sdf $(SYSTEM_FILE)
+$(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB) spi_virt.elf client.elf spi_driver.elf
+	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --output . --sdf $(SYSTEM_FILE) --dtb $(DTB)
+	$(OBJCOPY) --update-section .spi_virt_config=spi_virt.data spi_virt.elf
+	$(OBJCOPY) --update-section .spi_client_config=spi_client_spi_client.data client.elf
+	$(OBJCOPY) --update-section .spi_driver_config=spi_driver.data spi_driver.elf
+	$(OBJCOPY) --update-section .device_resources=spi_driver_device_resources.data spi_driver.elf
 
 $(IMAGE_FILE) $(REPORT_FILE): $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
 
 clean::
-	rm -f client.o
+	rm -f *.o *.elf
 clobber:: clean
 	rm -f client.elf ${IMAGE_FILE} ${REPORT_FILE}
