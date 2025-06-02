@@ -14,10 +14,10 @@ The following platforms are supported:
 * qemu_virt_aarch64
 * qemu_virt_riscv64
 
-Note that this example depends on `dosfstools`.
+Note that this example depends on `dosfstools` and `gdisk`.
 
 For `apt` users: `sudo apt-get install dosfstools`.
-For Homebrew users: `brew install dosfstools`.
+For Homebrew users: `brew install dosfstools gdisk`. You may need to add `dosfstools` bin directory to your path (`/opt/homebrew/Cellar/dosfstools/<version>/sbin`).
 
 ### Block device setup
 
