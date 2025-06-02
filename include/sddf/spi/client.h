@@ -9,6 +9,10 @@
 #include <stdbool.h>
 #include <microkit.h>
 
+#ifndef SPI_CS_LINES_MAX
+#define SPI_CS_LINES_MAX 16
+#endif
+
 #define SPI_BUS_SLOT (0)
 
 /* Protected-Procedure-Call function idenitifers */

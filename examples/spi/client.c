@@ -22,11 +22,6 @@ __attribute__((__section__(".spi_client_config"))) spi_client_config_t config;
 #endif
 #define LOG_CLIENT_ERR(...) do{ sddf_printf("SPI_CLIENT|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
-#define VIRT 0
-
-uintptr_t meta = 0x10000000, 
-          data = 0x10001000;
-
 spi_queue_handle_t handle;
 
 static inline void handle_response() {
@@ -41,14 +36,21 @@ static inline void handle_response() {
     }
 
     LOG_CLIENT("%d was recieved\n", error);
-    spi_enqueue_request(handle, 0, 0, 0, 0);
+    spi_enqueue_request(
+        handle, 
+        0, 
+        (uintptr_t) config.data.vaddr,
+        (uintptr_t) config.meta.vaddr, 
+        0
+    );
     if (error < 64)
-        microkit_deferred_notify(VIRT);        
+        microkit_deferred_notify(config.virt.id);        
 }
 
 void notified(microkit_channel ch) {
     switch (ch) {
-        case VIRT: {
+        //TODO: should be config.virt.id but not constexpr :(
+        case 0: {
             handle_response();
             break;
         }
@@ -64,18 +66,26 @@ void init(void) {
 
     microkit_msginfo claim = microkit_msginfo_new(SPI_BUS_CLAIM, 1);
     microkit_mr_set(SPI_BUS_SLOT, 0);
-    microkit_msginfo ret = microkit_ppcall(VIRT, claim);
+    microkit_msginfo ret = microkit_ppcall(config.virt.id, claim);
     LOG_CLIENT("ppc returned %lu\n", microkit_msginfo_get_label(ret));
 
     handle = spi_queue_init(
-        (spi_request_queue_t *) meta, 
-        (spi_response_queue_t *) meta + sizeof(spi_request_queue_t)
+        config.virt.req_queue.vaddr,
+        config.virt.resp_queue.vaddr 
     );
 
-    // Do initial operation
-    spi_enqueue_request(handle, 0, 0, 0, 0);
+    LOG_CLIENT("data=%p, meta=%p\n", config.data.vaddr, config.meta.vaddr);
 
-    microkit_deferred_notify(VIRT);
+    // Do initial operation
+    spi_enqueue_request(
+        handle, 
+        0, 
+        (uintptr_t) config.data.vaddr, 
+        (uintptr_t) config.meta.vaddr, 
+        0
+    );
+
+    microkit_deferred_notify(config.virt.id);
     
     LOG_CLIENT("sent request off\n");
 }

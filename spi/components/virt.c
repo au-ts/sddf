@@ -24,13 +24,9 @@
 
 #define CLIENT_CH_OFFSET 1
 
-// TODO: place in a more appropriate place
-#define SPI_CS_LINES_MAX 16
-
 __attribute__((__section__(".spi_virt_config"))) spi_virt_config_t config;
 
 // TODO: explode whatever is below
-uintptr_t client_meta = 0x10000000;
 spi_err_t counter = 0;
 
 spi_queue_handle_t client_queues[SDDF_SPI_MAX_CLIENTS];
@@ -42,12 +38,10 @@ int security_list[SPI_CS_LINES_MAX];
 void process_request(uint32_t client_id)
 {
 //    bool enqueued = false;
-    //assert(client_id < config.num_clients);
-
+    assert(client_id < config.num_clients);
 
     /* Do not process the request if we cannot pass it to the driver */
-    while (!spi_queue_empty(client_queues[client_id].request->ctrl)) {
-// && !spi_queue_full(driver_queue.request->ctrl)) {
+    while (!spi_queue_empty(client_queues[client_id].request->ctrl) /*&& !spi_queue_full(driver_queue.request->ctrl)*/) {
     // replace all the spi stuff
 
         spi_cs_line_t cs_line = 0;
@@ -97,9 +91,8 @@ void process_request(uint32_t client_id)
         // Send to client
         // Notify
 
-
-        err = spi_enqueue_response(client_queues[1], cs_line, counter++, 0);
-        microkit_notify(client_id);
+        err = spi_enqueue_response(client_queues[client_id], cs_line, counter++, 0);
+        microkit_notify(client_id + CLIENT_CH_OFFSET);
 
 //        enqueued = true;
     }
@@ -131,7 +124,7 @@ void process_response()
         int err = spi_dequeue_response(driver_queue, &cs_line, &error, &err_cmd);
         /* If this assert fails we have a race as the virtualiser should be the only one dequeuing
          * from the driver's response queue */
-        assert(!err);
+assert(!err);
 
         size_t client_id = security_list[cs_line];
         if (client_id == BUS_UNCLAIMED) {
@@ -151,21 +144,18 @@ void process_response()
 
 void init(void)
 {
-//    assert(spi_config_check_magic(&config));
-//    assert(config.driver.id == 0);  // @leslr: is this needed? sdfgen should remove any need
+    assert(spi_config_check_magic(&config));
+    assert(config.driver.id == 0);  // @leslr: is this needed? sdfgen should remove any need
     LOG_VIRT("initialising\n");
     for (int i = 0; i < SPI_CS_LINES_MAX; i++) {
         security_list[i] = BUS_UNCLAIMED;
     }
     //driver_queue = spi_queue_init(config.driver.req_queue.vaddr, config.driver.resp_queue.vaddr);
 
-    /* TODO: mr. electric, send this man to the bodge explosion chamber NOW! */
-    for (int i = 1; i < /*config.num_clients*/2; i++) {
-        /*LOG_VIRT("Initialising client %d -> DATA region: %p\n", i, config.)*/
-        client_queues[i] = spi_queue_init(/*config.clients[i].conn.req_queue.vaddr,
-                                          config.clients[i].conn.resp_queue.vaddr);*/
-            (spi_request_queue_t *) client_meta, 
-            (spi_response_queue_t *) client_meta + sizeof(spi_request_queue_t));
+    for (int i = 0; i < config.num_clients; i++) {
+        LOG_VIRT("Initialising client %d -> DATA region: %p\n", i, (void *) config.clients[i].client_data_vaddr);
+        client_queues[i] = spi_queue_init(config.clients[i].conn.req_queue.vaddr,
+                                          config.clients[i].conn.resp_queue.vaddr);
     }
 }
 
@@ -176,7 +166,7 @@ void notified(microkit_channel ch)
         process_response();
     } else {
         LOG_VIRT("notified by client %u\n", ch - CLIENT_CH_OFFSET);
-        process_request(ch);
+        process_request(ch - CLIENT_CH_OFFSET);
     }
 }
 
@@ -184,8 +174,7 @@ seL4_MessageInfo_t protected(microkit_channel ch, seL4_MessageInfo_t msginfo)
 {
     size_t label = microkit_msginfo_get_label(msginfo);
     size_t bus = microkit_mr_get(SPI_BUS_SLOT);
-    // TODO: bring this bug up to Lesley??
-    uint32_t client_id = ch;// - CLIENT_CH_OFFSET;
+    uint32_t client_id = ch - CLIENT_CH_OFFSET;
 
     if (label != SPI_BUS_CLAIM && label != SPI_BUS_RELEASE) {
         LOG_VIRT_ERR("unknown label (0x%lx) given by client on channel 0x%x\n", label, ch);
