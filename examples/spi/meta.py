@@ -19,56 +19,47 @@ class Board:
     name: str
     arch: SystemDescription.Arch
     paddr_top: int
+    spi: str
 
 
 BOARDS: List[Board] = [
     Board(
         name="cheshire",
-        arch=SystemDescription.Arch.AARCH64,
+        arch=SystemDescription.Arch.RISCV64,
+        #TODO: replace with actual value
         paddr_top=0xa_000_000,
+        spi="soc/spi@3004000"
     ),
 ]
 
 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
-    _ = """spi_driver = ProtectionDomain("spi_driver", "spi_driver.elf", priority=254)
-    spi_driver.add_irq(Irq(17, id=0))
-    spi_driver.add_irq(Irq(18, id=1))
-    spi_mr = MemoryRegion("spi_meta", 0x1000, paddr=0x3004000)
-    spi_driver.add_map(Map(spi_mr, 0x10_000_000, perms="rw", cached=False))
-    """
-    
-    client_virt_meta = MemoryRegion("client_virt_meta", 0x1000)
-    data = MemoryRegion("data", 0x1000)
-    
-    spi_client = ProtectionDomain("spi_client", "client.elf") 
-    spi_client.add_map(Map(client_virt_meta, 0x10_000_000, perms="rw"))
-    spi_client.add_map(Map(data, 0x10_001_000, perms="rw"))
-    
-    spi_virt = ProtectionDomain("spi_virt", "spi_virt.elf", priority=253)
-    spi_virt.add_map(Map(client_virt_meta, 0x10_000_000, perms="rw"))
-    spi_virt.add_map(Map(data, 0x10_001_000, perms="rw"))
- 
-    client_virt_ch = Channel(spi_client, spi_virt, pp_a=True, b_id=1)
+    spi_driver = ProtectionDomain("spi_driver", "spi_driver.elf", priority=3)
+    spi_virt = ProtectionDomain("spi_virt", "spi_virt.elf", priority=2)
+    spi_client = ProtectionDomain("spi_client", "client.elf", priority=1) 
+   
+    spi_node = dtb.node(board.spi)
+
+    spi_system = Sddf.Spi(sdf, spi_node, spi_driver, spi_virt) 
+    spi_system.add_client(spi_client)
 
     pds = [
         spi_client,
-        spi_virt
-        #spi_driver,
+        spi_virt,
+        spi_driver,
     ]
     for pd in pds:
         sdf.add_pd(pd)
-    sdf.add_mr(client_virt_meta)
-    sdf.add_mr(data)
-    sdf.add_channel(client_virt_ch)
+
+    assert spi_system.connect()
+    assert spi_system.serialise_config(output_dir)
 
     with open(f"{output_dir}/{sdf_file}", "w+") as f:
         f.write(sdf.render())
 
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    # parser.add_argument("--dtb", required=True)
+    parser.add_argument("--dtb", required=True)
     parser.add_argument("--sddf", required=True)
     parser.add_argument("--board", required=True, choices=[b.name for b in BOARDS])
     parser.add_argument("--output", required=True)
@@ -81,7 +72,7 @@ if __name__ == '__main__':
     sdf = SystemDescription(board.arch, board.paddr_top)
     sddf = Sddf(args.sddf)
 
-    # with open(args.dtb, "rb") as f:
-    #    dtb = DeviceTree(f.read())
+    with open(args.dtb, "rb") as f:
+        dtb = DeviceTree(f.read())
 
-    generate(args.sdf, args.output, None)
+    generate(args.sdf, args.output, dtb)
