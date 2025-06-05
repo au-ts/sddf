@@ -17,50 +17,32 @@ volatile struct control_registers *control_regs;
 volatile struct error_registers *error_regs;
 volatile struct canfd_registers *canfd_regs;
 volatile struct acceptance_filter_registers *filter_regs;
-volatile struct message_buffer *fifo_output_buffer;
+// volatile struct message_buffer *fifo_output_buffer;
 
 /* Specified in 11.8.2.8 - Rx FIFO */
-static uint64_t read_fifo(void) {
-    // Read the contents of RXFIR
-    // TODO - at the moment we're trying to accept all messages so we ignore this. Need to update to report ID of found message.
+// static uint64_t read_fifo(void) {
+//     // Read the contents of RXFIR
+//     // TODO - at the moment we're trying to accept all messages so we ignore this. Need to update to report ID of found message.
 
-    // Read the message
-    uint64_t message = fifo_output_buffer->data;
+//     // Read the message
+//     uint64_t message = fifo_output_buffer->data;
 
-    // Check for overflow occurred
-    if (control_regs->iflag1 & IFLAG1_BUF7I) {
-        sddf_dprintf("Rx FIFO has overflowed!\n");
-    }
+//     // Check for overflow occurred
+//     if (control_regs->iflag1 & IFLAG1_BUF7I) {
+//         sddf_dprintf("Rx FIFO has overflowed!\n");
+//     }
 
-    // Check for warning FIFO almost full
-    if (control_regs->iflag1 & IFLAG1_BUF6I) {
-        sddf_dprintf("Rx FIFO almost full!\n");
-    }
+//     // Check for warning FIFO almost full
+//     if (control_regs->iflag1 & IFLAG1_BUF6I) {
+//         sddf_dprintf("Rx FIFO almost full!\n");
+//     }
 
-    // Clear the frame is available buffer (and other flags) - note that this will retrigger an interrupt if there's more unserviced buffers in the FIFO
-    control_regs->iflag1 &= ~(IFLAG1_BUF7I | IFLAG1_BUF6I | IFLAG1_BUF5I);
+//     // Clear the frame is available buffer (and other flags) - note that this will retrigger an interrupt if there's more unserviced buffers in the FIFO
+//     control_regs->iflag1 &= ~(IFLAG1_BUF7I | IFLAG1_BUF6I | IFLAG1_BUF5I);
 
-    return message;
-}
+//     return message;
+// }
 
-static void handle_irq(microkit_channel ch) {
-    // At the moment this only handles receiving message interrupts
-
-    // Message available in the FIFO
-    if (control_regs->iflag1 & IFLAG1_BUF5I) {
-        // TODO - atm we just print out the message for debug purposes
-        uint64_t rx_message = read_fifo(); // Note: this will clear the necessary flags to make the FIFO available for reception
-        sddf_dprintf("FIFO READ - CONTENTS: %lu\n", rx_message);
-
-    } else {
-        sddf_dprintf("RECEVIED A DIFFERENT SORT OF INTERRUPT! NEED TO HANDLE THIS");
-        // Note there's currently a number of types of interrupts we're not handling
-        // See flexcan_irq from the linux kernel implementation for possibilities
-    }
-
-    // Ack the channel so we receive more interrupts
-    microkit_irq_ack(ch);
-}
 
 /* Copied from flexcan-core.c in Linux kernel */
 static void module_enable(void) {
@@ -234,6 +216,55 @@ static void can_clocks_enable(void) {
     sddf_dprintf("IPG >> Base: %x , Set: %x\n", clock_reg_ipg_root->base, clock_reg_ipg_root->set);
 }
 
+/* Message Buffer Structure - 11.8.5.3  */
+// Control bits
+#define MB_CTRL_EDL             (1UL << 31)             /* Extended Data Length -- Distinguishes between CAN and CANFD frames */
+#define MB_CTRL_BRS             (1UL << 30)             /* Bit Rate Switch -- Defines whether bit rate switch is in CANFD frame */
+#define MB_CTRL_ESI             (1UL << 29)             /* Error State Indicator -- Indicates if transmitting node is error active or error passive */
+#define MB_CTRL_RESERVED0       (1UL << 28)             /* Reserved */
+#define MB_CTRL_CODE(x)         (((x) & 15UL) << 24)    /* Message Buffer Code -- See below for details*/
+#define MB_CTRL_RESERVED1       (1UL << 23)             /* Reserved */
+#define MB_CTRL_SRR             (1UL << 22)             /* Substitute Remote Request -- Used only in extended format*/
+#define MB_CTRL_IDE             (1UL << 21)             /* ID Extended Bit -- Identifies whether frame is standard or extended */
+#define MB_CTRL_RTR             (1UL << 20)             /* Remote Transmission Request -- Used for arbitration (see Table 11-186 for details)*/
+#define MB_CTRL_DLC(x)          (((x) & 15UL) << 16)    /* Length of Data Bytes -- Contains the length in bytes of the Rx or Tx data */
+#define MB_CTRL_TIMESTAMP       (65535UL << 0)          /* Free-Running Counter Time Stamp -- Copy of the free-running timer value at Rx or Tx time */
+// Id bits      
+#define MB_ID_PRIO              (7UL << 29)             /* Local Priority -- Only used for Tx */
+#define MB_ID_STD               (2047UL << 18)          /* Frame Identifier -- In standard only the 11 most significant bits are used */
+#define MB_ID_EXT               (262143UL << 0)         /* Extended Identifier -- If extended is used both the 11 top and 18 bottom bits used for identifier */
+
+/*
+    Message Buffer Codes (Rx) -- See Table 11-186 for further details
+    > 0000b: MB is inactive
+    > 0100b: MB is active and empty
+    > 0010b: MB is full
+    > 0110b: MB is full and contains an overrun (written over a previous buffer)
+    > 1010b: A frame configured to recognize remote request frame
+    > If Code[0] == 1, FlexCAN is updating the contents of the MB and the CPU must not access it
+*/
+
+#define CODE_RX_INACTIVE    0x0 /* Won't store any data or do anything */
+#define CODE_RX_EMPTY       0x4 /* Ready to receive data from a frame */
+#define CODE_RX_FULL        0x2 /* Contains data from a frame */
+#define CODE_TX_INACTIVE    0x8 /* Emtpy and can be setup to transmit */
+#define CODE_TX_DATA        0xc /* Data ready for transmit --> goes to inactive after transmit */
+
+/* Message Buffer Setup */
+#define MESSAGE_BUFFERS_START 0x80
+struct message_buffer { // We have 16 byte message buffers holding 8 byes of metadata and 8 of data
+    uint32_t can_ctrl;
+    uint32_t can_id;
+    uint64_t data; // Note: this is fixed at 8 bytes as we're currently using standard CAN and not CANFD
+};
+
+struct message_buffer_container { // we have 64 message buffers
+    struct message_buffer mb[64]; // TODO: This is a bit of hard coding where we assume max 8 byte payloads - should update
+};
+
+volatile struct message_buffer_container *message_buffers;
+
+
 /* Specified in 11.8.4.1 - FlexCAN Initialization Sequence */
 static void can_init(void) {
     /* Setup references to the different groups of registers */
@@ -241,22 +272,134 @@ static void can_init(void) {
     control_regs = (volatile struct control_registers *) vaddr;
     filter_regs = (volatile struct acceptance_filter_registers *) (vaddr + ACCEPTANCE_FILTER_REGISTER_OFFSET);
     error_regs = (volatile struct error_registers *) (vaddr + ERROR_REGISTER_OFFSET);
-    fifo_output_buffer = (volatile struct message_buffer *) (vaddr + FIFO_OUTPUT_BUFFER_OFFSET);
+    message_buffers = (volatile struct message_buffer_container *) (vaddr + MESSAGE_BUFFERS_START);
 
     // NOTE: Most of the initialisation for this is handled in the loader atm. This currently just
     // sets up the memory regions for different registers. The source of truth for initialisation is now
     // the hack setup in the microkit loader.
+
+    /* Configuration for the message buffers */
+    // We make some assumptions here:
+    // 1. We're not using the FIFO
+    // 2. We're not using CANFD
+    // 3. Only one message buffer is used for Tx (MB0)
+    // 4. We're using all 64 mailboxes and each contains up to 8 bytes of data (and 8 bytes for id/ctrl)
+
+    message_buffers->mb[0].can_ctrl |= MB_CTRL_CODE(CODE_TX_INACTIVE); // Set the first MB as Tx
+
+    for (int i = 1; i < 64; i++) { // Set the remaining MBs as Rx
+        message_buffers->mb[i].can_ctrl |= MB_CTRL_CODE(CODE_RX_EMPTY);
+    }
+}
+
+/*
+    8. Configure the Control and Status word with the desired configuration.
+        a. Set ID type via MB_CS[IDE].
+        b. Set Remote Transmission Request (if needed) via MB_CS[RTR].
+        c. If MCR[FDEN] is enabled, also configure the MB_CS[EDL] and MB_CS[BRS]
+        fields. For details about the relationship between the written value and
+        transmitted value of the MB_CS[ESI] field, see Table 11-165.2
+        d. Set Data Length Code in bytes via MB_CS[DLC]. See Table 11-188 for detailed
+        information.
+        e. Activate the message buffer to transmit the CAN frame by setting
+        MB_CS[CODE] to Ch.
+
+*/
+
+/* Specified in 11.8.2.2 - Transmit Process */
+static void can_tx(void) { // TODO - add parameters
+
+    // TODO - we should probably do some clearing up here to make sure the interrupt bits aren't set
+
+    uint32_t id = (123UL << 18); // A standad can frame (without extended ID only uses the middle 11 bits)
+
+    uint64_t data = 0xffffffffffffffff; // Some dummy data
+
+    uint32_t ctrl = MB_CTRL_CODE(CODE_TX_DATA); // Set the data code to indicate we have a message to send
+    ctrl |= MB_CTRL_DLC(8); // Indicate we're sending an 8 byte data segment
+    ctrl &= ~(MB_CTRL_IDE | MB_CTRL_BRS | MB_CTRL_ESI | MB_CTRL_EDL | MB_CTRL_RTR); // We don't want any of this (not sure about ESI though)
+
+    message_buffers->mb[0].can_id = id;
+    message_buffers->mb[0].data = data;    
+    message_buffers->mb[0].can_ctrl |= ctrl; // Write the whole control word in a single write -- this triggers the transmission
+}
+
+/* Specified in 11.8.2.4 - Receive Process */
+static void can_rx(int index) {
+    sddf_dprintf("TODO: implement reading MB contents, atm we just print the MB number we'd like to read: %d\n", index);
+    // Linux handles this in flexcan_mailbox_read 
+}
+
+
+static void handle_irq(microkit_channel ch) {
+
+    /*
+        3 primary types of interrupts:
+         - Reception of frame
+         - Transmission complete
+         - Error/status changes
+    */
+    
+    // Reception interrupts
+    for (int i = 1; i < 32; i++) { // iflag1 (mb1 -31)
+        if (MYBIT(1, i) & control_regs->iflag1) { // Check for the corresponding flag
+            can_rx(i); // read the corresponding message buffer
+            control_regs->iflag1 |= MYBIT(1, i); // Ack the interrupt by writing 1 to it
+            sddf_dprintf("Timestamp: %u\n", control_regs->timer); // Read the timer to unlock the MB
+            goto handled;
+        }
+    }
+
+    for (int i = 0; i < 32; i++) { // iflag2 (mb32-63)
+        if (MYBIT(1, i) & control_regs->iflag2) { // Check for the corresponding flag
+            can_rx(i + 32); // read the corresponding message buffer
+            control_regs->iflag2 |= MYBIT(1, i); // Ack the interrupt by writing 1 to it
+            sddf_dprintf("Timestamp: %u\n", control_regs->timer); // Read the timer to unlock the MB
+            goto handled;
+        }
+    }
+
+    // Transmission complete interrupt
+    if (MYBIT(1, 0) & control_regs->iflag1) {
+        sddf_dprintf("Code following Tx: 0x%x", message_buffers->mb[0].can_ctrl); // Atm just reading this to see what it is -- expect 0x8 (INACTIVE)
+        control_regs->iflag1 |= MYBIT(1, 0); // Ack the interrupt by writing 1 to it
+        goto handled;
+    }
+
+    // TODO - ADD INTERRUPT HANDLING FOR OTHER SOURCES HERE (ERRORS / STATUS)
+
+    // Ack the channel so we can receive more interrupts
+    handled:
+        microkit_irq_ack(ch);
 }
 
 // microkit init
 void init (void) {
     sddf_dprintf("STARTING CAN DRIVER\n");
     can_init();
-    
-    // Testing: expect FIFO output to be empty at this point 
-    uint64_t fifo_output_value = read_fifo();
 
-    sddf_dprintf("FIFO OUTPUT ON INIT: %lu\n", fifo_output_value);
+    // We expect at this point MB0 to be configured for Tx and the rest for Rx
+    for (int i = 0; i < 64; i++) {
+        sddf_dprintf("Message buffer: %d has control bits: %d, id bits: %d, data bits: %lu\n", i, message_buffers->mb[i].can_ctrl, message_buffers->mb[i].can_id, message_buffers->mb[i].data);
+    }
+
+    // sddf_dprintf("ESR1 register should be emtpy: %u\n", control_regs->esr1);
+
+    // while (true) {
+    //     sddf_dprintf("Waiting to sync...\n");
+    //     sddf_dprintf("imask2 contents: %u\n", control_regs->imask2);    
+    //     sddf_dprintf("timer contents: %u\n", control_regs->timer);    
+    //     if (control_regs->esr1) {
+    //         sddf_dprintf("esr1 status: %u\n", control_regs->esr1);    
+    //         break;
+    //     }
+    // }
+
+
+    // We expect that at this point we have no interrupts and no iflag masks are set
+    // After our send we expect that mb0 will have an interrupt to indicate it has sent and probably mb1 will have one to indicate it has received this
+    // transmission. Need to test this out
+    can_tx();
 }
 
 // microkit notified
