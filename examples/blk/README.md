@@ -16,8 +16,8 @@ The following platforms are supported:
 
 Note that this example depends on `dosfstools` and `gdisk`.
 
-For `apt` users: `sudo apt-get install dosfstools`.
-For Homebrew users: `brew install dosfstools gdisk`. You may need to add `dosfstools` bin directory to your path (`/opt/homebrew/Cellar/dosfstools/<version>/sbin`).
+For `apt` users: `sudo apt-get install dosfstools gdisk`.
+For Homebrew users: `brew install dosfstools gdisk`.
 
 ### Block device setup
 
