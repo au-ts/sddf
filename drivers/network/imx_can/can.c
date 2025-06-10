@@ -327,7 +327,15 @@ static void can_tx(void) { // TODO - add parameters
 /* Specified in 11.8.2.4 - Receive Process */
 static void can_rx(int index) {
     sddf_dprintf("TODO: implement reading MB contents, atm we just print the MB number we'd like to read: %d\n", index);
-    // Linux handles this in flexcan_mailbox_read 
+
+    // Technically here we should read the ctrl register and check for the busy bit (LSB of CODE is 1 when busy) and if it's busy just loop until it's free
+    uint32_t ctrl = message_buffers->mb[index].can_ctrl;
+    uint64_t data = message_buffers->mb[index].data;
+
+    sddf_dprintf("The message in MB %d has ctrl: %u and data: %lu\n", index, ctrl, data);
+
+    // TODO - not sure if I should write empty to this MB now but we'll start out assuming we have to
+    message_buffers->mb[index].can_ctrl = MB_CTRL_CODE(CODE_RX_EMPTY);
 }
 
 
