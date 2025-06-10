@@ -34,7 +34,7 @@ BOARDS: List[Board] = [
 
 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
-    spi_driver = ProtectionDomain("spi_driver", "spi_driver.elf", priority=3)
+    spi_driver = ProtectionDomain("spi_driver", "spi_driver.elf", priority=3, stack_size=16384)
     spi_virt = ProtectionDomain("spi_virt", "spi_virt.elf", priority=2)
     spi_client = ProtectionDomain("spi_client", "client.elf", priority=1) 
    
