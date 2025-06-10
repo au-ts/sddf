@@ -15,7 +15,7 @@ SPI_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 spi_driver.elf: spi/spi.o
 	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
 
-spi/spi.o: ${SPI_DIR}/spi.c  ${CHECK_FLAGS_BOARD_MD5} |spi
+spi/spi.o: ${SPI_DIR}/spi.c ${SPI_DIR}/driver.h ${CHECK_FLAGS_BOARD_MD5} |spi
 	${CC} ${CFLAGS} -o $@ -c $<
 
 spi:

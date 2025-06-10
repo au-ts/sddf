@@ -12,8 +12,7 @@
 #include <sddf/resources/device.h>
 #include <sddf/spi/queue.h>
 
-// Not a hard limit, although it would be hard to go beyond this limit
-#define SDDF_SPI_MAX_CLIENTS 16
+#define SDDF_SPI_MAX_CLIENTS 64 
 
 #define SDDF_SPI_MAGIC_LEN 5
 static char SDDF_SPI_MAGIC[SDDF_SPI_MAGIC_LEN] = { 's', 'D', 'D', 'F', 0x9 };
