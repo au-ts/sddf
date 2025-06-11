@@ -35,16 +35,13 @@ static inline void handle_response() {
         return;
     }
 
+    uint8_t *buffer = config.buffer.vaddr;
+
     LOG_CLIENT("%d was recieved\n", error);
-    spi_enqueue_request(
-        handle, 
-        0, 
-        (uintptr_t) config.data.vaddr,
-        (uintptr_t) config.meta.vaddr, 
-        0
-    );
-    if (error < 64)
-        microkit_deferred_notify(config.virt.id);        
+
+    LOG_CLIENT("0x%x was recieved\n", buffer[8]);
+
+    while (true) {}
 }
 
 void notified(microkit_channel ch) {
@@ -64,25 +61,35 @@ void notified(microkit_channel ch) {
 void init(void) {
     LOG_CLIENT("initializing\n");
 
-    microkit_msginfo claim = microkit_msginfo_new(SPI_BUS_CLAIM, 1);
-    microkit_mr_set(SPI_BUS_SLOT, 0);
-    microkit_msginfo ret = microkit_ppcall(config.virt.id, claim);
-    LOG_CLIENT("ppc returned %lu\n", microkit_msginfo_get_label(ret));
-
     handle = spi_queue_init(
         config.virt.req_queue.vaddr,
         config.virt.resp_queue.vaddr 
     );
+    
+    // Test to see if plumbing works
+    // Claim bus 2
+    microkit_msginfo claim = microkit_msginfo_new(SPI_BUS_CLAIM, 1);
+    microkit_mr_set(SPI_BUS_SLOT, 2);
+    microkit_msginfo ret = microkit_ppcall(config.virt.id, claim);
+    LOG_CLIENT("ppc returned %lu\n", microkit_msginfo_get_label(ret));
 
-    LOG_CLIENT("data=%p, meta=%p\n", config.data.vaddr, config.meta.vaddr);
+    spi_cmd_t *spi_cmds = config.control.vaddr;
+    spi_cmds[0] = (spi_cmd_t) {0, 2, SPI_WRITE}; // Switch to bank 0
+    spi_cmds[1] = (spi_cmd_t) {4, 1, SPI_WRITE}; // Request WHO_AM_I
+    spi_cmds[2] = (spi_cmd_t) {8, 1, SPI_READ};  // Recieve WHO_AM_I
+
+    uint8_t *buffer = config.buffer.vaddr;
+    buffer[0] = BIT(7) | 0x7F; 
+    buffer[1] = 0;
+    buffer[4] = 0;
 
     // Do initial operation
     spi_enqueue_request(
         handle, 
-        0, 
-        (uintptr_t) config.data.vaddr, 
-        (uintptr_t) config.meta.vaddr, 
-        0
+        2, 
+        (uintptr_t) config.control.vaddr, 
+        (uintptr_t) config.buffer.vaddr, 
+        3
     );
 
     microkit_deferred_notify(config.virt.id);

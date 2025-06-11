@@ -26,9 +26,6 @@
 
 __attribute__((__section__(".spi_virt_config"))) spi_virt_config_t config;
 
-// TODO: explode whatever is below
-spi_err_t counter = 0;
-
 spi_queue_handle_t client_queues[SDDF_SPI_MAX_CLIENTS];
 spi_queue_handle_t driver_queue;
 
@@ -37,19 +34,18 @@ int security_list[SPI_CS_LINES_MAX];
 
 void process_request(uint32_t client_id)
 {
-//    bool enqueued = false;
+    bool enqueued = false;
     assert(client_id < config.num_clients);
 
     /* Do not process the request if we cannot pass it to the driver */
-    while (!spi_queue_empty(client_queues[client_id].request->ctrl) /*&& !spi_queue_full(driver_queue.request->ctrl)*/) {
-    // replace all the spi stuff
-
-        spi_cs_line_t cs_line = 0;
-        uintptr_t data_start_vaddr;
-        uintptr_t meta_base_vaddr;
+    while (!spi_queue_empty(client_queues[client_id].request->ctrl) && !spi_queue_full(driver_queue.request->ctrl)) {
+        spi_cs_line_t cs_line;
+        uintptr_t control_start_vaddr;
+        uintptr_t buffer_base_vaddr;
         uint16_t len;
+
         // Take request from client
-        int err = spi_dequeue_request(client_queues[client_id], &cs_line, &data_start_vaddr, &meta_base_vaddr,
+        int err = spi_dequeue_request(client_queues[client_id], &cs_line, &control_start_vaddr, &buffer_base_vaddr,
                                       &len);
         if (err) {
             LOG_VIRT_ERR("could not dequeue from request queue\n");
@@ -61,48 +57,36 @@ void process_request(uint32_t client_id)
             LOG_VIRT_ERR("invalid bus address (0x%x) requested by client 0x%x\n", cs_line, client_id);
             continue;
         }
-        LOG_VIRT("Request: bus address = %u : data = %p : len = %u\n", cs_line, (void *)data_start_vaddr, len);
-        LOG_VIRT("Data origin for this client: %p\n", (void *)config.clients[client_id].client_data_vaddr);
+        LOG_VIRT("Request: bus address = %u : control = %p : len = %u\n", cs_line, (void *)control_start_vaddr, len);
+        LOG_VIRT("Data origin for this client: %p\n", (void *)config.clients[client_id].client_control_vaddr);
 
-        size_t offset = (size_t)data_start_vaddr - (size_t)config.clients[client_id].client_data_vaddr;
+        size_t offset = (size_t)control_start_vaddr - (size_t)config.clients[client_id].client_control_vaddr;
         LOG_VIRT("request offset: %zu\n", offset);
-        if (offset > config.clients[client_id].data_size
-            || data_start_vaddr > config.clients[client_id].driver_data_vaddr) {
-            LOG_VIRT_ERR("invalid data vaddr (0x%lx) given by client %u.", data_start_vaddr, client_id);
+        if (offset > config.clients[client_id].control_size
+            || control_start_vaddr > config.clients[client_id].driver_control_vaddr) {
+            LOG_VIRT_ERR("invalid control vaddr (0x%lx) given by client %u.", control_start_vaddr, client_id);
             continue;
         }
-//TODO: hi! my name is bodge! pkm!!!!
-#define CLIENT_TEST
 
-        #ifndef CLIENT_TEST
         // Now we need to convert the offset into an offset the driver can use in its address space.
-        uintptr_t driver_data_vaddr = (uintptr_t)(config.clients[client_id].driver_data_vaddr + offset);
+        uintptr_t driver_control_vaddr = (uintptr_t)(config.clients[client_id].driver_control_vaddr + offset);
 
-        // We replace the meta base of the client with the driver's base. The client doesn't need
+        // We replace the buffer base of the client with the driver's base. The client doesn't need
         // to supply one at all!
         LOG_VIRT("Enqueueing request to driver...\n");
-        err = spi_enqueue_request(driver_queue, cs_line, driver_data_vaddr,
-                                  config.clients[client_id].driver_meta_vaddr, len);
+        err = spi_enqueue_request(driver_queue, cs_line, driver_control_vaddr,
+                                  config.clients[client_id].driver_buffer_vaddr, len);
+
         /* If this assert fails we have a race as the driver should only ever be dequeuing */
         assert(!err);
-        #endif
-        // Make a response struct
-        //
-        // Send to client
-        // Notify
 
-        err = spi_enqueue_response(client_queues[client_id], cs_line, counter++, 0);
-        microkit_notify(client_id + CLIENT_CH_OFFSET);
-
-//        enqueued = true;
+        enqueued = true;
     }
 
-    #ifndef CLIENT_TEST
     if (enqueued) {
         LOG_VIRT("Firing deferred notify to driver...\n");
         microkit_deferred_notify(config.driver.id);
     }
-    #endif
 }
 
 void process_response()
@@ -124,7 +108,7 @@ void process_response()
         int err = spi_dequeue_response(driver_queue, &cs_line, &error, &err_cmd);
         /* If this assert fails we have a race as the virtualiser should be the only one dequeuing
          * from the driver's response queue */
-assert(!err);
+        assert(!err);
 
         size_t client_id = security_list[cs_line];
         if (client_id == BUS_UNCLAIMED) {
@@ -150,10 +134,10 @@ void init(void)
     for (int i = 0; i < SPI_CS_LINES_MAX; i++) {
         security_list[i] = BUS_UNCLAIMED;
     }
-    //driver_queue = spi_queue_init(config.driver.req_queue.vaddr, config.driver.resp_queue.vaddr);
+    driver_queue = spi_queue_init(config.driver.req_queue.vaddr, config.driver.resp_queue.vaddr);
 
     for (int i = 0; i < config.num_clients; i++) {
-        LOG_VIRT("Initialising client %d -> DATA region: %p\n", i, (void *) config.clients[i].client_data_vaddr);
+        LOG_VIRT("Initialising client %d -> CONTROL region: %p\n", i, (void *) config.clients[i].client_control_vaddr);
         client_queues[i] = spi_queue_init(config.clients[i].conn.req_queue.vaddr,
                                           config.clients[i].conn.resp_queue.vaddr);
     }
