@@ -11,10 +11,11 @@
 
 /*
  * Here we choose the default data size and queue entries. This means
- * that by default the data region would need 4KiB of space (1 page on
+ * that by default the control region would need 4KiB of space (1 page on
  * AArch64 for example). These defaults have worked for our example systems
  * but are left configurable for the system designer if they are too small.
  */
+// TODO: where is this even used?
 #ifndef SPI_MAX_DATA_SIZE
 #define SPI_MAX_DATA_SIZE 128
 #endif
@@ -25,6 +26,7 @@
 #define NUM_QUEUE_ENTRIES 4
 #endif
 
+//TODO: are these usable?
 #define RESPONSE_ERR 0
 #define RESPONSE_ERR_TOKEN 1
 /* Start of payload bytes in response data (index of first non error byte that driver adds) */
@@ -52,17 +54,17 @@ typedef enum spi_err {
 typedef enum spi_cmd_mode {
     SPI_READ,
     SPI_WRITE,
-    SPI_TRANSFER,
-    SPI_TRANSFER_IN_PLACE,
-    SPI_DUMMY
+    SPI_TRANSFER, // TODO: remove, since reusing buffers decreases impl. headache
+    SPI_TRANSFER_IN_PLACE, 
+    SPI_DUMMY // TODO: remove since no QSPI support?
 } spi_cmd_mode_t;
 
 typedef uint8_t spi_cs_line_t;
 
 typedef struct spi_cmd {
-    /* TODO: offset into data region */
-    size_t offset, offset2;
-    /* length of cmd */
+    /* offset into buffer region */
+    size_t offset;
+    /* length of the referenced buffer */
     uint16_t len;
     /* what command do? */
     spi_cmd_mode_t mode; 
@@ -70,16 +72,15 @@ typedef struct spi_cmd {
 
 /* A queue entry is a single logical transaction. The offset points to a list of len spi_cmd_t's */
 typedef struct spi_queue_request {
-    // NOTE: data and meta base are set by the virtualiser, not the client. We use the same struct
+    // NOTE: control and buffer base are set by the virtualiser, not the client. We use the same struct
     // for symmetry, and to avoid a copy.
     
     /* These two vaddrs are unfortunately needed because it complicates verification to just let
      * the driver access this from SDFgen. We arguably should just trust SDFgen to avoid this.*/
-    /* Pointer to first command used in data region for this request*/
-// TODO: uhhhhh what to do with these clowns?
-    uintptr_t data_start_vaddr;
-    /* Start of meta region, pointed to by cmds in the data region */
-    uintptr_t meta_base_vaddr;
+    /* Pointer to first command used in control region for this request*/
+    uintptr_t control_start_vaddr;
+    /* Start of buffer region, pointed to by cmds in the control region */
+    uintptr_t buffer_base_addr;
     /* Number of commands in list. Max 32 per transaction */
     uint8_t len;
     /* SPI cs line to operate on */
@@ -174,14 +175,14 @@ static inline uint32_t spi_queue_length(spi_queue_ctrl_t q_ctrl)
  *
  * @param queue queue handle to enqueue into.
  * @param cs_line bus address on the SPI device to request on
- * @param data_start_vaddr pointer to command in data region
- * @param meta_base_vaddr pointer to start of meta region for this command. Set by virt.
- * @param len length of data at the offset given
+ * @param control_start_vaddr pointer to command in control region
+ * @param buffer_base_addr pointer to start of buffer region for this command. Set by virt.
+ * @param len length of buffer at the offset given
  *
  * @return -1 when queue is full, 0 on success.
  */
 static inline int spi_enqueue_request(spi_queue_handle_t h, spi_cs_line_t cs_line,
-                                      uintptr_t data_start_vaddr, uintptr_t meta_base_vaddr, uint8_t len)
+                                      uintptr_t control_start_vaddr, uintptr_t buffer_base_addr, uint8_t len)
 {
     spi_request_queue_t *queue = h.request;
     if (spi_queue_full(queue->ctrl)) {
@@ -190,8 +191,8 @@ static inline int spi_enqueue_request(spi_queue_handle_t h, spi_cs_line_t cs_lin
 
     size_t index = queue->ctrl.tail % NUM_QUEUE_ENTRIES;
     queue->requests[index].cs_line = cs_line;
-    queue->requests[index].data_start_vaddr = data_start_vaddr;
-    queue->requests[index].meta_base_vaddr = meta_base_vaddr;
+    queue->requests[index].control_start_vaddr = control_start_vaddr;
+    queue->requests[index].buffer_base_addr = buffer_base_addr;
     queue->requests[index].len = len;
 
     THREAD_MEMORY_RELEASE();
@@ -232,14 +233,14 @@ static inline int spi_enqueue_response(spi_queue_handle_t h, spi_cs_line_t cs_li
  *
  * @param queue queue handle to dequeue from
  * @param cs_line pointer for where to store the bus address associated with the dequeued request
- * @param data_start_vaddr pointer to command in data region
- * @param meta_base_vaddr pointer to start of meta region for this command. Set by virt.
- * @param len pointer for where to store the length of data associated with the dequeued request
+ * @param control_start_vaddr pointer to command in control region
+ * @param buffer_base_addr pointer to start of buffer region for this command. Set by virt.
+ * @param len pointer for where to store the length of the buffer associated with the dequeued request
  *
  * @return -1 when queue is empty, 0 on success.
  */
-static inline int spi_dequeue_request(spi_queue_handle_t h, spi_cs_line_t *cs_line, uintptr_t *data_start_vaddr,
-                                      uintptr_t *meta_base_vaddr, uint16_t *len)
+static inline int spi_dequeue_request(spi_queue_handle_t h, spi_cs_line_t *cs_line, uintptr_t *control_start_vaddr,
+                                      uintptr_t *buffer_base_addr, uint16_t *len)
 {
     spi_request_queue_t *queue = h.request;
     if (spi_queue_empty(queue->ctrl)) {
@@ -248,8 +249,8 @@ static inline int spi_dequeue_request(spi_queue_handle_t h, spi_cs_line_t *cs_li
 
     size_t index = queue->ctrl.head % NUM_QUEUE_ENTRIES;
     *cs_line = queue->requests[index].cs_line;
-    *data_start_vaddr = queue->requests[index].data_start_vaddr;
-    *meta_base_vaddr = queue->requests[index].meta_base_vaddr;
+    *control_start_vaddr = queue->requests[index].control_start_vaddr;
+    *buffer_base_addr = queue->requests[index].buffer_base_addr;
     *len = queue->requests[index].len;
 
     THREAD_MEMORY_RELEASE();
@@ -263,8 +264,8 @@ static inline int spi_dequeue_request(spi_queue_handle_t h, spi_cs_line_t *cs_li
  *
  * @param queue queue handle to dequeue from
  * @param cs_line pointer for where to store the bus address associated with the dequeued response
- * @param offset pointer for where to store teh offset of the data of associated with the dequeued response
- * @param len pointer for where to store the length of data associated with the dequeued response
+ * @param offset pointer for where to store the offset of the buffer associated with the dequeued response
+ * @param len pointer for where to store the length of the buffer associated with the dequeued response
  *
  * @return -1 when queue is empty, 0 on success.
  */

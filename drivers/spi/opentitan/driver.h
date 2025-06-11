@@ -1,17 +1,90 @@
-#define CONTROL_SPIEN (BIT(31))
-#define CONTROL_SW_RST (BIT(30))
-#define CONTROL_OUTPUT_EN (BIT(29))
+#include <stdint.h>
+#include <stdbool.h>
 
-#define COMMAND_DIRECTION_TX_ONLY (BIT(12))
-#define COMMAND_DIRECTION_RX_ONLY (BIT(13))
-#define COMMAND_DIRECTION_BIDIRECTION (BIT(12) | BIT(13))
+typedef struct spi_driver_data {
+    // Per request state
+    spi_cs_line_t cs_line;
+    spi_cmd_t *cmd;
+    uint16_t num_cmds;
+    void *buffer_base;
+    // Request in-progress state
+    uint8_t cmd_in_progress;
+    // Command in-progress state (effectively offsets into the buffer slice)
+    uint16_t tx_progress;
+    uint16_t rx_progress;
+    // Error
+    spi_err_t err;
+} spi_driver_data_t;
+
+typedef enum spi_state {
+    IDLE, REQ, SEL_CMD, CMD, CMD_RET, RESP, NUM_STATES
+} spi_state_t;
+
+typedef struct fsm_state {
+    spi_state_t curr_state;
+    spi_state_t nxt_state;
+    bool yield;
+} fsm_state_t;
+
+static void spi_reset_state(spi_driver_data_t *s) {
+    s->cmd = NULL;
+    s->cs_line = -1;
+    s->num_cmds = -1;
+    s->buffer_base = NULL;
+    s->cmd_in_progress = -1;
+    s->tx_progress = -1;
+    s->rx_progress = -1;
+    s->err = SPI_ERR_OK;
+}
+
+#define TIMEOUT_LIMIT (0xFFF)
+
+#define FIFO_DEPTH (64)
+
+/* Device Macros */
+#define INTR_ERROR      (BIT(0))
+#define INTR_SPI_EVENT  (BIT(1))
+
+#define CONTROL_SPIEN                   (BIT(31))
+#define CONTROL_SW_RST                  (BIT(30))
+#define CONTROL_OUTPUT_EN               (BIT(29))
+#define CONTROL_TX_WATERMARK(num)       (((num) & 0xFF) << 8)
+#define CONTROL_RX_WATERMARK(num)       ((num) & 0xFF)
+
+#define CONFIGOPTS_CLKDIV(div)          ((div) & 0xFFFF)
+#define CONFIGOPTS_CSNIDLE(num)         (((num) & 0xF) << 16)
+#define CONFIGOPTS_CSNTRAIL(num)        (((num) & 0xF) << 20)
+#define CONFIGOPTS_CSNLEAD(num)         (((num) & 0xF) << 24)
+#define CONFIGOPTS_FULLCYC              (BIT(29))
+#define CONFIGOPTS_CPHA                 (BIT(30))
+#define CONFIGOPTS_CPOL                 (BIT(31))
+
+#define COMMAND_DIRECTION_TX_ONLY       (BIT(13))
+#define COMMAND_DIRECTION_RX_ONLY       (BIT(12))
+#define COMMAND_DIRECTION_BIDIRECTION   (BIT(12) | BIT(13))
+#define COMMAND_CSAAT                   (BIT(9))
 
 // Trust me on this, it's stupid
-#define COMMAND_LEN_OFFSET(length) (((length) - 1) & 0x1FF)
+#define COMMAND_LEN_OFFSET(length)      (((length) - 1) & 0x1FF)
 
 #define STATUS_READY(status)    ((status) & BIT(31))
 #define STATUS_ACTIVE(status)   ((status) & BIT(30))
 #define STATUS_TXSTALL(status)  ((status) & BIT(27))
-#define STATUS_RXQD(status)     (((status) >> 8) & 0xFF)
+#define STATUS_RXQD(status)     (((status) & 0xFF00) >> 8)
 #define STATUS_TXQD(status)     ((status) & 0xFF)
+
+/* Access invalid is always active */
+#define ERROR_ACCESSINVAL       (BIT(5))
+#define ERROR_CSIDINVAL         (BIT(4))
+#define ERROR_CMDINVAL          (BIT(3))
+#define ERROR_UNDERFLOW         (BIT(2))
+#define ERROR_OVERFLOW          (BIT(1))
+#define ERROR_CMDBUSY           (BIT(0))
+
+#define EVENT_ENABLE_IDLE       (BIT(5))
+#define EVENT_ENABLE_READY      (BIT(4))
+#define EVENT_ENABLE_TXWM       (BIT(3))
+#define EVENT_ENABLE_RXWM       (BIT(2))
+#define EVENT_ENABLE_TXEMPTY    (BIT(1))
+#define EVENT_ENABLE_RXFULL     (BIT(0))
 

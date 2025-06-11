@@ -38,88 +38,151 @@ __attribute((__section__(".spi_driver_config"))) spi_driver_config_t config;
 
 __attribute((__section__(".device_resources"))) device_resources_t device_resources;
 
-uintptr_t spi_host_regs;
-
 volatile struct spi_regs *regs; 
 
-static inline void spi_sw_reset(void)
+// Driver state (for FSM?)
+// TODO
+
+// Shared memory regions
+spi_queue_handle_t queue_handle;
+uint8_t *buffer; // TODO: clarify why this isn't a struct?
+
+static inline void spi_reset(void)
 {
+    // Reset SPI host
     regs->CONTROL = CONTROL_SW_RST;
-    regs->INTR_ENABLE = 0x0;
-    LOG_DRIVER("clearing STATUS.ACTIVE\n");
-    while (STATUS_ACTIVE(regs->STATUS)) {}
-    LOG_DRIVER("waiting for TX FIFO to drain\n");
-    while (STATUS_TXQD(regs->STATUS) != 0) {}
-    LOG_DRIVER("waiting for RX FIFO to drain\n");
-    while (STATUS_RXQD(regs->STATUS) != 0) {}
-    LOG_DRIVER("clearing CONTROL.SW_RST\n");
+
+    // Poll status until inactive and both FIFOs are drained
+    uint32_t status = regs->STATUS; 
+    while (STATUS_ACTIVE(status) || STATUS_TXQD(status) || STATUS_RXQD(status)) {
+        status = regs->STATUS;
+    }
+
+    // Clear the reset bit
     regs->CONTROL = 0; 
 }
 
 static inline void spi_setup(void)
 {
+    spi_reset();
+
+    // TODO: remove this
+    regs->CONFIGOPTS2 = 0x7C;
+
+    // Enable the device
+    regs->CONTROL = CONTROL_SPIEN | CONTROL_OUTPUT_EN;
+
+    // Poll status until the device is ready
+    while (!STATUS_READY(regs->STATUS)) {} 
+}
+
+void init(void) {
+    assert(spi_config_check_magic(&config));
+    assert(device_resources_check_magic(&device_resources));
+    assert(device_resources.num_irqs == 2);
+    assert(device_resources.num_regions == 1);   
+ 
+    regs = (volatile struct spi_regs *)device_resources.regions[0].region.vaddr;
+    spi_setup(); 
+
+    queue_handle = spi_queue_init(config.virt.req_queue.vaddr, config.virt.resp_queue.vaddr);
+    buffer = NULL;
+
+    microkit_dbg_puts("Driver initialised.\n");
+}
+
+void transmit_data(uint8_t *buffer, uint16_t len) {
+    volatile uint8_t  *TX_BYTE = (uint8_t *) &regs->TXDATA;
+
+    // TODO: rewrite to support uint32_t writes
+    for (uint16_t idx = 0; idx < len; idx++) {
+        *TX_BYTE = buffer[idx];
+    }
+}
+
+void recieve_data(uint8_t *buffer, uint16_t len) {
+    // precondition: buffer and len is word-aligned, just to save implementation sanity
+   
+    uint32_t status;
+    do {
+        status = regs->STATUS;
+        sddf_printf("status=%x\n", status);
+    } while (STATUS_RXQD(status) != len);
+ 
+    uint32_t *buffer_word = (uint32_t *) buffer;
+    for (uint16_t idx = 0; idx < len / sizeof(uint32_t) + (len % sizeof(uint32_t)) ? 1 : 0; idx++) {
+        buffer_word[idx] = regs->RXDATA;
+        sddf_printf("%x was recieved\n", buffer_word[idx]);
+    }
+/*    uint8_t *buffer_tail = (uint8_t *)(buffer + len / sizeof(uint32_t));
     
+    for (uint16_t idx = 0; idx < len % sizeof(uint32_t); idx++) {
+        buffer_tail[idx] = 0; 
+    }*/
+}
+
+void handle_request(void) {
+    spi_cs_line_t cs_line;
+    uintptr_t control_start_vaddr;
+    uintptr_t buffer_base_vaddr;
+    uint16_t len;
+
+    int err = spi_dequeue_request(queue_handle, &cs_line, &control_start_vaddr,
+        &buffer_base_vaddr, &len);
+
+    if (err) {
+        sddf_printf("error dequeueing request\n");
+        return;
+    }
+
+    regs->CSID = cs_line;
+
+    for (int cmd_idx = 0; cmd_idx < len; cmd_idx++) {
+        spi_cmd_t *cmd = &((spi_cmd_t *) control_start_vaddr)[cmd_idx];
+
+        uint32_t spi_host_command = COMMAND_LEN_OFFSET(cmd->len);
+        if (cmd_idx < len - 1) // Not the last command
+           spi_host_command |= COMMAND_CSAAT;
+
+        uint8_t *buffer = (uint8_t *) buffer_base_vaddr + cmd->offset; 
+        switch (cmd->mode) {
+            case SPI_READ: {
+                regs->COMMAND = spi_host_command | COMMAND_DIRECTION_RX_ONLY;
+                sddf_printf("cmd=%x\n", spi_host_command);
+                recieve_data(buffer, cmd->len);
+                break;
+            }
+            case SPI_WRITE: {
+                regs->COMMAND = spi_host_command | COMMAND_DIRECTION_TX_ONLY;
+                sddf_printf("cmd=%x\n", spi_host_command);
+                transmit_data(buffer, cmd->len);
+                break;
+            }
+            case SPI_TRANSFER: {
+                regs->COMMAND = spi_host_command | COMMAND_DIRECTION_BIDIRECTION;
+                sddf_printf("cmd=%x\n", spi_host_command);
+                transmit_data(buffer, cmd->len);
+                recieve_data(buffer, cmd->len);
+                break;
+            }
+            default: {
+                sddf_printf("%x is an unsupported command", cmd->mode);
+                break;
+            }
+        }
+    }
+
+    spi_enqueue_response(queue_handle, cs_line, 0, 0);
+    microkit_deferred_notify(config.virt.id);
 }
 
 void notified(microkit_channel ch) {
     sddf_printf("driver: notified on channel %d\n", ch);
+
+    if (ch == 0) {}
+    else if (ch == 1) {}
+    else if (ch == 2) {
+        handle_request();
+    }
+    else {}
 };
-
-void init() {
-    LOG_DRIVER("Initializing driver\n");
-    
-    regs = (volatile struct spi_regs *)device_resources.regions[0].region.vaddr;
-
-    spi_sw_reset();
-
-    LOG_DRIVER("config=%x\n", regs->CONTROL);
-    LOG_DRIVER("status=%x\n", regs->STATUS);
-
-    // Test I can actually see anything
-    regs->CSID = 2;
-    regs->CONFIGOPTS2 = 0x0000007C;
-    regs->CONTROL = CONTROL_SPIEN | CONTROL_OUTPUT_EN;
-
-    for (uint32_t status = regs->STATUS; !STATUS_READY(status); status = regs->STATUS) {
-        LOG_DRIVER("regs->STATUS=%x, STATUS_READY=%lx\n", status, STATUS_READY(status));
-    }
-
-    uint32_t length = 64;
-
-    while (true) {
-        LOG_DRIVER("iterating\n");
-        for (uint32_t status = regs->STATUS; !STATUS_READY(status); status = regs->STATUS) {
-            LOG_DRIVER("regs->STATUS=%x, STATUS_READY=%lx\n", status, STATUS_READY(status));
-        } 
-        
-        regs->CSID = 2;
-        LOG_DRIVER("CSID set, CSID=%x\n", regs->CSID);
-        
-        regs->COMMAND = COMMAND_DIRECTION_BIDIRECTION | COMMAND_LEN_OFFSET(length);  
-        LOG_DRIVER("command sent, status=%x\n", regs->STATUS);
- 
-        for (int i = 0; i < length / 4; i++) {
-            regs->TXDATA =
-                (i * 4 + 0) << 24 |
-                (i * 4 + 1) << 16 |
-                (i * 4 + 2) <<  8 |
-                (i * 4 + 3) <<  0;
-            uint32_t status = regs->STATUS;
-            LOG_DRIVER("TX FIFO has %d words in it, status of %x\n", STATUS_TXQD(status), status);
-        }
-       
-        uint32_t status = regs->STATUS;
-        do { 
-            LOG_DRIVER("RX FIFO has %d words in it, status=%x\n", STATUS_RXQD(status), status);
-            for (volatile int i = 0; i < 0x1000; i++) {
-                volatile int j = i;
-                i = i & j;
-            }
-            status = regs->STATUS;
-        } while (STATUS_RXQD(status) != length / 4);
-
-        for (int i = 0; i < length / 4; i++) {
-            LOG_DRIVER("word %d = %x\n", i, regs->RXDATA);
-        }
-    }
-}
