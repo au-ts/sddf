@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This file is here as I am not sure how to use sdfgen -->
+<system>
+    <!-- Device memory region -->
+    <memory_region name="thermal" size="0x1000" phys_addr="0xff260000"/>
+    <memory_region name="pwm" size="0x1000" phys_addr="0xff420000"/>
+    <memory_region name="pmugrf" size="0x1000" phys_addr="0xff320000"/>
+    <!-- Used to reset the device -->
+    <memory_region name="cru" size="0x1000" phys_addr="0xff760000"/>
+    <memory_region name="grf" size="0x1000" phys_addr="0xff77e000"/>
+
+    <protection_domain name="thermal_driver" priority="101" >
+        <program_image path="thermal_driver.elf" />
+        <map mr="thermal" vaddr="0xff260000" perms="rw" cached="false" />
+        <map mr="pmugrf" vaddr="0xff320000" perms="rw" cached="false" />
+        <map mr="cru" vaddr="0xff760000" perms="rw" cached="false" />
+        <map mr="grf" vaddr="0xff77e000" perms="rw" cached="false" />
+    </protection_domain>
+
+    <protection_domain name="pwm_driver" priority="100" >
+        <program_image path="pwm_driver.elf" />
+        <map mr="pwm" vaddr="0xff420000" perms="rw" cached="false" />
+        <map mr="grf" vaddr="0xff77e000" perms="rw" cached="false" />
+    </protection_domain>
+</system>
