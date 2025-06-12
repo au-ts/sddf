@@ -9,17 +9,32 @@
     <memory_region name="cru" size="0x1000" phys_addr="0xff760000"/>
     <memory_region name="grf" size="0x1000" phys_addr="0xff77e000"/>
 
-    <protection_domain name="thermal_driver" priority="101" >
-        <program_image path="thermal_driver.elf" />
+    <protection_domain name="thermal_sensor_driver" priority="101" >
+        <program_image path="thermal_sensor_driver.elf" />
         <map mr="thermal" vaddr="0xff260000" perms="rw" cached="false" />
         <map mr="pmugrf" vaddr="0xff320000" perms="rw" cached="false" />
         <map mr="cru" vaddr="0xff760000" perms="rw" cached="false" />
         <map mr="grf" vaddr="0xff77e000" perms="rw" cached="false" />
+        <irq irq="97" id="1" />
     </protection_domain>
 
     <protection_domain name="pwm_driver" priority="100" >
-        <program_image path="pwm_driver.elf" />
+        <program_image path="pwm_fan_driver.elf" />
         <map mr="pwm" vaddr="0xff420000" perms="rw" cached="false" />
         <map mr="grf" vaddr="0xff77e000" perms="rw" cached="false" />
     </protection_domain>
+
+    <protection_domain name="thermal_governor" priority="1" >
+        <program_image path="thermal_governor.elf" />
+    </protection_domain>
+    
+    <channel>
+        <end pd="thermal_sensor_driver" id="0"/>
+        <end pd="thermal_governor" id="0"/>
+    </channel>
+
+    <channel>
+        <end pd="thermal_governor" id="1"/>
+        <end pd="pwm_driver" id="0"/>
+    </channel>
 </system>
