@@ -3,84 +3,34 @@
 
 use core::convert::Infallible;
 
-use sel4_microkit::{debug_println, protection_domain, Handler, MessageInfo};
-use sel4_microkit_message::{
-    types::{MessageRecv, MessageSend},
-    MessageInfoExt,
-};
+use sddf_pwm::pwm::{FanSpeed, PwmFan};
+use sddf_thermal::thermal::ThermalSensor;
+use sel4_microkit::{debug_println, protection_domain, Channel, Handler};
 
-const THERMAL_SENSOR: sel4_microkit::Channel = sel4_microkit::Channel::new(0);
+const THERMAL_SENSOR_CHANNEL_INDEX: usize = 0;
+const THERMAL_SENSOR_CHANNEL: Channel = sel4_microkit::Channel::new(THERMAL_SENSOR_CHANNEL_INDEX);
+const PWM_FAN_CHANNEL_INDEX: usize = 1;
+const PWM_FAN_CHANNEL: Channel = sel4_microkit::Channel::new(PWM_FAN_CHANNEL_INDEX);
 
-#[derive(serde::Serialize, serde::Deserialize)]
-pub enum ThermalMessage {
-    GetSensorNum,
-    GetTemp(u32),
-    SetAlarmTemp(u32, u32),
-}
+const THERMAL_SENSOR: ThermalSensor = ThermalSensor::new(THERMAL_SENSOR_CHANNEL);
+const PWM_FAN: PwmFan = PwmFan::new(PWM_FAN_CHANNEL);
 
-#[derive(serde::Serialize, serde::Deserialize)]
-pub enum ThermalReply {
-    SensorNum(u32),
-    GetTemp(u32),
-    SetAlarmTemp,
-}
-
-#[derive(Debug)]
-pub enum SimpleError {
-    Success = 0,
-    Error = 1,
-}
-
-impl MessageSend for ThermalMessage {
-    type Label = u64;
-
-    type Error = SimpleError;
-
-    fn write_message(self, buf: &mut [u8]) -> Result<(Self::Label, usize), Self::Error> {
-        let len: usize =
-            bincode::serde::encode_into_slice(self, buf, bincode::config::standard()).unwrap();
-        Ok((0, len))
-    }
-}
-
-impl MessageRecv for ThermalReply {
-    type Label = u64;
-
-    type Error = SimpleError;
-
-    fn read_message(label: Self::Label, buf: &[u8]) -> Result<Self, Self::Error> {
-        let (res, len) =
-            bincode::serde::decode_from_slice::<ThermalReply, _>(buf, bincode::config::standard()).unwrap();
-        Ok(res)
-    }
-}
-
-pub fn thermal_sensor_get_temperature(channel: sel4_microkit::Channel, sensor_channel: u32) -> u32 {
-    let meg: MessageInfo = MessageInfo::send(ThermalMessage::GetTemp(sensor_channel)).unwrap();
-
-    let reply = channel.pp_call(meg);
-    0
-}
-
-pub fn thermal_sensor_get_sensor_num(channel: sel4_microkit::Channel) -> MessageInfo {
-    let meg: MessageInfo = MessageInfo::send(ThermalMessage::GetSensorNum).unwrap();
-
-    channel.pp_call(meg)
-}
-
-pub fn thermal_sensor_set_alarm_temp(
-    channel: sel4_microkit::Channel,
-    sensor_channel: u32,
-    alarm_temp: u32,
-) -> MessageInfo {
-    let meg: MessageInfo =
-        MessageInfo::send(ThermalMessage::SetAlarmTemp(sensor_channel, alarm_temp)).unwrap();
-
-    channel.pp_call(meg)
-}
+/// The alarm temperature is deliberately set to a lower value for testing
+const ALARM_TEMPERATURE: i32 = 35000;
 
 #[protection_domain]
 fn init() -> HandlerImpl {
+    let sensor_number: u32 = THERMAL_SENSOR.get_sensor_num();
+    for i in 0..sensor_number {
+        let temp: i32 = THERMAL_SENSOR.get_temperature(i).unwrap();
+        debug_println!(
+            "Sensor {} temperature: {}.{}°C",
+            i,
+            temp / 1000,
+            (temp % 1000 - temp % 100) / 100
+        );
+        THERMAL_SENSOR.set_alarm_temp(i, ALARM_TEMPERATURE).unwrap();
+    }
     HandlerImpl {}
 }
 
@@ -89,7 +39,8 @@ struct HandlerImpl {}
 impl Handler for HandlerImpl {
     type Error = Infallible;
     fn notified(&mut self, channel: sel4_microkit::Channel) -> Result<(), Self::Error> {
-        if channel == THERMAL_SENSOR {
+        if channel == THERMAL_SENSOR_CHANNEL {
+            PWM_FAN.config_fan_speed(FanSpeed::Full);
         } else {
             debug_println!("unexpected notification from channel {channel:?}");
         }
