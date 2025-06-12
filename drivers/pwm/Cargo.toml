@@ -1,5 +1,5 @@
 [package]
-name = "thermal_governor"
+name = "pwm_fan_driver"
 version = "0.1.0"
 edition = "2021"
 authors = ["Cheng Li 李澄 <lichengchaoreng@gmail.com>"]
@@ -9,5 +9,9 @@ sel4-microkit = { git = "https://github.com/seL4/rust-sel4.git", rev = "ac5627ba
 sel4-microkit-message = { git = "https://github.com/seL4/rust-sel4.git", rev = "ac5627ba7a67e71f33a8eb1c5d05de09bf94ef5e" }
 serde = { version = "1.0", default-features = false, features = ["derive"] }
 bincode = { version = "2.0", default-features = false, features = ["serde"] }
-sddf_thermal = { path = "../../include/sddf_rust/thermal/" }
 sddf_pwm = { path = "../../include/sddf_rust/pwm/" }
+microkit_error = { path = "../../include/sddf_rust/error/" }
+pwm-hal = { path = "./pwm_hal/rockchip" }
+pwm-protocol = { path = "./pwm_protocol" }
+# pwm-hal = { git = "https://github.com/Cheng-Li1/pwm-rs" }
+# pwm-protocol = { git = "https://github.com/Cheng-Li1/pwm-rs" }
