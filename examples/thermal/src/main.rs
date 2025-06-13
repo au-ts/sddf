@@ -20,7 +20,9 @@ const ALARM_TEMPERATURE: i32 = 35000;
 
 #[protection_domain]
 fn init() -> HandlerImpl {
+    debug_println!("Cheng's Thermal Governor starting up...");
     let sensor_number: u32 = THERMAL_SENSOR.get_sensor_num();
+    debug_println!("Cheng's Thermal Governor Detected Sensor list:");
     for i in 0..sensor_number {
         let temp: i32 = THERMAL_SENSOR.get_temperature(i).unwrap();
         debug_println!(
@@ -31,16 +33,37 @@ fn init() -> HandlerImpl {
         );
         THERMAL_SENSOR.set_alarm_temp(i, ALARM_TEMPERATURE).unwrap();
     }
-    HandlerImpl {}
+    HandlerImpl {
+        sensor_number,
+        fan_speed: FanSpeed::Stopped,
+    }
 }
 
-struct HandlerImpl {}
+struct HandlerImpl {
+    sensor_number: u32,
+    fan_speed: FanSpeed,
+}
 
 impl Handler for HandlerImpl {
     type Error = Infallible;
     fn notified(&mut self, channel: sel4_microkit::Channel) -> Result<(), Self::Error> {
         if channel == THERMAL_SENSOR_CHANNEL {
-            PWM_FAN.config_fan_speed(FanSpeed::Full);
+            debug_println!("Cheng's Thermal Governor detect board overheating!");
+            if self.fan_speed != FanSpeed::Full {
+                debug_println!("Cheng's Thermal Governor turning on the fan!");
+                PWM_FAN.config_fan_speed(FanSpeed::Full);
+            }
+
+            debug_println!("Cheng's Thermal Governor Sensor list:");
+            for i in 0..self.sensor_number {
+                let temp: i32 = THERMAL_SENSOR.get_temperature(i).unwrap();
+                debug_println!(
+                    "Sensor {} temperature: {}.{}°C",
+                    i,
+                    temp / 1000,
+                    (temp % 1000 - temp % 100) / 100
+                );
+            }
         } else {
             debug_println!("unexpected notification from channel {channel:?}");
         }

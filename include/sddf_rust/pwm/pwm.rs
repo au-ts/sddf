@@ -11,7 +11,7 @@ use sel4_microkit_message::{
 /// that will be used to control the PWM duty cycle. The values range from 0 (stopped)
 /// to 255 (full speed).
 #[repr(u8)]
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq)]
 pub enum FanSpeed {
     Stopped = 0,  // 0%   (0/255)
     Low = 64,     // ~25% (64/255)
@@ -93,7 +93,7 @@ impl PwmFan {
             channel: server_channel,
         }
     }
-    
+
     /// Configures the fan's speed to a predefined level.
     ///
     /// This function takes a `FanSpeed` variant and sets the hardware PWM duty
