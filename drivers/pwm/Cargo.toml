@@ -13,5 +13,5 @@ sddf_pwm = { path = "../../include/sddf_rust/pwm/" }
 microkit_error = { path = "../../include/sddf_rust/error/" }
 pwm-hal = { path = "./pwm_hal/rockchip" }
 pwm-protocol = { path = "./pwm_protocol" }
-# pwm-hal = { git = "https://github.com/Cheng-Li1/pwm-rs" }
-# pwm-protocol = { git = "https://github.com/Cheng-Li1/pwm-rs" }
+# pwm-hal = { git = "https://github.com/Cheng-Li1/pwm-rs", rev = "ef60cefed810ab7ffb9f226f700c3a192becca88" }
+# pwm-protocol = { git = "https://github.com/Cheng-Li1/pwm-rs", rev = "ef60cefed810ab7ffb9f226f700c3a192becca88" }

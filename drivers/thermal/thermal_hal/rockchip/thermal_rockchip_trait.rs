@@ -51,6 +51,8 @@ const TSHUT_2GPIO_EN_SRC: u32 = 0x30;
 
 const TSHUT_SRC0_EN: u32 = 0x10;
 
+const HT_INTEN_SRC0: u32 = 0x1;
+
 /// The register structure for tsadc
 /// It is labeled as V2 as more than one board use similiar register mapping
 /// with rk3399 being one of them. And V2 means it is the same register struct
@@ -120,32 +122,20 @@ impl TsadcRegisterV2 {
     }
 
     pub fn get_temp(&self, channel: usize) -> u32 {
-        // Delete this later if the address is correct
-        debug_println!(
-            "channel that we trying to read: {}, address of the channel: 0x{:08p} ",
-            channel,
-            &self.tsadc_data[channel]
-        );
-
         unsafe { ptr::read_volatile(&self.tsadc_data[channel]) }
     }
 
     pub fn set_alarm_temp(&mut self, channel: usize, temp_code: u32) {
-        debug_println!(
-            "channel that we trying to config: {}, address of the channel: 0x{:08p} ",
-            channel,
-            &self.tsadc_comp_int[channel]
-        );
         unsafe { ptr::write_volatile(&mut self.tsadc_comp_int[channel], temp_code) }
+
+        let mut val: u32 = unsafe { ptr::read_volatile(&self.int_en) };
+
+        val |= HT_INTEN_SRC0 << channel;
+
+        unsafe { ptr::write_volatile(&mut self.int_en, val) }
     }
 
     pub fn set_tshut_temp(&mut self, channel: usize, temp_code: u32) {
-        debug_println!(
-            "channel that we trying to config: {}, address of the channel: 0x{:08p} ",
-            channel,
-            &self.tsadc_comp_shut[channel]
-        );
-
         unsafe { ptr::write_volatile(&mut self.tsadc_comp_shut[channel], temp_code) }
 
         let mut val: u32 = unsafe { ptr::read_volatile(&self.auto_con) };

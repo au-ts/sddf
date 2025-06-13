@@ -231,7 +231,7 @@ impl RK3399ThermalHardware {
 
         let tshut_code: u32 = RK3399_CODE_TABLE.rk_tsadc_temp_to_code(95_000).unwrap();
 
-        for i  in 0..RK3399_CHANNEL_NUM {
+        for i in 0..RK3399_CHANNEL_NUM {
             self.register.set_tshut_temp(i as usize, tshut_code);
         }
 
@@ -247,7 +247,7 @@ impl RK3399ThermalHardware {
 }
 
 impl ThermalHal for RK3399ThermalHardware {
-    fn thermal_sensor_get_sensor_number(&self) -> Result<u32, ThermalError>  {
+    fn thermal_sensor_get_sensor_number(&self) -> Result<u32, ThermalError> {
         Ok(RK3399_CHANNEL_NUM)
     }
 
@@ -258,12 +258,18 @@ impl ThermalHal for RK3399ThermalHardware {
         RK3399_CODE_TABLE.rk_tsadc_code_to_temp(self.register.get_temp(channel as usize))
     }
 
-    fn thermal_set_trip(&mut self, channel: u32, alarm_temperature: i32) -> Result<(), ThermalError> {
+    fn thermal_set_trip(
+        &mut self,
+        channel: u32,
+        alarm_temperature: i32,
+    ) -> Result<(), ThermalError> {
         if channel >= RK3399_CHANNEL_NUM {
             return Err(ThermalError::EINVAL);
         }
         let temp_code: u32 = RK3399_CODE_TABLE.rk_tsadc_temp_to_code(alarm_temperature)?;
         self.register.set_alarm_temp(channel as usize, temp_code);
+        // Clear existing irq
+        self.register.irq_ack();
         Ok(())
     }
 

@@ -15,7 +15,7 @@
         <map mr="pmugrf" vaddr="0xff320000" perms="rw" cached="false" />
         <map mr="cru" vaddr="0xff760000" perms="rw" cached="false" />
         <map mr="grf" vaddr="0xff77e000" perms="rw" cached="false" />
-        <irq irq="97" id="1" />
+        <irq irq="129" id="1" />
     </protection_domain>
 
     <protection_domain name="pwm_driver" priority="100" >
@@ -29,12 +29,12 @@
     </protection_domain>
     
     <channel>
+        <end pd="thermal_governor" id="0" pp="true"/>
         <end pd="thermal_sensor_driver" id="0"/>
-        <end pd="thermal_governor" id="0"/>
     </channel>
 
     <channel>
-        <end pd="thermal_governor" id="1"/>
+        <end pd="thermal_governor" id="1" pp="true"/>
         <end pd="pwm_driver" id="0"/>
     </channel>
 </system>
