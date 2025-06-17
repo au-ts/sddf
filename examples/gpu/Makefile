@@ -11,7 +11,8 @@ endif
 export FB_IMG ?= fb_img.jpeg
 export BLOB ?= 0
 BUILD_DIR ?= build
-export BUILD_DIR := $(abspath ${BUILD_DIR})
+override BUILD_DIR := $(abspath ${BUILD_DIR})
+export BUILD_DIR
 export MICROKIT_BOARD ?= qemu_virt_aarch64
 export MICROKIT_CONFIG ?= debug
 export SDDF := $(abspath ../..)

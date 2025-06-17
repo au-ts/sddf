@@ -10,7 +10,8 @@ endif
 override MICROKIT_SDK := $(abspath ${MICROKIT_SDK})
 
 BUILD_DIR ?= build
-export BUILD_DIR := $(abspath ${BUILD_DIR})
+override BUILD_DIR := $(abspath ${BUILD_DIR})
+export BUILD_DIR
 export MICROKIT_CONFIG ?= debug
 export MICROKIT_BOARD ?= odroidc4
 
