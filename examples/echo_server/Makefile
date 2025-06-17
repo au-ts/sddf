@@ -13,7 +13,7 @@ $(error MICROKIT_BOARD must be specified)
 endif
 BUILD_DIR ?= build
 export BUILD_DIR := $(abspath ${BUILD_DIR})
-export SDDF = $(abspath ../..)
+export SDDF := $(abspath ../..)
 override MICROKIT_SDK := $(abspath ${MICROKIT_SDK})
 
 IMAGE_FILE := $(BUILD_DIR)/loader.img
