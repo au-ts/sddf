@@ -26,19 +26,13 @@
 #define NUM_QUEUE_ENTRIES 4
 #endif
 
-//TODO: are these usable?
-#define RESPONSE_ERR 0
-#define RESPONSE_ERR_TOKEN 1
-/* Start of payload bytes in response data (index of first non error byte that driver adds) */
-#define RESPONSE_DATA_OFFSET 2
-
-// TODO: Regex'ed, dunno if its usable or not?
+// TODO: finish 
 typedef enum spi_err {
     SPI_ERR_OK,
     SPI_ERR_TIMEOUT,
-    SPI_ERR_NACK,
-    SPI_ERR_NOREAD,
-    SPI_ERR_BADSEQ,
+    SPI_ERR_INVALID_CS_LINE,
+    SPI_ERR_OOB,
+    SPI_ERR_INVALID_CMD,
     SPI_ERR_OTHER, // can be used for driver specific implementations
 } spi_err_t;
 
@@ -54,16 +48,17 @@ typedef enum spi_err {
 typedef enum spi_cmd_mode {
     SPI_READ,
     SPI_WRITE,
-    SPI_TRANSFER, // TODO: remove, since reusing buffers decreases impl. headache
-    SPI_TRANSFER_IN_PLACE, 
-    SPI_DUMMY // TODO: remove since no QSPI support?
+    SPI_TRANSFER,
+    SPI_DUMMY, // TODO: remove since no QSPI support?
+    NUM_MODES
 } spi_cmd_mode_t;
 
 typedef uint8_t spi_cs_line_t;
 
 typedef struct spi_cmd {
     /* offset into buffer region */
-    size_t offset;
+    size_t read_offset;
+    size_t write_offset;
     /* length of the referenced buffer */
     uint16_t len;
     /* what command do? */
