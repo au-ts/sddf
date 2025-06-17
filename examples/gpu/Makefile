@@ -18,7 +18,6 @@ export MICROKIT_CONFIG ?= debug
 export SDDF := $(abspath ../..)
 
 override FB_IMG := $(abspath ${FB_IMG})
-override BUILD_DIR := $(abspath ${BUILD_DIR})
 override MICROKIT_SDK := $(abspath ${MICROKIT_SDK})
 
 IMAGE_FILE := ${BUILD_DIR}/loader.img
