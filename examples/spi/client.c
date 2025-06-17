@@ -37,11 +37,10 @@ static inline void handle_response() {
 
     uint8_t *buffer = config.buffer.vaddr;
 
-    LOG_CLIENT("%d was recieved\n", error);
+    LOG_CLIENT("%d was recieved (err_cmd = %zu)\n", error, err_cmd);
 
-    LOG_CLIENT("0x%x was recieved\n", buffer[8]);
-
-    while (true) {}
+    for (int i = 0; i < 8 /*change lol*/; i++)
+        LOG_CLIENT("0x%x was recieved\n", buffer[0x800 + i]);
 }
 
 void notified(microkit_channel ch) {
@@ -58,6 +57,14 @@ void notified(microkit_channel ch) {
     }
 }
 
+//TODO: remove after done testing
+uint8_t tx_data[] = {
+    0xFF, 0x00,
+    0x2E, 0x2D,
+    0x30, 0x2F,
+    0x32, 0x31
+};
+
 void init(void) {
     LOG_CLIENT("initializing\n");
 
@@ -73,15 +80,15 @@ void init(void) {
     microkit_msginfo ret = microkit_ppcall(config.virt.id, claim);
     LOG_CLIENT("ppc returned %lu\n", microkit_msginfo_get_label(ret));
 
-    spi_cmd_t *spi_cmds = config.control.vaddr;
-    spi_cmds[0] = (spi_cmd_t) {0, 2, SPI_WRITE}; // Switch to bank 0
-    spi_cmds[1] = (spi_cmd_t) {4, 1, SPI_WRITE}; // Request WHO_AM_I
-    spi_cmds[2] = (spi_cmd_t) {8, 1, SPI_READ};  // Recieve WHO_AM_I
-
     uint8_t *buffer = config.buffer.vaddr;
-    buffer[0] = BIT(7) | 0x7F; 
-    buffer[1] = 0;
-    buffer[4] = 0;
+
+    for (int i = 0; i < sizeof(tx_data); i++)
+        buffer[i] = tx_data[i];
+
+    spi_cmd_t *spi_cmds = config.control.vaddr;
+    spi_cmds[0] = (spi_cmd_t) {-1, 0, 1, SPI_WRITE};
+    spi_cmds[1] = (spi_cmd_t) {0x0800, 1, sizeof(tx_data) - 1, SPI_TRANSFER};
+    spi_cmds[2] = (spi_cmd_t) {0x0800 + sizeof(tx_data) - 1,  -1, 1, SPI_READ};
 
     // Do initial operation
     spi_enqueue_request(

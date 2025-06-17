@@ -49,7 +49,7 @@ typedef struct spi_driver_config {
     char magic[SDDF_SPI_MAGIC_LEN];
     spi_connection_resource_t virt;
     // TODO: cross-checked w/ sddf.zig, don't see?
-    size_t buffer_size;   // Size of uniform buffer regions
+    size_t buffer_size;   // Size of uniform buffer regions //TODO: cross-reference to see if it is set anywhere since I use it
 } spi_driver_config_t;
 
 // zig: Client

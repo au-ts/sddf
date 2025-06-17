@@ -21,7 +21,6 @@ typedef enum spi_state {
 } spi_state_t;
 
 typedef struct fsm_state {
-    spi_state_t curr_state;
     spi_state_t nxt_state;
     bool yield;
 } fsm_state_t;
@@ -39,7 +38,11 @@ static void spi_reset_state(spi_driver_data_t *s) {
 
 #define TIMEOUT_LIMIT (0xFFF)
 
-#define FIFO_DEPTH (64)
+#define PULP_MAX_CS_LINE        (3)
+
+#define TX_FIFO_DEPTH   (72)
+#define RX_FIFO_DEPTH   (64)
+#define MIN_FIFO_DEPTH  MIN(TX_FIFO_DEPTH, RX_FIFO_DEPTH)
 
 /* Device Macros */
 #define INTR_ERROR      (BIT(0))
@@ -49,7 +52,8 @@ static void spi_reset_state(spi_driver_data_t *s) {
 #define CONTROL_SW_RST                  (BIT(30))
 #define CONTROL_OUTPUT_EN               (BIT(29))
 #define CONTROL_TX_WATERMARK(num)       (((num) & 0xFF) << 8)
-#define CONTROL_RX_WATERMARK(num)       ((num) & 0xFF)
+#define CONTROL_RX_WATERMARK_MASK       (0xFF)
+#define CONTROL_RX_WATERMARK(num)       ((num) & CONTROL_RX_WATERMARK_MASK)
 
 #define CONFIGOPTS_CLKDIV(div)          ((div) & 0xFFFF)
 #define CONFIGOPTS_CSNIDLE(num)         (((num) & 0xF) << 16)
@@ -64,7 +68,7 @@ static void spi_reset_state(spi_driver_data_t *s) {
 #define COMMAND_DIRECTION_BIDIRECTION   (BIT(12) | BIT(13))
 #define COMMAND_CSAAT                   (BIT(9))
 
-// Trust me on this, it's stupid
+// TODO: Trust me on this, it's stupid
 #define COMMAND_LEN_OFFSET(length)      (((length) - 1) & 0x1FF)
 
 #define STATUS_READY(status)    ((status) & BIT(31))
