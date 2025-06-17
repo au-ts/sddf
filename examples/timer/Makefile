@@ -11,10 +11,10 @@ endif
 ifeq ($(strip $(MICROKIT_BOARD)),)
 $(error MICROKIT_BOARD must be specified)
 endif
-export MICROKIT_BOARD
 BUILD_DIR ?= build
+override BUILD_DIR := $(abspath ${BUILD_DIR})
+export BUILD_DIR
 export SDDF := $(abspath ../..)
-export BUILD_DIR := $(abspath ${BUILD_DIR})
 override MICROKIT_SDK := $(abspath ${MICROKIT_SDK})
 
 IMAGE_FILE := $(BUILD_DIR)/loader.img
