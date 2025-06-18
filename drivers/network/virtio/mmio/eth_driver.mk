@@ -18,11 +18,11 @@ ${CHECK_NETDRV_FLAGS_MD5}:
 	-rm -f .netdrv_cflags-*
 	touch $@
 
-eth_driver.elf: network/virtio/ethernet.o
+eth_driver.elf: network/virtio/mmio/ethernet.o
 	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
 
-network/virtio/ethernet.o: ${ETHERNET_DRIVER_DIR}/ethernet.c ${CHECK_NETDRV_FLAGS}
-	mkdir -p network/virtio
+network/virtio/mmio/ethernet.o: ${ETHERNET_DRIVER_DIR}/ethernet.c ${CHECK_NETDRV_FLAGS}
+	mkdir -p network/virtio/mmio
 	${CC} -c ${CFLAGS} ${CFLAGS_network} -I ${ETHERNET_DRIVER_DIR} -o $@ $<
 
--include virtio/ethernet.d
+-include virtio/mmio/ethernet.d

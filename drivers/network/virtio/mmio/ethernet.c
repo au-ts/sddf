@@ -1,5 +1,5 @@
 /*
- * Copyright 2024, UNSW
+ * Copyright 2025, UNSW
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
@@ -23,7 +23,7 @@
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 #include <sddf/util/ialloc.h>
-#include <sddf/virtio/virtio.h>
+#include <sddf/virtio/virtio_transport_mmio.h>
 #include <sddf/virtio/virtio_queue.h>
 #include <sddf/resources/device.h>
 

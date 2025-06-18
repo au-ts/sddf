@@ -23,11 +23,11 @@ CFLAGS := \
 	-I$(MICROKIT_INCLUDE) \
 	-I$(SDDF)/include
 
-all: $(BUILD_DIR)/ethernet.o
+all: $(BUILD_DIR)/mmio/ethernet.o
 
-$(BUILD_DIR)/ethernet.o: ethernet.c ethernet.h
+$(BUILD_DIR)/mmio/ethernet.o: ethernet.c ethernet.h
 	$(CC) -c $(CFLAGS) ethernet.c -o $(BUILD_DIR)/ethernet.o
 
 .PHONY: clean
 clean:
-	rm $(BUILD_DIR)/ethernet.o
+	rm $(BUILD_DIR)/mmio/ethernet.o
