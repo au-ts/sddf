@@ -17,7 +17,7 @@ typedef enum {
     VIRTIO_DEVICE_ID_BLK = 0x2,
     VIRTIO_DEVICE_ID_CONSOLE = 0x3,
     VIRTIO_DEVICE_ID_GPU = 0x10,
-} virtio_device_id_t;
+} virtio_mmio_device_id_t;
 
 typedef volatile struct {
     uint32_t MagicValue;

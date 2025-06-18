@@ -13,7 +13,7 @@ static bool check_magic(virtio_mmio_regs_t *regs)
     return regs->MagicValue == 0x74726976;
 }
 
-static bool check_device_id(virtio_mmio_regs_t *regs, virtio_device_id_t id)
+static bool check_device_id(virtio_mmio_regs_t *regs, virtio_mmio_device_id_t id)
 {
     return regs->DeviceID == id;
 }
