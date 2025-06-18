@@ -310,7 +310,6 @@ static void handle_irq()
 
 static void eth_setup(void)
 {
-
     // @billn: make transport agnostic
     // if (!virtio_mmio_check_device_id(regs, VIRTIO_DEVICE_ID_NET)) {
     //     LOG_DRIVER_ERR("not a virtIO network device!\n");
@@ -332,7 +331,10 @@ static void eth_setup(void)
     virtio_transport_set_status(&dev, VIRTIO_DEVICE_STATUS_DRIVER);
 
 #ifdef DEBUG_DRIVER
-    virtio_net_print_features(virtio_transport_get_device_features(&dev));
+    uint32_t feature_low = virtio_transport_get_device_features(&dev, 0);
+    uint32_t feature_high = virtio_transport_get_device_features(&dev, 1);
+    uint64_t feature = feature_low | ((uint64_t)feature_high << 32);
+    virtio_net_print_features(feature);
 #endif
 
     virtio_transport_set_driver_features(&dev, 0, VIRTIO_NET_F_MAC);
