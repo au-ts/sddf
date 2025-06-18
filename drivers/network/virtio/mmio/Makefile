@@ -8,6 +8,8 @@ ifeq ($(strip $(MICROKIT_INCLUDE)),)
 $(error MICROKIT_INCLUDE must be specified)
 endif
 
+# @billn why is this hardcoded to aarch64?
+
 BUILD_DIR ?= .
 
 TOOLCHAIN := clang
@@ -25,7 +27,7 @@ CFLAGS := \
 
 all: $(BUILD_DIR)/mmio/ethernet.o
 
-$(BUILD_DIR)/mmio/ethernet.o: ethernet.c ethernet.h
+$(BUILD_DIR)/mmio/ethernet.o: ../common/ethernet.c ../common/ethernet.h
 	$(CC) -c $(CFLAGS) ethernet.c -o $(BUILD_DIR)/ethernet.o
 
 .PHONY: clean
