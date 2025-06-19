@@ -19,7 +19,7 @@ typedef enum {
     VIRTIO_DEVICE_ID_GPU = 0x10,
 } virtio_mmio_device_id_t;
 
-typedef volatile struct {
+typedef volatile __attribute__((packed)) struct {
     uint32_t MagicValue;
     uint32_t Version;
     uint32_t DeviceID;
