@@ -132,7 +132,7 @@ void set_timeout(uint64_t timeout)
 void init(void)
 {
     volatile uint64_t *general_config_reg = (void *)HPET_REGION + GENERAL_CONFIG_REG;
-    *general_config_reg |= (1ul << LEG_RT_CNF) | (1ul << ENABLE_CNF);
+    *general_config_reg |= (1ul << ENABLE_CNF);
 
     timer_0 = (void *)HPET_REGION + TIMERS_OFFSET;
     timer_0->config |= (1ul << TN_FSB_EN_CNF) | (1ul << TN_INT_ENB_CNF);
