@@ -18,6 +18,7 @@ use sddf_blk::{
     blk_queue_full_resp_helper, blk_queue_init_helper, BlkOp, BlkRequest, BlkStatus,
     blk_device_regs_vaddr, blk_device_init_data_vaddr, blk_device_init_data_ioaddr
 };
+use sddf_timer::timer::Timer;
 use sdmmc_hal::meson_gx_mmc::SdmmcMesonHardware;
 
 use sdmmc_protocol::sdmmc::{SdmmcError, SdmmcProtocol};
@@ -26,6 +27,9 @@ use sel4_microkit::{debug_print, debug_println, protection_domain, Channel, Hand
 
 const INTERRUPT: sel4_microkit::Channel = sel4_microkit::Channel::new(0);
 const BLK_VIRTUALIZER: sel4_microkit::Channel = sel4_microkit::Channel::new(1);
+
+const TIMER_CHANNEL: usize = 2;
+const TIMER: Timer = Timer::new(sel4_microkit::Channel::new(TIMER_CHANNEL));
 
 const SDCARD_SECTOR_SIZE: u32 = 512;
 const SDDF_TRANSFER_SIZE: u32 = 4096;
