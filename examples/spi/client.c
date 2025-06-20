@@ -22,6 +22,13 @@ __attribute__((__section__(".spi_client_config"))) spi_client_config_t config;
 #endif
 #define LOG_CLIENT_ERR(...) do{ sddf_printf("SPI_CLIENT|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
+#define R(byte) ((byte) | BIT(7))
+
+uint8_t tx_data[] = {
+    #embed "data.bin"
+};
+
+
 spi_queue_handle_t handle;
 
 static inline void handle_response() {
@@ -39,7 +46,7 @@ static inline void handle_response() {
 
     LOG_CLIENT("%d was recieved (err_cmd = %zu)\n", error, err_cmd);
 
-    for (int i = 0; i < 8 /*change lol*/; i++)
+    for (int i = 0; i < sizeof(tx_data); i++)
         LOG_CLIENT("0x%x was recieved\n", buffer[0x800 + i]);
 }
 
@@ -56,14 +63,6 @@ void notified(microkit_channel ch) {
         }
     }
 }
-
-//TODO: remove after done testing
-uint8_t tx_data[] = {
-    0xFF, 0x00,
-    0x2E, 0x2D,
-    0x30, 0x2F,
-    0x32, 0x31
-};
 
 void init(void) {
     LOG_CLIENT("initializing\n");

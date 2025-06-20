@@ -1,3 +1,5 @@
+//TODO: add licenses
+
 #include <microkit.h>
 #include <sddf/spi/config.h>
 #include <sddf/resources/device.h>
@@ -82,7 +84,7 @@ static inline void spi_setup(void)
     regs->EVENT_ENABLE = EVENT_ENABLE_TXEMPTY | EVENT_ENABLE_RXWM;
 
     // Set the recieve watermark at the max
-    regs->CONTROL |= CONTROL_RX_WATERMARK(RX_FIFO_DEPTH);
+    regs->CONTROL |= CONTROL_RX_WATERMARK(RX_FIFO_WORD_DEPTH);
 
     // Control which errors interrupt
     regs->ERROR_ENABLE = 
@@ -97,6 +99,15 @@ static inline void spi_setup(void)
 
     // Poll status until the device is ready
     while (!STATUS_READY(regs->STATUS)) {} 
+}
+
+void set_rx_watermark(uint16_t watermark) {
+    regs->CONTROL = 
+        // Mask non-RX_WATERMARK bits
+        (regs->CONTROL & ~CONTROL_RX_WATERMARK_MASK) | 
+        // Set RX_WATERMARK
+        // TODO: check if the cast is necessary or not
+        CONTROL_RX_WATERMARK((uint32_t) watermark);
 }
 
 // ret 0 if successful, -1 otherwise not
@@ -149,7 +160,7 @@ void transmit_data(void *buffer, uint16_t len) {
 // Precondition:
 // 1. buffer is word-aligned or
 // 2. len < 4
-void recieve_data(void *buffer, uint16_t len) {
+int recieve_data(void *buffer, uint16_t len) {
     // Recieve as many words as possible 
     uint32_t *words = buffer;
     uint16_t num_words = len / sizeof(uint32_t);
@@ -157,9 +168,10 @@ void recieve_data(void *buffer, uint16_t len) {
     for (uint16_t i = 0; i < num_words; i++) {
         sddf_printf("iteration %d of %d\n", i, num_words);   
         if (poll_rx()) {
-            return;
+            return -1;
         }
         words[i] = regs->RXDATA;
+        LOG_DRIVER("received word=%X\n", words[i]);
     }
  
     // Recieve trailing bytes
@@ -168,11 +180,11 @@ void recieve_data(void *buffer, uint16_t len) {
         sddf_printf("trailing\n");
 
         if (poll_rx()) {
-            return;
+            return -1;
         }
 
         // Effectively convert the unsigned int into a byte array
-        // Assumes the processor is big-endian
+        // Assumes the processor is little-endian
         uint32_t remaining_bytes = regs->RXDATA;
         uint8_t *trailing_bytes = (uint8_t *) &remaining_bytes;
         uint8_t *buffer_byte = buffer + num_words * sizeof(uint32_t);
@@ -181,14 +193,14 @@ void recieve_data(void *buffer, uint16_t len) {
             buffer_byte[i] = trailing_bytes[i];
         }
     }
+
+    return 0;
 }
 
 void state_idle(void) {
     spi_reset_state(&driver_data);
 
     if (!spi_queue_empty(queue_handle.request->ctrl)) {
-        // Turn on SPI event interrupts
-        regs->INTR_ENABLE |= INTR_SPI_EVENT;
         fsm_state.nxt_state = REQ;
     }
     else { 
@@ -221,6 +233,9 @@ void state_req(void) {
         return;
     } 
 
+    // Turn on SPI event interrupts
+    regs->INTR_ENABLE |= INTR_SPI_EVENT;
+
     regs->CSID = driver_data.cs_line; 
     driver_data.cmd_in_progress = 0;
 
@@ -228,7 +243,9 @@ void state_req(void) {
 }
 
 void state_sel_cmd(void) {
+    // Go to RESP once all commands have been completed
     if (driver_data.cmd_in_progress >= driver_data.num_cmds) {
+        driver_data.cmd_in_progress = -1;
         driver_data.err = SPI_ERR_OK;
         fsm_state.nxt_state = RESP;
         return;
@@ -249,14 +266,13 @@ void state_sel_cmd(void) {
         return;
     }
 
-    // Do bounds checking on each command
+    // Do bounds checking
     config.buffer_size = 0x1000; //TODO: gotta update sdfgen :(
     bool read_oob = cmd->read_offset  + cmd->len >= config.buffer_size;
     bool write_oob = cmd->write_offset + cmd->len >= config.buffer_size;
     LOG_DRIVER("read offset=%zu, write offset=%zu, len=%hu, buffer_sz=%zu\n",
         cmd->read_offset, cmd->write_offset, cmd->len, config.buffer_size);
 
-    // TODO: probably need to clean this up
     switch(cmd->mode) {
         case SPI_READ: {
             if (read_oob) {
@@ -285,31 +301,30 @@ void state_sel_cmd(void) {
         default: {}
     }
 
-    driver_data.tx_progress = 0;
-    driver_data.rx_progress = 0;
+    driver_data.tx_remaining = cmd->len;
+    driver_data.rx_remaining = cmd->len;
     fsm_state.nxt_state = CMD;
 }
 
 void state_cmd(void) {
     spi_cmd_t *cmd = &driver_data.cmd[driver_data.cmd_in_progress];
-    uint32_t cmd_len = 0;
-    /**
-     * This command only toggles SCLK, doesn't transmit from the TXFIFO or
-     * recieve any data into RXFIFO
-     */
-    uint32_t spi_host_command = COMMAND_LEN_OFFSET(1); 
-    bool tx_complete = driver_data.tx_progress == cmd->len;
+    uint32_t hw_cmd_len = 0;
+    uint32_t spi_host_command;
+    bool tx_complete = driver_data.tx_remaining == 0;
+    bool final_command = false;
 
     switch (cmd->mode) {
         case SPI_READ: {
-            cmd_len = MIN(cmd->len - driver_data.rx_progress, RX_FIFO_DEPTH); 
+            hw_cmd_len = MIN(driver_data.rx_remaining, RX_FIFO_BYTE_DEPTH); 
+            final_command = driver_data.rx_remaining - hw_cmd_len == 0;
             spi_host_command = COMMAND_DIRECTION_RX_ONLY;
-            // Set RX watermark to interrupt at
-            regs->CONTROL = (regs->CONTROL & ~CONTROL_RX_WATERMARK_MASK) | CONTROL_RX_WATERMARK(cmd->len);
+            // Set RX watermark to interrupt when it has recieved all data
+            set_rx_watermark(cmd->len);
             break;
         }
         case SPI_WRITE: {
-            cmd_len = MIN(cmd->len - driver_data.tx_progress, TX_FIFO_DEPTH);
+            hw_cmd_len = MIN(driver_data.tx_remaining, TX_FIFO_BYTE_DEPTH);
+            final_command = driver_data.tx_remaining - hw_cmd_len == 0;
             spi_host_command = COMMAND_DIRECTION_TX_ONLY;
             break;
         }
@@ -326,13 +341,15 @@ void state_cmd(void) {
          * ternary jumble below
          */
         case SPI_TRANSFER: {
-            cmd_len = 
+            hw_cmd_len = 
                 (tx_complete) ?
-                    MIN(cmd->len - driver_data.rx_progress, MIN_FIFO_DEPTH) :
-                    MIN(cmd->len - driver_data.tx_progress, MIN_FIFO_DEPTH);
+                    MIN(driver_data.rx_remaining, MIN_FIFO_WORD_DEPTH) :
+                    MIN(driver_data.tx_remaining, MIN_FIFO_WORD_DEPTH);
+            // TODO: analyze further
+            final_command = driver_data.rx_remaining - hw_cmd_len == 0;
             spi_host_command = COMMAND_DIRECTION_BIDIRECTION;
-            // Set RX watermark to interrupt at
-            regs->CONTROL = (regs->CONTROL & ~CONTROL_RX_WATERMARK_MASK) | CONTROL_RX_WATERMARK(cmd->len);
+            // Set RX watermark to interrupt when it has recieved all data
+            set_rx_watermark(cmd->len);
             break;
         }
         default: {
@@ -342,7 +359,13 @@ void state_cmd(void) {
         }
     }
 
-    spi_host_command |= COMMAND_LEN_OFFSET(cmd_len); 
+    spi_host_command |= COMMAND_LEN_OFFSET(hw_cmd_len); 
+    // TODO: add meaningful comment
+//    if (!(driver_data.cmd_in_progress == driver_data.num_cmds - 1 && final_command)) {
+  //      spi_host_command |= COMMAND_CSAAT;
+    //}
+    if (final_command)
+        {final_command = true;}
     sddf_printf("cmd=%x\n", spi_host_command);
     
     /* TODO: perhaps move everything beyond into SEL_CMD? */
@@ -350,38 +373,46 @@ void state_cmd(void) {
     regs->COMMAND = spi_host_command; 
 
     void *write_buffer = (void *)
-        driver_data.buffer_base + cmd->write_offset + driver_data.tx_progress;
+        // Pointer to base of the command's data to write
+        driver_data.buffer_base + cmd->write_offset +
+        // Can alternatively expressed as TX progress
+        config.buffer_size - driver_data.tx_remaining;
     void *read_buffer = (void *)
-        driver_data.buffer_base + cmd->read_offset + driver_data.rx_progress; 
+        // Pointer to base of the command's data to read
+        driver_data.buffer_base + cmd->read_offset + 
+        // Can alternatively expressed as RX progress
+        config.buffer_size - driver_data.rx_remaining;
 
     switch (cmd->mode) {
         case SPI_READ: {
-            recieve_data(read_buffer, cmd_len);
-            driver_data.rx_progress += cmd_len;
-            fsm_state.yield = STATUS_RXQD(regs->STATUS) != cmd_len;
+            recieve_data(read_buffer, hw_cmd_len);
+            driver_data.rx_remaining -= hw_cmd_len;
+            fsm_state.yield = STATUS_RXQD(regs->STATUS) != hw_cmd_len;
             break;
         }
         case SPI_WRITE: {
-            transmit_data(write_buffer, cmd_len);
-            driver_data.tx_progress += cmd_len;
+            transmit_data(write_buffer, hw_cmd_len);
+            driver_data.tx_remaining -= hw_cmd_len;
             fsm_state.yield = STATUS_TXQD(regs->STATUS) != 0;
             break;
         }
         case SPI_TRANSFER: {
             // As noted above, this is meant to reflect the FIFO access pattern
             if (!tx_complete) {
-                transmit_data(write_buffer, cmd_len);
-                driver_data.tx_progress += cmd_len;
+                transmit_data(write_buffer, hw_cmd_len);
+                driver_data.tx_remaining -= hw_cmd_len;
             }
 
-            bool first = driver_data.tx_progress == 0;
+            bool first = driver_data.tx_remaining == hw_cmd_len;
             if (!first) {
-                recieve_data(read_buffer, cmd_len);
-                driver_data.rx_progress += cmd_len;
+                recieve_data(read_buffer, hw_cmd_len);
+                driver_data.rx_remaining -= hw_cmd_len;
             }
 
-            fsm_state.yield = (STATUS_RXQD(regs->STATUS) != cmd_len) || 
-                              (STATUS_TXQD(regs->STATUS) != 0);
+            // Yield only if the command has not fully executed already
+            uint32_t status = regs->STATUS;
+            fsm_state.yield = (STATUS_RXQD(status) != hw_cmd_len) || 
+                              (STATUS_TXQD(status) != 0);
 
             break;
         }
@@ -399,24 +430,26 @@ void state_cmd_ret(void) {
     spi_cmd_t *cmd = &driver_data.cmd[driver_data.cmd_in_progress];
 
     bool done = false;
+    bool write_done = driver_data.tx_remaining == 0;
+    bool read_done = driver_data.rx_remaining == 0;
 
     switch (cmd->mode) {
         case SPI_READ: {
-            done = driver_data.rx_progress == cmd->len;
+            done = read_done;
             break;
         }
         case SPI_WRITE: {
-            done = driver_data.tx_progress == cmd->len;
+            done = write_done;
             break;
         }
         case SPI_TRANSFER: {
-            done = driver_data.rx_progress == cmd->len;
+            done = write_done && read_done;
             break;
         }
         default: {
             driver_data.err = SPI_ERR_INVALID_CMD;
             fsm_state.nxt_state = RESP;
-            break;
+            return;
         }
     }
 
@@ -425,6 +458,7 @@ void state_cmd_ret(void) {
         fsm_state.nxt_state = SEL_CMD;
     }
     else {
+        // Continue with current command if unfinished
         fsm_state.nxt_state = CMD;
     }
 
@@ -446,7 +480,8 @@ void state_resp(void) {
 
     microkit_deferred_notify(config.virt.id);
 
-    // Turn off SPI event interrupts, otherwise will be spammed with TXEMPTY
+    // Turn off SPI event interrupts, otherwise the driver will be spammed with
+    // TXEMPTY
     regs->INTR_ENABLE &= ~INTR_SPI_EVENT;    
 
     fsm_state.nxt_state = IDLE; 
@@ -467,26 +502,13 @@ void init(void) {
         CONFIGOPTS_CSNIDLE(1) |
         CONFIGOPTS_CSNTRAIL(1) |
         CONFIGOPTS_CSNLEAD(1) |
-        CONFIGOPTS_CPOL |
-        CONFIGOPTS_CPHA;
+        CONFIGOPTS_CPOL | CONFIGOPTS_CPHA;
     sddf_printf("config=%x\n", device_config);
     regs->CONFIGOPTS2 = device_config;
 
     queue_handle = spi_queue_init(config.virt.req_queue.vaddr, config.virt.resp_queue.vaddr);
 
     microkit_dbg_puts("Driver initialised.\n");
-}
-
-char *fsm_str(spi_state_t state) {
-    switch (state) {
-        case IDLE: return "IDLE";
-        case REQ: return "REQ";
-        case SEL_CMD: return "SEL_CMD";
-        case CMD: return "CMD";
-        case CMD_RET: return "CMD_RET";
-        case RESP: return "RESP";
-        default: return "INVALID";
-    }
 }
 
 void fsm(void) {
@@ -519,7 +541,9 @@ void fsm(void) {
                 break;
             }
             default: {
-                LOG_DRIVER("how did we end up here?");
+                LOG_DRIVER_ERR("Entered erroneous state, defaulting back to IDLE\n");
+                fsm_state.nxt_state = IDLE;
+                fsm_state.yield = false;
             }
         }
         LOG_DRIVER("Exiting %s\n", fsm_str(state));
@@ -532,6 +556,7 @@ void fsm(void) {
 void notified(microkit_channel ch) {
     LOG_DRIVER("Notified on channel %d\n", ch);
 
+    // TODO: switch notification names
     if (ch == 0) { // error 
         LOG_DRIVER("status=%8X error=%8X\n", regs->STATUS, regs->ERROR_STATUS);
         microkit_irq_ack(ch); 
