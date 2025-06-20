@@ -61,7 +61,7 @@ IMAGES := spi_driver.elf spi_virt.elf client.elf
 ifeq ($(ARCH),aarch64)
 	CFLAGS_ARCH := -mcpu=$(CPU) -mstrict-align -target aarch64-none-elf
 else ifeq ($(ARCH),riscv64)
-	CFLAGS_ARCH := -march=rv64imafdc -target riscv64-none-elf
+	CFLAGS_ARCH := -march=rv64imafdc -target riscv64-none-elf 
 endif
 
 CFLAGS := -nostdlib \
@@ -72,6 +72,7 @@ CFLAGS := -nostdlib \
 		  -I$(BOARD_DIR)/include \
 		  -I$(SDDF)/include \
 		  -I$(SDDF)/include/microkit \
+		  -std=gnu23 \
 		  $(CFLAGS_ARCH)
 LDFLAGS := -L$(BOARD_DIR)/lib
 LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group

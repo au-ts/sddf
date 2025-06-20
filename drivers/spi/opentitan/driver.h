@@ -10,8 +10,8 @@ typedef struct spi_driver_data {
     // Request in-progress state
     uint8_t cmd_in_progress;
     // Command in-progress state (effectively offsets into the buffer slice)
-    uint16_t tx_progress;
-    uint16_t rx_progress;
+    uint16_t tx_remaining;
+    uint16_t rx_remaining;
     // Error
     spi_err_t err;
 } spi_driver_data_t;
@@ -31,18 +31,33 @@ static void spi_reset_state(spi_driver_data_t *s) {
     s->num_cmds = -1;
     s->buffer_base = NULL;
     s->cmd_in_progress = -1;
-    s->tx_progress = -1;
-    s->rx_progress = -1;
+    s->tx_remaining = -1;
+    s->rx_remaining = -1;
     s->err = SPI_ERR_OK;
+}
+
+char *fsm_str(spi_state_t state) {
+    switch (state) {
+        case IDLE:      return "IDLE";
+        case REQ:       return "REQ";
+        case SEL_CMD:   return "SEL_CMD";
+        case CMD:       return "CMD";
+        case CMD_RET:   return "CMD_RET";
+        case RESP:      return "RESP";
+        default:        return "INVALID";
+    }
 }
 
 #define TIMEOUT_LIMIT (0xFFF)
 
 #define PULP_MAX_CS_LINE        (3)
 
-#define TX_FIFO_DEPTH   (72)
-#define RX_FIFO_DEPTH   (64)
-#define MIN_FIFO_DEPTH  MIN(TX_FIFO_DEPTH, RX_FIFO_DEPTH)
+#define TX_FIFO_WORD_DEPTH      (72)
+#define TX_FIFO_BYTE_DEPTH      (TX_FIFO_WORD_DEPTH * sizeof(uint32_t))
+#define RX_FIFO_WORD_DEPTH      (64)
+#define RX_FIFO_BYTE_DEPTH      (RX_FIFO_WORD_DEPTH * sizeof(uint32_t))
+#define MIN_FIFO_WORD_DEPTH     MIN(TX_FIFO_WORD_DEPTH, RX_FIFO_WORD_DEPTH)
+#define MIN_FIFO_BYTE_DEPTH     (MIN_FIFO_WORD_DEPTH * sizeof(uint32_t))
 
 /* Device Macros */
 #define INTR_ERROR      (BIT(0))
