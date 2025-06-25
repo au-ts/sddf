@@ -23,9 +23,9 @@
 // This contains data that must persist BETWEEN states.
 typedef struct i2c_driver_data {
     /* Pointer to current request/response being handled */
-    i2c_cmd_t *curr_data;
-    /* Pointer to base of current meta region */
-    uintptr_t meta_base;
+    i2c_cmd_t *curr_command_region;
+    /* Pointer to base of current slice region */
+    uintptr_t slice_base;
     /* Number of cmds in current request */
     int curr_request_len;
     /* Index into current request. */
@@ -66,8 +66,8 @@ void fsm(fsm_data_t *f);
 
 static void i2c_reset_state(i2c_driver_data_t *s)
 {
-    s->curr_data = NULL;
-    s->meta_base = 0;
+    s->curr_command_region = NULL;
+    s->slice_base = 0;
     s->curr_request_len = 0;
     s->req_idx = 0;
     s->rw_idx = 0;

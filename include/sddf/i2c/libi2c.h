@@ -7,7 +7,7 @@
 // I2C interface library for clients using libmicrokitco.
 // Provides helper functions for creating requests and handing them to the virtualiser.
 // Enables automatic allocation of command structs, but user is expected to perform management
-// of META region to supply buffers as this is not practical to generalise.
+// of SLICE region to supply buffers as this is not practical to generalise.
 //
 // Currently this interface only supports single command requests, but the protocol is capable
 // of doing many command requests. If your usage requires more commands per request, do not use
@@ -26,8 +26,8 @@
 // __attribute__((__section__(".i2c_client_config"))) i2c_client_config_t i2c_config;
 extern i2c_client_config_t i2c_config;
 
-#define I2C_DATA_REGION ((uint8_t *)i2c_config.data.vaddr)
-#define I2C_META_REGION ((uint8_t *)i2c_config.meta.vaddr)
+#define I2C_CONTROL_REGION ((uint8_t *)i2c_config.data.vaddr)
+#define I2C_SLICE_REGION ((uint8_t *)i2c_config.meta.vaddr)
 
 #define LOG_LIBI2C_ERR(...) do{ sddf_printf("LIBI2C|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 

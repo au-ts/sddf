@@ -57,7 +57,7 @@ static i2c_driver_data_t driver_data;
 
 // Shared memory regions
 i2c_queue_handle_t queue_handle;
-uint8_t *meta;
+uint8_t *slice_region;
 
 char *meson_token_to_str(uint8_t token)
 {
@@ -411,7 +411,7 @@ void init(void)
     // Set up driver state and shared regions
     i2c_reset_state(&driver_data);
     queue_handle = i2c_queue_init(config.virt.req_queue.vaddr, config.virt.resp_queue.vaddr);
-    meta = NULL;
+    slice_region = NULL;
 
     microkit_dbg_puts("Driver initialised.\n");
 }
@@ -458,10 +458,10 @@ void state_req(fsm_data_t *fsm, i2c_driver_data_t *data)
     // Get request from queue
     // Otherwise, begin work. Start by extracting the request
     i2c_addr_t bus_address = 0;
-    uintptr_t meta_vaddr, data_vaddr;
+    uintptr_t slice_region_vaddr, command_region_vaddr;
     uint16_t size = 0;
-    int err = i2c_dequeue_request(queue_handle, &bus_address, &data_vaddr, &meta_vaddr, &size);
-    LOG_DRIVER("New request: data->%p\n", (void *)(data_vaddr));
+    int err = i2c_dequeue_request(queue_handle, &bus_address, &command_region_vaddr, &slice_region_vaddr, &size);
+    LOG_DRIVER("New request: data->%p\n", (void *)(command_region_vaddr));
     if (err) {
         LOG_DRIVER_ERR("fatal: failed to dequeue request\n");
         return;
@@ -477,8 +477,8 @@ void state_req(fsm_data_t *fsm, i2c_driver_data_t *data)
     LOG_DRIVER("Loading request for bus address 0x%x\n", (unsigned int)(bus_address));
 
     // Virt converts address given by
-    data->curr_data = (i2c_cmd_t *)data_vaddr;
-    data->meta_base = meta_vaddr;
+    data->curr_command_region = (i2c_cmd_t *)command_region_vaddr;
+    data->slice_base = slice_region_vaddr;
     data->addr = bus_address;
     data->curr_request_len = size;
     fsm->next_state = S_SEL_CMD;
@@ -503,7 +503,7 @@ void state_sel_cmd(fsm_data_t *fsm, i2c_driver_data_t *data)
     // Get next command
     if (data->req_idx < data->curr_request_len) {
         LOG_DRIVER("Accepting new cmd...\n");
-        i2c_cmd_t cmd = data->curr_data[data->req_idx];
+        i2c_cmd_t cmd = data->curr_command_region[data->req_idx];
         i2c_cmd_t old_cmd = data->active_cmd == NULL ? cmd : *data->active_cmd;
         if (cmd.flag_mask & I2C_FLAG_RSTART && (cmd_is_read(cmd) != cmd_is_read(old_cmd))) {
             LOG_DRIVER_ERR("Invalid command sequence! Cannot `I2C_FLAG_RSTART` without "
@@ -520,11 +520,11 @@ void state_sel_cmd(fsm_data_t *fsm, i2c_driver_data_t *data)
         data->await_wrrd = (cmd.flag_mask & I2C_FLAG_WRRD) && (cmd.flag_mask & I2C_FLAG_READ) ? NUM_WRRD_STEPS : 0;
         data->await_stop = cmd.flag_mask & I2C_FLAG_STOP;
         data->rw_idx = 0;
-        data->active_cmd = &data->curr_data[data->req_idx];
+        data->active_cmd = &data->curr_command_region[data->req_idx];
 
         LOG_DRIVER("## Command loaded (SEL_CMD) ##\n");
         LOG_DRIVER("\t len = %u\n", cmd.len);
-        LOG_DRIVER("\t meta offset = %zu\n", cmd.offset);
+        LOG_DRIVER("\t slice_region offset = %zu\n", cmd.offset);
         LOG_DRIVER("\t FLAG_READ: %u\n", (cmd.flag_mask & I2C_FLAG_READ) != 0);
         LOG_DRIVER("\t FLAG_WRRD: %u\n", (cmd.flag_mask & I2C_FLAG_WRRD) != 0);
         LOG_DRIVER("\t FLAG_STOP: %u\n", (cmd.flag_mask & I2C_FLAG_STOP) != 0);
@@ -586,7 +586,7 @@ void state_cmd(fsm_data_t *fsm, i2c_driver_data_t *data)
         // Discover next operation
         uint8_t meson_token;
         uint32_t payload_byte;
-        meta = (uint8_t *)(data->meta_base + cmd.offset);
+        slice_region = (uint8_t *)(data->slice_base + cmd.offset);
 
         // Handle sending start condition
         if (data->await_start) {
@@ -604,10 +604,10 @@ void state_cmd(fsm_data_t *fsm, i2c_driver_data_t *data)
                 LOG_DRIVER("WRRD: sending address write...\n");
                 meson_token = MESON_I2C_TOKEN_ADDR_WRITE;
             } else if (data->await_wrrd == 2) {
-                LOG_DRIVER("WRRD: sending address byte %u\n", meta[0]);
+                LOG_DRIVER("WRRD: sending address byte %u\n", slice_region[0]);
                 // Send address of register
                 meson_token = MESON_I2C_TOKEN_DATA;
-                payload_byte = meta[0]; // Address of reg always contained in 0th byte
+                payload_byte = slice_region[0]; // Address of reg always contained in 0th byte
                     // of read buffer.
             } else {
                 meson_token = MESON_I2C_TOKEN_START;
@@ -649,7 +649,7 @@ void state_cmd(fsm_data_t *fsm, i2c_driver_data_t *data)
             }
             // If writing, and this is not the subaddress of a WRRD
             if (!cmd_is_read(cmd)) {
-                payload_byte = meta[data->rw_idx]; // Take next byte to write
+                payload_byte = slice_region[data->rw_idx]; // Take next byte to write
             }
             data->rw_idx++;
         }
@@ -705,7 +705,7 @@ void state_cmd_ret(fsm_data_t *f, i2c_driver_data_t *data)
     uint8_t curr_token = 0;
     uint8_t bytes_read = 0;
     bool write_error = i2c_get_error(&bytes_read, &curr_token);
-    meta = (uint8_t *)(data->meta_base + data->active_cmd->offset);
+    slice_region = (uint8_t *)(data->slice_base + data->active_cmd->offset);
     LOG_DRIVER("S_CMD_RET: returning with %u bytes read, halt token = %u\n", bytes_read, curr_token);
 
     // If there was an error, cancel the rest of this transaction and load the
@@ -725,14 +725,15 @@ void state_cmd_ret(fsm_data_t *f, i2c_driver_data_t *data)
         // Get bytes_read amount of read data,copy data into return buffer
         for (int i = 0; i < bytes_read; i++) {
             assert(cmd_is_read(*data->active_cmd)); // If we're here and we didn't read, die
-            uint8_t value;
+            uint8_t value = 0;
             if (i < 4) {
                 value = (regs->rdata0 >> (i * 8)) & 0xFF;
             } else if (i < 8) {
                 value = (regs->rdata1 >> ((i - 4) * 8)) & 0xFF;
             }
-            LOG_DRIVER("loading into meta at %d value 0x%x (0x%p)\n", data->bytes_read, value, &meta[data->bytes_read]);
-            meta[data->bytes_read] = value;
+            LOG_DRIVER("loading into slice_region at %d value 0x%x (0x%p)\n", data->bytes_read, value,
+                       &slice_region[data->bytes_read]);
+            slice_region[data->bytes_read] = value;
             data->bytes_read++;
         }
         // Decide whether this is the end or to return back to sel_cmd
