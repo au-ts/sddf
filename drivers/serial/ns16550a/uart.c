@@ -32,6 +32,10 @@ volatile uintptr_t uart_base;
 #define REG_IO_WIDTH 1
 #define REG_SHIFT 0
 #define REG_PTR(off)     ((volatile uint8_t *)((uart_base) + (off << REG_SHIFT)))
+#elif defined(CONFIG_PLAT_CHESHIRE)
+#define REG_IO_WIDTH 4
+#define REG_SHIFT 2
+#define REG_PTR(off)     ((volatile uint32_t *)((uart_base) + (off << REG_SHIFT)))
 #else
 #error "unknown platform reg-io-width"
 #endif

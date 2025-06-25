@@ -74,11 +74,18 @@ BOARDS: List[Board] = [
         paddr_top=0x100000000,
         serial="soc/serial@10000000"
     ),
+    Board(
+        name="cheshire",
+        arch=SystemDescription.Arch.RISCV64,
+        paddr_top=0x90000000,
+        serial="soc/serial@3002000"
+    ),
 ]
 
 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
-    serial_driver = ProtectionDomain("serial_driver", "serial_driver.elf", priority=200)
+    serial_driver = ProtectionDomain(
+        "serial_driver", "serial_driver.elf", priority=200)
     # Increase the stack size as running with UBSAN uses more stack space than normal.
     serial_virt_tx = ProtectionDomain("serial_virt_tx", "serial_virt_tx.elf",
                                       priority=199, stack_size=0x2000)
@@ -116,7 +123,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--dtb", required=True)
     parser.add_argument("--sddf", required=True)
-    parser.add_argument("--board", required=True, choices=[b.name for b in BOARDS])
+    parser.add_argument("--board", required=True,
+                        choices=[b.name for b in BOARDS])
     parser.add_argument("--output", required=True)
     parser.add_argument("--sdf", required=True)
 
