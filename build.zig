@@ -29,6 +29,11 @@ const DriverClass = struct {
         rk3568,
     };
 
+    const Gpio = enum {
+        imx,
+        meson,
+    };
+
     const Network = enum {
         imx,
         meson,
@@ -180,6 +185,35 @@ fn addTimerDriver(
     });
     driver.addIncludePath(b.path("include"));
     driver.addIncludePath(b.path("include/sddf/util/custom_libc"));
+    driver.addIncludePath(b.path("include/microkit"));
+    driver.linkLibrary(util);
+
+    return driver;
+}
+
+fn addGpioDriver(
+    b: *std.Build,
+    gpio_config_include: LazyPath,
+    util: *std.Build.Step.Compile,
+    class: DriverClass.Gpio,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+) *std.Build.Step.Compile {
+    const driver = addPd(b, .{
+        .name = b.fmt("driver_gpio_{s}.elf", .{@tagName(class)}),
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .strip = false,
+        }),
+    });
+    const source = b.fmt("drivers/gpio/{s}/gpio.c", .{@tagName(class)});
+    driver.addCSourceFile(.{
+        .file = b.path(source),
+    });
+    driver.addIncludePath(gpio_config_include);
+
+    driver.addIncludePath(b.path("include"));
     driver.addIncludePath(b.path("include/microkit"));
     driver.linkLibrary(util);
 
@@ -482,6 +516,13 @@ pub fn build(b: *std.Build) !void {
         // debug error if you do need a serial config but forgot to pass one in.
         const gpu_config_include = LazyPath{ .cwd_relative = gpu_config_include_option };
 
+        const gpio_config_include_option = b.option([]const u8, "gpio_config_include", "Include path to gpio config header") orelse "";
+
+        // TODO: So ideally this is part of the meta.py file
+        // for now we have a config file that defines which gpio/irq is assigned to
+        // all of the driver channels in the gpio driver.
+        const gpio_config_include = LazyPath{ .cwd_relative = gpio_config_include_option };
+
         // Util libraries
         const util = b.addLibrary(.{
             .name = "util",
@@ -698,6 +739,12 @@ pub fn build(b: *std.Build) !void {
         libi2c_raw.addIncludePath(libmicrokit_include);
         libi2c_raw.linkLibrary(util);
         b.installArtifact(libi2c_raw);
+        // Gpio drivers
+        inline for (std.meta.fields(DriverClass.Gpio)) |class| {
+            const driver = addGpioDriver(b, gpio_config_include, util, @enumFromInt(class.value), target, optimize);
+            driver.linkLibrary(util_putchar_debug);
+            b.installArtifact(driver);
+        }
 
         // I2C components
         const i2c_virt = addPd(b, .{
