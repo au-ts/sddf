@@ -12,6 +12,7 @@ Files:
     examples/i2c_bus_scan/build.zig.zon
     examples/serial/build.zig.zon
     examples/timer/build.zig.zon
+    examples/gpio/build.zig.zon
     examples/blk/build.zig.zon
     examples/blk/basic_data.txt
     examples/blk/basic_data.h
@@ -41,6 +42,7 @@ Files:
     drivers/timer/cdns/config.json
     drivers/timer/bcm2835/config.json
     drivers/timer/apb_timer/config.json
+    drivers/gpio/imx/config.json
 Copyright: UNSW
 License: BSD-2-Clause
 
