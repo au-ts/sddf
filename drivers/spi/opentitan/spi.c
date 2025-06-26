@@ -302,6 +302,18 @@ void state_sel_cmd(void) {
                 fsm_state.nxt_state = RESP;
                 return;
             }
+
+            if (
+                /* Slices do not completely overlap */
+                cmd->read_offset != cmd->write_offset &&
+                /* Slices are not disjoint */
+                (cmd->read_offset >= cmd->write_offset + len ||
+                cmd->write_offset >= cmd->read_offset + len)
+            ) {
+                driver_data.err = SPI_ERR_OTHER; //TODO: change error
+                fsm_state.nxt_state = RESP; 
+            }
+
             break;
         }
         default: {}
