@@ -6,10 +6,10 @@ typedef struct spi_driver_data {
     spi_cs_line_t cs_line;
     spi_cmd_t *cmd;
     uint16_t num_cmds;
-    void *buffer_base;
+    void *slice_base;
     // Request in-progress state
     uint8_t cmd_in_progress;
-    // Command in-progress state (effectively offsets into the buffer slice)
+    // Command in-progress state (effectively offsets into the slice region)
     uint16_t tx_remaining;
     uint16_t rx_remaining;
     // Error
@@ -29,7 +29,7 @@ static void spi_reset_state(spi_driver_data_t *s) {
     s->cmd = NULL;
     s->cs_line = -1;
     s->num_cmds = -1;
-    s->buffer_base = NULL;
+    s->slice_base = NULL;
     s->cmd_in_progress = -1;
     s->tx_remaining = -1;
     s->rx_remaining = -1;
