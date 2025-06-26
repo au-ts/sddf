@@ -7,6 +7,7 @@ const Step = std.Build.Step;
 const LazyPath = std.Build.LazyPath;
 
 const MicrokitBoard = enum {
+    cheshire,
     imx8mm_evk,
     imx8mp_evk,
     imx8mq_evk,
@@ -25,11 +26,20 @@ const Target = struct {
 
 const targets = [_]Target{
     .{
+        .board = MicrokitBoard.cheshire,
+        .zig_target = std.Target.Query{
+            .cpu_arch = .riscv64,
+            .cpu_model = .{ .explicit = &std.Target.riscv.cpu.baseline_rv64 },
+            .os_tag = .freestanding,
+            .abi = .none,
+        },
+    },
+    .{
         .board = MicrokitBoard.qemu_virt_aarch64,
         .zig_target = std.Target.Query{
             .cpu_arch = .aarch64,
             .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a53 },
-            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{ .strict_align }),
+            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{.strict_align}),
             .os_tag = .freestanding,
             .abi = .none,
         },
@@ -39,7 +49,7 @@ const targets = [_]Target{
         .zig_target = std.Target.Query{
             .cpu_arch = .aarch64,
             .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a53 },
-            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{ .strict_align }),
+            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{.strict_align}),
             .os_tag = .freestanding,
             .abi = .none,
         },
@@ -49,7 +59,7 @@ const targets = [_]Target{
         .zig_target = std.Target.Query{
             .cpu_arch = .aarch64,
             .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a55 },
-            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{ .strict_align }),
+            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{.strict_align}),
             .os_tag = .freestanding,
             .abi = .none,
         },
@@ -59,7 +69,7 @@ const targets = [_]Target{
         .zig_target = std.Target.Query{
             .cpu_arch = .aarch64,
             .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a53 },
-            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{ .strict_align }),
+            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{.strict_align}),
             .os_tag = .freestanding,
             .abi = .none,
         },
@@ -69,7 +79,7 @@ const targets = [_]Target{
         .zig_target = std.Target.Query{
             .cpu_arch = .aarch64,
             .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a53 },
-            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{ .strict_align }),
+            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{.strict_align}),
             .os_tag = .freestanding,
             .abi = .none,
         },
@@ -79,7 +89,7 @@ const targets = [_]Target{
         .zig_target = std.Target.Query{
             .cpu_arch = .aarch64,
             .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a53 },
-            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{ .strict_align }),
+            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{.strict_align}),
             .os_tag = .freestanding,
             .abi = .none,
         },
@@ -89,7 +99,7 @@ const targets = [_]Target{
         .zig_target = std.Target.Query{
             .cpu_arch = .aarch64,
             .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a53 },
-            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{ .strict_align }),
+            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{.strict_align}),
             .os_tag = .freestanding,
             .abi = .none,
         },
@@ -133,7 +143,7 @@ fn updateSectionObjcopy(b: *std.Build, section: []const u8, data_output: std.Bui
     });
     run_objcopy.addArg("--update-section");
     const data_full_path = data_output.join(b.allocator, data) catch @panic("OOM");
-    run_objcopy.addPrefixedFileArg(b.fmt("{s}=", .{ section }), data_full_path);
+    run_objcopy.addPrefixedFileArg(b.fmt("{s}=", .{section}), data_full_path);
     run_objcopy.addFileArg(.{ .cwd_relative = b.getInstallPath(.bin, elf) });
 
     // We need the ELFs we talk about to be in the install directory first.
@@ -180,10 +190,10 @@ pub fn build(b: *std.Build) !void {
         .qemu_virt_aarch64 => "arm",
         .odroidc2, .odroidc4 => "meson",
         .maaxboard, .imx8mm_evk, .imx8mp_evk, .imx8mq_evk => "imx",
-        .star64, .qemu_virt_riscv64 => "ns16550a",
+        .star64, .qemu_virt_riscv64, .cheshire => "ns16550a",
     };
 
-    const driver = sddf_dep.artifact(b.fmt("driver_serial_{s}.elf", .{ driver_class }));
+    const driver = sddf_dep.artifact(b.fmt("driver_serial_{s}.elf", .{driver_class}));
     // This is required because the SDF file is expecting a different name to the artifact we
     // are dealing with.
     const driver_install = b.addInstallArtifact(driver, .{ .dest_sub_path = "serial_driver.elf" });
@@ -216,10 +226,8 @@ pub fn build(b: *std.Build) !void {
     b.installArtifact(client);
 
     // For compiling the DTS into a DTB
-    const dts = sddf_dep.path(b.fmt("dts/{s}.dts", .{ microkit_board }));
-    const dtc_cmd = b.addSystemCommand(&[_][]const u8{
-        "dtc", "-q", "-I", "dts", "-O", "dtb"
-    });
+    const dts = sddf_dep.path(b.fmt("dts/{s}.dts", .{microkit_board}));
+    const dtc_cmd = b.addSystemCommand(&[_][]const u8{ "dtc", "-q", "-I", "dts", "-O", "dtb" });
     dtc_cmd.addFileInput(dts);
     dtc_cmd.addFileArg(dts);
     const dtb = dtc_cmd.captureStdOut();
