@@ -74,6 +74,12 @@ BOARDS: List[Board] = [
         paddr_top=0x100000000,
         serial="soc/serial@10000000"
     ),
+    Board(
+        name="cheshire",
+        arch=SystemDescription.Arch.RISCV64,
+        paddr_top=0x90000000,
+        serial="soc/serial@3002000"
+    ),
 ]
 
 

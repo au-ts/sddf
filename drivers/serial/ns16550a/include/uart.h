@@ -36,6 +36,9 @@
  */
 #define UART_CLK 3686400
 #define UART_DW_APB_SHADOW_REGISTERS 0
+#elif defined(CONFIG_PLAT_CHESHIRE)
+#define UART_CLK 50000000
+#define UART_DW_APB_SHADOW_REGISTERS 0
 #else
 #error "unknown UART clock"
 #endif
