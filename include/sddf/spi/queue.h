@@ -56,10 +56,10 @@ typedef enum spi_cmd_mode {
 typedef uint8_t spi_cs_line_t;
 
 typedef struct spi_cmd {
-    /* offset into buffer region */
+    /* offset into slice region */
     size_t read_offset;
     size_t write_offset;
-    /* length of the referenced buffer */
+    /* length of the referenced slice */
     uint16_t len;
     /* what command do? */
     spi_cmd_mode_t mode; 
@@ -67,15 +67,15 @@ typedef struct spi_cmd {
 
 /* A queue entry is a single logical transaction. The offset points to a list of len spi_cmd_t's */
 typedef struct spi_queue_request {
-    // NOTE: control and buffer base are set by the virtualiser, not the client. We use the same struct
+    // NOTE: control and slice base are set by the virtualiser, not the client. We use the same struct
     // for symmetry, and to avoid a copy.
     
     /* These two vaddrs are unfortunately needed because it complicates verification to just let
      * the driver access this from SDFgen. We arguably should just trust SDFgen to avoid this.*/
     /* Pointer to first command used in control region for this request*/
     uintptr_t control_start_vaddr;
-    /* Start of buffer region, pointed to by cmds in the control region */
-    uintptr_t buffer_base_addr;
+    /* Start of slice region, pointed to by cmds in the control region */
+    uintptr_t slice_base_addr;
     /* Number of commands in list. Max 32 per transaction */
     uint8_t len;
     /* SPI cs line to operate on */
@@ -146,7 +146,7 @@ static inline int spi_queue_empty(spi_queue_ctrl_t q_ctrl)
  *
  * @param queue queue to check.
  *
- * @return true indicates the buffer is full, false otherwise.
+ * @return true indicates the queue is full, false otherwise.
  */
 static inline int spi_queue_full(spi_queue_ctrl_t q_ctrl)
 {
@@ -171,13 +171,13 @@ static inline uint32_t spi_queue_length(spi_queue_ctrl_t q_ctrl)
  * @param queue queue handle to enqueue into.
  * @param cs_line bus address on the SPI device to request on
  * @param control_start_vaddr pointer to command in control region
- * @param buffer_base_addr pointer to start of buffer region for this command. Set by virt.
- * @param len length of buffer at the offset given
+ * @param slice_base_addr pointer to start of slice region for this command. Set by virt.
+ * @param len the number of commands in the request
  *
  * @return -1 when queue is full, 0 on success.
  */
 static inline int spi_enqueue_request(spi_queue_handle_t h, spi_cs_line_t cs_line,
-                                      uintptr_t control_start_vaddr, uintptr_t buffer_base_addr, uint8_t len)
+                                      uintptr_t control_start_vaddr, uintptr_t slice_base_addr, uint8_t len)
 {
     spi_request_queue_t *queue = h.request;
     if (spi_queue_full(queue->ctrl)) {
@@ -187,7 +187,7 @@ static inline int spi_enqueue_request(spi_queue_handle_t h, spi_cs_line_t cs_lin
     size_t index = queue->ctrl.tail % NUM_QUEUE_ENTRIES;
     queue->requests[index].cs_line = cs_line;
     queue->requests[index].control_start_vaddr = control_start_vaddr;
-    queue->requests[index].buffer_base_addr = buffer_base_addr;
+    queue->requests[index].slice_base_addr = slice_base_addr;
     queue->requests[index].len = len;
 
     THREAD_MEMORY_RELEASE();
@@ -229,13 +229,13 @@ static inline int spi_enqueue_response(spi_queue_handle_t h, spi_cs_line_t cs_li
  * @param queue queue handle to dequeue from
  * @param cs_line pointer for where to store the bus address associated with the dequeued request
  * @param control_start_vaddr pointer to command in control region
- * @param buffer_base_addr pointer to start of buffer region for this command. Set by virt.
- * @param len pointer for where to store the length of the buffer associated with the dequeued request
+ * @param slice_base_addr pointer to start of slice region for this command. Set by virt.
+ * @param len pointer for where to store the number of commands in the dequeued request
  *
  * @return -1 when queue is empty, 0 on success.
  */
 static inline int spi_dequeue_request(spi_queue_handle_t h, spi_cs_line_t *cs_line, uintptr_t *control_start_vaddr,
-                                      uintptr_t *buffer_base_addr, uint16_t *len)
+                                      uintptr_t *slice_base_addr, uint16_t *len)
 {
     spi_request_queue_t *queue = h.request;
     if (spi_queue_empty(queue->ctrl)) {
@@ -245,7 +245,7 @@ static inline int spi_dequeue_request(spi_queue_handle_t h, spi_cs_line_t *cs_li
     size_t index = queue->ctrl.head % NUM_QUEUE_ENTRIES;
     *cs_line = queue->requests[index].cs_line;
     *control_start_vaddr = queue->requests[index].control_start_vaddr;
-    *buffer_base_addr = queue->requests[index].buffer_base_addr;
+    *slice_base_addr = queue->requests[index].slice_base_addr;
     *len = queue->requests[index].len;
 
     THREAD_MEMORY_RELEASE();

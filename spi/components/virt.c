@@ -41,11 +41,11 @@ void process_request(uint32_t client_id)
     while (!spi_queue_empty(client_queues[client_id].request->ctrl) && !spi_queue_full(driver_queue.request->ctrl)) {
         spi_cs_line_t cs_line;
         uintptr_t control_start_vaddr;
-        uintptr_t buffer_base_vaddr;
+        uintptr_t slice_base_vaddr;
         uint16_t len;
 
         // Take request from client
-        int err = spi_dequeue_request(client_queues[client_id], &cs_line, &control_start_vaddr, &buffer_base_vaddr,
+        int err = spi_dequeue_request(client_queues[client_id], &cs_line, &control_start_vaddr, &slice_base_vaddr,
                                       &len);
         if (err) {
             LOG_VIRT_ERR("could not dequeue from request queue\n");
@@ -71,11 +71,11 @@ void process_request(uint32_t client_id)
         // Now we need to convert the offset into an offset the driver can use in its address space.
         uintptr_t driver_control_vaddr = (uintptr_t)(config.clients[client_id].driver_control_vaddr + offset);
 
-        // We replace the buffer base of the client with the driver's base. The client doesn't need
+        // We replace the slice base of the client with the driver's base. The client doesn't need
         // to supply one at all!
         LOG_VIRT("Enqueueing request to driver...\n");
         err = spi_enqueue_request(driver_queue, cs_line, driver_control_vaddr,
-                                  config.clients[client_id].driver_buffer_vaddr, len);
+                                  config.clients[client_id].driver_slice_vaddr, len);
 
         /* If this assert fails we have a race as the driver should only ever be dequeuing */
         assert(!err);
