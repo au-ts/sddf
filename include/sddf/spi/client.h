@@ -13,11 +13,28 @@
 #define SPI_CS_LINES_MAX 16
 #endif
 
+/* Argument Locations */
 #define SPI_BUS_SLOT (0)
+#define SPI_CPOL_SLOT (1)
+#define SPI_CPHA_SLOT (2)
 
-/* Protected-Procedure-Call function idenitifers */
-#define SPI_BUS_CLAIM       (1)
-#define SPI_BUS_RELEASE     (2)
+/* Virt Protected-Procedure-Call function idenitifers */
+#define SPI_BUS_CLAIM (1)
+#define SPI_BUS_RELEASE (2)
+#define SPI_BUS_CLAIM_ARGC (3)
+#define SPI_BUS_RELEASE_ARGC (1)
+
+/* Driver Protected-Procedure-Call function identifers */
+#define SPI_BUS_CONFIG (3)
+#define SPI_BUS_CONFIG_ARGC (3)
+
+/* Clock Polarities */
+#define SPI_CPOL_LOW (0)
+#define SPI_CPOL_HIGH (1)
+
+/* Clock Phase */
+#define SPI_CPHA_FIRST (0)
+#define SPI_CPHA_SECOND (1)
 
 /* This is the label of the PPC response from the virtualiser */
 #define SPI_SUCCESS (0)
