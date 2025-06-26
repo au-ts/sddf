@@ -100,6 +100,10 @@ char *fsm_str(spi_state_t state) {
 #define ERROR_OVERFLOW          (BIT(1))
 #define ERROR_CMDBUSY           (BIT(0))
 
+#define ERROR_MASK              (ERROR_ACCESSINVAL | ERROR_CSIDINVAL | \
+                                ERROR_CMDINVAL | ERROR_UNDERFLOW | \
+                                ERROR_OVERFLOW | ERROR_CMDBUSY)
+
 #define EVENT_ENABLE_IDLE       (BIT(5))
 #define EVENT_ENABLE_READY      (BIT(4))
 #define EVENT_ENABLE_TXWM       (BIT(3))
