@@ -59,6 +59,9 @@ char *fsm_str(spi_state_t state) {
 #define MIN_FIFO_WORD_DEPTH     MIN(TX_FIFO_WORD_DEPTH, RX_FIFO_WORD_DEPTH)
 #define MIN_FIFO_BYTE_DEPTH     (MIN_FIFO_WORD_DEPTH * sizeof(uint32_t))
 
+
+#define DEFAULT_DEVICE_CONFIG   (CONFIGOPTS_CLKDIV(0x7C))
+
 /* Device Macros */
 #define INTR_ERROR      (BIT(0))
 #define INTR_SPI_EVENT  (BIT(1))

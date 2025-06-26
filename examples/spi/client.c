@@ -74,8 +74,11 @@ void init(void) {
     
     // Test to see if plumbing works
     // Claim bus 2
-    microkit_msginfo claim = microkit_msginfo_new(SPI_BUS_CLAIM, 1);
+    microkit_msginfo claim = microkit_msginfo_new(SPI_BUS_CLAIM, 
+        SPI_BUS_CLAIM_ARGC);
     microkit_mr_set(SPI_BUS_SLOT, 2);
+    microkit_mr_set(SPI_CPOL_SLOT, 0);
+    microkit_mr_set(SPI_CPHA_SLOT, 0);
     microkit_msginfo ret = microkit_ppcall(config.virt.id, claim);
     LOG_CLIENT("ppc returned %lu\n", microkit_msginfo_get_label(ret));
 
@@ -102,3 +105,4 @@ void init(void) {
     
     LOG_CLIENT("sent request off\n");
 }
+
