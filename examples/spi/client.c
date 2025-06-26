@@ -42,7 +42,7 @@ static inline void handle_response() {
         return;
     }
 
-    uint8_t *buffer = config.buffer.vaddr;
+    uint8_t *buffer = config.slice.vaddr;
 
     LOG_CLIENT("%d was recieved (err_cmd = %zu)\n", error, err_cmd);
 
@@ -79,7 +79,7 @@ void init(void) {
     microkit_msginfo ret = microkit_ppcall(config.virt.id, claim);
     LOG_CLIENT("ppc returned %lu\n", microkit_msginfo_get_label(ret));
 
-    uint8_t *buffer = config.buffer.vaddr;
+    uint8_t *buffer = config.slice.vaddr;
 
     for (int i = 0; i < sizeof(tx_data); i++)
         buffer[i] = tx_data[i];
@@ -94,7 +94,7 @@ void init(void) {
         handle, 
         2, 
         (uintptr_t) config.control.vaddr, 
-        (uintptr_t) config.buffer.vaddr, 
+        (uintptr_t) config.slice.vaddr, 
         3
     );
 

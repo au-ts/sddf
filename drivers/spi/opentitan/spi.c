@@ -215,7 +215,7 @@ void state_req(void) {
         queue_handle,
         &driver_data.cs_line,
         (uintptr_t *) &driver_data.cmd,
-        (uintptr_t *) &driver_data.buffer_base, 
+        (uintptr_t *) &driver_data.slice_base, 
         &driver_data.num_cmds
     );
 
@@ -267,11 +267,11 @@ void state_sel_cmd(void) {
     }
 
     // Do bounds checking
-    config.buffer_size = 0x1000; //TODO: gotta update sdfgen :(
-    bool read_oob = cmd->read_offset  + cmd->len >= config.buffer_size;
-    bool write_oob = cmd->write_offset + cmd->len >= config.buffer_size;
-    LOG_DRIVER("read offset=%zu, write offset=%zu, len=%hu, buffer_sz=%zu\n",
-        cmd->read_offset, cmd->write_offset, cmd->len, config.buffer_size);
+    config.slice_size = 0x1000; //TODO: gotta update sdfgen :(
+    bool read_oob = cmd->read_offset  + cmd->len >= config.slice_size;
+    bool write_oob = cmd->write_offset + cmd->len >= config.slice_size;
+    LOG_DRIVER("read offset=%zu, write offset=%zu, len=%hu, slice_sz=%zu\n",
+        cmd->read_offset, cmd->write_offset, cmd->len, config.slice_size);
 
     switch(cmd->mode) {
         case SPI_READ: {
@@ -374,12 +374,12 @@ void state_cmd(void) {
 
     void *write_buffer = (void *)
         // Pointer to base of the command's data to write
-        driver_data.buffer_base + cmd->write_offset +
+        driver_data.slice_base + cmd->write_offset +
         // Can alternatively expressed as TX progress
         config.buffer_size - driver_data.tx_remaining;
     void *read_buffer = (void *)
         // Pointer to base of the command's data to read
-        driver_data.buffer_base + cmd->read_offset + 
+        driver_data.slice_base + cmd->read_offset + 
         // Can alternatively expressed as RX progress
         config.buffer_size - driver_data.rx_remaining;
 

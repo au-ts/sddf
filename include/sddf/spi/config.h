@@ -29,11 +29,11 @@ typedef struct spi_connection_resource {
 typedef struct spi_virt_client_config {
     spi_connection_resource_t conn;
     size_t control_size;
-    size_t buffer_size;
+    size_t slice_size;
     uintptr_t driver_control_vaddr;
-    uintptr_t driver_buffer_vaddr;
+    uintptr_t driver_slice_vaddr;
     uintptr_t client_control_vaddr;
-    uintptr_t client_buffer_vaddr;
+    uintptr_t client_slice_vaddr;
 } spi_virt_client_config_t;
 
 // zig: Virt
@@ -49,7 +49,7 @@ typedef struct spi_driver_config {
     char magic[SDDF_SPI_MAGIC_LEN];
     spi_connection_resource_t virt;
     // TODO: cross-checked w/ sddf.zig, don't see?
-    size_t buffer_size;   // Size of uniform buffer regions //TODO: cross-reference to see if it is set anywhere since I use it
+    size_t slice_size;   // Size of uniform slice regions //TODO: cross-reference to see if it is set anywhere since I use it
 } spi_driver_config_t;
 
 // zig: Client
@@ -57,7 +57,7 @@ typedef struct spi_client_config {
     char magic[SDDF_SPI_MAGIC_LEN];
     spi_connection_resource_t virt;
     region_resource_t control;
-    region_resource_t buffer;
+    region_resource_t slice;
 } spi_client_config_t;
 
 static bool spi_config_check_magic(void *config)
