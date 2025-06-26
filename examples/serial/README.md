@@ -11,6 +11,7 @@ This is an example to show multiple clients being used with a UART driver.
 ## Building
 
 The following platforms are supported:
+* cheshire
 * odroidc2
 * odroidc4
 * imx8mm_evk
