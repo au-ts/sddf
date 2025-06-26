@@ -53,7 +53,7 @@ typedef struct i2c_cmd {
     /* If a writeread operation, assumed that first byte of buffer contains sub address of byte register */
     size_t offset;
     /* Size of read/write operation. Max 256 back-to-back reads / 64KiB write */
-    uint16_t len;
+    uint8_t len;
     i2c_cmd_flags_t flag_mask;
 } i2c_cmd_t;
 

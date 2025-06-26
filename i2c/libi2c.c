@@ -35,7 +35,7 @@ int libi2c_init(libi2c_conf_t *conf_struct, i2c_queue_handle_t *queue_handle)
 // have a sane allocator which doesn't need a bunch of #defines set based on region sizes.
 //
 // This allocator sets aside a tracking bitmask from the available room in the data region.
-// Commands are 2 bytes, hence a region of size S can store a max of S/2 commands.
+// Commands are 2 words, hence a region of size S can store a max of S/2 commands.
 // S/2 commands can be indexed using (S/2)/64 = S/128. We set aside this many bitmask words at
 // the base of the region. The remaining C=S - (S/128)=127/128 * S bytes are used to store
 // ((127/128)S) / 2 commands.
