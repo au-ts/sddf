@@ -4,6 +4,8 @@
 #include <sddf/spi/config.h>
 #include <sddf/resources/device.h>
 #include <sddf/util/printf.h>
+// TODO: check if this is good
+#include <sddf/spi/client.h>
 
 #include "driver.h"
 
@@ -50,7 +52,6 @@ spi_queue_handle_t queue_handle;
 fsm_state_t fsm_state;
 spi_driver_data_t driver_data;
 
-//TODO: define failure condition
 /**
  * Resets the SPI host
  */
@@ -96,6 +97,11 @@ static inline void spi_setup(void)
 
     // Enable interrupts
     regs->INTR_ENABLE = INTR_ERROR;
+
+    // Setup all CS lines with default arguments
+    regs->CONFIGOPTS0 = DEFAULT_DEVICE_CONFIG;
+    regs->CONFIGOPTS1 = DEFAULT_DEVICE_CONFIG;
+    regs->CONFIGOPTS2 = DEFAULT_DEVICE_CONFIG;
 
     // Poll status until the device is ready
     while (!STATUS_READY(regs->STATUS)) {} 
@@ -496,17 +502,6 @@ void init(void) {
     regs = (volatile struct spi_regs *)device_resources.regions[0].region.vaddr;
     spi_setup(); 
 
-    // TODO: remove this
-    uint32_t device_config =
-        CONFIGOPTS_CLKDIV(0x7C) | 
-        CONFIGOPTS_CSNIDLE(1) |
-        CONFIGOPTS_CSNTRAIL(1) |
-        CONFIGOPTS_CSNLEAD(1) |
-        CONFIGOPTS_CPOL | CONFIGOPTS_CPHA;
-    sddf_printf("config=%x\n", device_config);
-    regs->CONFIGOPTS2 = device_config;
-
-    queue_handle = spi_queue_init(config.virt.req_queue.vaddr, config.virt.resp_queue.vaddr);
 
     microkit_dbg_puts("Driver initialised.\n");
 }
@@ -626,8 +621,72 @@ void notified(microkit_channel ch) {
         fsm();
         microkit_irq_ack(ch); 
     }
-    else if (ch == 2) {
+    else if (ch == config.virt.id) {
         fsm(); 
     }
     else {}
 };
+
+seL4_MessageInfo_t protected(microkit_channel ch, seL4_MessageInfo_t msginfo) {
+    size_t label = microkit_msginfo_get_label(msginfo);
+    if (label != SPI_BUS_CONFIG) {
+        LOG_DRIVER_ERR("unknown label 0x%zx given by virt\n", label);
+        return microkit_msginfo_new(SPI_FAILURE, 0);
+    }
+
+    size_t argc = microkit_msginfo_get_count(msginfo);
+    if (argc != SPI_BUS_CONFIG_ARGC) {
+        LOG_DRIVER_ERR("expected %d arguments, virt sent %zu instead\n", 
+            SPI_BUS_CONFIG_ARGC, argc);
+        return microkit_msginfo_new(SPI_FAILURE, 0);
+    }
+
+    volatile uint32_t *config_reg = NULL;
+    uint32_t config = 0;
+
+    size_t bus = microkit_mr_get(SPI_BUS_SLOT);
+    switch (bus) {
+    case 0: 
+        config_reg = &regs->CONFIGOPTS0;
+        break;
+    case 1:
+        config_reg = &regs->CONFIGOPTS1;
+        break;
+    case 2:
+        config_reg = &regs->CONFIGOPTS2;
+        break;
+    default:
+        LOG_DRIVER_ERR("virt gave invalid bus 0x%zx\n", bus);
+        return microkit_msginfo_new(SPI_FAILURE, 0);
+    } 
+
+    size_t cpol = microkit_mr_get(SPI_CPOL_SLOT);
+    switch (cpol) {
+    case SPI_CPOL_LOW:
+        break;
+    case SPI_CPOL_HIGH:
+        config |= CONFIGOPTS_CPOL;
+        break;
+    default:
+        LOG_DRIVER_ERR("virt gave invalid clock polarity 0x%zx on bus 0x%zx\n",
+            cpol, bus);
+        return microkit_msginfo_new(SPI_FAILURE, 0);
+    }
+
+    size_t cpha = microkit_mr_get(SPI_CPHA_SLOT);
+    switch (cpha) {
+    case SPI_CPHA_FIRST:
+        break;
+    case SPI_CPHA_SECOND:
+        config |= CONFIGOPTS_CPHA;
+        break;
+    default:
+        LOG_DRIVER_ERR("virt gave invalid clock phase 0x%zx on bus 0x%zx\n",
+            cpha, bus);
+    }
+
+    *config_reg |= config;
+
+    return microkit_msginfo_new(SPI_SUCCESS, 0);
+}
+

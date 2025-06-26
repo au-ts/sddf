@@ -173,9 +173,41 @@ seL4_MessageInfo_t protected(microkit_channel ch, seL4_MessageInfo_t msginfo)
 
     switch (label) {
     case SPI_BUS_CLAIM:
+        uint64_t argc = microkit_msginfo_get_count(msginfo);
+        if (argc != SPI_BUS_CLAIM_ARGC) {
+            LOG_VIRT_ERR("expected %d arguments, channel 0x%x sent %zu instead\n", 
+                SPI_BUS_CLAIM_ARGC, ch, argc);
+        }
+
         // We have a valid bus address, we need to make sure no one else has claimed it.
         if (security_list[bus] != BUS_UNCLAIMED) {
             LOG_VIRT_ERR("bus address 0x%lx already claimed, cannot claim for channel 0x%x\n", bus, ch);
+            return microkit_msginfo_new(SPI_FAILURE, 0);
+        }
+
+        // Validate clock phase
+        size_t cpha = microkit_mr_get(SPI_CPHA_SLOT);
+        if (cpha != SPI_CPHA_FIRST && cpha != SPI_CPHA_SECOND) {
+            LOG_VIRT_ERR("channel 0x%x provided an invalid clock phase\n", ch);
+            return microkit_msginfo_new(SPI_FAILURE, 0);
+        }
+
+        // Validate clock polarity
+        size_t cpol = microkit_mr_get(SPI_CPOL_SLOT);
+        if (cpol != SPI_CPOL_HIGH && cpol != SPI_CPOL_LOW) {
+            LOG_VIRT_ERR("channel 0x%x provided an invalid clock polarity\n", ch);
+            return microkit_msginfo_new(SPI_FAILURE, 0);
+        }
+
+        // Setup PPC
+        microkit_msginfo msginfo = microkit_msginfo_new(SPI_BUS_CONFIG, 3);
+        microkit_mr_set(SPI_BUS_SLOT, bus);
+        microkit_mr_set(SPI_CPOL_SLOT, cpol);
+        microkit_mr_set(SPI_CPOL_SLOT, cpha);
+        msginfo = microkit_ppcall(config.driver.id, msginfo);
+
+        if (microkit_msginfo_get_label(msginfo) == SPI_FAILURE) {
+            LOG_VIRT_ERR("failure in configuring bus address 0x%zx for channel 0x%x\n", bus, ch);
             return microkit_msginfo_new(SPI_FAILURE, 0);
         }
 
