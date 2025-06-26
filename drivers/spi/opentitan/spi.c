@@ -553,12 +553,72 @@ void fsm(void) {
     return;
 }
 
+void handle_error(void) {
+    uint32_t error = regs->ERROR_STATUS;
+
+    // Log all errors
+    if (error & ERROR_ACCESSINVAL) {
+        LOG_DRIVER_ERR("Zero byte write\n");
+    }
+    if (error & ERROR_CSIDINVAL) {
+        LOG_DRIVER_ERR("CSID was set incorrectly: 0x%08X\n", regs->CSID);
+    }
+    if (error & ERROR_CMDINVAL) {
+        LOG_DRIVER_ERR("Invalid command\n");
+    }
+    if (error & ERROR_UNDERFLOW) {
+        LOG_DRIVER_ERR("Attempted to read RX FIFO when empty\n");
+    }
+    if (error & ERROR_OVERFLOW) {
+        LOG_DRIVER_ERR("Attempted to write to TX FIFO when full\n");
+    }
+    if (error & ERROR_CMDBUSY) {
+        LOG_DRIVER_ERR("Wrote command while not ready\n");
+    }
+
+
+    if (!(error & ERROR_MASK)) {
+        LOG_DRIVER_ERR("Recieved error IRQ but no errors\n");
+    }
+    else {
+        // Abort transaction if in progress
+        switch (fsm_state.nxt_state) {
+            case IDLE:
+            case REQ: {
+                LOG_DRIVER_ERR("Going back to IDLE\n");
+                fsm_state.nxt_state = IDLE;
+                break;
+            }
+            case SEL_CMD:
+            case CMD:
+            case CMD_RET:
+            case RESP: {
+                LOG_DRIVER_ERR("Going to RESP\n");
+                fsm_state.nxt_state = RESP;
+                driver_data.err = SPI_ERR_OTHER;
+                break;
+            }
+            default: {
+                LOG_DRIVER_ERR("Handling error in invalid state, "
+                    "moving to IDLE\n");
+                fsm_state.nxt_state = IDLE;
+                break;
+            }
+        }
+    }
+
+    // Reset the device 
+    spi_setup();
+}
+
 void notified(microkit_channel ch) {
     LOG_DRIVER("Notified on channel %d\n", ch);
 
     // TODO: switch notification names
     if (ch == 0) { // error 
         LOG_DRIVER("status=%8X error=%8X\n", regs->STATUS, regs->ERROR_STATUS);
+        handle_error();
+        fsm();
         microkit_irq_ack(ch); 
     }
     else if (ch == 1) { // spi_event
