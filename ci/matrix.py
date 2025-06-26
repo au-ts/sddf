@@ -60,6 +60,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
         "configs": ["debug", "release"],
         "build_systems": ["make", "zig"],
         "boards_build": [
+            "cheshire",
             "imx8mm_evk",
             "imx8mq_evk",
             "imx8mp_evk",
