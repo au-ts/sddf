@@ -68,13 +68,13 @@ CFLAGS += -I$(BOARD_DIR)/include \
 	-MD \
 	-MP
 
-CLIENT_PN532_OBJS :=  pn532.o client_pn532.o
+CLIENT_PN532_OBJS := pn532.o client_pn532.o
 DEPS_PN532 := $(CLIENT_PN532_OBJS:.o=.d)
 
-CLIENT_DS3231_OBJS :=  ds3231.o client_ds3231.o
+CLIENT_DS3231_OBJS := ds3231.o client_ds3231.o
 DEPS_DS3231 := $(CLIENT_DS3231_OBJS:.o=.d)
 
-VPATH:=${TOP}
+VPATH := ${TOP}
 all: $(IMAGE_FILE)
 
 client_pn532.elf: $(CLIENT_PN532_OBJS) libco.a libsddf_util.a
