@@ -77,10 +77,10 @@ DEPS_DS3231 := $(CLIENT_DS3231_OBJS:.o=.d)
 VPATH:=${TOP}
 all: $(IMAGE_FILE)
 
-client_pn532.elf: $(CLIENT_PN532_OBJS) libco.a libsddf_util.a
+client_pn532.elf: $(CLIENT_PN532_OBJS) libco.a libsddf_util.a libi2c_raw.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-client_ds3231.elf: $(CLIENT_DS3231_OBJS) libco.a libsddf_util.a
+client_ds3231.elf: $(CLIENT_DS3231_OBJS) libco.a libsddf_util.a libi2c_raw.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(DTB): $(DTS)
@@ -124,5 +124,6 @@ include ${LIBCO}/libco.mk
 include ${I2C_DRIVER}/i2c_driver.mk
 include ${PN532_DRIVER}/pn532.mk
 include ${DS3231_DRIVER}/ds3231.mk
+include ${I2C}/libi2c_raw.mk
 -include $(DEPS_DS3231)
 -include $(DEPS_PN532)
