@@ -1,0 +1,22 @@
+{
+    "compatible": [
+        "cdns,ttc"
+    ],
+    "resources": {
+        "regions": [
+            {
+                "name": "regs",
+                "dt_index": 0
+            }
+        ],
+        "irqs": [
+            {
+                "dt_index": 0
+            },
+            {
+                "dt_index": 1
+            }
+
+        ]
+    }
+}

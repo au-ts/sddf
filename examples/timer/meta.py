@@ -74,6 +74,12 @@ BOARDS: List[Board] = [
         paddr_top=0xa0000000,
         timer="soc@0/bus@30000000/timer@302d0000"
     ),
+    Board(
+        name="zcu102",
+        arch=SystemDescription.Arch.AARCH64,
+        paddr_top=0xa0000000,
+        timer="axi/timer@ff140000"
+    ),
 ]
 
 

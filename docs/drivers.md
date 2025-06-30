@@ -73,3 +73,5 @@ and a list of Device Tree compatible strings it is known to work with.
     * `amlogic,meson-gxbb-wdt`
 * StarFive JH7110
     * `starfive,jh7110-timer`
+* Cadence
+    * `cdns,ttc`
