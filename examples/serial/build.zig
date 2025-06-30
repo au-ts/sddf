@@ -17,6 +17,7 @@ const MicrokitBoard = enum {
     qemu_virt_aarch64,
     qemu_virt_riscv64,
     star64,
+    zcu102,
 };
 
 const Target = struct {
@@ -122,6 +123,16 @@ const targets = [_]Target{
             .abi = .none,
         }
     },
+    .{
+        .board = MicrokitBoard.zcu102,
+        .zig_target = std.Target.Query{
+            .cpu_arch = .aarch64,
+            .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a53 },
+            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{ .strict_align }),
+            .os_tag = .freestanding,
+            .abi = .none,
+        },
+    },
 };
 
 fn findTarget(board: MicrokitBoard) std.Target.Query {
@@ -191,6 +202,7 @@ pub fn build(b: *std.Build) !void {
         .odroidc2, .odroidc4 => "meson",
         .maaxboard, .imx8mm_evk, .imx8mp_evk, .imx8mq_evk => "imx",
         .star64, .qemu_virt_riscv64, .cheshire => "ns16550a",
+        .zcu102 => "zynqmp",
     };
 
     const driver = sddf_dep.artifact(b.fmt("driver_serial_{s}.elf", .{driver_class}));
