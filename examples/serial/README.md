@@ -12,6 +12,7 @@ This is an example to show multiple clients being used with a UART driver.
 
 The following platforms are supported:
 * cheshire
+* hifive_p550
 * odroidc2
 * odroidc4
 * imx8mm_evk

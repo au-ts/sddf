@@ -86,6 +86,12 @@ BOARDS: List[Board] = [
         paddr_top=0x90000000,
         serial="soc/serial@3002000",
     ),
+    Board(
+        name="hifive_p550",
+        arch=SystemDescription.Arch.RISCV64,
+        paddr_top=0xa0000000,
+        serial="soc/serial@0x50900000"
+    ),
 ]
 
 
