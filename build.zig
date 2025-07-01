@@ -24,6 +24,11 @@ const DriverClass = struct {
         goldfish,
     };
 
+    const Gpio = enum {
+        imx,
+        meson,
+    };
+
     const Network = enum {
         imx,
         meson,
@@ -153,6 +158,32 @@ fn addTimerDriver(
     });
     driver.addIncludePath(b.path("include"));
     driver.addIncludePath(b.path("include/sddf/util/custom_libc"));
+    driver.addIncludePath(b.path("include/microkit"));
+    driver.linkLibrary(util);
+
+    return driver;
+}
+
+fn addGpioDriver(
+    b: *std.Build,
+    util: *std.Build.Step.Compile,
+    class: DriverClass.Gpio,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+) *std.Build.Step.Compile {
+    const driver = addPd(b, .{
+        .name = b.fmt("driver_gpio_{s}.elf", .{@tagName(class)}),
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .strip = false,
+        }),
+    });
+    const source = b.fmt("drivers/gpio/{s}/gpio.c", .{@tagName(class)});
+    driver.addCSourceFile(.{
+        .file = b.path(source),
+    });
+    driver.addIncludePath(b.path("include"));
     driver.addIncludePath(b.path("include/microkit"));
     driver.linkLibrary(util);
 
@@ -539,6 +570,13 @@ pub fn build(b: *std.Build) !void {
         // Timer drivers
         inline for (std.meta.fields(DriverClass.Timer)) |class| {
             const driver = addTimerDriver(b, util, @enumFromInt(class.value), target, optimize);
+            driver.linkLibrary(util_putchar_debug);
+            b.installArtifact(driver);
+        }
+
+        // Gpio drivers
+        inline for (std.meta.fields(DriverClass.Gpio)) |class| {
+            const driver = addGpioDriver(b, util, @enumFromInt(class.value), target, optimize);
             driver.linkLibrary(util_putchar_debug);
             b.installArtifact(driver);
         }

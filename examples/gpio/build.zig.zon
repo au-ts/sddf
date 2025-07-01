@@ -1,1 +1,16 @@
-build.zig.zon
+.{
+    .name = .sddf_gpio_example,
+    .version = "0.0.0",
+
+    .dependencies = .{
+        .sddf = .{
+            .path = "../../"
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+    },
+    .fingerprint = 0x7ad8c3845bf479d0,
+}
+
