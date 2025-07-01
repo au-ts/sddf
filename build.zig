@@ -2,6 +2,8 @@
 // Copyright 2024, UNSW
 // SPDX-License-Identifier: BSD-2-Clause
 //
+
+// @ Tristan: TODO
 const std = @import("std");
 const LazyPath = std.Build.LazyPath;
 
@@ -14,13 +16,9 @@ const DriverClass = struct {
         virtio,
     };
 
-    const Timer = enum {
-        arm,
-        meson,
-        imx,
-        jh7110,
-        goldfish
-    };
+    const Timer = enum { arm, meson, imx, jh7110, goldfish };
+
+    const Gpio = enum { meson };
 
     const Network = enum {
         imx,
@@ -93,7 +91,7 @@ fn addSerialDriver(
         .virtio => "console.c",
         else => "uart.c",
     };
-    const source = b.fmt("drivers/serial/{s}/{s}", .{@tagName(class), source_name});
+    const source = b.fmt("drivers/serial/{s}/{s}", .{ @tagName(class), source_name });
     const driver_include = b.fmt("drivers/serial/{s}/include", .{@tagName(class)});
     driver.addCSourceFile(.{
         .file = b.path(source),
@@ -119,7 +117,31 @@ fn addTimerDriver(
         .optimize = optimize,
         .strip = false,
     });
-    const source = b.fmt("drivers/timer/{s}/timer.c", .{ @tagName(class) });
+    const source = b.fmt("drivers/timer/{s}/timer.c", .{@tagName(class)});
+    driver.addCSourceFile(.{
+        .file = b.path(source),
+    });
+    driver.addIncludePath(b.path("include"));
+    driver.addIncludePath(b.path("include/microkit"));
+    driver.linkLibrary(util);
+
+    return driver;
+}
+
+fn addGpioDriver(
+    b: *std.Build,
+    util: *std.Build.Step.Compile,
+    class: DriverClass.Gpio,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+) *std.Build.Step.Compile {
+    const driver = addPd(b, .{
+        .name = b.fmt("driver_gpio_{s}.elf", .{@tagName(class)}),
+        .target = target,
+        .optimize = optimize,
+        .strip = false,
+    });
+    const source = b.fmt("drivers/gpio/{s}/gpio.c", .{@tagName(class)});
     driver.addCSourceFile(.{
         .file = b.path(source),
     });
@@ -192,16 +214,16 @@ fn addBlockDriver(
     optimize: std.builtin.OptimizeMode,
 ) *std.Build.Step.Compile {
     const driver = addPd(b, .{
-        .name = b.fmt("driver_blk_{s}.elf", .{ @tagName(class) }),
+        .name = b.fmt("driver_blk_{s}.elf", .{@tagName(class)}),
         .target = target,
         .optimize = optimize,
         .strip = false,
     });
-    const source = b.fmt("drivers/blk/{s}/block.c", .{ @tagName(class) });
+    const source = b.fmt("drivers/blk/{s}/block.c", .{@tagName(class)});
     driver.addCSourceFile(.{
         .file = b.path(source),
     });
-    driver.addIncludePath(b.path(b.fmt("drivers/blk/{s}/", .{ @tagName(class) })));
+    driver.addIncludePath(b.path(b.fmt("drivers/blk/{s}/", .{@tagName(class)})));
     driver.addIncludePath(b.path("include"));
     driver.addIncludePath(b.path("include/microkit"));
     driver.linkLibrary(util);
@@ -217,16 +239,16 @@ fn addMmcDriver(
     optimize: std.builtin.OptimizeMode,
 ) *std.Build.Step.Compile {
     const driver = addPd(b, .{
-        .name = b.fmt("driver_blk_mmc_{s}.elf", .{ @tagName(class) }),
+        .name = b.fmt("driver_blk_mmc_{s}.elf", .{@tagName(class)}),
         .target = target,
         .optimize = optimize,
         .strip = false,
     });
-    const source = b.fmt("drivers/blk/mmc/{s}/usdhc.c", .{ @tagName(class) });
+    const source = b.fmt("drivers/blk/mmc/{s}/usdhc.c", .{@tagName(class)});
     driver.addCSourceFile(.{
         .file = b.path(source),
     });
-    driver.addIncludePath(b.path(b.fmt("drivers/blk/mmc/{s}/", .{ @tagName(class) })));
+    driver.addIncludePath(b.path(b.fmt("drivers/blk/mmc/{s}/", .{@tagName(class)})));
     driver.addIncludePath(b.path("include"));
     driver.addIncludePath(b.path("include/microkit"));
     driver.linkLibrary(util);
@@ -242,16 +264,16 @@ fn addNetworkDriver(
     optimize: std.builtin.OptimizeMode,
 ) *std.Build.Step.Compile {
     const driver = addPd(b, .{
-        .name = b.fmt("driver_net_{s}.elf", .{ @tagName(class) }),
+        .name = b.fmt("driver_net_{s}.elf", .{@tagName(class)}),
         .target = target,
         .optimize = optimize,
         .strip = false,
     });
-    const source = b.fmt("drivers/network/{s}/ethernet.c", .{ @tagName(class) });
+    const source = b.fmt("drivers/network/{s}/ethernet.c", .{@tagName(class)});
     driver.addCSourceFile(.{
         .file = b.path(source),
     });
-    driver.addIncludePath(b.path(b.fmt("drivers/network/{s}/", .{ @tagName(class) })));
+    driver.addIncludePath(b.path(b.fmt("drivers/network/{s}/", .{@tagName(class)})));
     driver.addIncludePath(b.path("include"));
     driver.addIncludePath(b.path("include/microkit"));
     driver.linkLibrary(util);
@@ -268,17 +290,17 @@ fn addGpuDriver(
     optimize: std.builtin.OptimizeMode,
 ) *std.Build.Step.Compile {
     const driver = addPd(b, .{
-        .name = b.fmt("driver_gpu_{s}.elf", .{ @tagName(class) }),
+        .name = b.fmt("driver_gpu_{s}.elf", .{@tagName(class)}),
         .target = target,
         .optimize = optimize,
         .strip = false,
     });
-    const source = b.fmt("drivers/gpu/{s}/gpu.c", .{ @tagName(class) });
+    const source = b.fmt("drivers/gpu/{s}/gpu.c", .{@tagName(class)});
     driver.addCSourceFile(.{
         .file = b.path(source),
     });
     driver.addIncludePath(gpu_config_include);
-    driver.addIncludePath(b.path(b.fmt("drivers/gpu/{s}/", .{ @tagName(class) })));
+    driver.addIncludePath(b.path(b.fmt("drivers/gpu/{s}/", .{@tagName(class)})));
     driver.addIncludePath(b.path("include"));
     driver.addIncludePath(b.path("include/microkit"));
     driver.linkLibrary(util);
@@ -365,7 +387,7 @@ pub fn build(b: *std.Build) !void {
             .strip = false,
         });
         blk_virt.addCSourceFiles(.{
-            .files = &. { "blk/components/virt.c", "blk/components/partitioning.c" },
+            .files = &.{ "blk/components/virt.c", "blk/components/partitioning.c" },
         });
         blk_virt.addIncludePath(b.path("include"));
         blk_virt.addIncludePath(b.path("include/microkit"));
@@ -450,6 +472,13 @@ pub fn build(b: *std.Build) !void {
         // Timer drivers
         inline for (std.meta.fields(DriverClass.Timer)) |class| {
             const driver = addTimerDriver(b, util, @enumFromInt(class.value), target, optimize);
+            driver.linkLibrary(util_putchar_debug);
+            b.installArtifact(driver);
+        }
+
+        // Gpio drivers
+        inline for (std.meta.fields(DriverClass.Gpio)) |class| {
+            const driver = addGpioDriver(b, util, @enumFromInt(class.value), target, optimize);
             driver.linkLibrary(util_putchar_debug);
             b.installArtifact(driver);
         }
