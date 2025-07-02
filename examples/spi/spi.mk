@@ -12,6 +12,10 @@ ifeq ($(strip $(SDDF)),)
 $(error SDDF must be specified)
 endif
 
+ifeq ($(strip $(LIBMICROKITCO_PATH)),)
+$(error LIBMICROKITCO_PATH must be specified)
+endif
+
 BUILD_DIR ?= build
 # By default we make a debug build so that the client debug prints can be seen.
 MICROKIT_CONFIG ?= debug
@@ -45,10 +49,18 @@ ifeq ($(strip $(MICROKIT_BOARD)), cheshire)
 else
 $(error Unsupported MICROKIT_BOARD given)
 endif
+BOARD := $(MICROKIT_BOARD)
+#TODO: libmicrokitco needs to update this just as an FYI
+CPU := medany
+LIBMICROKITCO_OPTS_DIR := $(SDDF)/include/sddf/spi
+LIBMICROKITCO_OPT_PATH := $(LIBMICROKITCO_OPTS_DIR)
+LIBMICROKITCO_OBJ := libmicrokitco.a
 
+LLVM := 1
 TOP:= ${SDDF}/examples/spi
 METAPROGRAM := $(TOP)/meta.py
 UTIL := $(SDDF)/util
+SPI := $(SDDF)/spi
 SPI_DRIVER := $(SDDF)/drivers/spi/$(SPI_DRIVER_DIR)
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 SYSTEM_FILE := spi.system
@@ -59,9 +71,11 @@ ARCH := ${shell grep 'CONFIG_SEL4_ARCH  ' $(BOARD_DIR)/include/kernel/gen_config
 IMAGES := spi_driver.elf spi_virt.elf client.elf
 
 ifeq ($(ARCH),aarch64)
-	CFLAGS_ARCH := -mcpu=$(CPU) -mstrict-align -target aarch64-none-elf
+	TARGET := aarch64-none-elf
+	CFLAGS_ARCH := -mcpu=$(CPU) -mstrict-align -target $(TARGET)
 else ifeq ($(ARCH),riscv64)
-	CFLAGS_ARCH := -march=rv64imafdc -target riscv64-none-elf 
+	TARGET := riscv64-none-elf
+	CFLAGS_ARCH := -march=rv64imafdc -target $(TARGET)
 endif
 
 CFLAGS := -nostdlib \
@@ -72,11 +86,11 @@ CFLAGS := -nostdlib \
 		  -I$(BOARD_DIR)/include \
 		  -I$(SDDF)/include \
 		  -I$(SDDF)/include/microkit \
+		  -I$(LIBMICROKITCO_PATH) \
 		  -std=gnu23 \
 		  $(CFLAGS_ARCH)
 LDFLAGS := -L$(BOARD_DIR)/lib
 LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
-
 
 all: $(IMAGE_FILE)
 CHECK_FLAGS_BOARD_MD5:=.board_cflags-$(shell echo -- ${CFLAGS} ${MICROKIT_SDK} ${MICROKIT_BOARD} ${MICROKIT_CONFIG} | shasum | sed 's/ *-//')
@@ -85,6 +99,11 @@ ${CHECK_FLAGS_BOARD_MD5}:
 	-rm -f .board_cflags-*
 	touch $@
 
+export LIBMICROKITCO_PATH LIBMICROKITCO_OPT_PATH TARGET MICROKIT_SDK BUILD_DIR MICROKIT_BOARD MICROKIT_CONFIG CPU LLVM
+
+$(LIBMICROKITCO_OBJ):
+	make -f $(LIBMICROKITCO_PATH)/Makefile
+
 include ${SPI_DRIVER}/spi_driver.mk
 include ${SDDF}/util/util.mk
 include ${SDDF}/spi/components/spi_virt.mk
@@ -92,9 +111,10 @@ include ${SDDF}/spi/components/spi_virt.mk
 ${IMAGES}: libsddf_util_debug.a
 
 client.o: ${TOP}/client.c
-	$(CC) -c $(CFLAGS) $< -o client.o
-client.elf: client.o
-	$(LD) $(LDFLAGS) libsddf_util_debug.a $< $(LIBS) -o $@
+	$(CC) -c $(CFLAGS) -I$(SDDF)/include/sddf/spi $< -o client.o
+#TODO: unbodge the extraneous include (for libmicrokitco_opts.h)
+client.elf: client.o libspi.a libmicrokitco/$(LIBMICROKITCO_OBJ)
+	$(LD) $(LDFLAGS) libsddf_util_debug.a $^ $(LIBS) -o $@
 #TODO: unbodge the libsddf stuff ^
 
 $(DTB): $(DTS)
@@ -114,3 +134,7 @@ clean::
 	rm -f *.o *.elf
 clobber:: clean
 	rm -f client.elf ${IMAGE_FILE} ${REPORT_FILE}
+
+#TODO: relocate into appropriate places
+LIBMICROKITCO_INCLUDE_DIR := $(LIBMICROKITCO_PATH)
+include ${SPI}/libspi.mk
