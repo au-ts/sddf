@@ -171,9 +171,11 @@ seL4_MessageInfo_t protected(microkit_channel ch, seL4_MessageInfo_t msginfo)
         return microkit_msginfo_new(SPI_FAILURE, 0);
     }
 
+    uint64_t argc, cpha, cpol;
+
     switch (label) {
     case SPI_BUS_CLAIM:
-        uint64_t argc = microkit_msginfo_get_count(msginfo);
+        argc = microkit_msginfo_get_count(msginfo);
         if (argc != SPI_BUS_CLAIM_ARGC) {
             LOG_VIRT_ERR("expected %d arguments, channel 0x%x sent %zu instead\n", 
                 SPI_BUS_CLAIM_ARGC, ch, argc);
@@ -186,14 +188,14 @@ seL4_MessageInfo_t protected(microkit_channel ch, seL4_MessageInfo_t msginfo)
         }
 
         // Validate clock phase
-        size_t cpha = microkit_mr_get(SPI_CPHA_SLOT);
+        cpha = microkit_mr_get(SPI_CPHA_SLOT);
         if (cpha != SPI_CPHA_FIRST && cpha != SPI_CPHA_SECOND) {
             LOG_VIRT_ERR("channel 0x%x provided an invalid clock phase\n", ch);
             return microkit_msginfo_new(SPI_FAILURE, 0);
         }
 
         // Validate clock polarity
-        size_t cpol = microkit_mr_get(SPI_CPOL_SLOT);
+        cpol = microkit_mr_get(SPI_CPOL_SLOT);
         if (cpol != SPI_CPOL_HIGH && cpol != SPI_CPOL_LOW) {
             LOG_VIRT_ERR("channel 0x%x provided an invalid clock polarity\n", ch);
             return microkit_msginfo_new(SPI_FAILURE, 0);
