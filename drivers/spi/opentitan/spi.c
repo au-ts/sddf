@@ -243,6 +243,14 @@ void state_req(void) {
         return;
     }
 
+    // Check if the amount of commands make sense
+    if (driver_data.num_cmds > SPI_CMD_CAPACITY) {
+        LOG_DRIVER_ERR("amount of supplied commands exceeds the capacity");
+        driver_data.err = SPI_ERR_OTHER; //TODO: change
+        fsm_state.nxt_state = RESP;
+        return;
+    }
+
     // Set the CS line
     if (driver_data.cs_line > PULP_MAX_CS_LINE) {
         driver_data.err = SPI_ERR_INVALID_CS_LINE;
@@ -279,6 +287,13 @@ void state_sel_cmd(void) {
     // Check if the command is valid
     if (cmd->mode >= NUM_MODES) {
         driver_data.err = SPI_ERR_INVALID_CMD;
+        fsm_state.nxt_state = RESP;
+        return;
+    }
+
+    // Check if the command is properly sized
+    if (cmd->len > SPI_CMD_MAX_SZ) {
+        driver_data.err = SPI_ERR_OTHER;//TODO: replace with actual error
         fsm_state.nxt_state = RESP;
         return;
     }
