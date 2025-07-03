@@ -153,43 +153,63 @@ void transmit_data(void *buffer, uint16_t len) {
     }
 }
 
-// Precondition:
-// 1. buffer is word-aligned or
-// 2. len < 4
 int recieve_data(void *buffer, uint16_t len) {
-    // Recieve as many words as possible 
-    uint32_t *words = buffer;
-    uint16_t num_words = len / sizeof(uint32_t);
+    // Recieve leading bytes to word align buffer
+    uint8_t *leading_bytes = buffer;
+    const uint16_t bytes_until_aligned = ALIGN(buffer, sizeof(uint32_t)) - buffer;
+    const uint16_t num_leading_bytes = MIN(len, bytes_until_aligned); 
+
+    // Treat rx_data as queue
+    uint64_t rx_data = 0;
+    uint8_t *rx_byte = (uint8_t *) &rx_data;
+
+    if (num_leading_bytes > 0) {
+        if (poll_rx()) {
+            return -1;
+        }
+        rx_data = regs->RXDATA;
+
+        for (uint16_t i = 0; i < num_leading_bytes; i++) {
+            leading_bytes[i] = rx_byte[i];
+        } 
+        rx_data >>= num_leading_bytes * 8;
+
+        bool done = num_leading_bytes != bytes_until_aligned;
+        if (done) {
+            return 0;
+        }
+    }
+
+    // Transmit as many words as possible
+    uint32_t *words = buffer + num_leading_bytes;
+    const uint16_t num_words = (len - num_leading_bytes) / sizeof(uint32_t);
 
     for (uint16_t i = 0; i < num_words; i++) {
-        sddf_printf("iteration %d of %d\n", i, num_words);   
-        if (poll_rx()) {
-            return -1;
-        }
-        words[i] = regs->RXDATA;
-        LOG_DRIVER("received word=%X\n", words[i]);
-    }
- 
-    // Recieve trailing bytes
-    uint16_t num_trailing_bytes = len % sizeof(uint32_t);
-    if (num_trailing_bytes > 0) {
-        sddf_printf("trailing\n");
-
         if (poll_rx()) {
             return -1;
         }
 
-        // Effectively convert the unsigned int into a byte array
-        // Assumes the processor is little-endian
-        uint32_t remaining_bytes = regs->RXDATA;
-        uint8_t *trailing_bytes = (uint8_t *) &remaining_bytes;
-        uint8_t *buffer_byte = buffer + num_words * sizeof(uint32_t);
-
-        for (uint16_t i = 0; i < num_trailing_bytes; i++) {
-            buffer_byte[i] = trailing_bytes[i];
-        }
+        rx_data |= regs->RXDATA << (sizeof(uint32_t) - num_leading_bytes) * 8; 
+        words[i] = rx_data;
+        rx_data >>= sizeof(uint32_t) * 8;
     }
 
+    // Transmit trailing bytes
+    uint8_t *trailing_bytes = buffer + num_leading_bytes + num_words * sizeof(uint32_t);
+    const uint16_t num_trailing_bytes = (len - num_leading_bytes) % sizeof(uint32_t);
+
+    if (num_trailing_bytes == 0) {
+        return 0;
+    }
+    
+    if (poll_rx()) {
+        return -1;
+    }
+    rx_data |= regs->RXDATA << (sizeof(uint32_t) - num_leading_bytes) * 8;
+    for (uint16_t i = 0; i < num_trailing_bytes; i++) {
+        trailing_bytes[i] = rx_byte[i];
+    }
+    
     return 0;
 }
 
