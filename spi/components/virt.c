@@ -5,7 +5,6 @@
  */
 #include <microkit.h>
 #include <sddf/spi/queue.h>
-#include <sddf/spi/client.h>
 #include <sddf/spi/config.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>

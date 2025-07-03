@@ -21,6 +21,41 @@
 #define NUM_QUEUE_ENTRIES 32
 #endif
 
+#ifndef SPI_CS_LINES_MAX
+#define SPI_CS_LINES_MAX 16
+#endif
+
+/* Argument Locations */
+#define SPI_BUS_SLOT (0)
+#define SPI_CPOL_SLOT (1)
+#define SPI_CPHA_SLOT (2)
+
+/* Virt Protected-Procedure-Call function idenitifers */
+#define SPI_BUS_CLAIM (1)
+#define SPI_BUS_RELEASE (2)
+#define SPI_BUS_CLAIM_ARGC (3)
+#define SPI_BUS_RELEASE_ARGC (1)
+
+/* Driver Protected-Procedure-Call function identifers */
+#define SPI_BUS_CONFIG (3)
+#define SPI_BUS_CONFIG_ARGC (3)
+
+/* Clock Polarities */
+typedef enum {
+    SPI_CPOL_LOW,
+    SPI_CPOL_HIGH
+} spi_cpol_t; 
+
+/* Clock Phase */
+typedef enum {
+    SPI_CPHA_FIRST,
+    SPI_CPHA_SECOND
+} spi_cpha_t;
+
+/* This is the label of the PPC response from the virtualiser */
+#define SPI_SUCCESS (0)
+#define SPI_FAILURE (1)
+
 // TODO: finish 
 typedef enum spi_err {
     SPI_ERR_OK,
