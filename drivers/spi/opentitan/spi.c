@@ -103,8 +103,7 @@ void set_rx_watermark(uint16_t watermark) {
         // Mask non-RX_WATERMARK bits
         (regs->CONTROL & ~CONTROL_RX_WATERMARK_MASK) | 
         // Set RX_WATERMARK
-        // TODO: check if the cast is necessary or not
-        CONTROL_RX_WATERMARK((uint32_t) watermark);
+        CONTROL_RX_WATERMARK((uint32_t) watermark / sizeof(uint32_t));
 }
 
 // ret 0 if successful, -1 otherwise not
