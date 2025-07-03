@@ -4,9 +4,6 @@
 #include <sddf/spi/config.h>
 #include <sddf/resources/device.h>
 #include <sddf/util/printf.h>
-// TODO: check if this is good
-#include <sddf/spi/client.h>
-
 #include "driver.h"
 
 #define DEBUG_DRIVER
