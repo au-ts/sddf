@@ -69,5 +69,7 @@ int spi_write(libspi_conf_t *conf, spi_cs_line_t cs_line, void *write_buf, uint1
 int spi_read(libspi_conf_t *conf, spi_cs_line_t cs_line, void *read_buf, uint16_t len);
 int spi_transfer(libspi_conf_t *conf, spi_cs_line_t cs_line, void *read_buf, void *write_buf,
         uint16_t len);
-int spi_writeread(libspi_conf_t *conf, spi_cs_line_t cs_line, void *read_buf, uint16_t read_len,
-        void *write_buf, uint16_t write_len);
+int spi_writeread(libspi_conf_t *conf, spi_cs_line_t cs_line, void *write_buf, uint16_t write_len,
+        void *read_buf, uint16_t read_len);
+int spi_writewrite(libspi_conf_t *conf, spi_cs_line_t cs_line, void *write1_buf, 
+        uint16_t write1_len, void *write2_buf, uint16_t write2_len);
