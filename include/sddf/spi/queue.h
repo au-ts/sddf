@@ -15,7 +15,20 @@
  * AArch64 for example). These defaults have worked for our example systems
  * but are left configurable for the system designer if they are too small.
  */
+
+// math: 4096 / sizeof(spi_cmd_t) =
+// 4096 / 24 = 170.67
+// 128 is the largest that can fit
+
+#ifndef SPI_CMD_CAPACITY
+#define SPI_CMD_CAPACITY 128
 #endif
+
+// math: 16 * 4096 / 128 = 512
+
+#ifndef SPI_CMD_MAX_SZ
+#define SPI_CMD_MAX_SZ 512
+#endif 
 
 #ifndef NUM_QUEUE_ENTRIES
 #define NUM_QUEUE_ENTRIES 32
