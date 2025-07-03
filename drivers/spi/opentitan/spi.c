@@ -484,6 +484,13 @@ void state_cmd_ret(void) {
         }
         case SPI_TRANSFER: {
             done = write_done && read_done;
+
+            uint32_t status = regs->STATUS;
+            if (!done && !(STATUS_TXEMPTY(status) && STATUS_RXWM(status))) {
+                LOG_DRIVER("Expecting another interrupt, sleeping\n");
+                fsm_state.yield = true;
+                return;
+            }
             break;
         }
         default: {
