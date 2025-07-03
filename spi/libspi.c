@@ -221,8 +221,8 @@ int spi_transfer(libspi_conf_t *conf, spi_cs_line_t cs_line, void *read_buf, voi
  * @return -1 if queue ops or command allocation fails, positive value corresponding to spi_err_t,
  *      or 0 if successful;
  */
-int spi_writeread(libspi_conf_t *conf, spi_cs_line_t cs_line, void *read_buf, uint16_t read_len,
-        void *write_buf, uint16_t write_len) {
+int spi_writeread(libspi_conf_t *conf, spi_cs_line_t cs_line, void *write_buf, uint16_t write_len,
+        void *read_buf, uint16_t read_len) {
     if (check_slice_buf(read_buf) || check_slice_buf(write_buf)) {
         return -1;
     }
@@ -246,5 +246,33 @@ int spi_writeread(libspi_conf_t *conf, spi_cs_line_t cs_line, void *read_buf, ui
     cmds[1].mode = SPI_READ;
 
     return __spi_dispatch(conf, cs_line, cmds, 2);
+}
+
+int spi_writewrite(libspi_conf_t *conf, spi_cs_line_t cs_line, void *write1_buf, 
+        uint16_t write1_len, void *write2_buf, uint16_t write2_len) {
+    if (check_slice_buf(write1_buf) || check_slice_buf(write2_buf)) {
+        return -1;
+    }
+
+    // Allocate 2 commands
+    spi_cmd_t *cmds = __libspi_alloc_cmd(conf, 2);
+    if (cmds == NULL) {
+        LOG_LIBSPI_ERR("spi_writewrite failed to allocate command!\n");
+        return -1;
+    }
+
+    // Setup commands
+    cmds[0].read_offset = -1;
+    cmds[0].write_offset = PTR_TO_OFFSET(write1_buf);
+    cmds[0].len = write1_len;
+    cmds[0].mode = SPI_WRITE;
+
+    cmds[1].read_offset = -1;
+    cmds[1].write_offset = PTR_TO_OFFSET(write2_buf);
+    cmds[1].len = write2_len;
+    cmds[1].mode = SPI_WRITE;
+
+    return __spi_dispatch(conf, cs_line, cmds, 2);
+    
 }
 
