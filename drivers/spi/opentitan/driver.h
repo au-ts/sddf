@@ -56,7 +56,7 @@ char *fsm_str(spi_state_t state) {
 #define TX_FIFO_BYTE_DEPTH      (TX_FIFO_WORD_DEPTH * sizeof(uint32_t))
 #define RX_FIFO_WORD_DEPTH      (64)
 #define RX_FIFO_BYTE_DEPTH      (RX_FIFO_WORD_DEPTH * sizeof(uint32_t))
-#define MIN_FIFO_WORD_DEPTH     MIN(TX_FIFO_WORD_DEPTH, RX_FIFO_WORD_DEPTH)
+#define MIN_FIFO_WORD_DEPTH     (MIN(TX_FIFO_WORD_DEPTH, RX_FIFO_WORD_DEPTH))
 #define MIN_FIFO_BYTE_DEPTH     (MIN_FIFO_WORD_DEPTH * sizeof(uint32_t))
 
 
@@ -91,7 +91,9 @@ char *fsm_str(spi_state_t state) {
 
 #define STATUS_READY(status)    ((status) & BIT(31))
 #define STATUS_ACTIVE(status)   ((status) & BIT(30))
+#define STATUS_TXEMPTY(status)  ((status) & BIT(28))
 #define STATUS_TXSTALL(status)  ((status) & BIT(27))
+#define STATUS_RXWM(status)     ((status) & BIT(20))
 #define STATUS_RXQD(status)     (((status) & 0xFF00) >> 8)
 #define STATUS_TXQD(status)     ((status) & 0xFF)
 

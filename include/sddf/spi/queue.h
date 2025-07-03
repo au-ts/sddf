@@ -10,20 +10,15 @@
 #include <sddf/util/fence.h>
 
 /*
- * Here we choose the default data size and queue entries. This means
- * that by default the control region would need 4KiB of space (1 page on
+ * Here we choose the default cmd capacity and queue entries. This means
+ * that by default the region would need 4KiB of space (1 page on
  * AArch64 for example). These defaults have worked for our example systems
  * but are left configurable for the system designer if they are too small.
  */
-// TODO: where is this even used?
-#ifndef SPI_MAX_DATA_SIZE
-#define SPI_MAX_DATA_SIZE 128
 #endif
 
 #ifndef NUM_QUEUE_ENTRIES
-// TODO: bodgetopia up here; context - fit queue into 1 pg lol
-//#define NUM_QUEUE_ENTRIES 32
-#define NUM_QUEUE_ENTRIES 4
+#define NUM_QUEUE_ENTRIES 32
 #endif
 
 // TODO: finish 
@@ -57,8 +52,8 @@ typedef uint8_t spi_cs_line_t;
 
 typedef struct spi_cmd {
     /* offset into slice region */
-    size_t read_offset;
-    size_t write_offset;
+    uint64_t read_offset;
+    uint64_t write_offset;
     /* length of the referenced slice */
     uint16_t len;
     /* what command do? */
@@ -184,7 +179,7 @@ static inline int spi_enqueue_request(spi_queue_handle_t h, spi_cs_line_t cs_lin
         return -1;
     }
 
-    size_t index = queue->ctrl.tail % NUM_QUEUE_ENTRIES;
+    uint64_t index = queue->ctrl.tail % NUM_QUEUE_ENTRIES;
     queue->requests[index].cs_line = cs_line;
     queue->requests[index].control_start_vaddr = control_start_vaddr;
     queue->requests[index].slice_base_addr = slice_base_addr;
@@ -214,7 +209,7 @@ static inline int spi_enqueue_response(spi_queue_handle_t h, spi_cs_line_t cs_li
         return -1;
     }
 
-    size_t index = queue->ctrl.tail % NUM_QUEUE_ENTRIES;
+    uint64_t index = queue->ctrl.tail % NUM_QUEUE_ENTRIES;
     queue->responses[index].cs_line = cs_line;
     queue->responses[index].error = error;
     queue->responses[index].err_cmd = err_cmd;
@@ -242,7 +237,7 @@ static inline int spi_dequeue_request(spi_queue_handle_t h, spi_cs_line_t *cs_li
         return -1;
     }
 
-    size_t index = queue->ctrl.head % NUM_QUEUE_ENTRIES;
+    uint64_t index = queue->ctrl.head % NUM_QUEUE_ENTRIES;
     *cs_line = queue->requests[index].cs_line;
     *control_start_vaddr = queue->requests[index].control_start_vaddr;
     *slice_base_addr = queue->requests[index].slice_base_addr;
@@ -259,20 +254,20 @@ static inline int spi_dequeue_request(spi_queue_handle_t h, spi_cs_line_t *cs_li
  *
  * @param queue queue handle to dequeue from
  * @param cs_line pointer for where to store the bus address associated with the dequeued response
- * @param offset pointer for where to store the offset of the buffer associated with the dequeued response
- * @param len pointer for where to store the length of the buffer associated with the dequeued response
+ * @param error error code encountered (or ERR_OK for no error)
+ * @param err_cmd index of command in failing command chain
  *
  * @return -1 when queue is empty, 0 on success.
  */
 static inline int spi_dequeue_response(spi_queue_handle_t h, spi_cs_line_t *cs_line, spi_err_t *error,
-                                       size_t *err_cmd)
+                                       uint64_t *err_cmd)
 {
     spi_response_queue_t *queue = h.response;
     if (spi_queue_empty(queue->ctrl)) {
         return -1;
     }
 
-    size_t index = queue->ctrl.head % NUM_QUEUE_ENTRIES;
+    uint64_t index = queue->ctrl.head % NUM_QUEUE_ENTRIES;
     *cs_line = queue->responses[index].cs_line;
     *error= queue->responses[index].error;
     *err_cmd = queue->responses[index].err_cmd;
