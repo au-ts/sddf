@@ -290,13 +290,6 @@ void state_sel_cmd(void) {
         return;
     }
 
-    // Check if the command is properly sized
-    if (cmd->len > SPI_CMD_MAX_SZ) {
-        driver_data.err = SPI_ERR_OTHER;//TODO: replace with actual error
-        fsm_state.nxt_state = RESP;
-        return;
-    }
-
     // Do bounds checking
     config.slice_size = 0x1000; //TODO: gotta update sdfgen :(
     bool read_oob = cmd->read_offset  + cmd->len >= config.slice_size;
