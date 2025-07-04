@@ -8,15 +8,50 @@
 #include <sddf/resources/device.h>
 #include <sddf/util/printf.h>
 #include <sddf/gpio/protocol.h>
+#include "gpio.h"
+#include "gpio_config.h"
 
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
 void notified(microkit_channel ch)
-{}
+{
+    // right now the IRQs are not mapped but we already know that it
+    // works anyway
+}
 
 seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
 {
-	return microkit_msginfo_new(0, 0);
+    sddf_dprintf("GPIO DRIVER|LOG: ppc notification from channel %u\n", ch);
+
+    // check the config file to see the permissions
+    // can they edit this
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    return microkit_msginfo_new(0, 0);
 }
 
 void init(void)
@@ -24,7 +59,7 @@ void init(void)
 	assert(device_resources_check_magic(&device_resources));
 
 	// we mapped 8 irqs?
-    assert(device_resources.num_irqs == 8);
+    assert(device_resources.num_irqs == 0);
 
     // right now its just the one node for the interrupt controller registers
     assert(device_resources.num_regions == 1);
