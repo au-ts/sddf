@@ -30,6 +30,7 @@ BOARDS: List[Board] = [
         paddr_top=0x80000000,
         # @Tristan: Right now we can only map one set of MMIO registers in the driver
         # so for now we expose one and hardcode the rest of the mappings
+        # gpio="soc/bus@ff600000/bus@34400/pinctrl@40",
         # gpio="soc/bus@ff600000/bus@34400/pinctrl@40/bank@40",
         # gpio="soc/bus@ff800000/sys-ctrl@0/pinctrl@14/bank@14", # this is the AO bank
         gpio="soc/bus@ffd00000/interrupt-controller@f080", # this is the int-cont MMIO regs
