@@ -14,7 +14,6 @@
 
 __attribute__((__section__(".gpio_client_config"))) gpio_client_config_t config;
 
-// @ Tristan : will need to change this
 microkit_channel gpio_channel_1_output;
 microkit_channel gpio_channel_2_input;
 
@@ -63,10 +62,6 @@ void init(void)
     t_main = co_derive((void *)t_client_main_stack, STACK_SIZE, client_main);
 
     co_switch(t_main);
-
-	// sddf_printf("CLIENT|INFO: Is gpio_driver_channel_mappings included : %d\n", gpio_driver_channel_mappings[0].pin);
-	// sddf_ppcall(gpio_channel_1_output, seL4_MessageInfo_new(2, 0, 0, 1));
-	// sddf_ppcall(gpio_channel_2_input, seL4_MessageInfo_new(3, 0, 0, 1));
 }
 
 // @ TRistan : add coroutines later
@@ -76,6 +71,6 @@ void notified(microkit_channel ch)
     	sddf_printf("CLIENT|INFO: Got an interupt from GPIO!\n"); 
     	co_switch(t_main);
     } else {
-    	sddf_printf("CLIENT|ERROR: Unknown channel!\n"); 
+    	sddf_printf("CLIENT|ERROR: Unknown channel?!\n"); 
     }
 }

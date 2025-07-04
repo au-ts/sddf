@@ -18,7 +18,7 @@ const DriverClass = struct {
 
     const Timer = enum { arm, meson, imx, jh7110, goldfish };
 
-    const Gpio = enum { meson };
+    const Gpio = enum { meson, imx };
 
     const Network = enum {
         imx,

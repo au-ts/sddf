@@ -326,21 +326,3 @@ static const struct meson_pinctrl_data meson_g12a_aobus_pinctrl_data = {
 	// .pmx_data	= &meson_g12a_aobus_pmx_banks_data,
 	// .parse_dt	= meson_g12a_aobus_parse_dt_extra,
 };
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

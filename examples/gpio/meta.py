@@ -13,7 +13,6 @@ Irq = SystemDescription.Irq
 MemoryRegion = SystemDescription.MemoryRegion
 Map = SystemDescription.Map
 
-
 @dataclass
 class Board:
     name: str
@@ -99,17 +98,17 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
         sdf.add_mr(irq_con_mr)
         gpio_driver.add_map(Map(irq_con_mr, 0x30_100_000, "rw", cached=False)) 
 
-    # else:
-        # so right now this is just the IMX and everything should just work with no problems
-        # however the config does have to change
-
-        # For Odroid C4 it looks like this as almost everything gets hardcoded
+        # the config.json should also look like this
         # "resources": {
         #     "regions": [],
         #     "irqs": []
         # }
 
-        # For IMX it can actually be filled out normally as you would expect
+    # else:
+        # For IMX it everything is normal and how you would expect
+        # im currently hardcoding the channel ids for device irqs
+        # TODO: maybe we shoudl figure out what to do in terms of hardcoding these values in the config.json
+        # and thus the driver? we need this to match up with the gpio_config.h file as well
 
     gpio_node = dtb.node(board.gpio)
     assert gpio_node is not None
