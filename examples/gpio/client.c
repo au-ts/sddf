@@ -8,6 +8,7 @@
 #include <libco.h>
 #include <sddf/gpio/client.h>
 #include <sddf/gpio/config.h>
+#include <sddf/gpio/protocol.h>
 #include <sddf/util/printf.h>
 #include <os/sddf.h>
 #include <gpio_config.h>
@@ -27,17 +28,90 @@ static char t_client_main_stack[STACK_SIZE];
 
 static inline void polling_based()
 {
-	while (1) {}
+	// TODO: remember to set the IRQ to none
+
+	int ret = 0;
+
+	sddf_printf("CLIENT|INFO: Starting Polling!\n");
+	int input = 0; // assuming it starts with no input (floating or pulled down)
+
+	sddf_printf("CLIENT|INFO: Press button when ready!\n");
+	while (1) {
+		ret = sddf_gpio_get_value(gpio_channel_2_input);
+		if (ret < 0) {
+			sddf_printf("CLIENT|ERROR: Error code : %d!\n", ret); 
+			while (1) {}
+		}
+
+		if (input != ret) {
+			// the charge/state of the pin changed thus we should flip the output to the LED
+			ret = sddf_gpio_set_value(gpio_channel_1_output, ret);
+			if (ret < 0) {
+				sddf_printf("CLIENT|ERROR: Error code : %d!\n", ret); 
+				while (1) {}
+			}
+			input = ret;
+		}
+	}
 }
 
 static inline void irq_based()
 {
-	while (1) {}
+	int ret = 0;
+
+	sddf_printf("CLIENT|INFO: Starting IRQ driven loop!\n"); 
+
+	int output = 1;
+
+	sddf_printf("CLIENT|INFO: Press button when ready!\n");
+    while (1) {
+        sddf_printf("Waiting for IRQ from driver!\n");
+
+        co_switch(t_event);
+
+        // change the output
+        output = output == 1 ? 0 : 1;
+
+        ret = sddf_gpio_set_value(gpio_channel_1_output, ret);
+		if (ret < 0) {
+			sddf_printf("CLIENT|ERROR: Error code : %d!\n", ret); 
+			while (1) {}
+		}
+
+        if (output == 0) {
+            sddf_printf("Turned off!\n");
+        } else if (output == 1) {
+            sddf_printf("Turned on!\n");
+        }
+    }
 }
 
 void client_main(void)
 {
+	int ret = 0;
 
+	sddf_printf("CLIENT|INFO: Setting direction of gpio channel 1 to output!"); 
+	ret = sddf_gpio_set_direction(gpio_channel_1_output, GPIO_DIRECTION_OUTPUT);
+	if (ret < 0) {
+		sddf_printf("CLIENT|ERROR: Error code : %d!\n", ret); 
+		while (1) {}
+	}
+	
+	sddf_printf("CLIENT|INFO: Setting direction of gpio channel 1 to input!"); 
+	ret = sddf_gpio_set_direction(gpio_channel_2_input, GPIO_DIRECTION_INPUT);
+	if (ret < 0) {
+		sddf_printf("CLIENT|ERROR: Error code : %d!\n", ret); 
+		while (1) {}
+	}
+	
+	sddf_printf("CLIENT|INFO: Setting value of gpio channel 1 to 1, LED should switch on!"); 	
+	ret = sddf_gpio_set_value(gpio_channel_1_output, ret);
+	if (ret < 0) {
+		sddf_printf("CLIENT|ERROR: Error code : %d!\n", ret); 
+		while (1) {}
+	}
+	
+	// TODO: do pull up or pull down stuff	
 
 #ifdef USE_POLLING
 	polling_based();
@@ -67,7 +141,9 @@ void init(void)
 // @ TRistan : add coroutines later
 void notified(microkit_channel ch)
 {
-    if (ch == gpio_channel_2_input) {
+    if (ch == gpio_channel_1_output) {
+    	sddf_printf("CLIENT|ERROR: We should not of received IRQ from this channel!\n"); 
+    } else if (ch == gpio_channel_2_input) {
     	sddf_printf("CLIENT|INFO: Got an interupt from GPIO!\n"); 
     	co_switch(t_main);
     } else {

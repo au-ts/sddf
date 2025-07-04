@@ -75,6 +75,7 @@ typedef enum {
 } GPIO_direction_t;
 
 // NOTE: some of these might not be implemented in the driver
+// TODO: fix
 typedef enum {
     GPIO_IRQ_TYPE_NONE = 0,
     GPIO_IRQ_TYPE_EDGE_RISING,
@@ -91,8 +92,6 @@ typedef enum {
 // #define IRQ_TYPE_EDGE_BOTH	(IRQ_TYPE_EDGE_FALLING | IRQ_TYPE_EDGE_RISING)
 // #define IRQ_TYPE_LEVEL_HIGH	4
 // #define IRQ_TYPE_LEVEL_LOW	8
-
-// Question: in linux how does the type work, is it specific to meson??
 
 // NOTE: these are not implemented, but are here for reference as to how it could be used
 typedef enum {
