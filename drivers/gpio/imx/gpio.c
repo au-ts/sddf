@@ -13,9 +13,7 @@
 
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
-// Hardware memory
-uintptr_t gpio_regs = 0x30000000;
-uintptr_t irq_con_regs = 0x30100000;
+// volatile struct gpio_regs *regs;
 
 void notified(microkit_channel ch)
 {
@@ -33,8 +31,8 @@ void init(void)
 {
 	assert(device_resources_check_magic(&device_resources));
 
-    assert(device_resources.num_irqs == 0);
-    assert(device_resources.num_regions == 0);
+    assert(device_resources.num_irqs == 2);
+    assert(device_resources.num_regions == 1);
 
     sddf_dprintf("GPIO DRIVER|LOG: Is gpio_driver_channel_mappings included : %d\n", gpio_driver_channel_mappings[0].pin);
 }
