@@ -9,6 +9,7 @@
 #include <sddf/gpio/config.h>
 #include <sddf/util/printf.h>
 #include <os/sddf.h>
+#include <gpio_config.h>
 
 __attribute__((__section__(".gpio_client_config"))) gpio_client_config_t config;
 
@@ -21,18 +22,20 @@ microkit_channel gpio_channel_3_input;
 // @ TRistan : add coroutines later
 void notified(microkit_channel ch)
 {
-   sddf_printf("CLIENT|INFO: Got an interupt from GPIO!\n"); 
+    sddf_printf("CLIENT|INFO: Got an interupt from GPIO!\n"); 
 }
 
 void init(void)
 {
-    sddf_printf("CLIENT|INFO: starting\n");
+	sddf_printf("CLIENT|INFO: starting\n");
 
-    assert(gpio_config_check_magic(&config));
+	assert(gpio_config_check_magic(&config));
 
-    gpio_channel_1_output = config.driver_channel_ids[0];
-    gpio_channel_2_output = config.driver_channel_ids[1];
+	gpio_channel_1_output = config.driver_channel_ids[0];
+	gpio_channel_2_output = config.driver_channel_ids[1];
 
-    sddf_ppcall(gpio_channel_1_output, seL4_MessageInfo_new(2, 0, 0, 1));
-    sddf_ppcall(gpio_channel_2_output, seL4_MessageInfo_new(3, 0, 0, 1));
+	sddf_printf("CLIENT|INFO: Is gpio_driver_channel_mappings included : %d\n", gpio_driver_channel_mappings[0].pin);
+
+	sddf_ppcall(gpio_channel_1_output, seL4_MessageInfo_new(2, 0, 0, 1));
+	sddf_ppcall(gpio_channel_2_output, seL4_MessageInfo_new(3, 0, 0, 1));
 }

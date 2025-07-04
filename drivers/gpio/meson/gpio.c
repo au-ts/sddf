@@ -9,7 +9,7 @@
 #include <sddf/util/printf.h>
 #include <sddf/gpio/protocol.h>
 #include "gpio.h"
-#include "gpio_config.h"
+#include <gpio_config.h>
 
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
@@ -28,29 +28,6 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     return microkit_msginfo_new(0, 0);
 }
 
@@ -58,11 +35,14 @@ void init(void)
 {
 	assert(device_resources_check_magic(&device_resources));
 
-	// we mapped 8 irqs?
-    assert(device_resources.num_irqs == 0);
+	// we mapped 8 irqs but they arent in the config file so they wont get included?
+    // assert(device_resources.num_irqs == 0);
+
+    sddf_dprintf("GPIO DRIVER|LOG: Is gpio_driver_channel_mappings included : %d\n", gpio_driver_channel_mappings[0].pin);
+
 
     // right now its just the one node for the interrupt controller registers
-    assert(device_resources.num_regions == 1);
+    // assert(device_resources.num_regions == 1);
 
     // regs = (void *)((uintptr_t)device_resources.regions[0].region.vaddr + TIMER_REG_START);
 }

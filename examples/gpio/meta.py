@@ -22,7 +22,7 @@ class Board:
     gpio: str
 
 
-# @ Tristan: we need to figure out what this means in the device tree
+# @ Tristan: we need to figure out what this meansn the device tree
 BOARDS: List[Board] = [
     Board(
         name="odroidc4",
@@ -30,45 +30,86 @@ BOARDS: List[Board] = [
         paddr_top=0x80000000,
         # @Tristan: Right now we can only map one set of MMIO registers in the driver
         # so for now we expose one and hardcode the rest of the mappings
-        # gpio="soc/bus@ff600000/bus@34400/pinctrl@40",
-        # gpio="soc/bus@ff600000/bus@34400/pinctrl@40/bank@40",
-        # gpio="soc/bus@ff800000/sys-ctrl@0/pinctrl@14/bank@14", # this is the AO bank
-        gpio="soc/bus@ffd00000/interrupt-controller@f080", # this is the int-cont MMIO regs
-    ),
-]
 
+        # so in meson drivers there is no GPIO node in the DTS so you have to go through pinctrl
+        # the pinctrl driver is both the pinmux and gpio controller ( :( )
+        gpio="soc/bus@ff600000/bus@34400/pinctrl@40",
+
+        # This node has no compatiblie string
+        # but it contains all of the registers still
+        # gpio="soc/bus@ff600000/bus@34400/pinctrl@40/bank@40",
+
+        # This is the AO bank which has the same problem as above
+        # # NOTE: this is not compatible either with amlogic,meson-g12a-periphs-pinctrl
+        # must be amlogic,meson-g12a-aobus-pinctrl
+        # gpio="soc/bus@ff800000/sys-ctrl@0/pinctrl@14" 
+        # gpio="soc/bus@ff800000/sys-ctrl@0/pinctrl@14/bank@14",
+
+        # This is for the int-cont MMIO reg and also all the interrupts  
+        # irq_con="soc/bus@ffd00000/interrupt-controller@f080",
+    ),
+     Board(
+        name="maaxboard",
+        arch=SystemDescription.Arch.AARCH64,
+        paddr_top=0x7_0000_000,
+        gpio="soc@0/bus@30000000/gpio@30200000",
+        # gpio="soc@0/bus@30000000/gpio@30210000", # these are also compatible as well
+        # gpio="soc@0/bus@30000000/gpio@30220000",
+        # gpio="soc@0/bus@30000000/gpio@30230000",
+        # gpio="soc@0/bus@30000000/gpio@30240000"
+    )
+
+]
 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     gpio_driver = ProtectionDomain("gpio_driver", "gpio_driver.elf", priority=254)
     client = ProtectionDomain("client", "client.elf", priority=1)
 
-    # @Tristan: so there is an extra int-cont node for meson drivers that we will hardcode
-    # into the gpio driver for now, in the future this should be an xtra PD
+    if board.name == "odroidc4":
+        # @Tristan: so there is an extra int-cont node for meson drivers that we will hardcode
+        # into the gpio driver for now, in the future this should be an xtra PD
 
-    # we need to add the IRQs and the regs here from the int controller
-    # the DTS has all the interrupts listed so we should harcode all of them?
-    # for now the driver - device channels are fixed
-    # gpio_driver.add_irq(Irq(97, Irq.Trigger.EDGE, 54))
-    # gpio_driver.add_irq(Irq(98, Irq.Trigger.EDGE, 55)) 
-    # gpio_driver.add_irq(Irq(99, Irq.Trigger.EDGE, 56)) 
-    # gpio_driver.add_irq(Irq(100, Irq.Trigger.EDGE, 57)) 
-    # gpio_driver.add_irq(Irq(101, Irq.Trigger.EDGE, 58)) 
-    # gpio_driver.add_irq(Irq(102, Irq.Trigger.EDGE, 59)) 
-    # gpio_driver.add_irq(Irq(103, Irq.Trigger.EDGE, 60)) 
-    # gpio_driver.add_irq(Irq(104, Irq.Trigger.EDGE, 61)) 
+        # we need to add the IRQs and the regs here from the int controller
+        # the DTS has all the interrupts listed so we should harcode all of them?
+        # for now the driver - device channels are fixed
+        gpio_driver.add_irq(Irq(97, Irq.Trigger.EDGE, 54))
+        gpio_driver.add_irq(Irq(98, Irq.Trigger.EDGE, 55)) 
+        gpio_driver.add_irq(Irq(99, Irq.Trigger.EDGE, 56)) 
+        gpio_driver.add_irq(Irq(100, Irq.Trigger.EDGE, 57)) 
+        gpio_driver.add_irq(Irq(101, Irq.Trigger.EDGE, 58)) 
+        gpio_driver.add_irq(Irq(102, Irq.Trigger.EDGE, 59)) 
+        gpio_driver.add_irq(Irq(103, Irq.Trigger.EDGE, 60)) 
+        gpio_driver.add_irq(Irq(104, Irq.Trigger.EDGE, 61)) 
 
-    # gpio_mr = MemoryRegion(sdf, "gpio_mr", 0x1000, paddr=0xff634000)
-    # gpio_ao_mr = MemoryRegion(sdf, "gpio_ao_mr", 0x1000, paddr=0xff800000)
-    # sdf.add_mr(gpio_mr)
-    # sdf.add_mr(gpio_ao_mr)
+        # There is GPIO_AO interupts as well (ao_irq_0 and ao_irq_1) but theres no node in the DTS for it
+        # This is because they dont feed into the A55 GIC and they go into the SCP (the Always-On processor) instead
 
-    # gpio_driver.add_map(Map(gpio_mr, 0x30_000_000, "rw", cached=False))
-    # gpio_driver.add_map(Map(gpio_ao_mr, 0x30_100_000, "rw", cached=False))
+        # So remember from before the pinctrl node doesnt have the register ranges so we have to hardcode
+        # whichever bank we choose
+        gpio_mr = MemoryRegion(sdf, "gpio_mr", 0x1000, paddr=0xff634000)
+        # gpio_ao_mr = MemoryRegion(sdf, "gpio_ao_mr", 0x1000, paddr=0xff800000)
+        sdf.add_mr(gpio_mr)
+        # sdf.add_mr(gpio_ao_mr)
 
-    # soc/bus@ffd00000/interrupt-controller@f080 is not page aligned
-    # irq_con_mr = MemoryRegion(sdf, "irq_con", 0x1000, paddr=0xffd0f000)
-    # sdf.add_mr(irq_con_mr)
-    # gpio_driver.add_map(Map(irq_con_mr, 0x30_000_000, "rw", cached=False)) 
+        gpio_driver.add_map(Map(gpio_mr, 0x30_000_000, "rw", cached=False))
+        # gpio_driver.add_map(Map(gpio_ao_mr, 0x30_000_000, "rw", cached=False))
+
+        # soc/bus@ffd00000/interrupt-controller@f080 is not page aligned
+        irq_con_mr = MemoryRegion(sdf, "irq_con", 0x1000, paddr=0xffd0f000)
+        sdf.add_mr(irq_con_mr)
+        gpio_driver.add_map(Map(irq_con_mr, 0x30_100_000, "rw", cached=False)) 
+
+    # else:
+        # so right now this is just the IMX and everything should just work with no problems
+        # however the config does have to change
+
+        # For Odroid C4 it looks like this as almost everything gets hardcoded
+        # "resources": {
+        #     "regions": [],
+        #     "irqs": []
+        # }
+
+        # For IMX it can actually be filled out normally as you would expect
 
     gpio_node = dtb.node(board.gpio)
     assert gpio_node is not None
