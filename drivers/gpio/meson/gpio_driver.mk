@@ -14,7 +14,7 @@ GPIO_DRIVER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 gpio_driver.elf: gpio/gpio_driver.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-gpio/gpio_driver.o: ${GPIO_DRIVER_DIR}/gpio.c |gpio
+gpio/gpio_driver.o: ${GPIO_DRIVER_DIR}/gpio.c ${CHECK_FLAGS_BOARD_MD5} |gpio
 	${CC} ${CFLAGS} -c -o $@ $<
 
 gpio:

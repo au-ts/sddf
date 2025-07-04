@@ -88,9 +88,10 @@ pub fn build(b: *std.Build) !void {
         .target = target,
         .optimize = optimize,
         .microkit_board_dir = microkit_board_dir,
+        .gpio_config_include = @as([]const u8, "include"),
     });
 
-    const gpio_driver_class = switch (microkit_board_option) {
+    const driver_class = switch (microkit_board_option) {
         .odroidc4 => "meson",
     };
 
@@ -107,8 +108,13 @@ pub fn build(b: *std.Build) !void {
     });
 
     client.addCSourceFile(.{ .file = b.path("client.c") });
+
+    // For gpio_config.h
+    client.addIncludePath(b.path("include"));
+
     client.addIncludePath(sddf_dep.path("include"));
     client.addIncludePath(sddf_dep.path("include/microkit"));
+    client.addIncludePath(sddf_dep.path("examples/gpio"));
     client.linkLibrary(sddf_dep.artifact("util"));
     client.linkLibrary(sddf_dep.artifact("util_putchar_debug"));
 

@@ -54,18 +54,10 @@ BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 SYSTEM_FILE := gpio.system
 DTS := $(SDDF)/dts/$(MICROKIT_BOARD).dts
 DTB := $(MICROKIT_BOARD).dtb
-CONFIGS_INCLUDE := ${TOP} # this is for the gpio config file // remember to remove from cflags
-# why does the i2c driver not have this -> i think we are only usign one ARCH currently 
-# ARCH := ${shell grep 'CONFIG_SEL4_ARCH  ' $(BOARD_DIR)/include/kernel/gen_config.h | cut -d' ' -f4}
+CONFIGS_INCLUDE := ${TOP}/include # this is for the gpio config file 
 
 IMAGES := gpio_driver.elf client.elf
 CFLAGS_ARCH := -mcpu=$(CPU) -mstrict-align -target aarch64-none-elf
-
-# ifeq ($(ARCH),aarch64)
-# 	CFLAGS_ARCH := -mcpu=$(CPU) -mstrict-align -target aarch64-none-elf
-# else ifeq ($(ARCH),riscv64)
-# 	CFLAGS_ARCH := -march=rv64imafdc -target riscv64-none-elf
-# endif
 
 # @ Tristan : may be able to not compile with the sib i got rid of this (-nostdlib \)
 CFLAGS := -nostdlib \
@@ -84,11 +76,11 @@ LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
 
 all: $(IMAGE_FILE)
 # @Trsitan: i dont think this is neccesary
-# CHECK_FLAGS_BOARD_MD5:=.board_cflags-$(shell echo -- ${CFLAGS} ${MICROKIT_SDK} ${MICROKIT_BOARD} ${MICROKIT_CONFIG} | shasum | sed 's/ *-//')
+CHECK_FLAGS_BOARD_MD5:=.board_cflags-$(shell echo -- ${CFLAGS} ${MICROKIT_SDK} ${MICROKIT_BOARD} ${MICROKIT_CONFIG} | shasum | sed 's/ *-//')
 
-# ${CHECK_FLAGS_BOARD_MD5}:
-# 	-rm -f .board_cflags-*
-# 	touch $@
+${CHECK_FLAGS_BOARD_MD5}:
+	-rm -f .board_cflags-*
+	touch $@
 
 include ${GPIO_DRIVER}/gpio_driver.mk
 include ${SDDF}/util/util.mk
@@ -113,14 +105,6 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 
 $(IMAGE_FILE) $(REPORT_FILE): $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
-
-# @ Tristan : i dont think this is neccesary
-# qemu: $(IMAGE_FILE)
-# 	$(QEMU) $(QEMU_ARCH_ARGS) \
-# 			-serial mon:stdio \
-# 			-m size=2G \
-# 			-nographic \
-# 			-d guest_errors
 
 clean::
 	rm -f client.o
