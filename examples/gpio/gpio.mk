@@ -42,6 +42,9 @@ MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
 	export GPIO_DRIVER_DIR := meson
 	export CPU := cortex-a55
+else ifeq ($(strip $(MICROKIT_BOARD)), maaxboard)
+	export GPIO_DRIVER_DIR := imx
+	export CPU := cortex-a55
 else
 $(error Unsupported MICROKIT_BOARD given)
 endif
