@@ -26,10 +26,6 @@
 
 // math: 16 * 4096 / 128 = 512
 
-#ifndef SPI_CMD_MAX_SZ
-#define SPI_CMD_MAX_SZ 512
-#endif 
-
 #ifndef NUM_QUEUE_ENTRIES
 #define NUM_QUEUE_ENTRIES 32
 #endif
@@ -103,7 +99,7 @@ typedef struct spi_cmd {
     uint64_t read_offset;
     uint64_t write_offset;
     /* length of the referenced slice */
-    uint16_t len;
+    uint8_t len;
     /* what command do? */
     spi_cmd_mode_t mode; 
 } spi_cmd_t;
