@@ -54,6 +54,7 @@ BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 SYSTEM_FILE := gpio.system
 DTS := $(SDDF)/dts/$(MICROKIT_BOARD).dts
 DTB := $(MICROKIT_BOARD).dtb
+CONFIGS_INCLUDE := ${TOP} # this is for the gpio config file // remember to remove from cflags
 # why does the i2c driver not have this -> i think we are only usign one ARCH currently 
 # ARCH := ${shell grep 'CONFIG_SEL4_ARCH  ' $(BOARD_DIR)/include/kernel/gen_config.h | cut -d' ' -f4}
 
@@ -75,6 +76,7 @@ CFLAGS := -nostdlib \
 		  -I$(BOARD_DIR)/include \
 		  -I$(SDDF)/include \
 		  -I$(SDDF)/include/microkit \
+		  -I$(CONFIGS_INCLUDE) \
 		  $(CFLAGS_ARCH)
 LDFLAGS := -L$(BOARD_DIR)/lib
 LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
