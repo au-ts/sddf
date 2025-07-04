@@ -49,6 +49,7 @@ endif
 TOP:= ${SDDF}/examples/gpio
 METAPROGRAM := $(TOP)/meta.py
 UTIL := $(SDDF)/util
+LIBCO := $(SDDF)/libco
 GPIO_DRIVER := $(SDDF)/drivers/gpio/$(GPIO_DRIVER_DIR)
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 SYSTEM_FILE := gpio.system
@@ -68,6 +69,7 @@ CFLAGS := -nostdlib \
 		  -I$(BOARD_DIR)/include \
 		  -I$(SDDF)/include \
 		  -I$(SDDF)/include/microkit \
+		  -I$(LIBCO) \
 		  -I$(CONFIGS_INCLUDE) \
 		  $(CFLAGS_ARCH)
 LDFLAGS := -L$(BOARD_DIR)/lib
@@ -84,6 +86,7 @@ ${CHECK_FLAGS_BOARD_MD5}:
 
 include ${GPIO_DRIVER}/gpio_driver.mk
 include ${SDDF}/util/util.mk
+include ${LIBCO}/libco.mk
 
 ${IMAGES}: libsddf_util_debug.a
 
@@ -92,8 +95,8 @@ ${IMAGES}: libsddf_util_debug.a
 
 client.o: ${TOP}/client.c
 	$(CC) -c $(CFLAGS) $< -o client.o
-client.elf: client.o
-	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
+client.elf: client.o libco.a 
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o client.elf
 
 $(DTB): $(DTS)
 	dtc -q -I dts -O dtb $(DTS) > $(DTB)

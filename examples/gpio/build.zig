@@ -118,6 +118,9 @@ pub fn build(b: *std.Build) !void {
     client.linkLibrary(sddf_dep.artifact("util"));
     client.linkLibrary(sddf_dep.artifact("util_putchar_debug"));
 
+    client.addIncludePath(sddf_dep.path("libco"));
+    client.addCSourceFile(.{ .file = sddf_dep.path("libco/libco.c") });
+
     client.addIncludePath(libmicrokit_include);
     client.addObjectFile(libmicrokit);
     client.setLinkerScript(libmicrokit_linker_script);

@@ -5,6 +5,7 @@
 
 #include <stdint.h>
 #include <microkit.h>
+#include <libco.h>
 #include <sddf/gpio/client.h>
 #include <sddf/gpio/config.h>
 #include <sddf/util/printf.h>
@@ -15,14 +16,35 @@ __attribute__((__section__(".gpio_client_config"))) gpio_client_config_t config;
 
 // @ Tristan : will need to change this
 microkit_channel gpio_channel_1_output;
-microkit_channel gpio_channel_2_output;
-microkit_channel gpio_channel_3_input;
+microkit_channel gpio_channel_2_input;
 
+cothread_t t_event;
+cothread_t t_main;
 
-// @ TRistan : add coroutines later
-void notified(microkit_channel ch)
+#define STACK_SIZE (4096)
+static char t_client_main_stack[STACK_SIZE];
+
+#define USE_POLLING 
+
+static inline void polling_based()
 {
-    sddf_printf("CLIENT|INFO: Got an interupt from GPIO!\n"); 
+	while (1) {}
+}
+
+static inline void irq_based()
+{
+	while (1) {}
+}
+
+void client_main(void)
+{
+
+
+#ifdef USE_POLLING
+	polling_based();
+#else
+	irq_based();
+#endif	
 }
 
 void init(void)
@@ -32,10 +54,28 @@ void init(void)
 	assert(gpio_config_check_magic(&config));
 
 	gpio_channel_1_output = config.driver_channel_ids[0];
-	gpio_channel_2_output = config.driver_channel_ids[1];
+	gpio_channel_2_input = config.driver_channel_ids[1];
 
-	sddf_printf("CLIENT|INFO: Is gpio_driver_channel_mappings included : %d\n", gpio_driver_channel_mappings[0].pin);
+	/* Define the event loop/notified thread as the active co-routine */
+    t_event = co_active();
 
-	sddf_ppcall(gpio_channel_1_output, seL4_MessageInfo_new(2, 0, 0, 1));
-	sddf_ppcall(gpio_channel_2_output, seL4_MessageInfo_new(3, 0, 0, 1));
+    /* derive main entry point */
+    t_main = co_derive((void *)t_client_main_stack, STACK_SIZE, client_main);
+
+    co_switch(t_main);
+
+	// sddf_printf("CLIENT|INFO: Is gpio_driver_channel_mappings included : %d\n", gpio_driver_channel_mappings[0].pin);
+	// sddf_ppcall(gpio_channel_1_output, seL4_MessageInfo_new(2, 0, 0, 1));
+	// sddf_ppcall(gpio_channel_2_input, seL4_MessageInfo_new(3, 0, 0, 1));
+}
+
+// @ TRistan : add coroutines later
+void notified(microkit_channel ch)
+{
+    if (ch == gpio_channel_2_input) {
+    	sddf_printf("CLIENT|INFO: Got an interupt from GPIO!\n"); 
+    	co_switch(t_main);
+    } else {
+    	sddf_printf("CLIENT|ERROR: Unknown channel!\n"); 
+    }
 }
