@@ -9,6 +9,9 @@ from importlib.metadata import version
 # assert version('sdfgen').split(".")[1] == "24", "Unexpected sdfgen version"
 
 ProtectionDomain = SystemDescription.ProtectionDomain
+Irq = SystemDescription.Irq
+MemoryRegion = SystemDescription.MemoryRegion
+Map = SystemDescription.Map
 
 
 @dataclass
@@ -16,7 +19,7 @@ class Board:
     name: str
     arch: SystemDescription.Arch
     paddr_top: int
-    irq_con: str
+    gpio: str
 
 
 # @ Tristan: we need to figure out what this means in the device tree
@@ -28,8 +31,8 @@ BOARDS: List[Board] = [
         # @Tristan: Right now we can only map one set of MMIO registers in the driver
         # so for now we expose one and hardcode the rest of the mappings
         # gpio="soc/bus@ff600000/bus@34400/pinctrl@40/bank@40",
-        # gpio_ao="soc/bus@ff800000/sys-ctrl@0/pinctrl@14/bank@14",
-        irq_con="soc/bus@ffd00000/interrupt-controller@f080",
+        # gpio="soc/bus@ff800000/sys-ctrl@0/pinctrl@14/bank@14", # this is the AO bank
+        gpio="soc/bus@ffd00000/interrupt-controller@f080", # this is the int-cont MMIO regs
     ),
 ]
 
@@ -38,26 +41,42 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     gpio_driver = ProtectionDomain("gpio_driver", "gpio_driver.elf", priority=254)
     client = ProtectionDomain("client", "client.elf", priority=1)
 
-    # @Tristan: there are multiple nodes in the DTS we need in the gpio_driver PD
-    # so currently we manually add them all
-    gpio_mr = MemoryRegion("gpio_mr", 0x1000, paddr=0xff634000)
-    gpio_ao_mr = MemoryRegion("gpio_ao_mr", 0x1000, paddr=0xff800000)
-    sdf.add_mr(gpio_mr)
-    sdf.add_mr(gpio_ao_mr)
+    # @Tristan: so there is an extra int-cont node for meson drivers that we will hardcode
+    # into the gpio driver for now, in the future this should be an xtra PD
 
-    gpio_driver.add_map(Map(gpio_mr, 0x30_000_000, "rw", cached=False))
-    gpio_driver.add_map(Map(gpio_ao_mr, 0x30_100_000, "rw", cached=False))
+    # we need to add the IRQs and the regs here from the int controller
+    # the DTS has all the interrupts listed so we should harcode all of them?
+    # for now the driver - device channels are fixed
+    # gpio_driver.add_irq(Irq(97, Irq.Trigger.EDGE, 54))
+    # gpio_driver.add_irq(Irq(98, Irq.Trigger.EDGE, 55)) 
+    # gpio_driver.add_irq(Irq(99, Irq.Trigger.EDGE, 56)) 
+    # gpio_driver.add_irq(Irq(100, Irq.Trigger.EDGE, 57)) 
+    # gpio_driver.add_irq(Irq(101, Irq.Trigger.EDGE, 58)) 
+    # gpio_driver.add_irq(Irq(102, Irq.Trigger.EDGE, 59)) 
+    # gpio_driver.add_irq(Irq(103, Irq.Trigger.EDGE, 60)) 
+    # gpio_driver.add_irq(Irq(104, Irq.Trigger.EDGE, 61)) 
 
-    # @Tristan : I choose to only use the IRQ controller node because it contains Most of the IRQs
-    # @ Tristan: DTS doesnt even contain the AO irqs anyway?
-    irq_con_node = dtb.node(board.irq_con)
-    assert irq_con_node is not None
+    # gpio_mr = MemoryRegion(sdf, "gpio_mr", 0x1000, paddr=0xff634000)
+    # gpio_ao_mr = MemoryRegion(sdf, "gpio_ao_mr", 0x1000, paddr=0xff800000)
+    # sdf.add_mr(gpio_mr)
+    # sdf.add_mr(gpio_ao_mr)
 
-    gpio_system = Sddf.Gpio(sdf, irq_con_node, gpio_driver)
+    # gpio_driver.add_map(Map(gpio_mr, 0x30_000_000, "rw", cached=False))
+    # gpio_driver.add_map(Map(gpio_ao_mr, 0x30_100_000, "rw", cached=False))
 
-    # @ Tristan: we want to claim driver ids 0 and 1
-    driver_ids = [0, 1]
-    gpio_system.add_client(client, driver_ids=driver_ids)
+    # soc/bus@ffd00000/interrupt-controller@f080 is not page aligned
+    # irq_con_mr = MemoryRegion(sdf, "irq_con", 0x1000, paddr=0xffd0f000)
+    # sdf.add_mr(irq_con_mr)
+    # gpio_driver.add_map(Map(irq_con_mr, 0x30_000_000, "rw", cached=False)) 
+
+    gpio_node = dtb.node(board.gpio)
+    assert gpio_node is not None
+
+    gpio_system = Sddf.Gpio(sdf, gpio_node, gpio_driver)
+
+    # @ Tristan: we want to claim driver channel ids 0 and 1
+    driver_channel_ids = [0, 1]
+    gpio_system.add_client(client, driver_channel_ids=driver_channel_ids)
 
     pds = [
         gpio_driver,
