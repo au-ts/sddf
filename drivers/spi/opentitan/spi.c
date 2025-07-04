@@ -291,7 +291,6 @@ void state_sel_cmd(void) {
     }
 
     // Do bounds checking
-    config.slice_size = 0x1000; //TODO: gotta update sdfgen :(
     bool read_oob = cmd->read_offset  + cmd->len >= config.slice_size;
     bool write_oob = cmd->write_offset + cmd->len >= config.slice_size;
     LOG_DRIVER("read offset=%zu, write offset=%zu, len=%hu, slice_sz=%zu\n",
