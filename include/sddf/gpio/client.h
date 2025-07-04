@@ -9,7 +9,6 @@
 #include <stdint.h>
 #include <sddf/gpio/protocol.h>
 
-
 // /**
 //  * Request a timeout via PPC into the passive timer driver.
 //  * Use the label to indicate this request.
