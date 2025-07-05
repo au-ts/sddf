@@ -117,21 +117,10 @@ typedef enum {
 
 // TODO: come up with interface for set_configs config
 
-
-
-
-
-
-
 // NOTE: these will appear as negative numbers to clients (linux does this)
-// TODO:
-// typedef enum {
-// 	GPIO_ERROR_NOT_IMPLEMENTED = 1,
-//     GPIO_ERROR_INVALID_NUM_ARGS = 2,       // Incorrect number of arguments
-//     GPIO_ERROR_INVALID_LABEL = 3,          // Incorrect label
-//     GPIO_ERROR_INVALID_CONFIG = 4,         // Invalid configuration
-//     GPIO_ERROR_INVALID_VALUE = 5,          // Invalid value
-//     GPIO_ERROR_UNSUPPORTED_PIN_CONFIG = 6, // Requested config not supported for this pin
-//     GPIO_ERROR_UNSUPPORTED_IRQ_CONFIG = 7, // Requested config not supported for this IRQ
-//     GPIO_ERROR_PERMISSION_DENIED = 8       // Operation not allowed due to whats stated in the gpio_driver_channel_mappings 
-// } gpio_error_t;
+typedef enum {
+    SDDF_GPIO_EOPNOTSUPP = 1,
+    SDDF_GPIO_EINVAL = 2,
+    SDDF_GPIO_EPERM = 3
+    // I cant think of any others for now
+} gpio_error_t;
