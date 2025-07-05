@@ -11,6 +11,11 @@ We have 2 GPIOs:
 - GPIO_2 is set to input and should be attached a button then to 3.3V.
 When you push the button it should alternate the current state of the LED (off or on).
 
+The example will not work unless theres an external pull down resistor or
+change the code to set an internal pull down resistor.
+
+It may also work if floats at a low enough value.
+
 There is also 2 modes, one for polling and for for IRQ based
 
 ## Building
