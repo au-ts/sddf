@@ -8,7 +8,6 @@
 #include <sddf/timer/protocol.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
-#include <sddf/util/udivmodti4.h>
 #include <sddf/resources/device.h>
 
 #define MAX_TIMEOUTS 6
