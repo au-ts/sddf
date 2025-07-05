@@ -9,72 +9,225 @@
 #include <stdint.h>
 #include <sddf/gpio/protocol.h>
 
-// /**
-//  * Request a timeout via PPC into the passive timer driver.
-//  * Use the label to indicate this request.
-//  * @param microkit channel of timer driver.
-//  * @param timeout relative timeout in nanoseconds.
-//  */
-// static inline void sddf_timer_set_timeout(unsigned int channel, uint64_t timeout)
-// {
-//     sddf_set_mr(0, timeout);
-//     sddf_ppcall(channel, seL4_MessageInfo_new(SDDF_TIMER_SET_TIMEOUT, 0, 0, 1));
-// }
+// NOTE: GPIO driver is passive
 
-// /**
-//  * Request the time since start up via PPC into the passive timer driver.
-//  * Use the label to indicate this request.
-//  * @param microkit channel of timer driver.
-//  * @return the time in nanoseconds since start up.
-//  */
-// static inline uint64_t sddf_timer_time_now(unsigned int channel)
-// {
-//     sddf_ppcall(channel, seL4_MessageInfo_new(SDDF_TIMER_GET_TIME, 0, 0, 0));
-//     uint64_t time_now = sddf_get_mr(0);
-//     return time_now;
-// }
+// GPIO_BASED
 
-static inline int sddf_gpio_get_value(unsigned int channel) {
-	return -1;
-}
-
-static inline int sddf_gpio_set_value(unsigned int channel, uint32_t value) {
-	return -1;
-}
-
+/**
+ * Request the direction of GPIO line associated with channel (from gpio_config.h).
+ * 
+ * @param microkit channel of gpio driver.
+ * @return negative error code or direction of GPIO pin (SDDF_GPIO_line_direction_t).
+ */
 static inline int sddf_gpio_get_direction(unsigned int channel) {
-	return -1;
+	microkit_msginfo msginfo = sddf_ppcall(channel, seL4_MessageInfo_new(SDDF_GPIO_GET_DIRECTION, 0, 0, 0));
+
+	unsigned int label = microkit_msginfo_get_label(msginfo);
+
+	if (BIT(SDDF_GPIO_RESPONSE_ERROR_BIT)) {
+		return -(SDDF_GPIO_RESPONSE_VALUE_MASK & label);	
+	}
+	return BIT(0) & label ? SDDF_GPIO_LINE_DIRECTION_IN : SDDF_GPIO_LINE_DIRECTION_OUT;
 }
 
-static inline int sddf_gpio_set_direction(unsigned int channel, GPIO_direction_t direction) {
-	return -1;
+/**
+ * Request for direction of GPIO line associated with channel (from gpio_config.h) to be an input.
+ * 
+ * @param microkit channel of gpio driver.
+ * @return negative error code or 0.
+ */
+static inline int sddf_gpio_direction_input(unsigned int channel) {
+	microkit_msginfo msginfo = sddf_ppcall(channel, seL4_MessageInfo_new(SDDF_GPIO_DIRECTION_INPUT, 0, 0, 0));
+
+	unsigned int label = microkit_msginfo_get_label(msginfo);
+
+	if (BIT(SDDF_GPIO_RESPONSE_ERROR_BIT)) {
+		return -(SDDF_GPIO_RESPONSE_VALUE_MASK & label);	
+	}
+	return 0;
 }
 
-static inline int sddf_gpio_get_irq_configuration(unsigned int channel) {
-	return -1;
+/**
+ * Request for direction of GPIO line associated with channel (from gpio_config.h) to be an output with requested intial value.
+ * 
+ * @param microkit channel of gpio driver.
+ * @value
+ * @return negative error code or 0.
+ */
+static inline int sddf_gpio_direction_output(unsigned int channel, int value) {
+	microkit_msginfo msginfo = sddf_ppcall(channel, seL4_MessageInfo_new(SDDF_GPIO_DIRECTION_OUTPUT, 0, 0, 0));
+
+	unsigned int label = microkit_msginfo_get_label(msginfo);
+
+	if (BIT(SDDF_GPIO_RESPONSE_ERROR_BIT)) {
+		return -(SDDF_GPIO_RESPONSE_VALUE_MASK & label);	
+	}
+	return 0;
 }
 
-static inline int sddf_gpio_set_irq_configuration(unsigned int channel, GPIO_irq_configuration_t config, uint32_t value) {
-	(void)value;
-	return -1;
+/**
+ * Request the value of GPIO line associated with channel (from gpio_config.h).
+ * 
+ * @param microkit channel of gpio driver.
+ * @return negative error code or value of line.
+ */
+static inline int sddf_gpio_get(unsigned int channel) {
+	microkit_msginfo msginfo = sddf_ppcall(channel, seL4_MessageInfo_new(SDDF_GPIO_GET, 0, 0, 0));
+
+	unsigned int label = microkit_msginfo_get_label(msginfo);
+
+	if (BIT(SDDF_GPIO_RESPONSE_ERROR_BIT)) {
+		return -(SDDF_GPIO_RESPONSE_VALUE_MASK & label);	
+	}
+	return BIT(0) & label;
 }
 
-static inline int sddf_gpio_get_pin_configuration(unsigned int channel) {
-	(void)channel;
-	return -GPIO_ERROR_NOT_IMPLEMENTED;
+/**
+ * Request for value of GPIO line associated with channel (from gpio_config.h) to be requested logical level value.
+ * This usually updates the output latch so may not actually drive the GPIO line if its still in input mode.
+ * 
+ * @param microkit channel of gpio driver.
+ * @param value
+ * @return negative error code or 0.
+ */
+static inline int sddf_gpio_set(unsigned int channel, int value) {
+	unsigned int label = (SDDF_REQUEST_INTERFACE_MASK & SDDF_GPIO_SET) | (GPIO_REQUEST_VALUE_MASK & value);
+
+	microkit_msginfo msginfo = sddf_ppcall(channel, seL4_MessageInfo_new(label, 0, 0, 0));
+
+	label = microkit_msginfo_get_label(msginfo);
+
+	if (BIT(SDDF_GPIO_RESPONSE_ERROR_BIT)) {
+		return -(SDDF_GPIO_RESPONSE_VALUE_MASK & label);	
+	}
+	return 0;
 }
 
-static inline int sddf_gpio_set_pin_configuration(unsigned int channel, GPIO_pin_configuration_t config, uint32_t value) {
-	(void)channel;
-	(void)config;
-	(void)value;
-	return -GPIO_ERROR_NOT_IMPLEMENTED;
+/**
+ * Request the configuration of GPIO line associated with channel (from gpio_config.h) to requested config (+ arguement) value(s).
+ * 
+ * @param microkit channel of gpio driver.
+ * @param configuration
+ * @param optional arguement of config (usually a continuous value rather than flag)
+ * 
+ * @return negative error code or 0.
+ */
+static inline int sddf_gpio_set_config(unsigned int channel, unsigned int config, unsigned int arguement) {
+	unsigned int label = (SDDF_REQUEST_INTERFACE_MASK & SDDF_GPIO_SET_CONFIG) | (GPIO_REQUEST_VALUE_MASK & config);
+
+	sddf_set_mr(0, arguement);
+	microkit_msginfo msginfo = sddf_ppcall(channel, seL4_MessageInfo_new(label, 0, 0, 1));
+
+	label = microkit_msginfo_get_label(msginfo);
+	if (BIT(SDDF_GPIO_RESPONSE_ERROR_BIT)) {
+		return -(SDDF_GPIO_RESPONSE_VALUE_MASK & label);	
+	}
+	return 0;
 }
 
+// IRQ_BASED
 
-// how do we convey that its an erro
-// we could just return -1 and still have it as an int ?
+/**
+ * Request for IRQ line associated with channel (from gpio_config.h) to be enabled.
+ * 
+ * @param microkit channel of gpio driver.
+ * @return negative error code or 0.
+ */
+static inline int sddf_gpio_irq_enable(unsigned int channel) {
+	microkit_msginfo msginfo = sddf_ppcall(channel, seL4_MessageInfo_new(SDDF_GPIO_IRQ_ENABLE, 0, 0, 0));
 
-// errors can be negative and if its works its positive
+	uint64_t label = microkit_msginfo_get_label(msginfo);
 
-// 
+	if (BIT(SDDF_GPIO_RESPONSE_ERROR_BIT)) {
+		return -(SDDF_GPIO_RESPONSE_VALUE_MASK & label);	
+	}
+	return 0;
+}
+
+/**
+ * Request for IRQ line associated with channel (from gpio_config.h) to be disabled.
+ * 
+ * @param microkit channel of gpio driver.
+ * @return negative error code or 0.
+ */
+static inline int sddf_gpio_irq_disable(unsigned int channel) {
+	microkit_msginfo msginfo = sddf_ppcall(channel, seL4_MessageInfo_new(SDDF_GPIO_IRQ_DISABLE, 0, 0, 0));
+
+	uint64_t label = microkit_msginfo_get_label(msginfo);
+
+	if (BIT(SDDF_GPIO_RESPONSE_ERROR_BIT)) {
+		return -(SDDF_GPIO_RESPONSE_VALUE_MASK & label);	
+	}
+	return 0;
+}
+
+// SEE below regarding irq_unmask and irq_mask
+
+/**
+ * Request for type of IRQ line associated with channel (from gpio_config.h) to be requested type .
+ * 
+ * @param microkit channel of gpio driver.
+ * @param SDDF_GPIO_irq_line_status_t type.
+ * @return negative error code or 0.
+ */
+static inline int sddf_gpio_irq_set_type(unsigned int channel, unsigned int type) {
+	unsigned int label = (SDDF_REQUEST_INTERFACE_MASK & SDDF_GPIO_IRQ_SET_TYPE) | (GPIO_REQUEST_VALUE_MASK & type);
+
+	microkit_msginfo msginfo = sddf_ppcall(channel, seL4_MessageInfo_new(label, 0, 0, 1));
+
+	label = microkit_msginfo_get_label(msginfo);
+	if (BIT(SDDF_GPIO_RESPONSE_ERROR_BIT)) {
+		return -(SDDF_GPIO_RESPONSE_VALUE_MASK & label);	
+	}
+	return 0;
+}
+
+// NOTE: there is no sddf_gpio_get_config function this is because:
+// - Most GPIO controllers don’t let you read back “config” bits
+// - Clients can shadow if they really want it
+
+// TODO: changes need to be made to current gpio_config.h file
+// static inline int sddf_gpio_get_multiple(unsigned int channel, unsigned int *mask, unsigned int *bits) {
+// 	return -1;
+// }
+
+// TODO: changes need to be made to current gpio_config.h file
+// static inline int sddf_gpio_set_multiple(unsigned int channel, unsigned int *mask, unsigned int *bits) {
+// 	return -1;
+// }
+
+// tbd...
+// static inline int sddf_gpio_set_rv(unsigned int channel, int value) {
+// 	return -1;
+// }
+
+// tbd...
+// static inline int sddf_gpio_set_multiple_rv(unsigned int channel, unsigned int *mask, unsigned int *bits) {
+// 	return -1;
+// }
+
+// tbd...
+// static inline int sddf_gpio_en_hw_timestamp(unsigned int channel, unsigned int flags) {
+// 	return -1;
+// }
+
+// tbd...
+// static inline int sddf_gpio_dis_hw_timestamp(unsigned int channel, unsigned int flags) {
+// 	return -1;
+// }
+
+// The case could be made that theres enough of a semantic difference to have irq_unmask and irq_mask
+// on top of enable and disable
+
+// tbd...
+// static inline int sddf_gpio_irq_unmask(unsigned int channel) {
+// 	return -1;
+// }
+
+// tbd...
+// static inline int sddf_gpio_irq_mask(unsigned int channel) {
+// 	return -1;
+// }
+
+
+// @ Tristan: i dont think the rest of the IRQ configs are relevant to a SDDF GPIO driver
