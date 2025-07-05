@@ -14,6 +14,10 @@
 
 #define BIT(nr) (1UL << (nr))
 
+// [high, low]
+#define BIT_MASK_RANGE(high, low) \
+    (((1UL << ((high) - (low) + 1)) - 1) << (low))
+
 #ifdef __GNUC__
 #define likely(x)   __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
