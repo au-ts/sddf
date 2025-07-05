@@ -107,7 +107,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     # else:
         # For IMX it everything is normal and how you would expect
         # im currently hardcoding the channel ids for device irqs
-        # TODO: maybe we shoudl figure out what to do in terms of hardcoding these values in the config.json
+        # TODO: we should figure out what to do in terms of hardcoding these values in the config.json
         # and thus the driver? we need this to match up with the gpio_config.h file as well
         # if we dont hardcode values in config.json it will fail when we connect because driver_channel_ids
         # also tries to use those channels
