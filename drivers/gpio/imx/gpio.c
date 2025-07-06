@@ -45,7 +45,8 @@ void notified(microkit_channel ch)
       		}
       	}
 
-      	gpio_regs->isr &= ~clear_mask;
+        // Write 1 to clear if it was set
+      	gpio_regs->isr &= clear_mask;
 
       	// We want it to be cleared before the microkit acknowledges
       	THREAD_MEMORY_ACQUIRE();
@@ -108,15 +109,24 @@ static inline seL4_MessageInfo_t set_config(int pin, uint32_t value, uint32_t ar
 static inline seL4_MessageInfo_t irq_enable(int pin) {
     gpio_regs->imr |= BIT(pin);
 
-    // TODO: should we flush? Because we could recieve an irq in the meantime after this.
+    // TODO: should we flush? 
+    // Because we could recieve an irq in the meantime 
+    // before it actually gets written.
 
     return microkit_msginfo_new(0, 0);
 }
 
+// The semantic of disbale also means unchecking the status register
 static inline seL4_MessageInfo_t irq_disable(int pin) {
     gpio_regs->imr &= ~BIT(pin);
 
-     // TODO: should we flush? Because we could recieve an irq in the meantime after this.
+    THREAD_MEMORY_ACQUIRE();
+
+    // Now that we have unmasked we uncheck the status register
+    // so that if we go to notified we dont process this irq if
+    // it was set before we unmasked
+
+    gpio_regs->isr &= BIT(pin);
 
     return microkit_msginfo_new(0, 0);
 }
