@@ -21,31 +21,61 @@ class Board:
     gpio: str
 
 
-# @ Tristan: we need to figure out what this meansn the device tree
 BOARDS: List[Board] = [
     Board(
         name="odroidc4",
         arch=SystemDescription.Arch.AARCH64,
         paddr_top=0x80000000,
-        # @Tristan: Right now we can only map one set of MMIO registers in the driver
-        # so for now we expose one and hardcode the rest of the mappings
-
-        # so in meson drivers there is no GPIO node in the DTS so you have to go through pinctrl
-        # the pinctrl driver is both the pinmux and gpio controller ( :( )
         gpio="soc/bus@ff600000/bus@34400/pinctrl@40",
+        # Right now we can only mpa one DTS node in driver
+        # so we currently has hardcode the rest of the mappings
 
-        # This node has no compatiblie string
-        # but it contains all of the registers still
-        # gpio="soc/bus@ff600000/bus@34400/pinctrl@40/bank@40",
+        # For the MESON GPIO driver there are a lot of weird things going on.
 
-        # This is the AO bank which has the same problem as above
-        # # NOTE: this is not compatible either with amlogic,meson-g12a-periphs-pinctrl
-        # must be amlogic,meson-g12a-aobus-pinctrl
-        # gpio="soc/bus@ff800000/sys-ctrl@0/pinctrl@14" 
-        # gpio="soc/bus@ff800000/sys-ctrl@0/pinctrl@14/bank@14",
+        # There are 5 nodes we consider mapping
+        # 1. gpio="soc/bus@ff600000/bus@34400/pinctrl@40",
+        #   - This is the pinctrl node for peripheral bank
+        #   - It has a compatibilty string (a requirement)
+        #   - This is it "amlogic,meson-g12a-periphs-pinctrl"
+        #   - DOESN't contain any memory regions or interrupts though
+        #
+        # 2. gpio="soc/bus@ff600000/bus@34400/pinctrl@40/bank@40",
+        #   - Doesn't contain a compatibilty string so we cant map it
+        #   - Contains all the mapped memory regions for the peripheral GPIO bank 
+        #
+        # 3.  gpio="soc/bus@ff800000/sys-ctrl@0/pinctrl@14" 
+        #   - This is the pinctrl node for AO bank.
+        #   - It has a compatibilty string (a requirement)
+        #   - This is it "amlogic,meson-g12a-aobus-pinctrl"
+        #   - Probably not even useful as none of the pins are brought out
+        #
+        # 4. gpio="soc/bus@ff800000/sys-ctrl@0/pinctrl@14/bank@14",
+        #   - Doesn't contain a compatibilty string so we cant map it 
+        #   - Contains all the mapped memory regions for the AO GPIO bank 
+        #
+        # 5. irq_con="soc/bus@ffd00000/interrupt-controller@f080"
+        #   - This is the interrupt controller node for ALL GPIO pins (AO and peripheral)
+        #   - It muxes the pins into the specific interrupt lines
+        #   - Contains mapped memory regions and all the interrupts
+        #   - The interrupts it contains are marked like this
+        #   - amlogic,channel-interrupts = <0x40 0x41 0x42 0x43 0x44 0x45 0x46 0x47>;
+        #   - so the dtb library cannot even parse it
+        #   - To clarify both the other bank would need to access this irq_con's registers
+        #
 
-        # This is for the int-cont MMIO reg and also all the interrupts  
-        # irq_con="soc/bus@ffd00000/interrupt-controller@f080",
+        # Therefore:
+        # I think we have 2 options
+        # 
+        # 1. We use gpio="soc/bus@ff600000/bus@34400/pinctrl@40" and hardcode the interrupt controller
+        # Remember that gpio AO banks have no pins brought out anyway (so its useless??)
+        # 
+        # 2. We need to make a seperate interrupt controller driver that takes the DTS node for it
+        # Than both gpio="soc/bus@ff600000/bus@34400/pinctrl@40" and gpio="soc/bus@ff800000/sys-ctrl@0/pinctrl@14" PD's
+        # Communicate with it (i think this wont be very hard)
+        #
+
+        # NOTE: the 2 banks have different compatiblity strings as well but the implementation for both
+        # should be almost identical 
     ),
      Board(
         name="maaxboard",
@@ -65,12 +95,24 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     client = ProtectionDomain("client", "client.elf", priority=1)
 
     if board.name == "odroidc4":
-        # @Tristan: so there is an extra int-cont node for meson drivers that we will hardcode
-        # into the gpio driver for now, in the future this should be an xtra PD
+        # Hardcode the register ranges because pinctrl node doesn't have any
+        gpio_mr = MemoryRegion(sdf, "gpio_mr", 0x1000, paddr=0xff634000)
+        sdf.add_mr(gpio_mr)
+        gpio_driver.add_map(Map(gpio_mr, 0x30_000_000, "rw", cached=False))
 
-        # we need to add the IRQs and the regs here from the int controller
-        # the DTS has all the interrupts listed so we should harcode all of them?
-        # for now the driver - device channels are fixed
+        # gpio_ao_mr = MemoryRegion(sdf, "gpio_ao_mr", 0x1000, paddr=0xff800000)
+        # sdf.add_mr(gpio_ao_mr)
+        # gpio_driver.add_map(Map(gpio_ao_mr, 0x30_000_000, "rw", cached=False))
+
+        # Hardcode the interrupt controller register ranges
+        # soc/bus@ffd00000/interrupt-controller@f080 is not page aligned
+        irq_con_mr = MemoryRegion(sdf, "irq_con", 0x1000, paddr=0xffd0f000)
+        sdf.add_mr(irq_con_mr)
+        gpio_driver.add_map(Map(irq_con_mr, 0x30_100_000, "rw", cached=False)) 
+
+        # We fix the device irq channels at the end 54 - 61
+        # This would need to match up with a protocol in gpio_config.h
+        # and the driver
         gpio_driver.add_irq(Irq(97, Irq.Trigger.EDGE, 54))
         gpio_driver.add_irq(Irq(98, Irq.Trigger.EDGE, 55)) 
         gpio_driver.add_irq(Irq(99, Irq.Trigger.EDGE, 56)) 
@@ -81,36 +123,22 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
         gpio_driver.add_irq(Irq(104, Irq.Trigger.EDGE, 61)) 
 
         # There is GPIO_AO interupts as well (ao_irq_0 and ao_irq_1) but theres no node in the DTS for it
-        # This is because they dont feed into the A55 GIC and they go into the SCP (the Always-On processor) instead
+        # This is because they dont feed into the A55 GIC and they go into the SCP (the Always-On processor)
 
-        # So remember from before the pinctrl node doesnt have the register ranges so we have to hardcode
-        # whichever bank we choose
-        gpio_mr = MemoryRegion(sdf, "gpio_mr", 0x1000, paddr=0xff634000)
-        # gpio_ao_mr = MemoryRegion(sdf, "gpio_ao_mr", 0x1000, paddr=0xff800000)
-        sdf.add_mr(gpio_mr)
-        # sdf.add_mr(gpio_ao_mr)
-
-        gpio_driver.add_map(Map(gpio_mr, 0x30_000_000, "rw", cached=False))
-        # gpio_driver.add_map(Map(gpio_ao_mr, 0x30_000_000, "rw", cached=False))
-
-        # soc/bus@ffd00000/interrupt-controller@f080 is not page aligned
-        irq_con_mr = MemoryRegion(sdf, "irq_con", 0x1000, paddr=0xffd0f000)
-        sdf.add_mr(irq_con_mr)
-        gpio_driver.add_map(Map(irq_con_mr, 0x30_100_000, "rw", cached=False)) 
-
-        # the config.json should also look like this
+        # NOTE: since we hardcode everything the config.json should also look like this
         # "resources": {
         #     "regions": [],
         #     "irqs": []
         # }
 
+        # NOTE: from my research i can only find 3 DTS nodes in Linux
+        # that use a seperate interrupt controller
+        # - amlogic,meson-gpio-intc
+        # - st,stm32-exti
+        # - fsl,ls-extirq
+
     # else:
-        # For IMX it everything is normal and how you would expect
-        # im currently hardcoding the channel ids for device irqs
-        # TODO: we should figure out what to do in terms of hardcoding these values in the config.json
-        # and thus the driver? we need this to match up with the gpio_config.h file as well
-        # if we dont hardcode values in config.json it will fail when we connect because driver_channel_ids
-        # also tries to use those channels
+        # IMX and most other GPIO's have no issues
 
     gpio_node = dtb.node(board.gpio)
     assert gpio_node is not None
@@ -127,6 +155,10 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     ]
     for pd in pds:
         sdf.add_pd(pd)
+
+    # TODO: currently there is no check to see if driver_channel_ids hasn't chosen a channel used
+    # by a device irq
+    # But it will still fail really deep inside of gpio_system.connect() and not compile
 
     assert gpio_system.connect()
     assert gpio_system.serialise_config(output_dir)
