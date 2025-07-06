@@ -268,11 +268,11 @@ void validate_gpio_config() {
 
 void disable_all_interrupts() {
 	gpio_regs->imr = 0;	
-	gpio_regs->isr = ~0;	
-
 
 	// Flush to make sure we go NO more interrupts
 	THREAD_MEMORY_ACQUIRE();
+
+	gpio_regs->isr = ~0;
 
 	microkit_irq_ack(device_resources.irqs[0].id);
 	microkit_irq_ack(device_resources.irqs[1].id);
