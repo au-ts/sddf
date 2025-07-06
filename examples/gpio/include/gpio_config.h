@@ -17,6 +17,7 @@ IMX:
 - For pins we use 0-31 as thats how many pins per bank
 - For irqs write a value > 0 because it can only be connected to 1 irq line anyway
 
+NOTE: these are all what Linux does
 */
 
 #define PIN_1 (95) // gpiox_18
