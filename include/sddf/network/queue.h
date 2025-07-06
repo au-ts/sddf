@@ -13,6 +13,11 @@
 #include <sddf/util/fence.h>
 #include <sddf/util/util.h>
 
+/**
+ * Each function cannot be concurrently called by more than one thread on the same input argument.
+ * Different functions can be called concurrently, even though they are accessing the same net_queue_t.
+*/
+
 typedef struct net_buff_desc {
     /* offset of buffer within buffer memory region or io address of buffer */
     uint64_t io_or_offset;
@@ -40,156 +45,86 @@ typedef struct net_queue_handle {
     uint32_t capacity;
 } net_queue_handle_t;
 
-/**
- * Get the number of buffers enqueued into a queue.
- *
- * @param queue queue handle for the queue to get the length of.
- *
- * @return number of buffers enqueued into a queue.
- */
-static inline uint16_t net_queue_length(net_queue_t *queue)
+/* Length function used by the consumer of the queue 
+(component that modifies the head, but only reads the tail). */
+static inline uint16_t net_queue_length_consumer(net_queue_t *queue)
 {
+#if CONFIG_ENABLE_SMP_SUPPORT
+    uint16_t tail = __atomic_load_n(&queue->tail, __ATOMIC_ACQUIRE);
+    uint16_t head = __atomic_load_n(&queue->head, __ATOMIC_RELAXED);
+    return tail - head;
+#else
+    COMPILER_MEMORY_ACQUIRE();
     return queue->tail - queue->head;
-}
-
-/**
- * Check if the free queue is empty.
- *
- * @param queue queue handle for the free queue to check.
- *
- * @return true indicates the queue is empty, false otherwise.
- */
-static inline bool net_queue_empty_free(net_queue_handle_t *queue)
-{
-    return queue->free->tail - queue->free->head == 0;
-}
-
-/**
- * Check if the active queue is empty.
- *
- * @param queue queue handle for the active queue to check.
- *
- * @return true indicates the queue is empty, false otherwise.
- */
-static inline bool net_queue_empty_active(net_queue_handle_t *queue)
-{
-    return queue->active->tail - queue->active->head == 0;
-}
-
-/**
- * Check if the free queue is full.
- *
- * @param queue queue handle for the free queue to check.
- *
- * @return true indicates the queue is full, false otherwise.
- */
-static inline bool net_queue_full_free(net_queue_handle_t *queue)
-{
-    return queue->free->tail - queue->free->head == queue->capacity;
-}
-
-/**
- * Check if the active queue is full.
- *
- * @param queue queue handle for the active queue to check.
- *
- * @return true indicates the queue is full, false otherwise.
- */
-static inline bool net_queue_full_active(net_queue_handle_t *queue)
-{
-    return queue->active->tail - queue->active->head == queue->capacity;
-}
-
-/**
- * Enqueue an element into a free queue.
- *
- * @param queue queue to enqueue into.
- * @param buffer buffer descriptor for buffer to be enqueued.
- *
- * @return -1 when queue is full, 0 on success.
- */
-static inline int net_enqueue_free(net_queue_handle_t *queue, net_buff_desc_t buffer)
-{
-    if (net_queue_full_free(queue)) {
-        return -1;
-    }
-
-    queue->free->buffers[queue->free->tail % queue->capacity] = buffer;
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
-    THREAD_MEMORY_RELEASE();
 #endif
-    queue->free->tail++;
-
-    return 0;
 }
 
-/**
- * Enqueue an element into an active queue.
- *
- * @param queue queue to enqueue into.
- * @param buffer buffer descriptor for buffer to be enqueued.
- *
- * @return -1 when queue is full, 0 on success.
- */
-static inline int net_enqueue_active(net_queue_handle_t *queue, net_buff_desc_t buffer)
+/* Length function used by the producer of the queue 
+(component that modifies the tail, but only reads the head). */
+static inline uint16_t net_queue_length_producer(net_queue_t *queue)
 {
-    if (net_queue_full_active(queue)) {
-        return -1;
-    }
-
-    queue->active->buffers[queue->active->tail % queue->capacity] = buffer;
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
-    THREAD_MEMORY_RELEASE();
+#if CONFIG_ENABLE_SMP_SUPPORT
+    uint16_t tail = __atomic_load_n(&queue->tail, __ATOMIC_RELAXED);
+    uint16_t head = __atomic_load_n(&queue->head, __ATOMIC_ACQUIRE);
+    return tail - head;
+#else
+    COMPILER_MEMORY_ACQUIRE();
+    return queue->tail - queue->head;
 #endif
-    queue->active->tail++;
-
-    return 0;
 }
 
-/**
- * Dequeue an element from the free queue.
- *
- * @param queue queue handle to dequeue from.
- * @param buffer pointer to buffer descriptor for buffer to be dequeued.
- *
- * @return -1 when queue is empty, 0 on success.
- */
-static inline int net_dequeue_free(net_queue_handle_t *queue, net_buff_desc_t *buffer)
+/* Returns the address of the next descriptor entry in
+ queue array which points to a valid buffer. Used by the consumer. */
+static inline net_buff_desc_t *net_queue_next_full(net_queue_t *queue, uint32_t capacity, uint16_t idx)
 {
-    if (net_queue_empty_free(queue)) {
-        return -1;
-    }
-
-    *buffer = queue->free->buffers[queue->free->head % queue->capacity];
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
-    THREAD_MEMORY_RELEASE();
+#if CONFIG_ENABLE_SMP_SUPPORT
+    uint16_t head = __atomic_load_n(&queue->head, __ATOMIC_RELAXED);
+    uint16_t mod_idx = (head + idx) % capacity;
+    return &queue->buffers[mod_idx];
+#else
+    return &queue->buffers[(queue->head + idx) % capacity];
 #endif
-    queue->free->head++;
-
-    return 0;
 }
 
-/**
- * Dequeue an element from the active queue.
- *
- * @param queue queue handle to dequeue from.
- * @param buffer pointer to buffer descriptor for buffer to be dequeued.
- *
- * @return -1 when queue is empty, 0 on success.
- */
-static inline int net_dequeue_active(net_queue_handle_t *queue, net_buff_desc_t *buffer)
+/* Returns the address of the next descriptor entry in
+ queue array which points to an empty slot. Used by the producer. */
+static inline net_buff_desc_t *net_queue_next_empty(net_queue_t *queue, uint32_t capacity, uint16_t idx)
 {
-    if (net_queue_empty_active(queue)) {
-        return -1;
-    }
-
-    *buffer = queue->active->buffers[queue->active->head % queue->capacity];
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
-    THREAD_MEMORY_RELEASE();
+#if CONFIG_ENABLE_SMP_SUPPORT
+    uint16_t tail = __atomic_load_n(&queue->tail, __ATOMIC_RELAXED);
+    uint16_t mod_idx = (tail + idx) % capacity;
+    return &queue->buffers[mod_idx];
+#else
+    return &queue->buffers[(queue->tail + idx) % capacity];
 #endif
-    queue->active->head++;
+}
 
-    return 0;
+/* Used by the consumer to indicate how many buffers have
+ been processed. */
+static inline void net_queue_publish_dequeued(net_queue_t *queue, uint16_t num_dequeued)
+{
+    if (!num_dequeued) return;
+#if CONFIG_ENABLE_SMP_SUPPORT
+    uint16_t head = __atomic_load_n(&queue->head, __ATOMIC_RELAXED);
+    __atomic_store_n(&queue->head, head + num_dequeued, __ATOMIC_RELEASE);
+#else
+    COMPILER_MEMORY_RELEASE();
+    queue->head = queue->head + num_dequeued;
+#endif
+}
+
+/* Used by the producer to indicate how many buffers have
+ been inserted. */
+static inline void net_queue_publish_enqueued(net_queue_t *queue, uint16_t num_enqueued)
+{
+    if (!num_enqueued) return;
+#if CONFIG_ENABLE_SMP_SUPPORT
+    uint16_t tail = __atomic_load_n(&queue->tail, __ATOMIC_RELAXED);
+    __atomic_store_n(&queue->tail, tail + num_enqueued, __ATOMIC_RELEASE);
+#else
+    COMPILER_MEMORY_RELEASE();
+    queue->tail = queue->tail + num_enqueued;
+#endif
 }
 
 /**
@@ -216,10 +151,10 @@ static inline void net_queue_init(net_queue_handle_t *queue, net_queue_t *free, 
 static inline void net_buffers_init(net_queue_handle_t *queue, uintptr_t base_addr)
 {
     for (uint32_t i = 0; i < queue->capacity; i++) {
-        net_buff_desc_t buffer = {(NET_BUFFER_SIZE * i) + base_addr, 0};
-        int err = net_enqueue_free(queue, buffer);
-        assert(!err);
+        net_buff_desc_t *buf = net_queue_next_empty(queue->free, queue->capacity, i);
+        buf->io_or_offset = (NET_BUFFER_SIZE * i) + base_addr;
     }
+    net_queue_publish_enqueued(queue->free, queue->capacity);
 }
 
 /**
@@ -229,9 +164,10 @@ static inline void net_buffers_init(net_queue_handle_t *queue, uintptr_t base_ad
  */
 static inline void net_request_signal_free(net_queue_handle_t *queue)
 {
+#if CONFIG_ENABLE_SMP_SUPPORT
+    __atomic_store_n(&queue->free->consumer_signalled, 0, __ATOMIC_RELEASE);
+#else
     queue->free->consumer_signalled = 0;
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
-    THREAD_MEMORY_RELEASE();
 #endif
 }
 
@@ -242,9 +178,10 @@ static inline void net_request_signal_free(net_queue_handle_t *queue)
  */
 static inline void net_request_signal_active(net_queue_handle_t *queue)
 {
+#if CONFIG_ENABLE_SMP_SUPPORT
+    __atomic_store_n(&queue->active->consumer_signalled, 0, __ATOMIC_RELEASE);
+#else
     queue->active->consumer_signalled = 0;
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
-    THREAD_MEMORY_RELEASE();
 #endif
 }
 
@@ -255,9 +192,10 @@ static inline void net_request_signal_active(net_queue_handle_t *queue)
  */
 static inline void net_cancel_signal_free(net_queue_handle_t *queue)
 {
+#if CONFIG_ENABLE_SMP_SUPPORT
+    __atomic_store_n(&queue->free->consumer_signalled, 1, __ATOMIC_RELEASE);
+#else
     queue->free->consumer_signalled = 1;
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
-    THREAD_MEMORY_RELEASE();
 #endif
 }
 
@@ -268,9 +206,10 @@ static inline void net_cancel_signal_free(net_queue_handle_t *queue)
  */
 static inline void net_cancel_signal_active(net_queue_handle_t *queue)
 {
+#if CONFIG_ENABLE_SMP_SUPPORT
+    __atomic_store_n(&queue->active->consumer_signalled, 1, __ATOMIC_RELEASE);
+#else
     queue->active->consumer_signalled = 1;
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
-    THREAD_MEMORY_RELEASE();
 #endif
 }
 
@@ -281,7 +220,11 @@ static inline void net_cancel_signal_active(net_queue_handle_t *queue)
  */
 static inline bool net_require_signal_free(net_queue_handle_t *queue)
 {
+#if CONFIG_ENABLE_SMP_SUPPORT
+    return !__atomic_load_n(&queue->free->consumer_signalled, __ATOMIC_ACQUIRE);
+#else
     return !queue->free->consumer_signalled;
+#endif
 }
 
 /**
@@ -291,5 +234,9 @@ static inline bool net_require_signal_free(net_queue_handle_t *queue)
  */
 static inline bool net_require_signal_active(net_queue_handle_t *queue)
 {
+#if CONFIG_ENABLE_SMP_SUPPORT
+    return !__atomic_load_n(&queue->active->consumer_signalled, __ATOMIC_ACQUIRE);
+#else
     return !queue->active->consumer_signalled;
+#endif
 }

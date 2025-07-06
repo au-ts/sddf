@@ -76,21 +76,24 @@ static void update_ring_slot(hw_ring_t *ring, unsigned int idx, uintptr_t phys,
 static void rx_provide(void)
 {
     bool reprocess = true;
+    uint16_t free_length = net_queue_length_consumer(rx_queue.free);
     while (reprocess) {
-        while (!hw_ring_full(&rx) && !net_queue_empty_free(&rx_queue)) {
-            net_buff_desc_t buffer;
-            int err = net_dequeue_free(&rx_queue, &buffer);
-            assert(!err);
+        uint16_t bufs_dequeued = 0;
+        while (!hw_ring_full(&rx) && bufs_dequeued < free_length) {
+            net_buff_desc_t *buf = net_queue_next_full(rx_queue.free, rx_queue.capacity, bufs_dequeued);
+            bufs_dequeued++;
 
             uint32_t idx = rx.tail % rx.capacity;
             uint16_t stat = RXD_EMPTY;
             if (idx + 1 == rx.capacity) {
                 stat |= WRAP;
             }
-            update_ring_slot(&rx, idx, buffer.io_or_offset, 0, stat);
+            update_ring_slot(&rx, idx, buf->io_or_offset, 0, stat);
             rx.tail++;
             eth->rdar = RDAR_RDAR;
         }
+
+        net_queue_publish_dequeued(rx_queue.free, bufs_dequeued);
 
         /* Only request a notification from virtualiser if HW ring not full */
         if (!hw_ring_full(&rx)) {
@@ -100,7 +103,8 @@ static void rx_provide(void)
         }
         reprocess = false;
 
-        if (!net_queue_empty_free(&rx_queue) && !hw_ring_full(&rx)) {
+        free_length = net_queue_length_consumer(rx_queue.free);
+        if (!hw_ring_full(&rx) && free_length) {
             net_cancel_signal_free(&rx_queue);
             reprocess = true;
         }
@@ -109,7 +113,7 @@ static void rx_provide(void)
 
 static void rx_return(void)
 {
-    bool packets_transferred = false;
+    uint16_t bufs_enqueued = 0;
     while (!hw_ring_empty(&rx)) {
         /* If buffer slot is still empty, we have processed all packets the device has filled */
         uint32_t idx = rx.head % rx.capacity;
@@ -120,15 +124,16 @@ static void rx_return(void)
 
         THREAD_MEMORY_ACQUIRE();
 
-        net_buff_desc_t buffer = { d->addr, d->len };
-        int err = net_enqueue_active(&rx_queue, buffer);
-        assert(!err);
-
-        packets_transferred = true;
+        net_buff_desc_t *slot = net_queue_next_empty(rx_queue.active, rx_queue.capacity, bufs_enqueued);
+        bufs_enqueued++;
+        slot->io_or_offset = d->addr;
+        slot->len = d->len;
         rx.head++;
     }
 
-    if (packets_transferred && net_require_signal_active(&rx_queue)) {
+    net_queue_publish_enqueued(rx_queue.active, bufs_enqueued);
+
+    if (bufs_enqueued && net_require_signal_active(&rx_queue)) {
         net_cancel_signal_active(&rx_queue);
         microkit_notify(config.virt_rx.id);
     }
@@ -137,26 +142,30 @@ static void rx_return(void)
 static void tx_provide(void)
 {
     bool reprocess = true;
+    uint16_t active_length = net_queue_length_consumer(tx_queue.active);
     while (reprocess) {
-        while (!(hw_ring_full(&tx)) && !net_queue_empty_active(&tx_queue)) {
-            net_buff_desc_t buffer;
-            int err = net_dequeue_active(&tx_queue, &buffer);
-            assert(!err);
-
+        uint16_t bufs_dequeued = 0;
+        while (!(hw_ring_full(&tx)) && bufs_dequeued < active_length) {
+            net_buff_desc_t *buf = net_queue_next_full(tx_queue.active, tx_queue.capacity, bufs_dequeued);
+            bufs_dequeued++;
+            
             uint32_t idx = tx.tail % tx.capacity;
             uint16_t stat = TXD_READY | TXD_ADDCRC | TXD_LAST;
             if (idx + 1 == tx.capacity) {
                 stat |= WRAP;
             }
-            update_ring_slot(&tx, idx, buffer.io_or_offset, buffer.len, stat);
+            update_ring_slot(&tx, idx, buf->io_or_offset, buf->len, stat);
             tx.tail++;
             eth->tdar = TDAR_TDAR;
         }
 
+        net_queue_publish_dequeued(tx_queue.active, bufs_dequeued);
+
         net_request_signal_active(&tx_queue);
         reprocess = false;
 
-        if (!hw_ring_full(&tx) && !net_queue_empty_active(&tx_queue)) {
+        active_length = net_queue_length_consumer(tx_queue.active);
+        if (!hw_ring_full(&tx) && active_length) {
             net_cancel_signal_active(&tx_queue);
             reprocess = true;
         }
@@ -165,7 +174,7 @@ static void tx_provide(void)
 
 static void tx_return(void)
 {
-    bool enqueued = false;
+    uint16_t bufs_enqueued = 0;
     while (!hw_ring_empty(&tx)) {
         /* Ensure that this buffer has been sent by the device */
         uint32_t idx = tx.head % tx.capacity;
@@ -176,15 +185,15 @@ static void tx_return(void)
 
         THREAD_MEMORY_ACQUIRE();
 
-        net_buff_desc_t buffer = { d->addr, 0 };
-        int err = net_enqueue_free(&tx_queue, buffer);
-        assert(!err);
-
-        enqueued = true;
+        net_buff_desc_t *slot = net_queue_next_empty(tx_queue.free, tx_queue.capacity, bufs_enqueued);
+        bufs_enqueued++;
+        slot->io_or_offset = d->addr;
         tx.head++;
     }
 
-    if (enqueued && net_require_signal_free(&tx_queue)) {
+    net_queue_publish_enqueued(tx_queue.free, bufs_enqueued);
+
+    if (bufs_enqueued && net_require_signal_free(&tx_queue)) {
         net_cancel_signal_free(&tx_queue);
         microkit_notify(config.virt_tx.id);
     }

@@ -200,9 +200,9 @@ static void interface_free_buffer(struct pbuf *p)
     SYS_ARCH_DECL_PROTECT(old_level);
     pbuf_custom_offset_t *custom_pbuf_offset = (pbuf_custom_offset_t *)p;
     SYS_ARCH_PROTECT(old_level);
-    net_buff_desc_t buffer = { custom_pbuf_offset->offset, 0 };
-    int err = net_enqueue_free(&(sddf_state.rx_queue), buffer);
-    assert(!err);
+    net_buff_desc_t *slot = net_queue_next_empty(sddf_state.rx_queue.free, sddf_state.rx_queue.capacity, 0);
+    slot->io_or_offset = custom_pbuf_offset->offset;
+    net_queue_publish_enqueued(sddf_state.rx_queue.free, 1);
     sddf_state.notify_rx = true;
     pbuf_pool_free(&pbuf_pool, custom_pbuf_offset);
     SYS_ARCH_UNPROTECT(old_level);
@@ -245,24 +245,24 @@ static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
         return ERR_MEM;
     }
 
-    if (net_queue_empty_free(&sddf_state.tx_queue)) {
+    if (!net_queue_length_consumer(sddf_state.tx_queue.free)) {
         return sddf_err_to_lwip_err(lwip_state.handle_empty_tx_free(p));
     }
 
-    net_buff_desc_t buffer;
-    int err = net_dequeue_free(&sddf_state.tx_queue, &buffer);
-    assert(!err);
+    net_buff_desc_t *buf = net_queue_next_full(sddf_state.tx_queue.free, sddf_state.tx_queue.capacity, 0);
+    net_buff_desc_t *slot = net_queue_next_empty(sddf_state.tx_queue.active, sddf_state.tx_queue.capacity, 0);
 
-    uintptr_t frame = buffer.io_or_offset + sddf_state.tx_buffer_data_region;
+    uintptr_t frame = buf->io_or_offset + sddf_state.tx_buffer_data_region;
     uint16_t copied = 0;
     for (struct pbuf *curr = p; curr != NULL; curr = curr->next) {
         memcpy((void *)(frame + copied), curr->payload, curr->len);
         copied += curr->len;
     }
+    slot->io_or_offset = buf->io_or_offset;
+    slot->len = copied;
 
-    buffer.len = copied;
-    err = net_enqueue_active(&sddf_state.tx_queue, buffer);
-    assert(!err);
+    net_queue_publish_dequeued(sddf_state.tx_queue.free, 1);
+    net_queue_publish_enqueued(sddf_state.tx_queue.active, 1);
 
     sddf_state.notify_tx = true;
 
@@ -277,7 +277,7 @@ net_sddf_err_t sddf_lwip_transmit_pbuf(struct pbuf *p)
         return SDDF_LWIP_ERR_PBUF;
     }
 
-    if (net_queue_empty_free(&sddf_state.tx_queue)) {
+    if (!net_queue_length_consumer(sddf_state.tx_queue.free)) {
         return lwip_state.handle_empty_tx_free(p);
     }
 
@@ -290,13 +290,14 @@ net_sddf_err_t sddf_lwip_transmit_pbuf(struct pbuf *p)
 void sddf_lwip_process_rx(void)
 {
     bool reprocess = true;
+    uint16_t active_length = net_queue_length_consumer(sddf_state.rx_queue.active);
     while (reprocess) {
-        while (!net_queue_empty_active(&sddf_state.rx_queue)) {
-            net_buff_desc_t buffer;
-            int err = net_dequeue_active(&sddf_state.rx_queue, &buffer);
-            assert(!err);
+        uint16_t bufs_dequeued = 0;
+        while (bufs_dequeued < active_length) {
+            net_buff_desc_t *buf = net_queue_next_full(sddf_state.rx_queue.active, sddf_state.rx_queue.capacity, bufs_dequeued);
+            bufs_dequeued++;
 
-            struct pbuf *p = create_interface_buffer(buffer.io_or_offset, buffer.len);
+            struct pbuf *p = create_interface_buffer(buf->io_or_offset, buf->len);
             assert(p != NULL);
             if (lwip_state.netif.input(p, &lwip_state.netif) != ERR_OK) {
                 lwip_state.err_output("LWIP|ERROR: unknown error inputting pbuf into network stack\n");
@@ -304,10 +305,12 @@ void sddf_lwip_process_rx(void)
             }
         }
 
+        net_queue_publish_dequeued(sddf_state.rx_queue.active, bufs_dequeued);
         net_request_signal_active(&sddf_state.rx_queue);
         reprocess = false;
 
-        if (!net_queue_empty_active(&sddf_state.rx_queue)) {
+        active_length = net_queue_length_consumer(sddf_state.rx_queue.active);
+        if (active_length) {
             net_cancel_signal_active(&sddf_state.rx_queue);
             reprocess = true;
         }

@@ -86,7 +86,7 @@ void transmit(void)
 {
     bool reprocess = true;
     while (reprocess) {
-        while (head != NULL && !net_queue_empty_free(&net_tx_handle)) {
+        while (head != NULL && net_queue_length_consumer(net_tx_handle.free)) {
             net_sddf_err_t err = sddf_lwip_transmit_pbuf(head);
             if (err == SDDF_LWIP_ERR_PBUF) {
                 sddf_dprintf("LWIP|ERROR: attempted to send a packet of size %u > BUFFER SIZE %u\n", head->tot_len,
@@ -104,14 +104,14 @@ void transmit(void)
         }
 
         /* Only request a signal if there are more pending pbufs to send */
-        if (head == NULL || !net_queue_empty_free(&net_tx_handle)) {
+        if (head == NULL || net_queue_length_consumer(net_tx_handle.free)) {
             net_cancel_signal_free(&net_tx_handle);
         } else {
             net_request_signal_free(&net_tx_handle);
         }
         reprocess = false;
 
-        if (head != NULL && !net_queue_empty_free(&net_tx_handle)) {
+        if (head != NULL && net_queue_length_consumer(net_tx_handle.free)) {
             net_cancel_signal_free(&net_tx_handle);
             reprocess = true;
         }

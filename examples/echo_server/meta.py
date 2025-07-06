@@ -8,7 +8,7 @@ from typing import List, Tuple
 from sdfgen import SystemDescription, Sddf, DeviceTree
 from importlib.metadata import version
 
-assert version('sdfgen').split(".")[1] == "24", "Unexpected sdfgen version"
+assert version('sdfgen').split(".")[1] == "25", "Unexpected sdfgen version"
 
 ProtectionDomain = SystemDescription.ProtectionDomain
 MemoryRegion = SystemDescription.MemoryRegion
@@ -191,7 +191,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
         # For ethernet reset, the Pine64 Star64 driver needs access to the
         # clock controller. We do not have a clock driver for this platform so the
         # ethernet driver does it directly.
-        clock_controller = MemoryRegion("clock_controller", 0x10_000, paddr=0x17000000)
+        clock_controller = MemoryRegion(sdf, "clock_controller", 0x10_000, paddr=0x17000000)
         sdf.add_mr(clock_controller)
         ethernet_driver.add_map(Map(clock_controller, 0x3000000, perms="rw"))
 
@@ -258,7 +258,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     bench_idle_ch = Channel(bench_idle, bench)
     sdf.add_channel(bench_idle_ch)
 
-    cycle_counters_mr = MemoryRegion("cycle_counters", 0x1000)
+    cycle_counters_mr = MemoryRegion(sdf, "cycle_counters", 0x1000)
     sdf.add_mr(cycle_counters_mr)
 
     bench_idle.add_map(Map(cycle_counters_mr, 0x5_000_000, perms="rw"))

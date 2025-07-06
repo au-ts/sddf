@@ -34,44 +34,50 @@ int extract_offset(uintptr_t *phys)
 
 void tx_provide(void)
 {
-    bool enqueued = false;
+    uint16_t bufs_enqueued = 0;
     for (int client = 0; client < config.num_clients; client++) {
         bool reprocess = true;
+        uint16_t cli_length = net_queue_length_consumer(state.tx_queue_clients[client].active);
         while (reprocess) {
-            while (!net_queue_empty_active(&state.tx_queue_clients[client])) {
-                net_buff_desc_t buffer;
-                int err = net_dequeue_active(&state.tx_queue_clients[client], &buffer);
-                assert(!err);
-
-                if (buffer.io_or_offset % NET_BUFFER_SIZE
-                    || buffer.io_or_offset >= NET_BUFFER_SIZE * state.tx_queue_clients[client].capacity) {
+            uint16_t bufs_dequeued = 0;
+            while (bufs_dequeued < cli_length) {
+                net_buff_desc_t *buf = net_queue_next_full(state.tx_queue_clients[client].active, state.tx_queue_clients[client].capacity, bufs_dequeued);
+                bufs_dequeued++;
+                if (buf->io_or_offset % NET_BUFFER_SIZE
+                    || buf->io_or_offset >= NET_BUFFER_SIZE * state.tx_queue_clients[client].capacity) {
                     sddf_dprintf("VIRT_TX|LOG: Client provided offset %lx which is not buffer aligned or outside of buffer region\n",
-                                 buffer.io_or_offset);
-                    err = net_enqueue_free(&state.tx_queue_clients[client], buffer);
-                    assert(!err);
-                    continue;
+                                 buf->io_or_offset);
+                    // TODO handle this
+                    // err = net_enqueue_free(&state.tx_queue_clients[client], buffer);
+                    // assert(!err);
+                    // continue;
                 }
 
-                uintptr_t buffer_vaddr = buffer.io_or_offset + (uintptr_t)config.clients[client].data.region.vaddr;
-                cache_clean(buffer_vaddr, buffer_vaddr + buffer.len);
 
-                buffer.io_or_offset = buffer.io_or_offset + config.clients[client].data.io_addr;
-                err = net_enqueue_active(&state.tx_queue_drv, buffer);
-                assert(!err);
-                enqueued = true;
+                uintptr_t buffer_vaddr = buf->io_or_offset + (uintptr_t)config.clients[client].data.region.vaddr;
+                cache_clean(buffer_vaddr, buffer_vaddr + buf->len);
+                
+                net_buff_desc_t *slot = net_queue_next_empty(state.tx_queue_drv.active, state.tx_queue_drv.capacity, bufs_enqueued);
+                bufs_enqueued++;
+                slot->io_or_offset = buf->io_or_offset + config.clients[client].data.io_addr;
+                slot->len = buf->len;
             }
 
+            net_queue_publish_dequeued(state.tx_queue_clients[client].active, bufs_dequeued);
             net_request_signal_active(&state.tx_queue_clients[client]);
             reprocess = false;
 
-            if (!net_queue_empty_active(&state.tx_queue_clients[client])) {
+            cli_length = net_queue_length_consumer(state.tx_queue_clients[client].active);
+            if (cli_length) {
                 net_cancel_signal_active(&state.tx_queue_clients[client]);
                 reprocess = true;
             }
         }
     }
 
-    if (enqueued && net_require_signal_active(&state.tx_queue_drv)) {
+    net_queue_publish_enqueued(state.tx_queue_drv.active, bufs_enqueued);
+
+    if (bufs_enqueued && net_require_signal_active(&state.tx_queue_drv)) {
         net_cancel_signal_active(&state.tx_queue_drv);
         sddf_deferred_notify(config.driver.id);
     }
@@ -80,25 +86,35 @@ void tx_provide(void)
 void tx_return(void)
 {
     bool reprocess = true;
-    bool notify_clients[SDDF_NET_MAX_CLIENTS] = { false };
+    bool notify_clients[SDDF_NET_MAX_CLIENTS] = {false};
+    uint16_t drv_length = net_queue_length_consumer(state.tx_queue_drv.free);
     while (reprocess) {
-        while (!net_queue_empty_free(&state.tx_queue_drv)) {
-            net_buff_desc_t buffer;
-            int err = net_dequeue_free(&state.tx_queue_drv, &buffer);
-            assert(!err);
+        uint16_t bufs_dequeued = 0;
+        uint16_t bufs_enqueued_cli[SDDF_NET_MAX_CLIENTS] = {0};
+        while (bufs_dequeued < drv_length) {
+            net_buff_desc_t *buf = net_queue_next_full(state.tx_queue_drv.free, state.tx_queue_drv.capacity, bufs_dequeued);
+            bufs_dequeued++;
 
-            int client = extract_offset(&buffer.io_or_offset);
+            uint64_t phys = buf->io_or_offset;
+            int client = extract_offset(&phys);
             assert(client >= 0);
 
-            err = net_enqueue_free(&state.tx_queue_clients[client], buffer);
-            assert(!err);
-            notify_clients[client] = true;
+            net_buff_desc_t *slot = net_queue_next_empty(state.tx_queue_clients[client].free, state.tx_queue_clients[client].capacity, bufs_enqueued_cli[client]);
+            bufs_enqueued_cli[client]++;
+            slot->io_or_offset = phys;
+        }
+
+        net_queue_publish_dequeued(state.tx_queue_drv.free, bufs_dequeued);
+        for (int client = 0; client < config.num_clients; client++) {
+            net_queue_publish_enqueued(state.tx_queue_clients[client].free, bufs_enqueued_cli[client]);
+            notify_clients[client] |= bufs_enqueued_cli[client];
         }
 
         net_request_signal_free(&state.tx_queue_drv);
         reprocess = false;
 
-        if (!net_queue_empty_free(&state.tx_queue_drv)) {
+        drv_length = net_queue_length_consumer(state.tx_queue_drv.free);
+        if (drv_length) {
             net_cancel_signal_free(&state.tx_queue_drv);
             reprocess = true;
         }
