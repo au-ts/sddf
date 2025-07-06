@@ -24,3 +24,5 @@ typedef volatile struct imx_gpio_regs imx_gpio_regs_t;
 #define ICR_HIGH_LEVEL    0x1  /* 01 */
 #define ICR_RISING_EDGE   0x2  /* 10 */
 #define ICR_FALLING_EDGE  0x3  /* 11 */
+
+#define PINS_PER_BANK 32

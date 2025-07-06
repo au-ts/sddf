@@ -7,6 +7,7 @@
 #include <microkit.h>
 #include <sddf/resources/device.h>
 #include <sddf/util/printf.h>
+#include <sddf/util/fence.h>
 #include <sddf/gpio/protocol.h>
 #include <gpio_config.h>
 #include "gpio.h"
@@ -15,37 +16,47 @@ __attribute__((__section__(".device_resources"))) device_resources_t device_reso
 
 volatile imx_gpio_regs_t *gpio_regs;
 
-// I decided not to (overlay a C struct on the MMIO region) because then this driver will be more flexible
-// Hence im using tables
+// For O(1) lookups
+static int pin_subscriber[PINS_PER_BANK] = {-1};
 
 uint32_t craft_error_label(gpio_error_t error_code) {
     uint32_t e = error_code | BIT(SDDF_GPIO_RESPONSE_ERROR_BIT);
     return e;
 }
 
+// NOTE: there is actual some single line ones that the manual mentions however
+// From my research they dont appear to leave the GPIO block to go to the GIC
+// Also Linux doesn't use them and you dont need them anyway because we can just use the combined lines.
 void notified(microkit_channel ch)
 {
-    if (ch == device_resources.irqs[0].id) {
-        // lines 0 - 15
+    if (ch == device_resources.irqs[0].id ||
+    	ch == device_resources.irqs[1].id) 
+    {
+		uint32_t clear_mask = 0;
 
-    } 
-    else if (ch == device_resources.irqs[1].id) {
-        // lines 16 - 31
+      	for (int pin = 0; pin < PINS_PER_BANK; pin++) {
+      		// 1. Check status reg
+      		if (gpio_regs->isr & BIT(pin)) {
+      			// 2. Clear if set
+      			clear_mask |= BIT(pin);
 
+      			// 3. Notify client
+      			microkit_notify(pin_subscriber[pin]);
+      		}
+      	}
+
+      	gpio_regs->isr &= ~clear_mask;
+
+      	// We want it to be cleared before the microkit acknowledges
+      	THREAD_MEMORY_ACQUIRE();
+
+      	microkit_deferred_irq_ack(ch);
     } 
     else {
         sddf_dprintf("GPIO DRIVER|LOG: unexpected notification from channel %u\n", ch);
         return;
     }
-
-    // we want to be doing deferred irq acknowledgement 
-
 }
-
-// Most functions are generic that we can just pass in the offset and the rest happens.
-
-// Lets just hardcode every function for now
-
 
 static inline seL4_MessageInfo_t set(int pin, uint32_t value) {
 	if (value) {
@@ -79,7 +90,7 @@ static inline seL4_MessageInfo_t set_direction_output(int pin, uint32_t value) {
 }
 
 static inline seL4_MessageInfo_t set_direction_input(int pin) {
-    gpio_regs->gdir &= BIT(pin);
+    gpio_regs->gdir &= ~BIT(pin);
 
     return microkit_msginfo_new(0, 0);
 }
@@ -97,11 +108,15 @@ static inline seL4_MessageInfo_t set_config(int pin, uint32_t value, uint32_t ar
 static inline seL4_MessageInfo_t irq_enable(int pin) {
     gpio_regs->imr |= BIT(pin);
 
+    // TODO: should we flush? Because we could recieve an irq in the meantime after this.
+
     return microkit_msginfo_new(0, 0);
 }
 
 static inline seL4_MessageInfo_t irq_disable(int pin) {
-    gpio_regs->imr &= BIT(pin);
+    gpio_regs->imr &= ~BIT(pin);
+
+     // TODO: should we flush? Because we could recieve an irq in the meantime after this.
 
     return microkit_msginfo_new(0, 0);
 }
@@ -128,7 +143,7 @@ static inline seL4_MessageInfo_t irq_set_type(int pin, uint32_t type) {
         both = true;
         break;
     default:
-        microkit_msginfo_new(craft_error_label(SDDF_GPIO_EINVAL), 0);
+        return microkit_msginfo_new(craft_error_label(SDDF_GPIO_EINVAL), 0);
     }
 
     if (pin < 16) {
@@ -196,21 +211,69 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
     }
 }
 
-// we also map for fast interrupts as well
 void validate_gpio_config() {
-	// for (int ch = 0; ch < MICROKIT_MAX_CHANNELS; ch++) {
-    //     int pin = gpio_driver_channel_mappings[ch].pin;
-    //     int irq = gpio_driver_channel_mappings[ch].irq;
+	for (int ch = 0; ch < MICROKIT_MAX_CHANNELS; ch++) {
+        int pin = gpio_driver_channel_mappings[ch].pin;
+        int irq = gpio_driver_channel_mappings[ch].irq;
 
-    //     // IRQ-without-GPIO check
-    //     if (pin < 0 && irq >= 0) {
-    //         PANIC("GPIO pin must be set if IRQ is set! (ch=%d, irq=%d)", ch, irq);
-    //     }
-    //     if (pin < 0) {
-    //         continue;
-    //     }
+        // Irq without pin check
+        if (pin < 0 && irq >= 0) {
+        	sddf_dprintf("GPIO DRIVER|ERROR: Pin must be set if IRQ is set! (ch=%d, irq=%d)", ch, irq);
+        	while (1) {}
+        }
 
-    //   }
+    	// Nothing to configure
+        if (pin < 0) {
+            continue;
+        }
+
+        // Check a client hasn't claimed the channels we use for device interrupts 
+		if (device_resources.irqs[0].id == ch) {
+			sddf_dprintf("GPIO DRIVER|ERROR: Client can't claim channel used for device irqs : %d", ch);
+        	while (1) {}
+		} else if (device_resources.irqs[1].id == ch) {
+			sddf_dprintf("GPIO DRIVER|ERROR: Client can't claim channel used for device irqs : %d", ch);
+        	while (1) {}
+		}
+
+        // Check pin is valid number
+        if (pin >= PINS_PER_BANK) {
+        	sddf_dprintf("GPIO DRIVER|ERROR: Invalid pin number : %d", pin);
+        	while (1) {}
+        }
+
+       	// Unique-pin check
+        int seen = 0;
+        for (int ch_2 = 0; ch_2 < MICROKIT_MAX_CHANNELS; ch_2++) {
+            if (gpio_driver_channel_mappings[ch_2].pin == pin) {
+                seen++;
+            }
+        }
+        if (seen != 1) {
+            sddf_dprintf("GPIO DRIVER|ERROR: pin %d mapped %d times (must be exactly once)", pin, seen);
+        	while (1) {}
+        } 
+
+    	if (irq < 0) {
+            continue;
+        }
+
+        // For fast lookups in notify
+        pin_subscriber[pin] = ch;
+
+        // Since we can only bind each pin to one designated interrupt we dont validate the irq picked
+        // Other then it being above 0
+      }
+}
+
+void disable_all_interrupts() {
+	gpio_regs->imr = 0;	
+
+	// Flush to make sure we go NO more interrupts
+	THREAD_MEMORY_ACQUIRE();
+
+	microkit_irq_ack(device_resources.irqs[0].id);
+	microkit_irq_ack(device_resources.irqs[1].id);
 }
 
 void init(void)
@@ -220,20 +283,10 @@ void init(void)
     assert(device_resources.num_irqs == 2);
     assert(device_resources.num_regions == 1);
 
+    // TODO: make sure thres no offset
     gpio_regs = (imx_gpio_regs_t *)device_resources.regions[0].region.vaddr;
 
     validate_gpio_config();
 
-    // disable_all_interrupts();
-
-    // ack_all_interrupts();
-
-
-
-
-
-
-
-
-
+    disable_all_interrupts();
 }
