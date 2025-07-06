@@ -5,6 +5,20 @@
  */
 #pragma once
 
+/*
+NUMBERING SCHEMES
+
+Meson:
+- For pins we could use 2
+  - More details in sddf/drivers/gpio/meson/gpio.h
+- For irqs we use 0-7
+
+IMX:
+- For pins we use 0-31 as thats how many pins per bank
+- For irqs write a value > 0 because it can only be connected to 1 irq line anyway
+
+*/
+
 #define PIN_1 (95) // gpiox_18
 #define PIN_2 (96) // gpiox_19
 
