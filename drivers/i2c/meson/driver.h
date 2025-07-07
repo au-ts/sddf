@@ -1,51 +1,10 @@
 /*
- * Copyright 2023, UNSW
+ * Copyright 2025, UNSW
  *
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-// i2c-driver.h
-// Header containing all generic features for I2C drivers targeting the
-// sDDF and seL4 core platform.
-// Matt Rossouw (matthew.rossouw@unsw.edu.au)
-// 08/2023
-
 #pragma once
-
-#include <stdint.h>
-#include <sddf/util/printf.h>
-#include "gpio.h"
-#include "clk.h"
-
-enum data_direction {
-    DATA_DIRECTION_WRITE = 0x0,
-    DATA_DIRECTION_READ = 0x1
-};
-
-// Driver state
-typedef struct _i2c_ifState {
-    /* Pointer to current request/response being handled */
-    uint8_t *curr_data;
-    /* Number of bytes in current request (number of tokens) */
-    int curr_request_len;
-    /* Number of bytes in current response (only the data) and not the error tokens at the start */
-    int curr_response_len;
-    /* Number of bytes remaining to dispatch in the current request.*/
-    size_t remaining;
-    /* Flag indicating that there is more independent requests waiting on the queue_handle.request. */
-    bool notified;
-
-    /* Number of bytes to read/write if request data offset is in the midst of a buffer. If this is
-       zero, no read/write is in progress and we can interpret the current byte as a token.*/
-    uint8_t rw_remaining;
-
-    enum data_direction data_direction;
-    /* I2C bus address of the current request being handled */
-    size_t addr;
-} i2c_ifState_t;
-
-#define DATA_DIRECTION_WRITE (0x0)
-#define DATA_DIRECTION_READ (0x1)
 
 // Ctl register fields
 #define REG_CTRL_START      (BIT(0))
