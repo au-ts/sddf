@@ -49,7 +49,7 @@ void notified(microkit_channel ch)
       	gpio_regs->isr &= clear_mask;
 
       	// We want it to be cleared before the microkit acknowledges
-      	THREAD_MEMORY_ACQUIRE();
+      	THREAD_MEMORY_FENCE();
 
       	microkit_deferred_irq_ack(ch);
     } 
@@ -85,6 +85,10 @@ static inline seL4_MessageInfo_t set_direction_output(int pin, uint32_t value) {
 	else {
 	    gpio_regs->dr &= ~BIT(pin);
 	}
+
+    // @ Tristan: do we value glitching or speed more?
+    // THREAD_MEMORY_FENCE();
+
 	gpio_regs->gdir |= BIT(pin);
 
 	return microkit_msginfo_new(0, 0);
@@ -109,10 +113,6 @@ static inline seL4_MessageInfo_t set_config(int pin, uint32_t value, uint32_t ar
 static inline seL4_MessageInfo_t irq_enable(int pin) {
     gpio_regs->imr |= BIT(pin);
 
-    // TODO: should we flush? 
-    // Because we could recieve an irq in the meantime 
-    // before it actually gets written.
-
     return microkit_msginfo_new(0, 0);
 }
 
@@ -120,7 +120,7 @@ static inline seL4_MessageInfo_t irq_enable(int pin) {
 static inline seL4_MessageInfo_t irq_disable(int pin) {
     gpio_regs->imr &= ~BIT(pin);
 
-    THREAD_MEMORY_ACQUIRE();
+    THREAD_MEMORY_FENCE();
 
     // Now that we have unmasked we uncheck the status register
     // so that if we go to notified we dont process this irq if
@@ -133,7 +133,7 @@ static inline seL4_MessageInfo_t irq_disable(int pin) {
 
 static inline seL4_MessageInfo_t irq_set_type(int pin, uint32_t type) {
     uint32_t shift = (pin % 16) * 2;
-    uint32_t icr_val = uint32_t current_icr_val = (pin < 16)
+    uint32_t icr_val = (pin < 16)
     ? ((gpio_regs->icr1 >> shift) & 0x3u)
     : ((gpio_regs->icr2 >> shift) & 0x3u);
     
@@ -165,6 +165,9 @@ static inline seL4_MessageInfo_t irq_set_type(int pin, uint32_t type) {
     else {
         gpio_regs->icr2 = (gpio_regs->icr2 & ~(0x3u << shift)) | (icr_val << shift);
     }
+
+    // @ Tristan: do we value glitching or speed more?
+    // THREAD_MEMORY_FENCE();
 
     if (both) {
         gpio_regs->edge_sel |= BIT(pin);
@@ -282,8 +285,7 @@ void validate_gpio_config() {
 void disable_all_interrupts() {
 	gpio_regs->imr = 0;	
 
-	// Flush to make sure we go NO more interrupts
-	THREAD_MEMORY_ACQUIRE();
+	THREAD_MEMORY_FENCE();
 
 	gpio_regs->isr = ~0;
 
