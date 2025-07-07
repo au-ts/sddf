@@ -133,7 +133,10 @@ static inline seL4_MessageInfo_t irq_disable(int pin) {
 
 static inline seL4_MessageInfo_t irq_set_type(int pin, uint32_t type) {
     uint32_t shift = (pin % 16) * 2;
-    uint32_t icr_val = ICR_LOW_LEVEL;
+    uint32_t icr_val = uint32_t current_icr_val = (pin < 16)
+    ? ((gpio_regs->icr1 >> shift) & 0x3u)
+    : ((gpio_regs->icr2 >> shift) & 0x3u);
+    
     bool both = false;
 
    switch (type) {
