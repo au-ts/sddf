@@ -28,17 +28,17 @@
 /*  This reference clock value is taken from Pine64 u-boot.
     This value will be board specific. */
 #define UART_CLK 24000000
-#define UART_DW_APB_SHADOW_REGISTERS 1
+#define UART_DW_APB_REGISTERS 1
 #elif defined(CONFIG_PLAT_QEMU_RISCV_VIRT)
 /* Obtained via the device tree that QEMU generates, and from
  * the QEMU source code.
  * https://github.com/qemu/qemu/blob/56c6e249b6988c1b6edc2dd34ebb0f1e570a1365/hw/riscv/virt.c#L966
  */
 #define UART_CLK 3686400
-#define UART_DW_APB_SHADOW_REGISTERS 0
+#define UART_DW_APB_REGISTERS 0
 #elif defined(CONFIG_PLAT_CHESHIRE)
 #define UART_CLK 50000000
-#define UART_DW_APB_SHADOW_REGISTERS 0
+#define UART_DW_APB_REGISTERS 0
 #else
 #error "unknown UART clock"
 #endif
@@ -131,7 +131,7 @@
 /*
  * These registers are special to the DW APB UART implementation.
  */
-#if UART_DW_APB_SHADOW_REGISTERS
+#if UART_DW_APB_REGISTERS
 /* UART Software Reset Register */
 #define UART_SSR 0x22
 /* UART Reset */
