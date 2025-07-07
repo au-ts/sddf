@@ -307,6 +307,8 @@ struct meson_bank {
 	const char *name;
 	unsigned int first;
 	unsigned int last;
+	int irq_first;
+	int irq_last;
 	struct meson_reg_desc regs[MESON_NUM_REG];
 };
 
@@ -318,12 +320,14 @@ struct meson_pinctrl_data {
 	unsigned int num_banks;
 };
 
-#define BANK_DS(n, f, l, per, peb, pr, pb, dr, db, or, ob, ir, ib,     \
+#define BANK_DS(n, f, l, fi, li, per, peb, pr, pb, dr, db, or, ob, ir, ib,     \
 		dsr, dsb)                                                      \
 	{								\
 		.name		= n,					\
 		.first		= f,					\
 		.last		= l,					\
+		.irq_first	= fi,					\
+		.irq_last	= li,					\
 		.regs = {						\
 			[MESON_REG_PULLEN]	= { per, peb },		\
 			[MESON_REG_PULL]	= { pr, pb },		\
@@ -334,10 +338,8 @@ struct meson_pinctrl_data {
 		},							\
 	 }
 
-
-// #define BANK(n, f, l, per, peb, pr, pb, dr, db, or, ob, ir, ib) \
-// 	BANK_DS(n, f, l, per, peb, pr, pb, dr, db, or, ob, ir, ib, 0, 0)
-
+#define BANK(n, f, l, fi, li, per, peb, pr, pb, dr, db, or, ob, ir, ib) \
+	BANK_DS(n, f, l, fi, li, per, peb, pr, pb, dr, db, or, ob, ir, ib, 0, 0)
 /*
 =======
 linux/drivers/pinctrl/meson/pinctrl-meson-g12a.c
@@ -346,26 +348,26 @@ linux/drivers/pinctrl/meson/pinctrl-meson-g12a.c
 
 static const struct meson_bank meson_g12a_periphs_banks[] = {
 	/* name  first  last  irq  pullen  pull  dir  out  in  ds */
-	BANK_DS("Z",  IRQID_GPIOZ_0,  IRQID_GPIOZ_15,
+	BANK_DS("Z",    GPIOZ_0,  GPIOZ_15,  IRQID_GPIOZ_0,  IRQID_GPIOZ_15,
 		4,  0,  4,  0,  12,  0, 13,  0,  14,  0,  5, 0),
-	BANK_DS("H",  IRQID_GPIOH_0,  IRQID_GPIOH_8,
+	BANK_DS("H",    GPIOH_0,  GPIOH_8,   IRQID_GPIOH_0,  IRQID_GPIOH_8,
 		3,  0,  3,  0,   9,  0, 10,  0,  11,  0,  4, 0),
-	BANK_DS("BOOT",  IRQID_BOOT_0,   IRQID_BOOT_15,
+	BANK_DS("BOOT", BOOT_0,   BOOT_15,   IRQID_BOOT_0,   IRQID_BOOT_15,
 		0,  0,  0,  0,   0,  0,  1,  0,   2,  0,  0, 0),
-	BANK_DS("C",  IRQID_GPIOC_0,  IRQID_GPIOC_7,
+	BANK_DS("C",    GPIOC_0,  GPIOC_7,   IRQID_GPIOC_0,  IRQID_GPIOC_7,
 		1,  0,  1,  0,   3,  0,  4,  0,   5,  0,  1, 0),
-	BANK_DS("A",  IRQID_GPIOA_0,  IRQID_GPIOA_15,
+	BANK_DS("A",    GPIOA_0,  GPIOA_15,  IRQID_GPIOA_0,  IRQID_GPIOA_15,
 		5,  0,  5,  0,  16,  0, 17,  0,  18,  0,  6, 0),
-	BANK_DS("X",  IRQID_GPIOX_0,  IRQID_GPIOX_19,
+	BANK_DS("X",    GPIOX_0,  GPIOX_19,  IRQID_GPIOX_0,  IRQID_GPIOX_19,
 		2,  0,  2,  0,   6,  0,  7,  0,   8,  0,  2, 0),
 };
 
 static const struct meson_bank meson_g12a_aobus_banks[] = {
 	/* name  first  last  irq  pullen  pull  dir  out  in  ds */
-	BANK_DS("AO",  IRQID_GPIOAO_0, IRQID_GPIOAO_11,
+	BANK_DS("AO",   GPIOAO_0, GPIOAO_11, IRQID_GPIOAO_0, IRQID_GPIOAO_11,
 		3,  0,  2,  0,   0,  0,  4,  0,   1,  0,  0, 0),
 	/* GPIOE actually located in the AO bank */
-	BANK_DS("E",  IRQID_GPIOE_0,  IRQID_GPIOE_2,
+	BANK_DS("E",    GPIOE_0,  GPIOE_2,   IRQID_GPIOE_0,  IRQID_GPIOE_2,
 		3, 16,  2, 16,   0, 16,  4, 16,   1, 16,  1, 0),
 };
 
