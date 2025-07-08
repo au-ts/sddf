@@ -1,16 +1,19 @@
 # Copyright 2025, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
-import os, sys
+import os
+import sys
 import argparse
-from typing import List
-from dataclasses import dataclass
 from sdfgen import SystemDescription, Sddf, DeviceTree
+import importlib
 from importlib.metadata import version
 
 sys.path.append(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../tools/meta")
 )
-from board import BOARDS
+
+# Use importlib to dynamically load. Using `from` import below other code is bad style.
+board_module = importlib.import_module("board")
+BOARDS = board_module.BOARDS
 
 assert version("sdfgen").split(".")[1] == "27", "Unexpected sdfgen version"
 
@@ -18,7 +21,7 @@ ProtectionDomain = SystemDescription.ProtectionDomain
 
 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
-    timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=254)
+    timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=253)
     client = ProtectionDomain("client", "client.elf", priority=1)
 
     timer_node = dtb.node(board.timer)
