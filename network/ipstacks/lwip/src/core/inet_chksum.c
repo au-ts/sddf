@@ -255,7 +255,7 @@ lwip_standard_chksum(const void *dataptr, int len)
 }
 #endif
 
-#if (LWIP_CHKSUM_ALGORITHM == 4) 
+#if (LWIP_CHKSUM_ALGORITHM == 4)
 /* This is a more optimised version of the routine above. Written by Lucy Parker */
 u16_t
 lwip_standard_chksum(const void *dataptr, int len)

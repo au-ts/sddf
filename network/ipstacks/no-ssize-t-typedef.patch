@@ -1,0 +1,30 @@
+From ede1937d5fe72c65ccece34434eb74e656301625 Sat Aug 13 10:52:16 2022 +1000
+From: Lucy <lucyparker544@gmail.com>
+Date: Wed, 9 Jul 2025 14:34:38 +1000
+Subject: [PATCH] remove the ssize_t typedef in lwip source as we redefine it in arch/cc.h
+
+    In file included from /sddf/network/ipstacks/lwip/src/include/lwip/debug.h:40,
+                    from /sddf/network/ipstacks/lwip/src/include/lwip/opt.h:52,
+                    from /sddf/network/ipstacks/lwip/src/core/def.c:61:
+    /sddf/network/ipstacks/lwip/src/include/lwip/arch.h:202:13: error: conflicting types for ‘ssize_t’; have ‘int’
+    202 | typedef int ssize_t;
+        |             ^~~~~~~
+    In file included from /sddf/network/ipstacks/lwip/src/include/lwip/arch.h:48:
+    /sddf/examples/echo_server/include/lwip/arch/cc.h:58:28: note: previous declaration of ‘ssize_t’ with type ‘ssize_t’ {aka ‘long long unsigned int’}
+    58 | typedef unsigned long long ssize_t;
+        |                            ^~~~~~~
+
+Signed-off-by: julia <git.ts@trainwit.ch>
+---
+diff --git b/lwip/src/include/lwip/arch.h a/lwip/src/include/lwip/arch.h
+index 58dae33a..83f214a3 100644
+--- b/lwip/src/include/lwip/arch.h
++++ a/lwip/src/include/lwip/arch.h
+@@ -199,7 +199,7 @@ typedef uintptr_t mem_ptr_t;
+ #include <unistd.h>
+ #endif
+ #else /* SSIZE_MAX */
+-typedef int ssize_t;
++//typedef int ssize_t;
+ #define SSIZE_MAX INT_MAX
+ #endif /* SSIZE_MAX */

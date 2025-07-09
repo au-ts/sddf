@@ -1566,9 +1566,7 @@
 /**
  * @}
  */
-#if !defined LWIP_PBUF_INIT_CUSTOM_DATA || defined __DOXYGEN__
-#define LWIP_PBUF_INIT_CUSTOM_DATA(p)
-#endif
+
 /*
    ------------------------------------------------
    ---------- Network Interfaces options ----------
