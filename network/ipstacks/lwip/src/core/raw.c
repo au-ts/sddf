@@ -458,7 +458,6 @@ raw_sendto_if_src(struct raw_pcb *pcb, struct pbuf *p, const ip_addr_t *dst_ip,
 
   /* packet too large to add an IP header without causing an overflow? */
   if ((u16_t)(p->tot_len + header_size) < p->tot_len) {
-    print("p->tot_len + header_size < p->tot_len\n");
     return ERR_MEM;
   }
   /* not enough space to add an IP header to first pbuf in given p chain? */
@@ -467,7 +466,6 @@ raw_sendto_if_src(struct raw_pcb *pcb, struct pbuf *p, const ip_addr_t *dst_ip,
     q = pbuf_alloc(PBUF_IP, 0, PBUF_RAM);
     /* new header pbuf could not be allocated? */
     if (q == NULL) {
-      print("raw_sendto: could not allocate header\n");
       LWIP_DEBUGF(RAW_DEBUG | LWIP_DBG_TRACE | LWIP_DBG_LEVEL_SERIOUS, ("raw_sendto: could not allocate header\n"));
       return ERR_MEM;
     }
@@ -481,7 +479,6 @@ raw_sendto_if_src(struct raw_pcb *pcb, struct pbuf *p, const ip_addr_t *dst_ip,
     /* first pbuf q equals given pbuf */
     q = p;
     if (pbuf_remove_header(q, header_size)) {
-      print("Can't restore header we just removed!");
       LWIP_ASSERT("Can't restore header we just removed!", 0);
       return ERR_MEM;
     }
