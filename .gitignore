@@ -18,3 +18,5 @@ zig-out/
 .zig-cache/
 venv/
 __pycache__
+.*.sw*
+
