@@ -10,6 +10,13 @@ on:
   pull_request:
   push:
     branches: [ "main" ]
+  schedule:
+    # 19.37 AEST on a Thursday weekly
+    # i.e. 07.37 UTC on Thursday weekly.
+    # This is a random time as GitHub suggests non-hour-aligned times as their
+    # runners are busier at that time, and it has been scheduled to avoid
+    # conflicts with humans trying to use the boards.
+    - cron: '37 7 * * 4'
 
 env:
   MICROKIT_VERSION: 2.0.1
@@ -132,12 +139,11 @@ jobs:
           path: ci_logs
           if-no-files-found: error
 
-
-# TODO: cronjob
   run_hardware:
     name: Run (hardware)
     runs-on: ubuntu-latest
-    if: ${{ contains(github.event.pull_request.labels.*.name, 'hardware-test') }}
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'hardware-test') ||
+            (github.event_name == 'schedule') }}
     needs: build_linux_x86_64_nix
     concurrency:
       group: ${{ github.workflow }}-sddf-hardware-tests-${{ github.event.number }}-${{ strategy.job-index }}
