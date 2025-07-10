@@ -1,12 +1,9 @@
-
 .{
     .name = .sddf_i2c_example,
     .version = "0.0.0",
 
     .dependencies = .{
-        .sddf = .{
-            .path = "../../"
-        },
+        .sddf = .{ .path = "../../" },
     },
     .paths = .{
         "build.zig",
@@ -14,4 +11,3 @@
     },
     .fingerprint = 0xfa284ea0a5eec458,
 }
-
