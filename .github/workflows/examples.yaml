@@ -69,11 +69,10 @@ jobs:
       - name: Build examples
         run: nix develop --ignore-environment -c bash -c 'CI=1 ./ci/build.py $MICROKIT_SDK $(nproc)'
       - name: Archive image artifacts
-        uses: actions/upload-artifact@v4
+        uses: au-ts/systems_ci_artifacts/save-artifacts@main
         with:
-          name: loader-images
-          path: ci_build/**/loader.img
-          if-no-files-found: error
+          artifact_name: loader-images
+          artifacts_path: ci_build/**/loader.img
 
   build_macos_arm64:
     name: Build (macOS ARM64)
@@ -133,11 +132,10 @@ jobs:
           exec ./ci/run.py --only-qemu
       - name: Archive logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: au-ts/systems_ci_artifacts/save-artifacts@main
         with:
-          name: ci-logs-qemu
-          path: ci_logs
-          if-no-files-found: error
+          artifact_name: ci-logs-qemu
+          artifacts_path: ci_logs
 
   run_hardware:
     name: Run (hardware)
@@ -173,8 +171,7 @@ jobs:
           exec ./ci/run.py --no-only-qemu
       - name: Archive logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: au-ts/systems_ci_artifacts/save-artifacts@main
         with:
-          name: ci-logs-hardware
-          path: ci_logs
-          if-no-files-found: error
+          artifact_name: ci-logs-hardware
+          artifacts_path: ci_logs
