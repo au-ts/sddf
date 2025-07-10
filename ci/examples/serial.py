@@ -18,14 +18,15 @@ TEST_MATRIX = matrix_product(
     build_system=matrix.EXAMPLES["serial"]["build_systems"],
 )
 
-ANSI_RED   = b"\x1b[31m"
+ANSI_RED = b"\x1b[31m"
 ANSI_GREEN = b"\x1b[32m"
 ANSI_RESET = b"\x1b[0m"
+
 
 def colour_number(num: bytes, colour: bytes) -> bytes:
     out = b""
     for c in num:
-        out += (colour + bytes([c]) + ANSI_RESET)
+        out += colour + bytes([c]) + ANSI_RESET
     return out
 
 
@@ -40,7 +41,9 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
 
         await send_input(backend, b"1234567890")
         await expect_output(backend, colour_number(b"1234567890", ANSI_RED))
-        await wait_for_output(backend, b"client0 has received 10 characters so far!\r\n")
+        await wait_for_output(
+            backend, b"client0 has received 10 characters so far!\r\n"
+        )
         await wait_for_output(backend, ANSI_RESET)
 
         # Switch to client 1.
@@ -51,7 +54,9 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
 
         await send_input(backend, b"1234567890")
         await expect_output(backend, colour_number(b"1234567890", ANSI_GREEN))
-        await wait_for_output(backend, b"client1 has received 10 characters so far!\r\n")
+        await wait_for_output(
+            backend, b"client1 has received 10 characters so far!\r\n"
+        )
 
 
 if __name__ == "__main__":

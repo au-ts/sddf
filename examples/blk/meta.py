@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from sdfgen import SystemDescription, Sddf, DeviceTree
 from importlib.metadata import version
 
-assert version('sdfgen').split(".")[1] == "24", "Unexpected sdfgen version"
+assert version("sdfgen").split(".")[1] == "24", "Unexpected sdfgen version"
 
 ProtectionDomain = SystemDescription.ProtectionDomain
 
@@ -48,7 +48,7 @@ BOARDS: List[Board] = [
     Board(
         name="qemu_virt_riscv64",
         arch=SystemDescription.Arch.RISCV64,
-        paddr_top=0xa_0000_000,
+        paddr_top=0xA_0000_000,
         partition=0,
         blk="soc/virtio_mmio@10008000",
         serial="soc/serial@10000000",
@@ -60,16 +60,23 @@ BOARDS: List[Board] = [
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     serial_driver = ProtectionDomain("serial_driver", "serial_driver.elf", priority=200)
     # Increase the stack size as running with UBSAN uses more stack space than normal.
-    serial_virt_tx = ProtectionDomain("serial_virt_tx", "serial_virt_tx.elf",
-                                      priority=199, stack_size=0x2000)
+    serial_virt_tx = ProtectionDomain(
+        "serial_virt_tx", "serial_virt_tx.elf", priority=199, stack_size=0x2000
+    )
 
     serial_node = dtb.node(board.serial)
     assert serial_node is not None
 
-    serial_system = Sddf.Serial(sdf, serial_node, serial_driver, serial_virt_tx, enable_color=False)
+    serial_system = Sddf.Serial(
+        sdf, serial_node, serial_driver, serial_virt_tx, enable_color=False
+    )
 
-    blk_driver = ProtectionDomain("blk_driver", "blk_driver.elf", priority=200, stack_size=0x2000)
-    blk_virt = ProtectionDomain("blk_virt", "blk_virt.elf", priority=199, stack_size=0x2000)
+    blk_driver = ProtectionDomain(
+        "blk_driver", "blk_driver.elf", priority=200, stack_size=0x2000
+    )
+    blk_virt = ProtectionDomain(
+        "blk_virt", "blk_virt.elf", priority=199, stack_size=0x2000
+    )
     client = ProtectionDomain("client", "client.elf", priority=1)
 
     blk_node = dtb.node(board.blk)
@@ -78,7 +85,9 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
         timer_node = dtb.node(board.timer)
         assert timer_node is not None
 
-        timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=201)
+        timer_driver = ProtectionDomain(
+            "timer_driver", "timer_driver.elf", priority=201
+        )
         timer_system = sddf.Timer(sdf, timer_node, timer_driver)
         timer_system.add_client(blk_driver)
 
@@ -88,13 +97,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
     serial_system.add_client(client)
 
-    pds = [
-        serial_driver,
-        serial_virt_tx,
-        blk_driver,
-        blk_virt,
-        client
-    ]
+    pds = [serial_driver, serial_virt_tx, blk_driver, blk_virt, client]
     if board.timer:
         pds += [timer_driver]
     for pd in pds:
@@ -112,7 +115,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
         f.write(sdf.render())
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--dtb", required=True)
     parser.add_argument("--sddf", required=True)

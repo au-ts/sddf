@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from sdfgen import SystemDescription, Sddf, DeviceTree
 from importlib.metadata import version
 
-assert version('sdfgen').split(".")[1] == "24", "Unexpected sdfgen version"
+assert version("sdfgen").split(".")[1] == "24", "Unexpected sdfgen version"
 
 ProtectionDomain = SystemDescription.ProtectionDomain
 MemoryRegion = SystemDescription.MemoryRegion
@@ -39,8 +39,9 @@ BOARDS: List[Board] = [
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     serial_driver = ProtectionDomain("serial_driver", "serial_driver.elf", priority=200)
     # Increase the stack size as running with UBSAN uses more stack space than normal.
-    serial_virt_tx = ProtectionDomain("serial_virt_tx", "serial_virt_tx.elf",
-                                      priority=199, stack_size=0x2000)
+    serial_virt_tx = ProtectionDomain(
+        "serial_virt_tx", "serial_virt_tx.elf", priority=199, stack_size=0x2000
+    )
 
     timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=4)
     i2c_driver = ProtectionDomain("i2c_driver", "i2c_driver.elf", priority=3)
@@ -50,8 +51,8 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
     # Right now we do not have separate clk and GPIO drivers and so our I2C driver does manual
     # clk/GPIO setup for I2C.
-    clk_mr = MemoryRegion("clk", 0x1000, paddr=0xff63c000)
-    gpio_mr = MemoryRegion("gpio", 0x1000, paddr=0xff634000)
+    clk_mr = MemoryRegion("clk", 0x1000, paddr=0xFF63C000)
+    gpio_mr = MemoryRegion("gpio", 0x1000, paddr=0xFF634000)
     sdf.add_mr(clk_mr)
     sdf.add_mr(gpio_mr)
 
@@ -73,7 +74,9 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     timer_system.add_client(client_pn532)
     timer_system.add_client(client_ds3231)
 
-    serial_system = Sddf.Serial(sdf, serial_node, serial_driver, serial_virt_tx, enable_color=False)
+    serial_system = Sddf.Serial(
+        sdf, serial_node, serial_driver, serial_virt_tx, enable_color=False
+    )
     serial_system.add_client(client_pn532)
     serial_system.add_client(client_ds3231)
 
@@ -100,7 +103,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
         f.write(sdf.render())
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--dtb", required=True)
     parser.add_argument("--sddf", required=True)

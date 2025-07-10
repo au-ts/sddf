@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from sdfgen import SystemDescription, Sddf, DeviceTree
 from importlib.metadata import version
 
-assert version('sdfgen').split(".")[1] == "24", "Unexpected sdfgen version"
+assert version("sdfgen").split(".")[1] == "24", "Unexpected sdfgen version"
 
 ProtectionDomain = SystemDescription.ProtectionDomain
 
@@ -24,67 +24,67 @@ BOARDS: List[Board] = [
         name="qemu_virt_aarch64",
         arch=SystemDescription.Arch.AARCH64,
         paddr_top=0x6_0000_000,
-        serial="pl011@9000000"
+        serial="pl011@9000000",
     ),
     Board(
         name="qemu_virt_riscv64",
         arch=SystemDescription.Arch.RISCV64,
-        paddr_top=0xa0000000,
-        serial="soc/serial@10000000"
+        paddr_top=0xA0000000,
+        serial="soc/serial@10000000",
     ),
     Board(
         name="odroidc2",
         arch=SystemDescription.Arch.AARCH64,
         paddr_top=0x80000000,
-        serial="soc/bus@c8100000/serial@4c0"
+        serial="soc/bus@c8100000/serial@4c0",
     ),
     Board(
         name="odroidc4",
         arch=SystemDescription.Arch.AARCH64,
         paddr_top=0x80000000,
-        serial="soc/bus@ff800000/serial@3000"
+        serial="soc/bus@ff800000/serial@3000",
     ),
     Board(
         name="maaxboard",
         arch=SystemDescription.Arch.AARCH64,
-        paddr_top=0xa_000_000,
-        serial="soc@0/bus@30800000/serial@30860000"
+        paddr_top=0xA_000_000,
+        serial="soc@0/bus@30800000/serial@30860000",
     ),
     Board(
         name="imx8mm_evk",
         arch=SystemDescription.Arch.AARCH64,
-        paddr_top=0xa_000_000,
-        serial="soc@0/bus@30800000/spba-bus@30800000/serial@30890000"
+        paddr_top=0xA_000_000,
+        serial="soc@0/bus@30800000/spba-bus@30800000/serial@30890000",
     ),
     Board(
         name="imx8mp_evk",
         arch=SystemDescription.Arch.AARCH64,
-        paddr_top=0xa_000_000,
-        serial="soc@0/bus@30800000/spba-bus@30800000/serial@30890000"
+        paddr_top=0xA_000_000,
+        serial="soc@0/bus@30800000/spba-bus@30800000/serial@30890000",
     ),
     Board(
         name="imx8mq_evk",
         arch=SystemDescription.Arch.AARCH64,
-        paddr_top=0xa_000_000,
+        paddr_top=0xA_000_000,
         serial="soc@0/bus@30800000/serial@30860000",
     ),
     Board(
         name="zcu102",
         arch=SystemDescription.Arch.AARCH64,
-        paddr_top=0xf_000_0000,
-        serial="axi/serial@ff000000"
+        paddr_top=0xF_000_0000,
+        serial="axi/serial@ff000000",
     ),
     Board(
         name="star64",
         arch=SystemDescription.Arch.RISCV64,
         paddr_top=0x100000000,
-        serial="soc/serial@10000000"
+        serial="soc/serial@10000000",
     ),
     Board(
         name="cheshire",
         arch=SystemDescription.Arch.RISCV64,
         paddr_top=0x90000000,
-        serial="soc/serial@3002000"
+        serial="soc/serial@3002000",
     ),
 ]
 
@@ -92,18 +92,21 @@ BOARDS: List[Board] = [
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     serial_driver = ProtectionDomain("serial_driver", "serial_driver.elf", priority=200)
     # Increase the stack size as running with UBSAN uses more stack space than normal.
-    serial_virt_tx = ProtectionDomain("serial_virt_tx", "serial_virt_tx.elf",
-                                      priority=199, stack_size=0x2000)
-    serial_virt_rx = ProtectionDomain("serial_virt_rx", "serial_virt_rx.elf",
-                                      priority=199, stack_size=0x2000)
+    serial_virt_tx = ProtectionDomain(
+        "serial_virt_tx", "serial_virt_tx.elf", priority=199, stack_size=0x2000
+    )
+    serial_virt_rx = ProtectionDomain(
+        "serial_virt_rx", "serial_virt_rx.elf", priority=199, stack_size=0x2000
+    )
     client0 = ProtectionDomain("client0", "client0.elf", priority=1)
     client1 = ProtectionDomain("client1", "client1.elf", priority=1)
 
     serial_node = dtb.node(board.serial)
     assert serial_node is not None
 
-    serial_system = Sddf.Serial(sdf, serial_node, serial_driver,
-                                serial_virt_tx, virt_rx=serial_virt_rx)
+    serial_system = Sddf.Serial(
+        sdf, serial_node, serial_driver, serial_virt_tx, virt_rx=serial_virt_rx
+    )
     serial_system.add_client(client0)
     serial_system.add_client(client1)
 
@@ -124,7 +127,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
         f.write(sdf.render())
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--dtb", required=True)
     parser.add_argument("--sddf", required=True)

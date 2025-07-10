@@ -60,7 +60,7 @@ class _TeeOut:
 
 
 OUTPUT = _TeeOut(sys.stdout.buffer)
-sys.stdout = io.TextIOWrapper(OUTPUT, write_through=True) # type: ignore
+sys.stdout = io.TextIOWrapper(OUTPUT, write_through=True)  # type: ignore
 
 
 @contextmanager

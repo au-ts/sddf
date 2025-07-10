@@ -58,7 +58,7 @@ def build_zig(args: argparse.Namespace, example_name: str, test_config: TestConf
                 f"-Dconfig={test_config.config}",
                 "-p",
                 build_dir,
-                f"-j{args.num_jobs}"
+                f"-j{args.num_jobs}",
             ],
             check=True,
             env=zig_env,
@@ -96,7 +96,11 @@ if __name__ == "__main__":
         default=set(matrix.EXAMPLES.keys()),
         action=ArgparseActionList,
     )
-    parser.add_argument("--no-clean", action="store_true", help="Do not remove any pre-existing CI build directory before building")
+    parser.add_argument(
+        "--no-clean",
+        action="store_true",
+        help="Do not remove any pre-existing CI build directory before building",
+    )
 
     args = parser.parse_args()
 
