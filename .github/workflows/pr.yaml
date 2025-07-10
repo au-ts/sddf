@@ -54,3 +54,14 @@ jobs:
         run: zig version
       - name: Check formatting
         run: zig fmt . --check
+
+  style_python:
+    name: Style (Python)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - uses: psf/black@stable
+        with:
+          # black guarantees formatting stability within a calendar year version
+          version: "~= 25.0"
