@@ -1,0 +1,206 @@
+% unsw.sty
+%
+% Document style for UNSW reports. Works with both the article and report class.
+%
+% Written 2017-03-07 by Gernot Heiser <gernot@unsw.edu.au>
+
+% OPTIONS:
+%   noTrueType:	no effect - for backwards compatibility only
+%   noSommet:		no effect - for backwards compatibility only
+%   makeTitle:		generate the title header even if there is no \maketitle command
+%                              (useful for pandoc-generated LaTeX)
+%                              WARNING: This requires explicit setting
+%                                               of \date, and \today won't work!
+%   copyright:		add a copyright notice (default: CC-BY-4.0)
+%
+% COMMANDS:
+%   \Unit		        Optional Faculty/Unit
+%   \SubUnit		Optional Unit/Centre
+%   \title			(Short) title of the document
+%   \SubTitle		Header has space only for very short title, this goes below
+%   \Email	        autor email
+%   \CopyRightText	text following the Copyright assertion, default is CC~BY~4.0.
+%				Common alternatives are {} or {All rights reserved.}
+%   \copyYear		Year of copyright (default: this year)
+%   \AuthorSep         Use to separate authors instead of the default  ", ", " and "
+%   \AffilSep             Use to separate affiliations, instead of  putting them on separate lines
+
+
+% Note to self (Gernot): unsw.sty needs fixing.
+% - if there's a \clearpage on the first page it presently has the
+%    copyright note just below the last text instead of the bottom of
+%    the page
+
+\ProvidesPackage{unsw}[2024-01-09 UNSW simple A4 document style]
+
+\RequirePackage{ifluatex}
+\RequirePackage{graphicx}
+\RequirePackage{tabularx}
+\RequirePackage{enumitem}
+\RequirePackage{times,courier}       % to ensure no Type 0 (CM) fonts, even with Arial
+\RequirePackage[T1]{fontenc} 	% for a reasonably looking fixed-width font
+\RequirePackage[scaled=0.82]{beramono}
+\RequirePackage[pagebackref,hyperindex,bookmarks]{hyperref}
+
+\RequirePackage{url}
+\RequirePackage{color}
+\RequirePackage{fancyhdr}
+%\RequirePackage[pages=some,placement=top]{background}
+\RequirePackage[left=18mm,right=18mm,top=26mm,bottom=18mm]{geometry}
+\RequirePackage{parskip}
+\RequirePackage{xpatch}
+
+\RequirePackage{authblk}        % for separating affiliations from authors
+\newcommand{\AuthorSep}[1]{
+  \renewcommand\Authsep{#1}
+  \renewcommand{\Authand}{#1}
+  \renewcommand{\Authands}{#1}}
+\newcommand{\AffilSep}[1]{
+  \renewcommand\AB@affilsepx{#1}}
+\renewcommand\Affilfont{\large}
+
+\renewcommand\headrulewidth{0pt} % remove header rule
+\renewcommand\footrulewidth{0pt} % remove footer rule
+\newcommand\t@itleskip{5ex}
+\def\@email{}
+
+\newif\ifm@aketitle\m@aketitlefalse
+\newif\ifc@pyright\c@pyrightfalse
+
+\DeclareOption{noTrueType}{\TrueTypefalse}
+\DeclareOption{noSommet}{\Sommetfalse}
+\DeclareOption{copyright}{\c@pyrighttrue}
+\DeclareOption{makeTitle}{\m@aketitletrue}
+
+\newif\ifTrueType	\TrueTypefalse
+\newif\ifSommet	\Sommetfalse
+
+\ProcessOptions
+
+\ifTrueType\else
+  \Sommetfalse
+\fi
+
+\newif\if@openright             % expected by some internal commands
+
+\ifTrueType
+  \ifluatex
+    \usepackage{fontspec}
+    \newcommand{\Arial}{\setmainfont{Arial}}
+    \ifSommet
+      \newcommand{\Sommet}{\setmainfont{Sommet}}
+    \else
+      \newcommand{\Sommet}{\relax}
+    \fi
+    \Arial
+    \typeout{Using Arial \ifSommet and Sommet \fi fonts}
+  \else
+    \PackageError{unsw}{TrueType fonts need LuaTeX}{
+      This package uses Arial and Sommet fonts, which are not supported in pdfTeX.
+      Please compile your document with the ``lualatex'' command,
+      by uncommenting in the Makefile ``LaTeX = ... lualatex  ...''
+      or specify the ``noTrueType package option.
+    }
+  \fi
+\else
+  \renewcommand{\familydefault}{\sfdefault}
+  \newcommand{\Arial}{\relax}
+  \newcommand{\Sommet}{\relax}
+  \typeout{Using Helvetica fonts}
+\fi
+\urlstyle{rm}
+
+\renewcommand{\title}[1]{\def\@title{#1}}
+\newcommand{\Unit}[1]{\def\u@unit{#1}}
+\newcommand{\SubUnit}[1]{\def\u@sunit{#1}}
+\newcommand{\SubTitle}[1]{\def\u@stitle{#1}}
+\def\u@unit{~}
+\newcommand{\Email}[1]{\def\@email{#1}}
+
+\newcommand{\LogoFileName}{UNSW-header.png}
+\newcommand{\c@opyrighttext}{Licensed under the Creative Commons Attribution-ShareAlike
+  4.0 International (CC~BY-SA~4.0) License.}
+%\providecommand{\href}[2]{#2}   % in case the user hasn't loaded hyperref
+
+\newcommand{\Logo}{\includegraphics{\LogoFileName}}
+\newcommand{\CopyRightText}[1]{\renewcommand{\c@opyrighttext}{#1}}
+\newcommand{\copyYear}[1]{\def\@copyyear{#1}}
+\copyYear{\the\year}
+
+%% General formatting
+\pagestyle{fancyplain}
+\lhead{}
+\chead{}
+\rhead{}
+\lfoot{}
+\cfoot{}
+\rfoot{\scriptsize\thepage}
+
+%%% Produces copyright notice as a pseudo footnote without a footnote mark
+% Use it right at the top, or just after \maketitle. The optional argument is the year of the
+% copyright, it defaults to the current year.
+\newif\ifc@pyrightdone\c@pyrightdonefalse
+\newcommand{\doCopyright}{%
+  \ifc@pyrightdone\else%
+  \let\s@makefnmark=\@makefnmark%
+  \let\@makefnmark\relax%
+  \footnote{%
+    \hspace*{-1.8em}%    Magic number from article.cls/report.cls
+    Copyright \copyright~\@copyyear\ The University of New South Wales.%
+    \ifx\@empty\c@opyrighttext\else\\\c@opyrighttext\fi%
+}
+  \let\@makefnmark=\s@makefnmark%
+  \c@pyrightdonetrue%
+  \addtocounter{footnote}{-1}
+}
+%\iffalse
+\def\maketitle{
+  % to suppress overfull bars in ``draft'' mode:
+  \newlength{\saveOverfullRule}
+  \setlength{\saveOverfullRule}{\overfullrule}
+  \setlength\overfullrule{0pt}
+
+  \Sommet
+  \noindent%
+  \raisebox{-7mm}[25mm][15mm]{%
+    \makebox[57mm][r]{%
+      \Logo%
+    }%
+  }%
+  \hspace*{8.5mm}%
+  \raisebox{0pt}[0pt][0pt]{%
+    \makebox[100mm][l]{%
+      \begin{minipage}[b]{120mm}  \raggedright
+        \fontsize{15.5pt}{16}\selectfont\u@unit%
+        \ifx\undefined\u@sunit\else\\[0.5ex]\u@sunit\fi\\[6mm]
+        \fontsize{29.5pt}{33}\selectfont\@title
+      \end{minipage}%
+    }
+  }
+  % reset overfull rule
+  \setlength{\overfullrule}{\saveOverfullRule}%
+  \begin{center}
+    \ifx\undefined\u@stitle\else{\LARGE\u@stitle\\[0.5ex]}\fi
+    \ifx\@empty\@author\else{\Large\@author\\[0.5ex]}\fi
+    \ifx\@empty\@email\else{\large\@email\\[0.5ex]}\fi
+    \ifx\@empty\@date\else{\large\@date\\}\fi
+    \vspace*{\t@itleskip}%
+  \end{center}
+  \Arial
+}%\maketitle
+%\fi
+
+\AtBeginDocument{%
+  \raggedright%
+  \Arial%
+  %\title{~}%
+  \ifm@aketitle%
+     \maketitle%
+     \let\maketitle\relax%
+     \m@aketitlefalse%
+     \fi%
+   \ifc@pyright%
+     \doCopyright%
+   \fi%
+   \thispagestyle{empty}
+}

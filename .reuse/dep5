@@ -6,6 +6,7 @@ Files:
     flake.lock
     CHANGES.md
     build.zig.zon
+    docs/design/*
     examples/i2c/build.zig.zon
     examples/serial/build.zig.zon
     examples/timer/build.zig.zon

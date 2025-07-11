@@ -1,0 +1,18 @@
+load-req,load-ach,CPU,cycles/pkt,RTT mean,,
+10,10.00,0.02,25135.41,489
+20,20.00,0.04,24870.59,481
+50,50.00,0.10,23682.64,497
+100,100.00,0.18,21348.39,446
+200,200.00,0.29,16800.41,449
+300,300.00,0.39,15154.09,479
+400,400.00,0.43,12682.54,508
+500,500.01,0.49,11575.11,555
+600,600.00,0.52,10317.90,622
+700,700.00,0.56,9470.74,783
+800,800.02,0.60,8981.82,885
+900,899.99,0.66,8721.18,1020
+957,957.13,0.69,8589.12,1561
+#,Source: https://docs.google.com/spreadsheets/d/1d1hKhZVVbEvxm7ehs7sXc1KvGjfdJ0RHR4YiMPzR8O8/edit#gid=1350012342,,,,,
+#,Measured by Courtney using ipbench 2024-03-22,,,,,
+#,5-PD sDDF system: Driver plus client with lwip, dummy copier,,,,
+#,Commit,95492dcc32abf8f8b4fc34297ba5c26fb181d891 (with modified copy and memory regions)

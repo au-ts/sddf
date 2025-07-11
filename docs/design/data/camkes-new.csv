@@ -1,0 +1,14 @@
+#load-req,load-ach,CPU,cycles,RTT mean
+100,100,0.2668,1.38E+11,178
+200,200,0.5165,8.15E+10,160
+300,300,0.7865,6.27E+10,164
+400,400,0.9556,5.31E+10,175
+500,500,0.9789,4.76E+10,195
+600,600,0.9772,4.38E+10,210
+700,626,0.8618,4.30E+10,252
+800,283,0.3580,6.49E+10,317
+900,69,0.1509,1.96E+11,254
+957,67,0.1616,2.01E+11,540
+#,Source: https://docs.google.com/spreadsheets/d/1neMwJeKgMkRQvPDG8GXoqAUji8KJyAp9RC0tyuH-wEo/edit#gid=1386339745
+#,Measured by Lucy,late 2021
+#,Original CAmkES,rpio(dr)=prio(st)
