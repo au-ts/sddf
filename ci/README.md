@@ -15,6 +15,13 @@ On each commit and pull request, the build and simulation tests are checked.
 The hardware tests do not happen unless an explicit 'hardware test' label is added
 to a pull request. This is done to not overwhelm our supply of hardware.
 
+### Accessing Log Artifacts
+
+As GitHub's log viewer performs terribly when the log files are large enough, we
+publish archived copies on the [trustworthy.systems website](https://trustworthy.systems/github/ci-artifacts/).
+Both the raw log files, built images, and pre-rendered HTML logs are available.
+The archive is updated on an hourly basis.
+
 ### Builds
 
 You can reproduce what the CI builds with:
@@ -26,7 +33,7 @@ You can reproduce what the CI builds with:
 You will need to provide the path to your Microkit SDK.
 
 There are various options to speed up development, such as only compiling a particular
-example or for a particular baord.
+example or for a particular board.
 
 For example, if you were working on the timer example system, you might want to instead
 run:
