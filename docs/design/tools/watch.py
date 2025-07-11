@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# fmt: off
 
 '''
 Watch a given path and re-run a command when you see changes. This script is
