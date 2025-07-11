@@ -27,7 +27,7 @@ Host ts
   Hostname login.trustworthy.systems
   User ts_ci
 
-Host tftp.keg.cse.unsw.edu.au
+Host *.keg.cse.unsw.edu.au
   User ts_ci
   ProxyJump ts
 
