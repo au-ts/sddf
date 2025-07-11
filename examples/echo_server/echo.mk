@@ -62,8 +62,13 @@ else ifeq ($(strip $(MICROKIT_BOARD)), odroidc2)
 	SERIAL_DRIV_DIR := meson
 	TIMER_DRV_DIR := meson
 	CPU := cortex-a53
-else ifneq ($(filter $(strip $(MICROKIT_BOARD)),imx8mm_evk imx8mp_evk imx8mq_evk maaxboard),)
+else ifneq ($(filter $(strip $(MICROKIT_BOARD)),imx8mm_evk imx8mq_evk maaxboard),)
 	DRIV_DIR := imx
+	SERIAL_DRIV_DIR := imx
+	TIMER_DRV_DIR := imx
+	CPU := cortex-a53
+else ifeq ($(strip $(MICROKIT_BOARD)), imx8mp_evk)
+	DRIV_DIR := dwmac-5.10a
 	SERIAL_DRIV_DIR := imx
 	TIMER_DRV_DIR := imx
 	CPU := cortex-a53
