@@ -70,12 +70,12 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
 
     benchmark_run = await asyncio.create_subprocess_exec(
         # fmt: off
-        "/home/julia/code/ts/ipbench_queue/iq.sh", "run",
+        "iq.sh", "run",
         "-c", "vb04",
         "-c", "vb05",
         "-c", "vb06",
         "-c", "vb07",
-        "-f", "/home/julia/code/ts/sddf_benchmarking/benchmark.py",
+        "-f", Path(__file__).parent / "benchmark.py",
         "--",
         ip0,
         "--throughputs", "10000000",
