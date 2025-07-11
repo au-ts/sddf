@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# fmt: off
 
 import fileinput
 import sys
