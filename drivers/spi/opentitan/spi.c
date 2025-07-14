@@ -118,84 +118,38 @@ int poll_rx(void) {
     return -1;
 }
 
-void transmit_data(void *buffer, uint16_t len) {
-    volatile uint8_t *TX_BYTE = (uint8_t *) &regs->TXDATA;
-
-    // Transmit leading bytes to word align buffer
-    uint8_t *leading_bytes = buffer;
-    uint16_t bytes_until_aligned = ALIGN(buffer, sizeof(uint32_t)) - buffer;
-    uint16_t num_leading_bytes = MIN(len, bytes_until_aligned); 
-
-    for (uint16_t i = 0; i < num_leading_bytes; i++) {
-        *TX_BYTE = leading_bytes[i];
-    }
-
-    bool done = num_leading_bytes != bytes_until_aligned;
-    if (done) {
-        return;
-    }
-
-    // Transmit as many words as possible
-    uint32_t *words = buffer + num_leading_bytes;
-    uint16_t num_words = (len - num_leading_bytes) / sizeof(uint32_t);
+void transmit_data(const void *buffer, uint16_t len) {
+    const uint32_t *words = buffer;
+    const uint16_t num_words = len / sizeof(uint32_t);
 
     for (uint16_t i = 0; i < num_words; i++) {
         regs->TXDATA = words[i];
     }
 
     // Transmit trailing bytes
-    uint8_t *trailing_bytes = buffer + num_leading_bytes + num_words * sizeof(uint32_t);
-    uint16_t num_trailing_bytes = (len - num_leading_bytes) % sizeof(uint32_t);
+    const uint8_t *trailing_bytes = buffer + num_words * sizeof(uint32_t);
+    const uint16_t num_trailing_bytes = len % sizeof(uint32_t);
 
     for (uint16_t i = 0; i < num_trailing_bytes; i++) {
-        *TX_BYTE = trailing_bytes[i];
+        *((volatile uint8_t*) &regs->TXDATA) = trailing_bytes[i];
     }
 }
 
-int recieve_data(void *buffer, uint16_t len) {
-    // Recieve leading bytes to word align buffer
-    uint8_t *leading_bytes = buffer;
-    const uint16_t bytes_until_aligned = ALIGN(buffer, sizeof(uint32_t)) - buffer;
-    const uint16_t num_leading_bytes = MIN(len, bytes_until_aligned); 
-
-    // Treat rx_data as queue
-    uint64_t rx_data = 0;
-    uint8_t *rx_byte = (uint8_t *) &rx_data;
-
-    if (num_leading_bytes > 0) {
-        if (poll_rx()) {
-            return -1;
-        }
-        rx_data = regs->RXDATA;
-
-        for (uint16_t i = 0; i < num_leading_bytes; i++) {
-            leading_bytes[i] = rx_byte[i];
-        } 
-        rx_data >>= num_leading_bytes * 8;
-
-        bool done = num_leading_bytes != bytes_until_aligned;
-        if (done) {
-            return 0;
-        }
-    }
-
-    // Transmit as many words as possible
-    uint32_t *words = buffer + num_leading_bytes;
-    const uint16_t num_words = (len - num_leading_bytes) / sizeof(uint32_t);
+int receive_data(void *buffer, uint16_t len) {
+    uint32_t *words = buffer;
+    const uint16_t num_words = len / sizeof(uint32_t);
 
     for (uint16_t i = 0; i < num_words; i++) {
         if (poll_rx()) {
             return -1;
         }
 
-        rx_data |= regs->RXDATA << (sizeof(uint32_t) - num_leading_bytes) * 8; 
-        words[i] = rx_data;
-        rx_data >>= sizeof(uint32_t) * 8;
+        words[i] = regs->RXDATA;
     }
 
-    // Transmit trailing bytes
-    uint8_t *trailing_bytes = buffer + num_leading_bytes + num_words * sizeof(uint32_t);
-    const uint16_t num_trailing_bytes = (len - num_leading_bytes) % sizeof(uint32_t);
+    // Retrieve trailing bytes
+    uint8_t *trailing_bytes = buffer + num_words * sizeof(uint32_t);
+    const uint16_t num_trailing_bytes = len % sizeof(uint32_t);
 
     if (num_trailing_bytes == 0) {
         return 0;
@@ -204,9 +158,11 @@ int recieve_data(void *buffer, uint16_t len) {
     if (poll_rx()) {
         return -1;
     }
-    rx_data |= regs->RXDATA << (sizeof(uint32_t) - num_leading_bytes) * 8;
+    
+    uint32_t remaining_data = regs->RXDATA;
+
     for (uint16_t i = 0; i < num_trailing_bytes; i++) {
-        trailing_bytes[i] = rx_byte[i];
+        trailing_bytes[i] = ((uint8_t*) &remaining_data)[i];
     }
     
     return 0;
@@ -393,7 +349,7 @@ void state_cmd(void) {
     if (!(driver_data.cmd_in_progress == driver_data.num_cmds - 1 && final_command)) {
         spi_host_command |= COMMAND_CSAAT;
     }
-    sddf_printf("cmd=%x\n", spi_host_command);
+    LOG_DRIVER("cmd=%x\n", spi_host_command);
     
     /* TODO: perhaps move everything beyond into SEL_CMD? */
 
@@ -412,7 +368,7 @@ void state_cmd(void) {
 
     switch (cmd->mode) {
     case SPI_READ:
-        if (recieve_data(read_buffer, hw_cmd_len)) {
+        if (receive_data(read_buffer, hw_cmd_len)) {
             driver_data.err = SPI_ERR_OTHER; //TODO: replace
             fsm_state.nxt_state = RESP;
             return;
@@ -434,7 +390,7 @@ void state_cmd(void) {
 
         bool first = driver_data.tx_remaining == hw_cmd_len;
         if (!first) {
-            if (recieve_data(read_buffer, hw_cmd_len)) {
+            if (receive_data(read_buffer, hw_cmd_len)) {
                 driver_data.err = SPI_ERR_OTHER; //TODO: replace
                 fsm_state.nxt_state = RESP;
                 return;
@@ -539,7 +495,7 @@ void init(void) {
         config.virt.resp_queue.vaddr
     );
 
-    microkit_dbg_puts("Driver initialised.\n");
+    LOG_DRIVER("Driver initialised.\n");
 }
 
 void fsm(void) {
@@ -662,7 +618,7 @@ void notified(microkit_channel ch) {
     else {}
 };
 
-seL4_MessageInfo_t protected(microkit_channel ch, seL4_MessageInfo_t msginfo) {
+microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo) {
     size_t label = microkit_msginfo_get_label(msginfo);
     if (label != SPI_BUS_CONFIG) {
         LOG_DRIVER_ERR("unknown label 0x%zx given by virt\n", label);

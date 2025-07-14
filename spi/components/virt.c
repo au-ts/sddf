@@ -153,7 +153,7 @@ void notified(microkit_channel ch)
     }
 }
 
-seL4_MessageInfo_t protected(microkit_channel ch, seL4_MessageInfo_t msginfo)
+microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
 {
     size_t label = microkit_msginfo_get_label(msginfo);
     size_t bus = microkit_mr_get(SPI_BUS_SLOT);

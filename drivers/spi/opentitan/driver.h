@@ -26,8 +26,8 @@ typedef struct fsm_state {
 } fsm_state_t;
 
 static void spi_reset_state(spi_driver_data_t *s) {
-    s->cmd = NULL;
     s->cs_line = -1;
+    s->cmd = NULL;
     s->num_cmds = -1;
     s->slice_base = NULL;
     s->cmd_in_progress = -1;
