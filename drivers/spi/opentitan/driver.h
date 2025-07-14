@@ -9,7 +9,8 @@ typedef struct spi_driver_data {
     void *slice_base;
     // Request in-progress state
     uint8_t cmd_in_progress;
-    // Command in-progress state (effectively offsets into the slice region)
+    // Command in-progress state (effectively offsets into the slice region when combined with the 
+    // length of the command)
     uint16_t tx_remaining;
     uint16_t rx_remaining;
     // Error
@@ -86,7 +87,8 @@ char *fsm_str(spi_state_t state) {
 #define COMMAND_DIRECTION_BIDIRECTION   (BIT(12) | BIT(13))
 #define COMMAND_CSAAT                   (BIT(9))
 
-// TODO: Trust me on this, it's stupid
+// A small quirk of the hardware, the length reported to the device should be one less than the 
+// intended length
 #define COMMAND_LEN_OFFSET(length)      (((length) - 1) & 0x1FF)
 
 #define STATUS_READY(status)    ((status) & BIT(31))

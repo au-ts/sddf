@@ -77,16 +77,19 @@ static inline void spi_setup(void)
     // Enable the device
     regs->CONTROL = CONTROL_SPIEN | CONTROL_OUTPUT_EN;
 
-    // Control which SPI events interrupt
+    // The driver only cares when:
+    // 1. the TX FIFO is empty, and the driver should queue more data
+    // 2. the number of words in the RX FIFO is at the watermark, and the driver should therefore 
+    //    read some data
     regs->EVENT_ENABLE = EVENT_ENABLE_TXEMPTY | EVENT_ENABLE_RXWM;
 
-    // Set the recieve watermark at the max
+    // Set the receive watermark at the max
     regs->CONTROL |= CONTROL_RX_WATERMARK(RX_FIFO_WORD_DEPTH);
 
-    // Control which errors interrupt
+    // Recieve interrupts for all errors, since an unacknowledged error could halt the device
     regs->ERROR_ENABLE = ERROR_MASK; 
 
-    // Enable only error interrupts
+    // Enable only error interrupts, as enabling event interrupts would spam TXEMPTY
     regs->INTR_ENABLE = INTR_ERROR;
 
     // Setup all CS lines with default arguments
@@ -309,7 +312,7 @@ void state_cmd(void) {
         hw_cmd_len = MIN(driver_data.rx_remaining, RX_FIFO_BYTE_DEPTH); 
         final_command = driver_data.rx_remaining - hw_cmd_len == 0;
         spi_host_command = COMMAND_DIRECTION_RX_ONLY;
-        // Set RX watermark to interrupt when it has recieved all data
+        // Set RX watermark to interrupt when it has received all data
         set_rx_watermark(hw_cmd_len);
         break;
     case SPI_WRITE:
@@ -335,7 +338,7 @@ void state_cmd(void) {
                 MIN(driver_data.tx_remaining, MIN_FIFO_BYTE_DEPTH);
         final_command = driver_data.rx_remaining - hw_cmd_len == 0;
         spi_host_command = COMMAND_DIRECTION_BIDIRECTION;
-        // Set RX watermark to interrupt when it has recieved all data
+        // Set RX watermark to interrupt when it has received all data
         set_rx_watermark(hw_cmd_len);
         break;
     default:
@@ -355,15 +358,13 @@ void state_cmd(void) {
 
     regs->COMMAND = spi_host_command; 
 
-    void *write_buffer = (void *)
-        // Pointer to base of the command's data to write
-        driver_data.slice_base + cmd->write_offset +
-        // Can alternatively expressed as TX progress
+    // Pointer to base of the command's data to write
+    void *write_buffer = (void *) driver_data.slice_base + cmd->write_offset +
+        // aka TX progress
         cmd->len - driver_data.tx_remaining;
-    void *read_buffer = (void *)
-        // Pointer to base of the command's data to read
-        driver_data.slice_base + cmd->read_offset + 
-        // Can alternatively expressed as RX progress
+    // Pointer to base of the command's data to read
+    void *read_buffer = (void *) driver_data.slice_base + cmd->read_offset + 
+        // aka RX progress
         cmd->len - driver_data.rx_remaining;
 
     switch (cmd->mode) {
