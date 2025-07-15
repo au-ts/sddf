@@ -20,10 +20,11 @@ IMX:
 NOTE: these are all what Linux does
 */
 
-#define PIN_1 (95) // gpiox_18
-#define PIN_2 (96) // gpiox_19
+#define PIN_1 (15) // gpio1_15 // IMX physical 32
+#define PIN_2 (13) // gpio1_13 // IMX physical 33
+#define PIN_3 (3) // gpio1_03 // IMX physical 36
 
-#define IRQ_1 (57)
+#define IRQ_1 (1)
 
 #define NUM_DRIVER_CHANNELS 62
 
@@ -42,7 +43,7 @@ static const GPIO_driver_channel_t gpio_driver_channel_mappings[NUM_DRIVER_CHANN
     [0] = { PIN_1, IRQ_UNUSED }, // need to claim these channels in meta.py
     [1] = { PIN_2, IRQ_1 },
     UNUSED_CH(2),
-    UNUSED_CH(3),
+    [3] = { PIN_3, IRQ_UNUSED },
     UNUSED_CH(4),
     UNUSED_CH(5),
     UNUSED_CH(6),

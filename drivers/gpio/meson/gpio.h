@@ -5,6 +5,12 @@
 
 #include <stdint.h>	
 
+/* Custom definitions
+
+
+
+*/
+
 /*
 =======
 linux/include/dt-bindings/interrupt-controller/amlogic,meson-g12a-gpio-intc.h

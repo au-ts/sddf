@@ -58,7 +58,8 @@ BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 SYSTEM_FILE := gpio.system
 DTS := $(SDDF)/dts/$(MICROKIT_BOARD).dts
 DTB := $(MICROKIT_BOARD).dtb
-CONFIGS_INCLUDE := ${TOP}/include # this is for the gpio config file 
+CONFIGS_DIR   := $(TOP)/include
+CONFIG_HEADER := $(CONFIGS_DIR)/gpio_config.h
 
 IMAGES := gpio_driver.elf client.elf
 CFLAGS_ARCH := -mcpu=$(CPU) -mstrict-align -target aarch64-none-elf
@@ -73,7 +74,7 @@ CFLAGS := -nostdlib \
 		  -I$(SDDF)/include \
 		  -I$(SDDF)/include/microkit \
 		  -I$(LIBCO) \
-		  -I$(CONFIGS_INCLUDE) \
+		  -I$(CONFIGS_DIR) \
 		  $(CFLAGS_ARCH)
 LDFLAGS := -L$(BOARD_DIR)/lib
 LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
@@ -96,7 +97,7 @@ ${IMAGES}: libsddf_util_debug.a
 # @Tristan: so it recompiles when the config file changes
 -include client.d
 
-client.o: ${TOP}/client.c
+client.o: ${TOP}/client.c $(CONFIG_HEADER)
 	$(CC) -c $(CFLAGS) $< -o client.o
 client.elf: client.o libco.a 
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o client.elf
