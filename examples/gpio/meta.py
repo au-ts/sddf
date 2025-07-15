@@ -82,10 +82,6 @@ BOARDS: List[Board] = [
         arch=SystemDescription.Arch.AARCH64,
         paddr_top=0x7_0000_000,
         gpio="soc@0/bus@30000000/gpio@30200000",
-        # gpio="soc@0/bus@30000000/gpio@30210000", # these are also compatible as well
-        # gpio="soc@0/bus@30000000/gpio@30220000",
-        # gpio="soc@0/bus@30000000/gpio@30230000",
-        # gpio="soc@0/bus@30000000/gpio@30240000"
     )
 
 ]
@@ -145,7 +141,6 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
     gpio_system = Sddf.Gpio(sdf, gpio_node, gpio_driver)
 
-    # @ Tristan: we want to claim driver channel ids 0, 1, 3
     driver_channel_ids = [0, 1, 3]
     gpio_system.add_client(client, driver_channel_ids=driver_channel_ids)
 
