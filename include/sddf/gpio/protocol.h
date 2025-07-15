@@ -6,6 +6,8 @@
 #pragma once
 
 #include <sddf/util/util.h>
+#include <stdint.h>
+
 
 /* Shared functionality/definitions between timer drivers and clients */
 
@@ -111,6 +113,37 @@ typedef enum {
 
 #define GPIO_REQUEST_VALUE_MASK \
     BIT_MASK_RANGE(19, 10)
+
+#define GPIO_VALUE_SHIFT 10
+#define GPIO_VALUE_WIDTH 10
+
+#define GPIO_ENCODE_VALUE(val) (((val) & BIT_MASK(GPIO_VALUE_WIDTH)) << GPIO_VALUE_SHIFT)
+#define GPIO_DECODE_VALUE(label) (((label) >> GPIO_VALUE_SHIFT) & BIT_MASK(GPIO_VALUE_WIDTH))
+
+/**
+ * Encode a raw 10-bit value into bits [19:10] of a label.
+ */
+static inline uint32_t gpio_encode_value(uint32_t val) {
+    // shift up, then mask to that [19:10] window
+    return (val << GPIO_VALUE_SHIFT)
+         & BIT_MASK_RANGE(
+               GPIO_VALUE_SHIFT + GPIO_VALUE_WIDTH - 1,
+               GPIO_VALUE_SHIFT
+           );
+}
+
+/**
+ * Decode bits [19:10] from a 32-bit label into a 10-bit value.
+ */
+static inline uint32_t gpio_decode_value(uint32_t label) {
+    // mask to [19:10], then shift down
+    return (label
+           & BIT_MASK_RANGE(
+               GPIO_VALUE_SHIFT + GPIO_VALUE_WIDTH - 1,
+               GPIO_VALUE_SHIFT
+             ))
+         >> GPIO_VALUE_SHIFT;
+}
 
 #define SDDF_GPIO_RESPONSE_ERROR_BIT 19
 #define SDDF_GPIO_RESPONSE_VALUE_MASK BIT_MASK_RANGE(18, 0)

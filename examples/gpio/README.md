@@ -6,17 +6,15 @@
 
 # Gpio example
 
-We have 2 GPIOs:
-- GPIO_1 is set to output and should be attached to an LED then Ground.
-- GPIO_2 is set to input and should be attached a button then to 3.3V.
-When you push the button it should alternate the current state of the LED (off or on).
+We have 3 GPIOs:
+- GPIO_1 is set to output and should be attached to resistors then an LED then Ground.
+- GPIO_2 is set to input and should start unattached to anything. Note for this example this pin should have a floating logical state of 0 or a pull down resistor attached.
+- GPIO_3 is set to output should start unattached to anythng.
 
-The example will not work unless theres an external pull down resistor or
-change the code to set an internal pull down resistor.
+When you connect GPIO_2 and GPIO_3 together the LED should light up.
+When you disconnect GPIO_2 and GPIO_3 the LED should turn off.
 
-It may also work if floats at a low enough value.
-
-There is also 2 modes, one for polling and for for IRQ based
+There is also 2 testing modes, one for polling and for for IRQ based
 
 ## Building
 
@@ -44,57 +42,13 @@ The final bootable image will be in `zig-out/bin/loader.img`.
 ## Running
 
 NOTE: both ways emulate a BOTH EDGE driven model of changing the LED.
+Do #define USE_POLLING to use Polling mode, otherwise will default to irq based. 
 
---
+Since there is no debounce logic it may appear to not work with the irq based loop.
 
-When running the example, you should see something similar to the following
-output if USE_POLLING is not defined:
-```
-CLIENT|INFO: Turned off!
-CLIENT|INFO: Waiting for IRQ from driver!
-```
+Make sure you chose pins that are actually set as GPIO's via the pinmux.
 
-Press + HOLD the button.
-Light should turn on.
-
-```
-CLIENT|INFO: Turned on!
-CLIENT|INFO: Waiting for IRQ from driver!
-```
-
-Release the button.
-Light should turn off.
-
-```
-CLIENT|INFO: Turned off!
-CLIENT|INFO: Waiting for IRQ from driver!
-```
-
---
-
-When running the example, you should see something similar to the following
-output if USE_POLLING is defined:
-```
-CLIENT|INFO: Turned off!
-```
-
-Press + HOLD the button.
-Light should turn on.
-
-```
-CLIENT|INFO: Turned on!
-```
-
-Release the button.
-Light should turn off.
-
-```
-CLIENT|INFO: Turned off!
-```
+Make sure you have actually checked which pins mapped to which physical pins (the brought out pins).
 
 ## Warning
 For Meson the i2c pins have external pull up resistors.
-
-
-
-
