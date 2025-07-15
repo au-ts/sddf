@@ -145,8 +145,8 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
     gpio_system = Sddf.Gpio(sdf, gpio_node, gpio_driver)
 
-    # @ Tristan: we want to claim driver channel ids 0 and 1
-    driver_channel_ids = [0, 1]
+    # @ Tristan: we want to claim driver channel ids 0, 1, 3
+    driver_channel_ids = [0, 1, 3]
     gpio_system.add_client(client, driver_channel_ids=driver_channel_ids)
 
     pds = [
