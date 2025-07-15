@@ -141,6 +141,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
     gpio_system = Sddf.Gpio(sdf, gpio_node, gpio_driver)
 
+    # These need to be different to the ones hardcoded in config.json or this file
     driver_channel_ids = [0, 1, 3]
     gpio_system.add_client(client, driver_channel_ids=driver_channel_ids)
 
