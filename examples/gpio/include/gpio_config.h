@@ -8,16 +8,10 @@
 /*
 NUMBERING SCHEMES
 
-Meson:
-- For pins we could use 2
-  - More details in sddf/drivers/gpio/meson/gpio.h
-- For irqs we use 0-7
-
 IMX:
 - For pins we use 0-31 as thats how many pins per bank
 - For irqs write a value > 0 because it can only be connected to 1 irq line anyway
 
-NOTE: these are all what Linux does
 */
 
 #define PIN_1 (15) // gpio1_15 // IMX physical 32

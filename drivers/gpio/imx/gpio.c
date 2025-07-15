@@ -337,9 +337,6 @@ void disable_all_interrupts() {
     
 	THREAD_MEMORY_FENCE();
 
-    // Now that its masked we will get no more interrupts so we clear everything
-    gpio_regs->isr = gpio_regs->isr;
-    
 	microkit_irq_ack(device_resources.irqs[0].id);
 	microkit_irq_ack(device_resources.irqs[1].id);
 }
