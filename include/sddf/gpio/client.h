@@ -42,8 +42,8 @@ static int sddf_gpio_get_direction(uint32_t channel) {
     }
 
     return (label & BIT(0))
-         ? SDDF_GPIO_LINE_DIRECTION_IN
-         : SDDF_GPIO_LINE_DIRECTION_OUT;
+         ? SDDF_GPIO_LINE_DIRECTION_OUT
+         : SDDF_GPIO_LINE_DIRECTION_IN;
 }
 
 /**
@@ -247,5 +247,3 @@ static int sddf_gpio_irq_set_type(uint32_t channel, uint32_t type) {
 // static inline int sddf_gpio_irq_mask(uint32_t channel) {
 // 	return -1;
 // }
-
-// @ Tristan: i dont think the rest of the IRQ configs are relevant to a SDDF GPIO driver

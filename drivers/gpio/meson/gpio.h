@@ -5,11 +5,7 @@
 
 #include <stdint.h>	
 
-/* Custom definitions
-
-
-
-*/
+// This should get the next person started.
 
 /*
 =======

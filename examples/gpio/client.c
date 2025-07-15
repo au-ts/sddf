@@ -25,7 +25,7 @@ cothread_t t_main;
 #define STACK_SIZE (4096)
 static char t_client_main_stack[STACK_SIZE];
 
-#define USE_POLLING 
+// #define USE_POLLING 
 
 static inline void print_instructions() {
 	sddf_printf("\nCLIENT|INFO: Connect PIN2 to PIN3 to turn on the LED!\n");
