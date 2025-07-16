@@ -120,9 +120,11 @@ pub fn build(b: *std.Build) !void {
 
     const client_pn532 = b.addExecutable(.{
         .name = "client_pn532.elf",
-        .target = target,
-        .optimize = optimize,
-        .strip = false,
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .strip = false,
+        }),
     });
 
     client_pn532.addCSourceFiles(.{
@@ -136,9 +138,11 @@ pub fn build(b: *std.Build) !void {
 
     const client_ds3231 = b.addExecutable(.{
         .name = "client_ds3231.elf",
-        .target = target,
-        .optimize = optimize,
-        .strip = false,
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .strip = false,
+        }),
     });
 
     client_ds3231.addCSourceFiles(.{
