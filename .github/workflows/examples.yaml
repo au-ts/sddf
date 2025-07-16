@@ -211,12 +211,6 @@ jobs:
         run: .github/workflows/setup_ssh_key.sh
         env:
           MACHINE_QUEUE_KEY: ${{ secrets.MACHINE_QUEUE_KEY }}
-# TEMP
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
-        with:
-          detached: true
-# TEMP
       - name: Run tests
         run: |
           export PATH="$(pwd)/machine_queue":"$(pwd)/ipbench_queue":$PATH
