@@ -255,53 +255,6 @@ lwip_standard_chksum(const void *dataptr, int len)
 }
 #endif
 
-#if (LWIP_CHKSUM_ALGORITHM == 4)
-/* This is a more optimised version of the routine above. Written by Lucy Parker */
-u16_t
-lwip_standard_chksum(const void *dataptr, int len)
-{
-  const u64_t *pb = (const u64_t *)dataptr;
-  const u64_t *ps;
-  u64_t t = 0;
-  u64_t sum64 = 0;
-  u32_t sum = 0;
-  int odd = ((mem_ptr_t)pb & 1);
-
-  /* Get aligned to uint64_t */
-  if (odd && len > 0) {
-    ((u64_t *)&t)[1] = *pb++;
-    len--;
-  }
-
-  /* Add the bulk of the data */
-  ps = (const u64_t *)(const void *)pb;
-  while (len > 1) {
-    sum64 += *ps++;
-    len -= 8;
-  }
-
-  /* Consume left-over bytes, if any */
-  if (len > 0) {
-    ((u64_t *)&t)[0] = *(const u64_t *)ps;
-  }
-
-  /* Add end bytes */
-  sum64 += t;
-
-  sum64 += (sum64 >> 32) | (sum64 << 32);
-  sum = sum64 >> 32;
-  sum += (sum >> 16) | (sum << 16);
-
-  /* Swap if alignment was odd */
-  if (odd) {
-    sum = SWAP_BYTES_IN_WORD(sum);
-  }
-
-  return (u16_t)sum;
-}
-
-#endif
-
 /** Parts of the pseudo checksum which are common to IPv4 and IPv6 */
 static u16_t
 inet_cksum_pseudo_base(struct pbuf *p, u8_t proto, u16_t proto_len, u32_t acc)
