@@ -1,7 +1,7 @@
 [package]
 name = "sddf_timer"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 authors = ["Cheng Li 李澄 <lichengchaoreng@gmail.com>"]
 
 [lib]
@@ -9,5 +9,5 @@ name = "sddf_timer"
 path = "lib.rs"
 
 [dependencies]
-sel4-microkit = { git = "https://github.com/seL4/rust-sel4.git", rev = "ac5627ba7a67e71f33a8eb1c5d05de09bf94ef5e" }
-# sel4-microkit-message = { git = "https://github.com/seL4/rust-sel4.git", rev = "ac5627ba7a67e71f33a8eb1c5d05de09bf94ef5e" }
+sel4-microkit = { git = "https://github.com/seL4/rust-sel4.git", rev = "d2bc5cf71c5455f85898a4768e9dcbaea39e1a7e" }
+# sel4-microkit-message = { git = "https://github.com/seL4/rust-sel4.git", rev = "d2bc5cf71c5455f85898a4768e9dcbaea39e1a7e" }
