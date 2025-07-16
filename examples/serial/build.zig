@@ -218,9 +218,11 @@ pub fn build(b: *std.Build) !void {
 
     const client = b.addExecutable(.{
         .name = "client.elf",
-        .target = target,
-        .optimize = optimize,
-        .strip = false,
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .strip = false,
+        }),
     });
     const client1_install = b.addInstallArtifact(client, .{ .dest_sub_path = "client0.elf" });
     const client2_install = b.addInstallArtifact(client, .{ .dest_sub_path = "client1.elf" });

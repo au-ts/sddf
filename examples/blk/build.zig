@@ -137,9 +137,11 @@ pub fn build(b: *std.Build) !void {
 
     const client = b.addExecutable(.{
         .name = "client.elf",
-        .target = target,
-        .optimize = optimize,
-        .strip = false,
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .strip = false,
+        }),
     });
 
     client.addCSourceFiles(.{
