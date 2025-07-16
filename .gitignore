@@ -2,6 +2,9 @@
 # SPDX-License-Identifier: BSD-2-Clause
 
 build/
+*.zip
+*.tar.gz
+*.tar
 *.o
 *.elf
 *.depend
