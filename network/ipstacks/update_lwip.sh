@@ -16,5 +16,4 @@ find lwip/ -type f -print0 | xargs -0 dos2unix
 rm -rf lwip/doc/doxygen/output/html/
 rm lwip/pax_global_header
 
-patch -p 1 < no-ssize-t-typedef.patch
 patch -p 1 < no-dhcp-arp-check.patch
