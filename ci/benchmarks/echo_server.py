@@ -66,43 +66,44 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
 
     assert test_config.config == "benchmark"
 
-    # TODO: Abstract.
-
-    benchmark_run = await asyncio.create_subprocess_exec(
-        # fmt: off
-        "iq.sh", "run",
-        "-c", "vb04",
-        "-c", "vb05",
-        "-c", "vb06",
-        "-c", "vb07",
-        "-f", Path(__file__).parent / "benchmark.py",
-        "--",
-        ip0,
-        "--throughputs", "10000000",
-        "--samples", "1000",
-        "--clients", "vb04",
+    bench_backend = IpBenchQueueBackend(
+        ["vb04", "vb06"],
+        Path(__file__).parent / "benchmark.py",
+        target_ip=ip0,
+        throughputs=[10000000, 20000000],
+        samples=100,
     )
+
+    # XXX: I probably want to redesign the CI so that output is always printed
+    #      at the moment I'm sort of working around the fact that I only get
+    #      output printed while waiting, which means can't easily output
+    #      2 streams at once.
+
     try:
-        # # await wait_for_output(backend, b"client0 measurement finished...")
-        # await wait_for_output(backend, b"\n")
-        # # await wait_for_output(backend, b"\n")
-        # reset_terminal()
-        # await asyncio.wait(
-        #     [asyncio.create_task(f) for f in [benchmark_run.wait(), wait_for_output(backend, b"client0 measurement starting...")]],
-        #     return_when="FIRST_COMPLETED"
-        # )
-        # if benchmark_run.returncode is not None:
-        #     raise TestFailureException("AAA umm??")
-        # await asyncio.gather(
-        #     benchmark_run.wait(),
-        #     wait_for_output(backend, b"client0 measurement starting..."),
-        # )
-        await wait_for_output(backend, b"Result Summary:")
+        await bench_backend.start()
+        ANSI_RESET = b"\x1b[0m"
+        for _ in bench_backend.throughputs:
+            await wait_for_output(backend, b"Utilization connection established!\r\n" + ANSI_RESET)
+            await wait_for_output(bench_backend, b"[send_command] : START\n")
+            await wait_for_output(backend, b"client0 measurement starting...\r\n" + ANSI_RESET)
+            # TODO: ipbench print useful string out after the results.
+            await asyncio.gather(
+                wait_for_output(backend, b"client0 measurement finished \r\n" + ANSI_RESET),
+                wait_for_output(bench_backend, b"[send_command] : STOP\n")
+            )
+
+            # All PDs + two initial ones. TODO: Make the bench print out a good string at the end to avoid this.
+            for _ in range(12):
+                await wait_for_output(backend, b"}\r\n")
+
+            reset_terminal()
+
+        await wait_for_output(bench_backend, b"iq.sh runner is done\n")
+
+    # XXX: This doesn't work with ctrl+c the locks don't get released...
     finally:
-        try:
-            benchmark_run.terminate()
-        except ProcessLookupError:
-            pass
+        # XXX: When stopping, always print out the rest of the output?
+        await bench_backend.stop()
 
 
 if __name__ == "__main__":
