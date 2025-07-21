@@ -281,6 +281,9 @@ void init(void)
     assert(RX_COUNT * sizeof(struct descriptor) <= device_resources.regions[1].region.size);
     assert(TX_COUNT * sizeof(struct descriptor) <= device_resources.regions[2].region.size);
 
+    /* Ack any IRQs that were delivered before the driver started. */
+    microkit_irq_ack(device_resources.irqs[0].id);
+
     eth_setup();
 
     net_queue_init(&rx_queue, config.virt_rx.free_queue.vaddr, config.virt_rx.active_queue.vaddr,
@@ -300,8 +303,6 @@ void init(void)
     /* We are ready to receive. Enable. */
     eth_mac->conf |= RX_ENABLE | TX_ENABLE;
     eth_dma->opmode |= TXSTART | RXSTART;
-
-    microkit_irq_ack(device_resources.irqs[0].id);
 }
 
 void notified(microkit_channel ch)

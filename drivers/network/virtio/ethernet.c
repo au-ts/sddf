@@ -445,6 +445,9 @@ void init(void)
     assert(device_resources.num_irqs == 1);
     assert(device_resources.num_regions == 2);
 
+    /* Ack any IRQs that were delivered before the driver started. */
+    sddf_irq_ack(device_resources.irqs[0].id);
+
     regs = (volatile virtio_mmio_regs_t *)device_resources.regions[0].region.vaddr;
     hw_ring_buffer_vaddr = (uintptr_t)device_resources.regions[1].region.vaddr;
     hw_ring_buffer_paddr = device_resources.regions[1].io_addr;
@@ -458,8 +461,6 @@ void init(void)
                    config.virt_tx.num_buffers);
 
     eth_setup();
-
-    sddf_irq_ack(device_resources.irqs[0].id);
 }
 
 void notified(sddf_channel ch)
