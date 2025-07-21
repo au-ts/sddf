@@ -19,19 +19,9 @@ void _close(void)
     sddf_dprintf("NEWLIB ERROR: calling unimplemented _close()");
 }
 
-void close(void)
-{
-    sddf_dprintf("NEWLIB ERROR: calling unimplemented close()");
-}
-
 void _lseek(void)
 {
     sddf_dprintf("NEWLIB ERROR: calling unimplemented _lseek()");
-}
-
-void lseek(void)
-{
-    sddf_dprintf("NEWLIB ERROR: calling unimplemented lseek()");
 }
 
 void _read(void)
@@ -39,27 +29,12 @@ void _read(void)
     sddf_dprintf("NEWLIB ERROR: calling unimplemented _read()");
 }
 
-void read(void)
-{
-    sddf_dprintf("NEWLIB ERROR: calling unimplemented read()");
-}
-
 void _write(void)
 {
     sddf_dprintf("NEWLIB ERROR: calling unimplemented _write()");
 }
 
-void write(void)
-{
-    sddf_dprintf("NEWLIB ERROR: calling unimplemented write()");
-}
-
 void _sbrk(void)
 {
     sddf_dprintf("NEWLIB ERROR: calling unimplemented _sbrk()");
-}
-
-void sbrk(void)
-{
-    sddf_dprintf("NEWLIB ERROR: calling unimplemented sbrk()");
 }
