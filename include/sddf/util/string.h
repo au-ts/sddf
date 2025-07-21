@@ -14,6 +14,15 @@
 #  define __has_builtin(x) 0
 #endif
 
+__attribute__((weak)) void *memset(void *s, int c, size_t n)
+{
+    unsigned char *p = s;
+    while (n-- > 0) {
+        *p++ = c;
+    }
+    return s;
+}
+
 static inline void *sddf_memset(void *s, int c, size_t n)
 {
     unsigned char *p = s;
