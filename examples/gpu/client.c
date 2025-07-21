@@ -371,7 +371,7 @@ static void do_draw_state(void)
 
 static void handle_display_info_response()
 {
-    sddf_memcpy(&display_info, (void *)(gpu_data), sizeof(gpu_resp_get_display_info_t));
+    memcpy(&display_info, (void *)(gpu_data), sizeof(gpu_resp_get_display_info_t));
     LOG_GPU_CLIENT("Display info received: num_scanouts=%d\n", display_info.num_scanouts);
     for (int i = 0; i < display_info.num_scanouts; i++) {
         LOG_GPU_CLIENT("Scanout %d: enabled=%d, rect=(%d, %d, %d, %d) {x, y, "
@@ -402,7 +402,7 @@ void init(void)
     /* Assert image size does not exceed data region size */
     assert(FB_IMG_WIDTH * FB_IMG_HEIGHT * GPU_BPP_2D + DISPLAY_INFO_DATA_OFFSET <= GPU_DATA_REGION_SIZE_CLI0);
     gpu_queue_init(&gpu_queue_handle, gpu_req_queue, gpu_resp_queue, GPU_QUEUE_CAPACITY_CLI0);
-    sddf_memcpy((void *)(gpu_data + 0x1000), (void *)_fb_img, (size_t)(_fb_img_end - _fb_img));
+    memcpy((void *)(gpu_data + 0x1000), (void *)_fb_img, (size_t)(_fb_img_end - _fb_img));
 
     /* As part of initialisation, request for display info before sending anything else */
     LOG_GPU_CLIENT("Requesting initial display info\n");

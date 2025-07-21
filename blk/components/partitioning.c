@@ -151,7 +151,7 @@ static bool gpt_validate_partitions()
 
         if (gpt_resp_id == gpt_state.req_id) {
             // Validate the signature in partition header
-            if (sddf_strcmp(gpt_meta.header->signature, GPT_HEADER_SIGNATURE)) {
+            if (strcmp(gpt_meta.header->signature, GPT_HEADER_SIGNATURE)) {
                 LOG_BLK_VIRT_ERR("Invalid GPT signature\n");
                 return false;
             }
@@ -186,7 +186,7 @@ static bool gpt_validate_partitions()
                                                                      + gpt_state.mirror_req_cnt * BLK_TRANSFER_SIZE
                                                                      - GPT_SECTOR_SIZE);
             // Validate the signature in mirror header
-            if (sddf_strcmp(gpt_meta.mirror_header->signature, GPT_HEADER_SIGNATURE)) {
+            if (strcmp(gpt_meta.mirror_header->signature, GPT_HEADER_SIGNATURE)) {
                 LOG_BLK_VIRT_ERR("Invalid GPT signature in mirror partition header\n");
                 return false;
             }
@@ -329,7 +329,7 @@ static bool mbr_handle_response()
     }
 
     cache_clean_and_invalidate(mbr_state.req_addr, mbr_state.req_addr + (BLK_TRANSFER_SIZE * mbr_req_count));
-    sddf_memcpy(&msdos_mbr, (void *)mbr_state.req_addr, sizeof(struct msdos_mbr));
+    memcpy(&msdos_mbr, (void *)mbr_state.req_addr, sizeof(struct msdos_mbr));
 
     /* There is only one partition entry in Protective MBR of the GPT partition schema */
     if (msdos_mbr.partitions[0].type == MSDOS_MBR_PARTITION_TYPE_GPT) {

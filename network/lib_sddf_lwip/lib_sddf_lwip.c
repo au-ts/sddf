@@ -8,7 +8,6 @@
 #include <os/sddf.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
-#include <sddf/util/string.h>
 #include <sddf/network/lib_sddf_lwip.h>
 #include <sddf/network/queue.h>
 #include <sddf/network/util.h>
@@ -373,7 +372,7 @@ void sddf_lwip_init(lib_sddf_lwip_config_t *lib_sddf_lwip_config, net_client_con
     sddf_state.timer_ch = timer_config->driver_id;
 
     /* Initialise lwip state */
-    sddf_memcpy(lwip_state.mac, net_config->mac_addr, 6);
+    memcpy(lwip_state.mac, net_config->mac_addr, 6);
     lwip_state.err_output = (err_output == NULL) ? sddf_printf_ : err_output;
     lwip_state.netif_callback = (netif_callback == NULL) ? netif_status_callback_default : netif_callback;
     lwip_state.handle_empty_tx_free = (handle_empty_tx_free == NULL) ? handle_empty_tx_free_default

@@ -11,42 +11,6 @@ This example shows off the networking sub-system by having a
 
 The client simply accepts RX traffic and sends it back out (hence the name 'echo server').
 
-## Dependencies
-
-Due to the echo server relying on libc functionality, it currently only works with GCC
-instead of LLVM like all the other examples. As we use this example to perform benchmarking,
-it is important that the functions that lwIP uses from the standard library are optimised
-rather than simple implementations.
-
-For now, we rely on the libc packaged with the embedded C toolchains.
-
-### ARM
-
-When targeting ARM boards, the specific toolchain we use for testing and benchmarking the echo
-server is the `aarch64-none-elf` GCC toolchain distributed by ARM. You can download it from
-[here](https://developer.arm.com/downloads/-/arm-gnu-toolchain-downloads).
-
-### RISC-V
-
-When targeting RISC-V boards, we use the embedded GCC toolchain which is `riscv64-none-elf`
-or `riscv64-unknown-elf` depending on your environment. This toolchain is not distributed
-centrally so below are OS specific instructions:
-
-#### Linux (with apt)
-
-On a Debian-like system, you can do:
-```sh
-sudo apt install gcc-riscv64-unknown-elf picolibc-riscv64-unknown-elf
-```
-
-#### macOS
-
-With Homebrew:
-```sh
-brew tap riscv-software-src/riscv
-brew install riscv-tools
-```
-
 ## Building
 
 The following platforms are supported:
