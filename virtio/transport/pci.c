@@ -3,13 +3,11 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-#include <sddf/virtio/common.h>
 #include <sddf/virtio/transport/common.h>
 #include <sddf/virtio/transport/pci.h>
 #include <sddf/resources/device.h>
 
-// @billn fix everything about this file...
-
+// @billn fix hard coded addresses
 #define VADDR_COMMON 0x60000000
 #define VADDR_ISR 0x60001000
 #define VADDR_DEVICE 0x60002000
@@ -20,6 +18,7 @@
 #define PCI_DATA_PORT_ID 2
 #define PCI_DATA_PORT_ADDR 0xCFC
 
+/* Multiplier for virtIO queue kick mechanism. */
 uint32_t nftn_multiplier;
 
 uint32_t pci_compute_port_address(uint8_t bus, uint8_t dev, uint8_t func, uint8_t off) {
@@ -39,26 +38,34 @@ uint32_t pci_compute_port_address(uint8_t bus, uint8_t dev, uint8_t func, uint8_
     return addr;
 }
 
+// @billn should prolly use ecam instead of this io port business
 uint32_t pci_read_32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t off) {
     uint32_t addr = pci_compute_port_address(bus, dev, func, off);
 
     /* Write the address into the "select" port, then the data will be available at the "data" port. */
-    seL4_X86_IOPort_Out32(microkit_ioport_cap(PCI_ADDR_PORT_ID), PCI_ADDR_PORT_ADDR, addr);
-    return seL4_X86_IOPort_In32(microkit_ioport_cap(PCI_DATA_PORT_ID), PCI_DATA_PORT_ADDR).result;
+    microkit_x86_ioport_write_32(PCI_ADDR_PORT_ID, PCI_ADDR_PORT_ADDR, addr);
+    return microkit_x86_ioport_read_32(PCI_DATA_PORT_ID, PCI_DATA_PORT_ADDR);
+}
+
+void pci_write_8(uint8_t bus, uint8_t dev, uint8_t func, uint8_t off, uint8_t data) {
+    uint32_t addr = pci_compute_port_address(bus, dev, func, off);
+    microkit_x86_ioport_write_32(PCI_ADDR_PORT_ID, PCI_ADDR_PORT_ADDR, addr);
+    microkit_x86_ioport_write_8(PCI_DATA_PORT_ID, PCI_DATA_PORT_ADDR, data);
 }
 
 void pci_write_16(uint8_t bus, uint8_t dev, uint8_t func, uint8_t off, uint16_t data) {
     uint32_t addr = pci_compute_port_address(bus, dev, func, off);
-    seL4_X86_IOPort_Out32(microkit_ioport_cap(PCI_ADDR_PORT_ID), PCI_ADDR_PORT_ADDR, addr);
-    seL4_X86_IOPort_Out16(microkit_ioport_cap(PCI_DATA_PORT_ID), PCI_DATA_PORT_ADDR, data);
+    microkit_x86_ioport_write_32(PCI_ADDR_PORT_ID, PCI_ADDR_PORT_ADDR, addr);
+    microkit_x86_ioport_write_16(PCI_DATA_PORT_ID, PCI_DATA_PORT_ADDR, data);
 }
 
 void pci_write_32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t off, uint32_t data) {
     uint32_t addr = pci_compute_port_address(bus, dev, func, off);
-    seL4_X86_IOPort_Out32(microkit_ioport_cap(PCI_ADDR_PORT_ID), PCI_ADDR_PORT_ADDR, addr);
-    seL4_X86_IOPort_Out32(microkit_ioport_cap(PCI_DATA_PORT_ID), PCI_DATA_PORT_ADDR, data);
+    microkit_x86_ioport_write_32(PCI_ADDR_PORT_ID, PCI_ADDR_PORT_ADDR, addr);
+    microkit_x86_ioport_write_32(PCI_DATA_PORT_ID, PCI_DATA_PORT_ADDR, data);
 }
 
+// @billn fix hard coded addresses
 virtio_pci_common_cfg_t *get_cfg(device_resources_t *device_resources)
 {
     return (virtio_pci_common_cfg_t *) VADDR_COMMON;
