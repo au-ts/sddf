@@ -9,7 +9,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <sddf/util/string.h>
+#include <string.h>
 #include <sddf/util/util.h>
 #include <sddf/util/fence.h>
 
@@ -265,9 +265,9 @@ static inline uint32_t serial_enqueue_batch(serial_queue_handle_t *queue_handle,
     num_prewrap = MIN(num, num_prewrap);
     num_postwrap = num - num_prewrap;
 
-    sddf_memcpy(dst, src, num_prewrap);
+    memcpy(dst, src, num_prewrap);
     if (num_postwrap) {
-        sddf_memcpy(queue_handle->data_region, src + num_prewrap, num_postwrap);
+        memcpy(queue_handle->data_region, src + num_prewrap, num_postwrap);
     }
 
     serial_update_shared_tail(queue_handle, queue_handle->queue->tail + num);

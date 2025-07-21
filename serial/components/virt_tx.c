@@ -86,7 +86,7 @@ bool process_tx_queue(uint32_t client)
     uint32_t length = serial_queue_length(handle);
     if (config.enable_colour) {
         const char *client_colour = colours[client % ARRAY_SIZE(colours)];
-        assert(COLOUR_BEGIN_LEN == sddf_strlen(client_colour));
+        assert(COLOUR_BEGIN_LEN == strlen(client_colour));
         length += COLOUR_BEGIN_LEN + COLOUR_END_LEN;
     }
 
@@ -182,8 +182,8 @@ void init(void)
 
     if (config.enable_rx) {
         /* Print a deterministic string to allow console input to begin */
-        size_t begin_str_len = sddf_strlen(config.begin_str);
-        sddf_memcpy(tx_queue_handle_drv.data_region, config.begin_str, begin_str_len);
+        size_t begin_str_len = strlen(config.begin_str);
+        memcpy(tx_queue_handle_drv.data_region, config.begin_str, begin_str_len);
         serial_update_shared_tail(&tx_queue_handle_drv, begin_str_len);
         sddf_notify(config.driver.id);
     }

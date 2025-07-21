@@ -6,7 +6,7 @@
 #include <stdint.h>
 #include <os/sddf.h>
 #include <sddf/util/util.h>
-#include <sddf/util/string.h>
+#include <string.h>
 #include <sddf/util/printf.h>
 #include <sddf/network/lib_sddf_lwip.h>
 #include <sddf/network/queue.h>

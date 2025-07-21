@@ -7,7 +7,7 @@
 #include <os/sddf.h>
 #include <sddf/network/queue.h>
 #include <sddf/network/config.h>
-#include <sddf/util/string.h>
+#include <string.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 
@@ -44,7 +44,7 @@ void rx_return(void)
                 void *cli_addr = config.client_data.vaddr + cli_buffer.io_or_offset;
                 void *virt_addr = config.device_data.vaddr + virt_buffer.io_or_offset;
 
-                sddf_memcpy(cli_addr, virt_addr, virt_buffer.len);
+                memcpy(cli_addr, virt_addr, virt_buffer.len);
                 cli_buffer.len = virt_buffer.len;
                 virt_buffer.len = 0;
 
