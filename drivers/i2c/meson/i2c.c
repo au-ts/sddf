@@ -508,6 +508,11 @@ void init(void)
     assert(device_resources.num_irqs == 2);
     assert(device_resources.num_regions == 1);
 
+    /* Ack any IRQs that were delivered before the driver started. */
+    for (int i = 0; i < device_resources.num_irqs; i++) {
+        microkit_irq_ack(device_resources.irqs[i].id);
+    }
+
     regs = (volatile struct i2c_regs *)device_resources.regions[0].region.vaddr;
     i2c_setup();
     queue_handle = i2c_queue_init(config.virt.req_queue.vaddr, config.virt.resp_queue.vaddr);

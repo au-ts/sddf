@@ -393,6 +393,9 @@ void init()
     assert(device_resources.num_irqs == 1);
     assert(device_resources.num_regions == 4);
 
+    /* Ack any IRQs that were delivered before the driver started. */
+    sddf_irq_ack(device_resources.irqs[0].id);
+
     uart_regs = (volatile virtio_mmio_regs_t *)device_resources.regions[0].region.vaddr;
     hw_ring_buffer_vaddr = (uintptr_t)device_resources.regions[1].region.vaddr;
     hw_ring_buffer_paddr = device_resources.regions[1].io_addr;
@@ -412,8 +415,6 @@ void init()
         serial_queue_init(&rx_queue_handle, config.rx.queue.vaddr, config.rx.data.size, config.rx.data.vaddr);
     }
     serial_queue_init(&tx_queue_handle, config.tx.queue.vaddr, config.tx.data.size, config.tx.data.vaddr);
-
-    sddf_irq_ack(device_resources.irqs[0].id);
 }
 
 void notified(sddf_channel ch)
