@@ -64,6 +64,7 @@ to use, or modify the examples to add your board.
 
 If you are adding a driver for an *existing* device class, you'll need to add
 the following:
+
 * the configuration file
 * the driver code itself
 * integration into the build system
@@ -90,6 +91,7 @@ interrupt handling, register access, etc.
 
 To understand the how the driver should interact with the device there are a couple
 different avenues:
+
 * The technical reference manual for the SoC or device.
     * Unfortunately sometimes this either does not contain enough information to
       write a driver or is not publicly available.
