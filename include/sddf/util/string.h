@@ -33,6 +33,13 @@ static inline void *sddf_memcpy(void *dest, const void *src, size_t n)
     return dest;
 }
 
+static inline char *sddf_strcpy(char *restrict dest, const char *restrict src)
+{
+    char *to = dest;
+    while ((*to++ = *src++));
+    return dest;
+}
+
 static inline char *sddf_strncpy(char *dest, const char *restrict src,
                                  size_t dsize)
 {
@@ -115,5 +122,15 @@ static inline void *sddf_memmove(void *dest, const void *src, size_t n)
             ((uint8_t *)dest)[i] = ((uint8_t *)src)[i];
         }
     }
+    return dest;
+}
+
+static inline char *sddf_strcat(char *restrict dest, const char *restrict src)
+{
+    char *to = dest;
+    while (*to) {
+        to++;
+    };
+    while ((*to++ = *src++));
     return dest;
 }

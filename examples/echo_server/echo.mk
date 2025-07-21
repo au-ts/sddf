@@ -124,29 +124,13 @@ else ifeq ($(ARCH),riscv64)
 	CFLAGS_ARCH := -march=rv64imafdc -mabi=lp64d
 endif
 
-# Echo server example relies on libc functionality, hence only works with GCC
-# instead of LLVM. See README for more details.
-# Additionally, on x86_64 debian/ubuntu the gcc-riscv64-unknown-elf package is distributed
-# without libc. Checks if `picolibc-riscv64-unknown-elf` is installed in that case, and uses it.
-LIBC := $(dir $(realpath $(shell $(CC) --print-file-name libc.a)))
-PICOLIBC := $(dir $(realpath $(shell $(CC) --print-file-name picolibc.specs)))
-ifneq ($(strip $(LIBC)),)
-	LDFLAGS_ARCH += -L$(LIBC)
-	LIBS_ARCH += -lc
-else ifneq ($(strip $(PICOLIBC)),)
-	CFLAGS_ARCH += -specs=picolibc.specs
-else
-	$(error LIBC not found for the selected toolchain: $(TOOLCHAIN))
-endif
-
-# Of note here is that we don't specify -nostdlib, as we want libc.
-# But we don't want crt0, so add -nostartfiles
 CFLAGS := $(CFLAGS_ARCH) \
-	  -nostartfiles \
+	  -nostdlib \
 	  -ffreestanding \
 	  -g3 -O3 -Wall \
 	  -Wno-unused-function \
 	  -DMICROKIT_CONFIG_$(MICROKIT_CONFIG) \
+	  -DUSE_SDDF_LIBC \
 	  -I$(BOARD_DIR)/include \
 	  -I$(SDDF)/include/microkit \
 	  -I$(SDDF)/include \
@@ -156,8 +140,8 @@ CFLAGS := $(CFLAGS_ARCH) \
 	  -MD \
 	  -MP
 
-LDFLAGS := $(CFLAGS_ARCH) -nostartfiles -ffreestanding -L$(BOARD_DIR)/lib $(LDFLAGS_ARCH)
-LIBS := -Wl,--start-group -lmicrokit -Tmicrokit.ld ${LIBS_ARCH} libsddf_util_debug.a -Wl,--end-group
+LDFLAGS := $(CFLAGS_ARCH) -nostdlib -ffreestanding -L$(BOARD_DIR)/lib
+LIBS := -Wl,--start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a -Wl,--end-group
 
 CHECK_FLAGS_BOARD_MD5 := .board_cflags-$(shell echo -- ${CFLAGS} ${MICROKIT_SDK} ${MICROKIT_BOARD} ${MICROKIT_CONFIG} | shasum | sed 's/ *-//')
 

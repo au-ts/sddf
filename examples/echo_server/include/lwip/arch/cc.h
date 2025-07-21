@@ -78,3 +78,5 @@ typedef uintptr_t mem_ptr_t;
             sddf_printf("Assertion failed: %s\n", #x);              \
             while(1);                                           \
         } while(0)
+
+#define LWIP_NO_CTYPE_H 1
