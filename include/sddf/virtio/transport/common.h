@@ -16,6 +16,18 @@
 #define LOG_VIRTIO_TRANSPORT(...) do{}while(0)
 #endif
 
+#define VIRTIO_VERSION (0x2)
+
+#define VIRTIO_IRQ_VQUEUE  (1 << 0)
+#define VIRTIO_IRQ_CONFIG  (1 << 1)
+
+#define VIRTIO_DEVICE_STATUS_ACKNOWLEDGE (0x1)
+#define VIRTIO_DEVICE_STATUS_DRIVER (0x2)
+#define VIRTIO_DEVICE_STATUS_FAILED (0x80)
+#define VIRTIO_DEVICE_STATUS_FEATURES_OK (0x8)
+#define VIRTIO_DEVICE_STATUS_DRIVER_OK (0x4)
+#define VIRTIO_DEVICE_STATUS_DRIVER_RESET (0x40)
+
 typedef struct virtio_device_handle {
     device_resources_t *device_resources;
 } virtio_device_handle_t;

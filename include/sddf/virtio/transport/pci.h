@@ -6,6 +6,8 @@
 
 #include <stdint.h>
 
+/* Data structure specific to VirtIO devices using PCI transport. */
+
 typedef volatile struct __attribute__((packed)) virtio_pci_common_cfg {
     /* About the whole device. */
     uint32_t device_feature_select; /* read-write */
