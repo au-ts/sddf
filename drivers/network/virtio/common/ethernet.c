@@ -23,7 +23,6 @@
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 #include <sddf/util/ialloc.h>
-#include <sddf/virtio/common.h>
 #include <sddf/virtio/transport/common.h>
 #include <sddf/virtio/queue.h>
 #include <sddf/virtio/feature.h>
@@ -417,8 +416,12 @@ void init(void)
     assert(net_config_check_magic(&config));
     assert(device_resources_check_magic(&device_resources));
 
-    hw_ring_buffer_vaddr = (uintptr_t)device_resources.regions[1].region.vaddr;
-    hw_ring_buffer_paddr = device_resources.regions[1].io_addr;
+    // hw_ring_buffer_vaddr = (uintptr_t)device_resources.regions[1].region.vaddr;
+    // hw_ring_buffer_paddr = device_resources.regions[1].io_addr;
+
+    // @billn hack
+    hw_ring_buffer_vaddr = 0x70000000;
+    hw_ring_buffer_paddr = 0x60000000;
 
     ialloc_init(&rx_ialloc_desc, rx_descriptors, RX_COUNT);
     ialloc_init(&tx_ialloc_desc, tx_descriptors, TX_COUNT);
@@ -430,12 +433,14 @@ void init(void)
 
     eth_setup();
 
-    sddf_irq_ack(device_resources.irqs[0].id);
+    sddf_irq_ack(16);
 }
 
 void notified(sddf_channel ch)
 {
-    if (ch == device_resources.irqs[0].id) {
+    if (ch == 16) {
+        // sddf_printf("eth irq ch %d\n", ch);
+
         handle_irq();
         sddf_deferred_irq_ack(ch);
     } else if (ch == config.virt_rx.id) {

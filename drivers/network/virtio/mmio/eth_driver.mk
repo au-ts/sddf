@@ -12,8 +12,7 @@
 
 ETHERNET_DRIVER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 ETHERNET_COMMON_DIR := $(dir $(lastword $(MAKEFILE_LIST)))/../common
-# @billn this is not really elegant, should be going from sddf root
-VIRTIO_TRANSPORT_DIR := $(dir $(lastword $(MAKEFILE_LIST)))/../../../../virtio/transport/
+VIRTIO_TRANSPORT_DIR := $(SDDF)/virtio/transport/
 
 CHECK_NETDRV_FLAGS_MD5:=.netdrv_cflags-$(shell echo -- ${CFLAGS} ${CFLAGS_network} | shasum | sed 's/ *-//')
 
