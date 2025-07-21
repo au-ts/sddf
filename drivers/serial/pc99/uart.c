@@ -48,12 +48,12 @@ serial_queue_handle_t tx_queue_handle;
 
 void write(uint16_t port_offset, uint8_t v)
 {
-    seL4_X86_IOPort_Out8(microkit_ioport_cap(IOPORT_ID), IOPORT_BASE + port_offset, v);
+    microkit_x86_ioport_write_8((IOPORT_ID), IOPORT_BASE + port_offset, v);
 }
 
 uint8_t read(uint16_t port_offset)
 {
-    return seL4_X86_IOPort_In8(microkit_ioport_cap(IOPORT_ID), IOPORT_BASE + port_offset).result;
+    return microkit_x86_ioport_read_8((IOPORT_ID), IOPORT_BASE + port_offset);
 }
 
 int ready(void)
