@@ -13,6 +13,7 @@ Irq = SystemDescription.Irq
 MemoryRegion = SystemDescription.MemoryRegion
 Map = SystemDescription.Map
 
+
 @dataclass
 class Board:
     name: str
@@ -22,13 +23,14 @@ class Board:
 
 
 BOARDS: List[Board] = [
-     Board(
+    Board(
         name="maaxboard",
         arch=SystemDescription.Arch.AARCH64,
         paddr_top=0x7_0000_000,
         gpio="soc@0/bus@30000000/gpio@30200000",
     )
 ]
+
 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     gpio_driver = ProtectionDomain("gpio_driver", "gpio_driver.elf", priority=254)
@@ -43,10 +45,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     driver_channel_ids = [0, 1, 3]
     gpio_system.add_client(client, driver_channel_ids=driver_channel_ids)
 
-    pds = [
-        gpio_driver,
-        client
-    ]
+    pds = [gpio_driver, client]
     for pd in pds:
         sdf.add_pd(pd)
 
@@ -61,7 +60,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
         f.write(sdf.render())
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--dtb", required=True)
     parser.add_argument("--sddf", required=True)
