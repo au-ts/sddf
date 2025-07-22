@@ -28,8 +28,8 @@ IMX:
 #define UNUSED_CH(n) [n] = { PIN_UNUSED, IRQ_UNUSED }
 
 typedef struct {
-  int pin;
-  int irq;
+    int pin;
+    int irq;
 } GPIO_driver_channel_t;
 
 // ideally this whole setup should probably be in the meta.py file
