@@ -176,7 +176,7 @@ void notified(microkit_channel ch)
         return;
     }
 
-    microkit_irq_ack_delayed(0);
+    microkit_deferred_irq_ack(0);
 
     next_timeout = UINT64_MAX;
     uint64_t now = get_time();

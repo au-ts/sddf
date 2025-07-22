@@ -87,7 +87,7 @@ void rx_return(void)
 
     if (enqueued && (net_queue_length(rx_queue_virt.free) >= 32) && net_require_signal_free(&rx_queue_virt)) {
         net_cancel_signal_free(&rx_queue_virt);
-        microkit_notify_delayed(VIRT_RX_CH);
+        microkit_deferred_notify(VIRT_RX_CH);
     }
 }
 

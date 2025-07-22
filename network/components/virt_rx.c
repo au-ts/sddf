@@ -196,7 +196,7 @@ void rx_provide(void)
     // if (notify_drv && net_require_signal_free(&state.rx_queue_drv)) {
     if ((net_queue_length(state.rx_queue_drv.free) >= RX_SIGNAL_THRESHOLD) && net_require_signal_free(&state.rx_queue_drv)) {
         net_cancel_signal_free(&state.rx_queue_drv);
-        microkit_notify_delayed(DRIVER_CH);
+        microkit_deferred_notify(DRIVER_CH);
         notify_drv = false;
     }
 }
@@ -227,6 +227,6 @@ void init(void)
 
     if (net_require_signal_free(&state.rx_queue_drv)) {
         net_cancel_signal_free(&state.rx_queue_drv);
-        microkit_notify_delayed(DRIVER_CH);
+        microkit_deferred_notify(DRIVER_CH);
     }
 }

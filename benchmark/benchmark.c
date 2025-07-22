@@ -299,11 +299,11 @@ void init(void)
 #endif
 }
 
-void fault(microkit_channel id, microkit_msginfo msginfo)
-{
-    sddf_printf("BENCH|LOG: Faulting PD ");
-    print_pdid_name(id);
-    sddf_printf(" (%x)\n", id);
+// void fault(microkit_channel id, microkit_msginfo msginfo)
+// {
+//     sddf_printf("BENCH|LOG: Faulting PD ");
+//     print_pdid_name(id);
+//     sddf_printf(" (%x)\n", id);
 
     // seL4_UserContext regs;
     // seL4_TCB_ReadRegisters(BASE_TCB_CAP + id, false, 0, sizeof(seL4_UserContext) / sizeof(seL4_Word), &regs);
@@ -338,4 +338,4 @@ void fault(microkit_channel id, microkit_msginfo msginfo)
     // }
 
     // return seL4_False;
-}
+// }
