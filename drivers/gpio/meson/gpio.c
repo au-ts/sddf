@@ -22,7 +22,7 @@ static int pin_subscriber[8] = {-1};
 
 void notified(microkit_channel ch)
 {
-    switch (ch) { 
+    switch (ch) {
     case 54:
     case 55:
     case 56:
