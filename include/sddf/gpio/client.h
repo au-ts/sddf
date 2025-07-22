@@ -9,8 +9,9 @@
 #include <stdint.h>
 #include <sddf/gpio/protocol.h>
 
-static inline uint32_t gpio_make_label(uint32_t interface, uint32_t value) {
-    return (interface & SDDF_REQUEST_INTERFACE_MASK)  | gpio_encode_value(value);
+static inline uint32_t gpio_make_label(uint32_t interface, uint32_t value)
+{
+    return (interface & SDDF_REQUEST_INTERFACE_MASK) | gpio_encode_value(value);
 }
 
 static inline int gpio_check_err(uint32_t label)
@@ -31,7 +32,8 @@ static inline int gpio_check_err(uint32_t label)
  * @param microkit channel of gpio driver.
  * @return negative error code or direction of GPIO pin (SDDF_GPIO_line_direction_t).
  */
-static int sddf_gpio_get_direction(uint32_t channel) {
+static int sddf_gpio_get_direction(uint32_t channel)
+{
     uint32_t label = gpio_make_label(SDDF_GPIO_GET_DIRECTION, 0);
     microkit_msginfo msginfo = sddf_ppcall(channel, seL4_MessageInfo_new(label, 0, 0, 0));
     label = microkit_msginfo_get_label(msginfo);
@@ -41,9 +43,7 @@ static int sddf_gpio_get_direction(uint32_t channel) {
         return err;
     }
 
-    return (label & BIT(0))
-         ? SDDF_GPIO_LINE_DIRECTION_OUT
-         : SDDF_GPIO_LINE_DIRECTION_IN;
+    return (label & BIT(0)) ? SDDF_GPIO_LINE_DIRECTION_OUT : SDDF_GPIO_LINE_DIRECTION_IN;
 }
 
 /**
@@ -52,7 +52,8 @@ static int sddf_gpio_get_direction(uint32_t channel) {
  * @param microkit channel of gpio driver.
  * @return negative error code or 0.
  */
-static int sddf_gpio_direction_input(uint32_t channel) {
+static int sddf_gpio_direction_input(uint32_t channel)
+{
     uint32_t label = gpio_make_label(SDDF_GPIO_DIRECTION_INPUT, 0);
     microkit_msginfo msginfo = sddf_ppcall(channel, seL4_MessageInfo_new(label, 0, 0, 0));
     label = microkit_msginfo_get_label(msginfo);
@@ -71,7 +72,8 @@ static int sddf_gpio_direction_input(uint32_t channel) {
  * @value
  * @return negative error code or 0.
  */
-static int sddf_gpio_direction_output(uint32_t channel, uint32_t value) {
+static int sddf_gpio_direction_output(uint32_t channel, uint32_t value)
+{
     uint32_t label = gpio_make_label(SDDF_GPIO_DIRECTION_OUTPUT, value);
     microkit_msginfo msginfo = sddf_ppcall(channel, seL4_MessageInfo_new(label, 0, 0, 0));
     label = microkit_msginfo_get_label(msginfo);
@@ -89,7 +91,8 @@ static int sddf_gpio_direction_output(uint32_t channel, uint32_t value) {
  * @param microkit channel of gpio driver.
  * @return negative error code or value of line.
  */
-static int sddf_gpio_get(uint32_t channel) {
+static int sddf_gpio_get(uint32_t channel)
+{
     uint32_t label = gpio_make_label(SDDF_GPIO_GET, 0);
     microkit_msginfo msginfo = sddf_ppcall(channel, seL4_MessageInfo_new(label, 0, 0, 0));
     label = microkit_msginfo_get_label(msginfo);
@@ -109,7 +112,8 @@ static int sddf_gpio_get(uint32_t channel) {
  * @param value
  * @return negative error code or 0.
  */
-static int sddf_gpio_set(uint32_t channel, uint32_t value) {
+static int sddf_gpio_set(uint32_t channel, uint32_t value)
+{
     uint32_t label = gpio_make_label(SDDF_GPIO_SET, value);
     microkit_msginfo msginfo = sddf_ppcall(channel, seL4_MessageInfo_new(label, 0, 0, 0));
     label = microkit_msginfo_get_label(msginfo);
@@ -152,7 +156,8 @@ static int sddf_gpio_set_config(uint32_t channel, uint32_t config, uint32_t argu
  * @param microkit channel of gpio driver.
  * @return negative error code or 0.
  */
-static int sddf_gpio_irq_enable(uint32_t channel) {
+static int sddf_gpio_irq_enable(uint32_t channel)
+{
     uint32_t label = gpio_make_label(SDDF_GPIO_IRQ_ENABLE, 0);
     microkit_msginfo msginfo = sddf_ppcall(channel, seL4_MessageInfo_new(label, 0, 0, 0));
     label = microkit_msginfo_get_label(msginfo);
@@ -170,7 +175,8 @@ static int sddf_gpio_irq_enable(uint32_t channel) {
  * @param microkit channel of gpio driver.
  * @return negative error code or 0.
  */
-static int sddf_gpio_irq_disable(uint32_t channel) {
+static int sddf_gpio_irq_disable(uint32_t channel)
+{
     uint32_t label = gpio_make_label(SDDF_GPIO_IRQ_DISABLE, 0);
     microkit_msginfo msginfo = sddf_ppcall(channel, seL4_MessageInfo_new(label, 0, 0, 0));
     label = microkit_msginfo_get_label(msginfo);
@@ -189,7 +195,8 @@ static int sddf_gpio_irq_disable(uint32_t channel) {
  * @param SDDF_GPIO_irq_line_status_t type.
  * @return negative error code or 0.
  */
-static int sddf_gpio_irq_set_type(uint32_t channel, uint32_t type) {
+static int sddf_gpio_irq_set_type(uint32_t channel, uint32_t type)
+{
     uint32_t label = gpio_make_label(SDDF_GPIO_IRQ_SET_TYPE, type);
     microkit_msginfo msginfo = sddf_ppcall(channel, seL4_MessageInfo_new(label, 0, 0, 0));
     label = microkit_msginfo_get_label(msginfo);

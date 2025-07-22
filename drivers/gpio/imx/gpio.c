@@ -30,7 +30,8 @@ volatile imx_gpio_regs_t *gpio_regs;
 /* Map pin to client channels */
 static int pin_subscriber[PINS_PER_BANK];
 
-static void print_reg(uint32_t value) {
+static void print_reg(uint32_t value)
+{
     char buffer[40];
     int pos = 0;
 
@@ -49,13 +50,15 @@ static void print_reg(uint32_t value) {
     LOG_DRIVER("%s", buffer);
 }
 
-static inline void init_pin_subscribers() {
+static inline void init_pin_subscribers()
+{
     for (int i = 0; i < PINS_PER_BANK; ++i) {
         pin_subscriber[i] = -1;
     }
 }
 
-static void print_irq_pin_subscribers() {
+static void print_irq_pin_subscribers()
+{
     LOG_DRIVER("IRQ Pin Subscribers:\n");
 
     for (int i = 0; i < PINS_PER_BANK; ++i) {
@@ -65,12 +68,14 @@ static void print_irq_pin_subscribers() {
     }
 }
 
-static inline seL4_MessageInfo_t error_response(gpio_error_t error_code) {
+static inline seL4_MessageInfo_t error_response(gpio_error_t error_code)
+{
     uint32_t e = error_code | BIT(SDDF_GPIO_RESPONSE_ERROR_BIT);
     return microkit_msginfo_new(e, 0);
 }
 
-static inline bool check_irq_permission(microkit_channel ch) {
+static inline bool check_irq_permission(microkit_channel ch)
+{
     return gpio_driver_channel_mappings[ch].irq > 0;
 }
 
@@ -84,7 +89,7 @@ void notified(microkit_channel ch)
      * not either.
      */
     if (ch == device_resources.irqs[0].id || ch == device_resources.irqs[1].id) {
-		uint32_t clear_mask = 0;
+        uint32_t clear_mask = 0;
 
         /* Go through pin and build up a mask of IRQs to clear. */
         for (int pin = 0; pin < PINS_PER_BANK; pin++) {
@@ -107,23 +112,26 @@ void notified(microkit_channel ch)
     }
 }
 
-static inline seL4_MessageInfo_t set(int pin, uint32_t value) {
-	if (value) {
-		gpio_regs->dr |= BIT(pin);
-	} else {
-		gpio_regs->dr &= ~BIT(pin);
-	}
+static inline seL4_MessageInfo_t set(int pin, uint32_t value)
+{
+    if (value) {
+        gpio_regs->dr |= BIT(pin);
+    } else {
+        gpio_regs->dr &= ~BIT(pin);
+    }
 
-	return microkit_msginfo_new(0, 0);
+    return microkit_msginfo_new(0, 0);
 }
 
-static inline seL4_MessageInfo_t get(int pin) {
+static inline seL4_MessageInfo_t get(int pin)
+{
     uint32_t value = (gpio_regs->psr >> pin) & BIT(0);
 
     return microkit_msginfo_new(value, 0);
 }
 
-static inline seL4_MessageInfo_t set_direction_output(int pin, uint32_t value) {
+static inline seL4_MessageInfo_t set_direction_output(int pin, uint32_t value)
+{
     if (value) {
         gpio_regs->dr |= BIT(pin);
     } else {
@@ -137,23 +145,27 @@ static inline seL4_MessageInfo_t set_direction_output(int pin, uint32_t value) {
     return microkit_msginfo_new(0, 0);
 }
 
-static inline seL4_MessageInfo_t set_direction_input(int pin) {
+static inline seL4_MessageInfo_t set_direction_input(int pin)
+{
     gpio_regs->gdir &= ~BIT(pin);
 
     return microkit_msginfo_new(0, 0);
 }
 
-static inline seL4_MessageInfo_t get_direction(int pin) {
+static inline seL4_MessageInfo_t get_direction(int pin)
+{
     uint32_t dir = (gpio_regs->gdir >> pin) & BIT(0);
 
     return microkit_msginfo_new(dir, 0);
 }
 
-static inline seL4_MessageInfo_t set_config(int pin, uint32_t value, uint32_t argument) {
+static inline seL4_MessageInfo_t set_config(int pin, uint32_t value, uint32_t argument)
+{
     return error_response(SDDF_GPIO_EOPNOTSUPP);
 }
 
-static inline seL4_MessageInfo_t irq_enable(int pin) {
+static inline seL4_MessageInfo_t irq_enable(int pin)
+{
     // @Tristan: I think we should clear all noise that happened before the interrupt started
     gpio_regs->isr = BIT(pin);
 
@@ -165,7 +177,8 @@ static inline seL4_MessageInfo_t irq_enable(int pin) {
 }
 
 // The semantic of disbale also means unchecking the status register
-static inline seL4_MessageInfo_t irq_disable(int pin) {
+static inline seL4_MessageInfo_t irq_disable(int pin)
+{
     gpio_regs->imr &= ~BIT(pin);
 
     THREAD_MEMORY_FENCE();
@@ -179,15 +192,14 @@ static inline seL4_MessageInfo_t irq_disable(int pin) {
     return microkit_msginfo_new(0, 0);
 }
 
-static inline seL4_MessageInfo_t irq_set_type(int pin, uint32_t type) {
+static inline seL4_MessageInfo_t irq_set_type(int pin, uint32_t type)
+{
     uint32_t shift = (pin % 16) * 2;
-    uint32_t icr_val = (pin < 16)
-    ? ((gpio_regs->icr1 >> shift) & 0x3u)
-    : ((gpio_regs->icr2 >> shift) & 0x3u);
+    uint32_t icr_val = (pin < 16) ? ((gpio_regs->icr1 >> shift) & 0x3u) : ((gpio_regs->icr2 >> shift) & 0x3u);
 
     bool both = false;
 
-   switch (type) {
+    switch (type) {
     case SDDF_IRQ_TYPE_EDGE_RISING:
         icr_val = ICR_RISING_EDGE;
         break;
@@ -218,8 +230,7 @@ static inline seL4_MessageInfo_t irq_set_type(int pin, uint32_t type) {
 
     if (both) {
         gpio_regs->edge_sel |= BIT(pin);
-    }
-    else {
+    } else {
         gpio_regs->edge_sel &= ~BIT(pin);
     }
 
@@ -279,14 +290,14 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
         return error_response(SDDF_GPIO_EPERM);
     }
     default:
-        LOG_DRIVER("Unknown request %lu to gpio from channel %u\n", microkit_msginfo_get_label(msginfo),
-                     ch);
+        LOG_DRIVER("Unknown request %lu to gpio from channel %u\n", microkit_msginfo_get_label(msginfo), ch);
         return error_response(SDDF_GPIO_EOPNOTSUPP);
     }
 }
 
-void validate_gpio_config() {
-	for (int ch = 0; ch < MICROKIT_MAX_CHANNELS; ch++) {
+void validate_gpio_config()
+{
+    for (int ch = 0; ch < MICROKIT_MAX_CHANNELS; ch++) {
         int pin = gpio_driver_channel_mappings[ch].pin;
         int irq = gpio_driver_channel_mappings[ch].irq;
 
@@ -302,13 +313,13 @@ void validate_gpio_config() {
         }
 
         // Check a client hasn't claimed the channels we use for device interrupts
-		if (device_resources.irqs[0].id == ch) {
-			LOG_DRIVER_ERR("Client can't claim channel used for device irqs : %d\n", ch);
-            assert(false);
-		} else if (device_resources.irqs[1].id == ch) {
+        if (device_resources.irqs[0].id == ch) {
             LOG_DRIVER_ERR("Client can't claim channel used for device irqs : %d\n", ch);
             assert(false);
-		}
+        } else if (device_resources.irqs[1].id == ch) {
+            LOG_DRIVER_ERR("Client can't claim channel used for device irqs : %d\n", ch);
+            assert(false);
+        }
 
         // Check pin is valid number
         if (pin >= PINS_PER_BANK) {
@@ -340,20 +351,21 @@ void validate_gpio_config() {
     }
 }
 
-void disable_all_interrupts() {
+void disable_all_interrupts()
+{
     gpio_regs->imr = 0;
 
-	THREAD_MEMORY_FENCE();
+    THREAD_MEMORY_FENCE();
 
-	microkit_irq_ack(device_resources.irqs[0].id);
-	microkit_irq_ack(device_resources.irqs[1].id);
+    microkit_irq_ack(device_resources.irqs[0].id);
+    microkit_irq_ack(device_resources.irqs[1].id);
 }
 
 void init(void)
 {
     LOG_DRIVER("Starting.\n");
 
-	assert(device_resources_check_magic(&device_resources));
+    assert(device_resources_check_magic(&device_resources));
 
     assert(device_resources.num_irqs == 2);
     assert(device_resources.num_regions == 1);

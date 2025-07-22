@@ -8,10 +8,9 @@
 #include <sddf/util/util.h>
 #include <stdint.h>
 
-
 // Shared functionality/definitions between gpio drivers and clients
 
-typedef enum  {
+typedef enum {
     // GPIO based
     SDDF_GPIO_SET,
     SDDF_GPIO_GET,
@@ -27,17 +26,17 @@ typedef enum  {
 
 typedef enum {
     SDDF_GPIO_LINE_DIRECTION_OUT = 0,
-    SDDF_GPIO_LINE_DIRECTION_IN  = 1,
+    SDDF_GPIO_LINE_DIRECTION_IN = 1,
 } SDDF_GPIO_line_direction_t;
 
 typedef enum {
-    SDDF_IRQ_TYPE_NONE          = 0x00,
-    SDDF_IRQ_TYPE_EDGE_RISING   = 0x01,
-    SDDF_IRQ_TYPE_EDGE_FALLING  = 0x02,
-    SDDF_IRQ_TYPE_EDGE_BOTH     = (SDDF_IRQ_TYPE_EDGE_FALLING | SDDF_IRQ_TYPE_EDGE_RISING),
-    SDDF_IRQ_TYPE_LEVEL_HIGH    = 0x04,
-    SDDF_IRQ_TYPE_LEVEL_LOW     = 0x08,
-    SDDF_IRQ_TYPE_LEVEL_MASK    = (SDDF_IRQ_TYPE_LEVEL_LOW | SDDF_IRQ_TYPE_LEVEL_HIGH),
+    SDDF_IRQ_TYPE_NONE = 0x00,
+    SDDF_IRQ_TYPE_EDGE_RISING = 0x01,
+    SDDF_IRQ_TYPE_EDGE_FALLING = 0x02,
+    SDDF_IRQ_TYPE_EDGE_BOTH = (SDDF_IRQ_TYPE_EDGE_FALLING | SDDF_IRQ_TYPE_EDGE_RISING),
+    SDDF_IRQ_TYPE_LEVEL_HIGH = 0x04,
+    SDDF_IRQ_TYPE_LEVEL_LOW = 0x08,
+    SDDF_IRQ_TYPE_LEVEL_MASK = (SDDF_IRQ_TYPE_LEVEL_LOW | SDDF_IRQ_TYPE_LEVEL_HIGH),
 } SDDF_GPIO_irq_line_status_t;
 
 #define SDDF_REQUEST_INTERFACE_MASK \
@@ -55,26 +54,19 @@ typedef enum {
 /**
  * Encode a raw 10-bit value into bits [19:10] of a label.
  */
-static inline uint32_t gpio_encode_value(uint32_t val) {
+static inline uint32_t gpio_encode_value(uint32_t val)
+{
     // shift up, then mask to that [19:10] window
-    return (val << GPIO_VALUE_SHIFT)
-         & BIT_MASK_RANGE(
-               GPIO_VALUE_SHIFT + GPIO_VALUE_WIDTH - 1,
-               GPIO_VALUE_SHIFT
-           );
+    return (val << GPIO_VALUE_SHIFT) & BIT_MASK_RANGE(GPIO_VALUE_SHIFT + GPIO_VALUE_WIDTH - 1, GPIO_VALUE_SHIFT);
 }
 
 /**
  * Decode bits [19:10] from a 32-bit label into a 10-bit value.
  */
-static inline uint32_t gpio_decode_value(uint32_t label) {
+static inline uint32_t gpio_decode_value(uint32_t label)
+{
     // mask to [19:10], then shift down
-    return (label
-           & BIT_MASK_RANGE(
-               GPIO_VALUE_SHIFT + GPIO_VALUE_WIDTH - 1,
-               GPIO_VALUE_SHIFT
-             ))
-         >> GPIO_VALUE_SHIFT;
+    return (label & BIT_MASK_RANGE(GPIO_VALUE_SHIFT + GPIO_VALUE_WIDTH - 1, GPIO_VALUE_SHIFT)) >> GPIO_VALUE_SHIFT;
 }
 
 #define SDDF_GPIO_RESPONSE_ERROR_BIT 19
@@ -85,5 +77,5 @@ static inline uint32_t gpio_decode_value(uint32_t label) {
 typedef enum {
     SDDF_GPIO_EOPNOTSUPP = 1,
     SDDF_GPIO_EINVAL = 2,
-    SDDF_GPIO_EPERM = 3
+    SDDF_GPIO_EPERM = 3,
 } gpio_error_t;
