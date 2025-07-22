@@ -1,9 +1,0 @@
-{
-    "compatible": [
-        "amlogic,meson-g12a-periphs-pinctrl"
-    ],
-    "resources": {
-        "regions": [],
-        "irqs": []
-    }
-}
