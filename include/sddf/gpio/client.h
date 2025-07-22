@@ -27,7 +27,7 @@ static inline int gpio_check_err(uint32_t label)
 
 /**
  * Request the direction of GPIO line associated with channel (from gpio_config.h).
- * 
+ *
  * @param microkit channel of gpio driver.
  * @return negative error code or direction of GPIO pin (SDDF_GPIO_line_direction_t).
  */
@@ -48,7 +48,7 @@ static int sddf_gpio_get_direction(uint32_t channel) {
 
 /**
  * Request for direction of GPIO line associated with channel (from gpio_config.h) to be an input.
- * 
+ *
  * @param microkit channel of gpio driver.
  * @return negative error code or 0.
  */
@@ -66,7 +66,7 @@ static int sddf_gpio_direction_input(uint32_t channel) {
 
 /**
  * Request for direction of GPIO line associated with channel (from gpio_config.h) to be an output with requested intial value.
- * 
+ *
  * @param microkit channel of gpio driver.
  * @value
  * @return negative error code or 0.
@@ -85,7 +85,7 @@ static int sddf_gpio_direction_output(uint32_t channel, uint32_t value) {
 
 /**
  * Request the value of GPIO line associated with channel (from gpio_config.h).
- * 
+ *
  * @param microkit channel of gpio driver.
  * @return negative error code or value of line.
  */
@@ -104,7 +104,7 @@ static int sddf_gpio_get(uint32_t channel) {
 /**
  * Request for value of GPIO line associated with channel (from gpio_config.h) to be requested logical level value.
  * This usually updates the output latch so may not actually drive the GPIO line if its still in input mode.
- * 
+ *
  * @param microkit channel of gpio driver.
  * @param value
  * @return negative error code or 0.
@@ -123,11 +123,11 @@ static int sddf_gpio_set(uint32_t channel, uint32_t value) {
 
 /**
  * Request the configuration of GPIO line associated with channel (from gpio_config.h) to requested config (+ arguement) value(s).
- * 
+ *
  * @param microkit channel of gpio driver.
  * @param configuration
  * @param optional arguement of config (usually a continuous value rather than flag)
- * 
+ *
  * @return negative error code or 0.
  */
 static int sddf_gpio_set_config(uint32_t channel, uint32_t config, uint32_t argument)
@@ -148,7 +148,7 @@ static int sddf_gpio_set_config(uint32_t channel, uint32_t config, uint32_t argu
 
 /**
  * Request for IRQ line associated with channel (from gpio_config.h) to be enabled.
- * 
+ *
  * @param microkit channel of gpio driver.
  * @return negative error code or 0.
  */
@@ -166,7 +166,7 @@ static int sddf_gpio_irq_enable(uint32_t channel) {
 
 /**
  * Request for IRQ line associated with channel (from gpio_config.h) to be disabled.
- * 
+ *
  * @param microkit channel of gpio driver.
  * @return negative error code or 0.
  */
@@ -184,7 +184,7 @@ static int sddf_gpio_irq_disable(uint32_t channel) {
 
 /**
  * Request for type of IRQ line associated with channel (from gpio_config.h) to be requested type .
- * 
+ *
  * @param microkit channel of gpio driver.
  * @param SDDF_GPIO_irq_line_status_t type.
  * @return negative error code or 0.
