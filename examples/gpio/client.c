@@ -44,13 +44,13 @@ static inline void polling_based()
 		ret = sddf_gpio_get(gpio_channel_2_input);
 		if (ret < 0) {
 			sddf_printf("CLIENT|ERROR: Failed to get value. Error code : %d!\n", ret);
-			while (1) {}
+            assert(false);
 		}
 
 		ret = sddf_gpio_set(gpio_channel_1_output, ret);
 		if (ret < 0) {
 			sddf_printf("CLIENT|ERROR: Failed to set value. Error code : %d!\n", ret);
-			while (1) {}
+            assert(false);
 		}
 	}
 }
@@ -82,7 +82,7 @@ static inline void irq_based()
 	int output = 0;
 
     while (1) {
-    	// Waiting of irq from driver
+        // Waiting of irq from driver
         co_switch(t_event);
 
         // change the output
@@ -90,7 +90,7 @@ static inline void irq_based()
 
         ret = sddf_gpio_set(gpio_channel_1_output, output);
 		if (ret < 0) {
-			sddf_printf("CLIENT|ERROR: Failed to set value. Error code : %d!\n", ret); 
+			sddf_printf("CLIENT|ERROR: Failed to set value. Error code : %d!\n", ret);
 			while (1) {}
 		}
     }
@@ -113,21 +113,21 @@ void client_main(void)
 	ret = sddf_gpio_direction_output(gpio_channel_1_output, 0);
 	if (ret < 0) {
 		sddf_printf("CLIENT|ERROR: Failed to set direction to output. Error code : %d!\n", ret);
-		while (1) {}
-	} 
+        assert(false);
+	}
 
 	sddf_printf("CLIENT|INFO: Setting direction of gpio channel 2 to input!\n");
 	ret = sddf_gpio_direction_input(gpio_channel_2_input);
 	if (ret < 0) {
 		sddf_printf("CLIENT|ERROR: Failed to set direction to input. Error code : %d!\n", ret);
-		while (1) {}
+        assert(false);
 	}
 
 	sddf_printf("CLIENT|INFO: Setting direction of gpio channel 3 to output!\n");
 	ret = sddf_gpio_direction_output(gpio_channel_3_output, 1);
 	if (ret < 0) {
 		sddf_printf("CLIENT|ERROR: Failed to set direction to output. Error code : %d!\n", ret);
-		while (1) {}
+        assert(false);
 	}
 
 #ifdef USE_POLLING
@@ -159,13 +159,13 @@ void init(void)
 void notified(microkit_channel ch)
 {
     if (ch == gpio_channel_1_output) {
-    	sddf_printf("CLIENT|ERROR: We should not of received IRQ from this channel! (channel : %d)\n", ch);
+        sddf_printf("CLIENT|ERROR: We should not of received IRQ from this channel! (channel : %d)\n", ch);
     } else if (ch == gpio_channel_2_input) {
-    	sddf_printf("CLIENT|INFO: Got an interupt from GPIO driver!\n");
-    	co_switch(t_main);
+        sddf_printf("CLIENT|INFO: Got an interupt from GPIO driver!\n");
+        co_switch(t_main);
     } else if (ch == gpio_channel_3_output) {
-    	sddf_printf("CLIENT|ERROR: We should not of received IRQ from this channel! (channel : %d)\n", ch);
+        sddf_printf("CLIENT|ERROR: We should not of received IRQ from this channel! (channel : %d)\n", ch);
     } else {
-    	sddf_printf("CLIENT|ERROR: Unknown channel?!\n");
+        sddf_printf("CLIENT|ERROR: Unknown channel?!\n");
     }
 }

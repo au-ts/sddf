@@ -8,9 +8,7 @@
 // This should get the next person started.
 
 /*
-=======
 linux/include/dt-bindings/interrupt-controller/amlogic,meson-g12a-gpio-intc.h
-=======
 */
 
 // Note these bindings are so that its compatible with what goes into the
@@ -134,9 +132,7 @@ linux/include/dt-bindings/interrupt-controller/amlogic,meson-g12a-gpio-intc.h
 #define IRQID_GPIOE_2		99
 
 /*
-=======
 linux/include/dt-bindings/gpio/meson-g12a-gpio.h
-=======
 */
 
 // This file also has a scheme for numbering the GPIOs which is how the
