@@ -72,10 +72,10 @@ void notified(microkit_channel ch)
     if (ch == device_resources.irqs[0].id || ch == device_resources.irqs[1].id) {
 		uint32_t clear_mask = 0;
 
-      	for (int pin = 0; pin < PINS_PER_BANK; pin++) {
+        for (int pin = 0; pin < PINS_PER_BANK; pin++) {
             // Optimisation could be to shadow the imr reg and check it directly avoiding MMIO reads.
-      	    if (gpio_regs->imr & BIT(pin) && gpio_regs->isr & BIT(pin)) {
-      			clear_mask |= BIT(pin);
+            if (gpio_regs->imr & BIT(pin) && gpio_regs->isr & BIT(pin)) {
+                clear_mask |= BIT(pin);
                 microkit_notify(pin_subscriber[pin]);
             }
         }
@@ -278,7 +278,7 @@ void validate_gpio_config() {
 
         // Irq without pin check
         if (pin < 0 && irq >= 0) {
-        	sddf_dprintf("GPIO DRIVER|ERROR: Pin must be set if IRQ is set! (ch=%d, irq=%d)\n", ch, irq);
+            sddf_dprintf("GPIO DRIVER|ERROR: Pin must be set if IRQ is set! (ch=%d, irq=%d)\n", ch, irq);
             assert(false);
         }
 
@@ -298,11 +298,11 @@ void validate_gpio_config() {
 
         // Check pin is valid number
         if (pin >= PINS_PER_BANK) {
-        	sddf_dprintf("GPIO DRIVER|ERROR: Invalid pin number : %d\n", pin);
+            sddf_dprintf("GPIO DRIVER|ERROR: Invalid pin number : %d\n", pin);
             assert(false);
         }
 
-       	// Unique-pin check
+        // Unique-pin check
         int seen = 0;
         for (int ch_2 = 0; ch_2 < MICROKIT_MAX_CHANNELS; ch_2++) {
             if (gpio_driver_channel_mappings[ch_2].pin == pin) {
@@ -314,7 +314,7 @@ void validate_gpio_config() {
             assert(false);
         }
 
-    	if (irq < 0) {
+        if (irq < 0) {
             continue;
         }
 
