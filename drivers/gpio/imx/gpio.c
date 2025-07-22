@@ -70,14 +70,13 @@ static inline bool check_irq_permission(microkit_channel ch) {
 void notified(microkit_channel ch)
 {
     if (ch == device_resources.irqs[0].id ||
-    	ch == device_resources.irqs[1].id) 
+    	ch == device_resources.irqs[1].id)
     {
 		uint32_t clear_mask = 0;
 
       	for (int pin = 0; pin < PINS_PER_BANK; pin++) {
             // Optimisation could be to shadow the imr reg and check it directly avoiding MMIO reads.
-      		if (gpio_regs->imr & BIT(pin) && gpio_regs->isr & BIT(pin)) {
-
+      	    if (gpio_regs->imr & BIT(pin) && gpio_regs->isr & BIT(pin)) {
       			clear_mask |= BIT(pin);
       			microkit_notify(pin_subscriber[pin]);
       		}
@@ -86,11 +85,10 @@ void notified(microkit_channel ch)
       	gpio_regs->isr = clear_mask;
 
       	// We want it to be cleared before the microkit acknowledges so we dont enter notified again.
-      	THREAD_MEMORY_FENCE();
+        THREAD_MEMORY_FENCE();
 
       	microkit_deferred_irq_ack(ch);
-    } 
-    else {
+    } else {
         sddf_dprintf("GPIO DRIVER|LOG: unexpected notification from channel %u\n", ch);
     }
 }
@@ -214,7 +212,7 @@ static inline seL4_MessageInfo_t irq_set_type(int pin, uint32_t type) {
         gpio_regs->edge_sel &= ~BIT(pin);
     }
 
-    return microkit_msginfo_new(0, 0); 
+    return microkit_msginfo_new(0, 0);
 }
 
 seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
@@ -292,7 +290,7 @@ void validate_gpio_config() {
             continue;
         }
 
-        // Check a client hasn't claimed the channels we use for device interrupts 
+        // Check a client hasn't claimed the channels we use for device interrupts
 		if (device_resources.irqs[0].id == ch) {
 			sddf_dprintf("GPIO DRIVER|ERROR: Client can't claim channel used for device irqs : %d\n", ch);
         	while (1) {}
@@ -318,7 +316,7 @@ void validate_gpio_config() {
         if (seen != 1) {
             sddf_dprintf("GPIO DRIVER|ERROR: pin %d mapped %d times (must be exactly once)\n", pin, seen);
         	while (1) {}
-        } 
+        }
 
     	if (irq < 0) {
             continue;
