@@ -7,14 +7,16 @@
 # GPIO example
 
 We have 3 GPIOs:
-- GPIO_1 is set to output and should be attached to resistors then an LED then Ground.
-- GPIO_2 is set to input and should start unattached to anything. Note for this example this pin should have a floating logical state of 0 or a pull down resistor attached.
-- GPIO_3 is set to output should start unattached to anythng.
+- `GPIO_1` is set to output and should be attached to resistors then an LED then Ground.
+- `GPIO_2` is set to input and should start unattached to anything. Note for this example
+  this pin should have a floating logical state of 0 or a pull down resistor attached.
+- `GPIO_3` is set to output and should start unattached to anythng.
 
-When you connect GPIO_2 and GPIO_3 together the LED should light up.
-When you disconnect GPIO_2 and GPIO_3 the LED should turn off.
+When you connect `GPIO_2` and `GPIO_3` together the LED should light up.
+When you disconnect `GPIO_2` and `GPIO_3` the LED should turn off.
 
-There is also 2 testing modes, one for polling and for IRQ based.
+There is also 2 testing modes, one for polling and for IRQ based, by default the client
+operates in polling mode. See `client.c` for changing into IRQ mode.
 
 ## Building
 

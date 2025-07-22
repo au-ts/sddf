@@ -13,11 +13,21 @@
 #include <gpio_config.h>
 #include "gpio.h"
 
+// #define DEBUG_DRIVER
+
+#ifdef DEBUG_DRIVER
+#define LOG_DRIVER(...) do{ sddf_dprintf("GPIO DRIVER|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
+#else
+#define LOG_DRIVER(...) do{}while(0)
+#endif
+
+#define LOG_DRIVER_ERR(...) do{ sddf_printf("GPIO DRIVER|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
+
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
 volatile imx_gpio_regs_t *gpio_regs;
 
-// For O(1) lookups
+/* Map pin to client channels */
 static int pin_subscriber[PINS_PER_BANK];
 
 static void print_reg(uint32_t value) {
@@ -36,7 +46,7 @@ static void print_reg(uint32_t value) {
     buffer[pos++] = '\n';
     buffer[pos] = '\0';
 
-    sddf_dprintf("GPIO DRIVER|LOG: %s", buffer);
+    LOG_DRIVER("%s", buffer);
 }
 
 static inline void init_pin_subscribers() {
@@ -46,11 +56,11 @@ static inline void init_pin_subscribers() {
 }
 
 static void print_irq_pin_subscribers() {
-    sddf_dprintf("GPIO DRIVER|LOG: IRQ Pin Subscribers:\n");
+    LOG_DRIVER("IRQ Pin Subscribers:\n");
 
     for (int i = 0; i < PINS_PER_BANK; ++i) {
         if (pin_subscriber[i] != -1) {
-            sddf_dprintf("GPIO DRIVER|LOG: Pin %d -> Subscriber %d\n", i, pin_subscriber[i]);
+            LOG_DRIVER("Pin %d -> Subscriber %d\n", i, pin_subscriber[i]);
         }
     }
 }
@@ -64,16 +74,22 @@ static inline bool check_irq_permission(microkit_channel ch) {
     return gpio_driver_channel_mappings[ch].irq > 0;
 }
 
-// NOTE: there is actual some single line ones that the manual mentions however
-// From my research they dont appear to leave the GPIO block to go to the GIC
-// Also Linux doesn't use them and you dont need them anyway because we can just use the combined lines.
 void notified(microkit_channel ch)
 {
+    /*
+     * We have two potential interrupts to deal with, one for the lower 16 pins, and another for the
+     * the upper 16 pins.
+     * There exists single interrupt lines for the device, however they do not appear to leave the GPIO
+     * block and go the interrupt controller, so we do not make use of them. It seems that Linux does
+     * not either.
+     */
     if (ch == device_resources.irqs[0].id || ch == device_resources.irqs[1].id) {
 		uint32_t clear_mask = 0;
 
+        /* Go through pin and build up a mask of IRQs to clear. */
         for (int pin = 0; pin < PINS_PER_BANK; pin++) {
-            // Optimisation could be to shadow the imr reg and check it directly avoiding MMIO reads.
+            /* If the pin is unmasked and the IRQ was related to this pin, add it to the mask and notify
+             * the client subscribed to that pin. */
             if (gpio_regs->imr & BIT(pin) && gpio_regs->isr & BIT(pin)) {
                 clear_mask |= BIT(pin);
                 microkit_notify(pin_subscriber[pin]);
@@ -87,7 +103,7 @@ void notified(microkit_channel ch)
 
         microkit_deferred_irq_ack(ch);
     } else {
-        sddf_dprintf("GPIO DRIVER|LOG: unexpected notification from channel %u\n", ch);
+        LOG_DRIVER("unexpected notification from channel %u\n", ch);
     }
 }
 
@@ -110,8 +126,7 @@ static inline seL4_MessageInfo_t get(int pin) {
 static inline seL4_MessageInfo_t set_direction_output(int pin, uint32_t value) {
     if (value) {
         gpio_regs->dr |= BIT(pin);
-    }
-    else {
+    } else {
         gpio_regs->dr &= ~BIT(pin);
     }
 
@@ -194,8 +209,7 @@ static inline seL4_MessageInfo_t irq_set_type(int pin, uint32_t type) {
 
     if (pin < 16) {
         gpio_regs->icr1 = (gpio_regs->icr1 & ~(0x3u << shift)) | (icr_val << shift);
-    }
-    else {
+    } else {
         gpio_regs->icr2 = (gpio_regs->icr2 & ~(0x3u << shift)) | (icr_val << shift);
     }
 
@@ -265,7 +279,7 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
         return error_response(SDDF_GPIO_EPERM);
     }
     default:
-        sddf_dprintf("GPIO DRIVER|LOG: Unknown request %lu to gpio from channel %u\n", microkit_msginfo_get_label(msginfo),
+        LOG_DRIVER("Unknown request %lu to gpio from channel %u\n", microkit_msginfo_get_label(msginfo),
                      ch);
         return error_response(SDDF_GPIO_EOPNOTSUPP);
     }
@@ -278,7 +292,7 @@ void validate_gpio_config() {
 
         // Irq without pin check
         if (pin < 0 && irq >= 0) {
-            sddf_dprintf("GPIO DRIVER|ERROR: Pin must be set if IRQ is set! (ch=%d, irq=%d)\n", ch, irq);
+            LOG_DRIVER_ERR("Pin must be set if IRQ is set! (ch=%d, irq=%d)\n", ch, irq);
             assert(false);
         }
 
@@ -289,16 +303,16 @@ void validate_gpio_config() {
 
         // Check a client hasn't claimed the channels we use for device interrupts
 		if (device_resources.irqs[0].id == ch) {
-			sddf_dprintf("GPIO DRIVER|ERROR: Client can't claim channel used for device irqs : %d\n", ch);
+			LOG_DRIVER_ERR("Client can't claim channel used for device irqs : %d\n", ch);
             assert(false);
 		} else if (device_resources.irqs[1].id == ch) {
-            sddf_dprintf("GPIO DRIVER|ERROR: Client can't claim channel used for device irqs : %d\n", ch);
+            LOG_DRIVER_ERR("Client can't claim channel used for device irqs : %d\n", ch);
             assert(false);
 		}
 
         // Check pin is valid number
         if (pin >= PINS_PER_BANK) {
-            sddf_dprintf("GPIO DRIVER|ERROR: Invalid pin number : %d\n", pin);
+            LOG_DRIVER_ERR("Invalid pin number : %d\n", pin);
             assert(false);
         }
 
@@ -310,7 +324,7 @@ void validate_gpio_config() {
             }
         }
         if (seen != 1) {
-            sddf_dprintf("GPIO DRIVER|ERROR: pin %d mapped %d times (must be exactly once)\n", pin, seen);
+            LOG_DRIVER_ERR("pin %d mapped %d times (must be exactly once)\n", pin, seen);
             assert(false);
         }
 
@@ -337,7 +351,7 @@ void disable_all_interrupts() {
 
 void init(void)
 {
-    sddf_dprintf("GPIO DRIVER|LOG: Starting.\n");
+    LOG_DRIVER("Starting.\n");
 
 	assert(device_resources_check_magic(&device_resources));
 
@@ -354,5 +368,5 @@ void init(void)
 
     print_irq_pin_subscribers();
 
-    sddf_dprintf("GPIO DRIVER|LOG: Finished.\n");
+    LOG_DRIVER("Finished.\n");
 }
