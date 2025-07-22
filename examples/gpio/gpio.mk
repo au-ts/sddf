@@ -99,7 +99,7 @@ ${IMAGES}: libsddf_util_debug.a
 
 client.o: ${TOP}/client.c $(CONFIG_HEADER)
 	$(CC) -c $(CFLAGS) $< -o client.o
-client.elf: client.o libco.a 
+client.elf: client.o libco.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o client.elf
 
 $(DTB): $(DTS)

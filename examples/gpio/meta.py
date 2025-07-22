@@ -41,17 +41,17 @@ BOARDS: List[Board] = [
         #
         # 2. gpio="soc/bus@ff600000/bus@34400/pinctrl@40/bank@40",
         #   - Doesn't contain a compatibilty string so we cant map it
-        #   - Contains all the mapped memory regions for the peripheral GPIO bank 
+        #   - Contains all the mapped memory regions for the peripheral GPIO bank
         #
-        # 3.  gpio="soc/bus@ff800000/sys-ctrl@0/pinctrl@14" 
+        # 3.  gpio="soc/bus@ff800000/sys-ctrl@0/pinctrl@14"
         #   - This is the pinctrl node for AO bank.
         #   - It has a compatibilty string (a requirement)
         #   - This is it "amlogic,meson-g12a-aobus-pinctrl"
         #   - Probably not even useful as none of the pins are brought out
         #
         # 4. gpio="soc/bus@ff800000/sys-ctrl@0/pinctrl@14/bank@14",
-        #   - Doesn't contain a compatibilty string so we cant map it 
-        #   - Contains all the mapped memory regions for the AO GPIO bank 
+        #   - Doesn't contain a compatibilty string so we cant map it
+        #   - Contains all the mapped memory regions for the AO GPIO bank
         #
         # 5. irq_con="soc/bus@ffd00000/interrupt-controller@f080"
         #   - This is the interrupt controller node for ALL GPIO pins (AO and peripheral)
@@ -65,17 +65,17 @@ BOARDS: List[Board] = [
 
         # Therefore:
         # I think we have 2 options
-        # 
+        #
         # 1. We use gpio="soc/bus@ff600000/bus@34400/pinctrl@40" and hardcode the interrupt controller
         # Remember that gpio AO banks have no pins brought out anyway (so its useless??)
-        # 
+        #
         # 2. We need to make a seperate interrupt controller driver that takes the DTS node for it
         # Than both gpio="soc/bus@ff600000/bus@34400/pinctrl@40" and gpio="soc/bus@ff800000/sys-ctrl@0/pinctrl@14" PD's
         # Communicate with it (i think this wont be very hard)
         #
 
         # NOTE: the 2 banks have different compatiblity strings as well but the implementation for both
-        # should be almost identical 
+        # should be almost identical
     ),
      Board(
         name="maaxboard",
@@ -104,19 +104,19 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
         # soc/bus@ffd00000/interrupt-controller@f080 is not page aligned
         irq_con_mr = MemoryRegion(sdf, "irq_con", 0x1000, paddr=0xffd0f000)
         sdf.add_mr(irq_con_mr)
-        gpio_driver.add_map(Map(irq_con_mr, 0x30_100_000, "rw", cached=False)) 
+        gpio_driver.add_map(Map(irq_con_mr, 0x30_100_000, "rw", cached=False))
 
         # We fix the device irq channels at the end 54 - 61
         # This would need to match up with a protocol in gpio_config.h
         # and the driver
         gpio_driver.add_irq(Irq(97, Irq.Trigger.EDGE, 54))
-        gpio_driver.add_irq(Irq(98, Irq.Trigger.EDGE, 55)) 
-        gpio_driver.add_irq(Irq(99, Irq.Trigger.EDGE, 56)) 
-        gpio_driver.add_irq(Irq(100, Irq.Trigger.EDGE, 57)) 
-        gpio_driver.add_irq(Irq(101, Irq.Trigger.EDGE, 58)) 
-        gpio_driver.add_irq(Irq(102, Irq.Trigger.EDGE, 59)) 
-        gpio_driver.add_irq(Irq(103, Irq.Trigger.EDGE, 60)) 
-        gpio_driver.add_irq(Irq(104, Irq.Trigger.EDGE, 61)) 
+        gpio_driver.add_irq(Irq(98, Irq.Trigger.EDGE, 55))
+        gpio_driver.add_irq(Irq(99, Irq.Trigger.EDGE, 56))
+        gpio_driver.add_irq(Irq(100, Irq.Trigger.EDGE, 57))
+        gpio_driver.add_irq(Irq(101, Irq.Trigger.EDGE, 58))
+        gpio_driver.add_irq(Irq(102, Irq.Trigger.EDGE, 59))
+        gpio_driver.add_irq(Irq(103, Irq.Trigger.EDGE, 60))
+        gpio_driver.add_irq(Irq(104, Irq.Trigger.EDGE, 61))
 
         # There is GPIO_AO interupts as well (ao_irq_0 and ao_irq_1) but theres no node in the DTS for it
         # This is because they dont feed into the A55 GIC and they go into the SCP (the Always-On processor)

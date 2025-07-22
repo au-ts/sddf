@@ -69,28 +69,24 @@ static inline bool check_irq_permission(microkit_channel ch) {
 // Also Linux doesn't use them and you dont need them anyway because we can just use the combined lines.
 void notified(microkit_channel ch)
 {
-    if (ch == device_resources.irqs[0].id ||
-    	ch == device_resources.irqs[1].id) 
-    {
+    if (ch == device_resources.irqs[0].id || ch == device_resources.irqs[1].id) {
 		uint32_t clear_mask = 0;
 
       	for (int pin = 0; pin < PINS_PER_BANK; pin++) {
             // Optimisation could be to shadow the imr reg and check it directly avoiding MMIO reads.
-      		if (gpio_regs->imr & BIT(pin) && gpio_regs->isr & BIT(pin)) {
-
+      	    if (gpio_regs->imr & BIT(pin) && gpio_regs->isr & BIT(pin)) {
       			clear_mask |= BIT(pin);
-      			microkit_notify(pin_subscriber[pin]);
-      		}
-      	}
+                microkit_notify(pin_subscriber[pin]);
+            }
+        }
 
-      	gpio_regs->isr = clear_mask;
+        gpio_regs->isr = clear_mask;
 
-      	// We want it to be cleared before the microkit acknowledges so we dont enter notified again.
-      	THREAD_MEMORY_FENCE();
+        // We want it to be cleared before the microkit acknowledges so we dont enter notified again.
+        THREAD_MEMORY_FENCE();
 
-      	microkit_deferred_irq_ack(ch);
-    } 
-    else {
+        microkit_deferred_irq_ack(ch);
+    } else {
         sddf_dprintf("GPIO DRIVER|LOG: unexpected notification from channel %u\n", ch);
     }
 }
@@ -98,8 +94,7 @@ void notified(microkit_channel ch)
 static inline seL4_MessageInfo_t set(int pin, uint32_t value) {
 	if (value) {
 		gpio_regs->dr |= BIT(pin);
-	} 
-	else {
+	} else {
 		gpio_regs->dr &= ~BIT(pin);
 	}
 
@@ -174,7 +169,7 @@ static inline seL4_MessageInfo_t irq_set_type(int pin, uint32_t type) {
     uint32_t icr_val = (pin < 16)
     ? ((gpio_regs->icr1 >> shift) & 0x3u)
     : ((gpio_regs->icr2 >> shift) & 0x3u);
-    
+
     bool both = false;
 
    switch (type) {
@@ -214,7 +209,7 @@ static inline seL4_MessageInfo_t irq_set_type(int pin, uint32_t type) {
         gpio_regs->edge_sel &= ~BIT(pin);
     }
 
-    return microkit_msginfo_new(0, 0); 
+    return microkit_msginfo_new(0, 0);
 }
 
 seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
@@ -284,28 +279,27 @@ void validate_gpio_config() {
         // Irq without pin check
         if (pin < 0 && irq >= 0) {
         	sddf_dprintf("GPIO DRIVER|ERROR: Pin must be set if IRQ is set! (ch=%d, irq=%d)\n", ch, irq);
-        	while (1) {}
+            assert(false);
         }
 
-    	// Nothing to configure
+        // Nothing to configure
         if (pin < 0) {
             continue;
         }
 
-        // Check a client hasn't claimed the channels we use for device interrupts 
+        // Check a client hasn't claimed the channels we use for device interrupts
 		if (device_resources.irqs[0].id == ch) {
 			sddf_dprintf("GPIO DRIVER|ERROR: Client can't claim channel used for device irqs : %d\n", ch);
-        	while (1) {}
-		}
-        else if (device_resources.irqs[1].id == ch) {
-			sddf_dprintf("GPIO DRIVER|ERROR: Client can't claim channel used for device irqs : %d\n", ch);
-        	while (1) {}
+            assert(false);
+		} else if (device_resources.irqs[1].id == ch) {
+            sddf_dprintf("GPIO DRIVER|ERROR: Client can't claim channel used for device irqs : %d\n", ch);
+            assert(false);
 		}
 
         // Check pin is valid number
         if (pin >= PINS_PER_BANK) {
         	sddf_dprintf("GPIO DRIVER|ERROR: Invalid pin number : %d\n", pin);
-        	while (1) {}
+            assert(false);
         }
 
        	// Unique-pin check
@@ -317,8 +311,8 @@ void validate_gpio_config() {
         }
         if (seen != 1) {
             sddf_dprintf("GPIO DRIVER|ERROR: pin %d mapped %d times (must be exactly once)\n", pin, seen);
-        	while (1) {}
-        } 
+            assert(false);
+        }
 
     	if (irq < 0) {
             continue;
@@ -333,8 +327,8 @@ void validate_gpio_config() {
 }
 
 void disable_all_interrupts() {
-    gpio_regs->imr = 0;	
-    
+    gpio_regs->imr = 0;
+
 	THREAD_MEMORY_FENCE();
 
 	microkit_irq_ack(device_resources.irqs[0].id);
@@ -344,7 +338,7 @@ void disable_all_interrupts() {
 void init(void)
 {
     sddf_dprintf("GPIO DRIVER|LOG: Starting.\n");
-    
+
 	assert(device_resources_check_magic(&device_resources));
 
     assert(device_resources.num_irqs == 2);
