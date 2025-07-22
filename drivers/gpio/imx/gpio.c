@@ -174,7 +174,7 @@ static inline seL4_MessageInfo_t irq_set_type(int pin, uint32_t type) {
     uint32_t icr_val = (pin < 16)
     ? ((gpio_regs->icr1 >> shift) & 0x3u)
     : ((gpio_regs->icr2 >> shift) & 0x3u);
-    
+
     bool both = false;
 
    switch (type) {
@@ -333,8 +333,8 @@ void validate_gpio_config() {
 }
 
 void disable_all_interrupts() {
-    gpio_regs->imr = 0;	
-    
+    gpio_regs->imr = 0;
+
 	THREAD_MEMORY_FENCE();
 
 	microkit_irq_ack(device_resources.irqs[0].id);
@@ -344,7 +344,7 @@ void disable_all_interrupts() {
 void init(void)
 {
     sddf_dprintf("GPIO DRIVER|LOG: Starting.\n");
-    
+
 	assert(device_resources_check_magic(&device_resources));
 
     assert(device_resources.num_irqs == 2);
