@@ -64,7 +64,6 @@ CONFIG_HEADER := $(CONFIGS_DIR)/gpio_config.h
 IMAGES := gpio_driver.elf client.elf
 CFLAGS_ARCH := -mcpu=$(CPU) -mstrict-align -target aarch64-none-elf
 
-# @ Tristan : may be able to not compile with the sib i got rid of this (-nostdlib \)
 CFLAGS := -nostdlib \
 		  -ffreestanding \
 		  -g3 \
@@ -81,7 +80,6 @@ LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
 
 
 all: $(IMAGE_FILE)
-# @Trsitan: i dont think this is neccesary
 CHECK_FLAGS_BOARD_MD5:=.board_cflags-$(shell echo -- ${CFLAGS} ${MICROKIT_SDK} ${MICROKIT_BOARD} ${MICROKIT_CONFIG} | shasum | sed 's/ *-//')
 
 ${CHECK_FLAGS_BOARD_MD5}:
@@ -94,7 +92,7 @@ include ${LIBCO}/libco.mk
 
 ${IMAGES}: libsddf_util_debug.a
 
-# @Tristan: so it recompiles when the config file changes
+# So client recompiles when the config file changes
 -include client.d
 
 client.o: ${TOP}/client.c $(CONFIG_HEADER)

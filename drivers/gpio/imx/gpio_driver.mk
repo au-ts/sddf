@@ -26,5 +26,4 @@ clean::
 clobber::
 	rm -f gpio_driver.elf
 
-# @ Tristan: so it recompiles if the config changes
 -include gpio/gpio_driver.d
