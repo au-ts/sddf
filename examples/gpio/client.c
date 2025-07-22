@@ -25,15 +25,15 @@ cothread_t t_main;
 #define STACK_SIZE (4096)
 static char t_client_main_stack[STACK_SIZE];
 
-// #define USE_POLLING 
+// #define USE_POLLING
 
 static inline void print_instructions() {
 	sddf_printf("\nCLIENT|INFO: Connect PIN2 to PIN3 to turn on the LED!\n");
-	sddf_printf("CLIENT|INFO: Disconnect PIN2 to PIN3 to turn off the LED!\n\n"); 
+	sddf_printf("CLIENT|INFO: Disconnect PIN2 to PIN3 to turn off the LED!\n\n");
 }
 
 static inline void polling_based()
-{	
+{
 	int ret = 0;
 
 	sddf_printf("\nCLIENT|INFO: Starting Polling!\n");
@@ -43,13 +43,13 @@ static inline void polling_based()
 	while (1) {
 		ret = sddf_gpio_get(gpio_channel_2_input);
 		if (ret < 0) {
-			sddf_printf("CLIENT|ERROR: Failed to get value. Error code : %d!\n", ret); 
+			sddf_printf("CLIENT|ERROR: Failed to get value. Error code : %d!\n", ret);
 			while (1) {}
 		}
 
 		ret = sddf_gpio_set(gpio_channel_1_output, ret);
 		if (ret < 0) {
-			sddf_printf("CLIENT|ERROR: Failed to set value. Error code : %d!\n", ret); 
+			sddf_printf("CLIENT|ERROR: Failed to set value. Error code : %d!\n", ret);
 			while (1) {}
 		}
 	}
@@ -59,22 +59,22 @@ static inline void irq_based()
 {
 	int ret = 0;
 
-	sddf_printf("CLIENT|INFO: Setting type of IRQ!\n"); 
+	sddf_printf("CLIENT|INFO: Setting type of IRQ!\n");
 	// We choose SDDF_IRQ_TYPE_EDGE_BOTH to emulate the polling loop above.
 	ret = sddf_gpio_irq_set_type(gpio_channel_2_input, SDDF_IRQ_TYPE_EDGE_BOTH);
 	if (ret < 0) {
-		sddf_printf("CLIENT|ERROR: Failed to set IRQ type. Error code : %d!\n", ret); 
+		sddf_printf("CLIENT|ERROR: Failed to set IRQ type. Error code : %d!\n", ret);
 		while (1) {}
 	}
 
-	sddf_printf("CLIENT|INFO: Enabling IRQ!\n"); 
+	sddf_printf("CLIENT|INFO: Enabling IRQ!\n");
 	ret = sddf_gpio_irq_enable(gpio_channel_2_input);
 	if (ret < 0) {
-		sddf_printf("CLIENT|ERROR: Failed to enable IRQ. Error code : %d!\n", ret); 
+		sddf_printf("CLIENT|ERROR: Failed to enable IRQ. Error code : %d!\n", ret);
 		while (1) {}
 	}
 
-	sddf_printf("\nCLIENT|INFO: Starting IRQ driven loop!\n"); 
+	sddf_printf("\nCLIENT|INFO: Starting IRQ driven loop!\n");
 
 	print_instructions();
 
@@ -102,39 +102,39 @@ void client_main(void)
 		"  GPIO_1 should be attached to resistors then an LED then Ground.\n"
 		"  GPIO_2 should start unattached to anything.\n"
 		"  NOTE: for this example this pin should have a floating logical state of 0 or a pull down resistor attached.\n"
-		"  GPIO_3 should start unattached to anythng.!\n\n"); 
+		"  GPIO_3 should start unattached to anythng.!\n\n");
 
 	sddf_printf("CLIENT|INFO: Other infomation:\n"
 		"  NOTE: there are 2 modes you can use, polling and irq_based which can be changed with #define USE_POLLING\n"
 		"  NOTE: there is no debounce logic so it might not appear to work for the IRQ based loop\n\n");
 
 	int ret = 0;
-	sddf_printf("CLIENT|INFO: Setting direction of gpio channel 1 to output!\n"); 
+	sddf_printf("CLIENT|INFO: Setting direction of gpio channel 1 to output!\n");
 	ret = sddf_gpio_direction_output(gpio_channel_1_output, 0);
 	if (ret < 0) {
-		sddf_printf("CLIENT|ERROR: Failed to set direction to output. Error code : %d!\n", ret); 
+		sddf_printf("CLIENT|ERROR: Failed to set direction to output. Error code : %d!\n", ret);
 		while (1) {}
 	} 
 
-	sddf_printf("CLIENT|INFO: Setting direction of gpio channel 2 to input!\n"); 
+	sddf_printf("CLIENT|INFO: Setting direction of gpio channel 2 to input!\n");
 	ret = sddf_gpio_direction_input(gpio_channel_2_input);
 	if (ret < 0) {
-		sddf_printf("CLIENT|ERROR: Failed to set direction to input. Error code : %d!\n", ret); 
+		sddf_printf("CLIENT|ERROR: Failed to set direction to input. Error code : %d!\n", ret);
 		while (1) {}
 	}
 
-	sddf_printf("CLIENT|INFO: Setting direction of gpio channel 3 to output!\n"); 
+	sddf_printf("CLIENT|INFO: Setting direction of gpio channel 3 to output!\n");
 	ret = sddf_gpio_direction_output(gpio_channel_3_output, 1);
 	if (ret < 0) {
-		sddf_printf("CLIENT|ERROR: Failed to set direction to output. Error code : %d!\n", ret); 
+		sddf_printf("CLIENT|ERROR: Failed to set direction to output. Error code : %d!\n", ret);
 		while (1) {}
-	} 
+	}
 
 #ifdef USE_POLLING
 	polling_based();
 #else
 	irq_based();
-#endif	
+#endif
 }
 
 void init(void)
@@ -159,13 +159,13 @@ void init(void)
 void notified(microkit_channel ch)
 {
     if (ch == gpio_channel_1_output) {
-    	sddf_printf("CLIENT|ERROR: We should not of received IRQ from this channel! (channel : %d)\n", ch); 
+    	sddf_printf("CLIENT|ERROR: We should not of received IRQ from this channel! (channel : %d)\n", ch);
     } else if (ch == gpio_channel_2_input) {
-    	sddf_printf("CLIENT|INFO: Got an interupt from GPIO driver!\n"); 
+    	sddf_printf("CLIENT|INFO: Got an interupt from GPIO driver!\n");
     	co_switch(t_main);
     } else if (ch == gpio_channel_3_output) {
-    	sddf_printf("CLIENT|ERROR: We should not of received IRQ from this channel! (channel : %d)\n", ch); 
+    	sddf_printf("CLIENT|ERROR: We should not of received IRQ from this channel! (channel : %d)\n", ch);
     } else {
-    	sddf_printf("CLIENT|ERROR: Unknown channel?!\n"); 
+    	sddf_printf("CLIENT|ERROR: Unknown channel?!\n");
     }
 }

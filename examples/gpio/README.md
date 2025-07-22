@@ -4,7 +4,7 @@
     SPDX-License-Identifier: BSD-2-Clause
 -->
 
-# Gpio example
+# GPIO example
 
 We have 3 GPIOs:
 - GPIO_1 is set to output and should be attached to resistors then an LED then Ground.
@@ -14,7 +14,7 @@ We have 3 GPIOs:
 When you connect GPIO_2 and GPIO_3 together the LED should light up.
 When you disconnect GPIO_2 and GPIO_3 the LED should turn off.
 
-There is also 2 testing modes, one for polling and for for IRQ based
+There is also 2 testing modes, one for polling and for IRQ based.
 
 ## Building
 
@@ -42,9 +42,9 @@ The final bootable image will be in `zig-out/bin/loader.img`.
 ## Running
 
 NOTE: both ways emulate a BOTH EDGE driven model of changing the LED.
-Do #define USE_POLLING to use Polling mode, otherwise will default to irq based. 
+Do #define USE_POLLING to use Polling mode, otherwise will default to IRQ based.
 
-Since there is no debounce logic it may appear to not work with the irq based loop.
+Since there is no debounce logic it may appear to not work with the IRQ based loop.
 
 Make sure you chose pins that are actually set as GPIO's via the pinmux.
 
