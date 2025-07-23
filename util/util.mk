@@ -12,7 +12,7 @@
 # Both are character at a time polling (i.e., slow, and only for debugging)
 
 OBJS_LIBUTIL := cache.o sddf_printf.o libc.o assert.o bitarray.o fsmalloc.o \
-				memcmp.o memcpy.o memset.o \
+				memcmp.o memcpy.o memmove.o memset.o \
 				strcmp.o strcpy.o strlen.o strncmp.o
 
 ALL_OBJS_LIBUTIL := $(addprefix util/, ${OBJS_LIBUTIL} putchar_debug.o putchar_serial.o)
