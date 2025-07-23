@@ -22,31 +22,26 @@ REPORT_FILE = report.txt
 
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 ARCH := ${shell grep 'CONFIG_SEL4_ARCH  ' $(BOARD_DIR)/include/kernel/gen_config.h | cut -d' ' -f4}
-# Toolchain triples have inconsistent naming, below tries to automatically resolve that
-ifeq ($(strip $(TOOLCHAIN)),)
-	# Get whether the common toolchain triples exist
-	TOOLCHAIN_ARCH_NONE_ELF := $(shell command -v $(ARCH)-none-elf-gcc 2> /dev/null)
-	TOOLCHAIN_ARCH_UNKNOWN_ELF := $(shell command -v $(ARCH)-unknown-elf-gcc 2> /dev/null)
-	# Then check if they are defined and select the appropriate one
-	ifdef TOOLCHAIN_ARCH_NONE_ELF
-		TOOLCHAIN := $(ARCH)-none-elf
-	else ifdef TOOLCHAIN_ARCH_UNKNOWN_ELF
-		TOOLCHAIN := $(ARCH)-unknown-elf
-	else
-$(error "Could not find a $(ARCH) cross-compiler")
-	endif
-endif
-TOOLCHAIN := $(TOOLCHAIN)
 
-CC := $(TOOLCHAIN)-gcc
-# Usually, we use the linker directly. Since we're linking against the libc
-# for the echo server, we want to use the compiler driver so it can add its
-# knowledge of where the libc is located.
-LD := $(CC)
-AS := $(TOOLCHAIN)-as
-AR := $(TOOLCHAIN)-ar
-RANLIB := $(TOOLCHAIN)-ranlib
-OBJCOPY := $(TOOLCHAIN)-objcopy
+ifeq ($(strip $(TOOLCHAIN)),)
+	TOOLCHAIN := clang
+endif
+
+ifeq ($(strip $(TOOLCHAIN)), clang)
+	CC := clang
+	LD := ld.lld
+	AR := llvm-ar
+	RANLIB := llvm-ranlib
+	OBJCOPY := llvm-objcopy
+else
+	CC := $(TOOLCHAIN)-gcc
+	LD := $(TOOLCHAIN)-ld
+	AS := $(TOOLCHAIN)-as
+	AR := $(TOOLCHAIN)-ar
+	RANLIB := $(TOOLCHAIN)-ranlib
+	OBJCOPY := $(TOOLCHAIN)-objcopy
+endif
+
 DTC := dtc
 PYTHON ?= python3
 
@@ -119,9 +114,9 @@ IMAGES := eth_driver.elf echo0.elf echo1.elf benchmark.elf idle.elf network_virt
 	  serial_driver.elf serial_virt_tx.elf
 
 ifeq ($(ARCH),aarch64)
-	CFLAGS_ARCH := -mcpu=$(CPU) -mstrict-align
+	CFLAGS_ARCH := -mcpu=$(CPU) -target aarch64-none-elf
 else ifeq ($(ARCH),riscv64)
-	CFLAGS_ARCH := -march=rv64imafdc -mabi=lp64d
+	CFLAGS_ARCH := -march=rv64imafdc -target riscv64-none-elf
 endif
 
 CFLAGS := $(CFLAGS_ARCH) \
@@ -140,8 +135,8 @@ CFLAGS := $(CFLAGS_ARCH) \
 	  -MD \
 	  -MP
 
-LDFLAGS := $(CFLAGS_ARCH) -nostdlib -ffreestanding -L$(BOARD_DIR)/lib
-LIBS := -Wl,--start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a -Wl,--end-group
+LDFLAGS := -L$(BOARD_DIR)/lib
+LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
 
 CHECK_FLAGS_BOARD_MD5 := .board_cflags-$(shell echo -- ${CFLAGS} ${MICROKIT_SDK} ${MICROKIT_BOARD} ${MICROKIT_CONFIG} | shasum | sed 's/ *-//')
 
