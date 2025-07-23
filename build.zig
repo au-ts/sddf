@@ -354,8 +354,12 @@ pub fn build(b: *std.Build) !void {
         util.addCSourceFiles(.{
             .files = &util_src,
         });
+        const util_src_arch = switch (target.result.cpu.arch) {
+            .aarch64 => &util_src_aarch64,
+            else => unreachable,
+        };
         util.addCSourceFiles(.{
-            .files = &util_src_aarch64,
+            .files = util_src_arch,
         });
         util.addIncludePath(b.path("include"));
         util.addIncludePath(b.path("include/microkit"));
@@ -408,7 +412,6 @@ pub fn build(b: *std.Build) !void {
         });
         blk_virt.addCSourceFiles(.{
             .files = &.{ "blk/components/virt.c", "blk/components/partitioning.c" },
-            // .flags = &.{ "-DUSE_SDDF_LIBC" },
         });
         blk_virt.addIncludePath(b.path("include"));
         blk_virt.addIncludePath(b.path("include/microkit"));
