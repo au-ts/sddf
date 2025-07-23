@@ -71,6 +71,17 @@ const util_src_aarch64 = [_][]const u8{
     "util/aarch64/strncmp.S",
 };
 
+const util_src_riscv64 = [_][]const u8{
+    "util/riscv64/memcmp.c",
+    "util/riscv64/memcpy.c",
+    "util/riscv64/memmove.c",
+    "util/riscv64/memset.S",
+    "util/riscv64/strcmp.S",
+    "util/riscv64/strcpy.c",
+    "util/riscv64/strlen.c",
+    "util/riscv64/strncmp.c",
+};
+
 const util_putchar_debug_src = [_][]const u8{
     "util/assert.c",
     "util/printf.c",
@@ -357,6 +368,7 @@ pub fn build(b: *std.Build) !void {
         });
         const util_src_arch = switch (target.result.cpu.arch) {
             .aarch64 => &util_src_aarch64,
+            .riscv64 => &util_src_riscv64,
             else => unreachable,
         };
         util.addCSourceFiles(.{

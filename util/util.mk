@@ -37,6 +37,9 @@ util/%.o: ${SDDF}/util/%.c
 util/%.o: ${SDDF}/util/${ARCH}/%.S
 	${CC} ${CFLAGS} -c -o $@ $<
 
+util/%.o: ${SDDF}/util/${ARCH}/%.c
+	${CC} ${CFLAGS} -c -o $@ $<
+
 util:
 	mkdir -p $@
 
