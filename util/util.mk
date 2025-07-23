@@ -34,7 +34,7 @@ util/sddf_printf.o: ${SDDF}/util/printf.c
 util/%.o: ${SDDF}/util/%.c
 	${CC} ${CFLAGS} -c -o $@ $<
 
-util/%.o: ${SDDF}/util/%.S
+util/%.o: ${SDDF}/util/${ARCH}/%.S
 	${CC} ${CFLAGS} -c -o $@ $<
 
 util:

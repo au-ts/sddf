@@ -61,13 +61,13 @@ const util_src = [_][]const u8{
 };
 
 const util_src_aarch64 = [_][]const u8{
-    "util/memcmp.S",
-    "util/memcpy.S",
-    "util/memset.S",
-    "util/strcmp.S",
-    "util/strcpy.S",
-    "util/strlen.S",
-    "util/strlen.S",
+    "util/aarch64/memcmp.S",
+    "util/aarch64/memcpy.S",
+    "util/aarch64/memset.S",
+    "util/aarch64/strcmp.S",
+    "util/aarch64/strcpy.S",
+    "util/aarch64/strlen.S",
+    "util/aarch64/strncmp.S",
 };
 
 const util_putchar_debug_src = [_][]const u8{
