@@ -53,11 +53,21 @@ const DriverClass = struct {
 };
 
 const util_src = [_][]const u8{
-    "util/newlibc.c",
     "util/cache.c",
     "util/fsmalloc.c",
     "util/bitarray.c",
     "util/assert.c",
+    "util/libc.c",
+};
+
+const util_src_aarch64 = [_][]const u8{
+    "util/memcmp.S",
+    "util/memcpy.S",
+    "util/memset.S",
+    "util/strcmp.S",
+    "util/strcpy.S",
+    "util/strlen.S",
+    "util/strlen.S",
 };
 
 const util_putchar_debug_src = [_][]const u8{
@@ -344,6 +354,9 @@ pub fn build(b: *std.Build) !void {
         util.addCSourceFiles(.{
             .files = &util_src,
         });
+        util.addCSourceFiles(.{
+            .files = &util_src_aarch64,
+        });
         util.addIncludePath(b.path("include"));
         util.addIncludePath(b.path("include/microkit"));
         util.addIncludePath(libmicrokit_include);
@@ -395,6 +408,7 @@ pub fn build(b: *std.Build) !void {
         });
         blk_virt.addCSourceFiles(.{
             .files = &.{ "blk/components/virt.c", "blk/components/partitioning.c" },
+            // .flags = &.{ "-DUSE_SDDF_LIBC" },
         });
         blk_virt.addIncludePath(b.path("include"));
         blk_virt.addIncludePath(b.path("include/microkit"));
