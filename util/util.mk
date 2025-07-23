@@ -11,6 +11,10 @@
 # sddf_libutil_debug.a uses the microkit_dbg_putc function.
 # Both are character at a time polling (i.e., slow, and only for debugging)
 
+ifeq ($(strip $(ARCH)),)
+$(error ARCH must be specified)
+endif
+
 OBJS_LIBUTIL := cache.o sddf_printf.o libc.o assert.o bitarray.o fsmalloc.o \
 				memcmp.o memcpy.o memmove.o memset.o \
 				strcmp.o strcpy.o strlen.o strncmp.o
