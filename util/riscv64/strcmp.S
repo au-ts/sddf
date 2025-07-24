@@ -207,7 +207,7 @@ sddf_strcmp:
         ret
     #endif
   #endif
-	
+
 .Lmisaligned:
   # misaligned
   lbu   a2, 0(a0)

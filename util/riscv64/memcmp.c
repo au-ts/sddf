@@ -61,7 +61,7 @@ int sddf_memcmp(const void *m1, const void *m2, size_t n)
      then we punt to the byte compare loop.  Hopefully this will
      not turn up in inner loops.  */
     if (!TOO_SMALL_LITTLE_BLOCK(n) && !UNALIGNED_X_Y(s1, s2)) {
-      /* Otherwise, load and compare the blocks of memory one 
+      /* Otherwise, load and compare the blocks of memory one
          word at a time.  */
         a1 = (unsigned long *)s1;
         a2 = (unsigned long *)s2;
