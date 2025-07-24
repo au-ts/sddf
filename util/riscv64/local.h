@@ -1,3 +1,8 @@
+/*
+ * Copyright Newlib contributors
+ * SPDX-License-Identifier: LicenseRef-Newlib
+ */
+
 #include <limits.h>
 
 /*

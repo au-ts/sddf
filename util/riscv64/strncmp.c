@@ -1,4 +1,9 @@
 /*
+ * Copyright Newlib contributors
+ * SPDX-License-Identifier: LicenseRef-Newlib
+ */
+
+/*
 FUNCTION
 	<<strncmp>>---character string compare
 	

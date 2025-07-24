@@ -1,3 +1,8 @@
+/*
+ * Copyright Newlib contributors
+ * SPDX-License-Identifier: LicenseRef-Newlib
+ */
+
 #ifndef _XLENINT_H
 #define _XLENINT_H
 

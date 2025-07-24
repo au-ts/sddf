@@ -1,3 +1,9 @@
+/*
+ * Copyright (c) 2017  SiFive Inc. All rights reserved.
+ * Copyright (c) 2025  Marlene Fally <marlene.fally@gmail.com>
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
 /* Copyright (c) 2019  SiFive Inc. All rights reserved.
    Copyright (c) 2025  Marlene Fally <marlene.fally@gmail.com>
 

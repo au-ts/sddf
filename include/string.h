@@ -1,3 +1,8 @@
+/*
+ * Copyright 2025, UNSW
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
 #include <stddef.h>
 
 void *memset(void *s, int c, size_t n);
