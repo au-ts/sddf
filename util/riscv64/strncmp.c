@@ -6,7 +6,7 @@
 /*
 FUNCTION
 	<<strncmp>>---character string compare
-
+	
 INDEX
 	strncmp
 
