@@ -24,6 +24,10 @@ ifeq ($(strip $(USE_SDDF_LIBC)),True)
 	endif
 endif
 
+ifeq ($(ARCH),riscv64)
+	CFLAGS += -I${SDDF}/util/riscv64
+endif
+
 ALL_OBJS_LIBUTIL := $(addprefix util/, ${OBJS_LIBUTIL} putchar_debug.o putchar_serial.o)
 
 BASE_OBJS_LIBUTIL := $(addprefix util/, ${OBJS_LIBUTIL})

@@ -8,7 +8,7 @@
 #include <stdbool.h>
 #include <sddf/util/cache.h>
 #include <sddf/util/printf.h>
-#include <sddf/util/string.h>
+#include <string.h>
 #include <sddf/util/util.h>
 
 #include "virt.h"
@@ -68,7 +68,7 @@ void init(void)
 static void handle_driver()
 {
     bool client_notify[SDDF_BLK_MAX_CLIENTS];
-    sddf_memset(client_notify, 0, SDDF_BLK_MAX_CLIENTS);
+    memset(client_notify, 0, SDDF_BLK_MAX_CLIENTS);
 
     blk_resp_status_t drv_status = 0;
     uint16_t drv_success_count = 0;

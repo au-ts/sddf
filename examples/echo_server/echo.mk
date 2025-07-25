@@ -135,10 +135,6 @@ CFLAGS := $(CFLAGS_ARCH) \
 	  -MD \
 	  -MP
 
-ifeq ($(ARCH),riscv64)
-	CFLAGS += -I${SDDF}/util/riscv64
-endif
-
 LDFLAGS := -L$(BOARD_DIR)/lib
 LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
 

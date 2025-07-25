@@ -375,6 +375,7 @@ pub fn build(b: *std.Build) !void {
         });
         util.addIncludePath(b.path("include"));
         util.addIncludePath(b.path("include/microkit"));
+        util.addIncludePath(b.path("util/riscv64"));
         util.addIncludePath(libmicrokit_include);
         util.installHeadersDirectory(b.path("include"), "", .{});
         b.installArtifact(util);

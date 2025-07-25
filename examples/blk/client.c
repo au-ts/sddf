@@ -6,7 +6,7 @@
 #include <microkit.h>
 #include <sddf/util/printf.h>
 #include <sddf/util/util.h>
-#include <sddf/util/string.h>
+#include <string.h>
 #include <sddf/blk/queue.h>
 #include <sddf/blk/storage_info.h>
 #include <sddf/blk/config.h>
@@ -52,7 +52,7 @@ bool test_basic()
 
         // Copy our testing data into the block data region
         char *data_dest = (char *)blk_config.data.vaddr;
-        sddf_memcpy(data_dest, basic_data, basic_data_len);
+        memcpy(data_dest, basic_data, basic_data_len);
 
         int err = blk_enqueue_req(&blk_queue, BLK_REQ_WRITE, 0, REQUEST_BLK_NUMBER, REQUEST_NUM_BLOCKS, 0);
         assert(!err);
