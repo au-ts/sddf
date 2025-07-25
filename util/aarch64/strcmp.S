@@ -53,7 +53,7 @@
    NUL too in big-endian, byte-reverse the data before the NUL check.  */
 
 
-ENTRY (sddf_strcmp)
+ENTRY (strcmp)
 	sub	off2, src2, src1
 	mov	zeroones, REP8_01
 	and	tmp, src1, 7
@@ -186,5 +186,5 @@ L(done):
 	sub	result, data1, data2
 	ret
 
-END (sddf_strcmp)
+END (strcmp)
 #endif

@@ -15,9 +15,14 @@ ifeq ($(strip $(ARCH)),)
 $(error ARCH must be specified)
 endif
 
-OBJS_LIBUTIL := cache.o sddf_printf.o libc.o assert.o bitarray.o fsmalloc.o \
-				memcmp.o memcpy.o memmove.o memset.o \
-				strcmp.o strcpy.o strlen.o strncmp.o
+OBJS_LIBUTIL := cache.o sddf_printf.o assert.o bitarray.o fsmalloc.o
+
+ifeq ($(strip $(USE_SDDF_LIBC)),True)
+	OBJS_LIBUTIL += libc.o memcmp.o memcpy.o memset.o strcmp.o strcpy.o strlen.o strncmp.o
+	ifeq ($(ARCH),riscv64)
+		OBJS_LIBUTIL += memmove.o
+	endif
+endif
 
 ALL_OBJS_LIBUTIL := $(addprefix util/, ${OBJS_LIBUTIL} putchar_debug.o putchar_serial.o)
 

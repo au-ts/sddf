@@ -7,24 +7,44 @@
 
 #pragma once
 #include <stddef.h>
+#include <string.h>
 
-extern void *sddf_memset(void *s, int c, size_t n);
-extern void *sddf_memcpy(void *dest, const void *src, size_t n);
-extern char *sddf_strcpy(char *restrict dest, const char *restrict src);
-extern char *sddf_strncpy(char *dest, const char *restrict src, size_t dsize);
-extern int sddf_strcmp(const char *a, const char *b);
-extern int sddf_strncmp(const char *a, const char *b, size_t n);
-extern char *sddf_strchr(const char *s, int c);
-extern int sddf_memcmp(const void *a, const void *b, size_t n);
-extern size_t sddf_strlen(const char *s);
-extern void *sddf_memmove(void *dest, const void *src, size_t n);
-
-static inline char *sddf_strcat(char *restrict dest, const char *restrict src)
+static inline void *sddf_memset(void *s, int c, size_t n)
 {
-    char *to = dest;
-    while (*to) {
-        to++;
-    };
-    sddf_strcpy(to, src);
-    return dest;
+    return memset(s, c, n);
+}
+
+static inline void *sddf_memcpy(void *dest, const void *src, size_t n)
+{
+    return memcpy(dest, src, n);
+}
+
+static inline char *sddf_strcpy(char *restrict dest, const char *restrict src)
+{
+    return strcpy(dest, src);
+}
+
+static inline int sddf_strcmp(const char *a, const char *b)
+{
+    return strcmp(a, b);
+}
+
+static inline int sddf_strncmp(const char *a, const char *b, size_t n)
+{
+    return strncmp(a, b, n);
+}
+
+static inline int sddf_memcmp(const void *a, const void *b, size_t n)
+{
+    return memcmp(a, b, n);
+}
+
+static inline size_t sddf_strlen(const char *s)
+{
+    return strlen(s);
+}
+
+static inline void *sddf_memmove(void *dest, const void *src, size_t n)
+{
+    return memmove(dest, src, n);
 }

@@ -57,7 +57,7 @@
 #define LS_BK lsl
 #endif
 
-ENTRY (sddf_strncmp)
+ENTRY (strncmp)
 	cbz	limit, L(ret0)
 	eor	tmp1, src1, src2
 	mov	zeroones, #REP8_01
@@ -304,5 +304,5 @@ L(syndrome_check):
 L(ret0):
 	mov	result, #0
 	ret
-END(sddf_strncmp)
+END(strncmp)
 #endif

@@ -23,7 +23,7 @@
 #include "local.h"
 #include "xlenint.h"
 #include <string.h>
-#include "sys/asm.h"
+#include <sys/asm.h>
 
 #define unlikely(X) __builtin_expect (!!(X), 0)
 
@@ -62,7 +62,7 @@ __libc_load_xlen (const void *src)
 
 void *
 __inhibit_loop_to_libcall
-sddf_memcpy (void *__restrict aa, const void *__restrict bb, size_t n)
+memcpy (void *__restrict aa, const void *__restrict bb, size_t n)
 {
   unsigned char *a = (unsigned char *)aa;
   const unsigned char *b = (const unsigned char *)bb;

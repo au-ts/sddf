@@ -14,7 +14,7 @@
    http://www.opensource.org/licenses.
 */
 
-#include "sys/asm.h"
+#include <sys/asm.h>
 
 
 #define BYTE_TBL_SZ   31
@@ -48,13 +48,13 @@
 
 
 .text
-.global sddf_memset
-.type  sddf_memset, @function
+.global memset
+.type  memset, @function
 
-/* void *sddf_memset(void *s, int c, size_t n); */
+/* void *memset(void *s, int c, size_t n); */
 
 
-sddf_memset:
+memset:
 #if defined(PREFER_SIZE_OVER_SPEED) || defined(__OPTIMIZE_SIZE__)
   mv     a3, a0
   beqz   a2, .Ldone
@@ -306,4 +306,4 @@ sddf_memset:
 .Lexit:
   ret
 #endif
-.size  sddf_memset, .-sddf_memset
+.size  memset, .-memset

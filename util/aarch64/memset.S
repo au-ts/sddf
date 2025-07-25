@@ -24,7 +24,7 @@
 #define dstend	x4
 #define zva_val	x5
 
-ENTRY (sddf_memset)
+ENTRY (memset)
 	dup	v0.16B, valw
 	add	dstend, dstin, count
 
@@ -113,5 +113,5 @@ L(no_zva_loop):
 	stp	q0, q0, [dstend, -32]
 	ret
 
-END (sddf_memset)
+END (memset)
 #endif

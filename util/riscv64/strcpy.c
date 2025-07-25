@@ -17,7 +17,7 @@
 #include <stdbool.h>
 #include "rv_string.h"
 
-char *sddf_strcpy(char *dst, const char *src)
+char *strcpy(char *dst, const char *src)
 {
   return __libc_strcpy(dst, src, true);
 }

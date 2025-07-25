@@ -93,7 +93,7 @@ __libc_memmove_bytewise_forward_copy (unsigned char *dst,
 }
 
 void *__inhibit_loop_to_libcall
-sddf_memmove (void *dst_void, const void *src_void, size_t length)
+memmove (void *dst_void, const void *src_void, size_t length)
 {
   unsigned char *dst = dst_void;
   const unsigned char *src = src_void;

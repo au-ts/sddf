@@ -19,7 +19,7 @@
 #include <stdint.h>
 #include "rv_string.h"
 
-size_t sddf_strlen(const char *str)
+size_t strlen(const char *str)
 {
   const char *start = str;
 

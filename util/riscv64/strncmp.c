@@ -6,7 +6,7 @@
 /*
 FUNCTION
 	<<strncmp>>---character string compare
-	
+
 INDEX
 	strncmp
 
@@ -38,8 +38,8 @@ QUICKREF
 #include <limits.h>
 #include "local.h"
 
-int 
-sddf_strncmp (const char *s1,
+int
+strncmp (const char *s1,
 	const char *s2,
 	size_t n)
 {

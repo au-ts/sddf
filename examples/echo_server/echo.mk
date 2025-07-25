@@ -22,6 +22,7 @@ REPORT_FILE = report.txt
 
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 ARCH := ${shell grep 'CONFIG_SEL4_ARCH  ' $(BOARD_DIR)/include/kernel/gen_config.h | cut -d' ' -f4}
+USE_SDDF_LIBC := True
 
 ifeq ($(strip $(TOOLCHAIN)),)
 	TOOLCHAIN := clang
@@ -125,7 +126,6 @@ CFLAGS := $(CFLAGS_ARCH) \
 	  -g3 -O3 -Wall \
 	  -Wno-unused-function \
 	  -DMICROKIT_CONFIG_$(MICROKIT_CONFIG) \
-	  -DUSE_SDDF_LIBC \
 	  -I$(BOARD_DIR)/include \
 	  -I$(SDDF)/include/microkit \
 	  -I$(SDDF)/include \
@@ -134,6 +134,10 @@ CFLAGS := $(CFLAGS_ARCH) \
 	  -I${SDDF}/$(LWIPDIR)/include/ipv4 \
 	  -MD \
 	  -MP
+
+ifeq ($(ARCH),riscv64)
+	CFLAGS += -I${SDDF}/util/riscv64
+endif
 
 LDFLAGS := -L$(BOARD_DIR)/lib
 LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group

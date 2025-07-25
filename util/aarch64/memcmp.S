@@ -33,7 +33,7 @@
 #define src2end	x8
 
 
-ENTRY (sddf_memcmp)
+ENTRY (memcmp)
 	cmp	limit, 16
 	b.lo	L(less16)
 	ldp	data1, data3, [src1]
@@ -187,5 +187,5 @@ L(loop64):
 	cneg	result, result, lo
 	ret
 
-END (sddf_memcmp)
+END (memcmp)
 #endif

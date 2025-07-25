@@ -56,7 +56,8 @@
    The loop tail is handled by always copying 64 bytes from the end.
 */
 
-ENTRY (sddf_memcpy)
+ENTRY_ALIAS (memmove)
+ENTRY (memcpy)
 	add	srcend, src, count
 	add	dstend, dstin, count
 	cmp	count, 128
@@ -238,5 +239,5 @@ L(copy64_from_start):
 	stp	C_l, C_h, [dstin]
 	ret
 
-END (sddf_memcpy)
+END (memcpy)
 #endif

@@ -14,12 +14,12 @@
    http://www.opensource.org/licenses.
 */
 
-#include "sys/asm.h"
+#include <sys/asm.h>
 
 .text
-.globl sddf_strcmp
-.type  sddf_strcmp, @function
-sddf_strcmp:
+.globl strcmp
+.type  strcmp, @function
+strcmp:
 #if defined(PREFER_SIZE_OVER_SPEED) || defined(__OPTIMIZE_SIZE__)
 .Lcompare:
   lbu   a2, 0(a0)
@@ -33,7 +33,7 @@ sddf_strcmp:
   sub   a0, a2, a3
   ret
 
-.size	sddf_strcmp, .-sddf_strcmp
+.size	strcmp, .-strcmp
 #else
   li    t2, -1
 
@@ -207,7 +207,7 @@ sddf_strcmp:
         ret
     #endif
   #endif
-	
+
 .Lmisaligned:
   # misaligned
   lbu   a2, 0(a0)
@@ -240,7 +240,7 @@ sddf_strcmp:
 mask:
 .dword 0x7f7f7f7f7f7f7f7f
 #endif
-.size	sddf_strcmp, .-sddf_strcmp
+.size	strcmp, .-strcmp
 
 #if SZREG == 8 && !defined(__riscv_cmodel_large)
 .section .srodata.cst8,"aM",@progbits,8
