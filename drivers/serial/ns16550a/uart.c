@@ -38,13 +38,13 @@ volatile uintptr_t uart_base;
 
 static inline bool tx_fifo_not_full(void)
 {
-#if UART_DW_APB_REGISTERS
+// #if UART_DW_APB_REGISTERS
     /**
      * On DesignWare APB-derived 16550a-like IPs, they provide a TFNF bit in
      * the UART Status Register (USR).
      */
-    return !!(*REG_PTR(UART_USR) & UART_USR_TFNF);
-#else
+    // return !!(*REG_PTR(UART_USR) & UART_USR_TFNF);
+// #else
     /**
      * On a standard NS16550a UART IP, we don't have a "transmit FIFO (not) full"
      * indicator bit. Instead we have a FIFO empty / holding register empty bit.
@@ -79,7 +79,7 @@ static inline bool tx_fifo_not_full(void)
      * [6]: https://github.com/torvalds/linux/commit/f2d937f3bf00665ccf048b3b6616ef95859b0945
      */
     return !!(*REG_PTR(UART_LSR) & UART_LSR_THRE);
-#endif
+// #endif
 }
 
 static inline bool rx_has_data(void)
