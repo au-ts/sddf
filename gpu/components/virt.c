@@ -648,7 +648,7 @@ static bool handle_client(int cli_id)
                 continue;
             }
             memcpy((void *)(gpu_virt_cli_data_region(gpu_client_data, cli_id) + req.get_display_info.mem_offset),
-                        &get_display_info, sizeof(gpu_resp_get_display_info_t));
+                   &get_display_info, sizeof(gpu_resp_get_display_info_t));
             err = gpu_enqueue_resp(h, (gpu_resp_t) {
                                           .id = req.id,
                                           .status = GPU_RESP_OK,

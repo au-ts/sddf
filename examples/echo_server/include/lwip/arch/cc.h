@@ -65,7 +65,6 @@ typedef uintptr_t mem_ptr_t;
 #define LWIP_PLATFORM_HTONL(x) ( (((u32_t)(x))>>24) | (((x)&0xFF0000)>>8) \
                                | (((x)&0xFF00)<<8) | (((x)&0xFF)<<24) )
 
-
 /* Plaform specific diagnostic output */
 #define LWIP_PLATFORM_DIAG(x)           \
         do {                            \
