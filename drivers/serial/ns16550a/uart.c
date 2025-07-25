@@ -24,7 +24,7 @@ serial_queue_handle_t tx_queue_handle;
 volatile uintptr_t uart_base;
 
 /* TODO: Use the value from the device tree*/
-#if defined(CONFIG_PLAT_STAR64)
+#if defined(CONFIG_PLAT_STAR64) || defined(CONFIG_PLAT_CHESHIRE) || defined(CONFIG_PLAT_HIFIVE_P550)
 #define REG_IO_WIDTH 4
 #define REG_SHIFT 2
 #define REG_PTR(off)     ((volatile uint32_t *)((uart_base) + (off << REG_SHIFT)))
@@ -32,23 +32,19 @@ volatile uintptr_t uart_base;
 #define REG_IO_WIDTH 1
 #define REG_SHIFT 0
 #define REG_PTR(off)     ((volatile uint8_t *)((uart_base) + (off << REG_SHIFT)))
-#elif defined(CONFIG_PLAT_CHESHIRE)
-#define REG_IO_WIDTH 4
-#define REG_SHIFT 2
-#define REG_PTR(off)     ((volatile uint32_t *)((uart_base) + (off << REG_SHIFT)))
 #else
 #error "unknown platform reg-io-width"
 #endif
 
 static inline bool tx_fifo_not_full(void)
 {
-#if UART_DW_APB_REGISTERS
+// #if UART_DW_APB_REGISTERS
     /**
      * On DesignWare APB-derived 16550a-like IPs, they provide a TFNF bit in
      * the UART Status Register (USR).
      */
-    return !!(*REG_PTR(UART_USR) & UART_USR_TFNF);
-#else
+    // return !!(*REG_PTR(UART_USR) & UART_USR_TFNF);
+// #else
     /**
      * On a standard NS16550a UART IP, we don't have a "transmit FIFO (not) full"
      * indicator bit. Instead we have a FIFO empty / holding register empty bit.
@@ -83,7 +79,7 @@ static inline bool tx_fifo_not_full(void)
      * [6]: https://github.com/torvalds/linux/commit/f2d937f3bf00665ccf048b3b6616ef95859b0945
      */
     return !!(*REG_PTR(UART_LSR) & UART_LSR_THRE);
-#endif
+// #endif
 }
 
 static inline bool rx_has_data(void)
@@ -96,6 +92,9 @@ static void set_baud(unsigned long baud)
     /*  Divisor Latch Access Bit (DLAB) of the LCR must be set.
     *   These registers share their address with the FIFO's.
     */
+#if UART_DW_APB_REGISTERS
+    while (*REG_PTR(UART_USR) & 0x1);
+#endif
 
     uint32_t lcr_val = *REG_PTR(UART_LCR);
 
