@@ -53,11 +53,32 @@ const DriverClass = struct {
 };
 
 const util_src = [_][]const u8{
-    "util/newlibc.c",
     "util/cache.c",
     "util/fsmalloc.c",
     "util/bitarray.c",
     "util/assert.c",
+    "util/libc.c",
+};
+
+const util_src_aarch64 = [_][]const u8{
+    "util/aarch64/memcmp.S",
+    "util/aarch64/memcpy.S",
+    "util/aarch64/memset.S",
+    "util/aarch64/strcmp.S",
+    "util/aarch64/strcpy.S",
+    "util/aarch64/strlen.S",
+    "util/aarch64/strncmp.S",
+};
+
+const util_src_riscv64 = [_][]const u8{
+    "util/riscv64/memcmp.c",
+    "util/riscv64/memcpy.c",
+    "util/riscv64/memmove.c",
+    "util/riscv64/memset.S",
+    "util/riscv64/strcmp.S",
+    "util/riscv64/strcpy.c",
+    "util/riscv64/strlen.c",
+    "util/riscv64/strncmp.c",
 };
 
 const util_putchar_debug_src = [_][]const u8{
@@ -344,8 +365,17 @@ pub fn build(b: *std.Build) !void {
         util.addCSourceFiles(.{
             .files = &util_src,
         });
+        const util_src_arch = switch (target.result.cpu.arch) {
+            .aarch64 => &util_src_aarch64,
+            .riscv64 => &util_src_riscv64,
+            else => unreachable,
+        };
+        util.addCSourceFiles(.{
+            .files = util_src_arch,
+        });
         util.addIncludePath(b.path("include"));
         util.addIncludePath(b.path("include/microkit"));
+        util.addIncludePath(b.path("util/riscv64"));
         util.addIncludePath(libmicrokit_include);
         util.installHeadersDirectory(b.path("include"), "", .{});
         b.installArtifact(util);
