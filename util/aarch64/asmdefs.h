@@ -9,12 +9,12 @@
 #define _ASMDEFS_H
 
 /* Set the line separator for the assembler.  */
-#if defined(__APPLE__)
-#define SEP %%
-#define PREF _
+#if defined (__APPLE__)
+# define SEP %%
+# define PREF _
 #else
-#define SEP ;
-#define PREF
+# define SEP ;
+# define PREF
 #endif
 
 /* Branch Target Identitication support.  */
@@ -51,7 +51,7 @@
 
 #if WANT_GNU_PROPERTY
 /* Add property note with supported features to all asm files.  */
-GNU_PROPERTY(FEATURE_1_AND, FEATURE_1_BTI | FEATURE_1_PAC)
+GNU_PROPERTY (FEATURE_1_AND, FEATURE_1_BTI|FEATURE_1_PAC)
 #endif
 
 #define ENTRY_ALIGN(name, alignment)	\
@@ -62,26 +62,26 @@ GNU_PROPERTY(FEATURE_1_AND, FEATURE_1_BTI | FEATURE_1_PAC)
 
 #define ENTRY(name)	ENTRY_ALIGN(name, 6)
 
-#if defined(__APPLE__)
+#if defined (__APPLE__)
 /* Darwin is an underscore platform, symbols need an extra _ prefix.  */
-#define ENTRY_ALIAS(name)	\
+# define ENTRY_ALIAS(name)	\
   .global _ ## name	    SEP \
   _ ## name:
 
-#define END(name)	.cfi_endproc
-#elif defined(_WIN32) || defined(__CYGWIN__)
-#define ENTRY_ALIAS(name)	\
+# define END(name)	.cfi_endproc
+#elif defined (_WIN32) || defined (__CYGWIN__)
+# define ENTRY_ALIAS(name)	\
   .global name		   SEP  \
   name:
 
-#define END(name)	.cfi_endproc
+# define END(name)	.cfi_endproc
 #else
-#define ENTRY_ALIAS(name)	\
+# define ENTRY_ALIAS(name)	\
   .global name;			\
   .type name,%function;		\
   name:
 
-#define END(name)	\
+# define END(name)	\
   .cfi_endproc;		\
   .size name, .-name
 #endif

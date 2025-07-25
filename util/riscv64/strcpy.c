@@ -19,5 +19,5 @@
 
 char *sddf_strcpy(char *dst, const char *src)
 {
-    return __libc_strcpy(dst, src, true);
+  return __libc_strcpy(dst, src, true);
 }
