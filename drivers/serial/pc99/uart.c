@@ -18,6 +18,7 @@ __attribute__((__section__(".serial_driver_config"))) serial_driver_config_t con
 // @billn Need a way to express io port in sdfgen config structure
 #define IOPORT_ID 0
 #define IOPORT_BASE 0x3f8
+// @billn need some sort of "machine description" format for x86 sdfgen to automatically pull in IRQ
 #define IRQ_ID 1
 
 /*
@@ -160,13 +161,13 @@ static void handle_irq(void) {
 
 void notified(microkit_channel ch)
 {
-    if (ch == IRQ_ID) {
-        handle_irq();
-        microkit_deferred_irq_ack(IRQ_ID);
-    } else if (ch == config.tx.id) {
+    if (ch == config.tx.id) {
         tx_provide();
     } else if (ch == config.rx.id) {
         rx_return();
+    } else if (ch == IRQ_ID) {
+        handle_irq();
+        microkit_deferred_irq_ack(IRQ_ID);
     } else {
         sddf_dprintf("UART|LOG: received notification on unexpected channel: %u\n", ch);
     }
