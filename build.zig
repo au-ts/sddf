@@ -365,17 +365,22 @@ pub fn build(b: *std.Build) !void {
         util.addCSourceFiles(.{
             .files = &util_src,
         });
-        const util_src_arch = switch (target.result.cpu.arch) {
-            .aarch64 => &util_src_aarch64,
-            .riscv64 => &util_src_riscv64,
+        switch (target.result.cpu.arch) {
+            .aarch64 => {
+                util.addCSourceFiles(.{
+                    .files = &util_src_aarch64,
+                });
+            },
+            .riscv64 => {
+                util.addCSourceFiles(.{
+                    .files = &util_src_riscv64,
+                });
+                util.addIncludePath(b.path("util/riscv64"));
+            },
             else => unreachable,
-        };
-        util.addCSourceFiles(.{
-            .files = util_src_arch,
-        });
+        }
         util.addIncludePath(b.path("include"));
         util.addIncludePath(b.path("include/microkit"));
-        util.addIncludePath(b.path("util/riscv64"));
         util.addIncludePath(libmicrokit_include);
         util.installHeadersDirectory(b.path("include"), "", .{});
         b.installArtifact(util);
