@@ -42,8 +42,7 @@ __attribute__((__section__(".serial_driver_config"))) serial_driver_config_t con
 #define SERIAL_LSR_DATA_READY BIT(0)
 #define SERIAL_LSR_TRANSMITTER_EMPTY BIT(5)
 
-#define TX_CH  1
-
+serial_queue_handle_t rx_queue_handle;
 serial_queue_handle_t tx_queue_handle;
 
 void write(uint16_t port_offset, uint8_t v)
@@ -66,12 +65,19 @@ void init(void)
     assert(serial_config_check_magic(&config));
     assert(device_resources_check_magic(&device_resources));
 
+    if (config.rx_enabled) {
+        serial_queue_init(&rx_queue_handle, config.rx.queue.vaddr, config.rx.data.size, config.rx.data.vaddr);
+    }
     serial_queue_init(&tx_queue_handle, config.tx.queue.vaddr, config.tx.data.size, config.tx.data.vaddr);
 
     while (!(read(SERIAL_LSR) & 0x60)); /* wait until not busy */
 
     write(SERIAL_LCR, 0x00);
-    write(SERIAL_IER, 0x00); /* disable generating interrupts */
+    if (config.rx_enabled) {
+        write(SERIAL_IER, 0x01); /* IRQ on received data available */
+    } else {
+        write(SERIAL_IER, 0x00); /* disable generating interrupts */
+    }
     write(SERIAL_LCR, 0x80); /* line control register: command: set divisor */
     write(SERIAL_DLL, 0x01); /* set low byte of divisor to 0x01 = 115200 baud */
     write(SERIAL_DLH, 0x00); /* set high byte of divisor to 0x00 */
@@ -96,18 +102,15 @@ static void tx_provide(void)
 
     if (transferred && serial_require_consumer_signal(&tx_queue_handle)) {
         serial_cancel_consumer_signal(&tx_queue_handle);
-        microkit_notify(TX_CH);
+        microkit_notify(config.tx.id);
     }
 }
 
 void notified(microkit_channel ch)
 {
-    switch (ch) {
-    case TX_CH:
+    if (ch == config.tx.id) {
         tx_provide();
-        break;
-    default:
-        sddf_dprintf("UART|LOG: received notification on unexpected channel: %u\n", ch);
-        break;
+    } else {
+        sddf_dprintf("UART|LOG: received notification on unexpected channel: %u\n", ch);\
     }
 }
