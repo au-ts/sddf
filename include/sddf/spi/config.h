@@ -17,47 +17,65 @@
 #define SDDF_SPI_MAGIC_LEN 5
 static char SDDF_SPI_MAGIC[SDDF_SPI_MAGIC_LEN] = { 's', 'D', 'D', 'F', 0x9 };
 
-// zig; Connection
-typedef struct spi_connection_resource {
-    region_resource_t req_queue;
+// zig: DeviceConfig
+typedef struct spi_device_config {
+    bool cpha;
+    bool cpol;
+    uint64_t freq_div;
+} spi_device_config_t;
+
+// zig: Client.Connection
+typedef struct spi_client_connection_resource {
+    region_resource_t cmd_queue;
     region_resource_t resp_queue;
-    uint16_t num_buffers;
     uint8_t id;
-} spi_connection_resource_t;
-
-// zig: Virt.Client
-typedef struct spi_virt_client_config {
-    spi_connection_resource_t conn;
-    uint64_t control_size;
-    uint64_t slice_size;
-    uintptr_t driver_control_vaddr;
-    uintptr_t driver_slice_vaddr;
-    uintptr_t client_control_vaddr;
-    uintptr_t client_slice_vaddr;
-} spi_virt_client_config_t;
-
-// zig: Virt
-typedef struct spi_virt_config {
-    char magic[SDDF_SPI_MAGIC_LEN];
-    uint64_t num_clients;
-    spi_connection_resource_t driver;
-    spi_virt_client_config_t clients[SDDF_SPI_MAX_CLIENTS];
-} spi_virt_config_t;
-
-// zig: Driver
-typedef struct spi_driver_config {
-    char magic[SDDF_SPI_MAGIC_LEN];
-    spi_connection_resource_t virt;
-    uint64_t slice_size;
-} spi_driver_config_t;
+} spi_client_connection_resource_t;
 
 // zig: Client
 typedef struct spi_client_config {
     char magic[SDDF_SPI_MAGIC_LEN];
-    spi_connection_resource_t virt;
-    region_resource_t control;
-    region_resource_t slice;
+    spi_client_connection_resource_t virt;
+    region_resource_t data;
 } spi_client_config_t;
+
+// zig: Driver.Connection
+typedef struct spi_driver_connection_resource {
+    region_resource_t cmd_queue;
+    region_resource_t resp_queue;
+    region_resource_t cmd_cs_queue;
+    region_resource_t resp_cs_queue;
+    uint8_t id;
+} spi_driver_connection_resource_t;
+_Static_assert(sizeof(region_resource_t) == 16);
+_Static_assert(sizeof(spi_driver_connection_resource_t) == 16 * 4 + 8);
+_Static_assert(sizeof(bool) == 1);
+_Static_assert(sizeof(spi_device_config_t) == 16);
+
+// zig: Driver
+typedef struct spi_driver_config {
+    char magic[SDDF_SPI_MAGIC_LEN];
+    spi_driver_connection_resource_t virt;
+    region_resource_t data[SPI_CS_MAX];
+    spi_device_config_t dev_config[SPI_CS_MAX];
+} spi_driver_config_t;
+_Static_assert(sizeof(spi_driver_config_t) == 8 + 72 + 16 * 16 + 16 * 16);
+
+// zig: Virt.Client
+typedef struct spi_virt_config_client {
+    spi_client_connection_resource_t conn;
+    uint64_t data_size;
+    uint8_t cs;
+} spi_virt_config_client_t;
+
+// zig: Virt
+typedef struct spi_virt_config {
+    char magic[SDDF_SPI_MAGIC_LEN];
+    /* Client */
+    uint8_t num_clients;
+    spi_virt_config_client_t clients[SDDF_SPI_MAX_CLIENTS];
+    /* Driver */
+    spi_driver_connection_resource_t driver;
+} spi_virt_config_t;
 
 static bool spi_config_check_magic(void *config)
 {

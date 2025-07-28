@@ -41,7 +41,8 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     spi_node = dtb.node(board.spi)
 
     spi_system = Sddf.Spi(sdf, spi_node, spi_driver, spi_virt) 
-    spi_system.add_client(spi_client)
+    spi_system.add_client(spi_client, cs=2, freq_div=0x7F)
+    #spi_system.add_client(spi_client, cs=0, freq_div=0x3F)
 
     pds = [
         spi_client,

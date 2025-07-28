@@ -2,23 +2,29 @@
 #include <stdbool.h>
 
 typedef struct spi_driver_data {
-    // Per request state
-    spi_cs_line_t cs_line;
-    spi_cmd_t *cmd;
-    uint16_t num_cmds;
-    void *slice_base;
-    // Request in-progress state
-    uint8_t cmd_in_progress;
-    // Command in-progress state (effectively offsets into the slice region when combined with the 
-    // length of the command)
-    uint16_t tx_remaining;
-    uint16_t rx_remaining;
+    // Per CS state
+    void *data_region;
+    uint16_t cmd_in_progress;
+    spi_cs_t cs;
+    // Command
+    size_t read_offset;
+    size_t write_offset;
+    uint16_t len;
+    bool cs_active_after_cmd;
+    // Command in-progress state
+    uint16_t tx_progress;
+    uint16_t rx_progress;
     // Error
     spi_err_t err;
 } spi_driver_data_t;
 
 typedef enum spi_state {
-    IDLE, REQ, SEL_CMD, CMD, CMD_RET, RESP, NUM_STATES
+    SPI_STATE_IDLE, 
+    SPI_STATE_CS, 
+    SPI_STATE_SEL_CMD, 
+    SPI_STATE_CMD, 
+    SPI_STATE_CMD_RET, 
+    SPI_STATE_RESP, 
 } spi_state_t;
 
 typedef struct fsm_state {
@@ -27,24 +33,25 @@ typedef struct fsm_state {
 } fsm_state_t;
 
 static void spi_reset_state(spi_driver_data_t *s) {
-    s->cs_line = -1;
-    s->cmd = NULL;
-    s->num_cmds = -1;
-    s->slice_base = NULL;
-    s->cmd_in_progress = -1;
-    s->tx_remaining = -1;
-    s->rx_remaining = -1;
+    s->data_region = NULL;
+    s->cmd_in_progress = 0;
+    s->read_offset = -1;
+    s->write_offset = -1;
+    s->len = 0;
+    s->cs_active_after_cmd = false;
+    s->tx_progress = -1;
+    s->rx_progress = -1;
     s->err = SPI_ERR_OK;
 }
 
 char *fsm_str(spi_state_t state) {
     switch (state) {
-        case IDLE:      return "IDLE";
-        case REQ:       return "REQ";
-        case SEL_CMD:   return "SEL_CMD";
-        case CMD:       return "CMD";
-        case CMD_RET:   return "CMD_RET";
-        case RESP:      return "RESP";
+        case SPI_STATE_IDLE:      return "IDLE";
+        case SPI_STATE_CS:       return "REQ";
+        case SPI_STATE_SEL_CMD:   return "SEL_CMD";
+        case SPI_STATE_CMD:       return "CMD";
+        case SPI_STATE_CMD_RET:   return "CMD_RET";
+        case SPI_STATE_RESP:      return "RESP";
         default:        return "INVALID";
     }
 }
@@ -53,13 +60,7 @@ char *fsm_str(spi_state_t state) {
 
 #define PULP_MAX_CS_LINE        (3)
 
-#define TX_FIFO_WORD_DEPTH      (72)
-#define TX_FIFO_BYTE_DEPTH      (TX_FIFO_WORD_DEPTH * sizeof(uint32_t))
-#define RX_FIFO_WORD_DEPTH      (64)
-#define RX_FIFO_BYTE_DEPTH      (RX_FIFO_WORD_DEPTH * sizeof(uint32_t))
-#define MIN_FIFO_WORD_DEPTH     (MIN(TX_FIFO_WORD_DEPTH, RX_FIFO_WORD_DEPTH))
-#define MIN_FIFO_BYTE_DEPTH     (MIN_FIFO_WORD_DEPTH * sizeof(uint32_t))
-
+#define FIFO_DEPTH (64)
 
 #define DEFAULT_DEVICE_CONFIG   (CONFIGOPTS_CLKDIV(0x7C))
 

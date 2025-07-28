@@ -1,0 +1,47 @@
+
+#include <sddf/spi/libspi.h>
+
+typedef struct w25qxx_cmd {
+    uint8_t inst;
+    uint8_t addr[3];
+} w25qxx_cmd_t;
+
+_Static_assert(sizeof(w25qxx_cmd_t) == 4);
+
+typedef struct w25qxx_layout {
+    w25qxx_cmd_t cmd[3];
+    uint32_t data[];
+} w25qxx_layout_t;
+
+typedef struct w25qxx_conf {
+    libspi_conf_t *libspi_conf;
+    w25qxx_layout_t *data;
+    uint8_t cmd_idx;
+} w25qxx_conf_t;
+
+typedef enum w25qxx_inst {
+    W25QXX_INST_WRITE_ENABLE = 0x06,
+
+    W25QXX_INST_JEDEC_ID = 0x9F,
+
+    W25QXX_INST_READ_DATA = 0x03,
+
+    W25QXX_INST_PAGE_PROGRAM = 0x02,
+
+    W25QXX_INST_BLOCK_ERASE_64KB = 0xD8,
+    W25QXX_INST_CHIP_ERASE = 0xC7,
+
+    W25QXX_INST_READ_STATUS_REGISTER_1 = 0x05,
+    W25QXX_INST_READ_STATUS_REGISTER_2 = 0x35,
+    W25QXX_INST_READ_STATUS_REGISTER_3 = 0x15,
+
+    W25QXX_INST_ENABLE_RESET = 0x66,
+    W25QXX_INST_RESET_DEVICE = 0x99,
+} w25qxx_inst_t;
+
+#define W25QXX_PG_SZ (256)
+#define W25QXX_STATUS_BUSY(status) ((status) & BIT(0))
+
+int w25qxx_reset(w25qxx_conf_t *conf);
+int w25qxx_get_ids(w25qxx_conf_t *conf, uint8_t *manufacturer_id, uint16_t *device_id);
+

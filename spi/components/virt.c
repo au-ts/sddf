@@ -10,7 +10,6 @@
 #include <sddf/util/printf.h>
 
 #define DEBUG_VIRT
-
 #ifdef DEBUG_VIRT
 #define LOG_VIRT(...) do{ sddf_dprintf("SPI VIRT|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
 #else
@@ -19,213 +18,201 @@
 
 #define LOG_VIRT_ERR(...) do{ sddf_printf("SPI VIRT|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
-#define BUS_UNCLAIMED (-1)
+#define CLIENT_CH_OFFSET (1)
 
-#define CLIENT_CH_OFFSET 1
+uint64_t cs_to_client_id[SPI_CS_MAX];
+
+spi_cmd_t tx[NUM_QUEUE_ENTRIES];
+uint32_t tx_len;
+bool tx_cached;
+spi_cs_t tx_cs;
 
 __attribute__((__section__(".spi_virt_config"))) spi_virt_config_t config;
 
-spi_queue_handle_t client_queues[SDDF_SPI_MAX_CLIENTS];
-spi_queue_handle_t driver_queue;
+static inline void log_enqueue_resp_err(spi_err_t err, uint8_t err_cmd_idx, uint64_t client_id, 
+        spi_cs_t cs) {
+    LOG_VIRT("Failed to enqueue response (err=%s, err_cmd_idx=%u) into client %lu's CS %u queue\n", 
+            err_to_str(err), err_cmd_idx, client_id, cs);
+}
 
-// Security list: owner of each spi address on the bus
-int security_list[SPI_CS_LINES_MAX];
+spi_err_t validate_cmd(spi_cmd_t *cmd, uint64_t data_region_size) {
+    size_t read_offset = cmd->read_offset;
+    size_t write_offset = cmd->read_offset; 
+    size_t len = CMD_LEN(cmd->len);
+    LOG_VIRT("CMD_LEN(len)=%lu\n", len);
+    LOG_VIRT("data_size=%lu\n", data_region_size);
+
+    bool reading = read_offset != -1;
+    bool writing = write_offset != -1;
+    size_t read_end = read_offset + len;
+    size_t write_end = write_offset + len;
+
+    bool read_unaligned = reading && read_offset & sizeof(uint32_t) - 1;
+    bool write_unaligned = writing && write_offset & sizeof(uint32_t) - 1;
+    if (read_unaligned || write_unaligned) {
+        return SPI_ERR_UNALIGNED_OFFSET;
+    }
+
+    bool read_oob = reading && read_end >= data_region_size; 
+    bool write_oob = writing && write_end >= data_region_size;
+    if (read_oob || write_oob) {
+        return SPI_ERR_OOB;
+    }
+
+    bool partial_overlap = reading && writing && 
+        ((write_offset < read_offset  && read_offset  < write_end) || 
+         (read_offset  < write_offset && write_offset < read_end ));
+    if (partial_overlap) {
+        return SPI_ERR_PARTIAL_OVERLAP;
+    }
+
+    return SPI_ERR_OK;
+}
+
+spi_resp_t find_next_tx(spi_cmd_queue_t *cmd_queue, uint64_t data_region_size) {
+    spi_resp_t resp = (spi_resp_t) {SPI_ERR_OK, -1};
+
+    uint32_t queue_len = spi_queue_length(cmd_queue->ctrl);
+    for (tx_len = 0; tx_len < queue_len; tx_len++) {
+        spi_cmd_t *cmd = &tx[tx_len];
+        // TODO: remove assert since clients can cause this to fail in a multicore scenario
+        assert(!spi_dequeue_cmd(
+                cmd_queue, 
+                &cmd->read_offset,
+                &cmd->write_offset,
+                &cmd->len,
+                &cmd->cs_active_after_cmd
+        ));
+
+        LOG_VIRT("cmd %d: read_offset=%lu, write_offset=%lu, len=%u, csaac=%b\n",
+            tx_len, cmd->read_offset, cmd->write_offset, cmd->len, cmd->cs_active_after_cmd);
+
+        // Only validate the command if no other errors were encountered
+        if (resp.err == SPI_ERR_OK) {
+            resp = (spi_resp_t) {validate_cmd(cmd, data_region_size), tx_len};
+        }
+
+        // Only return early if the TX has terminated
+        if (!cmd->cs_active_after_cmd) {
+            tx_len++;
+            return resp;
+        }
+    }
+
+    // Should only be reachable if TX has not been terminated, or queue is empty
+    return (spi_resp_t) {SPI_ERR_UNTERM_TX, -1};
+}
 
 void process_request(uint32_t client_id)
 {
-    bool enqueued = false;
-    assert(client_id < config.num_clients);
+    spi_cmd_queue_t *driver_cmd_queue = config.driver.cmd_queue.vaddr;
+    spi_cs_queue_t *cmd_cs_queue = config.driver.cmd_cs_queue.vaddr;
+    // TODO: is this even logical?
+    if (tx_cached) {
+        // The driver's request queue should be empty
+        assert(!spi_mass_enqueue_cmd(driver_cmd_queue, tx, tx_len));
+        assert(!spi_enqueue_cs(cmd_cs_queue, tx_cs));
+    }
+    tx_cached = false;
 
-    /* Do not process the request if we cannot pass it to the driver */
-    while (!spi_queue_empty(client_queues[client_id].request->ctrl) && !spi_queue_full(driver_queue.request->ctrl)) {
-        spi_cs_line_t cs_line;
-        uintptr_t control_start_vaddr;
-        uintptr_t slice_base_vaddr;
-        uint16_t len;
+    spi_cmd_queue_t *cmd_queue = config.clients[client_id].conn.cmd_queue.vaddr;
+    spi_resp_queue_t *resp_queue = config.clients[client_id].conn.resp_queue.vaddr;
+    spi_cs_t cs = config.clients[client_id].cs;
+    uint64_t data_region_size = config.clients[client_id].data_size;
 
-        // Take request from client
-        int err = spi_dequeue_request(client_queues[client_id], &cs_line, &control_start_vaddr, &slice_base_vaddr,
-                                      &len);
-        if (err) {
-            LOG_VIRT_ERR("could not dequeue from request queue\n");
+    do {
+        spi_resp_t resp = find_next_tx(cmd_queue, data_region_size);
+        LOG_VIRT("resp.err=%s\n", err_to_str(resp.err));
+        if (resp.err == SPI_ERR_OK) {
+            if (spi_mass_enqueue_cmd(driver_cmd_queue, tx, tx_len)) {
+                tx_cached = true;
+                tx_cs = cs;
+            }
+            else {
+                assert(!spi_enqueue_cs(cmd_cs_queue, cs));
+                LOG_VIRT("%p, cs - head: %u, tail=%u\n", cmd_cs_queue, cmd_cs_queue->ctrl.head, cmd_cs_queue->ctrl.tail);
+                microkit_deferred_notify(config.driver.id);
+            }
             return;
         }
 
-        // Check that client can actually access bus
-        if (cs_line > SPI_CS_LINES_MAX || security_list[cs_line] != client_id) {
-            LOG_VIRT_ERR("invalid bus address (0x%x) requested by client 0x%x\n", cs_line, client_id);
-            continue;
+        if (spi_enqueue_resp(resp_queue, resp.err, resp.err_cmd_idx)) {
+            log_enqueue_resp_err(resp.err, resp.err_cmd_idx, client_id, cs);
         }
-        LOG_VIRT("Request: bus address = %u : control = %p : len = %u\n", cs_line, (void *)control_start_vaddr, len);
-        LOG_VIRT("Data origin for this client: %p\n", (void *)config.clients[client_id].client_control_vaddr);
-
-        size_t offset = (size_t)control_start_vaddr - (size_t)config.clients[client_id].client_control_vaddr;
-        LOG_VIRT("request offset: %zu\n", offset);
-        if (offset > config.clients[client_id].control_size
-            || control_start_vaddr > config.clients[client_id].driver_control_vaddr) {
-            LOG_VIRT_ERR("invalid control vaddr (0x%lx) given by client %u.", control_start_vaddr, client_id);
-            continue;
+        if (resp.err == SPI_ERR_UNTERM_TX) {
+            microkit_deferred_notify(config.clients[client_id].conn.id);
+            return;
         }
+    } while (spi_queue_length(cmd_queue->ctrl) > 0);
 
-        // Now we need to convert the offset into an offset the driver can use in its address space.
-        uintptr_t driver_control_vaddr = (uintptr_t)(config.clients[client_id].driver_control_vaddr + offset);
-
-        // We replace the slice base of the client with the driver's base. The client doesn't need
-        // to supply one at all!
-        LOG_VIRT("Enqueueing request to driver...\n");
-        err = spi_enqueue_request(driver_queue, cs_line, driver_control_vaddr,
-                                  config.clients[client_id].driver_slice_vaddr, len);
-
-        /* If this assert fails we have a race as the driver should only ever be dequeuing */
-        assert(!err);
-
-        enqueued = true;
-    }
-
-    if (enqueued) {
-        LOG_VIRT("Firing deferred notify to driver...\n");
-        microkit_deferred_notify(config.driver.id);
-    }
+    // All erroneous and terminated transactions, notify the client
+    microkit_deferred_notify(config.clients[client_id].conn.id);
+    return;
 }
+
+uint8_t i = 0;
+#define debug() LOG_VIRT("debug: %d\n", i++);
 
 void process_response()
 {
-    /*
-     * Process all responses that the driver has queued up. We look at which client currently has the
-     * claim on the bus and deliver the response to them. If a client's response queue is full we
-     * simply drop the response (a typical client will never reach that scenario unless it has some
-     * catastrophic bug or is malicious).
-     */
-    LOG_VIRT("PROCESS RESPONSE\n");
-    while (!spi_queue_empty(driver_queue.response->ctrl)) {
-        LOG_VIRT("Handling response...\n");
-        spi_cs_line_t cs_line = 0;
-        spi_err_t error = 0;
-        size_t err_cmd = 0;
+    spi_resp_queue_t *driver_resp_queue = config.driver.resp_queue.vaddr;
+    spi_cs_queue_t *driver_cs_resp_queue = config.driver.resp_cs_queue.vaddr;
+    while (!spi_queue_empty(driver_resp_queue->ctrl)) {
+        spi_cs_t cs;
+        uint16_t err_cmd_idx;
+        spi_err_t err;
 
-        /* We trust the driver to give us a sane bus address */
-        int err = spi_dequeue_response(driver_queue, &cs_line, &error, &err_cmd);
-        /* If this assert fails we have a race as the virtualiser should be the only one dequeuing
-         * from the driver's response queue */
-        assert(!err);
+        LOG_VIRT("cs - head: %u, tail=%u\n", driver_cs_resp_queue->ctrl.head, driver_cs_resp_queue->ctrl.tail);
 
-        size_t client_id = security_list[cs_line];
-        if (client_id == BUS_UNCLAIMED) {
-            LOG_VIRT_ERR("Driver response belongs to no authenticated client!\n");
-            /* The client has released the bus before receiving all their responses, so we simply
-             * drop the response. */
-            continue;
+        assert(!spi_dequeue_cs(driver_cs_resp_queue, &cs));
+        assert(!spi_dequeue_resp(driver_resp_queue, &err, &err_cmd_idx));        
+
+        LOG_VIRT("cs=%d\n", cs);
+
+        uint64_t client_id = cs_to_client_id[cs];
+        spi_resp_queue_t *resp_queue = config.clients[client_id].conn.resp_queue.vaddr;
+        LOG_VIRT("resp_queue=%p, client_id=%lu\n", resp_queue, client_id);
+        if (spi_enqueue_resp(resp_queue, err, err_cmd_idx)) {
+            log_enqueue_resp_err(err, err_cmd_idx, client_id, cs);
         }
-
-        /* There is no point checking if the enqueue succeeds or not. */
-        spi_enqueue_response(client_queues[client_id], cs_line, error, err_cmd);
-
-        LOG_VIRT("Notifying client.\n");
-        microkit_notify(CLIENT_CH_OFFSET + client_id);
+        else {
+            microkit_notify(CLIENT_CH_OFFSET + client_id);
+        }
     }
 }
 
 void init(void)
 {
     assert(spi_config_check_magic(&config));
-    assert(config.driver.id == 0);  // @leslr: is this needed? sdfgen should remove any need
-    LOG_VIRT("initialising\n");
-    for (int i = 0; i < SPI_CS_LINES_MAX; i++) {
-        security_list[i] = BUS_UNCLAIMED;
-    }
-    driver_queue = spi_queue_init(config.driver.req_queue.vaddr, config.driver.resp_queue.vaddr);
+    assert(config.driver.id == 0);
+    assert(config.num_clients > 0);
+    tx_cached = false;
+    
+    //TODO probe HW to check if all CS lines are valid
 
-    for (int i = 0; i < config.num_clients; i++) {
-        LOG_VIRT("Initialising client %d -> CONTROL region: %p\n", i, (void *) config.clients[i].client_control_vaddr);
-        client_queues[i] = spi_queue_init(config.clients[i].conn.req_queue.vaddr,
-                                          config.clients[i].conn.resp_queue.vaddr);
+    // Reverse lookup table from CS to client IDs
+    for (uint8_t i = 0; i < SPI_CS_MAX; i++) {
+        cs_to_client_id[i] = -1;
+    }
+    for (uint8_t i = 0; i < config.num_clients; i++) {
+        spi_cs_t cs = config.clients[i].cs;
+        uint64_t client_id = config.clients[i].conn.id - CLIENT_CH_OFFSET;
+        LOG_VIRT("%d: cs=%d, client_id=%ld\n", i, cs, client_id);
+        cs_to_client_id[cs] = client_id;
     }
 }
 
 void notified(microkit_channel ch)
 {
+    microkit_channel client_id = ch - CLIENT_CH_OFFSET;
     if (ch == config.driver.id) {
         LOG_VIRT("notified by driver\n");
         process_response();
+    } else if (client_id < config.num_clients) {
+        LOG_VIRT("notified by client %u\n", client_id);
+        process_request(client_id);
     } else {
-        LOG_VIRT("notified by client %u\n", ch - CLIENT_CH_OFFSET);
-        process_request(ch - CLIENT_CH_OFFSET);
+        LOG_VIRT_ERR("spuriously notified on channel %d\n", ch);
     }
 }
 
-microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
-{
-    size_t label = microkit_msginfo_get_label(msginfo);
-    size_t bus = microkit_mr_get(SPI_BUS_SLOT);
-    uint32_t client_id = ch - CLIENT_CH_OFFSET;
-
-    if (label != SPI_BUS_CLAIM && label != SPI_BUS_RELEASE) {
-        LOG_VIRT_ERR("unknown label (0x%lx) given by client on channel 0x%x\n", label, ch);
-        return microkit_msginfo_new(SPI_FAILURE, 0);
-    }
-
-    if (bus > SPI_CS_LINES_MAX) {
-        LOG_VIRT_ERR("invalid bus address (0x%lx) given by client on channel 0x%x. Max bus address is 0x%x\n",
-                     bus, ch, SPI_CS_LINES_MAX);
-        return microkit_msginfo_new(SPI_FAILURE, 0);
-    }
-
-    uint64_t argc, cpha, cpol;
-
-    switch (label) {
-    case SPI_BUS_CLAIM:
-        argc = microkit_msginfo_get_count(msginfo);
-        if (argc != SPI_BUS_CLAIM_ARGC) {
-            LOG_VIRT_ERR("expected %d arguments, channel 0x%x sent %zu instead\n", 
-                SPI_BUS_CLAIM_ARGC, ch, argc);
-        }
-
-        // We have a valid bus address, we need to make sure no one else has claimed it.
-        if (security_list[bus] != BUS_UNCLAIMED) {
-            LOG_VIRT_ERR("bus address 0x%lx already claimed, cannot claim for channel 0x%x\n", bus, ch);
-            return microkit_msginfo_new(SPI_FAILURE, 0);
-        }
-
-        // Validate clock phase
-        cpha = microkit_mr_get(SPI_CPHA_SLOT);
-        if (cpha != SPI_CPHA_FIRST && cpha != SPI_CPHA_SECOND) {
-            LOG_VIRT_ERR("channel 0x%x provided an invalid clock phase\n", ch);
-            return microkit_msginfo_new(SPI_FAILURE, 0);
-        }
-
-        // Validate clock polarity
-        cpol = microkit_mr_get(SPI_CPOL_SLOT);
-        if (cpol != SPI_CPOL_HIGH && cpol != SPI_CPOL_LOW) {
-            LOG_VIRT_ERR("channel 0x%x provided an invalid clock polarity\n", ch);
-            return microkit_msginfo_new(SPI_FAILURE, 0);
-        }
-
-        // Setup PPC
-        microkit_msginfo msginfo = microkit_msginfo_new(SPI_BUS_CONFIG, 3);
-        microkit_mr_set(SPI_BUS_SLOT, bus);
-        microkit_mr_set(SPI_CPOL_SLOT, cpol);
-        microkit_mr_set(SPI_CPOL_SLOT, cpha);
-        msginfo = microkit_ppcall(config.driver.id, msginfo);
-
-        if (microkit_msginfo_get_label(msginfo) == SPI_FAILURE) {
-            LOG_VIRT_ERR("failure in configuring bus address 0x%zx for channel 0x%x\n", bus, ch);
-            return microkit_msginfo_new(SPI_FAILURE, 0);
-        }
-
-        security_list[bus] = client_id;
-        break;
-    case SPI_BUS_RELEASE:
-        if (security_list[bus] != client_id) {
-            LOG_VIRT_ERR("bus address 0x%lx is not claimed by channel 0x%x\n", bus, ch);
-            return microkit_msginfo_new(SPI_FAILURE, 0);
-        }
-
-        security_list[bus] = BUS_UNCLAIMED;
-        break;
-    default:
-        LOG_VIRT_ERR("reached unreachable case\n");
-        return microkit_msginfo_new(SPI_FAILURE, 0);
-    }
-
-    return microkit_msginfo_new(SPI_SUCCESS, 0);
-}
