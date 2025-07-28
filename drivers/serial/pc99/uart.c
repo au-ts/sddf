@@ -15,8 +15,10 @@
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 __attribute__((__section__(".serial_driver_config"))) serial_driver_config_t config;
 
+// @billn Need a way to express io port in sdfgen config structure
 #define IOPORT_ID 0
 #define IOPORT_BASE 0x3f8
+#define IRQ_ID 1
 
 /*
  * Port offsets
@@ -42,6 +44,13 @@ __attribute__((__section__(".serial_driver_config"))) serial_driver_config_t con
 #define SERIAL_LSR_DATA_READY BIT(0)
 #define SERIAL_LSR_TRANSMITTER_EMPTY BIT(5)
 
+enum irq_state {
+    MODEM_STATUS = 0,
+    TX_HOLD_REG_EMPTY,
+    RX_DATA_AVAIL,
+    RX_LINE_STS
+};
+
 serial_queue_handle_t rx_queue_handle;
 serial_queue_handle_t tx_queue_handle;
 
@@ -55,9 +64,14 @@ uint8_t read(uint16_t port_offset)
     return microkit_x86_ioport_read_8((IOPORT_ID), IOPORT_BASE + port_offset);
 }
 
-int ready(void)
+int tx_ready(void)
 {
     return read(SERIAL_LSR) & SERIAL_LSR_TRANSMITTER_EMPTY;
+}
+
+int rx_ready(void)
+{
+    return read(SERIAL_LSR) & SERIAL_LSR_DATA_READY;
 }
 
 void init(void)
@@ -83,6 +97,7 @@ void init(void)
     write(SERIAL_DLH, 0x00); /* set high byte of divisor to 0x00 */
     write(SERIAL_LCR, 0x03); /* line control register: set 8 bit, no parity, 1 stop bit */
     write(SERIAL_MCR, 0x0b); /* modem control register: set DTR/RTS/OUT2 */
+    write(SERIAL_FCR, 0x00); /* set IRQ trigger level to 1 byte */
 
     read(SERIAL_RBR); /* clear receiver port */
     read(SERIAL_LSR); /* clear line status port */
@@ -95,7 +110,7 @@ static void tx_provide(void)
     char c;
     while (!serial_queue_empty(&tx_queue_handle, tx_queue_handle.queue->head)) {
         serial_dequeue(&tx_queue_handle, &c);
-        while (!ready());
+        while (!tx_ready());
         write(SERIAL_THR, c);
         transferred = true;
     }
@@ -106,11 +121,53 @@ static void tx_provide(void)
     }
 }
 
+static void rx_return(void)
+{
+    // bool reprocess = true;
+    bool enqueued = false;
+    // while (reprocess) {
+        while (rx_ready() && !serial_queue_full(&rx_queue_handle, rx_queue_handle.queue->tail)) {
+            char c = (char) read(SERIAL_RBR);
+            serial_enqueue(&rx_queue_handle, c);
+            enqueued = true;
+        }
+
+        // if (!(uart_regs->ts & UART_TST_RX_FIFO_EMPTY) && serial_queue_full(&rx_queue_handle, rx_queue_handle.queue->tail)) {
+        //     /* Disable rx interrupts until virtualisers queue is no longer full. */
+        //     uart_regs->cr1 &= ~UART_CR1_RX_READY_INT;
+        //     serial_request_consumer_signal(&rx_queue_handle);
+        // }
+        // reprocess = false;
+
+        // if (!(uart_regs->ts & UART_TST_RX_FIFO_EMPTY) && !serial_queue_full(&rx_queue_handle, rx_queue_handle.queue->tail)) {
+        //     serial_cancel_consumer_signal(&rx_queue_handle);
+        //     uart_regs->cr1 |= UART_CR1_RX_READY_INT;
+        //     reprocess = true;
+        // }
+    // }
+
+    if (enqueued) {
+        microkit_notify(config.rx.id);
+    }
+}
+
+static void handle_irq(void) {
+    uint8_t iir = read(SERIAL_IIR) >> 1;
+    if (iir & RX_DATA_AVAIL) {
+        rx_return();
+    }
+}
+
 void notified(microkit_channel ch)
 {
-    if (ch == config.tx.id) {
+    if (ch == IRQ_ID) {
+        handle_irq();
+        microkit_deferred_irq_ack(IRQ_ID);
+    } else if (ch == config.tx.id) {
         tx_provide();
+    } else if (ch == config.rx.id) {
+        rx_return();
     } else {
-        sddf_dprintf("UART|LOG: received notification on unexpected channel: %u\n", ch);\
+        sddf_dprintf("UART|LOG: received notification on unexpected channel: %u\n", ch);
     }
 }
