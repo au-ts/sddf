@@ -26,7 +26,7 @@ endif
 
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 ARCH := ${shell grep 'CONFIG_SEL4_ARCH  ' $(BOARD_DIR)/include/kernel/gen_config.h | cut -d' ' -f4}
-USE_SDDF_LIBC := True
+SDDF_CUSTOM_LIBC := True
 
 CC := clang -target aarch64-none-elf
 LD := ld.lld

@@ -23,5 +23,16 @@ architectures):
 Additionally, internal implementations of `atoi` and `strcat` are available.
 
 ## Usage
-Simply add `USE_SDDF_LIBC := True` to your Makefile snippet. Please refer to
+
+Simply add `SDDF_CUSTOM_LIBC := True` to your Makefile snippet. Please refer to
 the `echo_server` example for one such use case.
+
+## Motivation
+
+While sDDF components do not need a full libc like you would expect on an OS
+like Linux, there are certain basic functions such as `memcpy` or `strlen` that
+are expected.
+
+It is trivial to write our own implementations of these functions, however for
+high-peformance use-cases such as networking we need optimised implementations
+which is why we vendor them.
