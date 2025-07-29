@@ -17,7 +17,7 @@ endif
 
 OBJS_LIBUTIL := cache.o sddf_printf.o assert.o bitarray.o fsmalloc.o
 
-ifeq ($(strip $(SDDF_CUSTOM_LIBC)),True)
+ifeq ($(strip $(SDDF_CUSTOM_LIBC)),1)
 	OBJS_LIBUTIL += libc.o memcmp.o memcpy.o memset.o strcmp.o strcpy.o strlen.o strncmp.o
 	ifeq ($(ARCH),riscv64)
 		OBJS_LIBUTIL += memmove.o

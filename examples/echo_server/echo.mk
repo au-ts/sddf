@@ -22,7 +22,7 @@ REPORT_FILE = report.txt
 
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 ARCH := ${shell grep 'CONFIG_SEL4_ARCH  ' $(BOARD_DIR)/include/kernel/gen_config.h | cut -d' ' -f4}
-SDDF_CUSTOM_LIBC := True
+SDDF_CUSTOM_LIBC := 1
 
 ifeq ($(strip $(TOOLCHAIN)),)
 	TOOLCHAIN := clang

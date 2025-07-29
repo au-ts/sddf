@@ -24,7 +24,7 @@ Additionally, internal implementations of `atoi` and `strcat` are available.
 
 ## Usage
 
-Simply add `SDDF_CUSTOM_LIBC := True` to your Makefile snippet. Please refer to
+Simply add `SDDF_CUSTOM_LIBC := 1` to your Makefile snippet. Please refer to
 the `echo_server` example for one such use case.
 
 ## Motivation
