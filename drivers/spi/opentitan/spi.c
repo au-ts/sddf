@@ -74,13 +74,11 @@ static inline void device_setup(void)
     // Enable the device
     regs->CONTROL = CONTROL_SPIEN | CONTROL_OUTPUT_EN;
 
-    // The driver only cares when:
-    // 1. TX FIFO is empty, and the driver should enqueue data
-    // 2. RX FIFO is at the watermark, and the driver should dequeue data
-    regs->EVENT_ENABLE = EVENT_ENABLE_TXEMPTY | EVENT_ENABLE_RXWM;
-
-    // Set the receive watermark at the max
-    regs->CONTROL |= CONTROL_RX_WATERMARK(FIFO_DEPTH * sizeof(uint32_t));
+    // Interrupt when IDLE
+    regs->EVENT_ENABLE = EVENT_ENABLE_IDLE;
+//TODO
+//    // Set the receive watermark at the max
+//    regs->CONTROL |= CONTROL_RX_WATERMARK(FIFO_DEPTH * sizeof(uint32_t));
 
     // Recieve interrupts for all errors, since an unacknowledged error could halt the device
     regs->ERROR_ENABLE = ERROR_MASK; 
@@ -104,11 +102,12 @@ static inline void device_setup(void)
  * @param watermark the number of words in the RX FIFO which will trigger an interrupt
  */
 static inline void set_rx_watermark(uint16_t watermark) {
+    uint32_t wm = watermark;
     regs->CONTROL = 
         // Mask out RX_WATERMARK bits
         (regs->CONTROL & ~CONTROL_RX_WATERMARK_MASK) |
-        // Set RX_WATERMARK
-        CONTROL_RX_WATERMARK((uint32_t) watermark / sizeof(uint32_t));
+        // Set RX_WATERMARK TODO: explain this borgenshentien
+        CONTROL_RX_WATERMARK((wm - (wm < sizeof(uint32_t) ? 0 : sizeof(uint32_t))) / sizeof(uint32_t));
 }
 
 /**
@@ -178,10 +177,10 @@ int receive_data(void *buffer, uint16_t len) {
     uint16_t num_trailing_bytes = len % sizeof(uint32_t);
 
     if (num_trailing_bytes == 0) {
-        LOG_DRIVER("returning early");
+        LOG_DRIVER("returning early\n");
         return 0;
     }
-    LOG_DRIVER("not returning early");
+    LOG_DRIVER("not returning early\n");
     
     if (poll_rx()) {
         return -1;
@@ -195,6 +194,7 @@ int receive_data(void *buffer, uint16_t len) {
     
     return 0;
 }
+
 /**
  * IDLE: Resets the driver data, and processes the next transaction if available, sleeps otherwise
  * 
@@ -240,25 +240,24 @@ void state_sel_cmd(void) {
         &driver_data.len,
         &driver_data.cs_active_after_cmd
     ));
+    driver_data.tx_progress = 0;
+    driver_data.rx_progress = 0;
+
     LOG_DRIVER("read_offset=%lu, write_offset=%lu, len=%u, csaac=%u\n", driver_data.read_offset, driver_data.write_offset, driver_data.len, driver_data.cs_active_after_cmd);
 
-    bool reading = driver_data.read_offset != -1;
-    bool writing = driver_data.write_offset != -1;
-    // Encoding 'not doing this op' as a fully completed op simplifies subsequent logic
-    driver_data.tx_progress = writing ? 0 : driver_data.len;
-    driver_data.rx_progress = reading ? 0 : driver_data.len;
+    // The driver only cares when:
+    // 1. TX FIFO is empty, and the driver should enqueue data
+    // 2. RX FIFO is at the watermark, and the driver should dequeue data
 
-    uint32_t spi_host_command = COMMAND_LEN_OFFSET(driver_data.len); 
-    if (driver_data.cs_active_after_cmd) {
-        spi_host_command |= COMMAND_CSAAT;
-    }
-
-    if (reading) {
+    uint32_t spi_host_command = COMMAND_LEN_OFFSET(driver_data.len);
+    if (driver_data.read_offset != -1) {
         spi_host_command |= COMMAND_DIRECTION_RX_ONLY;
     }
-
-    if (writing) {
+    if (driver_data.write_offset != -1) {
         spi_host_command |= COMMAND_DIRECTION_TX_ONLY;
+    }
+    if (driver_data.cs_active_after_cmd) {
+        spi_host_command |= COMMAND_CSAAT;
     }
 
     LOG_DRIVER("cmd=%x\n", spi_host_command);
@@ -268,79 +267,124 @@ void state_sel_cmd(void) {
     fsm_state.nxt_state = SPI_STATE_CMD;
 }
 
-void state_cmd(void) {
-    /*
-     * Simultaneous reading and writing is special, as the FIFO access pattern 
-     * (MISO and MOSI are still simultaneously active) looks like this:
-     * 
-     * TX: ***|***|***|... |*  |
-     * RX:    |***|***|... |*  |***
-     *
-     * The |*  | fragment is due to being unable to specify differing amounts to read and write in
-     * the same command
-     *
-     * This explains the ternary jumble below, where the len is determined by TX progress until the
-     * very last FIFO access, which is RX-only
-     * The jumble also handles read and write-only, since the first branch is selected when writing,
-     * and the second branch is always selected when reading (see above where tx_progress is set)
-     */
-    uint16_t len = (driver_data.tx_progress < driver_data.len) ? 
-        MIN(FIFO_DEPTH, driver_data.len - driver_data.tx_progress) :
-        MIN(FIFO_DEPTH, driver_data.len - driver_data.rx_progress);
-    LOG_DRIVER("len=%d\n", len);
+void write_partial_cmd() {
+    const void *tx_buffer = driver_data.data_region + driver_data.write_offset + 
+        driver_data.tx_progress;
+    uint16_t len = MIN(FIFO_DEPTH, driver_data.len - driver_data.tx_progress);
+    transmit_data(tx_buffer, len);
+    driver_data.tx_progress += len;
+    fsm_state.yield = STATUS_TXQD(regs->STATUS) != 0;
+}
 
-    fsm_state.yield = true;
-
-    // Implicitly encodes either a read-only, or write-read after the first write
-    if (driver_data.rx_progress < driver_data.len && driver_data.tx_progress > 0) {
-        void *rx_buffer = driver_data.data_region + driver_data.read_offset + 
-            driver_data.rx_progress;
-        if (receive_data(rx_buffer, len)) {
-            //TODO: spi_setup(); since diff in amt of data cannot be reconciled easily
-            driver_data.err = SPI_ERR_TIMEOUT;
-            fsm_state.nxt_state = SPI_STATE_RESP;
-            return;
-        }
-        driver_data.rx_progress += len;
-        fsm_state.yield = fsm_state.yield && STATUS_RXQD(regs->STATUS) != len && 
-            driver_data.rx_progress < driver_data.len; //TODO is this even sane?
+int read_partial_cmd() {
+    void *rx_buffer = driver_data.data_region + driver_data.read_offset + 
+        driver_data.rx_progress;
+    uint16_t len = MIN(FIFO_DEPTH, driver_data.len - driver_data.rx_progress);
+    if (receive_data(rx_buffer, len)) {
+        // Re-setup the device to recover
+        device_setup();
+        driver_data.err = SPI_ERR_TIMEOUT;
+        fsm_state.nxt_state = SPI_STATE_RESP;
+        return -1;
     }
+    driver_data.rx_progress += len;
+    fsm_state.yield = STATUS_RXQD(regs->STATUS) != len;
 
     // Set RX watermark if more words are expected
     if (driver_data.rx_progress < driver_data.len) {
         set_rx_watermark(len);
     }
 
-    // Implicitly encodes either a write-only, or write-read before write completes
-    if (driver_data.tx_progress < driver_data.len) {
-        LOG_DRIVER(
-            "data_region=%p, write_offset=%lu, tx_progress=%u\n",
-            driver_data.data_region, driver_data.write_offset, driver_data.tx_progress
-        );
-        
-        void *tx_buffer = driver_data.data_region + driver_data.write_offset + 
-            driver_data.tx_progress;
-        transmit_data(tx_buffer, len);
-        driver_data.tx_progress += len;
-        fsm_state.yield = fsm_state.yield && STATUS_TXQD(regs->STATUS) != 0;
+    return 0;
+};
+
+int read_write_partial_cmd() {
+    void *rx_buffer = driver_data.data_region + driver_data.read_offset + 
+        driver_data.rx_progress;
+    uint16_t rx_len = driver_data.tx_progress - driver_data.rx_progress;
+    uint16_t tx_len = MIN(FIFO_DEPTH, driver_data.len - driver_data.tx_progress);
+
+    bool first = driver_data.tx_progress == 0;
+    bool last = !first && driver_data.rx_progress + rx_len == driver_data.len;
+
+    if (first) {
+        write_partial_cmd();
+        set_rx_watermark(tx_len);
+    }
+    else if (!last) {
+        write_partial_cmd();
+        set_rx_watermark(tx_len);
+        if (receive_data(rx_buffer, rx_len)) {
+            // Re-setup the device to recover
+            device_setup();
+            driver_data.err = SPI_ERR_TIMEOUT;
+            fsm_state.nxt_state = SPI_STATE_RESP;
+            return -1;
+        }
+        driver_data.rx_progress += rx_len;
+        fsm_state.yield = fsm_state.yield && STATUS_RXQD(regs->STATUS) != tx_len;
+    }
+    else {
+        if (receive_data(rx_buffer, rx_len)) {
+            // Re-setup the device to recover
+            device_setup();
+            driver_data.err = SPI_ERR_TIMEOUT;
+            fsm_state.nxt_state = SPI_STATE_RESP;
+            return -1;
+        }
+        driver_data.rx_progress += rx_len;
+        fsm_state.yield = false;
+    }
+    return 0;
+}
+
+void state_cmd(void) {
+    bool reading = driver_data.read_offset != -1;
+    bool writing = driver_data.write_offset != -1;
+
+    if (reading && writing) {
+        if (read_write_partial_cmd()) {
+            return;
+        }
+    }
+    else if (reading) {
+        if (read_partial_cmd()) {
+            return;
+        }
+    }
+    else if (writing) {
+        write_partial_cmd();
     }
 
+    fsm_state.yield = true; //TODO: if this works, delete the reset of the yield logic
     fsm_state.nxt_state = SPI_STATE_CMD_RET;
 }
 
 void state_cmd_ret(void) { 
-    // Implicitly encodes the completion conditions of all four cases: read-only, write-only, 
-    // write-read, and dummy
-    bool done = driver_data.tx_progress == driver_data.len && 
-                driver_data.rx_progress == driver_data.len;
+    bool reading = driver_data.read_offset != -1;
+    bool writing = driver_data.write_offset != -1;
+    bool read_done = driver_data.rx_progress == driver_data.len;
+    bool write_done = driver_data.tx_progress == driver_data.len;
 
-    if (!done && driver_data.read_offset != -1 && driver_data.write_offset != -1) {
+    bool done;
+    if (reading && writing) {
+        done = read_done && write_done;
         uint32_t status = regs->STATUS;
-        if (!STATUS_TXEMPTY(status) || !STATUS_RXWM(status)) {
+        // Expect empty TX FIFO and RX FIFO at watermark, sleep otherwise
+        if (!done && (!STATUS_TXEMPTY(status) || !STATUS_RXWM(status))) {
             LOG_DRIVER("Expecting another interrupt, sleeping\n");
             fsm_state.yield = true;
             return;
         }
+    }
+    else if (reading) {
+        done = read_done;
+    }
+    else if (writing) {
+        done = write_done;
+    }
+    else {
+        done = STATUS_ACTIVE(regs->STATUS);
     }
 
     fsm_state.nxt_state = 

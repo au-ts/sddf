@@ -30,14 +30,17 @@ uintptr_t stacks[1];
 
 void client_main(void) {
     libspi_conf_t *conf = (libspi_conf_t *) &spi_config;
+    #define W25QXX
+    #ifndef W25QXX
     uint8_t *data = spi_config.data.vaddr;
-    int len = 64;
+    int len = 65;
     for (int i = 0; i < len; i++) {
         data[i] = i;
     }
 
-    spi_err_t err = spi_enqueue_transfer(conf, data + 0x1000, data, len, false);
-    LOG_CLIENT("err=%s\n", err_to_str(err));
+//    spi_err_t err = spi_enqueue_transfer(conf, data + 0x1000, data, len, false);
+//    LOG_CLIENT("err=%s\n", err_to_str(err));
+    spi_enqueue_read(conf, data + 0x1000, len, false);
     spi_notify(conf);
     spi_resp_t resp;
     spi_read_resp(conf, &resp);
@@ -46,32 +49,37 @@ void client_main(void) {
         LOG_CLIENT("read_data[%3d]=%3d\n", i, ((uint8_t *) data + 0x1000)[i]);
     }
 
-    #ifdef W25QXX
-    assert(spi_config_check_magic(&spi_config));
+    #else
+    w25qxx_conf_t dev_conf = {
+        conf,
+        spi_config.data.vaddr,
+        0
+    };
+    void *data = dev_conf.data->data;
 
-    // Initialize PD state
-    w25qxx_cmd = spi_config.slice.vaddr;
-    scratch = spi_config.slice.vaddr + sizeof(uint64_t);
+    w25qxx_reset(&dev_conf);
 
-    w25qxx_reset();
-    w25qxx_get_ids(); 
+    uint8_t manufacturer_id;
+    uint16_t device_id;
+    w25qxx_get_ids(&dev_conf, &manufacturer_id, &device_id); 
+    LOG_CLIENT("manufacturer_id=%x, device_id=%x\n", manufacturer_id, device_id);
+    LOG_CLIENT("status_reg_1=%02X\n", w25qxx_get_status_reg_1(&dev_conf));
 
-    LOG_CLIENT("STATUS=%06X\n", w25qxx_get_status());
+    w25qxx_global_unlock(&dev_conf);
+    w25qxx_erase_block64kb(&dev_conf, 0x23);
 
-    //w25qxx_erase_chip();
-    w25qxx_erase_block64kb(0x23);
-
-    // fill scratch
-    for (uint32_t i = 0; i <= 0x1FF; i++) {
-        ((uint8_t *) scratch)[i] = i;
+    for (uint32_t i = 0; i < 256 * 4; i++) {
+        ((uint8_t *) data)[i] = i;
     }
 
-    w25qxx_write(0x23, scratch, 0x1FF);
+    for (uint32_t i = 0; i < 4; i++) {
+        w25qxx_program_page(&dev_conf, i * W25QXX_PG_SZ, data + i * W25QXX_PG_SZ, W25QXX_PG_SZ);
+    }
 
-    w25qxx_read(0x23, scratch + 0x800, 0x1FF);
+    w25qxx_read(&dev_conf, 0x0, data + 0x1000, 4 * W25QXX_PG_SZ);
 
-    for (uint32_t i = 0; i <= 0x1FF / sizeof(uint32_t); i++) {
-        uint32_t *stuff = ((uint32_t *) (scratch + 0x800));
+    for (uint32_t i = 0; i < 4 * W25QXX_PG_SZ / sizeof(uint32_t); i++) {
+        uint32_t *stuff = ((uint32_t *) (data + 0x1000));
         LOG_CLIENT("%03X: %08X\n", i, stuff[i]);
     }
 
@@ -87,6 +95,7 @@ void client_main(void) {
 void init(void) {
     LOG_CLIENT("initializing\n");
 
+    assert(spi_config_check_magic(&spi_config));
     stacks[0] = (uintptr_t) &client_stack;
 
     // Setup cothreads

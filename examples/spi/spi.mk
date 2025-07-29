@@ -87,6 +87,7 @@ CFLAGS := -nostdlib \
 		  -I$(SDDF)/include \
 		  -I$(SDDF)/include/microkit \
 		  -I$(LIBMICROKITCO_PATH) \
+		  -I$(SDDF)/include/sddf/spi \
 		  -std=gnu23 \
 		  $(CFLAGS_ARCH)
 LDFLAGS := -L$(BOARD_DIR)/lib
@@ -107,13 +108,14 @@ $(LIBMICROKITCO_OBJ):
 include ${SPI_DRIVER}/spi_driver.mk
 include ${SDDF}/util/util.mk
 include ${SDDF}/spi/components/spi_virt.mk
+include ${SDDF}/spi/devices/w25qxx/w25qxx.mk
 
 ${IMAGES}: libsddf_util_debug.a
 
 client.o: ${TOP}/client.c
 	$(CC) -c $(CFLAGS) -I$(SDDF)/include/sddf/spi $< -o client.o
 #TODO: unbodge the extraneous include (for libmicrokitco_opts.h)
-client.elf: client.o libspi.a libmicrokitco/$(LIBMICROKITCO_OBJ)
+client.elf: client.o libspi.a libmicrokitco/$(LIBMICROKITCO_OBJ) w25qxx.o
 	$(LD) $(LDFLAGS) libsddf_util_debug.a $^ $(LIBS) -o $@
 #TODO: unbodge the libsddf stuff ^
 

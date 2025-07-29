@@ -35,6 +35,8 @@ typedef enum w25qxx_inst {
     W25QXX_INST_READ_STATUS_REGISTER_2 = 0x35,
     W25QXX_INST_READ_STATUS_REGISTER_3 = 0x15,
 
+    W25QXX_INST_GLOBAL_BLOCK_SECTOR_UNLOCK = 0x98,
+
     W25QXX_INST_ENABLE_RESET = 0x66,
     W25QXX_INST_RESET_DEVICE = 0x99,
 } w25qxx_inst_t;
@@ -44,4 +46,11 @@ typedef enum w25qxx_inst {
 
 int w25qxx_reset(w25qxx_conf_t *conf);
 int w25qxx_get_ids(w25qxx_conf_t *conf, uint8_t *manufacturer_id, uint16_t *device_id);
+int w25qxx_read(w25qxx_conf_t *conf, uint32_t addr, void *buffer, uint16_t len);
+int w25qxx_write_en(w25qxx_conf_t *conf);
+int w25qxx_program_page(w25qxx_conf_t *conf, uint32_t addr, void *buffer, uint16_t len);
+uint8_t w25qxx_get_status_reg_1(w25qxx_conf_t *conf);
+void w25qxx_erase_chip(w25qxx_conf_t *conf);
+void w25qxx_erase_block64kb(w25qxx_conf_t *conf, uint32_t addr);
+void w25qxx_global_unlock(w25qxx_conf_t *conf);
 

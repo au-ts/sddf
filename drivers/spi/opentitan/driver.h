@@ -1,6 +1,13 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+typedef enum spi_op {
+    SPI_OP_DUMMY        = 0b00,
+    SPI_OP_READ_ONLY    = 0b01,
+    SPI_OP_WRITE_ONLY   = 0b10,
+    SPI_OP_READ_WRITE   = 0b11,
+} spi_op_t;
+
 typedef struct spi_driver_data {
     // Per CS state
     void *data_region;
@@ -12,6 +19,7 @@ typedef struct spi_driver_data {
     uint16_t len;
     bool cs_active_after_cmd;
     // Command in-progress state
+    spi_op_t op;
     uint16_t tx_progress;
     uint16_t rx_progress;
     // Error
@@ -83,9 +91,13 @@ char *fsm_str(spi_state_t state) {
 #define CONFIGOPTS_CPHA                 (BIT(30))
 #define CONFIGOPTS_CPOL                 (BIT(31))
 
-#define COMMAND_DIRECTION_TX_ONLY       (BIT(13))
-#define COMMAND_DIRECTION_RX_ONLY       (BIT(12))
-#define COMMAND_DIRECTION_BIDIRECTION   (BIT(12) | BIT(13))
+typedef enum command_direction {
+    COMMAND_DIRECTION_TX_ONLY = BIT(13),
+    COMMAND_DIRECTION_RX_ONLY = BIT(12),
+    COMMAND_DIRECTION_BIDIRECTION = BIT(12) | BIT(13),
+    COMMAND_DIRECTION_DUMMY_CYCLES = 0,
+} command_direction_t;
+
 #define COMMAND_CSAAT                   (BIT(9))
 
 // A small quirk of the hardware, the length reported to the device should be one less than the 

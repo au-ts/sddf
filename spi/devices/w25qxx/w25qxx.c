@@ -1,11 +1,19 @@
-#include <include/sddf/spi/devices/w25qxx.h>
+#include <sddf/spi/devices/w25qxx.h>
+
+#define DEBUG_W25QXX
+#ifdef DEBUG_W25QXX
+#define LOG_W25QXX(...) do{ sddf_dprintf("W25QXX|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
+#else
+#define LOG_W25QXX(...) do{}while(0)
+#endif
+#define LOG_W25QXX_ERR(...) do{ sddf_printf("W25QXX|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
 #define CMD conf->data->cmd
 #define DATA conf->data->data
 
 inline static w25qxx_cmd_t _pack_cmd(w25qxx_inst_t inst, uint32_t addr) {
     return (w25qxx_cmd_t) { 
-        .inst = inst;
+        .inst = inst,
         .addr = { 
             // Switch the addr from little to big-endian
             (addr & 0xFF0000) >> 16,
@@ -15,10 +23,18 @@ inline static w25qxx_cmd_t _pack_cmd(w25qxx_inst_t inst, uint32_t addr) {
     };
 }
 
-inline static int _enqueue_cmd(w25qxx_conf *conf, w25qxx_cmd_t cmd, bool final_cmd) {
-    conf->data->cmd[conf->cmd_idx++] = cmd;
-    return spi_enqueue_write(conf->libspi_conf, &conf->data->cmd[conf->cmd_idx], addr == -1 ? 1 : 4, 
-        !final_cmd);
+inline static uint32_t _addr_conv(uint8_t *addr) {
+    return (addr[0] == 0xFF && addr[1] == 0xFF && addr[2] == 0xFF) ?
+        -1 :
+        ((uint32_t) addr[2]) <<  0 |
+        ((uint32_t) addr[1]) <<  8 |
+        ((uint32_t) addr[0]) << 16;
+}
+
+inline static int _enqueue_cmd(w25qxx_conf_t *conf, w25qxx_cmd_t cmd, bool final_cmd) {
+    conf->data->cmd[conf->cmd_idx] = cmd;
+    return spi_enqueue_write(conf->libspi_conf, &conf->data->cmd[conf->cmd_idx++], 
+        _addr_conv(cmd.addr) == -1 ? 1 : 4, !final_cmd);
 }
 
 inline static int _block(w25qxx_conf_t *conf) {
@@ -39,14 +55,14 @@ int w25qxx_reset(w25qxx_conf_t *conf) {
     _enqueue_cmd(conf, _pack_cmd(W25QXX_INST_ENABLE_RESET, -1), false);
     _enqueue_cmd(conf, _pack_cmd(W25QXX_INST_RESET_DEVICE, -1), true);
 
-    return _block(conf->libspi_conf);
+    return _block(conf);
 }
 
 int w25qxx_get_ids(w25qxx_conf_t *conf, uint8_t *manufacturer_id, uint16_t *device_id) {
     _enqueue_cmd(conf, _pack_cmd(W25QXX_INST_JEDEC_ID, -1), false);
     spi_enqueue_read(conf->libspi_conf, DATA, 3, false);
 
-    _block(conf->libspi_conf);
+    _block(conf);
 
     uint32_t id = DATA[0];
 
@@ -60,71 +76,79 @@ int w25qxx_get_ids(w25qxx_conf_t *conf, uint8_t *manufacturer_id, uint16_t *devi
 }
 
 int w25qxx_read(w25qxx_conf_t *conf, uint32_t addr, void *buffer, uint16_t len) {
-    if (buffer < DATA) {
+    if (buffer < (void *) DATA) {
         return -1;
     }
 
     _enqueue_cmd(conf, _pack_cmd(W25QXX_INST_READ_DATA, addr), false);
     spi_enqueue_read(conf->libspi_conf, buffer, len, false);
 
-    return _block(conf->libspi_conf);
+    return _block(conf);
 }
 
 int w25qxx_write_en(w25qxx_conf_t *conf) {
-    return _enqueue_cmd(conf, _pack_cmd(W25QXX_INST_WRITE_ENABLE, -1), false);
+    _enqueue_cmd(conf, _pack_cmd(W25QXX_INST_WRITE_ENABLE, -1), true);
+    return _block(conf);
 }
 
 int w25qxx_program_page(w25qxx_conf_t *conf, uint32_t addr, void *buffer, uint16_t len) {
-    if (buffer < DATA) {
+    if (buffer < (void *) DATA) {
         return -1;
     }
 
     uint16_t bytes_until_aligned = ALIGN(addr, W25QXX_PG_SZ) - addr;
+    //TODO
+    bytes_until_aligned = (bytes_until_aligned) ? bytes_until_aligned : W25QXX_PG_SZ;
     if (len > bytes_until_aligned) {
         return -1;
     }
 
     w25qxx_write_en(conf);
-    _enqueue_cmd(conf, _pack_cmd(W25QXX_INST_PAGE_PROGRAM), false);
+    _enqueue_cmd(conf, _pack_cmd(W25QXX_INST_PAGE_PROGRAM, addr), false);
     spi_enqueue_write(conf->libspi_conf, buffer, len, false);
 
-    return _block(conf->libspi_conf);
+    return _block(conf);
 }
 
-uint32_t w25qxx_get_status(void) {
+uint8_t w25qxx_get_status_reg_1(w25qxx_conf_t *conf) {
     _enqueue_cmd(conf, _pack_cmd(W25QXX_INST_READ_STATUS_REGISTER_1, -1), false);
     spi_enqueue_read(conf->libspi_conf, &DATA[0], 1, false);
-    _enqueue_cmd(conf, _pack_cmd(W25QXX_INST_READ_STATUS_REGISTER_2, -1), false);
-    spi_enqueue_read(conf->libspi_conf, &DATA[1], 1, false);
-    _enqueue_cmd(conf, _pack_cmd(W25QXX_INST_READ_STATUS_REGISTER_3, -1), false);
-    spi_enqueue_read(conf->libspi_conf, &DATA[2], 1, false);
 
-    _block(conf->libspi_conf);
+    _block(conf);
 
-    return ((DATA[2] & 0xFF) << 16) |
-           ((DATA[1] & 0xFF) <<  8) | 
-           ((DATA[0] & 0xFF) <<  0);
+    return DATA[0];
 }
 
-void w25qxx_erase_chip(void) {
-    w25qxx_write_en();
+void w25qxx_erase_chip(w25qxx_conf_t *conf) {
+    w25qxx_write_en(conf);
     _enqueue_cmd(conf, _pack_cmd(W25QXX_INST_CHIP_ERASE, -1), true);
+
+    _block(conf);
 
     uint32_t status;
     do {
-        status = w25qxx_get_status();
-        LOG_CLIENT("STATUS=%06X\n", status);
+        status = w25qxx_get_status_reg_1(conf);
+        LOG_W25QXX("STATUS_REG_1=%02X\n", status);
     } while (W25QXX_STATUS_BUSY(status));
 } 
 
-void w25qxx_erase_block64kb(uint32_t addr) {
-    w25qxx_write_en();
-    _enqueue_cmd(conf, _pack_cmd(W25QXX_INST_BLOCK_ERASE_64KB, -1), true);
+void w25qxx_erase_block64kb(w25qxx_conf_t *conf, uint32_t addr) {
+    w25qxx_write_en(conf);
+    _enqueue_cmd(conf, _pack_cmd(W25QXX_INST_BLOCK_ERASE_64KB, addr), true);
+    
+    _block(conf);
 
     uint32_t status;
     do {
-        status = w25qxx_get_status();
-        LOG_CLIENT("STATUS=%06X\n", status);
+        status = w25qxx_get_status_reg_1(conf);
+        LOG_W25QXX("STATUS_REG_1=%02X\n", status);
     } while (W25QXX_STATUS_BUSY(status));
+}
+
+void w25qxx_global_unlock(w25qxx_conf_t *conf) {
+    w25qxx_write_en(conf);
+    _enqueue_cmd(conf, _pack_cmd(W25QXX_INST_GLOBAL_BLOCK_SECTOR_UNLOCK, -1), true);
+    
+    _block(conf);
 }
 
