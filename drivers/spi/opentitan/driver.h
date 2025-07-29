@@ -1,37 +1,48 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-typedef enum spi_op {
-    SPI_OP_DUMMY        = 0b00,
-    SPI_OP_READ_ONLY    = 0b01,
-    SPI_OP_WRITE_ONLY   = 0b10,
-    SPI_OP_READ_WRITE   = 0b11,
-} spi_op_t;
-
 typedef struct spi_driver_data {
     // Per CS state
+    spi_cs_t cs;
     void *data_region;
     uint16_t cmd_in_progress;
-    spi_cs_t cs;
-    // Command
+    // Logical command
     size_t read_offset;
     size_t write_offset;
-    uint16_t len;
+    uint32_t len;
     bool cs_active_after_cmd;
-    // Command in-progress state
-    spi_op_t op;
-    uint16_t tx_progress;
-    uint16_t rx_progress;
+    // Logical command in-progress state
+    uint32_t logical_progress;
+    // Physical command in-progress state
+    uint32_t phy_cmd_len;
+    uint32_t tx_progress;
+    uint32_t rx_progress;
     // Error
     spi_err_t err;
 } spi_driver_data_t;
 
+static void spi_reset_state(spi_driver_data_t *s) {
+    s->cs = -1;
+    s->data_region = NULL;
+    s->cmd_in_progress = 0;
+    s->read_offset = -1;
+    s->write_offset = -1;
+    s->len = 0;
+    s->cs_active_after_cmd = false;
+    s->logical_progress = -1;
+    s->phy_cmd_len = 0;
+    s->tx_progress = -1;
+    s->rx_progress = -1;
+    s->err = SPI_ERR_OK;
+}
+
 typedef enum spi_state {
     SPI_STATE_IDLE, 
-    SPI_STATE_CS, 
-    SPI_STATE_SEL_CMD, 
-    SPI_STATE_CMD, 
-    SPI_STATE_CMD_RET, 
+    SPI_STATE_GET_CS, 
+    SPI_STATE_GET_LOGICAL_CMD,
+    SPI_STATE_ISSUE_PHY_CMD,
+    SPI_STATE_EXEC_PHY_CMD, 
+    SPI_STATE_AWAIT_PHY_CMD, 
     SPI_STATE_RESP, 
 } spi_state_t;
 
@@ -40,27 +51,16 @@ typedef struct fsm_state {
     bool yield;
 } fsm_state_t;
 
-static void spi_reset_state(spi_driver_data_t *s) {
-    s->data_region = NULL;
-    s->cmd_in_progress = 0;
-    s->read_offset = -1;
-    s->write_offset = -1;
-    s->len = 0;
-    s->cs_active_after_cmd = false;
-    s->tx_progress = -1;
-    s->rx_progress = -1;
-    s->err = SPI_ERR_OK;
-}
-
 char *fsm_str(spi_state_t state) {
     switch (state) {
-        case SPI_STATE_IDLE:      return "IDLE";
-        case SPI_STATE_CS:       return "REQ";
-        case SPI_STATE_SEL_CMD:   return "SEL_CMD";
-        case SPI_STATE_CMD:       return "CMD";
-        case SPI_STATE_CMD_RET:   return "CMD_RET";
-        case SPI_STATE_RESP:      return "RESP";
-        default:        return "INVALID";
+    case SPI_STATE_IDLE: return "IDLE"; 
+    case SPI_STATE_GET_CS: return "GET_CS"; 
+    case SPI_STATE_GET_LOGICAL_CMD: return "GET_LOGICAL_CMD";
+    case SPI_STATE_ISSUE_PHY_CMD: return "ISSUE_PHY_CMD";
+    case SPI_STATE_EXEC_PHY_CMD: return "EXEC_PHY_CMD"; 
+    case SPI_STATE_AWAIT_PHY_CMD: return "AWAIT_PHY_CMD"; 
+    case SPI_STATE_RESP: return "RESP"; 
+    default: return "INVALID";
     }
 }
 
@@ -102,7 +102,8 @@ typedef enum command_direction {
 
 // A small quirk of the hardware, the length reported to the device should be one less than the 
 // intended length
-#define COMMAND_LEN_OFFSET(length)      (((length) - 1) & 0x1FF)
+#define COMMAND_LEN_MAX                 (0x1FF + 0x1)
+#define COMMAND_LEN(length)      (((length) - 1) & (COMMAND_LEN_MAX - 1))
 
 #define STATUS_READY(status)    ((status) & BIT(31))
 #define STATUS_ACTIVE(status)   ((status) & BIT(30))

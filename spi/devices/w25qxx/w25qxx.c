@@ -8,9 +8,6 @@
 #endif
 #define LOG_W25QXX_ERR(...) do{ sddf_printf("W25QXX|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
-#define CMD conf->data->cmd
-#define DATA conf->data->data
-
 inline static w25qxx_cmd_t _pack_cmd(w25qxx_inst_t inst, uint32_t addr) {
     return (w25qxx_cmd_t) { 
         .inst = inst,
@@ -26,6 +23,7 @@ inline static w25qxx_cmd_t _pack_cmd(w25qxx_inst_t inst, uint32_t addr) {
 inline static uint32_t _addr_conv(uint8_t *addr) {
     return (addr[0] == 0xFF && addr[1] == 0xFF && addr[2] == 0xFF) ?
         -1 :
+        // Switch the addr from big to little-endian
         ((uint32_t) addr[2]) <<  0 |
         ((uint32_t) addr[1]) <<  8 |
         ((uint32_t) addr[0]) << 16;
@@ -60,11 +58,11 @@ int w25qxx_reset(w25qxx_conf_t *conf) {
 
 int w25qxx_get_ids(w25qxx_conf_t *conf, uint8_t *manufacturer_id, uint16_t *device_id) {
     _enqueue_cmd(conf, _pack_cmd(W25QXX_INST_JEDEC_ID, -1), false);
-    spi_enqueue_read(conf->libspi_conf, DATA, 3, false);
+    spi_enqueue_read(conf->libspi_conf, conf->data->internal_data, 3, false);
 
     _block(conf);
 
-    uint32_t id = DATA[0];
+    uint32_t id = conf->data->internal_data[0];
 
     *manufacturer_id = id & 0xFF;
     // Switch endianess from big to little-endian
@@ -76,7 +74,7 @@ int w25qxx_get_ids(w25qxx_conf_t *conf, uint8_t *manufacturer_id, uint16_t *devi
 }
 
 int w25qxx_read(w25qxx_conf_t *conf, uint32_t addr, void *buffer, uint16_t len) {
-    if (buffer < (void *) DATA) {
+    if (buffer < (void *) conf->data->data) {
         return -1;
     }
 
@@ -92,7 +90,7 @@ int w25qxx_write_en(w25qxx_conf_t *conf) {
 }
 
 int w25qxx_program_page(w25qxx_conf_t *conf, uint32_t addr, void *buffer, uint16_t len) {
-    if (buffer < (void *) DATA) {
+    if (buffer < (void *) conf->data->data) {
         return -1;
     }
 
@@ -112,11 +110,11 @@ int w25qxx_program_page(w25qxx_conf_t *conf, uint32_t addr, void *buffer, uint16
 
 uint8_t w25qxx_get_status_reg_1(w25qxx_conf_t *conf) {
     _enqueue_cmd(conf, _pack_cmd(W25QXX_INST_READ_STATUS_REGISTER_1, -1), false);
-    spi_enqueue_read(conf->libspi_conf, &DATA[0], 1, false);
+    spi_enqueue_read(conf->libspi_conf, conf->data->internal_data, 1, false);
 
     _block(conf);
 
-    return DATA[0];
+    return conf->data->internal_data[0];
 }
 
 void w25qxx_erase_chip(w25qxx_conf_t *conf) {

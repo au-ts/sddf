@@ -1,4 +1,3 @@
-
 #include <sddf/spi/libspi.h>
 
 typedef struct w25qxx_cmd {
@@ -6,10 +5,9 @@ typedef struct w25qxx_cmd {
     uint8_t addr[3];
 } w25qxx_cmd_t;
 
-_Static_assert(sizeof(w25qxx_cmd_t) == 4);
-
 typedef struct w25qxx_layout {
     w25qxx_cmd_t cmd[3];
+    uint32_t internal_data[1];
     uint32_t data[];
 } w25qxx_layout_t;
 

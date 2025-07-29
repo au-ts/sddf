@@ -75,10 +75,10 @@ static inline void device_setup(void)
     regs->CONTROL = CONTROL_SPIEN | CONTROL_OUTPUT_EN;
 
     // Interrupt when IDLE
-    regs->EVENT_ENABLE = EVENT_ENABLE_IDLE;
+    regs->EVENT_ENABLE = EVENT_ENABLE_IDLE | EVENT_ENABLE_RXFULL | EVENT_ENABLE_TXEMPTY | EVENT_ENABLE_RXWM;
 //TODO
-//    // Set the receive watermark at the max
-//    regs->CONTROL |= CONTROL_RX_WATERMARK(FIFO_DEPTH * sizeof(uint32_t));
+    // Set the receive watermark at the max
+    regs->CONTROL |= CONTROL_RX_WATERMARK(FIFO_DEPTH / sizeof(uint32_t) - 1);
 
     // Recieve interrupts for all errors, since an unacknowledged error could halt the device
     regs->ERROR_ENABLE = ERROR_MASK; 
@@ -94,20 +94,6 @@ static inline void device_setup(void)
 
     // Poll status until the device is ready
     while (!STATUS_READY(regs->STATUS)) {} 
-}
-
-/**
- * Sets the watermark for the RX FIFO
- *
- * @param watermark the number of words in the RX FIFO which will trigger an interrupt
- */
-static inline void set_rx_watermark(uint16_t watermark) {
-    uint32_t wm = watermark;
-    regs->CONTROL = 
-        // Mask out RX_WATERMARK bits
-        (regs->CONTROL & ~CONTROL_RX_WATERMARK_MASK) |
-        // Set RX_WATERMARK TODO: explain this borgenshentien
-        CONTROL_RX_WATERMARK((wm - (wm < sizeof(uint32_t) ? 0 : sizeof(uint32_t))) / sizeof(uint32_t));
 }
 
 /**
@@ -206,194 +192,173 @@ void state_idle(void) {
 
     spi_cs_queue_t *cs_queue = config.virt.cmd_cs_queue.vaddr;
     if (!spi_queue_empty(cs_queue->ctrl)) {
-        fsm_state.nxt_state = SPI_STATE_CS;
+        // Turn on SPI event interrupts, i.e. the device is idling
+        regs->INTR_ENABLE |= INTR_SPI_EVENT;
+
+        fsm_state.nxt_state = SPI_STATE_GET_CS;
     }
     else { 
         fsm_state.yield = true;
     }
-
-    return;
 }
 
-void state_cs(void) {
-    spi_cs_t cs;
-    assert(!spi_dequeue_cs(config.virt.cmd_cs_queue.vaddr, &cs));
-    driver_data.cs = cs;
+void state_get_cs(void) {
+    assert(!spi_dequeue_cs(config.virt.cmd_cs_queue.vaddr, &driver_data.cs));
+    driver_data.data_region = config.data[driver_data.cs].vaddr;
 
-    // Set which data region to operate in
-    driver_data.data_region = config.data[cs].vaddr;
+    LOG_DRIVER("cs=%u\n", driver_data.cs);
 
     // Set CS line
-    regs->CSID = cs; 
+    regs->CSID = driver_data.cs; 
 
-    // Turn on SPI event interrupts, i.e. TX FIFO empty and RX FIFO at watermark
-    regs->INTR_ENABLE |= INTR_SPI_EVENT;
-
-    fsm_state.nxt_state = SPI_STATE_SEL_CMD;
+    fsm_state.nxt_state = SPI_STATE_GET_LOGICAL_CMD;
 }
 
-void state_sel_cmd(void) {
+void state_get_logical_cmd(void) {
+    uint16_t cmd_len;
     assert(!spi_dequeue_cmd(
         config.virt.cmd_queue.vaddr,
         &driver_data.read_offset,
         &driver_data.write_offset,
-        &driver_data.len,
+        &cmd_len,
         &driver_data.cs_active_after_cmd
     ));
+    // TODO: check if this works
+    driver_data.len = CMD_LEN(cmd_len);
+    driver_data.logical_progress = 0;
+
+    LOG_DRIVER(
+        "read_offset=%lu, write_offset=%lu, len=%u, csaac=%u\n",
+        driver_data.read_offset, driver_data.write_offset, driver_data.len, 
+        driver_data.cs_active_after_cmd
+    );
+
+    fsm_state.nxt_state = SPI_STATE_ISSUE_PHY_CMD;
+}
+
+void state_issue_phy_cmd(void) {
+    driver_data.phy_cmd_len = MIN(driver_data.len - driver_data.logical_progress, COMMAND_LEN_MAX);
+    if (driver_data.phy_cmd_len == 0) {
+        if (driver_data.cs_active_after_cmd) {
+            driver_data.cmd_in_progress++;
+            fsm_state.nxt_state = SPI_STATE_GET_LOGICAL_CMD;
+        }
+        else {
+            driver_data.err = SPI_ERR_OK;
+            fsm_state.nxt_state = SPI_STATE_RESP;
+        }
+        return;
+    }
+
     driver_data.tx_progress = 0;
     driver_data.rx_progress = 0;
 
-    LOG_DRIVER("read_offset=%lu, write_offset=%lu, len=%u, csaac=%u\n", driver_data.read_offset, driver_data.write_offset, driver_data.len, driver_data.cs_active_after_cmd);
-
-    // The driver only cares when:
-    // 1. TX FIFO is empty, and the driver should enqueue data
-    // 2. RX FIFO is at the watermark, and the driver should dequeue data
-
-    uint32_t spi_host_command = COMMAND_LEN_OFFSET(driver_data.len);
+    uint32_t command = COMMAND_LEN(driver_data.phy_cmd_len);
     if (driver_data.read_offset != -1) {
-        spi_host_command |= COMMAND_DIRECTION_RX_ONLY;
+        command |= COMMAND_DIRECTION_RX_ONLY;
     }
     if (driver_data.write_offset != -1) {
-        spi_host_command |= COMMAND_DIRECTION_TX_ONLY;
+        command |= COMMAND_DIRECTION_TX_ONLY;
     }
-    if (driver_data.cs_active_after_cmd) {
-        spi_host_command |= COMMAND_CSAAT;
+    bool final_phy_cmd = driver_data.logical_progress + driver_data.phy_cmd_len == driver_data.len;
+    if (!final_phy_cmd || driver_data.cs_active_after_cmd) {
+        command |= COMMAND_CSAAT;
     }
 
-    LOG_DRIVER("cmd=%x\n", spi_host_command);
+    LOG_DRIVER("COMMAND=%x\n", command);
 
-    regs->COMMAND = spi_host_command; 
+    regs->COMMAND = command; 
 
-    fsm_state.nxt_state = SPI_STATE_CMD;
+    fsm_state.nxt_state = SPI_STATE_EXEC_PHY_CMD;
 }
 
-void write_partial_cmd() {
+void state_exec_phy_cmd(void) {
+    /**
+     * When simultaneously reading and writing, the FIFO access pattern looks something like this:
+     * 
+     * TX: ***|***| ... |***|*
+     * RX:    |***| ... |***|***|*
+     *
+     * Some of the oddities in the logic (i.e. ternary for determining rx_len, the rw_first and
+     * rw_last variable, etc.) are to enable the access pattern
+     */
+    bool reading = driver_data.read_offset != -1;
+    bool writing = driver_data.write_offset != -1;
+
     const void *tx_buffer = driver_data.data_region + driver_data.write_offset + 
-        driver_data.tx_progress;
-    uint16_t len = MIN(FIFO_DEPTH, driver_data.len - driver_data.tx_progress);
-    transmit_data(tx_buffer, len);
-    driver_data.tx_progress += len;
-    fsm_state.yield = STATUS_TXQD(regs->STATUS) != 0;
-}
-
-int read_partial_cmd() {
+        driver_data.logical_progress + driver_data.tx_progress;
     void *rx_buffer = driver_data.data_region + driver_data.read_offset + 
-        driver_data.rx_progress;
-    uint16_t len = MIN(FIFO_DEPTH, driver_data.len - driver_data.rx_progress);
-    if (receive_data(rx_buffer, len)) {
-        // Re-setup the device to recover
-        device_setup();
-        driver_data.err = SPI_ERR_TIMEOUT;
-        fsm_state.nxt_state = SPI_STATE_RESP;
-        return -1;
-    }
-    driver_data.rx_progress += len;
-    fsm_state.yield = STATUS_RXQD(regs->STATUS) != len;
+        driver_data.logical_progress + driver_data.rx_progress;
+    uint16_t tx_len = MIN(FIFO_DEPTH, driver_data.phy_cmd_len - driver_data.tx_progress);
+    uint16_t rx_len = 
+        (!writing) ?
+            MIN(FIFO_DEPTH, driver_data.phy_cmd_len - driver_data.rx_progress) :
+            driver_data.tx_progress - driver_data.rx_progress;
 
-    // Set RX watermark if more words are expected
-    if (driver_data.rx_progress < driver_data.len) {
-        set_rx_watermark(len);
+    bool rw_first = driver_data.tx_progress == 0;
+    bool rw_last = !rw_first && driver_data.rx_progress + rx_len == driver_data.phy_cmd_len;
+
+    if (writing && !(reading && rw_last)) {
+        transmit_data(tx_buffer, tx_len);
+        driver_data.tx_progress += tx_len;
     }
 
-    return 0;
-};
-
-int read_write_partial_cmd() {
-    void *rx_buffer = driver_data.data_region + driver_data.read_offset + 
-        driver_data.rx_progress;
-    uint16_t rx_len = driver_data.tx_progress - driver_data.rx_progress;
-    uint16_t tx_len = MIN(FIFO_DEPTH, driver_data.len - driver_data.tx_progress);
-
-    bool first = driver_data.tx_progress == 0;
-    bool last = !first && driver_data.rx_progress + rx_len == driver_data.len;
-
-    if (first) {
-        write_partial_cmd();
-        set_rx_watermark(tx_len);
-    }
-    else if (!last) {
-        write_partial_cmd();
-        set_rx_watermark(tx_len);
+    if (reading && !(writing && rw_first)) {
         if (receive_data(rx_buffer, rx_len)) {
             // Re-setup the device to recover
             device_setup();
             driver_data.err = SPI_ERR_TIMEOUT;
             fsm_state.nxt_state = SPI_STATE_RESP;
-            return -1;
-        }
-        driver_data.rx_progress += rx_len;
-        fsm_state.yield = fsm_state.yield && STATUS_RXQD(regs->STATUS) != tx_len;
-    }
-    else {
-        if (receive_data(rx_buffer, rx_len)) {
-            // Re-setup the device to recover
-            device_setup();
-            driver_data.err = SPI_ERR_TIMEOUT;
-            fsm_state.nxt_state = SPI_STATE_RESP;
-            return -1;
-        }
-        driver_data.rx_progress += rx_len;
-        fsm_state.yield = false;
-    }
-    return 0;
-}
-
-void state_cmd(void) {
-    bool reading = driver_data.read_offset != -1;
-    bool writing = driver_data.write_offset != -1;
-
-    if (reading && writing) {
-        if (read_write_partial_cmd()) {
             return;
         }
-    }
-    else if (reading) {
-        if (read_partial_cmd()) {
-            return;
-        }
-    }
-    else if (writing) {
-        write_partial_cmd();
+        driver_data.rx_progress += rx_len;
     }
 
-    fsm_state.yield = true; //TODO: if this works, delete the reset of the yield logic
-    fsm_state.nxt_state = SPI_STATE_CMD_RET;
+    fsm_state.yield = true;
+    fsm_state.nxt_state = SPI_STATE_AWAIT_PHY_CMD;
 }
 
-void state_cmd_ret(void) { 
+void state_await_phy_cmd(void) { 
     bool reading = driver_data.read_offset != -1;
     bool writing = driver_data.write_offset != -1;
-    bool read_done = driver_data.rx_progress == driver_data.len;
-    bool write_done = driver_data.tx_progress == driver_data.len;
+    bool read_done = driver_data.rx_progress == driver_data.phy_cmd_len;
+    bool write_done = driver_data.tx_progress == driver_data.phy_cmd_len;
 
     bool done;
     if (reading && writing) {
         done = read_done && write_done;
+        #ifdef DEBUG_DRIVER
         uint32_t status = regs->STATUS;
-        // Expect empty TX FIFO and RX FIFO at watermark, sleep otherwise
-        if (!done && (!STATUS_TXEMPTY(status) || !STATUS_RXWM(status))) {
-            LOG_DRIVER("Expecting another interrupt, sleeping\n");
-            fsm_state.yield = true;
-            return;
-        }
+        assert(STATUS_TXQD(status) == 0);
+        //assert(done || STATUS_RXQD(status) > 0); //TODO: observed to be false, should still check its intent
+        #endif /* DEBUG_DRIVER */
     }
     else if (reading) {
+        #ifdef DEBUG_DRIVER
+        //assert(done || STATUS_RXQD(status) > 0); //TODO: observed to be false, should still check its intent
+        #endif /* DEBUG_DRIVER */
         done = read_done;
     }
     else if (writing) {
+        #ifdef DEBUG_DRIVER
+        assert(STATUS_TXQD(regs->STATUS) == 0);
+        #endif /* DEBUG_DRIVER */
         done = write_done;
     }
     else {
-        done = STATUS_ACTIVE(regs->STATUS);
+        #ifdef DEBUG_DRIVER
+        assert(!STATUS_ACTIVE(regs->STATUS));
+        #endif /* DEBUG_DRIVER */
+        done = true;
     }
 
-    fsm_state.nxt_state = 
-        // Return to CMD if the command is uncompleted
-        !done ? SPI_STATE_CMD :
-        // Go to SEL_CMD if another command is expected
-        driver_data.cs_active_after_cmd ? SPI_STATE_SEL_CMD :
-            // Otherwise, respond to the finished transaction
-            SPI_STATE_RESP;
+    if (done) {
+        driver_data.logical_progress += driver_data.phy_cmd_len;
+        fsm_state.nxt_state = SPI_STATE_ISSUE_PHY_CMD;
+    }
+    else {
+        fsm_state.nxt_state = SPI_STATE_EXEC_PHY_CMD;
+    }
 
     return;
 }
@@ -410,57 +375,36 @@ void state_resp(void) {
     fsm_state.nxt_state = SPI_STATE_IDLE;
 }
 
-void init(void) {
-    assert(spi_config_check_magic(&config));
-    assert(device_resources_check_magic(&device_resources));
-    assert(device_resources.num_irqs == 2);
-    assert(device_resources.num_regions == 1);   
- 
-    regs = (volatile struct spi_regs *)device_resources.regions[0].region.vaddr;
-    LOG_DRIVER("regs=%p\n", regs);
-    device_setup(); 
-
-    for (uint8_t i = 0; i < SPI_CS_MAX; i++) {
-        LOG_DRIVER("config[%2d] = {%p, %lu}\n", i, config.data[i].vaddr, config.data[i].size);
-    }
-
-    LOG_DRIVER("Driver initialised.\n");
-}
-
 void fsm(void) {
     do {
         spi_state_t state = fsm_state.nxt_state;
         LOG_DRIVER("Entering %s\n", fsm_str(state));
         switch (fsm_state.nxt_state) {
-            case SPI_STATE_IDLE: {
-                state_idle();
-                break;
-            }
-            case SPI_STATE_CS: {
-                state_cs();
-                break;
-            }
-            case SPI_STATE_SEL_CMD: {
-                state_sel_cmd();
-                break;
-            }
-            case SPI_STATE_CMD: {
-                state_cmd();
-                break;
-            }
-            case SPI_STATE_CMD_RET: {
-                state_cmd_ret();
-                break;
-            }
-            case SPI_STATE_RESP: {
-                state_resp();
-                break;
-            }
-            default: {
-                LOG_DRIVER_ERR("Entered erroneous state, defaulting back to IDLE\n");
-                fsm_state.nxt_state = SPI_STATE_IDLE;
-                fsm_state.yield = false;
-            }
+        case SPI_STATE_IDLE:
+            state_idle();
+            break;
+        case SPI_STATE_GET_CS: 
+            state_get_cs();
+            break;
+        case SPI_STATE_GET_LOGICAL_CMD:
+            state_get_logical_cmd();
+            break;
+        case SPI_STATE_ISSUE_PHY_CMD:
+            state_issue_phy_cmd();
+            break;
+        case SPI_STATE_EXEC_PHY_CMD: 
+            state_exec_phy_cmd();
+            break;
+        case SPI_STATE_AWAIT_PHY_CMD: 
+            state_await_phy_cmd();
+            break;
+        case SPI_STATE_RESP:
+            state_resp();
+            break;
+        default:
+            LOG_DRIVER_ERR("Entered erroneous state, defaulting back to IDLE\n");
+            fsm_state.nxt_state = SPI_STATE_IDLE;
+            fsm_state.yield = false;
         }
         LOG_DRIVER("Exiting %s\n", fsm_str(state));
     } while (!fsm_state.yield);
@@ -499,31 +443,46 @@ void handle_error(void) {
     else {
         // Abort transaction if in progress
         switch (fsm_state.nxt_state) {
-            case SPI_STATE_IDLE:
-            case SPI_STATE_CS: {
-                LOG_DRIVER_ERR("Going back to IDLE\n");
-                fsm_state.nxt_state = SPI_STATE_IDLE;
-                break;
-            }
-            case SPI_STATE_SEL_CMD:
-            case SPI_STATE_CMD:
-            case SPI_STATE_CMD_RET:
-            case SPI_STATE_RESP: {
-                LOG_DRIVER_ERR("Going to RESP\n");
-                fsm_state.nxt_state = SPI_STATE_RESP;
-                driver_data.err = SPI_ERR_OTHER;
-                break;
-            }
-            default: {
-                LOG_DRIVER_ERR("Handling error in invalid state, moving to IDLE\n");
-                fsm_state.nxt_state = SPI_STATE_IDLE;
-                break;
-            }
+        case SPI_STATE_IDLE:
+        case SPI_STATE_GET_CS:
+            LOG_DRIVER_ERR("Going back to IDLE\n");
+            fsm_state.nxt_state = SPI_STATE_IDLE;
+            break;
+        case SPI_STATE_GET_LOGICAL_CMD:
+        case SPI_STATE_ISSUE_PHY_CMD:
+        case SPI_STATE_EXEC_PHY_CMD: 
+        case SPI_STATE_AWAIT_PHY_CMD: 
+        case SPI_STATE_RESP: 
+            LOG_DRIVER_ERR("Going to RESP\n");
+            fsm_state.nxt_state = SPI_STATE_RESP;
+            driver_data.err = SPI_ERR_OTHER;
+            break;
+        default:
+            LOG_DRIVER_ERR("Handling error in invalid state, moving to IDLE\n");
+            fsm_state.nxt_state = SPI_STATE_IDLE;
+            break;
         }
     }
 
     // Reset the device 
     device_setup();
+}
+
+void init(void) {
+    assert(spi_config_check_magic(&config));
+    assert(device_resources_check_magic(&device_resources));
+    assert(device_resources.num_irqs == 2);
+    assert(device_resources.num_regions == 1);   
+ 
+    regs = (volatile struct spi_regs *)device_resources.regions[0].region.vaddr;
+    LOG_DRIVER("regs=%p\n", regs);
+    device_setup(); 
+
+    for (uint8_t i = 0; i < SPI_CS_MAX; i++) {
+        LOG_DRIVER("config[%2d] = {%p, %lu}\n", i, config.data[i].vaddr, config.data[i].size);
+    }
+
+    LOG_DRIVER("Driver initialised.\n");
 }
 
 void notified(microkit_channel ch) {

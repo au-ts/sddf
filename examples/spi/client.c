@@ -38,9 +38,9 @@ void client_main(void) {
         data[i] = i;
     }
 
-//    spi_err_t err = spi_enqueue_transfer(conf, data + 0x1000, data, len, false);
-//    LOG_CLIENT("err=%s\n", err_to_str(err));
-    spi_enqueue_read(conf, data + 0x1000, len, false);
+    spi_err_t err = spi_enqueue_transfer(conf, data + 0x1000, data, len, false);
+    LOG_CLIENT("err=%s\n", err_to_str(err));
+//    spi_enqueue_read(conf, data + 0x1000, len, false);
     spi_notify(conf);
     spi_resp_t resp;
     spi_read_resp(conf, &resp);
