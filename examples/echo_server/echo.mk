@@ -135,6 +135,8 @@ CFLAGS := $(CFLAGS_ARCH) \
 	  -MD \
 	  -MP
 
+CFLAGS += -Wno-tautological-constant-out-of-range-compare # Suppress warning from lwIP
+
 LDFLAGS := -L$(BOARD_DIR)/lib
 LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
 
