@@ -18,20 +18,23 @@ endif
 OBJS_LIBUTIL := cache.o sddf_printf.o assert.o bitarray.o fsmalloc.o
 
 ifeq ($(strip $(SDDF_CUSTOM_LIBC)),1)
-	OBJS_LIBUTIL += libc.o memcmp.o memcpy.o memset.o strcmp.o strcpy.o strlen.o strncmp.o
+	CFLAGS += -I${SDDF}/include/sddf/util/custom_libc
+	OBJS_LIBUTIL += custom_libc/libc.o custom_libc/memcmp.o custom_libc/memcpy.o \
+					custom_libc/memset.o custom_libc/strcmp.o custom_libc/strcpy.o \
+					custom_libc/strlen.o custom_libc/strncmp.o
 	ifeq ($(ARCH),riscv64)
-		OBJS_LIBUTIL += memmove.o
+		OBJS_LIBUTIL += custom_libc/memmove.o
 	endif
 endif
 
 ifeq ($(ARCH),riscv64)
-	CFLAGS += -I${SDDF}/util/riscv64
+	CFLAGS += -I${SDDF}/util/custom_libc/riscv64
 endif
 
 ALL_OBJS_LIBUTIL := $(addprefix util/, ${OBJS_LIBUTIL} putchar_debug.o putchar_serial.o)
 
 BASE_OBJS_LIBUTIL := $(addprefix util/, ${OBJS_LIBUTIL})
-${ALL_OBJS_LIBUTIL}: ${CHECK_FLAGS_BOARD_MD5} |util
+${ALL_OBJS_LIBUTIL}: ${CHECK_FLAGS_BOARD_MD5} |util util/custom_libc
 
 libsddf_util_debug.a: ${BASE_OBJS_LIBUTIL} util/putchar_debug.o
 	${AR} crv $@ $^
@@ -47,13 +50,19 @@ util/sddf_printf.o: ${SDDF}/util/printf.c
 util/%.o: ${SDDF}/util/%.c
 	${CC} ${CFLAGS} -c -o $@ $<
 
-util/%.o: ${SDDF}/util/${ARCH}/%.S
+util/custom_libc/%.o: ${SDDF}/util/custom_libc/%.c
 	${CC} ${CFLAGS} -c -o $@ $<
 
-util/%.o: ${SDDF}/util/${ARCH}/%.c
+util/custom_libc/%.o: ${SDDF}/util/custom_libc/${ARCH}/%.S
+	${CC} ${CFLAGS} -c -o $@ $<
+
+util/custom_libc/%.o: ${SDDF}/util/custom_libc/${ARCH}/%.c
 	${CC} ${CFLAGS} -c -o $@ $<
 
 util:
+	mkdir -p $@
+
+util/custom_libc:
 	mkdir -p $@
 
 clean::
