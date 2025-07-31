@@ -44,9 +44,10 @@ void cache_clean_and_invalidate(unsigned long start, unsigned long end)
         asm volatile("dc civac, %0" : : "r"(vaddr));
     }
     asm volatile("dsb sy" ::: "memory");
-#elif defined(CONFIG_ARCH_RISCV)
+#elif defined(CONFIG_ARCH_RISCV) || defined(CONFIG_ARCH_X86_64)
     /* While not all RISC-V platforms are DMA cache-cohernet,
      * we assume we are targeting one that is and so there is nothing to do. */
+    /* x86 is DMA coherent so nothing to do. */
 #else
 #error "Unknown architecture for cache_clean_and_invalidate"
 #endif
@@ -69,9 +70,10 @@ void cache_clean(unsigned long start, unsigned long end)
         asm volatile("dc cvac, %0" : : "r"(vaddr));
     }
     asm volatile("dmb sy" ::: "memory");
-#elif defined(CONFIG_ARCH_RISCV)
+#elif defined(CONFIG_ARCH_RISCV) || defined(CONFIG_ARCH_X86_64)
     /* While not all RISC-V platforms are DMA cache-cohernet,
      * we assume we are targeting one that is and so there is nothing to do. */
+    /* x86 is DMA coherent so nothing to do. */
 #else
 #error "Unknown architecture for cache_clean"
 #endif
