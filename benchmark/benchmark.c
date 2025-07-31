@@ -26,6 +26,8 @@ counter_bitfield_t benchmark_bf;
 
 serial_queue_handle_t serial_tx_queue_handle;
 
+uint32_t counter_overflows[7] = {0,0,0,0,0,0,0};
+
 char *counter_names[] = {
     "L1 i-cache misses",
     "L1 d-cache misses",
@@ -152,6 +154,9 @@ void notified(microkit_channel ch)
 #if defined(MICROKIT_CONFIG_benchmark) && defined(CONFIG_ARCH_ARM)
         sel4bench_reset_counters();
         THREAD_MEMORY_RELEASE();
+        for (int i = 0 ; i < 6; i++) {
+            counter_overflows[i] = 0;
+        }
         sel4bench_start_counters(benchmark_bf);
 
 #ifdef CONFIG_BENCHMARK_TRACK_UTILISATION
@@ -169,7 +174,8 @@ void notified(microkit_channel ch)
 
         sddf_printf("{\n");
         for (int i = 0; i < ARRAY_SIZE(benchmarking_events); i++) {
-            sddf_printf("%s: %lu\n", counter_names[i], counter_values[i]);
+            uint64_t true_value = (uint64_t)counter_values[i] + ((uint64_t)UINT32_MAX * (uint64_t)counter_overflows[i]);
+            sddf_printf("%s: %lu -- overflows: %u -- adjusted: %lu\n", counter_names[i], counter_values[i], counter_overflows[i], true_value);
         }
         sddf_printf("}\n");
 #endif
@@ -183,7 +189,21 @@ void notified(microkit_channel ch)
         sddf_printf("KernelEntries:  %lu\n", entries);
         dump_log_summary(entries);
 #endif
-    } else {
+    } else if (ch == 21) {
+        uint32_t irq_flag = sel4bench_read_pmovsclr();
+        for (int i = 0; i < 6; i++) {
+            if (irq_flag & (1 << i)) {
+                counter_overflows[i] += 1;
+            }
+        }
+        if (irq_flag & (1 << 31)) {
+            counter_overflows[6] += 1;
+        }
+        // When 1 is written to the above bits the interrupt is cleared
+        sel4bench_write_pmovsclr(irq_flag);
+        microkit_irq_ack(ch);
+    }
+    else {
         sddf_printf("BENCH|LOG: Bench thread notified on unexpected channel %u\n", ch);
     }
 }

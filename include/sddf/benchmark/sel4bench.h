@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <sddf/util/util.h>
+#include <sddf/util/printf.h>
 #include <os/sddf.h>
 
 /* This library contains a selection of libseL4bench used for sDDF benchmarking. libsel4bench can be found here:
@@ -58,6 +59,8 @@ typedef uint64_t ccnt_t;
 #define PMSELR      "PMSELR_EL0"
 #define PMXEVTYPER  "PMXEVTYPER_EL0"
 #define PMCCNTR     "PMCCNTR_EL0"
+#define PMOVSCLR    "pmovsclr_el0"
+
 
 #define PMU_WRITE(reg, v)                      \
     do {                                       \
@@ -120,6 +123,18 @@ static FASTFN void sel4bench_private_write_pmnxsel(uint32_t val)
 static FASTFN void sel4bench_private_write_evtsel(uint32_t val)
 {
     PMU_WRITE(PMXEVTYPER, val);
+}
+
+static FASTFN uint32_t sel4bench_read_pmovsclr(void)
+{
+    uint32_t val;
+    PMU_READ(PMOVSCLR, val);
+    return val;
+}
+
+static FASTFN void sel4bench_write_pmovsclr(uint32_t val)
+{
+    PMU_WRITE(PMOVSCLR, val);
 }
 
 /**

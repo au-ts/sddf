@@ -138,6 +138,7 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
         if (!strcmp(microkit_name, "client0")) {
             start = __atomic_load_n(&bench->ts, __ATOMIC_RELAXED);
             idle_ccount_start = __atomic_load_n(&bench->ccount, __ATOMIC_RELAXED);
+            sddf_dprintf("We are notifying bench start!\n");
             microkit_notify(bench_start_ch);
         }
     } else if (msg_match(data_packet_str, STOP)) {

@@ -8,13 +8,13 @@ from typing import List, Tuple
 from sdfgen import SystemDescription, Sddf, DeviceTree
 from importlib.metadata import version
 
-assert version("sdfgen").split(".")[1] == "24", "Unexpected sdfgen version"
+assert version("sdfgen").split(".")[1] == "25", "Unexpected sdfgen version"
 
 ProtectionDomain = SystemDescription.ProtectionDomain
 MemoryRegion = SystemDescription.MemoryRegion
 Map = SystemDescription.Map
 Channel = SystemDescription.Channel
-
+Irq = SystemDescription.Irq
 
 @dataclass
 class Board:
@@ -236,7 +236,8 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
     bench_idle = ProtectionDomain("bench_idle", "idle.elf", priority=1)
     bench = ProtectionDomain("bench", "benchmark.elf", priority=254)
-
+    pmu_irq = Irq(23, id=21)
+    bench.add_irq(pmu_irq)
     serial_system.add_client(bench)
 
     benchmark_pds = [
@@ -272,7 +273,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     bench_idle_ch = Channel(bench_idle, bench)
     sdf.add_channel(bench_idle_ch)
 
-    cycle_counters_mr = MemoryRegion("cycle_counters", 0x1000)
+    cycle_counters_mr = MemoryRegion(sdf, "cycle_counters", 0x1000)
     sdf.add_mr(cycle_counters_mr)
 
     bench_idle.add_map(Map(cycle_counters_mr, 0x5_000_000, perms="rw"))
