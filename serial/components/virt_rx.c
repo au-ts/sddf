@@ -8,7 +8,7 @@
 #include <os/sddf.h>
 #include <sddf/serial/queue.h>
 #include <sddf/serial/config.h>
-#include <sddf/util/string.h>
+#include <string.h>
 #include <sddf/util/printf.h>
 
 __attribute__((__section__(".serial_virt_rx_config"))) serial_virt_rx_config_t config;
@@ -26,7 +26,7 @@ uint8_t next_client_index;
 
 void reset_state(void)
 {
-    sddf_memset(next_client, '\0', MAX_CLI_BASE_10 + 1);
+    memset(next_client, '\0', MAX_CLI_BASE_10 + 1);
     next_client_index = 0;
     current_mode = normal;
 }

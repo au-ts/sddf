@@ -68,6 +68,7 @@ SYSTEM_FILE := serial.system
 DTS := $(SDDF)/dts/$(MICROKIT_BOARD).dts
 DTB := $(MICROKIT_BOARD).dtb
 ARCH := ${shell grep 'CONFIG_SEL4_ARCH  ' $(BOARD_DIR)/include/kernel/gen_config.h | cut -d' ' -f4}
+SDDF_CUSTOM_LIBC := 1
 QEMU := qemu-system-$(ARCH)
 
 IMAGES := serial_driver.elf \
