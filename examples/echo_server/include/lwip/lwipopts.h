@@ -193,7 +193,7 @@
     bool in_use; \
     struct pbuf *next_chain;
 
-#define LWIP_PBUF_INIT_CUSTOM_DATA(p) \
+#define LWIP_PBUF_CUSTOM_DATA_INIT(p) \
     (p)->in_use = false; \
     (p)->next_chain = NULL;
 
