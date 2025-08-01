@@ -190,11 +190,9 @@
  * chained so they can be processed at a later time.
  */
 #define LWIP_PBUF_CUSTOM_DATA \
-    bool in_use; \
     struct pbuf *next_chain;
 
 #define LWIP_PBUF_CUSTOM_DATA_INIT(p) \
-    (p)->in_use = false; \
     (p)->next_chain = NULL;
 
 /* Debugging options */
