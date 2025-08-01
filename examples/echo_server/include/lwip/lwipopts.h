@@ -49,7 +49,7 @@
  * The size of the heap memory. If the application will send
  * a lot of data that needs to be copied, this should be set high.
  */
-#define MEM_SIZE                        0x30000
+#define MEM_SIZE                        0x60000
 
 /**
  * Enable code to support static ARP table entries (using
@@ -160,7 +160,7 @@
 /**
  * The number of buffers in the pbuf pool.
  */
-#define PBUF_POOL_SIZE 1000
+#define PBUF_POOL_SIZE 4000
 
 /**
  * The number of memp struct pbufs (used for PBUF_ROM and PBUF_REF).
