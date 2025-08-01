@@ -59,6 +59,7 @@ LIB_SDDF_LWIP_LWIP_FILES := \
 	core/tcp_out.c \
 	core/timeouts.c \
 	core/udp.c \
+	core/ipv4/acd.c \
 	core/ipv4/autoip.c \
 	core/ipv4/dhcp.c \
 	core/ipv4/etharp.c \
