@@ -35,39 +35,19 @@
 # program_1.elf: lib_sddf_lwip_1.a
 #
 
-
 LIB_SDDF_LWIP_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
+
+LWIPDIR := $(SDDF)/network/ipstacks/lwip/src
+include $(LWIPDIR)/Filelists.mk
+
 LIB_SDDF_LWIP_LWIP_FILES := \
-	core/init.c \
-	api/err.c \
-	core/def.c \
-	core/dns.c \
-	core/inet_chksum.c \
-	core/ip.c \
-	core/mem.c \
-	core/memp.c \
-	core/netif.c \
-	core/pbuf.c \
-	core/raw.c \
-	core/stats.c \
-	core/sys.c \
-	core/altcp.c \
-	core/altcp_alloc.c \
-	core/altcp_tcp.c \
-	core/tcp.c \
-	core/tcp_in.c \
-	core/tcp_out.c \
-	core/timeouts.c \
-	core/udp.c \
-	core/ipv4/autoip.c \
-	core/ipv4/dhcp.c \
-	core/ipv4/etharp.c \
-	core/ipv4/icmp.c \
-	core/ipv4/igmp.c \
-	core/ipv4/ip4_frag.c \
-	core/ipv4/ip4.c \
-	core/ipv4/ip4_addr.c \
-	netif/ethernet.c
+	$(COREFILES) \
+	$(CORE4FILES) \
+	netif/ethernet.c \
+	api/err.c
+
+# Remove LWIPDIR prefix as we prefer the unprefixed form
+LIB_SDDF_LWIP_LWIP_FILES := $(subst $(LWIPDIR)/,,$(LIB_SDDF_LWIP_LWIP_FILES))
 
 lib_sddf_lwip.a: lib_sddf_lwip_out/lib_sddf_lwip.o $(addprefix lib_sddf_lwip_out/, $(LIB_SDDF_LWIP_LWIP_FILES:.c=.o))
 	$(AR) rv $@ $^
@@ -91,14 +71,14 @@ lib_sddf_lwip_out%/lib_sddf_lwip.o: $(LIB_SDDF_LWIP_DIR)/lib_sddf_lwip.c
 
 $(foreach f,$(LIB_SDDF_LWIP_LWIP_FILES), \
 	$(eval \
-		lib_sddf_lwip_out/$(f:.c=.o): $(SDDF)/network/ipstacks/lwip/src/$(f) ; \
+		lib_sddf_lwip_out/$(f:.c=.o): $(LWIPDIR)/$(f) ; \
 			mkdir -p $$(dir $$@); \
-			$$(CC) $$(CFLAGS) $$(LIB_SDDF_LWIP_CFLAGS) -I$$(SDDF)/network/ipstacks/lwip/src/include -c -o $$@ $$< \
+			$$(CC) $$(CFLAGS) $$(LIB_SDDF_LWIP_CFLAGS) -I$$(LWIPDIR)/include -c -o $$@ $$< \
 	) \
 	$(eval \
-		lib_sddf_lwip_out%/$(f:.c=.o): $(SDDF)/network/ipstacks/lwip/src/$(f) ; \
+		lib_sddf_lwip_out%/$(f:.c=.o): $(LWIPDIR)/$(f) ; \
 			mkdir -p $$(dir $$@); \
-			$$(CC) $$(CFLAGS) $$(LIB_SDDF_LWIP_CFLAGS$$*) -I$$(SDDF)/network/ipstacks/lwip/src/include -c -o $$@ $$< \
+			$$(CC) $$(CFLAGS) $$(LIB_SDDF_LWIP_CFLAGS$$*) -I$$(LWIPDIR)/include -c -o $$@ $$< \
 	) \
 )
 

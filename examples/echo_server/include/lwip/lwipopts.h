@@ -49,7 +49,7 @@
  * The size of the heap memory. If the application will send
  * a lot of data that needs to be copied, this should be set high.
  */
-#define MEM_SIZE                        0x30000
+#define MEM_SIZE                        0x60000
 
 /**
  * Enable code to support static ARP table entries (using
@@ -160,19 +160,19 @@
 /**
  * The number of buffers in the pbuf pool.
  */
-#define PBUF_POOL_SIZE 1000
+#define PBUF_POOL_SIZE 4000
 
 /**
  * The number of memp struct pbufs (used for PBUF_ROM and PBUF_REF).
  * If the application sends a lot of data out of ROM (or other static memory),
  * this should be set high.
  */
-#define MEMP_NUM_PBUF TCP_SND_QUEUELEN /* (TCP sender buffer space (pbufs)) */
+#define MEMP_NUM_PBUF 4000 /* (TCP sender buffer space (pbufs)) */
 
 /**
  * The number of simultaneously queued TCP segments.
  */
-#define MEMP_NUM_TCP_SEG TCP_SND_QUEUELEN
+#define MEMP_NUM_TCP_SEG 4000
 
 /**
  * The number of simultaneously active timeouts.
@@ -190,11 +190,9 @@
  * chained so they can be processed at a later time.
  */
 #define LWIP_PBUF_CUSTOM_DATA \
-    bool in_use; \
     struct pbuf *next_chain;
 
-#define LWIP_PBUF_INIT_CUSTOM_DATA(p) \
-    (p)->in_use = false; \
+#define LWIP_PBUF_CUSTOM_DATA_INIT(p) \
     (p)->next_chain = NULL;
 
 /* Debugging options */
