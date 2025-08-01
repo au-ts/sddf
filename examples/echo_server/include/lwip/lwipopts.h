@@ -167,12 +167,12 @@
  * If the application sends a lot of data out of ROM (or other static memory),
  * this should be set high.
  */
-#define MEMP_NUM_PBUF TCP_SND_QUEUELEN /* (TCP sender buffer space (pbufs)) */
+#define MEMP_NUM_PBUF 4000 /* (TCP sender buffer space (pbufs)) */
 
 /**
  * The number of simultaneously queued TCP segments.
  */
-#define MEMP_NUM_TCP_SEG TCP_SND_QUEUELEN
+#define MEMP_NUM_TCP_SEG 4000
 
 /**
  * The number of simultaneously active timeouts.
