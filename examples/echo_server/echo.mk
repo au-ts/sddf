@@ -115,9 +115,17 @@ IMAGES := eth_driver.elf echo0.elf echo1.elf benchmark.elf idle.elf network_virt
 	  serial_driver.elf serial_virt_tx.elf
 
 ifeq ($(ARCH),aarch64)
-	CFLAGS_ARCH := -mcpu=$(CPU) -target aarch64-none-elf
+	CFLAGS_ARCH := -mcpu=$(CPU)
+	TARGET := aarch64-none-elf
 else ifeq ($(ARCH),riscv64)
-	CFLAGS_ARCH := -march=rv64imafdc -target riscv64-none-elf
+	CFLAGS_ARCH := -march=rv64imafdc
+	TARGET := riscv64-none-elf
+else
+$(error Unsupported ARCH given)
+endif
+
+ifeq ($(strip $(TOOLCHAIN)), clang)
+	CFLAGS_ARCH += -target $(TARGET)
 endif
 
 CFLAGS := $(CFLAGS_ARCH) \
