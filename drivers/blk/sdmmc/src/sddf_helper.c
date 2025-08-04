@@ -8,7 +8,7 @@ __attribute__((__section__(".blk_driver_config"))) blk_driver_config_t config;
 
 blk_queue_handle_t blk_queue;
 
-void blk_queue_init_helper() {
+void blk_queue_init_helper(uint64_t capacity) {
     blk_queue_init(&blk_queue, config.virt.req_queue.vaddr, config.virt.resp_queue.vaddr, config.virt.num_buffers);
 
     blk_storage_info_t *storage_info = config.virt.storage_info.vaddr;

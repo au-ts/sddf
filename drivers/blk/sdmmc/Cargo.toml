@@ -4,12 +4,14 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-sel4-microkit = { git = "https://github.com/seL4/rust-sel4.git", rev = "a12b43ee359ed8f1fa7433f0534217da3b83e9ef" }
-sdmmc_hal = { git = "https://github.com/Cheng-Li1/sdcard-emmc-rs", rev = "e590aa23448cfeaa1398722a86472fa61122a7ba" }
-sdmmc_protocol = {git = "https://github.com/Cheng-Li1/sdcard-emmc-rs", rev = "e590aa23448cfeaa1398722a86472fa61122a7ba", features = ["sel4-microkit"] }
+sel4-microkit = { git = "https://github.com/seL4/rust-sel4.git", rev = "d2bc5cf71c5455f85898a4768e9dcbaea39e1a7e", features = ["alloc"] }
+sel4-panicking-env = { git = "https://github.com/seL4/rust-sel4.git", rev = "d2bc5cf71c5455f85898a4768e9dcbaea39e1a7e" }
+meson_hal = { git = "https://github.com/Cheng-Li1/sdcard-emmc-rs", rev = "3fa77fa08c8ef9c7927a75bbd0b06083c6d21fe5", optional = true }
+sdmmc_protocol = {git = "https://github.com/Cheng-Li1/sdcard-emmc-rs", rev = "3fa77fa08c8ef9c7927a75bbd0b06083c6d21fe5" }
 sddf_timer = { path = "../../../include/sddf_rust/timer" }
-# sdmmc_hal = { path = "sdmmc_hal/meson" }
-# sdmmc_protocol = { path = "sdmmc_protocol", features = ["sel4-microkit"] }
+
+[features]
+meson = ["dep:meson_hal"]
 
 [build]
 build = "build.rs"

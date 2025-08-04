@@ -38,6 +38,7 @@ blk_driver.elf: $(BUILD_DIR) blk/sdmmc/meson/libsddfblk.a
 		-Z build-std=core,alloc,compiler_builtins \
 		-Z build-std-features=compiler-builtins-mem \
 		--target-dir $(BUILD_DIR)/blk/sdmmc/meson/ \
-		--target support/targets/aarch64-sel4-microkit-minimal.json && \
+		--target support/targets/aarch64-sel4-microkit-minimal.json \
+		--features "meson"
 	cp $(BUILD_DIR)/blk/sdmmc/meson/aarch64-sel4-microkit-minimal/debug/blk_driver.elf $(BUILD_DIR)
 	echo "Build complete: $(TARGET_ELF)"
