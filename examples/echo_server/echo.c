@@ -35,7 +35,7 @@ serial_queue_handle_t serial_tx_queue_handle;
 net_queue_handle_t net_rx_handle;
 net_queue_handle_t net_tx_handle;
 
-#define LWIP_TICK_MS 100
+#define LWIP_TICK_MS 1
 
 struct pbuf *head;
 struct pbuf *tail;
