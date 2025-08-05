@@ -14,7 +14,7 @@ void blk_queue_init_helper(uint64_t capacity) {
     blk_storage_info_t *storage_info = config.virt.storage_info.vaddr;
     storage_info->sector_size = 512;
     storage_info->block_size = 1;
-    storage_info->capacity = 0xFFFFFFFFFF;
+    storage_info->capacity = capacity;
     storage_info->ready = true;
 }
 

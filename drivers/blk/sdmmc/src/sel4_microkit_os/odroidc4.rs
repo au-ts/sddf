@@ -126,11 +126,6 @@ impl VoltageOps for Odroidc4VoltageSwitch {
     }
 }
 
-pub unsafe fn platform_hal() -> SdmmcMesonHardware {
-    // Use this var! will actually leak the memory that use to store the address
-    let reg_base: &u64 = var!(sdmmc: u64 = 0x0);
-    if *reg_base == 0x0 {
-        panic!("SDMMC: SDMMC register address is not being set correctly!")
-    }
-    unsafe { SdmmcMesonHardware::new(*reg_base) }
+pub unsafe fn platform_hal(regs_base: u64) -> SdmmcMesonHardware {
+    unsafe { SdmmcMesonHardware::new(regs_base) }
 }

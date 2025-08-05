@@ -1,4 +1,3 @@
-use sddf_timer::timer::Timer;
 use sdmmc_protocol::sdmmc_os::{Log, Sleep};
 use sel4_panicking_env::__debug_print_macro_helper;
 
@@ -13,19 +12,17 @@ pub(crate) mod platform {
 const NS_IN_US: u64 = 1000;
 
 /// Wrapper to work around Rust's orphan rule
-pub struct TimerOps {
-    timer: Timer,
-}
+pub struct TimerOps {}
 
 impl TimerOps {
-    pub const fn new(timer: Timer) -> Self {
-        TimerOps { timer }
+    pub const fn new() -> Self {
+        TimerOps {}
     }
 }
 
 impl Sleep for TimerOps {
     fn usleep(&mut self, time_us: u32) {
-        self.timer.set_timeout(time_us as u64 * NS_IN_US);
+        sdmmc_protocol::sdmmc_os::process_wait_unreliable(time_us as u64 * NS_IN_US);
     }
 }
 
