@@ -1,10 +1,3 @@
-#
-# Copyright 2023, Colias Group, LLC
-#
-# SPDX-License-Identifier: BSD-2-Clause
-#
-
-
 # Get current dir
 SDMMC_DRIVER_DIR := $(realpath $(dir $(lastword $(MAKEFILE_LIST))))
 

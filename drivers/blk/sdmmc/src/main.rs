@@ -19,17 +19,18 @@ use sddf_blk::{
     blk_device_regs_vaddr, blk_enqueue_resp_helper, blk_queue_empty_req_helper,
     blk_queue_full_resp_helper, blk_queue_init_helper, BlkOp, BlkRequest, BlkStatus,
 };
-use sddf_timer::timer::Timer;
 
 use crate::sel4_microkit_os::{platform::VOLTAGE, SerialOps, TimerOps};
 
 const INTERRUPT: sel4_microkit::Channel = sel4_microkit::Channel::new(0);
 const BLK_VIRTUALIZER: sel4_microkit::Channel = sel4_microkit::Channel::new(1);
-const TIMER_CHANNEL: usize = 2;
-const TIMER: TimerOps = TimerOps::new(Timer::new(sel4_microkit::Channel::new(TIMER_CHANNEL)));
+const TIMER: TimerOps = TimerOps::new();
 const SERIAL: SerialOps = SerialOps::new();
 
-use sdmmc_protocol::{sdmmc::{mmc_struct::CardInfo, HostInfo}, sdmmc_traits::SdmmcHardware};
+use sdmmc_protocol::{
+    sdmmc::{mmc_struct::CardInfo, HostInfo},
+    sdmmc_traits::SdmmcHardware,
+};
 use sdmmc_protocol::{
     sdmmc::{SdmmcError, SdmmcProtocol},
     sdmmc_os::{Sleep, VoltageOps},
@@ -41,9 +42,6 @@ use sel4_microkit::{
 const SDCARD_SECTOR_SIZE: u32 = 512;
 const SDDF_TRANSFER_SIZE: u32 = 4096;
 const SDDF_TO_REAL_SECTOR: u32 = SDDF_TRANSFER_SIZE / SDCARD_SECTOR_SIZE;
-
-// If people don't like the retry logic being here, maybe I can move it to the protocol layer?
-const RETRY_CHANCE: u16 = 5;
 
 // Debug function for printing out content in one block
 #[allow(dead_code)]
@@ -82,18 +80,21 @@ fn create_dummy_waker() -> Waker {
 
 #[protection_domain(heap_size = 0x10000)]
 fn init() -> impl Handler {
-    debug_println!("Driver init!");
+    unsafe {
+        sdmmc_protocol::sdmmc_os::set_logger(&SERIAL).unwrap();
+    }
 
     let regs_base = unsafe { blk_device_regs_vaddr() };
 
-    let hal = unsafe { crate::sel4_microkit_os::platform::platform_hal() };
+    let hal = unsafe { crate::sel4_microkit_os::platform::platform_hal(regs_base) };
 
     let unsafe_stolen_memory: &mut [u8; 64];
 
-    // This line of code actually is very unsafe!S
+    // This line of code actually is very unsafe!
     // Considering the memory is stolen from the memory that has sdcard registers mapped in
     let init_data_vaddr = unsafe { blk_device_init_data_vaddr() };
     let init_data_ioaddr = unsafe { blk_device_init_data_ioaddr() };
+
     unsafe {
         let stolen_memory_addr = init_data_vaddr as *mut [u8; 64];
         assert!(stolen_memory_addr as usize % 8 == 0);
@@ -113,10 +114,6 @@ fn init() -> impl Handler {
 
     let host_info: HostInfo = sdmmc_host.get_host_info();
     let card_info: CardInfo = sdmmc_host.card_info().unwrap();
-
-    unsafe {
-        blk_queue_init_helper(card_info.card_capacity);
-    }
 
     let _ = sdmmc_host.config_interrupt(false, false);
 
@@ -140,11 +137,15 @@ fn init() -> impl Handler {
 
     // Should always succeed, at least for odroid C4
     let _ = sdmmc_host.config_interrupt(true, false);
+
+    unsafe {
+        blk_queue_init_helper(card_info.card_capacity);
+    }
+
     HandlerImpl {
         future: None,
         sdmmc: Some(sdmmc_host),
         request: None,
-        retry: RETRY_CHANCE,
         host_info,
         card_info,
     }
@@ -154,7 +155,6 @@ struct HandlerImpl<T: SdmmcHardware, S: Sleep, V: VoltageOps> {
     future: Option<Pin<Box<dyn Future<Output = (Result<(), SdmmcError>, SdmmcProtocol<T, S, V>)>>>>,
     sdmmc: Option<SdmmcProtocol<T, S, V>>,
     request: Option<BlkRequest>,
-    retry: u16,
     host_info: HostInfo,
     card_info: CardInfo,
 }
@@ -191,32 +191,28 @@ where
                                     // debug_println!("SDMMC_DRIVER: Future completed with result");
                                     self.future = None; // Reset the future once done
                                     self.sdmmc = Some(sdmmc);
-                                    if result.is_err() {
-                                        debug_println!(
-                                            "SDMMC_DRIVER: DISK ERROR ENCOUNTERED, possibly retry!"
-                                        );
-                                        self.retry -= 1;
-                                    } else {
+                                    if result.is_ok() {
                                         // Deduct finished count from count
                                         request.success_count += request.count_to_do;
                                         request.count -= request.count_to_do;
-                                    }
-                                    if request.count == 0 {
-                                        let resp_status = BlkStatus::BlkRespOk;
-                                        notify_virt = true;
-                                        unsafe {
-                                            // The using try_into() to convert u32 to u16 should not be necessary unless
-                                            // there are bugs in the code cause the operation to fail
-                                            blk_enqueue_resp_helper(
-                                                resp_status,
-                                                (request.success_count / SDDF_TO_REAL_SECTOR)
-                                                    .try_into()
-                                                    .unwrap(),
-                                                request.id,
-                                            );
+
+                                        if request.count == 0 {
+                                            let resp_status = BlkStatus::BlkRespOk;
+                                            notify_virt = true;
+                                            unsafe {
+                                                // The using try_into() to convert u32 to u16 should not be necessary unless
+                                                // there are bugs in the code cause the operation to fail
+                                                blk_enqueue_resp_helper(
+                                                    resp_status,
+                                                    (request.success_count / SDDF_TO_REAL_SECTOR)
+                                                        .try_into()
+                                                        .unwrap(),
+                                                    request.id,
+                                                );
+                                            }
+                                            self.request = None;
                                         }
-                                        self.request = None;
-                                    } else if self.retry == 0 {
+                                    } else {
                                         let resp_status = BlkStatus::BlkRespSeekError;
                                         notify_virt = true;
                                         unsafe {
@@ -279,16 +275,23 @@ where
                     debug_println!("count: {}", request.count);                  // Simple u16
                     debug_println!("id: {}", request.id);                        // Simple u32
                     */
+
+                    // Check if the request is valid
+                    if (request.count as u64 + request.block_number as u64)
+                        * SDCARD_SECTOR_SIZE as u64
+                        > self.card_info.card_capacity
+                    {
+                        unsafe {
+                            blk_enqueue_resp_helper(BlkStatus::BlkRespSeekError, 0, request.id);
+                        }
+                    }
+
                     match request.request_code {
                         BlkOp::BlkReqRead => {
-                            // Reset retry chance here
-                            self.retry = RETRY_CHANCE;
                             self.request = Some(request);
                             break;
                         }
                         BlkOp::BlkReqWrite => {
-                            // Reset retry chance here
-                            self.retry = RETRY_CHANCE;
                             self.request = Some(request);
                             break;
                         }
@@ -308,10 +311,8 @@ where
                         match request.request_code {
                             BlkOp::BlkReqRead => {
                                 // TODO: The MAX_BLOCK_PER_TRANSFER is got by hackily get the defines in hardware layer which is wrong, check that to get properly from protocol layer
-                                request.count_to_do = core::cmp::min(
-                                    request.count,
-                                    self.host_info.max_block_per_req,
-                                );
+                                request.count_to_do =
+                                    core::cmp::min(request.count, self.host_info.max_block_per_req);
                                 if let Some(sdmmc) = self.sdmmc.take() {
                                     self.future = Some(Box::pin(sdmmc.read_block(
                                         request.count_to_do,
@@ -326,10 +327,8 @@ where
                             }
                             BlkOp::BlkReqWrite => {
                                 // TODO: The MAX_BLOCK_PER_TRANSFER is got by hackily get the defines in hardware layer which is wrong, check that to get properly from protocol layer
-                                request.count_to_do = core::cmp::min(
-                                    request.count,
-                                    self.host_info.max_block_per_req,
-                                );
+                                request.count_to_do =
+                                    core::cmp::min(request.count, self.host_info.max_block_per_req);
                                 if let Some(sdmmc) = self.sdmmc.take() {
                                     self.future = Some(Box::pin(sdmmc.write_block(
                                         request.count_to_do,
@@ -352,11 +351,7 @@ where
                         if let Some(ref mut future) = self.future {
                             match future.as_mut().poll(&mut cx) {
                                 Poll::Ready(_) => {
-                                    panic!(
-                                        "SDMMC: The newly created future returned immediately! 
-                                        Most likely the future contain an invalid request! 
-                                        Double check request sanitize process!"
-                                    )
+                                    panic!("SDMMC: RECEIVED INVALID REQUEST! Check request validation code!");
                                 }
                                 Poll::Pending => break 'process_notification,
                             }
