@@ -104,6 +104,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "qemu_virt_aarch64",
             "qemu_virt_riscv64",
             "star64",
+            "zcu102",
         ],
         "boards_test": [
             "imx8mq_evk",
@@ -114,6 +115,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "qemu_virt_aarch64",
             "qemu_virt_riscv64",
             "star64",
+            "zcu102",
         ],
     },
 }
