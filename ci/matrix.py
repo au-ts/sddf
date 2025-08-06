@@ -33,13 +33,13 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "maaxboard",
             "qemu_virt_aarch64",
             "qemu_virt_riscv64",
-            "odroidc4"
+            "odroidc4",
         ],
         "boards_test": [
             "maaxboard",
             "qemu_virt_aarch64",
             "qemu_virt_riscv64",
-            "odroidc4"
+            "odroidc4",
         ],
     },
     "i2c": {
