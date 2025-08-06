@@ -6,7 +6,6 @@ use sdmmc_protocol::{
 };
 
 use meson_hal::meson_gx_mmc::SdmmcMesonHardware;
-use sel4_microkit::var;
 
 pub struct Odroidc4VoltageSwitch;
 pub(crate) const VOLTAGE: Odroidc4VoltageSwitch = Odroidc4VoltageSwitch::new();
