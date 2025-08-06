@@ -112,6 +112,8 @@ fn init() -> impl Handler {
         .setup_card()
         .unwrap_or_else(|error| panic!("SDMMC: Error at setup {:?}", error));
 
+    sdmmc_host.print_card_info();
+
     let host_info: HostInfo = sdmmc_host.get_host_info();
     let card_info: CardInfo = sdmmc_host.card_info().unwrap();
 
@@ -131,9 +133,9 @@ fn init() -> impl Handler {
             .unwrap_or_else(|error| panic!("SDMMC: Error at tuning performance {:?}", error));
     }
 
-    unsafe {
-        print_one_block(unsafe_stolen_memory.as_ptr(), 64);
-    }
+    // unsafe {
+    //     print_one_block(unsafe_stolen_memory.as_ptr(), 64);
+    // }
 
     // Should always succeed, at least for odroid C4
     let _ = sdmmc_host.config_interrupt(true, false);
