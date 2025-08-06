@@ -46,7 +46,6 @@ BOARDS: List[Board] = [
         timer="soc@0/bus@30000000/timer@302d0000",
         serial="soc@0/bus@30800000/serial@30860000",
     ),
-    
     Board(
         name="odroidc4",
         arch=SystemDescription.Arch.AARCH64,
@@ -54,14 +53,7 @@ BOARDS: List[Board] = [
         partition=0,
         blk="soc/sd@ffe05000",
         timer=None,
-    ),
-    Board(
-        name="odroidc4",
-        arch=SystemDescription.Arch.AARCH64,
-        paddr_top=0x80000000,
-        partition=0,
-        blk="soc/sd@ffe05000",
-        timer=None,
+        serial="soc/bus@ff800000/serial@3000",
     ),
     Board(
         name="qemu_virt_riscv64",
