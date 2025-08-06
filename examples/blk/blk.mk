@@ -63,6 +63,7 @@ else ifeq ($(strip $(MICROKIT_BOARD)), maaxboard)
 else ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
 	ARCH := aarch64
 	CPU := cortex-a55
+	SERIAL_DRIVER_DIR := meson
 	BLK_DRIVER_DIR := sdmmc
 else
 $(error Unsupported MICROKIT_BOARD given)
