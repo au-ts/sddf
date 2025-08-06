@@ -8,7 +8,8 @@ __attribute__((__section__(".blk_driver_config"))) blk_driver_config_t config;
 
 blk_queue_handle_t blk_queue;
 
-void blk_queue_init_helper(uint64_t capacity) {
+void blk_queue_init_helper(uint64_t capacity)
+{
     blk_queue_init(&blk_queue, config.virt.req_queue.vaddr, config.virt.resp_queue.vaddr, config.virt.num_buffers);
 
     blk_storage_info_t *storage_info = config.virt.storage_info.vaddr;
@@ -18,27 +19,33 @@ void blk_queue_init_helper(uint64_t capacity) {
     storage_info->ready = true;
 }
 
-uint64_t blk_device_regs_vaddr() {
+uint64_t blk_device_regs_vaddr()
+{
     return (uint64_t)device_resources.regions[0].region.vaddr;
 }
 
-uint64_t blk_device_init_data_vaddr() {
+uint64_t blk_device_init_data_vaddr()
+{
     return (uint64_t)device_resources.regions[1].region.vaddr;
 }
 
-uint64_t blk_device_init_data_ioaddr() {
+uint64_t blk_device_init_data_ioaddr()
+{
     return (uint64_t)device_resources.regions[1].io_addr;
 }
 
-uint8_t blk_queue_empty_req_helper() {
+uint8_t blk_queue_empty_req_helper()
+{
     return blk_queue_empty_req(&blk_queue);
 }
 
-uint8_t blk_queue_full_resp_helper() {
+uint8_t blk_queue_full_resp_helper()
+{
     return blk_queue_full_resp(&blk_queue);
 }
 
-uint8_t blk_enqueue_resp_helper(uint8_t status, uint16_t success, uint32_t id) {
+uint8_t blk_enqueue_resp_helper(uint8_t status, uint16_t success, uint32_t id)
+{
     // It would be better if we do not use int but use int8_t
     if (blk_enqueue_resp(&blk_queue, status, success, id) == 0) {
         return 0;
@@ -46,7 +53,9 @@ uint8_t blk_enqueue_resp_helper(uint8_t status, uint16_t success, uint32_t id) {
     return 1;
 }
 
-uint8_t blk_dequeue_req_helper(uint8_t *code, uintptr_t *io_or_offset, uint64_t *block_number, uint16_t *count, uint32_t *id) {
+uint8_t blk_dequeue_req_helper(uint8_t *code, uintptr_t *io_or_offset, uint64_t *block_number, uint16_t *count,
+                               uint32_t *id)
+{
     // It would be better if we do not use int but use int8_t
     // uint16_t temp_count = 0;
     if (blk_dequeue_req(&blk_queue, (blk_req_code_t *)code, io_or_offset, block_number, count, id) == 0) {
