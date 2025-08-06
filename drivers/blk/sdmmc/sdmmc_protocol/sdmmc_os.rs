@@ -1,3 +1,6 @@
+// Copyright 2025, UNSW
+// SPDX-License-Identifier: BSD-2-Clause
+
 use crate::sdmmc::MmcPowerMode;
 use crate::sdmmc::MmcSignalVoltage;
 use crate::sdmmc::SdmmcError;

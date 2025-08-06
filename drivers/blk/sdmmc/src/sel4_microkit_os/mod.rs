@@ -1,3 +1,6 @@
+// Copyright 2025, UNSW
+// SPDX-License-Identifier: BSD-2-Clause
+
 use sdmmc_protocol::sdmmc_os::{Log, Sleep};
 use sel4_panicking_env::__debug_print_macro_helper;
 

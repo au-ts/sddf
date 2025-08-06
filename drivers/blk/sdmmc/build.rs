@@ -1,3 +1,6 @@
+// Copyright 2025, UNSW
+// SPDX-License-Identifier: BSD-2-Clause
+
 fn main() {
     // Specify the path where the C library is located
     println!("cargo:rustc-link-search=native=./");

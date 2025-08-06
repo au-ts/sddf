@@ -1,3 +1,6 @@
+// Copyright 2025, UNSW
+// SPDX-License-Identifier: BSD-2-Clause
+
 use bitflags::bitflags;
 
 // Linux protocol layer use two u32 to represent all capabilities

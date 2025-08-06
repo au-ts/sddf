@@ -1,3 +1,6 @@
+// Copyright 2025, UNSW
+// SPDX-License-Identifier: BSD-2-Clause
+
 #![no_std] // Don't link the standard library
 #![no_main] // Don't use the default entry point
 #![feature(used_with_arg)]
@@ -28,7 +31,7 @@ const TIMER: TimerOps = TimerOps::new();
 const SERIAL: SerialOps = SerialOps::new();
 
 use sdmmc_protocol::{
-    sdmmc::{mmc_struct::CardInfo, HostInfo},
+    sdmmc::{mmc_struct::CardInfo, HostInfo, SDCARD_DEFAULT_SECTOR_SIZE},
     sdmmc_traits::SdmmcHardware,
 };
 use sdmmc_protocol::{
@@ -39,9 +42,8 @@ use sel4_microkit::{
     debug_print, debug_println, protection_domain, ChannelSet, Handler, Infallible,
 };
 
-const SDCARD_SECTOR_SIZE: u32 = 512;
 const SDDF_TRANSFER_SIZE: u32 = 4096;
-const SDDF_TO_REAL_SECTOR: u32 = SDDF_TRANSFER_SIZE / SDCARD_SECTOR_SIZE;
+const SDDF_TO_REAL_SECTOR: u32 = SDDF_TRANSFER_SIZE / SDCARD_DEFAULT_SECTOR_SIZE;
 
 // Debug function for printing out content in one block
 #[allow(dead_code)]
@@ -280,7 +282,7 @@ where
 
                     // Check if the request is valid
                     if (request.count as u64 + request.block_number as u64)
-                        * SDCARD_SECTOR_SIZE as u64
+                        * SDCARD_DEFAULT_SECTOR_SIZE as u64
                         > self.card_info.card_capacity
                     {
                         unsafe {
@@ -321,7 +323,7 @@ where
                                         request.block_number as u64 + request.success_count as u64,
                                         request.io_or_offset
                                             + request.success_count as u64
-                                                * SDCARD_SECTOR_SIZE as u64,
+                                                * SDCARD_DEFAULT_SECTOR_SIZE as u64,
                                     )));
                                 } else {
                                     panic!("SDMMC_DRIVER: The sdmmc should be here since the future should be empty!!!")
@@ -337,7 +339,7 @@ where
                                         request.block_number as u64 + request.success_count as u64,
                                         request.io_or_offset
                                             + request.success_count as u64
-                                                * SDCARD_SECTOR_SIZE as u64,
+                                                * SDCARD_DEFAULT_SECTOR_SIZE as u64,
                                     )));
                                 } else {
                                     panic!("SDMMC_DRIVER: The sdmmc should be here and the future should be empty!!!")

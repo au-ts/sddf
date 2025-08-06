@@ -1,3 +1,9 @@
+#
+# Copyright 2024, UNSW
+#
+# SPDX-License-Identifier: BSD-2-Clause
+#
+
 # Get current dir
 SDMMC_DRIVER_DIR := $(realpath $(dir $(lastword $(MAKEFILE_LIST))))
 

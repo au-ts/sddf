@@ -1,3 +1,6 @@
+// Copyright 2025, UNSW
+// SPDX-License-Identifier: BSD-2-Clause
+
 use core::sync::atomic::Ordering;
 
 use crate::{sdmmc_os::Sleep, sdmmc_traits::SdmmcHardware};
