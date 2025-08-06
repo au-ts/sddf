@@ -92,10 +92,13 @@ bool process_tx_queue(uint32_t client)
 
     /* Not enough space to transmit string to virtualiser. Continue later */
     if (length > serial_queue_free(&tx_queue_handle_drv)) {
-        tx_pending_push(client);
-
         /* Request signal from the driver when data has been consumed */
         serial_request_consumer_signal(&tx_queue_handle_drv);
+    }
+
+    /* Re-check free space in case signal was missed */
+    if (length > serial_queue_free(&tx_queue_handle_drv)) {
+        tx_pending_push(client);
         return false;
     }
 
