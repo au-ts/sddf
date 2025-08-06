@@ -80,8 +80,8 @@ static void tx_provide(void)
         transferred = true;
     }
 
-    /* If transmit fifo is full and there is data remaining to be sent, enable interrupt when fifo is no longer full */
-    if (uart_regs->sr & AML_UART_TX_FULL && !serial_queue_empty(&tx_queue_handle, tx_queue_handle.queue->head)) {
+    /* If there is data remaining to be sent, enable interrupt when fifo is no longer full */
+    if (!serial_queue_empty(&tx_queue_handle, tx_queue_handle.queue->head)) {
         uart_regs->cr |= AML_UART_TX_INT_EN;
     } else {
         uart_regs->cr &= ~AML_UART_TX_INT_EN;
