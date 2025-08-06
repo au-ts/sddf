@@ -12,6 +12,7 @@ ProtectionDomain = SystemDescription.ProtectionDomain
 MemoryRegion = SystemDescription.MemoryRegion
 Map = SystemDescription.Map
 
+
 @dataclass
 class Board:
     name: str
@@ -106,8 +107,8 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     blk_system.add_client(client, partition=partition)
 
     if board.name == "odroidc4":
-        gpio_mr = MemoryRegion("gpio", 0x1000, paddr=0xff800000)
-        blk_driver.add_map(Map(gpio_mr, 0xff800000, "rw", cached=False))
+        gpio_mr = MemoryRegion("gpio", 0x1000, paddr=0xFF800000)
+        blk_driver.add_map(Map(gpio_mr, 0xFF800000, "rw", cached=False))
         sdf.add_mr(gpio_mr)
 
     serial_system.add_client(client)
