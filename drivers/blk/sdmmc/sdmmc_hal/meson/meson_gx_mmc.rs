@@ -1,30 +1,22 @@
 use core::ptr;
 
 use sdmmc_protocol::{
+    dev_log, info,
     sdmmc::{
-        mmc_struct::{MmcBusWidth, MmcTiming, TuningState},
-        sdcard::Sdcard,
-        sdmmc_capability::{
-            MMC_CAP_4_BIT_DATA, MMC_CAP_CMD23, MMC_CAP_VOLTAGE_TUNE, MMC_TIMING_LEGACY,
-            MMC_TIMING_SD_HS, MMC_TIMING_UHS, MMC_VDD_31_32, MMC_VDD_32_33, MMC_VDD_33_34,
-        },
         HostInfo, MmcData, MmcDataFlag, MmcIos, MmcPowerMode, MmcSignalVoltage, SdmmcCmd,
         SdmmcError,
+        mmc_struct::{MmcBusWidth, MmcTiming},
+        sdcard::Sdcard,
+        sdmmc_capability::{
+            MMC_CAP_4_BIT_DATA, MMC_TIMING_LEGACY, MMC_TIMING_SD_HS, MMC_TIMING_UHS, MMC_VDD_31_32,
+            MMC_VDD_32_33, MMC_VDD_33_34,
+        },
     },
-    sdmmc_os::{debug_log, process_wait_unreliable},
+    sdmmc_os::{Sleep, process_wait_unreliable},
     sdmmc_traits::SdmmcHardware,
 };
 
 pub const SDIO_BASE: u64 = 0xffe05000; // Base address from DTS
-
-// The always on gpio pin pull
-const AO_RTI_PIN_REGION_START: u64 = 0xff800014;
-const AO_RTI_PIN_REGION_END: u64 = 0xff800038;
-const AO_RTI_PULL_UP_REG: u64 = 0xff80002c;
-const AO_RTI_OUTPUT_ENABLE_REG: u64 = 0xff800024;
-const AO_RTI_OUTPUT_LEVEL_REG: u64 = 0xff800034;
-const AO_RTI_PULL_UP_EN_REG: u64 = 0xff800030;
-const GPIO_AO_3: u32 = 1 << 3;
 
 macro_rules! div_round_up {
     ($n:expr, $d:expr) => {
@@ -85,12 +77,6 @@ const CMD_CFG_TIMEOUT_4S: u32 = 12 << 12;
 const CMD_CFG_OWNER: u32 = 1 << 31;
 const CMD_CFG_END_OF_CHAIN: u32 = 1 << 11;
 
-// MMC_RSP constants
-const MMC_RSP_PRESENT: u32 = 1 << 0;
-const MMC_RSP_136: u32 = 1 << 1;
-const MMC_RSP_CRC: u32 = 1 << 2;
-const MMC_RSP_BUSY: u32 = 1 << 3;
-
 // STATUS register masks and flags
 const STATUS_MASK: u32 = 0xFFFF; // GENMASK(15, 0)
 const STATUS_ERR_MASK: u32 = 0x1FFF; // GENMASK(12, 0)
@@ -112,11 +98,10 @@ const IRQ_RXD_ERR_MASK: u32 = 0xFF; // Equivalent to GENMASK(7, 0)
 const IRQ_TXD_ERR: u32 = 1 << 8;
 const IRQ_DESC_ERR: u32 = 1 << 9;
 const IRQ_RESP_ERR: u32 = 1 << 10;
-// Equivalent to (IRQ_RXD_ERR_MASK | IRQ_TXD_ERR | IRQ_DESC_ERR | IRQ_RESP_ERR)
 const IRQ_CRC_ERR: u32 = IRQ_RXD_ERR_MASK | IRQ_TXD_ERR | IRQ_DESC_ERR | IRQ_RESP_ERR;
 const IRQ_RESP_TIMEOUT: u32 = 1 << 11;
 const IRQ_DESC_TIMEOUT: u32 = 1 << 12;
-// Equivalent to (IRQ_RESP_TIMEOUT | IRQ_DESC_TIMEOUT)
+
 const IRQ_TIMEOUTS: u32 = IRQ_RESP_TIMEOUT | IRQ_DESC_TIMEOUT;
 const IRQ_END_OF_CHAIN: u32 = 1 << 13;
 const IRQ_RESP_STATUS: u32 = 1 << 14;
@@ -125,8 +110,6 @@ const IRQ_ERR_MASK: u32 = IRQ_CRC_ERR | IRQ_TIMEOUTS;
 
 const IRQ_EN_MASK: u32 = IRQ_ERR_MASK | IRQ_END_OF_CHAIN;
 
-const MESON_SDCARD_SECTOR_SIZE: u32 = 512;
-
 pub const MAX_BLOCK_PER_TRANSFER: u32 = 0x1FF;
 
 const WRITE_ADDR_UPPER: u32 = 0xFFFE0000;
@@ -134,11 +117,6 @@ const WRITE_ADDR_UPPER: u32 = 0xFFFE0000;
 // const VALID_DMA_ADDR_LOWER: u32 = 0x2000000;
 // const VALID_DMA_ADDR_UPPER: u32 = 0x10000000;
 // const VALID_DMA_ADDR_MASK: u32 = 0x80000003;
-
-fn ilog2(x: u32) -> u32 {
-    assert!(x > 0);
-    31 - x.leading_zeros()
-}
 
 // Structure representing the SDIO controller's registers
 /*
@@ -192,7 +170,7 @@ impl MesonSdmmcRegisters {
     /// This function is only safe to use if the sdmmc_register_base is the correct memory addr
     /// of the sdmmc register base and accessible for the driver
     unsafe fn new(sdmmc_register_base: u64) -> &'static mut MesonSdmmcRegisters {
-        &mut *(sdmmc_register_base as *mut MesonSdmmcRegisters)
+        unsafe { &mut *(sdmmc_register_base as *mut MesonSdmmcRegisters) }
     }
 }
 
@@ -215,7 +193,8 @@ pub struct SdmmcMesonHardware {
 
 impl SdmmcMesonHardware {
     pub unsafe fn new(sdmmc_register_base: u64) -> Self {
-        let register = MesonSdmmcRegisters::new(sdmmc_register_base);
+        let register: &'static mut MesonSdmmcRegisters =
+            unsafe { MesonSdmmcRegisters::new(sdmmc_register_base) };
 
         // TODO: Call reset function here
         SdmmcMesonHardware {
@@ -290,19 +269,19 @@ impl SdmmcMesonHardware {
 
         meson_mmc_cmd |= (cmd.cmdidx & 0x3F) << CMD_CFG_CMD_INDEX_SHIFT;
 
-        if cmd.resp_type & MMC_RSP_PRESENT != 0 {
-            if cmd.resp_type & MMC_RSP_136 != 0 {
+        if cmd.resp_type & sdmmc_protocol::sdmmc::MMC_RSP_PRESENT != 0 {
+            if cmd.resp_type & sdmmc_protocol::sdmmc::MMC_RSP_136 != 0 {
                 meson_mmc_cmd |= CMD_CFG_RESP_128;
             }
 
             // If the hardware does not have busy detection, polling for card datalines to be high is needed
             // as the card will signal "busy" (by pulling the DAT line low)
             // Odroid C4 have feature to wait until hardware exit busy state so we do not need to worry about it
-            if cmd.resp_type & MMC_RSP_BUSY != 0 {
+            if cmd.resp_type & sdmmc_protocol::sdmmc::MMC_RSP_BUSY != 0 {
                 meson_mmc_cmd |= CMD_CFG_R1B;
             }
 
-            if cmd.resp_type & MMC_RSP_CRC == 0 {
+            if cmd.resp_type & sdmmc_protocol::sdmmc::MMC_RSP_CRC == 0 {
                 meson_mmc_cmd |= CMD_CFG_RESP_NOCRC;
             }
         } else {
@@ -314,10 +293,10 @@ impl SdmmcMesonHardware {
 
             cfg &= !CFG_BL_LEN_MASK;
 
-            cfg |= ilog2(data.blocksize) << CFG_BL_LEN_SHIFT;
+            cfg |= data.blocksize.ilog2() << CFG_BL_LEN_SHIFT;
 
             // TODO: Maybe add blocksize is power of 2 check here?
-            // debug_log!("Configure register value: 0x{:08x}", cfg);
+            // dev_log!("Configure register value: 0x{:08x}", cfg);
 
             unsafe {
                 ptr::write_volatile(&mut self.register.cfg, cfg);
@@ -341,7 +320,7 @@ impl SdmmcMesonHardware {
         let [rsp0, rsp1, rsp2, rsp3] = response;
 
         // Assign values by reading the respective registers
-        if cmd.resp_type & MMC_RSP_136 != 0 {
+        if cmd.resp_type & sdmmc_protocol::sdmmc::MMC_RSP_136 != 0 {
             unsafe {
                 // Yes, this is in a reverse order as rsp0 and self.cmd_rsp3 is the least significant
                 // Check uboot read response code for more details
@@ -350,7 +329,7 @@ impl SdmmcMesonHardware {
                 *rsp2 = ptr::read_volatile(&self.register.cmd_rsp1);
                 *rsp3 = ptr::read_volatile(&self.register.cmd_rsp);
             }
-        } else if cmd.resp_type & MMC_RSP_PRESENT != 0 {
+        } else if cmd.resp_type & sdmmc_protocol::sdmmc::MMC_RSP_PRESENT != 0 {
             unsafe {
                 *rsp0 = ptr::read_volatile(&self.register.cmd_rsp);
             }
@@ -432,12 +411,7 @@ impl SdmmcMesonHardware {
 
 impl SdmmcHardware for SdmmcMesonHardware {
     fn sdmmc_init(&mut self) -> Result<(MmcIos, HostInfo, u128), SdmmcError> {
-        let cap: u128 = MMC_TIMING_LEGACY
-            | MMC_TIMING_SD_HS
-            | MMC_TIMING_UHS
-            | MMC_CAP_VOLTAGE_TUNE
-            | MMC_CAP_4_BIT_DATA
-            | MMC_CAP_CMD23;
+        let cap: u128 = MMC_TIMING_LEGACY | MMC_TIMING_SD_HS | MMC_TIMING_UHS | MMC_CAP_4_BIT_DATA;
 
         // Reset host state
         self.meson_reset();
@@ -465,7 +439,11 @@ impl SdmmcHardware for SdmmcMesonHardware {
         return Ok((ios, info, cap));
     }
 
-    fn sdmmc_execute_tuning(&mut self, memory: *mut [u8; 64]) -> Result<(), SdmmcError> {
+    fn sdmmc_execute_tuning(
+        &mut self,
+        memory: *mut [u8; 64],
+        sleep: &mut dyn Sleep,
+    ) -> Result<(), SdmmcError> {
         let mut current_delay: u32 = 0;
 
         if let Some(ref config) = self.delay {
@@ -502,13 +480,13 @@ impl SdmmcHardware for SdmmcMesonHardware {
         let mut tried_highest_delay: u32 = current_delay;
 
         loop {
-            debug_log!(
+            dev_log!(
                 "current delay: {}, lowest_tried: {}, highest_tried: {}\n",
                 current_delay,
                 tried_lowest_delay,
                 tried_highest_delay
             );
-            let res: Result<(), SdmmcError> = Sdcard::sdcard_test_tuning(self, memory);
+            let res: Result<(), SdmmcError> = Sdcard::sdcard_test_tuning(self, sleep, memory);
 
             match res {
                 Ok(_) => {
@@ -594,7 +572,7 @@ impl SdmmcHardware for SdmmcMesonHardware {
             clk_src = CLK_SRC_24M;
         }
 
-        let clk_div = div_round_up!(clk, clock_freq);
+        let clk_div: u32 = div_round_up!(clk, clock_freq);
         /*
          * From uboot meson_gx_mmc.c
          * SM1 SoCs doesn't work fine over 50MHz with CLK_CO_PHASE_180
@@ -676,7 +654,7 @@ impl SdmmcHardware for SdmmcMesonHardware {
                 || mmc_data.blockcnt == 0
                 || mmc_data.blockcnt > MAX_BLOCK_PER_TRANSFER
             {
-                debug_log!("SDMMC: INVALID INPUT VARIABLE!");
+                info!("SDMMC: INVALID INPUT VARIABLE!");
                 return Err(SdmmcError::EINVAL);
             }
             // Depend on the flag and hardware, the cache should be flushed accordingly
@@ -730,16 +708,16 @@ impl SdmmcHardware for SdmmcMesonHardware {
 
         if (status & STATUS_ERR_MASK) != 0 {
             // For debug
-            debug_log!("SDMMC: Print out error request:\n");
-            debug_log!("cmd idx: {}\n", cmd.cmdidx);
-            debug_log!("cmd arg: 0x{:x}\n", cmd.cmdarg);
+            info!("SDMMC: Print out error request:");
+            info!("cmd idx: {}", cmd.cmdidx);
+            info!("cmd arg: 0x{:x}", cmd.cmdarg);
 
-            debug_log!("Odroidc4 status register: 0x{:08}\n", status);
+            info!("Odroidc4 status register: 0x{:08x}", status);
 
-            debug_log!("Card's first response register: 0x{:08}\n", response[0]);
+            info!("Card's first response register: 0x{:08x}", response[0]);
 
             if (status & STATUS_RESP_TIMEOUT) != 0 {
-                debug_log!("SDMMC: CARD TIMEOUT!\n");
+                info!("SDMMC: CARD TIMEOUT!");
 
                 // The card will try to polling the status register until
                 // both descriptor and card are not in busy state
@@ -748,15 +726,15 @@ impl SdmmcHardware for SdmmcMesonHardware {
             }
 
             if (status & STATUS_EIO_ERR) != 0 {
-                debug_log!("SDMMC: CARD IO ERROR! Perform retuning\n");
+                info!("SDMMC: CARD IO ERROR! Perform retuning");
 
                 self.meson_wait_desc_stop()?;
                 // Notified the card to retune the card
                 return Err(SdmmcError::EIO);
             }
 
-            debug_log!(
-                "SDMMC: Unknown error, copy the prints from card init to end of the print and send it to me\n"
+            info!(
+                "SDMMC: Unknown error, Please copy the entire log from driver and send it to Cheng Li lichengchaoreng@gmail.com"
             );
 
             self.meson_wait_desc_stop()?;
@@ -802,118 +780,6 @@ impl SdmmcHardware for SdmmcMesonHardware {
             }
         }
         return Ok(());
-    }
-
-    fn sdmmc_set_signal_voltage(&mut self, voltage: MmcSignalVoltage) -> Result<(), SdmmcError> {
-        match voltage {
-            MmcSignalVoltage::Voltage330 => {
-                let mut value: u32;
-                unsafe {
-                    value = ptr::read_volatile(AO_RTI_OUTPUT_ENABLE_REG as *const u32);
-                }
-                value &= !(1 << 6);
-                unsafe {
-                    ptr::write_volatile(AO_RTI_OUTPUT_ENABLE_REG as *mut u32, value);
-                }
-                unsafe {
-                    value = ptr::read_volatile(AO_RTI_OUTPUT_LEVEL_REG as *const u32);
-                }
-                value &= !(1 << 6);
-                unsafe {
-                    ptr::write_volatile(AO_RTI_OUTPUT_LEVEL_REG as *mut u32, value);
-                }
-            }
-            MmcSignalVoltage::Voltage180 => {
-                let mut value: u32;
-                unsafe {
-                    value = ptr::read_volatile(AO_RTI_OUTPUT_ENABLE_REG as *const u32);
-                }
-                value &= !(1 << 6);
-                unsafe {
-                    ptr::write_volatile(AO_RTI_OUTPUT_ENABLE_REG as *mut u32, value);
-                }
-                unsafe {
-                    value = ptr::read_volatile(AO_RTI_OUTPUT_LEVEL_REG as *const u32);
-                }
-                value |= 1 << 6;
-                unsafe {
-                    ptr::write_volatile(AO_RTI_OUTPUT_LEVEL_REG as *mut u32, value);
-                }
-            }
-            MmcSignalVoltage::Voltage120 => return Err(SdmmcError::EINVAL),
-        }
-        // Disable pull-up/down for gpioAO_6
-        let mut value: u32;
-        unsafe {
-            value = ptr::read_volatile(AO_RTI_PULL_UP_EN_REG as *const u32);
-        }
-        value &= !(1 << 6); // Disable pull-up/down for gpioAO_6
-        unsafe {
-            ptr::write_volatile(AO_RTI_PULL_UP_EN_REG as *mut u32, value);
-        }
-
-        Ok(())
-    }
-
-    // Experimental function that tries to modify the pin that might control the power of the sdcard slot
-    // This function should be pretty much the same with sdmmc_set_signal_voltage, the only difference
-    // is the pin modified is gpioAO_3, busy wait is needed to be added after setting the power
-    fn sdmmc_set_power(&mut self, power_mode: MmcPowerMode) -> Result<(), SdmmcError> {
-        /*
-        unsafe {
-            debug_log!("In set power function\n");
-            let mut value: u32;
-
-            // Read the value using ptr::read_volatile
-            value = ptr::read_volatile(AO_RTI_OUTPUT_ENABLE_REG as *const u32);
-            debug_log!("Address {:#x}: {:#x}\n", AO_RTI_OUTPUT_ENABLE_REG, value);
-
-            value = ptr::read_volatile(AO_RTI_OUTPUT_LEVEL_REG as *const u32);
-            debug_log!("Address {:#x}: {:#x}\n", AO_RTI_OUTPUT_LEVEL_REG, value);
-
-            value = ptr::read_volatile(AO_RTI_PULL_UP_EN_REG as *const u32);
-            debug_log!("Address {:#x}: {:#x}\n", AO_RTI_PULL_UP_EN_REG, value);
-        }
-        */
-
-        let mut value: u32;
-        unsafe {
-            value = ptr::read_volatile(AO_RTI_OUTPUT_ENABLE_REG as *const u32);
-        }
-        // If the GPIO pin is not being set as output, set it to output first
-        if value & GPIO_AO_3 != 0 {
-            value &= !GPIO_AO_3;
-            unsafe {
-                ptr::write_volatile(AO_RTI_OUTPUT_ENABLE_REG as *mut u32, value);
-            }
-        }
-        match power_mode {
-            MmcPowerMode::On => {
-                unsafe {
-                    value = ptr::read_volatile(AO_RTI_OUTPUT_LEVEL_REG as *const u32);
-                }
-                if value & GPIO_AO_3 == 0 {
-                    value |= GPIO_AO_3;
-                    unsafe {
-                        ptr::write_volatile(AO_RTI_OUTPUT_LEVEL_REG as *mut u32, value);
-                    }
-                }
-                self.sdmmc_set_signal_voltage(MmcSignalVoltage::Voltage330)?;
-            }
-            MmcPowerMode::Off => {
-                unsafe {
-                    value = ptr::read_volatile(AO_RTI_OUTPUT_LEVEL_REG as *const u32);
-                }
-                if value & GPIO_AO_3 != 0 {
-                    value &= !GPIO_AO_3;
-                    unsafe {
-                        ptr::write_volatile(AO_RTI_OUTPUT_LEVEL_REG as *mut u32, value);
-                    }
-                }
-            }
-            _ => return Err(SdmmcError::EINVAL),
-        }
-        Ok(())
     }
 
     fn sdmmc_host_reset(&mut self) -> Result<MmcIos, SdmmcError> {
