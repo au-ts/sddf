@@ -32,6 +32,7 @@ Files:
     drivers/timer/jh7110/config.json
     drivers/timer/meson/config.json
     drivers/timer/goldfish/config.json
+    drivers/timer/cdns/config.json
 Copyright: UNSW
 License: BSD-2-Clause
 
