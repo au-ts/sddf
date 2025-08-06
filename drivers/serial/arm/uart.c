@@ -48,8 +48,8 @@ static void tx_provide(void)
         transferred = true;
     }
 
-    /* If transmit fifo is full and there is data remaining to be sent, enable interrupt when fifo is no longer full */
-    if (uart_regs->fr & PL011_FR_TXFF && !serial_queue_empty(&tx_queue_handle, tx_queue_handle.queue->head)) {
+    /* If there is data remaining to be sent, enable interrupt when fifo is no longer full */
+    if (!serial_queue_empty(&tx_queue_handle, tx_queue_handle.queue->head)) {
         uart_regs->imsc |= PL011_IMSC_TX_INT;
     } else {
         uart_regs->imsc &= ~PL011_IMSC_TX_INT;

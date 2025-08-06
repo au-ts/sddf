@@ -57,13 +57,10 @@ static void tx_provide(void)
         *REG_PTR(ZYNQMP_UART_ISR) = ZYNQMP_UART_IXR_TXEMPTY;
     }
 
-    /* If the TX FIFO becomes full... */
-    if (*REG_PTR(ZYNQMP_UART_SR) & ZYNQMP_UART_CHANNEL_STS_TXNFULL) {
-        /* ...and there is more work to be done, raise a TX FIFO empty interrupt */
-        if (!serial_queue_empty(&tx_queue_handle, tx_queue_handle.queue->head)) {
-            *REG_PTR(ZYNQMP_UART_IER) = ZYNQMP_UART_IXR_TXEMPTY;
-            waiting_for_tx_to_finish = true;
-        }
+    /* If there is more work to be done, raise a TX FIFO empty interrupt */
+    if (!serial_queue_empty(&tx_queue_handle, tx_queue_handle.queue->head)) {
+        *REG_PTR(ZYNQMP_UART_IER) = ZYNQMP_UART_IXR_TXEMPTY;
+        waiting_for_tx_to_finish = true;
     }
 
     if (transferred && serial_require_consumer_signal(&tx_queue_handle)) {
