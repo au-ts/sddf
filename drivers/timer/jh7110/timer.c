@@ -127,9 +127,9 @@ static void process_timeouts(uint64_t curr_time)
         uint64_t ticks_remainder = (ns % NS_IN_S) * STARFIVE_TIMER_TICKS_PER_SECOND / NS_IN_S;
         uint64_t num_ticks = ticks_whole_seconds + ticks_remainder;
 
-        assert(num_ticks <= STARFIVE_TIMER_MAX_TICKS);
         if (num_ticks > STARFIVE_TIMER_MAX_TICKS) {
-            sddf_dprintf("ERROR: num_ticks: 0x%lx\n", num_ticks);
+            /* truncate num_ticks to maximum timeout, will use multiple interrupts to process the requested timeout. */
+            num_ticks = STARFIVE_TIMER_MAX_TICKS;
         }
 
         timeout_regs->load = num_ticks;
