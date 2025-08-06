@@ -29,8 +29,18 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
     "blk": {
         "configs": ["debug", "release"],
         "build_systems": ["make", "zig"],
-        "boards_build": ["maaxboard", "qemu_virt_aarch64", "qemu_virt_riscv64"],
-        "boards_test": ["maaxboard", "qemu_virt_aarch64", "qemu_virt_riscv64"],
+        "boards_build": [
+            "maaxboard",
+            "qemu_virt_aarch64",
+            "qemu_virt_riscv64",
+            "odroidc4"
+        ],
+        "boards_test": [
+            "maaxboard",
+            "qemu_virt_aarch64",
+            "qemu_virt_riscv64",
+            "odroidc4"
+        ],
     },
     "i2c": {
         "configs": ["debug", "release"],
