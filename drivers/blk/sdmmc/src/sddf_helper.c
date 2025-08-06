@@ -1,3 +1,8 @@
+/*
+ * Copyright 2025, UNSW
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
 #include <stdint.h>
 #include <sddf/blk/queue.h>
 #include <sddf/blk/config.h>

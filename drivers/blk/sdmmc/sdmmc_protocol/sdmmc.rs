@@ -1,3 +1,6 @@
+// Copyright 2025, UNSW
+// SPDX-License-Identifier: BSD-2-Clause
+
 pub mod mmc_struct;
 pub mod sd_ops;
 pub mod sdcard;
@@ -36,9 +39,11 @@ use sdmmc_constant::{
     SD_SWITCH_FUNCTION_SELECTION_GROUP_ONE,
 };
 
+pub const SDCARD_DEFAULT_SECTOR_SIZE: u32 = 512;
+
 use crate::{
     dev_log,
-    sdmmc::mmc_struct::CardInfo,
+    sdmmc::{mmc_struct::CardInfo},
     sdmmc_os::{Sleep, VoltageOps},
     sdmmc_traits::SdmmcHardware,
 };
@@ -701,7 +706,7 @@ impl<T: SdmmcHardware, S: Sleep, V: VoltageOps> SdmmcProtocol<T, S, V> {
 
     pub fn test_read_one_block(&mut self, start_idx: u64, destination: u64) {
         let data: MmcData = MmcData {
-            blocksize: 512,
+            blocksize: SDCARD_DEFAULT_SECTOR_SIZE,
             blockcnt: 1,
             flags: MmcDataFlag::SdmmcDataRead,
             addr: destination,
@@ -1148,7 +1153,7 @@ impl<T: SdmmcHardware, S: Sleep, V: VoltageOps> SdmmcProtocol<T, S, V> {
 
         // TODO: Figure out a way to support cards with 4 KB sector size
         let data: MmcData = MmcData {
-            blocksize: 512,
+            blocksize: SDCARD_DEFAULT_SECTOR_SIZE,
             blockcnt,
             flags: MmcDataFlag::SdmmcDataRead,
             addr: destination,
@@ -1253,7 +1258,7 @@ impl<T: SdmmcHardware, S: Sleep, V: VoltageOps> SdmmcProtocol<T, S, V> {
         let res: Result<(), SdmmcError>;
         // TODO: Figure out a way to support cards with 4 KB sector size
         let data: MmcData = MmcData {
-            blocksize: 512,
+            blocksize: SDCARD_DEFAULT_SECTOR_SIZE,
             blockcnt,
             flags: MmcDataFlag::SdmmcDataWrite,
             addr: source,

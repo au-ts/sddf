@@ -1,3 +1,6 @@
+// Copyright 2025, UNSW
+// SPDX-License-Identifier: BSD-2-Clause
+
 use crate::{dev_log, info, sdmmc::mmc_struct::CardInfo};
 
 use super::{
