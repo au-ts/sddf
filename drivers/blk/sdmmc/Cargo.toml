@@ -1,13 +1,13 @@
 [package]
 name = "blk_driver"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 sel4-microkit = { git = "https://github.com/seL4/rust-sel4.git", rev = "d2bc5cf71c5455f85898a4768e9dcbaea39e1a7e", features = ["alloc"] }
 sel4-panicking-env = { git = "https://github.com/seL4/rust-sel4.git", rev = "d2bc5cf71c5455f85898a4768e9dcbaea39e1a7e" }
-meson_hal = { git = "https://github.com/Cheng-Li1/sdcard-emmc-rs", rev = "3fa77fa08c8ef9c7927a75bbd0b06083c6d21fe5", optional = true }
-sdmmc_protocol = {git = "https://github.com/Cheng-Li1/sdcard-emmc-rs", rev = "3fa77fa08c8ef9c7927a75bbd0b06083c6d21fe5" }
+meson_hal = { path = "sdmmc_hal/meson", optional = true }
+sdmmc_protocol = { path = "sdmmc_protocol" }
 
 [features]
 meson = ["dep:meson_hal"]

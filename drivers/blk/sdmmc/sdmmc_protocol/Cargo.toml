@@ -1,7 +1,7 @@
 [package]
 name = "sdmmc_protocol"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 authors = ["Cheng Li 李澄 <lichengchaoreng@gmail.com>"]
 
 [lib]
@@ -10,10 +10,8 @@ path = "lib.rs"
 
 [dependencies]
 bitflags = "2.6.0"
-sel4-microkit-support = { path = "../optional_os_support/sel4-microkit-support", optional = true }
 
 [features]
-# Feature Flags:
-# - sel4-microkit: Enables support for the optional `sel4-microkit` crate,
-#   adding seL4-specific functionalities such as debug output and optimized sleep functions.
-sel4-microkit = ["dep:sel4-microkit-support"]
+default = []
+# A feature specifically for enabling developer-level logging. The driver will always try to log errors
+dev-logs = []
