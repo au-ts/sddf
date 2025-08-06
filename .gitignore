@@ -22,3 +22,4 @@ zig-out/
 venv/
 __pycache__
 .*.sw*
+*.dtb
