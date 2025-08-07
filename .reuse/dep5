@@ -36,7 +36,6 @@ Files:
     drivers/timer/goldfish/config.json
     drivers/timer/cdns/config.json
     drivers/blk/mmc/core/config.json
-    drivers/blk/mmc/core/README.md
 Copyright: UNSW
 License: BSD-2-Clause
 
