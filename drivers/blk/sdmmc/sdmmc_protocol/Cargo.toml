@@ -16,5 +16,5 @@ bitflags = "2.6.0"
 
 [features]
 default = []
-# A feature specifically for enabling developer-level logging. The driver will always try to log errors
+# A feature specifically for enabling developer-level logging. The driver will always try to log errors.
 dev-logs = []

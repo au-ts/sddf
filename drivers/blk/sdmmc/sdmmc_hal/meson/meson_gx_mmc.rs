@@ -1,6 +1,8 @@
 // Copyright 2025, UNSW
 // SPDX-License-Identifier: BSD-2-Clause
 
+#![allow(dead_code)]
+
 use core::ptr;
 
 use sdmmc_protocol::{
