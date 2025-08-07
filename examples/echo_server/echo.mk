@@ -137,9 +137,10 @@ CFLAGS := $(CFLAGS_ARCH) \
 	  -I$(BOARD_DIR)/include \
 	  -I$(SDDF)/include/microkit \
 	  -I$(SDDF)/include \
-	  -I${ECHO_INCLUDE}/lwip \
-	  -I${SDDF}/$(LWIPDIR)/include \
-	  -I${SDDF}/$(LWIPDIR)/include/ipv4 \
+	  -I$(ECHO_INCLUDE)/lwip \
+	  -I$(SDDF)/$(LWIPDIR)/include \
+	  -I$(SDDF)/$(LWIPDIR)/include/ipv4 \
+	  -I $(ECHO_SERVER) \
 	  -MD \
 	  -MP
 

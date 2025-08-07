@@ -9,6 +9,8 @@
 #include <stdbool.h>
 #include <sddf/network/constants.h>
 
+#include "echo.h"
+
 /**
  * Use lwIP without OS-awareness (no thread, semaphores, mutexes or mboxes).
  */
@@ -112,7 +114,7 @@
  * The size of a TCP window - Maximum data we can receive at once. This
  * must be at least (2 * TCP_MSS) for things to work well.
  */
-#define TCP_WND 1000000
+#define TCP_WND (44 * TCP_MSS)
 
 /**
  * TCP sender buffer space (bytes). To achieve good performance, this
@@ -149,7 +151,7 @@
  * When LWIP_WND_SCALE is enabled but TCP_RCV_SCALE is 0, we can use a large
  * send window while having a small receive window only.
  */
-#define TCP_RCV_SCALE 12
+#define TCP_RCV_SCALE 0
 
 /**
  * Support the TCP timestamp option.
@@ -166,17 +168,12 @@
  * If the application sends a lot of data out of ROM (or other static memory),
  * this should be set high.
  */
-#define MEMP_NUM_PBUF TCP_SND_QUEUELEN /* (TCP sender buffer space (pbufs)) */
+#define MEMP_NUM_PBUF (TCP_ECHO_MAX_CONNS * TCP_SND_QUEUELEN) /* (TCP sender buffer space (pbufs)) */
 
 /**
  * The number of simultaneously queued TCP segments.
  */
-#define MEMP_NUM_TCP_SEG TCP_SND_QUEUELEN
-
-/**
- * The number of simultaneously active timeouts.
- */
-#define MEMP_NUM_SYS_TIMEOUT 512
+#define MEMP_NUM_TCP_SEG (TCP_ECHO_MAX_CONNS * TCP_SND_QUEUELEN)
 
 /**
  * Enable statistics collection in lwip_stats. Set this to 0 for performance.

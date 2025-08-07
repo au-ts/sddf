@@ -31,12 +31,12 @@ struct echo_state {
     char buf[ECHO_QUEUE_CAPACITY];
 };
 
-#define MAX_CONCURRENT 4
-static struct echo_state tcp_state_pool[MAX_CONCURRENT];
+#define TCP_ECHO_MAX_CONNS 4
+static struct echo_state tcp_state_pool[TCP_ECHO_MAX_CONNS];
 
 static struct echo_state *tcp_state_alloc()
 {
-    for (int i = 0; i < MAX_CONCURRENT; ++i) {
+    for (int i = 0; i < TCP_ECHO_MAX_CONNS; ++i) {
         if (!tcp_state_pool[i].in_use) {
             tcp_state_pool[i].in_use = true;
             return &tcp_state_pool[i];
