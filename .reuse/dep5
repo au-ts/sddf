@@ -35,9 +35,8 @@ Files:
     drivers/timer/meson/config.json
     drivers/timer/goldfish/config.json
     drivers/timer/cdns/config.json
-    drivers/timer/bcm2835/config.json
-    drivers/blk/sdmmc/config.json
-    drivers/blk/sdmmc/README.md
+    drivers/blk/mmc/core/config.json
+    drivers/blk/mmc/core/README.md
 Copyright: UNSW
 License: BSD-2-Clause
 

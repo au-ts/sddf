@@ -20,4 +20,4 @@ path = "lib.rs"
 # - sdmmc_protocol: Essential for core functionality.
 
 [dependencies]
-sdmmc_protocol = { path = "../../sdmmc_protocol" }
+sdmmc_protocol = { path = "../core/protocol" }
