@@ -13,19 +13,24 @@
 
 #include <sddf/util/util.h>
 
-// At most ECHO_QUEUE_CAPACITY - 1 bytes can be in the queue
+/* At most ECHO_QUEUE_CAPACITY - 1 bytes can be in the queue */
 #define ECHO_QUEUE_CAPACITY (TCP_WND + 1)
 
+/* The echo state stores received data to be echoed back in a circular buffer.
+Data is written to the tail index, and transmitted from the ack_head in FIFO
+order. Data from ack_head to tcp_write_head has been transmitted succesfully
+with `tcp_write` and is awaiting acknowledgement. When the data is acknowledged,
+ack_head is incremented. Data from tcp_write_head to tail is awaiting successful
+transmission with `tcp_write`. tcp_write_head must always lie between ack_head
+and tail: ack_head <= tcp_write_head <= tail (assuming no roll-over) */
 struct echo_state {
     bool in_use;
-    // sending ring buffer
-    size_t tail; // data gets added at tail
-    size_t head; // moved forward for acknowledged data
+    size_t tail; /* Data is in inserted at the tail when received */
+    size_t tcp_write_head; /* Next data to be transmitted with TCP write */
+    size_t ack_head; /* Next data awaiting acknowledgemet */
     char buf[ECHO_QUEUE_CAPACITY];
 };
 
-// This previously was a LWIP_MEMPOOL, but turns out that doesn't support sizes
-// greater than ~65536 (due to integer overflow somewhere).
 #define MAX_CONCURRENT 4
 static struct echo_state tcp_state_pool[MAX_CONCURRENT];
 
@@ -47,28 +52,53 @@ static void tcp_state_free(struct echo_state *state)
     state->in_use = false;
 }
 
-static size_t queue_space(struct echo_state *state)
+static inline size_t tcp_state_avail(struct echo_state *state)
 {
-    return (state->head + ECHO_QUEUE_CAPACITY - state->tail - 1) % ECHO_QUEUE_CAPACITY;
+    return (state->ack_head - state->tail + ECHO_QUEUE_CAPACITY - 1) % ECHO_QUEUE_CAPACITY;
 }
 
-static size_t queue_cont_space(struct echo_state *state)
+static inline size_t tcp_state_cont_avail(struct echo_state *state)
 {
-    if (state->tail >= state->head) {
+    /* Eliminate case head == 0, tail == capacity - 1 */
+    if (!tcp_state_avail(state)) {
+        return 0;
+    }
+
+    if (state->tail >= state->ack_head && state->ack_head != 0) {
         return ECHO_QUEUE_CAPACITY - state->tail;
     }
-    return state->head - state->tail - 1;
+
+    return state->ack_head - state->tail - 1;
+}
+
+static inline size_t tcp_state_len_to_tx(struct echo_state *state)
+{
+    return (state->tail - state->tcp_write_head + ECHO_QUEUE_CAPACITY) % ECHO_QUEUE_CAPACITY;
+}
+
+static inline size_t tcp_state_cont_len_to_tx(struct echo_state *state)
+{
+    if (state->tail >= state->tcp_write_head) {
+        return state->tail - state->tcp_write_head;
+    }
+    return ECHO_QUEUE_CAPACITY - state->tcp_write_head;
+}
+
+static inline size_t tcp_state_len_unacked(struct echo_state *state)
+{
+    return (state->tcp_write_head - state->ack_head + ECHO_QUEUE_CAPACITY) % ECHO_QUEUE_CAPACITY;
 }
 
 static err_t tcp_echo_sent(void *arg, struct tcp_pcb *pcb, u16_t len)
 {
     struct echo_state *state = arg;
     assert(state != NULL);
+    assert(len <= tcp_state_len_unacked(state));
 
-    state->head = (state->head + len) % ECHO_QUEUE_CAPACITY;
+    state->ack_head = (state->ack_head + len) % ECHO_QUEUE_CAPACITY;
 
-    // tcp_recved is only for increasing the TCP window, and isn't required to
-    // ACK incoming packets (that is done automatically on receive).
+    /* tcp_recved is only for increasing the TCP window, and isn't required to
+    ACK incoming packets (that is done automatically on receive). */
     tcp_recved(pcb, len);
 
     return ERR_OK;
@@ -80,7 +110,7 @@ static err_t tcp_echo_recv(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t
     assert(state != NULL);
 
     if (p == NULL) {
-        // closing
+        /* closing */
         sddf_printf("tcp_echo[%s:%d]: closing\n",
                     ipaddr_ntoa(&pcb->remote_ip), pcb->remote_port
                    );
@@ -108,43 +138,51 @@ static err_t tcp_echo_recv(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t
 
     assert(p->tot_len > 0);
 
-    const size_t capacity = MIN(MIN(queue_space(state), tcp_sndbuf(pcb)), p->tot_len);
+    const size_t capacity = MIN(MIN(tcp_state_avail(state), tcp_sndbuf(pcb)), p->tot_len);
     if (p->tot_len > capacity) {
         sddf_printf("tcp_echo[%s:%d]: can't handle packet of %d bytes: queue_space=%lu sndbuf=%d snd_queuelen=%d\n",
                     ipaddr_ntoa(&pcb->remote_ip), pcb->remote_port,
                     p->tot_len,
-                    queue_space(state),
+                    tcp_state_avail(state),
                     tcp_sndbuf(pcb),
                     pcb->snd_queuelen
                    );
 
-        // This causes LWIP to wait a bit and try calling this function again
-        // with the packet. To avoid double-sending any data in the packet, we
-        // don't handle the packet at all, even if we would have space for part
-        // of it.
+        /* This causes LWIP to wait a bit and try calling this function again
+        with the packet. To avoid double-sending any data in the packet, we
+        don't handle the packet at all, even if we would have space for part
+        of it. */
         return ERR_MEM;
     }
 
+    /* Copy received data into tcp state */
     size_t offset = 0;
     while (offset < capacity) {
         const u16_t copied_len = pbuf_copy_partial(
                                      p,
                                      state->buf + state->tail,
-                                     MIN(queue_cont_space(state), capacity - offset),
+                                     MIN(tcp_state_cont_avail(state), capacity - offset),
                                      offset
                                  );
 
-        err = tcp_write(pcb, state->buf + state->tail, copied_len, 0);
-        if (err) {
-            sddf_printf("tcp_echo[%s:%d]: failed to write: %s\n",
-                        ipaddr_ntoa(&pcb->remote_ip), pcb->remote_port,
-                        lwip_strerr(err)
-                       );
-            assert(false);
-        }
-
         offset += copied_len;
         state->tail = (state->tail + copied_len) % ECHO_QUEUE_CAPACITY;
+    }
+
+    /* Attempt to transmit more data */
+    size_t len_to_tx = tcp_state_len_to_tx(state);
+    while (len_to_tx) {
+        size_t tx_batch = MIN(UINT16_MAX, tcp_state_cont_len_to_tx(state));
+        err = tcp_write(pcb,
+                        state->buf + state->tcp_write_head,
+                        tx_batch,
+                        0);
+        if (err) {
+            /* Retry later */
+            break;
+        }
+        state->tcp_write_head = (state->tcp_write_head + tx_batch) % ECHO_QUEUE_CAPACITY;
+        len_to_tx = tcp_state_len_to_tx(state);
     }
 
     tcp_output(pcb);
@@ -176,7 +214,8 @@ static err_t tcp_echo_accept(void *arg, struct tcp_pcb *pcb, err_t err)
                );
 
     state->tail = 0;
-    state->head = 0;
+    state->ack_head = 0;
+    state->tcp_write_head = 0;
 
     tcp_nagle_disable(pcb);
     tcp_arg(pcb, state);
