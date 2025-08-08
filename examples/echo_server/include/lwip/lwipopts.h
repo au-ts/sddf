@@ -166,14 +166,20 @@
 #define PBUF_POOL_SIZE 1000
 
 /**
- * The number of memp struct pbufs (used for PBUF_ROM and PBUF_REF).
- * If the application sends a lot of data out of ROM (or other static memory),
- * this should be set high.
+ * The number of memp struct pbufs (used for PBUF_ROM and PBUF_REF). If the
+ * application sends a lot of data out of ROM (or other static memory), this
+ * should be set high. Each TCP echo socket will require these resources to
+ * succesfully support TCP_WND without running out of memory, thus there is a
+ * scaling factor added based on the number of TCP echo sockets we concurrently
+ * support.
  */
 #define MEMP_NUM_PBUF (TCP_ECHO_MAX_CONNS * TCP_SND_QUEUELEN) /* (TCP sender buffer space (pbufs)) */
 
 /**
- * The number of simultaneously queued TCP segments.
+ * The number of simultaneously queued TCP segments.  Each TCP echo socket will
+ * require these resources to succesfully support TCP_WND without running out of
+ * memory, thus there is a scaling factor added based on the number of TCP echo
+ * sockets we concurrently support.
  */
 #define MEMP_NUM_TCP_SEG (TCP_ECHO_MAX_CONNS * TCP_SND_QUEUELEN)
 
