@@ -33,6 +33,7 @@ struct echo_state {
 
 static struct echo_state tcp_state_pool[TCP_ECHO_MAX_CONNS];
 
+/* Allocate a new TCP state structure. */
 static struct echo_state *tcp_state_alloc()
 {
     for (int i = 0; i < TCP_ECHO_MAX_CONNS; ++i) {
@@ -44,6 +45,7 @@ static struct echo_state *tcp_state_alloc()
     return NULL;
 }
 
+/* Free a TCP state structure. */
 static void tcp_state_free(struct echo_state *state)
 {
     assert(state);
@@ -51,11 +53,15 @@ static void tcp_state_free(struct echo_state *state)
     state->in_use = false;
 }
 
+/* Available free space in the TCP state buffer to store new incoming data. */
 static inline size_t tcp_state_avail(struct echo_state *state)
 {
     return (state->ack_head - state->tail + ECHO_QUEUE_CAPACITY - 1) % ECHO_QUEUE_CAPACITY;
 }
 
+/* Available free contiguous space in the TCP state buffer to store new incoming
+data, i.e. the amount of data that can be copied into the buffer with one call
+to memcpy. */
 static inline size_t tcp_state_cont_avail(struct echo_state *state)
 {
     /* Eliminate case head == 0, tail == capacity - 1 */
@@ -70,11 +76,15 @@ static inline size_t tcp_state_cont_avail(struct echo_state *state)
     return state->ack_head - state->tail - 1;
 }
 
+/* Length of stored (unacked) data in the TCP state buffer which has not yet
+been succesfully transmitted using tcp_write. */
 static inline size_t tcp_state_len_to_tx(struct echo_state *state)
 {
     return (state->tail - state->tcp_write_head + ECHO_QUEUE_CAPACITY) % ECHO_QUEUE_CAPACITY;
 }
 
+/* Length of stored (unacked) contiguous data in the TCP state buffer which has
+not yet been succesfully transmitted using tcp_write. */
 static inline size_t tcp_state_cont_len_to_tx(struct echo_state *state)
 {
     if (state->tail >= state->tcp_write_head) {
@@ -83,11 +93,14 @@ static inline size_t tcp_state_cont_len_to_tx(struct echo_state *state)
     return ECHO_QUEUE_CAPACITY - state->tcp_write_head;
 }
 
+/* Length of stored data in the TCP state buffer which has succesfully been
+transmitted using tcp_write but has not yet been acked. */
 static inline size_t tcp_state_len_unacked(struct echo_state *state)
 {
     return (state->tcp_write_head - state->ack_head + ECHO_QUEUE_CAPACITY) % ECHO_QUEUE_CAPACITY;
 }
 
+/* Callback invoked to update TCP state when data has been acked. */
 static err_t tcp_echo_sent(void *arg, struct tcp_pcb *pcb, u16_t len)
 {
     struct echo_state *state = arg;
@@ -103,6 +116,10 @@ static err_t tcp_echo_sent(void *arg, struct tcp_pcb *pcb, u16_t len)
     return ERR_OK;
 }
 
+/* Callback invoked to update TCP state when data has been received. First
+checks if there is free space available to store the data in the TCP state
+buffer. Next copies the data into the buffer. Finally attempts to re-transmit
+the data back to the source. */
 static err_t tcp_echo_recv(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err)
 {
     struct echo_state *state = arg;
@@ -179,6 +196,7 @@ static err_t tcp_echo_recv(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t
     return ERR_OK;
 }
 
+/* Prints an LWIP TCP error and and frees the erroneous TCP state structure. */
 static void tcp_echo_err(void *arg, err_t err)
 {
     struct echo_state *state = arg;
@@ -189,6 +207,8 @@ static void tcp_echo_err(void *arg, err_t err)
     tcp_state_free(state);
 }
 
+/* Accepts a new TCP echo socket connection and allocates and initialises a TCP
+state structure. */
 static err_t tcp_echo_accept(void *arg, struct tcp_pcb *pcb, err_t err)
 {
     struct echo_state *state = tcp_state_alloc();
@@ -214,6 +234,8 @@ static err_t tcp_echo_accept(void *arg, struct tcp_pcb *pcb, err_t err)
     return ERR_OK;
 }
 
+/* Intitialise an LWIP TCP echo socket and register relevant callback functions.
+*/
 int setup_tcp_socket(void)
 {
     struct tcp_pcb *pcb;
