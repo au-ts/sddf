@@ -112,7 +112,9 @@
 
 /**
  * The size of a TCP window - Maximum data we can receive at once. This
- * must be at least (2 * TCP_MSS) for things to work well.
+ * must be at least (2 * TCP_MSS) for things to work well. TCP_WND is chosen to
+ * be the smallest multiple of TCP_MSS which is less than < 65535, the largest
+ * TCP window that can be used without enabling window scaling
  */
 #define TCP_WND (44 * TCP_MSS)
 
