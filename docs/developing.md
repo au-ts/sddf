@@ -84,7 +84,7 @@ the following:
 * integration into an example system
 
 If you are adding a driver for a device class that does not exist, see the
-section [below](#new_device_class).
+section [on adding a new device class](#Adding-a-new-device-class).
 
 ### Existing components and drivers
 
@@ -108,7 +108,7 @@ Writing a driver for sDDF typically involves three largely independent tasks:
 * Writing device interfacing code to create a device agnostic interface for the
   virtualisers
 
-#### Interfacing with sDDF
+#### Interface
 
 All sDDF drivers are event driven, and share a lot of similarities. Once
 initialisation has been completed, a driver will only be awoken to respond to
@@ -127,7 +127,10 @@ with the device.
 sDDF event handling functions are typically named '[tx|rx]_[provide|return]',
 where `tx` and `rx` correspond to transmission and reception, `provide`
 corresponds to when data or buffers are passed towards the driver, and `return`
-corresponds to when data or buffers are passed towards a client.
+corresponds to when data or buffers are passed towards a client. The naming
+convention is generally based on how the hardware works, hence `rx` and `tx`
+for serial and networking. Other device classes, such as block, use `request`
+and `response` since that maps onto the hardware better.
 
 If the driver is of a pre-existing device class, an existing driver can be used
 as a scaffold. You will find that there are very few if any changes that will
@@ -135,7 +138,17 @@ need to be made to the sDDF component of the initialisation code, the event
 handling loop constraints and sDDF queue interactions. In the case of a new
 device class, a similar class can also serve as a helpful scaffold.
 
-#### The sDDF signalling protocol
+#### Signalling protocol
+
+The most common protocol between sDDF components for all device classes is
+a combination of asynchronous notifications (e.g `microkit_notify`) and
+shared memory (e.g data regions or queue regions).
+
+TODO:
+* mention that notifications can be optimised, hence the existince of this
+  signalling protocol.
+* mention not all device classes use this protocol since this optimisation isn't
+  necessary there.
 
 Once a driver completes all available processing, they must notify all
 virtualisers that are awaiting the completion of this event. Since our systems
@@ -156,7 +169,7 @@ model-checked signalling protocol was developed. This signalling protocol is
 currently implemented in the network and serial subsystem. It involves a check
 of a shared flag before a notifying:
 
-```
+```c
     if (packets_transferred && net_require_signal_active(&rx_queue)) {
         net_cancel_signal_active(&rx_queue);
         microkit_notify(config.virt_rx.id);
@@ -169,7 +182,7 @@ a missed notification. This situation can occur if a neighbour checks the
 component's flag before the component has had the chance to reset it (see
 deadlock condition), but after it has terminated processing the queue:
 
-```
+```c
     bool reprocess = true;
     while (reprocess) {
         while (!(hw_ring_full(&tx)) && !net_queue_empty_active(&tx_queue)) {
@@ -321,7 +334,7 @@ There is a snippet system for the Makefiles and so each driver will have its own
 `.mk` file for building itself. You can base your drivers snippet on other ones within
 the same device class.
 
-## Adding a new device class {#new_device_class}
+## Adding a new device class
 
 Adding a new device class is a significant task as it requires a strong understanding
 of the sDDF principles as well as the device class in order to have a good design.
@@ -347,4 +360,3 @@ sub-system to be automatically generated. This includes:
 * the configuration options available for the system (memory region sizes,
   protection domain priorities, client multiplexing options, data processing
   options, etc)
-
