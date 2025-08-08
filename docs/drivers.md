@@ -24,6 +24,12 @@ and a list of Device Tree compatible strings it is known to work with.
 * Meson
     * `amlogic,meson-axg-i2c`
 
+## SPI
+
+* OpenTitan (PULP)
+    * `opentitan,spi-host`
+    * `lowrisc,spi`
+
 ## Network
 
 * DWMAC
