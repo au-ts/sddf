@@ -27,6 +27,12 @@ Device Tree compatible strings/platforms it is known to work with.
 * Meson
     * `amlogic,meson-axg-i2c`
 
+## SPI
+
+* OpenTitan (PULP)
+    * `opentitan,spi-host`
+    * `lowrisc,spi`
+
 ## Network
 
 * DWMAC
