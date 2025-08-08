@@ -140,28 +140,30 @@ device class, a similar class can also serve as a helpful scaffold.
 
 #### Signalling protocol
 
-The most common protocol between sDDF components for all device classes is
-a combination of asynchronous notifications (e.g `microkit_notify`) and
-shared memory (e.g data regions or queue regions).
+The most dominant protocol used by sDDF components to communicate and share data
+for all device classes is a combination of asynchronous notifications (e.g
+`microkit_notify`) and shared memory (e.g data regions and/or queue regions).
+Since components are event-based, when data has been made available to begin
+processing the producer of this data is typically required to notify the
+consumer of the data to ensure the consumer is scheduled. In some cases it is
+also necessary for the consumer of the data to notify the producer if more space
+has become available.
 
-TODO:
-* mention that notifications can be optimised, hence the existince of this
-  signalling protocol.
-* mention not all device classes use this protocol since this optimisation isn't
-  necessary there.
+Since our systems contain large numbers of components handling multiple
+independent events, components often incidentally become aware of events which
+they were not explicitly notified for. Also, components may require more than
+one event to occur before further progress can be made (e.g. one queue to become
+non-empty and another to become non-full). Thus, if components notify their
+neighbours unconditionally when progress is made, this can often result in the
+receiver being scheduled unnecessarily without making further progress.
 
-Once a driver completes all available processing, they must notify all
-virtualisers that are awaiting the completion of this event. Since our systems
-contain large numbers of components handling multiple independent events, it can
-often be the case that a component is notified for an event they are already
-aware of, or are unable to make further progress on before the completion of a
-secondary event.
-
-In order to optimise how components notify each other, the sDDF utilises a
-*signalling protocol* to try and minimise the number of *unnecessary
-notifications* which don't lead to further progress in the system. For some
-sub-systems, in some directions of communication, components will only notify
-their neighbour when work has been completed if a shared flag has been set.
+For device classes where these *unnecessary notifications* put too much of a
+strain on the overall utilisation of the system (i.e. networking), the sDDF
+utilises a *signalling protocol*. The signalling protocol allows producers and
+consumers to communicate more preciesly about when they require a signal after
+progress has been made. For some sub-systems, in some directions of
+communication, components will only notify their neighbour when work has been
+completed if a shared flag has been set.
 
 However, utilising a flag in shared memory which is concurrently written to and
 read from can result in deadlocks if care is not taken. To avoid this, a
