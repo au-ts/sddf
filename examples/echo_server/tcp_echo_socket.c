@@ -128,8 +128,10 @@ static err_t tcp_echo_sent(void *arg, struct tcp_pcb *pcb, u16_t len)
 
     state->ack_head = (state->ack_head + len) % ECHO_QUEUE_CAPACITY;
 
-    /* tcp_recved is only for increasing the TCP window, and isn't required to
-    ACK incoming packets (that is done automatically on receive). */
+    /*
+     * tcp_recved is only for increasing the TCP window, and isn't required to
+     * ACK incoming packets (that is done automatically on receive).
+     */
     tcp_recved(pcb, len);
 
     return ERR_OK;
@@ -147,7 +149,7 @@ static err_t tcp_echo_recv(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t
     assert(state != NULL);
 
     if (p == NULL) {
-        /* closing */
+        /* Closing. */
         sddf_printf("tcp_echo[%s:%d]: closing\n",
                     ipaddr_ntoa(&pcb->remote_ip), pcb->remote_port
                    );
@@ -181,14 +183,16 @@ static err_t tcp_echo_recv(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t
                     ipaddr_ntoa(&pcb->remote_ip), pcb->remote_port, p->tot_len, tcp_state_avail(state), tcp_sndbuf(pcb),
                     pcb->snd_queuelen);
 
-        /* This causes LWIP to wait a bit and try calling this function again
-        with the packet. To avoid double-sending any data in the packet, we
-        don't handle the packet at all, even if we would have space for part
-        of it. */
+        /*
+         * This causes LWIP to wait a bit and try calling this function again
+         * with the packet. To avoid double-sending any data in the packet, we
+         * don't handle the packet at all, even if we would have space for part
+         * of it.
+         */
         return ERR_MEM;
     }
 
-    /* Copy received data into tcp state */
+    /* Copy received data into tcp state. */
     size_t offset = 0;
     while (offset < capacity) {
         const u16_t copied_len = pbuf_copy_partial(p, state->buf + state->tail,
@@ -198,13 +202,13 @@ static err_t tcp_echo_recv(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t
         state->tail = (state->tail + copied_len) % ECHO_QUEUE_CAPACITY;
     }
 
-    /* Attempt to transmit more data */
+    /* Attempt to transmit more data. */
     size_t len_to_tx = tcp_state_len_to_tx(state);
     while (len_to_tx) {
         size_t tx_batch = MIN(UINT16_MAX, tcp_state_cont_len_to_tx(state));
         err = tcp_write(pcb, state->buf + state->tcp_write_head, tx_batch, 0);
         if (err) {
-            /* Retry later */
+            /* Retry later. */
             break;
         }
         state->tcp_write_head = (state->tcp_write_head + tx_batch) % ECHO_QUEUE_CAPACITY;
