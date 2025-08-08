@@ -31,7 +31,6 @@ struct echo_state {
     char buf[ECHO_QUEUE_CAPACITY];
 };
 
-#define TCP_ECHO_MAX_CONNS 4
 static struct echo_state tcp_state_pool[TCP_ECHO_MAX_CONNS];
 
 static struct echo_state *tcp_state_alloc()
