@@ -140,7 +140,7 @@ CFLAGS := $(CFLAGS_ARCH) \
 	  -I$(ECHO_INCLUDE)/lwip \
 	  -I$(SDDF)/$(LWIPDIR)/include \
 	  -I$(SDDF)/$(LWIPDIR)/include/ipv4 \
-	  -I $(ECHO_SERVER) \
+	  -I $(ECHO_SERVER)/include \
 	  -MD \
 	  -MP
 
