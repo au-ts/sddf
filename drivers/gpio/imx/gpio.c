@@ -8,7 +8,7 @@
 #include <microkit.h>
 #include <sddf/resources/device.h>
 #include <sddf/util/printf.h>
-#include <sddf/util/fence.h>
+#include <sddf/util/arm_barriers.h>
 #include <sddf/gpio/protocol.h>
 #include <gpio_config.h>
 #include "gpio.h"
@@ -79,6 +79,28 @@ static inline bool check_irq_permission(microkit_channel ch)
     return gpio_driver_channel_mappings[ch].irq > 0;
 }
 
+static void handle_gpio_irq(int ch, int start_pin, int end_pin) {
+    uint32_t clear_mask = 0;
+
+    /* Go through pin and build up a mask of IRQs to clear. */
+    for (int pin = start_pin; pin < end_pin; pin++) {
+        /* If the pin is unmasked and the IRQ was related to this pin, add it to the mask and notify
+             * the client subscribed to that pin. */
+        if ((gpio_regs->imr & BIT(pin)) && (gpio_regs->isr & BIT(pin))) {
+            clear_mask |= BIT(pin);
+            microkit_notify(pin_subscriber[pin]);
+        }
+    }
+
+    gpio_regs->isr = clear_mask;
+
+    // We want it to be cleared before the microkit acknowledges so we dont enter notified again.
+
+    // We use dsb because the the gpio and gic are seperate peripherals
+    DSB_ISHST();
+    microkit_deferred_irq_ack(ch);
+}
+
 void notified(microkit_channel ch)
 {
     /*
@@ -88,25 +110,10 @@ void notified(microkit_channel ch)
      * block and go the interrupt controller, so we do not make use of them. It seems that Linux does
      * not either.
      */
-    if (ch == device_resources.irqs[0].id || ch == device_resources.irqs[1].id) {
-        uint32_t clear_mask = 0;
-
-        /* Go through pin and build up a mask of IRQs to clear. */
-        for (int pin = 0; pin < PINS_PER_BANK; pin++) {
-            /* If the pin is unmasked and the IRQ was related to this pin, add it to the mask and notify
-             * the client subscribed to that pin. */
-            if (gpio_regs->imr & BIT(pin) && gpio_regs->isr & BIT(pin)) {
-                clear_mask |= BIT(pin);
-                microkit_notify(pin_subscriber[pin]);
-            }
-        }
-
-        gpio_regs->isr = clear_mask;
-
-        // We want it to be cleared before the microkit acknowledges so we dont enter notified again.
-        THREAD_MEMORY_FENCE();
-
-        microkit_deferred_irq_ack(ch);
+    if (ch == device_resources.irqs[0].id) {
+        handle_gpio_irq(ch, 0, PINS_PER_BANK / 2);
+    } else if (ch == device_resources.irqs[1].id) {
+        handle_gpio_irq(ch, PINS_PER_BANK / 2, PINS_PER_BANK);
     } else {
         LOG_DRIVER("unexpected notification from channel %u\n", ch);
     }
@@ -138,7 +145,8 @@ static inline seL4_MessageInfo_t set_direction_output(int pin, uint32_t value)
         gpio_regs->dr &= ~BIT(pin);
     }
 
-    THREAD_MEMORY_FENCE();
+    // Since its the same peripheral a simple read back will mean it completes
+    (void)gpio_regs->dr;  // read-back
 
     gpio_regs->gdir |= BIT(pin);
 
@@ -166,10 +174,11 @@ static inline seL4_MessageInfo_t set_config(int pin, uint32_t value, uint32_t ar
 
 static inline seL4_MessageInfo_t irq_enable(int pin)
 {
-    // @Tristan: I think we should clear all noise that happened before the interrupt started
+    // Clear all noise that happened before the interrupt started
     gpio_regs->isr = BIT(pin);
 
-    THREAD_MEMORY_FENCE();
+    // Since its the same peripheral a simple read back will mean it completes
+    (void)gpio_regs->isr;  // read-back
 
     gpio_regs->imr |= BIT(pin);
 
@@ -181,7 +190,8 @@ static inline seL4_MessageInfo_t irq_disable(int pin)
 {
     gpio_regs->imr &= ~BIT(pin);
 
-    THREAD_MEMORY_FENCE();
+    // Since its the same peripheral a simple read back will mean it completes
+    (void)gpio_regs->imr;  // read-back
 
     // Now that we have unmasked we uncheck the status register
     // so that if we go to notified we dont process this irq if
@@ -225,8 +235,9 @@ static inline seL4_MessageInfo_t irq_set_type(int pin, uint32_t type)
         gpio_regs->icr2 = (gpio_regs->icr2 & ~(0x3u << shift)) | (icr_val << shift);
     }
 
-    // @ Tristan: do we value glitching or speed more?
-    // THREAD_MEMORY_FENCE();
+    // Since its the same peripheral a simple read back will mean it completes
+    // It will also work for icr2
+    (void)gpio_regs->icr1;  // read-back
 
     if (both) {
         gpio_regs->edge_sel |= BIT(pin);
@@ -355,7 +366,8 @@ void disable_all_interrupts()
 {
     gpio_regs->imr = 0;
 
-    THREAD_MEMORY_FENCE();
+    // We use dsb because the the gpio and gic are seperate peripherals
+    DSB_ISHST();
 
     microkit_irq_ack(device_resources.irqs[0].id);
     microkit_irq_ack(device_resources.irqs[1].id);
