@@ -145,9 +145,7 @@ static inline seL4_MessageInfo_t set_direction_output(int pin, uint32_t value)
         gpio_regs->dr &= ~BIT(pin);
     }
 
-    // Since its the same peripheral a simple read back will mean it completes
-    (void)gpio_regs->dr;  // read-back
-
+    // This instruction already reads back to ensure previous instructions completion
     gpio_regs->gdir |= BIT(pin);
 
     return microkit_msginfo_new(0, 0);
@@ -176,10 +174,7 @@ static inline seL4_MessageInfo_t irq_enable(int pin)
 {
     // Clear all noise that happened before the interrupt started
     gpio_regs->isr = BIT(pin);
-
-    // Since its the same peripheral a simple read back will mean it completes
-    (void)gpio_regs->isr;  // read-back
-
+    // This instruction already reads back to ensure previous instructions completion
     gpio_regs->imr |= BIT(pin);
 
     return microkit_msginfo_new(0, 0);
@@ -190,8 +185,8 @@ static inline seL4_MessageInfo_t irq_disable(int pin)
 {
     gpio_regs->imr &= ~BIT(pin);
 
-    // Since its the same peripheral a simple read back will mean it completes
-    (void)gpio_regs->imr;  // read-back
+    // Since its the same peripheral a read back will mean it completes
+    (void)gpio_regs->imr;
 
     // Now that we have unmasked we uncheck the status register
     // so that if we go to notified we dont process this irq if
@@ -235,10 +230,7 @@ static inline seL4_MessageInfo_t irq_set_type(int pin, uint32_t type)
         gpio_regs->icr2 = (gpio_regs->icr2 & ~(0x3u << shift)) | (icr_val << shift);
     }
 
-    // Since its the same peripheral a simple read back will mean it completes
-    // It will also work for icr2
-    (void)gpio_regs->icr1;  // read-back
-
+    // These instructions already read back to ensure previous instructions completion
     if (both) {
         gpio_regs->edge_sel |= BIT(pin);
     } else {
