@@ -50,8 +50,8 @@ async def runner(
         await backend.start()
         await test(backend, test_config)
 
-    except (EOFError, asyncio.IncompleteReadError):
-        raise TestFailureException("EOF when reading from backend stream")
+    except asyncio.IncompleteReadError as e:
+        raise TestFailureException("EOF when reading from backend stream: {}".format(e))
     finally:
         reset_terminal()
         await backend.stop()
