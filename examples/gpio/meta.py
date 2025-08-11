@@ -24,6 +24,7 @@ class Board:
     # GPIO itself does not need a timer driver to work
     timer: str
 
+
 BOARDS: List[Board] = [
     Board(
         name="maaxboard",
