@@ -177,7 +177,7 @@ pub fn build(b: *std.Build) !void {
         client_gpio_objcopy,
         client_timer_objcopy,
         gpio_driver_objcopy,
-        timer_driver_objcopy
+        timer_driver_objcopy,
     };
 
     const final_image_dest = b.getInstallPath(.bin, "./loader.img");
