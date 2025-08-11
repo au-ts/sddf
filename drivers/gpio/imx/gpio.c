@@ -88,6 +88,7 @@ static void handle_gpio_irq(int ch, int start_pin, int end_pin) {
              * the client subscribed to that pin. */
         if ((gpio_regs->imr & BIT(pin)) && (gpio_regs->isr & BIT(pin))) {
             clear_mask |= BIT(pin);
+            LOG_DRIVER("Notifying channel%d\n", pin_subscriber[pin]);
             microkit_notify(pin_subscriber[pin]);
         }
     }

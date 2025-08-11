@@ -20,7 +20,9 @@ class Board:
     arch: SystemDescription.Arch
     paddr_top: int
     gpio: str
-
+    # The example needs a timer driver to verify the IRQ based loop
+    # GPIO itself does not need a timer driver to work
+    timer: str
 
 BOARDS: List[Board] = [
     Board(
@@ -28,6 +30,7 @@ BOARDS: List[Board] = [
         arch=SystemDescription.Arch.AARCH64,
         paddr_top=0x7_0000_000,
         gpio="soc@0/bus@30000000/gpio@30200000",
+        timer="soc@0/bus@30000000/timer@302d0000",
     )
 ]
 
@@ -42,12 +45,21 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     gpio_system = Sddf.Gpio(sdf, gpio_node, gpio_driver)
 
     # These need to be different to the ones hardcoded in config.json or this file
-    driver_channel_ids = [0, 1, 3]
+    driver_channel_ids = [0, 1]
     gpio_system.add_client(client, driver_channel_ids=driver_channel_ids)
 
-    pds = [gpio_driver, client]
+    # We need a timer driver for the example
+    timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=254)
+    timer_node = dtb.node(board.timer)
+    assert timer_node is not None
+    timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
+    timer_system.add_client(client)
+
+    pds = [gpio_driver, timer_driver, client]
     for pd in pds:
         sdf.add_pd(pd)
+
+    #TODO: check there isnt an overlap of channels
 
     # TODO: currently there is no check to see if driver_channel_ids hasn't chosen a channel used
     # by a device irq
@@ -55,6 +67,9 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
     assert gpio_system.connect()
     assert gpio_system.serialise_config(output_dir)
+
+    assert timer_system.connect()
+    assert timer_system.serialise_config(output_dir)
 
     with open(f"{output_dir}/{sdf_file}", "w+") as f:
         f.write(sdf.render())

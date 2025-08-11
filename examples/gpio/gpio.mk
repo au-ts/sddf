@@ -41,9 +41,11 @@ MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 
 ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
 	export GPIO_DRIVER_DIR := meson
+	export TIMER_DRIVER_DIR := meson
 	export CPU := cortex-a55
 else ifeq ($(strip $(MICROKIT_BOARD)), maaxboard)
 	export GPIO_DRIVER_DIR := imx
+	export TIMER_DRIVER_DIR := imx
 	export CPU := cortex-a55
 else
 $(error Unsupported MICROKIT_BOARD given)
@@ -53,6 +55,7 @@ TOP:= ${SDDF}/examples/gpio
 METAPROGRAM := $(TOP)/meta.py
 UTIL := $(SDDF)/util
 LIBCO := $(SDDF)/libco
+TIMER_DRIVER := $(SDDF)/drivers/timer/$(TIMER_DRIVER_DIR)
 GPIO_DRIVER := $(SDDF)/drivers/gpio/$(GPIO_DRIVER_DIR)
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 SYSTEM_FILE := gpio.system
@@ -61,7 +64,7 @@ DTB := $(MICROKIT_BOARD).dtb
 CONFIGS_DIR   := $(TOP)/include
 CONFIG_HEADER := $(CONFIGS_DIR)/gpio_config.h
 
-IMAGES := gpio_driver.elf client.elf
+IMAGES := gpio_driver.elf timer_driver.elf client.elf
 CFLAGS_ARCH := -mcpu=$(CPU) -mstrict-align -target aarch64-none-elf
 
 CFLAGS := -nostdlib \
@@ -86,6 +89,7 @@ ${CHECK_FLAGS_BOARD_MD5}:
 	-rm -f .board_cflags-*
 	touch $@
 
+include ${TIMER_DRIVER}/timer_driver.mk
 include ${GPIO_DRIVER}/gpio_driver.mk
 include ${SDDF}/util/util.mk
 include ${LIBCO}/libco.mk
@@ -107,6 +111,9 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE)
 	$(OBJCOPY) --update-section .device_resources=gpio_driver_device_resources.data gpio_driver.elf
 	$(OBJCOPY) --update-section .gpio_client_config=gpio_client_client.data client.elf
+	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
+	$(OBJCOPY) --update-section .timer_client_config=timer_client_client.data client.elf
+
 
 $(IMAGE_FILE) $(REPORT_FILE): $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)

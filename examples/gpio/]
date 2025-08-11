@@ -1,0 +1,41 @@
+#!/bin/bash
+
+echo "BUILDING..."
+
+# Get the current working directory
+EXEC_DIR="$(pwd)"
+
+# Execute the make command with the specified MICROKIT_SDK path
+# make MICROKIT_SDK="$EXEC_DIR/../../../microkit/release/microkit-sdk-2.0.1-dev"
+
+# Define the relative path to loader.img based on the current working directory
+FILE_PATH="$EXEC_DIR/build/loader.img"
+
+# Define the target destination
+DESTINATION="tristanc@tftp:/home/tftp/maaxboard_tristanc/"
+
+# Check if the file exists
+if [ -f "$FILE_PATH" ]; then
+  # Use scp to copy the file
+  scp "$FILE_PATH" "$DESTINATION"
+  if [ $? -eq 0 ]; then
+    echo "File successfully copied to $DESTINATION"
+    
+    # SSH into the remote server and execute the additional commands
+    ssh tftp << EOF
+      cd /tftpboot/maaxboard_tristanc/
+      mkimage -c none -A arm64 -T script -d boot-sel4.txt boot-sel4.scr
+EOF
+
+    if [ $? -eq 0 ]; then
+      echo "mkimage command executed successfully."
+    else
+      echo "Failed to execute mkimage command."
+    fi
+
+  else
+    echo "Failed to copy the file."
+  fi
+else
+  echo "File $FILE_PATH does not exist. Please ensure it is in the 'build' directory in the current directory."
+fi

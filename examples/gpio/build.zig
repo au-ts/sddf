@@ -91,14 +91,23 @@ pub fn build(b: *std.Build) !void {
         .gpio_config_include = @as([]const u8, "include"),
     });
 
-    const driver_class = switch (microkit_board_option) {
+    const gpio_driver_class = switch (microkit_board_option) {
         .maaxboard => "imx",
     };
 
-    const driver = sddf_dep.artifact(b.fmt("driver_gpio_{s}.elf", .{driver_class}));
+    const timer_driver_class = switch (microkit_board_option) {
+        .maaxboard => "imx",
+    };
+
+    const gpio_driver = sddf_dep.artifact(b.fmt("driver_gpio_{s}.elf", .{gpio_driver_class}));
     // This is required because the SDF file is expecting a different name to the artifact we
     // are dealing with.
-    const driver_install = b.addInstallArtifact(driver, .{ .dest_sub_path = "gpio_driver.elf" });
+    const gpio_driver_install = b.addInstallArtifact(gpio_driver, .{ .dest_sub_path = "gpio_driver.elf" });
+
+    const timer_driver = sddf_dep.artifact(b.fmt("driver_timer_{s}.elf", .{timer_driver_class}));
+    // This is required because the SDF file is expecting a different name to the artifact we
+    // are dealing with.
+    const timer_driver_install = b.addInstallArtifact(timer_driver, .{ .dest_sub_path = "timer_driver.elf" });
 
     const client = b.addExecutable(.{
         .name = "client.elf",
@@ -156,10 +165,20 @@ pub fn build(b: *std.Build) !void {
         .install_subdir = "meta_output",
     });
 
-    const client_objcopy = updateSectionObjcopy(b, ".gpio_client_config", meta_output, "gpio_client_client.data", "client.elf");
-    const driver_objcopy = updateSectionObjcopy(b, ".device_resources", meta_output, "gpio_driver_device_resources.data", "gpio_driver.elf");
-    driver_objcopy.step.dependOn(&driver_install.step);
-    const objcopys = &.{ client_objcopy, driver_objcopy };
+    const client_gpio_objcopy = updateSectionObjcopy(b, ".gpio_client_config", meta_output, "gpio_client_client.data", "client.elf");
+    const gpio_driver_objcopy = updateSectionObjcopy(b, ".device_resources", meta_output, "gpio_driver_device_resources.data", "gpio_driver.elf");
+    gpio_driver_objcopy.step.dependOn(&gpio_driver_install.step);
+
+    const client_timer_objcopy = updateSectionObjcopy(b, ".timer_client_config", meta_output, "timer_client_client.data", "client.elf");
+    const timer_driver_objcopy = updateSectionObjcopy(b, ".device_resources", meta_output, "timer_driver_device_resources.data", "timer_driver.elf");
+    timer_driver_objcopy.step.dependOn(&timer_driver_install.step);
+
+    const objcopys = &.{
+        client_gpio_objcopy,
+        client_timer_objcopy,
+        gpio_driver_objcopy,
+        timer_driver_objcopy
+    };
 
     const final_image_dest = b.getInstallPath(.bin, "./loader.img");
     const microkit_tool_cmd = Step.Run.create(b, "run microkit tool");
