@@ -31,7 +31,7 @@ BOARDS: List[Board] = [
         paddr_top=0x7_0000_000,
         gpio="soc@0/bus@30000000/gpio@30200000",
         timer="soc@0/bus@30000000/timer@302d0000",
-    )
+    ),
 ]
 
 
@@ -58,8 +58,6 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     pds = [gpio_driver, timer_driver, client]
     for pd in pds:
         sdf.add_pd(pd)
-
-    #TODO: check there isnt an overlap of channels
 
     # TODO: currently there is no check to see if driver_channel_ids hasn't chosen a channel used
     # by a device irq
