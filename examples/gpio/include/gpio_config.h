@@ -10,12 +10,11 @@ NUMBERING SCHEMES
 
 IMX:
 - For pins we use 0-31 as thats how many pins per bank
-- For irqs write a value > 0 because it can only be connected to 1 irq line anyway
-
+- For irqs write a value > 0 because irq lines are shared.
 */
 
-#define PIN_1 (15) // gpio1_15 // IMX physical 32
-#define PIN_2 (13) // gpio1_13 // IMX physical 33
+#define PIN_1 (15) // IMX gpio1_15 // IMX physical 32
+#define PIN_2 (13) // IMX gpio1_13 // IMX physical 33
 
 #define IRQ_1 (1)
 

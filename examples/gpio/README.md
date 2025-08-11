@@ -6,23 +6,18 @@
 
 # GPIO example
 
-We have 3 GPIOs:
-- `GPIO_1` is set to output and should be attached to resistors then an LED then Ground.
-- `GPIO_2` is set to input and should start unattached to anything. Note for this example
-  this pin should have a floating logical state of 0 or a pull down resistor attached.
-- `GPIO_3` is set to output and should start unattached to anythng.
+We have 2 GPIOs:
+- `GPIO_1` is set to output.
+- `GPIO_2` is set to input.
 
-When you connect `GPIO_2` and `GPIO_3` together the LED should light up.
-When you disconnect `GPIO_2` and `GPIO_3` the LED should turn off.
+`GPIO_1` should be directly attached to `GPIO_2`.
 
-There is also 2 testing modes, one for polling and for IRQ based, by default the client
-operates in polling mode. See `client.c` for changing into IRQ mode.
+Read `gpio_config.h` for details on which physical pins are being used.
 
 ## Building
 
 The following platforms are supported:
 * maaxboard
-* odroidc4 (work in progress)
 
 ### Make
 
@@ -43,14 +38,53 @@ The final bootable image will be in `zig-out/bin/loader.img`.
 
 ## Running
 
-NOTE: both ways emulate a BOTH EDGE driven model of changing the LED.
-Do #define USE_POLLING to use Polling mode, otherwise will default to IRQ based.
+When running the example, you should see the following output:
 
-Since there is no debounce logic it may appear to not work with the IRQ based loop.
+```
+CLIENT|INFO: Client Init!
 
-Make sure you chose pins that are actually set as GPIO's via the pinmux.
+CLIENT|INFO: Starting GPIO example! Note GPIO1 must be connected to GPIO2!
 
-Make sure you have actually checked which pins mapped to which physical pins (the brought out pins).
+CLIENT|INFO: Setting direction of GPIO1 to output and intial value 0!
+CLIENT|INFO: Setting direction of GPIO2 to input!
+CLIENT|INFO: Checking (GPIO1's output == GPIO2's input)!
+CLIENT|INFO: Setting value of GPIO1 to 1!
+CLIENT|INFO: Checking (GPIO1's output == GPIO2's input)!
+CLIENT|INFO: Now we will test IRQ functionality!
+CLIENT|INFO: Setting type of IRQ of GPIO2 to falling edge!
+CLIENT|INFO: Enabling IRQ functionality for GPIO2!
+CLIENT|INFO: Setting a timeout for 1 second!
+CLIENT|INFO: Setting value of GPIO1 to 0!
+CLIENT|INFO: Main coroutine paused!
+CLIENT|INFO: Got an interrupt from GPIO driver!
+CLIENT|INFO: Got an interrupt from timer driver!
+CLIENT|INFO: Main coroutine resumed!
+CLIENT|INFO: Checking we recieved irq from GPIO2!
+CLIENT|INFO: Setting type of IRQ of GPIO2 to rising edge!
+CLIENT|INFO: Re-enabling IRQ functionality for GPIO2!
+CLIENT|INFO: Setting a timeout for 1 second!
+CLIENT|INFO: Setting value of GPIO1 to 1!
+CLIENT|INFO: Main coroutine paused!
+CLIENT|INFO: Got an interrupt from GPIO driver!
+CLIENT|INFO: Got an interrupt from timer driver!
+CLIENT|INFO: Main coroutine resumed!
+CLIENT|INFO: Checking we recieved irq from GPIO2!
+CLIENT|INFO: Re-enabling IRQ functionality for GPIO2!
+CLIENT|INFO: Setting a timeout for 1 second!
+CLIENT|INFO: Setting value of GPIO1 to 0!
+CLIENT|INFO: Main coroutine paused!
+CLIENT|INFO: Got an interrupt from timer driver!
+CLIENT|INFO: Main coroutine resumed!
+CLIENT|INFO: Checking we DIDN'T recieve irq from GPIO2!
+CLIENT|INFO: Setting type of IRQ of GPIO2 to high level!
+CLIENT|INFO: Setting a timeout for 1 second!
+CLIENT|INFO: Checking we havent recieved any irq's from GPIO2!
+CLIENT|INFO: Setting value of GPIO1 to 1!
+CLIENT|INFO: Main coroutine paused!
+CLIENT|INFO: Got an interrupt from GPIO driver!
+CLIENT|INFO: Got an interrupt from timer driver!
+CLIENT|INFO: Main coroutine resumed!
+CLIENT|INFO: Checking we recieved irq from GPIO2!
 
-## Warning
-For Meson the i2c pins have external pull up resistors.
+CLIENT|INFO: IF YOU GOT THIS FAR EVERYTHING WENT SMOOTHLY!!!
+```
