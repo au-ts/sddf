@@ -79,7 +79,8 @@ static inline bool check_irq_permission(microkit_channel ch)
     return gpio_driver_channel_mappings[ch].irq > 0;
 }
 
-static void handle_gpio_irq(int ch, int start_pin, int end_pin) {
+static void handle_gpio_irq(int ch, int start_pin, int end_pin)
+{
     uint32_t clear_mask = 0;
 
     /* Go through pin and build up a mask of IRQs to clear. */

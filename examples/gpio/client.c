@@ -96,7 +96,7 @@ void client_main(void)
         assert(false);
     }
 
-    // To actually test IRQ was recieved from GPIO we set a timeout so that we can check if we got an IRQ
+    // To actually test an IRQ was recieved from a GPIO we set a timeout so that we can check if we got an IRQ
     // from the GPIO driver within a reasonable amount of time.
     LOG_CLIENT("Setting a timeout for 1 second!\n");
     sddf_timer_set_timeout(timer_channel, NS_IN_S);
@@ -220,7 +220,6 @@ void client_main(void)
 void init(void)
 {
     LOG_CLIENT("Client Init!\n\n");
-
 
     assert(gpio_config_check_magic(&gpio_config));
     assert(timer_config_check_magic(&timer_config));
