@@ -1,6 +1,8 @@
 // Copyright 2025, UNSW
 // SPDX-License-Identifier: BSD-2-Clause
 
+#![allow(dead_code)]
+
 unsafe extern "C" {
     pub unsafe fn blk_queue_init_helper(capacity: u64);
 

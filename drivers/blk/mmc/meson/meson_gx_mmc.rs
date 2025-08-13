@@ -11,8 +11,8 @@ use sdmmc_protocol::{
         HostInfo, MmcData, MmcDataFlag, MmcIos, MmcPowerMode, MmcSignalVoltage, SdmmcCmd,
         SdmmcError,
         mmc_struct::{MmcBusWidth, MmcTiming},
-        sdcard::Sdcard,
-        sdmmc_capability::{
+        sd::Sdcard,
+        capability::{
             MMC_CAP_4_BIT_DATA, MMC_TIMING_LEGACY, MMC_TIMING_SD_HS, MMC_TIMING_UHS, MMC_VDD_31_32,
             MMC_VDD_32_33, MMC_VDD_33_34,
         },

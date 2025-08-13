@@ -2,11 +2,10 @@
 // SPDX-License-Identifier: BSD-2-Clause
 
 pub mod mmc_struct;
-pub mod sd_ops;
-pub mod sdcard;
-pub mod sdmmc_capability;
+pub mod sd;
+pub mod capability;
 
-mod sdmmc_constant;
+mod constant;
 
 use core::{
     future::Future,
@@ -16,13 +15,13 @@ use core::{
 };
 
 use mmc_struct::{BlockTransmissionMode, MmcBusWidth, MmcDevice, MmcState, MmcTiming};
-use sdcard::{Cid, Csd, Scr, Sdcard};
-use sdmmc_capability::{
+use sd::{Cid, Csd, Scr, Sdcard};
+use capability::{
     MMC_CAP_4_BIT_DATA, MMC_EMPTY_CAP, MMC_TIMING_LEGACY, MMC_TIMING_SD_HS, MMC_TIMING_UHS_DDR50,
     MMC_TIMING_UHS_SDR12, MMC_TIMING_UHS_SDR25, MMC_TIMING_UHS_SDR50, MMC_TIMING_UHS_SDR104,
     SdcardCapability, SdmmcHostCapability,
 };
-use sdmmc_constant::{
+use constant::{
     MMC_CMD_ALL_SEND_CID, MMC_CMD_APP_CMD, MMC_CMD_ERASE, MMC_CMD_GO_IDLE_STATE,
     MMC_CMD_READ_MULTIPLE_BLOCK, MMC_CMD_READ_SINGLE_BLOCK, MMC_CMD_SELECT_CARD, MMC_CMD_SEND_CSD,
     MMC_CMD_SET_BLOCK_COUNT, MMC_CMD_STOP_TRANSMISSION, MMC_CMD_WRITE_MULTIPLE_BLOCK,
@@ -389,7 +388,7 @@ impl<T: SdmmcHardware, S: Sleep, V: VoltageOps> SdmmcProtocol<T, S, V> {
             if voltage_switch == true
                 && self
                     .host_capability
-                    .contains(sdmmc_capability::SdmmcHostCapability(MMC_TIMING_UHS_SDR12))
+                    .contains(capability::SdmmcHostCapability(MMC_TIMING_UHS_SDR12))
             {
                 cmd.cmdarg |= OCR_S18R;
                 // It seems that cards will not respond to commands that have MMC_VDD_165_195 bit set, even if the card supports UHS-I
@@ -419,7 +418,7 @@ impl<T: SdmmcHardware, S: Sleep, V: VoltageOps> SdmmcProtocol<T, S, V> {
         if voltage_switch == true
             && self
                 .host_capability
-                .contains(sdmmc_capability::SdmmcHostCapability(MMC_TIMING_UHS_SDR12))
+                .contains(capability::SdmmcHostCapability(MMC_TIMING_UHS_SDR12))
             && resp[0] & OCR_HCS == OCR_HCS
             && resp[0] & OCR_S18R == OCR_S18R
         {
@@ -471,7 +470,7 @@ impl<T: SdmmcHardware, S: Sleep, V: VoltageOps> SdmmcProtocol<T, S, V> {
         let res: Result<(), SdmmcError> = 'sdcard_init: {
             let mut voltage_switch_init: bool = self
                 .host_capability
-                .contains(sdmmc_capability::SdmmcHostCapability(MMC_TIMING_UHS_SDR12));
+                .contains(capability::SdmmcHostCapability(MMC_TIMING_UHS_SDR12));
             let mut init_error: SdmmcError = SdmmcError::EUNSUPPORTEDCARD;
             for _ in 0..CARD_INIT_RETRY {
                 match self.sdcard_init(voltage_switch_init) {
@@ -618,7 +617,7 @@ impl<T: SdmmcHardware, S: Sleep, V: VoltageOps> SdmmcProtocol<T, S, V> {
             card_version,
             relative_card_addr: rca,
             card_state,
-            card_cap: sdmmc_capability::SdcardCapability(MMC_EMPTY_CAP),
+            card_cap: capability::SdcardCapability(MMC_EMPTY_CAP),
             method: BlockTransmissionMode::StopTransmission,
             card_config: None,
         })
@@ -874,7 +873,7 @@ impl<T: SdmmcHardware, S: Sleep, V: VoltageOps> SdmmcProtocol<T, S, V> {
 
         let mut resp: [u32; 4] = [0; 4];
 
-        let mut card_cap: SdcardCapability = sdmmc_capability::SdcardCapability(MMC_EMPTY_CAP);
+        let mut card_cap: SdcardCapability = capability::SdcardCapability(MMC_EMPTY_CAP);
         let cmd: SdmmcCmd = SdmmcCmd {
             cmdidx: SD_CMD_SWITCH_FUNC,
             resp_type: MMC_RSP_R1,
@@ -892,25 +891,25 @@ impl<T: SdmmcHardware, S: Sleep, V: VoltageOps> SdmmcProtocol<T, S, V> {
             MmcSignalVoltage::Voltage330 => {
                 let speed_class_byte: u8 = unsafe { (*raw_memory)[SD_SWITCH_FUNCTION_GROUP_ONE] };
                 if speed_class_byte & SD_SWITCH_FUNCTION_GROUP_ONE_CHECK_SDHS != 0 {
-                    card_cap.insert(sdmmc_capability::SdcardCapability(MMC_TIMING_SD_HS));
+                    card_cap.insert(capability::SdcardCapability(MMC_TIMING_SD_HS));
                 }
             }
             MmcSignalVoltage::Voltage180 => {
                 let speed_class_byte: u8 = unsafe { (*raw_memory)[SD_SWITCH_FUNCTION_GROUP_ONE] };
                 if speed_class_byte & SD_SWITCH_FUNCTION_GROUP_ONE_CHECK_UHS_SDR12 != 0 {
-                    card_cap.insert(sdmmc_capability::SdcardCapability(MMC_TIMING_UHS_SDR12));
+                    card_cap.insert(capability::SdcardCapability(MMC_TIMING_UHS_SDR12));
                 }
                 if speed_class_byte & SD_SWITCH_FUNCTION_GROUP_ONE_CHECK_UHS_SDR25 != 0 {
-                    card_cap.insert(sdmmc_capability::SdcardCapability(MMC_TIMING_UHS_SDR25));
+                    card_cap.insert(capability::SdcardCapability(MMC_TIMING_UHS_SDR25));
                 }
                 if speed_class_byte & SD_SWITCH_FUNCTION_GROUP_ONE_CHECK_UHS_SDR50 != 0 {
-                    card_cap.insert(sdmmc_capability::SdcardCapability(MMC_TIMING_UHS_SDR50));
+                    card_cap.insert(capability::SdcardCapability(MMC_TIMING_UHS_SDR50));
                 }
                 if speed_class_byte & SD_SWITCH_FUNCTION_GROUP_ONE_CHECK_UHS_SDR104 != 0 {
-                    card_cap.insert(sdmmc_capability::SdcardCapability(MMC_TIMING_UHS_SDR104));
+                    card_cap.insert(capability::SdcardCapability(MMC_TIMING_UHS_SDR104));
                 }
                 if speed_class_byte & SD_SWITCH_FUNCTION_GROUP_ONE_CHECK_UHS_DDR50 != 0 {
-                    card_cap.insert(sdmmc_capability::SdcardCapability(MMC_TIMING_UHS_DDR50));
+                    card_cap.insert(capability::SdcardCapability(MMC_TIMING_UHS_DDR50));
                 }
             }
             // For sdcard, the signal voltage cannot be 1.2V
