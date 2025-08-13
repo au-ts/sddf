@@ -64,7 +64,6 @@ pub(crate) enum MmcDevice {
     Sdcard(Sdcard),
     EMmc(EMmc),
     Unknown,
-    // TODO, when we decide to support emmc/sdio, modify this struct
 }
 
 /// Represents the different states of an SD or eMMC card.

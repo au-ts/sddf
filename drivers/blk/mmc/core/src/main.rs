@@ -18,12 +18,12 @@ use core::{
 
 use alloc::boxed::Box;
 use sddf_blk::{
-    blk_dequeue_req_helper, blk_device_init_data_ioaddr, blk_device_init_data_vaddr,
-    blk_device_regs_vaddr, blk_enqueue_resp_helper, blk_queue_empty_req_helper,
-    blk_queue_full_resp_helper, blk_queue_init_helper, BlkOp, BlkRequest, BlkStatus,
+    BlkOp, BlkRequest, BlkStatus, blk_dequeue_req_helper, blk_device_init_data_ioaddr,
+    blk_device_init_data_vaddr, blk_device_regs_vaddr, blk_enqueue_resp_helper,
+    blk_queue_empty_req_helper, blk_queue_full_resp_helper, blk_queue_init_helper,
 };
 
-use crate::sel4_microkit_os::{platform::VOLTAGE, SerialOps, TimerOps};
+use crate::sel4_microkit_os::{SerialOps, TimerOps, platform::VOLTAGE};
 
 const INTERRUPT: sel4_microkit::Channel = sel4_microkit::Channel::new(0);
 const BLK_VIRTUALIZER: sel4_microkit::Channel = sel4_microkit::Channel::new(1);
@@ -31,35 +31,17 @@ const TIMER: TimerOps = TimerOps::new();
 const SERIAL: SerialOps = SerialOps::new();
 
 use sdmmc_protocol::{
-    sdmmc::{mmc_struct::CardInfo, HostInfo, SDCARD_DEFAULT_SECTOR_SIZE},
+    sdmmc::{HostInfo, SDCARD_DEFAULT_SECTOR_SIZE, mmc_struct::CardInfo},
     sdmmc_traits::SdmmcHardware,
 };
 use sdmmc_protocol::{
     sdmmc::{SdmmcError, SdmmcProtocol},
     sdmmc_os::{Sleep, VoltageOps},
 };
-use sel4_microkit::{
-    debug_print, debug_println, protection_domain, ChannelSet, Handler, Infallible,
-};
+use sel4_microkit::{ChannelSet, Handler, Infallible, debug_println, protection_domain};
 
 const SDDF_TRANSFER_SIZE: u32 = 4096;
 const SDDF_TO_REAL_SECTOR: u32 = SDDF_TRANSFER_SIZE / SDCARD_DEFAULT_SECTOR_SIZE;
-
-// Debug function for printing out content in one block
-#[allow(dead_code)]
-unsafe fn print_one_block(ptr: *const u8, num: usize) {
-    unsafe {
-        // Iterate over the number of bytes and print each one in hexadecimal format
-        for i in 0..num {
-            let byte = *ptr.add(i);
-            if i % 16 == 0 {
-                debug_print!("\n{:04x}: ", i);
-            }
-            debug_print!("{:02x} ", byte);
-        }
-        debug_println!();
-    }
-}
 
 // No-op waker implementations, they do nothing.
 unsafe fn noop(_data: *const ()) {}
@@ -80,7 +62,7 @@ fn create_dummy_waker() -> Waker {
     unsafe { Waker::from_raw(raw_waker) }
 }
 
-#[protection_domain(heap_size = 0x10000)]
+#[protection_domain(heap_size = 0x1000)]
 fn init() -> impl Handler {
     unsafe {
         sdmmc_protocol::sdmmc_os::set_logger(&SERIAL).unwrap();
@@ -121,10 +103,7 @@ fn init() -> impl Handler {
 
     let _ = sdmmc_host.config_interrupt(false, false);
 
-    // Print out one block to check if read works
-    // sdmmc_host.test_read_one_block(0, 0xf5500000);
-
-    // TODO: Should tuning be possible to fail?
+    // Should tuning be possible to fail?
     unsafe {
         sdmmc_host
             .tune_performance(
@@ -134,10 +113,6 @@ fn init() -> impl Handler {
             )
             .unwrap_or_else(|error| panic!("SDMMC: Error at tuning performance {:?}", error));
     }
-
-    // unsafe {
-    //     print_one_block(unsafe_stolen_memory.as_ptr(), 64);
-    // }
 
     // Should always succeed, at least for odroid C4
     let _ = sdmmc_host.config_interrupt(true, false);
@@ -192,7 +167,6 @@ where
                             let mut cx = Context::from_waker(&waker);
                             match future.as_mut().poll(&mut cx) {
                                 Poll::Ready((result, sdmmc)) => {
-                                    // debug_println!("SDMMC_DRIVER: Future completed with result");
                                     self.future = None; // Reset the future once done
                                     self.sdmmc = Some(sdmmc);
                                     if result.is_ok() {
@@ -232,7 +206,6 @@ where
                                     }
                                 }
                                 Poll::Pending => {
-                                    // debug_println!("SDMMC_DRIVER: Future is not ready, polling again...");
                                     // Since the future is not ready, no other request can be dequeued, exit the big loop
                                     break 'process_notification;
                                 }
@@ -269,16 +242,18 @@ where
                             &mut request.id as *mut u32,
                         );
                     }
-                    // TODO: Consider how to add integer overflow check here
+                    // TODO: Consider to add integer overflow check here
                     request.block_number = request.block_number * SDDF_TO_REAL_SECTOR as u64;
                     request.count = (sddf_count as u32) * SDDF_TO_REAL_SECTOR;
+
                     // Print the retrieved values
-                    /*
-                    debug_println!("io_or_offset: 0x{:x}", request.io_or_offset);// Simple u64
-                    debug_println!("block_number: {}", request.block_number);    // Simple u32
-                    debug_println!("count: {}", request.count);                  // Simple u16
-                    debug_println!("id: {}", request.id);                        // Simple u32
-                    */
+                    #[cfg(feature = "dev-logs")]
+                    {
+                        debug_println!("io_or_offset: 0x{:x}", request.io_or_offset); // Simple u64
+                        debug_println!("block_number: {}", request.block_number); // Simple u32
+                        debug_println!("count: {}", request.count); // Simple u16
+                        debug_println!("id: {}", request.id); // Simple u32
+                    }
 
                     // Check if the request is valid
                     if (request.count as u64 + request.block_number as u64)
@@ -314,7 +289,6 @@ where
                     if let None = self.future {
                         match request.request_code {
                             BlkOp::BlkReqRead => {
-                                // TODO: The MAX_BLOCK_PER_TRANSFER is got by hackily get the defines in hardware layer which is wrong, check that to get properly from protocol layer
                                 request.count_to_do =
                                     core::cmp::min(request.count, self.host_info.max_block_per_req);
                                 if let Some(sdmmc) = self.sdmmc.take() {
@@ -326,11 +300,12 @@ where
                                                 * SDCARD_DEFAULT_SECTOR_SIZE as u64,
                                     )));
                                 } else {
-                                    panic!("SDMMC_DRIVER: The sdmmc should be here since the future should be empty!!!")
+                                    panic!(
+                                        "SDMMC_DRIVER: The sdmmc should be here since the future should be empty!!!"
+                                    )
                                 }
                             }
                             BlkOp::BlkReqWrite => {
-                                // TODO: The MAX_BLOCK_PER_TRANSFER is got by hackily get the defines in hardware layer which is wrong, check that to get properly from protocol layer
                                 request.count_to_do =
                                     core::cmp::min(request.count, self.host_info.max_block_per_req);
                                 if let Some(sdmmc) = self.sdmmc.take() {
@@ -342,7 +317,9 @@ where
                                                 * SDCARD_DEFAULT_SECTOR_SIZE as u64,
                                     )));
                                 } else {
-                                    panic!("SDMMC_DRIVER: The sdmmc should be here and the future should be empty!!!")
+                                    panic!(
+                                        "SDMMC_DRIVER: The sdmmc should be here and the future should be empty!!!"
+                                    )
                                 }
                             }
                             _ => {
@@ -355,7 +332,9 @@ where
                         if let Some(ref mut future) = self.future {
                             match future.as_mut().poll(&mut cx) {
                                 Poll::Ready(_) => {
-                                    panic!("SDMMC: RECEIVED INVALID REQUEST! Check request validation code!");
+                                    panic!(
+                                        "SDMMC: RECEIVED INVALID REQUEST! Check request validation code!"
+                                    );
                                 }
                                 Poll::Pending => break 'process_notification,
                             }
