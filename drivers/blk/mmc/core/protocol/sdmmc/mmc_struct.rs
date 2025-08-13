@@ -1,7 +1,7 @@
 // Copyright 2025, UNSW
 // SPDX-License-Identifier: BSD-2-Clause
 
-use super::sdcard::{EMmc, Sdcard};
+use super::sd::{EMmc, Sdcard};
 
 // Enums for bus_width
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

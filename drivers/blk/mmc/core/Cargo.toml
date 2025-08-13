@@ -13,7 +13,7 @@ meson_hal = { path = "../meson", optional = true }
 sdmmc_protocol = { path = "protocol" }
 
 [features]
-dev_logs = ["sdmmc_protocol/dev-logs"]
+dev-logs = ["sdmmc_protocol/dev-logs"]
 meson = ["dep:meson_hal"]
 
 [build]
