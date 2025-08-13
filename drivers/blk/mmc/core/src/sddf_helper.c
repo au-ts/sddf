@@ -21,6 +21,7 @@ void blk_queue_init_helper(uint64_t capacity)
     storage_info->sector_size = 512;
     storage_info->block_size = 1;
     storage_info->capacity = capacity;
+    blk_storage_set_ready(storage_info, true);
     storage_info->ready = true;
 }
 
