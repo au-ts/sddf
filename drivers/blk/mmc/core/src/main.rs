@@ -76,6 +76,8 @@ fn init() -> impl Handler {
 
     // This line of code actually is very unsafe!
     // Considering the memory is stolen from the memory that has sdcard registers mapped in
+    // A data region for card init is needed because some information is passed to the driver
+    // by the card transferring data to normal memory instead of reading a register.
     let init_data_vaddr = unsafe { blk_device_init_data_vaddr() };
     let init_data_ioaddr = unsafe { blk_device_init_data_ioaddr() };
 

@@ -21,7 +21,7 @@ use sdmmc_protocol::{
     sdmmc_traits::SdmmcHardware,
 };
 
-pub const SDIO_BASE: u64 = 0xffe05000; // Base address from DTS
+// The driver is targeting the sdmmc host controller at this address: SDIO 0xffe05000
 
 macro_rules! div_round_up {
     ($n:expr, $d:expr) => {
@@ -193,7 +193,6 @@ pub struct SdmmcMesonHardware {
     frequency: u32,
     // Irq enabled
     enabled_irq: u32,
-    // Put other variables here
 }
 
 impl SdmmcMesonHardware {
@@ -201,7 +200,6 @@ impl SdmmcMesonHardware {
         let register: &'static mut MesonSdmmcRegisters =
             unsafe { MesonSdmmcRegisters::new(sdmmc_register_base) };
 
-        // TODO: Call reset function here
         SdmmcMesonHardware {
             register,
             delay: None,
