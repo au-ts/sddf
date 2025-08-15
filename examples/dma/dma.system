@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<system>
+    <!-- <memory_region name="fpd_dma_ch0" size="0x1000" phys_addr="0xfd500000" /> -->
+    <!-- <memory_region name="cci_gpv_s3" size="0x10000" phys_addr="0xfd6e0000" /> -->
+    <memory_region name="lpd_dma_ch0" size="0x1000" phys_addr="0xffa80000" />
+    <memory_region name="memory" size="0x1000" phys_addr="0x70000000" />
+
+    <protection_domain name="dma_driver" priority="1" passive="true"> <!-- smc="true" -->
+        <program_image path="dma_driver.elf" />
+
+        <!-- <map mr="fpd_dma_ch0" vaddr="0xfd500000" perms="rw" cached="false" setvar_vaddr="zdma_gdma_ch0" /> -->
+        <!-- <map mr="cci_gpv_s3" vaddr="0xfd6e0000" perms="rw" cached="false" setvar_vaddr="cci_gpv_s3" /> -->
+        <map mr="lpd_dma_ch0" vaddr="0xffa80000" perms="rw" cached="false" setvar_vaddr="zdma_adma_ch0" />
+        <map mr="memory" vaddr="0x70000000" perms="rw" cached="true" setvar_vaddr="shared_memory" />
+
+        <!-- interrupt for channel 0 of LPD_DMA (Table 13-1 of the manual) -->
+        <irq irq="109" id="0" trigger="level" />
+    </protection_domain>
+
+    <protection_domain name="client" priority="0">
+        <program_image path="client.elf" />
+
+        <map mr="memory" vaddr="0x70000000" perms="rw" cached="true" setvar_vaddr="shared_memory" />
+    </protection_domain>
+
+    <channel>
+        <end pd="dma_driver" id="1" pp="false" notify="false" />
+        <end pd="client" id="0" pp="true" notify="false" />
+    </channel>
+</system>

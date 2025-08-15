@@ -23,3 +23,7 @@ venv/
 __pycache__
 .*.sw*
 *.dtb
+/.clangd
+/*.sh
+/tmp.log
+microkit-*/
