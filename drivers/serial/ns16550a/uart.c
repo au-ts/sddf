@@ -92,6 +92,9 @@ static void set_baud(unsigned long baud)
     /*  Divisor Latch Access Bit (DLAB) of the LCR must be set.
     *   These registers share their address with the FIFO's.
     */
+#if UART_DW_APB_REGISTERS
+    while (*REG_PTR(UART_USR) & 0x1);
+#endif
 
     uint32_t lcr_val = *REG_PTR(UART_LCR);
 
@@ -216,7 +219,7 @@ void init(void)
     *REG_PTR(UART_LCR) = 0b00000011;
 
     /* Set the baud rate */
-    set_baud(config.default_baud);
+    set_baud(1500000);
 
     if (config.rx_enabled) {
         /* Enable (only) the receive data available IRQ
