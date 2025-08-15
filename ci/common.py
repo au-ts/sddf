@@ -9,7 +9,7 @@ sys.path.insert(1, Path(__file__).parents[1].as_posix())
 
 from ci.lib.backends import HardwareBackend, QemuBackend, MachineQueueBackend
 from ci.lib.runner import TestConfig
-from ci.matrix import MACHINE_QUEUE_BOARDS
+from ci.matrix import MACHINE_QUEUE_BOARDS, MACHINE_QUEUE_BOARD_OPTIONS
 
 
 CI_BUILD_DIR = Path(__file__).parents[1] / "ci_build"
@@ -76,4 +76,5 @@ def backend_fn(
 
     else:
         mq_boards: list[str] = MACHINE_QUEUE_BOARDS[test_config.board]
-        return MachineQueueBackend(loader_img.resolve(), mq_boards)
+        options = MACHINE_QUEUE_BOARD_OPTIONS.get(test_config.board, {})
+        return MachineQueueBackend(loader_img.resolve(), mq_boards, **options)

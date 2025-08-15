@@ -3,11 +3,12 @@
 # SPDX-License-Identifier: BSD-2-Clause
 
 from __future__ import annotations
-from typing import TYPE_CHECKING, Literal, TypedDict
+from typing import TYPE_CHECKING, Any, Literal, TypedDict
 
 # The ordering in these lists defines an implicit ordering of which boards
 # to use for CI preferentially, though all will eventually be tried.
 MACHINE_QUEUE_BOARDS: dict[str, list[str]] = {
+    "cheshire": ["cheshire1"],
     "imx8mm_evk": ["imx8mm"],
     "imx8mp_evk": ["iotgate1"],
     "imx8mq_evk": ["imx8mq", "imx8mq2"],
@@ -16,6 +17,10 @@ MACHINE_QUEUE_BOARDS: dict[str, list[str]] = {
     "odroidc4": ["odroidc4_1", "odroidc4_2"],
     "star64": ["star64"],
     "zcu102": ["zcu102"],
+}
+
+MACHINE_QUEUE_BOARD_OPTIONS: dict[str, dict[str, Any]] = {
+    "cheshire": dict(uboot_image_started=b"Starting kernel ..."),
 }
 
 EXAMPLES: dict[str, _ExampleMatrixType] = {
@@ -74,6 +79,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "zcu102",
         ],
         "boards_test": [
+            "cheshire",
             "imx8mm_evk",
             "imx8mq_evk",
             "imx8mp_evk",
