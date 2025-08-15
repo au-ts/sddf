@@ -92,6 +92,7 @@ __libc_memmove_bytewise_forward_copy (unsigned char *dst,
     }
 }
 
+#undef memmove
 void *__inhibit_loop_to_libcall
 memmove (void *dst_void, const void *src_void, size_t length)
 {

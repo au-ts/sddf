@@ -38,6 +38,7 @@ QUICKREF
 #include <limits.h>
 #include "local.h"
 
+#undef strncmp
 int
 strncmp (const char *s1,
 	const char *s2,
