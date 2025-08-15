@@ -92,10 +92,14 @@ microkit_msginfo protected([[maybe_unused]] microkit_channel ch, [[maybe_unused]
     auto src_vaddr = shared_memory + microkit_mr_get(1);
     auto count = microkit_mr_get(2);
 
+    // according to the video "Arm's Weakly-Ordered Memory Model and Barrier Requirements" for DMA,
+    // it is sufficient to use "dmb oshst" here,
+    // but in this case the DMA buffer is mapped as normal outer-shareable
     cache_clean(src_vaddr, src_vaddr + count);
 
     wait();
 
+    // TODO: currently it assumes that the paddr is equal to the vaddr
     store(SRC_DSCR_LO, src_vaddr & UINT32_MAX);
     store(SRC_DSCR_HI, (src_vaddr >> 32U) & ADDR_HI);
     store(DST_DSCR_LO, dest_vaddr & UINT32_MAX);
@@ -106,6 +110,7 @@ microkit_msginfo protected([[maybe_unused]] microkit_channel ch, [[maybe_unused]
 
     wait();
 
+    // can we use "dmb osh" here?
     cache_clean_and_invalidate(dest_vaddr, dest_vaddr + count);
 
     return microkit_msginfo_new(0, 0);
