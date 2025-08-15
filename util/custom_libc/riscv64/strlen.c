@@ -19,6 +19,7 @@
 #include <stdint.h>
 #include "rv_string.h"
 
+#undef strlen
 size_t strlen(const char *str)
 {
   const char *start = str;
