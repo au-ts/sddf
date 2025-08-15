@@ -29,6 +29,9 @@
     This value will be board specific. */
 #define UART_CLK 24000000
 #define UART_DW_APB_REGISTERS 1
+#elif defined(CONFIG_PLAT_NANOPI_R5C)
+#define UART_CLK 0x16e3600
+#define UART_DW_APB_REGISTERS 1
 #elif defined(CONFIG_PLAT_QEMU_RISCV_VIRT)
 /* Obtained via the device tree that QEMU generates, and from
  * the QEMU source code.

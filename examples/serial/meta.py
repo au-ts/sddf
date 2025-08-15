@@ -51,6 +51,12 @@ BOARDS: List[Board] = [
         serial="soc@0/bus@30800000/serial@30860000",
     ),
     Board(
+        name="nanopi_r5c",
+        arch=SystemDescription.Arch.AARCH64,
+        paddr_top=0x20000000,
+        serial="serial@fe660000",
+    ),
+    Board(
         name="imx8mm_evk",
         arch=SystemDescription.Arch.AARCH64,
         paddr_top=0xA_000_000,
