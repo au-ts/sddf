@@ -264,7 +264,7 @@ def cli(
     parser.add_argument(
         "--retry-count",
         type=int,
-        default=5,
+        default=15,
         help=(
             "number of times to retry tests due to transient failures (e.g. lock failures). "
             "prefer increasing this over the delay between retries"
@@ -274,7 +274,10 @@ def cli(
         "--retry-delay",
         type=int,
         default=60,
-        help="time (seconds) to delay between transient failure retries. this is between ALL tests, not individual ones.",
+        help=(
+            "time (seconds) to delay between transient failure retries. this is between ALL tests, not individual ones. "
+            "think of this as the polling delay between checking locks"
+        ),
     )
 
     args = parser.parse_args()
