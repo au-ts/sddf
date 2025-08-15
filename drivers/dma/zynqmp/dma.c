@@ -97,9 +97,9 @@ microkit_msginfo protected([[maybe_unused]] microkit_channel ch, [[maybe_unused]
     wait();
 
     store(SRC_DSCR_LO, src_vaddr & UINT32_MAX);
-    store(SRC_DSCR_HI, src_vaddr >> 32U);
+    store(SRC_DSCR_HI, (src_vaddr >> 32U) & ADDR_HI);
     store(DST_DSCR_LO, dest_vaddr & UINT32_MAX);
-    store(DST_DSCR_HI, dest_vaddr >> 32U);
+    store(DST_DSCR_HI, (dest_vaddr >> 32U) & ADDR_HI);
     store(SRC_DSCR_SIZE, count & SIZE);
     store(DST_DSCR_SIZE, count & SIZE);
     store(CTRL2, EN);
