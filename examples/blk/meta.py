@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from sdfgen import SystemDescription, Sddf, DeviceTree
 from importlib.metadata import version
 
-assert version('sdfgen').split(".")[1] == "24", "Unexpected sdfgen version"
+# assert version('sdfgen').split(".")[1] == "24", "Unexpected sdfgen version"
 
 ProtectionDomain = SystemDescription.ProtectionDomain
 
@@ -16,15 +16,14 @@ class Board:
     name: str
     arch: SystemDescription.Arch
     paddr_top: int
-    blk: str
+    blk: Optional[str]
     # Default partition if the user has not specified one
     partition: int
     # Use actual serial driver for output, so we can test non-debug configurations
-    serial: str
+    serial: Optional[str]
     # Some block drivers need a timer driver as well, the example
     # itself does not need a timer driver.
     timer: Optional[str]
-
 
 BOARDS: List[Board] = [
     Board(
@@ -54,27 +53,42 @@ BOARDS: List[Board] = [
         serial="soc/serial@10000000",
         timer=None,
     ),
+    Board(
+        name="x86_64_generic",
+        arch=SystemDescription.Arch.X86_64,
+        paddr_top=0x7ffdf000,
+        partition=0, # @Trsitan : todo , figure out what linux does and implications
+        blk=None,
+        serial=None,
+        timer=None,
+    )
 ]
 
 
-def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
+def generate(sdf_file: str, output_dir: str, dtb: Optional[DeviceTree]):
+    blk_node = None
+    serial_node = None
+    if dtb is not None:
+        serial_node = dtb.node(board.serial)
+        assert serial_node is not None
+        blk_node = dtb.node(board.blk)
+        assert blk_node is not None
+
     serial_driver = ProtectionDomain("serial_driver", "serial_driver.elf", priority=200)
     # Increase the stack size as running with UBSAN uses more stack space than normal.
     serial_virt_tx = ProtectionDomain("serial_virt_tx", "serial_virt_tx.elf",
                                       priority=199, stack_size=0x2000)
-
-    serial_node = dtb.node(board.serial)
-    assert serial_node is not None
-
     serial_system = Sddf.Serial(sdf, serial_node, serial_driver, serial_virt_tx, enable_color=False)
+
+    if board.arch == SystemDescription.Arch.X86_64:
+        serial_port = SystemDescription.IoPort(SystemDescription.Arch.X86_64, 0x3f8, 8, 0)
+        serial_driver.add_ioport(serial_port)
 
     blk_driver = ProtectionDomain("blk_driver", "blk_driver.elf", priority=200, stack_size=0x2000)
     blk_virt = ProtectionDomain("blk_virt", "blk_virt.elf", priority=199, stack_size=0x2000)
     client = ProtectionDomain("client", "client.elf", priority=1)
 
-    blk_node = dtb.node(board.blk)
-    assert blk_node is not None
-    if board.timer:
+    if dtb is not None and board.timer:
         timer_node = dtb.node(board.timer)
         assert timer_node is not None
 
@@ -82,7 +96,78 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
         timer_system = sddf.Timer(sdf, timer_node, timer_driver)
         timer_system.add_client(blk_driver)
 
+    # @Tristan: do this a better way
+    if board.arch == SystemDescription.Arch.X86_64:
+        timer_node = None
+        timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=201)
+        timer_system = sddf.Timer(sdf, timer_node, timer_driver)
+
+        hept_irq = SystemDescription.IrqMsi(board.arch, 0, 0, 0, 0, 0, 0)
+        timer_driver.add_irq(hept_irq)
+
+        hept_regs = SystemDescription.MemoryRegion(sdf, "hept_regs", 0x1000, paddr=0xfed00000)
+        hept_regs_map = SystemDescription.Map(hept_regs, 0x5_0000_0000, "rw", cached=False)
+        timer_driver.add_map(hept_regs_map)
+        sdf.add_mr(hept_regs)
+
+        timer_system.add_client(blk_driver)
+
     blk_system = Sddf.Blk(sdf, blk_node, blk_driver, blk_virt)
+
+    if board.arch == SystemDescription.Arch.X86_64:
+        pci_ecam = SystemDescription.MemoryRegion(sdf, "pci_ecam", 0x10000000, paddr=0x80000000)
+        pci_ecam_map = SystemDescription.Map(pci_ecam, 0x6_0000_0000, "rw", cached=False)
+        blk_driver.add_map(pci_ecam_map)
+        sdf.add_mr(pci_ecam)
+
+        # The last PCI base address register, BAR[5], points to the AHCI base memory, it’s called ABAR (AHCI Base Memory Register).
+        sata_bar_5 = SystemDescription.MemoryRegion(sdf, "sata_bar_5", 0x80000, paddr=0xaa180000)
+        sata_bar_5_map = SystemDescription.Map(sata_bar_5, 0x7_0000_0000, "rw", cached=False)
+        blk_driver.add_map(sata_bar_5_map)
+        sdf.add_mr(sata_bar_5)
+
+        msi_reg = SystemDescription.MemoryRegion(sdf, "msi_reg", 0x1000, paddr=0xfee00000) # 0xfee00278
+        msi_reg_map = SystemDescription.Map(msi_reg, 0x7_1000_0000, "rw", cached=False)
+        blk_driver.add_map(msi_reg_map)
+        sdf.add_mr(msi_reg)
+
+        # We only use one port in the example (1 device)
+        ahci_command_list = SystemDescription.MemoryRegion(sdf, "ahci_command_list", 0x1000, paddr=0x60000000) # Arbitrary paddr
+        ahci_command_list_map = SystemDescription.Map(ahci_command_list, 0x7_2000_0000, "rw", cached=False) # @Tristan : Test if we should cache (i think we do)
+        blk_driver.add_map(ahci_command_list_map)
+        sdf.add_mr(ahci_command_list)
+
+        ahci_FIS = SystemDescription.MemoryRegion(sdf, "ahci_FIS", 0x1000, paddr=0x60002000) # Arbitrary paddr
+        ahci_FIS_map = SystemDescription.Map(ahci_FIS, 0x7_2000_2000, "rw", cached=False)
+        blk_driver.add_map(ahci_FIS_map)
+        sdf.add_mr(ahci_FIS)
+
+        # There are 32 possible command tables
+        # We just map them all contiguously
+
+        # Command tables can support up to 65535 PRDT entries
+        # for now we just use 8 which should be enough for most use cases
+
+        # if its only got 8 then the size for each table becomes
+        # 128 (header) + 8 * 16 (PRDT) = 256 bytes each
+
+        # Which is conveniently 2 pages
+
+        ahci_command_tables = SystemDescription.MemoryRegion(sdf, "ahci_command_tables", 0x2000, paddr=0x60004000) # Arbitrary paddr
+        ahci_command_tables_map = SystemDescription.Map(ahci_command_tables, 0x7_2000_4000, "rw", cached=False)
+        blk_driver.add_map(ahci_command_tables_map)
+        sdf.add_mr(ahci_command_tables)
+
+        # use interupt pin A for now routed to IRQ 34
+
+        # Just for testing and first iterations of the driver before using virt and client
+        # @ Tristan : we need to figure out where this actually gets put
+        data_region = SystemDescription.MemoryRegion(sdf, "data_region", 0x10_000, paddr=0x60008000)
+        data_region_map = SystemDescription.Map(data_region, 0x7_2000_8000, "rw", cached=False)
+        blk_driver.add_map(data_region_map)
+        sdf.add_mr(data_region)
+
+
     partition = int(args.partition) if args.partition else board.partition
     blk_system.add_client(client, partition=partition)
 
@@ -95,8 +180,13 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
         blk_virt,
         client
     ]
-    if board.timer:
+    if dtb is not None and board.timer:
         pds += [timer_driver]
+
+    # @Tristan: do this a better way
+    if board.arch == SystemDescription.Arch.X86_64:
+         pds += [timer_driver]
+
     for pd in pds:
         sdf.add_pd(pd)
 
@@ -104,9 +194,14 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     assert blk_system.serialise_config(output_dir)
     assert serial_system.connect()
     assert serial_system.serialise_config(output_dir)
-    if board.timer:
+    if dtb is not None and board.timer:
         assert timer_system.connect()
         assert timer_system.serialise_config(output_dir)
+
+    # @Tristan: do this a better way 
+    if board.arch == SystemDescription.Arch.X86_64:
+      assert timer_system.connect()
+      assert timer_system.serialise_config(output_dir)
 
     with open(f"{output_dir}/{sdf_file}", "w+") as f:
         f.write(sdf.render())
@@ -128,7 +223,9 @@ if __name__ == '__main__':
     sdf = SystemDescription(board.arch, board.paddr_top)
     sddf = Sddf(args.sddf)
 
-    with open(args.dtb, "rb") as f:
-        dtb = DeviceTree(f.read())
+    dtb = None
+    if board.arch != SystemDescription.Arch.X86_64:
+        with open(args.dtb, "rb") as f:
+            dtb = DeviceTree(f.read())
 
     generate(args.sdf, args.output, dtb)

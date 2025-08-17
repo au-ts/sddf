@@ -60,6 +60,11 @@ else ifeq ($(strip $(MICROKIT_BOARD)), maaxboard)
 	SERIAL_DRIVER_DIR := imx
 	BLK_DRIVER_DIR := mmc/imx
 	TIMER_DRIVER_DIR := imx
+else ifeq ($(strip $(MICROKIT_BOARD)), x86_64_generic)
+	CPU := generic
+	SERIAL_DRIVER_DIR := pc99
+	TIMER_DRIVER_DIR := hpet
+	BLK_DRIVER_DIR := ahci
 else
 $(error Unsupported MICROKIT_BOARD given)
 endif
@@ -95,9 +100,12 @@ ifeq ($(ARCH),aarch64)
 	CFLAGS += -mcpu=$(CPU) -target aarch64-none-elf
 else ifeq ($(ARCH),riscv64)
 	CFLAGS += -march=rv64imafdc -target riscv64-none-elf
+else ifeq ($(ARCH),x86_64)
+	CFLAGS += -march=x86-64 -mtune=$(CPU) -target x86_64-pc-elf
+	DTS :=
 endif
 
-DTS := $(SDDF)/dts/$(MICROKIT_BOARD).dts
+DTS ?= $(SDDF)/dts/$(MICROKIT_BOARD).dts
 DTB := $(MICROKIT_BOARD).dtb
 METAPROGRAM := $(TOP)/meta.py
 
@@ -126,7 +134,9 @@ client.elf: client.o libsddf_util.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(DTB): $(DTS)
-	dtc -q -I dts -O dtb $(DTS) > $(DTB)
+ifneq ($(strip $(DTS)),)
+	$(DTC) -q -I dts -O dtb $(DTS) > $(DTB)
+endif
 
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE) $(PARTITION_ARG)
