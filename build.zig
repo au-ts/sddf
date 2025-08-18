@@ -22,6 +22,7 @@ const DriverClass = struct {
         imx,
         jh7110,
         goldfish,
+        rk3568,
     };
 
     const Network = enum {
