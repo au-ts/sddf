@@ -19,6 +19,8 @@
 #define RK3568_TIMER_DISABLE 0x0
 #define RK3568_TIMER_ENABLE ((1 << 0) | (1 << 2))
 
+#define RK3568_TIMER_SIZE 0x20
+
 typedef struct {
     uint32_t load_count0;
     uint32_t load_count1;
@@ -117,28 +119,50 @@ void init()
     timeout_irq = device_resources.irqs[1].id;
 
     uintptr_t timer_base = (uintptr_t)device_resources.regions[0].region.vaddr;
-    counter_regs = (volatile starfive_timer_regs_t *)timer_base;
-    timeout_regs = (volatile starfive_timer_regs_t *)(timer_base
-                                                      + STARFIVE_TIMER_CHANNEL_REGS_SIZE * STARFIVE_TIMER_CHANNEL);
-    timeout_regs->ctrl = RK3568_TIMER_DISABLE;
+    counter_regs = (volatile rk3568_timer_regs_t *)timer_base;
+    timeout_regs = (volatile rk3568_timer_regs_t *)(timer_base + RK3568_TIMER_SIZE);
+    timeout_regs->ctrl = (RK3568_TIMER_DISABLE | ;
     timeout_regs->ctrl |= STARFIVE_TIMER_MODE_CONTINUOUS;
-    timeout_regs->load = STARFIVE_TIMER_MAX_TICKS;
-    timeout_regs->intmask = STARFIVE_TIMER_INTERRUPT_UNMASKED;
+    timeout_regs->ctrl |= RK3568_;
+    timeout_regs->load = RK3568_TIMER_MAX_TICKS;
 
     counter_regs->enable = RK3568_TIMER_DISABLE;
-    counter_regs->ctrl = STARFIVE_TIMER_MODE_CONTINUOUS;
-    counter_regs->load = STARFIVE_TIMER_MAX_TICKS;
-    counter_regs->intmask = STARFIVE_TIMER_INTERRUPT_UNMASKED;
+    counter_regs->ctrl = RK3568_TIMER_MODE_CONTINUOUS;
+    counter_regs->load = RK3568_TIMER_MAX_TICKS;
+    counter_regs->intmask = RK3568_TIMER_INTERRUPT_UNMASKED;
 
     counter_regs->enable = RK3568_TIMER_ENABLE;
 }
 
 void notified(microkit_channel ch)
 {
-    assert(ch == device_resources.irqs[0].id);
-    microkit_deferred_irq_ack(ch);
+    if (ch == counter_irq) {
+        counter_timer_elapses += 1;
+        while (counter_regs->intclr & STARFIVE_TIMER_INTCLR_BUSY) {
+            /*
+            * Hardware will not currently accept writes to this register.
+            * Wait for this bit to be unset by hardware.
+            */
+        }
+        counter_regs->intclr = 1;
+    } else if (ch == timeout_irq) {
+        timeout_timer_elapses += 1;
+        while (timeout_regs->intclr & STARFIVE_TIMER_INTCLR_BUSY) {
+            /*
+            * Hardware will not currently accept writes to this register.
+            * Wait for this bit to be unset by hardware.
+            */
+        }
+        timeout_regs->intclr = 1;
 
-    assert(false);
+        uint64_t curr_time = get_ticks_in_ns();
+        process_timeouts(curr_time);
+    } else {
+        sddf_dprintf("TIMER DRIVER|LOG: unexpected notification from channel %u\n", ch);
+        return;
+    }
+
+    microkit_deferred_irq_ack(ch);
 }
 
 seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)

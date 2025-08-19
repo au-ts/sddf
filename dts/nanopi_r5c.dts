@@ -1535,6 +1535,13 @@
 		};
 	};
 
+	timer@fe5f0000 {
+		compatible = "rockchip,rk3568-timer";
+		reg = <0x00 0xfe5f0000 0x00 0x100>;
+		interrupts = <0x00 0x6d 0x04 0x00 0x6e 0x04>;
+		status = "okay";
+	};
+
 	watchdog@fe600000 {
 		compatible = "rockchip,rk3568-wdt\0snps,dw-wdt";
 		reg = <0x00 0xfe600000 0x00 0x100>;
@@ -1727,13 +1734,6 @@
 		reg-io-width = <0x04>;
 		reg-shift = <0x02>;
 		status = "disabled";
-	};
-
-	timer@ff700000 {
-		compatible = "rockchip,rk3568-timer";
-		reg = <0x00 0xFE5F0000 0x00 0x100>;
-		interrupts = <0x00 0x6d 0x04 0x00 0x6e 0x04>;
-		status = "okay";
 	};
 
 	thermal-zones {
