@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-#include <microkit.h>
+#include <os/sddf.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <sddf/blk/config.h>
@@ -21,7 +21,7 @@
 __attribute__((__section__(".blk_virt_config"))) blk_virt_config_t config;
 
 /* Uncomment this to enable debug logging */
-// #define DEBUG_BLK_VIRT
+//#define DEBUG_BLK_VIRT
 
 #if defined(DEBUG_BLK_VIRT)
 #define LOG_BLK_VIRT(...) do{ sddf_dprintf("BLK_VIRT|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
@@ -132,7 +132,7 @@ static void request_mbr()
     err = blk_enqueue_req(&drv_h, BLK_REQ_READ, mbr_paddr, 0, 1, mbr_req_id);
     assert(!err);
 
-    microkit_deferred_notify(config.driver.conn.id);
+    sddf_deferred_notify(config.driver.conn.id);
 }
 
 static bool handle_mbr_reply()
@@ -162,7 +162,7 @@ static bool handle_mbr_reply()
     /* TODO: This is a raw seL4 system call because Microkit does not (currently)
      * include a corresponding libmicrokit API. */
 #ifdef CONFIG_ARCH_ARM
-    seL4_ARM_VSpace_Invalidate_Data(3, mbr_bk.vaddr, mbr_bk.vaddr + (BLK_TRANSFER_SIZE * mbr_bk.count));
+    sddf_vspace_invalidate(3, mbr_bk.vaddr, mbr_bk.vaddr + (BLK_TRANSFER_SIZE * mbr_bk.count));
 #endif
     sddf_memcpy(&msdos_mbr, (void *)mbr_bk.vaddr, sizeof(struct msdos_mbr));
 
@@ -221,7 +221,7 @@ static void handle_driver()
                 /* TODO: This is a raw seL4 system call because Microkit does not (currently)
                     * include a corresponding libmicrokit API. */
 #ifdef CONFIG_ARCH_ARM
-                seL4_ARM_VSpace_Invalidate_Data(3, reqbk.vaddr, reqbk.vaddr + (BLK_TRANSFER_SIZE * reqbk.count));
+                sddf_vspace_invalidate(3, reqbk.vaddr, reqbk.vaddr + (BLK_TRANSFER_SIZE * reqbk.count));
 #endif
             }
             break;
@@ -249,7 +249,7 @@ static void handle_driver()
     /* Notify corresponding client if a response was enqueued */
     for (int i = 0; i < config.num_clients; i++) {
         if (client_notify[i]) {
-            microkit_notify(config.clients[i].conn.id);
+            sddf_notify(config.clients[i].conn.id);
         }
     }
 }
@@ -357,7 +357,7 @@ static bool handle_client(int cli_id)
     }
 
     if (client_notify) {
-        microkit_notify(config.clients[cli_id].conn.id);
+        sddf_notify(config.clients[cli_id].conn.id);
     }
 
     return driver_notify;
@@ -373,11 +373,11 @@ static void handle_clients()
     }
 
     if (driver_notify) {
-        microkit_notify(config.driver.conn.id);
+        sddf_notify(config.driver.conn.id);
     }
 }
 
-void notified(microkit_channel ch)
+void notified(sddf_channel ch)
 {
     if (initialised == false) {
         bool success = handle_mbr_reply();
