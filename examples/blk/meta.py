@@ -56,7 +56,7 @@ BOARDS: List[Board] = [
     Board(
         name="x86_64_generic",
         arch=SystemDescription.Arch.X86_64,
-        paddr_top=0x7ffdf000,
+        paddr_top=0x20000000,
         partition=0, # @Trsitan : todo , figure out what linux does and implications
         blk=None,
         serial=None,
@@ -115,29 +115,32 @@ def generate(sdf_file: str, output_dir: str, dtb: Optional[DeviceTree]):
     blk_system = Sddf.Blk(sdf, blk_node, blk_driver, blk_virt)
 
     if board.arch == SystemDescription.Arch.X86_64:
-        pci_ecam = SystemDescription.MemoryRegion(sdf, "pci_ecam", 0x10000000, paddr=0x80000000)
+        pci_ecam = SystemDescription.MemoryRegion(sdf, "pci_ecam", 0x10000000, paddr=0xe0000000)
         pci_ecam_map = SystemDescription.Map(pci_ecam, 0x6_0000_0000, "rw", cached=False)
         blk_driver.add_map(pci_ecam_map)
         sdf.add_mr(pci_ecam)
 
         # The last PCI base address register, BAR[5], points to the AHCI base memory, it’s called ABAR (AHCI Base Memory Register).
-        sata_bar_5 = SystemDescription.MemoryRegion(sdf, "sata_bar_5", 0x80000, paddr=0xaa180000)
+        sata_bar_5 = SystemDescription.MemoryRegion(sdf, "sata_bar_5", 0x1000, paddr=0xb0402000)
         sata_bar_5_map = SystemDescription.Map(sata_bar_5, 0x7_0000_0000, "rw", cached=False)
         blk_driver.add_map(sata_bar_5_map)
         sdf.add_mr(sata_bar_5)
 
-        msi_reg = SystemDescription.MemoryRegion(sdf, "msi_reg", 0x1000, paddr=0xfee00000) # 0xfee00278
-        msi_reg_map = SystemDescription.Map(msi_reg, 0x7_1000_0000, "rw", cached=False)
-        blk_driver.add_map(msi_reg_map)
-        sdf.add_mr(msi_reg)
+        # may not be valid on vb_105
+        # msi_reg = SystemDescription.MemoryRegion(sdf, "msi_reg", 0x1000, paddr=0xfee00000) # 0xfee00278
+        # msi_reg_map = SystemDescription.Map(msi_reg, 0x7_1000_0000, "rw", cached=False)
+        # blk_driver.add_map(msi_reg_map)
+        # sdf.add_mr(msi_reg)
+
+        # We can cache all of these as true
 
         # We only use one port in the example (1 device)
-        ahci_command_list = SystemDescription.MemoryRegion(sdf, "ahci_command_list", 0x1000, paddr=0x60000000) # Arbitrary paddr
+        ahci_command_list = SystemDescription.MemoryRegion(sdf, "ahci_command_list", 0x1000, paddr=0x10000000) # Arbitrary paddr
         ahci_command_list_map = SystemDescription.Map(ahci_command_list, 0x7_2000_0000, "rw", cached=False) # @Tristan : Test if we should cache (i think we do)
         blk_driver.add_map(ahci_command_list_map)
         sdf.add_mr(ahci_command_list)
 
-        ahci_FIS = SystemDescription.MemoryRegion(sdf, "ahci_FIS", 0x1000, paddr=0x60002000) # Arbitrary paddr
+        ahci_FIS = SystemDescription.MemoryRegion(sdf, "ahci_FIS", 0x1000, paddr=0x10002000) # Arbitrary paddr
         ahci_FIS_map = SystemDescription.Map(ahci_FIS, 0x7_2000_2000, "rw", cached=False)
         blk_driver.add_map(ahci_FIS_map)
         sdf.add_mr(ahci_FIS)
@@ -151,9 +154,7 @@ def generate(sdf_file: str, output_dir: str, dtb: Optional[DeviceTree]):
         # if its only got 8 then the size for each table becomes
         # 128 (header) + 8 * 16 (PRDT) = 256 bytes each
 
-        # Which is conveniently 2 pages
-
-        ahci_command_tables = SystemDescription.MemoryRegion(sdf, "ahci_command_tables", 0x2000, paddr=0x60004000) # Arbitrary paddr
+        ahci_command_tables = SystemDescription.MemoryRegion(sdf, "ahci_command_tables", 0x2000, paddr=0x10004000) # Arbitrary paddr
         ahci_command_tables_map = SystemDescription.Map(ahci_command_tables, 0x7_2000_4000, "rw", cached=False)
         blk_driver.add_map(ahci_command_tables_map)
         sdf.add_mr(ahci_command_tables)
@@ -161,8 +162,7 @@ def generate(sdf_file: str, output_dir: str, dtb: Optional[DeviceTree]):
         # use interupt pin A for now routed to IRQ 34
 
         # Just for testing and first iterations of the driver before using virt and client
-        # @ Tristan : we need to figure out where this actually gets put
-        data_region = SystemDescription.MemoryRegion(sdf, "data_region", 0x10_000, paddr=0x60008000)
+        data_region = SystemDescription.MemoryRegion(sdf, "data_region", 0x10_000, paddr=0x10008000)
         data_region_map = SystemDescription.Map(data_region, 0x7_2000_8000, "rw", cached=False)
         blk_driver.add_map(data_region_map)
         sdf.add_mr(data_region)
@@ -198,7 +198,7 @@ def generate(sdf_file: str, output_dir: str, dtb: Optional[DeviceTree]):
         assert timer_system.connect()
         assert timer_system.serialise_config(output_dir)
 
-    # @Tristan: do this a better way 
+    # @Tristan: do this a better way
     if board.arch == SystemDescription.Arch.X86_64:
       assert timer_system.connect()
       assert timer_system.serialise_config(output_dir)

@@ -16,13 +16,13 @@
 
 #define LOG_PCIE_ERR(...) do{ sddf_printf("PCIE |ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
-const uint64_t pcie_ecam_paddr = 0x80000000;
+const uint64_t pcie_ecam_paddr = 0xe0000000;
 const uint64_t pcie_ecam_vaddr = 0x600000000;
 const uint64_t pcie_ecam_size = 0x10000000;
 
-const uint64_t ahci_abar_paddr = 0xaa180000;
+const uint64_t ahci_abar_paddr = 0xb0402000;
 const uint64_t ahci_abar_vaddr = 0x700000000;
-const uint64_t ahci_abar_size = 0x80000;
+const uint64_t ahci_abar_size = 0x1000;
 
 /* bus between [0, 256)
    device between [0, 31)

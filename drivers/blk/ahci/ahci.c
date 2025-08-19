@@ -46,19 +46,20 @@ uint8_t number_of_command_slots;
 
 HBA_MEM* hba;
 
-const uint64_t ahci_command_list_paddr = 0x60000000;
+// i dont think they have setvar???
+const uint64_t ahci_command_list_paddr = 0x10000000;
 const uint64_t ahci_command_list_vaddr = 0x720000000;
 const uint64_t ahci_command_list_size = 0x1000;
 
-const uint64_t ahci_FIS_paddr = 0x60002000;
+const uint64_t ahci_FIS_paddr = 0x10002000;
 const uint64_t ahci_FIS_vaddr = 0x720002000;
 const uint64_t ahci_FIS_size = 0x1000;
 
-const uint64_t ahci_command_tables_paddr = 0x60004000;
+const uint64_t ahci_command_tables_paddr = 0x10004000;
 const uint64_t ahci_command_tables_vaddr = 0x720004000;
 const uint64_t ahci_command_tables_size = 0x2000;
 
-const uint64_t data_region_paddr = 0x60080000;
+const uint64_t data_region_paddr = 0x10008000;
 const uint64_t data_region_vaddr = 0x720008000;
 const uint64_t data_region_size = 0x10000;
 
@@ -120,7 +121,7 @@ bool read_device(HBA_PORT *port, uint32_t startl, uint32_t starth, uint32_t coun
         cmdtbl->prdt_entry[i].dba = (uint32_t) (buf & 0xFFFFFFFF);
         cmdtbl->prdt_entry[i].dbau = (uint32_t) (buf >> 32);
         cmdtbl->prdt_entry[i].dbc = 8*1024-1;   // 8K bytes (this value should always be set to 1 less than the actual value)
-        cmdtbl->prdt_entry[i].i = 1; // @Tristan: no interrupts for now
+        cmdtbl->prdt_entry[i].i = 0; // @Tristan: no interrupts for now
         buf += 8 * 1024;  // 4K words
         count -= 16;    // 16 sectors
     }
@@ -187,6 +188,101 @@ bool read_device(HBA_PORT *port, uint32_t startl, uint32_t starth, uint32_t coun
     return true;
 }
 
+bool write_device(HBA_PORT *port, uint32_t startl, uint32_t starth, uint32_t count, uint64_t buf)
+{
+    port->is = (uint32_t) -1; // Clear pending interrupt bits
+    int slot = find_cmdslot(port);
+    if (slot == -1) {
+        return false;
+    }
+
+    LOG_AHCI("We are using cmdslot %d\n", slot);
+
+    HBA_CMD_HEADER *cmdheader = (HBA_CMD_HEADER*)ahci_command_list_vaddr;
+    cmdheader += slot;
+    cmdheader->cfl   = sizeof(FIS_REG_H2D)/sizeof(uint32_t);  // Command FIS size
+    cmdheader->w     = 1;       // Write to device
+    cmdheader->prdtl = (uint16_t)((count-1)>>4) + 1;          // PRDT entries count
+
+    if (cmdheader->prdtl > 8) {
+        LOG_AHCI("We can't handle this request as its too big\n");
+        return false;
+    }
+
+    HBA_CMD_TBL *cmdtbl = (HBA_CMD_TBL*)ahci_command_tables_vaddr;
+    cmdtbl += slot;
+    sddf_memset(cmdtbl, 0, sizeof(HBA_CMD_TBL) + (cmdheader->prdtl-1)*sizeof(HBA_PRDT_ENTRY));
+
+    // 8K bytes (16 sectors) per PRDT is what we chose
+    for (int i = 0; i < cmdheader->prdtl - 1; i++)
+    {
+        cmdtbl->prdt_entry[i].dba  = (uint32_t) (buf & 0xFFFFFFFF);
+        cmdtbl->prdt_entry[i].dbau = (uint32_t) (buf >> 32);
+        cmdtbl->prdt_entry[i].dbc  = 8*1024 - 1;   // 8K bytes (value is size-1)
+        cmdtbl->prdt_entry[i].i    = 0;            // @Tristan: no interrupts for now
+        buf   += 8 * 1024;  // 4K words
+        count -= 16;        // 16 sectors
+    }
+    // Last entry
+    cmdtbl->prdt_entry[cmdheader->prdtl - 1].dba  = (uint32_t) (buf & 0xFFFFFFFF);
+    cmdtbl->prdt_entry[cmdheader->prdtl - 1].dbau = (uint32_t) (buf >> 32);
+    cmdtbl->prdt_entry[cmdheader->prdtl - 1].dbc  = (count << 9) - 1;   // 512 bytes per sector
+    cmdtbl->prdt_entry[cmdheader->prdtl - 1].i    = 0; // @Tristan: currently interrupts are off
+
+    // Setup command
+    FIS_REG_H2D *cmdfis = (FIS_REG_H2D*)(&cmdtbl->cfis);
+
+    cmdfis->fis_type = FIS_TYPE_REG_H2D;
+    cmdfis->c        = 1;  // Command
+    cmdfis->command  = ATA_CMD_WRITE_DMA_EX;
+
+    cmdfis->lba0   = (uint8_t) startl;
+    cmdfis->lba1   = (uint8_t) (startl >> 8);
+    cmdfis->lba2   = (uint8_t) (startl >> 16);
+    cmdfis->device = 1 << 6;  // LBA mode
+
+    cmdfis->lba3 = (uint8_t) (startl >> 24);
+    cmdfis->lba4 = (uint8_t) starth;
+    cmdfis->lba5 = (uint8_t) (starth >> 8);
+
+    cmdfis->countl = count & 0xFF;
+    cmdfis->counth = (count >> 8) & 0xFF;
+
+    // Wait while port is busy
+    int spin = 0;
+    while ((port->tfd & (ATA_DEV_BUSY | ATA_DEV_DRQ)) && spin < 1000000)
+        spin++;
+    if (spin == 1000000)
+    {
+        LOG_AHCI("Port is hung\n");
+        return false;
+    }
+
+    port->ci = 1 << slot; // Issue command
+
+    // Wait for completion
+    while (1)
+    {
+        if ((port->ci & (1 << slot)) == 0)
+            break;
+        if (port->is & HBA_PxIS_TFES)   // Task file error
+        {
+            LOG_AHCI("Write disk error\n");
+            return false;
+        }
+    }
+
+    // Check again
+    if (port->is & HBA_PxIS_TFES)
+    {
+        LOG_AHCI("Write disk error\n");
+        return false;
+    }
+
+    return true;
+}
+
+
 // Issue IDENTIFY DEVICE and extract sector size + total sectors.
 // Returns true on success and fills out params.
 bool identify_device(HBA_PORT *port, uint32_t *logical_sector_bytes_out, uint64_t *lba_count_out)
@@ -239,8 +335,6 @@ bool identify_device(HBA_PORT *port, uint32_t *logical_sector_bytes_out, uint64_
 
     cmdfis->device = 0;
 
-    LOG_AHCI("here\n");
-
     // The below loop waits until the port is no longer busy before issuing a new command
     int spin = 0;
     while ((port->tfd & (ATA_DEV_BUSY | ATA_DEV_DRQ)) && spin < 1000000) {
@@ -253,7 +347,7 @@ bool identify_device(HBA_PORT *port, uint32_t *logical_sector_bytes_out, uint64_
 
     port->ci = 1u << slot; // Issue command
 
-    LOG_AHCI("issued command\n");
+    LOG_AHCI("Issued command\n");
 
     // Wait for completion
     while (1) {
@@ -304,6 +398,10 @@ bool identify_device(HBA_PORT *port, uint32_t *logical_sector_bytes_out, uint64_
     LOG_AHCI("IDENTIFY: logical sector size = %u bytes, total sectors (LBA) = %llu, capacity = %llu bytes\n",
              logical_bytes, (unsigned long long)lba_count,
              (unsigned long long)(lba_count * (uint64_t)logical_bytes));
+
+
+    LOG_AHCI("Clearing data region!\n");
+    sddf_memset((void*)data_region_vaddr, 0, 512);
 
     return true;
 }
@@ -403,7 +501,7 @@ void port_rebase(HBA_PORT *port, int portno)
 
     port->clb  = (uint32_t)(ahci_command_list_paddr & 0xFFFFFFFF);
     port->clbu = (uint32_t)(ahci_command_list_paddr >> 32);
-    sddf_memset((void*)ahci_command_list_vaddr, 0, 1024);
+    sddf_memset((void*)ahci_command_list_vaddr, 0, 1024); // here
     LOG_AHCI("Cleared ahci_command_list_vaddr\n");
 
     // FIS offset: 32K+256*portno
@@ -655,11 +753,52 @@ void ahci_init_5() {
         LOG_AHCI("IDENTIFY failed\n");
     }
 
-    // After this we have done initialisation!
-    // I think we just need to get reads and writes done
-    // Then try to do interrupt handling
-    while (1) {}
+    LOG_AHCI("Testing Generic reads and writes\n");
 
+    uint8_t *write_buf = (uint8_t*)data_region_vaddr;
+    uint8_t *read_buf  = (uint8_t*)(data_region_vaddr + 0x5000);
+
+    LOG_AHCI("Filling our memory!\n");
+    // Fill the 512-byte sector with repeating alphabet
+    {
+        uint8_t *buf = write_buf;
+        for (int i = 0; i < 512; i++) {
+            buf[i] = 'A' + (i % 26);
+        }
+    }
+
+    LOG_AHCI("Now doing a generic write!\n");
+    if (write_device(&hba->ports[ahci_port], 100, 0, 1, data_region_paddr)) {
+        LOG_AHCI("write succeeded\n");
+    } else {
+        LOG_AHCI("write failed\n");
+    }
+
+    LOG_AHCI("Now doing a generic read!\n");
+    if (read_device(&hba->ports[ahci_port], 100, 0, 1, data_region_paddr + 0x5000)) {
+        LOG_AHCI("read succeeded\n");
+    } else {
+        LOG_AHCI("read failed\n");
+    }
+
+    LOG_AHCI("Checking if they match!\n");
+    bool match = true;
+    for (int i = 0; i < 512; i++) {
+        if (write_buf[i] != read_buf[i]) {
+            LOG_AHCI("Mismatch at byte %d: wrote 0x%02x, read 0x%02x\n",
+                     i, write_buf[i], read_buf[i]);
+            match = false;
+            break;
+        }
+    }
+
+    if (match) {
+        LOG_AHCI("Readback matches written pattern!\n");
+    } else {
+        LOG_AHCI("Readback did not match!\n");
+    }
+
+    // Then try to do interrupt handling
 }
 
 void notified(microkit_channel ch)
