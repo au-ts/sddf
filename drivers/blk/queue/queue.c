@@ -102,40 +102,32 @@ bool blk_config_check_magic_wrapper(void *config)
     return blk_config_check_magic(config);
 }
 
-void init(void) {
-    assert(fs_config_check_magic(&fs_config));
-    assert(blk_config_check_magic(&blk_config));
+uint64_t fs_queue_length_consumer_wrapper(fs_queue_t *queue)
+{
+    return fs_queue_length_consumer(queue);
+}
 
-    assert(blk_config.virt.num_buffers >= FAT_WORKER_THREAD_NUM);
+uint64_t fs_queue_length_producer_wrapper(fs_queue_t *queue)
+{
+    return fs_queue_length_producer(queue);
+}
 
-    max_cluster_size = blk_config.data.size / FAT_WORKER_THREAD_NUM;
-    fs_command_queue = fs_config.client.command_queue.vaddr;
-    fs_completion_queue = fs_config.client.completion_queue.vaddr;
-    fs_share = fs_config.client.share.vaddr;
+fs_msg_t *fs_queue_idx_filled_wrapper(fs_queue_t *queue, uint64_t index)
+{
+    return fs_queue_idx_filled(queue, index);
+}
 
-    blk_data = blk_config.data.vaddr;
+fs_msg_t *fs_queue_idx_empty_wrapper(fs_queue_t *queue, uint64_t index)
+{
+    return fs_queue_idx_empty(queue, index);
+}
 
-    blk_queue_init(&blk_queue, blk_config.virt.req_queue.vaddr, blk_config.virt.resp_queue.vaddr, blk_config.virt.num_buffers);
+void fs_queue_publish_consumption_wrapper(fs_queue_t *queue, uint64_t amount_consumed)
+{
+    fs_queue_publish_consumption(queue, amount_consumed);
+}
 
-    blk_storage_info = blk_config.virt.storage_info.vaddr;
-
-    /* Wait for the the block device before doing anything else */
-    while (!blk_storage_is_ready(blk_storage_info));
-
-    /*
-       This part of the code is for setting up the thread pool by
-       assign stacks and size of the stack to the pool
-    */
-    stack_ptrs_arg_array_t costacks = {
-        (uintptr_t) &worker_thread_stack_one,
-        (uintptr_t) &worker_thread_stack_two,
-        (uintptr_t) &worker_thread_stack_three,
-        (uintptr_t) &worker_thread_stack_four
-    };
-
-    // Init thread pool
-    microkit_cothread_init(&co_controller_mem, FAT_WORKER_THREAD_STACKSIZE, costacks);
-    for (uint32_t i = 0; i < (FAT_WORKER_THREAD_NUM + 1); i++) {
-        microkit_cothread_semaphore_init(&sem[i]);
-    }
+void fs_queue_publish_production_wrapper(fs_queue_t *queue, uint64_t amount_produced)
+{
+    fs_queue_publish_production(queue, amount_produced);
 }
