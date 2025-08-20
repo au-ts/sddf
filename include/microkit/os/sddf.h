@@ -62,7 +62,7 @@ static inline void sddf_set_mr(unsigned int n, uint64_t val)
     seL4_SetMR(n, val);
 }
 
-static inline seL4_Error sddf_vspace_invalidate(seL4_ARM_VSpace _service, seL4_Word start, seL4_Word end)
+static inline seL4_Error sddf_vspace_invalidate_data(seL4_ARM_VSpace _service, seL4_Word start, seL4_Word end)
 {
     return seL4_ARM_VSpace_Invalidate_Data(_service, start, end);
 }
