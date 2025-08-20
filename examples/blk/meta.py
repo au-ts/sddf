@@ -167,6 +167,12 @@ def generate(sdf_file: str, output_dir: str, dtb: Optional[DeviceTree]):
         blk_driver.add_map(data_region_map)
         sdf.add_mr(data_region)
 
+        # This is for the identify command! Which we need DMA for
+        identify_command = SystemDescription.MemoryRegion(sdf, "identify_command", 0x1000, paddr=0x10020000)
+        identify_command_map = SystemDescription.Map(identify_command, 0x7_2002_0000, "rw", cached=False)
+        blk_driver.add_map(identify_command_map)
+        sdf.add_mr(identify_command)
+
 
     partition = int(args.partition) if args.partition else board.partition
     blk_system.add_client(client, partition=partition)

@@ -37,7 +37,7 @@ uint8_t sata_bus;
 uint8_t sata_device;
 uint8_t sata_function;
 
-uint8_t ahci_port;
+uint8_t ahci_port_number;
 bool ahci_port_found = false;
 
 int ahci_init_stage = 0;
@@ -45,8 +45,10 @@ int ahci_init_stage = 0;
 uint8_t number_of_command_slots;
 
 HBA_MEM* hba;
+HBA_PORT* port;
+ATA_IDENTIFY* identify_command;
 
-// i dont think they have setvar???
+// i dont think they have setvar in sdfgen???
 const uint64_t ahci_command_list_paddr = 0x10000000;
 const uint64_t ahci_command_list_vaddr = 0x720000000;
 const uint64_t ahci_command_list_size = 0x1000;
@@ -63,12 +65,23 @@ const uint64_t data_region_paddr = 0x10008000;
 const uint64_t data_region_vaddr = 0x720008000;
 const uint64_t data_region_size = 0x10000;
 
+const uint64_t identify_command_paddr = 0x10020000;
+const uint64_t identify_command_vaddr = 0x720020000;
+const uint64_t identify_command_size = 0x1000;
+
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 __attribute__((__section__(".blk_driver_config"))) blk_driver_config_t blk_config;
 __attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
 
+/* The current action-status of the driver */
+// static enum {
+//     DrvStatusInactive,
+//     DrvStatusBringup,
+//     DrvStatusActive,
+// } driver_status;
+
 // Find a free command list slot
-int find_cmdslot(HBA_PORT *port)
+int find_cmdslot()
 {
     // If not set in SACT and CI, the slot is free
     // uint32_t slots = (port->sact | port->ci);
@@ -90,10 +103,10 @@ int find_cmdslot(HBA_PORT *port)
 // - Setup PRDT.
 // - Setup command list entry.
 // - Issue the command, and record separately that you have issued it.
-bool read_device(HBA_PORT *port, uint32_t startl, uint32_t starth, uint32_t count, uint64_t buf)
+bool read_device(uint32_t startl, uint32_t starth, uint32_t count, uint64_t buf)
 {
     port->is = (uint32_t) -1; // Clear pending interrupt bits
-    int slot = find_cmdslot(port);
+    int slot = find_cmdslot();
     if (slot == -1) {
         return false;
     }
@@ -188,10 +201,10 @@ bool read_device(HBA_PORT *port, uint32_t startl, uint32_t starth, uint32_t coun
     return true;
 }
 
-bool write_device(HBA_PORT *port, uint32_t startl, uint32_t starth, uint32_t count, uint64_t buf)
+bool write_device(uint32_t startl, uint32_t starth, uint32_t count, uint64_t buf)
 {
     port->is = (uint32_t) -1; // Clear pending interrupt bits
-    int slot = find_cmdslot(port);
+    int slot = find_cmdslot();
     if (slot == -1) {
         return false;
     }
@@ -285,14 +298,10 @@ bool write_device(HBA_PORT *port, uint32_t startl, uint32_t starth, uint32_t cou
 
 // Issue IDENTIFY DEVICE and extract sector size + total sectors.
 // Returns true on success and fills out params.
-bool identify_device(HBA_PORT *port, uint32_t *logical_sector_bytes_out, uint64_t *lba_count_out)
+bool identify_device()
 {
-    if (!logical_sector_bytes_out || !lba_count_out) {
-        return false;
-    }
-
     port->is = (uint32_t)-1; // Clear pending interrupt bits
-    int slot = find_cmdslot(port);
+    int slot = find_cmdslot();
     if (slot == -1) {
         return false;
     }
@@ -314,9 +323,9 @@ bool identify_device(HBA_PORT *port, uint32_t *logical_sector_bytes_out, uint64_
     sddf_memset(cmdtbl, 0, sizeof(HBA_CMD_TBL) + (cmdheader->prdtl-1)*sizeof(HBA_PRDT_ENTRY));
 
     // Single PRDT: 512 bytes for IDENTIFY DEVICE data
-    cmdtbl->prdt_entry[0].dba  = (uint32_t)(data_region_paddr & 0xFFFFFFFF);
-    cmdtbl->prdt_entry[0].dbau = (uint32_t)(data_region_paddr >> 32);
-    cmdtbl->prdt_entry[0].dbc  = 512 - 1;  // byte count, value is (n-1)
+    cmdtbl->prdt_entry[0].dba  = (uint32_t)(identify_command_paddr & 0xFFFFFFFF);
+    cmdtbl->prdt_entry[0].dbau = (uint32_t)(identify_command_paddr >> 32);
+    cmdtbl->prdt_entry[0].dbc  = 512 - 1;  // byte count, value is (n-1) // IDENTIFY DEVICE payload is always 512 bytes by spec—independent of the drive’s logical sector size.
     cmdtbl->prdt_entry[0].i    = 0;        // @Tristan: currently intterrupts are off
 
     LOG_AHCI("Command table prdt stuff done\n");
@@ -329,7 +338,6 @@ bool identify_device(HBA_PORT *port, uint32_t *logical_sector_bytes_out, uint64_
     cmdfis->command  = ATA_CMD_IDENTIFY;
 
     LOG_AHCI("Do command\n");
-
 
     // For IDENTIFY, all LBA/COUNT fields are zero; device register need not set LBA
 
@@ -371,43 +379,13 @@ bool identify_device(HBA_PORT *port, uint32_t *logical_sector_bytes_out, uint64_
 
     LOG_AHCI("Command successful!\n");
 
-    ATA_IDENTIFY* ata_identify_response = (ATA_IDENTIFY*)data_region_vaddr;
-
-    // Logical sector bytes (default 512)
-    uint32_t logical_bytes = 512;
-    if (ata_identify_response->w106 & (1u << 12)) {
-        uint32_t lss = ((uint32_t)ata_identify_response->logical_sector_size_hi << 16) | (uint32_t)ata_identify_response->logical_sector_size_lo;
-        if (lss) {
-            logical_bytes = lss;
-        }
-    }
-
-    uint64_t lba_count;
-    if (ata_identify_response->w83 & (1u << 10)) {
-        lba_count  = (uint64_t)ata_identify_response->lba48_0;
-        lba_count |= (uint64_t)ata_identify_response->lba48_1 << 16;
-        lba_count |= (uint64_t)ata_identify_response->lba48_2 << 32;
-        lba_count |= (uint64_t)ata_identify_response->lba48_3 << 48;
-    } else {
-        lba_count = (uint32_t)ata_identify_response->lba28_lo | ((uint32_t)ata_identify_response->lba28_hi << 16);
-    }
-
-    *logical_sector_bytes_out = logical_bytes;
-    *lba_count_out = lba_count;
-
-    LOG_AHCI("IDENTIFY: logical sector size = %u bytes, total sectors (LBA) = %llu, capacity = %llu bytes\n",
-             logical_bytes, (unsigned long long)lba_count,
-             (unsigned long long)(lba_count * (uint64_t)logical_bytes));
-
-
-    LOG_AHCI("Clearing data region!\n");
-    sddf_memset((void*)data_region_vaddr, 0, 512);
+    identify_command = (ATA_IDENTIFY*)identify_command_vaddr;
 
     return true;
 }
 
 // Start command engine
-void start_cmd(HBA_PORT *port)
+void start_cmd()
 {
     LOG_AHCI("Starting command engine...\n");
 
@@ -427,7 +405,7 @@ void start_cmd(HBA_PORT *port)
 }
 
 // Stop command engine
-void stop_cmd(HBA_PORT *port)
+void stop_cmd()
 {
     LOG_AHCI("Stopping command engine...\n");
 
@@ -452,9 +430,9 @@ void stop_cmd(HBA_PORT *port)
 }
 
 // @Tristan: analyse this function how do we implement the resetting for the port
-void port_reset_1(HBA_PORT *port) {
+void port_reset_1() {
     // Engine must be stopped before we touch SCTL
-    stop_cmd(port); // Stop command engine
+    stop_cmd(); // Stop command engine
 
     port->is   = 0xFFFFFFFF;
     port->serr = 0xFFFFFFFF;
@@ -467,13 +445,13 @@ void port_reset_1(HBA_PORT *port) {
     sddf_timer_set_timeout(timer_config.driver_id, NS_IN_MS);
 }
 
-void port_reset_2(HBA_PORT *port) {
+void port_reset_2() {
     port->sctl &= ~0xF; // DET=0
 
     sddf_timer_set_timeout(timer_config.driver_id, NS_IN_S);
 }
 
-void port_reset_3(HBA_PORT *port) {
+void port_reset_3() {
     if (((port->ssts & 0xF) != HBA_PORT_DET_PRESENT) ||
            (((port->ssts >> 8) & 0xF) != HBA_PORT_IPM_ACTIVE)) {
         LOG_AHCI("Something went wrong\n");
@@ -485,13 +463,13 @@ void port_reset_3(HBA_PORT *port) {
 }
 
 // We currently assume our system only uses one port
-void port_rebase(HBA_PORT *port, int portno)
+void port_rebase()
 {
     assert((ahci_command_list_paddr & (1024 - 1)) == 0);  // CLB: 1 KiB
     assert((ahci_FIS_paddr          & (256  - 1)) == 0);  // FB : 256 B
     assert((ahci_command_tables_paddr & (256 - 1)) == 0); // CT : 256 B
 
-    stop_cmd(port); // Stop command engine
+    stop_cmd(); // Stop command engine
 
     // Command list offset: 1K*portno
     // Command list entry size = 32
@@ -533,15 +511,15 @@ void port_rebase(HBA_PORT *port, int portno)
         LOG_AHCI("Cleared %d ahci_command_tables_vaddr\n", i);
     }
 
-    start_cmd(port); // Start command engine
+    start_cmd(); // Start command engine
 
     // @Tristan: should we consider clearing erro interrupts ?
 }
 
 // Check device type
-static int check_type(HBA_PORT *port)
+static int check_type(HBA_PORT *port_to_check)
 {
-    uint32_t ssts = port->ssts;
+    uint32_t ssts = port_to_check->ssts;
 
     uint8_t ipm = (ssts >> 8) & 0x0F;
     uint8_t det = ssts & 0x0F;
@@ -551,7 +529,7 @@ static int check_type(HBA_PORT *port)
     if (ipm != HBA_PORT_IPM_ACTIVE)
         return AHCI_DEV_NULL;
 
-    switch (port->sig)
+    switch (port_to_check->sig)
     {
     case SATA_SIG_ATAPI:
         return AHCI_DEV_SATAPI;
@@ -579,7 +557,7 @@ void probe_port()
                 LOG_AHCI("SATA drive found at port %d\n", i);
                 // We only handle the first device found.
                 if (ahci_port_found == false) {
-                    ahci_port = i;
+                    ahci_port_number = i;
                     ahci_port_found = true;
                 }
             }
@@ -684,6 +662,116 @@ void ahci_num_cmd_slots() {
     LOG_AHCI("Number of command slots is %u\n", number_of_command_slots);
 }
 
+void test_generic_reads_and_writes() {
+    LOG_AHCI("Testing Generic reads and writes\n");
+
+    uint8_t *write_buf = (uint8_t*)data_region_vaddr;
+    uint8_t *read_buf  = (uint8_t*)(data_region_vaddr + 0x5000);
+
+    LOG_AHCI("Filling our memory!\n");
+    // Fill the 512-byte sector with repeating alphabet
+    {
+        uint8_t *buf = write_buf;
+        for (int i = 0; i < 512; i++) {
+            buf[i] = 'A' + (i % 26);
+        }
+    }
+
+    LOG_AHCI("Now doing a generic write!\n");
+    if (write_device(100, 0, 1, data_region_paddr)) {
+        LOG_AHCI("write succeeded\n");
+    } else {
+        LOG_AHCI("write failed\n");
+    }
+
+    LOG_AHCI("Now doing a generic read!\n");
+    if (read_device(100, 0, 1, data_region_paddr + 0x5000)) {
+        LOG_AHCI("read succeeded\n");
+    } else {
+        LOG_AHCI("read failed\n");
+    }
+
+    LOG_AHCI("Checking if they match!\n");
+    bool match = true;
+    for (int i = 0; i < 512; i++) {
+        if (write_buf[i] != read_buf[i]) {
+            LOG_AHCI("Mismatch at byte %d: wrote 0x%02x, read 0x%02x\n",
+                     i, write_buf[i], read_buf[i]);
+            match = false;
+            break;
+        }
+    }
+
+    if (match) {
+        LOG_AHCI("Readback matches written pattern!\n");
+    } else {
+        LOG_AHCI("Readback did not match!\n");
+    }
+}
+
+void ata_extract_serial(char *dst) {
+    const uint16_t *src = (const uint16_t *)(identify_command->w0_59 + 10); // words 10–19
+    for (int i = 0; i < 10; i++) {
+        dst[2*i]     = src[i] >> 8;    // high byte first
+        dst[2*i + 1] = src[i] & 0xFF;  // then low byte
+    }
+    dst[20] = '\0';
+}
+
+void setup_blk_storage_info() {
+    LOG_AHCI("Send IDENTIFY ATA command to connected drives. Get their sector size and count...\n");
+    if (identify_device()) {
+        LOG_AHCI("IDENTIFY succeeded\n");
+    } else {
+        LOG_AHCI("IDENTIFY failed\n");
+        assert(false);
+    }
+
+    blk_storage_info_t *storage_info = blk_config.virt.storage_info.vaddr;
+    assert(!storage_info->ready);
+
+    ata_extract_serial(storage_info->serial_number);
+
+    if (identify_command->w106 & (1 << 12)) {
+        storage_info->sector_size =
+            identify_command->logical_sector_size_lo |
+            (identify_command->logical_sector_size_hi << 16);
+    } else {
+        storage_info->sector_size = 512; // default
+    }
+
+    // Block size
+    storage_info->block_size = 1; // copy the other blk device
+
+    // Queue depth
+    // storage_info->queue_depth = ?;
+
+    // Geometry (legacy CHS)
+    storage_info->cylinders = identify_command->w0_59[1];
+    storage_info->heads     = identify_command->w0_59[3];
+    storage_info->blocks    = identify_command->w0_59[6];
+
+    // Capacity in sectors (prefer 48-bit if supported)
+    uint64_t sectors;
+    if (identify_command->w83 & (1 << 10)) {
+        sectors = ((uint64_t)identify_command->lba48_3 << 48) |
+                  ((uint64_t)identify_command->lba48_2 << 32) |
+                  ((uint64_t)identify_command->lba48_1 << 16) |
+                   (uint64_t)identify_command->lba48_0;
+    } else {
+        sectors = ((uint32_t)identify_command->lba28_hi << 16) |
+                   identify_command->lba28_lo;
+    }
+    storage_info->capacity = sectors * storage_info->sector_size / BLK_TRANSFER_SIZE;
+
+     // Assume writable unless tested otherwise
+    storage_info->read_only = false; // TODO: fix
+
+    LOG_AHCI("Drive size (blocks): %lu\n", storage_info->capacity);
+    blk_storage_set_ready(storage_info, true);
+    LOG_AHCI("Driver initialisation complete\n");
+}
+
 void ahci_init_1() {
     LOG_AHCI("== Starting AHCI initialisation (1)...\n");
     ahci_init_stage = 1;
@@ -716,6 +804,8 @@ void ahci_init_3() {
     probe_port();
     assert(ahci_port_found);
 
+    port = &hba->ports[ahci_port_number];
+
     LOG_AHCI("Checking if 64 bit DMA is supported...\n");
     validate_allocated_dma_paddr();
 
@@ -723,14 +813,14 @@ void ahci_init_3() {
     ahci_num_cmd_slots();
 
     LOG_AHCI("Resetting port...\n");
-    port_reset_1(&hba->ports[ahci_port]);
+    port_reset_1();
 }
 
 void ahci_init_4() {
     LOG_AHCI("== Continuing AHCI initialisation (4)...\n");
     ahci_init_stage = 4;
     LOG_AHCI("Continuing resetting port...\n");
-    port_reset_2(&hba->ports[ahci_port]);
+    port_reset_2();
 }
 
 void ahci_init_5() {
@@ -738,78 +828,53 @@ void ahci_init_5() {
     ahci_init_stage = 5;
 
     LOG_AHCI("Continuing resetting port...\n");
-    port_reset_3(&hba->ports[ahci_port]);
+    port_reset_3();
 
     LOG_AHCI("AHCI port memory space initialisation...\n");
-    LOG_AHCI("Rebasing port %d\n", ahci_port);
-    port_rebase(&hba->ports[ahci_port], ahci_port);
+    LOG_AHCI("Rebasing port %d\n", ahci_port_number);
+    port_rebase();
 
-    LOG_AHCI("Send IDENTIFY ATA command to connected drives. Get their sector size and count...\n");
-    uint32_t sector_size = 0;
-    uint64_t sector_count = 0;
-    if (identify_device(&hba->ports[ahci_port], &sector_size, &sector_count)) {
-        LOG_AHCI("IDENTIFY succeeded\n");
-    } else {
-        LOG_AHCI("IDENTIFY failed\n");
-    }
+    // test_generic_reads_and_writes();
 
-    LOG_AHCI("Testing Generic reads and writes\n");
+    LOG_AHCI("Setting up blk storage info...\n");
+    setup_blk_storage_info();
 
-    uint8_t *write_buf = (uint8_t*)data_region_vaddr;
-    uint8_t *read_buf  = (uint8_t*)(data_region_vaddr + 0x5000);
-
-    LOG_AHCI("Filling our memory!\n");
-    // Fill the 512-byte sector with repeating alphabet
-    {
-        uint8_t *buf = write_buf;
-        for (int i = 0; i < 512; i++) {
-            buf[i] = 'A' + (i % 26);
-        }
-    }
-
-    LOG_AHCI("Now doing a generic write!\n");
-    if (write_device(&hba->ports[ahci_port], 100, 0, 1, data_region_paddr)) {
-        LOG_AHCI("write succeeded\n");
-    } else {
-        LOG_AHCI("write failed\n");
-    }
-
-    LOG_AHCI("Now doing a generic read!\n");
-    if (read_device(&hba->ports[ahci_port], 100, 0, 1, data_region_paddr + 0x5000)) {
-        LOG_AHCI("read succeeded\n");
-    } else {
-        LOG_AHCI("read failed\n");
-    }
-
-    LOG_AHCI("Checking if they match!\n");
-    bool match = true;
-    for (int i = 0; i < 512; i++) {
-        if (write_buf[i] != read_buf[i]) {
-            LOG_AHCI("Mismatch at byte %d: wrote 0x%02x, read 0x%02x\n",
-                     i, write_buf[i], read_buf[i]);
-            match = false;
-            break;
-        }
-    }
-
-    if (match) {
-        LOG_AHCI("Readback matches written pattern!\n");
-    } else {
-        LOG_AHCI("Readback did not match!\n");
-    }
-
-    // Then try to do interrupt handling
+    LOG_AHCI("Handling any client requests while in initialisation...\n");
+    // handle_client_request();
 }
 
 void notified(microkit_channel ch)
 {
+   // if (driver_status == DrvStatusBringup) {
+   //      if (ch == device_resources.irqs[0].id) {
+   //          do_bringup();
+   //          microkit_irq_ack(ch);
+   //      } else {
+   //          LOG_DRIVER_ERR("notification on non-IRQ channel during bringup: %d\n", ch);
+   //      }
+
+   //      return;
+    // } /* else in inactive or active */ 
+
+
+
+
+
+
+
+
+
+
     // if (ch == device_resources.irqs[0].id) {
     //     handle_client(/* was_irq: */ true);
     //     microkit_irq_ack(ch);
     // } else
+
     if (ch == blk_config.virt.id) {
-        LOG_AHCI("got the clients request\n");
+        LOG_AHCI("Got a client request!\n");
+        // handle_client_request();
     } else if (ch == timer_config.driver_id) {
+        microkit_irq_ack(ch);
         if (ahci_init_stage == 1) {
             ahci_init_2();
         } else if (ahci_init_stage == 2) {
@@ -833,12 +898,15 @@ void init()
     assert(device_resources_check_magic(&device_resources));
     assert(blk_config_check_magic(&blk_config));
     assert(timer_config_check_magic(&timer_config));
+    assert(device_resources.num_regions == 0);
+    assert(device_resources.num_irqs == 0);
+
+    LOG_AHCI("Beginning driver initialisation...\n");
 
     /* Setup the sDDF block queue */
     blk_queue_init(&blk_queue, blk_config.virt.req_queue.vaddr, blk_config.virt.resp_queue.vaddr,
                    blk_config.virt.num_buffers);
 
-    LOG_AHCI("Beginning driver initialisation...\n");
     pcie_init();
 
     assert(found_sata);
@@ -846,4 +914,6 @@ void init()
     print_pci_info(sata_bus, sata_device, sata_function, false);
 
     ahci_init_1();
+    // driver_status = DrvStatusBringup;
+    // do_bringup();
 }
