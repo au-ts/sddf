@@ -246,7 +246,9 @@ pub fn build(b: *std.Build) !void {
         }),
     });
 
-    parent.addCSourceFile(.{ .file = b.path("parent.c") });
+    parent.addCSourceFile(.{ .file = b.path("parent.c"), .flags = &.{ "-fno-sanitize=undefined" } });
+    parent.addCSourceFile(.{ .file = b.path("vspace.c") });
+    parent.addIncludePath(b.path("."));
     parent.addIncludePath(sddf_dep.path("include"));
     parent.addIncludePath(sddf_dep.path("include/microkit"));
     parent.linkLibrary(sddf_dep.artifact("util"));
@@ -286,7 +288,7 @@ pub fn build(b: *std.Build) !void {
         .install_subdir = "meta_output",
     });
 
-    const faulter_objcopy = updateSectionObjcopy(b, ".serial_client_config", meta_output, "serial_client_faulter.data", "faulter.elf");
+    // const faulter_objcopy = updateSectionObjcopy(b, ".serial_client_config", meta_output, "serial_client_faulter.data", "faulter.elf");
     const parent_objcopy = updateSectionObjcopy(b, ".serial_client_config", meta_output, "serial_client_parent.data", "parent.elf");
     const driver_resources_objcopy = updateSectionObjcopy(b, ".device_resources", meta_output, "serial_driver_device_resources.data", "serial_driver.elf");
     driver_resources_objcopy.step.dependOn(&driver_install.step);
@@ -294,20 +296,19 @@ pub fn build(b: *std.Build) !void {
     driver_config_objcopy.step.dependOn(&driver_install.step);
     const virt_rx_objcopy = updateSectionObjcopy(b, ".serial_virt_rx_config", meta_output, "serial_virt_rx.data", "serial_virt_rx.elf");
     const virt_tx_objcopy = updateSectionObjcopy(b, ".serial_virt_tx_config", meta_output, "serial_virt_tx.data", "serial_virt_tx.elf");
-    const objcopys = &.{ faulter_objcopy, parent_objcopy, virt_rx_objcopy, virt_tx_objcopy, driver_resources_objcopy, driver_config_objcopy };
+    const objcopys = &.{ parent_objcopy, virt_rx_objcopy, virt_tx_objcopy, driver_resources_objcopy, driver_config_objcopy };
 
     var elf_objcopy: *Step.Run = undefined;
     {
         elf_objcopy = b.addSystemCommand(&[_][]const u8{
             "llvm-objcopy",
         });
-        elf_objcopy.addArg("--add-section");
+        elf_objcopy.addArg("--update-section");
         elf_objcopy.addArg(b.fmt(".child_elf={s}", .{ b.getInstallPath(.bin, "faulter.elf") }));
-        elf_objcopy.addArg("--set-section-flags");
-        elf_objcopy.addArg(".child_elf=alloc,contents,load,readonly");
         elf_objcopy.addFileArg(.{ .cwd_relative = b.getInstallPath(.bin, "parent.elf") });
 
         // We need the ELFs we talk about to be in the install directory first.
+        // elf_objcopy.step.dependOn(&faulter_objcopy.step);
         elf_objcopy.step.dependOn(b.getInstallStep());
     }
 

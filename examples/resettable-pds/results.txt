@@ -1,0 +1,426 @@
+u-boot=> setenv loadaddr 0x50000000
+setenv loadaddr 0x50000000
+u-boot=> tftp ${loadaddr} /maaxboard1/sel4-image
+tftp ${loadaddr} /maaxboard1/sel4-image
+Using ethernet@30be0000 device
+TFTP from server 172.16.0.2; our IP address is 172.16.1.107
+Filename '/maaxboard1/sel4-image'.
+Load address: 0x50000000
+Loading: *#################################################################
+	 #################################################################
+	 #################################################################
+	 #################################################################
+	 ######################################################
+	 13.1 MiB/s
+done
+Bytes transferred = 4604912 (4643f0 hex)
+Automatic boot of image at addr 0x50000000 ...
+Wrong Image Format for tftpboot command
+ERROR: can't get kernel image!
+u-boot=> go ${loadaddr}
+go ${loadaddr}
+## Starting application at 0x50000000 ...
+Begin input
+[32mPARENT|INFO: starting
+PARENT|INFO: init done
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[0] 42608
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[1] 26904
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[2] 27920
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[3] 26817
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[4] 27135
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[5] 26499
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[6] 26943
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[7] 27381
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[8] 26779
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[9] 27590
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[10] 26601
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[11] 26524
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[12] 27188
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[13] 26642
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[14] 26620
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[15] 27088
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[16] 26860
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[17] 26413
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[18] 26597
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[19] 26566
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[20] 26755
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[21] 26510
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[22] 26488
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[23] 26968
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[24] 26662
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[25] 28442
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[26] 26637
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[27] 26879
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[28] 26837
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[29] 26627
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[30] 27374
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[31] 26648
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[32] 26519
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[33] 26644
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[34] 27007
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[35] 26797
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[36] 26672
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[37] 27412
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[38] 26474
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[39] 26626
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[40] 26816
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[41] 26779
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[42] 26604
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[43] 26523
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[44] 26965
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[45] 26492
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[46] 26786
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[47] 26792
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[48] 26570
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[49] 26859
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[50] 26853
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[51] 28419
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[52] 26842
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[53] 27069
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[54] 26645
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[55] 26947
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[56] 26881
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[57] 26566
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[58] 27054
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[59] 27277
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[60] 26568
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[61] 26767
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[62] 27391
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[63] 26667
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[64] 26975
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[65] 27496
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[66] 26662
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[67] 27166
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[68] 27541
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[69] 26715
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[70] 27066
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[71] 27429
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[72] 26926
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[73] 27402
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[74] 26665
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[75] 26689
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[76] 27548
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[77] 28001
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[78] 26890
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[79] 27621
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[80] 26715
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[81] 26778
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[82] 26519
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[83] 26797
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[84] 26712
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[85] 26628
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[86] 27113
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[87] 26698
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[88] 26621
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[89] 26839
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[90] 26808
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[91] 26842
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[92] 26595
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[93] 27081
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[94] 26716
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[95] 26603
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[96] 26706
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[97] 26820
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[98] 26937
+[0m[32mPARENT|INFO: reloading child ELF due to fault
+INFO: dealing with loadable and writable segment
+INFO: segment memsz 4464, filesz: 4336
+[99] 26853
+[0m

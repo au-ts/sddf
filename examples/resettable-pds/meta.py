@@ -9,6 +9,8 @@ from importlib.metadata import version
 # assert version("sdfgen").split(".")[1] == "24", "Unexpected sdfgen version"
 
 ProtectionDomain = SystemDescription.ProtectionDomain
+MemoryRegion = SystemDescription.MemoryRegion
+Map = SystemDescription.Map
 
 
 @dataclass
@@ -98,8 +100,8 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     serial_virt_rx = ProtectionDomain(
         "serial_virt_rx", "serial_virt_rx.elf", priority=199, stack_size=0x2000
     )
-    faulter = ProtectionDomain("faulter", "faulter.elf", priority=1)
-    parent = ProtectionDomain("parent", "parent.elf", priority=250)
+    faulter = ProtectionDomain("faulter", "faulter.elf", priority=1, stack_size=0x2000)
+    parent = ProtectionDomain("parent", "parent.elf", priority=250, stack_size=0x10000, child_pts=True)
 
     serial_node = dtb.node(board.serial)
     assert serial_node is not None
@@ -109,6 +111,16 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     )
     serial_system.add_client(faulter)
     serial_system.add_client(parent)
+
+    small_mapping_region = MemoryRegion(sdf, "small_region", 0x1000)
+    sdf.add_mr(small_mapping_region)
+    small_map = Map(small_mapping_region, 0x900000, "rw", setvar_vaddr="small_mapping_mr")
+    parent.add_map(small_map)
+
+    large_mapping_region = MemoryRegion(sdf, "large_region", 0x200000, page_size=MemoryRegion.PageSize.LargePage)
+    sdf.add_mr(large_mapping_region)
+    large_map = Map(large_mapping_region, 0xa00000, "rw", setvar_vaddr="large_mapping_mr")
+    parent.add_map(large_map)
 
     pds = [
         serial_driver,
