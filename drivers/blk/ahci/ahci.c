@@ -8,6 +8,7 @@
 // TODO: so much checking
 // PRDT lenggth
 // 48 bit and 28 bit address not implemented in the reads and write
+// TOODO : fix up the the struct vs base+ offset stuff
 
 // TODO: driver_status = DrvStatusInactive; add these where appropriate? or assert(false) LOG_DRIVER_ERR("Failed to initialise SD card\n");
 
