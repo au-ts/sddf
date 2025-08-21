@@ -1057,7 +1057,7 @@ void notified(microkit_channel ch)
    if (driver_status == DrvStatusBringup) { // add the unlikely compiler hint
         if (ch == timer_config.driver_id) {
             do_bringup();
-            microkit_irq_ack(ch);
+            // microkit_irq_ack(ch);
         } else {
             LOG_AHCI("notification on non-IRQ channel during bringup: %d\n", ch);
             // Is this in case the client messages us?

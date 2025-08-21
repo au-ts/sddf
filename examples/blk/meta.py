@@ -9,6 +9,7 @@ from importlib.metadata import version
 # assert version('sdfgen').split(".")[1] == "24", "Unexpected sdfgen version"
 
 ProtectionDomain = SystemDescription.ProtectionDomain
+Irq = SystemDescription.Irq
 
 
 @dataclass
@@ -173,6 +174,7 @@ def generate(sdf_file: str, output_dir: str, dtb: Optional[DeviceTree]):
         blk_driver.add_map(identify_command_map)
         sdf.add_mr(identify_command)
 
+        # blk_driver.add_irq(Irq(97, Irq.Trigger.EDGE, 60))
 
     partition = int(args.partition) if args.partition else board.partition
     blk_system.add_client(client, partition=partition)

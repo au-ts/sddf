@@ -19,14 +19,63 @@
 
 BLK_DRIVER_DIR := $(realpath $(dir $(lastword $(MAKEFILE_LIST))))
 
-SRC := $(wildcard $(BLK_DRIVER_DIR)/*.c)
-OBJ := $(patsubst $(BLK_DRIVER_DIR)/%.c,blk/ahci/%.o,$(SRC))
-
-blk_driver.elf: $(OBJ)
+blk_driver.elf: blk/ahci/ahci.o blk/ahci/pcie.o blk/ahci/ahci_init.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-blk/ahci/%.o: $(BLK_DRIVER_DIR)/%.c | blk/ahci
-	$(CC) -c $(CFLAGS) -o $@ $<
+blk/ahci/ahci.o: ${BLK_DRIVER_DIR}/ahci.c
+	${CC} ${CFLAGS} ${CFLAGS_blk} -o $@ -c $<
+
+blk/ahci/pcie.o: ${BLK_DRIVER_DIR}/pcie.c
+	${CC} ${CFLAGS} ${CFLAGS_blk} -o $@ -c $<
+
+
+clean::
+	rm -f blk/ahci/ahci.[od] blk/ahci/pcie.[od]
+
+clobber::
+	rm -f blk/ahci
+
+-include blk/ahci/ahci.d
+-include blk/ahci/pcie.d
+-include bblk/ahci/ahci_init.d
+
+# SRC := $(wildcard $(BLK_DRIVER_DIR)/*.c)
+# OBJ := $(patsubst $(BLK_DRIVER_DIR)/%.c,blk/ahci/%.o,$(SRC))
+
+# blk_driver.elf: $(OBJ)
+# 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+
+# blk/ahci/%.o: $(BLK_DRIVER_DIR)/%.c | blk/ahci
+# 	$(CC) -c $(CFLAGS) -o $@ $<
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 -include $(OBJ:.o=.d)
 
