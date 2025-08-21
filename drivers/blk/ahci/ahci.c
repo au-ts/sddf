@@ -4,6 +4,12 @@
  */
 
 // TOOD: fix the timeouts amounts i just chose 1s because i can
+// TODO: error messages
+// TODO: so much checking
+// PRDT lenggth
+// 48 bit and 28 bit address not implemented in the reads and write
+
+// TODO: driver_status = DrvStatusInactive; add these where appropriate? or assert(false) LOG_DRIVER_ERR("Failed to initialise SD card\n");
 
 #include "ahci.h"
 #include "pcie.h"
@@ -16,6 +22,10 @@
 #include <sddf/util/string.h>
 #include <sddf/timer/config.h>
 #include <sddf/timer/client.h>
+
+#define MAX_PRDT_ENTRIES     8
+#define SECTORS_PER_PRDT     16             // 8 KiB / 512 B
+#define MAX_SECTORS_PER_CMD  (MAX_PRDT_ENTRIES * SECTORS_PER_PRDT)  // 128
 
 #define DEBUG_DRIVER
 
@@ -40,13 +50,26 @@ uint8_t sata_function;
 uint8_t ahci_port_number;
 bool ahci_port_found = false;
 
-int ahci_init_stage = 0;
+int ahci_init_stage = 0; // @Tristan: make this an enum?
 
 uint8_t number_of_command_slots;
+
+#define SDDF_BLOCKS_TO_AHCI_BLOCKS (BLK_TRANSFER_SIZE / 512)
+
+// TODO: dont hardcode it at 512
+// uint64_t sddf_blocks_to_ahci_blocks() {
+//     blk_storage_info_t *storage_info = blk_config.virt.storage_info.vaddr;
+//     uint64_t ahci_block_size = storage_info->sector_size ;
+
+//     assert(BLK_TRANSFER_SIZE % ahci_block_size == 0);
+//     return BLK_TRANSFER_SIZE / ahci_block_size;
+//     // hopefully they devide nice
+// }
 
 HBA_MEM* hba;
 HBA_PORT* port;
 ATA_IDENTIFY* identify_command;
+blk_storage_info_t *storage_info;
 
 // i dont think they have setvar in sdfgen???
 const uint64_t ahci_command_list_paddr = 0x10000000;
@@ -74,11 +97,22 @@ __attribute__((__section__(".blk_driver_config"))) blk_driver_config_t blk_confi
 __attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
 
 /* The current action-status of the driver */
-// static enum {
-//     DrvStatusInactive,
-//     DrvStatusBringup,
-//     DrvStatusActive,
-// } driver_status;
+static enum {
+    DrvStatusInactive,
+    DrvStatusBringup,
+    DrvStatusActive,
+} driver_status;
+
+static struct driver_state {
+    struct {
+        bool inflight;
+        uint32_t id;
+        blk_req_code_t code;
+        uintptr_t paddr;
+        uint64_t blk_number;
+        uint16_t blk_count;
+    } blk_req;
+} driver_state;
 
 // Find a free command list slot
 int find_cmdslot()
@@ -97,6 +131,7 @@ int find_cmdslot()
     return -1;
 }
 
+// The code example shows how to read "count" sectors from sector offset "starth:startl" to "buf" with LBA48 mode from HBA "port". Every PRDT entry contains 8K bytes data payload at most.
 // Start read/write command
 // - Select an available command slot to use.
 // - Setup command FIS.
@@ -295,6 +330,34 @@ bool write_device(uint32_t startl, uint32_t starth, uint32_t count, uint64_t buf
     return true;
 }
 
+// THESE dont validate size or anything
+// sector number is 
+bool ahci_write_blocks(uintptr_t dma_address, uint64_t sector_number, uint64_t sector_count) {
+    // convert to write_device
+     uint32_t this_count = (sector_count > MAX_SECTORS_PER_CMD)
+                              ? MAX_SECTORS_PER_CMD
+                              : (uint32_t)sector_count;
+
+        uint64_t lba        = sector_number;
+        uint32_t startl     = (uint32_t)(lba & 0xFFFFFFFFull);
+        uint32_t starth     = (uint32_t)((lba >> 32) & 0xFFFFull);
+
+    return write_device(startl, starth, this_count, (uint64_t)dma_address);
+}
+
+bool ahci_read_blocks(uintptr_t dma_address, uint64_t sector_number, uint64_t sector_count) {
+    // convert to read_device
+
+     uint32_t this_count = (sector_count > MAX_SECTORS_PER_CMD)
+                              ? MAX_SECTORS_PER_CMD
+                              : (uint32_t)sector_count;
+
+        uint64_t lba        = sector_number;
+        uint32_t startl     = (uint32_t)(lba & 0xFFFFFFFFull);
+        uint32_t starth     = (uint32_t)((lba >> 32) & 0xFFFFull);
+
+    return read_device (startl, starth, this_count, (uint64_t)dma_address);
+}
 
 // Issue IDENTIFY DEVICE and extract sector size + total sectors.
 // Returns true on success and fills out params.
@@ -517,7 +580,7 @@ void port_rebase()
 }
 
 // Check device type
-static int check_type(HBA_PORT *port_to_check)
+int check_type(HBA_PORT *port_to_check)
 {
     uint32_t ssts = port_to_check->ssts;
 
@@ -597,7 +660,7 @@ void validate_allocated_dma_paddr() {
 void ahci_init_2();
 
 // Pre BIOS/OS Handoff
-static void ahci_boh_procedure_1()
+void ahci_boh_procedure_1()
 {
     if ((hba->cap2 & 1u) == 0) {
         LOG_AHCI("BOH not supported, skipping handoff\n");
@@ -619,7 +682,7 @@ static void ahci_boh_procedure_1()
     sddf_timer_set_timeout(timer_config.driver_id, NS_IN_S);
 }
 
-static void ahci_boh_procedure_2()
+void ahci_boh_procedure_2()
 {
     if ((hba->bohc & 1u) != 0) {
         LOG_AHCI("BIOS still hasn't released!\n");
@@ -634,7 +697,7 @@ static void ahci_boh_procedure_2()
              !!(hba->bohc & 1u), !!(hba->bohc & (1u << 1)));
 }
 
-static void ahci_hba_reset_1()
+void ahci_hba_reset_1()
 {
     LOG_AHCI("Enabling AHCI mode...\n");
     hba->ghc |= (1u << 31);
@@ -645,7 +708,7 @@ static void ahci_hba_reset_1()
     sddf_timer_set_timeout(timer_config.driver_id, NS_IN_S);
 }
 
-static void ahci_hba_reset_2()
+void ahci_hba_reset_2()
 {
     if (hba->ghc & 1u) {
         LOG_AHCI("Reset hasn't been complete, for now we fail but we could do everything manually...\n");
@@ -727,7 +790,8 @@ void setup_blk_storage_info() {
         assert(false);
     }
 
-    blk_storage_info_t *storage_info = blk_config.virt.storage_info.vaddr;
+    storage_info = blk_config.virt.storage_info.vaddr;
+
     assert(!storage_info->ready);
 
     ata_extract_serial(storage_info->serial_number);
@@ -741,10 +805,20 @@ void setup_blk_storage_info() {
     }
 
     // Block size
-    storage_info->block_size = 1; // copy the other blk device
+    storage_info->block_size = 1; // copy the other blk device // this is the optimal amount
+    // jsut make it 1 for now we can always change it
 
     // Queue depth
     // storage_info->queue_depth = ?;
+    /*
+    uint16_t device_depth = ncq_supported ? ((identify->queue_depth & 0x1F) + 1) : 1;
+    uint16_t hba_slots    = ((ahci->CAP >> 8) & 0x1F) + 1;   // CAP.NCS (bits 12:8) + 1
+    uint16_t driver_cap   = DRIVER_QUEUE_LIMIT;              // your policy, e.g., 32
+
+    storage_info->queue_depth = MIN3(device_depth, hba_slots, driver_cap);
+
+    i think  its just the command header length
+    */
 
     // Geometry (legacy CHS)
     storage_info->cylinders = identify_command->w0_59[1];
@@ -764,7 +838,7 @@ void setup_blk_storage_info() {
     }
     storage_info->capacity = sectors * storage_info->sector_size / BLK_TRANSFER_SIZE;
 
-     // Assume writable unless tested otherwise
+     // Assume writable unless tested otherwise // we dont support CD-ROM's????
     storage_info->read_only = false; // TODO: fix
 
     LOG_AHCI("Drive size (blocks): %lu\n", storage_info->capacity);
@@ -772,19 +846,122 @@ void setup_blk_storage_info() {
     LOG_AHCI("Driver initialisation complete\n");
 }
 
+void handle_client_device_inactive(void)
+{
+    while (!blk_queue_empty_req(&blk_queue)) {
+        blk_req_code_t code;
+        uintptr_t paddr;
+        uint64_t block_number;
+        uint16_t count;
+        uint32_t id;
+        int err = blk_dequeue_req(&blk_queue, &code, &paddr, &block_number, &count, &id);
+        assert(!err); /* shouldn't be empty */
+
+        err = blk_enqueue_resp(&blk_queue, BLK_RESP_ERR_NO_DEVICE, 0, id);
+        if (err) {
+            /* response queue is full */
+            break;
+        }
+    }
+
+    microkit_notify(blk_config.virt.id);
+}
+
+// For now do 1 request at a time
+void handle_client() {
+    assert(!(driver_status == DrvStatusBringup));
+
+    if (driver_state.blk_req.inflight) {
+        /* Only handle block queue notifications when idle */
+        return;
+    }
+
+    // /* if we're inactive (by choice or by recognition),
+    //    or if there's no card (but we haven't yet propagated this change to the state) */
+    // if (driver_status == DrvStatusInactive) {
+    //     handle_client_device_inactive(); // TODO: can we even reach this?
+    //     return;
+    // }
+
+    int err = blk_dequeue_req(&blk_queue, &driver_state.blk_req.code, &driver_state.blk_req.paddr,
+                                  &driver_state.blk_req.blk_number, &driver_state.blk_req.blk_count,
+                                  &driver_state.blk_req.id);
+
+    if (err == -1) {
+        /* no client requests; we likely handled it already.
+           this can happen as we can dequeue outstanding requests following an
+           IRQ being handled, which might happen before we get the virtualiser
+           notification from the microkit event loop. */
+        return;
+    }
+
+    driver_state.blk_req.inflight = true;
+    LOG_AHCI("Received command: code=%d, paddr=0x%lx, block_number=%lu, count=%d, id=%d\n",
+                   driver_state.blk_req.code, driver_state.blk_req.paddr, driver_state.blk_req.blk_number,
+                   driver_state.blk_req.blk_count, driver_state.blk_req.id);
+
+    blk_resp_status_t response_status;
+    uint16_t success_count;
+
+    switch (driver_state.blk_req.code) {
+    case BLK_REQ_FLUSH:
+    case BLK_REQ_BARRIER:
+        /* No-ops. Because we only do 1 request at a time */
+        response_status = BLK_RESP_OK;
+        success_count = 0;
+        break;
+
+    case BLK_REQ_READ: {
+        bool status = ahci_read_blocks(driver_state.blk_req.paddr,
+                                                driver_state.blk_req.blk_number * SDDF_BLOCKS_TO_AHCI_BLOCKS,
+                                                driver_state.blk_req.blk_count * SDDF_BLOCKS_TO_AHCI_BLOCKS);
+
+        response_status = status ? BLK_RESP_OK : BLK_RESP_ERR_UNSPEC; // random error message
+        success_count = driver_state.blk_req.blk_count;
+        break;
+    }
+
+    case BLK_REQ_WRITE: {
+        bool status = ahci_write_blocks(driver_state.blk_req.paddr,
+                                                 driver_state.blk_req.blk_number * SDDF_BLOCKS_TO_AHCI_BLOCKS,
+                                                 driver_state.blk_req.blk_count * SDDF_BLOCKS_TO_AHCI_BLOCKS);
+
+        response_status = status ? BLK_RESP_OK : BLK_RESP_ERR_UNSPEC; // random error message
+        success_count = driver_state.blk_req.blk_count;
+        break;
+    }
+
+    default: {
+        success_count = 0;
+        response_status = BLK_RESP_ERR_INVALID_PARAM;
+        break;
+    }
+    }
+
+    err = blk_enqueue_resp(&blk_queue, response_status, success_count, driver_state.blk_req.id);
+    assert(!err);
+    LOG_AHCI("Enqueued response: status=%d, success_count=%d, id=%d\n", response_status, success_count,
+               driver_state.blk_req.id);
+    microkit_notify(blk_config.virt.id);
+
+    driver_state.blk_req.inflight = false;
+
+    handle_client();
+}
+
+// BELOW IS CORRECT
+
 void ahci_init_1() {
     LOG_AHCI("== Starting AHCI initialisation (1)...\n");
-    ahci_init_stage = 1;
 
     hba = (HBA_MEM*)ahci_abar_vaddr;
 
-    LOG_AHCI("Doing BIOS/OS proceedure...\n");
+    LOG_AHCI("Doing BIOS/OS handoff proceedure...\n");
     ahci_boh_procedure_1();
 }
 
 void ahci_init_2() {
     LOG_AHCI("== Continuing AHCI initialisation (2)...\n");
-    ahci_init_stage = 2;
 
     LOG_AHCI("Continuing BIOS/OS proceedure...\n");
     ahci_boh_procedure_2();
@@ -795,18 +972,20 @@ void ahci_init_2() {
 
 void ahci_init_3() {
     LOG_AHCI("== Continuing AHCI initialisation (3)...\n");
-    ahci_init_stage = 3;
 
     LOG_AHCI("Continuing resetting AHCI HBA...\n");
     ahci_hba_reset_2();
 
     LOG_AHCI("Detecting attached SATA devices...\n");
     probe_port();
+
     assert(ahci_port_found);
+
+    LOG_AHCI("Choosing port %d...\n", ahci_port_number);
 
     port = &hba->ports[ahci_port_number];
 
-    LOG_AHCI("Checking if 64 bit DMA is supported...\n");
+    LOG_AHCI("Checking if physical addresses are valid for DMA...\n");
     validate_allocated_dma_paddr();
 
     LOG_AHCI("Checking the number of command slots/headers...\n");
@@ -818,14 +997,13 @@ void ahci_init_3() {
 
 void ahci_init_4() {
     LOG_AHCI("== Continuing AHCI initialisation (4)...\n");
-    ahci_init_stage = 4;
+
     LOG_AHCI("Continuing resetting port...\n");
     port_reset_2();
 }
 
 void ahci_init_5() {
     LOG_AHCI("== Continuing AHCI initialisation (5)...\n");
-    ahci_init_stage = 5;
 
     LOG_AHCI("Continuing resetting port...\n");
     port_reset_3();
@@ -834,59 +1012,65 @@ void ahci_init_5() {
     LOG_AHCI("Rebasing port %d\n", ahci_port_number);
     port_rebase();
 
+    // DMA successfully works!
     // test_generic_reads_and_writes();
 
     LOG_AHCI("Setting up blk storage info...\n");
     setup_blk_storage_info();
+}
 
-    LOG_AHCI("Handling any client requests while in initialisation...\n");
-    // handle_client_request();
+void do_bringup() {
+    assert(driver_status == DrvStatusBringup);
+
+    switch (ahci_init_stage) {
+    case 0:
+        ahci_init_1();
+        break;
+    case 1:
+        ahci_init_2();
+        break;
+    case 2:
+        ahci_init_3();
+        break;
+    case 3:
+        ahci_init_4();
+        break;
+    case 4:
+        ahci_init_5();
+        break;
+    default:
+        assert(false);
+    }
+
+    ahci_init_stage++;
+
+    if (ahci_init_stage == 5) {
+        driver_status = DrvStatusActive;
+        LOG_AHCI("Handling any client requests while in initialisation...\n");
+        handle_client();
+    }
 }
 
 void notified(microkit_channel ch)
 {
-   // if (driver_status == DrvStatusBringup) {
-   //      if (ch == device_resources.irqs[0].id) {
-   //          do_bringup();
-   //          microkit_irq_ack(ch);
-   //      } else {
-   //          LOG_DRIVER_ERR("notification on non-IRQ channel during bringup: %d\n", ch);
-   //      }
+   if (driver_status == DrvStatusBringup) { // add the unlikely compiler hint
+        if (ch == timer_config.driver_id) {
+            do_bringup();
+            microkit_irq_ack(ch);
+        } else {
+            LOG_AHCI("notification on non-IRQ channel during bringup: %d\n", ch);
+            // Is this in case the client messages us?
+        }
 
-   //      return;
-    // } /* else in inactive or active */ 
-
-
-
-
-
-
-
-
-
-
-    // if (ch == device_resources.irqs[0].id) {
-    //     handle_client(/* was_irq: */ true);
-    //     microkit_irq_ack(ch);
-    // } else
+        return;
+    } /* else in inactive or active */
 
     if (ch == blk_config.virt.id) {
         LOG_AHCI("Got a client request!\n");
-        // handle_client_request();
+        handle_client();
     } else if (ch == timer_config.driver_id) {
-        microkit_irq_ack(ch);
-        if (ahci_init_stage == 1) {
-            ahci_init_2();
-        } else if (ahci_init_stage == 2) {
-            ahci_init_3();
-        } else if (ahci_init_stage == 3) {
-            ahci_init_4();
-        } else if (ahci_init_stage == 4) {
-            ahci_init_5();
-        } else {
-            LOG_AHCI("got impossible timer interrupt\n");
-            assert(false);
-        }
+        LOG_AHCI("got impossible timer interrupt\n");
+        assert(false);
     } else {
         LOG_AHCI("notification on unknown channel: %d\n", ch);
         assert(false);
@@ -913,7 +1097,6 @@ void init()
 
     print_pci_info(sata_bus, sata_device, sata_function, false);
 
-    ahci_init_1();
-    // driver_status = DrvStatusBringup;
-    // do_bringup();
+    driver_status = DrvStatusBringup;
+    do_bringup();
 }
