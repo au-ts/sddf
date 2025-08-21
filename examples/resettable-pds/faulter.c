@@ -19,7 +19,7 @@ int my_global = 3;
 
 int my_zero = 0;
 
-uint8_t big_data[1024 * 64];
+uint8_t big_data[1024 * 32];
 
 void init(void)
 {
