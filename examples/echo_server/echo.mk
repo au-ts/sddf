@@ -19,6 +19,7 @@ BUILD_DIR ?= build
 MICROKIT_CONFIG ?= debug
 IMAGE_FILE = loader.img
 REPORT_FILE = report.txt
+COPIED_32BIT_X86_KERNEL = sel4.elf
 
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 ARCH := ${shell grep 'CONFIG_SEL4_ARCH  ' $(BOARD_DIR)/include/kernel/gen_config.h | cut -d' ' -f4}
@@ -75,17 +76,41 @@ else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
 	export QEMU := qemu-system-aarch64
 	export QEMU_ARCH_ARGS := -machine virt,virtualization=on -cpu cortex-a53 \
 						-device loader,file=$(IMAGE_FILE),addr=0x70000000,cpu-num=0 \
-						-serial mon:stdio
+						-serial mon:stdio \
+						-device virtio-net-device,netdev=netdev0 \
+						-netdev user,id=netdev0,hostfwd=tcp::1236-:1236,hostfwd=tcp::1237-:1237,hostfwd=udp::1235-:1235 \
+						-global virtio-mmio.force-legacy=false \
 else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_riscv64)
 	export DRIV_DIR := virtio
 	export SERIAL_DRIV_DIR := ns16550a
 	export TIMER_DRV_DIR := goldfish
 	export QEMU := qemu-system-riscv64
-	export QEMU_ARCH_ARGS := -machine virt -kernel $(IMAGE_FILE) -serial mon:stdio
+	export QEMU_ARCH_ARGS := -machine virt -kernel $(IMAGE_FILE) -serial mon:stdio \
+							-device virtio-net-device,netdev=netdev0 \
+							-netdev user,id=netdev0,hostfwd=tcp::1236-:1236,hostfwd=tcp::1237-:1237,hostfwd=udp::1235-:1235 \
+							-global virtio-mmio.force-legacy=false \
 else ifeq ($(strip $(MICROKIT_BOARD)), star64)
 	export DRIV_DIR := dwmac-5.10a
 	export SERIAL_DRIV_DIR := ns16550a
 	export TIMER_DRV_DIR := jh7110
+else ifeq (${MICROKIT_BOARD},x86_64_generic)
+	export TIMER_DRV_DIR := hpet
+	export DRIV_DIR := virtio/pci
+	export SERIAL_DRIV_DIR := pc99
+
+	CPU := generic
+	TARGET := x86_64-pc-elf
+	DTS=
+
+	export QEMU := qemu-system-x86_64
+	export QEMU_ARCH_ARGS = -machine q35,kernel-irqchip=split \
+						-cpu Nehalem,+fsgsbase,+pdpe1gb,+pcid,+invpcid,+xsave,+xsaves,+xsaveopt,+vmx,+vme \
+						-device intel-iommu \
+						-netdev user,id=net0,hostfwd=tcp::1236-:1236,hostfwd=tcp::1237-:1237,hostfwd=udp::1235-:1235 \
+						-device virtio-net-pci,netdev=net0 \
+						-kernel $(COPIED_32BIT_X86_KERNEL) \
+						-initrd $(IMAGE_FILE) \
+						-serial mon:stdio
 else
 $(error Unsupported MICROKIT_BOARD given)
 endif
@@ -117,6 +142,8 @@ ifeq ($(ARCH),aarch64)
 	CFLAGS_ARCH := -mcpu=$(CPU) -mstrict-align
 else ifeq ($(ARCH),riscv64)
 	CFLAGS_ARCH := -march=rv64imafdc -mabi=lp64d
+else ifeq ($(findstring x86_64,$(TARGET)),x86_64)
+	CFLAGS_ARCH := -mtune=$(CPU)
 endif
 
 # Echo server example relies on libc functionality, hence only works with GCC
@@ -139,7 +166,7 @@ endif
 CFLAGS := $(CFLAGS_ARCH) \
 	  -nostartfiles \
 	  -ffreestanding \
-	  -g3 -O3 -Wall \
+	  -g3 -Wall \
 	  -Wno-unused-function \
 	  -DMICROKIT_CONFIG_$(MICROKIT_CONFIG) \
 	  -I$(BOARD_DIR)/include \
@@ -152,7 +179,7 @@ CFLAGS := $(CFLAGS_ARCH) \
 	  -MP
 
 LDFLAGS := $(CFLAGS_ARCH) -nostartfiles -ffreestanding -L$(BOARD_DIR)/lib $(LDFLAGS_ARCH)
-LIBS := -Wl,--start-group -lmicrokit -Tmicrokit.ld ${LIBS_ARCH} libsddf_util_debug.a -Wl,--end-group
+LIBS := -Wl,--start-group -lmicrokit -Tmicrokit.ld ${LIBS_ARCH} libsddf_util_debug.a -Wl,--end-group -lnosys
 
 CHECK_FLAGS_BOARD_MD5 := .board_cflags-$(shell echo -- ${CFLAGS} ${MICROKIT_SDK} ${MICROKIT_BOARD} ${MICROKIT_CONFIG} | shasum | sed 's/ *-//')
 
@@ -177,11 +204,13 @@ network_copy0.elf network_copy1.elf: network_copy.elf
 # for the unimplemented libc dependencies
 ${IMAGES}: libsddf_util_debug.a ${CHECK_FLAGS_BOARD_MD5}
 
+ifneq ($(strip $(DTS)),)
 $(DTB): $(DTS)
 	dtc -q -I dts -O dtb $(DTS) > $(DTB)
+endif
 
-$(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
-	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE)
+$(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES)
+	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --output . --sdf $(SYSTEM_FILE)
 	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx.data serial_virt_tx.elf
@@ -219,12 +248,13 @@ include ${SERIAL_DRIVER}/serial_driver.mk
 include ${SERIAL_COMPONENTS}/serial_components.mk
 
 qemu: $(IMAGE_FILE)
+ifeq ($(findstring x86_64,$(TARGET)),x86_64)
+	$(OBJCOPY) -O elf32-i386 $(BOARD_DIR)/elf/sel4.elf $(COPIED_32BIT_X86_KERNEL)
+endif
+
 	$(QEMU) $(QEMU_ARCH_ARGS) \
-			-m size=2G \
+			-m size=3G \
 			-nographic \
-			-device virtio-net-device,netdev=netdev0 \
-			-netdev user,id=netdev0,hostfwd=tcp::1236-:1236,hostfwd=tcp::1237-:1237,hostfwd=udp::1235-:1235 \
-			-global virtio-mmio.force-legacy=false \
 			-d guest_errors
 
 clean::

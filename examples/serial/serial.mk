@@ -19,6 +19,7 @@ BUILD_DIR ?= build
 MICROKIT_CONFIG ?= debug
 IMAGE_FILE = loader.img
 REPORT_FILE = report.txt
+COPIED_32BIT_X86_KERNEL = sel4.elf
 
 CC := clang
 LD := ld.lld
@@ -51,6 +52,14 @@ else ifneq ($(filter $(strip $(MICROKIT_BOARD)),imx8mm_evk imx8mp_evk imx8mq_evk
 	CPU := cortex-a53
 else ifeq ($(strip $(MICROKIT_BOARD)), star64)
 	DRIVER_DIR := ns16550a
+else ifeq (${MICROKIT_BOARD},x86_64_generic)
+	DRIVER_DIR := pc99
+	CPU := generic
+	DTS=
+	QEMU_ARCH_ARGS = -machine q35 \
+					-cpu Nehalem,+fsgsbase,+pdpe1gb,+pcid,+invpcid,+xsave,+xsaves,+xsaveopt \
+					-kernel $(COPIED_32BIT_X86_KERNEL) \
+					-initrd $(IMAGE_FILE)
 else
 $(error Unsupported MICROKIT_BOARD given)
 endif
@@ -81,6 +90,8 @@ ifeq ($(ARCH),aarch64)
 	CFLAGS += -mcpu=$(CPU) -mstrict-align -target aarch64-none-elf
 else ifeq ($(ARCH),riscv64)
 	CFLAGS += -march=rv64imafdc -target riscv64-none-elf
+else ifeq ($(ARCH),x86_64)
+	CFLAGS += -mtune=$(CPU) -target x86_64-pc-elf
 endif
 CFLAGS += -I$(BOARD_DIR)/include \
 	-I${TOP}/include	\
@@ -112,11 +123,13 @@ client.o: ${TOP}/client.c ${CHECK_FLAGS_BOARD_MD5}
 client0.elf client1.elf: client.elf
 	cp client.elf $@
 
+ifneq ($(strip $(DTS)),)
 $(DTB): $(DTS)
 	dtc -q -I dts -O dtb $(DTS) > $(DTB)
+endif
 
-$(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
-	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE)
+$(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES)
+	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --output . --sdf $(SYSTEM_FILE)
 	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_virt_rx_config=serial_virt_rx.data serial_virt_rx.elf
@@ -128,6 +141,10 @@ $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	MICROKIT_SDK=${MICROKIT_SDK} $(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
 
 qemu: ${IMAGE_FILE}
+ifeq ($(findstring x86_64,$(ARCH)),x86_64)
+	$(OBJCOPY) -O elf32-i386 $(BOARD_DIR)/elf/sel4.elf $(COPIED_32BIT_X86_KERNEL)
+endif
+
 	$(QEMU) -m size=2G -nographic -serial mon:stdio -d guest_errors $(QEMU_ARCH_ARGS)
 
 clean::

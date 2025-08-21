@@ -3,7 +3,6 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-#include <sddf/virtio/common.h>
 #include <sddf/virtio/transport/common.h>
 #include <sddf/virtio/transport/mmio.h>
 #include <sddf/resources/device.h>

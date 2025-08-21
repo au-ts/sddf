@@ -1,0 +1,14 @@
+#!/bin/sh
+
+#  TOOLCHAIN=x86_64-linux-gnu
+
+rm -rfd build && make qemu MICROKIT_BOARD=x86_64_nehalem MICROKIT_SDK=/opt/billn/x86/microkit_mat_rebased/release/microkit-sdk-2.0.1-dev/ && qemu-system-x86_64                      \
+        -machine "$MACHINE"             \
+        -cpu "$CPU"                     \
+        -m "$RAM"                       \
+        -display none                   \
+        -serial mon:stdio               \
+        -device intel-iommu             \
+        -cdrom "$TMPDIR"/grub.iso       \
+        -netdev user,id=net0,hostfwd=tcp::5555-10.0.2.16:80 \
+        -device virtio-net-pci,netdev=net0

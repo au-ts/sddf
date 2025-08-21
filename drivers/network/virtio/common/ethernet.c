@@ -416,6 +416,9 @@ void init(void)
     assert(net_config_check_magic(&config));
     assert(device_resources_check_magic(&device_resources));
 
+    /* Ack any IRQs that were delivered before the driver started. */
+    sddf_irq_ack(16);
+
     // hw_ring_buffer_vaddr = (uintptr_t)device_resources.regions[1].region.vaddr;
     // hw_ring_buffer_paddr = device_resources.regions[1].io_addr;
 
@@ -439,6 +442,7 @@ void init(void)
 void notified(sddf_channel ch)
 {
     if (ch == 16) {
+    // if (ch == device_resources.irqs[0].id) {
         // sddf_printf("eth irq ch %d\n", ch);
 
         handle_irq();

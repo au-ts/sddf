@@ -60,6 +60,12 @@ else ifeq ($(strip $(MICROKIT_BOARD)), star64)
 else ifneq ($(filter $(strip $(MICROKIT_BOARD)),imx8mm_evk imx8mp_evk imx8mq_evk maaxboard),)
 	export TIMER_DRIVER_DIR := imx
 	export CPU := cortex-a53
+else ifeq ($(strip $(MICROKIT_BOARD)), x86_64_nehalem)
+	export TIMER_DRIVER_DIR := hpet
+	export CPU := nehalem
+	export QEMU := qemu-system-x86_64
+	export X86_IMAGE_FILE := grub.iso
+	export QEMU_ARCH_ARGS := -machine q35,kernel-irqchip=split -cpu Nehalem,+fsgsbase,+pdpe1gb,+pcid,+invpcid,+xsave,+xsaves,+xsaveopt,+vmx,+vme -display none -device intel-iommu -cdrom $(X86_IMAGE_FILE)
 else
 $(error Unsupported MICROKIT_BOARD given)
 endif
@@ -80,12 +86,14 @@ ifeq ($(ARCH),aarch64)
 	CFLAGS_ARCH := -mcpu=$(CPU) -mstrict-align -target aarch64-none-elf
 else ifeq ($(ARCH),riscv64)
 	CFLAGS_ARCH := -march=rv64imafdc -target riscv64-none-elf
+else ifeq ($(ARCH),x86_64)
+	CFLAGS_ARCH := -march=$(CPU) -fsanitize-trap=all -fsanitize=undefined -target x86_64-pc-elf
 endif
 
+# @billn investigate why comp op breaks irq
 CFLAGS := -nostdlib \
 		  -ffreestanding \
 		  -g3 \
-		  -O3 \
 		  -Wall -Wno-unused-function -Werror -Wno-unused-command-line-argument \
 		  -I$(BOARD_DIR)/include \
 		  -I$(SDDF)/include \
@@ -115,18 +123,31 @@ client.elf: client.o
 $(DTB): $(DTS)
 	dtc -q -I dts -O dtb $(DTS) > $(DTB)
 
+ifeq ($(ARCH),x86_64)
+$(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES)
+	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --output . --sdf $(SYSTEM_FILE)
+	# $(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
+	$(OBJCOPY) --update-section .timer_client_config=timer_client_client.data client.elf
+else
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE)
 	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
 	$(OBJCOPY) --update-section .timer_client_config=timer_client_client.data client.elf
+endif
 
 $(IMAGE_FILE) $(REPORT_FILE): $(SYSTEM_FILE)
-	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
+	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) --x86-machine /opt/billn/x86/microkit_mat_rebased/example/x86_64_nehalem/hello/machine.json -o $(IMAGE_FILE) -r $(REPORT_FILE)
 
 qemu: $(IMAGE_FILE)
+ifeq ($(ARCH),x86_64)
+	mkdir -p grub_iso_staging/boot/grub
+	cp $(IMAGE_FILE) grub_iso_staging/image
+	cp $(TOP)/x86_grub.cfg grub_iso_staging/boot/grub/grub.cfg
+	grub-mkrescue -d /usr/lib/grub/i386-pc -o $(X86_IMAGE_FILE) grub_iso_staging
+endif
 	$(QEMU) $(QEMU_ARCH_ARGS) \
 			-serial mon:stdio \
-			-m size=2G \
+			-m size=4G \
 			-nographic \
 			-d guest_errors
 

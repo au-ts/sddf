@@ -40,6 +40,14 @@ net_queue_handle_t net_tx_handle;
 struct pbuf *head;
 struct pbuf *tail;
 
+
+/* A workaround for problematic libc's that calls malloc */
+void *sbrk(ptrdiff_t incr)
+{
+    (void) incr;
+    return (void *)-1;
+}
+
 /**
  * Netif status callback function that output's client's name and
  * obtained IP address.
