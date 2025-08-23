@@ -22,7 +22,7 @@ env:
   MICROKIT_VERSION: 2.0.1
   MICROKIT_URL: https://github.com/seL4/microkit/releases/download/2.0.1/microkit-sdk-2.0.1
   SDFGEN_VERSION: 0.24.0
-  ZIG_VERSION: 0.14.0
+  ZIG_VERSION: 0.15.1
 
 jobs:
   build_linux_x86_64:
@@ -38,7 +38,7 @@ jobs:
       - name: Install dependencies (via apt)
         run: sudo apt update && sudo apt install -y make llvm lld imagemagick device-tree-compiler
       - name: Install Zig
-        uses: mlugg/setup-zig@v2.0.0
+        uses: mlugg/setup-zig@v2.0.5
         with:
           version: ${{ env.ZIG_VERSION }}
       - name: Setup pyenv
@@ -87,7 +87,7 @@ jobs:
           brew install riscv-tools
           echo "/opt/homebrew/opt/llvm/bin:$PATH" >> $GITHUB_PATH
       - name: Install Zig
-        uses: mlugg/setup-zig@v2.0.0
+        uses: mlugg/setup-zig@v2.0.5
         with:
           version: ${{ env.ZIG_VERSION }}
       - name: Setup pyenv
