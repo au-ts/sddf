@@ -7,7 +7,7 @@
 # the Synopsys dwmac 5.10a NIC driver
 #
 # NOTES:
-#   Generates eth_driver.elf
+#   Generates eth_driver.elf (alternative unique name eth_driver_dwmac-5.10a.elf)
 #   Assumes libsddf_util_debug.a is in LIBS
 
 ETHERNET_DRIVER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
@@ -18,11 +18,11 @@ ${CHECK_NETDRV_FLAGS_MD5}:
 	-rm -f .netdrv_cflags-*
 	touch $@
 
-eth_driver.elf: network/starfive/ethernet.o
+eth_driver.elf eth_driver_dwmac-5.10a.elf: network/dwmac-5.10a/ethernet.o
 	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
 
-network/starfive/ethernet.o: ${ETHERNET_DRIVER_DIR}ethernet.c ${CHECK_NETDRV_FLAGS}
-	mkdir -p network/starfive
+network/dwmac-5.10a/ethernet.o: ${ETHERNET_DRIVER_DIR}ethernet.c ${CHECK_NETDRV_FLAGS}
+	mkdir -p network/dwmac-5.10a
 	${CC} -c ${CFLAGS} ${CFLAGS_network} -I ${ETHERNET_DRIVER_DIR} -o $@ $<
 
--include starfive/ethernet.d
+-include dwmac-5.10a/ethernet.d

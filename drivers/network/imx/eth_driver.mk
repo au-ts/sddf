@@ -7,7 +7,7 @@
 # the IMX8 NIC driver
 #
 # NOTES
-#  Generates eth_driver.elf
+#  Generates eth_driver.elf (alternative unique name eth_driver_imx.elf)
 #  Expects libsddf_util_debug.a to be in LIBS
 
 ETHERNET_DRIVER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
@@ -17,7 +17,7 @@ ${CHECK_NETDRV_FLAGS_MD5}:
 	-rm -f .netdrv_cflags-*
 	touch $@
 
-eth_driver.elf: network/imx/ethernet.o
+eth_driver.elf eth_driver_imx.elf: network/imx/ethernet.o
 	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
 
 network/imx/ethernet.o: ${ETHERNET_DRIVER_DIR}/ethernet.c ${CHECK_NETDRV_FLAGS_MD5}
