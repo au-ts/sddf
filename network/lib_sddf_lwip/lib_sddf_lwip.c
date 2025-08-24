@@ -84,9 +84,7 @@ lwip_state_t lwip_state;
 sddf_state_t sddf_state;
 pbuf_pool_t pbuf_pool;
 
-static void pbuf_pool_init(void *mem,
-                           size_t mem_size,
-                           size_t pbuf_count)
+static void pbuf_pool_init(void *mem, size_t mem_size, size_t pbuf_count)
 {
     assert(mem != NULL);
     assert(pbuf_count != 0);
@@ -115,10 +113,9 @@ pbuf_custom_offset_t *pbuf_pool_alloc(void)
 
 net_sddf_err_t pbuf_pool_free(pbuf_custom_offset_t *pbuf)
 {
-    if (pbuf == NULL ||
-        pbuf < (pbuf_custom_offset_t *)pbuf_pool.pbufs ||
-        pbuf > (pbuf_custom_offset_t *)&pbuf_pool.pbufs[pbuf_pool.capacity] ||
-        ((uintptr_t)pbuf - (uintptr_t)pbuf_pool.pbufs % sizeof(pbuf_custom_offset_t))) {
+    if (pbuf == NULL || pbuf < (pbuf_custom_offset_t *)pbuf_pool.pbufs
+        || pbuf > (pbuf_custom_offset_t *)&pbuf_pool.pbufs[pbuf_pool.capacity]
+        || ((uintptr_t)pbuf - (uintptr_t)pbuf_pool.pbufs % sizeof(pbuf_custom_offset_t))) {
         return SDDF_LWIP_ERR_INVALID_PBUF;
     }
 
@@ -271,8 +268,7 @@ static void interface_free_buffer(struct pbuf *p)
  *
  * @return the newly created pbuf. Can be cast to pbuf_custom.
  */
-static struct pbuf *create_interface_buffer(uint64_t offset,
-                                            size_t length)
+static struct pbuf *create_interface_buffer(uint64_t offset, size_t length)
 {
     /* Client must have RX enabled */
     if (!sddf_state.rx_queue.capacity) {
@@ -300,8 +296,7 @@ static struct pbuf *create_interface_buffer(uint64_t offset,
  * sddf buffers available, handle_empty_tx_free will be called with the pbuf,
  * and the equivalent lwip error will be returned.
  */
-static err_t lwip_eth_send(struct netif *netif,
-                           struct pbuf *p)
+static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
 {
     if (p->tot_len > NET_BUFFER_SIZE) {
         lwip_state.err_output("LWIP|ERROR: attempted to send a packet of size %u > BUFFER SIZE %u\n", p->tot_len,
@@ -427,13 +422,9 @@ static void netif_status_callback(struct netif *netif)
     }
 }
 
-void sddf_lwip_init(lib_sddf_lwip_config_t *lib_sddf_lwip_config,
-                    net_client_config_t *net_config,
-                    timer_client_config_t *timer_config,
-                    net_queue_handle_t rx_queue,
-                    net_queue_handle_t tx_queue,
-                    char *ip_string,
-                    sddf_lwip_err_output_fn err_output,
+void sddf_lwip_init(lib_sddf_lwip_config_t *lib_sddf_lwip_config, net_client_config_t *net_config,
+                    timer_client_config_t *timer_config, net_queue_handle_t rx_queue, net_queue_handle_t tx_queue,
+                    char *ip_string, sddf_lwip_err_output_fn err_output,
                     sddf_lwip_netif_status_callback_fn netif_callback,
                     sddf_lwip_handle_empty_tx_free_fn handle_empty_tx_free,
                     sddf_lwip_tx_intercept_condition_fn tx_intercept_condition,
@@ -469,8 +460,7 @@ void sddf_lwip_init(lib_sddf_lwip_config_t *lib_sddf_lwip_config,
                                                                      : handle_empty_tx_free;
     lwip_state.tx_intercept_condition = (tx_intercept_condition == NULL) ? tx_intercept_condition_default
                                                                          : tx_intercept_condition;
-    lwip_state.tx_handle_intercept = (tx_handle_intercept == NULL) ? tx_handle_intercept_default
-                                                                         : tx_handle_intercept;
+    lwip_state.tx_handle_intercept = (tx_handle_intercept == NULL) ? tx_handle_intercept_default : tx_handle_intercept;
 
     lwip_init();
 

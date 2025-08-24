@@ -173,13 +173,9 @@ void sddf_lwip_maybe_notify(void);
  * for a pbuf, the TX intercept handle function will be invoked to handle the
  * transmission of the pbuf.
  */
-void sddf_lwip_init(lib_sddf_lwip_config_t *lib_sddf_lwip_config,
-                    net_client_config_t *net_config,
-                    timer_client_config_t *timer_config,
-                    net_queue_handle_t rx_queue,
-                    net_queue_handle_t tx_queue,
-                    char *ip_addr,
-                    sddf_lwip_err_output_fn err_output,
+void sddf_lwip_init(lib_sddf_lwip_config_t *lib_sddf_lwip_config, net_client_config_t *net_config,
+                    timer_client_config_t *timer_config, net_queue_handle_t rx_queue, net_queue_handle_t tx_queue,
+                    char *ip_addr, sddf_lwip_err_output_fn err_output,
                     sddf_lwip_netif_status_callback_fn netif_callback,
                     sddf_lwip_handle_empty_tx_free_fn handle_empty_tx_free,
                     sddf_lwip_tx_intercept_condition_fn tx_intercept_condition,
