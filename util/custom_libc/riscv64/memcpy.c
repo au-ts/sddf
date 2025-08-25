@@ -20,7 +20,7 @@
 // memcpy defined in memcpy-asm.S
 #else
 
-#include "local.h"
+#include <local.h>
 #include "xlenint.h"
 #include <string.h>
 #include <sys/asm.h>
