@@ -88,7 +88,7 @@ void transmit(void)
     while (reprocess) {
         while (head != NULL && !net_queue_empty_free(&net_tx_handle)) {
             net_sddf_err_t err = sddf_lwip_transmit_pbuf(head);
-            if (err == SDDF_LWIP_ERR_PBUF) {
+            if (err == SDDF_LWIP_ERR_LARGE_PBUF) {
                 sddf_dprintf("LWIP|ERROR: attempted to send a packet of size %u > BUFFER SIZE %u\n", head->tot_len,
                              NET_BUFFER_SIZE);
             } else if (err != SDDF_LWIP_ERR_OK) {
@@ -130,8 +130,8 @@ void init(void)
                    net_config.tx.num_buffers);
     net_buffers_init(&net_tx_handle, 0);
 
-    sddf_lwip_init(&lib_sddf_lwip_config, &net_config, &timer_config, net_rx_handle, net_tx_handle, NULL,
-                   netif_status_callback, enqueue_pbufs);
+    sddf_lwip_init(&lib_sddf_lwip_config, &net_config, &timer_config, net_rx_handle, net_tx_handle, NULL, 
+                   NULL, netif_status_callback, enqueue_pbufs, NULL, NULL);
     set_timeout();
 
     setup_udp_socket();
