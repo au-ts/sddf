@@ -20,7 +20,7 @@
 /* memmove defined in memmove-asm.S */
 //#else
 
-#include "local.h"
+#include <local.h>
 #include "sys/asm.h"
 #include "xlenint.h"
 #include <limits.h>

@@ -36,7 +36,7 @@ QUICKREF
 
 #include <string.h>
 #include <limits.h>
-#include "local.h"
+#include <local.h>
 
 #undef strncmp
 int
