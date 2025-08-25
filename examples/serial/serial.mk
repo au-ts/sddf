@@ -54,6 +54,16 @@ else ifneq ($(filter $(strip $(MICROKIT_BOARD)),cheshire star64),)
 else ifeq ($(strip $(MICROKIT_BOARD)), zcu102)
 	DRIVER_DIR := zynqmp
 	CPU := cortex-a53
+else ifeq ($(strip $(MICROKIT_BOARD)),x86_64_generic)
+	DRIVER_DIR := pc99
+	CPU := generic
+	SEL4_64B := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)/elf/sel4.elf
+	SEL4_32B := sel4.elf
+	DTS=
+	QEMU_ARCH_ARGS = -machine q35 \
+					-cpu qemu64,+fsgsbase,+pdpe1gb,+pcid,+invpcid,+xsave,+xsaves,+xsaveopt \
+					-kernel $(SEL4_32B) \
+					-initrd $(IMAGE_FILE)
 else
 $(error Unsupported MICROKIT_BOARD given)
 endif
@@ -65,7 +75,7 @@ SERIAL_COMPONENTS := $(SDDF)/serial/components
 UART_DRIVER := $(SDDF)/drivers/serial/$(DRIVER_DIR)
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 SYSTEM_FILE := serial.system
-DTS := $(SDDF)/dts/$(MICROKIT_BOARD).dts
+DTS ?= $(SDDF)/dts/$(MICROKIT_BOARD).dts
 DTB := $(MICROKIT_BOARD).dtb
 ARCH := ${shell grep 'CONFIG_SEL4_ARCH  ' $(BOARD_DIR)/include/kernel/gen_config.h | cut -d' ' -f4}
 SDDF_CUSTOM_LIBC := 1
@@ -85,6 +95,8 @@ ifeq ($(ARCH),aarch64)
 	CFLAGS += -mcpu=$(CPU) -mstrict-align -target aarch64-none-elf
 else ifeq ($(ARCH),riscv64)
 	CFLAGS += -march=rv64imafdc -target riscv64-none-elf
+else ifeq ($(ARCH),x86_64)
+	CFLAGS += -mtune=$(CPU) -target x86_64-pc-elf
 endif
 CFLAGS += -I$(BOARD_DIR)/include \
 	-I${TOP}/include	\
@@ -116,11 +128,17 @@ client.o: ${TOP}/client.c ${CHECK_FLAGS_BOARD_MD5}
 client0.elf client1.elf: client.elf
 	cp client.elf $@
 
-$(DTB): $(DTS)
-	dtc -q -I dts -O dtb $(DTS) > $(DTB)
+# $(DTB): $(DTS)
+# 	dtc -q -I dts -O dtb $(DTS) > $(DTB)
 
-$(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
+$(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTS)
+ifneq ($(strip $(DTS)),)
+	dtc -q -I dts -O dtb $(DTS) > $(DTB)
 	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE)
+else
+	$(OBJCOPY) -O elf32-i386 $(SEL4_64B) $(SEL4_32B)
+	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --output . --sdf $(SYSTEM_FILE)
+endif
 	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_virt_rx_config=serial_virt_rx.data serial_virt_rx.elf
