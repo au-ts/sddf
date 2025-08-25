@@ -35,7 +35,7 @@ QUICKREF
 */
 
 #include <string.h>
-#include "local.h"
+#include <local.h>
 
 #undef memcmp
 int
