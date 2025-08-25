@@ -226,7 +226,7 @@ static void device_print_and_set(uint8_t bus, uint8_t device, uint8_t function) 
             // 0xff (255) means "unknown" or "no connection" on interrupt line
             // interrupt pin: 0 = no, 1 => INTA#, 2 => INTB#, 3 => INTC#, 4 => INTD#
             LOG_PCIE("\t(PIN-based) interrupt line: %02x, interrupt pin: %02x\n", type0_header->interrupt_line, type0_header->interrupt_pin);
-
+            LOG_PCIE("\tNOTE: ignore interrupt line under APIC/ACPI.\n");
             if (!(header->status & BIT(4))) {
                 LOG_PCIE("no capabilities??\n");
             }; /* assert capabilities list status exists */

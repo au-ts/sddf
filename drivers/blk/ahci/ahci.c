@@ -52,6 +52,9 @@ const uint64_t identify_command_paddr = 0x10020000;
 const uint64_t identify_command_vaddr = 0x720020000;
 const uint64_t identify_command_size = 0x1000;
 
+// MAKE SURE THIS MATCH meta.py
+#define DEVICE_IRQ_MICROKIT_CHANNEL 60
+
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 __attribute__((__section__(".blk_driver_config"))) blk_driver_config_t blk_config;
 __attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
@@ -68,6 +71,8 @@ uint8_t ahci_port_number;
 bool ahci_port_found = false;
 
 int ahci_init_stage = 0; // @Tristan: make this an enum?
+
+bool dma64 = false;
 
 uint8_t number_of_command_slots;
 
@@ -968,16 +973,6 @@ void ahci_num_cmd_slots() {
     LOG_AHCI("Number of command slots is %u\n", number_of_command_slots);
 }
 
-void validate_allocated_dma_paddr() {
-    bool dma64 = (hba->cap & (1 << 31)) != 0;
-    if (!dma64) {
-        assert(data_region_paddr <= UINT32_MAX);
-        assert(ahci_command_tables_paddr <= UINT32_MAX);
-        assert(ahci_FIS_paddr <= UINT32_MAX);
-        assert(ahci_command_list_paddr <= UINT32_MAX);
-    }
-}
-
 int check_type(HBA_PORT *port_to_check) {
     uint32_t ssts = port_to_check->ssts;
 
@@ -1043,10 +1038,22 @@ void probe_port() {
     }
 }
 
-void ahci_hba_reset_1() {
-    LOG_AHCI("Enabling AHCI mode...\n");
-    hba->ghc |= (1u << 31);
+void validate_allocated_dma_paddr() {
+    dma64 = (hba->cap & (1 << 31)) != 0;
+    if (!dma64) {
+        assert(data_region_paddr <= UINT32_MAX);
+        assert(ahci_command_tables_paddr <= UINT32_MAX);
+        assert(ahci_FIS_paddr <= UINT32_MAX);
+        assert(ahci_command_list_paddr <= UINT32_MAX);
 
+        assert(data_region_paddr + data_region_size - 1 <= UINT32_MAX);
+        assert(ahci_command_tables_paddr + ahci_command_tables_size - 1 <= UINT32_MAX);
+        assert(ahci_FIS_paddr + ahci_FIS_size - 1 <= UINT32_MAX);
+        assert(ahci_command_list_paddr + ahci_command_list_size - 1 <= UINT32_MAX);
+    }
+}
+
+void ahci_hba_reset_1() {
     LOG_AHCI("Issuing Host Bus Adapter (HBA) reset...\n");
     hba->ghc |= 1u;
 
@@ -1059,8 +1066,6 @@ void ahci_hba_reset_2() {
         assert(false);
     }
 
-    // Spec: after HR clears, registers are reinitialized; AE may clear on some HBAs.
-    hba->ghc |= (1u << 31);
     LOG_AHCI("HBA reset complete\n");
 }
 
@@ -1084,7 +1089,7 @@ void ahci_boh_procedure_2() {
     if ((hba->bohc & 1u) != 0) {
         LOG_AHCI("BIOS still hasn't released!\n");
         LOG_AHCI("Proceed anyway; some firmwares ignore BOS or release implictly when we HBA reset\n");
-        // might have to disable in the firmware?
+        // TODO: Revisit as we might have to disable in the firmware?
     }
 
     // Clear any semaphore-change latched status
@@ -1106,18 +1111,27 @@ void ahci_init_1() {
 void ahci_init_2() {
     LOG_AHCI("== Continuing AHCI initialisation (2)...\n");
 
-    LOG_AHCI("Continuing BIOS/OS proceedure...\n");
+    LOG_AHCI("Continuing BIOS/OS handoff proceedure...\n");
     ahci_boh_procedure_2();
 
-    LOG_AHCI("Resetting AHCI HBA...\n");
+    LOG_AHCI("Resetting conrtoller...\n");
     ahci_hba_reset_1();
 }
 
 void ahci_init_3() {
     LOG_AHCI("== Continuing AHCI initialisation (3)...\n");
 
-    LOG_AHCI("Continuing resetting AHCI HBA...\n");
+    LOG_AHCI("Continuing resetting controller...\n");
     ahci_hba_reset_2();
+
+    LOG_AHCI("Enabling AHCI mode...\n");
+    hba->ghc |= (1u << 31);
+
+    LOG_AHCI("Enabling interrupts in HBA...\n");
+    hba->ghc |= (1u << 1);
+
+    LOG_AHCI("Checking if physical addresses are valid for DMA...\n");
+    validate_allocated_dma_paddr();
 
     LOG_AHCI("Detecting attached SATA devices...\n");
     probe_port();
@@ -1127,9 +1141,6 @@ void ahci_init_3() {
     LOG_AHCI("Choosing port %d...\n", ahci_port_number);
 
     port = &hba->ports[ahci_port_number];
-
-    LOG_AHCI("Checking if physical addresses are valid for DMA...\n");
-    validate_allocated_dma_paddr();
 
     LOG_AHCI("Checking the number of command slots/headers...\n");
     ahci_num_cmd_slots();
@@ -1284,7 +1295,7 @@ void do_bringup() {
 }
 
 void notified(microkit_channel ch) {
-   if (driver_status == DrvStatusBringup) { // add the unlikely compiler hint
+   if (driver_status == DrvStatusBringup) { // TODO: add the unlikely compiler hint
         if (ch == timer_config.driver_id) {
             LOG_AHCI("notification from timer!\n");
             do_bringup();
@@ -1300,7 +1311,7 @@ void notified(microkit_channel ch) {
         return;
     } /* else in inactive or active */
 
-    if (ch == 60) { // Pick any channel
+    if (ch == DEVICE_IRQ_MICROKIT_CHANNEL) {
         LOG_AHCI("Got an irq from the device!\n");
         handle_client(true);
         microkit_irq_ack(ch);
@@ -1316,6 +1327,35 @@ void notified(microkit_channel ch) {
     }
 }
 
+/*
+Initialisation Checklist:
+    1. Enable interrupts, DMA, and memory space access in the PCI command register
+    2. Memory map BAR 5
+    3. Perform BIOS/OS handoff (if the bit in the extended capabilities is set)
+    4. Reset the controller
+    5. Register IRQ handler, using interrupt line given in the PCI register.
+        This interrupt line may be shared with other devices, so the usual implications of this apply.
+        NOTE: this is for legacy ISA/PIC IRQ not APIC/ACPI.
+    6. Enable AHCI mode and interrupts in global host control register.
+    7. Read capabilities registers. Check 64-bit DMA is supported if you need it.
+
+    For all the implemented ports:
+        1. Allocate physical memory for its command list, the received FIS, and its command tables.
+            Make sure the command tables are 128 byte aligned. Memory map these as uncacheable.
+        2. Set command list and received FIS address registers (and upper registers, if supported).
+        3. Setup command list entries to point to the corresponding command table.
+
+
+Reset the port.
+Start command list processing with the port's command register.
+Enable interrupts for the port. The D2H bit will signal completed commands.
+Read signature/status of the port to see if it connected to a drive.
+Send IDENTIFY ATA command to connected drives. Get their sector size and count.
+
+
+
+
+*/
 void init()
 {
     assert(device_resources_check_magic(&device_resources));
