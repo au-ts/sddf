@@ -38,6 +38,30 @@ uint64_t get_bdf_offset(uint8_t bus, uint8_t device, uint8_t function)
     return offset;
 }
 
+static void disable_msi_msix(volatile void *pcie_config_base)
+{
+    volatile uint8_t *cfg = (volatile uint8_t *)pcie_config_base;
+
+    // Type-0 capability pointer at 0x34 (DWORD-aligned; low 2 bits reserved)
+    uint8_t cap_ptr = cfg[0x34] & ~0x3;
+
+    while (cap_ptr) {
+        volatile uint8_t *cap = cfg + cap_ptr;
+        uint8_t id  = cap[0];
+        uint8_t nxt = cap[1] & ~0x3;
+
+        if (id == 0x05) {                 // MSI
+            volatile uint16_t *ctl = (volatile uint16_t *)(cap + 2);
+            *ctl &= ~(uint16_t)BIT(0);    // clear MSI Enable
+        } else if (id == 0x11) {          // MSI-X
+            volatile uint16_t *ctl = (volatile uint16_t *)(cap + 2);
+            *ctl &= ~(uint16_t)BIT(15);   // clear MSI-X Enable
+            // (Optional) also mask all vectors in the MSI-X table if needed.
+        }
+        cap_ptr = nxt;
+    }
+}
+
 
 // The only config this does is enable bus mastering and memory access
 // And assigns bar5 if not set
@@ -80,8 +104,10 @@ static void device_print_and_set(uint8_t bus, uint8_t device, uint8_t function) 
             // enable bus mastering... and memory accesses
             header->command |= BIT(2) | BIT(1);
 
-            // Disbale legacy intx
-            header->command |= BIT(10);
+            disable_msi_msix(pcie_config_base);
+
+            // Enable legacy INTx (clear Interrupt Disable)
+            header->command &= ~BIT(10);
 
 	        found_sata = true;
 	        sata_bus = bus;

@@ -19,13 +19,13 @@
 
 BLK_DRIVER_DIR := $(realpath $(dir $(lastword $(MAKEFILE_LIST))))
 
-blk_driver.elf: blk/ahci/ahci.o blk/ahci/pcie.o blk/ahci/ahci_init.o
+blk_driver.elf: blk/ahci/ahci.o blk/ahci/pcie.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-blk/ahci/ahci.o: ${BLK_DRIVER_DIR}/ahci.c
+blk/ahci/ahci.o: ${BLK_DRIVER_DIR}/ahci.c | blk/ahci
 	${CC} ${CFLAGS} ${CFLAGS_blk} -o $@ -c $<
 
-blk/ahci/pcie.o: ${BLK_DRIVER_DIR}/pcie.c
+blk/ahci/pcie.o: ${BLK_DRIVER_DIR}/pcie.c | blk/ahci
 	${CC} ${CFLAGS} ${CFLAGS_blk} -o $@ -c $<
 
 
@@ -37,7 +37,6 @@ clobber::
 
 -include blk/ahci/ahci.d
 -include blk/ahci/pcie.d
--include bblk/ahci/ahci_init.d
 
 # SRC := $(wildcard $(BLK_DRIVER_DIR)/*.c)
 # OBJ := $(patsubst $(BLK_DRIVER_DIR)/%.c,blk/ahci/%.o,$(SRC))

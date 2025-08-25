@@ -9,8 +9,7 @@ from importlib.metadata import version
 # assert version('sdfgen').split(".")[1] == "24", "Unexpected sdfgen version"
 
 ProtectionDomain = SystemDescription.ProtectionDomain
-Irq = SystemDescription.Irq
-
+IrqIoapic = SystemDescription.IrqIoapic
 
 @dataclass
 class Board:
@@ -174,7 +173,16 @@ def generate(sdf_file: str, output_dir: str, dtb: Optional[DeviceTree]):
         blk_driver.add_map(identify_command_map)
         sdf.add_mr(identify_command)
 
-        # blk_driver.add_irq(Irq(97, Irq.Trigger.EDGE, 60))
+        irq = IrqIoapic(
+            arch=SystemDescription.Arch.X86_64,
+            ioapic_id=0, # from Linux
+            pin=16, # from Linux
+            vector=64,  # arbitrary
+            trigger=IrqIoapic.Trigger.LEVEL, # because it is
+            polarity=IrqIoapic.Polarity.ACTIVELOW, # because it is
+            id=60 # Microkit logical IRQ id
+        )
+        blk_driver.add_irq(irq)
 
     partition = int(args.partition) if args.partition else board.partition
     blk_system.add_client(client, partition=partition)
