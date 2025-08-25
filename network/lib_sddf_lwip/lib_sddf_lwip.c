@@ -100,9 +100,14 @@ static void pbuf_pool_init(void *mem, size_t mem_size, size_t pbuf_count)
     pbuf_pool.pbufs[pbuf_count - 1].next_free = SIZE_MAX;
 }
 
+inline bool pbuf_pool_empty(void)
+{
+    return pbuf_pool.first_free == SIZE_MAX;
+}
+
 pbuf_custom_offset_t *pbuf_pool_alloc(void)
 {
-    if (pbuf_pool.first_free == SIZE_MAX) {
+    if (pbuf_pool_empty()) {
         return NULL;
     }
 
@@ -115,7 +120,7 @@ net_sddf_err_t pbuf_pool_free(pbuf_custom_offset_t *pbuf)
 {
     if (pbuf == NULL || pbuf < (pbuf_custom_offset_t *)pbuf_pool.pbufs
         || pbuf > (pbuf_custom_offset_t *)&pbuf_pool.pbufs[pbuf_pool.capacity]
-        || ((uintptr_t)pbuf - (uintptr_t)pbuf_pool.pbufs % sizeof(pbuf_custom_offset_t))) {
+        || (((uintptr_t)pbuf - (uintptr_t)pbuf_pool.pbufs) % sizeof(pbuf_custom_offset_t))) {
         return SDDF_LWIP_ERR_INVALID_PBUF;
     }
 
@@ -276,6 +281,9 @@ static struct pbuf *create_interface_buffer(uint64_t offset, size_t length)
     }
 
     pbuf_custom_offset_t *custom_pbuf_offset = pbuf_pool_alloc();
+    if (!custom_pbuf_offset) {
+        return NULL;
+    }
     custom_pbuf_offset->offset = offset;
     custom_pbuf_offset->custom.custom_free_function = interface_free_buffer;
 
@@ -353,7 +361,7 @@ void sddf_lwip_process_rx(void)
 
     bool reprocess = true;
     while (reprocess) {
-        while (!net_queue_empty_active(&sddf_state.rx_queue)) {
+        while (!net_queue_empty_active(&sddf_state.rx_queue) && !pbuf_pool_empty()) {
             net_buff_desc_t buffer;
             int err = net_dequeue_active(&sddf_state.rx_queue, &buffer);
             assert(!err);

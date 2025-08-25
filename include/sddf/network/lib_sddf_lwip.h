@@ -75,6 +75,13 @@ typedef bool (*sddf_lwip_tx_intercept_condition_fn)(struct pbuf *p);
 typedef net_sddf_err_t (*sddf_lwip_tx_handle_intercept_fn)(struct pbuf *p);
 
 /**
+ * Check whether the pbuf pool is empty.
+ *
+ * @return true if pbuf pool is empty, false otherwise.
+ */
+bool pbuf_pool_empty(void);
+
+/**
  * Allocate a pbuf from lib sDDF LWIP static pbuf pool.
  *
  * @return pointer to allocated pbuf or NULL if out of memory.
