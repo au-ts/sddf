@@ -60,7 +60,7 @@ BOARDS: List[Board] = [
         name="nanopi_r5c",
         arch=SystemDescription.Arch.AARCH64,
         paddr_top=0x20000000,
-        timer="timer@ff700000",
+        timer="timer@fe5f0000",
     ),
     Board(
         name="imx8mm_evk",
