@@ -113,9 +113,11 @@ if __name__ == "__main__":
     for example_name, options in matrix.EXAMPLES.items():
         if example_name not in args.examples:
             continue
+        if example_name != "echo_server":
+            continue
 
         example_matrix = matrix_product(
-            board=options["boards_build"],
+            board=["maaxboard"], # options["boards_build"],
             config=options["configs"],
             build_system=options["build_systems"],
         )
