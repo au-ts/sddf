@@ -4,10 +4,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-extern bool found_sata;
-extern uint8_t sata_bus;
-extern uint8_t sata_device;
-extern uint8_t sata_function;
+extern bool found_sata_controller;
+extern uint8_t sata_controller_bus;
+extern uint8_t sata_controller_device;
+extern uint8_t sata_controller_function;
 
 extern const uint64_t pcie_ecam_paddr;
 extern const uint64_t pcie_ecam_vaddr;

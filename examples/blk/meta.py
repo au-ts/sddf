@@ -121,27 +121,21 @@ def generate(sdf_file: str, output_dir: str, dtb: Optional[DeviceTree]):
         sdf.add_mr(pci_ecam)
 
         # The last PCI base address register, BAR[5], points to the AHCI base memory, it’s called ABAR (AHCI Base Memory Register).
-        sata_bar_5 = SystemDescription.MemoryRegion(sdf, "sata_bar_5", 0x1000, paddr=0xb0402000)
-        sata_bar_5_map = SystemDescription.Map(sata_bar_5, 0x7_0000_0000, "rw", cached=False)
-        blk_driver.add_map(sata_bar_5_map)
-        sdf.add_mr(sata_bar_5)
-
-        # may not be valid on vb_105
-        # msi_reg = SystemDescription.MemoryRegion(sdf, "msi_reg", 0x1000, paddr=0xfee00000) # 0xfee00278
-        # msi_reg_map = SystemDescription.Map(msi_reg, 0x7_1000_0000, "rw", cached=False)
-        # blk_driver.add_map(msi_reg_map)
-        # sdf.add_mr(msi_reg)
+        sata_controller_bar_5 = SystemDescription.MemoryRegion(sdf, "sata_controller_bar_5", 0x1000, paddr=0xb0402000)
+        sata_controller_bar_5_map = SystemDescription.Map(sata_controller_bar_5, 0x7_0000_0000, "rw", cached=False)
+        blk_driver.add_map(sata_controller_bar_5_map)
+        sdf.add_mr(sata_controller_bar_5)
 
         # We can cache all of these as true
 
         # We only use one port in the example (1 device)
-        ahci_command_list = SystemDescription.MemoryRegion(sdf, "ahci_command_list", 0x1000, paddr=0x10000000) # Arbitrary paddr
-        ahci_command_list_map = SystemDescription.Map(ahci_command_list, 0x7_2000_0000, "rw", cached=False) # @Tristan : Test if we should cache (i think we do)
+        ahci_command_list = SystemDescription.MemoryRegion(sdf, "ahci_command_list", 0x1000, paddr=0x10000000)
+        ahci_command_list_map = SystemDescription.Map(ahci_command_list, 0x7_2000_0000, "rw", cached=True)
         blk_driver.add_map(ahci_command_list_map)
         sdf.add_mr(ahci_command_list)
 
-        ahci_FIS = SystemDescription.MemoryRegion(sdf, "ahci_FIS", 0x1000, paddr=0x10002000) # Arbitrary paddr
-        ahci_FIS_map = SystemDescription.Map(ahci_FIS, 0x7_2000_2000, "rw", cached=False)
+        ahci_FIS = SystemDescription.MemoryRegion(sdf, "ahci_FIS", 0x1000, paddr=0x10002000)
+        ahci_FIS_map = SystemDescription.Map(ahci_FIS, 0x7_2000_2000, "rw", cached=True)
         blk_driver.add_map(ahci_FIS_map)
         sdf.add_mr(ahci_FIS)
 
@@ -154,22 +148,20 @@ def generate(sdf_file: str, output_dir: str, dtb: Optional[DeviceTree]):
         # if its only got 8 then the size for each table becomes
         # 128 (header) + 8 * 16 (PRDT) = 256 bytes each
 
-        ahci_command_tables = SystemDescription.MemoryRegion(sdf, "ahci_command_tables", 0x2000, paddr=0x10004000) # Arbitrary paddr
-        ahci_command_tables_map = SystemDescription.Map(ahci_command_tables, 0x7_2000_4000, "rw", cached=False)
+        ahci_command_tables = SystemDescription.MemoryRegion(sdf, "ahci_command_tables", 0x2000, paddr=0x10004000)
+        ahci_command_tables_map = SystemDescription.Map(ahci_command_tables, 0x7_2000_4000, "rw", cached=True)
         blk_driver.add_map(ahci_command_tables_map)
         sdf.add_mr(ahci_command_tables)
 
-        # use interupt pin A for now routed to IRQ 34
-
         # Just for testing and first iterations of the driver before using virt and client
         data_region = SystemDescription.MemoryRegion(sdf, "data_region", 0x10_000, paddr=0x10008000)
-        data_region_map = SystemDescription.Map(data_region, 0x7_2000_8000, "rw", cached=False)
+        data_region_map = SystemDescription.Map(data_region, 0x7_2000_8000, "rw", cached=True)
         blk_driver.add_map(data_region_map)
         sdf.add_mr(data_region)
 
-        # This is for the identify command! Which we need DMA for
+        # This is for the identify command which we need DMA for
         identify_command = SystemDescription.MemoryRegion(sdf, "identify_command", 0x1000, paddr=0x10020000)
-        identify_command_map = SystemDescription.Map(identify_command, 0x7_2002_0000, "rw", cached=False)
+        identify_command_map = SystemDescription.Map(identify_command, 0x7_2002_0000, "rw", cached=True)
         blk_driver.add_map(identify_command_map)
         sdf.add_mr(identify_command)
 
@@ -178,9 +170,9 @@ def generate(sdf_file: str, output_dir: str, dtb: Optional[DeviceTree]):
             ioapic_id=0, # from Linux
             pin=16, # from Linux
             vector=64,  # arbitrary
-            trigger=IrqIoapic.Trigger.LEVEL, # because it is
-            polarity=IrqIoapic.Polarity.ACTIVELOW, # because it is
-            id=60 # Microkit logical IRQ id
+            trigger=IrqIoapic.Trigger.LEVEL,
+            polarity=IrqIoapic.Polarity.ACTIVELOW,
+            id=60
         )
         blk_driver.add_irq(irq)
 

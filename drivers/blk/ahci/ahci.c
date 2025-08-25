@@ -26,10 +26,6 @@
 #include <sddf/timer/config.h>
 #include <sddf/timer/client.h>
 
-#define MAX_PRDT_ENTRIES     8
-#define SECTORS_PER_PRDT     16             // 8 KiB / 512 B
-#define MAX_SECTORS_PER_CMD  (MAX_PRDT_ENTRIES * SECTORS_PER_PRDT)  // 128
-
 #define DEBUG_DRIVER
 
 #ifdef DEBUG_DRIVER
@@ -37,18 +33,36 @@
 #else
 #define LOG_AHCI(...) do{}while(0)
 #endif
-
 #define LOG_AHCI_ERR(...) do{ sddf_printf("AHCI |ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
+
+// MAKE SURE THESE MATCH meta.py (i dont think they have setvaddr in sdfgen)
+const uint64_t ahci_command_list_paddr = 0x10000000;
+const uint64_t ahci_command_list_vaddr = 0x720000000;
+const uint64_t ahci_command_list_size = 0x1000;
+const uint64_t ahci_FIS_paddr = 0x10002000;
+const uint64_t ahci_FIS_vaddr = 0x720002000;
+const uint64_t ahci_FIS_size = 0x1000;
+const uint64_t ahci_command_tables_paddr = 0x10004000;
+const uint64_t ahci_command_tables_vaddr = 0x720004000;
+const uint64_t ahci_command_tables_size = 0x2000;
+const uint64_t data_region_paddr = 0x10008000;
+const uint64_t data_region_vaddr = 0x720008000;
+const uint64_t data_region_size = 0x10000;
+const uint64_t identify_command_paddr = 0x10020000;
+const uint64_t identify_command_vaddr = 0x720020000;
+const uint64_t identify_command_size = 0x1000;
+
+__attribute__((__section__(".device_resources"))) device_resources_t device_resources;
+__attribute__((__section__(".blk_driver_config"))) blk_driver_config_t blk_config;
+__attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
 
 #define fallthrough __attribute__((__fallthrough__))
 
+#define MAX_PRDT_ENTRIES     8
+#define SECTORS_PER_PRDT     16             // 8 KiB / 512 B
+#define MAX_SECTORS_PER_CMD  (MAX_PRDT_ENTRIES * SECTORS_PER_PRDT)  // 128
+
 blk_queue_handle_t blk_queue;
-
-bool found_sata = false;
-
-uint8_t sata_bus;
-uint8_t sata_device;
-uint8_t sata_function;
 
 uint8_t ahci_port_number;
 bool ahci_port_found = false;
@@ -64,7 +78,7 @@ typedef enum {
     DrvErrorInternal,
 } drv_status_t;
 
- int slot = -1;
+int slot = -1;
 
 #define SDDF_BLOCKS_TO_AHCI_BLOCKS (BLK_TRANSFER_SIZE / 512)
 
@@ -83,30 +97,6 @@ HBA_PORT* port;
 ATA_IDENTIFY* identify_command;
 blk_storage_info_t *storage_info;
 
-// i dont think they have setvar in sdfgen???
-const uint64_t ahci_command_list_paddr = 0x10000000;
-const uint64_t ahci_command_list_vaddr = 0x720000000;
-const uint64_t ahci_command_list_size = 0x1000;
-
-const uint64_t ahci_FIS_paddr = 0x10002000;
-const uint64_t ahci_FIS_vaddr = 0x720002000;
-const uint64_t ahci_FIS_size = 0x1000;
-
-const uint64_t ahci_command_tables_paddr = 0x10004000;
-const uint64_t ahci_command_tables_vaddr = 0x720004000;
-const uint64_t ahci_command_tables_size = 0x2000;
-
-const uint64_t data_region_paddr = 0x10008000;
-const uint64_t data_region_vaddr = 0x720008000;
-const uint64_t data_region_size = 0x10000;
-
-const uint64_t identify_command_paddr = 0x10020000;
-const uint64_t identify_command_vaddr = 0x720020000;
-const uint64_t identify_command_size = 0x1000;
-
-__attribute__((__section__(".device_resources"))) device_resources_t device_resources;
-__attribute__((__section__(".blk_driver_config"))) blk_driver_config_t blk_config;
-__attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
 
 /* The current action-status of the driver */
 static enum {
@@ -121,6 +111,7 @@ typedef enum {
 } request_state_t;
 
 static struct driver_state {
+
     struct {
         bool inflight;
         uint32_t id;
@@ -705,8 +696,6 @@ bool identify_device_1() {
     LOG_AHCI("Issued command\n");
     LOG_AHCI("Issued: PxCI=0x%08x PxCMD=0x%08x GHC=0x%08x\n",
          port->ci, port->cmd, hba->ghc);
-
-    // sddf_timer_set_timeout(timer_config.driver_id, 3 * NS_IN_S);
 
     return true;
 }
@@ -1343,14 +1332,8 @@ void init()
 
     pcie_init();
 
-    assert(found_sata);
-
-    print_pci_info(sata_bus, sata_device, sata_function, false);
+    assert(found_sata_controller);
 
     driver_status = DrvStatusBringup;
     do_bringup();
 }
-
-// TODO:    the design for this driver PD is that it needs to operate ALL of the 32 ports
-//          we will have a seperate virt per port/device though
-//          thus microkit_sdfgen will have to change so we can have multiple virts intead of just one.
