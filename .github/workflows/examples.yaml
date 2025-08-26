@@ -70,6 +70,19 @@ jobs:
           path: ci_build/**/loader.img
           if-no-files-found: error
 
+  build_macos_arm64_nix:
+    name: Build (macOS ARM64 Nix)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Nix
+        uses: cachix/install-nix-action@v27
+      - name: Get Nix dependencies
+        run: nix develop -c bash -c 'echo Hello World'
+      - name: Build examples
+        run: nix develop --ignore-environment -c bash -c 'CI=1 ./ci/build.py $MICROKIT_SDK $(nproc)'
+
   build_macos_arm64:
     name: Build (macOS ARM64)
     runs-on: macos-14
