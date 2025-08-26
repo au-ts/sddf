@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from sdfgen import SystemDescription, Sddf, DeviceTree
 from importlib.metadata import version
 
-assert version("sdfgen").split(".")[1] == "24", "Unexpected sdfgen version"
+assert version("sdfgen").split(".")[1] == "26", "Unexpected sdfgen version"
 
 ProtectionDomain = SystemDescription.ProtectionDomain
 MemoryRegion = SystemDescription.MemoryRegion
@@ -51,8 +51,8 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
     # Right now we do not have separate clk and GPIO drivers and so our I2C driver does manual
     # clk/GPIO setup for I2C.
-    clk_mr = MemoryRegion("clk", 0x1000, paddr=0xFF63C000)
-    gpio_mr = MemoryRegion("gpio", 0x1000, paddr=0xFF634000)
+    clk_mr = MemoryRegion(sdf, "clk", 0x1000, paddr=0xFF63C000)
+    gpio_mr = MemoryRegion(sdf, "gpio", 0x1000, paddr=0xFF634000)
     sdf.add_mr(clk_mr)
     sdf.add_mr(gpio_mr)
 
