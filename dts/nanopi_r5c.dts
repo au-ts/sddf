@@ -885,7 +885,7 @@
 		snps,mtl-rx-config = <0x4b>;
 		snps,mtl-tx-config = <0x4c>;
 		snps,tso;
-		status = "disabled";
+		status = "okay";
 
 		mdio {
 			compatible = "snps,dwmac-mdio";
@@ -3215,7 +3215,7 @@
 		snps,mtl-rx-config = <0xc2>;
 		snps,mtl-tx-config = <0xc3>;
 		snps,tso;
-		status = "disabled";
+		status = "okay";
 
 		mdio {
 			compatible = "snps,dwmac-mdio";

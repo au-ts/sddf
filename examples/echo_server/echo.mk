@@ -87,6 +87,11 @@ else ifeq ($(strip $(MICROKIT_BOARD)), star64)
 	DRIV_DIR := dwmac-5.10a
 	SERIAL_DRIV_DIR := ns16550a
 	TIMER_DRV_DIR := jh7110
+else ifeq ($(strip $(MICROKIT_BOARD)), nanopi_r5c)
+	DRIV_DIR := meson
+	SERIAL_DRIV_DIR := ns16550a
+	TIMER_DRV_DIR := rk3568
+	CPU := cortex-a55
 else
 $(error Unsupported MICROKIT_BOARD given)
 endif

@@ -282,39 +282,40 @@ void init(void)
     assert(TX_COUNT * sizeof(struct descriptor) <= device_resources.regions[2].region.size);
 
     /* Ack any IRQs that were delivered before the driver started. */
-    microkit_irq_ack(device_resources.irqs[0].id);
+    // microkit_irq_ack(device_resources.irqs[0].id);
 
-    eth_setup();
+    // eth_setup();
 
-    net_queue_init(&rx_queue, config.virt_rx.free_queue.vaddr, config.virt_rx.active_queue.vaddr,
-                   config.virt_rx.num_buffers);
-    net_queue_init(&tx_queue, config.virt_tx.free_queue.vaddr, config.virt_tx.active_queue.vaddr,
-                   config.virt_tx.num_buffers);
+    // net_queue_init(&rx_queue, config.virt_rx.free_queue.vaddr, config.virt_rx.active_queue.vaddr,
+    //                config.virt_rx.num_buffers);
+    // net_queue_init(&tx_queue, config.virt_tx.free_queue.vaddr, config.virt_tx.active_queue.vaddr,
+    //                config.virt_tx.num_buffers);
 
-    rx_provide();
-    tx_provide();
+    // rx_provide();
+    // tx_provide();
 
-    /* Enable IRQs */
-    eth_dma->intenable |= DMA_INTR_MASK;
+    // /* Enable IRQs */
+    // eth_dma->intenable |= DMA_INTR_MASK;
 
-    /* Disable uneeded GMAC irqs */
-    eth_mac->intmask |= GMAC_INTR_MASK;
+    // /* Disable uneeded GMAC irqs */
+    // eth_mac->intmask |= GMAC_INTR_MASK;
 
-    /* We are ready to receive. Enable. */
-    eth_mac->conf |= RX_ENABLE | TX_ENABLE;
-    eth_dma->opmode |= TXSTART | RXSTART;
+    // /* We are ready to receive. Enable. */
+    // eth_mac->conf |= RX_ENABLE | TX_ENABLE;
+    // eth_dma->opmode |= TXSTART | RXSTART;
 }
 
 void notified(microkit_channel ch)
 {
-    if (ch == device_resources.irqs[0].id) {
-        handle_irq();
-        microkit_deferred_irq_ack(ch);
-    } else if (ch == config.virt_rx.id) {
-        rx_provide();
-    } else if (ch == config.virt_tx.id) {
-        tx_provide();
-    } else {
-        sddf_dprintf("ETH|LOG: received notification on unexpected channel %u\n", ch);
-    }
+    // if (ch == device_resources.irqs[0].id) {
+    //     sddf_dprintf("got irq\n");
+    //     handle_irq();
+    //     microkit_deferred_irq_ack(ch);
+    // } else if (ch == config.virt_rx.id) {
+    //     rx_provide();
+    // } else if (ch == config.virt_tx.id) {
+    //     tx_provide();
+    // } else {
+    //     sddf_dprintf("ETH|LOG: received notification on unexpected channel %u\n", ch);
+    // }
 }

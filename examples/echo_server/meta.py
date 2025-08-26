@@ -68,6 +68,14 @@ BOARDS: List[Board] = [
         ethernet="soc@0/bus@30800000/ethernet@30be0000",
     ),
     Board(
+        name="nanopi_r5c",
+        arch=SystemDescription.Arch.AARCH64,
+        paddr_top=0x20000000,
+        serial="serial@fe660000",
+        timer="timer@fe5f0000",
+        ethernet="ethernet@fe010000",
+    ),
+    Board(
         name="imx8mm_evk",
         arch=SystemDescription.Arch.AARCH64,
         paddr_top=0x70000000,
