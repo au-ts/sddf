@@ -9,7 +9,7 @@ name: PR
 on: [pull_request]
 
 env:
-  ZIG_VERSION: 0.14.0
+  ZIG_VERSION: 0.15.1
 
 jobs:
   whitespace:
@@ -46,7 +46,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Install Zig
-        uses: mlugg/setup-zig@v2.0.0
+        uses: mlugg/setup-zig@v2.0.5
         with:
           version: ${{ env.ZIG_VERSION }}
 

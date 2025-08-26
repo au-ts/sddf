@@ -9,7 +9,7 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
     zig-overlay.url = "github:mitchellh/zig-overlay";
     zig-overlay.inputs.nixpkgs.follows = "nixpkgs";
-    sdfgen.url = "github:au-ts/microkit_sdf_gen/0.24.0";
+    sdfgen.url = "github:au-ts/microkit_sdf_gen/0.26.0";
     sdfgen.inputs.nixpkgs.follows = "nixpkgs";
   };
 
@@ -38,7 +38,7 @@
               };
 
               llvm = pkgs.llvmPackages_18;
-              zig = zig-overlay.packages.${system}."0.14.0";
+              zig = zig-overlay.packages.${system}."0.15.1";
 
               pysdfgen = sdfgen.packages.${system}.pysdfgen.override { zig = zig; pythonPackages = pkgs.python312Packages; };
 

@@ -21,8 +21,8 @@ on:
 env:
   MICROKIT_VERSION: 2.0.1
   MICROKIT_URL: https://github.com/seL4/microkit/releases/download/2.0.1/microkit-sdk-2.0.1
-  SDFGEN_VERSION: 0.24.0
-  ZIG_VERSION: 0.14.0
+  SDFGEN_VERSION: 0.26.0
+  ZIG_VERSION: 0.15.1
 
 jobs:
   build_linux_x86_64:
@@ -38,7 +38,7 @@ jobs:
       - name: Install dependencies (via apt)
         run: sudo apt update && sudo apt install -y make llvm lld imagemagick device-tree-compiler
       - name: Install Zig
-        uses: mlugg/setup-zig@v2.0.0
+        uses: mlugg/setup-zig@v2.0.5
         with:
           version: ${{ env.ZIG_VERSION }}
       - name: Setup pyenv
@@ -70,6 +70,19 @@ jobs:
           path: ci_build/**/loader.img
           if-no-files-found: error
 
+  build_macos_arm64_nix:
+    name: Build (macOS ARM64 Nix)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Setup Nix
+        uses: cachix/install-nix-action@v27
+      - name: Get Nix dependencies
+        run: nix develop -c bash -c 'echo Hello World'
+      - name: Build examples
+        run: nix develop --ignore-environment -c bash -c 'CI=1 ./ci/build.py $MICROKIT_SDK $(nproc)'
+
   build_macos_arm64:
     name: Build (macOS ARM64)
     runs-on: macos-14
@@ -87,7 +100,7 @@ jobs:
           brew install riscv-tools
           echo "/opt/homebrew/opt/llvm/bin:$PATH" >> $GITHUB_PATH
       - name: Install Zig
-        uses: mlugg/setup-zig@v2.0.0
+        uses: mlugg/setup-zig@v2.0.5
         with:
           version: ${{ env.ZIG_VERSION }}
       - name: Setup pyenv
