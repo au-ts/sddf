@@ -72,7 +72,7 @@ jobs:
 
   build_macos_arm64_nix:
     name: Build (macOS ARM64 Nix)
-    runs-on: ubuntu-latest
+    runs-on: macos-14
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
