@@ -58,31 +58,31 @@ typedef uint64_t ccnt_t;
 // void seL4_DebugRun(void (* userfn) (void *), void* userarg);
 
 static inline uint64_t sel4bench_x86_rdmsr(uint32_t reg) {
-// #ifdef CONFIG_KERNEL_X86_DANGEROUS_MSR
-    // return seL4_X86DangerousRDMSR(reg);
-// #else
-//     uint32_t msr_data[3];
-//     msr_data[0] = reg;
-//     msr_data[1] = 0;
-//     msr_data[2] = 0;
+#ifdef CONFIG_KERNEL_X86_DANGEROUS_MSR
+    return seL4_X86DangerousRDMSR(reg);
+#else
+    uint32_t msr_data[3];
+    msr_data[0] = reg;
+    msr_data[1] = 0;
+    msr_data[2] = 0;
 
-//     seL4_DebugRun(&sel4bench_private_rdmsr, msr_data);
-//     return (uint64_t)msr_data[1] + ((uint64_t)msr_data[2] << 32);
-// #endif
+    seL4_DebugRun(&sel4bench_private_rdmsr, msr_data);
+    return (uint64_t)msr_data[1] + ((uint64_t)msr_data[2] << 32);
+#endif
     return 0;
 }
 
 static inline void sel4bench_x86_wrmsr(uint32_t reg, uint64_t val) {
-// #ifdef CONFIG_KERNEL_X86_DANGEROUS_MSR
-    // seL4_X86DangerousWRMSR(reg, val);
-// #else
-//     uint32_t msr_data[3];
-//     msr_data[0] = reg;
-//     msr_data[1] = val & 0xffffffff;
-//     msr_data[2] = val >> 32;
+#ifdef CONFIG_KERNEL_X86_DANGEROUS_MSR
+    seL4_X86DangerousWRMSR(reg, val);
+#else
+    uint32_t msr_data[3];
+    msr_data[0] = reg;
+    msr_data[1] = val & 0xffffffff;
+    msr_data[2] = val >> 32;
 
-//     seL4_DebugRun(&sel4bench_private_wrmsr, msr_data);
-// #endif
+    seL4_DebugRun(&sel4bench_private_wrmsr, msr_data);
+#endif
 }
 
 static FASTFN void sel4bench_init()
@@ -108,9 +108,10 @@ static FASTFN void sel4bench_init()
     }
 
     //enable user-mode RDPMC
-// #ifndef CONFIG_EXPORT_PMC_USER
-//     seL4_DebugRun(&sel4bench_private_enable_user_pmc, NULL);
-// #endif
+#ifndef CONFIG_EXPORT_PMC_USER
+    // seL4_DebugRun(&sel4bench_private_enable_user_pmc, NULL);
+    sel4bench_private_enable_user_pmc();
+#endif
 }
 
 static FASTFN ccnt_t sel4bench_get_cycle_count()
@@ -161,7 +162,8 @@ static CACHESENSFN ccnt_t sel4bench_get_counters(counter_bitfield_t mask, ccnt_t
     sel4bench_private_serialize_pmc();    /* Serialise all preceding instructions */
     for (; mask != 0; mask >>= 1, counter++)
         if (mask & 1) {
-            values[counter] = sel4bench_private_rdpmc(counter);
+            // values[counter] = sel4bench_private_rdpmc(counter);
+            values[counter] = sel4bench_x86_rdmsr(IA32_MSR_PMC_PERFEVTCNT_BASE + counter);
         }
 
     uint64_t time = sel4bench_private_rdtsc();
