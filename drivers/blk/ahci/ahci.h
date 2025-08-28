@@ -1,7 +1,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-// FIS types
+// FIS types (we only use FIS_TYPE_REG_H2D in this driver)
 typedef enum
 {
 	FIS_TYPE_REG_H2D	= 0x27,	// Register FIS - host to device
@@ -131,13 +131,13 @@ typedef struct tagFIS_DMA_SETUP
     uint64_t DMAbufferID;    // DMA Buffer Identifier. Used to Identify DMA buffer in host memory.
                              // SATA Spec says host specific and not in Spec. Trying AHCI spec might work.
     //DWORD 3
-    uint32_t rsvd;           //More reserved
+    uint32_t rsvd;           // More reserved
     //DWORD 4
-    uint32_t DMAbufOffset;   //Byte offset into buffer. First 2 bits must be 0
+    uint32_t DMAbufOffset;   // Byte offset into buffer. First 2 bits must be 0
     //DWORD 5
-    uint32_t TransferCount;  //Number of bytes to transfer. Bit 0 must be 0
+    uint32_t TransferCount;  // Number of bytes to transfer. Bit 0 must be 0
     //DWORD 6
-    uint32_t resvd;          //Reserved
+    uint32_t resvd;          // Reserved
 
 } __attribute__((packed)) FIS_DMA_SETUP;
 
@@ -184,7 +184,7 @@ typedef volatile struct tagHBA_MEM
 	// 0xA0 - 0xFF, Vendor specific registers
 	uint8_t  vendor[0x100-0xA0];
 	// 0x100 - 0x10FF, Port control registers
-	HBA_PORT	ports[1];	// 1 ~ 32
+	HBA_PORT	ports[32];	// 1 ~ 32 // For now just include space for all 32
 } __attribute__((packed)) HBA_MEM;
 
 // Received FIS
@@ -252,46 +252,82 @@ typedef struct tagHBA_CMD_TBL
 	// 0x50
 	uint8_t  rsv[48];	// Reserved
 	// 0x80
-	HBA_PRDT_ENTRY	prdt_entry[1];	// Physical region descriptor table entries, 0 ~ 65535
+	HBA_PRDT_ENTRY	prdt_entry[8];	// Physical region descriptor table entries, 0 ~ 65535
 	// NOTE: we are choosing 8 for now but you can chooose up to 65535 and you could make it dynamic later
 } __attribute__((packed)) HBA_CMD_TBL;
 
 // TODO: @Tristan
+// typedef volatile struct tagATA_IDENTIFY
+// {
+//     uint16_t w0_59[60];            // 0..59
+//     // 28-bit LBA sector count (use only if 48-bit not supported)
+//     uint16_t lba28_lo;             // 60
+//     uint16_t lba28_hi;             // 61
+//     uint16_t w62_82[21];           // 62..82
+//     uint16_t w83;                  // 83 (feature support: bit 10 = 48-bit LBA)
+//     uint16_t w84_99[16];           // 84..99
+//     uint16_t lba48_0;              // 100 (lowest 16 bits)
+//     uint16_t lba48_1;              // 101
+//     uint16_t lba48_2;              // 102
+//     uint16_t lba48_3;              // 103 (highest 16 bits of the 48-bit number)
+//     uint16_t w104_105[2];          // 104..105
+//     uint16_t w106;                 // 106 (bit 12 => logical sector size valid in 117–118)
+//     uint16_t w107_116[10];         // 107..116
+//     uint16_t logical_sector_size_lo; // 117 (low 16)
+//     uint16_t logical_sector_size_hi; // 118 (high 16)
+//     uint16_t w119_255[256 - 119];      // 119..255
+// } __attribute__((packed)) ATA_IDENTIFY;
+
 typedef volatile struct tagATA_IDENTIFY
 {
-    uint16_t w0_59[60];            // 0..59
-    // 28-bit LBA sector count (use only if 48-bit not supported)
-    uint16_t lba28_lo;             // 60
-    uint16_t lba28_hi;             // 61
-    uint16_t w62_82[21];           // 62..82
-    uint16_t w83;                  // 83 (feature support: bit 10 = 48-bit LBA)
-    uint16_t w84_99[16];           // 84..99
-    uint16_t lba48_0;              // 100 (lowest 16 bits)
-    uint16_t lba48_1;              // 101
-    uint16_t lba48_2;              // 102
-    uint16_t lba48_3;              // 103 (highest 16 bits of the 48-bit number)
-    uint16_t w104_105[2];          // 104..105
-    uint16_t w106;                 // 106 (bit 12 => logical sector size valid in 117–118)
-    uint16_t w107_116[10];         // 107..116
-    uint16_t logical_sector_size_lo; // 117 (low 16)
-    uint16_t logical_sector_size_hi; // 118 (high 16)
-    uint16_t w119_255[256 - 119];      // 119..255
+    uint16_t general_configuration_0;          	// word 0
+	uint16_t legacy_logical_cylinders_1;       	// word 1 (obsolete CHS)
+	uint16_t specific_configuration_2;         	// word 2
+	uint16_t legacy_logical_heads_3;           	// word 3 (obsolete CHS)
+	uint16_t retired_unfmt_bytes_per_track_4;  	// word 4 (retired)
+	uint16_t retired_unfmt_bytes_per_sector_5; 	// word 5 (retired)
+	uint16_t legacy_sectors_per_track_6;       	// word 6 (obsolete CHS)
+	uint16_t vendor_unique_7;                  	// word 7 (retired/vendor)
+	uint16_t vendor_unique_8;                  	// word 8 (retired/vendor)
+	uint16_t vendor_unique_9;                  	// word 9 (retired/vendor)
+    uint16_t serial_number_words[10];    		// 10..19 (ASCII, bytes swapped per word)
+    uint16_t rsv20_22[3];                		// 20..22
+    uint16_t firmware_rev_words[4];      		// 23..26 (optional)
+    uint16_t model_number_words[20];     		// 27..46 (optional)
+    uint16_t rsv47_59[13];               		// 47..59
+    uint16_t lba28_sectors_lo;           		// 60
+    uint16_t lba28_sectors_hi;           		// 61
+    uint16_t rsv62_82[21];               		// 62..82
+    uint16_t feature_support_83;         		// 83  (bit 10 = 48-bit LBA supported)
+    uint16_t rsv84_99[16];               		// 84..99
+    uint16_t lba48_sectors_0;            		// 100 (least significant 16)
+    uint16_t lba48_sectors_1;            		// 101
+    uint16_t lba48_sectors_2;            		// 102
+    uint16_t lba48_sectors_3;            		// 103 (most significant 16)
+    uint16_t rsv104_105[2];              		// 104..105
+    uint16_t sector_size_flags_106;      		// 106 (bit 12 = logical sector size valid in 117–118)
+    uint16_t rsv107_116[10];             		// 107..116
+    uint16_t logical_sector_size_lo;     		// 117 (low 16)
+    uint16_t logical_sector_size_hi;     		// 118 (high 16)
+    uint16_t rsv119_255[137];            		// 119..255
 } __attribute__((packed)) ATA_IDENTIFY;
 
+// probe_port
 #define	SATA_SIG_ATA	0x00000101	// SATA drive
 #define	SATA_SIG_ATAPI	0xEB140101	// SATAPI drive
 #define	SATA_SIG_SEMB	0xC33C0101	// Enclosure management bridge
 #define	SATA_SIG_PM		0x96690101	// Port multiplier
 
-#define AHCI_DEV_NULL 0
-#define AHCI_DEV_SATA 1
-#define AHCI_DEV_SEMB 2
-#define AHCI_DEV_PM 3
-#define AHCI_DEV_SATAPI 4
+#define AHCI_DEV_NULL 		0
+#define AHCI_DEV_SATA 		1
+#define AHCI_DEV_SEMB 		2
+#define AHCI_DEV_PM 		3
+#define AHCI_DEV_SATAPI 	4
 
-#define HBA_PORT_IPM_ACTIVE 1
-#define HBA_PORT_DET_PRESENT 3
+#define HBA_PORT_IPM_ACTIVE 	1
+#define HBA_PORT_DET_PRESENT 	3
 
+// start/stop command engine
 #define HBA_PxCMD_ST    0x0001
 #define HBA_PxCMD_FRE   0x0010
 #define HBA_PxCMD_FR    0x4000
@@ -299,10 +335,6 @@ typedef volatile struct tagATA_IDENTIFY
 
 #define ATA_DEV_BUSY 0x80
 #define ATA_DEV_DRQ 0x08
-
-// @Tristans definitions
-#define HBA_PxCMD_SUD   (1u << 1)
 #define ATA_CMD_READ_DMA_EX  0x25
 #define ATA_CMD_WRITE_DMA_EX 0x35
-#define HBA_PxIS_TFES  (1U << 30)
-#define ATA_CMD_IDENTIFY 0xEC
+#define ATA_CMD_IDENTIFY 	 0xEC

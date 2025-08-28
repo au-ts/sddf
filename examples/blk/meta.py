@@ -57,7 +57,7 @@ BOARDS: List[Board] = [
         name="x86_64_generic",
         arch=SystemDescription.Arch.X86_64,
         paddr_top=0x20000000,
-        partition=0, # @Trsitan : todo , figure out what linux does and implications
+        partition=0,
         blk=None,
         serial=None,
         timer=None,
@@ -126,42 +126,32 @@ def generate(sdf_file: str, output_dir: str, dtb: Optional[DeviceTree]):
         blk_driver.add_map(sata_controller_bar_5_map)
         sdf.add_mr(sata_controller_bar_5)
 
-        # We can cache all of these as true
-
-        # We only use one port in the example (1 device)
-        ahci_command_list = SystemDescription.MemoryRegion(sdf, "ahci_command_list", 0x1000, paddr=0x10000000)
+        # 32 ports * 1k size
+        # 32 * 1k
+        ahci_command_list = SystemDescription.MemoryRegion(sdf, "ahci_command_list", 0x8000, paddr=0x10000000)
         ahci_command_list_map = SystemDescription.Map(ahci_command_list, 0x7_2000_0000, "rw", cached=True)
         blk_driver.add_map(ahci_command_list_map)
         sdf.add_mr(ahci_command_list)
 
-        ahci_FIS = SystemDescription.MemoryRegion(sdf, "ahci_FIS", 0x1000, paddr=0x10002000)
-        ahci_FIS_map = SystemDescription.Map(ahci_FIS, 0x7_2000_2000, "rw", cached=True)
+        # 32 ports * 256 size
+        # 32 * 256
+        ahci_FIS = SystemDescription.MemoryRegion(sdf, "ahci_FIS", 0x2000, paddr=0x10008000)
+        ahci_FIS_map = SystemDescription.Map(ahci_FIS, 0x7_2000_8000, "rw", cached=True)
         blk_driver.add_map(ahci_FIS_map)
         sdf.add_mr(ahci_FIS)
 
-        # There are 32 possible command tables
-        # We just map them all contiguously
-
-        # Command tables can support up to 65535 PRDT entries
-        # for now we just use 8 which should be enough for most use cases
-
-        # if its only got 8 then the size for each table becomes
-        # 128 (header) + 8 * 16 (PRDT) = 256 bytes each
-
-        ahci_command_tables = SystemDescription.MemoryRegion(sdf, "ahci_command_tables", 0x2000, paddr=0x10004000)
-        ahci_command_tables_map = SystemDescription.Map(ahci_command_tables, 0x7_2000_4000, "rw", cached=True)
+        # 32 ports * 32 tables * (128 table metadata + 8 prdts * 16 size)
+        # 32 * 32 * (128 + 8 * 16)
+        # we use 8 prdts
+        ahci_command_tables = SystemDescription.MemoryRegion(sdf, "ahci_command_tables", 0x40000, paddr=0x10010000)
+        ahci_command_tables_map = SystemDescription.Map(ahci_command_tables, 0x7_2001_0000, "rw", cached=True)
         blk_driver.add_map(ahci_command_tables_map)
         sdf.add_mr(ahci_command_tables)
 
-        # Just for testing and first iterations of the driver before using virt and client
-        data_region = SystemDescription.MemoryRegion(sdf, "data_region", 0x10_000, paddr=0x10008000)
-        data_region_map = SystemDescription.Map(data_region, 0x7_2000_8000, "rw", cached=True)
-        blk_driver.add_map(data_region_map)
-        sdf.add_mr(data_region)
-
-        # This is for the identify command which we need DMA for
-        identify_command = SystemDescription.MemoryRegion(sdf, "identify_command", 0x1000, paddr=0x10020000)
-        identify_command_map = SystemDescription.Map(identify_command, 0x7_2002_0000, "rw", cached=True)
+        # We need to store seperate DMA regions for the IDENTIFY commands
+        # 32 * 512
+        identify_command = SystemDescription.MemoryRegion(sdf, "identify_command", 0x4000, paddr=0x10050000)
+        identify_command_map = SystemDescription.Map(identify_command, 0x7_2005_0000, "rw", cached=True)
         blk_driver.add_map(identify_command_map)
         sdf.add_mr(identify_command)
 
@@ -191,7 +181,6 @@ def generate(sdf_file: str, output_dir: str, dtb: Optional[DeviceTree]):
     if dtb is not None and board.timer:
         pds += [timer_driver]
 
-    # @Tristan: do this a better way
     if board.arch == SystemDescription.Arch.X86_64:
          pds += [timer_driver]
 
@@ -206,7 +195,6 @@ def generate(sdf_file: str, output_dir: str, dtb: Optional[DeviceTree]):
         assert timer_system.connect()
         assert timer_system.serialise_config(output_dir)
 
-    # @Tristan: do this a better way
     if board.arch == SystemDescription.Arch.X86_64:
       assert timer_system.connect()
       assert timer_system.serialise_config(output_dir)

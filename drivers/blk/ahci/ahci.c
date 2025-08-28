@@ -3,17 +3,6 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-// TOOD: fix the timeouts amounts i just chose 1s because i can
-// TODO: error messages
-// TODO: so much checking
-// PRDT lenggth
-// 48 bit and 28 bit address not implemented in the reads and write
-// TOODO : fix up the the struct vs base+ offset stuff
-// TODO: we only handle one port for now
-// they both interact with pcie
-
-// TODO: driver_status = DrvStatusInactive; add these where appropriate? or assert(false) LOG_DRIVER_ERR("Failed to initialise SD card\n");
-
 #include "ahci.h"
 #include "pcie.h"
 
@@ -25,6 +14,8 @@
 #include <sddf/util/string.h>
 #include <sddf/timer/config.h>
 #include <sddf/timer/client.h>
+
+static inline uint64_t min_u64(uint64_t a, uint64_t b) { return a < b ? a : b; }
 
 #define DEBUG_DRIVER
 
@@ -38,19 +29,16 @@
 // MAKE SURE THESE MATCH meta.py (i dont think they have setvaddr in sdfgen)
 const uint64_t ahci_command_list_paddr = 0x10000000;
 const uint64_t ahci_command_list_vaddr = 0x720000000;
-const uint64_t ahci_command_list_size = 0x1000;
-const uint64_t ahci_FIS_paddr = 0x10002000;
-const uint64_t ahci_FIS_vaddr = 0x720002000;
-const uint64_t ahci_FIS_size = 0x1000;
-const uint64_t ahci_command_tables_paddr = 0x10004000;
-const uint64_t ahci_command_tables_vaddr = 0x720004000;
-const uint64_t ahci_command_tables_size = 0x2000;
-const uint64_t data_region_paddr = 0x10008000;
-const uint64_t data_region_vaddr = 0x720008000;
-const uint64_t data_region_size = 0x10000;
-const uint64_t identify_command_paddr = 0x10020000;
-const uint64_t identify_command_vaddr = 0x720020000;
-const uint64_t identify_command_size = 0x1000;
+const uint64_t ahci_command_list_size = 0x8000;
+const uint64_t ahci_FIS_paddr = 0x10008000;
+const uint64_t ahci_FIS_vaddr = 0x720008000;
+const uint64_t ahci_FIS_size = 0x2000;
+const uint64_t ahci_command_tables_paddr = 0x10010000;
+const uint64_t ahci_command_tables_vaddr = 0x720010000;
+const uint64_t ahci_command_tables_size = 0x40000;
+const uint64_t identify_command_paddr = 0x10050000;
+const uint64_t identify_command_vaddr = 0x720050000;
+const uint64_t identify_command_size = 0x4000;
 
 // MAKE SURE THIS MATCH meta.py
 #define DEVICE_IRQ_MICROKIT_CHANNEL 60
@@ -59,85 +47,119 @@ __attribute__((__section__(".device_resources"))) device_resources_t device_reso
 __attribute__((__section__(".blk_driver_config"))) blk_driver_config_t blk_config;
 __attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
 
-#define fallthrough __attribute__((__fallthrough__))
-
-#define MAX_PRDT_ENTRIES     8
-#define SECTORS_PER_PRDT     16             // 8 KiB / 512 B
-#define MAX_SECTORS_PER_CMD  (MAX_PRDT_ENTRIES * SECTORS_PER_PRDT)  // 128
-
 blk_queue_handle_t blk_queue;
 
-uint8_t ahci_port_number;
-bool ahci_port_found = false;
-
-int ahci_init_stage = 0; // @Tristan: make this an enum?
-
-bool dma64 = false;
-
-uint8_t number_of_command_slots;
-
-/* Make sure to update drv_to_blk_status() as well */
+/* Make sure to update drv_to_sddf_blk_status() as well */
+// NOTE: command means a single hardware command however we use these to also describe the state of the overall request as well
 typedef enum {
-    DrvSuccess,
-    DrvIrqWait,
-    DrvErrorInternal,
-} drv_status_t;
-
-int slot = -1;
-
-#define SDDF_BLOCKS_TO_AHCI_BLOCKS (BLK_TRANSFER_SIZE / 512)
-
-// TODO: dont hardcode it at 512
-// uint64_t sddf_blocks_to_ahci_blocks() {
-//     blk_storage_info_t *storage_info = blk_config.virt.storage_info.vaddr;
-//     uint64_t ahci_block_size = storage_info->sector_size ;
-
-//     assert(BLK_TRANSFER_SIZE % ahci_block_size == 0);
-//     return BLK_TRANSFER_SIZE / ahci_block_size;
-//     // hopefully they devide nice
-// }
-
-HBA_MEM* hba;
-HBA_PORT* port;
-ATA_IDENTIFY* identify_command;
-blk_storage_info_t *storage_info;
-
-
-/* The current action-status of the driver */
-static enum {
-    DrvStatusInactive,
-    DrvStatusBringup,
-    DrvStatusActive,
-} driver_status;
+    RequestInit,
+    RequestSuccess,
+    RequestIrqWait,
+    RequestError,
+} request_status_t;
 
 typedef enum {
-    RequestStateStart,
-    RequestStateFinish,
-} request_state_t;
+    FIRST_STAGE,
+    SECOND_STAGE,
+    THIRD_STAGE,
+    FOURTH_STAGE,
+    FIFTH_STAGE,
+    LAST_STAGE,
+    COMPLETED_INITIALISATION,
+} initialisation_stage_t;
 
-static struct driver_state {
+/* The current action-status of the port */
+typedef enum {
+    PortStatusBringup,
+    PortStatusInactive,
+    PortStatusActive,
+} port_status_t;
+
+typedef enum {
+    DriverStatusBringup,
+    DriverStatusInactive,
+    DriverStatusActive,
+} driver_status_t;
+
+typedef struct {
+    port_status_t status;
+    HBA_PORT* port_regs;
+    ATA_IDENTIFY* identify_command;
+    blk_storage_info_t *storage_info;
 
     struct {
         bool inflight;
         uint32_t id;
         blk_req_code_t code;
+        int cmdslot;
         uintptr_t paddr;
         uint64_t blk_number;
         uint16_t blk_count;
+        uint16_t success_count;
+        request_status_t status;
     } blk_req;
+} PortState;
 
-    request_state_t request_state;
-
+static struct {
+    bool dma64;
+    HBA_MEM* hba_regs;
+    driver_status_t status;
+    PortState ports[32]; // Always do MAX (32)
+    initialisation_stage_t init_stage;
+    int number_of_command_slots;
 } driver_state;
 
-// Find a free command list slot
-int find_cmdslot() {
-    // If not set in SACT and CI, the slot is free
-    // uint32_t slots = (port->sact | port->ci);
-    uint32_t slots = (port->ci);
+uint64_t sddf_blocks_to_ahci_blocks(int portno) {
+    // Note: the clients must request a multiple of 4096 (BLK_TRANSFER_SIZE).
+    // The multiple is what we set as the block size in storage_info.
 
-    for (int i=0; i< number_of_command_slots; i++)
-    {
+    // NOTE: the sector size of the driver will always be <= block_size in storage info.
+    // I.e. its not optimal for the sector size for the device to be 8192
+    // But the clients request granularity is 4096
+
+    // NOTE: we wont use ACHI driver outside of SATA land
+
+    // For AHCI we only deal with 512, 1024, 2048, 4096, 8192 sector sizes
+    blk_storage_info_t *storage_info = driver_state.ports[portno].storage_info;
+
+    assert(((storage_info->block_size * BLK_TRANSFER_SIZE) % storage_info->sector_size) == 0);
+
+    return (BLK_TRANSFER_SIZE * storage_info->block_size) / storage_info->sector_size;
+}
+
+uint64_t ahci_blocks_to_sddf_blocks(int port, uint64_t ahci_blocks) {
+    blk_storage_info_t *storage_info = driver_state.ports[port].storage_info;
+
+    assert(((storage_info->block_size * BLK_TRANSFER_SIZE) % storage_info->sector_size) == 0);
+
+    uint64_t ahci_per_sddf = (BLK_TRANSFER_SIZE * storage_info->block_size) / storage_info->sector_size;
+
+    assert(ahci_blocks % ahci_per_sddf == 0);
+    return ahci_blocks / ahci_per_sddf;
+}
+
+static blk_resp_status_t request_to_sddf_blk_status(request_status_t status)
+{
+    switch (status) {
+    case RequestSuccess:
+        return BLK_RESP_OK;
+    case RequestError:
+        return BLK_RESP_ERR_UNSPEC;
+    /* these should never make it to the block queue */
+    case RequestIrqWait:
+    case RequestInit:
+    default:
+        // We shoudn't get here
+        assert(false);
+        return 0xff;
+    }
+}
+
+// Find a free command list slot
+int find_cmdslot(HBA_PORT *port) {
+    uint32_t slots = (port->sact | port->ci);
+
+    for (int i = 0; i < driver_state.number_of_command_slots; i++) {
         if ((slots & 1) == 0)
             return i;
         slots >>= 1;
@@ -146,414 +168,258 @@ int find_cmdslot() {
     return -1;
 }
 
-// The code example shows how to read/write "count" sectors from sector offset "starth:startl" to "buf" with LBA48 mode from HBA "port".
-// Every PRDT entry contains 8K bytes data payload at most.
+
+// This read/writes "count" sectors from sector offset "start" to "buf" with LBA48 mode from HBA "port" determined via the portno.
+// Calculations are done with bytes so that IDENTIFY commands can work with this funciton (we don't know sector size beforehand).
+// Every PRDT entry contains 8K bytes (for convenience) data payload at most.
+// Hardcode 8 prdt's max.
+// Callers job to enable interrupts
 // Start read/write command
 // - Select an available command slot to use.
 // - Setup command FIS.
 // - Setup PRDT.
 // - Setup command list entry.
-// - Issue the command, and record separately that you have issued it. TODO: @Tristan
-bool read_device(uint32_t startl, uint32_t starth, uint32_t count, uint64_t buf) {
-    port->is = (uint32_t) -1; // Clear pending interrupt bits
-     slot = find_cmdslot();
-    if (slot == -1) {
-        return false;
+// - Issue the command, and record separately that we have issued it.
+bool ahci_send_command(int portno, uint64_t start, uint32_t count, uint64_t bytes, uint64_t buf, uint64_t command, bool read) {
+    assert(count != 0);
+    assert(bytes != 0);
+    uint32_t startl = (uint32_t)(start & 0xFFFFFFFF);
+    uint32_t starth = (uint32_t)((start >> 32) & 0xFFFF);
+    assert(start >> 48 == 0);
+
+    HBA_PORT *port = driver_state.ports[portno].port_regs;
+
+    if (!driver_state.dma64) {
+        if (buf > UINT32_MAX || buf + bytes - 1 > UINT32_MAX) {
+            return false;
+        }
     }
+
+    // Clear pending/stale interrupt bits
+    port->is = 0xFFFFFFFF;     // W1C
+    port->serr = 0xFFFFFFFF;   // W1C
+
+    int slot = find_cmdslot(port);
+    if (slot == -1) {
+        return false; // TODO: more specific error messages // or try again later
+    }
+    driver_state.ports[portno].blk_req.cmdslot = slot;
 
     LOG_AHCI("We are using cmdslot %d\n", slot);
 
-    HBA_CMD_HEADER *cmdheader = (HBA_CMD_HEADER*)ahci_command_list_vaddr;
+    HBA_CMD_HEADER *cmdheader = (HBA_CMD_HEADER*)(ahci_command_list_vaddr + (portno << 10));
     cmdheader += slot;
     cmdheader->cfl = sizeof(FIS_REG_H2D)/sizeof(uint32_t);  // Command FIS size
-    cmdheader->w = 0;       // Read from device
-    cmdheader->prdtl = (uint16_t)((count-1)>>4) + 1;    // PRDT entries count
+    cmdheader->w = read ? 0 : 1;       // Read/write from device
 
-    if (cmdheader->prdtl > 8) {
-        LOG_AHCI("We can't handle this request as its too big\n");
-        return false;
+    uint16_t prdtl = (uint16_t)((bytes + (8*1024 - 1)) >> 13); //
+    if (prdtl == 0) {
+        prdtl = 1;
     }
+    if (prdtl > 8) {
+        assert(false);
+    }
+    cmdheader->prdtl = prdtl;
 
-    HBA_CMD_TBL *cmdtbl = (HBA_CMD_TBL*)ahci_command_tables_vaddr;
+    HBA_CMD_TBL *cmdtbl = (HBA_CMD_TBL*)(ahci_command_tables_vaddr + (portno << 13));
     cmdtbl += slot;
-    sddf_memset(cmdtbl, 0, sizeof(HBA_CMD_TBL) + (cmdheader->prdtl-1)*sizeof(HBA_PRDT_ENTRY));
+    sddf_memset(cmdtbl, 0, sizeof(HBA_CMD_TBL));
 
-    // 8K bytes (16 sectors) per PRDT
-    for (int i=0; i<cmdheader->prdtl-1; i++)
-    {
-        cmdtbl->prdt_entry[i].dba = (uint32_t) (buf & 0xFFFFFFFF);
-        cmdtbl->prdt_entry[i].dbau = (uint32_t) (buf >> 32);
-        cmdtbl->prdt_entry[i].dbc = 8*1024-1;   // 8K bytes (this value should always be set to 1 less than the actual value)
-        cmdtbl->prdt_entry[i].i = 0; // @Tristan: no interrupts for now
-        buf += 8 * 1024;  // 4K words
-        count -= 16;    // 16 sectors
+    uint64_t left = bytes;
+    for (uint16_t i = 0; i < prdtl; i++) {
+        uint32_t this_len = (left > 8*1024) ? (8*1024) : (uint32_t)left;
+
+        cmdtbl->prdt_entry[i].dba  = (uint32_t)(buf & 0xFFFFFFFFu);
+        cmdtbl->prdt_entry[i].dbau = (uint32_t)(buf >> 32);
+        cmdtbl->prdt_entry[i].dbc  = this_len - 1;  // DBC = bytes - 1
+        cmdtbl->prdt_entry[i].i    = 0;
+
+        buf  += this_len;
+        left -= this_len;
     }
-    // Last entry
-    cmdtbl->prdt_entry[cmdheader->prdtl - 1].dba = (uint32_t) (buf & 0xFFFFFFFF);;
-    cmdtbl->prdt_entry[cmdheader->prdtl - 1].dbau = (uint32_t) (buf >> 32);
-    cmdtbl->prdt_entry[cmdheader->prdtl - 1].dbc = (count<<9)-1;   // 512 bytes per sector
-    cmdtbl->prdt_entry[cmdheader->prdtl - 1].i = 0; // @Tristan: currently intterrupts are off
 
     // Setup command
     FIS_REG_H2D *cmdfis = (FIS_REG_H2D*)(&cmdtbl->cfis);
 
     cmdfis->fis_type = FIS_TYPE_REG_H2D;
     cmdfis->c = 1;  // Command
-    cmdfis->command = ATA_CMD_READ_DMA_EX;
+    cmdfis->command = command;
 
     cmdfis->lba0 = (uint8_t)startl;
-    cmdfis->lba1 = (uint8_t)(startl>>8);
-    cmdfis->lba2 = (uint8_t)(startl>>16);
-    cmdfis->device = 1<<6;  // LBA mode
+    cmdfis->lba1 = (uint8_t)(startl >>8);
+    cmdfis->lba2 = (uint8_t)(startl >> 16);
+    cmdfis->device = 1 << 6;  // LBA mode
 
-    cmdfis->lba3 = (uint8_t)(startl>>24);
+    cmdfis->lba3 = (uint8_t)(startl >> 24);
     cmdfis->lba4 = (uint8_t)starth;
-    cmdfis->lba5 = (uint8_t)(starth>>8);
+    cmdfis->lba5 = (uint8_t)(starth >> 8);
 
     cmdfis->countl = count & 0xFF;
     cmdfis->counth = (count >> 8) & 0xFF;
 
     // The below loop waits until the port is no longer busy before issuing a new command
+    // Guarding against some last second weird shit happenibng (might not be necessary)
+    // TODO: does linux do this?
     int spin = 0;
-    while ((port->tfd & (ATA_DEV_BUSY | ATA_DEV_DRQ)) && spin < 1000000)
-    {
+    while ((port->tfd & (ATA_DEV_BUSY | ATA_DEV_DRQ)) && spin < 1000000) {
         spin++;
     }
-    if (spin == 1000000)
-    {
+    if (spin == 1000000) {
         LOG_AHCI("Port is hung\n");
-        return false;
-    }
-
-    port->ci = 1<<slot; // Issue command
-
-    // Wait for completion
-    // while (1)
-    // {
-    //     // In some longer duration reads, it may be helpful to spin on the DPS bit
-    //     // in the PxIS port field as well (1 << 5)
-    //     if ((port->ci & (1<<slot)) == 0)
-    //         break;
-    //     if (port->is & HBA_PxIS_TFES)   // Task file error
-    //     {
-    //         LOG_AHCI("Read disk error\n");
-    //         return false;
-    //     }
-    // }
-
-    // // Check again
-    // if (port->is & HBA_PxIS_TFES)
-    // {
-    //     LOG_AHCI("Read disk error\n");
-    //     return false;
-    // }
-
-    return true;
-}
-
-bool write_device(uint32_t startl, uint32_t starth, uint32_t count, uint64_t buf) {
-    port->is = (uint32_t) -1; // Clear pending interrupt bits
-    slot = find_cmdslot();
-    if (slot == -1) {
-        return false;
-    }
-
-    LOG_AHCI("We are using cmdslot %d\n", slot);
-
-    HBA_CMD_HEADER *cmdheader = (HBA_CMD_HEADER*)ahci_command_list_vaddr;
-    cmdheader += slot;
-    cmdheader->cfl   = sizeof(FIS_REG_H2D)/sizeof(uint32_t);  // Command FIS size
-    cmdheader->w     = 1;       // Write to device
-    cmdheader->prdtl = (uint16_t)((count-1)>>4) + 1;          // PRDT entries count
-
-    if (cmdheader->prdtl > 8) {
-        LOG_AHCI("We can't handle this request as its too big\n");
-        return false;
-    }
-
-    HBA_CMD_TBL *cmdtbl = (HBA_CMD_TBL*)ahci_command_tables_vaddr;
-    cmdtbl += slot;
-    sddf_memset(cmdtbl, 0, sizeof(HBA_CMD_TBL) + (cmdheader->prdtl-1)*sizeof(HBA_PRDT_ENTRY));
-
-    // 8K bytes (16 sectors) per PRDT is what we chose
-    for (int i = 0; i < cmdheader->prdtl - 1; i++)
-    {
-        cmdtbl->prdt_entry[i].dba  = (uint32_t) (buf & 0xFFFFFFFF);
-        cmdtbl->prdt_entry[i].dbau = (uint32_t) (buf >> 32);
-        cmdtbl->prdt_entry[i].dbc  = 8*1024 - 1;   // 8K bytes (value is size-1)
-        cmdtbl->prdt_entry[i].i    = 0;            // @Tristan: no interrupts for now
-        buf   += 8 * 1024;  // 4K words
-        count -= 16;        // 16 sectors
-    }
-    // Last entry
-    cmdtbl->prdt_entry[cmdheader->prdtl - 1].dba  = (uint32_t) (buf & 0xFFFFFFFF);
-    cmdtbl->prdt_entry[cmdheader->prdtl - 1].dbau = (uint32_t) (buf >> 32);
-    cmdtbl->prdt_entry[cmdheader->prdtl - 1].dbc  = (count << 9) - 1;   // 512 bytes per sector
-    cmdtbl->prdt_entry[cmdheader->prdtl - 1].i    = 0; // @Tristan: currently interrupts are off
-
-    // Setup command
-    FIS_REG_H2D *cmdfis = (FIS_REG_H2D*)(&cmdtbl->cfis);
-
-    cmdfis->fis_type = FIS_TYPE_REG_H2D;
-    cmdfis->c        = 1;  // Command
-    cmdfis->command  = ATA_CMD_WRITE_DMA_EX;
-
-    cmdfis->lba0   = (uint8_t) startl;
-    cmdfis->lba1   = (uint8_t) (startl >> 8);
-    cmdfis->lba2   = (uint8_t) (startl >> 16);
-    cmdfis->device = 1 << 6;  // LBA mode
-
-    cmdfis->lba3 = (uint8_t) (startl >> 24);
-    cmdfis->lba4 = (uint8_t) starth;
-    cmdfis->lba5 = (uint8_t) (starth >> 8);
-
-    cmdfis->countl = count & 0xFF;
-    cmdfis->counth = (count >> 8) & 0xFF;
-
-    // Wait while port is busy
-    int spin = 0;
-    while ((port->tfd & (ATA_DEV_BUSY | ATA_DEV_DRQ)) && spin < 1000000)
-        spin++;
-    if (spin == 1000000)
-    {
-        LOG_AHCI("Port is hung\n");
-        return false;
+        return false; // TODO: more specific error messages // or try again later
     }
 
     port->ci = 1 << slot; // Issue command
-
-    // // Wait for completion
-    // while (1)
-    // {
-    //     if ((port->ci & (1 << slot)) == 0)
-    //         break;
-    //     if (port->is & HBA_PxIS_TFES)   // Task file error
-    //     {
-    //         LOG_AHCI("Write disk error\n");
-    //         return false;
-    //     }
-    // }
-
-    // // Check again
-    // if (port->is & HBA_PxIS_TFES)
-    // {
-    //     LOG_AHCI("Write disk error\n");
-    //     return false;
-    // }
+    (void)port->ci;
 
     return true;
 }
 
-// TODO: @Tristan: fix this shit THESE dont validate size or anything
-bool ahci_write_blocks(uintptr_t dma_address, uint64_t sector_number, uint64_t sector_count) {
-    // drv_status_t status;
-    // uint32_t data_address;
-    switch (driver_state.request_state) {
-    case RequestStateStart: {
-        // convert to write_device
-        uint32_t this_count = (sector_count > MAX_SECTORS_PER_CMD)
-                                  ? MAX_SECTORS_PER_CMD
-                                  : (uint32_t)sector_count;
+// This should continue looping through and sending the request
 
-        uint64_t lba        = sector_number;
-        uint32_t startl     = (uint32_t)(lba & 0xFFFFFFFFull);
-        uint32_t starth     = (uint32_t)((lba >> 32) & 0xFFFFull);
+// Each time this gets called we issue another request and return irq wait
 
-        bool success = write_device(startl, starth, this_count, (uint64_t)dma_address);
-        if (!success) {
-            return DrvErrorInternal;
-        }
+// Unless we are done or there is an error from the previous request in which we jsutr return the status
 
-        driver_state.request_state = RequestStateFinish;
-        return DrvIrqWait;
-    }
+void ahci_do_request(int portno) {
 
-    case RequestStateFinish:
-        // We got the response
+    assert(driver_state.ports[portno].blk_req.status != RequestSuccess);
+    assert(driver_state.ports[portno].blk_req.status != RequestError);
 
-        // Error first
+    HBA_PORT *port = driver_state.ports[portno].port_regs;
+
+    if (driver_state.ports[portno].blk_req.status == RequestIrqWait) {
+        // TFES
         if (port->is & (1u << 30)) {
-            port->is = (1u << 30);   // W1C clear
-            hba->is  = (1u << ahci_port_number);
-            driver_state.request_state = RequestStateStart;
-            return DrvErrorInternal;
+            port->is = 0xFFFFFFFF;   // W1C clear
+            driver_state.ports[portno].blk_req.status = RequestError;
+            // TODO: this request is now done so i cant get anymore irqs or it breaks everythign
+            return;
         }
 
         // Not done yet?
         if ((port->is & (1u << 0)) == 0) {
-            return DrvErrorInternal;
+            port->is = 0xFFFFFFFF;   // W1C clear
+            driver_state.ports[portno].blk_req.status = RequestError;
+            // TODO: this request is now done so i cant get anymore irqs or it breaks everythign
+            return;
+
         }
 
         // FIS arrived; make sure our slot’s CI bit is now cleared
-        if (slot >= 0 && (port->ci & (1u << slot)) != 0) {
-            // command not fully completed yet; keep waiting
-            return DrvErrorInternal;
+        if (driver_state.ports[portno].blk_req.cmdslot >= 0 && (port->ci & (1u << driver_state.ports[portno].blk_req.cmdslot)) != 0) {
+            port->is = 0xFFFFFFFF;   // W1C clear
+            driver_state.ports[portno].blk_req.status = RequestError;
+            // TODO: this request is now done so i cant get anymore irqs or it breaks everythign
+            return; // IS THIS correct
         }
 
         // Ack the completion we handled
-        port->is = ((1u << 0) | (1u << 30));                        // per-port W1C
-        hba->is  = (1u << ahci_port_number);   // HBA summary W1C
+        port->is = 0xFFFFFFFF;   // W1C clear
 
         LOG_AHCI("command complete (IRQ)\n");
-        driver_state.request_state = RequestStateStart;
-        slot = -1;
 
-        return DrvSuccess;
+        // Reverse engineer how much we sent
 
-    default:
-        /* unreachable */
-        return DrvIrqWait;
+        uint64_t max_transfer = ahci_blocks_to_sddf_blocks(portno, 128);
+        uint64_t total_left = driver_state.ports[portno].blk_req.blk_count - driver_state.ports[portno].blk_req.success_count;
+
+        driver_state.ports[portno].blk_req.success_count += min_u64(max_transfer, total_left);
+        driver_state.ports[portno].blk_req.cmdslot = -1;
+
+    } else if (driver_state.ports[portno].blk_req.status != RequestInit) {
+        assert(false);
     }
+
+
+    // Send the rest of the request
+    if (driver_state.ports[portno].blk_req.blk_count == driver_state.ports[portno].blk_req.success_count) {
+        driver_state.ports[portno].blk_req.status = RequestSuccess;
+        return;
+    } else if (driver_state.ports[portno].blk_req.blk_count < driver_state.ports[portno].blk_req.success_count) {
+        assert(false);
+    }
+
+    bool read;
+    uint64_t command;
+    if (driver_state.ports[portno].blk_req.code == BLK_REQ_READ) {
+        read = true;
+        command = ATA_CMD_READ_DMA_EX;
+    } else if (driver_state.ports[portno].blk_req.code == BLK_REQ_WRITE) {
+        read = false;
+        command = ATA_CMD_WRITE_DMA_EX;
+    } else {
+        assert(false);
+    }
+
+    // Figure out how much to send (one command chunk)
+
+    uint32_t bps = driver_state.ports[portno].storage_info->sector_size;  // bytes per sector
+
+    // sDDF blocks -> AHCI sectors
+    uint64_t sector_conversion     = sddf_blocks_to_ahci_blocks(portno);
+    uint64_t sector_start          = driver_state.ports[portno].blk_req.blk_number  * sector_conversion;
+    uint64_t sector_count_total    = driver_state.ports[portno].blk_req.blk_count   * sector_conversion;
+    uint64_t sector_count_done     = driver_state.ports[portno].blk_req.success_count * sector_conversion;
+    uint64_t sector_count_remaining= sector_count_total - sector_count_done;
+
+    // With 8 PRDTs * 8 KiB = 64 KiB max per command:
+    const uint32_t MAX_CMD_BYTES      = 8u * 8u * 1024u;          // 64 KiB
+    uint32_t       max_sectors_per_cmd = MAX_CMD_BYTES / bps;     // e.g., 128 if bps=512, 16 if bps=4096
+
+    // Sanity: sector_size should divide 64 KiB (true for 512/1K/2K/4K/8K)
+    assert(max_sectors_per_cmd > 0);
+
+    // Sectors to issue in this command (cap by remaining and per-cmd max)
+    uint32_t count = (sector_count_remaining < max_sectors_per_cmd)
+                   ? (uint32_t)sector_count_remaining
+                   : max_sectors_per_cmd;
+
+    // Bytes to transfer this command
+    uint64_t bytes = (uint64_t)count * (uint64_t)bps;
+
+    // Byte offset into client buffer
+    uint64_t buf = driver_state.ports[portno].blk_req.paddr + (sector_count_done * (uint64_t)bps);
+
+    // 32-bit DMA guard (inclusive end) if HBA doesn't support 64-bit DMA
+    if (!driver_state.dma64) {
+        if (buf > UINT32_MAX || (buf + bytes - 1) > UINT32_MAX) {
+            driver_state.ports[portno].blk_req.status = RequestError;
+            return;
+        }
+    }
+
+    // Issue the command: start LBA is in sectors; COUNT in sectors; PRDT built from 'bytes'
+    bool res = ahci_send_command(
+        portno,
+        /*start*/  sector_start + sector_count_done,
+        /*count*/  count,
+        /*bytes*/  bytes,
+        /*buf*/    buf,
+        /*command*/command,
+        /*read*/   read
+    );
+    if (!res) {
+        driver_state.ports[portno].blk_req.status = RequestError;
+        return;
+    }
+
+    driver_state.ports[portno].blk_req.status = RequestIrqWait;
 }
 
-bool ahci_read_blocks(uintptr_t dma_address, uint64_t sector_number, uint64_t sector_count) {
-    // drv_status_t status;
-    // uint32_t data_address;
-    switch (driver_state.request_state) {
-    case RequestStateStart: {
-        uint32_t this_count = (sector_count > MAX_SECTORS_PER_CMD)
-                              ? MAX_SECTORS_PER_CMD
-                              : (uint32_t)sector_count;
-
-        uint64_t lba        = sector_number;
-        uint32_t startl     = (uint32_t)(lba & 0xFFFFFFFFull);
-        uint32_t starth     = (uint32_t)((lba >> 32) & 0xFFFFull);
-
-        bool success = read_device (startl, starth, this_count, (uint64_t)dma_address);
-        if (!success) {
-            return DrvErrorInternal;
-        }
-
-        driver_state.request_state = RequestStateFinish;
-        return DrvIrqWait;
-    }
-    case RequestStateFinish:
-        // We got the response
-
-        // Error first
-        if (port->is & (1u << 30)) {
-            port->is = (1u << 30);   // W1C clear
-            hba->is  = (1u << ahci_port_number);
-            driver_state.request_state = RequestStateStart;
-            return DrvErrorInternal;
-        }
-
-        // Not done yet?
-        if ((port->is & (1u << 0)) == 0) {
-            return DrvErrorInternal;
-        }
-
-        // FIS arrived; make sure our slot’s CI bit is now cleared
-        if (slot >= 0 && (port->ci & (1u << slot)) != 0) {
-            // command not fully completed yet; keep waiting
-            return DrvErrorInternal;
-        }
-
-        // Ack the completion we handled
-        port->is = ((1u << 0) | (1u << 30));                        // per-port W1C
-        hba->is  = (1u << ahci_port_number);   // HBA summary W1C
-
-        LOG_AHCI("command complete (IRQ)\n");
-        driver_state.request_state = RequestStateStart;
-        slot = -1;
-
-        return DrvSuccess;
-
-    default:
-        /* unreachable */
-        return DrvIrqWait;
-    }
-}
-
-// THIS WILL NOT WORK BECAUSE UNLESS INTERUPTS ARE OFF
-// void test_generic_reads_and_writes() {
-//     LOG_AHCI("Testing Generic reads and writes\n");
-
-//     uint8_t *write_buf = (uint8_t*)data_region_vaddr;
-//     uint8_t *read_buf  = (uint8_t*)(data_region_vaddr + 0x5000);
-
-//     LOG_AHCI("Filling our memory!\n");
-//     // Fill the 512-byte sector with repeating alphabet
-//     {
-//         uint8_t *buf = write_buf;
-//         for (int i = 0; i < 512; i++) {
-//             buf[i] = 'A' + (i % 26);
-//         }
-//     }
-
-//     LOG_AHCI("Now doing a generic write!\n");
-//     if (write_device(100, 0, 1, data_region_paddr)) {
-//         LOG_AHCI("write succeeded\n");
-//     } else {
-//         LOG_AHCI("write failed\n");
-//     }
-
-//     LOG_AHCI("Now doing a generic read!\n");
-//     if (read_device(100, 0, 1, data_region_paddr + 0x5000)) {
-//         LOG_AHCI("read succeeded\n");
-//     } else {
-//         LOG_AHCI("read failed\n");
-//     }
-
-//     LOG_AHCI("Checking if they match!\n");
-//     bool match = true;
-//     for (int i = 0; i < 512; i++) {
-//         if (write_buf[i] != read_buf[i]) {
-//             LOG_AHCI("Mismatch at byte %d: wrote 0x%02x, read 0x%02x\n",
-//                      i, write_buf[i], read_buf[i]);
-//             match = false;
-//             break;
-//         }
-//     }
-
-//     if (match) {
-//         LOG_AHCI("Readback matches written pattern!\n");
-//     } else {
-//         LOG_AHCI("Readback did not match!\n");
-//     }
-// }
-
-// TODO: @Tristan: this shouldn't even get called
-void handle_client_device_inactive(void) {
-    while (!blk_queue_empty_req(&blk_queue)) {
-        blk_req_code_t code;
-        uintptr_t paddr;
-        uint64_t block_number;
-        uint16_t count;
-        uint32_t id;
-        int err = blk_dequeue_req(&blk_queue, &code, &paddr, &block_number, &count, &id);
-        assert(!err); /* shouldn't be empty */
-
-        err = blk_enqueue_resp(&blk_queue, BLK_RESP_ERR_NO_DEVICE, 0, id);
-        if (err) {
-            /* response queue is full */
-            break;
-        }
-    }
-
-    microkit_notify(blk_config.virt.id);
-}
-
-// For now do 1 request at a time
-void handle_client(bool was_irq) {
-    assert(!(driver_status == DrvStatusBringup));
+void handle_client(bool was_irq, int portno) {
+    LOG_AHCI("Who calls this %d\n", portno);
+    assert(portno == 0); // TODO: we only handle one port for now
 
     if (was_irq == false) {
-        if (driver_state.blk_req.inflight) {
+        if (driver_state.ports[portno].blk_req.inflight) {
             /* Only handle block queue notifications when idle */
             return;
         }
 
-        // /* if we're inactive (by choice or by recognition),
-        //    or if there's no card (but we haven't yet propagated this change to the state) */
-        // if (driver_status == DrvStatusInactive) {
-        //     handle_client_device_inactive(); // TODO: can we even reach this?
-        //     return;
-        // }
-
-        int err = blk_dequeue_req(&blk_queue, &driver_state.blk_req.code, &driver_state.blk_req.paddr,
-                                      &driver_state.blk_req.blk_number, &driver_state.blk_req.blk_count,
-                                      &driver_state.blk_req.id);
+        int err = blk_dequeue_req(&blk_queue, &driver_state.ports[portno].blk_req.code, &driver_state.ports[portno].blk_req.paddr,
+                                      &driver_state.ports[portno].blk_req.blk_number, &driver_state.ports[portno].blk_req.blk_count,
+                                      &driver_state.ports[portno].blk_req.id);
 
         if (err == -1) {
             /* no client requests; we likely handled it already.
@@ -563,429 +429,295 @@ void handle_client(bool was_irq) {
             return;
         }
 
-        driver_state.blk_req.inflight = true;
+        driver_state.ports[portno].blk_req.inflight = true;
+        driver_state.ports[portno].blk_req.success_count = 0;
+        driver_state.ports[portno].blk_req.status = RequestInit;
+
         LOG_AHCI("Received command: code=%d, paddr=0x%lx, block_number=%lu, count=%d, id=%d\n",
-                       driver_state.blk_req.code, driver_state.blk_req.paddr, driver_state.blk_req.blk_number,
-                       driver_state.blk_req.blk_count, driver_state.blk_req.id);
+                       driver_state.ports[portno].blk_req.code, driver_state.ports[portno].blk_req.paddr, driver_state.ports[portno].blk_req.blk_number,
+                       driver_state.ports[portno].blk_req.blk_count, driver_state.ports[portno].blk_req.id);
 
     }
 
     /* Should never get IRQs without inflight requests */
-    if (!driver_state.blk_req.inflight) {
+    if (!driver_state.ports[portno].blk_req.inflight) {
         assert(false);
     }
 
     blk_resp_status_t response_status;
-    uint16_t success_count;
 
-    switch (driver_state.blk_req.code) {
+    switch (driver_state.ports[portno].blk_req.code) {
     case BLK_REQ_FLUSH:
-    case BLK_REQ_BARRIER:
-        /* No-ops. Because we only do 1 request at a time */
+    case BLK_REQ_BARRIER: {
+        /* No-ops. Because we only do 1 request at a time | what are the proper semantics? */
         response_status = BLK_RESP_OK;
-        success_count = 0;
-        break;
-
-    case BLK_REQ_READ: {
-        drv_status_t status = ahci_read_blocks(driver_state.blk_req.paddr,
-                                                driver_state.blk_req.blk_number * SDDF_BLOCKS_TO_AHCI_BLOCKS,
-                                                driver_state.blk_req.blk_count * SDDF_BLOCKS_TO_AHCI_BLOCKS);
-        if (status == DrvIrqWait) {
-            return;
-        }
-
-        response_status = (status == DrvSuccess) ? BLK_RESP_OK : BLK_RESP_ERR_UNSPEC; // random error message
-        success_count = driver_state.blk_req.blk_count;
+        driver_state.ports[portno].blk_req.success_count = 0;
         break;
     }
 
+    case BLK_REQ_READ:
     case BLK_REQ_WRITE: {
-        drv_status_t status = ahci_write_blocks(driver_state.blk_req.paddr,
-                                                 driver_state.blk_req.blk_number * SDDF_BLOCKS_TO_AHCI_BLOCKS,
-                                                 driver_state.blk_req.blk_count * SDDF_BLOCKS_TO_AHCI_BLOCKS);
-        if (status == DrvIrqWait) {
+        // we only process one client request and serialise it chunk by chunk over 1 port
+        ahci_do_request(portno);
+
+        if (driver_state.ports[portno].blk_req.status == RequestIrqWait) {
             return;
+        } else if (driver_state.ports[portno].blk_req.status == RequestError) {
+            // TODO: retry or return error to client or even reset the port
+            // TODO: make the reponse status better
         }
 
-        response_status = (status == DrvSuccess) ? BLK_RESP_OK : BLK_RESP_ERR_UNSPEC; // random error message
-        success_count = driver_state.blk_req.blk_count;
+        response_status = request_to_sddf_blk_status(driver_state.ports[portno].blk_req.status);
         break;
     }
 
     default: {
-        success_count = 0;
         response_status = BLK_RESP_ERR_INVALID_PARAM;
         break;
     }
     }
 
-    int err = blk_enqueue_resp(&blk_queue, response_status, success_count, driver_state.blk_req.id);
+    int err = blk_enqueue_resp(&blk_queue, response_status, driver_state.ports[portno].blk_req.success_count, driver_state.ports[portno].blk_req.id);
     assert(!err);
-    LOG_AHCI("Enqueued response: status=%d, success_count=%d, id=%d\n", response_status, success_count,
-               driver_state.blk_req.id);
+    LOG_AHCI("Enqueued response: status=%d, success_count=%d, id=%d\n", response_status, driver_state.ports[portno].blk_req.success_count,
+               driver_state.ports[portno].blk_req.id);
     microkit_notify(blk_config.virt.id);
 
-    driver_state.blk_req.inflight = false;
+    driver_state.ports[portno].blk_req.inflight = false;
 
     /* Tail-call to handle another request */
-    return handle_client(false);
+    return handle_client(false, portno);
 }
 
-// INIT STAGE
+// We just enable:
+// - DHRS: Register D2H FIS on command completion (non-NCQ).
+// - TFES: Always catch errors.
+void enable_irqs_for_ports() {
+    for (int i = 0; i < 32; i++) {
+        if (driver_state.ports[i].status == PortStatusBringup) {
+            HBA_PORT *port = driver_state.ports[i].port_regs;
+            port->is = 0xFFFFFFFF; // W1C
+            (void)port->is;
+            port->ie = (1u<<0) | (1u<<30); // DHRS + TFES
+        }
+    }
+}
 
-bool identify_device_1() {
-    port->is = (uint32_t)-1; // Clear pending interrupt bits
-    slot = find_cmdslot();
-    if (slot == -1) {
+void ahci_copy_serial(char dst[BLK_MAX_SERIAL_NUMBER + 1], ATA_IDENTIFY *id) {
+    volatile uint16_t *w = id->serial_number_words;
+    size_t cap = BLK_MAX_SERIAL_NUMBER;
+    size_t out = 0;
+    for (int k = 0; k < 10 && out < cap; k++) {
+        uint16_t v = w[k];            // volatile read once
+        char hi = (char)(v >> 8);     // ATA strings are byte-swapped per word
+        char lo = (char)(v & 0xFF);
+        if (out < cap) dst[out++] = hi;
+        if (out < cap) dst[out++] = lo;
+    }
+    while (out > 0 && dst[out - 1] == ' ') out--;
+    dst[out] = '\0';
+}
+
+bool ahci_identify_device(int portno) {
+    return ahci_send_command(portno, 0 /* start */, 1 /* 1 sector */, 512 /* bytes */, identify_command_paddr + (portno << 9), 0xEC, /* IDENTIFY command */ true /* read */);
+}
+
+bool check_identify_device_response(int portno) {
+    HBA_PORT *port = driver_state.ports[portno].port_regs;
+
+    if (port->is & (1u << 30)) {
+        LOG_AHCI("Write disk error\n");
+        // We dont clear is or serr because we this port is now inactive
         return false;
     }
 
-    LOG_AHCI("We are using cmdslot %d\n", slot);
-
-    // Command header for this slot
-    HBA_CMD_HEADER *cmdheader = (HBA_CMD_HEADER*)ahci_command_list_vaddr;
-    cmdheader += slot;
-    cmdheader->cfl  = sizeof(FIS_REG_H2D)/sizeof(uint32_t); // Command FIS size
-    cmdheader->w    = 0;       // Read from device
-    cmdheader->prdtl = 1;      // We only need one PRDT entry for 512B
-
-    LOG_AHCI("Command header interaction done\n");
-
-    // Command table for this slot
-    HBA_CMD_TBL *cmdtbl = (HBA_CMD_TBL*)ahci_command_tables_vaddr;
-    cmdtbl += slot;
-    sddf_memset(cmdtbl, 0, sizeof(HBA_CMD_TBL) + (cmdheader->prdtl-1)*sizeof(HBA_PRDT_ENTRY));
-
-    // Single PRDT: 512 bytes for IDENTIFY DEVICE data
-    cmdtbl->prdt_entry[0].dba  = (uint32_t)(identify_command_paddr & 0xFFFFFFFF);
-    cmdtbl->prdt_entry[0].dbau = (uint32_t)(identify_command_paddr >> 32);
-    cmdtbl->prdt_entry[0].dbc  = 512 - 1;  // byte count, value is (n-1) // IDENTIFY DEVICE payload is always 512 bytes by spec—independent of the drive’s logical sector size.
-    cmdtbl->prdt_entry[0].i    = 0;        // @Tristan: currently intterrupts are off
-
-    LOG_AHCI("Command table prdt stuff done\n");
-
-    // Setup command
-    FIS_REG_H2D *cmdfis = (FIS_REG_H2D*)(&cmdtbl->cfis);
-
-    cmdfis->fis_type = FIS_TYPE_REG_H2D;
-    cmdfis->c        = 1;                   // Command
-    cmdfis->command  = ATA_CMD_IDENTIFY;
-
-    LOG_AHCI("Do command\n");
-
-    // For IDENTIFY, all LBA/COUNT fields are zero; device register need not set LBA
-
-    cmdfis->device = 0;
-
-    // The below loop waits until the port is no longer busy before issuing a new command
-    int spin = 0;
-    while ((port->tfd & (ATA_DEV_BUSY | ATA_DEV_DRQ)) && spin < 1000000) {
-        spin++;
-    }
-    if (spin == 1000000) {
-        LOG_AHCI("Port is hung\n");
+    const uint32_t done = (1u << 0) | (1u << 1) | (1u << 3); // DHRS|PSS|SDBS // on the vb105 it was the PSS one that signalled completion
+    if ((port->is & done) == 0) {
+        // We dont clear is or serr because we this port is now inactive
         return false;
     }
 
-    port->ci = 1u << slot; // Issue command
+    int slot = driver_state.ports[portno].blk_req.cmdslot;
+    if (slot >= 0 && (port->ci & (1u << slot)) != 0) {
+        // We dont clear is or serr because we this port is now inactive
+        return false;
+    }
 
-    /* force the MMIO write to post; a readback is enough */
-    for (int i = 0; i < 1000; i++) {
-        uint32_t r = port->ci;
-        if (r & (1u << slot)) {
-            LOG_AHCI("CI latched: 0x%08x\n", r);
-            break;
+    port->is = 0xFFFFFFFF; // W1C
+    port->serr = 0xFFFFFFFF; // W1C
+    (void)port->is;
+
+    return true;
+}
+
+void setup_ports_blk_storage_info_1() {
+    // So much easier if we just use a timeout to get them instead of irqs.
+    LOG_AHCI("Send IDENTIFY ATA command to connected drives. Get their sector size and count...\n");
+    for (int i = 0; i < 32; i++) {
+        if (driver_state.ports[i].status == PortStatusBringup && !ahci_identify_device(i)) {
+            driver_state.ports[i].status = PortStatusInactive;
         }
     }
 
-    LOG_AHCI("Issued command\n");
-    LOG_AHCI("Issued: PxCI=0x%08x PxCMD=0x%08x GHC=0x%08x\n",
-         port->ci, port->cmd, hba->ghc);
-
-    return true;
+    sddf_timer_set_timeout(timer_config.driver_id, 1 * NS_IN_S); // plenty of time
 }
 
-bool identify_device_2() {
-    /* Snapshot once so we act on a consistent view */
-    uint32_t is = port->is;
+void setup_ports_blk_storage_info_2() {
+    for (int i = 0; i < 32; i++) {
+        if (driver_state.ports[i].status == PortStatusBringup) {
+            // check if we got a response
+            if (!check_identify_device_response(i) || i != 0) { // we only support 1 virt which is for port 0
+                driver_state.ports[i].status = PortStatusInactive;
+            } else {
+                // TODO: we currently just assume this virt is for port0
+                driver_state.ports[i].storage_info = blk_config.virt.storage_info.vaddr;
+                blk_storage_info_t *storage_info = driver_state.ports[i].storage_info;
+                assert(!storage_info->ready);
 
-    /* --- Error first (TFES) --- */
-    if (is & (1u << 30)) {
-        port->is = (1u << 30);                 /* W1C TFES */
-        hba->is  = (1u << ahci_port_number);   /* W1C HBA summary for this port */
-        LOG_AHCI("IDENTIFY: task file error (PxTFD=0x%08x PxIS=0x%08x)\n", port->tfd, is);
-        return false;
+                // Data is ready in PRDT buffer
+                ATA_IDENTIFY *identify_command = (ATA_IDENTIFY *)(identify_command_vaddr + (i << 9));
+                driver_state.ports[i].identify_command = identify_command;
+
+                // We only support 48bit LBA, i.e. basically all devices post 2003
+                if (!(identify_command->feature_support_83 & (1 << 10))) {
+                    driver_state.ports[i].status = PortStatusInactive;
+                    continue;
+                }
+
+                ahci_copy_serial(storage_info->serial_number, identify_command);
+
+                if (identify_command->sector_size_flags_106 & (1 << 12)) {
+                    storage_info->sector_size =
+                        identify_command->logical_sector_size_lo |
+                        (identify_command->logical_sector_size_hi << 16);
+                } else {
+                    storage_info->sector_size = 512; // default
+                }
+
+                storage_info->block_size = 1; // TODO
+                storage_info->queue_depth = 1; // NCQ currently not implemented
+                storage_info->read_only = false; // TODO
+
+                if (((storage_info->block_size * BLK_TRANSFER_SIZE) % storage_info->sector_size) != 0) {
+                    // See sddf_blocks_to_ahci_blocks()
+                    driver_state.ports[i].status = PortStatusInactive;
+                    continue;
+                }
+
+                // Geometry (legacy CHS)
+                storage_info->cylinders = identify_command->legacy_logical_cylinders_1;
+                storage_info->heads     = identify_command->legacy_logical_heads_3;
+                storage_info->blocks    = identify_command->legacy_sectors_per_track_6;
+
+                uint64_t sectors =  ((uint64_t)identify_command->lba48_sectors_3 << 48) |
+                                    ((uint64_t)identify_command->lba48_sectors_2 << 32) |
+                                    ((uint64_t)identify_command->lba48_sectors_1 << 16) |
+                                    (uint64_t)identify_command->lba48_sectors_0;
+
+                storage_info->capacity = sectors * storage_info->sector_size / BLK_TRANSFER_SIZE;
+                LOG_AHCI("Drive size (blocks): %lu at port %d\n", storage_info->capacity, i);
+                blk_storage_set_ready(storage_info, true); // TODO: we only do this for devices that make it this far.
+            }
+        }
     }
-
-    /* --- Completion for IDENTIFY can be PSS and/or SDBS and/or DHRS --- */
-    const uint32_t done_mask = (1u << 0) | (1u << 1) | (1u << 3); /* DHRS | PSS | SDBS */
-    if ((is & done_mask) == 0) {
-        return false;  /* not done yet */
-    }
-
-    /* Command must be fully completed: CI bit cleared */
-    if (slot >= 0 && (port->ci & (1u << slot)) != 0) {
-        return false;  /* still in-flight */
-    }
-
-    /* Data is ready in PRDT buffer */
-    identify_command = (ATA_IDENTIFY *)identify_command_vaddr;
-
-    /* --- Acknowledge everything we handled --- */
-    uint32_t clr = is & ((1u << 0) | (1u << 1) | (1u << 3) | (1u << 30)); /* DHRS|PSS|SDBS|TFES */
-    if (clr) {
-        port->is = clr;                         /* W1C per-port causes */
-        hba->is  = (1u << ahci_port_number);    /* W1C summary bit for this port */
-    }
-
-    LOG_AHCI("IDENTIFY complete; PxIS was 0x%08x, cleared 0x%08x (via %s%s%s)\n",
-             is, clr,
-             (is & (1u<<0)) ? "DHRS " : "",
-             (is & (1u<<1)) ? "PSS "  : "",
-             (is & (1u<<3)) ? "SDBS " : "");
-    return true;
-}
-
-void ata_extract_serial(char *dst) {
-    const uint16_t *src = (const uint16_t *)(identify_command->w0_59 + 10); // words 10–19
-    for (int i = 0; i < 10; i++) {
-        dst[2*i]     = src[i] >> 8;    // high byte first
-        dst[2*i + 1] = src[i] & 0xFF;  // then low byte
-    }
-    dst[20] = '\0';
-}
-
-void setup_blk_storage_info_1() {
-    LOG_AHCI("Send IDENTIFY ATA command to connected drives. Get their sector size and count...\n");
-    if (identify_device_1()) {
-        LOG_AHCI("Initial part went correctly\n");
-    } else {
-        LOG_AHCI("something failed\n");
-        assert(false);
-    }
-}
-
-void setup_blk_storage_info_2() {
-    if (identify_device_2()) {
-        LOG_AHCI("Second part went correctly\n");
-    } else {
-        LOG_AHCI("something failed\n");
-        assert(false);
-    }
-
-    storage_info = blk_config.virt.storage_info.vaddr;
-
-    assert(!storage_info->ready);
-
-    ata_extract_serial(storage_info->serial_number);
-
-    if (identify_command->w106 & (1 << 12)) {
-        storage_info->sector_size =
-            identify_command->logical_sector_size_lo |
-            (identify_command->logical_sector_size_hi << 16);
-    } else {
-        storage_info->sector_size = 512; // default
-    }
-
-    // Block size
-    storage_info->block_size = 1; // copy the other blk device // this is the optimal amount
-    // jsut make it 1 for now we can always change it
-
-    // Queue depth
-    // storage_info->queue_depth = ?;
-    /*
-    uint16_t device_depth = ncq_supported ? ((identify->queue_depth & 0x1F) + 1) : 1;
-    uint16_t hba_slots    = ((ahci->CAP >> 8) & 0x1F) + 1;   // CAP.NCS (bits 12:8) + 1
-    uint16_t driver_cap   = DRIVER_QUEUE_LIMIT;              // your policy, e.g., 32
-
-    storage_info->queue_depth = MIN3(device_depth, hba_slots, driver_cap);
-
-    i think  its just the command header length
-    */
-
-    // Geometry (legacy CHS)
-    storage_info->cylinders = identify_command->w0_59[1];
-    storage_info->heads     = identify_command->w0_59[3];
-    storage_info->blocks    = identify_command->w0_59[6];
-
-    // Capacity in sectors (prefer 48-bit if supported)
-    uint64_t sectors;
-    if (identify_command->w83 & (1 << 10)) {
-        sectors = ((uint64_t)identify_command->lba48_3 << 48) |
-                  ((uint64_t)identify_command->lba48_2 << 32) |
-                  ((uint64_t)identify_command->lba48_1 << 16) |
-                   (uint64_t)identify_command->lba48_0;
-    } else {
-        sectors = ((uint32_t)identify_command->lba28_hi << 16) |
-                   identify_command->lba28_lo;
-    }
-    storage_info->capacity = sectors * storage_info->sector_size / BLK_TRANSFER_SIZE;
-
-     // Assume writable unless tested otherwise // we dont support CD-ROM's????
-    storage_info->read_only = false; // TODO: fix
-
-    LOG_AHCI("Drive size (blocks): %lu\n", storage_info->capacity);
-    blk_storage_set_ready(storage_info, true);
 }
 
 // Start command engine
-void start_cmd() {
+void start_cmd(HBA_PORT *port) {
     LOG_AHCI("Starting command engine...\n");
 
-    // Wait until CR (bit15) is cleared
+    // 1. Wait until CR (command engine running) is cleared
     while (port->cmd & HBA_PxCMD_CR) {}
 
-    // Set FRE (bit4) and ST (bit0)
-    // port->cmd |= HBA_PxCMD_FRE;
-    // port->cmd |= HBA_PxCMD_ST;
-
+    // 2. Enable FIS receive
     port->cmd |= HBA_PxCMD_FRE;
+
+    // 3. Wait until FR (FIS receive running) is set // TODO: poll forever
     while (!(port->cmd & HBA_PxCMD_FR)) {}
+
+    // 4. Start command engine
     port->cmd |= HBA_PxCMD_ST;
+
+    // 5. Verify CR is set
+    while (!(port->cmd & HBA_PxCMD_CR)) {} // TODO: poll forever
 
     LOG_AHCI("Successfully started\n");
 }
 
 // Stop command engine
-void stop_cmd() {
+void stop_cmd(HBA_PORT *port) {
     LOG_AHCI("Stopping command engine...\n");
 
-    // Clear ST (bit0)
+    // 1. Clear ST (stop command list engine)
     port->cmd &= ~HBA_PxCMD_ST;
 
-    // Clear FRE (bit4)
+    // 2. Wait until CR (bit15) is cleared
+    while (port->cmd & HBA_PxCMD_CR) {} // TODO: poll forever
+
+    // 3. Clear FRE (stop FIS receive)
     port->cmd &= ~HBA_PxCMD_FRE;
 
-    // Wait until FR (bit14), CR (bit15) are cleared
-    while(1)
-    {
-        if (port->cmd & HBA_PxCMD_FR)
-            continue;
-        if (port->cmd & HBA_PxCMD_CR)
-            continue;
-        break;
-    }
+    // 4. Wait until FR (bit14) is cleared
+    while (port->cmd & HBA_PxCMD_FR) {} // TODO: poll forever
 
     LOG_AHCI("Successfully stopped\n");
 }
 
-void enable_irqs() {
-    // Clear latched global + this port (W1C)
-    hba->is = 0xFFFFFFFF;
-    port->is = 0xFFFFFFFF;
-
-    // AHCI Enable + Global Interrupt Enable
-    hba->ghc |= (1u << 31); // AE
-    hba->ghc |= (1u << 1);  // IE
-
-    // Enable just what you need: command-complete + task-file error
-    // port->ie = (1u << 0) | (1u << 30) | (1u << 3); // also PIO setup apparently
-    port->ie = (1u<<0) | (1u<<1) | (1u<<3) | (1u<<30); // DHRS + PSS + SDBS + TFES
-
-}
-
-void port_rebase() {
+/* For now we leave enough space for best case scenario where all 32 ports are implemented. */
+void ports_rebase() {
+    LOG_AHCI("Checking alignment of DMA addresses\n");
     assert((ahci_command_list_paddr & (1024 - 1)) == 0);  // CLB: 1 KiB
     assert((ahci_FIS_paddr          & (256  - 1)) == 0);  // FB : 256 B
     assert((ahci_command_tables_paddr & (256 - 1)) == 0); // CT : 256 B
 
-    stop_cmd(); // Stop command engine
+    for (int i = 0; i < 32; i++) {
+        if (driver_state.ports[i].status == PortStatusBringup) {
+            HBA_PORT *port = driver_state.ports[i].port_regs;
 
-    // Command list offset: 1K*portno
-    // Command list entry size = 32
-    // Command list entry maxim count = 32
-    // Command list maxim size = 32*32 = 1K per port
-    // port->clb = AHCI_BASE + (portno<<10); // If we want to cater to more
+            stop_cmd(port); // Stop command engine
 
-    port->clb  = (uint32_t)(ahci_command_list_paddr & 0xFFFFFFFF);
-    port->clbu = (uint32_t)(ahci_command_list_paddr >> 32);
-    sddf_memset((void*)ahci_command_list_vaddr, 0, 1024); // here
-    LOG_AHCI("Cleared ahci_command_list_vaddr\n");
+            // Command list entry size = 32
+            // Command list entry max count = 32
+            // Command list max size = 32 * 32 = 1K per port
+            port->clb  = (uint32_t)((ahci_command_list_paddr + (i << 10)) & 0xFFFFFFFF);
+            port->clbu = (uint32_t)((ahci_command_list_paddr + (i << 10)) >> 32);
+            sddf_memset((void*)(ahci_command_list_vaddr + (i << 10)), 0, 1024);
 
-    // FIS offset: 32K+256*portno
-    // FIS entry size = 256 bytes per port
-    // port->fb = AHCI_BASE + (32<<10) + (portno<<8); // If we want to cater to more ports
+            // FIS entry size = 256 bytes per port
+            port->fb = (uint32_t)((ahci_FIS_paddr  + (i << 8)) & 0xFFFFFFFF);
+            port->fbu = (uint32_t)((ahci_FIS_paddr + (i << 8)) >> 32);
+            sddf_memset((void*)(ahci_FIS_vaddr + (i << 8)), 0, 256);
 
-    port->fb = (uint32_t)(ahci_FIS_paddr & 0xFFFFFFFF);
-    port->fbu = (uint32_t)(ahci_FIS_paddr >> 32);
-    sddf_memset((void*)ahci_FIS_vaddr, 0, 256);
-    LOG_AHCI("Cleared ahci_FIS_vaddr\n");
+            // Command table size = 256 * 32 = 8K per port
+            HBA_CMD_HEADER *cmdheader = (HBA_CMD_HEADER*)(ahci_command_list_vaddr + (i << 10));
+            for (int j = 0; j < 32; j++) {
+                cmdheader[j].prdtl = 8; // @Tristan: I'm deciding 8 prdt entries per command table
+                // 256 bytes per command table, 64 + 16 + 48 + (16 * 8)
 
-    // Command table offset: 40K + 8K*portno
-    // Command table size = 256*32 = 8K per port
+                cmdheader[j].ctba = (uint32_t)((ahci_command_tables_paddr + (i << 13) + (j << 8)) & 0xFFFFFFFF);
+                cmdheader[j].ctbau = (uint32_t)((ahci_command_tables_paddr + (i << 13) + (j << 8)) >> 32);
+                sddf_memset((void*)(ahci_command_tables_vaddr + (i << 13) + (j << 8)), 0, 256);
+            }
 
-    HBA_CMD_HEADER *cmdheader = (HBA_CMD_HEADER*)ahci_command_list_vaddr;
-    for (int i=0; i<32; i++)
-    {
-        cmdheader[i].prdtl = 8; // 8 prdt entries per command table
-        // 256 bytes per command table, 64+16+48+16*8
-        // Command table offset: 40K + 8K*portno + cmdheader_index*256
-        // cmdheader[i].ctba = AHCI_BASE + (40<<10) + (portno<<13) + (i<<8); // If we want to cater to more ports
-
-        uint64_t paddr = ahci_command_tables_paddr + ((uint64_t)i << 8); // 1 << 8 = 256
-        cmdheader[i].ctba = (uint32_t)(paddr & 0xFFFFFFFF);
-        cmdheader[i].ctbau = (uint32_t)(paddr >> 32);
-
-        uint64_t vaddr = ahci_command_tables_vaddr + ((uint64_t)i << 8);
-        sddf_memset((void*)vaddr, 0, 256);
-        LOG_AHCI("Cleared %d ahci_command_tables_vaddr\n", i);
+            start_cmd(port); // Start command engine
+        }
     }
-
-    start_cmd(); // Start command engine
-
-    // @Tristan: should we consider clearing erro interrupts ?
 }
 
-void port_reset_1() {
-    // Engine must be stopped before we touch SCTL
-    stop_cmd(); // Stop command engine
-
-    port->is   = 0xFFFFFFFF;
-    port->serr = 0xFFFFFFFF;
-
-    port->cmd |= HBA_PxCMD_SUD; // spin-up if needed // @Tristan: ?
-
-    // COMRESET
-    port->sctl = (port->sctl & ~0xF) | 0x1; // DET=1
-
-    sddf_timer_set_timeout(timer_config.driver_id, NS_IN_MS);
-}
-
-void port_reset_2() {
-    port->sctl &= ~0xF; // DET=0
-
-    sddf_timer_set_timeout(timer_config.driver_id, NS_IN_S);
-}
-
-void port_reset_3() {
-    if (((port->ssts & 0xF) != HBA_PORT_DET_PRESENT) ||
-           (((port->ssts >> 8) & 0xF) != HBA_PORT_IPM_ACTIVE)) {
-        LOG_AHCI("Something went wrong\n");
-        assert(false);
-    }
-
-    port->is   = 0xFFFFFFFF;
-    port->serr = 0xFFFFFFFF;
-}
-
-void ahci_num_cmd_slots() {
-    number_of_command_slots = ((hba->cap >> 8) & 0x1Fu) + 1;
-    LOG_AHCI("Number of command slots is %u\n", number_of_command_slots);
-}
-
-int check_type(HBA_PORT *port_to_check) {
-    uint32_t ssts = port_to_check->ssts;
+int check_type(HBA_PORT *port) {
+    uint32_t ssts = port->ssts;
 
     uint8_t ipm = (ssts >> 8) & 0x0F;
     uint8_t det = ssts & 0x0F;
 
-    if (det != HBA_PORT_DET_PRESENT)    // Check drive status
+    if (det != HBA_PORT_DET_PRESENT) {
         return AHCI_DEV_NULL;
-    if (ipm != HBA_PORT_IPM_ACTIVE)
+    }
+    if (ipm != HBA_PORT_IPM_ACTIVE) {
         return AHCI_DEV_NULL;
+    }
 
-    switch (port_to_check->sig)
-    {
+    switch (port->sig) {
     case SATA_SIG_ATAPI:
         return AHCI_DEV_SATAPI;
     case SATA_SIG_SEMB:
@@ -997,56 +729,124 @@ int check_type(HBA_PORT *port_to_check) {
     }
 }
 
-void probe_port() {
-    // Search disk in implemented ports
-    uint32_t pi = hba->pi;
-    int i = 0;
-    while (i<32)
-    {
-        if (pi & 1)
-        {
-            int dt = check_type(&hba->ports[i]);
-            if (dt == AHCI_DEV_SATA)
-            {
+void probe_ports() {
+    bool one_drive_found = false;
+
+    for (int i = 0; i < 32; i++) {
+        if (driver_state.ports[i].status == PortStatusBringup) {
+            int dt = check_type(driver_state.ports[i].port_regs);
+
+            if (dt == AHCI_DEV_SATA) {
                 LOG_AHCI("SATA drive found at port %d\n", i);
-                // We only handle the first device found.
-                if (ahci_port_found == false) {
-                    ahci_port_number = i;
-                    ahci_port_found = true;
-                }
-            }
-            else if (dt == AHCI_DEV_SATAPI)
-            {
-                LOG_AHCI("SATAPI drive found at port %d\n", i);
-            }
-            else if (dt == AHCI_DEV_SEMB)
-            {
-                LOG_AHCI("SEMB drive found at port %d\n", i);
-            }
-            else if (dt == AHCI_DEV_PM)
-            {
-                LOG_AHCI("PM drive found at port %d\n", i);
-            }
-            else
-            {
+                one_drive_found = true;
+            } else if (dt == AHCI_DEV_SATAPI) {
+                LOG_AHCI("SATAPI drive found at port %d. Currently NO Support!\n", i);
+                driver_state.ports[i].status = PortStatusInactive;
+            } else if (dt == AHCI_DEV_SEMB) {
+                LOG_AHCI("SEMB drive found at port %d. Currently NO Support!\n", i);
+                driver_state.ports[i].status = PortStatusInactive;
+            } else if (dt == AHCI_DEV_PM) {
+                LOG_AHCI("PM drive found at port %d. Currently NO Support!\n", i);
+                driver_state.ports[i].status = PortStatusInactive;
+            } else {
                 LOG_AHCI("No drive found at port %d\n", i);
+                driver_state.ports[i].status = PortStatusInactive;
             }
         }
+    }
 
-        pi >>= 1;
-        i ++;
+    if (!one_drive_found) {
+        // TODO: @Tristan: for now something definitely has gone wrong if theres no SATA drives found.
+        LOG_AHCI("No SATA drives found at all \n");
+        assert(false);
     }
 }
 
+void ports_reset_1() {
+    // Engine must be stopped before we touch SCTL
+    for (int i = 0; i < 32; i++) {
+        if (driver_state.ports[i].status == PortStatusBringup) {
+            HBA_PORT *port = driver_state.ports[i].port_regs;
+
+            stop_cmd(port); // Stop command engine
+
+            // Clear all the interrupts
+            port->ie = 0;
+            (void)port->ie;
+
+            port->is   = 0xFFFFFFFF; // W1C
+            port->serr = 0xFFFFFFFF; // W1C
+
+            port->cmd |= (1u << 1); // spin-up disk if needed
+
+            // COMRESET
+            port->sctl = (port->sctl & ~0xF) | 0x1; // DET=1
+        }
+    }
+
+    sddf_timer_set_timeout(timer_config.driver_id, NS_IN_MS);
+}
+
+void ports_reset_2() {
+    for (int i = 0; i < 32; i++) {
+        if (driver_state.ports[i].status == PortStatusBringup) {
+            HBA_PORT *port = driver_state.ports[i].port_regs;
+
+            port->sctl &= ~0xF; // DET=0
+        }
+    }
+
+    sddf_timer_set_timeout(timer_config.driver_id, NS_IN_S);
+}
+
+void ports_reset_3() {
+    for (int i = 0; i < 32; i++) {
+        if (driver_state.ports[i].status == PortStatusBringup) {
+            HBA_PORT *port = driver_state.ports[i].port_regs;
+
+            if (((port->ssts & 0xF) != HBA_PORT_DET_PRESENT) ||
+                   (((port->ssts >> 8) & 0xF) != HBA_PORT_IPM_ACTIVE)) {
+                LOG_AHCI("Something went wrong initialising port %d\n", i);
+                driver_state.ports[i].status = PortStatusInactive;
+            }
+
+            // Clear all the interrupts
+            port->ie = 0;
+            (void)port->ie;
+
+            port->is   = 0xFFFFFFFF; // W1C
+            port->serr = 0xFFFFFFFF; // W1C
+        }
+    }
+}
+
+void initialise_implemented_ports() {
+    uint32_t pi = driver_state.hba_regs->pi;
+    for (int i = 0; i < 32; i++) {
+        if (pi & 1) {
+            driver_state.ports[i].port_regs = &driver_state.hba_regs->ports[i];
+            driver_state.ports[i].status = PortStatusBringup;
+        } else {
+            driver_state.ports[i].port_regs = NULL;
+            driver_state.ports[i].status = PortStatusInactive;
+        }
+        pi >>= 1;
+    }
+}
+
+void ahci_get_num_cmd_slots() {
+    // This field says how many command slots each port supports (minus one).
+    driver_state.number_of_command_slots = ((driver_state.hba_regs->cap >> 8) & 0x1Fu) + 1;
+    LOG_AHCI("Number of command slots is %u\n", driver_state.number_of_command_slots);
+}
+
 void validate_allocated_dma_paddr() {
-    dma64 = (hba->cap & (1 << 31)) != 0;
-    if (!dma64) {
-        assert(data_region_paddr <= UINT32_MAX);
+    driver_state.dma64 = driver_state.hba_regs->cap & (1 << 31);
+    if (!driver_state.dma64) {
         assert(ahci_command_tables_paddr <= UINT32_MAX);
         assert(ahci_FIS_paddr <= UINT32_MAX);
         assert(ahci_command_list_paddr <= UINT32_MAX);
 
-        assert(data_region_paddr + data_region_size - 1 <= UINT32_MAX);
         assert(ahci_command_tables_paddr + ahci_command_tables_size - 1 <= UINT32_MAX);
         assert(ahci_FIS_paddr + ahci_FIS_size - 1 <= UINT32_MAX);
         assert(ahci_command_list_paddr + ahci_command_list_size - 1 <= UINT32_MAX);
@@ -1055,30 +855,32 @@ void validate_allocated_dma_paddr() {
 
 void ahci_hba_reset_1() {
     LOG_AHCI("Issuing Host Bus Adapter (HBA) reset...\n");
-    hba->ghc |= 1u;
+    driver_state.hba_regs->ghc |= 1u;
+    (void)driver_state.hba_regs->ghc;
 
     sddf_timer_set_timeout(timer_config.driver_id, NS_IN_S);
 }
 
 void ahci_hba_reset_2() {
-    if (hba->ghc & 1u) {
+    if (driver_state.hba_regs->ghc & 1u) {
         LOG_AHCI("Reset hasn't been complete, for now we fail but we could do everything manually...\n");
         assert(false);
+        // Could also just set the driver as inactive
     }
 
     LOG_AHCI("HBA reset complete\n");
 }
 
 void ahci_boh_procedure_1() {
-    if ((hba->cap2 & 1u) == 0) {
+    if ((driver_state.hba_regs->cap2 & 1u) == 0) {
         LOG_AHCI("BOH not supported, skipping handoff\n");
         // To help with control flow we just do timeout still
-    } else if ((hba->bohc & 1u) == 0) {
+    } else if ((driver_state.hba_regs->bohc & 1u) == 0) {
         LOG_AHCI("BIOS not owning controller, no handoff needed\n");
         // To help with control flow we just do timeout still
     } else {
         LOG_AHCI("Requesting OS ownership...\n");
-        hba->bohc |= (1u << 1);
+        driver_state.hba_regs->bohc |= (1u << 1);
         // BIOS firmware should now, Clear BOS to 0 (releasing ownership).
     }
 
@@ -1086,23 +888,23 @@ void ahci_boh_procedure_1() {
 }
 
 void ahci_boh_procedure_2() {
-    if ((hba->bohc & 1u) != 0) {
+    if ((driver_state.hba_regs->bohc & 1u) != 0) {
         LOG_AHCI("BIOS still hasn't released!\n");
         LOG_AHCI("Proceed anyway; some firmwares ignore BOS or release implictly when we HBA reset\n");
-        // TODO: Revisit as we might have to disable in the firmware?
+        // TODO: Revisit as we might have to disable in the firmware? Or set the driver as inactive
     }
 
     // Clear any semaphore-change latched status
-    hba->bohc = (1u << 2);
+    driver_state.hba_regs->bohc = (1u << 2);
 
     LOG_AHCI("BIOS/OS handoff complete (BOS=%u, OS=%u)\n",
-             !!(hba->bohc & 1u), !!(hba->bohc & (1u << 1)));
+             !!(driver_state.hba_regs->bohc & 1u), !!(driver_state.hba_regs->bohc & (1u << 1)));
 }
 
 void ahci_init_1() {
     LOG_AHCI("== Starting AHCI initialisation (1)...\n");
 
-    hba = (HBA_MEM*)ahci_abar_vaddr;
+    driver_state.hba_regs = (HBA_MEM*)ahci_abar_vaddr;
 
     LOG_AHCI("Doing BIOS/OS handoff proceedure...\n");
     ahci_boh_procedure_1();
@@ -1114,7 +916,7 @@ void ahci_init_2() {
     LOG_AHCI("Continuing BIOS/OS handoff proceedure...\n");
     ahci_boh_procedure_2();
 
-    LOG_AHCI("Resetting conrtoller...\n");
+    LOG_AHCI("Resetting controller...\n");
     ahci_hba_reset_1();
 }
 
@@ -1125,71 +927,76 @@ void ahci_init_3() {
     ahci_hba_reset_2();
 
     LOG_AHCI("Enabling AHCI mode...\n");
-    hba->ghc |= (1u << 31);
+    driver_state.hba_regs->ghc |= (1u << 31);
+    (void)driver_state.hba_regs->ghc;
 
-    LOG_AHCI("Enabling interrupts in HBA...\n");
-    hba->ghc |= (1u << 1);
-
-    LOG_AHCI("Checking if physical addresses are valid for DMA...\n");
+    LOG_AHCI("Checking if physical addresses for data structures are valid for DMA...\n");
     validate_allocated_dma_paddr();
 
-    LOG_AHCI("Detecting attached SATA devices...\n");
-    probe_port();
-
-    assert(ahci_port_found);
-
-    LOG_AHCI("Choosing port %d...\n", ahci_port_number);
-
-    port = &hba->ports[ahci_port_number];
-
     LOG_AHCI("Checking the number of command slots/headers...\n");
-    ahci_num_cmd_slots();
+    ahci_get_num_cmd_slots();
 
-    LOG_AHCI("Resetting port...\n");
-    port_reset_1();
+    LOG_AHCI("Initialise implemented ports...\n");
+    initialise_implemented_ports();
+
+    LOG_AHCI("Resetting all ports...\n");
+    ports_reset_1();
 }
 
 void ahci_init_4() {
     LOG_AHCI("== Continuing AHCI initialisation (4)...\n");
 
-    LOG_AHCI("Continuing resetting port...\n");
-    port_reset_2();
+    LOG_AHCI("Continuing resetting all ports...\n");
+    ports_reset_2();
 }
 
 void ahci_init_5() {
     LOG_AHCI("== Continuing AHCI initialisation (5)...\n");
 
-    LOG_AHCI("Continuing resetting port...\n");
-    port_reset_3();
+    LOG_AHCI("Continuing resetting all ports...\n");
+    ports_reset_3();
+
+    LOG_AHCI("Detecting attached SATA devices...\n");
+    probe_ports();
 
     LOG_AHCI("AHCI port memory space initialisation...\n");
-    LOG_AHCI("Rebasing port %d\n", ahci_port_number);
-    port_rebase();
+    ports_rebase();
 
-    LOG_AHCI("Enabling interrupts for port %u...\n", ahci_port_number);
-    enable_irqs();
-
-    // DMA successfully works!
-    // test_generic_reads_and_writes();
-
-    LOG_AHCI("Setting up blk storage info...\n");
-    setup_blk_storage_info_1();
+    LOG_AHCI("Setting up blk storage info for the ports...\n");
+    setup_ports_blk_storage_info_1();
 }
 
 void ahci_init_6() {
-    LOG_AHCI("== Continuing AHCI initialisation (5)...\n");
+    LOG_AHCI("== Continuing AHCI initialisation (6)...\n");
 
-    LOG_AHCI("Continuing setting up blk storage info...\n");
-    setup_blk_storage_info_2();
+    LOG_AHCI("Continuing setting up blk storage info for the ports...\n");
+    setup_ports_blk_storage_info_2();
 
-    // get rid of useuless irqs
-    port->ie = 0;
-    port->ie = (1u << 0) | (1u << 30);
+    LOG_AHCI("Enabling interrupts in HBA...\n");
+    driver_state.hba_regs->ghc |= (1u << 1);
+
+    LOG_AHCI("Enabling interrupts for ports ...\n");
+    enable_irqs_for_ports();
+
     LOG_AHCI("Driver initialisation complete\n");
 }
 
-void dump_ahci_registers() {
-    /* ===== HBA (global) registers — per your HBA_MEM layout ===== */
+static const char* port_status_str(port_status_t s) {
+    switch (s) {
+        case PortStatusBringup: return "Bringup";
+        case PortStatusInactive: return "Inactive";
+        case PortStatusActive: return "Active";
+        default: return "Unknown";
+    }
+}
+
+void dump_ahci_registers(bool only_non_inactive) {
+    HBA_MEM *hba = driver_state.hba_regs;
+    if (!hba) {
+        LOG_AHCI("dump_ahci_registers: driver_state.hba_regs is NULL\n");
+        return;
+    }
+
     uint32_t cap      = hba->cap;       /* 0x00 */
     uint32_t ghc      = hba->ghc;       /* 0x04 */
     uint32_t hba_is   = hba->is;        /* 0x08 */
@@ -1209,10 +1016,17 @@ void dump_ahci_registers() {
              ccc_ctl, ccc_pts, em_loc, em_ctl);
     LOG_AHCI("CAP2=0x%08x  BOHC=0x%08x\n", cap2, bohc);
 
-    /* ===== Per-port registers — dump all ports indicated in PI ===== */
-    LOG_AHCI("=== Per-Port Reg Dump (PI=0x%08x) ===\n", pi);
-    for (int i = 0; i < 1; i++) {
-        if (!(pi & (1u << i))) continue;
+    LOG_AHCI("=== Per-Port Reg Dump (implemented mask PI=0x%08x) ===\n", pi);
+
+    for (int i = 0; i < 32; i++) {
+        if (!(pi & (1u << i))) {
+            continue;
+        }
+
+        if (only_non_inactive &&
+            driver_state.ports[i].status == PortStatusInactive) {
+            continue;
+        }
 
         volatile HBA_PORT *p = &hba->ports[i];
 
@@ -1234,78 +1048,110 @@ void dump_ahci_registers() {
         uint32_t sntf   = p->sntf;    /* 0x3C */
         uint32_t fbs    = p->fbs;     /* 0x40 */
 
-        LOG_AHCI("-- Port %d --\n", i);
+        LOG_AHCI("-- Port %d (PortState=%s) --\n",
+                 i, port_status_str(driver_state.ports[i].status));
         LOG_AHCI("CLB=%08x CLBU=%08x  FB=%08x FBU=%08x\n", clb, clbu, fb, fbu);
         LOG_AHCI("IS =%08x  IE=%08x  CMD=%08x  RSV0=%08x\n", pis, pie, cmd, rsv0);
         LOG_AHCI("TFD=%08x  SIG=%08x  SSTS=%08x  SCTL=%08x\n", tfd, sig, ssts, sctl);
         LOG_AHCI("SERR=%08x  SACT=%08x  CI=%08x  SNTF=%08x  FBS=%08x\n",
                  serr, sact, ci, sntf, fbs);
-
-        /* Reserved and vendor-specific dwords from your struct */
-        for (int k = 0; k < 11; k += 4) {
-            uint32_t a = p->rsv1[k + 0];
-            uint32_t b = p->rsv1[k + 1];
-            uint32_t c = p->rsv1[k + 2];
-            uint32_t d = p->rsv1[k + 3];
-            LOG_AHCI("RSV1[%02d..%02d]= %08x %08x %08x %08x\n",
-                     k, k+3, a, b, c, d);
-        }
-        LOG_AHCI("VENDOR[0..3]= %08x %08x %08x %08x\n",
-                 p->vendor[0], p->vendor[1], p->vendor[2], p->vendor[3]);
     }
-
-    HBA_CMD_HEADER *hdr = (HBA_CMD_HEADER*)ahci_command_list_vaddr + slot;
-    LOG_AHCI("PRDBC=%u (expect 512 on IDENTIFY)\n", hdr->prdbc);
 }
 
+/*
+IRQ Handler Checklist:
+    1. Check global interrupt status. Write back its value. For all the ports that have a corresponding set bit...
+    2. Check the port interrupt status. Write back its value. If zero, continue to the next port.
+    3. If error bit set, reset port/retry commands as necessary.
+    4. Compare issued commands register to the commands you have recorded as issuing.
+        For any bits where a command was issued but is no longer running, this means that the command has completed.
+    5. Once done, continue checking if any other devices sharing the IRQ also need servicing.
+*/
+void irq_handler() {
+    assert(driver_state.status == DriverStatusActive);
 
-void do_bringup() {
-    assert(driver_status == DrvStatusBringup);
+    if (driver_state.hba_regs->is == 0) {
+        return;
+    }
 
-    switch (ahci_init_stage) {
-    case 0:
+    uint32_t clear_mask = 0;
+
+    for (int i = 0; i < 32; i++) {
+        if (driver_state.ports[i].status == PortStatusActive && (driver_state.hba_regs->is & (1 << i))) {
+            // service interrupt on this port which MUST be a response to command
+            LOG_AHCI("Handling irq from port %d\n", i);
+            handle_client(true, i);
+            clear_mask |= (1 << i);
+        } else if (driver_state.hba_regs->is & (1 << i)) {
+            // we should not have gotten an interrupt here
+            assert(false);
+        }
+    }
+
+    driver_state.hba_regs->is = clear_mask; // W1C
+    (void)driver_state.hba_regs->is;
+}
+
+void ahci_init() {
+    assert(driver_state.status == DriverStatusBringup);
+
+    switch (driver_state.init_stage) {
+    case FIRST_STAGE:
         ahci_init_1();
+        // timeout started
         break;
-    case 1:
+    case SECOND_STAGE:
         ahci_init_2();
+        // timeout started
         break;
-    case 2:
+    case THIRD_STAGE:
         ahci_init_3();
+        // timeout started
         break;
-    case 3:
+    case FOURTH_STAGE:
         ahci_init_4();
+        // timeout started
         break;
-    case 4:
+    case FIFTH_STAGE:
         ahci_init_5();
+        // timeout started
         break;
-    case 5:
+    case LAST_STAGE:
         ahci_init_6();
         break;
     default:
         assert(false);
     }
 
-    ahci_init_stage++;
+    driver_state.init_stage++;
 
-    if (ahci_init_stage == 6) {
-        driver_status = DrvStatusActive;
+    if (driver_state.init_stage == COMPLETED_INITIALISATION) {
+        for (int i = 0; i < 32; i++) {
+            if (driver_state.ports[i].status == PortStatusBringup) {
+                driver_state.ports[i].status = PortStatusActive;
+            }
+        }
+
+        driver_state.status = DriverStatusActive;
         LOG_AHCI("Handling any client requests while in initialisation...\n");
-        handle_client(false);
+        for (int i = 0; i < 32; i++) {
+             if (driver_state.ports[i].status == PortStatusActive) {
+                handle_client(false, i);
+            }
+        }
     }
 }
 
 void notified(microkit_channel ch) {
-   if (driver_status == DrvStatusBringup) { // TODO: add the unlikely compiler hint
+    if (driver_state.status == DriverStatusBringup) { // TODO: should add the unlikely compiler hint
         if (ch == timer_config.driver_id) {
             LOG_AHCI("notification from timer!\n");
-            do_bringup();
-        } else if (ch == 60) {
-            LOG_AHCI("notification from device!\n");
-            do_bringup();
+            ahci_init();
+        } else if (ch == DEVICE_IRQ_MICROKIT_CHANNEL) {
+            LOG_AHCI("notification from device ... ignoring\n");
             microkit_irq_ack(ch);
         } else {
             LOG_AHCI("notification on non-IRQ channel during bringup: %d\n", ch);
-            // Is this in case the client messages us?
         }
 
         return;
@@ -1313,11 +1159,11 @@ void notified(microkit_channel ch) {
 
     if (ch == DEVICE_IRQ_MICROKIT_CHANNEL) {
         LOG_AHCI("Got an irq from the device!\n");
-        handle_client(true);
+        irq_handler();
         microkit_irq_ack(ch);
     } else if (ch == blk_config.virt.id) {
         LOG_AHCI("Got a client request!\n");
-        handle_client(false);
+        handle_client(false, 0); // TODO: dont hardcode the port
     } else if (ch == timer_config.driver_id) {
         LOG_AHCI("got impossible timer interrupt\n");
         assert(false);
@@ -1342,20 +1188,17 @@ Initialisation Checklist:
     For all the implemented ports:
         1. Allocate physical memory for its command list, the received FIS, and its command tables.
             Make sure the command tables are 128 byte aligned. Memory map these as uncacheable.
-        2. Set command list and received FIS address registers (and upper registers, if supported).
-        3. Setup command list entries to point to the corresponding command table.
-
-
-Reset the port.
-Start command list processing with the port's command register.
-Enable interrupts for the port. The D2H bit will signal completed commands.
-Read signature/status of the port to see if it connected to a drive.
-Send IDENTIFY ATA command to connected drives. Get their sector size and count.
-
-
-
-
+        2. Stop the port
+        3. Reset the port.
+        4. Read signature/status of the port to see if it connected to a drive.
+        5. Set command list and received FIS address registers (and upper registers, if supported).
+        6. Setup command list entries to point to the corresponding command table.
+        7. Start command list processing with the port's command register.
+        8. Send IDENTIFY ATA command to connected drives. Get their sector size and count.
+        9. Enable interrupts for the port. The D2H bit will signal completed commands. Too complicated to be irq driven here.
+        10. Now we can process client requests for this port.
 */
+
 void init()
 {
     assert(device_resources_check_magic(&device_resources));
@@ -1374,6 +1217,17 @@ void init()
 
     assert(found_sata_controller);
 
-    driver_status = DrvStatusBringup;
-    do_bringup();
+    driver_state.status = DriverStatusBringup;
+    driver_state.init_stage = FIRST_STAGE;
+    ahci_init();
 }
+
+/*
+    TODO's
+    - change i variable to portno.
+    - fix the timeouts lengths.
+    - add more specific error messages for request.
+    - add retries or port resets?
+    - check where we assert, we probably want more graceful handling.
+    - think more about irq control flow, i think the device can do some weird things.
+*/

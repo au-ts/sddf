@@ -101,10 +101,15 @@ bool test_basic()
             }
         }
 
-        for (int i = 0; i < BLK_TRANSFER_SIZE; i += 90) {
-            for (int j = 0; j < 90; j++) {
-                sddf_printf("%c", read_data[i + j]);
+        size_t to_print = basic_data_len;
+        size_t off = 0;
+        while (off < to_print) {
+            size_t chunk = to_print - off;
+            if (chunk > 90) chunk = 90;
+            for (size_t k = 0; k < chunk; k++) {
+                sddf_printf("%c", read_data[off + k]);
             }
+            off += chunk;
         }
         sddf_printf("\n");
 
