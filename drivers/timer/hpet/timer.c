@@ -98,7 +98,7 @@ enum {
 #define IRQ_CH 0
 uintptr_t HPET_REGION = 0x50000000;
 
-hpet_timer_t *timer_0;
+volatile hpet_timer_t *timer_0;
 const uint64_t tick_period_fs = 10000000; // main counter tick period in femtoseconds
 
 #define MAX_CLIENTS 6
