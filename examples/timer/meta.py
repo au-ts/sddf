@@ -16,7 +16,7 @@ class Board:
     name: str
     arch: SystemDescription.Arch
     paddr_top: int
-    timer: str
+    timer: str | None
 
 
 BOARDS: List[Board] = [
@@ -80,15 +80,32 @@ BOARDS: List[Board] = [
         paddr_top=0xA0000000,
         timer="axi/timer@ff140000",
     ),
+    Board(
+        name="x86_64_generic",
+        arch=SystemDescription.Arch.X86_64,
+        paddr_top=0x7ffdf000,
+        timer=None,
+    )
 ]
 
 
-def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
+def generate(sdf_file: str, output_dir: str, dtb: DeviceTree | None):
+    timer_node = None
     timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=254)
-    client = ProtectionDomain("client", "client.elf", priority=1)
 
-    timer_node = dtb.node(board.timer)
-    assert timer_node is not None
+    if board.name == "x86_64_generic":
+        hpet_irq = SystemDescription.IrqMsi(board.arch, 0, 0, 0, 0, 0, 0)
+        timer_driver.add_irq(hpet_irq)
+
+        hept_regs = SystemDescription.MemoryRegion(sdf, "hept_regs", 0x1000, paddr=0xfed00000)
+        hept_regs_map = SystemDescription.Map(hept_regs, 0x5000_0000, "rw", cached=False)
+        timer_driver.add_map(hept_regs_map)
+        sdf.add_mr(hept_regs)
+    else:
+        timer_node = dtb.node(board.timer)
+        assert timer_node is not None
+
+    client = ProtectionDomain("client", "client.elf", priority=1)
 
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
     timer_system.add_client(client)
@@ -106,7 +123,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dtb", required=True)
+    parser.add_argument("--dtb", required=False)
     parser.add_argument("--sddf", required=True)
     parser.add_argument("--board", required=True, choices=[b.name for b in BOARDS])
     parser.add_argument("--output", required=True)
@@ -119,7 +136,9 @@ if __name__ == "__main__":
     sdf = SystemDescription(board.arch, board.paddr_top)
     sddf = Sddf(args.sddf)
 
-    with open(args.dtb, "rb") as f:
-        dtb = DeviceTree(f.read())
+    dtb = None
+    if board.arch != SystemDescription.Arch.X86_64:
+        with open(args.dtb, "rb") as f:
+            dtb = DeviceTree(f.read())
 
     generate(args.sdf, args.output, dtb)
