@@ -76,8 +76,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Setup Nix
-        uses: cachix/install-nix-action@v27
       - name: Get Nix dependencies
         run: nix develop -c bash -c 'echo Hello World'
       - name: Build examples
