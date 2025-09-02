@@ -13,6 +13,7 @@ This is a serial subsystem example demonstrating two receive and transmit client
 The following platforms are supported:
 
 * cheshire
+* hifive_p550
 * imx8mm_evk
 * imx8mp_evk
 * imx8mq_evk
