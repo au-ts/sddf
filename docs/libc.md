@@ -29,6 +29,8 @@ without a full libc.
 
 The vendored subset includes the following library functions:
 
+The following are provided (optimised for the `aarch64`, `x86_64`, `riscv64`
+architectures):
 - `memcmp`
 - `memcpy`
 - `memmove`
