@@ -63,6 +63,17 @@ else ifneq ($(filter $(strip $(MICROKIT_BOARD)),imx8mm_evk imx8mp_evk imx8mq_evk
 else ifeq ($(strip $(MICROKIT_BOARD)), zcu102)
 	TIMER_DRIVER_DIR := cdns
 	CPU := cortex-a53
+else ifeq ($(strip $(MICROKIT_BOARD)),x86_64_generic)
+	TIMER_DRIVER_DIR := hpet
+	CPU := generic
+	SEL4_64B := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)/elf/sel4.elf
+	SEL4_32B := sel4.elf
+	DTS=
+	QEMU := qemu-system-x86_64
+	QEMU_ARCH_ARGS = -machine q35 \
+					-cpu qemu64,+fsgsbase,+pdpe1gb,+pcid,+invpcid,+xsave,+xsaves,+xsaveopt \
+					-kernel $(SEL4_32B) \
+					-initrd $(IMAGE_FILE)
 else
 $(error Unsupported MICROKIT_BOARD given)
 endif
@@ -73,7 +84,7 @@ UTIL := $(SDDF)/util
 TIMER_DRIVER := $(SDDF)/drivers/timer/$(TIMER_DRIVER_DIR)
 BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 SYSTEM_FILE := timer.system
-DTS := $(SDDF)/dts/$(MICROKIT_BOARD).dts
+DTS ?= $(SDDF)/dts/$(MICROKIT_BOARD).dts
 DTB := $(MICROKIT_BOARD).dtb
 ARCH := ${shell grep 'CONFIG_SEL4_ARCH  ' $(BOARD_DIR)/include/kernel/gen_config.h | cut -d' ' -f4}
 SDDF_CUSTOM_LIBC := 1
@@ -84,6 +95,8 @@ ifeq ($(ARCH),aarch64)
 	CFLAGS_ARCH := -mcpu=$(CPU) -mstrict-align -target aarch64-none-elf
 else ifeq ($(ARCH),riscv64)
 	CFLAGS_ARCH := -march=rv64imafdc -target riscv64-none-elf
+else ifeq ($(ARCH),x86_64)
+	CFLAGS_ARCH := -mtune=$(CPU) -target x86_64-pc-elf
 endif
 
 CFLAGS := -nostdlib \
@@ -116,11 +129,17 @@ client.o: ${TOP}/client.c
 client.elf: client.o
 	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
 
-$(DTB): $(DTS)
-	dtc -q -I dts -O dtb $(DTS) > $(DTB)
+# $(DTB): $(DTS)
+# 	dtc -q -I dts -O dtb $(DTS) > $(DTB)
 
-$(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
+$(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTS)
+ifneq ($(strip $(DTS)),)
+	dtc -q -I dts -O dtb $(DTS) > $(DTB)
 	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE)
+else
+	$(OBJCOPY) -O elf32-i386 $(SEL4_64B) $(SEL4_32B)
+	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --output . --sdf $(SYSTEM_FILE)
+endif
 	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
 	$(OBJCOPY) --update-section .timer_client_config=timer_client_client.data client.elf
 
