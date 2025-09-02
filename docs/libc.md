@@ -9,7 +9,7 @@ The sDDF has vendored a subset of the C standard library from
 [newlib](https://sourceware.org/git/newlib-cygwin.git), as of commit
 [4613a9a9799792a53444576de61bd1569f346ffa](https://sourceware.org/git/?p=newlib-cygwin.git;a=commit;h=4613a9a9799792a53444576de61bd1569f346ffa).
 
-The following are provided (optimised for the `aarch64` and `riscv64`
+The following are provided (optimised for the `aarch64`, `x86_64`, `riscv64`
 architectures):
 - `memcmp`
 - `memcpy`
