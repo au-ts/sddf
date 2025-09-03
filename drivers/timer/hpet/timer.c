@@ -99,7 +99,7 @@ enum {
 uintptr_t HPET_REGION = 0x50000000;
 
 volatile hpet_timer_t *timer_0;
-const uint64_t tick_period_fs = 10000000; // main counter tick period in femtoseconds
+uint64_t tick_period_fs; // main counter tick period in femtoseconds
 
 #define MAX_CLIENTS 6
 
@@ -132,6 +132,9 @@ void set_timeout(uint64_t timeout)
 
 void init(void)
 {
+    volatile uint64_t cap = *((uint64_t *)HPET_REGION + CAP_ID_REG);
+    tick_period_fs = cap >> 32;
+
     volatile uint64_t *general_config_reg = (void *)HPET_REGION + GENERAL_CONFIG_REG;
     *general_config_reg |= (1ul << ENABLE_CNF);
 
