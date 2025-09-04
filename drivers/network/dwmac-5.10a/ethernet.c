@@ -243,7 +243,7 @@ static void handle_irq()
  */
 #if defined(CONFIG_PLAT_IMX8MP_EVK)
 #define USE_MAC_ADDR_REGS 1
-#elif defined(CONFIG_PLAT_STAR64)
+#elif defined(CONFIG_PLAT_STAR64) || defined(CONFIG_PLAT_HIFIVE_P550)
 #define USE_MAC_ADDR_REGS 0
 #else
 #error "Unknown platform to handle MAC address for"
