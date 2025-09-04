@@ -87,6 +87,10 @@ else ifeq ($(strip $(MICROKIT_BOARD)), star64)
 	DRIV_DIR := dwmac-5.10a
 	SERIAL_DRIV_DIR := ns16550a
 	TIMER_DRV_DIR := jh7110
+else ifeq ($(strip $(MICROKIT_BOARD)), hifive_p550)
+	DRIV_DIR := dwmac-5.10a
+	SERIAL_DRIV_DIR := ns16550a
+	TIMER_DRV_DIR := eswin
 else
 $(error Unsupported MICROKIT_BOARD given)
 endif

@@ -68,6 +68,14 @@ BOARDS: List[Board] = [
         ethernet="soc@0/bus@30800000/ethernet@30be0000",
     ),
     Board(
+        name="hifive_p550",
+        arch=SystemDescription.Arch.RISCV64,
+        paddr_top=0x59400000,
+        serial="soc/serial@0x50900000",
+        timer="soc/timer@0x51840000",
+        ethernet="soc/ethernet@50400000",
+    ),
+    Board(
         name="imx8mm_evk",
         arch=SystemDescription.Arch.AARCH64,
         paddr_top=0x70000000,
