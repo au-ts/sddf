@@ -12,6 +12,7 @@ timeouts and getting the current time from a timer driver.
 ## Building
 
 The following platforms are supported:
+
 * imx8mm_evk
 * imx8mp_evk
 * imx8mq_evk

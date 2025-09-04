@@ -11,6 +11,7 @@ This is a serial subsystem example demonstrating two receive and transmit client
 ## Building
 
 The following platforms are supported:
+
 * cheshire
 * imx8mm_evk
 * imx8mp_evk
