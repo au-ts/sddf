@@ -18,7 +18,6 @@ class Board:
     arch: SystemDescription.Arch
     paddr_top: int
     timer: str
-    serial: str
 
 
 BOARDS: List[Board] = [
@@ -27,7 +26,6 @@ BOARDS: List[Board] = [
         arch=SystemDescription.Arch.AARCH64,
         paddr_top=0xA0000000,
         timer="axi/timer@ff140000",
-        serial="axi/serial@ff000000",
     ),
 ]
 
@@ -36,23 +34,6 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=254)
 
     client = ProtectionDomain("client", "dvfs.elf", priority=100)
-
-    idle = ProtectionDomain("idle", "idle.elf", priority=1)
-
-    serial_driver = ProtectionDomain("serial_driver", "serial_driver.elf", priority=200)
-
-    # Increase the stack size as running with UBSAN uses more stack space than normal.
-    serial_virt_tx = ProtectionDomain(
-        "serial_virt_tx", "serial_virt_tx.elf", priority=199, stack_size=0x2000
-    )
-
-    serial_node = dtb.node(board.serial)
-    assert serial_node is not None
-
-    serial_system = Sddf.Serial(
-        sdf, serial_node, serial_driver, serial_virt_tx, enable_color=False
-    )
-    serial_system.add_client(client)
 
     clk_mr = MemoryRegion("clk", 0x1000, paddr=0xFD1A0000)
     client.add_map(Map(clk_mr, 0xFD1A0000, "rw", cached=False))
@@ -64,14 +45,12 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
     timer_system.add_client(client)
 
-    pds = [timer_driver, client, serial_driver, serial_virt_tx, idle.elf]
+    pds = [timer_driver, client]
     for pd in pds:
         sdf.add_pd(pd)
 
     assert timer_system.connect()
     assert timer_system.serialise_config(output_dir)
-    assert serial_system.connect()
-    assert serial_system.serialise_config(output_dir)
 
     with open(f"{output_dir}/{sdf_file}", "w+") as f:
         f.write(sdf.render())

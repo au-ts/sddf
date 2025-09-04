@@ -4,6 +4,7 @@
 use core::convert::Infallible;
 
 use cpufreq::freq_trait::FreqOps;
+use sddf_timer::timer::Timer;
 
 use crate::platforms::xilinx::Xilinx;
 
@@ -11,24 +12,30 @@ use sel4_microkit::{debug_println, protection_domain, Handler};
 
 mod platforms;
 
-mod helper;
+const TIMER: Timer = Timer::new(sel4_microkit::Channel::new(0));
+
+fn usleep(time_us: u32) {
+    let time_ns: u64 = time_us as u64 * 1000;
+    for _ in 0..time_ns {
+        core::hint::spin_loop(); // Use spin loop hint to reduce contention during the wait
+    }
+}
 
 #[protection_domain]
 fn init() -> impl Handler {
-    unsafe {
-        helper::counter_init();
-    }
-
     let res: u64 = Xilinx::get_freq(0);
 
     debug_println!("Current {:#x}", res);
 
-    unsafe {
-        let pre_count = helper::read_count();
-        helper::wait();
-        let post_count = helper::read_count();
-        helper::print_count(post_count - pre_count);
-    }
+    let mut past_time: u64 = TIMER.time_now();
+
+    usleep(1000_000);
+
+    let mut current_time: u64 = TIMER.time_now();
+
+    let mut time_elapsed: u64 = current_time - past_time;
+
+    debug_println!("Elapsed time: {} ns", time_elapsed);
 
     debug_println!("Change clk frequency");
 
@@ -38,12 +45,15 @@ fn init() -> impl Handler {
 
     debug_println!("Current {:#x}", res);
 
-    unsafe {
-        let pre_count = helper::read_count();
-        helper::wait();
-        let post_count = helper::read_count();
-        helper::print_count(post_count - pre_count);
-    }
+    past_time = TIMER.time_now();
+
+    usleep(1000_000);
+
+    current_time = TIMER.time_now();
+
+    time_elapsed = current_time - past_time;
+
+    debug_println!("Elapsed time: {} ns", time_elapsed);
 
     HandlerImpl{}
 }
