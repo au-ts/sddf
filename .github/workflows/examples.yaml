@@ -94,8 +94,6 @@ jobs:
       - name: Install dependencies (via Homebrew)
         run: |
           brew install llvm lld make imagemagick dtc
-          brew tap riscv-software-src/riscv
-          brew install riscv-tools
           echo "/opt/homebrew/opt/llvm/bin:$PATH" >> $GITHUB_PATH
       - name: Install Zig
         uses: mlugg/setup-zig@v2.0.5
