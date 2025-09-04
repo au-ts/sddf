@@ -46,7 +46,6 @@ SYSTEM_FILE := dvfs.system
 
 ifeq ($(strip $(MICROKIT_BOARD)), zcu102)
 	CPU := cortex-a53
-	SERIAL_DRIVER_DIR := zynqmp
 	TIMER_DRIVER_DIR := cdns
 else
 $(error Unsupported MICROKIT_BOARD given)
@@ -67,7 +66,7 @@ BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 ARCH := ${shell grep 'CONFIG_SEL4_ARCH  ' $(BOARD_DIR)/include/kernel/gen_config.h | cut -d' ' -f4}
 SDDF_CUSTOM_LIBC := 1
 
-IMAGES := dvfs.elf serial_virt_tx.elf serial_driver.elf timer_driver.elf idle.elf
+IMAGES := dvfs.elf timer_driver.elf
 CFLAGS := -nostdlib \
 		  -ffreestanding \
 		  -g3 \
@@ -90,32 +89,18 @@ DTS := $(SDDF)/dts/$(MICROKIT_BOARD).dts
 DTB := $(MICROKIT_BOARD).dtb
 METAPROGRAM := $(TOP)/meta.py
 
-SERIAL_DRIVER := $(SDDF)/drivers/serial/${SERIAL_DRIVER_DIR}
-
 all: $(IMAGE_FILE)
 
-include ${SDDF}/drivers/serial/${SERIAL_DRIVER_DIR}/serial_driver.mk
 include ${SDDF}/drivers/timer/${TIMER_DRIVER_DIR}/timer_driver.mk
 
 include ${SDDF}/util/util.mk
-include ${SDDF}/serial/components/serial_components.mk
 
 ${IMAGES}: libsddf_util_debug.a
 
 microkit_sdk_config_dir := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 sel4_include_dirs := $(microkit_sdk_config_dir)/include
 
-idle.elf: ${SDDF}/examples/dvfs/idle.c
-	$(CC) -c $(CFLAGS) -I. $< -o idle.o
-	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
-
-helper.o: ${SDDF}/examples/dvfs/src/helper.c
-	$(CC) -c $(CFLAGS) $< -o $@
-
-libhelper.a: helper.o
-	${AR} rcs $@ $<
-
-dvfs.elf: libhelper.a
+dvfs.elf:
 	@echo "Building dvfs.elf for board $(MICROKIT_BOARD)..." && \
 	echo "MICROKIT SDK config directory: $(microkit_sdk_config_dir)" && \
 	echo "SEl4 include directories: $(sel4_include_dirs)" && \
@@ -136,11 +121,6 @@ $(DTB): $(DTS)
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE) $(PARTITION_ARG)
 	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
-	$(OBJCOPY) --update-section .timer_client_config=timer_client_blk_driver.data dvfs.elf
-	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
-	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data serial_driver.elf
-	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx.data serial_virt_tx.elf
-	$(OBJCOPY) --update-section .serial_client_config=serial_client_client.data dvfs.elf
 
 $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
