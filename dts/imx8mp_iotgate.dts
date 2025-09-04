@@ -586,6 +586,12 @@
 				phandle = <0xa3>;
 			};
 
+			timer@302d0000 {
+				compatible = "fsl,imx8mp-gpt", "fsl,imx6dl-gpt";
+				reg = <0x302d0000 0x10000>;
+				interrupts = <0x00 0x37 0x04>;
+			};
+
 			pinctrl@30330000 {
 				compatible = "fsl,imx8mp-iomuxc";
 				reg = <0x30330000 0x10000>;
