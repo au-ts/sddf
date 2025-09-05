@@ -6,7 +6,6 @@
 #pragma once
 
 #include <stdint.h>
-#include <microkit.h>
 #include <sddf/util/util.h>
 
 #if defined(CONFIG_PLAT_ZYNQMP)

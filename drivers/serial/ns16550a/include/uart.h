@@ -5,8 +5,8 @@
 
 #pragma once
 
-#define LOG_DRIVER(...) do{ sddf_dprintf("%s|INFO: ", microkit_name); sddf_dprintf(__VA_ARGS__); }while(0)
-#define LOG_DRIVER_ERR(...) do{ sddf_dprintf("%s|ERROR: ", microkit_name); sddf_dprintf(__VA_ARGS__); }while(0)
+#define LOG_DRIVER(...) do{ sddf_dprintf("%s|INFO: ", sddf_get_pd_name()); sddf_dprintf(__VA_ARGS__); }while(0)
+#define LOG_DRIVER_ERR(...) do{ sddf_dprintf("%s|ERROR: ", sddf_get_pd_name()); sddf_dprintf(__VA_ARGS__); }while(0)
 
 /*
  * Divide positive or negative dividend by positive divisor and round

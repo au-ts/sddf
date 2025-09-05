@@ -14,7 +14,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <microkit.h>
+#include <os/sddf.h>
 #include <sddf/util/util.h>
 #include <sddf/serial/queue.h>
 #include <sddf/util/printf.h>
@@ -266,7 +266,7 @@ void init(void)
     assert(device_resources.num_regions == 1);
 
     /* Ack any IRQs that were delivered before the driver started. */
-    microkit_irq_ack(device_resources.irqs[0].id);
+    sddf_irq_ack(device_resources.irqs[0].id);
 
     uart_base = (uintptr_t)device_resources.regions[0].region.vaddr;
     uart_setup();
@@ -277,7 +277,7 @@ void init(void)
     serial_queue_init(&tx_queue_handle, config.tx.queue.vaddr, config.tx.data.size, config.tx.data.vaddr);
 }
 
-void notified(microkit_channel ch)
+void notified(sddf_channel ch)
 {
     if (ch == device_resources.irqs[0].id) {
         handle_irq();
