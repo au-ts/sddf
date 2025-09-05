@@ -326,7 +326,7 @@ void notified(sddf_channel ch)
         handle_irq();
         /*
          * Delay calling into the kernel to ack the IRQ until the next loop
-         * in the microkit/sddf event handler loop.
+         * in the event handler loop.
          */
         sddf_deferred_irq_ack(ch);
     } else if (ch == config.virt_rx.id) {
