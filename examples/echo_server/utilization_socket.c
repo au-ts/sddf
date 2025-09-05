@@ -4,7 +4,7 @@
  */
 
 #include <string.h>
-#include <microkit.h>
+#include <os/sddf.h>
 
 #include "lwip/ip.h"
 #include "lwip/pbuf.h"
@@ -71,8 +71,8 @@ static struct tcp_pcb *utiliz_socket;
 
 struct bench *bench;
 
-microkit_channel bench_start_ch;
-microkit_channel bench_stop_ch;
+sddf_channel bench_start_ch;
+sddf_channel bench_stop_ch;
 
 uint64_t start;
 uint64_t idle_ccount_start;
@@ -134,18 +134,18 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
         error = tcp_write(pcb, OK, strlen(OK), TCP_WRITE_FLAG_COPY);
         if (error) sddf_dprintf("Failed to send OK message through utilization peer\n");
     } else if (msg_match(data_packet_str, START)) {
-        sddf_printf("%s measurement starting...\n", microkit_name);
-        if (!strcmp(microkit_name, "client0")) {
+        sddf_printf("%s measurement starting...\n", sddf_get_pd_name());
+        if (!strcmp(sddf_get_pd_name(), "client0")) {
             start = __atomic_load_n(&bench->ts, __ATOMIC_RELAXED);
             idle_ccount_start = __atomic_load_n(&bench->ccount, __ATOMIC_RELAXED);
-            microkit_notify(bench_start_ch);
+            sddf_notify(bench_start_ch);
         }
     } else if (msg_match(data_packet_str, STOP)) {
-        sddf_printf("%s measurement finished \n", microkit_name);
+        sddf_printf("%s measurement finished \n", sddf_get_pd_name());
 
         uint64_t total = 0, idle = 0;
 
-        if (!strcmp(microkit_name, "client0")) {
+        if (!strcmp(sddf_get_pd_name(), "client0")) {
             total = __atomic_load_n(&bench->ts, __ATOMIC_RELAXED) - start;
             idle = __atomic_load_n(&bench->ccount, __ATOMIC_RELAXED) - idle_ccount_start;
         }
@@ -171,8 +171,8 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
         error = tcp_write(pcb, buffer, strlen(buffer) + 1, TCP_WRITE_FLAG_COPY);
         tcp_shutdown(pcb, 0, 1);
 
-        if (!strcmp(microkit_name, "client0"))
-            microkit_notify(bench_stop_ch);
+        if (!strcmp(sddf_get_pd_name(), "client0"))
+            sddf_notify(bench_stop_ch);
     } else if (msg_match(data_packet_str, QUIT)) {
         /* Do nothing for now */
     } else {
@@ -195,7 +195,7 @@ static err_t utilization_accept_callback(void *arg, struct tcp_pcb *newpcb, err_
     return ERR_OK;
 }
 
-int setup_utilization_socket(void *cycle_counters, microkit_channel start_ch, microkit_channel stop_ch)
+int setup_utilization_socket(void *cycle_counters, sddf_channel start_ch, sddf_channel stop_ch)
 {
     bench = cycle_counters;
     bench_start_ch = start_ch;

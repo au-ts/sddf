@@ -5,7 +5,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <microkit.h>
+#include <os/sddf.h>
 #include <sddf/resources/device.h>
 #include <sddf/network/queue.h>
 #include <sddf/network/config.h>
@@ -130,7 +130,7 @@ static void rx_return(void)
 
     if (packets_transferred && net_require_signal_active(&rx_queue)) {
         net_cancel_signal_active(&rx_queue);
-        microkit_notify(config.virt_rx.id);
+        sddf_notify(config.virt_rx.id);
     }
 }
 
@@ -186,7 +186,7 @@ static void tx_return(void)
 
     if (enqueued && net_require_signal_free(&tx_queue)) {
         net_cancel_signal_free(&tx_queue);
-        microkit_notify(config.virt_tx.id);
+        sddf_notify(config.virt_tx.id);
     }
 }
 
@@ -307,7 +307,7 @@ void init(void)
     assert(TX_COUNT * sizeof(struct descriptor) <= device_resources.regions[2].region.size);
 
     /* Ack any IRQs that were delivered before the driver started. */
-    microkit_irq_ack(device_resources.irqs[0].id);
+    sddf_irq_ack(device_resources.irqs[0].id);
 
     eth_setup();
 
@@ -320,15 +320,15 @@ void init(void)
     tx_provide();
 }
 
-void notified(microkit_channel ch)
+void notified(sddf_channel ch)
 {
     if (ch == device_resources.irqs[0].id) {
         handle_irq();
         /*
          * Delay calling into the kernel to ack the IRQ until the next loop
-         * in the microkit event handler loop.
+         * in the microkit/sddf event handler loop.
          */
-        microkit_deferred_irq_ack(ch);
+        sddf_deferred_irq_ack(ch);
     } else if (ch == config.virt_rx.id) {
         rx_provide();
     } else if (ch == config.virt_tx.id) {
