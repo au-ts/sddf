@@ -33,6 +33,7 @@ Files:
     drivers/timer/meson/config.json
     drivers/timer/goldfish/config.json
     drivers/timer/cdns/config.json
+    drivers/spi/opentitan/config.json
 Copyright: UNSW
 License: BSD-2-Clause
 
