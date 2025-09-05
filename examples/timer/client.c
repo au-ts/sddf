@@ -4,16 +4,16 @@
  */
 
 #include <stdint.h>
-#include <microkit.h>
+#include <os/sddf.h>
 #include <sddf/timer/client.h>
 #include <sddf/timer/config.h>
 #include <sddf/util/printf.h>
 
 __attribute__((__section__(".timer_client_config"))) timer_client_config_t config;
 
-microkit_channel timer_channel;
+sddf_channel timer_channel;
 
-void notified(microkit_channel ch)
+void notified(sddf_channel ch)
 {
     /*
      * In this example we only have a single possible channel,
