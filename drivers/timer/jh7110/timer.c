@@ -13,8 +13,8 @@
 /*
  * The JH7110 SoC contains a timer with four 32-bit counters. Each one of these
  * counters is referred to as a "channel". These are not to be confused with
- * Microkit/sDDF channels. Anything with a prefix STARFIVE_TIMER_* is to do with the
- * hardware.
+ * channels between the driver and clients. Anything with a prefix
+ * STARFIVE_TIMER_* is to do with the hardware.
  */
 #define STARFIVE_TIMER_NUM_CHANNELS 4
 
