@@ -5,7 +5,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <microkit.h>
+#include <os/sddf.h>
 #include <sddf/serial/config.h>
 #include <sddf/serial/queue.h>
 #include <sddf/util/util.h>
@@ -129,7 +129,7 @@ static void tx_provide(void)
 
     if (transferred && serial_require_consumer_signal(&tx_queue_handle)) {
         serial_cancel_consumer_signal(&tx_queue_handle);
-        microkit_notify(config.tx.id);
+        sddf_notify(config.tx.id);
     }
 }
 
@@ -163,7 +163,7 @@ static void rx_return(void)
     }
 
     if (enqueued) {
-        microkit_notify(config.rx.id);
+        sddf_notify(config.rx.id);
     }
 }
 
@@ -194,7 +194,7 @@ void init(void)
     assert(device_resources.num_regions == 1);
 
     /* Ack any IRQs that were delivered before the driver started. */
-    microkit_irq_ack(device_resources.irqs[0].id);
+    sddf_irq_ack(device_resources.irqs[0].id);
 
     uart_base = (uintptr_t)device_resources.regions[0].region.vaddr;
 
@@ -241,11 +241,11 @@ void init(void)
 #endif
 }
 
-void notified(microkit_channel ch)
+void notified(sddf_channel ch)
 {
     if (ch == device_resources.irqs[0].id) {
         handle_irq();
-        microkit_deferred_irq_ack(ch);
+        sddf_deferred_irq_ack(ch);
     } else if (ch == config.tx.id) {
         tx_provide();
     } else if (ch == config.rx.id) {
