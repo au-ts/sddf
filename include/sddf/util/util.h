@@ -12,7 +12,9 @@
 #endif
 #define ALIGN(x, align)   (((x) + (align) - 1) & ~((align) - 1))
 
+#ifndef BIT
 #define BIT(nr) (1UL << (nr))
+#endif
 
 #ifdef __GNUC__
 #define likely(x)   __builtin_expect(!!(x), 1)
