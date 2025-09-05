@@ -12,7 +12,7 @@
 /**
  * Request a timeout via PPC into the passive timer driver.
  * Use the label to indicate this request.
- * @param microkit channel of timer driver.
+ * @param microkit/sDDF channel of timer driver.
  * @param timeout relative timeout in nanoseconds.
  */
 static inline void sddf_timer_set_timeout(unsigned int channel, uint64_t timeout)
@@ -24,7 +24,7 @@ static inline void sddf_timer_set_timeout(unsigned int channel, uint64_t timeout
 /**
  * Request the time since start up via PPC into the passive timer driver.
  * Use the label to indicate this request.
- * @param microkit channel of timer driver.
+ * @param microkit/sDDF channel of timer driver.
  * @return the time in nanoseconds since start up.
  */
 static inline uint64_t sddf_timer_time_now(unsigned int channel)
