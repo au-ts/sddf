@@ -259,6 +259,18 @@ bool ahci_send_command(int port_number, uint64_t start, uint32_t count, uint64_t
     cmdfis->countl = count & 0xFF;
     cmdfis->counth = (count >> 8) & 0xFF;
 
+    int spin = 0;
+    // The below loop waits until the port is no longer busy before issuing a new command
+    while ((port->tfd & (ATA_DEV_BUSY | ATA_DEV_DRQ)) && spin < 1000000)
+    {
+        spin++;
+    }
+    if (spin == 1000000)
+    {
+        LOG_AHCI("Port is hung...\n");
+        return false;
+    }
+
     assert(port->ci == 0); // make sure no other commands are inflight
 
     port->ci = 1 << slot; // Issue command
@@ -282,14 +294,12 @@ void ahci_do_request(int port_number) {
 
     if (driver_state.ports[port_number].blk_req.status == RequestIrqWait) {
         bool command_complete = (port->ci & (1u << driver_state.ports[port_number].blk_req.cmdslot)) == 0;
-        bool no_error = (port->is & (1u << 30)) == 0;
-        if (command_complete && !no_error) {
+        // TODO: technically the command still could be fine but something else went wrong
+        bool no_error = (port->is & ((1u << 30) | (1u << 29) | (1u << 28) | (1u << 27) | (1u << 26) | (1u << 24))) == 0;
+        if (!(command_complete && no_error)) {
             port->is = 0xFFFFFFFF;   // W1C clear
-            driver_state.ports[port_number].blk_req.status = RequestError;
-            return;
-        } else if (!command_complete) {
-            // without a watchdog we cant guaranetee getting another irq so we should just mark the port as inactive
-            // Or the port is cooked.
+
+            // TODO: everything has to go perfect or we set the port as inactive.
             driver_state.ports[port_number].blk_req.status = RequestError;
             driver_state.ports[port_number].status = PortStatusInactive;
             return;
@@ -473,7 +483,7 @@ void enable_irqs_for_ports() {
             HBA_PORT *port = driver_state.ports[port_number].port_regs;
             port->is = 0xFFFFFFFF; // W1C
             (void)port->is;
-            port->ie = (1u<<0) | (1u<<30); // DHRS + TFES
+            port->ie = (1u<<0) | (1u<<24) | (1u<<26) | (1u<<27) | (1u<<28) | (1u<<29) |(1u<<30); // Completion plus all the error ones
         }
     }
 }
@@ -500,14 +510,15 @@ void ahci_copy_serial(char dst[BLK_MAX_SERIAL_NUMBER + 1], ATA_IDENTIFY *id) {
 }
 
 bool ahci_identify_device(int port_number) {
-    return ahci_send_command(port_number, 0 /* start */, 1 /* 1 sector */, 512 /* bytes */, identify_command_paddr + (port_number << 9), 0xEC, /* IDENTIFY command */ true /* read */);
+    return ahci_send_command(port_number, 0 /* start */, 1 /* 1 sector */, 512 /* bytes */, identify_command_paddr + (port_number << 9), ATA_CMD_IDENTIFY, /* IDENTIFY command */ true /* read */);
 }
 
 bool check_identify_device_response(int port_number) {
     HBA_PORT *port = driver_state.ports[port_number].port_regs;
 
     bool command_complete = (port->ci & (1u << driver_state.ports[port_number].blk_req.cmdslot)) == 0;
-    bool no_error = (port->is & (1u << 30)) == 0;
+    // TODO: technically the command still could be fine but something else went wrong
+    bool no_error = (port->is & ((1u << 30) | (1u << 29) | (1u << 28) | (1u << 27) | (1u << 26) | (1u << 24))) == 0;
     if (!(command_complete && no_error)) {
         port->is = 0xFFFFFFFF;   // W1C clear
 
@@ -530,7 +541,7 @@ void setup_ports_blk_storage_info_1() {
         }
     }
 
-    sddf_timer_set_timeout(timer_config.driver_id, 1 * NS_IN_S); // plenty of time
+    sddf_timer_set_timeout(timer_config.driver_id, 3 * NS_IN_S); // plenty of time
 }
 
 void setup_ports_blk_storage_info_2() {
@@ -1052,7 +1063,6 @@ void irq_handler() {
                 LOG_AHCI("Handling irq from port %d\n", port_number);
                 handle_client(true, port_number);
                 clear_mask |= (1 << port_number);
-                clear_mask |= (1 << port_number);
             } else if (driver_state.hba_regs->is & (1 << port_number)) {
                 LOG_AHCI("Unexpected irq from port %d\n", port_number);
                 clear_mask |= (1 << port_number);
@@ -1196,18 +1206,8 @@ void init()
 
 /*
     TODO's
-    - change i variable to port_number.
     - fix the timeouts lengths.
     - add more specific error messages for request.
     - add retries or port resets?
     - check where we assert, we probably want more graceful handling.
-    - think more about irq control flow, i think the device can do some weird things.
-*/
-
-/*
-    IRQ flow:
-        - Use CI transition as the source of truth for completion.
-        For DMA commands, completion is “our bit in PxCI cleared” + “no TFES”.
-        DHRS is helpful but not guaranteed to be the only thing set (PIO/ATAPI/CCC can differ).
-        Treat “DHRS not set” as not an error?
 */

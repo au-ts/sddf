@@ -1,6 +1,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+// TODO: bit fields have UB risk
+
 // FIS types (we only use FIS_TYPE_REG_H2D in this driver)
 typedef enum
 {
@@ -255,28 +257,6 @@ typedef struct tagHBA_CMD_TBL
 	HBA_PRDT_ENTRY	prdt_entry[8];	// Physical region descriptor table entries, 0 ~ 65535
 	// NOTE: we are choosing 8 for now but you can chooose up to 65535 and you could make it dynamic later
 } __attribute__((packed)) HBA_CMD_TBL;
-
-// TODO: @Tristan
-// typedef volatile struct tagATA_IDENTIFY
-// {
-//     uint16_t w0_59[60];            // 0..59
-//     // 28-bit LBA sector count (use only if 48-bit not supported)
-//     uint16_t lba28_lo;             // 60
-//     uint16_t lba28_hi;             // 61
-//     uint16_t w62_82[21];           // 62..82
-//     uint16_t w83;                  // 83 (feature support: bit 10 = 48-bit LBA)
-//     uint16_t w84_99[16];           // 84..99
-//     uint16_t lba48_0;              // 100 (lowest 16 bits)
-//     uint16_t lba48_1;              // 101
-//     uint16_t lba48_2;              // 102
-//     uint16_t lba48_3;              // 103 (highest 16 bits of the 48-bit number)
-//     uint16_t w104_105[2];          // 104..105
-//     uint16_t w106;                 // 106 (bit 12 => logical sector size valid in 117–118)
-//     uint16_t w107_116[10];         // 107..116
-//     uint16_t logical_sector_size_lo; // 117 (low 16)
-//     uint16_t logical_sector_size_hi; // 118 (high 16)
-//     uint16_t w119_255[256 - 119];      // 119..255
-// } __attribute__((packed)) ATA_IDENTIFY;
 
 typedef volatile struct tagATA_IDENTIFY
 {
