@@ -98,7 +98,7 @@ ${CHECK_FLAGS_BOARD_MD5}:
 	-rm -f .board_cflags-*
 	touch $@
 
-${IMAGES}: libsddf_util_debug.a ${CHECK_FLAGS_BOARD_MD5}
+${IMAGES}: libsddf_util_debug.a libsddf_util.a ${CHECK_FLAGS_BOARD_MD5}
 
 include ${SDDF}/util/util.mk
 include ${UART_DRIVER}/serial_driver.mk
