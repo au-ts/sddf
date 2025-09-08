@@ -119,7 +119,7 @@ include ${SDDF}/util/util.mk
 include ${SDDF}/blk/components/blk_components.mk
 include ${SDDF}/serial/components/serial_components.mk
 
-${IMAGES}: libsddf_util_debug.a
+${IMAGES}: libsddf_util.a libsddf_util_debug.a
 
 client.o: ${TOP}/client.c ${TOP}/basic_data.h
 	$(CC) -c $(CFLAGS) -I. $< -o client.o
