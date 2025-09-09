@@ -6,7 +6,7 @@
 # i.MX8 Platform-specific pinctrl details
 
 Prerequisite reading:
-1. drivers/pinctrl/README.md
+1. [pinctrl.md](../pinctrl.md)
 
 Each device's state will appear as a pin configuration node in the pinctrl device. A pin
 configuration node will contain all the data necessary for the pin controller configure all required

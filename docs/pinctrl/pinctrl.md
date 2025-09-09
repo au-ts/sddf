@@ -133,7 +133,7 @@ The pinctrl driver will always set the `default` configuration on boot up. Suppo
 setting of pinctrl state at run-time is future work.
 
 # Supported Platforms
-Please see [drivers.md](../../docs/drivers.md).
+Please see [drivers.md](../drivers.md).
 
 # Platform specific details
-Please see the README.md inside the respective platform's pinctrl folder.
+Please see the README.md inside the respective platform's folder.
