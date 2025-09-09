@@ -313,15 +313,12 @@ static void eth_setup(void)
     //     assert(false);
     // }
 
-    // LOG_DRIVER("version: 0x%x\n", virtio_mmio_version(regs));
-
     assert(virtio_transport_probe(&device_resources, &dev));
 
     // Do normal device initialisation (section 3.2)
 
     // First reset the device
     virtio_transport_set_status(&dev, 0);
-
     // Set the ACKNOWLEDGE bit to say we have noticed the device
     virtio_transport_set_status(&dev, VIRTIO_DEVICE_STATUS_ACKNOWLEDGE);
     // Set the DRIVER bit to say we know how to drive the device
@@ -380,7 +377,7 @@ static void eth_setup(void)
     /* Virtio TX headers will proceed the virtq structures. Then RX headers. */
     virtio_net_tx_headers_vaddr = hw_ring_buffer_vaddr + virtq_size;
     virtio_net_tx_headers_paddr = hw_ring_buffer_paddr + virtq_size;
-    virtio_net_tx_headers = (virtio_net_hdr_t *) virtio_net_tx_headers_vaddr;
+    virtio_net_tx_headers = (virtio_net_hdr_t *)virtio_net_tx_headers_vaddr;
     size_t tx_headers_size = ((TX_COUNT / 2) * sizeof(virtio_net_hdr_t));
     virtio_net_rx_headers_paddr = virtio_net_tx_headers_paddr + tx_headers_size;
     size_t rx_headers_size = ((RX_COUNT / 2) * sizeof(virtio_net_hdr_t));
@@ -391,10 +388,12 @@ static void eth_setup(void)
     tx_provide();
 
     // Setup RX queue first
-    assert(virtio_transport_queue_setup(&dev, VIRTIO_NET_RX_QUEUE, RX_COUNT, hw_ring_buffer_paddr + rx_desc_off, hw_ring_buffer_paddr + rx_avail_off, hw_ring_buffer_paddr + rx_used_off));
+    assert(virtio_transport_queue_setup(&dev, VIRTIO_NET_RX_QUEUE, RX_COUNT, hw_ring_buffer_paddr + rx_desc_off,
+                                        hw_ring_buffer_paddr + rx_avail_off, hw_ring_buffer_paddr + rx_used_off));
 
     // Setup TX queue
-    assert(virtio_transport_queue_setup(&dev, VIRTIO_NET_TX_QUEUE, TX_COUNT, hw_ring_buffer_paddr + tx_desc_off, hw_ring_buffer_paddr + tx_avail_off, hw_ring_buffer_paddr + tx_used_off));
+    assert(virtio_transport_queue_setup(&dev, VIRTIO_NET_TX_QUEUE, TX_COUNT, hw_ring_buffer_paddr + tx_desc_off,
+                                        hw_ring_buffer_paddr + tx_avail_off, hw_ring_buffer_paddr + tx_used_off));
 
     // Set the MAC address
     config->mac[0] = 0x52;
@@ -413,6 +412,12 @@ void init(void)
 {
     assert(net_config_check_magic(&config));
     assert(device_resources_check_magic(&device_resources));
+
+// @billn fix ridiculousness
+#if !defined(CONFIG_ARCH_X86_64)
+    assert(device_resources.num_irqs == 1);
+    assert(device_resources.num_regions == 2);
+#endif
 
     /* Ack any IRQs that were delivered before the driver started. */
 // @billn fix ridiculousness
@@ -450,7 +455,7 @@ void init(void)
 }
 
 void notified(sddf_channel ch)
-{        
+{
 // @billn fix ridiculousness
 #if defined(CONFIG_ARCH_X86_64)
     if (ch == 16) {
