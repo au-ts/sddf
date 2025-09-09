@@ -30,9 +30,6 @@ static volatile virtio_mmio_regs_t *get_regs(device_resources_t *device_resource
 bool virtio_transport_probe(device_resources_t *device_resources, virtio_device_handle_t *device_handle_ret)
 {
     assert(device_resources_check_magic(device_resources));
-    assert(device_resources->num_irqs == 1);
-    assert(device_resources->num_regions == 2);
-
     volatile virtio_mmio_regs_t *regs = get_regs(device_resources);
 
     // Do MMIO device init (section 4.2.3.1)
