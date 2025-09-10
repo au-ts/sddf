@@ -1,0 +1,37 @@
+/dts-v1/;
+
+/ {
+	model = "Raspberry Pi 4B minimal timer";
+	compatible = "raspberrypi,4-model-b", "brcm,bcm2711";
+
+	#address-cells = <1>;
+	#size-cells = <1>;
+
+	interrupt-parent = <&gic>;
+
+	soc {
+		compatible = "simple-bus";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+		gic: interrupt-controller@40041000 {
+			compatible = "arm,gic-400";
+			#interrupt-cells = <3>;
+			interrupt-controller;
+			reg = <0x40041000 0x1000>, /* Distributor */
+			      <0x40042000 0x2000>, /* CPU Interface */
+			      <0x40044000 0x2000>, /* Hypervisor */
+			      <0x40046000 0x2000>; /* Virtual */
+		};
+
+		timer@7e003000 {
+			compatible = "brcm,bcm2835-system-timer";
+			reg = <0x7e003000 0x1000>;
+			interrupts = <0 1 4>, /* Timer 0 */
+				     <0 2 4>, /* Timer 1 */
+				     <0 3 4>, /* Timer 2 */
+				     <0 4 4>; /* Timer 3 */
+		};
+	};
+};
