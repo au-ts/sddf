@@ -29,6 +29,6 @@ network/virtio/mmio/ethernet.o: ${ETHERNET_COMMON_DIR}/ethernet.c ${CHECK_NETDRV
 
 network/virtio/mmio/transport.o: ${VIRTIO_TRANSPORT_DIR}/mmio.c ${CHECK_NETDRV_FLAGS}
 	mkdir -p network/virtio/mmio
-	${CC} -c ${CFLAGS} -o $@ $<
+	${CC} -c ${CFLAGS} -DVIRTIO_MMIO_TRANSPORT_FOR_NET -o $@ $<
 
 -include virtio/mmio/ethernet.d
