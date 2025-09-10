@@ -268,12 +268,6 @@ void handle_irq(void)
 
 void virtio_blk_init(void)
 {
-    // @billn: make transport agnostic
-    // if (!virtio_mmio_check_device_id(regs, VIRTIO_DEVICE_ID_BLK)) {
-    //     LOG_DRIVER_ERR("not a virtIO block device!\n");
-    //     assert(false);
-    // }
-
     assert(virtio_transport_probe(&device_resources, &dev));
     ialloc_init(&ialloc_desc, descriptors, QUEUE_SIZE);
 
