@@ -58,6 +58,12 @@ when installing via pip, instead run:
 pip3 install --break-system-packages sdfgen==0.26.0
 ```
 
+If you're planning on using the `pinctrl` driver, you will need to run:
+```sh
+# Note that this depends on PyYAML>=5.1 so you might need to create a venv
+pip3 install devicetree
+```
+
 #### Microkit SDK
 
 ```sh
@@ -79,6 +85,12 @@ when installing via pip, instead run:
 # sdfgen is an isolated package and does not depend on anything
 # else so it will not break any system packages.
 pip3 install --break-system-packages sdfgen==0.26.0
+```
+
+If you're planning on using the `pinctrl` driver, you will need to run:
+```sh
+# Note that this depends on PyYAML>=5.1 so you might need to create a venv
+pip3 install devicetree
 ```
 
 #### Microkit SDK
