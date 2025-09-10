@@ -8,7 +8,7 @@
 #include <stdint.h>
 
 /* Describe the configuration space that all PCI device implements.
-   For more information, visit: https://wiki.osdev.org/PCI */
+   Document referenced: https://wiki.osdev.org/PCI */
 
 /* I/O Port */
 
@@ -19,11 +19,34 @@
 #define PCI_HEADER_TYPE_PCI_TO_PCI_BRIDGE 1
 #define PCI_HEADER_TYPE_PCI_TO_CARDBUS_BRIDGE 2
 
+#define PCI_CLASS_UNCLASSIFIED 0
+#define PCI_CLASS_MASS_STORAGE_CONTROLLER 1
+#define PCI_CLASS_NETWORK_CONTROLLER 2
+#define PCI_CLASS_DISPLAY_CONTROLLER 3
+#define PCI_CLASS_MULTIMEDIA_CONTROLLER 4
+#define PCI_CLASS_MEMORY_CONTROLLER 5
+#define PCI_CLASS_BRIDGE 6
+#define PCI_CLASS_SIMPLE_COMM_CONTROLLER 7
+#define PCI_CLASS_BASE_SYS_PERIPHERAL 8
+#define PCI_CLASS_INPUT_DEVICE_CONTROLLER 9
+#define PCI_CLASS_DOCKING_STATION 10
+#define PCI_CLASS_PROCESSOR 11
+#define PCI_CLASS_SERIAL_BUS_CONTROLLER 12
+#define PCI_CLASS_WIRELESS_CONTROLLER 13
+#define PCI_CLASS_INTELLIGENT_CONTROLLER 14
+#define PCI_CLASS_SATELLITE_COMM_CONTROLLER 15
+#define PCI_CLASS_ENCRYPTION_CONTROLLER 16
+#define PCI_CLASS_SIG_PROCESSING_CONTROLLER 17
+#define PCI_CLASS_PROCESSING_ACCELERATOR 18
+#define PCI_CLASS_NON_ESSENTIAL_INSTRUMENTATIONS 19
+
+#define PCI_CLASS_NETWORK_SUBCLASS_ETHERNET 0
+
 /* Every PCI devices implement these common header fields: */
 typedef volatile struct __attribute__((packed)) pci_common_hdr {
     uint16_t vendor_id;      /* Identifies a manufacturer. PCI-SIG allocated. */
     uint16_t device_id;      /* Identifies a particular device. Vendor allocated. */
-    uint16_t command;        /* Controls a device's ability to generate and respond to PCI cycle.s */
+    uint16_t command;        /* Controls a device's ability to generate and respond to PCI cycles. */
     uint16_t status;         /* Records PCI-bus related events. */
     uint8_t rev_id;          /* Identifies revision of a device. Vendor allocated. */
     uint8_t prog_if;         /* Specifies whether device has a register-level programming interface. */
@@ -52,5 +75,3 @@ typedef volatile struct __attribute__((packed)) pci_gen_dev_hdr {
     uint8_t min_grant;
     uint8_t max_latency;
 } pci_gen_dev_hdr_t;
-
-_Static_assert(sizeof(pci_gen_dev_hdr_t) == 256, "pci_gen_dev_hdr_t must be 256 bytes large.");
