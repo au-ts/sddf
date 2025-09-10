@@ -307,12 +307,6 @@ static void handle_irq()
 
 static void eth_setup(void)
 {
-    // @billn: make transport agnostic
-    // if (!virtio_mmio_check_device_id(regs, VIRTIO_DEVICE_ID_NET)) {
-    //     LOG_DRIVER_ERR("not a virtIO network device!\n");
-    //     assert(false);
-    // }
-
     assert(virtio_transport_probe(&device_resources, &dev));
 
     // Do normal device initialisation (section 3.2)
