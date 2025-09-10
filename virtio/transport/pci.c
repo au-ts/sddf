@@ -3,11 +3,17 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+#include <string.h>
+#include <sddf/pci/conf_space.h>
 #include <sddf/virtio/transport/common.h>
 #include <sddf/virtio/transport/pci.h>
 #include <sddf/resources/device.h>
 
 // @billn fix hard coded addresses
+#define PCI_BUS 0
+#define PCI_DEV 2
+#define PCI_FUNC 0
+
 #define VADDR_COMMON 0x60000000
 #define VADDR_ISR 0x60001000
 #define VADDR_DEVICE 0x60002000
@@ -71,61 +77,34 @@ virtio_pci_common_cfg_t *get_cfg(device_resources_t *device_resources)
     return (virtio_pci_common_cfg_t *) VADDR_COMMON;
 }
 
-void pci_debug_print_header(uint8_t bus, uint8_t dev, uint8_t func) {
-    /* A PCI header is always 256-bytes long */
-    uint32_t pci_header_regs[16];
-
-    /* Read the first 4 32-bits header registers to work out the header type. */
-    for (int i = 0; i < 4; i++) {
-        pci_header_regs[i] = pci_read_32(bus, dev, func, i * 4);
-    }
-
-    uint16_t dev_id       = pci_header_regs[0] >> 16;
-    uint16_t ven_id       = pci_header_regs[0] & 0xffff;
-    uint16_t status       = pci_header_regs[1] >> 16;
-    uint16_t cmd          = pci_header_regs[1] & 0xffff;
-    uint8_t class_code    = pci_header_regs[2] >> 24;
-    uint8_t subclass      = (pci_header_regs[2] >> 16) & 0xff;
-    uint8_t progif        = (pci_header_regs[2] >> 8) & 0xff;
-    uint8_t rev_id        = pci_header_regs[2] & 0xff;
-    uint8_t bist          = pci_header_regs[3] >> 24;
-    uint8_t hdr_type      = (pci_header_regs[3] >> 16) & 0xff;
-    uint8_t latency_timer = (pci_header_regs[3] >> 8) & 0xff;
-    uint8_t cache_line_sz = pci_header_regs[3] & 0xff;
-
-    if (hdr_type != 0) {
+void pci_debug_print_header(uint8_t bus, uint8_t dev, uint8_t func, pci_gen_dev_hdr_t *pci_device_header) {
+    if (pci_device_header->common_hdr.header_type != PCI_HEADER_TYPE_GENERAL) {
         LOG_VIRTIO_TRANSPORT("printing non device pci header is unsupported.\n");
     }
 
-    // https://wiki.osdev.org/PCI
-    LOG_VIRTIO_TRANSPORT("pci_debug_print_header: bus %u, dev %u, func%u:\n", bus, dev, func);
-    LOG_VIRTIO_TRANSPORT("\tDevice ID: 0x%x\n", dev_id);
-    LOG_VIRTIO_TRANSPORT("\tVendor ID: 0x%x\n", ven_id);
-    LOG_VIRTIO_TRANSPORT("\tStatus: 0x%x\n", status);
-    LOG_VIRTIO_TRANSPORT("\tCommand: 0x%x\n", cmd);
-    LOG_VIRTIO_TRANSPORT("\tClass code: 0x%x\n", class_code);
-    LOG_VIRTIO_TRANSPORT("\tSubclass: 0x%x\n", subclass);
-    LOG_VIRTIO_TRANSPORT("\tProgramming Interface: 0x%x\n", progif);
-    LOG_VIRTIO_TRANSPORT("\tRevision ID: 0x%x\n", rev_id);
-    LOG_VIRTIO_TRANSPORT("\tBuilt-in Self Test: 0x%x\n", bist);
+    LOG_VIRTIO_TRANSPORT("BEGIN PCI DEVICE HEADER PRINTING:\n");
+    LOG_VIRTIO_TRANSPORT("\tDevice ID: 0x%x\n", pci_device_header->common_hdr.device_id);
+    LOG_VIRTIO_TRANSPORT("\tVendor ID: 0x%x\n", pci_device_header->common_hdr.vendor_id);
+    LOG_VIRTIO_TRANSPORT("\tStatus: 0x%x\n", pci_device_header->common_hdr.status);
+    LOG_VIRTIO_TRANSPORT("\tCommand: 0x%x\n", pci_device_header->common_hdr.command);
+    LOG_VIRTIO_TRANSPORT("\tClass code: 0x%x\n", pci_device_header->common_hdr.class_code);
+    LOG_VIRTIO_TRANSPORT("\tSubclass: 0x%x\n", pci_device_header->common_hdr.subclass);
+    LOG_VIRTIO_TRANSPORT("\tProgramming Interface: 0x%x\n", pci_device_header->common_hdr.prog_if);
+    LOG_VIRTIO_TRANSPORT("\tRevision ID: 0x%x\n", pci_device_header->common_hdr.rev_id);
+    LOG_VIRTIO_TRANSPORT("\tBuilt-in Self Test: 0x%x\n", pci_device_header->common_hdr.bist);
     LOG_VIRTIO_TRANSPORT("\tHeader type: a general device\n");
-    LOG_VIRTIO_TRANSPORT("\tLatency timer: 0x%x\n", latency_timer);
-    LOG_VIRTIO_TRANSPORT("\tCache line size: 0x%x\n", cache_line_sz);
+    LOG_VIRTIO_TRANSPORT("\tLatency timer: 0x%x\n", pci_device_header->common_hdr.latency_timer);
+    LOG_VIRTIO_TRANSPORT("\tCache line size: 0x%x\n", pci_device_header->common_hdr.cache_line_size);
 
-    /* Now read the rest of the header registers */
-    for (int i = 4; i < 16; i++) {
-        pci_header_regs[i] = pci_read_32(bus, dev, func, i * 4);
+    for (int i = 0; i < PCI_GEN_DEV_NUM_BARS; i++) {
+        LOG_VIRTIO_TRANSPORT("\tBAR%d: 0x%x\n", i, pci_device_header->base_address_registers[i]);
     }
 
-    for (int i = 0; i < 6; i++) {
-        LOG_VIRTIO_TRANSPORT("\tBAR%d: 0x%x\n", i, pci_header_regs[i+4]);
-    }
-
-    LOG_VIRTIO_TRANSPORT("\tCapabilities ptr: 0x%x\n", pci_header_regs[13] & 0xff);
+    LOG_VIRTIO_TRANSPORT("\tCapabilities ptr: 0x%x\n", pci_device_header->cap_ptr);
 
     /* If the capability list bit is set, walk the cap list. */
-    if (status & BIT(4)) {
-        uint8_t cap_off = pci_header_regs[13] & 0xff;
+    if (pci_device_header->common_hdr.status & BIT(4)) {
+        uint8_t cap_off = pci_device_header->cap_ptr;
         while (cap_off) {
             uint32_t virtio_cap_arr[4];
             virtio_cap_arr[0] = pci_read_32(bus, dev, func, cap_off);
@@ -158,14 +137,63 @@ void pci_debug_print_header(uint8_t bus, uint8_t dev, uint8_t func) {
     }
 }
 
+static bool read_pci_general_device_header(uint8_t bus, uint8_t dev, uint8_t func, pci_gen_dev_hdr_t *ret) {
+    uint32_t pci_device_header[sizeof(pci_gen_dev_hdr_t) / sizeof(uint32_t)];
+
+    /* Read the first 4 32-bits header registers to work out the header type. */
+    int i = 0;
+    for (; i < sizeof(pci_common_hdr_t) / sizeof(uint32_t); i++) {
+        pci_device_header[i] = pci_read_32(bus, dev, func, i * 4);
+    }
+
+    uint8_t hdr_type = (pci_device_header[3] >> 16) & 0xff;
+    if (hdr_type != PCI_HEADER_TYPE_GENERAL) {
+        LOG_VIRTIO_TRANSPORT("parsing non device pci header is currently unsupported.\n");
+        return false;
+    }
+
+    /* Now read the rest of the header registers */
+    for (; i < sizeof(pci_gen_dev_hdr_t) / sizeof(uint32_t); i++) {
+        pci_device_header[i] = pci_read_32(bus, dev, func, i * 4);
+    }
+
+    memcpy((uint8_t *) ret, (uint8_t *) pci_device_header, sizeof(pci_gen_dev_hdr_t));
+    return true;
+}
+
 bool virtio_transport_probe(device_resources_t *device_resources, virtio_device_handle_t *device_handle_ret)
 {
     assert(device_resources_check_magic(device_resources));
-    // assert(device_resources->num_irqs == 1);
-    // assert(device_resources->num_regions == 2);
 
+    uint8_t bus = PCI_BUS;
+    uint8_t dev = PCI_DEV;
+    uint8_t func = PCI_FUNC;
 
-    pci_debug_print_header(0, 2, 0);
+    pci_gen_dev_hdr_t pci_device_header;
+    assert(read_pci_general_device_header(bus, dev, func, &pci_device_header));
+
+#if defined(VIRTIO_MMIO_TRANSPORT_FOR_NET)
+    if (pci_device_header.common_hdr.class_code != PCI_CLASS_NETWORK_CONTROLLER) {
+        LOG_VIRTIO_TRANSPORT("PCI device @ %u:%u.%u, with class code 0x%x is not a network controller!\n", pci_device_header.common_hdr.class_code, bus, dev, func);
+        return false;
+    }
+    if (pci_device_header.common_hdr.subclass != PCI_CLASS_NETWORK_SUBCLASS_ETHERNET) {
+        LOG_VIRTIO_TRANSPORT("PCI device @ %u:%u.%u, with subclass 0x%x is not an ethernet controller!\n", pci_device_header.common_hdr.subclass, bus, dev, func);
+        return false;
+    }
+    if (pci_device_header.common_hdr.vendor_id != VIRTIO_PCI_VEN_ID) {
+        LOG_VIRTIO_TRANSPORT("PCI device @ %u:%u.%u, with vendor id 0x%x isn't a virtio device!\n", pci_device_header.common_hdr.vendor_id, bus, dev, func);
+        return false;
+    }
+    if (pci_device_header.common_hdr.device_id != VIRTIO_NET_PCI_DEV_ID) {
+        LOG_VIRTIO_TRANSPORT("PCI device @ %u:%u.%u, with device id 0x%x isn't a virtio network device!\n", pci_device_header.common_hdr.device_id, bus, dev, func);
+        return false;
+    }
+#else
+#error "Unknown or undefined device class for virtio PCI transport."
+#endif
+
+    pci_debug_print_header(bus, dev, func, &pci_device_header);
 
     return true;
 }
