@@ -6,6 +6,9 @@
 
 #include <stdint.h>
 
+#define VIRTIO_PCI_VEN_ID 0x1af4
+#define VIRTIO_NET_PCI_DEV_ID 0x1000
+
 /* Data structure specific to VirtIO devices using PCI transport. */
 
 typedef volatile struct __attribute__((packed)) virtio_pci_common_cfg {
@@ -66,4 +69,4 @@ typedef volatile struct __attribute__((packed)) virtio_pci_cap64 {
     virtio_pci_cap_t cap;
     uint32_t offset_hi;
     uint32_t length_hi;
-};
+} virtio_pci_cap64_t;
