@@ -43,11 +43,29 @@ bool virtio_transport_probe(device_resources_t *device_resources, virtio_device_
         return false;
     }
 
-    // @billn double check
-    // if (!virtio_mmio_check_device_id(regs, VIRTIO_DEVICE_ID_NET)) {
-    //     LOG_VIRTIO_TRANSPORT("not a virtIO network device!\n");
-    //     return false;
-    // }
+#if defined(VIRTIO_MMIO_TRANSPORT_FOR_NET)
+    if (regs->DeviceID != VIRTIO_DEVICE_ID_NET) {
+        LOG_VIRTIO_TRANSPORT("not a virtIO network device!\n");
+        return false;
+    }
+#elif defined(VIRTIO_MMIO_TRANSPORT_FOR_BLK)
+    if (regs->DeviceID != VIRTIO_DEVICE_ID_BLK) {
+        LOG_VIRTIO_TRANSPORT("not a virtIO block device!\n");
+        return false;
+    }
+#elif defined(VIRTIO_MMIO_TRANSPORT_FOR_CONSOLE)
+    if (regs->DeviceID != VIRTIO_DEVICE_ID_CONSOLE) {
+        LOG_VIRTIO_TRANSPORT("not a virtIO console device!\n");
+        return false;
+    }
+#elif defined(VIRTIO_MMIO_TRANSPORT_FOR_GPU)
+    if (regs->DeviceID != VIRTIO_DEVICE_ID_GPU) {
+        LOG_VIRTIO_TRANSPORT("not a virtIO GPU device!\n");
+        return false;
+    }
+#else
+#error "Unknown or undefined device type for virtio MMIO transport."
+#endif
 
     device_handle_ret->device_resources = device_resources;
     return true;
