@@ -40,7 +40,7 @@ static void set_baud(unsigned long baud)
     uint32_t baud_register = AML_UART_BAUD_USE;
     if (uart_clock.crystal_clock) {
 #if defined(CONFIG_PLAT_ODROIDC2)
-        /* Odroidc2 hasn't clock divider option */
+        /* Odroid-C2 does not have clock divider option */
         baud_register |= AML_UART_BAUD_XTAL;
         clock_div = 3;
         ref_clock_ticks_per_symbol /= 3;
