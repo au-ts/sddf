@@ -40,7 +40,7 @@
 #define UART_CLK 50000000
 #define UART_DW_APB_REGISTERS 0
 #else
-#error "unknown UART clock"
+#error "unknown UART clock/APB register support"
 #endif
 
 /* These register offsets are given as their offset in terms of reg-io-width;
