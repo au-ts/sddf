@@ -54,6 +54,9 @@ else ifneq ($(filter $(strip $(MICROKIT_BOARD)),cheshire star64),)
 else ifeq ($(strip $(MICROKIT_BOARD)), zcu102)
 	DRIVER_DIR := zynqmp
 	CPU := cortex-a53
+else ifeq ($(strip $(MICROKIT_BOARD)), rpi4b_1gb)
+	DRIVER_DIR := ns16550a
+	CPU := cortex-a72
 else
 $(error Unsupported MICROKIT_BOARD given)
 endif

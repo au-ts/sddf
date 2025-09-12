@@ -69,6 +69,12 @@ BOARDS: List[Board] = [
         serial="soc@0/bus@30800000/serial@30860000",
     ),
     Board(
+        name="rpi4b_1gb",
+        arch=SystemDescription.Arch.AARCH64,
+        paddr_top=0x2_000_000,
+        serial="soc/serial@7e215040",
+    ),
+    Board(
         name="zcu102",
         arch=SystemDescription.Arch.AARCH64,
         paddr_top=0xF_000_0000,
