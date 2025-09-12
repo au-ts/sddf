@@ -39,6 +39,16 @@
 #elif defined(CONFIG_PLAT_CHESHIRE)
 #define UART_CLK 50000000
 #define UART_DW_APB_REGISTERS 0
+#elif defined(CONFIG_PLAT_BCM2711)
+/* The default system clock is 500Mhz for the Raspberry Pi 4B, our clock value is
+ * double that since we divide by 16 instead of by 8 like the BCM2711 manual shows.
+ * BCM2711 ARM peripherals - 2.2.1 (page 12).
+ * The manual says the system clock is 250Mhz, however that doesn't seem to actually
+ * be the case with the default firmware blobs, more details about core frequency here:
+ * https://www.raspberrypi.com/documentation/computers/config_txt.html#overclocking
+ */
+#define UART_CLK (500000000 * 2)
+#define UART_DW_APB_REGISTERS 0
 #else
 #error "unknown UART clock/APB register support"
 #endif
