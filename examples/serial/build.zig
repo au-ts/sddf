@@ -16,6 +16,7 @@ const MicrokitBoard = enum {
     maaxboard,
     qemu_virt_aarch64,
     qemu_virt_riscv64,
+    rpi4b_1gb,
     star64,
     zcu102,
 };
@@ -133,6 +134,16 @@ const targets = [_]Target{
             .abi = .none,
         },
     },
+    .{
+        .board = MicrokitBoard.rpi4b_1gb,
+        .zig_target = std.Target.Query{
+            .cpu_arch = .aarch64,
+            .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a72 },
+            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{.strict_align}),
+            .os_tag = .freestanding,
+            .abi = .none,
+        },
+    },
 };
 
 fn findTarget(board: MicrokitBoard) std.Target.Query {
@@ -201,7 +212,7 @@ pub fn build(b: *std.Build) !void {
         .qemu_virt_aarch64 => "arm",
         .odroidc2, .odroidc4 => "meson",
         .maaxboard, .imx8mm_evk, .imx8mp_evk, .imx8mq_evk => "imx",
-        .star64, .qemu_virt_riscv64, .cheshire => "ns16550a",
+        .rpi4b_1gb, .star64, .qemu_virt_riscv64, .cheshire => "ns16550a",
         .zcu102 => "zynqmp",
     };
 
