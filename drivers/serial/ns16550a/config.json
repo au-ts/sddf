@@ -1,7 +1,8 @@
 {
     "compatible": [
         "starfive,jh7110-uart",
-        "ns16550a"
+        "ns16550a",
+        "brcm,bcm2835-aux-uart"
     ],
     "resources": {
         "regions": [
