@@ -185,6 +185,15 @@ void init(void)
         memcpy(tx_queue_handle_drv.data_region, config.begin_str, begin_str_len);
         serial_update_shared_tail(&tx_queue_handle_drv, begin_str_len);
         sddf_notify(config.driver.id);
+#ifdef CONFIG_DEBUG_BUILD
+        /*
+         * Due to debug printing happening at the same time as printing via the user-space serial
+         * driver we can encounter these prints being inter-leaved with each other.
+         * Because of this, in debug mode, we busy loop until we know the driver has finished
+         * transmitting our console input begin string from above.
+         */
+        while (!serial_queue_empty(&tx_queue_handle_drv, tx_queue_handle_drv.queue->head));
+#endif
     }
 
     if (config.enable_colour) {
