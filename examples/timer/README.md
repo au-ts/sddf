@@ -23,6 +23,7 @@ The following platforms are supported:
 * qemu_virt_riscv64
 * star64
 * zcu102
+* rpi4b_1gb
 
 ### Make
 

@@ -12,8 +12,6 @@
 
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
-#define BCM2711_TIMER_MAX_US UINT32_MAX
-
 typedef struct {
     /* Registers 
      * BCM2711 System Timer peripheral provides four 32-bit timer channels
@@ -29,17 +27,33 @@ typedef struct {
 
 static volatile bcm2711_timer_regs_t *timer_regs;
 
+/* The system timer compare register being used */
+#define BCM2711_TIMEOUT_TIMER 0
+
+/* 
+ * The system timer status register has bits 31:4 reserved by default.
+ * Bits 3:0 correspond to the compare registers c3:c0 respectively.
+ * If a bit is set, it means that a match is detected between the free running counter
+ * and the timeout time in the respective register. This is routed to the interrupt controller.
+ * 
+ * The bits are of type W1C (write 1 to clear) so writing a 1 to the relevant bit clears the match
+ * status bit and its corresponding interrupt line. Since we are only using c0 in this driver, we
+ * will only be concerned with bit 0 of the status register.
+*/
+#define BCM2711_TIMER_CLEAR_IRQ BIT(BCM2711_TIMEOUT_TIMER)
+
+#define BCM2711_TIMER_MAX_US UINT32_MAX
+
 #define CLIENT_CH_START 1
 #define MAX_TIMEOUTS 6
 static uint64_t timeouts[MAX_TIMEOUTS];
 
 static inline uint64_t get_ticks_in_ns(void)
 {
+    /* convert current value of free-running counter from microseconds to nanoseconds */
     uint64_t value_h = (uint64_t) timer_regs->chi;
     uint64_t value_l = (uint64_t) timer_regs->clo;
     uint64_t value_us = (value_h << 32) | value_l;
-
-    /* convert from microseconds to nanoseconds */
     return value_us * NS_IN_US;
 }
 
@@ -96,12 +110,11 @@ void notified(sddf_channel ch)
     assert(ch == device_resources.irqs[0].id);
 
     /* The status register is W1C (write 1 to clear) so we write 1 to clear the irq */
-    timer_regs->cs = 1 << 0;
+    timer_regs->cs = BCM2711_TIMER_CLEAR_IRQ;
 
-    /* Handled irq -> clear device interrupt */
+    /* Process the timeout and handle the irq */
     uint64_t curr_time = get_ticks_in_ns();
     process_timeouts(curr_time);
-
     sddf_deferred_irq_ack(ch);
 }
 
