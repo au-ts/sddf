@@ -24,7 +24,7 @@ serial_queue_handle_t tx_queue_handle;
 volatile uintptr_t uart_base;
 
 /* TODO: Use the value from the device tree*/
-#if defined(CONFIG_PLAT_STAR64) || defined(CONFIG_PLAT_CHESHIRE)
+#if defined(CONFIG_PLAT_STAR64) || defined(CONFIG_PLAT_CHESHIRE) || defined(CONFIG_PLAT_HIFIVE_P550)
 #define REG_IO_WIDTH 4
 #define REG_SHIFT 2
 #define REG_PTR(off)     ((volatile uint32_t *)((uart_base) + (off << REG_SHIFT)))
@@ -92,6 +92,9 @@ static void set_baud(unsigned long baud)
     /*  Divisor Latch Access Bit (DLAB) of the LCR must be set.
     *   These registers share their address with the FIFO's.
     */
+#if UART_DW_APB_REGISTERS
+    while (*REG_PTR(UART_USR) & 0x1);
+#endif
 
     uint32_t lcr_val = *REG_PTR(UART_LCR);
 
