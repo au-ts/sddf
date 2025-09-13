@@ -13,7 +13,7 @@
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
 typedef struct {
-    /* Registers 
+    /* Registers
      * BCM2711 System Timer peripheral provides four 32-bit timer channels
      * and one 64-bit free running counter. */
     uint32_t cs;    /* 0x00: system timer control/status */
@@ -30,12 +30,12 @@ static volatile bcm2711_timer_regs_t *timer_regs;
 /* The system timer compare register being used */
 #define BCM2711_TIMEOUT_TIMER 0
 
-/* 
+/*
  * The system timer status register has bits 31:4 reserved by default.
  * Bits 3:0 correspond to the compare registers c3:c0 respectively.
  * If a bit is set, it means that a match is detected between the free running counter
  * and the timeout time in the respective register. This is routed to the interrupt controller.
- * 
+ *
  * The bits are of type W1C (write 1 to clear) so writing a 1 to the relevant bit clears the match
  * status bit and its corresponding interrupt line. Since we are only using c0 in this driver, we
  * will only be concerned with bit 0 of the status register.
@@ -51,8 +51,8 @@ static uint64_t timeouts[MAX_TIMEOUTS];
 static inline uint64_t get_ticks_in_ns(void)
 {
     /* convert current value of free-running counter from microseconds to nanoseconds */
-    uint64_t value_h = (uint64_t) timer_regs->chi;
-    uint64_t value_l = (uint64_t) timer_regs->clo;
+    uint64_t value_h = (uint64_t)timer_regs->chi;
+    uint64_t value_l = (uint64_t)timer_regs->clo;
     uint64_t value_us = (value_h << 32) | value_l;
     return value_us * NS_IN_US;
 }
@@ -64,7 +64,7 @@ void set_timeout(uint64_t ns)
         value_us = BCM2711_TIMER_MAX_US;
     }
     uint64_t timer_us = ((uint64_t)timer_regs->chi << 32) | timer_regs->clo;
-    timer_regs->c0 = (uint32_t) (timer_us + value_us);
+    timer_regs->c0 = (uint32_t)(timer_us + value_us);
 }
 
 static void process_timeouts(uint64_t curr_time)
@@ -98,7 +98,7 @@ void init()
     /* Ack any IRQs that were delivered before the driver started. */
     sddf_irq_ack(device_resources.irqs[0].id);
 
-    timer_regs = (bcm2711_timer_regs_t *) device_resources.regions[0].region.vaddr;
+    timer_regs = (bcm2711_timer_regs_t *)device_resources.regions[0].region.vaddr;
 
     for (int i = 0; i < MAX_TIMEOUTS; i++) {
         timeouts[i] = UINT64_MAX;
@@ -120,7 +120,7 @@ void notified(sddf_channel ch)
 
 seL4_MessageInfo_t protected(sddf_channel ch, seL4_MessageInfo_t msginfo)
 {
-    switch(seL4_MessageInfo_get_label(msginfo)) {
+    switch (seL4_MessageInfo_get_label(msginfo)) {
     case SDDF_TIMER_GET_TIME: {
         uint64_t time_ns = get_ticks_in_ns();
         seL4_SetMR(0, time_ns);

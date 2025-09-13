@@ -132,8 +132,8 @@ const targets = [_]Target{
             .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{.strict_align}),
             .os_tag = .freestanding,
             .abi = .none,
-        }
-    }
+        },
+    },
 };
 
 fn findTarget(board: MicrokitBoard) std.Target.Query {
