@@ -63,7 +63,7 @@ else ifneq ($(filter $(strip $(MICROKIT_BOARD)),imx8mm_evk imx8mq_evk maaxboard)
 	SERIAL_DRIV_DIR := imx
 	TIMER_DRV_DIR := imx
 	CPU := cortex-a53
-else ifeq ($(strip $(MICROKIT_BOARD)), imx8mp_evk)
+else ifneq ($(filter $(strip $(MICROKIT_BOARD)),imx8mp_evk imx8mp_iotgate),)
 	DRIV_DIR := dwmac-5.10a
 	SERIAL_DRIV_DIR := imx
 	TIMER_DRV_DIR := imx

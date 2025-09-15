@@ -84,6 +84,14 @@ BOARDS: List[Board] = [
         ethernet="soc@0/bus@30800000/ethernet@30bf0000",
     ),
     Board(
+        name="imx8mp_iotgate",
+        arch=SystemDescription.Arch.AARCH64,
+        paddr_top=0x70000000,
+        serial="soc@0/bus@30800000/serial@30890000",
+        timer="soc@0/bus@30000000/timer@302d0000",
+        ethernet="soc@0/bus@30800000/ethernet@30bf0000",
+    ),
+    Board(
         name="imx8mq_evk",
         arch=SystemDescription.Arch.AARCH64,
         paddr_top=0x70000000,
