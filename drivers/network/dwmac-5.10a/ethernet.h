@@ -135,48 +135,48 @@
 #define DMA_INTR_MASK (DMA_INTR_NORMAL | DMA_INTR_ABNORMAL)
 
 /* Rx status bit definitions */
-#define DESC_RXSTS_OWNBYDMA         (1 << 31)           /* Descriptor is owned by the DMA of the GMAC Subsystem. */
-#define DESC_RXSTS_BUFFER1_ADDR_VALID (1 << 24)			/* Indicates to the DMA that the buffer 1 address specified in RDES1 is valid. */
-#define DESC_RXSTS_IOC     			(1 << 30)           /* Interrupt enable on completion. */
-#define DESC_RXSTS_LENMSK           (0x3fff0000)        /* Byte length of the received frame that was transferred to Host memory. */
+#define DESC_RXSTS_OWNBYDMA         BIT(31)           /* Descriptor is owned by the DMA of the GMAC Subsystem. */
+#define DESC_RXSTS_BUFFER1_ADDR_VALID BIT(24)		  /* Indicates to the DMA that the buffer 1 address specified in RDES1 is valid. */
+#define DESC_RXSTS_IOC     			BIT(30)           /* Interrupt enable on completion. */
+#define DESC_RXSTS_LENMSK           (0x3fff0000)      /* Byte length of the received frame that was transferred to Host memory. */
 #define DESC_RXSTS_LENSHFT          (16)
-#define DESC_RXSTS_ERROR            (1 << 15)           /* Error Summary. */
-#define DESC_RXSTS_RXTRUNCATED      (1 << 14)           /* Frame truncation caused by a frame that does not fit within the current descriptor buffers. */
-#define DESC_RXSTS_SAFILTERFAIL     (1 << 13)           /* Source Address Filter Fail. */
-#define DESC_RXSTS_RXIPC_GIANTFRAME (1 << 12)           /* Length Error. */
-#define DESC_RXSTS_RXDAMAGED        (1 << 11)           /* Overflow Error. When set, this bit indicates that the received frame was damaged due to buffer overflow in MTL. */
-#define DESC_RXSTS_RXVLANTAG        (1 << 10)           /* Frame pointed to by this descriptor is a VLAN frame tagged by the GMAC Core. */
-#define DESC_RXSTS_RXFIRST          (1 << 9)            /* This descriptor contains the first buffer of the frame. */
-#define DESC_RXSTS_RXLAST           (1 << 8)            /* The buffers pointed to by this descriptor are the last buffers of the frame. */
-#define DESC_RXSTS_RXIPC_GIANT      (1 << 7)            /* IPC Checksum Error/Giant Frame. */
-#define DESC_RXSTS_RXCOLLISION      (1 << 6)            /* Late collision has occurred while receiving the frame in Half-duplex mode. */
-#define DESC_RXSTS_RXFRAMEETHER     (1 << 5)            /* Indicates that the Receive Frame is an Ethernet-type frame. When this bit is reset, it indicates that the received frame is an IEEE802.3 frame. */
-#define DESC_RXSTS_RXWATCHDOG       (1 << 4)            /* The Receive Watchdog Timer has expired while receiving the current frame and the current frame is truncated after the Watchdog Timeout. */
-#define DESC_RXSTS_RXMIIERROR       (1 << 3)
-#define DESC_RXSTS_RXDRIBBLING      (1 << 2)
-#define DESC_RXSTS_RXCRC            (1 << 1)            /* Cyclic Redundancy Check Error. */
-#define DESC_RXSTS_RXMAC            (1)                 /* Rx MAC Address registers value matched the DA field of the frame. */
+#define DESC_RXSTS_ERROR            BIT(15)           /* Error Summary. */
+#define DESC_RXSTS_RXTRUNCATED      BIT(14)           /* Frame truncation caused by a frame that does not fit within the current descriptor buffers. */
+#define DESC_RXSTS_SAFILTERFAIL     BIT(13)           /* Source Address Filter Fail. */
+#define DESC_RXSTS_RXIPC_GIANTFRAME BIT(12)           /* Length Error. */
+#define DESC_RXSTS_RXDAMAGED        BIT(11)           /* Overflow Error. When set, this bit indicates that the received frame was damaged due to buffer overflow in MTL. */
+#define DESC_RXSTS_RXVLANTAG        BIT(10)           /* Frame pointed to by this descriptor is a VLAN frame tagged by the GMAC Core. */
+#define DESC_RXSTS_RXFIRST          BIT(9)            /* This descriptor contains the first buffer of the frame. */
+#define DESC_RXSTS_RXLAST           BIT(8)            /* The buffers pointed to by this descriptor are the last buffers of the frame. */
+#define DESC_RXSTS_RXIPC_GIANT      BIT(7)            /* IPC Checksum Error/Giant Frame. */
+#define DESC_RXSTS_RXCOLLISION      BIT(6)            /* Late collision has occurred while receiving the frame in Half-duplex mode. */
+#define DESC_RXSTS_RXFRAMEETHER     BIT(5)            /* Indicates that the Receive Frame is an Ethernet-type frame. When this bit is reset, it indicates that the received frame is an IEEE802.3 frame. */
+#define DESC_RXSTS_RXWATCHDOG       BIT(4)            /* The Receive Watchdog Timer has expired while receiving the current frame and the current frame is truncated after the Watchdog Timeout. */
+#define DESC_RXSTS_RXMIIERROR       BIT(3)
+#define DESC_RXSTS_RXDRIBBLING      BIT(2)
+#define DESC_RXSTS_RXCRC            BIT(1)            /* Cyclic Redundancy Check Error. */
+#define DESC_RXSTS_RXMAC            (1)               /* Rx MAC Address registers value matched the DA field of the frame. */
 
 /* Rx control bit definitions */
-#define DESC_RXCTRL_RXINTDIS        (1 << 31)           /* Disable Interrupt on Completion. */
-#define DESC_RXCTRL_RXRINGEND       (1 << 25)           /* Descriptor list reached its final descriptor. DMA must loop around. */
-#define DESC_RXCTRL_RXCHAIN         (1 << 24)           /* Second address in the descriptor is the Next Descriptor address rather than the second buffer address. */
-#define DESC_RXCTRL_SIZE2MASK       (0x3ff800)          /* Receive Buffer 2 Size. */
+#define DESC_RXCTRL_RXINTDIS        BIT(31)           /* Disable Interrupt on Completion. */
+#define DESC_RXCTRL_RXRINGEND       BIT(25)           /* Descriptor list reached its final descriptor. DMA must loop around. */
+#define DESC_RXCTRL_RXCHAIN         BIT(24)           /* Second address in the descriptor is the Next Descriptor address rather than the second buffer address. */
+#define DESC_RXCTRL_SIZE2MASK       (0x3ff800)        /* Receive Buffer 2 Size. */
 #define DESC_RXCTRL_SIZE2SHFT       (11)
 #define DESC_RXCTRL_SIZE1MASK       (0x7FF)             /* Receive Buffer 1 Size. */
 #define DESC_RXCTRL_SIZE1SHFT       (0)
 
 /* Tx status bit definitions */
-#define DESC_TXSTS_OWNBYDMA         (1 << 31)           /* Descriptor is owned by the DMA of the GMAC Subsystem. */
+#define DESC_TXSTS_OWNBYDMA         BIT(31)           /* Descriptor is owned by the DMA of the GMAC Subsystem. */
 
 /* Tx control bit definitions */
-#define DESC_TXCTRL_TXINT		    (1 << 31)           /* Sets Transmit Interrupt after the present frame has been transmitted. */
-#define DESC_TXCTRL_TXLAST		    (1 << 28)           /* Buffer contains the last segment of the frame. */
-#define DESC_TXCTRL_TXFIRST		    (1 << 29)           /* Buffer contains the first segment of a frame. */
-#define DESC_TXCTRL_TXCRCDIS		(1 << 26)           /* GMAC does not append the Cyclic Redundancy Check (CRC) to the end of the transmitted frame.*/
-#define DESC_TXCTRL_TXRINGEND		(1 << 25)           /* Descriptor list reached its final descriptor. DMA must loop around. */
-#define DESC_TXCTRL_TXCHAIN		    (1 << 24)           /* Second address in the descriptor is the Next Descriptor address rather than the second buffer address. */
-#define DESC_TXCTRL_TXCIC			(3 << 16)			/* IP header checksum and payload checksum insertion are enabled. Pseudo-header checksum is caclculated in hardware. */
+#define DESC_TXCTRL_TXINT		    BIT(31)           /* Sets Transmit Interrupt after the present frame has been transmitted. */
+#define DESC_TXCTRL_TXLAST		    BIT(28)           /* Buffer contains the last segment of the frame. */
+#define DESC_TXCTRL_TXFIRST		    BIT(29)           /* Buffer contains the first segment of a frame. */
+#define DESC_TXCTRL_TXCRCDIS		BIT(26)           /* GMAC does not append the Cyclic Redundancy Check (CRC) to the end of the transmitted frame.*/
+#define DESC_TXCTRL_TXRINGEND		BIT(25)           /* Descriptor list reached its final descriptor. DMA must loop around. */
+#define DESC_TXCTRL_TXCHAIN		    BIT(24)           /* Second address in the descriptor is the Next Descriptor address rather than the second buffer address. */
+#define DESC_TXCTRL_TXCIC			(3 << 16)		  /* IP header checksum and payload checksum insertion are enabled. Pseudo-header checksum is caclculated in hardware. */
 #define DESC_TXCTRL_SIZE2MASK		(0x3ff800)
 #define DESC_TXCTRL_SIZE2SHFT		(11)
 #define DESC_TXCTRL_SIZE1MASK		(0x7FF)
