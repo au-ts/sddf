@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, Literal, TypedDict
 MACHINE_QUEUE_BOARDS: dict[str, list[str]] = {
     "cheshire": ["cheshire1"],
     "imx8mm_evk": ["imx8mm"],
-    "imx8mp_evk": ["iotgate1"],
+    "imx8mp_iotgate": ["iotgate1"],
     "imx8mq_evk": ["imx8mq", "imx8mq2"],
     "maaxboard": ["maaxboard1", "maaxboard2"],
     "odroidc2": ["odroidc2"],
@@ -43,6 +43,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "imx8mm_evk",
             "imx8mq_evk",
             "imx8mp_evk",
+            "imx8mp_iotgate",
             "maaxboard",
             "odroidc2",
             "odroidc4",
@@ -53,7 +54,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
         "boards_test": [
             "imx8mm_evk",
             "imx8mq_evk",
-            "imx8mp_evk",
+            "imx8mp_iotgate",
             "maaxboard",
             "odroidc2",
             "odroidc4",
