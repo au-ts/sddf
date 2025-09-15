@@ -20,6 +20,7 @@ The following platforms are supported:
 
 * imx8mm_evk
 * imx8mp_evk
+* imx8mp_iotgate
 * imx8mq_evk
 * maaxboard
 * odroidc2
