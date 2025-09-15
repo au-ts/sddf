@@ -40,8 +40,12 @@
 #define STARFIVE_TIMER_INTERRUPT_MASKED 1
 #define STARFIVE_TIMER_INTCLR_BUSY (1 << 1)
 
+#if defined(CONFIG_PLAT_STAR64)
 /* 24 MHz frequency. */
 #define STARFIVE_TIMER_TICKS_PER_SECOND 0x16e3600
+#else
+#error "Unknown clock-frequency for JH7110 timer"
+#endif
 
 typedef struct {
     /* Registers */
