@@ -61,6 +61,7 @@ Device Tree compatible strings/platforms it is known to work with.
     * `starfive,jh7110-uart`
     * `ns16550a`
     * `pc99`
+    * `snps,dw-apb-uart`
 * AMD Zynq UltraScale+ MPSoC UART
     * `xlnx,zynqmp-uart`
 * virtIO console
