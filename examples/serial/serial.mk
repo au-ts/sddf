@@ -49,7 +49,7 @@ else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_riscv64)
 else ifneq ($(filter $(strip $(MICROKIT_BOARD)),imx8mm_evk imx8mp_evk imx8mq_evk maaxboard),)
 	DRIVER_DIR := imx
 	CPU := cortex-a53
-else ifneq ($(filter $(strip $(MICROKIT_BOARD)),cheshire star64),)
+else ifneq ($(filter $(strip $(MICROKIT_BOARD)),cheshire star64 hifive_p550),)
 	DRIVER_DIR := ns16550a
 else ifeq ($(strip $(MICROKIT_BOARD)), zcu102)
 	DRIVER_DIR := zynqmp

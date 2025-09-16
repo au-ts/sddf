@@ -8,6 +8,7 @@ const LazyPath = std.Build.LazyPath;
 
 const MicrokitBoard = enum {
     cheshire,
+    hifive_p550,
     imx8mm_evk,
     imx8mp_evk,
     imx8mq_evk,
@@ -29,6 +30,15 @@ const Target = struct {
 const targets = [_]Target{
     .{
         .board = MicrokitBoard.cheshire,
+        .zig_target = std.Target.Query{
+            .cpu_arch = .riscv64,
+            .cpu_model = .{ .explicit = &std.Target.riscv.cpu.baseline_rv64 },
+            .os_tag = .freestanding,
+            .abi = .none,
+        },
+    },
+    .{
+        .board = MicrokitBoard.hifive_p550,
         .zig_target = std.Target.Query{
             .cpu_arch = .riscv64,
             .cpu_model = .{ .explicit = &std.Target.riscv.cpu.baseline_rv64 },
@@ -212,7 +222,7 @@ pub fn build(b: *std.Build) !void {
         .qemu_virt_aarch64 => "arm",
         .odroidc2, .odroidc4 => "meson",
         .maaxboard, .imx8mm_evk, .imx8mp_evk, .imx8mq_evk => "imx",
-        .rpi4b_1gb, .star64, .qemu_virt_riscv64, .cheshire => "ns16550a",
+        .rpi4b_1gb, .star64, .qemu_virt_riscv64, .cheshire, .hifive_p550 => "ns16550a",
         .zcu102 => "zynqmp",
     };
 
