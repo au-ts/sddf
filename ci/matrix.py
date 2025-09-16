@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, Literal, TypedDict
 # The ordering in these lists defines an implicit ordering of which boards
 # to use for CI preferentially, though all will eventually be tried.
 MACHINE_QUEUE_BOARDS: dict[str, list[str]] = {
+    "hifive_p550": ["p550a"],
     "cheshire": ["cheshire1"],
     "imx8mm_evk": ["imx8mm"],
     "imx8mp_iotgate": ["iotgate1"],
@@ -69,6 +70,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
         "build_systems": ["make", "zig"],
         "boards_build": [
             "cheshire",
+            "hifive_p550",
             "imx8mm_evk",
             "imx8mq_evk",
             "imx8mp_evk",
@@ -83,6 +85,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
         ],
         "boards_test": [
             "cheshire",
+            "hifive_p550",
             "imx8mm_evk",
             "imx8mq_evk",
             "imx8mp_evk",
