@@ -56,6 +56,7 @@ and a list of Device Tree compatible strings it is known to work with.
     * `brcm,bcm2835-aux-uart`
     * `starfive,jh7110-uart`
     * `ns16550a`
+    * `snps,dw-apb-uart`
 * AMD Zynq UltraScale+ MPSoC UART
     * `xlnx,zynqmp-uart`
 * virtIO console
