@@ -33,6 +33,7 @@ Device Tree compatible strings/platforms it is known to work with.
     * `nxp,imx8mp-dwmac-eqos`
     * `snps,dwmac-5.10a`
     * `snps,dwmac-5.20`
+    * `eswin,eic7700-qos-eth`
 * i.MX8
     * `fsl,imx8mq-fec`
 * Meson
