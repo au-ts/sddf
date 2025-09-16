@@ -49,6 +49,10 @@
  */
 #define UART_CLK (500000000 * 2)
 #define UART_DW_APB_REGISTERS 0
+#elif defined(CONFIG_PLAT_HIFIVE_P550)
+/* Obtained from the 'clock-frequency' property of the serial DTS node */
+#define UART_CLK 0xbebc200
+#define UART_DW_APB_REGISTERS 1
 #else
 #error "unknown UART clock/APB register support"
 #endif
