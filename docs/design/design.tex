@@ -1860,7 +1860,39 @@ Note: More \textbf{details to come}.
 
 \subsubsection{SPI}\label{s:cl-spi}
 
-\ToCome{Details}
+An SPI bus consists of one host device and N client devices; this is reflected with one driver and a
+corresponding virtualiser controlling the host, and a maximum of N clients controlling their 
+respective device. 
+
+All devices share three wires: clock, MISO (client to host) and MOSI (host to client); individual 
+devices are addressed by pulling down its respective CS line.
+SPI allows for full-duplex communication, as MISO and MOSI are always active; however, not all bytes
+are meaningful. 
+The smallest unit of interaction in SPI subsystem is the command:
+
+\begin{lstlisting}[gobble=2,firstline=2,float=th,
+  label={l:SPI_command_definition},
+  caption={SPI Command definition.}]
+
+  typedef struct spi_cmd {
+    /* Offset in the data region to start reading from, -1 if not reading */
+    size_t read_offset;
+    /* Offset in the data region to start writing from, -1 if not writing */
+    size_t write_offset;
+    /* Number of bytes to read and/or write, or clocks to toggle if not reading or writing;
+       will be the same for reading and writing due to the full-duplex nature of the bus */
+    uint16_t len;
+    /* Should be true for all commands in a transaction, except for the last one */
+    bool cs_active_after_cmd;
+  } spi_cmd_t;
+
+\end{lstlisting}
+
+The clients control their respective device by enqueueing transactions, which are a sequence of
+commands, where the CS line is pulled low during the entire duration. 
+
+The SPI subsystem maps each client's data region into the driver's address space, which is referred
+to by commands. 
 
 \subsubsection{I2C host}\label{s:cl-i2c}
 
