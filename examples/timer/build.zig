@@ -194,6 +194,7 @@ pub fn build(b: *std.Build) !void {
         .star64 => "jh7110",
         .maaxboard, .imx8mm_evk, .imx8mp_evk, .imx8mq_evk => "imx",
         .zcu102 => "cdns",
+        .pi4B => "bcm2711",
     };
 
     const driver = sddf_dep.artifact(b.fmt("driver_timer_{s}.elf", .{driver_class}));

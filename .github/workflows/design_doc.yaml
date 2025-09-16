@@ -13,17 +13,9 @@ on:
 jobs:
   build_doc:
     name: Build
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, macos, ARM64]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/cache@v3
-        with:
-          path: docs/design/
-          key: design-doc-${{ hashFiles('docs/design/**') }}
-      - name: Setup Nix
-        uses: cachix/install-nix-action@v31
-        with:
-          nix_path: nixpkgs=channel:nixos-25.05
       - name: Compile document
         run: |
           cd docs/design
