@@ -52,6 +52,7 @@ and a list of Device Tree compatible strings it is known to work with.
     * `fsl,imx8mm-uart`
     * `fsl,imx8mp-uart`
 * NS16550A
+    * `brcm,bcm2835-aux-uart`
     * `starfive,jh7110-uart`
     * `ns16550a`
 * AMD Zynq UltraScale+ MPSoC UART
