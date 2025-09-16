@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, Literal, TypedDict
 MACHINE_QUEUE_BOARDS: dict[str, list[str]] = {
     "hifive_p550": ["p550a"],
     "cheshire": ["cheshire1"],
+    "hifive_p550": ["p550a"],
     "imx8mm_evk": ["imx8mm"],
     "imx8mp_iotgate": ["iotgate1"],
     "imx8mq_evk": ["imx8mq", "imx8mq2"],
@@ -42,6 +43,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
         "configs": ["debug", "release", "benchmark"],
         "build_systems": ["make"],
         "boards_build": [
+            "hifive_p550",
             "imx8mm_evk",
             "imx8mq_evk",
             "imx8mp_evk",
@@ -54,6 +56,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "star64",
         ],
         "boards_test": [
+            "hifive_p550",
             "imx8mm_evk",
             "imx8mq_evk",
             "imx8mp_iotgate",
@@ -109,6 +112,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
         #     { "config", "debug", "build": "zig", board: "odroid"}
         # ],
         "boards_build": [
+            "hifive_p550",
             "imx8mq_evk",
             "imx8mp_evk",
             "maaxboard",
@@ -120,6 +124,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "zcu102",
         ],
         "boards_test": [
+            "hifive_p550",
             "imx8mq_evk",
             "imx8mp_evk",
             "maaxboard",
