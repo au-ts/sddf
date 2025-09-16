@@ -93,6 +93,14 @@ static void set_baud(unsigned long baud)
     /*  Divisor Latch Access Bit (DLAB) of the LCR must be set.
     *   These registers share their address with the FIFO's.
     */
+#if UART_DW_APB_REGISTERS
+    /*
+     * From the specification for DLH:
+     * "This register may only be accessed when the DLAB bit (LCR[7]) is set
+     * and the UART is not busy (USR[0] is zero)"
+     */
+    while (*REG_PTR(UART_USR) & UART_USR_BUSY);
+#endif
 
     uint32_t lcr_val = *REG_PTR(UART_LCR);
 
