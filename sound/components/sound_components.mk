@@ -26,7 +26,7 @@ sound_virt.elf: sound_virt.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 sound_virt.o: $(CHECK_SND_FLAGS_MD5)
-sound_virt.o: $(SDDF)/sound/components/virt.c
+sound_virt.o: $(SDDF)/sound/components/virt.c | $(SDDF_LIBC_INCLUDE)
 	$(CC) $(CFLAGS) $(CFLAGS_sound) -o $@ -c $<
 
 clean::

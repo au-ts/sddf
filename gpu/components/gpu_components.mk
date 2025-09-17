@@ -21,7 +21,7 @@ ${CHECK_GPU_VIRT_FLAGS_MD5}:
 gpu_virt.elf: gpu_virt.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-gpu_virt.o: ${SDDF}/gpu/components/virt.c ${CHECK_GPU_VIRT_FLAGS_MD5}
+gpu_virt.o: ${SDDF}/gpu/components/virt.c ${CHECK_GPU_VIRT_FLAGS_MD5} | $(SDDF_LIBC_INCLUDE)
 	${CC} ${CFLAGS} ${CFLAGS_gpu} -o $@ -c $<
 
 -include gpu_virt.d

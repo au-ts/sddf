@@ -17,7 +17,7 @@ i2c_driver.elf: i2c/i2c_driver.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 i2c/i2c_driver.o: CFLAGS+=-I${I2C_DRIVER_DIR} -DI2C_BUS_NUM=${I2C_BUS_NUM}
-i2c/i2c_driver.o: ${I2C_DRIVER_DIR}/i2c.c |i2c
+i2c/i2c_driver.o: ${I2C_DRIVER_DIR}/i2c.c |i2c $(SDDF_LIBC_INCLUDE)
 	${CC} ${CFLAGS} -c -o $@ $<
 
 i2c:

@@ -11,7 +11,7 @@ USDHC_DRIVER_DIR := $(realpath $(dir $(lastword $(MAKEFILE_LIST))))
 blk_driver.elf: blk/mmc/imx/blk_driver.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-blk/mmc/imx/blk_driver.o: ${USDHC_DRIVER_DIR}/usdhc.c |blk/mmc/imx
+blk/mmc/imx/blk_driver.o: ${USDHC_DRIVER_DIR}/usdhc.c |blk/mmc/imx $(SDDF_LIBC_INCLUDE)
 	$(CC) -c $(CFLAGS) -o $@ $<
 
 -include blk/mmc/imx/mmc_driver.d

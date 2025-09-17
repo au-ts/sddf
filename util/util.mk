@@ -44,19 +44,19 @@ libsddf_util.a: ${BASE_OBJS_LIBUTIL} util/putchar_serial.o
 	${AR} crv $@ $^
 	${RANLIB} $@
 
-util/sddf_printf.o: ${SDDF}/util/printf.c
+util/sddf_printf.o: ${SDDF}/util/printf.c | $(SDDF_LIBC_INCLUDE)
 	${CC} ${CFLAGS} -c -o $@ $<
 
-util/%.o: ${SDDF}/util/%.c
+util/%.o: ${SDDF}/util/%.c | $(SDDF_LIBC_INCLUDE)
 	${CC} ${CFLAGS} -c -o $@ $<
 
-util/custom_libc/%.o: ${SDDF}/util/custom_libc/%.c
+util/custom_libc/%.o: ${SDDF}/util/custom_libc/%.c | $(SDDF_LIBC_INCLUDE)
 	${CC} ${CFLAGS} -c -o $@ $<
 
 util/custom_libc/%.o: ${SDDF}/util/custom_libc/${ARCH}/%.S
 	${CC} ${CFLAGS} -c -o $@ $<
 
-util/custom_libc/%.o: ${SDDF}/util/custom_libc/${ARCH}/%.c
+util/custom_libc/%.o: ${SDDF}/util/custom_libc/${ARCH}/%.c | $(SDDF_LIBC_INCLUDE)
 	${CC} ${CFLAGS} -c -o $@ $<
 
 util:

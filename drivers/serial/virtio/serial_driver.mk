@@ -11,7 +11,7 @@ SERIAL_DRIVER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 serial_driver.elf: serial/virtio/serial_driver.o libsddf_util_debug.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-serial/virtio/serial_driver.o: ${SERIAL_DRIVER_DIR}/console.c |serial/virtio
+serial/virtio/serial_driver.o: ${SERIAL_DRIVER_DIR}/console.c |serial/virtio $(SDDF_LIBC_INCLUDE)
 	$(CC) -c $(CFLAGS) -I${SERIAL_DRIVER_DIR}/include -o $@ $<
 
 serial/virtio:

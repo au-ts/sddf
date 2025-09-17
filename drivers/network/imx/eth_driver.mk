@@ -20,7 +20,7 @@ ${CHECK_NETDRV_FLAGS_MD5}:
 eth_driver.elf eth_driver_imx.elf: network/imx/ethernet.o
 	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
 
-network/imx/ethernet.o: ${ETHERNET_DRIVER_DIR}/ethernet.c ${CHECK_NETDRV_FLAGS_MD5}
+network/imx/ethernet.o: ${ETHERNET_DRIVER_DIR}/ethernet.c ${CHECK_NETDRV_FLAGS_MD5} | $(SDDF_LIBC_INCLUDE)
 	mkdir -p network/imx
 	${CC} -c ${CFLAGS} ${CFLAGS_network} -I ${ETHERNET_DRIVER_DIR} -o $@ $<
 
