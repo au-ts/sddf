@@ -21,7 +21,7 @@ ${CHECK_NETDRV_FLAGS_MD5}:
 eth_driver.elf eth_driver_dwmac-5.10a.elf: network/dwmac-5.10a/ethernet.o
 	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
 
-network/dwmac-5.10a/ethernet.o: ${ETHERNET_DRIVER_DIR}ethernet.c ${CHECK_NETDRV_FLAGS}
+network/dwmac-5.10a/ethernet.o: ${ETHERNET_DRIVER_DIR}ethernet.c ${CHECK_NETDRV_FLAGS} | $(SDDF_LIBC_INCLUDE)
 	mkdir -p network/dwmac-5.10a
 	${CC} -c ${CFLAGS} ${CFLAGS_network} -I ${ETHERNET_DRIVER_DIR} -o $@ $<
 

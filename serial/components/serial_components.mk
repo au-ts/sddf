@@ -21,7 +21,7 @@ ${CHECK_SERIAL_FLAGS_MD5}:
 	-rm -f .serial_cflags-*
 	touch $@
 
-${SERIAL_COMPONENT_OBJ}: |serial/components
+${SERIAL_COMPONENT_OBJ}: |serial/components $(SDDF_LIBC_INCLUDE)
 ${SERIAL_COMPONENT_OBJ}: ${CHECK_SERIAL_FLAGS_MD5}
 
 serial/components/serial_virt_%.o: ${SDDF}/serial/components/virt_%.c

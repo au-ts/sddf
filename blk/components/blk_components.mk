@@ -26,11 +26,11 @@ blk_virt.elf: blk_virt.o blk_partitioning.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 blk_virt.o: ${CHECK_BLK_FLAGS_MD5}
-blk_virt.o: ${SDDF}/blk/components/virt.c
+blk_virt.o: ${SDDF}/blk/components/virt.c | $(SDDF_LIBC_INCLUDE)
 	${CC} ${CFLAGS} -I${SDDF}/blk/components ${CFLAGS_blk} -o $@ -c $<
 
 blk_partitioning.o: ${CHECK_BLK_FLAGS_MD5}
-blk_partitioning.o: ${SDDF}/blk/components/partitioning.c
+blk_partitioning.o: ${SDDF}/blk/components/partitioning.c | $(SDDF_LIBC_INCLUDE)
 	${CC} ${CFLAGS} ${CFLAGS_blk} -o $@ -c $<
 
 clean::
