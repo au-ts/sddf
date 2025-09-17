@@ -12,7 +12,7 @@ SERIAL_DRIVER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 serial_driver.elf: serial/zynqmp/serial_driver.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-serial/zynqmp/serial_driver.o: ${SERIAL_DRIVER_DIR}/uart.c |serial/zynqmp
+serial/zynqmp/serial_driver.o: ${SERIAL_DRIVER_DIR}/uart.c |serial/zynqmp $(SDDF_LIBC_INCLUDE)
 	$(CC) -c $(CFLAGS) -I${SERIAL_DRIVER_DIR}/include -o $@ $<
 
 -include serial_driver.d

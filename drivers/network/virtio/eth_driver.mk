@@ -21,7 +21,7 @@ ${CHECK_NETDRV_FLAGS_MD5}:
 eth_driver.elf eth_driver_virtio.elf: network/virtio/ethernet.o
 	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
 
-network/virtio/ethernet.o: ${ETHERNET_DRIVER_DIR}/ethernet.c ${CHECK_NETDRV_FLAGS}
+network/virtio/ethernet.o: ${ETHERNET_DRIVER_DIR}/ethernet.c ${CHECK_NETDRV_FLAGS} | $(SDDF_LIBC_INCLUDE)
 	mkdir -p network/virtio
 	${CC} -c ${CFLAGS} ${CFLAGS_network} -I ${ETHERNET_DRIVER_DIR} -o $@ $<
 

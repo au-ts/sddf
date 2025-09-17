@@ -27,6 +27,10 @@ Additionally, internal implementations of `atoi` and `strcat` are available.
 Simply add `SDDF_CUSTOM_LIBC := 1` to your Makefile snippet. Please refer to
 the `echo_server` example for one such use case.
 
+Alternatively, when building libc instead, `SDDF_LIBC_INCLUDE` can be provided
+and refer to a Makefile target which builds the include directory. This
+directory should also be appended to `CFLAGS`.
+
 ## Motivation
 
 While sDDF components do not need a full libc like you would expect on an OS

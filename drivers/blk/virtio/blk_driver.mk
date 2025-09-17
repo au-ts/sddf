@@ -11,7 +11,7 @@ VIRTIO_BLK_DRIVER_DIR := $(realpath $(dir $(lastword $(MAKEFILE_LIST))))
 blk_driver.elf: blk/virtio/blk_driver.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-blk/virtio/blk_driver.o: ${VIRTIO_BLK_DRIVER_DIR}/block.c |blk/virtio
+blk/virtio/blk_driver.o: ${VIRTIO_BLK_DRIVER_DIR}/block.c |blk/virtio $(SDDF_LIBC_INCLUDE)
 	$(CC) -c $(CFLAGS) -I${VIRTIO_BLK_DRIVER_DIR}/include -o $@ $<
 
 -include blk_driver.d

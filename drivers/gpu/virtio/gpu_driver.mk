@@ -23,7 +23,7 @@ ${CHECK_GPU_DRV_FLAGS_MD5}:
 gpu_driver.elf: gpu/virtio/gpu_driver.o
 	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
 
-gpu/virtio/gpu_driver.o: ${GPU_DRIVER_DIR}gpu.c ${CHECK_GPU_DRV_FLAGS_MD5}
+gpu/virtio/gpu_driver.o: ${GPU_DRIVER_DIR}gpu.c ${CHECK_GPU_DRV_FLAGS_MD5} | $(SDDF_LIBC_INCLUDE)
 	mkdir -p gpu/virtio
 	${CC} -c ${CFLAGS} ${CFLAGS_gpu} -I ${GPU_DRIVER_DIR} -o $@ $<
 

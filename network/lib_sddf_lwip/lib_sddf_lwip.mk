@@ -59,24 +59,24 @@ lib_sddf_lwip%.a: lib_sddf_lwip_out%/lib_sddf_lwip.o $(addprefix lib_sddf_lwip_o
 
 lib_sddf_lwip_out/lib_sddf_lwip.o: CFLAGS += $(LIB_SDDF_LWIP_CFLAGS)
 lib_sddf_lwip_out/lib_sddf_lwip.o: $(CHECK_FLAGS_BOARD_MD5)
-lib_sddf_lwip_out/lib_sddf_lwip.o: $(LIB_SDDF_LWIP_DIR)/lib_sddf_lwip.c
+lib_sddf_lwip_out/lib_sddf_lwip.o: $(LIB_SDDF_LWIP_DIR)/lib_sddf_lwip.c | $(SDDF_LIBC_INCLUDE)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 lib_sddf_lwip_out%/lib_sddf_lwip.o: CFLAGS += $(LIB_SDDF_LWIP_CFLAGS$*)
 lib_sddf_lwip_out%/lib_sddf_lwip.o: $(CHECK_FLAGS_BOARD_MD5)
-lib_sddf_lwip_out%/lib_sddf_lwip.o: $(LIB_SDDF_LWIP_DIR)/lib_sddf_lwip.c
+lib_sddf_lwip_out%/lib_sddf_lwip.o: $(LIB_SDDF_LWIP_DIR)/lib_sddf_lwip.c | $(SDDF_LIBC_INCLUDE)
 	mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(foreach f,$(LIB_SDDF_LWIP_LWIP_FILES), \
 	$(eval \
-		lib_sddf_lwip_out/$(f:.c=.o): $(LWIPDIR)/$(f) ; \
+		lib_sddf_lwip_out/$(f:.c=.o): $(LWIPDIR)/$(f) | $$(SDDF_LIBC_INCLUDE) ; \
 			mkdir -p $$(dir $$@); \
 			$$(CC) $$(CFLAGS) $$(LIB_SDDF_LWIP_CFLAGS) -I$$(LWIPDIR)/include -c -o $$@ $$< \
 	) \
 	$(eval \
-		lib_sddf_lwip_out%/$(f:.c=.o): $(LWIPDIR)/$(f) ; \
+		lib_sddf_lwip_out%/$(f:.c=.o): $(LWIPDIR)/$(f) | $$(SDDF_LIBC_INCLUDE) ; \
 			mkdir -p $$(dir $$@); \
 			$$(CC) $$(CFLAGS) $$(LIB_SDDF_LWIP_CFLAGS$$*) -I$$(LWIPDIR)/include -c -o $$@ $$< \
 	) \

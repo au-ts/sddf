@@ -10,7 +10,7 @@
 #  Builds i2c_virt.elf
 #  Depends on ${SDDF}/util/util.mk also being included
 
-i2c_virt.o: ${SDDF}/i2c/components/virt.c
+i2c_virt.o: ${SDDF}/i2c/components/virt.c | $(SDDF_LIBC_INCLUDE)
 	${CC} ${CFLAGS} -c -o $@ $<
 
 i2c_virt.elf: i2c_virt.o libsddf_util_debug.a
