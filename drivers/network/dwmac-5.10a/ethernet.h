@@ -55,7 +55,7 @@
 
 /* MAC Phy Control Bits */
 
-#define MAC_PHYIF_CONTROL_LINKSTS	BIT(19)		/* Link status, indicates if the link is up (0b1) or down (0b0). */
+#define MAC_PHYIF_CONTROL_LINKSTS   BIT(19)     /* Link status, indicates if the link is up (0b1) or down (0b0). */
 
 /* MTL Registers */
 
@@ -95,8 +95,8 @@
 #define DMA_CH0_RXDESC_LIST_ADDR    0x111C      /* Points the DMA to the start of the rx descriptor list. Can only write to this register when rx is sopped. */
 #define DMA_CH0_TXDESC_TAIL_PTR     0x1120      /* Points to an offset from the base and indicates the location of the last valid tx descriptor. */
 #define DMA_CH0_RXDESC_TAIL_PTR     0x1128      /* Points to an offset from the base and indicates the location of the last valid rx descriptor. */
-#define DMA_CH0_TXDESC_RING_LENGTH	0x112C		/* Contains the length of the transmit descriptor ring. */
-#define DMA_CH0_RXDESC_RING_LENGTH	0x1130		/* Contains the length of the receive descriptor ring. */
+#define DMA_CH0_TXDESC_RING_LENGTH  0x112C      /* Contains the length of the transmit descriptor ring. */
+#define DMA_CH0_RXDESC_RING_LENGTH  0x1130      /* Contains the length of the receive descriptor ring. */
 #define DMA_CH0_INTERRUPT_EN        0x1134      /* Enables the interrupts that are reported by the DMA_CH0_STATUS register. */
 #define DMA_CH0_STATUS              0x1160      /* Software must read this register to get the status during the ISR to determine the status of the DMA device. */
 
@@ -136,8 +136,8 @@
 
 /* Rx status bit definitions */
 #define DESC_RXSTS_OWNBYDMA         BIT(31)           /* Descriptor is owned by the DMA of the GMAC Subsystem. */
-#define DESC_RXSTS_BUFFER1_ADDR_VALID BIT(24)		  /* Indicates to the DMA that the buffer 1 address specified in RDES1 is valid. */
-#define DESC_RXSTS_IOC     			BIT(30)           /* Interrupt enable on completion. */
+#define DESC_RXSTS_BUFFER1_ADDR_VALID BIT(24)         /* Indicates to the DMA that the buffer 1 address specified in RDES1 is valid. */
+#define DESC_RXSTS_IOC              BIT(30)           /* Interrupt enable on completion. */
 #define DESC_RXSTS_LENMSK           (0x3fff0000)      /* Byte length of the received frame that was transferred to Host memory. */
 #define DESC_RXSTS_LENSHFT          (16)
 #define DESC_RXSTS_ERROR            BIT(15)           /* Error Summary. */
@@ -170,14 +170,14 @@
 #define DESC_TXSTS_OWNBYDMA         BIT(31)           /* Descriptor is owned by the DMA of the GMAC Subsystem. */
 
 /* Tx control bit definitions */
-#define DESC_TXCTRL_TXINT		    BIT(31)           /* Sets Transmit Interrupt after the present frame has been transmitted. */
-#define DESC_TXCTRL_TXLAST		    BIT(28)           /* Buffer contains the last segment of the frame. */
-#define DESC_TXCTRL_TXFIRST		    BIT(29)           /* Buffer contains the first segment of a frame. */
-#define DESC_TXCTRL_TXCRCDIS		BIT(26)           /* GMAC does not append the Cyclic Redundancy Check (CRC) to the end of the transmitted frame.*/
-#define DESC_TXCTRL_TXRINGEND		BIT(25)           /* Descriptor list reached its final descriptor. DMA must loop around. */
-#define DESC_TXCTRL_TXCHAIN		    BIT(24)           /* Second address in the descriptor is the Next Descriptor address rather than the second buffer address. */
-#define DESC_TXCTRL_TXCIC			(3 << 16)		  /* IP header checksum and payload checksum insertion are enabled. Pseudo-header checksum is caclculated in hardware. */
-#define DESC_TXCTRL_SIZE2MASK		(0x3ff800)
-#define DESC_TXCTRL_SIZE2SHFT		(11)
-#define DESC_TXCTRL_SIZE1MASK		(0x7FF)
-#define DESC_TXCTRL_SIZE1SHFT		(0)
+#define DESC_TXCTRL_TXINT           BIT(31)           /* Sets Transmit Interrupt after the present frame has been transmitted. */
+#define DESC_TXCTRL_TXLAST          BIT(28)           /* Buffer contains the last segment of the frame. */
+#define DESC_TXCTRL_TXFIRST         BIT(29)           /* Buffer contains the first segment of a frame. */
+#define DESC_TXCTRL_TXCRCDIS        BIT(26)           /* GMAC does not append the Cyclic Redundancy Check (CRC) to the end of the transmitted frame.*/
+#define DESC_TXCTRL_TXRINGEND       BIT(25)           /* Descriptor list reached its final descriptor. DMA must loop around. */
+#define DESC_TXCTRL_TXCHAIN         BIT(24)           /* Second address in the descriptor is the Next Descriptor address rather than the second buffer address. */
+#define DESC_TXCTRL_TXCIC           (3 << 16)         /* IP header checksum and payload checksum insertion are enabled. Pseudo-header checksum is caclculated in hardware. */
+#define DESC_TXCTRL_SIZE2MASK       (0x3ff800)
+#define DESC_TXCTRL_SIZE2SHFT       (11)
+#define DESC_TXCTRL_SIZE1MASK       (0x7FF)
+#define DESC_TXCTRL_SIZE1SHFT       (0)
