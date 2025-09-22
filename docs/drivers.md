@@ -76,3 +76,5 @@ and a list of Device Tree compatible strings it is known to work with.
     * `starfive,jh7110-timer`
 * Cadence
     * `cdns,ttc`
+* BCM2835
+    * `brcm,bcm2835-system-timer`
