@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
 # Include this snippet in your project Makefile to build
-# the JH7110 timer driver
+# the ESWIN timer driver
 #
 # NOTES:
 #  Generates timer_driver.elf
@@ -15,7 +15,7 @@ TIMER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 timer_driver.elf: timer/timer.o
 	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
 
-timer/timer.o: ${TIMER_DIR}/timer.c ${CHECK_FLAGS_BOARD_MD5} |timer
+timer/timer.o: ${TIMER_DIR}/timer.c ${CHECK_FLAGS_BOARD_MD5} |timer $(SDDF_LIBC_INCLUDE)
 	${CC} ${CFLAGS} -o $@ -c $<
 
 timer:

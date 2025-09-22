@@ -34,16 +34,16 @@ volatile struct timer_regs *timeout_timer_regs;
 
 #define REG_PTR(off)     ((volatile uint32_t *)((regs_base) + (off)))
 
-// TODO: huh? why 6?
 #define MAX_TIMEOUTS 6
 static uint64_t timeouts[MAX_TIMEOUTS];
 
-/* 24 MHz frequency. */
-#define TIMER_TICKS_PER_SECOND 0x16e3600
+#define TIMER_MAX_TICKS UINT32_MAX
 
-#define TIMER_MAX_TICKS 0xffffffff
+#ifdef CONFIG_PLAT_HIFIVE_P550
+/* 24 MHz frequency. Obtained from 'timebase-frequency = <0xf4240>' in the DTS. */
+#define TIMER_TICKS_PER_SECOND 24000000
+#endif
 
-// TODO: remove
 #define CLIENT_CH_START 1
 
 /* Keep track of how many timer overflows have occured.
@@ -58,15 +58,16 @@ uint32_t timeout_timer_elapses = 0;
 static uint64_t get_ticks_in_ns(bool irq)
 {
     /* the timer value counts down from the load value */
-    uint32_t value_l = (TIMER_MAX_TICKS - counter_timer_regs->val);
-    uint32_t value_h = counter_timer_elapses;
+    uint64_t value_l = (TIMER_MAX_TICKS - counter_timer_regs->val);
+    uint64_t value_h = counter_timer_elapses;
 
-    /* Include unhandled interrupt in value_h */
+    /* Account for potential pending counter IRQ */
     if (irq) {
         value_h += 1;
+        value_l = (uint64_t)(TIMER_MAX_TICKS - counter_timer_regs->val);
     }
 
-    uint64_t value_ticks = ((uint64_t)value_h << 32) | value_l;
+    uint64_t value_ticks = (value_h << 32) | value_l;
 
     /* convert from ticks to nanoseconds */
     uint64_t value_whole_seconds = value_ticks / TIMER_TICKS_PER_SECOND;
@@ -104,9 +105,8 @@ static void process_timeouts(uint64_t curr_time)
         uint64_t ticks_remainder = (ns % NS_IN_S) * TIMER_TICKS_PER_SECOND / NS_IN_S;
         uint64_t num_ticks = ticks_whole_seconds + ticks_remainder;
 
-        assert(num_ticks <= TIMER_TICKS_PER_SECOND);
-        if (num_ticks > TIMER_TICKS_PER_SECOND) {
-            sddf_dprintf("ERROR: num_ticks: 0x%lx\n", num_ticks);
+        if (num_ticks > TIMER_MAX_TICKS) {
+            num_ticks = TIMER_MAX_TICKS;
         }
 
         timeout_timer_regs->load_count = num_ticks;
