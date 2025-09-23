@@ -53,16 +53,12 @@ jobs:
 
   build_linux_x86_64_nix:
     name: Build (Linux x86-64 Nix)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      - name: Setup Nix
-        uses: cachix/install-nix-action@v27
-      - name: Get Nix dependencies
-        run: nix develop -c bash -c 'echo Hello World'
       - name: Build examples
-        run: nix develop --ignore-environment -c bash -c 'CI=1 ./ci/build.py $MICROKIT_SDK $(nproc)'
+        run: HOME=/opt/ts_ci nix develop --ignore-environment -c bash -c 'CI=1 ./ci/build.py $MICROKIT_SDK $(nproc)'
       - name: Archive image artifacts
         uses: actions/upload-artifact@v4
         with:
