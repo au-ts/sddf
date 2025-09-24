@@ -19,10 +19,20 @@ IMAGE_FILE = loader.img
 REPORT_FILE = report.txt
 BUILD_DIR ?= build
 MICROKIT_CONFIG ?= debug
-MICROKIT_TOOL := $(MICROKIT_SDK)/bin/microkit
+TOOLCHAIN ?= clang
 
-SUPPORTED_BOARDS:= imx8mm_evk maaxboard odroidc4 qemu_virt_aarch64 \
-		   rpi4b_1gb zcu102
+SUPPORTED_BOARDS:= cheshire \
+		   imx8mm_evk \
+		   imx8mp_evk \
+		   imx8mq_evk \
+		   maaxboard \
+		   odroidc2 \
+		   odroidc4 \
+		   qemu_virt_aarch64 \
+		   qemu_virt_riscv64 \
+		   rpi4b_1gb \
+		   zcu102 \
+		   star64
 
 include ${SDDF}/tools/Make/board/common.mk
 
@@ -70,6 +80,7 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx.data serial_virt_tx.elf
 	$(OBJCOPY) --update-section .serial_client_config=serial_client_client0.data client0.elf
 	$(OBJCOPY) --update-section .serial_client_config=serial_client_client1.data client1.elf
+	touch $@
 
 $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	MICROKIT_SDK=${MICROKIT_SDK} $(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
