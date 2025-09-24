@@ -6,7 +6,7 @@
 # Set up variables for Raspberry Pi 4b ith 1Gb RAM
 # Should be included _before_ toolchain makefile.
 # NET_DRIV_DIR := genet-v5
-# ETH_DRIV := 
+# ETH_DRIV :=
 UART_DRIV_DIR := ns16550a
 #TIMER_DRIV_DIR := arm
 #I2C_DRIV_DIR := ${PLATFORM}
