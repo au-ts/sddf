@@ -18,6 +18,9 @@ SUPPORTED_BOARDS := odroidc4 odroidc2 maaxboard \
 		    star64 qemu_virt_riscv64
 TOOLCHAIN ?= clang
 MICROKIT_CONFIG ?= debug
+SYSTEM_FILE := echo_server.system
+IMAGE_FILE := loader.img
+REPORT_FILE := report.txt
 
 include ${SDDF}/tools/Make/board/common.mk
 
@@ -32,12 +35,6 @@ SERIAL_COMPONENTS := $(SDDF)/serial/components
 UART_DRIVER := $(SDDF)/drivers/serial/$(UART_DRIV_DIR)
 TIMER_DRIVER := $(SDDF)/drivers/timer/$(TIMER_DRIV_DIR)
 NETWORK_COMPONENTS := $(SDDF)/network/components
-
-PYTHON ?= python3
-
-SYSTEM_FILE := echo_server.system
-IMAGE_FILE := loader.img
-REPORT_FILE := report.txt
 
 SDDF_CUSTOM_LIBC := 1
 
@@ -110,6 +107,7 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(OBJCOPY) --update-section .benchmark_config=benchmark_idle_config.data idle.elf
 	$(OBJCOPY) --update-section .lib_sddf_lwip_config=lib_sddf_lwip_config_client0.data echo0.elf
 	$(OBJCOPY) --update-section .lib_sddf_lwip_config=lib_sddf_lwip_config_client1.data echo1.elf
+	touch $@
 
 ${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) \
@@ -128,12 +126,12 @@ include ${SERIAL_COMPONENTS}/serial_components.mk
 
 qemu: $(IMAGE_FILE)
 	$(QEMU) $(QEMU_ARCH_ARGS) \
-			-m size=2G \
-			-nographic \
-			-device virtio-net-device,netdev=netdev0 \
-			-netdev user,id=netdev0,hostfwd=tcp::1236-:1236,hostfwd=tcp::1237-:1237,hostfwd=udp::1235-:1235 \
-			-global virtio-mmio.force-legacy=false \
-			-d guest_errors
+		-m size=2G \
+		-nographic \
+		-device virtio-net-device,netdev=netdev0 \
+		-netdev user,id=netdev0,hostfwd=tcp::1236-:1236,hostfwd=tcp::1237-:1237,hostfwd=udp::1235-:1235 \
+		-global virtio-mmio.force-legacy=false \
+		-d guest_errors
 
 clean::
 	${RM} -f *.elf .depend* $
