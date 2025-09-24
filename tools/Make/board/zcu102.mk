@@ -9,6 +9,6 @@ PLATFORM := zynqmp
 # NET_DRIV_DIR :=
 # ETH_DRIV := eth_driver_dwmac-5.10a.elf
 UART_DRIV_DIR := ${PLATFORM}
-#TIMER_DRIV_DIR := ${PLATFORM}
+TIMER_DRIV_DIR := arm
 #I2C_DRIV_DIR := ${PLATFORM}
 CPU := cortex-a53
