@@ -33,10 +33,13 @@ OBJCOPY := ${TRIPLE}-objcopy
 OBJDUMP := ${TRIPLE}-objdump
 SIZE := ${TRIPLE}-size
 
+OPTIMISATION ?= -g -O3
+
 CFLAGS += \
 	-MD \
 	-mstrict-align \
 	-ffreestanding \
-	-g -O3 -Wall \
+	${OPTIMISATION} \
+	-Wall \
 	${CFLAGS_ARCH} \
 	-I ${BOARD_DIR}/include
