@@ -50,6 +50,8 @@ ${ETH_DRIV}: libsddf_util_debug.a
 eth_driver.elf: ${ETH_DRIV}
 	cp ${ETH_DRIV} $@
 
+include ${SDDF}/tools/Make/toolchain/${TOOLCHAIN}.mk
+
 # Magic to ensure stuff gets recompiled if we change
 # board name, or use a different Microkit etc.
 CHECK_FLAGS_BOARD_HASH := .board_cflags-$(shell echo -- ${CFLAGS} ${MICROKIT_SDK} ${MICROKIT_BOARD} ${MICROKIT_CONFIG} | shasum | sed 's/ *-//g')
@@ -60,4 +62,3 @@ ${CHECK_FLAGS_BOARD_HASH}:
 
 .EXTRA_PREREQS := ${CHECK_FLAGS_BOARD_HASH}
 
-include ${SDDF}/tools/Make/toolchain/${TOOLCHAIN}.mk

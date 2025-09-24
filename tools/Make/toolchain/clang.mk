@@ -11,6 +11,8 @@ OBJCOPY := llvm-objcopy
 OBJDUMP := llvm-objdump
 SIZE := llvm-size
 
+OPTIMISATION ?= -g3 -O3
+
 ifndef BOARD_DIR
 $(error BOARD_DIR not defined)
 endif
@@ -39,5 +41,6 @@ CFLAGS += \
 	-mstrict-align \
 	-ffreestanding \
 	${CFLAGS_ARCH} \
-	-g3 -O3 -Wall \
+	${OPTIMISATION} \
+	-Wall \
 	-I ${BOARD_DIR}/include
