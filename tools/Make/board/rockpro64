@@ -6,9 +6,11 @@
 # Set up variables for rockpro64
 # Should be included _before_ toolchain makefile.
 PLATFORM := rk3399
+
+I2C_DRIV_DIR := ${PLATFORM}
 NET_DRIV_DIR := dwmac-5.10a
 ETH_DRIV := eth_driver_dwmac-5.10a.elf
-UART_DRIV_DIR := ns16550a
 TIMER_DRIV_DIR := arm
-I2C_DRIV_DIR := ${PLATFORM}
+UART_DRIV_DIR := ns16550a
+
 CPU := cortex-a72
