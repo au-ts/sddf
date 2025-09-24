@@ -17,7 +17,7 @@ ifndef BOARD_DIR
 $(error BOARD_DIR not defined)
 endif
 
-ARCH := $(shell sed -n 's/#define *CONFIG_SEL4_ARCH  *\([^ ]*\).*$$/\1/p'  $(BOARD_DIR)/include/kernel/gen_config.h)
+ARCH := $(shell sed -n 's/.define *CONFIG_SEL4_ARCH  *\([^ ]*\).*$$/\1/p'  $(BOARD_DIR)/include/kernel/gen_config.h)
 
 ifeq ($(ARCH),aarch64)
 	TARGET := aarch64-none-elf
