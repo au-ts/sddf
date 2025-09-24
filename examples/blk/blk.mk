@@ -63,7 +63,7 @@ all: $(IMAGE_FILE)
 include ${SDDF}/drivers/blk/${BLK_DRIV_DIR}/blk_driver.mk
 include ${SDDF}/drivers/serial/${UART_DRIV_DIR}/serial_driver.mk
 
-ifdef TIMER_DRIVER_DIR
+ifdef TIMER_DRIV_DIR
 include ${SDDF}/drivers/timer/${TIMER_DRIV_DIR}/timer_driver.mk
 IMAGES += timer_driver.elf
 endif
