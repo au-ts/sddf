@@ -34,7 +34,7 @@ endif
 ALL_OBJS_LIBUTIL := $(addprefix util/, ${OBJS_LIBUTIL} putchar_debug.o putchar_serial.o)
 
 BASE_OBJS_LIBUTIL := $(addprefix util/, ${OBJS_LIBUTIL})
-${ALL_OBJS_LIBUTIL}: ${CHECK_FLAGS_BOARD_MD5} |util util/custom_libc
+${ALL_OBJS_LIBUTIL}: ${CHECK_FLAGS_BOARD_HASH} |util util/custom_libc
 
 libsddf_util_debug.a: ${BASE_OBJS_LIBUTIL} util/putchar_debug.o
 	${AR} crv $@ $^

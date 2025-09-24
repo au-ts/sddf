@@ -3,12 +3,12 @@
 #
 # SPDX-License-Identifier: BSD-2-Clause
 #
-# Set up variables for IMX8MQ_evk
+# Set up variables for rockpro64
 # Should be included _before_ toolchain makefile.
-PLATFORM := imx
+PLATFORM := rk3399
 NET_DRIV_DIR := dwmac-5.10a
 ETH_DRIV := eth_driver_dwmac-5.10a.elf
-UART_DRIV_DIR := ${PLATFORM}
-TIMER_DRIV_DIR := ${PLATFORM}
+UART_DRIV_DIR := ns16550a
+TIMER_DRIV_DIR := arm
 I2C_DRIV_DIR := ${PLATFORM}
-CPU := cortex-a53
+CPU := cortex-a72

@@ -12,3 +12,6 @@ TIMER_DRIV_DIR := ${PLATFORM}
 BLK_DRIV_DIR := virtio
 CPU := cortex-a53
 QEMU := qemu-system-aarch64
+QEMU_ARCH_ARGS := -machine virt,virtualization=on -cpu cortex-a53 \
+		  -device loader,file=\$(IMAGE_FILE),addr=0x70000000,cpu-num=0 \
+		  -serial mon:stdio
