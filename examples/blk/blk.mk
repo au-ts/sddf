@@ -56,15 +56,15 @@ LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
 METAPROGRAM := $(TOP)/meta.py
 
 BLK_DRIVER := $(SDDF)/drivers/blk/${BLK_DRIV_DIR}
-SERIAL_DRIVER := $(SDDF)/drivers/serial/${SERIAL_DRIV_DIR}
+SERIAL_DRIVER := $(SDDF)/drivers/serial/${UART_DRIV_DIR}
 
 all: $(IMAGE_FILE)
 
 include ${SDDF}/drivers/blk/${BLK_DRIV_DIR}/blk_driver.mk
-include ${SDDF}/drivers/serial/${SERIAL_DRIVER_DIR}/serial_driver.mk
+include ${SDDF}/drivers/serial/${UART_DRIV_DIR}/serial_driver.mk
 
 ifdef TIMER_DRIVER_DIR
-include ${SDDF}/drivers/timer/${TIMER_DRIVER_DIR}/timer_driver.mk
+include ${SDDF}/drivers/timer/${TIMER_DRIV_DIR}/timer_driver.mk
 IMAGES += timer_driver.elf
 endif
 
