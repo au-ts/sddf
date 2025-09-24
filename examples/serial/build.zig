@@ -18,6 +18,7 @@ const MicrokitBoard = enum {
     qemu_virt_aarch64,
     qemu_virt_riscv64,
     rpi4b_1gb,
+    rpi5b_2gb,
     star64,
     zcu102,
 };
@@ -154,6 +155,16 @@ const targets = [_]Target{
             .abi = .none,
         },
     },
+    .{
+        .board = MicrokitBoard.rpi5b_2gb,
+        .zig_target = std.Target.Query{
+            .cpu_arch = .aarch64,
+            .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a76 },
+            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{.strict_align}),
+            .os_tag = .freestanding,
+            .abi = .none,
+        },
+    },
 };
 
 fn findTarget(board: MicrokitBoard) std.Target.Query {
@@ -219,7 +230,7 @@ pub fn build(b: *std.Build) !void {
     });
 
     const driver_class = switch (microkit_board_option) {
-        .qemu_virt_aarch64 => "arm",
+        .qemu_virt_aarch64, .rpi5b_2gb => "arm",
         .odroidc2, .odroidc4 => "meson",
         .maaxboard, .imx8mm_evk, .imx8mp_evk, .imx8mq_evk => "imx",
         .rpi4b_1gb, .star64, .qemu_virt_riscv64, .cheshire, .hifive_p550 => "ns16550a",

@@ -120,7 +120,7 @@ static void uart_setup(void)
     uart_regs->lcr_h |= (0b11 < PL011_LCR_WLEN_SHFT);
 
     /* Configure the reference clock and baud rate. Difficult to use automatic detection here as it requires the next incoming character to be 'a' or 'A'. */
-    set_baud(config.default_baud);
+    // set_baud(config.default_baud);
 
     /* Enable FIFOs */
     uart_regs->lcr_h |= PL011_LCR_FIFO_EN;
@@ -156,6 +156,8 @@ void init(void)
     assert(device_resources_check_magic(&device_resources));
     assert(device_resources.num_irqs == 1);
     assert(device_resources.num_regions == 1);
+
+    microkit_dbg_puts("hello\n");
 
     /* Ack any IRQs that were delivered before the driver started. */
     sddf_irq_ack(device_resources.irqs[0].id);

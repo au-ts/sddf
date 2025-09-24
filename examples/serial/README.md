@@ -23,6 +23,7 @@ The following platforms are supported:
 * qemu_virt_aarch64
 * qemu_virt_riscv64
 * rpi4b_1gb
+* rpi5b_2gb
 * star64
 * zcu102
 

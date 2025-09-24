@@ -57,6 +57,9 @@ else ifeq ($(strip $(MICROKIT_BOARD)), zcu102)
 else ifeq ($(strip $(MICROKIT_BOARD)), rpi4b_1gb)
 	DRIVER_DIR := ns16550a
 	CPU := cortex-a72
+else ifeq ($(strip $(MICROKIT_BOARD)), rpi5b_2gb)
+	DRIVER_DIR := arm
+	CPU := cortex-a76
 else
 $(error Unsupported MICROKIT_BOARD given)
 endif
