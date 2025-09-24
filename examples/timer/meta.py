@@ -86,6 +86,12 @@ BOARDS: List[Board] = [
         paddr_top=0xA0000000,
         timer="soc/timer@7e003000",
     ),
+    Board(
+        name="rpi5b_2gb",
+        arch=SystemDescription.Arch.AARCH64,
+        paddr_top=0xA0000000,
+        timer="soc@107c000000/timer@7c003000",
+    ),
 ]
 
 
