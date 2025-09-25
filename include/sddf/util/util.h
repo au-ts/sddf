@@ -10,7 +10,9 @@
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(x[0]))
 #endif
-#define ALIGN(x, align)   (((x) + (align) - 1) & ~((align) - 1))
+
+#define __ALIGN_MASK(x, mask)  (((x) + (mask)) & ~(mask))
+#define ALIGN(x, align) ((typeof(x)) __ALIGN_MASK(((typeof(align)) (x)), ((align) - 1)))
 
 #ifndef BIT
 #define BIT(nr) (1UL << (nr))
