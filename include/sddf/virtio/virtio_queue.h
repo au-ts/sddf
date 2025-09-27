@@ -85,9 +85,9 @@ struct virtq_used {
 struct virtq {
     unsigned int num;
 
-    struct virtq_desc *desc;
-    struct virtq_avail *avail;
-    struct virtq_used *used;
+    volatile struct virtq_desc *desc;
+    volatile struct virtq_avail *avail;
+    volatile struct virtq_used *used;
 };
 
 static inline int virtq_need_event(uint16_t event_idx, uint16_t new_idx, uint16_t old_idx)
