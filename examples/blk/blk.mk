@@ -21,7 +21,7 @@ endif
 
 BUILD_DIR ?= build
 MICROKIT_CONFIG ?= debug
-
+BLK_NEED_TIMER ?= 0
 
 # Allow to user to specify a custom partition
 PARTITION :=
@@ -63,7 +63,7 @@ all: $(IMAGE_FILE)
 include ${SDDF}/drivers/blk/${BLK_DRIV_DIR}/blk_driver.mk
 include ${SDDF}/drivers/serial/${UART_DRIV_DIR}/serial_driver.mk
 
-ifdef TIMER_DRIV_DIR
+ifeq (BLK_NEED_TIMER,1)
 include ${SDDF}/drivers/timer/${TIMER_DRIV_DIR}/timer_driver.mk
 IMAGES += timer_driver.elf
 endif
@@ -80,8 +80,11 @@ client.elf: client.o libsddf_util.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
-	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE) $(PARTITION_ARG)
-ifdef TIMER_DRIVER_DIR
+	PYTHONPATH=${SDDF}/tools/Python:$${PYTHONPATH} $(PYTHON) \
+	$(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
+	--dtb $(DTB) --output . --sdf $(SYSTEM_FILE) $(PARTITION_ARG) \
+	--need_timer ${BLK_NEED_TIMER}
+ifeq (BLK_NEED_TIMER,1)
 	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
 	$(OBJCOPY) --update-section .timer_client_config=timer_client_blk_driver.data blk_driver.elf
 endif
@@ -103,7 +106,6 @@ qemu_disk:
 
 qemu: ${IMAGE_FILE} qemu_disk
 	$(QEMU) $(QEMU_ARCH_ARGS) \
-			-serial mon:stdio \
 			-m size=2G \
 			-nographic \
             -d guest_errors \

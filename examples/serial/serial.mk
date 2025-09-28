@@ -25,6 +25,7 @@ SUPPORTED_BOARDS:= cheshire \
 		   hifive_p550 \
 		   imx8mm_evk \
 		   imx8mp_evk \
+		   imx8mp_iotgate \
 		   imx8mq_evk \
 		   maaxboard \
 		   odroidc2 \
@@ -44,6 +45,8 @@ SERIAL_COMPONENTS := $(SDDF)/serial/components
 UART_DRIVER := $(SDDF)/drivers/serial/$(UART_DRIV_DIR)
 SYSTEM_FILE := serial.system
 SDDF_CUSTOM_LIBC := 1
+PYTHONPATH := ${SDDF}/tools/Python:${PAYTHONPATH}
+export PYTHONPATH
 
 IMAGES := serial_driver.elf \
 	  client0.elf client1.elf \

@@ -5,35 +5,13 @@ from typing import List
 from dataclasses import dataclass
 from sdfgen import SystemDescription, Sddf, DeviceTree
 from importlib.metadata import version
+from board import BOARDS
 
 assert version("sdfgen").split(".")[1] == "27", "Unexpected sdfgen version"
 
 ProtectionDomain = SystemDescription.ProtectionDomain
 MemoryRegion = SystemDescription.MemoryRegion
 Map = SystemDescription.Map
-
-
-@dataclass
-class Board:
-    name: str
-    arch: SystemDescription.Arch
-    paddr_top: int
-    i2c: str
-    timer: str
-    # Use actual serial driver for output, so we can test non-debug configurations
-    serial: str
-
-
-BOARDS: List[Board] = [
-    Board(
-        name="odroidc4",
-        arch=SystemDescription.Arch.AARCH64,
-        paddr_top=0x80000000,
-        i2c="soc/bus@ffd00000/i2c@1d000",
-        timer="soc/bus@ffd00000/watchdog@f0d0",
-        serial="soc/bus@ff800000/serial@3000",
-    ),
-]
 
 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
