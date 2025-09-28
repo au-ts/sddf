@@ -15,6 +15,9 @@ ifeq ($(strip $(TOOLCHAIN)),)
 	TOOLCHAIN := clang
 endif
 
+PYTHONPATH := ${SDDF}/tools/Python:${PYTHONPATH}
+export PYTHONPATH
+
 SUPPORTED_BOARDS := odroidc4
 
 include ${SDDF}/tools/Make/board/common.mk

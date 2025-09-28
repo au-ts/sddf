@@ -6,6 +6,7 @@
 PLATFORM := arm
 
 BLK_DRIV_DIR := virtio
+GPU_DRIV_DIR := virtio
 NET_DRIV_DIR := virtio
 ETH_DRIV := eth_driver_virtio.elf
 TIMER_DRIV_DIR := ${PLATFORM}
