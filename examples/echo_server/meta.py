@@ -1,6 +1,6 @@
 # Copyright 2025, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
-import sys,os
+import sys, os
 import argparse
 import struct
 import random
@@ -8,7 +8,9 @@ from dataclasses import dataclass
 from typing import List, Tuple
 from sdfgen import SystemDescription, Sddf, DeviceTree
 from importlib.metadata import version
-sys.path.append(os.path.join(os.getenv("SDDF"), "tools/Python"))
+
+sys.path.append(os.path.join(os.path.dirname(
+    os.path.abspath(__file__)), "../../tools/Python"))
 from board import BOARDS
 
 assert version("sdfgen").split(".")[1] == "26", "Unexpected sdfgen version"
