@@ -21,7 +21,6 @@ endif
 
 BUILD_DIR ?= build
 MICROKIT_CONFIG ?= debug
-BLK_NEED_TIMER ?= 0
 
 # Allow to user to specify a custom partition
 PARTITION :=
@@ -63,9 +62,10 @@ all: $(IMAGE_FILE)
 include ${SDDF}/drivers/blk/${BLK_DRIV_DIR}/blk_driver.mk
 include ${SDDF}/drivers/serial/${UART_DRIV_DIR}/serial_driver.mk
 
-ifeq (BLK_NEED_TIMER,1)
+ifdef BLK_NEED_TIMER
 include ${SDDF}/drivers/timer/${TIMER_DRIV_DIR}/timer_driver.mk
 IMAGES += timer_driver.elf
+export BLK_NEED_TIMER
 endif
 
 include ${SDDF}/util/util.mk
@@ -83,8 +83,8 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(PYTHON) \
 	$(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
 	--dtb $(DTB) --output . --sdf $(SYSTEM_FILE) $(PARTITION_ARG) \
-	--need_timer ${BLK_NEED_TIMER}
-ifeq (BLK_NEED_TIMER,1)
+	$${BLK_NEED_TIMER:+--need_timer}
+ifdef BLK_NEED_TIMER
 	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
 	$(OBJCOPY) --update-section .timer_client_config=timer_client_blk_driver.data blk_driver.elf
 endif
@@ -106,12 +106,12 @@ qemu_disk:
 
 qemu: ${IMAGE_FILE} qemu_disk
 	$(QEMU) $(QEMU_ARCH_ARGS) \
-			-m size=2G \
-			-nographic \
-            -d guest_errors \
-            -global virtio-mmio.force-legacy=false \
-            -drive file=disk,if=none,format=raw,id=hd \
-            -device virtio-blk-device,drive=hd
+	    -m size=2G \
+	    -nographic \
+	    -d guest_errors \
+	    -global virtio-mmio.force-legacy=false \
+	    -drive file=disk,if=none,format=raw,id=hd \
+	    -device virtio-blk-device,drive=hd
 
 clean::
 	rm -f client.o
