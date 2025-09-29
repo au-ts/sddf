@@ -14,7 +14,7 @@ SERIAL_DRIVER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 serial_driver.elf: serial/pc99/serial_driver.o libsddf_util_debug.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-serial/pc99/serial_driver.o: ${SERIAL_DRIVER_DIR}/uart.c |serial/pc99
+serial/pc99/serial_driver.o: ${SERIAL_DRIVER_DIR}/uart.c |serial/pc99 $(SDDF_LIBC_INCLUDE)
 	$(CC) -c $(CFLAGS) -I${SERIAL_DRIVER_DIR}/include -o $@ $<
 
 serial/pc99:
