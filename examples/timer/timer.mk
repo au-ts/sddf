@@ -23,6 +23,7 @@ SUPPORTED_BOARDS := \
 		    imx8mp_evk \
 		    imx8mq_evk \
 		    imx8mp_iotgate \
+		    maaxboard \
 		    odroidc2 \
 		    odroidc4 \
 		    qemu_virt_aarch64 \
