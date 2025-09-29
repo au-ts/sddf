@@ -16,7 +16,7 @@ assert version("sdfgen").split(".")[1] == "26", "Unexpected sdfgen version"
 ProtectionDomain = SystemDescription.ProtectionDomain
 
 
-def generate(sdf_file: str, output_dir: str, dtb: DeviceTree, need_timer: int):
+def generate(sdf_file: str, output_dir: str, dtb: DeviceTree, need_timer: bool):
     serial_driver = ProtectionDomain("serial_driver", "serial_driver.elf", priority=200)
     # Increase the stack size as running with UBSAN uses more stack space than normal.
     serial_virt_tx = ProtectionDomain(
