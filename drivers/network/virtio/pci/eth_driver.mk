@@ -7,7 +7,7 @@
 # the VirtIO network PCI driver
 #
 # NOTES:
-#   Generates eth_driver.elf
+#   Generates eth_driver.elf (alternative unique name eth_driver_virtio.elf)
 #   Assumes libsddf_util_debug.a is in LIBS
 
 ETHERNET_DRIVER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
@@ -20,7 +20,7 @@ ${CHECK_NETDRV_FLAGS_MD5}:
 	-rm -f .netdrv_cflags-*
 	touch $@
 
-eth_driver.elf: network/virtio/pci/ethernet.o network/virtio/pci/transport.o
+eth_driver.elf eth_driver_virtio.elf: network/virtio/pci/ethernet.o network/virtio/pci/transport.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 network/virtio/pci/ethernet.o: ${ETHERNET_COMMON_DIR}/ethernet.c ${CHECK_NETDRV_FLAGS} | $(SDDF_LIBC_INCLUDE)
