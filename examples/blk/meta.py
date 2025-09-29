@@ -7,8 +7,9 @@ from dataclasses import dataclass
 from sdfgen import SystemDescription, Sddf, DeviceTree
 from importlib.metadata import version
 
-sys.path.append(os.path.join(os.path.dirname(
-    os.path.abspath(__file__)), "../../tools/Python"))
+sys.path.append(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../tools/Python")
+)
 from board import BOARDS
 
 assert version("sdfgen").split(".")[1] == "26", "Unexpected sdfgen version"
