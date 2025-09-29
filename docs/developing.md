@@ -333,7 +333,7 @@ on anything. We do however aim to keep both the Makefiles and Zig builds capable
 building all the parts of sDDF.
 
 There is a snippet system for the Makefiles and so each driver will have its own
-`.mk` file for building itself. You can base your drivers snippet on other ones within
+`.mk` file for building itself. You can base your driver's snippet on other ones within
 the same device class.
 
 ## Adding a new device class
