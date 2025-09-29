@@ -82,7 +82,7 @@ if __name__ == "__main__":
     parser.add_argument("--board", required=True, choices=[b.name for b in BOARDS])
     parser.add_argument("--output", required=True)
     parser.add_argument("--sdf", required=True)
-    parser.add_argument("--need_timer", action='store_true', default=False)
+    parser.add_argument("--need_timer", action="store_true", default=False)
     parser.add_argument("--partition")
 
     args = parser.parse_args()
