@@ -23,8 +23,8 @@ def backend_fn(test_config: TestConfig, loader_img: Path) -> HardwareBackend:
     backend = common.backend_fn(test_config, loader_img)
 
     if isinstance(backend, MachineQueueBackend) and test_config.board == "odroidc4":
-        # Only odroidc4_2 is connected to the I²C tests
-        backend.boards = ["odroidc4_2"]
+        # Only odroidc4_1 is connected to the I²C tests
+        backend.boards = ["odroidc4_1"]
 
     return backend
 
