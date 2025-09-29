@@ -122,10 +122,7 @@ pub fn build(b: *std.Build) !void {
         const driver = sddf_dep.artifact(b.fmt("driver_timer_{s}.elf", .{c}));
         // To match what our SDF expects
         timer_driver_install = b.addInstallArtifact(driver, .{ .dest_sub_path = "timer_driver.elf" });
-	const need_timer = "1";
-    } else {
-        const need_timer = "0";
-    };
+    }
 
     const blk_driver_class = switch (microkit_board_option) {
         .qemu_virt_aarch64, .qemu_virt_riscv64 => "virtio",
@@ -194,8 +191,9 @@ pub fn build(b: *std.Build) !void {
     run_metaprogram.addArg(microkit_board);
     run_metaprogram.addArg("--sdf");
     run_metaprogram.addArg("blk.system");
-    run_metaprogram.addArg("--need_timer");
-    run_metaprogram.addArg(need_timer);
+    if (timer_driver_install != null) {
+        run_metaprogram.addArg("--need_timer");
+    }
     if (partition) |p| {
         run_metaprogram.addArg("--partition");
         run_metaprogram.addArg(b.fmt("{}", .{p}));
