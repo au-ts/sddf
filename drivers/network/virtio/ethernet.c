@@ -159,11 +159,15 @@ static void rx_return(void)
         struct virtq_used_elem hdr_used = rx_virtq.used->ring[i % rx_virtq.num];
         assert(rx_virtq.desc[hdr_used.id].flags & VIRTQ_DESC_F_NEXT);
 
-        struct virtq_desc pkt = rx_virtq.desc[rx_virtq.desc[hdr_used.id].next % rx_virtq.num];
+        struct virtq_desc virtio_hdr = rx_virtq.desc[hdr_used.id];
+        struct virtq_desc pkt = rx_virtq.desc[virtio_hdr.next % rx_virtq.num];
         uint64_t addr = pkt.addr;
-        uint32_t len = pkt.len;
         assert(!(pkt.flags & VIRTQ_DESC_F_NEXT));
 
+        /* Received packet length is obtained from used header. This includes
+        the virtIO header length as well, so this must be subtracted before
+        passing to the virtualiser. */
+        uint32_t len = hdr_used.len - virtio_hdr.len;
         net_buff_desc_t buffer = { addr, len };
         int err = net_enqueue_active(&rx_queue, buffer);
         assert(!err);
