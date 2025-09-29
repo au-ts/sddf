@@ -1,10 +1,12 @@
 # Copyright 2025, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
+import os,sys
 import argparse
 from typing import List, Optional
 from dataclasses import dataclass
 from sdfgen import SystemDescription, Sddf, DeviceTree
 from importlib.metadata import version
+sys.path.append(os.path.join(os.getenv("SDDF"), "tools/Python"))
 from board import BOARDS
 
 assert version("sdfgen").split(".")[1] == "26", "Unexpected sdfgen version"
@@ -53,7 +55,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree, need_timer: int):
     serial_system.add_client(client)
 
     pds = [serial_driver, serial_virt_tx, blk_driver, blk_virt, client]
-    if need_timer ==1:
+    if need_timer == 1:
         pds += [timer_driver]
     for pd in pds:
         sdf.add_pd(pd)
@@ -62,7 +64,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree, need_timer: int):
     assert blk_system.serialise_config(output_dir)
     assert serial_system.connect()
     assert serial_system.serialise_config(output_dir)
-    if need_timer==1:
+    if need_timer == 1:
         assert timer_system.connect()
         assert timer_system.serialise_config(output_dir)
 

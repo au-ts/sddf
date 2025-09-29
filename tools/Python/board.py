@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import List, Tuple, Optional
 from sdfgen import SystemDescription
 
+
 @dataclass
 class Board:
     name: str
@@ -12,7 +13,7 @@ class Board:
     serial: str
     ethernet: Optional[str] = None
     timer: Optional[str] = None
-    i2c:   Optional[str] = None
+    i2c: Optional[str] = None
     partition: int = 0
     blk: Optional[str] = None
 
@@ -20,7 +21,7 @@ class Board:
 # Keep this list in alphabetical order by board name
 # TODO: convert to Dictionary
 BOARDS: List[Board] = [
-     Board(
+    Board(
         name="hifive_p550",
         arch=SystemDescription.Arch.RISCV64,
         paddr_top=0xA0000000,
@@ -109,6 +110,7 @@ BOARDS: List[Board] = [
         arch=SystemDescription.Arch.AARCH64,
         paddr_top=0x2_000_000,
         serial="soc/serial@7e215040",
+        timer="soc/timer@7e003000",
     ),
     Board(
         name="star64",
@@ -123,6 +125,6 @@ BOARDS: List[Board] = [
         arch=SystemDescription.Arch.AARCH64,
         paddr_top=0xA0000000,
         timer="axi/timer@ff140000",
-        serial="axi/serial@ff000000"
+        serial="axi/serial@ff000000",
     ),
 ]

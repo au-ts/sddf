@@ -8,6 +8,6 @@
 # NET_DRIV_DIR := genet-v5
 # ETH_DRIV :=
 UART_DRIV_DIR := ns16550a
-#TIMER_DRIV_DIR := arm
+TIMER_DRIV_DIR := bcm2835
 #I2C_DRIV_DIR := ${PLATFORM}
 CPU := cortex-a72

@@ -90,6 +90,7 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx.data serial_virt_tx.elf
 	$(OBJCOPY) --update-section .serial_client_config=serial_client_client_pn532.data client_pn532.elf
 	$(OBJCOPY) --update-section .serial_client_config=serial_client_client_ds3231.data client_ds3231.elf
+	touch $@
 
 $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)

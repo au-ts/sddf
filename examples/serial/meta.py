@@ -1,15 +1,18 @@
 # Copyright 2025, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
+import sys,os
 import argparse
 from typing import List
 from dataclasses import dataclass
 from sdfgen import SystemDescription, Sddf, DeviceTree
 from importlib.metadata import version
+sys.path.append(os.path.join(os.getenv("SDDF"), "tools/Python"))
 from board import BOARDS
 
 assert version("sdfgen").split(".")[1] == "26", "Unexpected sdfgen version"
 
 ProtectionDomain = SystemDescription.ProtectionDomain
+
 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     serial_driver = ProtectionDomain("serial_driver", "serial_driver.elf", priority=200)

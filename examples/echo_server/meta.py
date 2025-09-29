@@ -1,5 +1,6 @@
 # Copyright 2025, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
+import sys,os
 import argparse
 import struct
 import random
@@ -7,6 +8,7 @@ from dataclasses import dataclass
 from typing import List, Tuple
 from sdfgen import SystemDescription, Sddf, DeviceTree
 from importlib.metadata import version
+sys.path.append(os.path.join(os.getenv("SDDF"), "tools/Python"))
 from board import BOARDS
 
 assert version("sdfgen").split(".")[1] == "26", "Unexpected sdfgen version"
@@ -15,7 +17,6 @@ ProtectionDomain = SystemDescription.ProtectionDomain
 MemoryRegion = SystemDescription.MemoryRegion
 Map = SystemDescription.Map
 Channel = SystemDescription.Channel
-
 
 
 """

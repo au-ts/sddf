@@ -84,7 +84,7 @@ network_copy0.elf network_copy1.elf: network_copy.elf
 ${IMAGES}: libsddf_util_debug.a
 
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
-	PYTHONPATH=${SDDF}/tools/Python:$${PYTHONPATH} $(PYTHON)\
+	$(PYTHON)\
 	    $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
 	    --dtb $(DTB) --output . --sdf $(SYSTEM_FILE)
 	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
