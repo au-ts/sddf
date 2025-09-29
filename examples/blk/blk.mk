@@ -80,7 +80,7 @@ client.elf: client.o libsddf_util.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
-	PYTHONPATH=${SDDF}/tools/Python:$${PYTHONPATH} $(PYTHON) \
+	$(PYTHON) \
 	$(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
 	--dtb $(DTB) --output . --sdf $(SYSTEM_FILE) $(PARTITION_ARG) \
 	--need_timer ${BLK_NEED_TIMER}

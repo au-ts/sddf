@@ -9,10 +9,8 @@ endif
 
 ARCH := $(shell sed -n 's/#define *CONFIG_SEL4_ARCH  *\([^ ]*\).*$$/\1/p'  $(BOARD_DIR)/include/kernel/gen_config.h)
 ifeq ($(ARCH),aarch64)
-	CFLAGS_ARCH := -mcpu=$(CPU)
 	TRIPLE := aarch64-none-elf
 else ifeq ($(ARCH),riscv64)
-	CFLAGS_ARCH := -march=rv64imafdc
 	TRIPLE := riscv64-unknown-elf
 else
 $(error Unsupported ARCH given)

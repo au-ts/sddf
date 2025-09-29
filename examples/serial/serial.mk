@@ -45,8 +45,6 @@ SERIAL_COMPONENTS := $(SDDF)/serial/components
 UART_DRIVER := $(SDDF)/drivers/serial/$(UART_DRIV_DIR)
 SYSTEM_FILE := serial.system
 SDDF_CUSTOM_LIBC := 1
-PYTHONPATH := ${SDDF}/tools/Python:${PAYTHONPATH}
-export PYTHONPATH
 
 IMAGES := serial_driver.elf \
 	  client0.elf client1.elf \
@@ -57,7 +55,7 @@ LDFLAGS := -L$(BOARD_DIR)/lib -L$(SDDF)/lib
 LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
 
 CFLAGS += \
-	-I${TOP}/include  \
+	-I${TOP}/include \
 	-I${SDDF}/include \
 	-I${SDDF}/include/microkit
 
@@ -90,7 +88,7 @@ $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	MICROKIT_SDK=${MICROKIT_SDK} $(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
 
 qemu: ${IMAGE_FILE}
-	$(QEMU) -m size=2G -nographic -serial mon:stdio -d guest_errors $(QEMU_ARCH_ARGS)
+	$(QEMU) -m size=2G -nographic -d guest_errors $(QEMU_ARCH_ARGS)
 
 clean::
 	${RM} -f *.elf
