@@ -29,5 +29,5 @@
 
 #define PN532_MIFARE_ISO14443A          (0x00)
 
-uint8_t pn532_write_command(uint8_t *header, uint8_t hlen, const uint8_t *body, uint8_t blen, size_t retries);
-uint8_t pn532_read_response(uint8_t *buffer, uint8_t buffer_len, size_t retries);
+uint8_t pn532_write_command(uint8_t *header, uint8_t hlen, const uint8_t *body, uint8_t blen, unsigned retries);
+uint8_t pn532_read_response(uint8_t *buffer, uint8_t buffer_len, unsigned retries);
