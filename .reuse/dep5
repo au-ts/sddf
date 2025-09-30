@@ -46,6 +46,7 @@ Files:
     drivers/timer/apb_timer/config.json
     drivers/timer/rk3399/config.json
     drivers/timer/rk3568/config.json
+    drivers/timer/eswin/config.json
 Copyright: UNSW
 License: BSD-2-Clause
 
