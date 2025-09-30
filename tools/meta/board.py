@@ -31,6 +31,7 @@ BOARDS: List[Board] = [
         name="hifive_p550",
         arch=SystemDescription.Arch.RISCV64,
         paddr_top=0xA0000000,
+        timer="soc/timer@0x51840000",
         serial="soc/serial@0x50900000",
     ),
     Board(
