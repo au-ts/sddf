@@ -29,18 +29,14 @@ typedef struct i2c_connection_resource {
 typedef struct i2c_driver_config {
     char magic[SDDF_I2C_MAGIC_LEN];
     i2c_connection_resource_t virt;
-    size_t slice_size;   // Size of uniform meta regions
 } i2c_driver_config_t;
 
 // zig: Virt.Client
 typedef struct i2c_virt_client_config {
     i2c_connection_resource_t conn;
-    size_t command_size;
-    size_t slice_size;
-    uintptr_t driver_command_vaddr;
-    uintptr_t driver_slice_vaddr;
-    uintptr_t client_command_vaddr;
-    uintptr_t client_slice_vaddr;
+    size_t data_size;
+    uintptr_t driver_data_vaddr;
+    uintptr_t client_data_vaddr;
 } i2c_virt_client_config_t;
 
 // zig: Virt
@@ -55,8 +51,7 @@ typedef struct i2c_virt_config {
 typedef struct i2c_client_config {
     char magic[SDDF_I2C_MAGIC_LEN];
     i2c_connection_resource_t virt;
-    region_resource_t command;
-    region_resource_t slice;
+    region_resource_t data;
 } i2c_client_config_t;
 
 static bool i2c_config_check_magic(void *config)

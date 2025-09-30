@@ -6,8 +6,9 @@
 
 #include <sddf/i2c/libi2c.h>
 
+// #define DEBUG_LIBI2C
 #ifdef DEBUG_LIBI2C
-#define LOG_LIBI2C(...) do{ sddf_dprintf("CLIENT|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
+#define LOG_LIBI2C(...) do{ sddf_dprintf("LIBI2C|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
 #else
 #define LOG_LIBI2C(...) do{}while(0)
 #endif
@@ -18,111 +19,94 @@
 int libi2c_init(libi2c_conf_t *conf_struct, i2c_queue_handle_t *queue_handle)
 {
     conf_struct->handle = queue_handle;
-
-    // Allocate bitmask (i.e. zero portion of data region)
-    for (int i = 0; i < LIBI2C_BITMASK_SZ; i++) {
-        I2C_DATA_REGION[i] = 0;
-    }
-
-    // Index commands after bytes used for bitmask
-    conf_struct->data_start = (void *)(I2C_DATA_REGION + LIBI2C_BITMASK_SZ);
+    conf_struct->data_start = (void *) I2C_DATA_REGION;
     return 0;
-}
-
-// ########### Command allocator functions ############
-// SDFgen will do a lot of the work for us, but unfortunately all of the variables it generates
-// are considered runtime-context by the C compiler. As a result, we need to do some magic to
-// have a sane allocator which doesn't need a bunch of #defines set based on region sizes.
-//
-// This allocator sets aside a tracking bitmask from the available room in the data region.
-// Commands are 2 words, hence a region of size S can store a max of S/2 commands.
-// S/2 commands can be indexed using (S/2)/64 = S/128. We set aside this many bitmask words at
-// the base of the region. The remaining C=S - (S/128)=127/128 * S bytes are used to store
-// ((127/128)S) / 2 commands.
-
-/**
- * Given configuration struct, return first available command from allocation bitmask.
- * Returns NULL if allocator is exhausted.
- */
-static i2c_cmd_t *__libi2c_alloc_cmd(libi2c_conf_t *conf)
-{
-    // Find first non-zero byte in bitmask range
-    for (int i = 0; i < LIBI2C_BITMASK_SZ; i++) {
-        uint8_t mask = I2C_DATA_REGION[i];
-        if (I2C_DATA_REGION[i] != 0xFF) {
-            for (int bit = 0; bit < 8; bit++) {
-                if (!(mask & (1 << bit))) {
-                    // Mark this bit as allocated
-                    I2C_DATA_REGION[i] |= (1 << bit);
-                    // Calculate command index
-                    int cmd_idx = (i * 8) + bit;
-                    return &conf->data_start[cmd_idx];
-                }
-            }
-        }
-    }
-    return NULL;  // No space.
-}
-
-/**
- * Given a pointer to a command in the data region, release this command to the allocator.
- */
-static void __libi2c_free_cmd(libi2c_conf_t *conf, i2c_cmd_t *cmd)
-{
-    // Make sure command is actually in the data region.
-    assert((uintptr_t)cmd > (uintptr_t)I2C_DATA_REGION
-           && ((uintptr_t)cmd - (uintptr_t)I2C_DATA_REGION) <= i2c_config.data.size);
-
-    size_t cmd_idx = cmd - conf->data_start;
-    size_t bitmask_byte = cmd_idx / 8;
-    uint8_t bitmask_bit = cmd_idx % 8;
-    I2C_DATA_REGION[bitmask_byte] &= ~(1 << bitmask_bit);
 }
 
 // ########### I2C interface ###########
 
-static inline int check_meta_buf(void *meta_buf)
+static inline int check_data_buf(void *data_buf)
 {
-    if ((uintptr_t)meta_buf < (uintptr_t)I2C_META_REGION
-        || (uintptr_t)meta_buf > ((uintptr_t)I2C_META_REGION + i2c_config.meta.size)) {
-        LOG_LIBI2C_ERR("i2c_write called with meta_buf not in meta region!");
+    if ((uintptr_t)data_buf < (uintptr_t)I2C_DATA_REGION
+        || (uintptr_t)data_buf > ((uintptr_t)I2C_DATA_REGION + i2c_config.data.size)) {
+        LOG_LIBI2C_ERR("i2c_write called with data_buf not in data region!");
         return -1;
     }
     return 0;
 }
 
 /**
- * Given a buffer pointer from the META region, create an I2C op, dispatch and return when
+ * Given a buffer pointer from the DATA region, create an I2C op, dispatch and return when
  * complete. This is a blocking function call. Implements all single-cmd ops.
  * @return -1 if queue ops fail, positive value corresponding to i2c_err_t, or 0 if successful.
  */
 static int __i2c_dispatch(libi2c_conf_t *conf, i2c_addr_t address, void *buf, uint16_t len, uint8_t flag_mask)
 {
-    // Check that supplied buffer is within bounds of meta region
-    if (check_meta_buf(buf)) {
+    LOG_LIBI2C("Dispatch: to=%zu, buf = %p, flag_mask = %zu, len = %zu\n",
+               address, buf, flag_mask, len);
+    // Check that supplied buffer is within bounds of data region
+    if (check_data_buf(buf)) {
         return -1;
     }
-    // Create a write command
-    i2c_cmd_t *cmd = __libi2c_alloc_cmd(conf);
-    if (cmd == NULL) {
-        LOG_LIBI2C_ERR("__i2c_dispatch failed to allocate command!\n");
-        return -1;
-    }
-    size_t meta_offset = (uint8_t *)buf - I2C_META_REGION;
-    i2c_err_t error = 0;
-    cmd->offset = meta_offset;
-    cmd->len = len;
-    cmd->flag_mask = flag_mask;
+    uint16_t num_batches = (len / 255)+1; // Number of 255 long batches. cmd_t indexes with uint8
 
-    if (i2c_enqueue_request(*conf->handle, address, (uintptr_t)cmd, (uintptr_t)I2C_META_REGION, 1)) {
-        LOG_LIBI2C_ERR("__i2c_dispatch failed to enqueue request!\n");
-        error = -1;
-        goto i2c_dispatch_fail;
+    // Give up if queue cannot fit this many commands. Add 1 for header.
+    if (I2C_QUEUE_SZ - i2c_request_queue_length(*conf->handle) < num_batches + 1) {
+        return -1;
     }
+
+    // Create header command
+    i2c_cmd_t header;
+    i2c_err_t error = I2C_ERR_OK;
+    header.flag_mask = I2C_FLAG_HEAD;
+    header.payload.i2c_header.batch_len = num_batches;
+    header.payload.i2c_header.address = address;
+    if(i2c_enqueue_request(*conf->handle, header)) {
+        LOG_LIBI2C("ERROR: failed to enqueue header!\n");
+        return -1;
+    }
+
+    // Slice buffer into 255 byte long segments and enqueue.
+    for (uint16_t i = 0; i < num_batches; i++) {
+        LOG_LIBI2C("Slice %zu / %zu\n", i+1, num_batches);
+        uint16_t curr_offset = ((1<<8) * i);
+        // Batch of 255, unless there are fewer commands left.
+        uint8_t data_len = (len - curr_offset) >= 255 ?
+                           255 : (uint8_t)(len - curr_offset);
+        i2c_cmd_t data;
+        data.payload.data = (uint8_t *)(buf + curr_offset);
+        data.data_len = data_len;
+        // RSTART for all commands but first, STOP for final, and WRRD only for start.
+        data.flag_mask = data_len != (255) ? flag_mask & I2C_FLAG_STOP : 0;
+        if (i != 0) {
+            data.flag_mask |= I2C_FLAG_RSTART;
+        } else {
+            data.flag_mask |= flag_mask & I2C_FLAG_WRRD;
+        }
+
+        // Add read flag if required.
+        data.flag_mask |= flag_mask & I2C_FLAG_READ;
+
+        if (i2c_enqueue_request(*conf->handle, data)) {
+            // No need to clean up if we fail. We just surrender pending requests
+            // and exit.
+            LOG_LIBI2C_ERR("__i2c_dispatch failed to enqueue request!\n");
+            error = -1;
+            i2c_request_abort(*conf->handle);
+            goto i2c_dispatch_fail;
+        }
+    }
+
+    i2c_request_commit(*conf->handle);
+    LOG_LIBI2C("Dispatching request to virt...\n");
     microkit_notify(i2c_config.virt.id);
 
     // Await response.
+    #ifdef LIBI2C_RAW
+    co_switch(t_event);
+    #else
     microkit_cothread_wait_on_channel(i2c_config.virt.id);
+    #endif
 
     i2c_addr_t returned_addr = 0;
     size_t err_cmd = 0;     // Irrelevant for single-command runs.
@@ -133,12 +117,11 @@ static int __i2c_dispatch(libi2c_conf_t *conf, i2c_addr_t address, void *buf, ui
     }
     assert(returned_addr == address);   // If this ever fails, the protocol is broken or misused!
 i2c_dispatch_fail:
-    __libi2c_free_cmd(conf, cmd);
     return error;
 }
 
 /**
- * Perform a simple I2C write given a META region buffer containing data.
+ * Perform a simple I2C write given a DATA region buffer containing data.
  * To perform a write to a device register, ensure the FIRST byte of write_buf contains
  * the register address.
  * This is a blocking function call.
@@ -150,7 +133,7 @@ int i2c_write(libi2c_conf_t *conf, i2c_addr_t address, void *write_buf, uint16_t
 }
 
 /**
- * Perform a simple I2C read given a META region buffer to store result.
+ * Perform a simple I2C read given a DATA region buffer to store result.
  * To perform a read to a device register, use i2c_writeread!
  * This is a blocking function call.
  * @return -1 if queue ops fail, positive value corresponding to i2c_err_t, or 0 if successful.
@@ -161,15 +144,15 @@ int i2c_read(libi2c_conf_t *conf, i2c_addr_t address, void *read_buf, uint16_t l
 }
 
 /**
- * Perform an I2C read given a META region buffer to store result, writing the address of a
+ * Perform an I2C read given a DATA region buffer to store result, writing the address of a
  * peripheral register first.
  * This is a blocking function call.
  * @return -1 if queue ops fail, positive value corresponding to i2c_err_t, or 0 if successful.
  */
 int i2c_writeread(libi2c_conf_t *conf, i2c_addr_t address, i2c_addr_t reg_address, void *read_buf, uint16_t len)
 {
-    // Check that supplied buffer is within bounds of meta region
-    if (check_meta_buf(read_buf)) {
+    // Check that supplied buffer is within bounds of data region
+    if (check_data_buf(read_buf)) {
         return -1;
     }
     // Inject register address to read buf

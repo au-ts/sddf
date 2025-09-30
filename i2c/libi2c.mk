@@ -10,12 +10,15 @@
 #   LIBMICROKITCO_INCLUDE_DIR - Path to libmicrokitco include directory
 #   LIBMICROKITCO_OPTS_DIR - Path to directory containing libmicrokitco_opts.h
 
+# If we are using the raw API, we don't need libmicrokitco
+ifneq ($(LIBI2C_RAW),)
 ifeq ($(strip $(LIBMICROKITCO_INCLUDE_DIR)),)
 $(error LIBMICROKITCO_INCLUDE_DIR must be specified for libi2c)
 endif
 
 ifeq ($(strip $(LIBMICROKITCO_OPTS_DIR)),)
 $(error LIBMICROKITCO_OPTS_DIR must be specified for libi2c)
+endif
 endif
 
 LIBI2C_DIR := $(SDDF)/i2c

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+#include <sddf/i2c/i2c_driver.h>
 #pragma once
 
 // Ctl register fields
@@ -40,3 +41,68 @@
 
 /* The client cannot attach or use a bus address greater than 7-bits. */
 #define MESON_I2C_MAX_BUS_ADDRESS (0x7f)
+
+
+char *meson_token_to_str(uint8_t token)
+{
+    switch (token) {
+    case MESON_I2C_TOKEN_END:
+        return "MESON_I2C_TOKEN_END";
+    case MESON_I2C_TOKEN_START:
+        return "MESON_I2C_TOKEN_START";
+    case MESON_I2C_TOKEN_ADDR_WRITE:
+        return "MESON_I2C_TOKEN_ADDR_WRITE";
+    case MESON_I2C_TOKEN_ADDR_READ:
+        return "MESON_I2C_TOKEN_ADDR_READ";
+    case MESON_I2C_TOKEN_DATA:
+        return "MESON_I2C_TOKEN_DATA";
+    case MESON_I2C_TOKEN_DATA_END:
+        return "MESON_I2C_TOKEN_DATA_END";
+    case MESON_I2C_TOKEN_STOP:
+        return "MESON_I2C_TOKEN_STOP";
+    default:
+        return "Unknown token!";
+    }
+}
+
+static inline char *state_to_str(i2c_state_t s)
+{
+    switch (s) {
+    case S_IDLE:
+        return "S_IDLE";
+    case S_REQ:
+        return "S_REQ";
+    case S_SEL_CMD:
+        return "S_SEL_CMD";
+    case S_CMD:
+        return "S_CMD";
+    case S_CMD_RET:
+        return "S_CMD_RET";
+    case S_RESPONSE:
+        return "S_RESPONSE";
+    default:
+        return "S_INVALID!";
+    }
+}
+
+static inline char *i2c_err_to_str(i2c_err_t err)
+{
+    switch (err) {
+    case I2C_ERR_OK:
+        return "I2C_ERR_OK";
+    case I2C_ERR_TIMEOUT:
+        return "I2C_ERR_TIMEOUT";
+    case I2C_ERR_NACK:
+        return "I2C_ERR_NACK";
+    case I2C_ERR_NOREAD:
+        return "I2C_ERR_NOREAD";
+    case I2C_ERR_BADSEQ:
+        return "I2C_ERR_BADSEQ";
+    case I2C_ERR_OTHER:
+        return "I2C_ERR_OTHER";
+    default:
+        return "Invalid error";
+    }
+}
+
+

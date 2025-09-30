@@ -14,7 +14,7 @@
 #include <sddf/i2c/client.h>
 #include <sddf/i2c/config.h>
 #include <sddf/i2c/devices/pn532/pn532.h>
-#include <sddf/i2c/libi2c_raw.h>
+#include <sddf/i2c/libi2c.h>
 
 bool delay_ms(size_t milliseconds);
 
@@ -42,7 +42,7 @@ __attribute__((__section__(".serial_client_config"))) serial_client_config_t ser
 static serial_queue_handle_t serial_tx_queue_handle;
 
 i2c_queue_handle_t queue;
-uintptr_t command_region;
+uintptr_t data_region;
 libi2c_conf_t libi2c_conf;
 
 cothread_t t_event;
@@ -218,7 +218,7 @@ void init(void)
 
     assert(i2c_config_check_magic((void *)&i2c_config));
 
-    command_region = (uintptr_t)i2c_config.command.vaddr;
+    data_region = (uintptr_t)i2c_config.data.vaddr;
     queue = i2c_queue_init(i2c_config.virt.req_queue.vaddr, i2c_config.virt.resp_queue.vaddr);
 
     bool claimed = i2c_bus_claim(i2c_config.virt.id, PN532_I2C_BUS_ADDRESS);

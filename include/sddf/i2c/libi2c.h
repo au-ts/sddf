@@ -6,11 +6,10 @@
 
 // I2C interface library for clients using libmicrokitco.
 // Provides helper functions for creating requests and handing them to the virtualiser.
-// Enables automatic allocation of command structs, but user is expected to perform management
-// of SLICE region to supply buffers as this is not practical to generalise.
 //
 // Currently this interface only supports single command requests, but the protocol is capable
-// of doing many command requests. If your usage requires more commands per request, do not use
+// of doing many command requests. This is simply because multi-command requests are not
+// necessary in most cases! If your usage requires more commands per request, do not use
 // this library and instead implement direct calls to the protocol in <sddf/i2c/queue.h>
 //
 // See i2c/queue.h for details about the I2C transport layer.
@@ -20,14 +19,20 @@
 #include <sddf/i2c/queue.h>
 #include <sddf/util/printf.h>
 #include <sddf/i2c/config.h>
+#ifdef LIBI2C_RAW
+#include <libco.h>
+// Client must define and set up these cothreads for this interface to function.
+extern cothread_t t_event;
+extern cothread_t t_main;
+#else
 #include <libmicrokitco.h>
+#endif
 
 // Client must define this. E.g.
 // __attribute__((__section__(".i2c_client_config"))) i2c_client_config_t i2c_config;
 extern i2c_client_config_t i2c_config;
 
-#define I2C_CONTROL_REGION ((uint8_t *)i2c_config.data.vaddr)
-#define I2C_SLICE_REGION ((uint8_t *)i2c_config.meta.vaddr)
+#define I2C_DATA_REGION ((uint8_t *)i2c_config.data.vaddr)
 
 #define LOG_LIBI2C_ERR(...) do{ sddf_printf("LIBI2C|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
@@ -44,7 +49,6 @@ extern i2c_client_config_t i2c_config;
  *  Other flags are used to describe a read, write or write-read (sub-address read)
  */
 
-#define LIBI2C_BITMASK_SZ (i2c_config.data.size % 2 ? i2c_config.data.size/128 : (i2c_config.data.size+1)/128)
 typedef struct libi2c_conf {
     i2c_queue_handle_t *handle;
     i2c_cmd_t *data_start;   // Pointer to first command in data region

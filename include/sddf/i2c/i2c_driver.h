@@ -15,30 +15,24 @@
 // Header containing all generic features for I2C drivers targeting the
 // sDDF and Microkit platform.
 // Lesley Rossouw (lesley.rossouw@unsw.edu.au)
-// 08/2023
+// 08/2025
 //
 #pragma once
 
 // Driver "state". Referred to as "data" to avoid confusion with the finite state machine.
 // This contains data that must persist BETWEEN states.
 typedef struct i2c_driver_data {
-    /* Pointer to current request/response being handled */
-    i2c_cmd_t *curr_command_region;
-    /* Pointer to base of current slice region */
-    uintptr_t slice_base;
-    /* Number of cmds in current request */
-    int curr_request_len;
-    /* Index into current request. */
+    /* Pointer to head of current request */
+    i2c_cmd_t curr_request;
+    /* Index into current request. I.e. number of commands popped. */
     unsigned int req_idx;
     /* Current command. Aliased from `curr_data`/`req_idx` for structural reasons*/
-    i2c_cmd_t *active_cmd;
+    i2c_cmd_t active_cmd;
     /* Number of read/write ops successfully dispatched, used to track working in S_CMD */
     uint8_t rw_idx;
     /* Number of bytes received back from hardware, used to track when a read request is done*/
     uint8_t bytes_read;
-    /* I2C bus address of the current request being handled */
-    i2c_addr_t addr;
-    /* Is this cmd pending a start, address, subaddress (preceding read) or stop token? */
+    /* Is current cmd pending a start, address, subaddress (preceding read) or stop token? */
     bool await_start, await_addr, await_stop;   // Flags for single-token ops
     uint8_t await_wrrd;     // Countdown of steps for the wrrd op. 0 = nothing to do.
                             // This is needed to prevent requiring two full commands
@@ -66,19 +60,28 @@ void fsm(fsm_data_t *f);
 
 static void i2c_reset_state(i2c_driver_data_t *s)
 {
-    s->curr_command_region = NULL;
-    s->slice_base = 0;
-    s->curr_request_len = 0;
+    s->curr_request.payload.i2c_header.address = 0;
+    s->curr_request.data_len = 0;
+    s->curr_request.flag_mask = 0;
+    s->active_cmd.payload.i2c_header.address = 0;
+    s->active_cmd.data_len = 0;
+    s->active_cmd.flag_mask = 0;
     s->req_idx = 0;
     s->rw_idx = 0;
     s->bytes_read = 0;
-    s->addr = 0;
-    s->active_cmd = NULL;
     s->await_start = false;
     s->await_addr = false;
     s->await_stop = false;
     s->await_wrrd = 0;
     s->err = I2C_ERR_OK;
+}
+
+static inline uint8_t i2c_curr_req_len(i2c_driver_data_t *s) {
+    return s->curr_request.payload.i2c_header.batch_len;
+}
+
+static inline i2c_addr_t i2c_curr_addr(i2c_driver_data_t *s) {
+    return s->curr_request.payload.i2c_header.address;
 }
 
 #define NUM_WRRD_STEPS 3    // Address, subaddress, START
