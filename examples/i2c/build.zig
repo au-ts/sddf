@@ -104,7 +104,6 @@ pub fn build(b: *std.Build) !void {
     // This is required because the SDF file is expecting a different name to the artifact we
     // are dealing with.
     const timer_driver_install = b.addInstallArtifact(timer_driver, .{ .dest_sub_path = "timer_driver.elf" });
-
     const serial_driver = sddf_dep.artifact(b.fmt("driver_serial_{s}.elf", .{serial_driver_class}));
     // This is required because the SDF file is expecting a different name to the artifact we
     // are dealing with.
@@ -129,12 +128,14 @@ pub fn build(b: *std.Build) !void {
 
     client_pn532.addCSourceFiles(.{
         .files = &.{"client_pn532.c"},
+        .flags = &.{"-DLIBI2C_RAW"},
     });
     client_pn532.addIncludePath(sddf_dep.path("include"));
     client_pn532.addIncludePath(sddf_dep.path("include/microkit"));
     client_pn532.linkLibrary(sddf_dep.artifact("util"));
     client_pn532.linkLibrary(sddf_dep.artifact("util_putchar_serial"));
     client_pn532.linkLibrary(pn532_driver);
+    client_pn532.linkLibrary(sddf_dep.artifact("libi2c_raw"));
 
     const client_ds3231 = b.addExecutable(.{
         .name = "client_ds3231.elf",
@@ -147,12 +148,14 @@ pub fn build(b: *std.Build) !void {
 
     client_ds3231.addCSourceFiles(.{
         .files = &.{"client_ds3231.c"},
+        .flags = &.{"-DLIBI2C_RAW"},
     });
     client_ds3231.addIncludePath(sddf_dep.path("include"));
     client_ds3231.addIncludePath(sddf_dep.path("include/microkit"));
     client_ds3231.linkLibrary(sddf_dep.artifact("util"));
     client_ds3231.linkLibrary(sddf_dep.artifact("util_putchar_serial"));
     client_ds3231.linkLibrary(ds3231_driver);
+    client_ds3231.linkLibrary(sddf_dep.artifact("libi2c_raw"));
 
     // Here we compile libco. Right now this is the only example that uses libco and so
     // we just compile it here instead of in a separate build.zig
@@ -245,13 +248,16 @@ pub fn build(b: *std.Build) !void {
     microkit_tool_cmd.addFileArg(microkit_tool);
     microkit_tool_cmd.addArgs(&[_][]const u8{
         b.getInstallPath(.{ .custom = "meta_output" }, "i2c.system"),
-        // zig fmt: off
-        "--search-path", b.getInstallPath(.bin, ""),
-        "--board", microkit_board,
-        "--config", microkit_config,
-        "-o", final_image_dest,
-        "-r", b.getInstallPath(.prefix, "./report.txt"),
-        // zig fmt: on
+        "--search-path",
+        b.getInstallPath(.bin, ""),
+        "--board",
+        microkit_board,
+        "--config",
+        microkit_config,
+        "-o",
+        final_image_dest,
+        "-r",
+        b.getInstallPath(.prefix, "./report.txt"),
     });
     inline for (objcopys) |objcopy| {
         microkit_tool_cmd.step.dependOn(&objcopy.step);

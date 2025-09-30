@@ -32,11 +32,11 @@ def backend_fn(test_config: TestConfig, loader_img: Path) -> HardwareBackend:
 async def test(backend: HardwareBackend, test_config: TestConfig):
     async with asyncio.timeout(30):
         await wait_for_output(
-            backend, b"Set Date and Time on DS3231 to: 31-12-23 23:59:42 (Sunday)\r\n"
+            backend, b"Set Date and Time on DS3231 to: 31-05-25 23:59:42 (Sunday)\r\n"
         )
 
         # It should take us less than 20 sec before it becomes Monday.
-        await wait_for_output(backend, b"Date and Time: 01-01-24 00:00:00 (Monday)\r\n")
+        await wait_for_output(backend, b"Date and Time: 01-06-25 00:00:00 (Monday)\r\n")
 
 
 if __name__ == "__main__":

@@ -180,6 +180,7 @@ fn addI2cDriverDevice(
     const source = b.fmt("i2c/devices/{s}/{s}.c", .{ @tagName(device), @tagName(device) });
     driver.addCSourceFile(.{
         .file = b.path(source),
+        .flags = &.{"-DLIBI2C_RAW"},
     });
     driver.addIncludePath(b.path(b.fmt("i2c/devices/{s}/", .{@tagName(device)})));
     driver.addIncludePath(b.path("include"));
@@ -543,6 +544,26 @@ pub fn build(b: *std.Build) !void {
             driver.linkLibrary(util_putchar_debug);
             b.installArtifact(driver);
         }
+
+        const libi2c_raw = b.addLibrary(.{
+            .name = "libi2c_raw",
+            .linkage = .static,
+            .root_module = b.createModule(.{
+                .target = target,
+                .optimize = optimize,
+            }),
+        });
+        libi2c_raw.addCSourceFile(.{
+            .file = b.path("i2c/libi2c.c"),
+            .flags = &.{"-DLIBI2C_RAW"},
+        });
+        libi2c_raw.addIncludePath(b.path("include"));
+        libi2c_raw.addIncludePath(b.path("include/sddf/util/custom_libc"));
+        libi2c_raw.addIncludePath(b.path("include/microkit"));
+        libi2c_raw.addIncludePath(b.path("libco"));
+        libi2c_raw.addIncludePath(libmicrokit_include);
+        libi2c_raw.linkLibrary(util);
+        b.installArtifact(libi2c_raw);
 
         // I2C components
         const i2c_virt = addPd(b, .{
