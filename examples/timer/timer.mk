@@ -66,6 +66,8 @@ else ifeq ($(strip $(MICROKIT_BOARD)), zcu102)
 else ifeq ($(strip $(MICROKIT_BOARD)), rpi4b_1gb)
 	TIMER_DRIVER_DIR := bcm2835
 	CPU := cortex-a72
+else ifeq ($(strip $(MICROKIT_BOARD)), hifive_p550)
+	TIMER_DRIVER_DIR := eswin
 else
 $(error Unsupported MICROKIT_BOARD given)
 endif

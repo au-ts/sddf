@@ -13,6 +13,7 @@ const MicrokitBoard = enum {
     odroidc4,
     star64,
     maaxboard,
+    hifive_p550,
     imx8mm_evk,
     imx8mp_evk,
     imx8mq_evk,
@@ -38,6 +39,15 @@ const targets = [_]Target{
     },
     .{
         .board = MicrokitBoard.qemu_virt_riscv64,
+        .zig_target = std.Target.Query{
+            .cpu_arch = .riscv64,
+            .cpu_model = .{ .explicit = &std.Target.riscv.cpu.baseline_rv64 },
+            .os_tag = .freestanding,
+            .abi = .none,
+        },
+    },
+    .{
+        .board = MicrokitBoard.hifive_p550,
         .zig_target = std.Target.Query{
             .cpu_arch = .riscv64,
             .cpu_model = .{ .explicit = &std.Target.riscv.cpu.baseline_rv64 },
@@ -203,6 +213,7 @@ pub fn build(b: *std.Build) !void {
         .qemu_virt_riscv64 => "goldfish",
         .odroidc2, .odroidc4 => "meson",
         .star64 => "jh7110",
+        .hifive_p550 => "eswin",
         .maaxboard, .imx8mm_evk, .imx8mp_evk, .imx8mq_evk => "imx",
         .zcu102 => "cdns",
         .rpi4b_1gb => "bcm2835",
