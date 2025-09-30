@@ -44,8 +44,6 @@ static uint64_t timeouts[MAX_TIMEOUTS];
 #define TIMER_TICKS_PER_SECOND 24000000
 #endif
 
-#define TIMER_MAX_TICKS 0xffffffff
-
 #define CLIENT_CH_START 1
 
 /* Keep track of how many timer overflows have occured.
