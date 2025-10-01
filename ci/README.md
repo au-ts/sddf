@@ -95,7 +95,7 @@ On macOS: `brew install clang-format`.
 
 On apt: `sudo apt install clang-format`.
 
-On Nix: `nix-shell` in the root of the repository.
+On Nix: `nix develop` in the root of the repository.
 
 ### Using
 
