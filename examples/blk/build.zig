@@ -191,6 +191,9 @@ pub fn build(b: *std.Build) !void {
     run_metaprogram.addArg(microkit_board);
     run_metaprogram.addArg("--sdf");
     run_metaprogram.addArg("blk.system");
+    if (timer_driver_install != null) {
+        run_metaprogram.addArg("--need_timer");
+    }
     if (partition) |p| {
         run_metaprogram.addArg("--partition");
         run_metaprogram.addArg(b.fmt("{}", .{p}));
