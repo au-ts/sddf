@@ -135,7 +135,7 @@ void init(void)
     set_timeout();
 
     setup_udp_socket();
-    setup_utilization_socket(benchmark_config.cycle_counters, benchmark_config.start_ch, benchmark_config.stop_ch);
+    // setup_utilization_socket(benchmark_config.cycle_counters, benchmark_config.start_ch, benchmark_config.stop_ch);
     setup_tcp_socket();
 
     sddf_lwip_maybe_notify();

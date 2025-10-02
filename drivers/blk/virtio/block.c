@@ -15,7 +15,7 @@
  * may be needed if instead this driver was to be used in a different environment.
  */
 
-#include <microkit.h>
+#include <os/sddf.h>
 #include <sddf/util/util.h>
 #include <sddf/util/ialloc.h>
 #include <sddf/virtio/virtio.h>
@@ -110,7 +110,7 @@ void handle_response(void)
     }
 
     if (notify) {
-        microkit_notify(config.virt.id);
+        sddf_notify(config.virt.id);
     }
 
     last_seen_used = i;
@@ -229,13 +229,13 @@ void handle_request()
         case BLK_REQ_FLUSH: {
             int err = blk_enqueue_resp(&blk_queue, BLK_RESP_OK, 0, id);
             assert(!err);
-            microkit_notify(config.virt.id);
+            sddf_notify(config.virt.id);
             break;
         }
         case BLK_REQ_BARRIER: {
             int err = blk_enqueue_resp(&blk_queue, BLK_RESP_OK, 0, id);
             assert(!err);
-            microkit_notify(config.virt.id);
+            sddf_notify(config.virt.id);
             break;
         }
         default:
@@ -395,11 +395,11 @@ void init(void)
     blk_queue_init(&blk_queue, config.virt.req_queue.vaddr, config.virt.resp_queue.vaddr, config.virt.num_buffers);
 }
 
-void notified(microkit_channel ch)
+void notified(sddf_channel ch)
 {
     if (ch == device_resources.irqs[0].id) {
         handle_irq();
-        microkit_deferred_irq_ack(ch);
+        sddf_deferred_irq_ack(ch);
         /*
          * It is possible that we could not enqueue all requests when being notified
          * by the virtualiser because we ran out of space, so we try again now that

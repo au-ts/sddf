@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-#include <microkit.h>
+#include <os/sddf.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <sddf/util/cache.h>
@@ -16,6 +16,16 @@
 #define DRIVER_MAX_NUM_BUFFERS 1024
 
 __attribute__((__section__(".blk_virt_config"))) blk_virt_config_t config;
+
+/* Uncomment this to enable debug logging */
+// #define DEBUG_BLK_VIRT
+
+#if defined(DEBUG_BLK_VIRT)
+#define LOG_BLK_VIRT(...) do{ sddf_dprintf("BLK_VIRT|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
+#else
+#define LOG_BLK_VIRT(...) do{}while(0)
+#endif
+#define LOG_BLK_VIRT_ERR(...) do{ sddf_dprintf("BLK_VIRT|ERROR: "); sddf_dprintf(__VA_ARGS__); }while(0)
 
 /* Driver queue handle */
 blk_queue_handle_t drv_h;
@@ -37,6 +47,114 @@ ialloc_t ialloc;
 static uint32_t ialloc_idxlist[DRIVER_MAX_NUM_BUFFERS];
 
 bool initialised = false;
+
+static void partitions_dump()
+{
+    sddf_dprintf("the following partitions exist:\n");
+    for (int i = 0; i < MSDOS_MBR_MAX_PRIMARY_PARTITIONS; i++) {
+        sddf_dprintf("partition %d: type: 0x%hhx", i, msdos_mbr.partitions[i].type);
+        if (msdos_mbr.partitions[i].type == MSDOS_MBR_PARTITION_TYPE_EMPTY) {
+            sddf_dprintf(" (empty)\n");
+        } else {
+            sddf_dprintf("\n");
+        }
+    }
+}
+
+static void partitions_init()
+{
+    if (msdos_mbr.signature != MSDOS_MBR_SIGNATURE) {
+        LOG_BLK_VIRT_ERR("Invalid MBR signature\n");
+        return;
+    }
+
+    /* Validate partition and assign to client */
+    for (int i = 0; i < config.num_clients; i++) {
+        blk_virt_config_client_t *client = &config.clients[i];
+        size_t client_partition = client->partition;
+
+        if (client_partition >= MSDOS_MBR_MAX_PRIMARY_PARTITIONS
+            || msdos_mbr.partitions[client_partition].type == MSDOS_MBR_PARTITION_TYPE_EMPTY) {
+            /* Partition does not exist */
+            LOG_BLK_VIRT_ERR(
+                "Invalid client partition mapping for client %d: partition: %zu, partition does not exist\n", i,
+                client_partition);
+            partitions_dump();
+            return;
+        }
+
+        if (msdos_mbr.partitions[client_partition].lba_start % (BLK_TRANSFER_SIZE / MSDOS_MBR_SECTOR_SIZE) != 0) {
+            /* Partition start sector is not aligned to sDDF transfer size */
+            LOG_BLK_VIRT_ERR("Partition %d start sector %d not aligned to sDDF transfer size\n", (int)client_partition,
+                             msdos_mbr.partitions[client_partition].lba_start);
+            return;
+        }
+
+        /* We have a valid partition now. */
+        clients[i].start_sector = msdos_mbr.partitions[client_partition].lba_start;
+        clients[i].sectors = msdos_mbr.partitions[client_partition].sectors;
+
+        blk_storage_info_t *client_storage_info = client->conn.storage_info.vaddr;
+        blk_storage_info_t *driver_storage_info = config.driver.conn.storage_info.vaddr;
+        client_storage_info->sector_size = driver_storage_info->sector_size;
+        client_storage_info->capacity = clients[i].sectors / (BLK_TRANSFER_SIZE / MSDOS_MBR_SECTOR_SIZE);
+        client_storage_info->read_only = false;
+        __atomic_store_n(&client_storage_info->ready, true, __ATOMIC_RELEASE);
+    }
+}
+
+static void request_mbr()
+{
+    int err = 0;
+    uintptr_t mbr_paddr = config.driver.data.io_addr;
+    uintptr_t mbr_vaddr = (uintptr_t)config.driver.data.region.vaddr;
+
+    uint32_t mbr_req_id = 0;
+    err = ialloc_alloc(&ialloc, &mbr_req_id);
+    assert(!err);
+    reqsbk[mbr_req_id] = (reqbk_t) { 0, 0, mbr_vaddr, 1, 0 };
+
+    /* Virt-to-driver data region needs to be big enough to transfer MBR data */
+    assert(config.driver.data.region.size >= BLK_TRANSFER_SIZE);
+    err = blk_enqueue_req(&drv_h, BLK_REQ_READ, mbr_paddr, 0, 1, mbr_req_id);
+    assert(!err);
+
+    microkit_deferred_notify(config.driver.conn.id);
+}
+
+static bool handle_mbr_reply()
+{
+    int err = 0;
+    if (blk_queue_empty_resp(&drv_h)) {
+        LOG_BLK_VIRT(
+            "Notified by driver but queue is empty, expecting a response to a BLK_REQ_READ request into sector 0\n");
+        return false;
+    }
+
+    blk_resp_status_t drv_status;
+    uint16_t drv_success_count;
+    uint32_t drv_resp_id;
+    err = blk_dequeue_resp(&drv_h, &drv_status, &drv_success_count, &drv_resp_id);
+    assert(!err);
+
+    reqbk_t mbr_bk = reqsbk[drv_resp_id];
+    err = ialloc_free(&ialloc, drv_resp_id);
+    assert(!err);
+
+    if (drv_status != BLK_RESP_OK) {
+        LOG_BLK_VIRT_ERR("Failed to read sector 0 from driver\n");
+        return false;
+    }
+
+    /* TODO: This is a raw seL4 system call because Microkit does not (currently)
+     * include a corresponding libmicrokit API. */
+#ifdef CONFIG_ARCH_ARM
+    seL4_ARM_VSpace_Invalidate_Data(3, mbr_bk.vaddr, mbr_bk.vaddr + (BLK_TRANSFER_SIZE * mbr_bk.count));
+#endif
+    sddf_memcpy(&msdos_mbr, (void *)mbr_bk.vaddr, sizeof(struct msdos_mbr));
+
+    return true;
+}
 
 void init(void)
 {
@@ -87,7 +205,11 @@ static void handle_driver()
         case BLK_REQ_READ:
             if (drv_status == BLK_RESP_OK) {
                 /* Invalidate cache */
-                cache_clean_and_invalidate(reqbk.vaddr, reqbk.vaddr + (BLK_TRANSFER_SIZE * reqbk.count));
+                /* TODO: This is a raw seL4 system call because Microkit does not (currently)
+                    * include a corresponding libmicrokit API. */
+#ifdef CONFIG_ARCH_ARM
+                seL4_ARM_VSpace_Invalidate_Data(3, reqbk.vaddr, reqbk.vaddr + (BLK_TRANSFER_SIZE * reqbk.count));
+#endif
             }
             break;
         case BLK_REQ_WRITE:
@@ -114,7 +236,7 @@ static void handle_driver()
     /* Notify corresponding client if a response was enqueued */
     for (int i = 0; i < config.num_clients; i++) {
         if (client_notify[i]) {
-            microkit_notify(config.clients[i].conn.id);
+            sddf_notify(config.clients[i].conn.id);
         }
     }
 }
@@ -217,7 +339,7 @@ static bool handle_client(int cli_id)
     }
 
     if (client_notify) {
-        microkit_notify(config.clients[cli_id].conn.id);
+        sddf_notify(config.clients[cli_id].conn.id);
     }
 
     return driver_notify;
@@ -233,11 +355,11 @@ static void handle_clients()
     }
 
     if (driver_notify) {
-        microkit_notify(config.driver.conn.id);
+        sddf_notify(config.driver.conn.id);
     }
 }
 
-void notified(microkit_channel ch)
+void notified(sddf_channel ch)
 {
     if (!initialised) {
         /* Continue processing partitions until initialisation has finished. */

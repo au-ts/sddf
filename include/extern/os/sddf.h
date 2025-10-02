@@ -11,6 +11,7 @@
 typedef unsigned int sddf_channel;
 
 #define SDDF_NAME_LENGTH 64
+#define SDDF_MAX_CHANNELS 62
 
 extern char *sddf_get_pd_name();
 extern void sddf_irq_ack(sddf_channel id);
@@ -21,3 +22,4 @@ extern seL4_MessageInfo_t sddf_ppcall(sddf_channel id, seL4_MessageInfo_t msginf
 extern uint64_t sddf_get_mr(sddf_channel n);
 extern void sddf_set_mr(sddf_channel n, uint64_t val);
 extern sddf_channel sddf_deferred_notify_curr();
+extern seL4_Error sddf_vspace_invalidate_data(seL4_ARM_VSpace _service, seL4_Word start, seL4_Word end);
