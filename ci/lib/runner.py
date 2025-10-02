@@ -255,6 +255,11 @@ def cli(
         help="force the use of a specific backend to run the test. requires --single",
     )
     parser.add_argument(
+        "--image",
+        type=Path,
+        help="force the use of a specific loader.img file to run the test. requires --single",
+    )
+    parser.add_argument(
         "--logs-dir",
         type=Path,
         default=Path("ci_logs"),
@@ -289,6 +294,21 @@ def cli(
     matrix = sorted(_subset_test_matrix(matrix, filters_args))
     if len(matrix) == 0:
         parser.error("applied filters result in zero selected tests")
+
+    if args.image:
+        if not args.single:
+            parser.error("requested --image but --single not specified")
+
+        # Remove config and build system from the path as we pass the board path.
+        # But we still want to make the user specify the board.
+        matrix = sorted(
+            set(
+                TestConfig(board=test.board, config="custom", build_system="custom")
+                for test in matrix
+            )
+        )
+
+        loader_img_fn = lambda n, c: args.image
 
     if args.single and len(matrix) != 1:
         parser.error(
