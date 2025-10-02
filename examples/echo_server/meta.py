@@ -10,7 +10,7 @@ from sdfgen import SystemDescription, Sddf, DeviceTree
 from importlib.metadata import version
 
 sys.path.append(
-    os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../tools/python")
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../tools/meta")
 )
 from board import BOARDS
 
