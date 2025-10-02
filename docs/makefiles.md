@@ -105,7 +105,7 @@ device, you can depend on `eth_driver.elf`; it will be built from
 whatever is the first ethernet device defined in the board file.
 
 If you need more than one ethernet device, you will need to use the
-_real_ name of the ethernet drivers you need.  So for the IMX series
+_real_ name of the ethernet drivers you need.  So for the imx8mp series
 of boards, the first ethernet device uses `eth_driver_imx.elf` and the
-second (if present) uses `eth_driver_dwmac-5.10a.elf`; these are the
+second (if needed) uses `eth_driver_dwmac-5.10a.elf`; these are the
 ones you need to deal with in your Makefile.
