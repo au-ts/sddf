@@ -36,7 +36,7 @@ ifeq ($(strip $(TOOLCHAIN)),)
 	TOOLCHAIN := clang
 endif
 
-include ${SDDF}/tools/Make/board/common.mk
+include ${SDDF}/tools/make/board/common.mk
 
 TOP := ${SDDF}/examples/timer
 METAPROGRAM := $(TOP)/meta.py

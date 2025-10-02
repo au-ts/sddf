@@ -20,7 +20,7 @@ SUPPORTED_BOARDS := qemu_virt_aarch64
 ifeq ($(strip ${TOOLCHAIN}),)
 	TOOLCHAIN := clang
 endif
-include ${SDDF}/tools/Make/board/common.mk
+include ${SDDF}/tools/make/board/common.mk
 
 TOP := ${SDDF}/examples/gpu
 PROJECT_INCLUDE := ${TOP}/include

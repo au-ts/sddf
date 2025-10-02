@@ -40,7 +40,7 @@ TOP := ${SDDF}/examples/blk
 CONFIGS_INCLUDE := ${TOP}
 SDDF_CUSTOM_LIBC := 1
 
-include ${SDDF}/tools/Make/board/common.mk
+include ${SDDF}/tools/make/board/common.mk
 
 
 IMAGES := blk_driver.elf client.elf blk_virt.elf serial_virt_tx.elf serial_driver.elf

@@ -20,7 +20,7 @@ export PYTHONPATH
 
 SUPPORTED_BOARDS := odroidc4
 
-include ${SDDF}/tools/Make/board/common.mk
+include ${SDDF}/tools/make/board/common.mk
 
 SDDF_CUSTOM_LIBC := 1
 UTIL := $(SDDF)/util
