@@ -46,6 +46,9 @@ You are encouraged to explore all the script's options with:
 ./ci/build.py --help
 ```
 
+Take a look at the `--image` option to the individual example's script
+if you are doing development of a certain example.
+
 ### Runtime
 
 There are two kinds of runtime tests, simulation via QEMU and hardware tests on actual
@@ -67,6 +70,36 @@ There are various options, such as running only a specific example:
 All the options can be found with:
 ```sh
 ./ci/run.py --help
+```
+
+For developing specific examples, the example's script can be invoked directly,
+which gives more options for filtering what gets run and how.
+
+```sh
+./ci/examples/blk.py --help
+```
+
+One useful option is `--image` which allows you to do testing of a certain
+example repeatedly, for debugging:
+
+```sh
+$ make MICROKIT_BOARD=maaxboard
+
+[[ builds ]]
+
+$ ../../ci/examples/blk.py --image build/loader.img --single --boards maaxboard
+CI|INFO: Running blk on maaxboard (custom, built with custom)
+CI|INFO: Acquired lock: maaxboard1 LOCKED juliab 2025-10-02 12:04:24.699846598 +1000 au_ts_ci (running locally)
+
+[[ test runs ]]
+
+CI|INFO: Released lock: maaxboard1 FREE
+CI|INFO: Test passed
+CI|INFO: Finished running blk on maaxboard (custom, built with custom)
+==== Passing ====
+ - maaxboard: custom/custom
+==== Failed =====
+   (none)
 ```
 
 #### Running with QEMU
