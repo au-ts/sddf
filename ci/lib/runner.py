@@ -255,7 +255,7 @@ def cli(
         help="force the use of a specific backend to run the test. requires --single",
     )
     parser.add_argument(
-        "--image",
+        "--override-image",
         type=Path,
         help="force the use of a specific loader.img file to run the test. requires --single",
     )
@@ -295,9 +295,9 @@ def cli(
     if len(matrix) == 0:
         parser.error("applied filters result in zero selected tests")
 
-    if args.image:
+    if loader_img := args.override_image:
         if not args.single:
-            parser.error("requested --image but --single not specified")
+            parser.error("requested --override-image but --single not specified")
 
         # Remove config and build system from the path as we pass the board path.
         # But we still want to make the user specify the board.
@@ -308,7 +308,7 @@ def cli(
             )
         )
 
-        loader_img_fn = lambda n, c: args.image
+        loader_img_fn = lambda n, c: loader_img
 
     if args.single and len(matrix) != 1:
         parser.error(

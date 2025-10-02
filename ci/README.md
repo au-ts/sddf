@@ -46,7 +46,7 @@ You are encouraged to explore all the script's options with:
 ./ci/build.py --help
 ```
 
-Take a look at the `--image` option to the individual example's script
+Take a look at the `--override-image` option to the individual example's script
 if you are doing development of a certain example.
 
 ### Runtime
@@ -79,7 +79,7 @@ which gives more options for filtering what gets run and how.
 ./ci/examples/blk.py --help
 ```
 
-One useful option is `--image` which allows you to do testing of a certain
+One useful option is `--override-image` which allows you to do testing of a certain
 example repeatedly, for debugging:
 
 ```sh
@@ -87,7 +87,7 @@ $ make MICROKIT_BOARD=maaxboard
 
 [[ builds ]]
 
-$ ../../ci/examples/blk.py --image build/loader.img --single --boards maaxboard
+$ ../../ci/examples/blk.py --override-image build/loader.img --single --boards maaxboard
 CI|INFO: Running blk on maaxboard (custom, built with custom)
 CI|INFO: Acquired lock: maaxboard1 LOCKED juliab 2025-10-02 12:04:24.699846598 +1000 au_ts_ci (running locally)
 
