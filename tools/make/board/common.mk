@@ -21,11 +21,11 @@ ifeq ($(wildcard ${BOARD_DIR}),)
   $(error ${MICROKIT_BOARD} not supported by ${MICROKIT_SDK})
 endif
 
-ifeq ($(wildcard ${SDDF}/tools/Make/board/${MICROKIT_BOARD}.mk),)
-  $(error No Make snippet in ${SDDF}/tools/Make/board for ${MICROKIT_BOARD})
+ifeq ($(wildcard ${SDDF}/tools/make/board/${MICROKIT_BOARD}.mk),)
+  $(error No Make snippet in ${SDDF}/tools/make/board for ${MICROKIT_BOARD})
 endif
 
-include ${SDDF}/tools/Make/board/${MICROKIT_BOARD}.mk
+include ${SDDF}/tools/make/board/${MICROKIT_BOARD}.mk
 
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 
@@ -50,7 +50,7 @@ ${ETH_DRIV}: libsddf_util_debug.a
 eth_driver.elf: ${ETH_DRIV}
 	cp ${ETH_DRIV} $@
 
-include ${SDDF}/tools/Make/toolchain/${TOOLCHAIN}.mk
+include ${SDDF}/tools/make/toolchain/${TOOLCHAIN}.mk
 
 # Magic to ensure stuff gets recompiled if we change
 # board name, or use a different Microkit etc.

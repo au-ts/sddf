@@ -22,7 +22,7 @@ SYSTEM_FILE := echo_server.system
 IMAGE_FILE := loader.img
 REPORT_FILE := report.txt
 
-include ${SDDF}/tools/Make/board/common.mk
+include ${SDDF}/tools/make/board/common.mk
 
 ECHO_SERVER := ${SDDF}/examples/echo_server
 METAPROGRAM := $(ECHO_SERVER)/meta.py

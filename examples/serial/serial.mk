@@ -36,7 +36,7 @@ SUPPORTED_BOARDS:= cheshire \
 		   zcu102 \
 		   star64
 
-include ${SDDF}/tools/Make/board/common.mk
+include ${SDDF}/tools/make/board/common.mk
 
 TOP := ${SDDF}/examples/serial
 METAPROGRAM := $(TOP)/meta.py
