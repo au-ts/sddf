@@ -16,6 +16,13 @@ __attribute__((__section__(".device_resources"))) device_resources_t device_reso
 #error "Driver assumes 100MHz clock frequency, check if your platform supports that"
 #endif
 
+/*
+ * The system timer has four 32-bit compare registers available.
+ * Channels 0 and 2 are used by the VideoCore and cause spurious interrupts
+ * (see: https://github.com/seL4/seL4/pull/894)
+*/
+#define BCM2835_TIMEOUT_TIMER 1
+
 typedef struct {
     /* Registers
      * BCM2835 System Timer peripheral provides four 32-bit timer channels
@@ -23,19 +30,10 @@ typedef struct {
     uint32_t cs;    /* 0x00: system timer control/status */
     uint32_t clo;   /* 0x04: system timer counter lower 32 bits */
     uint32_t chi;   /* 0x08: system timer counter higher 32 bits */
-    uint32_t c0;    /* 0x0c: system timer compare 0 */
-    uint32_t c1;    /* 0x10: (not used) system timer compare 1 */
-    uint32_t c2;    /* 0x14: (not used) system timer compare 2 */
-    uint32_t c3;    /* 0x18: (not used) system timer compare 3 */
+    uint32_t cn[4]; /* 0x0c - 0x18: system timer compare 0-3 */
 } bcm2835_timer_regs_t;
 
 static volatile bcm2835_timer_regs_t *timer_regs;
-
-/*
- * The system timer has four 32-bit compare registers available.
- * We use register 0 to set the timeouts.
-*/
-#define BCM2835_TIMEOUT_TIMER 0
 
 /*
  * The system timer status register has bits 31:4 reserved by default.
@@ -44,8 +42,9 @@ static volatile bcm2835_timer_regs_t *timer_regs;
  * and the timeout time in the respective register. This is routed to the interrupt controller.
  *
  * The bits are of type W1C (write 1 to clear) so writing a 1 to the relevant bit clears the match
- * status bit and its corresponding interrupt line. Since we are only using c0 in this driver, we
- * will only be concerned with bit 0 of the status register.
+ * status bit and its corresponding interrupt line. Since we are only using channel
+ * BCM2835_TIMEOUT_TIMER in this driver, we will only be concerned with bit
+ * BIT(BCM2835_TIMEOUT_TIMER) of the status register.
 */
 #define BCM2835_TIMER_CLEAR_IRQ BIT(BCM2835_TIMEOUT_TIMER)
 
@@ -71,7 +70,7 @@ void set_timeout(uint64_t ns)
         value_us = BCM2835_TIMER_MAX_US;
     }
     uint64_t timer_us = ((uint64_t)timer_regs->chi << 32) | timer_regs->clo;
-    timer_regs->c0 = (uint32_t)(timer_us + value_us);
+    timer_regs->cn[BCM2835_TIMEOUT_TIMER] = (uint32_t)(timer_us + value_us);
 }
 
 static void process_timeouts(uint64_t curr_time)
