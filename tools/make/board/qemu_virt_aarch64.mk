@@ -15,5 +15,6 @@ UART_DRIV_DIR := ${PLATFORM}
 CPU := cortex-a53
 QEMU := qemu-system-aarch64
 QEMU_ARCH_ARGS := -machine virt,virtualization=on -cpu cortex-a53 \
+		  -m size=2G \
 		  -device loader,file=\$(IMAGE_FILE),addr=0x70000000,cpu-num=0 \
 		  -serial mon:stdio
