@@ -5,6 +5,7 @@
 #
 # Set up variables for rockpro64
 # Should be included _before_ toolchain makefile.
+# WARNING: not fully working yet
 PLATFORM := rk3399
 
 I2C_DRIV_DIR := ${PLATFORM}
