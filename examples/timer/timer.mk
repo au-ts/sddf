@@ -80,7 +80,6 @@ $(IMAGE_FILE) $(REPORT_FILE): $(SYSTEM_FILE)
 qemu: $(IMAGE_FILE)
 	$(QEMU) $(QEMU_ARCH_ARGS) \
 			-nographic \
-			-m size=2G \
 			-d guest_errors
 
 clean::

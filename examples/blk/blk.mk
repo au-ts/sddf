@@ -106,7 +106,6 @@ qemu_disk:
 
 qemu: ${IMAGE_FILE} qemu_disk
 	$(QEMU) $(QEMU_ARCH_ARGS) \
-	    -m size=2G \
 	    -nographic \
 	    -d guest_errors \
 	    -global virtio-mmio.force-legacy=false \
