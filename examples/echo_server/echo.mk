@@ -128,7 +128,6 @@ include ${SERIAL_COMPONENTS}/serial_components.mk
 
 qemu: $(IMAGE_FILE)
 	$(QEMU) $(QEMU_ARCH_ARGS) \
-		-m size=2G \
 		-nographic \
 		-device virtio-net-device,netdev=netdev0 \
 		-netdev user,id=netdev0,hostfwd=tcp::1236-:1236,hostfwd=tcp::1237-:1237,hostfwd=udp::1235-:1235 \
