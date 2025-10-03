@@ -33,10 +33,12 @@ typedef struct i2c_driver_data {
     uint8_t bytes_read;
     /* Is current cmd pending a start, address, subaddress (preceding read) or stop token? */
     bool await_start, await_addr, await_stop;
-    uint8_t await_wrrd;     // Countdown of steps for the wrrd op. 0 = nothing to do.
-                            // This is needed to prevent requiring two full commands
-                            // to write to a device subaddress! Steps:
-                            // Write WRITE, write ADDR, READ dev addr, continue as normal
+    /* Countdown of steps for the wrrd op. 0 = nothing to do.
+     * This is needed to prevent requiring two full commands
+     * to write to a device subaddress! Steps:
+     * Write WRITE, write ADDR, READ dev addr, continue as normal
+     */
+    uint8_t await_wrrd;
     i2c_err_t err;
 
 } i2c_driver_data_t;

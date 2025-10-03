@@ -44,16 +44,23 @@ typedef enum i2c_err {
     I2C_ERR_OTHER, // can be used for driver specific implementations
 } i2c_err_t;
 
-#define I2C_FLAG_HEAD (1 << 0)  // This isn't a command but instead designates a command header
-#define I2C_FLAG_READ (1 << 1)  // This is a read command.
-#define I2C_FLAG_WRRD (1 << 2) // This is a write-read op. I.e. we write the index of a register                                           \
-                                // in the device before we read. Special case, as we never can                                                 \
-                                // intermingle data otherwise.                                                                                 \
-                                // ALWAYS implies a read.
-#define I2C_FLAG_STOP (1 << 3) // We want a stop at the end of the command.
-#define I2C_FLAG_RSTART (1 << 4) // This is a continuation of a previous command, demarcating a                                              \
-                                // repeated start condition. CAUTION: must match read/write                                                    \
-                                // direction of last op!
+/* This isn't a command but instead designates a command header */
+#define I2C_FLAG_HEAD (1 << 0)
+/* This is a read command. */
+#define I2C_FLAG_READ (1 << 1)
+/*
+ * This is a write-read op. I.e. we write the index of a register
+ * in the device before we read. Special case, as we never can
+ * intermingle data otherwise.
+ * ALWAYS implies a read.
+ */
+#define I2C_FLAG_WRRD (1 << 2)
+/* We want a stop at the end of the command. */
+#define I2C_FLAG_STOP (1 << 3)
+/* This is a continuation of a previous command,
+ * demarcating a repeated start condition. CAUTION: must match read/write
+ * direction of last op! */
+#define I2C_FLAG_RSTART (1 << 4)
 typedef uint8_t i2c_cmd_flags_t;
 typedef uint8_t i2c_addr_t; // We currently only support the 7 bit addressing mode.
 
@@ -81,8 +88,9 @@ typedef struct i2c_queue_ctrl {
 
 /* Request queue. Master-mode I2C is inherently asymmetrical and responses can be very simple. */
 typedef struct i2c_request_queue {
-    uint32_t staged_active_tail; // Producers for the active queue must batch update the tail
-        // to prevent a race condition between the clients and virt.
+    // Producers for the active queue must batch update the tail
+    // to prevent a race condition between the clients and virt.
+    uint32_t staged_active_tail;
     i2c_queue_ctrl_t ctrl;
     i2c_cmd_t cmds[I2C_QUEUE_CAPACITY];
 } i2c_request_queue_t;
@@ -92,7 +100,7 @@ typedef struct i2c_response {
     size_t err_cmd;
     i2c_addr_t bus_address;
     i2c_err_t error;
-} i2c_response_t; // Packed as written -> 16 bytes
+} i2c_response_t;
 
 /* Response queue. Client already knows where all data is, so this is just a mechanism for
  * error reporting. */
