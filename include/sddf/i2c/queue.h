@@ -100,7 +100,7 @@ typedef struct i2c_response {
     size_t err_cmd;
     i2c_addr_t bus_address;
     i2c_err_t error;
-} i2c_response_t;
+} i2c_response_t; // Packed as written -> 16 bytes
 
 /* Response queue. Client already knows where all data is, so this is just a mechanism for
  * error reporting. */
@@ -318,8 +318,8 @@ static inline int i2c_dequeue_request(i2c_queue_handle_t h, i2c_cmd_t *cmd)
     }
 
     size_t index = queue->ctrl.head % I2C_QUEUE_CAPACITY;
-    THREAD_MEMORY_RELEASE();
     *cmd = queue->cmds[index];
+    THREAD_MEMORY_RELEASE();
     queue->ctrl.head++;
 
     return 0;
