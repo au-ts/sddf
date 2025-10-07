@@ -5,7 +5,7 @@
 #
 PLATFORM := riscv
 # Placeholders
-#NET_DRIV_DIR := 
-#ETH_DRIV := 
+#NET_DRIV_DIR :=
+#ETH_DRIV :=
 UART_DRIV_DIR := ns16550a
-#TIMER_DRIV_DIR := 
+#TIMER_DRIV_DIR :=
