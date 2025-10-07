@@ -3,12 +3,21 @@
 
 use core::sync::atomic::Ordering;
 
-use crate::{dev_log, info, sdmmc::{constant::{MMC_CMD_APP_CMD, SD_CMD_APP_SEND_SCR, SD_CMD_SWITCH_FUNC}, mmc_struct::CardInfo, MmcData, MmcDataFlag, SdmmcCmd, MMC_RSP_R1}, sdmmc_os::Sleep, sdmmc_traits::SdmmcHardware};
+use crate::{
+    dev_log, info,
+    sdmmc::{
+        MMC_RSP_R1, MmcData, MmcDataFlag, SdmmcCmd,
+        constant::{MMC_CMD_APP_CMD, SD_CMD_APP_SEND_SCR, SD_CMD_SWITCH_FUNC},
+        mmc_struct::CardInfo,
+    },
+    sdmmc_os::Sleep,
+    sdmmc_traits::SdmmcHardware,
+};
 
 use super::{
     SdmmcError,
-    mmc_struct::{BlockTransmissionMode, MmcBusWidth, MmcState},
     capability::SdcardCapability,
+    mmc_struct::{BlockTransmissionMode, MmcBusWidth, MmcState},
 };
 
 #[allow(dead_code)]

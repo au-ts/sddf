@@ -4,11 +4,14 @@
 use core::ptr;
 
 use sdmmc_protocol::{
-    sdmmc::{MmcPowerMode, MmcSignalVoltage, SdmmcError},
-    sdmmc_os::VoltageOps,
+    sdmmc::{HostInfo, MmcSignalVoltage, SdmmcError},
+    sdmmc_os::{Sleep, VoltageOps},
+    sdmmc_traits::SdmmcHardware,
 };
 
 use meson_hal::meson_gx_mmc::SdmmcMesonHardware;
+
+use crate::sel4_microkit_os::TimerOps;
 
 pub struct Odroidc4VoltageSwitch;
 pub(crate) const VOLTAGE: Odroidc4VoltageSwitch = Odroidc4VoltageSwitch::new();
@@ -86,7 +89,7 @@ impl VoltageOps for Odroidc4VoltageSwitch {
         Ok(())
     }
 
-    fn card_set_power(&mut self, power_mode: MmcPowerMode) -> Result<(), SdmmcError> {
+    fn card_power_cycling(&mut self) -> Result<(), SdmmcError> {
         let mut value: u32;
         unsafe {
             value = ptr::read_volatile(AO_RTI_OUTPUT_ENABLE_REG as *const u32);
@@ -98,36 +101,44 @@ impl VoltageOps for Odroidc4VoltageSwitch {
                 ptr::write_volatile(AO_RTI_OUTPUT_ENABLE_REG as *mut u32, value);
             }
         }
-        match power_mode {
-            MmcPowerMode::On => {
-                unsafe {
-                    value = ptr::read_volatile(AO_RTI_OUTPUT_LEVEL_REG as *const u32);
-                }
-                if value & GPIO_AO_3 == 0 {
-                    value |= GPIO_AO_3;
-                    unsafe {
-                        ptr::write_volatile(AO_RTI_OUTPUT_LEVEL_REG as *mut u32, value);
-                    }
-                }
-                self.card_voltage_switch(MmcSignalVoltage::Voltage330)?;
-            }
-            MmcPowerMode::Off => {
-                unsafe {
-                    value = ptr::read_volatile(AO_RTI_OUTPUT_LEVEL_REG as *const u32);
-                }
-                if value & GPIO_AO_3 != 0 {
-                    value &= !GPIO_AO_3;
-                    unsafe {
-                        ptr::write_volatile(AO_RTI_OUTPUT_LEVEL_REG as *mut u32, value);
-                    }
-                }
-            }
-            _ => return Err(SdmmcError::EINVAL),
+
+        // Turning the power off
+        unsafe {
+            value = ptr::read_volatile(AO_RTI_OUTPUT_LEVEL_REG as *const u32);
         }
+        if value & GPIO_AO_3 != 0 {
+            value &= !GPIO_AO_3;
+            unsafe {
+                ptr::write_volatile(AO_RTI_OUTPUT_LEVEL_REG as *mut u32, value);
+            }
+        }
+
+        // Sleep for 5ms
+        TimerOps::new().usleep(5000);
+
+        // Turning the power on
+        unsafe {
+            value = ptr::read_volatile(AO_RTI_OUTPUT_LEVEL_REG as *const u32);
+        }
+        if value & GPIO_AO_3 == 0 {
+            value |= GPIO_AO_3;
+            unsafe {
+                ptr::write_volatile(AO_RTI_OUTPUT_LEVEL_REG as *mut u32, value);
+            }
+        }
+        self.card_voltage_switch(MmcSignalVoltage::Voltage330)?;
+
+        // Sleep for another 5ms
+        TimerOps::new().usleep(5000);
+
         Ok(())
     }
 }
 
 pub unsafe fn platform_hal(regs_base: u64) -> SdmmcMesonHardware {
     unsafe { SdmmcMesonHardware::new(regs_base) }
+}
+
+pub const fn host_info() -> HostInfo {
+    SdmmcMesonHardware::HOST_INFO
 }

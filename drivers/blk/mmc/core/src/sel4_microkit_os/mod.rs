@@ -9,7 +9,7 @@ mod odroidc4;
 
 #[cfg(feature = "meson")]
 pub(crate) mod platform {
-    pub(crate) use crate::sel4_microkit_os::odroidc4::{VOLTAGE, platform_hal};
+    pub(crate) use crate::sel4_microkit_os::odroidc4::{VOLTAGE, host_info, platform_hal};
 }
 
 const NS_IN_US: u64 = 1000;

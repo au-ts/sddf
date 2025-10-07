@@ -19,9 +19,8 @@ const POLLING_CHANCE_BEFORE_TIME_OUT: u32 = 10240;
 const DATA_TRANSFER_POLLING_CHANCE_BEFORE_TIME_OUT: u32 = 2048;
 
 #[allow(unused_variables)]
-/// Trait to be implemented by the sdcard hal
-pub trait SdmmcHardware {
-    fn sdmmc_init(&mut self) -> Result<(MmcIos, HostInfo, u128), SdmmcError> {
+pub trait SdmmcOps {
+    fn sdmmc_init(&mut self) -> Result<MmcIos, SdmmcError> {
         Err(SdmmcError::ENOTIMPLEMENTED)
     }
 
@@ -204,4 +203,14 @@ pub trait SdmmcHardware {
         dev_log!("A timeout request not reported by the host, the host might be unreliable\n");
         Err(SdmmcError::EUNDEFINED)
     }
+}
+
+#[allow(unused_variables)]
+/// Trait to be implemented by the sdcard hal
+pub trait SdmmcHardware: SdmmcOps {
+    const HOST_INFO: HostInfo;
+
+    /// This function is NOT meant for initialization of the host
+    /// It should be marked as const once the const traits feature in Rust is stable
+    unsafe fn new(sdmmc_register_base: u64) -> Self;
 }

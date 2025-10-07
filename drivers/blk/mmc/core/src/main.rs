@@ -29,9 +29,10 @@ const INTERRUPT: sel4_microkit::Channel = sel4_microkit::Channel::new(0);
 const BLK_VIRTUALIZER: sel4_microkit::Channel = sel4_microkit::Channel::new(1);
 const TIMER: TimerOps = TimerOps::new();
 const SERIAL: SerialOps = SerialOps::new();
+const HOST_INFO: HostInfo = crate::sel4_microkit_os::platform::host_info();
 
 use sdmmc_protocol::{
-    sdmmc::{HostInfo, SDCARD_DEFAULT_SECTOR_SIZE, mmc_struct::CardInfo},
+    sdmmc::{mmc_struct::CardInfo, HostInfo, SDCARD_DEFAULT_SECTOR_SIZE},
     sdmmc_traits::SdmmcHardware,
 };
 use sdmmc_protocol::{
@@ -100,7 +101,6 @@ fn init() -> impl Handler {
 
     sdmmc_host.print_card_info();
 
-    let host_info: HostInfo = sdmmc_host.get_host_info();
     let card_info: CardInfo = sdmmc_host.card_info().unwrap();
 
     let _ = sdmmc_host.config_interrupt(false, false);
@@ -127,7 +127,6 @@ fn init() -> impl Handler {
         future: None,
         sdmmc: Some(sdmmc_host),
         request: None,
-        host_info,
         card_info,
     }
 }
@@ -136,7 +135,6 @@ struct HandlerImpl<T: SdmmcHardware, S: Sleep, V: VoltageOps> {
     future: Option<Pin<Box<dyn Future<Output = (Result<(), SdmmcError>, SdmmcProtocol<T, S, V>)>>>>,
     sdmmc: Option<SdmmcProtocol<T, S, V>>,
     request: Option<BlkRequest>,
-    host_info: HostInfo,
     card_info: CardInfo,
 }
 
@@ -292,7 +290,7 @@ where
                         match request.request_code {
                             BlkOp::BlkReqRead => {
                                 request.count_to_do =
-                                    core::cmp::min(request.count, self.host_info.max_block_per_req);
+                                    core::cmp::min(request.count, HOST_INFO.max_block_per_req);
                                 if let Some(sdmmc) = self.sdmmc.take() {
                                     self.future = Some(Box::pin(sdmmc.read_block(
                                         request.count_to_do,
@@ -309,7 +307,7 @@ where
                             }
                             BlkOp::BlkReqWrite => {
                                 request.count_to_do =
-                                    core::cmp::min(request.count, self.host_info.max_block_per_req);
+                                    core::cmp::min(request.count, HOST_INFO.max_block_per_req);
                                 if let Some(sdmmc) = self.sdmmc.take() {
                                     self.future = Some(Box::pin(sdmmc.write_block(
                                         request.count_to_do,
