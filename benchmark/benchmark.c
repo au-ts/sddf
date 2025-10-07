@@ -18,7 +18,7 @@
 /* At the moment we run systems that contain this benchmarking code on architectures
  * where we cannot properly do benchmarking. We also include the benchmarking PD
  * on non-benchmarking configurations.
- * This defines whether we actually try to benchmarking, setup the PMU etc.
+ * This defines whether we actually try to benchmark, setup the PMU etc.
  */
 #if defined(CONFIG_ENABLE_BENCHMARKS) && defined(CONFIG_ARCH_ARM)
 #define ENABLE_BENCHMARKING 1
@@ -207,9 +207,6 @@ void init(void)
 
 #if ENABLE_BENCHMARKING
     sddf_printf("BENCH|LOG: ENABLE_BENCHMARKING defined\n");
-#ifndef CONFIG_ARCH_ARM
-    sddf_printf("BENCH|LOG: System not running on ARM, benchmarking not implemented.\n");
-#endif
 #endif
 #ifdef CONFIG_BENCHMARK_TRACK_UTILISATION
     sddf_printf("BENCH|LOG: CONFIG_BENCHMARK_TRACK_UTILISATION defined\n");
