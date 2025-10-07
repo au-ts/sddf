@@ -15,6 +15,17 @@
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 
+/* At the moment we run systems that contain this benchmarking code on architectures
+ * where we cannot properly do benchmarking. We also include the benchmarking PD
+ * on non-benchmarking configurations.
+ * This defines whether we actually try to benchmarking, setup the PMU etc.
+ */
+#if defined(CONFIG_ENABLE_BENCHMARKS) && defined(CONFIG_ARCH_ARM)
+#define ENABLE_BENCHMARKING 1
+#else
+#define ENABLE_BENCHMARKING 0
+#endif
+
 #define LOG_BUFFER_CAP 7
 
 __attribute__((__section__(".benchmark_config"))) benchmark_config_t benchmark_config;
@@ -149,7 +160,7 @@ void notified(microkit_channel ch)
     if (ch == serial_config.tx.id) {
         return;
     } else if (ch == benchmark_config.start_ch) {
-#if defined(MICROKIT_CONFIG_benchmark) && defined(CONFIG_ARCH_ARM)
+#if ENABLE_BENCHMARKING
         sel4bench_reset_counters();
         THREAD_MEMORY_RELEASE();
         sel4bench_start_counters(benchmark_bf);
@@ -163,7 +174,7 @@ void notified(microkit_channel ch)
 #endif
 #endif
     } else if (ch == benchmark_config.stop_ch) {
-#if defined(MICROKIT_CONFIG_benchmark) && defined(CONFIG_ARCH_ARM)
+#if ENABLE_BENCHMARKING
         sel4bench_get_counters(benchmark_bf, &counter_values[0]);
         sel4bench_stop_counters(benchmark_bf);
 
@@ -194,8 +205,8 @@ void init(void)
                       serial_config.tx.data.vaddr);
     serial_putchar_init(serial_config.tx.id, &serial_tx_queue_handle);
 
-#ifdef MICROKIT_CONFIG_benchmark
-    sddf_printf("BENCH|LOG: MICROKIT_CONFIG_benchmark defined\n");
+#if ENABLE_BENCHMARKING
+    sddf_printf("BENCH|LOG: ENABLE_BENCHMARKING defined\n");
 #ifndef CONFIG_ARCH_ARM
     sddf_printf("BENCH|LOG: System not running on ARM, benchmarking not implemented.\n");
 #endif
@@ -207,7 +218,7 @@ void init(void)
     sddf_printf("BENCH|LOG: CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES defined\n");
 #endif
 
-#if defined(MICROKIT_CONFIG_benchmark) && defined(CONFIG_ARCH_ARM)
+#if ENABLE_BENCHMARKING
     sel4bench_init();
     seL4_Word n_counters = sel4bench_get_num_counters();
     for (seL4_Word counter = 0; counter < MIN(n_counters, ARRAY_SIZE(benchmarking_events)); counter++) {
