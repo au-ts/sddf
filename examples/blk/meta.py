@@ -107,7 +107,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     blk_system.add_client(client, partition=partition)
 
     if board.name == "odroidc4":
-        gpio_mr = MemoryRegion("gpio", 0x1000, paddr=0xFF800000)
+        gpio_mr = MemoryRegion(sdf, name="gpio", size=0x1000, paddr=0xFF800000)
         blk_driver.add_map(Map(gpio_mr, 0xFF800000, "rw", cached=False))
         sdf.add_mr(gpio_mr)
 
