@@ -6,6 +6,7 @@ Files:
     flake.lock
     CHANGES.md
     build.zig.zon
+    ci/genmc/nix/cmake_install.patch
     docs/design/*
     examples/i2c/build.zig.zon
     examples/serial/build.zig.zon
