@@ -60,6 +60,7 @@
               gnumake
               inkscape
               gnuplot
+              which
             ];
           };
           # Shell for developing sDDF.
