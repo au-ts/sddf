@@ -23,4 +23,3 @@ index 5bb5c05..227c189 100644
 +install(TARGETS ${PROJECT_NAME} RUNTIME)
 
  target_link_libraries(${PROJECT_NAME} PRIVATE genmc_config_includes genmc_lib)
-
