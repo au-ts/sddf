@@ -49,7 +49,7 @@ void *consumer(void *p)
 
 int main()
 {
-    net_queue_t * free_queue = malloc(sizeof(net_queue_t) + sizeof(net_buff_desc_t) * QUEUE_SIZE);
+    net_queue_t *free_queue = malloc(sizeof(net_queue_t) + sizeof(net_buff_desc_t) * QUEUE_SIZE);
     if (free_queue == NULL) {
         exit(1);
     }
@@ -57,7 +57,7 @@ int main()
     free_queue->tail = 0;
     free_queue->consumer_signalled = 0;
 
-    net_queue_t * active_queue = malloc(sizeof(net_queue_t) + sizeof(net_buff_desc_t) * QUEUE_SIZE);
+    net_queue_t *active_queue = malloc(sizeof(net_queue_t) + sizeof(net_buff_desc_t) * QUEUE_SIZE);
     if (active_queue == NULL) {
         exit(1);
     }
