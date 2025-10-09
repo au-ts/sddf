@@ -12,7 +12,7 @@ from typing import BinaryIO, Union
 
 
 def reset_terminal():
-    OUTPUT.write(b"\n\x1b[0m")
+    OUTPUT.write(b"\x1b[0m")
 
 
 class TestRetryException(Exception):
