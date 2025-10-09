@@ -8,7 +8,7 @@ name: genmc
 on:
   pull_request:
   push:
-    branches: [ "main", "genmc" ]
+    branches: [ "main" ]
 
 jobs:
   test:
