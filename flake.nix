@@ -47,11 +47,41 @@
             pythonPackages = pkgs.python312Packages;
           };
 
+          clang-complete = (pkgs.symlinkJoin {
+            name = "clang-complete";
+            paths = llvm.clang-unwrapped.all;
+            meta.mainProgram = "clang";
+
+            # Clang searches up from the directory where it sits to find its built-in
+            # headers. The `symlinkJoin` creates a symlink to the clang binary, and that
+            # symlink is what ends up in your PATH from this shell. However, that symlink's
+            # destination, the clang binary file, still resides in its own nix store
+            # entry (`llvm.clang-unwrapped`), isolated from the header files (found in
+            # `llvm.clang-unwrapped.lib` under `lib/clang/18/include`). So when search up its
+            # parent directories, no built-in headers are found.
+            #
+            # By copying over the clang binary over the symlinks in the realisation of the
+            # `symlinkJoin`, we can fix this; now the search mechanism looks up the parent
+            # directories of the `clang` binary (which is a copy created by below command),
+            # until it finds the aforementioned `lib/clang/18/include` (where the `lib` is
+            # actually a symlink to `llvm.clang-unwrapped.lib + "/lib"`).
+            postBuild = ''
+              cp --remove-destination -- ${llvm.clang-unwrapped}/bin/* $out/bin/
+            '';
+          });
+
+          genmc = pkgs.callPackage ./tests/genmc/package.nix { inherit clang-complete; llvm = pkgs.llvmPackages_20.llvm; };
+
           pythonTool = pkgs.python312.withPackages (ps: [
             pysdfgen
           ]);
         in
         {
+          genmc = pkgs.mkShell rec {
+            nativeBuildInputs = [
+              genmc
+            ];
+          };
 
           # For building the design documnet
           docs = pkgs.mkShell rec {
@@ -60,7 +90,6 @@
               gnumake
               inkscape
               gnuplot
-              which
             ];
           };
           # Shell for developing sDDF.
@@ -93,29 +122,7 @@
               perl
               which
               gptfdisk
-
-              (symlinkJoin {
-                name = "clang-complete";
-                paths = llvm.clang-unwrapped.all;
-
-                # Clang searches up from the directory where it sits to find its built-in
-                # headers. The `symlinkJoin` creates a symlink to the clang binary, and that
-                # symlink is what ends up in your PATH from this shell. However, that symlink's
-                # destination, the clang binary file, still resides in its own nix store
-                # entry (`llvm.clang-unwrapped`), isolated from the header files (found in
-                # `llvm.clang-unwrapped.lib` under `lib/clang/18/include`). So when search up its
-                # parent directories, no built-in headers are found.
-                #
-                # By copying over the clang binary over the symlinks in the realisation of the
-                # `symlinkJoin`, we can fix this; now the search mechanism looks up the parent
-                # directories of the `clang` binary (which is a copy created by below command),
-                # until it finds the aforementioned `lib/clang/18/include` (where the `lib` is
-                # actually a symlink to `llvm.clang-unwrapped.lib + "/lib"`).
-                postBuild = ''
-                  cp --remove-destination -- ${llvm.clang-unwrapped}/bin/* $out/bin/
-                '';
-              })
-
+              clang-complete
               # for git-clang-format.
               llvm.libclang.python
               llvm.lld
