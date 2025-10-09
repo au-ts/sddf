@@ -70,7 +70,7 @@
             '';
           });
 
-          genmc = pkgs.callPackage ./tests/genmc/package.nix { inherit clang-complete; llvm = pkgs.llvmPackages_20.llvm; };
+          genmc = pkgs.callPackage ./ci/genmc/nix/package.nix { inherit clang-complete; llvm = pkgs.llvmPackages_20.llvm; };
 
           pythonTool = pkgs.python312.withPackages (ps: [
             pysdfgen

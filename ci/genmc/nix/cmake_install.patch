@@ -10,17 +10,17 @@ index 9ef8718..d4b474a 100644
 +set(INCLUDE_DIR "${PKG_INCLUDE_DIR}")
  set(SRC_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/include")
  set(RUST_DIR "${CMAKE_SOURCE_DIR}/rust")
- 
+
 diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
 index 5bb5c05..227c189 100644
 --- a/src/CMakeLists.txt
 +++ b/src/CMakeLists.txt
 @@ -104,7 +104,7 @@ endif()
- 
+
  ### GenMC executable
  add_executable(${PROJECT_NAME} main.cpp)
 -install(TARGETS ${PROJECT_NAME} RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}/${PROJECT_NAME})
 +install(TARGETS ${PROJECT_NAME} RUNTIME)
- 
+
  target_link_libraries(${PROJECT_NAME} PRIVATE genmc_config_includes genmc_lib)
- 
+
