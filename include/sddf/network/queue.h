@@ -41,18 +41,6 @@ typedef struct net_queue_handle {
 } net_queue_handle_t;
 
 /**
- * Get the number of buffers enqueued into a queue.
- *
- * @param queue queue handle for the queue to get the length of.
- *
- * @return number of buffers enqueued into a queue.
- */
-static inline uint16_t net_queue_length(net_queue_t *queue)
-{
-    return queue->tail - queue->head;
-}
-
-/**
  * Check if the free queue is empty.
  *
  * @param queue queue handle for the free queue to check.
@@ -61,7 +49,10 @@ static inline uint16_t net_queue_length(net_queue_t *queue)
  */
 static inline bool net_queue_empty_free(net_queue_handle_t *queue)
 {
-    return queue->free->tail - queue->free->head == 0;
+    uint16_t head = queue->free->head;
+    // the load-acquire will be paired with the store-released in net_enqueue_free() in the "synchronizes with" relation
+    uint16_t tail = __atomic_load_n(&queue->free->tail, __ATOMIC_ACQUIRE);
+    return tail - head == 0;
 }
 
 /**
@@ -73,7 +64,10 @@ static inline bool net_queue_empty_free(net_queue_handle_t *queue)
  */
 static inline bool net_queue_empty_active(net_queue_handle_t *queue)
 {
-    return queue->active->tail - queue->active->head == 0;
+    uint16_t head = queue->active->head;
+    // the load-acquire will be paired with the store-released in net_enqueue_active() in the "synchronizes with" relation
+    uint16_t tail = __atomic_load_n(&queue->active->tail, __ATOMIC_ACQUIRE);
+    return tail - head == 0;
 }
 
 /**
@@ -85,7 +79,10 @@ static inline bool net_queue_empty_active(net_queue_handle_t *queue)
  */
 static inline bool net_queue_full_free(net_queue_handle_t *queue)
 {
-    return queue->free->tail - queue->free->head == queue->capacity;
+    uint16_t tail = queue->free->tail;
+    // the load-acquire will be paired with the store-released in net_dequeue_free() in the "synchronizes with" relation
+    uint16_t head = __atomic_load_n(&queue->free->head, __ATOMIC_ACQUIRE);
+    return tail - head == queue->capacity;
 }
 
 /**
@@ -97,7 +94,10 @@ static inline bool net_queue_full_free(net_queue_handle_t *queue)
  */
 static inline bool net_queue_full_active(net_queue_handle_t *queue)
 {
-    return queue->active->tail - queue->active->head == queue->capacity;
+    uint16_t tail = queue->active->tail;
+    // the load-acquire will be paired with the store-released in net_dequeue_active() in the "synchronizes with" relation
+    uint16_t head = __atomic_load_n(&queue->active->head, __ATOMIC_ACQUIRE);
+    return tail - head == queue->capacity;
 }
 
 /**
@@ -115,10 +115,9 @@ static inline int net_enqueue_free(net_queue_handle_t *queue, net_buff_desc_t bu
     }
 
     queue->free->buffers[queue->free->tail % queue->capacity] = buffer;
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
-    THREAD_MEMORY_RELEASE();
-#endif
-    queue->free->tail++;
+
+    // the store-release will synchronise with the load-acquire in net_queue_empty_free()
+    __atomic_store_n(&queue->free->tail, queue->free->tail + 1, __ATOMIC_RELEASE);
 
     return 0;
 }
@@ -138,10 +137,9 @@ static inline int net_enqueue_active(net_queue_handle_t *queue, net_buff_desc_t 
     }
 
     queue->active->buffers[queue->active->tail % queue->capacity] = buffer;
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
-    THREAD_MEMORY_RELEASE();
-#endif
-    queue->active->tail++;
+
+    // the store-release will synchronise with the load-acquire in net_queue_empty_active()
+    __atomic_store_n(&queue->active->tail, queue->active->tail + 1, __ATOMIC_RELEASE);
 
     return 0;
 }
@@ -161,10 +159,9 @@ static inline int net_dequeue_free(net_queue_handle_t *queue, net_buff_desc_t *b
     }
 
     *buffer = queue->free->buffers[queue->free->head % queue->capacity];
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
-    THREAD_MEMORY_RELEASE();
-#endif
-    queue->free->head++;
+
+    // the store-release will synchronise with the load-acquire in net_queue_full_free()
+    __atomic_store_n(&queue->free->head, queue->free->head + 1, __ATOMIC_RELEASE);
 
     return 0;
 }
@@ -184,10 +181,9 @@ static inline int net_dequeue_active(net_queue_handle_t *queue, net_buff_desc_t 
     }
 
     *buffer = queue->active->buffers[queue->active->head % queue->capacity];
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
-    THREAD_MEMORY_RELEASE();
-#endif
-    queue->active->head++;
+
+    // the store-release will synchronise with the load-acquire in net_queue_full_active()
+    __atomic_store_n(&queue->active->head, queue->active->head + 1, __ATOMIC_RELEASE);
 
     return 0;
 }
@@ -216,7 +212,7 @@ static inline void net_queue_init(net_queue_handle_t *queue, net_queue_t *free, 
 static inline void net_buffers_init(net_queue_handle_t *queue, uintptr_t base_addr)
 {
     for (uint32_t i = 0; i < queue->capacity; i++) {
-        net_buff_desc_t buffer = {(NET_BUFFER_SIZE * i) + base_addr, 0};
+        net_buff_desc_t buffer = { (NET_BUFFER_SIZE * i) + base_addr, 0 };
         int err = net_enqueue_free(queue, buffer);
         assert(!err);
     }

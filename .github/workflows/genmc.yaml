@@ -1,0 +1,22 @@
+# Copyright 2025, UNSW
+# SPDX-License-Identifier: BSD-2-Clause
+
+# Run genmc tests
+
+name: genmc
+
+on:
+  pull_request:
+  push:
+    branches: [ "main", "genmc" ]
+
+jobs:
+  test:
+    name: Test
+    runs-on: [self-hosted, macos, ARM64]
+    steps:
+      - uses: actions/checkout@v5
+      - name: Get Nix dependencies
+        run: nix develop .#genmc -c bash -c 'echo Hello World'
+      - name: Test genmc
+        run: nix develop .#genmc --ignore-environment -c bash -c './ci/genmc/genmc.sh'
