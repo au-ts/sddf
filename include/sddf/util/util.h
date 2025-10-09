@@ -10,18 +10,13 @@
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(x[0]))
 #endif
+
+#ifndef
 #define ALIGN(x, align)   (((x) + (align) - 1) & ~((align) - 1))
+#endif
 
 #ifndef BIT
 #define BIT(nr) (1UL << (nr))
-#endif
-
-#ifdef __GNUC__
-#define likely(x)   __builtin_expect(!!(x), 1)
-#define unlikely(x) __builtin_expect(!!(x), 0)
-#else
-#define likely(x)   (!!(x))
-#define unlikely(x) (!!(x))
 #endif
 
 #ifndef BYTE_ORDER
