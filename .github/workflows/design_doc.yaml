@@ -19,7 +19,7 @@ jobs:
       - name: Compile document
         run: |
           cd docs/design
-          nix-shell -p texliveFull gnumake inkscape gnuplot --command 'make'
+          nix develop .#docs --ignore-environment -c bash -c 'make'
       - name: Upload PDF
         uses: actions/upload-artifact@v4
         with:
