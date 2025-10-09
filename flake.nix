@@ -26,28 +26,37 @@
       forAllSystems = with nixpkgs.lib; genAttrs (builtins.attrNames microkit-platforms);
     in
     {
-      # Shell for developing sDDF.
-      # Includes dependencies for building sDDF and its
-      # examples.
       devShells = forAllSystems
-        (system: {
-          default =
-            let
-              pkgs = import nixpkgs {
-                inherit system;
-              };
+        (system:
+          let
+            pkgs = import nixpkgs {
+              inherit system;
+            };
 
-              llvm = pkgs.llvmPackages_18;
-              zig = zig-overlay.packages.${system}."0.15.1";
+            llvm = pkgs.llvmPackages_18;
+            zig = zig-overlay.packages.${system}."0.15.1";
 
-              pysdfgen = sdfgen.packages.${system}.pysdfgen.override { zig = zig; pythonPackages = pkgs.python312Packages; };
+            pysdfgen = sdfgen.packages.${system}.pysdfgen.override { zig = zig; pythonPackages = pkgs.python312Packages; };
 
-              pythonTool = pkgs.python312.withPackages (ps: [
-                pysdfgen
-              ]);
-            in
+            pythonTool = pkgs.python312.withPackages (ps: [
+              pysdfgen
+            ]);
+          in
+            {
+
+            # For building the design documnet
+            docs = pkgs.mkShell rec {
+              nativeBuildInputs = with pkgs; [
+                texliveFull
+                gnumake
+                inkscape
+                gnuplot
+              ];
+            };
+            # Shell for developing sDDF.
+            # Includes dependencies for building sDDF and its examples.
             # mkShellNoCC, because we do not want the cc from stdenv to leak into this shell
-            pkgs.mkShellNoCC rec {
+            default = pkgs.mkShellNoCC rec {
               name = "sddf-dev";
 
               microkit-platform = microkit-platforms.${system} or (throw "Unsupported system: ${system}");
