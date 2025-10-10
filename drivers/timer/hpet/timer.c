@@ -7,6 +7,7 @@
 #include <microkit.h>
 #include <sddf/util/printf.h>
 #include <sddf/resources/device.h>
+#include <sddf/timer/protocol.h>
 
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
@@ -101,9 +102,9 @@ uintptr_t HPET_REGION = 0x50000000;
 volatile hpet_timer_t *timer_0;
 uint64_t tick_period_fs; // main counter tick period in femtoseconds
 
-#define MAX_CLIENTS 6
+#define MAX_TIMEOUTS 6
 
-uint64_t client_timeout[MAX_CLIENTS];
+uint64_t timeouts[MAX_TIMEOUTS];
 uint64_t next_timeout = UINT64_MAX;
 
 uint64_t ns_to_ticks(uint64_t ns)
@@ -130,6 +131,23 @@ void set_timeout(uint64_t timeout)
     __atomic_signal_fence(__ATOMIC_RELEASE);
 }
 
+static void process_timeouts(uint64_t curr_time)
+{
+    uint64_t next_timeout = UINT64_MAX;
+    for (int i = 0; i < MAX_TIMEOUTS; i++) {
+        if (timeouts[i] <= curr_time) {
+            sddf_notify(i);
+            timeouts[i] = UINT64_MAX;
+        } else if (timeouts[i] < next_timeout) {
+            next_timeout = timeouts[i];
+        }
+    }
+
+    if (next_timeout != UINT64_MAX) {
+        set_timeout(next_timeout);
+    }
+}
+
 void init(void)
 {
     volatile uint64_t cap = *((uint64_t *)HPET_REGION + CAP_ID_REG);
@@ -145,8 +163,8 @@ void init(void)
     __atomic_signal_fence(__ATOMIC_ACQ_REL);
 
     next_timeout = UINT64_MAX;
-    for (int i = 0; i < MAX_CLIENTS; i++) {
-        client_timeout[i] = UINT64_MAX;
+    for (int i = 0; i < MAX_TIMEOUTS; i++) {
+        timeouts[i] = UINT64_MAX;
     }
 
     microkit_deferred_irq_ack(IRQ_CH);
@@ -165,13 +183,9 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
     case 1: {
         uint64_t delta = microkit_mr_get(0);
         uint64_t now = get_time();
-        uint64_t timeout = now + delta;
 
-        client_timeout[ch] = timeout;
-        if (timeout < next_timeout) {
-            next_timeout = timeout;
-            set_timeout(timeout);
-        }
+        timeouts[ch] = now + delta;
+        process_timeouts(now);
         return microkit_msginfo_new(0, 0);
     }
 
@@ -188,18 +202,6 @@ void notified(microkit_channel ch)
 
     microkit_deferred_irq_ack(IRQ_CH);
 
-    next_timeout = UINT64_MAX;
     uint64_t now = get_time();
-    for (int i = 0; i < MAX_CLIENTS; i++) {
-        if (client_timeout[i] <= now) {
-            client_timeout[i] = UINT64_MAX;
-            microkit_notify(i);
-        } else if (client_timeout[i] < next_timeout) {
-            next_timeout = client_timeout[i];
-        }
-    }
-
-    if (next_timeout != UINT64_MAX) {
-        set_timeout(next_timeout);
-    }
+    process_timeouts(now);
 }
