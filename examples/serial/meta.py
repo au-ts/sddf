@@ -1,104 +1,20 @@
 # Copyright 2025, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
+import sys, os
 import argparse
 from typing import List
 from dataclasses import dataclass
 from sdfgen import SystemDescription, Sddf, DeviceTree
 from importlib.metadata import version
 
+sys.path.append(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../tools/meta")
+)
+from board import BOARDS
+
 assert version("sdfgen").split(".")[1] == "27", "Unexpected sdfgen version"
 
 ProtectionDomain = SystemDescription.ProtectionDomain
-
-
-@dataclass
-class Board:
-    name: str
-    arch: SystemDescription.Arch
-    paddr_top: int
-    serial: str
-
-
-BOARDS: List[Board] = [
-    Board(
-        name="qemu_virt_aarch64",
-        arch=SystemDescription.Arch.AARCH64,
-        paddr_top=0x6_0000_000,
-        serial="pl011@9000000",
-    ),
-    Board(
-        name="qemu_virt_riscv64",
-        arch=SystemDescription.Arch.RISCV64,
-        paddr_top=0xA0000000,
-        serial="soc/serial@10000000",
-    ),
-    Board(
-        name="odroidc2",
-        arch=SystemDescription.Arch.AARCH64,
-        paddr_top=0x80000000,
-        serial="soc/bus@c8100000/serial@4c0",
-    ),
-    Board(
-        name="odroidc4",
-        arch=SystemDescription.Arch.AARCH64,
-        paddr_top=0x80000000,
-        serial="soc/bus@ff800000/serial@3000",
-    ),
-    Board(
-        name="maaxboard",
-        arch=SystemDescription.Arch.AARCH64,
-        paddr_top=0xA_000_000,
-        serial="soc@0/bus@30800000/serial@30860000",
-    ),
-    Board(
-        name="imx8mm_evk",
-        arch=SystemDescription.Arch.AARCH64,
-        paddr_top=0xA_000_000,
-        serial="soc@0/bus@30800000/spba-bus@30800000/serial@30890000",
-    ),
-    Board(
-        name="imx8mp_evk",
-        arch=SystemDescription.Arch.AARCH64,
-        paddr_top=0xA_000_000,
-        serial="soc@0/bus@30800000/spba-bus@30800000/serial@30890000",
-    ),
-    Board(
-        name="imx8mq_evk",
-        arch=SystemDescription.Arch.AARCH64,
-        paddr_top=0xA_000_000,
-        serial="soc@0/bus@30800000/serial@30860000",
-    ),
-    Board(
-        name="rpi4b_1gb",
-        arch=SystemDescription.Arch.AARCH64,
-        paddr_top=0x2_000_000,
-        serial="soc/serial@7e215040",
-    ),
-    Board(
-        name="zcu102",
-        arch=SystemDescription.Arch.AARCH64,
-        paddr_top=0xF_000_0000,
-        serial="axi/serial@ff000000",
-    ),
-    Board(
-        name="star64",
-        arch=SystemDescription.Arch.RISCV64,
-        paddr_top=0x100000000,
-        serial="soc/serial@10000000",
-    ),
-    Board(
-        name="cheshire",
-        arch=SystemDescription.Arch.RISCV64,
-        paddr_top=0x90000000,
-        serial="soc/serial@3002000",
-    ),
-    Board(
-        name="hifive_p550",
-        arch=SystemDescription.Arch.RISCV64,
-        paddr_top=0xA0000000,
-        serial="soc/serial@0x50900000",
-    ),
-]
 
 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):

@@ -15,45 +15,35 @@ ifeq ($(strip $(TOOLCHAIN)),)
 	TOOLCHAIN := clang
 endif
 
-ifeq (${MICROKIT_BOARD},odroidc4)
-	I2C_DRIVER_DIR := meson
-	TIMER_DRIVER_DIR := meson
-	SERIAL_DRIVER_DIR := meson
-	CPU := cortex-a55
-else
-$(error Unsupported MICROKIT_BOARD)
-endif
+PYTHONPATH := ${SDDF}/tools/meta:${PYTHONPATH}
+export PYTHONPATH
 
-BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
-ARCH := ${shell grep 'CONFIG_SEL4_ARCH  ' $(BOARD_DIR)/include/kernel/gen_config.h | cut -d' ' -f4}
+SUPPORTED_BOARDS := odroidc4
+
+include ${SDDF}/tools/make/board/common.mk
+
 SDDF_CUSTOM_LIBC := 1
-
-CC := clang -target aarch64-none-elf
-LD := ld.lld
-AR := llvm-ar
-RANLIB := llvm-ranlib
-OBJCOPY := llvm-objcopy
-
-PYTHON ?= python3
-DTC := dtc
-
-MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
-
 UTIL := $(SDDF)/util
 LIBCO := $(SDDF)/libco
 TOP := ${SDDF}/examples/i2c
 I2C := $(SDDF)/i2c
 SERIAL := $(SDDF)/serial
-I2C_DRIVER := $(SDDF)/drivers/i2c/${I2C_DRIVER_DIR}
-TIMER_DRIVER := $(SDDF)/drivers/timer/${TIMER_DRIVER_DIR}
-SERIAL_DRIVER := $(SDDF)/drivers/serial/${SERIAL_DRIVER_DIR}
+I2C_DRIVER := $(SDDF)/drivers/i2c/${I2C_DRIV_DIR}
+TIMER_DRIVER := $(SDDF)/drivers/timer/${TIMER_DRIV_DIR}
+SERIAL_DRIVER := $(SDDF)/drivers/serial/${UART_DRIV_DIR}
 PN532_DRIVER := $(SDDF)/i2c/devices/pn532
 DS3231_DRIVER := $(SDDF)/i2c/devices/ds3231
 
-IMAGES := i2c_virt.elf i2c_driver.elf client_pn532.elf client_ds3231.elf timer_driver.elf serial_driver.elf serial_virt_tx.elf
-CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall -Werror -Wno-unused-function -I${TOP}
+IMAGES := i2c_virt.elf \
+	  i2c_driver.elf \
+	  client_pn532.elf \
+	  client_ds3231.elf \
+	  timer_driver.elf \
+	  serial_driver.elf \
+	  serial_virt_tx.elf
 LDFLAGS := -L$(BOARD_DIR)/lib
 LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
+CFLAGS +=  -Wno-unused-function -I${TOP}
 
 IMAGE_FILE = loader.img
 REPORT_FILE = report.txt
@@ -86,9 +76,6 @@ client_pn532.elf: $(CLIENT_PN532_OBJS) libco.a libsddf_util.a libi2c.a
 client_ds3231.elf: $(CLIENT_DS3231_OBJS) libco.a libsddf_util.a libi2c.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-$(DTB): $(DTS)
-	$(DTC) -q -I dts -O dtb $(DTS) > $(DTB)
-
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE)
 	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
@@ -104,6 +91,7 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx.data serial_virt_tx.elf
 	$(OBJCOPY) --update-section .serial_client_config=serial_client_client_pn532.data client_pn532.elf
 	$(OBJCOPY) --update-section .serial_client_config=serial_client_client_ds3231.data client_ds3231.elf
+	touch $@
 
 $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
