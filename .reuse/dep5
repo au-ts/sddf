@@ -4,6 +4,8 @@ Source: https://github.com/au-ts/sddf
 
 Files:
     flake.lock
+    *Cargo.lock
+    *aarch64-sel4-microkit-minimal.json
     CHANGES.md
     build.zig.zon
     docs/design/*
@@ -34,6 +36,7 @@ Files:
     drivers/timer/goldfish/config.json
     drivers/timer/cdns/config.json
     drivers/timer/bcm2835/config.json
+    drivers/blk/mmc/core/config.json
 Copyright: UNSW
 License: BSD-2-Clause
 
