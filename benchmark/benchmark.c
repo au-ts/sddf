@@ -15,17 +15,6 @@
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 
-/* At the moment we run systems that contain this benchmarking code on architectures
- * where we cannot properly do benchmarking. We also include the benchmarking PD
- * on non-benchmarking configurations.
- * This defines whether we actually try to benchmark, setup the PMU etc.
- */
-#if defined(CONFIG_ENABLE_BENCHMARKS) && defined(CONFIG_ARCH_ARM)
-#define ENABLE_BENCHMARKING 1
-#else
-#define ENABLE_BENCHMARKING 0
-#endif
-
 #define LOG_BUFFER_CAP 7
 
 __attribute__((__section__(".benchmark_config"))) benchmark_config_t benchmark_config;

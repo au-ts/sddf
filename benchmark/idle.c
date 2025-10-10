@@ -20,7 +20,7 @@ struct bench *b;
 
 void count_idle(void)
 {
-#if defined(MICROKIT_CONFIG_benchmark) && defined(CONFIG_ARCH_ARM)
+#if ENABLE_BENCHMARKING
     uint64_t val;
     SEL4BENCH_READ_CCNT(val);
     b->prev = val;

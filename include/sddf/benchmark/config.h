@@ -8,6 +8,17 @@
 #include <os/sddf.h>
 #include <stdint.h>
 
+/* At the moment we run systems that contain this benchmarking code on architectures
+ * where we cannot properly do benchmarking. We also include the benchmarking PD
+ * on non-benchmarking configurations.
+ * This defines whether we actually try to benchmark, setup the PMU etc.
+ */
+#if defined(CONFIG_ENABLE_BENCHMARKS) && defined(CONFIG_ARCH_ARM)
+#define ENABLE_BENCHMARKING 1
+#else
+#define ENABLE_BENCHMARKING 0
+#endif
+
 #define BENCHMARK_MAX_CHILDREN 64 // TODO: Can we have a higher upper bound on this?
 
 typedef struct benchmark_child_config {
