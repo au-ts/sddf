@@ -11,24 +11,26 @@ UDP_ECHO_PORT = 1235
 TCP_ECHO_PORT = 1237
 
 
-def udp(ip: str):
+def udp(ip: str) -> bool:
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     server_port = UDP_ECHO_PORT
     s.connect((ip, server_port))
     message = "Hello World"
     s.send(message.encode())
     response = s.recv(1024).decode()
-    print("SUCCESS: Received UDP response" if message == response else "UDP failed")
+
+    return message == response
 
 
-def tcp(ip: str):
+def tcp(ip: str) -> bool:
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_port = TCP_ECHO_PORT
     s.connect((ip, server_port))
     message = "Hello World"
     s.send(message.encode())
     response = s.recv(1024).decode()
-    print("SUCCESS: Received TCP response" if message == response else "TCP failed")
+
+    return message == response
 
 
 if __name__ == "__main__":
@@ -36,5 +38,12 @@ if __name__ == "__main__":
     parser.add_argument("ip")
     args = parser.parse_args()
 
-    udp(args.ip)
-    tcp(args.ip)
+    if udp(args.ip):
+        print("SUCCESS: Received UDP response")
+    else:
+        print("ERROR: UDP failed")
+
+    if tcp(args.ip):
+        print("SUCCESS: Received TCP response")
+    else:
+        print("ERROR: TCP failed")
