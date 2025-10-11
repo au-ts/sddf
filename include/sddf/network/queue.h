@@ -50,8 +50,16 @@ typedef struct net_queue_handle {
 static inline bool net_queue_empty_free(net_queue_handle_t *queue)
 {
     uint16_t head = queue->free->head;
-    // the load-acquire will be paired with the store-released in net_enqueue_free() in the "synchronizes with" relation
+#ifdef CONFIG_ENABLE_SMP_SUPPORT
+    // the load-acquire will be paired with the store-released
+    // in net_enqueue_free() in the "synchronizes with" relation
     uint16_t tail = __atomic_load_n(&queue->free->tail, __ATOMIC_ACQUIRE);
+#else
+    uint16_t tail = __atomic_load_n(&queue->free->tail, __ATOMIC_RELAXED);
+    // the compiler acquire fence will be paired with the compiler release fence
+    // in net_enqueue_free() in the "synchronizes with" relation
+    __atomic_signal_fence(__ATOMIC_ACQUIRE);
+#endif
     return tail - head == 0;
 }
 
@@ -65,8 +73,16 @@ static inline bool net_queue_empty_free(net_queue_handle_t *queue)
 static inline bool net_queue_empty_active(net_queue_handle_t *queue)
 {
     uint16_t head = queue->active->head;
-    // the load-acquire will be paired with the store-released in net_enqueue_active() in the "synchronizes with" relation
+#ifdef CONFIG_ENABLE_SMP_SUPPORT
+    // the load-acquire will be paired with the store-released
+    // in net_enqueue_active() in the "synchronizes with" relation
     uint16_t tail = __atomic_load_n(&queue->active->tail, __ATOMIC_ACQUIRE);
+#else
+    uint16_t tail = __atomic_load_n(&queue->active->tail, __ATOMIC_RELAXED);
+    // the compiler acquire fence will be paired with the compiler release fence
+    // in net_enqueue_active() in the "synchronizes with" relation
+    __atomic_signal_fence(__ATOMIC_ACQUIRE);
+#endif
     return tail - head == 0;
 }
 
@@ -80,8 +96,16 @@ static inline bool net_queue_empty_active(net_queue_handle_t *queue)
 static inline bool net_queue_full_free(net_queue_handle_t *queue)
 {
     uint16_t tail = queue->free->tail;
-    // the load-acquire will be paired with the store-released in net_dequeue_free() in the "synchronizes with" relation
+#ifdef CONFIG_ENABLE_SMP_SUPPORT
+    // the load-acquire will be paired with the store-released
+    // in net_dequeue_free() in the "synchronizes with" relation
     uint16_t head = __atomic_load_n(&queue->free->head, __ATOMIC_ACQUIRE);
+#else
+    uint16_t head = __atomic_load_n(&queue->free->head, __ATOMIC_RELAXED);
+    // the compiler acquire fence will be paired with the compiler release fence
+    // in net_dequeue_free() in the "synchronizes with" relation
+    __atomic_signal_fence(__ATOMIC_ACQUIRE);
+#endif
     return tail - head == queue->capacity;
 }
 
@@ -95,8 +119,16 @@ static inline bool net_queue_full_free(net_queue_handle_t *queue)
 static inline bool net_queue_full_active(net_queue_handle_t *queue)
 {
     uint16_t tail = queue->active->tail;
-    // the load-acquire will be paired with the store-released in net_dequeue_active() in the "synchronizes with" relation
+#ifdef CONFIG_ENABLE_SMP_SUPPORT
+    // the load-acquire will be paired with the store-released
+    // in net_dequeue_active() in the "synchronizes with" relation
     uint16_t head = __atomic_load_n(&queue->active->head, __ATOMIC_ACQUIRE);
+#else
+    uint16_t head = __atomic_load_n(&queue->active->head, __ATOMIC_RELAXED);
+    // the compiler acquire fence will be paired with the compiler release fence
+    // in net_dequeue_active() in the "synchronizes with" relation
+    __atomic_signal_fence(__ATOMIC_ACQUIRE);
+#endif
     return tail - head == queue->capacity;
 }
 
@@ -116,8 +148,16 @@ static inline int net_enqueue_free(net_queue_handle_t *queue, net_buff_desc_t bu
 
     queue->free->buffers[queue->free->tail % queue->capacity] = buffer;
 
-    // the store-release will synchronise with the load-acquire in net_queue_empty_free()
+#ifdef CONFIG_ENABLE_SMP_SUPPORT
+    // the store-release will synchronise with the load-acquire
+    // in net_queue_empty_free()
     __atomic_store_n(&queue->free->tail, queue->free->tail + 1, __ATOMIC_RELEASE);
+#else
+    // the compiler release fence will synchronise with the compiler acquire fence
+    // in net_queue_empty_free()
+    __atomic_signal_fence(__ATOMIC_RELEASE);
+    __atomic_store_n(&queue->free->tail, queue->free->tail + 1, __ATOMIC_RELAXED);
+#endif
 
     return 0;
 }
@@ -138,8 +178,16 @@ static inline int net_enqueue_active(net_queue_handle_t *queue, net_buff_desc_t 
 
     queue->active->buffers[queue->active->tail % queue->capacity] = buffer;
 
-    // the store-release will synchronise with the load-acquire in net_queue_empty_active()
+#ifdef CONFIG_ENABLE_SMP_SUPPORT
+    // the store-release will synchronise with the load-acquire
+    // in net_queue_empty_active()
     __atomic_store_n(&queue->active->tail, queue->active->tail + 1, __ATOMIC_RELEASE);
+#else
+    // the compiler release fence will synchronise with the compiler acquire fence
+    // in net_queue_empty_active()
+    __atomic_signal_fence(__ATOMIC_RELEASE);
+    __atomic_store_n(&queue->active->tail, queue->active->tail + 1, __ATOMIC_RELAXED);
+#endif
 
     return 0;
 }
@@ -160,8 +208,16 @@ static inline int net_dequeue_free(net_queue_handle_t *queue, net_buff_desc_t *b
 
     *buffer = queue->free->buffers[queue->free->head % queue->capacity];
 
-    // the store-release will synchronise with the load-acquire in net_queue_full_free()
+#ifdef CONFIG_ENABLE_SMP_SUPPORT
+    // the store-release will synchronise with the load-acquire
+    // in net_queue_full_free()
     __atomic_store_n(&queue->free->head, queue->free->head + 1, __ATOMIC_RELEASE);
+#else
+    // the compiler release fence will synchronise with the compiler acquire fence
+    // in net_queue_full_free()
+    __atomic_signal_fence(__ATOMIC_RELEASE);
+    __atomic_store_n(&queue->free->head, queue->free->head + 1, __ATOMIC_RELAXED);
+#endif
 
     return 0;
 }
@@ -182,8 +238,16 @@ static inline int net_dequeue_active(net_queue_handle_t *queue, net_buff_desc_t 
 
     *buffer = queue->active->buffers[queue->active->head % queue->capacity];
 
-    // the store-release will synchronise with the load-acquire in net_queue_full_active()
+#ifdef CONFIG_ENABLE_SMP_SUPPORT
+    // the store-release will synchronise with the load-acquire
+    // in net_queue_full_active()
     __atomic_store_n(&queue->active->head, queue->active->head + 1, __ATOMIC_RELEASE);
+#else
+    // the compiler release fence will synchronise with the compiler acquire fence
+    // in net_queue_full_active()
+    __atomic_signal_fence(__ATOMIC_RELEASE);
+    __atomic_store_n(&queue->active->head, queue->active->head + 1, __ATOMIC_RELAXED);
+#endif
 
     return 0;
 }
