@@ -38,6 +38,3 @@ Porting the driver to a new hardware platform involves implementing the hardware
 2.  **Implement the HAL:** Create a new hardware abstraction layer (HAL) for your platform by implementing the `SdmmcHardware` trait. This trait defines the interface for all hardware-specific operations.
 3.  **Build with Logging:** Compile your HAL and the core protocol crate with the `dev-logs` feature enabled to get detailed diagnostic output.
 4.  **Test and Verify:** Run the driver on your hardware. Analyze the logs to verify that the initialization sequence and command responses are correct.
-
----
-*This README was authored by the project maintainer and refined for clarity with assistance from Google's Gemini. All technical information was written and verified by the author.*
