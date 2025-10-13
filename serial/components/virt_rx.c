@@ -16,6 +16,9 @@ __attribute__((__section__(".serial_virt_rx_config"))) serial_virt_rx_config_t c
 serial_queue_handle_t rx_queue_handle_drv;
 serial_queue_handle_t rx_queue_handle_cli[SDDF_SERIAL_MAX_CLIENTS];
 
+// #define SWITCHING_DISABLED 0
+#define SWITCHING_DISABLED 1
+
 #define MAX_CLI_BASE_10 4
 typedef enum mode {normal, switched, number} mode_t;
 
@@ -39,7 +42,7 @@ void rx_return(void)
     while (!serial_dequeue(&rx_queue_handle_drv, &c)) {
         switch (current_mode) {
         case normal:
-            if (c == config.switch_char) {
+            if (!SWITCHING_DISABLED && c == config.switch_char) {
                 current_mode = switched;
             } else {
                 if (!serial_enqueue_local(&rx_queue_handle_cli[current_client], &local_tail, c)) {
@@ -53,7 +56,7 @@ void rx_return(void)
                 next_client_index++;
                 current_mode = number;
             } else {
-                if (c == config.switch_char) {
+                if (!SWITCHING_DISABLED && c == config.switch_char) {
                     if (!serial_enqueue_local(&rx_queue_handle_cli[current_client], &local_tail, c)) {
                         transferred = true;
                     }
