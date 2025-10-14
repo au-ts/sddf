@@ -27,7 +27,7 @@
     <protection_domain name="thermal_governor" priority="1" >
         <program_image path="thermal_governor.elf" />
     </protection_domain>
-    
+
     <channel>
         <end pd="thermal_governor" id="0" pp="true"/>
         <end pd="thermal_sensor_driver" id="0"/>

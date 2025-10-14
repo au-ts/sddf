@@ -160,7 +160,7 @@ impl ThermalSensor {
             panic!("Thermal reply does not contain temperature!")
         }
     }
-    
+
     /// Sets the high-temperature alarm threshold for a specific sensor channel.
     ///
     // When the sensor's reading surpasses this value, the driver will issue a
