@@ -358,13 +358,13 @@ static void rx_return(void)
 void init(void)
 {
     // Enable MSI, refer to https://www.intel.com/content/www/us/en/docs/programmable/683488/16-0/msi-registers.html
-    set_flags16(PCI_COMMAND_16, BIT(10));
-    set_flags16(PCI_MSI_MESSAGE_CONTROL_16, BIT(0));
-    clear_flags16(PCI_MSI_MESSAGE_CONTROL_16, BIT(4) | BIT(5) | BIT(6));
-    set_reg(PCI_MSI_MESSAGE_ADDRESS_LOW, 0xFEEu << 20);
-    set_reg(PCI_MSI_MESSAGE_ADDRESS_HIGH, 0);
-    set_reg16(PCI_MSI_MESSAGE_DATA_16, 0x31);
-    clear_flags16(PCI_MSI_MASK, BIT(0));
+    /* set_flags16(PCI_COMMAND_16, BIT(10)); */
+    /* set_flags16(PCI_MSI_MESSAGE_CONTROL_16, BIT(0)); */
+    /* clear_flags16(PCI_MSI_MESSAGE_CONTROL_16, BIT(4) | BIT(5) | BIT(6)); */
+    /* set_reg(PCI_MSI_MESSAGE_ADDRESS_LOW, 0xFEEu << 20); */
+    /* set_reg(PCI_MSI_MESSAGE_ADDRESS_HIGH, 0); */
+    /* set_reg16(PCI_MSI_MESSAGE_DATA_16, 0x31); */
+    /* clear_flags16(PCI_MSI_MASK, BIT(0)); */
 
     /* sddf_dprintf("\n"); */
     /* sddf_dprintf("NIC vendor_id: 0x%x\n", get_reg16(0x3100000)); */
