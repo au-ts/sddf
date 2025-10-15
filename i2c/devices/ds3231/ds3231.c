@@ -64,7 +64,7 @@ int ds3231_write(uint8_t *data, uint16_t data_len, size_t retries)
             data_region_buf[i] = data[i];
         }
 
-        int error = i2c_write(&libi2c_conf, DS3231_I2C_BUS_ADDRESS, data_region_buf, data_len);
+        int error = sddf_i2c_write(&libi2c_conf, DS3231_I2C_BUS_ADDRESS, data_region_buf, data_len);
         if (!error) {
             return error;
         }
@@ -84,8 +84,8 @@ int ds3231_read(uint8_t *data_region_data, i2c_addr_t reg_addr, uint16_t data_le
         if (attempts == retries)
             return -1;
         // Set register address
-        int error = i2c_writeread(&libi2c_conf, DS3231_I2C_BUS_ADDRESS, reg_addr, (uint8_t *)(data_region_data),
-                                  data_len);
+        int error = sddf_i2c_writeread(&libi2c_conf, DS3231_I2C_BUS_ADDRESS, reg_addr, (uint8_t *)(data_region_data),
+                                       data_len);
         if (!error) {
             return error;
         }

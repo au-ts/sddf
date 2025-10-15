@@ -27,7 +27,7 @@ static inline int check_data_buf(void *data_buf)
 {
     if ((uintptr_t)data_buf < (uintptr_t)I2C_DATA_REGION
         || (uintptr_t)data_buf > ((uintptr_t)I2C_DATA_REGION + i2c_config.data.size)) {
-        LOG_LIBI2C_ERR("i2c_write called with data_buf not in data region!");
+        LOG_LIBI2C_ERR("sddf_i2c_write called with data_buf not in data region!");
         return -1;
     }
     return 0;
@@ -123,18 +123,18 @@ i2c_dispatch_fail:
  * This is a blocking function call.
  * @return -1 if queue ops fail, positive value corresponding to i2c_err_t, or 0 if successful.
  */
-int i2c_write(libi2c_conf_t *conf, i2c_addr_t address, void *write_buf, uint16_t len)
+int sddf_i2c_write(libi2c_conf_t *conf, i2c_addr_t address, void *write_buf, uint16_t len)
 {
     return __i2c_dispatch(conf, address, write_buf, len, I2C_FLAG_STOP);
 }
 
 /**
  * Perform a simple I2C read given a DATA region buffer to store result.
- * To perform a read to a device register, use i2c_writeread!
+ * To perform a read to a device register, use sddf_i2c_writeread!
  * This is a blocking function call.
  * @return -1 if queue ops fail, positive value corresponding to i2c_err_t, or 0 if successful.
  */
-int i2c_read(libi2c_conf_t *conf, i2c_addr_t address, void *read_buf, uint16_t len)
+int sddf_i2c_read(libi2c_conf_t *conf, i2c_addr_t address, void *read_buf, uint16_t len)
 {
     return __i2c_dispatch(conf, address, read_buf, len, I2C_FLAG_STOP | I2C_FLAG_READ);
 }
@@ -145,7 +145,7 @@ int i2c_read(libi2c_conf_t *conf, i2c_addr_t address, void *read_buf, uint16_t l
  * This is a blocking function call.
  * @return -1 if queue ops fail, positive value corresponding to i2c_err_t, or 0 if successful.
  */
-int i2c_writeread(libi2c_conf_t *conf, i2c_addr_t address, i2c_addr_t reg_address, void *read_buf, uint16_t len)
+int sddf_i2c_writeread(libi2c_conf_t *conf, i2c_addr_t address, i2c_addr_t reg_address, void *read_buf, uint16_t len)
 {
     // Check that supplied buffer is within bounds of data region
     if (check_data_buf(read_buf)) {

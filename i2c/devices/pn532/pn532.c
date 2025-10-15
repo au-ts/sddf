@@ -68,7 +68,7 @@ uint8_t read_ack_frame(unsigned retries)
     while (attempts < retries) {
         LOG_PN532("\t## %d \n", attempts);
         // Start: read FRAME_SIZE+1
-        int ret = i2c_read(&libi2c_conf, PN532_I2C_BUS_ADDRESS, data_buf, ACK_FRAME_SIZE + 1);
+        int ret = sddf_i2c_read(&libi2c_conf, PN532_I2C_BUS_ADDRESS, data_buf, ACK_FRAME_SIZE + 1);
         if (ret != 0) {
             /*LOG_PN532_ERR("Failed to read ack frame! Retries = %d/%d\n", attempts, retries);*/
             attempts++;
@@ -144,7 +144,7 @@ uint8_t pn532_write_command(uint8_t *header, uint8_t hlen, const uint8_t *body, 
     data_buf[7 + hlen + blen] = (PN532_POSTAMBLE);
 
     int error = 0;
-    error = i2c_write(&libi2c_conf, PN532_I2C_BUS_ADDRESS, data_buf, i2c_req_len);
+    error = sddf_i2c_write(&libi2c_conf, PN532_I2C_BUS_ADDRESS, data_buf, i2c_req_len);
     if (!error) {
         LOG_PN532("Wrote command successfully. Reading ack frame\n");
         error = read_ack_frame(retries);
@@ -166,7 +166,7 @@ uint8_t read_response_length(int8_t *length, unsigned retries)
     uint8_t error = I2C_ERR_OK;
     uint8_t *data_buf = (uint8_t *)(I2C_DATA_REGION + PN532_DATA_BASE);
     while (attempts < retries) {
-        int error = i2c_read(&libi2c_conf, PN532_I2C_BUS_ADDRESS, data_buf, NACK_SIZE + 1);
+        int error = sddf_i2c_read(&libi2c_conf, PN532_I2C_BUS_ADDRESS, data_buf, NACK_SIZE + 1);
         if (error) {
             attempts++;
             continue;
@@ -210,7 +210,7 @@ uint8_t read_response_length(int8_t *length, unsigned retries)
     for (int i = 0; i < NACK_SIZE; i++) {
         data_buf[i] = PN532_NACK[i];
     }
-    error = i2c_write(&libi2c_conf, PN532_I2C_BUS_ADDRESS, data_buf, NACK_SIZE);
+    error = sddf_i2c_write(&libi2c_conf, PN532_I2C_BUS_ADDRESS, data_buf, NACK_SIZE);
     if (error) {
         LOG_PN532_ERR("read_response_len: failed to write NACK\n");
     }
@@ -242,7 +242,7 @@ uint8_t pn532_read_response(uint8_t *buffer, uint8_t buffer_len, unsigned retrie
         }
 
         LOG_PN532("read_response: sent request of size %z\n", num_data_tokens);
-        int error = i2c_read(&libi2c_conf, PN532_I2C_BUS_ADDRESS, data_buf, num_data_tokens);
+        int error = sddf_i2c_read(&libi2c_conf, PN532_I2C_BUS_ADDRESS, data_buf, num_data_tokens);
         if (error) {
             attempts++;
             continue;
