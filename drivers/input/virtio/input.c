@@ -4,7 +4,8 @@
 #include <sddf/virtio/virtio.h>
 #include <sddf/virtio/virtio_queue.h>
 
-#define MOUSE
+// #define MOUSE
+#define KEYBOARD
 
 #define DEBUG_DRIVER
 
@@ -45,6 +46,9 @@ uint32_t event_descriptors[EVENT_COUNT];
 
 #define EV_KEY 0x1
 #define EV_REL 0x2
+
+#define REL_X 0x0
+#define REL_Y 0x1
 
 enum virtio_input_config_select {
     VIRTIO_INPUT_CFG_UNSET      = 0x00,
@@ -91,7 +95,7 @@ struct virtio_input_event {
 };
 
 static void virtio_input_event_print(struct virtio_input_event *event) {
-    LOG_DRIVER("event type: 0x%x, code: 0x%x, value: 0x%x\n", event->type, event->code, event->value);
+    LOG_DRIVER("event type: 0x%x, code: 0x%x, value: 0x%lx\n", event->type, event->code, event->value);
 }
 
 static void virtio_input_config_select(volatile struct virtio_input_config *cfg, uint8_t select, uint8_t subsel) {
@@ -118,7 +122,7 @@ static void eventq_process(void) {
         struct virtq_desc desc = event_virtq.desc[used.id];
 
         uintptr_t addr = desc.addr;
-        LOG_DRIVER("addr: 0x%lx, len: %d\n", addr, desc.len);
+        // LOG_DRIVER("addr: 0x%lx, len: %d\n", addr, desc.len);
         assert(desc.len == sizeof(struct virtio_input_event));
 
         // TODO: clear the virtio_event_vaddr memory after using this descriptor? Probably not worth it
@@ -127,6 +131,11 @@ static void eventq_process(void) {
 
         if (event->type == EV_REL) {
             LOG_DRIVER("got EV_REL event\n");
+            if (event->code == REL_X) {
+                LOG_DRIVER("REL_X\n");
+            } else if (event->code == REL_Y) {
+                LOG_DRIVER("REL_Y\n");
+            }
         } else if (event->type == EV_KEY) {
             LOG_DRIVER("got EV_KEY event\n");
         }
@@ -158,7 +167,7 @@ static void eventq_provide(void) {
         event_virtq.desc[event_desc_idx].len = sizeof(struct virtio_input_event);
         event_virtq.desc[event_desc_idx].flags = VIRTQ_DESC_F_WRITE;
 
-        LOG_DRIVER("adding event %d, 0x%lx\n", event_desc_idx, event_virtq.desc[event_desc_idx].addr);
+        // LOG_DRIVER("adding event %d, 0x%lx\n", event_desc_idx, event_virtq.desc[event_desc_idx].addr);
 
         // Set the entry in the available ring to point to the descriptor entry fort he packet
         event_virtq.avail->ring[event_virtq.avail->idx % event_virtq.num] = event_desc_idx;
@@ -175,8 +184,16 @@ static void eventq_provide(void) {
 }
 
 void notified(microkit_channel ch) {
-    LOG_DRIVER("notified\n");
-    eventq_process();
+
+    uint32_t irq_status = regs->InterruptStatus;
+    if (irq_status & VIRTIO_MMIO_IRQ_VQUEUE) {
+        regs->InterruptACK = VIRTIO_MMIO_IRQ_VQUEUE;
+        eventq_process();
+    }
+
+    if (irq_status & VIRTIO_MMIO_IRQ_CONFIG) {
+        LOG_DRIVER_ERR("ETH|ERROR: unexpected change in configuration %u\n", irq_status);
+    }
 
     sddf_irq_ack(ch);
 }
@@ -298,7 +315,13 @@ void input_setup() {
     for (int i = 0; i < virtio_config->size; i++) {
         LOG_DRIVER("bitmap: 0x%hhx\n", virtio_config->u.bitmap[i]);
     }
-    virtio_config->u.bitmap[0] = 0x3;
+#elif defined(KEYBOARD)
+    LOG_DRIVER("selecting EV_KEY\n");
+    virtio_input_config_select(virtio_config, VIRTIO_INPUT_CFG_EV_BITS, EV_KEY);
+    LOG_DRIVER("virtio_config->size: %d\n", virtio_config->size);
+    for (int i = 0; i < virtio_config->size; i++) {
+        LOG_DRIVER("bitmap: 0x%hhx\n", virtio_config->u.bitmap[i]);
+    }
 #endif
 
     /* Finish initialisation */
