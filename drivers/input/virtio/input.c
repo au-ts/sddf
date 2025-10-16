@@ -125,6 +125,12 @@ static void eventq_process(void) {
         struct virtio_input_event *event = &virtio_event_vaddr[used.id];
         virtio_input_event_print(event);
 
+        if (event->type == EV_REL) {
+            LOG_DRIVER("got EV_REL event\n");
+        } else if (event->type == EV_KEY) {
+            LOG_DRIVER("got EV_KEY event\n");
+        }
+
         int err = ialloc_free(&event_ialloc_desc, used.id);
         assert(!err);
         event_last_desc_idx++;
