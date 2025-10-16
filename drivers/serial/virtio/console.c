@@ -286,7 +286,7 @@ void console_setup()
     // Set the ACKNOWLEDGE bit to say we have noticed the device
     uart_regs->Status = VIRTIO_DEVICE_STATUS_ACKNOWLEDGE;
 
-        // Set the DRIVER bit to say we know how to drive the device
+    // Set the DRIVER bit to say we know how to drive the device
     uart_regs->Status = VIRTIO_DEVICE_STATUS_DRIVER;
 
 #ifdef DEBUG_DRIVER
