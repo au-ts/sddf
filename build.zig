@@ -66,6 +66,10 @@ const DriverClass = struct {
     const Gpu = enum {
         virtio,
     };
+
+    const Input = enum {
+        virtio,
+    };
 };
 
 const util_src = [_][]const u8{
@@ -454,6 +458,36 @@ fn addGpuDriver(
     return driver;
 }
 
+fn addInputDriver(
+    b: *std.Build,
+    util: *std.Build.Step.Compile,
+    class: DriverClass.Input,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+) *std.Build.Step.Compile {
+    const driver = addPd(b, .{
+        .name = b.fmt("driver_input_{s}.elf", .{@tagName(class)}),
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .strip = false,
+        }),
+    });
+    const source = b.fmt("drivers/input/{s}/input.c", .{@tagName(class)});
+    driver.addCSourceFile(.{
+        .file = b.path(source),
+    });
+    driver.addCSourceFile(.{
+        .file = b.path("virtio/transport/mmio.c"),
+    });
+    driver.addIncludePath(b.path("include"));
+    driver.addIncludePath(b.path("include/sddf/util/custom_libc"));
+    driver.addIncludePath(b.path("include/microkit"));
+    driver.linkLibrary(util);
+
+    return driver;
+}
+
 fn addPd(b: *std.Build, options: std.Build.ExecutableOptions) *std.Build.Step.Compile {
     const pd = b.addExecutable(options);
     pd.addObjectFile(libmicrokit);
@@ -675,6 +709,13 @@ pub fn build(b: *std.Build) !void {
         // Timer drivers
         inline for (std.meta.fields(DriverClass.Timer)) |class| {
             const driver = addTimerDriver(b, util, @enumFromInt(class.value), target, optimize);
+            driver.linkLibrary(util_putchar_debug);
+            b.installArtifact(driver);
+        }
+
+        // Input drivers
+        inline for (std.meta.fields(DriverClass.Input)) |class| {
+            const driver = addInputDriver(b, util, @enumFromInt(class.value), target, optimize);
             driver.linkLibrary(util_putchar_debug);
             b.installArtifact(driver);
         }
