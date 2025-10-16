@@ -4,6 +4,8 @@
 #include <sddf/virtio/virtio.h>
 #include <sddf/virtio/virtio_queue.h>
 
+#define MOUSE
+
 #define DEBUG_DRIVER
 
 #ifdef DEBUG_DRIVER
@@ -40,6 +42,9 @@ uint16_t event_last_desc_idx = 0;
 /* Allocator for event queue descriptors */
 ialloc_t event_ialloc_desc;
 uint32_t event_descriptors[EVENT_COUNT];
+
+#define EV_KEY 0x1
+#define EV_REL 0x2
 
 enum virtio_input_config_select {
     VIRTIO_INPUT_CFG_UNSET      = 0x00,
@@ -278,6 +283,17 @@ void input_setup() {
     struct virtio_input_devids *devids = &virtio_config->u.ids;
     LOG_DRIVER("virtio_config->size: %d\n", virtio_config->size);
     LOG_DRIVER("devids bustype: 0x%x, vendor: 0x%x, product: 0x%x, version: 0x%x\n", devids->bustype, devids->vendor, devids->product, devids->version);
+
+    // Select the event types we want, right now this is hard-coded for the keyboard.
+#ifdef MOUSE
+    LOG_DRIVER("selecting EV_REL\n");
+    virtio_input_config_select(virtio_config, VIRTIO_INPUT_CFG_EV_BITS, EV_REL);
+    LOG_DRIVER("virtio_config->size: %d\n", virtio_config->size);
+    for (int i = 0; i < virtio_config->size; i++) {
+        LOG_DRIVER("bitmap: 0x%hhx\n", virtio_config->u.bitmap[i]);
+    }
+    virtio_config->u.bitmap[0] = 0x3;
+#endif
 
     /* Finish initialisation */
     regs->Status |= VIRTIO_DEVICE_STATUS_DRIVER_OK;

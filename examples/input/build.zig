@@ -184,6 +184,7 @@ pub fn build(b: *std.Build) !void {
     if (microkit_board_option == .qemu_virt_aarch64) {
         const loader_arg = b.fmt("loader,file={s},addr=0x70000000,cpu-num=0", .{final_image_dest});
         qemu_cmd = b.addSystemCommand(&[_][]const u8{
+            "sudo",
             "qemu-system-aarch64",
             "-machine",
             "virt,virtualization=on",
@@ -195,7 +196,7 @@ pub fn build(b: *std.Build) !void {
             loader_arg,
             "-m",
             "2G",
-            "-device", "virtio-keyboard-device",
+            "-device", "virtio-mouse-device",
             "-global", "virtio-mmio.force-legacy=false",
             "-d", "guest_errors",
             "-display", "default,show-cursor=on",
