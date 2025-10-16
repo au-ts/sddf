@@ -85,8 +85,8 @@ struct virtio_input_event {
     uint32_t value;
 };
 
-static void virtio_input_event_print(struct virtio_input_event event) {
-    LOG_DRIVER("event type: 0x%x, code: 0x%x, value: 0x%x\n", event.type, event.code, event.value);
+static void virtio_input_event_print(struct virtio_input_event *event) {
+    LOG_DRIVER("event type: 0x%x, code: 0x%x, value: 0x%x\n", event->type, event->code, event->value);
 }
 
 static void virtio_input_config_select(volatile struct virtio_input_config *cfg, uint8_t select, uint8_t subsel) {
@@ -117,7 +117,7 @@ static void eventq_process(void) {
         assert(desc.len == sizeof(struct virtio_input_event));
 
         // TODO: clear the virtio_event_vaddr memory after using this descriptor? Probably not worth it
-        struct virtio_input_event event = virtio_event_vaddr[used.id];
+        struct virtio_input_event *event = &virtio_event_vaddr[used.id];
         virtio_input_event_print(event);
 
         int err = ialloc_free(&event_ialloc_desc, used.id);
@@ -147,7 +147,7 @@ static void eventq_provide(void) {
         event_virtq.desc[event_desc_idx].len = sizeof(struct virtio_input_event);
         event_virtq.desc[event_desc_idx].flags = VIRTQ_DESC_F_WRITE;
 
-        // LOG_DRIVER("adding event %d, 0x%lx\n", event_desc_idx, event_virtq.desc[event_desc_idx].addr);
+        LOG_DRIVER("adding event %d, 0x%lx\n", event_desc_idx, event_virtq.desc[event_desc_idx].addr);
 
         // Set the entry in the available ring to point to the descriptor entry fort he packet
         event_virtq.avail->ring[event_virtq.avail->idx % event_virtq.num] = event_desc_idx;
@@ -164,6 +164,7 @@ static void eventq_provide(void) {
 }
 
 void notified(microkit_channel ch) {
+    LOG_DRIVER("notified\n");
     eventq_process();
 
     sddf_irq_ack(ch);
