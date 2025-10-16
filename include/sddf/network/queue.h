@@ -13,6 +13,8 @@
 #include <sddf/util/fence.h>
 #include <sddf/util/util.h>
 
+#define CONFIG_ENABLE_SMP_SUPPORT 1
+
 typedef struct net_buff_desc {
     /* offset of buffer within buffer memory region or io address of buffer */
     uint64_t io_or_offset;

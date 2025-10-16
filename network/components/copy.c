@@ -97,4 +97,9 @@ void init(void)
                    config.virt_rx.num_buffers);
 
     net_buffers_init(&rx_queue_cli, 0);
+
+    /* It's possible that there are already responses in the queue, and because
+       of our signalling protocol if there are we'll never be notified. Kick off
+       our actions by polling. */
+    rx_return();
 }

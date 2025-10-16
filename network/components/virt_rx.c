@@ -209,4 +209,6 @@ void init(void)
         net_cancel_signal_free(&state.rx_queue_drv);
         sddf_deferred_notify(config.driver.id);
     }
+
+    // XX: Should we poll here too?
 }
