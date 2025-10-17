@@ -190,7 +190,6 @@ static void eventq_provide(void) {
 
 void notified(microkit_channel ch) {
     uint32_t irq_status = regs->InterruptStatus;
-    LOG_DRIVER("here!, irq_status: %d\n", irq_status);
     if (irq_status & VIRTIO_MMIO_IRQ_VQUEUE) {
         regs->InterruptACK = VIRTIO_MMIO_IRQ_VQUEUE;
         eventq_process();
