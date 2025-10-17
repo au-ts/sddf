@@ -1,0 +1,13 @@
+[package]
+name = "microkit_error"
+version = "0.1.0"
+edition = "2021"
+authors = ["Cheng Li 李澄 <lichengchaoreng@gmail.com>"]
+
+[lib]
+name = "microkit_error"
+path = "lib.rs"
+
+[dependencies]
+serde = { version = "1.0", default-features = false, features = ["derive"] }
+bincode = { version = "2.0", default-features = false, features = ["serde"] }
