@@ -23,6 +23,7 @@ MACHINE_QUEUE_BOARDS: dict[str, list[str]] = {
 
 MACHINE_QUEUE_BOARD_OPTIONS: dict[str, dict[str, Any]] = {
     "cheshire": dict(uboot_image_started=b"Starting kernel ..."),
+    "hifive_p550": dict(uboot_image_started=b"Starting kernel ..."),
 }
 
 EXAMPLES: dict[str, _ExampleMatrixType] = {
