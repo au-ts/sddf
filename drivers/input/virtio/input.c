@@ -4,9 +4,6 @@
 #include <sddf/virtio/virtio.h>
 #include <sddf/virtio/virtio_queue.h>
 
-#define MOUSE
-// #define KEYBOARD
-
 #define DEBUG_DRIVER
 
 #ifdef DEBUG_DRIVER
@@ -16,6 +13,9 @@
 #endif
 
 #define LOG_DRIVER_ERR(...) do{ sddf_printf("VIRTIO INPUT|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
+
+#define VIRTIO_ID_NAME_QEMU_KEYBOARD     "QEMU Virtio Keyboard"
+#define VIRTIO_ID_NAME_QEMU_MOUSE        "QEMU Virtio Mouse"
 
 #define VIRTIO_INPUT_EVENT_QUEUE 0
 #define VIRTIO_INPUT_STATUS_QUEUE 1
@@ -297,14 +297,6 @@ void input_setup() {
 
     volatile struct virtio_input_config *virtio_config = (volatile struct virtio_input_config *)regs->Config;
 
-    // First check config for name
-    virtio_input_config_select(virtio_config, VIRTIO_INPUT_CFG_ID_NAME, 0);
-    // TODO: strings are not null-terminated, don't do this
-    LOG_DRIVER("device name: %s\n", virtio_config->u.string);
-    // virtio_input_config_select(virtio_config, VIRTIO_INPUT_CFG_ID_SERIAL, 0);
-    // LOG_DRIVER("virtio_config->size: %d\n", virtio_config->size);
-    // LOG_DRIVER("virtio_config->u.string: %s\n", virtio_config->u.string);
-
     virtio_input_config_select(virtio_config, VIRTIO_INPUT_CFG_ID_DEVIDS, 0);
     struct virtio_input_devids *devids = &virtio_config->u.ids;
     if (virtio_config->size != 0) {
@@ -313,22 +305,25 @@ void input_setup() {
         LOG_DRIVER("unknown devids\n");
     }
 
-    // Select the event types we want, right now this is hard-coded for the keyboard.
-#ifdef MOUSE
-    LOG_DRIVER("selecting EV_REL\n");
-    virtio_input_config_select(virtio_config, VIRTIO_INPUT_CFG_EV_BITS, EV_REL);
-    assert(virtio_config->size);
-    for (int i = 0; i < virtio_config->size; i++) {
-        LOG_DRIVER("bitmap: 0x%hhx\n", virtio_config->u.bitmap[i]);
+    // Select the event types we want, right now this is hard-coded for QEMU mouse and keyboard.
+    virtio_input_config_select(virtio_config, VIRTIO_INPUT_CFG_ID_NAME, 0);
+    uint8_t ev_bits;
+    if (!memcmp(virtio_config->u.string, VIRTIO_ID_NAME_QEMU_MOUSE, virtio_config->size)) {
+        ev_bits = EV_REL;
+    } else if (!memcmp(virtio_config->u.string, VIRTIO_ID_NAME_QEMU_KEYBOARD, virtio_config->size)) {
+        ev_bits = EV_KEY;
+    } else {
+        // TODO: strings are not null-terminated, don't do this
+        LOG_DRIVER("unknown device: %s\n", virtio_config->u.string);
+        assert(false);
     }
-#elif defined(KEYBOARD)
-    LOG_DRIVER("selecting EV_KEY\n");
-    virtio_input_config_select(virtio_config, VIRTIO_INPUT_CFG_EV_BITS, EV_KEY);
-    assert(virtio_config->size);
-    for (int i = 0; i < virtio_config->size; i++) {
-        LOG_DRIVER("bitmap: 0x%hhx\n", virtio_config->u.bitmap[i]);
+    // TODO: strings are not null-terminated, don't do this
+    LOG_DRIVER("device: %s\n", virtio_config->u.string);
+    virtio_input_config_select(virtio_config, VIRTIO_INPUT_CFG_EV_BITS, ev_bits);
+    if (!virtio_config->size) {
+        LOG_DRIVER("device did not accept EV bits 0x%x\n", ev_bits);
+        assert(false);
     }
-#endif
 
     /* Finish initialisation */
     regs->Status |= VIRTIO_DEVICE_STATUS_DRIVER_OK;
