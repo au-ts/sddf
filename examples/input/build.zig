@@ -195,10 +195,9 @@ pub fn build(b: *std.Build) !void {
             loader_arg,
             "-m",
             "2G",
-            "-device", "virtio-keyboard-device",
+            "-device", "virtio-mouse-device",
             "-global", "virtio-mmio.force-legacy=false",
             "-d", "guest_errors",
-            "--trace", "virtqueue_*",
         });
     } else if (microkit_board_option == .qemu_virt_riscv64) {
         qemu_cmd = b.addSystemCommand(&[_][]const u8{

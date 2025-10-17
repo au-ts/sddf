@@ -4,8 +4,8 @@
 #include <sddf/virtio/virtio.h>
 #include <sddf/virtio/virtio_queue.h>
 
-// #define MOUSE
-#define KEYBOARD
+#define MOUSE
+// #define KEYBOARD
 
 #define DEBUG_DRIVER
 
@@ -94,6 +94,8 @@ struct virtio_input_event {
     uint32_t value;
 };
 
+static void eventq_provide(void);
+
 static void virtio_input_event_print(struct virtio_input_event *event) {
     LOG_DRIVER("event type: 0x%x, code: 0x%x, value: 0x%lx\n", event->type, event->code, event->value);
 }
@@ -110,6 +112,7 @@ static inline bool virtio_avail_full_event(struct virtq *virtq)
 
 /* Process used buffers put into the event queue by the device. */
 static void eventq_process(void) {
+    LOG_DRIVER("processing\n");
     uint16_t events_processed = 0;
     uint16_t i = event_last_seen_used;
     uint16_t curr_idx = event_virtq.used->idx;
@@ -142,13 +145,15 @@ static void eventq_process(void) {
 
         int err = ialloc_free(&event_ialloc_desc, used.id);
         assert(!err);
-        event_last_desc_idx++;
+        event_last_desc_idx--;
         i++;
         // TODO: I don't know if it's worth having this variable/incrementer
         events_processed++;
     }
 
     event_last_seen_used += events_processed;
+
+    eventq_provide();
 }
 
 /* Populate the eventq with buffers that are at of size struct virtio_input_event so we can actually
@@ -172,7 +177,7 @@ static void eventq_provide(void) {
         // Set the entry in the available ring to point to the descriptor entry fort he packet
         event_virtq.avail->ring[event_virtq.avail->idx % event_virtq.num] = event_desc_idx;
         event_virtq.avail->idx++;
-        event_last_desc_idx += 1;
+        event_last_desc_idx++;
 
         transferred = true;
     }
@@ -184,15 +189,15 @@ static void eventq_provide(void) {
 }
 
 void notified(microkit_channel ch) {
-
     uint32_t irq_status = regs->InterruptStatus;
+    LOG_DRIVER("here!, irq_status: %d\n", irq_status);
     if (irq_status & VIRTIO_MMIO_IRQ_VQUEUE) {
         regs->InterruptACK = VIRTIO_MMIO_IRQ_VQUEUE;
         eventq_process();
     }
 
     if (irq_status & VIRTIO_MMIO_IRQ_CONFIG) {
-        LOG_DRIVER_ERR("ETH|ERROR: unexpected change in configuration %u\n", irq_status);
+        LOG_DRIVER_ERR("unexpected change in configuration %u\n", irq_status);
     }
 
     sddf_irq_ack(ch);
@@ -295,30 +300,32 @@ void input_setup() {
 
     // First check config for name
     virtio_input_config_select(virtio_config, VIRTIO_INPUT_CFG_ID_NAME, 0);
-    LOG_DRIVER("virtio_config->size: %d\n", virtio_config->size);
     // TODO: strings are not null-terminated, don't do this
-    LOG_DRIVER("virtio_config->u.string: %s\n", virtio_config->u.string);
-    virtio_input_config_select(virtio_config, VIRTIO_INPUT_CFG_ID_SERIAL, 0);
-    LOG_DRIVER("virtio_config->size: %d\n", virtio_config->size);
-    LOG_DRIVER("virtio_config->u.string: %s\n", virtio_config->u.string);
+    LOG_DRIVER("device name: %s\n", virtio_config->u.string);
+    // virtio_input_config_select(virtio_config, VIRTIO_INPUT_CFG_ID_SERIAL, 0);
+    // LOG_DRIVER("virtio_config->size: %d\n", virtio_config->size);
+    // LOG_DRIVER("virtio_config->u.string: %s\n", virtio_config->u.string);
 
     virtio_input_config_select(virtio_config, VIRTIO_INPUT_CFG_ID_DEVIDS, 0);
     struct virtio_input_devids *devids = &virtio_config->u.ids;
-    LOG_DRIVER("virtio_config->size: %d\n", virtio_config->size);
-    LOG_DRIVER("devids bustype: 0x%x, vendor: 0x%x, product: 0x%x, version: 0x%x\n", devids->bustype, devids->vendor, devids->product, devids->version);
+    if (virtio_config->size != 0) {
+        LOG_DRIVER("devids bustype: 0x%x, vendor: 0x%x, product: 0x%x, version: 0x%x\n", devids->bustype, devids->vendor, devids->product, devids->version);
+    } else {
+        LOG_DRIVER("unknown devids\n");
+    }
 
     // Select the event types we want, right now this is hard-coded for the keyboard.
 #ifdef MOUSE
     LOG_DRIVER("selecting EV_REL\n");
     virtio_input_config_select(virtio_config, VIRTIO_INPUT_CFG_EV_BITS, EV_REL);
-    LOG_DRIVER("virtio_config->size: %d\n", virtio_config->size);
+    assert(virtio_config->size);
     for (int i = 0; i < virtio_config->size; i++) {
         LOG_DRIVER("bitmap: 0x%hhx\n", virtio_config->u.bitmap[i]);
     }
 #elif defined(KEYBOARD)
     LOG_DRIVER("selecting EV_KEY\n");
     virtio_input_config_select(virtio_config, VIRTIO_INPUT_CFG_EV_BITS, EV_KEY);
-    LOG_DRIVER("virtio_config->size: %d\n", virtio_config->size);
+    assert(virtio_config->size);
     for (int i = 0; i < virtio_config->size; i++) {
         LOG_DRIVER("bitmap: 0x%hhx\n", virtio_config->u.bitmap[i]);
     }
@@ -326,7 +333,6 @@ void input_setup() {
 
     /* Finish initialisation */
     regs->Status |= VIRTIO_DEVICE_STATUS_DRIVER_OK;
-    regs->InterruptACK = VIRTIO_MMIO_IRQ_VQUEUE;
 }
 
 void init() {
