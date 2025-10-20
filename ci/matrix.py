@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, Literal, TypedDict
 # to use for CI preferentially, though all will eventually be tried.
 MACHINE_QUEUE_BOARDS: dict[str, list[str]] = {
     "hifive_p550": ["p550a"],
-    "cheshire": ["cheshire1"],
+    "cheshire": ["cheshire1", "cheshire2"],
     "imx8mm_evk": ["imx8mm"],
     "imx8mp_iotgate": ["iotgate1"],
     "imx8mq_evk": ["imx8mq", "imx8mq2"],
