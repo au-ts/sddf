@@ -12,6 +12,7 @@ ProtectionDomain = SystemDescription.ProtectionDomain
 MemoryRegion = SystemDescription.MemoryRegion
 Map = SystemDescription.Map
 Irq = SystemDescription.Irq
+Channel = SystemDescription.Channel
 
 
 @dataclass
@@ -35,6 +36,11 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     mouse_driver = ProtectionDomain("virtio_mouse_driver", "virtio_mouse_driver.elf", priority=254, stack_size=0x2000)
     client = ProtectionDomain("client", "client.elf", priority=1)
 
+    keyboard_inputs_mr = MemoryRegion(sdf, "keyboard-inputs", size=0x1000)
+    mouse_inputs_mr = MemoryRegion(sdf, "mouse-inputs", size=0x1000)
+    sdf.add_mr(keyboard_inputs_mr)
+    sdf.add_mr(mouse_inputs_mr)
+
     virtio_mr = MemoryRegion(sdf, "virtio-device", size=0x1000, paddr=0xa003000)
     sdf.add_mr(virtio_mr)
 
@@ -46,6 +52,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     keyboad_driver.add_map(Map(virtio_keyboard_queues, 0x70000000, perms="rw", cached=False))
     keyboad_driver.add_map(Map(virtio_keyboard_events, 0x71000000, perms="rw", cached=False))
     keyboad_driver.add_irq(Irq(irq=79, trigger=Irq.Trigger.EDGE))
+    keyboad_driver.add_map(Map(keyboard_inputs_mr, 0x60000000, perms="rw", cached=False))
 
     virtio_mouse_queues = MemoryRegion(sdf, "virtio-mouse-queues", size=0x10000, paddr=0x80000000)
     virtio_mouse_events = MemoryRegion(sdf, "virtio-mouse-events", size=0x10000, paddr=0x81000000)
@@ -55,6 +62,13 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     mouse_driver.add_map(Map(virtio_mouse_queues, 0x80000000, perms="rw", cached=False))
     mouse_driver.add_map(Map(virtio_mouse_events, 0x81000000, perms="rw", cached=False))
     mouse_driver.add_irq(Irq(irq=78, trigger=Irq.Trigger.EDGE))
+    mouse_driver.add_map(Map(mouse_inputs_mr, 0x60000000, perms="rw", cached=False))
+
+    client.add_map(Map(mouse_inputs_mr, 0x10000000, perms="rw", cached=False))
+    client.add_map(Map(keyboard_inputs_mr, 0x20000000, perms="rw", cached=False))
+
+    sdf.add_channel(Channel(keyboad_driver, client, a_id=10, b_id=0))
+    sdf.add_channel(Channel(mouse_driver, client, a_id=10, b_id=1))
 
     pds = [keyboad_driver, mouse_driver, client]
     for pd in pds:

@@ -14,6 +14,8 @@
 
 #define LOG_DRIVER_ERR(...) do{ sddf_printf("%s|ERROR: ", microkit_name); sddf_printf(__VA_ARGS__); }while(0)
 
+#define CLIENT_CH 10
+
 #define VIRTIO_ID_NAME_QEMU_KEYBOARD     "QEMU Virtio Keyboard"
 #define VIRTIO_ID_NAME_QEMU_MOUSE        "QEMU Virtio Mouse"
 
@@ -24,6 +26,8 @@
 #define STATUS_COUNT 256
 
 void *virtio_device;
+
+struct virtio_input_event *client_events = (struct virtio_input_event *)0x60000000;
 
 volatile virtio_mmio_regs_t *regs;
 
@@ -47,9 +51,6 @@ uint32_t event_descriptors[EVENT_COUNT];
 
 #define EV_KEY 0x1
 #define EV_REL 0x2
-
-#define REL_X 0x0
-#define REL_Y 0x1
 
 enum virtio_input_config_select {
     VIRTIO_INPUT_CFG_UNSET      = 0x00,
@@ -117,7 +118,7 @@ static void eventq_process(void) {
     uint16_t i = event_last_seen_used;
     uint16_t curr_idx = event_virtq.used->idx;
     while (i != curr_idx) {
-        LOG_DRIVER("processing event descriptor %d\n", i);
+        // LOG_DRIVER("processing event descriptor %d\n", i);
         struct virtq_used_elem used = event_virtq.used->ring[i % event_virtq.num];
         // Not expecting a chained descriptor at all
         assert(!(event_virtq.desc[used.id].flags & VIRTQ_DESC_F_NEXT));
@@ -131,17 +132,9 @@ static void eventq_process(void) {
         // TODO: clear the virtio_event_vaddr memory after using this descriptor? Probably not worth it
         struct virtio_input_event *event = &virtio_event_vaddr[used.id];
         virtio_input_event_print(event);
-
-        if (event->type == EV_REL) {
-            LOG_DRIVER("got EV_REL event\n");
-            if (event->code == REL_X) {
-                LOG_DRIVER("REL_X\n");
-            } else if (event->code == REL_Y) {
-                LOG_DRIVER("REL_Y\n");
-            }
-        } else if (event->type == EV_KEY) {
-            LOG_DRIVER("got EV_KEY event\n");
-        }
+        // TODO: terrible, fix,
+        memcpy(client_events, event, sizeof(struct virtio_input_event));
+        microkit_notify(CLIENT_CH);
 
         int err = ialloc_free(&event_ialloc_desc, used.id);
         assert(!err);
