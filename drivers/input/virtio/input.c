@@ -7,12 +7,12 @@
 #define DEBUG_DRIVER
 
 #ifdef DEBUG_DRIVER
-#define LOG_DRIVER(...) do{ sddf_dprintf("VIRTIO INPUT|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
+#define LOG_DRIVER(...) do{ sddf_dprintf("%s|INFO: ", microkit_name); sddf_dprintf(__VA_ARGS__); }while(0)
 #else
 #define LOG_DRIVER(...) do{}while(0)
 #endif
 
-#define LOG_DRIVER_ERR(...) do{ sddf_printf("VIRTIO INPUT|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
+#define LOG_DRIVER_ERR(...) do{ sddf_printf("%s|ERROR: ", microkit_name); sddf_printf(__VA_ARGS__); }while(0)
 
 #define VIRTIO_ID_NAME_QEMU_KEYBOARD     "QEMU Virtio Keyboard"
 #define VIRTIO_ID_NAME_QEMU_MOUSE        "QEMU Virtio Mouse"
@@ -23,17 +23,18 @@
 #define EVENT_COUNT 256
 #define STATUS_COUNT 256
 
-void *virtio_device = (void *)0xa003e00;
+void *virtio_device;
 
 volatile virtio_mmio_regs_t *regs;
 
 /* DMA region used for virtIO queues */
-uintptr_t virtio_queues_paddr = 0x70000000;
-uintptr_t virtio_queues_vaddr = 0x70000000;
+/* Physical address set in init code. */
+uintptr_t virtio_queues_paddr;
 
 // TODO: should actually check that this memory region can fit this many input event buffers
-struct virtio_input_event *virtio_event_paddr = (struct virtio_input_event *)0x80000000;
-struct virtio_input_event *virtio_event_vaddr = (struct virtio_input_event *)0x80000000;
+/* Physical address set in init code. */
+struct virtio_input_event *virtio_event_paddr;
+struct virtio_input_event *virtio_event_vaddr;
 
 struct virtq event_virtq;
 struct virtq status_virtq;
@@ -112,7 +113,6 @@ static inline bool virtio_avail_full_event(struct virtq *virtq)
 
 /* Process used buffers put into the event queue by the device. */
 static void eventq_process(void) {
-    LOG_DRIVER("processing\n");
     uint16_t events_processed = 0;
     uint16_t i = event_last_seen_used;
     uint16_t curr_idx = event_virtq.used->idx;
@@ -330,6 +330,22 @@ void input_setup() {
 }
 
 void init() {
+    if (!memcmp(microkit_name, "virtio_keyboard_driver", strlen(microkit_name))) {
+        LOG_DRIVER("keyboard\n");
+        virtio_device = (void *)0xa003e00;
+        virtio_queues_paddr = 0x70000000;
+        virtio_event_vaddr = (struct virtio_input_event *)0x71000000;
+        virtio_event_paddr = (struct virtio_input_event *)0x71000000;
+    } else if (!memcmp(microkit_name, "virtio_mouse_driver", strlen(microkit_name))) {
+        LOG_DRIVER("mouse\n");
+        virtio_queues_paddr = 0x80000000;
+        virtio_event_vaddr = (struct virtio_input_event *)0x81000000;
+        virtio_event_paddr = (struct virtio_input_event *)0x81000000;
+        virtio_device = (void *)0xa003c00;
+    } else {
+        assert(false);
+    }
+
     regs = (volatile virtio_mmio_regs_t *)virtio_device;
 
     ialloc_init(&event_ialloc_desc, event_descriptors, EVENT_COUNT);

@@ -97,7 +97,8 @@ pub fn build(b: *std.Build) !void {
     const driver = sddf_dep.artifact(b.fmt("driver_input_{s}.elf", .{driver_class}));
     // This is required because the SDF file is expecting a different name to the artifact we
     // are dealing with.
-    const driver_install = b.addInstallArtifact(driver, .{ .dest_sub_path = "input_driver.elf" });
+    const keyboard_driver_install = b.addInstallArtifact(driver, .{ .dest_sub_path = "virtio_keyboard_driver.elf" });
+    const mouse_driver_install = b.addInstallArtifact(driver, .{ .dest_sub_path = "virtio_mouse_driver.elf" });
 
     const client = b.addExecutable(.{
         .name = "client.elf",
@@ -169,7 +170,8 @@ pub fn build(b: *std.Build) !void {
     inline for (objcopys) |objcopy| {
         microkit_tool_cmd.step.dependOn(&objcopy.step);
     }
-    microkit_tool_cmd.step.dependOn(&driver_install.step);
+    microkit_tool_cmd.step.dependOn(&keyboard_driver_install.step);
+    microkit_tool_cmd.step.dependOn(&mouse_driver_install.step);
     microkit_tool_cmd.step.dependOn(&meta_output_install.step);
     microkit_tool_cmd.step.dependOn(b.getInstallStep());
     microkit_tool_cmd.setEnvironmentVariable("MICROKIT_SDK", microkit_sdk.getPath3(b, null).toString(b.allocator) catch @panic("OOM"));
@@ -196,6 +198,7 @@ pub fn build(b: *std.Build) !void {
             "-m",
             "2G",
             "-device", "virtio-keyboard-device",
+            "-device", "virtio-mouse-device",
             "-global", "virtio-mmio.force-legacy=false",
             "-d", "guest_errors",
             "-device", "ramfb",
