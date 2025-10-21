@@ -24,7 +24,7 @@ struct virtio_input_event *mouse_events = (struct virtio_input_event *)0x2000000
 void notified(sddf_channel ch)
 {
     assert(ch == KEYBOARD_CH || ch == MOUSE_CH);
-    if (KEYBOARD_CH) {
+    if (ch == KEYBOARD_CH) {
         sddf_printf("CLIENT|INFO: keyboard event\n");
         sddf_printf("event type: 0x%x, code: 0x%x, value: 0x%lx\n", keyboard_events->type, keyboard_events->code, keyboard_events->value);
     } else {

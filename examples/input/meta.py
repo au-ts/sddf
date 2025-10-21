@@ -64,8 +64,8 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     mouse_driver.add_irq(Irq(irq=78, trigger=Irq.Trigger.EDGE))
     mouse_driver.add_map(Map(mouse_inputs_mr, 0x60000000, perms="rw", cached=False))
 
-    client.add_map(Map(mouse_inputs_mr, 0x10000000, perms="rw", cached=False))
-    client.add_map(Map(keyboard_inputs_mr, 0x20000000, perms="rw", cached=False))
+    client.add_map(Map(keyboard_inputs_mr, 0x10000000, perms="rw", cached=False))
+    client.add_map(Map(mouse_inputs_mr, 0x20000000, perms="rw", cached=False))
 
     sdf.add_channel(Channel(keyboad_driver, client, a_id=10, b_id=0))
     sdf.add_channel(Channel(mouse_driver, client, a_id=10, b_id=1))
