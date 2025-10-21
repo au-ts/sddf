@@ -131,10 +131,13 @@ static void eventq_process(void) {
 
         // TODO: clear the virtio_event_vaddr memory after using this descriptor? Probably not worth it
         struct virtio_input_event *event = &virtio_event_vaddr[used.id];
-        virtio_input_event_print(event);
-        // TODO: terrible, fix,
-        memcpy(client_events, event, sizeof(struct virtio_input_event));
-        microkit_notify(CLIENT_CH);
+        // TODO: check why we get events with type 0
+        if (event->type != 0) {
+            // virtio_input_event_print(event);
+            // TODO: terrible, fix,
+            memcpy(client_events, event, sizeof(struct virtio_input_event));
+            microkit_notify(CLIENT_CH);
+        }
 
         int err = ialloc_free(&event_ialloc_desc, used.id);
         assert(!err);
