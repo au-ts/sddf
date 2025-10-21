@@ -26,7 +26,7 @@
 #define RX_PBL_MASK                 (0x7e0000)          /* Maximum number of beats to be transferred in one RxDMA transaction. Only applicable when USE_SEP_PBL is set. */
 #define RX_PBL_SHFT                 (17)
 #define USE_SEP_PBL                 (1 << 23)           /* Configures the RxDMA to use the value in bits [22:17] and TxDMA to use value in bits [13:8]. When unset [13:8] is applicable for both DMA engines. */
-#define DMA_PBL_X4                  (1 << 24)           /* Multiplies the PBL value programmed (bits[22:17] and bits [13:8]) four times. */
+#define DMA_PBL_X                   (1 << 24)           /* Multiplies the PBL value programmed (bits[22:17] and bits [13:8]) four times (before 3.50a) or eight times. */
 
 /* DMA Poll demand register definitions - When these bits are written with any value, the DMA reads the current descriptor pointed to by Register 18.
    If that descriptor is not available (owned by Host), transmission returns to the Suspend state and buffer unavailable is asserted in the status register.

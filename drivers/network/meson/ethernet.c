@@ -251,7 +251,16 @@ static void eth_setup(void)
     eth_mac->macaddr0lo = l;
     eth_mac->macaddr0hi = h;
 
+#ifdef CONFIG_PLAT_ODROIDC4
+    /*
+     * Odroid-C4 uses the S905X3 SoC, whose ethernet MAC has 4KB RX FIFO and 2KB TX FIFO
+     * and uses 32-bit AHB bus.
+     * We use the maximum allowed PBL value here 256 = 32 (DMA_PBL) * 8 (DMA_PBL_X8).
+     */
+    eth_dma->busmode = PRIORXTX_11 | DMA_PBL_X | ((DMA_PBL << TX_PBL_SHFT) & TX_PBL_MASK);
+#else
     eth_dma->busmode = PRIORXTX_11 | ((DMA_PBL << TX_PBL_SHFT) & TX_PBL_MASK);
+#endif
     /*
      * Operate in store-and-forward mode.
      * Send pause frames when there's only 1k of fifo left,
