@@ -1,0 +1,10 @@
+#
+# Copyright 2023, Colias Group, LLC
+#
+# SPDX-License-Identifier: BSD-2-Clause
+#
+
+[toolchain]
+channel = "nightly-2025-07-07"
+components = [ "rust-src", "rustc-dev", "llvm-tools-preview" ]
+profile = "default"

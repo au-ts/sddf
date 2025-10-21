@@ -9,6 +9,8 @@ from importlib.metadata import version
 assert version("sdfgen").split(".")[1] == "27", "Unexpected sdfgen version"
 
 ProtectionDomain = SystemDescription.ProtectionDomain
+MemoryRegion = SystemDescription.MemoryRegion
+Map = SystemDescription.Map
 
 
 @dataclass
@@ -44,6 +46,15 @@ BOARDS: List[Board] = [
         blk="soc@0/bus@30800000/mmc@30b40000",
         timer="soc@0/bus@30000000/timer@302d0000",
         serial="soc@0/bus@30800000/serial@30860000",
+    ),
+    Board(
+        name="odroidc4",
+        arch=SystemDescription.Arch.AARCH64,
+        paddr_top=0x80000000,
+        partition=0,
+        blk="soc/sd@ffe05000",
+        timer=None,
+        serial="soc/bus@ff800000/serial@3000",
     ),
     Board(
         name="qemu_virt_riscv64",
@@ -94,6 +105,11 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     blk_system = Sddf.Blk(sdf, blk_node, blk_driver, blk_virt)
     partition = int(args.partition) if args.partition else board.partition
     blk_system.add_client(client, partition=partition)
+
+    if board.name == "odroidc4":
+        gpio_mr = MemoryRegion(sdf, name="gpio", size=0x1000, paddr=0xFF800000)
+        blk_driver.add_map(Map(gpio_mr, 0xFF800000, "rw", cached=False))
+        sdf.add_mr(gpio_mr)
 
     serial_system.add_client(client)
 
