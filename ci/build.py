@@ -87,7 +87,7 @@ def build(args: argparse.Namespace, example_name: str, test_config: TestConfig):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description=__doc__)
 
     parser.add_argument("microkit_sdk")
     parser.add_argument("num_jobs", nargs="?", type=int, default=os.cpu_count())
