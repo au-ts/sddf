@@ -102,7 +102,7 @@ jobs:
       - name: Setup pyenv
         run: |
           python3 -m venv venv
-          ./venv/bin/pip install --upgrade sdfgen==${{ env.SDFGEN_VERSION }}
+          ./venv/bin/pip install sdfgen
       - name: Build examples
         run: ./ci/build.py ${PWD}/microkit-sdk-${{ env.MICROKIT_VERSION }}-macos-aarch64 $(nproc)
         shell: bash
