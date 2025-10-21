@@ -56,6 +56,8 @@ class _TeeOut:
     def seekable(self): return False
     @property
     def closed(self): return self.stdout.closed
+    def fileno(self): return self.stdout.fileno()
+    def isatty(self): return self.stdout.isatty()
     # fmt: on
 
 
