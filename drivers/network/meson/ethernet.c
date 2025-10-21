@@ -258,7 +258,8 @@ static void eth_setup(void)
      * stop sending them when there is 1k of fifo left.
      * Continue DMA on 2nd frame while updating status on first
      */
-    eth_dma->opmode = RX_STOREFORWARD | TX_STOREFORWARD | EN_FLOWCTL | (0 << FLOWCTL_SHFT) | (0 << DISFLOWCTL_SHFT) | TX_OPSCND;
+    eth_dma->opmode = RX_STOREFORWARD | TX_STOREFORWARD | EN_FLOWCTL | (0 << FLOWCTL_SHFT) | (0 << DISFLOWCTL_SHFT)
+                    | TX_OPSCND;
     eth_mac->conf = FULLDPLXMODE;
 
     eth_dma->rxdesclistaddr = device_resources.regions[1].io_addr;
