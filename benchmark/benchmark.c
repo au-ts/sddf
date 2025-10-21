@@ -70,9 +70,10 @@ static void print_total_util(uint64_t *buffer)
     uint64_t number_schedules = buffer[BENCHMARK_TOTAL_NUMBER_SCHEDULES];
     uint64_t kernel = buffer[BENCHMARK_TOTAL_KERNEL_UTILISATION];
     uint64_t entries = buffer[BENCHMARK_TOTAL_NUMBER_KERNEL_ENTRIES];
-    sddf_printf("Total utilisation details: \n{\nKernelUtilisation: %lu\nKernelEntries: %lu\nNumberSchedules: "
+    uint64_t entries_fp = buffer[BENCHMARK_TOTAL_NUMBER_KERNEL_ENTRIES_FASTPATH];
+    sddf_printf("Total utilisation details: \n{\nKernelUtilisation: %lu\nKernelEntries: %lu\nKernelEntriesFastpath: %lu\nNumberSchedules: "
                 "%lu\nTotalUtilisation: %lu\n}\n",
-                kernel, entries, number_schedules, total);
+                kernel, entries, entries_fp, number_schedules, total);
 }
 
 static void print_child_util(uint64_t *buffer, uint8_t id)
