@@ -33,7 +33,8 @@
 #endif
 
 typedef enum i2c_err {
-    I2C_ERR_OK,
+    I2C_ERR_QUEUE = -1,
+    I2C_ERR_OK = 0,
     I2C_ERR_MALFORMED_TRANSACTION,
     I2C_ERR_MALFORMED_HEADER,
     I2C_ERR_UNPERMITTED_ADDR,
