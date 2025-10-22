@@ -1,9 +1,10 @@
-use microkit_error::MicrokitError;
 use sel4_microkit::MessageInfo;
 use sel4_microkit_message::{
     types::{MessageRecv, MessageSend},
     MessageInfoExt,
 };
+
+use crate::error::error::MicrokitError;
 
 #[derive(serde::Serialize, serde::Deserialize)]
 pub enum ThermalMessage {
