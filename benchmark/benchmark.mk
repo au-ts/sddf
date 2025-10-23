@@ -6,7 +6,7 @@
 # Include this snippet in your project Makefile to build
 # the benchmark.elf and idle.elf programs.
 #
-BENCH_OBJS := benchmark/benchmark.o
+BENCH_OBJS := benchmark/benchmark.o benchmark/riscv.o
 IDLE_OBJS := benchmark/idle.o
 LIBUTIL_DBG := libsddf_util_debug.a
 LIBUTIL := libsddf_util.a

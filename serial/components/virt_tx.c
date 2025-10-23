@@ -192,7 +192,9 @@ void init(void)
          * Because of this, in debug mode, we busy loop until we know the driver has finished
          * transmitting our console input begin string from above.
          */
-        while (!serial_queue_empty(&tx_queue_handle_drv, tx_queue_handle_drv.queue->head));
+        while (!serial_queue_empty(&tx_queue_handle_drv, tx_queue_handle_drv.queue->head)) {
+            asm volatile("nop");
+        }
 #endif
     }
 

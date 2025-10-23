@@ -14,6 +14,7 @@
 #include <sddf/util/fence.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
+#include "riscv.h"
 
 #define LOG_BUFFER_CAP 7
 
@@ -203,6 +204,8 @@ void init(void)
 #ifdef CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES
     sddf_printf("BENCH|LOG: CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES defined\n");
 #endif
+
+    riscv_dump_pmu_info();
 
 #if ENABLE_BENCHMARKING
     sel4bench_init();

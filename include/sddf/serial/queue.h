@@ -15,9 +15,9 @@
 
 typedef struct serial_queue {
     /* index to insert at */
-    uint32_t tail;
+    _Atomic(uint32_t) tail;
     /* index to remove from */
-    uint32_t head;
+    _Atomic(uint32_t) head;
     /* flag to indicate whether producer requires signalling */
     uint32_t producer_signalled;
 } serial_queue_t;
@@ -77,7 +77,7 @@ static inline int serial_queue_full(serial_queue_handle_t *queue_handle, uint32_
  */
 static inline int serial_enqueue(serial_queue_handle_t *queue_handle, char character)
 {
-    uint32_t *tail = &queue_handle->queue->tail;
+    _Atomic uint32_t *tail = &queue_handle->queue->tail;
 
     if (serial_queue_full(queue_handle, *tail)) {
         return -1;
@@ -122,7 +122,7 @@ static inline int serial_enqueue_local(serial_queue_handle_t *queue_handle, uint
  */
 static inline int serial_dequeue(serial_queue_handle_t *queue_handle, char *character)
 {
-    uint32_t *head = &queue_handle->queue->head;
+    _Atomic uint32_t *head = &queue_handle->queue->head;
 
     if (serial_queue_empty(queue_handle, *head)) {
         return -1;
