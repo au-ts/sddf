@@ -183,7 +183,7 @@
 
 \title{sDDF Design}
 \SubTitle{Design, Implementation and Evaluation of the\\ seL4 Device Driver Framework}
-\author{Gernot Heiser, Peter Chubb, Alex Brown, Julia Broady, Courtney Darville, Lucy Parker}
+\author{Gernot Heiser, Peter Chubb, Alex Brown, Julia Vassiliki, Courtney Darville, Lucy Parker}
 \Email{gernot@unsw.edu.au}
 \date{\Release \ifDraft\ of \today\fi}
 \maketitle
@@ -1991,17 +1991,18 @@ them to the virtualiser queue. The virtualiser will process the contents of the 
 being notified by the client. The client can manually compose an arbitrary transaction by
 creating commands or it can use libi2c to simplify transactions.
 
-\mathrm{libi2c} is a simple blocking interface to the \gls{i2c} driver subsystem, supplying
+\texttt{libi2c} is a simple blocking interface to the \gls{i2c} driver subsystem, supplying
 functions to compose single-command transactions. There are three methods available:
-\begin{itemize}
-  \item i2c_write. Create a write of up to 256 bytes with a stop condition.
-  \item i2c_read. Create a read operation of up to 256 bytes with a stop condition.
-  \item i2c_writeread. Read from the register reg_address in the function call.
-    Otherwise identical to i2c_read.
-\end{itemize}
+
+\begin{description}
+  \item[\code{i2c\_write}] Create a write of up to 256 bytes with a stop condition.
+  \item[\code{i2c\_read}] Create a read operation of up to 256 bytes with a stop condition.
+  \item[\code{i2c\_writeread}] Read from the register \code{reg\_address} in the function call.
+    Otherwise identical to \code{i2c\_read}.
+\end{description}
 
 All libi2c calls will block the client until a response arrives. It supports the
-seL4 Microkit coroutines library as well as as the generic \mathrm{libco} library used in
+seL4 Microkit coroutines library as well as as the generic \texttt{libco} library used in
 the sDDF example systems.
 
 Whether the client used libi2c or not, the client will be signalled and a response struct
