@@ -350,6 +350,19 @@ static void eth_init()
     *DMA_REG(DMA_CH0_RX_CONTROL) &= ~(DMA_CH0_RX_RBSZ_MASK);
     *DMA_REG(DMA_CH0_RX_CONTROL) |= (MAX_RX_FRAME_SZ << DMA_CH0_RX_RBSZ_POS);
 
+    // Set programmable burst length (PBL)
+#if defined(CONFIG_PLAT_IMX8MP_EVK)
+    // i.MX 8M PLUS has 32-bit AHB bus and 8 KB TX/RX Queue size.
+    // Here we use the maximum allowed PBL value here (256 = 32 * 8).
+    *DMA_REG(DMA_CH0_CONTROL) |= DMA_CH0_CONTROL_PBLx8;
+    *DMA_REG(DMA_CH0_TX_CONTROL) |= (32 << DMA_CH0_TX_CONTROL_PBL_POS) & DMA_CH0_TX_CONTROL_PBL_MASK;
+    *DMA_REG(DMA_CH0_RX_CONTROL) |= (32 << DMA_CH0_RX_CONTROL_PBL_POS) & DMA_CH0_RX_CONTROL_PBL_MASK;
+#elif defined(CONFIG_PLAT_STAR64)
+    // We follow the dts and set PBL to 16.
+    *DMA_REG(DMA_CH0_TX_CONTROL) |= (16 << DMA_CH0_TX_CONTROL_PBL_POS) & DMA_CH0_TX_CONTROL_PBL_MASK;
+    *DMA_REG(DMA_CH0_RX_CONTROL) |= (16 << DMA_CH0_RX_CONTROL_PBL_POS) & DMA_CH0_RX_CONTROL_PBL_MASK;
+#endif
+
     // Program the descriptor length. This is to tell the device that when
     // we reach the base addr + count, we should then wrap back around to
     // the base.
