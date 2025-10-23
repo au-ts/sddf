@@ -361,6 +361,11 @@ static void eth_init()
     // We follow the dts and set PBL to 16.
     *DMA_REG(DMA_CH0_TX_CONTROL) |= (16 << DMA_CH0_TX_CONTROL_PBL_POS) & DMA_CH0_TX_CONTROL_PBL_MASK;
     *DMA_REG(DMA_CH0_RX_CONTROL) |= (16 << DMA_CH0_RX_CONTROL_PBL_POS) & DMA_CH0_RX_CONTROL_PBL_MASK;
+#elif defined(CONFIG_PLAT_HIFIVE_P550)
+    // Preliminary.
+    *DMA_REG(DMA_CH0_CONTROL) |= DMA_CH0_CONTROL_PBLx8;
+    *DMA_REG(DMA_CH0_TX_CONTROL) |= (8 << DMA_CH0_TX_CONTROL_PBL_POS) & DMA_CH0_TX_CONTROL_PBL_MASK;
+    *DMA_REG(DMA_CH0_RX_CONTROL) |= (8 << DMA_CH0_RX_CONTROL_PBL_POS) & DMA_CH0_RX_CONTROL_PBL_MASK;
 #endif
 
     // Program the descriptor length. This is to tell the device that when
