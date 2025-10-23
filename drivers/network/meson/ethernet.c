@@ -159,6 +159,9 @@ static void tx_provide(void)
             if (idx + 1 == tx.capacity) {
                 cntl |= DESC_TXCTRL_TXRINGEND;
             }
+#ifdef CONFIG_PLAT_ODROIDC4
+            cntl |= DESC_TXCTRL_TXCIC;
+#endif
             update_ring_slot(&tx, idx, DESC_TXSTS_OWNBYDMA, cntl, buffer.io_or_offset, 0);
 
             tx.tail++;
@@ -255,9 +258,10 @@ static void eth_setup(void)
     /*
      * Odroid-C4 uses the S905X3 SoC, whose ethernet MAC has 4KB RX FIFO and 2KB TX FIFO
      * and uses 32-bit AHB bus.
-     * We use the maximum allowed PBL value here 256 = 32 (DMA_PBL) * 8 (DMA_PBL_X8).
+     * To ensure deadlock-free Tx checksum offload, we set PBL to 64 = 8 * 8 (PBLx8) here.
+     * PBL must not be greater than 128.
      */
-    eth_dma->busmode = PRIORXTX_11 | DMA_PBL_X | ((DMA_PBL << TX_PBL_SHFT) & TX_PBL_MASK);
+    eth_dma->busmode = PRIORXTX_11 | DMA_PBL_X | ((8 << TX_PBL_SHFT) & TX_PBL_MASK);
 #else
     eth_dma->busmode = PRIORXTX_11 | ((DMA_PBL << TX_PBL_SHFT) & TX_PBL_MASK);
 #endif

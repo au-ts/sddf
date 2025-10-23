@@ -153,6 +153,7 @@
 #define DESC_TXCTRL_TXINT           (1 << 31)           /* Sets Transmit Interrupt after the present frame has been transmitted. */
 #define DESC_TXCTRL_TXLAST          (1 << 30)           /* Buffer contains the last segment of the frame. */
 #define DESC_TXCTRL_TXFIRST         (1 << 29)           /* Buffer contains the first segment of a frame. */
+#define DESC_TXCTRL_TXCIC           (3 << 27)           /* Calculate and insert a TCP/UDP/ICMP/IP checksum in hardware. */
 #define DESC_TXCTRL_TXCRCDIS        (1 << 26)           /* GMAC does not append the Cyclic Redundancy Check (CRC) to the end of the transmitted frame.*/
 #define DESC_TXCTRL_TXRINGEND       (1 << 25)           /* Descriptor list reached its final descriptor. DMA must loop around. */
 #define DESC_TXCTRL_TXCHAIN         (1 << 24)           /* Second address in the descriptor is the Next Descriptor address rather than the second buffer address. */
@@ -196,4 +197,5 @@ struct eth_dma_regs {
     uint32_t currhostrxdesc;                            /* 0x4c Points to the start of current Receive Descriptor read by the DMA. */
     uint32_t currhosttxbuffaddr;                        /* 0x50 Points to the current Transmit Buffer address read by the DMA. */
     uint32_t currhostrxbuffaddr;                        /* 0x54 Points to the current Transmit Buffer address read by the DMA. */
+    uint32_t hw_feature;                                /* 0x58 Hardware feature register. */
 };
