@@ -273,7 +273,7 @@ static void eth_setup(void)
      */
     eth_dma->opmode = RX_STOREFORWARD | TX_STOREFORWARD | EN_FLOWCTL | (0 << FLOWCTL_SHFT) | (0 << DISFLOWCTL_SHFT)
                     | TX_OPSCND;
-    eth_mac->conf = FULLDPLXMODE;
+    eth_mac->conf = FULLDPLXMODE | IP_CHK_OFFLD;
 
     eth_dma->rxdesclistaddr = device_resources.regions[1].io_addr;
     eth_dma->txdesclistaddr = device_resources.regions[2].io_addr;
