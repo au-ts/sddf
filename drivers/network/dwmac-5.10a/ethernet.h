@@ -89,6 +89,7 @@
 /* DMA Registers */
 
 #define DMA_MODE                    0x1000      /* Establishes the bus operating modes for the DMA. */
+#define DMA_CH0_CONTROL             0x1100      /* Specifies the MSS value for segmentation, length to skip between two descriptors, and also the features such as header splitting and 8xPBL mode. */
 #define DMA_CH0_TX_CONTROL          0x1104      /* Controls the Tx features such as PBL, TCP segmentation and Tx channel weights. */
 #define DMA_CH0_RX_CONTROL          0x1108      /* Controls the Rx features such as PBL, buffer size and extended status. */
 #define DMA_CH0_TXDESC_LIST_ADDR    0x1114      /* Points the DMA to the start of the tx descriptor list. Can only write to this register when tx is stopped. */
@@ -104,16 +105,24 @@
 
 #define DMA_MODE_SWR                BIT(0)      /* Software reset when this bit is set. */
 
+/* DMA CH0 Control Bits */
+
+#define DMA_CH0_CONTROL_PBLx8       BIT(16)     /* 8xPBL mode. */
+
 /* DMA CH0 Tx Control Bits */
 
 #define DMA_CH0_TX_CONTROL_ST       BIT(0)      /* Start or stop transmission. When set, tx is placed in the 'Running' state. */
 #define DMA_CH0_TX_CONTROL_OSF      BIT(4)      /* Operate on second packet when this bit is set. */
+#define DMA_CH0_TX_CONTROL_PBL_POS  16          /* The position of the TxPBL field to use for bit shifting. */
+#define DMA_CH0_TX_CONTROL_PBL_MASK (0b111111 << DMA_CH0_TX_CONTROL_PBL_POS) /* Mask for the TxPBL field. */
 
 /* DMA CH0 Rx Control Bits */
 
 #define DMA_CH0_RX_CONTROL_SR       BIT(0)      /* Start or stop receive. When this bit is set DMA attempts to acquire a rx descriptor. */
 #define DMA_CH0_RX_RBSZ_POS         1           /* The position of the RBSZ field to use for bit shifting. */
 #define DMA_CH0_RX_RBSZ_MASK        (0b11111111111111 << DMA_CH0_RX_RBSZ_POS) /* Mask for the RBSZ field. */
+#define DMA_CH0_RX_CONTROL_PBL_POS  16          /* The position of the RxPBL field to use for bit shifting. */
+#define DMA_CH0_RX_CONTROL_PBL_MASK (0b111111 << DMA_CH0_RX_CONTROL_PBL_POS) /* Mask for the RxPBL field. */
 
 /* DMA CH0 Interrupt Enable Bits */
 

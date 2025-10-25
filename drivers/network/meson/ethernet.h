@@ -9,7 +9,6 @@
 
 #define DMA_REG_OFFSET              (0x1000)            /* Offset of the DMA Registers. */
 #define MAX_RX_FRAME_SZ             (0x600)             /* Maximum size of a received packet. */
-#define DMA_PBL                     (32)                /* DMA programmable burst length. Must be 1, 2, 4, 8, 16, or 32. */
 
 /* DMA Bus mode register definitions */
 #define DMAMAC_SWRST                (1 << 0)            /* Resets all GMAC Subsystem internal registers and logic. Cleared automatically after the reset operation has completed. */
@@ -26,7 +25,7 @@
 #define RX_PBL_MASK                 (0x7e0000)          /* Maximum number of beats to be transferred in one RxDMA transaction. Only applicable when USE_SEP_PBL is set. */
 #define RX_PBL_SHFT                 (17)
 #define USE_SEP_PBL                 (1 << 23)           /* Configures the RxDMA to use the value in bits [22:17] and TxDMA to use value in bits [13:8]. When unset [13:8] is applicable for both DMA engines. */
-#define DMA_PBL_X4                  (1 << 24)           /* Multiplies the PBL value programmed (bits[22:17] and bits [13:8]) four times. */
+#define DMA_PBL_X                   (1 << 24)           /* Multiplies the PBL value programmed (bits[22:17] and bits [13:8]) four times (before 3.50a) or eight times. */
 
 /* DMA Poll demand register definitions - When these bits are written with any value, the DMA reads the current descriptor pointed to by Register 18.
    If that descriptor is not available (owned by Host), transmission returns to the Suspend state and buffer unavailable is asserted in the status register.
@@ -73,8 +72,9 @@
 #define TX_THRSH_MASK               (0x1c000)            /* Transmit Threshold Control. These three bits control the threshold level of the MTL Transmit FIFO. Transmission starts when the frame size within the MTL Transmit FIFO is larger than the threshold*/
 #define TX_THRSH_SHFT               (14)
 #define FLUSHTXFIFO                 (1 << 20)            /* Flush Transmit FIFO. When this bit is set, the transmit FIFO controller logic is reset to its default values and thus all data in the Tx FIFO is lost/flushed. */
-#define STOREFORWARD                (1 << 21)            /* When this bit is set, transmission starts when a full frame resides in the MTL Transmit FIFO. When this bit is set, the TTC values specified in Register6[16:14] are ignored. */
+#define TX_STOREFORWARD             (1 << 21)            /* When this bit is set, transmission starts when a full frame resides in the MTL Transmit FIFO. When this bit is set, the TTC values specified in Register6[16:14] are ignored. */
 #define DIS_FRMFLUSH                (1 << 24)            /* Disable Flushing of Received Frames. When this bit is set, the RxDMA does not flush any frames due to the unavailability of receive descriptors/buffers as it does normally when this bit is reset. */
+#define RX_STOREFORWARD             (1 << 25)            /* When this bit is set, the MTL reads a frame from the Rx FIFO only after the complete frame has been written to it, ignoring the RTC bits. When this bit is reset, the Rx FIFO operates in the cut-through mode, subject to the threshold specified by the RTC bits. */
 
 /* DMA Missed Frame and Buffer Overflow Counter register definitions */
 #define FIFO_OVFLW_BIT              (1 << 28)            /* Overflow bit for FIFO Overflow Counter */
@@ -152,6 +152,7 @@
 #define DESC_TXCTRL_TXINT           (1 << 31)           /* Sets Transmit Interrupt after the present frame has been transmitted. */
 #define DESC_TXCTRL_TXLAST          (1 << 30)           /* Buffer contains the last segment of the frame. */
 #define DESC_TXCTRL_TXFIRST         (1 << 29)           /* Buffer contains the first segment of a frame. */
+#define DESC_TXCTRL_TXCIC           (3 << 27)           /* Calculate and insert a TCP/UDP/ICMP/IP checksum in hardware. */
 #define DESC_TXCTRL_TXCRCDIS        (1 << 26)           /* GMAC does not append the Cyclic Redundancy Check (CRC) to the end of the transmitted frame.*/
 #define DESC_TXCTRL_TXRINGEND       (1 << 25)           /* Descriptor list reached its final descriptor. DMA must loop around. */
 #define DESC_TXCTRL_TXCHAIN         (1 << 24)           /* Second address in the descriptor is the Next Descriptor address rather than the second buffer address. */
@@ -195,4 +196,5 @@ struct eth_dma_regs {
     uint32_t currhostrxdesc;                            /* 0x4c Points to the start of current Receive Descriptor read by the DMA. */
     uint32_t currhosttxbuffaddr;                        /* 0x50 Points to the current Transmit Buffer address read by the DMA. */
     uint32_t currhostrxbuffaddr;                        /* 0x54 Points to the current Transmit Buffer address read by the DMA. */
+    uint32_t hw_feature;                                /* 0x58 Hardware feature register. */
 };

@@ -159,6 +159,9 @@ static void tx_provide(void)
             if (idx + 1 == tx.capacity) {
                 cntl |= DESC_TXCTRL_TXRINGEND;
             }
+#if defined(CONFIG_PLAT_ODROIDC4) || defined(CONFIG_PLAT_ODROIDC2)
+            cntl |= DESC_TXCTRL_TXCIC;
+#endif
             update_ring_slot(&tx, idx, DESC_TXSTS_OWNBYDMA, cntl, buffer.io_or_offset, 0);
 
             tx.tail++;
@@ -251,15 +254,25 @@ static void eth_setup(void)
     eth_mac->macaddr0lo = l;
     eth_mac->macaddr0hi = h;
 
-    eth_dma->busmode = PRIORXTX_11 | ((DMA_PBL << TX_PBL_SHFT) & TX_PBL_MASK);
+#if defined(CONFIG_PLAT_ODROIDC4) || defined(CONFIG_PLAT_ODROIDC2)
+    /*
+     * Odroid-C4 uses the S905X3 SoC, whose ethernet MAC has a 4KB RX FIFO and a 2KB TX FIFO
+     * and uses a 32-bit AHB bus. Odroid-C2 has the same hardware configuration.
+     * To ensure deadlock-free Tx checksum offload, we set TxPBL to 128 = 16 * 8 (PBLx8).
+     * The value of TxPBL here must not be greater than 128.
+     */
+    eth_dma->busmode = PRIORXTX_11 | DMA_PBL_X | USE_SEP_PBL | ((32 << RX_PBL_SHFT) & RX_PBL_MASK)
+                     | ((16 << TX_PBL_SHFT) & TX_PBL_MASK);
+#endif
     /*
      * Operate in store-and-forward mode.
      * Send pause frames when there's only 1k of fifo left,
-     * stop sending them when there is 2k of fifo left.
+     * stop sending them when there is 1k of fifo left.
      * Continue DMA on 2nd frame while updating status on first
      */
-    eth_dma->opmode = STOREFORWARD | EN_FLOWCTL | (0 << FLOWCTL_SHFT) | (1 < DISFLOWCTL_SHFT) | TX_OPSCND;
-    eth_mac->conf = FULLDPLXMODE;
+    eth_dma->opmode = RX_STOREFORWARD | TX_STOREFORWARD | EN_FLOWCTL | (0 << FLOWCTL_SHFT) | (0 << DISFLOWCTL_SHFT)
+                    | TX_OPSCND;
+    eth_mac->conf = FULLDPLXMODE | IP_CHK_OFFLD;
 
     eth_dma->rxdesclistaddr = device_resources.regions[1].io_addr;
     eth_dma->txdesclistaddr = device_resources.regions[2].io_addr;
