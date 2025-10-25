@@ -9,7 +9,6 @@
 
 #define DMA_REG_OFFSET              (0x1000)            /* Offset of the DMA Registers. */
 #define MAX_RX_FRAME_SZ             (0x600)             /* Maximum size of a received packet. */
-#define DMA_PBL                     (32)                /* DMA programmable burst length. Must be 1, 2, 4, 8, 16, or 32. */
 
 /* DMA Bus mode register definitions */
 #define DMAMAC_SWRST                (1 << 0)            /* Resets all GMAC Subsystem internal registers and logic. Cleared automatically after the reset operation has completed. */

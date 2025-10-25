@@ -258,12 +258,11 @@ static void eth_setup(void)
     /*
      * Odroid-C4 uses the S905X3 SoC, whose ethernet MAC has 4KB RX FIFO and 2KB TX FIFO
      * and uses 32-bit AHB bus. Odroid-C2 has the same hardware configuration.
-     * To ensure deadlock-free Tx checksum offload, we set PBL to 128 = 16 * 8 (PBLx8).
-     * The value of PBL here must not be greater than 128.
+     * To ensure deadlock-free Tx checksum offload, we set TxPBL to 128 = 16 * 8 (PBLx8).
+     * The value of TxPBL here must not be greater than 128.
      */
-    eth_dma->busmode = PRIORXTX_11 | DMA_PBL_X | ((16 << TX_PBL_SHFT) & TX_PBL_MASK);
-#else
-    eth_dma->busmode = PRIORXTX_11 | ((DMA_PBL << TX_PBL_SHFT) & TX_PBL_MASK);
+    eth_dma->busmode = PRIORXTX_11 | DMA_PBL_X | USE_SEP_PBL | ((32 << RX_PBL_SHFT) & RX_PBL_MASK)
+                     | ((16 << TX_PBL_SHFT) & TX_PBL_MASK);
 #endif
     /*
      * Operate in store-and-forward mode.
