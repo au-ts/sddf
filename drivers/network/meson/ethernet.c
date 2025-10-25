@@ -256,8 +256,8 @@ static void eth_setup(void)
 
 #if defined(CONFIG_PLAT_ODROIDC4) || defined(CONFIG_PLAT_ODROIDC2)
     /*
-     * Odroid-C4 uses the S905X3 SoC, whose ethernet MAC has 4KB RX FIFO and 2KB TX FIFO
-     * and uses 32-bit AHB bus. Odroid-C2 has the same hardware configuration.
+     * Odroid-C4 uses the S905X3 SoC, whose ethernet MAC has a 4KB RX FIFO and a 2KB TX FIFO
+     * and uses a 32-bit AHB bus. Odroid-C2 has the same hardware configuration.
      * To ensure deadlock-free Tx checksum offload, we set TxPBL to 128 = 16 * 8 (PBLx8).
      * The value of TxPBL here must not be greater than 128.
      */
