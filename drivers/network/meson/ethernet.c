@@ -24,9 +24,6 @@ __attribute__((__section__(".net_driver_config"))) net_driver_config_t config;
 #define TX_COUNT 256
 #define MAX_COUNT MAX(RX_COUNT, TX_COUNT)
 
-/* The same as Linux's default for pause frame timeout */
-const uint32_t pause_time = 0xffff;
-
 struct descriptor {
     uint32_t status;
     uint32_t cntl;
@@ -266,22 +263,15 @@ static void eth_setup(void)
 #endif
     /*
      * Operate in store-and-forward mode.
-     * Send pause frames when there's only 1k of fifo left,
-     * stop sending them when there is 1k of fifo left.
      * Continue DMA on 2nd frame while updating status on first
      */
-    eth_dma->opmode = RX_STOREFORWARD | TX_STOREFORWARD | EN_FLOWCTL | (0 << FLOWCTL_SHFT) | (0 << DISFLOWCTL_SHFT)
-                    | TX_OPSCND;
+    eth_dma->opmode = RX_STOREFORWARD | TX_STOREFORWARD | TX_OPSCND;
     eth_mac->conf = FULLDPLXMODE | IP_CHK_OFFLD;
 
     eth_dma->rxdesclistaddr = device_resources.regions[1].io_addr;
     eth_dma->txdesclistaddr = device_resources.regions[2].io_addr;
 
     eth_mac->framefilt |= PMSCUOUS_MODE;
-
-    uint32_t flow_ctrl = GMAC_FLOW_CTRL_UP | GMAC_FLOW_CTRL_RFE | GMAC_FLOW_CTRL_TFE;
-    flow_ctrl |= (pause_time << GMAC_FLOW_CTRL_PT_SHIFT);
-    eth_mac->flowcontrol = flow_ctrl;
 }
 
 void init(void)
