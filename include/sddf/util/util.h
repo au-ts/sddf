@@ -45,6 +45,9 @@
        _d * (_n/_d + (_n % _d == 0 ? 0 : 1)); \
     })
 #endif
+#ifndef ROUND_DOWN
+#define ROUND_DOWN(n, d) ((n) - ((n) % (d)))
+#endif
 #ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #endif
