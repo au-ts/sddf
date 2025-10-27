@@ -99,7 +99,7 @@ struct virtio_input_event {
 static void eventq_provide(void);
 
 static void virtio_input_event_print(struct virtio_input_event *event) {
-    LOG_DRIVER("event type: 0x%x, code: 0x%x, value: 0x%lx\n", event->type, event->code, event->value);
+    LOG_DRIVER("event type: 0x%x, code: 0x%x, value: 0x%x\n", event->type, event->code, event->value);
 }
 
 static void virtio_input_config_select(volatile struct virtio_input_config *cfg, uint8_t select, uint8_t subsel) {
@@ -125,7 +125,7 @@ static void eventq_process(void) {
 
         struct virtq_desc desc = event_virtq.desc[used.id];
 
-        uintptr_t addr = desc.addr;
+        // uintptr_t addr = desc.addr;
         // LOG_DRIVER("addr: 0x%lx, len: %d\n", addr, desc.len);
         assert(desc.len == sizeof(struct virtio_input_event));
 
@@ -304,9 +304,9 @@ void input_setup() {
     // Select the event types we want, right now this is hard-coded for QEMU mouse and keyboard.
     virtio_input_config_select(virtio_config, VIRTIO_INPUT_CFG_ID_NAME, 0);
     uint8_t ev_bits;
-    if (!memcmp(virtio_config->u.string, VIRTIO_ID_NAME_QEMU_MOUSE, virtio_config->size)) {
+    if (!strncmp(virtio_config->u.string, VIRTIO_ID_NAME_QEMU_MOUSE, virtio_config->size)) {
         ev_bits = EV_REL;
-    } else if (!memcmp(virtio_config->u.string, VIRTIO_ID_NAME_QEMU_KEYBOARD, virtio_config->size)) {
+    } else if (!strncmp(virtio_config->u.string, VIRTIO_ID_NAME_QEMU_KEYBOARD, virtio_config->size)) {
         ev_bits = EV_KEY;
     } else {
         // TODO: strings are not null-terminated, don't do this
