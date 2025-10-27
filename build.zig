@@ -84,6 +84,17 @@ const util_src_riscv64 = [_][]const u8{
     "util/custom_libc/riscv64/strncmp.c",
 };
 
+const util_src_x86_64 = [_][]const u8{
+    "util/custom_libc/x86_64/memcmp.c",
+    "util/custom_libc/x86_64/memcpy.S",
+    "util/custom_libc/x86_64/memmove.c",
+    "util/custom_libc/x86_64/memset.S",
+    "util/custom_libc/x86_64/strcmp.c",
+    "util/custom_libc/x86_64/strcpy.c",
+    "util/custom_libc/x86_64/strlen.c",
+    "util/custom_libc/x86_64/strncmp.c",
+};
+
 const util_putchar_debug_src = [_][]const u8{
     "util/assert.c",
     "util/printf.c",
@@ -388,6 +399,12 @@ pub fn build(b: *std.Build) !void {
                     .files = &util_src_riscv64,
                 });
                 util.addIncludePath(b.path("util/custom_libc/riscv64"));
+            },
+            .x86_64 => {
+                util.addCSourceFiles(.{
+                    .files = &util_src_x86_64,
+                });
+                util.addIncludePath(b.path("util/custom_libc/x86_64"));
             },
             else => unreachable,
         }
