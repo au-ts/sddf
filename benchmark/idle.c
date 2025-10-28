@@ -18,16 +18,28 @@ __attribute__((__section__(".benchmark_config"))) benchmark_idle_config_t config
 
 struct bench *b;
 
+static inline uint64_t read_cycle_count() {
+    uint64_t cycle_count;
+#if CONFIG_ARCH_ARM
+    SEL4BENCH_READ_CCNT(cycle_count);
+#elif CONFIG_ARCH_RISCV
+    asm volatile("rdcycle %0" :"=r"(cycle_count));
+#else
+#error "unsupported architecture for 'read_cycle_count'"
+#endif
+
+    return cycle_count;
+}
+
 void count_idle(void)
 {
 #if ENABLE_BENCHMARKING
-    uint64_t val;
-    SEL4BENCH_READ_CCNT(val);
+    uint64_t val = read_cycle_count();
     b->prev = val;
     b->ccount = 0;
 
     while (1) {
-        SEL4BENCH_READ_CCNT(val);
+        val = read_cycle_count();
         __atomic_store_n(&b->ts, val, __ATOMIC_RELAXED);
         uint64_t diff = b->ts - b->prev;
 
