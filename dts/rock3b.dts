@@ -1808,19 +1808,12 @@
     and sit next to one another from a base address.
     */
 
-	rktimer@ff700000 {
+    /* TODO: verify works, add IRQs for other timers if confirmed */
+	rktimer@fe5f0000 {
 		compatible = "rockchip,rk3568-timer";
-		reg = <0x00 0xff700000 0x00 0x20>;
-		interrupts = <0x00 0x8d 0x04>;
+		reg = <0x00 0xfe5f0000 0x00 0x10000>;
+		interrupts = <0x00 0x6d 0x04>;
 		/*clocks = <0x08 0x168 0x08 0x5a>; */
-		clock-names = "xin24m";
-	};
-
-	rktimer@ff700020 {
-		compatible = "rockchip,rk3568-timer";
-		reg = <0x00 0xff700020 0x00 0x20>;
-		interrupts = <0x00 0x8e 0x04>;
-		/* clocks = <0x08 0x168 0x08 0x5a>; */
 		clock-names = "xin24m";
 	};
 
