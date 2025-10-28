@@ -30,7 +30,8 @@ SUPPORTED_BOARDS := \
 		    qemu_virt_riscv64 \
 		    rpi4b_1gb \
 		    star64 \
-		    zcu102
+		    zcu102 \
+			rock3b
 
 ifeq ($(strip $(TOOLCHAIN)),)
 	TOOLCHAIN := clang
