@@ -27,6 +27,7 @@ SUPPORTED_BOARDS := \
 			star64 \
 			x86_64_generic \
 			rpi4b_1gb \
+   			hifive_p550 \
 			zcu102
 
 TOOLCHAIN ?= clang
