@@ -60,7 +60,7 @@ typedef struct serial_client_config {
     serial_connection_resource_t tx;
 } serial_client_config_t;
 
-static bool serial_config_check_magic(void *config)
+static inline bool serial_config_check_magic(void *config)
 {
     char *magic = (char *)config;
     for (int i = 0; i < SDDF_SERIAL_MAGIC_LEN; i++) {

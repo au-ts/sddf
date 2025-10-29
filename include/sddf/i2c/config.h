@@ -54,7 +54,7 @@ typedef struct i2c_client_config {
     region_resource_t data;
 } i2c_client_config_t;
 
-static bool i2c_config_check_magic(void *config)
+static inline bool i2c_config_check_magic(void *config)
 {
     char *magic = (char *)config;
     for (int i = 0; i < SDDF_I2C_MAGIC_LEN; i++) {
