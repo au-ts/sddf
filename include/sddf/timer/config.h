@@ -18,7 +18,7 @@ typedef struct timer_client_config {
     uint8_t driver_id;
 } timer_client_config_t;
 
-static bool timer_config_check_magic(void *config)
+static inline bool timer_config_check_magic(void *config)
 {
     char *magic = (char *)config;
     for (int i = 0; i < SDDF_TIMER_MAGIC_LEN; i++) {

@@ -14,7 +14,7 @@
 #define HTONS(x) ((uint16_t)((((x) & (uint16_t)0x00ffU) << 8) | (((x) & (uint16_t)0xff00U) >> 8)))
 #endif
 
-static void net_set_mac_addr(uint8_t *mac, uint64_t val)
+static inline void net_set_mac_addr(uint8_t *mac, uint64_t val)
 {
     mac[0] = val >> 40 & 0xff;
     mac[1] = val >> 32 & 0xff;

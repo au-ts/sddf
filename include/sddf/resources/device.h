@@ -33,7 +33,7 @@ typedef struct device_resources {
     device_irq_resource_t irqs[DEVICE_MAX_IRQS];
 } device_resources_t;
 
-static bool device_resources_check_magic(device_resources_t *device)
+static inline bool device_resources_check_magic(device_resources_t *device)
 {
     for (int i = 0; i < DEVICE_MAGIC_LEN; i++) {
         if (device->magic[i] != DEVICE_MAGIC[i]) {
