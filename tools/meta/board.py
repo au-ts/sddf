@@ -100,6 +100,7 @@ BOARDS: List[Board] = [
         timer="timer",
         blk="virtio_mmio@a003e00",
         ethernet="virtio_mmio@a003e00",
+        i2c=None,
     ),
     Board(
         name="qemu_virt_riscv64",
@@ -110,6 +111,7 @@ BOARDS: List[Board] = [
         ethernet="soc/virtio_mmio@10008000",
         blk="soc/virtio_mmio@10008000",
         partition=0,
+        i2c=None,
     ),
     Board(
         name="rpi4b_1gb",
