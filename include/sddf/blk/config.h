@@ -55,7 +55,7 @@ typedef struct blk_client_config {
     region_resource_t data;
 } blk_client_config_t;
 
-static bool blk_config_check_magic(void *config)
+static inline bool blk_config_check_magic(void *config)
 {
     char *magic = (char *)config;
     for (int i = 0; i < SDDF_BLK_MAGIC_LEN; i++) {
