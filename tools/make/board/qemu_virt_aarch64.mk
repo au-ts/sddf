@@ -9,6 +9,8 @@ BLK_DRIV_DIR := virtio
 GPU_DRIV_DIR := virtio
 NET_DRIV_DIR := virtio
 ETH_DRIV := eth_driver_virtio.elf
+ETH_DRIV_DIR1 := ${NET_DRIV_DIR}
+ETH_DRIV_1 := ${ETH_DRIV}
 TIMER_DRIV_DIR := ${PLATFORM}
 UART_DRIV_DIR := ${PLATFORM}
 
