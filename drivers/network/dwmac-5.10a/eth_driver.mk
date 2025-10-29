@@ -12,10 +12,10 @@
 
 ETHERNET_DRIVER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 
-CHECK_NETDRV_FLAGS_MD5:=.netdrv_cflags-$(shell echo -- ${CFLAGS} ${CFLAGS_network} | shasum | sed 's/ *-//')
+CHECK_DWMAC_FLAGS_MD5:=.DWMAC_cflags-$(shell echo -- ${CFLAGS} ${CFLAGS_network} | shasum | sed 's/ *-//')
 
-${CHECK_NETDRV_FLAGS_MD5}:
-	-rm -f .netdrv_cflags-*
+${CHECK_DWMAC_FLAGS_MD5}:
+	-rm -f .DWMAC_cflags-*
 	touch $@
 
 eth_driver_dwmac-5.10a.elf: network/dwmac-5.10a/ethernet.o
