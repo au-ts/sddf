@@ -81,7 +81,7 @@ typedef struct virtio_net_hdr {
     uint16_t csum_offset; /* Offset after that to place checksum */
 } virtio_net_hdr_t;
 
-static void virtio_net_print_config(volatile virtio_net_config_t *config)
+static inline void virtio_net_print_config(volatile virtio_net_config_t *config)
 {
     LOG_DRIVER("Printing virtIO net config:\n");
     sddf_printf("    mac: %x:%x:%x:%x:%x:%x\n",
@@ -96,7 +96,7 @@ static void virtio_net_print_config(volatile virtio_net_config_t *config)
     sddf_printf("    supported_hash_types: 0x%x\n", config->supported_hash_types);
 }
 
-static void virtio_net_print_hdr(volatile virtio_net_hdr_t *hdr)
+static inline void virtio_net_print_hdr(volatile virtio_net_hdr_t *hdr)
 {
     LOG_DRIVER("Printing virtIO net header:\n");
     sddf_printf("    flags: 0x%x\n", hdr->flags);
@@ -107,7 +107,7 @@ static void virtio_net_print_hdr(volatile virtio_net_hdr_t *hdr)
     sddf_printf("    csum_offset: 0x%x\n", hdr->csum_offset);
 }
 
-static void virtio_net_print_features(uint64_t features)
+static inline void virtio_net_print_features(uint64_t features)
 {
     if (features & ((uint64_t)1 << VIRTIO_NET_F_CSUM)) {
         sddf_printf("    VIRTIO_NET_F_CSUM\n");
