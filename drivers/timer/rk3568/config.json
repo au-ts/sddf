@@ -12,6 +12,9 @@
         "irqs": [
             {
                 "dt_index": 0
+            },
+            {
+                "dt_index": 1
             }
         ]
     }
