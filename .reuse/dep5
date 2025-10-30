@@ -40,6 +40,7 @@ License: BSD-2-Clause
 Files:
     examples/gpu/fb_img.jpeg
     examples/echo_server/docs/echo_server.svg
+    docs/i2c/i2cdriver.drawio.png
 Copyright: UNSW
 License: CC-BY-SA-4.0
 
