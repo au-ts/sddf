@@ -183,7 +183,7 @@
 
 \title{sDDF Design}
 \SubTitle{Design, Implementation and Evaluation of the\\ seL4 Device Driver Framework}
-\author{Gernot Heiser, Peter Chubb, Alex Brown, Julia Broady, Courtney Darville, Lucy Parker}
+\author{Gernot Heiser, Peter Chubb, Alex Brown, Julia Vassiliki, Courtney Darville, Lucy Parker}
 \Email{gernot@unsw.edu.au}
 \date{\Release \ifDraft\ of \today\fi}
 \maketitle
@@ -1836,38 +1836,75 @@ do not plan to support this feature.
 The specifications for Ethernet are tested and evaluated, they are
 \textbf{stable}.
 
-\section{Serial ports}\label{s:cl-serial}
+\section{Asynchronous serial busses}\label{s:cl-serial}
 
-The \gls{sddf} covers only asynchronous serial \gls{io} at the moment, as
-synchronous serial is not anywhere near as common.
+\subsection{UART}
 
-Asynchronous serial \gls{io} is very similar to networking, in that output is
+UART (Universal Asynchronous Receiver-Transmitter) \gls{io} is an asynchronous
+serial communication standard used on most consumer electronics for bidirectional
+text communication.
+
+UART is very similar to networking, in that output is
 client-initiated, and input is spontaneous.  At the hardware level,
 communicating terminals need to agree on bit-rate, number of bits per
 character, and whether a parity bit is included.
 
-Serial tends to be much lower bandwidth (most serial ports have a
-maximum bit rate around 4Mb/s; the POSIX standard only mentions up to
-32768b/s.
+UART tends to be much lower bandwidth than networking, with most serial
+ports having a maximum throughput around 4Mb/s. Consequently, the UART
+subsystem merges the data being transferred into the same metadata region
+as the queue head and tail.
 
-As such the serial framework merges the data being transferred into
-the same metadata region as the queue head and tail.
+The UART subsystem is referred to as ``serial" within the sDDF.
 
 Note: More \textbf{details to come}.
 
-
-\section{Serial busses}\label{s:cl-bus}
-
-\subsubsection{SPI}\label{s:cl-spi}
+\subsection{USB}\label{s:cl-usb}
 
 \ToCome{Details}
 
-\subsubsection{I2C host}\label{s:cl-i2c}
 
-The \gls{i2c} device class is a multi-client serial bus that allows
-clients to initiate
-requests (i.e.\ acting as controllers) to a device as well as receiving a response (i.e.\
-acting as targets).
+\section{Synchronous serial busses}\label{s:cl-bus}
+
+\subsection{I2C host}\label{s:cl-i2c}
+
+\gls{i2c} (inter-integrated-circuit) is a half-duplex two-wire
+synchronous serial bus used for interfacing between chips. The
+bus architecture consists of some number of controllers
+which control targets (peripherals). The sDDF supplies a
+driver for hardware I2C controllers with 7-bit addressing.
+
+All targets have a bus address which is typically 7 bits.
+A controller can start a transaction by sending a start bit
+followed by an address. The final bit of the address specifies
+if the operation is a read.
+
+On every rising edge of the clock after the start and address,
+the controller will write a bit or read a bit until there is
+no more data available. The controller sends a STOP condition
+to indicate it is done writing, or the target send a NACK to
+indicate no more data can be read. Only one target can ever
+be addressed at any one time and all interactions must be
+instigated by a controller.
+
+An important convention for I2C is the usage of device register
+addressing. This is not a part of the standard but is used in
+most peripherals. Registers are addressed by performing a 1-byte
+write operation to send the target register to the device before
+continuing to perform the expected operation. For example, a read
+to register 0x55 begins as:
+\begin{itemize}
+  \item Start condition,
+  \item address of peripheral with read bit set to zero (write),
+  \item write register address (0x55),
+  \item (repeated) start condition,
+  \item address of peripheral with read bit set.
+\end{itemize}
+
+For writes, the first byte of the written data is interpreted as
+the register address. We refer to the ``read from register" operation
+as a ``write read" within our materials for brevity.
+
+\subsubsection{Transport layer}
 
 \begin{figure}[th]
   \centering
@@ -1878,77 +1915,166 @@ acting as targets).
   \label{f:i2c_diagram}
 \end{figure}
 
-The \gls{i2c} subsystem has each client's data region mapped directly into the driver's address space.
-Each Virtualiser corresponds to exactly one driver which corresponds to exactly one \gls{i2c} bus line.
-The Virtualiser checks for authentic requests before it maps client-specific offsets into a driver-specific offset and vice versa.
-It also demultiplexes the responses from the driver to the correct client.
-Each MD region contains only a \gls{rq} and a \gls{rs} queue.
+% TODO: add more diagrams matching the diagrams elsewhere in this doc.
 
-\gls{i2c} interactions happen in terms of \emph{tokens} (1 token = 1 byte), see
-\autoref{l:i2c_token_definition} for their definitions.
-Intially a client will create a single request in the form of a request buffer containing tokens
-and payload data which, once enqueued, travels only along the \gls{rq} interfaces between Client, Virtualiser and Driver.
+The \gls{i2c} subsystem has each client's
+data region mapped directly into the driver's address space instead
+of using DMA buffers to share information as we assume a non-DMA compatable
+host controller.
 
-\begin{lstlisting}[gobble=2,firstline=2,float=th,
-  label={l:i2c_token_definition},
-  caption={I2C token definitions.}]
+As a protocol with a controller-target architecture, the \gls{i2c} protocol
+has an asymmetrical queueing design because there is very little data in
+responses relative to requests. There is no notion of bidirectional communication,
+clients instead request reads and writes and receive only simple acknowledgements
+in return. This is contrasted with the identical RX and TX queues in bidirectional
+(symmetric) driver susbsystems.
 
-  enum i2c_token {
-    /* START: Begin a transfer. Causes master device to capture bus. */
-    I2C_TOKEN_START = 0x1,
-    /* ADDRESS WRITE: Address target.
-    The byte immediately following this token is an integer (N) length of the
-    succeeding write. Max size 255. The next N bytes are the payload. */
-    I2C_TOKEN_ADDR_WRITE = 0x2,
-    /* ADDRESS READ: Address target.
-    The byte immediately following this token is an integer (N) length of the
-    desired read. Max size 255. */
-    I2C_TOKEN_ADDR_READ = 0x3,
-    /* CONTINUING READ: same as ADDRESS READ, but does not end the read operation.
-    Allows chaining of multiple reads for arbitrarily long read operations.
-    A multi-read chain should consist of several READCs terminated by a
-    final READ. */
-    I2C_TOKEN_ADDR_READC = 0x4,
-    /* STOP: Used to send the STOP condition on the bus to end a transaction.
-    Causes master to release the bus. */
-    I2C_TOKEN_STOP = 0x5,
-  };
-\end{lstlisting}
+Each PD in the driver subsystem is connected
+using a request and response queue, where requests contain
+specifications for I2C transactions and responses contain a simple error state
+and number of bytes written or read.
 
-Note: a single I2C transaction can only be for one address.
+Requests are structured as a series of commands, where each command corresponds
+to a single read or write operation against a single buffer in the data region.
+Each buffer is an arbitrary pointer to the data region as specified by the client.
 
-The Driver will parse the request and potentially divide it into smaller segments,
-each of which will be loaded into \gls{mmio} device registers
-on an interface of an explicitly, initially configured \gls{i2c} bus line.
-If the request is a READ, for each segment of the request a corresponding response
-will be loaded into the \gls{mmio} device registers by the device.
-The driver uses this data to build a response which re-uses the request buffer.
-Once the request has been completely loaded through the registers and converted into a response,
-the resulting response buffer will be enqueued by the Driver into the \gls{rs} queue.
-This response now travels only along the \gls{rs} interfaces between Driver, Virtualiser and Client.
+The request queue has a special behaviour: the tail pointer (most recently enqueued
+member) is not updated immediately upon enqueue. Instead, a staged tail is maintained
+by the client and is ``committed" once a client has inserted all the commands it needs
+in a transaction. This prevents race conditions in multicore environments by ensuring
+transactions are transmitted atomically.
 
-\autoref{l:i2c_queue_entry} shows the format of the entries in the \gls{rq}
-and \gls{rs} queues.
+The first command in a request is the header, specifying the bus address that all
+commands target and the number of commands in the request. Since I2C is a serial
+protocol which has all interactions specified by the controller, it is very important
+that transactions are transmitted in the order clients expect. It is impossible to
+address a different client in the midst of a transaction without breaking the ongoing
+transaction! The header is used to group commands to ensure monotonic, contiguous
+transmission.
+
+Commands are implemented as a tagged union such that they can function as a header or
+regular command as shown in \autoref{l:i2ccmddef}. A flag mask sets properties of
+the command such as whether to insert a stop condition or if the command is a header.
 
 \begin{lstlisting}[gobble=2,firstline=2,float=th,
-  label={l:i2c_queue_entry},
-  caption={I2C request and response queue entry data structure.}]
+  label={l:i2ccmddef},
+  caption={I2C command structure.}]
+  typedef struct i2c_cmd {
+    union {
+        /* Location of read destination / write data in data region */
+        uint8_t *data;
 
-  struct i2c_queue_entry {
-    size_t offset;
-    unsigned int len;
-    size_t bus_address;
-  };
+        /* Fields for header members */
+        struct {
+            uint16_t batch_len;
+            i2c_addr_t address;
+        } i2c_header;
+    } payload;
+    /* Size of read/write operation. Max 256 back-to-back reads / 64KiB write */
+    /* Unused if this is a header command */
+    uint8_t data_len;
+    i2c_cmd_flags_t flag_mask;
+  } i2c_cmd_t;
 \end{lstlisting}
 
-The Virtualiser provides a \gls{ppc} interface for a Client to claim
-a free address on the \gls{i2c} bus line.
+It is an invariant that a header specifying a transaction of N commands must be followed
+by those N commands immediately. It is not possible to enqueue partial requests as this
+will significantly complicate the design of the device class.
 
-\paragraph{Status}
+The response queue is a simple first-in, first-out queue containing simple response
+structures. Each response contains the I2C bus address of the corresponding request,
+the error value and the number of bytes written or read.
 
-The basic design is \textbf{preliminary and subject to change}.
+% TODO: diagram of a chain of commands with their header, showing buffers pointing to shared data region.
 
-\subsubsection{USB}\label{s:cl-usb}
+\subsubsection{Clients and libi2c}
+
+Clients can request I2C transactions by composing a chain of requests locally and enqueuing
+them to the virtualiser queue. The virtualiser will process the contents of the queue upon
+being notified by the client. The client can manually compose an arbitrary transaction by
+creating commands or it can use libi2c to simplify transactions.
+
+\texttt{libi2c} is a simple blocking interface to the \gls{i2c} driver subsystem, supplying
+functions to compose single-command transactions. It also supplies non-blocking variations of
+all calls to enable usage of alternative concurrency models.
+
+Whether the client used libi2c or not, the client will be signalled and a response struct
+will be returned by the virtualiser once the driver is finished working on the transaction.
+
+\subsubsection{Virtualiser}
+
+There is a single virtualiser in the \gls{i2c} driver subsystem, connected to all clients
+with request and response queues and using notifications for IPC. The virtualiser is
+responsible for ensuring that incoming requests are valid and processed in the correct order.
+It also is responsible for translating data buffer addresses in commands to their
+mappings in the driver address space.
+
+Unlike most other sDDF virtualisers, the \gls{i2c} virtualiser must operate freely
+from PD notifications instead of being driven transiently by them. This is to say that
+rather than simply forwarding requests or responses as they arrive, the virtualiser instead
+builds an internal queue of work which it will process independently. The driver expects to
+only receive fully formed transactions in its queue and the virtualiser must thus always wait
+until enough room exists to forward work. This means that the virtualiser will try and forward
+requests both upon being notified by a client as well as when the driver notifies it to handle
+a response.
+
+Incoming work from clients is enqueued in an internal queue structure
+and is guaranteed to be processed in order of arrival. This is a necessary policy to
+allow monotonic request processing without livelock.
+
+Whenever the virtualiser is awoken, it will perform the following steps:
+\begin{itemize}
+  \item If signalled by the driver, accept and forward all responses to clients. Signal
+    clients who received a response.
+  \item If there are any requests in the virtualiser internal work queue, attempt to process
+    all of them. Any that cannot fit in the driver queue are left behind.
+  \item If all deferred work was completed and a client signalled the virtualiser, handle the
+    incoming work from that client. Process requests immediately if they fit in the driver queue
+    and defer anything that remains. If previous deferred requests could not complete,
+    the virtualiser adds the new request(s) to the back of the internal queue.
+\end{itemize}
+
+The addressing unit for the \gls{i2c} device class is the bus address of peripherals.
+Only one client may have access to any particular bus address, and the bus address is
+used as a cookie to direct responses back to clients. Currently, clients can claim an
+address for their use via a protected procedure call to the virtualiser although this
+is planned to be replaced with build-time configuration in the future.
+
+If any incoming request targets an address that doesn't belong to the requesting client,
+it will be returned as an error by the virtualiser.
+
+\subsubsection{Driver}
+
+The \gls{i2c} driver is responsible for driving the I2C hardware to perform transactions.
+
+Although I2C is a very simple protocol electrically, driving I2C hardware according
+to the contract specified by incoming commands requires a large amount of bookkeeping.
+
+The \gls{i2c} driver is implemented as a general-purpose finite state machine in order
+to promote reusability and robustness. A well-designed finite state machine eliminates
+most invalid software states and is a natural target for formal verification.
+
+The state machine has six states, each representing a different phase of interaction with
+the request or response queues.
+
+The states are:
+\begin{itemize}
+  \item Idle. Go to sleep if the request queue is empty, otherwise go to Request state.
+  \item Request. Find the next valid request and load it into driver data. Go to Select Command.
+  \item Select Command. Choose a command to operate on from the current set and go to Command.
+    If the request is done, go to Return.
+  \item Command. Perform reads or writes using the hardware to complete the command. Once
+    the the hardware needs to perform work, go to sleep and set Command Return as next state.
+  \item Command Return. Extract bytes read / error status from hardware and add to driver data.
+    Go back to Command if more work remains for current command, otherwise go to Select Command.
+  \item Return. Create response queue entry using bytes read and error status, enqueue and
+    signal virtualiser. Go back to Idle always.
+\end{itemize}
+
+If any state encounters invalid data or the hardware reports an issue,
+the state function will set an error value and jump to the Return state.
+
+\subsection{SPI}\label{s:cl-spi}
 
 \ToCome{Details}
 
@@ -3741,7 +3867,7 @@ well-known devices such as PCI bus controllers and the interrupt controllers.
   \begin{itemize}
   \item How do \gls{dma} controllers and Device drivers coordinate?  How does
     address translation get set up for \gls{dma}?
-  \item When buses cascade, how is naming done for subsidiary buses?
+  \item When busses cascade, how is naming done for subsidiary busses?
   \end{itemize}
 
 \iffalse
