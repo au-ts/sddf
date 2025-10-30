@@ -13,7 +13,7 @@
  * on non-benchmarking configurations.
  * This defines whether we actually try to benchmark, setup the PMU etc.
  */
-#if defined(CONFIG_ENABLE_BENCHMARKS) && defined(CONFIG_ARCH_ARM)
+#if defined(CONFIG_ENABLE_BENCHMARKS) && (defined(CONFIG_ARCH_ARM) || defined(CONFIG_ARCH_RISCV))
 #define ENABLE_BENCHMARKING 1
 #else
 #define ENABLE_BENCHMARKING 0
