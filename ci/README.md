@@ -120,9 +120,11 @@ TODO:
 The CI runs a style check on any changed files and new files added in each GitHub
 pull request.
 
-We use `clang-format`, following the style guide in `.clang-format`.
+### C code
 
-### Installation
+We use `clang-format`, following the style guide in `.clang-format` for C code.
+
+#### Installation
 
 On macOS: `brew install clang-format`.
 
@@ -130,7 +132,7 @@ On apt: `sudo apt install clang-format`.
 
 On Nix: `nix develop` in the root of the repository.
 
-### Using
+#### Using
 
 You can reproduce the style check by doing the following, which prints the diff
 of your committed changes against the main branch.
@@ -146,3 +148,13 @@ git clang-format main
 ```
 
 Omitting the branch name runs the formatter on any staged files.
+
+### Python code
+
+For helper scripts and the metaprograms (`meta.py`) which are written in Python,
+we use [black](https://black.readthedocs.io/en/stable/).
+
+Running `black . --required-version 25` in the root of the respository or on a specific directory/file
+will run the Python style check.
+
+Note that currently we target the 2025 styling of black.
