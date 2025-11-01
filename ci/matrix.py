@@ -43,6 +43,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
         "configs": ["debug", "release", "benchmark"],
         "build_systems": ["make"],
         "boards_build": [
+            "hifive_p550",
             "imx8mm_evk",
             "imx8mq_evk",
             "imx8mp_evk",
@@ -55,6 +56,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "star64",
         ],
         "boards_test": [
+            "hifive_p550",
             "imx8mm_evk",
             "imx8mq_evk",
             "imx8mp_iotgate",
@@ -109,6 +111,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
         #     { "config", "debug", "build": "zig", board: "odroid"}
         # ],
         "boards_build": [
+            "hifive_p550",
             "imx8mq_evk",
             "imx8mp_evk",
             "maaxboard",
@@ -121,6 +124,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "zcu102",
         ],
         "boards_test": [
+            "hifive_p550",
             "imx8mq_evk",
             "maaxboard",
             "odroidc2",
