@@ -5,9 +5,10 @@
 
 PLATFORM := rk3568
 # Placeholders
+#I2C_DRIV_DIR :=
 #NET_DRIV_DIR :=
 #ETH_DRIV :=
-UART_DRIV_DIR := arm
-TIMER_DRIV_DIR := rk3568
+UART_DRIV_DIR := ns16550a
+TIMER_DRIV_DIR := ${PLATFORM}
 
 CPU := cortex-a55
