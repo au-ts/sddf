@@ -35,7 +35,8 @@ SUPPORTED_BOARDS:= cheshire \
 		   rockpro64 \
 		   rpi4b_1gb \
 		   zcu102 \
-		   star64
+		   star64 \
+		   rock3b
 
 include ${SDDF}/tools/make/board/common.mk
 
