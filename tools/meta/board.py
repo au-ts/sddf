@@ -25,7 +25,7 @@ BOARDS: List[Board] = [
         name="rock3b",
         arch=SystemDescription.Arch.AARCH64,
         paddr_top=0xecc9c000,
-        serial="serial/@fe660000",
+        serial="serial@fe660000",
         timer="rktimer@fe5f0000",
         ),
     Board(
