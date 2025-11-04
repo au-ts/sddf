@@ -255,8 +255,10 @@ static void eth_setup(void)
     /*
      * Odroid-C4 uses the S905X3 SoC, whose ethernet MAC has a 4KB RX FIFO and a 2KB TX FIFO
      * and uses a 32-bit AHB bus. Odroid-C2 has the same hardware configuration.
-     * To ensure deadlock-free Tx checksum offload, we set TxPBL to 128 = 16 * 8 (PBLx8).
-     * The value of TxPBL here must not be greater than 128.
+     * We use the maximum allowed TxPBL value here (128 = 16 * 8),
+     * in which [2048 - (128 + 3) * (32 / 8) = 1524 > packet size] to avoid dead-lock.
+     * The formula is based on P185 of the dw ethernet universal databook (ver. 3.73a).
+     * The RxPBL value here is also the maximum value (256 = 32 * 8).
      */
     eth_dma->busmode = PRIORXTX_11 | DMA_PBL_X | USE_SEP_PBL | ((32 << RX_PBL_SHFT) & RX_PBL_MASK)
                      | ((16 << TX_PBL_SHFT) & TX_PBL_MASK);
