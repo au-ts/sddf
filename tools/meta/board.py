@@ -16,6 +16,7 @@ class Board:
     i2c: Optional[str] = None
     partition: int = 0
     blk: Optional[str] = None
+    baud_rate: Optional[int] = None
 
 
 # Keep this list in alphabetical order by board name
@@ -27,6 +28,7 @@ BOARDS: List[Board] = [
         paddr_top=0xecc9c000,
         serial="serial@fe660000",
         timer="rktimer@fe5f0000",
+        baud_rate=115200,
         ),
     Board(
         name="cheshire",
