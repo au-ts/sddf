@@ -1,6 +1,5 @@
 <!--
     Copyright 2025, UNSW
-
     SPDX-License-Identifier: BSD-2-Clause
 -->
 # libc Usage in sDDF Components
@@ -28,7 +27,7 @@ sDDF includes a minimal subset of the C standard library, vendored from
 for `aarch64` and `riscv64` architectures, suitable for use in environments
 without a full libc.
 
-The following functions are provided:
+The vendored subset includes the following library functions:
 
 - `memcmp`
 - `memcpy`
@@ -39,47 +38,49 @@ The following functions are provided:
 - `strlen`
 - `strncmp`
 
-Additionally, internal implementations of `atoi` and `strcat` are available.
+Note that compiler builtins are preferred when available; the sDDF library
+headers already map standard functions to `__builtin_*` equivalents using
+feature detection.
+
+Internal implementations of `atoi` and `strcat` are also included.
 
 ### Usage
 
-If you with to use the vendored libc in your sDDF system, the build system can
-add the provided libc functions to the sDDF [utility](/util/util.mk) library.
-All the existing sDDF example systems already utilise this library for
-functionalities like
+If you wish to use the vendored libc in your sDDF system, the sDDF
+[utility](/util/util.mk) library includes the provided libc functions. All the
+existing sDDF example systems already use this library to provide functionality
+like
 [printing](/docs/serial/serial.md#building-components-and-libraries) in either
 its serial (`libsddf_util.a`) or debug (`libsddf_util_debug.a`) form.
 
-To simplify this we have created the `SDDF_CUSTOM_LIBC` configuration variable.
+To simplify this, we have created the `SDDF_CUSTOM_LIBC` configuration variable.
 
 #### Makefile
 
 First, you must set the custom libc configuration variable to 1 in your system's
-makefile:
+Makefile:
 
-```sh
+```Makefile
 SDDF_CUSTOM_LIBC := 1
 ```
 
-You also must ensure the sDDF utility library make snippet is included, and that
-one or more utility libraries are a target of your makefile. You will also need
-to ensure that any components depending on the library are tracked:
+You must also ensure the sDDF utility library make snippet is included, and that
+one or more utility libraries are a target of your Makefile. You will also need
+to ensure that the library is declared as a pre-requisite for any components
+depending on it:
 
-```sh
+```Makefile
 include ${SDDF}/util/util.mk
 
 ${IMAGES}: libsddf_util_debug.a
 ```
 
 The utility library make snippet will then build and archive the libc functions,
-and add the required include path to your system's `CFLAGS`. 
+and add the required include path to your system's `CFLAGS`.
 
 Finally, you will need to ensure that all components requiring the libc
 functions are linked with the desired utility library (this is typically done by
 adding `libsddf_util_debug` to your linker `LIBS`).
-
-Note that compiler builtins are preferred when available; headers map standard
-functions to `__builtin_*` equivalents using feature detection.
 
 ## External libc (OS-Provided)
 
@@ -90,7 +91,7 @@ done by default when `SDDF_CUSTOM_LIBC` is not defined.
 To allow libc dependencies to still be tracked when an external libc is to be
 used, we have created a distinct `SDDF_LIBC_INCLUDE` path/configuration variable
 that typically contains the path of the external libc headers. This works best
-when this path is a makefile target in your external system's makefile. You can
+when the path is a Makefile target in your external system's Makefile. You can
 read more about how this is used in LionsOS
 [here](https://lionsos.org/docs/use/language_support/libc/).
 
@@ -103,10 +104,10 @@ To use an external libc:
 Ensure that `SDDF_CUSTOM_LIBC` **is not set**.
 
 Set `SDDF_LIBC_INCLUDE` to the external libc header path, and ensure this
-definition is visible to all sDDF component makefiles. If you are building this
-path and headers, ensure there is a matching target in your makefile. sDDF
+definition is visible to all sDDF component Makefiles. If you are building this
+path and headers, ensure there is a matching target in your Makefile. sDDF
 components treat this as an order-only prerequisite to ensure headers are
-available before compilation (avoiding unnecessary rebuilds). 
+available before compilation (avoiding unnecessary rebuilds).
 
 Add the external libc header path (typically `SDDF_LIBC_INCLUDE`) to the
 `CFLAGS` of the sDDF components. Also ensure that sDDF components are linked
@@ -114,11 +115,11 @@ with the external libc when required.
 
 ### Developing
 
-Typically while developing an sDDF example system or component, the vendored
-libc included in the utility library will be used. Since components typically
-depend on this library for functionality outside of just libc, most example
-systems list the utility library as a dependency for all components, thus
-per-component libc dependency can easily be ignored.
+When developing an sDDF example system or component, you typically use the
+vendored libc in the utility library. Since components depend on this library
+for functionality outside of just libc, most example systems list the utility
+library as a dependency for all components, thus per-component libc dependency
+can easily be ignored.
 
 However, when an external libc is used, it is important to keep track of
 per-component libc dependency to avoid future build dependency issues. When
@@ -126,7 +127,7 @@ creating a new make snippet for a component or system, you must ensure that any
 components requiring libc functionalities are marked as having this
 pre-requisite using `SDDF_LIBC_INCLUDE`:
 
-```sh
+```Makefile
 network/imx/ethernet.o: ... | $(SDDF_LIBC_INCLUDE)
     ...
 ```
