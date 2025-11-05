@@ -351,7 +351,6 @@ static void eth_init()
     *DMA_REG(DMA_CH0_RX_CONTROL) |= (MAX_RX_FRAME_SZ << DMA_CH0_RX_RBSZ_POS);
 
     // Set programmable burst length (PBL).
-    // The formula is based on the note in P364 of the dw ethernet qos databook (ver. 5.20a).
 #if defined(CONFIG_PLAT_IMX8MP_EVK)
     // i.MX 8M PLUS has a 32-bit AHB bus, an 8KB TX FIFO and an 8KB RX FIFO.
     // We use the maximum allowed PBL value here (256 = 32 * 8),
