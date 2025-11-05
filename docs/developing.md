@@ -336,6 +336,9 @@ There is a snippet system for the Makefiles and so each driver will have its own
 `.mk` file for building itself. You can base your driver's snippet on other ones within
 the same device class.
 
+When creating new components/Makefiles relying on libc, ensure that you specify
+this in the [compilation rule](/docs/libc.md#developing).
+
 ## Adding a new device class
 
 Adding a new device class is a significant task as it requires a strong understanding
