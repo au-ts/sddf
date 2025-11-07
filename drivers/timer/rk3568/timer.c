@@ -1,5 +1,4 @@
 /*
-    sddf_dprintf("TIMER DRIVER|LOG: regs load_count0 : %lu\n", timer->load_count0);
  * Copyright 2025, UNSW
  * SPDX-License-Identifier: BSD-2-Clause
  */
@@ -69,7 +68,7 @@ static inline uint64_t get_ticks_in_ns(void)
     uint64_t value_subsecond_ns = (value_subsecond_ticks * NS_IN_S) / RK3568_TIMER_TICKS_PER_SECOND;
     uint64_t value_ns = value_whole_seconds * NS_IN_S + value_subsecond_ns;
 
-    sddf_dprintf("TIMER DRIVER|LOG: get_ticks_in_ns load_values: %lu value_ns: %lu\n", load_values, value_ns);
+    //sddf_dprintf("TIMER DRIVER|LOG: get_ticks_in_ns load_values: %lu value_ns: %lu\n", load_values, value_ns);
     return value_ns;
 }
 
@@ -126,8 +125,8 @@ void init()
     assert(device_resources.num_irqs == 2);
     assert(device_resources.num_regions == 1);
 
-    sddf_dprintf("Touch mem region phys 0x%lx vaddr: %p\n", device_resources.regions[0].io_addr, (uint64_t*)device_resources.regions[0].region.vaddr);
-    sddf_dprintf("0x%lx\n", *((uint64_t*)device_resources.regions[0].region.vaddr));
+    //sddf_dprintf("Touch mem region phys 0x%lx vaddr: %p\n", device_resources.regions[0].io_addr, (uint64_t*)device_resources.regions[0].region.vaddr);
+    //sddf_dprintf("0x%lx\n", *((uint64_t*)device_resources.regions[0].region.vaddr));
 
     /* Ack any IRQs that were delivered before the driver started. */
     for (int i = 0; i < device_resources.num_irqs; i++) {
@@ -170,7 +169,7 @@ void init()
 void notified(sddf_channel ch)
 {
     if (ch == timestamp_irq) {
-        sddf_dprintf("TIMER DRIVER|LOG: notified on timestamp_irq channel\n");
+        //sddf_dprintf("TIMER DRIVER|LOG: notified on timestamp_irq channel\n");
         // we don't really care about that right now
     } else if (ch == timeout_irq) {
         //sddf_dprintf("TIMER DRIVER|LOG: notified on timeout channel %u\n", ch);

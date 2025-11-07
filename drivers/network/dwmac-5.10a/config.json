@@ -2,7 +2,8 @@
     "compatible": [
         "nxp,imx8mp-dwmac-eqos",
         "snps,dwmac-5.10a",
-        "snps,dwmac-5.20"
+        "snps,dwmac-5.20",
+        "snps,dwmac-4.20a"
     ],
     "resources": {
         "regions": [
