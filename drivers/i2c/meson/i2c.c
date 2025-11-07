@@ -22,7 +22,7 @@
 #endif
 
 // Uncomment to enable logging
-// #define DEBUG_DRIVER
+// #define DEBUG_I2C_DRIVER
 
 struct i2c_regs {
     uint32_t ctl;           // control register
