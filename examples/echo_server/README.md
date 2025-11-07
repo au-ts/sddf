@@ -43,6 +43,10 @@ clients for logging DHCP messages, and by the benchmarking component to print
 results. The timer subsystem is used by the echo server clients to create the
 regular timeouts that the IP stack requires to function.
 
+In addition to an ethernet driver, we also make use of a serial driver and timer driver.
+The serial driver is used for logging DHCP messages, benchmarking results, etc.
+The timer driver is used as the IP stack needs to be able to set regular timeouts to function.
+
 To learn more about the benchmarking architecture and setup, see the
 [benchmarking section below](#benchmarking).
 

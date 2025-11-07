@@ -28,7 +28,8 @@ BOARDS: List[Board] = [
         paddr_top=0xecc9c000,
         serial="serial@fe660000",
         timer="rktimer@fe5f0000",
-        baud_rate=115200,
+        ethernet="ethernet@fe2a0000",
+        baud_rate=1500000,
         ),
     Board(
         name="cheshire",
