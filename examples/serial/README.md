@@ -25,6 +25,7 @@ The following platforms are supported:
 * rpi4b_1gb
 * star64
 * zcu102
+* rock3b
 
 ### Make
 

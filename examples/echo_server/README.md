@@ -27,7 +27,7 @@ In addition to an ethernet driver, we also make use of a serial driver and timer
 The serial driver is used for logging DHCP messages, benchmarking results, etc.
 The timer driver is used as the IP stack needs to be able to set regular timeouts to function.
 
-To learn more about the benchmarking architecutre and setup, see the
+To learn more about the benchmarking architecture and setup, see the
 [benchmarking section below](#benchmarking).
 
 ## Building
