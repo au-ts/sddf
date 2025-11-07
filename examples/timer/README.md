@@ -26,6 +26,7 @@ The following platforms are supported:
 * star64
 * x86_64_generic
 * zcu102
+* rock3b
 
 ### Make
 
