@@ -26,6 +26,7 @@ BOARDS: List[Board] = [
         arch=SystemDescription.Arch.RISCV64,
         paddr_top=0x90000000,
         serial="soc/serial@3002000",
+        i2c="soc/i2c@3003000",
     ),
     Board(
         name="hifive_p550",
@@ -124,6 +125,7 @@ BOARDS: List[Board] = [
         paddr_top=0x90000000,
         serial="soc/serial@3002000",
         timer="soc/timer@300B000",
+        i2c="soc/i2c@3003000",
     ),
     Board(
         name="star64",

@@ -1,8 +1,6 @@
 # Copyright 2025, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
-from board import BOARDS
-import os
-import sys
+import os, sys
 import argparse
 from typing import List
 from dataclasses import dataclass
@@ -10,9 +8,9 @@ from sdfgen import SystemDescription, Sddf, DeviceTree
 from importlib.metadata import version
 
 sys.path.append(
-    os.path.join(os.path.dirname(
-        os.path.abspath(__file__)), "../../tools/meta")
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../tools/meta")
 )
+from board import BOARDS
 
 assert version("sdfgen").split(".")[1] == "27", "Unexpected sdfgen version"
 
@@ -21,51 +19,18 @@ MemoryRegion = SystemDescription.MemoryRegion
 Map = SystemDescription.Map
 
 
-@dataclass
-class Board:
-    name: str
-    arch: SystemDescription.Arch
-    paddr_top: int
-    i2c: str
-    timer: str
-    # Use actual serial driver for output, so we can test non-debug configurations
-    serial: str
-
-
-BOARDS: List[Board] = [
-    Board(
-        name="odroidc4",
-        arch=SystemDescription.Arch.AARCH64,
-        paddr_top=0x80000000,
-        i2c="soc/bus@ffd00000/i2c@1d000",
-        timer="soc/bus@ffd00000/watchdog@f0d0",
-        serial="soc/bus@ff800000/serial@3000",
-    ),
-    Board(
-        name="cheshire",
-        arch=SystemDescription.Arch.RISCV64,
-        paddr_top=0x90000000,
-        timer="soc/timer@13050000"
-    ),
-]
-
-
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
-    serial_driver = ProtectionDomain(
-        "serial_driver", "serial_driver.elf", priority=200)
+    serial_driver = ProtectionDomain("serial_driver", "serial_driver.elf", priority=200)
     # Increase the stack size as running with UBSAN uses more stack space than normal.
     serial_virt_tx = ProtectionDomain(
         "serial_virt_tx", "serial_virt_tx.elf", priority=199, stack_size=0x2000
     )
 
-    timer_driver = ProtectionDomain(
-        "timer_driver", "timer_driver.elf", priority=4)
+    timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=4)
     i2c_driver = ProtectionDomain("i2c_driver", "i2c_driver.elf", priority=3)
     i2c_virt = ProtectionDomain("i2c_virt", "i2c_virt.elf", priority=2)
-    client_pn532 = ProtectionDomain(
-        "client_pn532", "client_pn532.elf", priority=1)
-    client_ds3231 = ProtectionDomain(
-        "client_ds3231", "client_ds3231.elf", priority=1)
+    client_pn532 = ProtectionDomain("client_pn532", "client_pn532.elf", priority=1)
+    client_ds3231 = ProtectionDomain("client_ds3231", "client_ds3231.elf", priority=1)
 
     # Right now we do not have separate clk and GPIO drivers and so our I2C driver does manual
     # clk/GPIO setup for I2C.
@@ -125,8 +90,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--dtb", required=True)
     parser.add_argument("--sddf", required=True)
-    parser.add_argument("--board", required=True,
-                        choices=[b.name for b in BOARDS])
+    parser.add_argument("--board", required=True, choices=[b.name for b in BOARDS])
     parser.add_argument("--output", required=True)
     parser.add_argument("--sdf", required=True)
 
