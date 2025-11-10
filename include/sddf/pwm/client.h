@@ -16,7 +16,7 @@ enum FanSpeed {
     Medium = 128,
     High = 192,
     Full = 255,
-}
+};
 
 static inline void sddf_pwm_fan_speed(unsigned int channel, FanSpeed speed)
 {
