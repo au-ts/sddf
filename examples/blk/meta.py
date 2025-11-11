@@ -19,9 +19,8 @@ ProtectionDomain = SystemDescription.ProtectionDomain
 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree, need_timer: bool):
     serial_driver = ProtectionDomain("serial_driver", "serial_driver.elf", priority=200)
-    # Increase the stack size as running with UBSAN uses more stack space than normal.
     serial_virt_tx = ProtectionDomain(
-        "serial_virt_tx", "serial_virt_tx.elf", priority=199, stack_size=0x2000
+        "serial_virt_tx", "serial_virt_tx.elf", priority=199
     )
 
     serial_node = dtb.node(board.serial)
@@ -31,12 +30,8 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree, need_timer: bool):
         sdf, serial_node, serial_driver, serial_virt_tx, enable_color=False
     )
 
-    blk_driver = ProtectionDomain(
-        "blk_driver", "blk_driver.elf", priority=200, stack_size=0x2000
-    )
-    blk_virt = ProtectionDomain(
-        "blk_virt", "blk_virt.elf", priority=199, stack_size=0x2000
-    )
+    blk_driver = ProtectionDomain("blk_driver", "blk_driver.elf", priority=200)
+    blk_virt = ProtectionDomain("blk_virt", "blk_virt.elf", priority=199)
     client = ProtectionDomain("client", "client.elf", priority=1)
 
     blk_node = dtb.node(board.blk)
