@@ -46,7 +46,7 @@ const size_t CPU_INFO_LEN = sizeof(CPU_INFO) / sizeof(CPU_INFO[0]);
 #define SDDF_DVFS_GET_FREQ 0
 #define SDDF_DVFS_SET_FREQ 1
 
-static inline int32_t get_freq(unsigned int channel, uint64_t core_ident, uint32_t *freq)
+static inline int32_t sddf_dvfs_get_freq(unsigned int channel, uint64_t core_ident, uint32_t *freq)
 {
     sddf_set_mr(0, core_ident);
 
@@ -59,7 +59,7 @@ static inline int32_t get_freq(unsigned int channel, uint64_t core_ident, uint32
     return error;
 }
 
-static inline int32_t set_freq(unsigned int channel, uint64_t core_ident, uint32_t freq)
+static inline int32_t sddf_dvfs_set_freq(unsigned int channel, uint64_t core_ident, uint32_t freq)
 {
     sddf_set_mr(0, core_ident);
     sddf_set_mr(1, freq);
