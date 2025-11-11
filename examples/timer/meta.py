@@ -18,7 +18,7 @@ ProtectionDomain = SystemDescription.ProtectionDomain
 
 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
-    timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=254)
+    timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=253)
     client = ProtectionDomain("client", "client.elf", priority=1)
 
     timer_node = dtb.node(board.timer)

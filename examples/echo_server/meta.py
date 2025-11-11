@@ -158,7 +158,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     # Benchmark specific resources
 
     bench_idle = ProtectionDomain("bench_idle", "idle.elf", priority=1)
-    bench = ProtectionDomain("bench", "benchmark.elf", priority=254)
+    bench = ProtectionDomain("bench", "benchmark.elf", priority=253)
 
     serial_system.add_client(bench)
 
