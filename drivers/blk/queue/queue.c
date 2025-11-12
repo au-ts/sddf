@@ -26,8 +26,6 @@ blk_queue_handle_t blk_queue;
 blk_storage_info_t *blk_storage_info;
 char *blk_data;
 
-fs_queue_t *fs_command_queue;
-fs_queue_t *fs_completion_queue;
 char *fs_share;
 
 char worker_thread_stack_one[0x40000];
@@ -116,6 +114,9 @@ typedef struct ext4_fs_queue {
     ext4_fs_msg_t buffer[FS_QUEUE_CAPACITY];
 } ext4_fs_queue_t;
 
+ext4_fs_queue_t *fs_command_queue;
+ext4_fs_queue_t *fs_completion_queue;
+
 /* Wrapper functions to get around inline for FFI */
 
 bool blk_storage_is_ready_wrapper(blk_storage_info_t *storage_info)
@@ -159,34 +160,36 @@ bool blk_config_check_magic_wrapper(void *config)
     return blk_config_check_magic(config);
 }
 
-uint64_t fs_queue_length_consumer_wrapper(fs_queue_t *queue)
+uint64_t ext4_fs_queue_length_consumer(ext4_fs_queue_t *queue)
 {
-    return fs_queue_length_consumer(queue);
+    return __atomic_load_n(&queue->tail, __ATOMIC_ACQUIRE) - queue->head;
 }
 
-uint64_t fs_queue_length_producer_wrapper(fs_queue_t *queue)
+uint64_t ext4_fs_queue_length_producer(ext4_fs_queue_t *queue)
 {
-    return fs_queue_length_producer(queue);
+    return queue->tail - __atomic_load_n(&queue->head, __ATOMIC_ACQUIRE);
 }
 
-fs_msg_t *fs_queue_idx_filled_wrapper(fs_queue_t *queue, uint64_t index)
+ext4_fs_msg_t *ext4_fs_queue_idx_filled(ext4_fs_queue_t *queue, uint64_t index)
 {
-    return fs_queue_idx_filled(queue, index);
+    index = queue->head + index;
+    return &queue->buffer[index % FS_QUEUE_CAPACITY];
 }
 
-fs_msg_t *fs_queue_idx_empty_wrapper(fs_queue_t *queue, uint64_t index)
+ext4_fs_msg_t *ext4_fs_queue_idx_empty(ext4_fs_queue_t *queue, uint64_t index)
 {
-    return fs_queue_idx_empty(queue, index);
+    index = queue->tail + index;
+    return &queue->buffer[index % FS_QUEUE_CAPACITY];
 }
 
-void fs_queue_publish_consumption_wrapper(fs_queue_t *queue, uint64_t amount_consumed)
+void ext4_fs_queue_publish_consumption(ext4_fs_queue_t *queue, uint64_t amount_consumed)
 {
-    fs_queue_publish_consumption(queue, amount_consumed);
+    __atomic_store_n(&queue->head, queue->head + amount_consumed, __ATOMIC_RELEASE);
 }
 
-void fs_queue_publish_production_wrapper(fs_queue_t *queue, uint64_t amount_produced)
+void ext4_fs_queue_publish_production(ext4_fs_queue_t *queue, uint64_t amount_produced)
 {
-    fs_queue_publish_production(queue, amount_produced);
+    __atomic_store_n(&queue->tail, queue->tail + amount_produced, __ATOMIC_RELEASE);
 }
 
 void init(void) {
@@ -196,9 +199,9 @@ void init(void) {
     assert(blk_config.virt.num_buffers >= FAT_WORKER_THREAD_NUM);
 
     max_cluster_size = blk_config.data.size / FAT_WORKER_THREAD_NUM;
-    fs_command_queue = fs_config.client.command_queue.vaddr;
-    fs_completion_queue = fs_config.client.completion_queue.vaddr;
-    fs_share = fs_config.client.share.vaddr;
+    fs_command_queue = fs_config.clients.command_queue.vaddr;
+    fs_completion_queue = fs_config.clients.completion_queue.vaddr;
+    fs_share = fs_config.clients.share.vaddr;
 
     blk_data = blk_config.data.vaddr;
 
