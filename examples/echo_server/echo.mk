@@ -15,7 +15,8 @@ SUPPORTED_BOARDS := odroidc4 odroidc2 maaxboard \
 		    imx8mm_evk qemu_virt_aarch64 \
 		    imx8mq_evk imx8mp_evk \
 		    imx8mp_iotgate \
-		    star64 qemu_virt_riscv64
+		    star64 qemu_virt_riscv64 \
+		    hifive_p550
 TOOLCHAIN ?= clang
 MICROKIT_CONFIG ?= debug
 SYSTEM_FILE := echo_server.system

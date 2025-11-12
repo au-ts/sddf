@@ -19,6 +19,7 @@ IMAGE_FILE := loader.img
 REPORT_FILE := report.txt
 
 SUPPORTED_BOARDS := \
+			hifive_p550 \
 		    imx8mm_evk \
 		    imx8mp_evk \
 		    imx8mq_evk \
