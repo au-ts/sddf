@@ -38,12 +38,6 @@ static volatile rk3568_timer_regs_t * timeout_timer;
 sddf_channel timestamp_irq;
 sddf_channel timeout_irq;
 
-/* Keep track of how many timer overflows have occured.
- * Used as the most significant segment of ticks.
- * We need to keep track of this state as the value register is only
- * 32 bits as opposed to the common 64 bit timer value regsiters found
- * on other devices.
- */
 static uint64_t timeouts[MAX_TIMEOUTS];
 
 static void print_regs(volatile rk3568_timer_regs_t * timer) {
@@ -78,7 +72,7 @@ void set_timeout(uint64_t ns)
     //print_regs(timeout_timer);
     /* load the timeout timer with ticks to count down from */
     uint64_t ticks_whole_seconds = (ns / NS_IN_S) * RK3568_TIMER_TICKS_PER_SECOND;
-    uint64_t ticks_remainder = (ns % NS_IN_S) * RK3568_TIMER_TICKS_PER_SECOND;
+    uint64_t ticks_remainder = (ns % NS_IN_S) * RK3568_TIMER_TICKS_PER_SECOND / NS_IN_S ;
     uint64_t num_ticks = ticks_whole_seconds + ticks_remainder;
     uint32_t timeout_ticks_l = num_ticks & 0x00000000ffffffff;
     uint32_t timeout_ticks_h = num_ticks & 0xffffffff00000000;
@@ -108,13 +102,15 @@ static void process_timeouts(uint64_t curr_time)
     uint64_t next_timeout = UINT64_MAX;
     for (int i = 0; i < MAX_TIMEOUTS; i++) {
         if (timeouts[i] < next_timeout) {
+        //sddf_dprintf("TIMER DRIVER|LOG: next timeout at %lu i=%d\n", timeouts[i], i);
             next_timeout = timeouts[i];
         }
     }
-    //sddf_dprintf("TIMER DRIVER|LOG: process timeout val: %lu curr_time: %lu\n", timeout, curr_time);
-    uint64_t ns = next_timeout - curr_time;
-    //sddf_dprintf("TIMER DRIVER|LOG: next timeout in %lu\n", ns);
-    set_timeout(ns);
+
+    if (next_timeout != UINT64_MAX) {
+        uint64_t ns = next_timeout - curr_time;
+        set_timeout(ns);
+    }
 
     return;
 }
@@ -178,7 +174,8 @@ void notified(sddf_channel ch)
         timeout_timer->int_status = 0x1;
         timeout_timer->control_reg ^= RK3568_TIMER_CONTROL_TIMER_ENABLE;
         //print_regs(timeout_timer);
-        sddf_notify(CLIENT_CH_START);
+        uint64_t curr_time = get_ticks_in_ns();
+        process_timeouts(curr_time);
     } else {
         sddf_dprintf("TIMER DRIVER|LOG: unexpected notification from channel %u\n", ch);
     }
@@ -187,7 +184,6 @@ void notified(sddf_channel ch)
 
 seL4_MessageInfo_t protected(sddf_channel ch, seL4_MessageInfo_t msginfo)
 {
-    // TODO: add timestamp/timeout channel handling
     switch (seL4_MessageInfo_get_label(msginfo)) {
     case SDDF_TIMER_GET_TIME: {
         uint64_t time_ns = get_ticks_in_ns(); //XXX
