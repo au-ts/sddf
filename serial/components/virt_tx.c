@@ -10,9 +10,6 @@
 #include <sddf/serial/config.h>
 #include <sddf/util/printf.h>
 
-#define NAME_MAX 128
-#define BEGIN_STR_MAX 128
-
 __attribute__((__section__(".serial_virt_tx_config"))) serial_virt_tx_config_t config;
 
 /* When we have more clients than colours, we re-use the colours. */
@@ -34,8 +31,6 @@ const char *colours[] = {
 #define COLOUR_BEGIN_LEN 5
 #define COLOUR_END "\x1b[0m"
 #define COLOUR_END_LEN 4
-
-char client_names[NAME_MAX][SDDF_SERIAL_MAX_CLIENTS];
 
 serial_queue_handle_t tx_queue_handle_drv;
 serial_queue_handle_t tx_queue_handle_cli[SDDF_SERIAL_MAX_CLIENTS];
@@ -91,16 +86,19 @@ bool process_tx_queue(uint32_t client)
     uint32_t length = serial_queue_length(handle);
     if (config.enable_colour) {
         const char *client_colour = colours[client % ARRAY_SIZE(colours)];
-        assert(COLOUR_BEGIN_LEN == sddf_strlen(client_colour));
+        assert(COLOUR_BEGIN_LEN == strlen(client_colour));
         length += COLOUR_BEGIN_LEN + COLOUR_END_LEN;
     }
 
     /* Not enough space to transmit string to virtualiser. Continue later */
     if (length > serial_queue_free(&tx_queue_handle_drv)) {
-        tx_pending_push(client);
-
         /* Request signal from the driver when data has been consumed */
         serial_request_consumer_signal(&tx_queue_handle_drv);
+    }
+
+    /* Re-check free space in case signal was missed */
+    if (length > serial_queue_free(&tx_queue_handle_drv)) {
+        tx_pending_push(client);
         return false;
     }
 
@@ -123,11 +121,7 @@ void tx_return(void)
     }
 
     uint32_t client;
-    // TODO: `= {false};` gets optimised into memset
-    bool notify_client[SDDF_SERIAL_MAX_CLIENTS];
-    for (int i = 0; i < SDDF_SERIAL_MAX_CLIENTS; i++) {
-        notify_client[i] = false;
-    }
+    bool notify_client[SDDF_SERIAL_MAX_CLIENTS] = { false };
     bool transferred = false;
     for (uint32_t req = 0; req < num_pending_tx; req++) {
         tx_pending_pop(&client);
@@ -187,17 +181,25 @@ void init(void)
 
     if (config.enable_rx) {
         /* Print a deterministic string to allow console input to begin */
-        sddf_memcpy(tx_queue_handle_drv.data_region, config.begin_str, config.begin_str_len + 1);
-        serial_update_shared_tail(&tx_queue_handle_drv, config.begin_str_len + 1);
+        size_t begin_str_len = strlen(config.begin_str);
+        memcpy(tx_queue_handle_drv.data_region, config.begin_str, begin_str_len);
+        serial_update_shared_tail(&tx_queue_handle_drv, begin_str_len);
         sddf_notify(config.driver.id);
+#ifdef CONFIG_DEBUG_BUILD
+        /*
+         * Due to debug printing happening at the same time as printing via the user-space serial
+         * driver we can encounter these prints being inter-leaved with each other.
+         * Because of this, in debug mode, we busy loop until we know the driver has finished
+         * transmitting our console input begin string from above.
+         */
+        while (!serial_queue_empty(&tx_queue_handle_drv, tx_queue_handle_drv.queue->head));
+#endif
     }
 
     if (config.enable_colour) {
         for (uint64_t i = 0; i < config.num_clients; i++) {
-            for (int j = 0; j < NAME_MAX; j++) {
-                sddf_memcpy(client_names[i], config.clients[i].name, sizeof client_names[i]);
-            }
-            sddf_dprintf("%s'%s' is client %lu%s\n", colours[i % ARRAY_SIZE(colours)], client_names[i], i, COLOUR_END);
+            sddf_dprintf("%s'%s' is client %lu%s\n", colours[i % ARRAY_SIZE(colours)], config.clients[i].name, i,
+                         COLOUR_END);
         }
     }
 }

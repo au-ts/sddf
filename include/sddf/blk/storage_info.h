@@ -45,3 +45,12 @@ static inline bool blk_storage_is_ready(blk_storage_info_t *storage_info)
 {
     return __atomic_load_n(&storage_info->ready, __ATOMIC_ACQUIRE);
 }
+
+/**
+ * Set shared memory whether the block storage device is ready.
+ * This does an atomic release operation.
+ */
+static inline void blk_storage_set_ready(blk_storage_info_t *storage_info, bool ready)
+{
+    __atomic_store_n(&storage_info->ready, ready, __ATOMIC_RELEASE);
+}

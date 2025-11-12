@@ -8,6 +8,9 @@ name: PR
 
 on: [pull_request]
 
+env:
+  ZIG_VERSION: 0.15.1
+
 jobs:
   whitespace:
     name: 'Trailing Whitespace'
@@ -15,16 +18,17 @@ jobs:
     steps:
     - uses: seL4/ci-actions/git-diff-check@master
 
-  style:
-    name: Style
+  style_c:
+    name: Style (C)
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
+        # We use this form as this creates a "test-revision" rev in the git repo,
+        # which we can use to compare against. Also, git-clang-format only diffs
+        # changed files, so we need a proper checkout.
         run: |
           curl https://raw.githubusercontent.com/seL4/ci-actions/master/scripts/checkout.sh | bash
           curl https://raw.githubusercontent.com/seL4/ci-actions/master/scripts/fetch-base.sh | bash
-          # This creates a "test-revision" rev in the git repo.
-          # Print this out for visibility.
           git rev-parse test-revision
 
       - name: Ensure clang-format-18
@@ -34,3 +38,30 @@ jobs:
       - name: Check formatting
         run: |
           git clang-format-18 --diff ${GITHUB_BASE_REF} test-revision --verbose
+
+  style_zig:
+    name: Style (Zig)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Install Zig
+        uses: mlugg/setup-zig@v2.0.5
+        with:
+          version: ${{ env.ZIG_VERSION }}
+
+      - name: Ensure zig version
+        run: zig version
+      - name: Check formatting
+        run: zig fmt . --check
+
+  style_python:
+    name: Style (Python)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - uses: psf/black@stable
+        with:
+          # black guarantees formatting stability within a calendar year version
+          version: "~= 25.0"

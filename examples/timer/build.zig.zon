@@ -3,9 +3,7 @@
     .version = "0.0.0",
 
     .dependencies = .{
-        .sddf = .{
-            .path = "../../"
-        },
+        .sddf = .{ .path = "../../" },
     },
     .paths = .{
         "build.zig",
@@ -13,4 +11,3 @@
     },
     .fingerprint = 0x7ad8c3845bf479d0,
 }
-

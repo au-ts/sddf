@@ -23,7 +23,7 @@ const targets = [_]Target{
         .zig_target = std.Target.Query{
             .cpu_arch = .aarch64,
             .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a53 },
-            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{ .strict_align }),
+            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{.strict_align}),
             .os_tag = .freestanding,
             .abi = .none,
         },
@@ -33,7 +33,7 @@ const targets = [_]Target{
         .zig_target = std.Target.Query{
             .cpu_arch = .aarch64,
             .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a53 },
-            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{ .strict_align }),
+            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{.strict_align}),
             .os_tag = .freestanding,
             .abi = .none,
         },
@@ -45,7 +45,7 @@ const targets = [_]Target{
             .cpu_model = .{ .explicit = &std.Target.riscv.cpu.baseline_rv64 },
             .os_tag = .freestanding,
             .abi = .none,
-        }
+        },
     },
 };
 
@@ -68,7 +68,7 @@ fn updateSectionObjcopy(b: *std.Build, section: []const u8, data_output: std.Bui
     });
     run_objcopy.addArg("--update-section");
     const data_full_path = data_output.join(b.allocator, data) catch @panic("OOM");
-    run_objcopy.addPrefixedFileArg(b.fmt("{s}=", .{ section }), data_full_path);
+    run_objcopy.addPrefixedFileArg(b.fmt("{s}=", .{section}), data_full_path);
     run_objcopy.addFileArg(.{ .cwd_relative = b.getInstallPath(.bin, elf) });
 
     // We need the ELFs we talk about to be in the install directory first.
@@ -85,91 +85,94 @@ pub fn build(b: *std.Build) !void {
 
     const partition = b.option(usize, "partition", "Block device partition for client to use") orelse null;
 
-    // Getting the path to the Microkit SDK before doing anything else
-    const microkit_sdk_arg = b.option([]const u8, "sdk", "Path to Microkit SDK");
-    if (microkit_sdk_arg == null) {
-        std.log.err("Missing -Dsdk=/path/to/sdk argument being passed\n", .{});
-        std.posix.exit(1);
-    }
-    const microkit_sdk = microkit_sdk_arg.?;
+    const microkit_sdk = b.option(LazyPath, "sdk", "Path to Microkit SDK") orelse {
+        std.log.err("Missing -Dsdk=<sdk> argument", .{});
+        return error.MissingSdkPath;
+    };
 
-    const microkit_config_option = b.option(ConfigOptions, "config", "Microkit config to build for") orelse ConfigOptions.debug;
+    const microkit_config_option = b.option(ConfigOptions, "config", "Microkit config to build for") orelse .debug;
     const microkit_config = @tagName(microkit_config_option);
 
-    // Get the Microkit SDK board we want to target
-    const microkit_board_option = b.option(MicrokitBoard, "board", "Microkit board to target");
+    const microkit_board_option = b.option(MicrokitBoard, "board", "Microkit board to target") orelse {
+        std.log.err("Missing -Dboard=<board> argument", .{});
+        return error.MissingBoard;
+    };
 
-    if (microkit_board_option == null) {
-        std.log.err("Missing -Dboard=<BOARD> argument being passed\n", .{});
-        std.posix.exit(1);
-    }
-    const target = b.resolveTargetQuery(findTarget(microkit_board_option.?));
-    const microkit_board = @tagName(microkit_board_option.?);
+    const target = b.resolveTargetQuery(findTarget(microkit_board_option));
+    const microkit_board = @tagName(microkit_board_option);
 
-    const microkit_board_dir = b.fmt("{s}/board/{s}/{s}", .{ microkit_sdk, microkit_board, microkit_config });
-    const microkit_tool = b.fmt("{s}/bin/microkit", .{microkit_sdk});
-    const libmicrokit = b.fmt("{s}/lib/libmicrokit.a", .{microkit_board_dir});
-    const libmicrokit_include = b.fmt("{s}/include", .{microkit_board_dir});
-    const libmicrokit_linker_script = b.fmt("{s}/lib/microkit.ld", .{microkit_board_dir});
+    const microkit_board_dir = microkit_sdk.path(b, "board").path(b, microkit_board).path(b, microkit_config);
+    const microkit_tool = microkit_sdk.path(b, "bin/microkit");
+    const libmicrokit = microkit_board_dir.path(b, "lib/libmicrokit.a");
+    const libmicrokit_include = microkit_board_dir.path(b, "include");
+    const libmicrokit_linker_script = microkit_board_dir.path(b, "lib/microkit.ld");
 
     const sddf_dep = b.dependency("sddf", .{
         .target = target,
         .optimize = optimize,
-        .libmicrokit = @as([]const u8, libmicrokit),
-        .libmicrokit_include = @as([]const u8, libmicrokit_include),
-        .libmicrokit_linker_script = @as([]const u8, libmicrokit_linker_script),
+        .microkit_board_dir = microkit_board_dir,
     });
 
-    const timer_driver_class = switch (microkit_board_option.?) {
+    const timer_driver_class = switch (microkit_board_option) {
         .maaxboard => "imx",
         else => null,
     };
     var timer_driver_install: ?*Step.InstallArtifact = null;
     if (timer_driver_class) |c| {
-        const driver = sddf_dep.artifact(b.fmt("driver_timer_{s}.elf", .{ c }));
+        const driver = sddf_dep.artifact(b.fmt("driver_timer_{s}.elf", .{c}));
         // To match what our SDF expects
         timer_driver_install = b.addInstallArtifact(driver, .{ .dest_sub_path = "timer_driver.elf" });
     }
 
-    const blk_driver_class = switch (microkit_board_option.?) {
+    const blk_driver_class = switch (microkit_board_option) {
         .qemu_virt_aarch64, .qemu_virt_riscv64 => "virtio",
         .maaxboard => "mmc_imx",
     };
 
+    const serial_driver_class = switch (microkit_board_option) {
+        .qemu_virt_aarch64 => "arm",
+        .qemu_virt_riscv64 => "ns16550a",
+        .maaxboard => "imx",
+    };
+
     const client = b.addExecutable(.{
         .name = "client.elf",
-        .target = target,
-        .optimize = optimize,
-        .strip = false,
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .strip = false,
+        }),
     });
 
     client.addCSourceFiles(.{
-        .files = &.{ "client.c" },
+        .files = &.{"client.c"},
     });
 
     client.addIncludePath(sddf_dep.path("include"));
     client.addIncludePath(sddf_dep.path("include/microkit"));
     client.linkLibrary(sddf_dep.artifact("util"));
-    client.linkLibrary(sddf_dep.artifact("util_putchar_debug"));
+    client.linkLibrary(sddf_dep.artifact("util_putchar_serial"));
 
-    client.addIncludePath(.{ .cwd_relative = libmicrokit_include });
-    client.addObjectFile(.{ .cwd_relative = libmicrokit });
-    client.setLinkerScript(.{ .cwd_relative = libmicrokit_linker_script });
+    client.addIncludePath(libmicrokit_include);
+    client.addObjectFile(libmicrokit);
+    client.setLinkerScript(libmicrokit_linker_script);
 
-    const blk_driver = sddf_dep.artifact(b.fmt("driver_blk_{s}.elf", .{ blk_driver_class }));
+    const blk_driver = sddf_dep.artifact(b.fmt("driver_blk_{s}.elf", .{blk_driver_class}));
+    const serial_driver = sddf_dep.artifact(b.fmt("driver_serial_{s}.elf", .{serial_driver_class}));
 
     b.installArtifact(client);
     b.installArtifact(blk_driver);
     b.installArtifact(sddf_dep.artifact("blk_virt.elf"));
+    b.installArtifact(sddf_dep.artifact("serial_virt_tx.elf"));
 
     // Because our SDF expects a different ELF name for the block driver, we have this extra step.
     const blk_driver_install = b.addInstallArtifact(blk_driver, .{ .dest_sub_path = "blk_driver.elf" });
+    // Because our SDF expects a different ELF name for the serial driver, we have this extra step.
+    const serial_driver_install = b.addInstallArtifact(serial_driver, .{ .dest_sub_path = "serial_driver.elf" });
 
     // For compiling the DTS into a DTB
-    const dts = sddf_dep.path(b.fmt("dts/{s}.dts", .{ microkit_board }));
-    const dtc_cmd = b.addSystemCommand(&[_][]const u8{
-        "dtc", "-q", "-I", "dts", "-O", "dtb"
-    });
+    const dts = sddf_dep.path(b.fmt("dts/{s}.dts", .{microkit_board}));
+    const dtc_cmd = b.addSystemCommand(&[_][]const u8{ "dtc", "-q", "-I", "dts", "-O", "dtb" });
     dtc_cmd.addFileInput(dts);
     dtc_cmd.addFileArg(dts);
     const dtb = dtc_cmd.captureStdOut();
@@ -188,9 +191,12 @@ pub fn build(b: *std.Build) !void {
     run_metaprogram.addArg(microkit_board);
     run_metaprogram.addArg("--sdf");
     run_metaprogram.addArg("blk.system");
+    if (timer_driver_install != null) {
+        run_metaprogram.addArg("--need_timer");
+    }
     if (partition) |p| {
         run_metaprogram.addArg("--partition");
-        run_metaprogram.addArg(b.fmt("{}", .{ p }));
+        run_metaprogram.addArg(b.fmt("{}", .{p}));
     }
     _ = try run_metaprogram.step.addDirectoryWatchInput(sddf_dep.path(""));
 
@@ -200,13 +206,30 @@ pub fn build(b: *std.Build) !void {
         .install_subdir = "meta_output",
     });
 
-    const client_objcopy = updateSectionObjcopy(b, ".blk_client_config", meta_output, "blk_client_client.data", "client.elf");
-    const virt_objcopy = updateSectionObjcopy(b, ".blk_virt_config", meta_output, "blk_virt.data", "blk_virt.elf");
-    const driver_resources_objcopy = updateSectionObjcopy(b, ".device_resources", meta_output, "blk_driver_device_resources.data", "blk_driver.elf");
-    const driver_config_objcopy = updateSectionObjcopy(b, ".blk_driver_config", meta_output, "blk_driver.data", "blk_driver.elf");
-    driver_resources_objcopy.step.dependOn(&blk_driver_install.step);
-    driver_config_objcopy.step.dependOn(&blk_driver_install.step);
-    const blk_objcopys = .{ client_objcopy, virt_objcopy, driver_resources_objcopy, driver_config_objcopy };
+    const blk_client_objcopy = updateSectionObjcopy(b, ".blk_client_config", meta_output, "blk_client_client.data", "client.elf");
+    const blk_virt_objcopy = updateSectionObjcopy(b, ".blk_virt_config", meta_output, "blk_virt.data", "blk_virt.elf");
+    const blk_driver_resources_objcopy = updateSectionObjcopy(b, ".device_resources", meta_output, "blk_driver_device_resources.data", "blk_driver.elf");
+    const blk_driver_config_objcopy = updateSectionObjcopy(b, ".blk_driver_config", meta_output, "blk_driver.data", "blk_driver.elf");
+    blk_driver_resources_objcopy.step.dependOn(&blk_driver_install.step);
+    blk_driver_config_objcopy.step.dependOn(&blk_driver_install.step);
+
+    const serial_client_objcopy = updateSectionObjcopy(b, ".serial_client_config", meta_output, "serial_client_client.data", "client.elf");
+    const serial_virt_objcopy = updateSectionObjcopy(b, ".serial_virt_tx_config", meta_output, "serial_virt_tx.data", "serial_virt_tx.elf");
+    const serial_driver_resources_objcopy = updateSectionObjcopy(b, ".device_resources", meta_output, "serial_driver_device_resources.data", "serial_driver.elf");
+    const serial_driver_config_objcopy = updateSectionObjcopy(b, ".serial_driver_config", meta_output, "serial_driver_config.data", "serial_driver.elf");
+    serial_driver_resources_objcopy.step.dependOn(&serial_driver_install.step);
+    serial_driver_config_objcopy.step.dependOn(&serial_driver_install.step);
+
+    const blk_objcopys = .{
+        blk_client_objcopy,
+        blk_virt_objcopy,
+        blk_driver_resources_objcopy,
+        blk_driver_config_objcopy,
+        serial_client_objcopy,
+        serial_virt_objcopy,
+        serial_driver_resources_objcopy,
+        serial_driver_config_objcopy,
+    };
     const objcopys = blk: {
         if (timer_driver_install != null) {
             const blk_driver_timer_objcopy = updateSectionObjcopy(b, ".timer_client_config", meta_output, "timer_client_blk_driver.data", "blk_driver.elf");
@@ -220,21 +243,24 @@ pub fn build(b: *std.Build) !void {
     };
 
     const final_image_dest = b.getInstallPath(.bin, "./loader.img");
-    const microkit_tool_cmd = b.addSystemCommand(&[_][]const u8{
-        microkit_tool,
+    const microkit_tool_cmd = Step.Run.create(b, "run microkit tool");
+    microkit_tool_cmd.addFileArg(microkit_tool);
+    microkit_tool_cmd.addArgs(&[_][]const u8{
         b.getInstallPath(.{ .custom = "meta_output" }, "blk.system"),
+        // zig fmt: off
         "--search-path", b.getInstallPath(.bin, ""),
         "--board", microkit_board,
         "--config", microkit_config,
         "-o", final_image_dest,
-        "-r", b.getInstallPath(.prefix, "./report.txt")
+        "-r", b.getInstallPath(.prefix, "./report.txt"),
+        // zig fmt: on
     });
     for (objcopys) |objcopy| {
         microkit_tool_cmd.step.dependOn(&objcopy.step);
     }
     microkit_tool_cmd.step.dependOn(&meta_output_install.step);
     microkit_tool_cmd.step.dependOn(b.getInstallStep());
-    microkit_tool_cmd.setEnvironmentVariable("MICROKIT_SDK", microkit_sdk);
+    microkit_tool_cmd.setEnvironmentVariable("MICROKIT_SDK", microkit_sdk.getPath3(b, null).toString(b.allocator) catch @panic("OOM"));
 
     const microkit_step = b.step("microkit", "Compile and build the final bootable image");
     microkit_step.dependOn(&microkit_tool_cmd.step);
@@ -242,7 +268,7 @@ pub fn build(b: *std.Build) !void {
 
     // This is setting up a `qemu` command for running the system using QEMU,
     // which we only want to do when we have a board that we can actually simulate.
-    if (microkit_board_option.? == .qemu_virt_aarch64 or microkit_board_option.? == .qemu_virt_riscv64) {
+    if (microkit_board_option == .qemu_virt_aarch64 or microkit_board_option == .qemu_virt_riscv64) {
         const create_disk_cmd = b.addSystemCommand(&[_][]const u8{
             "bash",
         });
@@ -251,41 +277,41 @@ pub fn build(b: *std.Build) !void {
         create_disk_cmd.addFileInput(mkvirtdisk);
         const disk = create_disk_cmd.addOutputFileArg("disk");
         create_disk_cmd.addArgs(&[_][]const u8{
-            "1", "512", b.fmt("{}", .{ 1024 * 1024 * 16 }),
+            "1", "512", b.fmt("{}", .{1024 * 1024 * 16}), "GPT",
         });
         const disk_install = b.addInstallFile(disk, "disk");
         disk_install.step.dependOn(&create_disk_cmd.step);
 
         var qemu_cmd: *Step.Run = undefined;
-        if (microkit_board_option.? == .qemu_virt_aarch64) {
-            const loader_arg = b.fmt("loader,file={s},addr=0x70000000,cpu-num=0", .{ final_image_dest });
+        if (microkit_board_option == .qemu_virt_aarch64) {
+            const loader_arg = b.fmt("loader,file={s},addr=0x70000000,cpu-num=0", .{final_image_dest});
             qemu_cmd = b.addSystemCommand(&[_][]const u8{
                 "qemu-system-aarch64",
+                // zig fmt: off
                 "-machine", "virt,virtualization=on",
                 "-cpu", "cortex-a53",
                 "-serial", "mon:stdio",
                 "-device", loader_arg,
                 "-m", "2G",
+                // zig fmt: on
                 "-nographic",
             });
-        } else if (microkit_board_option.? == .qemu_virt_riscv64) {
+        } else if (microkit_board_option == .qemu_virt_riscv64) {
             qemu_cmd = b.addSystemCommand(&[_][]const u8{
                 "qemu-system-riscv64",
-                "-machine",
-                "virt",
-                "-serial",
-                "mon:stdio",
-                "-kernel",
-                final_image_dest,
-                "-m",
-                "2G",
+                // zig fmt: off
+                "-machine", "virt",
+                "-serial", "mon:stdio",
+                "-kernel", final_image_dest,
+                "-m", "2G",
+                // zig fmt: on
                 "-nographic",
             });
         }
 
         const blk_device_args = &.{
             "-global", "virtio-mmio.force-legacy=false",
-            "-drive", b.fmt("file={s},if=none,format=raw,id=hd", .{ b.getInstallPath(.prefix, "disk") }),
+            "-drive",  b.fmt("file={s},if=none,format=raw,id=hd", .{b.getInstallPath(.prefix, "disk")}),
             "-device", "virtio-blk-device,drive=hd",
         };
         qemu_cmd.addArgs(blk_device_args);

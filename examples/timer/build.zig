@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: BSD-2-Clause
 //
 const std = @import("std");
+const LazyPath = std.Build.LazyPath;
 const Step = std.Build.Step;
 
 const MicrokitBoard = enum {
@@ -15,6 +16,8 @@ const MicrokitBoard = enum {
     imx8mm_evk,
     imx8mp_evk,
     imx8mq_evk,
+    zcu102,
+    rpi4b_1gb,
 };
 
 const Target = struct {
@@ -28,7 +31,7 @@ const targets = [_]Target{
         .zig_target = std.Target.Query{
             .cpu_arch = .aarch64,
             .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a53 },
-            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{ .strict_align }),
+            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{.strict_align}),
             .os_tag = .freestanding,
             .abi = .none,
         },
@@ -47,7 +50,7 @@ const targets = [_]Target{
         .zig_target = std.Target.Query{
             .cpu_arch = .aarch64,
             .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a53 },
-            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{ .strict_align }),
+            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{.strict_align}),
             .os_tag = .freestanding,
             .abi = .none,
         },
@@ -57,7 +60,7 @@ const targets = [_]Target{
         .zig_target = std.Target.Query{
             .cpu_arch = .aarch64,
             .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a55 },
-            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{ .strict_align }),
+            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{.strict_align}),
             .os_tag = .freestanding,
             .abi = .none,
         },
@@ -67,17 +70,7 @@ const targets = [_]Target{
         .zig_target = std.Target.Query{
             .cpu_arch = .aarch64,
             .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a53 },
-            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{ .strict_align }),
-            .os_tag = .freestanding,
-            .abi = .none,
-        },
-    },
-    .{
-        .board = MicrokitBoard.maaxboard,
-        .zig_target = std.Target.Query{
-            .cpu_arch = .aarch64,
-            .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a53 },
-            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{ .strict_align }),
+            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{.strict_align}),
             .os_tag = .freestanding,
             .abi = .none,
         },
@@ -87,7 +80,7 @@ const targets = [_]Target{
         .zig_target = std.Target.Query{
             .cpu_arch = .aarch64,
             .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a53 },
-            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{ .strict_align }),
+            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{.strict_align}),
             .os_tag = .freestanding,
             .abi = .none,
         },
@@ -97,7 +90,7 @@ const targets = [_]Target{
         .zig_target = std.Target.Query{
             .cpu_arch = .aarch64,
             .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a53 },
-            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{ .strict_align }),
+            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{.strict_align}),
             .os_tag = .freestanding,
             .abi = .none,
         },
@@ -107,7 +100,7 @@ const targets = [_]Target{
         .zig_target = std.Target.Query{
             .cpu_arch = .aarch64,
             .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a53 },
-            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{ .strict_align }),
+            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{.strict_align}),
             .os_tag = .freestanding,
             .abi = .none,
         },
@@ -117,6 +110,26 @@ const targets = [_]Target{
         .zig_target = std.Target.Query{
             .cpu_arch = .riscv64,
             .cpu_model = .{ .explicit = &std.Target.riscv.cpu.baseline_rv64 },
+            .os_tag = .freestanding,
+            .abi = .none,
+        },
+    },
+    .{
+        .board = MicrokitBoard.zcu102,
+        .zig_target = std.Target.Query{
+            .cpu_arch = .aarch64,
+            .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a53 },
+            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{.strict_align}),
+            .os_tag = .freestanding,
+            .abi = .none,
+        },
+    },
+    .{
+        .board = MicrokitBoard.rpi4b_1gb,
+        .zig_target = std.Target.Query{
+            .cpu_arch = .aarch64,
+            .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a72 },
+            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{.strict_align}),
             .os_tag = .freestanding,
             .abi = .none,
         },
@@ -142,7 +155,7 @@ fn updateSectionObjcopy(b: *std.Build, section: []const u8, data_output: std.Bui
     });
     run_objcopy.addArg("--update-section");
     const data_full_path = data_output.join(b.allocator, data) catch @panic("OOM");
-    run_objcopy.addPrefixedFileArg(b.fmt("{s}=", .{ section }), data_full_path);
+    run_objcopy.addPrefixedFileArg(b.fmt("{s}=", .{section}), data_full_path);
     run_objcopy.addFileArg(.{ .cwd_relative = b.getInstallPath(.bin, elf) });
 
     // We need the ELFs we talk about to be in the install directory first.
@@ -157,58 +170,56 @@ pub fn build(b: *std.Build) !void {
     const default_python = if (std.posix.getenv("PYTHON")) |p| p else "python3";
     const python = b.option([]const u8, "python", "Path to Python to use") orelse default_python;
 
-    const microkit_sdk_arg = b.option([]const u8, "sdk", "Path to Microkit SDK");
-    if (microkit_sdk_arg == null) {
-        std.log.err("Missing -Dsdk=/path/to/sdk argument being passed\n", .{});
-        std.posix.exit(1);
-    }
-    const microkit_sdk = microkit_sdk_arg.?;
+    const microkit_sdk = b.option(LazyPath, "sdk", "Path to Microkit SDK") orelse {
+        std.log.err("Missing -Dsdk=<sdk> argument", .{});
+        return error.MissingSdkPath;
+    };
 
-    const microkit_config_option = b.option(ConfigOptions, "config", "Microkit config to build for") orelse ConfigOptions.debug;
+    const microkit_config_option = b.option(ConfigOptions, "config", "Microkit config to build for") orelse .debug;
     const microkit_config = @tagName(microkit_config_option);
 
-    // Get the Microkit SDK board we want to target
-    const microkit_board_option = b.option(MicrokitBoard, "board", "Microkit board to target");
+    const microkit_board_option = b.option(MicrokitBoard, "board", "Microkit board to target") orelse {
+        std.log.err("Missing -Dboard=<board> argument", .{});
+        return error.MissingBoard;
+    };
 
-    if (microkit_board_option == null) {
-        std.log.err("Missing -Dboard=<BOARD> argument being passed\n", .{});
-        std.posix.exit(1);
-    }
-    const target = b.resolveTargetQuery(findTarget(microkit_board_option.?));
-    const microkit_board = @tagName(microkit_board_option.?);
+    const target = b.resolveTargetQuery(findTarget(microkit_board_option));
+    const microkit_board = @tagName(microkit_board_option);
 
-    const microkit_board_dir = b.fmt("{s}/board/{s}/{s}", .{ microkit_sdk, microkit_board, microkit_config });
-    const microkit_tool = b.fmt("{s}/bin/microkit", .{microkit_sdk});
-    const libmicrokit = b.fmt("{s}/lib/libmicrokit.a", .{microkit_board_dir});
-    const libmicrokit_include = b.fmt("{s}/include", .{microkit_board_dir});
-    const libmicrokit_linker_script = b.fmt("{s}/lib/microkit.ld", .{microkit_board_dir});
+    const microkit_board_dir = microkit_sdk.path(b, "board").path(b, microkit_board).path(b, microkit_config);
+    const microkit_tool = microkit_sdk.path(b, "bin/microkit");
+    const libmicrokit = microkit_board_dir.path(b, "lib/libmicrokit.a");
+    const libmicrokit_include = microkit_board_dir.path(b, "include");
+    const libmicrokit_linker_script = microkit_board_dir.path(b, "lib/microkit.ld");
 
     const sddf_dep = b.dependency("sddf", .{
         .target = target,
         .optimize = optimize,
-        .libmicrokit = @as([]const u8, libmicrokit),
-        .libmicrokit_include = @as([]const u8, libmicrokit_include),
-        .libmicrokit_linker_script = @as([]const u8, libmicrokit_linker_script),
+        .microkit_board_dir = microkit_board_dir,
     });
 
-    const driver_class = switch (microkit_board_option.?) {
+    const driver_class = switch (microkit_board_option) {
         .qemu_virt_aarch64 => "arm",
         .qemu_virt_riscv64 => "goldfish",
         .odroidc2, .odroidc4 => "meson",
         .star64 => "jh7110",
         .maaxboard, .imx8mm_evk, .imx8mp_evk, .imx8mq_evk => "imx",
+        .zcu102 => "cdns",
+        .rpi4b_1gb => "bcm2835",
     };
 
-    const driver = sddf_dep.artifact(b.fmt("driver_timer_{s}.elf", .{ driver_class }));
+    const driver = sddf_dep.artifact(b.fmt("driver_timer_{s}.elf", .{driver_class}));
     // This is required because the SDF file is expecting a different name to the artifact we
     // are dealing with.
     const driver_install = b.addInstallArtifact(driver, .{ .dest_sub_path = "timer_driver.elf" });
 
     const client = b.addExecutable(.{
         .name = "client.elf",
-        .target = target,
-        .optimize = optimize,
-        .strip = false,
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .strip = false,
+        }),
     });
 
     client.addCSourceFile(.{ .file = b.path("client.c") });
@@ -217,17 +228,15 @@ pub fn build(b: *std.Build) !void {
     client.linkLibrary(sddf_dep.artifact("util"));
     client.linkLibrary(sddf_dep.artifact("util_putchar_debug"));
 
-    client.addIncludePath(.{ .cwd_relative = libmicrokit_include });
-    client.addObjectFile(.{ .cwd_relative = libmicrokit });
-    client.setLinkerScript(.{ .cwd_relative = libmicrokit_linker_script });
+    client.addIncludePath(libmicrokit_include);
+    client.addObjectFile(libmicrokit);
+    client.setLinkerScript(libmicrokit_linker_script);
 
     b.installArtifact(client);
 
     // For compiling the DTS into a DTB
-    const dts = sddf_dep.path(b.fmt("dts/{s}.dts", .{ microkit_board }));
-    const dtc_cmd = b.addSystemCommand(&[_][]const u8{
-        "dtc", "-q", "-I", "dts", "-O", "dtb"
-    });
+    const dts = sddf_dep.path(b.fmt("dts/{s}.dts", .{microkit_board}));
+    const dtc_cmd = b.addSystemCommand(&[_][]const u8{ "dtc", "-q", "-I", "dts", "-O", "dtb" });
     dtc_cmd.addFileInput(dts);
     dtc_cmd.addFileArg(dts);
     const dtb = dtc_cmd.captureStdOut();
@@ -259,21 +268,25 @@ pub fn build(b: *std.Build) !void {
     const objcopys = &.{ client_objcopy, driver_objcopy };
 
     const final_image_dest = b.getInstallPath(.bin, "./loader.img");
-    const microkit_tool_cmd = b.addSystemCommand(&[_][]const u8{
-        microkit_tool,
+    const microkit_tool_cmd = Step.Run.create(b, "run microkit tool");
+    microkit_tool_cmd.addFileArg(microkit_tool);
+    microkit_tool_cmd.addArgs(&[_][]const u8{
         b.getInstallPath(.{ .custom = "meta_output" }, "timer.system"),
+        // zig fmt: off
         "--search-path", b.getInstallPath(.bin, ""),
         "--board", microkit_board,
         "--config", microkit_config,
         "-o", final_image_dest,
-        "-r", b.getInstallPath(.prefix, "./report.txt")
+        "-r", b.getInstallPath(.prefix, "./report.txt"),
+        // zig fmt: on
     });
     inline for (objcopys) |objcopy| {
         microkit_tool_cmd.step.dependOn(&objcopy.step);
     }
     microkit_tool_cmd.step.dependOn(&meta_output_install.step);
     microkit_tool_cmd.step.dependOn(b.getInstallStep());
-    microkit_tool_cmd.setEnvironmentVariable("MICROKIT_SDK", microkit_sdk);
+    microkit_tool_cmd.setEnvironmentVariable("MICROKIT_SDK", microkit_sdk.getPath3(b, null).toString(b.allocator) catch @panic("OOM"));
+
     const microkit_step = b.step("microkit", "Compile and build the final bootable image");
     microkit_step.dependOn(&microkit_tool_cmd.step);
     b.default_step = microkit_step;
@@ -281,7 +294,7 @@ pub fn build(b: *std.Build) !void {
     // This is setting up a `qemu` command for running the system using QEMU,
     // which we only want to do when we have a board that we can actually simulate.
     var qemu_cmd: ?*Step.Run = null;
-    if (std.mem.eql(u8, microkit_board, "qemu_virt_aarch64")) {
+    if (microkit_board_option == .qemu_virt_aarch64) {
         const loader_arg = b.fmt("loader,file={s},addr=0x70000000,cpu-num=0", .{final_image_dest});
         qemu_cmd = b.addSystemCommand(&[_][]const u8{
             "qemu-system-aarch64",
@@ -297,7 +310,7 @@ pub fn build(b: *std.Build) !void {
             "2G",
             "-nographic",
         });
-    }  else if (microkit_board_option.? == .qemu_virt_riscv64) {
+    } else if (microkit_board_option == .qemu_virt_riscv64) {
         qemu_cmd = b.addSystemCommand(&[_][]const u8{
             "qemu-system-riscv64",
             "-machine",

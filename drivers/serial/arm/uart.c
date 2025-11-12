@@ -5,7 +5,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <microkit.h>
+#include <os/sddf.h>
 #include <sddf/util/printf.h>
 #include <sddf/resources/device.h>
 #include <sddf/serial/config.h>
@@ -48,8 +48,8 @@ static void tx_provide(void)
         transferred = true;
     }
 
-    /* If transmit fifo is full and there is data remaining to be sent, enable interrupt when fifo is no longer full */
-    if (uart_regs->fr & PL011_FR_TXFF && !serial_queue_empty(&tx_queue_handle, tx_queue_handle.queue->head)) {
+    /* If there is data remaining to be sent, enable interrupt when fifo is no longer full */
+    if (!serial_queue_empty(&tx_queue_handle, tx_queue_handle.queue->head)) {
         uart_regs->imsc |= PL011_IMSC_TX_INT;
     } else {
         uart_regs->imsc &= ~PL011_IMSC_TX_INT;
@@ -57,7 +57,7 @@ static void tx_provide(void)
 
     if (transferred && serial_require_consumer_signal(&tx_queue_handle)) {
         serial_cancel_consumer_signal(&tx_queue_handle);
-        microkit_notify(config.tx.id);
+        sddf_notify(config.tx.id);
     }
 }
 
@@ -87,7 +87,7 @@ static void rx_return(void)
     }
 
     if (enqueued) {
-        microkit_notify(config.rx.id);
+        sddf_notify(config.rx.id);
     }
 }
 
@@ -95,7 +95,7 @@ static void handle_irq(void)
 {
     uint32_t uart_int_reg = uart_regs->mis;
     while (uart_int_reg & (PL011_IMSC_RX_TIMEOUT | PL011_IMSC_RX_INT) || uart_int_reg & PL011_IMSC_TX_INT) {
-        if (uart_int_reg & (PL011_IMSC_RX_TIMEOUT | PL011_IMSC_RX_INT)) {
+        if (config.rx_enabled && uart_int_reg & (PL011_IMSC_RX_TIMEOUT | PL011_IMSC_RX_INT)) {
             rx_return();
         }
         if (uart_int_reg & PL011_IMSC_TX_INT) {
@@ -157,6 +157,9 @@ void init(void)
     assert(device_resources.num_irqs == 1);
     assert(device_resources.num_regions == 1);
 
+    /* Ack any IRQs that were delivered before the driver started. */
+    sddf_irq_ack(device_resources.irqs[0].id);
+
     uart_regs = device_resources.regions[0].region.vaddr;
 
     uart_setup();
@@ -167,11 +170,11 @@ void init(void)
     serial_queue_init(&tx_queue_handle, config.tx.queue.vaddr, config.tx.data.size, config.tx.data.vaddr);
 }
 
-void notified(microkit_channel ch)
+void notified(sddf_channel ch)
 {
     if (ch == device_resources.irqs[0].id) {
         handle_irq();
-        microkit_deferred_irq_ack(ch);
+        sddf_deferred_irq_ack(ch);
     } else if (ch == config.tx.id) {
         tx_provide();
     } else if (ch == config.rx.id) {

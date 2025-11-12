@@ -149,7 +149,7 @@ void notified(microkit_channel ch)
     if (ch == serial_config.tx.id) {
         return;
     } else if (ch == benchmark_config.start_ch) {
-#ifdef MICROKIT_CONFIG_benchmark
+#if ENABLE_BENCHMARKING
         sel4bench_reset_counters();
         THREAD_MEMORY_RELEASE();
         sel4bench_start_counters(benchmark_bf);
@@ -163,7 +163,7 @@ void notified(microkit_channel ch)
 #endif
 #endif
     } else if (ch == benchmark_config.stop_ch) {
-#ifdef MICROKIT_CONFIG_benchmark
+#if ENABLE_BENCHMARKING
         sel4bench_get_counters(benchmark_bf, &counter_values[0]);
         sel4bench_stop_counters(benchmark_bf);
 
@@ -194,8 +194,8 @@ void init(void)
                       serial_config.tx.data.vaddr);
     serial_putchar_init(serial_config.tx.id, &serial_tx_queue_handle);
 
-#ifdef MICROKIT_CONFIG_benchmark
-    sddf_printf("BENCH|LOG: MICROKIT_CONFIG_benchmark defined\n");
+#if ENABLE_BENCHMARKING
+    sddf_printf("BENCH|LOG: ENABLE_BENCHMARKING defined\n");
 #endif
 #ifdef CONFIG_BENCHMARK_TRACK_UTILISATION
     sddf_printf("BENCH|LOG: CONFIG_BENCHMARK_TRACK_UTILISATION defined\n");
@@ -204,7 +204,7 @@ void init(void)
     sddf_printf("BENCH|LOG: CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES defined\n");
 #endif
 
-#ifdef MICROKIT_CONFIG_benchmark
+#if ENABLE_BENCHMARKING
     sel4bench_init();
     seL4_Word n_counters = sel4bench_get_num_counters();
     for (seL4_Word counter = 0; counter < MIN(n_counters, ARRAY_SIZE(benchmarking_events)); counter++) {
@@ -237,8 +237,16 @@ seL4_Bool fault(microkit_child id, microkit_msginfo msginfo, microkit_msginfo *r
 
     seL4_UserContext regs;
     seL4_TCB_ReadRegisters(BASE_TCB_CAP + id, false, 0, sizeof(seL4_UserContext) / sizeof(seL4_Word), &regs);
+#if defined(CONFIG_ARCH_ARM)
     sddf_printf("Registers: \npc : %lx\nspsr : %lx\nx0 : %lx\nx1 : %lx\nx2 : %lx\nx3 : %lx\nx4 : %lx\nx5 : %lx\nx6 : %lx\nx7 : %lx\n",
                 regs.pc, regs.spsr, regs.x0, regs.x1, regs.x2, regs.x3, regs.x4, regs.x5, regs.x6, regs.x7);
+#elif defined(CONFIG_ARCH_RISCV)
+    sddf_printf("Registers: \npc : %lx\nra : %lx\nsp : %lx\ngp : %lx\ns0 : %lx\ns1 : %lx\ns2 : %lx\ns3 : %lx\ns4 : "
+                "%lx\ns5 : %lx\n",
+                regs.pc, regs.ra, regs.sp, regs.gp, regs.s0, regs.s1, regs.s2, regs.s3, regs.s4, regs.s5);
+#else
+    sddf_printf("Register reading not implemented for current ARCH.\n");
+#endif
 
     switch (microkit_msginfo_get_label(msginfo)) {
     case seL4_Fault_CapFault: {

@@ -5,7 +5,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <microkit.h>
+#include <os/sddf.h>
 #include <sddf/resources/device.h>
 #include <sddf/network/queue.h>
 #include <sddf/network/config.h>
@@ -40,6 +40,7 @@ typedef struct {
     uint32_t head; /* index to remove from */
     uint32_t capacity; /* capacity of the ring */
     volatile struct descriptor *descr; /* buffer descripter array */
+    net_buff_desc_t descr_mdata[MAX_COUNT]; /* associated meta data array */
 } hw_ring_t;
 
 hw_ring_t rx;
@@ -87,7 +88,8 @@ static void rx_provide()
             assert(!err);
 
             uint32_t idx = rx.tail % rx.capacity;
-            update_ring_slot(&rx, idx, buffer.io_or_offset, buffer.io_or_offset >> 32, 0,
+            rx.descr_mdata[idx] = buffer;
+            update_ring_slot(&rx, idx, (uint32_t)buffer.io_or_offset, buffer.io_or_offset >> 32, 0,
                              DESC_RXSTS_OWNBYDMA | DESC_RXSTS_BUFFER1_ADDR_VALID | DESC_RXSTS_IOC);
             /* We will update the hardware register that stores the tail address. This tells
             the device that we have new descriptors to use. */
@@ -119,10 +121,12 @@ static void rx_return(void)
 
         THREAD_MEMORY_ACQUIRE();
 
+        net_buff_desc_t buffer = rx.descr_mdata[idx];
         if (d->des3 & DESC_RXSTS_ERROR) {
             sddf_dprintf("ETH|ERROR: RX descriptor returned with error status %x\n", d->des3);
             idx = rx.tail % rx.capacity;
-            update_ring_slot(&rx, idx, d->addr_low, d->addr_high, 0,
+            rx.descr_mdata[idx] = buffer;
+            update_ring_slot(&rx, idx, (uint32_t)buffer.io_or_offset, buffer.io_or_offset >> 32, 0,
                              DESC_RXSTS_OWNBYDMA | DESC_RXSTS_BUFFER1_ADDR_VALID | DESC_RXSTS_IOC);
 
             /* We will update the hardware register that stores the tail address. This tells
@@ -131,7 +135,7 @@ static void rx_return(void)
             rx.tail++;
         } else {
             /* Read 0-14 bits to get length of received packet, manual pg 4081, table 11-152, RDES3 Normal Descriptor */
-            net_buff_desc_t buffer = { (uint64_t)d->addr_low | ((uint64_t d->addr_high) << 32), d->des3 & 0x7FFF };
+            buffer.len = (d->des3 & 0x7FFF);
             int err = net_enqueue_active(&rx_queue, buffer);
             assert(!err);
             packets_transferred = true;
@@ -141,7 +145,7 @@ static void rx_return(void)
 
     if (packets_transferred && net_require_signal_active(&rx_queue)) {
         net_cancel_signal_active(&rx_queue);
-        microkit_notify(config.virt_rx.id);
+        sddf_notify(config.virt_rx.id);
     }
 }
 
@@ -163,8 +167,8 @@ static void tx_provide(void)
             // that this is the first and last parts of the current packet.
             uint32_t des3 = (DESC_TXSTS_OWNBYDMA | DESC_TXCTRL_TXFIRST | DESC_TXCTRL_TXLAST | DESC_TXCTRL_TXCIC
                              | buffer.len);
-
-            update_ring_slot(&tx, idx, buffer.io_or_offset & 0xffffffff, buffer.io_or_offset >> 32, des2, des3);
+            tx.descr_mdata[idx] = buffer;
+            update_ring_slot(&tx, idx, (uint32_t)buffer.io_or_offset, buffer.io_or_offset >> 32, des2, des3);
 
             tx.tail++;
             /* Set the tail in hardware to the latest tail we have inserted in.
@@ -196,7 +200,7 @@ static void tx_return(void)
         }
         THREAD_MEMORY_ACQUIRE();
 
-        net_buff_desc_t buffer = { (uint64_t)d->addr_low | ((uint64_t d->addr_high) << 32), 0 };
+        net_buff_desc_t buffer = tx.descr_mdata[idx];
         int err = net_enqueue_free(&tx_queue, buffer);
         assert(!err);
         enqueued = true;
@@ -205,7 +209,7 @@ static void tx_return(void)
 
     if (enqueued && net_require_signal_free(&tx_queue)) {
         net_cancel_signal_free(&tx_queue);
-        microkit_notify(config.virt_tx.id);
+        sddf_notify(config.virt_tx.id);
     }
 }
 
@@ -215,12 +219,12 @@ static void handle_irq()
     *DMA_REG(DMA_CH0_STATUS) &= e;
 
     while (e & DMA_INTR_MASK) {
-        if (e & DMA_CH0_INTERRUPT_EN_RIE) {
-            rx_return();
-        }
         if (e & DMA_CH0_INTERRUPT_EN_TIE) {
             tx_return();
             tx_provide();
+        }
+        if (e & DMA_CH0_INTERRUPT_EN_RIE) {
+            rx_return();
         }
         if (e & DMA_INTR_ABNORMAL) {
             if (e & DMA_CH0_INTERRUPT_EN_FBEE) {
@@ -232,8 +236,25 @@ static void handle_irq()
     }
 }
 
+/* On the JH7110 U-Boot asserts a reset signal that clears the MAC register values.
+ * For other SoCs we can re-use the MAC address that U-Boot has read from
+ * the EEPROM.
+ * See https://github.com/au-ts/sddf/issues/437 for more details.
+ */
+#if defined(CONFIG_PLAT_IMX8MP_EVK)
+#define USE_MAC_ADDR_REGS 1
+#elif defined(CONFIG_PLAT_STAR64)
+#define USE_MAC_ADDR_REGS 0
+#else
+#error "Unknown platform to handle MAC address for"
+#endif
+
 static void eth_init()
 {
+#if USE_MAC_ADDR_REGS
+    uint32_t mac_high = *MAC_REG(MAC_ADDRESS0_HIGH);
+    uint32_t mac_low = *MAC_REG(MAC_ADDRESS0_LOW);
+#endif
     // Software reset -- This will reset the MAC internal registers.
     volatile uint32_t *mode = DMA_REG(DMA_MODE);
     *mode |= DMA_MODE_SWR;
@@ -310,12 +331,15 @@ static void eth_init()
     *MAC_REG(MAC_CONFIGURATION) = conf;
 
     // Set the MAC Address.
-
-    /* NOTE: We are hardcoding this MAC address to the hardware MAC address of the
-    Star64 in the TS machine queue. This address is resident the boards EEPROM, however,
-    we need I2C to read from this ROM. */
+#if USE_MAC_ADDR_REGS
+    *MAC_REG(MAC_ADDRESS0_HIGH) = mac_high;
+    *MAC_REG(MAC_ADDRESS0_LOW) = mac_low;
+#else
+    /* Certain platforms require more work to read/set the hardware MAC address,
+     * see the definition of USE_MAC_ADDR_REGS for more details. */
     *MAC_REG(MAC_ADDRESS0_HIGH) = 0x00005b75;
     *MAC_REG(MAC_ADDRESS0_LOW) = 0x0039cf6c;
+#endif
 
     /* Configure DMA */
 
@@ -325,6 +349,28 @@ static void eth_init()
     // Set the max packet size for rx
     *DMA_REG(DMA_CH0_RX_CONTROL) &= ~(DMA_CH0_RX_RBSZ_MASK);
     *DMA_REG(DMA_CH0_RX_CONTROL) |= (MAX_RX_FRAME_SZ << DMA_CH0_RX_RBSZ_POS);
+
+    // Set programmable burst length (PBL).
+#if defined(CONFIG_PLAT_IMX8MP_EVK)
+    // i.MX 8M PLUS has a 32-bit AHB bus, an 8KB TX FIFO and an 8KB RX FIFO.
+    // We use the maximum allowed PBL value here (256 = 32 * 8),
+    // in which [8192 - (256 + 7) * (32 / 8) = 7140 > packet size] to avoid dead-lock.
+    *DMA_REG(DMA_CH0_CONTROL) |= DMA_CH0_CONTROL_PBLx8;
+    *DMA_REG(DMA_CH0_TX_CONTROL) |= (32 << DMA_CH0_TX_CONTROL_PBL_POS) & DMA_CH0_TX_CONTROL_PBL_MASK;
+    *DMA_REG(DMA_CH0_RX_CONTROL) |= (32 << DMA_CH0_RX_CONTROL_PBL_POS) & DMA_CH0_RX_CONTROL_PBL_MASK;
+#elif defined(CONFIG_PLAT_STAR64)
+    // JH-7110 has a 64-bit AXI4 bus, a 2KB TX FIFO and a 2KB RX FIFO.
+    // We set PBL to 32 such that [2048 - (32 + 5) * (64 / 8) = 1752 > packet size] to avoid dead-lock.
+    *DMA_REG(DMA_CH0_TX_CONTROL) |= (32 << DMA_CH0_TX_CONTROL_PBL_POS) & DMA_CH0_TX_CONTROL_PBL_MASK;
+    *DMA_REG(DMA_CH0_RX_CONTROL) |= (32 << DMA_CH0_RX_CONTROL_PBL_POS) & DMA_CH0_RX_CONTROL_PBL_MASK;
+#elif defined(CONFIG_PLAT_HIFIVE_P550)
+    // EIC7700X has an 8KB RX FIFO and an 8KB TX FIFO.
+    // We use the maximum allowed PBL value here (256 = 32 * 8),
+    // in which [8192 - (256 + 5) * (128 / 8) = 4016 > packet size] to avoid dead-lock.
+    *DMA_REG(DMA_CH0_CONTROL) |= DMA_CH0_CONTROL_PBLx8;
+    *DMA_REG(DMA_CH0_TX_CONTROL) |= (32 << DMA_CH0_TX_CONTROL_PBL_POS) & DMA_CH0_TX_CONTROL_PBL_MASK;
+    *DMA_REG(DMA_CH0_RX_CONTROL) |= (32 << DMA_CH0_RX_CONTROL_PBL_POS) & DMA_CH0_RX_CONTROL_PBL_MASK;
+#endif
 
     // Program the descriptor length. This is to tell the device that when
     // we reach the base addr + count, we should then wrap back around to
@@ -386,7 +432,10 @@ void init(void)
     assert(RX_COUNT * sizeof(struct descriptor) <= device_resources.regions[1].region.size);
     assert(TX_COUNT * sizeof(struct descriptor) <= device_resources.regions[2].region.size);
 
-    eth_regs = (void *)device_resources.regions[0].region.vaddr;
+    /* Ack any IRQs that were delivered before the driver started. */
+    sddf_irq_ack(device_resources.irqs[0].id);
+
+    eth_regs = (uintptr_t)device_resources.regions[0].region.vaddr;
 
     /* De-assert the reset signals that u-boot left asserted. */
 #ifdef CONFIG_PLAT_STAR64
@@ -424,14 +473,14 @@ void init(void)
                    config.virt_tx.num_buffers);
     eth_setup();
 
-    microkit_irq_ack(device_resources.irqs[0].id);
+    sddf_irq_ack(device_resources.irqs[0].id);
 }
 
-void notified(microkit_channel ch)
+void notified(sddf_channel ch)
 {
     if (ch == device_resources.irqs[0].id) {
         handle_irq();
-        microkit_deferred_irq_ack(ch);
+        sddf_deferred_irq_ack(ch);
     } else if (ch == config.virt_rx.id) {
         rx_provide();
     } else if (ch == config.virt_tx.id) {

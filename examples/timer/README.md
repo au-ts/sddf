@@ -12,6 +12,7 @@ timeouts and getting the current time from a timer driver.
 ## Building
 
 The following platforms are supported:
+
 * imx8mm_evk
 * imx8mp_evk
 * imx8mq_evk
@@ -20,7 +21,9 @@ The following platforms are supported:
 * odroidc4
 * qemu_virt_aarch64
 * qemu_virt_riscv64
+* rpi4b_1gb
 * star64
+* zcu102
 
 ### Make
 

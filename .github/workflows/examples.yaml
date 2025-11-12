@@ -10,84 +10,170 @@ on:
   pull_request:
   push:
     branches: [ "main" ]
+  schedule:
+    # 19.37 AEST on a Thursday weekly
+    # i.e. 07.37 UTC on Thursday weekly.
+    # This is a random time as GitHub suggests non-hour-aligned times as their
+    # runners are busier at that time, and it has been scheduled to avoid
+    # conflicts with humans trying to use the boards.
+    - cron: '37 7 * * 4'
 
 env:
-  MICROKIT_VERSION: 2.0.1
-  MICROKIT_URL: https://github.com/seL4/microkit/releases/download/2.0.1/microkit-sdk-2.0.1
-  SDFGEN_VERSION: 0.23.1
-  ZIG_VERSION: 0.14.0
+  MICROKIT_VERSION: 2.0.1-dev.61+d7da977
+  MICROKIT_URL: https://trustworthy.systems/Downloads/microkit
+  SDFGEN_VERSION: 0.27.0
+  ZIG_VERSION: 0.15.1
 
 jobs:
   build_linux_x86_64:
-    name: Linux x86-64
+    name: Build (Linux x86-64)
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Download Microkit SDK
         run: |
-          wget ${{ env.MICROKIT_URL }}-linux-x86-64.tar.gz
+          wget ${{ env.MICROKIT_URL }}/microkit-sdk-${{ env.MICROKIT_VERSION }}-linux-x86-64.tar.gz
           tar xf microkit-sdk-${{ env.MICROKIT_VERSION }}-linux-x86-64.tar.gz
       - name: Install dependencies (via apt)
         run: sudo apt update && sudo apt install -y make llvm lld imagemagick device-tree-compiler
-      - name: Download and install AArch64 GCC toolchain
-        run: |
-          wget -O aarch64-toolchain.tar.xz https://trustworthy.systems/Downloads/microkit/arm-gnu-toolchain-12.3.rel1-x86_64-aarch64-none-elf.tar.xz
-          tar xf aarch64-toolchain.tar.xz
-          echo "$(pwd)/arm-gnu-toolchain-12.3.rel1-x86_64-aarch64-none-elf/bin" >> $GITHUB_PATH
       - name: Install Zig
-        uses: mlugg/setup-zig@v1.2.0
+        uses: mlugg/setup-zig@v2.0.5
         with:
           version: ${{ env.ZIG_VERSION }}
       - name: Setup pyenv
         run: |
           python3 -m venv venv
           ./venv/bin/pip install --upgrade sdfgen==${{ env.SDFGEN_VERSION }}
-      - name: Build and run examples
-        run: ./ci/examples.sh ${PWD}/microkit-sdk-${{ env.MICROKIT_VERSION }}
+      - name: Build examples
+        run: ./ci/build.py ${PWD}/microkit-sdk-${{ env.MICROKIT_VERSION }}-linux-x86-64 $(nproc)
         shell: bash
         env:
           PYTHON: ${{ github.workspace }}/venv/bin/python
+
   build_linux_x86_64_nix:
-    name: Linux x86-64 (Nix)
-    runs-on: ubuntu-24.04
+    name: Build (Linux x86-64 Nix)
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Setup Nix
         uses: cachix/install-nix-action@v27
-      - name: Build and run examples
-        run: nix develop -c bash -c './ci/examples.sh $MICROKIT_SDK'
-        shell: bash
+      - name: Get Nix dependencies
+        run: nix develop -c bash -c 'echo Hello World'
+      - name: Build examples
+        run: nix develop --ignore-environment -c bash -c 'CI=1 ./ci/build.py $MICROKIT_SDK $(nproc)'
+      - name: Archive image artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: loader-images
+          path: ci_build/**/loader.img
+          if-no-files-found: error
+
+  build_macos_arm64_nix:
+    name: Build (macOS ARM64 Nix)
+    runs-on: [self-hosted, macos, ARM64]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Get Nix dependencies
+        run: nix develop -c bash -c 'echo Hello World'
+      - name: Build examples
+        run: nix develop --ignore-environment -c bash -c 'CI=1 ./ci/build.py $MICROKIT_SDK $(nproc)'
+
   build_macos_arm64:
-    name: macOS ARM64
+    name: Build (macOS ARM64)
     runs-on: macos-14
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
       - name: Download Microkit SDK
         run: |
-          wget ${{ env.MICROKIT_URL }}-macos-aarch64.tar.gz
+          wget ${{ env.MICROKIT_URL }}/microkit-sdk-${{ env.MICROKIT_VERSION }}-macos-aarch64.tar.gz
           tar xf microkit-sdk-${{ env.MICROKIT_VERSION }}-macos-aarch64.tar.gz
       - name: Install dependencies (via Homebrew)
         run: |
           brew install llvm lld make imagemagick dtc
           echo "/opt/homebrew/opt/llvm/bin:$PATH" >> $GITHUB_PATH
       - name: Install Zig
-        uses: mlugg/setup-zig@v1.2.0
+        uses: mlugg/setup-zig@v2.0.5
         with:
           version: ${{ env.ZIG_VERSION }}
-      - name: Download and install AArch64 GCC toolchain
-        run: |
-          wget -O aarch64-toolchain.tar.xz https://trustworthy.systems/Downloads/microkit/arm-gnu-toolchain-12.3.rel1-darwin-arm64-aarch64-none-elf.tar.xz
-          tar xf aarch64-toolchain.tar.xz
-          echo "$(pwd)/arm-gnu-toolchain-12.3.rel1-darwin-arm64-aarch64-none-elf/bin" >> $GITHUB_PATH
       - name: Setup pyenv
         run: |
-          python3 -m venv venv
+          python3.13 -m venv venv
           ./venv/bin/pip install --upgrade sdfgen==${{ env.SDFGEN_VERSION }}
-      - name: Build and run examples
-        run: ./ci/examples.sh ${PWD}/microkit-sdk-${{ env.MICROKIT_VERSION }}
+      - name: Build examples
+        run: python3.13 ./ci/build.py ${PWD}/microkit-sdk-${{ env.MICROKIT_VERSION }}-macos-aarch64 $(nproc)
         shell: bash
         env:
           PYTHON: ${{ github.workspace }}/venv/bin/python
+
+  run_qemu:
+    name: Run (QEMU)
+    runs-on: ubuntu-latest
+    needs: build_linux_x86_64_nix
+    steps:
+      - name: Checkout sDDF repository
+        uses: actions/checkout@v4
+      - name: Install dependencies (via apt)
+        run: |
+          sudo rm /var/lib/man-db/auto-update # speedup
+          sudo apt update
+          sudo apt-get install qemu-system-arm qemu-system-misc
+      - name: Download images
+        uses: actions/download-artifact@v4
+        with:
+          name: loader-images
+          path: ci_build
+      - name: Run tests
+        run: |
+          export PATH="$(pwd)/machine_queue":$PATH
+          exec ./ci/run.py --only-qemu
+      - name: Archive logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-logs-qemu
+          path: ci_logs
+          if-no-files-found: error
+
+  run_hardware:
+    name: Run (hardware)
+    runs-on: ubuntu-latest
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'hardware-test') ||
+            (github.event_name == 'schedule') }}
+    needs: build_linux_x86_64_nix
+    concurrency:
+      group: ${{ github.workflow }}-sddf-hardware-tests-${{ github.event.number }}-${{ strategy.job-index }}
+      cancel-in-progress: true
+    steps:
+      - name: Checkout sDDF repository
+        uses: actions/checkout@v4
+      - name: Get machine queue
+        uses: actions/checkout@v4
+        with:
+          repository: seL4/machine_queue
+          path: machine_queue
+      - name: Download images
+        uses: actions/download-artifact@v4
+        with:
+          name: loader-images
+          path: ci_build
+      - name: Setup machine queue SSH key
+        run: .github/workflows/setup_ssh_key.sh
+        env:
+          MACHINE_QUEUE_KEY: ${{ secrets.MACHINE_QUEUE_KEY }}
+      - name: Run tests
+        run: |
+          export PATH="$(pwd)/machine_queue":$PATH
+          # GitHub Actions is broken
+          # https://github.com/ringerc/github-actions-signal-handling-demo#why-child-process-tasks-dont-get-a-chance-to-clean-up-on-job-cancel
+          exec ./ci/run.py --no-only-qemu
+      - name: Archive logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-logs-hardware
+          path: ci_logs
+          if-no-files-found: error

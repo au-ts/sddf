@@ -1,66 +1,53 @@
 # Copyright 2025, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
+import os, sys
 import argparse
 from typing import List, Optional
 from dataclasses import dataclass
 from sdfgen import SystemDescription, Sddf, DeviceTree
+from importlib.metadata import version
+
+sys.path.append(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../tools/meta")
+)
+from board import BOARDS
+
+assert version("sdfgen").split(".")[1] == "27", "Unexpected sdfgen version"
 
 ProtectionDomain = SystemDescription.ProtectionDomain
 
 
-@dataclass
-class Board:
-    name: str
-    arch: SystemDescription.Arch
-    paddr_top: int
-    blk: str
-    # Default partition if the user has not specified one
-    partition: int
-    # Some block drivers need a timer driver as well, the example
-    # itself does not need a timer driver.
-    timer: Optional[str]
+def generate(sdf_file: str, output_dir: str, dtb: DeviceTree, need_timer: bool):
+    serial_driver = ProtectionDomain("serial_driver", "serial_driver.elf", priority=200)
+    # Increase the stack size as running with UBSAN uses more stack space than normal.
+    serial_virt_tx = ProtectionDomain(
+        "serial_virt_tx", "serial_virt_tx.elf", priority=199, stack_size=0x2000
+    )
 
+    serial_node = dtb.node(board.serial)
+    assert serial_node is not None
 
-BOARDS: List[Board] = [
-    Board(
-        name="qemu_virt_aarch64",
-        arch=SystemDescription.Arch.AARCH64,
-        paddr_top=0x6_0000_000,
-        partition=0,
-        blk="virtio_mmio@a003e00",
-        timer=None,
-    ),
-    Board(
-        name="maaxboard",
-        arch=SystemDescription.Arch.AARCH64,
-        paddr_top=0x7_0000_000,
-        partition=2,
-        blk="soc@0/bus@30800000/mmc@30b40000",
-        timer="soc@0/bus@30000000/timer@302d0000",
-    ),
-    Board(
-        name="qemu_virt_riscv64",
-        arch=SystemDescription.Arch.RISCV64,
-        paddr_top=0xa_0000_000,
-        partition=0,
-        blk="soc/virtio_mmio@10008000",
-        timer=None,
-    ),
-]
+    serial_system = Sddf.Serial(
+        sdf, serial_node, serial_driver, serial_virt_tx, enable_color=False
+    )
 
-
-def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
-    blk_driver = ProtectionDomain("blk_driver", "blk_driver.elf", priority=200)
-    blk_virt = ProtectionDomain("blk_virt", "blk_virt.elf", priority=199, stack_size=0x2000)
+    blk_driver = ProtectionDomain(
+        "blk_driver", "blk_driver.elf", priority=200, stack_size=0x2000
+    )
+    blk_virt = ProtectionDomain(
+        "blk_virt", "blk_virt.elf", priority=199, stack_size=0x2000
+    )
     client = ProtectionDomain("client", "client.elf", priority=1)
 
     blk_node = dtb.node(board.blk)
     assert blk_node is not None
-    if board.timer:
+    if need_timer:
         timer_node = dtb.node(board.timer)
         assert timer_node is not None
 
-        timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=201)
+        timer_driver = ProtectionDomain(
+            "timer_driver", "timer_driver.elf", priority=201
+        )
         timer_system = sddf.Timer(sdf, timer_node, timer_driver)
         timer_system.add_client(blk_driver)
 
@@ -68,19 +55,19 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     partition = int(args.partition) if args.partition else board.partition
     blk_system.add_client(client, partition=partition)
 
-    pds = [
-        blk_driver,
-        blk_virt,
-        client
-    ]
-    if board.timer:
+    serial_system.add_client(client)
+
+    pds = [serial_driver, serial_virt_tx, blk_driver, blk_virt, client]
+    if need_timer:
         pds += [timer_driver]
     for pd in pds:
         sdf.add_pd(pd)
 
     assert blk_system.connect()
     assert blk_system.serialise_config(output_dir)
-    if board.timer:
+    assert serial_system.connect()
+    assert serial_system.serialise_config(output_dir)
+    if need_timer:
         assert timer_system.connect()
         assert timer_system.serialise_config(output_dir)
 
@@ -88,13 +75,14 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
         f.write(sdf.render())
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--dtb", required=True)
     parser.add_argument("--sddf", required=True)
     parser.add_argument("--board", required=True, choices=[b.name for b in BOARDS])
     parser.add_argument("--output", required=True)
     parser.add_argument("--sdf", required=True)
+    parser.add_argument("--need_timer", action="store_true", default=False)
     parser.add_argument("--partition")
 
     args = parser.parse_args()
@@ -107,4 +95,4 @@ if __name__ == '__main__':
     with open(args.dtb, "rb") as f:
         dtb = DeviceTree(f.read())
 
-    generate(args.sdf, args.output, dtb)
+    generate(args.sdf, args.output, dtb, args.need_timer)

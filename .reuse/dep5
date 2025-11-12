@@ -6,6 +6,7 @@ Files:
     flake.lock
     CHANGES.md
     build.zig.zon
+    docs/design/*
     examples/i2c/build.zig.zon
     examples/serial/build.zig.zon
     examples/timer/build.zig.zon
@@ -23,18 +24,23 @@ Files:
     drivers/serial/arm/config.json
     drivers/serial/imx/config.json
     drivers/serial/meson/config.json
-    drivers/serial/snps/config.json
+    drivers/serial/ns16550a/config.json
     drivers/serial/virtio/config.json
+    drivers/serial/zynqmp/config.json
     drivers/timer/arm/config.json
     drivers/timer/imx/config.json
     drivers/timer/jh7110/config.json
     drivers/timer/meson/config.json
     drivers/timer/goldfish/config.json
+    drivers/timer/cdns/config.json
+    drivers/timer/bcm2835/config.json
 Copyright: UNSW
 License: BSD-2-Clause
 
 Files:
     examples/gpu/fb_img.jpeg
+    examples/echo_server/docs/echo_server.svg
+    docs/i2c/i2cdriver.drawio.png
 Copyright: UNSW
 License: CC-BY-SA-4.0
 

@@ -62,34 +62,162 @@ to use, or modify the examples to add your board.
 
 ## Adding a new driver
 
+Before writing a new sDDF device driver, it is highly recommended to first gain
+an understanding of the design principles behind the sDDF. All sDDF components,
+data structures and communication mechanisms are implemented to adhere to these
+principles, and consequently have a great deal in common. This is important
+whether the class of the new device driver exists or not, as non-adherence may
+cause difficulty when trying to utilise the new driver in other sDDF systems.
+
+The [sDDF design document](https://trustworthy.systems/projects/drivers/sddf-design.pdf)
+explains these principles and interfaces on a more abstract level and discusses
+why they were chosen.
+
+### Creations and modifications needed
+
 If you are adding a driver for an *existing* device class, you'll need to add
 the following:
-* the configuration file
+
+* the driver configuration file
 * the driver code itself
 * integration into the build system
 * integration into an example system
 
-### Writing the driver
+If you are adding a driver for a device class that does not exist, see the
+section [on adding a new device class](#Adding-a-new-device-class).
+
+### Existing components and drivers
+
+Existing virtualiser components can be found in the corresponding
+`[class]/components` directories. sDDF queue libraries can be found in
+`include/sddf/[class]` directories.
 
 All drivers are in `drivers/`, each device class has its own sub-directory and
 each kind of driver has it's own sub-directory within that.
 
 For example, the i.MX8 UART driver would go under `drivers/serial/imx/`. The
-directory for the driver typically refers to its manufacturer or the family
-of devices the particular driver is written for.
+directory for the driver typically refers to its manufacturer or the family of
+devices the particular driver is written for.
 
-For writing the actual driver code, it is best to first understand how the device
-class works within sDDF, by reading the
-[design document](https://trustworthy.systems/projects/drivers/sddf-design.pdf).
+### Writing the driver
 
-After that, you should have a high-level understanding of what the responsibility
-of the driver is for your device class. For specifics, it is best to study the
-existing drivers and follow their layout. Generally, the drivers within the same
-device class will have the same flow and structure with differences in initialisation,
-interrupt handling, register access, etc.
+Writing a driver for sDDF typically involves three largely independent tasks:
+* Initialising the driver and device data structures, and configuring the
+  device. These tasks are performed in the `init` function
+* Writing sDDF interfacing code to communicate with virtualisers
+* Writing device interfacing code to create a device agnostic interface for the
+  virtualisers
+
+#### Interface
+
+All sDDF drivers are event driven, and share a lot of similarities. Once
+initialisation has been completed, a driver will only be awoken to respond to
+signals from virtualisers and IRQs from the device. These are typically
+triggered by only a handful of different events, and each will require a
+specific handling function.
+
+Each event indicates that data or buffers are available to be passed between the
+device and virtualiser, the only differences being what type of data or buffer,
+and which direction it needs to be passed. This dictates which sDDF queue each
+handling function will process, and whether data needs to be enqueued or
+dequeued from the queue. Consequently, each event handler has a very similar
+structure, and the most difficult part of writing the code will be interacting
+with the device.
+
+sDDF event handling functions are typically named '[tx|rx]_[provide|return]',
+where `tx` and `rx` correspond to transmission and reception, `provide`
+corresponds to when data or buffers are passed towards the driver, and `return`
+corresponds to when data or buffers are passed towards a client. The naming
+convention is generally based on how the hardware works, hence `rx` and `tx`
+for serial and networking. Other device classes, such as block, use `request`
+and `response` since that maps onto the hardware better.
+
+If the driver is of a pre-existing device class, an existing driver can be used
+as a scaffold. You will find that there are very few if any changes that will
+need to be made to the sDDF component of the initialisation code, the event
+handling loop constraints and sDDF queue interactions. In the case of a new
+device class, a similar class can also serve as a helpful scaffold.
+
+#### Signalling protocol
+
+The most dominant protocol used by sDDF components to communicate and share data
+for all device classes is a combination of asynchronous notifications (e.g
+`microkit_notify`) and shared memory (e.g data regions and/or queue regions).
+Since components are event-based, when data has been made available to begin
+processing the producer of this data is typically required to notify the
+consumer of the data to ensure the consumer is scheduled. In some cases it is
+also necessary for the consumer of the data to notify the producer if more space
+has become available.
+
+Since our systems contain large numbers of components handling multiple
+independent events, components often incidentally become aware of events which
+they were not explicitly notified for. Also, components may require more than
+one event to occur before further progress can be made (e.g. one queue to become
+non-empty and another to become non-full). Thus, if components notify their
+neighbours unconditionally when progress is made, this can often result in the
+receiver being scheduled unnecessarily without making further progress.
+
+For device classes where these *unnecessary notifications* put too much of a
+strain on the overall utilisation of the system (i.e. networking), the sDDF
+utilises a *signalling protocol*. The signalling protocol allows producers and
+consumers to communicate more preciesly about when they require a signal after
+progress has been made. For some sub-systems, in some directions of
+communication, components will only notify their neighbour when work has been
+completed if a shared flag has been set.
+
+However, utilising a flag in shared memory which is concurrently written to and
+read from can result in deadlocks if care is not taken. To avoid this, a
+model-checked signalling protocol was developed. This signalling protocol is
+currently implemented in the network and serial subsystem. It involves a check
+of a shared flag before a notifying:
+
+```c
+    if (packets_transferred && net_require_signal_active(&rx_queue)) {
+        net_cancel_signal_active(&rx_queue);
+        microkit_notify(config.virt_rx.id);
+    }
+```
+
+as well as a less intuitive extra "double-check" before terminating a processing
+loop. This prevents a component from failing to to process available data due to
+a missed notification. This situation can occur if a neighbour checks the
+component's flag before the component has had the chance to reset it (see
+deadlock condition), but after it has terminated processing the queue:
+
+```c
+    bool reprocess = true;
+    while (reprocess) {
+        while (!(hw_ring_full(&tx)) && !net_queue_empty_active(&tx_queue)) {
+            ... *process queues* ...
+        }
+
+        <-- deadlock condition -->
+
+        net_request_signal_active(&tx_queue);
+        reprocess = false;
+
+        if (!hw_ring_full(&tx) && !net_queue_empty_active(&tx_queue)) {
+            net_cancel_signal_active(&tx_queue);
+            reprocess = true;
+        }
+    }
+```
+
+When writing a driver for these subsystems, care must be taken to ensure the
+driver's event handling functions adhere to this protocol, and don't introduce
+the possibility of deadlock. If the scaffold of the pre-existing driver's event
+handling functions is unchanged, then this should not be a risk.
+
+#### Interfacing with the device
+
+Differences between drivers of the same device class typically boil down to
+device initialisation (utilising different available features of different
+devices), interrupt enabling and handling, register access, device specified
+data structures and required memory regions.
 
 To understand the how the driver should interact with the device there are a couple
 different avenues:
+
 * The technical reference manual for the SoC or device.
     * Unfortunately sometimes this either does not contain enough information to
       write a driver or is not publicly available.
@@ -97,6 +225,14 @@ different avenues:
 * U-Boot source code.
     * Note that U-Boot drivers are not interrupt driven while all sDDF drivers are.
 * Manufacturer provided SDKs or reference drivers.
+
+#### Code
+
+Below is a list of things that should be in each driver regardless of device class:
+
+* Each IRQ used by the driver must be acked during initialisation in-case there
+  were undelivered IRQs from the time the IRQ is registered with seL4 and the driver
+  starts.
 
 #### Finding the Linux or U-Boot driver
 
@@ -197,8 +333,11 @@ on anything. We do however aim to keep both the Makefiles and Zig builds capable
 building all the parts of sDDF.
 
 There is a snippet system for the Makefiles and so each driver will have its own
-`.mk` file for building itself. You can base your drivers snippet on other ones within
+`.mk` file for building itself. You can base your driver's snippet on other ones within
 the same device class.
+
+When creating new components/Makefiles relying on libc, ensure that you specify
+this in the [compilation rule](/docs/libc.md#developing).
 
 ## Adding a new device class
 
@@ -207,3 +346,22 @@ of the sDDF principles as well as the device class in order to have a good desig
 
 If you are an outside contributor and are interested in adding a new device class,
 please contact the developers by opening an issue on the GitHub repository.
+
+When creating a new device class, you'll additionally need to create
+the supporting infrastructure as well:
+* *virtualiser* protection domains to perform security operations as well as
+  client and data management tasks
+* an sDDF queue library containing the queue data structure and helper functions
+  used to pass data and buffers between drivers, virtualisers and clients
+* an sdfgen module allowing the new sub-system to be seamlessly added to systems
+
+Creating a new device class module for sdfgen is an involved task, and will
+require encoding into the tool all the information that is needed for the
+sub-system to be automatically generated. This includes:
+* necessary protection domains (driver, virtualisers)
+* memory regions and channels required for protection domains to use the
+  corresponding queue library
+* how virtualisers should organise their clients
+* the configuration options available for the system (memory region sizes,
+  protection domain priorities, client multiplexing options, data processing
+  options, etc)

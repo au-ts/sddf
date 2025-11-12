@@ -7,13 +7,15 @@
 ifeq ($(strip $(MICROKIT_SDK)),)
 $(error MICROKIT_SDK must be specified)
 endif
-override MICROKIT_SDK:=$(abspath ${MICROKIT_SDK})
+override MICROKIT_SDK := $(abspath ${MICROKIT_SDK})
 
-export BUILD_DIR ?= build
+BUILD_DIR ?= build
+override BUILD_DIR := $(abspath ${BUILD_DIR})
+export BUILD_DIR
 export MICROKIT_CONFIG ?= debug
 export MICROKIT_BOARD ?= odroidc4
 
-export I2C_BUS_NUM:=2
+export I2C_BUS_NUM := 2
 export SDDF := $(abspath ../../)
 
 IMAGE_FILE := $(BUILD_DIR)/loader.img

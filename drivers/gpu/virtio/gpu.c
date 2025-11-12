@@ -114,6 +114,9 @@ void init(void)
 
     gpu_queue_init(&gpu_queue_h, gpu_req_queue, gpu_resp_queue, GPU_QUEUE_CAPACITY_DRV);
 
+    /* Ack any IRQs that were delivered before the driver started. */
+    microkit_irq_ack(IRQ_CH);
+
     regs = (volatile virtio_mmio_regs_t *)(virtio_regs + VIRTIO_MMIO_GPU_OFFSET);
     virtio_config = (volatile struct virtio_gpu_config *)regs->Config;
     virtio_gpu_init();
@@ -784,8 +787,9 @@ static void handle_irq()
     uint32_t irq_status = regs->InterruptStatus;
     if (irq_status & VIRTIO_MMIO_IRQ_VQUEUE) {
         LOG_GPU_VIRTIO_DRIVER("Received virtqueue used buffer notification\n");
-        notify = handle_response();
+        // ACK before handling responses
         regs->InterruptACK = VIRTIO_MMIO_IRQ_VQUEUE;
+        notify = handle_response();
         /* Now that there are (maybe) some free descriptors, we want to handle any remaining
          * requests that we may have left in the queue before due to being
          * out of free descriptors.

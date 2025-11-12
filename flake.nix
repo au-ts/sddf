@@ -6,16 +6,22 @@
   description = "A flake for building sDDF";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
     zig-overlay.url = "github:mitchellh/zig-overlay";
     zig-overlay.inputs.nixpkgs.follows = "nixpkgs";
-    sdfgen.url = "github:au-ts/microkit_sdf_gen/0.23.1";
+    sdfgen.url = "github:au-ts/microkit_sdf_gen/0.27.0";
     sdfgen.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = { nixpkgs, zig-overlay, sdfgen, ... }:
+  outputs =
+    {
+      nixpkgs,
+      zig-overlay,
+      sdfgen,
+      ...
+    }:
     let
-      microkit-version = "2.0.1";
+      microkit-version = "2.0.1-dev.61+d7da977";
       microkit-platforms = {
         aarch64-darwin = "macos-aarch64";
         x86_64-darwin = "macos-x86-64";
@@ -26,85 +32,103 @@
       forAllSystems = with nixpkgs.lib; genAttrs (builtins.attrNames microkit-platforms);
     in
     {
-      # Shell for developing sDDF.
-      # Includes dependencies for building sDDF and its
-      # examples.
-      devShells = forAllSystems
-        (system: {
-          default =
-            let
-              pkgs = import nixpkgs {
-                inherit system;
-              };
+      devShells = forAllSystems (
+        system:
+        let
+          pkgs = import nixpkgs {
+            inherit system;
+          };
 
-              llvm = pkgs.llvmPackages_18;
-              zig = zig-overlay.packages.${system}."0.14.0";
+          llvm = pkgs.llvmPackages_18;
+          zig = zig-overlay.packages.${system}."0.15.1";
 
-              pysdfgen = sdfgen.packages.${system}.pysdfgen.override { zig = zig; pythonPackages = pkgs.python312Packages; };
+          pysdfgen = sdfgen.packages.${system}.pysdfgen.override {
+            zig = zig;
+            pythonPackages = pkgs.python312Packages;
+          };
 
-              pythonTool = pkgs.python312.withPackages (ps: [
-                pysdfgen
-              ]);
-            in
-            # mkShellNoCC, because we do not want the cc from stdenv to leak into this shell
-            pkgs.mkShellNoCC rec {
-              name = "sddf-dev";
+          pythonTool = pkgs.python312.withPackages (ps: [
+            pysdfgen
+          ]);
+        in
+        {
 
-              microkit-platform = microkit-platforms.${system} or (throw "Unsupported system: ${system}");
+          # For building the design documnet
+          docs = pkgs.mkShell rec {
+            nativeBuildInputs = with pkgs; [
+              texliveFull
+              gnumake
+              inkscape
+              gnuplot
+              which
+            ];
+          };
+          # Shell for developing sDDF.
+          # Includes dependencies for building sDDF and its examples.
+          # mkShellNoCC, because we do not want the cc from stdenv to leak into this shell
+          default = pkgs.mkShellNoCC rec {
+            name = "sddf-dev";
 
-              env.MICROKIT_SDK = pkgs.fetchzip {
-                url = "https://github.com/seL4/microkit/releases/download/${microkit-version}/microkit-sdk-${microkit-version}-${microkit-platform}.tar.gz";
-                hash = {
-                  aarch64-darwin = "sha256-bFFyVBF2E3YDJ6CYbfCOID7KGREQXkIFDpTD4MzxfCE=";
-                  x86_64-darwin = "sha256-tQWrI5LRp05tLy/HIxgN+0KFJrlmOQ+dpws4Fre+6E0=";
-                  x86_64-linux = "sha256-YpgIAXWB8v4Njm/5Oo0jZpRt/t+e+rVTwFTJ8zr2Hn4=";
-                  aarch64-linux = "sha256-GwWDRJalJOpAYCP/qggFOHDh2e2J1LspWUsyjopECYA=";
-                }.${system} or (throw "Unsupported system: ${system}");
-              };
+            microkit-platform = microkit-platforms.${system} or (throw "Unsupported system: ${system}");
 
-              nativeBuildInputs = with pkgs; [
-                pkgsCross.aarch64-embedded.stdenv.cc.bintools
-                pkgsCross.aarch64-embedded.stdenv.cc
-                zig
-                qemu
-                gnumake
-                dosfstools
-                imagemagick
-
-                (symlinkJoin {
-                  name = "clang-complete";
-                  paths = llvm.clang-unwrapped.all;
-
-                  # Clang searches up from the directory where it sits to find its built-in
-                  # headers. The `symlinkJoin` creates a symlink to the clang binary, and that
-                  # symlink is what ends up in your PATH from this shell. However, that symlink's
-                  # destination, the clang binary file, still resides in its own nix store
-                  # entry (`llvm.clang-unwrapped`), isolated from the header files (found in
-                  # `llvm.clang-unwrapped.lib` under `lib/clang/18/include`). So when search up its
-                  # parent directories, no built-in headers are found.
-                  #
-                  # By copying over the clang binary over the symlinks in the realisation of the
-                  # `symlinkJoin`, we can fix this; now the search mechanism looks up the parent
-                  # directories of the `clang` binary (which is a copy created by below command),
-                  # until it finds the aforementioned `lib/clang/18/include` (where the `lib` is
-                  # actually a symlink to `llvm.clang-unwrapped.lib + "/lib"`).
-                  postBuild = ''
-                    cp --remove-destination -- ${llvm.clang-unwrapped}/bin/* $out/bin/
-                  '';
-                })
-
-                # for git-clang-format.
-                llvm.libclang.python
-                llvm.lld
-                llvm.libllvm
-                dtc
-                pythonTool
-              ];
-
-              # To avoid Nix adding compiler flags that are not available on a freestanding
-              # environment.
-              hardeningDisable = [ "all" ];
+            env.MICROKIT_SDK = pkgs.fetchzip {
+              url = "https://trustworthy.systems/Downloads/microkit/microkit-sdk-${microkit-version}-${microkit-platform}.tar.gz";
+              hash =
+                {
+                  aarch64-darwin = "sha256-f5ZORh3kZqfNEDdkviqos6SNVYg72Mb5+4m+hlOwnW0=";
+                  x86_64-darwin = "sha256-uS7cM/MK645XCyOR8FUQFtj9yMXGLluMX+k0dt3jXS4=";
+                  x86_64-linux = "sha256-qetUCkLNGDyr29OnrE4pSCKP8Xq35jCCQdnCChKkujs=";
+                  aarch64-linux = "sha256-3AT3I89QDRzI7bEvKgK5yqNeGv5SQQEzcYTeuFyClnI=";
+                }
+                .${system} or (throw "Unsupported system: ${system}");
             };
-        });
+
+            nativeBuildInputs = with pkgs; [
+              zig
+              qemu
+              gnumake
+              dosfstools
+              imagemagick
+              # for shasum
+              perl
+              which
+              gptfdisk
+
+              (symlinkJoin {
+                name = "clang-complete";
+                paths = llvm.clang-unwrapped.all;
+
+                # Clang searches up from the directory where it sits to find its built-in
+                # headers. The `symlinkJoin` creates a symlink to the clang binary, and that
+                # symlink is what ends up in your PATH from this shell. However, that symlink's
+                # destination, the clang binary file, still resides in its own nix store
+                # entry (`llvm.clang-unwrapped`), isolated from the header files (found in
+                # `llvm.clang-unwrapped.lib` under `lib/clang/18/include`). So when search up its
+                # parent directories, no built-in headers are found.
+                #
+                # By copying over the clang binary over the symlinks in the realisation of the
+                # `symlinkJoin`, we can fix this; now the search mechanism looks up the parent
+                # directories of the `clang` binary (which is a copy created by below command),
+                # until it finds the aforementioned `lib/clang/18/include` (where the `lib` is
+                # actually a symlink to `llvm.clang-unwrapped.lib + "/lib"`).
+                postBuild = ''
+                  cp --remove-destination -- ${llvm.clang-unwrapped}/bin/* $out/bin/
+                '';
+              })
+
+              # for git-clang-format.
+              llvm.libclang.python
+              llvm.lld
+              llvm.libllvm
+              dtc
+              pythonTool
+            ];
+
+            # To avoid Nix adding compiler flags that are not available on a freestanding
+            # environment.
+            hardeningDisable = [ "all" ];
+          };
+        }
+      );
     };
 }

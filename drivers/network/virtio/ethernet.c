@@ -159,11 +159,15 @@ static void rx_return(void)
         struct virtq_used_elem hdr_used = rx_virtq.used->ring[i % rx_virtq.num];
         assert(rx_virtq.desc[hdr_used.id].flags & VIRTQ_DESC_F_NEXT);
 
-        struct virtq_desc pkt = rx_virtq.desc[rx_virtq.desc[hdr_used.id].next % rx_virtq.num];
+        struct virtq_desc virtio_hdr = rx_virtq.desc[hdr_used.id];
+        struct virtq_desc pkt = rx_virtq.desc[virtio_hdr.next % rx_virtq.num];
         uint64_t addr = pkt.addr;
-        uint32_t len = pkt.len;
         assert(!(pkt.flags & VIRTQ_DESC_F_NEXT));
 
+        /* Received packet length is obtained from used header. This includes
+        the virtIO header length as well, so this must be subtracted before
+        passing to the virtualiser. */
+        uint32_t len = hdr_used.len - virtio_hdr.len;
         net_buff_desc_t buffer = { addr, len };
         int err = net_enqueue_active(&rx_queue, buffer);
         assert(!err);
@@ -291,13 +295,14 @@ static void handle_irq()
 {
     uint32_t irq_status = regs->InterruptStatus;
     if (irq_status & VIRTIO_MMIO_IRQ_VQUEUE) {
+        // ACK the interrupt first before handling responses
+        regs->InterruptACK = VIRTIO_MMIO_IRQ_VQUEUE;
+
         // We don't know whether the IRQ is related to a change to the RX queue
         // or TX queue, so we check both.
-        rx_return();
         tx_return();
         tx_provide();
-        // We have handled the used buffer notification
-        regs->InterruptACK = VIRTIO_MMIO_IRQ_VQUEUE;
+        rx_return();
     }
 
     if (irq_status & VIRTIO_MMIO_IRQ_CONFIG) {
@@ -444,6 +449,9 @@ void init(void)
     assert(device_resources.num_irqs == 1);
     assert(device_resources.num_regions == 2);
 
+    /* Ack any IRQs that were delivered before the driver started. */
+    sddf_irq_ack(device_resources.irqs[0].id);
+
     regs = (volatile virtio_mmio_regs_t *)device_resources.regions[0].region.vaddr;
     hw_ring_buffer_vaddr = (uintptr_t)device_resources.regions[1].region.vaddr;
     hw_ring_buffer_paddr = device_resources.regions[1].io_addr;
@@ -457,8 +465,6 @@ void init(void)
                    config.virt_tx.num_buffers);
 
     eth_setup();
-
-    sddf_irq_ack(device_resources.irqs[0].id);
 }
 
 void notified(sddf_channel ch)

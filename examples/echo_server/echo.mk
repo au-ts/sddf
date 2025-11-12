@@ -3,64 +3,68 @@
 #
 # SPDX-License-Identifier: BSD-2-Clause
 #
+# This Makefile is copied into the build directory
+# and operated on from there.
+#
 
-QEMU := qemu-system-aarch64
-DTC := dtc
-PYTHON ?= python3
-
-METAPROGRAM := $(TOP)/meta.py
 
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 ECHO_SERVER:=${SDDF}/examples/echo_server
-LWIPDIR:=network/ipstacks/lwip/src
-BENCHMARK:=$(SDDF)/benchmark
-UTIL:=$(SDDF)/util
-ETHERNET_DRIVER:=$(SDDF)/drivers/network/$(DRIV_DIR)
-SERIAL_COMPONENTS := $(SDDF)/serial/components
-SERIAL_DRIVER := $(SDDF)/drivers/serial/$(SERIAL_DRIV_DIR)
-TIMER_DRIVER:=$(SDDF)/drivers/timer/$(TIMER_DRV_DIR)
-NETWORK_COMPONENTS:=$(SDDF)/network/components
 
-BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
+SUPPORTED_BOARDS := odroidc4 odroidc2 maaxboard \
+		    imx8mm_evk qemu_virt_aarch64 \
+		    imx8mq_evk imx8mp_evk \
+		    imx8mp_iotgate \
+		    star64 qemu_virt_riscv64
+TOOLCHAIN ?= clang
+MICROKIT_CONFIG ?= debug
+SYSTEM_FILE := echo_server.system
 IMAGE_FILE := loader.img
 REPORT_FILE := report.txt
-SYSTEM_FILE := echo_server.system
-DTS := $(SDDF)/dts/$(MICROKIT_BOARD).dts
-DTB := $(MICROKIT_BOARD).dtb
-METAPROGRAM := $(TOP)/meta.py
+
+include ${SDDF}/tools/make/board/common.mk
+
+ECHO_SERVER := ${SDDF}/examples/echo_server
+METAPROGRAM := $(ECHO_SERVER)/meta.py
+LWIPDIR := network/ipstacks/lwip/src
+BENCHMARK := $(SDDF)/benchmark
+UTIL := $(SDDF)/util
+ETHERNET_DRIVER := $(SDDF)/drivers/network/$(NET_DRIV_DIR)
+ETHERNET_CONFIG_INCLUDE := ${ECHO_SERVER}/include/ethernet_config
+SERIAL_COMPONENTS := $(SDDF)/serial/components
+UART_DRIVER := $(SDDF)/drivers/serial/$(UART_DRIV_DIR)
+TIMER_DRIVER := $(SDDF)/drivers/timer/$(TIMER_DRIV_DIR)
+NETWORK_COMPONENTS := $(SDDF)/network/components
+
+SDDF_CUSTOM_LIBC := 1
 
 vpath %.c ${SDDF} ${ECHO_SERVER}
 
-IMAGES := eth_driver.elf echo0.elf echo1.elf benchmark.elf idle.elf network_virt_rx.elf\
-	  network_virt_tx.elf network_copy0.elf network_copy1.elf timer_driver.elf\
+IMAGES := eth_driver.elf echo0.elf echo1.elf benchmark.elf idle.elf \
+	  network_virt_rx.elf network_virt_tx.elf network_copy.elf \
+	  network_copy0.elf network_copy1.elf timer_driver.elf \
 	  serial_driver.elf serial_virt_tx.elf
 
-CFLAGS := -mcpu=$(CPU) \
-	  -mstrict-align \
-	  -ffreestanding \
-	  -g3 -O3 -Wall \
+
+CFLAGS += \
 	  -Wno-unused-function \
-	  -DMICROKIT_CONFIG_$(MICROKIT_CONFIG) \
 	  -I$(BOARD_DIR)/include \
 	  -I$(SDDF)/include/microkit \
 	  -I$(SDDF)/include \
 	  -I${ECHO_INCLUDE}/lwip \
-	  -I${SDDF}/$(LWIPDIR)/include \
-	  -I${SDDF}/$(LWIPDIR)/include/ipv4 \
-	  -MD \
+	  -I${ETHERNET_CONFIG_INCLUDE} \
+	  -I$(LWIPDIR)/include \
+	  -I$(LWIPDIR)/include/ipv4 \
+	  -I $(ECHO_SERVER)/include \
 	  -MP
 
-LDFLAGS := -L$(BOARD_DIR)/lib -L${LIBC}
-LIBS := --start-group -lmicrokit -Tmicrokit.ld -lc libsddf_util_debug.a --end-group
 
-CHECK_FLAGS_BOARD_MD5 := .board_cflags-$(shell echo -- ${CFLAGS} ${BOARD} ${MICROKIT_CONFIG} | shasum | sed 's/ *-//')
+# Suppress warning from lwIP
+CFLAGS += -Wno-tautological-constant-out-of-range-compare
 
-${CHECK_FLAGS_BOARD_MD5}:
-	-rm -f .board_cflags-*
-	touch $@
-
-%.elf: %.o
-	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
+LDFLAGS := -L$(BOARD_DIR)/lib
+LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a \
+	--end-group
 
 ECHO_OBJS := echo.o utilization_socket.o \
 	     udp_echo_socket.o tcp_echo_socket.o
@@ -69,7 +73,6 @@ DEPS := $(ECHO_OBJS:.o=.d)
 
 all: loader.img
 
-${ECHO_OBJS}: ${CHECK_FLAGS_BOARD_MD5}
 echo0.elf echo1.elf: $(ECHO_OBJS) libsddf_util.a lib_sddf_lwip_echo.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
@@ -80,11 +83,10 @@ network_copy0.elf network_copy1.elf: network_copy.elf
 # for the unimplemented libc dependencies
 ${IMAGES}: libsddf_util_debug.a
 
-$(DTB): $(DTS)
-	dtc -q -I dts -O dtb $(DTS) > $(DTB)
-
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
-	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE)
+	$(PYTHON)\
+	    $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
+	    --dtb $(DTB) --output . --sdf $(SYSTEM_FILE)
 	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx.data serial_virt_tx.elf
@@ -107,9 +109,12 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(OBJCOPY) --update-section .benchmark_config=benchmark_idle_config.data idle.elf
 	$(OBJCOPY) --update-section .lib_sddf_lwip_config=lib_sddf_lwip_config_client0.data echo0.elf
 	$(OBJCOPY) --update-section .lib_sddf_lwip_config=lib_sddf_lwip_config_client1.data echo1.elf
+	touch $@
 
 ${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
-	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
+	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) \
+	--board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) \
+	-o $(IMAGE_FILE) -r $(REPORT_FILE)
 
 
 include ${SDDF}/util/util.mk
@@ -118,27 +123,22 @@ include ${SDDF}/network/lib_sddf_lwip/lib_sddf_lwip.mk
 include ${ETHERNET_DRIVER}/eth_driver.mk
 include ${BENCHMARK}/benchmark.mk
 include ${TIMER_DRIVER}/timer_driver.mk
-include ${SERIAL_DRIVER}/serial_driver.mk
+include ${UART_DRIVER}/serial_driver.mk
 include ${SERIAL_COMPONENTS}/serial_components.mk
 
 qemu: $(IMAGE_FILE)
-	$(QEMU) -machine virt,virtualization=on \
-			-cpu cortex-a53 \
-			-serial mon:stdio \
-			-device loader,file=$(IMAGE_FILE),addr=0x70000000,cpu-num=0 \
-			-m size=2G \
-			-nographic \
-			-device virtio-net-device,netdev=netdev0 \
-			-netdev user,id=netdev0,hostfwd=tcp::1236-:1236,hostfwd=tcp::1237-:1237,hostfwd=udp::1235-:1235 \
-			-global virtio-mmio.force-legacy=false \
-			-d guest_errors
+	$(QEMU) $(QEMU_ARCH_ARGS) \
+		-nographic \
+		-device virtio-net-device,netdev=netdev0 \
+		-netdev user,id=netdev0,hostfwd=tcp::1236-:1236,hostfwd=tcp::1237-:1237,hostfwd=udp::1235-:1235 \
+		-global virtio-mmio.force-legacy=false \
+		-d guest_errors
 
 clean::
 	${RM} -f *.elf .depend* $
 	find . -name \*.[do] |xargs --no-run-if-empty rm
 
 clobber:: clean
-	rm -f *.a
 	rm -f ${IMAGE_FILE} ${REPORT_FILE}
 
 -include $(DEPS)

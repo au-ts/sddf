@@ -83,8 +83,7 @@ void handle_response(void)
         struct virtq_desc data_desc = virtq.desc[data_desc_idx % virtq.num];
         uint32_t data_len = data_desc.len;
 #ifdef DEBUG_DRIVER
-        uint64_t data_addr = data_desc.addr;
-        LOG_DRIVER("response data addr: 0x%lx, data len: %d\n", data_addr, data_len);
+        LOG_DRIVER("response data addr: 0x%lx, data len: %d\n", data_desc.addr, data_len);
 #endif
 
         uint16_t footer_desc_idx = virtq.desc[data_desc_idx].next;
@@ -166,10 +165,10 @@ void handle_request()
             assert(virtio_block_number + virtio_count <= virtio_config->capacity);
 
             if (req_code == BLK_REQ_READ) {
-                LOG_DRIVER("handling read request with physical address 0x%lx, block_number: 0x%x, count: 0x%x, id: 0x%x\n",
+                LOG_DRIVER("handling read request with physical address 0x%lx, block_number: 0x%lx, count: 0x%x, id: 0x%x\n",
                            phys_addr, block_number, count, id);
             } else {
-                LOG_DRIVER("handling write request with physical address 0x%lx, block_number: 0x%x, count: 0x%x, id: 0x%x\n",
+                LOG_DRIVER("handling write request with physical address 0x%lx, block_number: 0x%lx, count: 0x%x, id: 0x%x\n",
                            phys_addr, block_number, count, id);
             }
 
@@ -255,8 +254,8 @@ void handle_irq(void)
 {
     uint32_t irq_status = regs->InterruptStatus;
     if (irq_status & VIRTIO_MMIO_IRQ_VQUEUE) {
-        handle_response();
         regs->InterruptACK = VIRTIO_MMIO_IRQ_VQUEUE;
+        handle_response();
     }
 
     if (irq_status & VIRTIO_MMIO_IRQ_CONFIG) {
@@ -319,7 +318,7 @@ void virtio_blk_init(void)
     storage_info->sector_size = VIRTIO_BLK_SECTOR_SIZE;
 
     /* Finished populating configuration */
-    __atomic_store_n(&storage_info->ready, true, __ATOMIC_RELEASE);
+    blk_storage_set_ready(storage_info, true);
 
 #ifdef DEBUG_DRIVER
     uint32_t features_low = regs->DeviceFeatures;
@@ -376,6 +375,9 @@ void init(void)
     assert(device_resources_check_magic(&device_resources));
     assert(device_resources.num_irqs == 1);
     assert(device_resources.num_regions == 3);
+
+    /* Ack any IRQs that were delivered before the driver started. */
+    microkit_irq_ack(device_resources.irqs[0].id);
 
     regs = (volatile virtio_mmio_regs_t *)device_resources.regions[0].region.vaddr;
     requests_paddr = device_resources.regions[2].io_addr;

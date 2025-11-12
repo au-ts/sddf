@@ -3,9 +3,7 @@
     .version = "0.0.0",
 
     .dependencies = .{
-        .sddf = .{
-            .path = "../../"
-        },
+        .sddf = .{ .path = "../../" },
     },
     .paths = .{
         "build.zig",

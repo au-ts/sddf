@@ -187,7 +187,7 @@ static inline bool handle_init_get_display_info_response()
     assert(!err);
     assert(resp.id == 0);
     assert(resp.status == GPU_RESP_OK);
-    sddf_memcpy(&get_display_info, (void *)gpu_driver_data, sizeof(gpu_resp_get_display_info_t));
+    memcpy(&get_display_info, (void *)gpu_driver_data, sizeof(gpu_resp_get_display_info_t));
     return true;
 }
 
@@ -647,8 +647,8 @@ static bool handle_client(int cli_id)
                 assert(!err);
                 continue;
             }
-            sddf_memcpy((void *)(gpu_virt_cli_data_region(gpu_client_data, cli_id) + req.get_display_info.mem_offset),
-                        &get_display_info, sizeof(gpu_resp_get_display_info_t));
+            memcpy((void *)(gpu_virt_cli_data_region(gpu_client_data, cli_id) + req.get_display_info.mem_offset),
+                   &get_display_info, sizeof(gpu_resp_get_display_info_t));
             err = gpu_enqueue_resp(h, (gpu_resp_t) {
                                           .id = req.id,
                                           .status = GPU_RESP_OK,
@@ -829,7 +829,7 @@ static void handle_driver()
             assert(!err);
             if (resp.status == GPU_RESP_OK) {
                 cache_clean_and_invalidate(gpu_driver_data, gpu_driver_data + sizeof(gpu_resp_get_display_info_t));
-                sddf_memcpy(&get_display_info, (void *)gpu_driver_data, sizeof(gpu_resp_get_display_info_t));
+                memcpy(&get_display_info, (void *)gpu_driver_data, sizeof(gpu_resp_get_display_info_t));
                 pending_display_info_request = false;
                 try_again_display_info_req = false;
                 /* Forward display info event to clients*/

@@ -78,7 +78,7 @@ typedef struct net_client_config {
     uint8_t mac_addr[6];
 } net_client_config_t;
 
-static bool net_config_check_magic(void *config)
+static inline bool net_config_check_magic(void *config)
 {
     char *magic = (char *)config;
     for (int i = 0; i < SDDF_NET_MAGIC_LEN; i++) {

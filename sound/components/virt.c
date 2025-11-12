@@ -227,9 +227,7 @@ int notified_by_driver(void)
         uintptr_t vaddr = data_region_vaddr + pcm.io_or_offset;
 
         // Cache is dirty as device may have written to buffer
-        /* TODO: This is a raw seL4 system call because Microkit does not (currently)
-         * include a corresponding libmicrokit API. */
-        seL4_ARM_VSpace_Invalidate_Data(3, vaddr, vaddr + pcm.len);
+        cache_clean_and_invalidate(vaddr, vaddr + pcm.len);
 
         pcm.io_or_offset = offset;
         if (sound_enqueue_pcm(&client_queues->pcm_res, &pcm) != 0) {

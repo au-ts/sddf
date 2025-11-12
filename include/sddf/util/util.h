@@ -12,7 +12,9 @@
 #endif
 #define ALIGN(x, align)   (((x) + (align) - 1) & ~((align) - 1))
 
+#ifndef BIT
 #define BIT(nr) (1UL << (nr))
+#endif
 
 #ifdef __GNUC__
 #define likely(x)   __builtin_expect(!!(x), 1)
@@ -48,6 +50,9 @@
 #endif
 #ifndef MAX
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
+#endif
+#ifndef ABS
+#define ABS(x) ((x) < 0 ? -(x) : (x))
 #endif
 
 void _assert_fail(const char  *assertion, const char  *file, unsigned int line, const char  *function);

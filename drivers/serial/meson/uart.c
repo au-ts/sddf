@@ -5,7 +5,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <microkit.h>
+#include <os/sddf.h>
 #include <sddf/resources/device.h>
 #include <sddf/util/printf.h>
 #include <sddf/serial/config.h>
@@ -40,7 +40,7 @@ static void set_baud(unsigned long baud)
     uint32_t baud_register = AML_UART_BAUD_USE;
     if (uart_clock.crystal_clock) {
 #if defined(CONFIG_PLAT_ODROIDC2)
-        /* Odroidc2 hasn't clock divider option */
+        /* Odroid-C2 does not have clock divider option */
         baud_register |= AML_UART_BAUD_XTAL;
         clock_div = 3;
         ref_clock_ticks_per_symbol /= 3;
@@ -80,8 +80,8 @@ static void tx_provide(void)
         transferred = true;
     }
 
-    /* If transmit fifo is full and there is data remaining to be sent, enable interrupt when fifo is no longer full */
-    if (uart_regs->sr & AML_UART_TX_FULL && !serial_queue_empty(&tx_queue_handle, tx_queue_handle.queue->head)) {
+    /* If there is data remaining to be sent, enable interrupt when fifo is no longer full */
+    if (!serial_queue_empty(&tx_queue_handle, tx_queue_handle.queue->head)) {
         uart_regs->cr |= AML_UART_TX_INT_EN;
     } else {
         uart_regs->cr &= ~AML_UART_TX_INT_EN;
@@ -89,7 +89,7 @@ static void tx_provide(void)
 
     if (transferred && serial_require_consumer_signal(&tx_queue_handle)) {
         serial_cancel_consumer_signal(&tx_queue_handle);
-        microkit_notify(config.tx.id);
+        sddf_notify(config.tx.id);
     }
 }
 
@@ -119,7 +119,7 @@ static void rx_return(void)
     }
 
     if (enqueued) {
-        microkit_notify(config.rx.id);
+        sddf_notify(config.rx.id);
     }
 }
 
@@ -129,7 +129,7 @@ static void handle_irq(void)
     uint32_t uart_cr = uart_regs->cr;
     while (uart_sr & UART_INTR_ABNORMAL || !(uart_sr & AML_UART_RX_EMPTY)
            || (uart_cr & AML_UART_TX_INT_EN && !(uart_sr & AML_UART_TX_FULL))) {
-        if (!(uart_sr & AML_UART_RX_EMPTY)) {
+        if (config.rx_enabled && !(uart_sr & AML_UART_RX_EMPTY)) {
             rx_return();
         }
         if (uart_cr & AML_UART_TX_INT_EN && !(uart_sr & AML_UART_TX_FULL)) {
@@ -197,6 +197,9 @@ void init(void)
     assert(device_resources.num_irqs == 1);
     assert(device_resources.num_regions == 1);
 
+    /* Ack any IRQs that were delivered before the driver started. */
+    sddf_irq_ack(device_resources.irqs[0].id);
+
     uart_setup();
 
     if (config.rx_enabled) {
@@ -205,11 +208,11 @@ void init(void)
     serial_queue_init(&tx_queue_handle, config.tx.queue.vaddr, config.tx.data.size, config.tx.data.vaddr);
 }
 
-void notified(microkit_channel ch)
+void notified(sddf_channel ch)
 {
     if (ch == device_resources.irqs[0].id) {
         handle_irq();
-        microkit_deferred_irq_ack(ch);
+        sddf_deferred_irq_ack(ch);
     } else if (ch == config.tx.id) {
         tx_provide();
     } else if (ch == config.rx.id) {

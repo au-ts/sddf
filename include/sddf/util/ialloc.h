@@ -140,7 +140,7 @@ static void ialloc_init(ialloc_t *ia, uint32_t *idxlist, uint32_t size)
  * @param size number of indices that can be allocated.
  * @param offset offset to add to the index.
  */
-static void ialloc_init_with_offset(ialloc_t *ia, uint32_t *idxlist, uint32_t size, uint32_t offset)
+static inline void ialloc_init_with_offset(ialloc_t *ia, uint32_t *idxlist, uint32_t size, uint32_t offset)
 {
     ialloc_init(ia, idxlist, size);
     ia->offset = offset;

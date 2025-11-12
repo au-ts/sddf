@@ -7,21 +7,24 @@
 #include <microkit.h>
 #include <libco.h>
 #include <sddf/util/printf.h>
+#include <sddf/serial/queue.h>
+#include <sddf/serial/config.h>
 #include <sddf/timer/client.h>
 #include <sddf/timer/config.h>
 #include <sddf/i2c/queue.h>
 #include <sddf/i2c/client.h>
 #include <sddf/i2c/config.h>
 #include <sddf/i2c/devices/ds3231/ds3231.h>
+#include <sddf/i2c/libi2c.h>
 
 // #define DEBUG_CLIENT
 
 #ifdef DEBUG_CLIENT
-#define LOG_CLIENT(...) do{ sddf_dprintf("DS3231_CLIENT|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
+#define LOG_CLIENT(...) do{ sddf_dprintf("DS3231|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
 #else
 #define LOG_CLIENT(...) do{}while(0)
 #endif
-#define LOG_CLIENT_ERR(...) do{ sddf_printf("DS3231_CLIENT|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
+#define LOG_CLIENT_ERR(...) do{ sddf_printf("DS3231|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
 bool delay_ms(size_t milliseconds);
 
@@ -34,11 +37,14 @@ bool delay_ms(size_t milliseconds);
 #endif
 
 __attribute__((__section__(".i2c_client_config"))) i2c_client_config_t i2c_config;
-
 __attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
+__attribute__((__section__(".serial_client_config"))) serial_client_config_t serial_config;
+
+static serial_queue_handle_t serial_tx_queue_handle;
 
 i2c_queue_handle_t queue;
 uintptr_t data_region;
+libi2c_conf_t libi2c_conf;
 
 cothread_t t_event;
 cothread_t t_main;
@@ -50,15 +56,8 @@ cothread_t t_main;
 static char t_client_main_stack[STACK_SIZE];
 
 // weeks bits are from 1 - 7 so remember to index correctly (subtract 1)
-static const char *day_of_week_strings[] = {
-    "Monday",
-    "Tuesday",
-    "Wednesday",
-    "Thursday",
-    "Friday",
-    "Saturday",
-    "Sunday"
-};
+static const char *day_of_week_strings[] = { "Monday", "Tuesday",  "Wednesday", "Thursday",
+                                             "Friday", "Saturday", "Sunday" };
 
 void client_main(void)
 {
@@ -72,12 +71,13 @@ void client_main(void)
         LOG_CLIENT_ERR("failed to find DS3231 on bus!\n");
         assert(false);
     }
+    LOG_CLIENT("ds3231 ACK! setting time\n");
 
-    if (ds3231_set_time(42, 59, 23, 7, 31, 12, 23)) {
+    if (ds3231_set_time(42, 59, 23, 7, 31, 5, 25)) {
         LOG_CLIENT_ERR("failed to set time on DS3231!\n");
         assert(false);
     }
-    sddf_printf("Set Date and Time on DS3231 to: %02d-%02d-%02d %02d:%02d:%02d (%s)\n", 31, 12, 23, 23, 59, 42,
+    sddf_printf("Set Date and Time on DS3231 to: %02d-%02d-%02d %02d:%02d:%02d (%s)\n", 31, 05, 25, 23, 59, 42,
                 day_of_week_strings[7 - 1]);
 
     LOG_CLIENT("Starting to ask for the time!\n");
@@ -126,11 +126,16 @@ bool delay_ms(size_t milliseconds)
 
 void init(void)
 {
-    LOG_CLIENT("init\n");
+    assert(serial_config_check_magic(&serial_config));
+    serial_queue_init(&serial_tx_queue_handle, serial_config.tx.queue.vaddr, serial_config.tx.data.size,
+                      serial_config.tx.data.vaddr);
+    serial_putchar_init(serial_config.tx.id, &serial_tx_queue_handle);
+
+    sddf_printf("DS3231|INFO: init\n");
 
     assert(i2c_config_check_magic((void *)&i2c_config));
 
-    data_region = (uintptr_t)i2c_config.virt.data.vaddr;
+    data_region = (uintptr_t)i2c_config.data.vaddr;
     queue = i2c_queue_init(i2c_config.virt.req_queue.vaddr, i2c_config.virt.resp_queue.vaddr);
 
     bool claimed = i2c_bus_claim(i2c_config.virt.id, DS3231_I2C_BUS_ADDRESS);
@@ -139,6 +144,9 @@ void init(void)
         return;
     }
     LOG_CLIENT("claimed DS3231 bus!\n");
+
+    /* Initialise libi2c for DS3231 */
+    libi2c_init(&libi2c_conf, &queue);
 
     /* Define the event loop/notified thread as the active co-routine */
     t_event = co_active();
@@ -153,6 +161,8 @@ void notified(microkit_channel ch)
 {
     if (ch == i2c_config.virt.id || ch == timer_config.driver_id) {
         co_switch(t_main);
+    } else if (ch == serial_config.tx.id) {
+        // Nothing to do
     } else {
         LOG_CLIENT_ERR("Unknown channel 0x%x!\n", ch);
     }
