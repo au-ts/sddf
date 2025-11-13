@@ -31,7 +31,8 @@ SUPPORTED_BOARDS := \
 		    rpi4b_1gb \
 			serengeti \
 		    star64 \
-		    zcu102
+		    zcu102 \
+			rock3b
 
 ifeq ($(strip $(TOOLCHAIN)),)
 	TOOLCHAIN := clang
