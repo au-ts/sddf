@@ -85,8 +85,8 @@ void set_timeout(uint64_t ns)
 {
     /* load the timeout timer with ticks to count down from */
     uint64_t num_ticks = (ns * RK3568_TIMER_FREQUENCY) / NANO_INVERSE;
-    uint32_t timeout_ticks_l = num_ticks & 0x00000000ffffffff;
-    uint32_t timeout_ticks_h = num_ticks & 0xffffffff00000000;
+    uint32_t timeout_ticks_l = (uint32_t)num_ticks;
+    uint32_t timeout_ticks_h = (uint32_t)(num_ticks >> 32);
 
     timeout_timer->control_reg = 0x0;
 
