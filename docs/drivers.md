@@ -62,6 +62,8 @@ and a list of Device Tree compatible strings it is known to work with.
 
 ## Timer
 
+* APB timer
+    * `pulp,apb_timer`
 * ARM architectural timer
     * `arm,armv8-timer`
 * Google Goldfish RTC
