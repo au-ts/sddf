@@ -205,7 +205,7 @@ static inline void timeout_set_enable(bool enable)
  *
  * Timeouts are stored using absolute time upon PPC, this function converts the
  * next timeout into a relative stamp from the current time and awaits it using
- * the timeout timer. Automatically sets prescalar to satisfy most granular time
+ * the timeout timer. Automatically sets prescaler to satisfy most granular time
  * resolution.
  */
 static void process_timeouts(void)
