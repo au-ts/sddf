@@ -22,6 +22,14 @@ class Board:
 # TODO: convert to Dictionary
 BOARDS: List[Board] = [
     Board(
+        name="rock3b",
+        arch=SystemDescription.Arch.AARCH64,
+        paddr_top=0xecc9c000,
+        # TODO: ADD PROPER SERIAL DEVICE
+        serial="serial/@fe660000",
+        timer="rktimer@ff700000",
+        ),
+    Board(
         name="cheshire",
         arch=SystemDescription.Arch.RISCV64,
         paddr_top=0x90000000,
