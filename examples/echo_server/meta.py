@@ -206,7 +206,14 @@ def generate(
     )
 
     baud_rate = board.baud_rate
-    serial_system = Sddf.Serial(sdf, uart_node, uart_driver, serial_virt_tx, enable_color=True, baud_rate=baud_rate)
+    serial_system = Sddf.Serial(
+        sdf,
+        uart_node,
+        uart_driver,
+        serial_virt_tx,
+        enable_color=True,
+        baud_rate=baud_rate,
+    )
 
     ethernet_driver = ProtectionDomain(
         "ethernet_driver",
@@ -224,15 +231,18 @@ def generate(
             sdf, "clock_controller", 0x10_000, paddr=0x17000000
         )
         sdf.add_mr(clock_controller)
-        ethernet_driver.add_map(Map(clock_controller, 0x3000000, perms="rw", cached=False))
+        ethernet_driver.add_map(
+            Map(clock_controller, 0x3000000, perms="rw", cached=False)
+        )
     elif board.name == "rock3b":
         # For ethernet reset, we need to disable areset_gmac0 which is left high by u-boot
         clock_controller = MemoryRegion(
-            sdf, "clock_controller", 0x10_000, paddr=0xfdd20000
+            sdf, "clock_controller", 0x10_000, paddr=0xFDD20000
         )
         sdf.add_mr(clock_controller)
-        ethernet_driver.add_map(Map(clock_controller, 0x3000000, perms="rw", cached=False))
-
+        ethernet_driver.add_map(
+            Map(clock_controller, 0x3000000, perms="rw", cached=False)
+        )
 
     net_virt_tx = ProtectionDomain(
         "net_virt_tx",
