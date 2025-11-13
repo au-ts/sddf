@@ -10,6 +10,15 @@
 #include <sddf/util/cache.h>
 #include <sddf/util/util.h>
 
+static inline int sddf_strcmp(const char *a, const char *b)
+{
+    while (*a != '\0' && *b != '\0' && *a == *b) {
+        a++;
+        b++;
+    }
+    return (int)(*a) - *b;
+}
+
 /* Client specific info */
 typedef struct client {
     uint32_t start_sector;
@@ -151,7 +160,7 @@ static bool gpt_validate_partitions()
 
         if (gpt_resp_id == gpt_state.req_id) {
             // Validate the signature in partition header
-            if (strcmp(gpt_meta.header->signature, GPT_HEADER_SIGNATURE)) {
+            if (sddf_strcmp(gpt_meta.header->signature, GPT_HEADER_SIGNATURE)) {
                 LOG_BLK_VIRT_ERR("Invalid GPT signature\n");
                 return false;
             }
@@ -186,7 +195,7 @@ static bool gpt_validate_partitions()
                                                                      + gpt_state.mirror_req_cnt * BLK_TRANSFER_SIZE
                                                                      - GPT_SECTOR_SIZE);
             // Validate the signature in mirror header
-            if (strcmp(gpt_meta.mirror_header->signature, GPT_HEADER_SIGNATURE)) {
+            if (sddf_strcmp(gpt_meta.mirror_header->signature, GPT_HEADER_SIGNATURE)) {
                 LOG_BLK_VIRT_ERR("Invalid GPT signature in mirror partition header\n");
                 return false;
             }
@@ -293,7 +302,7 @@ static void mbr_request()
     err = blk_enqueue_req(&drv_h, BLK_REQ_READ, mbr_paddr, 0, 1, mbr_state.req_id);
     assert(!err);
 
-    microkit_deferred_notify(config.driver.conn.id);
+    sddf_deferred_notify(config.driver.conn.id);
 
     mbr_state.sent_request = true;
 }
@@ -371,7 +380,7 @@ static bool mbr_handle_response()
         assert(!err);
         gpt_state.sent_request = true;
 
-        microkit_deferred_notify(config.driver.conn.id);
+        sddf_deferred_notify(config.driver.conn.id);
         return false;
     }
 
