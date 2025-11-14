@@ -118,7 +118,6 @@ jobs:
         uses: actions/checkout@v4
       - name: Install dependencies (via apt)
         run: |
-          sudo rm /var/lib/man-db/auto-update # speedup
           sudo apt update
           sudo apt-get install qemu-system-arm qemu-system-misc
       - name: Download images
