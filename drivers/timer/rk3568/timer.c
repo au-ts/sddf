@@ -12,7 +12,7 @@
 
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
-//#define DEBUG_TIMER
+#define DEBUG_TIMER
 
 #ifdef DEBUG_TIMER
 #define LOG_TIMER(...) do{ sddf_printf("LOG_TIMER|INFO: ");sddf_printf(__VA_ARGS__); }while(0)
@@ -53,12 +53,12 @@ static uint64_t timeouts[MAX_TIMEOUTS];
 
 static void print_regs(volatile rk3568_timer_regs_t *timer)
 {
-    sddf_dprintf("TIMER DRIVER|LOG: regs load_count0 : 0x%x\n", timer->load_count0);
-    sddf_dprintf("TIMER DRIVER|LOG: regs load_count1 : 0x%x\n", timer->load_count1);
-    sddf_dprintf("TIMER DRIVER|LOG: regs current_value0: 0x%x\n", timer->current_value0);
-    sddf_dprintf("TIMER DRIVER|LOG: regs current_value1: 0x%x\n", timer->current_value1);
-    sddf_dprintf("TIMER DRIVER|LOG: regs control_reg: 0x%x\n", timer->control_reg);
-    sddf_dprintf("TIMER DRIVER|LOG: regs int_status: 0x%x\n", timer->int_status);
+    LOG_TIMER("regs load_count0 : 0x%x\n", timer->load_count0);
+    LOG_TIMER("regs load_count1 : 0x%x\n", timer->load_count1);
+    LOG_TIMER("regs current_value0: 0x%x\n", timer->current_value0);
+    LOG_TIMER("regs current_value1: 0x%x\n", timer->current_value1);
+    LOG_TIMER("regs control_reg: 0x%x\n", timer->control_reg);
+    LOG_TIMER("regs int_status: 0x%x\n", timer->int_status);
 }
 
 static inline void acknowledge_irq(void)
@@ -75,7 +75,9 @@ static inline uint64_t get_ticks_in_ns(void)
     uint64_t ticks = UINT64_MAX - load_values;
 
     /* convert from ticks to nanoseconds */
-    uint64_t value_ns = (ticks * NANO_INVERSE) / RK3568_TIMER_FREQUENCY;
+    uint64_t value_s = ticks / RK3568_TIMER_FREQUENCY;
+    uint64_t value_frac = ticks % RK3568_TIMER_FREQUENCY;
+    uint64_t value_ns = (value_s * NANO_INVERSE) + (value_frac * NANO_INVERSE) / RK3568_TIMER_FREQUENCY;
 
     LOG_TIMER("get_ticks_in_ns load_values: %lu value_ns: %lu\n", load_values, value_ns);
     return value_ns;
@@ -84,7 +86,9 @@ static inline uint64_t get_ticks_in_ns(void)
 void set_timeout(uint64_t ns)
 {
     /* load the timeout timer with ticks to count down from */
-    uint64_t num_ticks = (ns * RK3568_TIMER_FREQUENCY) / NANO_INVERSE;
+    uint64_t num_s = ns / NANO_INVERSE;
+    uint64_t num_frac = ns % NANO_INVERSE;
+    uint64_t num_ticks = (num_s * RK3568_TIMER_FREQUENCY) + (num_frac * RK3568_TIMER_FREQUENCY) / NANO_INVERSE;
     uint32_t timeout_ticks_l = (uint32_t)num_ticks;
     uint32_t timeout_ticks_h = (uint32_t)(num_ticks >> 32);
 
