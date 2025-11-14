@@ -27,7 +27,7 @@ In addition to an ethernet driver, we also make use of a serial driver and timer
 The serial driver is used for logging DHCP messages, benchmarking results, etc.
 The timer driver is used as the IP stack needs to be able to set regular timeouts to function.
 
-To learn more about the benchmarking architecutre and setup, see the
+To learn more about the benchmarking architecture and setup, see the
 [benchmarking section below](#benchmarking).
 
 ## Building
@@ -44,6 +44,7 @@ The following platforms are supported:
 * qemu_virt_aarch64
 * qemu_virt_riscv64
 * star64
+* rock3b
 
 To compile the system image, run:
 
@@ -111,7 +112,7 @@ For benchmarking, we have two specific PDs as part of the system:
 * the benchmark PD
 * the bench idle PD
 
-The benchmark PD is responsbile for using the PMU hardware to record performance events such as
+The benchmark PD is responsible for using the PMU hardware to record performance events such as
 cycle counts and manage the start/stopping of benchmark runs.
 
 Typically our setup is that ipbench will begin a benchmarking run for each throughput we want
@@ -142,7 +143,7 @@ echo server system.
 
 You can see all the possible arguments with
 ```sh
-python3 script/benchmark.py -h
+python3 scripts/benchmark.py -h
 ```
 
 Note that for gathering benchmark results you should not change the default parameters
@@ -161,7 +162,7 @@ IP stack relies on a functioning timer driver, without it even DHCP will fail.
 Once you are confident that the other drivers are working, you can begin debugging the
 echo server.
 
-Other than adding debug prints in the ethernet driver to check that IRQs are occuring
+Other than adding debug prints in the ethernet driver to check that IRQs are occurring
 (to ensure RX/TX traffic is happening), the main helper is to increase the amount of
 logging in lwIP.
 

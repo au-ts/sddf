@@ -25,6 +25,7 @@ The following platforms are supported:
 * serengeti
 * star64
 * zcu102
+* rock3b
 
 ### Make
 
