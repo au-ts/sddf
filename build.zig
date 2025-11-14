@@ -16,6 +16,7 @@ const DriverClass = struct {
     };
 
     const Timer = enum {
+        apb_timer,
         arm,
         cdns,
         meson,

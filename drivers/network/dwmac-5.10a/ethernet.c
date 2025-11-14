@@ -350,6 +350,28 @@ static void eth_init()
     *DMA_REG(DMA_CH0_RX_CONTROL) &= ~(DMA_CH0_RX_RBSZ_MASK);
     *DMA_REG(DMA_CH0_RX_CONTROL) |= (MAX_RX_FRAME_SZ << DMA_CH0_RX_RBSZ_POS);
 
+    // Set programmable burst length (PBL).
+#if defined(CONFIG_PLAT_IMX8MP_EVK)
+    // i.MX 8M PLUS has a 32-bit AHB bus, an 8KB TX FIFO and an 8KB RX FIFO.
+    // We use the maximum allowed PBL value here (256 = 32 * 8),
+    // in which [8192 - (256 + 7) * (32 / 8) = 7140 > packet size] to avoid dead-lock.
+    *DMA_REG(DMA_CH0_CONTROL) |= DMA_CH0_CONTROL_PBLx8;
+    *DMA_REG(DMA_CH0_TX_CONTROL) |= (32 << DMA_CH0_TX_CONTROL_PBL_POS) & DMA_CH0_TX_CONTROL_PBL_MASK;
+    *DMA_REG(DMA_CH0_RX_CONTROL) |= (32 << DMA_CH0_RX_CONTROL_PBL_POS) & DMA_CH0_RX_CONTROL_PBL_MASK;
+#elif defined(CONFIG_PLAT_STAR64)
+    // JH-7110 has a 64-bit AXI4 bus, a 2KB TX FIFO and a 2KB RX FIFO.
+    // We set PBL to 32 such that [2048 - (32 + 5) * (64 / 8) = 1752 > packet size] to avoid dead-lock.
+    *DMA_REG(DMA_CH0_TX_CONTROL) |= (32 << DMA_CH0_TX_CONTROL_PBL_POS) & DMA_CH0_TX_CONTROL_PBL_MASK;
+    *DMA_REG(DMA_CH0_RX_CONTROL) |= (32 << DMA_CH0_RX_CONTROL_PBL_POS) & DMA_CH0_RX_CONTROL_PBL_MASK;
+#elif defined(CONFIG_PLAT_HIFIVE_P550)
+    // EIC7700X has an 8KB RX FIFO and an 8KB TX FIFO.
+    // We use the maximum allowed PBL value here (256 = 32 * 8),
+    // in which [8192 - (256 + 5) * (128 / 8) = 4016 > packet size] to avoid dead-lock.
+    *DMA_REG(DMA_CH0_CONTROL) |= DMA_CH0_CONTROL_PBLx8;
+    *DMA_REG(DMA_CH0_TX_CONTROL) |= (32 << DMA_CH0_TX_CONTROL_PBL_POS) & DMA_CH0_TX_CONTROL_PBL_MASK;
+    *DMA_REG(DMA_CH0_RX_CONTROL) |= (32 << DMA_CH0_RX_CONTROL_PBL_POS) & DMA_CH0_RX_CONTROL_PBL_MASK;
+#endif
+
     // Program the descriptor length. This is to tell the device that when
     // we reach the base addr + count, we should then wrap back around to
     // the base.

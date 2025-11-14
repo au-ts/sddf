@@ -121,6 +121,13 @@ BOARDS: List[Board] = [
         timer="soc/timer@7e003000",
     ),
     Board(
+        name="serengeti",
+        arch=SystemDescription.Arch.RISCV64,
+        paddr_top=0x90000000,
+        serial="soc/serial@3002000",
+        timer="soc/timer@300B000",
+    ),
+    Board(
         name="star64",
         arch=SystemDescription.Arch.RISCV64,
         paddr_top=0x100000000,

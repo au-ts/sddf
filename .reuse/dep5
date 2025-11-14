@@ -34,6 +34,7 @@ Files:
     drivers/timer/goldfish/config.json
     drivers/timer/cdns/config.json
     drivers/timer/bcm2835/config.json
+    drivers/timer/apb_timer/config.json
 Copyright: UNSW
 License: BSD-2-Clause
 
