@@ -79,90 +79,6 @@ static void print_child_util(uint64_t *buffer, uint8_t id)
 
 #endif
 
-static void benchmark_init(void)
-{
-#if !ENABLE_BENCHMARKING
-    sddf_dprintf("BENCH|LOG: Bench running in debug mode, no access to counters\n");
-    return;
-#endif
-
-#if ENABLE_PMU_EVENTS
-    sel4bench_init();
-    seL4_Word n_counters = sel4bench_get_num_counters();
-    for (seL4_Word counter = 0; counter < MIN(n_counters, ARRAY_SIZE(benchmarking_events)); counter++) {
-        sel4bench_set_count_event(counter, benchmarking_events[counter]);
-        benchmark_bf |= BIT(counter);
-    }
-
-    sel4bench_reset_counters();
-    sel4bench_start_counters(benchmark_bf);
-#endif
-}
-
-static void benchmark_start(void)
-{
-#if !ENABLE_BENCHMARKING
-    sddf_printf("BENCHMARK: benchmark_start is no-op as benchmarking is disabled\n");
-    return;
-#endif
-
-#if ENABLE_PMU_EVENTS
-    sel4bench_reset_counters();
-    THREAD_MEMORY_RELEASE();
-    sel4bench_start_counters(benchmark_bf);
-#endif
-
-#ifdef CONFIG_BENCHMARK_TRACK_UTILISATION
-    seL4_BenchmarkResetThreadUtilisation(TCB_CAP);
-    for (uint8_t i = 0; i < benchmark_config.num_children; i++) {
-        seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + benchmark_config.children[i].child_id);
-    }
-    seL4_BenchmarkResetLog();
-#endif
-
-#ifdef CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES
-    seL4_BenchmarkResetLog();
-#endif
-}
-
-static void benchmark_stop(void)
-{
-#if !ENABLE_BENCHMARKING
-    sddf_printf("BENCHMARK: benchmark_stop is no-op as benchmarking is disabled\n");
-    return;
-#endif
-
-    sddf_printf("BENCHMARK: actually stopping benchmark\n");
-
-#if ENABLE_PMU_EVENTS
-    sel4bench_get_counters(benchmark_bf, &counter_values[0]);
-    sel4bench_stop_counters(benchmark_bf);
-
-    sddf_printf("{\n");
-    for (int i = 0; i < ARRAY_SIZE(benchmarking_events); i++) {
-        sddf_printf("%s: %lu\n", counter_names[i], counter_values[i]);
-    }
-    sddf_printf("}\n");
-#endif
-
-#ifdef CONFIG_BENCHMARK_TRACK_UTILISATION
-    sddf_printf("BENCHMARK: finalize log\n");
-    seL4_BenchmarkFinalizeLog();
-    seL4_BenchmarkGetThreadUtilisation(TCB_CAP);
-    print_total_util((uint64_t *)&seL4_GetIPCBuffer()->msg[0]);
-    for (uint8_t i = 0; i < benchmark_config.num_children; i++) {
-        seL4_BenchmarkGetThreadUtilisation(BASE_TCB_CAP + benchmark_config.children[i].child_id);
-        print_child_util((uint64_t *)&seL4_GetIPCBuffer()->msg[0], benchmark_config.children[i].child_id);
-    }
-#endif
-
-#ifdef CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES
-    uint64_t entries = seL4_BenchmarkFinalizeLog();
-    sddf_printf("KernelEntries:  %lu\n", entries);
-    dump_log_summary(entries);
-#endif
-}
-
 #ifdef CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES
 benchmark_track_kernel_entry_t *log_buffer;
 
@@ -208,6 +124,95 @@ static void dump_log_summary(uint64_t log_size)
 }
 #endif
 
+static void benchmark_init(void)
+{
+#if !ENABLE_BENCHMARKING
+    sddf_dprintf("BENCH|LOG: Bench running in debug mode, no access to counters\n");
+    return;
+#endif
+
+#if ENABLE_PMU_EVENTS
+    sel4bench_init();
+    seL4_Word n_counters = sel4bench_get_num_counters();
+    for (seL4_Word counter = 0; counter < MIN(n_counters, ARRAY_SIZE(benchmarking_events)); counter++) {
+        sel4bench_set_count_event(counter, benchmarking_events[counter]);
+        benchmark_bf |= BIT(counter);
+    }
+
+    sel4bench_reset_counters();
+    sel4bench_start_counters(benchmark_bf);
+#endif
+
+#ifdef CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES
+    int res_buf = seL4_BenchmarkSetLogBuffer(LOG_BUFFER_CAP);
+    if (res_buf) {
+        sddf_printf("BENCH|ERROR: Could not set log buffer: %d\n", res_buf);
+    } else {
+        sddf_printf("BENCH|LOG: Log buffer set\n");
+    }
+#endif
+}
+
+static void benchmark_start(void)
+{
+#if !ENABLE_BENCHMARKING
+    sddf_printf("BENCHMARK: benchmark_start is no-op as benchmarking is disabled\n");
+    return;
+#endif
+
+#if ENABLE_PMU_EVENTS
+    sel4bench_reset_counters();
+    THREAD_MEMORY_RELEASE();
+    sel4bench_start_counters(benchmark_bf);
+#endif
+
+#ifdef CONFIG_BENCHMARK_TRACK_UTILISATION
+    seL4_BenchmarkResetThreadUtilisation(TCB_CAP);
+    for (uint8_t i = 0; i < benchmark_config.num_children; i++) {
+        seL4_BenchmarkResetThreadUtilisation(BASE_TCB_CAP + benchmark_config.children[i].child_id);
+    }
+    seL4_BenchmarkResetLog();
+#endif
+
+#ifdef CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES
+    seL4_BenchmarkResetLog();
+#endif
+}
+
+static void benchmark_stop(void)
+{
+#if !ENABLE_BENCHMARKING
+    sddf_printf("BENCHMARK: benchmark_stop is no-op as benchmarking is disabled\n");
+    return;
+#endif
+
+#if ENABLE_PMU_EVENTS
+    sel4bench_get_counters(benchmark_bf, &counter_values[0]);
+    sel4bench_stop_counters(benchmark_bf);
+
+    sddf_printf("{\n");
+    for (int i = 0; i < ARRAY_SIZE(benchmarking_events); i++) {
+        sddf_printf("%s: %lu\n", counter_names[i], counter_values[i]);
+    }
+    sddf_printf("}\n");
+#endif
+
+#ifdef CONFIG_BENCHMARK_TRACK_UTILISATION
+    seL4_BenchmarkFinalizeLog();
+    seL4_BenchmarkGetThreadUtilisation(TCB_CAP);
+    print_total_util((uint64_t *)&seL4_GetIPCBuffer()->msg[0]);
+    for (uint8_t i = 0; i < benchmark_config.num_children; i++) {
+        seL4_BenchmarkGetThreadUtilisation(BASE_TCB_CAP + benchmark_config.children[i].child_id);
+        print_child_util((uint64_t *)&seL4_GetIPCBuffer()->msg[0], benchmark_config.children[i].child_id);
+    }
+#endif
+
+#ifdef CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES
+    uint64_t entries = seL4_BenchmarkFinalizeLog();
+    sddf_printf("KernelEntries:  %lu\n", entries);
+    dump_log_summary(entries);
+#endif
+}
 
 void notified(microkit_channel ch)
 {
@@ -244,15 +249,6 @@ void init(void)
     benchmark_init();
     /* Notify the idle thread that the sel4bench library is initialised. */
     microkit_notify(benchmark_config.init_ch);
-
-#ifdef CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES
-    int res_buf = seL4_BenchmarkSetLogBuffer(LOG_BUFFER_CAP);
-    if (res_buf) {
-        sddf_printf("BENCH|ERROR: Could not set log buffer: %d\n", res_buf);
-    } else {
-        sddf_printf("BENCH|LOG: Log buffer set\n");
-    }
-#endif
 }
 
 seL4_Bool fault(microkit_child id, microkit_msginfo msginfo, microkit_msginfo *reply_msginfo)
