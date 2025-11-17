@@ -63,7 +63,7 @@ fn create_dummy_waker() -> Waker {
     unsafe { Waker::from_raw(raw_waker) }
 }
 
-#[protection_domain(heap_size = 0x1000)]
+#[protection_domain(heap_size = 0x10000)]
 fn init() -> impl Handler {
     unsafe {
         sdmmc_protocol::sdmmc_os::set_logger(&SERIAL).unwrap();
