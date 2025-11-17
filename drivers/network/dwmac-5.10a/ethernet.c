@@ -432,9 +432,6 @@ void init(void)
     assert(RX_COUNT * sizeof(struct descriptor) <= device_resources.regions[1].region.size);
     assert(TX_COUNT * sizeof(struct descriptor) <= device_resources.regions[2].region.size);
 
-    /* Ack any IRQs that were delivered before the driver started. */
-    sddf_irq_ack(device_resources.irqs[0].id);
-
     eth_regs = (uintptr_t)device_resources.regions[0].region.vaddr;
 
     /* De-assert the reset signals that u-boot left asserted. */
