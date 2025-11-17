@@ -83,7 +83,7 @@ bool process_tx_queue(uint32_t client)
         return false;
     }
 
-    uint32_t length = serial_queue_length(handle);
+    uint32_t length = serial_queue_length_consumer(handle);
     if (config.enable_colour) {
         const char *client_colour = colours[client % ARRAY_SIZE(colours)];
         assert(COLOUR_BEGIN_LEN == strlen(client_colour));
