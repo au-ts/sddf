@@ -95,8 +95,7 @@ static inline int serial_enqueue(serial_queue_handle_t *queue_handle, char chara
 
     queue_handle->data_region[*tail % queue_handle->capacity] = character;
 
-    // the store-release will synchronise with the load-acquire
-    // in serial_dequeue() or serial_update_shared_head()
+    // the store-release will synchronise with the load-acquire in serial_dequeue()
     store_release_32(tail, *tail + 1);
 
     return 0;
@@ -143,8 +142,7 @@ static inline int serial_dequeue(serial_queue_handle_t *queue_handle, char *char
 
     *character = queue_handle->data_region[*head % queue_handle->capacity];
 
-    // the store-release will synchronise with the load-acquire
-    // in serial_enqueue() or serial_update_shared_tail()
+    // the store-release will synchronise with the load-acquire in serial_enqueue()
     store_release_32(head, *head + 1);
 
     return 0;
@@ -182,9 +180,7 @@ static inline int serial_dequeue_local(serial_queue_handle_t *queue_handle, uint
 static inline void serial_update_shared_tail(serial_queue_handle_t *queue_handle, uint32_t local_tail)
 {
     uint32_t current_length = serial_queue_length(queue_handle);
-    // the load-acquire will be paired with the store-release
-    // in serial_dequeue() or serial_update_shared_head()
-    uint32_t head = load_acquire_32(&queue_handle->queue->head);
+    uint32_t head = load_relaxed_32(&queue_handle->queue->head);
     uint32_t new_length = local_tail - head;
 
     /* Ensure updates to tail don't overwrite existing data */
@@ -193,8 +189,7 @@ static inline void serial_update_shared_tail(serial_queue_handle_t *queue_handle
     /* Ensure updates to tail don't exceed capacity restraints */
     assert(new_length <= queue_handle->capacity);
 
-    // the store-release will synchronise with the load-acquire
-    // in serial_dequeue() or serial_update_shared_head()
+    // the store-release will synchronise with the load-acquire in serial_dequeue()
     store_release_32(&queue_handle->queue->tail, local_tail);
 }
 
@@ -208,16 +203,13 @@ static inline void serial_update_shared_tail(serial_queue_handle_t *queue_handle
 static inline void serial_update_shared_head(serial_queue_handle_t *queue_handle, uint32_t local_head)
 {
     uint32_t current_length = serial_queue_length(queue_handle);
-    // the load-acquire will be paired with the store-release
-    // in serial_enqueue() or serial_update_shared_tail()
-    uint32_t tail = load_acquire_32(&queue_handle->queue->tail);
+    uint32_t tail = load_relaxed_32(&queue_handle->queue->tail);
     uint32_t new_length = tail - local_head;
 
     /* Ensure updates to head don't corrupt queue or capacity constraints */
     assert(new_length <= current_length);
 
-    // the store-release will synchronise with the load-acquire
-    // in serial_enqueue() or serial_update_shared_tail()
+    // the store-release will synchronise with the load-acquire in serial_enqueue()
     store_release_32(&queue_handle->queue->head, local_head);
 }
 
