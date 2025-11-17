@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include <pthread.h>
 
-#include <sddf/network/queue.h>
+#include <sddf/serial/queue.h>
 
 #ifndef QUEUE_SIZE
 #define QUEUE_SIZE 1
@@ -25,14 +25,12 @@
 #error "the producer size must be not less than the consumer size"
 #endif
 
-net_queue_handle_t queue;
+static serial_queue_handle_t queue_handle;
 
 void *producer(void *p)
 {
     for (uint64_t i = 0; i < PRODUCER; i++) {
-        net_buff_desc_t desc = { 0 };
-        desc.io_or_offset = i;
-        while (net_enqueue_free(&queue, desc) != 0);
+        while (serial_enqueue(&queue_handle, (char)i) != 0);
     }
     return NULL;
 }
@@ -40,32 +38,29 @@ void *producer(void *p)
 void *consumer(void *p)
 {
     for (uint64_t i = 0; i < CONSUMER; i++) {
-        net_buff_desc_t desc;
-        while (net_dequeue_free(&queue, &desc) != 0);
-        assert(desc.io_or_offset == i);
+        char character;
+        while (serial_dequeue(&queue_handle, &character) != 0);
+        assert(character == (char)i);
     }
     return NULL;
 }
 
 int main()
 {
-    net_queue_t * free_queue = malloc(sizeof(net_queue_t) + sizeof(net_buff_desc_t) * QUEUE_SIZE);
-    if (free_queue == NULL) {
+    serial_queue_t *queue = malloc(sizeof(serial_queue_t));
+    if (queue == NULL) {
         exit(1);
     }
-    free_queue->head = 0;
-    free_queue->tail = 0;
-    free_queue->consumer_signalled = 0;
+    queue->tail = 0;
+    queue->head = 0;
+    queue->producer_signalled = 0;
 
-    net_queue_t * active_queue = malloc(sizeof(net_queue_t) + sizeof(net_buff_desc_t) * QUEUE_SIZE);
-    if (active_queue == NULL) {
+    char *data_region = malloc(QUEUE_SIZE * sizeof(char));
+    if (data_region == NULL) {
         exit(1);
     }
-    active_queue->head = 0;
-    active_queue->tail = 0;
-    active_queue->consumer_signalled = 0;
 
-    net_queue_init(&queue, free_queue, active_queue, QUEUE_SIZE);
+    serial_queue_init(&queue_handle, queue, QUEUE_SIZE, data_region);
 
     pthread_t t1, t2;
     if (pthread_create(&t1, NULL, producer, NULL) != 0) {
@@ -78,8 +73,8 @@ int main()
     pthread_join(t2, NULL);
     pthread_join(t1, NULL);
 
-    free(active_queue);
-    free(free_queue);
+    free(data_region);
+    free(queue);
 
     return 0;
 }
