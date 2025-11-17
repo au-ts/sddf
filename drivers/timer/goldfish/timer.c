@@ -70,10 +70,6 @@ void init()
     assert(device_resources_check_magic(&device_resources));
     assert(device_resources.num_irqs == 1);
     assert(device_resources.num_regions == 1);
-
-    /* Ack any IRQs that were delivered before the driver started. */
-    sddf_irq_ack(device_resources.irqs[0].id);
-
     timer_regs = (goldfish_timer_regs_t *)device_resources.regions[0].region.vaddr;
 
     for (int i = 0; i < MAX_TIMEOUTS; i++) {

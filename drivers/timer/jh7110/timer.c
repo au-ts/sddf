@@ -202,11 +202,6 @@ void init(void)
     assert(device_resources.num_irqs == 2);
     assert(device_resources.num_regions == 1);
 
-    /* Ack any IRQs that were delivered before the driver started. */
-    for (int i = 0; i < device_resources.num_irqs; i++) {
-        sddf_irq_ack(device_resources.irqs[i].id);
-    }
-
     for (int i = 0; i < MAX_TIMEOUTS; i++) {
         timeouts[i] = UINT64_MAX;
     }
