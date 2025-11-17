@@ -183,9 +183,6 @@ static inline void serial_update_shared_tail(serial_queue_handle_t *queue_handle
     uint32_t head = load_relaxed_32(&queue_handle->queue->head);
     uint32_t new_length = local_tail - head;
 
-    /* Ensure updates to tail don't overwrite existing data */
-    assert(new_length >= current_length);
-
     /* Ensure updates to tail don't exceed capacity restraints */
     assert(new_length <= queue_handle->capacity);
 
