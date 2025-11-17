@@ -258,7 +258,7 @@ static inline uint32_t serial_queue_free(serial_queue_handle_t *queue_handle)
  */
 static inline uint32_t serial_queue_contiguous_free(serial_queue_handle_t *queue_handle)
 {
-    return MIN(queue_handle->capacity - (load_relaxed_32(&queue_handle->queue->tail) % queue_handle->capacity),
+    return MIN(queue_handle->capacity - (queue_handle->queue->tail % queue_handle->capacity),
                serial_queue_free(queue_handle));
 }
 
