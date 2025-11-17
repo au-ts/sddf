@@ -29,7 +29,7 @@ SUPPORTED_BOARDS := \
 		    qemu_virt_aarch64 \
 		    qemu_virt_riscv64 \
 		    rpi4b_1gb \
-			serengeti \
+		    serengeti \
 		    star64 \
 		    zcu102
 
