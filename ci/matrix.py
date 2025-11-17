@@ -17,7 +17,7 @@ MACHINE_QUEUE_BOARDS: dict[str, list[str]] = {
     "odroidc2": ["odroidc2"],
     "odroidc4": ["odroidc4_1", "odroidc4_2"],
     "star64": ["star64"],
-    "zcu102": ["zcu102"],
+    "zcu102": ["zcu102", "zcu102_2"],
     "rpi4b_1gb": ["pi4B"],
 }
 
