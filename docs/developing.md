@@ -226,14 +226,6 @@ different avenues:
     * Note that U-Boot drivers are not interrupt driven while all sDDF drivers are.
 * Manufacturer provided SDKs or reference drivers.
 
-#### Code
-
-Below is a list of things that should be in each driver regardless of device class:
-
-* Each IRQ used by the driver must be acked during initialisation in-case there
-  were undelivered IRQs from the time the IRQ is registered with seL4 and the driver
-  starts.
-
 #### Finding the Linux or U-Boot driver
 
 To find the driver for your device in Linux or U-Boot, the easiest way to is to first
