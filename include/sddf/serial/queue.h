@@ -37,8 +37,8 @@ typedef struct serial_queue_handle {
  */
 static inline uint32_t serial_queue_length(serial_queue_handle_t *queue_handle)
 {
-    uint32_t tail = __atomic_load_n(&queue_handle->queue->tail, __ATOMIC_RELAXED);
-    uint32_t head = __atomic_load_n(&queue_handle->queue->head, __ATOMIC_RELAXED);
+    uint32_t tail = load_relaxed_32(&queue_handle->queue->tail);
+    uint32_t head = load_relaxed_32(&queue_handle->queue->head);
     return tail - head;
 }
 
@@ -52,16 +52,9 @@ static inline uint32_t serial_queue_length(serial_queue_handle_t *queue_handle)
  */
 static inline int serial_queue_empty(serial_queue_handle_t *queue_handle, uint32_t local_head)
 {
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
-    // the load-acquire will be paired with the store-released
-    // in serial_enqueue() or serial_update_shared_tail() in the "synchronizes with" relation
-    uint32_t tail = __atomic_load_n(&queue_handle->queue->tail, __ATOMIC_ACQUIRE);
-#else
-    uint32_t tail = __atomic_load_n(&queue_handle->queue->tail, __ATOMIC_RELAXED);
-    // the compiler acquire fence will be paired with the compiler release fence
-    // in serial_enqueue() or serial_update_shared_tail() in the "synchronizes with" relation
-    __atomic_signal_fence(__ATOMIC_ACQUIRE);
-#endif
+    // the load-acquire will be paired with the store-release
+    // in serial_enqueue() or serial_update_shared_tail()
+    uint32_t tail = load_acquire_32(&queue_handle->queue->tail);
 
     return local_head == tail;
 }
@@ -76,16 +69,9 @@ static inline int serial_queue_empty(serial_queue_handle_t *queue_handle, uint32
  */
 static inline int serial_queue_full(serial_queue_handle_t *queue_handle, uint32_t local_tail)
 {
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
-    // the load-acquire will be paired with the store-released
-    // in serial_dequeue() or serial_update_shared_head() in the "synchronizes with" relation
-    uint32_t head = __atomic_load_n(&queue_handle->queue->head, __ATOMIC_ACQUIRE);
-#else
-    uint32_t head = __atomic_load_n(&queue_handle->queue->head, __ATOMIC_RELAXED);
-    // the compiler acquire fence will be paired with the compiler release fence
-    // in serial_dequeue() or serial_update_shared_head() in the "synchronizes with" relation
-    __atomic_signal_fence(__ATOMIC_ACQUIRE);
-#endif
+    // the load-acquire will be paired with the store-release
+    // in serial_dequeue() or serial_update_shared_head()
+    uint32_t head = load_acquire_32(&queue_handle->queue->head);
 
     return local_tail - head == queue_handle->capacity;
 }
@@ -108,16 +94,10 @@ static inline int serial_enqueue(serial_queue_handle_t *queue_handle, char chara
     }
 
     queue_handle->data_region[*tail % queue_handle->capacity] = character;
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
+
     // the store-release will synchronise with the load-acquire
     // in serial_dequeue() or serial_update_shared_head()
-    __atomic_store_n(tail, *tail + 1, __ATOMIC_RELEASE);
-#else
-    // the compiler release fence will synchronise with the compiler acquire fence
-    // in serial_dequeue() or serial_update_shared_head()
-    __atomic_signal_fence(__ATOMIC_RELEASE);
-    __atomic_store_n(tail, *tail + 1, __ATOMIC_RELAXED);
-#endif
+    store_release_32(tail, *tail + 1);
 
     return 0;
 }
@@ -162,16 +142,10 @@ static inline int serial_dequeue(serial_queue_handle_t *queue_handle, char *char
     }
 
     *character = queue_handle->data_region[*head % queue_handle->capacity];
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
+
     // the store-release will synchronise with the load-acquire
     // in serial_enqueue() or serial_update_shared_tail()
-    __atomic_store_n(head, *head + 1, __ATOMIC_RELEASE);
-#else
-    // the compiler release fence will synchronise with the compiler acquire fence
-    // in serial_enqueue() or serial_update_shared_tail()
-    __atomic_signal_fence(__ATOMIC_RELEASE);
-    __atomic_store_n(head, *head + 1, __ATOMIC_RELAXED);
-#endif
+    store_release_32(head, *head + 1);
 
     return 0;
 }
@@ -208,16 +182,9 @@ static inline int serial_dequeue_local(serial_queue_handle_t *queue_handle, uint
 static inline void serial_update_shared_tail(serial_queue_handle_t *queue_handle, uint32_t local_tail)
 {
     uint32_t current_length = serial_queue_length(queue_handle);
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
-    // the load-acquire will be paired with the store-released
-    // in serial_dequeue() or serial_update_shared_head() in the "synchronizes with" relation
-    uint32_t head = __atomic_load_n(&queue_handle->queue->head, __ATOMIC_ACQUIRE);
-#else
-    uint32_t head = __atomic_load_n(&queue_handle->queue->head, __ATOMIC_RELAXED);
-    // the compiler acquire fence will be paired with the compiler release fence
-    // in serial_dequeue() or serial_update_shared_head() in the "synchronizes with" relation
-    __atomic_signal_fence(__ATOMIC_ACQUIRE);
-#endif
+    // the load-acquire will be paired with the store-release
+    // in serial_dequeue() or serial_update_shared_head()
+    uint32_t head = load_acquire_32(&queue_handle->queue->head);
     uint32_t new_length = local_tail - head;
 
     /* Ensure updates to tail don't overwrite existing data */
@@ -226,16 +193,9 @@ static inline void serial_update_shared_tail(serial_queue_handle_t *queue_handle
     /* Ensure updates to tail don't exceed capacity restraints */
     assert(new_length <= queue_handle->capacity);
 
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
     // the store-release will synchronise with the load-acquire
     // in serial_dequeue() or serial_update_shared_head()
-    __atomic_store_n(&queue_handle->queue->tail, local_tail, __ATOMIC_RELEASE);
-#else
-    // the compiler release fence will synchronise with the compiler acquire fence
-    // in serial_dequeue() or serial_update_shared_head()
-    __atomic_signal_fence(__ATOMIC_RELEASE);
-    __atomic_store_n(&queue_handle->queue->tail, local_tail, __ATOMIC_RELAXED);
-#endif
+    store_release_32(&queue_handle->queue->tail, local_tail);
 }
 
 /**
@@ -248,31 +208,17 @@ static inline void serial_update_shared_tail(serial_queue_handle_t *queue_handle
 static inline void serial_update_shared_head(serial_queue_handle_t *queue_handle, uint32_t local_head)
 {
     uint32_t current_length = serial_queue_length(queue_handle);
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
-    // the load-acquire will be paired with the store-released
-    // in serial_enqueue() or serial_update_shared_tail() in the "synchronizes with" relation
-    uint32_t tail = __atomic_load_n(&queue_handle->queue->tail, __ATOMIC_ACQUIRE);
-#else
-    uint32_t tail = __atomic_load_n(&queue_handle->queue->tail, __ATOMIC_RELAXED);
-    // the compiler acquire fence will be paired with the compiler release fence
-    // in serial_enqueue() or serial_update_shared_tail() in the "synchronizes with" relation
-    __atomic_signal_fence(__ATOMIC_ACQUIRE);
-#endif
+    // the load-acquire will be paired with the store-release
+    // in serial_enqueue() or serial_update_shared_tail()
+    uint32_t tail = load_acquire_32(&queue_handle->queue->tail);
     uint32_t new_length = tail - local_head;
 
     /* Ensure updates to head don't corrupt queue or capacity constraints */
     assert(new_length <= current_length);
 
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
     // the store-release will synchronise with the load-acquire
     // in serial_enqueue() or serial_update_shared_tail()
-    __atomic_store_n(&queue_handle->queue->head, local_head, __ATOMIC_RELEASE);
-#else
-    // the compiler release fence will synchronise with the compiler acquire fence
-    // in serial_dequeue()
-    __atomic_signal_fence(__ATOMIC_RELEASE);
-    __atomic_store_n(&queue_handle->queue->head, local_head, __ATOMIC_RELAXED);
-#endif
+    store_release_32(&queue_handle->queue->head, local_head);
 }
 
 /**
@@ -285,8 +231,7 @@ static inline void serial_update_shared_head(serial_queue_handle_t *queue_handle
  */
 static inline uint32_t serial_queue_contiguous_length(serial_queue_handle_t *queue_handle)
 {
-    return MIN(queue_handle->capacity
-                   - (__atomic_load_n(&queue_handle->queue->head, __ATOMIC_RELAXED) % queue_handle->capacity),
+    return MIN(queue_handle->capacity - (load_relaxed_32(&queue_handle->queue->head) % queue_handle->capacity),
                serial_queue_length(queue_handle));
 }
 
@@ -313,8 +258,7 @@ static inline uint32_t serial_queue_free(serial_queue_handle_t *queue_handle)
  */
 static inline uint32_t serial_queue_contiguous_free(serial_queue_handle_t *queue_handle)
 {
-    return MIN(queue_handle->capacity
-                   - (__atomic_load_n(&queue_handle->queue->tail, __ATOMIC_RELAXED) % queue_handle->capacity),
+    return MIN(queue_handle->capacity - (load_relaxed_32(&queue_handle->queue->tail) % queue_handle->capacity),
                serial_queue_free(queue_handle));
 }
 
