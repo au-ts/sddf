@@ -226,7 +226,10 @@ static inline uint32_t serial_queue_contiguous_length(serial_queue_handle_t *que
  */
 static inline uint32_t serial_queue_free(serial_queue_handle_t *queue_handle)
 {
-    return queue_handle->capacity - serial_queue_length(queue_handle);
+    uint32_t tail = queue_handle->queue->tail;
+    uint32_t head = load_acquire_32(&queue_handle->queue->head);
+    uint32_t length = tail - head;
+    return queue_handle->capacity - length;
 }
 
 /**
