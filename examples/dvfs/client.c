@@ -33,6 +33,7 @@ void init(void) {
 
     if (res != 0) {
         sddf_printf_("DVFS Client: Fail to get the frequency\n");
+        return;
     }
 
     cpu_intensive_loop();
@@ -43,6 +44,7 @@ void init(void) {
 
     if (res != 0) {
         sddf_printf_("DVFS Client: Fail to set the frequency\n");
+        return;
     }
 
     cpu_intensive_loop();
