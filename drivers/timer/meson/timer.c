@@ -134,8 +134,6 @@ void init(void)
     assert(device_resources.num_irqs == 1);
     assert(device_resources.num_regions == 1);
 
-    sddf_irq_ack(device_resources.irqs[0].id);
-
     for (int i = 0; i < MAX_TIMEOUTS; i++) {
         timeouts[i] = UINT64_MAX;
     }
