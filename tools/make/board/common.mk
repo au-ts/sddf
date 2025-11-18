@@ -26,12 +26,15 @@ ifeq ($(wildcard ${SDDF}/tools/make/board/${MICROKIT_BOARD}.mk),)
 endif
 
 include ${SDDF}/tools/make/board/${MICROKIT_BOARD}.mk
+include ${SDDF}/tools/make/toolchain/${TOOLCHAIN}.mk
 
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 
+ifneq ($(ARCH),x86_64)
 DTS := $(SDDF)/dts/$(MICROKIT_BOARD).dts
 DTB := $(MICROKIT_BOARD).dtb
 DTC := dtc
+endif
 
 PYTHON ?= python3
 
@@ -50,7 +53,6 @@ ${ETH_DRIV}: libsddf_util_debug.a
 eth_driver.elf: ${ETH_DRIV}
 	cp ${ETH_DRIV} $@
 
-include ${SDDF}/tools/make/toolchain/${TOOLCHAIN}.mk
 
 # Magic to ensure stuff gets recompiled if we change
 # board name, or use a different Microkit etc.
