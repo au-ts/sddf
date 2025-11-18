@@ -24,35 +24,51 @@ void cpu_intensive_loop() {
 }
 
 void init(void) {
-    uint64_t time_start = sddf_timer_time_now(config.driver_id);
-
     uint32_t freq = 0;
 
     uint32_t res = sddf_dvfs_get_freq(DVFS_CHANNEL, CPU_INFO[0].core_ident, &freq);
 
-    if (res != 0) {
-        sddf_printf_("DVFS Client: Fail to get the frequency\n");
+    if (res != SDDF_DVFS_SUCCESS) {
+        sddf_printf_("DVFS Client: Fail to get the frequency, Error: %d\n", res);
         return;
     }
 
+    sddf_printf_("DVFS Client: BEGIN FIRST ROUND\n");
+
+    uint64_t time_start_1 = sddf_timer_time_now(config.driver_id);
+
     cpu_intensive_loop();
 
-    uint64_t time_mid = sddf_timer_time_now(config.driver_id);
+    uint64_t time_end_1 = sddf_timer_time_now(config.driver_id);
+
+    sddf_printf_("DVFS Client: BEGIN SECOND ROUND\n");
 
     res = sddf_dvfs_set_freq(DVFS_CHANNEL, CPU_INFO[0].core_ident, CPU_INFO[0].opptable[1].freq_hz);
 
-    if (res != 0) {
-        sddf_printf_("DVFS Client: Fail to set the frequency\n");
+    sddf_printf_("DVFS Client: TEST\n");
+
+    if (res != SDDF_DVFS_SUCCESS) {
+        sddf_printf_("DVFS Client: Fail to set the frequency, Error: %d\n", res);
         return;
     }
 
+    sddf_printf_("DVFS Client: TEST\n");
+
+    uint64_t time_start_2 = sddf_timer_time_now(config.driver_id);
+
+    sddf_printf_("DVFS Client: TEST\n");
+
     cpu_intensive_loop();
 
-    uint64_t time_end = sddf_timer_time_now(config.driver_id);
+    uint64_t time_end_2 = sddf_timer_time_now(config.driver_id);
 
-    sddf_printf_("%lu ns takes under Frequency: %d", time_mid - time_start, freq);
+    sddf_printf_("DVFS Client: TEST\n");
 
-    sddf_printf_("%lu ns takes under Frequency: %lu", time_end - time_mid, CPU_INFO[0].opptable[1].freq_hz);
+    sddf_printf_("%lu ns takes under Frequency: %d\n", time_end_1 - time_start_1, freq);
+
+    sddf_printf_("%lu ns takes under Frequency: %d\n", time_end_2 - time_start_2, sddf_dvfs_get_freq(DVFS_CHANNEL, CPU_INFO[0].core_ident, &freq));
+
+    sddf_printf_("DVFS Client: TEST\n");
 }
 
 void notified(microkit_channel ch) {}

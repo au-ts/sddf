@@ -45,6 +45,8 @@ impl Handler for HandlerImpl {
 
         let (label, count) = with_msg_regs_mut(|buf| resp.write_message(buf)).unwrap();
 
+        debug_println!("exiting from dvfs");
+
         Ok(MessageInfo::new(label, count))
     }
 }

@@ -397,7 +397,7 @@ source = "git+https://github.com/seL4/rust-sel4.git?rev=95feffab18a1b46b9feb78aa
 [[package]]
 name = "sddf-rust"
 version = "0.1.0"
-source = "git+ssh://git@github.com/Cheng-Li1/sddf-rust.git#348811e395b0cb3cf888f66f1391e56bd0591840"
+source = "git+ssh://git@github.com/Cheng-Li1/sddf-rust.git?rev=f46f4d7efefa175de42e2590462257a485898f1d#f46f4d7efefa175de42e2590462257a485898f1d"
 dependencies = [
  "num_enum",
  "sddf-ipc-types",
