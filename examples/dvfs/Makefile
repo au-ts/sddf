@@ -17,16 +17,16 @@ export BUILD_DIR
 export SDDF := $(abspath ../..)
 override MICROKIT_SDK := $(abspath ${MICROKIT_SDK})
 
-IMAGE_FILE := ${BUILD_DIR}/loader.img
-REPORT_FILE := ${BUILD_DIR}/report.txt
+IMAGE_FILE := $(BUILD_DIR)/loader.img
+REPORT_FILE := $(BUILD_DIR)/report.txt
 
 all: ${IMAGE_FILE}
 
-qemu ${IMAGE_FILE} ${REPORT_FILE} clean clobber: ${BUILD_DIR}/Makefile FORCE
-	${MAKE} -C ${BUILD_DIR}  MICROKIT_SDK=${MICROKIT_SDK} $(notdir $@)
+qemu ${IMAGE_FILE} ${REPORT_FILE} clean clobber: $(IMAGE_FILE) ${BUILD_DIR}/Makefile FORCE
+	${MAKE} -C ${BUILD_DIR} MICROKIT_SDK=${MICROKIT_SDK} $(notdir $@)
 
 ${BUILD_DIR}/Makefile: dvfs.mk
 	mkdir -p ${BUILD_DIR}
-	cp dvfs.mk $@
+	cp dvfs.mk ${BUILD_DIR}/Makefile
 
 FORCE:

@@ -34,12 +34,6 @@ else
 	OBJCOPY := $(TOOLCHAIN)-objcopy
 endif
 
-# Allow to user to specify a custom partition
-PARTITION :=
-ifdef PARTITION
-	PARTITION_ARG := --partition $(PARTITION)
-endif
-
 IMAGE_FILE := loader.img
 REPORT_FILE  := report.txt
 SYSTEM_FILE := dvfs.system
@@ -66,11 +60,11 @@ BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 ARCH := ${shell grep 'CONFIG_SEL4_ARCH  ' $(BOARD_DIR)/include/kernel/gen_config.h | cut -d' ' -f4}
 SDDF_CUSTOM_LIBC := 1
 
-IMAGES := dvfs.elf timer_driver.elf
+IMAGES := dvfs.elf timer_driver.elf client.elf
 CFLAGS := -nostdlib \
 		  -ffreestanding \
 		  -g3 \
-		  -O3 \
+		  -O0 \
 		  -Wall -Wno-unused-function -Werror -Wno-unused-command-line-argument \
 		  -I$(BOARD_DIR)/include \
 		  -I$(SDDF)/include \
@@ -100,18 +94,20 @@ ${IMAGES}: libsddf_util_debug.a
 microkit_sdk_config_dir := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 sel4_include_dirs := $(microkit_sdk_config_dir)/include
 
+client.o: ${TOP}/client.c
+	$(CC) -c $(CFLAGS) $< -o client.o
+
+client.elf: client.o
+	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
+
 dvfs.elf:
 	@echo "Building dvfs.elf for board $(MICROKIT_BOARD)..." && \
 	echo "MICROKIT SDK config directory: $(microkit_sdk_config_dir)" && \
 	echo "SEl4 include directories: $(sel4_include_dirs)" && \
 	cd .. && \
 	SEL4_INCLUDE_DIRS=$(abspath $(sel4_include_dirs)) \
-	RUSTFLAGS="-L $(BUILD_DIR)/ -l static=helper" \
 	cargo build \
-		-Z build-std=core,alloc,compiler_builtins \
-		-Z build-std-features=compiler-builtins-mem \
-		--target-dir $(BUILD_DIR) \
-		--target support/targets/aarch64-sel4-microkit-minimal.json
+		--target-dir $(BUILD_DIR)
 	@echo "Build complete: $(TARGET_ELF)"
 	cp ./aarch64-sel4-microkit-minimal/debug/dvfs.elf $(BUILD_DIR)
 
@@ -121,6 +117,7 @@ $(DTB): $(DTS)
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE) $(PARTITION_ARG)
 	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
+	$(OBJCOPY) --update-section .timer_client_config=timer_client_client.data client.elf
 
 $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
