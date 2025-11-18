@@ -23,7 +23,7 @@ ifeq ($(ARCH),aarch64)
     CFLAGS_ARCH := -mstrict-align -mcpu=$(CPU) -mtune=$(CPU)
 	TARGET := aarch64-none-elf
 else ifeq ($(ARCH),riscv64)
-	CFLAGS_ARCH := -march=rv64imafdc -mstrict-align -mcpu=$(CPU) -mtune=$(CPU)
+	CFLAGS_ARCH := -march=rv64imafdc -mstrict-align
 	TARGET := riscv64-none-elf
 else ifeq ($(ARCH),x86_64)
     CFLAGS_ARCH := -mtune=$(CPU)
