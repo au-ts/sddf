@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, Literal, TypedDict
 # to use for CI preferentially, though all will eventually be tried.
 MACHINE_QUEUE_BOARDS: dict[str, list[str]] = {
     "hifive_p550": ["p550a"],
-    "cheshire": ["cheshire1", "cheshire2"],
+    "serengeti": ["serengeti1", "serengeti2"],
     "imx8mm_evk": ["imx8mm"],
     "imx8mp_iotgate": ["iotgate1"],
     "imx8mq_evk": ["imx8mq", "imx8mq2"],
@@ -22,7 +22,7 @@ MACHINE_QUEUE_BOARDS: dict[str, list[str]] = {
 }
 
 MACHINE_QUEUE_BOARD_OPTIONS: dict[str, dict[str, Any]] = {
-    "cheshire": dict(uboot_image_started=b"Starting kernel ..."),
+    "serengeti": dict(uboot_image_started=b"Starting kernel ..."),
     "hifive_p550": dict(uboot_image_started=b"Starting kernel ..."),
 }
 
@@ -85,7 +85,6 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "zcu102",
         ],
         "boards_test": [
-            "cheshire",
             "hifive_p550",
             "imx8mm_evk",
             "imx8mq_evk",
@@ -142,6 +141,7 @@ if TYPE_CHECKING:
         "imx8mq_evk",
         "maaxboard",
         "odroidc2",
+        "serengeti",
         "star64",
         "qemu_virt_aarch64",
         "qemu_virt_riscv64",
