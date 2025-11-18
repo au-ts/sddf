@@ -35,7 +35,8 @@ SUPPORTED_BOARDS:= cheshire \
 		   rockpro64 \
 		   rpi4b_1gb \
 		   zcu102 \
-		   star64
+		   star64 \
+		   x86_64_generic
 
 include ${SDDF}/tools/make/board/common.mk
 
@@ -76,7 +77,12 @@ client0.elf client1.elf: client.elf
 	cp client.elf $@
 
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
+ifneq ($(strip $(DTS)),)
 	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE)
+else
+	$(OBJCOPY) -O elf32-i386 $(SEL4_64B) $(SEL4_32B)
+	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --output . --sdf $(SYSTEM_FILE)
+endif
 	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_virt_rx_config=serial_virt_rx.data serial_virt_rx.elf
