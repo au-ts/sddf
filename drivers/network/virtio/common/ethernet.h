@@ -84,8 +84,8 @@ typedef struct virtio_net_hdr {
 static inline void virtio_net_print_config(volatile virtio_net_config_t *config)
 {
     LOG_DRIVER("Printing virtIO net config:\n");
-    sddf_printf("    mac: %x:%x:%x:%x:%x:%x\n",
-                config->mac[0], config->mac[1], config->mac[2], config->mac[3], config->mac[4], config->mac[5]);
+    sddf_printf("    mac: %x:%x:%x:%x:%x:%x\n", config->mac[0], config->mac[1], config->mac[2], config->mac[3],
+                config->mac[4], config->mac[5]);
     sddf_printf("    status: 0x%x\n", config->status);
     sddf_printf("    max_virtqueue_pairs: 0x%x\n", config->max_virtqueue_pairs);
     sddf_printf("    mtu: 0x%x\n", config->mtu);
