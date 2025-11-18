@@ -25,11 +25,26 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     serial_virt_rx = ProtectionDomain(
         "serial_virt_rx", "serial_virt_rx.elf", priority=199
     )
+
+    if board.arch == SystemDescription.Arch.X86_64:
+        serial_port = SystemDescription.IoPort(
+            SystemDescription.Arch.X86_64, 0x3F8, 8, 0
+        )
+        serial_driver.add_ioport(serial_port)
+
+        # The serial device does not located on PCIe and the interrupts are
+        # conventionally configured by BIOS. The IRQ number can be read from
+        # Linux or APCI tables.
+        serial_irq = SystemDescription.IrqIoapic(board.arch, 0, 4, 0, id=1)
+        serial_driver.add_irq(serial_irq)
+
     client0 = ProtectionDomain("client0", "client0.elf", priority=1)
     client1 = ProtectionDomain("client1", "client1.elf", priority=1)
 
-    serial_node = dtb.node(board.serial)
-    assert serial_node is not None
+    serial_node = None
+    if dtb is not None:
+        serial_node = dtb.node(board.serial)
+        assert serial_node is not None
 
     serial_system = Sddf.Serial(
         sdf, serial_node, serial_driver, serial_virt_tx, virt_rx=serial_virt_rx
@@ -56,7 +71,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dtb", required=True)
+    parser.add_argument("--dtb", required=False)
     parser.add_argument("--sddf", required=True)
     parser.add_argument("--board", required=True, choices=[b.name for b in BOARDS])
     parser.add_argument("--output", required=True)
@@ -69,7 +84,9 @@ if __name__ == "__main__":
     sdf = SystemDescription(board.arch, board.paddr_top)
     sddf = Sddf(args.sddf)
 
-    with open(args.dtb, "rb") as f:
-        dtb = DeviceTree(f.read())
+    dtb = None
+    if board.arch != SystemDescription.Arch.X86_64:
+        with open(args.dtb, "rb") as f:
+            dtb = DeviceTree(f.read())
 
     generate(args.sdf, args.output, dtb)
