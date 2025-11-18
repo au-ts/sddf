@@ -12,7 +12,7 @@
 
 __attribute__((__section__(".timer_client_config"))) timer_client_config_t config;
 
-#define DVFS_CHANNEL 1
+#define DVFS_CHANNEL 0
 #define LOOP_LIMITATION 100000
 
 void cpu_intensive_loop() {
@@ -54,3 +54,5 @@ void init(void) {
 
     sddf_printf_("%lu ns takes under Frequency: %lu", time_end - time_mid, CPU_INFO[0].opptable[1].freq_hz);
 }
+
+void notified(microkit_channel ch) {}

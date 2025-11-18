@@ -104,12 +104,12 @@ dvfs.elf:
 	@echo "Building dvfs.elf for board $(MICROKIT_BOARD)..." && \
 	echo "MICROKIT SDK config directory: $(microkit_sdk_config_dir)" && \
 	echo "SEl4 include directories: $(sel4_include_dirs)" && \
-	cd .. && \
+	cd ${SDDF}/drivers/dvfs && \
 	SEL4_INCLUDE_DIRS=$(abspath $(sel4_include_dirs)) \
 	cargo build \
 		--target-dir $(BUILD_DIR)
 	@echo "Build complete: $(TARGET_ELF)"
-	cp ./aarch64-sel4-microkit-minimal/debug/dvfs.elf $(BUILD_DIR)
+	cp ./aarch64-sel4-microkit-minimal/debug/dvfs_driver.elf $(BUILD_DIR)
 
 $(DTB): $(DTS)
 	dtc -q -I dts -O dtb $(DTS) > $(DTB)

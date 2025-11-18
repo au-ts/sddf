@@ -1,11 +1,11 @@
 [package]
 name = "dvfs_driver"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 authors = ["Cheng Li 李澄 <lichengchaoreng@gmail.com>"]
 
 [dependencies]
 cpufreq = { git = "ssh://git@github.com/Cheng-Li1/freq-scaling-rs.git", rev = "80c5d93d258b1e2abf8939592643f105b53c7fed" }
 sel4-microkit = { git = "https://github.com/seL4/rust-sel4.git", tag = "v2.0.0" }
 sddf-ipc-types = { git = "https://github.com/seL4/rust-sel4.git", rev = "95feffab18a1b46b9feb78aa599dd2f23c8eb364" }
-sddf-rust = { path = "../../" }
+sddf-rust = { git = "ssh://git@github.com/Cheng-Li1/sddf-rust.git" }

@@ -6,11 +6,12 @@ from dataclasses import dataclass
 from sdfgen import SystemDescription, Sddf, DeviceTree
 from importlib.metadata import version
 
-assert version("sdfgen").split(".")[1] == "24", "Unexpected sdfgen version"
+assert version("sdfgen").split(".")[1] == "27", "Unexpected sdfgen version"
 
 ProtectionDomain = SystemDescription.ProtectionDomain
 MemoryRegion = SystemDescription.MemoryRegion
 Map = SystemDescription.Map
+Channel = SystemDescription.Channel
 
 @dataclass
 class Board:
@@ -33,10 +34,12 @@ BOARDS: List[Board] = [
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=254)
 
-    client = ProtectionDomain("client", "dvfs.elf", priority=100)
+    dvfs_driver = ProtectionDomain("dvfs_driver", "dvfs_driver.elf", priority=100)
 
-    clk_mr = MemoryRegion("clk", 0x1000, paddr=0xFD1A0000)
-    client.add_map(Map(clk_mr, 0xFD1A0000, "rw", cached=False))
+    client = ProtectionDomain("client", "client.elf", priority=1)
+
+    clk_mr = MemoryRegion(sdf, "clk", 0x1000, paddr=0xFD1A0000)
+    dvfs_driver.add_map(Map(clk_mr, 0xFD1A0000, "rw", cached=False))
     sdf.add_mr(clk_mr)
 
     timer_node = dtb.node(board.timer)
@@ -45,7 +48,10 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
     timer_system.add_client(client)
 
-    pds = [timer_driver, client]
+    dvfs_ch = Channel(client, dvfs_driver, pp_a = True)
+    sdf.add_channel(dvfs_ch)
+
+    pds = [timer_driver, client, dvfs_driver]
     for pd in pds:
         sdf.add_pd(pd)
 
@@ -54,7 +60,6 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
     with open(f"{output_dir}/{sdf_file}", "w+") as f:
         f.write(sdf.render())
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
