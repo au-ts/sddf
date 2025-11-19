@@ -42,7 +42,8 @@ void count_idle(void)
         uint64_t diff = b->core_ccount - b->prev_ccount;
 
         if (diff < MAGIC_CYCLES) {
-            __atomic_store_n(&b->idle_ccount, __atomic_load_n(&b->idle_ccount, __ATOMIC_RELAXED) + diff, __ATOMIC_RELAXED);
+            __atomic_store_n(&b->idle_ccount, __atomic_load_n(&b->idle_ccount, __ATOMIC_RELAXED) + diff,
+                             __ATOMIC_RELAXED);
         }
 
         b->prev_ccount = b->core_ccount;
