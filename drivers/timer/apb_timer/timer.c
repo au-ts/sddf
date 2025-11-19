@@ -3,13 +3,13 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+#include <sddf/timer/timer_driver.h>
+#include <sddf/resources/device.h>
 #include <stdint.h>
 #include <microkit.h>
-#include <sddf/resources/device.h>
+#include <sddf/timer/protocol.h>
 #include <sddf/util/printf.h>
 #include <sddf/util/util.h>
-#include <sddf/timer/protocol.h>
-#include <sddf/timer/timer_driver.h>
 
 // #define DEBUG_APBTIMER
 
@@ -25,7 +25,6 @@
                         // Minimum = 2 due to a bug in the HDL, assumed for rest of this driver.
 #define APBTIMER_MAX_TICKS (UINT32_MAX)
 #define APBTIMER_CLK_FREQ ((uint64_t)50000000) // 50MHz
-#define NANO_INVERSE NS_IN_S
 
 // The APB timer has an array of internal timers. Use one for long-running time measurements, use
 // the other for generating interrupts at finer granularity using prescalers.
@@ -79,23 +78,6 @@ typedef struct apbtimer_timeout_conf {
     uint8_t prescaler;
 } apbtimer_timeout_conf_t;
 
-/**
- * Convert the tick count of a timer to nanoseconds, given the expected prescaler
- * and overflow counter. Prescaler can be set to 0 to ignore.
- *
- * Prescaler should be given in same format as ctrl reg - i.e. 0 = disabled (multiply
- * by 1), 1 = multiply by 2, etc.
- */
-static inline uint64_t tick_to_ns(uint64_t ticks, uint64_t prescaler)
-{
-    // seconds per tick = T_clk*prescaler = (f_clk^-1)*prescaler
-    // ns per period = T_clk / 1e-9 = 1e9/f_clk = T_clk_nano
-    // ns per tick = T_clk_nano * prescaler
-    // ticks in ns = ticks * (T_clk_nano*prescaler)
-    assert(prescaler <= APBTIMER_PRESCALER_MAX);
-    uint64_t prescaler_adjusted = (prescaler == 0) ? 1 : prescaler + 1;
-    return (ticks * NANO_INVERSE * prescaler_adjusted) / APBTIMER_CLK_FREQ;
-}
 
 /**
  * Return number of ticks since driver startup using timekeeper timer.
@@ -108,7 +90,7 @@ static uint64_t get_time_ns(void)
     uint64_t value_h = (uint64_t)timekeeper_overflow_count;
     uint64_t value_ticks = (value_h << 32) | value_l;
 
-    return tick_to_ns(value_ticks, TIMEKEEPER_PRESCALER);
+    return tick_to_ns_cached(value_ticks, TIMEKEEPER_PRESCALER, APBTIMER_CLK_FREQ);
 }
 
 /**
@@ -119,22 +101,14 @@ static uint64_t get_time_ns(void)
 static apbtimer_timeout_conf_t calculate_timeout_from_ns(uint64_t ns_delay)
 {
     // Convert nanoseconds to ticks with a prescaler of zero (x1)
-    // tick = 1 timer period = 1/f_clk = T_clk
-    // ticks = n. periods in delay = seconds_delay / T_clk
-    //
-    // To get ticks efficiently, precalculate 1/nano (10e-9).
-    // Hence, T_clk = NANO_INVERSE / F_clk
-    // and T_delay = seconds_delay / (NANO_INVERSE/F_clk)
-    // uint64_t divisor = NANO_INVERSE / APBTIMER_CLK_FREQ;
-    // uint64_t ticks = ns_delay / divisor;
-    uint64_t ticks = (ns_delay * APBTIMER_CLK_FREQ) / NANO_INVERSE;
+    uint64_t ticks = ns_to_tick_cached(ns_delay, 0, APBTIMER_CLK_FREQ);
 
     uint32_t prescaler = 0;
     uint32_t cmp = ticks;
     // NOTE: at the time of writing, the APB timer's prescaler logic is completely
     // broken. The prescaler calculator is disabled as a result.
 
-    // if (ticks <= UINT32_MAX) {
+    // if (ticks < UINT32_MAX - 1) {
     //     // No prescaler needed
     //     cmp = ticks;
     // } else {

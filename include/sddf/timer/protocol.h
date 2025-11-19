@@ -4,23 +4,18 @@
  */
 
 #pragma once
+#include <stdint.h>
+#include <sddf/util/si_units.h>
 
 /* Shared functionality/definitions between timer drivers and clients */
 
 #define SDDF_TIMER_GET_TIME 0
 #define SDDF_TIMER_SET_TIMEOUT 1
 
-/* Number of nanoseconds in a second */
-#define NS_IN_S  1000000000ULL
-/* Number of nanoseconds in a millisecond */
-#define NS_IN_MS 1000000ULL
-/* Number of nanoseconds in a microsecond */
-#define NS_IN_US 1000ULL
+// We use 32 bits because this fits any sane frequency in Hz
+// (0-4.3GHz). All peripheral timers will usually be <200MHz.
+// A larger frequency will break our common math, so we shouldn't
+// force such values into this type anyway.
+typedef uint32_t sddf_timer_freq_hz_t;
 
-/* Number of microseconds in a millisecond */
-#define US_IN_MS 1000ULL
-/* Number of microseconds in a second */
-#define US_IN_S  1000000ULL
 
-/* Number of milliseconds in a second */
-#define MS_IN_S  1000ULL
