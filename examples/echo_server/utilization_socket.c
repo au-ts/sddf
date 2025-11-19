@@ -11,15 +11,14 @@
 #include "lwip/tcp.h"
 
 #include <sddf/benchmark/bench.h>
+#include <sddf/benchmark/config.h>
 #include <sddf/util/printf.h>
 
 #include "echo.h"
 
-#define MAX_PACKET_SIZE 0x1000
-
-/* This file implements a TCP based utilization measurment process that starts
- * and stops utilization measurements based on a client's requests.
- * The protocol used to communicate is as follows:
+/* This file implements a ipbench TCP based utilization measurement process that
+ * starts and stops utilization measurements based on a client's requests. The
+ * protocol used to communicate is as follows:
  * - Client connects
  * - Server sends: 100 IPBENCH V1.0\n
  * - Client sends: HELLO\n
@@ -68,17 +67,14 @@ static struct tcp_pcb *utiliz_socket;
     "Content-length: "STR(x)"\n"\
     ","STR(y)","STR(z)
 
+benchmark_client_config_t *bench;
 
-struct bench *bench;
+uint64_t core_ccount_start[CONFIG_MAX_NUM_NODES];
+uint64_t idle_ccount_start[CONFIG_MAX_NUM_NODES];
 
-sddf_channel bench_start_ch;
-sddf_channel bench_stop_ch;
+#define MAX_TCP_DATA_LEN 1460
 
-uint64_t start;
-uint64_t idle_ccount_start;
-
-char data_packet_str[MAX_PACKET_SIZE];
-
+char data_packet_str[MAX_TCP_DATA_LEN];
 
 static inline void my_reverse(char s[])
 {
@@ -135,19 +131,23 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
         if (error) sddf_dprintf("Failed to send OK message through utilization peer\n");
     } else if (msg_match(data_packet_str, START)) {
         sddf_printf("%s measurement starting...\n", sddf_get_pd_name());
-        if (!strcmp(sddf_get_pd_name(), "client0")) {
-            start = __atomic_load_n(&bench->ts, __ATOMIC_RELAXED);
-            idle_ccount_start = __atomic_load_n(&bench->ccount, __ATOMIC_RELAXED);
-            sddf_notify(bench_start_ch);
+        /* Only benchmark controller client will have bench->num_cores > 0 */
+        if (bench->num_cores) {
+            for (uint8_t i = 0; i < bench->num_cores; i++) {
+                struct bench *ccounts = (struct bench *)bench->core_ccounts[i];
+                core_ccount_start[i] = __atomic_load_n(&ccounts->core_ccount, __ATOMIC_RELAXED);
+                idle_ccount_start[i] = __atomic_load_n(&ccounts->idle_ccount, __ATOMIC_RELAXED);
+            }
+            microkit_notify(bench->start_ch);
         }
     } else if (msg_match(data_packet_str, STOP)) {
         sddf_printf("%s measurement finished \n", sddf_get_pd_name());
 
         uint64_t total = 0, idle = 0;
-
-        if (!strcmp(sddf_get_pd_name(), "client0")) {
-            total = __atomic_load_n(&bench->ts, __ATOMIC_RELAXED) - start;
-            idle = __atomic_load_n(&bench->ccount, __ATOMIC_RELAXED) - idle_ccount_start;
+        for (uint8_t i = 0; i < bench->num_cores; i++) {
+            struct bench *ccounts = (struct bench *)bench->core_ccounts[i];
+            total += __atomic_load_n(&ccounts->core_ccount, __ATOMIC_RELAXED) - core_ccount_start[i];
+            idle += __atomic_load_n(&ccounts->idle_ccount, __ATOMIC_RELAXED) - idle_ccount_start[i];
         }
 
         char tbuf[21];
@@ -171,8 +171,10 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
         error = tcp_write(pcb, buffer, strlen(buffer) + 1, TCP_WRITE_FLAG_COPY);
         tcp_shutdown(pcb, 0, 1);
 
-        if (!strcmp(sddf_get_pd_name(), "client0"))
-            sddf_notify(bench_stop_ch);
+        /* Only benchmark controller client will have bench->num_cores > 0 */
+        if (bench->num_cores) {
+            microkit_notify(bench->stop_ch);
+        }
     } else if (msg_match(data_packet_str, QUIT)) {
         /* Do nothing for now */
     } else {
@@ -195,11 +197,10 @@ static err_t utilization_accept_callback(void *arg, struct tcp_pcb *newpcb, err_
     return ERR_OK;
 }
 
-int setup_utilization_socket(void *cycle_counters, sddf_channel start_ch, sddf_channel stop_ch)
+int setup_utilization_socket(void *benchmark_config)
 {
-    bench = cycle_counters;
-    bench_start_ch = start_ch;
-    bench_stop_ch = stop_ch;
+    bench = (benchmark_client_config_t *)benchmark_config;
+
     utiliz_socket = tcp_new_ip_type(IPADDR_TYPE_V4);
     if (utiliz_socket == NULL) {
         sddf_dprintf("Failed to open a socket for listening!\n");
