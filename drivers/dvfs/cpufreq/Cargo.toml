@@ -1,0 +1,12 @@
+# Copyright 2025, UNSW
+# SPDX-License-Identifier: BSD-2-Clause
+
+[package]
+name = "cpufreq"
+version = "0.1.0"
+edition = "2024"
+authors = ["Cheng Li 李澄 <lichengchaoreng@gmail.com>"]
+
+[lib]
+name = "cpufreq"
+path = "lib.rs"
