@@ -29,8 +29,8 @@ include ${SDDF}/tools/make/board/${MICROKIT_BOARD}.mk
 
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 
-DTS := $(SDDF)/dts/$(MICROKIT_BOARD).dts
-DTB := $(MICROKIT_BOARD).dtb
+DTS ?= $(SDDF)/dts/$(MICROKIT_BOARD).dts
+DTB ?= $(MICROKIT_BOARD).dtb
 DTC := dtc
 
 PYTHON ?= python3
@@ -54,7 +54,7 @@ include ${SDDF}/tools/make/toolchain/${TOOLCHAIN}.mk
 
 # Magic to ensure stuff gets recompiled if we change
 # board name, or use a different Microkit etc.
-CHECK_FLAGS_BOARD_HASH := .board_cflags-$(shell echo -- ${CFLAGS} ${MICROKIT_SDK} ${MICROKIT_BOARD} ${MICROKIT_CONFIG} | shasum | sed 's/ *-//g')
+CHECK_FLAGS_BOARD_HASH := .board_cflags-$(shell echo -- ${CFLAGS} ${MICROKIT_SDK} ${MICROKIT_BOARD} ${MICROKIT_CONFIG} ${SMP_CONFIG} | shasum | sed 's/ *-//g')
 
 ${CHECK_FLAGS_BOARD_HASH}:
 	-rm -f .board_cflags-*
