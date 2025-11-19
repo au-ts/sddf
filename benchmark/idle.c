@@ -35,20 +35,18 @@ static inline uint64_t read_cycle_count()
 void count_idle(void)
 {
 #if ENABLE_BENCHMARKING
-    uint64_t val = read_cycle_count();
-    b->prev = val;
-    b->ccount = 0;
+    b->prev_ccount = read_cycle_count();
 
     while (1) {
-        val = read_cycle_count();
-        __atomic_store_n(&b->ts, val, __ATOMIC_RELAXED);
-        uint64_t diff = b->ts - b->prev;
+        __atomic_store_n(&b->core_ccount, read_cycle_count(), __ATOMIC_RELAXED);
+        uint64_t diff = b->core_ccount - b->prev_ccount;
 
         if (diff < MAGIC_CYCLES) {
-            __atomic_store_n(&b->ccount, __atomic_load_n(&b->ccount, __ATOMIC_RELAXED) + diff, __ATOMIC_RELAXED);
+            __atomic_store_n(&b->idle_ccount, __atomic_load_n(&b->idle_ccount, __ATOMIC_RELAXED) + diff,
+                             __ATOMIC_RELAXED);
         }
 
-        b->prev = b->ts;
+        b->prev_ccount = b->core_ccount;
     }
 #endif
 }

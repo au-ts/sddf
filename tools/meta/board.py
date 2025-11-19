@@ -76,6 +76,16 @@ BOARDS: List[Board] = [
         partition=2,
     ),
     Board(
+        name="maaxboard_4_cores",
+        arch=SystemDescription.Arch.AARCH64,
+        paddr_top=0x70000000,
+        serial="soc@0/bus@30800000/serial@30860000",
+        timer="soc@0/bus@30000000/timer@302d0000",
+        ethernet="soc@0/bus@30800000/ethernet@30be0000",
+        blk="soc@0/bus@30800000/mmc@30b40000",
+        partition=2,
+    ),
+    Board(
         name="odroidc2",
         arch=SystemDescription.Arch.AARCH64,
         paddr_top=0x60000000,
@@ -85,6 +95,15 @@ BOARDS: List[Board] = [
     ),
     Board(
         name="odroidc4",
+        arch=SystemDescription.Arch.AARCH64,
+        paddr_top=0x60000000,
+        i2c="soc/bus@ffd00000/i2c@1d000",
+        serial="soc/bus@ff800000/serial@3000",
+        timer="soc/bus@ffd00000/watchdog@f0d0",
+        ethernet="soc/ethernet@ff3f0000",
+    ),
+    Board(
+        name="odroidc4_4_cores",
         arch=SystemDescription.Arch.AARCH64,
         paddr_top=0x60000000,
         i2c="soc/bus@ffd00000/i2c@1d000",
