@@ -16,9 +16,9 @@
    http://www.opensource.org/licenses.
 */
 
-//#if defined(PREFER_SIZE_OVER_SPEED) || defined(__OPTIMIZE_SIZE__)
+#if defined(PREFER_SIZE_OVER_SPEED) || defined(__OPTIMIZE_SIZE__)
 // memcpy defined in memcpy-asm.S
-//#else
+#else
 
 #include <local.h>
 #include "xlenint.h"
@@ -151,4 +151,4 @@ memcpy (void *__restrict aa, const void *__restrict bb, size_t n)
     __libc_memcpy_bytewise (a, b, end - a);
   return aa;
 }
-//#endif
+#endif
