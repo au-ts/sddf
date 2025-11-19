@@ -3,13 +3,13 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+#include <sddf/timer/timer_driver.h>
+#include <sddf/resources/device.h>
 #include <stdint.h>
 #include <microkit.h>
-#include <sddf/resources/device.h>
+#include <sddf/timer/protocol.h>
 #include <sddf/util/printf.h>
 #include <sddf/util/util.h>
-#include <sddf/timer/protocol.h>
-#include <sddf/timer/timer_driver.h>
 
 // #define DEBUG_APBTIMER
 
