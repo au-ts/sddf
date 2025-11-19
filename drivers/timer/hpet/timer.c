@@ -9,6 +9,7 @@
 #include <sddf/resources/device.h>
 #include <sddf/timer/protocol.h>
 #include <sddf/timer/config.h>
+#include <sddf/timer/timer_driver.h>
 
 __attribute__((__section__(".device_resources"), retain, used)) device_resources_t device_resources;
 
@@ -69,6 +70,7 @@ typedef struct __attribute__((packed)) hpet_timer {
 
 #define LOCAL_APIC_ADDR 0x0FEE00000llu
 
+#define HPET_CLK_FREQ ((sddf_clk_freq_hz_t) )
 // @terryb: remove hard-coded IRQ channel
 #define IRQ_CH 0
 #define IRQ_NUM 0x30
@@ -76,31 +78,23 @@ uintptr_t HPET_REGION = 0x50000000;
 
 volatile hpet_timer_t *timer_0;
 uint64_t tick_period_fs; // main counter tick period in femtoseconds
+sddf_timer_freq_hz_t clk_freq;
 
 #define MAX_TIMEOUTS SDDF_TIMER_MAX_CLIENTS
 
 uint64_t timeouts[MAX_TIMEOUTS];
 uint64_t next_timeout = UINT64_MAX;
 
-uint64_t ns_to_ticks(uint64_t ns)
-{
-    return ns * 1000000 / tick_period_fs;
-}
-
-uint64_t ticks_to_ns(uint64_t ticks)
-{
-    return ticks * tick_period_fs / 1000000;
-}
-
 uint64_t get_time(void)
 {
     uint64_t time = *(uint64_t *)(HPET_REGION + HPET_MAIN_COUNTER_REG);
-    return ticks_to_ns(time);
+    return tick_to_ns_cached(time, 0, clk_freq);
 }
 
 void set_timeout(uint64_t timeout)
 {
     timer_0->comparator = ns_to_ticks(timeout);
+    timer_0->comparator = ns_to_tick_cached(timeout, 0, clk_freq);
 }
 
 static void process_timeouts(uint64_t curr_time)
@@ -124,7 +118,11 @@ void init(void)
 {
     // Read COUNTER_CLK_PERIOD 32:63 from General Capabilities and ID Register
     volatile uint64_t cap = *((uint64_t *)HPET_REGION + HPET_GENERAL_CAP_ID_REG);
-    tick_period_fs = cap >> 32;
+    uint64_t tick_period_fs = cap >> 32;
+
+    // Convert to frequency -> f = 1/T = 1 / (T * 1e-15) = 1e15 / T
+    clk_freq = FS_IN_S / tick_period_fs;
+    sddf_dprintf("Found clk_freq as %u\n", clk_freq);
 
     // Enable all timer interrupts
     volatile uint64_t *general_config_reg = (void *)HPET_REGION + HPET_GENERAL_CONFIG_REG;
