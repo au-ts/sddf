@@ -84,7 +84,6 @@ dependencies = [
 [[package]]
 name = "cpufreq"
 version = "0.1.0"
-source = "git+ssh://git@github.com/Cheng-Li1/freq-scaling-rs.git?rev=80c5d93d258b1e2abf8939592643f105b53c7fed#80c5d93d258b1e2abf8939592643f105b53c7fed"
 
 [[package]]
 name = "crypto-common"
@@ -397,7 +396,6 @@ source = "git+https://github.com/seL4/rust-sel4.git?rev=95feffab18a1b46b9feb78aa
 [[package]]
 name = "sddf-rust"
 version = "0.1.0"
-source = "git+ssh://git@github.com/Cheng-Li1/sddf-rust.git?rev=f46f4d7efefa175de42e2590462257a485898f1d#f46f4d7efefa175de42e2590462257a485898f1d"
 dependencies = [
  "num_enum",
  "sddf-ipc-types",

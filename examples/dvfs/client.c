@@ -13,62 +13,53 @@
 __attribute__((__section__(".timer_client_config"))) timer_client_config_t config;
 
 #define DVFS_CHANNEL 0
-#define LOOP_LIMITATION 100000
+
+#define LOOP_LIMIT 5000000
 
 void cpu_intensive_loop() {
     volatile int i;
 
-    for (i = 0; i < LOOP_LIMITATION; i++) {
+    for (i = 0; i < LOOP_LIMIT; i++) {
 
     }
 }
 
-void init(void) {
+int test_cpu_freq(uint64_t core_freq) {
+    uint32_t res = sddf_dvfs_set_freq(DVFS_CHANNEL, CPU_INFO[0].core_ident, core_freq);
+    
+    if (res != SDDF_DVFS_SUCCESS) {
+        sddf_printf_("DVFS Client: Fail to get the frequency, Error: %d\n", res);
+        return 1;
+    }
+
     uint32_t freq = 0;
 
-    uint32_t res = sddf_dvfs_get_freq(DVFS_CHANNEL, CPU_INFO[0].core_ident, &freq);
+    res = sddf_dvfs_get_freq(DVFS_CHANNEL, CPU_INFO[0].core_ident, &freq);
 
     if (res != SDDF_DVFS_SUCCESS) {
         sddf_printf_("DVFS Client: Fail to get the frequency, Error: %d\n", res);
-        return;
+        return 1;
     }
 
-    sddf_printf_("DVFS Client: BEGIN FIRST ROUND\n");
+    sddf_printf_("\nDVFS Client: CURRENT FREQ: %d\n", freq);
 
-    uint64_t time_start_1 = sddf_timer_time_now(config.driver_id);
+    uint64_t time_start = sddf_timer_time_now(config.driver_id);
 
     cpu_intensive_loop();
 
-    uint64_t time_end_1 = sddf_timer_time_now(config.driver_id);
+    uint64_t time_end = sddf_timer_time_now(config.driver_id);
 
-    sddf_printf_("DVFS Client: BEGIN SECOND ROUND\n");
+    sddf_printf_("DVFS Client: %lu ns was used for running the test\n", time_end - time_start);
 
-    res = sddf_dvfs_set_freq(DVFS_CHANNEL, CPU_INFO[0].core_ident, CPU_INFO[0].opptable[1].freq_hz);
+    return 0;
+}
 
-    sddf_printf_("DVFS Client: TEST\n");
+void init(void) {
+    test_cpu_freq(CPU_INFO[0].opptable[0].freq_hz);
 
-    if (res != SDDF_DVFS_SUCCESS) {
-        sddf_printf_("DVFS Client: Fail to set the frequency, Error: %d\n", res);
-        return;
-    }
+    test_cpu_freq(CPU_INFO[0].opptable[1].freq_hz);
 
-    sddf_printf_("DVFS Client: TEST\n");
-
-    uint64_t time_start_2 = sddf_timer_time_now(config.driver_id);
-
-    sddf_printf_("DVFS Client: TEST\n");
-
-    cpu_intensive_loop();
-
-    uint64_t time_end_2 = sddf_timer_time_now(config.driver_id);
-
-    sddf_printf_("DVFS Client: TEST\n");
-
-    sddf_printf_("%lu ns takes under Frequency: %d\n", time_end_1 - time_start_1, freq);
-
-    sddf_printf_("%lu ns takes under Frequency: %d\n", time_end_2 - time_start_2, sddf_dvfs_get_freq(DVFS_CHANNEL, CPU_INFO[0].core_ident, &freq));
-
-    sddf_printf_("DVFS Client: TEST\n");
+    test_cpu_freq(CPU_INFO[0].opptable[2].freq_hz);
 }
 
 void notified(microkit_channel ch) {}
