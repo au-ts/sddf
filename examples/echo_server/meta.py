@@ -71,14 +71,27 @@ class BenchmarkClientConfig:
     def serialise(self) -> bytes:
         # Padded for 64 bit alignment
         pack_str = "<BBBxxxxx" + "q" * len(self.cycle_counters)
-        return struct.pack(pack_str, self.ch_start, self.ch_stop,
-                           len(self.cycle_counters), *self.cycle_counters)
+        return struct.pack(
+            pack_str,
+            self.ch_start,
+            self.ch_stop,
+            len(self.cycle_counters),
+            *self.cycle_counters,
+        )
 
 
 class BenchmarkConfig:
-    def __init__(self, ch_rx_start: int, ch_tx_start: int, ch_rx_stop: int,
-                 ch_tx_stop: int, ch_init: int, core: int, last_core: bool,
-                 children: List[Tuple[int, str]]):
+    def __init__(
+        self,
+        ch_rx_start: int,
+        ch_tx_start: int,
+        ch_rx_stop: int,
+        ch_tx_stop: int,
+        ch_init: int,
+        core: int,
+        last_core: bool,
+        children: List[Tuple[int, str]],
+    ):
         self.ch_rx_start = ch_rx_start
         self.ch_tx_start = ch_tx_start
         self.ch_rx_stop = ch_rx_stop
@@ -87,7 +100,8 @@ class BenchmarkConfig:
         self.core = core
         self.last_core = last_core
         self.children = children
-    '''
+
+    """
         Matches struct definition:
         {
             uint8_t;
@@ -103,7 +117,8 @@ class BenchmarkConfig:
                 uint8_t;
             } [64];
         }
-    '''
+    """
+
     def serialise(self) -> bytes:
         child_config_format = "c" * 65
         pack_str = "<BBBBBB?B" + child_config_format * 64
@@ -129,11 +144,12 @@ class BenchmarkConfig:
             self.core,
             self.last_core,
             len(self.children),
-            *child_bytes_list
+            *child_bytes_list,
         )
 
+
 # Adds ".elf" to elf strings
-def copy_elf(source_elf: str, new_elf: str, elf_number = None):
+def copy_elf(source_elf: str, new_elf: str, elf_number=None):
     source_elf += ".elf"
     if elf_number != None:
         new_elf += str(elf_number)
@@ -141,18 +157,32 @@ def copy_elf(source_elf: str, new_elf: str, elf_number = None):
     assert path.isfile(source_elf)
     return shutil.copyfile(source_elf, new_elf)
 
+
 # Assumes elf string has ".elf" suffix, and ".data" to data string
-def update_elf_section(elf_name: str, section_name: str, data_name: str, data_number = None):
+def update_elf_section(
+    elf_name: str, section_name: str, data_name: str, data_number=None
+):
     assert path.isfile(elf_name)
     if data_number != None:
         data_name += str(data_number)
     data_name += ".data"
     assert path.isfile(data_name)
-    assert subprocess.run([obj_copy, "--update-section",
-                           "." + section_name + "=" + data_name,
-                           elf_name]).returncode == 0
+    assert (
+        subprocess.run(
+            [
+                obj_copy,
+                "--update-section",
+                "." + section_name + "=" + data_name,
+                elf_name,
+            ]
+        ).returncode
+        == 0
+    )
 
-def generate(sdf_file: str, output_dir: str, dtb: DeviceTree, get_core: Callable[[str], int]):
+
+def generate(
+    sdf_file: str, output_dir: str, dtb: DeviceTree, get_core: Callable[[str], int]
+):
     uart_node = dtb.node(board.serial)
     assert uart_node is not None
     ethernet_node = dtb.node(board.ethernet)
@@ -160,19 +190,36 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree, get_core: Callable
     timer_node = dtb.node(board.timer)
     assert timer_node is not None
 
-    timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=101, cpu=get_core("timer_driver"))
+    timer_driver = ProtectionDomain(
+        "timer_driver", "timer_driver.elf", priority=101, cpu=get_core("timer_driver")
+    )
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
 
     uart_driver = ProtectionDomain("serial_driver", "serial_driver.elf", priority=100)
     serial_virt_tx = ProtectionDomain(
         "serial_virt_tx", "serial_virt_tx.elf", priority=99
     )
-    uart_driver = ProtectionDomain("serial_driver", "serial_driver.elf", priority=100, cpu=get_core("serial_driver"))
-    serial_virt_tx = ProtectionDomain("serial_virt_tx", "serial_virt_tx.elf", priority=99, cpu=get_core("serial_virt_tx"))
+    uart_driver = ProtectionDomain(
+        "serial_driver",
+        "serial_driver.elf",
+        priority=100,
+        cpu=get_core("serial_driver"),
+    )
+    serial_virt_tx = ProtectionDomain(
+        "serial_virt_tx",
+        "serial_virt_tx.elf",
+        priority=99,
+        cpu=get_core("serial_virt_tx"),
+    )
     serial_system = Sddf.Serial(sdf, uart_node, uart_driver, serial_virt_tx)
 
     ethernet_driver = ProtectionDomain(
-        "ethernet_driver", "eth_driver.elf", priority=101, budget=100, period=400, cpu=get_core("ethernet_driver")
+        "ethernet_driver",
+        "eth_driver.elf",
+        priority=101,
+        budget=100,
+        period=400,
+        cpu=get_core("ethernet_driver"),
     )
     if board.name == "star64":
         # For ethernet reset, the Pine64 Star64 driver needs access to the
@@ -189,22 +236,42 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree, get_core: Callable
     )
     net_virt_rx = ProtectionDomain("net_virt_rx", "network_virt_rx.elf", priority=99)
 
-    net_virt_tx = ProtectionDomain("net_virt_tx", "network_virt_tx.elf", priority=100, budget=20000, cpu=get_core("net_virt_tx"))
-    net_virt_rx = ProtectionDomain("net_virt_rx", "network_virt_rx.elf", priority=99, cpu=get_core("net_virt_rx"))
+    net_virt_tx = ProtectionDomain(
+        "net_virt_tx",
+        "network_virt_tx.elf",
+        priority=100,
+        budget=20000,
+        cpu=get_core("net_virt_tx"),
+    )
+    net_virt_rx = ProtectionDomain(
+        "net_virt_rx", "network_virt_rx.elf", priority=99, cpu=get_core("net_virt_rx")
+    )
     net_system = Sddf.Net(sdf, ethernet_node, ethernet_driver, net_virt_tx, net_virt_rx)
 
     client0_elf = copy_elf("echo", "echo", 0)
-    client0 = ProtectionDomain("client0", client0_elf, priority=97, budget=20000, cpu=get_core("client0"))
+    client0 = ProtectionDomain(
+        "client0", client0_elf, priority=97, budget=20000, cpu=get_core("client0")
+    )
     client0_net_copier_elf = copy_elf("network_copy", "network_copy", 0)
     client0_net_copier = ProtectionDomain(
-        "client0_net_copier", client0_net_copier_elf, priority=98, budget=20000, cpu=get_core("client0_net_copier")
+        "client0_net_copier",
+        client0_net_copier_elf,
+        priority=98,
+        budget=20000,
+        cpu=get_core("client0_net_copier"),
     )
 
     client1_elf = copy_elf("echo", "echo", 1)
-    client1 = ProtectionDomain("client1", client1_elf, priority=97, budget=20000, cpu=get_core("client1"))
+    client1 = ProtectionDomain(
+        "client1", client1_elf, priority=97, budget=20000, cpu=get_core("client1")
+    )
     client1_net_copier_elf = copy_elf("network_copy", "network_copy", 0)
     client1_net_copier = ProtectionDomain(
-        "client1_net_copier", client1_net_copier_elf, priority=98, budget=20000, cpu=get_core("client1_net_copier")
+        "client1_net_copier",
+        client1_net_copier_elf,
+        priority=98,
+        budget=20000,
+        cpu=get_core("client1_net_copier"),
     )
 
     serial_system.add_client(client0)
@@ -237,7 +304,9 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree, get_core: Callable
         try:
             core = get_core(pd.name)
         except:
-            raise ValueError(f"PD {pd.name} is missing from your core allocation configuration file!")
+            raise ValueError(
+                f"PD {pd.name} is missing from your core allocation configuration file!"
+            )
         if core in pds_per_core:
             pds_per_core[core].append(pd)
         else:
@@ -252,13 +321,17 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree, get_core: Callable
 
         # Create benchmark and idle PDs for each active core
         core_objs[i]["idle_elf"] = copy_elf("idle", "idle", core)
-        core_objs[i]["idle_pd"] = ProtectionDomain(f"bench_idle{core}", core_objs[i]["idle_elf"], priority=1, cpu=core)
+        core_objs[i]["idle_pd"] = ProtectionDomain(
+            f"bench_idle{core}", core_objs[i]["idle_elf"], priority=1, cpu=core
+        )
         sdf.add_pd(core_objs[i]["idle_pd"])
 
         core_objs[i]["bench_elf"] = copy_elf("benchmark", "benchmark", core)
-        core_objs[i]["bench_pd"] = ProtectionDomain(f"bench{core}", core_objs[i]["bench_elf"], priority=254, cpu=core)
+        core_objs[i]["bench_pd"] = ProtectionDomain(
+            f"bench{core}", core_objs[i]["bench_elf"], priority=254, cpu=core
+        )
         sdf.add_pd(core_objs[i]["bench_pd"])
-        
+
         # Benchmark PD requires serial output
         serial_system.add_client(core_objs[i]["bench_pd"])
 
@@ -269,7 +342,9 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree, get_core: Callable
             core_objs[i]["children"].append((child_id, pd.name))
 
         # Create benchmark to idle init channel
-        core_objs[i]["init_ch"] = Channel(core_objs[i]["idle_pd"], core_objs[i]["bench_pd"])
+        core_objs[i]["init_ch"] = Channel(
+            core_objs[i]["idle_pd"], core_objs[i]["bench_pd"]
+        )
         sdf.add_channel(core_objs[i]["init_ch"])
 
         # Create benchmarking start and stop channels
@@ -279,8 +354,12 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree, get_core: Callable
             core_objs[i]["stop_ch"] = Channel(client0, core_objs[i]["bench_pd"])
         else:
             # Other cores are notified by benchmark PD on previous core
-            core_objs[i]["start_ch"] = Channel(core_objs[i - 1]["bench_pd"], core_objs[i]["bench_pd"])
-            core_objs[i]["stop_ch"] = Channel(core_objs[i - 1]["bench_pd"], core_objs[i]["bench_pd"])
+            core_objs[i]["start_ch"] = Channel(
+                core_objs[i - 1]["bench_pd"], core_objs[i]["bench_pd"]
+            )
+            core_objs[i]["stop_ch"] = Channel(
+                core_objs[i - 1]["bench_pd"], core_objs[i]["bench_pd"]
+            )
 
         sdf.add_channel(core_objs[i]["start_ch"])
         sdf.add_channel(core_objs[i]["stop_ch"])
@@ -292,13 +371,15 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree, get_core: Callable
         client0.add_map(Map(cycle_counters_mr, 0x20_000_000 + 0x1000 * i, perms="r"))
 
         # Create configuration structures to be serialised
-        core_objs[i]["idle_config"] = BenchmarkIdleConfig(0x5_000_000, core_objs[i]["init_ch"].pd_a_id)
+        core_objs[i]["idle_config"] = BenchmarkIdleConfig(
+            0x5_000_000, core_objs[i]["init_ch"].pd_a_id
+        )
         if i == 0:
             # We first create a config for the benchmarking client
             bench_client_config = BenchmarkClientConfig(
                 core_objs[i]["start_ch"].pd_a_id,
                 core_objs[i]["stop_ch"].pd_a_id,
-                list(((0x20_000_000 + 0x1000 * i) for i in range(num_cores)))
+                list(((0x20_000_000 + 0x1000 * i) for i in range(num_cores))),
             )
         else:
             # Then we create the config for the benchmark PD on the previous core
@@ -310,7 +391,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree, get_core: Callable
                 core_objs[i - 1]["init_ch"].pd_b_id,
                 core_objs[i - 1]["core"],
                 False,
-                core_objs[i - 1]["children"]
+                core_objs[i - 1]["children"],
             )
 
     # Finally create the last benchmark PD config
@@ -322,7 +403,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree, get_core: Callable
         core_objs[num_cores - 1]["init_ch"].pd_b_id,
         core_objs[num_cores - 1]["core"],
         True,
-        core_objs[num_cores - 1]["children"]
+        core_objs[num_cores - 1]["children"],
     )
 
     assert serial_system.connect()
@@ -338,19 +419,30 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree, get_core: Callable
 
     with open(f"{output_dir}/benchmark_client_config.data", "wb+") as f:
         f.write(bench_client_config.serialise())
-    update_elf_section(client0_elf, "benchmark_client_config", "benchmark_client_config")
+    update_elf_section(
+        client0_elf, "benchmark_client_config", "benchmark_client_config"
+    )
 
     for i in range(num_cores):
         core = core_objs[i]["core"]
-        update_elf_section(core_objs[i]["bench_elf"],  "serial_client_config", "serial_client_bench", core)
+        update_elf_section(
+            core_objs[i]["bench_elf"],
+            "serial_client_config",
+            "serial_client_bench",
+            core,
+        )
 
         with open(f"{output_dir}/benchmark_config{core}.data", "wb+") as f:
             f.write(core_objs[i]["bench_config"].serialise())
-        update_elf_section(core_objs[i]["bench_elf"],  "benchmark_config",  "benchmark_config", core)
+        update_elf_section(
+            core_objs[i]["bench_elf"], "benchmark_config", "benchmark_config", core
+        )
 
         with open(f"{output_dir}/benchmark_idle_config{core}.data", "wb+") as f:
             f.write(core_objs[i]["idle_config"].serialise())
-        update_elf_section(core_objs[i]["idle_elf"], "benchmark_config", "benchmark_idle_config", core)
+        update_elf_section(
+            core_objs[i]["idle_elf"], "benchmark_config", "benchmark_idle_config", core
+        )
 
     with open(f"{output_dir}/{sdf_file}", "w+") as f:
         f.write(sdf.render())
@@ -375,16 +467,18 @@ if __name__ == "__main__":
 
     global obj_copy
     obj_copy = args.objcopy
-    
+
     with open(args.smp, "r") as core_alloc:
         core_dict = json.load(core_alloc)
     get_core = lambda name: core_dict[name]
-    
+
     # Ensure that SMP board is used for a multicore configuration
     if board.name[-8:] != "_4_cores":
         for pd in core_dict:
             if get_core(pd) != 0:
-                raise ValueError(f"Multicore configuration selected without SMP Microkit board, {pd} on core {get_core(pd)}!")
+                raise ValueError(
+                    f"Multicore configuration selected without SMP Microkit board, {pd} on core {get_core(pd)}!"
+                )
 
     with open(args.dtb, "rb") as f:
         dtb = DeviceTree(f.read())
