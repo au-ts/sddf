@@ -4,7 +4,6 @@ Source: https://github.com/au-ts/sddf
 
 Files:
     flake.lock
-    Cargo.lock
     CHANGES.md
     build.zig.zon
     docs/design/*
@@ -36,6 +35,7 @@ Files:
     drivers/timer/cdns/config.json
     drivers/timer/bcm2835/config.json
     drivers/timer/apb_timer/config.json
+    drivers/dvfs/Cargo.lock
 Copyright: UNSW
 License: BSD-2-Clause
 
