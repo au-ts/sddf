@@ -53,7 +53,7 @@
 /* Obtained from the 'clock-frequency' property of the serial DTS node */
 #define UART_CLK 0xbebc200
 #define UART_DW_APB_REGISTERS 1
-#elif defined(CONFIG_PLAT_rk3568)
+#elif defined(CONFIG_PLAT_RK3568)
 #define UART_CLK 0x16e3600
 #define UART_DW_APB_REGISTERS 1
 #else
