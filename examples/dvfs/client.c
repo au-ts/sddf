@@ -16,17 +16,17 @@ __attribute__((__section__(".timer_client_config"))) timer_client_config_t confi
 
 #define LOOP_LIMIT 5000000
 
-void cpu_intensive_loop() {
+void cpu_intensive_loop()
+{
     volatile int i;
 
-    for (i = 0; i < LOOP_LIMIT; i++) {
-
-    }
+    for (i = 0; i < LOOP_LIMIT; i++) {}
 }
 
-int test_cpu_freq(uint64_t core_freq) {
+int test_cpu_freq(uint64_t core_freq)
+{
     uint32_t res = sddf_dvfs_set_freq(DVFS_CHANNEL, CPU_INFO[0].core_ident, core_freq);
-    
+
     if (res != SDDF_DVFS_SUCCESS) {
         sddf_printf_("DVFS Client: Fail to get the frequency, Error: %d\n", res);
         return 1;
@@ -54,7 +54,8 @@ int test_cpu_freq(uint64_t core_freq) {
     return 0;
 }
 
-void init(void) {
+void init(void)
+{
     test_cpu_freq(CPU_INFO[0].opptable[0].freq_hz);
 
     test_cpu_freq(CPU_INFO[0].opptable[1].freq_hz);
@@ -62,4 +63,6 @@ void init(void) {
     test_cpu_freq(CPU_INFO[0].opptable[2].freq_hz);
 }
 
-void notified(microkit_channel ch) {}
+void notified(microkit_channel ch)
+{
+}

@@ -4,6 +4,7 @@ Source: https://github.com/au-ts/sddf
 
 Files:
     flake.lock
+    Cargo.lock
     CHANGES.md
     build.zig.zon
     docs/design/*
@@ -52,3 +53,7 @@ License: ISC
 Files: network/ipstacks/lwip/*
 Copyright: Copyright (c) 2001-2004 Swedish Institute of Computer Science
 License: LicenseRef-BSD-LWIP
+
+Files: support/targets/aarch64-sel4-microkit-minimal.json
+Copyright: Copyright 2023, Colias Group, LLC
+License: BSD-2-Clause

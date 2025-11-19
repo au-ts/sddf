@@ -13,6 +13,7 @@ MemoryRegion = SystemDescription.MemoryRegion
 Map = SystemDescription.Map
 Channel = SystemDescription.Channel
 
+
 @dataclass
 class Board:
     name: str
@@ -48,7 +49,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
     timer_system.add_client(client)
 
-    dvfs_ch = Channel(client, dvfs_driver, pp_a = True)
+    dvfs_ch = Channel(client, dvfs_driver, pp_a=True)
     sdf.add_channel(dvfs_ch)
 
     pds = [timer_driver, client, dvfs_driver]
@@ -60,6 +61,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
     with open(f"{output_dir}/{sdf_file}", "w+") as f:
         f.write(sdf.render())
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
