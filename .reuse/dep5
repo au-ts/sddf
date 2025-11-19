@@ -58,3 +58,7 @@ License: LicenseRef-BSD-LWIP
 Files: support/targets/aarch64-sel4-microkit-minimal.json
 Copyright: Copyright 2023, Colias Group, LLC
 License: BSD-2-Clause
+
+Files: util/custom_libc/x86_64/*
+Copyright: Newlib contributors
+License: LicenseRef-Newlib
