@@ -14,5 +14,5 @@
 #define TCP_ECHO_MAX_CONNS 4
 
 int setup_udp_socket(void);
-int setup_utilization_socket(void *cycle_counters, sddf_channel start_ch, sddf_channel stop_ch);
+int setup_utilization_socket(void *benchmark_config);
 int setup_tcp_socket(void);
