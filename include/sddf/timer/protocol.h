@@ -10,6 +10,9 @@
 #define SDDF_TIMER_GET_TIME 0
 #define SDDF_TIMER_SET_TIMEOUT 1
 
+/* Number of picoseconds in a second */
+#define PS_IN_IS 1000000000000ULL
+
 /* Number of nanoseconds in a second */
 #define NS_IN_S  1000000000ULL
 /* Number of nanoseconds in a millisecond */
