@@ -1,5 +1,5 @@
 #
-# Copyright 2025, UNSW
+# Copyright 2026, UNSW
 #
 # SPDX-License-Identifier: BSD-2-Clause
 #
@@ -11,12 +11,14 @@
 #  Expects libsddf_util_debug.a in ${LIBS}
 
 TIMER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
+include ${TIMER_DIR}/../timer_common.mk
 
-timer_driver.elf: timer/timer.o
-	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
+timer_driver.elf: timer/timer_driver.o timer/timer_common.o
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-timer/timer.o: ${TIMER_DIR}/timer.c $(SDDF_LIBC_INCLUDE)|timer
-	${CC} ${CFLAGS} -o $@ -c $<
+timer/timer_driver.o: CFLAGS+=-I${TIMER_DIR}
+timer/timer_driver.o: ${TIMER_DIR}/timer.c ${CHECK_FLAGS_BOARD_MD5} $(SDDF_LIBC_INCLUDE)|timer
+	${CC} ${CFLAGS} -c -o $@ $<
 
 timer:
 	mkdir -p timer

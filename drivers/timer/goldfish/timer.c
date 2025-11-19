@@ -7,11 +7,16 @@
 #include <os/sddf.h>
 #include <sddf/timer/protocol.h>
 #include <sddf/timer/config.h>
+#include <sddf/timer/timer_driver.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 #include <sddf/resources/device.h>
 
 #define MAX_TIMEOUTS SDDF_TIMER_MAX_CLIENTS
+
+// This is a virtual timer - it has no clock rate and just returns nanoseconds directly.
+// This is equivalent to a 1GHz clock, but we don't attempt time conversion here since
+// it would be pointless.
 
 /* taken from: https://github.com/torvalds/linux/blob/master/include/clocksource/timer-goldfish.h */
 typedef struct {
