@@ -177,6 +177,11 @@ static void benchmark_start(void)
 #ifdef CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES
     seL4_BenchmarkResetLog();
 #endif
+
+    /* Notify benchmark PD running on next core */
+    if (!benchmark_config.last_core) {
+        microkit_notify(benchmark_config.tx_start_ch);
+    }
 }
 
 static void benchmark_stop(void)
@@ -190,7 +195,7 @@ static void benchmark_stop(void)
     sel4bench_get_counters(benchmark_bf, &counter_values[0]);
     sel4bench_stop_counters(benchmark_bf);
 
-    sddf_printf("{\n");
+    sddf_printf("{CORE %u: \n", benchmark_config.core);
     for (int i = 0; i < ARRAY_SIZE(benchmarking_events); i++) {
         sddf_printf("%s: %lu\n", counter_names[i], counter_values[i]);
     }
@@ -212,15 +217,20 @@ static void benchmark_stop(void)
     sddf_printf("KernelEntries:  %lu\n", entries);
     dump_log_summary(entries);
 #endif
+
+    /* Notify benchmark PD running on next core */
+    if (!benchmark_config.last_core) {
+        microkit_notify(benchmark_config.tx_stop_ch);
+    }
 }
 
 void notified(microkit_channel ch)
 {
     if (ch == serial_config.tx.id) {
         return;
-    } else if (ch == benchmark_config.start_ch) {
+    } else if (ch == benchmark_config.rx_start_ch) {
         benchmark_start();
-    } else if (ch == benchmark_config.stop_ch) {
+    } else if (ch == benchmark_config.rx_stop_ch) {
         benchmark_stop();
     } else {
         sddf_printf("BENCH|LOG: Bench thread notified on unexpected channel %u\n", ch);

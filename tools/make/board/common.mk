@@ -56,7 +56,7 @@ eth_driver.elf: ${ETH_DRIV}
 
 # Magic to ensure stuff gets recompiled if we change
 # board name, or use a different Microkit etc.
-CHECK_FLAGS_BOARD_HASH := .board_cflags-$(shell echo -- ${CFLAGS} ${MICROKIT_SDK} ${MICROKIT_BOARD} ${MICROKIT_CONFIG} | shasum | sed 's/ *-//g')
+CHECK_FLAGS_BOARD_HASH := .board_cflags-$(shell echo -- ${CFLAGS} ${MICROKIT_SDK} ${MICROKIT_BOARD} ${MICROKIT_CONFIG} ${SMP_CONFIG} | shasum | sed 's/ *-//g')
 
 ${CHECK_FLAGS_BOARD_HASH}:
 	-rm -f .board_cflags-*
