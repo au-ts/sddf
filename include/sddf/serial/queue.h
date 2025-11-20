@@ -40,6 +40,9 @@ typedef struct serial_queue_handle {
  */
 static inline uint32_t serial_queue_length_consumer(serial_queue_handle_t *queue_handle)
 {
+    /* The load-acquire will be paired with the store-release
+     * in serial_enqueue() or serial_update_shared_tail().
+     */
     uint32_t tail = load_acquire_32(&queue_handle->queue->tail);
     uint32_t head = queue_handle->queue->head;
     return tail - head;
@@ -58,6 +61,9 @@ static inline uint32_t serial_queue_length_consumer(serial_queue_handle_t *queue
 static inline uint32_t serial_queue_length_producer(serial_queue_handle_t *queue_handle)
 {
     uint32_t tail = queue_handle->queue->tail;
+    /* The load-acquire will be paired with the store-release
+     * in serial_dequeue() or serial_update_shared_head().
+     */
     uint32_t head = load_acquire_32(&queue_handle->queue->head);
     return tail - head;
 }
@@ -75,8 +81,9 @@ static inline uint32_t serial_queue_length_producer(serial_queue_handle_t *queue
  */
 static inline int serial_queue_empty(serial_queue_handle_t *queue_handle, uint32_t local_head)
 {
-    // the load-acquire will be paired with the store-release
-    // in serial_enqueue() or serial_update_shared_tail()
+    /* The load-acquire will be paired with the store-release
+     * in serial_enqueue() or serial_update_shared_tail().
+     */
     uint32_t tail = load_acquire_32(&queue_handle->queue->tail);
 
     return local_head == tail;
@@ -94,8 +101,9 @@ static inline int serial_queue_empty(serial_queue_handle_t *queue_handle, uint32
  */
 static inline int serial_queue_full(serial_queue_handle_t *queue_handle, uint32_t local_tail)
 {
-    // the load-acquire will be paired with the store-release
-    // in serial_dequeue() or serial_update_shared_head()
+    /* The load-acquire will be paired with the store-release
+     * in serial_dequeue() or serial_update_shared_head().
+     */
     uint32_t head = load_acquire_32(&queue_handle->queue->head);
 
     return local_tail - head == queue_handle->capacity;
@@ -121,7 +129,7 @@ static inline int serial_enqueue(serial_queue_handle_t *queue_handle, char chara
 
     queue_handle->data_region[*tail % queue_handle->capacity] = character;
 
-    // the store-release will synchronise with the load-acquire in serial_dequeue()
+    /* The store-release will synchronise with load-acquires by the CONSUMER of the queue. */
     store_release_32(tail, *tail + 1);
 
     return 0;
@@ -170,7 +178,7 @@ static inline int serial_dequeue(serial_queue_handle_t *queue_handle, char *char
 
     *character = queue_handle->data_region[*head % queue_handle->capacity];
 
-    // the store-release will synchronise with the load-acquire in serial_enqueue() or serial_enqueue_batch()
+    /* The store-release will synchronise with load-acquires by the PRODUCER of the queue. */
     store_release_32(head, *head + 1);
 
     return 0;
@@ -223,7 +231,7 @@ static inline void serial_update_shared_tail(serial_queue_handle_t *queue_handle
     assert(new_length <= queue_handle->capacity);
 #endif
 
-    // the store-release will synchronise with the load-acquire in serial_dequeue()
+    /* The store-release will synchronise with load-acquires by the CONSUMER of the queue. */
     store_release_32(&queue_handle->queue->tail, local_tail);
 }
 
@@ -238,6 +246,9 @@ static inline void serial_update_shared_tail(serial_queue_handle_t *queue_handle
 static inline void serial_update_shared_head(serial_queue_handle_t *queue_handle, uint32_t local_head)
 {
 #ifdef CONFIG_DEBUG_BUILD
+    /* The load-acquire will be paired with the store-release
+     * in serial_enqueue() or serial_update_shared_tail().
+     */
     uint32_t tail = load_acquire_32(&queue_handle->queue->tail);
     uint32_t current_head = queue_handle->queue->head;
 
@@ -249,7 +260,7 @@ static inline void serial_update_shared_head(serial_queue_handle_t *queue_handle
     assert(new_length <= current_length);
 #endif
 
-    // the store-release will synchronise with the load-acquire in serial_enqueue() or serial_enqueue_batch()
+    /* The store-release will synchronise with load-acquires by the PRODUCER of the queue. */
     store_release_32(&queue_handle->queue->head, local_head);
 }
 
@@ -352,7 +363,10 @@ static inline void serial_transfer_all(serial_queue_handle_t *free_queue_handle,
     uint32_t active_length = load_acquire_32(&active_queue_handle->queue->tail) - active_head;
 
 #ifdef CONFIG_DEBUG_BUILD
-    /* The caller is the producer of the free queue */
+    /* The caller is the producer of the free queue.
+     * The load-acquire will be paired with the store-release
+     * in serial_dequeue() or serial_update_shared_head()
+     */
     uint32_t free_length = free_queue_handle->queue->tail - load_acquire_32(&free_queue_handle->queue->head);
 
     assert(active_length <= free_length);
@@ -368,6 +382,9 @@ static inline void serial_transfer_all(serial_queue_handle_t *free_queue_handle,
 
         active_head += active_batch;
         serial_update_shared_head(active_queue_handle, active_head);
+        /* The load-acquire will be paired with the store-release
+         * in serial_enqueue() or serial_update_shared_tail().
+         */
         active_length = load_acquire_32(&active_queue_handle->queue->tail) - active_head;
     }
 }
