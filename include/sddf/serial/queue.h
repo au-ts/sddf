@@ -218,7 +218,10 @@ static inline int serial_dequeue_local(serial_queue_handle_t *queue_handle, uint
 static inline void serial_update_shared_tail(serial_queue_handle_t *queue_handle, uint32_t local_tail)
 {
 #ifdef CONFIG_DEBUG_BUILD
-    uint32_t head = load_relaxed_32(&queue_handle->queue->head);
+    /* The load-acquire will be paired with the store-release
+     * in serial_dequeue() or serial_update_shared_head().
+     */
+    uint32_t head = load_acquire_32(&queue_handle->queue->head);
     uint32_t current_tail = queue_handle->queue->tail;
 
     uint32_t current_length = current_tail - head;
@@ -367,7 +370,7 @@ static inline void serial_transfer_all(serial_queue_handle_t *free_queue_handle,
      * The load-acquire will be paired with the store-release
      * in serial_dequeue() or serial_update_shared_head()
      */
-    uint32_t free_length = free_queue_handle->queue->tail - load_acquire_32(&free_queue_handle->queue->head);
+    uint32_t free_length = serial_queue_free(free_queue_handle);
 
     assert(active_length <= free_length);
 #endif
@@ -411,7 +414,7 @@ static inline void serial_transfer_all_colour(serial_queue_handle_t *free_queue_
     uint32_t active_length = serial_queue_length_consumer(active_queue_handle);
 
     /* The caller is the producer of the free queue */
-    uint32_t free_length = serial_queue_length_producer(free_queue_handle);
+    uint32_t free_length = serial_queue_free(free_queue_handle);
 
     assert(active_length + col_start_len + col_end_len <= free_length);
 #endif
