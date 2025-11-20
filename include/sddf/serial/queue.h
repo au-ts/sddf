@@ -29,8 +29,10 @@ typedef struct serial_queue_handle {
 } serial_queue_handle_t;
 
 /**
- * Return the number of bytes of data stored in the queue. This
- * function should only be called by the CONSUMER of the queue.
+ * Return the number of bytes of data stored in the queue. This is calculated by
+ * using the head and tail values currently stored in the shared queue handle
+ * data structure. This function should only be called by the CONSUMER of the
+ * queue.
  *
  * @param queue_handle queue containing the data.
  *
@@ -44,8 +46,10 @@ static inline uint32_t serial_queue_length_consumer(serial_queue_handle_t *queue
 }
 
 /**
- * Return the number of bytes of data stored in the queue. This
- * function should only be called by the PRODUCER of the queue.
+ * Return the number of bytes of data stored in the queue. This is calculated by
+ * using the head and tail values currently stored in the shared queue handle
+ * data structure. This function should only be called by the PRODUCER of the
+ * queue.
  *
  * @param queue_handle queue containing the data.
  *
@@ -59,10 +63,13 @@ static inline uint32_t serial_queue_length_producer(serial_queue_handle_t *queue
 }
 
 /**
- * Check if the queue is empty.
+ * Check if the queue is empty. This function should only be called by the
+ * CONSUMER of the queue.
  *
  * @param queue_handle queue to check.
  * @param local_head head which points to the next character to be dequeued.
+ * Should be set to the value of the shared head in the queue if a local copy is
+ * not in use.
  *
  * @return true indicates the queue is empty, false otherwise.
  */
@@ -76,10 +83,12 @@ static inline int serial_queue_empty(serial_queue_handle_t *queue_handle, uint32
 }
 
 /**
- * Check if the queue is full.
+ * Check if the queue is full. This function should only be called by the
+ * PRODUCER of the queue.
  *
  * @param queue_handle queue to check.
- * @param local_tail tail which points to the next enqueue slot.
+ * @param local_tail tail which points to the next enqueue slot. Should be set
+ * to the value of the shared tail in the queue if a local copy is not in use.
  *
  * @return true indicates the queue is full, false otherwise.
  */
@@ -93,8 +102,9 @@ static inline int serial_queue_full(serial_queue_handle_t *queue_handle, uint32_
 }
 
 /**
- * Enqueue a character into a queue. Update the shared tail so the character
- * is visible to the consumer.
+ * Enqueue a character into a queue. Update the shared tail so the character is
+ * visible to the consumer. This function should only be called by the PRODUCER
+ * of the queue.
  *
  * @param queue_handle queue to enqueue into.
  * @param character character to be enqueued.
@@ -119,7 +129,8 @@ static inline int serial_enqueue(serial_queue_handle_t *queue_handle, char chara
 
 /**
  * Enqueue a character locally into a queue. Update a local tail variable so the
- * character is not visible to the consumer.
+ * character is not visible to the consumer. This function should only be called
+ * by the PRODUCER of the queue.
  *
  * @param queue_handle queue to enqueue into.
  * @param local_tail address of the tail to be used and incremented.
@@ -140,8 +151,9 @@ static inline int serial_enqueue_local(serial_queue_handle_t *queue_handle, uint
 }
 
 /**
- * Dequeue a character from a queue. Update the shared head so the removal of the
- * character is visible to the producer.
+ * Dequeue a character from a queue. Update the shared head so the removal of
+ * the character is visible to the producer. This function should only be called
+ * by the CONSUMER of the queue.
  *
  * @param queue_handle queue to dequeue from.
  * @param character address of character to copy into.
@@ -166,7 +178,8 @@ static inline int serial_dequeue(serial_queue_handle_t *queue_handle, char *char
 
 /**
  * Dequeue a character locally from a queue. Update a local head variable so the
- * removal of the character is not visible to the producer.
+ * removal of the character is not visible to the producer. This function should
+ * only be called by the CONSUMER of the queue.
  *
  * @param queue_handle queue to dequeue from.
  * @param local_head address of the head to be used and incremented.
@@ -187,8 +200,9 @@ static inline int serial_dequeue_local(serial_queue_handle_t *queue_handle, uint
 }
 
 /**
- * Update the value of the tail in the shared data structure to make
- * locally enqueued data visible.
+ * Update the value of the tail in the shared data structure to make locally
+ * enqueued data visible. This function should only be called by the PRODUCER of
+ * the queue.
  *
  * @param queue_handle queue to update.
  * @param local_tail tail which points to the last character enqueued.
@@ -214,8 +228,9 @@ static inline void serial_update_shared_tail(serial_queue_handle_t *queue_handle
 }
 
 /**
- * Update the value of the head in the shared data structure to make
- * local dequeues visible.
+ * Update the value of the head in the shared data structure to make local
+ * dequeues visible. This function should only be called by the CONSUMER of the
+ * queue.
  *
  * @param queue_handle queue to update.
  * @param local_head head which points to the next character to dequeue.
@@ -257,7 +272,8 @@ static inline uint32_t serial_queue_contiguous_length(serial_queue_handle_t *que
 
 /**
  * Return the number of free bytes remaining in the queue. This is the number of
- * bytes that can be enqueued until the queue is full.
+ * bytes that can be enqueued until the queue is full. This function should only
+ * be called by the PRODUCER of the queue.
  *
  * @param queue_handle queue to be filled with data.
  *
@@ -271,8 +287,10 @@ static inline uint32_t serial_queue_free(serial_queue_handle_t *queue_handle)
 }
 
 /**
- * Return the number of bytes that can be copied into the queue contiguously. This
- * is the number of bytes that can be copied into the queue with a single call of memcpy.
+ * Return the number of bytes that can be copied into the queue contiguously.
+ * This is the number of bytes that can be copied into the queue with a single
+ * call of memcpy. This function should only be called by the PRODUCER of the
+ * queue.
  *
  * @param queue_handle queue to be filled with data.
  *
@@ -285,7 +303,8 @@ static inline uint32_t serial_queue_contiguous_free(serial_queue_handle_t *queue
 }
 
 /**
- * Enqueue a buffer of contiguous characters into a queue.
+ * Enqueue a buffer of contiguous characters into a queue. This function should
+ * only be called by the PRODUCER of the queue.
  *
  * @param queue_handle queue to be filled with data.
  * @param num number of characters to enqueue.
@@ -316,9 +335,10 @@ static inline uint32_t serial_enqueue_batch(serial_queue_handle_t *queue_handle,
 }
 
 /**
- * Transfer all data from a consumer queue to a producer queue. Assumes there
- * is enough free space in the free queue to fit all data in the active
- * queue.
+ * Transfer all data from a consumer queue to a producer queue. Assumes there is
+ * enough free space in the free queue to fit all data in the active queue. This
+ * function should only be called by the CONSUMER of the active queue, and the
+ * PRODUCER of the free queue.
  *
  * @param free_queue_handle queue to produce into.
  * @param active_queue_handle queue to consume.
@@ -355,7 +375,8 @@ static inline void serial_transfer_all(serial_queue_handle_t *free_queue_handle,
 /**
  * Transfer all data from a consumer queue to a producer queue, adding colour codes
  * before and after. Assumes there is enough free space in the free queue to fit
- * all data in the active.
+ * all data in the active. This function should only be called by the CONSUMER
+ * of the active queue, and the PRODUCER of the free queue.
  *
  * @param free_queue_handle queue to produce into.
  * @param active_queue_handle queue to consume.
