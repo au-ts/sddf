@@ -29,16 +29,32 @@ typedef struct serial_queue_handle {
 } serial_queue_handle_t;
 
 /**
- * Return the number of bytes of data stored in the queue.
+ * Return the number of bytes of data stored in the queue. This
+ * function should only be called by the CONSUMER of the queue.
  *
  * @param queue_handle queue containing the data.
  *
  * @return The number bytes of data stored in the queue.
  */
-static inline uint32_t serial_queue_length(serial_queue_handle_t *queue_handle)
+static inline uint32_t serial_queue_length_consumer(serial_queue_handle_t *queue_handle)
 {
-    uint32_t tail = load_relaxed_32(&queue_handle->queue->tail);
-    uint32_t head = load_relaxed_32(&queue_handle->queue->head);
+    uint32_t tail = load_acquire_32(&queue_handle->queue->tail);
+    uint32_t head = queue_handle->queue->head;
+    return tail - head;
+}
+
+/**
+ * Return the number of bytes of data stored in the queue. This
+ * function should only be called by the PRODUCER of the queue.
+ *
+ * @param queue_handle queue containing the data.
+ *
+ * @return The number bytes of data stored in the queue.
+ */
+static inline uint32_t serial_queue_length_producer(serial_queue_handle_t *queue_handle)
+{
+    uint32_t tail = queue_handle->queue->tail;
+    uint32_t head = load_acquire_32(&queue_handle->queue->head);
     return tail - head;
 }
 
@@ -179,11 +195,19 @@ static inline int serial_dequeue_local(serial_queue_handle_t *queue_handle, uint
  */
 static inline void serial_update_shared_tail(serial_queue_handle_t *queue_handle, uint32_t local_tail)
 {
+#ifdef CONFIG_DEBUG_BUILD
     uint32_t head = load_relaxed_32(&queue_handle->queue->head);
+    uint32_t current_tail = queue_handle->queue->tail;
+
+    uint32_t current_length = current_tail - head;
     uint32_t new_length = local_tail - head;
+
+    /* Ensure updates to tail do not decrease data length */
+    assert(new_length >= current_length);
 
     /* Ensure updates to tail don't exceed capacity restraints */
     assert(new_length <= queue_handle->capacity);
+#endif
 
     // the store-release will synchronise with the load-acquire in serial_dequeue()
     store_release_32(&queue_handle->queue->tail, local_tail);
@@ -198,13 +222,26 @@ static inline void serial_update_shared_tail(serial_queue_handle_t *queue_handle
  */
 static inline void serial_update_shared_head(serial_queue_handle_t *queue_handle, uint32_t local_head)
 {
+#ifdef CONFIG_DEBUG_BUILD
+    uint32_t tail = load_acquire_32(&queue_handle->queue->tail);
+    uint32_t current_head = queue_handle->queue->head;
+
+    uint32_t current_length = tail - current_head;
+    uint32_t new_length = tail - local_head;
+
+    /* Ensure updates to head don't increase data length or violate capacity
+    constraints */
+    assert(new_length <= current_length);
+#endif
+
     // the store-release will synchronise with the load-acquire in serial_enqueue() or serial_enqueue_batch()
     store_release_32(&queue_handle->queue->head, local_head);
 }
 
 /**
- * Return the number of bytes of data stored contiguously in the queue from
- * the head index to either the tail index or the end of the data region.
+ * Return the number of bytes of data stored contiguously in the queue from the
+ * head index to either the tail index or the end of the data region. This
+ * function should only be called by the CONSUMER of the queue.
  *
  * @param queue_handle queue containing the data.
  *
@@ -212,8 +249,10 @@ static inline void serial_update_shared_head(serial_queue_handle_t *queue_handle
  */
 static inline uint32_t serial_queue_contiguous_length(serial_queue_handle_t *queue_handle)
 {
-    return MIN(queue_handle->capacity - (load_relaxed_32(&queue_handle->queue->head) % queue_handle->capacity),
-               serial_queue_length(queue_handle));
+    uint32_t head = queue_handle->queue->head;
+    uint32_t length = serial_queue_length_consumer(queue_handle);
+
+    return MIN(queue_handle->capacity - (head % queue_handle->capacity), length);
 }
 
 /**
@@ -226,11 +265,8 @@ static inline uint32_t serial_queue_contiguous_length(serial_queue_handle_t *que
  */
 static inline uint32_t serial_queue_free(serial_queue_handle_t *queue_handle)
 {
-    uint32_t tail = queue_handle->queue->tail;
-    // the load-acquire will be paired with the store-release
-    // in serial_dequeue() or serial_update_shared_head()
-    uint32_t head = load_acquire_32(&queue_handle->queue->head);
-    uint32_t length = tail - head;
+    uint32_t length = serial_queue_length_producer(queue_handle);
+
     return queue_handle->capacity - length;
 }
 
@@ -290,18 +326,29 @@ static inline uint32_t serial_enqueue_batch(serial_queue_handle_t *queue_handle,
 static inline void serial_transfer_all(serial_queue_handle_t *free_queue_handle,
                                        serial_queue_handle_t *active_queue_handle)
 {
-    assert(serial_queue_length(active_queue_handle) <= serial_queue_free(free_queue_handle));
+    /* The caller is the consumer of the active queue */
+    uint32_t active_capacity = active_queue_handle->capacity;
+    uint32_t active_head = active_queue_handle->queue->head;
+    uint32_t active_length = load_acquire_32(&active_queue_handle->queue->tail) - active_head;
+
+#ifdef CONFIG_DEBUG_BUILD
+    /* The caller is the producer of the free queue */
+    uint32_t free_length = free_queue_handle->queue->tail - load_acquire_32(&free_queue_handle->queue->head);
+
+    assert(active_length <= free_length);
+#endif
 
     /* Copy in contiguous chunks */
-    while (serial_queue_length(active_queue_handle)) {
-        uint32_t num_active = serial_queue_contiguous_length(active_queue_handle);
-        char *src = active_queue_handle->data_region
-                  + (active_queue_handle->queue->head % active_queue_handle->capacity);
+    while (active_length) {
+        uint32_t active_batch = MIN(active_capacity - (active_head % active_capacity), active_length);
+        char *src = active_queue_handle->data_region + (active_head % active_capacity);
 
-        uint32_t transferred = serial_enqueue_batch(free_queue_handle, num_active, src);
-        assert(transferred == num_active);
+        uint32_t transferred = serial_enqueue_batch(free_queue_handle, active_batch, src);
+        assert(transferred == active_batch);
 
-        serial_update_shared_head(active_queue_handle, active_queue_handle->queue->head + num_active);
+        active_head += active_batch;
+        serial_update_shared_head(active_queue_handle, active_head);
+        active_length = load_acquire_32(&active_queue_handle->queue->tail) - active_head;
     }
 }
 
@@ -321,8 +368,15 @@ static inline void serial_transfer_all_colour(serial_queue_handle_t *free_queue_
                                               serial_queue_handle_t *active_queue_handle, const char *col_start,
                                               uint16_t col_start_len, const char *col_end, uint16_t col_end_len)
 {
-    assert(serial_queue_length(active_queue_handle) + col_start_len + col_end_len
-           <= serial_queue_free(free_queue_handle));
+#ifdef CONFIG_DEBUG_BUILD
+    /* The caller is the consumer of the active queue */
+    uint32_t active_length = serial_queue_length_consumer(active_queue_handle);
+
+    /* The caller is the producer of the free queue */
+    uint32_t free_length = serial_queue_length_producer(free_queue_handle);
+
+    assert(active_length + col_start_len + col_end_len <= free_length);
+#endif
 
     /* Transfer col_start string */
     uint32_t transferred = serial_enqueue_batch(free_queue_handle, col_start_len, col_start);
