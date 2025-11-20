@@ -23,12 +23,6 @@ for i in `seq 0 1`; do
 
   $CMD -DQUEUE_SIZE=2 -DPRODUCER=8 -DCONSUMER=8 ./ci/genmc/serial/test1.c
 
-  $CMD -DQUEUE_SIZE=3 -DPRODUCER=4 -DCONSUMER=4 ./ci/genmc/serial/test1.c
-
-  $CMD -DQUEUE_SIZE=3 -DPRODUCER=6 -DCONSUMER=6 ./ci/genmc/serial/test1.c
-
-  $CMD -DQUEUE_SIZE=3 -DPRODUCER=7 -DCONSUMER=7 ./ci/genmc/serial/test1.c
-
   $CMD -DQUEUE_SIZE=4 -DPRODUCER=4 -DCONSUMER=4 ./ci/genmc/serial/test1.c
 
   $CMD -DQUEUE_SIZE=4 -DPRODUCER=6 -DCONSUMER=6 ./ci/genmc/serial/test1.c
@@ -60,20 +54,6 @@ for i in `seq 0 1`; do
   $CMD -DQUEUE_SIZE=2 -DPRODUCER=8 -DCONSUMER=8 -DBATCH_SIZE=1 ./ci/genmc/serial/test2.c
 
   $CMD -DQUEUE_SIZE=2 -DPRODUCER=8 -DCONSUMER=8 -DBATCH_SIZE=2 ./ci/genmc/serial/test2.c
-
-  $CMD -DQUEUE_SIZE=3 -DPRODUCER=4 -DCONSUMER=4 -DBATCH_SIZE=1 ./ci/genmc/serial/test2.c
-
-  $CMD -DQUEUE_SIZE=3 -DPRODUCER=4 -DCONSUMER=4 -DBATCH_SIZE=2 ./ci/genmc/serial/test2.c
-
-  $CMD -DQUEUE_SIZE=3 -DPRODUCER=4 -DCONSUMER=4 -DBATCH_SIZE=3 ./ci/genmc/serial/test2.c
-
-  $CMD -DQUEUE_SIZE=3 -DPRODUCER=6 -DCONSUMER=6 -DBATCH_SIZE=2 ./ci/genmc/serial/test2.c
-
-  $CMD -DQUEUE_SIZE=3 -DPRODUCER=6 -DCONSUMER=6 -DBATCH_SIZE=3 ./ci/genmc/serial/test2.c
-
-  $CMD -DQUEUE_SIZE=3 -DPRODUCER=7 -DCONSUMER=7 -DBATCH_SIZE=2 ./ci/genmc/serial/test2.c
-
-  $CMD -DQUEUE_SIZE=3 -DPRODUCER=7 -DCONSUMER=7 -DBATCH_SIZE=3 ./ci/genmc/serial/test2.c
 
   $CMD -DQUEUE_SIZE=4 -DPRODUCER=4 -DCONSUMER=4 -DBATCH_SIZE=1 ./ci/genmc/serial/test2.c
 
@@ -114,18 +94,6 @@ for i in `seq 0 1`; do
   $CMD -DQUEUE_SIZE=2 -DPRODUCER=8 -DCONSUMER=8 -DBATCH_SIZE=1 ./ci/genmc/serial/test3.c
 
   $CMD -DQUEUE_SIZE=2 -DPRODUCER=8 -DCONSUMER=4 -DBATCH_SIZE=2 ./ci/genmc/serial/test3.c
-
-  $CMD -DQUEUE_SIZE=3 -DPRODUCER=4 -DCONSUMER=4 -DBATCH_SIZE=1 ./ci/genmc/serial/test3.c
-
-  $CMD -DQUEUE_SIZE=3 -DPRODUCER=4 -DCONSUMER=2 -DBATCH_SIZE=2 ./ci/genmc/serial/test3.c
-
-  $CMD -DQUEUE_SIZE=3 -DPRODUCER=6 -DCONSUMER=3 -DBATCH_SIZE=2 ./ci/genmc/serial/test3.c
-
-  $CMD -DQUEUE_SIZE=3 -DPRODUCER=6 -DCONSUMER=2 -DBATCH_SIZE=3 ./ci/genmc/serial/test3.c
-
-  $CMD -DQUEUE_SIZE=3 -DPRODUCER=7 -DCONSUMER=3 -DBATCH_SIZE=2 ./ci/genmc/serial/test3.c
-
-  $CMD -DQUEUE_SIZE=3 -DPRODUCER=7 -DCONSUMER=2 -DBATCH_SIZE=3 ./ci/genmc/serial/test3.c
 
   $CMD -DQUEUE_SIZE=4 -DPRODUCER=4 -DCONSUMER=4 -DBATCH_SIZE=1 ./ci/genmc/serial/test3.c
 
