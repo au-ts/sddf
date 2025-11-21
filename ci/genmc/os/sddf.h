@@ -1,0 +1,1 @@
+/* This is a fake header file for GenMC model checking. */
