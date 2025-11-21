@@ -13,6 +13,15 @@
 #include <sddf/util/util.h>
 #include <sddf/util/fence.h>
 
+/**
+ * The serial queue, like all sDDF queues, is an implementation of a single-producer,
+ * single-consumer FIFO queue. The key assumption being that only the producer is permitted to
+ * modify the tail, and only the consumer is permitted to modify the head. Both components are
+ * permitted to read both indices. The library's atomic operations are written to ensure correctness
+ * under these assumptions, thus each function's description contains an explicit notes on its
+ * assumed caller.
+ */
+
 typedef struct serial_queue {
     /* index to insert at */
     uint32_t tail;
