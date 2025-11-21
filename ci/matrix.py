@@ -19,7 +19,7 @@ MACHINE_QUEUE_BOARDS: dict[str, list[str]] = {
     "star64": ["star64"],
     "zcu102": ["zcu102", "zcu102_2"],
     "rpi4b_1gb": ["pi4B"],
-    "rock3b" : ["rockb"],
+    "rock3b": ["rockb"],
 }
 
 MACHINE_QUEUE_BOARD_OPTIONS: dict[str, dict[str, Any]] = {
