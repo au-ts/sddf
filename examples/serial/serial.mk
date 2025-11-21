@@ -33,10 +33,10 @@ SUPPORTED_BOARDS:= cheshire \
 		   qemu_virt_aarch64 \
 		   qemu_virt_riscv64 \
 		   rockpro64 \
+		   rock3b \
 		   rpi4b_1gb \
 		   zcu102 \
-		   star64 \
-		   rock3b
+		   star64
 
 include ${SDDF}/tools/make/board/common.mk
 

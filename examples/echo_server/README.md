@@ -43,8 +43,8 @@ The following platforms are supported:
 * odroidc4
 * qemu_virt_aarch64
 * qemu_virt_riscv64
-* star64
 * rock3b
+* star64
 
 To compile the system image, run:
 
