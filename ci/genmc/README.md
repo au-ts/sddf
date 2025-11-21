@@ -9,7 +9,8 @@
 GenMC works by efficiently enumerating the state space of the concurrent system, which makes testing
 concurrent programs reliable and reproducible.
 We use it to verify partial correctness of implementations of critical concurrent data structures,
-including the lock-free single-producer single-consumer queue.
+some of our lock-free single-producer single-consumer queue, currently just the queue implementation
+used by the serial subsystem.
 
 ## Usage
 Follows the instruction of GenMC to install the tool, then run
