@@ -7,12 +7,11 @@
 
 ## System architecture
 
-The serial subsystem adheres to the sDDF design principles of modularalised
-components split via separation of concerns. Components communicate via shared
-queues and data regions, as well as asynchronous notifications (Microkit
-channels). For a more in depth discussion of these design principles and how the
-serial subsystem incorporates them, see the [sDDF design
-document](/docs/design_doc).
+The serial subsystem adheres to the sDDF design principles of modular components
+split via separation of concerns. Components communicate via shared queues and
+data regions, as well as asynchronous notifications (Microkit channels). For a
+more in depth discussion of these design principles and how the serial subsystem
+incorporates them, see the [sDDF design document](/docs/design_doc).
 
 The UART driver protection domain handles all UART device interrupts, and is the
 only protection domain with access to the UART registers. In order to safely
@@ -33,11 +32,12 @@ region to be written to. Head and tail indices are kept as overflowing unsigned
 integers, and must be used modulo *queue capacity* when accessing queues. This
 enforces the constraint that queue capacity must be a power of two.
 
-All sDDF queues are single producer single consumer, and as a consequence the
-head index is only written to by the consumer of the queue, and the tail index
-is only written to by the producer of the queue. This allows the queues to be
-accessed without a lock, with the only concurrency concern being the consistency
-of the order of queue operations which is maintained using memory barriers.
+All sDDF queues are single-producer single-consumer, and as a consequence the
+head index must only be written to by the consumer of the queue, and the tail
+index must only be written to by the producer of the queue. This allows the
+queues to be used without a lock, with the only concurrency concern being the
+consistency of the order of queue operations which is achieved with memory
+barriers.
 
 The *serial_queue* data structure contains the queue head, tail and
 *producer_signalled* notification flag [described below](#signalling), while
