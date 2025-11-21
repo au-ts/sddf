@@ -21,12 +21,12 @@ The following platforms are supported:
 * odroidc4
 * qemu_virt_aarch64
 * qemu_virt_riscv64
+* rock3b
 * rpi4b_1gb
 * serengeti
 * star64
 * x86_64_generic
 * zcu102
-* rock3b
 
 ### Make
 

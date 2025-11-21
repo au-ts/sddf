@@ -23,15 +23,6 @@ class Board:
 # TODO: convert to Dictionary
 BOARDS: List[Board] = [
     Board(
-        name="rock3b",
-        arch=SystemDescription.Arch.AARCH64,
-        paddr_top=0xECC9C000,
-        serial="serial@fe660000",
-        timer="rktimer@fe5f0000",
-        ethernet="ethernet@fe2a0000",
-        baud_rate=1500000,
-    ),
-    Board(
         name="cheshire",
         arch=SystemDescription.Arch.RISCV64,
         paddr_top=0x90000000,
@@ -122,6 +113,15 @@ BOARDS: List[Board] = [
         blk="soc/virtio_mmio@10008000",
         partition=0,
         i2c=None,
+    ),
+    Board(
+        name="rock3b",
+        arch=SystemDescription.Arch.AARCH64,
+        paddr_top=0xECC9C000,
+        serial="serial@fe660000",
+        timer="rktimer@fe5f0000",
+        ethernet="ethernet@fe2a0000",
+        baud_rate=1500000,
     ),
     Board(
         name="rpi4b_1gb",
