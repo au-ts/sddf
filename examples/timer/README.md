@@ -6,8 +6,8 @@
 
 # Timer example
 
-This is a very simple example where a single client program is setting
-timeouts and getting the current time from a timer driver.
+This is a very simple example where a single client program is setting timeouts
+and getting the current time from a timer driver.
 
 ## Building
 
@@ -34,8 +34,8 @@ make MICROKIT_SDK=<path/to/sdk> MICROKIT_BOARD=<board>
 
 After building, the system image to load will be `build/loader.img`.
 
-If you wish to simulate on the QEMU virt AArch64 platform, you can append `qemu` to your make command
-after building for qemu_virt_aarch64.
+If you wish to simulate on the QEMU virt AArch64 platform, you can append `qemu`
+to your make command after building for qemu_virt_aarch64.
 
 ### Zig
 

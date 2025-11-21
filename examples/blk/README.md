@@ -4,8 +4,8 @@
 -->
 # Block example
 
-This example is meant to show off the various operations that are possible
-with block devices in sDDF.
+This example is meant to show off the various operations that are possible with
+block devices in sDDF.
 
 ## Building
 
@@ -16,8 +16,8 @@ The following platforms are supported:
 
 Note that this example depends on `dosfstools` and `gdisk`.
 
-For `apt` users: `sudo apt-get install dosfstools gdisk`.
-For Homebrew users: `brew install dosfstools gdisk`.
+For `apt` users: `sudo apt-get install dosfstools gdisk`. For Homebrew users:
+`brew install dosfstools gdisk`.
 
 ### Block device setup
 
@@ -26,8 +26,9 @@ with certain partitioning.
 
 For the MaaXBoard, the example system expects to use the 4th partition (index 3)
 of the microSD card using MBR partitioning. The example will read **and write to
-the partition** so make sure you do not have any important data on it. If you want
-to specify a custom partition, you can do so when following the build steps below.
+the partition** so make sure you do not have any important data on it. If you
+want to specify a custom partition, you can do so when following the build steps
+below.
 
 ### Make
 
@@ -37,8 +38,8 @@ make MICROKIT_SDK=<path/to/sdk> MICROKIT_BOARD=<board> [PARTITION=<partition>]
 
 After building, the system image to load will be `build/loader.img`.
 
-If you wish to simulate on the QEMU virt AArch64/RISCV-64 platform, you can append
-`qemu` to your make command like so:
+If you wish to simulate on the QEMU virt AArch64/RISCV-64 platform, you can
+append `qemu` to your make command like so:
 ```sh
 make MICROKIT_SDK=<path/to/sdk> MICROKIT_BOARD=<board> qemu
 ```
@@ -61,9 +62,9 @@ The final bootable image will be in `zig-out/bin/loader.img`.
 
 ## Running
 
-The example uses a generated C header that contains bytes for an ASCII
-image of the seL4 logo and some 'Lorem ipsum' text. It writes this data
-to the device and then reads it back and prints out what it got back.
+The example uses a generated C header that contains bytes for an ASCII image of
+the seL4 logo and some 'Lorem ipsum' text. It writes this data to the device and
+then reads it back and prints out what it got back.
 
 When running the example, you should see the following output:
 ```
