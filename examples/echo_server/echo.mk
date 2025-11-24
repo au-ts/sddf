@@ -15,7 +15,8 @@ SUPPORTED_BOARDS := odroidc4 odroidc2 maaxboard \
 		    imx8mm_evk qemu_virt_aarch64 \
 		    imx8mq_evk imx8mp_evk \
 		    imx8mp_iotgate \
-		    star64 qemu_virt_riscv64
+		    star64 qemu_virt_riscv64 \
+        x86_64_generic
 TOOLCHAIN ?= clang
 MICROKIT_CONFIG ?= debug
 SYSTEM_FILE := echo_server.system
@@ -84,9 +85,14 @@ network_copy0.elf network_copy1.elf: network_copy.elf
 ${IMAGES}: libsddf_util_debug.a
 
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
+ifneq ($(strip $(DTS)),)
 	$(PYTHON)\
 	    $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
 	    --dtb $(DTB) --output . --sdf $(SYSTEM_FILE)
+else
+	$(OBJCOPY) -O elf32-i386 $(SEL4_64B) $(SEL4_32B)
+	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --output . --sdf $(SYSTEM_FILE)
+endif
 	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx.data serial_virt_tx.elf
@@ -127,9 +133,9 @@ include ${UART_DRIVER}/serial_driver.mk
 include ${SERIAL_COMPONENTS}/serial_components.mk
 
 qemu: $(IMAGE_FILE)
-	$(QEMU) $(QEMU_ARCH_ARGS) \
+	$(QEMU) $(QEMU_ARCH_ARGS) $(QEMU_NET_ARGS) \
+		-m size=2G \
 		-nographic \
-		-device virtio-net-device,netdev=netdev0 \
 		-netdev user,id=netdev0,\
 hostfwd=udp::1235-10.0.2.15:1235,\
 hostfwd=tcp::1236-10.0.2.15:1236,\
@@ -138,6 +144,7 @@ hostfwd=udp::1238-10.0.2.16:1235,\
 hostfwd=tcp::1239-10.0.2.16:1236,\
 hostfwd=tcp::1240-10.0.2.16:1237 \
 		-global virtio-mmio.force-legacy=false \
+		-serial mon:stdio \
 		-d guest_errors
 
 clean::
