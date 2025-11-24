@@ -61,6 +61,8 @@ Files: network/ipstacks/lwip/*
 Copyright: Copyright (c) 2001-2004 Swedish Institute of Computer Science
 License: LicenseRef-BSD-LWIP
 
-Files: util/custom_libc/x86_64/*
+Files:
+    util/custom_libc/x86_64/*
+    util/custom_libc/aarch64/memmove.c
 Copyright: Newlib contributors
 License: LicenseRef-Newlib
