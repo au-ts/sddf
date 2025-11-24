@@ -49,8 +49,8 @@ SYSTEM_FILE := serial.system
 SDDF_CUSTOM_LIBC := 1
 
 IMAGES := serial_driver.elf \
-	  client0.elf client1.elf \
-	  serial_virt_tx.elf serial_virt_rx.elf
+	  serial_virt_tx.elf serial_virt_rx.elf \
+	  client.elf
 CFLAGS +=  -Wno-unused-function -Werror
 
 LDFLAGS := -L$(BOARD_DIR)/lib -L$(SDDF)/lib
@@ -72,9 +72,6 @@ client.elf: client.o libsddf_util.a
 
 client.o: ${TOP}/client.c
 	$(CC) $(CFLAGS) -c -o $@ $<
-
-client0.elf client1.elf: client.elf
-	cp client.elf $@
 
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE)

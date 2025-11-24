@@ -1,6 +1,6 @@
 # Copyright 2025, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
-import sys, os
+import sys, os, shutil
 import argparse
 from typing import List
 from dataclasses import dataclass
@@ -16,6 +16,14 @@ assert version("sdfgen").split(".")[1] == "27", "Unexpected sdfgen version"
 
 ProtectionDomain = SystemDescription.ProtectionDomain
 
+# Adds ".elf" to elf strings
+def copy_elf(source_elf: str, new_elf: str, elf_number=None):
+    source_elf += ".elf"
+    if elf_number != None:
+        new_elf += str(elf_number)
+    new_elf += ".elf"
+    assert os.path.isfile(source_elf)
+    return shutil.copyfile(source_elf, new_elf)
 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     serial_driver = ProtectionDomain("serial_driver", "serial_driver.elf", priority=200)
@@ -25,8 +33,10 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     serial_virt_rx = ProtectionDomain(
         "serial_virt_rx", "serial_virt_rx.elf", priority=199
     )
-    client0 = ProtectionDomain("client0", "client0.elf", priority=1)
-    client1 = ProtectionDomain("client1", "client1.elf", priority=1)
+    client0_elf = copy_elf("client", "client", 0)
+    client0 = ProtectionDomain("client0", client0_elf, priority=1)
+    client1_elf = copy_elf("client", "client", 1)
+    client1 = ProtectionDomain("client1", client1_elf, priority=1)
 
     serial_node = dtb.node(board.serial)
     assert serial_node is not None
