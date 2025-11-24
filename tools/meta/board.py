@@ -10,7 +10,7 @@ class Board:
     name: str
     arch: SystemDescription.Arch
     paddr_top: int
-    serial: str
+    serial: Optional[str] = None
     ethernet: Optional[str] = None
     timer: Optional[str] = None
     i2c: Optional[str] = None
@@ -141,5 +141,12 @@ BOARDS: List[Board] = [
         paddr_top=0xA0000000,
         timer="axi/timer@ff140000",
         serial="axi/serial@ff000000",
+    ),
+    Board(
+        name="x86_64_generic",
+        arch=SystemDescription.Arch.X86_64,
+        paddr_top=0x7FFDF000,
+        timer=None,
+        serial=None,
     ),
 ]
