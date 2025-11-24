@@ -9,11 +9,6 @@
 #include <sddf/virtio/transport/pci.h>
 #include <sddf/resources/device.h>
 
-// @billn fix hard coded addresses
-#define PCI_BUS 0
-#define PCI_DEV 2
-#define PCI_FUNC 0
-
 #define VADDR_COMMON 0x60000000
 #define VADDR_ISR 0x60001000
 #define VADDR_DEVICE 0x60002000
@@ -46,7 +41,7 @@ uint32_t pci_compute_port_address(uint8_t bus, uint8_t dev, uint8_t func, uint8_
 }
 
 // @billn should prolly use ecam instead of this io port business
-uint32_t pci_read_32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t off)
+uint32_t pci_x86_read_32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t off)
 {
     uint32_t addr = pci_compute_port_address(bus, dev, func, off);
 
@@ -55,21 +50,21 @@ uint32_t pci_read_32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t off)
     return microkit_x86_ioport_read_32(PCI_DATA_PORT_ID, PCI_DATA_PORT_ADDR);
 }
 
-void pci_write_8(uint8_t bus, uint8_t dev, uint8_t func, uint8_t off, uint8_t data)
+void pci_x86_write_8(uint8_t bus, uint8_t dev, uint8_t func, uint8_t off, uint8_t data)
 {
     uint32_t addr = pci_compute_port_address(bus, dev, func, off);
     microkit_x86_ioport_write_32(PCI_ADDR_PORT_ID, PCI_ADDR_PORT_ADDR, addr);
     microkit_x86_ioport_write_8(PCI_DATA_PORT_ID, PCI_DATA_PORT_ADDR, data);
 }
 
-void pci_write_16(uint8_t bus, uint8_t dev, uint8_t func, uint8_t off, uint16_t data)
+void pci_x86_write_16(uint8_t bus, uint8_t dev, uint8_t func, uint8_t off, uint16_t data)
 {
     uint32_t addr = pci_compute_port_address(bus, dev, func, off);
     microkit_x86_ioport_write_32(PCI_ADDR_PORT_ID, PCI_ADDR_PORT_ADDR, addr);
     microkit_x86_ioport_write_16(PCI_DATA_PORT_ID, PCI_DATA_PORT_ADDR, data);
 }
 
-void pci_write_32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t off, uint32_t data)
+void pci_x86_write_32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t off, uint32_t data)
 {
     uint32_t addr = pci_compute_port_address(bus, dev, func, off);
     microkit_x86_ioport_write_32(PCI_ADDR_PORT_ID, PCI_ADDR_PORT_ADDR, addr);
@@ -113,10 +108,10 @@ void pci_debug_print_header(uint8_t bus, uint8_t dev, uint8_t func, pci_gen_dev_
         uint8_t cap_off = pci_device_header->cap_ptr;
         while (cap_off) {
             uint32_t virtio_cap_arr[4];
-            virtio_cap_arr[0] = pci_read_32(bus, dev, func, cap_off);
-            virtio_cap_arr[1] = pci_read_32(bus, dev, func, cap_off + 4);
-            virtio_cap_arr[2] = pci_read_32(bus, dev, func, cap_off + 8);
-            virtio_cap_arr[3] = pci_read_32(bus, dev, func, cap_off + 12);
+            virtio_cap_arr[0] = pci_x86_read_32(bus, dev, func, cap_off);
+            virtio_cap_arr[1] = pci_x86_read_32(bus, dev, func, cap_off + 4);
+            virtio_cap_arr[2] = pci_x86_read_32(bus, dev, func, cap_off + 8);
+            virtio_cap_arr[3] = pci_x86_read_32(bus, dev, func, cap_off + 12);
 
             virtio_pci_cap_t *cap = (virtio_pci_cap_t *)virtio_cap_arr;
 
@@ -133,8 +128,8 @@ void pci_debug_print_header(uint8_t bus, uint8_t dev, uint8_t func, pci_gen_dev_
                 // @billn break this out, this debug print functions mustn't have side effects
                 if (cap->cfg_type == VIRTIO_PCI_CAP_NOTIFY_CFG) {
                     // 4.1.4.4 Notification structure layout
-                    nftn_multiplier = pci_read_32(bus, dev, func, cap_off + sizeof(virtio_pci_cap_t));
-                    LOG_VIRTIO_TRANSPORT("\t\tfuck 0x%x\n", nftn_multiplier);
+                    nftn_multiplier = pci_x86_read_32(bus, dev, func, cap_off + sizeof(virtio_pci_cap_t));
+                    LOG_VIRTIO_TRANSPORT("\t\tnftn_multiplier: 0x%x\n", nftn_multiplier);
                 }
             }
 
@@ -150,7 +145,7 @@ static bool read_pci_general_device_header(uint8_t bus, uint8_t dev, uint8_t fun
     /* Read the first 4 32-bits header registers to work out the header type. */
     int i = 0;
     for (; i < sizeof(pci_common_hdr_t) / sizeof(uint32_t); i++) {
-        pci_device_header[i] = pci_read_32(bus, dev, func, i * 4);
+        pci_device_header[i] = pci_x86_read_32(bus, dev, func, i * 4);
     }
 
     uint8_t hdr_type = (pci_device_header[3] >> 16) & 0xff;
@@ -161,7 +156,7 @@ static bool read_pci_general_device_header(uint8_t bus, uint8_t dev, uint8_t fun
 
     /* Now read the rest of the header registers */
     for (; i < sizeof(pci_gen_dev_hdr_t) / sizeof(uint32_t); i++) {
-        pci_device_header[i] = pci_read_32(bus, dev, func, i * 4);
+        pci_device_header[i] = pci_x86_read_32(bus, dev, func, i * 4);
     }
 
     memcpy((uint8_t *)ret, (uint8_t *)pci_device_header, sizeof(pci_gen_dev_hdr_t));
@@ -173,37 +168,58 @@ bool virtio_transport_probe(device_resources_t *device_resources, virtio_device_
 {
     assert(device_resources_check_magic(device_resources));
 
-    uint8_t bus = PCI_BUS;
-    uint8_t dev = PCI_DEV;
-    uint8_t func = PCI_FUNC;
+    uint8_t bus = device_handle_ret->pci_bus;
+    uint8_t dev = device_handle_ret->pci_dev;
+    uint8_t func = device_handle_ret->pci_func;
 
     pci_gen_dev_hdr_t pci_device_header;
     assert(read_pci_general_device_header(bus, dev, func, &pci_device_header));
 
-#if defined(VIRTIO_MMIO_TRANSPORT_FOR_NET)
-    if (pci_device_header.common_hdr.class_code != PCI_CLASS_NETWORK_CONTROLLER) {
-        LOG_VIRTIO_TRANSPORT("PCI device @ %u:%u.%u, with class code 0x%x is not a network controller!\n",
-                             pci_device_header.common_hdr.class_code, bus, dev, func);
-        return false;
+    if (device_id == VIRTIO_DEVICE_ID_NET) {
+        if (pci_device_header.common_hdr.class_code != PCI_CLASS_NETWORK_CONTROLLER) {
+            LOG_VIRTIO_TRANSPORT("PCI device @ %u:%u.%u, with class code 0x%x is not a network controller!\n",
+                                 pci_device_header.common_hdr.class_code, bus, dev, func);
+            return false;
+        }
+        if (pci_device_header.common_hdr.subclass != PCI_CLASS_NETWORK_SUBCLASS_ETHERNET) {
+            LOG_VIRTIO_TRANSPORT("PCI device @ %u:%u.%u, with subclass 0x%x is not an ethernet controller!\n",
+                                 pci_device_header.common_hdr.subclass, bus, dev, func);
+            return false;
+        }
+        if (pci_device_header.common_hdr.vendor_id != VIRTIO_PCI_VEN_ID) {
+            LOG_VIRTIO_TRANSPORT("PCI device @ %u:%u.%u, with vendor id 0x%x isn't a virtio device!\n",
+                                 pci_device_header.common_hdr.vendor_id, bus, dev, func);
+            return false;
+        }
+        if (pci_device_header.common_hdr.device_id != VIRTIO_NET_PCI_DEV_ID) {
+            LOG_VIRTIO_TRANSPORT("PCI device @ %u:%u.%u, with device id 0x%x isn't a virtio network device!\n",
+                                 pci_device_header.common_hdr.device_id, bus, dev, func);
+            return false;
+        }
+    } else if (device_id == VIRTIO_DEVICE_ID_BLK) {
+        if (pci_device_header.common_hdr.class_code != PCI_CLASS_MASS_STORAGE_CONTROLLER) {
+            LOG_VIRTIO_TRANSPORT("PCI device @ %u:%u.%u, with class code 0x%x is not a block controller!\n",
+                                 pci_device_header.common_hdr.class_code, bus, dev, func);
+            return false;
+        }
+        if (pci_device_header.common_hdr.subclass != PCI_CLASS_NETWORK_SUBCLASS_ETHERNET) {
+            LOG_VIRTIO_TRANSPORT("PCI device @ %u:%u.%u, with subclass 0x%x is not an block controller!\n",
+                                 pci_device_header.common_hdr.subclass, bus, dev, func);
+            return false;
+        }
+        if (pci_device_header.common_hdr.vendor_id != VIRTIO_PCI_VEN_ID) {
+            LOG_VIRTIO_TRANSPORT("PCI device @ %u:%u.%u, with vendor id 0x%x isn't a block device!\n",
+                                 pci_device_header.common_hdr.vendor_id, bus, dev, func);
+            return false;
+        }
+        if (pci_device_header.common_hdr.device_id != VIRTIO_BLK_PCI_DEV_ID) {
+            LOG_VIRTIO_TRANSPORT("PCI device @ %u:%u.%u, with device id 0x%x isn't a virtio block device!\n",
+                                 pci_device_header.common_hdr.device_id, bus, dev, func);
+            return false;
+        }
+    } else {
+        LOG_VIRTIO_TRANSPORT("Unknown or undefined device class for virtio PCI transport.\n");
     }
-    if (pci_device_header.common_hdr.subclass != PCI_CLASS_NETWORK_SUBCLASS_ETHERNET) {
-        LOG_VIRTIO_TRANSPORT("PCI device @ %u:%u.%u, with subclass 0x%x is not an ethernet controller!\n",
-                             pci_device_header.common_hdr.subclass, bus, dev, func);
-        return false;
-    }
-    if (pci_device_header.common_hdr.vendor_id != VIRTIO_PCI_VEN_ID) {
-        LOG_VIRTIO_TRANSPORT("PCI device @ %u:%u.%u, with vendor id 0x%x isn't a virtio device!\n",
-                             pci_device_header.common_hdr.vendor_id, bus, dev, func);
-        return false;
-    }
-    if (pci_device_header.common_hdr.device_id != VIRTIO_NET_PCI_DEV_ID) {
-        LOG_VIRTIO_TRANSPORT("PCI device @ %u:%u.%u, with device id 0x%x isn't a virtio network device!\n",
-                             pci_device_header.common_hdr.device_id, bus, dev, func);
-        return false;
-    }
-#else
-#error "Unknown or undefined device class for virtio PCI transport."
-#endif
 
     pci_debug_print_header(bus, dev, func, &pci_device_header);
 
@@ -268,7 +284,7 @@ void virtio_transport_queue_notify(virtio_device_handle_t *device_handle, uint32
 
     cfg->queue_select = select;
     uint16_t q_off = cfg->queue_notify_off;
-    uint16_t *addr = (uint16_t *)(VADDR_NOTIFY + (q_off * nftn_multiplier));
+    uint16_t *addr = (uint16_t *)(VADDR_NOTIFY + (uintptr_t)(q_off * nftn_multiplier));
     *addr = (uint16_t)select;
 }
 
