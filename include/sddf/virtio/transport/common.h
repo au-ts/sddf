@@ -37,6 +37,9 @@ typedef enum {
 
 typedef struct virtio_device_handle {
     device_resources_t *device_resources;
+    uint8_t pci_bus;
+    uint8_t pci_dev;
+    uint8_t pci_func;
 } virtio_device_handle_t;
 
 bool virtio_transport_probe(device_resources_t *device_resources, virtio_device_handle_t *device_handle_ret,
