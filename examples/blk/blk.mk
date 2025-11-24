@@ -35,6 +35,7 @@ SYSTEM_FILE := blk.system
 SUPPORTED_BOARDS := qemu_virt_aarch64 \
 		    qemu_virt_riscv64 \
 		    maaxboard \
+			x86_64_generic
 
 TOP := ${SDDF}/examples/blk
 CONFIGS_INCLUDE := ${TOP}
@@ -80,9 +81,14 @@ client.elf: client.o libsddf_util.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
+ifneq ($(strip $(DTS)),)
 	$(PYTHON) \
-	$(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
-	--dtb $(DTB) --output . --sdf $(SYSTEM_FILE) $(PARTITION_ARG) \
+		$(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
+		--dtb $(DTB) --output . --sdf $(SYSTEM_FILE) $(PARTITION_ARG)
+else
+	$(OBJCOPY) -O elf32-i386 $(SEL4_64B) $(SEL4_32B)
+	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --output . --sdf $(SYSTEM_FILE) $(PARTITION_ARG)
+endif
 	$${BLK_NEED_TIMER:+--need_timer}
 ifdef BLK_NEED_TIMER
 	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
@@ -105,12 +111,13 @@ qemu_disk:
 	$(SDDF)/tools/mkvirtdisk disk 1 512 16777216 GPT
 
 qemu: ${IMAGE_FILE} qemu_disk
-	$(QEMU) $(QEMU_ARCH_ARGS) \
+	echo "hello"
+	$(QEMU) $(QEMU_ARCH_ARGS) $(QEMU_BLK_ARGS) \
+		-serial mon:stdio \
+		-m size=2G \
 	    -nographic \
 	    -d guest_errors \
-	    -global virtio-mmio.force-legacy=false \
-	    -drive file=disk,if=none,format=raw,id=hd \
-	    -device virtio-blk-device,drive=hd
+	    -drive file=disk,if=none,format=raw,id=hd
 
 clean::
 	rm -f client.o
