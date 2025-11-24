@@ -21,10 +21,7 @@ ifeq ($(strip $(SDDF_CUSTOM_LIBC)),1)
 	CFLAGS += -I${SDDF}/include/sddf/util/custom_libc
 	OBJS_LIBUTIL += custom_libc/libc.o custom_libc/memcmp.o custom_libc/memcpy.o \
 					custom_libc/memset.o custom_libc/strcmp.o custom_libc/strcpy.o \
-					custom_libc/strlen.o custom_libc/strncmp.o
-	ifeq ($(ARCH),riscv64)
-		OBJS_LIBUTIL += custom_libc/memmove.o
-	endif
+					custom_libc/strlen.o custom_libc/strncmp.o custom_libc/memmove.o
 endif
 
 ifeq ($(ARCH),riscv64)
