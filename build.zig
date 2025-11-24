@@ -41,7 +41,10 @@ const DriverClass = struct {
     };
 
     const Block = enum {
-        virtio,
+        const Virtio = enum {
+            pci,
+            mmio,
+        };
     };
 
     const Mmc = enum {
@@ -258,6 +261,37 @@ fn addBlockDriver(
     const source = b.fmt("drivers/blk/{s}/block.c", .{@tagName(class)});
     driver.addCSourceFile(.{
         .file = b.path(source),
+    });
+    driver.addIncludePath(b.path(b.fmt("drivers/blk/{s}/", .{@tagName(class)})));
+    driver.addIncludePath(b.path("include"));
+    driver.addIncludePath(b.path("include/sddf/util/custom_libc"));
+    driver.addIncludePath(b.path("include/microkit"));
+    driver.linkLibrary(util);
+
+    return driver;
+}
+
+fn addVirtioBlockDriver(
+    b: *std.Build,
+    util: *std.Build.Step.Compile,
+    class: DriverClass.Block.Virtio,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+) *std.Build.Step.Compile {
+    const driver = addPd(b, .{
+        .name = b.fmt("driver_blk_virtio_{s}.elf", .{@tagName(class)}),
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .strip = false,
+        }),
+    });
+
+    driver.addCSourceFile(.{
+        .file = b.path("drivers/blk/virtio/block.c"),
+    });
+    driver.addCSourceFile(.{
+        .file = b.path(b.fmt("virtio/transport/{s}.c", .{@tagName(class)})),
     });
     driver.addIncludePath(b.path(b.fmt("drivers/blk/{s}/", .{@tagName(class)})));
     driver.addIncludePath(b.path("include"));
@@ -487,6 +521,11 @@ pub fn build(b: *std.Build) !void {
         }
         inline for (std.meta.fields(DriverClass.Mmc)) |class| {
             const driver = addMmcDriver(b, util, @enumFromInt(class.value), target, optimize);
+            driver.linkLibrary(util_putchar_debug);
+            b.installArtifact(driver);
+        }
+        inline for (std.meta.fields(DriverClass.Block.Virtio)) |class| {
+            const driver = addVirtioBlockDriver(b, util, @enumFromInt(class.value), target, optimize);
             driver.linkLibrary(util_putchar_debug);
             b.installArtifact(driver);
         }

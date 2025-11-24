@@ -434,6 +434,10 @@ void init(void)
     net_queue_init(&tx_queue, config.virt_tx.free_queue.vaddr, config.virt_tx.active_queue.vaddr,
                    config.virt_tx.num_buffers);
 
+    dev.pci_bus = 0;
+    dev.pci_dev = 2;
+    dev.pci_func = 0;
+
     eth_setup();
 
 // @billn fix ridiculousness

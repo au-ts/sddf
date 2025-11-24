@@ -18,21 +18,22 @@
 #include <microkit.h>
 #include <sddf/util/util.h>
 #include <sddf/util/ialloc.h>
-#include <sddf/virtio/virtio.h>
-#include <sddf/virtio/virtio_queue.h>
+#include <sddf/virtio/transport/common.h>
+#include <sddf/virtio/queue.h>
+#include <sddf/virtio/feature.h>
 #include <sddf/blk/queue.h>
 #include <sddf/blk/config.h>
 #include <sddf/blk/storage_info.h>
 #include <sddf/resources/device.h>
 #include "block.h"
 
+virtio_device_handle_t dev;
+
 #define QUEUE_SIZE 1024
 #define VIRTQ_NUM_REQUESTS QUEUE_SIZE
 
 uintptr_t requests_paddr;
 uintptr_t requests_vaddr;
-
-static volatile virtio_mmio_regs_t *regs;
 
 static volatile struct virtq virtq;
 static blk_queue_handle_t blk_queue;
@@ -165,11 +166,13 @@ void handle_request()
             assert(virtio_block_number + virtio_count <= virtio_config->capacity);
 
             if (req_code == BLK_REQ_READ) {
-                LOG_DRIVER("handling read request with physical address 0x%lx, block_number: 0x%lx, count: 0x%x, id: 0x%x\n",
-                           phys_addr, block_number, count, id);
+                LOG_DRIVER(
+                    "handling read request with physical address 0x%lx, block_number: 0x%lx, count: 0x%x, id: 0x%x\n",
+                    phys_addr, block_number, count, id);
             } else {
-                LOG_DRIVER("handling write request with physical address 0x%lx, block_number: 0x%lx, count: 0x%x, id: 0x%x\n",
-                           phys_addr, block_number, count, id);
+                LOG_DRIVER(
+                    "handling write request with physical address 0x%lx, block_number: 0x%lx, count: 0x%x, id: 0x%x\n",
+                    phys_addr, block_number, count, id);
             }
 
             uint32_t hdr_desc_idx = -1;
@@ -246,56 +249,36 @@ void handle_request()
     }
 
     if (virtio_queue_notify) {
-        regs->QueueNotify = 0;
+        virtio_transport_queue_notify(&dev, 0);
     }
 }
 
 void handle_irq(void)
 {
-    uint32_t irq_status = regs->InterruptStatus;
-    if (irq_status & VIRTIO_MMIO_IRQ_VQUEUE) {
-        regs->InterruptACK = VIRTIO_MMIO_IRQ_VQUEUE;
+    uint32_t irq_status = virtio_transport_read_isr(&dev);
+    if (irq_status & VIRTIO_IRQ_VQUEUE) {
+        virtio_transport_write_isr(&dev, VIRTIO_IRQ_VQUEUE);
         handle_response();
     }
 
-    if (irq_status & VIRTIO_MMIO_IRQ_CONFIG) {
+    if (irq_status & VIRTIO_IRQ_CONFIG) {
         LOG_DRIVER_ERR("unexpected change in configuration\n");
     }
 }
 
 void virtio_blk_init(void)
 {
-    // Do MMIO device init (section 4.2.3.1)
-    if (!virtio_mmio_check_magic(regs)) {
-        LOG_DRIVER_ERR("invalid virtIO magic value!\n");
-        assert(false);
-    }
-
-    if (virtio_mmio_version(regs) != VIRTIO_VERSION) {
-        LOG_DRIVER_ERR("not correct virtIO version!\n");
-        assert(false);
-    }
-
-    if (!virtio_mmio_check_device_id(regs, VIRTIO_DEVICE_ID_BLK)) {
-        LOG_DRIVER_ERR("not a virtIO block device!\n");
-        assert(false);
-    }
-
-    if (virtio_mmio_version(regs) != VIRTIO_BLK_DRIVER_VERSION) {
-        LOG_DRIVER_ERR("driver does not support given virtIO version: 0x%x\n", virtio_mmio_version(regs));
-        assert(false);
-    }
-
+    assert(virtio_transport_probe(&device_resources, &dev, VIRTIO_DEVICE_ID_BLK));
     ialloc_init(&ialloc_desc, descriptors, QUEUE_SIZE);
 
     /* First reset the device */
-    regs->Status = 0;
+    virtio_transport_set_status(&dev, 0);
     /* Set the ACKNOWLEDGE bit to say we have noticed the device */
-    regs->Status = VIRTIO_DEVICE_STATUS_ACKNOWLEDGE;
+    virtio_transport_set_status(&dev, VIRTIO_DEVICE_STATUS_ACKNOWLEDGE);
     /* Set the DRIVER bit to say we know how to drive the device */
-    regs->Status = VIRTIO_DEVICE_STATUS_DRIVER;
+    virtio_transport_set_status(&dev, VIRTIO_DEVICE_STATUS_DRIVER);
 
-    virtio_config = (volatile struct virtio_blk_config *)regs->Config;
+    virtio_config = (volatile struct virtio_blk_config *)virtio_transport_get_device_config(&dev);
 #ifdef DEBUG_DRIVER
     virtio_blk_print_config(virtio_config);
 #endif
@@ -321,19 +304,17 @@ void virtio_blk_init(void)
     blk_storage_set_ready(storage_info, true);
 
 #ifdef DEBUG_DRIVER
-    uint32_t features_low = regs->DeviceFeatures;
-    regs->DeviceFeaturesSel = 1;
-    uint32_t features_high = regs->DeviceFeatures;
+    uint32_t features_low = virtio_transport_get_driver_features(&dev, 0);
+    uint32_t features_high = virtio_transport_get_driver_features(&dev, 1);
     uint64_t features = features_low | ((uint64_t)features_high << 32);
     virtio_blk_print_features(features);
 #endif
     /* Select features we want from the device */
-    regs->DriverFeatures = 0;
-    regs->DriverFeaturesSel = 1;
-    regs->DriverFeatures = 0;
+    virtio_transport_set_driver_features(&dev, 0, 0);
+    virtio_transport_set_driver_features(&dev, 1, 0);
 
-    regs->Status |= VIRTIO_DEVICE_STATUS_FEATURES_OK;
-    if (!(regs->Status & VIRTIO_DEVICE_STATUS_FEATURES_OK)) {
+    virtio_transport_set_status(&dev, VIRTIO_DEVICE_STATUS_FEATURES_OK);
+    if (!(virtio_transport_get_status(&dev) & VIRTIO_DEVICE_STATUS_FEATURES_OK)) {
         LOG_DRIVER_ERR("device status features is not OK!\n");
         return;
     }
@@ -346,46 +327,59 @@ void virtio_blk_init(void)
 
     // Make sure that the metadata region is able to fit all the virtIO specific
     // extra data.
+
+#if defined(CONFIG_ARCH_X86_64)
+    // @terryb remove hard-coded values here
+    assert(size <= 0x200000);
+#else
     assert(size <= device_resources.regions[2].region.size);
+#endif
 
     virtq.num = VIRTQ_NUM_REQUESTS;
     virtq.desc = (struct virtq_desc *)(requests_vaddr + desc_off);
     virtq.avail = (struct virtq_avail *)(requests_vaddr + avail_off);
     virtq.used = (struct virtq_used *)(requests_vaddr + used_off);
 
-    assert(regs->QueueNumMax >= VIRTQ_NUM_REQUESTS);
-    regs->QueueSel = 0;
-    regs->QueueNum = VIRTQ_NUM_REQUESTS;
-    regs->QueueDescLow = (requests_paddr + desc_off) & 0xFFFFFFFF;
-    regs->QueueDescHigh = (requests_paddr + desc_off) >> 32;
-    regs->QueueDriverLow = (requests_paddr + avail_off) & 0xFFFFFFFF;
-    regs->QueueDriverHigh = (requests_paddr + avail_off) >> 32;
-    regs->QueueDeviceLow = (requests_paddr + used_off) & 0xFFFFFFFF;
-    regs->QueueDeviceHigh = (requests_paddr + used_off) >> 32;
-    regs->QueueReady = 1;
+    virtio_transport_queue_setup(&dev, 0, VIRTQ_NUM_REQUESTS, requests_paddr + desc_off, requests_paddr + avail_off,
+                                 requests_paddr + used_off);
 
     /* Finish initialisation */
-    regs->Status |= VIRTIO_DEVICE_STATUS_DRIVER_OK;
-    regs->InterruptACK = VIRTIO_MMIO_IRQ_VQUEUE;
+    virtio_transport_set_status(&dev, VIRTIO_DEVICE_STATUS_DRIVER_OK);
+    virtio_transport_write_isr(&dev, VIRTIO_IRQ_VQUEUE);
 }
 
 void init(void)
 {
     assert(blk_config_check_magic(&config));
     assert(device_resources_check_magic(&device_resources));
+
+// @billn fix ridiculousness
+#if !defined(CONFIG_ARCH_X86_64)
     assert(device_resources.num_irqs == 1);
     assert(device_resources.num_regions == 3);
+#endif
 
-    regs = (volatile virtio_mmio_regs_t *)device_resources.regions[0].region.vaddr;
+// @billn fix ridiculousness
+#if defined(CONFIG_ARCH_X86_64)
+    requests_paddr = 0x5fdf0000;
+    requests_vaddr = (uintptr_t)0x20200000;
+    virtio_headers_paddr = (uintptr_t)0x5fff0000;
+    virtio_headers = (struct virtio_blk_req *)0x20210000;
+#else
     requests_paddr = device_resources.regions[2].io_addr;
     requests_vaddr = (uintptr_t)device_resources.regions[2].region.vaddr;
     virtio_headers_paddr = (uintptr_t)device_resources.regions[1].io_addr;
     virtio_headers = (struct virtio_blk_req *)device_resources.regions[1].region.vaddr;
+#endif
 
     assert(virtio_headers_paddr);
     assert(virtio_headers);
     assert(requests_paddr);
     assert(requests_vaddr);
+
+    dev.pci_bus = 0;
+    dev.pci_dev = 3;
+    dev.pci_func = 0;
 
     virtio_blk_init();
 
@@ -394,7 +388,12 @@ void init(void)
 
 void notified(microkit_channel ch)
 {
+// @billn fix ridiculousness
+#if defined(CONFIG_ARCH_X86_64)
+    if (ch == 17) {
+#else
     if (ch == device_resources.irqs[0].id) {
+#endif
         handle_irq();
         microkit_deferred_irq_ack(ch);
         /*

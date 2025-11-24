@@ -8,6 +8,7 @@
 
 #define VIRTIO_PCI_VEN_ID 0x1af4
 #define VIRTIO_NET_PCI_DEV_ID 0x1000
+#define VIRTIO_BLK_PCI_DEV_ID 0x1001
 
 /* Data structure specific to VirtIO devices using PCI transport. */
 
