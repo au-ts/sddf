@@ -12,10 +12,11 @@ MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 ECHO_SERVER:=${SDDF}/examples/echo_server
 
 SUPPORTED_BOARDS := odroidc4 odroidc2 maaxboard \
-		    imx8mm_evk qemu_virt_aarch64 \
-		    imx8mq_evk imx8mp_evk \
-		    imx8mp_iotgate \
-		    star64 qemu_virt_riscv64
+				imx8mm_evk qemu_virt_aarch64 \
+				imx8mq_evk imx8mp_evk \
+				imx8mp_iotgate \
+				star64 qemu_virt_riscv64 \
+				x86_64_generic
 TOOLCHAIN ?= clang
 MICROKIT_CONFIG ?= debug
 SYSTEM_FILE := echo_server.system
@@ -78,9 +79,15 @@ echo.elf: $(ECHO_OBJS) libsddf_util.a lib_sddf_lwip_echo.a
 ${IMAGES}: libsddf_util_debug.a
 
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
+ifneq ($(strip $(DTS)),)
 	$(PYTHON)\
 	    $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
 	    --dtb $(DTB) --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) --smp $(SMP_CONFIG)
+else
+	$(PYTHON)\
+	    $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
+	    --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) --smp $(SMP_CONFIG)
+endif
 	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx.data serial_virt_tx.elf
@@ -117,9 +124,8 @@ include ${UART_DRIVER}/serial_driver.mk
 include ${SERIAL_COMPONENTS}/serial_components.mk
 
 qemu: $(IMAGE_FILE)
-	$(QEMU) $(QEMU_ARCH_ARGS) \
+	$(QEMU) $(QEMU_ARCH_ARGS) $(QEMU_NET_ARGS) \
 		-nographic \
-		-device virtio-net-device,netdev=netdev0 \
 		-netdev user,id=netdev0,\
 hostfwd=udp::1235-10.0.2.15:1235,\
 hostfwd=tcp::1236-10.0.2.15:1236,\
