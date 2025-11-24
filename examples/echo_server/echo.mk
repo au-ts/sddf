@@ -130,7 +130,7 @@ hostfwd=udp::1238-10.0.2.16:1235,\
 hostfwd=tcp::1239-10.0.2.16:1236,\
 hostfwd=tcp::1240-10.0.2.16:1237 \
 		-global virtio-mmio.force-legacy=false \
-		-d guest_errors
+		-d guest_errors -smp 4
 
 clean::
 	${RM} -f *.elf .depend* $
