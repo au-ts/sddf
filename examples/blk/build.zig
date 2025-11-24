@@ -10,6 +10,7 @@ const MicrokitBoard = enum {
     qemu_virt_aarch64,
     maaxboard,
     qemu_virt_riscv64,
+    x86_64_generic,
 };
 
 const Target = struct {
@@ -43,6 +44,15 @@ const targets = [_]Target{
         .zig_target = std.Target.Query{
             .cpu_arch = .riscv64,
             .cpu_model = .{ .explicit = &std.Target.riscv.cpu.baseline_rv64 },
+            .os_tag = .freestanding,
+            .abi = .none,
+        },
+    },
+    .{
+        .board = MicrokitBoard.x86_64_generic,
+        .zig_target = std.Target.Query{
+            .cpu_arch = .x86_64,
+            .cpu_model = .{ .explicit = std.Target.Cpu.Model.generic(.x86_64) },
             .os_tag = .freestanding,
             .abi = .none,
         },
@@ -125,14 +135,16 @@ pub fn build(b: *std.Build) !void {
     }
 
     const blk_driver_class = switch (microkit_board_option) {
-        .qemu_virt_aarch64, .qemu_virt_riscv64 => "virtio",
+        .qemu_virt_aarch64, .qemu_virt_riscv64 => "virtio_mmio",
         .maaxboard => "mmc_imx",
+        .x86_64_generic => "virtio_pci",
     };
 
     const serial_driver_class = switch (microkit_board_option) {
         .qemu_virt_aarch64 => "arm",
         .qemu_virt_riscv64 => "ns16550a",
         .maaxboard => "imx",
+        .x86_64_generic => "pc99",
     };
 
     const client = b.addExecutable(.{
@@ -170,12 +182,18 @@ pub fn build(b: *std.Build) !void {
     // Because our SDF expects a different ELF name for the serial driver, we have this extra step.
     const serial_driver_install = b.addInstallArtifact(serial_driver, .{ .dest_sub_path = "serial_driver.elf" });
 
-    // For compiling the DTS into a DTB
-    const dts = sddf_dep.path(b.fmt("dts/{s}.dts", .{microkit_board}));
-    const dtc_cmd = b.addSystemCommand(&[_][]const u8{ "dtc", "-q", "-I", "dts", "-O", "dtb" });
-    dtc_cmd.addFileInput(dts);
-    dtc_cmd.addFileArg(dts);
-    const dtb = dtc_cmd.captureStdOut();
+    const dtb = blk: {
+        if (target.result.cpu.arch != .x86_64) {
+            // For compiling the DTS into a DTB
+            const dts = sddf_dep.path(b.fmt("dts/{s}.dts", .{microkit_board}));
+            const dtc_cmd = b.addSystemCommand(&[_][]const u8{ "dtc", "-q", "-I", "dts", "-O", "dtb" });
+            dtc_cmd.addFileInput(dts);
+            dtc_cmd.addFileArg(dts);
+            break :blk dtc_cmd.captureStdOut();
+        } else {
+            break :blk null;
+        }
+    };
 
     // Run the metaprogram to get sDDF configuration binary files and the SDF file.
     const metaprogram = b.path("meta.py");
@@ -185,7 +203,9 @@ pub fn build(b: *std.Build) !void {
     run_metaprogram.addFileArg(metaprogram);
     run_metaprogram.addFileInput(metaprogram);
     run_metaprogram.addPrefixedDirectoryArg("--sddf=", sddf_dep.path(""));
-    run_metaprogram.addPrefixedDirectoryArg("--dtb=", dtb);
+    if (dtb != null) {
+        run_metaprogram.addPrefixedDirectoryArg("--dtb=", dtb.?);
+    }
     const meta_output = run_metaprogram.addPrefixedOutputDirectoryArg("--output=", "meta_output");
     run_metaprogram.addArg("--board");
     run_metaprogram.addArg(microkit_board);
@@ -268,7 +288,7 @@ pub fn build(b: *std.Build) !void {
 
     // This is setting up a `qemu` command for running the system using QEMU,
     // which we only want to do when we have a board that we can actually simulate.
-    if (microkit_board_option == .qemu_virt_aarch64 or microkit_board_option == .qemu_virt_riscv64) {
+    if (microkit_board_option == .qemu_virt_aarch64 or microkit_board_option == .qemu_virt_riscv64 or microkit_board_option == .x86_64_generic) {
         const create_disk_cmd = b.addSystemCommand(&[_][]const u8{
             "bash",
         });
@@ -307,12 +327,36 @@ pub fn build(b: *std.Build) !void {
                 // zig fmt: on
                 "-nographic",
             });
+        } else if (microkit_board_option == .x86_64_generic) {
+            const kernel_32 = microkit_board_dir.path(b, "elf/sel4_32.elf");
+            qemu_cmd = b.addSystemCommand(&[_][]const u8{
+                "qemu-system-x86_64",
+                "-machine",
+                "q35",
+                "-cpu",
+                "qemu64,+fsgsbase,+pdpe1gb,+pcid,+invpcid,+xsave,+xsaves,+xsaveopt",
+                "-serial",
+                "mon:stdio",
+                "-kernel",
+                b.getInstallPath(.bin, "sel4_32.elf"),
+                "-initrd",
+                final_image_dest,
+                "-m",
+                "2G",
+                "-nographic",
+            });
+            qemu_cmd.step.dependOn(&b.addInstallFileWithDir(kernel_32, .bin, "sel4_32.elf").step);
         }
+
+        const qemu_virtio_device = switch (target.result.cpu.arch) {
+            .x86_64 => "pci",
+            else => "device",
+        };
 
         const blk_device_args = &.{
             "-global", "virtio-mmio.force-legacy=false",
             "-drive",  b.fmt("file={s},if=none,format=raw,id=hd", .{b.getInstallPath(.prefix, "disk")}),
-            "-device", "virtio-blk-device,drive=hd",
+            "-device", b.fmt("virtio-blk-{s},drive=hd", .{qemu_virtio_device}),
         };
         qemu_cmd.addArgs(blk_device_args);
 
