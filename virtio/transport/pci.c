@@ -9,11 +9,6 @@
 #include <sddf/virtio/transport/pci.h>
 #include <sddf/resources/device.h>
 
-// @billn fix hard coded addresses
-#define PCI_BUS 0
-#define PCI_DEV 2
-#define PCI_FUNC 0
-
 #define VADDR_COMMON 0x60000000
 #define VADDR_ISR 0x60001000
 #define VADDR_DEVICE 0x60002000
@@ -173,14 +168,14 @@ bool virtio_transport_probe(device_resources_t *device_resources, virtio_device_
 {
     assert(device_resources_check_magic(device_resources));
 
-    uint8_t bus = PCI_BUS;
-    uint8_t dev = PCI_DEV;
-    uint8_t func = PCI_FUNC;
+    uint8_t bus = device_handle_ret->pci_bus;
+    uint8_t dev = device_handle_ret->pci_dev;
+    uint8_t func = device_handle_ret->pci_func;
 
     pci_gen_dev_hdr_t pci_device_header;
     assert(read_pci_general_device_header(bus, dev, func, &pci_device_header));
 
-#if defined(VIRTIO_MMIO_TRANSPORT_FOR_NET)
+#if defined(VIRTIO_PCI_TRANSPORT_FOR_NET)
     if (pci_device_header.common_hdr.class_code != PCI_CLASS_NETWORK_CONTROLLER) {
         LOG_VIRTIO_TRANSPORT("PCI device @ %u:%u.%u, with class code 0x%x is not a network controller!\n",
                              pci_device_header.common_hdr.class_code, bus, dev, func);
@@ -198,6 +193,27 @@ bool virtio_transport_probe(device_resources_t *device_resources, virtio_device_
     }
     if (pci_device_header.common_hdr.device_id != VIRTIO_NET_PCI_DEV_ID) {
         LOG_VIRTIO_TRANSPORT("PCI device @ %u:%u.%u, with device id 0x%x isn't a virtio network device!\n",
+                             pci_device_header.common_hdr.device_id, bus, dev, func);
+        return false;
+    }
+#elif defined(VIRTIO_PCI_TRANSPORT_FOR_BLK)
+    if (pci_device_header.common_hdr.class_code != PCI_CLASS_MASS_STORAGE_CONTROLLER) {
+        LOG_VIRTIO_TRANSPORT("PCI device @ %u:%u.%u, with class code 0x%x is not a block controller!\n",
+                             pci_device_header.common_hdr.class_code, bus, dev, func);
+        return false;
+    }
+    if (pci_device_header.common_hdr.subclass != PCI_CLASS_NETWORK_SUBCLASS_ETHERNET) {
+        LOG_VIRTIO_TRANSPORT("PCI device @ %u:%u.%u, with subclass 0x%x is not an block controller!\n",
+                             pci_device_header.common_hdr.subclass, bus, dev, func);
+        return false;
+    }
+    if (pci_device_header.common_hdr.vendor_id != VIRTIO_PCI_VEN_ID) {
+        LOG_VIRTIO_TRANSPORT("PCI device @ %u:%u.%u, with vendor id 0x%x isn't a block device!\n",
+                             pci_device_header.common_hdr.vendor_id, bus, dev, func);
+        return false;
+    }
+    if (pci_device_header.common_hdr.device_id != VIRTIO_BLK_PCI_DEV_ID) {
+        LOG_VIRTIO_TRANSPORT("PCI device @ %u:%u.%u, with device id 0x%x isn't a virtio block device!\n",
                              pci_device_header.common_hdr.device_id, bus, dev, func);
         return false;
     }
@@ -268,7 +284,7 @@ void virtio_transport_queue_notify(virtio_device_handle_t *device_handle, uint32
 
     cfg->queue_select = select;
     uint16_t q_off = cfg->queue_notify_off;
-    uint16_t *addr = (uint16_t *)(VADDR_NOTIFY + (q_off * nftn_multiplier));
+    uint16_t *addr = (uint16_t *)(VADDR_NOTIFY + (uintptr_t)(q_off * nftn_multiplier));
     *addr = (uint16_t)select;
 }
 
