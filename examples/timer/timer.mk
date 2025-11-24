@@ -31,7 +31,8 @@ SUPPORTED_BOARDS := \
 		    rpi4b_1gb \
 		    serengeti \
 		    star64 \
-		    zcu102
+		    zcu102 \
+		    x86_64_generic
 
 ifeq ($(strip $(TOOLCHAIN)),)
 	TOOLCHAIN := clang
@@ -70,7 +71,12 @@ client.elf: client.o
 	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
 
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
+ifneq ($(strip $(DTS)),)
 	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE)
+else
+	$(OBJCOPY) -O elf32-i386 $(SEL4_64B) $(SEL4_32B)
+	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --output . --sdf $(SYSTEM_FILE)
+endif
 	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
 	$(OBJCOPY) --update-section .timer_client_config=timer_client_client.data client.elf
 	touch $@
