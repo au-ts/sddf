@@ -7,12 +7,16 @@
 # Assumes libsddf_util_debug.a is in ${LIBS}.
 
 VIRTIO_BLK_DRIVER_DIR := $(realpath $(dir $(lastword $(MAKEFILE_LIST))))
+VIRTIO_TRANSPORT_DIR := $(SDDF)/virtio/transport/
 
-blk_driver.elf: blk/virtio/blk_driver.o
+blk_driver.elf: blk/virtio/blk_driver.o blk/virtio/mmio_transport.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 blk/virtio/blk_driver.o: ${VIRTIO_BLK_DRIVER_DIR}/block.c |blk/virtio $(SDDF_LIBC_INCLUDE)
 	$(CC) -c $(CFLAGS) -I${VIRTIO_BLK_DRIVER_DIR}/include -o $@ $<
+
+blk/virtio/mmio_transport.o: ${VIRTIO_TRANSPORT_DIR}/mmio.c
+	${CC} -c ${CFLAGS} -DVIRTIO_MMIO_TRANSPORT_FOR_BLK -o $@ $<
 
 -include blk_driver.d
 
