@@ -10,12 +10,22 @@
 #include <stdint.h>
 #include <os/sddf.h>
 
+/**
+ * The struct that describes an operating performance point table entry.
+ */
 typedef struct {
     uint64_t freq_hz;
     uint64_t voltage_uv;
     uint64_t latency_ns;
 } OppEntry;
 
+/**
+ * The struct that describes one CPU core.
+ * It includes the identifier of the core,
+ * the identifier of the clock that controls the core,
+ * and the operating performance point table that describe the
+ * frequency and the voltage that the core can be operating under.
+ */
 typedef struct {
     uint64_t core_ident;
     uint64_t clock_source_ident;
@@ -49,7 +59,15 @@ const size_t CPU_INFO_LEN = sizeof(CPU_INFO) / sizeof(CPU_INFO[0]);
 #define SDDF_DVFS_SUCCESS 0
 #define SDDF_DVFS_RESPONSE_ERROR 1
 
-static inline int32_t sddf_dvfs_get_freq(unsigned int channel, uint64_t core_ident, uint32_t *freq)
+/**
+ * Get the frequency of a specific CPU core via PPC into the DVFS driver.
+ * Use the label to indicate this request.
+ * A return value of zero means the request is completed successfully.
+ * @param channel ID of the DVFS driver.
+ * @param core_ident The unique identifier of the CPU core.
+ * @param freq A pointer to a unsighed integer to pass back the returned frequency.
+ */
+static inline int32_t sddf_dvfs_get_freq(unsigned int channel, uint64_t core_ident, uint64_t *freq)
 {
     sddf_set_mr(0, core_ident);
 
@@ -62,7 +80,15 @@ static inline int32_t sddf_dvfs_get_freq(unsigned int channel, uint64_t core_ide
     return error;
 }
 
-static inline int32_t sddf_dvfs_set_freq(unsigned int channel, uint64_t core_ident, uint32_t freq)
+/**
+ * Set the frequency of a specific CPU core via PPC into the DVFS driver.
+ * Use the label to indicate this request.
+ * A return value of zero means the request is completed successfully.
+ * @param channel ID of the DVFS driver.
+ * @param core_ident The unique identifier of the CPU core.
+ * @param freq The desired core frequency.
+ */
+static inline int32_t sddf_dvfs_set_freq(unsigned int channel, uint64_t core_ident, uint64_t freq)
 {
     sddf_set_mr(0, core_ident);
     sddf_set_mr(1, freq);

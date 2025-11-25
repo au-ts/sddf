@@ -32,7 +32,7 @@ int test_cpu_freq(uint64_t core_freq)
         return 1;
     }
 
-    uint32_t freq = 0;
+    uint64_t freq = 0;
 
     res = sddf_dvfs_get_freq(DVFS_CHANNEL, CPU_INFO[0].core_ident, &freq);
 
@@ -41,7 +41,7 @@ int test_cpu_freq(uint64_t core_freq)
         return 1;
     }
 
-    sddf_printf_("\nDVFS Client: CURRENT FREQ: %d\n", freq);
+    sddf_printf_("\nDVFS Client: CURRENT FREQ: %lu\n", freq);
 
     uint64_t time_start = sddf_timer_time_now(config.driver_id);
 
