@@ -49,9 +49,8 @@ Internal implementations of `atoi` and `strcat` are also included.
 If you wish to use the vendored libc in your sDDF system, the sDDF
 [utility](/util/util.mk) library includes the provided libc functions. All the
 existing sDDF example systems already use this library to provide functionality
-like
-[printing](/docs/serial/serial.md#building-components-and-libraries) in either
-its serial (`libsddf_util.a`) or debug (`libsddf_util_debug.a`) form.
+like [printing](/docs/serial/serial.md#building-components-and-libraries) in
+either its serial (`libsddf_util.a`) or debug (`libsddf_util_debug.a`) form.
 
 To simplify this, we have created the `SDDF_CUSTOM_LIBC` configuration variable.
 
