@@ -14,8 +14,11 @@
  * The struct that describes an operating performance point table entry.
  */
 typedef struct {
+    // Target Frequency in Hertz
     uint64_t freq_hz;
+    // Target Voltage in Microvolts
     uint64_t voltage_uv;
+    // Transition latency in Nanoseconds
     uint64_t latency_ns;
 } OppEntry;
 
@@ -27,9 +30,13 @@ typedef struct {
  * frequency and the voltage that the core can be operating under.
  */
 typedef struct {
+    // Logical Core ID
     uint64_t core_ident;
+    // ID of the clock source
     uint64_t clock_source_ident;
+    // Pointer to valid OPPs for this core
     const OppEntry *opptable;
+    // Number of the OPPs
     size_t opptable_len;
 } CoreInfo;
 

@@ -2542,9 +2542,91 @@ interface at the moment.  \ToCome{Details}
 
 This device-class specification is \textbf{subject to change}.
 
+\section{Dynamic Voltage and Frequency Scaling}\label{s:DVFS}
+Dynamic Voltage and Frequency Scaling is a power management technology
+to adjust the frequency and the voltage applied on the processing units in runtime
+depending on the actual needs.
+
+\subsection{Principle of the operation}
+The power consumption of CMOS circuits can be defined by the following formula:
+
+\begin{equation}
+    P_{total} = P_{dynamic} + P_{static}
+\end{equation}
+
+Where dynamic power can be roughly defined as:
+
+\begin{equation}
+    P_{dynamic} \approx C \cdot V^2 \cdot f
+\end{equation}
+
+\begin{itemize}
+    \item \textbf{C}: Capacitance (fixed by hardware design).
+    \item \textbf{V}: Supply Voltage.
+    \item \textbf{f}: Clock Frequency.
+\end{itemize}
+
+The power scales linearly with the frequency and quadratically with voltage. Lowering
+the frequency, which usually allows a lower supply voltage, can dramatically lower
+the power consumption as well as the generated heat.
+
+\subsection{Implementing DVFS on different platforms}
+There are generally two ways to implement DVFS, and which one to use is heavily depended 
+on the hardware platform.
+
+\paragraph{Direct Interact with the clock/regulator:} The DVFS driver directly interact 
+with the clock and the regulator that control the frequency and the voltage the processing 
+units are operating on. This approach is used on most of the ARM or RISC-V platforms.
+
+\paragraph{Firmware Abstraction:} For some very new ARM platforms, System Control and 
+Management Interface (SCMI) is supported, providing a unified framework to manage the 
+the power state of the processing units. For X86 platforms, ACPI and HWP are the common 
+framework to provide platform agnostic power management interfaces.
+
+\subsection{Data Structures and Interface Specification}
+The interface contains static configuration tables to describe the hardware. These are 
+exposed to the client at compile time.
+
+\paragraph{Operating Performance Point}
+Describes a valid discrete state the processing unit can operate on.
+\begin{lstlisting}
+typedef struct {
+    uint64_t freq_hz;     // Target Frequency in Hertz
+    uint64_t voltage_uv;  // Target Voltage in Microvolts
+    uint64_t latency_ns;  // Transition latency in Nanoseconds
+} OppEntry;
+\end{lstlisting}
+
+\paragraph{Core Configuration (CPU\_INFO)}
+Describes the topology of the processor. The configuration describes 
+the number of the processing units, the clock source they are operating under 
+(one clock source may provide clock for multiple processing units, which means
+changing the frequency for one unit would change the frequency of all the units
+which has the same clock source), and the Operating Performance Point table.
+
+\begin{lstlisting}
+typedef struct {
+    uint64_t core_ident;         // Logical Core ID
+    uint64_t clock_source_ident; // ID of the clock source
+    const OppEntry *opptable;    // Pointer to valid OPPs for this core
+    size_t opptable_len;         // Number of OPPs
+} CoreInfo;
+\end{lstlisting}
+
+The interface for DVFS uses \gls{ppc}, and has the following
+procedures that can be called:
+\begin{description}
+  \item[\texttt{get\_freq(\emph{core\_identifier})}] 
+  Retrieves the current actual frequency of a specific processing unit.
+  \item[\texttt{set\_freq(\emph{core\_identifier}, \emph{frequency})}] 
+  Sets the designate processing unit to a specific target frequency. The frequency 
+  must be a valid value from the opp table for that specific core or the request 
+  will be rejected.
+\end{description}
+
 \section{Sensors, PWM, GPIO, etc}\label{s:sensors}
 
-These device classes are all very similar, and tend tend to be low
+These device classes are all very similar, and tend to be low
 bandwidth --- transferring one bit to a few bytes at a time.  They
 fall into the ``simple device'' category introduced in
 \autoref{s:dr-overview}; rather than
