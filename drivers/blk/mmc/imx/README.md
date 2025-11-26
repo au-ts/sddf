@@ -5,7 +5,8 @@
 
 # uSDHC iMX8 Driver
 
-This is a driver for the MaaXBoard SD host controller, based on the following documents:
+This is a driver for the MaaXBoard SD host controller, based on the following
+documents:
 
 - i.MX 8M Dual/8M QuadLite/8M Quad Applications Processors Reference Manual
   Document Number: IMX8MDQLQRM, Rev 3.1, 06/2021.
@@ -20,7 +21,8 @@ This is a driver for the MaaXBoard SD host controller, based on the following do
 ## Implemented
 - IRQ & DMA based driver
 - Supports Version 2 SD Cards (SDSC, SDHC, SDXC, SDUC) operating at 3.3V
-- $f_{OD}$ (400kHz) initialisation, then data transfer at $f_{PP}$ Default Speed (25 MHz)
+- $f_{OD}$ (400kHz) initialisation, then data transfer at $f_{PP}$ Default Speed
+  (25 MHz)
 
 ## Not Implemented
 - Voltage Negotiation (anything but 3.3V)

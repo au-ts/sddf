@@ -7,11 +7,10 @@
 
 ## lwIP
 
-While the sDDF network protocol does not assume a particular IP stack,
-all of our experimentation and development has been done with the
-lwIP stack.
+While the sDDF network protocol does not assume a particular IP stack, all of
+our experimentation and development has been done with the lwIP stack.
 
 ### Updating lwIP
 
-The source for lwIP is currently vendored in the source for sDDF, to
-update lwIP see the script `network/ipstacks/update_lwip.sh`
+The source for lwIP is currently vendored in the source for sDDF, to update lwIP
+see the script `network/ipstacks/update_lwip.sh`
