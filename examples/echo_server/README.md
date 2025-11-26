@@ -290,15 +290,16 @@ specifying a comma separated list of throughputs for each test:
 python3 scripts/process_output.py [system output log file] [comma separated throughput]
 ```
 
-> [!NOTE] There is a distinct difference between the system utilisation reported
-> by the kernel and that reported by the echo server client using the idle
-> thread. The approach of the idle thread to count idle cycles is inherently
-> less accurate than that of the kernel, and has a tendency to attribute less
-> cycles to the idle thread than the kernel (for example, the idle thread will
-> not count kernel cycles involved in handling its own scheduling). You should
-> expect CPU utilisation figures to be higher when obtained using the idle
-> thread, e.g. a system utilisation of 65% tracked by the kernel may be up to
-> 70% as tracked by the idle thread.
+> [!NOTE]
+> There is a distinct difference between the system utilisation reported by the
+> kernel and that reported by the echo server client using the idle thread. The
+> approach of the idle thread to count idle cycles is inherently less accurate
+> than that of the kernel, and has a tendency to attribute less cycles to the
+> idle thread than the kernel (for example, the idle thread will not count
+> kernel cycles involved in handling its own scheduling). You should expect CPU
+> utilisation figures to be higher when obtained using the idle thread, e.g. a
+> system utilisation of 65% tracked by the kernel may be up to 70% as tracked by
+> the idle thread.
 
 #### Difference between echo server clients
 
@@ -318,15 +319,17 @@ We refer to the client with the cycle counts and benchmarking channels as the
 will simply report total and idle cycle counts of 0 to the ipbench controller if
 it is the target of a benchmark.
 
-> [!NOTE] If you wish to obtain total and idle cycles from ipbench, or kernel
-> and PMU data from the echo server ensure that the target IP address is set to
-> the IP address of client0. client1 will always report cycle counts of 0, and
-> does not have the capability to communicate with the benchmarking PD.
+> [!NOTE]
+> If you wish to obtain total and idle cycles from ipbench, or kernel and PMU
+> data from the echo server ensure that the target IP address is set to the IP
+> address of client0. client1 will always report cycle counts of 0, and does not
+> have the capability to communicate with the benchmarking PD.
 
 ### Running the benchmarks
 
-> [!NOTE] Collecting PMU data while benchmarking is only supported for AArch64
-> boards, RISC-V benchmarking is not supported yet, see
+> [!NOTE]
+> Collecting PMU data while benchmarking is only supported for AArch64 boards,
+> RISC-V benchmarking is not supported yet, see
 > https://github.com/au-ts/sddf/issues/421 for details.
 
 Although the echo server clients run the ipbench daemon on the utilisation port
