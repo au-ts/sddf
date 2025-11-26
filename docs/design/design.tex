@@ -2543,12 +2543,13 @@ interface at the moment.  \ToCome{Details}
 This device-class specification is \textbf{subject to change}.
 
 \section{Dynamic Voltage and Frequency Scaling}\label{s:DVFS}
-Dynamic Voltage and Frequency Scaling is a power management technology
+Dynamic Voltage and Frequency Scaling(DVFS) is a power management technology
 to adjust the frequency and the voltage applied on the processing units in runtime
 depending on the actual needs.
 
 \subsection{Principle of the operation}
-The power consumption of CMOS circuits can be defined by the following formula:
+The power consumption of CMOS(Complementary Metal-Oxide-Semiconductor) circuits can
+be defined by the following formula:
 
 \begin{equation}
     P_{total} = P_{dynamic} + P_{static}
@@ -2571,20 +2572,20 @@ the frequency, which usually allows a lower supply voltage, can dramatically low
 the power consumption as well as the generated heat.
 
 \subsection{Implementing DVFS on different platforms}
-There are generally two ways to implement DVFS, and which one to use is heavily depended 
+There are generally two ways to implement DVFS, and which one to use is heavily depended
 on the hardware platform.
 
-\paragraph{Direct Interact with the clock/regulator:} The DVFS driver directly interact 
-with the clock and the regulator that control the frequency and the voltage the processing 
+\paragraph{Direct interact with the clock/regulator:} The DVFS driver directly interacts
+with the clock and the regulator that control the frequency and the voltage the processing
 units are operating on. This approach is used on most of the ARM or RISC-V platforms.
 
-\paragraph{Firmware Abstraction:} For some very new ARM platforms, System Control and 
-Management Interface (SCMI) is supported, providing a unified framework to manage the 
-the power state of the processing units. For X86 platforms, ACPI and HWP are the common 
+\paragraph{Firmware Abstraction:} For some very new ARM platforms, System Control and
+Management Interface (SCMI) is supported, providing a unified framework to manage the
+the power state of the processing units. For x86 platforms, ACPI and HWP are the common
 framework to provide platform agnostic power management interfaces.
 
 \subsection{Data Structures and Interface Specification}
-The interface contains static configuration tables to describe the hardware. These are 
+The interface contains static configuration tables to describe the hardware. These are
 exposed to the client at compile time.
 
 \paragraph{Operating Performance Point}
@@ -2597,9 +2598,9 @@ typedef struct {
 } OppEntry;
 \end{lstlisting}
 
-\paragraph{Core Configuration (CPU\_INFO)}
-Describes the topology of the processor. The configuration describes 
-the number of the processing units, the clock source they are operating under 
+\paragraph{Core Configuration (CoreInfo)}
+Describes the topology of the processor. The configuration describes
+the number of the processing units, the clock source they are operating under
 (one clock source may provide clock for multiple processing units, which means
 changing the frequency for one unit would change the frequency of all the units
 which has the same clock source), and the Operating Performance Point table.
@@ -2616,11 +2617,11 @@ typedef struct {
 The interface for DVFS uses \gls{ppc}, and has the following
 procedures that can be called:
 \begin{description}
-  \item[\texttt{get\_freq(\emph{core\_identifier})}] 
+  \item[\texttt{get\_freq(core\_identifier)}]
   Retrieves the current actual frequency of a specific processing unit.
-  \item[\texttt{set\_freq(\emph{core\_identifier}, \emph{frequency})}] 
-  Sets the designate processing unit to a specific target frequency. The frequency 
-  must be a valid value from the opp table for that specific core or the request 
+  \item[\texttt{set\_freq(core\_identifier, frequency)}]
+  Sets the designated processing unit to a specific target frequency. The frequency
+  must be a valid value from the opp table for that specific core or the request
   will be rejected.
 \end{description}
 
