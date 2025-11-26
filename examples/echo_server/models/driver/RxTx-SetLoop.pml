@@ -1,3 +1,6 @@
+// Copyright 2025, UNSW
+// SPDX-License-Identifier: BSD-2-Clause
+
 // COMPONENTS: Virt tx, virt rx, eth driver, device
 // OUTCOME: Deadlock freedom:
 // - RX path verifies in 0.24 seconds

@@ -1,3 +1,6 @@
+// Copyright 2025, UNSW
+// SPDX-License-Identifier: BSD-2-Clause
+
 // COMPONENTS: Copy0, copy1, virt rx, eth
 // OUTCOME: Deadlock freedom:
 // - One client verifies in 84.2 seconds
