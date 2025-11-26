@@ -3,7 +3,13 @@
     SPDX-License-Identifier: BSD-2-Clause
 -->
 
-# Network sub-system
+# sDDF network subsystem
+
+## System architecture
+
+### Network queues
+
+### Network signalling protocol
 
 ## lwIP
 
@@ -14,3 +20,17 @@ our experimentation and development has been done with the lwIP stack.
 
 The source for lwIP is currently vendored in the source for sDDF, to update lwIP
 see the script `network/ipstacks/update_lwip.sh`
+
+### Lib sDDF lwIP
+
+## Using the network subsystem
+
+### sdfgen
+
+### Interfacing with clients
+
+### Building components and libraries
+
+#### Include paths
+
+## Running and using

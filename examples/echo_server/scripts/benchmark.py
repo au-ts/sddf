@@ -63,7 +63,7 @@ def run_benchmark(args, throughput: int, packet_size: int):
         args.ip,
         "--test-port",
         {
-            "tcp": "1237",
+            "tcp": "1236",
             "udp": "1235",
         }[args.protocol],
         # benchmark stuff
@@ -72,7 +72,7 @@ def run_benchmark(args, throughput: int, packet_size: int):
         "--target-test-hostname",
         args.ip,
         "--target-test-port",
-        "1236",
+        "1237",
     ]
 
     p = subprocess.run(argv, stdout=subprocess.PIPE)
