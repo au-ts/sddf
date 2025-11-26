@@ -8,19 +8,20 @@
 
 ## Testing code
 
-Each example system as part of CI is compiled and run either in a simulator (QEMU)
-or on real hardware (remotely in the Trustworthy Systems lab).
+Each example system as part of CI is compiled and run either in a simulator
+(QEMU) or on real hardware (remotely in the Trustworthy Systems lab).
 
-On each commit and pull request, the build and simulation tests are checked.
-The hardware tests do not happen unless an explicit 'hardware test' label is added
+On each commit and pull request, the build and simulation tests are checked. The
+hardware tests do not happen unless an explicit 'hardware test' label is added
 to a pull request. This is done to not overwhelm our supply of hardware.
 
 ### Accessing Log Artifacts
 
 As GitHub's log viewer performs terribly when the log files are large enough, we
-publish archived copies on the [trustworthy.systems website](https://trustworthy.systems/github/ci-artifacts/).
-Both the raw log files, built images, and pre-rendered HTML logs are available.
-The archive is updated on an hourly basis.
+publish archived copies on the [trustworthy.systems
+website](https://trustworthy.systems/github/ci-artifacts/). Both the raw log
+files, built images, and pre-rendered HTML logs are available. The archive is
+updated on an hourly basis.
 
 ### Builds
 
@@ -32,11 +33,11 @@ You can reproduce what the CI builds with:
 
 You will need to provide the path to your Microkit SDK.
 
-There are various options to speed up development, such as only compiling a particular
-example or for a particular board.
+There are various options to speed up development, such as only compiling a
+particular example or for a particular board.
 
-For example, if you were working on the timer example system, you might want to instead
-run:
+For example, if you were working on the timer example system, you might want to
+instead run:
 ```sh
 ./ci/build.py /path/to/sdk --examples timer
 ```
@@ -51,13 +52,14 @@ if you are doing development of a certain example.
 
 ### Runtime
 
-There are two kinds of runtime tests, simulation via QEMU and hardware tests on actual
-boards.
+There are two kinds of runtime tests, simulation via QEMU and hardware tests on
+actual boards.
 
-Simulation tests can be run on your development machine but hardware tests obviously
-require actual hardware.
+Simulation tests can be run on your development machine but hardware tests
+obviously require actual hardware.
 
-After you've run the [build script](#builds) you can run everything with images with:
+After you've run the [build script](#builds) you can run everything with images
+with:
 ```sh
 ./ci/run.py
 ```
@@ -79,8 +81,8 @@ which gives more options for filtering what gets run and how.
 ./ci/examples/blk.py --help
 ```
 
-One useful option is `--override-image` which allows you to do testing of a certain
-example repeatedly, for debugging:
+One useful option is `--override-image` which allows you to do testing of a
+certain example repeatedly, for debugging:
 
 ```sh
 $ make MICROKIT_BOARD=maaxboard
@@ -104,7 +106,8 @@ CI|INFO: Finished running blk on maaxboard (custom, built with custom)
 
 #### Running with QEMU
 
-If you do not have access to hardware, you can run all the simulation tests with QEMU:
+If you do not have access to hardware, you can run all the simulation tests with
+QEMU:
 ```sh
 ./ci/run.py --only-qemu
 ```
@@ -117,8 +120,8 @@ TODO:
 
 ## Style
 
-The CI runs a style check on any changed files and new files added in each GitHub
-pull request.
+The CI runs a style check on any changed files and new files added in each
+GitHub pull request.
 
 ### C code
 
@@ -154,7 +157,7 @@ Omitting the branch name runs the formatter on any staged files.
 For helper scripts and the metaprograms (`meta.py`) which are written in Python,
 we use [black](https://black.readthedocs.io/en/stable/).
 
-Running `black . --required-version 25` in the root of the respository or on a specific directory/file
-will run the Python style check.
+Running `black . --required-version 25` in the root of the repository or on a
+specific directory/file will run the Python style check.
 
 Note that currently we target the 2025 styling of black.

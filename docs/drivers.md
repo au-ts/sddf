@@ -6,11 +6,11 @@
 
 # Available drivers
 
-Below is a list of all the avaiable drivers in sDDF, grouped by
-their device class.
+Below is a list of all the available drivers in sDDF, grouped by their device
+class.
 
-Each driver is listed by the device family it is written for
-and a list of Device Tree compatible strings it is known to work with.
+Each driver is listed by the device family it is written for and a list of
+Device Tree compatible strings it is known to work with.
 
 ## Block
 
