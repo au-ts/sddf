@@ -185,8 +185,8 @@ For a full set of benchmarking results, we measure the performance of the system
 using both UDP and TCP traffic, over a fixed set of incrementally increasing
 throughput loads. The throughputs start small (10Mb/s, 20Mb/s, 50Mb/s, 100Mb/s)
 and increase in increments of 100Mb/s until the maximum throughput of the NIC is
-reached (normally 1000Mb/s, corresponding to an approximate data throughput of
-970Mb/s when headers are accounted for).
+reached (normally 970Mb/s, which corresponds to an actual load of 1000mb/s when
+accounting for the overhead of ethernet headers).
 
 For a selected throughput, a benchmark run involves three phases, throughout all
 of which traffic is sent by the clients to the target at the selected
@@ -199,7 +199,7 @@ throughput:
    achieved throughput of the target. Note that if the target becomes
    unresponsive during this phase, or there is a large amount of packet loss
    ipbench will hang here.
-3. A cool-down phase for a fixed number of seconds. 
+3. A cool-down phase for a fixed number of seconds.
 
 The latency and throughput measurements taken by the clients are based only on
 the sampling phase, while the target CPU measurement is measured throughout all
@@ -312,7 +312,7 @@ run the ipbench daemon on the [utilisation
 port](/examples/echo_server/utilization_socket.c), thus both will be capable of
 participating in the protocol with the ipbench controller. However only one of
 the clients has the idle thread cycle count page mapped into its address space,
-as well as start and stop channels to the benchmark PD. 
+as well as start and stop channels to the benchmark PD.
 
 We refer to the client with the cycle counts and benchmarking channels as the
 *benchmarking client*. This is by default client0. The other client, client1,
