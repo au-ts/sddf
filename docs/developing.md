@@ -98,7 +98,7 @@ deadlock freedom of this protocol can be found
 language PROMELA, and are highly abstracted from the original C code, partially
 due to the inherent state space limitations involved with model checking. The
 models were originally made for the networking subsystem, but the protocol has
-subsequently been used in the serial subsystem as well. 
+subsequently been used in the serial subsystem as well.
 
 The signalling protocol is used between pairs of components (producers and
 consumers) which share a queue for the transmission of buffers or data. Along

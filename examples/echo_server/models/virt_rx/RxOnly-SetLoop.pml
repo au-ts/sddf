@@ -72,15 +72,15 @@ active proctype COPY0() priority 1 {
 
         CPY0_RX_active.flag = 1;
 
-        if 
+        if
         :: !EMPTY(CPY0_RX_active) ->
             CPY0_RX_active.flag = 0;
             goto work_copy;
         :: else;
         fi
 
-        if 
-        :: CPY0_RX_free.flag && notify_rx && !(CPY0_RX_free.notification ?? [1]) -> 
+        if
+        :: CPY0_RX_free.flag && notify_rx && !(CPY0_RX_free.notification ?? [1]) ->
             CPY0_RX_free.flag = 0;
             CPY0_RX_free.notification ! 1;
         :: else;
@@ -102,15 +102,15 @@ active proctype COPY0() priority 1 {
 
 //         CPY1_RX_active.flag = 1;
 
-//         if 
+//         if
 //         :: !EMPTY(CPY1_RX_active) ->
 //             CPY1_RX_active.flag = 0;
 //             goto work_copy;
 //         :: else;
 //         fi
 
-//         if 
-//         :: CPY1_RX_free.flag && notify_rx && !(CPY0_RX_free.notification ?? [1]) -> 
+//         if
+//         :: CPY1_RX_free.flag && notify_rx && !(CPY0_RX_free.notification ?? [1]) ->
 //             CPY1_RX_free.flag = 0;
 //             // Share one channel but different flags
 //             CPY0_RX_free.notification ! 1;
@@ -155,14 +155,14 @@ active proctype VIRT_RX() priority 1 {
         fi
 
         if
-        :: notify_client[0] && CPY0_RX_active.flag && !(CPY0_RX_active.notification ?? [1]) -> 
+        :: notify_client[0] && CPY0_RX_active.flag && !(CPY0_RX_active.notification ?? [1]) ->
             CPY0_RX_active.flag = 0;
             CPY0_RX_active.notification ! 1;
         :: else;
         fi
 
         // if
-        // :: notify_client[1] && CPY1_RX_active.flag && !(CPY1_RX_active.notification ?? [1]) -> 
+        // :: notify_client[1] && CPY1_RX_active.flag && !(CPY1_RX_active.notification ?? [1]) ->
         //     CPY1_RX_active.flag = 0;
         //     CPY1_RX_active.notification ! 1;
         // :: else;
@@ -179,7 +179,7 @@ active proctype VIRT_RX() priority 1 {
         CPY0_RX_free.flag = 1;
 
         if
-        :: !EMPTY(CPY0_RX_free) -> 
+        :: !EMPTY(CPY0_RX_free) ->
             CPY0_RX_free.flag = 0;
             goto work_virt_rx_free_0;
         :: else;
@@ -196,14 +196,14 @@ active proctype VIRT_RX() priority 1 {
         // CPY1_RX_free.flag = 1;
 
         // if
-        // :: !EMPTY(CPY1_RX_free) -> 
+        // :: !EMPTY(CPY1_RX_free) ->
         //     CPY1_RX_free.flag = 0;
         //     goto work_virt_rx_free_1;
         // :: else;
         // fi
 
         if
-        :: notify_eth && ETH_RX_free.flag && !(ETH_RX_free.notification ?? [1]) -> 
+        :: notify_eth && ETH_RX_free.flag && !(ETH_RX_free.notification ?? [1]) ->
             ETH_RX_free.flag = 0;
             ETH_RX_free.notification ! 1;
         :: else;
@@ -235,7 +235,7 @@ active proctype ETH() priority 1 {
         fi
 
         if
-        :: !EMPTY(ETH_RX_free) -> 
+        :: !EMPTY(ETH_RX_free) ->
             ETH_RX_free.flag = 0;
             goto work_eth_rx;
         :: else;

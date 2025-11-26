@@ -65,7 +65,7 @@ active proctype CLIENT() priority 1 {
 
         CLT_RX_active.flag = 1;
 
-        if 
+        if
         :: !EMPTY(CLT_RX_active) ->
             CLT_RX_active.flag = 0;
             goto work_clt;
@@ -73,7 +73,7 @@ active proctype CLIENT() priority 1 {
         fi
 
         if
-        :: notify_rx && CLT_RX_free.flag && !(CLT_RX_free.notification ?? [1]) -> 
+        :: notify_rx && CLT_RX_free.flag && !(CLT_RX_free.notification ?? [1]) ->
             notify_rx = 0;
             CLT_RX_free.flag = 0;
             CLT_RX_free.notification ! 1;
@@ -99,12 +99,12 @@ active proctype COPY() priority 1 {
 
         CPY_RX_active.flag = 1;
 
-        if 
+        if
         :: !EMPTY(CPY_RX_active) -> CLT_RX_free.flag = 1;
         :: else -> CLT_RX_free.flag = 0;
         fi;
 
-        if 
+        if
         :: !EMPTY(CPY_RX_active) && !EMPTY(CLT_RX_free) ->
             CPY_RX_active.flag = 0;
             CLT_RX_free.flag = 0;
@@ -112,15 +112,15 @@ active proctype COPY() priority 1 {
         :: else;
         fi
 
-        if 
-        :: enqueued && CLT_RX_active.flag && !(CLT_RX_active.notification ?? [1]) -> 
+        if
+        :: enqueued && CLT_RX_active.flag && !(CLT_RX_active.notification ?? [1]) ->
             CLT_RX_active.flag = 0;
             CLT_RX_active.notification ! 1;
         :: else;
         fi;
 
-        if 
-        :: enqueued && CPY_RX_free.flag && !(CPY_RX_free.notification ?? [1]) -> 
+        if
+        :: enqueued && CPY_RX_free.flag && !(CPY_RX_free.notification ?? [1]) ->
             CPY_RX_free.flag = 0;
             CPY_RX_free.notification ! 1;
         :: else;
@@ -144,7 +144,7 @@ active proctype VIRT_RX() priority 1 {
         od
 
         if
-        :: notify_copy && CPY_RX_active.flag && !(CPY_RX_active.notification ?? [1]) -> 
+        :: notify_copy && CPY_RX_active.flag && !(CPY_RX_active.notification ?? [1]) ->
             CPY_RX_active.flag = 0;
             CPY_RX_active.notification ! 1;
         :: else;
@@ -160,7 +160,7 @@ active proctype VIRT_RX() priority 1 {
         CPY_RX_free.flag = 1;
 
         if
-        :: !EMPTY(CPY_RX_free) -> 
+        :: !EMPTY(CPY_RX_free) ->
             CPY_RX_free.flag = 0;
             goto work_RX_free;
         :: else;

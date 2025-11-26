@@ -73,7 +73,7 @@ active proctype VIRT_RX() priority 1 {
     unsigned stored : 2 = 0;
     do
     :: stored > 0 -> goto work_virt_rx;
-    :: ETH_RX_active.notification ? 1 -> 
+    :: ETH_RX_active.notification ? 1 ->
 
         work_virt_rx: ;
         bit notify_eth = 0;
@@ -91,7 +91,7 @@ active proctype VIRT_RX() priority 1 {
 
         ETH_RX_active.flag = 1;
 
-        if  
+        if
         :: !EMPTY(ETH_RX_active) ->
             ETH_RX_active.flag = 0;
             goto work_virt_rx;
@@ -106,7 +106,7 @@ active proctype VIRT_RX() priority 1 {
         od
 
         if
-        :: notify_eth && ETH_RX_free.flag && !(ETH_RX_free.notification ?? [1]) -> 
+        :: notify_eth && ETH_RX_free.flag && !(ETH_RX_free.notification ?? [1]) ->
             ETH_RX_free.flag = 0;
             ETH_RX_free.notification ! 1;
         :: else;
@@ -118,11 +118,11 @@ active proctype VIRT_TX() priority 1 {
     unsigned stored : 2 = 0;
     do
     :: stored > 0 -> goto work_virt_tx_start;
-    :: ETH_TX_free.notification ? 1-> 
+    :: ETH_TX_free.notification ? 1->
         work_virt_tx_start: ;
         bit notify_eth = 0;
         work_virt_tx: ;
-        do  
+        do
         :: !EMPTY(ETH_TX_free) ->
             REMOVE(ETH_TX_free, stored);
         :: else -> break;
@@ -130,14 +130,14 @@ active proctype VIRT_TX() priority 1 {
 
         ETH_TX_free.flag = 1;
 
-        if  
+        if
         :: !EMPTY(ETH_TX_free) ->
             ETH_TX_free.flag = 0;
             goto work_virt_tx;
         :: else;
         fi;
 
-        do  
+        do
         :: stored > 0 ->
             INSERT(ETH_TX_active, stored);
             notify_eth = 1;
@@ -145,7 +145,7 @@ active proctype VIRT_TX() priority 1 {
         od;
 
         if
-        :: notify_eth && ETH_TX_active.flag && !(ETH_TX_active.notification ?? [1]) -> 
+        :: notify_eth && ETH_TX_active.flag && !(ETH_TX_active.notification ?? [1]) ->
             ETH_TX_active.flag = 0;
             ETH_TX_active.notification ! 1;
         :: else;
@@ -165,7 +165,7 @@ active proctype ETH() priority 1 {
 
         ETH_TX_active.flag = 1;
 
-        if  
+        if
         :: !EMPTY(ETH_TX_active) ->
             ETH_TX_active.flag = 0;
             goto work_eth_tx;
@@ -181,14 +181,14 @@ active proctype ETH() priority 1 {
         :: else -> break
         od
 
-        if 
+        if
         :: !FULL(HW_RX) ->
             ETH_RX_free.flag = 1;
         :: else ->
             ETH_RX_free.flag = 0;
         fi
 
-        if  
+        if
         :: !EMPTY(ETH_RX_free) ->
             ETH_RX_free.flag = 0;
             goto work_eth_rx;
@@ -197,15 +197,15 @@ active proctype ETH() priority 1 {
 
     :: IRQ_TX ? 1 ->
         bit notify_tx = 0;
-        do  
+        do
         :: !EMPTY(HW_TX) && BUFS_PROCESSED(HW_TX) ->
             TRANSFER(HW_TX, ETH_TX_free);
             notify_tx = 1;
         :: else -> break;
         od
 
-        if  
-        :: notify_tx && ETH_TX_free.flag && !(ETH_TX_free.notification ?? [1])-> 
+        if
+        :: notify_tx && ETH_TX_free.flag && !(ETH_TX_free.notification ?? [1])->
             ETH_TX_free.flag = 0;
             ETH_TX_free.notification ! 1;
         :: else;
@@ -235,7 +235,7 @@ active proctype DEV() priority 1 {
     do
     :: !EMPTY(HW_RX) && BUFS_AVAILABLE(HW_RX) ->
         PROCESS_BUF(HW_RX);
-        
+
         if
         :: IRQ_RX ?? [1];
         :: else -> IRQ_RX ! 1;

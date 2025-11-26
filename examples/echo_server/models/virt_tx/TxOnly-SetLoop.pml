@@ -77,7 +77,7 @@ active proctype CLIENT0() priority 1 {
                 to_send--;
                 notify_tx = 1;
             :: else -> break;
-            od 
+            od
 
             if
             :: EMPTY(CLT0_TX_free) && to_send > 0 ->
@@ -86,7 +86,7 @@ active proctype CLIENT0() priority 1 {
                 CLT0_TX_free.flag = 0;
             fi
 
-            if  
+            if
             :: !EMPTY(CLT0_TX_free) && to_send > 0 ->
                 CLT0_TX_free.flag = 0;
                 goto work_clt;
@@ -123,7 +123,7 @@ active proctype VIRT_TX() priority 1 {
 
         ETH_TX_free.flag = 1;
 
-        if  
+        if
         :: !EMPTY(ETH_TX_free) ->
             ETH_TX_free.flag = 0;
             goto work_virt_tx_free;
@@ -131,14 +131,14 @@ active proctype VIRT_TX() priority 1 {
         fi;
 
         if
-        :: notify_client[0] && CLT0_TX_free.flag && !(CLT0_TX_free.notification ?? [1]) -> 
+        :: notify_client[0] && CLT0_TX_free.flag && !(CLT0_TX_free.notification ?? [1]) ->
             CLT0_TX_free.flag = 0;
             CLT0_TX_free.notification ! 1;
         :: else;
         fi
 
         work_virt_tx_active_0: ;
-        do  
+        do
         :: !EMPTY(CLT0_TX_active) ->
             TRANSFER(CLT0_TX_active, ETH_TX_active);
             notify_eth = 1;
@@ -147,7 +147,7 @@ active proctype VIRT_TX() priority 1 {
 
         CLT0_TX_active.flag = 1;
 
-        if  
+        if
         :: !EMPTY(CLT0_TX_active) ->
             CLT0_TX_active.flag = 0;
             goto work_virt_tx_active_0;
@@ -180,7 +180,7 @@ active proctype ETH() priority 1 {
 
         ETH_TX_active.flag = 1;
 
-        if  
+        if
         :: !EMPTY(ETH_TX_active) ->
             ETH_TX_active.flag = 0;
             goto work_eth_tx;
@@ -190,15 +190,15 @@ active proctype ETH() priority 1 {
     :: dev_free > 0 ->
         bit notify_tx = 0;
 
-        do  
+        do
         :: dev_free > 0 ->
             INSERT(ETH_TX_free, dev_free);
             notify_tx = 1;
         :: else -> break;
         od
 
-        if  
-        :: notify_tx && ETH_TX_free.flag && !(ETH_TX_free.notification ?? [1])-> 
+        if
+        :: notify_tx && ETH_TX_free.flag && !(ETH_TX_free.notification ?? [1])->
             ETH_TX_free.flag = 0;
             ETH_TX_free.notification ! 1;
         :: else;

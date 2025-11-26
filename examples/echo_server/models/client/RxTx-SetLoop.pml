@@ -66,12 +66,12 @@ active proctype CLIENT() priority 1 {
                 notify_rx = 1;
                 notify_tx = 1;
             :: else -> break;
-            od 
+            od
 
             if
-            :: CURR_EMPTY(stored) || !EMPTY(TX_free) -> 
+            :: CURR_EMPTY(stored) || !EMPTY(TX_free) ->
                 TX_free.flag = 0;
-            :: else -> 
+            :: else ->
                 TX_free.flag = 1;
             fi
 
@@ -104,7 +104,7 @@ active proctype CLIENT() priority 1 {
 
             RX_active.flag = 1;
 
-            if 
+            if
             :: !EMPTY(RX_active) ->
                 RX_active.flag = 0;
                 goto process_rx;
@@ -113,7 +113,7 @@ active proctype CLIENT() priority 1 {
         fi;
 
         if
-        :: notify_rx && RX_free.flag && !(RX_free.notification ?? [1]) -> 
+        :: notify_rx && RX_free.flag && !(RX_free.notification ?? [1]) ->
             notify_rx = 0;
             RX_free.flag = 0;
             RX_free.notification ! 1;
@@ -121,7 +121,7 @@ active proctype CLIENT() priority 1 {
         fi;
 
         if
-        :: notify_tx && TX_active.flag && !(TX_active.notification ?? [1]) -> 
+        :: notify_tx && TX_active.flag && !(TX_active.notification ?? [1]) ->
             notify_tx = 0;
             TX_active.flag = 0;
             TX_active.notification ! 1;
@@ -151,15 +151,15 @@ active proctype COPY() priority 1 {
         :: else -> break;
         od;
 
-        if 
+        if
         :: drv_active > 0 ->
             RX_free.flag = 1;
         :: else ->
             RX_free.flag = 0;
         fi;
 
-        if 
-        :: notify_client && RX_active.flag && !(RX_active.notification ?? [1]) -> 
+        if
+        :: notify_client && RX_active.flag && !(RX_active.notification ?? [1]) ->
             RX_active.flag = 0;
             RX_active.notification ! 1;
         :: else;
@@ -175,7 +175,7 @@ active proctype VIRT_TX() priority 1 {
 
     work_TX_free: ;
     bit notify_client = 0;
-    do  
+    do
     :: stored > 0 ->
         INSERT(TX_free, stored);
         notify_client = 1;
@@ -183,14 +183,14 @@ active proctype VIRT_TX() priority 1 {
     od;
 
     if
-    :: notify_client && TX_free.flag && !(TX_free.notification ?? [1]) -> 
+    :: notify_client && TX_free.flag && !(TX_free.notification ?? [1]) ->
         TX_free.flag = 0;
         TX_free.notification ! 1;
     :: else;
     fi
 
     work_TX_active: ;
-    do  
+    do
     :: !EMPTY(TX_active) ->
         REMOVE(TX_active, stored);
     :: else -> break;
@@ -198,7 +198,7 @@ active proctype VIRT_TX() priority 1 {
 
     TX_active.flag = 1;
 
-    if  
+    if
     :: !EMPTY(TX_active) ->
         TX_active.flag = 0;
         goto work_TX_active;
