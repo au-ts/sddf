@@ -355,6 +355,82 @@ Note that for gathering benchmark results you should not change the default
 parameters unless you have networking experience and understand the echo server
 system well.
 
+## Multicore
+
+The echo server system can also run in a multicore configuration using the SMP
+kernel. To build an SMP echo server system, pass the `SMP_CONFIG` variable as a
+make argument when building the system:
+
+```sh
+make MICROKIT_BOARD=<board> MICROKIT_SDK=<path/to/sdk> MICROKIT_CONFIG=(benchmark/release/debug) SMP_CONFIG[= core configuration file]
+```
+
+If `SMP_CONFIG` is passed alone, the system will default to the following
+configuration on 4 cores:
+
+```json
+{
+    "timer_driver": 0,
+    "serial_driver": 0,
+    "serial_virt_tx": 0,
+    "ethernet_driver": 1,
+    "net_virt_tx": 1,
+    "net_virt_rx": 0,
+    "client0": 2,
+    "client0_net_copier": 2,
+    "client1": 3,
+    "client1_net_copier": 3
+}
+```
+
+Otherwise, this variable can be set to the path of a core configuration file of your
+choosing following the format of the example files provided
+[here](/examples/echo_server/core_config). You must ensure that all PDs in the
+system are allocated to a core, or the system will fail to build.
+
+To benchmark a multicore echo server system, the benchmark and idle PDs
+[described above](#cpu-utilisation-and-pmu-data) will need to be duplicated so
+that each core that contains active echo server PDS has its own benchmark and
+idle PD. This is because cycle counts and PMU data are obtained on a per-core
+basis. The creation of these PDs will be handled automatically by the echo
+server [metaprogram](/examples/echo_server/meta.py). When a core configuration
+file is provided, the metaprogram will read the file and determine which cores
+are in use, creating all the required system infrastructure.
+
+During a multicore benchmark, the system transitions through the following
+events:
+
+START:
+- Echo server client receives an ipbench `START` packet. Continues as per single
+  core description.
+- Echo server client notifies the benchmark PD on the first active core.
+
+BENCHMARK 0 START (If core 0 is active):
+- Benchmark PD on core 0 receives notification from client. Continues as per
+  single core description.
+- Benchmark PD on core 0 notifies the benchmark PD on next active core (if such
+  a core exists).
+
+BENCHMARK 1 START (If core 1 is active):
+- Benchmark PD on core 1 receives notification from client or previous benchmark
+  PD. Continues as per single core description.
+- Benchmark PD on core 1 notifies the benchmark PD on next active core (if such
+  a core exists).
+
+BENCHMARK 2 START (If core 2 is active):
+- Benchmark PD on core 2 receives notification from client or previous benchmark
+  PD. Continues as per single core description.
+- Benchmark PD on core 2 notifies the benchmark PD on next active core (if such
+  a core exists).
+
+BENCHMARK 3 START (If core 3 is active):
+- Benchmark PD on core 3 receives notification from client or previous benchmark
+  PD. Continues as per single core description.
+
+The same chain of notification occurs when a stop packet is received by the
+client. Upon completion of the benchmarks, each benchmark PD will print the
+core's results in the order in which they are notified.
+
 ## Debugging
 
 If you are not seeing the DHCP messages from the clients or you are failing to
