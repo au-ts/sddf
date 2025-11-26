@@ -7,15 +7,16 @@
 # I<sup>2</sup>C example
 
 This example makes use of the DS3231 RTC and NXP PN532 card-reader.
-Documentation and more specific infomation about each can be found below.
+Documentation and more specific information about each can be found below.
 
-This example is intended to run on an Odroid-C4 using the I2C connected via GPIO pins 3 and 5
-for SDA and SCL respectively.
+This example is intended to run on an Odroid-C4 using the I2C connected via GPIO
+pins 3 and 5 for SDA and SCL respectively.
 
 ## Before compiling
 
-The I2C virtualiser (currently) hard-codes the number of clients and so depending on the configuration
-of the system, you may have to change `sddf/i2c/components/virt.c`.
+The I2C virtualiser (currently) hard-codes the number of clients and so
+depending on the configuration of the system, you may have to change
+`sddf/i2c/components/virt.c`.
 
 ## Building
 
@@ -46,8 +47,8 @@ CLIENT|ERROR: Timed out waiting for a card
 CLIENT|ERROR: Timed out waiting for a card
 ```
 
-If you put a card in front of the card reader, you should see messages similar to
-the following:
+If you put a card in front of the card reader, you should see messages similar
+to the following:
 ```
 UID Length: 4 bytes
 UID Value:  0x9c 0x1b 0xb4 0x1
@@ -80,8 +81,8 @@ Date and Time: 31-12-23 23:59:42 (Sunday)
 
 ## Running DS3231 and PN532
 
-Running the example will show similar to the following output after the system has booted:
-Basically it is a mix between output from the PN532 and the DS3231:
+Running the example will show similar to the following output after the system
+has booted: Basically it is a mix between output from the PN532 and the DS3231:
 
 ```
 Set Date and Time on DS3231 to: 31-12-23 23:59:42 (Sunday)
