@@ -283,10 +283,11 @@ Unlike the ipbench controller data which is output as a csv, data printed by the
 benchmark PD does not adhere to a standardised format. Thus, we have provided a
 Python formatting script which can convert the echo server system output log
 file into a series of result csvs. The script can handle the log file of a
-system that has performed an arbitrary number of benchmarks:
+system that has performed an arbitrary number of benchmarks by optionally
+specifying a comma separated list of throughputs for each test:
 
 ```sh
-python3 scripts/process_output.py [system output log]
+python3 scripts/process_output.py [system output log file] [comma separated throughput]
 ```
 
 > [!NOTE] There is a distinct difference between the system utilisation reported
