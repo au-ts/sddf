@@ -19,8 +19,8 @@ on:
     - cron: '37 7 * * 4'
 
 env:
-  MICROKIT_VERSION: 2.0.1-dev.153+70f5105
-  MICROKIT_URL: https://trustworthy.systems/Downloads/microkit
+  MICROKIT_VERSION: 2.1.0
+  MICROKIT_URL: https://github.com/seL4/microkit/releases/download/2.1.0
   SDFGEN_VERSION: 0.27.0
   ZIG_VERSION: 0.15.1
 
@@ -46,7 +46,7 @@ jobs:
           python3 -m venv venv
           ./venv/bin/pip install --upgrade sdfgen==${{ env.SDFGEN_VERSION }}
       - name: Build examples
-        run: ./ci/build.py ${PWD}/microkit-sdk-${{ env.MICROKIT_VERSION }}-linux-x86-64 $(nproc)
+        run: ./ci/build.py ${PWD}/microkit-sdk-${{ env.MICROKIT_VERSION }} $(nproc)
         shell: bash
         env:
           PYTHON: ${{ github.workspace }}/venv/bin/python
@@ -104,7 +104,7 @@ jobs:
           python3.13 -m venv venv
           ./venv/bin/pip install --upgrade sdfgen==${{ env.SDFGEN_VERSION }}
       - name: Build examples
-        run: python3.13 ./ci/build.py ${PWD}/microkit-sdk-${{ env.MICROKIT_VERSION }}-macos-aarch64 $(nproc)
+        run: python3.13 ./ci/build.py ${PWD}/microkit-sdk-${{ env.MICROKIT_VERSION }} $(nproc)
         shell: bash
         env:
           PYTHON: ${{ github.workspace }}/venv/bin/python
