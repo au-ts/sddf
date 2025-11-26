@@ -11,9 +11,8 @@ UDP_ECHO_PORT = 1235
 TCP_ECHO_PORT = 1236
 
 
-def udp(ip: str):
+def udp(ip: str, server_port: int):
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    server_port = UDP_ECHO_PORT
     s.connect((ip, server_port))
     message = "Hello World"
     s.send(message.encode())
@@ -21,9 +20,8 @@ def udp(ip: str):
     print("SUCCESS: Received UDP response" if message == response else "UDP failed")
 
 
-def tcp(ip: str):
+def tcp(ip: str, server_port: int):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_port = TCP_ECHO_PORT
     s.connect((ip, server_port))
     message = "Hello World"
     s.send(message.encode())
@@ -34,7 +32,9 @@ def tcp(ip: str):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("ip")
+    parser.add_argument("--udp_port", required=False)
+    parser.add_argument("--tcp_port", required=False)
     args = parser.parse_args()
 
-    udp(args.ip)
-    tcp(args.ip)
+    udp(args.ip, int(args.udp_port) if args.udp_port else UDP_ECHO_PORT)
+    tcp(args.ip, int(args.tcp_port) if args.tcp_port else TCP_ECHO_PORT)

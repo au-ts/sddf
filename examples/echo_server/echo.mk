@@ -130,7 +130,13 @@ qemu: $(IMAGE_FILE)
 	$(QEMU) $(QEMU_ARCH_ARGS) \
 		-nographic \
 		-device virtio-net-device,netdev=netdev0 \
-		-netdev user,id=netdev0,hostfwd=tcp::1236-:1236,hostfwd=tcp::1237-:1237,hostfwd=udp::1235-:1235 \
+		-netdev user,id=netdev0,\
+hostfwd=udp::1235-10.0.2.15:1235,\
+hostfwd=tcp::1236-10.0.2.15:1236,\
+hostfwd=tcp::1237-10.0.2.15:1237,\
+hostfwd=udp::1238-10.0.2.16:1235,\
+hostfwd=tcp::1239-10.0.2.16:1236,\
+hostfwd=tcp::1240-10.0.2.16:1237 \
 		-global virtio-mmio.force-legacy=false \
 		-d guest_errors
 
