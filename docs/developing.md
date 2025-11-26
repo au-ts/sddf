@@ -60,6 +60,110 @@ The first step is to get the Device Tree and puts it in the `dts/` directory of
 sDDF. You can then start either writing the new drivers for devices you want to
 use, or modify the examples to add your board.
 
+## Signalling protocol
+
+The most dominant protocol used by sDDF components to communicate and share data
+for all device classes is a combination of asynchronous notifications (e.g
+`microkit_notify`) and shared memory (e.g data regions and/or queue regions).
+Since components are event-based, when data has been made available to begin
+processing the producer of this data is typically required to notify the
+consumer of the data to ensure the consumer is scheduled. In some cases it is
+also necessary for the consumer of the data to notify the producer if more space
+has become available.
+
+Since our systems contain large numbers of components handling multiple
+independent events, components often incidentally become aware of events which
+they were not explicitly notified for. Also, components may require more than
+one event to occur before further progress can be made (e.g. one queue to become
+non-empty and another to become non-full). Thus, if components notify their
+neighbours unconditionally when progress is made, this can often result in the
+receiver being scheduled unnecessarily without making further progress.
+
+For device classes where these *unnecessary notifications* and resulting
+schedules put too much of a strain on the overall utilisation of the system
+(i.e. networking), the sDDF utilises a *signalling protocol*. The signalling
+protocol allows producers and consumers to communicate more precisely about when
+they require a signal after progress has been made. For some subsystems, in some
+directions of communication, components will only notify their neighbour when
+work has been completed if a shared flag has been set.
+
+Utilising a flag residing in shared memory allows us to significantly optimise
+the number of notifications needed by the subsystem, however it can result in
+critical notifications being missed if care is not taken to protect against race
+conditions. To avoid these cases, we used the
+[Spin](https://spinroot.com/spin/whatispin.html) model checker to develop a
+protocol for setting and checking this flag. The models created to verify the
+deadlock freedom of this protocol can be found
+[here](/examples/echo_server/models). They are written in Spin's modelling
+language PROMELA, and are highly abstracted from the original C code, partially
+due to the inherent state space limitations involved with model checking. The
+models were originally made for the networking subsystem, but the protocol has
+subsequently been used in the serial subsystem as well.
+
+The signalling protocol is used between pairs of components (producers and
+consumers) which share a queue for the transmission of buffers or data. Along
+with an array of entries, the queue data structure also contains a 'notification
+flag' used to indicate when a component wishes to be notified by its neighbour.
+
+The control flow of processing this queue can be broken into three phases:
+- Processing phase: The component receives a notification resulting in the queue
+  being processed (the producer enqueues data, the consumer dequeues data).
+- Event registering phase: The component can no longer process the queue (this
+  may be because the queue has become empty or full, or possibly a second queue
+  has become empty or full). If a notification is required for the next queue
+  event, the component will set the corresponding queue flag
+  (`consumer_signalled` or `producer_signalled`).
+- Notification phase: The component signals its neighbour if required. This can
+  either occur unconditionally, or depend on the value of a shared flag as shown
+  below.
+
+```c
+    /* Notification phase */
+    if (packets_transferred && net_require_signal_active(&rx_queue)) {
+        net_cancel_signal_active(&rx_queue);
+        microkit_notify(config.virt_rx.id);
+    }
+```
+
+The key part of the signalling protocol is what occurs in the event registering
+phase. Along with setting the shared flag, the component is also required to
+perform an additional "double-check" of the queue state. If there has been a
+change in state that enables the component to continue processing the queue
+since it last checked, it will jump back into processing the queue. This is to
+protect against the race condition that may occur if a component is pre-empted
+by its neighbour after its last check of the queue, but before it sets the flag.
+In this case when the neighbour checks the shared flag when deciding whether to
+notify there is no guarantee that it will be set, thus a *critical notification
+may be missed*. This can lead to system-wide processing delays or in the worst
+case deadlocks. The "double-check" is implemented as follows:
+
+```c
+    bool reprocess = true;
+    while (reprocess) {
+        /* Processing phase */
+        while (!(hw_ring_full(&tx)) && !net_queue_empty_active(&tx_queue)) {
+            ... *process queues* ...
+        }
+
+        <-- deadlock condition if neighbour processes the queue and checks the flag here -->
+
+        /* Event registering phase */
+        net_request_signal_active(&tx_queue);
+        reprocess = false;
+
+        if (!hw_ring_full(&tx) && !net_queue_empty_active(&tx_queue)) {
+            net_cancel_signal_active(&tx_queue);
+            reprocess = true;
+            /* Jump back to processing phase... */
+        }
+    }
+
+    /* Notification phase */
+```
+
+Note that if the component jumps back into "reprocessing" the queue, it will
+first clear the flag to avoid any unnecessary signals.
+
 ## Adding a new driver
 
 Before writing a new sDDF device driver, it is highly recommended to first gain
@@ -139,75 +243,11 @@ need to be made to the sDDF component of the initialisation code, the event
 handling loop constraints and sDDF queue interactions. In the case of a new
 device class, a similar class can also serve as a helpful scaffold.
 
-#### Signalling protocol
-
-The most dominant protocol used by sDDF components to communicate and share data
-for all device classes is a combination of asynchronous notifications (e.g
-`microkit_notify`) and shared memory (e.g data regions and/or queue regions).
-Since components are event-based, when data has been made available to begin
-processing the producer of this data is typically required to notify the
-consumer of the data to ensure the consumer is scheduled. In some cases it is
-also necessary for the consumer of the data to notify the producer if more space
-has become available.
-
-Since our systems contain large numbers of components handling multiple
-independent events, components often incidentally become aware of events which
-they were not explicitly notified for. Also, components may require more than
-one event to occur before further progress can be made (e.g. one queue to become
-non-empty and another to become non-full). Thus, if components notify their
-neighbours unconditionally when progress is made, this can often result in the
-receiver being scheduled unnecessarily without making further progress.
-
-For device classes where these *unnecessary notifications* put too much of a
-strain on the overall utilisation of the system (i.e. networking), the sDDF
-utilises a *signalling protocol*. The signalling protocol allows producers and
-consumers to communicate more preciesly about when they require a signal after
-progress has been made. For some sub-systems, in some directions of
-communication, components will only notify their neighbour when work has been
-completed if a shared flag has been set.
-
-However, utilising a flag in shared memory which is concurrently written to and
-read from can result in deadlocks if care is not taken. To avoid this, a
-model-checked signalling protocol was developed. This signalling protocol is
-currently implemented in the network and serial subsystem. It involves a check
-of a shared flag before a notifying:
-
-```c
-    if (packets_transferred && net_require_signal_active(&rx_queue)) {
-        net_cancel_signal_active(&rx_queue);
-        microkit_notify(config.virt_rx.id);
-    }
-```
-
-as well as a less intuitive extra "double-check" before terminating a processing
-loop. This prevents a component from failing to to process available data due to
-a missed notification. This situation can occur if a neighbour checks the
-component's flag before the component has had the chance to reset it (see
-deadlock condition), but after it has terminated processing the queue:
-
-```c
-    bool reprocess = true;
-    while (reprocess) {
-        while (!(hw_ring_full(&tx)) && !net_queue_empty_active(&tx_queue)) {
-            ... *process queues* ...
-        }
-
-        <-- deadlock condition -->
-
-        net_request_signal_active(&tx_queue);
-        reprocess = false;
-
-        if (!hw_ring_full(&tx) && !net_queue_empty_active(&tx_queue)) {
-            net_cancel_signal_active(&tx_queue);
-            reprocess = true;
-        }
-    }
-```
-
-When writing a driver for these subsystems, care must be taken to ensure the
-driver's event handling functions adhere to this protocol, and don't introduce
-the possibility of deadlock. If the scaffold of the pre-existing driver's event
-handling functions is unchanged, then this should not be a risk.
+When writing a driver for existing subsystems which utilise the [signalling
+protocol](#signalling-protocol), care must be taken to ensure the driver's event
+handling functions implement the protocol correctly and don't introduce
+potential deadlock scenarios. The control flow scaffold of a pre-existing driver
+may be used to avoid this.
 
 #### Interfacing with the device
 

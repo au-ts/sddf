@@ -8,8 +8,8 @@
 #include <os/sddf.h>
 
 #define UDP_ECHO_PORT 1235
-#define UTILIZATION_PORT 1236
-#define TCP_ECHO_PORT 1237
+#define TCP_ECHO_PORT 1236
+#define UTILIZATION_PORT 1237
 
 #define TCP_ECHO_MAX_CONNS 4
 

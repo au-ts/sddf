@@ -3,16 +3,15 @@
 
     SPDX-License-Identifier: BSD-2-Clause
 -->
-# sDDF Serial Subsystem
+# sDDF serial subsystem
 
 ## System architecture
 
-The serial subsystem adheres to the sDDF design principles of modularalised
-components split via separation of concerns. Components communicate via shared
-queues and data regions, as well as asynchronous notifications (Microkit
-channels). For a more in depth discussion of these design principles and how the
-serial subsystem incorporates them, see the [sDDF design
-document](/docs/design_doc).
+The serial subsystem adheres to the sDDF design principles of modular components
+split via separation of concerns. Components communicate via shared queues and
+data regions, as well as asynchronous notifications (Microkit channels). For a
+more in depth discussion of these design principles and how the serial subsystem
+incorporates them, see the [sDDF design document](/docs/design_doc).
 
 The UART driver protection domain handles all UART device interrupts, and is the
 only protection domain with access to the UART registers. In order to safely
@@ -22,7 +21,7 @@ transmit virtualiser is responsible for multiplexing client output, while the
 serial receive virtualiser is responsible for deciding which characters are
 directed to which client.
 
-### Serial Queues
+### Serial queues
 
 To pass characters between components two shared memory regions are used - a
 *data region* where characters are written to and read from, and a *queue*
@@ -33,50 +32,62 @@ region to be written to. Head and tail indices are kept as overflowing unsigned
 integers, and must be used modulo *queue capacity* when accessing queues. This
 enforces the constraint that queue capacity must be a power of two.
 
-All sDDF queues are single producer single consumer, and as a consequence the
-head index is only written to by the consumer of the queue, and the tail index
-is only written to by the producer of the queue. This allows the queues to be
-accessed without a lock, with the only concurrency concern being the consistency
-of the order of queue operations which is maintained using memory barriers.
+All sDDF queues are single-producer single-consumer, and as a consequence the
+head index must only be written to by the consumer of the queue, and the tail
+index must only be written to by the producer of the queue. This allows the
+queues to be used without a lock, with the only concurrency concern being the
+consistency of the order of queue operations which is achieved with memory
+barriers.
 
 The *serial_queue* data structure contains the queue head, tail and
-*producer_signalled* notification flag [described below](#signalling), while
-*serial_queue_handle* data structure contains a pointer to the serial queue, the
-queue capacity and a pointer to the data region. The serial queue and data
-regions reside in separate shared memory regions, while the queue handle resides
-in local memory ensuring that queue capacity may not be modified by untrusted
-clients which could result in out of bound data region accesses. Serial queue
-library functions are written to take serial queue handles as arguments, so it
-is recommended to use serial queue handles over raw serial queues.
+*producer_signalled* notification flag [described
+below](#serial-signalling-protocol), while *serial_queue_handle* data structure
+contains a pointer to the serial queue, the queue capacity and a pointer to the
+data region. The serial queue and data regions reside in separate shared memory
+regions, while the queue handle resides in local memory ensuring that queue
+capacity may not be modified by untrusted clients which could result in out of
+bound data region accesses. Serial queue library functions are written to take
+serial queue handles as arguments, so it is recommended to use serial queue
+handles over raw serial queues.
 
 The implementation of the serial queue and serial queue handle along with the
 serial queue library functions can be found in the [serial queue
 library](/include/sddf/serial/queue.h).
 
-### Serial Communication Protocols {#signalling}
+### Serial signalling protocol
 
 When a producer has enqueued characters in a queue, or a consumer has dequeued
 characters from a queue, we say that *work* has been performed on the queue. In
-order for further work to be performed, it is typically the case that the
-working component will need to signal its neighbour in order for it to be
-scheduled.
+order for further work to be performed on the queue, it is typical that the
+neighbouring component will require a signal in order to be scheduled.
 
-In the case of work being performed by the producer, the consumer of the queue
-will unconditionally be signalled. In contrast, if work is performed by the
-consumer of a queue, this is only relevant to the producer of the queue if it is
-awaiting free space to enqueue additional characters. To minimise unnecessary
-signals from the consumer to the producer, the serial subsystem utilises a
-*notification flag* for the producer to indicate to the consumer that it
-requires a signal if more space has become available. If upon finishing
-dequeueing characters the consumer finds the *producer_signalled* flag set to
-false, it will set the flag to true and signal its neighbour.
+In the case of work being performed by the producer, the serial subsystem
+requires that the consumer of the queue must *always* be notified by the
+producer. In contrast, if work is performed by the consumer, the producer will
+only be notified if it is awaiting free space to enqueue additional characters.
 
-This procedure of signalling based on the value of a *notification flag* is an
-instance of the *sDDF signalling protocol*, and is written in such a way to
-prevent deadlocks from race conditions. Further information on the specifics of
-this protocol can also be found in the [sDDF design document](/docs/design_doc).
-Failure to follow this protocol when interfacing with sDDF components may result
-in data processing delays, or in the worst case deadlocks.
+To minimise unnecessary signals from the consumer to the producer, the serial
+subsystem uses the [sDDF signalling
+protocol](/docs/developing.md#signalling-protocol), which utilises a shared
+*notification flag* for the producer to register for notifications from the
+consumer when queue space becomes available. Upon finishing dequeueing a batch
+of characters, the consumer will check the *`producer_signalled`* flag to
+determine whether to notify the producer.
+
+The signalling protocol was designed to ensure that deadlocks can not occur as a
+result of race conditions from setting and checking this flag. Failure to follow
+this protocol correctly may result in data processing delays, or in the worst
+case deadlocks.
+
+If you wish to enable free space available notifications using the
+`producer_signalled` flag, setting the flag alone is not enough to guarantee the
+producer will eventually be awoken by the consumer. The signalling protocol also
+requires that the setter of the flag "double-checks" the state of the queue
+before blocking. This protects against a race condition that can occur if the
+consumer pre-empts the producer and processes the queue before the producer has
+finished setting its flag. Pseudo code demonstrating how to this "double-check"
+should be implemented can be found
+[here](/docs/developing.md#signalling-protocol).
 
 ## Transmission
 
@@ -156,12 +167,12 @@ transmit virtualiser:
 For each of these methods, special care must be taken to consider the following
 cases:
 
-### Carriage Returns
+### Carriage returns
 
 Whether a `\r` should be added automatically to client output preceding a `\n`.
 `sddf_putchar` does this automatically when using `sddf_[d]printf`.
 
-### Reaching Data Region Capacity
+### Reaching data region capacity
 
 How to handle the data region hitting capacity. The `serial_enqueue*` functions
 will return with an error if called when the queue is full. When the queue
@@ -232,7 +243,7 @@ being enqueued, the new character will be dropped. This ensures that the receive
 virtualiser may continue making progress regardless of the state of a client's
 queue.
 
-## Using the Serial Subsystem in your System
+## Using the serial subsystem
 
 If you wish to use a platform that is not yet supported, you will need to create
 your own UART driver to interface with the serial receive and transmit
@@ -240,7 +251,7 @@ virtualisers. See [here](/docs/developing.md) for tips on how to do this and
 [drivers.md](/docs/drivers.md) for an existing list of all serial devices
 supported.
 
-### SDF Generator Tool
+### sdfgen
 
 It is highly recommended to use the [Microkit sdfgen
 tool](https://au-ts.github.io/microkit_sdf_gen/) to create sDDF and LionsOS
@@ -287,7 +298,7 @@ given the ability to receive characters. In the future, receive and transmit
 ability will be decided on a per client basis as each client is added to the
 system.
 
-### Interfacing with Clients
+### Interfacing with clients
 
 The Microkit sdfgen tool will create all the serial resources required for each
 serial component. The virtual addresses of memory regions and channel values
@@ -352,7 +363,7 @@ while (!serial_dequeue(&rx_queue_handle, &c)) {
 Note that if a client's data region is full at the time when the receive
 virtualiser tries to enqueue a character, the character will be dropped.
 
-### Building Components and Libraries
+### Building components and libraries
 
 Our build system relies on makefile snippets to build sDDF components and
 libraries. The serial components that are required to use the subsystem are:
@@ -377,13 +388,13 @@ Serial components assume that `libsddf_util_debug.a` is present in `${LIBS}`. If
 a client wishes to print via the serial subsystem, `libsddf_util.a` must be
 listed prior to `libsddf_util_debug.a`.
 
-#### Include Paths
+#### Include paths
 
 Serial components and clients will need to have the top level [sDDF
 include](/include/) in their `CFLAGS` to access sDDF library functions as well
 as serial configuration structs.
 
-## Running and Using
+## Running and using
 
 An example system utilising both the transmit and receive functionality of the
 serial subsystem can be found [here](/examples/serial/). The
