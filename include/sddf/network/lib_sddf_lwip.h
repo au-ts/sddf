@@ -25,7 +25,7 @@ typedef enum {
     SDDF_LWIP_ERR_INVALID_PBUF = -2,
     /* No buffers available. */
     SDDF_LWIP_ERR_NO_BUF = -3,
-    /* Unknown LWIP error. */
+    /* Unknown lwIP error. */
     SDDF_LWIP_ERR_UNHANDLED = -4
 } net_sddf_err_t;
 
@@ -45,12 +45,12 @@ typedef struct pbuf_custom_offset {
 } pbuf_custom_offset_t;
 
 /**
- * Function type for output of sDDF LWIP errors.
+ * Function type for output of sDDF lwIP errors.
  */
 typedef int (*sddf_lwip_err_output_fn)(const char *format, ...) __attribute__((format(__printf__, 1, 2)));
 
 /**
- * Function type for netif status callback. Invoked by LWIP upon
+ * Function type for netif status callback. Invoked by lwIP upon
  * successfully obtaining an IP address for the network interface.
  */
 typedef void (*sddf_lwip_netif_status_callback_fn)(char *ip_addr);
@@ -82,14 +82,14 @@ typedef net_sddf_err_t (*sddf_lwip_tx_handle_intercept_fn)(struct pbuf *p);
 bool pbuf_pool_empty(void);
 
 /**
- * Allocate a pbuf from lib sDDF LWIP static pbuf pool.
+ * Allocate a pbuf from lib sDDF lwIP static pbuf pool.
  *
  * @return pointer to allocated pbuf or NULL if out of memory.
  */
 pbuf_custom_offset_t *pbuf_pool_alloc(void);
 
 /**
- * Free a pbuf allocated from lib sDDF LWIP static pbuf pool. WARNING: This
+ * Free a pbuf allocated from lib sDDF lwIP static pbuf pool. WARNING: This
  * function only checks if p is a valid pbuf pointer from the memory pool, not
  * if it is currently allocated. Freeing a pbuf that is already free will cause
  * pbufs to be permanently lost.
@@ -97,13 +97,13 @@ pbuf_custom_offset_t *pbuf_pool_alloc(void);
  * @param p pbuf to free.
  *
  * @return SDDF_LWIP_ERR_OK pbuf freed succesfully.
- * @return SDDF_LWIP_ERR_INVALID_PBUF pbuf is not part of lib sDDF LWIP static
+ * @return SDDF_LWIP_ERR_INVALID_PBUF pbuf is not part of lib sDDF lwIP static
  * pbuf pool.
  */
 net_sddf_err_t pbuf_pool_free(pbuf_custom_offset_t *pbuf);
 
 /**
- * Checks LWIP system timeouts. Should be invoked after every LWIP tick.
+ * Checks lwIP system timeouts. Should be invoked after every lwIP tick.
  */
 void sddf_lwip_process_timeout(void);
 
@@ -116,14 +116,14 @@ void sddf_lwip_process_timeout(void);
  *
  * @return SDDF_LWIP_ERR_OK pbuf was sent successfully.
  * @return SDDF_LWIP_ERR_LARGE_PBUF pbuf is larger than sDDF net buffer.
- * @return SDDF_LWIP_ERR_NO_BUF no available sDDF buffers, or lib sDDF LWIP does
+ * @return SDDF_LWIP_ERR_NO_BUF no available sDDF buffers, or lib sDDF lwIP does
    not have Tx enabled.
- * @return SDDF_LWIP_ERR_UNHANDLED unhandled LWIP error occured.
+ * @return SDDF_LWIP_ERR_UNHANDLED unhandled lwIP error occured.
  */
 net_sddf_err_t sddf_lwip_transmit_pbuf(struct pbuf *p);
 
 /**
- * Handles the passing of incoming packets in sDDF buffers to LWIP. Must be
+ * Handles the passing of incoming packets in sDDF buffers to lwIP. Must be
  * called to process the sDDF RX queue each time a notification is received from
  * the network virtualiser. If client is TX only calling this function has no
  * effect.
@@ -131,14 +131,14 @@ net_sddf_err_t sddf_lwip_transmit_pbuf(struct pbuf *p);
 void sddf_lwip_process_rx(void);
 
 /**
- * Input a user provided pbuf into LWIPs network stack. User is responsible for
+ * Input a user provided pbuf into lwIPs network stack. User is responsible for
  * freeing the pbuf in the case of failure.
  *
  * @param p initialised pbuf to input.
  *
  * @return SDDF_LWIP_ERR_OK pbuf was input successfully.
  * @return SDDF_LWIP_ERR_INVALID_PBUF invalid pbuf pointer.
- * @return SDDF_LWIP_ERR_UNHANDLED unhandled LWIP error occured.
+ * @return SDDF_LWIP_ERR_UNHANDLED unhandled lwIP error occured.
  */
 net_sddf_err_t sddf_lwip_input_pbuf(struct pbuf *p);
 
@@ -150,8 +150,8 @@ net_sddf_err_t sddf_lwip_input_pbuf(struct pbuf *p);
 void sddf_lwip_maybe_notify(void);
 
 /**
- * Initialisation function for the sDDF LWIP library. Must be called prior to
- * using any other sDDF LWIP library functions.
+ * Initialisation function for the sDDF lwIP library. Must be called prior to
+ * using any other sDDF lwIP library functions.
  *
  * @param lib_sddf_lwip_config config structure for this library
  * @param net_config sDDF-Net config resource structure
@@ -169,10 +169,10 @@ void sddf_lwip_maybe_notify(void);
  * callback function. Provide NULL to use err_output to print client MAC address
  * and obtained IP address.
  * @param handle_empty_tx_free function pointer to optional user provided
- * handling function for no available sDDF TX buffers during sending of LWIP
+ * handling function for no available sDDF TX buffers during sending of lwIP
  * pbuf. Provide NULL to leave unhandled.
  * @param tx_intercept_condition function pointer to optional user provided TX
- * interception check function. Allows users to intercept LWIP transmissions
+ * interception check function. Allows users to intercept lwIP transmissions
  * before they are enqueued in sDDF net TX queue. Return true to invoke TX
  * intercept handling function.
  * @param tx_handle_intercept function pointer to optional user provided TX

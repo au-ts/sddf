@@ -30,7 +30,7 @@
 static char SDDF_LIB_SDDF_LWIP_MAGIC[SDDF_LIB_SDDF_LWIP_MAGIC_LEN] = { 's', 'D', 'D', 'F', 0x8 };
 
 typedef struct lwip_state {
-    /* LWIP network interface struct. */
+    /* lwIP network interface struct. */
     struct netif netif;
     /* IP address of client as a string */
     char ip_string[SDDF_LWIP_IPV4_ADDR_STRLEN];

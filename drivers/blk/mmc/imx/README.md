@@ -11,12 +11,10 @@ documents:
 - i.MX 8M Dual/8M QuadLite/8M Quad Applications Processors Reference Manual
   Document Number: IMX8MDQLQRM, Rev 3.1, 06/2021.
   https://www.nxp.com/webapp/Download?colCode=IMX8MDQLQRM
-- SD Specifications Part 1 Physical Layer Simplified Specification.
-  Version 9.10, Dec. 2023.
-  https://www.sdcard.org/downloads/pls/
-- SD Specifications Part A2 SD Host Controller Simplified Specification.
-  Version 4.20, July 2018.
-  https://www.sdcard.org/downloads/pls/
+- SD Specifications Part 1 Physical Layer Simplified Specification. Version
+  9.10, Dec. 2023. https://www.sdcard.org/downloads/pls/
+- SD Specifications Part A2 SD Host Controller Simplified Specification. Version
+  4.20, July 2018. https://www.sdcard.org/downloads/pls/
 
 ## Implemented
 - IRQ & DMA based driver

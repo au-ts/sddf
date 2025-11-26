@@ -56,7 +56,7 @@ zig build -Dsdk=/path/to/sdk -Dboard=qemu_virt_aarch64 qemu
 
 The final bootable image will be in `zig-out/bin/loader.img`.
 
-## Running/Using
+## Running/using
 
 When running the example in debug mode you should see the following output from
 the serial transmit virtualiser upon booting, showing which client is associated
