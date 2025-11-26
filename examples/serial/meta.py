@@ -16,6 +16,7 @@ assert version("sdfgen").split(".")[1] == "27", "Unexpected sdfgen version"
 
 ProtectionDomain = SystemDescription.ProtectionDomain
 
+
 # Adds ".elf" to elf strings
 def copy_elf(source_elf: str, new_elf: str, elf_number=None):
     source_elf += ".elf"
@@ -24,6 +25,7 @@ def copy_elf(source_elf: str, new_elf: str, elf_number=None):
     new_elf += ".elf"
     assert os.path.isfile(source_elf)
     return shutil.copyfile(source_elf, new_elf)
+
 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     serial_driver = ProtectionDomain("serial_driver", "serial_driver.elf", priority=200)
