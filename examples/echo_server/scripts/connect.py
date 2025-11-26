@@ -8,7 +8,7 @@ import socket
 import sys
 
 UDP_ECHO_PORT = 1235
-TCP_ECHO_PORT = 1237
+TCP_ECHO_PORT = 1236
 
 
 def udp(ip: str):
