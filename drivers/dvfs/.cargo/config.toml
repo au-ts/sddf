@@ -1,0 +1,14 @@
+# Copyright 2025, UNSW
+# SPDX-License-Identifier: BSD-2-Clause
+
+[build]
+target = "../../support/targets/aarch64-sel4-microkit-minimal.json"
+
+[unstable]
+build-std = ["core", "compiler_builtins", "alloc"]
+build-std-features = ["compiler-builtins-mem"]
+
+[net]
+git-fetch-with-cli = true
+
+[target."aarch64-sel4-microkit-minimal"]

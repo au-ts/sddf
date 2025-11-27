@@ -36,6 +36,7 @@ Files:
     drivers/timer/cdns/config.json
     drivers/timer/bcm2835/config.json
     drivers/timer/apb_timer/config.json
+    drivers/dvfs/Cargo.lock
 Copyright: UNSW
 License: BSD-2-Clause
 
@@ -53,3 +54,7 @@ License: ISC
 Files: network/ipstacks/lwip/*
 Copyright: Copyright (c) 2001-2004 Swedish Institute of Computer Science
 License: LicenseRef-BSD-LWIP
+
+Files: support/targets/aarch64-sel4-microkit-minimal.json
+Copyright: Copyright 2023, Colias Group, LLC
+License: BSD-2-Clause

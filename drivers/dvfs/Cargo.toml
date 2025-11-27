@@ -1,0 +1,14 @@
+# Copyright 2025, UNSW
+# SPDX-License-Identifier: BSD-2-Clause
+
+[package]
+name = "dvfs_driver"
+version = "0.1.0"
+edition = "2024"
+authors = ["Cheng Li 李澄 <lichengchaoreng@gmail.com>"]
+
+[dependencies]
+cpufreq = { path = "cpufreq" }
+sddf-rust = { path = "../../include/sddf-rust" }
+sel4-microkit = { git = "https://github.com/seL4/rust-sel4.git", tag = "v3.0.0" }
+sddf-ipc-types = { git = "https://github.com/seL4/rust-sel4.git", tag = "v3.0.0" }
