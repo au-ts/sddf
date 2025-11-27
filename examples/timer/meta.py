@@ -26,8 +26,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     client = ProtectionDomain("client", "client.elf", priority=1)
 
     if board.name == "x86_64_generic":
-        # actual interrupt vector = 0 + irq_user_min(0x10) + IRQ_INT_OFFSET(0x20) = 0x30
-        hpet_irq = SystemDescription.IrqMsi(0, 0, 0, 0, 0, 0)
+        hpet_irq = SystemDescription.IrqIoapic(board.arch, ioapic_id=0, pin=2, vector=0, id=0)
         timer_driver.add_irq(hpet_irq)
 
         hept_regs = SystemDescription.MemoryRegion(
