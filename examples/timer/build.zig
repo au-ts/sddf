@@ -19,6 +19,7 @@ const MicrokitBoard = enum {
     imx8mq_evk,
     zcu102,
     rpi4b_1gb,
+    x86_64_generic,
 };
 
 const Target = struct {
@@ -144,6 +145,15 @@ const targets = [_]Target{
             .abi = .none,
         },
     },
+    .{
+        .board = MicrokitBoard.x86_64_generic,
+        .zig_target = std.Target.Query{
+            .cpu_arch = .x86_64,
+            .cpu_model = .{ .explicit = std.Target.Cpu.Model.generic(.x86_64) },
+            .os_tag = .freestanding,
+            .abi = .none,
+        },
+    },
 };
 
 fn findTarget(board: MicrokitBoard) std.Target.Query {
@@ -217,6 +227,7 @@ pub fn build(b: *std.Build) !void {
         .maaxboard, .imx8mm_evk, .imx8mp_evk, .imx8mq_evk => "imx",
         .zcu102 => "cdns",
         .rpi4b_1gb => "bcm2835",
+        .x86_64_generic => "hpet",
     };
 
     const driver = sddf_dep.artifact(b.fmt("driver_timer_{s}.elf", .{driver_class}));
@@ -245,13 +256,18 @@ pub fn build(b: *std.Build) !void {
 
     b.installArtifact(client);
 
-    // For compiling the DTS into a DTB
-    const dts = sddf_dep.path(b.fmt("dts/{s}.dts", .{microkit_board}));
-    const dtc_cmd = b.addSystemCommand(&[_][]const u8{ "dtc", "-q", "-I", "dts", "-O", "dtb" });
-    dtc_cmd.addFileInput(dts);
-    dtc_cmd.addFileArg(dts);
-    const dtb = dtc_cmd.captureStdOut();
-
+    const dtb = blk: {
+        if (target.result.cpu.arch != .x86_64) {
+            // For compiling the DTS into a DTB
+            const dts = sddf_dep.path(b.fmt("dts/{s}.dts", .{microkit_board}));
+            const dtc_cmd = b.addSystemCommand(&[_][]const u8{ "dtc", "-q", "-I", "dts", "-O", "dtb" });
+            dtc_cmd.addFileInput(dts);
+            dtc_cmd.addFileArg(dts);
+            break :blk dtc_cmd.captureStdOut();
+        } else {
+            break :blk null;
+        }
+    };
     // Run the metaprogram to get sDDF configuration binary files and the SDF file.
     const metaprogram = b.path("meta.py");
     const run_metaprogram = b.addSystemCommand(&[_][]const u8{
@@ -260,7 +276,9 @@ pub fn build(b: *std.Build) !void {
     run_metaprogram.addFileArg(metaprogram);
     run_metaprogram.addFileInput(metaprogram);
     run_metaprogram.addPrefixedDirectoryArg("--sddf=", sddf_dep.path(""));
-    run_metaprogram.addPrefixedDirectoryArg("--dtb=", dtb);
+    if (dtb != null) {
+        run_metaprogram.addPrefixedDirectoryArg("--dtb=", dtb.?);
+    }
     const meta_output = run_metaprogram.addPrefixedOutputDirectoryArg("--output=", "meta_output");
     run_metaprogram.addArg("--board");
     run_metaprogram.addArg(microkit_board);
@@ -334,6 +352,25 @@ pub fn build(b: *std.Build) !void {
             "2G",
             "-nographic",
         });
+    } else if (microkit_board_option == .x86_64_generic) {
+        const kernel_32 = microkit_board_dir.path(b, "elf/sel4_32.elf");
+        qemu_cmd = b.addSystemCommand(&[_][]const u8{
+            "qemu-system-x86_64",
+            "-machine",
+            "q35",
+            "-cpu",
+            "qemu64,+fsgsbase,+pdpe1gb,+pcid,+invpcid,+xsave,+xsaves,+xsaveopt",
+            "-serial",
+            "mon:stdio",
+            "-kernel",
+            b.getInstallPath(.bin, "sel4_32.elf"),
+            "-initrd",
+            final_image_dest,
+            "-m",
+            "2G",
+            "-nographic",
+        });
+        qemu_cmd.?.step.dependOn(&b.addInstallFileWithDir(kernel_32, .bin, "sel4_32.elf").step);
     }
 
     if (qemu_cmd) |cmd| {
