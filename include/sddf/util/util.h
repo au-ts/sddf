@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <microkit.h>
 #include <stddef.h>
 
 #ifndef ARRAY_SIZE

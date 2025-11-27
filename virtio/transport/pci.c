@@ -20,7 +20,10 @@
 #define PCI_DATA_PORT_ADDR 0xCFC
 
 /* Multiplier for virtIO queue kick mechanism. */
-uint32_t nftn_multiplier;
+
+// @billn hack hardcode: should pull from the PCI config space, but seL4 doesn't allow two CSpaces to access
+// the same I/O port. So hardcoding to allow multiple virtio PCI drivers in one system.
+uint32_t nftn_multiplier = 4;
 
 uint32_t pci_compute_port_address(uint8_t bus, uint8_t dev, uint8_t func, uint8_t off)
 {
@@ -104,38 +107,37 @@ void pci_debug_print_header(uint8_t bus, uint8_t dev, uint8_t func, pci_gen_dev_
     LOG_VIRTIO_TRANSPORT("\tCapabilities ptr: 0x%x\n", pci_device_header->cap_ptr);
 
     /* If the capability list bit is set, walk the cap list. */
-    if (pci_device_header->common_hdr.status & BIT(4)) {
-        uint8_t cap_off = pci_device_header->cap_ptr;
-        while (cap_off) {
-            uint32_t virtio_cap_arr[4];
-            virtio_cap_arr[0] = pci_x86_read_32(bus, dev, func, cap_off);
-            virtio_cap_arr[1] = pci_x86_read_32(bus, dev, func, cap_off + 4);
-            virtio_cap_arr[2] = pci_x86_read_32(bus, dev, func, cap_off + 8);
-            virtio_cap_arr[3] = pci_x86_read_32(bus, dev, func, cap_off + 12);
+    // if (pci_device_header->common_hdr.status & BIT(4)) {
+    //     uint8_t cap_off = pci_device_header->cap_ptr;
+    //     while (cap_off) {
+    //         uint32_t virtio_cap_arr[4];
+    //         virtio_cap_arr[0] = pci_x86_read_32(bus, dev, func, cap_off);
+    //         virtio_cap_arr[1] = pci_x86_read_32(bus, dev, func, cap_off + 4);
+    //         virtio_cap_arr[2] = pci_x86_read_32(bus, dev, func, cap_off + 8);
+    //         virtio_cap_arr[3] = pci_x86_read_32(bus, dev, func, cap_off + 12);
 
-            virtio_pci_cap_t *cap = (virtio_pci_cap_t *)virtio_cap_arr;
+    //         virtio_pci_cap_t *cap = (virtio_pci_cap_t *)virtio_cap_arr;
 
-            if (cap->cap_vndr == PCI_CAP_ID_VNDR) {
-                LOG_VIRTIO_TRANSPORT("\tCap @ 0x%x, vendor 0x%x\n", cap_off, cap->cap_vndr);
-                LOG_VIRTIO_TRANSPORT("\t\tCap next: 0x%x\n", cap->cap_next);
-                LOG_VIRTIO_TRANSPORT("\t\tCap len: 0x%x\n", cap->cap_len);
-                LOG_VIRTIO_TRANSPORT("\t\tType: 0x%x\n", cap->cfg_type);
-                LOG_VIRTIO_TRANSPORT("\t\tBar: 0x%x\n", cap->bar);
-                LOG_VIRTIO_TRANSPORT("\t\tID: 0x%x\n", cap->id);
-                LOG_VIRTIO_TRANSPORT("\t\tBar off: 0x%x\n", cap->offset);
-                LOG_VIRTIO_TRANSPORT("\t\tBar Len: 0x%x\n", cap->length);
+    //         if (cap->cap_vndr == PCI_CAP_ID_VNDR) {
+    //             LOG_VIRTIO_TRANSPORT("\tCap @ 0x%x, vendor 0x%x\n", cap_off, cap->cap_vndr);
+    //             LOG_VIRTIO_TRANSPORT("\t\tCap next: 0x%x\n", cap->cap_next);
+    //             LOG_VIRTIO_TRANSPORT("\t\tCap len: 0x%x\n", cap->cap_len);
+    //             LOG_VIRTIO_TRANSPORT("\t\tType: 0x%x\n", cap->cfg_type);
+    //             LOG_VIRTIO_TRANSPORT("\t\tBar: 0x%x\n", cap->bar);
+    //             LOG_VIRTIO_TRANSPORT("\t\tID: 0x%x\n", cap->id);
+    //             LOG_VIRTIO_TRANSPORT("\t\tBar off: 0x%x\n", cap->offset);
+    //             LOG_VIRTIO_TRANSPORT("\t\tBar Len: 0x%x\n", cap->length);
 
-                // @billn break this out, this debug print functions mustn't have side effects
-                if (cap->cfg_type == VIRTIO_PCI_CAP_NOTIFY_CFG) {
-                    // 4.1.4.4 Notification structure layout
-                    nftn_multiplier = pci_x86_read_32(bus, dev, func, cap_off + sizeof(virtio_pci_cap_t));
-                    LOG_VIRTIO_TRANSPORT("\t\tnftn_multiplier: 0x%x\n", nftn_multiplier);
-                }
-            }
+    //             // @billn break this out, this debug print functions mustn't have side effects
+    //             if (cap->cfg_type == VIRTIO_PCI_CAP_NOTIFY_CFG) {
+    //                 // 4.1.4.4 Notification structure layout
+    //                 nftn_multiplier = pci_x86_read_32(bus, dev, func, cap_off + sizeof(virtio_pci_cap_t));
+    //             }
+    //         }
 
-            cap_off = cap->cap_next;
-        }
-    }
+    //         cap_off = cap->cap_next;
+    //     }
+    // }
 }
 
 static bool read_pci_general_device_header(uint8_t bus, uint8_t dev, uint8_t func, pci_gen_dev_hdr_t *ret)
@@ -150,7 +152,7 @@ static bool read_pci_general_device_header(uint8_t bus, uint8_t dev, uint8_t fun
 
     uint8_t hdr_type = (pci_device_header[3] >> 16) & 0xff;
     if (hdr_type != PCI_HEADER_TYPE_GENERAL) {
-        LOG_VIRTIO_TRANSPORT("parsing non device pci header is currently unsupported.\n");
+        LOG_VIRTIO_ERR("parsing non device pci header is currently unsupported.\n");
         return false;
     }
 
@@ -168,40 +170,40 @@ bool virtio_transport_probe(device_resources_t *device_resources, virtio_device_
 {
     assert(device_resources_check_magic(device_resources));
 
-    uint8_t bus = device_handle_ret->pci_bus;
-    uint8_t dev = device_handle_ret->pci_dev;
-    uint8_t func = device_handle_ret->pci_func;
+    // uint8_t bus = device_handle_ret->pci_bus;
+    // uint8_t dev = device_handle_ret->pci_dev;
+    // uint8_t func = device_handle_ret->pci_func;
 
-    uint8_t pci_class_code = device_handle_ret->pci_class_code;
-    uint8_t pci_subclass = device_handle_ret->pci_subclass;
-    uint16_t pci_vendor_id = device_handle_ret->pci_vendor_id;
-    uint16_t pci_device_id = device_handle_ret->pci_device_id;
+    // uint8_t pci_class_code = device_handle_ret->pci_class_code;
+    // uint8_t pci_subclass = device_handle_ret->pci_subclass;
+    // uint16_t pci_vendor_id = device_handle_ret->pci_vendor_id;
+    // uint16_t pci_device_id = device_handle_ret->pci_device_id;
 
-    pci_gen_dev_hdr_t pci_device_header;
-    assert(read_pci_general_device_header(bus, dev, func, &pci_device_header));
+    // pci_gen_dev_hdr_t pci_device_header;
+    // assert(read_pci_general_device_header(bus, dev, func, &pci_device_header));
 
-    if (pci_device_header.common_hdr.class_code != pci_class_code) {
-        LOG_VIRTIO_ERR("PCI device @ %u:%u.%u, expected class code 0x%x, got 0x%x!\n", bus, dev, func, pci_class_code,
-                       pci_device_header.common_hdr.class_code);
-        return false;
-    }
-    if (pci_device_header.common_hdr.subclass != pci_subclass) {
-        LOG_VIRTIO_ERR("PCI device @ %u:%u.%u, expected subclass code 0x%x, got 0x%x!\n", bus, dev, func, pci_subclass,
-                       pci_device_header.common_hdr.subclass);
-        return false;
-    }
-    if (pci_device_header.common_hdr.vendor_id != pci_vendor_id) {
-        LOG_VIRTIO_ERR("PCI device @ %u:%u.%u, expected vendor id 0x%x, got 0x%x!\n", bus, dev, func, pci_vendor_id,
-                       pci_device_header.common_hdr.vendor_id);
-        return false;
-    }
-    if (pci_device_header.common_hdr.device_id != pci_device_id) {
-        LOG_VIRTIO_ERR("PCI device @ %u:%u.%u, expected device id 0x%x, got 0x%x!\n", bus, dev, func, pci_device_id,
-                       pci_device_header.common_hdr.device_id);
-        return false;
-    }
+    // if (pci_device_header.common_hdr.class_code != pci_class_code) {
+    //     LOG_VIRTIO_ERR("PCI device @ %u:%u.%u, expected class code 0x%x, got 0x%x!\n", bus, dev, func, pci_class_code,
+    //                    pci_device_header.common_hdr.class_code);
+    //     return false;
+    // }
+    // if (pci_device_header.common_hdr.subclass != pci_subclass) {
+    //     LOG_VIRTIO_ERR("PCI device @ %u:%u.%u, expected subclass code 0x%x, got 0x%x!\n", bus, dev, func, pci_subclass,
+    //                    pci_device_header.common_hdr.subclass);
+    //     return false;
+    // }
+    // if (pci_device_header.common_hdr.vendor_id != pci_vendor_id) {
+    //     LOG_VIRTIO_ERR("PCI device @ %u:%u.%u, expected vendor id 0x%x, got 0x%x!\n", bus, dev, func, pci_vendor_id,
+    //                    pci_device_header.common_hdr.vendor_id);
+    //     return false;
+    // }
+    // if (pci_device_header.common_hdr.device_id != pci_device_id) {
+    //     LOG_VIRTIO_ERR("PCI device @ %u:%u.%u, expected device id 0x%x, got 0x%x!\n", bus, dev, func, pci_device_id,
+    //                    pci_device_header.common_hdr.device_id);
+    //     return false;
+    // }
 
-    pci_debug_print_header(bus, dev, func, &pci_device_header);
+    // pci_debug_print_header(bus, dev, func, &pci_device_header);
 
     return true;
 }

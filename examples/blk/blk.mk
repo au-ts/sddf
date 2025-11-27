@@ -41,7 +41,8 @@ SYSTEM_FILE := blk.system
 SUPPORTED_BOARDS := qemu_virt_aarch64 \
 		    qemu_virt_riscv64 \
 		    maaxboard \
-			x86_64_generic
+			x86_64_generic \
+			x86_64_generic_vtx
 
 TOP := ${SDDF}/examples/blk
 CONFIGS_INCLUDE := ${TOP}

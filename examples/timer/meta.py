@@ -25,19 +25,18 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=253)
     client = ProtectionDomain("client", "client.elf", priority=1)
 
-    if board.name == "x86_64_generic":
-        # actual interrupt vector = 0 + irq_user_min(0x10) + IRQ_INT_OFFSET(0x20) = 0x30
-        hpet_irq = SystemDescription.IrqMsi(0, 0, 0, 0, 0, 0)
+    if board.name == "x86_64_generic" or board.name == "x86_64_generic_vtx":
+        hpet_irq = SystemDescription.IrqIoapic(ioapic_id=0, pin=2, vector=0, id=0, trigger=SystemDescription.IrqIoapic.Trigger.EDGE)
         timer_driver.add_irq(hpet_irq)
 
-        hept_regs = SystemDescription.MemoryRegion(
-            sdf, "hept_regs", 0x1000, paddr=0xFED00000
+        hpet_regs = SystemDescription.MemoryRegion(
+            sdf, "hpet_regs", 0x1000, paddr=0xFED00000
         )
-        hept_regs_map = SystemDescription.Map(
-            hept_regs, 0x5000_0000, "rw", cached=False
+        hpet_regs_map = SystemDescription.Map(
+            hpet_regs, 0x5000_0000, "rw", cached=False
         )
-        timer_driver.add_map(hept_regs_map)
-        sdf.add_mr(hept_regs)
+        timer_driver.add_map(hpet_regs_map)
+        sdf.add_mr(hpet_regs)
     else:
         timer_node = dtb.node(board.timer)
         assert timer_node is not None
@@ -51,6 +50,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
     assert timer_system.connect()
     assert timer_system.serialise_config(output_dir)
+    timer_driver.passive = False
 
     with open(f"{output_dir}/{sdf_file}", "w+") as f:
         f.write(sdf.render())

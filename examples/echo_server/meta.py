@@ -200,9 +200,7 @@ def generate(
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
 
     if board.arch == SystemDescription.Arch.X86_64:
-        hpet_irq = SystemDescription.IrqMsi(
-            pci_bus=0, pci_device=0, pci_func=0, vector=0, handle=0, id=0
-        )
+        hpet_irq = SystemDescription.IrqIoapic(ioapic_id=0, pin=2, vector=40, id=0)
         timer_driver.add_irq(hpet_irq)
 
         hpet_regs = SystemDescription.MemoryRegion(
