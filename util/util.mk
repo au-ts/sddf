@@ -31,7 +31,7 @@ ifeq ($(ARCH),riscv64)
 	CFLAGS += -I${SDDF}/util/custom_libc/riscv64
 endif
 
-ALL_OBJS_LIBUTIL := $(addprefix util/, ${OBJS_LIBUTIL} putchar_debug.o putchar_serial.o custom_libc/memmove.o)
+ALL_OBJS_LIBUTIL := $(addprefix util/, ${OBJS_LIBUTIL} putchar_debug.o putchar_serial.o)
 
 BASE_OBJS_LIBUTIL := $(addprefix util/, ${OBJS_LIBUTIL})
 ${ALL_OBJS_LIBUTIL}: |util util/custom_libc
