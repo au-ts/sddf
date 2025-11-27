@@ -287,10 +287,10 @@ fn addVirtioBlockDriver(
         .file = b.path("drivers/blk/virtio/block.c"),
     });
     driver.addCSourceFile(.{
-        .file = b.path(b.fmt("virtio/transport/{s}.c", .{ @tagName(class) })),
+        .file = b.path(b.fmt("virtio/transport/{s}.c", .{@tagName(class)})),
         .flags = switch (class) {
-            .pci => &.{ "-DVIRTIO_PCI_TRANSPORT_FOR_BLK" },
-            .mmio => &.{ "-DVIRTIO_MMIO_TRANSPORT_FOR_BLK" },
+            .pci => &.{"-DVIRTIO_PCI_TRANSPORT_FOR_BLK"},
+            .mmio => &.{"-DVIRTIO_MMIO_TRANSPORT_FOR_BLK"},
         },
     });
     driver.addIncludePath(b.path(b.fmt("drivers/blk/{s}/", .{@tagName(class)})));

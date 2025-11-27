@@ -356,7 +356,7 @@ pub fn build(b: *std.Build) !void {
         const blk_device_args = &.{
             "-global", "virtio-mmio.force-legacy=false",
             "-drive",  b.fmt("file={s},if=none,format=raw,id=hd", .{b.getInstallPath(.prefix, "disk")}),
-            "-device", b.fmt("virtio-blk-{s},drive=hd", .{ qemu_virtio_device }),
+            "-device", b.fmt("virtio-blk-{s},drive=hd", .{qemu_virtio_device}),
         };
         qemu_cmd.addArgs(blk_device_args);
 
