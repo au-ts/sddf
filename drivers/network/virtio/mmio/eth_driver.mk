@@ -20,7 +20,7 @@ ${CHECK_NETDRV_FLAGS_MD5}:
 	-rm -f .netdrv_cflags-*
 	touch $@
 
-eth_driver.elf eth_driver_virtio.elf: network/virtio/mmio/ethernet.o network/virtio/mmio/transport.o
+eth_driver_virtio.elf: network/virtio/mmio/ethernet.o network/virtio/mmio/transport.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 network/virtio/mmio/ethernet.o: ${ETHERNET_COMMON_DIR}/ethernet.c ${CHECK_NETDRV_FLAGS} | $(SDDF_LIBC_INCLUDE)
