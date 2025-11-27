@@ -24,6 +24,7 @@ The following platforms are supported:
 * rpi4b_1gb
 * serengeti
 * star64
+* x86_64_generic
 * zcu102
 
 ### Make
