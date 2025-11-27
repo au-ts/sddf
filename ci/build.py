@@ -17,6 +17,8 @@ try:
     from rich.console import Console, Group
     from rich.table import Table
     from rich.panel import Panel
+    from rich.text import Text
+    from rich.live import Live
     RICH_OK = True
 except Exception:
     RICH_OK = False
@@ -44,6 +46,23 @@ def get_example_dir(example_name: str):
 def is_ci() -> bool:
     return bool(os.environ.get("CI"))
 
+def _job_color(status: str) -> str:
+    # treat "not done yet" as yellow
+    if status in ("PENDING", "RUNNING"):
+        return "yellow"
+    if status == "DONE":
+        return "green"
+    if status == "FAILED":
+        return "red"
+    return "white"
+
+def _panel_border(jobs: list[JobState]) -> str:
+    if any(j.status == "FAILED" for j in jobs):
+        return "red"
+    if all(j.status == "DONE" for j in jobs):
+        return "green"
+    return "yellow"
+
 def render_dashboard(state_by_example: dict[str, list[JobState]]):
     # Rendering with rich
     panels = []
@@ -51,15 +70,19 @@ def render_dashboard(state_by_example: dict[str, list[JobState]]):
     for ex in sorted(state_by_example.keys()):
         jobs = state_by_example[ex]
         done = sum(1 for j in jobs if js.status in ("DONE", "FAILED"))
+        total = len(jobs)
         t = Table(show_header=True, box=None, padding=(0,1))
         t.add_column("board", no_wrap=True)
         t.add_column("config", no_wrap=True)
         t.add_column("sys", no_wrap=True)
         t.add_column("status", no_wrap=True)
-        for j in jobs:
-            t.add_row(j.board, j.config, j.build_system, j.status)
 
-        panels.append(Panel(t, title=f"{ex} ({done}/{len(jobs)})", border_style="dim"))
+        for j in jobs:
+            color = _job_color(j.status)
+            t.add_row(j.board, j.config, j.build_system, Text(j.status, style=color))
+
+        panels.append(Panel(t, title=f"{ex} ({done}/{total})", border_style=_panel_border(jobs)))
+
     return Group(*panels)
 
 def print_dashboard_plain(state_by_example: dict[str, list[JobState]]):
@@ -167,10 +190,19 @@ if __name__ == "__main__":
             pass
 
     dashboard = (not is_ci()) and RICH_OK
-    console = Console(stderr=True) if dashboard else None
 
     state_by_example: dict[str, list[JobState]] = {}
     jobs_in_order: list[tuple[JobState, TestConfig]] = []
+
+    if dashboard:
+        console = Console(stderr=True, force_terminal=True)
+        live = Live(
+            render_dashboard(state_by_example),
+            console=console,
+            screen=True,               # prevents scroll/overflow junk
+            refresh_per_second=10,
+        )
+        live.start()
 
     # Prepare the jobs # TODO: this can be later ported to running as well
     for example_name, options in matrix.EXAMPLES.items():
@@ -189,45 +221,40 @@ if __name__ == "__main__":
             jobs_in_order.append((js, cfg))
 
     failed = 0
-    last_draw = 0.0
 
     def draw():
-        global last_draw
-        if not dashboard:
-            return
-
-        now = time.monotonic()
-        if now - last_draw < 0.1:
-            return
-        last_draw = now
-        console.clear()
-        console.print(render_dashboard(state_by_example))
-
-    draw()
-    # Build and optionally draw
-    for js, cfg in jobs_in_order:
-        js.status = "RUNNING"
+        if live is not None:
+            live.update(render_dashboard(state_by_example), refresh=True)
+    try:
         draw()
-
-        try:
-            if cfg.build_system == "make":
-                build_make(args, js.example, cfg, dashboard)
-            elif cfg.build_system == "zig":
-                build_zig(args, js.example, cfg, dashboard)
-            else:
-                raise NotImplementedError(f"unknown build system '{cfg.build_system}'")
-            js.status = "DONE"
-        except subprocess.CalledProcessError as e:
-            js.status = "FAILED"
-            failed += 1
+        # Build and optionally draw
+        for js, cfg in jobs_in_order:
+            js.status = "RUNNING"
             draw()
-            # Small backtrace of failing build
-            if dashboard:
-                console.print("\n[bold red]Build failed (tail):[/bold red]")
-                out = getattr(e, "output", "")
-                if out:
-                    console.print(out)
-        draw()
+
+            try:
+                if cfg.build_system == "make":
+                    build_make(args, js.example, cfg, dashboard)
+                elif cfg.build_system == "zig":
+                    build_zig(args, js.example, cfg, dashboard)
+                else:
+                    raise NotImplementedError(f"unknown build system '{cfg.build_system}'")
+                js.status = "DONE"
+            except subprocess.CalledProcessError as e:
+                js.status = "FAILED"
+                failed += 1
+                draw()
+                # Small backtrace of failing build
+                if dashboard:
+                    console.print("\n[bold red]Build failed (tail):[/bold red]")
+                    out = getattr(e, "output", "")
+                    if out:
+                        console.print(out)
+            draw()
+
+    finally:
+        if live is not None:
+            live.stop()
 
     # Draw static dashboard for CI
     if not dashboard:
