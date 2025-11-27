@@ -94,7 +94,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree | None):
     timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=254)
 
     if board.name == "x86_64_generic":
-        hpet_irq = SystemDescription.IrqMsi(board.arch, 0, 0, 0, 0, 0, 0)
+        hpet_irq = SystemDescription.IrqIoapic(board.arch, ioapic_id=0, pin=20, vector=0, id=0)
         timer_driver.add_irq(hpet_irq)
 
         hept_regs = SystemDescription.MemoryRegion(sdf, "hept_regs", 0x1000, paddr=0xfed00000)

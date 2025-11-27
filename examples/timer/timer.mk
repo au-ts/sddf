@@ -66,8 +66,8 @@ else ifeq ($(strip $(MICROKIT_BOARD)), zcu102)
 else ifeq ($(strip $(MICROKIT_BOARD)),x86_64_generic)
 	TIMER_DRIVER_DIR := hpet
 	CPU := generic
-	SEL4_64B := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)/elf/sel4.elf
-	SEL4_32B := sel4.elf
+	SEL4_64B := sel4.elf
+	SEL4_32B := sel4_32.elf
 	DTS=
 	QEMU := qemu-system-x86_64
 	QEMU_ARCH_ARGS = -machine q35 \
@@ -137,7 +137,6 @@ ifneq ($(strip $(DTS)),)
 	dtc -q -I dts -O dtb $(DTS) > $(DTB)
 	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output . --sdf $(SYSTEM_FILE)
 else
-	$(OBJCOPY) -O elf32-i386 $(SEL4_64B) $(SEL4_32B)
 	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --output . --sdf $(SYSTEM_FILE)
 endif
 	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf

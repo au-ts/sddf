@@ -10,7 +10,7 @@
 
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
-/* hpet data structures / memory maps */
+/* HPET individual timer config */
 typedef struct __attribute__((packed)) hpet_timer {
     uint64_t config;
     uint64_t comparator;
@@ -93,7 +93,7 @@ enum {
 #define GENERAL_CONFIG_REG 0x10
 #define GENERAL_ISR_REG 0x20
 #define MAIN_COUNTER_REG 0xF0
-#define TIMERS_OFFSET 0x120
+#define TIMER0_OFFSET 0x100
 
 #define IRQ_CH 0
 uintptr_t HPET_REGION = 0x50000000;
@@ -132,15 +132,40 @@ void set_timeout(uint64_t timeout)
 
 void init(void)
 {
-    volatile uint64_t cap = *((uint64_t *)HPET_REGION + CAP_ID_REG);
-    tick_period_fs = cap >> 32;
-
+    volatile uint64_t capability = *((uint64_t *)(HPET_REGION + CAP_ID_REG));
+    tick_period_fs = capability >> 32;
+    
     volatile uint64_t *general_config_reg = (void *)HPET_REGION + GENERAL_CONFIG_REG;
+    /* Disable legacy IRQ mapping */
+    *general_config_reg &= ~(1ul << LEG_RT_CNF);
+    /* Enable main counter */
     *general_config_reg |= (1ul << ENABLE_CNF);
 
-    timer_0 = (void *)HPET_REGION + TIMERS_OFFSET;
-    timer_0->config |= (1ul << TN_FSB_EN_CNF) | (1ul << TN_INT_ENB_CNF);
-    timer_0->fsb_irr = ((0x0FEEllu << FIXED) << 32llu) | 0x000 | 0x30;
+    timer_0 = (hpet_timer_t *)(HPET_REGION + TIMER0_OFFSET);
+    
+    uint32_t irq_route = timer_0->config >> 32;
+    for (int i = 0; i < 32; i++) {
+        if (irq_route & BIT(i)) {
+            microkit_dbg_puts("usable timer IO APIC pin is ");
+            microkit_dbg_put32(i);
+            microkit_dbg_puts("\n");
+        }
+    }
+    uint32_t ioapic_pin = 20; // pick an arbitrary pin, then make sure that timer 0 can be routed here.
+    assert(irq_route & BIT(ioapic_pin));
+
+    uint64_t t0_cfg = timer_0->config;
+    /* Don't deliver IRQ via the Front Side Bus */
+    t0_cfg &= ~BIT(TN_FSB_EN_CNF);
+    /* Clear IRQ routing */
+    t0_cfg &= ~(((uint64_t)0x1f) << TN_INT_ROUTE_CNF);
+    /* Set IRQ routing */
+    t0_cfg |= ((uint64_t)ioapic_pin << TN_INT_ROUTE_CNF);
+    /* Use level IRQ */
+    t0_cfg |= BIT(TN_INT_TYPE_CNF);
+    /* Switch on IRQ */
+    t0_cfg |= BIT(TN_INT_ENB_CNF);
+    timer_0->config = t0_cfg;
 
     __atomic_signal_fence(__ATOMIC_ACQ_REL);
 
@@ -148,6 +173,10 @@ void init(void)
     for (int i = 0; i < MAX_CLIENTS; i++) {
         client_timeout[i] = UINT64_MAX;
     }
+
+    /* Clear ISR */
+    volatile uint64_t *isr = (void *)HPET_REGION + GENERAL_ISR_REG;
+    *isr = 1;
 
     microkit_deferred_irq_ack(IRQ_CH);
 }
@@ -185,6 +214,8 @@ void notified(microkit_channel ch)
     if (ch != IRQ_CH) {
         return;
     }
+    volatile uint64_t *isr = (void *)HPET_REGION + GENERAL_ISR_REG;
+    *isr = 1;
 
     microkit_deferred_irq_ack(IRQ_CH);
 
