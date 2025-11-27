@@ -75,6 +75,7 @@
 
           pythonTool = pkgs.python312.withPackages (ps: [
             pysdfgen
+            ps.rich
           ]);
         in
         {
