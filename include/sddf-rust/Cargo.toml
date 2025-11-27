@@ -10,6 +10,6 @@ edition = "2024"
 path = "lib.rs"
 
 [dependencies]
-sddf-ipc-types = { git = "https://github.com/seL4/rust-sel4.git", rev = "95feffab18a1b46b9feb78aa599dd2f23c8eb364" }
-sel4-microkit = { git = "https://github.com/seL4/rust-sel4.git", tag = "v2.0.0" }
+sddf-ipc-types = { git = "https://github.com/seL4/rust-sel4.git", tag = "v3.0.0" }
+sel4-microkit = { git = "https://github.com/seL4/rust-sel4.git", tag = "v3.0.0" }
 num_enum = { version = "0.7.5", default-features = false }
