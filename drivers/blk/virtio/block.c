@@ -268,7 +268,7 @@ void handle_irq(void)
 
 void virtio_blk_init(void)
 {
-    assert(virtio_transport_probe(&device_resources, &dev));
+    assert(virtio_transport_probe(&device_resources, &dev, VIRTIO_DEVICE_ID_BLK));
     ialloc_init(&ialloc_desc, descriptors, QUEUE_SIZE);
 
     /* First reset the device */

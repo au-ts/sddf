@@ -12,7 +12,7 @@ static bool check_magic(virtio_mmio_regs_t *regs)
     return regs->MagicValue == 0x74726976;
 }
 
-static bool check_device_id(virtio_mmio_regs_t *regs, virtio_mmio_device_id_t id)
+static bool check_device_id(virtio_mmio_regs_t *regs, virtio_device_id_t id)
 {
     return regs->DeviceID == id;
 }
@@ -27,7 +27,7 @@ static volatile virtio_mmio_regs_t *get_regs(device_resources_t *device_resource
     return (volatile virtio_mmio_regs_t *)device_resources->regions[0].region.vaddr;
 }
 
-bool virtio_transport_probe(device_resources_t *device_resources, virtio_device_handle_t *device_handle_ret)
+bool virtio_transport_probe(device_resources_t *device_resources, virtio_device_handle_t *device_handle_ret, uint32_t device_id)
 {
     assert(device_resources_check_magic(device_resources));
     volatile virtio_mmio_regs_t *regs = get_regs(device_resources);
@@ -43,29 +43,10 @@ bool virtio_transport_probe(device_resources_t *device_resources, virtio_device_
         return false;
     }
 
-#if defined(VIRTIO_MMIO_TRANSPORT_FOR_NET)
-    if (regs->DeviceID != VIRTIO_DEVICE_ID_NET) {
-        LOG_VIRTIO_TRANSPORT("not a virtIO network device!\n");
+    if (regs->DeviceID != device_id) {
+        LOG_VIRTIO_TRANSPORT("not correct virtIO device ID (expected %d, got %d)!\n", regs->DeviceID, device_id);
         return false;
     }
-#elif defined(VIRTIO_MMIO_TRANSPORT_FOR_BLK)
-    if (regs->DeviceID != VIRTIO_DEVICE_ID_BLK) {
-        LOG_VIRTIO_TRANSPORT("not a virtIO block device!\n");
-        return false;
-    }
-#elif defined(VIRTIO_MMIO_TRANSPORT_FOR_CONSOLE)
-    if (regs->DeviceID != VIRTIO_DEVICE_ID_CONSOLE) {
-        LOG_VIRTIO_TRANSPORT("not a virtIO console device!\n");
-        return false;
-    }
-#elif defined(VIRTIO_MMIO_TRANSPORT_FOR_GPU)
-    if (regs->DeviceID != VIRTIO_DEVICE_ID_GPU) {
-        LOG_VIRTIO_TRANSPORT("not a virtIO GPU device!\n");
-        return false;
-    }
-#else
-#error "Unknown or undefined device type for virtio MMIO transport."
-#endif
 
     device_handle_ret->device_resources = device_resources;
     return true;

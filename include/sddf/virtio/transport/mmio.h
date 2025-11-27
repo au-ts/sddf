@@ -12,13 +12,6 @@
 /* Note this is little endian */
 #define VIRTIO_MMIO_MAGIC_VALUE (0x74726976)
 
-typedef enum {
-    VIRTIO_DEVICE_ID_NET = 0x1,
-    VIRTIO_DEVICE_ID_BLK = 0x2,
-    VIRTIO_DEVICE_ID_CONSOLE = 0x3,
-    VIRTIO_DEVICE_ID_GPU = 0x10,
-} virtio_mmio_device_id_t;
-
 typedef volatile struct {
     uint32_t MagicValue;
     uint32_t Version;

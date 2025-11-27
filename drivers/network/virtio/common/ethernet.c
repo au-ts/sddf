@@ -311,7 +311,7 @@ static void handle_irq()
 
 static void eth_setup(void)
 {
-    assert(virtio_transport_probe(&device_resources, &dev));
+    assert(virtio_transport_probe(&device_resources, &dev, VIRTIO_DEVICE_ID_NET));
 
     // Do normal device initialisation (section 3.2)
 

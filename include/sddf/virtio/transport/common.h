@@ -28,6 +28,13 @@
 #define VIRTIO_DEVICE_STATUS_DRIVER_OK (0x4)
 #define VIRTIO_DEVICE_STATUS_DRIVER_RESET (0x40)
 
+typedef enum {
+    VIRTIO_DEVICE_ID_NET = 0x1,
+    VIRTIO_DEVICE_ID_BLK = 0x2,
+    VIRTIO_DEVICE_ID_CONSOLE = 0x3,
+    VIRTIO_DEVICE_ID_GPU = 0x10,
+} virtio_device_id_t;
+
 typedef struct virtio_device_handle {
     device_resources_t *device_resources;
     uint8_t pci_bus;
@@ -35,7 +42,7 @@ typedef struct virtio_device_handle {
     uint8_t pci_func;
 } virtio_device_handle_t;
 
-bool virtio_transport_probe(device_resources_t *device_resources, virtio_device_handle_t *device_handle_ret);
+bool virtio_transport_probe(device_resources_t *device_resources, virtio_device_handle_t *device_handle_ret, uint32_t device_id);
 void *virtio_transport_get_device_config(virtio_device_handle_t *device_handle);
 void virtio_transport_set_status(virtio_device_handle_t *device_handle, uint8_t status);
 uint8_t virtio_transport_get_status(virtio_device_handle_t *device_handle);
