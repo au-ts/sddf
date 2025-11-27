@@ -3,9 +3,9 @@
 #
 # SPDX-License-Identifier: BSD-2-Clause
 #
-BLK_DRIV_DIR := virtio
+BLK_DRIV_DIR := virtio/mmio
 GPU_DRIV_DIR := virtio
-NET_DRIV_DIR := virtio
+NET_DRIV_DIR := virtio/mmio
 ETH_DRIV := eth_driver_virtio.elf
 TIMER_DRIV_DIR := goldfish
 UART_DRIV_DIR := ns16550a

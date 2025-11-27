@@ -6,7 +6,7 @@ import struct
 import json
 import subprocess
 import shutil
-from typing import List, Tuple, Callable
+from typing import List, Tuple, Callable, Optional
 from sdfgen import SystemDescription, Sddf, DeviceTree
 from importlib.metadata import version
 
@@ -180,7 +180,7 @@ def update_elf_section(
 def generate(
     sdf_file: str,
     output_dir: str,
-    dtb: DeviceTree | None,
+    dtb: Optional[DeviceTree],
     get_core: Callable[[str], int],
 ):
     uart_node = None
