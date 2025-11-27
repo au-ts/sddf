@@ -17,7 +17,9 @@ assert version("sdfgen").split(".")[1] == "28", "Unexpected sdfgen version"
 ProtectionDomain = SystemDescription.ProtectionDomain
 
 
-def generate(sdf_file: str, output_dir: str, dtb: Optional[DeviceTree], need_timer: bool):
+def generate(
+    sdf_file: str, output_dir: str, dtb: Optional[DeviceTree], need_timer: bool
+):
     uart_node = None
     blk_node = None
     timer_node = None
