@@ -25,6 +25,8 @@ static inline uint64_t read_cycle_count()
     SEL4BENCH_READ_CCNT(cycle_count);
 #elif defined(CONFIG_ARCH_RISCV)
     asm volatile("rdcycle %0" : "=r"(cycle_count));
+#elif defined(CONFIG_ARCH_X86_64)
+    // Do nothing only for build atm
 #else
 #error "read_cycle_count: unsupported architecture"
 #endif
