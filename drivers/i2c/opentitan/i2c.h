@@ -52,4 +52,3 @@ enum I2C_SPEED_MODE { I2C_SPEED_STD = (100 * KILO), I2C_SPEED_FAST = (400 * KILO
 #define I2C_SCL_MAX_FREQ (I2C_SPEED_FAST)
 #define I2C_SCL_MIN_T (2500) // Min period in nanoseconds (max frequency) -> 400kHz^-1 = 2500ns
 #endif
-

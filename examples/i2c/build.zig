@@ -6,7 +6,7 @@ const std = @import("std");
 const LazyPath = std.Build.LazyPath;
 const Step = std.Build.Step;
 
-const MicrokitBoard = enum { odroidc4, cheshire };
+const MicrokitBoard = enum { odroidc4 };
 
 const Target = struct {
     board: MicrokitBoard,
@@ -20,15 +20,6 @@ const targets = [_]Target{
             .cpu_arch = .aarch64,
             .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a55 },
             .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{.strict_align}),
-            .os_tag = .freestanding,
-            .abi = .none,
-        },
-    },
-    .{
-        .board = MicrokitBoard.cheshire,
-        .zig_target = std.Target.Query{
-            .cpu_arch = .riscv64,
-            .cpu_model = .{ .explicit = &std.Target.riscv.cpu.generic_rv64 },
             .os_tag = .freestanding,
             .abi = .none,
         },
@@ -99,17 +90,14 @@ pub fn build(b: *std.Build) !void {
 
     const i2c_driver_class = switch (microkit_board_option) {
         .odroidc4 => "meson",
-        .cheshire => "opentitan",
     };
 
     const serial_driver_class = switch (microkit_board_option) {
         .odroidc4 => "meson",
-        .cheshire => "ns16550a",
     };
 
     const timer_driver_class = switch (microkit_board_option) {
         .odroidc4 => "meson",
-        .cheshire => "apb_timer",
     };
 
     const timer_driver = sddf_dep.artifact(b.fmt("driver_timer_{s}.elf", .{timer_driver_class}));

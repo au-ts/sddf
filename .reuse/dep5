@@ -9,6 +9,7 @@ Files:
     ci/genmc/nix/cmake_install.patch
     docs/design/*
     examples/i2c/build.zig.zon
+    examples/i2c_bus_scan/build.zig.zon
     examples/serial/build.zig.zon
     examples/timer/build.zig.zon
     examples/blk/build.zig.zon
@@ -21,6 +22,7 @@ Files:
     drivers/blk/mmc/imx/config.json
     drivers/blk/virtio/config.json
     drivers/i2c/meson/config.json
+    drivers/i2c/opentitan/config.json
     drivers/network/imx/config.json
     drivers/network/meson/config.json
     drivers/network/virtio/config.json

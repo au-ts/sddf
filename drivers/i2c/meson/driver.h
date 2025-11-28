@@ -47,7 +47,7 @@
 #define I2C_MAX_RDATA       (8)
 
 /* The client cannot attach or use a bus address greater than 7-bits. */
-#define MESON_I2C_MAX_BUS_ADDRESS (0x7f)
+#define MESON_I2C_MAX_BUS_ADDRESS ((1 << 7) - 1)
 
 const char *meson_token_to_str(uint8_t token)
 {
@@ -70,4 +70,3 @@ const char *meson_token_to_str(uint8_t token)
         return "Unknown token!";
     }
 }
-
