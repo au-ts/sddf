@@ -15,42 +15,29 @@
 /* Register definitions for Cheshire/Serengeti, accounting
  * for present hardware and IP version. */
 typedef struct opentitan_i2c_regs {
-    uint32_t intr_state;                    // 0x00: Interrupt State Register
-    uint32_t intr_enable;                   // 0x04: Interrupt Enable Register
-    uint32_t intr_test;                     // 0x08: Interrupt Test Register
-    uint32_t alert_test;                    // 0x0C: Alert Test Register
-    uint32_t ctrl;                          // 0x10: I2C Control Register
-    uint32_t status;                        // 0x14: I2C Live Status Register
-    uint32_t rdata;                         // 0x18: I2C Read Data
-    uint32_t fdata;                         // 0x1C: I2C Host Format Data
-    uint32_t fifo_ctrl;                     // 0x20: I2C FIFO control register
-    // uint32_t host_fifo_config;              // 0x24: Host mode FIFO configuration
-    // uint32_t target_fifo_config;            // 0x28: Target mode FIFO configuration
-    uint32_t host_fifo_status;              // 0x2C: Host mode FIFO status register
-    // uint32_t target_fifo_status;            // 0x30: Target mode FIFO status register
-    uint32_t ovrd;                          // 0x34: I2C Override Control Register
-    uint32_t val;                           // 0x38: Oversampled RX values
-    uint32_t timing0;                       // 0x3C: Detailed I2C Timing 0
-    uint32_t timing1;                       // 0x40: Detailed I2C Timing 1
-    uint32_t timing2;                       // 0x44: Detailed I2C Timing 2
-    uint32_t timing3;                       // 0x48: Detailed I2C Timing 3
-    uint32_t timing4;                       // 0x4C: Detailed I2C Timing 4
-    uint32_t timeout_ctrl;                  // 0x50: Clock stretching and bus timeout
-    uint32_t target_id;                     // 0x54: I2C target address and mask pairs
-    uint32_t acqdata;                       // 0x58: I2C target acquired data
-    uint32_t txdata;                        // 0x5C: I2C target transmit data
-    uint32_t host_timeout_ctrl;             // 0x60: Host clock generation timeout
-    // Unused in Cheshire below this point
-    // uint32_t target_timeout_ctrl;           // 0x64: Target internal stretching timeout
-    // uint32_t target_nack_count;             // 0x68: Target NACK count
-    // uint32_t target_ack_ctrl;               // 0x6C: Mid-transfer (N)ACK phase handling
-    // uint32_t acq_fifo_next_data;            // 0x70: Pending ACQ FIFO data byte
-    // uint32_t host_nack_handler_timeout;     // 0x74: Host-Mode NACK timeout
-    // uint32_t controller_host_events;        // 0x78: Controller halt event flags
-    // uint32_t target_events;                 // 0x7c: Target clock stretch event flags
+    uint32_t intr_state;
+    uint32_t intr_enable;
+    uint32_t intr_test;
+    uint32_t alert_test;
+    uint32_t ctrl;
+    uint32_t status;
+    uint32_t rdata;
+    uint32_t fdata;
+    uint32_t fifo_ctrl;
+    uint32_t host_fifo_status;
+    uint32_t ovrd;
+    uint32_t val;
+    uint32_t timing0;
+    uint32_t timing1;
+    uint32_t timing2;
+    uint32_t timing3;
+    uint32_t timing4;
+    uint32_t timeout_ctrl;
+    uint32_t target_id;
+    uint32_t acqdata;
+    uint32_t txdata;
+    uint32_t host_timeout_ctrl;
 } opentitan_i2c_regs_t;
-
-
 
 /* Timing properties for timing init algorithm */
 
@@ -72,7 +59,7 @@ typedef struct opentitan_i2c_regs {
 #define I2C_MODE_FAST   // Select fast mode
 #define DUTY_100X (32)
 
-#define OPENTITAN_I2C_MAX_BUS_ADDRESS     (1 << 7)
+#define OPENTITAN_I2C_MAX_BUS_ADDRESS     ((1 << 7) - 1)
 
 /* FIFO config */
 #define I2C_FMT_THRESHOLD       (1) // Only refill when FIFO is empty.
@@ -83,7 +70,6 @@ typedef struct opentitan_i2c_regs {
 /* HW properties */
 #define OPENTITAN_I2C_FIFO_DEPTH    (64)
 #define OPENTITAN_I2C_READ_MAX      (64)
-
 
 /*
  * Register fields.
@@ -123,7 +109,7 @@ typedef struct opentitan_i2c_regs {
 #define I2C_TIMING3_THD_DAT_OFFSET  (16)
 
 // TIMING4
-// 0:12 -> TSU_STO, 16:28 -> T_BUF
+// 0:15 -> TSU_STO, 16:31 -> T_BUF
 #define I2C_TIMING4_TSU_STO_MASK    (0xFFFF)
 #define I2C_TIMING4_TSU_STO_OFFSET  (0)
 #define I2C_TIMING4_T_BUF_MASK      (0xFFFF0000)
@@ -131,7 +117,7 @@ typedef struct opentitan_i2c_regs {
 
 // TIMEOUT_CTRL
 // 0:30 -> VAL, 31 -> EN
-#define I2C_TIMEOUT_CTRL_VAL_MASK   (0x7FFF)
+#define I2C_TIMEOUT_CTRL_VAL_MASK   (0x7FFFFFFF)
 #define I2C_TIMEOUT_CTRL_VAL_OFFSET (0)
 #define I2C_TIMEOUT_CTRL_EN_BIT     (1 << 31)
 
@@ -178,7 +164,6 @@ typedef struct _fdata_fmt_flags {
     uint32_t rcont; // If reading, request to continue reading after final byte of last read.
     uint32_t nakok; // Ignore target device NAKs for writes. Doesn't work with any reads.
 } fdata_fmt_flags_t;
-
 
 // FIFO_CTRL
 // 0 -> RXRST, 1 -> FMTRST, 2:4 RXILVL, 5:6 -> FMTILVL, 7: ACQRST, 8 -> TXRST

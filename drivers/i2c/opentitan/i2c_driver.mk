@@ -1,14 +1,14 @@
 #
-#Copyright 2025, UNSW
+# Copyright 2024, UNSW
 #
-#SPDX - License - Identifier : BSD - 2 - Clause
+# SPDX-License-Identifier: BSD-2-Clause
 #
-#Include this snippet in your project Makefile to build
-#the OpenTitan i2c driver
+# Include this snippet in your project Makefile to build
+# the OpenTitan i2c driver
 #
-#NOTES
-#Generates i2c_driver.elf
-#Requires libsddf_util_debug.a in ${ LIBS }
+# NOTES
+# Generates i2c_driver.elf
+# Requires libsddf_util_debug.a in ${ LIBS }
 
 I2C_DRIVER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 

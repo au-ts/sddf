@@ -40,6 +40,14 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
         "boards_build": ["odroidc4"],
         "boards_test": ["odroidc4"],
     },
+    # Use i2c bus scan for all devices that don't have an I2C test board
+    # attached.
+    "i2c_bus_scan": {
+        "configs": ["debug", "release"],
+        "build_systems": ["make", "zig"],
+        "boards_build": ["serengeti"],
+        "boards_test": ["serengeti"],
+    },
     "echo_server": {
         "configs": ["debug", "release", "benchmark"],
         "build_systems": ["make"],

@@ -58,7 +58,6 @@ i2c_queue_handle_t queue_handle;
 i2c_state_func_t *i2c_state_table[NUM_STATES] = { state_idle, state_req,     state_sel_cmd,
                                                   state_cmd,  state_cmd_ret, state_resp };
 
-
 /**
  * Prints the registers of the i2c interface
  */
@@ -421,7 +420,7 @@ void state_cmd(fsm_data_t *fsm, i2c_driver_data_t *data, i2c_queue_handle_t *que
             // Handle data transmission
         } else {
             LOG_I2C_DRIVER("Resuming in-progress read/write. rd=%d remaining=%d\n", cmd_is_read(cmd),
-                       cmd.data_len - data->rw_idx);
+                           cmd.data_len - data->rw_idx);
 
             // We are in the middle of a read or write. Pick up where we left off
             if (data->rw_idx == (cmd.data_len - 1) && cmd_is_read(cmd)) {
