@@ -28,5 +28,6 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
     async with asyncio.timeout(60):
         await wait_for_output(backend, b"           	 ... is present!\r\n")
 
+
 if __name__ == "__main__":
     cli("i2c_bus_scan", test, TEST_MATRIX, backend_fn, common.loader_img_path)

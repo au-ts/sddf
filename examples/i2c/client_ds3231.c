@@ -17,7 +17,7 @@
 #include <sddf/i2c/devices/ds3231/ds3231.h>
 #include <sddf/i2c/libi2c.h>
 
-#define DEBUG_CLIENT
+// #define DEBUG_CLIENT
 
 #ifdef DEBUG_CLIENT
 #define LOG_CLIENT(...) do{ sddf_dprintf("DS3231|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
