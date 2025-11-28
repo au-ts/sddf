@@ -11,10 +11,9 @@ import sys
 import contextlib
 from dataclasses import dataclass
 from collections import deque
-import time
 
 try:
-    from rich.console import Console, Group
+    from rich.console import Console
     from rich.table import Table
     from rich.panel import Panel
     from rich.text import Text
@@ -83,7 +82,18 @@ def render_dashboard(state_by_example: dict[str, list[JobState]]):
 
         panels.append(Panel(t, title=f"{ex} ({done}/{total})", border_style=_panel_border(jobs)))
 
-    return Group(*panels)
+    # 3 columns
+    grid = Table.grid(expand=True)
+    grid.add_column(ratio=1)
+    grid.add_column(ratio=1)
+    grid.add_column(ratio=1)
+
+    for i in range(0, len(panels), 3):
+        middle = panels[i + 1] if i + 1 < len(panels) else ""
+        right = panels[i + 2] if i + 2 < len(panels) else ""
+        grid.add_row(panels[i], middle, right)
+
+    return grid
 
 def print_dashboard_plain(state_by_example: dict[str, list[JobState]]):
     for ex in sorted(state_by_example.keys()):
@@ -195,7 +205,7 @@ if __name__ == "__main__":
     jobs_in_order: list[tuple[JobState, TestConfig]] = []
 
     if dashboard:
-        console = Console(stderr=True, force_terminal=True)
+        console = Console(stderr=True, force_terminal=True, markup=False)
         live = Live(
             render_dashboard(state_by_example),
             console=console,
@@ -249,7 +259,7 @@ if __name__ == "__main__":
                     console.print("\n[bold red]Build failed (tail):[/bold red]")
                     out = getattr(e, "output", "")
                     if out:
-                        console.print(out)
+                        console.print(out, markup=False, highlight=False, soft_wrap=True)
             draw()
 
     finally:
