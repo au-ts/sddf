@@ -366,16 +366,13 @@ void init(void)
     /* set_reg16(PCI_MSI_MESSAGE_DATA_16, 0x31); */
     /* clear_flags16(PCI_MSI_MASK, BIT(0)); */
 
-    /* sddf_dprintf("\n"); */
-    /* sddf_dprintf("NIC vendor_id: 0x%x\n", get_reg16(0x3100000)); */
-    /* sddf_dprintf("NIC device_id: 0x%x\n", get_reg16(0x3100002)); */
-    /* sddf_dprintf("NIC command: 0x%x\n", get_reg16(0x3100004)); */
-    /* sddf_dprintf("NIC status: 0x%x\n", get_reg16(0x3100006)); */
-    /* sddf_dprintf("NIC offset 0x10: 0x%x\n", get_reg(0x3100010)); */
-    /* sddf_dprintf("NIC offset 0x20: 0x%x\n", get_reg(0x3100020)); */
-    /* sddf_dprintf("NIC offset 0x30: 0x%x\n", get_reg(0x3100030)); */
-    /* sddf_dprintf("FACTPS reg: 0x%x\n", get_reg(FACTPS)); */
-    /* sddf_dprintf("CTRL reg: 0x%x\n", get_reg(CTRL)); */
+    // Enable MSI-X, refer to https://www.intel.com/content/www/us/en/docs/programmable/683488/16-0/msi-x-capability-structure.html
+    set_flags16(PCI_COMMAND_16, BIT(10));           // Disable legacy interrupts
+    set_reg(DEVICE_MSIX_TABLE + 0x0, 0xFEEu << 20); // Set vector0 message address low
+    set_reg(DEVICE_MSIX_TABLE + 0x4, 0);            // Set vector0 message address high
+    set_reg(DEVICE_MSIX_TABLE + 0x8, 0x32);       // Set vector0 message data, i.e. interrupt vector
+    set_reg(DEVICE_MSIX_TABLE + 0xC, 0xFFFFFFFE); // Unmask vector0
+    set_flags(PCI_MSIX_CTRL, BIT(31));              // Enable MSI-X
 
     // initialise the statistic registers. Must keep.
     set_reg(RQSMR(0), 0);
@@ -608,6 +605,16 @@ void notified(microkit_channel ch)
             init_2();
         } else if (device.init_stage == 2) {
             init_3();
+            sddf_dprintf("\n\n\n");
+            sddf_dprintf("BAR4: 0x%x\n", get_reg(PCIE_CONFIG_BASE + 0x20));
+            sddf_dprintf("MSI CTRL: 0x%x\n", get_reg(PCIE_CONFIG_BASE + 0x50));
+            sddf_dprintf("MSI-X CTRL: 0x%x\n", get_reg(PCI_MSIX_CTRL));
+            sddf_dprintf("MSI-X OFFSET: 0x%x\n", get_reg(PCI_MSIX_OFFSET));
+            sddf_dprintf("MSI-X PENDING: 0x%x\n", get_reg(PCI_MSIX_PENDING));
+            sddf_dprintf("MSI-X Table - vector0 address low: 0x%x\n", get_reg(DEVICE_MSIX_TABLE));
+            sddf_dprintf("MSI-X Table - vector0 address high: 0x%x\n", get_reg(DEVICE_MSIX_TABLE + 0x4));
+            sddf_dprintf("MSI-X Table - vector0 data: 0x%x\n", get_reg(DEVICE_MSIX_TABLE + 0x8));
+            sddf_dprintf("MSI-X Table - vector0 control: 0x%x\n", get_reg(DEVICE_MSIX_TABLE + 0xC));
         }
     } else if (ch == device_resources.irqs[0].id){
         /* bench->eth_irq_count++; */

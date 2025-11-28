@@ -5,6 +5,7 @@
 
 #define PCIE_CONFIG_BASE 0x3000000lu
 #define DEVICE_BASE 0x2000000lu
+#define DEVICE_MSIX_TABLE 0x4000000lu
 
 #define declare_register(base, name, offset)             \
     uintptr_t name = (uintptr_t)(base + offset);
@@ -31,6 +32,9 @@ declare_register(PCIE_CONFIG_BASE, PCI_MSI_MESSAGE_ADDRESS_HIGH, 0x58);
 declare_register(PCIE_CONFIG_BASE, PCI_MSI_MESSAGE_DATA_16, 0x5C);
 declare_register(PCIE_CONFIG_BASE, PCI_MSI_MASK, 0x60);
 declare_register(PCIE_CONFIG_BASE, PCI_MSI_PENDING, 0x64);
+declare_register(PCIE_CONFIG_BASE, PCI_MSIX_CTRL, 0x70);
+declare_register(PCIE_CONFIG_BASE, PCI_MSIX_OFFSET, 0x74);
+declare_register(PCIE_CONFIG_BASE, PCI_MSIX_PENDING, 0x78);
 
 declare_register(DEVICE_BASE, CTRL, 0x00000);
 declare_register(DEVICE_BASE, STATUS, 0x00008);
