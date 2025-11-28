@@ -193,7 +193,6 @@ and increase in increments of 100Mb/s until the maximum throughput of the NIC is
 reached (normally 970Mb/s, which corresponds to an actual load of 1000mb/s when
 accounting for the overhead of ethernet headers).
 
-<<<<<<< HEAD
 For a selected throughput, a benchmark run involves three phases, throughout all
 of which traffic is sent by the clients to the target at the selected
 throughput:
@@ -206,13 +205,6 @@ throughput:
    unresponsive during this phase, or there is a large amount of packet loss
    ipbench will hang here.
 3. A cool-down phase for a fixed number of seconds.
-||||||| parent of 1ce32112 (Fix build errors)
-The benchmark PD is responsbile for using the PMU hardware to record performance events such as
-cycle counts and manage the start/stopping of benchmark runs.
-=======
-The benchmark PD is responsible for using the PMU hardware to record performance events such as
-cycle counts and manage the start/stopping of benchmark runs.
->>>>>>> 1ce32112 (Fix build errors)
 
 The latency and throughput measurements taken by the clients are based only on
 the sampling phase, while the target CPU measurement is measured throughout all
