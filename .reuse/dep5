@@ -9,6 +9,7 @@ Files:
     ci/genmc/nix/cmake_install.patch
     docs/design/*
     examples/i2c/build.zig.zon
+    examples/i2c_bus_scan/build.zig.zon
     examples/serial/build.zig.zon
     examples/timer/build.zig.zon
     examples/blk/build.zig.zon
