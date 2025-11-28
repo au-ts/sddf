@@ -12,7 +12,7 @@ sys.path.append(
 )
 from board import BOARDS
 
-assert version("sdfgen").split(".")[1] == "27", "Unexpected sdfgen version"
+assert version("sdfgen").split(".")[1] == "28", "Unexpected sdfgen version"
 
 ProtectionDomain = SystemDescription.ProtectionDomain
 
@@ -27,15 +27,13 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     )
 
     if board.arch == SystemDescription.Arch.X86_64:
-        serial_port = SystemDescription.IoPort(
-            SystemDescription.Arch.X86_64, 0x3F8, 8, 0
-        )
+        serial_port = SystemDescription.IoPort(0x3F8, 8, 0)
         serial_driver.add_ioport(serial_port)
 
         # The serial device does not located on PCIe and the interrupts are
         # conventionally configured by BIOS. The IRQ number can be read from
         # Linux or APCI tables.
-        serial_irq = SystemDescription.IrqIoapic(board.arch, 0, 4, 0, id=1)
+        serial_irq = SystemDescription.IrqIoapic(0, 4, 0, id=1)
         serial_driver.add_irq(serial_irq)
 
     client0 = ProtectionDomain("client0", "client0.elf", priority=1)

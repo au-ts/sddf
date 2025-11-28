@@ -6,7 +6,7 @@ import struct
 import json
 import subprocess
 import shutil
-from typing import List, Tuple, Callable
+from typing import List, Tuple, Callable, Optional
 from sdfgen import SystemDescription, Sddf, DeviceTree
 from importlib.metadata import version
 
@@ -15,7 +15,7 @@ sys.path.append(
 )
 from board import BOARDS
 
-assert version("sdfgen").split(".")[1] == "27", "Unexpected sdfgen version"
+assert version("sdfgen").split(".")[1] == "28", "Unexpected sdfgen version"
 
 ProtectionDomain = SystemDescription.ProtectionDomain
 MemoryRegion = SystemDescription.MemoryRegion
@@ -178,19 +178,41 @@ def update_elf_section(
 
 
 def generate(
-    sdf_file: str, output_dir: str, dtb: DeviceTree, get_core: Callable[[str], int]
+    sdf_file: str,
+    output_dir: str,
+    dtb: Optional[DeviceTree],
+    get_core: Callable[[str], int],
 ):
-    uart_node = dtb.node(board.serial)
-    assert uart_node is not None
-    ethernet_node = dtb.node(board.ethernet)
-    assert ethernet_node is not None
-    timer_node = dtb.node(board.timer)
-    assert timer_node is not None
+    uart_node = None
+    ethernet_node = None
+    timer_node = None
+    if dtb is not None:
+        uart_node = dtb.node(board.serial)
+        assert uart_node is not None
+        ethernet_node = dtb.node(board.ethernet)
+        assert ethernet_node is not None
+        timer_node = dtb.node(board.timer)
+        assert timer_node is not None
 
     timer_driver = ProtectionDomain(
         "timer_driver", "timer_driver.elf", priority=101, cpu=get_core("timer_driver")
     )
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
+
+    if board.arch == SystemDescription.Arch.X86_64:
+        hpet_irq = SystemDescription.IrqMsi(
+            board.arch, pci_bus=0, pci_device=0, pci_func=0, vector=0, handle=0, id=0
+        )
+        timer_driver.add_irq(hpet_irq)
+
+        hpet_regs = SystemDescription.MemoryRegion(
+            sdf, "hpet_regs", 0x1000, paddr=0xFED00000
+        )
+        hpet_regs_map = SystemDescription.Map(
+            hpet_regs, 0x5000_0000, "rw", cached=False
+        )
+        timer_driver.add_map(hpet_regs_map)
+        sdf.add_mr(hpet_regs)
 
     uart_driver = ProtectionDomain("serial_driver", "serial_driver.elf", priority=100)
     serial_virt_tx = ProtectionDomain(
@@ -210,6 +232,12 @@ def generate(
     )
     serial_system = Sddf.Serial(sdf, uart_node, uart_driver, serial_virt_tx)
 
+    if board.arch == SystemDescription.Arch.X86_64:
+        serial_port = SystemDescription.IoPort(
+            SystemDescription.Arch.X86_64, 0x3F8, 8, 0
+        )
+        uart_driver.add_ioport(serial_port)
+
     ethernet_driver = ProtectionDomain(
         "ethernet_driver",
         "eth_driver.elf",
@@ -227,6 +255,38 @@ def generate(
         )
         sdf.add_mr(clock_controller)
         ethernet_driver.add_map(Map(clock_controller, 0x3000000, perms="rw"))
+
+    if board.arch == SystemDescription.Arch.X86_64:
+        hw_net_rings = SystemDescription.MemoryRegion(
+            sdf, "hw_net_rings", 65536, paddr=0x7A000000
+        )
+        sdf.add_mr(hw_net_rings)
+        hw_net_rings_map = SystemDescription.Map(hw_net_rings, 0x7000_0000, "rw")
+        ethernet_driver.add_map(hw_net_rings_map)
+
+        virtio_net_regs = SystemDescription.MemoryRegion(
+            sdf, "virtio_net_regs", 0x4000, paddr=0xFE000000
+        )
+        sdf.add_mr(virtio_net_regs)
+        virtio_net_regs_map = SystemDescription.Map(
+            virtio_net_regs, 0x6000_0000, "rw", cached=False
+        )
+        ethernet_driver.add_map(virtio_net_regs_map)
+
+        virtio_net_irq = SystemDescription.IrqIoapic(
+            board.arch, ioapic_id=0, pin=11, vector=1, id=16
+        )
+        ethernet_driver.add_irq(virtio_net_irq)
+
+        pci_config_address_port = SystemDescription.IoPort(
+            SystemDescription.Arch.X86_64, 0xCF8, 4, 1
+        )
+        ethernet_driver.add_ioport(pci_config_address_port)
+
+        pci_config_data_port = SystemDescription.IoPort(
+            SystemDescription.Arch.X86_64, 0xCFC, 4, 2
+        )
+        ethernet_driver.add_ioport(pci_config_data_port)
 
     net_virt_tx = ProtectionDomain(
         "net_virt_tx", "network_virt_tx.elf", priority=100, budget=20000
@@ -447,7 +507,7 @@ def generate(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dtb", required=True)
+    parser.add_argument("--dtb", required=False)
     parser.add_argument("--sddf", required=True)
     parser.add_argument("--board", required=True, choices=[b.name for b in BOARDS])
     parser.add_argument("--output", required=True)
@@ -469,7 +529,9 @@ if __name__ == "__main__":
         core_dict = json.load(core_alloc)
     get_core = lambda name: core_dict[name]
 
-    with open(args.dtb, "rb") as f:
-        dtb = DeviceTree(f.read())
+    dtb = None
+    if board.arch != SystemDescription.Arch.X86_64:
+        with open(args.dtb, "rb") as f:
+            dtb = DeviceTree(f.read())
 
     generate(args.sdf, args.output, dtb, get_core)
