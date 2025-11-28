@@ -43,7 +43,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
     # attached.
     "i2c_bus_scan": {
         "configs": ["debug", "release"],
-        "build_systems": ["make"],
+        "build_systems": ["make", "zig"],
         "boards_build": ["serengeti"],
         "boards_test": ["serengeti"],
     },

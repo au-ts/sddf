@@ -12,7 +12,6 @@
 // WARNING: This driver is for the OpenTitan commit above with Cheshire patches applied!
 //          Cheshire applies several patches to adapt peripherals.
 
-
 #include <sddf/i2c/i2c_driver.h>
 #include <sddf/i2c/queue.h>
 #include <sddf/resources/device.h>
@@ -76,14 +75,16 @@ static inline bool rx_fifo_not_empty()
 /**
  * Start the host running.
  */
-static inline void i2c_start_host(void) {
+static inline void i2c_start_host(void)
+{
     regs->ctrl |= (I2C_CTRL_ENHOST_BIT);
 }
 
 /**
  * Stop the host while preserving FMT FIFO status.
  */
-static inline void i2c_stop_host(void) {
+static inline void i2c_stop_host(void)
+{
     regs->ctrl &= ~(I2C_CTRL_ENHOST_BIT);
 }
 /**
@@ -103,7 +104,8 @@ int i2c_halt(void)
     return 0;
 }
 
-static inline void clear_irq(uint32_t irq_mask) {
+static inline void clear_irq(uint32_t irq_mask)
+{
     regs->intr_state = irq_mask;
 }
 
@@ -144,7 +146,7 @@ int i2c_fmt_write(uint8_t data, fdata_fmt_flags_t *flags)
                         || (flags->stop && !flags->nakok && flags->readb && !flags->rcont));
     if (!flags_valid) {
         LOG_I2C_DRIVER_ERR("Invalid fmt flags supplied to sddf_i2c_write! Combination cannot be represented "
-                       "by hardware!");
+                           "by hardware!");
         return -1;
     }
     uint32_t addr_fdata = (data)&I2C_FDATA_FBYTE_MASK;
@@ -181,7 +183,7 @@ void state_cmd(fsm_data_t *fsm, i2c_driver_data_t *data, i2c_queue_handle_t *que
 
     // Wait until FIFOs are empty
     i2c_halt();
-    while(!fmt_fifo_empty()) {}
+    while (!fmt_fifo_empty()) {}
 
     // Only load data while the host isn't running.
     i2c_stop_host();
@@ -234,7 +236,7 @@ void state_cmd(fsm_data_t *fsm, i2c_driver_data_t *data, i2c_queue_handle_t *que
         // Handle writing data
         } else {
             LOG_I2C_DRIVER("Resuming in-progress read/write. rd=%d remaining=%d\n", cmd_is_read(cmd),
-                       cmd.data_len - data->rw_idx);
+                           cmd.data_len - data->rw_idx);
             // Send stop if needed (this is last op of command)
             if (data->await_stop && data->rw_idx == cmd.data_len - 1) {
                 flags.stop = 1;
@@ -287,8 +289,8 @@ void state_cmd_ret(fsm_data_t *f, i2c_driver_data_t *data, i2c_queue_handle_t *q
     while (cmd_is_read(data->active_cmd) && rx_fifo_not_empty()) {
         // Get bytes_read amount of read data,copy data into return buffer
         uint8_t value = regs->rdata & 0xFF; // Bytes in low 8 of rdata register.
-        LOG_I2C_DRIVER("loading into buffer %p value[%u] 0x%x\n", data->active_cmd.payload.data,
-                       data->bytes_read, value);
+        LOG_I2C_DRIVER("loading into buffer %p value[%u] 0x%x\n", data->active_cmd.payload.data, data->bytes_read,
+                       value);
         data->active_cmd.payload.data[data->bytes_read] = value;
         data->bytes_read++;
     }
@@ -467,9 +469,13 @@ void notified(microkit_channel ch)
     } else if (driver_data.err != I2C_ERR_OK) {
         LOG_I2C_DRIVER_ERR("Spurious error interrupt received! err=%u\n", driver_data.err);
         LOG_I2C_DRIVER_ERR("Current state: %s\n", state_to_str(fsm_data.curr_state));
-        if (ch == IRQ_BAD_STOP_CH) LOG_I2C_DRIVER_ERR("IRQ_BAD_STOP\n");
-        else if (ch == IRQ_TIMEOUT_CH) LOG_I2C_DRIVER_ERR("IRQ_TIMEOUT\n");
-        else if (ch == IRQ_NAK_CH) LOG_I2C_DRIVER_ERR("IRQ_NAK\n");
-        else LOG_I2C_DRIVER_ERR("No sane channel could have caused error! ch = %u\n", ch);
+        if (ch == IRQ_BAD_STOP_CH)
+            LOG_I2C_DRIVER_ERR("IRQ_BAD_STOP\n");
+        else if (ch == IRQ_TIMEOUT_CH)
+            LOG_I2C_DRIVER_ERR("IRQ_TIMEOUT\n");
+        else if (ch == IRQ_NAK_CH)
+            LOG_I2C_DRIVER_ERR("IRQ_NAK\n");
+        else
+            LOG_I2C_DRIVER_ERR("No sane channel could have caused error! ch = %u\n", ch);
     }
 }

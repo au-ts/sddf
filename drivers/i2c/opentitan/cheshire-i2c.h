@@ -50,8 +50,6 @@ typedef struct opentitan_i2c_regs {
     // uint32_t target_events;                 // 0x7c: Target clock stretch event flags
 } opentitan_i2c_regs_t;
 
-
-
 /* Timing properties for timing init algorithm */
 
 // Input clock period (peripheral clocK)
@@ -83,7 +81,6 @@ typedef struct opentitan_i2c_regs {
 /* HW properties */
 #define OPENTITAN_I2C_FIFO_DEPTH    (64)
 #define OPENTITAN_I2C_READ_MAX      (64)
-
 
 /*
  * Register fields.
@@ -178,7 +175,6 @@ typedef struct _fdata_fmt_flags {
     uint32_t rcont; // If reading, request to continue reading after final byte of last read.
     uint32_t nakok; // Ignore target device NAKs for writes. Doesn't work with any reads.
 } fdata_fmt_flags_t;
-
 
 // FIFO_CTRL
 // 0 -> RXRST, 1 -> FMTRST, 2:4 RXILVL, 5:6 -> FMTILVL, 7: ACQRST, 8 -> TXRST

@@ -70,4 +70,3 @@ const char *meson_token_to_str(uint8_t token)
         return "Unknown token!";
     }
 }
-

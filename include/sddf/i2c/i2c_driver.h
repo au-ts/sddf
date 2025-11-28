@@ -196,8 +196,6 @@ void state_sel_cmd(fsm_data_t *fsm, i2c_driver_data_t *data, i2c_queue_handle_t 
  */
 void state_resp(fsm_data_t *f, i2c_driver_data_t *data, i2c_queue_handle_t *queue_handle);
 
-
-
 static inline const char *state_to_str(i2c_state_t s)
 {
     switch (s) {
