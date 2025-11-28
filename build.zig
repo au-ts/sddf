@@ -37,7 +37,7 @@ const DriverClass = struct {
 
     const I2cHost = enum {
         meson,
-        cheshire,
+        opentitan,
     };
 
     const Block = enum {
@@ -227,6 +227,9 @@ fn addI2cDriverHost(
         .file = b.path(source),
         // Note: the I2C_BUS_NUM flag is temporary
         .flags = &.{"-DI2C_BUS_NUM=2"},
+    });
+    driver.addCSourceFile(.{
+        .file = b.path("drivers/i2c/i2c_common.c"),
     });
     driver.addIncludePath(b.path(b.fmt("drivers/i2c/{s}/", .{@tagName(class)})));
     driver.addIncludePath(b.path("include"));

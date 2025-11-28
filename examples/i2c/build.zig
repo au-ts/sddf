@@ -99,14 +99,17 @@ pub fn build(b: *std.Build) !void {
 
     const i2c_driver_class = switch (microkit_board_option) {
         .odroidc4 => "meson",
+        .cheshire => "opentitan",
     };
 
     const serial_driver_class = switch (microkit_board_option) {
         .odroidc4 => "meson",
+        .cheshire => "ns16550a",
     };
 
     const timer_driver_class = switch (microkit_board_option) {
         .odroidc4 => "meson",
+        .cheshire => "apb_timer",
     };
 
     const timer_driver = sddf_dep.artifact(b.fmt("driver_timer_{s}.elf", .{timer_driver_class}));
