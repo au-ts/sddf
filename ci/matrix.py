@@ -120,6 +120,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "qemu_virt_riscv64",
             "rpi4b_1gb",
             "star64",
+            "serengeti",
             "zcu102",
         ],
         "boards_test": [
