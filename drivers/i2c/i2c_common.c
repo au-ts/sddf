@@ -21,7 +21,6 @@ extern i2c_state_func_t *i2c_state_table[NUM_STATES];
 // i2c_state_func_t *i2c_state_table[NUM_STATES] = { state_idle, state_req,     state_sel_cmd,
 //                                                   state_cmd,  state_cmd_ret, state_resp };
 
-
 /**
  * I2C finite state machine. Abstracts stateful execution into fixed states to improve
  * maintainability (and save a little bit of room on the stack!). The FSM responds
@@ -48,7 +47,8 @@ void fsm(fsm_data_t *f)
  * This should ideally be called after an IRQ arrives to wake the driver
  * after the driver dispatched some work.
  */
-void fsm_cmd_done(fsm_data_t *fsm_data) {
+void fsm_cmd_done(fsm_data_t *fsm_data)
+{
     if (fsm_data->curr_state == S_CMD_RET) {
         fsm(fsm_data);
     } else {
@@ -62,7 +62,8 @@ void fsm_cmd_done(fsm_data_t *fsm_data) {
  * because the driver is already running.
  * This should be called in response to virtualiser notifications.
  */
-void fsm_virt_notified(fsm_data_t *fsm_data) {
+void fsm_virt_notified(fsm_data_t *fsm_data)
+{
     if (fsm_data->curr_state == S_IDLE)
         fsm(fsm_data);
 }
@@ -235,4 +236,3 @@ void state_resp(fsm_data_t *f, i2c_driver_data_t *data, i2c_queue_handle_t *queu
     f->next_state = S_IDLE;
     microkit_notify(config.virt.id);
 }
-

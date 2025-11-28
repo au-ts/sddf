@@ -1,5 +1,5 @@
 //
-// Copyright 2024, UNSW
+// Copyright 2025, UNSW
 // SPDX-License-Identifier: BSD-2-Clause
 //
 const std = @import("std");
@@ -28,7 +28,7 @@ const targets = [_]Target{
         .board = MicrokitBoard.serengeti,
         .zig_target = std.Target.Query{
             .cpu_arch = .riscv64,
-            .cpu_model = .{ .explicit = &std.Target.riscv.cpu.generic_rv64 },
+            .cpu_model = .{ .explicit = &std.Target.riscv.cpu.baseline_rv64 },
             .os_tag = .freestanding,
             .abi = .none,
         },
@@ -121,8 +121,6 @@ pub fn build(b: *std.Build) !void {
     // are dealing with.
     const serial_driver_install = b.addInstallArtifact(serial_driver, .{ .dest_sub_path = "serial_driver.elf" });
 
-    const scan_driver = sddf_dep.artifact("driver_i2c_device_scan");
-
     const i2c_driver = sddf_dep.artifact(b.fmt("driver_i2c_{s}.elf", .{i2c_driver_class}));
     // This is required because the SDF file is expecting a different name to the artifact we
     // are dealing with.
@@ -145,9 +143,10 @@ pub fn build(b: *std.Build) !void {
     client_scan.addIncludePath(sddf_dep.path("include/microkit"));
     client_scan.linkLibrary(sddf_dep.artifact("util"));
     client_scan.linkLibrary(sddf_dep.artifact("util_putchar_serial"));
-    client_scan.linkLibrary(scan_driver);
     client_scan.linkLibrary(sddf_dep.artifact("libi2c_raw"));
 
+    // Here we compile libco. Right now this is the only example that uses libco and so
+    // we just compile it here instead of in a separate build.zig
     client_scan.addIncludePath(sddf_dep.path("libco"));
     client_scan.addCSourceFile(.{ .file = sddf_dep.path("libco/libco.c") });
 

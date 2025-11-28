@@ -12,7 +12,6 @@
 // WARNING: This driver is for the OpenTitan commit above with Cheshire patches applied!
 //          Cheshire applies several patches to adapt peripherals.
 
-
 #include <sddf/i2c/i2c_driver.h>
 #include <sddf/i2c/queue.h>
 #include <sddf/resources/device.h>
@@ -50,6 +49,9 @@ i2c_state_func_t *i2c_state_table[NUM_STATES] = { state_idle, state_req,     sta
 /* Registers */
 volatile opentitan_i2c_regs_t *regs;
 
+// Calculate periods - use device-supplied if faster than minimum.
+const uint32_t i2c_period = MAX(((I2C_SCL_MIN_T) / (T_CLK)), ((SCL_PERIOD) / (T_CLK)));
+
 /* Clock value calculations and timing*/
 i2c_timing_params_t timing_params = { .t_high_min = (MAX(((T_HIGH_MIN) / (T_CLK)), 4)),
                                       .t_low_min = (MAX(((T_LOW_MIN) / (T_CLK)), 4)),
@@ -60,8 +62,8 @@ i2c_timing_params_t timing_params = { .t_high_min = (MAX(((T_HIGH_MIN) / (T_CLK)
                                       .t_sto_min = ((0 + T_SU_STO_MIN) / (T_CLK)),
                                       .t_r = ((0 + T_RISE) / (T_CLK)),
                                       .t_f = ((0 + T_FALL) / (T_CLK)),
-                                      .t_h = 0,
-                                      .t_l = 0 };
+                                      .t_h = ((100 * (i2c_period - T_FALL - T_RISE)) / (DUTY_100X)),
+                                      .t_l = ((100 * (i2c_period - T_FALL - T_RISE)) / (100 - DUTY_100X)) };
 
 static inline bool fmt_fifo_empty(void)
 {
@@ -76,14 +78,16 @@ static inline bool rx_fifo_not_empty()
 /**
  * Start the host running.
  */
-static inline void i2c_start_host(void) {
+static inline void i2c_start_host(void)
+{
     regs->ctrl |= (I2C_CTRL_ENHOST_BIT);
 }
 
 /**
  * Stop the host while preserving FMT FIFO status.
  */
-static inline void i2c_stop_host(void) {
+static inline void i2c_stop_host(void)
+{
     regs->ctrl &= ~(I2C_CTRL_ENHOST_BIT);
 }
 /**
@@ -94,16 +98,15 @@ int i2c_halt(void)
     i2c_stop_host();
 
     // Reset all fifos
-    regs->fifo_ctrl |= (I2C_FIFO_CTRL_FMTRST_BIT);
-    regs->fifo_ctrl |= (I2C_FIFO_CTRL_RXRST_BIT);
-    regs->fifo_ctrl |= (I2C_FIFO_CTRL_ACQRST_BIT);
-    regs->fifo_ctrl |= (I2C_FIFO_CTRL_TXRST_BIT);
+    regs->fifo_ctrl |= I2C_FIFO_CTRL_FMTRST_BIT | I2C_FIFO_CTRL_RXRST_BIT | I2C_FIFO_CTRL_ACQRST_BIT
+                     | I2C_FIFO_CTRL_TXRST_BIT;
 
     while (regs->ctrl & I2C_CTRL_ENHOST_BIT) {}
     return 0;
 }
 
-static inline void clear_irq(uint32_t irq_mask) {
+static inline void clear_irq(uint32_t irq_mask)
+{
     regs->intr_state = irq_mask;
 }
 
@@ -144,7 +147,7 @@ int i2c_fmt_write(uint8_t data, fdata_fmt_flags_t *flags)
                         || (flags->stop && !flags->nakok && flags->readb && !flags->rcont));
     if (!flags_valid) {
         LOG_I2C_DRIVER_ERR("Invalid fmt flags supplied to sddf_i2c_write! Combination cannot be represented "
-                       "by hardware!");
+                           "by hardware!");
         return -1;
     }
     uint32_t addr_fdata = (data)&I2C_FDATA_FBYTE_MASK;
@@ -181,7 +184,6 @@ void state_cmd(fsm_data_t *fsm, i2c_driver_data_t *data, i2c_queue_handle_t *que
 
     // Wait until FIFOs are empty
     i2c_halt();
-    while(!fmt_fifo_empty()) {}
 
     // Only load data while the host isn't running.
     i2c_stop_host();
@@ -234,7 +236,7 @@ void state_cmd(fsm_data_t *fsm, i2c_driver_data_t *data, i2c_queue_handle_t *que
         // Handle writing data
         } else {
             LOG_I2C_DRIVER("Resuming in-progress read/write. rd=%d remaining=%d\n", cmd_is_read(cmd),
-                       cmd.data_len - data->rw_idx);
+                           cmd.data_len - data->rw_idx);
             // Send stop if needed (this is last op of command)
             if (data->await_stop && data->rw_idx == cmd.data_len - 1) {
                 flags.stop = 1;
@@ -287,8 +289,8 @@ void state_cmd_ret(fsm_data_t *f, i2c_driver_data_t *data, i2c_queue_handle_t *q
     while (cmd_is_read(data->active_cmd) && rx_fifo_not_empty()) {
         // Get bytes_read amount of read data,copy data into return buffer
         uint8_t value = regs->rdata & 0xFF; // Bytes in low 8 of rdata register.
-        LOG_I2C_DRIVER("loading into buffer %p value[%u] 0x%x\n", data->active_cmd.payload.data,
-                       data->bytes_read, value);
+        LOG_I2C_DRIVER("loading into buffer %p value[%u] 0x%x\n", data->active_cmd.payload.data, data->bytes_read,
+                       value);
         data->active_cmd.payload.data[data->bytes_read] = value;
         data->bytes_read++;
     }
@@ -345,16 +347,10 @@ void init(void)
     assert(timing_params.t_hd_sta_min > timing_params.t_hd_dat_min);
     assert(timing_params.t_buf_min > timing_params.t_hd_dat_min);
 
-    // Calculate periods - use device-supplied if faster than minimum.
-    uint32_t period = MAX(((I2C_SCL_MIN_T) / (T_CLK)), ((SCL_PERIOD) / (T_CLK)));
-
     // T_H + T_L >= PERIOD - T_F - T_R
-    // -> find T_H and T_L such that they fit and achieve duty cycle defined by board.
+    // Check T_H and T_L fit and achieve duty cycle defined by board.
     // t_h = ( 100 * (T-T_F-T_R) ) / (duty_cycle*100)
-    timing_params.t_h = ((100 * (period - T_FALL - T_RISE)) / (DUTY_100X));
-
     // t_l = ( 100 * (T-T_F-T_R) ) / ((1 - duty_cycle)*100)
-    timing_params.t_l = ((100 * (period - T_FALL - T_RISE)) / (100 - DUTY_100X));
 
     // Check values are valid
     assert(timing_params.t_h >= timing_params.t_high_min);
@@ -367,12 +363,9 @@ void init(void)
     i2c_halt();
 
     // Set up interrupts
-    regs->intr_enable |= I2C_INTR_ENABLE_FMT_THRESHOLD_BIT;
-    regs->intr_enable |= I2C_INTR_ENABLE_RX_THRESHOLD_BIT;
-    regs->intr_enable |= I2C_INTR_ENABLE_NAK_BIT;
-    regs->intr_enable |= I2C_INTR_ENABLE_CMD_COMPLETE_BIT;
-    regs->intr_enable |= I2C_INTR_ENABLE_UNEXP_STOP_BIT;
-    regs->intr_enable |= I2C_INTR_ENABLE_HOST_TIMEOUT_BIT;
+    regs->intr_enable = I2C_INTR_ENABLE_FMT_THRESHOLD_BIT | I2C_INTR_ENABLE_RX_THRESHOLD_BIT | I2C_INTR_ENABLE_NAK_BIT
+                      | I2C_INTR_ENABLE_CMD_COMPLETE_BIT | I2C_INTR_ENABLE_UNEXP_STOP_BIT
+                      | I2C_INTR_ENABLE_HOST_TIMEOUT_BIT;
 
     // Configure FIFO interrupt thresholds.
     // FMT: interrupt once emptied.
@@ -467,9 +460,13 @@ void notified(microkit_channel ch)
     } else if (driver_data.err != I2C_ERR_OK) {
         LOG_I2C_DRIVER_ERR("Spurious error interrupt received! err=%u\n", driver_data.err);
         LOG_I2C_DRIVER_ERR("Current state: %s\n", state_to_str(fsm_data.curr_state));
-        if (ch == IRQ_BAD_STOP_CH) LOG_I2C_DRIVER_ERR("IRQ_BAD_STOP\n");
-        else if (ch == IRQ_TIMEOUT_CH) LOG_I2C_DRIVER_ERR("IRQ_TIMEOUT\n");
-        else if (ch == IRQ_NAK_CH) LOG_I2C_DRIVER_ERR("IRQ_NAK\n");
-        else LOG_I2C_DRIVER_ERR("No sane channel could have caused error! ch = %u\n", ch);
+        if (ch == IRQ_BAD_STOP_CH)
+            LOG_I2C_DRIVER_ERR("IRQ_BAD_STOP\n");
+        else if (ch == IRQ_TIMEOUT_CH)
+            LOG_I2C_DRIVER_ERR("IRQ_TIMEOUT\n");
+        else if (ch == IRQ_NAK_CH)
+            LOG_I2C_DRIVER_ERR("IRQ_NAK\n");
+        else
+            LOG_I2C_DRIVER_ERR("No sane channel could have caused error! ch = %u\n", ch);
     }
 }
