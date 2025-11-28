@@ -1,5 +1,5 @@
 /*
- * Copyright 2024, UNSW
+ * Copyright 2025, UNSW
  *
  * SPDX-License-Identifier: BSD-2-Clause
  */
@@ -14,27 +14,18 @@
 #include <sddf/i2c/queue.h>
 #include <sddf/i2c/client.h>
 #include <sddf/i2c/config.h>
-#include <sddf/i2c/devices/ds3231/ds3231.h>
 #include <sddf/i2c/libi2c.h>
 
 #define DEBUG_CLIENT
 
 #ifdef DEBUG_CLIENT
-#define LOG_CLIENT(...) do{ sddf_dprintf("DS3231|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
+#define LOG_CLIENT(...) do{ sddf_dprintf("SCAN|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
 #else
 #define LOG_CLIENT(...) do{}while(0)
 #endif
-#define LOG_CLIENT_ERR(...) do{ sddf_printf("DS3231|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
+#define LOG_CLIENT_ERR(...) do{ sddf_printf("SCAN|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
 bool delay_ms(size_t milliseconds);
-
-#define DS_3231_ON
-
-#ifdef DS_3231_ON
-#define USING_HALT(...) do{}while(0)
-#else
-#define USING_HALT(...) do{ while(1); }while(0)
-#endif
 
 __attribute__((__section__(".i2c_client_config"))) i2c_client_config_t i2c_config;
 __attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
@@ -49,62 +40,32 @@ libi2c_conf_t libi2c_conf;
 cothread_t t_event;
 cothread_t t_main;
 
-#define DEFAULT_READ_RESPONSE_RETRIES (256)
-#define DEFAULT_READ_ACK_FRAME_RETRIES (20)
-
 #define STACK_SIZE (4096)
 static char t_client_main_stack[STACK_SIZE];
 
-// weeks bits are from 1 - 7 so remember to index correctly (subtract 1)
-static const char *day_of_week_strings[] = { "Monday", "Tuesday",  "Wednesday", "Thursday",
-                                             "Friday", "Saturday", "Sunday" };
+#ifndef I2C_DATA_REGION
+#define I2C_DATA_REGION ((uint8_t *)i2c_config.data.vaddr)
+#endif
 
 void client_main(void)
 {
-    USING_HALT();
-
     LOG_CLIENT("client_main: started\n");
-
-    LOG_CLIENT("see if ds3231 responds with ACK\n");
-    uint8_t write_fail = ds3231_write(NULL, 0, DEFAULT_READ_ACK_FRAME_RETRIES);
-    if (write_fail) {
-        LOG_CLIENT_ERR("failed to find DS3231 on bus!\n");
-        assert(false);
-    }
-    LOG_CLIENT("ds3231 ACK! setting time\n");
-
-    if (ds3231_set_time(42, 59, 23, 7, 31, 5, 25)) {
-        LOG_CLIENT_ERR("failed to set time on DS3231!\n");
-        assert(false);
-    }
-    sddf_printf("Set Date and Time on DS3231 to: %02d-%02d-%02d %02d:%02d:%02d (%s)\n", 31, 05, 25, 23, 59, 42,
-                day_of_week_strings[7 - 1]);
-
-    LOG_CLIENT("Starting to ask for the time!\n");
     while (true) {
-        uint8_t second;
-        uint8_t minute;
-        uint8_t hour;
-        uint8_t day_of_week;
-        uint8_t day;
-        uint8_t month;
-        uint8_t year;
-        if (ds3231_get_time(&second, &minute, &hour, &day_of_week, &day, &month, &year)) {
-            LOG_CLIENT_ERR("failed to get time from DS3231!\n");
-            assert(false);
+        // Try probe all addresses
+        uint8_t *data = (uint8_t *)data_region;
+        data[0] = 0;
+        sddf_printf("SCAN|SCAN: Beginning scan...\n");
+        for (uint8_t i = 1; i < (1 << 7); i++) {
+            sddf_printf("SCAN|SCAN: \t address 0x%X", i);
+            int ret = sddf_i2c_write(&libi2c_conf, i, data, 1);
+            if (ret == 0) {
+                sddf_printf("\n           \t ... is present!\n");
+            } else {
+                sddf_printf(" not detected.\n");
+            }
         }
-
-        if (day_of_week < 1 || day_of_week > 7) {
-            LOG_CLIENT_ERR("day of week index is wrong\n");
-            sddf_printf("Date and Time: %02d-%02d-%02d %02d:%02d:%02d\n", day, month, year, hour, minute, second);
-            delay_ms(500);
-            continue;
-        }
-
-        sddf_printf("Date and Time: %02d-%02d-%02d %02d:%02d:%02d (%s)\n", day, month, year, hour, minute, second,
-                    day_of_week_strings[day_of_week - 1]);
-
-        delay_ms(500);
+        sddf_printf("\nRescanning in 5 seconds...\n");
+        delay_ms(5000);
     }
 }
 
@@ -131,21 +92,24 @@ void init(void)
                       serial_config.tx.data.vaddr);
     serial_putchar_init(serial_config.tx.id, &serial_tx_queue_handle);
 
-    sddf_printf("DS3231|INFO: init\n");
+    sddf_printf("SCAN|INFO: init\n");
 
     assert(i2c_config_check_magic((void *)&i2c_config));
 
     data_region = (uintptr_t)i2c_config.data.vaddr;
     queue = i2c_queue_init(i2c_config.virt.req_queue.vaddr, i2c_config.virt.resp_queue.vaddr);
 
-    bool claimed = i2c_bus_claim(i2c_config.virt.id, DS3231_I2C_BUS_ADDRESS);
-    if (!claimed) {
-        LOG_CLIENT_ERR("failed to claim DS3231 bus\n");
-        return;
+    // Claim all addresses except the general call address (0)
+    for (uint8_t i = 1; i < (1 << 7); i++) {
+        bool claimed = i2c_bus_claim(i2c_config.virt.id, i);
+        if (!claimed) {
+            LOG_CLIENT_ERR("failed to claim %u!\n", i);
+            return;
+        }
+        LOG_CLIENT("claimed peripheral address %u\n", i);
     }
-    LOG_CLIENT("claimed DS3231 bus!\n");
 
-    /* Initialise libi2c for DS3231 */
+    /* Initialise libi2c */
     libi2c_init(&libi2c_conf, &queue);
 
     /* Define the event loop/notified thread as the active co-routine */

@@ -8,6 +8,7 @@ PLATFORM := riscv
 #NET_DRIV_DIR :=
 #ETH_DRIV :=
 UART_DRIV_DIR := ns16550a
+I2C_DRIV_DIR := opentitan
 # Cheshire has no peripheral timer.
 # Serengeti is our fork with a timer
 #TIMER_DRIV_DIR := apb_timer
