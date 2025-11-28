@@ -163,7 +163,8 @@ static bool read_pci_general_device_header(uint8_t bus, uint8_t dev, uint8_t fun
     return true;
 }
 
-bool virtio_transport_probe(device_resources_t *device_resources, virtio_device_handle_t *device_handle_ret, uint32_t device_id)
+bool virtio_transport_probe(device_resources_t *device_resources, virtio_device_handle_t *device_handle_ret,
+                            uint32_t device_id)
 {
     assert(device_resources_check_magic(device_resources));
 

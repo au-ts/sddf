@@ -27,7 +27,8 @@ static volatile virtio_mmio_regs_t *get_regs(device_resources_t *device_resource
     return (volatile virtio_mmio_regs_t *)device_resources->regions[0].region.vaddr;
 }
 
-bool virtio_transport_probe(device_resources_t *device_resources, virtio_device_handle_t *device_handle_ret, uint32_t device_id)
+bool virtio_transport_probe(device_resources_t *device_resources, virtio_device_handle_t *device_handle_ret,
+                            uint32_t device_id)
 {
     assert(device_resources_check_magic(device_resources));
     volatile virtio_mmio_regs_t *regs = get_regs(device_resources);
