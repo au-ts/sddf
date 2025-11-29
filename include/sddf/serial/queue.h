@@ -463,10 +463,35 @@ static inline void serial_queue_init(serial_queue_handle_t *queue_handle, serial
  */
 static inline void serial_request_consumer_signal(serial_queue_handle_t *queue_handle)
 {
-    queue_handle->queue->producer_signalled = 0;
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
-    THREAD_MEMORY_RELEASE();
-#endif
+    store_relaxed_32(&queue_handle->queue->producer_signalled, 0);
+    /* The sc fence will synchronise with the sc fence in the consumer in the signalling protocol,
+     * such that at least one of the producer and the consumer can make progress
+     * and avoid deadlock.
+     *
+     * In particular, the following shape of cppmem program (http://svr-pes20-cppmem.cl.cam.ac.uk/cppmem/)
+     * represents the undesired behaviour that is prevented by the pair of sc fences.
+     *
+     * int main() {
+     *   atomic_int flag = 0;
+     *   atomic_int queue = 0;
+     *   {{{
+     *     // producer
+     *     {
+     *       flag.store(1, relaxed);
+     *       atomic_thread_fence(seq_cst);
+     *       queue.load(relaxed).readsvalue(0);
+     *     }
+     *   |||
+     *     // consumer
+     *     {
+     *       queue.store(1, relaxed);
+     *       atomic_thread_fence(seq_cst);
+     *       flag.load(relaxed).readsvalue(0);
+     *     }
+     *   }}};
+     * }
+     */
+    fence_seq_cst();
 }
 
 /**
@@ -476,10 +501,10 @@ static inline void serial_request_consumer_signal(serial_queue_handle_t *queue_h
  */
 static inline void serial_cancel_consumer_signal(serial_queue_handle_t *queue_handle)
 {
-    queue_handle->queue->producer_signalled = 1;
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
-    THREAD_MEMORY_RELEASE();
-#endif
+    store_relaxed_32(&queue_handle->queue->producer_signalled, 1);
+    /* It is not necessary to insert a sc fence here, unlike in serial_request_consumer_signal(),
+     * as the signalling protocol requires that a cancellation is always followed by a request.
+     */
 }
 
 /**
@@ -489,5 +514,10 @@ static inline void serial_cancel_consumer_signal(serial_queue_handle_t *queue_ha
  */
 static inline bool serial_require_consumer_signal(serial_queue_handle_t *queue_handle)
 {
-    return !queue_handle->queue->producer_signalled;
+    /* The sc fence will synchronise with the sc fence in the producer in the signalling protocol,
+     * such that at least one of the producer and the consumer can make progress
+     * and avoid deadlock.
+     */
+    fence_seq_cst();
+    return !load_relaxed_32(&queue_handle->queue->producer_signalled);
 }

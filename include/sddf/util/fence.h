@@ -67,6 +67,11 @@ static inline uint32_t load_relaxed_32(const uint32_t *ptr)
     return __atomic_load_n(ptr, __ATOMIC_RELAXED);
 }
 
+static inline void store_relaxed_32(uint32_t *ptr, uint32_t value)
+{
+    __atomic_store_n(ptr, value, __ATOMIC_RELAXED);
+}
+
 /* load_acquire_16: synchronises with a store_release_16 that writes the same value to the same location
  */
 static inline uint16_t load_acquire_16(const uint16_t *ptr)
@@ -95,4 +100,18 @@ static inline void store_release_16(uint16_t *ptr, uint16_t value)
 static inline uint16_t load_relaxed_16(const uint16_t *ptr)
 {
     return __atomic_load_n(ptr, __ATOMIC_RELAXED);
+}
+
+static inline void store_relaxed_16(uint16_t *ptr, uint16_t value)
+{
+    __atomic_store_n(ptr, value, __ATOMIC_RELAXED);
+}
+
+static inline void fence_seq_cst()
+{
+#ifdef CONFIG_ENABLE_SMP_SUPPORT
+    __atomic_thread_fence(__ATOMIC_SEQ_CST);
+#else
+    __atomic_signal_fence(__ATOMIC_SEQ_CST);
+#endif
 }
