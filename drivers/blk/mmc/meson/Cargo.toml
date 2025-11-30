@@ -1,0 +1,23 @@
+# Copyright 2025, UNSW
+# SPDX-License-Identifier: BSD-2-Clause
+
+[package]
+name = "meson_hal"
+version = "0.1.0"
+edition = "2024"
+authors = ["Cheng Li 李澄 <lichengchaoreng@gmail.com>"]
+
+[lib]
+name = "meson_hal"
+path = "lib.rs"
+
+# The Hardware Abstraction Layer (HAL) is designed to be:
+# - Bare-metal compatible
+# - Operating system (OS) agnostic
+# - Minimally dependent to ensure cross-platform flexibility
+#
+# Required Dependencies:
+# - sdmmc_protocol: Essential for core functionality.
+
+[dependencies]
+sdmmc_protocol = { path = "../core/protocol" }

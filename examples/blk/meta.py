@@ -15,6 +15,8 @@ from board import BOARDS
 assert version("sdfgen").split(".")[1] == "27", "Unexpected sdfgen version"
 
 ProtectionDomain = SystemDescription.ProtectionDomain
+MemoryRegion = SystemDescription.MemoryRegion
+Map = SystemDescription.Map
 
 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree, need_timer: bool):
@@ -54,6 +56,11 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree, need_timer: bool):
     blk_system = Sddf.Blk(sdf, blk_node, blk_driver, blk_virt)
     partition = int(args.partition) if args.partition else board.partition
     blk_system.add_client(client, partition=partition)
+
+    if board.name == "odroidc4":
+        gpio_mr = MemoryRegion(sdf, name="gpio", size=0x1000, paddr=0xFF800000)
+        blk_driver.add_map(Map(gpio_mr, 0xFF800000, "rw", cached=False))
+        sdf.add_mr(gpio_mr)
 
     serial_system.add_client(client)
 

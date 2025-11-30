@@ -20,6 +20,7 @@ ci_logs/
 zig-out/
 .zig-cache/
 venv/
+target/
 __pycache__
 .*.sw*
 *.dtb
