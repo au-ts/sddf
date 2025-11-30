@@ -6,3 +6,4 @@
 pub mod sdmmc;
 pub mod sdmmc_os;
 pub mod sdmmc_traits;
+pub mod chirag;

@@ -377,7 +377,7 @@ void init(void)
     assert(device_resources.num_regions == 3);
 
     /* Ack any IRQs that were delivered before the driver started. */
-    microkit_irq_ack(device_resources.irqs[0].id);
+    sddf_irq_ack(device_resources.irqs[0].id);
 
     regs = (volatile virtio_mmio_regs_t *)device_resources.regions[0].region.vaddr;
     requests_paddr = device_resources.regions[2].io_addr;

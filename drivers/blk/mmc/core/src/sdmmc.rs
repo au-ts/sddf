@@ -14,6 +14,10 @@ use core::{
     task::{Context, Poll, Waker},
 };
 
+use crate::sdmmc_os::VoltageOps;
+
+use crate::dev_log;
+
 use capability::{
     MMC_CAP_4_BIT_DATA, MMC_EMPTY_CAP, MMC_TIMING_LEGACY, MMC_TIMING_SD_HS, MMC_TIMING_UHS_DDR50,
     MMC_TIMING_UHS_SDR12, MMC_TIMING_UHS_SDR25, MMC_TIMING_UHS_SDR50, MMC_TIMING_UHS_SDR104,
@@ -40,12 +44,13 @@ use sd::{Cid, Csd, Scr, Sdcard};
 
 pub const SDCARD_DEFAULT_SECTOR_SIZE: u32 = 512;
 
-use crate::{
-    dev_log,
-    sdmmc::mmc_struct::CardInfo,
-    sdmmc_os::{Sleep, VoltageOps},
-    sdmmc_traits::{SdmmcHardware, SdmmcOps},
-};
+use crate::sdmmc_traits::SdmmcOps;
+use crate::CardInfo;
+use crate::SdmmcHardware;
+use crate::chirag::SdmmcMesonHardware;
+use crate::sdmmc_os::Sleep;
+use crate::sel4_microkit_os::TimerOps;
+use crate::sel4_microkit_os::Odroidc4VoltageSwitch;
 
 pub struct SdmmcCmd {
     pub cmdidx: u32,
@@ -251,12 +256,12 @@ impl HostInfo {
     }
 }
 
-pub struct SdmmcProtocol<T: SdmmcHardware, S: Sleep, V: VoltageOps> {
-    hardware: T,
+pub struct SdmmcProtocol {
+    hardware: SdmmcMesonHardware,
 
-    sleep: S,
+    sleep: TimerOps,
 
-    voltage_ops: Option<V>,
+    voltage_ops: Option<Odroidc4VoltageSwitch>,
 
     mmc_ios: MmcIos,
 
@@ -266,16 +271,12 @@ pub struct SdmmcProtocol<T: SdmmcHardware, S: Sleep, V: VoltageOps> {
     private_memory: Option<*mut [u8; 64]>,
 }
 
-impl<T, S, V> Unpin for SdmmcProtocol<T, S, V>
-where
-    T: Unpin + SdmmcHardware,
-    S: Unpin + Sleep,
-    V: Unpin + VoltageOps,
+impl Unpin for SdmmcProtocol
 {
 }
 
-impl<T: SdmmcHardware, S: Sleep, V: VoltageOps> SdmmcProtocol<T, S, V> {
-    pub fn new(mut hardware: T, sleep: S, voltage_ops: Option<V>) -> Result<Self, SdmmcError> {
+impl SdmmcProtocol {
+    pub fn new(mut hardware: SdmmcMesonHardware, sleep: TimerOps, voltage_ops: Option<Odroidc4VoltageSwitch>) -> Result<Self, SdmmcError> {
         let ios = hardware.sdmmc_init()?;
 
         Ok(SdmmcProtocol {
@@ -361,9 +362,9 @@ impl<T: SdmmcHardware, S: Sleep, V: VoltageOps> SdmmcProtocol<T, S, V> {
             // Right now we deliberately not set XPC bit for maximum compatibility
 
             // Change this when we decide to support spi or SDSC as well
-            cmd.cmdarg |= T::HOST_INFO.vdd & 0xff8000;
+            cmd.cmdarg |= <SdmmcMesonHardware as SdmmcHardware>::HOST_INFO.vdd & 0xff8000;
 
-            if voltage_switch == true && T::HOST_INFO.has_capability(MMC_TIMING_UHS_SDR12) {
+            if voltage_switch == true && <SdmmcMesonHardware as SdmmcHardware>::HOST_INFO.has_capability(MMC_TIMING_UHS_SDR12) {
                 cmd.cmdarg |= OCR_S18R;
                 // It seems that cards will not respond to commands that have MMC_VDD_165_195 bit set, even if the card supports UHS-I
                 // cmd.cmdarg |= MMC_VDD_165_195;
@@ -390,7 +391,7 @@ impl<T: SdmmcHardware, S: Sleep, V: VoltageOps> SdmmcProtocol<T, S, V> {
 
         // Checking if the host and card is eligible for voltage switch
         if voltage_switch == true
-            && T::HOST_INFO.has_capability(MMC_TIMING_UHS_SDR12)
+            && <SdmmcMesonHardware as SdmmcHardware>::HOST_INFO.has_capability(MMC_TIMING_UHS_SDR12)
             && resp[0] & OCR_HCS == OCR_HCS
             && resp[0] & OCR_S18R == OCR_S18R
         {
@@ -420,7 +421,7 @@ impl<T: SdmmcHardware, S: Sleep, V: VoltageOps> SdmmcProtocol<T, S, V> {
         // For card initialization, we retry 2 times for each card
         // There could be more complex retry logic implemented in the future
         let res: Result<(), SdmmcError> = 'sdcard_init: {
-            let mut voltage_switch_init: bool = T::HOST_INFO.has_capability(MMC_TIMING_UHS_SDR12);
+            let mut voltage_switch_init: bool = <SdmmcMesonHardware as SdmmcHardware>::HOST_INFO.has_capability(MMC_TIMING_UHS_SDR12);
             let mut init_error: SdmmcError = SdmmcError::EUNSUPPORTEDCARD;
             for _ in 0..CARD_INIT_RETRY {
                 match self.sdcard_init(voltage_switch_init) {
@@ -901,7 +902,7 @@ impl<T: SdmmcHardware, S: Sleep, V: VoltageOps> SdmmcProtocol<T, S, V> {
         }
 
         if self.mmc_ios.bus_width == MmcBusWidth::Width1
-            && T::HOST_INFO.has_capability(MMC_CAP_4_BIT_DATA)
+            && <SdmmcMesonHardware as SdmmcHardware>::HOST_INFO.has_capability(MMC_CAP_4_BIT_DATA)
         {
             // Switch data bits per transfer
             let relative_card_address: u16;
@@ -987,33 +988,33 @@ impl<T: SdmmcHardware, S: Sleep, V: VoltageOps> SdmmcProtocol<T, S, V> {
                 match self.mmc_ios.signal_voltage {
                     MmcSignalVoltage::Voltage330 => {
                         if sdcard_cap.contains(SdcardCapability(MMC_TIMING_SD_HS))
-                            && T::HOST_INFO.has_capability(MMC_TIMING_SD_HS)
+                            && <SdmmcMesonHardware as SdmmcHardware>::HOST_INFO.has_capability(MMC_TIMING_SD_HS)
                         {
                             target_timing = MmcTiming::SdHs;
                         }
                     }
                     MmcSignalVoltage::Voltage180 => {
                         if sdcard_cap.contains(SdcardCapability(MMC_TIMING_UHS_SDR104))
-                            && T::HOST_INFO.has_capability(MMC_TIMING_UHS_SDR104)
+                            && <SdmmcMesonHardware as SdmmcHardware>::HOST_INFO.has_capability(MMC_TIMING_UHS_SDR104)
                         {
                             target_timing = MmcTiming::UhsSdr104;
                             // If the switch speed succeed, terminate the block
                             break 'tune_speed;
                         }
                         if !sdcard_cap.contains(SdcardCapability(MMC_TIMING_UHS_DDR50))
-                            && T::HOST_INFO.has_capability(MMC_TIMING_UHS_DDR50)
+                            && <SdmmcMesonHardware as SdmmcHardware>::HOST_INFO.has_capability(MMC_TIMING_UHS_DDR50)
                         {
                             target_timing = MmcTiming::UhsDdr50;
                             break 'tune_speed;
                         }
                         if !sdcard_cap.contains(SdcardCapability(MMC_TIMING_UHS_SDR50))
-                            && T::HOST_INFO.has_capability(MMC_TIMING_UHS_SDR50)
+                            && <SdmmcMesonHardware as SdmmcHardware>::HOST_INFO.has_capability(MMC_TIMING_UHS_SDR50)
                         {
                             target_timing = MmcTiming::UhsSdr50;
                             break 'tune_speed;
                         }
                         if !sdcard_cap.contains(SdcardCapability(MMC_TIMING_UHS_SDR25))
-                            && T::HOST_INFO.has_capability(MMC_TIMING_UHS_SDR25)
+                            && <SdmmcMesonHardware as SdmmcHardware>::HOST_INFO.has_capability(MMC_TIMING_UHS_SDR25)
                         {
                             target_timing = MmcTiming::UhsSdr25;
                             break 'tune_speed;
@@ -1065,7 +1066,7 @@ impl<T: SdmmcHardware, S: Sleep, V: VoltageOps> SdmmcProtocol<T, S, V> {
         blockcnt: u32,
         start_idx: u64,
         destination: u64,
-    ) -> (Result<(), SdmmcError>, SdmmcProtocol<T, S, V>) {
+    ) -> (Result<(), SdmmcError>, SdmmcProtocol) {
         let trans_meth: BlockTransmissionMode = {
             if let Some(ref device) = self.mmc_device {
                 match device {
@@ -1170,7 +1171,7 @@ impl<T: SdmmcHardware, S: Sleep, V: VoltageOps> SdmmcProtocol<T, S, V> {
         blockcnt: u32,
         start_idx: u64,
         source: u64,
-    ) -> (Result<(), SdmmcError>, SdmmcProtocol<T, S, V>) {
+    ) -> (Result<(), SdmmcError>, SdmmcProtocol) {
         let trans_meth: BlockTransmissionMode = {
             if let Some(ref device) = self.mmc_device {
                 match device {
@@ -1242,7 +1243,7 @@ impl<T: SdmmcHardware, S: Sleep, V: VoltageOps> SdmmcProtocol<T, S, V> {
         mut self,
         start_idx: u64,
         end_idx: u64,
-    ) -> (Result<(), SdmmcError>, SdmmcProtocol<T, S, V>) {
+    ) -> (Result<(), SdmmcError>, SdmmcProtocol) {
         let mut cmd: SdmmcCmd;
         let mut res: Result<(), SdmmcError>;
 
@@ -1286,7 +1287,7 @@ impl<T: SdmmcHardware, S: Sleep, V: VoltageOps> SdmmcProtocol<T, S, V> {
     /// Function to execute one sdmmc request asynchronously
     /// The resp could be used for future error parsing
     async fn sdmmc_async_request(
-        hardware: &mut T,
+        hardware: &mut SdmmcMesonHardware,
         cmd: &SdmmcCmd,
         data: Option<&MmcData>,
         resp: &mut [u32; 4],
@@ -1305,7 +1306,7 @@ impl<T: SdmmcHardware, S: Sleep, V: VoltageOps> SdmmcProtocol<T, S, V> {
     /// MMC_CMD_STOP_TRANSMISSION must be sent in the end so the card
     /// stop transmission correctly
     async fn sdmmc_multi_blocks_io(
-        hardware: &mut T,
+        hardware: &mut SdmmcMesonHardware,
         request_cmd: &SdmmcCmd,
         data: &MmcData,
         resp: &mut [u32; 4],
@@ -1367,7 +1368,7 @@ impl<T: SdmmcHardware, S: Sleep, V: VoltageOps> SdmmcProtocol<T, S, V> {
     }
 
     pub const fn host_info() -> HostInfo {
-        T::HOST_INFO
+        <SdmmcMesonHardware as SdmmcHardware>::HOST_INFO
     }
 
     pub fn card_info(&self) -> Result<CardInfo, SdmmcError> {

@@ -2,21 +2,16 @@
 # SPDX-License-Identifier: BSD-2-Clause
 
 [package]
-name = "blk_driver"
+name = "odroidc4_blk_driver"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 
 [dependencies]
-#sel4 = { git = "https://github.com/seL4/rust-sel4", features = ["state", "thread-local-state"]}
-#sel4-sys = { git = "https://github.com/seL4/rust-sel4" }
-#sel4-config = { git = "https://github.com/seL4/rust-sel4" }
+sel4 = { git = "https://github.com/seL4/rust-sel4", features = ["state", "thread-local-state"]}
+sel4-sys = { git = "https://github.com/seL4/rust-sel4" }
+sel4-config = { git = "https://github.com/seL4/rust-sel4" }
 sel4-panicking-env = { git = "https://github.com/seL4/rust-sel4.git" }
-meson_hal = { path = "../meson", optional = true }
-sdmmc_protocol = { path = "protocol" }
-
-[features]
-dev-logs = ["sdmmc_protocol/dev-logs"]
-meson = ["dep:meson_hal"]
-
-[build]
-build = "build.rs"
+smos-sddf = { path = "../../../../../crates/smos-sddf" }
+#blk_driver = { path = "../../../../../crates/blk_driver" }
+#sdmmc_protocol = { path = "protocol" }
+bitflags = "2.6.0"

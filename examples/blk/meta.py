@@ -19,7 +19,62 @@ MemoryRegion = SystemDescription.MemoryRegion
 Map = SystemDescription.Map
 
 
-def generate(sdf_file: str, output_dir: str, dtb: DeviceTree, need_timer: bool):
+@dataclass
+class Board:
+    name: str
+    arch: SystemDescription.Arch
+    paddr_top: int
+    blk: str
+    # Default partition if the user has not specified one
+    partition: int
+    # Use actual serial driver for output, so we can test non-debug configurations
+    serial: str
+    # Some block drivers need a timer driver as well, the example
+    # itself does not need a timer driver.
+    timer: Optional[str]
+
+
+BOARDS: List[Board] = [
+    Board(
+        name="qemu_virt_aarch64",
+        arch=SystemDescription.Arch.AARCH64,
+        paddr_top=0x6_0000_000,
+        partition=0,
+        blk="virtio_mmio@a003e00",
+        serial="pl011@9000000",
+        timer=None,
+    ),
+    Board(
+        name="maaxboard",
+        arch=SystemDescription.Arch.AARCH64,
+        paddr_top=0x7_0000_000,
+        partition=2,
+        blk="soc@0/bus@30800000/mmc@30b40000",
+        timer="soc@0/bus@30000000/timer@302d0000",
+        serial="soc@0/bus@30800000/serial@30860000",
+    ),
+    Board(
+        name="odroidc4",
+        arch=SystemDescription.Arch.AARCH64,
+        paddr_top=0x80000000,
+        partition=0,
+        blk="soc/sd@ffe05000",
+        timer=None,
+        serial="soc/bus@ff800000/serial@3000",
+    ),
+    Board(
+        name="qemu_virt_riscv64",
+        arch=SystemDescription.Arch.RISCV64,
+        paddr_top=0xA_0000_000,
+        partition=0,
+        blk="soc/virtio_mmio@10008000",
+        serial="soc/serial@10000000",
+        timer=None,
+    ),
+]
+
+
+def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     serial_driver = ProtectionDomain("serial_driver", "serial_driver.elf", priority=200)
     # Increase the stack size as running with UBSAN uses more stack space than normal.
     serial_virt_tx = ProtectionDomain(

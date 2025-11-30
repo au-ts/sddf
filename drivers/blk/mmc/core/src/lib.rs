@@ -14,6 +14,8 @@ use core::{
     future::Future, mem::MaybeUninit, pin::Pin, task::{Context, Poll, RawWaker, RawWakerVTable, Waker}
 };
 
+use crate::sdmmc_os::set_logger;
+
 use alloc::boxed::Box;
 use sddf_blk::{
     BlkOp, BlkRequest, BlkStatus, blk_dequeue_req_helper, blk_device_init_data_ioaddr,
@@ -21,24 +23,33 @@ use sddf_blk::{
     blk_queue_empty_req_helper, blk_queue_full_resp_helper, blk_queue_init_helper,
 };
 
-use crate::sel4_microkit_os::{SerialOps, TimerOps, platform::VOLTAGE};
+use crate::sel4_microkit_os::{SerialOps, TimerOps, VOLTAGE};
 
-extern "C" {
-    pub static mut device_resources: DeviceResources;
-    pub static mut config: BlkDriverConfig;
+use smos_sddf::sddf_bindings::{sddf_irq_ack, sddf_notify};
+use smos_sddf::device_config::DeviceResources;
+use smos_sddf::blk_config::BlkDriverConfig;
+
+unsafe extern "C" {
+    pub unsafe static mut device_resources: DeviceResources;
+    pub unsafe static mut config: BlkDriverConfig;
 }
 
-const INTERRUPT: u32 = unsafe { device_resources.irqs[0].id };
-const BLK_VIRTUALIZER: u32 = unsafe { config.virt.id };
+pub static mut INTERRUPT: u32 = 0;
+pub static mut BLK_VIRTUALIZER: u32 = 0;
 const TIMER: TimerOps = TimerOps::new();
 const SERIAL: SerialOps = SerialOps::new();
-const HOST_INFO: HostInfo = crate::sel4_microkit_os::platform::host_info();
+const HOST_INFO: HostInfo = crate::sel4_microkit_os::host_info();
 
-use sdmmc_protocol::{
+mod sdmmc;
+mod sdmmc_traits;
+mod sdmmc_os;
+mod chirag;
+
+use {
     sdmmc::{mmc_struct::CardInfo, HostInfo, SDCARD_DEFAULT_SECTOR_SIZE},
     sdmmc_traits::SdmmcHardware,
 };
-use sdmmc_protocol::{
+use {
     sdmmc::{SdmmcError, SdmmcProtocol},
     sdmmc_os::{Sleep, VoltageOps},
 };
@@ -46,14 +57,14 @@ use sdmmc_protocol::{
 const SDDF_TRANSFER_SIZE: u32 = 4096;
 const SDDF_TO_REAL_SECTOR: u32 = SDDF_TRANSFER_SIZE / SDCARD_DEFAULT_SECTOR_SIZE;
 
-struct HandlerImpl<T: SdmmcHardware, S: Sleep, V: VoltageOps> {
-    future: Option<Pin<Box<dyn Future<Output = (Result<(), SdmmcError>, SdmmcProtocol<T, S, V>)>>>>,
-    sdmmc: Option<SdmmcProtocol<T, S, V>>,
+struct HandlerImpl{
+    future: Option<Pin<Box<dyn Future<Output = (Result<(), SdmmcError>, SdmmcProtocol)>>>>,
+    sdmmc: Option<SdmmcProtocol>,
     request: Option<BlkRequest>,
     card_info: CardInfo,
 }
 
-pub static mut handler: MaybeUninit<HandlerImpl<T, S, V>> = MaybeUninit::uninit();
+pub static mut handler: MaybeUninit<HandlerImpl> = MaybeUninit::uninit();
 
 // No-op waker implementations, they do nothing.
 unsafe fn noop(_data: *const ()) {}
@@ -74,14 +85,23 @@ fn create_dummy_waker() -> Waker {
     unsafe { Waker::from_raw(raw_waker) }
 }
 
-pub fn init() {
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn init() {
+
     unsafe {
-        sdmmc_protocol::sdmmc_os::set_logger(&SERIAL).unwrap();
+        let irq_ref = device_resources.irqs[0].assume_init_ref();
+        INTERRUPT = irq_ref.id as u32;
+
+        BLK_VIRTUALIZER = config.virt.id as u32;
+    }
+
+    unsafe {
+        set_logger(&SERIAL).unwrap();
     }
 
     let regs_base = unsafe { blk_device_regs_vaddr() };
 
-    let hal = unsafe { crate::sel4_microkit_os::platform::platform_hal(regs_base) };
+    let hal = unsafe { crate::sel4_microkit_os::platform_hal(regs_base) };
 
     let unsafe_stolen_memory: &mut [u8; 64];
 
@@ -133,56 +153,45 @@ pub fn init() {
         blk_queue_init_helper(card_info.card_capacity);
     }
 
-    unsafe { handler.write(HandlerImpl { future: None, sdmmc: Some(sdmmc_host), request: None, card_info }) };
+    unsafe {
+        core::ptr::addr_of_mut!(handler).write(MaybeUninit::new(HandlerImpl {
+            future: None,
+            sdmmc: Some(sdmmc_host),
+            request: None,
+            card_info,
+        }));
+    }
 }
 
-fn notified(channel_set: ChannelSet) {
-    for channel in channel_set.iter() {
-        if channel.index() != INTERRUPT.index() && channel.index() != BLK_VIRTUALIZER.index() {
-            sel4::debug_println!(
-                "SDMMC_DRIVER: Unknown channel sent me message: {}",
-                channel.index()
-            );
-            return;
-        }
+#[no_mangle]
+pub extern "C" fn notified(channel: u32) {
+    if channel != unsafe { INTERRUPT } && channel != unsafe { BLK_VIRTUALIZER } {
+        sel4::debug_println!(
+            "SDMMC_DRIVER: Unknown channel sent me message: {}",
+            channel
+        );
+        return;
+    }
 
-        let mut notify_virt: bool = false;
-        let init_handler = unsafe { handler.assume_init() };
+    let mut notify_virt: bool = false;
+    let init_handler: &mut HandlerImpl = unsafe { &mut *core::ptr::addr_of_mut!(handler).cast::<HandlerImpl>() };    
+    
+    'process_notification: {
+        if channel == unsafe { INTERRUPT } {
+            if let Some(request) = &mut init_handler.request {
+                if let Some(future) = &mut init_handler.future {
+                    let waker = create_dummy_waker();
+                    let mut cx = Context::from_waker(&waker);
+                    match future.as_mut().poll(&mut cx) {
+                        Poll::Ready((result, sdmmc)) => {
+                            init_handler.future = None;
+                            init_handler.sdmmc = Some(sdmmc);
+                            if result.is_ok() {
+                                request.success_count += request.count_to_do;
+                                request.count -= request.count_to_do;
 
-        'process_notification: {
-            // Polling if receive interrupt notification
-            if channel.index() == INTERRUPT.index() {
-                if let Some(request) = &mut init_handler.request {
-                    if let Some(future) = &mut init_handler.future {
-                        let waker = create_dummy_waker();
-                        let mut cx = Context::from_waker(&waker);
-                        match future.as_mut().poll(&mut cx) {
-                            Poll::Ready((result, sdmmc)) => {
-                                init_handler.future = None; // Reset the future once done
-                                init_handler.sdmmc = Some(sdmmc);
-                                if result.is_ok() {
-                                    // Deduct finished count from count
-                                    request.success_count += request.count_to_do;
-                                    request.count -= request.count_to_do;
-
-                                    if request.count == 0 {
-                                        let resp_status = BlkStatus::BlkRespOk;
-                                        notify_virt = true;
-                                        unsafe {
-                                            // The using try_into() to convert u32 to u16 should not be necessary unless
-                                            // there are bugs in the code cause the operation to fail
-                                            blk_enqueue_resp_helper(
-                                                resp_status,
-                                                (request.success_count / SDDF_TO_REAL_SECTOR)
-                                                    .try_into()
-                                                    .unwrap(),
-                                                request.id,
-                                            );
-                                        }
-                                        init_handler.request = None;
-                                    }
-                                } else {
-                                    let resp_status = BlkStatus::BlkRespSeekError;
+                                if request.count == 0 {
+                                    let resp_status = BlkStatus::BlkRespOk;
                                     notify_virt = true;
                                     unsafe {
                                         blk_enqueue_resp_helper(
@@ -195,155 +204,157 @@ fn notified(channel_set: ChannelSet) {
                                     }
                                     init_handler.request = None;
                                 }
-                            }
-                            Poll::Pending => {
-                                // Since the future is not ready, no other request can be dequeued, exit the big loop
-                                break 'process_notification;
+                            } else {
+                                let resp_status = BlkStatus::BlkRespSeekError;
+                                notify_virt = true;
+                                unsafe {
+                                    blk_enqueue_resp_helper(
+                                        resp_status,
+                                        (request.success_count / SDDF_TO_REAL_SECTOR)
+                                            .try_into()
+                                            .unwrap(),
+                                        request.id,
+                                    );
+                                }
+                                init_handler.request = None;
                             }
                         }
-                    } else {
-                        panic!(
-                            "SDMMC: Receive a hardware interrupt despite not having a future!"
-                        );
+                        Poll::Pending => break 'process_notification,
                     }
-                }
-            }
-
-            while init_handler.request.is_none()
-                && unsafe {
-                    blk_queue_empty_req_helper() == 0 && blk_queue_full_resp_helper() == 0
-                }
-            {
-                let mut request: BlkRequest = BlkRequest {
-                    request_code: BlkOp::BlkReqFlush,
-                    io_or_offset: 0,
-                    block_number: 0,
-                    count: 0,
-                    success_count: 0,
-                    count_to_do: 0,
-                    id: 0,
-                };
-                let mut sddf_count: u16 = 0;
-                unsafe {
-                    blk_dequeue_req_helper(
-                        &mut request.request_code as *mut BlkOp,
-                        &mut request.io_or_offset as *mut u64,
-                        &mut request.block_number as *mut u64,
-                        &mut sddf_count as *mut u16,
-                        &mut request.id as *mut u32,
+                } else {
+                    panic!(
+                        "SDMMC: Receive a hardware interrupt despite not having a future!"
                     );
                 }
-                // TODO: Consider to add integer overflow check here
-                request.block_number = request.block_number * SDDF_TO_REAL_SECTOR as u64;
-                request.count = (sddf_count as u32) * SDDF_TO_REAL_SECTOR;
+            }
+        }
 
-                // Print the retrieved values
-                #[cfg(feature = "dev-logs")]
-                {
-                    sel4::debug_println!("io_or_offset: 0x{:x}", request.io_or_offset); // Simple u64
-                    sel4::debug_println!("block_number: {}", request.block_number); // Simple u32
-                    sel4::debug_println!("count: {}", request.count); // Simple u16
-                    sel4::debug_println!("id: {}", request.id); // Simple u32
+        while init_handler.request.is_none()
+            && unsafe {
+                blk_queue_empty_req_helper() == 0 && blk_queue_full_resp_helper() == 0
+            }
+        {
+            let mut request: BlkRequest = BlkRequest {
+                request_code: BlkOp::BlkReqFlush,
+                io_or_offset: 0,
+                block_number: 0,
+                count: 0,
+                success_count: 0,
+                count_to_do: 0,
+                id: 0,
+            };
+            let mut sddf_count: u16 = 0;
+            unsafe {
+                blk_dequeue_req_helper(
+                    &mut request.request_code as *mut BlkOp,
+                    &mut request.io_or_offset as *mut u64,
+                    &mut request.block_number as *mut u64,
+                    &mut sddf_count as *mut u16,
+                    &mut request.id as *mut u32,
+                );
+            }
+
+            request.block_number = request.block_number * SDDF_TO_REAL_SECTOR as u64;
+            request.count = (sddf_count as u32) * SDDF_TO_REAL_SECTOR;
+
+            #[cfg(feature = "dev-logs")]
+            {
+                sel4::debug_println!("io_or_offset: 0x{:x}", request.io_or_offset);
+                sel4::debug_println!("block_number: {}", request.block_number);
+                sel4::debug_println!("count: {}", request.count);
+                sel4::debug_println!("id: {}", request.id);
+            }
+
+            if (request.count as u64 + request.block_number as u64)
+                * SDCARD_DEFAULT_SECTOR_SIZE as u64
+                > init_handler.card_info.card_capacity
+            {
+                unsafe {
+                    blk_enqueue_resp_helper(BlkStatus::BlkRespSeekError, 0, request.id);
                 }
+            }
 
-                // Check if the request is valid
-                if (request.count as u64 + request.block_number as u64)
-                    * SDCARD_DEFAULT_SECTOR_SIZE as u64
-                    > init_handler.card_info.card_capacity
-                {
+            match request.request_code {
+                BlkOp::BlkReqRead => {
+                    init_handler.request = Some(request);
+                    break;
+                }
+                BlkOp::BlkReqWrite => {
+                    init_handler.request = Some(request);
+                    break;
+                }
+                _ => {
+                    notify_virt = true;
                     unsafe {
-                        blk_enqueue_resp_helper(BlkStatus::BlkRespSeekError, 0, request.id);
+                        blk_enqueue_resp_helper(BlkStatus::BlkRespOk, 0, request.id);
                     }
                 }
+            }
+        }
 
+        if let Some(request) = &mut init_handler.request {
+            if let None = init_handler.future {
                 match request.request_code {
                     BlkOp::BlkReqRead => {
-                        init_handler.request = Some(request);
-                        break;
+                        request.count_to_do =
+                            core::cmp::min(request.count, HOST_INFO.max_block_per_req);
+                        if let Some(sdmmc) = init_handler.sdmmc.take() {
+                            init_handler.future = Some(Box::pin(unsafe {
+                                sdmmc.read_block(
+                                    request.count_to_do,
+                                    request.block_number as u64 + request.success_count as u64,
+                                    request.io_or_offset
+                                        + request.success_count as u64
+                                            * SDCARD_DEFAULT_SECTOR_SIZE as u64,
+                                )
+                            }));
+                        } else {
+                            panic!(
+                                "SDMMC_DRIVER: The sdmmc should be here since the future should be empty!!!"
+                            )
+                        }
                     }
                     BlkOp::BlkReqWrite => {
-                        init_handler.request = Some(request);
-                        break;
-                    }
-                    _ => {
-                        // For other request, enqueue response
-                        notify_virt = true;
-                        unsafe {
-                            blk_enqueue_resp_helper(BlkStatus::BlkRespOk, 0, request.id);
-                        }
-                    }
-                }
-            }
-
-            // If future is empty
-            if let Some(request) = &mut init_handler.request {
-                if let None = init_handler.future {
-                    match request.request_code {
-                        BlkOp::BlkReqRead => {
-                            request.count_to_do =
-                                core::cmp::min(request.count, HOST_INFO.max_block_per_req);
-                            if let Some(sdmmc) = init_handler.sdmmc.take() {
-                                init_handler.future = Some(Box::pin(sdmmc.read_block(
+                        request.count_to_do =
+                            core::cmp::min(request.count, HOST_INFO.max_block_per_req);
+                        if let Some(sdmmc) = init_handler.sdmmc.take() {
+                            init_handler.future = Some(Box::pin(unsafe {
+                                sdmmc.write_block(
                                     request.count_to_do,
                                     request.block_number as u64 + request.success_count as u64,
                                     request.io_or_offset
                                         + request.success_count as u64
                                             * SDCARD_DEFAULT_SECTOR_SIZE as u64,
-                                )));
-                            } else {
-                                panic!(
-                                    "SDMMC_DRIVER: The sdmmc should be here since the future should be empty!!!"
                                 )
-                            }
-                        }
-                        BlkOp::BlkReqWrite => {
-                            request.count_to_do =
-                                core::cmp::min(request.count, HOST_INFO.max_block_per_req);
-                            if let Some(sdmmc) = init_handler.sdmmc.take() {
-                                init_handler.future = Some(Box::pin(sdmmc.write_block(
-                                    request.count_to_do,
-                                    request.block_number as u64 + request.success_count as u64,
-                                    request.io_or_offset
-                                        + request.success_count as u64
-                                            * SDCARD_DEFAULT_SECTOR_SIZE as u64,
-                                )));
-                            } else {
-                                panic!(
-                                    "SDMMC_DRIVER: The sdmmc should be here and the future should be empty!!!"
-                                )
-                            }
-                        }
-                        _ => {
-                            panic!("SDMMC_DRIVER: You should not reach here!")
+                            }));
+                        } else {
+                            panic!(
+                                "SDMMC_DRIVER: The sdmmc should be here and the future should be empty!!!"
+                            )
                         }
                     }
-                    let waker = create_dummy_waker();
-                    let mut cx = Context::from_waker(&waker);
-                    // Poll the future once to make it start working!
-                    if let Some(ref mut future) = init_handler.future {
-                        match future.as_mut().poll(&mut cx) {
-                            Poll::Ready(_) => {
-                                panic!(
-                                    "SDMMC: RECEIVED INVALID REQUEST! Check request validation code!"
-                                );
-                            }
-                            Poll::Pending => break 'process_notification,
-                        }
+                    _ => panic!("SDMMC_DRIVER: You should not reach here!"),
+                }
+
+                let waker = create_dummy_waker();
+                let mut cx = Context::from_waker(&waker);
+                if let Some(ref mut future) = init_handler.future {
+                    match future.as_mut().poll(&mut cx) {
+                        Poll::Ready(_) => panic!(
+                            "SDMMC: RECEIVED INVALID REQUEST! Check request validation code!"
+                        ),
+                        Poll::Pending => break 'process_notification,
                     }
                 }
             }
         }
+    }
 
-        if notify_virt == true {
-            // sel4::debug_println!("SDMMC_DRIVER: Notify the BLK_VIRTUALIZER!");
-            sddf_notify(BLK_VIRTUALIZER);
-        }
-        // Ack irq
-        if channel.index() == INTERRUPT {
-            let err = channel.irq_ack();
-            if err.is_err() {
-                panic!("SDMMC: Cannot acknowledge interrupt for CPU!")
-            }
-        }
+    if notify_virt == true {
+        unsafe { sddf_notify(BLK_VIRTUALIZER) };
+    }
+
+    if channel == unsafe { INTERRUPT } {
+        unsafe { sddf_irq_ack(channel) };
     }
 }

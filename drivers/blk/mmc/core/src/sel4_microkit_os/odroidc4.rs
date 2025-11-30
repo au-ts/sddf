@@ -3,13 +3,13 @@
 
 use core::ptr;
 
-use sdmmc_protocol::{
+use crate::{
     sdmmc::{HostInfo, MmcSignalVoltage, SdmmcError},
     sdmmc_os::{Sleep, VoltageOps},
     sdmmc_traits::SdmmcHardware,
 };
 
-use meson_hal::meson_gx_mmc::SdmmcMesonHardware;
+use crate::chirag::SdmmcMesonHardware;
 
 use crate::sel4_microkit_os::TimerOps;
 

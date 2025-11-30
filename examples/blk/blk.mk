@@ -32,9 +32,36 @@ IMAGE_FILE := loader.img
 REPORT_FILE  := report.txt
 SYSTEM_FILE := blk.system
 
-SUPPORTED_BOARDS := qemu_virt_aarch64 \
-		    qemu_virt_riscv64 \
-		    maaxboard \
+ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
+	BLK_DRIVER_DIR := virtio
+	SERIAL_DRIVER_DIR := arm
+	CPU := cortex-a53
+	QEMU := qemu-system-aarch64
+	QEMU_ARCH_ARGS := -machine virt,virtualization=on -cpu cortex-a53 -device loader,file=$(IMAGE_FILE),addr=0x70000000,cpu-num=0
+else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_riscv64)
+	BLK_DRIVER_DIR := virtio
+	SERIAL_DRIVER_DIR := ns16550a
+	QEMU := qemu-system-riscv64
+	QEMU_ARCH_ARGS := -machine virt -kernel $(IMAGE_FILE)
+else ifeq ($(strip $(MICROKIT_BOARD)), maaxboard)
+	CPU := cortex-a53
+	SERIAL_DRIVER_DIR := imx
+	BLK_DRIVER_DIR := mmc/imx
+	TIMER_DRIVER_DIR := imx
+else ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
+	ARCH := aarch64
+	CPU := cortex-a55
+	SERIAL_DRIVER_DIR := meson
+	BLK_DRIVER_DIR := mmc/core
+else
+$(error Unsupported MICROKIT_BOARD given)
+endif
+
+DTC := dtc
+PYTHON ?= python3
+
+BUILD_DIR ?= build
+MICROKIT_CONFIG ?= debug
 
 TOP := ${SDDF}/examples/blk
 CONFIGS_INCLUDE := ${TOP}
@@ -44,7 +71,14 @@ include ${SDDF}/tools/make/board/common.mk
 
 
 IMAGES := blk_driver.elf client.elf blk_virt.elf serial_virt_tx.elf serial_driver.elf
-CFLAGS +=  -Wall -Wno-unused-function -Werror -Wno-unused-command-line-argument \
+
+CFLAGS := -mstrict-align \
+		  -nostdlib \
+		  -ffreestanding \
+		  -g3 \
+		  -O3 \
+		  -Wall -Wno-unused-function -Werror -Wno-unused-command-line-argument \
+		  -I$(BOARD_DIR)/include \
 		  -I$(SDDF)/include \
 		  -I$(SDDF)/include/microkit \
 		  -I$(CONFIGS_INCLUDE)
