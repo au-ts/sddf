@@ -468,8 +468,32 @@ static inline void serial_request_consumer_signal(serial_queue_handle_t *queue_h
      * such that at least one of the producer and the consumer can make progress
      * and avoid deadlock.
      *
-     * In particular, the following shape of cppmem program (http://svr-pes20-cppmem.cl.cam.ac.uk/cppmem/)
-     * represents the undesired behaviour that is prevented by the pair of sc fences.
+     * More information on the sDDF signalling protocol can be found in the corresponding section
+     * in the developer docs (docs/developing.md).
+     * How the serial subsystem uses the protocol can be found in the serial docs
+     * (docs/serial/serial.md).
+     *
+     * The sc fence ensures that:
+     * 1. The producer is observed to set the `producer_signalled` flag before performing its
+     *    "re-check" of the space in the queue.
+     * 2. The consumer is observed to check the producer_signalled flag after it terminates updating
+     *    the queue.
+     * Enforcing the ordering of these events ensures that the producer will not become deadlocked
+     * awaiting free space in the queue (assuming this space does become available).
+     *
+     * Once the producer breaks out of its queue processing loop, if the consumer subsequently
+     * makes space available there are two possible timelines:
+     * 1. The producer's update to the flag is observed by the consumer, causing the consumer to
+     *    notify.
+     * 2. The producer's update to the flag is not observed, thus must not have occurred at the time
+     *    of the consumer's decision to notify. If this is the case then the producer's "re-check"
+     *    also hasn't occurred (thanks to the fences). Thus, when this "re-check" is performed the
+     *    free space in the queue will be observable (thanks again to the fences), triggering the
+     *    producer to "re-process" the queue.
+     *
+     * From a memory model perspective, the following shape of cppmem program
+     * (http://svr-pes20-cppmem.cl.cam.ac.uk/cppmem/) represents the undesired behaviour that is
+     * prevented by the pair of sc fences.
      *
      * int main() {
      *   atomic_int flag = 0;
