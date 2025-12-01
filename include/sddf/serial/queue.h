@@ -463,10 +463,59 @@ static inline void serial_queue_init(serial_queue_handle_t *queue_handle, serial
  */
 static inline void serial_request_consumer_signal(serial_queue_handle_t *queue_handle)
 {
-    queue_handle->queue->producer_signalled = 0;
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
-    THREAD_MEMORY_RELEASE();
-#endif
+    store_relaxed_32(&queue_handle->queue->producer_signalled, 0);
+    /* The sc fence will synchronise with the sc fence in the consumer in the signalling protocol,
+     * such that at least one of the producer and the consumer can make progress
+     * and avoid deadlock.
+     *
+     * More information on the sDDF signalling protocol can be found in the corresponding section
+     * in the developer docs (docs/developing.md).
+     * How the serial subsystem uses the protocol can be found in the serial docs
+     * (docs/serial/serial.md).
+     *
+     * The sc fence ensures that:
+     * 1. The producer is observed to set the `producer_signalled` flag before performing its
+     *    "re-check" of the space in the queue.
+     * 2. The consumer is observed to check the producer_signalled flag after it terminates updating
+     *    the queue.
+     * Enforcing the ordering of these events ensures that the producer will not become deadlocked
+     * awaiting free space in the queue (assuming this space does become available).
+     *
+     * Once the producer breaks out of its queue processing loop, if the consumer subsequently
+     * makes space available there are two possible timelines:
+     * 1. The producer's update to the flag is observed by the consumer, causing the consumer to
+     *    notify.
+     * 2. The producer's update to the flag is not observed, thus must not have occurred at the time
+     *    of the consumer's decision to notify. If this is the case then the producer's "re-check"
+     *    also hasn't occurred (thanks to the fences). Thus, when this "re-check" is performed the
+     *    free space in the queue will be observable (thanks again to the fences), triggering the
+     *    producer to "re-process" the queue.
+     *
+     * From a memory model perspective, the following shape of cppmem program
+     * (http://svr-pes20-cppmem.cl.cam.ac.uk/cppmem/) represents the undesired behaviour that is
+     * prevented by the pair of sc fences.
+     *
+     * int main() {
+     *   atomic_int flag = 0;
+     *   atomic_int queue = 0;
+     *   {{{
+     *     // producer
+     *     {
+     *       flag.store(1, relaxed);
+     *       atomic_thread_fence(seq_cst);
+     *       queue.load(relaxed).readsvalue(0);
+     *     }
+     *   |||
+     *     // consumer
+     *     {
+     *       queue.store(1, relaxed);
+     *       atomic_thread_fence(seq_cst);
+     *       flag.load(relaxed).readsvalue(0);
+     *     }
+     *   }}};
+     * }
+     */
+    fence_seq_cst();
 }
 
 /**
@@ -476,10 +525,10 @@ static inline void serial_request_consumer_signal(serial_queue_handle_t *queue_h
  */
 static inline void serial_cancel_consumer_signal(serial_queue_handle_t *queue_handle)
 {
-    queue_handle->queue->producer_signalled = 1;
-#ifdef CONFIG_ENABLE_SMP_SUPPORT
-    THREAD_MEMORY_RELEASE();
-#endif
+    store_relaxed_32(&queue_handle->queue->producer_signalled, 1);
+    /* It is not necessary to insert a sc fence here, unlike in serial_request_consumer_signal(),
+     * as the signalling protocol requires that a cancellation is always followed by a request.
+     */
 }
 
 /**
@@ -489,5 +538,10 @@ static inline void serial_cancel_consumer_signal(serial_queue_handle_t *queue_ha
  */
 static inline bool serial_require_consumer_signal(serial_queue_handle_t *queue_handle)
 {
-    return !queue_handle->queue->producer_signalled;
+    /* The sc fence will synchronise with the sc fence in the producer in the signalling protocol,
+     * such that at least one of the producer and the consumer can make progress
+     * and avoid deadlock.
+     */
+    fence_seq_cst();
+    return !load_relaxed_32(&queue_handle->queue->producer_signalled);
 }
