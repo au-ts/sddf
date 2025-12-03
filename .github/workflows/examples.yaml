@@ -22,7 +22,7 @@ env:
   MICROKIT_VERSION: 2.1.0
   MICROKIT_URL: https://github.com/seL4/microkit/releases/download/2.1.0
   SDFGEN_VERSION: 0.28.0
-  ZIG_VERSION: 0.15.1
+  ZIG_VERSION: 0.15.2
 
 jobs:
   build_linux_x86_64:
