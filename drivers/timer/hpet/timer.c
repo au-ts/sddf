@@ -136,31 +136,16 @@ void init(void)
     tick_period_fs = capability >> 32;
     
     volatile uint64_t *general_config_reg = (void *)HPET_REGION + GENERAL_CONFIG_REG;
-    /* Disable legacy IRQ mapping */
-    *general_config_reg &= ~(1ul << LEG_RT_CNF);
     /* Enable main counter */
     *general_config_reg |= (1ul << ENABLE_CNF);
+    /* Use legacy routing, so that comparator 0's IRQ always come in on I/O APIC pin 2 */
+    *general_config_reg |= (1ul << LEG_RT_CNF);
 
     timer_0 = (hpet_timer_t *)(HPET_REGION + TIMER0_OFFSET);
-    
-    uint32_t irq_route = timer_0->config >> 32;
-    for (int i = 0; i < 32; i++) {
-        if (irq_route & BIT(i)) {
-            microkit_dbg_puts("usable timer IO APIC pin is ");
-            microkit_dbg_put32(i);
-            microkit_dbg_puts("\n");
-        }
-    }
-    uint32_t ioapic_pin = 20; // pick an arbitrary pin, then make sure that timer 0 can be routed here.
-    assert(irq_route & BIT(ioapic_pin));
 
     uint64_t t0_cfg = timer_0->config;
     /* Don't deliver IRQ via the Front Side Bus */
     t0_cfg &= ~BIT(TN_FSB_EN_CNF);
-    /* Clear IRQ routing */
-    t0_cfg &= ~(((uint64_t)0x1f) << TN_INT_ROUTE_CNF);
-    /* Set IRQ routing */
-    t0_cfg |= ((uint64_t)ioapic_pin << TN_INT_ROUTE_CNF);
     /* Use level IRQ */
     t0_cfg |= BIT(TN_INT_TYPE_CNF);
     /* Switch on IRQ */
