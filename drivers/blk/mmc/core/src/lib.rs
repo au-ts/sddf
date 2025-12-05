@@ -161,6 +161,7 @@ pub unsafe extern "C" fn init() {
             card_info,
         }));
     }
+    sel4::debug_println!("finisiehed odroidc4 init");
 }
 
 #[no_mangle]
