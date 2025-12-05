@@ -19,6 +19,7 @@ MACHINE_QUEUE_BOARDS: dict[str, list[str]] = {
     "star64": ["star64"],
     "zcu102": ["zcu102", "zcu102_2"],
     "rpi4b_1gb": ["pi4B"],
+    "rock3b": ["rockb"],
 }
 
 MACHINE_QUEUE_BOARD_OPTIONS: dict[str, dict[str, Any]] = {
@@ -53,6 +54,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "odroidc4",
             "qemu_virt_aarch64",
             "qemu_virt_riscv64",
+            "rock3b",
             "star64",
         ],
         "boards_test": [
@@ -64,6 +66,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "odroidc4",
             "qemu_virt_aarch64",
             "qemu_virt_riscv64",
+            "rock3b",
             "star64",
         ],
     },
@@ -81,6 +84,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "odroidc4",
             "qemu_virt_aarch64",
             "qemu_virt_riscv64",
+            "rock3b",
             "rpi4b_1gb",
             "serengeti",
             "star64",
@@ -95,6 +99,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "odroidc4",
             "qemu_virt_aarch64",
             "qemu_virt_riscv64",
+            "rock3b",
             "rpi4b_1gb",
             "serengeti",
             "star64",
@@ -118,6 +123,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "odroidc4",
             "qemu_virt_aarch64",
             "qemu_virt_riscv64",
+            "rock3b",
             "rpi4b_1gb",
             "star64",
             "serengeti",
@@ -130,6 +136,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "odroidc4",
             "qemu_virt_aarch64",
             "qemu_virt_riscv64",
+            "rock3b",
             "rpi4b_1gb",
             "serengeti",
             "star64",
@@ -146,10 +153,11 @@ if TYPE_CHECKING:
         "imx8mq_evk",
         "maaxboard",
         "odroidc2",
-        "serengeti",
-        "star64",
         "qemu_virt_aarch64",
         "qemu_virt_riscv64",
+        "rock3b",
+        "serengeti",
+        "star64",
     ]
     assert set(MACHINE_QUEUE_BOARDS.keys()) == set(_BoardNames.__args__) | {
         "qemu_virt_aarch64",

@@ -44,8 +44,16 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
         serial_node = dtb.node(board.serial)
         assert serial_node is not None
 
+    baud_rate = board.baud_rate
+
     serial_system = Sddf.Serial(
-        sdf, serial_node, serial_driver, serial_virt_tx, virt_rx=serial_virt_rx
+        sdf,
+        serial_node,
+        serial_driver,
+        serial_virt_tx,
+        virt_rx=serial_virt_rx,
+        enable_color=True,
+        baud_rate=baud_rate,
     )
     serial_system.add_client(client0)
     serial_system.add_client(client1)
