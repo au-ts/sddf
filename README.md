@@ -50,7 +50,7 @@ On apt based Linux distributions run the following commands:
 
 ```sh
 sudo apt install make clang llvm lld device-tree-compiler python3 python3-pip
-pip3 install sdfgen==0.27.0
+pip3 install sdfgen==0.28.1
 ```
 
 If you get `error: externally-managed-environment` when installing via pip,
@@ -58,7 +58,7 @@ instead run:
 ```sh
 # sdfgen is an isolated package and does not depend on anything
 # else so it will not break any system packages.
-pip3 install --break-system-packages sdfgen==0.27.0
+pip3 install --break-system-packages sdfgen==0.28.1
 ```
 
 #### Microkit SDK
@@ -73,7 +73,7 @@ tar xf microkit-sdk-2.1.0-linux-x86-64.tar.gz
 On macOS, you can install the dependencies via Homebrew:
 ```sh
 brew install llvm lld make dtc python3
-pip3 install sdfgen==0.27.0
+pip3 install sdfgen==0.28.1
 ```
 
 If you get `error: externally-managed-environment` when installing via pip,
@@ -81,7 +81,7 @@ instead run:
 ```sh
 # sdfgen is an isolated package and does not depend on anything
 # else so it will not break any system packages.
-pip3 install --break-system-packages sdfgen==0.27.0
+pip3 install --break-system-packages sdfgen==0.28.1
 ```
 
 #### Microkit SDK
