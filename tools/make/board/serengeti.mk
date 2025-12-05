@@ -9,3 +9,4 @@ PLATFORM := riscv
 #ETH_DRIV :=
 UART_DRIV_DIR := ns16550a
 TIMER_DRIV_DIR := apb_timer
+I2C_DRIV_DIR := opentitan
