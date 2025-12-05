@@ -95,7 +95,8 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "odroidc4",
             "qemu_virt_aarch64",
             "qemu_virt_riscv64",
-            "rpi4b_1gb",
+            # Disabled because https://github.com/seL4/microkit/issues/401
+            # "rpi4b_1gb",
             "serengeti",
             "star64",
             "zcu102",
@@ -130,7 +131,8 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "odroidc4",
             "qemu_virt_aarch64",
             "qemu_virt_riscv64",
-            "rpi4b_1gb",
+            # Disabled for https://github.com/seL4/microkit/issues/401
+            # "rpi4b_1gb",
             "serengeti",
             "star64",
             "zcu102",
