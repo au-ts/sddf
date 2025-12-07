@@ -46,6 +46,8 @@ Files:
     examples/gpu/fb_img.jpeg
     examples/echo_server/docs/echo_server.svg
     docs/i2c/i2cdriver.drawio.png
+    docs/network/imgs/metadata.svg
+    docs/network/imgs/network_arch.png
 Copyright: UNSW
 License: CC-BY-SA-4.0
 
