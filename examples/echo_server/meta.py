@@ -192,10 +192,6 @@ def generate(
     )
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
 
-    uart_driver = ProtectionDomain("serial_driver", "serial_driver.elf", priority=100)
-    serial_virt_tx = ProtectionDomain(
-        "serial_virt_tx", "serial_virt_tx.elf", priority=99
-    )
     uart_driver = ProtectionDomain(
         "serial_driver",
         "serial_driver.elf",
@@ -227,11 +223,6 @@ def generate(
         )
         sdf.add_mr(clock_controller)
         ethernet_driver.add_map(Map(clock_controller, 0x3000000, perms="rw"))
-
-    net_virt_tx = ProtectionDomain(
-        "net_virt_tx", "network_virt_tx.elf", priority=100, budget=20000
-    )
-    net_virt_rx = ProtectionDomain("net_virt_rx", "network_virt_rx.elf", priority=99)
 
     net_virt_tx = ProtectionDomain(
         "net_virt_tx",
