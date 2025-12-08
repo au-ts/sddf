@@ -375,9 +375,14 @@ requires a handful of functions to be called in the Microkit `init` and
    This function also requires a config struct emitted by the [sdfgen](#sdfgen)
    tool.
 
-   Once the library has been initialised, you must also make sure that lwIP's
-   first IP stack timeout is set by calling `set_timeout(ch)`. This starts a
-   chain of timeouts that must be continuously reset.
+   Once the library has been initialised, you must also make sure to set the
+   first timeout using the [timer subsystem](/docs/timer/timer.md). This will be
+   the first of a chain of timeouts that must be continuously reset.
+
+   The lwIP stack requires regular timeouts for protocols like DHCP and TCP.
+   Timeouts can be set using the [timer client](/include/sddf/timer/client.h)
+   `sddf_timer_set_timeout` API. Typically, we use an lwIP tick timeout value of
+   100ms, although you may prefer to use a smaller value.
 
 3. Include the following three functions in the user's `notified` function:
  * `sddf_lwip_process_rx()` in response to be notified by the Rx virtualiser.
@@ -385,8 +390,8 @@ requires a handful of functions to be called in the Microkit `init` and
  * `sddf_lwip_process_timeout()` in response to receiving a timeout. This
    processes pending lwIP timeouts which is important for DHCP and TCP to work
    correctly.
- * After processing the timeout, you must ensure that the next timeout is set by
-   calling `set_timeout(ch)`
+ * After processing the timeout, you must ensure that the next lwIP tick timeout
+   is set.
 
 The [echo server](/examples/echo_server/) provides an example for how the
 library should be used. More details on using the library can be found in the
@@ -499,9 +504,22 @@ clients are processed in the order which they are added to the system.
 If you wish for a client to use [lib sDDF lwIP](#lib-sddf-lwip), you will also
 need to generate the resources needed for this in your metaprogram. This is
 because the library requires dedicated lwIP memory pools proportional to the
-number of client Rx buffers. To do this, add the following to your metaprogram:
+number of client Rx buffers, as well as access to the timer subsystem. To do
+this, add the following to your metaprogram:
 
 ```py
+# Create a timer driver
+timer_driver = ProtectionDomain(
+    "timer_driver", "timer_driver.elf", priority=101, cpu=get_core("timer_driver")
+)
+
+# Create a timer subsystem
+timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
+
+# Add your client to the timer subsystem
+timer_system.add_client(client0)
+
+# Create lwIP resources for your client
 client0_lib_sddf_lwip = Sddf.Lwip(sdf, net_system, client0)
 ```
 
@@ -509,11 +527,15 @@ Once all your system resources are created, ensure to connect and serialise the
 data files each component needs to access them as follows:
 
 ```py
-# serialise the network system data
+# connect and serialise the network subsystem data
 assert net_system.connect()
 assert net_system.serialise_config(output_dir)
 
-# serialise the lib sDDF lwIP client data
+# connect and serialise the timer subsystem data if required
+assert timer_system.connect()
+assert timer_system.serialise_config(output_dir)
+
+# connect and serialise the lib sDDF lwIP client data
 assert client0_lib_sddf_lwip.connect()
 assert client0_lib_sddf_lwip.serialise_config(output_dir)
 ```
@@ -561,7 +583,9 @@ buffers belonging to the client. In the case of client Rx buffers, this is done
 by the client's copy component.
 
 If a client wishes to use [lib sDDF lwIP](#lib-sddf-lwip), a configuration
-struct for this must also be declared, and the library must be initialised:
+struct for the library and the timer connection must also be declared. Lib sDDF
+lwIP must also be initialised. See the section on [lib sDDF
+lwIP](#lib-sddf-lwip) for how to use this library afterwards.
 
 ```c
 #include <sddf/network/lib_sddf_lwip.h>
@@ -571,12 +595,9 @@ __attribute__((__section__(".timer_client_config"))) timer_client_config_t timer
 
 __attribute__((__section__(".lib_sddf_lwip_config"))) lib_sddf_lwip_config_t lib_sddf_lwip_config;
 
-sddf_lwip_init(&lib_sddf_lwip_config, &net_config, &timer_config, net_rx_handle, net_tx_handle, NULL, LWIP_TICK_MS, sddf_dprintf, netif_status_callback, NULL, NULL, NULL);
+sddf_lwip_init(&lib_sddf_lwip_config, &net_config, &timer_config, net_rx_handle, net_tx_handle, NULL, NULL,
+                netif_status_callback, NULL, NULL, NULL);
 ```
-
-Note that the library also requires [timer](/docs/timer/timer.md) subsystem
-access.
-
 
 ### Building components and libraries
 
@@ -598,7 +619,9 @@ to be linked with it. The snippet for building the library can be found
 
 If components in your system are using [lib sDDF lwIP](#lib-sddf-lwip), you will
 also need to build an archive of the library for each component using this
-[snippet](/network/lib_sddf_lwip/lib_sddf_lwip.mk).
+[snippet](/network/lib_sddf_lwip/lib_sddf_lwip.mk). As well as this, you will
+need to build the corresponding timer driver for your platform using the
+makefile snippets found [here](/drivers/timer/).
 
 Finally, you will need to ensure each `.elf` file has all the emitted `.data`
 files from the metaprogram copied in. For network system components, this looks
@@ -614,13 +637,15 @@ $(OBJCOPY) --update-section .net_virt_tx_config=net_virt_tx.data network_virt_tx
 ```
 
 For network clients, there is one `.data` file for the network connection, and
-one for lib sDDF lwIP if the library is in use. There is also a file for each
-copy component:
+if lib sDDF lwIP is in use there will also be a file for the library and the
+timer subsystem connection. Additionally, each copy component will also have a
+network connection data file:
 
 ```sh
 $(OBJCOPY) --update-section .net_copy_config=net_copy_client0_net_copier.data network_copy.elf network_copy0.elf
 
 $(OBJCOPY) --update-section .net_client_config=net_client_client0.data echo0.elf
+$(OBJCOPY) --update-section .timer_client_config=timer_client_client0.data echo0.elf
 $(OBJCOPY) --update-section .lib_sddf_lwip_config=lib_sddf_lwip_config_client0.data echo0.elf
 ```
 
