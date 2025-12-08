@@ -190,16 +190,24 @@ static void netif_status_callback_default(char *ip_addr)
 }
 
 /**
- * Default handling function to be called during transmission if tx free
- * queue is empty.
+ * Default handling function to be called during transmission of a pbuf if the
+ * Tx free queue is empty. We signal the Tx virtualiser as it is likely that
+ * there has been a delay in processing active buffers, possibly due to the Tx
+ * virtualiser not being scheduled.
  *
  * @param p pbuf that could not be sent due to queue being empty.
  *
- * @return Simply returns the sddf error indicating nothing was done.
+ * @return sddf error indicating that there were no buffers available.
  */
 static inline net_sddf_err_t handle_empty_tx_free_default(struct pbuf *p)
 {
-    return SDDF_LWIP_ERR_UNHANDLED;
+    if (sddf_state.tx_queue.capacity && sddf_state.notify_tx && net_require_signal_active(&sddf_state.tx_queue)) {
+        net_cancel_signal_active(&sddf_state.tx_queue);
+        sddf_state.notify_tx = false;
+        sddf_notify(sddf_state.tx_ch);
+    }
+
+    return SDDF_LWIP_ERR_NO_BUF;
 }
 
 /**
