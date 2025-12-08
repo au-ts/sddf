@@ -100,14 +100,14 @@ static void pbuf_pool_init(void *mem, size_t mem_size, size_t pbuf_count)
     pbuf_pool.pbufs[pbuf_count - 1].next_free = SIZE_MAX;
 }
 
-inline bool pbuf_pool_empty(void)
+inline bool sddf_lwip_pbuf_pool_empty(void)
 {
     return pbuf_pool.first_free == SIZE_MAX;
 }
 
-pbuf_custom_offset_t *pbuf_pool_alloc(void)
+pbuf_custom_offset_t *sddf_lwip_pbuf_pool_alloc(void)
 {
-    if (pbuf_pool_empty()) {
+    if (sddf_lwip_pbuf_pool_empty()) {
         return NULL;
     }
 
@@ -116,7 +116,7 @@ pbuf_custom_offset_t *pbuf_pool_alloc(void)
     return &pbuf_pool.pbufs[first_free].pbuf;
 }
 
-net_sddf_err_t pbuf_pool_free(pbuf_custom_offset_t *pbuf)
+net_sddf_err_t sddf_lwip_pbuf_pool_free(pbuf_custom_offset_t *pbuf)
 {
     if (pbuf == NULL || pbuf < (pbuf_custom_offset_t *)pbuf_pool.pbufs
         || pbuf > (pbuf_custom_offset_t *)&pbuf_pool.pbufs[pbuf_pool.capacity]
@@ -268,7 +268,7 @@ static void interface_free_buffer(struct pbuf *p)
     int err = net_enqueue_free(&(sddf_state.rx_queue), buffer);
     assert(!err);
     sddf_state.notify_rx = true;
-    pbuf_pool_free(custom_pbuf_offset);
+    sddf_lwip_pbuf_pool_free(custom_pbuf_offset);
     SYS_ARCH_UNPROTECT(old_level);
 }
 
@@ -288,7 +288,7 @@ static struct pbuf *create_interface_buffer(uint64_t offset, size_t length)
         return NULL;
     }
 
-    pbuf_custom_offset_t *custom_pbuf_offset = pbuf_pool_alloc();
+    pbuf_custom_offset_t *custom_pbuf_offset = sddf_lwip_pbuf_pool_alloc();
     if (!custom_pbuf_offset) {
         return NULL;
     }
@@ -369,7 +369,7 @@ void sddf_lwip_process_rx(void)
 
     bool reprocess = true;
     while (reprocess) {
-        while (!net_queue_empty_active(&sddf_state.rx_queue) && !pbuf_pool_empty()) {
+        while (!net_queue_empty_active(&sddf_state.rx_queue) && !sddf_lwip_pbuf_pool_empty()) {
             net_buff_desc_t buffer;
             int err = net_dequeue_active(&sddf_state.rx_queue, &buffer);
             assert(!err);
