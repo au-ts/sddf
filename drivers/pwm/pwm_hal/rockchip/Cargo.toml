@@ -1,0 +1,13 @@
+[package]
+name = "pwm-hal"
+version = "0.1.0"
+edition = "2021"
+authors = ["Cheng Li 李澄 <lichengchaoreng@gmail.com>"]
+
+[lib]
+name = "pwm_rockchip_hal"
+path = "lib.rs"
+
+[dependencies]
+pwm-protocol = { path = "../../pwm_protocol" }
+# sel4-microkit = { git = "https://github.com/seL4/rust-sel4.git", rev = "ac5627ba7a67e71f33a8eb1c5d05de09bf94ef5e" }
