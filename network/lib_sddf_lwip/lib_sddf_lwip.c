@@ -454,6 +454,13 @@ void sddf_lwip_init(lib_sddf_lwip_config_t *lib_sddf_lwip_config, net_client_con
     }
     lib_config = *lib_sddf_lwip_config;
 
+    /**
+     * This library assumes that we will never run out of pbufs to input Rx
+     * buffers into the lwIP stack. This means that the number of pbufs must
+     * exceed the capacity of the Rx queue.
+     */
+    assert(lib_config.num_pbufs >= sddf_state.rx_queue.capacity);
+
     /* Initialise sddf state */
     sddf_state.rx_queue = rx_queue;
     sddf_state.tx_queue = tx_queue;
