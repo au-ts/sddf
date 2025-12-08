@@ -15,7 +15,7 @@
 
 __attribute__((__section__(".pcie_config"))) pcie_driver_config_t config;
 
-void rsdp_dump()
+void *rsdp_dump()
 {
     for (char *addr = (char *)BIOS_AREA_START; addr < (char *)BIOS_AREA_END; addr += 16) {
         if (!strncmp(addr, "RSD PTR ", 8)) {
@@ -24,10 +24,30 @@ void rsdp_dump()
 
             // TODO: validate the checksum
             // TODO: return rsdt_addr
+            struct acpi_rsdp_t *acpi_rsdp = (struct acpi_rsdp_t *)addr;
+            sddf_dprintf("revision: 0x%x\n", acpi_rsdp->revision);
+            sddf_dprintf("checksum: 0x%x\n", acpi_rsdp->checksum);
+            sddf_dprintf("rsdt: 0x%x\n", acpi_rsdp->rsdt_addr);
+            sddf_dprintf("length: 0x%x\n", acpi_rsdp->length);
+            sddf_dprintf("xsdt: 0x%lx\n", acpi_rsdp->xsdt_addr);
+
+            // TODO: distinguish ACPI 1.0 and 2.0
+
+            uint32_t checksum = 0;
+            for (char *ch = addr; ch < addr + 20; ch++) {
+                checksum += (uint8_t)(*ch);
+            }
+            if ((checksum & 0xFF) != 0) {
+                sddf_dprintf("Wrong checksum!\n");
+                return NULL;
+            }
+
+            return (void *)(uintptr_t)acpi_rsdp->rsdt_addr;
         }
     }
 
-    // TODO:  return NULL
+    // No RSDP found!
+    return NULL;
 }
 
 void pci_bus_scan(uintptr_t pci_bus)

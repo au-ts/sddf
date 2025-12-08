@@ -57,7 +57,11 @@ struct pci_config_space {
 #define BIOS_AREA_START 0xE0000
 #define BIOS_AREA_END 0x100000
 
-struct acpi_rsdp {
+/**
+ * Root System Description Pointer (RSDP)
+ * https://wiki.osdev.org/RSDP
+ *  */
+struct acpi_rsdp_t {
     char signature[8];  // "RSD PTR "
     uint8_t checksum;   // Checksum of first 20 bytes
     char oem_id[6];
@@ -65,4 +69,7 @@ struct acpi_rsdp {
     uint32_t rsdt_addr; // 32-bit RSDT address (ACPI 1.0)
     uint32_t length;    // Length (ACPI 2.0+)
     uint64_t xsdt_addr; // 64-bit XSDT address (ACPI 2.0+)
+    uint8_t ext_checksum; // Checksum of all fields
+    uint8_t reserved[3];
 };
+
