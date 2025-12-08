@@ -19,7 +19,7 @@ void rsdp_dump()
 {
     for (char *addr = (char *)BIOS_AREA_START; addr < (char *)BIOS_AREA_END; addr += 16) {
         if (!strncmp(addr, "RSD PTR ", 8)) {
-            sddf_dprintf("Found the identifier at 0x%x\n", addr);
+            sddf_dprintf("Found the identifier at 0x%lx:\n", (uintptr_t)addr);
             sddf_dprintf("%c%c%c%c%c%c%c%c\n", addr[0], addr[1], addr[2], addr[3], addr[4], addr[5], addr[6], addr[7]);
 
             // TODO: validate the checksum
