@@ -12,7 +12,7 @@
 
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
-#define DEBUG_TIMER
+//#define DEBUG_TIMER
 
 #ifdef DEBUG_TIMER
 #define LOG_TIMER(...) do{ sddf_printf("LOG_TIMER|INFO: ");sddf_printf(__VA_ARGS__); }while(0)
