@@ -26,10 +26,13 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     pcie_driver = ProtectionDomain("pcie_driver", "pcie_driver.elf", priority=252)
     ecam_mr = SystemDescription.MemoryRegion(sdf, "ecam_regs", 0x10000, paddr=0xfe000000)
     bios_mr = SystemDescription.MemoryRegion(sdf, "bios_regs", 0x20000, paddr=0xe0000)
+    sdt_mr = SystemDescription.MemoryRegion(sdf, "sdt_regs", 0x100000, paddr=0x7f00000)
     sdf.add_mr(ecam_mr)
     sdf.add_mr(bios_mr)
+    sdf.add_mr(sdt_mr)
     pcie_driver.add_map(SystemDescription.Map(ecam_mr, 0x20000000, "rw"))
     pcie_driver.add_map(SystemDescription.Map(bios_mr, 0xe0000, "rw"))
+    pcie_driver.add_map(SystemDescription.Map(sdt_mr, 0x7f00000, "rw"))
 
     pds = [client, pcie_driver]
     for pd in pds:

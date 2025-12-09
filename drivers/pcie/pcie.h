@@ -61,7 +61,7 @@ struct pci_config_space {
  * Root System Description Pointer (RSDP)
  * https://wiki.osdev.org/RSDP
  *  */
-struct acpi_rsdp_t {
+typedef struct acpi_rsdp {
     char signature[8];  // "RSD PTR "
     uint8_t checksum;   // Checksum of first 20 bytes
     char oem_id[6];
@@ -71,5 +71,41 @@ struct acpi_rsdp_t {
     uint64_t xsdt_addr; // 64-bit XSDT address (ACPI 2.0+)
     uint8_t ext_checksum; // Checksum of all fields
     uint8_t reserved[3];
-};
+} acpi_rsdp_t;
 
+/**
+ * System Description Table Header
+ *
+ * All SDT share the same header but have different data part.
+ * See https://wiki.osdev.org/RSDT for more details.
+ *  */
+typedef struct acpi_sdt_header {
+    char signature[4];
+    uint32_t length;
+    uint8_t revision;
+    uint8_t checksum;
+    char oem_id[6];
+    char oem_table_id[8];
+    uint32_t oem_revision;
+    uint32_t creator_id;
+    uint32_t creator_revision;
+} acpi_sdt_header_t;
+
+/**
+ *
+ * MCFG Table is structured as:
+ *   - ACPI SDT Header
+ *   - 8-byte reserved area
+ *   - A list of memory mapped configuration base address allocation structures.
+ *
+ * ECAM Base Address Allocation Structure
+ *
+ * see PCI Firmware Specification 3.3 Table 4-3 for more details.
+ * */
+typedef struct mcfg_ecam_alloc {
+    uint64_t base_addr;
+    uint16_t pci_seg_group;
+    uint8_t start_bus;
+    uint8_t end_bus;
+    uint32_t reserved;
+} mcfg_ecam_alloc_t;

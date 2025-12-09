@@ -24,7 +24,7 @@ void *rsdp_dump()
 
             // TODO: validate the checksum
             // TODO: return rsdt_addr
-            struct acpi_rsdp_t *acpi_rsdp = (struct acpi_rsdp_t *)addr;
+            acpi_rsdp_t *acpi_rsdp = (acpi_rsdp_t *)addr;
             sddf_dprintf("revision: 0x%x\n", acpi_rsdp->revision);
             sddf_dprintf("checksum: 0x%x\n", acpi_rsdp->checksum);
             sddf_dprintf("rsdt: 0x%x\n", acpi_rsdp->rsdt_addr);
@@ -48,6 +48,41 @@ void *rsdp_dump()
 
     // No RSDP found!
     return NULL;
+}
+
+void *find_sdt(void *rsdt_addr, char *signature)
+{
+    acpi_sdt_header_t *rsdt_header = (acpi_sdt_header_t *)rsdt_addr;
+    int num_entries = (rsdt_header->length - sizeof(acpi_sdt_header_t)) / 4;
+    sddf_dprintf("num of entries: 0x%x\n", num_entries);
+
+    for (int i = 0; i < num_entries; i++)
+    {
+        uint32_t *sdt_pointer = (uint32_t *)((uintptr_t)rsdt_header + sizeof(acpi_sdt_header_t) + 4 * i);
+        acpi_sdt_header_t *header = (acpi_sdt_header_t *)(uintptr_t)(*sdt_pointer);
+        sddf_dprintf("scan at 0x%lx: %c%c%c%c\n", (uintptr_t)header, header->signature[0], header->signature[1],
+                     header->signature[2], header->signature[3]);
+        if (!strncmp(header->signature, signature, 4)) {
+            sddf_dprintf("MCFG header found at: 0x%lx\n", (uintptr_t)header);
+            return (void *)header;
+        }
+    }
+
+    // No MCFG found
+    return NULL;
+}
+
+void parse_mcfg(void *mcfg_addr)
+{
+    acpi_sdt_header_t *mcfg_header = (acpi_sdt_header_t *)mcfg_addr;
+    uint32_t num_entries = (mcfg_header->length - sizeof(acpi_sdt_header_t)) / sizeof(mcfg_ecam_alloc_t);
+    mcfg_ecam_alloc_t *ecam_alloc = (mcfg_ecam_alloc_t *)((uintptr_t)mcfg_addr + sizeof(acpi_sdt_header_t) + 8);
+    for (int i = 0; i < num_entries; i++) {
+        sddf_dprintf("base addr: 0x%lx\n", ecam_alloc[i].base_addr);
+        sddf_dprintf("seg group: 0x%x\n", ecam_alloc[i].pci_seg_group);
+        sddf_dprintf("start bus: 0x%x\n", ecam_alloc[i].start_bus);
+        sddf_dprintf("end bus: 0x%x\n", ecam_alloc[i].end_bus);
+    }
 }
 
 void pci_bus_scan(uintptr_t pci_bus)
@@ -89,7 +124,9 @@ void init(void)
 
     pci_ecam_scan((uintptr_t)config.ecam_base, config.ecam_size, config.bus_range);
 
-    rsdp_dump();
+    void *rsdt_addr = rsdp_dump();
+    void *mcfg_addr = find_sdt(rsdt_addr, "MCFG");
+    parse_mcfg(mcfg_addr);
 }
 
 void notified(sddf_channel ch)
