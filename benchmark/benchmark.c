@@ -62,9 +62,10 @@ static void print_total_util(uint64_t *buffer)
     uint64_t kernel = buffer[BENCHMARK_TOTAL_KERNEL_UTILISATION];
     uint64_t entries = buffer[BENCHMARK_TOTAL_NUMBER_KERNEL_ENTRIES];
     uint64_t instructions = buffer[BENCHMARK_TOTAL_INSTRUCTIONS];
+    uint64_t kernel_instructions = buffer[BENCHMARK_TOTAL_KERNEL_INSTRUCTIONS];
     sddf_printf("Total utilisation details: \n{\nKernelUtilisation: %lu\nKernelEntries: %lu\nNumberSchedules: "
-                "%lu\nTotalUtilisation: %lu\nInstructions: %lu\n}\n",
-                kernel, entries, number_schedules, total, instructions);
+                "%lu\nTotalUtilisation: %lu\nKernelInstructions: %lu\nTotalInstructions: %lu\n}\n",
+                kernel, entries, number_schedules, total, kernel_instructions, instructions);
 }
 
 static void print_child_util(uint64_t *buffer, uint8_t id)
