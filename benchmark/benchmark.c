@@ -74,9 +74,10 @@ static void print_child_util(uint64_t *buffer, uint8_t id)
     uint64_t number_schedules = buffer[BENCHMARK_TCB_NUMBER_SCHEDULES];
     uint64_t kernel = buffer[BENCHMARK_TCB_KERNEL_UTILISATION];
     uint64_t entries = buffer[BENCHMARK_TCB_NUMBER_KERNEL_ENTRIES];
+    uint64_t instruction = buffer[BENCHMARK_TCB_INSTRUCTION];
     sddf_printf("Utilisation details for PD: %s (%u)\n{\nKernelUtilisation: %lu\nKernelEntries: %lu\nNumberSchedules: "
-                "%lu\nTotalUtilisation: %lu\n}\n",
-                child_name(id), id, kernel, entries, number_schedules, total);
+                "%lu\nTotalUtilisation: %lu\nTotalInstruction: %lu\n}\n",
+                child_name(id), id, kernel, entries, number_schedules, total, instruction);
 }
 
 #endif
