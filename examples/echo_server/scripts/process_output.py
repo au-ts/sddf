@@ -20,10 +20,10 @@ if len(sys.argv) == 3:
 num_cores = 4
 
 # Data collected for each core and PD
-data = {"total": 0, "kernel": 0, "user": 0, "entries": 0, "schedules": 0}
+data = {"total": 0, "kernel": 0, "user": 0, "entries": 0, "schedules": 0, "total_instructions": 0, "kernel_instructions": 0, "user_instructions": 0}
 
 # Summed data collected for each core
-core_data = {"pd_total": 0, "pd_kernel": 0, "pd_user": 0, "data": dict(data)}
+core_data = {"pd_total": 0, "pd_kernel": 0, "pd_user": 0, "data": dict(data), "pd_total_instructions": 0, "pd_kernel_instructions": 0, "pd_user_instructions": 0}
 
 # Named data for each PD
 pd_data = {"name": "", "data": dict(data)}
@@ -39,7 +39,7 @@ test_data = {
 
 # Output of processing script
 results_output = {
-    "system": "Component,Core Cycles,System Cycles,Kernel Cycles,User Cycles,Kernel Entries,Schedules,Core CPU Util,Core Kernel CPU Util,Core User CPU Util",
+    "system": "Component,Core Cycles,System Cycles,Kernel Cycles,User Cycles,Kernel Entries,Schedules,Core CPU Util,Core Kernel CPU Util,Core User CPU Util,System Instructions,Kernel Instructions,User Instructions,User Instructions(%),Kernel CPI,User CPI",
     "cores": "",
 }
 
@@ -76,15 +76,15 @@ def next_result(f):
 
 
 # Create a line of .csv results
-def result_string(pd, tc, tu, k, u, e, s, ut, kut, uut):
-    return f"\n{pd},{tc},{tu},{k},{u},{e},{s},{round(100 * ut, 2)},{round(100 * kut, 2)},{round(100 * uut, 2)}"
+def result_string(pd, tc, tu, k, u, e, s, ut, kut, uut, ti, ki, ui):
+    return f"\n{pd},{tc},{tu},{k},{u},{e},{s},{round(100 * ut, 2)},{round(100 * kut, 2)},{round(100 * uut, 2)},{ti},{ki},{ui},{round(100 * ui / ti, 2)},{round(k / ki, 2)},{round(u / ui, 2)}"
 
 
 # Convert test results dictionary to .csv output
 def output_and_reset():
     global test
 
-    # Calculate user cycles and system totals, create results output
+    # Calculate user cycles/instructions and system totals, create results output
     for core in range(num_cores):
 
         # Skip cores with no pds
@@ -92,17 +92,25 @@ def output_and_reset():
             continue
         test["active"] += 1
 
-        # Sum up cycles used by PDs
+        # Sum up cycles and instructions used by PDs
         for pd in test["pds"][core]:
             pd["data"]["user"] = pd["data"]["total"] - pd["data"]["kernel"]
             test["cores"][core]["pd_total"] += pd["data"]["total"]
             test["cores"][core]["pd_kernel"] += pd["data"]["kernel"]
             test["cores"][core]["pd_user"] += pd["data"]["user"]
 
+            pd["data"]["user_instructions"] = pd["data"]["total_instructions"] - pd["data"]["kernel_instructions"]
+            test["cores"][core]["pd_total_instructions"] += pd["data"]["total_instructions"]
+            test["cores"][core]["pd_kernel_instructions"] += pd["data"]["kernel_instructions"]
+            test["cores"][core]["pd_user_instructions"] += pd["data"]["user_instructions"]
+
         # Sum up core counts
         test["system"]["pd_total"] += test["cores"][core]["pd_total"]
         test["system"]["pd_kernel"] += test["cores"][core]["pd_kernel"]
         test["system"]["pd_user"] += test["cores"][core]["pd_user"]
+        test["system"]["pd_total_instructions"] += test["cores"][core]["pd_total_instructions"]
+        test["system"]["pd_kernel_instructions"] += test["cores"][core]["pd_kernel_instructions"]
+        test["system"]["pd_user_instructions"] += test["cores"][core]["pd_user_instructions"]
         for key in test["system"]["data"].keys():
             test["system"]["data"][key] += test["cores"][core]["data"][key]
 
@@ -119,6 +127,9 @@ def output_and_reset():
             test["cores"][core]["pd_total"] / total_core_cycles,
             test["cores"][core]["pd_kernel"] / total_core_cycles,
             test["cores"][core]["pd_user"] / total_core_cycles,
+            test["cores"][core]["pd_total_instructions"],
+            test["cores"][core]["pd_kernel_instructions"],
+            test["cores"][core]["pd_user_instructions"],
         )
 
         # Create core PDs result output
@@ -139,6 +150,9 @@ def output_and_reset():
                 pd_total_util,
                 pd["data"]["kernel"] / total_core_cycles,
                 pd["data"]["user"] / total_core_cycles,
+                pd["data"]["total_instructions"],
+                pd["data"]["kernel_instructions"],
+                pd["data"]["user_instructions"],
             )
 
     # Create system totals results output
@@ -154,6 +168,9 @@ def output_and_reset():
         test["active"] * test["system"]["pd_total"] / total_board_cycles,
         test["active"] * test["system"]["pd_kernel"] / total_board_cycles,
         test["active"] * test["system"]["pd_user"] / total_board_cycles,
+        test["system"]["pd_total_instructions"],
+        test["system"]["pd_kernel_instructions"],
+        test["system"]["pd_user_instructions"],
     )
 
     # Reset test, keep test number
@@ -209,6 +226,10 @@ with open(file, "r") as f:
             data["schedules"] = int(line[17:-1])
             line = next_result(f)
             data["total"] = int(line[18:-1])
+            line = next_result(f)
+            data["kernel_instructions"] = int(line[19:-1])
+            line = next_result(f)
+            data["total_instructions"] = int(line[18:-1])
 
         else:
             # Skip TCP output
