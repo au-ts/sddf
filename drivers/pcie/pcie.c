@@ -72,19 +72,6 @@ void *find_sdt(void *rsdt_addr, char *signature)
     return NULL;
 }
 
-void parse_mcfg(void *mcfg_addr)
-{
-    acpi_sdt_header_t *mcfg_header = (acpi_sdt_header_t *)mcfg_addr;
-    uint32_t num_entries = (mcfg_header->length - sizeof(acpi_sdt_header_t)) / sizeof(mcfg_ecam_alloc_t);
-    mcfg_ecam_alloc_t *ecam_alloc = (mcfg_ecam_alloc_t *)((uintptr_t)mcfg_addr + sizeof(acpi_sdt_header_t) + 8);
-    for (int i = 0; i < num_entries; i++) {
-        sddf_dprintf("base addr: 0x%lx\n", ecam_alloc[i].base_addr);
-        sddf_dprintf("seg group: 0x%x\n", ecam_alloc[i].pci_seg_group);
-        sddf_dprintf("start bus: 0x%x\n", ecam_alloc[i].start_bus);
-        sddf_dprintf("end bus: 0x%x\n", ecam_alloc[i].end_bus);
-    }
-}
-
 void pci_bus_scan(uintptr_t pci_bus)
 {
     for (int i = 0; i < 32; i++) {
@@ -103,15 +90,38 @@ void pci_bus_scan(uintptr_t pci_bus)
                     sddf_dprintf("%02x ", *(uint8_t *)(pci_bus + (i << 15) + (k << 12) + j));
                 }
                 sddf_dprintf("\n");
+
+                if (pci_header->vendor_id == 0x1af4 && pci_header->device_id == 0x1001) {
+                    volatile uint32_t *mem_bar = (volatile uint32_t *)((uintptr_t)pci_header + 0x10);
+                    sddf_dprintf("Memory BAR 0: 0x%x\n", *mem_bar);
+                    *mem_bar = 0xFFFFFFFF;
+                    sddf_dprintf("Memory BAR 0: 0x%x\n", *mem_bar);
+                    /* *mem_bar = 0xFEBD6000; */
+                    sddf_dprintf("Memory BAR 0: 0x%x\n", *mem_bar);
+                }
             }
         }
     }
 }
 
-void pci_ecam_scan(uintptr_t ecam_base, uint64_t ecam_size, uint8_t bus_range)
+void pci_ecam_scan(uintptr_t ecam_base, uint8_t start_bus, uint8_t end_bus)
 {
-    for (int i = 0; i < bus_range; i++) {
+    for (int i = start_bus; i < end_bus; i++) {
         pci_bus_scan(ecam_base + (i << 20));
+    }
+}
+
+void parse_mcfg(void *mcfg_addr)
+{
+    acpi_sdt_header_t *mcfg_header = (acpi_sdt_header_t *)mcfg_addr;
+    uint32_t num_entries = (mcfg_header->length - sizeof(acpi_sdt_header_t)) / sizeof(mcfg_ecam_alloc_t);
+    mcfg_ecam_alloc_t *ecam_alloc = (mcfg_ecam_alloc_t *)((uintptr_t)mcfg_addr + sizeof(acpi_sdt_header_t) + 8);
+
+    // TODO: validate the checksum
+    for (int i = 0; i < num_entries; i++) {
+        sddf_dprintf("\nScan the buses [0x%02x-0x%02x] at 0x%lx\n", ecam_alloc[i].start_bus,
+                     ecam_alloc[i].end_bus, ecam_alloc[i].base_addr);
+        pci_ecam_scan(ecam_alloc[i].base_addr, ecam_alloc[i].start_bus, ecam_alloc[i].end_bus);
     }
 }
 
@@ -121,8 +131,6 @@ void init(void)
     sddf_dprintf("ecam_base: 0x%lx\n", (uintptr_t)(config.ecam_base));
     sddf_dprintf("ecam_size: 0x%lx\n", config.ecam_size);
     sddf_dprintf("bus_range: 0x%x\n", config.bus_range);
-
-    pci_ecam_scan((uintptr_t)config.ecam_base, config.ecam_size, config.bus_range);
 
     void *rsdt_addr = rsdp_dump();
     void *mcfg_addr = find_sdt(rsdt_addr, "MCFG");
