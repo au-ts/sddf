@@ -100,14 +100,14 @@ static void pbuf_pool_init(void *mem, size_t mem_size, size_t pbuf_count)
     pbuf_pool.pbufs[pbuf_count - 1].next_free = SIZE_MAX;
 }
 
-inline bool pbuf_pool_empty(void)
+inline bool sddf_lwip_pbuf_pool_empty(void)
 {
     return pbuf_pool.first_free == SIZE_MAX;
 }
 
-pbuf_custom_offset_t *pbuf_pool_alloc(void)
+pbuf_custom_offset_t *sddf_lwip_pbuf_pool_alloc(void)
 {
-    if (pbuf_pool_empty()) {
+    if (sddf_lwip_pbuf_pool_empty()) {
         return NULL;
     }
 
@@ -116,7 +116,7 @@ pbuf_custom_offset_t *pbuf_pool_alloc(void)
     return &pbuf_pool.pbufs[first_free].pbuf;
 }
 
-net_sddf_err_t pbuf_pool_free(pbuf_custom_offset_t *pbuf)
+net_sddf_err_t sddf_lwip_pbuf_pool_free(pbuf_custom_offset_t *pbuf)
 {
     if (pbuf == NULL || pbuf < (pbuf_custom_offset_t *)pbuf_pool.pbufs
         || pbuf > (pbuf_custom_offset_t *)&pbuf_pool.pbufs[pbuf_pool.capacity]
@@ -190,16 +190,24 @@ static void netif_status_callback_default(char *ip_addr)
 }
 
 /**
- * Default handling function to be called during transmission if tx free
- * queue is empty.
+ * Default handling function to be called during transmission of a pbuf if the
+ * Tx free queue is empty. We signal the Tx virtualiser as it is likely that
+ * there has been a delay in processing active buffers, possibly due to the Tx
+ * virtualiser not being scheduled.
  *
  * @param p pbuf that could not be sent due to queue being empty.
  *
- * @return Simply returns the sddf error indicating nothing was done.
+ * @return sddf error indicating that there were no buffers available.
  */
 static inline net_sddf_err_t handle_empty_tx_free_default(struct pbuf *p)
 {
-    return SDDF_LWIP_ERR_UNHANDLED;
+    if (sddf_state.tx_queue.capacity && sddf_state.notify_tx && net_require_signal_active(&sddf_state.tx_queue)) {
+        net_cancel_signal_active(&sddf_state.tx_queue);
+        sddf_state.notify_tx = false;
+        sddf_notify(sddf_state.tx_ch);
+    }
+
+    return SDDF_LWIP_ERR_NO_BUF;
 }
 
 /**
@@ -260,7 +268,7 @@ static void interface_free_buffer(struct pbuf *p)
     int err = net_enqueue_free(&(sddf_state.rx_queue), buffer);
     assert(!err);
     sddf_state.notify_rx = true;
-    pbuf_pool_free(custom_pbuf_offset);
+    sddf_lwip_pbuf_pool_free(custom_pbuf_offset);
     SYS_ARCH_UNPROTECT(old_level);
 }
 
@@ -280,7 +288,7 @@ static struct pbuf *create_interface_buffer(uint64_t offset, size_t length)
         return NULL;
     }
 
-    pbuf_custom_offset_t *custom_pbuf_offset = pbuf_pool_alloc();
+    pbuf_custom_offset_t *custom_pbuf_offset = sddf_lwip_pbuf_pool_alloc();
     if (!custom_pbuf_offset) {
         return NULL;
     }
@@ -361,7 +369,7 @@ void sddf_lwip_process_rx(void)
 
     bool reprocess = true;
     while (reprocess) {
-        while (!net_queue_empty_active(&sddf_state.rx_queue) && !pbuf_pool_empty()) {
+        while (!net_queue_empty_active(&sddf_state.rx_queue) && !sddf_lwip_pbuf_pool_empty()) {
             net_buff_desc_t buffer;
             int err = net_dequeue_active(&sddf_state.rx_queue, &buffer);
             assert(!err);
@@ -445,6 +453,13 @@ void sddf_lwip_init(lib_sddf_lwip_config_t *lib_sddf_lwip_config, net_client_con
         }
     }
     lib_config = *lib_sddf_lwip_config;
+
+    /**
+     * This library assumes that we will never run out of pbufs to input Rx
+     * buffers into the lwIP stack. This means that the number of pbufs must
+     * exceed the capacity of the Rx queue.
+     */
+    assert(lib_config.num_pbufs >= sddf_state.rx_queue.capacity);
 
     /* Initialise sddf state */
     sddf_state.rx_queue = rx_queue;

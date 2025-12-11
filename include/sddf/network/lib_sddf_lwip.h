@@ -79,14 +79,14 @@ typedef net_sddf_err_t (*sddf_lwip_tx_handle_intercept_fn)(struct pbuf *p);
  *
  * @return true if pbuf pool is empty, false otherwise.
  */
-bool pbuf_pool_empty(void);
+bool sddf_lwip_pbuf_pool_empty(void);
 
 /**
  * Allocate a pbuf from lib sDDF lwIP static pbuf pool.
  *
  * @return pointer to allocated pbuf or NULL if out of memory.
  */
-pbuf_custom_offset_t *pbuf_pool_alloc(void);
+pbuf_custom_offset_t *sddf_lwip_pbuf_pool_alloc(void);
 
 /**
  * Free a pbuf allocated from lib sDDF lwIP static pbuf pool. WARNING: This
@@ -100,7 +100,7 @@ pbuf_custom_offset_t *pbuf_pool_alloc(void);
  * @return SDDF_LWIP_ERR_INVALID_PBUF pbuf is not part of lib sDDF lwIP static
  * pbuf pool.
  */
-net_sddf_err_t pbuf_pool_free(pbuf_custom_offset_t *pbuf);
+net_sddf_err_t sddf_lwip_pbuf_pool_free(pbuf_custom_offset_t *pbuf);
 
 /**
  * Checks lwIP system timeouts. Should be invoked after every lwIP tick.
