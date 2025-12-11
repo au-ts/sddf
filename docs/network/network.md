@@ -7,49 +7,47 @@
 
 ## System architecture
 
-The network subsystem adheres to the sDDF design principles of modular
-components split via separation of concerns. The subsystem broadly performs two
-functions - securely multiplexing the ethernet device between isolated clients,
-and providing a platform independent abstraction layer over all the hardware.
-These functions are split into separate Microkit Protection Domains (PDs), and
-in the case of multiplexing this is split further into receive (Rx) and transmit
-(Tx) components.
+The network subsystem adheres to the sDDF design principle of modular components
+split via separation of concerns. The subsystem broadly performs two functions -
+securely multiplexing the ethernet device between isolated clients, and
+providing a platform independent abstraction layer over network hardware. The
+responsibilities of the subsystem are performed by several interconnected
+Microkit Protection Domains (PDs) split by a particular function.
 
-Since each PD has a restricted set of responsibilities, they can be implemented
-with minimal complexity and only require capabilities to a restricted subset of
-the surrounding system. An example of this being our ethernet drivers *do not*
-have the Rx or Tx DMA regions mapped into their address space, since they only
-require the IO addresses of these regions to enqueue them into the NIC's
-hardware rings.
+Since the set of tasks performed by each PD is limited, their implementation can
+be kept simple and their system capabilities minimal. An example of this being
+that ethernet drivers *do not* have buffer DMA regions mapped into their address
+space.
 
 ![Networking subsystem architecture](/docs/network/imgs/network_arch.png)
 
-The network subsystem is comprised of the following components, as shown in the
-diagram:
-* The ethernet driver which handles all NIC device interrupts, and is the only
-  PD with access to the NIC's registers and hardware rings.
-* The Rx virtualiser which is responsible for multiplexing the packets received
-  by the NIC, and returning free buffers to the driver.
-* The Tx virtualiser which is responsible for passing packets which clients wish
-  to transmit to the ethernet driver, and returning free buffers back to the
-  correct client upon completion.
+The network subsystem is comprised of the following component PDs, as shown in
+the diagram:
+* The ethernet driver controls the network interface controller (NIC), handling
+  interrupts, writing to and from reading registers and managing the device's
+  hardware rings.
+* The receive (Rx) virtualiser which is responsible for multiplexing the packets
+  received by the NIC, and returning free buffers to the driver.
+* The transmit (Tx) virtualiser which is responsible for passing packets which
+  clients wish to transmit to the ethernet driver, and returning free buffers
+  back to the correct client upon completion.
 * The (Rx) copy components which are responsible for copying packets residing in
   the Rx DMA region into [client-specific Rx data regions](#data-regions). In
   contrast to the other network components, each client [has its own copy
   component](#copy-components-and-availability).
 
-Typically a networking client has both Rx and Tx capabilities, but the system
-supports Rx and Tx only clients. Rx clients interface only with their respective
-copiers to receive packets (or in the rare case where they are *trusted*, the Rx
-virtualiser). Tx clients interface only with the Tx virtualiser to transmit
-packets.
+Networking clients can both receive (Rx) and transmit (Tx) data unless the
+system configures them to be Rx or Tx only. Rx clients interface only with their
+respective copiers to receive packets (or in the rare case where they are
+*trusted*, the Rx virtualiser). Tx clients interface only with the Tx
+virtualiser to transmit packets.
 
-Network components communicate using shared memory (holding queues and data) and
+Network components communicate using shared memory (queues and data) and
 asynchronous notifications (Microkit channels). The diagram below gives an
 overview of how the queue metadata region is used to reference and organise
 buffers in the data regions. For a more in depth discussion of these design
 principles and how the network subsystem incorporates them, see the [sDDF design
-document](/docs/design).
+document]((https://trustworthy.systems/projects/drivers/sddf-design.pdf)).
 
 ![Queue metadata regions](/docs/network/imgs/metadata.svg)
 
@@ -57,11 +55,11 @@ document](/docs/design).
 ### Data regions
 
 There are two types of regions used to hold data in the networking subsystem -
-regions that are used by the NIC to perform DMA into and out of (referred to as
-DMA regions), and regions that hold data belonging to a particular client
-(referred to as client data regions).
+regions used to contain raw buffers which the NIC interacts with via DMA
+(referred to as DMA regions), and regions that hold data belonging to a
+particular client (referred to as client data regions).
 
-DMA regions are used *either* for Rx or Tx. In the case of Tx, each client is
+There are separate Rx and Tx DMA regions. In the case of Tx, each client is
 allocated its own Tx DMA region which it has exclusive access to. The only other
 component that has permissions to a client's Tx DMA region is the Tx
 virtualiser, which it requires for performing cache cleaning operations.
@@ -69,11 +67,10 @@ virtualiser, which it requires for performing cache cleaning operations.
 In contrast, as our multiplexing is performed by the virtualiser, all clients
 share a single Rx DMA region. Since giving clients direct access to this global
 region [poses a significant security issue](#copy-components-and-availability),
-it is recommended that clients use a *copy* component which allows them be
-allocated an exclusive Rx data region. In this case, a client's data region will
-not be used for DMA and it will only ever contain packets addressed to that
-client. The Rx DMA region will then only be accessible by the trusted Rx
-virtualiser and copy components.
+clients use a *copy* component which allows them be allocated an exclusive Rx
+data region. In this case, a client's data region will not be used for DMA and
+it will only ever contain packets addressed to that client. The Rx DMA region
+will then only be accessible by the trusted Rx virtualiser and copy components.
 
 It is possible to connect a client *without* a copy component, however please
 note that copiers play an [important safety
@@ -83,18 +80,17 @@ and do not incur as large of a performance penality as you may think.
 All data regions are broken into buffers of a fixed size of 2048 bytes (the
 minimum size required to hold the ethernet MTU with the power of two
 constraint). Since data regions must always be mapped into two address spaces,
-buffers are always referenced using *offsets into data regions* rather than
-virtual addresses. Components can use this offset to calculate a virtual since
-each queue only holds references to buffers from a single region.
+it is simpler to use *offsets into data regions* rather than component specific
+virtual addresses. Components can use offsets to calculate virtual addresses
+since each queue only holds buffers from a single region.
 
-The only exception to this rule is the pair of queues shared between the Tx
-virtualiser and the driver, since these queues hold buffers from each client's
-Tx DMA region. This does not pose a problem, as in this case the virtualisers
-use IO addresses instead of offsets. This allows the driver to pass these
-addresses directly to the hardware without having knowledge of the underlying
-data regions. When buffers are returned to clients, the Tx virtualiser can
-determine their owner by comparing their address to the bounds of each client's
-DMA region.
+The only exception to this rule are the queues shared between the Tx virtualiser
+and the driver, which hold all client's buffers. When buffers are enqueued in
+these queues, their IO address is used by adding their offset to the IO address
+of the underlying region. This allows the driver to pass IO addresses directly
+to the hardware without having knowledge of the underlying data regions. When
+buffers are returned to clients, the Tx virtualiser can determine their owner by
+comparing their IO address to the bounds of each client's DMA region.
 
 ### Network queues
 
@@ -105,25 +101,24 @@ references to data, and are never used to store data themselves.
 
 Network queues always come in pairs - an *active* queue for transferring buffers
 containing *valid* or *active* data, and a *free* queue for returning *free*
-buffers for reuse. Currently, the subsystem assumes that the free and active
-queues will always be shared between the same two components, that is, if a
-buffer is passed to a component for transmission or reception, it will always be
-returned by the same component.
+buffers for reuse. These queues are always shared between the same two
+components, that is, if a buffer is passed to a component for transmission or
+reception, it will always be returned by the same component.
 
 Each queue is implemented as a circular ring buffer, with entries being stored
 in an array, and head and tail indices represented using overflowing unsigned
-integers. Allowing head and tail indices to overflow optimises queue operations
-and distinguishes between the empty and full condition, however it also enforces
-that the queue capacities must be a power of two. While both the consumer and
-producer of a queue need to read both indices, only the producer needs to modify
-the tail, and only the consumer needs to modify the head. This enable all queue
-operations to be lock-free, only requiring memory barriers to enforce observable
-ordering.
+integers. Allowing head and tail indices to overflow is a perfectly correct
+optimisation allowing the full and empty condition to be distinguished, so long
+as the queue capacity is restricted to a power of two. While both the consumer
+and producer of a queue need to read both indices, only the producer needs to
+modify the tail, and only the consumer needs to modify the head. This enable all
+queue operations to be lock-free, only requiring memory barriers to enforce
+observable ordering.
 
 It is strongly recommended to use the network queue
 [library](/include/sddf/network/queue.h) as it was carefully constructed to
-implement the required memory barriers correctly. If you do interact with the
-network queues directly, the library should be used as a guide.
+implement the required memory barriers correctly. If you do wish to interact
+with the network queues directly, the library should be used as a guide.
 
 While the `net_queue_t` data structure sits in shared memory, the
 `net_queue_handle_t` wrapper data structure does not. The handle holds pointers
@@ -161,7 +156,6 @@ static inline bool net_queue_full_active(net_queue_handle_t *queue)
 {
     return queue->active->tail - queue->active->head == queue->capacity;
 }
-
 ```
 
 Net queues also contain a `consumer_signalled` flag which is used by the
@@ -192,14 +186,15 @@ only with the transmit virtualiser.
 
 Since we do not utilise any hardware multiplexing features, all packets are
 DMA'd into one region. Although it is possible to give a client access to this
-region, this should not be done unless the client is *trusted*. To protect the
-privacy of clients (and the [availability](#copy-components-and-availability) of
-buffers), each client is allocated its own Rx data region and *copy* component.
-When the Rx virtualiser determines that a packet is addressed to a client, the
-packet is transferred to to the client's copier component who copies the packet
-from the Rx DMA region and into the client's Rx data region. This allows the Rx
-DMA region to only be mapped into the Rx virtualiser and copy component's
-address spaces. Client's Rx data regions are only shared with a client's copier.
+region, this should not be permitted unless the client is *trusted*. To protect
+the privacy of clients (and the
+[availability](#copy-components-and-availability) of buffers), each client is
+allocated its own Rx data region and *copy* component. When the Rx virtualiser
+determines that a packet is addressed to a client, the packet is transferred to
+to the client's copier component who copies the packet from the Rx DMA region
+and into the client's Rx data region. This allows the Rx DMA region to only be
+mapped into the Rx virtualiser and copy component's address spaces. Client's Rx
+data regions are only shared with a client's copier.
 
 The design ensures that both client Rx and Tx data regions are only shared with
 trusted components of the networking subsystem, and no client has direct access
@@ -246,7 +241,7 @@ system by writing to shared memory regions:
 
    If an untrusted component experiences buffer loss, this loss will only be to
    that client's buffer pools. However in the case of buffer gain this does have
-   the potential to [effect other clients in the system](#queue-assumptions). We
+   the potential to [affect other clients in the system](#queue-assumptions). We
    hope to fix this issue in the near future by having trusted components keep
    copies of indices shared with untrusted neighbours allowing checks for
    invalid modifications to be performed.
@@ -259,18 +254,20 @@ system by writing to shared memory regions:
    However on the Tx side, this may pose a problem if we wish to provide a
    *packet filtering* layer, which would enable us to prevent clients
    masquerading as other clients (we hope to provide this functionality in the
-   future). This could only be implemented effectively is we could prevent
+   future). This could only be implemented effectively if we could prevent
    clients from modifying packets after they have been transmitted. To enable
    this, we plan on introducing a Tx copier in the future.
 
 ### Queue assumptions
 
-Currently the network queues are designed to have the capacity to hold all
-buffers simultaneously. Since queue entries themselves are only pointers to
-buffers, this does not incur significant memory overhead. Thus, while processing
-network queues components do not need to check whether a queue is *full* - they
-only need to check whether queues are *empty*. Since checking for fullness
-requires the use of memory barriers, this is a significant optimisation.
+Currently each network queue is designed to have the capacity needed to hold all
+the buffers that can possibly be enqueued simultaneously, i.e. it is impossible
+for a queue to be filled past capacity. Since queue entries themselves are only
+pointers to buffers, this does not incur significant memory overhead. Thus,
+while processing network queues, components do not need to check whether a queue
+is *full* - they only need to check whether queues are *empty*. Since checking
+for fullness requires the use of memory barriers, this is a significant
+optimisation.
 
 Unfortunately there is currently a vulnerability where untrusted clients are
 able to insert *duplicate buffers* into their queues, which could cause a
@@ -286,8 +283,8 @@ or with the use of a Tx copy component.
 
 When a producer has enqueued buffers into a queue, or a consumer has dequeued
 buffers from a queue, we say that *work* has been performed. In order for work
-to continue, it is typical that the sharer of the queue will require a
-notification in order to be scheduled.
+to continue, it is typical that a component will need to notify the next
+component in order for it to be scheduled.
 
 In the network subsystem, only the producer of a queue notifies the consumer.
 However, since all neighbouring components share a pair of queues with each
@@ -491,12 +488,13 @@ copier.
 Note that priorities of network components are *configurable*, however the
 system is designed with the assumption that the driver runs at the highest
 priority, followed by the Tx virtualiser, the Rx virtualiser, and finally the
-copiers and clients. sDDF generally prioritises the processing of Tx IRQs over
-Rx IRQs to improve latency. If you wish to prioritise one client over another,
-ensure this is reflected in the priority of their copiers as well. In the future
-we will also be introducing the ability to customise the order in which clients
-are processed by the Tx virtualiser, but currently clients are processed in the
-order which they are added to the system.
+copiers and clients. This priority ordering is with respect to the network
+components, and *passive* drivers like the timer driver should run as the
+highest priority. Rx IRQs to improve latency. If you wish to prioritise one
+client over another, ensure this is reflected in the priority of their copiers
+as well. In the future we will also be introducing the ability to customise the
+order in which clients are processed by the Tx virtualiser, but currently
+clients are processed in the order which they are added to the system.
 
 If you wish for a client to use [lib sDDF lwIP](#lib-sddf-lwip), you will also
 need to generate the resources needed for this in your metaprogram. This is
