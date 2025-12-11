@@ -30,7 +30,6 @@ LWIPDIR := network/ipstacks/lwip/src
 BENCHMARK := $(SDDF)/benchmark
 UTIL := $(SDDF)/util
 ETHERNET_DRIVER := $(SDDF)/drivers/network/$(NET_DRIV_DIR)
-ETHERNET_CONFIG_INCLUDE := ${ECHO_SERVER}/include/ethernet_config
 SERIAL_COMPONENTS := $(SDDF)/serial/components
 UART_DRIVER := $(SDDF)/drivers/serial/$(UART_DRIV_DIR)
 TIMER_DRIVER := $(SDDF)/drivers/timer/$(TIMER_DRIV_DIR)
@@ -51,7 +50,6 @@ CFLAGS += \
 	  -I$(SDDF)/include/microkit \
 	  -I$(SDDF)/include \
 	  -I${ECHO_INCLUDE}/lwip \
-	  -I${ETHERNET_CONFIG_INCLUDE} \
 	  -I$(LWIPDIR)/include \
 	  -I$(LWIPDIR)/include/ipv4 \
 	  -I $(ECHO_SERVER)/include \
