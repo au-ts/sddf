@@ -11,7 +11,7 @@ OBJCOPY := llvm-objcopy
 OBJDUMP := llvm-objdump
 SIZE := llvm-size
 
-OPTIMISATION ?= -g3 -O3
+OPTIMISATION ?= -g3 -O2
 
 ifndef BOARD_DIR
 $(error BOARD_DIR not defined)
