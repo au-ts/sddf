@@ -340,8 +340,9 @@ configurations will report utilisation numbers as 0, and no PMU data will be
 printed.
 
 Assuming you have ipbench setup, you can use the following script to run the
-benchmark. Note that machine which runs this script will become the ipbench
-[controller](#benchmarking) of all the benchmarks.
+benchmark. Note that the machine which runs this script will become the ipbench
+[controller](#benchmarking) of all the benchmarks, and the script assumes that
+the ipbench daemon of the clients are already running.
 ```sh
 python3 scripts/benchmark.py [target machine ip] --clients [ip addr(s) of ipbenchd systems]
 ```
