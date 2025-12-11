@@ -31,7 +31,7 @@ OBJCOPY := ${TRIPLE}-objcopy
 OBJDUMP := ${TRIPLE}-objdump
 SIZE := ${TRIPLE}-size
 
-OPTIMISATION ?= -g -O3
+OPTIMISATION ?= -g -O2
 
 CFLAGS += \
 	-MD \
