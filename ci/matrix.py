@@ -31,8 +31,18 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
     "blk": {
         "configs": ["debug", "release"],
         "build_systems": ["make", "zig"],
-        "boards_build": ["maaxboard", "qemu_virt_aarch64", "qemu_virt_riscv64"],
-        "boards_test": ["maaxboard", "qemu_virt_aarch64", "qemu_virt_riscv64"],
+        "boards_build": [
+            "maaxboard",
+            "qemu_virt_aarch64",
+            "qemu_virt_riscv64",
+            "x86_64_generic",
+        ],
+        "boards_test": [
+            "maaxboard",
+            "qemu_virt_aarch64",
+            "qemu_virt_riscv64",
+            "x86_64_generic",
+        ],
     },
     "i2c": {
         "configs": ["debug", "release"],
@@ -62,6 +72,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "qemu_virt_aarch64",
             "qemu_virt_riscv64",
             "star64",
+            "x86_64_generic",
         ],
         "boards_test": [
             "imx8mm_evk",
@@ -73,6 +84,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "qemu_virt_aarch64",
             "qemu_virt_riscv64",
             "star64",
+            "x86_64_generic",
         ],
     },
     "serial": {
@@ -92,6 +104,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "rpi4b_1gb",
             "serengeti",
             "star64",
+            "x86_64_generic",
             "zcu102",
         ],
         "boards_test": [
@@ -107,6 +120,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             # "rpi4b_1gb",
             "serengeti",
             "star64",
+            "x86_64_generic",
             "zcu102",
         ],
     },
@@ -130,6 +144,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "rpi4b_1gb",
             "star64",
             "serengeti",
+            "x86_64_generic",
             "zcu102",
         ],
         "boards_test": [
@@ -143,6 +158,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             # "rpi4b_1gb",
             "serengeti",
             "star64",
+            "x86_64_generic",
             "zcu102",
         ],
     },
@@ -160,10 +176,12 @@ if TYPE_CHECKING:
         "star64",
         "qemu_virt_aarch64",
         "qemu_virt_riscv64",
+        "x86_64_generic",
     ]
     assert set(MACHINE_QUEUE_BOARDS.keys()) == set(_BoardNames.__args__) | {
         "qemu_virt_aarch64",
         "qemu_virt_riscv64",
+        "x86_64_generic",
     }
 
     class _ExampleMatrixType(TypedDict):
