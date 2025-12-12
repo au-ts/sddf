@@ -71,6 +71,18 @@ def backend_fn(
                 # fmt: on
                 *QEMU_COMMON_FLAGS,
             )
+        elif test_config.board == "x86_64_generic":
+            return QemuBackend(
+                "qemu-system-x86_64",
+                # fmt: off
+                "-machine", "q35",
+                    # TODO: this is somewhat of a hack
+                "-kernel", str(loader_img.parent / "sel4_32.elf"),
+                "-initrd", str(loader_img.resolve()),
+                "-cpu", "qemu64,+fsgsbase,+pdpe1gb,+pcid,+invpcid,+xsave,+xsaves,+xsaveopt",
+                # fmt: on
+                *QEMU_COMMON_FLAGS,
+            )
         else:
             raise NotImplementedError(f"unknown qemu board {test_config.board}")
 

@@ -28,7 +28,7 @@ def backend_fn(test_config: TestConfig, loader_img: Path) -> HardwareBackend:
         # fmt: off
         backend.invocation_args.extend([
 			"-global", "virtio-mmio.force-legacy=false",
-			"-device", "virtio-net-device,netdev=netdev0",
+			"-device", "virtio-net-pci,netdev=netdev0" if test_config.board == "x86_64_generic" else "virtio-net-device,netdev=netdev0",
 			"-netdev", "user,id=netdev0," +
                        "hostfwd=udp::1235-10.0.2.15:1235,hostfwd=tcp::1236-10.0.2.15:1236,hostfwd=tcp::1237-10.0.2.15:1237," +
                        "hostfwd=udp::1238-10.0.2.16:1235,hostfwd=tcp::1239-10.0.2.16:1236,hostfwd=tcp::1240-10.0.2.16:1237",
