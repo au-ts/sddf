@@ -115,8 +115,7 @@ inline fun set_eir(1 eir)
 
 inline fun rx_update_ring_slot(1 ring_addr, 1 idx, 1 phys, 1 len, 1 stat)
 {
-  var descr_base = hw_rx_descr;
-  var descr = descr_base + idx * 8;
+  var descr = hw_rx_descr + idx * 8;
 
   if (idx + 1 == hw_rx_capacity) {
     stat = stat | WRAP;
@@ -124,6 +123,9 @@ inline fun rx_update_ring_slot(1 ring_addr, 1 idx, 1 phys, 1 len, 1 stat)
 
   !st32 descr + 4, phys;
   !st16 descr, len;
+  /* Ensure all writes to the descriptor complete, before we set the flags
+   * that makes hardware aware of this slot.
+   */
   THREAD_MEMORY_RELEASE()
   !st16 descr + 2, stat;
   return 0;
@@ -131,8 +133,7 @@ inline fun rx_update_ring_slot(1 ring_addr, 1 idx, 1 phys, 1 len, 1 stat)
 
 inline fun tx_update_ring_slot(1 ring_addr, 1 idx, 1 phys, 1 len, 1 stat)
 {
-  var descr_base = hw_tx_descr;
-  var descr = descr_base + idx * 8;
+  var descr = hw_tx_descr + idx * 8;
 
   if (idx + 1 == hw_tx_capacity) {
     stat = stat | WRAP;
@@ -140,6 +141,9 @@ inline fun tx_update_ring_slot(1 ring_addr, 1 idx, 1 phys, 1 len, 1 stat)
 
   !st32 descr + 4, phys;
   !st16 descr, len;
+  /* Ensure all writes to the descriptor complete, before we set the flags
+   * that makes hardware aware of this slot.
+   */
   THREAD_MEMORY_RELEASE()
   !st16 descr + 2, stat;
   return 0;
@@ -148,86 +152,38 @@ inline fun tx_update_ring_slot(1 ring_addr, 1 idx, 1 phys, 1 len, 1 stat)
 fun rx_provide()
 {
   var reprocess = true;
-  var rx_free = net_rx_free;
-  var rx_queue_cap = net_rx_capacity;
-  var rx_hw_cap = hw_rx_capacity;
 
   while (reprocess)
   {
-    while (true)
-    {
-      var 1 full = rx_hw_ring_full();
-      if (full) { break; }
-      var 1 empty = net_queue_empty(rx_free, rx_queue_cap);
-      if (empty) { break; }
-
-      var {1,1} buffer = net_dequeue(rx_free, rx_queue_cap);
-
-      var rx_tail = HW_RX_TAIL;
-      var idx = rx_tail & (rx_hw_cap - 1);
-
-      var io_addr = buffer.0;
-      var stat = RXD_EMPTY;
-      rx_update_ring_slot(HW_RX_PTR, idx, io_addr, 0, stat);
-
-      st HW_RX_TAIL_SLOT, (rx_tail + 1);
-      set_rdar();
-    }
-
     var 1 full = rx_hw_ring_full();
-    if (!full) {
-      net_request_signal(rx_free, rx_queue_cap);
-    } else {
-      net_cancel_signal(rx_free);
-    }
-    reprocess = false;
-
-    var 1 empty = net_queue_empty(rx_free, rx_queue_cap);
-    if ((!empty) && (!full)) {
-      net_cancel_signal(rx_free);
-      reprocess = true;
-    }
-  }
-  return 0;
-}
-
-fun tx_provide()
-{
-  var reprocess = true;
-  var tx_active = net_tx_active;
-  var tx_queue_cap = net_tx_capacity;
-  var tx_hw_cap = hw_tx_capacity;
-
-  while (reprocess)
-  {
-    while (true)
+    var 1 empty = net_queue_empty(net_rx_free, net_rx_capacity);
+    while (!full && !empty)
     {
-      var 1 full = tx_hw_ring_full();
-      if (full) { break; }
-      var 1 empty = net_queue_empty(tx_active, tx_queue_cap);
-      if (empty) { break; }
+      var {1,1} buffer = net_dequeue(net_rx_free, net_rx_capacity);
 
-      var {1,1} buffer = net_dequeue(tx_active, tx_queue_cap);
-
-      var tx_tail = HW_TX_TAIL;
-      var idx = tx_tail & (tx_hw_cap - 1);
+      var idx = HW_RX_TAIL & (hw_rx_capacity - 1);
 
       var io_addr = buffer.0;
-      var len = buffer.1;
-      var stat = TXD_READY | TXD_ADDCRC | TXD_LAST;
-      tx_update_ring_slot(HW_TX_PTR, idx, io_addr, len, stat);
+      rx_update_ring_slot(HW_RX_PTR, idx, io_addr, 0, RXD_EMPTY);
 
-      st HW_TX_TAIL_SLOT, (tx_tail + 1);
-      set_tdar();
+      st HW_RX_TAIL_SLOT, (HW_RX_TAIL + 1);
+      set_rdar();
+      full = rx_hw_ring_full();
+      empty = net_queue_empty(net_rx_free, net_rx_capacity);
     }
 
-    net_request_signal(tx_active, tx_queue_cap);
+    /* Only request a notification from virtualiser if HW ring not full */
+    full = rx_hw_ring_full();
+    if (!full) {
+      net_request_signal(net_rx_free, net_rx_capacity);
+    } else {
+      net_cancel_signal(net_rx_free);
+    }
     reprocess = false;
 
-    var 1 full = tx_hw_ring_full();
-    var 1 empty = net_queue_empty(tx_active, tx_queue_cap);
+    empty = net_queue_empty(net_rx_free, net_rx_capacity);
     if ((!empty) && (!full)) {
-      net_cancel_signal(tx_active);
+      net_cancel_signal(net_rx_free);
       reprocess = true;
     }
   }
@@ -236,22 +192,15 @@ fun tx_provide()
 
 fun rx_return()
 {
-  var rx_active = net_rx_active;
-  var rx_descr = hw_rx_descr;
-  var rx_queue_cap = net_rx_capacity;
-  var rx_hw_cap = hw_rx_capacity;
-
   var packets_transferred = false;
 
-  while (true)
+  var 1 empty = rx_hw_ring_empty();
+  while (!empty)
   {
-    var 1 empty = rx_hw_ring_empty();
-    if (empty) { break; }
+    /* If buffer slot is still empty, we have processed all packets the device has filled */
+    var idx = HW_RX_HEAD & (hw_rx_capacity - 1);
 
-    var rx_head = HW_RX_HEAD;
-    var idx = rx_head & (rx_hw_cap - 1);
-
-    var dscr_addr = rx_descr + idx * 8;
+    var dscr_addr = hw_rx_descr + idx * @biw;
     var stat = 0;
     !ld16 stat, dscr_addr + 2;
     if (stat & RXD_EMPTY) { break; }
@@ -263,18 +212,59 @@ fun rx_return()
     var io_addr = 0;
     !ld32 io_addr, dscr_addr + 4;
 
-    net_enqueue(rx_active, io_addr, len, rx_queue_cap);
+    net_enqueue(net_rx_active, io_addr, len, net_rx_capacity);
     packets_transferred = true;
 
-    st HW_RX_HEAD_SLOT, (rx_head + 1);
+    st HW_RX_HEAD_SLOT, (HW_RX_HEAD + 1);
+
+    empty = rx_hw_ring_empty();
   }
 
-  var 1 to_signal = net_require_signal(rx_active, rx_queue_cap);
+  var 1 to_signal = net_require_signal(net_rx_active, net_rx_capacity);
   if (packets_transferred && to_signal) {
-    net_cancel_signal(rx_active);
+    net_cancel_signal(net_rx_active);
     microkit_notify(rx_ch)
   }
 
+  return 0;
+}
+
+fun tx_provide()
+{
+  var reprocess = true;
+
+  while (reprocess)
+  {
+    var 1 full = tx_hw_ring_full();
+    var 1 empty = net_queue_empty(net_tx_active, net_tx_capacity);
+    while (!full && !empty)
+    {
+      var {1,1} buffer = net_dequeue(net_tx_active, net_tx_capacity);
+
+      var idx = HW_TX_TAIL & (hw_tx_capacity - 1);
+
+      var io_addr = buffer.0;
+      var len = buffer.1;
+      var stat = TXD_READY | TXD_ADDCRC | TXD_LAST;
+      tx_update_ring_slot(HW_TX_PTR, idx, io_addr, len, stat);
+
+      st HW_TX_TAIL_SLOT, (HW_TX_TAIL + 1);
+      set_tdar();
+
+      full = tx_hw_ring_full();
+      empty = net_queue_empty(net_tx_active, net_tx_capacity);
+    }
+
+    net_request_signal(net_tx_active, net_tx_capacity);
+    reprocess = false;
+
+    full = tx_hw_ring_full();
+    empty = net_queue_empty(net_tx_active, net_tx_capacity);
+    if ((!empty) && (!full)) {
+      net_cancel_signal(net_tx_active);
+      reprocess = true;
+    }
+  }
   return 0;
 }
 
@@ -287,13 +277,11 @@ fun tx_return()
 
   var enqueued = false;
 
-  while (true)
+  var 1 empty = tx_hw_ring_empty();
+  while (!empty)
   {
-    var 1 empty = tx_hw_ring_empty();
-    if (empty) { break; }
-
-    var tx_head = HW_TX_HEAD;
-    var idx = tx_head & (tx_hw_cap - 1);
+    /* Ensure that this buffer has been sent by the device */
+    var idx = HW_TX_HEAD & (tx_hw_cap - 1);
 
     var dscr_addr = tx_descr + idx * 8;
     var stat = 0;
@@ -307,7 +295,9 @@ fun tx_return()
     net_enqueue(tx_free, io_addr, 0, tx_queue_cap);
 
     enqueued = true;
-    st HW_TX_HEAD_SLOT, (tx_head + 1);
+    st HW_TX_HEAD_SLOT, (HW_TX_HEAD + 1);
+
+    empty = tx_hw_ring_empty();
   }
 
   var 1 to_signal = net_require_signal(tx_free, tx_queue_cap);
@@ -340,9 +330,6 @@ fun handle_irq() {
       rx_return();
       rx_provide();
     }
-    if (eir & NETIRQ_EBERR) {
-      @assert(0,0,0,0);
-    }
     eir_full = get_eir_status();
     eir = eir_full & IRQ_MASK;
     set_eir(eir);
@@ -354,6 +341,10 @@ export fun notified(1 ch)
 {
   if (ch == irq_ch) {
     handle_irq();
+    /*
+     * Delay calling into the kernel to ack the IRQ until the next loop
+     * in the microkit event handler loop.
+     */
     microkit_deferred_irq_ack(ch)
   }
   if (ch == rx_ch) {
