@@ -37,7 +37,7 @@ ccnt_t ccounter_benchmark_start;
 ccnt_t ccounter_benchmark_stop;
 uint64_t timer_start;
 uint64_t timer_end;
-uint64_t timeout_uart = 11e9;
+uint64_t timeout_uart = 1e9;
 uint8_t benchmark_size_idx = 0;
 
 serial_queue_handle_t serial_tx_queue_handle;
@@ -414,17 +414,17 @@ void notified(microkit_channel ch) {
                     case THROUGHPUT_RANDOM_READ:
                         run_benchmark_state = THROUGHPUT_RANDOM_WRITE;
                         /* >10s timeout for write benchmarks -> sd card power cycling */
-                        timeout_uart = 11e9;
+                        timeout_uart = 1e9;
                         break;
                     case THROUGHPUT_RANDOM_WRITE:
                         run_benchmark_state = THROUGHPUT_SEQUENTIAL_READ;
                         /* >10s timeout for read benchmarks also -> sd card power cycling */
-                        timeout_uart = 11e9;
+                        timeout_uart = 1e9;
                         break;
                     case THROUGHPUT_SEQUENTIAL_READ:
                         run_benchmark_state = THROUGHPUT_SEQUENTIAL_WRITE;
                         /* >10s timeout for write benchmarks -> sd card power cycling */
-                        timeout_uart = 11e9;
+                        timeout_uart = 1e9;
                         break;
                     case THROUGHPUT_SEQUENTIAL_WRITE:
                         run_benchmark_state = LATENCY_READ;

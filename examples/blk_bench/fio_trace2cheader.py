@@ -53,10 +53,10 @@ def validate_filename(file: str) -> None:
         raise Exception(f"File {file} not in the expected format [benchmark_type]_[request_size][unit].")
     if file.split("_")[0] not in SUPPORTED_BENCHMARKS:
         raise Exception(f"File {file} not in the expected format [benchmark_type]_[request_size][unit].\n"
-              f"Unrecognised benchmark type. Supported benchmarks: {SUPPORTED_BENCHMARKS}")
+                f"Unrecognised benchmark type: {file.split('_')[0]}. Supported benchmarks: {SUPPORTED_BENCHMARKS}")
     if file.split("_")[1][-1] not in SUPPORTED_UNITS:
         raise Exception(f"File {file} not in the expected format [benchmark_type]_[request_size][unit].\n"
-              f"Unrecognised request size unit. Supported units: {SUPPORTED_UNITS}")
+                f"Unrecognised request size unit: {file.split('_')[1][-1]}. Supported units: {SUPPORTED_UNITS}")
     try:
         int(file.split("_")[1][:-1])
     except ValueError:
@@ -107,6 +107,12 @@ if __name__ == "__main__":
             # minimally validate file contents
             if fio_version != "fio version 3 iolog\n":
                 raise Exception(f"First line of {file} is not 'fio version 3 iolog', but: '{fio_version}'")
+            """
+            Each line is expected to look like:
+            0    1              2    3        4
+            time blk_dev/file   type offset   size(B)
+            9717 /dev/mmcblk0p1 read 27918336 131072
+            """
             for line in f.readlines():
                 # only keep lines that contain read or write commands
                 if not any(x in line for x in ("read", "write")):
