@@ -41,7 +41,6 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "maaxboard",
             "qemu_virt_aarch64",
             "qemu_virt_riscv64",
-            "x86_64_generic",
         ],
     },
     "i2c": {
@@ -84,7 +83,6 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "qemu_virt_aarch64",
             "qemu_virt_riscv64",
             "star64",
-            "x86_64_generic",
         ],
     },
     "serial": {
@@ -120,7 +118,6 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             # "rpi4b_1gb",
             "serengeti",
             "star64",
-            "x86_64_generic",
             "zcu102",
         ],
     },
@@ -158,7 +155,6 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             # "rpi4b_1gb",
             "serengeti",
             "star64",
-            "x86_64_generic",
             "zcu102",
         ],
     },
