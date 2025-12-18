@@ -38,7 +38,8 @@ class TestConfig:
     build_system: str
 
     def is_qemu(self):
-        return self.board.startswith("qemu")
+        # TODO: x86_64_generic assumes QEMU for the moment.
+        return self.board.startswith("qemu") or self.board == "x86_64_generic"
 
 
 async def runner(

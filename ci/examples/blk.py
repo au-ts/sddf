@@ -43,7 +43,7 @@ def backend_fn(
         backend.invocation_args.extend([
             "-global", "virtio-mmio.force-legacy=false",
             "-drive", "file={},if=none,format=raw,id=hd".format(disk_path),
-            "-device", "virtio-blk-device,drive=hd",
+            "-device", "virtio-blk-pci,drive=hd" if test_config.board == "x86_64_generic" else "virtio-blk-device,drive=hd",
         ])
         # fmt: on
 
