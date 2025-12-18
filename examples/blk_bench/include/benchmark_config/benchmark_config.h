@@ -12,7 +12,7 @@
 #define REQUEST_COUNT (uint16_t[]) {256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256, 256}
 //#define REQUEST_COUNT (uint32_t[]) {10, 10, 10, 10, 10}
 #define BENCHMARK_RUN_COUNT ((int) sizeof(BENCHMARK_BLOCKS_PER_REQUEST)/sizeof(uint16_t))
-#define BENCHMARK_INDIVIDUAL_RUN_REPEATS 10
+#define BENCHMARK_INDIVIDUAL_RUN_REPEATS 1
 // comment out when benchmarking, if defined: performs validation of all IO operations (using RANDOM_WRITE and SEQUENTIAL_WRITE traces and reading them back)
 //#define VALIDATE_IO_OPERATIONS
 

@@ -41,7 +41,7 @@ else ifeq ($(strip $(MICROKIT_BOARD)), maaxboard)
 	export CPU := cortex-a53
 	export BLK_DRIV_USE_TIMER := yes
 else
-	$(error Unsupported MICROKIT_BOARD given)
+$(error Unsupported MICROKIT_BOARD given)
 endif
 
 BUILD_DIR ?= build
