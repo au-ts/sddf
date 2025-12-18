@@ -119,7 +119,7 @@ jobs:
       - name: Install dependencies (via apt)
         run: |
           sudo apt update
-          sudo apt-get install qemu-system-arm qemu-system-misc
+          sudo apt-get install qemu-system-arm qemu-system-misc qemu-system-x86
       - name: Download images
         uses: actions/download-artifact@v4
         with:
