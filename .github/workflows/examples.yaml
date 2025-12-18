@@ -67,7 +67,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: loader-images
-          path: ci_build/**/loader.img
+          path: |
+            ci_build/**/loader.img
+            ci_build/**/sel4_32.elf
           if-no-files-found: error
 
   build_macos_arm64_nix:
