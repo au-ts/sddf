@@ -64,6 +64,7 @@ typedef struct __attribute__((packed)) hpet_timer {
 #define HPET_GENERAL_CONFIG_REG 0x10
 #define HPET_GENERAL_ISR_REG 0x20
 #define HPET_MAIN_COUNTER_REG 0xF0
+#define HPET_TIMER0_OFFSET 0x100
 #define HPET_TIMER1_OFFSET 0x120
 
 #define LOCAL_APIC_ADDR 0x0FEE00000llu
@@ -122,27 +123,39 @@ static void process_timeouts(uint64_t curr_time)
 void init(void)
 {
     // Read COUNTER_CLK_PERIOD 32:63 from General Capabilities and ID Register
-    volatile uint64_t cap = *((uint64_t *)HPET_REGION + HPET_GENERAL_CAP_ID_REG);
+    volatile uint64_t cap = *((uint64_t *)(HPET_REGION + HPET_GENERAL_CAP_ID_REG));
     tick_period_fs = cap >> 32;
 
     // Enable all timer interrupts
     volatile uint64_t *general_config_reg = (void *)HPET_REGION + HPET_GENERAL_CONFIG_REG;
+    /* Enable main counter */
     *general_config_reg |= BIT(ENABLE_CNF);
+    /* Use legacy routing, so that comparator 0's IRQ always come in on I/O APIC pin 2 */
+    *general_config_reg |= BIT(LEG_RT_CNF);
 
-    timer_0 = (void *)HPET_REGION + HPET_TIMER1_OFFSET;
-    // Enable Timer 0 interrupts
-    timer_0->config |= BIT(TN_FSB_EN_CNF) | BIT(TN_INT_ENB_CNF);
-    // Direct timer interrupts to local APIC: write address and value (interrupt vector)
-    // interrupt vector = vector (in SDF) + irq_user_min(0x10) + IRQ_INT_OFFSET(0x20)
-    // @terryb: remove hard-coded IRQ number
-    timer_0->fsb_irr = (LOCAL_APIC_ADDR << 32llu) | IRQ_NUM;
+    timer_0 = (hpet_timer_t *)(HPET_REGION + HPET_TIMER0_OFFSET);
+
+    uint64_t t0_cfg = timer_0->config;
+
+    /* Don't deliver IRQ via the Front Side Bus */
+    t0_cfg &= ~BIT(TN_FSB_EN_CNF);
+    /* Use level IRQ */
+    t0_cfg |= BIT(TN_INT_TYPE_CNF);
+    /* Switch on IRQ */
+    t0_cfg |= BIT(TN_INT_ENB_CNF);
+    timer_0->config = t0_cfg;
 
     next_timeout = UINT64_MAX;
     for (int i = 0; i < MAX_TIMEOUTS; i++) {
         timeouts[i] = UINT64_MAX;
     }
 
-    microkit_deferred_irq_ack(IRQ_CH);
+    /* Clear ISR */
+    volatile uint64_t *isr = (void *)HPET_REGION + HPET_GENERAL_ISR_REG;
+    *isr = 1;
+
+    /* microkit_deferred_irq_ack(IRQ_CH); */
+    sddf_dprintf("Timer is ready\n");
 }
 
 seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
@@ -175,6 +188,8 @@ void notified(microkit_channel ch)
         return;
     }
 
+    volatile uint64_t *isr = (void *)HPET_REGION + HPET_GENERAL_ISR_REG;
+    *isr = 1;
     microkit_deferred_irq_ack(IRQ_CH);
 
     uint64_t now = get_time();
