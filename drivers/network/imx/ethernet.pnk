@@ -34,6 +34,8 @@
 #define RDAR_OFFSET             16
 #define TDAR_OFFSET             20
 
+#define DESC_ELEM_LEN           8
+
 /* Device constants */
 #define RXD_EMPTY               (1 << 15)
 #define WRAP                    (1 << 13)
@@ -115,7 +117,7 @@ inline fun set_eir(1 eir)
 
 inline fun rx_update_ring_slot(1 ring_addr, 1 idx, 1 phys, 1 len, 1 stat)
 {
-  var descr = hw_rx_descr + idx * 8;
+  var descr = hw_rx_descr + idx * DESC_ELEM_LEN;
 
   if (idx + 1 == hw_rx_capacity) {
     stat = stat | WRAP;
@@ -133,7 +135,7 @@ inline fun rx_update_ring_slot(1 ring_addr, 1 idx, 1 phys, 1 len, 1 stat)
 
 inline fun tx_update_ring_slot(1 ring_addr, 1 idx, 1 phys, 1 len, 1 stat)
 {
-  var descr = hw_tx_descr + idx * 8;
+  var descr = hw_tx_descr + idx * DESC_ELEM_LEN;
 
   if (idx + 1 == hw_tx_capacity) {
     stat = stat | WRAP;
@@ -283,7 +285,7 @@ fun tx_return()
     /* Ensure that this buffer has been sent by the device */
     var idx = HW_TX_HEAD & (tx_hw_cap - 1);
 
-    var dscr_addr = tx_descr + idx * 8;
+    var dscr_addr = tx_descr + idx * DESC_ELEM_LEN;
     var stat = 0;
     !ld16 stat, dscr_addr + 2;
     if (stat & TXD_READY) { break; }
