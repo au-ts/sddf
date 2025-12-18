@@ -54,9 +54,9 @@ ${SERIAL_COMPONENT_OBJ}: ${CHECK_SERIAL_FLAGS_MD5}
 SERIAL_QUEUE_INCLUDE := ${SDDF}/include/sddf/serial
 
 ifeq ($(PANCAKE_SERIAL_VIRT_RX),1)
-SERIAL_VIRT_RX_PNK = ${UTIL}/util.🥞 \
-	${SERIAL_QUEUE_INCLUDE}/queue.🥞 \
-	${SDDF}/serial/components/virt_rx.🥞
+SERIAL_VIRT_RX_PNK = ${UTIL}/util.pnk \
+	${SERIAL_QUEUE_INCLUDE}/queue.pnk \
+	${SDDF}/serial/components/virt_rx.pnk
 
 serial_virt_rx.elf: serial/components/virt_rx_pnk.o serial/components/serial_virt_rx.o pancake_ffi.o libsddf_util_debug.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
@@ -78,9 +78,9 @@ serial/components/serial_virt_rx.o: ${SDDF}/serial/components/virt_rx.c
 endif
 
 ifeq ($(PANCAKE_SERIAL_VIRT_TX),1)
-SERIAL_VIRT_TX_PNK = ${UTIL}/util.🥞 \
-	${SERIAL_QUEUE_INCLUDE}/queue.🥞 \
-	${SDDF}/serial/components/virt_tx.🥞
+SERIAL_VIRT_TX_PNK = ${UTIL}/util.pnk \
+	${SERIAL_QUEUE_INCLUDE}/queue.pnk \
+	${SDDF}/serial/components/virt_tx.pnk
 
 serial_virt_tx.elf: serial/components/virt_tx_pnk.o serial/components/serial_virt_tx.o pancake_ffi.o libsddf_util_debug.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@

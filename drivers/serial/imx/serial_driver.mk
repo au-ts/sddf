@@ -11,9 +11,9 @@ SERIAL_DRIVER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 SERIAL_QUEUE_INCLUDE := ${SDDF}/include/sddf/serial
 
 ifeq ($(PANCAKE_SERIAL_DRIVER),1)
-DRIVER_PNK = ${UTIL}/util.🥞 \
-	${SERIAL_QUEUE_INCLUDE}/queue.🥞 \
-	${SERIAL_DRIVER_DIR}/uart.🥞
+DRIVER_PNK = ${UTIL}/util.pnk \
+	${SERIAL_QUEUE_INCLUDE}/queue.pnk \
+	${SERIAL_DRIVER_DIR}/uart.pnk
 
 CC_IS_CLANG := $(shell $(CC) --version 2>/dev/null | grep -q clang && echo yes || echo no)
 

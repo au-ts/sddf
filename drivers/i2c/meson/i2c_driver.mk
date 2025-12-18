@@ -17,9 +17,9 @@ ifeq ($(PANCAKE_I2C),1)
 i2c_driver.elf: i2c/i2c_pnk.o i2c/i2c_driver.o pancake_ffi.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-I2C_PNK = ${UTIL}/util.🥞 \
-        ${SDDF}/include/microkit/os/sddf/i2c/queue.🥞 \
-        ${I2C_DRIVER_DIR}/i2c.🥞
+I2C_PNK = ${UTIL}/util.pnk \
+        ${SDDF}/include/microkit/os/sddf/i2c/queue.pnk \
+        ${I2C_DRIVER_DIR}/i2c.pnk
 
 i2c/i2c_pnk.S: $(I2C_PNK) |i2c
 	cat $(I2C_PNK) | cpp -P | $(CAKE_COMPILER) --target=arm8 --pancake --main_return=true > $@

@@ -1,34 +1,34 @@
 Pancake sDDF Components
 
 Network Drivers:
-- DWMAC-5.10a Ethernet: https://github.com/au-ts/sddf-pancake/tree/zhewen/pancake-sddf/drivers/network/dwmac-5.10a/ethernet.🥞
-- IMX Ethernet: https://github.com/au-ts/sddf-pancake/tree/zhewen/pancake-sddf/drivers/network/imx/ethernet.🥞
-- Meson Ethernet: https://github.com/au-ts/sddf-pancake/tree/zhewen/pancake-sddf/drivers/network/meson/ethernet.🥞
-- VirtIO Ethernet: https://github.com/au-ts/sddf-pancake/tree/zhewen/pancake-sddf/drivers/network/virtio/ethernet.🥞
+- DWMAC-5.10a Ethernet: https://github.com/au-ts/sddf-pancake/tree/zhewen/pancake-sddf/drivers/network/dwmac-5.10a/ethernet.pnk
+- IMX Ethernet: https://github.com/au-ts/sddf-pancake/tree/zhewen/pancake-sddf/drivers/network/imx/ethernet.pnk
+- Meson Ethernet: https://github.com/au-ts/sddf-pancake/tree/zhewen/pancake-sddf/drivers/network/meson/ethernet.pnk
+- VirtIO Ethernet: https://github.com/au-ts/sddf-pancake/tree/zhewen/pancake-sddf/drivers/network/virtio/ethernet.pnk
 
 Serial Drivers:
-- ARM PL011 UART: https://github.com/au-ts/sddf-pancake/tree/zhewen/pancake-sddf/drivers/serial/arm/uart.🥞
-- IMX UART: https://github.com/au-ts/sddf-pancake/tree/zhewen/pancake-sddf/drivers/serial/imx/uart.🥞
-- Meson UART: https://github.com/au-ts/sddf-pancake/tree/zhewen/pancake-sddf/drivers/serial/meson/uart.🥞
-- NS16550A UART: https://github.com/au-ts/sddf-pancake/tree/zhewen/pancake-sddf/drivers/serial/ns16550a/uart.🥞
-- VirtIO Console: https://github.com/au-ts/sddf-pancake/tree/zhewen/pancake-sddf/drivers/serial/virtio/console.🥞
-- ZynqMP UART: https://github.com/au-ts/sddf-pancake/tree/zhewen/pancake-sddf/drivers/serial/zynqmp/uart.🥞
+- ARM PL011 UART: https://github.com/au-ts/sddf-pancake/tree/zhewen/pancake-sddf/drivers/serial/arm/uart.pnk
+- IMX UART: https://github.com/au-ts/sddf-pancake/tree/zhewen/pancake-sddf/drivers/serial/imx/uart.pnk
+- Meson UART: https://github.com/au-ts/sddf-pancake/tree/zhewen/pancake-sddf/drivers/serial/meson/uart.pnk
+- NS16550A UART: https://github.com/au-ts/sddf-pancake/tree/zhewen/pancake-sddf/drivers/serial/ns16550a/uart.pnk
+- VirtIO Console: https://github.com/au-ts/sddf-pancake/tree/zhewen/pancake-sddf/drivers/serial/virtio/console.pnk
+- ZynqMP UART: https://github.com/au-ts/sddf-pancake/tree/zhewen/pancake-sddf/drivers/serial/zynqmp/uart.pnk
 
 Timer Drivers:
-- ARM Generic Timer: https://github.com/au-ts/sddf-pancake/tree/zhewen/pancake-sddf/drivers/timer/arm/timer.🥞
-- Goldfish Timer: https://github.com/au-ts/sddf-pancake/tree/zhewen/pancake-sddf/drivers/timer/goldfish/timer.🥞
-- IMX Timer: https://github.com/au-ts/sddf-pancake/tree/zhewen/pancake-sddf/drivers/timer/imx/timer.🥞
-- JH7110 Timer: https://github.com/au-ts/sddf-pancake/tree/zhewen/pancake-sddf/drivers/timer/jh7110/timer.🥞
-- Meson Timer: https://github.com/au-ts/sddf-pancake/tree/zhewen/pancake-sddf/drivers/timer/meson/timer.🥞
+- ARM Generic Timer: https://github.com/au-ts/sddf-pancake/tree/zhewen/pancake-sddf/drivers/timer/arm/timer.pnk
+- Goldfish Timer: https://github.com/au-ts/sddf-pancake/tree/zhewen/pancake-sddf/drivers/timer/goldfish/timer.pnk
+- IMX Timer: https://github.com/au-ts/sddf-pancake/tree/zhewen/pancake-sddf/drivers/timer/imx/timer.pnk
+- JH7110 Timer: https://github.com/au-ts/sddf-pancake/tree/zhewen/pancake-sddf/drivers/timer/jh7110/timer.pnk
+- Meson Timer: https://github.com/au-ts/sddf-pancake/tree/zhewen/pancake-sddf/drivers/timer/meson/timer.pnk
 
 I2C Drivers:
-- Meson I2C: https://github.com/au-ts/sddf-pancake/tree/zhewen/pancake-sddf/drivers/i2c/meson/i2c.🥞
+- Meson I2C: https://github.com/au-ts/sddf-pancake/tree/zhewen/pancake-sddf/drivers/i2c/meson/i2c.pnk
 
 Serial Components:
-- RX Virtualiser: https://github.com/au-ts/sddf-pancake/tree/zhewen/pancake-sddf/serial/components/virt_rx.🥞
-- TX Virtualiser: https://github.com/au-ts/sddf-pancake/tree/zhewen/pancake-sddf/serial/components/virt_tx.🥞
+- RX Virtualiser: https://github.com/au-ts/sddf-pancake/tree/zhewen/pancake-sddf/serial/components/virt_rx.pnk
+- TX Virtualiser: https://github.com/au-ts/sddf-pancake/tree/zhewen/pancake-sddf/serial/components/virt_tx.pnk
 
 Queue Implementations:
-- I2C Queue: https://github.com/au-ts/sddf-pancake/tree/zhewen/pancake-sddf/include/sddf/i2c/queue.🥞
-- Network Queue: https://github.com/au-ts/sddf-pancake/tree/zhewen/pancake-sddf/include/sddf/network/queue.🥞
-- Serial Queue: https://github.com/au-ts/sddf-pancake/tree/zhewen/pancake-sddf/include/sddf/serial/queue.🥞
+- I2C Queue: https://github.com/au-ts/sddf-pancake/tree/zhewen/pancake-sddf/include/sddf/i2c/queue.pnk
+- Network Queue: https://github.com/au-ts/sddf-pancake/tree/zhewen/pancake-sddf/include/sddf/network/queue.pnk
+- Serial Queue: https://github.com/au-ts/sddf-pancake/tree/zhewen/pancake-sddf/include/sddf/serial/queue.pnk

@@ -40,9 +40,9 @@ $(info [ns16550a] Using PANCAKE_TARGET: $(PANCAKE_TARGET))
 serial_driver.elf: serial_pnk.o serial/ns16550a/serial_driver.o pancake_ffi.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-DRIVER_PNK = ${UTIL}/util.🥞 \
-	${SDDF}/include/sddf/serial/queue.🥞 \
-	${SERIAL_DRIVER_DIR}/uart.🥞
+DRIVER_PNK = ${UTIL}/util.pnk \
+	${SDDF}/include/sddf/serial/queue.pnk \
+	${SERIAL_DRIVER_DIR}/uart.pnk
 
 serial_pnk.o: serial_pnk.S
 	$(CC) -c $(ASM_FLAGS) $< -o $@

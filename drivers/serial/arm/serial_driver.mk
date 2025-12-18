@@ -21,9 +21,9 @@ endif
 serial_driver.elf: serial_pnk.o serial/arm/serial_driver.o pancake_ffi.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-DRIVER_PNK = ${UTIL}/util.🥞 \
-	${SDDF}/include/sddf/serial/queue.🥞 \
-	${SERIAL_DRIVER_DIR}/uart.🥞
+DRIVER_PNK = ${UTIL}/util.pnk \
+	${SDDF}/include/sddf/serial/queue.pnk \
+	${SERIAL_DRIVER_DIR}/uart.pnk
 
 serial_pnk.o: serial_pnk.S
 	$(CC) -c -mcpu=$(CPU) $(TARGET_FLAG) $< -o $@

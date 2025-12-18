@@ -22,9 +22,9 @@ ifeq ($(PANCAKE_SERIAL_DRIVER),1)
 serial_driver.elf: serial_pnk.o serial/zynqmp/serial_driver.o pancake_ffi.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-DRIVER_PNK = ${UTIL}/util.🥞 \
-	${SERIAL_QUEUE_INCLUDE}/queue.🥞 \
-	${SERIAL_DRIVER_DIR}/uart.🥞
+DRIVER_PNK = ${UTIL}/util.pnk \
+	${SERIAL_QUEUE_INCLUDE}/queue.pnk \
+	${SERIAL_DRIVER_DIR}/uart.pnk
 
 serial_pnk.o: serial_pnk.S
 	$(CC) -c -mcpu=$(CPU) $(TARGET_FLAG) $< -o $@

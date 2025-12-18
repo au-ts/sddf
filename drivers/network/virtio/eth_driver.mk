@@ -22,9 +22,9 @@ ifeq ($(PANCAKE_NETWORK_DRIVER),1)
 eth_driver.elf: ${BUILD_DIR}/ethernet_pnk.o virtio/ethernet.o pancake_ffi.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-ETHERNET_PNK = ${UTIL}/util.🥞 \
-		${SDDF}/include/sddf/network/queue.🥞 \
-		${ETHERNET_DRIVER_DIR}/ethernet.🥞
+ETHERNET_PNK = ${UTIL}/util.pnk \
+		${SDDF}/include/sddf/network/queue.pnk \
+		${ETHERNET_DRIVER_DIR}/ethernet.pnk
 
 ${BUILD_DIR}/ethernet_pnk.S: $(ETHERNET_PNK)
 ifeq ($(findstring riscv,$(MICROKIT_BOARD)),riscv)

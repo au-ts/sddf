@@ -13,7 +13,7 @@
 __attribute__((__section__(".net_virt_tx_config"))) net_virt_tx_config_t config;
 
 #ifdef PANCAKE_NETWORK_VIRT
-// Memory layout for Pancake (must match .🥞 file)
+// Memory layout for Pancake (must match .pnk file)
 #define CONFIG_DRIVER_ID          0
 #define DRV_QUEUE_BASE           10
 #define CLI_QUEUE_BASE           30

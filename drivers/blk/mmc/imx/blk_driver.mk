@@ -17,8 +17,8 @@ ifeq ($(PANCAKE_BLK_DRIVER),1)
 blk_driver.elf: ${BUILD_DIR}/usdhc_pnk.o blk/mmc/imx/usdhc.o pancake_ffi.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-USDHC_PNK = ${UTIL}/util.🥞 \
-		${USDHC_DRIVER_DIR}/usdhc.🥞
+USDHC_PNK = ${UTIL}/util.pnk \
+		${USDHC_DRIVER_DIR}/usdhc.pnk
 
 ${BUILD_DIR}/usdhc_pnk.S: $(USDHC_PNK)
 	cat $(USDHC_PNK) | cpp -P | $(CAKE_COMPILER) --target=arm8 --pancake --main_return=true > $@

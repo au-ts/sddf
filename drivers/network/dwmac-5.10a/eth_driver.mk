@@ -21,9 +21,9 @@ ifeq ($(PANCAKE_NETWORK_DRIVER),1)
 eth_driver.elf eth_driver_dwmac-5.10a.elf: ${BUILD_DIR}/ethernet_pnk.o dwmac-5.10a/ethernet.o pancake_ffi.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-ETHERNET_PNK = ${UTIL}/util.🥞 \
-		${SDDF}/include/sddf/network/queue.🥞 \
-		${ETHERNET_DRIVER_DIR}/ethernet.🥞
+ETHERNET_PNK = ${UTIL}/util.pnk \
+		${SDDF}/include/sddf/network/queue.pnk \
+		${ETHERNET_DRIVER_DIR}/ethernet.pnk
 
 ${BUILD_DIR}/ethernet_pnk.S: $(ETHERNET_PNK)
 	cat $(ETHERNET_PNK) | cpp -P | $(CAKE_COMPILER) --target=riscv --reg_alg=0 --pancake --main_return=true > $@

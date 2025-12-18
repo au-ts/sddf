@@ -24,8 +24,8 @@ else
 endif
 
 ifeq ($(PANCAKE_DRIVER),1)
-TIMER_PNK = ${UTIL}/util.🥞 \
-	${TIMER_DIR}/timer.🥞
+TIMER_PNK = ${UTIL}/util.pnk \
+	${TIMER_DIR}/timer.pnk
 
 timer_driver.elf: timer/timer_pnk.o timer/timer.o pancake_ffi.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@

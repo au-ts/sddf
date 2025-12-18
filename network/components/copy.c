@@ -14,7 +14,7 @@
 __attribute__((__section__(".net_copy_config"))) net_copy_config_t config;
 
 #ifdef PANCAKE_NETWORK_COPY
-// Memory layout for Pancake (must match .🥞 file)
+// Memory layout for Pancake (must match .pnk file)
 #define CONFIG_CLIENT_ID         0
 #define CONFIG_VIRT_RX_ID        1
 #define CLI_QUEUE_BASE           10
