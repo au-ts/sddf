@@ -8,26 +8,33 @@
 #define MAX_INT16        65535
 #define MAX_INT8         255
 
-#define microkit_notify(channel)        \
-  @microkit_notify(0,channel,0,0);     \
+#define microkit_notify(channel) \
+  @microkit_notify(0,channel,0,0); 
+/@ method ffimicrokit_notify(c: Int, cl: Int, a: Int, al: Int) @/
 
-#define microkit_deferred_irq_ack(channel)      \
-  @microkit_deferred_irq_ack(0,channel,0,0);   \
+#define microkit_deferred_irq_ack(channel) \
+  @microkit_deferred_irq_ack(0,channel,0,0);
+/@ method ffimicrokit_deferred_irq_ack(c: Int, cl: Int, a: Int, al: Int) @/
 
-#define sddf_irq_ack(channel)    \
-  @sddf_irq_ack(0,channel,0,0);  \
+#define sddf_irq_ack(channel) \
+  @sddf_irq_ack(0,channel,0,0);
+/@ method ffisddf_irq_ack(c: Int, cl: Int, a: Int, al: Int) @/
 
-#define sddf_notify(channel)    \
-  @sddf_notify(0,channel,0,0);  \
+#define sddf_notify(channel) \
+  @sddf_notify(0,channel,0,0);
+/@ method ffisddf_notify(c: Int, cl: Int, a: Int, al: Int) @/
 
-#define sddf_deferred_notify(channel)   \
-  @sddf_deferred_notify(0,channel,0,0); \
+#define sddf_deferred_notify(channel) \
+  @sddf_deferred_notify(0,channel,0,0);
+/@ method ffisddf_deferred_notify(c: Int, cl: Int, a: Int, al: Int) @/
 
-#define cache_clean(start, end)  \
-  @cache_clean(start,0,end,0);   \
+#define cache_clean(start, end) \
+  @cache_clean(start,0,end,0);
+/@ method fficache_clean(c: Int, cl: Int, a: Int, al: Int) @/
 
-#define cache_clean_and_invalidate(start, end)  \
+#define cache_clean_and_invalidate(start, end) \
   @cache_clean_and_invalidate(start,0,end,0);
+/@ method fficache_clean_and_invalidate(c: Int, cl: Int, a: Int, al: Int) @/
 
 /* Some helper macros */
 #define pnk_mem_ptr(idx)  (@base + (idx) * @biw)
@@ -35,14 +42,18 @@
 
 #define get_idx_array(addr, idx)    lds 1 (addr + idx * @biw)
 
-#define THREAD_MEMORY_RELEASE()     \
-  @THREAD_MEMORY_RELEASE(0,0,0,0);  \
+#define THREAD_MEMORY_RELEASE() \
+  @THREAD_MEMORY_RELEASE(0,0,0,0);
+/@ method ffiTHREAD_MEMORY_RELEASE(c: Int, cl: Int, a: Int, al: Int) @/
 
-#define THREAD_MEMORY_ACQUIRE()     \
-  @THREAD_MEMORY_ACQUIRE(0,0,0,0);  \
+#define THREAD_MEMORY_ACQUIRE() \
+  @THREAD_MEMORY_ACQUIRE(0,0,0,0);
+/@ method ffiTHREAD_MEMORY_ACQUIRE(c: Int, cl: Int, a: Int, al: Int) @/
 
-#define seL4_SetMR(reg, value)      \
-  @seL4_SetMR(0,reg,0,value);       \
+#define seL4_SetMR(reg, value) \
+  @seL4_SetMR(0,reg,0,value);
+/@ method ffiseL4_SetMR(c: Int, cl: Int, a: Int, al: Int) @/
 
-#define debug_print(c, clen, a, alen)   \
-  @debug_print(c,clen,a,alen)
+#define debug_print(c, cl, a, al) \
+  @debug_print(c,cl,a,al)
+/@ method ffidebug_print(c: Int, cl: Int, a: Int, al: Int) @/
