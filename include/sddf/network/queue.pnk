@@ -5,73 +5,94 @@
 
 #define NET_BUFF_DESC_SIZE  (2*@biw)
 
+#define TAIL_OFFSET               0
+#define HEAD_OFFSET               2
+#define CONSUMER_SIGNALLED_OFFSET 4
+#define BUFFERS_OFFSET            8
+
+#define IO_OFFSET           0
+#define OFFSET_OFFSET       0
+#define LEN_OFFSET          8
+
 inline fun net_queue_empty(1 queue_ptr, 1 capacity)
 {
   var tail = 0;
   var head = 0;
-  !ld16 tail, queue_ptr;
-  !ld16 head, queue_ptr + 2;
+  !ld16 tail, queue_ptr + TAIL_OFFSET;
+  !ld16 head, queue_ptr + HEAD_OFFSET;
 
-  return ((tail - head) == 0);
+  return (tail - head) == 0;
 }
 
 inline fun net_queue_full(1 queue_ptr, 1 capacity)
 {
   var tail = 0;
   var head = 0;
-  !ld16 tail, queue_ptr;
-  !ld16 head, queue_ptr + 2;
+  !ld16 tail, queue_ptr + TAIL_OFFSET;
+  !ld16 head, queue_ptr + HEAD_OFFSET;
 
-  var full = (tail - head) == capacity;
-  return full;
+  return (tail - head) == capacity;
 }
 
 inline fun net_enqueue(1 queue_ptr, 1 io_addr, 1 len, 1 capacity)
 {
+  /* capacity must be a power of 2 */
   var tail = 0;
-  !ld16 tail, queue_ptr;
+  !ld16 tail, queue_ptr + TAIL_OFFSET;
 
   var mod_tail = tail & (capacity - 1);
-  var buff_addr = queue_ptr + @biw + mod_tail * NET_BUFF_DESC_SIZE;
-  !stw buff_addr, io_addr;
-  !stw buff_addr + @biw, len;
+  var buff_addr = queue_ptr + BUFFERS_OFFSET + mod_tail * NET_BUFF_DESC_SIZE;
+  !stw buff_addr + IO_OFFSET, io_addr;
+  !stw buff_addr + LEN_OFFSET, len;
+
+#ifdef CONFIG_ENABLE_SMP_SUPPORT
+  THREAD_MEMORY_RELEASE()
+#endif
+
   tail = (tail + 1) & MAX_INT16;
-  !st16 queue_ptr, tail;
+  !st16 queue_ptr + TAIL_OFFSET, tail;
+
   return 0;
 }
 
 inline fun {1,1} net_dequeue(1 queue_ptr, 1 capacity)
 {
+  /* capacity must be a power of 2 */
   var head = 0;
-  !ld16 head, queue_ptr + 2;
+  !ld16 head, queue_ptr + HEAD_OFFSET;
 
   var mod_head = head & (capacity - 1);
-  var buff_addr = queue_ptr + @biw + mod_head * NET_BUFF_DESC_SIZE;
+  var buff_addr = queue_ptr + BUFFERS_OFFSET + mod_head * NET_BUFF_DESC_SIZE;
   var io_addr = 0;
   var len = 0;
-  !ldw io_addr, buff_addr;
-  !ldw len, buff_addr + @biw;
-  head = (head + 1) & MAX_INT16;
+  !ldw io_addr, buff_addr + IO_OFFSET;
+  !ldw len, buff_addr + LEN_OFFSET;
 
-  !st16 queue_ptr + 2, head;
+#ifdef CONFIG_ENABLE_SMP_SUPPORT
+  THREAD_MEMORY_RELEASE()
+#endif
+
+  head = (head + 1) & MAX_INT16;
+  !st16 queue_ptr + HEAD_OFFSET, head;
+
   return <io_addr, len>;
 }
 
 inline fun net_request_signal(1 queue_ptr, 1 capacity)
 {
-  !st32 queue_ptr + 4, 0;
+  !st32 queue_ptr + CONSUMER_SIGNALLED_OFFSET, 0;
   return 0;
 }
 
 inline fun net_cancel_signal(1 queue_ptr)
 {
-  !st32 queue_ptr + 4, 1;
+  !st32 queue_ptr + CONSUMER_SIGNALLED_OFFSET, 1;
   return 0;
 }
 
 inline fun net_require_signal(1 queue_ptr, 1 capacity)
 {
   var signalled = 0;
-  !ld32 signalled, queue_ptr + 4;
+  !ld32 signalled, queue_ptr + CONSUMER_SIGNALLED_OFFSET;
   return !signalled;
 }
