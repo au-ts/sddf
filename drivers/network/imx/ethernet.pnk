@@ -67,8 +67,8 @@
 /@ shared w u32 hw_ring_tx_addr[35651584 + 256 * @biw + 4..(35651584 + 256 * @biw + 256 * @biw) : 8] @/
 /@ shared rw u8 hw_ring_rx_stat[35651584 + 3..(35651584 + 256 * @biw) : 8] @/
 /@ shared rw u8 hw_ring_tx_stat[35651584 + 256 * @biw + 3..(35651584 + 256 * @biw + 256 * @biw) : 8] @/
-/@ shared r u32 hw_ring_rx_len[35651584..(35651584 + 256 * @biw) : 8] @/
-/@ shared w u32 hw_ring_tx_len[35651584 + 256 * @biw..(35651584 + 256 * @biw + 256 * @biw) : 8] @/
+/@ shared r u16 hw_ring_rx_len[35651584..(35651584 + 256 * @biw) : 8] @/
+/@ shared w u16 hw_ring_tx_len[35651584 + 256 * @biw..(35651584 + 256 * @biw + 256 * @biw) : 8] @/
 /@ shared w u8 hw_ring_reserve[35651584 + 2..(35651584 + 256 * @biw + 256 * @biw) : 8] @/
 /@ shared w u32 RDAR[33554432 + 16] @/
 /@ shared w u32 TDAR[33554432 + 20] @/
