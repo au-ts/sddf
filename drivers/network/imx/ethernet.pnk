@@ -30,11 +30,14 @@
 #define HW_TX_DESCR             pnk_mem(17)
 #define HW_TX_PTR               pnk_mem_ptr(14)
 
-#define EIR_OFFSET              4
-#define RDAR_OFFSET             16
-#define TDAR_OFFSET             20
+#define ETH_EIR_OFF              4
+#define ETH_RDAR_OFF             16
+#define ETH_TDAR_OFF             20
 
-#define DESC_ELEM_LEN           8
+#define DESCR_LEN_OFF              0
+#define DESCR_STAT_OFF             2
+#define DESCR_ADDR_OFF             4
+#define DESCR_LEN                  8
 
 /* Device constants */
 #define RXD_EMPTY               (1 << 15)
@@ -110,20 +113,20 @@ inline fun tx_hw_ring_full() {
 
 inline fun set_rdar()
 {
-  !st32 eth_reg + RDAR_OFFSET, RDAR_RDAR;
+  !st32 eth_reg + ETH_RDAR_OFF, RDAR_RDAR;
   return 0;
 }
 
 inline fun set_tdar()
 {
-  !st32  eth_reg + TDAR_OFFSET, TDAR_TDAR;
+  !st32  eth_reg + ETH_TDAR_OFF, TDAR_TDAR;
   return 0;
 }
 
 inline fun get_eir_status()
 {
   var eir = 0;
-  !ld32 eir, eth_reg + EIR_OFFSET;
+  !ld32 eir, eth_reg + ETH_EIR_OFF;
   return eir;
 }
 
@@ -135,43 +138,41 @@ inline fun get_eir()
 
 inline fun set_eir(1 eir)
 {
-  !st32 eth_reg + EIR_OFFSET, eir;
+  !st32 eth_reg + ETH_EIR_OFF, eir;
   return 0;
 }
 
 inline fun rx_update_ring_slot(1 ring_addr, 1 idx, 1 phys, 1 len, 1 stat)
 {
-  var descr = hw_rx_descr + idx * DESC_ELEM_LEN;
-
+  var descr = hw_rx_descr + idx * DESCR_LEN;        
   if (idx + 1 == hw_rx_capacity) {
     stat = stat | WRAP;
   }
 
-  !st32 descr + 4, phys;
-  !st16 descr, len;
+  !st32 descr + DESCR_ADDR_OFF, phys;
+  !st16 descr + DESCR_LEN_OFF, len;
   /* Ensure all writes to the descriptor complete, before we set the flags
    * that makes hardware aware of this slot.
    */
   THREAD_MEMORY_RELEASE()
-  !st16 descr + 2, stat;
+  !st16 descr + DESCR_STAT_OFF, stat;
   return 0;
 }
 
 inline fun tx_update_ring_slot(1 ring_addr, 1 idx, 1 phys, 1 len, 1 stat)
 {
-  var descr = hw_tx_descr + idx * DESC_ELEM_LEN;
-
+  var descr = hw_tx_descr + idx * DESCR_LEN;        
   if (idx + 1 == hw_tx_capacity) {
     stat = stat | WRAP;
   }
 
-  !st32 descr + 4, phys;
-  !st16 descr, len;
+  !st32 descr + DESCR_ADDR_OFF, phys;
+  !st16 descr + DESCR_LEN_OFF, len;
   /* Ensure all writes to the descriptor complete, before we set the flags
    * that makes hardware aware of this slot.
    */
   THREAD_MEMORY_RELEASE()
-  !st16 descr + 2, stat;
+  !st16 descr + DESCR_STAT_OFF, stat;
   return 0;
 }
 
@@ -309,15 +310,15 @@ fun tx_return()
     /* Ensure that this buffer has been sent by the device */
     var idx = HW_TX_HEAD & (tx_hw_cap - 1);
 
-    var dscr_addr = tx_descr + idx * DESC_ELEM_LEN;
+    var dscr_addr = tx_descr + idx * DESCR_LEN;        
     var stat = 0;
-    !ld16 stat, dscr_addr + 2;
+    !ld16 stat, dscr_addr + DESCR_STAT_OFF;
     if (stat & TXD_READY) { break; }
 
     THREAD_MEMORY_ACQUIRE()
 
     var io_addr = 0;
-    !ld32 io_addr, dscr_addr + 4;
+    !ld32 io_addr, dscr_addr + DESCR_ADDR_OFF;
     net_enqueue(tx_free, io_addr, 0, tx_queue_cap);
 
     enqueued = true;

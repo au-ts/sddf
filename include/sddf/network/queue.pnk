@@ -9,13 +9,16 @@
 #define HEAD_OFFSET               2
 #define CONSUMER_SIGNALLED_OFFSET 4
 #define BUFFERS_OFFSET            8
+#define QUEUE_LENGTH              8 + @biw
 
-#define IO_OFFSET           0
-#define OFFSET_OFFSET       0
-#define LEN_OFFSET          8
+#define QUEUE_IO_OFF           0
+#define QUEUE_OFFSET_OFF       0
+#define QUEUE_LEN_OFF          8
 
 inline fun net_queue_empty(1 queue_ptr, 1 capacity)
 {
+  /@ requires bounded(queue_ptr + QUEUE_LENGTH) @/
+
   var tail = 0;
   var head = 0;
   !ld16 tail, queue_ptr + TAIL_OFFSET;
@@ -42,8 +45,8 @@ inline fun net_enqueue(1 queue_ptr, 1 io_addr, 1 len, 1 capacity)
 
   var mod_tail = tail & (capacity - 1);
   var buff_addr = queue_ptr + BUFFERS_OFFSET + mod_tail * NET_BUFF_DESC_SIZE;
-  !stw buff_addr + IO_OFFSET, io_addr;
-  !stw buff_addr + LEN_OFFSET, len;
+  !stw buff_addr + QUEUE_IO_OFF, io_addr;
+  !stw buff_addr + QUEUE_LEN_OFF, len;
 
 #ifdef CONFIG_ENABLE_SMP_SUPPORT
   THREAD_MEMORY_RELEASE()
@@ -65,8 +68,8 @@ inline fun {1,1} net_dequeue(1 queue_ptr, 1 capacity)
   var buff_addr = queue_ptr + BUFFERS_OFFSET + mod_head * NET_BUFF_DESC_SIZE;
   var io_addr = 0;
   var len = 0;
-  !ldw io_addr, buff_addr + IO_OFFSET;
-  !ldw len, buff_addr + LEN_OFFSET;
+  !ldw io_addr, buff_addr + QUEUE_IO_OFF;
+  !ldw len, buff_addr + QUEUE_LEN_OFF;
 
 #ifdef CONFIG_ENABLE_SMP_SUPPORT
   THREAD_MEMORY_RELEASE()
