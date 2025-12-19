@@ -66,16 +66,38 @@
 /@ extern field hardware_ring_rx_len: Seq[Int] @/
 /@ extern field hardware_ring_tx_len: Seq[Int] @/
 
-/@ shared w u32 hw_ring_rx_addr[35651584 + 4..(35651584 + 256 * @biw) : 8] @/
-/@ shared w u32 hw_ring_tx_addr[35651584 + 256 * @biw + 4..(35651584 + 256 * @biw + 256 * @biw) : 8] @/
-/@ shared rw u8 hw_ring_rx_stat[35651584 + 3..(35651584 + 256 * @biw) : 8] @/
-/@ shared rw u8 hw_ring_tx_stat[35651584 + 256 * @biw + 3..(35651584 + 256 * @biw + 256 * @biw) : 8] @/
-/@ shared r u16 hw_ring_rx_len[35651584..(35651584 + 256 * @biw) : 8] @/
-/@ shared w u16 hw_ring_tx_len[35651584 + 256 * @biw..(35651584 + 256 * @biw + 256 * @biw) : 8] @/
-/@ shared w u8 hw_ring_reserve[35651584 + 2..(35651584 + 256 * @biw + 256 * @biw) : 8] @/
-/@ shared w u32 RDAR[33554432 + 16] @/
-/@ shared w u32 TDAR[33554432 + 20] @/
-/@ shared rw u32 EIR[33554432 + 4] @/
+#define HW_RING_BASE         35651584
+#define HW_RING_RX_ADDR_LO   HW_RING_BASE + 4
+#define HW_RING_RX_ADDR_HI   HW_RING_BASE + 256 * @biw
+#define HW_RING_TX_ADDR_LO   HW_RING_BASE + 256 * @biw + 4
+#define HW_RING_TX_ADDR_HI   HW_RING_BASE + 256 * @biw + 256 * @biw
+#define HW_RING_RX_STAT_LO   HW_RING_BASE + 3
+#define HW_RING_RX_STAT_HI   HW_RING_BASE + 256 * @biw
+#define HW_RING_TX_STAT_LO   HW_RING_BASE + 256 * @biw + 3
+#define HW_RING_TX_STAT_HI   HW_RING_BASE + 256 * @biw + 256 * @biw
+#define HW_RING_RX_LEN_LO    HW_RING_BASE
+#define HW_RING_RX_LEN_HI    HW_RING_BASE + 256 * @biw
+#define HW_RING_TX_LEN_LO    HW_RING_BASE + 256 * @biw
+#define HW_RING_TX_LEN_HI    HW_RING_BASE + 256 * @biw + 256 * @biw
+#define HW_RING_RESERVE_LO   HW_RING_BASE + 2
+#define HW_RING_RESERVE_HI   HW_RING_BASE + 256 * @biw + 256 * @biw
+
+#define HW_ETH_BASE   33554432
+#define RDAR_ADDR     HW_ETH_BASE + ETH_RDAR_OFF
+#define TDAR_ADDR     HW_ETH_BASE + ETH_TDAR_OFF
+#define EIR_ADDR      HW_ETH_BASE + ETH_EIR_OFF
+
+/@ shared w u32 hw_ring_rx_addr[HW_RING_RX_ADDR_LO..HW_RING_RX_ADDR_HI] @/
+/@ shared w u32 hw_ring_tx_addr[HW_RING_TX_ADDR_LO..HW_RING_TX_ADDR_HI] @/
+/@ shared rw u8 hw_ring_rx_stat[HW_RING_RX_STAT_LO..HW_RING_RX_STAT_HI] @/
+/@ shared rw u8 hw_ring_tx_stat[HW_RING_TX_STAT_LO..HW_RING_TX_STAT_HI] @/
+/@ shared r u16 hw_ring_rx_len[HW_RING_RX_LEN_LO..HW_RING_RX_LEN_HI] @/
+/@ shared w u16 hw_ring_tx_len[HW_RING_TX_LEN_LO..HW_RING_TX_LEN_HI] @/
+/@ shared w u8 hw_ring_reserve[HW_RING_RESERVE_LO..HW_RING_RESERVE_HI] @/
+
+/@ shared w u32 RDAR[RDAR_ADDR] @/
+/@ shared w u32 TDAR[TDAR_ADDR] @/
+/@ shared rw u32 EIR[EIR_ADDR] @/
 
 /@ model field device @/
 /@ model field virt @/
