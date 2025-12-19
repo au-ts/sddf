@@ -390,11 +390,6 @@ method load_hw_ring_tx_stat(heap: IArray, gv: Ref, device: Ref, virt: Ref, addre
     refute false
 }
 
-/* Note:
- * desc_len should be bounded16() but we use !st32/!ld32 to store/load it.
- * This is a temporary hack since Pancake currently doesn't support !ld16/!st16 due to architecture complexity
- * I really don't know what this means, where is the hack?
-*/
 method load_hw_ring_rx_len(heap: IArray, gv: Ref, device: Ref, virt: Ref, address: Int)
     returns (retval: Int)
     requires valid_device(heap, device, virt)
