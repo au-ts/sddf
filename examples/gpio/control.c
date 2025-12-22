@@ -83,14 +83,7 @@ void digital_write(int gpio_ch, int value) {
 }
 
 void control_left() {
-    microkit_msginfo msginfo;
-    size_t value;
-
-    msginfo = microkit_msginfo_new(GPIO_SET_GPIO, 2);
-    microkit_mr_set(GPIO_REQ_CONFIG_SLOT, GPIO_DIRECTION);
-    microkit_mr_set(GPIO_REQ_VALUE_SLOT, GPIO_DIRECTION_OUTPUT);
-
-    msginfo = microkit_ppcall(GPIO_DRIVER_CH_1, msginfo);
+    
 }
 
 void control_right() {
@@ -98,11 +91,24 @@ void control_right() {
 }
 
 void control_forward() {
+    // Set motor 1 forward
+    digital_write(1, GPIO_LOW);
+    digital_write(2, GPIO_HIGH);
 
+    // Set motor 2 forward
+    digital_write(3, GPIO_LOW);
+    digital_write(4, GPIO_HIGH);
 }
 
-void control_back() {
 
+void control_back() {
+    // Set motor 1 backward
+    digital_write(1, GPIO_HIGH);
+    digital_write(2, GPIO_LOW);
+
+    // Set motor 2 backward
+    digital_write(3, GPIO_HIGH);
+    digital_write(4, GPIO_LOW);
 }
 
 void control_break() {
