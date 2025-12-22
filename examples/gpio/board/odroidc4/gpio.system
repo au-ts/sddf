@@ -10,7 +10,7 @@
     <memory_region name="gpio_ao" size="0x1_000" phys_addr="0xFF800000"/>
     <memory_region name="interupt_control" size="0x10_000" phys_addr="0xFFD00000"/>
 
-    <protection_domain name="driver" priority="100" pp="true">
+    <protection_domain name="driver" priority="100">
         <program_image path="gpio_driver.elf"/>
 
         <map mr="gpio" vaddr="0x4_000_000" perms="rw" setvar_vaddr="gpio_regs" cached="false" />
@@ -29,12 +29,12 @@
     <!-- We are using 2 GPIO pins -->
     <channel>
         <end pd="driver" id="0" />
-        <end pd="client" id="1" />
+        <end pd="client" id="1" pp="true"/>
     </channel>
 
     <channel>
         <end pd="driver" id="1" />
-        <end pd="client" id="2" />
+        <end pd="client" id="2" pp="true"/>
     </channel>
 
 </system>

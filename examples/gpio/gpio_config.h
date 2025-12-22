@@ -9,8 +9,13 @@
 #include <sddf/gpio/meson/gpio.h>
 #include <sddf/gpio/imx/gpio.h>
 
-#define GPIO_1 (MESON_GPIO_A + 15)
-#define GPIO_2 (MESON_GPIO_A + 14)
+// Right motor pins
+#define GPIO_1 (MESON_GPIO_X + 1)
+#define GPIO_2 (MESON_GPIO_X + 2)
+
+// Left motor pins
+#define GPIO_3 (MESON_GPIO_X + 3)
+#define GPIO_4 (MESON_GPIO_X + 4)
 
 // WARNING : The GPIOA pins DO NOT work for input!!
 
