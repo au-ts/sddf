@@ -28,6 +28,17 @@ cothread_t t_main;
 #define GPIO_HIGH (1);
 #define GPIO_LOW (0);
 
+
+// All GPIO 3 pins are for ENA
+#define MOTOR_A_GPIO_1 (0);
+#define MOTOR_A_GPIO_2 (1);
+#define MOTOR_A_GPIO_3 (2);
+
+#define MOTOR_B_GPIO_1 (3);
+#define MOTOR_B_GPIO_2 (4);
+#define MOTOR_B_GPIO_3 (5);
+
+
 static char t_client_main_stack[STACK_SIZE];
 
 // GPIO output HIGH/LOW
@@ -82,37 +93,71 @@ void digital_write(int gpio_ch, int value) {
     }
 }
 
+// l289n truth table: https://www.dprg.org/l298n-motor-driver-board-drive-modes/
+// TODO check if left/right are correct
 void control_left() {
-    
+    // Set motor 2 forward
+    digital_write(MOTOR_B_GPIO_1, GPIO_LOW);
+    digital_write(MOTOR_B_GPIO_2, GPIO_HIGH);
+    digital_write(MOTOR_B_GPIO_3, GPIO_HIGH);
+
+    // Set motor 1 to coast
+    digital_write(MOTOR_A_GPIO_1, GPIO_LOW);
+    digital_write(MOTOR_A_GPIO_2, GPIO_HIGH);
+    digital_write(MOTOR_A_GPIO_3, GPIO_LOW);
 }
 
 void control_right() {
+    // Set motor 1 forward
+    digital_write(MOTOR_A_GPIO_1, GPIO_LOW);
+    digital_write(MOTOR_A_GPIO_2, GPIO_HIGH);
+    digital_write(MOTOR_A_GPIO_3, GPIO_HIGH);
 
+    // Set motor 2 coast
+    digital_write(MOTOR_B_GPIO_1, GPIO_LOW);
+    digital_write(MOTOR_B_GPIO_2, GPIO_HIGH);
+    digital_write(MOTOR_B_GPIO_3, GPIO_LOW);
 }
 
+// TODO how to send PWM signal to control motor speed??
 void control_forward() {
     // Set motor 1 forward
-    digital_write(1, GPIO_LOW);
-    digital_write(2, GPIO_HIGH);
+    digital_write(MOTOR_A_GPIO_1, GPIO_LOW);
+    digital_write(MOTOR_A_GPIO_2, GPIO_HIGH);
+    digital_write(MOTOR_A_GPIO_3, GPIO_HIGH);
 
     // Set motor 2 forward
-    digital_write(3, GPIO_LOW);
-    digital_write(4, GPIO_HIGH);
+    digital_write(MOTOR_B_GPIO_1, GPIO_LOW);
+    digital_write(MOTOR_B_GPIO_2, GPIO_HIGH);
+    digital_write(MOTOR_B_GPIO_3, GPIO_HIGH);
 }
 
 
 void control_back() {
     // Set motor 1 backward
-    digital_write(1, GPIO_HIGH);
-    digital_write(2, GPIO_LOW);
+    digital_write(MOTOR_A_GPIO_1, GPIO_HIGH);
+    digital_write(MOTOR_A_GPIO_2, GPIO_LOW);
+    digital_write(MOTOR_A_GPIO_3, GPIO_HIGH);
 
     // Set motor 2 backward
-    digital_write(3, GPIO_HIGH);
-    digital_write(4, GPIO_LOW);
+    digital_write(MOTOR_B_GPIO_1, GPIO_HIGH);
+    digital_write(MOTOR_B_GPIO_2, GPIO_LOW);
+    digital_write(MOTOR_B_GPIO_3, GPIO_HIGH);
 }
 
-void control_break() {
 
+// https://howtomechatronics.com/tutorials/arduino/arduino-dc-motor-control-tutorial-l298n-pwm-h-bridge/#:~:text=Next%20are%20the%20logic%20control,the%20motor%20will%20be%20disabled.
+// TODO check coasting vs brakes
+void control_brakes() {
+    // Set motor 1 backward
+    digital_write(MOTOR_A_GPIO_1, GPIO_LOW);
+    digital_write(MOTOR_A_GPIO_2, GPIO_LOW);
+    digital_write(MOTOR_A_GPIO_3, GPIO_HIGH);
+
+    // Set motor 2 backward
+    digital_write(MOTOR_B_GPIO_1, GPIO_LOW);
+    digital_write(MOTOR_B_GPIO_2, GPIO_LOW);
+    digital_write(MOTOR_B_GPIO_3, GPIO_HIGH);
 }
 
 void control_loop_main() {
