@@ -5,19 +5,9 @@
 
 #define NET_BUFF_DESC_SIZE  (2*@biw)
 
-#define TAIL_OFFSET               0
-#define HEAD_OFFSET               2
-#define CONSUMER_SIGNALLED_OFFSET 4
-#define BUFFERS_OFFSET            8
-#define QUEUE_LENGTH              8 + @biw
-
-#define QUEUE_IO_OFF           0
-#define QUEUE_OFFSET_OFF       0
-#define QUEUE_LEN_OFF          8
-
 inline fun net_queue_empty(1 queue_ptr, 1 capacity)
 {
-  /@ requires bounded(queue_ptr + QUEUE_LENGTH) @/
+  /@ requires VALID_QUEUE_PTR(queue_ptr) @/
 
   var tail = 0;
   var head = 0;
@@ -29,6 +19,8 @@ inline fun net_queue_empty(1 queue_ptr, 1 capacity)
 
 inline fun net_queue_full(1 queue_ptr, 1 capacity)
 {
+  /@ requires VALID_QUEUE_PTR(queue_ptr) @/
+
   var tail = 0;
   var head = 0;
   !ld16 tail, queue_ptr + TAIL_OFFSET;
@@ -39,6 +31,8 @@ inline fun net_queue_full(1 queue_ptr, 1 capacity)
 
 inline fun net_enqueue(1 queue_ptr, 1 io_addr, 1 len, 1 capacity)
 {
+  /@ requires VALID_QUEUE_PTR(queue_ptr) @/
+
   /* capacity must be a power of 2 */
   var tail = 0;
   !ld16 tail, queue_ptr + TAIL_OFFSET;
@@ -60,6 +54,8 @@ inline fun net_enqueue(1 queue_ptr, 1 io_addr, 1 len, 1 capacity)
 
 inline fun {1,1} net_dequeue(1 queue_ptr, 1 capacity)
 {
+  /@ requires VALID_QUEUE_PTR(queue_ptr) @/
+
   /* capacity must be a power of 2 */
   var head = 0;
   !ld16 head, queue_ptr + HEAD_OFFSET;
@@ -83,18 +79,24 @@ inline fun {1,1} net_dequeue(1 queue_ptr, 1 capacity)
 
 inline fun net_request_signal(1 queue_ptr, 1 capacity)
 {
+  /@ requires VALID_QUEUE_PTR(queue_ptr) @/
+
   !st32 queue_ptr + CONSUMER_SIGNALLED_OFFSET, 0;
   return 0;
 }
 
 inline fun net_cancel_signal(1 queue_ptr)
 {
+  /@ requires VALID_QUEUE_PTR(queue_ptr) @/
+
   !st32 queue_ptr + CONSUMER_SIGNALLED_OFFSET, 1;
   return 0;
 }
 
 inline fun net_require_signal(1 queue_ptr, 1 capacity)
 {
+  /@ requires VALID_QUEUE_PTR(queue_ptr) @/
+
   var signalled = 0;
   !ld32 signalled, queue_ptr + CONSUMER_SIGNALLED_OFFSET;
   return !signalled;
