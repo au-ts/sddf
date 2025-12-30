@@ -28,7 +28,7 @@ define unchanged(exprs)   exprs == old(exprs)
 
 /* TODO find a replacement for this 
 define IRQ_CH   0
-method microkit_deferred_irq_ack(heap: IArray, device: Ref, virt: Ref, x1: Int, x2: Int, x3: Int, x4: Int) 
+method microkit_deferred_irq_ack(heap: IArray, gv: Ref, device: Ref, virt: Ref, x1: Int, x2: Int, x3: Int, x4: Int) 
   requires x2 == IRQ_CH
   requires (x1 == 0) && (x3 == 0) && (x4 == 0)
 {
@@ -122,17 +122,17 @@ field hardware_ring_tx_len:  Seq[Int]
  * The last slot of hardware_ring_*_stat[] must have WRAP set.
  * Other slots must not have WRAP set.
 */
-predicate valid_device(heap: IArray, device: Ref, virt: Ref)
+predicate valid_device(heap: IArray, gv: Ref, device: Ref, virt: Ref)
 {
-    valid_hardware_ring_rx_addr(heap, device, virt) &&
-    valid_hardware_ring_rx_stat(heap, device, virt) &&
-    valid_hardware_ring_rx_len(heap, device, virt) &&
-    valid_hardware_ring_tx_addr(heap, device, virt) &&
-    valid_hardware_ring_tx_stat(heap, device, virt) &&
-    valid_hardware_ring_tx_len(heap, device, virt)
+    valid_hardware_ring_rx_addr(heap, gv, device, virt) &&
+    valid_hardware_ring_rx_stat(heap, gv, device, virt) &&
+    valid_hardware_ring_rx_len(heap, gv, device, virt) &&
+    valid_hardware_ring_tx_addr(heap, gv, device, virt) &&
+    valid_hardware_ring_tx_stat(heap, gv, device, virt) &&
+    valid_hardware_ring_tx_len(heap, gv, device, virt)
 }
 
-predicate valid_hardware_ring_rx_addr(heap: IArray, device: Ref, virt: Ref)
+predicate valid_hardware_ring_rx_addr(heap: IArray, gv: Ref, device: Ref, virt: Ref)
 {
     acc(device.hardware_ring_rx_addr) &&
     |device.hardware_ring_rx_addr| == hw_capacity &&
@@ -140,7 +140,7 @@ predicate valid_hardware_ring_rx_addr(heap: IArray, device: Ref, virt: Ref)
         (i >= 0 && i < hw_capacity) ==> is_valid_data_addr(device.hardware_ring_rx_addr[i]))
 }
 
-predicate valid_hardware_ring_tx_addr(heap: IArray, device: Ref, virt: Ref)
+predicate valid_hardware_ring_tx_addr(heap: IArray, gv: Ref, device: Ref, virt: Ref)
 {
     acc(device.hardware_ring_tx_addr) &&
     |device.hardware_ring_tx_addr| == hw_capacity &&
@@ -148,7 +148,7 @@ predicate valid_hardware_ring_tx_addr(heap: IArray, device: Ref, virt: Ref)
         (i >= 0 && i < hw_capacity) ==> is_valid_data_addr(device.hardware_ring_tx_addr[i]))
 }
 
-predicate valid_hardware_ring_rx_len(heap: IArray, device: Ref, virt: Ref)
+predicate valid_hardware_ring_rx_len(heap: IArray, gv: Ref, device: Ref, virt: Ref)
 {
     acc(device.hardware_ring_rx_len) &&
     |device.hardware_ring_rx_len| == hw_capacity &&
@@ -156,7 +156,7 @@ predicate valid_hardware_ring_rx_len(heap: IArray, device: Ref, virt: Ref)
         (i >= 0 && i < hw_capacity) ==> is_valid_data_len(device.hardware_ring_rx_len[i]))
 }
 
-predicate valid_hardware_ring_tx_len(heap: IArray, device: Ref, virt: Ref)
+predicate valid_hardware_ring_tx_len(heap: IArray, gv: Ref, device: Ref, virt: Ref)
 {
     acc(device.hardware_ring_tx_len) &&
     |device.hardware_ring_tx_len| == hw_capacity &&
@@ -164,7 +164,7 @@ predicate valid_hardware_ring_tx_len(heap: IArray, device: Ref, virt: Ref)
         (i >= 0 && i < hw_capacity) ==> is_valid_data_len(device.hardware_ring_tx_len[i]))
 }
 
-predicate valid_hardware_ring_rx_stat(heap: IArray, device: Ref, virt: Ref)
+predicate valid_hardware_ring_rx_stat(heap: IArray, gv: Ref, device: Ref, virt: Ref)
 {
     acc(device.hardware_ring_rx_stat) &&
     |device.hardware_ring_rx_stat| == hw_capacity &&
@@ -177,7 +177,7 @@ predicate valid_hardware_ring_rx_stat(heap: IArray, device: Ref, virt: Ref)
         (i >= 0 && i < hw_capacity - 1) ==> !is_WRAP(device.hardware_ring_rx_stat[i]))
 }
 
-predicate valid_hardware_ring_tx_stat(heap: IArray, device: Ref, virt: Ref)
+predicate valid_hardware_ring_tx_stat(heap: IArray, gv: Ref, device: Ref, virt: Ref)
 {
     acc(device.hardware_ring_tx_stat) &&
     |device.hardware_ring_tx_stat| == hw_capacity &&
@@ -191,49 +191,49 @@ predicate valid_hardware_ring_tx_stat(heap: IArray, device: Ref, virt: Ref)
 }
 
 // todo: not sure if we need these unchanged stuff
-define device_rx_all_unchanged(heap, device, virt)
-    device_rx_addr_unchanged(heap, device, virt) &&
-    device_rx_len_unchanged(heap, device, virt)
+define device_rx_all_unchanged(heap, gv, device, virt)
+    device_rx_addr_unchanged(heap, gv, device, virt) &&
+    device_rx_len_unchanged(heap, gv, device, virt)
 
-define device_tx_all_unchanged(heap, device, virt)
-    device_tx_addr_unchanged(heap, device, virt) &&
-    device_tx_len_unchanged(heap, device, virt)
+define device_tx_all_unchanged(heap, gv, device, virt)
+    device_tx_addr_unchanged(heap, gv, device, virt) &&
+    device_tx_len_unchanged(heap, gv, device, virt)
 
-define device_rx_addr_unchanged(heap, device, virt)
-    (unfolding valid_device(heap, device, virt) in unfolding valid_hardware_ring_rx_addr(heap, device, virt) in
+define device_rx_addr_unchanged(heap, gv, device, virt)
+    (unfolding valid_device(heap, gv, device, virt) in unfolding valid_hardware_ring_rx_addr(heap, gv, device, virt) in
         forall i: Int:: {device.hardware_ring_rx_addr[i]}
         i >= 0 && i < hw_capacity ==> device.hardware_ring_rx_addr[i] ==
-        old(unfolding valid_device(heap, device, virt) in unfolding valid_hardware_ring_rx_addr(heap, device, virt) in device.hardware_ring_rx_addr[i]))
+        old(unfolding valid_device(heap, gv, device, virt) in unfolding valid_hardware_ring_rx_addr(heap, gv, device, virt) in device.hardware_ring_rx_addr[i]))
 
-define device_rx_stat_unchanged(heap, device, virt)
-    (unfolding valid_device(heap, device, virt) in unfolding valid_hardware_ring_rx_stat(heap, device, virt) in
+define device_rx_stat_unchanged(heap, gv, device, virt)
+    (unfolding valid_device(heap, gv, device, virt) in unfolding valid_hardware_ring_rx_stat(heap, gv, device, virt) in
         forall i: Int:: {device.hardware_ring_rx_stat[i]}
         i >= 0 && i < hw_capacity ==> device.hardware_ring_rx_stat[i] ==
-        old(unfolding valid_device(heap, device, virt) in unfolding valid_hardware_ring_rx_stat(heap, device, virt) in device.hardware_ring_rx_stat[i]))
+        old(unfolding valid_device(heap, gv, device, virt) in unfolding valid_hardware_ring_rx_stat(heap, gv, device, virt) in device.hardware_ring_rx_stat[i]))
 
-define device_rx_len_unchanged(heap, device, virt)
-    (unfolding valid_device(heap, device, virt) in unfolding valid_hardware_ring_rx_len(heap, device, virt) in
+define device_rx_len_unchanged(heap, gv, device, virt)
+    (unfolding valid_device(heap, gv, device, virt) in unfolding valid_hardware_ring_rx_len(heap, gv, device, virt) in
         forall i: Int:: {device.hardware_ring_rx_len[i]}
         i >= 0 && i < hw_capacity ==> device.hardware_ring_rx_len[i] ==
-        old(unfolding valid_device(heap, device, virt) in unfolding valid_hardware_ring_rx_len(heap, device, virt) in device.hardware_ring_rx_len[i]))
+        old(unfolding valid_device(heap, gv, device, virt) in unfolding valid_hardware_ring_rx_len(heap, gv, device, virt) in device.hardware_ring_rx_len[i]))
 
-define device_tx_addr_unchanged(heap, device, virt)
-    (unfolding valid_device(heap, device, virt) in unfolding valid_hardware_ring_tx_addr(heap, device, virt) in
+define device_tx_addr_unchanged(heap, gv, device, virt)
+    (unfolding valid_device(heap, gv, device, virt) in unfolding valid_hardware_ring_tx_addr(heap, gv, device, virt) in
         forall i: Int:: {device.hardware_ring_tx_addr[i]}
         i >= 0 && i < hw_capacity ==> device.hardware_ring_tx_addr[i] ==
-        old(unfolding valid_device(heap, device, virt) in unfolding valid_hardware_ring_tx_addr(heap, device, virt) in device.hardware_ring_tx_addr[i]))
+        old(unfolding valid_device(heap, gv, device, virt) in unfolding valid_hardware_ring_tx_addr(heap, gv, device, virt) in device.hardware_ring_tx_addr[i]))
 
-define device_tx_stat_unchanged(heap, device, virt)
-    (unfolding valid_device(heap, device, virt) in unfolding valid_hardware_ring_tx_stat(heap, device, virt) in
+define device_tx_stat_unchanged(heap, gv, device, virt)
+    (unfolding valid_device(heap, gv, device, virt) in unfolding valid_hardware_ring_tx_stat(heap, gv, device, virt) in
         forall i: Int:: {device.hardware_ring_tx_stat[i]}
         i >= 0 && i < hw_capacity ==> device.hardware_ring_tx_stat[i] ==
-        old(unfolding valid_device(heap, device, virt) in unfolding valid_hardware_ring_tx_stat(heap, device, virt) in device.hardware_ring_tx_stat[i]))
+        old(unfolding valid_device(heap, gv, device, virt) in unfolding valid_hardware_ring_tx_stat(heap, gv, device, virt) in device.hardware_ring_tx_stat[i]))
 
-define device_tx_len_unchanged(heap, device, virt)
-    (unfolding valid_device(heap, device, virt) in unfolding valid_hardware_ring_tx_len(heap, device, virt) in
+define device_tx_len_unchanged(heap, gv, device, virt)
+    (unfolding valid_device(heap, gv, device, virt) in unfolding valid_hardware_ring_tx_len(heap, gv, device, virt) in
         forall i: Int:: {device.hardware_ring_tx_len[i]}
         i >= 0 && i < hw_capacity ==> device.hardware_ring_tx_len[i] ==
-        old(unfolding valid_device(heap, device, virt) in unfolding valid_hardware_ring_tx_len(heap, device, virt) in device.hardware_ring_tx_len[i]))
+        old(unfolding valid_device(heap, gv, device, virt) in unfolding valid_hardware_ring_tx_len(heap, gv, device, virt) in device.hardware_ring_tx_len[i]))
 
 /* The below methods are pretty much similar to each other.
  * Bascially for stat, len, and addr udpate, we make sure that:
@@ -247,56 +247,56 @@ define device_tx_len_unchanged(heap, device, virt)
 */
 // todo: can we have disjoint address chunks that give the same method?
 method store_hw_ring_rx_addr(heap: IArray, gv: Ref, device: Ref, virt: Ref, address: Int, value: Int)
-    requires valid_device(heap, device, virt)
+    requires valid_device(heap, gv, device, virt)
     requires (address - 4) >= hw_ring_rx_addr && (address - 4) < (hw_ring_rx_addr + hw_ring_rx_size)
     requires (address - 4) % 8 == 0
     requires is_valid_data_addr(value)
     ensures address == old(address)
     ensures value == old(value)
-    ensures valid_device(heap, device, virt)
+    ensures valid_device(heap, gv, device, virt)
     // check that the specified slot in the hardware ring is updated
-    ensures unfolding valid_device(heap, device, virt) in unfolding valid_hardware_ring_rx_addr(heap, device, virt) in
+    ensures unfolding valid_device(heap, gv, device, virt) in unfolding valid_hardware_ring_rx_addr(heap, gv, device, virt) in
         device.hardware_ring_rx_addr[(address - 4 - hw_ring_rx_addr) / hw_descriptor_size] == value
     // check that other slots are not modified
-    ensures device_rx_len_unchanged(heap, device, virt)
-    ensures device_tx_all_unchanged(heap, device, virt)
+    ensures device_rx_len_unchanged(heap, gv, device, virt)
+    ensures device_tx_all_unchanged(heap, gv, device, virt)
 {
-    unfold valid_device(heap, device, virt)
-    unfold valid_hardware_ring_rx_addr(heap, device, virt)
+    unfold valid_device(heap, gv, device, virt)
+    unfold valid_hardware_ring_rx_addr(heap, gv, device, virt)
     var index: Int := (address - 4 - hw_ring_rx_addr) / hw_descriptor_size
     device.hardware_ring_rx_addr := device.hardware_ring_rx_addr[index := value]
-    fold valid_hardware_ring_rx_addr(heap, device, virt)
-    fold valid_device(heap, device, virt)
+    fold valid_hardware_ring_rx_addr(heap, gv, device, virt)
+    fold valid_device(heap, gv, device, virt)
     refute false
 }
 
 method store_hw_ring_tx_addr(heap: IArray, gv: Ref, device: Ref, virt: Ref, address: Int, value: Int)
-    requires valid_device(heap, device, virt)
+    requires valid_device(heap, gv, device, virt)
     requires (address - 4) >= hw_ring_tx_addr && (address - 4) < (hw_ring_tx_addr + hw_ring_tx_size)
     requires (address - 4) % 8 == 0
     requires is_valid_data_addr(value)
     ensures address == old(address)
     ensures value == old(value)
-    ensures valid_device(heap, device, virt)
+    ensures valid_device(heap, gv, device, virt)
     // check that the specified slot in the hardware ring is updated
-    ensures unfolding valid_device(heap, device, virt) in
-        unfolding valid_hardware_ring_tx_addr(heap, device, virt) in
+    ensures unfolding valid_device(heap, gv, device, virt) in
+        unfolding valid_hardware_ring_tx_addr(heap, gv, device, virt) in
         device.hardware_ring_tx_addr[(address - 4 - hw_ring_tx_addr) / hw_descriptor_size] == value
     // check that other slots are not modified
-    ensures device_tx_len_unchanged(heap, device, virt)
-    ensures device_rx_all_unchanged(heap, device, virt)
+    ensures device_tx_len_unchanged(heap, gv, device, virt)
+    ensures device_rx_all_unchanged(heap, gv, device, virt)
 {
-    unfold valid_device(heap, device, virt)
-    unfold valid_hardware_ring_tx_addr(heap, device, virt)
+    unfold valid_device(heap, gv, device, virt)
+    unfold valid_hardware_ring_tx_addr(heap, gv, device, virt)
     var index: Int := (address - 4 - hw_ring_tx_addr) / hw_descriptor_size
     device.hardware_ring_tx_addr := device.hardware_ring_tx_addr[index := value]
-    fold valid_hardware_ring_tx_addr(heap, device, virt)
-    fold valid_device(heap, device, virt)
+    fold valid_hardware_ring_tx_addr(heap, gv, device, virt)
+    fold valid_device(heap, gv, device, virt)
     refute false
 }
 
 method store_hw_ring_rx_stat(heap: IArray, gv: Ref, device: Ref, virt: Ref, address: Int, value: Int)
-    requires valid_device(heap, device, virt)
+    requires valid_device(heap, gv, device, virt)
     requires (address - 3) >= hw_ring_rx_addr && (address - 3) < (hw_ring_rx_addr + hw_ring_rx_size)
     requires (address - 3) % 8 == 0
     requires is_valid_rx_stat(value)
@@ -305,47 +305,47 @@ method store_hw_ring_rx_stat(heap: IArray, gv: Ref, device: Ref, virt: Ref, addr
     requires (((address - 3 - hw_ring_rx_addr) / hw_descriptor_size) == (hw_capacity - 1)) <==> is_WRAP(value)
     ensures address == old(address)
     ensures value == old(value)
-    ensures valid_device(heap, device, virt)
+    ensures valid_device(heap, gv, device, virt)
     // check that the specified slot in the hardware ring is updated
-    ensures unfolding valid_device(heap, device, virt) in
-        unfolding valid_hardware_ring_rx_stat(heap, device, virt) in
+    ensures unfolding valid_device(heap, gv, device, virt) in
+        unfolding valid_hardware_ring_rx_stat(heap, gv, device, virt) in
         device.hardware_ring_rx_stat[(address - 3 - hw_ring_rx_addr) / hw_descriptor_size] == value
     // check that other slots are not modified
-    ensures device_rx_addr_unchanged(heap, device, virt)
-    ensures device_rx_len_unchanged(heap, device, virt)
-    ensures device_tx_all_unchanged(heap, device, virt)
+    ensures device_rx_addr_unchanged(heap, gv, device, virt)
+    ensures device_rx_len_unchanged(heap, gv, device, virt)
+    ensures device_tx_all_unchanged(heap, gv, device, virt)
 {
-    unfold valid_device(heap, device, virt)
-    unfold valid_hardware_ring_rx_stat(heap, device, virt)
+    unfold valid_device(heap, gv, device, virt)
+    unfold valid_hardware_ring_rx_stat(heap, gv, device, virt)
     var index: Int := (address - 3 - hw_ring_rx_addr) / hw_descriptor_size
     device.hardware_ring_rx_stat := device.hardware_ring_rx_stat[index := value]
-    fold valid_hardware_ring_rx_stat(heap, device, virt)
-    fold valid_device(heap, device, virt)
+    fold valid_hardware_ring_rx_stat(heap, gv, device, virt)
+    fold valid_device(heap, gv, device, virt)
     refute false
 }
 
 method load_hw_ring_rx_stat(heap: IArray, gv: Ref, device: Ref, virt: Ref, address: Int)
     returns (retval: Int)
-    requires valid_device(heap, device, virt)
+    requires valid_device(heap, gv, device, virt)
     requires (address - 3) % 8 == 0
     requires (address - 3) >= hw_ring_rx_addr && (address - 3) < (hw_ring_rx_addr + hw_ring_rx_size)
-    ensures valid_device(heap, device, virt)
+    ensures valid_device(heap, gv, device, virt)
     ensures address == old(address)
-    ensures device_rx_all_unchanged(heap, device, virt)
-    ensures device_tx_all_unchanged(heap, device, virt)
-    ensures retval == unfolding valid_device(heap, device, virt) in
-        unfolding valid_hardware_ring_rx_stat(heap, device, virt) in
+    ensures device_rx_all_unchanged(heap, gv, device, virt)
+    ensures device_tx_all_unchanged(heap, gv, device, virt)
+    ensures retval == unfolding valid_device(heap, gv, device, virt) in
+        unfolding valid_hardware_ring_rx_stat(heap, gv, device, virt) in
         device.hardware_ring_rx_stat[(address - 3 - hw_ring_rx_addr) / hw_descriptor_size]
     ensures is_valid_rx_stat(retval)
 {
-    retval := unfolding valid_device(heap, device, virt) in
-        unfolding valid_hardware_ring_rx_stat(heap, device, virt) in
+    retval := unfolding valid_device(heap, gv, device, virt) in
+        unfolding valid_hardware_ring_rx_stat(heap, gv, device, virt) in
         device.hardware_ring_rx_stat[(address - 3 - hw_ring_rx_addr) / hw_descriptor_size]
     refute false
 }
 
 method store_hw_ring_tx_stat(heap: IArray, gv: Ref, device: Ref, virt: Ref, address: Int, value: Int)
-    requires valid_device(heap, device, virt)
+    requires valid_device(heap, gv, device, virt)
     requires (address - 3) >= hw_ring_tx_addr && (address - 3) < (hw_ring_tx_addr + hw_ring_tx_size)
     requires (address - 3) % 8 == 0
     requires is_valid_tx_stat(value)
@@ -353,86 +353,86 @@ method store_hw_ring_tx_stat(heap: IArray, gv: Ref, device: Ref, virt: Ref, addr
     requires (((address - 3 - hw_ring_tx_addr) / hw_descriptor_size) == (hw_capacity - 1)) <==> is_WRAP(value)
     ensures address == old(address)
     ensures value == old(value)
-    ensures valid_device(heap, device, virt)
-    ensures unfolding valid_device(heap, device, virt) in
-        unfolding valid_hardware_ring_tx_stat(heap, device, virt) in
+    ensures valid_device(heap, gv, device, virt)
+    ensures unfolding valid_device(heap, gv, device, virt) in
+        unfolding valid_hardware_ring_tx_stat(heap, gv, device, virt) in
         device.hardware_ring_tx_stat[(address - 3 - hw_ring_tx_addr) / hw_descriptor_size] == value
-    ensures device_tx_addr_unchanged(heap, device, virt)
-    ensures device_tx_len_unchanged(heap, device, virt)
-    ensures device_rx_all_unchanged(heap, device, virt)
+    ensures device_tx_addr_unchanged(heap, gv, device, virt)
+    ensures device_tx_len_unchanged(heap, gv, device, virt)
+    ensures device_rx_all_unchanged(heap, gv, device, virt)
 {
-    unfold valid_device(heap, device, virt)
-    unfold valid_hardware_ring_tx_stat(heap, device, virt)
+    unfold valid_device(heap, gv, device, virt)
+    unfold valid_hardware_ring_tx_stat(heap, gv, device, virt)
     var index: Int := (address - 3 - hw_ring_tx_addr) / hw_descriptor_size
     device.hardware_ring_tx_stat := device.hardware_ring_tx_stat[index := value]
-    fold valid_hardware_ring_tx_stat(heap, device, virt)
-    fold valid_device(heap, device, virt)
+    fold valid_hardware_ring_tx_stat(heap, gv, device, virt)
+    fold valid_device(heap, gv, device, virt)
     refute false
 }
 
 method load_hw_ring_tx_stat(heap: IArray, gv: Ref, device: Ref, virt: Ref, address: Int)
     returns (retval: Int)
-    requires valid_device(heap, device, virt)
+    requires valid_device(heap, gv, device, virt)
     requires (address - 3) % 8 == 0
     requires (address - 3) >= hw_ring_tx_addr && (address - 3) < (hw_ring_tx_addr + hw_ring_tx_size)
-    ensures valid_device(heap, device, virt)
+    ensures valid_device(heap, gv, device, virt)
     ensures address == old(address)
-    ensures device_rx_all_unchanged(heap, device, virt)
-    ensures device_tx_all_unchanged(heap, device, virt)
-    ensures retval == unfolding valid_device(heap, device, virt) in
-        unfolding valid_hardware_ring_tx_stat(heap, device, virt) in
+    ensures device_rx_all_unchanged(heap, gv, device, virt)
+    ensures device_tx_all_unchanged(heap, gv, device, virt)
+    ensures retval == unfolding valid_device(heap, gv, device, virt) in
+        unfolding valid_hardware_ring_tx_stat(heap, gv, device, virt) in
         device.hardware_ring_tx_stat[(address - 3 - hw_ring_tx_addr) / hw_descriptor_size]
     ensures is_valid_tx_stat(retval)
 {
-    retval := unfolding valid_device(heap, device, virt) in
-        unfolding valid_hardware_ring_tx_stat(heap, device, virt) in
+    retval := unfolding valid_device(heap, gv, device, virt) in
+        unfolding valid_hardware_ring_tx_stat(heap, gv, device, virt) in
         device.hardware_ring_tx_stat[(address - 3 - hw_ring_tx_addr) / hw_descriptor_size]
     refute false
 }
 
 method load_hw_ring_rx_len(heap: IArray, gv: Ref, device: Ref, virt: Ref, address: Int)
     returns (retval: Int)
-    requires valid_device(heap, device, virt)
+    requires valid_device(heap, gv, device, virt)
     requires address >= hw_ring_rx_addr && address < (hw_ring_rx_addr + hw_ring_rx_size)
     requires address % 8 == 0
-    ensures valid_device(heap, device, virt)
-    ensures device_rx_all_unchanged(heap, device, virt)
-    ensures device_tx_all_unchanged(heap, device, virt)
+    ensures valid_device(heap, gv, device, virt)
+    ensures device_rx_all_unchanged(heap, gv, device, virt)
+    ensures device_tx_all_unchanged(heap, gv, device, virt)
     ensures address == old(address)
-    ensures retval == unfolding valid_device(heap, device, virt) in
-        unfolding valid_hardware_ring_rx_len(heap, device, virt) in
+    ensures retval == unfolding valid_device(heap, gv, device, virt) in
+        unfolding valid_hardware_ring_rx_len(heap, gv, device, virt) in
         device.hardware_ring_rx_len[(address - hw_ring_rx_addr) / hw_descriptor_size]
     ensures is_valid_data_len(retval)
 {
     // todo: load the correspoding field
-    retval := unfolding valid_device(heap, device, virt) in
-        unfolding valid_hardware_ring_rx_len(heap, device, virt) in
+    retval := unfolding valid_device(heap, gv, device, virt) in
+        unfolding valid_hardware_ring_rx_len(heap, gv, device, virt) in
         device.hardware_ring_rx_len[(address - hw_ring_rx_addr) / hw_descriptor_size]
     refute false
 }
 
 method store_hw_ring_tx_len(heap: IArray, gv: Ref, device: Ref, virt: Ref, address: Int, value: Int)
-    requires valid_device(heap, device, virt)
+    requires valid_device(heap, gv, device, virt)
     requires address >= hw_ring_tx_addr && address < (hw_ring_tx_addr + hw_ring_tx_size)
     requires address % 8 == 0
     requires is_valid_data_len(value)
     ensures address == old(address)
     ensures value == old(value)
-    ensures valid_device(heap, device, virt)
+    ensures valid_device(heap, gv, device, virt)
     // check that the specified slot in the hardware ring is updated
-    ensures unfolding valid_device(heap, device, virt) in
-        unfolding valid_hardware_ring_tx_len(heap, device, virt) in
+    ensures unfolding valid_device(heap, gv, device, virt) in
+        unfolding valid_hardware_ring_tx_len(heap, gv, device, virt) in
         device.hardware_ring_tx_len[(address - hw_ring_tx_addr) / hw_descriptor_size] == value
     // check that other slots are not modified
-    ensures device_tx_addr_unchanged(heap, device, virt)
-    ensures device_rx_all_unchanged(heap, device, virt)
+    ensures device_tx_addr_unchanged(heap, gv, device, virt)
+    ensures device_rx_all_unchanged(heap, gv, device, virt)
 {
-    unfold valid_device(heap, device, virt)
-    unfold valid_hardware_ring_tx_len(heap, device, virt)
+    unfold valid_device(heap, gv, device, virt)
+    unfold valid_hardware_ring_tx_len(heap, gv, device, virt)
     var index: Int := (address - hw_ring_tx_addr) / hw_descriptor_size
     device.hardware_ring_tx_len := device.hardware_ring_tx_len[index := value]
-    fold valid_hardware_ring_tx_len(heap, device, virt)
-    fold valid_device(heap, device, virt)
+    fold valid_hardware_ring_tx_len(heap, gv, device, virt)
+    fold valid_device(heap, gv, device, virt)
     refute false
 }
 
@@ -440,10 +440,10 @@ method store_hw_ring_reserve(heap: IArray, gv: Ref, device: Ref, virt: Ref, addr
     requires ((address - 2) >= hw_ring_rx_addr && (address - 2) < (hw_ring_tx_addr + hw_ring_tx_size))
     requires (address - 2) % 8 == 0
     requires value == 0
-    requires valid_device(heap, device, virt)
-    ensures valid_device(heap, device, virt)
-    ensures device_rx_all_unchanged(heap, device, virt)
-    ensures device_tx_all_unchanged(heap, device, virt)
+    requires valid_device(heap, gv, device, virt)
+    ensures valid_device(heap, gv, device, virt)
+    ensures device_rx_all_unchanged(heap, gv, device, virt)
+    ensures device_tx_all_unchanged(heap, gv, device, virt)
 {
     refute false
 }
@@ -455,12 +455,12 @@ define TDAR_TDAR        16777216    // 1 << 24
 method store_RDAR(heap: IArray, gv: Ref, device: Ref, virt: Ref, address: Int, value: Int)
     requires address == (REG_BASE + RDAR_offset)
     requires value == RDAR_RDAR
-    requires valid_device(heap, device, virt)
+    requires valid_device(heap, gv, device, virt)
     ensures address == old(address)
     ensures value == old(value)
-    ensures valid_device(heap, device, virt)
-    ensures device_rx_all_unchanged(heap, device, virt)
-    ensures device_tx_all_unchanged(heap, device, virt)
+    ensures valid_device(heap, gv, device, virt)
+    ensures device_rx_all_unchanged(heap, gv, device, virt)
+    ensures device_tx_all_unchanged(heap, gv, device, virt)
 {
     refute false
 }
@@ -468,12 +468,12 @@ method store_RDAR(heap: IArray, gv: Ref, device: Ref, virt: Ref, address: Int, v
 method store_TDAR(heap: IArray, gv: Ref, device: Ref, virt: Ref, address: Int, value: Int)
     requires address == (REG_BASE + TDAR_offset)
     requires value == TDAR_TDAR
-    requires valid_device(heap, device, virt)
+    requires valid_device(heap, gv, device, virt)
     ensures address == old(address)
     ensures value == old(value)
-    ensures valid_device(heap, device, virt)
-    ensures device_rx_all_unchanged(heap, device, virt)
-    ensures device_tx_all_unchanged(heap, device, virt)
+    ensures valid_device(heap, gv, device, virt)
+    ensures device_rx_all_unchanged(heap, gv, device, virt)
+    ensures device_tx_all_unchanged(heap, gv, device, virt)
 {
     refute false
 }
@@ -506,12 +506,12 @@ function is_EIR_TXF(eir: Int): Bool
 method store_EIR(heap: IArray, gv: Ref, device: Ref, virt: Ref, address: Int, value: Int)
     requires address == (REG_BASE + EIR_offset)
     requires value == IRQ_MASK
-    requires valid_device(heap, device, virt)
+    requires valid_device(heap, gv, device, virt)
     ensures address == old(address)
     ensures value == old(value)
-    ensures valid_device(heap, device, virt)
-    ensures device_rx_all_unchanged(heap, device, virt)
-    ensures device_tx_all_unchanged(heap, device, virt)
+    ensures valid_device(heap, gv, device, virt)
+    ensures device_rx_all_unchanged(heap, gv, device, virt)
+    ensures device_tx_all_unchanged(heap, gv, device, virt)
 {
     refute false
 }
@@ -519,12 +519,12 @@ method store_EIR(heap: IArray, gv: Ref, device: Ref, virt: Ref, address: Int, va
 method load_EIR(heap: IArray, gv: Ref, device: Ref, virt: Ref, address: Int)
     returns (retval: Int)
     requires address == (REG_BASE + EIR_offset)
-    requires valid_device(heap, device, virt)
+    requires valid_device(heap, gv, device, virt)
     ensures bounded32(retval)
     ensures address == old(address)
-    ensures valid_device(heap, device, virt)
-    ensures device_rx_all_unchanged(heap, device, virt)
-    ensures device_tx_all_unchanged(heap, device, virt)
+    ensures valid_device(heap, gv, device, virt)
+    ensures device_rx_all_unchanged(heap, gv, device, virt)
+    ensures device_tx_all_unchanged(heap, gv, device, virt)
 {
     retval := ND_bounded32()
     refute false
