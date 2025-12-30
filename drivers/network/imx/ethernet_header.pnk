@@ -104,11 +104,6 @@
 #define NET_TX_FREE_BASE 		1234767
 #define NET_TX_ACTIVE_BASE 		1234867
 
-/@ shared rw u32 net_rx_free[NET_RX_FREE_BASE..NET_RX_FREE_BASE+QUEUE_LENGTH] @/
-/@ shared rw u32 net_rx_active[NET_RX_ACTIVE_BASE..NET_RX_ACTIVE_BASE+QUEUE_LENGTH] @/
-/@ shared rw u32 net_tx_free[NET_TX_FREE_BASE..NET_TX_FREE_BASE+QUEUE_LENGTH] @/
-/@ shared rw u32 net_tx_active[NET_TX_ACTIVE_BASE..NET_TX_ACTIVE_BASE+QUEUE_LENGTH] @/
-
 #define VALID_QUEUE_PTR(x) ( \
 	x == NET_RX_FREE_BASE   || \
 	x == NET_RX_ACTIVE_BASE || \
