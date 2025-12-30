@@ -55,6 +55,7 @@
 
 #define ETH_REG                 pnk_mem(0)
 
+/@ extern predicate valid_device @/
 /@ extern predicate valid_hardware_ring_rx_addr @/
 /@ extern predicate valid_hardware_ring_rx_len @/
 /@ extern predicate valid_hardware_ring_tx_addr @/
@@ -120,18 +121,27 @@ inline fun tx_hw_ring_full() {
 
 inline fun set_rdar()
 {
+  /@ requires valid_device() @/
+  /@ ensures valid_device() @/
+
   !st32 ETH_REG + ETH_RDAR_OFF, RDAR_RDAR;
   return 0;
 }
 
 inline fun set_tdar()
 {
+  /@ requires valid_device() @/
+  /@ ensures valid_device() @/
+
   !st32  ETH_REG + ETH_TDAR_OFF, TDAR_TDAR;
   return 0;
 }
 
 inline fun get_eir_status()
 {
+  /@ requires valid_device() @/
+  /@ ensures valid_device() @/
+
   var eir = 0;
   !ld32 eir, ETH_REG + ETH_EIR_OFF;
   return eir;
@@ -139,18 +149,27 @@ inline fun get_eir_status()
 
 inline fun get_eir()
 {
+  /@ requires valid_device() @/
+  /@ ensures valid_device() @/
+
   var 1 eir_full = get_eir_status();
   return eir_full & IRQ_MASK;
 }
 
 inline fun set_eir(1 eir)
 {
+  /@ requires valid_device() @/
+  /@ ensures valid_device() @/
+
   !st32 ETH_REG + ETH_EIR_OFF, eir;
   return 0;
 }
 
 inline fun rx_update_ring_slot(1 ring_addr, 1 idx, 1 phys, 1 len, 1 stat)
 {
+  /@ requires valid_device() @/
+  /@ ensures valid_device() @/
+
   var descr = HW_RX_DESCR + idx * DESCR_LEN;        
   if (idx + 1 == HW_RX_CAPACITY) {
     stat = stat | WRAP;
@@ -168,6 +187,9 @@ inline fun rx_update_ring_slot(1 ring_addr, 1 idx, 1 phys, 1 len, 1 stat)
 
 inline fun tx_update_ring_slot(1 ring_addr, 1 idx, 1 phys, 1 len, 1 stat)
 {
+  /@ requires valid_device() @/
+  /@ ensures valid_device() @/
+
   var descr = HW_TX_DESCR + idx * DESCR_LEN;        
   if (idx + 1 == HW_TX_CAPACITY) {
     stat = stat | WRAP;
@@ -185,6 +207,9 @@ inline fun tx_update_ring_slot(1 ring_addr, 1 idx, 1 phys, 1 len, 1 stat)
 
 fun rx_provide()
 {
+  /@ requires valid_device() @/
+  /@ ensures valid_device() @/
+
   var reprocess = true;
 
   while (reprocess)
@@ -226,6 +251,9 @@ fun rx_provide()
 
 fun rx_return()
 {
+  /@ requires valid_device() @/
+  /@ ensures valid_device() @/
+
   var packets_transferred = false;
 
   var 1 empty = rx_hw_ring_empty();
@@ -265,6 +293,9 @@ fun rx_return()
 
 fun tx_provide()
 {
+  /@ requires valid_device() @/
+  /@ ensures valid_device() @/
+
   var reprocess = true;
 
   while (reprocess)
@@ -304,6 +335,9 @@ fun tx_provide()
 
 fun tx_return()
 {
+  /@ requires valid_device() @/
+  /@ ensures valid_device() @/
+
   var tx_free = NET_TX_FREE;
   var tx_descr = HW_TX_DESCR;
   var tx_queue_cap = NET_TX_CAPACITY;
@@ -343,13 +377,10 @@ fun tx_return()
   return 0;
 }
 
-fun main() {
-  rx_provide();
-  tx_provide();
-  return 0;
-}
-
 fun handle_irq() {
+  /@ requires valid_device() @/
+  /@ ensures valid_device() @/
+
   var 1 eir_full = get_eir_status();
   var eir = eir_full & IRQ_MASK;
   set_eir(eir);
@@ -373,6 +404,9 @@ fun handle_irq() {
 
 export fun notified(1 ch)
 {
+  /@ requires valid_device() @/
+  /@ ensures valid_device() @/
+
   if (ch == IRQ_CH) {
     handle_irq();
     /*
