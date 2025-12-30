@@ -11,8 +11,8 @@ inline fun net_queue_empty(1 queue_ptr, 1 capacity)
 
   var tail = 0;
   var head = 0;
-  !ld32 tail, queue_ptr + TAIL_OFFSET;
-  !ld32 head, queue_ptr + HEAD_OFFSET;
+  !ld16 tail, queue_ptr + TAIL_OFFSET;
+  !ld16 head, queue_ptr + HEAD_OFFSET;
 
   return (tail - head) == 0;
 }
@@ -23,8 +23,8 @@ inline fun net_queue_full(1 queue_ptr, 1 capacity)
 
   var tail = 0;
   var head = 0;
-  !ld32 tail, queue_ptr + TAIL_OFFSET;
-  !ld32 head, queue_ptr + HEAD_OFFSET;
+  !ld16 tail, queue_ptr + TAIL_OFFSET;
+  !ld16 head, queue_ptr + HEAD_OFFSET;
 
   return (tail - head) == capacity;
 }
@@ -35,7 +35,7 @@ inline fun net_enqueue(1 queue_ptr, 1 io_addr, 1 len, 1 capacity)
 
   /* capacity must be a power of 2 */
   var tail = 0;
-  !ld32 tail, queue_ptr + TAIL_OFFSET;
+  !ld16 tail, queue_ptr + TAIL_OFFSET;
 
   var mod_tail = tail & (capacity - 1);
   var buff_addr = queue_ptr + BUFFERS_OFFSET + mod_tail * NET_BUFF_DESC_SIZE;
@@ -58,7 +58,7 @@ inline fun {1,1} net_dequeue(1 queue_ptr, 1 capacity)
 
   /* capacity must be a power of 2 */
   var head = 0;
-  !ld32 head, queue_ptr + HEAD_OFFSET;
+  !ld16 head, queue_ptr + HEAD_OFFSET;
 
   var mod_head = head & (capacity - 1);
   var buff_addr = queue_ptr + BUFFERS_OFFSET + mod_head * NET_BUFF_DESC_SIZE;

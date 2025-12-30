@@ -15,16 +15,16 @@
 
 typedef struct net_buff_desc {
     /* offset of buffer within buffer memory region or io address of buffer */
-    uint32_t io_or_offset;
+    uint64_t io_or_offset;
     /* length of data inside buffer */
-    uint32_t len;
+    uint16_t len;
 } net_buff_desc_t;
 
 typedef struct net_queue {
     /* index to insert at */
-    uint32_t tail;
+    uint16_t tail;
     /* index to remove from */
-    uint32_t head;
+    uint16_t head;
     /* flag to indicate whether consumer requires signalling */
     uint32_t consumer_signalled;
     /* buffer descripter array */
