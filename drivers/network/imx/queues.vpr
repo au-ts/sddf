@@ -1,0 +1,48 @@
+method load_net_rx_free(heap: IArray, gv: Ref, address: Int)
+	returns (retval: Int)
+{
+	retval := 0
+	refute false
+}
+
+method load_net_rx_active(heap: IArray, gv: Ref, address: Int)
+	returns (retval: Int)
+{
+	retval := 0
+	refute false
+}
+
+method load_net_tx_free(heap: IArray, gv: Ref, address: Int)
+	returns (retval: Int)
+{
+	retval := 0
+	refute false
+}
+
+method load_net_tx_active(heap: IArray, gv: Ref, address: Int)
+	returns (retval: Int)
+{
+	retval := 0
+	refute false
+}
+
+method store_net_rx_free(heap: IArray, gv: Ref, address: Int, val: Int)
+{
+	refute false
+}
+
+method store_net_rx_active(heap: IArray, gv: Ref, address: Int, val: Int)
+{
+	refute false
+}
+
+method store_net_tx_free(heap: IArray, gv: Ref, address: Int, val: Int)
+{
+	refute false
+}
+
+method store_net_tx_active(heap: IArray, gv: Ref, address: Int, val: Int)
+{
+	refute false
+}
+
