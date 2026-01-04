@@ -99,14 +99,27 @@
 /* It does not matter what these values are. The location of these is
    externally defined somewhere in RAM, so we can choose whatever we want
    in main memory. */
-#define NET_RX_FREE_BASE 		1234567
-#define NET_RX_ACTIVE_BASE 		1234667
-#define NET_TX_FREE_BASE 		1234767
-#define NET_TX_ACTIVE_BASE 		1234867
+#define RX_FREE_BASE 		1234567
+#define RX_ACTIVE_BASE 		1234667
+#define TX_FREE_BASE 		1234767
+#define TX_ACTIVE_BASE 		1234867
+
+/@ shared rw u16 rx_free_tail[RX_FREE_BASE+TAIL_OFFSET..RX_FREE_BASE+TAIL_OFFSET+2] @/
+/@ shared r u16 rx_free_head[RX_FREE_BASE+HEAD_OFFSET..RX_FREE_BASE+HEAD_OFFSET+2] @/
+/@ shared r u32 rx_free_consumer_signalled[RX_FREE_BASE+CONSUMER_SIGNALLED_OFFSET..RX_FREE_BASE+CONSUMER_SIGNALLED_OFFSET+4] @/
+/@ shared r u16 rx_active_tail[RX_ACTIVE_BASE+TAIL_OFFSET..RX_ACTIVE_BASE+TAIL_OFFSET+2] @/
+/@ shared rw u16 rx_active_head[RX_ACTIVE_BASE+HEAD_OFFSET..RX_ACTIVE_BASE+HEAD_OFFSET+2] @/
+/@ shared w u32 rx_active_consumer_signalled[RX_ACTIVE_BASE+CONSUMER_SIGNALLED_OFFSET..RX_ACTIVE_BASE+CONSUMER_SIGNALLED_OFFSET+4] @/
+/@ shared r u16 tx_free_tail[TX_FREE_BASE+TAIL_OFFSET..TX_FREE_BASE+TAIL_OFFSET+2] @/
+/@ shared rw u16 tx_free_head[TX_FREE_BASE+HEAD_OFFSET..TX_FREE_BASE+HEAD_OFFSET+2] @/
+/@ shared w u32 tx_free_consumer_signalled[TX_FREE_BASE+CONSUMER_SIGNALLED_OFFSET..TX_FREE_BASE+CONSUMER_SIGNALLED_OFFSET+4] @/
+/@ shared rw u16 tx_active_tail[TX_ACTIVE_BASE+TAIL_OFFSET..TX_ACTIVE_BASE+TAIL_OFFSET+2] @/
+/@ shared r u16 tx_active_head[TX_ACTIVE_BASE+HEAD_OFFSET..TX_ACTIVE_BASE+HEAD_OFFSET+2] @/
+/@ shared r u32 tx_active_consumer_signalled[TX_ACTIVE_BASE+CONSUMER_SIGNALLED_OFFSET..TX_ACTIVE_BASE+CONSUMER_SIGNALLED_OFFSET+4] @/
 
 #define VALID_QUEUE_PTR(x) ( \
-	x == NET_RX_FREE_BASE   || \
-	x == NET_RX_ACTIVE_BASE || \
-	x == NET_TX_FREE_BASE   || \
-	x == NET_TX_ACTIVE_BASE    \
+	x == RX_FREE_BASE   || \
+	x == RX_ACTIVE_BASE || \
+	x == TX_FREE_BASE   || \
+	x == TX_ACTIVE_BASE    \
 )

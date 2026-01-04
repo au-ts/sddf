@@ -1,0 +1,350 @@
+define RX_FREE_BASE 		1234567
+define RX_ACTIVE_BASE 		1234667
+define TX_FREE_BASE 		1234767
+define TX_ACTIVE_BASE 		1234867
+
+define TAIL_OFFSET               0
+define HEAD_OFFSET               2
+define CONSUMER_SIGNALLED_OFFSET 4
+
+define RX_QUEUE_CAPACITY   512
+define TX_QUEUE_CAPACITY   1024
+
+define TX_CH   1
+define RX_CH   2
+
+field rx_free: Ref
+field rx_active: Ref
+field tx_free: Ref
+field tx_active: Ref
+field rx_notified: Int
+field tx_notified: Int
+
+/* Top level (default) virtualiser predicate */
+predicate valid_virt(heap: IArray, virt: Ref)
+{
+  acc(virt.rx_free) && acc(virt.rx_active) && acc(virt.tx_free) && acc(virt.tx_active) &&
+  acc(virt.rx_notified) && acc(virt.tx_notified) &&
+  valid_net_queue(heap, virt, virt.rx_free, RX_QUEUE_CAPACITY) &&
+  valid_net_queue(heap, virt, virt.rx_active, RX_QUEUE_CAPACITY) &&
+  valid_net_queue(heap, virt, virt.tx_free, TX_QUEUE_CAPACITY) &&
+  valid_net_queue(heap, virt, virt.tx_active, TX_QUEUE_CAPACITY)
+}
+
+method microkit_notify(heap: IArray, virt: Ref, x1: Int, x2: Int, x3: Int, x4: Int) 
+  requires acc(virt.rx_notified) && acc(virt.tx_notified)
+  requires (x1 == 0) && (x3 == 0) && (x4 == 0)
+  requires (x2 == RX_CH) || (x2 == TX_CH)
+  ensures acc(virt.rx_notified) && acc(virt.tx_notified)
+  ensures (x2 == RX_CH) ==> (virt.rx_notified == old(virt.rx_notified) + 1)
+  ensures (x2 == TX_CH) ==> (virt.tx_notified == old(virt.tx_notified) + 1)
+{
+  if (x2 == RX_CH) {
+    virt.rx_notified := virt.rx_notified + 1
+  } elseif (x2 == TX_CH) {
+    virt.tx_notified := virt.tx_notified + 1
+  } else {assert false}
+  refute false
+}
+
+/////////////////////// Generic sDDF network shared queue model (shared with virtuliser PDs)
+field net_tail: Int
+field net_head: Int
+field net_signal: Bool
+field n_enqueue_dequeue: Int
+
+predicate valid_net_queue(heap: IArray, virt: Ref, queue: Ref, capacity: Int)
+{
+  acc(queue.net_tail) && acc(queue.net_head) && acc(queue.net_signal) &&
+  acc(queue.n_enqueue_dequeue) &&
+  (capacity == RX_QUEUE_CAPACITY || capacity == TX_QUEUE_CAPACITY) &&
+  bounded16(queue.net_tail) &&
+  bounded16(queue.net_head)
+}
+
+/////////////////////// Helper macros
+define queue_field(queue_name, capacity, field_)
+  unfolding valid_net_queue(heap, gv, gv.queue_name, capacity) in gv.queue_name.field_
+
+define queue_field_unchanged(queue_name, capacity, field_)
+  unchanged(queue_field(queue_name, capacity, field_))
+
+define queue_unchanged(queue_name, capacity)
+ queue_field_unchanged(queue_name, capacity, net_tail) &&
+  queue_field_unchanged(queue_name, capacity, net_head) &&
+  queue_field_unchanged(queue_name, capacity, net_signal) &&
+  queue_field_unchanged(queue_name, capacity, n_enqueue_dequeue)
+
+/////////////////////// RX_FREE queue
+method store_rx_free_tail(heap: IArray, gv: Ref, address: Int, value: Int)
+  requires acc(gv.rx_free)
+  requires valid_net_queue(heap, gv, gv.rx_free, RX_QUEUE_CAPACITY)
+  requires address == RX_FREE_BASE + TAIL_OFFSET
+  requires bounded16(value)
+  ensures acc(gv.rx_free)
+  ensures valid_net_queue(heap, gv, gv.rx_free, RX_QUEUE_CAPACITY)
+  ensures queue_field_unchanged(rx_free, RX_QUEUE_CAPACITY, net_signal)
+  ensures queue_field(rx_free, RX_QUEUE_CAPACITY, n_enqueue_dequeue) == old(queue_field(rx_free, RX_QUEUE_CAPACITY, n_enqueue_dequeue)) + 1
+{
+  unfold valid_net_queue(heap, gv, gv.rx_free, RX_QUEUE_CAPACITY)
+  gv.rx_free.net_tail := value
+  gv.rx_free.n_enqueue_dequeue := gv.rx_free.n_enqueue_dequeue + 1
+  fold valid_net_queue(heap, gv, gv.rx_free, RX_QUEUE_CAPACITY)
+}
+
+method load_rx_free_tail(heap: IArray, gv: Ref, address: Int)
+  returns (retval: Int)
+  requires acc(gv.rx_free)
+  requires valid_net_queue(heap, gv, gv.rx_free, RX_QUEUE_CAPACITY)
+  requires address == RX_FREE_BASE + TAIL_OFFSET
+  ensures acc(gv.rx_free)
+  ensures valid_net_queue(heap, gv, gv.rx_free, RX_QUEUE_CAPACITY)
+  ensures retval == queue_field(rx_free, RX_QUEUE_CAPACITY, net_tail)
+  ensures queue_unchanged(rx_free, RX_QUEUE_CAPACITY)
+{
+    retval := queue_field(rx_free, RX_QUEUE_CAPACITY, net_tail)
+    refute false
+}
+
+method load_rx_free_head(heap: IArray, gv: Ref, address: Int)
+  returns (retval: Int)
+  requires acc(gv.rx_free)
+  requires valid_net_queue(heap, gv, gv.rx_free, RX_QUEUE_CAPACITY)
+  requires address == RX_FREE_BASE + HEAD_OFFSET
+  ensures acc(gv.rx_free)
+  ensures valid_net_queue(heap, gv, gv.rx_free, RX_QUEUE_CAPACITY)
+  ensures retval == queue_field(rx_free, RX_QUEUE_CAPACITY, net_head)
+  ensures queue_unchanged(rx_free, RX_QUEUE_CAPACITY)
+{
+    retval := queue_field(rx_free, RX_QUEUE_CAPACITY, net_head)
+    refute false
+}
+
+method load_rx_free_consumer_signalled(heap: IArray, gv: Ref, address: Int)
+  returns (retval: Int)
+  requires acc(gv.rx_free)
+  requires valid_net_queue(heap, gv, gv.rx_free, RX_QUEUE_CAPACITY)
+  requires address == RX_FREE_BASE + CONSUMER_SIGNALLED_OFFSET
+  ensures acc(gv.rx_free)
+  ensures valid_net_queue(heap, gv, gv.rx_free, RX_QUEUE_CAPACITY)
+  ensures retval == (queue_field(rx_free, RX_QUEUE_CAPACITY, net_signal) ? 1 : 0)
+  ensures queue_unchanged(rx_free, RX_QUEUE_CAPACITY)
+{
+    retval := queue_field(rx_free, RX_QUEUE_CAPACITY, net_signal) ? 1 : 0
+    refute false
+}
+
+/////////////////////// RX_ACTIVE queue
+method load_rx_active_tail(heap: IArray, gv: Ref, address: Int)
+  returns (retval: Int)
+  requires acc(gv.rx_active)
+  requires valid_net_queue(heap, gv, gv.rx_active, RX_QUEUE_CAPACITY)
+  requires address == RX_ACTIVE_BASE + TAIL_OFFSET
+  ensures acc(gv.rx_active)
+  ensures valid_net_queue(heap, gv, gv.rx_active, RX_QUEUE_CAPACITY)
+  ensures retval == queue_field(rx_active, RX_QUEUE_CAPACITY, net_tail)
+  ensures queue_unchanged(rx_active, RX_QUEUE_CAPACITY)
+{
+    retval := queue_field(rx_active, RX_QUEUE_CAPACITY, net_tail)
+    refute false
+}
+
+method load_rx_active_head(heap: IArray, gv: Ref, address: Int)
+  returns (retval: Int)
+  requires acc(gv.rx_active)
+  requires valid_net_queue(heap, gv, gv.rx_active, RX_QUEUE_CAPACITY)
+  requires address == RX_ACTIVE_BASE + HEAD_OFFSET
+  ensures acc(gv.rx_active)
+  ensures valid_net_queue(heap, gv, gv.rx_active, RX_QUEUE_CAPACITY)
+  ensures retval == queue_field(rx_active, RX_QUEUE_CAPACITY, net_head)
+  ensures queue_unchanged(rx_active, RX_QUEUE_CAPACITY)
+{
+    retval := queue_field(rx_active, RX_QUEUE_CAPACITY, net_head)
+    refute false
+}
+
+method store_rx_active_head(heap: IArray, gv: Ref, address: Int, value: Int)
+  requires acc(gv.rx_active)
+  requires valid_net_queue(heap, gv, gv.rx_active, RX_QUEUE_CAPACITY)
+  requires address == RX_ACTIVE_BASE + HEAD_OFFSET
+  requires bounded16(value)
+  ensures acc(gv.rx_active)
+  ensures valid_net_queue(heap, gv, gv.rx_active, RX_QUEUE_CAPACITY)
+  ensures queue_field_unchanged(rx_active, RX_QUEUE_CAPACITY, net_signal)
+  ensures queue_field(rx_active, RX_QUEUE_CAPACITY, n_enqueue_dequeue) == old(queue_field(rx_active, RX_QUEUE_CAPACITY, n_enqueue_dequeue)) + 1
+{
+  unfold valid_net_queue(heap, gv, gv.rx_active, RX_QUEUE_CAPACITY)
+  gv.rx_active.net_head := value
+  gv.rx_active.n_enqueue_dequeue := gv.rx_active.n_enqueue_dequeue + 1
+  fold valid_net_queue(heap, gv, gv.rx_active, RX_QUEUE_CAPACITY)
+}
+
+method store_rx_active_consumer_signalled(heap: IArray, gv: Ref, address: Int, value: Int)
+  requires acc(gv.rx_active)
+  requires valid_net_queue(heap, gv, gv.rx_active, RX_QUEUE_CAPACITY)
+  requires address == RX_ACTIVE_BASE + CONSUMER_SIGNALLED_OFFSET
+  requires value == 0 || value == 1
+  ensures acc(gv.rx_active)
+  ensures valid_net_queue(heap, gv, gv.rx_active, RX_QUEUE_CAPACITY)
+  ensures value == old(value)
+  ensures value == (queue_field(rx_active, RX_QUEUE_CAPACITY, net_signal) ? 1 : 0)
+{
+  unfold valid_net_queue(heap, gv, gv.rx_active, RX_QUEUE_CAPACITY)
+  gv.rx_active.net_signal := (value == 1)
+  fold valid_net_queue(heap, gv, gv.rx_active, RX_QUEUE_CAPACITY)
+}
+
+/////////////////////// TX_ACTIVE queue
+method store_tx_active_tail(heap: IArray, gv: Ref, address: Int, value: Int)
+  requires acc(gv.tx_active)
+  requires valid_net_queue(heap, gv, gv.tx_active, TX_QUEUE_CAPACITY)
+  requires address == TX_ACTIVE_BASE + TAIL_OFFSET
+  requires bounded16(value)
+  ensures acc(gv.tx_active)
+  ensures valid_net_queue(heap, gv, gv.tx_active, TX_QUEUE_CAPACITY)
+  ensures queue_field_unchanged(tx_active, TX_QUEUE_CAPACITY, net_signal)
+  ensures queue_field(tx_active, TX_QUEUE_CAPACITY, n_enqueue_dequeue) == old(queue_field(tx_active, TX_QUEUE_CAPACITY, n_enqueue_dequeue)) + 1
+{
+  unfold valid_net_queue(heap, gv, gv.tx_active, TX_QUEUE_CAPACITY)
+  gv.tx_active.net_tail := value
+  gv.tx_active.n_enqueue_dequeue := gv.tx_active.n_enqueue_dequeue + 1
+  fold valid_net_queue(heap, gv, gv.tx_active, TX_QUEUE_CAPACITY)
+}
+
+method load_tx_active_tail(heap: IArray, gv: Ref, address: Int)
+  returns (retval: Int)
+  requires acc(gv.tx_active)
+  requires valid_net_queue(heap, gv, gv.tx_active, TX_QUEUE_CAPACITY)
+  requires address == TX_ACTIVE_BASE + TAIL_OFFSET
+  ensures acc(gv.tx_active)
+  ensures valid_net_queue(heap, gv, gv.tx_active, TX_QUEUE_CAPACITY)
+  ensures retval == queue_field(tx_active, TX_QUEUE_CAPACITY, net_tail)
+  ensures queue_unchanged(tx_active, TX_QUEUE_CAPACITY)
+{
+    retval := queue_field(tx_active, TX_QUEUE_CAPACITY, net_tail)
+    refute false
+}
+
+method load_tx_active_head(heap: IArray, gv: Ref, address: Int)
+  returns (retval: Int)
+  requires acc(gv.tx_active)
+  requires valid_net_queue(heap, gv, gv.tx_active, TX_QUEUE_CAPACITY)
+  requires address == TX_ACTIVE_BASE + HEAD_OFFSET
+  ensures acc(gv.tx_active)
+  ensures valid_net_queue(heap, gv, gv.tx_active, TX_QUEUE_CAPACITY)
+  ensures retval == queue_field(tx_active, TX_QUEUE_CAPACITY, net_head)
+  ensures queue_unchanged(tx_active, TX_QUEUE_CAPACITY)
+{
+    retval := queue_field(tx_active, TX_QUEUE_CAPACITY, net_head)
+    refute false
+}
+
+method load_tx_active_consumer_signalled(heap: IArray, gv: Ref, address: Int)
+  returns (retval: Int)
+  requires acc(gv.tx_active)
+  requires valid_net_queue(heap, gv, gv.tx_active, TX_QUEUE_CAPACITY)
+  requires address == TX_ACTIVE_BASE + CONSUMER_SIGNALLED_OFFSET
+  ensures acc(gv.tx_active)
+  ensures valid_net_queue(heap, gv, gv.tx_active, TX_QUEUE_CAPACITY)
+  ensures retval == (queue_field(tx_active, TX_QUEUE_CAPACITY, net_signal) ? 1 : 0)
+  ensures queue_unchanged(tx_active, TX_QUEUE_CAPACITY)
+{
+    retval := queue_field(tx_active, TX_QUEUE_CAPACITY, net_signal) ? 1 : 0
+    refute false
+}
+
+/////////////////////// TX_FREE queue
+method load_tx_free_tail(heap: IArray, gv: Ref, address: Int)
+  returns (retval: Int)
+  requires acc(gv.tx_free)
+  requires valid_net_queue(heap, gv, gv.tx_free, TX_QUEUE_CAPACITY)
+  requires address == TX_FREE_BASE + TAIL_OFFSET
+  ensures acc(gv.tx_free)
+  ensures valid_net_queue(heap, gv, gv.tx_free, TX_QUEUE_CAPACITY)
+  ensures retval == queue_field(tx_free, TX_QUEUE_CAPACITY, net_tail)
+  ensures queue_unchanged(tx_free, TX_QUEUE_CAPACITY)
+{
+    retval := queue_field(tx_free, TX_QUEUE_CAPACITY, net_tail)
+    refute false
+}
+
+method load_tx_free_head(heap: IArray, gv: Ref, address: Int)
+  returns (retval: Int)
+  requires acc(gv.tx_free)
+  requires valid_net_queue(heap, gv, gv.tx_free, TX_QUEUE_CAPACITY)
+  requires address == TX_FREE_BASE + HEAD_OFFSET
+  ensures acc(gv.tx_free)
+  ensures valid_net_queue(heap, gv, gv.tx_free, TX_QUEUE_CAPACITY)
+  ensures retval == queue_field(tx_free, TX_QUEUE_CAPACITY, net_head)
+  ensures queue_unchanged(tx_free, TX_QUEUE_CAPACITY)
+{
+    retval := queue_field(tx_free, TX_QUEUE_CAPACITY, net_head)
+    refute false
+}
+
+method store_tx_free_head(heap: IArray, gv: Ref, address: Int, value: Int)
+  requires acc(gv.tx_free)
+  requires valid_net_queue(heap, gv, gv.tx_free, TX_QUEUE_CAPACITY)
+  requires address == TX_FREE_BASE + HEAD_OFFSET
+  requires bounded16(value)
+  ensures acc(gv.tx_free)
+  ensures valid_net_queue(heap, gv, gv.tx_free, TX_QUEUE_CAPACITY)
+  ensures queue_field_unchanged(tx_free, TX_QUEUE_CAPACITY, net_signal)
+  ensures queue_field(tx_free, TX_QUEUE_CAPACITY, n_enqueue_dequeue) == old(queue_field(tx_free, TX_QUEUE_CAPACITY, n_enqueue_dequeue)) + 1
+{
+  unfold valid_net_queue(heap, gv, gv.tx_free, TX_QUEUE_CAPACITY)
+  gv.tx_free.net_head := value
+  gv.tx_free.n_enqueue_dequeue := gv.tx_free.n_enqueue_dequeue + 1
+  fold valid_net_queue(heap, gv, gv.tx_free, TX_QUEUE_CAPACITY)
+}
+
+method store_tx_free_consumer_signalled(heap: IArray, gv: Ref, address: Int, value: Int)
+  requires acc(gv.tx_free)
+  requires valid_net_queue(heap, gv, gv.tx_free, TX_QUEUE_CAPACITY)
+  requires address == TX_FREE_BASE + CONSUMER_SIGNALLED_OFFSET
+  requires value == 0 || value == 1
+  ensures acc(gv.tx_free)
+  ensures valid_net_queue(heap, gv, gv.tx_free, TX_QUEUE_CAPACITY)
+  ensures value == old(value)
+  ensures value == (queue_field(tx_free, TX_QUEUE_CAPACITY, net_signal) ? 1 : 0)
+{
+  unfold valid_net_queue(heap, gv, gv.tx_free, TX_QUEUE_CAPACITY)
+  gv.tx_free.net_signal := (value == 1)
+  fold valid_net_queue(heap, gv, gv.tx_free, TX_QUEUE_CAPACITY)
+}
+
+/////////////////////// shared buffers
+//define buffer_addr_range(addr)
+//  ((addr >= NET_RX_FREE + 3 * 8) && (addr < NET_RX_FREE + (5 + RX_QUEUE_CAPACITY * 2) * 8)) ||
+//  ((addr >= NET_RX_ACTIVE + 3 * 8) && (addr < NET_RX_ACTIVE + (5 + RX_QUEUE_CAPACITY * 2) * 8)) ||
+//  ((addr >= NET_TX_FREE + 3 * 8) && (addr < NET_TX_FREE + (5 + TX_QUEUE_CAPACITY * 2) * 8)) ||
+//  ((addr >= NET_TX_ACTIVE + 3 * 8) && (addr < NET_TX_ACTIVE + (5 + TX_QUEUE_CAPACITY * 2) * 8))
+//
+//method load_net_queue_buffer(heap: IArray, virt: Ref, addr: Int)
+//  returns (retval: Int)
+//  requires buffer_addr_range(addr)
+//  requires addr % 8 == 0
+//  ensures addr == old(addr)
+//  ensures bounded32(retval)
+//  ensures ((addr % 16) == 0) ==> bounded16(retval)
+//{
+//  if ((addr % 16) == 0) {
+//    // this is length (buffer.1)
+//    retval := ND_bounded16()
+//  } elseif((addr % 16) == 8) {
+//    // this is io_addr (buffer.0)
+//    retval := ND_bounded32()
+//  }
+//  refute false
+//}
+//
+//method store_net_queue_buffer(heap: IArray, virt: Ref, addr: Int, value: Int)
+//  requires buffer_addr_range(addr)
+//  requires addr % 8 == 0
+//  requires bounded32(value)
+//  requires ((addr % 16) == 0) ==> bounded16(value)
+//  ensures addr == old(addr)
+//  ensures value == old(value)
+//{
+//  refute false
+//}
