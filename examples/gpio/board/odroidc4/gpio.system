@@ -9,6 +9,13 @@
     <memory_region name="gpio" size="0x1_000" phys_addr="0xFF634000"/>
     <memory_region name="gpio_ao" size="0x1_000" phys_addr="0xFF800000"/>
     <memory_region name="interupt_control" size="0x10_000" phys_addr="0xFFD00000"/>
+    <memory_region name="timer_registers" size="0x10_000" phys_addr="0xffd0f000" />
+
+    <protection_domain name="timer" priority="254" pp="true" passive="true">
+        <program_image path="timer_driver.elf" />
+        <map mr="timer_registers" vaddr="0x2_000_000" perms="rw" cached="false" setvar_vaddr="gpt_regs" />
+        <irq irq="42" id="0" trigger="edge" /> <!-- timer interrupt for timer A -->
+    </protection_domain>
 
     <protection_domain name="driver" priority="100">
         <program_image path="gpio_driver.elf"/>
@@ -19,22 +26,27 @@
 
         <!-- gpio_irq[0] -->
         <irq irq="97" id="53" trigger="edge"/>
-
     </protection_domain>
 
     <protection_domain name="client" priority="1">
         <program_image path="client.elf"/>
     </protection_domain>
+    
+
+    <channel>
+        <end pd="timer" id="1" />
+        <end pd="client" id="1" /> <!-- Should this number change, so should TIMER_CH in timer.h -->
+    </channel>
 
     <!-- We are using 2 GPIO pins -->
     <channel>
         <end pd="driver" id="0" />
-        <end pd="client" id="1" pp="true"/>
+        <end pd="client" id="3" pp="true"/>
     </channel>
 
     <channel>
         <end pd="driver" id="1" />
-        <end pd="client" id="2" pp="true"/>
+        <end pd="client" id="4" pp="true"/>
     </channel>
 
 </system>
