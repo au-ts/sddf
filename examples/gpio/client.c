@@ -23,29 +23,19 @@
 #endif
 #define LOG_CLIENT_ERR(...) do{ sddf_printf("CLIENT|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
-cothread_t t_event;
-cothread_t t_main;
+// cothread_t t_event;
+// cothread_t t_main;
 
-#define STACK_SIZE (4096)
-static char t_client_main_stack[STACK_SIZE];
+// #define STACK_SIZE (4096)
+// static char t_client_main_stack[STACK_SIZE];
 
 #define TIMER_CHANNEL (1)
 
 #define GPIO_HIGH (1)
 #define GPIO_LOW (0)
 
-
 // All GPIO 3 pins are for ENA
 #define MOTOR_A_GPIO_1 (3)
-
-// #define MOTOR_A_GPIO_2 (1)
-// #define MOTOR_A_GPIO_3 (2)
-
-// #define MOTOR_B_GPIO_1 (3)
-// #define MOTOR_B_GPIO_2 (4)
-// #define MOTOR_B_GPIO_3 (5)
-
-
 
 // l289n truth table: https://www.dprg.org/l298n-motor-driver-board-drive-modes/
 // TODO check if left/right are correct
@@ -117,82 +107,20 @@ void set_pwm(int gpio_ch, int micro_s) {
     sddf_timer_set_timeout(TIMER_CHANNEL, micro_s);
 }
 
-// void control_left() {
-//     // Set motor 2 forward
-//     digital_write(MOTOR_B_GPIO_1, GPIO_LOW);
-//     digital_write(MOTOR_B_GPIO_2, GPIO_HIGH);
-//     digital_write(MOTOR_B_GPIO_3, GPIO_HIGH);
-
-//     // Set motor 1 to coast
-//     digital_write(MOTOR_A_GPIO_1, GPIO_LOW);
-//     digital_write(MOTOR_A_GPIO_2, GPIO_HIGH);
-//     digital_write(MOTOR_A_GPIO_3, GPIO_LOW);
-// }
-
-// void control_right() {
-//     // Set motor 1 forward
-//     digital_write(MOTOR_A_GPIO_1, GPIO_LOW);
-//     digital_write(MOTOR_A_GPIO_2, GPIO_HIGH);
-//     digital_write(MOTOR_A_GPIO_3, GPIO_HIGH);
-
-//     // Set motor 2 coast
-//     digital_write(MOTOR_B_GPIO_1, GPIO_LOW);
-//     digital_write(MOTOR_B_GPIO_2, GPIO_HIGH);
-//     digital_write(MOTOR_B_GPIO_3, GPIO_LOW);
-// }
-
-// void control_forward() {
-//     // Set motor 1 forward
-//     digital_write(MOTOR_A_GPIO_1, GPIO_LOW);
-//     digital_write(MOTOR_A_GPIO_2, GPIO_HIGH);
-//     digital_write(MOTOR_A_GPIO_3, GPIO_HIGH);
-
-//     // Set motor 2 forward
-//     digital_write(MOTOR_B_GPIO_1, GPIO_LOW);
-//     digital_write(MOTOR_B_GPIO_2, GPIO_HIGH);
-//     digital_write(MOTOR_B_GPIO_3, GPIO_HIGH);
-// }
-
-
-// void control_back() {
-//     // Set motor 1 backward
-//     digital_write(MOTOR_A_GPIO_1, GPIO_HIGH);
-//     digital_write(MOTOR_A_GPIO_2, GPIO_LOW);
-//     digital_write(MOTOR_A_GPIO_3, GPIO_HIGH);
-
-//     // Set motor 2 backward
-//     digital_write(MOTOR_B_GPIO_1, GPIO_HIGH);
-//     digital_write(MOTOR_B_GPIO_2, GPIO_LOW);
-//     digital_write(MOTOR_B_GPIO_3, GPIO_HIGH);
-// }
-
-
-// void control_brakes() {
-//     // Set motor 1 backward
-//     digital_write(MOTOR_A_GPIO_1, GPIO_LOW);
-//     digital_write(MOTOR_A_GPIO_2, GPIO_LOW);
-//     digital_write(MOTOR_A_GPIO_3, GPIO_HIGH);
-
-//     // Set motor 2 backward
-//     digital_write(MOTOR_B_GPIO_1, GPIO_LOW);
-//     digital_write(MOTOR_B_GPIO_2, GPIO_LOW);
-//     digital_write(MOTOR_B_GPIO_3, GPIO_HIGH);
-// }
-
 void control_loop_main(void) {
     // try to drive forward
     gpio_init(MOTOR_A_GPIO_1);
-    set_pwm(MOTOR_A_GPIO_1, 200000);
+    digital_write(MOTOR_A_GPIO_1, GPIO_HIGH);
+
+    // set_pwm(MOTOR_A_GPIO_1, 200000);
 }
 
 void notified(microkit_channel ch) {
     // check this switch
-    LOG_CLIENT("NOTIFIED");
     switch (ch)
     {
     case TIMER_CHANNEL:
         LOG_CLIENT("PWM TIMEOUT\n");
-
         // should be pwm timer, write high again
         digital_write(MOTOR_A_GPIO_1, GPIO_LOW);
         LOG_CLIENT("SET DIGITAL LOW\n");
@@ -202,21 +130,13 @@ void notified(microkit_channel ch) {
         set_pwm(MOTOR_A_GPIO_1, 200000);
         break;
     default:
-        LOG_CLIENT("YO CHAT WHAT\n");
+        LOG_CLIENT("Unexpected channel call\n");
         break;
     }
 }
 
 void init(void) {
     LOG_CLIENT("Init\n");
-
-    // /* Define the event loop/notified thread as the active co-routine */
-    // t_event = co_active();
-
-    // /* derive main entry point */
-    // t_main = co_derive((void *)t_client_main_stack, STACK_SIZE, control_loop_main);
-
-    // co_switch(t_main);
     control_loop_main();
 }
 
