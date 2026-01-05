@@ -302,6 +302,7 @@ void virtio_blk_init(void)
 
     /* Finished populating configuration */
     blk_storage_set_ready(storage_info, true);
+    sddf_dprintf("Hello %d\n", blk_storage_is_ready(storage_info));
 
 #ifdef DEBUG_DRIVER
     uint32_t features_low = virtio_transport_get_driver_features(&dev, 0);
@@ -345,7 +346,7 @@ void virtio_blk_init(void)
 
     /* Finish initialisation */
     virtio_transport_set_status(&dev, VIRTIO_DEVICE_STATUS_DRIVER_OK);
-    virtio_transport_write_isr(&dev, VIRTIO_IRQ_VQUEUE);
+    /* virtio_transport_write_isr(&dev, VIRTIO_IRQ_VQUEUE); */
 }
 
 void init(void)
@@ -388,13 +389,14 @@ void init(void)
 
 void notified(microkit_channel ch)
 {
+    sddf_dprintf("notified by ch %d\n", ch);
 // @billn fix ridiculousness
 #if defined(CONFIG_ARCH_X86_64)
     if (ch == 17) {
 #else
     if (ch == device_resources.irqs[0].id) {
 #endif
-        handle_irq();
+        /* handle_irq(); */
         microkit_deferred_irq_ack(ch);
         /*
          * It is possible that we could not enqueue all requests when being notified

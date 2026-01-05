@@ -90,9 +90,13 @@ def generate(
         )
         blk_driver.add_map(virtio_blk_regs_map)
 
-        virtio_blk_irq = SystemDescription.IrqIoapic(
-            ioapic_id=0, pin=11, vector=1, id=17
+        # virtio_blk_irq = SystemDescription.IrqIoapic(
+            # ioapic_id=0, pin=11, vector=1, id=17
+        # )
+        virtio_blk_irq = SystemDescription.IrqMsi(
+            pci_bus=0, pci_device=3, pci_func=0, vector=1, handle=0
         )
+
         blk_driver.add_irq(virtio_blk_irq)
 
         pci_config_addr_port = SystemDescription.IoPort(0xCF8, 4, 1)
@@ -103,7 +107,21 @@ def generate(
 
     serial_system.add_client(client)
 
-    pds = [serial_driver, serial_virt_tx, blk_driver, blk_virt, client]
+    pcie_driver = ProtectionDomain("pcie_driver", "pcie_driver.elf", priority=252)
+    ecam_mr = SystemDescription.MemoryRegion(sdf, "ecam_regs", 0x10000000, paddr=0xb0000000)
+    bios_mr = SystemDescription.MemoryRegion(sdf, "bios_regs", 0x20000, paddr=0xe0000)
+    sdt_mr = SystemDescription.MemoryRegion(sdf, "sdt_regs", 0x10000, paddr=0x7ffe0000)
+    blk_msix_mr = SystemDescription.MemoryRegion(sdf, "blk_msix_regs", 0x10000, paddr=0xFEBD5000)
+    sdf.add_mr(ecam_mr)
+    sdf.add_mr(bios_mr)
+    sdf.add_mr(sdt_mr)
+    sdf.add_mr(blk_msix_mr)
+    pcie_driver.add_map(SystemDescription.Map(ecam_mr, 0xb0000000, "rw"))
+    pcie_driver.add_map(SystemDescription.Map(bios_mr, 0xe0000, "rw"))
+    pcie_driver.add_map(SystemDescription.Map(sdt_mr, 0x7ffe0000, "rw"))
+    pcie_driver.add_map(SystemDescription.Map(blk_msix_mr, 0xFEBD5000, "rw"))
+
+    pds = [serial_driver, serial_virt_tx, blk_driver, blk_virt, client, pcie_driver]
     if need_timer:
         pds += [timer_driver]
     for pd in pds:

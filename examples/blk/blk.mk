@@ -44,7 +44,7 @@ SDDF_CUSTOM_LIBC := 1
 include ${SDDF}/tools/make/board/common.mk
 
 
-IMAGES := blk_driver.elf client.elf blk_virt.elf serial_virt_tx.elf serial_driver.elf
+IMAGES := blk_driver.elf client.elf blk_virt.elf serial_virt_tx.elf serial_driver.elf pcie_driver.elf
 CFLAGS +=  -Wall -Wno-unused-function -Werror -Wno-unused-command-line-argument \
 		  -I$(SDDF)/include \
 		  -I$(SDDF)/include/microkit \
@@ -57,11 +57,13 @@ METAPROGRAM := $(TOP)/meta.py
 
 BLK_DRIVER := $(SDDF)/drivers/blk/${BLK_DRIV_DIR}
 SERIAL_DRIVER := $(SDDF)/drivers/serial/${UART_DRIV_DIR}
+PCIE_DRIVER := $(SDDF)/drivers/pcie
 
 all: $(IMAGE_FILE)
 
 include ${SDDF}/drivers/blk/${BLK_DRIV_DIR}/blk_driver.mk
 include ${SDDF}/drivers/serial/${UART_DRIV_DIR}/serial_driver.mk
+include ${PCIE_DRIVER}/pcie_driver.mk
 
 ifdef BLK_NEED_TIMER
 include ${SDDF}/drivers/timer/${TIMER_DRIV_DIR}/timer_driver.mk

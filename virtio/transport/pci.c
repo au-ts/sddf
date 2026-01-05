@@ -228,7 +228,7 @@ bool virtio_transport_probe(device_resources_t *device_resources, virtio_device_
 
 void *virtio_transport_get_device_config(virtio_device_handle_t *device_handle)
 {
-    return (void *)VADDR_DEVICE;
+    return (void *)(VADDR_DEVICE);
 }
 
 void virtio_transport_set_status(virtio_device_handle_t *device_handle, uint8_t status)
@@ -269,11 +269,13 @@ bool virtio_transport_queue_setup(virtio_device_handle_t *device_handle, uint32_
     virtio_pci_common_cfg_t *cfg = get_cfg(device_handle->device_resources);
 
     cfg->queue_select = select;
+    cfg->queue_msix_vector = 0;
     cfg->queue_size = size;
     cfg->queue_desc = desc;
     cfg->queue_driver = driver;
     cfg->queue_device = device;
     cfg->queue_enable = 1;
+    sddf_dprintf("queue_select: 0x%x, queue_msix_vector: 0x%x\n", select, cfg->queue_msix_vector);
 
     return true;
 }

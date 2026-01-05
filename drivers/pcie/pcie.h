@@ -8,6 +8,29 @@
 #include <stdint.h>
 #include <microkit.h>
 
+// PCI Capability IDs
+#define PCI_CAP_ID_PM       0x01    // Power Management
+#define PCI_CAP_ID_AGP      0x02    // AGP
+#define PCI_CAP_ID_VPD      0x03    // Vital Product Data
+#define PCI_CAP_ID_SLOTID   0x04    // Slot Identification
+#define PCI_CAP_ID_MSI      0x05    // Message Signaled Interrupts
+#define PCI_CAP_ID_CHSWP    0x06    // CompactPCI HotSwap
+#define PCI_CAP_ID_PCIX     0x07    // PCI-X
+#define PCI_CAP_ID_HT       0x08    // HyperTransport
+#define PCI_CAP_ID_VNDR     0x09    // Vendor Specific
+#define PCI_CAP_ID_DBG      0x0A    // Debug port
+#define PCI_CAP_ID_CCRC     0x0B    // CompactPCI Central Resource Control
+#define PCI_CAP_ID_SHPC     0x0C    // PCI Standard Hot-Plug Controller
+#define PCI_CAP_ID_SSVID    0x0D    // Bridge subsystem vendor/device ID
+#define PCI_CAP_ID_AGP3     0x0E    // AGP Target PCI-PCI bridge
+#define PCI_CAP_ID_SECDEV   0x0F    // Secure Device
+#define PCI_CAP_ID_EXP      0x10    // PCI Express
+#define PCI_CAP_ID_MSIX     0x11    // MSI-X
+#define PCI_CAP_ID_SATA     0x12    // SATA Data/Index Conf.
+#define PCI_CAP_ID_AF       0x13    // PCI Advanced Features
+#define PCI_CAP_ID_EA       0x14    // PCI Enhanced Allocation
+
+
 typedef struct pcie_driver_config {
     void *ecam_base;
     uint64_t ecam_size;
@@ -109,3 +132,57 @@ typedef struct mcfg_ecam_alloc {
     uint8_t end_bus;
     uint32_t reserved;
 } mcfg_ecam_alloc_t;
+
+// Shared Capability Structure
+struct shared_pci_cap {
+    uint8_t cap_id;               /* Generic PCI field: PCI_CAP_ID_VNDR */
+    uint8_t next_ptr;             /* Generic PCI field: next ptr. */
+};
+
+// MSI Message Control Register
+struct msi_msg_ctrl {
+    uint8_t msi_enable : 1;       /* Enable MSI (RW)*/
+    uint8_t mul_msg_cap: 3;       /* Multiple Message Capable: table_size = 2 ** (mul_msg_cap) (RO) */
+    uint8_t mul_msg_en: 3;        /* Multiple Message Enable: table_size = 2 ** (mul_msg_en) (RW) */
+    uint8_t addr_64 : 1;          /* 64-bit Address Capable (RO) */
+    uint8_t per_vec_masking : 1;  /* Per-Vector Masking Capable (RO) */
+    uint8_t ext_msg_data_cap : 1; /* Extended Message Data Capable (RO) */
+    uint8_t ext_msg_data_en : 1;  /* Extended Message Data Enable (RW) */
+    uint8_t reserved : 5;
+} __attribute__((packed));
+
+// MSI-X Message Control Register
+struct msix_msg_ctrl {
+    uint16_t table_size : 11;     /* Real Table Size = table_size + 1 */
+    uint8_t reserved : 3;
+    uint8_t func_mask : 1;        /* Function Mask: disable all interrupts if set */
+    uint8_t msix_enable : 1;      /* MSI-X Enable */
+};
+
+// MSI Capability (ID: 0x05)
+struct msi_capability {
+    uint8_t cap_id;               /* Generic PCI field: PCI_CAP_ID_VNDR */
+    uint8_t next_ptr;             /* Generic PCI field: next ptr. */
+    uint16_t msg_ctrl;            /* Message Control register */
+    uint32_t msg_addr;            /* Message Address */
+    uint32_t msg_addr_upper;      /* Message Address - high 32 bits */
+    uint16_t msg_data;            /* Message Data */
+    uint16_t reserved;
+};
+
+// MSI-X Capability (ID 0x11)
+struct msix_capability {
+    uint8_t cap_id;               /* Generic PCI field: PCI_CAP_ID_VNDR */
+    uint8_t next_ptr;             /* Generic PCI field: next ptr. */
+    struct msix_msg_ctrl msg_ctrl; /* Message Control register */
+    uint32_t table_offset_bir;    /* Table offset and BAR indicator */
+    uint32_t pba_offset_bir;      /* Pending bit array offset and BAR */
+};
+
+// MSI-X Table Structure
+struct msix_table {
+    uint32_t msg_addr_low;
+    uint32_t msg_addr_hi;
+    uint32_t msg_data;
+    uint32_t vec_ctrl;
+};
