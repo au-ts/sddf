@@ -11,7 +11,7 @@
 
 // Right motor pins
 #define GPIO_1 (MESON_GPIO_X + 1)
-#define GPIO_2 (MESON_GPIO_X + 2)
+// #define GPIO_2 (MESON_GPIO_X + 2)
 
 // Left motor pins
 // #define GPIO_3 (MESON_GPIO_X + 3)
@@ -38,11 +38,11 @@
     because channel 52 is for GPIO_IRQ_0.
 */
 static const int gpio_channel_mappings[GPIO_CHANNEL_MAPPING_ROWS][GPIO_CHANNEL_MAPPING_COLS] = {
-    { 0, -1, -1 },
+    { 0, GPIO_1, -1 },
     { 1, -1, -1 },
     { 2, -1, -1 },
-    { 3, GPIO_1, -1 },
-    { 4, GPIO_2, -1 },
+    { 3, -1, -1 },
+    { 4, -1, -1 },
     { 5, -1, -1 },
     { 6, -1, -1 },
     { 7, -1, -1 },

@@ -3,82 +3,107 @@
 #
 # SPDX-License-Identifier: BSD-2-Clause
 #
-# This Makefile is copied into the build directory
-# and operated on from there.
+# Combined GPIO + Timer build
 #
 
 ifeq ($(strip $(MICROKIT_SDK)),)
 $(error MICROKIT_SDK must be specified)
 endif
 
+ifeq ($(strip $(SDDF)),)
+$(error SDDF must be specified)
+endif
+
+BUILD_DIR ?= build
+MICROKIT_CONFIG ?= debug
+IMAGE_FILE := loader.img
+REPORT_FILE := report.txt
+
 ifeq ($(strip $(TOOLCHAIN)),)
 	TOOLCHAIN := aarch64-none-elf
 endif
 
+# Board-specific configuration
 ifeq (${MICROKIT_BOARD},odroidc4)
 	PLATFORM := meson
 	CPU := cortex-a55
+	TIMER_DRIV_DIR := meson
 else
 $(error Unsupported MICROKIT_BOARD)
 endif
 
-BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
-
+# Toolchain setup
 CC := $(TOOLCHAIN)-gcc
 LD := $(TOOLCHAIN)-ld
 AS := $(TOOLCHAIN)-as
 AR := $(TOOLCHAIN)-ar
 RANLIB := $(TOOLCHAIN)-ranlib
-
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 
+BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
+
+# Driver paths
 UTIL := $(SDDF)/util
 LIBCO := $(SDDF)/libco
-TOP := ${SDDF}/examples/gpio
+GPIO_TOP := ${SDDF}/examples/gpio
+TIMER_TOP := ${SDDF}/examples/timer
 GPIO_DRIVER := $(SDDF)/drivers/gpio/${PLATFORM}
-CONFIGS_INCLUDE := ${TOP}
+TIMER_DRIVER := $(SDDF)/drivers/timer/${TIMER_DRIV_DIR}
 
-IMAGES := gpio_driver.elf client.elf
-CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 -Wall -Wno-unused-function -I${TOP}
-LDFLAGS := -L$(BOARD_DIR)/lib -L$(SDDF)/lib -L${LIBC}
-LIBS := --start-group -lmicrokit -Tmicrokit.ld -lc libsddf_util_debug.a --end-group
+# System file (you'll need to create this)
+SYSTEM_FILE := ${GPIO_TOP}/board/$(MICROKIT_BOARD)/gpio.system
 
-IMAGE_FILE = loader.img
-REPORT_FILE = report.txt
-SYSTEM_FILE = ${TOP}/board/$(MICROKIT_BOARD)/gpio.system
+# Images to build
+IMAGES := gpio_driver.elf timer_driver.elf client.elf
 
-CFLAGS += -I$(BOARD_DIR)/include \
-	-I$(SDDF)/include \
-	-I$(LIBCO) \
-	-I$(CONFIGS_INCLUDE) \
-	-MD \
-	-MP
+# Compiler flags
+CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 \
+          -Wall -Wno-unused-function \
+          -DCONFIG_EXPORT_PCNT_USER=1 \
+          -DCONFIG_EXPORT_PTMR_USER=1 \
+          -I$(BOARD_DIR)/include \
+          -I$(SDDF)/include \
+          -I$(SDDF)/include/microkit \
+          -I$(LIBCO) \
+          -I${GPIO_TOP} \
+          -MD -MP
 
-COMMONFILES=libsddf_util_debug.a
+LDFLAGS := -L$(BOARD_DIR)/lib -L$(SDDF)/lib
+LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
+
+COMMONFILES := libsddf_util_debug.a
 
 CLIENT_OBJS := client.o
 
 -include client.d
 
-VPATH:=${TOP}
+VPATH := ${GPIO_TOP}
+
 all: $(IMAGE_FILE)
+
+# Client build (modify this based on your actual client source location)
+client.o: ${GPIO_TOP}/client.c
+	$(CC) -c $(CFLAGS) $< -o $@
 
 client.elf: $(CLIENT_OBJS) libco.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
+# Final image generation
 $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
 
 ${IMAGES}: ${COMMONFILES}
-.PHONY: all compile clean
+
+.PHONY: all clean clobber
 
 clean::
-	rm -f *.elf
-	find . -name '*.[do]' |xargs --no-run-if-empty rm
+	rm -f *.elf *.o *.d
 
 clobber:: clean
-	rm -f ${REPORT_FILE} ${IMAGE_FILE} *.a .*cflags*
+	rm -f ${REPORT_FILE} ${IMAGE_FILE} *.a
 
+# Include driver build rules
 include ${SDDF}/util/util.mk
 include ${LIBCO}/libco.mk
 include ${GPIO_DRIVER}/gpio_driver.mk
+include ${TIMER_DRIVER}/timer_driver.mk

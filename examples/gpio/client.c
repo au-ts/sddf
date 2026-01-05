@@ -1,3 +1,5 @@
+
+
 /*
  * Copyright 2024, UNSW
  *
@@ -15,7 +17,7 @@
 #define DEBUG_CLIENT
 
 #ifdef DEBUG_CLIENT
-#define LOG_CLIENT(...) do{ sddf_dprintf("CLIENT|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
+#define LOG_CLIENT(...) do{ sddf_printf("CLIENT|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
 #else
 #define LOG_CLIENT(...) do{}while(0)
 #endif
@@ -50,8 +52,7 @@ static char t_client_main_stack[STACK_SIZE];
 
 // https://howtomechatronics.com/tutorials/arduino/arduino-dc-motor-control-tutorial-l298n-pwm-h-bridge/#:~:text=Next%20are%20the%20logic%20control,the%20motor%20will%20be%20disabled.
 
-// GPIO output HIGH/LOW
-void digital_write(int gpio_ch, int value) {
+void gpio_init(int gpio_ch) {
     LOG_CLIENT("Setting direction of GPIO1 to output!\n");
     microkit_msginfo msginfo;
     msginfo = microkit_msginfo_new(GPIO_SET_GPIO, 2);
@@ -63,6 +64,11 @@ void digital_write(int gpio_ch, int value) {
         LOG_CLIENT_ERR("failed to set direction of gpio with error %ld!\n", error);
         while (1) {};
     }
+}
+
+// GPIO output HIGH/LOW
+void digital_write(int gpio_ch, int value) {
+    microkit_msginfo msginfo;
 
     if (value == GPIO_HIGH) {
         LOG_CLIENT("Setting GPIO1 to on!\n");
@@ -105,6 +111,7 @@ void digital_write(int gpio_ch, int value) {
 
 void set_pwm(int gpio_ch, int micro_s) {
     digital_write(gpio_ch, GPIO_HIGH);
+    LOG_CLIENT("SET DIGITAL HIGH\n");
 
     // timeout to drive motor forward, 200 microsecods to nanoseconds
     sddf_timer_set_timeout(TIMER_CHANNEL, micro_s);
@@ -174,21 +181,28 @@ void set_pwm(int gpio_ch, int micro_s) {
 
 void control_loop_main(void) {
     // try to drive forward
+    gpio_init(MOTOR_A_GPIO_1);
     set_pwm(MOTOR_A_GPIO_1, 200000);
 }
 
 void notified(microkit_channel ch) {
     // check this switch
+    LOG_CLIENT("NOTIFIED");
     switch (ch)
     {
     case TIMER_CHANNEL:
+        LOG_CLIENT("PWM TIMEOUT\n");
+
         // should be pwm timer, write high again
         digital_write(MOTOR_A_GPIO_1, GPIO_LOW);
+        LOG_CLIENT("SET DIGITAL LOW\n");
+
         // 20 ms timeout before sending next pulse
         sddf_timer_set_timeout(TIMER_CHANNEL, 20000000);
         set_pwm(MOTOR_A_GPIO_1, 200000);
         break;
     default:
+        LOG_CLIENT("YO CHAT WHAT\n");
         break;
     }
 }
@@ -196,12 +210,13 @@ void notified(microkit_channel ch) {
 void init(void) {
     LOG_CLIENT("Init\n");
 
-    /* Define the event loop/notified thread as the active co-routine */
-    t_event = co_active();
+    // /* Define the event loop/notified thread as the active co-routine */
+    // t_event = co_active();
 
-    /* derive main entry point */
-    t_main = co_derive((void *)t_client_main_stack, STACK_SIZE, control_loop_main);
+    // /* derive main entry point */
+    // t_main = co_derive((void *)t_client_main_stack, STACK_SIZE, control_loop_main);
 
-    co_switch(t_main);
+    // co_switch(t_main);
     control_loop_main();
 }
+
