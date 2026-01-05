@@ -7,8 +7,8 @@ define TAIL_OFFSET               0
 define HEAD_OFFSET               2
 define CONSUMER_SIGNALLED_OFFSET 4
 
-define RX_QUEUE_CAPACITY   512
-define TX_QUEUE_CAPACITY   1024
+define RX_QUEUE_CAPACITY   256
+define TX_QUEUE_CAPACITY   256
 
 define TX_CH   1
 define RX_CH   2
