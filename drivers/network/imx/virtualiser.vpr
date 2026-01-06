@@ -84,6 +84,7 @@ method store_rx_free_tail(heap: IArray, gv: Ref, address: Int, value: Int)
   ensures acc(gv.rx_free)
   ensures valid_net_queue(heap, gv, gv.rx_free, RX_QUEUE_CAPACITY)
   ensures queue_field_unchanged(rx_free, RX_QUEUE_CAPACITY, net_signal)
+  ensures queue_field_unchanged(rx_free, RX_QUEUE_CAPACITY, net_head)
   ensures queue_field(rx_free, RX_QUEUE_CAPACITY, n_enqueue_dequeue) == old(queue_field(rx_free, RX_QUEUE_CAPACITY, n_enqueue_dequeue)) + 1
 {
   unfold valid_net_queue(heap, gv, gv.rx_free, RX_QUEUE_CAPACITY)
@@ -171,6 +172,7 @@ method store_rx_active_head(heap: IArray, gv: Ref, address: Int, value: Int)
   ensures acc(gv.rx_active)
   ensures valid_net_queue(heap, gv, gv.rx_active, RX_QUEUE_CAPACITY)
   ensures queue_field_unchanged(rx_active, RX_QUEUE_CAPACITY, net_signal)
+  ensures queue_field_unchanged(rx_active, RX_QUEUE_CAPACITY, net_tail)
   ensures queue_field(rx_active, RX_QUEUE_CAPACITY, n_enqueue_dequeue) == old(queue_field(rx_active, RX_QUEUE_CAPACITY, n_enqueue_dequeue)) + 1
 {
   unfold valid_net_queue(heap, gv, gv.rx_active, RX_QUEUE_CAPACITY)
@@ -187,6 +189,8 @@ method store_rx_active_consumer_signalled(heap: IArray, gv: Ref, address: Int, v
   ensures acc(gv.rx_active)
   ensures valid_net_queue(heap, gv, gv.rx_active, RX_QUEUE_CAPACITY)
   ensures value == old(value)
+  ensures queue_field_unchanged(rx_active, RX_QUEUE_CAPACITY, net_head)
+  ensures queue_field_unchanged(rx_active, RX_QUEUE_CAPACITY, net_tail)
   ensures value == (queue_field(rx_active, RX_QUEUE_CAPACITY, net_signal) ? 1 : 0)
 {
   unfold valid_net_queue(heap, gv, gv.rx_active, RX_QUEUE_CAPACITY)
@@ -203,6 +207,7 @@ method store_tx_active_tail(heap: IArray, gv: Ref, address: Int, value: Int)
   ensures acc(gv.tx_active)
   ensures valid_net_queue(heap, gv, gv.tx_active, TX_QUEUE_CAPACITY)
   ensures queue_field_unchanged(tx_active, TX_QUEUE_CAPACITY, net_signal)
+  ensures queue_field_unchanged(tx_active, TX_QUEUE_CAPACITY, net_head)
   ensures queue_field(tx_active, TX_QUEUE_CAPACITY, n_enqueue_dequeue) == old(queue_field(tx_active, TX_QUEUE_CAPACITY, n_enqueue_dequeue)) + 1
 {
   unfold valid_net_queue(heap, gv, gv.tx_active, TX_QUEUE_CAPACITY)
@@ -290,6 +295,7 @@ method store_tx_free_head(heap: IArray, gv: Ref, address: Int, value: Int)
   ensures acc(gv.tx_free)
   ensures valid_net_queue(heap, gv, gv.tx_free, TX_QUEUE_CAPACITY)
   ensures queue_field_unchanged(tx_free, TX_QUEUE_CAPACITY, net_signal)
+  ensures queue_field_unchanged(tx_free, TX_QUEUE_CAPACITY, net_tail)
   ensures queue_field(tx_free, TX_QUEUE_CAPACITY, n_enqueue_dequeue) == old(queue_field(tx_free, TX_QUEUE_CAPACITY, n_enqueue_dequeue)) + 1
 {
   unfold valid_net_queue(heap, gv, gv.tx_free, TX_QUEUE_CAPACITY)
@@ -305,6 +311,8 @@ method store_tx_free_consumer_signalled(heap: IArray, gv: Ref, address: Int, val
   requires value == 0 || value == 1
   ensures acc(gv.tx_free)
   ensures valid_net_queue(heap, gv, gv.tx_free, TX_QUEUE_CAPACITY)
+  ensures queue_field_unchanged(tx_free, TX_QUEUE_CAPACITY, net_tail)
+  ensures queue_field_unchanged(tx_free, TX_QUEUE_CAPACITY, net_head)
   ensures value == old(value)
   ensures value == (queue_field(tx_free, TX_QUEUE_CAPACITY, net_signal) ? 1 : 0)
 {

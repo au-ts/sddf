@@ -7,3 +7,5 @@
 #define QUEUE_IO_OFF           0
 #define QUEUE_OFFSET_OFF       0
 #define QUEUE_LEN_OFF          8
+
+#define QUEUE_CAPACITY  256
