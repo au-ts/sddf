@@ -94,7 +94,7 @@ def generate(
             # ioapic_id=0, pin=11, vector=1, id=17
         # )
         virtio_blk_irq = SystemDescription.IrqMsi(
-            pci_bus=0, pci_device=3, pci_func=0, vector=1, handle=0
+            pci_bus=0, pci_device=3, pci_func=0, vector=1, handle=0, id=17
         )
 
         blk_driver.add_irq(virtio_blk_irq)

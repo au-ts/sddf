@@ -157,7 +157,7 @@ struct msix_msg_ctrl {
     uint8_t reserved : 3;
     uint8_t func_mask : 1;        /* Function Mask: disable all interrupts if set */
     uint8_t msix_enable : 1;      /* MSI-X Enable */
-};
+} __attribute__((packed));
 
 // MSI Capability (ID: 0x05)
 struct msi_capability {

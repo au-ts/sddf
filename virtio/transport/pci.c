@@ -261,6 +261,7 @@ void virtio_transport_set_driver_features(virtio_device_handle_t *device_handle,
     virtio_pci_common_cfg_t *cfg = get_cfg(device_handle->device_resources);
     cfg->driver_feature_select = select;
     cfg->driver_feature = driver_features;
+    cfg->config_msix_vector = 0;
 }
 
 bool virtio_transport_queue_setup(virtio_device_handle_t *device_handle, uint32_t select, uint16_t size, uint64_t desc,

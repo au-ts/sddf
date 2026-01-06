@@ -396,7 +396,7 @@ void notified(microkit_channel ch)
 #else
     if (ch == device_resources.irqs[0].id) {
 #endif
-        /* handle_irq(); */
+        handle_irq();
         microkit_deferred_irq_ack(ch);
         /*
          * It is possible that we could not enqueue all requests when being notified

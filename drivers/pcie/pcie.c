@@ -115,36 +115,43 @@ void pci_bus_scan(uintptr_t pci_bus)
                     sddf_dprintf("Memory BAR 1: 0x%x\n", *mem_bar);
 
 
+                    struct msix_capability *msix_cap = (struct msix_capability *)find_pci_cap_by_id(pci_header, PCI_CAP_ID_MSIX);
+                    if (msix_cap) {
+                        // Disable legacy Interrupts
+                        pci_header->command = pci_header->command | (1 << 10);
+
+                        uint16_t *test = (uint16_t *)((void *)pci_header + 0x98 + 2);
+                        sddf_dprintf("test: 0x%x\n", *test);
+                        // Enable MSI-X
+                        struct msix_msg_ctrl *msg_ctrl = &msix_cap->msg_ctrl;
+                        msg_ctrl->msix_enable = 1;
+                        sddf_dprintf("Table Size: 0x%x\n", msg_ctrl->table_size + 1);
+                        sddf_dprintf("Function Mask: 0x%x\n", msg_ctrl->func_mask);
+                        sddf_dprintf("MSI-X Enable: 0x%x\n", msg_ctrl->msix_enable);
+
+                        struct msix_table *msix_table = (struct msix_table *)0xFEBD5000;
+                        msix_table->msg_addr_low = 0xFEEu << 20;
+                        msix_table->msg_data = 0x4031;
+                        msix_table->vec_ctrl = 0x0;
+                        sddf_dprintf("Vector 0 Message Addr Low: 0x%x\n", msix_table->msg_addr_low);
+                        sddf_dprintf("Vector 0 Message Addr Hi: 0x%x\n", msix_table->msg_addr_hi);
+                        sddf_dprintf("Vector 0 Message Data: 0x%x\n", msix_table->msg_data);
+                        sddf_dprintf("Vector 0 Vector Control: 0x%x\n", msix_table->vec_ctrl);
+
+                        uint32_t *msix_pba = (uint32_t *)0xFEBD5800;
+                        sddf_dprintf("PBA: 0x%x\n", msix_pba[0]);
+                    }
+
                     for (int j = 0; j < 256; j++) {
                         if (j && j % 16 == 0) sddf_dprintf("\n");
                         sddf_dprintf("%02x ", *(uint8_t *)(pci_bus + (i << 15) + (k << 12) + j));
                     }
                     sddf_dprintf("\n");
 
-                    struct msix_capability *msix_cap = (struct msix_capability *)find_pci_cap_by_id(pci_header, PCI_CAP_ID_MSIX);
-                    if (msix_cap) {
-                        // Disable legacy Interrupts
-                        pci_header->command = pci_header->command | (1 << 10);
-
-                        // Enable MSI-X
-                        struct msix_msg_ctrl msg_ctrl = msix_cap->msg_ctrl;
-                        msg_ctrl.msix_enable = 1;
-                        sddf_dprintf("Table Size: 0x%x\n", msg_ctrl.table_size + 1);
-                        sddf_dprintf("Function Mask: 0x%x\n", msg_ctrl.func_mask);
-                        sddf_dprintf("MSI-X Enable: 0x%x\n", msg_ctrl.msix_enable);
-
-                        struct msix_table *msix_table = (struct msix_table *)0xFEBD5000;
-                        msix_table[0].msg_addr_low = 0xFEEu << 20;
-                        msix_table[0].msg_data = 0x31;
-                        msix_table[0].vec_ctrl = 0x0;
-                        sddf_dprintf("Vector 0 Message Addr Low: 0x%x\n", msix_table[0].msg_addr_low);
-                        sddf_dprintf("Vector 0 Message Addr Hi: 0x%x\n", msix_table[0].msg_addr_hi);
-                        sddf_dprintf("Vector 0 Message Data: 0x%x\n", msix_table[0].msg_data);
-                        sddf_dprintf("Vector 0 Vector Control: 0x%x\n", msix_table[0].vec_ctrl);
-
-                        uint32_t *msix_pba = (uint32_t *)0xFEBD5800;
-                        sddf_dprintf("PBA: 0x%x\n", msix_pba[0]);
-                    }
+                    sddf_dprintf("pci header: 0x%lx\n", (uintptr_t)pci_header);
+                    sddf_dprintf("MSI-X cap: 0x%lx\n", (uintptr_t)msix_cap);
+                    uint16_t *test = (uint16_t *)((void *)pci_header + 0x98 + 2);
+                    sddf_dprintf("test: 0x%x\n", *test);
 
                     struct msi_capability *msi_cap = (struct msi_capability *)find_pci_cap_by_id(pci_header, PCI_CAP_ID_MSI);
                     if (msi_cap) {
