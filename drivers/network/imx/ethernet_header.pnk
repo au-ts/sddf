@@ -26,6 +26,29 @@
 #define HW_TX_DESCR             pnk_mem(17)
 #define HW_TX_PTR               pnk_mem_ptr(14)
 
+var 1 net_rx_free     = NET_RX_FREE;
+var 1 net_rx_active   = NET_RX_ACTIVE;
+var 1 net_rx_capacity = NET_RX_CAPACITY;
+var 1 net_tx_free     = NET_TX_FREE;
+var 1 net_tx_active   = NET_TX_ACTIVE;
+var 1 net_tx_capacity = NET_TX_CAPACITY;
+
+var 1 hw_rx_tail_slot = HW_RX_TAIL_SLOT;
+var 1 hw_rx_head_slot = HW_RX_HEAD_SLOT;
+var 1 hw_rx_tail      = HW_RX_TAIL;
+var 1 hw_rx_head      = HW_RX_HEAD;
+var 1 hw_rx_capacity  = HW_RX_CAPACITY;
+var 1 hw_rx_descr     = HW_RX_DESCR;
+var 1 hw_rx_ptr       = HW_RX_PTR;
+
+var 1 hw_tx_tail_slot = HW_TX_TAIL_SLOT;
+var 1 hw_tx_head_slot = HW_TX_HEAD_SLOT;
+var 1 hw_tx_tail      = HW_TX_TAIL;
+var 1 hw_tx_head      = HW_TX_HEAD;
+var 1 hw_tx_capacity  = HW_TX_CAPACITY;
+var 1 hw_tx_descr     = HW_TX_DESCR;
+var 1 hw_tx_ptr       = HW_TX_PTR;
+
 #define ETH_EIR_OFF              4
 #define ETH_RDAR_OFF             16
 #define ETH_TDAR_OFF             20
@@ -123,3 +146,9 @@
 	x == TX_FREE_BASE   || \
 	x == TX_ACTIVE_BASE    \
 )
+
+/@
+  predicate valid() {
+	valid_device() && valid_virt() && acc(gv.net_tx_capacity) && gv.net_tx_capacity == QUEUE_CAPACITY && acc(gv.net_rx_capacity) && gv.net_rx_capacity == QUEUE_CAPACITY
+  }
+@/
