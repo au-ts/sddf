@@ -131,6 +131,7 @@ predicate valid_device(heap: IArray, gv: Ref)
     valid_hardware_ring_tx_stat(heap, gv) &&
     valid_hardware_ring_tx_len(heap, gv)
 }
+define f_valid_device(a, b) valid_device(a, b) // silly transpiler bug
 
 predicate valid_hardware_ring_rx_addr(heap: IArray, gv: Ref)
 {

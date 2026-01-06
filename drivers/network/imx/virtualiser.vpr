@@ -30,6 +30,7 @@ predicate valid_virt(heap: IArray, virt: Ref)
   valid_net_queue(heap, virt, virt.tx_free, TX_QUEUE_CAPACITY) &&
   valid_net_queue(heap, virt, virt.tx_active, TX_QUEUE_CAPACITY)
 }
+define f_valid_virt(a, b) valid_virt(a, b) // silly transpiler bug
 
 method microkit_notify(heap: IArray, virt: Ref, x1: Int, x2: Int, x3: Int, x4: Int) 
   requires acc(virt.rx_notified) && acc(virt.tx_notified)
