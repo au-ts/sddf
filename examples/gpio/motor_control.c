@@ -25,34 +25,48 @@
 
 uintptr_t control_buffer_base_vaddr;
 
-
-#define TIMER_CHANNEL (1)
-#define MOTOR_CONTROL_CHANNEL (2)
+// Channels
+#define CLIENT_CHANNEL (1)
+#define TIMER_CHANNEL (2)
+#define MOTOR_A_GPIO_1 (3)
 
 #define GPIO_HIGH (1)
 #define GPIO_LOW (0)
 
-// All GPIO 3 pins are for ENA
-#define MOTOR_A_GPIO_1 (3)
-
+// Buffer Masks
+#define RHR_MASK 0b111111111
+#define UARTDR 0x000
+#define UARTFR 0x018
+#define UARTIMSC 0x038
+#define UARTICR 0x044
+#define PL011_UARTFR_TXFF (1 << 5)
+#define PL011_UARTFR_RXFE (1 << 4)
+#define REG_PTR(base, offset) ((volatile uint32_t *)((base) + (offset)))
 
 // Timer States for PWM
 #define PAUSE_HIGH (0)
 #define PAUSE_LOW (1)
 
-// Motor Controls
-
-
 #define NS_IN_MS 1000000ULL
 
 
-// l289n truth table: https://www.dprg.org/l298n-motor-driver-board-drive-modes/
-// TODO check if left/right are correct
-
-// https://howtomechatronics.com/tutorials/arduino/arduino-dc-motor-control-tutorial-l298n-pwm-h-bridge/#:~:text=Next%20are%20the%20logic%20control,the%20motor%20will%20be%20disabled.
-
 int pwm_state = PAUSE_LOW;
-int curr_control = ;
+int curr_command = CONTROL_NEUTRAL;
+
+// State of Current Control
+int is_control_fulfilled = -1;
+
+// Read data sent from client in the control buffer
+int read_control_buffer() {
+    int ch = 0;
+
+    if ((*REG_PTR(control_buffer_base_vaddr, UARTFR) & PL011_UARTFR_RXFE) == 0) {
+        ch = *REG_PTR(control_buffer_base_vaddr, UARTDR) & RHR_MASK;
+    }
+
+    return ch;
+}
+
 
 void gpio_init(int gpio_ch) {
     // LOG_CLIENT("Setting direction of GPIO1 to output!\n");
@@ -108,36 +122,80 @@ void set_pwm(int gpio_ch, int micro_s) {
     sddf_timer_set_timeout(TIMER_CHANNEL, micro_s);
 }
 
-void control_loop_main(void) {
-    gpio_init(MOTOR_A_GPIO_1);
 
-    // hold high for 2 ms
+void set_forward() {
     set_pwm(MOTOR_A_GPIO_1, 2*NS_IN_MS);
-    digital_write(MOTOR_A_GPIO_1, GPIO_HIGH);
+}
+
+// TODO complete these
+void set_reverse() {
+    LOG_CLIENT("REVERSE");
+}
+
+void set_neutral() {
+    LOG_CLIENT("NEUTRAL");
+}
+
+void handle_motor_request(void) {
+    switch (curr_command)
+    {
+    case CONTROL_FORWARD:
+        set_forward();
+        break;
+    case CONTROL_REVERSE:
+        set_reverse();
+        break;
+    case CONTROL_NEUTRAL:
+        set_neutral();
+        break;
+    default:
+        break;
+    }
 }
 
 void notified(microkit_channel ch) {
-    // check this switch
     switch (ch)
     {
     case TIMER_CHANNEL:
-        // LOG_CLIENT("PWM TIMEOUT\n");
+        // new control request, stop current signal to make new one
+        if (!is_control_fulfilled) {
+            handle_motor_request();
+            is_control_fulfilled = 1;
+            break;
+        } 
+
         if (pwm_state == PAUSE_HIGH) {
             digital_write(MOTOR_A_GPIO_1, GPIO_LOW);
             uint64_t time = sddf_timer_time_now(TIMER_CHANNEL);
             LOG_CLIENT("SET DIGITAL LOW, the time now is: %lu\n", time);
             
-            // hold low for 18 ms
+            // TODO change this to corresponding down time for each motor direction
+            // hold low for 18 ms (to drive forward)
             sddf_timer_set_timeout(TIMER_CHANNEL, 18*NS_IN_MS);
             pwm_state = PAUSE_LOW;
         }
         else {
             uint64_t time = sddf_timer_time_now(TIMER_CHANNEL);
             LOG_CLIENT("SET DIGITAL HIGH, the time now is: %lu\n", time);
-
             set_pwm(MOTOR_A_GPIO_1, 2*NS_IN_MS);
         }   
        
+        break;
+    case CLIENT_CHANNEL:
+        int command = read_control_buffer();
+        int was_control_fulfilled = is_control_fulfilled;
+
+        if (!command) {
+            break;
+        }
+        curr_command = command;
+        is_control_fulfilled = 0;
+
+        // first control request, call a function to handle it
+        if (was_control_fulfilled < 0) {
+            handle_motor_request();
+        }
+
         break;
     default:
         LOG_CLIENT("Unexpected channel call\n");
@@ -147,6 +205,6 @@ void notified(microkit_channel ch) {
 
 void init(void) {
     LOG_CLIENT("Init\n");
-    control_loop_main();
+    gpio_init(MOTOR_A_GPIO_1);
 }
 
