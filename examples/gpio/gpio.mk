@@ -54,7 +54,7 @@ TIMER_DRIVER := $(SDDF)/drivers/timer/${TIMER_DRIV_DIR}
 SYSTEM_FILE := ${GPIO_TOP}/board/$(MICROKIT_BOARD)/gpio.system
 
 # Images to build
-IMAGES := gpio_driver.elf timer_driver.elf client.elf
+IMAGES := gpio_driver.elf timer_driver.elf client.elf motor_control.elf
 
 # Compiler flags
 CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 \
@@ -74,18 +74,27 @@ LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
 COMMONFILES := libsddf_util_debug.a
 
 CLIENT_OBJS := client.o
+MOTOR_CONTROL_OBJS := motor_control.o
 
 -include client.d
+-include motor_control.d
 
 VPATH := ${GPIO_TOP}
 
 all: $(IMAGE_FILE)
 
-# Client build (modify this based on your actual client source location)
+# Client build
 client.o: ${GPIO_TOP}/client.c
 	$(CC) -c $(CFLAGS) $< -o $@
 
 client.elf: $(CLIENT_OBJS) libco.a
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+
+# Motor control build
+motor_control.o: ${GPIO_TOP}/motor_control.c
+	$(CC) -c $(CFLAGS) $< -o $@
+
+motor_control.elf: $(MOTOR_CONTROL_OBJS) libco.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 # Final image generation

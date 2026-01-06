@@ -33,22 +33,9 @@ uintptr_t control_buffer_base_vaddr;
 #define GPIO_HIGH (1)
 #define GPIO_LOW (0)
 
-// Buffer Masks
-#define RHR_MASK 0b111111111
-#define UARTDR 0x000
-#define UARTFR 0x018
-#define UARTIMSC 0x038
-#define UARTICR 0x044
-#define PL011_UARTFR_TXFF (1 << 5)
-#define PL011_UARTFR_RXFE (1 << 4)
-#define REG_PTR(base, offset) ((volatile uint32_t *)((base) + (offset)))
-
 // Timer States for PWM
 #define PAUSE_HIGH (0)
 #define PAUSE_LOW (1)
-
-#define NS_IN_MS 1000000ULL
-
 
 int pwm_state = PAUSE_LOW;
 int curr_command = CONTROL_NEUTRAL;
