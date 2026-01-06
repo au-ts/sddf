@@ -17,11 +17,11 @@
 #define DEBUG_CLIENT
 
 #ifdef DEBUG_CLIENT
-#define LOG_CLIENT(...) do{ sddf_printf("CLIENT|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
+#define LOG_CONTROL(...) do{ sddf_printf("CONTROL|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
 #else
-#define LOG_CLIENT(...) do{}while(0)
+#define  LOG_CONTROL(...) do{}while(0)
 #endif
-#define LOG_CLIENT_ERR(...) do{ sddf_printf("CLIENT|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
+#define LOG_CONTROL_ERR(...) do{ sddf_printf("CONTROL|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
 uintptr_t control_buffer_base_vaddr;
 
@@ -44,6 +44,7 @@ int curr_command = CONTROL_NEUTRAL;
 int is_control_fulfilled = -1;
 
 // Read data sent from client in the control buffer
+// TODO destroy data????
 int read_control_buffer() {
     int ch = 0;
 
@@ -56,7 +57,7 @@ int read_control_buffer() {
 
 
 void gpio_init(int gpio_ch) {
-    // LOG_CLIENT("Setting direction of GPIO1 to output!\n");
+    // LOG_CONTROL("Setting direction of GPIO1 to output!\n");
     microkit_msginfo msginfo;
     msginfo = microkit_msginfo_new(GPIO_SET_GPIO, 2);
     microkit_mr_set(GPIO_REQ_CONFIG_SLOT, GPIO_DIRECTION);
@@ -64,7 +65,7 @@ void gpio_init(int gpio_ch) {
     msginfo = microkit_ppcall(gpio_ch, msginfo);
     if (microkit_msginfo_get_label(msginfo) == GPIO_FAILURE) {
         size_t error = microkit_mr_get(GPIO_RES_VALUE_SLOT);
-        LOG_CLIENT_ERR("failed to set direction of gpio with error %ld!\n", error);
+        LOG_CONTROL_ERR("failed to set direction of gpio with error %ld!\n", error);
         while (1) {};
     }
 }
@@ -74,34 +75,34 @@ void digital_write(int gpio_ch, int value) {
     microkit_msginfo msginfo;
 
     if (value == GPIO_HIGH) {
-        // LOG_CLIENT("Setting GPIO1 to on!\n");
+        // LOG_CONTROL("Setting GPIO1 to on!\n");
         msginfo = microkit_msginfo_new(GPIO_SET_GPIO, 2);
         microkit_mr_set(GPIO_REQ_CONFIG_SLOT, GPIO_OUTPUT);
         microkit_mr_set(GPIO_REQ_VALUE_SLOT, 1);
         msginfo = microkit_ppcall(gpio_ch, msginfo);
         if (microkit_msginfo_get_label(msginfo) == GPIO_FAILURE) {
             size_t error = microkit_mr_get(GPIO_RES_VALUE_SLOT);
-            LOG_CLIENT_ERR("failed to set output of gpio with error %ld!\n", error);
+            LOG_CONTROL_ERR("failed to set output of gpio with error %ld!\n", error);
             while (1) {};
         }       
     }
     else if (value == GPIO_LOW) {
         // TODO check if this is correct to set GPIO LOW
-        // LOG_CLIENT("Setting GPIO1 to off!\n");
+        // LOG_CONTROL("Setting GPIO1 to off!\n");
         msginfo = microkit_msginfo_new(GPIO_SET_GPIO, 2);
         microkit_mr_set(GPIO_REQ_CONFIG_SLOT, GPIO_OUTPUT);
         microkit_mr_set(GPIO_REQ_VALUE_SLOT, 0);
         msginfo = microkit_ppcall(gpio_ch, msginfo);
         if (microkit_msginfo_get_label(msginfo) == GPIO_FAILURE) {
             size_t error = microkit_mr_get(GPIO_RES_VALUE_SLOT);
-            // LOG_CLIENT_ERR("failed to set output of gpio with error %ld!\n", error);
+            LOG_CONTROL_ERR("failed to set output of gpio with error %ld!\n", error);
             while (1) {};
         }
     }
 }
 
 void set_pwm(int gpio_ch, int micro_s) {
-    // LOG_CLIENT("SET DIGITAL HIGH\n");
+    // LOG_CONTROL("SET DIGITAL HIGH\n");
     digital_write(gpio_ch, GPIO_HIGH);
     pwm_state = PAUSE_HIGH;
 
@@ -116,20 +117,22 @@ void set_forward() {
 
 // TODO complete these
 void set_reverse() {
-    LOG_CLIENT("REVERSE");
+    LOG_CONTROL("REVERSE");
 }
 
 void set_neutral() {
-    LOG_CLIENT("NEUTRAL");
+    LOG_CONTROL("NEUTRAL");
 }
 
 void handle_motor_request(void) {
     switch (curr_command)
     {
     case CONTROL_FORWARD:
+        LOG_CONTROL("CONTROL FORWARD RECEIVED");
         set_forward();
         break;
     case CONTROL_REVERSE:
+        LOG_CONTROL("CONTROL REVERSE RECEIVED");
         set_reverse();
         break;
     case CONTROL_NEUTRAL:
@@ -154,7 +157,9 @@ void notified(microkit_channel ch) {
         if (pwm_state == PAUSE_HIGH) {
             digital_write(MOTOR_A_GPIO_1, GPIO_LOW);
             uint64_t time = sddf_timer_time_now(TIMER_CHANNEL);
-            LOG_CLIENT("SET DIGITAL LOW, the time now is: %lu\n", time);
+            LOG_CONTROL("SET DIGITAL LOW, the time now is: %lu\n", time);
+            LOG_CONTROL("CURRENT CONTROL, %d\n", curr_command);
+
             
             // TODO change this to corresponding down time for each motor direction
             // hold low for 18 ms (to drive forward)
@@ -162,8 +167,8 @@ void notified(microkit_channel ch) {
             pwm_state = PAUSE_LOW;
         }
         else {
-            uint64_t time = sddf_timer_time_now(TIMER_CHANNEL);
-            LOG_CLIENT("SET DIGITAL HIGH, the time now is: %lu\n", time);
+            // uint64_t time = sddf_timer_time_now(TIMER_CHANNEL);
+            // LOG_CONTROL("SET DIGITAL HIGH, the time now is: %lu\n", time);
             set_pwm(MOTOR_A_GPIO_1, 2*NS_IN_MS);
         }   
        
@@ -185,13 +190,13 @@ void notified(microkit_channel ch) {
 
         break;
     default:
-        LOG_CLIENT("Unexpected channel call\n");
+        LOG_CONTROL("Unexpected channel call\n");
         break;
     }
 }
 
 void init(void) {
-    LOG_CLIENT("Init\n");
+    LOG_CONTROL("Init\n");
     gpio_init(MOTOR_A_GPIO_1);
 }
 

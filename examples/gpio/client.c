@@ -44,7 +44,7 @@ bool delay_ms(size_t milliseconds)
 
     /* Detect potential overflow */
     if (milliseconds != 0 && time_ns / milliseconds != NS_IN_MS) {
-        LOG_CLIENT_ERR("overflow detected in delay_ms");
+        LOG_CLIENT_ERR("overflow detected in delay_ms\n");
         return false;
     }
 
@@ -60,11 +60,13 @@ void append_control_buffer(int command) {
 } 
 
 void send_forward_request() {
+    LOG_CLIENT("Sending forward request\n");
     append_control_buffer(CONTROL_FORWARD);
     microkit_notify(MOTOR_CONTROL_CHANNEL);
 }
 
 void send_reverse_request() {
+    LOG_CLIENT("Sending reverse request\n");
     append_control_buffer(CONTROL_REVERSE);
     microkit_notify(MOTOR_CONTROL_CHANNEL);
 }
@@ -75,6 +77,7 @@ void send_neutral_request() {
 }
 
 void client_main(void) {
+    LOG_CLIENT("In client main\n");
     send_forward_request();
     delay_ms(20000);
 
