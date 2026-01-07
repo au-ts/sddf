@@ -12,7 +12,10 @@
 #define CONTROL_REVERSE (2)
 #define CONTROL_NEUTRAL (3)
 
+/* Number of nanoseconds in a millisecond */
 #define NS_IN_MS 1000000ULL
+/* Number of nanoseconds in a microsecond */
+#define NS_IN_US 1000ULL
 
 // Buffer Masks
 #define RHR_MASK 0b111111111
@@ -31,12 +34,12 @@
 #define PWM_TIME_HIGH 1
 #define PWM_TIME_LOW 2
 
-// Time Spent (ms) on HIGH/LOW for Motor Control PWM Signals
+// Time Spent (microseconds) on HIGH/LOW for Motor Control PWM Signals
 // Control, Time HIGH, Time LOW
 static const int pwm_delay_mappings[PWM_CHANNEL_MAPPING_COLS][PWM_CHANNEL_MAPPING_ROWS] = {
-    {CONTROL_FORWARD, 2, 18},
-    {CONTROL_REVERSE,  1, 19},
-    {CONTROL_NEUTRAL, 2, 18},
+    {CONTROL_FORWARD, 2000, 18000},
+    {CONTROL_REVERSE,  1000, 19000},
+    {CONTROL_NEUTRAL, 1500, 18500},
 };
 
 

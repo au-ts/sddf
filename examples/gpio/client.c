@@ -34,8 +34,7 @@ static char t_client_main_stack[STACK_SIZE];
 #define TIMER_CHANNEL (1)
 #define MOTOR_CONTROL_CHANNEL (2)
 
-// TODO Do a coroutine while motor control (to block current control requests)
-// Whether there is unfulfilled motor control request
+// Unfulfilled motor control request
 int is_ongoing_request = 0;
 
 bool delay_ms(size_t milliseconds)
@@ -79,10 +78,10 @@ void send_neutral_request() {
 void client_main(void) {
     LOG_CLIENT("In client main\n");
     send_forward_request();
-    delay_ms(20000);
+    delay_ms(10000);
 
     send_reverse_request();
-    delay_ms(20000);
+    delay_ms(10000);
 }
 
 // Call coroutine, block other commands from executing
