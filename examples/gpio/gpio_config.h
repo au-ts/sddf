@@ -13,6 +13,12 @@
 #define GPIO_1 (MESON_GPIO_X + 1)
 #define GPIO_2 (MESON_GPIO_X + 0)
 
+// Ultrasonic pins
+// Echo pin
+#define GPIO_3 (MESON_GPIO_X + 3)
+// Trig pin
+#define GPIO_4 (MESON_GPIO_X + 4)
+
 // WARNING : The GPIOA pins DO NOT work for input!!
 
 #define GPIO_CHANNEL_MAPPING_COLS   3  // do not change
@@ -36,8 +42,8 @@
 static const int gpio_channel_mappings[GPIO_CHANNEL_MAPPING_ROWS][GPIO_CHANNEL_MAPPING_COLS] = {
     { 0, GPIO_1, -1 },
     { 1, GPIO_2, -1 },
-    { 2, -1, -1 },
-    { 3, -1, -1 },
+    { 2, GPIO_3, -1 },
+    { 3, GPIO_4, -1 },
     { 4, -1, -1 },
     { 5, -1, -1 },
     { 6, -1, -1 },

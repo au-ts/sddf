@@ -92,11 +92,40 @@ void send_neutral_request(int motor_ch) {
     microkit_notify(motor_ch);
 }
 
+// TODO check these
+void drive_forward(void) {
+    send_forward_request(MOTOR_CONTROL_A_CHANNEL);
+    send_forward_request(MOTOR_CONTROL_B_CHANNEL);
+}
+
+void drive_reverse(void) {
+    send_reverse_request(MOTOR_CONTROL_A_CHANNEL);
+    send_reverse_request(MOTOR_CONTROL_B_CHANNEL);
+}
+
+void drive_left(void) {
+    send_forward_request(MOTOR_CONTROL_A_CHANNEL);
+    send_neutral_request(MOTOR_CONTROL_B_CHANNEL);
+}
+
+void drive_right(void) {
+    send_forward_request(MOTOR_CONTROL_B_CHANNEL);
+    send_neutral_request(MOTOR_CONTROL_A_CHANNEL);
+}
+
 void client_main(void) {
     LOG_CLIENT("In client main\n");
-    send_forward_request(MOTOR_CONTROL_A_CHANNEL);
-    send_reverse_request(MOTOR_CONTROL_B_CHANNEL);
-    delay_ms(10000);
+    drive_forward();
+    delay_ms(5000);
+
+    drive_left();
+    delay_ms(5000);
+
+    drive_right();
+    delay_ms(5000);
+
+    drive_reverse();
+    delay_ms(5000);
 }
 
 // Call coroutine, block other commands from executing
