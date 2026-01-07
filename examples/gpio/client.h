@@ -24,5 +24,21 @@
 #define PL011_UARTFR_RXFE (1 << 4)
 #define REG_PTR(base, offset) ((volatile uint32_t *)((base) + (offset)))
 
+// PWM Delays
+#define PWM_CHANNEL_MAPPING_COLS 3
+#define PWM_CHANNEL_MAPPING_ROWS 3
+
+#define PWM_TIME_HIGH 1
+#define PWM_TIME_LOW 2
+
+// Time Spent (ms) on HIGH/LOW for Motor Control PWM Signals
+// Control, Time HIGH, Time LOW
+static const int pwm_delay_mappings[PWM_CHANNEL_MAPPING_COLS][PWM_CHANNEL_MAPPING_ROWS] = {
+    {CONTROL_FORWARD, 2, 18},
+    {CONTROL_REVERSE,  1, 19},
+    {CONTROL_NEUTRAL, 2, 18},
+};
+
+
 
 
