@@ -10,9 +10,7 @@
 #include <libco.h>
 #include <sddf/util/printf.h>
 #include <sddf/timer/client.h>
-#include <sddf/gpio/meson/gpio.h>
 #include "client.h"
-#include "gpio_config.h"
 
 #define DEBUG_CLIENT
 
@@ -23,7 +21,9 @@
 #endif
 #define LOG_CLIENT_ERR(...) do{ sddf_printf("CLIENT|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
-uintptr_t control_buffer_base_vaddr;
+// Motor control buffers
+uintptr_t control_buffer_base_vaddr_a;
+uintptr_t control_buffer_base_vaddr_b;
 
 cothread_t t_event;
 cothread_t t_main;
@@ -31,8 +31,10 @@ cothread_t t_main;
 #define STACK_SIZE (4096)
 static char t_client_main_stack[STACK_SIZE];
 
+// Channels
 #define TIMER_CHANNEL (1)
-#define MOTOR_CONTROL_CHANNEL (2)
+#define MOTOR_CONTROL_A_CHANNEL (2)
+#define MOTOR_CONTROL_B_CHANNEL (3)
 
 // Unfulfilled motor control request
 int is_ongoing_request = 0;
@@ -53,34 +55,47 @@ bool delay_ms(size_t milliseconds)
     return true;
 }
 
-
-void append_control_buffer(int command) {
-    *REG_PTR(control_buffer_base_vaddr, UARTDR) = command;
+void append_control_buffer(int command, uintptr_t vaddr) {
+    *REG_PTR(vaddr, UARTDR) = command;
 } 
 
-void send_forward_request() {
+void send_forward_request(int motor_ch) {
+    if (motor_ch == MOTOR_CONTROL_A_CHANNEL) {
+        append_control_buffer(CONTROL_FORWARD, control_buffer_base_vaddr_a);
+    }
+    else if (motor_ch == MOTOR_CONTROL_B_CHANNEL) {
+        append_control_buffer(CONTROL_FORWARD, control_buffer_base_vaddr_b);
+    }
     LOG_CLIENT("Sending forward request\n");
-    append_control_buffer(CONTROL_FORWARD);
-    microkit_notify(MOTOR_CONTROL_CHANNEL);
+    microkit_notify(motor_ch);
 }
 
-void send_reverse_request() {
+void send_reverse_request(int motor_ch) {
+    if (motor_ch == MOTOR_CONTROL_A_CHANNEL) {
+        append_control_buffer(CONTROL_REVERSE, control_buffer_base_vaddr_a);
+    }
+    else if (motor_ch == MOTOR_CONTROL_B_CHANNEL) {
+        append_control_buffer(CONTROL_REVERSE, control_buffer_base_vaddr_b);
+    }
     LOG_CLIENT("Sending reverse request\n");
-    append_control_buffer(CONTROL_REVERSE);
-    microkit_notify(MOTOR_CONTROL_CHANNEL);
+    microkit_notify(motor_ch);
 }
 
-void send_neutral_request() {
-    append_control_buffer(CONTROL_NEUTRAL);
-    microkit_notify(MOTOR_CONTROL_CHANNEL);
+void send_neutral_request(int motor_ch) {
+    if (motor_ch == MOTOR_CONTROL_A_CHANNEL) {
+        append_control_buffer(CONTROL_NEUTRAL, control_buffer_base_vaddr_a);
+    }
+    else if (motor_ch == MOTOR_CONTROL_B_CHANNEL) {
+        append_control_buffer(CONTROL_NEUTRAL, control_buffer_base_vaddr_b);
+    }
+    LOG_CLIENT("Sending neutral request\n");
+    microkit_notify(motor_ch);
 }
 
 void client_main(void) {
     LOG_CLIENT("In client main\n");
-    send_forward_request();
-    delay_ms(10000);
-
-    send_reverse_request();
+    send_forward_request(MOTOR_CONTROL_A_CHANNEL);
+    send_reverse_request(MOTOR_CONTROL_B_CHANNEL);
     delay_ms(10000);
 }
 

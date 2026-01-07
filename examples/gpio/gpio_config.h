@@ -9,13 +9,9 @@
 #include <sddf/gpio/meson/gpio.h>
 #include <sddf/gpio/imx/gpio.h>
 
-// Right motor pins
+//  Motor pins
 #define GPIO_1 (MESON_GPIO_X + 1)
-// #define GPIO_2 (MESON_GPIO_X + 2)
-
-// Left motor pins
-// #define GPIO_3 (MESON_GPIO_X + 3)
-// #define GPIO_4 (MESON_GPIO_X + 4)
+#define GPIO_2 (MESON_GPIO_X + 0)
 
 // WARNING : The GPIOA pins DO NOT work for input!!
 
@@ -39,7 +35,7 @@
 */
 static const int gpio_channel_mappings[GPIO_CHANNEL_MAPPING_ROWS][GPIO_CHANNEL_MAPPING_COLS] = {
     { 0, GPIO_1, -1 },
-    { 1, -1, -1 },
+    { 1, GPIO_2, -1 },
     { 2, -1, -1 },
     { 3, -1, -1 },
     { 4, -1, -1 },

@@ -21,6 +21,7 @@
 #else
 #define  LOG_CONTROL(...) do{}while(0)
 #endif
+
 #define LOG_CONTROL_ERR(...) do{ sddf_printf("CONTROL|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
 uintptr_t control_buffer_base_vaddr;
@@ -28,7 +29,7 @@ uintptr_t control_buffer_base_vaddr;
 // Channels
 #define CLIENT_CHANNEL (1)
 #define TIMER_CHANNEL (2)
-#define MOTOR_A_GPIO_1 (3)
+#define GPIO_CHANNEL (3)
 
 #define GPIO_HIGH (1)
 #define GPIO_LOW (0)
@@ -44,7 +45,6 @@ int curr_command = CONTROL_NEUTRAL;
 int is_control_fulfilled = -1;
 
 // Read data sent from client in the control buffer
-// TODO destroy data????
 int read_control_buffer() {
     int ch = 0;
 
@@ -112,27 +112,26 @@ void set_pwm(int gpio_ch, int micro_s) {
 
 
 void set_forward(void) {
-    set_pwm(MOTOR_A_GPIO_1, pwm_delay_mappings[CONTROL_FORWARD - 1][PWM_TIME_HIGH]*NS_IN_US);
+    set_pwm(GPIO_CHANNEL, pwm_delay_mappings[CONTROL_FORWARD - 1][PWM_TIME_HIGH]*NS_IN_US);
 }
 
 // TODO complete these
 void set_reverse(void) {
-    set_pwm(MOTOR_A_GPIO_1, pwm_delay_mappings[CONTROL_REVERSE - 1][PWM_TIME_HIGH]*NS_IN_US);
+    set_pwm(GPIO_CHANNEL, pwm_delay_mappings[CONTROL_REVERSE - 1][PWM_TIME_HIGH]*NS_IN_US);
 }
 
 void set_neutral(void) {
-    set_pwm(MOTOR_A_GPIO_1, pwm_delay_mappings[CONTROL_NEUTRAL - 1][PWM_TIME_HIGH]*NS_IN_US);
+    set_pwm(GPIO_CHANNEL, pwm_delay_mappings[CONTROL_NEUTRAL - 1][PWM_TIME_HIGH]*NS_IN_US);
 }
+
 
 void handle_motor_request(void) {
     switch (curr_command)
     {
     case CONTROL_FORWARD:
-        LOG_CONTROL("CONTROL FORWARD RECEIVED");
         set_forward();
         break;
     case CONTROL_REVERSE:
-        LOG_CONTROL("CONTROL REVERSE RECEIVED");
         set_reverse();
         break;
     case CONTROL_NEUTRAL:
@@ -155,11 +154,10 @@ void notified(microkit_channel ch) {
         } 
 
         if (pwm_state == PAUSE_HIGH) {
-            digital_write(MOTOR_A_GPIO_1, GPIO_LOW);
-            uint64_t time = sddf_timer_time_now(TIMER_CHANNEL);
-            LOG_CONTROL("SET DIGITAL LOW, the time now is: %lu\n", time);
+            digital_write(GPIO_CHANNEL, GPIO_LOW);
+            // uint64_t time = sddf_timer_time_now(TIMER_CHANNEL);
+            // LOG_CONTROL("SET DIGITAL LOW, the time now is: %lu\n", time);
             LOG_CONTROL("CURRENT CONTROL, %d\n", curr_command);
-
             
             // TODO change this to corresponding down time for each motor direction
             // hold low for 18 ms (to drive forward)
@@ -167,15 +165,13 @@ void notified(microkit_channel ch) {
             pwm_state = PAUSE_LOW;
         }
         else {
-            uint64_t time = sddf_timer_time_now(TIMER_CHANNEL);
-            LOG_CONTROL("SET DIGITAL HIGH, the time now is: %lu\n", time);
-            set_pwm(MOTOR_A_GPIO_1, pwm_delay_mappings[curr_command - 1][PWM_TIME_HIGH]*NS_IN_US);
+            // uint64_t time = sddf_timer_time_now(TIMER_CHANNEL);
+            // LOG_CONTROL("SET DIGITAL HIGH, the time now is: %lu\n", time);
+            set_pwm(GPIO_CHANNEL, pwm_delay_mappings[curr_command - 1][PWM_TIME_HIGH]*NS_IN_US);
         }   
-       
+        
         break;
     case CLIENT_CHANNEL:
-        LOG_CONTROL("RECEIVED SOMETHING");
-
         int command = read_control_buffer();
         int was_control_fulfilled = is_control_fulfilled;
 
@@ -199,6 +195,6 @@ void notified(microkit_channel ch) {
 
 void init(void) {
     LOG_CONTROL("Init\n");
-    gpio_init(MOTOR_A_GPIO_1);
+    gpio_init(GPIO_CHANNEL);
 }
 

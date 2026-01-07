@@ -9,7 +9,9 @@
     <memory_region name="gpio" size="0x1_000" phys_addr="0xFF634000"/>
     <memory_region name="gpio_ao" size="0x1_000" phys_addr="0xFF800000"/>
     <memory_region name="timer_registers" size="0x10_000" phys_addr="0xffd0f000" />
-    <memory_region name="control_buffer" size="0x1000"/>
+
+    <memory_region name="control_buffer_a" size="0x1000"/>
+    <memory_region name="control_buffer_b" size="0x1000"/>
 
 
     <protection_domain name="timer" priority="254" passive="true">
@@ -26,16 +28,22 @@
     </protection_domain>
 
     <protection_domain name="client" priority="1">
-        <map mr="control_buffer" vaddr="0x6000000" perms="rw" setvar_vaddr="control_buffer_base_vaddr"/>
+        <map mr="control_buffer_a" vaddr="0x6000000" perms="rw" setvar_vaddr="control_buffer_base_vaddr_a"/>
+        <map mr="control_buffer_b" vaddr="0x8000000" perms="rw" setvar_vaddr="control_buffer_base_vaddr_b"/>
+
         <program_image path="client.elf"/>
     </protection_domain>
 
-    <!-- TODO update priorities -->
-    <protection_domain name="motor_control" priority="2">
-        <map mr="control_buffer" vaddr="0x6000000" perms="rw" setvar_vaddr="control_buffer_base_vaddr"/>
-        <program_image path="motor_control.elf"/>
+    <protection_domain name="motor_control_a" priority="2">
+        <map mr="control_buffer_a" vaddr="0x6000000" perms="rw" setvar_vaddr="control_buffer_base_vaddr"/>
+        <program_image path="motor_control_a.elf"/>
     </protection_domain>
-    
+
+    <protection_domain name="motor_control_b" priority="2">
+        <map mr="control_buffer_b" vaddr="0x6000000" perms="rw" setvar_vaddr="control_buffer_base_vaddr"/>
+        <program_image path="motor_control_b.elf"/>
+    </protection_domain>
+
 
     <!-- Timer channels -->
     <channel>
@@ -45,19 +53,35 @@
 
     <channel>
         <end pd="timer" id="2" />
-        <end pd="motor_control" id="2" pp="true"/>
+        <end pd="motor_control_a" id="2" pp="true"/>
     </channel>
+
+     <channel>
+        <end pd="timer" id="3" />
+        <end pd="motor_control_b" id="2" pp="true"/>
+    </channel>
+
 
     <!-- Client to motor channel -->
     <channel>
-        <end pd="motor_control" id="1" />
+        <end pd="motor_control_a" id="1" />
         <end pd="client" id="2" pp="true"/>
+    </channel>
+
+    <channel>
+        <end pd="motor_control_b" id="1" />
+        <end pd="client" id="3" pp="true"/>
     </channel>
 
     <!-- Motor to GPIO channel -->
     <channel>
         <end pd="driver" id="0" />
-        <end pd="motor_control" id="3" pp="true"/>
+        <end pd="motor_control_a" id="3" pp="true"/>
+    </channel>
+
+    <channel>
+        <end pd="driver" id="1" />
+        <end pd="motor_control_b" id="3" pp="true"/>
     </channel>
 
 </system>

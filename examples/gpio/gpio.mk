@@ -50,11 +50,10 @@ TIMER_TOP := ${SDDF}/examples/timer
 GPIO_DRIVER := $(SDDF)/drivers/gpio/${PLATFORM}
 TIMER_DRIVER := $(SDDF)/drivers/timer/${TIMER_DRIV_DIR}
 
-# System file (you'll need to create this)
 SYSTEM_FILE := ${GPIO_TOP}/board/$(MICROKIT_BOARD)/gpio.system
 
 # Images to build
-IMAGES := gpio_driver.elf timer_driver.elf client.elf motor_control.elf
+IMAGES := gpio_driver.elf timer_driver.elf client.elf motor_control_a.elf motor_control_b.elf
 
 # Compiler flags
 CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 \
@@ -74,10 +73,13 @@ LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
 COMMONFILES := libsddf_util_debug.a
 
 CLIENT_OBJS := client.o
-MOTOR_CONTROL_OBJS := motor_control.o
+MOTOR_CONTROL_A_OBJS := motor_control_a.o
+MOTOR_CONTROL_B_OBJS := motor_control_b.o
 
 -include client.d
--include motor_control.d
+-include motor_control_a.d
+-include motor_control_b.d
+
 
 VPATH := ${GPIO_TOP}
 
@@ -90,12 +92,19 @@ client.o: ${GPIO_TOP}/client.c
 client.elf: $(CLIENT_OBJS) libco.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-# Motor control build
-motor_control.o: ${GPIO_TOP}/motor_control.c
+# Motor control build, specify what channel the GPIO pins are
+motor_control_a.o: ${GPIO_TOP}/motor_control.c
 	$(CC) -c $(CFLAGS) $< -o $@
 
-motor_control.elf: $(MOTOR_CONTROL_OBJS) libco.a
+motor_control_a.elf: $(MOTOR_CONTROL_A_OBJS) libco.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+
+motor_control_b.o: ${GPIO_TOP}/motor_control.c
+	$(CC) -c $(CFLAGS) $< -o $@
+
+motor_control_b.elf: $(MOTOR_CONTROL_B_OBJS) libco.a
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+
 
 # Final image generation
 $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
