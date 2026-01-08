@@ -1,0 +1,336 @@
+/*
+ * Copyright 2025, UNSW
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
+#include <stdbool.h>
+#include <stdint.h>
+#include <microkit.h>
+#include <sddf/resources/device.h>
+#include <sddf/network/queue.h>
+#include <sddf/network/config.h>
+#include <sddf/util/util.h>
+#include <sddf/util/fence.h>
+#include <sddf/util/printf.h>
+#include <sddf/serial/queue.h>
+#include <sddf/serial/config.h>
+
+#include "ethernet.h"
+
+__attribute__((__section__(".device_resources"))) device_resources_t device_resources;
+
+__attribute__((__section__(".net_driver_config"))) net_driver_config_t config;
+
+// TODO :remove
+__attribute__((__section__(".serial_client_config"))) serial_client_config_t serial_config;
+
+/* HW ring capacity must be a power of 2 */
+#define RX_COUNT 256
+#define TX_COUNT 256
+#define MAX_COUNT MAX(RX_COUNT, TX_COUNT)
+
+/* HW ring descriptor (shared with device) */
+struct descriptor {
+    uint16_t len;
+    uint16_t stat;
+    uint32_t addr;
+};
+
+/* HW ring buffer data type */
+typedef struct {
+    uint32_t tail; /* index to insert at */
+    uint32_t head; /* index to remove from */
+    uint32_t capacity; /* capacity of the ring */
+    volatile struct descriptor *descr; /* buffer descriptor array */
+} hw_ring_t;
+
+hw_ring_t rx; /* Rx NIC ring */
+hw_ring_t tx; /* Tx NIC ring */
+
+net_queue_handle_t rx_queue;
+net_queue_handle_t tx_queue;
+
+#define MAX_PACKET_SIZE     1536
+
+volatile zynqmp_gem_regs_t *eth;
+
+static inline bool hw_ring_full(hw_ring_t *ring)
+{
+    return ring->tail - ring->head == ring->capacity;
+}
+
+static inline bool hw_ring_empty(hw_ring_t *ring)
+{
+    return ring->tail - ring->head == 0;
+}
+
+static void update_ring_slot(hw_ring_t *ring, unsigned int idx, uintptr_t phys,
+                             uint16_t len, uint16_t stat)
+{
+    volatile struct descriptor *d = &(ring->descr[idx]);
+    d->addr = phys;
+    d->len = len;
+
+    /* Ensure all writes to the descriptor complete, before we set the flags
+     * that makes hardware aware of this slot.
+     */
+    THREAD_MEMORY_RELEASE();
+    d->stat = stat;
+}
+
+static void rx_provide(void)
+{
+    // TODO: use correct registers for gem device
+    sddf_printf("rx_provide entry\n");
+    //bool reprocess = true;
+    //while (reprocess) {
+    //    while (!hw_ring_full(&rx) && !net_queue_empty_free(&rx_queue)) {
+    //        net_buff_desc_t buffer;
+    //        int err = net_dequeue_free(&rx_queue, &buffer);
+    //        assert(!err);
+
+    //        uint32_t idx = rx.tail % rx.capacity;
+    //        uint16_t stat = RXD_EMPTY;
+    //        if (idx + 1 == rx.capacity) {
+    //            stat |= WRAP;
+    //        }
+    //        update_ring_slot(&rx, idx, buffer.io_or_offset, 0, stat);
+    //        rx.tail++;
+    //        eth->rdar = RDAR_RDAR;
+    //    }
+
+    //    /* Only request a notification from virtualiser if HW ring not full */
+    //    if (!hw_ring_full(&rx)) {
+    //        net_request_signal_free(&rx_queue);
+    //    } else {
+    //        net_cancel_signal_free(&rx_queue);
+    //    }
+    //    reprocess = false;
+
+    //    if (!net_queue_empty_free(&rx_queue) && !hw_ring_full(&rx)) {
+    //        net_cancel_signal_free(&rx_queue);
+    //        reprocess = true;
+    //    }
+    //}
+}
+
+static void rx_return(void)
+{
+    // TODO: check if any updates needed
+    sddf_printf("rx_return entry\n");
+    //bool packets_transferred = false;
+    //while (!hw_ring_empty(&rx)) {
+    //    /* If buffer slot is still empty, we have processed all packets the device has filled */
+    //    uint32_t idx = rx.head % rx.capacity;
+    //    volatile struct descriptor *d = &(rx.descr[idx]);
+    //    if (d->stat & RXD_EMPTY) {
+    //        break;
+    //    }
+
+    //    THREAD_MEMORY_ACQUIRE();
+
+    //    net_buff_desc_t buffer = { d->addr, d->len };
+    //    int err = net_enqueue_active(&rx_queue, buffer);
+    //    assert(!err);
+
+    //    packets_transferred = true;
+    //    rx.head++;
+    //}
+
+    //if (packets_transferred && net_require_signal_active(&rx_queue)) {
+    //    net_cancel_signal_active(&rx_queue);
+    //    microkit_notify(config.virt_rx.id);
+    //}
+}
+
+static void tx_provide(void)
+{
+    // TODO: use correct registers for gem device
+    sddf_printf("tx_provide entry\n");
+    //bool reprocess = true;
+    //while (reprocess) {
+    //    while (!(hw_ring_full(&tx)) && !net_queue_empty_active(&tx_queue)) {
+    //        net_buff_desc_t buffer;
+    //        int err = net_dequeue_active(&tx_queue, &buffer);
+    //        assert(!err);
+
+    //        uint32_t idx = tx.tail % tx.capacity;
+    //        uint16_t stat = TXD_READY | TXD_ADDCRC | TXD_LAST;
+    //        if (idx + 1 == tx.capacity) {
+    //            stat |= WRAP;
+    //        }
+    //        update_ring_slot(&tx, idx, buffer.io_or_offset, buffer.len, stat);
+    //        tx.tail++;
+    //        eth->tdar = TDAR_TDAR;
+    //    }
+
+    //    net_request_signal_active(&tx_queue);
+    //    reprocess = false;
+
+    //    if (!hw_ring_full(&tx) && !net_queue_empty_active(&tx_queue)) {
+    //        net_cancel_signal_active(&tx_queue);
+    //        reprocess = true;
+    //    }
+    //}
+}
+
+static void tx_return(void)
+{
+    // TODO: check if any updates needed
+    sddf_printf("tx_return entry\n");
+    //bool enqueued = false;
+    //while (!hw_ring_empty(&tx)) {
+    //    /* Ensure that this buffer has been sent by the device */
+    //    uint32_t idx = tx.head % tx.capacity;
+    //    volatile struct descriptor *d = &(tx.descr[idx]);
+    //    if (d->stat & TXD_READY) {
+    //        break;
+    //    }
+
+    //    THREAD_MEMORY_ACQUIRE();
+
+    //    net_buff_desc_t buffer = { d->addr, 0 };
+    //    int err = net_enqueue_free(&tx_queue, buffer);
+    //    assert(!err);
+
+    //    enqueued = true;
+    //    tx.head++;
+    //}
+
+    //if (enqueued && net_require_signal_free(&tx_queue)) {
+    //    net_cancel_signal_free(&tx_queue);
+    //    microkit_notify(config.virt_tx.id);
+    //}
+}
+
+static void handle_irq(void)
+{
+    // TODO: update to use correct registers and flags
+    sddf_printf("handle_irq entry\n");
+    //uint32_t e = eth->eir & IRQ_MASK;
+    //eth->eir = e;
+
+    //while (e & IRQ_MASK) {
+    //    if (e & NETIRQ_TXF) {
+    //        tx_return();
+    //        tx_provide();
+    //    }
+    //    if (e & NETIRQ_RXF) {
+    //        rx_return();
+    //        rx_provide();
+    //    }
+    //    if (e & NETIRQ_EBERR) {
+    //        sddf_dprintf("ETH|ERROR: System bus/uDMA %u\n", e);
+    //    }
+    //    e = eth->eir & IRQ_MASK;
+    //    eth->eir = e;
+    //}
+}
+
+static void eth_setup(void)
+{
+    // TODO: use correct registers and setup process
+    //sddf_dprintf("eth_setup entry!\n");
+    eth = device_resources.regions[0].region.vaddr;
+
+    /* Set up HW rings */
+    rx.descr = (volatile struct descriptor *)device_resources.regions[1].region.vaddr;
+    tx.descr = (volatile struct descriptor *)device_resources.regions[2].region.vaddr;
+    rx.capacity = RX_COUNT;
+    tx.capacity = TX_COUNT;
+
+    /* Chapter 34: GEM Ethernet: programming steps */
+    /* 1: Init controller */
+    eth->nwctrl = 0x0;
+    eth->nwctrl |= ZYNQ_GEM_NWCTRL_CLEARSTAT;
+    eth->rxsr = ZYNQ_GEM_RXSR_CLEAR;
+    eth->txsr = ZYNQ_GEM_TXSR_CLEAR;
+    eth->idr = ZYNQ_GEM_IDR_CLEAR;
+    // XXX: need to reset receive_q-ptr too?
+    eth->receive_q1_ptr = 0x0;
+    eth->transmit_q1_ptr = 0x0;
+
+    // XXX: clear stat counters? clear phymntnc?
+
+    /* 2: Controller config */
+    // TODO: Debug: enable promiscuous mode (copy all frames)
+    #define ZYNQ_GEM_NWCFG_CPY_ALL_FRAMES BIT(4)
+    eth->nwcfg |= ZYNQ_GEM_NWCFG_INIT | ZYNQ_GEM_NWCFG_SPEED1000 | ZYNQ_GEM_NWCFG_CPY_ALL_FRAMES;
+    // XXX: SGMII enable? https://github.com/u-boot/u-boot/blob/master/drivers/net/zynq_gem.c#L503
+    // XXX: clkrate setup??
+    // XXX: MDC clk division??
+    // XXX: set the MAC address? write to laddr?
+    /* DMA config */
+    eth->dmacr = ZYNQ_GEM_DMACR_INIT;
+    /* enable MDIO, transmitter, receiver */
+    eth->nwctrl = ZYNQ_GEM_NWCTRL_MDEN_MASK | ZYNQ_GEM_NWCTRL_TXEN_MASK | ZYNQ_GEM_NWCTRL_RXEN_MASK;
+
+    /* 3: I/O config */
+    // XXX: skip for now, might need to configure clocks
+
+    /* 4: PHY config */
+    // XXX: assumed set up by u-boot? no driver for now.
+
+    /* 5: Buffer descriptors config */
+
+    /* 6: Interrupt config */
+
+
+    /* 7: Controller enable */
+
+    /* ?? Transmitting frames */
+
+    /* ?? Receiving frames */
+    sddf_printf("eth_setup exit!\n");
+}
+
+
+serial_queue_handle_t serial_tx_queue_handle;
+void init(void)
+{
+    // TODO: ensure correct initialisation
+    assert(serial_config_check_magic(&serial_config)); // TODO: remove
+    assert(net_config_check_magic(&config));
+    assert(device_resources_check_magic(&device_resources));
+    assert(device_resources.num_irqs == 1);
+    assert(device_resources.num_regions == 3);
+    // All buffers should fit within our DMA region
+    assert(RX_COUNT * sizeof(struct descriptor) <= device_resources.regions[1].region.size);
+    assert(TX_COUNT * sizeof(struct descriptor) <= device_resources.regions[2].region.size);
+
+    // TODO: remove:
+    serial_queue_init(&serial_tx_queue_handle, serial_config.tx.queue.vaddr, serial_config.tx.data.size,
+                      serial_config.tx.data.vaddr);
+    serial_putchar_init(serial_config.tx.id, &serial_tx_queue_handle);
+    //sddf_printf("ETH DRIVER: INIT!\n");
+
+    eth_setup();
+
+    net_queue_init(&rx_queue, config.virt_rx.free_queue.vaddr, config.virt_rx.active_queue.vaddr,
+                   config.virt_rx.num_buffers);
+    net_queue_init(&tx_queue, config.virt_tx.free_queue.vaddr, config.virt_tx.active_queue.vaddr,
+                   config.virt_tx.num_buffers);
+
+    sddf_printf("finish net queue init\n");
+    rx_provide();
+    tx_provide();
+}
+
+void notified(microkit_channel ch)
+{
+    // TODO; ensure no additional actions needed on notification
+    if (ch == device_resources.irqs[0].id) {
+        handle_irq();
+        /*
+         * Delay calling into the kernel to ack the IRQ until the next loop
+         * in the microkit event handler loop.
+         */
+        microkit_deferred_irq_ack(ch);
+    } else if (ch == config.virt_rx.id) {
+        rx_provide();
+    } else if (ch == config.virt_tx.id) {
+        tx_provide();
+    } else {
+        sddf_dprintf("ETH|LOG: received notification on unexpected channel: %u\n", ch);
+    }
+}
