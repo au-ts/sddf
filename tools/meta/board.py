@@ -143,6 +143,7 @@ BOARDS: List[Board] = [
         paddr_top=0xA0000000,
         timer="axi/timer@ff140000",
         serial="axi/serial@ff000000",
+        ethernet="axi/ethernet@ff0e0000",
     ),
     Board(
         name="x86_64_generic",

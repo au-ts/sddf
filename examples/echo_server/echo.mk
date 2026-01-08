@@ -16,7 +16,7 @@ SUPPORTED_BOARDS := odroidc4 odroidc2 maaxboard \
 				imx8mq_evk imx8mp_evk \
 				imx8mp_iotgate \
 				star64 qemu_virt_riscv64 \
-				x86_64_generic
+				x86_64_generic zcu102
 TOOLCHAIN ?= clang
 MICROKIT_CONFIG ?= debug
 SYSTEM_FILE := echo_server.system

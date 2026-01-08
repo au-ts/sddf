@@ -7,8 +7,8 @@
 # Should be included _before_ toolchain makefile.
 PLATFORM := zynqmp
 # I2C_DRIV_DIR := ${PLATFORM}
-# NET_DRIV_DIR :=
-# ETH_DRIV := eth_driver_dwmac-5.10a.elf
+NET_DRIV_DIR := zynqmp-gem
+ETH_DRIV := eth_driver_znyqmp_gem.elf
 TIMER_DRIV_DIR := cdns
 UART_DRIV_DIR := ${PLATFORM}
 

@@ -7,7 +7,7 @@
 # the zynqmp-gem NIC driver
 #
 # NOTES
-#  Generates eth_driver.elf
+#  Generates eth_driver_znyqmp_gem.elf.elf
 #  Expects libsddf_util_debug.a to be in LIBS
 
 ETHERNET_DRIVER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
@@ -17,7 +17,7 @@ ${CHECK_NETDRV_FLAGS_MD5}:
 	-rm -f .netdrv_cflags-*
 	touch $@
 
-eth_driver.elf: network/zynqmp-gem/ethernet.o libsddf_util.a
+eth_driver_znyqmp_gem.elf: network/zynqmp-gem/ethernet.o libsddf_util.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 network/zynqmp-gem/ethernet.o: ${ETHERNET_DRIVER_DIR}/ethernet.c ${CHECK_NETDRV_FLAGS_MD5}
