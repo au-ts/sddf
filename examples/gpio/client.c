@@ -11,6 +11,7 @@
 #include <sddf/util/printf.h>
 #include <sddf/timer/client.h>
 #include "client.h"
+#include "motor_control.h"
 
 #define DEBUG_CLIENT
 
@@ -143,14 +144,14 @@ void notified(microkit_channel ch) {
 }
 
 void init(void) {
-    LOG_CLIENT("Init\n");
+    // LOG_CLIENT("Init\n");
 
-    /* Define the event loop/notified thread as the active co-routine */
-    t_event = co_active();
+    // /* Define the event loop/notified thread as the active co-routine */
+    // t_event = co_active();
 
-    /* derive main entry point */
-    t_main = co_derive((void *)t_client_main_stack, STACK_SIZE, client_main);
+    // /* derive main entry point */
+    // t_main = co_derive((void *)t_client_main_stack, STACK_SIZE, client_main);
 
-    co_switch(t_main);
+    // co_switch(t_main);
 }
 

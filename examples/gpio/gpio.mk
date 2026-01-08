@@ -53,7 +53,7 @@ TIMER_DRIVER := $(SDDF)/drivers/timer/${TIMER_DRIV_DIR}
 SYSTEM_FILE := ${GPIO_TOP}/board/$(MICROKIT_BOARD)/gpio.system
 
 # Images to build
-IMAGES := gpio_driver.elf timer_driver.elf client.elf motor_control_a.elf motor_control_b.elf
+IMAGES := gpio_driver.elf timer_driver.elf client.elf motor_control_a.elf motor_control_b.elf ultrasonic_sensor.elf
 
 # Compiler flags
 CFLAGS := -mcpu=$(CPU) -mstrict-align -ffreestanding -g3 -O3 \
@@ -75,6 +75,8 @@ COMMONFILES := libsddf_util_debug.a
 CLIENT_OBJS := client.o
 MOTOR_CONTROL_A_OBJS := motor_control_a.o
 MOTOR_CONTROL_B_OBJS := motor_control_b.o
+ULTRASONIC_SENSOR_OBJS := ultrasonic_sensor.o
+
 
 -include client.d
 -include motor_control_a.d
@@ -92,7 +94,7 @@ client.o: ${GPIO_TOP}/client.c
 client.elf: $(CLIENT_OBJS) libco.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-# Motor control build, specify what channel the GPIO pins are
+# Motor control build
 motor_control_a.o: ${GPIO_TOP}/motor_control.c
 	$(CC) -c $(CFLAGS) $< -o $@
 
@@ -105,6 +107,12 @@ motor_control_b.o: ${GPIO_TOP}/motor_control.c
 motor_control_b.elf: $(MOTOR_CONTROL_B_OBJS) libco.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
+# Ultrasonic sensor build
+ultrasonic_sensor.o: ${GPIO_TOP}/ultrasonic_sensor.c
+	$(CC) -c $(CFLAGS) $< -o $@
+
+ultrasonic_sensor.elf: $(ULTRASONIC_SENSOR_OBJS) libco.a
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 # Final image generation
 $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)

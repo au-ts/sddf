@@ -8,10 +8,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define CONTROL_FORWARD (1)
-#define CONTROL_REVERSE (2)
-#define CONTROL_NEUTRAL (3)
-
 /* Number of nanoseconds in a millisecond */
 #define NS_IN_MS 1000000ULL
 /* Number of nanoseconds in a microsecond */
@@ -26,22 +22,4 @@
 #define PL011_UARTFR_TXFF (1 << 5)
 #define PL011_UARTFR_RXFE (1 << 4)
 #define REG_PTR(base, offset) ((volatile uint32_t *)((base) + (offset)))
-
-// PWM Delays
-#define PWM_CHANNEL_MAPPING_COLS 3
-#define PWM_CHANNEL_MAPPING_ROWS 3
-
-#define PWM_TIME_HIGH 1
-#define PWM_TIME_LOW 2
-
-// Time Spent (microseconds) on HIGH/LOW for Motor Control PWM Signals
-// Control, Time HIGH, Time LOW
-static const int pwm_delay_mappings[PWM_CHANNEL_MAPPING_COLS][PWM_CHANNEL_MAPPING_ROWS] = {
-    {CONTROL_FORWARD, 2000, 18000},
-    {CONTROL_REVERSE,  1000, 19000},
-    {CONTROL_NEUTRAL, 1500, 18500},
-};
-
-
-
 

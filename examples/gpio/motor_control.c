@@ -12,6 +12,7 @@
 #include <sddf/timer/client.h>
 #include <sddf/gpio/meson/gpio.h>
 #include "client.h"
+#include "motor_control.h"
 #include "gpio_config.h"
 
 #define DEBUG_CLIENT

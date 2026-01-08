@@ -5,7 +5,6 @@
     SPDX-License-Identifier: BSD-2-Clause
 -->
 <system>
-
     <memory_region name="gpio" size="0x1_000" phys_addr="0xFF634000"/>
     <memory_region name="gpio_ao" size="0x1_000" phys_addr="0xFF800000"/>
     <memory_region name="timer_registers" size="0x10_000" phys_addr="0xffd0f000" />
@@ -44,7 +43,7 @@
         <program_image path="motor_control_b.elf"/>
     </protection_domain>
 
-    <protection_domain name="ultrasonic_sensor" priority="3">
+    <protection_domain name="ultrasonic_sensor" priority="2">
         <program_image path="ultrasonic_sensor.elf"/>
     </protection_domain>
 
@@ -104,13 +103,13 @@
     <!-- Echo pin -->
     <channel>
         <end pd="driver" id="2" />
-        <end pd="ultrasonic_sensor" id="3" />
+        <end pd="ultrasonic_sensor" id="3" pp="true"/>
     </channel>
 
     <!-- Trig pin -->
     <channel>
         <end pd="driver" id="3" />
-        <end pd="ultrasonic_sensor" id="4" />
+        <end pd="ultrasonic_sensor" id="4" pp="true"/>
     </channel>
 
 </system>

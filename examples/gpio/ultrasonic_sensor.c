@@ -24,7 +24,7 @@
 
 #define LOG_SENSOR_ERR(...) do{ sddf_printf("SENSOR|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
-uintptr_t ultrasonic_sensor_buffer_base_vaddr;
+// uintptr_t ultrasonic_sensor_buffer_base_vaddr;
 
 cothread_t t_event;
 cothread_t t_main;
@@ -50,21 +50,17 @@ static char t_sensor_main_stack[STACK_SIZE];
 #define SENSOR_TIMEOUT (38)
 
 // https://howtomechatronics.com/tutorials/arduino/ultrasonic-sensor-hc-sr04/
-int pwm_state = PAUSE_LOW;
-int curr_command = CONTROL_NEUTRAL;
 
-// State of Current Control
-int is_control_fulfilled = -1;
 // Read data sent from client in the control buffer
-int read_control_buffer() {
-    int ch = 0;
+// int read_control_buffer() {
+//     int ch = 0;
 
-    if ((*REG_PTR(ultrasonic_sensor_buffer_base_vaddr, UARTFR) & PL011_UARTFR_RXFE) == 0) {
-        ch = *REG_PTR(ultrasonic_sensor_buffer_base_vaddr, UARTDR) & RHR_MASK;
-    }
+//     if ((*REG_PTR(ultrasonic_sensor_buffer_base_vaddr, UARTFR) & PL011_UARTFR_RXFE) == 0) {
+//         ch = *REG_PTR(ultrasonic_sensor_buffer_base_vaddr, UARTDR) & RHR_MASK;
+//     }
 
-    return ch;
-}
+//     return ch;
+// }
 
 void gpio_init(int gpio_ch, int direction) {
     microkit_msginfo msginfo;
@@ -74,7 +70,7 @@ void gpio_init(int gpio_ch, int direction) {
     msginfo = microkit_ppcall(gpio_ch, msginfo);
     if (microkit_msginfo_get_label(msginfo) == GPIO_FAILURE) {
         size_t error = microkit_mr_get(GPIO_RES_VALUE_SLOT);
-        LOG_CONTROL_ERR("failed to set direction of gpio with error %ld!\n", error);
+        LOG_SENSOR_ERR("failed to set direction of gpio with error %ld!\n", error);
         while (1) {};
     }
 }
@@ -90,7 +86,7 @@ void digital_write(int gpio_ch, int value) {
         msginfo = microkit_ppcall(gpio_ch, msginfo);
         if (microkit_msginfo_get_label(msginfo) == GPIO_FAILURE) {
             size_t error = microkit_mr_get(GPIO_RES_VALUE_SLOT);
-            LOG_CONTROL_ERR("failed to set output of gpio with error %ld!\n", error);
+            LOG_SENSOR_ERR("failed to set output of gpio with error %ld!\n", error);
             while (1) {};
         }       
     }
@@ -103,19 +99,10 @@ void digital_write(int gpio_ch, int value) {
         msginfo = microkit_ppcall(gpio_ch, msginfo);
         if (microkit_msginfo_get_label(msginfo) == GPIO_FAILURE) {
             size_t error = microkit_mr_get(GPIO_RES_VALUE_SLOT);
-            LOG_CONTROL_ERR("failed to set output of gpio with error %ld!\n", error);
+            LOG_SENSOR_ERR("failed to set output of gpio with error %ld!\n", error);
             while (1) {};
         }
     }
-}
-
-void set_pwm(int gpio_ch, int micro_s) {
-    // LOG_CONTROL("SET DIGITAL HIGH\n");
-    digital_write(gpio_ch, GPIO_HIGH);
-    pwm_state = PAUSE_HIGH;
-
-    // timeout to drive motor forward
-    sddf_timer_set_timeout(TIMER_CHANNEL, micro_s);
 }
 
 bool delay_microsec(size_t microsec)
@@ -123,7 +110,7 @@ bool delay_microsec(size_t microsec)
     size_t time_us = microsec * NS_IN_US;
 
     /* Detect potential overflow */
-    if (microsec != 0 && size_t / microsec != NS_IN_MS) {
+    if (microsec != 0 && time_us / microsec != NS_IN_US) {
         LOG_SENSOR_ERR("overflow detected in delay_microsec\n");
         return false;
     }
@@ -134,43 +121,7 @@ bool delay_microsec(size_t microsec)
     return true;
 }
 
-
-void notified(microkit_channel ch) {
-    switch (ch)
-    {
-    case TIMER_CHANNEL:
-        // new control request, stop current signal to make new one
-        if (!is_control_fulfilled) {
-            handle_motor_request();
-            is_control_fulfilled = 1;
-            break;
-        } 
-
-        if (pwm_state == PAUSE_HIGH) {
-            digital_write(GPIO_CHANNEL, GPIO_LOW);
-            // uint64_t time = sddf_timer_time_now(TIMER_CHANNEL);
-            // LOG_CONTROL("SET DIGITAL LOW, the time now is: %lu\n", time);
-            LOG_CONTROL("CURRENT CONTROL, %d\n", curr_command);
-            
-            // TODO change this to corresponding down time for each motor direction
-            // hold low for 18 ms (to drive forward)
-            sddf_timer_set_timeout(TIMER_CHANNEL, pwm_delay_mappings[curr_command - 1][PWM_TIME_LOW]*NS_IN_US);
-            pwm_state = PAUSE_LOW;
-        }
-        else {
-            // uint64_t time = sddf_timer_time_now(TIMER_CHANNEL);
-            // LOG_CONTROL("SET DIGITAL HIGH, the time now is: %lu\n", time);
-            set_pwm(GPIO_CHANNEL, pwm_delay_mappings[curr_command - 1][PWM_TIME_HIGH]*NS_IN_US);
-        }   
-        
-        break;
-    default:
-        LOG_CONTROL("Unexpected channel call\n");
-        break;
-    }
-}
-
-// Read duration of value from GPIO pin
+// Read duration of value from GPIO pin (in ns)
 uint64_t pulse_in(int gpio_ch, int value) {
     uint64_t time_start = sddf_timer_time_now(TIMER_CHANNEL);
     uint64_t time_received = 0;
@@ -188,31 +139,36 @@ uint64_t pulse_in(int gpio_ch, int value) {
             while (1) {};
         }
         int value_received = microkit_mr_get(GPIO_RES_VALUE_SLOT);
-        LOG_SENSOR("%ld!\n", value);
-
         if (value_received == value) {
             // First time measured value has been received
+            // LOG_SENSOR("receiving high\n");
+
             if (!has_received) {
                 has_received = 1;
                 time_received = sddf_timer_time_now(TIMER_CHANNEL);
+                continue;
             }
-            
+
             uint64_t time_now = sddf_timer_time_now(TIMER_CHANNEL);
             if (((time_now - time_start) / NS_IN_MS) > SENSOR_TIMEOUT) {
-                return 0;
                 LOG_SENSOR("sensor read timeout\n");
+                return 0;
             }
         } 
         else {
             // Have received measured value before, this is time when value changes
+            // LOG_SENSOR("receiving low\n");
+            // LOG_SENSOR("receiving low\n");
+
             if (has_received) {
                 time_change = sddf_timer_time_now(TIMER_CHANNEL);
+                break;
             }
         }
     }
 
     if (time_change && time_received) {
-        return (time_change - time_received)
+        return (time_change - time_received);
     }
 
     return 0;
@@ -222,21 +178,42 @@ void sensor_main(void) {
     gpio_init(GPIO_CHANNEL_ECHO, GPIO_DIRECTION_INPUT);
     gpio_init(GPIO_CHANNEL_TRIG, GPIO_DIRECTION_OUTPUT);
 
-    digital_write(GPIO_CHANNEL_TRIG, GPIO_HIGH);
-    delay_microsec(10);
-    digital_write(GPIO_CHANNEL_TRIG, GPIO_LOW);
+    while (true) {
+        digital_write(GPIO_CHANNEL_TRIG, GPIO_LOW);
+        delay_microsec(2);
 
-    uint64_t duration = pulse_in(GPIO_CHANNEL_ECHO, GPIO_HIGH);
-    if (duration) {
-        LOG_SENSOR("duration received, %ld", duration);
+        digital_write(GPIO_CHANNEL_TRIG, GPIO_HIGH);
+        delay_microsec(10);
+
+        digital_write(GPIO_CHANNEL_TRIG, GPIO_LOW);
+
+        uint64_t duration = pulse_in(GPIO_CHANNEL_ECHO, GPIO_HIGH);
+        if (duration) {
+            LOG_SENSOR("duration received, %ld\n", duration);
+        }  
+        
+        LOG_SENSOR("done reading\n");
+        delay_microsec(1000000);
     }
+
     
-    pulse_in(GPIO_CHANNEL_ECHO, GPIO_HIGH);
 }
+
+void notified(microkit_channel ch) {
+    switch (ch)
+    {
+    case TIMER_CHANNEL:
+        co_switch(t_main);
+        break;
+    default:
+        LOG_SENSOR("Unexpected channel call\n");
+        break;
+    }
+}
+
 
 void init(void) {
     LOG_SENSOR("Init\n");
-
     /* Define the event loop/notified thread as the active co-routine */
     t_event = co_active();
 
