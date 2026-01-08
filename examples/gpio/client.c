@@ -10,8 +10,8 @@
 #include <libco.h>
 #include <sddf/util/printf.h>
 #include <sddf/timer/client.h>
-#include "client.h"
-#include "motor_control.h"
+#include "include/client/client.h"
+#include "include/motor/motor_control.h"
 
 #define DEBUG_CLIENT
 
