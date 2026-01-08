@@ -17,14 +17,20 @@
 #define DEBUG_CLIENT
 
 #ifdef DEBUG_CLIENT
-#define LOG_CONTROL(...) do{ sddf_printf("CONTROL|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
+#define LOG_SENSOR(...) do{ sddf_printf("SENSOR|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
 #else
-#define  LOG_CONTROL(...) do{}while(0)
+#define  LOG_SENSOR(...) do{}while(0)
 #endif
 
-#define LOG_CONTROL_ERR(...) do{ sddf_printf("CONTROL|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
+#define LOG_SENSOR_ERR(...) do{ sddf_printf("SENSOR|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
 uintptr_t ultrasonic_sensor_buffer_base_vaddr;
+
+cothread_t t_event;
+cothread_t t_main;
+
+#define STACK_SIZE (4096)
+static char t_sensor_main_stack[STACK_SIZE];
 
 // Channels
 #define CLIENT_CHANNEL (1)
@@ -39,6 +45,9 @@ uintptr_t ultrasonic_sensor_buffer_base_vaddr;
 // Timer States for PWM
 #define PAUSE_HIGH (0)
 #define PAUSE_LOW (1)
+
+// Time (ms) Timeout for Sensor Read
+#define SENSOR_TIMEOUT (38)
 
 // https://howtomechatronics.com/tutorials/arduino/ultrasonic-sensor-hc-sr04/
 int pwm_state = PAUSE_LOW;
@@ -109,17 +118,17 @@ void set_pwm(int gpio_ch, int micro_s) {
     sddf_timer_set_timeout(TIMER_CHANNEL, micro_s);
 }
 
-bool delay_ms(size_t milliseconds)
+bool delay_microsec(size_t microsec)
 {
-    size_t time_ns = milliseconds * NS_IN_MS;
+    size_t time_us = microsec * NS_IN_US;
 
     /* Detect potential overflow */
-    if (milliseconds != 0 && time_ns / milliseconds != NS_IN_MS) {
-        LOG_CLIENT_ERR("overflow detected in delay_ms\n");
+    if (microsec != 0 && size_t / microsec != NS_IN_MS) {
+        LOG_SENSOR_ERR("overflow detected in delay_microsec\n");
         return false;
     }
 
-    sddf_timer_set_timeout(TIMER_CHANNEL, time_ns);
+    sddf_timer_set_timeout(TIMER_CHANNEL, time_us);
     co_switch(t_event);
 
     return true;
@@ -161,12 +170,79 @@ void notified(microkit_channel ch) {
     }
 }
 
-void init(void) {
-    LOG_CONTROL("Init\n");
+// Read duration of value from GPIO pin
+uint64_t pulse_in(int gpio_ch, int value) {
+    uint64_t time_start = sddf_timer_time_now(TIMER_CHANNEL);
+    uint64_t time_received = 0;
+    uint64_t time_change = 0;
+    int has_received = 0;
+
+    while (1) {
+        microkit_msginfo msginfo;
+        msginfo = microkit_msginfo_new(GPIO_GET_GPIO, 1);
+        microkit_mr_set(GPIO_REQ_CONFIG_SLOT, GPIO_INPUT);
+        msginfo = microkit_ppcall(gpio_ch, msginfo);
+        if (microkit_msginfo_get_label(msginfo) == GPIO_FAILURE) {
+            size_t error = microkit_mr_get(GPIO_RES_VALUE_SLOT);
+            LOG_SENSOR_ERR("failed to get input of gpio with error %ld!\n", error);
+            while (1) {};
+        }
+        int value_received = microkit_mr_get(GPIO_RES_VALUE_SLOT);
+        LOG_SENSOR("%ld!\n", value);
+
+        if (value_received == value) {
+            // First time measured value has been received
+            if (!has_received) {
+                has_received = 1;
+                time_received = sddf_timer_time_now(TIMER_CHANNEL);
+            }
+            
+            uint64_t time_now = sddf_timer_time_now(TIMER_CHANNEL);
+            if (((time_now - time_start) / NS_IN_MS) > SENSOR_TIMEOUT) {
+                return 0;
+                LOG_SENSOR("sensor read timeout\n");
+            }
+        } 
+        else {
+            // Have received measured value before, this is time when value changes
+            if (has_received) {
+                time_change = sddf_timer_time_now(TIMER_CHANNEL);
+            }
+        }
+    }
+
+    if (time_change && time_received) {
+        return (time_change - time_received)
+    }
+
+    return 0;
+}
+
+void sensor_main(void) {
     gpio_init(GPIO_CHANNEL_ECHO, GPIO_DIRECTION_INPUT);
     gpio_init(GPIO_CHANNEL_TRIG, GPIO_DIRECTION_OUTPUT);
 
+    digital_write(GPIO_CHANNEL_TRIG, GPIO_HIGH);
+    delay_microsec(10);
+    digital_write(GPIO_CHANNEL_TRIG, GPIO_LOW);
 
+    uint64_t duration = pulse_in(GPIO_CHANNEL_ECHO, GPIO_HIGH);
+    if (duration) {
+        LOG_SENSOR("duration received, %ld", duration);
+    }
+    
+    pulse_in(GPIO_CHANNEL_ECHO, GPIO_HIGH);
+}
 
+void init(void) {
+    LOG_SENSOR("Init\n");
+
+    /* Define the event loop/notified thread as the active co-routine */
+    t_event = co_active();
+
+    /* derive main entry point */
+    t_main = co_derive((void *)t_sensor_main_stack, STACK_SIZE, sensor_main);
+
+    co_switch(t_main);
 }
 
