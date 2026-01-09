@@ -1,0 +1,9 @@
+function _f_or_WRAP(x_2: Int): Int
+  requires bounded64(x_2)
+  requires bounded16(x_2)
+  ensures bounded64(x_2)
+  ensures bounded64(result)
+  ensures bounded16(result)
+  ensures result ==
+    bv64_to_int(bv64_or(bv64_from_int(x_2), bv64_from_int(8192)))
+ 

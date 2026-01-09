@@ -4,27 +4,76 @@
  */
 
 inline fun rx_hw_ring_empty() {
-  return (hw_rx_head == hw_rx_tail);
+  /@ requires valid() @/
+  /@ ensures valid() @/
+  /@ ensures retval == unfolding valid() in unfolding valid_hw_meta() in (gv.hw_rx_head == gv.hw_rx_tail) ? 1 : 0 @/
+
+  /@ unfold valid() @/
+  /@ unfold valid_hw_meta() @/
+  var r = (hw_rx_head == hw_rx_tail);
+  /@ fold valid_hw_meta() @/
+  /@ fold valid() @/
+  return r;
 }
 
 inline fun tx_hw_ring_empty() {
-  return (hw_tx_head == hw_tx_tail);
+  /@ requires valid() @/
+  /@ ensures valid() @/
+  /@ ensures retval == unfolding valid() in unfolding valid_hw_meta() in (gv.hw_tx_head == gv.hw_tx_tail) ? 1 : 0 @/
+
+  /@ unfold valid() @/
+  /@ unfold valid_hw_meta() @/
+  var r = (hw_tx_head == hw_tx_tail);
+  /@ fold valid_hw_meta() @/
+  /@ fold valid() @/
+  return r;
 }
 
 inline fun rx_hw_ring_full() {
-  return (hw_rx_tail - hw_rx_head) == hw_rx_capacity;
+  /@ requires valid() @/
+  /@ ensures valid() @/
+  /@ ensures retval == unfolding valid() in unfolding valid_hw_meta() in ((gv.hw_rx_tail - gv.hw_rx_head) % (MAX_INT16 + 1) == gv.hw_rx_capacity) ? 1 : 0 @/
+
+  var r = 0;
+  /@ unfold valid() @/
+  /@ unfold valid_hw_meta() @/
+  if (hw_rx_tail >= hw_rx_head) {
+    r = (hw_rx_tail - hw_rx_head) == hw_rx_capacity;
+  } else {
+    r = (hw_rx_head - hw_rx_tail) == (MAX_INT16 + 1 - hw_rx_capacity);
+  }
+  /@ fold valid_hw_meta() @/
+  /@ fold valid() @/
+  return r;
 }
 
 inline fun tx_hw_ring_full() {
-  return (hw_tx_tail - hw_tx_head) == hw_tx_capacity;
+  /@ requires valid() @/
+  /@ ensures valid() @/
+  /@ ensures retval == unfolding valid() in unfolding valid_hw_meta() in ((gv.hw_tx_tail - gv.hw_tx_head) % (MAX_INT16 + 1) == gv.hw_tx_capacity) ? 1 : 0 @/
+
+  var r = 0;
+  /@ unfold valid() @/
+  /@ unfold valid_hw_meta() @/
+  if (hw_tx_tail >= hw_tx_head) {
+    r = (hw_tx_tail - hw_tx_head) == hw_tx_capacity;
+  } else {
+    r = (hw_tx_head - hw_tx_tail) == MAX_INT16 + 1 - hw_tx_capacity;
+  }
+  /@ fold valid_hw_meta() @/
+  /@ fold valid() @/
+  return r;
 }
 
 inline fun set_rdar()
 {
   /@ requires valid() @/
   /@ ensures valid() @/
+  // TODO: some kind of functional property
 
-  !st32 ETH_REG + ETH_RDAR_OFF, RDAR_RDAR;
+  /@ unfold valid() @/
+  !st32 eth_reg + ETH_RDAR_OFF, RDAR_RDAR;
+  /@ fold valid() @/
   return 0;
 }
 
@@ -32,8 +81,11 @@ inline fun set_tdar()
 {
   /@ requires valid() @/
   /@ ensures valid() @/
+  // TODO: some kind of functional property
 
-  !st32 ETH_REG + ETH_TDAR_OFF, TDAR_TDAR;
+  /@ unfold valid() @/
+  !st32 eth_reg + ETH_TDAR_OFF, TDAR_TDAR;
+  /@ fold valid() @/
   return 0;
 }
 
@@ -41,9 +93,12 @@ inline fun get_eir_status()
 {
   /@ requires valid() @/
   /@ ensures valid() @/
+  // TODO: some kind of functional property
 
   var eir = 0;
-  !ld32 eir, ETH_REG + ETH_EIR_OFF;
+  /@ unfold valid() @/
+  !ld32 eir, eth_reg + ETH_EIR_OFF;
+  /@ fold valid() @/
   return eir;
 }
 
@@ -51,6 +106,7 @@ inline fun get_eir()
 {
   /@ requires valid() @/
   /@ ensures valid() @/
+  // TODO: some kind of functional property
 
   var 1 eir_full = get_eir_status();
   return eir_full & IRQ_MASK;
@@ -58,21 +114,40 @@ inline fun get_eir()
 
 inline fun set_eir(1 eir)
 {
+  /@ requires (eir & IRQ_MASK) == eir @/
   /@ requires valid() @/
   /@ ensures valid() @/
 
-  !st32 ETH_REG + ETH_EIR_OFF, eir;
+  /@ unfold valid() @/
+  !st32 eth_reg + ETH_EIR_OFF, eir;
+  /@ fold valid() @/
   return 0;
+}
+
+inline fun or_WRAP(1 x)
+{
+  /@ requires bounded16(x) @/
+  /@ ensures bounded16(retval) @/
+  /@ ensures retval == (x | 8192) @/
+  return x | 8192;
 }
 
 inline fun rx_update_ring_slot(1 ring_addr, 1 idx, 1 phys, 1 len, 1 stat)
 {
-  /@ requires valid() @/
-  /@ ensures valid() @/
+  /@ requires valid_hw_meta() @/
+  /@ requires valid_device() @/
+  /@ requires unfolding valid_hw_meta() in 0 <= idx && idx < gv.hw_rx_capacity @/
+  /@ requires bounded32(phys) @/
+  /@ requires bounded16(len) @/
+  /@ requires bounded16(stat) @/
+  /@ ensures valid_device() @/
+  /@ ensures valid_hw_meta() @/
+  // TODO: some kind of functional property
 
-  var descr = hw_rx_descr + idx * DESCR_LEN;        
+  /@ unfold valid_hw_meta() @/
+  var descr = hw_rx_descr + idx * DESCR_LEN;
   if (idx + 1 == hw_rx_capacity) {
-    stat = stat | WRAP;
+    stat = or_WRAP(stat);
   }
 
   !st32 descr + DESCR_ADDR_OFF, phys;
@@ -82,17 +157,26 @@ inline fun rx_update_ring_slot(1 ring_addr, 1 idx, 1 phys, 1 len, 1 stat)
    */
   THREAD_MEMORY_RELEASE()
   !st16 descr + DESCR_STAT_OFF, stat;
+  /@ fold valid_hw_meta() @/
   return 0;
 }
 
 inline fun tx_update_ring_slot(1 ring_addr, 1 idx, 1 phys, 1 len, 1 stat)
 {
-  /@ requires valid() @/
-  /@ ensures valid() @/
+  /@ requires valid_hw_meta() @/
+  /@ requires valid_device() @/
+  /@ requires unfolding valid_hw_meta() in 0 <= idx && idx < gv.hw_tx_capacity @/
+  /@ requires bounded32(phys) @/
+  /@ requires bounded16(len) @/
+  /@ requires bounded16(stat) @/
+  /@ ensures valid_device() @/
+  /@ ensures valid_hw_meta() @/
+  // TODO: some kind of functional property
 
-  var descr = hw_tx_descr + idx * DESCR_LEN;        
+  /@ unfold valid_hw_meta() @/
+  var descr = hw_tx_descr + idx * DESCR_LEN;
   if (idx + 1 == hw_tx_capacity) {
-    stat = stat | WRAP;
+    stat = or_WRAP(stat);
   }
 
   !st32 descr + DESCR_ADDR_OFF, phys;
@@ -102,6 +186,7 @@ inline fun tx_update_ring_slot(1 ring_addr, 1 idx, 1 phys, 1 len, 1 stat)
    */
   THREAD_MEMORY_RELEASE()
   !st16 descr + DESCR_STAT_OFF, stat;
+  /@ fold valid_hw_meta() @/
   return 0;
 }
 
@@ -114,25 +199,54 @@ fun rx_provide()
 
   while (reprocess)
   {
+    /@ invariant valid() @/
     var 1 full = rx_hw_ring_full();
+    /@ unfold valid() @/
+    /@ unfold valid_virt_meta() @/
     var 1 empty = net_queue_empty(net_rx_free, net_rx_capacity);
-    while (!full && !empty)
+    /@ fold valid_virt_meta() @/
+    /@ fold valid() @/
+    // this may seem like a weird condition, this is to get around the silly way the transpiler models this
+    // !full && !empty is modelled as ((full == 0 ? 1 : 0) & (empty == 0 ? 1 : 0)) != 0
+    // this makes it model it without an &
+    while ((!full + !empty) == 2)
     {
-      var {1,1} buffer = net_dequeue(net_rx_free, net_rx_capacity);
+      /@ invariant valid() @/
+      /@ invariant empty == unfolding valid() in unfolding_queue(rx_free) in (gv.rx_free.net_tail == gv.rx_free.net_head) @/
 
+      /@ unfold valid() @/
+      /@ unfold valid_virt_meta() @/
+      var {1,1} buffer = net_dequeue(net_rx_free, net_rx_capacity);
+      /@ fold valid_virt_meta() @/
+
+      /@ unfold valid_hw_meta() @/
       var idx = hw_rx_tail & (hw_rx_capacity - 1);
+      /@ fold valid_hw_meta() @/
 
       var io_addr = buffer.0;
       rx_update_ring_slot(hw_rx_ptr, idx, io_addr, 0, RXD_EMPTY);
 
-      st hw_rx_tail_slot, (hw_rx_tail + 1);
+      /@ unfold valid_hw_meta() @/
+      // work around a silly transpiler bug
+      var temp = wrap_int16(hw_rx_tail + 1);
+      hw_rx_tail = temp;
+      //st hw_rx_tail_slot, (hw_rx_tail + 1);
+      /@ fold valid_hw_meta() @/
+      /@ fold valid() @/
       set_rdar();
+
       full = rx_hw_ring_full();
+      /@ unfold valid() @/
+      /@ unfold valid_virt_meta() @/
       empty = net_queue_empty(net_rx_free, net_rx_capacity);
+      /@ fold valid_virt_meta() @/
+      /@ fold valid() @/
     }
 
     /* Only request a notification from virtualiser if HW ring not full */
     full = rx_hw_ring_full();
+    /@ unfold valid() @/
+    /@ unfold valid_virt_meta() @/
     if (!full) {
       net_request_signal(net_rx_free, net_rx_capacity);
     } else {
@@ -145,6 +259,8 @@ fun rx_provide()
       net_cancel_signal(net_rx_free);
       reprocess = true;
     }
+    /@ fold valid_virt_meta() @/
+    /@ fold valid() @/
   }
   return 0;
 }
@@ -159,13 +275,21 @@ fun rx_return()
   var 1 empty = rx_hw_ring_empty();
   while (!empty)
   {
+    /@ invariant valid() @/
+
+    /@ unfold valid() @/
+    /@ unfold valid_hw_meta() @/
     /* If buffer slot is still empty, we have processed all packets the device has filled */
     var idx = hw_rx_head & (hw_rx_capacity - 1);
 
-    var dscr_addr = HW_RX_DESCR + idx * @biw;
+    var dscr_addr = hw_rx_descr + idx * @biw;
     var stat = 0;
     !ld16 stat, dscr_addr + 2;
-    if (stat & RXD_EMPTY) { break; }
+    if (stat & RXD_EMPTY) {
+      /@ fold valid_hw_meta() @/
+      /@ fold valid() @/
+      break;
+    }
 
     THREAD_MEMORY_ACQUIRE()
 
@@ -174,19 +298,39 @@ fun rx_return()
     var io_addr = 0;
     !ld32 io_addr, dscr_addr + 4;
 
+    /@ unfold valid_virt_meta() @/
+    // the following should be provable with more work
+    var queue_full = net_queue_full(net_rx_active, net_rx_capacity);
+    if (queue_full) {
+      /@ fold valid_virt_meta() @/
+      /@ fold valid_hw_meta() @/
+      /@ fold valid() @/
+      // panic
+      return 1;
+    }
+    /@ assert queue_full == 0 @/
     net_enqueue(net_rx_active, io_addr, len, net_rx_capacity);
+    /@ fold valid_virt_meta() @/
     packets_transferred = true;
 
-    st hw_rx_head_slot, (hw_rx_head + 1);
+    var temp = wrap_int16(hw_rx_head + 1);
+    hw_rx_head = temp;
+    //st hw_rx_head_slot, (hw_rx_head + 1);
+    /@ fold valid_hw_meta() @/
+    /@ fold valid() @/
 
     empty = rx_hw_ring_empty();
   }
 
+  /@ unfold valid() @/
+  /@ unfold valid_virt_meta() @/
   var 1 to_signal = net_require_signal(net_rx_active, net_rx_capacity);
   if (packets_transferred && to_signal) {
     net_cancel_signal(net_rx_active);
-    microkit_notify(RX_CH)
+    microkit_notify(rx_ch);
   }
+  /@ fold valid_virt_meta() @/
+  /@ fold valid() @/
 
   return 0;
 }
@@ -200,35 +344,67 @@ fun tx_provide()
 
   while (reprocess)
   {
+    /@ invariant valid() @/
     var 1 full = tx_hw_ring_full();
+    /@ unfold valid() @/
+    /@ unfold valid_virt_meta() @/
     var 1 empty = net_queue_empty(net_tx_active, net_tx_capacity);
-    while (!full && !empty)
+    /@ fold valid_virt_meta() @/
+    /@ fold valid() @/
+    // see same comment in rx_provide
+    while ((!full + !empty) == 2)
     {
-      var {1,1} buffer = net_dequeue(net_tx_active, net_tx_capacity);
+      /@ invariant valid() @/
+      /@ invariant empty == unfolding valid() in unfolding_queue(tx_active) in (gv.tx_active.net_tail == gv.tx_active.net_head) @/
 
+      /@ unfold valid() @/
+      /@ unfold valid_virt_meta() @/
+      var {1,1} buffer = net_dequeue(net_tx_active, net_tx_capacity);
+      /@ fold valid_virt_meta() @/
+
+      /@ unfold valid_hw_meta() @/
       var idx = hw_tx_tail & (hw_tx_capacity - 1);
+      /@ fold valid_hw_meta() @/
 
       var io_addr = buffer.0;
       var len = buffer.1;
       var stat = TXD_READY | TXD_ADDCRC | TXD_LAST;
       tx_update_ring_slot(hw_tx_ptr, idx, io_addr, len, stat);
 
-      st hw_tx_tail_slot, (hw_tx_tail + 1);
+      /@ unfold valid_hw_meta() @/
+      // work around a silly transpiler bug
+      var temp = wrap_int16(hw_tx_tail + 1);
+      hw_tx_tail = temp;
+      //st hw_tx_tail_slot, (hw_tx_tail + 1);
+      /@ fold valid_hw_meta() @/
+      /@ fold valid() @/
       set_tdar();
 
       full = tx_hw_ring_full();
+      /@ unfold valid() @/
+      /@ unfold valid_virt_meta() @/
       empty = net_queue_empty(net_tx_active, net_tx_capacity);
+      /@ fold valid_virt_meta() @/
+      /@ fold valid() @/
     }
 
+    /@ unfold valid() @/
+    /@ unfold valid_virt_meta() @/
     net_request_signal(net_tx_active, net_tx_capacity);
     reprocess = false;
 
+    /@ fold valid_virt_meta() @/
+    /@ fold valid() @/
     full = tx_hw_ring_full();
+    /@ unfold valid() @/
+    /@ unfold valid_virt_meta() @/
     empty = net_queue_empty(net_tx_active, net_tx_capacity);
     if ((!empty) && (!full)) {
       net_cancel_signal(net_tx_active);
       reprocess = true;
     }
+    /@ fold valid_virt_meta() @/
+    /@ fold valid() @/
   }
   return 0;
 }
@@ -243,33 +419,75 @@ fun tx_return()
   var 1 empty = tx_hw_ring_empty();
   while (!empty)
   {
-    /* Ensure that this buffer has been sent by the device */
-    var idx = hw_tx_head & (net_tx_capacity - 1);
+    /@ invariant valid() @/
 
-    var dscr_addr = hw_tx_descr + idx * DESCR_LEN;        
+    /@ unfold valid() @/
+    /@ unfold valid_hw_meta() @/
+    /* Ensure that this buffer has been sent by the device */
+    var idx = hw_tx_head & (hw_tx_capacity - 1);
+
+    var dscr_addr = hw_tx_descr + idx * DESCR_LEN;
     var stat = 0;
     !ld16 stat, dscr_addr + DESCR_STAT_OFF;
-    if (stat & TXD_READY) { break; }
+    if (stat & TXD_READY) {
+      /@ fold valid_hw_meta() @/
+      /@ fold valid() @/
+      break;
+    }
 
     THREAD_MEMORY_ACQUIRE()
 
     var io_addr = 0;
     !ld32 io_addr, dscr_addr + DESCR_ADDR_OFF;
+    /@ unfold valid_virt_meta() @/
+    // the following should be provable with more work
+    var queue_full = net_queue_full(net_tx_free, net_rx_capacity);
+    if (queue_full) {
+      /@ fold valid_virt_meta() @/
+      /@ fold valid_hw_meta() @/
+      /@ fold valid() @/
+      // panic
+      return 1;
+    }
+    /@ assert queue_full == 0 @/
     net_enqueue(net_tx_free, io_addr, 0, net_tx_capacity);
+    /@ fold valid_virt_meta() @/
 
     enqueued = true;
-    st hw_tx_head_slot, (hw_tx_head + 1);
+    var temp = wrap_int16(hw_tx_head + 1);
+    hw_tx_head = temp;
+    //st hw_tx_head_slot, (hw_tx_head + 1);
+    /@ fold valid_hw_meta() @/
+    /@ fold valid() @/
 
     empty = tx_hw_ring_empty();
   }
 
+  /@ unfold valid() @/
+  /@ unfold valid_virt_meta() @/
   var 1 to_signal = net_require_signal(net_tx_free, net_tx_capacity);
   if (enqueued && to_signal) {
     net_cancel_signal(net_tx_free);
-    microkit_notify(TX_CH)
+    microkit_notify(tx_ch);
   }
+  /@ fold valid_virt_meta() @/
+  /@ fold valid() @/
 
   return 0;
+}
+
+fun bw_and_idempotent_IRQ_MASK(1 x) {
+  /@ ensures (retval == 0) ==> (retval & IRQ_MASK) == retval @/
+  /@ ensures (retval == 33554432) ==> (retval & IRQ_MASK) == retval @/
+  /@ ensures (retval == 134217728) ==> (retval & IRQ_MASK) == retval @/
+  /@ ensures (retval == 4194304) ==> (retval & IRQ_MASK) == retval @/
+  /@ ensures (retval == 167772160) ==> (retval & IRQ_MASK) == retval @/
+  /@ ensures (retval == 37748736) ==> (retval & IRQ_MASK) == retval @/
+  /@ ensures (retval == 138412032) ==> (retval & IRQ_MASK) == retval @/
+  /@ ensures (retval == 171966464) ==> (retval & IRQ_MASK) == retval @/
+  /@ ensures (retval & IRQ_MASK) == retval @/
+  return x & IRQ_MASK;
+  // each of the following are the possible values of retval
 }
 
 fun handle_irq() {
@@ -277,11 +495,12 @@ fun handle_irq() {
   /@ ensures valid() @/
 
   var 1 eir_full = get_eir_status();
-  var eir = eir_full & IRQ_MASK;
+  var eir = bw_and_idempotent_IRQ_MASK(eir_full);
   set_eir(eir);
 
   while (eir & IRQ_MASK)
   {
+    /@ invariant valid() @/
     if (eir & NETIRQ_TXF) {
       tx_return();
       tx_provide();
@@ -291,7 +510,7 @@ fun handle_irq() {
       rx_provide();
     }
     eir_full = get_eir_status();
-    eir = eir_full & IRQ_MASK;
+    eir = bw_and_idempotent_IRQ_MASK(eir_full);
     set_eir(eir);
   }
   return 0;
@@ -302,19 +521,28 @@ export fun notified(1 ch)
   /@ requires valid() @/
   /@ ensures valid() @/
 
-  if (ch == IRQ_CH) {
+  /@ unfold valid() @/
+  if (ch == irq_ch) {
+    /@ fold valid() @/
     handle_irq();
     /*
      * Delay calling into the kernel to ack the IRQ until the next loop
      * in the microkit event handler loop.
      */
-    microkit_deferred_irq_ack(ch)
+    microkit_deferred_irq_ack(ch);
+    /@ unfold valid() @/
   }
-  if (ch == RX_CH) {
+  // XXX no else if?!
+  if (ch == rx_ch) {
+    /@ fold valid() @/
     rx_provide();
+    /@ unfold valid() @/
   }
-  if (ch == TX_CH) {
+  if (ch == tx_ch) {
+    /@ fold valid() @/
     tx_provide();
+    /@ unfold valid() @/
   }
+  /@ fold valid() @/
   return 0;
 }

@@ -1,7 +1,7 @@
 define RX_FREE_BASE 		1234567
-define RX_ACTIVE_BASE 		1234667
-define TX_FREE_BASE 		1234767
-define TX_ACTIVE_BASE 		1234867
+define RX_ACTIVE_BASE 		1244667
+define TX_FREE_BASE 		1254767
+define TX_ACTIVE_BASE 		1264867
 
 define TAIL_OFFSET               0
 define HEAD_OFFSET               2
@@ -9,6 +9,11 @@ define CONSUMER_SIGNALLED_OFFSET 4
 
 define RX_QUEUE_CAPACITY   256
 define TX_QUEUE_CAPACITY   256
+define QUEUE_CAPACITY      256
+
+define BUFFERS_OFFSET      8
+define NET_BUFF_DESC_SIZE  16
+define VIRT_LEN            BUFFERS_OFFSET + QUEUE_CAPACITY * NET_BUFF_DESC_SIZE
 
 define TX_CH   1
 define RX_CH   2
@@ -122,6 +127,23 @@ method load_rx_free_head(heap: IArray, gv: Ref, address: Int)
     refute false
 }
 
+method store_rx_free_consumer_signalled(heap: IArray, gv: Ref, address: Int, value: Int)
+  requires acc(gv.rx_free)
+  requires valid_net_queue(heap, gv, gv.rx_free, TX_QUEUE_CAPACITY)
+  requires address == RX_FREE_BASE + CONSUMER_SIGNALLED_OFFSET
+  requires value == 0 || value == 1
+  ensures acc(gv.rx_free)
+  ensures valid_net_queue(heap, gv, gv.rx_free, TX_QUEUE_CAPACITY)
+  ensures queue_field_unchanged(rx_free, TX_QUEUE_CAPACITY, net_tail)
+  ensures queue_field_unchanged(rx_free, TX_QUEUE_CAPACITY, net_head)
+  ensures value == old(value)
+  ensures value == (queue_field(rx_free, TX_QUEUE_CAPACITY, net_signal) ? 1 : 0)
+{
+  unfold valid_net_queue(heap, gv, gv.rx_free, TX_QUEUE_CAPACITY)
+  gv.rx_free.net_signal := (value == 1)
+  fold valid_net_queue(heap, gv, gv.rx_free, TX_QUEUE_CAPACITY)
+}
+
 method load_rx_free_consumer_signalled(heap: IArray, gv: Ref, address: Int)
   returns (retval: Int)
   requires acc(gv.rx_free)
@@ -199,6 +221,20 @@ method store_rx_active_consumer_signalled(heap: IArray, gv: Ref, address: Int, v
   fold valid_net_queue(heap, gv, gv.rx_active, RX_QUEUE_CAPACITY)
 }
 
+method load_rx_active_consumer_signalled(heap: IArray, gv: Ref, address: Int)
+  returns (retval: Int)
+  requires acc(gv.rx_active)
+  requires valid_net_queue(heap, gv, gv.rx_active, RX_QUEUE_CAPACITY)
+  requires address == RX_ACTIVE_BASE + CONSUMER_SIGNALLED_OFFSET
+  ensures acc(gv.rx_active)
+  ensures valid_net_queue(heap, gv, gv.rx_active, RX_QUEUE_CAPACITY)
+  ensures retval == (queue_field(rx_active, RX_QUEUE_CAPACITY, net_signal) ? 1 : 0)
+  ensures queue_unchanged(rx_active, RX_QUEUE_CAPACITY)
+{
+    retval := queue_field(rx_active, RX_QUEUE_CAPACITY, net_signal) ? 1 : 0
+    refute false
+}
+
 /////////////////////// TX_ACTIVE queue
 method store_tx_active_tail(heap: IArray, gv: Ref, address: Int, value: Int)
   requires acc(gv.tx_active)
@@ -243,6 +279,23 @@ method load_tx_active_head(heap: IArray, gv: Ref, address: Int)
 {
     retval := queue_field(tx_active, TX_QUEUE_CAPACITY, net_head)
     refute false
+}
+
+method store_tx_active_consumer_signalled(heap: IArray, gv: Ref, address: Int, value: Int)
+  requires acc(gv.tx_active)
+  requires valid_net_queue(heap, gv, gv.tx_active, TX_QUEUE_CAPACITY)
+  requires address == TX_ACTIVE_BASE + CONSUMER_SIGNALLED_OFFSET
+  requires value == 0 || value == 1
+  ensures acc(gv.tx_active)
+  ensures valid_net_queue(heap, gv, gv.tx_active, TX_QUEUE_CAPACITY)
+  ensures queue_field_unchanged(tx_active, TX_QUEUE_CAPACITY, net_tail)
+  ensures queue_field_unchanged(tx_active, TX_QUEUE_CAPACITY, net_head)
+  ensures value == old(value)
+  ensures value == (queue_field(tx_active, TX_QUEUE_CAPACITY, net_signal) ? 1 : 0)
+{
+  unfold valid_net_queue(heap, gv, gv.tx_active, TX_QUEUE_CAPACITY)
+  gv.tx_active.net_signal := (value == 1)
+  fold valid_net_queue(heap, gv, gv.tx_active, TX_QUEUE_CAPACITY)
 }
 
 method load_tx_active_consumer_signalled(heap: IArray, gv: Ref, address: Int)
@@ -320,6 +373,20 @@ method store_tx_free_consumer_signalled(heap: IArray, gv: Ref, address: Int, val
   unfold valid_net_queue(heap, gv, gv.tx_free, TX_QUEUE_CAPACITY)
   gv.tx_free.net_signal := (value == 1)
   fold valid_net_queue(heap, gv, gv.tx_free, TX_QUEUE_CAPACITY)
+}
+
+method load_tx_free_consumer_signalled(heap: IArray, gv: Ref, address: Int)
+  returns (retval: Int)
+  requires acc(gv.tx_free)
+  requires valid_net_queue(heap, gv, gv.tx_free, RX_QUEUE_CAPACITY)
+  requires address == TX_FREE_BASE + CONSUMER_SIGNALLED_OFFSET
+  ensures acc(gv.tx_free)
+  ensures valid_net_queue(heap, gv, gv.tx_free, RX_QUEUE_CAPACITY)
+  ensures retval == (queue_field(tx_free, RX_QUEUE_CAPACITY, net_signal) ? 1 : 0)
+  ensures queue_unchanged(tx_free, RX_QUEUE_CAPACITY)
+{
+    retval := queue_field(tx_free, RX_QUEUE_CAPACITY, net_signal) ? 1 : 0
+    refute false
 }
 
 /////////////////////// shared buffers

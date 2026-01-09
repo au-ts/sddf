@@ -496,7 +496,7 @@ method store_TDAR(heap: IArray, gv: Ref, address: Int, value: Int)
 */
 define EIR_RXF_MASK     33554432    // 1 << 25
 define EIR_TXF_MASK     134217728   // 1 << 27
-define IRQ_MASK         167772160   // (1 << 25) | (1 << 27)
+define IRQ_MASK         171966464   // (1 << 25) | (1 << 27) | (1 << 22)
 
 function is_EIR_RXF(eir: Int): Bool
     ensures result <==> bv64_to_int(bv64_and(bv64_from_int(eir), bv64_from_int(EIR_RXF_MASK))) != 0
@@ -506,7 +506,7 @@ function is_EIR_TXF(eir: Int): Bool
 
 method store_EIR(heap: IArray, gv: Ref, address: Int, value: Int)
     requires address == (REG_BASE + EIR_offset)
-    requires value == IRQ_MASK
+    requires bv64_to_int(bv64_and(bv64_from_int(value), bv64_from_int(IRQ_MASK))) == value
     requires valid_device(heap, gv)
     ensures address == old(address)
     ensures value == old(value)

@@ -4,16 +4,17 @@
  */
 
 /* Helper constants */
+#define MAX_INT64        18446744073709551615
 #define MAX_INT32        4294967295
 #define MAX_INT16        65535
 #define MAX_INT8         255
 
 #define microkit_notify(channel) \
-  @microkit_notify(0,channel,0,0); 
+  @microkit_notify(0,channel,0,0)
 /@ method ffimicrokit_notify(c: Int, cl: Int, a: Int, al: Int) @/
 
 #define microkit_deferred_irq_ack(channel) \
-  @microkit_deferred_irq_ack(0,channel,0,0);
+  @microkit_deferred_irq_ack(0,channel,0,0)
 /@ method ffimicrokit_deferred_irq_ack(c: Int, cl: Int, a: Int, al: Int) @/
 
 #define sddf_irq_ack(channel) \
@@ -57,3 +58,30 @@
 #define debug_print(c, cl, a, al) \
   @debug_print(c,cl,a,al)
 /@ method ffidebug_print(c: Int, cl: Int, a: Int, al: Int) @/
+
+fun wrap_int8(1 a)
+{
+    /@ requires a > 0 @/
+    /@ ensures retval == (a % (MAX_INT8 + 1)) @/
+    /@ ensures retval <= MAX_INT8 @/
+    var mod = a & MAX_INT8;
+    return mod;
+}
+
+fun wrap_int16(1 a)
+{
+    /@ requires a > 0 @/
+    /@ ensures retval == (a % (MAX_INT16 + 1)) @/
+    /@ ensures retval <= MAX_INT16 @/
+    var mod = a & MAX_INT16;
+    return mod;
+}
+
+fun wrap_int32(1 a)
+{
+    /@ requires a > 0 @/
+    /@ ensures retval == (a % (MAX_INT32 + 1)) @/
+    /@ ensures retval <= MAX_INT32 @/
+    var mod = a & MAX_INT32;
+    return mod;
+}
