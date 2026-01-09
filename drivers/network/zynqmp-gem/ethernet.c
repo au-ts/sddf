@@ -288,8 +288,9 @@ static void eth_setup(void)
 serial_queue_handle_t serial_tx_queue_handle;
 void init(void)
 {
+    microkit_dbg_puts("ETH DRIVER INIT!\n");
     // TODO: ensure correct initialisation
-    assert(serial_config_check_magic(&serial_config)); // TODO: remove
+    // assert(serial_config_check_magic(&serial_config)); // TODO: remove
     assert(net_config_check_magic(&config));
     assert(device_resources_check_magic(&device_resources));
     assert(device_resources.num_irqs == 1);
@@ -299,9 +300,9 @@ void init(void)
     assert(TX_COUNT * sizeof(struct descriptor) <= device_resources.regions[2].region.size);
 
     // TODO: remove:
-    serial_queue_init(&serial_tx_queue_handle, serial_config.tx.queue.vaddr, serial_config.tx.data.size,
-                      serial_config.tx.data.vaddr);
-    serial_putchar_init(serial_config.tx.id, &serial_tx_queue_handle);
+    // serial_queue_init(&serial_tx_queue_handle, serial_config.tx.queue.vaddr, serial_config.tx.data.size,
+                      // serial_config.tx.data.vaddr);
+    // serial_putchar_init(serial_config.tx.id, &serial_tx_queue_handle);
     //sddf_printf("ETH DRIVER: INIT!\n");
 
     eth_setup();
