@@ -1,0 +1,10 @@
+inline fun or_WRAP(1 x)
+{
+  /@ requires bounded16(x) @/
+  /@ ensures bounded16(retval) @/
+  /@ ensures retval == (x | 8192) @/
+  /@ assert bounded16(x) && bounded16(8192) @/
+  /@ assert bounded16(x) && bounded16(8192) ==> bounded16(x | 8192) @/
+  return x | 8192;
+}
+

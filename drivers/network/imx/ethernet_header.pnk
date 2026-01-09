@@ -1,4 +1,3 @@
-
 #define IRQ_CH                  pnk_mem(1)
 #define RX_CH                   pnk_mem(2)
 #define TX_CH                   pnk_mem(3)
@@ -25,6 +24,10 @@
 #define HW_TX_CAPACITY          pnk_mem(16)
 #define HW_TX_DESCR             pnk_mem(17)
 #define HW_TX_PTR               pnk_mem_ptr(14)
+
+var 1 irq_ch          = IRQ_CH;
+var 1 rx_ch           = RX_CH;
+var 1 tx_ch           = TX_CH;
 
 var 1 net_rx_free     = NET_RX_FREE;
 var 1 net_rx_active   = NET_RX_ACTIVE;
@@ -73,6 +76,7 @@ var 1 hw_tx_ptr       = HW_TX_PTR;
 #define IRQ_MASK                (NETIRQ_RXF | NETIRQ_TXF | NETIRQ_EBERR)
 
 #define ETH_REG                 pnk_mem(0)
+var 1 eth_reg = ETH_REG;
 
 /@ extern predicate valid_device @/
 /@ extern predicate valid_hardware_ring_rx_addr @/
@@ -123,22 +127,22 @@ var 1 hw_tx_ptr       = HW_TX_PTR;
    externally defined somewhere in RAM, so we can choose whatever we want
    in main memory. */
 #define RX_FREE_BASE 		1234567
-#define RX_ACTIVE_BASE 		1234667
-#define TX_FREE_BASE 		1234767
-#define TX_ACTIVE_BASE 		1234867
+#define RX_ACTIVE_BASE 		1244667
+#define TX_FREE_BASE 		1254767
+#define TX_ACTIVE_BASE 		1264867
 
 /@ shared rw u16 rx_free_tail[RX_FREE_BASE+TAIL_OFFSET..RX_FREE_BASE+TAIL_OFFSET+2] @/
 /@ shared r u16 rx_free_head[RX_FREE_BASE+HEAD_OFFSET..RX_FREE_BASE+HEAD_OFFSET+2] @/
-/@ shared r u32 rx_free_consumer_signalled[RX_FREE_BASE+CONSUMER_SIGNALLED_OFFSET..RX_FREE_BASE+CONSUMER_SIGNALLED_OFFSET+4] @/
+/@ shared rw u32 rx_free_consumer_signalled[RX_FREE_BASE+CONSUMER_SIGNALLED_OFFSET..RX_FREE_BASE+CONSUMER_SIGNALLED_OFFSET+4] @/
 /@ shared r u16 rx_active_tail[RX_ACTIVE_BASE+TAIL_OFFSET..RX_ACTIVE_BASE+TAIL_OFFSET+2] @/
 /@ shared rw u16 rx_active_head[RX_ACTIVE_BASE+HEAD_OFFSET..RX_ACTIVE_BASE+HEAD_OFFSET+2] @/
-/@ shared w u32 rx_active_consumer_signalled[RX_ACTIVE_BASE+CONSUMER_SIGNALLED_OFFSET..RX_ACTIVE_BASE+CONSUMER_SIGNALLED_OFFSET+4] @/
+/@ shared rw u32 rx_active_consumer_signalled[RX_ACTIVE_BASE+CONSUMER_SIGNALLED_OFFSET..RX_ACTIVE_BASE+CONSUMER_SIGNALLED_OFFSET+4] @/
 /@ shared r u16 tx_free_tail[TX_FREE_BASE+TAIL_OFFSET..TX_FREE_BASE+TAIL_OFFSET+2] @/
 /@ shared rw u16 tx_free_head[TX_FREE_BASE+HEAD_OFFSET..TX_FREE_BASE+HEAD_OFFSET+2] @/
-/@ shared w u32 tx_free_consumer_signalled[TX_FREE_BASE+CONSUMER_SIGNALLED_OFFSET..TX_FREE_BASE+CONSUMER_SIGNALLED_OFFSET+4] @/
+/@ shared rw u32 tx_free_consumer_signalled[TX_FREE_BASE+CONSUMER_SIGNALLED_OFFSET..TX_FREE_BASE+CONSUMER_SIGNALLED_OFFSET+4] @/
 /@ shared rw u16 tx_active_tail[TX_ACTIVE_BASE+TAIL_OFFSET..TX_ACTIVE_BASE+TAIL_OFFSET+2] @/
 /@ shared r u16 tx_active_head[TX_ACTIVE_BASE+HEAD_OFFSET..TX_ACTIVE_BASE+HEAD_OFFSET+2] @/
-/@ shared r u32 tx_active_consumer_signalled[TX_ACTIVE_BASE+CONSUMER_SIGNALLED_OFFSET..TX_ACTIVE_BASE+CONSUMER_SIGNALLED_OFFSET+4] @/
+/@ shared rw u32 tx_active_consumer_signalled[TX_ACTIVE_BASE+CONSUMER_SIGNALLED_OFFSET..TX_ACTIVE_BASE+CONSUMER_SIGNALLED_OFFSET+4] @/
 
 #define VALID_QUEUE_PTR(x) ( \
 	x == RX_FREE_BASE   || \
@@ -147,8 +151,57 @@ var 1 hw_tx_ptr       = HW_TX_PTR;
 	x == TX_ACTIVE_BASE    \
 )
 
+#define boundedW(x) bounded64(x)
+#define MAX_WORD    MAX_INT64
+
+/@
+  predicate valid_hw_meta() {
+  	acc(gv.hw_tx_tail) && acc(gv.hw_tx_head) && acc(gv.hw_tx_capacity) && acc(gv.hw_tx_descr) &&
+  	acc(gv.hw_rx_tail) && acc(gv.hw_rx_head) && acc(gv.hw_rx_capacity) && acc(gv.hw_rx_descr) &&
+    bounded16(gv.hw_tx_tail) && bounded16(gv.hw_tx_head) && boundedW(gv.hw_tx_descr) && boundedW(gv.hw_tx_descr + gv.hw_tx_capacity * DESCR_LEN) && gv.hw_tx_capacity == QUEUE_CAPACITY &&
+    bounded16(gv.hw_rx_tail) && bounded16(gv.hw_rx_head) && boundedW(gv.hw_rx_descr) && boundedW(gv.hw_rx_descr + gv.hw_rx_capacity * DESCR_LEN) && gv.hw_rx_capacity == QUEUE_CAPACITY &&
+    gv.hw_tx_descr + gv.hw_tx_capacity * DESCR_LEN < RX_FREE_BASE &&
+    gv.hw_tx_descr + gv.hw_tx_capacity * DESCR_LEN < RX_ACTIVE_BASE &&
+    gv.hw_tx_descr + gv.hw_tx_capacity * DESCR_LEN < TX_FREE_BASE &&
+    gv.hw_tx_descr + gv.hw_tx_capacity * DESCR_LEN < TX_ACTIVE_BASE &&
+    gv.hw_rx_descr + gv.hw_rx_capacity * DESCR_LEN < RX_FREE_BASE &&
+    gv.hw_rx_descr + gv.hw_rx_capacity * DESCR_LEN < RX_ACTIVE_BASE &&
+    gv.hw_rx_descr + gv.hw_rx_capacity * DESCR_LEN < TX_FREE_BASE &&
+    gv.hw_rx_descr + gv.hw_rx_capacity * DESCR_LEN < TX_ACTIVE_BASE
+  }
+@/
+
+/@
+  predicate valid_virt_meta() {
+    acc(gv.net_rx_free) && gv.net_rx_free == RX_FREE_BASE &&
+    acc(gv.net_rx_active) && gv.net_rx_active == RX_ACTIVE_BASE &&
+    acc(gv.net_tx_free) && gv.net_tx_free == TX_FREE_BASE &&
+    acc(gv.net_tx_active) && gv.net_tx_active == TX_ACTIVE_BASE &&
+  	acc(gv.net_tx_capacity) && gv.net_tx_capacity == QUEUE_CAPACITY &&
+  	acc(gv.net_rx_capacity) && gv.net_rx_capacity == QUEUE_CAPACITY
+  }
+@/
+
+// WLOG we can say the overlap is one way or another
+/*/@
+  predicate non_overlap() {
+    acc(valid_hw_meta()) && unfolding valid_hw_meta() in
+    (gv.hw_tx_descr + gv.hw_tx_capacity * DESCR_LEN < RX_FREE_BASE &&
+    gv.hw_tx_descr + gv.hw_tx_capacity * DESCR_LEN < RX_ACTIVE_BASE &&
+    gv.hw_tx_descr + gv.hw_tx_capacity * DESCR_LEN < TX_FREE_BASE &&
+    gv.hw_tx_descr + gv.hw_tx_capacity * DESCR_LEN < TX_ACTIVE_BASE)
+  }
+@/*/
+
 /@
   predicate valid() {
-	valid_device() && valid_virt() && acc(gv.net_tx_capacity) && gv.net_tx_capacity == QUEUE_CAPACITY && acc(gv.net_rx_capacity) && gv.net_rx_capacity == QUEUE_CAPACITY
+  	valid_device() &&
+  	valid_virt() &&
+  	acc(gv.eth_reg) && gv.eth_reg == HW_ETH_BASE &&
+  	valid_hw_meta() &&
+    valid_virt_meta() &&
+    acc(gv.hw_rx_ptr) && acc(gv.hw_tx_ptr) &&
+    boundedW(gv.hw_rx_ptr) && boundedW(gv.hw_tx_ptr) &&
+    acc(gv.irq_ch) && acc(gv.rx_ch) && acc(gv.tx_ch)
   }
 @/
