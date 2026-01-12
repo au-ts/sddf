@@ -85,13 +85,14 @@ ifneq ($(strip $(DTS)),)
 	    --dtb $(DTB) --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) --smp $(SMP_CONFIG)
 else
 	$(PYTHON)\
-	    $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
+	    $(METAPROGRAM) --sddf $(SDDF) --board $(X86_BOARD) \
 	    --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) --smp $(SMP_CONFIG)
 endif
 	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx.data serial_virt_tx.elf
 	$(OBJCOPY) --update-section .device_resources=ethernet_driver_device_resources.data eth_driver.elf
+	$(OBJCOPY) --update-section .timer_client_config=timer_client_ethernet_driver.data eth_driver.elf
 	$(OBJCOPY) --update-section .net_driver_config=net_driver.data eth_driver.elf
 	$(OBJCOPY) --update-section .net_virt_rx_config=net_virt_rx.data network_virt_rx.elf
 	$(OBJCOPY) --update-section .net_virt_tx_config=net_virt_tx.data network_virt_tx.elf

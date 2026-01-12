@@ -357,7 +357,7 @@ static void rx_return(void)
 
 void init(void)
 {
-    // Enable MSI, refer to https://www.intel.com/content/www/us/en/docs/programmable/683488/16-0/msi-registers.html
+    // Enable MSI. see PCI Express Technology 3.0 Chapter 17 for more details.
     /* set_flags16(PCI_COMMAND_16, BIT(10)); */
     /* set_flags16(PCI_MSI_MESSAGE_CONTROL_16, BIT(0)); */
     /* clear_flags16(PCI_MSI_MESSAGE_CONTROL_16, BIT(4) | BIT(5) | BIT(6)); */
@@ -366,44 +366,44 @@ void init(void)
     /* set_reg16(PCI_MSI_MESSAGE_DATA_16, 0x31); */
     /* clear_flags16(PCI_MSI_MASK, BIT(0)); */
 
-    // Enable MSI-X, refer to https://www.intel.com/content/www/us/en/docs/programmable/683488/16-0/msi-x-capability-structure.html
-    set_flags16(PCI_COMMAND_16, BIT(10));           // Disable legacy interrupts
-    set_reg(DEVICE_MSIX_TABLE + 0x0, 0xFEEu << 20); // Set vector0 message address low
-    set_reg(DEVICE_MSIX_TABLE + 0x4, 0);            // Set vector0 message address high
-    set_reg(DEVICE_MSIX_TABLE + 0x8, 0x32);       // Set vector0 message data, i.e. interrupt vector
-    set_reg(DEVICE_MSIX_TABLE + 0xC, 0xFFFFFFFE); // Unmask vector0
-    set_flags(PCI_MSIX_CTRL, BIT(31));              // Enable MSI-X
+    // Enable MSI-X, see PCI Express Technology 3.0 Chapter 17 for more details.
+    // Disable legacy interrupts. TODO: this should be done by PCI driver.
+    set_flags16(PCI_COMMAND_16, BIT(10));
+    // Set vector message address to Local APIC of CPU0
+    set_reg(DEVICE_MSIX_TABLE + 0x0, 0xFEEu << 20);
+    set_reg(DEVICE_MSIX_TABLE + 0x4, 0);
+    // Set vector data to Interrupt Vector
+    set_reg(DEVICE_MSIX_TABLE + 0x8, 0x32);
+    // Unmask vector 0 to enable interrupts through it
+    set_reg(DEVICE_MSIX_TABLE + 0xC, 0xFFFFFFFE);
+    // Enable MSI-X. TODO: this should be set by PCI driver.
+    set_flags(PCI_MSIX_CTRL, BIT(31));
 
-    // initialise the statistic registers. Must keep.
+    // Initialise the statistic registers. Must keep. TODO: why?
     set_reg(RQSMR(0), 0);
-
-    /* sddf_dprintf("ethernet init stage 0 running\n"); */
 
     device.rx_ring = (void *)hw_rx_ring_vaddr;
     device.tx_ring = (void *)hw_tx_ring_vaddr;
 
-    /* net_queue_init(&rx_queue, rx_free, rx_active, NET_RX_QUEUE_CAPACITY_DRIV); */
-    /* net_queue_init(&tx_queue, tx_free, tx_active, NET_TX_QUEUE_CAPACITY_DRIV); */
-    net_queue_init(&rx_queue, config.virt_rx.free_queue.vaddr, config.virt_rx.active_queue.vaddr,
+    net_queue_init(&rx_queue, config.virt_rx.free_queue.vaddr,
+                   config.virt_rx.active_queue.vaddr,
                    config.virt_rx.num_buffers);
-    net_queue_init(&tx_queue, config.virt_tx.free_queue.vaddr, config.virt_tx.active_queue.vaddr,
+    net_queue_init(&tx_queue, config.virt_tx.free_queue.vaddr,
+                   config.virt_tx.active_queue.vaddr,
                    config.virt_tx.num_buffers);
 
     // Disable Interrupts, see Section 4.6.3.1
-    /* sddf_dprintf("disable irqs\n"); */
     disable_interrupts();
 
-    /* sddf_dprintf("writing regs\n"); */
+    // Master disable prior to link reset, see Section 4.2.1.7
     set_reg(CTRL, IXGBE_CTRL_PCIE_MASTER_DISABLE);
     while (get_reg(STATUS) & IXGBE_STATUS_PCIE_MASTER_STATUS);
-    /* sddf_dprintf("CTRL: 0x%x\n", get_reg(CTRL)); */
 
-    /* Global Reset and General Configuration, see Section 4.6.3.2 */
+    // Global Reset and General Configuration, see Section 4.6.3.2
     set_reg(CTRL, get_reg(CTRL) | IXGBE_CTRL_RST);
-    /* sddf_dprintf("CTRL: 0x%x, EEC: 0x%x\n", get_reg(CTRL), get_reg(EEC)); */
     while ((get_reg(CTRL) & IXGBE_CTRL_RST_MASK) != 0);
 
-    /* sddf_dprintf("sleep\n"); */
+    // Wait at least 10ms
     sddf_timer_set_timeout(timer_config.driver_id, 100 * NS_IN_MS);
 }
 
@@ -429,7 +429,8 @@ void init_1(void)
     get_mac_addr(mac);
 
     sddf_dprintf("initialising device\n");
-    sddf_dprintf("   - MAC: %02X:%02X:%02X:%02X:%02X:%02X\n", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+    sddf_dprintf("   - MAC: %02X:%02X:%02X:%02X:%02X:%02X\n",
+                 mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
     // section 4.6.3 - wait for EEPROM auto read completion
     while ((get_reg(EEC) & IXGBE_EEC_ARD) != IXGBE_EEC_ARD);
@@ -606,6 +607,10 @@ void notified(microkit_channel ch)
         } else if (device.init_stage == 2) {
             init_3();
             sddf_dprintf("\n\n\n");
+            sddf_dprintf("BAR0: 0x%x\n", get_reg(PCIE_CONFIG_BASE + 0x10));
+            sddf_dprintf("BAR1: 0x%x\n", get_reg(PCIE_CONFIG_BASE + 0x14));
+            sddf_dprintf("BAR2: 0x%x\n", get_reg(PCIE_CONFIG_BASE + 0x18));
+            sddf_dprintf("BAR3: 0x%x\n", get_reg(PCIE_CONFIG_BASE + 0x1c));
             sddf_dprintf("BAR4: 0x%x\n", get_reg(PCIE_CONFIG_BASE + 0x20));
             sddf_dprintf("MSI CTRL: 0x%x\n", get_reg(PCIE_CONFIG_BASE + 0x50));
             sddf_dprintf("MSI-X CTRL: 0x%x\n", get_reg(PCI_MSIX_CTRL));

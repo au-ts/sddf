@@ -10,9 +10,9 @@ class Board:
     name: str
     arch: SystemDescription.Arch
     paddr_top: int
-    serial: Optional[str] = None
-    ethernet: Optional[str] = None
-    timer: Optional[str] = None
+    serial: Optional[str | int] = None
+    ethernet: Optional[str | int] = None
+    timer: Optional[str | int] = None
     i2c: Optional[str] = None
     partition: int = 0
     blk: Optional[str] = None
@@ -150,5 +150,21 @@ BOARDS: List[Board] = [
         paddr_top=0x7FFDF000,
         timer=None,
         serial=None,
+    ),
+    Board(
+        name="qemu_virt_x86",
+        arch=SystemDescription.Arch.X86_64,
+        paddr_top=0x70000000,
+        serial=0x3f8,
+        timer=0xfed00000,
+        ethernet=0xfe000000,
+    ),
+    Board(
+        name="makatea",
+        arch=SystemDescription.Arch.X86_64,
+        paddr_top=0x70000000,
+        serial=0x2f8,
+        timer=0xfed00000,
+        ethernet=0xe0800000,
     ),
 ]

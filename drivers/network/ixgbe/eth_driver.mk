@@ -17,7 +17,7 @@ ${CHECK_NETDRV_FLAGS_MD5}:
 	-rm -f .netdrv_cflags-*
 	touch $@
 
-eth_driver.elf eth_driver_ixgbe.elf: network/ixgbe/ethernet.o
+eth_driver_ixgbe.elf: network/ixgbe/ethernet.o
 	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
 
 network/ixgbe/ethernet.o: ${ETHERNET_DRIVER_DIR}/ethernet.c ${CHECK_NETDRV_FLAGS_MD5}
