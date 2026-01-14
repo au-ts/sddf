@@ -138,7 +138,7 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
                 core_ccount_start[i] = __atomic_load_n(&ccounts->core_ccount, __ATOMIC_RELAXED);
                 idle_ccount_start[i] = __atomic_load_n(&ccounts->idle_ccount, __ATOMIC_RELAXED);
             }
-            microkit_notify(bench->start_ch);
+            sddf_notify(bench->start_ch);
         }
     } else if (msg_match(data_packet_str, STOP)) {
         sddf_printf("%s measurement finished \n", sddf_get_pd_name());
@@ -173,7 +173,7 @@ static err_t utilization_recv_callback(void *arg, struct tcp_pcb *pcb, struct pb
 
         /* Only benchmark controller client will have bench->num_cores > 0 */
         if (bench->num_cores) {
-            microkit_notify(bench->stop_ch);
+            sddf_notify(bench->stop_ch);
         }
     } else if (msg_match(data_packet_str, QUIT)) {
         /* Do nothing for now */
