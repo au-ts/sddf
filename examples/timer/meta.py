@@ -42,8 +42,6 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
         timer_node = dtb.node(board.timer)
         assert timer_node is not None
 
-    client = ProtectionDomain("client", "client.elf", priority=1)
-
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
     timer_system.add_client(client)
 
