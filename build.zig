@@ -72,6 +72,7 @@ const util_src = [_][]const u8{
 const util_src_aarch64 = [_][]const u8{
     "util/custom_libc/aarch64/memcmp.S",
     "util/custom_libc/aarch64/memcpy.S",
+    "util/custom_libc/aarch64/memmove.c",
     "util/custom_libc/aarch64/memset.S",
     "util/custom_libc/aarch64/strcmp.S",
     "util/custom_libc/aarch64/strcpy.S",
