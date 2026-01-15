@@ -14,7 +14,8 @@ QEMU := qemu-system-riscv64
 QEMU_ARCH_ARGS := -machine virt \
 					-kernel $(IMAGE_FILE) \
 					-m size=2G \
-					-serial mon:stdio
+					-serial mon:stdio \
+				    -global virtio-mmio.force-legacy=false
 
 QEMU_NET_ARGS := -device virtio-net-device,netdev=netdev0
 
