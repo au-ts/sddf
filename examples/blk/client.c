@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-#include <microkit.h>
+#include <os/sddf.h>
 #include <sddf/util/printf.h>
 #include <sddf/util/util.h>
 #include <string.h>
@@ -148,14 +148,14 @@ void init(void)
     assert(REQUEST_BLK_NUMBER < storage_info->capacity - REQUEST_NUM_BLOCKS);
 
     test_basic();
-    microkit_notify(blk_config.virt.id);
+    sddf_notify(blk_config.virt.id);
 }
 
-void notified(microkit_channel ch)
+void notified(sddf_channel ch)
 {
     assert(ch == blk_config.virt.id || ch == serial_config.tx.id);
 
     if (ch == blk_config.virt.id && !test_basic()) {
-        microkit_notify(blk_config.virt.id);
+        sddf_notify(blk_config.virt.id);
     }
 }
