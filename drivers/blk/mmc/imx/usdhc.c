@@ -5,7 +5,7 @@
 
 #include "usdhc.h"
 
-#include <microkit.h>
+#include <os/sddf.h>
 #include <sddf/blk/config.h>
 #include <sddf/blk/queue.h>
 #include <sddf/blk/storage_info.h>
@@ -1118,7 +1118,7 @@ void handle_client_device_inactive(void)
         }
     }
 
-    microkit_notify(blk_config.virt.id);
+    sddf_notify(blk_config.virt.id);
 }
 
 void handle_client(bool was_irq)
@@ -1218,7 +1218,7 @@ void handle_client(bool was_irq)
     assert(!err);
     LOG_DRIVER("Enqueued response: status=%d, success_count=%d, id=%d\n", response_status, success_count,
                driver_state.blk_req.id);
-    microkit_notify(blk_config.virt.id);
+    sddf_notify(blk_config.virt.id);
 
     driver_state.blk_req.inflight = false;
 
@@ -1250,12 +1250,12 @@ void do_bringup(void)
     handle_client(/* was_irq: */ false);
 }
 
-void notified(microkit_channel ch)
+void notified(sddf_channel ch)
 {
     if (driver_status == DrvStatusBringup) {
         if (ch == device_resources.irqs[0].id) {
             do_bringup();
-            microkit_irq_ack(ch);
+            sddf_irq_ack(ch);
         } else {
             LOG_DRIVER_ERR("notification on non-IRQ channel during bringup: %d\n", ch);
         }
@@ -1265,7 +1265,7 @@ void notified(microkit_channel ch)
 
     if (ch == device_resources.irqs[0].id) {
         handle_client(/* was_irq: */ true);
-        microkit_irq_ack(ch);
+        sddf_irq_ack(ch);
     } else if (ch == blk_config.virt.id) {
         handle_client(/* was_irq: */ false);
     } else if (ch == timer_config.driver_id) {
