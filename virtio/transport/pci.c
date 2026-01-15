@@ -276,7 +276,6 @@ bool virtio_transport_queue_setup(virtio_device_handle_t *device_handle, uint32_
     cfg->queue_driver = driver;
     cfg->queue_device = device;
     cfg->queue_enable = 1;
-    sddf_dprintf("queue_select: 0x%x, queue_msix_vector: 0x%x\n", select, cfg->queue_msix_vector);
 
     return true;
 }

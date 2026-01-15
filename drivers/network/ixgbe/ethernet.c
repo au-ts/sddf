@@ -412,18 +412,14 @@ void init_1(void)
     device.init_stage = 1;
     sddf_dprintf("ethernet init stage 1 running\n");
 
-    sddf_dprintf("resume after sleep\n");
     // section 4.6.3.1 - disable interrupts again after reset
     disable_interrupts();
 
-    sddf_dprintf("no snoop disable bit\n");
     // check for no snoop disable bit
-    // uint64_t ctrl_ext = *CTRL_EXT;
+    /* uint64_t ctrl_ext = *CTRL_EXT; */
     // if ((ctrl_ext & IXGBE_CTRL_EXT_NS_DIS) == 0) {
     //     *CTRL_EXT = ctrl_ext | IXGBE_CTRL_EXT_NS_DIS;
     // }
-
-    // *CTRL_EXT = IXGBE_CTRL_EXT_DRV_LOAD;
 
     uint8_t mac[6];
     get_mac_addr(mac);
@@ -437,16 +433,14 @@ void init_1(void)
     sddf_dprintf("EEC: 0x%x\n", get_reg(EEC));
 
     // section 4.6.3 - wait for dma initialization done
-    while ((get_reg(RDRXCTL) & IXGBE_RDRXCTL_DMAIDONE) != IXGBE_RDRXCTL_DMAIDONE);
+    while ((get_reg(RDRXCTL) & IXGBE_RDRXCTL_DMAIDONE) == 0);
 
     // section 4.6.4 - initialize link (auto negotiation)
-    // link auto-configuration register should already be set correctly, we're resetting it anyway
-    /* set_reg(AUTOC, (get_reg(AUTOC) & ~IXGBE_AUTOC_LMS_MASK) | IXGBE_AUTOC_LMS_10G_SERIAL); */
-    /* set_reg(AUTOC, (get_reg(AUTOC) & ~IXGBE_AUTOC_10G_PMA_PMD_MASK) | IXGBE_AUTOC_10G_XAUI); */
 
     // negotiate link
     /* set_flags(AUTOC, IXGBE_AUTOC_AN_RESTART); */
-    /* datasheet wants us to wait for the link here, but we can continue and wait afterwards */
+    /* datasheet wants us to wait for the link here,
+     * but we can continue and wait afterwards */
 
     // section 4.6.5 - statistical counters
     // reset-on-read registers, just read them once
@@ -475,7 +469,7 @@ void init_1(void)
 
         // only use queue 0
         for (int i = 0; i < 1; i++) {
-            set_reg(SRRCTL(i), (get_reg(SRRCTL(i)) & ~IXGBE_SRRCTL_DESCTYPE_MASK) | IXGBE_SRRCTL_DESCTYPE_ADV_ONEBUF);
+            set_reg(SRRCTL(i), get_reg(SRRCTL(i)) | IXGBE_SRRCTL_DESCTYPE_ADV_ONEBUF);
             set_reg(SRRCTL(i), get_reg(SRRCTL(i)) | IXGBE_SRRCTL_DROP_EN);
 
             set_reg(RDBAL(i), hw_rx_ring_paddr & 0xFFFFFFFFull);
@@ -485,7 +479,8 @@ void init_1(void)
             sddf_dprintf("RDLEN: 0x%x\n", get_reg(RDLEN(i)));
             set_reg(RDH(0), 0);
             set_reg(RDT(0), 0);
-            sddf_dprintf("RDH: 0x%x, RDT: 0x%x\n", get_reg(RDH(0)), get_reg(RDT(0)));
+            sddf_dprintf("RDH: 0x%x, RDT: 0x%x\n",
+                         get_reg(RDH(0)), get_reg(RDT(0)));
         }
 
         set_reg(CTRL_EXT, IXGBE_CTRL_EXT_NS_DIS);

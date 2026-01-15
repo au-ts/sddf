@@ -17,7 +17,7 @@ __attribute__((__section__(".serial_driver_config"))) serial_driver_config_t con
 
 // @billn Need a way to express io port in sdfgen config structure
 #define IOPORT_ID 0
-#define IOPORT_BASE 0x2f8
+#define IOPORT_BASE 0x3f8
 // @billn need some sort of "machine description" format for x86 sdfgen to automatically pull in IRQ
 #define IRQ_ID 1
 

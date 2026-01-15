@@ -232,10 +232,6 @@ def generate(
     )
     serial_system = Sddf.Serial(sdf, uart_node, uart_driver, serial_virt_tx)
 
-    if board.arch == SystemDescription.Arch.X86_64:
-        serial_port = SystemDescription.IoPort(board.serial, 8, 0)
-        uart_driver.add_ioport(serial_port)
-
     ethernet_driver = ProtectionDomain(
         "ethernet_driver",
         "eth_driver.elf",
@@ -253,6 +249,25 @@ def generate(
         )
         sdf.add_mr(clock_controller)
         ethernet_driver.add_map(Map(clock_controller, 0x3000000, perms="rw"))
+
+    if board.arch == SystemDescription.Arch.X86_64:
+        serial_port = SystemDescription.IoPort(board.serial, 8, 0)
+        uart_driver.add_ioport(serial_port)
+
+        pcie_driver = ProtectionDomain("pcie_driver", "pcie_driver.elf", priority=252)
+        ecam_mr = SystemDescription.MemoryRegion(sdf, "ecam_regs", 0x10000000, paddr=0xb0000000)
+        blk_msix_mr = SystemDescription.MemoryRegion(sdf, "blk_msix_regs", 0x10000, paddr=0xFEBD5000)
+        sdf.add_mr(ecam_mr)
+        sdf.add_mr(net_msix_mr)
+        pcie_driver.add_map(SystemDescription.Map(ecam_mr, 0xb0000000, "rw"))
+        pcie_driver.add_map(SystemDescription.Map(net_msix_mr, 0xFEBD5000, "rw"))
+
+        ecam_mr = MemoryRegion(
+            sdf, name="ecam", size=0x10000000, paddr=0x80000000
+        )
+        sdf.add_mr(ecam_mr)
+        pcie_driver.add_map(Map(ecam_mr, vaddr=0x3000000, perms="rw"))
+
 
     if board.name == "qemu_virt_x86":
         hw_net_rings = MemoryRegion(sdf, "hw_net_rings", 65536, paddr=0x7A000000)
@@ -280,7 +295,7 @@ def generate(
 
     if board.name == "makatea":
         ecam_mr = MemoryRegion(
-            sdf, name="ecam", size=0x200000, paddr=0x86500000
+            sdf, name="ecam-makatea", size=0x200000, paddr=0x86500000
         )
         sdf.add_mr(ecam_mr)
         ethernet_driver.add_map(Map(ecam_mr, vaddr=0x3000000, perms="rw"))

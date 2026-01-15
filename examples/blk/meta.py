@@ -107,18 +107,25 @@ def generate(
 
     serial_system.add_client(client)
 
+    # pcie_driver = ProtectionDomain("pcie_driver", "pcie_driver.elf", priority=252)
+    # ecam_mr = SystemDescription.MemoryRegion(sdf, "ecam_regs", 0x10000000, paddr=0xb0000000)
+    # bios_mr = SystemDescription.MemoryRegion(sdf, "bios_regs", 0x20000, paddr=0xe0000)
+    # sdt_mr = SystemDescription.MemoryRegion(sdf, "sdt_regs", 0x10000, paddr=0x7ffe0000)
+    # blk_msix_mr = SystemDescription.MemoryRegion(sdf, "blk_msix_regs", 0x10000, paddr=0xFEBD5000)
+    # sdf.add_mr(ecam_mr)
+    # sdf.add_mr(bios_mr)
+    # sdf.add_mr(sdt_mr)
+    # sdf.add_mr(blk_msix_mr)
+    # pcie_driver.add_map(SystemDescription.Map(ecam_mr, 0xb0000000, "rw"))
+    # pcie_driver.add_map(SystemDescription.Map(bios_mr, 0xe0000, "rw"))
+    # pcie_driver.add_map(SystemDescription.Map(sdt_mr, 0x7ffe0000, "rw"))
+    # pcie_driver.add_map(SystemDescription.Map(blk_msix_mr, 0xFEBD5000, "rw"))
+
     pcie_driver = ProtectionDomain("pcie_driver", "pcie_driver.elf", priority=252)
-    ecam_mr = SystemDescription.MemoryRegion(sdf, "ecam_regs", 0x10000000, paddr=0xb0000000)
-    bios_mr = SystemDescription.MemoryRegion(sdf, "bios_regs", 0x20000, paddr=0xe0000)
-    sdt_mr = SystemDescription.MemoryRegion(sdf, "sdt_regs", 0x10000, paddr=0x7ffe0000)
+    pci_system = Sddf.Pci(sdf, None, pcie_driver)
+    pci_system.add_ecam(paddr=0xb0000000, size=0x10000000)
     blk_msix_mr = SystemDescription.MemoryRegion(sdf, "blk_msix_regs", 0x10000, paddr=0xFEBD5000)
-    sdf.add_mr(ecam_mr)
-    sdf.add_mr(bios_mr)
-    sdf.add_mr(sdt_mr)
     sdf.add_mr(blk_msix_mr)
-    pcie_driver.add_map(SystemDescription.Map(ecam_mr, 0xb0000000, "rw"))
-    pcie_driver.add_map(SystemDescription.Map(bios_mr, 0xe0000, "rw"))
-    pcie_driver.add_map(SystemDescription.Map(sdt_mr, 0x7ffe0000, "rw"))
     pcie_driver.add_map(SystemDescription.Map(blk_msix_mr, 0xFEBD5000, "rw"))
 
     pds = [serial_driver, serial_virt_tx, blk_driver, blk_virt, client, pcie_driver]
@@ -131,6 +138,7 @@ def generate(
     assert blk_system.serialise_config(output_dir)
     assert serial_system.connect()
     assert serial_system.serialise_config(output_dir)
+    assert pci_system.serialise_config(output_dir)
     if need_timer:
         assert timer_system.connect()
         assert timer_system.serialise_config(output_dir)

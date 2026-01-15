@@ -106,6 +106,7 @@ endif
 	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx.data serial_virt_tx.elf
 	$(OBJCOPY) --update-section .serial_client_config=serial_client_client.data client.elf
+	$(OBJCOPY) --update-section .device_resources=pcie_driver_device_resources.data pcie_driver.elf
 	touch $@
 
 $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)

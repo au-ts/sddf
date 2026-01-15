@@ -10,67 +10,11 @@
 #include <sddf/util/util.h>
 #include <sddf/util/fence.h>
 #include <sddf/util/printf.h>
+#include <sddf/resources/device.h>
 
 #include "pcie.h"
 
-__attribute__((__section__(".pcie_config"))) pcie_driver_config_t config;
-
-void *rsdp_dump()
-{
-    for (char *addr = (char *)BIOS_AREA_START; addr < (char *)BIOS_AREA_END; addr += 16) {
-        if (!strncmp(addr, "RSD PTR ", 8)) {
-            sddf_dprintf("Found the identifier at 0x%lx:\n", (uintptr_t)addr);
-            sddf_dprintf("%c%c%c%c%c%c%c%c\n", addr[0], addr[1], addr[2], addr[3], addr[4], addr[5], addr[6], addr[7]);
-
-            // TODO: validate the checksum
-            // TODO: return rsdt_addr
-            acpi_rsdp_t *acpi_rsdp = (acpi_rsdp_t *)addr;
-            sddf_dprintf("revision: 0x%x\n", acpi_rsdp->revision);
-            sddf_dprintf("checksum: 0x%x\n", acpi_rsdp->checksum);
-            sddf_dprintf("rsdt: 0x%x\n", acpi_rsdp->rsdt_addr);
-            sddf_dprintf("length: 0x%x\n", acpi_rsdp->length);
-            sddf_dprintf("xsdt: 0x%lx\n", acpi_rsdp->xsdt_addr);
-
-            // TODO: distinguish ACPI 1.0 and 2.0
-
-            uint32_t checksum = 0;
-            for (char *ch = addr; ch < addr + 20; ch++) {
-                checksum += (uint8_t)(*ch);
-            }
-            if ((checksum & 0xFF) != 0) {
-                sddf_dprintf("Wrong checksum!\n");
-                return NULL;
-            }
-
-            return (void *)(uintptr_t)acpi_rsdp->rsdt_addr;
-        }
-    }
-
-    // No RSDP found!
-    return NULL;
-}
-
-void *find_sdt(void *rsdt_addr, char *signature)
-{
-    acpi_sdt_header_t *rsdt_header = (acpi_sdt_header_t *)rsdt_addr;
-    int num_entries = (rsdt_header->length - sizeof(acpi_sdt_header_t)) / 4;
-    sddf_dprintf("num of entries: 0x%x\n", num_entries);
-
-    for (int i = 0; i < num_entries; i++)
-    {
-        uint32_t *sdt_pointer = (uint32_t *)((uintptr_t)rsdt_header + sizeof(acpi_sdt_header_t) + 4 * i);
-        acpi_sdt_header_t *header = (acpi_sdt_header_t *)(uintptr_t)(*sdt_pointer);
-        sddf_dprintf("scan at 0x%lx: %c%c%c%c\n", (uintptr_t)header, header->signature[0], header->signature[1],
-                     header->signature[2], header->signature[3]);
-        if (!strncmp(header->signature, signature, 4)) {
-            sddf_dprintf("MCFG header found at: 0x%lx\n", (uintptr_t)header);
-            return (void *)header;
-        }
-    }
-
-    // No MCFG found
-    return NULL;
-}
+__attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
 /**
  * Look for the capability of a device by ID
@@ -165,7 +109,7 @@ void pci_bus_scan(uintptr_t pci_bus)
 
 void pci_ecam_scan(uintptr_t ecam_base, uint8_t start_bus, uint8_t end_bus)
 {
-    for (int i = start_bus; i < end_bus; i++) {
+    for (int i = start_bus; i <= end_bus; i++) {
         pci_bus_scan(ecam_base + (i << 20));
     }
 }
@@ -187,13 +131,14 @@ void parse_mcfg(void *mcfg_addr)
 void init(void)
 {
     sddf_dprintf("PCIE|INFO: hello\n");
-    sddf_dprintf("ecam_base: 0x%lx\n", (uintptr_t)(config.ecam_base));
-    sddf_dprintf("ecam_size: 0x%lx\n", config.ecam_size);
-    sddf_dprintf("bus_range: 0x%x\n", config.bus_range);
+    sddf_dprintf("number of ECAMs: %d\n", device_resources.num_regions);
+    sddf_dprintf("ecam_base: 0x%lx\n", (uintptr_t)(device_resources.regions[0].region.vaddr));
+    sddf_dprintf("ecam_size: 0x%lx\n", device_resources.regions[0].region.size);
 
-    void *rsdt_addr = rsdp_dump();
-    void *mcfg_addr = find_sdt(rsdt_addr, "MCFG");
-    parse_mcfg(mcfg_addr);
+
+    uint16_t end_bus = device_resources.regions[0].region.size / BIT(20) - 1;
+    sddf_dprintf("BIT(20): 0x%lx, end_bus: %d\n", BIT(20), end_bus);
+    pci_ecam_scan((uintptr_t)device_resources.regions[0].region.vaddr, 0, end_bus);
 }
 
 void notified(sddf_channel ch)
