@@ -7,6 +7,7 @@
 #include "msdos_mbr.h"
 #include "gpt.h"
 
+#include <os/sddf.h>
 #include <sddf/util/cache.h>
 #include <sddf/util/util.h>
 
@@ -293,7 +294,7 @@ static void mbr_request()
     err = blk_enqueue_req(&drv_h, BLK_REQ_READ, mbr_paddr, 0, 1, mbr_state.req_id);
     assert(!err);
 
-    microkit_deferred_notify(config.driver.conn.id);
+    sddf_deferred_notify(config.driver.conn.id);
 
     mbr_state.sent_request = true;
 }
@@ -371,7 +372,7 @@ static bool mbr_handle_response()
         assert(!err);
         gpt_state.sent_request = true;
 
-        microkit_deferred_notify(config.driver.conn.id);
+        sddf_deferred_notify(config.driver.conn.id);
         return false;
     }
 

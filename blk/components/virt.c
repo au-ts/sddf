@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-#include <microkit.h>
+#include <os/sddf.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <sddf/util/cache.h>
@@ -114,7 +114,7 @@ static void handle_driver()
     /* Notify corresponding client if a response was enqueued */
     for (int i = 0; i < config.num_clients; i++) {
         if (client_notify[i]) {
-            microkit_notify(config.clients[i].conn.id);
+            sddf_notify(config.clients[i].conn.id);
         }
     }
 }
@@ -217,7 +217,7 @@ static bool handle_client(int cli_id)
     }
 
     if (client_notify) {
-        microkit_notify(config.clients[cli_id].conn.id);
+        sddf_notify(config.clients[cli_id].conn.id);
     }
 
     return driver_notify;
@@ -233,11 +233,11 @@ static void handle_clients()
     }
 
     if (driver_notify) {
-        microkit_notify(config.driver.conn.id);
+        sddf_notify(config.driver.conn.id);
     }
 }
 
-void notified(microkit_channel ch)
+void notified(sddf_channel ch)
 {
     if (!initialised) {
         /* Continue processing partitions until initialisation has finished. */
