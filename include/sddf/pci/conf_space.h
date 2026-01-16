@@ -41,6 +41,7 @@
 #define PCI_CLASS_NON_ESSENTIAL_INSTRUMENTATIONS 19
 
 #define PCI_CLASS_NETWORK_SUBCLASS_ETHERNET 0
+#define PCI_CLASS_BLOCK_SUBCLASS_SCSI 0
 
 /* Every PCI devices implement these common header fields: */
 typedef volatile struct __attribute__((packed)) pci_common_hdr {
