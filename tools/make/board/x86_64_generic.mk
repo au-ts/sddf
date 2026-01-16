@@ -26,6 +26,8 @@ QEMU_ARCH_ARGS := -machine q35 \
 		-cpu qemu64,+fsgsbase,+pdpe1gb,+pcid,+invpcid,+xsave,+xsaves,+xsaveopt \
 		-initrd $(IMAGE_FILE)
 
-QEMU_NET_ARGS := -device virtio-net-pci,netdev=netdev0
-
-QEMU_BLK_ARGS := -device virtio-blk-pci,drive=hd
+# The PCI slot is hard-coded in the virtIO drivers for now, so we have to
+# specify the slot with QEMU as well.
+# See https://github.com/au-ts/sddf/issues/607 for details.
+QEMU_NET_ARGS := -device virtio-net-pci,netdev=netdev0,addr=0x2.0
+QEMU_BLK_ARGS := -device virtio-blk-pci,drive=hd,addr=0x3.0
