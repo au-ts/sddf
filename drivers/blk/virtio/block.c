@@ -19,12 +19,14 @@
 #include <sddf/util/util.h>
 #include <sddf/util/ialloc.h>
 #include <sddf/virtio/transport/common.h>
+#include <sddf/virtio/transport/pci.h>
 #include <sddf/virtio/queue.h>
 #include <sddf/virtio/feature.h>
 #include <sddf/blk/queue.h>
 #include <sddf/blk/config.h>
 #include <sddf/blk/storage_info.h>
 #include <sddf/resources/device.h>
+#include <sddf/pci/conf_space.h>
 #include "block.h"
 
 virtio_device_handle_t dev;
@@ -380,6 +382,10 @@ void init(void)
     dev.pci_bus = 0;
     dev.pci_dev = 3;
     dev.pci_func = 0;
+    dev.pci_class_code = PCI_CLASS_MASS_STORAGE_CONTROLLER;
+    dev.pci_subclass = PCI_CLASS_BLOCK_SUBCLASS_SCSI;
+    dev.pci_vendor_id = VIRTIO_PCI_VEN_ID;
+    dev.pci_device_id = VIRTIO_BLK_PCI_DEV_ID;
 
     virtio_blk_init();
 

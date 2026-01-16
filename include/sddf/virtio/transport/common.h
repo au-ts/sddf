@@ -16,6 +16,8 @@
 #define LOG_VIRTIO_TRANSPORT(...) do{}while(0)
 #endif
 
+#define LOG_VIRTIO_ERR(...) do{ sddf_dprintf("VIRTIO|ERR: "); sddf_dprintf(__VA_ARGS__); }while(0)
+
 #define VIRTIO_VERSION (0x2)
 
 #define VIRTIO_IRQ_VQUEUE  (1 << 0)
@@ -40,6 +42,10 @@ typedef struct virtio_device_handle {
     uint8_t pci_bus;
     uint8_t pci_dev;
     uint8_t pci_func;
+    uint8_t pci_class_code;
+    uint8_t pci_subclass;
+    uint16_t pci_vendor_id;
+    uint16_t pci_device_id;
 } virtio_device_handle_t;
 
 bool virtio_transport_probe(device_resources_t *device_resources, virtio_device_handle_t *device_handle_ret,

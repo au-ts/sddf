@@ -24,9 +24,11 @@
 #include <sddf/util/printf.h>
 #include <sddf/util/ialloc.h>
 #include <sddf/virtio/transport/common.h>
+#include <sddf/virtio/transport/pci.h>
 #include <sddf/virtio/queue.h>
 #include <sddf/virtio/feature.h>
 #include <sddf/resources/device.h>
+#include <sddf/pci/conf_space.h>
 
 #include "ethernet.h"
 
@@ -437,6 +439,10 @@ void init(void)
     dev.pci_bus = 0;
     dev.pci_dev = 2;
     dev.pci_func = 0;
+    dev.pci_class_code = PCI_CLASS_NETWORK_CONTROLLER;
+    dev.pci_subclass = PCI_CLASS_NETWORK_SUBCLASS_ETHERNET;
+    dev.pci_vendor_id = VIRTIO_PCI_VEN_ID;
+    dev.pci_device_id = VIRTIO_NET_PCI_DEV_ID;
 
     eth_setup();
 
