@@ -104,38 +104,39 @@ void pci_debug_print_header(uint8_t bus, uint8_t dev, uint8_t func, pci_gen_dev_
     LOG_VIRTIO_TRANSPORT("\tCapabilities ptr: 0x%x\n", pci_device_header->cap_ptr);
 
     /* If the capability list bit is set, walk the cap list. */
-    if (pci_device_header->common_hdr.status & BIT(4)) {
-        uint8_t cap_off = pci_device_header->cap_ptr;
-        while (cap_off) {
-            uint32_t virtio_cap_arr[4];
-            virtio_cap_arr[0] = pci_x86_read_32(bus, dev, func, cap_off);
-            virtio_cap_arr[1] = pci_x86_read_32(bus, dev, func, cap_off + 4);
-            virtio_cap_arr[2] = pci_x86_read_32(bus, dev, func, cap_off + 8);
-            virtio_cap_arr[3] = pci_x86_read_32(bus, dev, func, cap_off + 12);
+    // if (pci_device_header->common_hdr.status & BIT(4)) {
+    //     uint8_t cap_off = pci_device_header->cap_ptr;
+    //     while (cap_off) {
+    //         uint32_t virtio_cap_arr[4];
+    //         virtio_cap_arr[0] = pci_x86_read_32(bus, dev, func, cap_off);
+    //         virtio_cap_arr[1] = pci_x86_read_32(bus, dev, func, cap_off + 4);
+    //         virtio_cap_arr[2] = pci_x86_read_32(bus, dev, func, cap_off + 8);
+    //         virtio_cap_arr[3] = pci_x86_read_32(bus, dev, func, cap_off + 12);
 
-            virtio_pci_cap_t *cap = (virtio_pci_cap_t *)virtio_cap_arr;
+    //         virtio_pci_cap_t *cap = (virtio_pci_cap_t *)virtio_cap_arr;
 
-            if (cap->cap_vndr == PCI_CAP_ID_VNDR) {
-                LOG_VIRTIO_TRANSPORT("\tCap @ 0x%x, vendor 0x%x\n", cap_off, cap->cap_vndr);
-                LOG_VIRTIO_TRANSPORT("\t\tCap next: 0x%x\n", cap->cap_next);
-                LOG_VIRTIO_TRANSPORT("\t\tCap len: 0x%x\n", cap->cap_len);
-                LOG_VIRTIO_TRANSPORT("\t\tType: 0x%x\n", cap->cfg_type);
-                LOG_VIRTIO_TRANSPORT("\t\tBar: 0x%x\n", cap->bar);
-                LOG_VIRTIO_TRANSPORT("\t\tID: 0x%x\n", cap->id);
-                LOG_VIRTIO_TRANSPORT("\t\tBar off: 0x%x\n", cap->offset);
-                LOG_VIRTIO_TRANSPORT("\t\tBar Len: 0x%x\n", cap->length);
+    //         if (cap->cap_vndr == PCI_CAP_ID_VNDR) {
+    //             LOG_VIRTIO_TRANSPORT("\tCap @ 0x%x, vendor 0x%x\n", cap_off, cap->cap_vndr);
+    //             LOG_VIRTIO_TRANSPORT("\t\tCap next: 0x%x\n", cap->cap_next);
+    //             LOG_VIRTIO_TRANSPORT("\t\tCap len: 0x%x\n", cap->cap_len);
+    //             LOG_VIRTIO_TRANSPORT("\t\tType: 0x%x\n", cap->cfg_type);
+    //             LOG_VIRTIO_TRANSPORT("\t\tBar: 0x%x\n", cap->bar);
+    //             LOG_VIRTIO_TRANSPORT("\t\tID: 0x%x\n", cap->id);
+    //             LOG_VIRTIO_TRANSPORT("\t\tBar off: 0x%x\n", cap->offset);
+    //             LOG_VIRTIO_TRANSPORT("\t\tBar Len: 0x%x\n", cap->length);
 
-                // @billn break this out, this debug print functions mustn't have side effects
-                if (cap->cfg_type == VIRTIO_PCI_CAP_NOTIFY_CFG) {
-                    // 4.1.4.4 Notification structure layout
-                    nftn_multiplier = pci_x86_read_32(bus, dev, func, cap_off + sizeof(virtio_pci_cap_t));
-                    LOG_VIRTIO_TRANSPORT("\t\tnftn_multiplier: 0x%x\n", nftn_multiplier);
-                }
-            }
+    //             // @billn break this out, this debug print functions mustn't have side effects
+    //             if (cap->cfg_type == VIRTIO_PCI_CAP_NOTIFY_CFG) {
+    //                 // 4.1.4.4 Notification structure layout
+    //                 nftn_multiplier = pci_x86_read_32(bus, dev, func, cap_off + sizeof(virtio_pci_cap_t));
+    //             }
+    //         }
 
-            cap_off = cap->cap_next;
-        }
-    }
+    //         cap_off = cap->cap_next;
+    //     }
+    // }
+
+    nftn_multiplier = 4;
 }
 
 static bool read_pci_general_device_header(uint8_t bus, uint8_t dev, uint8_t func, pci_gen_dev_hdr_t *ret)
