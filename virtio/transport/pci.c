@@ -150,7 +150,7 @@ static bool read_pci_general_device_header(uint8_t bus, uint8_t dev, uint8_t fun
 
     uint8_t hdr_type = (pci_device_header[3] >> 16) & 0xff;
     if (hdr_type != PCI_HEADER_TYPE_GENERAL) {
-        LOG_VIRTIO_TRANSPORT("parsing non device pci header is currently unsupported.\n");
+        LOG_VIRTIO_ERR("parsing non device pci header is currently unsupported.\n");
         return false;
     }
 
