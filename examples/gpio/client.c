@@ -25,6 +25,8 @@
 // Motor control buffers
 uintptr_t control_buffer_base_vaddr_a;
 uintptr_t control_buffer_base_vaddr_b;
+uintptr_t ultrasonic_input_buffer_base_vaddr;
+uintptr_t ultrasonic_output_buffer_base_vaddr;
 
 cothread_t t_event;
 cothread_t t_main;
@@ -36,6 +38,7 @@ static char t_client_main_stack[STACK_SIZE];
 #define TIMER_CHANNEL (1)
 #define MOTOR_CONTROL_A_CHANNEL (2)
 #define MOTOR_CONTROL_B_CHANNEL (3)
+#define ULTRASONIC_CHANNEL (4)
 
 // Unfulfilled motor control request
 int is_ongoing_request = 0;
@@ -91,6 +94,14 @@ void send_neutral_request(int motor_ch) {
     }
     LOG_CLIENT("Sending neutral request\n");
     microkit_notify(motor_ch);
+}
+
+// returns distance in cm
+uint64_t get_ultrasonic_reading() {
+    microkit_msginfo new_msg = microkit_msginfo_new(0, 0);
+    microkit_msginfo res = microkit_ppcall(ULTRASONIC_CHANNEL, new_msg);
+    uint64_t distance = microkit_mr_get(0);
+    return distance;
 }
 
 // TODO check these

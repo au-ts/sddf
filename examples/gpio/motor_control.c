@@ -13,7 +13,7 @@
 #include <sddf/gpio/meson/gpio.h>
 #include "include/client/client.h"
 #include "include/motor/motor_control.h"
-#include "include/gpio/gpio_config.h"
+#include "gpio_config.h"
 
 #define DEBUG_CLIENT
 

@@ -12,7 +12,7 @@
 #include <sddf/timer/client.h>
 #include <sddf/gpio/meson/gpio.h>
 #include "include/client/client.h"
-#include "include/gpio/gpio_config.h"
+#include "gpio_config.h"
 
 #define DEBUG_CLIENT
 
@@ -24,7 +24,8 @@
 
 #define LOG_SENSOR_ERR(...) do{ sddf_printf("SENSOR|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
-// uintptr_t ultrasonic_sensor_buffer_base_vaddr;
+uintptr_t ultrasonic_input_buffer_base_vaddr;
+uintptr_t ultrasonic_output_buffer_base_vaddr;
 
 cothread_t t_event;
 cothread_t t_main;
@@ -49,10 +50,8 @@ static char t_sensor_main_stack[STACK_SIZE];
 // Time (ms) Timeout for Sensor Read
 #define SENSOR_TIMEOUT (38)
 
-// https://howtomechatronics.com/tutorials/arduino/ultrasonic-sensor-hc-sr04/
-
 // Read data sent from client in the control buffer
-// int read_control_buffer() {
+// int append_client_buffer() {
 //     int ch = 0;
 
 //     if ((*REG_PTR(ultrasonic_sensor_buffer_base_vaddr, UARTFR) & PL011_UARTFR_RXFE) == 0) {
@@ -121,7 +120,7 @@ bool delay_microsec(size_t microsec)
     return true;
 }
 
-// Read duration of value from GPIO pin (in ns)
+// Read duration of value from GPIO pin (in micro seconds)
 uint64_t pulse_in(int gpio_ch, int value) {
     uint64_t time_start = sddf_timer_time_now(TIMER_CHANNEL);
     uint64_t time_received = 0;
@@ -168,7 +167,8 @@ uint64_t pulse_in(int gpio_ch, int value) {
     }
 
     if (time_change && time_received) {
-        return (time_change - time_received);
+        // micro seconds
+        return (time_change - time_received) / 1000;
     }
 
     return 0;
@@ -177,6 +177,9 @@ uint64_t pulse_in(int gpio_ch, int value) {
 void sensor_main(void) {
     gpio_init(GPIO_CHANNEL_ECHO, GPIO_DIRECTION_INPUT);
     gpio_init(GPIO_CHANNEL_TRIG, GPIO_DIRECTION_OUTPUT);
+
+    LOG_SENSOR("attempt reading\n");
+
 
     while (true) {
         digital_write(GPIO_CHANNEL_TRIG, GPIO_LOW);
@@ -189,12 +192,53 @@ void sensor_main(void) {
 
         uint64_t duration = pulse_in(GPIO_CHANNEL_ECHO, GPIO_HIGH);
         if (duration) {
-            LOG_SENSOR("duration received, %ld\n", duration);
+            uint64_t distance = duration * 0.034 / 2;
+            
+            LOG_SENSOR("distance received, %ld\n", distance);
         }  
         
         LOG_SENSOR("done reading\n");
         delay_microsec(1000000);
     }   
+}
+
+// TODO: might want to buffer over multiple reads
+uint64_t read_sensor() {
+    uint64_t duration = pulse_in(GPIO_CHANNEL_ECHO, GPIO_HIGH);
+    if (duration) {
+        uint64_t distance = duration * 0.034 / 2;
+        return distance;
+    }  
+    
+    // sensor timeout
+    return 0;
+}
+
+microkit_msginfo send_reading_to_client() {
+    uint64_t distance = read_sensor();
+
+    // send 2 words (64 bits) for sensor read
+    // highest 4 bytes, lowest 4 bytes
+    microkit_msginfo new_msg = microkit_msginfo_new(0, 1);
+
+    microkit_mr_set(0, distance);
+
+    return new_msg;
+}
+
+microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo) {
+    microkit_msginfo res;
+
+    switch (ch) {
+    case CLIENT_CHANNEL:
+        res = send_reading_to_client();
+        break;
+    default:
+        LOG_SENSOR("Unexpected pp call\n");
+        break;
+    }
+
+    return res;
 }
 
 void notified(microkit_channel ch) {

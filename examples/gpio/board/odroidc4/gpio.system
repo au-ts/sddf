@@ -12,6 +12,9 @@
     <memory_region name="control_buffer_a" size="0x1000"/>
     <memory_region name="control_buffer_b" size="0x1000"/>
 
+    <memory_region name="ultrasonic_input_buffer" size="0x1000"/>
+    <memory_region name="ultrasonic_output_buffer" size="0x1000"/>
+
 
     <protection_domain name="timer" priority="254" passive="true">
         <program_image path="timer_driver.elf" />
@@ -29,7 +32,8 @@
     <protection_domain name="client" priority="1">
         <map mr="control_buffer_a" vaddr="0x6000000" perms="rw" setvar_vaddr="control_buffer_base_vaddr_a"/>
         <map mr="control_buffer_b" vaddr="0x8000000" perms="rw" setvar_vaddr="control_buffer_base_vaddr_b"/>
-
+        <map mr="ultrasonic_input_buffer" vaddr="0x9000000" perms="rw" setvar_vaddr="ultrasonic_input_buffer_base_vaddr"/>
+        <map mr="ultrasonic_output_buffer" size="0x10000000" perms="rw" setvar_vaddr="ultrasonic_output_buffer_base_vaddr"/>
         <program_image path="client.elf"/>
     </protection_domain>
 
@@ -44,6 +48,9 @@
     </protection_domain>
 
     <protection_domain name="ultrasonic_sensor" priority="2">
+        <map mr="ultrasonic_input_buffer" vaddr="0x9000000" perms="rw" setvar_vaddr="ultrasonic_input_buffer_base_vaddr"/>
+        <map mr="ultrasonic_output_buffer" size="0x10000000" perms="rw" setvar_vaddr="ultrasonic_output_buffer_base_vaddr"/>
+
         <program_image path="ultrasonic_sensor.elf"/>
     </protection_domain>
 
