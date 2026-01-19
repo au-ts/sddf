@@ -117,6 +117,8 @@ uint64_t pulse_in(int gpio_ch, int value) {
     int has_received = 0;
 
     while (true) {
+        LOG_SENSOR("sensor read attempt\n");
+
         microkit_msginfo msginfo;
         msginfo = microkit_msginfo_new(GPIO_GET_GPIO, 1);
         microkit_mr_set(GPIO_REQ_CONFIG_SLOT, GPIO_INPUT);
@@ -142,6 +144,9 @@ uint64_t pulse_in(int gpio_ch, int value) {
             }
         } 
         else {
+            LOG_SENSOR("test val\n");
+
+
             // Have received measured value before, this is time when value changes
             if (has_received) {
                 time_change = sddf_timer_time_now(TIMER_CHANNEL);
@@ -159,8 +164,11 @@ uint64_t pulse_in(int gpio_ch, int value) {
 }
 
 void sensor_main(void) {
+    LOG_SENSOR("init\n");
+
     gpio_init(GPIO_CHANNEL_ECHO, GPIO_DIRECTION_INPUT);
     gpio_init(GPIO_CHANNEL_TRIG, GPIO_DIRECTION_OUTPUT);
+    // delay_microsec(2);
 
     // LOG_SENSOR("attempt reading\n");
 
@@ -188,16 +196,18 @@ void sensor_main(void) {
 
 // TODO: might want to buffer over multiple reads
 uint64_t read_sensor() {
-    delay_microsec(1000000);
-    LOG_SENSOR("attempt reading\n");
+    // delay_microsec(1000000);
+    // LOG_SENSOR("attempt reading\n");
     uint64_t duration = pulse_in(GPIO_CHANNEL_ECHO, GPIO_HIGH);
     if (duration) {
         uint64_t distance = duration * 0.034 / 2;
+        LOG_SENSOR("Sensor Reading Received: %ld\n", distance);
+
         return distance;
     }  
     
     // sensor timeout
-    LOG_SENSOR("done reading\n");
+    // LOG_SENSOR("done reading\n");
     return 0;
 }
 
@@ -216,8 +226,10 @@ microkit_msginfo send_reading_to_client() {
 microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo) {
     switch (ch) {
     case CLIENT_CHANNEL:
+        LOG_SENSOR("Client call\n");
         microkit_msginfo res = send_reading_to_client();
         return res;
+        break;
     default:
         LOG_SENSOR("Unexpected pp call\n");
         break;
@@ -241,13 +253,14 @@ void notified(microkit_channel ch) {
 
 
 void init(void) {
-    LOG_SENSOR("Init\n");
-    /* Define the event loop/notified thread as the active co-routine */
-    t_event = co_active();
+    sensor_main();
+    // LOG_SENSOR("Init\n");
+    // /* Define the event loop/notified thread as the active co-routine */
+    // t_event = co_active();
 
-    /* derive main entry point */
-    t_main = co_derive((void *)t_sensor_main_stack, STACK_SIZE, sensor_main);
+    // /* derive main entry point */
+    // t_main = co_derive((void *)t_sensor_main_stack, STACK_SIZE, sensor_main);
 
-    co_switch(t_main);
+    // co_switch(t_main);
 }
 

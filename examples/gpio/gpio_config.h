@@ -11,7 +11,7 @@
 
 //  Motor pins
 #define GPIO_1 (MESON_GPIO_X + 1)
-#define GPIO_2 (MESON_GPIO_X + 0)
+#define GPIO_2 (MESON_GPIO_X + 2)
 
 // Ultrasonic pins
 // Echo pin

@@ -110,6 +110,7 @@ void set_reverse(void) {
 }
 
 void set_neutral(void) {
+    // LOG_CONTROL("Command Received: Neutral\n");
     set_pwm(GPIO_CHANNEL, pwm_delay_mappings[CONTROL_NEUTRAL - 1][PWM_TIME_HIGH]*NS_IN_US);
 }
 
@@ -173,7 +174,7 @@ void notified(microkit_channel ch) {
             digital_write(GPIO_CHANNEL, GPIO_LOW);
             // uint64_t time = sddf_timer_time_now(TIMER_CHANNEL);
             // LOG_CONTROL("SET DIGITAL LOW, the time now is: %lu\n", time);
-            LOG_CONTROL("CURRENT CONTROL, %d\n", curr_command);
+            // LOG_CONTROL("CURRENT CONTROL, %d\n", curr_command);
             
             // TODO change this to corresponding down time for each motor direction
             // hold low for 18 ms (to drive forward)
