@@ -112,7 +112,7 @@ void client_main(void) {
         delay_ms(1000);
         drive_stop();
         uint64_t distance = get_ultrasonic_reading();
-        // LOG_CLIENT("Sensor Reading Received: %ld\n", distance);
+        LOG_CLIENT("Sensor Reading Received: %ld\n", distance);
     }
     
     // while (true) {

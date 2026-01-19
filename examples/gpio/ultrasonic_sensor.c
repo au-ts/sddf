@@ -117,7 +117,7 @@ uint64_t pulse_in(int gpio_ch, int value) {
     int has_received = 0;
 
     while (true) {
-        LOG_SENSOR("sensor read attempt\n");
+        // LOG_SENSOR("sensor read attempt\n");
 
         microkit_msginfo msginfo;
         msginfo = microkit_msginfo_new(GPIO_GET_GPIO, 1);
@@ -144,7 +144,7 @@ uint64_t pulse_in(int gpio_ch, int value) {
             }
         } 
         else {
-            LOG_SENSOR("test val\n");
+            // LOG_SENSOR("test val\n");
 
 
             // Have received measured value before, this is time when value changes
@@ -165,9 +165,9 @@ uint64_t pulse_in(int gpio_ch, int value) {
 
 void sensor_main(void) {
     LOG_SENSOR("init\n");
-
     gpio_init(GPIO_CHANNEL_ECHO, GPIO_DIRECTION_INPUT);
     gpio_init(GPIO_CHANNEL_TRIG, GPIO_DIRECTION_OUTPUT);
+
     // delay_microsec(2);
 
     // LOG_SENSOR("attempt reading\n");
@@ -194,15 +194,42 @@ void sensor_main(void) {
     // }   
 }
 
+
+// void sensor_main(void) {
+//     gpio_init(GPIO_CHANNEL_ECHO, GPIO_DIRECTION_INPUT);
+//     gpio_init(GPIO_CHANNEL_TRIG, GPIO_DIRECTION_OUTPUT);
+
+//     while (true) {
+//         digital_write(GPIO_CHANNEL_TRIG, GPIO_LOW);
+//         delay_microsec(2);
+
+//         digital_write(GPIO_CHANNEL_TRIG, GPIO_HIGH);
+//         delay_microsec(10);
+
+//         digital_write(GPIO_CHANNEL_TRIG, GPIO_LOW);
+
+//         uint64_t duration = pulse_in(GPIO_CHANNEL_ECHO, GPIO_HIGH);
+//         if (duration) {
+//             LOG_SENSOR("duration received, %ld\n", duration);
+//         }  
+        
+//         LOG_SENSOR("done reading\n");
+//         delay_microsec(1000000);
+//     }   
+// }
+
 // TODO: might want to buffer over multiple reads
 uint64_t read_sensor() {
-    // delay_microsec(1000000);
-    // LOG_SENSOR("attempt reading\n");
+    digital_write(GPIO_CHANNEL_TRIG, GPIO_LOW);
+    // delay_microsec(2);
+
+    digital_write(GPIO_CHANNEL_TRIG, GPIO_HIGH);
+    // delay_microsec(10);
+
     uint64_t duration = pulse_in(GPIO_CHANNEL_ECHO, GPIO_HIGH);
     if (duration) {
         uint64_t distance = duration * 0.034 / 2;
         LOG_SENSOR("Sensor Reading Received: %ld\n", distance);
-
         return distance;
     }  
     
@@ -253,8 +280,9 @@ void notified(microkit_channel ch) {
 
 
 void init(void) {
+    LOG_SENSOR("Init\n");
+
     sensor_main();
-    // LOG_SENSOR("Init\n");
     // /* Define the event loop/notified thread as the active co-routine */
     // t_event = co_active();
 
