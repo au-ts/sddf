@@ -178,32 +178,33 @@ void sensor_main(void) {
     gpio_init(GPIO_CHANNEL_ECHO, GPIO_DIRECTION_INPUT);
     gpio_init(GPIO_CHANNEL_TRIG, GPIO_DIRECTION_OUTPUT);
 
-    LOG_SENSOR("attempt reading\n");
+    // LOG_SENSOR("attempt reading\n");
 
 
-    while (true) {
-        digital_write(GPIO_CHANNEL_TRIG, GPIO_LOW);
-        delay_microsec(2);
+    // while (true) {
+    //     digital_write(GPIO_CHANNEL_TRIG, GPIO_LOW);
+    //     delay_microsec(2);
 
-        digital_write(GPIO_CHANNEL_TRIG, GPIO_HIGH);
-        delay_microsec(10);
+    //     digital_write(GPIO_CHANNEL_TRIG, GPIO_HIGH);
+    //     delay_microsec(10);
 
-        digital_write(GPIO_CHANNEL_TRIG, GPIO_LOW);
+    //     digital_write(GPIO_CHANNEL_TRIG, GPIO_LOW);
 
-        uint64_t duration = pulse_in(GPIO_CHANNEL_ECHO, GPIO_HIGH);
-        if (duration) {
-            uint64_t distance = duration * 0.034 / 2;
+    //     uint64_t duration = pulse_in(GPIO_CHANNEL_ECHO, GPIO_HIGH);
+    //     if (duration) {
+    //         uint64_t distance = duration * 0.034 / 2;
             
-            LOG_SENSOR("distance received, %ld\n", distance);
-        }  
+    //         LOG_SENSOR("distance received, %ld\n", distance);
+    //     }  
         
-        LOG_SENSOR("done reading\n");
-        delay_microsec(1000000);
-    }   
+    //     LOG_SENSOR("done reading\n");
+    //     delay_microsec(1000000);
+    // }   
 }
 
 // TODO: might want to buffer over multiple reads
 uint64_t read_sensor() {
+    LOG_SENSOR("attempt reading\n");
     uint64_t duration = pulse_in(GPIO_CHANNEL_ECHO, GPIO_HIGH);
     if (duration) {
         uint64_t distance = duration * 0.034 / 2;
@@ -211,6 +212,7 @@ uint64_t read_sensor() {
     }  
     
     // sensor timeout
+    LOG_SENSOR("done reading\n");
     return 0;
 }
 

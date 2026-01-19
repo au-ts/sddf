@@ -125,19 +125,28 @@ void drive_right(void) {
     send_neutral_request(MOTOR_CONTROL_A_CHANNEL);
 }
 
+void drive_stop() {
+    send_neutral_request(MOTOR_CONTROL_A_CHANNEL);
+    send_neutral_request(MOTOR_CONTROL_B_CHANNEL);
+}
+
 void client_main(void) {
-    LOG_CLIENT("In client main\n");
-    drive_forward();
-    delay_ms(5000);
+    // wait for all sensors to initialise first
+    // TODO: might want to change this
+    delay_ms(1000);
 
-    drive_left();
-    delay_ms(5000);
+    while (true) {
+        uint64_t distance = get_ultrasonic_reading();
 
-    drive_right();
-    delay_ms(5000);
+        if (distance > 10) {
+            drive_forward();
+        }
+        else if (distance <= 10) {
+            drive_stop();
+        }
 
-    drive_reverse();
-    delay_ms(5000);
+        delay_ms(1000);
+    }
 }
 
 // Call coroutine, block other commands from executing
@@ -155,14 +164,14 @@ void notified(microkit_channel ch) {
 }
 
 void init(void) {
-    // LOG_CLIENT("Init\n");
+    LOG_CLIENT("Init\n");
 
-    // /* Define the event loop/notified thread as the active co-routine */
-    // t_event = co_active();
+    /* Define the event loop/notified thread as the active co-routine */
+    t_event = co_active();
 
-    // /* derive main entry point */
-    // t_main = co_derive((void *)t_client_main_stack, STACK_SIZE, client_main);
+    /* derive main entry point */
+    t_main = co_derive((void *)t_client_main_stack, STACK_SIZE, client_main);
 
-    // co_switch(t_main);
+    co_switch(t_main);
 }
 
