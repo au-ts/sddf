@@ -23,10 +23,10 @@
 #define LOG_CLIENT_ERR(...) do{ sddf_printf("CLIENT|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
 // Motor control buffers
-uintptr_t control_buffer_base_vaddr_a;
-uintptr_t control_buffer_base_vaddr_b;
-uintptr_t ultrasonic_input_buffer_base_vaddr;
-uintptr_t ultrasonic_output_buffer_base_vaddr;
+// uintptr_t control_buffer_base_vaddr_a;
+// uintptr_t control_buffer_base_vaddr_b;
+// uintptr_t ultrasonic_input_buffer_base_vaddr;
+// uintptr_t ultrasonic_output_buffer_base_vaddr;
 
 cothread_t t_event;
 cothread_t t_main;
@@ -59,41 +59,13 @@ bool delay_ms(size_t milliseconds)
     return true;
 }
 
-void append_control_buffer(int command, uintptr_t vaddr) {
-    *REG_PTR(vaddr, UARTDR) = command;
-} 
+void send_motor_request(int motor_ch, int command) {
+    LOG_CLIENT("Sending motor request\n");
 
-void send_forward_request(int motor_ch) {
-    if (motor_ch == MOTOR_CONTROL_A_CHANNEL) {
-        append_control_buffer(CONTROL_FORWARD, control_buffer_base_vaddr_a);
-    }
-    else if (motor_ch == MOTOR_CONTROL_B_CHANNEL) {
-        append_control_buffer(CONTROL_FORWARD, control_buffer_base_vaddr_b);
-    }
-    LOG_CLIENT("Sending forward request\n");
-    microkit_notify(motor_ch);
-}
+    microkit_msginfo new_msg = microkit_msginfo_new(0, 1);
+    microkit_mr_set(0, command);
 
-void send_reverse_request(int motor_ch) {
-    if (motor_ch == MOTOR_CONTROL_A_CHANNEL) {
-        append_control_buffer(CONTROL_REVERSE, control_buffer_base_vaddr_a);
-    }
-    else if (motor_ch == MOTOR_CONTROL_B_CHANNEL) {
-        append_control_buffer(CONTROL_REVERSE, control_buffer_base_vaddr_b);
-    }
-    LOG_CLIENT("Sending reverse request\n");
-    microkit_notify(motor_ch);
-}
-
-void send_neutral_request(int motor_ch) {
-    if (motor_ch == MOTOR_CONTROL_A_CHANNEL) {
-        append_control_buffer(CONTROL_NEUTRAL, control_buffer_base_vaddr_a);
-    }
-    else if (motor_ch == MOTOR_CONTROL_B_CHANNEL) {
-        append_control_buffer(CONTROL_NEUTRAL, control_buffer_base_vaddr_b);
-    }
-    LOG_CLIENT("Sending neutral request\n");
-    microkit_notify(motor_ch);
+    microkit_ppcall(motor_ch, new_msg);
 }
 
 // returns distance in cm
@@ -106,28 +78,28 @@ uint64_t get_ultrasonic_reading() {
 
 // TODO check these
 void drive_forward(void) {
-    send_forward_request(MOTOR_CONTROL_A_CHANNEL);
-    send_forward_request(MOTOR_CONTROL_B_CHANNEL);
+    send_motor_request(MOTOR_CONTROL_A_CHANNEL, CONTROL_FORWARD);
+    send_motor_request(MOTOR_CONTROL_B_CHANNEL, CONTROL_FORWARD);
 }
 
 void drive_reverse(void) {
-    send_reverse_request(MOTOR_CONTROL_A_CHANNEL);
-    send_reverse_request(MOTOR_CONTROL_B_CHANNEL);
+    send_motor_request(MOTOR_CONTROL_A_CHANNEL, CONTROL_REVERSE);
+    send_motor_request(MOTOR_CONTROL_B_CHANNEL, CONTROL_REVERSE);
 }
 
 void drive_left(void) {
-    send_forward_request(MOTOR_CONTROL_A_CHANNEL);
-    send_neutral_request(MOTOR_CONTROL_B_CHANNEL);
+    send_motor_request(MOTOR_CONTROL_A_CHANNEL, CONTROL_FORWARD);
+    send_motor_request(MOTOR_CONTROL_B_CHANNEL, CONTROL_NEUTRAL);
 }
 
 void drive_right(void) {
-    send_forward_request(MOTOR_CONTROL_B_CHANNEL);
-    send_neutral_request(MOTOR_CONTROL_A_CHANNEL);
+    send_motor_request(MOTOR_CONTROL_A_CHANNEL, CONTROL_NEUTRAL);
+    send_motor_request(MOTOR_CONTROL_B_CHANNEL, CONTROL_FORWARD);
 }
 
 void drive_stop() {
-    send_neutral_request(MOTOR_CONTROL_A_CHANNEL);
-    send_neutral_request(MOTOR_CONTROL_B_CHANNEL);
+    send_motor_request(MOTOR_CONTROL_A_CHANNEL, CONTROL_NEUTRAL);
+    send_motor_request(MOTOR_CONTROL_B_CHANNEL, CONTROL_NEUTRAL);
 }
 
 void client_main(void) {
@@ -137,13 +109,15 @@ void client_main(void) {
 
     while (true) {
         uint64_t distance = get_ultrasonic_reading();
+        drive_stop();
 
-        if (distance > 10) {
-            drive_forward();
-        }
-        else if (distance <= 10) {
-            drive_stop();
-        }
+        // if (distance > 10) {
+        //     drive_stop();
+        //     // drive_forward();
+        // }
+        // else if (distance <= 10) {
+        //     drive_stop();
+        // }
 
         delay_ms(1000);
     }

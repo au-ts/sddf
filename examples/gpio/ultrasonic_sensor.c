@@ -24,8 +24,8 @@
 
 #define LOG_SENSOR_ERR(...) do{ sddf_printf("SENSOR|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
-uintptr_t ultrasonic_input_buffer_base_vaddr;
-uintptr_t ultrasonic_output_buffer_base_vaddr;
+// uintptr_t ultrasonic_input_buffer_base_vaddr;
+// uintptr_t ultrasonic_output_buffer_base_vaddr;
 
 cothread_t t_event;
 cothread_t t_main;
@@ -49,17 +49,6 @@ static char t_sensor_main_stack[STACK_SIZE];
 
 // Time (ms) Timeout for Sensor Read
 #define SENSOR_TIMEOUT (38)
-
-// Read data sent from client in the control buffer
-// int append_client_buffer() {
-//     int ch = 0;
-
-//     if ((*REG_PTR(ultrasonic_sensor_buffer_base_vaddr, UARTFR) & PL011_UARTFR_RXFE) == 0) {
-//         ch = *REG_PTR(ultrasonic_sensor_buffer_base_vaddr, UARTDR) & RHR_MASK;
-//     }
-
-//     return ch;
-// }
 
 void gpio_init(int gpio_ch, int direction) {
     microkit_msginfo msginfo;
@@ -127,7 +116,7 @@ uint64_t pulse_in(int gpio_ch, int value) {
     uint64_t time_change = 0;
     int has_received = 0;
 
-    while (1) {
+    while (true) {
         microkit_msginfo msginfo;
         msginfo = microkit_msginfo_new(GPIO_GET_GPIO, 1);
         microkit_mr_set(GPIO_REQ_CONFIG_SLOT, GPIO_INPUT);
@@ -140,8 +129,6 @@ uint64_t pulse_in(int gpio_ch, int value) {
         int value_received = microkit_mr_get(GPIO_RES_VALUE_SLOT);
         if (value_received == value) {
             // First time measured value has been received
-            // LOG_SENSOR("receiving high\n");
-
             if (!has_received) {
                 has_received = 1;
                 time_received = sddf_timer_time_now(TIMER_CHANNEL);
@@ -156,9 +143,6 @@ uint64_t pulse_in(int gpio_ch, int value) {
         } 
         else {
             // Have received measured value before, this is time when value changes
-            // LOG_SENSOR("receiving low\n");
-            // LOG_SENSOR("receiving low\n");
-
             if (has_received) {
                 time_change = sddf_timer_time_now(TIMER_CHANNEL);
                 break;
@@ -204,6 +188,7 @@ void sensor_main(void) {
 
 // TODO: might want to buffer over multiple reads
 uint64_t read_sensor() {
+    delay_microsec(1000000);
     LOG_SENSOR("attempt reading\n");
     uint64_t duration = pulse_in(GPIO_CHANNEL_ECHO, GPIO_HIGH);
     if (duration) {
@@ -229,17 +214,16 @@ microkit_msginfo send_reading_to_client() {
 }
 
 microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo) {
-    microkit_msginfo res;
-
     switch (ch) {
     case CLIENT_CHANNEL:
-        res = send_reading_to_client();
-        break;
+        microkit_msginfo res = send_reading_to_client();
+        return res;
     default:
         LOG_SENSOR("Unexpected pp call\n");
         break;
     }
 
+    microkit_msginfo res = microkit_msginfo_new(0, 0);
     return res;
 }
 

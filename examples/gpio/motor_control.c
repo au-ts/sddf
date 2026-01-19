@@ -25,7 +25,7 @@
 
 #define LOG_CONTROL_ERR(...) do{ sddf_printf("CONTROL|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
-uintptr_t control_buffer_base_vaddr;
+// uintptr_t control_buffer_base_vaddr;
 
 // Channels
 #define CLIENT_CHANNEL (1)
@@ -44,17 +44,6 @@ int curr_command = CONTROL_NEUTRAL;
 
 // State of Current Control
 int is_control_fulfilled = -1;
-
-// Read data sent from client in the control buffer
-int read_control_buffer() {
-    int ch = 0;
-
-    if ((*REG_PTR(control_buffer_base_vaddr, UARTFR) & PL011_UARTFR_RXFE) == 0) {
-        ch = *REG_PTR(control_buffer_base_vaddr, UARTDR) & RHR_MASK;
-    }
-
-    return ch;
-}
 
 
 void gpio_init(int gpio_ch) {
@@ -111,7 +100,6 @@ void set_pwm(int gpio_ch, int micro_s) {
     sddf_timer_set_timeout(TIMER_CHANNEL, micro_s);
 }
 
-
 void set_forward(void) {
     set_pwm(GPIO_CHANNEL, pwm_delay_mappings[CONTROL_FORWARD - 1][PWM_TIME_HIGH]*NS_IN_US);
 }
@@ -143,6 +131,33 @@ void handle_motor_request(void) {
     }
 }
 
+microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo) {
+    switch (ch) {
+    case CLIENT_CHANNEL:
+        int command = (int) microkit_mr_get(0);
+        int was_control_fulfilled = is_control_fulfilled;
+
+        if (!command) {
+            break;
+        }
+
+        curr_command = command;
+        is_control_fulfilled = 0;
+
+        // first control request, call a function to handle it
+        if (was_control_fulfilled < 0) {
+            handle_motor_request();
+        }
+        break;
+    default:
+        LOG_CONTROL("Unexpected pp call\n");
+        break;
+    }
+
+    microkit_msginfo res = microkit_msginfo_new(0, 0);
+    return res;
+} 
+
 void notified(microkit_channel ch) {
     switch (ch)
     {
@@ -171,22 +186,6 @@ void notified(microkit_channel ch) {
             set_pwm(GPIO_CHANNEL, pwm_delay_mappings[curr_command - 1][PWM_TIME_HIGH]*NS_IN_US);
         }   
         
-        break;
-    case CLIENT_CHANNEL:
-        int command = read_control_buffer();
-        int was_control_fulfilled = is_control_fulfilled;
-
-        if (!command) {
-            break;
-        }
-        curr_command = command;
-        is_control_fulfilled = 0;
-
-        // first control request, call a function to handle it
-        if (was_control_fulfilled < 0) {
-            handle_motor_request();
-        }
-
         break;
     default:
         LOG_CONTROL("Unexpected channel call\n");
