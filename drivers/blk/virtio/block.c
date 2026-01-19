@@ -305,7 +305,6 @@ void virtio_blk_init(void)
 
     /* Finished populating configuration */
     blk_storage_set_ready(storage_info, true);
-    sddf_dprintf("Hello %d\n", blk_storage_is_ready(storage_info));
 
 #ifdef DEBUG_DRIVER
     uint32_t features_low = virtio_transport_get_driver_features(&dev, 0);
@@ -395,11 +394,11 @@ void notified(microkit_channel ch)
 {
     sddf_dprintf("notified by ch %d\n", ch);
 // @billn fix ridiculousness
-#if defined(CONFIG_ARCH_X86_64)
-    if (ch == 17) {
-#else
+/* #if defined(CONFIG_ARCH_X86_64) */
+    /* if (ch == 17) { */
+/* #else */
     if (ch == device_resources.irqs[0].id) {
-#endif
+/* #endif */
         handle_irq();
         microkit_deferred_irq_ack(ch);
         /*

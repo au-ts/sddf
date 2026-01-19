@@ -7,7 +7,8 @@
             {
                 "name": "regs",
                 "perms": "rw",
-                "size": 16384
+                "size": 16384,
+                "paddr": 4026531840
             },
             {
                 "name": "virtio_headers",
@@ -18,9 +19,10 @@
                 "size": 2097152
             }
         ],
-        "irq_type": "msix",
+        "irq_type": "ioapic",
         "irqs": [
             {
+                "pin": 11,
                 "vector": 1
             }
         ],
