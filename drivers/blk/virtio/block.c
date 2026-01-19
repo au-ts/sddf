@@ -363,9 +363,9 @@ void init(void)
 
 // @billn fix ridiculousness
 #if defined(CONFIG_ARCH_X86_64)
-    requests_paddr = 0x000071000000;
+    requests_paddr = 0x11000000;
     requests_vaddr = (uintptr_t)0x20200000;
-    virtio_headers_paddr = (uintptr_t)0x000072000000;
+    virtio_headers_paddr = (uintptr_t)0x12000000;
     virtio_headers = (struct virtio_blk_req *)0x20210000;
 #else
     requests_paddr = device_resources.regions[2].io_addr;

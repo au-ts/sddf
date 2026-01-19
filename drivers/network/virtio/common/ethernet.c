@@ -422,7 +422,7 @@ void init(void)
 // @billn fix ridiculousness
 #if defined(CONFIG_ARCH_X86_64)
     hw_ring_buffer_vaddr = 0x70000000;
-    hw_ring_buffer_paddr = 0x7a000000;
+    hw_ring_buffer_paddr = 0x10000000;
 #else
     hw_ring_buffer_vaddr = (uintptr_t)device_resources.regions[1].region.vaddr;
     hw_ring_buffer_paddr = device_resources.regions[1].io_addr;
