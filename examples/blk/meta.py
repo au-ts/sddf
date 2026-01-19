@@ -91,7 +91,7 @@ def generate(
         blk_driver.add_map(virtio_blk_regs_map)
 
         virtio_blk_irq = SystemDescription.IrqIoapic(
-            ioapic_id=0, pin=11, vector=1, id=17
+            ioapic_id=0, pin=11, vector=32, id=17
         )
         blk_driver.add_irq(virtio_blk_irq)
 
