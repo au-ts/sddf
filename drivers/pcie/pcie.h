@@ -186,3 +186,38 @@ struct msix_table {
     uint32_t msg_data;
     uint32_t vec_ctrl;
 };
+
+#define DEV_MAX_BARS 6
+#define ECAM_MAX_REQUESTS 64
+
+typedef enum bar_locatable {
+    any_32b, less_1m, any_64b
+} bar_locatable_t;
+
+typedef enum irq_type : uint8_t {
+    legacy, msi, msix
+} irq_type_t;
+
+typedef struct mem_bar {
+    uint8_t bar_id;
+    uint64_t base_addr;
+    bool mem_mapped;
+    uint8_t locatable;
+    bool prefetchable;
+} mem_bar_t;
+
+typedef struct config_request {
+    uint8_t bus;
+    uint8_t dev;
+    uint8_t func;
+    uint16_t device_id;
+    uint16_t vendor_id;
+    mem_bar_t mem_bars[DEV_MAX_BARS];
+    irq_type_t irq_type;
+} config_request_t;
+
+typedef struct pci_ecam_config {
+    char magic[5];
+    uint8_t num_requests;
+    config_request_t requests[ECAM_MAX_REQUESTS];
+} pci_ecam_config_t;

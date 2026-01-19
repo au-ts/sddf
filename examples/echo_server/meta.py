@@ -256,7 +256,7 @@ def generate(
 
         pcie_driver = ProtectionDomain("pcie_driver", "pcie_driver.elf", priority=252)
         ecam_mr = SystemDescription.MemoryRegion(sdf, "ecam_regs", 0x10000000, paddr=0xb0000000)
-        blk_msix_mr = SystemDescription.MemoryRegion(sdf, "blk_msix_regs", 0x10000, paddr=0xFEBD5000)
+        net_msix_mr = SystemDescription.MemoryRegion(sdf, "blk_msix_regs", 0x10000, paddr=0xFEBD5000)
         sdf.add_mr(ecam_mr)
         sdf.add_mr(net_msix_mr)
         pcie_driver.add_map(SystemDescription.Map(ecam_mr, 0xb0000000, "rw"))

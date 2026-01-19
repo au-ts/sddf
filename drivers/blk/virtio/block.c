@@ -271,10 +271,13 @@ void virtio_blk_init(void)
     assert(virtio_transport_probe(&device_resources, &dev, VIRTIO_DEVICE_ID_BLK));
     ialloc_init(&ialloc_desc, descriptors, QUEUE_SIZE);
 
+    sddf_dprintf("device status: %d\n", virtio_transport_get_status(&dev));
     /* First reset the device */
     virtio_transport_set_status(&dev, 0);
+    sddf_dprintf("device status: %d\n", virtio_transport_get_status(&dev));
     /* Set the ACKNOWLEDGE bit to say we have noticed the device */
     virtio_transport_set_status(&dev, VIRTIO_DEVICE_STATUS_ACKNOWLEDGE);
+    sddf_dprintf("device status: %d\n", virtio_transport_get_status(&dev));
     /* Set the DRIVER bit to say we know how to drive the device */
     virtio_transport_set_status(&dev, VIRTIO_DEVICE_STATUS_DRIVER);
 
@@ -329,12 +332,12 @@ void virtio_blk_init(void)
     // Make sure that the metadata region is able to fit all the virtIO specific
     // extra data.
 
-#if defined(CONFIG_ARCH_X86_64)
-    // @terryb remove hard-coded values here
-    assert(size <= 0x200000);
-#else
+/* #if defined(CONFIG_ARCH_X86_64) */
+/*     // @terryb remove hard-coded values here */
+/*     assert(size <= 0x200000); */
+/* #else */
     assert(size <= device_resources.regions[2].region.size);
-#endif
+/* #endif */
 
     virtq.num = VIRTQ_NUM_REQUESTS;
     virtq.desc = (struct virtq_desc *)(requests_vaddr + desc_off);
@@ -360,18 +363,19 @@ void init(void)
     assert(device_resources.num_regions == 3);
 #endif
 
-// @billn fix ridiculousness
-#if defined(CONFIG_ARCH_X86_64)
-    requests_paddr = 0x5fdf0000;
-    requests_vaddr = (uintptr_t)0x20200000;
-    virtio_headers_paddr = (uintptr_t)0x5fff0000;
-    virtio_headers = (struct virtio_blk_req *)0x20210000;
-#else
+/* // @billn fix ridiculousness */
+/* #if defined(CONFIG_ARCH_X86_64) */
+/*     requests_paddr = 0x5fdf0000; */
+/*     requests_vaddr = (uintptr_t)0x20200000; */
+/*     virtio_headers_paddr = (uintptr_t)0x5fff0000; */
+/*     virtio_headers = (struct virtio_blk_req *)0x20210000; */
+/* #else */
+    sddf_dprintf("addr: 0x%lx\n", (uintptr_t)device_resources.regions[0].region.vaddr);
     requests_paddr = device_resources.regions[2].io_addr;
     requests_vaddr = (uintptr_t)device_resources.regions[2].region.vaddr;
     virtio_headers_paddr = (uintptr_t)device_resources.regions[1].io_addr;
     virtio_headers = (struct virtio_blk_req *)device_resources.regions[1].region.vaddr;
-#endif
+/* #endif */
 
     assert(virtio_headers_paddr);
     assert(virtio_headers);

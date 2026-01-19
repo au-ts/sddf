@@ -9,10 +9,11 @@
 #include <sddf/virtio/transport/pci.h>
 #include <sddf/resources/device.h>
 
-#define VADDR_COMMON 0x60000000
-#define VADDR_ISR 0x60001000
-#define VADDR_DEVICE 0x60002000
-#define VADDR_NOTIFY 0x60003000
+#define DEVICE_REGS_COMMON 0x0
+#define DEVICE_REGS_ISR 0x1
+#define DEVICE_REGS_DEVICE 0x2
+#define DEVICE_REGS_NOTIFY 0x3
+#define DEVICE_REGS_REGION_SIZE 0x1000
 
 #define PCI_ADDR_PORT_ID 1
 #define PCI_ADDR_PORT_ADDR 0xCF8
@@ -71,10 +72,9 @@ void pci_x86_write_32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t off, uint3
     microkit_x86_ioport_write_32(PCI_DATA_PORT_ID, PCI_DATA_PORT_ADDR, data);
 }
 
-// @billn fix hard coded addresses
-virtio_pci_common_cfg_t *get_cfg(device_resources_t *device_resources)
+void *get_cfg(virtio_device_handle_t *device_handle, uint8_t cfg_type)
 {
-    return (virtio_pci_common_cfg_t *)VADDR_COMMON;
+    return (void *)((uintptr_t)device_handle->device_resources->regions[0].region.vaddr + cfg_type * DEVICE_REGS_REGION_SIZE);
 }
 
 void pci_debug_print_header(uint8_t bus, uint8_t dev, uint8_t func, pci_gen_dev_hdr_t *pci_device_header)
@@ -171,6 +171,7 @@ bool virtio_transport_probe(device_resources_t *device_resources, virtio_device_
     uint8_t bus = device_handle_ret->pci_bus;
     uint8_t dev = device_handle_ret->pci_dev;
     uint8_t func = device_handle_ret->pci_func;
+    device_handle_ret->device_resources = device_resources;
 
     pci_gen_dev_hdr_t pci_device_header;
     assert(read_pci_general_device_header(bus, dev, func, &pci_device_header));
@@ -228,29 +229,37 @@ bool virtio_transport_probe(device_resources_t *device_resources, virtio_device_
 
 void *virtio_transport_get_device_config(virtio_device_handle_t *device_handle)
 {
-    return (void *)(VADDR_DEVICE);
+    void *test_ptr = get_cfg(device_handle, DEVICE_REGS_DEVICE);
+    for (int j = 0; j < 256; j++) {
+        if (j && j % 16 == 0) sddf_dprintf("\n");
+        sddf_dprintf("%02x ", *(uint8_t *)(test_ptr + j));
+    }
+    sddf_dprintf("\n");
+    return get_cfg(device_handle, DEVICE_REGS_DEVICE);
 }
 
 void virtio_transport_set_status(virtio_device_handle_t *device_handle, uint8_t status)
 {
-    get_cfg(device_handle->device_resources)->device_status = status;
+    virtio_pci_common_cfg_t *cfg = get_cfg(device_handle, DEVICE_REGS_COMMON);
+    cfg->device_status = status;
 }
 
 uint8_t virtio_transport_get_status(virtio_device_handle_t *device_handle)
 {
-    return get_cfg(device_handle->device_resources)->device_status;
+    virtio_pci_common_cfg_t *cfg = get_cfg(device_handle, DEVICE_REGS_COMMON);
+    return cfg->device_status;
 }
 
 uint32_t virtio_transport_get_device_features(virtio_device_handle_t *device_handle, uint32_t select)
 {
-    virtio_pci_common_cfg_t *cfg = get_cfg(device_handle->device_resources);
+    virtio_pci_common_cfg_t *cfg = get_cfg(device_handle, DEVICE_REGS_COMMON);
     cfg->device_feature_select = select;
     return cfg->device_feature;
 }
 
 uint32_t virtio_transport_get_driver_features(virtio_device_handle_t *device_handle, uint32_t select)
 {
-    virtio_pci_common_cfg_t *cfg = get_cfg(device_handle->device_resources);
+    virtio_pci_common_cfg_t *cfg = get_cfg(device_handle, DEVICE_REGS_COMMON);
     cfg->driver_feature_select = select;
     return cfg->driver_feature;
 }
@@ -258,7 +267,7 @@ uint32_t virtio_transport_get_driver_features(virtio_device_handle_t *device_han
 void virtio_transport_set_driver_features(virtio_device_handle_t *device_handle, uint32_t select,
                                           uint32_t driver_features)
 {
-    virtio_pci_common_cfg_t *cfg = get_cfg(device_handle->device_resources);
+    virtio_pci_common_cfg_t *cfg = get_cfg(device_handle, DEVICE_REGS_COMMON);
     cfg->driver_feature_select = select;
     cfg->driver_feature = driver_features;
     cfg->config_msix_vector = 0;
@@ -267,7 +276,7 @@ void virtio_transport_set_driver_features(virtio_device_handle_t *device_handle,
 bool virtio_transport_queue_setup(virtio_device_handle_t *device_handle, uint32_t select, uint16_t size, uint64_t desc,
                                   uint64_t driver, uint64_t device)
 {
-    virtio_pci_common_cfg_t *cfg = get_cfg(device_handle->device_resources);
+    virtio_pci_common_cfg_t *cfg = get_cfg(device_handle, DEVICE_REGS_COMMON);
 
     cfg->queue_select = select;
     cfg->queue_msix_vector = 0;
@@ -282,22 +291,22 @@ bool virtio_transport_queue_setup(virtio_device_handle_t *device_handle, uint32_
 
 void virtio_transport_queue_notify(virtio_device_handle_t *device_handle, uint32_t select)
 {
-    virtio_pci_common_cfg_t *cfg = get_cfg(device_handle->device_resources);
+    virtio_pci_common_cfg_t *cfg = get_cfg(device_handle, DEVICE_REGS_COMMON);
 
     cfg->queue_select = select;
     uint16_t q_off = cfg->queue_notify_off;
-    uint16_t *addr = (uint16_t *)(VADDR_NOTIFY + (uintptr_t)(q_off * nftn_multiplier));
+    uint16_t *addr = (uint16_t *)(get_cfg(device_handle, DEVICE_REGS_NOTIFY) + (uintptr_t)(q_off * nftn_multiplier));
     *addr = (uint16_t)select;
 }
 
 uint32_t virtio_transport_read_isr(virtio_device_handle_t *device_handle)
 {
-    uint8_t *isr_ptr = (uint8_t *)VADDR_ISR;
+    uint8_t *isr_ptr = (uint8_t *)get_cfg(device_handle, DEVICE_REGS_ISR);
     return (*isr_ptr);
 }
 
 void virtio_transport_write_isr(virtio_device_handle_t *device_handle, uint32_t isr)
 {
-    uint8_t *isr_ptr = (uint8_t *)VADDR_ISR;
+    uint8_t *isr_ptr = (uint8_t *)get_cfg(device_handle, DEVICE_REGS_ISR);
     *isr_ptr = (uint8_t)isr;
 }

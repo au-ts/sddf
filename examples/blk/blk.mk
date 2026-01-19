@@ -90,7 +90,7 @@ ifneq ($(strip $(DTS)),)
 		$${BLK_NEED_TIMER:+--need_timer}
 else
 	$(PYTHON) \
-		$(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
+		$(METAPROGRAM) --sddf $(SDDF) --board $(X86_BOARD) \
 		--output . --sdf $(SYSTEM_FILE) $(PARTITION_ARG) \
 		$${BLK_NEED_TIMER:+--need_timer}
 endif
@@ -107,6 +107,7 @@ endif
 	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx.data serial_virt_tx.elf
 	$(OBJCOPY) --update-section .serial_client_config=serial_client_client.data client.elf
 	$(OBJCOPY) --update-section .device_resources=pcie_driver_device_resources.data pcie_driver.elf
+	$(OBJCOPY) --update-section .ecam_configs=pcie_driver_client_configs.data pcie_driver.elf
 	touch $@
 
 $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
