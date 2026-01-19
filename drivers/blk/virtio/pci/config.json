@@ -1,0 +1,34 @@
+{
+    "compatible": [
+        "virtio,pci"
+    ],
+    "resources": {
+        "regions": [
+            {
+                "name": "regs",
+                "perms": "rw",
+                "size": 16384
+            },
+            {
+                "name": "virtio_headers",
+                "size": 65536
+            },
+            {
+                "name": "virtio_metadata",
+                "size": 2097152
+            }
+        ],
+        "irq_type": "msix",
+        "irqs": [
+            {
+                "vector": 1
+            }
+        ],
+        "pci_bars": [
+            {
+                "region_idx": 0,
+                "bar_id": 4
+            }
+        ]
+    }
+}
