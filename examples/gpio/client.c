@@ -106,31 +106,32 @@ void client_main(void) {
     // wait for all sensors to initialise first
     // TODO: might want to change this
     // drive_stop();
-
+    
     while (true)
     {
-        delay_ms(1000);
-        drive_stop();
-        uint64_t distance = get_ultrasonic_reading();
-        LOG_CLIENT("Sensor Reading Received: %ld\n", distance);
+        uint64_t averaged_dist = 0;
+
+        for (int i = 0; i < 3; i++) {
+            uint64_t distance = get_ultrasonic_reading();
+            if (!distance) {
+                continue;
+            }
+            averaged_dist += distance;
+        }
+        
+        averaged_dist /= 3;
+        LOG_CLIENT("Sensor Reading Received: %ld\n", averaged_dist);
+
+        if (averaged_dist < 10) {
+            drive_stop();
+            // turn left every time there's an obstacle
+            drive_left();
+            delay_ms(4);
+        }
+        else {
+            drive_forward();
+        }       
     }
-    
-    // while (true) {
-    //     // uint64_t distance = get_ultrasonic_reading();
-    //     // LOG_CLIENT("Sensor Reading Received: %ld\n", distance);
-
-    //     drive_stop();
-
-    //     // if (distance > 10) {
-    //     //     drive_stop();
-    //     //     // drive_forward();
-    //     // }
-    //     // else if (distance <= 10) {
-    //     //     drive_stop();
-    //     // }
-
-    //     delay_ms(1000);
-    // }
 }
 
 // Call coroutine, block other commands from executing
