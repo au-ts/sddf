@@ -50,6 +50,9 @@ static char t_sensor_main_stack[STACK_SIZE];
 // Time (ms) Timeout for Sensor Read
 #define SENSOR_TIMEOUT (38)
 
+
+uint64_t curr_dist = 0;
+
 void gpio_init(int gpio_ch, int direction) {
     microkit_msginfo msginfo;
     msginfo = microkit_msginfo_new(GPIO_SET_GPIO, 2);
@@ -128,6 +131,7 @@ uint64_t pulse_in(int gpio_ch, int value) {
             LOG_SENSOR_ERR("failed to get input of gpio with error %ld!\n", error);
             while (1) {};
         }
+
         int value_received = microkit_mr_get(GPIO_RES_VALUE_SLOT);
         if (value_received == value) {
             // First time measured value has been received
@@ -138,14 +142,18 @@ uint64_t pulse_in(int gpio_ch, int value) {
             }
 
             uint64_t time_now = sddf_timer_time_now(TIMER_CHANNEL);
+
             if (((time_now - time_start) / NS_IN_MS) > SENSOR_TIMEOUT) {
-                LOG_SENSOR("sensor read timeout\n");
                 return 0;
             }
+
         } 
         else {
-            // LOG_SENSOR("test val\n");
-
+            // Timeout not seeing GPIO HIGH from sensor
+            uint64_t time_now = sddf_timer_time_now(TIMER_CHANNEL);
+            if (((time_now - time_start) / NS_IN_MS) > (SENSOR_TIMEOUT * 100)) {
+                return 0;
+            }
 
             // Have received measured value before, this is time when value changes
             if (has_received) {
@@ -168,63 +176,40 @@ void sensor_main(void) {
     gpio_init(GPIO_CHANNEL_ECHO, GPIO_DIRECTION_INPUT);
     gpio_init(GPIO_CHANNEL_TRIG, GPIO_DIRECTION_OUTPUT);
 
-    // delay_microsec(2);
-
+    delay_microsec(2);
     // LOG_SENSOR("attempt reading\n");
 
+    while (true) {
+        digital_write(GPIO_CHANNEL_TRIG, GPIO_LOW);
+        delay_microsec(2);
 
-    // while (true) {
-    //     digital_write(GPIO_CHANNEL_TRIG, GPIO_LOW);
-    //     delay_microsec(2);
+        digital_write(GPIO_CHANNEL_TRIG, GPIO_HIGH);
+        delay_microsec(10);
 
-    //     digital_write(GPIO_CHANNEL_TRIG, GPIO_HIGH);
-    //     delay_microsec(10);
+        digital_write(GPIO_CHANNEL_TRIG, GPIO_LOW);
 
-    //     digital_write(GPIO_CHANNEL_TRIG, GPIO_LOW);
-
-    //     uint64_t duration = pulse_in(GPIO_CHANNEL_ECHO, GPIO_HIGH);
-    //     if (duration) {
-    //         uint64_t distance = duration * 0.034 / 2;
+        uint64_t duration = pulse_in(GPIO_CHANNEL_ECHO, GPIO_HIGH);
+        if (duration) {
+            uint64_t distance = duration * 0.034 / 2;
+            curr_dist = distance;
             
-    //         LOG_SENSOR("distance received, %ld\n", distance);
-    //     }  
+            LOG_SENSOR("distance received, %ld\n", distance);
+        } else {
+            curr_dist = 0;
+        }
         
-    //     LOG_SENSOR("done reading\n");
-    //     delay_microsec(1000000);
-    // }   
+        LOG_SENSOR("done reading\n");
+        delay_microsec(1000000);
+    }   
 }
-
-
-// void sensor_main(void) {
-//     gpio_init(GPIO_CHANNEL_ECHO, GPIO_DIRECTION_INPUT);
-//     gpio_init(GPIO_CHANNEL_TRIG, GPIO_DIRECTION_OUTPUT);
-
-//     while (true) {
-//         digital_write(GPIO_CHANNEL_TRIG, GPIO_LOW);
-//         delay_microsec(2);
-
-//         digital_write(GPIO_CHANNEL_TRIG, GPIO_HIGH);
-//         delay_microsec(10);
-
-//         digital_write(GPIO_CHANNEL_TRIG, GPIO_LOW);
-
-//         uint64_t duration = pulse_in(GPIO_CHANNEL_ECHO, GPIO_HIGH);
-//         if (duration) {
-//             LOG_SENSOR("duration received, %ld\n", duration);
-//         }  
-        
-//         LOG_SENSOR("done reading\n");
-//         delay_microsec(1000000);
-//     }   
-// }
 
 // TODO: might want to buffer over multiple reads
 uint64_t read_sensor() {
     digital_write(GPIO_CHANNEL_TRIG, GPIO_LOW);
-    // delay_microsec(2);
+    delay_microsec(2);
 
     digital_write(GPIO_CHANNEL_TRIG, GPIO_HIGH);
-    // delay_microsec(10);
+    delay_microsec(10);
 
     uint64_t duration = pulse_in(GPIO_CHANNEL_ECHO, GPIO_HIGH);
     if (duration) {
@@ -233,16 +218,12 @@ uint64_t read_sensor() {
         return distance;
     }  
     
-    // sensor timeout
-    // LOG_SENSOR("done reading\n");
     return 0;
 }
 
 microkit_msginfo send_reading_to_client() {
-    uint64_t distance = read_sensor();
+    uint64_t distance = curr_dist;
 
-    // send 2 words (64 bits) for sensor read
-    // highest 4 bytes, lowest 4 bytes
     microkit_msginfo new_msg = microkit_msginfo_new(0, 1);
 
     microkit_mr_set(0, distance);
@@ -253,6 +234,7 @@ microkit_msginfo send_reading_to_client() {
 microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo) {
     switch (ch) {
     case CLIENT_CHANNEL:
+        // co_switch(t_main);
         LOG_SENSOR("Client call\n");
         microkit_msginfo res = send_reading_to_client();
         return res;
@@ -281,14 +263,14 @@ void notified(microkit_channel ch) {
 
 void init(void) {
     LOG_SENSOR("Init\n");
+    // sensor_main();
 
-    sensor_main();
-    // /* Define the event loop/notified thread as the active co-routine */
-    // t_event = co_active();
+    /* Define the event loop/notified thread as the active co-routine */
+    t_event = co_active();
 
-    // /* derive main entry point */
-    // t_main = co_derive((void *)t_sensor_main_stack, STACK_SIZE, sensor_main);
+    /* derive main entry point */
+    t_main = co_derive((void *)t_sensor_main_stack, STACK_SIZE, sensor_main);
 
-    // co_switch(t_main);
+    co_switch(t_main);
 }
 
