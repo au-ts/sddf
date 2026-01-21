@@ -195,7 +195,7 @@
             <map mr="serial_tx_data_client1" vaddr="0x4_001_000" perms="rw" cached="true" setvar_vaddr="serial_tx_data" />
         </protection_domain>
 
-        <protection_domain name="timer" priority="101" pp="true" id="8" passive="true">
+        <protection_domain name="timer" priority="101" id="8" passive="true">
             <program_image path="timer_driver.elf" />
             <map mr="timer" vaddr="0x2_000_000" perms="rw" cached="false" setvar_vaddr="gpt_regs" />
             <irq irq="42" id="0" trigger="edge" /> <!-- timer interrupt -->
@@ -279,12 +279,12 @@
 
     <channel>
         <end pd="timer" id="1" />
-        <end pd="client0" id="1" />
+        <end pd="client0" id="1" pp="true"/>
     </channel>
 
     <channel>
         <end pd="timer" id="2" />
-        <end pd="client1" id="1" />
+        <end pd="client1" id="1" pp="true"/>
     </channel>
 
 </system>

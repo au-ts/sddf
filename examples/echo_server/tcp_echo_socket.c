@@ -76,6 +76,7 @@ static err_t tcp_echo_sent(void *arg, struct tcp_pcb *pcb, u16_t len)
 
 static err_t tcp_echo_recv(void *arg, struct tcp_pcb *pcb, struct pbuf *p, err_t err)
 {
+    sddf_printf("receiving something\n");
     struct echo_state *state = arg;
     assert(state != NULL);
 
