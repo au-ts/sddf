@@ -6,7 +6,7 @@
 #pragma once
 
 #include <stddef.h>
-#include <sddf/util/string.h>
+#include <string.h>
 #include <sddf/gpu/queue.h>
 #include <sddf/gpu/events.h>
 
@@ -91,7 +91,7 @@ static inline uint32_t gpu_virt_cli_queue_capacity(unsigned int id)
 
 static inline uint32_t gpu_cli_queue_capacity(char *pd_name)
 {
-    if (!sddf_strcmp(pd_name, GPU_NAME_CLI0)) {
+    if (!strcmp(pd_name, GPU_NAME_CLI0)) {
         return GPU_QUEUE_CAPACITY_CLI0;
     } else {
         return 0;

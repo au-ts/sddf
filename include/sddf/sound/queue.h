@@ -12,8 +12,8 @@
 #include <sddf/sound/sound.h>
 #include <sddf/util/fence.h>
 
-#define SOUND_CMD_QUEUE_SIZE 64
-#define SOUND_PCM_QUEUE_SIZE 256
+#define SOUND_CMD_QUEUE_CAPACITY 64
+#define SOUND_PCM_QUEUE_CAPACITY 256
 #define SOUND_PCM_BUFFER_SIZE 4096
 
 typedef enum {
@@ -74,12 +74,12 @@ typedef struct sound_pcm_queue {
 
 typedef struct sound_cmd_queue_handle {
     sound_cmd_queue_t *q;
-    uint32_t size;
+    uint32_t capacity;
 } sound_cmd_queue_handle_t;
 
 typedef struct sound_pcm_queue_handle {
     sound_pcm_queue_t *q;
-    uint32_t size;
+    uint32_t capacity;
 } sound_pcm_queue_handle_t;
 
 typedef struct sound_queues {
@@ -89,7 +89,7 @@ typedef struct sound_queues {
     sound_pcm_queue_handle_t pcm_res;
 } sound_queues_t;
 
-/** Set queue size. Call on both ends. */
+/** Set queue capacity. Call on both ends. */
 static inline void sound_queues_init(sound_queues_t *queues,
                                      sound_cmd_queue_t *cmd_req,
                                      sound_cmd_queue_t *cmd_res,
@@ -103,10 +103,10 @@ static inline void sound_queues_init(sound_queues_t *queues,
     queues->pcm_req.q = pcm_req;
     queues->pcm_res.q = pcm_res;
 
-    queues->cmd_req.size = cmd_count;
-    queues->cmd_res.size = cmd_count;
-    queues->pcm_req.size = pcm_count;
-    queues->pcm_res.size = pcm_count;
+    queues->cmd_req.capacity = cmd_count;
+    queues->cmd_res.capacity = cmd_count;
+    queues->pcm_req.capacity = pcm_count;
+    queues->pcm_res.capacity = pcm_count;
 }
 
 /** Only needs to be called once */
@@ -145,7 +145,7 @@ static inline bool sound_pcm_queue_empty(sound_pcm_queue_handle_t *h)
  */
 static inline bool sound_cmd_queue_full(sound_cmd_queue_handle_t *h)
 {
-    return (h->q->tail - h->q->head) == h->size;
+    return (h->q->tail - h->q->head) == h->capacity;
 }
 
 /**
@@ -158,29 +158,29 @@ static inline bool sound_cmd_queue_full(sound_cmd_queue_handle_t *h)
  */
 static inline bool sound_pcm_queue_full(sound_pcm_queue_handle_t *h)
 {
-    return (h->q->tail - h->q->head) == h->size;
+    return (h->q->tail - h->q->head) == h->capacity;
 }
 
 /**
- * Get the number of elements in a command queue.
+ * Get the number of elements enqueued in a command queue.
  *
  * @param q Command queue.
  *
- * @return number of elements in the queue buffer.
+ * @return number of elements in the queue.
  */
-static inline int sound_cmd_queue_size(sound_cmd_queue_handle_t *h)
+static inline int sound_cmd_queue_length(sound_cmd_queue_handle_t *h)
 {
     return h->q->tail - h->q->head;
 }
 
 /**
- * Get the number of elements in a PCM queue.
+ * Get the number of elements enqueued in a PCM queue.
  *
  * @param q PCM queue.
  *
- * @return number of elements in the queue buffer.
+ * @return number of elements in the queue.
  */
-static inline int sound_pcm_queue_size(sound_pcm_queue_handle_t *h)
+static inline int sound_pcm_queue_length(sound_pcm_queue_handle_t *h)
 {
     return h->q->tail - h->q->head;
 }
@@ -199,7 +199,7 @@ static inline int sound_enqueue_cmd(sound_cmd_queue_handle_t *h, const sound_cmd
         return -1;
     }
 
-    sound_cmd_t *dest = &h->q->buffers[h->q->tail % h->size];
+    sound_cmd_t *dest = &h->q->buffers[h->q->tail % h->capacity];
 
     dest->code = command->code;
     dest->cookie = command->cookie;
@@ -226,7 +226,7 @@ static inline int sound_enqueue_pcm(sound_pcm_queue_handle_t *h, sound_pcm_t *pc
         return -1;
     }
 
-    sound_pcm_t *data = &h->q->buffers[h->q->tail % h->size];
+    sound_pcm_t *data = &h->q->buffers[h->q->tail % h->capacity];
 
     data->cookie = pcm->cookie;
     data->stream_id = pcm->stream_id;
@@ -255,7 +255,7 @@ static inline int sound_dequeue_cmd(sound_cmd_queue_handle_t *h, sound_cmd_t *ou
         return -1;
     }
 
-    sound_cmd_t *src = &h->q->buffers[h->q->head % h->size];
+    sound_cmd_t *src = &h->q->buffers[h->q->head % h->capacity];
     out->code = src->code;
     out->cookie = src->cookie;
     out->stream_id = src->stream_id;
@@ -281,7 +281,7 @@ static inline int sound_dequeue_pcm(sound_pcm_queue_handle_t *h, sound_pcm_t *ou
         return -1;
     }
 
-    sound_pcm_t *pcm = &h->q->buffers[h->q->head % h->size];
+    sound_pcm_t *pcm = &h->q->buffers[h->q->head % h->capacity];
 
     out->cookie = pcm->cookie;
     out->stream_id = pcm->stream_id;

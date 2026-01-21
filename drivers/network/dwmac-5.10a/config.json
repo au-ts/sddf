@@ -1,0 +1,30 @@
+{
+    "compatible": [
+        "nxp,imx8mp-dwmac-eqos",
+        "snps,dwmac-5.10a",
+        "snps,dwmac-5.20"
+    ],
+    "resources": {
+        "regions": [
+            {
+                "name": "regs",
+                "perms": "rw",
+                "size": 65536,
+                "dt_index": 0
+            },
+            {
+                "name": "device_rx_ring",
+                "size": 32768
+            },
+            {
+                "name": "device_tx_ring",
+                "size": 32768
+            }
+        ],
+        "irqs": [
+            {
+                "dt_index": 0
+            }
+        ]
+    }
+}

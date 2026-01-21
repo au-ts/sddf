@@ -4,7 +4,8 @@
  */
 
 #include <stdint.h>
-#include <microkit.h>
+#include <os/sddf.h>
+#include <sddf/resources/device.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 #include <sddf/timer/protocol.h>
@@ -12,8 +13,8 @@
 /*
  * The JH7110 SoC contains a timer with four 32-bit counters. Each one of these
  * counters is referred to as a "channel". These are not to be confused with
- * Microkit channels. Anything with a prefix STARFIVE_TIMER_* is to do with the
- * hardware.
+ * channels between the driver and clients. Anything with a prefix
+ * STARFIVE_TIMER_* is to do with the hardware.
  */
 #define STARFIVE_TIMER_NUM_CHANNELS 4
 
@@ -27,9 +28,6 @@
 #error "Invalid StarFive timer device channel"
 #endif
 
-#define COUNTER_IRQ_CH 0
-#define TIMEOUT_IRQ_CH 1
-
 #define CLIENT_CH_START 2
 #define MAX_TIMEOUTS 6
 
@@ -42,8 +40,12 @@
 #define STARFIVE_TIMER_INTERRUPT_MASKED 1
 #define STARFIVE_TIMER_INTCLR_BUSY (1 << 1)
 
+#if defined(CONFIG_PLAT_STAR64)
 /* 24 MHz frequency. */
 #define STARFIVE_TIMER_TICKS_PER_SECOND 0x16e3600
+#else
+#error "Unknown clock-frequency for JH7110 timer"
+#endif
 
 typedef struct {
     /* Registers */
@@ -59,9 +61,12 @@ typedef struct {
     uint32_t intmask;   /* 0x24: Timer interrupt mask register. */
 } starfive_timer_regs_t;
 
-uintptr_t timer_base;
+__attribute__((__section__(".device_resources"))) device_resources_t device_resources;
+
 static volatile starfive_timer_regs_t *counter_regs;
 static volatile starfive_timer_regs_t *timeout_regs;
+sddf_channel counter_irq;
+sddf_channel timeout_irq;
 
 /* Keep track of how many timer overflows have occured.
  * Used as the most significant segment of ticks.
@@ -83,9 +88,10 @@ static uint64_t get_ticks_in_ns(void)
     uint64_t value_l = (uint64_t)(STARFIVE_TIMER_MAX_TICKS - counter_regs->value);
     uint64_t value_h = (uint64_t)counter_timer_elapses;
 
-    /* Include unhandled interrupt in value_h */
+    /* Account for potential pending counter IRQ */
     if (counter_regs->intclr == 1) {
         value_h += 1;
+        value_l = (uint64_t)(STARFIVE_TIMER_MAX_TICKS - counter_regs->value);
     }
 
     uint64_t value_ticks = (value_h << 32) | value_l;
@@ -103,7 +109,7 @@ static void process_timeouts(uint64_t curr_time)
 {
     for (int i = 0; i < MAX_TIMEOUTS; i++) {
         if (timeouts[i] <= curr_time) {
-            microkit_notify(CLIENT_CH_START + i);
+            sddf_notify(CLIENT_CH_START + i);
             timeouts[i] = UINT64_MAX;
         }
     }
@@ -125,9 +131,9 @@ static void process_timeouts(uint64_t curr_time)
         uint64_t ticks_remainder = (ns % NS_IN_S) * STARFIVE_TIMER_TICKS_PER_SECOND / NS_IN_S;
         uint64_t num_ticks = ticks_whole_seconds + ticks_remainder;
 
-        assert(num_ticks <= STARFIVE_TIMER_MAX_TICKS);
         if (num_ticks > STARFIVE_TIMER_MAX_TICKS) {
-            sddf_dprintf("ERROR: num_ticks: 0x%lx\n", num_ticks);
+            /* truncate num_ticks to maximum timeout, will use multiple interrupts to process the requested timeout. */
+            num_ticks = STARFIVE_TIMER_MAX_TICKS;
         }
 
         timeout_regs->load = num_ticks;
@@ -135,10 +141,9 @@ static void process_timeouts(uint64_t curr_time)
     }
 }
 
-void notified(microkit_channel ch)
+void notified(sddf_channel ch)
 {
-    switch (ch) {
-    case COUNTER_IRQ_CH: {
+    if (ch == counter_irq) {
         counter_timer_elapses += 1;
         while (counter_regs->intclr & STARFIVE_TIMER_INTCLR_BUSY) {
             /*
@@ -147,9 +152,7 @@ void notified(microkit_channel ch)
             */
         }
         counter_regs->intclr = 1;
-        break;
-    }
-    case TIMEOUT_IRQ_CH: {
+    } else if (ch == timeout_irq) {
         timeout_timer_elapses += 1;
         while (timeout_regs->intclr & STARFIVE_TIMER_INTCLR_BUSY) {
             /*
@@ -161,48 +164,52 @@ void notified(microkit_channel ch)
 
         uint64_t curr_time = get_ticks_in_ns();
         process_timeouts(curr_time);
-
-        break;
-    }
-    default: {
+    } else {
         sddf_dprintf("TIMER DRIVER|LOG: unexpected notification from channel %u\n", ch);
         return;
     }
-    }
 
-    microkit_deferred_irq_ack(ch);
+    sddf_deferred_irq_ack(ch);
 }
 
-seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
+seL4_MessageInfo_t protected(sddf_channel ch, seL4_MessageInfo_t msginfo)
 {
-    switch (microkit_msginfo_get_label(msginfo)) {
+    switch (seL4_MessageInfo_get_label(msginfo)) {
     case SDDF_TIMER_GET_TIME: {
         uint64_t time_ns = get_ticks_in_ns();
-        seL4_SetMR(0, time_ns);
-        return microkit_msginfo_new(0, 1);
+        sddf_set_mr(0, time_ns);
+        return seL4_MessageInfo_new(0, 0, 0, 1);
     }
     case SDDF_TIMER_SET_TIMEOUT: {
         uint64_t curr_time = get_ticks_in_ns();
-        uint64_t offset_ns = seL4_GetMR(0);
+        uint64_t offset_ns = sddf_get_mr(0);
         timeouts[ch - CLIENT_CH_START] = curr_time + offset_ns;
         process_timeouts(curr_time);
         break;
     }
     default:
         sddf_dprintf("TIMER DRIVER|LOG: Unknown request %lu to timer from channel %u\n",
-                     microkit_msginfo_get_label(msginfo), ch);
+                     seL4_MessageInfo_get_label(msginfo), ch);
         break;
     }
 
-    return microkit_msginfo_new(0, 0);
+    return seL4_MessageInfo_new(0, 0, 0, 0);
 }
 
 void init(void)
 {
+    assert(device_resources_check_magic(&device_resources));
+    assert(device_resources.num_irqs == 2);
+    assert(device_resources.num_regions == 1);
+
     for (int i = 0; i < MAX_TIMEOUTS; i++) {
         timeouts[i] = UINT64_MAX;
     }
 
+    counter_irq = device_resources.irqs[0].id;
+    timeout_irq = device_resources.irqs[1].id;
+
+    uintptr_t timer_base = (uintptr_t)device_resources.regions[0].region.vaddr;
     counter_regs = (volatile starfive_timer_regs_t *)timer_base;
     timeout_regs = (volatile starfive_timer_regs_t *)(timer_base
                                                       + STARFIVE_TIMER_CHANNEL_REGS_SIZE * STARFIVE_TIMER_CHANNEL);

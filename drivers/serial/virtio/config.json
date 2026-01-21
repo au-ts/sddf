@@ -1,0 +1,32 @@
+{
+    "compatible": [
+        "virtio,mmio"
+    ],
+    "resources": {
+        "regions": [
+            {
+                "name": "regs",
+                "perms": "rw",
+                "size": 4096,
+                "dt_index": 0
+            },
+            {
+                "name": "hw_ring_buffer",
+                "size": 65536
+            },
+            {
+                "name": "virtio_rx_buf",
+                "size": 4096
+            },
+            {
+                "name": "virtio_tx_buf",
+                "size": 4096
+            }
+        ],
+        "irqs": [
+            {
+                "dt_index": 0
+            }
+        ]
+    }
+}

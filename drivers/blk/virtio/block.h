@@ -2,6 +2,7 @@
  * Copyright 2024, UNSW
  * SPDX-License-Identifier: BSD-2-Clause
  */
+#pragma once
 
 #include <sddf/util/printf.h>
 
@@ -13,7 +14,7 @@
 #define LOG_DRIVER(...) do{}while(0)
 #endif
 
-#define LOG_DRIVER_ERR(...) do{ sddf_printf("BLK DRIVER|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
+#define LOG_DRIVER_ERR(...) do{ sddf_dprintf("BLK DRIVER|ERROR: "); sddf_dprintf(__VA_ARGS__); }while(0)
 
 /*
  * This is specific to our driver, and not the virtIO specification.

@@ -7,23 +7,21 @@
 # the IMX8 NIC driver
 #
 # NOTES
-#  Generates eth_driver.elf
-#  Expects System Description File to set eth_regs to the address of
-#  the registers
+#  Generates eth_driver.elf (alternative unique name eth_driver_imx.elf)
 #  Expects libsddf_util_debug.a to be in LIBS
 
 ETHERNET_DRIVER_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
-CHECK_NETDRV_FLAGS_MD5:=.netdrv_cflags-$(shell echo -- ${CFLAGS} ${CFLAGS_network} | shasum | sed 's/ *-//')
+CHECK_NETDRV_IMX_FLAGS_MD5:=.netdrv_imx_cflags-$(shell echo -- ${CFLAGS} ${CFLAGS_network} | shasum | sed 's/ *-//')
 
-${CHECK_NETDRV_FLAGS_MD5}:
-	-rm -f .netdrv_cflags-*
+${CHECK_NETDRV_IMX_FLAGS_MD5}:
+	-rm -f .netdrv_imx_cflags-*
 	touch $@
 
-eth_driver.elf: imx/ethernet.o
+eth_driver_imx.elf: network/imx/ethernet.o
 	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
 
-imx/ethernet.o: ${ETHERNET_DRIVER_DIR}/ethernet.c ${CHECK_NETDRV_FLAGS_MD5}
-	mkdir -p imx
+network/imx/ethernet.o: ${ETHERNET_DRIVER_DIR}/ethernet.c ${CHECK_NETDRV_FLAGS_MD5} | $(SDDF_LIBC_INCLUDE)
+	mkdir -p network/imx
 	${CC} -c ${CFLAGS} ${CFLAGS_network} -I ${ETHERNET_DRIVER_DIR} -o $@ $<
 
 

@@ -132,9 +132,9 @@ static int notified_by_client(int client)
             continue;
         }
 
-        if (pcm.io_or_offset % SOUND_PCM_BUFFER_SIZE ||
-            pcm.io_or_offset >= SOUND_PCM_BUFFER_SIZE * client_queues->pcm_req.size ||
-            pcm.len > SOUND_PCM_BUFFER_SIZE) {
+        if (pcm.io_or_offset % SOUND_PCM_BUFFER_SIZE
+            || pcm.io_or_offset >= SOUND_PCM_BUFFER_SIZE * client_queues->pcm_req.capacity
+            || pcm.len > SOUND_PCM_BUFFER_SIZE) {
             sddf_dprintf("SND VIRT|ERR: [client %d] invalid PCM buffer bounds\n", client);
             respond_to_pcm(client_queues, &pcm, SOUND_S_BAD_MSG);
             notify_client = true;
@@ -216,9 +216,9 @@ int notified_by_driver(void)
         sound_queues_t *client_queues = &clients[owner];
         uintptr_t paddr = pcm.io_or_offset;
 
-        if (paddr < data_region_paddr ||
-            paddr >= data_region_paddr + SOUND_PCM_BUFFER_SIZE * client_queues->pcm_res.size ||
-            pcm.len > SOUND_PCM_BUFFER_SIZE) {
+        if (paddr < data_region_paddr
+            || paddr >= data_region_paddr + SOUND_PCM_BUFFER_SIZE * client_queues->pcm_res.capacity
+            || pcm.len > SOUND_PCM_BUFFER_SIZE) {
             sddf_dprintf("SND VIRT|ERR: invalid PCM buffer bounds from driver\n");
             continue;
         }
@@ -227,9 +227,7 @@ int notified_by_driver(void)
         uintptr_t vaddr = data_region_vaddr + pcm.io_or_offset;
 
         // Cache is dirty as device may have written to buffer
-        /* TODO: This is a raw seL4 system call because Microkit does not (currently)
-         * include a corresponding libmicrokit API. */
-        seL4_ARM_VSpace_Invalidate_Data(3, vaddr, vaddr + pcm.len);
+        cache_clean_and_invalidate(vaddr, vaddr + pcm.len);
 
         pcm.io_or_offset = offset;
         if (sound_enqueue_pcm(&client_queues->pcm_res, &pcm) != 0) {
@@ -255,29 +253,14 @@ void init(void)
     assert(data_region_paddr);
     assert(data_region_vaddr);
 
-    sound_queues_init(&clients[0],
-                      (void *)c0_cmd_req,
-                      (void *)c0_cmd_res,
-                      (void *)c0_pcm_req,
-                      (void *)c0_pcm_res,
-                      SOUND_CMD_QUEUE_SIZE,
-                      SOUND_PCM_QUEUE_SIZE);
+    sound_queues_init(&clients[0], (void *)c0_cmd_req, (void *)c0_cmd_res, (void *)c0_pcm_req, (void *)c0_pcm_res,
+                      SOUND_CMD_QUEUE_CAPACITY, SOUND_PCM_QUEUE_CAPACITY);
 
-    sound_queues_init(&clients[1],
-                      (void *)c1_cmd_req,
-                      (void *)c1_cmd_res,
-                      (void *)c1_pcm_req,
-                      (void *)c1_pcm_res,
-                      SOUND_CMD_QUEUE_SIZE,
-                      SOUND_PCM_QUEUE_SIZE);
+    sound_queues_init(&clients[1], (void *)c1_cmd_req, (void *)c1_cmd_res, (void *)c1_pcm_req, (void *)c1_pcm_res,
+                      SOUND_CMD_QUEUE_CAPACITY, SOUND_PCM_QUEUE_CAPACITY);
 
-    sound_queues_init(&driver_queues,
-                      (void *)drv_cmd_req,
-                      (void *)drv_cmd_res,
-                      (void *)drv_pcm_req,
-                      (void *)drv_pcm_res,
-                      SOUND_CMD_QUEUE_SIZE,
-                      SOUND_PCM_QUEUE_SIZE);
+    sound_queues_init(&driver_queues, (void *)drv_cmd_req, (void *)drv_cmd_res, (void *)drv_pcm_req,
+                      (void *)drv_pcm_res, SOUND_CMD_QUEUE_CAPACITY, SOUND_PCM_QUEUE_CAPACITY);
     sound_queues_init_buffers(&driver_queues);
 
     for (int i = 0; i < MAX_STREAMS; i++) {

@@ -3,40 +3,29 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-#include <microkit.h>
+#include <os/sddf.h>
 #include <sddf/network/queue.h>
+#include <sddf/network/config.h>
 #include <sddf/util/cache.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
-#include <ethernet_config.h>
 
-#define DRIVER 0
-#define CLIENT_CH 1
-
-net_queue_t *tx_free_drv;
-net_queue_t *tx_active_drv;
-net_queue_t *tx_free_cli0;
-net_queue_t *tx_active_cli0;
-
-uintptr_t buffer_data_region_cli0_vaddr;
-uintptr_t buffer_data_region_cli0_paddr;
-uintptr_t buffer_data_region_cli1_paddr;
+__attribute__((__section__(".net_virt_tx_config"))) net_virt_tx_config_t config;
 
 typedef struct state {
     net_queue_handle_t tx_queue_drv;
-    net_queue_handle_t tx_queue_clients[NUM_NETWORK_CLIENTS];
-    uintptr_t buffer_region_vaddrs[NUM_NETWORK_CLIENTS];
-    uintptr_t buffer_region_paddrs[NUM_NETWORK_CLIENTS];
+    net_queue_handle_t tx_queue_clients[SDDF_NET_MAX_CLIENTS];
 } state_t;
 
 state_t state;
 
 int extract_offset(uintptr_t *phys)
 {
-    for (int client = 0; client < NUM_NETWORK_CLIENTS; client++) {
-        if (*phys >= state.buffer_region_paddrs[client]
-            && *phys < state.buffer_region_paddrs[client] + state.tx_queue_clients[client].capacity * NET_BUFFER_SIZE) {
-            *phys = *phys - state.buffer_region_paddrs[client];
+    for (int client = 0; client < config.num_clients; client++) {
+        if (*phys >= config.clients[client].data.io_addr
+            && *phys
+                   < config.clients[client].data.io_addr + state.tx_queue_clients[client].capacity * NET_BUFFER_SIZE) {
+            *phys = *phys - config.clients[client].data.io_addr;
             return client;
         }
     }
@@ -46,7 +35,7 @@ int extract_offset(uintptr_t *phys)
 void tx_provide(void)
 {
     bool enqueued = false;
-    for (int client = 0; client < NUM_NETWORK_CLIENTS; client++) {
+    for (int client = 0; client < config.num_clients; client++) {
         bool reprocess = true;
         while (reprocess) {
             while (!net_queue_empty_active(&state.tx_queue_clients[client])) {
@@ -63,10 +52,10 @@ void tx_provide(void)
                     continue;
                 }
 
-                cache_clean(buffer.io_or_offset + state.buffer_region_vaddrs[client],
-                            buffer.io_or_offset + state.buffer_region_vaddrs[client] + buffer.len);
+                uintptr_t buffer_vaddr = buffer.io_or_offset + (uintptr_t)config.clients[client].data.region.vaddr;
+                cache_clean(buffer_vaddr, buffer_vaddr + buffer.len);
 
-                buffer.io_or_offset = buffer.io_or_offset + state.buffer_region_paddrs[client];
+                buffer.io_or_offset = buffer.io_or_offset + config.clients[client].data.io_addr;
                 err = net_enqueue_active(&state.tx_queue_drv, buffer);
                 assert(!err);
                 enqueued = true;
@@ -84,14 +73,14 @@ void tx_provide(void)
 
     if (enqueued && net_require_signal_active(&state.tx_queue_drv)) {
         net_cancel_signal_active(&state.tx_queue_drv);
-        microkit_deferred_notify(DRIVER);
+        sddf_deferred_notify(config.driver.id);
     }
 }
 
 void tx_return(void)
 {
     bool reprocess = true;
-    bool notify_clients[NUM_NETWORK_CLIENTS] = {false};
+    bool notify_clients[SDDF_NET_MAX_CLIENTS] = { false };
     while (reprocess) {
         while (!net_queue_empty_free(&state.tx_queue_drv)) {
             net_buff_desc_t buffer;
@@ -115,15 +104,15 @@ void tx_return(void)
         }
     }
 
-    for (int client = 0; client < NUM_NETWORK_CLIENTS; client++) {
+    for (int client = 0; client < config.num_clients; client++) {
         if (notify_clients[client] && net_require_signal_free(&state.tx_queue_clients[client])) {
             net_cancel_signal_free(&state.tx_queue_clients[client]);
-            microkit_notify(client + CLIENT_CH);
+            sddf_notify(config.clients[client].conn.id);
         }
     }
 }
 
-void notified(microkit_channel ch)
+void notified(sddf_channel ch)
 {
     tx_return();
     tx_provide();
@@ -131,24 +120,16 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
+    assert(net_config_check_magic(&config));
+
     /* Set up driver queues */
-    net_queue_init(&state.tx_queue_drv, tx_free_drv, tx_active_drv, NET_TX_QUEUE_CAPACITY_DRIV);
+    net_queue_init(&state.tx_queue_drv, config.driver.free_queue.vaddr, config.driver.active_queue.vaddr,
+                   config.driver.num_buffers);
 
-    /* Setup client queues and state */
-    net_queue_info_t queue_info[NUM_NETWORK_CLIENTS] = {0};
-    uintptr_t client_vaddrs[NUM_NETWORK_CLIENTS] = {0};
-    net_virt_queue_info(microkit_name, tx_free_cli0, tx_active_cli0, queue_info);
-    net_mem_region_vaddr(microkit_name, client_vaddrs, buffer_data_region_cli0_vaddr);
-
-    for (int i = 0; i < NUM_NETWORK_CLIENTS; i++) {
-        net_queue_init(&state.tx_queue_clients[i], queue_info[i].free, queue_info[i].active, queue_info[i].capacity);
-        state.buffer_region_vaddrs[i] = client_vaddrs[i];
+    for (int i = 0; i < config.num_clients; i++) {
+        net_queue_init(&state.tx_queue_clients[i], config.clients[i].conn.free_queue.vaddr,
+                       config.clients[i].conn.active_queue.vaddr, config.clients[i].conn.num_buffers);
     }
-
-    state.buffer_region_paddrs[0] = buffer_data_region_cli0_paddr;
-#if NUM_NETWORK_CLIENTS > 1
-    state.buffer_region_paddrs[1] = buffer_data_region_cli1_paddr;
-#endif
 
     tx_provide();
 }

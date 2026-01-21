@@ -5,25 +5,19 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <microkit.h>
+#include <os/sddf.h>
+#include <sddf/resources/device.h>
 #include <sddf/util/printf.h>
-#include <serial_config.h>
+#include <sddf/serial/config.h>
 #include "uart.h"
 
-#define IRQ_CH 0
-#define TX_CH  1
-#define RX_CH  2
+__attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
-serial_queue_t *rx_queue;
-serial_queue_t *tx_queue;
-
-char *rx_data;
-char *tx_data;
+__attribute__((__section__(".serial_driver_config"))) serial_driver_config_t config;
 
 serial_queue_handle_t rx_queue_handle;
 serial_queue_handle_t tx_queue_handle;
 
-uintptr_t uart_base;
 volatile meson_uart_regs_t *uart_regs;
 struct uart_clock_state uart_clock;
 
@@ -45,6 +39,12 @@ static void set_baud(unsigned long baud)
     uint16_t clock_div = 1;
     uint32_t baud_register = AML_UART_BAUD_USE;
     if (uart_clock.crystal_clock) {
+#if defined(CONFIG_PLAT_ODROIDC2)
+        /* Odroid-C2 does not have clock divider option */
+        baud_register |= AML_UART_BAUD_XTAL;
+        clock_div = 3;
+        ref_clock_ticks_per_symbol /= 3;
+#elif defined(CONFIG_PLAT_ODROIDC4)
         baud_register |= AML_UART_BAUD_XTAL;
         if (ref_clock_ticks_per_symbol % 3 == 0) {
             clock_div = 3;
@@ -56,6 +56,7 @@ static void set_baud(unsigned long baud)
         } else {
             baud_register |= AML_UART_BAUD_XTAL_DIV3;
         }
+#endif
     }
 
     /* UART does not support baud rates this slow. */
@@ -72,34 +73,23 @@ static void set_baud(unsigned long baud)
 
 static void tx_provide(void)
 {
-    bool reprocess = true;
     bool transferred = false;
-    while (reprocess) {
-        char c;
-        while (!(uart_regs->sr & AML_UART_TX_FULL) && !serial_dequeue(&tx_queue_handle, &tx_queue_handle.queue->head, &c)) {
-            uart_regs->wfifo = (uint32_t)c;
-            transferred = true;
-        }
+    char c;
+    while (!(uart_regs->sr & AML_UART_TX_FULL) && !serial_dequeue(&tx_queue_handle, &c)) {
+        uart_regs->wfifo = (uint32_t)c;
+        transferred = true;
+    }
 
-        serial_request_producer_signal(&tx_queue_handle);
-        /* If transmit fifo is full and there is data remaining to be sent, enable interrupt when fifo is no longer full */
-        if (uart_regs->sr & AML_UART_TX_FULL && !serial_queue_empty(&tx_queue_handle, tx_queue_handle.queue->head)) {
-            uart_regs->cr |= AML_UART_TX_INT_EN;
-        } else {
-            uart_regs->cr &= ~AML_UART_TX_INT_EN;
-        }
-        reprocess = false;
-
-        if (!(uart_regs->sr & AML_UART_TX_FULL) && !serial_queue_empty(&tx_queue_handle, tx_queue_handle.queue->head)) {
-            serial_cancel_producer_signal(&tx_queue_handle);
-            uart_regs->cr &= ~AML_UART_TX_INT_EN;
-            reprocess = true;
-        }
+    /* If there is data remaining to be sent, enable interrupt when fifo is no longer full */
+    if (!serial_queue_empty(&tx_queue_handle, tx_queue_handle.queue->head)) {
+        uart_regs->cr |= AML_UART_TX_INT_EN;
+    } else {
+        uart_regs->cr &= ~AML_UART_TX_INT_EN;
     }
 
     if (transferred && serial_require_consumer_signal(&tx_queue_handle)) {
         serial_cancel_consumer_signal(&tx_queue_handle);
-        microkit_notify(TX_CH);
+        sddf_notify(config.tx.id);
     }
 }
 
@@ -110,12 +100,12 @@ static void rx_return(void)
     while (reprocess) {
         while (!(uart_regs->sr & AML_UART_RX_EMPTY) && !serial_queue_full(&rx_queue_handle, rx_queue_handle.queue->tail)) {
             char c = (char) uart_regs->rfifo;
-            serial_enqueue(&rx_queue_handle, &rx_queue_handle.queue->tail, c);
+            serial_enqueue(&rx_queue_handle, c);
             enqueued = true;
         }
 
         if (!(uart_regs->sr & AML_UART_RX_EMPTY) && serial_queue_full(&rx_queue_handle, rx_queue_handle.queue->tail)) {
-            /* Disable rx interrupts until virtualisers queue is no longer empty. */
+            /* Disable rx interrupts until virtualisers queue is no longer full. */
             uart_regs->cr &= ~AML_UART_RX_INT_EN;
             serial_request_consumer_signal(&rx_queue_handle);
         }
@@ -128,9 +118,8 @@ static void rx_return(void)
         }
     }
 
-    if (enqueued && serial_require_producer_signal(&rx_queue_handle)) {
-        serial_cancel_producer_signal(&rx_queue_handle);
-        microkit_notify(RX_CH);
+    if (enqueued) {
+        sddf_notify(config.rx.id);
     }
 }
 
@@ -140,7 +129,7 @@ static void handle_irq(void)
     uint32_t uart_cr = uart_regs->cr;
     while (uart_sr & UART_INTR_ABNORMAL || !(uart_sr & AML_UART_RX_EMPTY)
            || (uart_cr & AML_UART_TX_INT_EN && !(uart_sr & AML_UART_TX_FULL))) {
-        if (!(uart_sr & AML_UART_RX_EMPTY)) {
+        if (config.rx_enabled && !(uart_sr & AML_UART_RX_EMPTY)) {
             rx_return();
         }
         if (uart_cr & AML_UART_TX_INT_EN && !(uart_sr & AML_UART_TX_FULL)) {
@@ -157,7 +146,7 @@ static void handle_irq(void)
 
 static void uart_setup(void)
 {
-    uart_regs = (meson_uart_regs_t *)(uart_base + UART_REGS_OFFSET);
+    uart_regs = (meson_uart_regs_t *)device_resources.regions[0].region.vaddr;
 
     /* Wait until receive and transmit state machines are no longer busy */
     while (uart_regs->sr & (AML_UART_TX_BUSY | AML_UART_RX_BUSY));
@@ -182,15 +171,15 @@ static void uart_setup(void)
     uart_clock.crystal_clock = true;
     uart_clock.reference_clock_frequency = UART_XTAL_REF_CLK;
     uart_clock.crystal_clock_divider = 1;
-    set_baud(UART_DEFAULT_BAUD);
+    set_baud(config.default_baud);
 
     uint32_t irqc = uart_regs->irqc;
     /* Enable receive interrupts every byte */
-#if !SERIAL_TX_ONLY
-    irqc &= ~AML_UART_RECV_IRQ_MASK;
-    irqc |= AML_UART_RECV_IRQ(1);
-    cr |= (AML_UART_RX_INT_EN | AML_UART_RX_EN);
-#endif
+    if (config.rx_enabled) {
+        irqc &= ~AML_UART_RECV_IRQ_MASK;
+        irqc |= AML_UART_RECV_IRQ(1);
+        cr |= (AML_UART_RX_INT_EN | AML_UART_RX_EN);
+    }
 
     /* Enable transmit interrupts if the write fifo drops below one byte - used when the write fifo becomes full */
     irqc &= ~AML_UART_XMIT_IRQ_MASK;
@@ -203,30 +192,30 @@ static void uart_setup(void)
 
 void init(void)
 {
+    assert(serial_config_check_magic(&config));
+    assert(device_resources_check_magic(&device_resources));
+    assert(device_resources.num_irqs == 1);
+    assert(device_resources.num_regions == 1);
+
     uart_setup();
 
-#if !SERIAL_TX_ONLY
-    serial_queue_init(&rx_queue_handle, rx_queue, SERIAL_RX_DATA_REGION_CAPACITY_DRIV, rx_data);
-#endif
-    serial_queue_init(&tx_queue_handle, tx_queue, SERIAL_TX_DATA_REGION_CAPACITY_DRIV, tx_data);
+    if (config.rx_enabled) {
+        serial_queue_init(&rx_queue_handle, config.rx.queue.vaddr, config.rx.data.size, config.rx.data.vaddr);
+    }
+    serial_queue_init(&tx_queue_handle, config.tx.queue.vaddr, config.tx.data.size, config.tx.data.vaddr);
 }
 
-void notified(microkit_channel ch)
+void notified(sddf_channel ch)
 {
-    switch (ch) {
-    case IRQ_CH:
+    if (ch == device_resources.irqs[0].id) {
         handle_irq();
-        microkit_deferred_irq_ack(ch);
-        break;
-    case TX_CH:
+        sddf_deferred_irq_ack(ch);
+    } else if (ch == config.tx.id) {
         tx_provide();
-        break;
-    case RX_CH:
+    } else if (ch == config.rx.id) {
         uart_regs->cr |= AML_UART_RX_INT_EN;
         rx_return();
-        break;
-    default:
+    } else {
         sddf_dprintf("UART|LOG: received notification on unexpected channel: %u\n", ch);
-        break;
     }
 }

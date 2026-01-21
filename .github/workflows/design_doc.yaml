@@ -1,0 +1,28 @@
+# Copyright 2025, UNSW
+# SPDX-License-Identifier: BSD-2-Clause
+
+# Build the design documentation PDF
+
+name: Design doc
+
+on:
+  pull_request:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build_doc:
+    name: Build
+    runs-on: [self-hosted, macos, ARM64]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile document
+        run: |
+          cd docs/design
+          nix develop .#docs --ignore-environment -c bash -c 'make'
+      - name: Upload PDF
+        uses: actions/upload-artifact@v4
+        with:
+          name: design.pdf
+          path: docs/design/design.pdf
+          if-no-files-found: error

@@ -8,7 +8,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <sddf/util/string.h>
+#include <string.h>
 #include <sddf/util/fence.h>
 #include <sddf/gpu/gpu.h>
 
@@ -201,7 +201,7 @@ static inline int gpu_enqueue_req(gpu_queue_handle_t *h, gpu_req_t req)
 
     gpu_req_q = h->req_queue;
     gpu_req = gpu_req_q->buffers + (gpu_req_q->tail % h->capacity);
-    sddf_memcpy(gpu_req, &req, sizeof(gpu_req_t));
+    memcpy(gpu_req, &req, sizeof(gpu_req_t));
 
     gpu_req_q->tail++;
 
@@ -253,7 +253,7 @@ static inline int gpu_dequeue_req(gpu_queue_handle_t *h, gpu_req_t *req)
 
     gpu_req_q = h->req_queue;
     gpu_req = gpu_req_q->buffers + (gpu_req_q->head % h->capacity);
-    sddf_memcpy(req, gpu_req, sizeof(gpu_req_t));
+    memcpy(req, gpu_req, sizeof(gpu_req_t));
 
     gpu_req_q->head++;
 

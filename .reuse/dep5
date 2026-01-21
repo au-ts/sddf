@@ -6,18 +6,50 @@ Files:
     flake.lock
     CHANGES.md
     build.zig.zon
+    ci/genmc/nix/cmake_install.patch
+    docs/design/*
     examples/i2c/build.zig.zon
+    examples/i2c_bus_scan/build.zig.zon
     examples/serial/build.zig.zon
     examples/timer/build.zig.zon
     examples/blk/build.zig.zon
     examples/blk/basic_data.txt
     examples/blk/basic_data.h
+    examples/echo_server/core_config/single_core.json
+    examples/echo_server/core_config/two_core.json
+    examples/echo_server/core_config/four_core.json
     examples/gpu/build.zig.zon
+    drivers/blk/mmc/imx/config.json
+    drivers/blk/virtio/config.json
+    drivers/i2c/meson/config.json
+    drivers/i2c/opentitan/config.json
+    drivers/network/imx/config.json
+    drivers/network/meson/config.json
+    drivers/network/virtio/mmio/config.json
+    drivers/network/dwmac-5.10a/config.json
+    drivers/serial/arm/config.json
+    drivers/serial/imx/config.json
+    drivers/serial/meson/config.json
+    drivers/serial/ns16550a/config.json
+    drivers/serial/virtio/config.json
+    drivers/serial/zynqmp/config.json
+    drivers/timer/arm/config.json
+    drivers/timer/imx/config.json
+    drivers/timer/jh7110/config.json
+    drivers/timer/meson/config.json
+    drivers/timer/goldfish/config.json
+    drivers/timer/cdns/config.json
+    drivers/timer/bcm2835/config.json
+    drivers/timer/apb_timer/config.json
 Copyright: UNSW
 License: BSD-2-Clause
 
 Files:
     examples/gpu/fb_img.jpeg
+    examples/echo_server/docs/echo_server.svg
+    docs/i2c/i2cdriver.drawio.png
+    docs/network/imgs/metadata.svg
+    docs/network/imgs/network_arch.png
 Copyright: UNSW
 License: CC-BY-SA-4.0
 
@@ -28,3 +60,9 @@ License: ISC
 Files: network/ipstacks/lwip/*
 Copyright: Copyright (c) 2001-2004 Swedish Institute of Computer Science
 License: LicenseRef-BSD-LWIP
+
+Files:
+    util/custom_libc/x86_64/*
+    util/custom_libc/aarch64/memmove.c
+Copyright: Newlib contributors
+License: LicenseRef-Newlib

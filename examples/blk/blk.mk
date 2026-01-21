@@ -19,90 +19,104 @@ ifeq ($(strip $(TOOLCHAIN)),)
 	TOOLCHAIN := clang
 endif
 
-ifeq ($(strip $(TOOLCHAIN)), clang)
-	CC := clang -target aarch64-none-elf
-	LD := ld.lld
-	AR := llvm-ar
-	RANLIB := llvm-ranlib
-else
-	CC := $(TOOLCHAIN)-gcc
-	LD := $(TOOLCHAIN)-ld
-	AS := $(TOOLCHAIN)-as
-	AR := $(TOOLCHAIN)-ar
-	RANLIB := $(TOOLCHAIN)-ranlib
-endif
-
-QEMU := qemu-system-aarch64
-
 BUILD_DIR ?= build
 MICROKIT_CONFIG ?= debug
 
-BLK_DRIVER_DIR := virtio
-TIMER_DRIVER_DIR := arm
-CPU := cortex-a53
+# Allow to user to specify a custom partition
+PARTITION :=
+ifdef PARTITION
+	PARTITION_ARG := --partition $(PARTITION)
+endif
+
+IMAGE_FILE := loader.img
+REPORT_FILE  := report.txt
+SYSTEM_FILE := blk.system
+
+SUPPORTED_BOARDS := qemu_virt_aarch64 \
+		    qemu_virt_riscv64 \
+		    maaxboard \
+			x86_64_generic
 
 TOP := ${SDDF}/examples/blk
 CONFIGS_INCLUDE := ${TOP}
+SDDF_CUSTOM_LIBC := 1
 
-MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
+include ${SDDF}/tools/make/board/common.mk
 
-BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
 
-IMAGES := blk_driver.elf timer_driver.elf client.elf blk_virt.elf
-CFLAGS := -mcpu=$(CPU) \
-		  -mstrict-align \
-		  -nostdlib \
-		  -ffreestanding \
-		  -g3 \
-		  -O3 \
-		  -Wall -Wno-unused-function -Werror -Wno-unused-command-line-argument \
-		  -I$(BOARD_DIR)/include \
+IMAGES := blk_driver.elf client.elf blk_virt.elf serial_virt_tx.elf serial_driver.elf
+CFLAGS +=  -Wall -Wno-unused-function -Werror -Wno-unused-command-line-argument \
 		  -I$(SDDF)/include \
+		  -I$(SDDF)/include/microkit \
 		  -I$(CONFIGS_INCLUDE)
+
 LDFLAGS := -L$(BOARD_DIR)/lib
 LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
 
-IMAGE_FILE   := loader.img
-REPORT_FILE  := report.txt
-SYSTEM_FILE  := ${TOP}/board/$(MICROKIT_BOARD)/blk.system
+METAPROGRAM := $(TOP)/meta.py
 
-BLK_DRIVER   := $(SDDF)/drivers/blk/${BLK_DRIVER_DIR}
-TIMER_DRIVER := $(SDDF)/drivers/timer/${TIMER_DRIVER_DIR}
-
-BLK_COMPONENTS := $(SDDF)/blk/components
+BLK_DRIVER := $(SDDF)/drivers/blk/${BLK_DRIV_DIR}
+SERIAL_DRIVER := $(SDDF)/drivers/serial/${UART_DRIV_DIR}
 
 all: $(IMAGE_FILE)
 
-include ${BLK_DRIVER}/blk_driver.mk
-include ${TIMER_DRIVER}/timer_driver.mk
+include ${SDDF}/drivers/blk/${BLK_DRIV_DIR}/blk_driver.mk
+include ${SDDF}/drivers/serial/${UART_DRIV_DIR}/serial_driver.mk
+
+ifdef BLK_NEED_TIMER
+include ${SDDF}/drivers/timer/${TIMER_DRIV_DIR}/timer_driver.mk
+IMAGES += timer_driver.elf
+export BLK_NEED_TIMER
+endif
 
 include ${SDDF}/util/util.mk
-include ${BLK_COMPONENTS}/blk_components.mk
+include ${SDDF}/blk/components/blk_components.mk
+include ${SDDF}/serial/components/serial_components.mk
 
 ${IMAGES}: libsddf_util_debug.a
 
 client.o: ${TOP}/client.c ${TOP}/basic_data.h
 	$(CC) -c $(CFLAGS) -I. $< -o client.o
-client.elf: client.o
-	$(LD) $(LDFLAGS) $< $(LIBS) -o $@
+client.elf: client.o libsddf_util.a
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+
+$(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
+ifneq ($(strip $(DTS)),)
+	$(PYTHON) \
+		$(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
+		--dtb $(DTB) --output . --sdf $(SYSTEM_FILE) $(PARTITION_ARG) \
+		$${BLK_NEED_TIMER:+--need_timer}
+else
+	$(PYTHON) \
+		$(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
+		--output . --sdf $(SYSTEM_FILE) $(PARTITION_ARG) \
+		$${BLK_NEED_TIMER:+--need_timer}
+endif
+ifdef BLK_NEED_TIMER
+	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
+	$(OBJCOPY) --update-section .timer_client_config=timer_client_blk_driver.data blk_driver.elf
+endif
+	$(OBJCOPY) --update-section .device_resources=blk_driver_device_resources.data blk_driver.elf
+	$(OBJCOPY) --update-section .blk_driver_config=blk_driver.data blk_driver.elf
+	$(OBJCOPY) --update-section .blk_virt_config=blk_virt.data blk_virt.elf
+	$(OBJCOPY) --update-section .blk_client_config=blk_client_client.data client.elf
+	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
+	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data serial_driver.elf
+	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx.data serial_virt_tx.elf
+	$(OBJCOPY) --update-section .serial_client_config=serial_client_client.data client.elf
+	touch $@
 
 $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	$(MICROKIT_TOOL) $(SYSTEM_FILE) --search-path $(BUILD_DIR) --board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) -o $(IMAGE_FILE) -r $(REPORT_FILE)
 
 qemu_disk:
-	$(SDDF)/tools/mkvirtdisk mydisk 1 512 16777216
+	$(SDDF)/tools/mkvirtdisk disk 1 512 16777216 GPT
 
 qemu: ${IMAGE_FILE} qemu_disk
-	$(QEMU) -machine virt,virtualization=on \
-			-cpu cortex-a53 \
-			-serial mon:stdio \
-			-device loader,file=$(IMAGE_FILE),addr=0x70000000,cpu-num=0 \
-			-m size=2G \
-			-nographic \
-            -global virtio-mmio.force-legacy=false \
-            -d guest_errors \
-            -drive file=mydisk,if=none,format=raw,id=hd \
-            -device virtio-blk-device,drive=hd
+	$(QEMU) $(QEMU_ARCH_ARGS) $(QEMU_BLK_ARGS) \
+	    -nographic \
+	    -d guest_errors \
+	    -drive file=disk,if=none,format=raw,id=hd
 
 clean::
 	rm -f client.o

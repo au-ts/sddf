@@ -1,0 +1,25 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 9ef8718..d4b474a 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -12,7 +12,7 @@ set(PACKAGE_NAME "GenMC")
+ set(PACKAGE_BUGREPORT "michalis.kokologiannakis@inf.ethz.ch")
+ set(PACKAGE_URL "https://plv.mpi-sws.org/genmc")
+ set(PACKAGE_VERSION "${CMAKE_PROJECT_VERSION}")
+-set(INCLUDE_DIR "${CMAKE_INSTALL_PREFIX}/${PKG_INCLUDE_DIR}")
++set(INCLUDE_DIR "${PKG_INCLUDE_DIR}")
+ set(SRC_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/include")
+ set(RUST_DIR "${CMAKE_SOURCE_DIR}/rust")
+
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index 5bb5c05..227c189 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -104,7 +104,7 @@ endif()
+
+ ### GenMC executable
+ add_executable(${PROJECT_NAME} main.cpp)
+-install(TARGETS ${PROJECT_NAME} RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}/${PROJECT_NAME})
++install(TARGETS ${PROJECT_NAME} RUNTIME)
+
+ target_link_libraries(${PROJECT_NAME} PRIVATE genmc_config_includes genmc_lib)

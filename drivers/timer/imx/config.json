@@ -1,0 +1,22 @@
+{
+    "compatible": [
+        "fsl,imx8mm-gpt",
+        "fsl,imx8mq-gpt",
+        "fsl,imx8mp-gpt"
+    ],
+    "resources": {
+        "regions": [
+            {
+                "name": "regs",
+                "perms": "rw",
+                "size": 65536,
+                "dt_index": 0
+            }
+        ],
+        "irqs": [
+            {
+                "dt_index": 0
+            }
+        ]
+    }
+}

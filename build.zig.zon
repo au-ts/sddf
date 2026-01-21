@@ -1,8 +1,9 @@
 .{
-    .name = "sddf",
-    .version = "0.1.0",
+    .name = .sddf,
+    .version = "0.0.0",
 
     .paths = .{
+        "dts",
         "drivers",
         "benchmark",
         "blk",
@@ -17,6 +18,7 @@
         "build.zig",
         "build.zig.zon",
         "LICENSE",
-        "README.md"
-    }
+        "README.md",
+    },
+    .fingerprint = 0xb250d95cee7aa2e9,
 }

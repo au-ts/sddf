@@ -6,14 +6,15 @@
 #pragma once
 
 #include <stddef.h>
-#include <microkit.h>
 
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof(x[0]))
 #endif
 #define ALIGN(x, align)   (((x) + (align) - 1) & ~((align) - 1))
 
+#ifndef BIT
 #define BIT(nr) (1UL << (nr))
+#endif
 
 #define BIT_MASK(start, end) (((1U << (end)) - 1U) & ~((1U << (start)) - 1U)) // [start, end)
 
@@ -46,11 +47,17 @@
        _d * (_n/_d + (_n % _d == 0 ? 0 : 1)); \
     })
 #endif
+#ifndef ROUND_DOWN
+#define ROUND_DOWN(n, d) ((n) - ((n) % (d)))
+#endif
 #ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #endif
 #ifndef MAX
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
+#endif
+#ifndef ABS
+#define ABS(x) ((x) < 0 ? -(x) : (x))
 #endif
 
 void _assert_fail(const char  *assertion, const char  *file, unsigned int line, const char  *function);

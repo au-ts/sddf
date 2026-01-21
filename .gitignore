@@ -2,6 +2,9 @@
 # SPDX-License-Identifier: BSD-2-Clause
 
 build/
+*.zip
+*.tar.gz
+*.tar
 *.o
 *.elf
 *.depend
@@ -10,8 +13,13 @@ build/
 *.P
 *.d
 ci_build/
+ci_logs/
 *.orig
 *~
 .#*
 zig-out/
 .zig-cache/
+venv/
+__pycache__
+.*.sw*
+*.dtb

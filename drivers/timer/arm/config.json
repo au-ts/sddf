@@ -1,0 +1,13 @@
+{
+    "compatible": [
+        "arm,armv8-timer"
+    ],
+    "resources": {
+        "regions": [],
+        "irqs": [
+            {
+                "dt_index": 1
+            }
+        ]
+    }
+}

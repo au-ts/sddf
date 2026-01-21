@@ -6,84 +6,118 @@
 
 # seL4 Device Driver Framework
 
-The seL4 Device Driver Framework (sDDF) aims to provide interfaces and protocols for writing and
-porting device drivers to run as seL4 user level programs.
+The seL4 Device Driver Framework (sDDF) aims to provide interfaces and protocols
+for writing and porting device drivers to run as seL4 user level programs.
 
-The sDDF is currently under-going active research and development and is largely experimental
-software.
+The sDDF is currently under-going active research and development and is largely
+experimental software.
 
-We are working on developing the protocols and interfaces for various device classes such as:
+We are working on developing the protocols and interfaces for various device
+classes such as:
 * Network
 * Block
 * Serial
 * I<sup>2</sup>C
 * Audio
 
-There is a large amount of experimentation on-going for each device class, although the design
-for the network device class is mostly mature at this point.
+There is a large amount of experimentation on-going for each device class,
+although the design for the network device class is mostly mature at this point.
 
-The latest design documentation can be found [here](https://trustworthy.systems/projects/drivers/sddf-design.pdf).
+The latest design documentation can be found
+[here](https://trustworthy.systems/projects/drivers/sddf-design.pdf).
 
-More information about the sDDF project can be found on the Trustworthy Systems website
-[here](https://trustworthy.systems/projects/drivers/).
+More information about the sDDF project can be found on the Trustworthy Systems
+website [here](https://trustworthy.systems/projects/drivers/).
 
 ## Dependencies
 
-* Microkit SDK 1.4.1
+* [Microkit SDK 2.1.0](https://github.com/seL4/microkit/releases/tag/2.1.0)
 * GNU Make
 * Clang and LLVM bintools
+* Device Tree Compiler
+* Python (3.9 or higher)
 
-The Microkit SDK can be acquired from [here](https://github.com/seL4/microkit/releases/tag/1.4.1).
+sDDF is primarily compiled via Makefiles, but the [Zig](https://ziglang.org)
+build system is also available. If you are intending on using Zig instead of
+Make, please see https://ziglang.org/download/.
 
-sDDF is primarily compiled via Makefiles, but the [Zig](https://ziglang.org) build system is also
-available. If you are intending on using Zig instead of Make, please see https://ziglang.org/download/.
-
-See the instructions below for installing the rest of the dependencies based on your
-machine:
+See the instructions below for installing the rest of the dependencies based on
+your machine:
 
 ### apt
 
 On apt based Linux distributions run the following commands:
 
 ```sh
-sudo apt install make llvm lld
+sudo apt install make clang llvm lld device-tree-compiler python3 python3-pip
+pip3 install sdfgen==0.28.1
+```
+
+If you get `error: externally-managed-environment` when installing via pip,
+instead run:
+```sh
+# sdfgen is an isolated package and does not depend on anything
+# else so it will not break any system packages.
+pip3 install --break-system-packages sdfgen==0.28.1
+```
+
+#### Microkit SDK
+
+```sh
+wget https://github.com/seL4/microkit/releases/download/2.1.0/microkit-sdk-2.1.0-linux-x86-64.tar.gz
+tar xf microkit-sdk-2.1.0-linux-x86-64.tar.gz
 ```
 
 ### Homebrew
 
 On macOS, you can install the dependencies via Homebrew:
 ```sh
-brew install llvm lld make
+brew install llvm lld make dtc python3
+pip3 install sdfgen==0.28.1
+```
+
+If you get `error: externally-managed-environment` when installing via pip,
+instead run:
+```sh
+# sdfgen is an isolated package and does not depend on anything
+# else so it will not break any system packages.
+pip3 install --break-system-packages sdfgen==0.28.1
+```
+
+#### Microkit SDK
+
+For Apple Silicon:
+```sh
+wget https://github.com/seL4/microkit/releases/download/2.1.0/microkit-sdk-2.1.0-macos-aarch64.tar.gz
+tar xf microkit-sdk-2.1.0-macos-aarch64.tar.gz
+```
+
+For Intel:
+```sh
+wget https://github.com/seL4/microkit/releases/download/2.1.0/microkit-sdk-2.1.0-macos-x86-64.tar.gz
+tar xf microkit-sdk-2.1.0-macos-x86-64.tar.gz
 ```
 
 ### Nix
 
-There is a Nix flake available in the repository, so you can get a development shell via:
+There is a Nix flake available in the repository, so you can get a development
+shell via:
 ```sh
 nix develop
 ```
 
-Note that this will set the `MICROKIT_SDK` environment variable to the SDK path, you do not
-need to download the Microkit SDK manually.
+Note that this will set the `MICROKIT_SDK` environment variable to the SDK path,
+you do not need to download the Microkit SDK manually.
 
 ## Examples
 
-You can find examples making use of the sDDF in the `examples/` directory. Each example has its
-own README for how to build and run it.
+You can find examples making use of the sDDF in the `examples/` directory. Each
+example has its own README for how to build and run it.
 
-Note that some examples may have dependencies in addition to the ones listed in this README.
+Note that some examples may have dependencies in addition to the ones listed in
+this README.
 
-## Developing sDDF
+## Developing
 
-### Adding a new driver
-
-At a *minimum*, each new driver should have the following:
-* An example system in `examples/` showing off the capabilities of the driver if the
-  device class does not have an example already.
-* The README in the example system should contain the following:
-    * A brief description of what hardware functionality the driver supports
-    * What the example does and how to compile and run it
-* The driver should state exactly what documents where referenced (and what
-  version of the documents) to create the driver. If the driver was taken
-  from U-Boot or Linux that should also be mentioned along with how to find
-  the driver's source code in U-Boot/Linux.
+If you intend to work on the sDDF, please look at the documentation in
+[docs/developing.md](docs/developing.md).

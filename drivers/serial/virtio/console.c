@@ -16,17 +16,16 @@
  * may be needed if instead this driver was to be used in a different environment.
  */
 
-#include <microkit.h>
+#include <os/sddf.h>
 #include <sddf/util/ialloc.h>
 #include <sddf/virtio/virtio.h>
 #include <sddf/virtio/virtio_queue.h>
-#include <serial_config.h>
+#include <sddf/resources/device.h>
+#include <sddf/serial/config.h>
 #include "console.h"
 
-/* Channels */
-#define IRQ_CH 0
-#define TX_CH  1
-#define RX_CH  2
+__attribute__((__section__(".device_resources"))) device_resources_t device_resources;
+__attribute__((__section__(".serial_driver_config"))) serial_driver_config_t config;
 
 /*
  * The 'hardware' ring buffer region is used to store the virtIO virtqs
@@ -37,15 +36,6 @@ uintptr_t hw_ring_buffer_paddr;
 /* The number of entries in each virtqueue */
 #define RX_COUNT 512
 #define TX_COUNT 512
-
-/*
- * This default is based on the default QEMU setup but could change
- * depending on the instantiation of QEMU or wherever this driver is
- * being used.
- */
-#ifndef VIRTIO_MMIO_CONSOLE_OFFSET
-#define VIRTIO_MMIO_CONSOLE_OFFSET (0xe00)
-#endif
 
 #define VIRTIO_SERIAL_RX_QUEUE 0
 #define VIRTIO_SERIAL_TX_QUEUE 1
@@ -101,56 +91,42 @@ static inline bool virtio_avail_full_tx(struct virtq *virtq)
     return tx_last_desc_idx >= tx_virtq.num;
 }
 
-/* The virtio MMIO region */
-uintptr_t uart_base;
 volatile virtio_mmio_regs_t *uart_regs;
 
 static void tx_provide(void)
 {
-    bool reprocess = true;
     bool transferred = false;
-    while (reprocess) {
-        char c;
-        while (!virtio_avail_full_tx(&tx_virtq)
-               && !serial_dequeue(&tx_queue_handle, &tx_queue_handle.queue->head, &c)) {
+    char c;
+    while (!virtio_avail_full_tx(&tx_virtq) && !serial_dequeue(&tx_queue_handle, &c)) {
 
-                /* First, allocate somewhere to put the character */
-            uint32_t char_idx = -1;
-            int err = ialloc_alloc(&tx_char_ialloc_desc, &char_idx);
-            assert(!err && char_idx != -1);
+        /* First, allocate somewhere to put the character */
+        uint32_t char_idx = -1;
+        int err = ialloc_alloc(&tx_char_ialloc_desc, &char_idx);
+        assert(!err && char_idx != -1);
 
-            /* Now we need to a descriptor to put into the virtIO ring */
-            uint32_t pkt_desc_idx = -1;
-            err = ialloc_alloc(&tx_ialloc_desc, &pkt_desc_idx);
-            assert(!err && pkt_desc_idx != -1);
+        /* Now we need to a descriptor to put into the virtIO ring */
+        uint32_t pkt_desc_idx = -1;
+        err = ialloc_alloc(&tx_ialloc_desc, &pkt_desc_idx);
+        assert(!err && pkt_desc_idx != -1);
 
-            /* We should not run out of descriptors assuming that the avail ring is not full. */
-            assert(pkt_desc_idx < tx_virtq.num);
+        /* We should not run out of descriptors assuming that the avail ring is not full. */
+        assert(pkt_desc_idx < tx_virtq.num);
 
-            /* Put the character into the data region */
-            virtio_tx_char[char_idx] = c;
+        /* Put the character into the data region */
+        virtio_tx_char[char_idx] = c;
 
-            /* Set up the packet */
-            tx_virtq.desc[pkt_desc_idx].addr = virtio_tx_char_paddr + char_idx;
-            tx_virtq.desc[pkt_desc_idx].len = 1;
-            tx_virtq.desc[pkt_desc_idx].flags = 0;
+        /* Set up the packet */
+        tx_virtq.desc[pkt_desc_idx].addr = virtio_tx_char_paddr + char_idx;
+        tx_virtq.desc[pkt_desc_idx].len = 1;
+        tx_virtq.desc[pkt_desc_idx].flags = 0;
 
-            /* Enqueue the packet */
-            tx_virtq.avail->ring[tx_virtq.avail->idx % tx_virtq.num] = pkt_desc_idx;
+        /* Enqueue the packet */
+        tx_virtq.avail->ring[tx_virtq.avail->idx % tx_virtq.num] = pkt_desc_idx;
 
-            tx_virtq.avail->idx++;
-            tx_last_desc_idx += 1;
+        tx_virtq.avail->idx++;
+        tx_last_desc_idx += 1;
 
-            transferred = true;
-        }
-
-        serial_request_producer_signal(&tx_queue_handle);
-        reprocess = false;
-
-        if (!virtio_avail_full_tx(&tx_virtq) && !serial_queue_empty(&tx_queue_handle, tx_queue_handle.queue->head)) {
-            serial_cancel_producer_signal(&tx_queue_handle);
-            reprocess = true;
-        }
+        transferred = true;
     }
 
     if (transferred) {
@@ -159,14 +135,14 @@ static void tx_provide(void)
         uart_regs->QueueNotify = VIRTIO_SERIAL_TX_QUEUE;
         if (serial_require_consumer_signal(&tx_queue_handle)) {
             serial_cancel_consumer_signal(&tx_queue_handle);
-            microkit_notify(TX_CH);
+            sddf_notify(config.tx.id);
         }
     }
 }
 
 static void tx_return(void)
 {
-        /* After the tx has been processed, we need to free the packet/character allocation */
+    /* After the tx has been processed, we need to free the packet/character allocation */
     uint16_t enqueued = 0;
     uint16_t i = tx_last_seen_used;
     uint16_t curr_idx = tx_virtq.used->idx;
@@ -198,7 +174,7 @@ static void tx_return(void)
 
 static void rx_provide(void)
 {
-        /* Fill up the virtio available ring buffer */
+    /* Fill up the virtio available ring buffer */
     bool transferred = false;
     while (!virtio_avail_full_rx(&rx_virtq)) {
         // Allocate a desc entry for the packet and the character
@@ -250,7 +226,7 @@ static void rx_return(void)
             assert(!(pkt.flags & VIRTQ_DESC_F_NEXT));
 
             uint32_t char_idx = addr - virtio_rx_char_paddr;
-            serial_enqueue(&rx_queue_handle, &rx_queue_handle.queue->tail, virtio_rx_char[char_idx]);
+            serial_enqueue(&rx_queue_handle, virtio_rx_char[char_idx]);
 
                 /* Free the packet descriptor */
             int err = ialloc_free(&rx_ialloc_desc, pkt_used.id);
@@ -279,9 +255,8 @@ static void rx_return(void)
 
     rx_last_seen_used += transferred;
 
-    if (transferred > 0 && serial_require_producer_signal(&rx_queue_handle)) {
-        serial_cancel_producer_signal(&rx_queue_handle);
-        microkit_notify(RX_CH);
+    if (transferred > 0) {
+        sddf_notify(config.rx.id);
     }
 }
 
@@ -356,7 +331,9 @@ void console_setup()
     assert((uintptr_t)tx_virtq.used % 4 == 0);
 
     /* Load the Rx queue with free buffers */
-    rx_provide();
+    if (config.rx_enabled) {
+        rx_provide();
+    }
 
     // Setup RX queue first
     assert(uart_regs->QueueNumMax >= RX_COUNT);
@@ -391,14 +368,17 @@ static void handle_irq()
 {
     uint32_t irq_status = uart_regs->InterruptStatus;
     if (irq_status & VIRTIO_MMIO_IRQ_VQUEUE) {
+        // ACK the interrupt first before handling responses
+        uart_regs->InterruptACK = VIRTIO_MMIO_IRQ_VQUEUE;
+
         // We don't know whether the IRQ is related to a change to the RX queue
         // or TX queue, so we check both.
-        rx_return();
-        rx_provide(); // Refill the virtio Rx queue
+        if (config.rx_enabled) {
+            rx_return();
+            rx_provide(); // Refill the virtio Rx queue
+        }
         tx_return();
         tx_provide();
-        // We have handled the used buffer notification
-        uart_regs->InterruptACK = VIRTIO_MMIO_IRQ_VQUEUE;
     }
 
     if (irq_status & VIRTIO_MMIO_IRQ_CONFIG) {
@@ -408,7 +388,18 @@ static void handle_irq()
 
 void init()
 {
-    uart_regs = (volatile virtio_mmio_regs_t *)(uart_base + VIRTIO_MMIO_CONSOLE_OFFSET);
+    assert(serial_config_check_magic(&config));
+    assert(device_resources_check_magic(&device_resources));
+    assert(device_resources.num_irqs == 1);
+    assert(device_resources.num_regions == 4);
+
+    uart_regs = (volatile virtio_mmio_regs_t *)device_resources.regions[0].region.vaddr;
+    hw_ring_buffer_vaddr = (uintptr_t)device_resources.regions[1].region.vaddr;
+    hw_ring_buffer_paddr = device_resources.regions[1].io_addr;
+    virtio_rx_char = device_resources.regions[2].region.vaddr;
+    virtio_rx_char_paddr = device_resources.regions[2].io_addr;
+    virtio_tx_char = device_resources.regions[3].region.vaddr;
+    virtio_tx_char_paddr = device_resources.regions[3].io_addr;
 
     ialloc_init(&rx_ialloc_desc, rx_descriptors, RX_COUNT);
     ialloc_init(&tx_ialloc_desc, tx_descriptors, TX_COUNT);
@@ -417,29 +408,24 @@ void init()
 
     console_setup();
 
-#if !SERIAL_TX_ONLY
-    serial_queue_init(&rx_queue_handle, rx_queue, SERIAL_RX_DATA_REGION_CAPACITY_DRIV, rx_data);
-#endif
-    serial_queue_init(&tx_queue_handle, tx_queue, SERIAL_TX_DATA_REGION_CAPACITY_DRIV, tx_data);
+    if (config.rx_enabled) {
+        serial_queue_init(&rx_queue_handle, config.rx.queue.vaddr, config.rx.data.size, config.rx.data.vaddr);
+    }
+    serial_queue_init(&tx_queue_handle, config.tx.queue.vaddr, config.tx.data.size, config.tx.data.vaddr);
 
-    microkit_irq_ack(IRQ_CH);
+    sddf_irq_ack(device_resources.irqs[0].id);
 }
 
-void notified(microkit_channel ch)
+void notified(sddf_channel ch)
 {
-    switch (ch) {
-    case IRQ_CH:
+    if (ch == device_resources.irqs[0].id) {
         handle_irq();
-        microkit_deferred_irq_ack(ch);
-        break;
-    case TX_CH:
+        sddf_deferred_irq_ack(ch);
+    } else if (ch == config.tx.id) {
         tx_provide();
-        break;
-    case RX_CH:
+    } else if (ch == config.rx.id) {
         rx_return();
-        break;
-    default:
+    } else {
         LOG_DRIVER_ERR("received notification on unexpected channel: %u\n", ch);
-        break;
     }
 }

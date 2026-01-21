@@ -4,16 +4,14 @@
  */
 
 #include <stdint.h>
-#include <microkit.h>
+#include <os/sddf.h>
+#include <sddf/resources/device.h>
 #include <sddf/util/printf.h>
 #include <sddf/timer/protocol.h>
 
-uintptr_t gpt_regs;
-
-#define IRQ_CH 0
 #define MAX_TIMEOUTS 6
 
-#define TIMER_REG_START   0x140    // TIMER_MUX
+#define TIMER_REG_START   0x70    // TIMER_MUX
 
 #define TIMER_A_INPUT_CLK 0
 #define TIMER_E_INPUT_CLK 8
@@ -30,6 +28,8 @@ uintptr_t gpt_regs;
 #define TIMEOUT_TIMEBASE_10_US  0b01
 #define TIMEOUT_TIMEBASE_100_US 0b10
 #define TIMEOUT_TIMEBASE_1_MS   0b11
+
+__attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
 struct timer_regs {
     uint32_t mux;
@@ -71,7 +71,7 @@ static void process_timeouts(uint64_t curr_time)
 {
     for (int i = 0; i < MAX_TIMEOUTS; i++) {
         if (timeouts[i] <= curr_time) {
-            microkit_notify(i);
+            sddf_notify(i);
             timeouts[i] = UINT64_MAX;
         }
     }
@@ -90,51 +90,55 @@ static void process_timeouts(uint64_t curr_time)
     }
 }
 
-void notified(microkit_channel ch)
+void notified(sddf_channel ch)
 {
-    if (ch != IRQ_CH) {
+    if (ch != device_resources.irqs[0].id) {
         sddf_dprintf("TIMER DRIVER|LOG: unexpected notification from channel %u\n", ch);
         return;
     }
 
-    microkit_deferred_irq_ack(ch);
+    sddf_deferred_irq_ack(ch);
     regs->mux &= ~TIMER_A_EN;
 
     uint64_t curr_time = get_ticks();
     process_timeouts(curr_time);
 }
 
-seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
+seL4_MessageInfo_t protected(sddf_channel ch, seL4_MessageInfo_t msginfo)
 {
-    switch (microkit_msginfo_get_label(msginfo)) {
+    switch (seL4_MessageInfo_get_label(msginfo)) {
     case SDDF_TIMER_GET_TIME: {
         uint64_t time_ns = get_ticks() * NS_IN_US;
-        seL4_SetMR(0, time_ns);
-        return microkit_msginfo_new(0, 1);
+        sddf_set_mr(0, time_ns);
+        return seL4_MessageInfo_new(0, 0, 0, 1);
     }
     case SDDF_TIMER_SET_TIMEOUT: {
         uint64_t curr_time = get_ticks();
-        uint64_t offset_us = seL4_GetMR(0) / NS_IN_US;
+        uint64_t offset_us = sddf_get_mr(0) / NS_IN_US;
         timeouts[ch] = curr_time + offset_us;
         process_timeouts(curr_time);
         break;
     }
     default:
-        sddf_dprintf("TIMER DRIVER|LOG: Unknown request %lu to timer from channel %u\n", microkit_msginfo_get_label(msginfo),
-                     ch);
+        sddf_dprintf("TIMER DRIVER|LOG: Unknown request %lu to timer from channel %u\n",
+                     seL4_MessageInfo_get_label(msginfo), ch);
         break;
     }
 
-    return microkit_msginfo_new(0, 0);
+    return seL4_MessageInfo_new(0, 0, 0, 0);
 }
 
 void init(void)
 {
+    assert(device_resources_check_magic(&device_resources));
+    assert(device_resources.num_irqs == 1);
+    assert(device_resources.num_regions == 1);
+
     for (int i = 0; i < MAX_TIMEOUTS; i++) {
         timeouts[i] = UINT64_MAX;
     }
 
-    regs = (void *)(gpt_regs + TIMER_REG_START);
+    regs = (void *)((uintptr_t)device_resources.regions[0].region.vaddr + TIMER_REG_START);
 
     /* Start timer E acts as a clock, while timer A can be used for timeouts from clients */
     regs->mux = TIMER_A_EN | (TIMESTAMP_TIMEBASE_1_US << TIMER_E_INPUT_CLK) |

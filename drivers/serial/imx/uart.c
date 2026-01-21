@@ -4,27 +4,21 @@
  */
 
 #include "sddf/util/util.h"
-#include <microkit.h>
+#include <os/sddf.h>
+#include <sddf/resources/device.h>
 #include <sddf/util/printf.h>
+#include <sddf/serial/config.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <serial_config.h>
 #include <uart.h>
 
-#define IRQ_CH 0
-#define TX_CH  1
-#define RX_CH  2
+__attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
-serial_queue_t *rx_queue;
-serial_queue_t *tx_queue;
-
-char *rx_data;
-char *tx_data;
+__attribute__((__section__(".serial_driver_config"))) serial_driver_config_t config;
 
 serial_queue_handle_t rx_queue_handle;
 serial_queue_handle_t tx_queue_handle;
 
-uintptr_t uart_base;
 volatile imx_uart_regs_t *uart_regs;
 
 /*
@@ -48,35 +42,23 @@ static void set_baud(long bps)
 
 static void tx_provide(void)
 {
-    bool reprocess = true;
     bool transferred = false;
-    while (reprocess) {
-        char c;
-        while (!(uart_regs->ts & UART_TST_TX_FIFO_FULL)
-               && !serial_dequeue(&tx_queue_handle, &tx_queue_handle.queue->head, &c)) {
-            uart_regs->txd = (uint32_t)c;
-            transferred = true;
-        }
+    char c;
+    while (!(uart_regs->ts & UART_TST_TX_FIFO_FULL) && !serial_dequeue(&tx_queue_handle, &c)) {
+        uart_regs->txd = (uint32_t)c;
+        transferred = true;
+    }
 
-        serial_request_producer_signal(&tx_queue_handle);
-        /* If transmit fifo is full and there is data remaining to be sent, enable interrupt when fifo is no longer full */
-        if (uart_regs->ts & UART_TST_TX_FIFO_FULL && !serial_queue_empty(&tx_queue_handle, tx_queue_handle.queue->head)) {
-            uart_regs->cr1 |= UART_CR1_TX_READY_INT;
-        } else {
-            uart_regs->cr1 &= ~UART_CR1_TX_READY_INT;
-        }
-        reprocess = false;
-
-        if (!(uart_regs->ts & UART_TST_TX_FIFO_FULL) && !serial_queue_empty(&tx_queue_handle, tx_queue_handle.queue->head)) {
-            serial_cancel_producer_signal(&tx_queue_handle);
-            uart_regs->cr1 &= ~UART_CR1_TX_READY_INT;
-            reprocess = true;
-        }
+    /* If there is data remaining to be sent, enable interrupt when fifo is no longer full */
+    if (!serial_queue_empty(&tx_queue_handle, tx_queue_handle.queue->head)) {
+        uart_regs->cr1 |= UART_CR1_TX_READY_INT;
+    } else {
+        uart_regs->cr1 &= ~UART_CR1_TX_READY_INT;
     }
 
     if (transferred && serial_require_consumer_signal(&tx_queue_handle)) {
         serial_cancel_consumer_signal(&tx_queue_handle);
-        microkit_notify(TX_CH);
+        sddf_notify(config.tx.id);
     }
 }
 
@@ -87,12 +69,12 @@ static void rx_return(void)
     while (reprocess) {
         while (!(uart_regs->ts & UART_TST_RX_FIFO_EMPTY) && !serial_queue_full(&rx_queue_handle, rx_queue_handle.queue->tail)) {
             char c = (char) uart_regs->rxd;
-            serial_enqueue(&rx_queue_handle, &rx_queue_handle.queue->tail, c);
+            serial_enqueue(&rx_queue_handle, c);
             enqueued = true;
         }
 
         if (!(uart_regs->ts & UART_TST_RX_FIFO_EMPTY) && serial_queue_full(&rx_queue_handle, rx_queue_handle.queue->tail)) {
-            /* Disable rx interrupts until virtualisers queue is no longer empty. */
+            /* Disable rx interrupts until virtualisers queue is no longer full. */
             uart_regs->cr1 &= ~UART_CR1_RX_READY_INT;
             serial_request_consumer_signal(&rx_queue_handle);
         }
@@ -105,9 +87,8 @@ static void rx_return(void)
         }
     }
 
-    if (enqueued && serial_require_producer_signal(&rx_queue_handle)) {
-        serial_cancel_producer_signal(&rx_queue_handle);
-        microkit_notify(RX_CH);
+    if (enqueued) {
+        sddf_notify(config.rx.id);
     }
 }
 
@@ -117,7 +98,7 @@ static void handle_irq(void)
     uint32_t uart_cr1 = uart_regs->cr1;
     while (uart_sr1 & UART_SR1_ABNORMAL || uart_sr1 & UART_SR1_RX_RDY
            || (uart_cr1 & UART_CR1_TX_READY_INT && uart_sr1 & UART_SR1_TX_RDY)) {
-        if (uart_sr1 & UART_SR1_RX_RDY) {
+        if (config.rx_enabled && uart_sr1 & UART_SR1_RX_RDY) {
             rx_return();
         }
         if (uart_cr1 & UART_CR1_TX_READY_INT && uart_sr1 & UART_SR1_TX_RDY) {
@@ -134,16 +115,16 @@ static void handle_irq(void)
 
 static void uart_setup(void)
 {
-    uart_regs = (imx_uart_regs_t *) uart_base;
+    uart_regs = (imx_uart_regs_t *)device_resources.regions[0].region.vaddr;
 
     /* Enable the UART */
     uart_regs->cr1 |= UART_CR1_UART_EN;
 
     /* Enable transmit and receive */
     uart_regs->cr2 |= UART_CR2_TX_EN;
-#if !SERIAL_TX_ONLY
-    uart_regs->cr2 |= UART_CR2_RX_EN;
-#endif
+    if (config.rx_enabled) {
+        uart_regs->cr2 |= UART_CR2_RX_EN;
+    }
 
     /* Configure stop bit length to 1 */
     uart_regs->cr2 &= ~(UART_CR2_STOP_BITS);
@@ -152,7 +133,7 @@ static void uart_setup(void)
     uart_regs->cr2 |= UART_CR2_WORD_SZE;
 
     /* Configure the reference clock and baud rate. Difficult to use automatic detection here as it requires the next incoming character to be 'a' or 'A'. */
-    set_baud(UART_DEFAULT_BAUD);
+    set_baud(config.default_baud);
 
     /* Disable escape sequence, parity checking and aging rx data interrupts. */
     uart_regs->cr2 &= ~UART_CR2_PARITY_EN;
@@ -161,47 +142,47 @@ static void uart_setup(void)
 
     uint32_t fcr = uart_regs->fcr;
     /* Enable receive interrupts every byte */
-#if !SERIAL_TX_ONLY
-    fcr &= ~UART_FCR_RXTL_MASK;
-    fcr |= (1 << UART_FCR_RXTL_SHFT);
-#endif
+    if (config.rx_enabled) {
+        fcr &= ~UART_FCR_RXTL_MASK;
+        fcr |= (1 << UART_FCR_RXTL_SHFT);
+    }
 
     /* Enable transmit interrupts if the write fifo drops below one byte - used when the write fifo becomes full */
     fcr &= ~UART_FCR_TXTL_MASK;
     fcr |= (2 << UART_FCR_TXTL_SHFT);
 
     uart_regs->fcr = fcr;
-#if !SERIAL_TX_ONLY
-    uart_regs->cr1 |= UART_CR1_RX_READY_INT;
-#endif
+    if (config.rx_enabled) {
+        uart_regs->cr1 |= UART_CR1_RX_READY_INT;
+    }
 }
 
 void init(void)
 {
+    assert(serial_config_check_magic(&config));
+    assert(device_resources_check_magic(&device_resources));
+    assert(device_resources.num_irqs == 1);
+    assert(device_resources.num_regions == 1);
+
     uart_setup();
 
-#if !SERIAL_TX_ONLY
-    serial_queue_init(&rx_queue_handle, rx_queue, SERIAL_RX_DATA_REGION_CAPACITY_DRIV, rx_data);
-#endif
-    serial_queue_init(&tx_queue_handle, tx_queue, SERIAL_TX_DATA_REGION_CAPACITY_DRIV, tx_data);
+    if (config.rx_enabled) {
+        serial_queue_init(&rx_queue_handle, config.rx.queue.vaddr, config.rx.data.size, config.rx.data.vaddr);
+    }
+    serial_queue_init(&tx_queue_handle, config.tx.queue.vaddr, config.tx.data.size, config.tx.data.vaddr);
 }
 
-void notified(microkit_channel ch)
+void notified(sddf_channel ch)
 {
-    switch (ch) {
-    case IRQ_CH:
+    if (ch == device_resources.irqs[0].id) {
         handle_irq();
-        microkit_deferred_irq_ack(ch);
-        break;
-    case TX_CH:
+        sddf_deferred_irq_ack(ch);
+    } else if (ch == config.tx.id) {
         tx_provide();
-        break;
-    case RX_CH:
+    } else if (ch == config.rx.id) {
         uart_regs->cr1 |= UART_CR1_RX_READY_INT;
         rx_return();
-        break;
-    default:
+    } else {
         sddf_dprintf("UART|LOG: received notification on unexpected channel: %u\n", ch);
-        break;
     }
 }

@@ -1,0 +1,1649 @@
+/*
+ * Copyright Linux Kernel Team
+ *
+ * SPDX-License-Identifier: GPL-2.0-only
+ *
+ * This file is derived from an intermediate build stage of the
+ * Linux kernel. The licenses of all input files to this process
+ * are compatible with GPL-2.0-only.
+ */
+/dts-v1/;
+
+/ {
+	interrupt-parent = <0x01>;
+	#address-cells = <0x02>;
+	#size-cells = <0x02>;
+	compatible = "hardkernel,odroid-c2", "amlogic,meson-gxbb";
+	model = "Hardkernel ODROID-C2";
+
+	aliases {
+		mmc0 = "/soc/apb@d0000000/mmc@72000";
+		mmc1 = "/soc/apb@d0000000/mmc@74000";
+		mmc2 = "/soc/apb@d0000000/mmc@70000";
+		serial0 = "/soc/bus@c8100000/serial@4c0";
+		ethernet0 = "/soc/ethernet@c9410000";
+	};
+
+	reserved-memory {
+		#address-cells = <0x02>;
+		#size-cells = <0x02>;
+		ranges;
+
+		hwrom@0 {
+			reg = <0x00 0x00 0x00 0x1000000>;
+			no-map;
+		};
+
+		secmon@10000000 {
+			reg = <0x00 0x10000000 0x00 0x200000>;
+			no-map;
+		};
+
+		secmon@5000000 {
+			reg = <0x00 0x5000000 0x00 0x300000>;
+			no-map;
+		};
+
+		secmon@5300000 {
+			reg = <0x00 0x5300000 0x00 0x2000000>;
+			no-map;
+		};
+
+		linux,cma {
+			compatible = "shared-dma-pool";
+			reusable;
+			size = <0x00 0x10000000>;
+			alignment = <0x00 0x400000>;
+			linux,cma-default;
+		};
+	};
+
+	chosen {
+		#address-cells = <0x02>;
+		#size-cells = <0x02>;
+		ranges;
+		stdout-path = "serial0:115200n8";
+
+		framebuffer-cvbs {
+			compatible = "amlogic,simple-framebuffer", "simple-framebuffer";
+			amlogic,pipeline = "vpu-cvbs";
+			power-domains = <0x02 0x00>;
+			status = "disabled";
+		};
+
+		framebuffer-hdmi {
+			compatible = "amlogic,simple-framebuffer", "simple-framebuffer";
+			amlogic,pipeline = "vpu-hdmi";
+			power-domains = <0x02 0x00>;
+			status = "disabled";
+			clocks = <0x03 0x3f 0x03 0x0c 0x03 0x4d>;
+		};
+	};
+
+	cpus {
+		#address-cells = <0x02>;
+		#size-cells = <0x00>;
+
+		cpu@0 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a53";
+			reg = <0x00 0x00>;
+			enable-method = "psci";
+			next-level-cache = <0x04>;
+			clocks = <0x05 0x00>;
+			#cooling-cells = <0x02>;
+			phandle = <0x08>;
+		};
+
+		cpu@1 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a53";
+			reg = <0x00 0x01>;
+			enable-method = "psci";
+			next-level-cache = <0x04>;
+			clocks = <0x05 0x00>;
+			#cooling-cells = <0x02>;
+			phandle = <0x09>;
+		};
+
+		cpu@2 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a53";
+			reg = <0x00 0x02>;
+			enable-method = "psci";
+			next-level-cache = <0x04>;
+			clocks = <0x05 0x00>;
+			#cooling-cells = <0x02>;
+			phandle = <0x0a>;
+		};
+
+		cpu@3 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a53";
+			reg = <0x00 0x03>;
+			enable-method = "psci";
+			next-level-cache = <0x04>;
+			clocks = <0x05 0x00>;
+			#cooling-cells = <0x02>;
+			phandle = <0x0b>;
+		};
+
+		l2-cache0 {
+			compatible = "cache";
+			cache-level = <0x02>;
+			cache-unified;
+			phandle = <0x04>;
+		};
+	};
+
+	thermal-zones {
+
+		cpu-thermal {
+			polling-delay-passive = <0xfa>;
+			polling-delay = <0x3e8>;
+			thermal-sensors = <0x06 0x00>;
+
+			trips {
+
+				cpu-passive {
+					temperature = <0x13880>;
+					hysteresis = <0x7d0>;
+					type = "passive";
+					phandle = <0x07>;
+				};
+
+				cpu-hot {
+					temperature = <0x15f90>;
+					hysteresis = <0x7d0>;
+					type = "hot";
+					phandle = <0x0c>;
+				};
+
+				cpu-critical {
+					temperature = <0x1adb0>;
+					hysteresis = <0x7d0>;
+					type = "critical";
+				};
+			};
+
+			cooling-maps {
+
+				map0 {
+					trip = <0x07>;
+					cooling-device = <0x08 0xffffffff 0xffffffff 0x09 0xffffffff 0xffffffff 0x0a 0xffffffff 0xffffffff 0x0b 0xffffffff 0xffffffff>;
+				};
+
+				map1 {
+					trip = <0x0c>;
+					cooling-device = <0x08 0xffffffff 0xffffffff 0x09 0xffffffff 0xffffffff 0x0a 0xffffffff 0xffffffff 0x0b 0xffffffff 0xffffffff>;
+				};
+			};
+		};
+	};
+
+	arm-pmu {
+		compatible = "arm,cortex-a53-pmu";
+		interrupts = <0x00 0x89 0x04 0x00 0x8a 0x04 0x00 0x99 0x04 0x00 0x9a 0x04>;
+		interrupt-affinity = <0x08 0x09 0x0a 0x0b>;
+	};
+
+	psci {
+		compatible = "arm,psci-0.2";
+		method = "smc";
+	};
+
+	timer {
+		compatible = "arm,armv8-timer";
+		interrupts = <0x01 0x0d 0xff08 0x01 0x0e 0xff08 0x01 0x0b 0xff08 0x01 0x0a 0xff08>;
+	};
+
+	xtal-clk {
+		compatible = "fixed-clock";
+		clock-frequency = <0x16e3600>;
+		clock-output-names = "xtal";
+		#clock-cells = <0x00>;
+		phandle = <0x12>;
+	};
+
+	firmware {
+
+		secure-monitor {
+			compatible = "amlogic,meson-gx-sm", "amlogic,meson-gxbb-sm";
+			phandle = <0x0d>;
+		};
+	};
+
+	efuse {
+		compatible = "amlogic,meson-gx-efuse", "amlogic,meson-gxbb-efuse";
+		#address-cells = <0x01>;
+		#size-cells = <0x01>;
+		read-only;
+		secure-monitor = <0x0d>;
+		clocks = <0x03 0x3a>;
+
+		sn@14 {
+			reg = <0x14 0x10>;
+		};
+
+		eth-mac@34 {
+			reg = <0x34 0x10>;
+		};
+
+		bid@46 {
+			reg = <0x46 0x30>;
+		};
+	};
+
+	scpi {
+		compatible = "amlogic,meson-gxbb-scpi", "arm,scpi-pre-1.0";
+		mboxes = <0x0e 0x01 0x0e 0x02>;
+		shmem = <0x0f 0x10>;
+
+		clocks {
+			compatible = "arm,scpi-clocks";
+			status = "disabled";
+
+			clocks-0 {
+				compatible = "arm,scpi-dvfs-clocks";
+				#clock-cells = <0x01>;
+				clock-indices = <0x00>;
+				clock-output-names = "vcpu";
+				phandle = <0x05>;
+			};
+		};
+
+		sensors {
+			compatible = "amlogic,meson-gxbb-scpi-sensors", "arm,scpi-sensors";
+			#thermal-sensor-cells = <0x01>;
+			phandle = <0x06>;
+		};
+	};
+
+	soc {
+		compatible = "simple-bus";
+		#address-cells = <0x02>;
+		#size-cells = <0x02>;
+		ranges;
+
+		bus@c1100000 {
+			compatible = "simple-bus";
+			reg = <0x00 0xc1100000 0x00 0x100000>;
+			#address-cells = <0x02>;
+			#size-cells = <0x02>;
+			ranges = <0x00 0x00 0x00 0xc1100000 0x00 0x100000>;
+
+			interrupt-controller@9880 {
+				compatible = "amlogic,meson-gxbb-gpio-intc", "amlogic,meson-gpio-intc";
+				reg = <0x00 0x9880 0x00 0x10>;
+				interrupt-controller;
+				#interrupt-cells = <0x02>;
+				amlogic,channel-interrupts = <0x40 0x41 0x42 0x43 0x44 0x45 0x46 0x47>;
+				status = "okay";
+				phandle = <0x21>;
+			};
+
+			reset-controller@4404 {
+				compatible = "amlogic,meson-gxbb-reset";
+				reg = <0x00 0x4404 0x00 0x9c>;
+				#reset-cells = <0x01>;
+				phandle = <0x11>;
+			};
+
+			audio-controller@5400 {
+				compatible = "amlogic,aiu-gxbb", "amlogic,aiu";
+				#sound-dai-cells = <0x02>;
+				sound-name-prefix = "AIU";
+				reg = <0x00 0x5400 0x00 0x2ac>;
+				interrupts = <0x00 0x30 0x01 0x00 0x32 0x01>;
+				interrupt-names = "i2s", "spdif";
+				status = "okay";
+				clocks = <0x03 0x26 0x03 0x28 0x03 0x50 0x03 0x6b 0x03 0x2c 0x03 0x27 0x03 0x51 0x03 0x6e 0x03 0x71>;
+				clock-names = "pclk", "i2s_pclk", "i2s_aoclk", "i2s_mclk", "i2s_mixer", "spdif_pclk", "spdif_aoclk", "spdif_mclk", "spdif_mclk_sel";
+				resets = <0x11 0x06>;
+				phandle = <0x39>;
+			};
+
+			serial@84c0 {
+				compatible = "amlogic,meson-gx-uart";
+				reg = <0x00 0x84c0 0x00 0x18>;
+				interrupts = <0x00 0x1a 0x01>;
+				status = "disabled";
+				fifo-size = <0x80>;
+				clocks = <0x12 0x03 0x1a 0x12>;
+				clock-names = "xtal", "pclk", "baud";
+			};
+
+			serial@84dc {
+				compatible = "amlogic,meson-gx-uart";
+				reg = <0x00 0x84dc 0x00 0x18>;
+				interrupts = <0x00 0x4b 0x01>;
+				status = "disabled";
+				clocks = <0x12 0x03 0x30 0x12>;
+				clock-names = "xtal", "pclk", "baud";
+			};
+
+			i2c@8500 {
+				compatible = "amlogic,meson-gxbb-i2c";
+				reg = <0x00 0x8500 0x00 0x20>;
+				interrupts = <0x00 0x15 0x01>;
+				#address-cells = <0x01>;
+				#size-cells = <0x00>;
+				status = "okay";
+				clocks = <0x03 0x16>;
+				pinctrl-0 = <0x13>;
+				pinctrl-names = "default";
+			};
+
+			pwm@8550 {
+				compatible = "amlogic,meson-gx-pwm", "amlogic,meson-gxbb-pwm";
+				reg = <0x00 0x8550 0x00 0x10>;
+				#pwm-cells = <0x03>;
+				status = "disabled";
+			};
+
+			pwm@8650 {
+				compatible = "amlogic,meson-gx-pwm", "amlogic,meson-gxbb-pwm";
+				reg = <0x00 0x8650 0x00 0x10>;
+				#pwm-cells = <0x03>;
+				status = "disabled";
+			};
+
+			adc@8680 {
+				compatible = "amlogic,meson-gxbb-saradc", "amlogic,meson-saradc";
+				reg = <0x00 0x8680 0x00 0x34>;
+				#io-channel-cells = <0x01>;
+				interrupts = <0x00 0x49 0x01>;
+				status = "okay";
+				clocks = <0x12 0x03 0x17 0x03 0x61 0x03 0x62>;
+				clock-names = "clkin", "core", "adc_clk", "adc_sel";
+				vref-supply = <0x14>;
+			};
+
+			pwm@86c0 {
+				compatible = "amlogic,meson-gx-pwm", "amlogic,meson-gxbb-pwm";
+				reg = <0x00 0x86c0 0x00 0x10>;
+				#pwm-cells = <0x03>;
+				status = "disabled";
+			};
+
+			serial@8700 {
+				compatible = "amlogic,meson-gx-uart";
+				reg = <0x00 0x8700 0x00 0x18>;
+				interrupts = <0x00 0x5d 0x01>;
+				status = "disabled";
+				clocks = <0x12 0x03 0x44 0x12>;
+				clock-names = "xtal", "pclk", "baud";
+			};
+
+			clock-measure@8758 {
+				compatible = "amlogic,meson-gx-clk-measure";
+				reg = <0x00 0x8758 0x00 0x10>;
+			};
+
+			i2c@87c0 {
+				compatible = "amlogic,meson-gxbb-i2c";
+				reg = <0x00 0x87c0 0x00 0x20>;
+				interrupts = <0x00 0xd6 0x01>;
+				#address-cells = <0x01>;
+				#size-cells = <0x00>;
+				status = "disabled";
+				clocks = <0x03 0x16>;
+			};
+
+			i2c@87e0 {
+				compatible = "amlogic,meson-gxbb-i2c";
+				reg = <0x00 0x87e0 0x00 0x20>;
+				interrupts = <0x00 0xd7 0x01>;
+				#address-cells = <0x01>;
+				#size-cells = <0x00>;
+				status = "disabled";
+				clocks = <0x03 0x16>;
+			};
+
+			spi@8d80 {
+				compatible = "amlogic,meson-gx-spicc";
+				reg = <0x00 0x8d80 0x00 0x80>;
+				interrupts = <0x00 0x51 0x04>;
+				#address-cells = <0x01>;
+				#size-cells = <0x00>;
+				status = "disabled";
+				clocks = <0x03 0x15>;
+				clock-names = "core";
+				resets = <0x11 0xc1>;
+				num-cs = <0x01>;
+			};
+
+			spi@8c80 {
+				compatible = "amlogic,meson-gxbb-spifc";
+				reg = <0x00 0x8c80 0x00 0x80>;
+				#address-cells = <0x01>;
+				#size-cells = <0x00>;
+				status = "disabled";
+				clocks = <0x03 0x22>;
+			};
+
+			watchdog@98d0 {
+				compatible = "amlogic,meson-gxbb-wdt";
+				reg = <0x00 0x98d0 0x00 0x10>;
+				interrupts = <0x00 0xce 0x01>;
+				clocks = <0x12>;
+			};
+		};
+
+		interrupt-controller@c4301000 {
+			compatible = "arm,gic-400";
+			reg = <0x00 0xc4301000 0x00 0x1000 0x00 0xc4302000 0x00 0x2000 0x00 0xc4304000 0x00 0x2000 0x00 0xc4306000 0x00 0x2000>;
+			interrupt-controller;
+			interrupts = <0x01 0x09 0xff04>;
+			#interrupt-cells = <0x03>;
+			#address-cells = <0x00>;
+			phandle = <0x01>;
+		};
+
+		sram@c8000000 {
+			compatible = "mmio-sram";
+			reg = <0x00 0xc8000000 0x00 0x14000>;
+			#address-cells = <0x01>;
+			#size-cells = <0x01>;
+			ranges = <0x00 0x00 0xc8000000 0x14000>;
+
+			scp-sram@0 {
+				compatible = "amlogic,meson-gxbb-scp-shmem";
+				reg = <0x13000 0x400>;
+				phandle = <0x0f>;
+			};
+
+			scp-sram@200 {
+				compatible = "amlogic,meson-gxbb-scp-shmem";
+				reg = <0x13400 0x400>;
+				phandle = <0x10>;
+			};
+		};
+
+		bus@c8100000 {
+			compatible = "simple-bus";
+			reg = <0x00 0xc8100000 0x00 0x100000>;
+			#address-cells = <0x02>;
+			#size-cells = <0x02>;
+			ranges = <0x00 0x00 0x00 0xc8100000 0x00 0x100000>;
+
+			sys-ctrl@0 {
+				compatible = "amlogic,meson-gx-ao-sysctrl", "simple-mfd", "syscon";
+				reg = <0x00 0x00 0x00 0x100>;
+				phandle = <0x1b>;
+
+				clock-controller {
+					compatible = "amlogic,meson-gxbb-aoclkc", "amlogic,meson-gx-aoclkc";
+					#clock-cells = <0x01>;
+					#reset-cells = <0x01>;
+					clocks = <0x12 0x03 0x0c>;
+					clock-names = "xtal", "mpeg-clk";
+					phandle = <0x15>;
+				};
+			};
+
+			cec@100 {
+				compatible = "amlogic,meson-gx-ao-cec";
+				reg = <0x00 0x100 0x00 0x14>;
+				interrupts = <0x00 0xc7 0x01>;
+				status = "okay";
+				clocks = <0x15 0x06>;
+				clock-names = "core";
+				pinctrl-0 = <0x16>;
+				pinctrl-names = "default";
+				hdmi-phandle = <0x17>;
+			};
+
+			ao-secure@140 {
+				compatible = "amlogic,meson-gx-ao-secure", "syscon";
+				reg = <0x00 0x140 0x00 0x140>;
+				amlogic,has-chip-id;
+			};
+
+			serial@4c0 {
+				compatible = "amlogic,meson-gx-uart", "amlogic,meson-ao-uart";
+				reg = <0x00 0x4c0 0x00 0x18>;
+				interrupts = <0x00 0xc1 0x01>;
+				status = "okay";
+				clocks = <0x12 0x15 0x03 0x12>;
+				clock-names = "xtal", "pclk", "baud";
+				pinctrl-0 = <0x18>;
+				pinctrl-names = "default";
+			};
+
+			serial@4e0 {
+				compatible = "amlogic,meson-gx-uart", "amlogic,meson-ao-uart";
+				reg = <0x00 0x4e0 0x00 0x18>;
+				interrupts = <0x00 0xc5 0x01>;
+				status = "disabled";
+				clocks = <0x12 0x15 0x04 0x12>;
+				clock-names = "xtal", "pclk", "baud";
+			};
+
+			i2c@500 {
+				compatible = "amlogic,meson-gxbb-i2c";
+				reg = <0x00 0x500 0x00 0x20>;
+				interrupts = <0x00 0xc3 0x01>;
+				#address-cells = <0x01>;
+				#size-cells = <0x00>;
+				status = "disabled";
+				clocks = <0x03 0x5d>;
+			};
+
+			pwm@550 {
+				compatible = "amlogic,meson-gx-ao-pwm", "amlogic,meson-gxbb-ao-pwm";
+				reg = <0x00 0x550 0x00 0x10>;
+				#pwm-cells = <0x03>;
+				status = "disabled";
+			};
+
+			ir@580 {
+				compatible = "amlogic,meson-gx-ir", "amlogic,meson-gxbb-ir";
+				reg = <0x00 0x580 0x00 0x40>;
+				interrupts = <0x00 0xc4 0x01>;
+				status = "okay";
+				pinctrl-0 = <0x19>;
+				pinctrl-names = "default";
+				linux,rc-map-name = "rc-odroid";
+			};
+
+			pinctrl@14 {
+				compatible = "amlogic,meson-gxbb-aobus-pinctrl";
+				#address-cells = <0x02>;
+				#size-cells = <0x02>;
+				ranges;
+				phandle = <0x1a>;
+
+				bank@14 {
+					reg = <0x00 0x14 0x00 0x08 0x00 0x2c 0x00 0x04 0x00 0x24 0x00 0x08>;
+					reg-names = "mux", "pull", "gpio";
+					gpio-controller;
+					#gpio-cells = <0x02>;
+					gpio-ranges = <0x1a 0x00 0x00 0x0e>;
+					gpio-line-names = "UART TX", "UART RX", "VCCK En", "TF 3V3/1V8 En", "USB HUB nRESET", "USB OTG Power En", "J7 Header Pin2", "IR In", "J7 Header Pin4", "J7 Header Pin6", "J7 Header Pin5", "J7 Header Pin7", "HDMI CEC", "SYS LED", "";
+					phandle = <0x36>;
+				};
+
+				uart_ao_a {
+					phandle = <0x18>;
+
+					mux {
+						groups = "uart_tx_ao_a", "uart_rx_ao_a";
+						function = "uart_ao";
+						bias-disable;
+					};
+				};
+
+				uart_ao_a_cts_rts {
+
+					mux {
+						groups = "uart_cts_ao_a", "uart_rts_ao_a";
+						function = "uart_ao";
+						bias-disable;
+					};
+				};
+
+				uart_ao_b {
+
+					mux {
+						groups = "uart_tx_ao_b", "uart_rx_ao_b";
+						function = "uart_ao_b";
+						bias-disable;
+					};
+				};
+
+				uart_ao_b_cts_rts {
+
+					mux {
+						groups = "uart_cts_ao_b", "uart_rts_ao_b";
+						function = "uart_ao_b";
+						bias-disable;
+					};
+				};
+
+				remote_input_ao {
+					phandle = <0x19>;
+
+					mux {
+						groups = "remote_input_ao";
+						function = "remote_input_ao";
+						bias-disable;
+					};
+				};
+
+				i2c_ao {
+
+					mux {
+						groups = "i2c_sck_ao", "i2c_sda_ao";
+						function = "i2c_ao";
+						bias-disable;
+					};
+				};
+
+				pwm_ao_a_3 {
+
+					mux {
+						groups = "pwm_ao_a_3";
+						function = "pwm_ao_a_3";
+						bias-disable;
+					};
+				};
+
+				pwm_ao_a_6 {
+
+					mux {
+						groups = "pwm_ao_a_6";
+						function = "pwm_ao_a_6";
+						bias-disable;
+					};
+				};
+
+				pwm_ao_a_12 {
+
+					mux {
+						groups = "pwm_ao_a_12";
+						function = "pwm_ao_a_12";
+						bias-disable;
+					};
+				};
+
+				pwm_ao_b {
+
+					mux {
+						groups = "pwm_ao_b";
+						function = "pwm_ao_b";
+						bias-disable;
+					};
+				};
+
+				i2s_am_clk {
+
+					mux {
+						groups = "i2s_am_clk";
+						function = "i2s_out_ao";
+						bias-disable;
+					};
+				};
+
+				i2s_out_ao_clk {
+
+					mux {
+						groups = "i2s_out_ao_clk";
+						function = "i2s_out_ao";
+						bias-disable;
+					};
+				};
+
+				i2s_out_lr_clk {
+
+					mux {
+						groups = "i2s_out_lr_clk";
+						function = "i2s_out_ao";
+						bias-disable;
+					};
+				};
+
+				i2s_out_ch01_ao {
+
+					mux {
+						groups = "i2s_out_ch01_ao";
+						function = "i2s_out_ao";
+						bias-disable;
+					};
+				};
+
+				i2s_out_ch23_ao {
+
+					mux {
+						groups = "i2s_out_ch23_ao";
+						function = "i2s_out_ao";
+						bias-disable;
+					};
+				};
+
+				i2s_out_ch45_ao {
+
+					mux {
+						groups = "i2s_out_ch45_ao";
+						function = "i2s_out_ao";
+						bias-disable;
+					};
+				};
+
+				spdif_out_ao_6 {
+
+					mux {
+						groups = "spdif_out_ao_6";
+						function = "spdif_out_ao";
+					};
+				};
+
+				spdif_out_ao_13 {
+
+					mux {
+						groups = "spdif_out_ao_13";
+						function = "spdif_out_ao";
+						bias-disable;
+					};
+				};
+
+				ao_cec {
+					phandle = <0x16>;
+
+					mux {
+						groups = "ao_cec";
+						function = "cec_ao";
+						bias-disable;
+					};
+				};
+
+				ee_cec {
+
+					mux {
+						groups = "ee_cec";
+						function = "cec_ao";
+						bias-disable;
+					};
+				};
+			};
+		};
+
+		video-codec@c8820000 {
+			compatible = "amlogic,gxbb-vdec", "amlogic,gx-vdec";
+			reg = <0x00 0xc8820000 0x00 0x10000 0x00 0xc110a580 0x00 0xe4>;
+			reg-names = "dos", "esparser";
+			interrupts = <0x00 0x2c 0x01 0x00 0x20 0x01>;
+			interrupt-names = "vdec", "esparser";
+			amlogic,ao-sysctrl = <0x1b>;
+			amlogic,canvas = <0x1c>;
+			clocks = <0x03 0x36 0x03 0x11 0x03 0x99 0x03 0x9c>;
+			clock-names = "dos_parser", "dos", "vdec_1", "vdec_hevc";
+			resets = <0x11 0x28>;
+			reset-names = "esparser";
+		};
+
+		bus@c8834000 {
+			compatible = "simple-bus";
+			reg = <0x00 0xc8834000 0x00 0x2000>;
+			#address-cells = <0x02>;
+			#size-cells = <0x02>;
+			ranges = <0x00 0x00 0x00 0xc8834000 0x00 0x2000>;
+
+			rng@0 {
+				compatible = "amlogic,meson-rng";
+				reg = <0x00 0x00 0x00 0x04>;
+				clocks = <0x03 0x19>;
+				clock-names = "core";
+			};
+
+			pinctrl@4b0 {
+				compatible = "amlogic,meson-gxbb-periphs-pinctrl";
+				#address-cells = <0x02>;
+				#size-cells = <0x02>;
+				ranges;
+				phandle = <0x1d>;
+
+				bank@4b0 {
+					reg = <0x00 0x4b0 0x00 0x28 0x00 0x4e8 0x00 0x14 0x00 0x520 0x00 0x14 0x00 0x430 0x00 0x40>;
+					reg-names = "mux", "pull", "pull-enable", "gpio";
+					gpio-controller;
+					#gpio-cells = <0x02>;
+					gpio-ranges = <0x1d 0x00 0x00 0x77>;
+					gpio-line-names = "Eth MDIO", "Eth MDC", "Eth RGMII RX Clk", "Eth RX DV", "Eth RX D0", "Eth RX D1", "Eth RX D2", "Eth RX D3", "Eth RGMII TX Clk", "Eth TX En", "Eth TX D0", "Eth TX D1", "Eth TX D2", "Eth TX D3", "Eth PHY nRESET", "Eth PHY Intc", "HDMI HPD", "HDMI DDC SDA", "HDMI DDC SCL", "", "eMMC D0", "eMMC D1", "eMMC D2", "eMMC D3", "eMMC D4", "eMMC D5", "eMMC D6", "eMMC D7", "eMMC Clk", "eMMC Reset", "eMMC CMD", "", "", "", "", "", "", "", "SDCard D1", "SDCard D0", "SDCard CLK", "SDCard CMD", "SDCard D3", "SDCard D2", "SDCard Det", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "I2C A SDA", "I2C A SCK", "I2C B SDA", "I2C B SCK", "PWM D", "PWM B", "Revision Bit0", "Revision Bit1", "", "J2 Header Pin35", "", "", "", "J2 Header Pin36", "J2 Header Pin31", "", "", "", "TF VDD En", "J2 Header Pin32", "J2 Header Pin26", "", "", "J2 Header Pin29", "J2 Header Pin24", "J2 Header Pin23", "J2 Header Pin22", "J2 Header Pin21", "J2 Header Pin18", "J2 Header Pin33", "J2 Header Pin19", "J2 Header Pin16", "J2 Header Pin15", "J2 Header Pin12", "J2 Header Pin13", "J2 Header Pin8", "J2 Header Pin10", "", "", "", "", "", "J2 Header Pin11", "", "J2 Header Pin7", "", "", "", "", "";
+					phandle = <0x20>;
+				};
+
+				emmc {
+					phandle = <0x26>;
+
+					mux-0 {
+						groups = "emmc_nand_d07", "emmc_cmd";
+						function = "emmc";
+						bias-pull-up;
+					};
+
+					mux-1 {
+						groups = "emmc_clk";
+						function = "emmc";
+						bias-disable;
+					};
+				};
+
+				emmc-ds {
+					phandle = <0x27>;
+
+					mux {
+						groups = "emmc_ds";
+						function = "emmc";
+						bias-pull-down;
+					};
+				};
+
+				emmc_clk_gate {
+					phandle = <0x28>;
+
+					mux {
+						groups = "BOOT_8";
+						function = "gpio_periphs";
+						bias-pull-down;
+					};
+				};
+
+				nor {
+
+					mux {
+						groups = "nor_d", "nor_q", "nor_c", "nor_cs";
+						function = "nor";
+						bias-disable;
+					};
+				};
+
+				spi-pins {
+
+					mux {
+						groups = "spi_miso", "spi_mosi", "spi_sclk";
+						function = "spi";
+						bias-disable;
+					};
+				};
+
+				spi-idle-high-pins {
+
+					mux {
+						groups = "spi_sclk";
+						bias-pull-up;
+					};
+				};
+
+				spi-idle-low-pins {
+
+					mux {
+						groups = "spi_sclk";
+						bias-pull-down;
+					};
+				};
+
+				spi-ss0 {
+
+					mux {
+						groups = "spi_ss0";
+						function = "spi";
+						bias-disable;
+					};
+				};
+
+				sdcard {
+					phandle = <0x22>;
+
+					mux-0 {
+						groups = "sdcard_d0", "sdcard_d1", "sdcard_d2", "sdcard_d3", "sdcard_cmd";
+						function = "sdcard";
+						bias-pull-up;
+					};
+
+					mux-1 {
+						groups = "sdcard_clk";
+						function = "sdcard";
+						bias-disable;
+					};
+				};
+
+				sdcard_clk_gate {
+					phandle = <0x23>;
+
+					mux {
+						groups = "CARD_2";
+						function = "gpio_periphs";
+						bias-pull-down;
+					};
+				};
+
+				sdio {
+
+					mux-0 {
+						groups = "sdio_d0", "sdio_d1", "sdio_d2", "sdio_d3", "sdio_cmd";
+						function = "sdio";
+						bias-pull-up;
+					};
+
+					mux-1 {
+						groups = "sdio_clk";
+						function = "sdio";
+						bias-disable;
+					};
+				};
+
+				sdio_clk_gate {
+
+					mux {
+						groups = "GPIOX_4";
+						function = "gpio_periphs";
+						bias-pull-down;
+					};
+				};
+
+				sdio_irq {
+
+					mux {
+						groups = "sdio_irq";
+						function = "sdio";
+						bias-disable;
+					};
+				};
+
+				uart_a {
+
+					mux {
+						groups = "uart_tx_a", "uart_rx_a";
+						function = "uart_a";
+						bias-disable;
+					};
+				};
+
+				uart_a_cts_rts {
+
+					mux {
+						groups = "uart_cts_a", "uart_rts_a";
+						function = "uart_a";
+						bias-disable;
+					};
+				};
+
+				uart_b {
+
+					mux {
+						groups = "uart_tx_b", "uart_rx_b";
+						function = "uart_b";
+						bias-disable;
+					};
+				};
+
+				uart_b_cts_rts {
+
+					mux {
+						groups = "uart_cts_b", "uart_rts_b";
+						function = "uart_b";
+						bias-disable;
+					};
+				};
+
+				uart_c {
+
+					mux {
+						groups = "uart_tx_c", "uart_rx_c";
+						function = "uart_c";
+						bias-disable;
+					};
+				};
+
+				uart_c_cts_rts {
+
+					mux {
+						groups = "uart_cts_c", "uart_rts_c";
+						function = "uart_c";
+						bias-disable;
+					};
+				};
+
+				i2c_a {
+					phandle = <0x13>;
+
+					mux {
+						groups = "i2c_sck_a", "i2c_sda_a";
+						function = "i2c_a";
+						bias-disable;
+					};
+				};
+
+				i2c_b {
+
+					mux {
+						groups = "i2c_sck_b", "i2c_sda_b";
+						function = "i2c_b";
+						bias-disable;
+					};
+				};
+
+				i2c_c {
+
+					mux {
+						groups = "i2c_sck_c", "i2c_sda_c";
+						function = "i2c_c";
+						bias-disable;
+					};
+				};
+
+				eth-rgmii {
+					phandle = <0x1e>;
+
+					mux {
+						groups = "eth_mdio", "eth_mdc", "eth_clk_rx_clk", "eth_rx_dv", "eth_rxd0", "eth_rxd1", "eth_rxd2", "eth_rxd3", "eth_rgmii_tx_clk", "eth_tx_en", "eth_txd0", "eth_txd1", "eth_txd2", "eth_txd3";
+						function = "eth";
+						bias-disable;
+					};
+				};
+
+				eth-rmii {
+
+					mux {
+						groups = "eth_mdio", "eth_mdc", "eth_clk_rx_clk", "eth_rx_dv", "eth_rxd0", "eth_rxd1", "eth_tx_en", "eth_txd0", "eth_txd1";
+						function = "eth";
+						bias-disable;
+					};
+				};
+
+				pwm_a_x {
+
+					mux {
+						groups = "pwm_a_x";
+						function = "pwm_a_x";
+						bias-disable;
+					};
+				};
+
+				pwm_a_y {
+
+					mux {
+						groups = "pwm_a_y";
+						function = "pwm_a_y";
+						bias-disable;
+					};
+				};
+
+				pwm_b {
+
+					mux {
+						groups = "pwm_b";
+						function = "pwm_b";
+						bias-disable;
+					};
+				};
+
+				pwm_d {
+
+					mux {
+						groups = "pwm_d";
+						function = "pwm_d";
+						bias-disable;
+					};
+				};
+
+				pwm_e {
+
+					mux {
+						groups = "pwm_e";
+						function = "pwm_e";
+						bias-disable;
+					};
+				};
+
+				pwm_f_x {
+
+					mux {
+						groups = "pwm_f_x";
+						function = "pwm_f_x";
+						bias-disable;
+					};
+				};
+
+				pwm_f_y {
+
+					mux {
+						groups = "pwm_f_y";
+						function = "pwm_f_y";
+						bias-disable;
+					};
+				};
+
+				hdmi_hpd {
+					phandle = <0x2d>;
+
+					mux {
+						groups = "hdmi_hpd";
+						function = "hdmi_hpd";
+						bias-disable;
+					};
+				};
+
+				hdmi_i2c {
+					phandle = <0x2e>;
+
+					mux {
+						groups = "hdmi_sda", "hdmi_scl";
+						function = "hdmi_i2c";
+						bias-disable;
+					};
+				};
+
+				i2sout_ch23_y {
+
+					mux {
+						groups = "i2sout_ch23_y";
+						function = "i2s_out";
+						bias-disable;
+					};
+				};
+
+				i2sout_ch45_y {
+
+					mux {
+						groups = "i2sout_ch45_y";
+						function = "i2s_out";
+						bias-disable;
+					};
+				};
+
+				i2sout_ch67_y {
+
+					mux {
+						groups = "i2sout_ch67_y";
+						function = "i2s_out";
+						bias-disable;
+					};
+				};
+
+				spdif_out_y {
+
+					mux {
+						groups = "spdif_out_y";
+						function = "spdif_out";
+						bias-disable;
+					};
+				};
+			};
+		};
+
+		bus@c8838000 {
+			compatible = "simple-bus";
+			reg = <0x00 0xc8838000 0x00 0x400>;
+			#address-cells = <0x02>;
+			#size-cells = <0x02>;
+			ranges = <0x00 0x00 0x00 0xc8838000 0x00 0x400>;
+
+			video-lut@48 {
+				compatible = "amlogic,canvas";
+				reg = <0x00 0x48 0x00 0x14>;
+				phandle = <0x1c>;
+			};
+		};
+
+		bus@c883c000 {
+			compatible = "simple-bus";
+			reg = <0x00 0xc883c000 0x00 0x2000>;
+			#address-cells = <0x02>;
+			#size-cells = <0x02>;
+			ranges = <0x00 0x00 0x00 0xc883c000 0x00 0x2000>;
+
+			system-controller@0 {
+				compatible = "amlogic,meson-gx-hhi-sysctrl", "simple-mfd", "syscon";
+				reg = <0x00 0x00 0x00 0x400>;
+
+				power-controller {
+					compatible = "amlogic,meson-gxbb-pwrc";
+					#power-domain-cells = <0x01>;
+					amlogic,ao-sysctrl = <0x1b>;
+					resets = <0x11 0x05 0x11 0x0a 0x11 0x0d 0x11 0x25 0x11 0x84 0x11 0x85 0x11 0x86 0x11 0x87 0x11 0x89 0x11 0x8c 0x11 0x8d 0x11 0xe7>;
+					reset-names = "viu", "venc", "vcbus", "bt656", "dvin", "rdma", "venci", "vencp", "vdac", "vdi6", "vencl", "vid_lock";
+					clocks = <0x03 0x84 0x03 0x8c>;
+					clock-names = "vpu", "vapb";
+					assigned-clocks = <0x03 0x7e 0x03 0x80 0x03 0x84 0x03 0x85 0x03 0x87 0x03 0x8b>;
+					assigned-clock-parents = <0x03 0x05 0x00 0x03 0x80 0x03 0x06 0x00 0x03 0x87>;
+					assigned-clock-rates = <0x00 0x27bc86aa 0x00 0x00 0xee6b280 0x00>;
+					phandle = <0x02>;
+				};
+
+				clock-controller {
+					compatible = "amlogic,gxbb-clkc";
+					#clock-cells = <0x01>;
+					clocks = <0x12>;
+					clock-names = "xtal";
+					phandle = <0x03>;
+				};
+			};
+
+			mailbox@404 {
+				compatible = "amlogic,meson-gxbb-mhu";
+				reg = <0x00 0x404 0x00 0x4c>;
+				interrupts = <0x00 0xd0 0x01 0x00 0xd1 0x01 0x00 0xd2 0x01>;
+				#mbox-cells = <0x01>;
+				phandle = <0x0e>;
+			};
+		};
+
+		ethernet@c9410000 {
+			compatible = "amlogic,meson-gxbb-dwmac", "snps,dwmac-3.70a", "snps,dwmac";
+			reg = <0x00 0xc9410000 0x00 0x10000 0x00 0xc8834540 0x00 0x04>;
+			interrupts = <0x00 0x08 0x04>;
+			interrupt-names = "macirq";
+			rx-fifo-depth = <0x1000>;
+			tx-fifo-depth = <0x800>;
+			power-domains = <0x02 0x01>;
+			status = "okay";
+			clocks = <0x03 0x24 0x03 0x04 0x03 0x0f 0x03 0x04>;
+			clock-names = "stmmaceth", "clkin0", "clkin1", "timing-adjustment";
+			pinctrl-0 = <0x1e>;
+			pinctrl-names = "default";
+			phy-handle = <0x1f>;
+			phy-mode = "rgmii";
+			amlogic,tx-delay-ns = <0x02>;
+
+			mdio {
+				compatible = "snps,dwmac-mdio";
+				#address-cells = <0x01>;
+				#size-cells = <0x00>;
+
+				ethernet-phy@0 {
+					reg = <0x00>;
+					reset-assert-us = <0x2710>;
+					reset-deassert-us = <0x13880>;
+					reset-gpios = <0x20 0x0e 0x01>;
+					interrupt-parent = <0x21>;
+					interrupts = <0x1d 0x08>;
+					phandle = <0x1f>;
+				};
+			};
+		};
+
+		apb@d0000000 {
+			compatible = "simple-bus";
+			reg = <0x00 0xd0000000 0x00 0x200000>;
+			#address-cells = <0x02>;
+			#size-cells = <0x02>;
+			ranges = <0x00 0x00 0x00 0xd0000000 0x00 0x200000>;
+
+			mmc@70000 {
+				compatible = "amlogic,meson-gx-mmc", "amlogic,meson-gxbb-mmc";
+				reg = <0x00 0x70000 0x00 0x800>;
+				interrupts = <0x00 0xd8 0x04>;
+				status = "disabled";
+				clocks = <0x03 0x5e 0x03 0x77 0x03 0x04>;
+				clock-names = "core", "clkin0", "clkin1";
+				resets = <0x11 0x2c>;
+			};
+
+			mmc@72000 {
+				compatible = "amlogic,meson-gx-mmc", "amlogic,meson-gxbb-mmc";
+				reg = <0x00 0x72000 0x00 0x800>;
+				interrupts = <0x00 0xd9 0x04>;
+				status = "okay";
+				clocks = <0x03 0x5f 0x03 0x7a 0x03 0x04>;
+				clock-names = "core", "clkin0", "clkin1";
+				resets = <0x11 0x2d>;
+				pinctrl-0 = <0x22>;
+				pinctrl-1 = <0x23>;
+				pinctrl-names = "default", "clk-gate";
+				bus-width = <0x04>;
+				cap-sd-highspeed;
+				sd-uhs-sdr12;
+				sd-uhs-sdr25;
+				sd-uhs-sdr50;
+				sd-uhs-ddr50;
+				max-frequency = <0x5f5e100>;
+				disable-wp;
+				cd-gpios = <0x20 0x2c 0x01>;
+				vmmc-supply = <0x24>;
+				vqmmc-supply = <0x25>;
+			};
+
+			mmc@74000 {
+				compatible = "amlogic,meson-gx-mmc", "amlogic,meson-gxbb-mmc";
+				reg = <0x00 0x74000 0x00 0x800>;
+				interrupts = <0x00 0xda 0x04>;
+				status = "okay";
+				clocks = <0x03 0x60 0x03 0x7d 0x03 0x04>;
+				clock-names = "core", "clkin0", "clkin1";
+				resets = <0x11 0x2e>;
+				pinctrl-0 = <0x26 0x27>;
+				pinctrl-1 = <0x28>;
+				pinctrl-names = "default", "clk-gate";
+				bus-width = <0x08>;
+				max-frequency = <0xbebc200>;
+				non-removable;
+				disable-wp;
+				cap-mmc-highspeed;
+				mmc-ddr-1_8v;
+				mmc-hs200-1_8v;
+				mmc-pwrseq = <0x29>;
+				vmmc-supply = <0x2a>;
+				vqmmc-supply = <0x14>;
+			};
+
+			gpu@c0000 {
+				compatible = "amlogic,meson-gxbb-mali", "arm,mali-450";
+				reg = <0x00 0xc0000 0x00 0x40000>;
+				interrupts = <0x00 0xa0 0x04 0x00 0xa1 0x04 0x00 0xa2 0x04 0x00 0xa3 0x04 0x00 0xa4 0x04 0x00 0xa5 0x04 0x00 0xa6 0x04 0x00 0xa7 0x04 0x00 0xa8 0x04 0x00 0xa9 0x04>;
+				interrupt-names = "gp", "gpmmu", "pp", "pmu", "pp0", "ppmmu0", "pp1", "ppmmu1", "pp2", "ppmmu2";
+				operating-points-v2 = <0x2b>;
+				clocks = <0x03 0x0c 0x03 0x6a>;
+				clock-names = "bus", "core";
+				assigned-clocks = <0x03 0x09>;
+				assigned-clock-rates = <0x2c588a00>;
+			};
+		};
+
+		vpu@d0100000 {
+			compatible = "amlogic,meson-gxbb-vpu", "amlogic,meson-gx-vpu";
+			reg = <0x00 0xd0100000 0x00 0x100000 0x00 0xc883c000 0x00 0x1000>;
+			reg-names = "vpu", "hhi";
+			interrupts = <0x00 0x03 0x01>;
+			#address-cells = <0x01>;
+			#size-cells = <0x00>;
+			amlogic,canvas = <0x1c>;
+			power-domains = <0x02 0x00>;
+
+			port@0 {
+				reg = <0x00>;
+			};
+
+			port@1 {
+				reg = <0x01>;
+
+				endpoint {
+					remote-endpoint = <0x2c>;
+					phandle = <0x30>;
+				};
+			};
+		};
+
+		hdmi-tx@c883a000 {
+			compatible = "amlogic,meson-gxbb-dw-hdmi", "amlogic,meson-gx-dw-hdmi";
+			reg = <0x00 0xc883a000 0x00 0x1c>;
+			interrupts = <0x00 0x39 0x01>;
+			#address-cells = <0x01>;
+			#size-cells = <0x00>;
+			#sound-dai-cells = <0x00>;
+			sound-name-prefix = "HDMITX";
+			status = "okay";
+			resets = <0x11 0x13 0x11 0x4f 0x11 0x42>;
+			reset-names = "hdmitx_apb", "hdmitx", "hdmitx_phy";
+			clocks = <0x03 0xcd 0x03 0x3f 0x03 0x4d>;
+			clock-names = "isfr", "iahb", "venci";
+			power-domains = <0x02 0x00>;
+			assigned-clocks = <0x03 0xcb 0x03 0xcd>;
+			assigned-clock-parents = <0x12 0x00>;
+			assigned-clock-rates = <0x00 0x16e3600>;
+			pinctrl-0 = <0x2d 0x2e>;
+			pinctrl-names = "default";
+			hdmi-supply = <0x2f>;
+			phandle = <0x17>;
+
+			port@0 {
+				reg = <0x00>;
+
+				endpoint {
+					remote-endpoint = <0x30>;
+					phandle = <0x2c>;
+				};
+			};
+
+			port@1 {
+				reg = <0x01>;
+
+				endpoint {
+					remote-endpoint = <0x31>;
+					phandle = <0x38>;
+				};
+			};
+		};
+
+		phy@c0000000 {
+			compatible = "amlogic,meson-gxbb-usb2-phy";
+			#phy-cells = <0x00>;
+			reg = <0x00 0xc0000000 0x00 0x20>;
+			resets = <0x11 0x22>;
+			clocks = <0x03 0x37 0x03 0x32>;
+			clock-names = "usb_general", "usb";
+			status = "disabled";
+			phy-supply = <0x32>;
+			phandle = <0x33>;
+		};
+
+		phy@c0000020 {
+			compatible = "amlogic,meson-gxbb-usb2-phy";
+			#phy-cells = <0x00>;
+			reg = <0x00 0xc0000020 0x00 0x20>;
+			resets = <0x11 0x22>;
+			clocks = <0x03 0x37 0x03 0x33>;
+			clock-names = "usb_general", "usb";
+			status = "okay";
+			phy-supply = <0x32>;
+			phandle = <0x34>;
+		};
+
+		usb@c9000000 {
+			compatible = "amlogic,meson-gxbb-usb", "snps,dwc2";
+			reg = <0x00 0xc9000000 0x00 0x40000>;
+			interrupts = <0x00 0x1e 0x04>;
+			clocks = <0x03 0x41>;
+			clock-names = "otg";
+			phys = <0x33>;
+			phy-names = "usb2-phy";
+			dr_mode = "host";
+			status = "disabled";
+		};
+
+		usb@c9100000 {
+			compatible = "amlogic,meson-gxbb-usb", "snps,dwc2";
+			reg = <0x00 0xc9100000 0x00 0x40000>;
+			interrupts = <0x00 0x1f 0x04>;
+			clocks = <0x03 0x40>;
+			clock-names = "otg";
+			phys = <0x34>;
+			phy-names = "usb2-phy";
+			dr_mode = "host";
+			status = "okay";
+			#address-cells = <0x01>;
+			#size-cells = <0x00>;
+
+			hub@1 {
+				compatible = "usb5e3,610";
+				reg = <0x01>;
+				vdd-supply = <0x35>;
+				reset-gpios = <0x36 0x04 0x01>;
+			};
+		};
+	};
+
+	opp-table {
+		compatible = "operating-points-v2";
+		phandle = <0x2b>;
+
+		opp-125000000 {
+			opp-hz = <0x00 0x7735940>;
+			opp-microvolt = <0xe7ef0>;
+		};
+
+		opp-250000000 {
+			opp-hz = <0x00 0xee6b280>;
+			opp-microvolt = <0xe7ef0>;
+		};
+
+		opp-285714285 {
+			opp-hz = <0x00 0x1107a76d>;
+			opp-microvolt = <0xe7ef0>;
+		};
+
+		opp-400000000 {
+			opp-hz = <0x00 0x17d78400>;
+			opp-microvolt = <0xe7ef0>;
+		};
+
+		opp-500000000 {
+			opp-hz = <0x00 0x1dcd6500>;
+			opp-microvolt = <0xe7ef0>;
+		};
+
+		opp-666666666 {
+			opp-hz = <0x00 0x27bc86aa>;
+			opp-microvolt = <0xe7ef0>;
+		};
+
+		opp-744000000 {
+			opp-hz = <0x00 0x2c588a00>;
+			opp-microvolt = <0xe7ef0>;
+		};
+	};
+
+	memory@0 {
+		device_type = "memory";
+		reg = <0x00 0x00 0x00 0x80000000>;
+	};
+
+	regulator-usb-pwrs {
+		compatible = "regulator-fixed";
+		regulator-name = "USB_OTG_PWR";
+		regulator-min-microvolt = <0x4c4b40>;
+		regulator-max-microvolt = <0x4c4b40>;
+		gpio = <0x36 0x05 0x00>;
+		enable-active-high;
+		vin-supply = <0x35>;
+		phandle = <0x32>;
+	};
+
+	leds {
+		compatible = "gpio-leds";
+
+		led-blue {
+			label = "c2:blue:alive";
+			gpios = <0x36 0x0d 0x01>;
+			linux,default-trigger = "heartbeat";
+			default-state = "off";
+		};
+	};
+
+	regulator-p5v0 {
+		compatible = "regulator-fixed";
+		regulator-name = "P5V0";
+		regulator-min-microvolt = <0x4c4b40>;
+		regulator-max-microvolt = <0x4c4b40>;
+		regulator-always-on;
+		phandle = <0x35>;
+	};
+
+	regulator-hdmi-p5v0 {
+		compatible = "regulator-fixed";
+		regulator-name = "HDMI_P5V0";
+		regulator-min-microvolt = <0x4c4b40>;
+		regulator-max-microvolt = <0x4c4b40>;
+		vin-supply = <0x35>;
+		phandle = <0x2f>;
+	};
+
+	regulator-tflash-vdd {
+		compatible = "regulator-fixed";
+		regulator-name = "TFLASH_VDD";
+		regulator-min-microvolt = <0x325aa0>;
+		regulator-max-microvolt = <0x325aa0>;
+		gpio = <0x20 0x57 0x00>;
+		enable-active-high;
+		vin-supply = <0x37>;
+		phandle = <0x24>;
+	};
+
+	gpio-regulator-tf-io {
+		compatible = "regulator-gpio";
+		regulator-name = "TF_IO";
+		regulator-min-microvolt = <0x1b7740>;
+		regulator-max-microvolt = <0x325aa0>;
+		gpios = <0x36 0x03 0x00>;
+		gpios-states = <0x00>;
+		states = <0x325aa0 0x00 0x1b7740 0x01>;
+		vin-supply = <0x37>;
+		phandle = <0x25>;
+	};
+
+	regulator-vcc1v8 {
+		compatible = "regulator-fixed";
+		regulator-name = "VCC1V8";
+		regulator-min-microvolt = <0x1b7740>;
+		regulator-max-microvolt = <0x1b7740>;
+		regulator-always-on;
+		vin-supply = <0x37>;
+		phandle = <0x14>;
+	};
+
+	regulator-vcc3v3 {
+		compatible = "regulator-fixed";
+		regulator-name = "VCC3V3";
+		regulator-min-microvolt = <0x325aa0>;
+		regulator-max-microvolt = <0x325aa0>;
+		phandle = <0x2a>;
+	};
+
+	regulator-vddio-ao1v8 {
+		compatible = "regulator-fixed";
+		regulator-name = "VDDIO_AO1V8";
+		regulator-min-microvolt = <0x1b7740>;
+		regulator-max-microvolt = <0x1b7740>;
+		regulator-always-on;
+		vin-supply = <0x35>;
+	};
+
+	regulator-vddio-ao3v3 {
+		compatible = "regulator-fixed";
+		regulator-name = "VDDIO_AO3V3";
+		regulator-min-microvolt = <0x325aa0>;
+		regulator-max-microvolt = <0x325aa0>;
+		regulator-always-on;
+		vin-supply = <0x35>;
+		phandle = <0x37>;
+	};
+
+	regulator-ddr3-1v5 {
+		compatible = "regulator-fixed";
+		regulator-name = "DDR3_1V5";
+		regulator-min-microvolt = <0x16e360>;
+		regulator-max-microvolt = <0x16e360>;
+		regulator-always-on;
+		vin-supply = <0x35>;
+	};
+
+	emmc-pwrseq {
+		compatible = "mmc-pwrseq-emmc";
+		reset-gpios = <0x20 0x1d 0x01>;
+		phandle = <0x29>;
+	};
+
+	hdmi-connector {
+		compatible = "hdmi-connector";
+		type = "a";
+
+		port {
+
+			endpoint {
+				remote-endpoint = <0x38>;
+				phandle = <0x31>;
+			};
+		};
+	};
+
+	sound {
+		compatible = "amlogic,gx-sound-card";
+		model = "ODROID-C2";
+		assigned-clocks = <0x03 0x0d 0x03 0x0e 0x03 0x0f>;
+		assigned-clock-parents = <0x00 0x00 0x00>;
+		assigned-clock-rates = <0x11940000 0x10266000 0x17700000>;
+
+		dai-link-0 {
+			sound-dai = <0x39 0x00 0x00>;
+		};
+
+		dai-link-1 {
+			sound-dai = <0x39 0x00 0x02>;
+			dai-format = "i2s";
+			mclk-fs = <0x100>;
+
+			codec-0 {
+				sound-dai = <0x39 0x01 0x00>;
+			};
+		};
+
+		dai-link-2 {
+			sound-dai = <0x39 0x01 0x02>;
+
+			codec-0 {
+				sound-dai = <0x17>;
+			};
+		};
+	};
+};

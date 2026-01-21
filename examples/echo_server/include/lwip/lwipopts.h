@@ -9,6 +9,17 @@
 #include <stdbool.h>
 #include <sddf/network/constants.h>
 
+#include "echo.h"
+
+#if defined(CONFIG_PLAT_QEMU_ARM_VIRT) || defined(CONFIG_PLAT_QEMU_RISCV_VIRT)
+// We don't need to do any address conflict detection on QEMU
+// as it creates it's own isolated network.
+//
+// Disabling this option drastically decreases the time to
+// complete DHCP on QEMU.
+#define LWIP_DHCP_DOES_ACD_CHECK 0
+#endif
+
 /**
  * Use lwIP without OS-awareness (no thread, semaphores, mutexes or mboxes).
  */
@@ -33,7 +44,6 @@
  * Enable ICMP module inside the IP stack.
  */
 #define LWIP_ICMP                       1
-#define LWIP_RAND                       rand
 
 /**
  * Enable DHCP module.
@@ -111,9 +121,11 @@
 
 /**
  * The size of a TCP window - Maximum data we can receive at once. This
- * must be at least (2 * TCP_MSS) for things to work well.
+ * must be at least (2 * TCP_MSS) for things to work well. TCP_WND is chosen to
+ * be the smallest multiple of TCP_MSS which is less than < 65535, the largest
+ * TCP window that can be used without enabling window scaling
  */
-#define TCP_WND 1000000
+#define TCP_WND (44 * TCP_MSS)
 
 /**
  * TCP sender buffer space (bytes). To achieve good performance, this
@@ -150,7 +162,7 @@
  * When LWIP_WND_SCALE is enabled but TCP_RCV_SCALE is 0, we can use a large
  * send window while having a small receive window only.
  */
-#define TCP_RCV_SCALE 12
+#define TCP_RCV_SCALE 0
 
 /**
  * Support the TCP timestamp option.
@@ -163,21 +175,22 @@
 #define PBUF_POOL_SIZE 1000
 
 /**
- * The number of memp struct pbufs (used for PBUF_ROM and PBUF_REF).
- * If the application sends a lot of data out of ROM (or other static memory),
- * this should be set high.
+ * The number of memp struct pbufs (used for PBUF_ROM and PBUF_REF). If the
+ * application sends a lot of data out of ROM (or other static memory), this
+ * should be set high. Each TCP echo socket will require these resources to
+ * succesfully support TCP_WND without running out of memory, thus there is a
+ * scaling factor added based on the number of TCP echo sockets we concurrently
+ * support.
  */
-#define MEMP_NUM_PBUF TCP_SND_QUEUELEN /* (TCP sender buffer space (pbufs)) */
+#define MEMP_NUM_PBUF (TCP_ECHO_MAX_CONNS * TCP_SND_QUEUELEN) /* (TCP sender buffer space (pbufs)) */
 
 /**
- * The number of simultaneously queued TCP segments.
+ * The number of simultaneously queued TCP segments.  Each TCP echo socket will
+ * require these resources to succesfully support TCP_WND without running out of
+ * memory, thus there is a scaling factor added based on the number of TCP echo
+ * sockets we concurrently support.
  */
-#define MEMP_NUM_TCP_SEG TCP_SND_QUEUELEN
-
-/**
- * The number of simultaneously active timeouts.
- */
-#define MEMP_NUM_SYS_TIMEOUT 512
+#define MEMP_NUM_TCP_SEG (TCP_ECHO_MAX_CONNS * TCP_SND_QUEUELEN)
 
 /**
  * Enable statistics collection in lwip_stats. Set this to 0 for performance.
@@ -190,11 +203,9 @@
  * chained so they can be processed at a later time.
  */
 #define LWIP_PBUF_CUSTOM_DATA \
-    bool in_use; \
     struct pbuf *next_chain;
 
-#define LWIP_PBUF_INIT_CUSTOM_DATA(p) \
-    (p)->in_use = false; \
+#define LWIP_PBUF_CUSTOM_DATA_INIT(p) \
     (p)->next_chain = NULL;
 
 /* Debugging options */

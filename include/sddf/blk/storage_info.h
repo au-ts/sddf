@@ -30,6 +30,8 @@ typedef struct blk_storage_info {
     /* total capacity of the device, specified in BLK_TRANSFER_SIZE sized units. */
     uint64_t capacity;
 } blk_storage_info_t;
+_Static_assert(sizeof(blk_storage_info_t) <= BLK_STORAGE_INFO_REGION_SIZE,
+               "struct blk_storage_info must be smaller than the region size");
 
 /**
  * Load from shared memory whether the block storage device is ready.
@@ -42,4 +44,13 @@ typedef struct blk_storage_info {
 static inline bool blk_storage_is_ready(blk_storage_info_t *storage_info)
 {
     return __atomic_load_n(&storage_info->ready, __ATOMIC_ACQUIRE);
+}
+
+/**
+ * Set shared memory whether the block storage device is ready.
+ * This does an atomic release operation.
+ */
+static inline void blk_storage_set_ready(blk_storage_info_t *storage_info, bool ready)
+{
+    __atomic_store_n(&storage_info->ready, ready, __ATOMIC_RELEASE);
 }

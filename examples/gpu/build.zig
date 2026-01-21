@@ -5,7 +5,7 @@
 const std = @import("std");
 
 const MicrokitBoard = enum {
-    qemu_virt_aarch64
+    qemu_virt_aarch64,
 };
 
 const Target = struct {
@@ -86,8 +86,10 @@ pub fn build(b: *std.Build) void {
     const fb_img_cmd = b.addSystemCommand(&[_][]const u8{
         "convert",
         "-auto-orient",
-        "-depth", "8",
-        "-size", b.fmt("{any}x{any}", .{fb_img_width, fb_img_height}),
+        "-depth",
+        "8",
+        "-size",
+        b.fmt("{any}x{any}", .{ fb_img_width, fb_img_height }),
     });
     fb_img_cmd.addFileArg(fb_img);
     const fb_img_bgra = fb_img_cmd.addOutputFileArg("fb_img.bgra");
@@ -115,22 +117,23 @@ pub fn build(b: *std.Build) void {
     client.addIncludePath(b.path("include"));
 
     client.addIncludePath(sddf_dep.path("include"));
+    client.addIncludePath(sddf_dep.path("include/microkit"));
     client.linkLibrary(sddf_dep.artifact("util"));
     client.linkLibrary(sddf_dep.artifact("util_putchar_debug"));
 
     client.addIncludePath(.{ .cwd_relative = libmicrokit_include });
     client.addObjectFile(.{ .cwd_relative = libmicrokit });
-    client.setLinkerScriptPath(.{ .cwd_relative = libmicrokit_linker_script });
+    client.setLinkerScript(.{ .cwd_relative = libmicrokit_linker_script });
 
     b.installArtifact(client);
     b.installArtifact(sddf_dep.artifact("gpu_virt.elf"));
 
-    const gpu_driver = sddf_dep.artifact(b.fmt("driver_gpu_{s}.elf", .{ gpu_driver_class }));
+    const gpu_driver = sddf_dep.artifact(b.fmt("driver_gpu_{s}.elf", .{gpu_driver_class}));
     // Because our SDF expects a different ELF name for the gpu driver, we have this extra step.
     const gpu_driver_install = b.addInstallArtifact(gpu_driver, .{ .dest_sub_path = "gpu_driver.elf" });
     b.getInstallStep().dependOn(&gpu_driver_install.step);
 
-    const timer_driver = sddf_dep.artifact(b.fmt("driver_timer_{s}.elf", .{ timer_driver_class }));
+    const timer_driver = sddf_dep.artifact(b.fmt("driver_timer_{s}.elf", .{timer_driver_class}));
     // Same thing here, a different ELF name for the timer driver
     const timer_driver_install = b.addInstallArtifact(timer_driver, .{ .dest_sub_path = "timer_driver.elf" });
     b.getInstallStep().dependOn(&timer_driver_install.step);
@@ -140,11 +143,13 @@ pub fn build(b: *std.Build) void {
     const microkit_tool_cmd = b.addSystemCommand(&[_][]const u8{
         microkit_tool,
         system_description_path,
+        // zig fmt: off
         "--search-path", b.getInstallPath(.bin, ""),
         "--board", microkit_board,
         "--config", microkit_config,
         "-o", final_image_dest,
-        "-r", b.getInstallPath(.prefix, "./report.txt")
+        "-r", b.getInstallPath(.prefix, "./report.txt"),
+        // zig fmt: on
     });
     microkit_tool_cmd.step.dependOn(b.getInstallStep());
 
@@ -154,9 +159,10 @@ pub fn build(b: *std.Build) void {
 
     // This is setting up a `qemu` command for running the system using QEMU,
     // which we only want to do when we have a board that we can actually simulate.
-    const loader_arg = b.fmt("loader,file={s},addr=0x70000000,cpu-num=0", .{ final_image_dest });
+    const loader_arg = b.fmt("loader,file={s},addr=0x70000000,cpu-num=0", .{final_image_dest});
     if (std.mem.eql(u8, microkit_board, "qemu_virt_aarch64")) {
         const qemu_cmd = b.addSystemCommand(&[_][]const u8{
+            // zig fmt: off
             "qemu-system-aarch64",
             "-machine", "virt,virtualization=on",
             "-cpu", "cortex-a53",
@@ -167,6 +173,7 @@ pub fn build(b: *std.Build) void {
             "-global", "virtio-mmio.force-legacy=false",
             "-d", "guest_errors",
             // "--trace", "enable=virtio*",
+            // zig fmt: on
         });
         qemu_cmd.step.dependOn(b.default_step);
         const simulate_step = b.step("qemu", "Simulate the image using QEMU");

@@ -6,10 +6,26 @@
 
 # Timer example
 
-This is a very simple example where a single client program is setting
-timeouts and getting the current time from a timer driver.
+This is a very simple example where a single client program is setting timeouts
+and getting the current time from a timer driver.
 
 ## Building
+
+The following platforms are supported:
+
+* imx8mm_evk
+* imx8mp_evk
+* imx8mq_evk
+* maaxboard
+* odroidc2
+* odroidc4
+* qemu_virt_aarch64
+* qemu_virt_riscv64
+* rpi4b_1gb
+* serengeti
+* star64
+* x86_64_generic
+* zcu102
 
 ### Make
 
@@ -17,14 +33,10 @@ timeouts and getting the current time from a timer driver.
 make MICROKIT_SDK=<path/to/sdk> MICROKIT_BOARD=<board>
 ```
 
-Currently the options for `MICROKIT_BOARD` are:
-* odroidc4
-* qemu_virt_aarch64
-
 After building, the system image to load will be `build/loader.img`.
 
-If you wish to simulate on the QEMU virt AArch64 platform, you can append `qemu` to your make command
-after building for qemu_virt_aarch64.
+If you wish to simulate on the QEMU virt AArch64 platform, you can append `qemu`
+to your make command after building for qemu_virt_aarch64.
 
 ### Zig
 

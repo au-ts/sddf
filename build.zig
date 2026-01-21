@@ -6,32 +6,45 @@ const std = @import("std");
 const LazyPath = std.Build.LazyPath;
 
 const DriverClass = struct {
-    const Uart = enum {
+    const Serial = enum {
         arm,
         meson,
         imx,
-        snps,
+        ns16550a,
+        pc99,
+        virtio,
+        zynqmp,
     };
 
     const Timer = enum {
+        apb_timer,
         arm,
+        cdns,
+        hpet,
         meson,
         imx,
         jh7110,
+        goldfish,
+        bcm2835,
     };
 
     const Network = enum {
         imx,
         meson,
-        virtio
+        virtio,
+        @"dwmac-5.10a",
     };
 
     const I2cHost = enum {
         meson,
+        opentitan,
     };
 
     const Block = enum {
-        virtio,
+        const Virtio = enum {
+            pci,
+            mmio,
+        };
     };
 
     const Mmc = enum {
@@ -49,11 +62,44 @@ const DriverClass = struct {
 };
 
 const util_src = [_][]const u8{
-    "util/newlibc.c",
     "util/cache.c",
     "util/fsmalloc.c",
     "util/bitarray.c",
     "util/assert.c",
+    "util/custom_libc/libc.c",
+};
+
+const util_src_aarch64 = [_][]const u8{
+    "util/custom_libc/aarch64/memcmp.S",
+    "util/custom_libc/aarch64/memcpy.S",
+    "util/custom_libc/aarch64/memmove.c",
+    "util/custom_libc/aarch64/memset.S",
+    "util/custom_libc/aarch64/strcmp.S",
+    "util/custom_libc/aarch64/strcpy.S",
+    "util/custom_libc/aarch64/strlen.S",
+    "util/custom_libc/aarch64/strncmp.S",
+};
+
+const util_src_riscv64 = [_][]const u8{
+    "util/custom_libc/riscv64/memcmp.c",
+    "util/custom_libc/riscv64/memcpy.c",
+    "util/custom_libc/riscv64/memmove.c",
+    "util/custom_libc/riscv64/memset.S",
+    "util/custom_libc/riscv64/strcmp.S",
+    "util/custom_libc/riscv64/strcpy.c",
+    "util/custom_libc/riscv64/strlen.c",
+    "util/custom_libc/riscv64/strncmp.c",
+};
+
+const util_src_x86_64 = [_][]const u8{
+    "util/custom_libc/x86_64/memcmp.c",
+    "util/custom_libc/x86_64/memcpy.S",
+    "util/custom_libc/x86_64/memmove.c",
+    "util/custom_libc/x86_64/memset.S",
+    "util/custom_libc/x86_64/strcmp.c",
+    "util/custom_libc/x86_64/strcpy.c",
+    "util/custom_libc/x86_64/strlen.c",
+    "util/custom_libc/x86_64/strncmp.c",
 };
 
 const util_putchar_debug_src = [_][]const u8{
@@ -72,28 +118,35 @@ var libmicrokit: std.Build.LazyPath = undefined;
 var libmicrokit_linker_script: std.Build.LazyPath = undefined;
 var libmicrokit_include: std.Build.LazyPath = undefined;
 
-fn addUartDriver(
+fn addSerialDriver(
     b: *std.Build,
-    serial_config_include: LazyPath,
     util: *std.Build.Step.Compile,
-    class: DriverClass.Uart,
+    class: DriverClass.Serial,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
 ) *std.Build.Step.Compile {
     const driver = addPd(b, .{
-        .name = b.fmt("driver_uart_{s}.elf", .{@tagName(class)}),
-        .target = target,
-        .optimize = optimize,
-        .strip = false,
+        .name = b.fmt("driver_serial_{s}.elf", .{@tagName(class)}),
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .strip = false,
+        }),
     });
-    const source = b.fmt("drivers/serial/{s}/uart.c", .{@tagName(class)});
+
+    const source_name = switch (class) {
+        .virtio => "console.c",
+        else => "uart.c",
+    };
+    const source = b.fmt("drivers/serial/{s}/{s}", .{ @tagName(class), source_name });
     const driver_include = b.fmt("drivers/serial/{s}/include", .{@tagName(class)});
     driver.addCSourceFile(.{
         .file = b.path(source),
     });
     driver.addIncludePath(b.path("include"));
+    driver.addIncludePath(b.path("include/sddf/util/custom_libc"));
+    driver.addIncludePath(b.path("include/microkit"));
     driver.addIncludePath(b.path(driver_include));
-    driver.addIncludePath(serial_config_include);
     driver.linkLibrary(util);
 
     return driver;
@@ -108,15 +161,19 @@ fn addTimerDriver(
 ) *std.Build.Step.Compile {
     const driver = addPd(b, .{
         .name = b.fmt("driver_timer_{s}.elf", .{@tagName(class)}),
-        .target = target,
-        .optimize = optimize,
-        .strip = false,
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .strip = false,
+        }),
     });
-    const source = b.fmt("drivers/timer/{s}/timer.c", .{ @tagName(class) });
+    const source = b.fmt("drivers/timer/{s}/timer.c", .{@tagName(class)});
     driver.addCSourceFile(.{
         .file = b.path(source),
     });
     driver.addIncludePath(b.path("include"));
+    driver.addIncludePath(b.path("include/sddf/util/custom_libc"));
+    driver.addIncludePath(b.path("include/microkit"));
     driver.linkLibrary(util);
 
     return driver;
@@ -128,24 +185,28 @@ fn addI2cDriverDevice(
     device: DriverClass.I2cDevice,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
-    i2c_client_include: LazyPath,
 ) *std.Build.Step.Compile {
-    const driver = b.addStaticLibrary(.{
+    const driver = b.addLibrary(.{
         .name = b.fmt("driver_i2c_device_{s}", .{@tagName(device)}),
-        .target = target,
-        .optimize = optimize,
-        .strip = false,
+        .linkage = .static,
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .strip = false,
+        }),
     });
     driver.addIncludePath(libmicrokit_include);
     const source = b.fmt("i2c/devices/{s}/{s}.c", .{ @tagName(device), @tagName(device) });
     driver.addCSourceFile(.{
         .file = b.path(source),
+        .flags = &.{"-DLIBI2C_RAW"},
     });
     driver.addIncludePath(b.path(b.fmt("i2c/devices/{s}/", .{@tagName(device)})));
     driver.addIncludePath(b.path("include"));
+    driver.addIncludePath(b.path("include/sddf/util/custom_libc"));
+    driver.addIncludePath(b.path("include/microkit"));
     driver.linkLibrary(util);
     driver.addIncludePath(b.path("libco"));
-    driver.addIncludePath(i2c_client_include);
 
     return driver;
 }
@@ -159,9 +220,11 @@ fn addI2cDriverHost(
 ) *std.Build.Step.Compile {
     const driver = addPd(b, .{
         .name = b.fmt("driver_i2c_{s}.elf", .{@tagName(class)}),
-        .target = target,
-        .optimize = optimize,
-        .strip = false,
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .strip = false,
+        }),
     });
     const source = b.fmt("drivers/i2c/{s}/i2c.c", .{@tagName(class)});
     driver.addCSourceFile(.{
@@ -169,8 +232,13 @@ fn addI2cDriverHost(
         // Note: the I2C_BUS_NUM flag is temporary
         .flags = &.{"-DI2C_BUS_NUM=2"},
     });
+    driver.addCSourceFile(.{
+        .file = b.path("drivers/i2c/i2c_common.c"),
+    });
     driver.addIncludePath(b.path(b.fmt("drivers/i2c/{s}/", .{@tagName(class)})));
     driver.addIncludePath(b.path("include"));
+    driver.addIncludePath(b.path("include/sddf/util/custom_libc"));
+    driver.addIncludePath(b.path("include/microkit"));
     driver.linkLibrary(util);
 
     return driver;
@@ -178,25 +246,58 @@ fn addI2cDriverHost(
 
 fn addBlockDriver(
     b: *std.Build,
-    blk_config_include: LazyPath,
     util: *std.Build.Step.Compile,
     class: DriverClass.Block,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
 ) *std.Build.Step.Compile {
     const driver = addPd(b, .{
-        .name = b.fmt("driver_blk_{s}.elf", .{ @tagName(class) }),
-        .target = target,
-        .optimize = optimize,
-        .strip = false,
+        .name = b.fmt("driver_blk_{s}.elf", .{@tagName(class)}),
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .strip = false,
+        }),
     });
-    const source = b.fmt("drivers/blk/{s}/block.c", .{ @tagName(class) });
+    const source = b.fmt("drivers/blk/{s}/block.c", .{@tagName(class)});
     driver.addCSourceFile(.{
         .file = b.path(source),
     });
-    driver.addIncludePath(blk_config_include);
-    driver.addIncludePath(b.path(b.fmt("drivers/blk/{s}/", .{ @tagName(class) })));
+    driver.addIncludePath(b.path(b.fmt("drivers/blk/{s}/", .{@tagName(class)})));
     driver.addIncludePath(b.path("include"));
+    driver.addIncludePath(b.path("include/sddf/util/custom_libc"));
+    driver.addIncludePath(b.path("include/microkit"));
+    driver.linkLibrary(util);
+
+    return driver;
+}
+
+fn addVirtioBlockDriver(
+    b: *std.Build,
+    util: *std.Build.Step.Compile,
+    class: DriverClass.Block.Virtio,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+) *std.Build.Step.Compile {
+    const driver = addPd(b, .{
+        .name = b.fmt("driver_blk_virtio_{s}.elf", .{@tagName(class)}),
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .strip = false,
+        }),
+    });
+
+    driver.addCSourceFile(.{
+        .file = b.path("drivers/blk/virtio/block.c"),
+    });
+    driver.addCSourceFile(.{
+        .file = b.path(b.fmt("virtio/transport/{s}.c", .{@tagName(class)})),
+    });
+    driver.addIncludePath(b.path(b.fmt("drivers/blk/{s}/", .{@tagName(class)})));
+    driver.addIncludePath(b.path("include"));
+    driver.addIncludePath(b.path("include/sddf/util/custom_libc"));
+    driver.addIncludePath(b.path("include/microkit"));
     driver.linkLibrary(util);
 
     return driver;
@@ -204,25 +305,27 @@ fn addBlockDriver(
 
 fn addMmcDriver(
     b: *std.Build,
-    blk_config_include: LazyPath,
     util: *std.Build.Step.Compile,
     class: DriverClass.Mmc,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
 ) *std.Build.Step.Compile {
     const driver = addPd(b, .{
-        .name = b.fmt("driver_blk_mmc_{s}.elf", .{ @tagName(class) }),
-        .target = target,
-        .optimize = optimize,
-        .strip = false,
+        .name = b.fmt("driver_blk_mmc_{s}.elf", .{@tagName(class)}),
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .strip = false,
+        }),
     });
-    const source = b.fmt("drivers/blk/mmc/{s}/usdhc.c", .{ @tagName(class) });
+    const source = b.fmt("drivers/blk/mmc/{s}/usdhc.c", .{@tagName(class)});
     driver.addCSourceFile(.{
         .file = b.path(source),
     });
-    driver.addIncludePath(blk_config_include);
-    driver.addIncludePath(b.path(b.fmt("drivers/blk/mmc/{s}/", .{ @tagName(class) })));
+    driver.addIncludePath(b.path(b.fmt("drivers/blk/mmc/{s}/", .{@tagName(class)})));
     driver.addIncludePath(b.path("include"));
+    driver.addIncludePath(b.path("include/sddf/util/custom_libc"));
+    driver.addIncludePath(b.path("include/microkit"));
     driver.linkLibrary(util);
 
     return driver;
@@ -230,25 +333,27 @@ fn addMmcDriver(
 
 fn addNetworkDriver(
     b: *std.Build,
-    net_config_include: LazyPath,
     util: *std.Build.Step.Compile,
     class: DriverClass.Network,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
 ) *std.Build.Step.Compile {
     const driver = addPd(b, .{
-        .name = b.fmt("driver_net_{s}.elf", .{ @tagName(class) }),
-        .target = target,
-        .optimize = optimize,
-        .strip = false,
+        .name = b.fmt("driver_net_{s}.elf", .{@tagName(class)}),
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .strip = false,
+        }),
     });
-    const source = b.fmt("drivers/network/{s}/ethernet.c", .{ @tagName(class) });
+    const source = b.fmt("drivers/network/{s}/ethernet.c", .{@tagName(class)});
     driver.addCSourceFile(.{
         .file = b.path(source),
     });
-    driver.addIncludePath(net_config_include);
-    driver.addIncludePath(b.path(b.fmt("drivers/network/{s}/", .{ @tagName(class) })));
+    driver.addIncludePath(b.path(b.fmt("drivers/network/{s}/", .{@tagName(class)})));
     driver.addIncludePath(b.path("include"));
+    driver.addIncludePath(b.path("include/sddf/util/custom_libc"));
+    driver.addIncludePath(b.path("include/microkit"));
     driver.linkLibrary(util);
 
     return driver;
@@ -263,18 +368,22 @@ fn addGpuDriver(
     optimize: std.builtin.OptimizeMode,
 ) *std.Build.Step.Compile {
     const driver = addPd(b, .{
-        .name = b.fmt("driver_gpu_{s}.elf", .{ @tagName(class) }),
-        .target = target,
-        .optimize = optimize,
-        .strip = false,
+        .name = b.fmt("driver_gpu_{s}.elf", .{@tagName(class)}),
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .strip = false,
+        }),
     });
-    const source = b.fmt("drivers/gpu/{s}/gpu.c", .{ @tagName(class) });
+    const source = b.fmt("drivers/gpu/{s}/gpu.c", .{@tagName(class)});
     driver.addCSourceFile(.{
         .file = b.path(source),
     });
     driver.addIncludePath(gpu_config_include);
-    driver.addIncludePath(b.path(b.fmt("drivers/gpu/{s}/", .{ @tagName(class) })));
+    driver.addIncludePath(b.path(b.fmt("drivers/gpu/{s}/", .{@tagName(class)})));
     driver.addIncludePath(b.path("include"));
+    driver.addIncludePath(b.path("include/sddf/util/custom_libc"));
+    driver.addIncludePath(b.path("include/microkit"));
     driver.linkLibrary(util);
 
     return driver;
@@ -283,255 +392,335 @@ fn addGpuDriver(
 fn addPd(b: *std.Build, options: std.Build.ExecutableOptions) *std.Build.Step.Compile {
     const pd = b.addExecutable(options);
     pd.addObjectFile(libmicrokit);
-    pd.setLinkerScriptPath(libmicrokit_linker_script);
+    pd.setLinkerScript(libmicrokit_linker_script);
     pd.addIncludePath(libmicrokit_include);
 
     return pd;
 }
 
-pub fn build(b: *std.Build) void {
+pub fn build(b: *std.Build) !void {
     const optimize = b.standardOptimizeOption(.{});
     const target = b.standardTargetOptions(.{});
 
-    const libmicrokit_opt = b.option([]const u8, "libmicrokit", "Path to libmicrokit.a") orelse null;
-    const libmicrokit_include_opt = b.option([]const u8, "libmicrokit_include", "Path to the libmicrokit include directory") orelse null;
-    const libmicrokit_linker_script_opt = b.option([]const u8, "libmicrokit_linker_script", "Path to the libmicrokit linker script") orelse null;
-    const blk_config_include_opt = b.option([]const u8, "blk_config_include", "Include path to block config header") orelse "";
-    const serial_config_include_option = b.option([]const u8, "serial_config_include", "Include path to serial config header") orelse "";
-    const net_config_include_option = b.option([]const u8, "net_config_include", "Include path to network config header") orelse "";
-    const i2c_client_include_option = b.option([]const u8, "i2c_client_include", "Include path to client config header") orelse "";
-    const gpu_config_include_option = b.option([]const u8, "gpu_config_include", "Include path to gpu config header") orelse "";
+    const maybe_microkit_board_dir = b.option(LazyPath, "microkit_board_dir", "Path within Microkit SDK for the target board") orelse null;
+    if (maybe_microkit_board_dir) |microkit_board_dir| {
+        libmicrokit = microkit_board_dir.path(b, "lib/libmicrokit.a");
+        libmicrokit_include = microkit_board_dir.path(b, "include");
+        libmicrokit_linker_script = microkit_board_dir.path(b, "lib/microkit.ld");
 
-    // TODO: Right now this is not super ideal. What's happening is that we do not
-    // always need a serial config include, but we must always specify it
-    // as a build option. What we do instead is just make the include path an
-    // empty string if it has not been provided, which could be an annoying to
-    // debug error if you do need a serial config but forgot to pass one in.
-    const serial_config_include = LazyPath{ .cwd_relative = serial_config_include_option };
-    const blk_config_include = LazyPath{ .cwd_relative = blk_config_include_opt };
-    const net_config_include = LazyPath{ .cwd_relative = net_config_include_option };
-    const i2c_client_include = LazyPath{ .cwd_relative = i2c_client_include_option };
-    const gpu_config_include = LazyPath{ .cwd_relative = gpu_config_include_option };
-    // libmicrokit
-    // We're declaring explicitly here instead of with anonymous structs due to a bug. See https://github.com/ziglang/zig/issues/19832
-    libmicrokit = LazyPath{ .cwd_relative = libmicrokit_opt.? };
-    libmicrokit_include = LazyPath{ .cwd_relative = libmicrokit_include_opt.? };
-    libmicrokit_linker_script = LazyPath{ .cwd_relative = libmicrokit_linker_script_opt.? };
+        const gpu_config_include_option = b.option([]const u8, "gpu_config_include", "Include path to gpu config header") orelse "";
 
-    // Util libraries
-    const util = b.addStaticLibrary(.{
-        .name = "util",
-        .target = target,
-        .optimize = optimize,
-    });
-    util.addCSourceFiles(.{
-        .files = &util_src,
-    });
-    util.addIncludePath(b.path("include"));
-    util.addIncludePath(libmicrokit_include);
-    util.installHeadersDirectory(b.path("include"), "", .{});
-    b.installArtifact(util);
+        // TODO: Right now this is not super ideal. What's happening is that we do not
+        // always need a serial config include, but we must always specify it
+        // as a build option. What we do instead is just make the include path an
+        // empty string if it has not been provided, which could be an annoying to
+        // debug error if you do need a serial config but forgot to pass one in.
+        const gpu_config_include = LazyPath{ .cwd_relative = gpu_config_include_option };
 
-    const util_putchar_serial = b.addStaticLibrary(.{
-        .name = "util_putchar_serial",
-        .target = target,
-        .optimize = optimize,
-    });
-    util_putchar_serial.addCSourceFiles(.{
-        .files = &util_putchar_serial_src,
-    });
-    util_putchar_serial.addIncludePath(b.path("include"));
-    util_putchar_serial.addIncludePath(libmicrokit_include);
-    util_putchar_serial.installHeadersDirectory(b.path("include"), "", .{});
-    b.installArtifact(util_putchar_serial);
+        // Util libraries
+        const util = b.addLibrary(.{
+            .name = "util",
+            .linkage = .static,
+            .root_module = b.createModule(.{
+                .target = target,
+                .optimize = optimize,
+            }),
+        });
+        util.addCSourceFiles(.{
+            .files = &util_src,
+        });
+        switch (target.result.cpu.arch) {
+            .aarch64 => {
+                util.addCSourceFiles(.{
+                    .files = &util_src_aarch64,
+                });
+            },
+            .riscv64 => {
+                util.addCSourceFiles(.{
+                    .files = &util_src_riscv64,
+                });
+                util.addIncludePath(b.path("util/custom_libc/riscv64"));
+            },
+            .x86_64 => {
+                util.addCSourceFiles(.{
+                    .files = &util_src_x86_64,
+                });
+                util.addIncludePath(b.path("util/custom_libc/x86_64"));
+            },
+            else => unreachable,
+        }
+        util.addIncludePath(b.path("include"));
+        util.addIncludePath(b.path("include/sddf/util/custom_libc"));
+        util.addIncludePath(b.path("include/microkit"));
+        util.addIncludePath(libmicrokit_include);
+        util.installHeadersDirectory(b.path("include"), "", .{});
+        util.installHeadersDirectory(b.path("include/sddf/util/custom_libc"), "", .{});
+        b.installArtifact(util);
 
-    const util_putchar_debug = b.addStaticLibrary(.{
-        .name = "util_putchar_debug",
-        .target = target,
-        .optimize = optimize,
-    });
-    util_putchar_debug.addCSourceFiles(.{
-        .files = &util_putchar_debug_src,
-    });
-    util_putchar_debug.addIncludePath(b.path("include"));
-    util_putchar_debug.addIncludePath(libmicrokit_include);
-    util_putchar_debug.installHeadersDirectory(b.path("include"), "", .{});
-    b.installArtifact(util_putchar_debug);
+        const util_putchar_serial = b.addLibrary(.{
+            .name = "util_putchar_serial",
+            .linkage = .static,
+            .root_module = b.createModule(.{
+                .target = target,
+                .optimize = optimize,
+            }),
+        });
+        util_putchar_serial.addCSourceFiles(.{
+            .files = &util_putchar_serial_src,
+        });
+        util_putchar_serial.addIncludePath(b.path("include"));
+        util_putchar_serial.addIncludePath(b.path("include/sddf/util/custom_libc"));
+        util_putchar_serial.addIncludePath(b.path("include/microkit"));
+        util_putchar_serial.addIncludePath(libmicrokit_include);
+        util_putchar_serial.installHeadersDirectory(b.path("include"), "", .{});
+        util_putchar_serial.installHeadersDirectory(b.path("include/sddf/util/custom_libc"), "", .{});
+        b.installArtifact(util_putchar_serial);
 
-    // Block components
-    const blk_virt = addPd(b, .{
-        .name = "blk_virt.elf",
-        .target = target,
-        .optimize = optimize,
-        .strip = false,
-    });
-    blk_virt.addCSourceFile(.{
-        .file = b.path("blk/components/virt.c"),
-    });
-    blk_virt.addIncludePath(blk_config_include);
-    blk_virt.addIncludePath(b.path("include"));
-    blk_virt.linkLibrary(util);
-    blk_virt.linkLibrary(util_putchar_debug);
-    b.installArtifact(blk_virt);
+        const util_putchar_debug = b.addLibrary(.{
+            .name = "util_putchar_debug",
+            .linkage = .static,
+            .root_module = b.createModule(.{
+                .target = target,
+                .optimize = optimize,
+            }),
+        });
+        util_putchar_debug.addCSourceFiles(.{
+            .files = &util_putchar_debug_src,
+        });
+        util_putchar_debug.addIncludePath(b.path("include"));
+        util_putchar_debug.addIncludePath(b.path("include/sddf/util/custom_libc"));
+        util_putchar_debug.addIncludePath(b.path("include/microkit"));
+        util_putchar_debug.addIncludePath(libmicrokit_include);
+        util_putchar_debug.installHeadersDirectory(b.path("include"), "", .{});
+        util_putchar_debug.installHeadersDirectory(b.path("include/sddf/util/custom_libc"), "", .{});
+        b.installArtifact(util_putchar_debug);
 
-    // Block drivers
-    inline for (std.meta.fields(DriverClass.Block)) |class| {
-        const driver = addBlockDriver(b, blk_config_include, util, @enumFromInt(class.value), target, optimize);
-        driver.linkLibrary(util_putchar_debug);
-        b.installArtifact(driver);
+        // Block components
+        const blk_virt = addPd(b, .{
+            .name = "blk_virt.elf",
+            .root_module = b.createModule(.{
+                .target = target,
+                .optimize = optimize,
+                .strip = false,
+            }),
+        });
+        blk_virt.addCSourceFiles(.{
+            .files = &.{ "blk/components/virt.c", "blk/components/partitioning.c" },
+        });
+        blk_virt.addIncludePath(b.path("include"));
+        blk_virt.addIncludePath(b.path("include/sddf/util/custom_libc"));
+        blk_virt.addIncludePath(b.path("include/microkit"));
+        blk_virt.linkLibrary(util);
+        blk_virt.linkLibrary(util_putchar_debug);
+        b.installArtifact(blk_virt);
+
+        // Block drivers
+        inline for (std.meta.fields(DriverClass.Block)) |class| {
+            const driver = addBlockDriver(b, util, @enumFromInt(class.value), target, optimize);
+            driver.linkLibrary(util_putchar_debug);
+            b.installArtifact(driver);
+        }
+        inline for (std.meta.fields(DriverClass.Mmc)) |class| {
+            const driver = addMmcDriver(b, util, @enumFromInt(class.value), target, optimize);
+            driver.linkLibrary(util_putchar_debug);
+            b.installArtifact(driver);
+        }
+        inline for (std.meta.fields(DriverClass.Block.Virtio)) |class| {
+            const driver = addVirtioBlockDriver(b, util, @enumFromInt(class.value), target, optimize);
+            driver.linkLibrary(util_putchar_debug);
+            b.installArtifact(driver);
+        }
+
+        // Serial components
+        const serial_virt_rx = addPd(b, .{
+            .name = "serial_virt_rx.elf",
+            .root_module = b.createModule(.{
+                .target = target,
+                .optimize = optimize,
+                .strip = false,
+            }),
+        });
+        serial_virt_rx.addCSourceFile(.{
+            .file = b.path("serial/components/virt_rx.c"),
+        });
+        serial_virt_rx.addIncludePath(b.path("include"));
+        serial_virt_rx.addIncludePath(b.path("include/sddf/util/custom_libc"));
+        serial_virt_rx.addIncludePath(b.path("include/microkit"));
+        serial_virt_rx.linkLibrary(util);
+        serial_virt_rx.linkLibrary(util_putchar_debug);
+        b.installArtifact(serial_virt_rx);
+
+        const serial_virt_tx = addPd(b, .{
+            .name = "serial_virt_tx.elf",
+            .root_module = b.createModule(.{
+                .target = target,
+                .optimize = optimize,
+                .strip = false,
+            }),
+        });
+        serial_virt_tx.addCSourceFile(.{
+            .file = b.path("serial/components/virt_tx.c"),
+        });
+        serial_virt_tx.addIncludePath(b.path("include"));
+        serial_virt_tx.addIncludePath(b.path("include/sddf/util/custom_libc"));
+        serial_virt_tx.addIncludePath(b.path("include/microkit"));
+        serial_virt_tx.linkLibrary(util);
+        serial_virt_tx.linkLibrary(util_putchar_debug);
+        b.installArtifact(serial_virt_tx);
+
+        // Serial drivers
+        inline for (std.meta.fields(DriverClass.Serial)) |class| {
+            const driver = addSerialDriver(b, util, @enumFromInt(class.value), target, optimize);
+            driver.linkLibrary(util_putchar_debug);
+            b.installArtifact(driver);
+        }
+
+        // Gpu components
+        const gpu_virt = addPd(b, .{
+            .name = "gpu_virt.elf",
+            .root_module = b.createModule(.{
+                .target = target,
+                .optimize = optimize,
+                .strip = false,
+            }),
+        });
+        gpu_virt.addCSourceFile(.{
+            .file = b.path("gpu/components/virt.c"),
+        });
+        gpu_virt.addIncludePath(gpu_config_include);
+        gpu_virt.addIncludePath(b.path("include"));
+        gpu_virt.addIncludePath(b.path("include/sddf/util/custom_libc"));
+        gpu_virt.addIncludePath(b.path("include/microkit"));
+        gpu_virt.linkLibrary(util);
+        gpu_virt.linkLibrary(util_putchar_debug);
+        b.installArtifact(gpu_virt);
+
+        // Gpu drivers
+        inline for (std.meta.fields(DriverClass.Gpu)) |class| {
+            const driver = addGpuDriver(b, gpu_config_include, util, @enumFromInt(class.value), target, optimize);
+            driver.linkLibrary(util_putchar_debug);
+            b.installArtifact(driver);
+        }
+
+        // Timer drivers
+        inline for (std.meta.fields(DriverClass.Timer)) |class| {
+            const driver = addTimerDriver(b, util, @enumFromInt(class.value), target, optimize);
+            driver.linkLibrary(util_putchar_debug);
+            b.installArtifact(driver);
+        }
+
+        const libi2c_raw = b.addLibrary(.{
+            .name = "libi2c_raw",
+            .linkage = .static,
+            .root_module = b.createModule(.{
+                .target = target,
+                .optimize = optimize,
+            }),
+        });
+        libi2c_raw.addCSourceFile(.{
+            .file = b.path("i2c/libi2c.c"),
+            .flags = &.{"-DLIBI2C_RAW"},
+        });
+        libi2c_raw.addIncludePath(b.path("include"));
+        libi2c_raw.addIncludePath(b.path("include/sddf/util/custom_libc"));
+        libi2c_raw.addIncludePath(b.path("include/microkit"));
+        libi2c_raw.addIncludePath(b.path("libco"));
+        libi2c_raw.addIncludePath(libmicrokit_include);
+        libi2c_raw.linkLibrary(util);
+        b.installArtifact(libi2c_raw);
+
+        // I2C components
+        const i2c_virt = addPd(b, .{
+            .name = "i2c_virt.elf",
+            .root_module = b.createModule(.{
+                .target = target,
+                .optimize = optimize,
+                .strip = false,
+            }),
+        });
+        i2c_virt.addCSourceFile(.{
+            .file = b.path("i2c/components/virt.c"),
+        });
+        i2c_virt.addIncludePath(b.path("include"));
+        i2c_virt.addIncludePath(b.path("include/sddf/util/custom_libc"));
+        i2c_virt.addIncludePath(b.path("include/microkit"));
+        i2c_virt.linkLibrary(util);
+        i2c_virt.linkLibrary(util_putchar_debug);
+        b.installArtifact(i2c_virt);
+
+        // I2C drivers
+        inline for (std.meta.fields(DriverClass.I2cHost)) |class| {
+            const driver = addI2cDriverHost(b, util, @enumFromInt(class.value), target, optimize);
+            driver.linkLibrary(util_putchar_debug);
+            b.installArtifact(driver);
+        }
+
+        inline for (std.meta.fields(DriverClass.I2cDevice)) |device| {
+            const driver = addI2cDriverDevice(b, util, @enumFromInt(device.value), target, optimize);
+            driver.linkLibrary(util_putchar_debug);
+            b.installArtifact(driver);
+        }
+
+        // Network drivers
+        inline for (std.meta.fields(DriverClass.Network)) |class| {
+            const driver = addNetworkDriver(b, util, @enumFromInt(class.value), target, optimize);
+            driver.linkLibrary(util_putchar_debug);
+            b.installArtifact(driver);
+        }
+
+        // Network components
+        const net_virt_rx = addPd(b, .{
+            .name = "net_virt_rx.elf",
+            .root_module = b.createModule(.{
+                .target = target,
+                .optimize = optimize,
+                .strip = false,
+            }),
+        });
+        net_virt_rx.addCSourceFile(.{
+            .file = b.path("network/components/virt_rx.c"),
+        });
+        net_virt_rx.addIncludePath(b.path("include"));
+        net_virt_rx.addIncludePath(b.path("include/sddf/util/custom_libc"));
+        net_virt_rx.addIncludePath(b.path("include/microkit"));
+        net_virt_rx.linkLibrary(util);
+        net_virt_rx.linkLibrary(util_putchar_debug);
+        b.installArtifact(net_virt_rx);
+
+        const net_virt_tx = addPd(b, .{
+            .name = "net_virt_tx.elf",
+            .root_module = b.createModule(.{
+                .target = target,
+                .optimize = optimize,
+                .strip = false,
+            }),
+        });
+        net_virt_tx.addCSourceFile(.{
+            .file = b.path("network/components/virt_tx.c"),
+        });
+        net_virt_tx.addIncludePath(b.path("include"));
+        net_virt_tx.addIncludePath(b.path("include/sddf/util/custom_libc"));
+        net_virt_tx.addIncludePath(b.path("include/microkit"));
+        net_virt_tx.linkLibrary(util);
+        net_virt_tx.linkLibrary(util_putchar_debug);
+        b.installArtifact(net_virt_tx);
+
+        const net_copy = addPd(b, .{
+            .name = "net_copy.elf",
+            .root_module = b.createModule(.{
+                .target = target,
+                .optimize = optimize,
+                .strip = false,
+            }),
+        });
+        net_copy.addCSourceFile(.{
+            .file = b.path("network/components/copy.c"),
+        });
+        net_copy.addIncludePath(b.path("include"));
+        net_copy.addIncludePath(b.path("include/sddf/util/custom_libc"));
+        net_copy.addIncludePath(b.path("include/microkit"));
+        net_copy.linkLibrary(util);
+        net_copy.linkLibrary(util_putchar_debug);
+        b.installArtifact(net_copy);
     }
-    inline for (std.meta.fields(DriverClass.Mmc)) |class| {
-        const driver = addMmcDriver(b, blk_config_include, util, @enumFromInt(class.value), target, optimize);
-        driver.linkLibrary(util_putchar_debug);
-        b.installArtifact(driver);
-    }
-
-    // Serial components
-    const serial_virt_rx = addPd(b, .{
-        .name = "serial_virt_rx.elf",
-        .target = target,
-        .optimize = optimize,
-        .strip = false,
-    });
-    serial_virt_rx.addCSourceFile(.{
-        .file = b.path("serial/components/virt_rx.c"),
-    });
-    serial_virt_rx.addIncludePath(serial_config_include);
-    serial_virt_rx.addIncludePath(b.path("include"));
-    serial_virt_rx.linkLibrary(util);
-    serial_virt_rx.linkLibrary(util_putchar_debug);
-    b.installArtifact(serial_virt_rx);
-
-    const serial_virt_tx = addPd(b, .{
-        .name = "serial_virt_tx.elf",
-        .target = target,
-        .optimize = optimize,
-        .strip = false,
-    });
-    serial_virt_tx.addCSourceFile(.{
-        .file = b.path("serial/components/virt_tx.c"),
-    });
-    serial_virt_tx.addIncludePath(serial_config_include);
-    serial_virt_tx.addIncludePath(b.path("include"));
-    serial_virt_tx.linkLibrary(util);
-    serial_virt_tx.linkLibrary(util_putchar_debug);
-    b.installArtifact(serial_virt_tx);
-
-    // UART drivers
-    inline for (std.meta.fields(DriverClass.Uart)) |class| {
-        const driver = addUartDriver(b, serial_config_include, util, @enumFromInt(class.value), target, optimize);
-        driver.linkLibrary(util_putchar_debug);
-        b.installArtifact(driver);
-    }
-
-    // Gpu components
-    const gpu_virt = addPd(b, .{
-        .name = "gpu_virt.elf",
-        .target = target,
-        .optimize = optimize,
-        .strip = false,
-    });
-    gpu_virt.addCSourceFile(.{
-        .file = b.path("gpu/components/virt.c"),
-    });
-    gpu_virt.addIncludePath(gpu_config_include);
-    gpu_virt.addIncludePath(b.path("include"));
-    gpu_virt.linkLibrary(util);
-    gpu_virt.linkLibrary(util_putchar_debug);
-    b.installArtifact(gpu_virt);
-
-    // Gpu drivers
-    inline for (std.meta.fields(DriverClass.Gpu)) |class| {
-        const driver = addGpuDriver(b, gpu_config_include, util, @enumFromInt(class.value), target, optimize);
-        driver.linkLibrary(util_putchar_debug);
-        b.installArtifact(driver);
-    }
-
-    // Timer drivers
-    inline for (std.meta.fields(DriverClass.Timer)) |class| {
-        const driver = addTimerDriver(b, util, @enumFromInt(class.value), target, optimize);
-        driver.linkLibrary(util_putchar_debug);
-        b.installArtifact(driver);
-    }
-
-    // I2C components
-    const i2c_virt = addPd(b, .{
-        .name = "i2c_virt.elf",
-        .target = target,
-        .optimize = optimize,
-        .strip = false,
-    });
-    i2c_virt.addCSourceFile(.{
-        .file = b.path("i2c/components/virt.c"),
-    });
-    i2c_virt.addIncludePath(b.path("include"));
-    i2c_virt.linkLibrary(util);
-    i2c_virt.linkLibrary(util_putchar_debug);
-    b.installArtifact(i2c_virt);
-
-    // I2C drivers
-    inline for (std.meta.fields(DriverClass.I2cHost)) |class| {
-        const driver = addI2cDriverHost(b, util, @enumFromInt(class.value), target, optimize);
-        driver.linkLibrary(util_putchar_debug);
-        b.installArtifact(driver);
-    }
-
-    inline for (std.meta.fields(DriverClass.I2cDevice)) |device| {
-        const driver = addI2cDriverDevice(b, util, @enumFromInt(device.value), target, optimize, i2c_client_include);
-        driver.linkLibrary(util_putchar_debug);
-        b.installArtifact(driver);
-    }
-
-    // Network drivers
-    inline for (std.meta.fields(DriverClass.Network)) |class| {
-        const driver = addNetworkDriver(b, net_config_include, util, @enumFromInt(class.value), target, optimize);
-        driver.linkLibrary(util_putchar_debug);
-        b.installArtifact(driver);
-    }
-
-    // Network components
-    const net_virt_rx = addPd(b, .{
-        .name = "net_virt_rx.elf",
-        .target = target,
-        .optimize = optimize,
-        .strip = false,
-    });
-    net_virt_rx.addCSourceFile(.{
-        .file = b.path("network/components/virt_rx.c"),
-    });
-    net_virt_rx.addIncludePath(net_config_include);
-    net_virt_rx.addIncludePath(b.path("include"));
-    net_virt_rx.linkLibrary(util);
-    net_virt_rx.linkLibrary(util_putchar_debug);
-    b.installArtifact(net_virt_rx);
-
-    const net_virt_tx = addPd(b, .{
-        .name = "net_virt_tx.elf",
-        .target = target,
-        .optimize = optimize,
-        .strip = false,
-    });
-    net_virt_tx.addCSourceFile(.{
-        .file = b.path("network/components/virt_tx.c"),
-    });
-    net_virt_tx.addIncludePath(net_config_include);
-    net_virt_tx.addIncludePath(b.path("include"));
-    net_virt_tx.linkLibrary(util);
-    net_virt_tx.linkLibrary(util_putchar_debug);
-    b.installArtifact(net_virt_tx);
-
-    const net_copy = addPd(b, .{
-        .name = "net_copy.elf",
-        .target = target,
-        .optimize = optimize,
-        .strip = false,
-    });
-    net_copy.addCSourceFile(.{
-        .file = b.path("network/components/copy.c"),
-    });
-    net_copy.addIncludePath(net_config_include);
-    net_copy.addIncludePath(b.path("include"));
-    net_copy.linkLibrary(util);
-    net_copy.linkLibrary(util_putchar_debug);
-    b.installArtifact(net_copy);
 }

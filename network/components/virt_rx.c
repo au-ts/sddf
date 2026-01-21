@@ -5,42 +5,29 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-#include <microkit.h>
+#include <os/sddf.h>
 #include <sddf/network/constants.h>
 #include <sddf/network/queue.h>
 #include <sddf/network/util.h>
+#include <sddf/network/config.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 #include <sddf/util/cache.h>
-#include <ethernet_config.h>
-
-/* Notification channels */
-#define DRIVER_CH 0
-#define CLIENT_CH 1
 
 /* Used to signify that a packet has come in for the broadcast address and does not match with
  * any particular client. */
-#define BROADCAST_ID (NUM_NETWORK_CLIENTS + 1)
+#define BROADCAST_ID (-2)
 
-/* Queue regions */
-net_queue_t *rx_free_drv;
-net_queue_t *rx_active_drv;
-net_queue_t *rx_free_cli0;
-net_queue_t *rx_active_cli0;
-
-/* Buffer data regions */
-uintptr_t buffer_data_vaddr;
-uintptr_t buffer_data_paddr;
+__attribute__((__section__(".net_virt_rx_config"))) net_virt_rx_config_t config;
 
 /* In order to handle broadcast packets where the same buffer is given to multiple clients
   * we keep track of a reference count of each buffer and only hand it back to the driver once
   * all clients have returned the buffer. */
-uint32_t buffer_refs[NET_RX_QUEUE_CAPACITY_DRIV] = { 0 };
+uint32_t *buffer_refs;
 
 typedef struct state {
     net_queue_handle_t rx_queue_drv;
-    net_queue_handle_t rx_queue_clients[NUM_NETWORK_CLIENTS];
-    uint8_t mac_addrs[NUM_NETWORK_CLIENTS][ETH_HWADDR_LEN];
+    net_queue_handle_t rx_queue_clients[SDDF_NET_MAX_CLIENTS];
 } state_t;
 
 state_t state;
@@ -52,10 +39,10 @@ static bool notify_drv;
   is a broadcast address. */
 int get_mac_addr_match(struct ethernet_header *buffer)
 {
-    for (int client = 0; client < NUM_NETWORK_CLIENTS; client++) {
+    for (int client = 0; client < config.num_clients; client++) {
         bool match = true;
         for (int i = 0; (i < ETH_HWADDR_LEN) && match; i++) {
-            if (buffer->dest.addr[i] != state.mac_addrs[client][i]) {
+            if (buffer->dest.addr[i] != config.clients[client].mac_addr[i]) {
                 match = false;
             }
         }
@@ -80,15 +67,15 @@ int get_mac_addr_match(struct ethernet_header *buffer)
 void rx_return(void)
 {
     bool reprocess = true;
-    bool notify_clients[NUM_NETWORK_CLIENTS] = {false};
+    bool notify_clients[SDDF_NET_MAX_CLIENTS] = { false };
     while (reprocess) {
         while (!net_queue_empty_active(&state.rx_queue_drv)) {
             net_buff_desc_t buffer;
             int err = net_dequeue_active(&state.rx_queue_drv, &buffer);
             assert(!err);
 
-            buffer.io_or_offset = buffer.io_or_offset - buffer_data_paddr;
-            uintptr_t buffer_vaddr = buffer.io_or_offset + buffer_data_vaddr;
+            buffer.io_or_offset = buffer.io_or_offset - config.data.io_addr;
+            uintptr_t buffer_vaddr = buffer.io_or_offset + (uintptr_t)config.data.region.vaddr;
 
             // Cache invalidate after DMA write, so we don't read stale data.
             // This must be performed after the DMA write to avoid reading
@@ -107,9 +94,9 @@ void rx_return(void)
                 // For broadcast packets, set the refcount to number of clients
                 // in the system. Only enqueue buffer back to driver if
                 // all clients have consumed the buffer.
-                buffer_refs[ref_index] = NUM_NETWORK_CLIENTS;
+                buffer_refs[ref_index] = config.num_clients;
 
-                for (int i = 0; i < NUM_NETWORK_CLIENTS; i++) {
+                for (int i = 0; i < config.num_clients; i++) {
                     err = net_enqueue_active(&state.rx_queue_clients[i], buffer);
                     assert(!err);
                     notify_clients[i] = true;
@@ -124,7 +111,7 @@ void rx_return(void)
                 assert(!err);
                 notify_clients[client] = true;
             } else {
-                buffer.io_or_offset = buffer.io_or_offset + buffer_data_paddr;
+                buffer.io_or_offset = buffer.io_or_offset + config.data.io_addr;
                 err = net_enqueue_free(&state.rx_queue_drv, buffer);
                 assert(!err);
                 notify_drv = true;
@@ -139,17 +126,17 @@ void rx_return(void)
         }
     }
 
-    for (int client = 0; client < NUM_NETWORK_CLIENTS; client++) {
+    for (int client = 0; client < config.num_clients; client++) {
         if (notify_clients[client] && net_require_signal_active(&state.rx_queue_clients[client])) {
             net_cancel_signal_active(&state.rx_queue_clients[client]);
-            microkit_notify(client + CLIENT_CH);
+            sddf_notify(config.clients[client].conn.id);
         }
     }
 }
 
 void rx_provide(void)
 {
-    for (int client = 0; client < NUM_NETWORK_CLIENTS; client++) {
+    for (int client = 0; client < config.num_clients; client++) {
         bool reprocess = true;
         while (reprocess) {
             while (!net_queue_empty_free(&state.rx_queue_clients[client])) {
@@ -172,7 +159,7 @@ void rx_provide(void)
                 // the DMA region is only mapped in read only. This avoids the
                 // case where pending writes are only written to the buffer
                 // memory after DMA has occured.
-                buffer.io_or_offset = buffer.io_or_offset + buffer_data_paddr;
+                buffer.io_or_offset = buffer.io_or_offset + config.data.io_addr;
                 err = net_enqueue_free(&state.rx_queue_drv, buffer);
                 assert(!err);
                 notify_drv = true;
@@ -190,12 +177,12 @@ void rx_provide(void)
 
     if (notify_drv && net_require_signal_free(&state.rx_queue_drv)) {
         net_cancel_signal_free(&state.rx_queue_drv);
-        microkit_deferred_notify(DRIVER_CH);
+        sddf_deferred_notify(config.driver.id);
         notify_drv = false;
     }
 }
 
-void notified(microkit_channel ch)
+void notified(sddf_channel ch)
 {
     rx_return();
     rx_provide();
@@ -203,24 +190,23 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
-    uint64_t macs[NUM_NETWORK_CLIENTS] = {0};
-    net_queue_info_t queue_info[NUM_NETWORK_CLIENTS] = {0};
+    assert(net_config_check_magic(&config));
 
-    net_virt_mac_addrs(microkit_name, macs);
-    net_virt_queue_info(microkit_name, rx_free_cli0, rx_active_cli0, queue_info);
+    buffer_refs = config.buffer_metadata.vaddr;
 
     /* Set up client queues */
-    for (int i = 0; i < NUM_NETWORK_CLIENTS; i++) {
-        net_set_mac_addr((uint8_t *) &state.mac_addrs[i], macs[i]);
-        net_queue_init(&state.rx_queue_clients[i], queue_info[i].free, queue_info[i].active, queue_info[i].capacity);
+    for (int i = 0; i < config.num_clients; i++) {
+        net_queue_init(&state.rx_queue_clients[i], config.clients[i].conn.free_queue.vaddr,
+                       config.clients[i].conn.active_queue.vaddr, config.clients[i].conn.num_buffers);
     }
 
     /* Set up driver queues */
-    net_queue_init(&state.rx_queue_drv, rx_free_drv, rx_active_drv, NET_RX_QUEUE_CAPACITY_DRIV);
-    net_buffers_init(&state.rx_queue_drv, buffer_data_paddr);
+    net_queue_init(&state.rx_queue_drv, config.driver.free_queue.vaddr, config.driver.active_queue.vaddr,
+                   config.driver.num_buffers);
+    net_buffers_init(&state.rx_queue_drv, config.data.io_addr);
 
     if (net_require_signal_free(&state.rx_queue_drv)) {
         net_cancel_signal_free(&state.rx_queue_drv);
-        microkit_deferred_notify(DRIVER_CH);
+        sddf_deferred_notify(config.driver.id);
     }
 }
