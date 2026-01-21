@@ -187,24 +187,30 @@ struct msix_table {
     uint32_t vec_ctrl;
 };
 
-#define DEV_MAX_BARS 6
+#define PCI_DEV_MAX_BARS 6
+#define PCI_DEV_MAX_IRQS 8
 #define ECAM_MAX_REQUESTS 64
 
 typedef enum bar_locatable {
     any_32b, less_1m, any_64b
 } bar_locatable_t;
 
-typedef enum irq_type : uint8_t {
-    legacy, msi, msix
-} irq_type_t;
+typedef enum irq_kind : uint8_t {
+    irq_ioapic, irq_msi, irq_msix
+} irq_kind_t;
 
-typedef struct mem_bar {
+typedef struct pci_irq {
+    uint64_t pin;
+    uint64_t vector;
+    uint64_t kind;
+} pci_irq_t;
+
+typedef struct pci_bar {
     uint8_t bar_id;
     uint64_t base_addr;
     bool mem_mapped;
-    uint8_t locatable;
-    bool prefetchable;
-} mem_bar_t;
+    bool mem_64b;
+} pci_bar_t;
 
 typedef struct config_request {
     uint8_t bus;
@@ -212,8 +218,9 @@ typedef struct config_request {
     uint8_t func;
     uint16_t device_id;
     uint16_t vendor_id;
-    mem_bar_t mem_bars[DEV_MAX_BARS];
-    irq_type_t irq_type;
+    pci_bar_t bars[PCI_DEV_MAX_BARS];
+    uint8_t num_irqs;
+    pci_irq_t irqs[PCI_DEV_MAX_IRQS];
 } config_request_t;
 
 typedef struct pci_ecam_config {

@@ -19,10 +19,9 @@
                 "size": 2097152
             }
         ],
-        "irq_type": "ioapic",
         "irqs": [
             {
-                "pin": 11,
+                "irq_type": "msix",
                 "vector": 1
             }
         ],

@@ -60,75 +60,24 @@ def generate(
         timer_system = sddf.Timer(sdf, timer_node, timer_driver)
         timer_system.add_client(blk_driver)
 
-    blk_system = Sddf.Blk(sdf, blk_node, blk_driver, blk_virt)
+    blk_system = Sddf.Blk(sdf, blk_node, blk_driver, blk_virt, compatible="virtio,pci")
     partition = int(args.partition) if args.partition else board.partition
     blk_system.add_client(client, partition=partition)
 
     if board.arch == SystemDescription.Arch.X86_64:
-    #     blk_requests_mr = SystemDescription.MemoryRegion(
-    #         sdf, "virtio_requests", 65536, paddr=0x5FDF0000
-    #     )
-    #     sdf.add_mr(blk_requests_mr)
-    #     blk_requests_map = SystemDescription.Map(blk_requests_mr, 0x20200000, "rw")
-    #     blk_driver.add_map(blk_requests_map)
-
-    #     blk_virtio_metadata_mr = SystemDescription.MemoryRegion(
-    #         sdf, "virtio_metadata", 65536, paddr=0x5FFF0000
-    #     )
-    #     sdf.add_mr(blk_virtio_metadata_mr)
-    #     blk_virtio_metadata_map = SystemDescription.Map(
-    #         blk_virtio_metadata_mr, 0x20210000, "rw"
-    #     )
-    #     blk_driver.add_map(blk_virtio_metadata_map)
-
-    #     virtio_blk_regs = SystemDescription.MemoryRegion(
-    #         sdf, "virtio_net_regs", 0x4000, paddr=0xFE000000
-    #     )
-    #     sdf.add_mr(virtio_blk_regs)
-    #     virtio_blk_regs_map = SystemDescription.Map(
-    #         virtio_blk_regs, 0x6000_0000, "rw", cached=False
-    #     )
-    #     blk_driver.add_map(virtio_blk_regs_map)
-
-    #     # virtio_blk_irq = SystemDescription.IrqIoapic(
-    #         # ioapic_id=0, pin=11, vector=1, id=17
-    #     # )
-    #     virtio_blk_irq = SystemDescription.IrqMsi(
-    #         pci_bus=0, pci_device=3, pci_func=0, vector=1, handle=0, id=17
-    #     )
-
-    #     blk_driver.add_irq(virtio_blk_irq)
-
-        pci_config_addr_port = SystemDescription.IoPort(0xCF8, 4, 1)
+        pci_config_addr_port = SystemDescription.IoPort(0xCF8, 8, 1)
         blk_driver.add_ioport(pci_config_addr_port)
-
-        pci_config_data_port = SystemDescription.IoPort(0xCFC, 4, 2)
-        blk_driver.add_ioport(pci_config_data_port)
 
     serial_system.add_client(client)
 
-    # pcie_driver = ProtectionDomain("pcie_driver", "pcie_driver.elf", priority=252)
-    # ecam_mr = SystemDescription.MemoryRegion(sdf, "ecam_regs", 0x10000000, paddr=0xb0000000)
-    # bios_mr = SystemDescription.MemoryRegion(sdf, "bios_regs", 0x20000, paddr=0xe0000)
-    # sdt_mr = SystemDescription.MemoryRegion(sdf, "sdt_regs", 0x10000, paddr=0x7ffe0000)
-    # blk_msix_mr = SystemDescription.MemoryRegion(sdf, "blk_msix_regs", 0x10000, paddr=0xFEBD5000)
-    # sdf.add_mr(ecam_mr)
-    # sdf.add_mr(bios_mr)
-    # sdf.add_mr(sdt_mr)
-    # sdf.add_mr(blk_msix_mr)
-    # pcie_driver.add_map(SystemDescription.Map(ecam_mr, 0xb0000000, "rw"))
-    # pcie_driver.add_map(SystemDescription.Map(bios_mr, 0xe0000, "rw"))
-    # pcie_driver.add_map(SystemDescription.Map(sdt_mr, 0x7ffe0000, "rw"))
-    # pcie_driver.add_map(SystemDescription.Map(blk_msix_mr, 0xFEBD5000, "rw"))
-
     pcie_driver = ProtectionDomain("pcie_driver", "pcie_driver.elf", priority=252)
-    pci_system = Sddf.Pci(sdf, None, pcie_driver)
+    pci_system = Sddf.Pci(sdf, pcie_driver)
     pci_system.add_ecam(paddr=0xb0000000, size=0x10000000)
     blk_msix_mr = SystemDescription.MemoryRegion(sdf, "blk_msix_regs", 0x10000, paddr=0xFEBD5000)
     sdf.add_mr(blk_msix_mr)
     pcie_driver.add_map(SystemDescription.Map(blk_msix_mr, 0xFEBD5000, "rw"))
 
-    pci_system.add_client(blk_system)
+    pci_system.add_client(blk_system, device_id=0x1001, vendor_id=0x1af4, bus=0, dev=3, func=0)
 
     pds = [serial_driver, serial_virt_tx, blk_driver, blk_virt, client, pcie_driver]
     if need_timer:
@@ -137,10 +86,10 @@ def generate(
         sdf.add_pd(pd)
 
     assert blk_system.connect()
-    assert blk_system.serialise_config(output_dir)
     assert serial_system.connect()
-    assert serial_system.serialise_config(output_dir)
     assert pci_system.connect()
+    assert serial_system.serialise_config(output_dir)
+    assert blk_system.serialise_config(output_dir)
     assert pci_system.serialise_config(output_dir)
     if need_timer:
         assert timer_system.connect()

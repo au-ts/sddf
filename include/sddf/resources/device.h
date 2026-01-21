@@ -15,6 +15,7 @@ static char DEVICE_MAGIC[DEVICE_MAGIC_LEN] = { 's', 'D', 'D', 'F', 0x1 };
 
 #define DEVICE_MAX_REGIONS 64
 #define DEVICE_MAX_IRQS 64
+#define DEVICE_MAX_IOPORTS 8
 
 typedef struct device_region_resource {
     region_resource_t region;
@@ -25,12 +26,19 @@ typedef struct device_irq_resource {
     uint8_t id;
 } device_irq_resource_t;
 
+typedef struct device_ioport_resource {
+    uint8_t id;
+    uint64_t base_addr;
+} device_ioport_resource_t;
+
 typedef struct device_resources {
     char magic[5];
     uint8_t num_regions;
     uint8_t num_irqs;
+    uint8_t num_ioports;
     device_region_resource_t regions[DEVICE_MAX_REGIONS];
     device_irq_resource_t irqs[DEVICE_MAX_IRQS];
+    device_ioport_resource_t ioports[DEVICE_MAX_IOPORTS];
 } device_resources_t;
 
 static inline bool device_resources_check_magic(device_resources_t *device)

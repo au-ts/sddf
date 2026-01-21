@@ -32,55 +32,91 @@ static struct shared_pci_cap *find_pci_cap_by_id(struct pci_config_space *config
     return NULL;
 }
 
-void configure_mem_bar(struct pci_config_space *pci_header, uint8_t bar_id, mem_bar_t mem_bar_cfg)
+void configure_pci_bar(struct pci_config_space *pci_header, uint8_t bar_id, pci_bar_t pci_bar_cfg)
 {
-    sddf_dprintf("sizeof(locatable): %lu\n", sizeof(mem_bar_cfg.locatable));
-    sddf_dprintf("bar_id: %d, base_addr: 0x%lx\n", bar_id, mem_bar_cfg.base_addr);
-    sddf_dprintf("mem_mapped: %d, locatable: %d, prefetchable: %d\n", mem_bar_cfg.mem_mapped, mem_bar_cfg.locatable, mem_bar_cfg.prefetchable);
-    if (mem_bar_cfg.base_addr) {
+    sddf_dprintf("bar_id: %d, base_addr: 0x%lx\n", bar_id, pci_bar_cfg.base_addr);
+    if (pci_bar_cfg.base_addr) {
         volatile uint32_t *mem_bar = (volatile uint32_t *)((uintptr_t)pci_header + 0x10 + (bar_id * 0x04));
+        // TODO: check if the BAR type is matched
         sddf_dprintf("Memory BAR %d: 0x%x\n", bar_id, *mem_bar);
         *mem_bar = 0xFFFFFFFF;
+        // TODO:  read the size back written by the device
         sddf_dprintf("Memory BAR %d: 0x%x\n", bar_id, *mem_bar);
-        *mem_bar = (uint32_t)mem_bar_cfg.base_addr;
+        *mem_bar = (uint32_t)pci_bar_cfg.base_addr;
         sddf_dprintf("Memory BAR %d: 0x%x\n", bar_id, *mem_bar);
     }
 }
 
-void configure_irq_type()
+void configure_irqs(struct pci_config_space *pci_header, config_request_t config_request)
 {
-                    /* struct msix_capability *msix_cap = (struct msix_capability *)find_pci_cap_by_id(pci_header, PCI_CAP_ID_MSIX); */
-                    /* if (msix_cap) { */
-                    /*     // Disable legacy Interrupts */
-                    /*     pci_header->command = pci_header->command | (1 << 10); */
+    bool ioapic_enabled = true;
+    for (int i = 0; i < config_request.num_irqs; i++) {
+        if (config_request.irqs[i].kind != irq_ioapic) {
+            ioapic_enabled = false;
+        }
 
-                    /*     uint16_t *test = (uint16_t *)((void *)pci_header + 0x98 + 2); */
-                    /*     sddf_dprintf("test: 0x%x\n", *test); */
-                    /*     // Enable MSI-X */
-                    /*     struct msix_msg_ctrl *msg_ctrl = &msix_cap->msg_ctrl; */
-                    /*     msg_ctrl->msix_enable = 1; */
-                    /*     sddf_dprintf("Table Size: 0x%x\n", msg_ctrl->table_size + 1); */
-                    /*     sddf_dprintf("Function Mask: 0x%x\n", msg_ctrl->func_mask); */
-                    /*     sddf_dprintf("MSI-X Enable: 0x%x\n", msg_ctrl->msix_enable); */
+        if (!ioapic_enabled && config_request.irqs[i].kind == irq_ioapic) {
+            sddf_dprintf("error: I/O APIC can not be enabled with MSI/MSI-X\n");
+            return;
+        }
+    }
 
-                    /*     struct msix_table *msix_table = (struct msix_table *)0xFEBD5000; */
-                    /*     msix_table->msg_addr_low = 0xFEEu << 20; */
-                    /*     msix_table->msg_data = 0x4031; */
-                    /*     msix_table->vec_ctrl = 0x0; */
-                    /*     sddf_dprintf("Vector 0 Message Addr Low: 0x%x\n", msix_table->msg_addr_low); */
-                    /*     sddf_dprintf("Vector 0 Message Addr Hi: 0x%x\n", msix_table->msg_addr_hi); */
-                    /*     sddf_dprintf("Vector 0 Message Data: 0x%x\n", msix_table->msg_data); */
-                    /*     sddf_dprintf("Vector 0 Vector Control: 0x%x\n", msix_table->vec_ctrl); */
+    // Enable/Disable I/O APIC interrupts
+    if (ioapic_enabled) {
+        pci_header->command &= (~BIT(10));
+    } else {
+        pci_header->command |= BIT(10);
+    }
 
-                    /*     uint32_t *msix_pba = (uint32_t *)0xFEBD5800; */
-                    /*     sddf_dprintf("PBA: 0x%x\n", msix_pba[0]); */
-                    /* } */
+    for (int i = 0; i < config_request.num_irqs; i++) {
+        switch (config_request.irqs[i].kind) {
+            case irq_ioapic: {
+                // TODO: figure out how to reconfigure interrupt vectors
+                break;
+            };
+            case irq_msi: {
+                // TODO: configure MSI interrupts
+                break;
+            };
+            case irq_msix: {
+                struct msix_capability *msix_cap = (struct msix_capability *)find_pci_cap_by_id(pci_header, PCI_CAP_ID_MSIX);
+                if (msix_cap) {
 
+                    // TODO: allocate a BAR for MSI-X
+
+                    uint16_t *test = (uint16_t *)((void *)pci_header + 0x98 + 2);
+                    sddf_dprintf("test: 0x%x\n", *test);
+                    // Enable MSI-X
+                    struct msix_msg_ctrl *msg_ctrl = &msix_cap->msg_ctrl;
+                    msg_ctrl->msix_enable = 1;
+                    sddf_dprintf("Table Size: 0x%x\n", msg_ctrl->table_size + 1);
+                    sddf_dprintf("Function Mask: 0x%x\n", msg_ctrl->func_mask);
+                    sddf_dprintf("MSI-X Enable: 0x%x\n", msg_ctrl->msix_enable);
+
+                    struct msix_table *msix_table = (struct msix_table *)0xFEBD5000;
+                    msix_table->msg_addr_low = 0xFEEu << 20;
+                    msix_table->msg_data = 0x4031;
+                    msix_table->vec_ctrl = 0x0;
+                    sddf_dprintf("Vector 0 Message Addr Low: 0x%x\n", msix_table->msg_addr_low);
+                    sddf_dprintf("Vector 0 Message Addr Hi: 0x%x\n", msix_table->msg_addr_hi);
+                    sddf_dprintf("Vector 0 Message Data: 0x%x\n", msix_table->msg_data);
+                    sddf_dprintf("Vector 0 Vector Control: 0x%x\n", msix_table->vec_ctrl);
+
+                    uint32_t *msix_pba = (uint32_t *)0xFEBD5800;
+                    sddf_dprintf("PBA: 0x%x\n", msix_pba[0]);
+                } else {
+                    sddf_dprintf("error: device does not support MSI-X\n");
+                }
+                break;
+            };
+        }
+
+    }
 }
 
 void pci_bus_scan(uintptr_t bus_base)
 {
-    uint8_t pci_bus = (((uintptr_t)bus_base >> 20) & 0xff);
+    /* uint8_t pci_bus = (((uintptr_t)bus_base >> 20) & 0xff); */
     for (uint8_t pci_dev = 0; pci_dev < 32; pci_dev++) {
         for (uint8_t pci_func = 0; pci_func < 8; pci_func++) {
             struct pci_config_space *pci_header = (struct pci_config_space *)(bus_base + (pci_dev << 15) + (pci_func << 12));
@@ -92,47 +128,33 @@ void pci_bus_scan(uintptr_t bus_base)
                              pci_header->vendor_id,
                              pci_header->device_id);
 
-                for (int j = 0; j < 64; j++) {
-                    if (j && j % 16 == 0) sddf_dprintf("\n");
-                    sddf_dprintf("%02x ", *(uint8_t *)(bus_base + (pci_dev << 15) + (pci_func << 12) + j));
-                }
-                sddf_dprintf("\n");
+                /* for (int j = 0; j < 64; j++) { */
+                /*     if (j && j % 16 == 0) sddf_dprintf("\n"); */
+                /*     sddf_dprintf("%02x ", *(uint8_t *)(bus_base + (pci_dev << 15) + (pci_func << 12) + j)); */
+                /* } */
+                /* sddf_dprintf("\n"); */
 
                 for (int i = 0; i < pci_ecam_config.num_requests; i++) {
                     config_request_t config_request = pci_ecam_config.requests[i];
                     sddf_dprintf("bus: 0x%x, dev: 0x%x, func: 0x%x\n", config_request.bus, config_request.dev, config_request.func);
-                    if (config_request.bus == pci_bus && config_request.dev == pci_dev && config_request.func == pci_func) {
-                        for (int bar_id = 0; bar_id < DEV_MAX_BARS; bar_id++) {
-                            pci_header->command = 0x4;
-                            configure_mem_bar(pci_header, bar_id, config_request.mem_bars[bar_id]);
+                    if (config_request.device_id == pci_header->device_id && config_request.vendor_id == pci_header->vendor_id) {
+                        sddf_dprintf("interrupt_line: 0x%x\n", pci_header->interrupt_line);
+                        sddf_dprintf("interrupt_pin: 0x%x\n", pci_header->interrupt_pin);
+                        for (int bar_id = 0; bar_id < PCI_DEV_MAX_BARS; bar_id++) {
+                            configure_pci_bar(pci_header, bar_id, config_request.bars[bar_id]);
 
-                            pci_header->command = 0x7;
-                            for (int j = 0; j < 256; j++) {
-                                if (j && j % 16 == 0) sddf_dprintf("\n");
-                                sddf_dprintf("%02x ", *(uint8_t *)(bus_base + (pci_dev << 15) + (pci_func << 12) + j));
-                            }
-                            sddf_dprintf("\n");
+                            // TODO:  consider 64-bit memory
+
+                            /* for (int j = 0; j < 256; j++) { */
+                            /*     if (j && j % 16 == 0) sddf_dprintf("\n"); */
+                            /*     sddf_dprintf("%02x ", *(uint8_t *)(bus_base + (pci_dev << 15) + (pci_func << 12) + j)); */
+                            /* } */
+                            /* sddf_dprintf("\n"); */
                         }
 
-                        /* configure_irq_type(pci_header, config_request.irq_type); */
+                        configure_irqs(pci_header, config_request);
                     }
                 }
-
-                    /* for (int j = 0; j < 256; j++) { */
-                    /*     if (j && j % 16 == 0) sddf_dprintf("\n"); */
-                    /*     sddf_dprintf("%02x ", *(uint8_t *)(pci_bus + (pci_dev << 15) + (pci_func << 12) + j)); */
-                    /* } */
-                    /* sddf_dprintf("\n"); */
-
-                    /* /\* sddf_dprintf("pci header: 0x%lx\n", (uintptr_t)pci_header); *\/ */
-                    /* /\* sddf_dprintf("MSI-X cap: 0x%lx\n", (uintptr_t)msix_cap); *\/ */
-                    /* uint16_t *test = (uint16_t *)((void *)pci_header + 0x98 + 2); */
-                    /* sddf_dprintf("test: 0x%x\n", *test); */
-
-                    /* struct msi_capability *msi_cap = (struct msi_capability *)find_pci_cap_by_id(pci_header, PCI_CAP_ID_MSI); */
-                    /* if (msi_cap) { */
-                    /*     // Enable MSI */
-                    /* } */
             }
         }
     }

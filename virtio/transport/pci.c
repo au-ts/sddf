@@ -17,7 +17,7 @@
 
 #define PCI_ADDR_PORT_ID 1
 #define PCI_ADDR_PORT_ADDR 0xCF8
-#define PCI_DATA_PORT_ID 2
+#define PCI_DATA_PORT_ID 1
 #define PCI_DATA_PORT_ADDR 0xCFC
 
 /* Multiplier for virtIO queue kick mechanism. */
