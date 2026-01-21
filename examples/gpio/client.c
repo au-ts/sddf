@@ -28,6 +28,9 @@
 // uintptr_t ultrasonic_input_buffer_base_vaddr;
 // uintptr_t ultrasonic_output_buffer_base_vaddr;
 
+uint64_t time_start;
+uint64_t time_end;
+
 cothread_t t_event;
 cothread_t t_main;
 
@@ -110,7 +113,6 @@ void client_main(void) {
     while (true)
     {
         uint64_t averaged_dist = 0;
-
         for (int i = 0; i < 3; i++) {
             uint64_t distance = get_ultrasonic_reading();
             if (!distance) {
@@ -120,7 +122,7 @@ void client_main(void) {
         }
         
         averaged_dist /= 3;
-        LOG_CLIENT("Sensor Reading Received: %ld\n", averaged_dist);
+        // LOG_CLIENT("Sensor Reading Received: %ld\n", averaged_dist);
 
         if (averaged_dist < 10) {
             drive_stop();
@@ -130,7 +132,12 @@ void client_main(void) {
         }
         else {
             drive_forward();
-        }       
+        }
+        
+        time_end = sddf_timer_time_now(TIMER_CHANNEL);
+
+        LOG_CLIENT("Execution time: %ld\n", time_end - time_start);
+        return;
     }
 }
 
@@ -149,6 +156,7 @@ void notified(microkit_channel ch) {
 }
 
 void init(void) {
+    time_start = sddf_timer_time_now(TIMER_CHANNEL);
     LOG_CLIENT("Init\n");
 
     /* Define the event loop/notified thread as the active co-routine */

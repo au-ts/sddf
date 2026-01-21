@@ -17,7 +17,8 @@
 #define DEBUG_CLIENT
 
 #ifdef DEBUG_CLIENT
-#define LOG_SENSOR(...) do{ sddf_printf("SENSOR|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
+#define  LOG_SENSOR(...) do{}while(0)
+// #define LOG_SENSOR(...) do{ sddf_printf("SENSOR|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
 #else
 #define  LOG_SENSOR(...) do{}while(0)
 #endif
