@@ -19,28 +19,25 @@ MICROKIT_CONFIG ?= debug
 IMAGE_FILE := loader.img
 REPORT_FILE := report.txt
 
+SUPPORTED_BOARDS := odroidc4
+
 ifeq ($(strip $(TOOLCHAIN)),)
-	TOOLCHAIN := aarch64-none-elf
+	TOOLCHAIN := clang
 endif
 
-# Board-specific configuration
-ifeq (${MICROKIT_BOARD},odroidc4)
-	PLATFORM := meson
-	CPU := cortex-a55
-	TIMER_DRIV_DIR := meson
-else
-$(error Unsupported MICROKIT_BOARD)
-endif
+include ${SDDF}/tools/make/board/common.mk
 
 # Toolchain setup
-CC := $(TOOLCHAIN)-gcc
-LD := $(TOOLCHAIN)-ld
-AS := $(TOOLCHAIN)-as
-AR := $(TOOLCHAIN)-ar
-RANLIB := $(TOOLCHAIN)-ranlib
-MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
+# CC := $(TOOLCHAIN)-gcc
+# LD := $(TOOLCHAIN)-ld
+# AS := $(TOOLCHAIN)-as
+# AR := $(TOOLCHAIN)-ar
+# RANLIB := $(TOOLCHAIN)-ranlib
+# MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 
-BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
+# BOARD_DIR := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)
+
+
 
 # Driver paths
 UTIL := $(SDDF)/util
@@ -49,6 +46,7 @@ GPIO_TOP := ${SDDF}/examples/gpio
 TIMER_TOP := ${SDDF}/examples/timer
 GPIO_DRIVER := $(SDDF)/drivers/gpio/${PLATFORM}
 TIMER_DRIVER := $(SDDF)/drivers/timer/${TIMER_DRIV_DIR}
+SDDF_CUSTOM_LIBC := 1
 
 SYSTEM_FILE := ${GPIO_TOP}/board/$(MICROKIT_BOARD)/gpio.system
 
@@ -78,9 +76,9 @@ MOTOR_CONTROL_B_OBJS := motor_control_b.o
 ULTRASONIC_SENSOR_OBJS := ultrasonic_sensor.o
 
 
--include client.d
--include motor_control_a.d
--include motor_control_b.d
+# -include client.d
+# -include motor_control_a.d
+# -include motor_control_b.d
 
 
 VPATH := ${GPIO_TOP}
@@ -113,6 +111,15 @@ ultrasonic_sensor.o: ${GPIO_TOP}/ultrasonic_sensor.c
 
 ultrasonic_sensor.elf: $(ULTRASONIC_SENSOR_OBJS) libco.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+
+
+# $(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
+# $(OBJCOPY) --update-section .timer_client_config=timer_client_client.data client.elf
+# $(OBJCOPY) --update-section .timer_client_config=timer_client_motor_control_a.data motor_control_a.elf
+# $(OBJCOPY) --update-section .timer_client_config=timer_client_motor_control_b.data motor_control_b.elf
+# $(OBJCOPY) --update-section .timer_client_config=timer_client_ultrasonic_sensor.data ultrasonic_sensor.elf
+
+# touch $@
 
 # Final image generation
 $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)

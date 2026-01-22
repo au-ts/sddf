@@ -42,22 +42,22 @@
     <!-- Timer channels -->
     <channel>
         <end pd="timer" id="1" />
-        <end pd="client" id="1" pp="true"/> <!-- Should this number change, so should TIMER_CH in timer.h -->
+        <end pd="client" id="1" notify="false" pp="true"/> <!-- Should this number change, so should TIMER_CH in timer.h -->
     </channel>
 
     <channel>
         <end pd="timer" id="2" />
-        <end pd="motor_control_a" id="2" pp="true"/>
+        <end pd="motor_control_a" id="2" notify="false" pp="true"/>
     </channel>
 
     <channel>
         <end pd="timer" id="3" />
-        <end pd="motor_control_b" id="2" pp="true"/>
+        <end pd="motor_control_b" id="2" notify="false" pp="true"/>
     </channel>
 
     <channel>
         <end pd="timer" id="4" />
-        <end pd="ultrasonic_sensor" id="2" pp="true"/>
+        <end pd="ultrasonic_sensor" id="2" notify="false" pp="true"/>
     </channel>
 
 

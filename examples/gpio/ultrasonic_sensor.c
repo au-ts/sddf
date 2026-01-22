@@ -28,6 +28,9 @@
 // uintptr_t ultrasonic_input_buffer_base_vaddr;
 // uintptr_t ultrasonic_output_buffer_base_vaddr;
 
+__attribute__((__section__(".timer_client_config"))) timer_client_config_t config;
+sddf_channel timer_channel;
+
 cothread_t t_event;
 cothread_t t_main;
 
@@ -36,7 +39,7 @@ static char t_sensor_main_stack[STACK_SIZE];
 
 // Channels
 #define CLIENT_CHANNEL (1)
-#define TIMER_CHANNEL (2)
+// #define TIMER_CHANNEL (2)
 
 #define GPIO_CHANNEL_ECHO (3)
 #define GPIO_CHANNEL_TRIG (4)
@@ -107,7 +110,7 @@ bool delay_microsec(size_t microsec)
         return false;
     }
 
-    sddf_timer_set_timeout(TIMER_CHANNEL, time_us);
+    sddf_timer_set_timeout(timer_channel, time_us);
     co_switch(t_event);
 
     return true;
@@ -115,7 +118,7 @@ bool delay_microsec(size_t microsec)
 
 // Read duration of value from GPIO pin (in micro seconds)
 uint64_t pulse_in(int gpio_ch, int value) {
-    uint64_t time_start = sddf_timer_time_now(TIMER_CHANNEL);
+    uint64_t time_start = sddf_timer_time_now(timer_channel);
     uint64_t time_received = 0;
     uint64_t time_change = 0;
     int has_received = 0;
@@ -138,11 +141,11 @@ uint64_t pulse_in(int gpio_ch, int value) {
             // First time measured value has been received
             if (!has_received) {
                 has_received = 1;
-                time_received = sddf_timer_time_now(TIMER_CHANNEL);
+                time_received = sddf_timer_time_now(timer_channel);
                 continue;
             }
 
-            uint64_t time_now = sddf_timer_time_now(TIMER_CHANNEL);
+            uint64_t time_now = sddf_timer_time_now(timer_channel);
 
             if (((time_now - time_start) / NS_IN_MS) > SENSOR_TIMEOUT) {
                 return 0;
@@ -151,14 +154,14 @@ uint64_t pulse_in(int gpio_ch, int value) {
         } 
         else {
             // Timeout not seeing GPIO HIGH from sensor
-            uint64_t time_now = sddf_timer_time_now(TIMER_CHANNEL);
+            uint64_t time_now = sddf_timer_time_now(timer_channel);
             if (((time_now - time_start) / NS_IN_MS) > (SENSOR_TIMEOUT * 100)) {
                 return 0;
             }
 
             // Have received measured value before, this is time when value changes
             if (has_received) {
-                time_change = sddf_timer_time_now(TIMER_CHANNEL);
+                time_change = sddf_timer_time_now(timer_channel);
                 break;
             }
         }
@@ -252,7 +255,7 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo) {
 void notified(microkit_channel ch) {
     switch (ch)
     {
-    case TIMER_CHANNEL:
+    case timer_channel:
         co_switch(t_main);
         break;
     default:
@@ -265,6 +268,8 @@ void notified(microkit_channel ch) {
 void init(void) {
     LOG_SENSOR("Init\n");
     // sensor_main();
+    timer_channel = config.driver_id;
+
 
     /* Define the event loop/notified thread as the active co-routine */
     t_event = co_active();

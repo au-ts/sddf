@@ -10,6 +10,9 @@
 #include <libco.h>
 #include <sddf/util/printf.h>
 #include <sddf/timer/client.h>
+#include <os/sddf.h>
+#include <stdint.h>
+#include <sddf/timer/config.h>
 #include "include/client/client.h"
 #include "include/motor/motor_control.h"
 
@@ -22,11 +25,10 @@
 #endif
 #define LOG_CLIENT_ERR(...) do{ sddf_printf("CLIENT|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
-// Motor control buffers
-// uintptr_t control_buffer_base_vaddr_a;
-// uintptr_t control_buffer_base_vaddr_b;
-// uintptr_t ultrasonic_input_buffer_base_vaddr;
-// uintptr_t ultrasonic_output_buffer_base_vaddr;
+__attribute__((__section__(".timer_client_config"))) timer_client_config_t config;
+
+
+sddf_channel timer_channel;
 
 uint64_t time_start;
 uint64_t time_end;
@@ -38,7 +40,7 @@ cothread_t t_main;
 static char t_client_main_stack[STACK_SIZE];
 
 // Channels
-#define TIMER_CHANNEL (1)
+// #define TIMER_CHANNEL (1)
 #define MOTOR_CONTROL_A_CHANNEL (2)
 #define MOTOR_CONTROL_B_CHANNEL (3)
 #define ULTRASONIC_CHANNEL (4)
@@ -56,7 +58,7 @@ bool delay_ms(size_t milliseconds)
         return false;
     }
 
-    sddf_timer_set_timeout(TIMER_CHANNEL, time_ns);
+    sddf_timer_set_timeout(timer_channel, time_ns);
     co_switch(t_event);
 
     return true;
@@ -134,7 +136,7 @@ void client_main(void) {
             drive_forward();
         }
         
-        time_end = sddf_timer_time_now(TIMER_CHANNEL);
+        time_end = sddf_timer_time_now(timer_channel);
 
         LOG_CLIENT("Execution time: %ld\n", time_end - time_start);
         return;
@@ -142,11 +144,11 @@ void client_main(void) {
 }
 
 // Call coroutine, block other commands from executing
-void notified(microkit_channel ch) {
+void notified(sddf_channel ch) {
     // check this switch
     switch (ch)
     {
-    case TIMER_CHANNEL:
+    case timer_channel:
         co_switch(t_main);
         break;
     default:
@@ -156,7 +158,9 @@ void notified(microkit_channel ch) {
 }
 
 void init(void) {
-    time_start = sddf_timer_time_now(TIMER_CHANNEL);
+    timer_channel = config.driver_id;
+
+    // time_start = sddf_timer_time_now(TIMER_CHANNEL);
     LOG_CLIENT("Init\n");
 
     /* Define the event loop/notified thread as the active co-routine */

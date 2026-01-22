@@ -26,11 +26,15 @@
 
 #define LOG_CONTROL_ERR(...) do{ sddf_printf("CONTROL|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
+__attribute__((__section__(".timer_client_config"))) timer_client_config_t config;
+
+sddf_channel timer_channel;
+
 // uintptr_t control_buffer_base_vaddr;
 
 // Channels
 #define CLIENT_CHANNEL (1)
-#define TIMER_CHANNEL (2)
+// #define TIMER_CHANNEL (2)
 #define GPIO_CHANNEL (3)
 
 #define GPIO_HIGH (1)
@@ -98,7 +102,7 @@ void set_pwm(int gpio_ch, int micro_s) {
     pwm_state = PAUSE_HIGH;
 
     // timeout to drive motor forward
-    sddf_timer_set_timeout(TIMER_CHANNEL, micro_s);
+    sddf_timer_set_timeout(timer_channel, micro_s);
 }
 
 void set_forward(void) {
@@ -163,7 +167,7 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo) {
 void notified(microkit_channel ch) {
     switch (ch)
     {
-    case TIMER_CHANNEL:
+    case timer_channel:
         // new control request, stop current signal to make new one
         if (!is_control_fulfilled) {
             handle_motor_request();
@@ -179,7 +183,7 @@ void notified(microkit_channel ch) {
             
             // TODO change this to corresponding down time for each motor direction
             // hold low for 18 ms (to drive forward)
-            sddf_timer_set_timeout(TIMER_CHANNEL, pwm_delay_mappings[curr_command - 1][PWM_TIME_LOW]*NS_IN_US);
+            sddf_timer_set_timeout(timer_channel, pwm_delay_mappings[curr_command - 1][PWM_TIME_LOW]*NS_IN_US);
             pwm_state = PAUSE_LOW;
         }
         else {
@@ -196,6 +200,8 @@ void notified(microkit_channel ch) {
 }
 
 void init(void) {
+    timer_channel = config.driver_id;
+
     LOG_CONTROL("Init\n");
     gpio_init(GPIO_CHANNEL);
 }
