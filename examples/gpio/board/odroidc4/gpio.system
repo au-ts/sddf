@@ -11,7 +11,7 @@
 
     <protection_domain name="timer" priority="254" passive="true">
         <program_image path="timer_driver.elf" />
-        <map mr="timer_registers" vaddr="0x2_000_000" perms="rw" cached="false" setvar_vaddr="gpt_regs" />
+        <map mr="timer_registers" vaddr="0x2_000_000" perms="rw" cached="false"/>
         <irq irq="42" id="0" trigger="edge" /> <!-- timer interrupt for timer A -->
     </protection_domain>
 
