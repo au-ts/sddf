@@ -17,6 +17,9 @@
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 __attribute__((__section__(".ecam_configs"))) pci_ecam_config_t pci_ecam_config;
 
+// regions[1..] are used for MSI-X BARs
+uint8_t avail_region_idx = 1;
+
 /**
  * Look for the capability of a device by ID
  * */
@@ -81,11 +84,15 @@ void configure_irqs(struct pci_config_space *pci_header, config_request_t config
             case irq_msix: {
                 struct msix_capability *msix_cap = (struct msix_capability *)find_pci_cap_by_id(pci_header, PCI_CAP_ID_MSIX);
                 if (msix_cap) {
+                    // Bits 2-0 refer to BAR ID
+                    uint8_t bar_id = msix_cap->table_offset_bir & 0x5;
+                    pci_bar_t msix_bar;
+                    msix_bar.bar_id = bar_id;
+                    msix_bar.base_addr = device_resources.regions[avail_region_idx].io_addr;
+                    msix_bar.mem_mapped = true;
 
-                    // TODO: allocate a BAR for MSI-X
+                    configure_pci_bar(pci_header, bar_id, msix_bar);
 
-                    uint16_t *test = (uint16_t *)((void *)pci_header + 0x98 + 2);
-                    sddf_dprintf("test: 0x%x\n", *test);
                     // Enable MSI-X
                     struct msix_msg_ctrl *msg_ctrl = &msix_cap->msg_ctrl;
                     msg_ctrl->msix_enable = 1;
@@ -93,9 +100,9 @@ void configure_irqs(struct pci_config_space *pci_header, config_request_t config
                     sddf_dprintf("Function Mask: 0x%x\n", msg_ctrl->func_mask);
                     sddf_dprintf("MSI-X Enable: 0x%x\n", msg_ctrl->msix_enable);
 
-                    struct msix_table *msix_table = (struct msix_table *)0xFEBD5000;
+                    struct msix_table *msix_table = (struct msix_table *)device_resources.regions[avail_region_idx].region.vaddr;
                     msix_table->msg_addr_low = 0xFEEu << 20;
-                    msix_table->msg_data = 0x4031;
+                    msix_table->msg_data = 0x4030 + config_request.irqs[i].vector;
                     msix_table->vec_ctrl = 0x0;
                     sddf_dprintf("Vector 0 Message Addr Low: 0x%x\n", msix_table->msg_addr_low);
                     sddf_dprintf("Vector 0 Message Addr Hi: 0x%x\n", msix_table->msg_addr_hi);
@@ -104,6 +111,8 @@ void configure_irqs(struct pci_config_space *pci_header, config_request_t config
 
                     uint32_t *msix_pba = (uint32_t *)0xFEBD5800;
                     sddf_dprintf("PBA: 0x%x\n", msix_pba[0]);
+
+                    avail_region_idx += 1;
                 } else {
                     sddf_dprintf("error: device does not support MSI-X\n");
                 }
@@ -145,12 +154,12 @@ void pci_bus_scan(uintptr_t bus_base)
 
                             // TODO:  consider 64-bit memory
 
-                            /* for (int j = 0; j < 256; j++) { */
-                            /*     if (j && j % 16 == 0) sddf_dprintf("\n"); */
-                            /*     sddf_dprintf("%02x ", *(uint8_t *)(bus_base + (pci_dev << 15) + (pci_func << 12) + j)); */
-                            /* } */
-                            /* sddf_dprintf("\n"); */
                         }
+                        for (int j = 0; j < 256; j++) {
+                            if (j && j % 16 == 0) sddf_dprintf("\n");
+                            sddf_dprintf("%02x ", *(uint8_t *)(bus_base + (pci_dev << 15) + (pci_func << 12) + j));
+                        }
+                        sddf_dprintf("\n");
 
                         configure_irqs(pci_header, config_request);
                     }

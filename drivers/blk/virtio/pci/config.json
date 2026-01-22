@@ -22,7 +22,7 @@
         "irqs": [
             {
                 "irq_type": "msix",
-                "vector": 1
+                "vector": 2
             }
         ],
         "pci_bars": [

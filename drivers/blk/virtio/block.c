@@ -271,13 +271,10 @@ void virtio_blk_init(void)
     assert(virtio_transport_probe(&device_resources, &dev, VIRTIO_DEVICE_ID_BLK));
     ialloc_init(&ialloc_desc, descriptors, QUEUE_SIZE);
 
-    sddf_dprintf("device status: %d\n", virtio_transport_get_status(&dev));
     /* First reset the device */
     virtio_transport_set_status(&dev, 0);
-    sddf_dprintf("device status: %d\n", virtio_transport_get_status(&dev));
     /* Set the ACKNOWLEDGE bit to say we have noticed the device */
     virtio_transport_set_status(&dev, VIRTIO_DEVICE_STATUS_ACKNOWLEDGE);
-    sddf_dprintf("device status: %d\n", virtio_transport_get_status(&dev));
     /* Set the DRIVER bit to say we know how to drive the device */
     virtio_transport_set_status(&dev, VIRTIO_DEVICE_STATUS_DRIVER);
 

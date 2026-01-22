@@ -229,12 +229,6 @@ bool virtio_transport_probe(device_resources_t *device_resources, virtio_device_
 
 void *virtio_transport_get_device_config(virtio_device_handle_t *device_handle)
 {
-    void *test_ptr = get_cfg(device_handle, DEVICE_REGS_DEVICE);
-    for (int j = 0; j < 256; j++) {
-        if (j && j % 16 == 0) sddf_dprintf("\n");
-        sddf_dprintf("%02x ", *(uint8_t *)(test_ptr + j));
-    }
-    sddf_dprintf("\n");
     return get_cfg(device_handle, DEVICE_REGS_DEVICE);
 }
 
