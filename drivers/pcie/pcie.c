@@ -109,7 +109,7 @@ void configure_irqs(struct pci_config_space *pci_header, config_request_t config
                     sddf_dprintf("Vector 0 Message Data: 0x%x\n", msix_table->msg_data);
                     sddf_dprintf("Vector 0 Vector Control: 0x%x\n", msix_table->vec_ctrl);
 
-                    uint32_t *msix_pba = (uint32_t *)0xFEBD5800;
+                    uint32_t *msix_pba = (uint32_t *)(device_resources.regions[avail_region_idx].region.vaddr + 0x800);
                     sddf_dprintf("PBA: 0x%x\n", msix_pba[0]);
 
                     avail_region_idx += 1;

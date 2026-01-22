@@ -71,11 +71,7 @@ def generate(
     serial_system.add_client(client)
 
     pcie_driver = ProtectionDomain("pcie_driver", "pcie_driver.elf", priority=252)
-    pci_system = Sddf.Pci(sdf, pcie_driver, ecam_paddr=0xb0000000, ecam_size=0x10000000, mmio_paddr=0xf0000000, mmio_size=0x8000000)
-    blk_msix_mr = SystemDescription.MemoryRegion(sdf, "blk_msix_regs", 0x10000, paddr=0xFEBD5000)
-    sdf.add_mr(blk_msix_mr)
-    pcie_driver.add_map(SystemDescription.Map(blk_msix_mr, 0xFEBD5000, "rw"))
-
+    pci_system = Sddf.Pci(sdf, pcie_driver, ecam_paddr=0xb0000000, ecam_size=0x10000000, mmio_paddr=0xe0000000, mmio_size=0x10000000)
     pci_system.add_client(blk_system, device_id=0x1001, vendor_id=0x1af4, bus=0, dev=3, func=0)
 
     pds = [serial_driver, serial_virt_tx, blk_driver, blk_virt, client, pcie_driver]

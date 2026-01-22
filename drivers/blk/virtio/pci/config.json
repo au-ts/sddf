@@ -7,8 +7,7 @@
             {
                 "name": "regs",
                 "perms": "rw",
-                "size": 16384,
-                "paddr": 4026531840
+                "size": 16384
             },
             {
                 "name": "virtio_headers",
