@@ -19,11 +19,11 @@ SEL4_64B := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)/elf/sel4.
 SEL4_32B := $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG)/elf/sel4_32.elf
 
 QEMU := qemu-system-x86_64
-QEMU_ARCH_ARGS := -machine q35 \
+QEMU_ARCH_ARGS := -accel kvm -nic none \
 		-kernel $(SEL4_32B) \
-		-m size=2G \
+		-m size=8G \
 		-serial mon:stdio \
-		-cpu qemu64,+fsgsbase,+pdpe1gb,+pcid,+invpcid,+xsave,+xsaves,+xsaveopt \
+		-cpu host,+fsgsbase,+pdpe1gb,+pcid,+invpcid,+xsave,+xsaves,+xsaveopt \
 		-initrd $(IMAGE_FILE)
 
 # The PCI slot is hard-coded in the virtIO drivers for now, so we have to
