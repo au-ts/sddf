@@ -250,48 +250,23 @@ def generate(
         sdf.add_mr(clock_controller)
         ethernet_driver.add_map(Map(clock_controller, 0x3000000, perms="rw"))
 
-    if board.arch == SystemDescription.Arch.X86_64:
-        serial_port = SystemDescription.IoPort(board.serial, 8, 0)
-        uart_driver.add_ioport(serial_port)
+    # if board.arch == SystemDescription.Arch.X86_64:
+    #     serial_port = SystemDescription.IoPort(board.serial, 8, 0)
+    #     uart_driver.add_ioport(serial_port)
 
-        pcie_driver = ProtectionDomain("pcie_driver", "pcie_driver.elf", priority=252)
-        ecam_mr = SystemDescription.MemoryRegion(sdf, "ecam_regs", 0x10000000, paddr=0xb0000000)
-        net_msix_mr = SystemDescription.MemoryRegion(sdf, "blk_msix_regs", 0x10000, paddr=0xFEBD5000)
-        sdf.add_mr(ecam_mr)
-        sdf.add_mr(net_msix_mr)
-        pcie_driver.add_map(SystemDescription.Map(ecam_mr, 0xb0000000, "rw"))
-        pcie_driver.add_map(SystemDescription.Map(net_msix_mr, 0xFEBD5000, "rw"))
+    #     pcie_driver = ProtectionDomain("pcie_driver", "pcie_driver.elf", priority=252)
+    #     ecam_mr = SystemDescription.MemoryRegion(sdf, "ecam_regs", 0x10000000, paddr=0xb0000000)
+    #     net_msix_mr = SystemDescription.MemoryRegion(sdf, "blk_msix_regs", 0x10000, paddr=0xFEBD5000)
+    #     sdf.add_mr(ecam_mr)
+    #     sdf.add_mr(net_msix_mr)
+    #     pcie_driver.add_map(SystemDescription.Map(ecam_mr, 0xb0000000, "rw"))
+    #     pcie_driver.add_map(SystemDescription.Map(net_msix_mr, 0xFEBD5000, "rw"))
 
-        ecam_mr = MemoryRegion(
-            sdf, name="ecam", size=0x10000000, paddr=0x80000000
-        )
-        sdf.add_mr(ecam_mr)
-        pcie_driver.add_map(Map(ecam_mr, vaddr=0x3000000, perms="rw"))
-
-
-    if board.name == "qemu_virt_x86":
-        hw_net_rings = MemoryRegion(sdf, "hw_net_rings", 65536, paddr=0x7A000000)
-        sdf.add_mr(hw_net_rings)
-        ethernet_driver.add_map(Map(hw_net_rings, 0x7000_0000, "rw"))
-
-        virtio_net_regs = MemoryRegion(
-            sdf, "virtio_net_regs", 0x4000, paddr=0xFE000000
-        )
-        sdf.add_mr(virtio_net_regs)
-        ethernet_driver.add_map(
-            Map(virtio_net_regs, 0x6000_0000, "rw", cached=False)
-        )
-
-        virtio_net_irq = SystemDescription.IrqIoapic(
-            ioapic_id=0, pin=11, vector=1, id=16
-        )
-        ethernet_driver.add_irq(virtio_net_irq)
-
-        pci_config_address_port = SystemDescription.IoPort(0xCF8, 4, 1)
-        ethernet_driver.add_ioport(pci_config_address_port)
-
-        pci_config_data_port = SystemDescription.IoPort(0xCFC, 4, 2)
-        ethernet_driver.add_ioport(pci_config_data_port)
+    #     ecam_mr = MemoryRegion(
+    #         sdf, name="ecam", size=0x10000000, paddr=0x80000000
+    #     )
+    #     sdf.add_mr(ecam_mr)
+    #     pcie_driver.add_map(Map(ecam_mr, vaddr=0x3000000, perms="rw"))
 
     if board.name == "makatea":
         ecam_mr = MemoryRegion(
@@ -358,7 +333,7 @@ def generate(
     net_virt_rx = ProtectionDomain(
         "net_virt_rx", "network_virt_rx.elf", priority=99, cpu=get_core("net_virt_rx")
     )
-    net_system = Sddf.Net(sdf, ethernet_node, ethernet_driver, net_virt_tx, net_virt_rx)
+    net_system = Sddf.Net(sdf, ethernet_node, ethernet_driver, net_virt_tx, net_virt_rx, compatible="virtio,pci")
 
     client0_elf = copy_elf("echo", "echo", 0)
     client0 = ProtectionDomain(
@@ -385,6 +360,37 @@ def generate(
         budget=20000,
         cpu=get_core("client1_net_copier"),
     )
+
+    # if board.name == "qemu_virt_x86":
+        # hw_net_rings = MemoryRegion(sdf, "hw_net_rings", 65536, paddr=0x7A000000)
+        # sdf.add_mr(hw_net_rings)
+        # ethernet_driver.add_map(Map(hw_net_rings, 0x7000_0000, "rw"))
+
+        # virtio_net_regs = MemoryRegion(
+        #     sdf, "virtio_net_regs", 0x4000, paddr=0xFE000000
+        # )
+        # sdf.add_mr(virtio_net_regs)
+        # ethernet_driver.add_map(
+        #     Map(virtio_net_regs, 0x6000_0000, "rw", cached=False)
+        # )
+
+        # virtio_net_irq = SystemDescription.IrqIoapic(
+        #     ioapic_id=0, pin=11, vector=1, id=16
+        # )
+        # ethernet_driver.add_irq(virtio_net_irq)
+
+    if board.arch == SystemDescription.Arch.X86_64:
+        serial_port = SystemDescription.IoPort(board.serial, 8, 0)
+        uart_driver.add_ioport(serial_port)
+
+        pci_config_address_port = SystemDescription.IoPort(0xCF8, 8, 1)
+        ethernet_driver.add_ioport(pci_config_address_port)
+
+        pcie_driver = ProtectionDomain("pcie_driver", "pcie_driver.elf", priority=252)
+        sdf.add_pd(pcie_driver)
+        pci_system = Sddf.Pci(sdf, pcie_driver, ecam_paddr=0xb0000000, ecam_size=0x10000000, mmio_paddr=0xe0000000, mmio_size=0x10000000)
+        pci_system.add_client(net_system, device_id=0x1000, vendor_id=0x1af4, bus=0, dev=3, func=0)
+
 
     serial_system.add_client(client0)
     serial_system.add_client(client1)
@@ -520,15 +526,17 @@ def generate(
     )
 
     assert serial_system.connect()
-    assert serial_system.serialise_config(output_dir)
     assert net_system.connect()
-    assert net_system.serialise_config(output_dir)
     assert timer_system.connect()
-    assert timer_system.serialise_config(output_dir)
     assert client0_lib_sddf_lwip.connect()
-    assert client0_lib_sddf_lwip.serialise_config(output_dir)
     assert client1_lib_sddf_lwip.connect()
+    assert pci_system.connect()
+    assert serial_system.serialise_config(output_dir)
+    assert net_system.serialise_config(output_dir)
+    assert timer_system.serialise_config(output_dir)
+    assert client0_lib_sddf_lwip.serialise_config(output_dir)
     assert client1_lib_sddf_lwip.serialise_config(output_dir)
+    assert pci_system.serialise_config(output_dir)
 
     with open(f"{output_dir}/benchmark_client_config.data", "wb+") as f:
         f.write(bench_client_config.serialise())

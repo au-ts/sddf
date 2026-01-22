@@ -67,6 +67,7 @@ void configure_irqs(struct pci_config_space *pci_header, config_request_t config
     // Enable/Disable I/O APIC interrupts
     if (ioapic_enabled) {
         pci_header->command &= (~BIT(10));
+        return;
     } else {
         pci_header->command |= BIT(10);
     }

@@ -411,20 +411,8 @@ void init(void)
     assert(net_config_check_magic(&config));
     assert(device_resources_check_magic(&device_resources));
 
-// @billn fix ridiculousness
-#if !defined(CONFIG_ARCH_X86_64)
-    assert(device_resources.num_irqs == 1);
-    assert(device_resources.num_regions == 2);
-#endif
-
-// @billn fix ridiculousness
-#if defined(CONFIG_ARCH_X86_64)
-    hw_ring_buffer_vaddr = 0x70000000;
-    hw_ring_buffer_paddr = 0x7a000000;
-#else
     hw_ring_buffer_vaddr = (uintptr_t)device_resources.regions[1].region.vaddr;
     hw_ring_buffer_paddr = device_resources.regions[1].io_addr;
-#endif
 
     ialloc_init(&rx_ialloc_desc, rx_descriptors, RX_COUNT);
     ialloc_init(&tx_ialloc_desc, tx_descriptors, TX_COUNT);
@@ -440,23 +428,12 @@ void init(void)
 
     eth_setup();
 
-// @billn fix ridiculousness
-#if defined(CONFIG_ARCH_X86_64)
-    sddf_irq_ack(16);
-#else
     sddf_irq_ack(device_resources.irqs[0].id);
-#endif
 }
 
 void notified(sddf_channel ch)
 {
-// @billn fix ridiculousness
-#if defined(CONFIG_ARCH_X86_64)
-    if (ch == 16) {
-#else
     if (ch == device_resources.irqs[0].id) {
-#endif
-
         handle_irq();
         sddf_deferred_irq_ack(ch);
     } else if (ch == config.virt_rx.id) {

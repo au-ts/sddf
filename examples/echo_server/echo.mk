@@ -35,6 +35,7 @@ SERIAL_COMPONENTS := $(SDDF)/serial/components
 UART_DRIVER := $(SDDF)/drivers/serial/$(UART_DRIV_DIR)
 TIMER_DRIVER := $(SDDF)/drivers/timer/$(TIMER_DRIV_DIR)
 NETWORK_COMPONENTS := $(SDDF)/network/components
+PCIE_DRIVER := $(SDDF)/drivers/pcie
 
 SDDF_CUSTOM_LIBC := 1
 
@@ -42,7 +43,8 @@ vpath %.c ${SDDF} ${ECHO_SERVER}
 
 IMAGES := eth_driver.elf echo.elf benchmark.elf idle.elf \
 	  network_virt_rx.elf network_virt_tx.elf network_copy.elf \
-	  timer_driver.elf serial_driver.elf serial_virt_tx.elf
+	  timer_driver.elf serial_driver.elf serial_virt_tx.elf \
+	  pcie_driver.elf
 
 
 CFLAGS += \
@@ -87,6 +89,8 @@ else
 	$(PYTHON)\
 	    $(METAPROGRAM) --sddf $(SDDF) --board $(X86_BOARD) \
 	    --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) --smp $(SMP_CONFIG)
+	$(OBJCOPY) --update-section .device_resources=pcie_driver_device_resources.data pcie_driver.elf
+	$(OBJCOPY) --update-section .ecam_configs=pcie_driver_client_configs.data pcie_driver.elf
 endif
 	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data serial_driver.elf
@@ -122,6 +126,7 @@ include ${BENCHMARK}/benchmark.mk
 include ${TIMER_DRIVER}/timer_driver.mk
 include ${UART_DRIVER}/serial_driver.mk
 include ${SERIAL_COMPONENTS}/serial_components.mk
+include ${PCIE_DRIVER}/pcie_driver.mk
 
 qemu: $(IMAGE_FILE)
 	$(QEMU) $(QEMU_ARCH_ARGS) $(QEMU_NET_ARGS) \
