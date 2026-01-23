@@ -10,6 +10,7 @@
 #include <libco.h>
 #include <sddf/util/printf.h>
 #include <sddf/timer/client.h>
+#include <sddf/timer/config.h>
 #include <sddf/gpio/meson/gpio.h>
 #include "include/client/client.h"
 #include "gpio_config.h"
@@ -28,7 +29,7 @@
 // uintptr_t ultrasonic_input_buffer_base_vaddr;
 // uintptr_t ultrasonic_output_buffer_base_vaddr;
 
-__attribute__((__section__(".timer_client_config"))) timer_client_config_t config;
+__attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
 sddf_channel timer_channel;
 
 cothread_t t_event;
@@ -252,15 +253,12 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo) {
     return res;
 }
 
-void notified(microkit_channel ch) {
-    switch (ch)
-    {
-    case timer_channel:
+void notified(sddf_channel ch) {
+
+    if (ch == timer_config.driver_id) {
         co_switch(t_main);
-        break;
-    default:
+    } else {
         LOG_SENSOR("Unexpected channel call\n");
-        break;
     }
 }
 
@@ -268,7 +266,7 @@ void notified(microkit_channel ch) {
 void init(void) {
     LOG_SENSOR("Init\n");
     // sensor_main();
-    timer_channel = config.driver_id;
+    timer_channel = timer_config.driver_id;
 
 
     /* Define the event loop/notified thread as the active co-routine */

@@ -25,7 +25,7 @@
 #endif
 #define LOG_CLIENT_ERR(...) do{ sddf_printf("CLIENT|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
-__attribute__((__section__(".timer_client_config"))) timer_client_config_t config;
+__attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
 
 
 sddf_channel timer_channel;
@@ -146,19 +146,16 @@ void client_main(void) {
 // Call coroutine, block other commands from executing
 void notified(sddf_channel ch) {
     // check this switch
-    switch (ch)
-    {
-    case timer_channel:
+    if (ch == timer_config.driver_id) {
         co_switch(t_main);
-        break;
-    default:
+    }
+    else {
         LOG_CLIENT("Unexpected channel call\n");
-        break;
     }
 }
 
 void init(void) {
-    timer_channel = config.driver_id;
+    timer_channel = timer_config.driver_id;
 
     // time_start = sddf_timer_time_now(TIMER_CHANNEL);
     LOG_CLIENT("Init\n");

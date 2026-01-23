@@ -10,6 +10,7 @@
 #include <libco.h>
 #include <sddf/util/printf.h>
 #include <sddf/timer/client.h>
+#include <sddf/timer/config.h>
 #include <sddf/gpio/meson/gpio.h>
 #include "include/client/client.h"
 #include "include/motor/motor_control.h"
@@ -26,7 +27,7 @@
 
 #define LOG_CONTROL_ERR(...) do{ sddf_printf("CONTROL|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
-__attribute__((__section__(".timer_client_config"))) timer_client_config_t config;
+__attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
 
 sddf_channel timer_channel;
 
@@ -164,15 +165,12 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo) {
     return res;
 } 
 
-void notified(microkit_channel ch) {
-    switch (ch)
-    {
-    case timer_channel:
-        // new control request, stop current signal to make new one
+void notified(sddf_channel ch) {
+    if (ch == timer_config.driver_id) {
         if (!is_control_fulfilled) {
             handle_motor_request();
             is_control_fulfilled = 1;
-            break;
+            return;
         } 
 
         if (pwm_state == PAUSE_HIGH) {
@@ -190,17 +188,15 @@ void notified(microkit_channel ch) {
             // uint64_t time = sddf_timer_time_now(TIMER_CHANNEL);
             // LOG_CONTROL("SET DIGITAL HIGH, the time now is: %lu\n", time);
             set_pwm(GPIO_CHANNEL, pwm_delay_mappings[curr_command - 1][PWM_TIME_HIGH]*NS_IN_US);
-        }   
-        
-        break;
-    default:
+        }
+    }
+    else {
         LOG_CONTROL("Unexpected channel call\n");
-        break;
     }
 }
 
 void init(void) {
-    timer_channel = config.driver_id;
+    timer_channel = timer_config.driver_id;
 
     LOG_CONTROL("Init\n");
     gpio_init(GPIO_CHANNEL);

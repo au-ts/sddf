@@ -6,7 +6,7 @@ import importlib
 from importlib.metadata import version
 
 
-# TODO: channels, memory regions
+# WARNING: the system file this generates is incomplete (missing & vaddr-var mapping)
 
 sys.path.append(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../tools/meta")
@@ -23,8 +23,8 @@ ProtectionDomain = SystemDescription.ProtectionDomain
 # 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     # Memory regions
-    gpio_mr = MemoryRegion(sdf, "gpio", 0x1000,  paddr=0xFF634000)
-    gpio_ao_mr = MemoryRegion(sdf, "gpio_ao", 0x1000,  paddr=0xFF800000)
+    gpio_mr = SystemDescription.MemoryRegion(sdf, "gpio", 0x1000,  paddr=0xFF634000)
+    gpio_ao_mr = SystemDescription.MemoryRegion(sdf, "gpio_ao", 0x1000,  paddr=0xFF800000)
     sdf.add_mr(gpio_mr)
     sdf.add_mr(gpio_ao_mr)
 
@@ -32,9 +32,12 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     timer_node = None
     timer_driver = ProtectionDomain("timer", "timer_driver.elf", priority=254)
 
+    # setvar_vaddr="gpio_regs"
+    # setvar_vaddr="gpio_ao_regs"
+
     gpio_driver = ProtectionDomain("gpio_driver", "gpio_driver.elf", priority=100)
-    gpio_driver.add_map(Map(gpio_mr, vaddr=0x4000000, perms="rw", setvar_vaddr="gpio_regs", cached="false"))
-    gpio_driver.add_map(Map(gpio_ao_mr, vaddr=0x4100000, perms="rw", setvar_vaddr="gpio_ao_regs", cached="false"))
+    gpio_driver.add_map(SystemDescription.Map(gpio_mr, vaddr=0x4000000, perms="rw", cached="false"))
+    gpio_driver.add_map(SystemDescription.Map(gpio_ao_mr, vaddr=0x4100000, perms="rw", cached="false"))
 
 
     client = ProtectionDomain("client", "client.elf", priority=1)
@@ -52,24 +55,24 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     timer_system.add_client(ultrasonic_sensor)
 
     # Client to motors channel
-    sdf.add_channel(SystemDescription.Channel(client, motor_control_a, 2, 1))
-    sdf.add_channel(SystemDescription.Channel(client, motor_control_b, 3, 1))
+    sdf.add_channel(SystemDescription.Channel(client, motor_control_a, a_id=2, b_id=1, pp_a=True))
+    sdf.add_channel(SystemDescription.Channel(client, motor_control_b, a_id=3, b_id=1, pp_a=True))
 
     # Client to sensor channel
-    sdf.add_channel(SystemDescription.Channel(client, ultrasonic_sensor, 4, 1))
+    sdf.add_channel(SystemDescription.Channel(client, ultrasonic_sensor, a_id=4, b_id=1, pp_a=True))
 
     # Motors to GPIO channel
-    sdf.add_channel(SystemDescription.Channel(motor_control_a, gpio_driver, 3, 0))
-    sdf.add_channel(SystemDescription.Channel(motor_control_b, gpio_driver, 3, 1))
+    sdf.add_channel(SystemDescription.Channel(motor_control_a, gpio_driver, a_id=3, b_id=0, pp_a=True))
+    sdf.add_channel(SystemDescription.Channel(motor_control_b, gpio_driver, a_id=3, b_id=1, pp_a=True))
 
     # Sensors to GPIO channel
     # Echo pin
-    sdf.add_channel(SystemDescription.Channel(ultrasonic_sensor, gpio_driver, 3, 2))
+    sdf.add_channel(SystemDescription.Channel(ultrasonic_sensor, gpio_driver, a_id=3, b_id=2, pp_a=True))
 
     # Trig pin
-    sdf.add_channel(SystemDescription.Channel(ultrasonic_sensor, gpio_driver, 4, 3))
+    sdf.add_channel(SystemDescription.Channel(ultrasonic_sensor, gpio_driver, a_id=4, b_id=3, pp_a=True))
 
-    pds = [timer_driver, client, motor_control_a, motor_control_b, ultrasonic_sensor]
+    pds = [timer_driver, client, motor_control_a, motor_control_b, ultrasonic_sensor, gpio_driver]
     for pd in pds:
         sdf.add_pd(pd)
 

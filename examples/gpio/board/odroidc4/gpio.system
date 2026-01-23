@@ -1,106 +1,72 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
-    Copyright 2024, UNSW
-
-    SPDX-License-Identifier: BSD-2-Clause
--->
 <system>
-    <memory_region name="gpio" size="0x1_000" phys_addr="0xFF634000"/>
-    <memory_region name="gpio_ao" size="0x1_000" phys_addr="0xFF800000"/>
-    <memory_region name="timer_registers" size="0x10_000" phys_addr="0xffd0f000" />
-
+    <memory_region name="gpio" size="0x1000" phys_addr="0xff634000" />
+    <memory_region name="gpio_ao" size="0x1000" phys_addr="0xff800000" />
+    <memory_region name="watchdog@f0d0/drivers/timer/meson/regs" size="0x1000" phys_addr="0xffd0f000" />
     <protection_domain name="timer" priority="254" passive="true">
         <program_image path="timer_driver.elf" />
-        <map mr="timer_registers" vaddr="0x2_000_000" perms="rw" cached="false"/>
-        <irq irq="42" id="0" trigger="edge" /> <!-- timer interrupt for timer A -->
+        <map mr="watchdog@f0d0/drivers/timer/meson/regs" vaddr="0x20000000" perms="rw" cached="false" />
+        <irq irq="42" id="0" trigger="edge" />
     </protection_domain>
-
-    <protection_domain name="driver" priority="100">
-        <program_image path="gpio_driver.elf"/>
-
-        <map mr="gpio" vaddr="0x4_000_000" perms="rw" setvar_vaddr="gpio_regs" cached="false" />
-        <map mr="gpio_ao" vaddr="0x4_100_000" perms="rw" setvar_vaddr="gpio_ao_regs" cached="false" />
-    </protection_domain>
-
     <protection_domain name="client" priority="1">
-        <program_image path="client.elf"/>
+        <program_image path="client.elf" />
     </protection_domain>
-
     <protection_domain name="motor_control_a" priority="2">
-        <program_image path="motor_control_a.elf"/>
+        <program_image path="motor_control_a.elf" />
     </protection_domain>
-
     <protection_domain name="motor_control_b" priority="2">
-        <program_image path="motor_control_b.elf"/>
+        <program_image path="motor_control_b.elf" />
     </protection_domain>
-
     <protection_domain name="ultrasonic_sensor" priority="2">
-        <program_image path="ultrasonic_sensor.elf"/>
+        <program_image path="ultrasonic_sensor.elf" />
     </protection_domain>
-
-
-    <!-- Timer channels -->
+    <protection_domain name="gpio_driver" priority="100">
+        <program_image path="gpio_driver.elf" />
+        <map mr="gpio" vaddr="0x4000000" perms="rw" cached="true" />
+        <map mr="gpio_ao" vaddr="0x4100000" perms="rw" cached="true" />
+    </protection_domain>
+    <channel>
+        <end pd="client" id="2" pp="true" />
+        <end pd="motor_control_a" id="1" />
+    </channel>
+    <channel>
+        <end pd="client" id="3" pp="true" />
+        <end pd="motor_control_b" id="1" />
+    </channel>
+    <channel>
+        <end pd="client" id="4" pp="true" />
+        <end pd="ultrasonic_sensor" id="1" />
+    </channel>
+    <channel>
+        <end pd="motor_control_a" id="3" pp="true" />
+        <end pd="gpio_driver" id="0" />
+    </channel>
+    <channel>
+        <end pd="motor_control_b" id="3" pp="true" />
+        <end pd="gpio_driver" id="1" />
+    </channel>
+    <channel>
+        <end pd="ultrasonic_sensor" id="3" pp="true" />
+        <end pd="gpio_driver" id="2" />
+    </channel>
+    <channel>
+        <end pd="ultrasonic_sensor" id="4" pp="true" />
+        <end pd="gpio_driver" id="3" />
+    </channel>
     <channel>
         <end pd="timer" id="1" />
-        <end pd="client" id="1" notify="false" pp="true"/> <!-- Should this number change, so should TIMER_CH in timer.h -->
+        <end pd="client" id="0" notify="false" pp="true" />
     </channel>
-
     <channel>
         <end pd="timer" id="2" />
-        <end pd="motor_control_a" id="2" notify="false" pp="true"/>
+        <end pd="motor_control_a" id="0" notify="false" pp="true" />
     </channel>
-
     <channel>
         <end pd="timer" id="3" />
-        <end pd="motor_control_b" id="2" notify="false" pp="true"/>
+        <end pd="motor_control_b" id="0" notify="false" pp="true" />
     </channel>
-
     <channel>
         <end pd="timer" id="4" />
-        <end pd="ultrasonic_sensor" id="2" notify="false" pp="true"/>
+        <end pd="ultrasonic_sensor" id="0" notify="false" pp="true" />
     </channel>
-
-
-    <!-- Client to motors channel -->
-    <channel>
-        <end pd="motor_control_a" id="1" />
-        <end pd="client" id="2" pp="true"/>
-    </channel>
-
-    <channel>
-        <end pd="motor_control_b" id="1" />
-        <end pd="client" id="3" pp="true"/>
-    </channel>
-
-    <!-- Client to sensors channel -->
-    <channel>
-        <end pd="ultrasonic_sensor" id="1" />
-        <end pd="client" id="4" pp="true"/>
-    </channel>
-
-    <!-- Motors to GPIO channel -->
-    <channel>
-        <end pd="driver" id="0" />
-        <end pd="motor_control_a" id="3" pp="true"/>
-    </channel>
-
-    <channel>
-        <end pd="driver" id="1" />
-        <end pd="motor_control_b" id="3" pp="true"/>
-    </channel>
-
-
-    <!-- Sensors to GPIO channel -->
-    <!-- Echo pin -->
-    <channel>
-        <end pd="driver" id="2" />
-        <end pd="ultrasonic_sensor" id="3" pp="true"/>
-    </channel>
-
-    <!-- Trig pin -->
-    <channel>
-        <end pd="driver" id="3" />
-        <end pd="ultrasonic_sensor" id="4" pp="true"/>
-    </channel>
-
 </system>
