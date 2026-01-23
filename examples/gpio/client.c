@@ -139,7 +139,6 @@ void client_main(void) {
         time_end = sddf_timer_time_now(timer_channel);
 
         LOG_CLIENT("Execution time: %ld\n", time_end - time_start);
-        return;
     }
 }
 
