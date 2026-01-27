@@ -252,7 +252,7 @@ if __name__ == "__main__":
     try:
         draw()
 
-        # Run each selected config as a single subprocess job
+        # Run each selected config as a single subprocess job (we cannot run examples concurrently as they use the same HW)
         for js in jobs_in_order:
             js.status = "RUNNING"
             draw()

@@ -263,8 +263,10 @@ if __name__ == "__main__":
             draw()
 
     finally:
-        if live is not None:
-            live.stop()
+        pass
+    #    if live is not None:
+    #        # Wait for user input ?
+    #        live.stop()
 
     # Draw static dashboard for CI
     if not dashboard:
