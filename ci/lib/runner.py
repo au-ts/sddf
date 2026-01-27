@@ -19,6 +19,7 @@ import os
 from pathlib import Path
 import time
 from typing import Literal, Optional
+import concurrent.futures
 
 from . import log
 from .backends import (
@@ -336,22 +337,32 @@ def cli(
     do_retries = False
     retry_queue: list[TestConfig] = []
 
-    for test_config in matrix:
-        fmt = f"{test_name} on {test_config.board} ({test_config.config}, built with {test_config.build_system})"
-        log.group_start("Running " + fmt)
-        result = run_test_config(
-            test_name, test_config, test_fn, backend_fn, loader_img_fn, args.logs_dir
-        )
-        log.group_end("Finished running " + fmt)
+    ## We can run tests in parallel if they are on different boards, we cannot run debug/release on the same board
+    ## Logging has to be handled properly - we cannot interleave logs
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        # submit jobs
+        futures_to_testruns = {}
+        for test_config in matrix:
+            future_to_testrun = executor.submit(run_test_config, test_name, test_config, test_fn, backend_fn, loader_img_fn, args.logs_dir)
+            futures_to_testruns[test_config] = future_to_testrun
 
-        test_results[test_config] = result
+        # read futures
+        for future in concurrent.futures.as_completed(futures_to_testruns):
+            result = "fail"
+            test_config = futures_to_testruns[future]
+            try:
+                result = future.result()
+            except Exception as exc:
+                print('%r generated an exception: %s' % ("Blabla", exc))
+            else:
+                if result == "interrupted" or (result != "pass" and args.fast_fail):
+                    do_retries = False
+                    break
+                elif result == "retry":
+                    do_retries = True
+                    retry_queue.append(test_config)
 
-        if result == "interrupted" or (result != "pass" and args.fast_fail):
-            do_retries = False
-            break
-        elif result == "retry":
-            do_retries = True
-            retry_queue.append(test_config)
+            test_results[test_config] = result
 
     if do_retries:
         for retry in range(args.retry_count):
@@ -366,6 +377,8 @@ def cli(
                 time.sleep(args.retry_delay)
             except KeyboardInterrupt:
                 break
+
+            ## Run retries in parallel as well
 
             for test_config in retry_queue:
                 fmt = f"{test_name} on {test_config.board} ({test_config.config}, built with {test_config.build_system})"
