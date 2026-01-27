@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 // djb2 hash: http://www.cse.yorku.ca/~oz/hash.html
-unsigned long generate_hash(unsigned char *str)
+unsigned long generate_hash(char str[])
 {
     unsigned long hash = 5381;
     int c;
@@ -16,8 +16,12 @@ unsigned long generate_hash(unsigned char *str)
     return hash;
 }
 
+void notified(sddf_channel ch) {
+    sddf_printf("Unexpected channel call\n");
+}
+
 void init(void) {
-    char magic[26] = "SCaTRyBCliglbggGhQoDk6UfEn";
+    char magic[] = "SCaTRyBCliglbggGhQoDk6UfEn";
 
     while (true) {
         unsigned long hash = generate_hash(magic);

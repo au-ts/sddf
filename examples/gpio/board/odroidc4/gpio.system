@@ -22,8 +22,11 @@
     </protection_domain>
     <protection_domain name="gpio_driver" priority="100">
         <program_image path="gpio_driver.elf" />
-        <map mr="gpio" vaddr="0x4000000" perms="rw" cached="false" setvar_vaddr="gpio_regs"/>
-        <map mr="gpio_ao" vaddr="0x4100000" perms="rw" cached="false" setvar_vaddr="gpio_ao_regs"/>
+        <map mr="gpio" vaddr="0x4000000" perms="rw" cached="false" />
+        <map mr="gpio_ao" vaddr="0x4100000" perms="rw" cached="false" />
+    </protection_domain>
+    <protection_domain name="telemetry" priority="1">
+        <program_image path="telemetry.elf" />
     </protection_domain>
     <channel>
         <end pd="client" id="2" pp="true" />
