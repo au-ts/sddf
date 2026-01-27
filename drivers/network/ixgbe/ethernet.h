@@ -3,98 +3,79 @@
 #include <stdint.h>
 #include <sddf/util/printf.h>
 
-#define PCIE_CONFIG_BASE 0x3000000lu
-#define DEVICE_BASE 0x2000000lu
-#define DEVICE_MSIX_TABLE 0x4000000lu
+#define declare_register(name, offset)             \
+    uintptr_t name = (uintptr_t)offset;
 
-#define declare_register(base, name, offset)             \
-    uintptr_t name = (uintptr_t)(base + offset);
-
-#define declare_array_register(base, name, offset, count, multiplier)    \
+#define declare_array_register(name, offset, count, multiplier)    \
     static inline                                                       \
     uintptr_t                                                           \
     name(int index) {                                                   \
         if (index >= count) {                                           \
-            sddf_dprintf("array register index out of bounds\n");             \
+            sddf_dprintf("array register index out of bounds\n");       \
             return 0;                                                   \
         }                                                               \
-        return base + offset + multiplier * index;               \
+        return offset + multiplier * index;                             \
     }                                                                   \
 
-declare_register(PCIE_CONFIG_BASE, PCI_VENDOR_ID_16, 0x00);
-declare_register(PCIE_CONFIG_BASE, PCI_DEVICE_ID_16, 0x02);
-declare_register(PCIE_CONFIG_BASE, PCI_COMMAND_16, 0x04);
-declare_register(PCIE_CONFIG_BASE, PCI_STATUS_16, 0x06);
-declare_register(PCIE_CONFIG_BASE, PCI_INTERRUPT_PIN_LINE_16, 0x3C);
-declare_register(PCIE_CONFIG_BASE, PCI_MSI_MESSAGE_CONTROL_16, 0x52);
-declare_register(PCIE_CONFIG_BASE, PCI_MSI_MESSAGE_ADDRESS_LOW, 0x54);
-declare_register(PCIE_CONFIG_BASE, PCI_MSI_MESSAGE_ADDRESS_HIGH, 0x58);
-declare_register(PCIE_CONFIG_BASE, PCI_MSI_MESSAGE_DATA_16, 0x5C);
-declare_register(PCIE_CONFIG_BASE, PCI_MSI_MASK, 0x60);
-declare_register(PCIE_CONFIG_BASE, PCI_MSI_PENDING, 0x64);
-declare_register(PCIE_CONFIG_BASE, PCI_MSIX_CTRL, 0x70);
-declare_register(PCIE_CONFIG_BASE, PCI_MSIX_OFFSET, 0x74);
-declare_register(PCIE_CONFIG_BASE, PCI_MSIX_PENDING, 0x78);
-
-declare_register(DEVICE_BASE, CTRL, 0x00000);
-declare_register(DEVICE_BASE, STATUS, 0x00008);
-declare_register(DEVICE_BASE, CTRL_EXT, 0x00018);
-declare_register(DEVICE_BASE, EEC, 0x10010);
-declare_register(DEVICE_BASE, GPRC, 0x04074);
-declare_register(DEVICE_BASE, GPTC, 0x04080);
-declare_register(DEVICE_BASE, GORCL, 0x04088);
-declare_register(DEVICE_BASE, GORCH, 0x0408C);
-declare_register(DEVICE_BASE, GOTCL, 0x04090);
-declare_register(DEVICE_BASE, GOTCH, 0x04094);
-declare_register(DEVICE_BASE, HLREG0, 0x04240);
-declare_register(DEVICE_BASE, LINKS, 0x042A4);
-declare_register(DEVICE_BASE, FCTRL, 0x05080);
-declare_register(DEVICE_BASE, RXCTRL, 0x03000);
-declare_register(DEVICE_BASE, RDRXCTL, 0x02F00);
-declare_register(DEVICE_BASE, DTXMXSZRQ, 0x08100);
-declare_register(DEVICE_BASE, DMATXCTL, 0x04A80);
-declare_register(DEVICE_BASE, RTTDCS, 0x04900);
-declare_register(DEVICE_BASE, EICR, 0x00800);
-declare_register(DEVICE_BASE, EICS, 0x00808);
-declare_register(DEVICE_BASE, EIMS, 0x00880);
-declare_register(DEVICE_BASE, EIMC, 0x00888);
-declare_register(DEVICE_BASE, EIAC, 0x00810);
-declare_register(DEVICE_BASE, GPIE, 0x00898);
-declare_register(DEVICE_BASE, TXDGPC, 0x087A0);
-declare_register(DEVICE_BASE, TXDGBCL, 0x087A4);
-declare_register(DEVICE_BASE, TXDGBCH, 0x087A8);
-declare_register(DEVICE_BASE, FACTPS, 0x10150);
-declare_array_register(DEVICE_BASE, RDBAL, 0x01000, 64, 0x40);
-declare_array_register(DEVICE_BASE, RDBAH, 0x01004, 64, 0x40);
-declare_array_register(DEVICE_BASE, RDLEN, 0x01008, 64, 0x60);
-declare_array_register(DEVICE_BASE, RDH, 0x01010, 64, 0x40);
-declare_array_register(DEVICE_BASE, RDT, 0x01018, 64, 0x40);
-declare_array_register(DEVICE_BASE, SRRCTL, 0x01014, 64, 0x40);
-declare_array_register(DEVICE_BASE, RXPBSIZE, 0x03C00, 8, 0x4);
-declare_array_register(DEVICE_BASE, DCA_RXCTRL, 0x0100C, 64, 0x40);
-declare_array_register(DEVICE_BASE, RXDCTL, 0x01028, 64, 0x40);
-declare_array_register(DEVICE_BASE, RSCCTL, 0x0102C, 64, 0x40);
-declare_array_register(DEVICE_BASE, TDBAL, 0x06000, 64, 0x40);
-declare_array_register(DEVICE_BASE, TDBAH, 0x06004, 64, 0x40);
-declare_array_register(DEVICE_BASE, TDLEN, 0x06008, 64, 0x40);
-declare_array_register(DEVICE_BASE, TDH, 0x06010, 64, 0x40);
-declare_array_register(DEVICE_BASE, TDT, 0x06018, 64, 0x40);
-declare_array_register(DEVICE_BASE, TXPBSIZE, 0x0CC00, 8, 0x4);
-declare_array_register(DEVICE_BASE, TXPBTHRESH, 0x04950, 8, 0x4);
-declare_array_register(DEVICE_BASE, TXDCTL, 0x06028, 64, 0x40);
-declare_array_register(DEVICE_BASE, IVAR, 0x00900, 64, 0x4);
-declare_array_register(DEVICE_BASE, EITR, 0x00820, 24, 0x4);
-declare_array_register(DEVICE_BASE, QPTC, 0x08680, 16, 0x4);
-declare_array_register(DEVICE_BASE, RAL, 0x0A200, 128, 0x8);
-declare_array_register(DEVICE_BASE, RAH, 0x0A204, 128, 0x8);
-declare_array_register(DEVICE_BASE, RSCINT, 0x12000, 128, 0x4);
+declare_register(CTRL, 0x00000);
+declare_register(STATUS, 0x00008);
+declare_register(CTRL_EXT, 0x00018);
+declare_register(EEC, 0x10010);
+declare_register(GPRC, 0x04074);
+declare_register(GPTC, 0x04080);
+declare_register(GORCL, 0x04088);
+declare_register(GORCH, 0x0408C);
+declare_register(GOTCL, 0x04090);
+declare_register(GOTCH, 0x04094);
+declare_register(HLREG0, 0x04240);
+declare_register(LINKS, 0x042A4);
+declare_register(FCTRL, 0x05080);
+declare_register(RXCTRL, 0x03000);
+declare_register(RDRXCTL, 0x02F00);
+declare_register(DTXMXSZRQ, 0x08100);
+declare_register(DMATXCTL, 0x04A80);
+declare_register(RTTDCS, 0x04900);
+declare_register(EICR, 0x00800);
+declare_register(EICS, 0x00808);
+declare_register(EIMS, 0x00880);
+declare_register(EIMC, 0x00888);
+declare_register(EIAC, 0x00810);
+declare_register(GPIE, 0x00898);
+declare_register(TXDGPC, 0x087A0);
+declare_register(TXDGBCL, 0x087A4);
+declare_register(TXDGBCH, 0x087A8);
+declare_register(FACTPS, 0x10150);
+declare_array_register(RDBAL, 0x01000, 64, 0x40);
+declare_array_register(RDBAH, 0x01004, 64, 0x40);
+declare_array_register(RDLEN, 0x01008, 64, 0x60);
+declare_array_register(RDH, 0x01010, 64, 0x40);
+declare_array_register(RDT, 0x01018, 64, 0x40);
+declare_array_register(SRRCTL, 0x01014, 64, 0x40);
+declare_array_register(RXPBSIZE, 0x03C00, 8, 0x4);
+declare_array_register(DCA_RXCTRL, 0x0100C, 64, 0x40);
+declare_array_register(RXDCTL, 0x01028, 64, 0x40);
+declare_array_register(RSCCTL, 0x0102C, 64, 0x40);
+declare_array_register(TDBAL, 0x06000, 64, 0x40);
+declare_array_register(TDBAH, 0x06004, 64, 0x40);
+declare_array_register(TDLEN, 0x06008, 64, 0x40);
+declare_array_register(TDH, 0x06010, 64, 0x40);
+declare_array_register(TDT, 0x06018, 64, 0x40);
+declare_array_register(TXPBSIZE, 0x0CC00, 8, 0x4);
+declare_array_register(TXPBTHRESH, 0x04950, 8, 0x4);
+declare_array_register(TXDCTL, 0x06028, 64, 0x40);
+declare_array_register(IVAR, 0x00900, 64, 0x4);
+declare_array_register(EITR, 0x00820, 24, 0x4);
+declare_array_register(QPTC, 0x08680, 16, 0x4);
+declare_array_register(RAL, 0x0A200, 128, 0x8);
+declare_array_register(RAH, 0x0A204, 128, 0x8);
+declare_array_register(RSCINT, 0x12000, 128, 0x4);
 
 // Queue Packets Received Count
-declare_array_register(DEVICE_BASE, QPRC, 0x01030, 16, 0x40);
+declare_array_register(QPRC, 0x01030, 16, 0x40);
 // Queue Packets Received Drop Count
-declare_array_register(DEVICE_BASE, QPRDC, 0x01430, 16, 0x40);
+declare_array_register(QPRDC, 0x01430, 16, 0x40);
 // Receive Queue Statistic Mapping Registers
-declare_array_register(DEVICE_BASE, RQSMR, 0x02300, 32, 0x4);
+declare_array_register(RQSMR, 0x02300, 32, 0x4);
 
 const uint64_t IXGBE_CTRL_LNK_RST = 0x00000008; /* Link Reset. Resets everything. */
 const uint64_t IXGBE_CTRL_RST = 0x04000000; /* Reset (SW) */

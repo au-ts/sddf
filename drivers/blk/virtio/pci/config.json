@@ -18,6 +18,11 @@
                 "size": 2097152
             }
         ],
+        "ioports": [
+            {
+                "size": 128
+            }
+        ],
         "irqs": [
             {
                 "irq_type": "msix",
@@ -26,8 +31,13 @@
         ],
         "pci_bars": [
             {
-                "region_idx": 0,
+                "res_idx": 0,
                 "bar_id": 4
+            },
+            {
+                "res_idx": 0,
+                "ioport": true,
+                "bar_id": 0
             }
         ]
     }

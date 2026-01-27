@@ -71,7 +71,14 @@ def generate(
     serial_system.add_client(client)
 
     pcie_driver = ProtectionDomain("pcie_driver", "pcie_driver.elf", priority=252)
-    pci_system = Sddf.Pci(sdf, pcie_driver, ecam_paddr=0xb0000000, ecam_size=0x10000000, mmio_paddr=0xe0000000, mmio_size=0x10000000)
+    # pci_system = Sddf.Pci(sdf, pcie_driver, ecam_paddr=0xb0000000, ecam_size=0x10000000, mmio_paddr=0xe0000000, mmio_size=0x10000000)
+    pci_system = Sddf.Pci(sdf, pcie_driver,
+                          ecam_paddr=board.pci.ecam_paddr,
+                          ecam_size=board.pci.ecam_size,
+                          mmio_paddr=board.pci.mmio_paddr,
+                          mmio_size=board.pci.mmio_size,
+                          ioport_paddr=board.pci.ioport_paddr,
+                          ioport_size=board.pci.ioport_size)
     pci_system.add_client(blk_system, device_id=0x1001, vendor_id=0x1af4, bus=0, dev=3, func=0)
 
     pds = [serial_driver, serial_virt_tx, blk_driver, blk_virt, client, pcie_driver]
@@ -116,5 +123,7 @@ if __name__ == "__main__":
     if board.arch != SystemDescription.Arch.X86_64:
         with open(args.dtb, "rb") as f:
             dtb = DeviceTree(f.read())
+
+    print("need_timer:", args.need_timer)
 
     generate(args.sdf, args.output, dtb, args.need_timer)

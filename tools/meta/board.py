@@ -4,6 +4,23 @@ from dataclasses import dataclass
 from typing import List, Tuple, Optional
 from sdfgen import SystemDescription
 
+@dataclass
+class PciDevice:
+    compatible: str
+    bus: int
+    dev: int
+    func: int
+    device_id: int
+    vendor_id: int
+
+@dataclass
+class PciResource:
+    ecam_paddr: int
+    ecam_size: int
+    mmio_paddr: int
+    mmio_size: int
+    ioport_paddr: int
+    ioport_size: int
 
 @dataclass
 class Board:
@@ -11,11 +28,12 @@ class Board:
     arch: SystemDescription.Arch
     paddr_top: int
     serial: Optional[str | int] = None
-    ethernet: Optional[str | int] = None
+    ethernet: Optional[str | PciDevice] = None
     timer: Optional[str | int] = None
     i2c: Optional[str] = None
     partition: int = 0
     blk: Optional[str] = None
+    pci: Optional[PciResource] = None
 
 
 # Keep this list in alphabetical order by board name
@@ -157,7 +175,22 @@ BOARDS: List[Board] = [
         paddr_top=0x70000000,
         serial=0x3f8,
         timer=0xfed00000,
-        ethernet=0xfe000000,
+        ethernet=PciDevice(
+            compatible="virtio,pci",
+            device_id=0x1000,
+            vendor_id=0x1af4,
+            bus=0,
+            dev=2,
+            func=0,
+        ),
+        pci=PciResource(
+            ecam_paddr=0xb0000000,
+            ecam_size=0x10000000,
+            mmio_paddr=0xe0000000,
+            mmio_size=0x01000000,
+            ioport_paddr=0x0000,
+            ioport_size=0x10000,
+        )
     ),
     Board(
         name="makatea",
@@ -165,6 +198,21 @@ BOARDS: List[Board] = [
         paddr_top=0x70000000,
         serial=0x2f8,
         timer=0xfed00000,
-        ethernet=0xe0800000,
+        ethernet=PciDevice(
+            compatible="ixgbe",
+            device_id=0x1528,
+            vendor_id=0x8086,
+            bus=0x65,
+            dev=0,
+            func=0,
+        ),
+        pci=PciResource(
+            ecam_paddr=0x80000000,
+            ecam_size=0x10000000,
+            mmio_paddr=0xe0000000,
+            mmio_size=0x01000000,
+            ioport_paddr=0x0000,
+            ioport_size=0x10000,
+        )
     ),
 ]

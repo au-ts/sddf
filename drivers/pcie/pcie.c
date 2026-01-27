@@ -39,14 +39,13 @@ void configure_pci_bar(struct pci_config_space *pci_header, uint8_t bar_id, pci_
 {
     sddf_dprintf("bar_id: %d, base_addr: 0x%lx\n", bar_id, pci_bar_cfg.base_addr);
     if (pci_bar_cfg.base_addr) {
-        volatile uint32_t *mem_bar = (volatile uint32_t *)((uintptr_t)pci_header + 0x10 + (bar_id * 0x04));
-        // TODO: check if the BAR type is matched
-        sddf_dprintf("Memory BAR %d: 0x%x\n", bar_id, *mem_bar);
-        *mem_bar = 0xFFFFFFFF;
-        // TODO:  read the size back written by the device
-        sddf_dprintf("Memory BAR %d: 0x%x\n", bar_id, *mem_bar);
-        *mem_bar = (uint32_t)pci_bar_cfg.base_addr;
-        sddf_dprintf("Memory BAR %d: 0x%x\n", bar_id, *mem_bar);
+            volatile uint32_t *mem_bar = (volatile uint32_t *)((uintptr_t)pci_header + 0x10 + (bar_id * 0x04));
+            // TODO: check if the BAR type is matched
+            sddf_dprintf("Memory BAR %d: 0x%x\n", bar_id, *mem_bar);
+            *mem_bar = 0xFFFFFFFF;
+            sddf_dprintf("Memory BAR %d: 0x%x\n", bar_id, *mem_bar);
+            *mem_bar = (uint32_t)pci_bar_cfg.base_addr;
+            sddf_dprintf("Memory BAR %d: 0x%x\n", bar_id, *mem_bar);
     }
 }
 
@@ -90,7 +89,7 @@ void configure_irqs(struct pci_config_space *pci_header, config_request_t config
                     pci_bar_t msix_bar;
                     msix_bar.bar_id = bar_id;
                     msix_bar.base_addr = device_resources.regions[avail_region_idx].io_addr;
-                    msix_bar.mem_mapped = true;
+                    msix_bar.ioport = false;
 
                     configure_pci_bar(pci_header, bar_id, msix_bar);
 
@@ -126,17 +125,17 @@ void configure_irqs(struct pci_config_space *pci_header, config_request_t config
 
 void pci_bus_scan(uintptr_t bus_base)
 {
-    /* uint8_t pci_bus = (((uintptr_t)bus_base >> 20) & 0xff); */
+    uint8_t pci_bus = (((uintptr_t)bus_base >> 20) & 0xff);
     for (uint8_t pci_dev = 0; pci_dev < 32; pci_dev++) {
         for (uint8_t pci_func = 0; pci_func < 8; pci_func++) {
             struct pci_config_space *pci_header = (struct pci_config_space *)(bus_base + (pci_dev << 15) + (pci_func << 12));
             if (pci_header->vendor_id != 0xffff && pci_header->vendor_id != 0x0000) {
-                sddf_dprintf("bus: 0x%lx, dev: 0x%lx, func: 0x%lx, vedor_id: 0x%x, device_id: 0x%x\n",
-                             (((uintptr_t)pci_header >> 20) & 0xff),
-                             (((uintptr_t)pci_header >> 15) & 0x1f),
-                             (((uintptr_t)pci_header >> 12) & 0x7),
-                             pci_header->vendor_id,
-                             pci_header->device_id);
+                /* sddf_dprintf("bus: 0x%lx, dev: 0x%lx, func: 0x%lx, vedor_id: 0x%x, device_id: 0x%x\n", */
+                /*              (((uintptr_t)pci_header >> 20) & 0xff), */
+                /*              (((uintptr_t)pci_header >> 15) & 0x1f), */
+                /*              (((uintptr_t)pci_header >> 12) & 0x7), */
+                /*              pci_header->vendor_id, */
+                /*              pci_header->device_id); */
 
                 /* for (int j = 0; j < 64; j++) { */
                 /*     if (j && j % 16 == 0) sddf_dprintf("\n"); */
@@ -146,8 +145,9 @@ void pci_bus_scan(uintptr_t bus_base)
 
                 for (int i = 0; i < pci_ecam_config.num_requests; i++) {
                     config_request_t config_request = pci_ecam_config.requests[i];
-                    sddf_dprintf("bus: 0x%x, dev: 0x%x, func: 0x%x\n", config_request.bus, config_request.dev, config_request.func);
-                    if (config_request.device_id == pci_header->device_id && config_request.vendor_id == pci_header->vendor_id) {
+                    if (config_request.bus == pci_bus && config_request.dev == pci_dev && config_request.func == pci_func) {
+                        sddf_dprintf("bus: 0x%x, dev: 0x%x, func: 0x%x\n", config_request.bus, config_request.dev, config_request.func);
+                        sddf_dprintf("device_id: 0x%x, vendor_id: 0x%x\n", config_request.device_id, config_request.vendor_id);
                         sddf_dprintf("interrupt_line: 0x%x\n", pci_header->interrupt_line);
                         sddf_dprintf("interrupt_pin: 0x%x\n", pci_header->interrupt_pin);
                         for (int bar_id = 0; bar_id < PCI_DEV_MAX_BARS; bar_id++) {

@@ -208,7 +208,7 @@ typedef struct pci_irq {
 typedef struct pci_bar {
     uint8_t bar_id;
     uint64_t base_addr;
-    bool mem_mapped;
+    bool ioport;
     bool mem_64b;
 } pci_bar_t;
 

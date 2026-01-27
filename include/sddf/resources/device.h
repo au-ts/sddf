@@ -28,7 +28,8 @@ typedef struct device_irq_resource {
 
 typedef struct device_ioport_resource {
     uint8_t id;
-    uint64_t base_addr;
+    uint16_t addr;
+    uint16_t size;
 } device_ioport_resource_t;
 
 typedef struct device_resources {

@@ -35,7 +35,6 @@ SERIAL_COMPONENTS := $(SDDF)/serial/components
 UART_DRIVER := $(SDDF)/drivers/serial/$(UART_DRIV_DIR)
 TIMER_DRIVER := $(SDDF)/drivers/timer/$(TIMER_DRIV_DIR)
 NETWORK_COMPONENTS := $(SDDF)/network/components
-PCIE_DRIVER := $(SDDF)/drivers/pcie
 
 SDDF_CUSTOM_LIBC := 1
 
@@ -43,8 +42,7 @@ vpath %.c ${SDDF} ${ECHO_SERVER}
 
 IMAGES := eth_driver.elf echo.elf benchmark.elf idle.elf \
 	  network_virt_rx.elf network_virt_tx.elf network_copy.elf \
-	  timer_driver.elf serial_driver.elf serial_virt_tx.elf \
-	  pcie_driver.elf
+	  timer_driver.elf serial_driver.elf serial_virt_tx.elf
 
 
 CFLAGS += \
@@ -76,6 +74,26 @@ all: loader.img
 echo.elf: $(ECHO_OBJS) libsddf_util.a lib_sddf_lwip_echo.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
+ifeq ($(ARCH),x86_64)
+PCIE_DRIVER := $(SDDF)/drivers/pcie
+include ${PCIE_DRIVER}/pcie_driver.mk
+IMAGES += pcie_driver.elf
+endif
+
+
+include ${SDDF}/util/util.mk
+include ${SDDF}/network/components/network_components.mk
+include ${SDDF}/network/lib_sddf_lwip/lib_sddf_lwip.mk
+include ${ETHERNET_DRIVER}/eth_driver.mk
+include ${BENCHMARK}/benchmark.mk
+include ${TIMER_DRIVER}/timer_driver.mk
+include ${UART_DRIVER}/serial_driver.mk
+include ${SERIAL_COMPONENTS}/serial_components.mk
+
+ifdef NET_NEED_TIMER
+export NET_NEED_TIMER
+endif
+
 # Need to build libsddf_util_debug.a because it's included in LIBS
 # for the unimplemented libc dependencies
 ${IMAGES}: libsddf_util_debug.a
@@ -84,13 +102,19 @@ $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 ifneq ($(strip $(DTS)),)
 	$(PYTHON)\
 	    $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
-	    --dtb $(DTB) --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) --smp $(SMP_CONFIG)
+	    --dtb $(DTB) --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) --smp $(SMP_CONFIG) \
+		$${NET_NEED_TIMER:+--need_timer}
 else
 	$(PYTHON)\
 	    $(METAPROGRAM) --sddf $(SDDF) --board $(X86_BOARD) \
-	    --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) --smp $(SMP_CONFIG)
+	    --output . --sdf $(SYSTEM_FILE) --objcopy $(OBJCOPY) --smp $(SMP_CONFIG) \
+		$${NET_NEED_TIMER:+--need_timer}
 	$(OBJCOPY) --update-section .device_resources=pcie_driver_device_resources.data pcie_driver.elf
 	$(OBJCOPY) --update-section .ecam_configs=pcie_driver_client_configs.data pcie_driver.elf
+endif
+	echo "NET_NEED_TIMER:" ${NET_NEED_TIMER} $${NET_NEED_TIMER:+--need_timer}
+ifdef NET_NEED_TIMER
+	$(OBJCOPY) --update-section .timer_client_config=timer_client_ethernet_driver.data eth_driver.elf
 endif
 	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
 	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data serial_driver.elf
@@ -117,16 +141,6 @@ ${IMAGE_FILE} $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 	--board $(MICROKIT_BOARD) --config $(MICROKIT_CONFIG) \
 	-o $(IMAGE_FILE) -r $(REPORT_FILE)
 
-
-include ${SDDF}/util/util.mk
-include ${SDDF}/network/components/network_components.mk
-include ${SDDF}/network/lib_sddf_lwip/lib_sddf_lwip.mk
-include ${ETHERNET_DRIVER}/eth_driver.mk
-include ${BENCHMARK}/benchmark.mk
-include ${TIMER_DRIVER}/timer_driver.mk
-include ${UART_DRIVER}/serial_driver.mk
-include ${SERIAL_COMPONENTS}/serial_components.mk
-include ${PCIE_DRIVER}/pcie_driver.mk
 
 qemu: $(IMAGE_FILE)
 	$(QEMU) $(QEMU_ARCH_ARGS) $(QEMU_NET_ARGS) \

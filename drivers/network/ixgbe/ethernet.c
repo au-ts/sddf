@@ -22,6 +22,8 @@ __attribute__((__section__(".timer_client_config"))) timer_client_config_t timer
 
 __attribute__((__section__(".net_driver_config"))) net_driver_config_t config;
 
+uintptr_t dev_regs_base;
+
 #define MASK(n) (~BIT(n))
 
 #define IRQ_CH 0
@@ -36,10 +38,10 @@ __attribute__((__section__(".net_driver_config"))) net_driver_config_t config;
 // #define IRQ_INTERVAL 0
 #define IRQ_INTERVAL 40
 
-const uint64_t hw_rx_ring_paddr = 0x10000000;
-const uint64_t hw_rx_ring_vaddr = 0x2400000;
-const uint64_t hw_tx_ring_paddr = 0x10004000;
-const uint64_t hw_tx_ring_vaddr = 0x2404000;
+uintptr_t hw_rx_ring_paddr;
+uintptr_t hw_rx_ring_vaddr;
+uintptr_t hw_tx_ring_paddr;
+uintptr_t hw_tx_ring_vaddr;
 
 static bool achieved_something;
 
@@ -80,12 +82,12 @@ net_queue_handle_t tx_queue;
 volatile struct enet_regs *eth;
 
 static inline void set_reg(uintptr_t reg, uint32_t val) {
-    asm volatile("movl %0,%1" : : "r" (val), "m" (*(volatile uint32_t *)reg));
+    asm volatile("movl %0,%1" : : "r" (val), "m" (*(volatile uint32_t *)(reg + dev_regs_base)));
 }
 
 static inline uint32_t get_reg(uintptr_t reg) {
     uint32_t ret;
-    asm volatile("movl %1,%0" : "=r" (ret) : "m" (*(volatile uint32_t *)reg) : "memory");
+    asm volatile("movl %1,%0" : "=r" (ret) : "m" (*(volatile uint32_t *)(reg + dev_regs_base)) : "memory");
     return ret;
 }
 
@@ -98,12 +100,12 @@ static inline void clear_flags(uintptr_t reg, uint32_t flags) {
 }
 
 static inline void set_reg16(uintptr_t reg, uint16_t val) {
-    asm volatile("movw %0,%1" : : "r" (val), "m" (*(volatile uint16_t *)reg));
+    asm volatile("movw %0,%1" : : "r" (val), "m" (*(volatile uint16_t *)(reg + dev_regs_base)));
 }
 
 static inline uint16_t get_reg16(uintptr_t reg) {
     uint16_t ret;
-    asm volatile("movw %1,%0" : "=r" (ret) : "m" (*(volatile uint16_t *)reg) : "memory");
+    asm volatile("movw %1,%0" : "=r" (ret) : "m" (*(volatile uint16_t *)(reg + dev_regs_base)) : "memory");
     return ret;
 }
 
@@ -368,19 +370,24 @@ void init(void)
 
     // Enable MSI-X, see PCI Express Technology 3.0 Chapter 17 for more details.
     // Disable legacy interrupts. TODO: this should be done by PCI driver.
-    set_flags16(PCI_COMMAND_16, BIT(10));
+    /* set_flags16(PCI_COMMAND_16, BIT(10)); */
     // Set vector message address to Local APIC of CPU0
-    set_reg(DEVICE_MSIX_TABLE + 0x0, 0xFEEu << 20);
-    set_reg(DEVICE_MSIX_TABLE + 0x4, 0);
-    // Set vector data to Interrupt Vector
-    set_reg(DEVICE_MSIX_TABLE + 0x8, 0x32);
-    // Unmask vector 0 to enable interrupts through it
-    set_reg(DEVICE_MSIX_TABLE + 0xC, 0xFFFFFFFE);
-    // Enable MSI-X. TODO: this should be set by PCI driver.
-    set_flags(PCI_MSIX_CTRL, BIT(31));
+    /* set_reg(DEVICE_MSIX_TABLE + 0x0, 0xFEEu << 20); */
+    /* set_reg(DEVICE_MSIX_TABLE + 0x4, 0); */
+    /* // Set vector data to Interrupt Vector */
+    /* set_reg(DEVICE_MSIX_TABLE + 0x8, 0x32); */
+    /* // Unmask vector 0 to enable interrupts through it */
+    /* set_reg(DEVICE_MSIX_TABLE + 0xC, 0xFFFFFFFE); */
+    /* // Enable MSI-X. TODO: this should be set by PCI driver. */
+    /* set_flags(PCI_MSIX_CTRL, BIT(31)); */
 
     // Initialise the statistic registers. Must keep. TODO: why?
     set_reg(RQSMR(0), 0);
+
+    hw_rx_ring_vaddr = (uintptr_t)device_resources.regions[1].region.vaddr;
+    hw_rx_ring_paddr = device_resources.regions[1].io_addr;
+    hw_tx_ring_vaddr = (uintptr_t)device_resources.regions[2].region.vaddr;
+    hw_tx_ring_paddr = device_resources.regions[2].io_addr;
 
     device.rx_ring = (void *)hw_rx_ring_vaddr;
     device.tx_ring = (void *)hw_tx_ring_vaddr;
@@ -395,6 +402,13 @@ void init(void)
     // Disable Interrupts, see Section 4.6.3.1
     disable_interrupts();
 
+    /* sddf_dprintf("\n\n\n\n\n"); */
+    /* for (int j = 0; j < 256; j++) { */
+    /*     if (j && j % 16 == 0) sddf_dprintf("\n"); */
+    /*     sddf_dprintf("%02x ", *(uint8_t *)(dev_regs_base + j)); */
+    /* } */
+    /* sddf_dprintf("\n"); */
+
     // Master disable prior to link reset, see Section 4.2.1.7
     set_reg(CTRL, IXGBE_CTRL_PCIE_MASTER_DISABLE);
     while (get_reg(STATUS) & IXGBE_STATUS_PCIE_MASTER_STATUS);
@@ -403,6 +417,7 @@ void init(void)
     set_reg(CTRL, get_reg(CTRL) | IXGBE_CTRL_RST);
     while ((get_reg(CTRL) & IXGBE_CTRL_RST_MASK) != 0);
 
+    sddf_dprintf("wait for 100ns\n");
     // Wait at least 10ms
     sddf_timer_set_timeout(timer_config.driver_id, 100 * NS_IN_MS);
 }
@@ -601,20 +616,6 @@ void notified(microkit_channel ch)
             init_2();
         } else if (device.init_stage == 2) {
             init_3();
-            sddf_dprintf("\n\n\n");
-            sddf_dprintf("BAR0: 0x%x\n", get_reg(PCIE_CONFIG_BASE + 0x10));
-            sddf_dprintf("BAR1: 0x%x\n", get_reg(PCIE_CONFIG_BASE + 0x14));
-            sddf_dprintf("BAR2: 0x%x\n", get_reg(PCIE_CONFIG_BASE + 0x18));
-            sddf_dprintf("BAR3: 0x%x\n", get_reg(PCIE_CONFIG_BASE + 0x1c));
-            sddf_dprintf("BAR4: 0x%x\n", get_reg(PCIE_CONFIG_BASE + 0x20));
-            sddf_dprintf("MSI CTRL: 0x%x\n", get_reg(PCIE_CONFIG_BASE + 0x50));
-            sddf_dprintf("MSI-X CTRL: 0x%x\n", get_reg(PCI_MSIX_CTRL));
-            sddf_dprintf("MSI-X OFFSET: 0x%x\n", get_reg(PCI_MSIX_OFFSET));
-            sddf_dprintf("MSI-X PENDING: 0x%x\n", get_reg(PCI_MSIX_PENDING));
-            sddf_dprintf("MSI-X Table - vector0 address low: 0x%x\n", get_reg(DEVICE_MSIX_TABLE));
-            sddf_dprintf("MSI-X Table - vector0 address high: 0x%x\n", get_reg(DEVICE_MSIX_TABLE + 0x4));
-            sddf_dprintf("MSI-X Table - vector0 data: 0x%x\n", get_reg(DEVICE_MSIX_TABLE + 0x8));
-            sddf_dprintf("MSI-X Table - vector0 control: 0x%x\n", get_reg(DEVICE_MSIX_TABLE + 0xC));
         }
     } else if (ch == device_resources.irqs[0].id){
         /* bench->eth_irq_count++; */

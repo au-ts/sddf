@@ -1,39 +1,35 @@
 {
     "compatible": [
-        "virtio,pci"
+        "ixgbe"
     ],
     "resources": {
         "regions": [
             {
-                "name": "regs",
+                "name": "device_regs",
                 "perms": "rw",
+                "setvar_vaddr": "dev_regs_base",
+                "size": 1048576
+            },
+            {
+                "name": "hw_rx_ring_buffer",
                 "size": 16384
             },
             {
-                "name": "hw_ring_buffer",
-                "size": 65536
-            }
-        ],
-        "ioports": [
-            {
-                "size": 128
+                "name": "hw_tx_ring_buffer",
+                "size": 16384
             }
         ],
         "irqs": [
             {
                 "irq_type": "ioapic",
-                "pin": 11,
-                "vector": 1
+                "ioapic": 3,
+                "pin": 4,
+                "vector": 2
             }
         ],
         "pci_bars": [
             {
                 "res_idx": 0,
-                "bar_id": 4
-            },
-            {
-                "res_idx": 0,
-                "ioport": true,
                 "bar_id": 0
             }
         ]
