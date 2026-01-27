@@ -31,6 +31,8 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     timer_node = None
     timer_driver = ProtectionDomain("timer", "timer_driver.elf", priority=254)
 
+    telemetry = ProtectionDomain("telemetry", "telemetry.elf", priority=1)
+
     # setvar_vaddr="gpio_regs"
     # setvar_vaddr="gpio_ao_regs"
 
@@ -71,7 +73,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     # Trig pin
     sdf.add_channel(SystemDescription.Channel(ultrasonic_sensor, gpio_driver, a_id=4, b_id=3, pp_a=True))
 
-    pds = [timer_driver, client, motor_control_a, motor_control_b, ultrasonic_sensor, gpio_driver]
+    pds = [timer_driver, client, motor_control_a, motor_control_b, ultrasonic_sensor, gpio_driver, telemetry]
     for pd in pds:
         sdf.add_pd(pd)
 

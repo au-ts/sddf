@@ -42,7 +42,7 @@ SDFGEN_OUT = ${GPIO_TOP}/board/$(MICROKIT_BOARD)
 SYSTEM_FILE := ${SDFGEN_OUT}/gpio.system
 
 # Images to build
-IMAGES := gpio_driver.elf timer_driver.elf client.elf motor_control_a.elf motor_control_b.elf ultrasonic_sensor.elf
+IMAGES := gpio_driver.elf timer_driver.elf client.elf telemetry.elf motor_control_a.elf motor_control_b.elf ultrasonic_sensor.elf
 
 # Compiler flags
 CFLAGS += \
@@ -62,7 +62,7 @@ CLIENT_OBJS := client.o
 MOTOR_CONTROL_A_OBJS := motor_control_a.o
 MOTOR_CONTROL_B_OBJS := motor_control_b.o
 ULTRASONIC_SENSOR_OBJS := ultrasonic_sensor.o
-
+TELEMETRY_OBJS := telemetry.o
 
 VPATH := ${GPIO_TOP}
 
@@ -93,6 +93,12 @@ ultrasonic_sensor.o: ${GPIO_TOP}/ultrasonic_sensor.c
 	$(CC) -c $(CFLAGS) $< -o $@
 
 ultrasonic_sensor.elf: $(ULTRASONIC_SENSOR_OBJS) libco.a
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+
+telemetry.o: ${GPIO_TOP}/telemetry.c
+	$(CC) -c $(CFLAGS) $< -o $@
+
+telemetry.elf: $(CLIENT_OBJS)
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
