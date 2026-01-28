@@ -5,6 +5,7 @@
 
 #pragma once
 
+#define CONTROL_STOP (0)
 #define CONTROL_FORWARD (1)
 #define CONTROL_REVERSE (2)
 #define CONTROL_NEUTRAL (3)

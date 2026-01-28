@@ -264,7 +264,6 @@ void notified(sddf_channel ch) {
         else if (trig_state == TRIG_HIGH) {
             curr_dist = read_distance();
         }
-        break;
     } else {
         LOG_SENSOR("Unexpected channel call\n");
     }
