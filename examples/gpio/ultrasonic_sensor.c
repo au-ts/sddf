@@ -48,13 +48,15 @@ static char t_sensor_main_stack[STACK_SIZE];
 #define GPIO_HIGH (1)
 #define GPIO_LOW (0)
 
-// Timer States for PWM
-#define PAUSE_HIGH (0)
-#define PAUSE_LOW (1)
+// Timer States for TRIG pin
+#define TRIG_UNSET (0)
+#define TRIG_HIGH (1)
+#define TRIG_LOW (2)
 
 // Time (ms) Timeout for Sensor Read
 #define SENSOR_TIMEOUT (38)
 
+int trig_state = TRIG_UNSET;
 
 uint64_t curr_dist = 0;
 
@@ -114,6 +116,18 @@ bool delay_microsec(size_t microsec)
     sddf_timer_set_timeout(timer_channel, time_us);
     co_switch(t_event);
 
+    return true;
+}
+
+bool timeout_microsec(size_t microsec)
+{
+    size_t time_us = microsec * NS_IN_US;
+    /* Detect potential overflow */
+    if (microsec != 0 && time_us / microsec != NS_IN_US) {
+        LOG_SENSOR_ERR("overflow detected in delay_microsec\n");
+        return false;
+    }
+    sddf_timer_set_timeout(timer_channel, microsec);
     return true;
 }
 
@@ -179,68 +193,48 @@ uint64_t pulse_in(int gpio_ch, int value) {
 void sensor_main(void) {
     LOG_SENSOR("init\n");
     gpio_init(GPIO_CHANNEL_ECHO, GPIO_DIRECTION_INPUT);
-    gpio_init(GPIO_CHANNEL_TRIG, GPIO_DIRECTION_OUTPUT);
-
-    delay_microsec(2);
-    // LOG_SENSOR("attempt reading\n");
-
-    while (true) {
-        digital_write(GPIO_CHANNEL_TRIG, GPIO_LOW);
-        delay_microsec(2);
-
-        digital_write(GPIO_CHANNEL_TRIG, GPIO_HIGH);
-        delay_microsec(10);
-
-        digital_write(GPIO_CHANNEL_TRIG, GPIO_LOW);
-
-        uint64_t duration = pulse_in(GPIO_CHANNEL_ECHO, GPIO_HIGH);
-        if (duration) {
-            uint64_t distance = duration * 0.034 / 2;
-            curr_dist = distance;
-            
-            LOG_SENSOR("distance received, %ld\n", distance);
-        } else {
-            curr_dist = 0;
-        }
-        
-        LOG_SENSOR("done reading\n");
-        delay_microsec(1000000);
-    }   
+    gpio_init(GPIO_CHANNEL_TRIG, GPIO_DIRECTION_OUTPUT);  
 }
 
 // TODO: might want to buffer over multiple reads
-uint64_t read_sensor() {
+// set trigger pin to LOW then HIGH to fire sensor
+void set_trig_low() {
+    trig_state = TRIG_LOW;
     digital_write(GPIO_CHANNEL_TRIG, GPIO_LOW);
-    delay_microsec(2);
-
-    digital_write(GPIO_CHANNEL_TRIG, GPIO_HIGH);
-    delay_microsec(10);
-
-    uint64_t duration = pulse_in(GPIO_CHANNEL_ECHO, GPIO_HIGH);
-    if (duration) {
-        uint64_t distance = duration * 0.034 / 2;
-        LOG_SENSOR("Sensor Reading Received: %ld\n", distance);
-        return distance;
-    }  
-    
-    return 0;
+    timeout_microsec(2);
 }
 
-microkit_msginfo send_reading_to_client() {
-    uint64_t distance = curr_dist;
+void set_trig_high() {
+    trig_state = TRIG_HIGH;
+    digital_write(GPIO_CHANNEL_TRIG, GPIO_HIGH);
+    timeout_microsec(10);
+}
 
+// TODO: timeout state
+microkit_msginfo send_reading_to_client() {
     microkit_msginfo new_msg = microkit_msginfo_new(0, 1);
 
-    microkit_mr_set(0, distance);
+    while (true) {
+        if (curr_dist != 0) {
+            uint64_t distance = curr_dist;
+            microkit_mr_set(0, distance);
+
+            // clean up states
+            curr_dist = 0;
+            trig_state = TRIG_UNSET;
+            return new_msg;
+        }
+    }
 
     return new_msg;
 }
 
+
 microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo) {
     switch (ch) {
     case CLIENT_CHANNEL:
-        // co_switch(t_main);
-        LOG_SENSOR("Client call\n");
+        // start up sensor
+        set_trig_low();
         microkit_msginfo res = send_reading_to_client();
         return res;
         break;
@@ -253,10 +247,27 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo) {
     return res;
 }
 
-void notified(sddf_channel ch) {
+uint64_t read_distance() {
+    uint64_t duration = pulse_in(GPIO_CHANNEL_ECHO, GPIO_HIGH);
+    if (duration) {
+        uint64_t distance = duration * 0.034 / 2;
+        LOG_SENSOR("Sensor Reading Received: %ld\n", distance);
+        return distance;
+    }
 
+    return 0;
+}
+
+void notified(sddf_channel ch) {
+    // want to send a specific set of signals for sensor to fire
     if (ch == timer_config.driver_id) {
-        co_switch(t_main);
+        if (trig_state == TRIG_LOW) {
+            set_trig_high();
+        }
+        else if (trig_state == TRIG_HIGH) {
+            curr_dist = read_distance();
+        }
+        break;
     } else {
         LOG_SENSOR("Unexpected channel call\n");
     }
