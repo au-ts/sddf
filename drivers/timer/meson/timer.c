@@ -8,8 +8,9 @@
 #include <sddf/resources/device.h>
 #include <sddf/util/printf.h>
 #include <sddf/timer/protocol.h>
+#include <sddf/timer/config.h>
 
-#define MAX_TIMEOUTS 6
+#define MAX_TIMEOUTS SDDF_TIMER_MAX_CLIENTS
 
 #define TIMER_REG_START   0x70    // TIMER_MUX
 

@@ -9,6 +9,7 @@
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 #include <sddf/timer/protocol.h>
+#include <sddf/timer/config.h>
 
 /*
  * The JH7110 SoC contains a timer with four 32-bit counters. Each one of these
@@ -29,7 +30,7 @@
 #endif
 
 #define CLIENT_CH_START 2
-#define MAX_TIMEOUTS 6
+#define MAX_TIMEOUTS SDDF_TIMER_MAX_CLIENTS
 
 #define STARFIVE_TIMER_MAX_TICKS UINT32_MAX
 #define STARFIVE_TIMER_MODE_CONTINUOUS 0

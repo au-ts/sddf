@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <os/sddf.h>
 #include <sddf/timer/protocol.h>
+#include <sddf/timer/config.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 #include <sddf/resources/device.h>
@@ -87,7 +88,7 @@ sddf_channel timeout_irq;
 
 /* offset for the 2 interrupt channels */
 #define CLIENT_CH_START 2
-#define MAX_TIMEOUTS 6
+#define MAX_TIMEOUTS SDDF_TIMER_MAX_CLIENTS
 static uint64_t timeouts[MAX_TIMEOUTS];
 
 static inline uint64_t get_ticks_in_ns(void)
