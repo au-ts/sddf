@@ -76,6 +76,11 @@ async def wait_for_output(backend: HardwareBackend, text: bytes) -> bytes:
             # we can't find a match with text more than that far from the end.
             offset = len(buffer) + 1 - len(text)
 
+    if b"LDR|ERROR: loader trapped exception: Synchronous" in buffer:
+        raise TestFailureException(
+            "loader trapped. Backtrace avialable."
+            )
+
     return buffer
 
 
