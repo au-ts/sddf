@@ -53,10 +53,15 @@ static char t_sensor_main_stack[STACK_SIZE];
 #define TRIG_HIGH (1)
 #define TRIG_LOW (2)
 
+// Timer states for timeout
+#define RUNNING (0)
+#define TIMED_OUT (1)
+
 // Time (ms) Timeout for Sensor Read
 #define SENSOR_TIMEOUT (38)
 
 int trig_state = TRIG_UNSET;
+int timeout_state = RUNNING;
 
 uint64_t curr_dist = 0;
 
@@ -103,28 +108,12 @@ void digital_write(int gpio_ch, int value) {
     }
 }
 
-bool delay_microsec(size_t microsec)
-{
-    size_t time_us = microsec * NS_IN_US;
-
-    /* Detect potential overflow */
-    if (microsec != 0 && time_us / microsec != NS_IN_US) {
-        LOG_SENSOR_ERR("overflow detected in delay_microsec\n");
-        return false;
-    }
-
-    sddf_timer_set_timeout(timer_channel, time_us);
-    co_switch(t_event);
-
-    return true;
-}
-
 bool timeout_microsec(size_t microsec)
 {
     size_t time_us = microsec * NS_IN_US;
     /* Detect potential overflow */
     if (microsec != 0 && time_us / microsec != NS_IN_US) {
-        LOG_SENSOR_ERR("overflow detected in delay_microsec\n");
+        LOG_SENSOR_ERR("overflow detected in timeout_microsec\n");
         return false;
     }
     sddf_timer_set_timeout(timer_channel, microsec);
@@ -163,14 +152,15 @@ uint64_t pulse_in(int gpio_ch, int value) {
             uint64_t time_now = sddf_timer_time_now(timer_channel);
 
             if (((time_now - time_start) / NS_IN_MS) > SENSOR_TIMEOUT) {
+                timeout_state = TIMED_OUT;
                 return 0;
             }
-
         } 
         else {
             // Timeout not seeing GPIO HIGH from sensor
             uint64_t time_now = sddf_timer_time_now(timer_channel);
             if (((time_now - time_start) / NS_IN_MS) > (SENSOR_TIMEOUT * 100)) {
+                timeout_state = TIMED_OUT;
                 return 0;
             }
 
@@ -210,22 +200,29 @@ void set_trig_high() {
     timeout_microsec(10);
 }
 
+// clean timer states
+void reset_states() {
+    timeout_state = RUNNING;
+    curr_dist = 0;
+    trig_state = TRIG_UNSET;
+}
+
 // TODO: timeout state
 microkit_msginfo send_reading_to_client() {
     microkit_msginfo new_msg = microkit_msginfo_new(0, 1);
 
     while (true) {
+        if (timeout_state == TIMED_OUT) {
+            break;
+        }
         if (curr_dist != 0) {
             uint64_t distance = curr_dist;
             microkit_mr_set(0, distance);
-
-            // clean up states
-            curr_dist = 0;
-            trig_state = TRIG_UNSET;
-            return new_msg;
+            break;
         }
     }
 
+    reset_states();
     return new_msg;
 }
 
@@ -276,16 +273,6 @@ void notified(sddf_channel ch) {
 
 void init(void) {
     LOG_SENSOR("Init\n");
-    // sensor_main();
-    timer_channel = timer_config.driver_id;
-
-
-    /* Define the event loop/notified thread as the active co-routine */
-    t_event = co_active();
-
-    /* derive main entry point */
-    t_main = co_derive((void *)t_sensor_main_stack, STACK_SIZE, sensor_main);
-
-    co_switch(t_main);
+    sensor_main();
 }
 
