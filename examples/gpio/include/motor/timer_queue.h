@@ -2,36 +2,28 @@
 #include <sddf/util/printf.h>
 #include <os/sddf.h>
 
-#define MAX_SIZE 100
+#define MAX 100
 
 // Defining the Queue structure
 typedef struct {
-    int items[MAX_SIZE];
-    int front;
-    int rear;
-} Queue;
+    int items[MAX];
+    int size;
+} PriorityQueue;
 
 
-// Function to initialize the queue
-void initializeQueue(Queue* q);
+// Define heapifyUp function to maintain heap property
+// during insertion
+void heapifyUp(PriorityQueue* pq, int index);
 
-// Function to check if the queue is empty
-bool isEmpty(Queue* q);
+// Define enqueue function to add an item to the queue
+void enqueue(PriorityQueue* pq, int value);
 
-// Function to check if the queue is full
-bool isFull(Queue* q);
+// Define heapifyDown function to maintain heap property
+// during deletion
+int heapifyDown(PriorityQueue* pq, int index);
 
-// Function to add an element to the queue (Enqueue
-// operation)
-void enqueue(Queue* q, int value);
+// Define dequeue function to remove an item from the queue
+int dequeue(PriorityQueue* pq);
 
-// Function to remove an element from the queue (Dequeue
-// operation)
-void dequeue(Queue* q);
-
-// Function to get the element at the front of the queue
-// (Peek operation)
-int pop(Queue* q);
-
-// Function to print the current queue
-void printQueue(Queue* q);
+// Define peek function to get the top item from the queue
+int peek(PriorityQueue* pq);

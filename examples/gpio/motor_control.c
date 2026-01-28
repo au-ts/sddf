@@ -126,6 +126,18 @@ void set_neutral(void) {
     set_pwm(GPIO_CHANNEL_B, pwm_delay_mappings[CONTROL_NEUTRAL - 1][PWM_TIME_HIGH]*NS_IN_US);
 }
 
+void set_left(void) {
+    // LOG_CONTROL("Command Received: Neutral\n");
+    set_pwm(GPIO_CHANNEL_A, pwm_delay_mappings[CONTROL_NEUTRAL - 1][PWM_TIME_HIGH]*NS_IN_US);
+    set_pwm(GPIO_CHANNEL_B, pwm_delay_mappings[CONTROL_FORWARD - 1][PWM_TIME_HIGH]*NS_IN_US);
+}
+
+void set_right(void) {
+    // LOG_CONTROL("Command Received: Neutral\n");
+    set_pwm(GPIO_CHANNEL_A, pwm_delay_mappings[CONTROL_FORWARD - 1][PWM_TIME_HIGH]*NS_IN_US);
+    set_pwm(GPIO_CHANNEL_B, pwm_delay_mappings[CONTROL_NEUTRAL - 1][PWM_TIME_HIGH]*NS_IN_US);
+}
+
 void handle_motor_request(void) {
     switch (curr_command)
     {
