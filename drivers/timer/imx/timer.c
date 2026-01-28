@@ -13,6 +13,7 @@
 #include <sddf/resources/device.h>
 #include <sddf/util/printf.h>
 #include <sddf/timer/protocol.h>
+#include <sddf/timer/config.h>
 
 #define GPT_STATUS_REGISTER_CLEAR 0x3F
 #define CR 0
@@ -26,7 +27,7 @@
 #define ICR2 8
 #define CNT 9
 
-#define MAX_TIMEOUTS 6
+#define MAX_TIMEOUTS SDDF_TIMER_MAX_CLIENTS
 
 #define GPT_FREQ   (12u)
 

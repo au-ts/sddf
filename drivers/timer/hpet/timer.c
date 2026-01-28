@@ -8,6 +8,7 @@
 #include <sddf/util/printf.h>
 #include <sddf/resources/device.h>
 #include <sddf/timer/protocol.h>
+#include <sddf/timer/config.h>
 
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
@@ -76,7 +77,7 @@ uintptr_t HPET_REGION = 0x50000000;
 volatile hpet_timer_t *timer_0;
 uint64_t tick_period_fs; // main counter tick period in femtoseconds
 
-#define MAX_TIMEOUTS 6
+#define MAX_TIMEOUTS SDDF_TIMER_MAX_CLIENTS
 
 uint64_t timeouts[MAX_TIMEOUTS];
 uint64_t next_timeout = UINT64_MAX;

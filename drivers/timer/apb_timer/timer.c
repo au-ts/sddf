@@ -23,7 +23,6 @@
 
 #define NUM_TIMERS 2 // Adjust if synthesised with more timers.                                                                       \
                         // Minimum = 2 due to a bug in the HDL, assumed for rest of this driver.
-#define MAX_TIMEOUTS (NUM_TIMERS)
 #define APBTIMER_MAX_TICKS (UINT32_MAX)
 #define APBTIMER_CLK_FREQ ((uint64_t)50000000) // 50MHz
 #define NANO_INVERSE NS_IN_S
