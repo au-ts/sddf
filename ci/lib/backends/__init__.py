@@ -27,6 +27,7 @@ from .common import (
     OUTPUT,
 )
 from .streams import send_input, wait_for_output, expect_output
+from .ipbench_queue import IpBenchQueueBackend
 from .machine_queue import MachineQueueBackend
 from .qemu import QemuBackend
 from .tty import TtyBackend
@@ -46,6 +47,7 @@ __all__ = (
     "wait_for_output",
     "expect_output",
     # backends
+    "IpBenchQueueBackend",
     "MachineQueueBackend",
     "QemuBackend",
     "TtyBackend",

@@ -94,8 +94,7 @@ class MachineQueueBackend(HardwareBackend):
             "-wait", self.chosen_board,
             "-k", self.job_key,
             "-T", str(LOCK_TIMEOUT),
-            "-t", "0",
-            # only try to acquire once.
+            "-t", "0",  # only try to acquire once.
             # fmt: on
             stdout=None,  # inherit -> print
             stderr=None,  # inherit -> print

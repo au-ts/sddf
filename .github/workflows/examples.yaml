@@ -111,8 +111,8 @@ jobs:
         env:
           PYTHON: ${{ github.workspace }}/venv/bin/python
 
-  run_qemu:
-    name: Run (QEMU)
+  tests_qemu:
+    name: Tests (QEMU)
     runs-on: ubuntu-latest
     needs: build_linux_x86_64_nix
     steps:
@@ -139,8 +139,8 @@ jobs:
           path: ci_logs
           if-no-files-found: error
 
-  run_hardware:
-    name: Run (hardware)
+  tests_hardware:
+    name: Tests (hardware)
     runs-on: ubuntu-latest
     if: ${{ contains(github.event.pull_request.labels.*.name, 'hardware-test') ||
             (github.event_name == 'schedule') }}
@@ -176,5 +176,51 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ci-logs-hardware
+          path: ci_logs
+          if-no-files-found: error
+
+  bench_hardware:
+    name: Benchmarks (hardware)
+    runs-on: ubuntu-latest
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'hardware-bench') ||
+            (github.event_name == 'schedule') }}
+    needs: build_linux_x86_64_nix
+    concurrency:
+      group: ${{ github.workflow }}-sddf-hardware-bench-${{ github.event.number }}-${{ strategy.job-index }}
+      cancel-in-progress: true
+    steps:
+      - name: Checkout sDDF repository
+        uses: actions/checkout@v4
+      - name: Get machine queue
+        uses: actions/checkout@v4
+        with:
+          repository: seL4/machine_queue
+          path: machine_queue
+      - name: Get ipbench_queue
+        uses: actions/checkout@v4
+        with:
+          repository: au-ts/ipbench_queue
+          path: ipbench_queue
+          ssh-key: ${{ secrets.IPBENCH_GITHUB_DEPLOY_KEY }}
+      - name: Download images
+        uses: actions/download-artifact@v4
+        with:
+          name: loader-images
+          path: ci_build
+      - name: Setup machine queue SSH key
+        run: .github/workflows/setup_ssh_key.sh
+        env:
+          MACHINE_QUEUE_KEY: ${{ secrets.MACHINE_QUEUE_KEY }}
+      - name: Run tests
+        run: |
+          export PATH="$(pwd)/machine_queue":"$(pwd)/ipbench_queue":$PATH
+          # GitHub Actions is broken
+          # https://github.com/ringerc/github-actions-signal-handling-demo#why-child-process-tasks-dont-get-a-chance-to-clean-up-on-job-cancel
+          exec ./ci/benchmarks/echo_server.py --boards maaxboard --single --configs benchmark
+      - name: Archive logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-logs-hardware-benchmarks
           path: ci_logs
           if-no-files-found: error

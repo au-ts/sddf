@@ -25,6 +25,10 @@ def _print_text_on_timeout(f):
                 )
             )
             raise
+        except asyncio.IncompleteReadError:
+            reset_terminal()
+            log.info("'{}' hit EOF whilst waiting for {}".format(f.__name__, text))
+            raise
 
     return wrapper
 
@@ -60,7 +64,7 @@ async def wait_for_output(backend: HardwareBackend, text: bytes) -> bytes:
         # TODO: backwards seek?
         read = await backend.output_stream.read(1)
         if read == b"":
-            raise EOFError()
+            raise asyncio.IncompleteReadError(partial=buffer, expected=None)
 
         OUTPUT.write(read)
         buffer.extend(read)
