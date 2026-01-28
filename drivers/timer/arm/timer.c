@@ -17,7 +17,7 @@
 
 static uint64_t timer_freq;
 
-#define MAX_TIMEOUTS 6
+#define MAX_TIMEOUTS 16
 
 #define GENERIC_TIMER_ENABLE (1 << 0)
 #define GENERIC_TIMER_IMASK  (1 << 1)
