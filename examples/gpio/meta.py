@@ -42,8 +42,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
 
     client = ProtectionDomain("client", "client.elf", priority=1)
-    motor_control_a = ProtectionDomain("motor_control_a", "motor_control_a.elf", priority=2)
-    motor_control_b = ProtectionDomain("motor_control_b", "motor_control_b.elf", priority=2)
+    motor_control = ProtectionDomain("motor_control", "motor_control.elf", priority=2)
     ultrasonic_sensor = ProtectionDomain("ultrasonic_sensor", "ultrasonic_sensor.elf", priority=2, passive=True)
 
     timer_node = dtb.node(board.timer)
@@ -51,20 +50,18 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
     timer_system.add_client(client)
-    timer_system.add_client(motor_control_a)
-    timer_system.add_client(motor_control_b)
+    timer_system.add_client(motor_control)
     timer_system.add_client(ultrasonic_sensor)
 
     # Client to motors channel
-    sdf.add_channel(SystemDescription.Channel(client, motor_control_a, a_id=2, b_id=1, pp_a=True))
-    sdf.add_channel(SystemDescription.Channel(client, motor_control_b, a_id=3, b_id=1, pp_a=True))
+    sdf.add_channel(SystemDescription.Channel(client, motor_control, a_id=2, b_id=1, pp_a=True))
 
     # Client to sensor channel
     sdf.add_channel(SystemDescription.Channel(client, ultrasonic_sensor, a_id=4, b_id=1, pp_a=True))
 
     # Motors to GPIO channel
-    sdf.add_channel(SystemDescription.Channel(motor_control_a, gpio_driver, a_id=3, b_id=0, pp_a=True))
-    sdf.add_channel(SystemDescription.Channel(motor_control_b, gpio_driver, a_id=3, b_id=1, pp_a=True))
+    sdf.add_channel(SystemDescription.Channel(motor_control, gpio_driver, a_id=2, b_id=0, pp_a=True))
+    sdf.add_channel(SystemDescription.Channel(motor_control, gpio_driver, a_id=3, b_id=1, pp_a=True))
 
     # Sensors to GPIO channel
     # Echo pin
@@ -73,7 +70,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     # Trig pin
     sdf.add_channel(SystemDescription.Channel(ultrasonic_sensor, gpio_driver, a_id=4, b_id=3, pp_a=True))
 
-    pds = [timer_driver, client, motor_control_a, motor_control_b, ultrasonic_sensor, gpio_driver, telemetry]
+    pds = [timer_driver, client, motor_control, ultrasonic_sensor, gpio_driver, telemetry]
     for pd in pds:
         sdf.add_pd(pd)
 

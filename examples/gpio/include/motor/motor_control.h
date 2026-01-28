@@ -10,6 +10,14 @@
 #define CONTROL_REVERSE (2)
 #define CONTROL_NEUTRAL (3)
 
+#define REQUEST_STOP (0)
+#define REQUEST_FORWARD (1)
+#define REQUEST_BACK (2)
+#define REQUEST_LEFT (3)
+#define REQUEST_RIGHT (4)
+#define REQUEST_NEUTRAL (5)
+
+
 // PWM Delays
 #define PWM_CHANNEL_MAPPING_COLS 3
 #define PWM_CHANNEL_MAPPING_ROWS 3

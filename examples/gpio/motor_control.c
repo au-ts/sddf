@@ -36,8 +36,10 @@ sddf_channel timer_channel;
 
 // Channels
 #define CLIENT_CHANNEL (1)
-// #define TIMER_CHANNEL (2)
-#define GPIO_CHANNEL (3)
+
+// Motors A and B channels
+#define GPIO_CHANNEL_A (2)
+#define GPIO_CHANNEL_B (3)
 
 #define GPIO_HIGH (1)
 #define GPIO_LOW (0)
@@ -108,31 +110,42 @@ void set_pwm(int gpio_ch, int micro_s) {
 }
 
 void set_forward(void) {
-    set_pwm(GPIO_CHANNEL, pwm_delay_mappings[CONTROL_FORWARD - 1][PWM_TIME_HIGH]*NS_IN_US);
+    set_pwm(GPIO_CHANNEL_A, pwm_delay_mappings[CONTROL_FORWARD - 1][PWM_TIME_HIGH]*NS_IN_US);
+    set_pwm(GPIO_CHANNEL_B, pwm_delay_mappings[CONTROL_FORWARD - 1][PWM_TIME_HIGH]*NS_IN_US);
 }
 
 // TODO complete these
 void set_reverse(void) {
-    set_pwm(GPIO_CHANNEL, pwm_delay_mappings[CONTROL_REVERSE - 1][PWM_TIME_HIGH]*NS_IN_US);
+    set_pwm(GPIO_CHANNEL_A, pwm_delay_mappings[CONTROL_REVERSE - 1][PWM_TIME_HIGH]*NS_IN_US);
+    set_pwm(GPIO_CHANNEL_B, pwm_delay_mappings[CONTROL_REVERSE - 1][PWM_TIME_HIGH]*NS_IN_US);
 }
 
 void set_neutral(void) {
     // LOG_CONTROL("Command Received: Neutral\n");
-    set_pwm(GPIO_CHANNEL, pwm_delay_mappings[CONTROL_NEUTRAL - 1][PWM_TIME_HIGH]*NS_IN_US);
+    set_pwm(GPIO_CHANNEL_A, pwm_delay_mappings[CONTROL_NEUTRAL - 1][PWM_TIME_HIGH]*NS_IN_US);
+    set_pwm(GPIO_CHANNEL_B, pwm_delay_mappings[CONTROL_NEUTRAL - 1][PWM_TIME_HIGH]*NS_IN_US);
 }
-
 
 void handle_motor_request(void) {
     switch (curr_command)
     {
-    case CONTROL_FORWARD:
+    case REQUEST_FORWARD:
         set_forward();
         break;
-    case CONTROL_REVERSE:
+    case REQUEST_BACK:
         set_reverse();
         break;
-    case CONTROL_NEUTRAL:
+    case REQUEST_LEFT:
+        set_left();
+        break;
+    case REQUEST_RIGHT:
+        set_right();
+        break;
+    case REQUEST_NEUTRAL:
         set_neutral();
+        break;
+    case REQUEST_STOP:
+        set_stop();
         break;
     default:
         break;
