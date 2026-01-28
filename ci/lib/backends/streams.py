@@ -77,9 +77,7 @@ async def wait_for_output(backend: HardwareBackend, text: bytes) -> bytes:
             offset = len(buffer) + 1 - len(text)
 
     if b"LDR|ERROR: loader trapped exception: Synchronous" in buffer:
-        raise TestFailureException(
-            "loader trapped. Backtrace avialable."
-            )
+        raise TestFailureException("loader trapped. Backtrace avialable.")
 
     return buffer
 
