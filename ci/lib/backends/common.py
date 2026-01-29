@@ -9,7 +9,7 @@ import io
 from pathlib import Path
 import sys
 from typing import BinaryIO, Union
-
+import threading, time
 
 def reset_terminal():
     OUTPUT.write(b"\n\x1b[0m")
@@ -36,13 +36,25 @@ class TestFailureException(Exception):
     """Test failed"""
 
 
-# TODO: extend this to have a new stream to monitor for hanging?
-class _TeeOut:
+class TeeOut:
     def __init__(self, stdout: BinaryIO):
         self.stdout = stdout
         self.fileio: BinaryIO | None = None
+        self._lock = threading.Lock()
+        self._last_write = time.monotonic()
+
+    def last_write_age_s(self) -> float:
+        with self._lock:
+            return time.monotonic() - self._last_write
+
+    def touch(self):
+        with self._lock:
+            self._last_write = time.monotonic()
 
     def write(self, s: Union[bytes, bytearray]):
+        with self._lock:
+            self._last_write = time.monotonic()
+
         self.stdout.write(s)
         self.stdout.flush()
 
@@ -62,7 +74,7 @@ class _TeeOut:
     # fmt: on
 
 
-OUTPUT = _TeeOut(sys.stdout.buffer)
+OUTPUT = TeeOut(sys.stdout.buffer)
 sys.stdout = io.TextIOWrapper(OUTPUT, write_through=True)  # type: ignore
 
 
