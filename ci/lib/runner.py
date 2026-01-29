@@ -11,12 +11,12 @@ QEMU.
 import argparse
 import asyncio
 from collections.abc import Awaitable, Callable
-from contextlib import nullcontext
+import contextlib
 from datetime import datetime
 import itertools
 from pathlib import Path
 import time
-from typing import Literal, Optional
+from typing import Literal, Optional, Awaitable
 
 from . import log
 from .backends import (
@@ -25,8 +25,42 @@ from .backends import (
     TestFailureException,
     reset_terminal,
     log_output_to_file,
+    TeeOut,
+    OUTPUT,
 )
-from ci.common import list_test_cases, TestConfig, TestResults
+from ci.common import list_test_cases, TestConfig, TestResults, INACTIVITY_TIMEOUT
+
+# Task to monitor for inactivity
+async def _watch_stdout_inactivity(tee: TeeOut, timeout_no_output: float, poll_s: float = 0.5):
+    while True:
+        await asyncio.sleep(poll_s)
+        if tee.last_write_age_s() >= timeout_no_output:
+            raise asyncio.TimeoutError(f"No output for more than {timeout_no_output}s")
+
+async def _run_with_watchdog(main: Awaitable[None], tee: TeeOut, timeout_no_output: float):
+    tee.touch()
+
+    main_task = asyncio.create_task(main)
+    watchdog_task = asyncio.create_task(_watch_stdout_inactivity(tee, timeout_no_output))
+
+    done, pending = await asyncio.wait({main_task, watchdog_task}, return_when=asyncio.FIRST_COMPLETED)
+
+    # watchdog fired
+    if watchdog_task in done:
+        main_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await main_task
+        # propagate the exception
+        watchdog_task.result()
+
+    # main completed, cancel the watchdog
+    watchdog_task.cancel()
+    # await the rest
+    with contextlib.suppress(asyncio.CancelledError):
+        await watchdog_task
+
+    # propagate any errors from the main task
+    await main_task
 
 async def runner(
     test: Callable[[HardwareBackend, TestConfig], Awaitable[None]],
@@ -152,11 +186,11 @@ def run_test_config(
         log_file.parent.mkdir(parents=True, exist_ok=True)
         log_file_cm = log_output_to_file(log_file)
     else:
-        log_file_cm = nullcontext()
+        log_file_cm = contextlib.nullcontext()
 
     try:
         with log_file_cm:
-            asyncio.run(runner(test_fn, backend, test_config))
+            asyncio.run(_run_with_watchdog(runner(test_fn, backend, test_config), OUTPUT, INACTIVITY_TIMEOUT))
 
     except TestFailureException as e:
         log.error(f"Test failed: {e}")
