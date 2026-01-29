@@ -63,11 +63,13 @@ bool delay_ms(size_t milliseconds)
     return true;
 }
 
-void send_motor_request(int motor_ch, int command) {
+// send motor control request for micro_s micorseconds
+void send_motor_request(int motor_ch, int command, uint64_t micro_s) {
     LOG_CLIENT("Sending motor request\n");
 
-    microkit_msginfo new_msg = microkit_msginfo_new(0, 1);
+    microkit_msginfo new_msg = microkit_msginfo_new(0, 2);
     microkit_mr_set(0, command);
+    microkit_mr_set(1, micro_s);
 
     microkit_ppcall(motor_ch, new_msg);
 }
@@ -81,30 +83,29 @@ uint64_t get_ultrasonic_reading() {
 }
 
 // TODO check these
-void drive_forward(void) {
-    send_motor_request(MOTOR_CONTROL_CHANNEL, REQUEST_FORWARD);
+void drive_forward(uint64_t micro_s) {
+    send_motor_request(MOTOR_CONTROL_CHANNEL, REQUEST_FORWARD, micro_s);
 }
 
-void drive_reverse(void) {
-    send_motor_request(MOTOR_CONTROL_CHANNEL, REQUEST_BACK);
+void drive_reverse(uint64_t micro_s) {
+    send_motor_request(MOTOR_CONTROL_CHANNEL, REQUEST_BACK, micro_s);
 }
 
-void drive_left(void) {
-    send_motor_request(MOTOR_CONTROL_CHANNEL, REQUEST_LEFT);
+void drive_left(uint64_t micro_s) {
+    send_motor_request(MOTOR_CONTROL_CHANNEL, REQUEST_LEFT, micro_s);
 }
 
-void drive_right(void) {
-    send_motor_request(MOTOR_CONTROL_CHANNEL, REQUEST_RIGHT);
+void drive_right(uint64_t micro_s) {
+    send_motor_request(MOTOR_CONTROL_CHANNEL, REQUEST_RIGHT, micro_s);
 }
 
-void drive_neutral(void) {
-    send_motor_request(MOTOR_CONTROL_CHANNEL, REQUEST_NEUTRAL);
+void drive_neutral(uint64_t micro_s) {
+    send_motor_request(MOTOR_CONTROL_CHANNEL, REQUEST_NEUTRAL, micro_s);
 }
 
 void client_main(void) {
     // wait for all sensors to initialise first
 
-    // TODO: check this
     while (true)
     {
         uint64_t averaged_dist = 0;
@@ -120,10 +121,9 @@ void client_main(void) {
         // LOG_CLIENT("Sensor Reading Received: %ld\n", averaged_dist);
 
         if (averaged_dist < 10) {
-            drive_neutral();
+            drive_neutral(1*NS_IN_MS);
             // turn left every time there's an obstacle
-            drive_left();
-            delay_ms(4);
+            drive_left(4*NS_IN_MS);
         }
         else {
             drive_forward();

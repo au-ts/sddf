@@ -107,7 +107,7 @@ void digital_write(int gpio_ch, int value) {
     }
 }
 
-void set_pwm(int gpio_ch, int micro_s) {
+void set_pwm(int gpio_ch, uint64_t micro_s) {
     digital_write(gpio_ch, GPIO_HIGH);
 
     // TODO: refactor this

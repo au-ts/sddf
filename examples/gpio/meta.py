@@ -42,7 +42,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
 
     client = ProtectionDomain("client", "client.elf", priority=1)
-    motor_control = ProtectionDomain("motor_control", "motor_control.elf", priority=2)
+    motor_control = ProtectionDomain("motor_control", "motor_control.elf", priority=2, passive=True)
     ultrasonic_sensor = ProtectionDomain("ultrasonic_sensor", "ultrasonic_sensor.elf", priority=2, passive=True)
 
     timer_node = dtb.node(board.timer)
