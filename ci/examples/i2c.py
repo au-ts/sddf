@@ -9,7 +9,8 @@ import sys
 sys.path.insert(1, Path(__file__).parents[2].as_posix())
 
 from ci.lib.backends import *
-from ci.lib.runner import TestConfig, cli, matrix_product
+from ci.lib.runner import cli, matrix_product, ResultKind
+from ci.common import TestConfig
 from ci import common, matrix
 
 TEST_MATRIX = matrix_product(
@@ -38,6 +39,8 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
         # It should take us less than 20 sec before it becomes Monday.
         await wait_for_output(backend, b"Date and Time: 01-06-25 00:00:00 (Monday)\r\n")
 
+def run_test(only_qemu: bool) -> dict[TestConfig, ResultKind]:
+    return cli("i2c", test, common.get_test_configs(TEST_MATRIX, only_qemu), backend_fn, common.loader_img_path)
 
 if __name__ == "__main__":
-    cli("i2c", test, TEST_MATRIX, backend_fn, common.loader_img_path)
+    run_test(False)

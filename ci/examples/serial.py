@@ -9,7 +9,8 @@ import sys
 sys.path.insert(1, Path(__file__).parents[2].as_posix())
 
 from ci.lib.backends import *
-from ci.lib.runner import TestConfig, cli, matrix_product
+from ci.lib.runner import cli, matrix_product, ResultKind
+from ci.common import TestConfig
 from ci import common, matrix
 
 TEST_MATRIX = matrix_product(
@@ -58,6 +59,8 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
             backend, b"client1 has received 10 characters so far!\r\n"
         )
 
+def run_test(only_qemu: bool) -> dict[TestConfig, ResultKind]:
+    return cli("serial", test, common.get_test_configs(TEST_MATRIX, only_qemu), common.backend_fn, common.loader_img_path)
 
 if __name__ == "__main__":
-    cli("serial", test, TEST_MATRIX, common.backend_fn, common.loader_img_path)
+    run_test(False)

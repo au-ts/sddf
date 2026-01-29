@@ -10,7 +10,8 @@ import sys
 sys.path.insert(1, Path(__file__).parents[2].as_posix())
 
 from ci.lib.backends import *
-from ci.lib.runner import TestConfig, cli, matrix_product
+from ci.lib.runner import cli, matrix_product, ResultKind
+from ci.common import TestConfig
 from ci.lib import log
 from ci import common, matrix
 
@@ -64,6 +65,9 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
         reset_terminal()
         log.info(f"client IPs: client1={ip1}, client0={ip0}")
 
+def run_test(only_qemu: bool) -> dict[TestConfig, ResultKind]:
+    return cli("echo_server", test, common.get_test_configs(TEST_MATRIX, only_qemu), backend_fn, common.loader_img_path)
 
 if __name__ == "__main__":
-    cli("echo_server", test, TEST_MATRIX, backend_fn, common.loader_img_path)
+    run_test(False)
+
