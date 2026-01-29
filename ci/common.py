@@ -14,7 +14,6 @@ from ci.matrix import MACHINE_QUEUE_BOARDS, MACHINE_QUEUE_BOARD_OPTIONS
 
 
 CI_BUILD_DIR = Path(__file__).parents[1] / "ci_build"
-INACTIVITY_TIMEOUT = 60
 
 @dataclass(order=True, frozen=True)
 class TestConfig:

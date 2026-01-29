@@ -28,7 +28,7 @@ from .backends import (
     TeeOut,
     OUTPUT,
 )
-from ci.common import list_test_cases, TestConfig, TestResults, INACTIVITY_TIMEOUT
+from ci.common import list_test_cases, TestConfig, TestResults
 
 # Task to monitor for inactivity
 async def _watch_stdout_inactivity(tee: TeeOut, timeout_no_output: float, poll_s: float = 0.5):
@@ -168,6 +168,7 @@ def run_test_config(
     test_fn: Callable[[HardwareBackend, TestConfig], Awaitable[None]],
     backend_fn: Callable[[TestConfig, Path], HardwareBackend],
     loader_img_fn: Callable[[str, TestConfig], Path],
+    no_output_timeout: int,
     logs_dir: Optional[Path] = None,
 ) -> ResultKind:
 
@@ -190,7 +191,7 @@ def run_test_config(
 
     try:
         with log_file_cm:
-            asyncio.run(_run_with_watchdog(runner(test_fn, backend, test_config), OUTPUT, INACTIVITY_TIMEOUT))
+            asyncio.run(_run_with_watchdog(runner(test_fn, backend, test_config), OUTPUT, no_output_timeout))
 
     except TestFailureException as e:
         log.error(f"Test failed: {e}")
@@ -290,6 +291,14 @@ def cli(
             "think of this as the polling delay between checking locks"
         ),
     )
+    parser.add_argument(
+        "--no-output-timeout",
+        type=int,
+        default=60,
+        help=(
+            "time (seconds) to allow the test to not output any text. If this timeout is reached the test is terminated."
+        ),
+    )
 
     args = parser.parse_args()
 
@@ -299,6 +308,7 @@ def cli(
 
     matrix = sorted(_subset_test_matrix(matrix, filters_args))
     if len(matrix) == 0:
+        # this is fine for qemu tests
         parser.error("applied filters result in zero selected tests")
 
     if loader_img := args.override_image:
@@ -345,7 +355,7 @@ def cli(
         fmt = f"{test_name} on {test_config.board} ({test_config.config}, built with {test_config.build_system})"
         log.group_start("Running " + fmt)
         result = run_test_config(
-            test_name, test_config, test_fn, backend_fn, loader_img_fn, args.logs_dir
+            test_name, test_config, test_fn, backend_fn, loader_img_fn, args.no_output_timeout, args.logs_dir
         )
         log.group_end("Finished running " + fmt)
 
@@ -381,6 +391,7 @@ def cli(
                     test_fn,
                     backend_fn,
                     loader_img_fn,
+                    args.no_output_timeout,
                     args.logs_dir,
                 )
                 log.group_end("Finished running " + fmt)

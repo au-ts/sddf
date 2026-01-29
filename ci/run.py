@@ -50,6 +50,11 @@ if __name__ == "__main__":
             sys.argv = [saved_argv[0]]
             mod = importlib.import_module(f"examples.{example}")
             results.append(mod.run_test(args.only_qemu))
+        except SystemExit as e:
+            if e.code == 2:
+                print(f"Skipping {example} (zero selected tests)")
+                continue
+            raise
         finally:
             sys.argv = saved_argv
 
