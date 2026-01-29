@@ -1,5 +1,4 @@
 #include "include/motor/timer_queue.h"
-// https://www.geeksforgeeks.org/c/queue-in-c/
 
 void swap(int* a, int* b)
 {
@@ -14,21 +13,24 @@ void heapifyUp(PriorityQueue* pq, int index)
         && pq->items[(index - 1) / 2] > pq->items[index]) {
         swap(&pq->items[(index - 1) / 2],
              &pq->items[index]);
+        swap(&pq->vals[(index - 1) / 2],
+             &pq->vals[index]);
         heapifyUp(pq, (index - 1) / 2);
     }
 }
-void enqueue(PriorityQueue* pq, int value)
+void enqueue(PriorityQueue* pq, uint64_t value, char symbol)
 {
     if (pq->size == MAX) {
-        printf("Priority queue is full\n");
+        sddf_printf("Priority queue is full\n");
         return;
     }
 
     pq->items[pq->size++] = value;
+    pq->vals[pq->size++] = symbol;
     heapifyUp(pq, pq->size - 1);
 }
 
-int heapifyDown(PriorityQueue* pq, int index)
+void heapifyDown(PriorityQueue* pq, int index)
 {
     int smallest = index;
     int left = 2 * index + 1;
@@ -44,28 +46,31 @@ int heapifyDown(PriorityQueue* pq, int index)
 
     if (smallest != index) {
         swap(&pq->items[index], &pq->items[smallest]);
+        swap(&pq->vals[index], &pq->vals[smallest]);
         heapifyDown(pq, smallest);
     }
 }
 
-int dequeue(PriorityQueue* pq)
+char dequeue(PriorityQueue* pq)
 {
     if (!pq->size) {
-        printf("Priority queue is empty\n");
+        sddf_printf("Priority queue is empty\n");
         return -1;
     }
 
-    int item = pq->items[0];
+    char value = pq->vals[0];
     pq->items[0] = pq->items[--pq->size];
+    pq->vals[0] = pq->vals[--pq->size];
+
     heapifyDown(pq, 0);
-    return item;
+    return value;
 }
 
-int peek(PriorityQueue* pq)
+char peek(PriorityQueue* pq)
 {
     if (!pq->size) {
-        printf("Priority queue is empty\n");
-        return -1;
+        sddf_printf("Priority queue is empty\n");
+        return 0;
     }
-    return pq->items[0];
+    return pq->vals[0];
 }

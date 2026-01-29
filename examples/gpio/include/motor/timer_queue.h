@@ -3,10 +3,12 @@
 #include <os/sddf.h>
 
 #define MAX 100
+// https://www.geeksforgeeks.org/c/c-program-to-implement-priority-queue/
 
 // Defining the Queue structure
 typedef struct {
-    int items[MAX];
+    uint64_t items[MAX];
+    char vals[MAX];
     int size;
 } PriorityQueue;
 
@@ -16,14 +18,14 @@ typedef struct {
 void heapifyUp(PriorityQueue* pq, int index);
 
 // Define enqueue function to add an item to the queue
-void enqueue(PriorityQueue* pq, int value);
+void enqueue(PriorityQueue* pq, uint64_t value, char symbol);
 
 // Define heapifyDown function to maintain heap property
 // during deletion
-int heapifyDown(PriorityQueue* pq, int index);
+void heapifyDown(PriorityQueue* pq, int index);
 
 // Define dequeue function to remove an item from the queue
-int dequeue(PriorityQueue* pq);
+char dequeue(PriorityQueue* pq);
 
 // Define peek function to get the top item from the queue
-int peek(PriorityQueue* pq);
+char peek(PriorityQueue* pq);
