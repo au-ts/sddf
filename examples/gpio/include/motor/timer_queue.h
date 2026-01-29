@@ -2,13 +2,13 @@
 #include <sddf/util/printf.h>
 #include <os/sddf.h>
 
-#define MAX 100
+#define MAX_SIZE 100
 // https://www.geeksforgeeks.org/c/c-program-to-implement-priority-queue/
 
 // Defining the Queue structure
 typedef struct {
-    uint64_t items[MAX];
-    int vals[MAX];
+    uint64_t items[MAX_SIZE];
+    int vals[MAX_SIZE];
     int size;
 } PriorityQueue;
 

@@ -27,7 +27,7 @@ void heapifyUp(PriorityQueue* pq, int index)
 }
 void enqueue(PriorityQueue* pq, uint64_t value, int id)
 {
-    if (pq->size == MAX) {
+    if (pq->size == MAX_SIZE) {
         sddf_printf("Priority queue is full\n");
         return;
     }

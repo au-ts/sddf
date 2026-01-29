@@ -118,7 +118,7 @@ void set_pwm(int gpio_ch, int micro_s) {
         pwm_b_state = PAUSE_HIGH;
     }
 
-    enqueue(&timeout_queue, sddf_timer_time_now(), gpio_ch);
+    enqueue(&timeout_queue, sddf_timer_time_now(timer_channel), gpio_ch);
     // timeout to drive motor forward
     sddf_timer_set_timeout(timer_channel, micro_s);
 }

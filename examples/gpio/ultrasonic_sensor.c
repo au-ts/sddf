@@ -35,9 +35,6 @@ sddf_channel timer_channel;
 cothread_t t_event;
 cothread_t t_main;
 
-#define STACK_SIZE (4096)
-static char t_sensor_main_stack[STACK_SIZE];
-
 // Channels
 #define CLIENT_CHANNEL (1)
 // #define TIMER_CHANNEL (2)
