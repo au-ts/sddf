@@ -11,14 +11,12 @@ QEMU.
 import argparse
 import asyncio
 from collections.abc import Awaitable, Callable
-from contextlib import nullcontext
-from dataclasses import dataclass
+import contextlib
 from datetime import datetime
 import itertools
-import os
 from pathlib import Path
 import time
-from typing import Literal, Optional
+from typing import Literal, Optional, Awaitable
 
 from . import log
 from .backends import (
@@ -27,19 +25,52 @@ from .backends import (
     TestFailureException,
     reset_terminal,
     log_output_to_file,
+    TeeOut,
     OUTPUT,
 )
+from ci.common import list_test_cases, TestConfig, TestResults
 
 
-@dataclass(order=True, frozen=True)
-class TestConfig:
-    board: str
-    config: str
-    build_system: str
+# Task to monitor for inactivity
+async def _watch_stdout_inactivity(
+    tee: TeeOut, timeout_no_output: float, poll_s: float = 0.5
+):
+    while True:
+        await asyncio.sleep(poll_s)
+        if tee.last_write_age_s() >= timeout_no_output:
+            raise asyncio.TimeoutError(f"No output for more than {timeout_no_output}s")
 
-    def is_qemu(self):
-        # TODO: x86_64_generic assumes QEMU for the moment.
-        return self.board.startswith("qemu") or self.board == "x86_64_generic"
+
+async def _run_with_watchdog(
+    main: Awaitable[None], tee: TeeOut, timeout_no_output: float
+):
+    tee.touch()
+
+    main_task = asyncio.create_task(main)
+    watchdog_task = asyncio.create_task(
+        _watch_stdout_inactivity(tee, timeout_no_output)
+    )
+
+    done, pending = await asyncio.wait(
+        {main_task, watchdog_task}, return_when=asyncio.FIRST_COMPLETED
+    )
+
+    # watchdog fired
+    if watchdog_task in done:
+        main_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await main_task
+        # propagate the exception
+        watchdog_task.result()
+
+    # main completed, cancel the watchdog
+    watchdog_task.cancel()
+    # await the rest
+    with contextlib.suppress(asyncio.CancelledError):
+        await watchdog_task
+
+    # propagate any errors from the main task
+    await main_task
 
 
 async def runner(
@@ -139,21 +170,6 @@ def _subset_test_matrix(
     return list(filter(filter_check, matrix))
 
 
-def _list_test_cases(matrix: list[TestConfig]):
-    if len(matrix) == 0:
-        return "   (none)"
-
-    lines = []
-    for board, group in itertools.groupby(matrix, key=lambda c: c.board):
-        lines.append(
-            " - {}: {}".format(
-                board, ", ".join(f"{c.config}/{c.build_system}" for c in group)
-            )
-        )
-
-    return "\n".join(lines)
-
-
 ResultKind = Literal["pass", "fail", "not_run", "retry", "interrupted"]
 
 
@@ -163,6 +179,7 @@ def run_test_config(
     test_fn: Callable[[HardwareBackend, TestConfig], Awaitable[None]],
     backend_fn: Callable[[TestConfig, Path], HardwareBackend],
     loader_img_fn: Callable[[str, TestConfig], Path],
+    no_output_timeout: int,
     logs_dir: Optional[Path] = None,
 ) -> ResultKind:
 
@@ -181,11 +198,15 @@ def run_test_config(
         log_file.parent.mkdir(parents=True, exist_ok=True)
         log_file_cm = log_output_to_file(log_file)
     else:
-        log_file_cm = nullcontext()
+        log_file_cm = contextlib.nullcontext()
 
     try:
         with log_file_cm:
-            asyncio.run(runner(test_fn, backend, test_config))
+            asyncio.run(
+                _run_with_watchdog(
+                    runner(test_fn, backend, test_config), OUTPUT, no_output_timeout
+                )
+            )
 
     except TestFailureException as e:
         log.error(f"Test failed: {e}")
@@ -210,7 +231,7 @@ def cli(
     matrix: list[TestConfig],
     backend_fn: Callable[[TestConfig, Path], HardwareBackend],
     loader_img_fn: Callable[[str, TestConfig], Path],
-):
+) -> TestResults:
     """
     test should raise an exception on failure.
     matrix is the set of supported test configs for this test.
@@ -285,6 +306,14 @@ def cli(
             "think of this as the polling delay between checking locks"
         ),
     )
+    parser.add_argument(
+        "--no-output-timeout",
+        type=int,
+        default=60,
+        help=(
+            "time (seconds) to allow the test to not output any text. If this timeout is reached the test is terminated."
+        ),
+    )
 
     args = parser.parse_args()
 
@@ -294,6 +323,7 @@ def cli(
 
     matrix = sorted(_subset_test_matrix(matrix, filters_args))
     if len(matrix) == 0:
+        # this is fine for qemu tests
         parser.error("applied filters result in zero selected tests")
 
     if loader_img := args.override_image:
@@ -314,7 +344,7 @@ def cli(
     if args.single and len(matrix) != 1:
         parser.error(
             "requested --single but applied filters generated multiple cases: \n"
-            + _list_test_cases(matrix)
+            + list_test_cases(matrix)
         )
 
     if args.override_backend:
@@ -325,7 +355,7 @@ def cli(
 
     if args.dry_run:
         print("Would run the following test cases:")
-        print(_list_test_cases(matrix))
+        print(list_test_cases(matrix))
         return
 
     for test_config in matrix:
@@ -340,7 +370,13 @@ def cli(
         fmt = f"{test_name} on {test_config.board} ({test_config.config}, built with {test_config.build_system})"
         log.group_start("Running " + fmt)
         result = run_test_config(
-            test_name, test_config, test_fn, backend_fn, loader_img_fn, args.logs_dir
+            test_name,
+            test_config,
+            test_fn,
+            backend_fn,
+            loader_img_fn,
+            args.no_output_timeout,
+            args.logs_dir,
         )
         log.group_end("Finished running " + fmt)
 
@@ -376,6 +412,7 @@ def cli(
                     test_fn,
                     backend_fn,
                     loader_img_fn,
+                    args.no_output_timeout,
                     args.logs_dir,
                 )
                 log.group_end("Finished running " + fmt)
@@ -402,15 +439,17 @@ def cli(
             assert False, "impossible"
 
     print("==== Passing ====")
-    print(_list_test_cases(passing))
+    print(list_test_cases(passing))
     print("==== Failed =====")
-    print(_list_test_cases(failing))
+    print(list_test_cases(failing))
     if len(not_run) != 0:
         print("===== Cancelled (not run) =====")
-        print(_list_test_cases(not_run))
+        print(list_test_cases(not_run))
     if len(retry_failures) != 0:
         print("===== Transient failures remaining after multiple retries ====")
-        print(_list_test_cases(retry_failures))
+        print(list_test_cases(retry_failures))
 
     if len(passing) != len(matrix):
         quit(1)
+
+    return TestResults(test_name, passing, failing, retry_failures, not_run)

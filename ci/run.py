@@ -5,16 +5,21 @@
 import argparse
 import os
 from pathlib import Path
-import subprocess
 import sys
+import importlib
 
 sys.path.insert(1, Path(__file__).parents[1].as_posix())
 
-from ci.lib.runner import ArgparseActionList
+from ci.lib.runner import ArgparseActionList, TestResults
+from ci.common import list_test_cases
 
 EXAMPLES_DIR = Path(__file__).parent / "examples"
 EXAMPLES_TO_RUN = sorted(
-    [e.removesuffix(".py") for e in os.listdir(EXAMPLES_DIR) if e.endswith(".py")]
+    [
+        e.removesuffix(".py")
+        for e in os.listdir(EXAMPLES_DIR)
+        if (e.endswith(".py") and e != "__init__.py")
+    ]
 )
 
 if __name__ == "__main__":
@@ -41,41 +46,31 @@ if __name__ == "__main__":
     elif args.only_qemu is False:
         filter_flags.append("--no-only-qemu")
 
-    results: dict[str, bool] = {}
-    try:
-        for example in examples_to_run:
-            proc = subprocess.run([EXAMPLES_DIR / (example + ".py"), *filter_flags])
-            if proc.returncode != 0:
-                if proc.returncode == 2:
-                    # this is the case when it doesn't support some of our filters
-                    continue
-
-                results[example] = False
+    results: list[TestResults] = []
+    for example in examples_to_run:
+        # overwrite args to not leak them to tests
+        saved_argv = sys.argv
+        try:
+            sys.argv = [saved_argv[0]]
+            mod = importlib.import_module(f"examples.{example}")
+            results.append(mod.run_test(args.only_qemu))
+        except SystemExit as e:
+            if e.code == 2:
+                print(f"Skipping {example} (zero selected tests)")
                 continue
+            raise
+        finally:
+            sys.argv = saved_argv
 
-            results[example] = True
-    except KeyboardInterrupt:
-        results[example] = False  # type: ignore
-        print("\nSIGINT, exiting...")
-
-    passed = [e for e in examples_to_run if results.get(e) is True]
-    failed = [e for e in examples_to_run if results.get(e) is False]
-    not_run = [e for e in examples_to_run if results.get(e) is None]
-    print("==== Passing ====")
-    for example in passed:
-        print(f"- {example}")
-    if len(passed) == 0:
-        print("  (none)")
-    print("==== Failed =====")
-    for example in failed:
-        print(f"- {example}")
-    if len(failed) == 0:
-        print("  (none)")
-
-    if len(not_run) != 0:
-        print("===== Not run =====")
-        for example in not_run:
-            print(f"- {example}")
-
-    if len(failed) != 0:
-        quit(1)
+    for result in results:
+        print(f"==== Results for example: {result.test_name} ====")
+        print("==== Passing ====")
+        print(list_test_cases(result.passing))
+        print("==== Failed =====")
+        print(list_test_cases(result.failing))
+        if len(result.not_run) != 0:
+            print("===== Cancelled (not run) =====")
+            print(list_test_cases(result.not_run))
+        if len(result.retry_failures) != 0:
+            print("===== Transient failures remaining after multiple retries ====")
+            print(list_test_cases(result.retry_failures))
