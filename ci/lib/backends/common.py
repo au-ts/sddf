@@ -11,6 +11,7 @@ import sys
 from typing import BinaryIO, Union
 import threading, time
 
+
 def reset_terminal():
     OUTPUT.write(b"\n\x1b[0m")
 

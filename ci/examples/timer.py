@@ -54,8 +54,16 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
 
     log.info(f"Deltas within {DRIFT_THRESHOLD:.0%} threshold")
 
+
 def run_test(only_qemu: bool) -> dict[TestConfig, ResultKind]:
-    return cli("timer", test, common.get_test_configs(TEST_MATRIX, only_qemu), common.backend_fn, common.loader_img_path)
+    return cli(
+        "timer",
+        test,
+        common.get_test_configs(TEST_MATRIX, only_qemu),
+        common.backend_fn,
+        common.loader_img_path,
+    )
+
 
 if __name__ == "__main__":
     run_test(False)

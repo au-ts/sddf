@@ -29,8 +29,16 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
     async with asyncio.timeout(60):
         await wait_for_output(backend, b"           	 ... is present!\r\n")
 
+
 def run_test(only_qemu: bool) -> dict[TestConfig, ResultKind]:
-    return cli("i2c_bus_scan", test, common.get_test_configs(TEST_MATRIX, only_qemu), backend_fn, common.loader_img_path)
+    return cli(
+        "i2c_bus_scan",
+        test,
+        common.get_test_configs(TEST_MATRIX, only_qemu),
+        backend_fn,
+        common.loader_img_path,
+    )
+
 
 if __name__ == "__main__":
     run_test(False)
