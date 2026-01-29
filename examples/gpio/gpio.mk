@@ -19,7 +19,8 @@ PYTHONPATH := ${SDDF}/tools/meta:${PYTHONPATH}
 export PYTHONPATH
 
 SUPPORTED_BOARDS := \
-		maaxboard
+		maaxboard \
+		odroidc4
 
 include ${SDDF}/tools/make/board/common.mk
 

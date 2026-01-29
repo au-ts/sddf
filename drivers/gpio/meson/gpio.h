@@ -8,7 +8,8 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <microkit.h>
-#include <sddf/gpio/gpio.h>
+#include <sddf/gpio/protocol.h>
+#include <sddf/gpio/config.h>
 
 /* MESON SPECIFIC FORMAT FOR GPIO PPC REQUESTS/RESPONSES */
 
@@ -60,15 +61,15 @@ typedef enum {
 ================================================================================
 */
 
-typedef enum {
-    MESON_GPIO_PULL = GPIO_CONFIG_PLATFORM_SPECIFIC_START,
-    MESON_GPIO_DRIVE_STRENGTH,
-} meson_gpio_config_t;
+// typedef enum {
+//     MESON_GPIO_PULL = SDDF_GPIO_PLATFORM_SPECIFIC_START,
+//     MESON_GPIO_DRIVE_STRENGTH,
+// } meson_gpio_config_t;
 
-typedef enum {
-    MESON_GPIO_IRQ_EDGE = GPIO_IRQ_CONFIG_PLATFORM_SPECIFIC_START,
-    MESON_GPIO_IRQ_FILTER,
-} meson_gpio_irq_config_t;
+// typedef enum {
+//     MESON_GPIO_IRQ_EDGE = GPIO_IRQ_CONFIG_PLATFORM_SPECIFIC_START,
+//     MESON_GPIO_IRQ_FILTER,
+// } meson_gpio_irq_config_t;
 
 /*
 ================================================================================

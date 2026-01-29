@@ -1,7 +1,8 @@
 # Copyright 2025, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
 from dataclasses import dataclass
-from typing import List, Tuple, Optional
+from typing import List, Optional, Tuple
+
 from sdfgen import SystemDescription
 
 

@@ -10,7 +10,7 @@
 #include <stdbool.h>
 #include <sddf/util/printf.h>
 #include <sddf/util/util.h>
-#include <sddf/gpio/meson/gpio.h>
+#include "gpio.h"
 
 /* because start is not page aligned */
 #define GPIO_REGS_BASE_ADDRESS_OFFSET           0x400
