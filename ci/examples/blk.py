@@ -12,7 +12,8 @@ import tempfile
 sys.path.insert(1, Path(__file__).parents[2].as_posix())
 
 from ci.lib.backends import *
-from ci.lib.runner import TestConfig, cli, matrix_product
+from ci.lib.runner import cli, matrix_product, ResultKind
+from ci.common import TestConfig
 from ci import common, matrix
 
 TEST_MATRIX = matrix_product(
@@ -60,13 +61,15 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
             backend, b"CLIENT|INFO: basic: successfully finished!\r\n"
         )
 
-
-if __name__ == "__main__":
+def run_test(only_qemu: bool) -> dict[TestConfig, ResultKind]:
     with tempfile.TemporaryDirectory(suffix="sddf_blk_disks") as qemu_disks_dir:
-        cli(
+        return cli(
             "blk",
             test,
-            TEST_MATRIX,
+            common.get_test_configs(TEST_MATRIX, only_qemu),
             functools.partial(backend_fn, qemu_disks_dir),
             common.loader_img_path,
         )
+
+if __name__ == "__main__":
+    run_test(False)

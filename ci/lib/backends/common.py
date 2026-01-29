@@ -36,6 +36,7 @@ class TestFailureException(Exception):
     """Test failed"""
 
 
+# TODO: extend this to have a new stream to monitor for hanging?
 class _TeeOut:
     def __init__(self, stdout: BinaryIO):
         self.stdout = stdout

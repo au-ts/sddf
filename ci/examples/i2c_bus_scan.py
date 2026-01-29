@@ -9,7 +9,8 @@ import sys
 sys.path.insert(1, Path(__file__).parents[2].as_posix())
 
 from ci.lib.backends import *
-from ci.lib.runner import TestConfig, cli, matrix_product
+from ci.lib.runner import cli, matrix_product, ResultKind
+from ci.common import TestConfig
 from ci import common, matrix
 
 TEST_MATRIX = matrix_product(
@@ -28,6 +29,8 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
     async with asyncio.timeout(60):
         await wait_for_output(backend, b"           	 ... is present!\r\n")
 
+def run_test(only_qemu: bool) -> dict[TestConfig, ResultKind]:
+    return cli("i2c_bus_scan", test, common.get_test_configs(TEST_MATRIX, only_qemu), backend_fn, common.loader_img_path)
 
 if __name__ == "__main__":
-    cli("i2c_bus_scan", test, TEST_MATRIX, backend_fn, common.loader_img_path)
+    run_test(False)

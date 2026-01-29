@@ -12,10 +12,8 @@ import argparse
 import asyncio
 from collections.abc import Awaitable, Callable
 from contextlib import nullcontext
-from dataclasses import dataclass
 from datetime import datetime
 import itertools
-import os
 from pathlib import Path
 import time
 from typing import Literal, Optional
@@ -27,20 +25,8 @@ from .backends import (
     TestFailureException,
     reset_terminal,
     log_output_to_file,
-    OUTPUT,
 )
-
-
-@dataclass(order=True, frozen=True)
-class TestConfig:
-    board: str
-    config: str
-    build_system: str
-
-    def is_qemu(self):
-        # TODO: x86_64_generic assumes QEMU for the moment.
-        return self.board.startswith("qemu") or self.board == "x86_64_generic"
-
+from ci.common import list_test_cases, TestConfig, TestResults
 
 async def runner(
     test: Callable[[HardwareBackend, TestConfig], Awaitable[None]],
@@ -139,21 +125,6 @@ def _subset_test_matrix(
     return list(filter(filter_check, matrix))
 
 
-def _list_test_cases(matrix: list[TestConfig]):
-    if len(matrix) == 0:
-        return "   (none)"
-
-    lines = []
-    for board, group in itertools.groupby(matrix, key=lambda c: c.board):
-        lines.append(
-            " - {}: {}".format(
-                board, ", ".join(f"{c.config}/{c.build_system}" for c in group)
-            )
-        )
-
-    return "\n".join(lines)
-
-
 ResultKind = Literal["pass", "fail", "not_run", "retry", "interrupted"]
 
 
@@ -210,7 +181,7 @@ def cli(
     matrix: list[TestConfig],
     backend_fn: Callable[[TestConfig, Path], HardwareBackend],
     loader_img_fn: Callable[[str, TestConfig], Path],
-):
+) -> TestResults:
     """
     test should raise an exception on failure.
     matrix is the set of supported test configs for this test.
@@ -314,7 +285,7 @@ def cli(
     if args.single and len(matrix) != 1:
         parser.error(
             "requested --single but applied filters generated multiple cases: \n"
-            + _list_test_cases(matrix)
+            + list_test_cases(matrix)
         )
 
     if args.override_backend:
@@ -325,7 +296,7 @@ def cli(
 
     if args.dry_run:
         print("Would run the following test cases:")
-        print(_list_test_cases(matrix))
+        print(list_test_cases(matrix))
         return
 
     for test_config in matrix:
@@ -402,15 +373,17 @@ def cli(
             assert False, "impossible"
 
     print("==== Passing ====")
-    print(_list_test_cases(passing))
+    print(list_test_cases(passing))
     print("==== Failed =====")
-    print(_list_test_cases(failing))
+    print(list_test_cases(failing))
     if len(not_run) != 0:
         print("===== Cancelled (not run) =====")
-        print(_list_test_cases(not_run))
+        print(list_test_cases(not_run))
     if len(retry_failures) != 0:
         print("===== Transient failures remaining after multiple retries ====")
-        print(_list_test_cases(retry_failures))
+        print(list_test_cases(retry_failures))
 
     if len(passing) != len(matrix):
         quit(1)
+
+    return TestResults(test_name, passing, failing, retry_failures, not_run)

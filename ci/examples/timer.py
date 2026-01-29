@@ -9,7 +9,8 @@ import sys
 sys.path.insert(1, Path(__file__).parents[2].as_posix())
 
 from ci.lib.backends import *
-from ci.lib.runner import TestConfig, cli, matrix_product
+from ci.lib.runner import cli, matrix_product, ResultKind
+from ci.common import TestConfig
 from ci.lib import log
 from ci import common, matrix
 
@@ -53,6 +54,8 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
 
     log.info(f"Deltas within {DRIFT_THRESHOLD:.0%} threshold")
 
+def run_test(only_qemu: bool) -> dict[TestConfig, ResultKind]:
+    return cli("timer", test, common.get_test_configs(TEST_MATRIX, only_qemu), common.backend_fn, common.loader_img_path)
 
 if __name__ == "__main__":
-    cli("timer", test, TEST_MATRIX, common.backend_fn, common.loader_img_path)
+    run_test(False)
