@@ -8,7 +8,6 @@ const Step = std.Build.Step;
 
 const MicrokitBoard = enum {
     odroidc4,
-    maaxboard,
 };
 
 const Target = struct {
@@ -22,16 +21,6 @@ const targets = [_]Target{
         .zig_target = std.Target.Query{
             .cpu_arch = .aarch64,
             .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a55 },
-            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{.strict_align}),
-            .os_tag = .freestanding,
-            .abi = .none,
-        },
-    },
-    .{
-        .board = MicrokitBoard.maaxboard,
-        .zig_target = std.Target.Query{
-            .cpu_arch = .aarch64,
-            .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a53 },
             .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{.strict_align}),
             .os_tag = .freestanding,
             .abi = .none,
@@ -104,7 +93,6 @@ pub fn build(b: *std.Build) !void {
 
     const driver_class = switch (microkit_board_option) {
         .odroidc4 => "meson",
-        .maaxboard => "imx",
     };
 
     const driver = sddf_dep.artifact(b.fmt("driver_gpio_{s}.elf", .{driver_class}));
