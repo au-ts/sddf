@@ -8,15 +8,15 @@
 # it should be included into your project Makefile
 #
 # NOTES:
-# Generates network_virt_rx.elf network_virt_tx.elf network_arp.elf network_copy.elf
+# Generates network_virt_rx.elf network_virt_tx.elf network_arp.elf network_copy.elf network_vswitch.elf
 # Requires ${SDDF}/util/util.mk to build the utility library for debug output
 
 NETWORK_COMPONENTS_DIR := $(abspath $(dir $(lastword ${MAKEFILE_LIST})))
-NETWORK_IMAGES:= network_virt_rx.elf network_virt_tx.elf network_arp.elf network_copy.elf
+NETWORK_IMAGES:= network_virt_rx.elf network_virt_tx.elf network_arp.elf network_copy.elf network_vswitch.elf
 network/components/%.o: ${SDDF}/network/components/%.c
 	${CC} ${CFLAGS} -c -o $@ $<
 
-NETWORK_COMPONENT_OBJ := $(addprefix network/components/, network_copy.o network_arp.o network_virt_tx.o network_virt_rx.o)
+NETWORK_COMPONENT_OBJ := $(addprefix network/components/, network_copy.o network_arp.o network_virt_tx.o network_virt_rx.o vswitch.o)
 
 CHECK_NETWORK_FLAGS_MD5:=.network_cflags-$(shell echo -- ${CFLAGS} ${CFLAGS_network} | shasum | sed 's/ *-//')
 
@@ -42,11 +42,14 @@ network/components/network_copy.o: ${SDDF}/network/components/copy.c
 network/components/network_arp.o: ${SDDF}/network/components/arp.c
 	${CC} ${CFLAGS} -c -o $@ $<
 
+network/components/vswitch.o: ${SDDF}/network/components/vswitch.c
+	${CC} ${CFLAGS} -c -o $@ $<
+
 %.elf: network/components/%.o
 	${LD} ${LDFLAGS} -o $@ $< ${LIBS}
 
 clean::
-	${RM} -f network_virt_[rt]x.[od] network_copy.[od] network_arp.[od]
+	${RM} -f network_virt_[rt]x.[od] network_copy.[od] network_arp.[od] network_vswitch.[od]
 
 clobber::
 	${RM} -f ${NETWORK_IMAGES}
