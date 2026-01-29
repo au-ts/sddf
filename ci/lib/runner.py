@@ -30,20 +30,30 @@ from .backends import (
 )
 from ci.common import list_test_cases, TestConfig, TestResults
 
+
 # Task to monitor for inactivity
-async def _watch_stdout_inactivity(tee: TeeOut, timeout_no_output: float, poll_s: float = 0.5):
+async def _watch_stdout_inactivity(
+    tee: TeeOut, timeout_no_output: float, poll_s: float = 0.5
+):
     while True:
         await asyncio.sleep(poll_s)
         if tee.last_write_age_s() >= timeout_no_output:
             raise asyncio.TimeoutError(f"No output for more than {timeout_no_output}s")
 
-async def _run_with_watchdog(main: Awaitable[None], tee: TeeOut, timeout_no_output: float):
+
+async def _run_with_watchdog(
+    main: Awaitable[None], tee: TeeOut, timeout_no_output: float
+):
     tee.touch()
 
     main_task = asyncio.create_task(main)
-    watchdog_task = asyncio.create_task(_watch_stdout_inactivity(tee, timeout_no_output))
+    watchdog_task = asyncio.create_task(
+        _watch_stdout_inactivity(tee, timeout_no_output)
+    )
 
-    done, pending = await asyncio.wait({main_task, watchdog_task}, return_when=asyncio.FIRST_COMPLETED)
+    done, pending = await asyncio.wait(
+        {main_task, watchdog_task}, return_when=asyncio.FIRST_COMPLETED
+    )
 
     # watchdog fired
     if watchdog_task in done:
@@ -61,6 +71,7 @@ async def _run_with_watchdog(main: Awaitable[None], tee: TeeOut, timeout_no_outp
 
     # propagate any errors from the main task
     await main_task
+
 
 async def runner(
     test: Callable[[HardwareBackend, TestConfig], Awaitable[None]],
@@ -191,7 +202,11 @@ def run_test_config(
 
     try:
         with log_file_cm:
-            asyncio.run(_run_with_watchdog(runner(test_fn, backend, test_config), OUTPUT, no_output_timeout))
+            asyncio.run(
+                _run_with_watchdog(
+                    runner(test_fn, backend, test_config), OUTPUT, no_output_timeout
+                )
+            )
 
     except TestFailureException as e:
         log.error(f"Test failed: {e}")
@@ -355,7 +370,13 @@ def cli(
         fmt = f"{test_name} on {test_config.board} ({test_config.config}, built with {test_config.build_system})"
         log.group_start("Running " + fmt)
         result = run_test_config(
-            test_name, test_config, test_fn, backend_fn, loader_img_fn, args.no_output_timeout, args.logs_dir
+            test_name,
+            test_config,
+            test_fn,
+            backend_fn,
+            loader_img_fn,
+            args.no_output_timeout,
+            args.logs_dir,
         )
         log.group_end("Finished running " + fmt)
 

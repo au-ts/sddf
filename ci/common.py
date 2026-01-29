@@ -15,6 +15,7 @@ from ci.matrix import MACHINE_QUEUE_BOARDS, MACHINE_QUEUE_BOARD_OPTIONS
 
 CI_BUILD_DIR = Path(__file__).parents[1] / "ci_build"
 
+
 @dataclass(order=True, frozen=True)
 class TestConfig:
     board: str
@@ -24,6 +25,7 @@ class TestConfig:
     def is_qemu(self):
         # TODO: x86_64_generic assumes QEMU for the moment.
         return self.board.startswith("qemu") or self.board == "x86_64_generic"
+
 
 @dataclass
 class TestResults:
@@ -55,11 +57,13 @@ def loader_img_path(
         / "loader.img"
     )
 
+
 def get_test_configs(tests: list[TestConfig], is_qemu: bool) -> list[TestConfig]:
     if is_qemu:
         return [test for test in tests if test.is_qemu()]
     else:
         return tests
+
 
 def list_test_cases(matrix: list[TestConfig]):
     if len(matrix) == 0:

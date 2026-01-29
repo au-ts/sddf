@@ -65,9 +65,16 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
         reset_terminal()
         log.info(f"client IPs: client1={ip1}, client0={ip0}")
 
+
 def run_test(only_qemu: bool) -> dict[TestConfig, ResultKind]:
-    return cli("echo_server", test, common.get_test_configs(TEST_MATRIX, only_qemu), backend_fn, common.loader_img_path)
+    return cli(
+        "echo_server",
+        test,
+        common.get_test_configs(TEST_MATRIX, only_qemu),
+        backend_fn,
+        common.loader_img_path,
+    )
+
 
 if __name__ == "__main__":
     run_test(False)
-

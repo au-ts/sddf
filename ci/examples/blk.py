@@ -61,6 +61,7 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
             backend, b"CLIENT|INFO: basic: successfully finished!\r\n"
         )
 
+
 def run_test(only_qemu: bool) -> dict[TestConfig, ResultKind]:
     with tempfile.TemporaryDirectory(suffix="sddf_blk_disks") as qemu_disks_dir:
         return cli(
@@ -70,6 +71,7 @@ def run_test(only_qemu: bool) -> dict[TestConfig, ResultKind]:
             functools.partial(backend_fn, qemu_disks_dir),
             common.loader_img_path,
         )
+
 
 if __name__ == "__main__":
     run_test(False)

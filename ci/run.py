@@ -15,7 +15,11 @@ from ci.common import list_test_cases
 
 EXAMPLES_DIR = Path(__file__).parent / "examples"
 EXAMPLES_TO_RUN = sorted(
-    [e.removesuffix(".py") for e in os.listdir(EXAMPLES_DIR) if (e.endswith(".py") and e != "__init__.py")]
+    [
+        e.removesuffix(".py")
+        for e in os.listdir(EXAMPLES_DIR)
+        if (e.endswith(".py") and e != "__init__.py")
+    ]
 )
 
 if __name__ == "__main__":
@@ -70,4 +74,3 @@ if __name__ == "__main__":
         if len(result.retry_failures) != 0:
             print("===== Transient failures remaining after multiple retries ====")
             print(list_test_cases(result.retry_failures))
-
