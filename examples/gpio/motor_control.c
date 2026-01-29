@@ -48,12 +48,13 @@ sddf_channel timer_channel;
 #define PAUSE_HIGH (0)
 #define PAUSE_LOW (1)
 
+PriorityQueue timeout_queue = {{}, {}, 0};
+
 int pwm_state = PAUSE_LOW;
 int curr_command = CONTROL_NEUTRAL;
 
 // State of Current Control
 int is_control_fulfilled = -1;
-
 
 void gpio_init(int gpio_ch) {
     // LOG_CONTROL("Setting direction of GPIO1 to output!\n");
@@ -101,10 +102,10 @@ void digital_write(int gpio_ch, int value) {
 }
 
 void set_pwm(int gpio_ch, int micro_s) {
-    // LOG_CONTROL("SET DIGITAL HIGH\n");
     digital_write(gpio_ch, GPIO_HIGH);
     pwm_state = PAUSE_HIGH;
 
+    enqueue(&timeout_queue, sddf_timer_time_now(), gpio_ch);
     // timeout to drive motor forward
     sddf_timer_set_timeout(timer_channel, micro_s);
 }
@@ -191,8 +192,13 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo) {
     return res;
 } 
 
+// have different states for motor A/B
+
+
 void notified(sddf_channel ch) {
     if (ch == timer_config.driver_id) {
+        int motor_channel = dequeue(&timeout_queue);
+
         if (!is_control_fulfilled) {
             handle_motor_request();
             is_control_fulfilled = 1;

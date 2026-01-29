@@ -8,7 +8,7 @@
 // Defining the Queue structure
 typedef struct {
     uint64_t items[MAX];
-    char vals[MAX];
+    int vals[MAX];
     int size;
 } PriorityQueue;
 
@@ -18,14 +18,14 @@ typedef struct {
 void heapifyUp(PriorityQueue* pq, int index);
 
 // Define enqueue function to add an item to the queue
-void enqueue(PriorityQueue* pq, uint64_t value, char symbol);
+void enqueue(PriorityQueue* pq, uint64_t value, int id);
 
 // Define heapifyDown function to maintain heap property
 // during deletion
 void heapifyDown(PriorityQueue* pq, int index);
 
-// Define dequeue function to remove an item from the queue
-char dequeue(PriorityQueue* pq);
+// Remove the top id from the queue
+int dequeue(PriorityQueue* pq);
 
-// Define peek function to get the top item from the queue
-char peek(PriorityQueue* pq);
+// Get the top id from the queue
+int peek(PriorityQueue* pq);
