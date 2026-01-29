@@ -41,8 +41,7 @@ static char t_client_main_stack[STACK_SIZE];
 
 // Channels
 // #define TIMER_CHANNEL (1)
-#define MOTOR_CONTROL_A_CHANNEL (2)
-#define MOTOR_CONTROL_B_CHANNEL (3)
+#define MOTOR_CONTROL_CHANNEL (2)
 #define ULTRASONIC_CHANNEL (4)
 
 // Unfulfilled motor control request
@@ -83,35 +82,29 @@ uint64_t get_ultrasonic_reading() {
 
 // TODO check these
 void drive_forward(void) {
-    send_motor_request(MOTOR_CONTROL_A_CHANNEL, CONTROL_FORWARD);
-    send_motor_request(MOTOR_CONTROL_B_CHANNEL, CONTROL_FORWARD);
+    send_motor_request(MOTOR_CONTROL_CHANNEL, REQUEST_FORWARD);
 }
 
 void drive_reverse(void) {
-    send_motor_request(MOTOR_CONTROL_A_CHANNEL, CONTROL_REVERSE);
-    send_motor_request(MOTOR_CONTROL_B_CHANNEL, CONTROL_REVERSE);
+    send_motor_request(MOTOR_CONTROL_CHANNEL, REQUEST_BACK);
 }
 
 void drive_left(void) {
-    send_motor_request(MOTOR_CONTROL_A_CHANNEL, CONTROL_FORWARD);
-    send_motor_request(MOTOR_CONTROL_B_CHANNEL, CONTROL_NEUTRAL);
+    send_motor_request(MOTOR_CONTROL_CHANNEL, REQUEST_LEFT);
 }
 
 void drive_right(void) {
-    send_motor_request(MOTOR_CONTROL_A_CHANNEL, CONTROL_NEUTRAL);
-    send_motor_request(MOTOR_CONTROL_B_CHANNEL, CONTROL_FORWARD);
+    send_motor_request(MOTOR_CONTROL_CHANNEL, REQUEST_RIGHT);
 }
 
-void drive_stop() {
-    send_motor_request(MOTOR_CONTROL_A_CHANNEL, CONTROL_NEUTRAL);
-    send_motor_request(MOTOR_CONTROL_B_CHANNEL, CONTROL_NEUTRAL);
+void drive_neutral(void) {
+    send_motor_request(MOTOR_CONTROL_CHANNEL, REQUEST_NEUTRAL);
 }
 
 void client_main(void) {
     // wait for all sensors to initialise first
-    // TODO: might want to change this
-    // drive_stop();
-    
+
+    // TODO: check this
     while (true)
     {
         uint64_t averaged_dist = 0;
@@ -127,7 +120,7 @@ void client_main(void) {
         // LOG_CLIENT("Sensor Reading Received: %ld\n", averaged_dist);
 
         if (averaged_dist < 10) {
-            drive_stop();
+            drive_neutral();
             // turn left every time there's an obstacle
             drive_left();
             delay_ms(4);

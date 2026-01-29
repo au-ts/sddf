@@ -184,9 +184,6 @@ void handle_motor_request(void) {
     case REQUEST_NEUTRAL:
         set_neutral();
         break;
-    case REQUEST_STOP:
-        set_stop();
-        break;
     default:
         break;
     }
