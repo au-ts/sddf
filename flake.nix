@@ -119,6 +119,7 @@
               qemu
               gnumake
               dosfstools
+              gptfdisk
               imagemagick
               # for shasum
               perl
