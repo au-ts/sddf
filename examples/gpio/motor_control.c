@@ -54,12 +54,12 @@ PriorityQueue timeout_queue = {{}, {}, 0};
 int pwm_a_state = PAUSE_LOW;
 int pwm_b_state = PAUSE_LOW;
 
-int motor_a_state = CONTROL_STOP;
-int motor_b_state = CONTROL_STOP;
-
-int control_request = REQUEST_STOP;
+int motor_a_state = CONTROL_NEUTRAL;
+int motor_b_state = CONTROL_NEUTRAL;
 
 // State of Current Control
+int control_request = REQUEST_NEUTRAL;
+uint64_t request_time_end = 0;
 int is_control_fulfilled = -1;
 
 void gpio_init(int gpio_ch) {
@@ -195,6 +195,9 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo) {
         int request = (int) microkit_mr_get(0);
         int was_control_fulfilled = is_control_fulfilled;
 
+        uint64_t request_duration = microkit_mr_get(1);
+        request_time_end = sddf_timer_time_now(timer_channel) + request_duration;
+
         if (!request) {
             break;
         }
@@ -207,6 +210,10 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo) {
             // TODO: is this correct?
             handle_motor_request();
         }
+        
+        // block while current time < request duration
+        // TODO: might want to use delay_ms here, check if it faults & if timer interrupts will be handled appropriately
+        while (sddf_timer_time_now(timer_channel) < request_time_end){}
         break;
     default:
         LOG_CONTROL("Unexpected pp call\n");
@@ -250,6 +257,9 @@ void handle_pwm_timeout(int gpio_ch) {
 
 void notified(sddf_channel ch) {
     if (ch == timer_config.driver_id) {
+        if (sddf_timer_time_now() >= request_time_end) {
+            return;
+        }
         int motor_channel = dequeue(&timeout_queue);
         handle_pwm_timeout(motor_channel);
     }

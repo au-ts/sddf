@@ -121,6 +121,7 @@ void client_main(void) {
         // LOG_CLIENT("Sensor Reading Received: %ld\n", averaged_dist);
 
         if (averaged_dist < 10) {
+            // ms
             drive_neutral(1*NS_IN_MS);
             // turn left every time there's an obstacle
             drive_left(4*NS_IN_MS);
