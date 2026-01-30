@@ -14,7 +14,7 @@ void swap_values(int* a, int* b)
     *b = temp;
 }
 
-void heapifyUp(PriorityQueue* pq, int index)
+void heapify_up(PriorityQueue* pq, int index)
 {
     if (index
         && pq->items[(index - 1) / 2] > pq->items[index]) {
@@ -22,7 +22,7 @@ void heapifyUp(PriorityQueue* pq, int index)
              &pq->items[index]);
         swap_values(&pq->vals[(index - 1) / 2],
              &pq->vals[index]);
-        heapifyUp(pq, (index - 1) / 2);
+        heapify_up(pq, (index - 1) / 2);
     }
 }
 void enqueue(PriorityQueue* pq, uint64_t value, int id)
@@ -34,10 +34,10 @@ void enqueue(PriorityQueue* pq, uint64_t value, int id)
 
     pq->items[pq->size++] = value;
     pq->vals[pq->size++] = id;
-    heapifyUp(pq, pq->size - 1);
+    heapify_up(pq, pq->size - 1);
 }
 
-void heapifyDown(PriorityQueue* pq, int index)
+void heapify_down(PriorityQueue* pq, int index)
 {
     int smallest = index;
     int left = 2 * index + 1;
@@ -54,7 +54,7 @@ void heapifyDown(PriorityQueue* pq, int index)
     if (smallest != index) {
         swap_items(&pq->items[index], &pq->items[smallest]);
         swap_values(&pq->vals[index], &pq->vals[smallest]);
-        heapifyDown(pq, smallest);
+        heapify_down(pq, smallest);
     }
 }
 
@@ -69,7 +69,7 @@ int dequeue(PriorityQueue* pq)
     pq->items[0] = pq->items[--pq->size];
     pq->vals[0] = pq->vals[--pq->size];
 
-    heapifyDown(pq, 0);
+    heapify_down(pq, 0);
     return value;
 }
 

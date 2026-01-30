@@ -15,14 +15,14 @@ typedef struct {
 
 // Define heapifyUp function to maintain heap property
 // during insertion
-void heapifyUp(PriorityQueue* pq, int index);
+void heapify_up(PriorityQueue* pq, int index);
 
 // Define enqueue function to add an item to the queue
 void enqueue(PriorityQueue* pq, uint64_t value, int id);
 
 // Define heapifyDown function to maintain heap property
 // during deletion
-void heapifyDown(PriorityQueue* pq, int index);
+void heapify_down(PriorityQueue* pq, int index);
 
 // Remove the top id from the queue
 int dequeue(PriorityQueue* pq);
