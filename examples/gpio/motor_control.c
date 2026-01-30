@@ -257,7 +257,7 @@ void handle_pwm_timeout(int gpio_ch) {
 
 void notified(sddf_channel ch) {
     if (ch == timer_config.driver_id) {
-        if (sddf_timer_time_now() >= request_time_end) {
+        if (sddf_timer_time_now(timer_channel) >= request_time_end) {
             return;
         }
         int motor_channel = dequeue(&timeout_queue);

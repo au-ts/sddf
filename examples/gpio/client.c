@@ -127,7 +127,7 @@ void client_main(void) {
             drive_left(4*NS_IN_MS);
         }
         else {
-            drive_forward();
+            drive_forward(4*NS_IN_MS);
         }
         
         time_end = sddf_timer_time_now(timer_channel);

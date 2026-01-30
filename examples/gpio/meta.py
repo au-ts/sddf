@@ -36,7 +36,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     # setvar_vaddr="gpio_regs"
     # setvar_vaddr="gpio_ao_regs"
 
-    gpio_driver = ProtectionDomain("gpio_driver", "gpio_driver.elf", priority=100)
+    gpio_driver = ProtectionDomain("gpio_driver", "gpio_driver.elf", priority=100, passive=True)
     gpio_driver.add_map(SystemDescription.Map(gpio_mr, vaddr=0x4000000, perms="rw", cached=False))
     gpio_driver.add_map(SystemDescription.Map(gpio_ao_mr, vaddr=0x4100000, perms="rw", cached=False))
 
