@@ -17,6 +17,12 @@
 /* Timeout IDs */
 #define CLIENT_TIMEOUT_ID (0)
 #define SENSOR_TIMEOUT_ID (1)
+// Note: motor timeout IDs are the same as their gpio channel IDs
+#define MOTOR_A_TIMEOUT_ID (2)
+#define MOTOR_B_TIMEOUT_ID (3)
+// Used to timeout duration of motor control
+#define MOTOR_CONTROL_TIMEOUT_ID (4)
+
 
 /* Timer Helpers */
 bool delay_microsec(size_t microseconds, int timeout_id);

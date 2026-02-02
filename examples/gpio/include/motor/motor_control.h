@@ -10,12 +10,12 @@
 #define CONTROL_REVERSE (2)
 #define CONTROL_NEUTRAL (3)
 
-#define REQUEST_STOP (0)
-#define REQUEST_FORWARD (1)
-#define REQUEST_BACK (2)
-#define REQUEST_LEFT (3)
-#define REQUEST_RIGHT (4)
-#define REQUEST_NEUTRAL (5)
+// #define REQUEST_STOP (0)
+// #define REQUEST_FORWARD (1)
+// #define REQUEST_BACK (2)
+// #define REQUEST_LEFT (3)
+// #define REQUEST_RIGHT (4)
+// #define REQUEST_NEUTRAL (5)
 
 
 // PWM Delays
@@ -33,6 +33,13 @@ static const int pwm_delay_mappings[PWM_CHANNEL_MAPPING_COLS][PWM_CHANNEL_MAPPIN
     {CONTROL_NEUTRAL, 1500, 18500},
 };
 
+/* Motor Control State */
+// TODO: might want to refactor this
+int is_control_fulfilled;
 
-
+void control_forward();
+void control_reverse();
+void control_neutral();
+void control_left();
+void control_right();
 

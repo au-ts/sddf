@@ -60,7 +60,7 @@ int motor_b_state = CONTROL_NEUTRAL;
 // State of Current Control
 int control_request = REQUEST_NEUTRAL;
 uint64_t request_time_end = 0;
-int is_control_fulfilled = -1;
+
 
 void gpio_init(int gpio_ch) {
     // LOG_CONTROL("Setting direction of GPIO1 to output!\n");
@@ -123,7 +123,9 @@ void set_pwm(int gpio_ch, uint64_t micro_s) {
     sddf_timer_set_timeout(timer_channel, micro_s);
 }
 
-void set_forward(void) {
+void control_forward(void) {
+    is_control_fulfilled = 1;
+
     motor_a_state = CONTROL_FORWARD;
     motor_b_state = CONTROL_FORWARD;
 
@@ -132,7 +134,9 @@ void set_forward(void) {
 }
 
 // TODO complete these
-void set_reverse(void) {
+void control_reverse(void) {
+    is_control_fulfilled = 1;
+
     motor_a_state = CONTROL_REVERSE;
     motor_b_state = CONTROL_REVERSE;
 
@@ -140,7 +144,9 @@ void set_reverse(void) {
     set_pwm(GPIO_CHANNEL_B, pwm_delay_mappings[CONTROL_REVERSE - 1][PWM_TIME_HIGH]*NS_IN_US);
 }
 
-void set_neutral(void) {
+void control_neutral(void) {
+    is_control_fulfilled = 1;
+
     motor_a_state = CONTROL_NEUTRAL;
     motor_b_state = CONTROL_NEUTRAL;
 
@@ -148,7 +154,9 @@ void set_neutral(void) {
     set_pwm(GPIO_CHANNEL_B, pwm_delay_mappings[CONTROL_NEUTRAL - 1][PWM_TIME_HIGH]*NS_IN_US);
 }
 
-void set_left(void) {
+void control_left(void) {
+    is_control_fulfilled = 1;
+
     motor_a_state = CONTROL_NEUTRAL;
     motor_b_state = CONTROL_FORWARD;
 
@@ -156,7 +164,9 @@ void set_left(void) {
     set_pwm(GPIO_CHANNEL_B, pwm_delay_mappings[CONTROL_FORWARD - 1][PWM_TIME_HIGH]*NS_IN_US);
 }
 
-void set_right(void) {
+void control_right(void) {
+    is_control_fulfilled = 1;
+
     motor_a_state = CONTROL_FORWARD;
     motor_b_state = CONTROL_NEUTRAL;
 
@@ -164,72 +174,78 @@ void set_right(void) {
     set_pwm(GPIO_CHANNEL_B, pwm_delay_mappings[CONTROL_NEUTRAL - 1][PWM_TIME_HIGH]*NS_IN_US);
 }
 
-void handle_motor_request(void) {
-    is_control_fulfilled = 1;
+// void handle_motor_request(int control_request) {
+//     is_control_fulfilled = 1;
 
-    switch (control_request)
-    {
-    case REQUEST_FORWARD:
-        set_forward();
-        break;
-    case REQUEST_BACK:
-        set_reverse();
-        break;
-    case REQUEST_LEFT:
-        set_left();
-        break;
-    case REQUEST_RIGHT:
-        set_right();
-        break;
-    case REQUEST_NEUTRAL:
-        set_neutral();
-        break;
-    default:
-        break;
-    }
-}
+//     switch (control_request)
+//     {
+//     case REQUEST_FORWARD:
+//         set_forward();
+//         break;
+//     case REQUEST_BACK:
+//         set_reverse();
+//         break;
+//     case REQUEST_LEFT:
+//         set_left();
+//         break;
+//     case REQUEST_RIGHT:
+//         set_right();
+//         break;
+//     case REQUEST_NEUTRAL:
+//         set_neutral();
+//         break;
+//     default:
+//         break;
+//     }
+// }
 
-microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo) {
-    switch (ch) {
-    case CLIENT_CHANNEL:
-        int request = (int) microkit_mr_get(0);
-        int was_control_fulfilled = is_control_fulfilled;
+// microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo) {
+//     switch (ch) {
+//     case CLIENT_CHANNEL:
+//         int request = (int) microkit_mr_get(0);
+//         int was_control_fulfilled = is_control_fulfilled;
 
-        uint64_t request_duration = microkit_mr_get(1);
-        request_time_end = sddf_timer_time_now(timer_channel) + request_duration;
+//         uint64_t request_duration = microkit_mr_get(1);
+//         request_time_end = sddf_timer_time_now(timer_channel) + request_duration;
 
-        if (!request) {
-            break;
-        }
+//         if (!request) {
+//             break;
+//         }
 
-        control_request = request;
-        is_control_fulfilled = 0;
+//         control_request = request;
+//         is_control_fulfilled = 0;
 
-        // first control request, call a function to handle it
-        if (was_control_fulfilled < 0) {
-            // TODO: is this correct?
-            handle_motor_request();
-        }
+//         // first control request, call a function to handle it
+//         if (was_control_fulfilled < 0) {
+//             // TODO: is this correct?
+//             handle_motor_request();
+//         }
         
-        // block while current time < request duration
-        // TODO: might want to use delay_ms here, check if it faults & if timer interrupts will be handled appropriately
-        while (sddf_timer_time_now(timer_channel) < request_time_end){}
-        break;
-    default:
-        LOG_CONTROL("Unexpected pp call\n");
-        break;
-    }
+//         // block while current time < request duration
+//         // TODO: might want to use delay_ms here, check if it faults & if timer interrupts will be handled appropriately
+//         while (sddf_timer_time_now(timer_channel) < request_time_end){}
+//         break;
+//     default:
+//         LOG_CONTROL("Unexpected pp call\n");
+//         break;
+//     }
 
-    microkit_msginfo res = microkit_msginfo_new(0, 0);
-    return res;
-} 
+//     microkit_msginfo res = microkit_msginfo_new(0, 0);
+//     return res;
+// } 
+
+// handle current motor command timeout, update control states
+void handle_motor_control_timeout() {
+    is_control_fulfilled = 0;
+    set_neutral();
+}
 
 // upon pwm timeout, send next gpio signal
 void handle_pwm_timeout(int gpio_ch) {
-    if (!is_control_fulfilled) {
-        handle_motor_request();
-        return;
-    }
+    // if (!is_control_fulfilled) {
+    //     handle_motor_request();
+    //     return;
+    // }
 
     // TODO: refactor this
     if (gpio_ch == GPIO_CHANNEL_A) {
@@ -255,20 +271,22 @@ void handle_pwm_timeout(int gpio_ch) {
 }
 
 
-void notified(sddf_channel ch) {
-    if (ch == timer_config.driver_id) {
-        if (sddf_timer_time_now(timer_channel) >= request_time_end) {
-            return;
-        }
-        int motor_channel = dequeue(&timeout_queue);
-        handle_pwm_timeout(motor_channel);
-    }
-    else {
-        LOG_CONTROL("Unexpected channel call\n");
-    }
-}
+// void notified(sddf_channel ch) {
+//     if (ch == timer_config.driver_id) {
+//         if (sddf_timer_time_now(timer_channel) >= request_time_end) {
+//             return;
+//         }
+//         int motor_channel = dequeue(&timeout_queue);
+//         handle_pwm_timeout(motor_channel);
+//     }
+//     else {
+//         LOG_CONTROL("Unexpected channel call\n");
+//     }
+// }
 
-void init(void) {
+
+void motors_init(void) {
+    is_control_fulfilled = 0;
     timer_channel = timer_config.driver_id;
 
     LOG_CONTROL("Init\n");

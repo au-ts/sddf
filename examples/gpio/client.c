@@ -86,6 +86,10 @@ bool delay_ms(size_t milliseconds, int timeout_id)
     return true;
 }
 
+void delay_motors(size_t milliseconds) {
+    delay_ms(milliseconds, MOTOR_CONTROL_TIMEOUT_ID);
+}
+
 uint64_t get_time_now() {
     return sddf_timer_time_now(timer_channel);
 }
@@ -127,13 +131,14 @@ void drive_neutral(uint64_t micro_s) {
 
 void client_main(void) {
     // wait for all sensors to initialise first
-
     while (true)
     {
         // LOG_CLIENT("Client main\n");
         LOG_CLIENT("Reading received: %lu\n", get_ultrasonic_reading());
         delay_ms(1000, CLIENT_TIMEOUT_ID);
-        
+        control_forward();
+        delay_motors(1000);
+        control_reverse();
 
         // uint64_t averaged_dist = 0;
         // for (int i = 0; i < 3; i++) {
@@ -177,6 +182,15 @@ void notified(sddf_channel ch) {
         case CLIENT_TIMEOUT_ID:
             co_switch(t_main);
             break;
+        case MOTOR_CONTROL_TIMEOUT_ID:
+            handle_motor_control_timeout();
+            break;
+        case MOTOR_A_TIMEOUT_ID:
+            handle_pwm_timeout(MOTOR_A_TIMEOUT_ID);
+            break;
+        case MOTOR_B_TIMEOUT_ID:
+            handle_pwm_timeout(MOTOR_B_TIMEOUT_ID);
+            break;        
         default:
             break;
         }
@@ -188,6 +202,7 @@ void notified(sddf_channel ch) {
 
 void init(void) {
     sensor_init();
+    motors_init();
 
     timer_channel = timer_config.driver_id;
 
