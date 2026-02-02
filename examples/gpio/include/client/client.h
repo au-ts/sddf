@@ -13,13 +13,12 @@
 /* Number of nanoseconds in a microsecond */
 #define NS_IN_US 1000ULL
 
-// Buffer Masks
-#define RHR_MASK 0b111111111
-#define UARTDR 0x000
-#define UARTFR 0x018
-#define UARTIMSC 0x038
-#define UARTICR 0x044
-#define PL011_UARTFR_TXFF (1 << 5)
-#define PL011_UARTFR_RXFE (1 << 4)
-#define REG_PTR(base, offset) ((volatile uint32_t *)((base) + (offset)))
+
+/* Timeout IDs */
+#define CLIENT_TIMEOUT_ID (0)
+#define SENSOR_TIMEOUT_ID (1)
+
+/* Timer Helpers */
+bool delay_microsec(size_t microseconds, int timeout_id);
+bool delay_ms(size_t milliseconds, int timeout_id);
 

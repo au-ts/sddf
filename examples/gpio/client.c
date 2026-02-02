@@ -15,6 +15,7 @@
 #include <sddf/timer/config.h>
 #include "include/client/client.h"
 #include "include/motor/motor_control.h"
+#include "include/motor/timer_queue.h"
 
 #define DEBUG_CLIENT
 
@@ -25,8 +26,15 @@
 #endif
 #define LOG_CLIENT_ERR(...) do{ sddf_printf("CLIENT|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
-__attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
+#define STACK_SIZE (4096)
 
+// Channels
+// #define TIMER_CHANNEL (1)
+#define MOTOR_CONTROL_CHANNEL (2)
+#define ULTRASONIC_CHANNEL (4)
+
+__attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
+static char t_client_main_stack[STACK_SIZE];
 
 sddf_channel timer_channel;
 
@@ -36,26 +44,22 @@ uint64_t time_end;
 cothread_t t_event;
 cothread_t t_main;
 
-#define STACK_SIZE (4096)
-static char t_client_main_stack[STACK_SIZE];
-
-// Channels
-// #define TIMER_CHANNEL (1)
-#define MOTOR_CONTROL_CHANNEL (2)
-#define ULTRASONIC_CHANNEL (4)
+PriorityQueue timeout_queue = {{}, {}, 0};
 
 // Unfulfilled motor control request
 int is_ongoing_request = 0;
 
-bool delay_microsec(size_t microseconds)
+bool delay_microsec(size_t microseconds, int timeout_id)
 {
     size_t time_ns = microseconds * NS_IN_US;
 
     /* Detect potential overflow */
     if (microseconds != 0 && time_ns / microseconds != NS_IN_US) {
-        LOG_CLIENT_ERR("overflow detected in delay_ms\n");
+        LOG_CLIENT_ERR("overflow detected in delay_microsec\n");
         return false;
     }
+
+    enqueue(&timeout_queue, sddf_timer_time_now(timer_channel) + microseconds, timeout_id);
 
     sddf_timer_set_timeout(timer_channel, time_ns);
     co_switch(t_event);
@@ -63,7 +67,7 @@ bool delay_microsec(size_t microseconds)
     return true;
 }
 
-bool delay_ms(size_t milliseconds)
+bool delay_ms(size_t milliseconds, int timeout_id)
 {
     size_t time_ns = milliseconds * NS_IN_MS;
 
@@ -72,6 +76,8 @@ bool delay_ms(size_t milliseconds)
         LOG_CLIENT_ERR("overflow detected in delay_ms\n");
         return false;
     }
+
+    enqueue(&timeout_queue, sddf_timer_time_now(timer_channel) + milliseconds, timeout_id);
 
     sddf_timer_set_timeout(timer_channel, time_ns);
     co_switch(t_event);
@@ -121,7 +127,7 @@ void client_main(void) {
     {
         // LOG_CLIENT("Client main\n");
         get_ultrasonic_reading();
-        delay_ms(1000);
+        delay_ms(1000, CLIENT_TIMEOUT_ID);
         
 
         // uint64_t averaged_dist = 0;
@@ -156,9 +162,19 @@ void client_main(void) {
 void notified(sddf_channel ch) {
     // check this switch
     if (ch == timer_config.driver_id) {
-        // LOG_CLIENT("Timer channel call\n");
+        int timeout_id = dequeue(&timeout_queue);
 
-        co_switch(t_main);
+        switch (timeout_id)
+        {
+        case SENSOR_TIMEOUT_ID:
+            co_switch(t_main);
+            break;
+        case CLIENT_TIMEOUT_ID:
+            co_switch(t_main);
+            break;
+        default:
+            break;
+        }
     }
     else {
         LOG_CLIENT("Unexpected channel call\n");

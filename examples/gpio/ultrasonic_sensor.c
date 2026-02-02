@@ -26,14 +26,6 @@
 
 #define LOG_SENSOR_ERR(...) do{ sddf_printf("SENSOR|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
-// uintptr_t ultrasonic_input_buffer_base_vaddr;
-// uintptr_t ultrasonic_output_buffer_base_vaddr;
-
-__attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
-sddf_channel timer_channel;
-
-cothread_t t_event;
-cothread_t t_main;
 
 // Channels
 #define CLIENT_CHANNEL (1)
@@ -184,13 +176,15 @@ void set_trig_low() {
 
     trig_state = TRIG_LOW;
     digital_write(GPIO_CHANNEL_TRIG, GPIO_LOW);
-    delay_microsec(2);
+        // enqueue(&timeout_queue, sddf_timer_time_now(timer_channel) + micro_s, gpio_ch);
+
+    delay_microsec(2, SENSOR_TIMEOUT_ID);
 }
 
 void set_trig_high() {
     trig_state = TRIG_HIGH;
     digital_write(GPIO_CHANNEL_TRIG, GPIO_HIGH);
-    delay_microsec(10);
+    delay_microsec(10, SENSOR_TIMEOUT_ID);
 }
 
 uint64_t read_distance() {
