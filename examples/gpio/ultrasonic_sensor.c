@@ -79,8 +79,7 @@ uint64_t pulse_in(int gpio_ch, int value) {
     int has_received = 0;
 
     while (true) {
-        LOG_SENSOR("sensor read attempt\n");
-
+        // LOG_SENSOR("sensor read attempt\n");
         microkit_msginfo msginfo;
         msginfo = microkit_msginfo_new(GPIO_GET_GPIO, 1);
         microkit_mr_set(GPIO_REQ_CONFIG_SLOT, GPIO_INPUT);
@@ -152,6 +151,8 @@ void set_trig_low() {
 }
 
 void set_trig_high() {
+    LOG_SENSOR("Setting trigger high\n");
+
     digital_write(GPIO_CHANNEL_TRIG, GPIO_HIGH);
     delay_microsec(10, SENSOR_TIMEOUT_ID);
 }

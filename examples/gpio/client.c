@@ -87,7 +87,7 @@ bool delay_ms(size_t milliseconds, int timeout_id)
 }
 
 uint64_t get_time_now() {
-    sddf_timer_time_now(timer_channel);
+    return sddf_timer_time_now(timer_channel);
 }
 
 // send motor control request for micro_s micorseconds
@@ -131,7 +131,7 @@ void client_main(void) {
     while (true)
     {
         // LOG_CLIENT("Client main\n");
-        get_ultrasonic_reading();
+        LOG_CLIENT("Reading received: %lu", get_ultrasonic_reading());
         delay_ms(1000, CLIENT_TIMEOUT_ID);
         
 
