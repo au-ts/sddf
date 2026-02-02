@@ -18,8 +18,8 @@
 #define DEBUG_CLIENT
 
 #ifdef DEBUG_CLIENT
-#define  LOG_SENSOR(...) do{}while(0)
-// #define LOG_SENSOR(...) do{ sddf_printf("SENSOR|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
+// #define  LOG_SENSOR(...) do{}while(0)
+#define LOG_SENSOR(...) do{ sddf_printf("SENSOR|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
 #else
 #define  LOG_SENSOR(...) do{}while(0)
 #endif
@@ -105,18 +105,6 @@ void digital_write(int gpio_ch, int value) {
     }
 }
 
-bool timeout_microsec(size_t microsec)
-{
-    size_t time_us = microsec * NS_IN_US;
-    /* Detect potential overflow */
-    if (microsec != 0 && time_us / microsec != NS_IN_US) {
-        LOG_SENSOR_ERR("overflow detected in timeout_microsec\n");
-        return false;
-    }
-    sddf_timer_set_timeout(timer_channel, microsec);
-    return true;
-}
-
 // Read duration of value from GPIO pin (in micro seconds)
 uint64_t pulse_in(int gpio_ch, int value) {
     uint64_t time_start = sddf_timer_time_now(timer_channel);
@@ -125,7 +113,7 @@ uint64_t pulse_in(int gpio_ch, int value) {
     int has_received = 0;
 
     while (true) {
-        // LOG_SENSOR("sensor read attempt\n");
+        LOG_SENSOR("sensor read attempt\n");
 
         microkit_msginfo msginfo;
         msginfo = microkit_msginfo_new(GPIO_GET_GPIO, 1);
@@ -149,6 +137,8 @@ uint64_t pulse_in(int gpio_ch, int value) {
             uint64_t time_now = sddf_timer_time_now(timer_channel);
 
             if (((time_now - time_start) / NS_IN_MS) > SENSOR_TIMEOUT) {
+                LOG_SENSOR("timeout 1\n");
+
                 timeout_state = TIMED_OUT;
                 return 0;
             }
@@ -157,6 +147,8 @@ uint64_t pulse_in(int gpio_ch, int value) {
             // Timeout not seeing GPIO HIGH from sensor
             uint64_t time_now = sddf_timer_time_now(timer_channel);
             if (((time_now - time_start) / NS_IN_MS) > (SENSOR_TIMEOUT * 100)) {
+                LOG_SENSOR("timeout 2\n");
+
                 timeout_state = TIMED_OUT;
                 return 0;
             }
@@ -177,7 +169,9 @@ uint64_t pulse_in(int gpio_ch, int value) {
     return 0;
 }
 
-void sensor_main(void) {
+void sensor_init(void) {
+    sddf_timer_set_timeout(timer_channel, 1*NS_IN_MS);
+
     LOG_SENSOR("init\n");
     gpio_init(GPIO_CHANNEL_ECHO, GPIO_DIRECTION_INPUT);
     gpio_init(GPIO_CHANNEL_TRIG, GPIO_DIRECTION_OUTPUT);  
@@ -186,59 +180,17 @@ void sensor_main(void) {
 // TODO: might want to buffer over multiple reads
 // set trigger pin to LOW then HIGH to fire sensor
 void set_trig_low() {
+    LOG_SENSOR("Setting trigger low\n");
+
     trig_state = TRIG_LOW;
     digital_write(GPIO_CHANNEL_TRIG, GPIO_LOW);
-    timeout_microsec(2);
+    delay_microsec(2);
 }
 
 void set_trig_high() {
     trig_state = TRIG_HIGH;
     digital_write(GPIO_CHANNEL_TRIG, GPIO_HIGH);
-    timeout_microsec(10);
-}
-
-// clean timer states
-void reset_states() {
-    timeout_state = RUNNING;
-    curr_dist = 0;
-    trig_state = TRIG_UNSET;
-}
-
-// TODO: timeout state
-microkit_msginfo send_reading_to_client() {
-    microkit_msginfo new_msg = microkit_msginfo_new(0, 1);
-
-    while (true) {
-        if (timeout_state == TIMED_OUT) {
-            break;
-        }
-        if (curr_dist != 0) {
-            uint64_t distance = curr_dist;
-            microkit_mr_set(0, distance);
-            break;
-        }
-    }
-
-    reset_states();
-    return new_msg;
-}
-
-
-microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo) {
-    switch (ch) {
-    case CLIENT_CHANNEL:
-        // start up sensor
-        set_trig_low();
-        microkit_msginfo res = send_reading_to_client();
-        return res;
-        break;
-    default:
-        LOG_SENSOR("Unexpected pp call\n");
-        break;
-    }
-
-    microkit_msginfo res = microkit_msginfo_new(0, 0);
-    return res;
+    delay_microsec(10);
 }
 
 uint64_t read_distance() {
@@ -252,23 +204,57 @@ uint64_t read_distance() {
     return 0;
 }
 
-void notified(sddf_channel ch) {
-    // want to send a specific set of signals for sensor to fire
-    if (ch == timer_config.driver_id) {
-        if (trig_state == TRIG_LOW) {
-            set_trig_high();
-        }
-        else if (trig_state == TRIG_HIGH) {
-            curr_dist = read_distance();
-        }
-    } else {
-        LOG_SENSOR("Unexpected channel call\n");
-    }
+// TODO: timeout state
+// returns distance in cm
+uint64_t get_ultrasonic_reading() {
+    set_trig_low();
+    set_trig_high();
+    return read_distance();
 }
 
+// trig low, trig high, read dist, send client
 
-void init(void) {
-    LOG_SENSOR("Init\n");
-    sensor_main();
-}
+// microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo) {
+//     switch (ch) {
+//     case CLIENT_CHANNEL:
+//         // start up sensor
+//         LOG_SENSOR("Channel call\n");
+
+//         set_trig_low();
+//         microkit_msginfo res = send_reading_to_client();
+//         return res;
+//         break;
+//     default:
+//         LOG_SENSOR("Unexpected pp call\n");
+//         break;
+//     }
+
+//     microkit_msginfo res = microkit_msginfo_new(0, 0);
+//     return res;
+// }
+
+// void notified(sddf_channel ch) {
+//     // want to send a specific set of signals for sensor to fire
+//     LOG_SENSOR("Notification call\n");
+
+//     if (ch == timer_channel) {
+//         LOG_SENSOR("Timer interrupt\n");
+//         if (trig_state == TRIG_LOW) {
+//             set_trig_high();
+//         }
+//         else if (trig_state == TRIG_HIGH) {
+//             curr_dist = read_distance();
+//         }
+//     } else {
+//         LOG_SENSOR("Unexpected channel call\n");
+//     }
+// }
+
+
+// void init(void) {
+//     timer_channel = timer_config.driver_id;
+
+//     LOG_SENSOR("Init\n");
+//     sensor_main();
+// }
 

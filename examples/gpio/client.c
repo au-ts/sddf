@@ -47,6 +47,22 @@ static char t_client_main_stack[STACK_SIZE];
 // Unfulfilled motor control request
 int is_ongoing_request = 0;
 
+bool delay_microsec(size_t microseconds)
+{
+    size_t time_ns = microseconds * NS_IN_US;
+
+    /* Detect potential overflow */
+    if (microseconds != 0 && time_ns / microseconds != NS_IN_US) {
+        LOG_CLIENT_ERR("overflow detected in delay_ms\n");
+        return false;
+    }
+
+    sddf_timer_set_timeout(timer_channel, time_ns);
+    co_switch(t_event);
+
+    return true;
+}
+
 bool delay_ms(size_t milliseconds)
 {
     size_t time_ns = milliseconds * NS_IN_MS;
@@ -75,12 +91,7 @@ void send_motor_request(int motor_ch, int command, uint64_t micro_s) {
 }
 
 // returns distance in cm
-uint64_t get_ultrasonic_reading() {
-    microkit_msginfo new_msg = microkit_msginfo_new(0, 0);
-    microkit_msginfo res = microkit_ppcall(ULTRASONIC_CHANNEL, new_msg);
-    uint64_t distance = microkit_mr_get(0);
-    return distance;
-}
+
 
 // TODO check these
 void drive_forward(uint64_t micro_s) {
@@ -108,31 +119,36 @@ void client_main(void) {
 
     while (true)
     {
-        uint64_t averaged_dist = 0;
-        for (int i = 0; i < 3; i++) {
-            uint64_t distance = get_ultrasonic_reading();
-            if (!distance) {
-                continue;
-            }
-            averaged_dist += distance;
-        }
+        // LOG_CLIENT("Client main\n");
+        get_ultrasonic_reading();
+        delay_ms(1000);
         
-        averaged_dist /= 3;
-        // LOG_CLIENT("Sensor Reading Received: %ld\n", averaged_dist);
 
-        if (averaged_dist < 10) {
-            // ms
-            drive_neutral(1*NS_IN_MS);
-            // turn left every time there's an obstacle
-            drive_left(4*NS_IN_MS);
-        }
-        else {
-            drive_forward(4*NS_IN_MS);
-        }
+        // uint64_t averaged_dist = 0;
+        // for (int i = 0; i < 3; i++) {
+        //     uint64_t distance = get_ultrasonic_reading();
+        //     if (!distance) {
+        //         continue;
+        //     }
+        //     averaged_dist += distance;
+        // }
         
-        time_end = sddf_timer_time_now(timer_channel);
+        // averaged_dist /= 3;
+        // // LOG_CLIENT("Sensor Reading Received: %ld\n", averaged_dist);
 
-        LOG_CLIENT("Execution time: %ld\n", time_end - time_start);
+        // if (averaged_dist < 10) {
+        //     drive_stop();
+        //     // turn left every time there's an obstacle
+        //     drive_left();
+        //     delay_ms(4);
+        // }
+        // else {
+        //     drive_forward();
+        // }
+        
+        // time_end = sddf_timer_time_now(timer_channel);
+
+        // LOG_CLIENT("Execution time: %ld\n", time_end - time_start);
     }
 }
 
@@ -140,6 +156,8 @@ void client_main(void) {
 void notified(sddf_channel ch) {
     // check this switch
     if (ch == timer_config.driver_id) {
+        // LOG_CLIENT("Timer channel call\n");
+
         co_switch(t_main);
     }
     else {
@@ -148,6 +166,8 @@ void notified(sddf_channel ch) {
 }
 
 void init(void) {
+    sensor_init();
+
     timer_channel = timer_config.driver_id;
 
     // time_start = sddf_timer_time_now(TIMER_CHANNEL);
