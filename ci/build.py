@@ -22,9 +22,9 @@ def get_example_dir(example_name: str):
     return SDDF / "examples" / example_name
 
 
-def build_make(args: argparse.Namespace, example_name: str, test_config: TestConfig):
-    build_dir = common.example_build_path(example_name, test_config)
-    example_dir = get_example_dir(example_name)
+def build_make(args: argparse.Namespace, test_config: TestConfig):
+    build_dir = common.example_build_path(test_config)
+    example_dir = get_example_dir(test_config.example)
 
     subprocess.run(
         [
@@ -40,9 +40,9 @@ def build_make(args: argparse.Namespace, example_name: str, test_config: TestCon
     )
 
 
-def build_zig(args: argparse.Namespace, example_name: str, test_config: TestConfig):
-    build_dir = common.example_build_path(example_name, test_config)
-    example_dir = get_example_dir(example_name)
+def build_zig(args: argparse.Namespace, test_config: TestConfig):
+    build_dir = common.example_build_path(test_config)
+    example_dir = get_example_dir(test_config.example)
 
     zig_env = os.environ.copy()
     zig_env["ZIG_GLOBAL_CACHE_DIR"] = str(common.CI_BUILD_DIR / "zig-cache")
@@ -65,11 +65,11 @@ def build_zig(args: argparse.Namespace, example_name: str, test_config: TestConf
         )
 
 
-def build(args: argparse.Namespace, example_name: str, test_config: TestConfig):
+def build(args: argparse.Namespace, test_config: TestConfig):
     log.group_start(
         "building example '%s' for '%s' with microkit config '%s' and '%s'"
         % (
-            example_name,
+            test_config.example,
             test_config.board,
             test_config.config,
             test_config.build_system,
@@ -77,9 +77,9 @@ def build(args: argparse.Namespace, example_name: str, test_config: TestConfig):
     )
 
     if test_config.build_system == "make":
-        build_make(args, example_name, test_config)
+        build_make(args, test_config)
     elif test_config.build_system == "zig":
-        build_zig(args, example_name, test_config)
+        build_zig(args, test_config)
     else:
         raise NotImplementedError(f"unknown build system '{test_config.build_system}'")
 
@@ -115,9 +115,10 @@ if __name__ == "__main__":
             continue
 
         example_matrix = matrix_product(
+            example=example_name,
             board=options["boards_build"],
             config=options["configs"],
             build_system=options["build_systems"],
         )
         for test_config in example_matrix:
-            build(args, example_name, test_config)
+            build(args, test_config)

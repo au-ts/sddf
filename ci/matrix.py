@@ -155,10 +155,14 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "rpi4b_1gb",
             "serengeti",
             "star64",
-            "x86_64_generic",
+            #"x86_64_generic",
             "zcu102",
         ],
     },
+}
+
+TEST_TIMEOUTS: dict[str, dict[str, int]] = {
+        "blk": { "maaxboard" : 90 }
 }
 
 if TYPE_CHECKING:

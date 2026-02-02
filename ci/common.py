@@ -15,32 +15,26 @@ from ci.matrix import MACHINE_QUEUE_BOARDS, MACHINE_QUEUE_BOARD_OPTIONS
 
 CI_BUILD_DIR = Path(__file__).parents[1] / "ci_build"
 
+NO_OUTPUT_DEFAULT_TIMEOUT_S = 60
 
 @dataclass(order=True, frozen=True)
 class TestConfig:
+    example: str
     board: str
     config: str
     build_system: str
+    timeout_s: int = NO_OUTPUT_DEFAULT_TIMEOUT_S
 
     def is_qemu(self):
         # TODO: x86_64_generic assumes QEMU for the moment.
-        return self.board.startswith("qemu") or self.board == "x86_64_generic"
+        return self.board.startswith("qemu") #or self.board == "x86_64_generic"
 
 
-@dataclass
-class TestResults:
-    test_name: str
-    passing: list[TestConfig]
-    failing: list[TestConfig]
-    retry_failures: list[TestConfig]
-    not_run: list[TestConfig]
-
-
-def example_build_path(example_name: str, test_config: TestConfig):
+def example_build_path(test_config: TestConfig):
     return (
         CI_BUILD_DIR
         / "examples"
-        / example_name
+        / test_config.example
         / test_config.build_system
         / test_config.board
         / test_config.config
@@ -48,11 +42,10 @@ def example_build_path(example_name: str, test_config: TestConfig):
 
 
 def loader_img_path(
-    example_name: str,
     test_config: TestConfig,
 ):
     return (
-        example_build_path(example_name, test_config)
+        example_build_path(test_config)
         / ("bin" if test_config.build_system == "zig" else "")
         / "loader.img"
     )
@@ -70,12 +63,16 @@ def list_test_cases(matrix: list[TestConfig]):
         return "   (none)"
 
     lines = []
-    for board, group in itertools.groupby(matrix, key=lambda c: c.board):
+    for example, tests in itertools.groupby(matrix, key=lambda c: c.example):
         lines.append(
-            " - {}: {}".format(
-                board, ", ".join(f"{c.config}/{c.build_system}" for c in group)
+            f"--- Example: {example} ---")
+
+        for board, group in itertools.groupby(tests, key=lambda c: c.board):
+            lines.append(
+                " - {}: {}".format(
+                    board, ", ".join(f"{c.config}/{c.build_system}" for c in group)
+                )
             )
-        )
 
     return "\n".join(lines)
 

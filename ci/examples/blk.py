@@ -12,11 +12,12 @@ import tempfile
 sys.path.insert(1, Path(__file__).parents[2].as_posix())
 
 from ci.lib.backends import *
-from ci.lib.runner import cli, matrix_product, ResultKind
+from ci.lib.runner import run_single_example, matrix_product
 from ci.common import TestConfig
 from ci import common, matrix
 
 TEST_MATRIX = matrix_product(
+    example="blk",
     board=matrix.EXAMPLES["blk"]["boards_test"],
     config=matrix.EXAMPLES["blk"]["configs"],
     build_system=matrix.EXAMPLES["blk"]["build_systems"],
@@ -27,28 +28,29 @@ mkvirtdisk = (SDDF / "tools" / "mkvirtdisk").resolve()
 
 
 def backend_fn(
-    disks_dir: str, test_config: TestConfig, loader_img: Path
+    test_config: TestConfig, loader_img: Path
 ) -> HardwareBackend:
-    backend = common.backend_fn(test_config, loader_img)
+    with tempfile.TemporaryDirectory(suffix="sddf_blk_disks") as disks_dir:
+        backend = common.backend_fn(test_config, loader_img)
 
-    if isinstance(backend, QemuBackend):
-        (_, disk_path) = tempfile.mkstemp(dir=disks_dir)
+        if isinstance(backend, QemuBackend):
+            (_, disk_path) = tempfile.mkstemp(dir=disks_dir)
 
-        subprocess.run(
-            [mkvirtdisk, disk_path, "1", "512", "16777216", "GPT"],
-            check=True,
-            capture_output=True,
-        )
+            subprocess.run(
+                [mkvirtdisk, disk_path, "1", "512", "16777216", "GPT"],
+                check=True,
+                capture_output=True,
+            )
 
-        # fmt: off
-        backend.invocation_args.extend([
-            "-global", "virtio-mmio.force-legacy=false",
-            "-drive", "file={},if=none,format=raw,id=hd".format(disk_path),
-            "-device", "virtio-blk-pci,drive=hd" if test_config.board == "x86_64_generic" else "virtio-blk-device,drive=hd",
-        ])
-        # fmt: on
+            # fmt: off
+            backend.invocation_args.extend([
+                "-global", "virtio-mmio.force-legacy=false",
+                "-drive", "file={},if=none,format=raw,id=hd".format(disk_path),
+                "-device", "virtio-blk-pci,drive=hd" if test_config.board == "x86_64_generic" else "virtio-blk-device,drive=hd",
+            ])
+            # fmt: on
 
-    return backend
+        return backend
 
 
 async def test(backend: HardwareBackend, test_config: TestConfig):
@@ -62,16 +64,10 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
         )
 
 
-def run_test(only_qemu: bool) -> dict[TestConfig, ResultKind]:
-    with tempfile.TemporaryDirectory(suffix="sddf_blk_disks") as qemu_disks_dir:
-        return cli(
+if __name__ == "__main__":
+        run_single_example(
             "blk",
             test,
-            common.get_test_configs(TEST_MATRIX, only_qemu),
-            functools.partial(backend_fn, qemu_disks_dir),
-            common.loader_img_path,
+            TEST_MATRIX,
+            backend_fn,
         )
-
-
-if __name__ == "__main__":
-    run_test(False)

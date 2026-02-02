@@ -9,11 +9,12 @@ import sys
 sys.path.insert(1, Path(__file__).parents[2].as_posix())
 
 from ci.lib.backends import *
-from ci.lib.runner import cli, matrix_product, ResultKind
+from ci.lib.runner import run_single_example, matrix_product
 from ci.common import TestConfig
 from ci import common, matrix
 
 TEST_MATRIX = matrix_product(
+    example="i2c",
     board=matrix.EXAMPLES["i2c"]["boards_test"],
     config=matrix.EXAMPLES["i2c"]["configs"],
     build_system=matrix.EXAMPLES["i2c"]["build_systems"],
@@ -40,15 +41,10 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
         await wait_for_output(backend, b"Date and Time: 01-06-25 00:00:00 (Monday)\r\n")
 
 
-def run_test(only_qemu: bool) -> dict[TestConfig, ResultKind]:
-    return cli(
+if __name__ == "__main__":
+    run_single_example(
         "i2c",
         test,
-        common.get_test_configs(TEST_MATRIX, only_qemu),
+        TEST_MATRIX,
         backend_fn,
-        common.loader_img_path,
     )
-
-
-if __name__ == "__main__":
-    run_test(False)

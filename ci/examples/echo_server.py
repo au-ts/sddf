@@ -10,12 +10,13 @@ import sys
 sys.path.insert(1, Path(__file__).parents[2].as_posix())
 
 from ci.lib.backends import *
-from ci.lib.runner import cli, matrix_product, ResultKind
+from ci.lib.runner import run_single_example, matrix_product
 from ci.common import TestConfig
 from ci.lib import log
 from ci import common, matrix
 
 TEST_MATRIX = matrix_product(
+    example="echo_server",
     board=matrix.EXAMPLES["echo_server"]["boards_test"],
     config=matrix.EXAMPLES["echo_server"]["configs"],
     build_system=matrix.EXAMPLES["echo_server"]["build_systems"],
@@ -66,15 +67,10 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
         log.info(f"client IPs: client1={ip1}, client0={ip0}")
 
 
-def run_test(only_qemu: bool) -> dict[TestConfig, ResultKind]:
-    return cli(
+if __name__ == "__main__":
+    run_single_example(
         "echo_server",
         test,
-        common.get_test_configs(TEST_MATRIX, only_qemu),
+        TEST_MATRIX,
         backend_fn,
-        common.loader_img_path,
     )
-
-
-if __name__ == "__main__":
-    run_test(False)
