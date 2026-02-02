@@ -8,6 +8,7 @@
 #include <sddf/resources/device.h>
 #include <sddf/util/printf.h>
 #include <sddf/timer/protocol.h>
+#include <sddf/timer/timer_driver.h>
 
 #define MAX_TIMEOUTS 6
 
@@ -52,7 +53,6 @@ volatile struct timer_regs *regs;
 /* Right now, we only service a single timeout per client.
  * This timeout array indicates when a timeout should occur,
  * indexed by client ID. */
-static uint64_t timeouts[MAX_TIMEOUTS];
 
 static timer_heap_t timeouts;
 
@@ -105,6 +105,24 @@ static void process_timeouts(uint64_t curr_time)
     // }
 }
 
+/**
+ * Insert a new timeout into the timer priority heap.
+ * @return true if successful, otherwise false
+ */
+static inline bool timer_heap_insert(timer_heap_t *heap, uint64_t timestamp, unsigned int client_channel)
+{
+    if (timer_heap_is_full(heap)) {
+        return false;
+    }
+
+    heap->timeouts[heap->size].timestamp = timestamp;
+    heap->timeouts[heap->size].client_channel = client_channel;
+    timer_heap_heapify_up(heap, heap->size);
+    heap->size++;
+
+    return true;
+}
+
 void notified(sddf_channel ch)
 {
     if (ch != device_resources.irqs[0].id) {
@@ -130,7 +148,8 @@ seL4_MessageInfo_t protected(sddf_channel ch, seL4_MessageInfo_t msginfo)
     case SDDF_TIMER_SET_TIMEOUT: {
         uint64_t curr_time = get_ticks();
         uint64_t offset_us = sddf_get_mr(0) / NS_IN_US;
-        timeouts[ch] = curr_time + offset_us;
+        timer_heap_insert(&timeouts, curr_time + offset_us, ch);
+
         process_timeouts(curr_time);
         break;
     }
@@ -149,10 +168,6 @@ void init(void)
     assert(device_resources.num_irqs == 1);
     assert(device_resources.num_regions == 1);
 
-    for (int i = 0; i < MAX_TIMEOUTS; i++) {
-        timeouts[i] = UINT64_MAX;
-    }
-
     regs = (void *)((uintptr_t)device_resources.regions[0].region.vaddr + TIMER_REG_START);
 
     /* Start timer E acts as a clock, while timer A can be used for timeouts from clients */
@@ -160,4 +175,5 @@ void init(void)
                 (TIMEOUT_TIMEBASE_1_US << TIMER_A_INPUT_CLK);
 
     regs->timer_e = 0;
+    timer_heap_init(&timeouts);
 }
