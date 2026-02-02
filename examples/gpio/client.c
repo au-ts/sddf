@@ -131,7 +131,7 @@ void client_main(void) {
     while (true)
     {
         // LOG_CLIENT("Client main\n");
-        LOG_CLIENT("Reading received: %lu", get_ultrasonic_reading());
+        LOG_CLIENT("Reading received: %lu\n", get_ultrasonic_reading());
         delay_ms(1000, CLIENT_TIMEOUT_ID);
         
 
