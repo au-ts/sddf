@@ -21,4 +21,4 @@
 /* Timer Helpers */
 bool delay_microsec(size_t microseconds, int timeout_id);
 bool delay_ms(size_t milliseconds, int timeout_id);
-
+uint64_t get_time_now();

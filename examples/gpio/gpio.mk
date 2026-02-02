@@ -42,7 +42,7 @@ SDFGEN_OUT = ${GPIO_TOP}/board/$(MICROKIT_BOARD)
 SYSTEM_FILE := ${SDFGEN_OUT}/gpio.system
 
 # Images to build
-IMAGES := gpio_driver.elf timer_driver.elf client.elf motor_control.elf ultrasonic_sensor.elf telemetry.elf
+IMAGES := gpio_driver.elf timer_driver.elf client.elf motor_control.elf telemetry.elf
 
 # Compiler flags
 CFLAGS += \
@@ -62,23 +62,18 @@ CLIENT_OBJS := client.o
 MOTOR_CONTROL_OBJS := motor_control.o
 ULTRASONIC_SENSOR_OBJS := ultrasonic_sensor.o
 TELEMETRY_OBJS := telemetry.o
+TIMER_QUEUE_OBJS = timer_queue.o
 
 VPATH := ${GPIO_TOP}
 
 all: $(IMAGE_FILE)
 
-# Client build
-client.o: ${GPIO_TOP}/client.c 
-	$(CC) -c $(CFLAGS) $< -o $@
 
-client.elf: $(CLIENT_OBJS) libco.a
-	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+timer_queue.o: ${GPIO_TOP}/timer_queue.c
+	$(CC) -c $(CFLAGS) $< -o $@
 
 # Motor control build
 motor_control.o: ${GPIO_TOP}/motor_control.c 
-	$(CC) -c $(CFLAGS) $< -o $@
-
-timer_queue.o: ${GPIO_TOP}/timer_queue.c
 	$(CC) -c $(CFLAGS) $< -o $@
 
 motor_control.elf: motor_control.o timer_queue.o libco.a
@@ -88,13 +83,17 @@ motor_control.elf: motor_control.o timer_queue.o libco.a
 ultrasonic_sensor.o: ${GPIO_TOP}/ultrasonic_sensor.c
 	$(CC) -c $(CFLAGS) $< -o $@
 
-ultrasonic_sensor.elf: $(ULTRASONIC_SENSOR_OBJS) libco.a
-	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
-
 telemetry.o: ${GPIO_TOP}/telemetry.c
 	$(CC) -c $(CFLAGS) $< -o $@
 
 telemetry.elf: $(TELEMETRY_OBJS) libco.a
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+
+# Client build
+client.o: ${GPIO_TOP}/client.c 
+	$(CC) -c $(CFLAGS) $< -o $@
+
+client.elf: $(CLIENT_OBJS) ${ULTRASONIC_SENSOR_OBJS} ${TIMER_QUEUE_OBJS} libco.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
@@ -106,7 +105,6 @@ endif
 	$(OBJCOPY) --update-section .device_resources=${SDFGEN_OUT}/timer_device_resources.data timer_driver.elf
 	$(OBJCOPY) --update-section .timer_client_config=${SDFGEN_OUT}/timer_client_client.data client.elf
 	$(OBJCOPY) --update-section .timer_client_config=${SDFGEN_OUT}/timer_client_motor_control.data motor_control.elf
-	$(OBJCOPY) --update-section .timer_client_config=${SDFGEN_OUT}/timer_client_ultrasonic_sensor.data ultrasonic_sensor.elf
 	touch $@
 
 # Final image generation

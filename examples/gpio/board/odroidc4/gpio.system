@@ -14,13 +14,10 @@
     <protection_domain name="motor_control" priority="2" passive="true">
         <program_image path="motor_control.elf" />
     </protection_domain>
-    <protection_domain name="ultrasonic_sensor" priority="2">
-        <program_image path="ultrasonic_sensor.elf" />
-    </protection_domain>
     <protection_domain name="gpio_driver" priority="100" passive="true">
         <program_image path="gpio_driver.elf" />
-        <map mr="gpio" vaddr="0x4000000" perms="rw" cached="false" setvar_vaddr="gpio_regs"/>
-        <map mr="gpio_ao" vaddr="0x4100000" perms="rw" cached="false" setvar_vaddr="gpio_ao_regs"/>
+        <map mr="gpio" vaddr="0x4000000" perms="rw" cached="false" />
+        <map mr="gpio_ao" vaddr="0x4100000" perms="rw" cached="false" />
     </protection_domain>
     <protection_domain name="telemetry" priority="1">
         <program_image path="telemetry.elf" />
@@ -28,10 +25,6 @@
     <channel>
         <end pd="client" id="2" notify="true" pp="true" />
         <end pd="motor_control" id="1" notify="true" />
-    </channel>
-    <channel>
-        <end pd="client" id="4" notify="true" pp="true" />
-        <end pd="ultrasonic_sensor" id="1" notify="true" />
     </channel>
     <channel>
         <end pd="motor_control" id="2" notify="true" pp="true" />
@@ -42,11 +35,11 @@
         <end pd="gpio_driver" id="1" notify="true" />
     </channel>
     <channel>
-        <end pd="ultrasonic_sensor" id="3" notify="true" pp="true" />
+        <end pd="client" id="3" notify="true" pp="true" />
         <end pd="gpio_driver" id="2" notify="true" />
     </channel>
     <channel>
-        <end pd="ultrasonic_sensor" id="4" notify="true" pp="true" />
+        <end pd="client" id="4" notify="true" pp="true" />
         <end pd="gpio_driver" id="3" notify="true" />
     </channel>
     <channel>
@@ -56,9 +49,5 @@
     <channel>
         <end pd="timer" id="2" />
         <end pd="motor_control" id="0" notify="false" pp="true" />
-    </channel>
-    <channel>
-        <end pd="timer" id="3" />
-        <end pd="ultrasonic_sensor" id="0" notify="false" pp="true" />
     </channel>
 </system>

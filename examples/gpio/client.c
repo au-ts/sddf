@@ -15,7 +15,8 @@
 #include <sddf/timer/config.h>
 #include "include/client/client.h"
 #include "include/motor/motor_control.h"
-#include "include/motor/timer_queue.h"
+#include "include/client/timer_queue.h"
+#include "include/ultrasonic/ultrasonic_sensor.h"
 
 #define DEBUG_CLIENT
 
@@ -83,6 +84,10 @@ bool delay_ms(size_t milliseconds, int timeout_id)
     co_switch(t_event);
 
     return true;
+}
+
+uint64_t get_time_now() {
+    sddf_timer_time_now(timer_channel);
 }
 
 // send motor control request for micro_s micorseconds

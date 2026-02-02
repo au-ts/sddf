@@ -13,6 +13,7 @@
 #include <sddf/timer/config.h>
 #include <sddf/gpio/meson/gpio.h>
 #include "include/client/client.h"
+#include "include/ultrasonic/ultrasonic_sensor.h"
 #include "gpio_config.h"
 
 #define DEBUG_CLIENT
@@ -26,33 +27,6 @@
 
 #define LOG_SENSOR_ERR(...) do{ sddf_printf("SENSOR|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
-
-// Channels
-#define CLIENT_CHANNEL (1)
-// #define TIMER_CHANNEL (2)
-
-#define GPIO_CHANNEL_ECHO (3)
-#define GPIO_CHANNEL_TRIG (4)
-
-#define GPIO_HIGH (1)
-#define GPIO_LOW (0)
-
-// Timer States for TRIG pin
-#define TRIG_UNSET (0)
-#define TRIG_HIGH (1)
-#define TRIG_LOW (2)
-
-// Timer states for timeout
-#define RUNNING (0)
-#define TIMED_OUT (1)
-
-// Time (ms) Timeout for Sensor Read
-#define SENSOR_TIMEOUT (38)
-
-int trig_state = TRIG_UNSET;
-int timeout_state = RUNNING;
-
-uint64_t curr_dist = 0;
 
 void gpio_init(int gpio_ch, int direction) {
     microkit_msginfo msginfo;
@@ -99,7 +73,7 @@ void digital_write(int gpio_ch, int value) {
 
 // Read duration of value from GPIO pin (in micro seconds)
 uint64_t pulse_in(int gpio_ch, int value) {
-    uint64_t time_start = sddf_timer_time_now(timer_channel);
+    uint64_t time_start = get_time_now();
     uint64_t time_received = 0;
     uint64_t time_change = 0;
     int has_received = 0;
@@ -122,32 +96,28 @@ uint64_t pulse_in(int gpio_ch, int value) {
             // First time measured value has been received
             if (!has_received) {
                 has_received = 1;
-                time_received = sddf_timer_time_now(timer_channel);
+                time_received = get_time_now();
                 continue;
             }
 
-            uint64_t time_now = sddf_timer_time_now(timer_channel);
+            uint64_t time_now = get_time_now();
 
             if (((time_now - time_start) / NS_IN_MS) > SENSOR_TIMEOUT) {
                 LOG_SENSOR("timeout 1\n");
-
-                timeout_state = TIMED_OUT;
                 return 0;
             }
         } 
         else {
             // Timeout not seeing GPIO HIGH from sensor
-            uint64_t time_now = sddf_timer_time_now(timer_channel);
+            uint64_t time_now = get_time_now();
             if (((time_now - time_start) / NS_IN_MS) > (SENSOR_TIMEOUT * 100)) {
                 LOG_SENSOR("timeout 2\n");
-
-                timeout_state = TIMED_OUT;
                 return 0;
             }
 
             // Have received measured value before, this is time when value changes
             if (has_received) {
-                time_change = sddf_timer_time_now(timer_channel);
+                time_change = get_time_now();
                 break;
             }
         }
@@ -162,7 +132,8 @@ uint64_t pulse_in(int gpio_ch, int value) {
 }
 
 void sensor_init(void) {
-    sddf_timer_set_timeout(timer_channel, 1*NS_IN_MS);
+    // TODO: hopefully commeting this out does not break anything
+    // sddf_timer_set_timeout(timer_channel, 1*NS_IN_MS);
 
     LOG_SENSOR("init\n");
     gpio_init(GPIO_CHANNEL_ECHO, GPIO_DIRECTION_INPUT);
@@ -174,7 +145,6 @@ void sensor_init(void) {
 void set_trig_low() {
     LOG_SENSOR("Setting trigger low\n");
 
-    trig_state = TRIG_LOW;
     digital_write(GPIO_CHANNEL_TRIG, GPIO_LOW);
         // enqueue(&timeout_queue, sddf_timer_time_now(timer_channel) + micro_s, gpio_ch);
 
@@ -182,7 +152,6 @@ void set_trig_low() {
 }
 
 void set_trig_high() {
-    trig_state = TRIG_HIGH;
     digital_write(GPIO_CHANNEL_TRIG, GPIO_HIGH);
     delay_microsec(10, SENSOR_TIMEOUT_ID);
 }

@@ -43,7 +43,6 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
     client = ProtectionDomain("client", "client.elf", priority=1)
     motor_control = ProtectionDomain("motor_control", "motor_control.elf", priority=2, passive=True)
-    ultrasonic_sensor = ProtectionDomain("ultrasonic_sensor", "ultrasonic_sensor.elf", priority=2)
 
     timer_node = dtb.node(board.timer)
     assert timer_node is not None
@@ -51,13 +50,10 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
     timer_system.add_client(client)
     timer_system.add_client(motor_control)
-    timer_system.add_client(ultrasonic_sensor)
 
     # Client to motors channel
     sdf.add_channel(SystemDescription.Channel(client, motor_control, a_id=2, b_id=1, pp_a=True, notify_a=True, notify_b=True))
 
-    # Client to sensor channel
-    sdf.add_channel(SystemDescription.Channel(client, ultrasonic_sensor, a_id=4, b_id=1, pp_a=True, notify_a=True, notify_b=True))
 
     # Motors to GPIO channel
     sdf.add_channel(SystemDescription.Channel(motor_control, gpio_driver, a_id=2, b_id=0, pp_a=True, notify_a=True, notify_b=True))
@@ -65,12 +61,12 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
     # Sensors to GPIO channel
     # Echo pin
-    sdf.add_channel(SystemDescription.Channel(ultrasonic_sensor, gpio_driver, a_id=3, b_id=2, pp_a=True, notify_a=True, notify_b=True))
+    sdf.add_channel(SystemDescription.Channel(client, gpio_driver, a_id=3, b_id=2, pp_a=True, notify_a=True, notify_b=True))
 
     # Trig pin
-    sdf.add_channel(SystemDescription.Channel(ultrasonic_sensor, gpio_driver, a_id=4, b_id=3, pp_a=True, notify_a=True, notify_b=True))
+    sdf.add_channel(SystemDescription.Channel(client, gpio_driver, a_id=4, b_id=3, pp_a=True, notify_a=True, notify_b=True))
 
-    pds = [timer_driver, client, motor_control, ultrasonic_sensor, gpio_driver, telemetry]
+    pds = [timer_driver, client, motor_control, gpio_driver, telemetry]
     for pd in pds:
         sdf.add_pd(pd)
 

@@ -14,7 +14,7 @@
 #include <sddf/gpio/meson/gpio.h>
 #include "include/client/client.h"
 #include "include/motor/motor_control.h"
-#include "include/motor/timer_queue.h"
+#include "include/client/timer_queue.h"
 #include "gpio_config.h"
 
 #define DEBUG_CLIENT
