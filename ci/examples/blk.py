@@ -3,10 +3,10 @@
 # SPDX-License-Identifier: BSD-2-Clause
 
 import asyncio
-import functools
 import subprocess
 from pathlib import Path
 import sys
+import os
 import tempfile
 
 sys.path.insert(1, Path(__file__).parents[2].as_posix())
@@ -27,30 +27,31 @@ SDDF = Path(__file__).parents[2]
 mkvirtdisk = (SDDF / "tools" / "mkvirtdisk").resolve()
 
 
-def backend_fn(
-    test_config: TestConfig, loader_img: Path
-) -> HardwareBackend:
-    with tempfile.TemporaryDirectory(suffix="sddf_blk_disks") as disks_dir:
-        backend = common.backend_fn(test_config, loader_img)
+def backend_fn(test_config: TestConfig, loader_img: Path) -> HardwareBackend:
+    backend = common.backend_fn(test_config, loader_img)
 
-        if isinstance(backend, QemuBackend):
-            (_, disk_path) = tempfile.mkstemp(dir=disks_dir)
+    if isinstance(backend, QemuBackend):
+        tmpdir = tempfile.TemporaryDirectory(suffix="sddf_blk_disks")
+        backend._sddf_tmpdir = tmpdir
 
-            subprocess.run(
-                [mkvirtdisk, disk_path, "1", "512", "16777216", "GPT"],
-                check=True,
-                capture_output=True,
-            )
+        (fd, disk_path) = tempfile.mkstemp(dir=tmpdir.name)
+        os.close(fd)
 
-            # fmt: off
-            backend.invocation_args.extend([
-                "-global", "virtio-mmio.force-legacy=false",
-                "-drive", "file={},if=none,format=raw,id=hd".format(disk_path),
-                "-device", "virtio-blk-pci,drive=hd" if test_config.board == "x86_64_generic" else "virtio-blk-device,drive=hd",
-            ])
-            # fmt: on
+        subprocess.run(
+            [mkvirtdisk, disk_path, "1", "512", "16777216", "GPT"],
+            check=True,
+            capture_output=True,
+        )
 
-        return backend
+        # fmt: off
+        backend.invocation_args.extend([
+            "-global", "virtio-mmio.force-legacy=false",
+            "-drive", "file={},if=none,format=raw,id=hd".format(disk_path),
+            "-device", "virtio-blk-pci,drive=hd" if test_config.board == "x86_64_generic" else "virtio-blk-device,drive=hd",
+        ])
+        # fmt: on
+
+    return backend
 
 
 async def test(backend: HardwareBackend, test_config: TestConfig):
@@ -65,9 +66,9 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
 
 
 if __name__ == "__main__":
-        run_single_example(
-            "blk",
-            test,
-            TEST_MATRIX,
-            backend_fn,
-        )
+    run_single_example(
+        "blk",
+        test,
+        TEST_MATRIX,
+        backend_fn,
+    )

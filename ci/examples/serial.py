@@ -44,20 +44,20 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
         await send_input(backend, b"1234567890")
         await expect_output(backend, colour_number(b"1234567890", ANSI_RED))
         await wait_for_output(
-            backend, b"run_single_exampleent0 has received 10 characters so far!\r\n"
+            backend, b"client0 has received 10 characters so far!\r\n"
         )
         await wait_for_output(backend, ANSI_RESET)
 
-        # Switch to run_single_exampleent 1.
+        # Switch to client 1.
         await send_input(backend, b"\x1c1\r")
         # TODO: ???
         if test_config.config == "debug":
-            await expect_output(backend, b"VIRT_RX|LOG: switching to run_single_exampleent 1\r\n")
+            await expect_output(backend, b"VIRT_RX|LOG: switching to client 1\r\n")
 
         await send_input(backend, b"1234567890")
         await expect_output(backend, colour_number(b"1234567890", ANSI_GREEN))
         await wait_for_output(
-            backend, b"run_single_exampleent1 has received 10 characters so far!\r\n"
+            backend, b"client1 has received 10 characters so far!\r\n"
         )
 
 

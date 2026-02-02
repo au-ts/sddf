@@ -18,6 +18,7 @@ import itertools
 from pathlib import Path
 import time
 from typing import Literal, Optional, Awaitable, Tuple
+import dataclasses
 
 from . import log
 from .backends import (
@@ -29,11 +30,12 @@ from .backends import (
     TeeOut,
     OUTPUT,
 )
-from ci.common import list_test_cases, TestConfig, loader_img_path
+from ci.common import TestConfig, loader_img_path
 from ci.matrix import TEST_TIMEOUTS
 
 type TestFunction = Callable[[HardwareBackend, TestConfig], Awaitable[None]]
 type BackendFunction = Callable[[TestConfig, Path], HardwareBackend]
+
 
 # Task to monitor for inactivity
 async def _watch_stdout_inactivity(
@@ -93,7 +95,7 @@ async def runner(
         await backend.stop()
 
 
-def matrix_product(*, example:str, **items):
+def matrix_product(*, example: str, **items):
     assert set(items.keys()) <= set(
         TestConfig.__dataclass_fields__.keys()
     ), "keys subset of config fields"
@@ -156,6 +158,24 @@ class ArgparseActionList(argparse.Action):
         setattr(namespace, self.dest, values_set)
 
 
+def _list_test_cases(matrix: list[TestConfig]):
+    if len(matrix) == 0:
+        return "   (none)"
+
+    lines = []
+    for example, tests in itertools.groupby(matrix, key=lambda c: c.example):
+        lines.append(f"--- Example: {example} ---")
+
+        for board, group in itertools.groupby(tests, key=lambda c: c.board):
+            lines.append(
+                " - {}: {}".format(
+                    board, ", ".join(f"{c.config}/{c.build_system}" for c in group)
+                )
+            )
+
+    return "\n".join(lines)
+
+
 def _subset_test_matrix(
     matrix: list[TestConfig], filters: Namespace
 ) -> list[TestConfig]:
@@ -188,7 +208,6 @@ def run_test_config(
 ) -> ResultKind:
 
     loader_img = loader_img_path(test_config)
-    print(f"Loader img is {loader_img}")
     backend = backend_fn(test_config, loader_img)
 
     if logs_dir:
@@ -229,7 +248,10 @@ def run_test_config(
     log.info(f"Test passed")
     return "pass"
 
-def parse_arguments(parser: ArgumentParser, matrix: list[TestConfig], examples_list: Optional[set[str]]) -> Tuple[Namespace, Namespace]:
+
+def parse_arguments(
+    parser: ArgumentParser, matrix: list[TestConfig], examples_list: Optional[set[str]]
+) -> Tuple[Namespace, Namespace]:
     filters = parser.add_argument_group(title="filters")
     # Only enable filtering by example for multi-example runs
     if examples_list:
@@ -313,7 +335,13 @@ def parse_arguments(parser: ArgumentParser, matrix: list[TestConfig], examples_l
     )
     return (args, filters_args)
 
-def refine_matrix(parser: ArgumentParser, args: Namespace, filters_args: Namespace, matrix: list[TestConfig]) -> list[TestConfig]:
+
+def refine_matrix(
+    parser: ArgumentParser,
+    args: Namespace,
+    filters_args: Namespace,
+    matrix: list[TestConfig],
+) -> list[TestConfig]:
     matrix = sorted(_subset_test_matrix(matrix, filters_args))
     if len(matrix) == 0:
         # this is fine for qemu tests
@@ -334,17 +362,10 @@ def refine_matrix(parser: ArgumentParser, args: Namespace, filters_args: Namespa
 
         loader_img_fn = lambda n, c: loader_img
 
-    # TODO: impl
-    # Override timeouts for tests
-    #for example in TEST_TIMEOUTS.items():
-    #    if matrix
-
-    print(matrix)
-
     if args.single and len(matrix) != 1:
         parser.error(
             "requested --single but applied filters generated multiple cases: \n"
-            + list_test_cases(matrix)
+            + _list_test_cases(matrix)
         )
 
     if args.override_backend:
@@ -355,16 +376,31 @@ def refine_matrix(parser: ArgumentParser, args: Namespace, filters_args: Namespa
 
     if args.dry_run:
         print("Would run the following test cases:")
-        print(list_test_cases(matrix))
-        return [] # TODO: if empty, don't print results
+        print(_list_test_cases(matrix))
+        return []  # TODO: if empty, don't print results
 
-    for test_config in matrix:
-        loader_img = loader_img_path(test_config) # TODO: is this proper?
+    for i, test_config in enumerate(matrix):
+        loader_img = loader_img_path(test_config)
         assert loader_img.exists(), f"loader image file {loader_img} does not exist"
+
+        # Override timeouts for tests
+        per_example_timeouts = TEST_TIMEOUTS.get(test_config.example)
+        if per_example_timeouts:
+            per_board_timeout = per_example_timeouts.get(test_config.board)
+            if per_board_timeout:
+                matrix[i] = dataclasses.replace(
+                    test_config, timeout_s=per_board_timeout
+                )
 
     return matrix
 
-def execute_tests(matrix: list[TestConfig], test_fns: dict[str, TestFunction], backend_fns: dict[str, BackendFunction], args: Namespace):
+
+def execute_tests(
+    matrix: list[TestConfig],
+    test_fns: dict[str, TestFunction],
+    backend_fns: dict[str, BackendFunction],
+    args: Namespace,
+):
     # If the tests are empty, don't execute
     if len(matrix) == 0:
         return
@@ -450,27 +486,34 @@ def execute_tests(matrix: list[TestConfig], test_fns: dict[str, TestFunction], b
             assert False, "impossible"
 
     print("==== Passing ====")
-    print(list_test_cases(passing))
+    print(_list_test_cases(passing))
     print("==== Failed =====")
-    print(list_test_cases(failing))
+    print(_list_test_cases(failing))
     if len(not_run) != 0:
         print("===== Cancelled (not run) =====")
-        print(list_test_cases(not_run))
+        print(_list_test_cases(not_run))
     if len(retry_failures) != 0:
         print("===== Transient failures remaining after multiple retries ====")
-        print(list_test_cases(retry_failures))
+        print(_list_test_cases(retry_failures))
 
     # TODO: early exit?
     if len(passing) != len(matrix):
         quit(1)
 
-def run_all_examples(example_list: list[str], matrix: list[TestConfig], test_fns: dict[str, TestFunction], backend_fns: dict[str, BackendFunction]):
+
+def run_all_examples(
+    example_list: list[str],
+    matrix: list[TestConfig],
+    test_fns: dict[str, TestFunction],
+    backend_fns: dict[str, BackendFunction],
+):
     parser = argparse.ArgumentParser(description=__doc__)
     args, filters_args = parse_arguments(parser, matrix, set(example_list))
 
     refined_matrix = refine_matrix(parser, args, filters_args, matrix)
 
     execute_tests(refined_matrix, test_fns, backend_fns, args)
+
 
 def run_single_example(
     test_fn: TestFunction,
@@ -486,4 +529,9 @@ def run_single_example(
 
     refined_matrix = refine_matrix(parser, args, filters_args, matrix)
 
-    execute_tests(refined_matrix, {refined_matrix[0].example: test_fn}, {refined_matrix[0].example: backend_fn}, args)
+    execute_tests(
+        refined_matrix,
+        {refined_matrix[0].example: test_fn},
+        {refined_matrix[0].example: backend_fn},
+        args,
+    )
