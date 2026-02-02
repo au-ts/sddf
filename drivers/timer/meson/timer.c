@@ -54,6 +54,8 @@ volatile struct timer_regs *regs;
  * indexed by client ID. */
 static uint64_t timeouts[MAX_TIMEOUTS];
 
+static timer_heap_t timeouts;
+
 static uint64_t get_ticks(void)
 {
     uint64_t initial_high = regs->timer_e_hi;
@@ -69,25 +71,38 @@ static uint64_t get_ticks(void)
 
 static void process_timeouts(uint64_t curr_time)
 {
-    for (int i = 0; i < MAX_TIMEOUTS; i++) {
-        if (timeouts[i] <= curr_time) {
-            sddf_notify(i);
-            timeouts[i] = UINT64_MAX;
-        }
+    uint64_t curr_time = get_time_ns();
+
+    // Pop from priority heap until all timeouts are serviced
+    while (timer_heap_peek(&timeouts) != NULL && timer_heap_peek(&timeouts)->timestamp <= curr_time) {
+        timeout_t expired;
+        bool ret = timer_heap_pop(&timeouts, &expired);
+        assert(ret); // This should never happen! Peek should catch empty queue
+        sddf_notify(expired.client_channel);
     }
 
-    uint64_t next_timeout = UINT64_MAX;
-    for (int i = 0; i < MAX_TIMEOUTS; i++) {
-        if (timeouts[i] < next_timeout) {
-            next_timeout = timeouts[i];
-        }
-    }
+    timeout_t *next = timer_heap_peek(&timeouts);
 
-    if (next_timeout != UINT64_MAX) {
+    // Reissue next timeout irq, if needed.
+    if (next != NULL) {
+        uint64_t next_delay = next->timestamp - curr_time;
         regs->mux &= ~TIMER_A_MODE;
-        regs->timer_a = next_timeout - curr_time;
+        regs->timer_a = next_delay;
         regs->mux |= TIMER_A_EN;
     }
+
+    // uint64_t next_timeout = UINT64_MAX;
+    // for (int i = 0; i < MAX_TIMEOUTS; i++) {
+    //     if (timeouts[i] < next_timeout) {
+    //         next_timeout = timeouts[i];
+    //     }
+    // }
+
+    // if (next_timeout != UINT64_MAX) {
+    //     regs->mux &= ~TIMER_A_MODE;
+    //     regs->timer_a = next_timeout - curr_time;
+    //     regs->mux |= TIMER_A_EN;
+    // }
 }
 
 void notified(sddf_channel ch)
