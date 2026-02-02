@@ -71,8 +71,6 @@ static uint64_t get_ticks(void)
 
 static void process_timeouts(uint64_t curr_time)
 {
-    uint64_t curr_time = get_time_ns();
-
     // Pop from priority heap until all timeouts are serviced
     while (timer_heap_peek(&timeouts) != NULL && timer_heap_peek(&timeouts)->timestamp <= curr_time) {
         timeout_t expired;
@@ -103,24 +101,6 @@ static void process_timeouts(uint64_t curr_time)
     //     regs->timer_a = next_timeout - curr_time;
     //     regs->mux |= TIMER_A_EN;
     // }
-}
-
-/**
- * Insert a new timeout into the timer priority heap.
- * @return true if successful, otherwise false
- */
-static inline bool timer_heap_insert(timer_heap_t *heap, uint64_t timestamp, unsigned int client_channel)
-{
-    if (timer_heap_is_full(heap)) {
-        return false;
-    }
-
-    heap->timeouts[heap->size].timestamp = timestamp;
-    heap->timeouts[heap->size].client_channel = client_channel;
-    timer_heap_heapify_up(heap, heap->size);
-    heap->size++;
-
-    return true;
 }
 
 void notified(sddf_channel ch)
