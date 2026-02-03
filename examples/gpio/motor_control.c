@@ -47,6 +47,7 @@ int is_control_fulfilled = 0;
 
 void set_pwm(int gpio_ch, uint64_t micro_s) {
     digital_write(gpio_ch, GPIO_HIGH);
+    size_t time_ns = micro_s * NS_IN_US;
 
     // TODO: refactor this
     if (gpio_ch == GPIO_CHANNEL_A) {
@@ -56,7 +57,7 @@ void set_pwm(int gpio_ch, uint64_t micro_s) {
         pwm_b_state = PAUSE_HIGH;
     }
 
-    enqueue(&timeout_queue, get_time_now() + micro_s, gpio_ch);
+    enqueue(&timeout_queue, get_time_now() + time_ns, gpio_ch);
     // timeout to drive motor forward
     set_timeout(micro_s);
 }

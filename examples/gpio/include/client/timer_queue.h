@@ -2,7 +2,7 @@
 #include <sddf/util/printf.h>
 #include <os/sddf.h>
 
-#define MAX_SIZE 100
+#define MAX_SIZE 1000
 // https://www.geeksforgeeks.org/c/c-program-to-implement-priority-queue/
 
 // Defining the Queue structure

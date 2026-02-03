@@ -49,7 +49,7 @@ bool delay_microsec(size_t microseconds, int timeout_id)
         return false;
     }
 
-    enqueue(&timeout_queue, sddf_timer_time_now(timer_channel) + microseconds, timeout_id);
+    enqueue(&timeout_queue, sddf_timer_time_now(timer_channel) + time_ns, timeout_id);
 
     sddf_timer_set_timeout(timer_channel, time_ns);
     co_switch(t_event);
@@ -67,7 +67,7 @@ bool delay_ms(size_t milliseconds, int timeout_id)
         return false;
     }
 
-    enqueue(&timeout_queue, sddf_timer_time_now(timer_channel) + milliseconds, timeout_id);
+    enqueue(&timeout_queue, sddf_timer_time_now(timer_channel) + time_ns, timeout_id);
 
     sddf_timer_set_timeout(timer_channel, time_ns);
     co_switch(t_event);
@@ -102,14 +102,16 @@ void send_motor_request(int motor_ch, int command, uint64_t micro_s) {
 
 void client_main(void) {
     // wait for all sensors to initialise first
+    // control_forward();
+
+
     while (true)
     {
         // LOG_CLIENT("Client main\n");
         LOG_CLIENT("Reading received: %lu\n", get_ultrasonic_reading());
         delay_ms(1000, CLIENT_TIMEOUT_ID);
-        control_forward();
-        delay_motors(1000);
-        control_reverse();
+        // delay_motors(1000);
+        // control_reverse();
 
         // uint64_t averaged_dist = 0;
         // for (int i = 0; i < 3; i++) {
