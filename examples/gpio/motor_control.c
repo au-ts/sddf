@@ -187,11 +187,11 @@ void handle_pwm_timeout(int gpio_ch) {
     //     return;
     // }
 
-    LOG_CONTROL("handling pwm timeout %d\n", gpio_ch);
+    // LOG_CONTROL("handling pwm timeout %d\n", gpio_ch);
 
     // TODO: refactor this
     if (gpio_ch == GPIO_CHANNEL_A) {
-        LOG_CONTROL("handling motor A pwm\n");
+        // LOG_CONTROL("handling motor A pwm\n");
         if (pwm_a_state == PAUSE_HIGH) {
             digital_write(gpio_ch, GPIO_LOW);
             size_t time_ns = pwm_delay_mappings[motor_a_state - 1][PWM_TIME_LOW]*NS_IN_US;

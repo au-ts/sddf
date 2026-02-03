@@ -32,8 +32,9 @@ void enqueue(PriorityQueue* pq, uint64_t value, int id)
         return;
     }
 
-    pq->items[pq->size++] = value;
-    pq->vals[pq->size++] = id;
+    pq->items[pq->size] = value;
+    pq->vals[pq->size] = id;
+    pq->size++;
     heapify_up(pq, pq->size - 1);
 }
 
@@ -66,8 +67,9 @@ int dequeue(PriorityQueue* pq)
     }
 
     int value = pq->vals[0];
-    pq->items[0] = pq->items[--pq->size];
-    pq->vals[0] = pq->vals[--pq->size];
+    pq->size--;
+    pq->items[0] = pq->items[pq->size];
+    pq->vals[0] = pq->vals[pq->size];
 
     heapify_down(pq, 0);
     return value;
