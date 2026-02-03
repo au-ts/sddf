@@ -3,11 +3,12 @@
 # SPDX-License-Identifier: BSD-2-Clause
 
 import asyncio
-import subprocess
-from pathlib import Path
-import sys
 import os
+from pathlib import Path
+import subprocess
+import sys
 import tempfile
+import types
 
 sys.path.insert(1, Path(__file__).parents[2].as_posix())
 
@@ -17,10 +18,11 @@ from ci.common import TestConfig
 from ci import common, matrix
 
 TEST_MATRIX = matrix_product(
-    example="blk",
+    example=["blk"],
     board=matrix.EXAMPLES["blk"]["boards_test"],
     config=matrix.EXAMPLES["blk"]["configs"],
     build_system=matrix.EXAMPLES["blk"]["build_systems"],
+    timeout_s=[matrix.EXAMPLES["blk"]["timeout_s"]],
 )
 
 SDDF = Path(__file__).parents[2]
@@ -51,6 +53,16 @@ def backend_fn(test_config: TestConfig, loader_img: Path) -> HardwareBackend:
         ])
         # fmt: on
 
+        orig_stop = backend.stop
+
+        async def stop_with_cleanup(self):
+            try:
+                await orig_stop()
+            finally:
+                tmpdir.cleanup()
+
+        backend.stop = types.MethodType(stop_with_cleanup, backend)
+
     return backend
 
 
@@ -67,7 +79,6 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
 
 if __name__ == "__main__":
     run_single_example(
-        "blk",
         test,
         TEST_MATRIX,
         backend_fn,

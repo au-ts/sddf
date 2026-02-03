@@ -5,6 +5,8 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Literal, TypedDict
 
+NO_OUTPUT_DEFAULT_TIMEOUT_S: int = 60
+
 # The ordering in these lists defines an implicit ordering of which boards
 # to use for CI preferentially, though all will eventually be tried.
 MACHINE_QUEUE_BOARDS: dict[str, list[str]] = {
@@ -43,12 +45,14 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "qemu_virt_riscv64",
             "x86_64_generic",
         ],
+        "timeout_s": NO_OUTPUT_DEFAULT_TIMEOUT_S,
     },
     "i2c": {
         "configs": ["debug", "release"],
         "build_systems": ["make", "zig"],
         "boards_build": ["odroidc4"],
         "boards_test": ["odroidc4"],
+        "timeout_s": NO_OUTPUT_DEFAULT_TIMEOUT_S,
     },
     # Use i2c bus scan for all devices that don't have an I2C test board
     # attached.
@@ -57,6 +61,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
         "build_systems": ["make", "zig"],
         "boards_build": ["serengeti"],
         "boards_test": ["serengeti"],
+        "timeout_s": NO_OUTPUT_DEFAULT_TIMEOUT_S,
     },
     "echo_server": {
         "configs": ["debug", "release", "benchmark"],
@@ -85,6 +90,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "qemu_virt_riscv64",
             "star64",
         ],
+        "timeout_s": NO_OUTPUT_DEFAULT_TIMEOUT_S,
     },
     "serial": {
         "configs": ["debug", "release"],
@@ -121,6 +127,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "x86_64_generic",
             "zcu102",
         ],
+        "timeout_s": NO_OUTPUT_DEFAULT_TIMEOUT_S,
     },
     "timer": {
         # Only works in debug mode so as to not depend on serial
@@ -158,10 +165,9 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             # "x86_64_generic",
             "zcu102",
         ],
+        "timeout_s": NO_OUTPUT_DEFAULT_TIMEOUT_S,
     },
 }
-
-TEST_TIMEOUTS: dict[str, dict[str, int]] = {"blk": {"qemu_virt_aarch64": 90}}
 
 if TYPE_CHECKING:
     _BoardNames = Literal[
@@ -188,3 +194,4 @@ if TYPE_CHECKING:
         build_systems: list[Literal["make", "zig"]]
         boards_build: list[_BoardNames]
         boards_test: list[_BoardNames]
+        timeout_s: int

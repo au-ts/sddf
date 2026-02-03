@@ -14,10 +14,11 @@ from ci.common import TestConfig
 from ci import common, matrix
 
 TEST_MATRIX = matrix_product(
-    example="serial",
+    example=["serial"],
     board=matrix.EXAMPLES["serial"]["boards_test"],
     config=matrix.EXAMPLES["serial"]["configs"],
     build_system=matrix.EXAMPLES["serial"]["build_systems"],
+    timeout_s=[matrix.EXAMPLES["serial"]["timeout_s"]],
 )
 
 ANSI_RED = b"\x1b[31m"
@@ -63,7 +64,6 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
 
 if __name__ == "__main__":
     run_single_example(
-        "serial",
         test,
         TEST_MATRIX,
         common.backend_fn,

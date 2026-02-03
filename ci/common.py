@@ -4,18 +4,18 @@
 
 from pathlib import Path
 import sys
-import itertools
 from dataclasses import dataclass
 
 sys.path.insert(1, Path(__file__).parents[1].as_posix())
 
 from ci.lib.backends import HardwareBackend, QemuBackend, MachineQueueBackend
-from ci.matrix import MACHINE_QUEUE_BOARDS, MACHINE_QUEUE_BOARD_OPTIONS
-
+from ci.matrix import (
+    MACHINE_QUEUE_BOARDS,
+    MACHINE_QUEUE_BOARD_OPTIONS,
+    NO_OUTPUT_DEFAULT_TIMEOUT_S,
+)
 
 CI_BUILD_DIR = Path(__file__).parents[1] / "ci_build"
-
-NO_OUTPUT_DEFAULT_TIMEOUT_S = 60
 
 
 @dataclass(order=True, frozen=True)

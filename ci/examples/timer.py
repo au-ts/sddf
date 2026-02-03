@@ -15,10 +15,11 @@ from ci.lib import log
 from ci import common, matrix
 
 TEST_MATRIX = matrix_product(
-    example="timer",
+    example=["timer"],
     board=matrix.EXAMPLES["timer"]["boards_test"],
     config=matrix.EXAMPLES["timer"]["configs"],
     build_system=matrix.EXAMPLES["timer"]["build_systems"],
+    timeout_s=[matrix.EXAMPLES["timer"]["timeout_s"]],
 )
 
 DRIFT_THRESHOLD = 0.05  # 5 percent.
@@ -58,7 +59,6 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
 
 if __name__ == "__main__":
     run_single_example(
-        "timer",
         test,
         TEST_MATRIX,
         common.backend_fn,

@@ -9,7 +9,6 @@ QEMU.
 """
 
 import argparse
-from argparse import ArgumentParser, Namespace
 import asyncio
 from collections.abc import Awaitable, Callable
 import contextlib
@@ -18,7 +17,6 @@ import itertools
 from pathlib import Path
 import time
 from typing import Literal, Optional, Awaitable, Tuple
-import dataclasses
 
 from . import log
 from .backends import (
@@ -31,7 +29,6 @@ from .backends import (
     OUTPUT,
 )
 from ci.common import TestConfig, loader_img_path
-from ci.matrix import TEST_TIMEOUTS
 
 type TestFunction = Callable[[HardwareBackend, TestConfig], Awaitable[None]]
 type BackendFunction = Callable[[TestConfig, Path], HardwareBackend]
@@ -52,31 +49,12 @@ async def _run_with_watchdog(
 ):
     tee.touch()
 
-    main_task = asyncio.create_task(main)
-    watchdog_task = asyncio.create_task(
-        _watch_stdout_inactivity(tee, timeout_no_output)
-    )
+    async with asyncio.TaskGroup() as tg:
+        main_task = tg.create_task(main)
+        watchdog_task = tg.create_task(_watch_stdout_inactivity(tee, timeout_no_output))
 
-    done, _ = await asyncio.wait(
-        {main_task, watchdog_task}, return_when=asyncio.FIRST_COMPLETED
-    )
-
-    # watchdog fired
-    if watchdog_task in done:
-        main_task.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await main_task
-        # propagate the exception
-        watchdog_task.result()
-
-    # main completed, cancel the watchdog
-    watchdog_task.cancel()
-    # await the rest
-    with contextlib.suppress(asyncio.CancelledError):
-        await watchdog_task
-
-    # propagate any errors from the main task
-    await main_task
+        # await main_task, if watchdog fires we exit TaskGroup, on timeout we propagate errors
+        await main_task
 
 
 async def runner(
@@ -95,13 +73,13 @@ async def runner(
         await backend.stop()
 
 
-def matrix_product(*, example: str, **items):
+def matrix_product(**items):
     assert set(items.keys()) <= set(
         TestConfig.__dataclass_fields__.keys()
     ), "keys subset of config fields"
 
     return [
-        TestConfig(example=example, **dict(zip(items.keys(), fields)))
+        TestConfig(**dict(zip(items.keys(), fields)))
         for fields in itertools.product(*items.values())
     ]
 
@@ -177,15 +155,13 @@ def _list_test_cases(matrix: list[TestConfig]):
 
 
 def _subset_test_matrix(
-    matrix: list[TestConfig], filters: Namespace
+    matrix: list[TestConfig], filters: argparse.Namespace
 ) -> list[TestConfig]:
-    examples = getattr(filters, "examples", None)
-
     def filter_check(test_config):
         implies = lambda a, b: not a or b
         return all(
             [
-                (examples is None or test_config.example in examples),
+                (test_config.example in filters.examples),
                 (test_config.board in filters.boards),
                 (test_config.config in filters.configs),
                 (test_config.build_system in filters.build_systems),
@@ -205,9 +181,10 @@ def run_test_config(
     test_fn: TestFunction,
     backend_fn: BackendFunction,
     logs_dir: Optional[Path] = None,
+    loader_img_fn: Optional[Path] = None,
 ) -> ResultKind:
 
-    loader_img = loader_img_path(test_config)
+    loader_img = loader_img_fn or loader_img_path(test_config)
     backend = backend_fn(test_config, loader_img)
 
     if logs_dir:
@@ -225,13 +202,18 @@ def run_test_config(
         log_file_cm = contextlib.nullcontext()
 
     try:
-        with log_file_cm:
-            asyncio.run(
-                _run_with_watchdog(
-                    runner(test_fn, backend, test_config), OUTPUT, test_config.timeout_s
+        try:
+            with log_file_cm:
+                asyncio.run(
+                    _run_with_watchdog(
+                        runner(test_fn, backend, test_config),
+                        OUTPUT,
+                        test_config.timeout_s,
+                    )
                 )
-            )
-
+        except* asyncio.TimeoutError as eg:
+            # turn ExceptionGroup into a plain TimeoutError
+            raise asyncio.TimeoutError(str(eg.exceptions[0])) from None
     except TestFailureException as e:
         log.error(f"Test failed: {e}")
         return "fail"
@@ -250,16 +232,14 @@ def run_test_config(
 
 
 def parse_arguments(
-    parser: ArgumentParser, matrix: list[TestConfig], examples_list: Optional[set[str]]
-) -> Tuple[Namespace, Namespace]:
+    parser: argparse.ArgumentParser, matrix: list[TestConfig]
+) -> Tuple[argparse.Namespace, argparse.Namespace]:
     filters = parser.add_argument_group(title="filters")
-    # Only enable filtering by example for multi-example runs
-    if examples_list:
-        filters.add_argument(
-            "--examples",
-            default=examples_list,
-            action=ArgparseActionList,
-        )
+    filters.add_argument(
+        "--examples",
+        default={test.example for test in matrix},
+        action=ArgparseActionList,
+    )
     filters.add_argument(
         "--boards", default={test.board for test in matrix}, action=ArgparseActionList
     )
@@ -337,14 +317,13 @@ def parse_arguments(
 
 
 def refine_matrix(
-    parser: ArgumentParser,
-    args: Namespace,
-    filters_args: Namespace,
+    parser: argparse.ArgumentParser,
+    args: argparse.Namespace,
+    filters_args: argparse.Namespace,
     matrix: list[TestConfig],
 ) -> list[TestConfig]:
     matrix = sorted(_subset_test_matrix(matrix, filters_args))
     if len(matrix) == 0:
-        # this is fine for qemu tests
         parser.error("applied filters result in zero selected tests")
 
     if loader_img := args.override_image:
@@ -377,20 +356,11 @@ def refine_matrix(
     if args.dry_run:
         print("Would run the following test cases:")
         print(_list_test_cases(matrix))
-        return []  # TODO: if empty, don't print results
+        quit(0)
 
-    for i, test_config in enumerate(matrix):
+    for test_config in matrix:
         loader_img = loader_img_path(test_config)
         assert loader_img.exists(), f"loader image file {loader_img} does not exist"
-
-        # Override timeouts for tests
-        per_example_timeouts = TEST_TIMEOUTS.get(test_config.example)
-        if per_example_timeouts:
-            per_board_timeout = per_example_timeouts.get(test_config.board)
-            if per_board_timeout:
-                matrix[i] = dataclasses.replace(
-                    test_config, timeout_s=per_board_timeout
-                )
 
     return matrix
 
@@ -399,21 +369,18 @@ def execute_tests(
     matrix: list[TestConfig],
     test_fns: dict[str, TestFunction],
     backend_fns: dict[str, BackendFunction],
-    args: Namespace,
+    args: argparse.Namespace,
 ):
-    # If the tests are empty, don't execute
     if len(matrix) == 0:
-        return
+        quit(1)
 
     test_results: dict[TestConfig, ResultKind] = {}
     do_retries = False
     retry_queue: list[TestConfig] = []
 
     for test_config in matrix:
-        test_fn = test_fns.get(test_config.example)
-        backend_fn = backend_fns.get(test_config.example)
-        if test_fn is None or backend_fn is None:
-            assert False, "impossible"
+        test_fn = test_fns[test_config.example]
+        backend_fn = backend_fns[test_config.example]
 
         fmt = f"{test_config.example} on {test_config.board} ({test_config.config}, built with {test_config.build_system})"
         log.group_start("Running " + fmt)
@@ -422,6 +389,7 @@ def execute_tests(
             test_fn,
             backend_fn,
             args.logs_dir,
+            args.override_image,
         )
         log.group_end("Finished running " + fmt)
 
@@ -449,10 +417,8 @@ def execute_tests(
                 break
 
             for test_config in retry_queue:
-                test_fn = test_fns.get(test_config.example)
-                backend_fn = backend_fns.get(test_config.example)
-                if test_fn is None or backend_fn is None:
-                    assert False, "impossible"
+                test_fn = test_fns[test_config.example]
+                backend_fn = backend_fns[test_config.example]
 
                 fmt = f"{test_config.example} on {test_config.board} ({test_config.config}, built with {test_config.build_system})"
                 log.group_start("Running " + fmt)
@@ -461,6 +427,7 @@ def execute_tests(
                     test_fn,
                     backend_fn,
                     args.logs_dir,
+                    args.override_image,
                 )
                 log.group_end("Finished running " + fmt)
 
@@ -496,19 +463,19 @@ def execute_tests(
         print("===== Transient failures remaining after multiple retries ====")
         print(_list_test_cases(retry_failures))
 
-    # TODO: early exit?
     if len(passing) != len(matrix):
         quit(1)
 
 
 def run_all_examples(
-    example_list: list[str],
     matrix: list[TestConfig],
     test_fns: dict[str, TestFunction],
     backend_fns: dict[str, BackendFunction],
 ):
-    parser = argparse.ArgumentParser(description=__doc__)
-    args, filters_args = parse_arguments(parser, matrix, set(example_list))
+    parser = argparse.ArgumentParser(
+        description="Run all examples passed to this script"
+    )
+    args, filters_args = parse_arguments(parser, matrix)
 
     refined_matrix = refine_matrix(parser, args, filters_args, matrix)
 
@@ -524,8 +491,8 @@ def run_single_example(
     test should raise an exception on failure.
     matrix is the set of supported test configs for this test.
     """
-    parser = argparse.ArgumentParser(description=__doc__)
-    args, filters_args = parse_arguments(parser, matrix, None)
+    parser = argparse.ArgumentParser(description="Run a single example")
+    args, filters_args = parse_arguments(parser, matrix)
 
     refined_matrix = refine_matrix(parser, args, filters_args, matrix)
 

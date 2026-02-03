@@ -16,10 +16,11 @@ from ci.lib import log
 from ci import common, matrix
 
 TEST_MATRIX = matrix_product(
-    example="echo_server",
+    example=["echo_server"],
     board=matrix.EXAMPLES["echo_server"]["boards_test"],
     config=matrix.EXAMPLES["echo_server"]["configs"],
     build_system=matrix.EXAMPLES["echo_server"]["build_systems"],
+    timeout_s=[matrix.EXAMPLES["echo_server"]["timeout_s"]],
 )
 
 
@@ -69,7 +70,6 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
 
 if __name__ == "__main__":
     run_single_example(
-        "echo_server",
         test,
         TEST_MATRIX,
         backend_fn,

@@ -14,10 +14,11 @@ from ci.common import TestConfig
 from ci import common, matrix
 
 TEST_MATRIX = matrix_product(
-    example="i2c",
+    example=["i2c"],
     board=matrix.EXAMPLES["i2c"]["boards_test"],
     config=matrix.EXAMPLES["i2c"]["configs"],
     build_system=matrix.EXAMPLES["i2c"]["build_systems"],
+    timeout_s=[matrix.EXAMPLES["i2c"]["timeout_s"]],
 )
 
 
@@ -43,7 +44,6 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
 
 if __name__ == "__main__":
     run_single_example(
-        "i2c",
         test,
         TEST_MATRIX,
         backend_fn,
