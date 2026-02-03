@@ -6,15 +6,9 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-#include <microkit.h>
-#include <libco.h>
-#include <sddf/util/printf.h>
-#include <sddf/timer/client.h>
-#include <sddf/timer/config.h>
-#include <sddf/gpio/meson/gpio.h>
 #include "include/client/client.h"
 #include "include/ultrasonic/ultrasonic_sensor.h"
-#include "gpio_config.h"
+#include "include/gpio_common/gpio_common.h"
 
 #define DEBUG_CLIENT
 
@@ -26,50 +20,6 @@
 #endif
 
 #define LOG_SENSOR_ERR(...) do{ sddf_printf("SENSOR|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
-
-
-void gpio_init(int gpio_ch, int direction) {
-    microkit_msginfo msginfo;
-    msginfo = microkit_msginfo_new(GPIO_SET_GPIO, 2);
-    microkit_mr_set(GPIO_REQ_CONFIG_SLOT, GPIO_DIRECTION);
-    microkit_mr_set(GPIO_REQ_VALUE_SLOT, direction);
-    msginfo = microkit_ppcall(gpio_ch, msginfo);
-    if (microkit_msginfo_get_label(msginfo) == GPIO_FAILURE) {
-        size_t error = microkit_mr_get(GPIO_RES_VALUE_SLOT);
-        LOG_SENSOR_ERR("failed to set direction of gpio with error %ld!\n", error);
-        while (1) {};
-    }
-}
-
-// GPIO output HIGH/LOW
-void digital_write(int gpio_ch, int value) {
-    microkit_msginfo msginfo;
-    if (value == GPIO_HIGH) {
-        // LOG_CONTROL("Setting GPIO1 to on!\n");
-        msginfo = microkit_msginfo_new(GPIO_SET_GPIO, 2);
-        microkit_mr_set(GPIO_REQ_CONFIG_SLOT, GPIO_OUTPUT);
-        microkit_mr_set(GPIO_REQ_VALUE_SLOT, 1);
-        msginfo = microkit_ppcall(gpio_ch, msginfo);
-        if (microkit_msginfo_get_label(msginfo) == GPIO_FAILURE) {
-            size_t error = microkit_mr_get(GPIO_RES_VALUE_SLOT);
-            LOG_SENSOR_ERR("failed to set output of gpio with error %ld!\n", error);
-            while (1) {};
-        }       
-    }
-    else if (value == GPIO_LOW) {
-        // TODO check if this is correct to set GPIO LOW
-        // LOG_CONTROL("Setting GPIO1 to off!\n");
-        msginfo = microkit_msginfo_new(GPIO_SET_GPIO, 2);
-        microkit_mr_set(GPIO_REQ_CONFIG_SLOT, GPIO_OUTPUT);
-        microkit_mr_set(GPIO_REQ_VALUE_SLOT, 0);
-        msginfo = microkit_ppcall(gpio_ch, msginfo);
-        if (microkit_msginfo_get_label(msginfo) == GPIO_FAILURE) {
-            size_t error = microkit_mr_get(GPIO_RES_VALUE_SLOT);
-            LOG_SENSOR_ERR("failed to set output of gpio with error %ld!\n", error);
-            while (1) {};
-        }
-    }
-}
 
 // Read duration of value from GPIO pin (in micro seconds)
 uint64_t pulse_in(int gpio_ch, int value) {
@@ -156,6 +106,7 @@ void set_trig_high() {
     digital_write(GPIO_CHANNEL_TRIG, GPIO_HIGH);
     delay_microsec(10, SENSOR_TIMEOUT_ID);
 }
+
 
 uint64_t read_distance() {
     uint64_t duration = pulse_in(GPIO_CHANNEL_ECHO, GPIO_HIGH);

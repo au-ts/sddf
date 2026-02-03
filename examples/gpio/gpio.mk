@@ -42,7 +42,7 @@ SDFGEN_OUT = ${GPIO_TOP}/board/$(MICROKIT_BOARD)
 SYSTEM_FILE := ${SDFGEN_OUT}/gpio.system
 
 # Images to build
-IMAGES := gpio_driver.elf timer_driver.elf client.elf motor_control.elf telemetry.elf
+IMAGES := gpio_driver.elf timer_driver.elf client.elf telemetry.elf
 
 # Compiler flags
 CFLAGS += \
@@ -58,6 +58,7 @@ LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
 
 COMMONFILES := libsddf_util_debug.a
 
+GPIO_COMMON_OBJS := gpio_common.o
 CLIENT_OBJS := client.o
 MOTOR_CONTROL_OBJS := motor_control.o
 ULTRASONIC_SENSOR_OBJS := ultrasonic_sensor.o
@@ -68,6 +69,8 @@ VPATH := ${GPIO_TOP}
 
 all: $(IMAGE_FILE)
 
+gpio_common.o: ${GPIO_TOP}/gpio_common.c
+	$(CC) -c $(CFLAGS) $< -o $@
 
 timer_queue.o: ${GPIO_TOP}/timer_queue.c
 	$(CC) -c $(CFLAGS) $< -o $@
@@ -75,9 +78,6 @@ timer_queue.o: ${GPIO_TOP}/timer_queue.c
 # Motor control build
 motor_control.o: ${GPIO_TOP}/motor_control.c 
 	$(CC) -c $(CFLAGS) $< -o $@
-
-motor_control.elf: motor_control.o timer_queue.o libco.a
-	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 # Ultrasonic sensor build
 ultrasonic_sensor.o: ${GPIO_TOP}/ultrasonic_sensor.c
@@ -93,7 +93,7 @@ telemetry.elf: $(TELEMETRY_OBJS) libco.a
 client.o: ${GPIO_TOP}/client.c 
 	$(CC) -c $(CFLAGS) $< -o $@
 
-client.elf: $(CLIENT_OBJS) ${ULTRASONIC_SENSOR_OBJS} ${TIMER_QUEUE_OBJS} libco.a
+client.elf: $(CLIENT_OBJS) ${ULTRASONIC_SENSOR_OBJS} ${TIMER_QUEUE_OBJS} ${GPIO_COMMON_OBJS} ${MOTOR_CONTROL_OBJS} libco.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
@@ -104,7 +104,6 @@ else
 endif
 	$(OBJCOPY) --update-section .device_resources=${SDFGEN_OUT}/timer_device_resources.data timer_driver.elf
 	$(OBJCOPY) --update-section .timer_client_config=${SDFGEN_OUT}/timer_client_client.data client.elf
-	$(OBJCOPY) --update-section .timer_client_config=${SDFGEN_OUT}/timer_client_motor_control.data motor_control.elf
 	touch $@
 
 # Final image generation

@@ -6,17 +6,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-#include <microkit.h>
-#include <libco.h>
-#include <sddf/util/printf.h>
-#include <sddf/timer/client.h>
-#include <os/sddf.h>
-#include <stdint.h>
-#include <sddf/timer/config.h>
 #include "include/client/client.h"
-#include "include/motor/motor_control.h"
-#include "include/client/timer_queue.h"
-#include "include/ultrasonic/ultrasonic_sensor.h"
 
 #define DEBUG_CLIENT
 
@@ -37,18 +27,17 @@
 __attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
 static char t_client_main_stack[STACK_SIZE];
 
-sddf_channel timer_channel;
-
 uint64_t time_start;
 uint64_t time_end;
 
 cothread_t t_event;
 cothread_t t_main;
 
-PriorityQueue timeout_queue = {{}, {}, 0};
-
 // Unfulfilled motor control request
 int is_ongoing_request = 0;
+
+PriorityQueue timeout_queue = {{}, {}, 0};
+sddf_channel timer_channel = 0;
 
 bool delay_microsec(size_t microseconds, int timeout_id)
 {
@@ -90,6 +79,10 @@ void delay_motors(size_t milliseconds) {
     delay_ms(milliseconds, MOTOR_CONTROL_TIMEOUT_ID);
 }
 
+void set_timeout(uint64_t microseconds) {
+    sddf_timer_set_timeout(timer_channel, microseconds*NS_IN_US);
+}
+
 uint64_t get_time_now() {
     return sddf_timer_time_now(timer_channel);
 }
@@ -106,28 +99,6 @@ void send_motor_request(int motor_ch, int command, uint64_t micro_s) {
 }
 
 // returns distance in cm
-
-
-// TODO check these
-void drive_forward(uint64_t micro_s) {
-    send_motor_request(MOTOR_CONTROL_CHANNEL, REQUEST_FORWARD, micro_s);
-}
-
-void drive_reverse(uint64_t micro_s) {
-    send_motor_request(MOTOR_CONTROL_CHANNEL, REQUEST_BACK, micro_s);
-}
-
-void drive_left(uint64_t micro_s) {
-    send_motor_request(MOTOR_CONTROL_CHANNEL, REQUEST_LEFT, micro_s);
-}
-
-void drive_right(uint64_t micro_s) {
-    send_motor_request(MOTOR_CONTROL_CHANNEL, REQUEST_RIGHT, micro_s);
-}
-
-void drive_neutral(uint64_t micro_s) {
-    send_motor_request(MOTOR_CONTROL_CHANNEL, REQUEST_NEUTRAL, micro_s);
-}
 
 void client_main(void) {
     // wait for all sensors to initialise first
@@ -203,8 +174,6 @@ void notified(sddf_channel ch) {
 void init(void) {
     sensor_init();
     motors_init();
-
-    timer_channel = timer_config.driver_id;
 
     // time_start = sddf_timer_time_now(TIMER_CHANNEL);
     LOG_CLIENT("Init\n");

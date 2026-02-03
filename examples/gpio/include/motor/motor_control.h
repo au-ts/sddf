@@ -5,6 +5,13 @@
 
 #pragma once
 
+#include <microkit.h>
+#include <libco.h>
+#include <sddf/util/printf.h>
+#include <sddf/timer/client.h>
+#include <sddf/timer/config.h>
+#include <sddf/gpio/meson/gpio.h>
+
 #define CONTROL_STOP (0)
 #define CONTROL_FORWARD (1)
 #define CONTROL_REVERSE (2)
@@ -33,13 +40,13 @@ static const int pwm_delay_mappings[PWM_CHANNEL_MAPPING_COLS][PWM_CHANNEL_MAPPIN
     {CONTROL_NEUTRAL, 1500, 18500},
 };
 
-/* Motor Control State */
-// TODO: might want to refactor this
-int is_control_fulfilled;
-
 void control_forward();
 void control_reverse();
 void control_neutral();
 void control_left();
 void control_right();
+
+void handle_motor_control_timeout();
+void handle_pwm_timeout(int gpio_ch);
+void motors_init();
 

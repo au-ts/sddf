@@ -42,22 +42,16 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
 
     client = ProtectionDomain("client", "client.elf", priority=1)
-    motor_control = ProtectionDomain("motor_control", "motor_control.elf", priority=2, passive=True)
 
     timer_node = dtb.node(board.timer)
     assert timer_node is not None
 
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
     timer_system.add_client(client)
-    timer_system.add_client(motor_control)
-
-    # Client to motors channel
-    sdf.add_channel(SystemDescription.Channel(client, motor_control, a_id=2, b_id=1, pp_a=True, notify_a=True, notify_b=True))
-
 
     # Motors to GPIO channel
-    sdf.add_channel(SystemDescription.Channel(motor_control, gpio_driver, a_id=2, b_id=0, pp_a=True, notify_a=True, notify_b=True))
-    sdf.add_channel(SystemDescription.Channel(motor_control, gpio_driver, a_id=3, b_id=1, pp_a=True, notify_a=True, notify_b=True))
+    sdf.add_channel(SystemDescription.Channel(client, gpio_driver, a_id=5, b_id=0, pp_a=True, notify_a=True, notify_b=True))
+    sdf.add_channel(SystemDescription.Channel(client, gpio_driver, a_id=6, b_id=1, pp_a=True, notify_a=True, notify_b=True))
 
     # Sensors to GPIO channel
     # Echo pin
@@ -66,7 +60,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     # Trig pin
     sdf.add_channel(SystemDescription.Channel(client, gpio_driver, a_id=4, b_id=3, pp_a=True, notify_a=True, notify_b=True))
 
-    pds = [timer_driver, client, motor_control, gpio_driver, telemetry]
+    pds = [timer_driver, client, gpio_driver, telemetry]
     for pd in pds:
         sdf.add_pd(pd)
 

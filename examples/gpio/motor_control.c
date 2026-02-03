@@ -6,16 +6,9 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-#include <microkit.h>
-#include <libco.h>
-#include <sddf/util/printf.h>
-#include <sddf/timer/client.h>
-#include <sddf/timer/config.h>
-#include <sddf/gpio/meson/gpio.h>
-#include "include/client/client.h"
 #include "include/motor/motor_control.h"
-#include "include/client/timer_queue.h"
-#include "gpio_config.h"
+#include "include/client/client.h"
+#include "include/gpio_common/gpio_common.h"
 
 #define DEBUG_CLIENT
 
@@ -28,29 +21,20 @@
 
 #define LOG_CONTROL_ERR(...) do{ sddf_printf("CONTROL|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
-__attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
-
-sddf_channel timer_channel;
-
-// uintptr_t control_buffer_base_vaddr;
 
 // Channels
-#define CLIENT_CHANNEL (1)
 
 // Motors A and B channels
-#define GPIO_CHANNEL_A (2)
-#define GPIO_CHANNEL_B (3)
-
-#define GPIO_HIGH (1)
-#define GPIO_LOW (0)
+#define GPIO_CHANNEL_A (5)
+#define GPIO_CHANNEL_B (6)
 
 // Timer States for PWM
 #define PAUSE_HIGH (0)
 #define PAUSE_LOW (1)
 
-PriorityQueue timeout_queue = {{}, {}, 0};
 
 // Motor/PWM States
+
 int pwm_a_state = PAUSE_LOW;
 int pwm_b_state = PAUSE_LOW;
 
@@ -58,54 +42,8 @@ int motor_a_state = CONTROL_NEUTRAL;
 int motor_b_state = CONTROL_NEUTRAL;
 
 // State of Current Control
-int control_request = REQUEST_NEUTRAL;
 uint64_t request_time_end = 0;
-
-
-void gpio_init(int gpio_ch) {
-    // LOG_CONTROL("Setting direction of GPIO1 to output!\n");
-    microkit_msginfo msginfo;
-    msginfo = microkit_msginfo_new(GPIO_SET_GPIO, 2);
-    microkit_mr_set(GPIO_REQ_CONFIG_SLOT, GPIO_DIRECTION);
-    microkit_mr_set(GPIO_REQ_VALUE_SLOT, GPIO_DIRECTION_OUTPUT);
-    msginfo = microkit_ppcall(gpio_ch, msginfo);
-    if (microkit_msginfo_get_label(msginfo) == GPIO_FAILURE) {
-        size_t error = microkit_mr_get(GPIO_RES_VALUE_SLOT);
-        LOG_CONTROL_ERR("failed to set direction of gpio with error %ld!\n", error);
-        while (1) {};
-    }
-}
-
-// GPIO output HIGH/LOW
-void digital_write(int gpio_ch, int value) {
-    microkit_msginfo msginfo;
-
-    if (value == GPIO_HIGH) {
-        // LOG_CONTROL("Setting GPIO1 to on!\n");
-        msginfo = microkit_msginfo_new(GPIO_SET_GPIO, 2);
-        microkit_mr_set(GPIO_REQ_CONFIG_SLOT, GPIO_OUTPUT);
-        microkit_mr_set(GPIO_REQ_VALUE_SLOT, 1);
-        msginfo = microkit_ppcall(gpio_ch, msginfo);
-        if (microkit_msginfo_get_label(msginfo) == GPIO_FAILURE) {
-            size_t error = microkit_mr_get(GPIO_RES_VALUE_SLOT);
-            LOG_CONTROL_ERR("failed to set output of gpio with error %ld!\n", error);
-            while (1) {};
-        }       
-    }
-    else if (value == GPIO_LOW) {
-        // TODO check if this is correct to set GPIO LOW
-        // LOG_CONTROL("Setting GPIO1 to off!\n");
-        msginfo = microkit_msginfo_new(GPIO_SET_GPIO, 2);
-        microkit_mr_set(GPIO_REQ_CONFIG_SLOT, GPIO_OUTPUT);
-        microkit_mr_set(GPIO_REQ_VALUE_SLOT, 0);
-        msginfo = microkit_ppcall(gpio_ch, msginfo);
-        if (microkit_msginfo_get_label(msginfo) == GPIO_FAILURE) {
-            size_t error = microkit_mr_get(GPIO_RES_VALUE_SLOT);
-            LOG_CONTROL_ERR("failed to set output of gpio with error %ld!\n", error);
-            while (1) {};
-        }
-    }
-}
+int is_control_fulfilled = 0;
 
 void set_pwm(int gpio_ch, uint64_t micro_s) {
     digital_write(gpio_ch, GPIO_HIGH);
@@ -118,9 +56,9 @@ void set_pwm(int gpio_ch, uint64_t micro_s) {
         pwm_b_state = PAUSE_HIGH;
     }
 
-    enqueue(&timeout_queue, sddf_timer_time_now(timer_channel) + micro_s, gpio_ch);
+    enqueue(&timeout_queue, get_time_now() + micro_s, gpio_ch);
     // timeout to drive motor forward
-    sddf_timer_set_timeout(timer_channel, micro_s);
+    set_timeout(micro_s);
 }
 
 void control_forward(void) {
@@ -129,8 +67,8 @@ void control_forward(void) {
     motor_a_state = CONTROL_FORWARD;
     motor_b_state = CONTROL_FORWARD;
 
-    set_pwm(GPIO_CHANNEL_A, pwm_delay_mappings[CONTROL_FORWARD - 1][PWM_TIME_HIGH]*NS_IN_US);
-    set_pwm(GPIO_CHANNEL_B, pwm_delay_mappings[CONTROL_FORWARD - 1][PWM_TIME_HIGH]*NS_IN_US);
+    set_pwm(GPIO_CHANNEL_A, pwm_delay_mappings[CONTROL_FORWARD - 1][PWM_TIME_HIGH]);
+    set_pwm(GPIO_CHANNEL_B, pwm_delay_mappings[CONTROL_FORWARD - 1][PWM_TIME_HIGH]);
 }
 
 // TODO complete these
@@ -140,8 +78,8 @@ void control_reverse(void) {
     motor_a_state = CONTROL_REVERSE;
     motor_b_state = CONTROL_REVERSE;
 
-    set_pwm(GPIO_CHANNEL_A, pwm_delay_mappings[CONTROL_REVERSE - 1][PWM_TIME_HIGH]*NS_IN_US);
-    set_pwm(GPIO_CHANNEL_B, pwm_delay_mappings[CONTROL_REVERSE - 1][PWM_TIME_HIGH]*NS_IN_US);
+    set_pwm(GPIO_CHANNEL_A, pwm_delay_mappings[CONTROL_REVERSE - 1][PWM_TIME_HIGH]);
+    set_pwm(GPIO_CHANNEL_B, pwm_delay_mappings[CONTROL_REVERSE - 1][PWM_TIME_HIGH]);
 }
 
 void control_neutral(void) {
@@ -150,8 +88,8 @@ void control_neutral(void) {
     motor_a_state = CONTROL_NEUTRAL;
     motor_b_state = CONTROL_NEUTRAL;
 
-    set_pwm(GPIO_CHANNEL_A, pwm_delay_mappings[CONTROL_NEUTRAL - 1][PWM_TIME_HIGH]*NS_IN_US);
-    set_pwm(GPIO_CHANNEL_B, pwm_delay_mappings[CONTROL_NEUTRAL - 1][PWM_TIME_HIGH]*NS_IN_US);
+    set_pwm(GPIO_CHANNEL_A, pwm_delay_mappings[CONTROL_NEUTRAL - 1][PWM_TIME_HIGH]);
+    set_pwm(GPIO_CHANNEL_B, pwm_delay_mappings[CONTROL_NEUTRAL - 1][PWM_TIME_HIGH]);
 }
 
 void control_left(void) {
@@ -160,8 +98,8 @@ void control_left(void) {
     motor_a_state = CONTROL_NEUTRAL;
     motor_b_state = CONTROL_FORWARD;
 
-    set_pwm(GPIO_CHANNEL_A, pwm_delay_mappings[CONTROL_NEUTRAL - 1][PWM_TIME_HIGH]*NS_IN_US);
-    set_pwm(GPIO_CHANNEL_B, pwm_delay_mappings[CONTROL_FORWARD - 1][PWM_TIME_HIGH]*NS_IN_US);
+    set_pwm(GPIO_CHANNEL_A, pwm_delay_mappings[CONTROL_NEUTRAL - 1][PWM_TIME_HIGH]);
+    set_pwm(GPIO_CHANNEL_B, pwm_delay_mappings[CONTROL_FORWARD - 1][PWM_TIME_HIGH]);
 }
 
 void control_right(void) {
@@ -170,8 +108,8 @@ void control_right(void) {
     motor_a_state = CONTROL_FORWARD;
     motor_b_state = CONTROL_NEUTRAL;
 
-    set_pwm(GPIO_CHANNEL_A, pwm_delay_mappings[CONTROL_FORWARD - 1][PWM_TIME_HIGH]*NS_IN_US);
-    set_pwm(GPIO_CHANNEL_B, pwm_delay_mappings[CONTROL_NEUTRAL - 1][PWM_TIME_HIGH]*NS_IN_US);
+    set_pwm(GPIO_CHANNEL_A, pwm_delay_mappings[CONTROL_FORWARD - 1][PWM_TIME_HIGH]);
+    set_pwm(GPIO_CHANNEL_B, pwm_delay_mappings[CONTROL_NEUTRAL - 1][PWM_TIME_HIGH]);
 }
 
 // void handle_motor_request(int control_request) {
@@ -237,7 +175,7 @@ void control_right(void) {
 // handle current motor command timeout, update control states
 void handle_motor_control_timeout() {
     is_control_fulfilled = 0;
-    set_neutral();
+    control_neutral();
 }
 
 // upon pwm timeout, send next gpio signal
@@ -251,21 +189,21 @@ void handle_pwm_timeout(int gpio_ch) {
     if (gpio_ch == GPIO_CHANNEL_A) {
         if (pwm_a_state == PAUSE_HIGH) {
             digital_write(gpio_ch, GPIO_LOW);
-            sddf_timer_set_timeout(timer_channel, pwm_delay_mappings[motor_a_state - 1][PWM_TIME_LOW]*NS_IN_US);
+            set_timeout(pwm_delay_mappings[motor_a_state - 1][PWM_TIME_LOW]);
             pwm_a_state = PAUSE_LOW;
         }
         else {
-            set_pwm(gpio_ch, pwm_delay_mappings[motor_a_state - 1][PWM_TIME_HIGH]*NS_IN_US);
+            set_pwm(gpio_ch, pwm_delay_mappings[motor_a_state - 1][PWM_TIME_HIGH]);
         }
     }
     else if (gpio_ch == GPIO_CHANNEL_B) {
         if (pwm_b_state == PAUSE_HIGH) {
             digital_write(gpio_ch, GPIO_LOW);
-            sddf_timer_set_timeout(timer_channel, pwm_delay_mappings[motor_b_state - 1][PWM_TIME_LOW]*NS_IN_US);
+            set_timeout(pwm_delay_mappings[motor_b_state - 1][PWM_TIME_LOW]);
             pwm_b_state = PAUSE_LOW;
         }
         else {
-            set_pwm(gpio_ch, pwm_delay_mappings[motor_b_state - 1][PWM_TIME_HIGH]*NS_IN_US);
+            set_pwm(gpio_ch, pwm_delay_mappings[motor_b_state - 1][PWM_TIME_HIGH]);
         }
     }
 }
@@ -287,10 +225,9 @@ void handle_pwm_timeout(int gpio_ch) {
 
 void motors_init(void) {
     is_control_fulfilled = 0;
-    timer_channel = timer_config.driver_id;
 
     LOG_CONTROL("Init\n");
-    gpio_init(GPIO_CHANNEL_A);
-    gpio_init(GPIO_CHANNEL_B);
+    gpio_init(GPIO_CHANNEL_A, GPIO_DIRECTION_OUTPUT);
+    gpio_init(GPIO_CHANNEL_B, GPIO_DIRECTION_OUTPUT);
 }
 
