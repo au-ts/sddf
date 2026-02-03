@@ -109,6 +109,14 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             {"board": "rock3b"},
         ],
     },
+    "gpio": {
+        "configs": ["debug", "release", "benchmark"],
+        "build_systems": ["make"],
+        "boards_build": [
+            "maaxboard",
+        ],
+        "boards_test": [],
+    },
     "serial": {
         "configs": ["debug", "release"],
         "build_systems": ["make", "zig"],
