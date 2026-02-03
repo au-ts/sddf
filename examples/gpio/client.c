@@ -102,13 +102,12 @@ void send_motor_request(int motor_ch, int command, uint64_t micro_s) {
 
 void client_main(void) {
     // wait for all sensors to initialise first
-    // control_forward();
-
+    control_forward();
 
     while (true)
     {
         // LOG_CLIENT("Client main\n");
-        LOG_CLIENT("Reading received: %lu\n", get_ultrasonic_reading());
+        // LOG_CLIENT("Reading received: %lu\n", get_ultrasonic_reading());
         delay_ms(1000, CLIENT_TIMEOUT_ID);
         // delay_motors(1000);
         // control_reverse();
@@ -144,8 +143,11 @@ void client_main(void) {
 // Call coroutine, block other commands from executing
 void notified(sddf_channel ch) {
     // check this switch
+    LOG_CLIENT("timer: %d\n", ch);
+
     if (ch == timer_config.driver_id) {
         int timeout_id = dequeue(&timeout_queue);
+        LOG_CLIENT("timeout id: %d\n", timeout_id);
 
         switch (timeout_id)
         {
@@ -159,9 +161,11 @@ void notified(sddf_channel ch) {
             handle_motor_control_timeout();
             break;
         case MOTOR_A_TIMEOUT_ID:
+            LOG_CLIENT("motor A timeout\n");
             handle_pwm_timeout(MOTOR_A_TIMEOUT_ID);
             break;
         case MOTOR_B_TIMEOUT_ID:
+            LOG_CLIENT("motor B timeout\n");
             handle_pwm_timeout(MOTOR_B_TIMEOUT_ID);
             break;        
         default:

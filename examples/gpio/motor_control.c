@@ -13,8 +13,8 @@
 #define DEBUG_CLIENT
 
 #ifdef DEBUG_CLIENT
-#define  LOG_CONTROL(...) do{}while(0)
-// #define LOG_CONTROL(...) do{ sddf_printf("CONTROL|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
+// #define  LOG_CONTROL(...) do{}while(0)
+#define LOG_CONTROL(...) do{ sddf_printf("CONTROL|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
 #else
 #define  LOG_CONTROL(...) do{}while(0)
 #endif
@@ -82,6 +82,7 @@ void control_reverse(void) {
     set_pwm(GPIO_CHANNEL_A, pwm_delay_mappings[CONTROL_REVERSE - 1][PWM_TIME_HIGH]);
     set_pwm(GPIO_CHANNEL_B, pwm_delay_mappings[CONTROL_REVERSE - 1][PWM_TIME_HIGH]);
 }
+
 
 void control_neutral(void) {
     is_control_fulfilled = 1;
@@ -186,10 +187,16 @@ void handle_pwm_timeout(int gpio_ch) {
     //     return;
     // }
 
+    LOG_CONTROL("handling pwm timeout %d\n", gpio_ch);
+
     // TODO: refactor this
     if (gpio_ch == GPIO_CHANNEL_A) {
+        LOG_CONTROL("handling motor A pwm\n");
         if (pwm_a_state == PAUSE_HIGH) {
             digital_write(gpio_ch, GPIO_LOW);
+            size_t time_ns = pwm_delay_mappings[motor_a_state - 1][PWM_TIME_LOW]*NS_IN_US;
+
+            enqueue(&timeout_queue, get_time_now() + time_ns, gpio_ch);
             set_timeout(pwm_delay_mappings[motor_a_state - 1][PWM_TIME_LOW]);
             pwm_a_state = PAUSE_LOW;
         }
@@ -200,6 +207,9 @@ void handle_pwm_timeout(int gpio_ch) {
     else if (gpio_ch == GPIO_CHANNEL_B) {
         if (pwm_b_state == PAUSE_HIGH) {
             digital_write(gpio_ch, GPIO_LOW);
+            size_t time_ns = pwm_delay_mappings[motor_b_state - 1][PWM_TIME_LOW]*NS_IN_US;
+
+            enqueue(&timeout_queue, get_time_now() + time_ns, gpio_ch);
             set_timeout(pwm_delay_mappings[motor_b_state - 1][PWM_TIME_LOW]);
             pwm_b_state = PAUSE_LOW;
         }
