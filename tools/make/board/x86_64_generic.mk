@@ -6,7 +6,8 @@
 # Set up variables for the x86_64_generic
 # Should be included _before_ toolchain makefile.
 
-BLK_DRIV_DIR := virtio/pci
+# BLK_DRIV_DIR might be set by NVME option in blk.mk
+BLK_DRIV_DIR ?= virtio/pci
 I2C_DRIV_DIR :=
 NET_DRIV_DIR := virtio/pci
 ETH_DRIV := eth_driver_virtio.elf
@@ -30,4 +31,6 @@ QEMU_ARCH_ARGS := -machine q35 \
 # specify the slot with QEMU as well.
 # See https://github.com/au-ts/sddf/issues/607 for details.
 QEMU_NET_ARGS := -device virtio-net-pci,netdev=netdev0,addr=0x2.0
-QEMU_BLK_ARGS := -device virtio-blk-pci,drive=hd,addr=0x3.0
+
+# QEMU_BLK_ARGS might be set by NVME option in blk.mk
+QEMU_BLK_ARGS ?= -device virtio-blk-pci,drive=hd,addr=0x3.0

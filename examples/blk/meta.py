@@ -18,7 +18,11 @@ ProtectionDomain = SystemDescription.ProtectionDomain
 
 
 def generate(
-    sdf_file: str, output_dir: str, dtb: Optional[DeviceTree], need_timer: bool
+    sdf_file: str,
+    output_dir: str,
+    dtb: Optional[DeviceTree],
+    need_timer: bool,
+    nvme: bool,  # hack to select NVMe or Virtio
 ):
     uart_node = None
     blk_node = None
@@ -59,41 +63,88 @@ def generate(
         )
         timer_system = sddf.Timer(sdf, timer_node, timer_driver)
         timer_system.add_client(blk_driver)
+        if board.arch == SystemDescription.Arch.X86_64:
+            hpet_irq = SystemDescription.IrqMsi(
+                pci_bus=0, pci_device=0, pci_func=0, vector=0, handle=0, id=0
+            )
+            timer_driver.add_irq(hpet_irq)
+
+            hpet_regs = SystemDescription.MemoryRegion(
+                sdf, "hpet_regs", 0x1000, paddr=0xFED00000
+            )
+            hpet_regs_map = SystemDescription.Map(
+                hpet_regs, 0x5000_0000, "rw", cached=False
+            )
+            timer_driver.add_map(hpet_regs_map)
+            sdf.add_mr(hpet_regs)
 
     blk_system = Sddf.Blk(sdf, blk_node, blk_driver, blk_virt)
     partition = int(args.partition) if args.partition else board.partition
     blk_system.add_client(client, partition=partition)
 
     if board.arch == SystemDescription.Arch.X86_64:
-        blk_requests_mr = SystemDescription.MemoryRegion(
-            sdf, "virtio_requests", 65536, paddr=0x5FDF0000
-        )
-        sdf.add_mr(blk_requests_mr)
-        blk_requests_map = SystemDescription.Map(blk_requests_mr, 0x20200000, "rw")
-        blk_driver.add_map(blk_requests_map)
+        if nvme:
+            nvme_bar0_mr = SystemDescription.MemoryRegion(
+                sdf, "nvme_bar0", 0x4000, paddr=0xFEBD4000
+            )
+            sdf.add_mr(nvme_bar0_mr)
+            nvme_bar0_map = SystemDescription.Map(
+                nvme_bar0_mr, 0x20000000, "rw", cached=False
+            )
+            blk_driver.add_map(nvme_bar0_map)
 
-        blk_virtio_metadata_mr = SystemDescription.MemoryRegion(
-            sdf, "virtio_metadata", 65536, paddr=0x5FFF0000
-        )
-        sdf.add_mr(blk_virtio_metadata_mr)
-        blk_virtio_metadata_map = SystemDescription.Map(
-            blk_virtio_metadata_mr, 0x20210000, "rw"
-        )
-        blk_driver.add_map(blk_virtio_metadata_map)
+            # Metadata (ASQ/ACQ, etc.)
+            nvme_metadata_mr = SystemDescription.MemoryRegion(
+                sdf, "nvme_metadata", 0x10000, paddr=0x5FFF0000
+            )
+            sdf.add_mr(nvme_metadata_mr)
+            nvme_metadata_map = SystemDescription.Map(
+                nvme_metadata_mr, 0x20100000, "rw", cached=False
+            )
+            blk_driver.add_map(nvme_metadata_map)
 
-        virtio_blk_regs = SystemDescription.MemoryRegion(
-            sdf, "virtio_blk_regs", 0x4000, paddr=0xFE000000
-        )
-        sdf.add_mr(virtio_blk_regs)
-        virtio_blk_regs_map = SystemDescription.Map(
-            virtio_blk_regs, 0x6000_0000, "rw", cached=False
-        )
-        blk_driver.add_map(virtio_blk_regs_map)
+            # Data Region
+            data_region_mr = SystemDescription.MemoryRegion(
+                sdf, "data_region", 0x200000, paddr=0x5FDF0000
+            )
+            sdf.add_mr(data_region_mr)
+            data_region_map = SystemDescription.Map(data_region_mr, 0x20200000, "rw")
+            blk_driver.add_map(data_region_map)
 
-        virtio_blk_irq = SystemDescription.IrqIoapic(
-            ioapic_id=0, pin=11, vector=1, id=17
-        )
-        blk_driver.add_irq(virtio_blk_irq)
+            # IRQ
+            nvme_irq = SystemDescription.IrqIoapic(ioapic_id=0, pin=10, vector=1, id=17)
+            blk_driver.add_irq(nvme_irq)
+
+        else:
+            blk_requests_mr = SystemDescription.MemoryRegion(
+                sdf, "virtio_requests", 65536, paddr=0x5FDF0000
+            )
+            sdf.add_mr(blk_requests_mr)
+            blk_requests_map = SystemDescription.Map(blk_requests_mr, 0x20200000, "rw")
+            blk_driver.add_map(blk_requests_map)
+
+            blk_virtio_metadata_mr = SystemDescription.MemoryRegion(
+                sdf, "virtio_metadata", 65536, paddr=0x5FFF0000
+            )
+            sdf.add_mr(blk_virtio_metadata_mr)
+            blk_virtio_metadata_map = SystemDescription.Map(
+                blk_virtio_metadata_mr, 0x20210000, "rw"
+            )
+            blk_driver.add_map(blk_virtio_metadata_map)
+
+            virtio_blk_regs = SystemDescription.MemoryRegion(
+                sdf, "virtio_blk_regs", 0x4000, paddr=0xFE000000
+            )
+            sdf.add_mr(virtio_blk_regs)
+            virtio_blk_regs_map = SystemDescription.Map(
+                virtio_blk_regs, 0x6000_0000, "rw", cached=False
+            )
+            blk_driver.add_map(virtio_blk_regs_map)
+
+            virtio_blk_irq = SystemDescription.IrqIoapic(
+                ioapic_id=0, pin=11, vector=1, id=17
+            )
+            blk_driver.add_irq(virtio_blk_irq)
 
         pci_config_addr_port = SystemDescription.IoPort(0xCF8, 4, 1)
         blk_driver.add_ioport(pci_config_addr_port)
@@ -129,6 +180,7 @@ if __name__ == "__main__":
     parser.add_argument("--output", required=True)
     parser.add_argument("--sdf", required=True)
     parser.add_argument("--need_timer", action="store_true", default=False)
+    parser.add_argument("--nvme", action="store_true", default=False)
     parser.add_argument("--partition")
 
     args = parser.parse_args()
@@ -143,4 +195,4 @@ if __name__ == "__main__":
         with open(args.dtb, "rb") as f:
             dtb = DeviceTree(f.read())
 
-    generate(args.sdf, args.output, dtb, args.need_timer)
+    generate(args.sdf, args.output, dtb, args.need_timer, args.nvme)

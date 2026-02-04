@@ -48,6 +48,9 @@ const DriverClass = struct {
             pci,
             mmio,
         };
+        const Nvme = enum {
+            pci,
+        };
     };
 
     const Mmc = enum {
@@ -298,6 +301,33 @@ fn addVirtioBlockDriver(
         .file = b.path(b.fmt("virtio/transport/{s}.c", .{@tagName(class)})),
     });
     driver.addIncludePath(b.path(b.fmt("drivers/blk/{s}/", .{@tagName(class)})));
+    driver.addIncludePath(b.path("include"));
+    driver.addIncludePath(b.path("include/sddf/util/custom_libc"));
+    driver.addIncludePath(b.path("include/microkit"));
+    driver.linkLibrary(util);
+
+    return driver;
+}
+
+fn addNvmeBlockDriver(
+    b: *std.Build,
+    util: *std.Build.Step.Compile,
+    class: DriverClass.Block.Nvme,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+) *std.Build.Step.Compile {
+    const driver = addPd(b, .{
+        .name = b.fmt("driver_blk_nvme_{s}.elf", .{@tagName(class)}),
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .strip = false,
+        }),
+    });
+    driver.addCSourceFile(.{
+        .file = b.path("drivers/blk/nvme/nvme.c"),
+    });
+    driver.addIncludePath(b.path("drivers/blk/nvme"));
     driver.addIncludePath(b.path("include"));
     driver.addIncludePath(b.path("include/sddf/util/custom_libc"));
     driver.addIncludePath(b.path("include/microkit"));
@@ -561,6 +591,11 @@ pub fn build(b: *std.Build) !void {
         }
         inline for (std.meta.fields(DriverClass.Block.Virtio)) |class| {
             const driver = addVirtioBlockDriver(b, util, @enumFromInt(class.value), target, optimize);
+            driver.linkLibrary(util_putchar_debug);
+            b.installArtifact(driver);
+        }
+        inline for (std.meta.fields(DriverClass.Block.Nvme)) |class| {
+            const driver = addNvmeBlockDriver(b, util, @enumFromInt(class.value), target, optimize);
             driver.linkLibrary(util_putchar_debug);
             b.installArtifact(driver);
         }
