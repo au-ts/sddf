@@ -134,10 +134,12 @@ pub fn build(b: *std.Build) !void {
         timer_driver_install = b.addInstallArtifact(driver, .{ .dest_sub_path = "timer_driver.elf" });
     }
 
+    const nvme = b.option(bool, "nvme", "Use NVMe driver") orelse false;
+
     const blk_driver_class = switch (microkit_board_option) {
         .qemu_virt_aarch64, .qemu_virt_riscv64 => "virtio_mmio",
         .maaxboard => "mmc_imx",
-        .x86_64_generic => "virtio_pci",
+        .x86_64_generic => if (nvme) "nvme_pci" else "virtio_pci",
     };
 
     const serial_driver_class = switch (microkit_board_option) {
@@ -213,6 +215,9 @@ pub fn build(b: *std.Build) !void {
     run_metaprogram.addArg("blk.system");
     if (timer_driver_install != null) {
         run_metaprogram.addArg("--need_timer");
+    }
+    if (nvme) {
+        run_metaprogram.addArg("--nvme");
     }
     if (partition) |p| {
         run_metaprogram.addArg("--partition");
