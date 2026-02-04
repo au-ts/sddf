@@ -119,68 +119,6 @@ void control_stop(void) {
     digital_write(GPIO_CHANNEL_A, GPIO_LOW);
 }
 
-// void handle_motor_request(int control_request) {
-//     is_control_fulfilled = 1;
-
-//     switch (control_request)
-//     {
-//     case REQUEST_FORWARD:
-//         set_forward();
-//         break;
-//     case REQUEST_BACK:
-//         set_reverse();
-//         break;
-//     case REQUEST_LEFT:
-//         set_left();
-//         break;
-//     case REQUEST_RIGHT:
-//         set_right();
-//         break;
-//     case REQUEST_NEUTRAL:
-//         set_neutral();
-//         break;
-//     default:
-//         break;
-//     }
-// }
-
-// microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo) {
-//     switch (ch) {
-//     case CLIENT_CHANNEL:
-//         int request = (int) microkit_mr_get(0);
-//         int was_control_fulfilled = is_control_fulfilled;
-
-//         uint64_t request_duration = microkit_mr_get(1);
-//         request_time_end = sddf_timer_time_now(timer_channel) + request_duration;
-
-//         if (!request) {
-//             break;
-//         }
-
-//         control_request = request;
-//         is_control_fulfilled = 0;
-
-//         // first control request, call a function to handle it
-//         if (was_control_fulfilled < 0) {
-//             // TODO: is this correct?
-//             handle_motor_request();
-//         }
-        
-//         // block while current time < request duration
-//         // TODO: might want to use delay_ms here, check if it faults & if timer interrupts will be handled appropriately
-//         while (sddf_timer_time_now(timer_channel) < request_time_end){}
-//         break;
-//     default:
-//         LOG_CONTROL("Unexpected pp call\n");
-//         break;
-//     }
-
-//     microkit_msginfo res = microkit_msginfo_new(0, 0);
-//     return res;
-// } 
-
-// 
-
 // handle current motor command timeout, update control states
 void handle_motor_control_timeout() {
     is_control_fulfilled = 0;
@@ -193,10 +131,6 @@ void handle_motor_control_timeout() {
     pwm_a_state = PAUSE_LOW;
     pwm_b_state = PAUSE_LOW;
 }
-
-
-// handle change of control in pwm timeout
-
 
 // upon pwm timeout, send next gpio signal
 void handle_pwm_timeout(int gpio_ch) {
@@ -236,21 +170,6 @@ void handle_pwm_timeout(int gpio_ch) {
         }
     }
 }
-
-
-// void notified(sddf_channel ch) {
-//     if (ch == timer_config.driver_id) {
-//         if (sddf_timer_time_now(timer_channel) >= request_time_end) {
-//             return;
-//         }
-//         int motor_channel = dequeue(&timeout_queue);
-//         handle_pwm_timeout(motor_channel);
-//     }
-//     else {
-//         LOG_CONTROL("Unexpected channel call\n");
-//     }
-// }
-
 
 void motors_init(void) {
     is_control_fulfilled = 0;
