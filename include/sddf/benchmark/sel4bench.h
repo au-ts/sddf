@@ -10,6 +10,8 @@
 #include <sddf/util/util.h>
 #include <os/sddf.h>
 
+#include <sddf/util/printf.h>
+
 /* This library contains a selection of libseL4bench used for sDDF benchmarking. libsel4bench can be found here:
 https://github.com/seL4/seL4_libs
 
@@ -22,6 +24,9 @@ The definitions are specific to ARMv8 - different definitions will need to used 
 #define SEL4BENCH_EVENT_TLB_L1D_MISS                0x05
 #define SEL4BENCH_EVENT_EXECUTE_INSTRUCTION         0x08
 #define SEL4BENCH_EVENT_BRANCH_MISPREDICT           0x10
+
+#define SEL4BENCH_EVENT_CACHE_L1I_ACCESS            0x14
+#define SEL4BENCH_EVENT_CACHE_L1D_WB                0x15
 
 /* Armv8 constants. */
 #define SEL4BENCH_ARMV8A_COUNTER_CCNT 31
@@ -53,7 +58,7 @@ typedef uint64_t ccnt_t;
 /* PMU registers. */
 #define PMCR        "PMCR_EL0"
 #define PMCNTENCLR  "PMCNTENCLR_EL0"
-#define PMCNTENSET  "PMCNTENSET_EL0"
+#define PMCNTENSET  "PMCNTENSET_EL0" // set of enabled counters
 #define PMXEVCNTR   "PMXEVCNTR_EL0"
 #define PMSELR      "PMSELR_EL0"
 #define PMXEVTYPER  "PMXEVTYPER_EL0"
@@ -83,11 +88,52 @@ static FASTFN uint32_t sel4bench_private_read_pmcr(void)
 
 #define MODIFY_PMCR(op, val) sel4bench_private_write_pmcr(sel4bench_private_read_pmcr() op (val))
 
+typedef struct event_value {
+    bool multiplexed;
+    bool new;
+    double last_rate;
+    ccnt_t prev_cycle_count;
+    ccnt_t total;
+} event_value_t;
+
+typedef struct counter_data {
+    uint8_t len;
+    uint8_t curr_event_idx;
+    event_id_t events[2];
+} counter_data_t;
+
+counter_data_t counters[6];
+event_value_t event_values[8];
+
+char *counter_names[] = {
+    "L1 i-cache misses",
+    "L1 d-cache misses",
+    "L1 i-tlb misses",
+    "L1 d-tlb misses",
+    "Instructions",
+    "Branch mispredictions",
+    "L1 i-cache accesses",
+    "L1 d-cache write backs"
+};
+
+event_id_t benchmarking_events[] = {
+    SEL4BENCH_EVENT_CACHE_L1I_MISS,
+    SEL4BENCH_EVENT_CACHE_L1D_MISS,
+    SEL4BENCH_EVENT_TLB_L1I_MISS,
+    SEL4BENCH_EVENT_TLB_L1D_MISS,
+    SEL4BENCH_EVENT_EXECUTE_INSTRUCTION,
+    SEL4BENCH_EVENT_BRANCH_MISPREDICT,
+    SEL4BENCH_EVENT_CACHE_L1I_ACCESS,
+    SEL4BENCH_EVENT_CACHE_L1D_WB
+};
+
+// Write to set of enabled counters
 static FASTFN void sel4bench_private_write_cntens(uint32_t mask)
 {
     PMU_WRITE(PMCNTENSET, mask);
 }
 
+// returns set of enabled counters
 static FASTFN uint32_t sel4bench_private_read_cntens(void)
 {
     uint64_t mask;
@@ -95,11 +141,13 @@ static FASTFN uint32_t sel4bench_private_read_cntens(void)
     return (uint32_t)mask;
 }
 
+// Disables counters
 static FASTFN void sel4bench_private_write_cntenc(uint32_t mask)
 {
     PMU_WRITE(PMCNTENCLR, mask);
 }
 
+// Reads value of selected register in PMSELR
 static FASTFN uint32_t sel4bench_private_read_pmcnt(void)
 {
     uint64_t val;
@@ -107,16 +155,19 @@ static FASTFN uint32_t sel4bench_private_read_pmcnt(void)
     return (uint32_t)val;
 }
 
+// Writes to counter register selected in PMSELR
 static FASTFN void sel4bench_private_write_pmcnt(uint32_t val)
 {
     PMU_WRITE(PMXEVCNTR, val);
 }
 
+// Selects counter
 static FASTFN void sel4bench_private_write_pmnxsel(uint32_t val)
 {
     PMU_WRITE(PMSELR, val);
 }
 
+// Configures counter to track event
 static FASTFN void sel4bench_private_write_evtsel(uint32_t val)
 {
     PMU_WRITE(PMXEVTYPER, val);
@@ -134,7 +185,7 @@ static FASTFN void sel4bench_init()
     // ensure all counters are in the stopped state
     sel4bench_private_write_cntenc(-1);
 
-    // clear div 64 flag
+    // clear div 64 flag -> PMCCNTR counts every clock cycle
     MODIFY_PMCR(&, ~SEL4BENCH_ARMV8A_PMCR_DIV64);
 
     // reset all counters
@@ -168,7 +219,7 @@ static FASTFN seL4_Word sel4bench_get_num_counters()
 }
 
 /**
- * Query the value of a set of counters.
+ * Query the value of a set of counters. Temporarily disables counters then re-enables them once reading is finished
  *
  * `values` must point to an array of a length at least equal to the highest
  * counter index to be read (to a maximum of `sel4bench_get_num_counters()`).
@@ -180,7 +231,7 @@ static FASTFN seL4_Word sel4bench_get_num_counters()
  *
  * @return current cycle count as in `sel4bench_get_cycle_count()`
  */
-static CACHESENSFN ccnt_t sel4bench_get_counters(counter_bitfield_t mask, ccnt_t *values)
+static CACHESENSFN ccnt_t sel4bench_get_counters(counter_bitfield_t mask, event_value_t *values)
 {
     // store current running state
     uint32_t enable_word = sel4bench_private_read_cntens();
@@ -192,7 +243,39 @@ static CACHESENSFN ccnt_t sel4bench_get_counters(counter_bitfield_t mask, ccnt_t
     for (; mask != 0; mask >>= 1, counter++) {
         if (mask & 1) {
             sel4bench_private_write_pmnxsel(counter);
-            values[counter] = sel4bench_private_read_pmcnt();
+
+            uint8_t event_idx = counters[counter].events[counters[counter].curr_event_idx];
+
+            if (!values[event_idx].multiplexed) {
+                values[event_idx].total = sel4bench_private_read_pmcnt();
+            } else {
+                uint64_t value = sel4bench_private_read_pmcnt();
+                ccnt_t ccnt;
+                SEL4BENCH_READ_CCNT(ccnt);
+
+                // only start TAM once events start to occur
+                if (values[event_idx].new && value == 0) continue;
+
+                if (values[event_idx].new) {
+                    values[event_idx].new = 0;    
+                    values[event_idx].prev_cycle_count = ccnt;
+                    values[event_idx].last_rate = (double)value / (double)ccnt;
+                } else {
+                    uint64_t tmp = values[event_idx].prev_cycle_count;
+
+                    double delta_ccnt = (ccnt - values[event_idx].prev_cycle_count);
+                    double new_rate = (double)value / delta_ccnt;
+
+                    double count_interval = ((new_rate + values[event_idx].last_rate) * delta_ccnt) / 2;
+                    values[event_idx].total += (uint64_t)count_interval;
+
+                    values[event_idx].last_rate = new_rate;
+                    values[event_idx].prev_cycle_count = ccnt;
+
+                    // sddf_printf("counter %d event 0x%x value %lld ccnt %lld prev ccnt %lld newrate %lf this interval %lld\n", 
+                    //     counter, benchmarking_events[event_idx], value, ccnt, tmp, new_rate, count_interval);
+                }
+            }
         }
     }
 
@@ -251,4 +334,35 @@ static FASTFN void sel4bench_stop_counters(counter_bitfield_t mask)
 static FASTFN void sel4bench_reset_counters(void)
 {
     MODIFY_PMCR( |, SEL4BENCH_ARMV8A_PMCR_RESET_ALL);
+}
+
+/**
+ * Changes the event being monitored in a counter for multiplexing.
+ * Does nothing if counter only has one event assigned to it.
+ *
+ */
+static FASTFN void sel4bench_rotate_events(void) {
+    counter_bitfield_t multiplex_bf = 0;
+    for (seL4_Word counter = 0; counter < sel4bench_get_num_counters(); counter++) {
+        if (counters[counter].len < 2) continue;
+        multiplex_bf |= BIT(counter);
+    }
+
+    if (multiplex_bf == 0) return;
+
+    sel4bench_get_counters(multiplex_bf, event_values);
+
+    for (seL4_Word i = 0; multiplex_bf != 0; multiplex_bf >>= 1, i++) {
+        if (multiplex_bf & 1) {
+            if (counters[i].curr_event_idx == counters[i].len - 1) {
+                counters[i].curr_event_idx = 0;
+            } else {
+                counters[i].curr_event_idx++;
+            }
+
+            event_id_t event = benchmarking_events[counters[i].events[counters[i].curr_event_idx]];
+            sel4bench_set_count_event(i, event);
+            // sddf_printf("Change event on countr %d to 0x%x\n", i, benchmarking_events[counters[i].events[counters[i].curr_event_idx]]);
+        }   
+    }
 }
