@@ -15,6 +15,7 @@ sys.path.insert(1, Path(__file__).parents[2].as_posix())
 from ci.lib.backends import *
 from ci.lib.runner import run_single_example, matrix_product
 from ci.common import TestConfig
+from ci.matrix import NO_OUTPUT_DEFAULT_TIMEOUT_S
 from ci import common, matrix
 
 TEST_MATRIX = matrix_product(
@@ -22,7 +23,7 @@ TEST_MATRIX = matrix_product(
     board=matrix.EXAMPLES["blk"]["boards_test"],
     config=matrix.EXAMPLES["blk"]["configs"],
     build_system=matrix.EXAMPLES["blk"]["build_systems"],
-    timeout_s=[matrix.EXAMPLES["blk"]["timeout_s"]],
+    timeout_s=[NO_OUTPUT_DEFAULT_TIMEOUT_S],
 )
 
 SDDF = Path(__file__).parents[2]

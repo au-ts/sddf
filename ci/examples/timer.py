@@ -11,6 +11,7 @@ sys.path.insert(1, Path(__file__).parents[2].as_posix())
 from ci.lib.backends import *
 from ci.lib.runner import run_single_example, matrix_product
 from ci.common import TestConfig
+from ci.matrix import NO_OUTPUT_DEFAULT_TIMEOUT_S
 from ci.lib import log
 from ci import common, matrix
 
@@ -19,7 +20,7 @@ TEST_MATRIX = matrix_product(
     board=matrix.EXAMPLES["timer"]["boards_test"],
     config=matrix.EXAMPLES["timer"]["configs"],
     build_system=matrix.EXAMPLES["timer"]["build_systems"],
-    timeout_s=[matrix.EXAMPLES["timer"]["timeout_s"]],
+    timeout_s=[NO_OUTPUT_DEFAULT_TIMEOUT_S],
 )
 
 DRIFT_THRESHOLD = 0.05  # 5 percent.

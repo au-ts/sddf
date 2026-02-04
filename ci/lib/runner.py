@@ -50,11 +50,11 @@ async def _run_with_watchdog(
     tee.touch()
 
     async with asyncio.TaskGroup() as tg:
-        main_task = tg.create_task(main)
         watchdog_task = tg.create_task(_watch_stdout_inactivity(tee, timeout_no_output))
-
-        # await main_task, if watchdog fires we exit TaskGroup, on timeout we propagate errors
-        await main_task
+        try:
+            await main
+        finally:
+            watchdog_task.cancel()
 
 
 async def runner(
@@ -371,8 +371,7 @@ def execute_tests(
     backend_fns: dict[str, BackendFunction],
     args: argparse.Namespace,
 ):
-    if len(matrix) == 0:
-        quit(1)
+    assert len(matrix) > 0, "Test list is empty."
 
     test_results: dict[TestConfig, ResultKind] = {}
     do_retries = False
