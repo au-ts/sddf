@@ -111,7 +111,12 @@ void control_right(void) {
     motor_b_state = CONTROL_NEUTRAL;
 
     set_pwm(GPIO_CHANNEL_A, pwm_delay_mappings[CONTROL_FORWARD - 1][PWM_TIME_HIGH]);
-    set_pwm(GPIO_CHANNEL_B, pwm_delay_mappings[CONTROL_NEUTRAL - 1][PWM_TIME_HIGH]);
+    set_pwm(GPIO_CHANNEL_A, pwm_delay_mappings[CONTROL_NEUTRAL - 1][PWM_TIME_HIGH]);
+}
+
+void control_stop(void) {
+    digital_write(GPIO_CHANNEL_A, GPIO_LOW);
+    digital_write(GPIO_CHANNEL_A, GPIO_LOW);
 }
 
 // void handle_motor_request(int control_request) {
@@ -174,20 +179,33 @@ void control_right(void) {
 //     return res;
 // } 
 
+// 
+
 // handle current motor command timeout, update control states
 void handle_motor_control_timeout() {
     is_control_fulfilled = 0;
-    control_neutral();
+    
+    // Stop motors immediately
+    digital_write(GPIO_CHANNEL_A, GPIO_LOW);
+    digital_write(GPIO_CHANNEL_B, GPIO_LOW);
+    
+    // Reset PWM states so any queued timeouts won't restart PWM
+    pwm_a_state = PAUSE_LOW;
+    pwm_b_state = PAUSE_LOW;
 }
+
+
+// handle change of control in pwm timeout
+
 
 // upon pwm timeout, send next gpio signal
 void handle_pwm_timeout(int gpio_ch) {
-    // if (!is_control_fulfilled) {
-    //     handle_motor_request();
-    //     return;
-    // }
-
-    // LOG_CONTROL("handling pwm timeout %d\n", gpio_ch);
+    // new request coming in
+    if (!is_control_fulfilled) {
+        LOG_CONTROL("control timeout\n");
+        control_stop();
+        return;
+    }
 
     // TODO: refactor this
     if (gpio_ch == GPIO_CHANNEL_A) {

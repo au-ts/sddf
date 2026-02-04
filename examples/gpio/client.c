@@ -33,10 +33,8 @@ uint64_t time_end;
 cothread_t t_event;
 cothread_t t_main;
 
-// Unfulfilled motor control request
-int is_ongoing_request = 0;
-
 PriorityQueue timeout_queue = {{}, {}, 0};
+// Note: not the actual value for timer channel, actual timer channel id is set by timer_config.driver_id
 sddf_channel timer_channel = 0;
 
 bool delay_microsec(size_t microseconds, int timeout_id)
@@ -102,13 +100,23 @@ void send_motor_request(int motor_ch, int command, uint64_t micro_s) {
 
 void client_main(void) {
     // wait for all sensors to initialise first
-    control_forward();
+    // control_forward();
 
     while(true)
     {
-        // LOG_CLIENT("Client main\n");
+        LOG_CLIENT("Client main\n");
         LOG_CLIENT("Reading received: %lu\n", get_ultrasonic_reading());
         delay_ms(1000, CLIENT_TIMEOUT_ID);
+
+        control_forward();
+        delay_motors(1000);
+
+        delay_ms(1000, CLIENT_TIMEOUT_ID);
+
+        
+        // control_reverse();
+        // delay_motors(1000);
+
         // delay_motors(1000);
         // control_reverse();
 
@@ -152,21 +160,24 @@ void notified(sddf_channel ch) {
         switch (timeout_id)
         {
         case SENSOR_TIMEOUT_ID:
+            LOG_CLIENT("sensor timeout\n");
             co_switch(t_main);
             break;
         case CLIENT_TIMEOUT_ID:
             co_switch(t_main);
             break;
         case MOTOR_CONTROL_TIMEOUT_ID:
+            LOG_CLIENT("motor timeout\n");
             handle_motor_control_timeout();
+            co_switch(t_main);
             break;
         case MOTOR_A_TIMEOUT_ID:
-            // LOG_CLIENT("motor A timeout\n");
             handle_pwm_timeout(MOTOR_A_TIMEOUT_ID);
+            LOG_CLIENT("motor A timeout %d\n", timeout_queue.size);
             break;
         case MOTOR_B_TIMEOUT_ID:
-            // LOG_CLIENT("motor B timeout\n");
             handle_pwm_timeout(MOTOR_B_TIMEOUT_ID);
+            LOG_CLIENT("motor B timeout %d\n", timeout_queue.size);
             break;        
         default:
             break;
