@@ -19,11 +19,6 @@
 
 #define STACK_SIZE (4096)
 
-// Channels
-// #define TIMER_CHANNEL (1)
-#define MOTOR_CONTROL_CHANNEL (2)
-#define ULTRASONIC_CHANNEL (4)
-
 __attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
 static char t_client_main_stack[STACK_SIZE];
 
@@ -34,10 +29,11 @@ cothread_t t_event;
 cothread_t t_main;
 
 PriorityQueue timeout_queue = {{}, {}, 0};
+
 // Note: not the actual value for timer channel, actual timer channel id is set by timer_config.driver_id
 sddf_channel timer_channel = 0;
 
-bool delay_microsec(size_t microseconds, int timeout_id)
+bool delay_microseconds(size_t microseconds, int timeout_id)
 {
     size_t time_ns = microseconds * NS_IN_US;
 
@@ -55,7 +51,7 @@ bool delay_microsec(size_t microseconds, int timeout_id)
     return true;
 }
 
-bool delay_ms(size_t milliseconds, int timeout_id)
+bool delay_miliseconds(size_t milliseconds, int timeout_id)
 {
     size_t time_ns = milliseconds * NS_IN_MS;
 
@@ -71,10 +67,6 @@ bool delay_ms(size_t milliseconds, int timeout_id)
     co_switch(t_event);
 
     return true;
-}
-
-void delay_motors(size_t milliseconds) {
-    delay_ms(milliseconds, MOTOR_CONTROL_TIMEOUT_ID);
 }
 
 void set_timeout(uint64_t microseconds) {
@@ -104,16 +96,16 @@ void client_main(void) {
 
     while(true)
     {
+        delay_miliseconds(1000, CLIENT_TIMEOUT_ID);
+
         LOG_CLIENT("Client main\n");
         LOG_CLIENT("Reading received: %lu\n", get_ultrasonic_reading());
-        delay_ms(1000, CLIENT_TIMEOUT_ID);
+        delay_miliseconds(1000, CLIENT_TIMEOUT_ID);
 
         control_forward();
-        delay_motors(1000);
 
-        delay_ms(1000, CLIENT_TIMEOUT_ID);
+        delay_miliseconds(1000, MOTOR_CONTROL_TIMEOUT_ID);
 
-        
         // control_reverse();
         // delay_motors(1000);
 
