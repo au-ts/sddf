@@ -22,6 +22,12 @@ endif
 BUILD_DIR ?= build
 MICROKIT_CONFIG ?= debug
 
+# Hack - need better way to configure which driver
+ifeq ($(strip $(NVME)),1)
+	BLK_DRIV_DIR := nvme
+	QEMU_BLK_ARGS := -device nvme,drive=hd,serial=TEST1234,addr=0x4.0
+endif
+
 # Allow to user to specify a custom partition
 PARTITION :=
 ifdef PARTITION
@@ -85,12 +91,14 @@ ifneq ($(strip $(DTS)),)
 	$(PYTHON) \
 		$(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
 		--dtb $(DTB) --output . --sdf $(SYSTEM_FILE) $(PARTITION_ARG) \
-		$${BLK_NEED_TIMER:+--need_timer}
+		$${BLK_NEED_TIMER:+--need_timer} \
+		$${NVME:+--nvme}
 else
 	$(PYTHON) \
 		$(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) \
 		--output . --sdf $(SYSTEM_FILE) $(PARTITION_ARG) \
-		$${BLK_NEED_TIMER:+--need_timer}
+		$${BLK_NEED_TIMER:+--need_timer} \
+		$${NVME:+--nvme}
 endif
 ifdef BLK_NEED_TIMER
 	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
