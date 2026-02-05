@@ -3,35 +3,42 @@
 # SPDX-License-Identifier: BSD-2-Clause
 
 import asyncio
-import functools
-import subprocess
+import os
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
+import types
 
 sys.path.insert(1, Path(__file__).parents[2].as_posix())
 
 from ci.lib.backends import *
-from ci.lib.runner import TestConfig, cli, matrix_product
+from ci.lib.runner import run_single_example, matrix_product
+from ci.common import TestConfig
+from ci.matrix import NO_OUTPUT_DEFAULT_TIMEOUT_S
 from ci import common, matrix
 
 TEST_MATRIX = matrix_product(
+    example=["blk"],
     board=matrix.EXAMPLES["blk"]["boards_test"],
     config=matrix.EXAMPLES["blk"]["configs"],
     build_system=matrix.EXAMPLES["blk"]["build_systems"],
+    timeout_s=[NO_OUTPUT_DEFAULT_TIMEOUT_S],
 )
 
 SDDF = Path(__file__).parents[2]
 mkvirtdisk = (SDDF / "tools" / "mkvirtdisk").resolve()
 
 
-def backend_fn(
-    disks_dir: str, test_config: TestConfig, loader_img: Path
-) -> HardwareBackend:
+def backend_fn(test_config: TestConfig, loader_img: Path) -> HardwareBackend:
     backend = common.backend_fn(test_config, loader_img)
 
     if isinstance(backend, QemuBackend):
-        (_, disk_path) = tempfile.mkstemp(dir=disks_dir)
+        tmpdir = tempfile.TemporaryDirectory(suffix="sddf_blk_disks")
+        backend._sddf_tmpdir = tmpdir
+
+        (fd, disk_path) = tempfile.mkstemp(dir=tmpdir.name)
+        os.close(fd)
 
         subprocess.run(
             [mkvirtdisk, disk_path, "1", "512", "16777216", "GPT"],
@@ -46,6 +53,16 @@ def backend_fn(
             "-device", "virtio-blk-pci,drive=hd" if test_config.board == "x86_64_generic" else "virtio-blk-device,drive=hd",
         ])
         # fmt: on
+
+        orig_stop = backend.stop
+
+        async def stop_with_cleanup(self):
+            try:
+                await orig_stop()
+            finally:
+                tmpdir.cleanup()
+
+        backend.stop = types.MethodType(stop_with_cleanup, backend)
 
     return backend
 
@@ -62,11 +79,8 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
 
 
 if __name__ == "__main__":
-    with tempfile.TemporaryDirectory(suffix="sddf_blk_disks") as qemu_disks_dir:
-        cli(
-            "blk",
-            test,
-            TEST_MATRIX,
-            functools.partial(backend_fn, qemu_disks_dir),
-            common.loader_img_path,
-        )
+    run_single_example(
+        test,
+        TEST_MATRIX,
+        backend_fn,
+    )

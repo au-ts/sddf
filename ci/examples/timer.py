@@ -9,14 +9,18 @@ import sys
 sys.path.insert(1, Path(__file__).parents[2].as_posix())
 
 from ci.lib.backends import *
-from ci.lib.runner import TestConfig, cli, matrix_product
+from ci.lib.runner import run_single_example, matrix_product
+from ci.common import TestConfig
+from ci.matrix import NO_OUTPUT_DEFAULT_TIMEOUT_S
 from ci.lib import log
 from ci import common, matrix
 
 TEST_MATRIX = matrix_product(
+    example=["timer"],
     board=matrix.EXAMPLES["timer"]["boards_test"],
     config=matrix.EXAMPLES["timer"]["configs"],
     build_system=matrix.EXAMPLES["timer"]["build_systems"],
+    timeout_s=[NO_OUTPUT_DEFAULT_TIMEOUT_S],
 )
 
 DRIFT_THRESHOLD = 0.05  # 5 percent.
@@ -55,4 +59,8 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
 
 
 if __name__ == "__main__":
-    cli("timer", test, TEST_MATRIX, common.backend_fn, common.loader_img_path)
+    run_single_example(
+        test,
+        TEST_MATRIX,
+        common.backend_fn,
+    )

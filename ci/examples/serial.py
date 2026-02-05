@@ -9,13 +9,17 @@ import sys
 sys.path.insert(1, Path(__file__).parents[2].as_posix())
 
 from ci.lib.backends import *
-from ci.lib.runner import TestConfig, cli, matrix_product
+from ci.lib.runner import run_single_example, matrix_product
+from ci.common import TestConfig
+from ci.matrix import NO_OUTPUT_DEFAULT_TIMEOUT_S
 from ci import common, matrix
 
 TEST_MATRIX = matrix_product(
+    example=["serial"],
     board=matrix.EXAMPLES["serial"]["boards_test"],
     config=matrix.EXAMPLES["serial"]["configs"],
     build_system=matrix.EXAMPLES["serial"]["build_systems"],
+    timeout_s=[NO_OUTPUT_DEFAULT_TIMEOUT_S],
 )
 
 ANSI_RED = b"\x1b[31m"
@@ -60,4 +64,8 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
 
 
 if __name__ == "__main__":
-    cli("serial", test, TEST_MATRIX, common.backend_fn, common.loader_img_path)
+    run_single_example(
+        test,
+        TEST_MATRIX,
+        common.backend_fn,
+    )

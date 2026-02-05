@@ -9,13 +9,17 @@ import sys
 sys.path.insert(1, Path(__file__).parents[2].as_posix())
 
 from ci.lib.backends import *
-from ci.lib.runner import TestConfig, cli, matrix_product
+from ci.lib.runner import run_single_example, matrix_product
+from ci.common import TestConfig
+from ci.matrix import NO_OUTPUT_DEFAULT_TIMEOUT_S
 from ci import common, matrix
 
 TEST_MATRIX = matrix_product(
+    example=["i2c_bus_scan"],
     board=matrix.EXAMPLES["i2c_bus_scan"]["boards_test"],
     config=matrix.EXAMPLES["i2c_bus_scan"]["configs"],
     build_system=matrix.EXAMPLES["i2c_bus_scan"]["build_systems"],
+    timeout_s=[NO_OUTPUT_DEFAULT_TIMEOUT_S],
 )
 
 
@@ -30,4 +34,8 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
 
 
 if __name__ == "__main__":
-    cli("i2c_bus_scan", test, TEST_MATRIX, backend_fn, common.loader_img_path)
+    run_single_example(
+        test,
+        TEST_MATRIX,
+        backend_fn,
+    )
