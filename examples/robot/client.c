@@ -19,7 +19,10 @@
 
 #define STACK_SIZE (4096)
 
+
+__attribute__((__section__(".gpio_client_config"))) gpio_client_config_t gpio_config;
 __attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
+
 static char t_client_main_stack[STACK_SIZE];
 
 uint64_t time_start;

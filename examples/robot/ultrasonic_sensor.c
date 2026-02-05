@@ -29,7 +29,7 @@ uint64_t pulse_in(int gpio_ch, int value) {
     int has_received = 0;
 
     while (true) {
-        int value_received = digital_read();
+        int value_received = digital_read(gpio_ch);
 
         if (value_received < 0) {
             LOG_CLIENT_ERR("Failed to get value. Error code : %d!\n", value_received);
