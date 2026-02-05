@@ -349,14 +349,14 @@ pub fn build(b: *std.Build) !void {
         }
 
         const qemu_virtio_device = switch (target.result.cpu.arch) {
-            .x86_64 => "pci",
-            else => "device",
+            .x86_64 => "-device virtio-blk-pci,drive=hd,addr=0x3.0",
+            else => "virtio-blk-device,drive=hd,bus=virtio-mmio-bus.1",
         };
 
         const blk_device_args = &.{
             "-global", "virtio-mmio.force-legacy=false",
             "-drive",  b.fmt("file={s},if=none,format=raw,id=hd", .{b.getInstallPath(.prefix, "disk")}),
-            "-device", b.fmt("virtio-blk-{s},drive=hd", .{qemu_virtio_device}),
+            "-device", qemu_virtio_device,
         };
         qemu_cmd.addArgs(blk_device_args);
 

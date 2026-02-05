@@ -29,10 +29,14 @@ def backend_fn(test_config: TestConfig, loader_img: Path) -> HardwareBackend:
     backend = common.backend_fn(test_config, loader_img)
 
     if isinstance(backend, QemuBackend):
+        if test_config.board == "x86_64_generic":
+            virtio_device = "virtio-net-pci,netdev=netdev0,addr=0x2.0"
+        else:
+            virtio_device = "virtio-net-device,netdev=netdev0,bus=virtio-mmio-bus.0"
         # fmt: off
         backend.invocation_args.extend([
 			"-global", "virtio-mmio.force-legacy=false",
-			"-device", "virtio-net-pci,netdev=netdev0" if test_config.board == "x86_64_generic" else "virtio-net-device,netdev=netdev0",
+			"-device",  virtio_device,
 			"-netdev", "user,id=netdev0," +
                        "hostfwd=udp::1235-10.0.2.15:1235,hostfwd=tcp::1236-10.0.2.15:1236,hostfwd=tcp::1237-10.0.2.15:1237," +
                        "hostfwd=udp::1238-10.0.2.16:1235,hostfwd=tcp::1239-10.0.2.16:1236,hostfwd=tcp::1240-10.0.2.16:1237",

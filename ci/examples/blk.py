@@ -46,11 +46,16 @@ def backend_fn(test_config: TestConfig, loader_img: Path) -> HardwareBackend:
             capture_output=True,
         )
 
+        if test_config.board == "x86_64_generic":
+            virtio_device = "virtio-blk-pci,drive=hd,addr=0x3.0"
+        else:
+            virtio_device = "virtio-blk-device,drive=hd,bus=virtio-mmio-bus.1"
+
         # fmt: off
         backend.invocation_args.extend([
             "-global", "virtio-mmio.force-legacy=false",
             "-drive", "file={},if=none,format=raw,id=hd".format(disk_path),
-            "-device", "virtio-blk-pci,drive=hd" if test_config.board == "x86_64_generic" else "virtio-blk-device,drive=hd",
+            "-device", virtio_device,
         ])
         # fmt: on
 
