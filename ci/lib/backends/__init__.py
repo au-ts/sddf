@@ -25,6 +25,7 @@ from .common import (
     reset_terminal,
     log_output_to_file,
     OUTPUT,
+    TeeOut,
 )
 from .streams import send_input, wait_for_output, expect_output
 from .machine_queue import MachineQueueBackend
@@ -41,6 +42,7 @@ __all__ = (
     "reset_terminal",
     "log_output_to_file",
     "OUTPUT",
+    "TeeOut",
     # .streams
     "send_input",
     "wait_for_output",

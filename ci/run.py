@@ -2,80 +2,44 @@
 # Copyright 2025, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
 
-import argparse
+import importlib
 import os
 from pathlib import Path
-import subprocess
 import sys
 
 sys.path.insert(1, Path(__file__).parents[1].as_posix())
 
-from ci.lib.runner import ArgparseActionList
+from ci.common import TestConfig, backend_fn
+from ci.lib.log import error
+from ci.lib.runner import TestFunction, BackendFunction, run_all_examples
 
 EXAMPLES_DIR = Path(__file__).parent / "examples"
-EXAMPLES_TO_RUN = sorted(
-    [e.removesuffix(".py") for e in os.listdir(EXAMPLES_DIR) if e.endswith(".py")]
+EXAMPLES_LIST = sorted(
+    [
+        e.removesuffix(".py")
+        for e in os.listdir(EXAMPLES_DIR)
+        if (e.endswith(".py") and e != "__init__.py")
+    ]
 )
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--examples",
-        default=set(EXAMPLES_TO_RUN),
-        action=ArgparseActionList,
-    )
-    parser.add_argument(
-        "--only-qemu",
-        action=argparse.BooleanOptionalAction,
-        help="select only QEMU tests",
-    )
-    args = parser.parse_args()
+    examples_list = sorted(set(EXAMPLES_LIST))
+    if len(examples_list) == 0:
+        error("no examples found")
+        exit(1)
 
-    examples_to_run = sorted(set(EXAMPLES_TO_RUN) & args.examples)
-    if len(examples_to_run) == 0:
-        parser.error("no examples passed")
+    matrix: list[TestConfig] = []
+    test_fns: dict[str, TestFunction] = {}
+    backend_fns: dict[str, BackendFunction] = {}
 
-    filter_flags = []
-    if args.only_qemu is True:
-        filter_flags.append("--only-qemu")
-    elif args.only_qemu is False:
-        filter_flags.append("--no-only-qemu")
+    for example in examples_list:
+        mod = importlib.import_module(f"examples.{example}")
+        matrix.extend(mod.TEST_MATRIX)
+        test_fns[example] = mod.test
+        custom_backend_fn = callable(getattr(mod, "backend_fn", None))
+        if custom_backend_fn:
+            backend_fns[example] = mod.backend_fn
+        else:
+            backend_fns[example] = backend_fn
 
-    results: dict[str, bool] = {}
-    try:
-        for example in examples_to_run:
-            proc = subprocess.run([EXAMPLES_DIR / (example + ".py"), *filter_flags])
-            if proc.returncode != 0:
-                if proc.returncode == 2:
-                    # this is the case when it doesn't support some of our filters
-                    continue
-
-                results[example] = False
-                continue
-
-            results[example] = True
-    except KeyboardInterrupt:
-        results[example] = False  # type: ignore
-        print("\nSIGINT, exiting...")
-
-    passed = [e for e in examples_to_run if results.get(e) is True]
-    failed = [e for e in examples_to_run if results.get(e) is False]
-    not_run = [e for e in examples_to_run if results.get(e) is None]
-    print("==== Passing ====")
-    for example in passed:
-        print(f"- {example}")
-    if len(passed) == 0:
-        print("  (none)")
-    print("==== Failed =====")
-    for example in failed:
-        print(f"- {example}")
-    if len(failed) == 0:
-        print("  (none)")
-
-    if len(not_run) != 0:
-        print("===== Not run =====")
-        for example in not_run:
-            print(f"- {example}")
-
-    if len(failed) != 0:
-        quit(1)
+    run_all_examples(matrix, test_fns, backend_fns)

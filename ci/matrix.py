@@ -5,6 +5,8 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Literal, TypedDict
 
+NO_OUTPUT_DEFAULT_TIMEOUT_S: int = 60
+
 # The ordering in these lists defines an implicit ordering of which boards
 # to use for CI preferentially, though all will eventually be tried.
 MACHINE_QUEUE_BOARDS: dict[str, list[str]] = {

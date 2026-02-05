@@ -11,14 +11,12 @@ QEMU.
 import argparse
 import asyncio
 from collections.abc import Awaitable, Callable
-from contextlib import nullcontext
-from dataclasses import dataclass
+import contextlib
 from datetime import datetime
 import itertools
-import os
 from pathlib import Path
 import time
-from typing import Literal, Optional
+from typing import Literal, Optional, Awaitable, Tuple
 
 from . import log
 from .backends import (
@@ -27,23 +25,40 @@ from .backends import (
     TestFailureException,
     reset_terminal,
     log_output_to_file,
+    TeeOut,
     OUTPUT,
 )
+from ci.common import TestConfig, loader_img_path
+
+type TestFunction = Callable[[HardwareBackend, TestConfig], Awaitable[None]]
+type BackendFunction = Callable[[TestConfig, Path], HardwareBackend]
 
 
-@dataclass(order=True, frozen=True)
-class TestConfig:
-    board: str
-    config: str
-    build_system: str
+# Task to monitor for inactivity
+async def _watch_stdout_inactivity(
+    tee: TeeOut, timeout_no_output: float, poll_s: float = 0.5
+):
+    while True:
+        await asyncio.sleep(poll_s)
+        if tee.last_write_age_s() >= timeout_no_output:
+            raise asyncio.TimeoutError(f"No output for more than {timeout_no_output}s")
 
-    def is_qemu(self):
-        # TODO: x86_64_generic assumes QEMU for the moment.
-        return self.board.startswith("qemu") or self.board == "x86_64_generic"
+
+async def _run_with_watchdog(
+    main: Awaitable[None], tee: TeeOut, timeout_no_output: float
+):
+    tee.touch()
+
+    async with asyncio.TaskGroup() as tg:
+        watchdog_task = tg.create_task(_watch_stdout_inactivity(tee, timeout_no_output))
+        try:
+            await main
+        finally:
+            watchdog_task.cancel()
 
 
 async def runner(
-    test: Callable[[HardwareBackend, TestConfig], Awaitable[None]],
+    test: TestFunction,
     backend: HardwareBackend,
     test_config: TestConfig,
 ):
@@ -121,6 +136,24 @@ class ArgparseActionList(argparse.Action):
         setattr(namespace, self.dest, values_set)
 
 
+def _list_test_cases(matrix: list[TestConfig]):
+    if len(matrix) == 0:
+        return "   (none)"
+
+    lines = []
+    for example, tests in itertools.groupby(matrix, key=lambda c: c.example):
+        lines.append(f"--- Example: {example} ---")
+
+        for board, group in itertools.groupby(tests, key=lambda c: c.board):
+            lines.append(
+                " - {}: {}".format(
+                    board, ", ".join(f"{c.config}/{c.build_system}" for c in group)
+                )
+            )
+
+    return "\n".join(lines)
+
+
 def _subset_test_matrix(
     matrix: list[TestConfig], filters: argparse.Namespace
 ) -> list[TestConfig]:
@@ -128,6 +161,7 @@ def _subset_test_matrix(
         implies = lambda a, b: not a or b
         return all(
             [
+                (test_config.example in filters.examples),
                 (test_config.board in filters.boards),
                 (test_config.config in filters.configs),
                 (test_config.build_system in filters.build_systems),
@@ -139,40 +173,24 @@ def _subset_test_matrix(
     return list(filter(filter_check, matrix))
 
 
-def _list_test_cases(matrix: list[TestConfig]):
-    if len(matrix) == 0:
-        return "   (none)"
-
-    lines = []
-    for board, group in itertools.groupby(matrix, key=lambda c: c.board):
-        lines.append(
-            " - {}: {}".format(
-                board, ", ".join(f"{c.config}/{c.build_system}" for c in group)
-            )
-        )
-
-    return "\n".join(lines)
-
-
 ResultKind = Literal["pass", "fail", "not_run", "retry", "interrupted"]
 
 
 def run_test_config(
-    test_name: str,
     test_config: TestConfig,
-    test_fn: Callable[[HardwareBackend, TestConfig], Awaitable[None]],
-    backend_fn: Callable[[TestConfig, Path], HardwareBackend],
-    loader_img_fn: Callable[[str, TestConfig], Path],
+    test_fn: TestFunction,
+    backend_fn: BackendFunction,
     logs_dir: Optional[Path] = None,
+    loader_img_fn: Optional[Path] = None,
 ) -> ResultKind:
 
-    loader_img = loader_img_fn(test_name, test_config)
+    loader_img = loader_img_fn or loader_img_path(test_config)
     backend = backend_fn(test_config, loader_img)
 
     if logs_dir:
         log_file = (
             logs_dir
-            / test_name
+            / test_config.example
             / test_config.board
             / test_config.config
             / test_config.build_system
@@ -181,12 +199,21 @@ def run_test_config(
         log_file.parent.mkdir(parents=True, exist_ok=True)
         log_file_cm = log_output_to_file(log_file)
     else:
-        log_file_cm = nullcontext()
+        log_file_cm = contextlib.nullcontext()
 
     try:
-        with log_file_cm:
-            asyncio.run(runner(test_fn, backend, test_config))
-
+        try:
+            with log_file_cm:
+                asyncio.run(
+                    _run_with_watchdog(
+                        runner(test_fn, backend, test_config),
+                        OUTPUT,
+                        test_config.timeout_s,
+                    )
+                )
+        except* asyncio.TimeoutError as eg:
+            # turn ExceptionGroup into a plain TimeoutError
+            raise asyncio.TimeoutError(str(eg.exceptions[0])) from None
     except TestFailureException as e:
         log.error(f"Test failed: {e}")
         return "fail"
@@ -204,20 +231,15 @@ def run_test_config(
     return "pass"
 
 
-def cli(
-    test_name: str,
-    test_fn: Callable[[HardwareBackend, TestConfig], Awaitable[None]],
-    matrix: list[TestConfig],
-    backend_fn: Callable[[TestConfig, Path], HardwareBackend],
-    loader_img_fn: Callable[[str, TestConfig], Path],
-):
-    """
-    test should raise an exception on failure.
-    matrix is the set of supported test configs for this test.
-    """
-    parser = argparse.ArgumentParser(description=__doc__)
-
+def parse_arguments(
+    parser: argparse.ArgumentParser, matrix: list[TestConfig]
+) -> Tuple[argparse.Namespace, argparse.Namespace]:
     filters = parser.add_argument_group(title="filters")
+    filters.add_argument(
+        "--examples",
+        default={test.example for test in matrix},
+        action=ArgparseActionList,
+    )
     filters.add_argument(
         "--boards", default={test.board for test in matrix}, action=ArgparseActionList
     )
@@ -291,7 +313,15 @@ def cli(
     filters_args = argparse.Namespace(
         **{a.dest: getattr(args, a.dest) for a in filters._group_actions}
     )
+    return (args, filters_args)
 
+
+def refine_matrix(
+    parser: argparse.ArgumentParser,
+    args: argparse.Namespace,
+    filters_args: argparse.Namespace,
+    matrix: list[TestConfig],
+) -> list[TestConfig]:
     matrix = sorted(_subset_test_matrix(matrix, filters_args))
     if len(matrix) == 0:
         parser.error("applied filters result in zero selected tests")
@@ -304,12 +334,16 @@ def cli(
         # But we still want to make the user specify the board.
         matrix = sorted(
             set(
-                TestConfig(board=test.board, config="custom", build_system="custom")
+                TestConfig(
+                    example=test.example,
+                    board=test.board,
+                    config="custom",
+                    build_system="custom",
+                    timeout_s=test.timeout_s,
+                )
                 for test in matrix
             )
         )
-
-        loader_img_fn = lambda n, c: loader_img
 
     if args.single and len(matrix) != 1:
         parser.error(
@@ -326,21 +360,42 @@ def cli(
     if args.dry_run:
         print("Would run the following test cases:")
         print(_list_test_cases(matrix))
-        return
+        quit(0)
 
     for test_config in matrix:
-        loader_img = loader_img_fn(test_name, test_config)
+        if test_config.config == "custom":
+            loader_img = args.override_image
+        else:
+            loader_img = loader_img_path(test_config)
         assert loader_img.exists(), f"loader image file {loader_img} does not exist"
+
+    return matrix
+
+
+def execute_tests(
+    matrix: list[TestConfig],
+    test_fns: dict[str, TestFunction],
+    backend_fns: dict[str, BackendFunction],
+    args: argparse.Namespace,
+):
+    assert len(matrix) > 0, "Test list is empty."
 
     test_results: dict[TestConfig, ResultKind] = {}
     do_retries = False
     retry_queue: list[TestConfig] = []
 
     for test_config in matrix:
-        fmt = f"{test_name} on {test_config.board} ({test_config.config}, built with {test_config.build_system})"
+        test_fn = test_fns[test_config.example]
+        backend_fn = backend_fns[test_config.example]
+
+        fmt = f"{test_config.example} on {test_config.board} ({test_config.config}, built with {test_config.build_system})"
         log.group_start("Running " + fmt)
         result = run_test_config(
-            test_name, test_config, test_fn, backend_fn, loader_img_fn, args.logs_dir
+            test_config,
+            test_fn,
+            backend_fn,
+            args.logs_dir,
+            args.override_image,
         )
         log.group_end("Finished running " + fmt)
 
@@ -368,15 +423,17 @@ def cli(
                 break
 
             for test_config in retry_queue:
-                fmt = f"{test_name} on {test_config.board} ({test_config.config}, built with {test_config.build_system})"
+                test_fn = test_fns[test_config.example]
+                backend_fn = backend_fns[test_config.example]
+
+                fmt = f"{test_config.example} on {test_config.board} ({test_config.config}, built with {test_config.build_system})"
                 log.group_start("Running " + fmt)
                 result = run_test_config(
-                    test_name,
                     test_config,
                     test_fn,
                     backend_fn,
-                    loader_img_fn,
                     args.logs_dir,
+                    args.override_image,
                 )
                 log.group_end("Finished running " + fmt)
 
@@ -414,3 +471,40 @@ def cli(
 
     if len(passing) != len(matrix):
         quit(1)
+
+
+def run_all_examples(
+    matrix: list[TestConfig],
+    test_fns: dict[str, TestFunction],
+    backend_fns: dict[str, BackendFunction],
+):
+    parser = argparse.ArgumentParser(
+        description="Run all examples passed to this script"
+    )
+    args, filters_args = parse_arguments(parser, matrix)
+
+    refined_matrix = refine_matrix(parser, args, filters_args, matrix)
+
+    execute_tests(refined_matrix, test_fns, backend_fns, args)
+
+
+def run_single_example(
+    test_fn: TestFunction,
+    matrix: list[TestConfig],
+    backend_fn: BackendFunction,
+):
+    """
+    test should raise an exception on failure.
+    matrix is the set of supported test configs for this test.
+    """
+    parser = argparse.ArgumentParser(description="Run a single example")
+    args, filters_args = parse_arguments(parser, matrix)
+
+    refined_matrix = refine_matrix(parser, args, filters_args, matrix)
+
+    execute_tests(
+        refined_matrix,
+        {refined_matrix[0].example: test_fn},
+        {refined_matrix[0].example: backend_fn},
+        args,
+    )

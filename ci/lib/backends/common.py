@@ -9,6 +9,7 @@ import io
 from pathlib import Path
 import sys
 from typing import BinaryIO, Union
+import time
 
 
 def reset_terminal():
@@ -36,12 +37,21 @@ class TestFailureException(Exception):
     """Test failed"""
 
 
-class _TeeOut:
+class TeeOut:
     def __init__(self, stdout: BinaryIO):
         self.stdout = stdout
         self.fileio: BinaryIO | None = None
+        self._last_write = time.monotonic()
+
+    def last_write_age_s(self) -> float:
+        return time.monotonic() - self._last_write
+
+    def touch(self):
+        self._last_write = time.monotonic()
 
     def write(self, s: Union[bytes, bytearray]):
+        self._last_write = time.monotonic()
+
         self.stdout.write(s)
         self.stdout.flush()
 
@@ -61,7 +71,7 @@ class _TeeOut:
     # fmt: on
 
 
-OUTPUT = _TeeOut(sys.stdout.buffer)
+OUTPUT = TeeOut(sys.stdout.buffer)
 sys.stdout = io.TextIOWrapper(OUTPUT, write_through=True)  # type: ignore
 
 

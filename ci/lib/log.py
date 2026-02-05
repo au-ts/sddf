@@ -3,8 +3,6 @@
 # SPDX-License-Identifier: BSD-2-Clause
 import os
 
-from .backends import OUTPUT
-
 # For Github Actions etc.
 IS_CI = bool(os.environ.get("CI"))
 
