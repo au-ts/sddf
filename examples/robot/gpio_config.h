@@ -19,7 +19,7 @@
 // Trig pin
 #define GPIO_4 (MESON_GPIO_X + 4)
 
-// WARNING : The GPIOA pins DO NOT work for input!!
+// WARNING : The GPIOA pins DO NOT work for input!
 
 #define GPIO_CHANNEL_MAPPING_COLS   3  // do not change
 #define GPIO_CHANNEL_MAPPING_ROWS   62 // do not change
