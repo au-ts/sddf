@@ -82,7 +82,7 @@ def generate(
         blk_driver.add_map(blk_virtio_metadata_map)
 
         virtio_blk_regs = SystemDescription.MemoryRegion(
-            sdf, "virtio_net_regs", 0x4000, paddr=0xFE000000
+            sdf, "virtio_blk_regs", 0x4000, paddr=0xFE000000
         )
         sdf.add_mr(virtio_blk_regs)
         virtio_blk_regs_map = SystemDescription.Map(

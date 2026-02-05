@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 
 from __future__ import annotations
+
 from typing import TYPE_CHECKING, Any, Literal, TypedDict
 
 # The ordering in these lists defines an implicit ordering of which boards
@@ -27,7 +28,7 @@ MACHINE_QUEUE_BOARD_OPTIONS: dict[str, dict[str, Any]] = {
     "hifive_p550": dict(uboot_image_started=b"Starting kernel ..."),
 }
 
-EXAMPLES: dict[str, _ExampleMatrixType] = {
+EXAMPLES: dict[Literal[str], _ExampleMatrixType] = {
     "blk": {
         "configs": ["debug", "release"],
         "build_systems": ["make", "zig"],
@@ -85,6 +86,14 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "qemu_virt_riscv64",
             "star64",
         ],
+    },
+    "gpio": {
+        "configs": ["debug", "release", "benchmark"],
+        "build_systems": ["make"],
+        "boards_build": [
+            "maaxboard",
+        ],
+        "boards_test": [],
     },
     "serial": {
         "configs": ["debug", "release"],

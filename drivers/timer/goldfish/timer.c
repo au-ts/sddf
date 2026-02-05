@@ -6,11 +6,12 @@
 #include <stdint.h>
 #include <os/sddf.h>
 #include <sddf/timer/protocol.h>
+#include <sddf/timer/config.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 #include <sddf/resources/device.h>
 
-#define MAX_TIMEOUTS 6
+#define MAX_TIMEOUTS SDDF_TIMER_MAX_CLIENTS
 
 /* taken from: https://github.com/torvalds/linux/blob/master/include/clocksource/timer-goldfish.h */
 typedef struct {

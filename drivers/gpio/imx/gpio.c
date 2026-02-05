@@ -1,17 +1,19 @@
 /*
- * Copyright 2023, UNSW
- *
+ * Copyright 2024, UNSW
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-// Implementation of the gpio driver targeting the MAAXBOARD.
-// Made by Tristan Clinton-Muehr
-
+#include <stdint.h>
+#include <stdbool.h>
 #include <microkit.h>
-#include "driver.h"
-#include "gpio_config.h"
+#include <sddf/resources/device.h>
+#include <sddf/util/printf.h>
+#include <sddf/util/arm_barriers.h>
+#include <sddf/gpio/protocol.h>
+#include <gpio_config.h>
+#include "gpio.h"
 
-#define DEBUG_DRIVER
+// #define DEBUG_DRIVER
 
 #ifdef DEBUG_DRIVER
 #define LOG_DRIVER(...) do{ sddf_dprintf("GPIO DRIVER|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
@@ -21,715 +23,367 @@
 
 #define LOG_DRIVER_ERR(...) do{ sddf_printf("GPIO DRIVER|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
-/* Hardware memory */
-uintptr_t gpio1_regs; // both gpio and irq regs
-uintptr_t gpio2_regs; // both gpio and irq regs
-uintptr_t gpio3_regs; // both gpio and irq regs
-uintptr_t gpio4_regs; // both gpio and irq regs
-uintptr_t gpio5_regs; // both gpio and irq regs
+__attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 
-/* Channel Mappings (for O(1) notifying of forwardings IRQs from driver to client) */
-/* ONLY FOR SINGLE CHANNELS THOUGH */
-/* (imx_irq - MESON_GPIO_IRQ_CHANNEL_START) to index into array */
-int driver_to_client_channel_mappings_single_irq_line[IMX_GPIO_IRQ_AH_GPIO1_7 - IMX_GPIO_IRQ_AH_GPIO1_0] = {-1};
+volatile imx_gpio_regs_t *gpio_regs;
 
-/* For combined irq line */
-void notify_combined(microkit_channel ch) {
-    /* see which channels have configured this as there irq channel */
-    for (int i = 0; i < 62; i++) {
-        if (gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_IRQ_SLOT] == ch) {
-            int gpio_pin = gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_GPIO_PIN_SLOT];
+/* Map pin to client channels */
+static int pin_subscriber[PINS_PER_BANK];
 
-            /* see if the ISR for this pin has been flipped */
-            uint32_t reg_offset;
-            uint32_t start_bit;
+static void print_reg(uint32_t value)
+{
+    char buffer[40];
+    int pos = 0;
 
-            if (!imx_gpio_and_irq_calculate_reg_and_bits(IMX_IRQ_ISR, gpio_pin, &reg_offset, &start_bit)) {
-                LOG_DRIVER_ERR("Something was not caught during initialisation!\n");
-                while (1) {};
-            }
+    for (int i = 31; i >= 0; i--) {
+        uint32_t bit = (value >> i) & 1U;
+        buffer[pos++] = bit ? '1' : '0';
 
-            volatile uint32_t *gpio_and_irq_base_address = imx_get_gpio_and_gpio_and_irq_base_address(gpio_pin);
-            volatile uint32_t *final_reg_address = ((void *)gpio_and_irq_base_address + reg_offset);
+        if (i % 8 == 0 && i != 0) {
+            buffer[pos++] = ' ';
+        }
+    }
 
-            uint32_t value = (*final_reg_address >> start_bit) & BIT(0);
-            if (value) {
-                /* forward to the client */
-                microkit_notify(gpio_channel_mappings[GPIO_CHANNEL_MAPPING_CLIENTS_CHANNEL_SLOT]);
+    buffer[pos++] = '\n';
+    buffer[pos] = '\0';
 
-                /* clear the status flag by setting to 1 */
-                *final_reg_address &= BIT(start_bit);
-            }
+    LOG_DRIVER("%s", buffer);
+}
+
+static inline void init_pin_subscribers()
+{
+    for (int i = 0; i < PINS_PER_BANK; ++i) {
+        pin_subscriber[i] = -1;
+    }
+}
+
+static void print_irq_pin_subscribers()
+{
+    LOG_DRIVER("IRQ Pin Subscribers:\n");
+
+    for (int i = 0; i < PINS_PER_BANK; ++i) {
+        if (pin_subscriber[i] != -1) {
+            LOG_DRIVER("Pin %d -> Subscriber %d\n", i, pin_subscriber[i]);
         }
     }
 }
 
+static inline seL4_MessageInfo_t error_response(gpio_error_t error_code)
+{
+    uint32_t e = error_code | BIT(SDDF_GPIO_RESPONSE_ERROR_BIT);
+    return microkit_msginfo_new(e, 0);
+}
 
-/* Notifications should only come from device */
+static inline bool check_irq_permission(microkit_channel ch)
+{
+    return gpio_driver_channel_mappings[ch].irq > 0;
+}
+
+static void handle_gpio_irq(int ch, int start_pin, int end_pin)
+{
+    uint32_t clear_mask = 0;
+
+    /* Go through pin and build up a mask of IRQs to clear. */
+    for (int pin = start_pin; pin < end_pin; pin++) {
+        /* If the pin is unmasked and the IRQ was related to this pin, add it to the mask and notify
+             * the client subscribed to that pin. */
+        if ((gpio_regs->imr & BIT(pin)) && (gpio_regs->isr & BIT(pin))) {
+            clear_mask |= BIT(pin);
+            microkit_notify(pin_subscriber[pin]);
+        }
+    }
+
+    gpio_regs->imr &= ~clear_mask;
+
+    // We want it to be cleared before the microkit acknowledges so we dont enter notified again.
+
+    // We use dsb because the the gpio and gic are seperate peripherals
+    DSB_ISHST();
+    microkit_deferred_irq_ack(ch);
+}
+
 void notified(microkit_channel ch)
 {
-    LOG_DRIVER("Driver Notified %d!\n", ch);
-    switch (ch) {
-        case IMX_GPIO_IRQ_AH_GPIO1_7:
-        case IMX_GPIO_IRQ_AH_GPIO1_6:
-        case IMX_GPIO_IRQ_AH_GPIO1_5:
-        case IMX_GPIO_IRQ_AH_GPIO1_4:
-        case IMX_GPIO_IRQ_AH_GPIO1_3:
-        case IMX_GPIO_IRQ_AH_GPIO1_2:
-        case IMX_GPIO_IRQ_AH_GPIO1_1:
-        case IMX_GPIO_IRQ_AH_GPIO1_0:
-            microkit_irq_ack(ch);
-            microkit_notify(driver_to_client_channel_mappings_single_irq_line[ch - IMX_GPIO_IRQ_AH_GPIO1_0]);
-            break;
-        case IMX_GPIO_IRQ_GPIO1_0_15:
-        case IMX_GPIO_IRQ_GPIO1_16_31:
-        case IMX_GPIO_IRQ_GPIO2_0_15:
-        case IMX_GPIO_IRQ_GPIO2_16_31:
-        case IMX_GPIO_IRQ_GPIO3_0_15:
-        case IMX_GPIO_IRQ_GPIO3_16_31:
-        case IMX_GPIO_IRQ_GPIO4_0_15:
-        case IMX_GPIO_IRQ_GPIO4_16_31:
-        case IMX_GPIO_IRQ_GPIO5_0_15:
-        case IMX_GPIO_IRQ_GPIO5_16_31:
-            microkit_irq_ack(ch);
-            notify_combined(ch);
-            break;
-        default:
-            LOG_DRIVER_ERR("Unexpected notification from %d!\n", ch);
-    }
-}
-
-static imx_gpio_bank_t imx_get_gpio_instance(size_t pin) {
-    if (pin < IMX_GPIO_INSTANCE_GPIO_2) return IMX_GPIO_INSTANCE_GPIO_1;
-    if (pin < IMX_GPIO_INSTANCE_GPIO_3) return IMX_GPIO_INSTANCE_GPIO_2;
-    if (pin < IMX_GPIO_INSTANCE_GPIO_4) return IMX_GPIO_INSTANCE_GPIO_3;
-    if (pin < IMX_GPIO_INSTANCE_GPIO_5) return IMX_GPIO_INSTANCE_GPIO_4;
-    if (pin < IMX_GPIO_INVALID_PIN) return IMX_GPIO_INSTANCE_GPIO_5;
-    return IMX_GPIO_INVALID_PIN;
-}
-
-static volatile uint32_t *imx_get_gpio_and_gpio_and_irq_base_address(size_t pin) {
-    imx_gpio_instance_t instance = imx_get_gpio_instance(pin);
-
-    if (instance == IMX_GPIO_INSTANCE_GPIO_1) return (volatile uint32_t *)(gpio1_regs + 0 /*base address offest due to page alignmemt*/);
-    if (instance == IMX_GPIO_INSTANCE_GPIO_2) return (volatile uint32_t *)(gpio2_regs + 0 /*base address offest due to page alignmemt*/);
-    if (instance == IMX_GPIO_INSTANCE_GPIO_3) return (volatile uint32_t *)(gpio3_regs + 0 /*base address offest due to page alignmemt*/);
-    if (instance == IMX_GPIO_INSTANCE_GPIO_4) return (volatile uint32_t *)(gpio4_regs + 0 /*base address offest due to page alignmemt*/);
-    if (instance == IMX_GPIO_INSTANCE_GPIO_5) return (volatile uint32_t *)(gpio5_regs + 0 /*base address offest due to page alignmemt*/);
-}
-
-static bool imx_is_valid_irq_config(int irq) {
-    return (irq >= IMX_GPIO_IRQ_CHANNEL_START
-        && irq < IMX_GPIO_IRQ_CHANNEL_START + IMX_GPIO_IRQ_CHANNEL_COUNT
-        && gpio_channel_mappings[irq][GPIO_CHANNEL_MAPPING_GPIO_PIN_SLOT] == -1
-        && gpio_channel_mappings[irq][GPIO_CHANNEL_MAPPING_IRQ_SLOT] == -1);
-}
-
-static bool imx_check_irq_is_combined(int irq) {
-    return irq <= IMX_GPIO_IRQ_AH_GPIO1_7 && irq >= IMX_GPIO_IRQ_AH_GPIO1_0;
-}
-
-static int imx_get_irq_from_config_file(size_t pin) {
-    for (int i = 0; i < 62; i++) {
-        if (gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_GPIO_PIN_SLOT] == pin) {
-            return gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_IRQ_SLOT];
-        }
-    }
-    return -1; // never happens
-}
-
-static bool imx_gpio_and_irq_calculate_reg_and_bits(imx_gpio_and_irq_reg_type_t function, size_t pin, uint32_t *reg_offset, uint32_t *start_bit) {
-    // check if pin is too high
-    imx_gpio_instance_t instance = imx_get_gpio_instance(pin);
-    if (instance == IMX_GPIO_INVALID_PIN) {
-        return false;
-    }
-
-    // find function
-    for (int i = 0; i < IMX_GPIO_AND_IRQ_FUNC_COUNT; i++) {
-        if (gpio_and_irq_config_control[i].function == function) {
-
-            // find instance
-            for (int j = 0; j < IMX_GPIO_INSTANCE_COUNT; j++) {
-                if (gpio_and_irq_config_control[i].instances[j].instance == instance) {
-                    // find reg and bits
-                    bool is_last = false;
-                    int k = 0;
-                    uint32_t bit_stride = imx_gpio_and_irq_bit_strides[function];
-
-                    // there will always be at least one register
-                    while (!is_last) {
-                        struct imx_gpio_and_irq_register_data reg_data = gpio_and_irq_config_control[i].instances[j].registers[k];
-                        is_last = reg_data.is_last;
-                        k++;
-
-                        uint32_t instance_pin_number = (uint32_t)(pin) - (uint32_t)instance;
-
-                        // see if the pin is in this register range
-                        if (instance_pin_number < reg_data.start_pin_number) {
-                            // we missed it
-                            return false;
-                        }
-
-                        uint32_t range = 32;
-                        range /= bit_stride;
-                        if (instance_pin_number > reg_data.start_pin_number + range - 1) {
-                            continue; // check next register
-                        }
-
-                        // its in this register so find what bits
-                        *reg_offset = reg_data.register_offset;
-                        *start_bit = (instance_pin_number - reg_data.start_pin_number /* get the amount of pins after start bit */) * bit_stride;
-                        return true;
-                    }
-                }
-            }
-        }
-    }
-    return true; // never get here
-}
-
-/* GETS | GPIO */
-
-static void imx_get_gpio_output(size_t pin, size_t* label, size_t* response) {
-    uint32_t reg_offset;
-    uint32_t start_bit;
-    if (!imx_gpio_and_irq_calculate_reg_and_bits(IMX_GPIO_REG_DR, pin, &reg_offset, &start_bit)) {
-        *label = GPIO_FAILURE;
-        *response = GPIO_ERROR_UNSUPPORTED_PIN_CONFIG;
-        return;
-    }
-
-    volatile uint32_t *gpio_and_irq_base_address = imx_get_gpio_and_gpio_and_irq_base_address(pin);
-    volatile uint32_t *final_reg_address = ((void *)gpio_and_irq_base_address + reg_offset);
-
-    // get value
-    uint32_t value = (*final_reg_address >> start_bit) & BIT(0);
-
-    *label = GPIO_SUCCESS;
-    *response = value;
-}
-
-static void imx_get_gpio_input(size_t pin, size_t* label, size_t* response) {
-    uint32_t reg_offset;
-    uint32_t start_bit;
-    if (!imx_gpio_and_irq_calculate_reg_and_bits(IMX_GPIO_REG_PSR, pin, &reg_offset, &start_bit)) {
-        *label = GPIO_FAILURE;
-        *response = GPIO_ERROR_UNSUPPORTED_PIN_CONFIG;
-        return;
-    }
-
-    volatile uint32_t *gpio_and_irq_base_address = imx_get_gpio_and_gpio_and_irq_base_address(pin);
-    volatile uint32_t *final_reg_address = ((void *)gpio_and_irq_base_address + reg_offset);
-
-    uint32_t value = (*final_reg_address >> start_bit) & BIT(0);
-
-    *label = GPIO_SUCCESS;
-    *response = value;
-}
-
-static void imx_get_gpio_direction(size_t pin, size_t* label, size_t* response) {
-    uint32_t reg_offset;
-    uint32_t start_bit;
-    if (!imx_gpio_and_irq_calculate_reg_and_bits(IMX_GPIO_REG_GDIR, pin, &reg_offset, &start_bit)) {
-        *label = GPIO_FAILURE;
-        *response = GPIO_ERROR_UNSUPPORTED_PIN_CONFIG;
-        return;
-    }
-
-    volatile uint32_t *gpio_and_irq_base_address = imx_get_gpio_and_gpio_and_irq_base_address(pin);
-    volatile uint32_t *final_reg_address = ((void *)gpio_and_irq_base_address + reg_offset);
-
-    uint32_t value = ((*final_reg_address >> start_bit) & BIT(0)) == 1 ? GPIO_DIRECTION_OUTPUT : GPIO_DIRECTION_INPUT;
-
-    *label = GPIO_SUCCESS;
-    *response = value;
-}
-
-/* GETS | IRQ */
-
-/* All this does is check if the IMR is set for this pin and if so returns the pin back */
-static void imx_get_irq_pin(size_t pin, size_t* label, size_t* response) {
-    /* check if its combined (the only ones that can be configured in registers) */
-    if (!imx_check_irq_is_combined(imx_get_irq_from_config_file(pin))) {
-        *label = GPIO_FAILURE;
-        *response = GPIO_ERROR_UNSUPPORTED_IRQ_CONFIG;
-    }
-
-    /* Check IMR reg */
-    uint32_t reg_offset;
-    uint32_t start_bit;
-
-    if (!imx_gpio_and_irq_calculate_reg_and_bits(IMX_IRQ_REG_IMR, pin, &reg_offset, &start_bit)) {
-        *label = GPIO_FAILURE;
-        *response = GPIO_ERROR_UNSUPPORTED_PIN_CONFIG;
-        return;
-    }
-
-    volatile uint32_t *gpio_and_irq_base_address = imx_get_gpio_and_gpio_and_irq_base_address(value);
-    volatile uint32_t *final_reg_address = ((void *)gpio_and_irq_base_address + reg_offset);
-
-    uint32_t value = (*final_reg_address >> start_bit) & BIT(0);
-    if (value) {
-        /* then we return the pin in the response */
-        *label = GPIO_SUCCESS;
-        *response = pin;
+    /*
+     * We have two potential interrupts to deal with, one for the lower 16 pins, and another for the
+     * the upper 16 pins.
+     * There exists single interrupt lines for the device, however they do not appear to leave the GPIO
+     * block and go the interrupt controller, so we do not make use of them. It seems that Linux does
+     * not either.
+     */
+    if (ch == device_resources.irqs[0].id) {
+        handle_gpio_irq(ch, 0, PINS_PER_BANK / 2);
+    } else if (ch == device_resources.irqs[1].id) {
+        handle_gpio_irq(ch, PINS_PER_BANK / 2, PINS_PER_BANK);
     } else {
-        /* we return the error pin in the response because its equivalent to not being set */
-        *label = GPIO_FAILURE;
-        *response = IMX_GPIO_INVALID_PIN;
+        LOG_DRIVER("unexpected notification from channel %u\n", ch);
     }
 }
 
-static void imx_get_irq_edge(size_t pin, size_t* label, size_t* response) {
-    /* check if its combined (the only ones that can be configured in registers) */
-    if (!imx_check_irq_is_combined(imx_get_irq_from_config_file(pin))) {
-        *label = GPIO_FAILURE;
-        *response = GPIO_ERROR_UNSUPPORTED_IRQ_CONFIG;
-    }
-
-    uint32_t reg_offset;
-    uint32_t start_bit;
-
-    if (!imx_gpio_and_irq_calculate_reg_and_bits(IMX_IRQ_EDGE_SEL, pin, &reg_offset, &start_bit)) {
-        *label = GPIO_FAILURE;
-        *response = GPIO_ERROR_UNSUPPORTED_IRQ_CONFIG;
-        return;
-    }
-
-    volatile uint32_t *gpio_and_irq_base_address = imx_get_gpio_and_gpio_and_irq_base_address(value);
-    volatile uint32_t *final_reg_address = ((void *)gpio_and_irq_base_address + reg_offset);
-
-    uint32_t value = (*final_reg_address >> start_bit) & BIT(0);
-
-    if (value == 1) {
-        *label = GPIO_SUCCESS;
-        *response = IMX_GPIO_IRQ_ANY_EDGE;
-        return;
-    }
-
-    if (!imx_gpio_and_irq_calculate_reg_and_bits(IMX_IRQ_ICR, irq, &reg_offset, &start_bit)) {
-        *label = GPIO_FAILURE;
-        *response = GPIO_ERROR_UNSUPPORTED_IRQ_CONFIG;
-        return;
-    }
-
-    final_reg_address = ((void *)gpio_and_irq_base_address + reg_offset);
-
-    value = (*final_reg_address >> start_bit) & BIT_MASK(0, imx_gpio_and_irq_bit_strides[IMX_IRQ_ICR]);
-
-    *label = GPIO_SUCCESS;
-    if (value == 0) {
-        *response = IMX_GPIO_IRQ_LOW_LEVEL;
-    } else if (value == 1) {
-        *response = IMX_GPIO_IRQ_HIGH_LEVEL;
-    } else if (value == 2) {
-        *response = IMX_GPIO_IRQ_RISING_EDGE;
-    } else {
-        *response = IMX_GPIO_IRQ_FALLING_EDGE;
-    }
-}
-
-/* SETS | GPIO */
-
-static void imx_set_gpio_output(size_t pin, size_t value, size_t* label, size_t* response) {
-    if (value != 0 && value != 1) {
-        *label = GPIO_FAILURE;
-        *response = GPIO_ERROR_INVALID_VALUE;
-        return;
-    }
-
-    uint32_t reg_offset;
-    uint32_t start_bit;
-    if (!imx_gpio_and_irq_calculate_reg_and_bits(IMX_GPIO_REG_DR, pin, &reg_offset, &start_bit)) {
-        *label = GPIO_FAILURE;
-        *response = GPIO_ERROR_UNSUPPORTED_PIN_CONFIG;
-        return;
-    }
-
-    volatile uint32_t *gpio_and_irq_base_address = imx_get_gpio_and_gpio_and_irq_base_address(pin);
-    volatile uint32_t *final_reg_address = ((void *)gpio_and_irq_base_address + reg_offset);
-
-    *final_reg_address &= ~BIT(start_bit);
-    *final_reg_address |= (BIT(0) & value) << start_bit;
-
-    *label = GPIO_SUCCESS;
-}
-
-static void imx_set_gpio_direction(size_t pin, size_t value, size_t* label, size_t* response) {
-    if (value != GPIO_DIRECTION_OUTPUT && value != GPIO_DIRECTION_INPUT) {
-        *label = GPIO_FAILURE;
-        *response = GPIO_ERROR_INVALID_VALUE;
-        return;
-    }
-
-    uint32_t reg_offset;
-    uint32_t start_bit;
-    if (!imx_gpio_and_irq_calculate_reg_and_bits(IMX_GPIO_REG_GDIR, pin, &reg_offset, &start_bit)) {
-        *label = GPIO_FAILURE;
-        *response = GPIO_ERROR_UNSUPPORTED_PIN_CONFIG;
-        return;
-    }
-
-    volatile uint32_t *gpio_and_irq_base_address = imx_get_gpio_and_gpio_and_irq_base_address(pin);
-    volatile uint32_t *final_reg_address = ((void *)gpio_and_irq_base_address + reg_offset);
-
-    if (value == GPIO_DIRECTION_INPUT) {
-        *final_reg_address &= ~BIT(start_bit); 
-    } else {
-        *final_reg_address |= BIT(start_bit);
-    }
-
-    *label = GPIO_SUCCESS;
-}
-
-/* SETS | IRQ */
-
-static void imx_set_irq_pin(size_t pin, size_t value, size_t* label, size_t* response) {
-    /* check if the irq is a combined irq */
-    if (imx_check_irq_is_combined(value)) {
-        /* check if this value (pin) can be configured to this channel */
-        if (pin == value - IMX_GPIO_IRQ_CHANNEL_START) {
-            *label = GPIO_FAILURE;
-            *response = GPIO_ERROR_UNSUPPORTED_IRQ_CONFIG;
-            return;
-        } else {
-            /* no configuration is neccessary */
-            *label = GPIO_SUCCESS;
-            return;
-        }
-    }
-
-    /* handling of the combined channels that requires actually interacting with hardware register */
-    size_t start_valid_pin = 16 * (value - IMX_GPIO_IRQ_GPIO1_0_15);
-    size_t end_valid_pin = start_valid_pin + 15;
-    if (pin < start_valid_pin || pin > end_valid_pin) {
-        /* this pin cannot be configured for this combined interrupt */
-        *label = GPIO_FAILURE;
-        *response = GPIO_ERROR_UNSUPPORTED_IRQ_CONFIG;
-        return;
-    }
-
-    /* set the mask so pin configures interrupts */
-
-    uint32_t reg_offset;
-    uint32_t start_bit;
-
-    if (!imx_gpio_and_irq_calculate_reg_and_bits(IMX_IRQ_REG_IMR, pin, &reg_offset, &start_bit)) {
-        *label = GPIO_FAILURE;
-        *response = GPIO_ERROR_UNSUPPORTED_IRQ_CONFIG;
-        return;
-    }
-
-    volatile uint32_t *gpio_and_irq_base_address = imx_get_gpio_and_gpio_and_irq_base_address(value);
-    volatile uint32_t *final_reg_address = ((void *)gpio_and_irq_base_address + reg_offset);
-
-    *final_reg_address |= BIT(start_bit);
-    *label = GPIO_SUCCESS;
-}
-
-static void imx_set_irq_edge(size_t pin, size_t value, size_t* label, size_t* response) {
-    /* check if its combined (the only ones that can be configured in registers) */
-    if (!imx_check_irq_is_combined(imx_get_irq_from_config_file(pin))) {
-        *label = GPIO_FAILURE;
-        *response = GPIO_ERROR_UNSUPPORTED_IRQ_CONFIG;
-    }
-
-    if (value != IMX_GPIO_IRQ_LOW_LEVEL &&
-        value != IMX_GPIO_IRQ_HIGH_LEVEL &&
-        value != IMX_GPIO_IRQ_RISING_EDGE &&
-        value != IMX_GPIO_IRQ_FALLING_EDGE &&
-        value != IMX_GPIO_IRQ_ANY_EDGE)
-    {
-        *label = GPIO_FAILURE;
-        *response = GPIO_ERROR_INVALID_VALUE;
-        return;
-    }
-
-    uint32_t reg_offset;
-    uint32_t start_bit;
-
-    if (!imx_gpio_and_irq_calculate_reg_and_bits(IMX_IRQ_EDGE_SEL, pin, &reg_offset, &start_bit)) {
-        *label = GPIO_FAILURE;
-        *response = GPIO_ERROR_UNSUPPORTED_IRQ_CONFIG;
-        return;
-    }
-
-    volatile uint32_t *gpio_and_irq_base_address = imx_get_gpio_and_gpio_and_irq_base_address(value);
-    volatile uint32_t *final_reg_address = ((void *)gpio_and_irq_base_address + reg_offset);
-
-    *final_reg_address &= ~BIT(start_bit); 
-    if (value == IMX_GPIO_IRQ_ANY_EDGE) {
-        *final_reg_address |= BIT(start_bit);
-        *label = GPIO_SUCCESS;
-        return;
-    }
-
-    if (!imx_gpio_and_irq_calculate_reg_and_bits(IMX_IRQ_ICR, pin, &reg_offset, &start_bit)) {
-        *label = GPIO_FAILURE;
-        *response = GPIO_ERROR_UNSUPPORTED_IRQ_CONFIG;
-        return;
-    }
-
-    final_reg_address = ((void *)gpio_and_irq_base_address + reg_offset);
-
-    *final_reg_address &= ~BIT_MASK(start_bit, start_bit + imx_gpio_and_irq_bit_strides[IMX_IRQ_ICR]); 
-    *final_reg_address |= (BIT_MASK(0, 0 + imx_gpio_and_irq_bit_strides[IMX_IRQ_ICR]) & value) << start_bit;
-
-    *label = GPIO_SUCCESS;
-}
-
-/* HANDLERS */
-
-static seL4_MessageInfo_t handle_get_gpio_request(size_t pin, size_t config) {
-    size_t label;
-    size_t response;
-
-    switch (config) {
-        case GPIO_OUTPUT:
-            imx_get_gpio_output(pin, &label, &response);
-            break;
-        case GPIO_INPUT:
-            imx_get_gpio_input(pin, &label, &response);
-            break;
-        case GPIO_DIRECTION:
-            imx_get_gpio_direction(pin, &label, &response);
-            break;
-        default:
-            label = GPIO_FAILURE;
-            response = GPIO_ERROR_INVALID_CONFIG;
-    }
-
-    seL4_MessageInfo_t message = microkit_msginfo_new(label, 1);
-    microkit_mr_set(GPIO_RES_VALUE_SLOT, response);
-    return message;
-}
-
-static seL4_MessageInfo_t handle_set_gpio_request(size_t pin, size_t config, size_t value) {
-    size_t label;
-    size_t response;
-
-    switch (config) {
-        case GPIO_OUTPUT:
-            imx_set_gpio_output(pin, value, &label, &response);
-            break;
-        case GPIO_DIRECTION:
-            imx_set_gpio_direction(pin, value, &label, &response);
-            break;
-        default:
-            label = GPIO_FAILURE;
-            response = GPIO_ERROR_INVALID_CONFIG;
-    }
-
-    seL4_MessageInfo_t message;
-    if (label == GPIO_FAILURE) {
-        message = microkit_msginfo_new(label, 1);
-        microkit_mr_set(GPIO_RES_VALUE_SLOT, response);
-    } else {
-        message = microkit_msginfo_new(label, 0);
-    }
-
-    return message;
-}
-
-static seL4_MessageInfo_t handle_get_irq_request(size_t pin, size_t config) {
-    size_t label;
-    size_t response;
-
-    switch (config) {
-        case GPIO_IRQ_PIN:
-            imx_get_irq_pin(pin, &label, &response);
-            break;
-        case IMX_GPIO_IRQ_EDGE:
-            imx_get_irq_edge(pin, &label, &response);
-            break;
-        default:
-            label = GPIO_FAILURE;
-            response = GPIO_ERROR_INVALID_CONFIG;
-    }
-
-    seL4_MessageInfo_t message = microkit_msginfo_new(label, 1);
-    microkit_mr_set(GPIO_RES_VALUE_SLOT, response);
-    return message;
-}
-
-static seL4_MessageInfo_t handle_set_irq_request(size_t pin, size_t config, size_t value) {
-    size_t label;
-    size_t response;
-
-    switch (config) {
-        case IMX_GPIO_IRQ_EDGE:
-            imx_set_irq_edge(pin, value, &label, &response);
-            break;
-        default:
-            label = GPIO_FAILURE;
-            response = GPIO_ERROR_INVALID_CONFIG;
-    }
-
-    seL4_MessageInfo_t message;
-    if (label == GPIO_FAILURE) {
-        message = microkit_msginfo_new(label, 1);
-        microkit_mr_set(GPIO_RES_VALUE_SLOT, response);
-    } else {
-        message = microkit_msginfo_new(label, 0);
-    }
-
-    return message;
-}
-
-seL4_MessageInfo_t protected(microkit_channel ch, seL4_MessageInfo_t msginfo)
+static inline seL4_MessageInfo_t set(int pin, uint32_t value)
 {
-    size_t label = microkit_msginfo_get_label(msginfo);
-    size_t count = microkit_msginfo_get_count(msginfo);
-    size_t config, pin, value;
-
-    switch (label) {
-        case GPIO_GET_GPIO:
-            if (count != 1) {
-                seL4_MessageInfo_t message = microkit_msginfo_new(GPIO_FAILURE, 1);
-                microkit_mr_set(GPIO_RES_VALUE_SLOT, (size_t)GPIO_ERROR_INVALID_NUM_ARGS);
-                return message;
-            }
-
-            /* Check GPIO mapping permissions */
-            if (gpio_channel_mappings[ch][GPIO_CHANNEL_MAPPING_GPIO_PIN_SLOT] < 0) {
-                seL4_MessageInfo_t message = microkit_msginfo_new(GPIO_FAILURE, 1);
-                microkit_mr_set(GPIO_RES_VALUE_SLOT, (size_t)GPIO_ERROR_PERMISSION_DENIED);
-                return message;
-            }
-
-            config = microkit_mr_get(GPIO_REQ_CONFIG_SLOT);
-            pin = gpio_channel_mappings[ch][GPIO_CHANNEL_MAPPING_GPIO_PIN_SLOT];
-
-            return handle_get_gpio_request(pin, config);
-
-        case GPIO_GET_IRQ:
-            if (count != 1) {
-                seL4_MessageInfo_t message = microkit_msginfo_new(GPIO_FAILURE, 1);
-                microkit_mr_set(GPIO_RES_VALUE_SLOT, (size_t)GPIO_ERROR_INVALID_NUM_ARGS);
-                return message;
-            }
-
-            /* Check irq channel mapping permissions */
-            if (gpio_channel_mappings[ch][GPIO_CHANNEL_MAPPING_IRQ_SLOT] < 0) {
-                seL4_MessageInfo_t message = microkit_msginfo_new(GPIO_FAILURE, 1);
-                microkit_mr_set(GPIO_RES_VALUE_SLOT, (size_t)GPIO_ERROR_PERMISSION_DENIED);
-                return message;
-            }
-
-            config = microkit_mr_get(GPIO_REQ_CONFIG_SLOT);
-            pin = gpio_channel_mappings[ch][GPIO_CHANNEL_MAPPING_GPIO_PIN_SLOT];
-
-            return handle_get_irq_request(pin, config);
-
-        case GPIO_SET_GPIO:
-            if (count != 2) {
-                seL4_MessageInfo_t message = microkit_msginfo_new(GPIO_FAILURE, 1);
-                microkit_mr_set(GPIO_RES_VALUE_SLOT, (size_t)GPIO_ERROR_INVALID_NUM_ARGS);
-                return message;
-            }
-
-            /* Check GPIO mapping permissions */
-            if (gpio_channel_mappings[ch][GPIO_CHANNEL_MAPPING_GPIO_PIN_SLOT] < 0) {
-                seL4_MessageInfo_t message = microkit_msginfo_new(GPIO_FAILURE, 1);
-                microkit_mr_set(GPIO_RES_VALUE_SLOT, (size_t)GPIO_ERROR_PERMISSION_DENIED);
-                return message;
-            }
-
-            config = microkit_mr_get(GPIO_REQ_CONFIG_SLOT);
-            pin = gpio_channel_mappings[ch][GPIO_CHANNEL_MAPPING_GPIO_PIN_SLOT];
-            value = microkit_mr_get(GPIO_REQ_VALUE_SLOT);
-
-            return handle_set_gpio_request(pin, config, value);
-
-        case GPIO_SET_IRQ:
-            if (count != 2) {
-                seL4_MessageInfo_t message = microkit_msginfo_new(GPIO_FAILURE, 1);
-                microkit_mr_set(GPIO_RES_VALUE_SLOT, (size_t)GPIO_ERROR_INVALID_NUM_ARGS);
-                return message;
-            }
-
-            /* Check irq channel mapping permissions */
-            if (gpio_channel_mappings[ch][GPIO_CHANNEL_MAPPING_IRQ_SLOT] < 0) {
-                seL4_MessageInfo_t message = microkit_msginfo_new(GPIO_FAILURE, 1);
-                microkit_mr_set(GPIO_RES_VALUE_SLOT, (size_t)GPIO_ERROR_PERMISSION_DENIED);
-                return message;
-            }
-
-            config = microkit_mr_get(GPIO_REQ_CONFIG_SLOT);
-            pin = gpio_channel_mappings[ch][GPIO_CHANNEL_MAPPING_GPIO_PIN_SLOT];
-            value = microkit_mr_get(GPIO_REQ_VALUE_SLOT);
-
-            return handle_set_irq_request(pin, config, value);
-
-        default:
-            seL4_MessageInfo_t message = microkit_msginfo_new(GPIO_FAILURE, 1);
-            microkit_mr_set(GPIO_RES_VALUE_SLOT, (size_t)GPIO_ERROR_INVALID_LABEL);
-            return message;
+    if (value) {
+        gpio_regs->dr |= BIT(pin);
+    } else {
+        gpio_regs->dr &= ~BIT(pin);
     }
 
+    return microkit_msginfo_new(0, 0);
+}
+
+static inline seL4_MessageInfo_t get(int pin)
+{
+    uint32_t value = (gpio_regs->psr >> pin) & BIT(0);
+
+    return microkit_msginfo_new(value, 0);
+}
+
+static inline seL4_MessageInfo_t set_direction_output(int pin, uint32_t value)
+{
+    if (value) {
+        gpio_regs->dr |= BIT(pin);
+    } else {
+        gpio_regs->dr &= ~BIT(pin);
+    }
+
+    // This instruction already reads back to ensure previous instructions completion
+    gpio_regs->gdir |= BIT(pin);
+
+    return microkit_msginfo_new(0, 0);
+}
+
+static inline seL4_MessageInfo_t set_direction_input(int pin)
+{
+    gpio_regs->gdir &= ~BIT(pin);
+
+    return microkit_msginfo_new(0, 0);
+}
+
+static inline seL4_MessageInfo_t get_direction(int pin)
+{
+    uint32_t dir = (gpio_regs->gdir >> pin) & BIT(0);
+
+    return microkit_msginfo_new(dir, 0);
+}
+
+static inline seL4_MessageInfo_t set_config(int pin, uint32_t value, uint32_t argument)
+{
+    return error_response(SDDF_GPIO_EOPNOTSUPP);
+}
+
+static inline seL4_MessageInfo_t irq_enable(int pin)
+{
+    // Clear all noise that happened before the interrupt started
+    gpio_regs->isr = BIT(pin);
+    // This instruction already reads back to ensure previous instructions completion
+    gpio_regs->imr |= BIT(pin);
+
+    return microkit_msginfo_new(0, 0);
+}
+
+// The semantic of disbale also means unchecking the status register
+static inline seL4_MessageInfo_t irq_disable(int pin)
+{
+    gpio_regs->imr &= ~BIT(pin);
+
+    // Since its the same peripheral a read back will mean it completes
+    (void)gpio_regs->imr;
+
+    // Now that we have unmasked we uncheck the status register
+    // so that if we go to notified we dont process this irq if
+    // it was set before we unmasked
+
+    gpio_regs->isr = BIT(pin);
+
+    return microkit_msginfo_new(0, 0);
+}
+
+static inline seL4_MessageInfo_t irq_set_type(int pin, uint32_t type)
+{
+    uint32_t shift = (pin % 16) * 2;
+    uint32_t icr_val = (pin < 16) ? ((gpio_regs->icr1 >> shift) & 0x3u) : ((gpio_regs->icr2 >> shift) & 0x3u);
+
+    bool both = false;
+
+    switch (type) {
+    case SDDF_IRQ_TYPE_EDGE_RISING:
+        icr_val = ICR_RISING_EDGE;
+        break;
+    case SDDF_IRQ_TYPE_EDGE_FALLING:
+        icr_val = ICR_FALLING_EDGE;
+        break;
+    case SDDF_IRQ_TYPE_LEVEL_HIGH:
+        icr_val = ICR_HIGH_LEVEL;
+        break;
+    case SDDF_IRQ_TYPE_LEVEL_LOW:
+        icr_val = ICR_LOW_LEVEL;
+        break;
+    case SDDF_IRQ_TYPE_EDGE_BOTH:
+        both = true;
+        break;
+    default:
+        return error_response(SDDF_GPIO_EINVAL);
+    }
+
+    if (pin < 16) {
+        gpio_regs->icr1 = (gpio_regs->icr1 & ~(0x3u << shift)) | (icr_val << shift);
+    } else {
+        gpio_regs->icr2 = (gpio_regs->icr2 & ~(0x3u << shift)) | (icr_val << shift);
+    }
+
+    // These instructions already read back to ensure previous instructions completion
+    if (both) {
+        gpio_regs->edge_sel |= BIT(pin);
+    } else {
+        gpio_regs->edge_sel &= ~BIT(pin);
+    }
+
+    return microkit_msginfo_new(0, 0);
+}
+
+seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
+{
+    uint32_t label = microkit_msginfo_get_label(msginfo);
+    uint32_t interface_function = label & SDDF_REQUEST_INTERFACE_MASK;
+    uint32_t value = gpio_decode_value(label);
+
+    // Check what pin it has
+    int pin = gpio_driver_channel_mappings[ch].pin;
+
+    // Unexpected channel
+    if (pin < 0) {
+        return error_response(SDDF_GPIO_EPERM);
+    }
+
+    switch (interface_function) {
+    case SDDF_GPIO_SET: {
+        return set(pin, value);
+    }
+    case SDDF_GPIO_GET: {
+        return get(pin);
+    }
+    case SDDF_GPIO_DIRECTION_OUTPUT: {
+        return set_direction_output(pin, value);
+    }
+    case SDDF_GPIO_DIRECTION_INPUT: {
+        return set_direction_input(pin);
+    }
+    case SDDF_GPIO_GET_DIRECTION: {
+        return get_direction(pin);
+    }
+    case SDDF_GPIO_SET_CONFIG: {
+        uint32_t arguement = seL4_GetMR(0);
+        return set_config(pin, value, arguement);
+    }
+    case SDDF_GPIO_IRQ_ENABLE: {
+        if (check_irq_permission(ch)) {
+            return irq_enable(pin);
+        }
+        return error_response(SDDF_GPIO_EPERM);
+    }
+    case SDDF_GPIO_IRQ_DISABLE: {
+        if (check_irq_permission(ch)) {
+            return irq_disable(pin);
+        }
+        return error_response(SDDF_GPIO_EPERM);
+    }
+    case SDDF_GPIO_IRQ_SET_TYPE: {
+        if (check_irq_permission(ch)) {
+            return irq_set_type(pin, value);
+        }
+        return error_response(SDDF_GPIO_EPERM);
+    }
+    default:
+        LOG_DRIVER("Unknown request %lu to gpio from channel %u\n", microkit_msginfo_get_label(msginfo), ch);
+        return error_response(SDDF_GPIO_EOPNOTSUPP);
+    }
+}
+
+void validate_gpio_config()
+{
+    for (int ch = 0; ch < MICROKIT_MAX_CHANNELS; ch++) {
+        int pin = gpio_driver_channel_mappings[ch].pin;
+        int irq = gpio_driver_channel_mappings[ch].irq;
+
+        // Irq without pin check
+        if (pin < 0 && irq >= 0) {
+            LOG_DRIVER_ERR("Pin must be set if IRQ is set! (ch=%d, irq=%d)\n", ch, irq);
+            assert(false);
+        }
+
+        // Nothing to configure
+        if (pin < 0) {
+            continue;
+        }
+
+        // Check a client hasn't claimed the channels we use for device interrupts
+        if (device_resources.irqs[0].id == ch) {
+            LOG_DRIVER_ERR("Client can't claim channel used for device irqs : %d\n", ch);
+            assert(false);
+        } else if (device_resources.irqs[1].id == ch) {
+            LOG_DRIVER_ERR("Client can't claim channel used for device irqs : %d\n", ch);
+            assert(false);
+        }
+
+        // Check pin is valid number
+        if (pin >= PINS_PER_BANK) {
+            LOG_DRIVER_ERR("Invalid pin number : %d\n", pin);
+            assert(false);
+        }
+
+        // Unique-pin check
+        int seen = 0;
+        for (int ch_2 = 0; ch_2 < MICROKIT_MAX_CHANNELS; ch_2++) {
+            if (gpio_driver_channel_mappings[ch_2].pin == pin) {
+                seen++;
+            }
+        }
+        if (seen != 1) {
+            LOG_DRIVER_ERR("pin %d mapped %d times (must be exactly once)\n", pin, seen);
+            assert(false);
+        }
+
+        if (irq < 0) {
+            continue;
+        }
+
+        // For fast lookups in notify
+        pin_subscriber[pin] = ch;
+
+        // Since we can only bind each pin to one designated interrupt we dont validate the irq picked
+        // Other then it being above 0
+    }
+}
+
+void disable_all_interrupts()
+{
+    gpio_regs->imr = 0;
+
+    // We use dsb because the the gpio and gic are seperate peripherals
+    DSB_ISHST();
+
+    microkit_irq_ack(device_resources.irqs[0].id);
+    microkit_irq_ack(device_resources.irqs[1].id);
 }
 
 void init(void)
 {
-    LOG_DRIVER("Driver Init!\n");
+    LOG_DRIVER("Starting.\n");
 
-    /* Configure gpio channel mappings */
-    for (int i = 0; i < 62; i++) {
-        if (gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_GPIO_PIN_SLOT] == -1 && gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_IRQ_SLOT] != -1) {
-            LOG_DRIVER_ERR("GPIO pin must be set if IRQ is set!\n");
-            while (1) {}
-        } else if (gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_GPIO_PIN_SLOT] == -1) {
-            continue;
-        }
+    assert(device_resources_check_magic(&device_resources));
 
-        int gpio_pin = gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_GPIO_PIN_SLOT];
+    assert(device_resources.num_irqs == 2);
+    assert(device_resources.num_regions == 1);
 
-        /* If GPIO pin is configured make sure its only configured to a client channel once */
-        int count = 0;
-        for (int j = 0; j < 62; j++) {
-            if (gpio_pin == gpio_channel_mappings[j][GPIO_CHANNEL_MAPPING_GPIO_PIN_SLOT]) {
-                count++;
-            }
-        }
+    gpio_regs = (imx_gpio_regs_t *)device_resources.regions[0].region.vaddr;
 
-        if (count != 1) {
-            LOG_DRIVER_ERR("Failed to config gpio_channel_mappings[%d] because GPIO pin is not configured ONLY ONCE\n", i, response);
-            while (1) {}
-        }
+    init_pin_subscribers();
 
-        /* Check if IRQ has been configured for this GPIO */
-        if (gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_IRQ_SLOT] != -1) {
-            int irq = gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_IRQ_SLOT];
+    validate_gpio_config();
 
-            /* Check if its a valid irq configuration (its in range + corresponding device channel entry in table is uninitialised) */
-            if (!imx_is_valid_irq_config(irq)) {
-                LOG_DRIVER_ERR("Failed to config irq!\n");
-                while (1) {}
-            }
+    disable_all_interrupts();
 
-            /* Configure with hardware */
-            size_t label;
-            size_t response;
-            imx_set_irq_pin(gpio_pin, irq, &label, &response);
-            if (label == GPIO_FAILURE) {
-                LOG_DRIVER_ERR("Failed to config gpio_channel_mappings[%d] with gpio_irq_error_t : %ld!\n", i, response);
-                while (1) {}
-            }
-            /* Since imx_get_irq_pin is just checking the IMR register we dont need to worry if it fails because its unsupported (irq was NOT COMBINED)*/
-            imx_get_irq_pin(gpio_pin, &label, &response);
-            if (label == GPIO_FAILURE && (response != GPIO_ERROR_UNSUPPORTED_IRQ_CONFIG)) {
-                LOG_DRIVER_ERR("Failed to config gpio_channel_mappings[%d] with gpio_irq_error_t : %ld!\n", i, response);
-                while (1) {}
-            }
+    print_irq_pin_subscribers();
 
-            /* Assign single channel to the gpio pin */
-            if (imx_check_irq_is_combined(irq)) {
-                driver_to_client_channel_mappings_single_irq_line[irq - IMX_GPIO_IRQ_AH_GPIO1_0] = gpio_channel_mappings[i][GPIO_CHANNEL_MAPPING_CLIENTS_CHANNEL_SLOT];
-            }
-
-            /* ACK the IRQ so we can recieve further IRQs */
-            microkit_irq_ack(irq);
-        }
-    }
+    LOG_DRIVER("Finished.\n");
 }

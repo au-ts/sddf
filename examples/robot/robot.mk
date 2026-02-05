@@ -31,15 +31,15 @@ include ${SDDF}/tools/make/board/common.mk
 # Driver paths
 UTIL := $(SDDF)/util
 LIBCO := $(SDDF)/libco
-GPIO_TOP := ${SDDF}/examples/gpio
-METAPROGRAM := $(GPIO_TOP)/meta.py
+ROBOT_TOP := ${SDDF}/examples/robot
+METAPROGRAM := $(ROBOT_TOP)/meta.py
 TIMER_TOP := ${SDDF}/examples/timer
 GPIO_DRIVER := $(SDDF)/drivers/gpio/${PLATFORM}
 TIMER_DRIVER := $(SDDF)/drivers/timer/${TIMER_DRIV_DIR}
 SDDF_CUSTOM_LIBC := 1
 
-SDFGEN_OUT = ${GPIO_TOP}/board/$(MICROKIT_BOARD)
-SYSTEM_FILE := ${SDFGEN_OUT}/gpio.system
+SDFGEN_OUT = ${ROBOT_TOP}/board/$(MICROKIT_BOARD)
+SYSTEM_FILE := ${SDFGEN_OUT}/robot.system
 
 # Images to build
 IMAGES := gpio_driver.elf timer_driver.elf client.elf telemetry.elf
@@ -51,7 +51,7 @@ CFLAGS += \
           -I$(SDDF)/include \
           -I$(SDDF)/include/microkit \
           -I$(LIBCO) \
-          -I${GPIO_TOP}
+          -I${ROBOT_TOP}
 
 LDFLAGS := -L$(BOARD_DIR)/lib -L$(SDDF)/lib
 LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
@@ -65,32 +65,32 @@ ULTRASONIC_SENSOR_OBJS := ultrasonic_sensor.o
 TELEMETRY_OBJS := telemetry.o
 TIMER_QUEUE_OBJS = timer_queue.o
 
-VPATH := ${GPIO_TOP}
+VPATH := ${ROBOT_TOP}
 
 all: $(IMAGE_FILE)
 
-gpio_common.o: ${GPIO_TOP}/gpio_common.c
+gpio_common.o: ${ROBOT_TOP}/gpio_common.c
 	$(CC) -c $(CFLAGS) $< -o $@
 
-timer_queue.o: ${GPIO_TOP}/timer_queue.c
+timer_queue.o: ${ROBOT_TOP}/timer_queue.c
 	$(CC) -c $(CFLAGS) $< -o $@
 
 # Motor control build
-motor_control.o: ${GPIO_TOP}/motor_control.c 
+motor_control.o: ${ROBOT_TOP}/motor_control.c 
 	$(CC) -c $(CFLAGS) $< -o $@
 
 # Ultrasonic sensor build
-ultrasonic_sensor.o: ${GPIO_TOP}/ultrasonic_sensor.c
+ultrasonic_sensor.o: ${ROBOT_TOP}/ultrasonic_sensor.c
 	$(CC) -c $(CFLAGS) $< -o $@
 
-telemetry.o: ${GPIO_TOP}/telemetry.c
+telemetry.o: ${ROBOT_TOP}/telemetry.c
 	$(CC) -c $(CFLAGS) $< -o $@
 
 telemetry.elf: $(TELEMETRY_OBJS) libco.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 # Client build
-client.o: ${GPIO_TOP}/client.c 
+client.o: ${ROBOT_TOP}/client.c 
 	$(CC) -c $(CFLAGS) $< -o $@
 
 client.elf: $(CLIENT_OBJS) ${ULTRASONIC_SENSOR_OBJS} ${TIMER_QUEUE_OBJS} ${GPIO_COMMON_OBJS} ${MOTOR_CONTROL_OBJS} libco.a
@@ -98,9 +98,9 @@ client.elf: $(CLIENT_OBJS) ${ULTRASONIC_SENSOR_OBJS} ${TIMER_QUEUE_OBJS} ${GPIO_
 
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
 ifneq ($(strip $(DTS)),)
-	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output ${SDFGEN_OUT} --sdf gpio.system
+	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --dtb $(DTB) --output ${SDFGEN_OUT} --sdf robot.system
 else
-	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --output ${SDFGEN_OUT} --sdf gpio.system
+	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --output ${SDFGEN_OUT} --sdf robot.system
 endif
 	$(OBJCOPY) --update-section .device_resources=${SDFGEN_OUT}/timer_device_resources.data timer_driver.elf
 	$(OBJCOPY) --update-section .timer_client_config=${SDFGEN_OUT}/timer_client_client.data client.elf

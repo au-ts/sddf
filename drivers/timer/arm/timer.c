@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <os/sddf.h>
 #include <sddf/timer/protocol.h>
+#include <sddf/timer/config.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 #include <sddf/util/udivmodti4.h>
@@ -17,7 +18,7 @@
 
 static uint64_t timer_freq;
 
-#define MAX_TIMEOUTS 6
+#define MAX_TIMEOUTS SDDF_TIMER_MAX_CLIENTS
 
 #define GENERIC_TIMER_ENABLE (1 << 0)
 #define GENERIC_TIMER_IMASK  (1 << 1)
