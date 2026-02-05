@@ -71,7 +71,7 @@ def generate(
     if board.arch == SystemDescription.Arch.X86_64:
         if nvme:
             nvme_bar0_mr = SystemDescription.MemoryRegion(
-                sdf, "nvme_bar0", 0x4000, paddr=0xFEBD4000
+                sdf, "nvme_bar0", 0x4000, paddr=0xA1000000
             )
             sdf.add_mr(nvme_bar0_mr)
             nvme_bar0_map = SystemDescription.Map(
@@ -98,7 +98,7 @@ def generate(
             blk_driver.add_map(data_region_map)
 
             # IRQ
-            nvme_irq = SystemDescription.IrqIoapic(ioapic_id=0, pin=10, vector=1, id=17)
+            nvme_irq = SystemDescription.IrqIoapic(ioapic_id=0, pin=11, vector=1, id=17)
             blk_driver.add_irq(nvme_irq)
 
         else:

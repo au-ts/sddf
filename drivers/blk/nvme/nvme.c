@@ -44,12 +44,12 @@ __attribute__((__section__(".device_resources"))) device_resources_t device_reso
 __attribute__((__section__(".blk_driver_config"))) blk_driver_config_t config;
 
 /*
- * PCI Configuration (hardcoded for QEMU x86_64)
+ * PCI Configuration (hardcoded for x86_64)
  * FUTURE: Get these from PCIe enumeration
  */
 
-#define NVME_PCI_BUS 0
-#define NVME_PCI_DEV 4
+#define NVME_PCI_BUS 5
+#define NVME_PCI_DEV 0
 #define NVME_PCI_FUNC 0
 
 /* Memory Region Virtual Addresses */
@@ -150,10 +150,35 @@ void nvme_controller_init()
     nvme_controller->cc &= ~NVME_CC_EN;
 
     // 1. Wait for CSTS.RDY to become '0' (i.e. not ready)
-    int i = 100;
-    while (nvme_controller->csts & NVME_CSTS_RDY && i != 0) i--;
-    if (i == 0) {
-        sddf_dprintf("time out\n");
+    /*
+    [NVMe-2.1] Figure 36
+    
+    CAP.TO (offset 24)
+    This is the worst-case time that host software should wait for the 
+    CSTS.RDY bit to transition from: 
+    a) ‘0’ to ‘1’ after the CC.EN bit transitions from ‘0’ to ‘1’; or 
+    b) ‘1’ to ‘0’ after the CC.EN bit transitions from ‘1’ to ‘0’. 
+    This worst-case time may be experienced after events such as an abrupt shutdown, 
+    loss of main power without shutting down the controller, or activation of a new 
+    firmware image; typical times are expected to be much shorter. 
+    This field is in 500 millisecond units. The maximum value of this field is FFh, which 
+    indicates a 127.5 second timeout.
+    */
+    uint8_t cap_to = (nvme_controller->cap >> 24) & 0xFF;
+    uint32_t timeout_ms = (cap_to + 1) * 500;
+    uint32_t waited_ms = 0;
+
+    while ((nvme_controller->csts & NVME_CSTS_RDY) && waited_ms < timeout_ms) {
+        // Busy-wait approximately 10ms - TODO properly with timer ??
+        for (volatile int j = 0; j < 100000; j++) {
+            // spinlock hint
+            __asm__ volatile("pause");
+        }
+        waited_ms += 10;
+    }
+
+    if (nvme_controller->csts & NVME_CSTS_RDY) {
+        sddf_dprintf("NVMe reset timeout after %u ms\n", waited_ms);
         return;
     }
 
@@ -202,7 +227,7 @@ void nvme_controller_init()
                           .cdw0 = /* CID */ (0b1111 << 16) | /* PSDT */ 0 | /* FUSE */ 0 | /* OPC */ 0x6,
                           .cdw10 = /* CNTID[31:16] */ 0x0 | /* CNS */ 0x01,
                           .prp2 = 0,
-                          .prp1 = NVME_DATA_REGION_PADDR, /* Data region for identify - hardcoded for QEMU x86 */
+                          .prp1 = NVME_DATA_REGION_PADDR, /* Data region for identify - hardcoded for x86 */
                       });
 
     assert((entry.phase_tag_and_status & _MASK(1, 15)) == 0x0); // §4.2.3 Status Field
@@ -315,7 +340,7 @@ static void handle_request(void)
             prp2 = data_paddr + 0x1000;
         } else if (count > 2) {
             /* PRP2 points to a PRP List stored in the metadata region. */
-            /* QEMU x86 hardcoded addresses */
+            /* x86 hardcoded addresses */
             uint64_t *prp_list = (uint64_t *)(NVME_PRP_LIST_VADDR);
             uint64_t prp_list_paddr = NVME_PRP_LIST_PADDR;
 
@@ -370,7 +395,7 @@ void init(void)
 
     /* Check device presence first */
     uint32_t vid_did = pci_config_read_32(NVME_PCI_BUS, NVME_PCI_DEV, NVME_PCI_FUNC, 0x00);
-    LOG_NVME("VendorID:DeviceID at 00:04.0 = %08x\n", vid_did);
+    LOG_NVME("VendorID:DeviceID = %08x\n", vid_did);
 
     uint32_t bar0 = pci_config_read_32(NVME_PCI_BUS, NVME_PCI_DEV, NVME_PCI_FUNC, 0x10);
     LOG_NVME("NVMe PCI BAR0 readback: %08x\n", bar0);
@@ -386,7 +411,7 @@ void init(void)
     uint8_t intr_pin = (intr_info >> 8) & 0xFF;
     LOG_NVME("PCI Interrupt Line: %d, Pin: %d\n", intr_line, intr_pin);
 
-    /* Map Controller and Metadata - QEMU x86 uses hardcoded addresses */
+    /* Map Controller and Metadata - x86 uses hardcoded addresses */
     nvme_controller = (void *)NVME_CONTROLLER_VADDR;
 
     nvme_asq_region = (void *)NVME_ASQ_VADDR;
@@ -423,7 +448,7 @@ void init(void)
 
 void notified(microkit_channel ch)
 {
-    if (ch == NVME_IRQ) { /* NVMe IRQ - hardcoded for QEMU x86 */
+    if (ch == NVME_IRQ) { /* NVMe IRQ - hardcoded for x86 */
         handle_irq();
         microkit_irq_ack(ch);
     } else if (ch == config.virt.id) {
