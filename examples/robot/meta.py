@@ -36,33 +36,29 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     # setvar_vaddr="gpio_regs"
     # setvar_vaddr="gpio_ao_regs"
 
-    gpio_driver = ProtectionDomain("gpio_driver", "gpio_driver.elf", priority=100, passive=True)
-    gpio_driver.add_map(SystemDescription.Map(gpio_mr, vaddr=0x4000000, perms="rw", cached=False))
-    gpio_driver.add_map(SystemDescription.Map(gpio_ao_mr, vaddr=0x4100000, perms="rw", cached=False))
-
-
+    # TODO: make this passive for scheduling
+    gpio_driver = ProtectionDomain("gpio_driver", "gpio_driver.elf", priority=100)
     client = ProtectionDomain("client", "client.elf", priority=1)
 
     timer_node = dtb.node(board.timer)
     assert timer_node is not None
 
+    gpio_node = dtb.node(board.gpio)
+    assert gpio_node is not None
+
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
     timer_system.add_client(client)
 
-    # Motors to GPIO channel
-    sdf.add_channel(SystemDescription.Channel(client, gpio_driver, a_id=5, b_id=0, pp_a=True, notify_a=True, notify_b=True))
-    sdf.add_channel(SystemDescription.Channel(client, gpio_driver, a_id=6, b_id=1, pp_a=True, notify_a=True, notify_b=True))
-
-    # Sensors to GPIO channel
-    # Echo pin
-    sdf.add_channel(SystemDescription.Channel(client, gpio_driver, a_id=3, b_id=2, pp_a=True, notify_a=True, notify_b=True))
-
-    # Trig pin
-    sdf.add_channel(SystemDescription.Channel(client, gpio_driver, a_id=4, b_id=3, pp_a=True, notify_a=True, notify_b=True))
+    gpio_system = Sddf.Gpio(sdf, gpio_node, gpio_driver)
+    driver_channel_ids = [3, 4, 5, 6]
+    gpio_system.add_client(client, driver_channel_ids=driver_channel_ids)
 
     pds = [timer_driver, client, gpio_driver, telemetry]
     for pd in pds:
         sdf.add_pd(pd)
+
+    assert gpio_system.connect()
+    assert gpio_system.serialise_config(output_dir)
 
 
     assert timer_system.connect()

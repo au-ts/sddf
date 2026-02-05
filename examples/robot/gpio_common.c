@@ -27,3 +27,13 @@ void digital_write(int gpio_ch, int value) {
         assert(false);
     }
 }
+
+int digital_read(int gpio_ch) {
+    int value_received = sddf_gpio_get(gpio_ch);
+    if (value_received < 0) {
+        LOG_CLIENT_ERR("Failed to get value. Error code : %d!\n", value_received);
+        assert(false);
+    }
+
+    return value_received;
+}
