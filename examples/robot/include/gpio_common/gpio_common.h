@@ -12,5 +12,8 @@
 #define GPIO_HIGH (1)
 #define GPIO_LOW (0)
 
+#define GPIO_DIRECTION_INPUT (0)
+#define GPIO_DIRECTION_OUTPUT (1)
+
 void gpio_init(int gpio_ch, int direction);
 void digital_write(int gpio_ch, int value);
