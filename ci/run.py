@@ -25,7 +25,7 @@ EXAMPLES_LIST = sorted(
 if __name__ == "__main__":
     examples_list = sorted(set(EXAMPLES_LIST))
     if len(examples_list) == 0:
-        error("no examples passed")
+        error("no examples found")
         exit(1)
 
     matrix: list[TestConfig] = []

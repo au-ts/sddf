@@ -334,12 +334,16 @@ def refine_matrix(
         # But we still want to make the user specify the board.
         matrix = sorted(
             set(
-                TestConfig(board=test.board, config="custom", build_system="custom")
+                TestConfig(
+                    example=test.example,
+                    board=test.board,
+                    config="custom",
+                    build_system="custom",
+                    timeout_s=test.timeout_s,
+                )
                 for test in matrix
             )
         )
-
-        loader_img_fn = lambda n, c: loader_img
 
     if args.single and len(matrix) != 1:
         parser.error(
@@ -359,7 +363,10 @@ def refine_matrix(
         quit(0)
 
     for test_config in matrix:
-        loader_img = loader_img_path(test_config)
+        if test_config.config == "custom":
+            loader_img = args.override_image
+        else:
+            loader_img = loader_img_path(test_config)
         assert loader_img.exists(), f"loader image file {loader_img} does not exist"
 
     return matrix
