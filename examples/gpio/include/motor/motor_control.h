@@ -40,11 +40,12 @@ static const int pwm_delay_mappings[PWM_CHANNEL_MAPPING_COLS][PWM_CHANNEL_MAPPIN
     {CONTROL_NEUTRAL, 1500, 18500},
 };
 
-void control_forward();
-void control_reverse();
-void control_neutral();
-void control_left();
-void control_right();
+void control_forward(uint64_t miliseconds);
+void control_reverse(uint64_t miliseconds);
+void control_neutral(uint64_t miliseconds);
+void control_left(uint64_t miliseconds);
+void control_right(uint64_t miliseconds);
+void control_stop();
 
 void handle_motor_control_timeout();
 void handle_pwm_timeout(int gpio_ch);

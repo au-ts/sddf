@@ -96,47 +96,22 @@ void client_main(void) {
 
     while(true)
     {
-        delay_miliseconds(1000, CLIENT_TIMEOUT_ID);
+        delay_miliseconds(1, CLIENT_TIMEOUT_ID);
 
         LOG_CLIENT("Client main\n");
-        LOG_CLIENT("Reading received: %lu\n", get_ultrasonic_reading());
-        delay_miliseconds(1000, CLIENT_TIMEOUT_ID);
 
-        control_forward();
+        uint64_t dist = get_ultrasonic_reading();
 
-        delay_miliseconds(1000, MOTOR_CONTROL_TIMEOUT_ID);
+        LOG_CLIENT("Reading received: %lu\n", dist);
 
-        // control_reverse();
-        // delay_motors(1000);
-
-        // delay_motors(1000);
-        // control_reverse();
-
-        // uint64_t averaged_dist = 0;
-        // for (int i = 0; i < 3; i++) {
-        //     uint64_t distance = get_ultrasonic_reading();
-        //     if (!distance) {
-        //         continue;
-        //     }
-        //     averaged_dist += distance;
-        // }
-        
-        // averaged_dist /= 3;
-        // // LOG_CLIENT("Sensor Reading Received: %ld\n", averaged_dist);
-
-        // if (averaged_dist < 10) {
-        //     drive_stop();
-        //     // turn left every time there's an obstacle
-        //     drive_left();
-        //     delay_ms(4);
-        // }
-        // else {
-        //     drive_forward();
-        // }
-        
-        // time_end = sddf_timer_time_now(timer_channel);
-
-        // LOG_CLIENT("Execution time: %ld\n", time_end - time_start);
+        if (dist < 10) {
+            control_stop();
+            // turn left every time there's an obstacle
+            control_left(1000);
+        }
+        else {
+            control_forward(1000);
+        }
     }
 }
 

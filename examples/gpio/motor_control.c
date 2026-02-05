@@ -21,7 +21,6 @@
 
 #define LOG_CONTROL_ERR(...) do{ sddf_printf("CONTROL|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
-
 // Channels
 
 // Motors A and B channels
@@ -62,7 +61,9 @@ void set_pwm(int gpio_ch, uint64_t micro_s) {
     set_timeout(micro_s);
 }
 
-void control_forward(void) {
+void control_forward(uint64_t miliseconds) {
+    delay_miliseconds(miliseconds, MOTOR_CONTROL_TIMEOUT_ID);
+
     is_control_fulfilled = 1;
 
     motor_a_state = CONTROL_FORWARD;
@@ -73,7 +74,9 @@ void control_forward(void) {
 }
 
 // TODO complete these
-void control_reverse(void) {
+void control_reverse(uint64_t miliseconds) {
+    delay_miliseconds(miliseconds, MOTOR_CONTROL_TIMEOUT_ID);
+
     is_control_fulfilled = 1;
 
     motor_a_state = CONTROL_REVERSE;
@@ -84,7 +87,9 @@ void control_reverse(void) {
 }
 
 
-void control_neutral(void) {
+void control_neutral(uint64_t miliseconds) {
+    delay_miliseconds(miliseconds, MOTOR_CONTROL_TIMEOUT_ID);
+
     is_control_fulfilled = 1;
 
     motor_a_state = CONTROL_NEUTRAL;
@@ -94,7 +99,9 @@ void control_neutral(void) {
     set_pwm(GPIO_CHANNEL_B, pwm_delay_mappings[CONTROL_NEUTRAL - 1][PWM_TIME_HIGH]);
 }
 
-void control_left(void) {
+void control_left(uint64_t miliseconds) {
+    delay_miliseconds(miliseconds, MOTOR_CONTROL_TIMEOUT_ID);
+
     is_control_fulfilled = 1;
 
     motor_a_state = CONTROL_NEUTRAL;
@@ -104,7 +111,9 @@ void control_left(void) {
     set_pwm(GPIO_CHANNEL_B, pwm_delay_mappings[CONTROL_FORWARD - 1][PWM_TIME_HIGH]);
 }
 
-void control_right(void) {
+void control_right(uint64_t miliseconds) {
+    delay_miliseconds(miliseconds, MOTOR_CONTROL_TIMEOUT_ID);
+
     is_control_fulfilled = 1;
 
     motor_a_state = CONTROL_FORWARD;
@@ -114,7 +123,7 @@ void control_right(void) {
     set_pwm(GPIO_CHANNEL_A, pwm_delay_mappings[CONTROL_NEUTRAL - 1][PWM_TIME_HIGH]);
 }
 
-void control_stop(void) {
+void control_stop() {
     digital_write(GPIO_CHANNEL_A, GPIO_LOW);
     digital_write(GPIO_CHANNEL_A, GPIO_LOW);
 }
