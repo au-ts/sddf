@@ -1,7 +1,7 @@
 # Copyright 2025, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
 from dataclasses import dataclass
-from typing import List, Tuple, Optional
+from typing import List, Optional
 from sdfgen import SystemDescription
 
 
@@ -99,8 +99,8 @@ BOARDS: List[Board] = [
         paddr_top=0x6_0000_000,
         serial="pl011@9000000",
         timer="timer",
-        blk="virtio_mmio@a003e00",
-        ethernet="virtio_mmio@a003e00",
+        blk="virtio_mmio@a000200",
+        ethernet="virtio_mmio@a000000",
         i2c=None,
     ),
     Board(
