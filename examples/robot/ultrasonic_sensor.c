@@ -29,18 +29,12 @@ uint64_t pulse_in(int gpio_ch, int value) {
     int has_received = 0;
 
     while (true) {
-        // LOG_SENSOR("sensor read attempt\n");
-        microkit_msginfo msginfo;
-        msginfo = microkit_msginfo_new(GPIO_GET_GPIO, 1);
-        microkit_mr_set(GPIO_REQ_CONFIG_SLOT, GPIO_INPUT);
-        msginfo = microkit_ppcall(gpio_ch, msginfo);
-        if (microkit_msginfo_get_label(msginfo) == GPIO_FAILURE) {
-            size_t error = microkit_mr_get(GPIO_RES_VALUE_SLOT);
-            LOG_SENSOR_ERR("failed to get input of gpio with error %ld!\n", error);
-            while (1) {};
+        int value_received = sddf_gpio_get(gpio_ch);
+        if (value_received < 0) {
+            LOG_CLIENT_ERR("Failed to get value. Error code : %d!\n", value_received);
+            assert(false);
         }
 
-        int value_received = microkit_mr_get(GPIO_RES_VALUE_SLOT);
         if (value_received == value) {
             // First time measured value has been received
             if (!has_received) {
