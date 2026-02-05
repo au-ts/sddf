@@ -19,7 +19,7 @@ MICROKIT_CONFIG ?= debug
 IMAGE_FILE := loader.img
 REPORT_FILE := report.txt
 
-SUPPORTED_BOARDS := odroidc4
+SUPPORTED_BOARDS := maaxboard
 
 ifeq ($(strip $(TOOLCHAIN)),)
 	TOOLCHAIN := clang
@@ -27,16 +27,18 @@ endif
 
 include ${SDDF}/tools/make/board/common.mk
 
-
 # Driver paths
 UTIL := $(SDDF)/util
 LIBCO := $(SDDF)/libco
 ROBOT_TOP := ${SDDF}/examples/robot
 METAPROGRAM := $(ROBOT_TOP)/meta.py
 TIMER_TOP := ${SDDF}/examples/timer
-GPIO_DRIVER := $(SDDF)/drivers/gpio/${PLATFORM}
+GPIO_DRIVER := $(SDDF)/drivers/gpio/${GPIO_DRIV_DIR}
 TIMER_DRIVER := $(SDDF)/drivers/timer/${TIMER_DRIV_DIR}
 SDDF_CUSTOM_LIBC := 1
+CONFIGS_DIR   := $(ROBOT_TOP)/include/gpio_common
+CONFIG_HEADER := $(CONFIGS_DIR)/gpio_config.h
+
 
 SDFGEN_OUT = ${ROBOT_TOP}/board/$(MICROKIT_BOARD)
 SYSTEM_FILE := ${SDFGEN_OUT}/robot.system
@@ -69,7 +71,7 @@ VPATH := ${ROBOT_TOP}
 
 all: $(IMAGE_FILE)
 
-gpio_common.o: ${ROBOT_TOP}/gpio_common.c
+gpio_common.o: ${ROBOT_TOP}/gpio_common.c $(CONFIG_HEADER)
 	$(CC) -c $(CFLAGS) $< -o $@
 
 timer_queue.o: ${ROBOT_TOP}/timer_queue.c
@@ -103,6 +105,7 @@ else
 	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --output ${SDFGEN_OUT} --sdf robot.system
 endif
 	$(OBJCOPY) --update-section .device_resources=${SDFGEN_OUT}/timer_device_resources.data timer_driver.elf
+	$(OBJCOPY) --update-section .gpio_client_config=gpio_client_client.data client.elf
 	$(OBJCOPY) --update-section .timer_client_config=${SDFGEN_OUT}/timer_client_client.data client.elf
 	touch $@
 
