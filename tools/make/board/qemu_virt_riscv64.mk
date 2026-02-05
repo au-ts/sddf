@@ -17,6 +17,6 @@ QEMU_ARCH_ARGS := -machine virt \
 					-serial mon:stdio \
 				    -global virtio-mmio.force-legacy=false
 
-QEMU_NET_ARGS := -device virtio-net-device,netdev=netdev0
+QEMU_NET_ARGS := -device virtio-net-device,netdev=netdev0,bus=virtio-mmio-bus.0
 
-QEMU_BLK_ARGS := -device virtio-blk-device,drive=hd \
+QEMU_BLK_ARGS := -device virtio-blk-device,drive=hd,bus=virtio-mmio-bus.1
