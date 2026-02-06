@@ -13,6 +13,10 @@
 #include <sddf/timer/client.h>
 #include <os/sddf.h>
 #include <sddf/timer/config.h>
+#include <sddf/gpio/client.h>
+#include <sddf/gpio/config.h>
+#include <sddf/gpio/protocol.h>
+
 #include "include/motor/motor_control.h"
 #include "include/client/timer_queue.h"
 #include "include/ultrasonic/ultrasonic_sensor.h"

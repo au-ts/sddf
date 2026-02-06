@@ -14,18 +14,21 @@ IMX:
 */
 
 //  Motor pins
-#define GPIO_1 (MESON_GPIO_X + 1)
-#define GPIO_2 (MESON_GPIO_X + 2)
+// #define GPIO_1 (MESON_GPIO_X + 1)
+// #define GPIO_2 (MESON_GPIO_X + 2)
 
 // Ultrasonic pins
 // Echo pin
-#define GPIO_3 (MESON_GPIO_X + 3)
+// #define GPIO_3 (MESON_GPIO_X + 3)
 // Trig pin
-#define GPIO_4 (MESON_GPIO_X + 4)
+// #define GPIO_4 (MESON_GPIO_X + 4)
 
 
 #define PIN_1 (15) // IMX gpio1_15 // IMX physical 32
 #define PIN_2 (13) // IMX gpio1_13 // IMX physical 33
+#define PIN_3 (14) // IMX gpio1_15 // IMX physical 32
+#define PIN_4 (16) // IMX gpio1_13 // IMX physical 33
+
 
 #define IRQ_1 (1)
 
@@ -43,10 +46,10 @@ typedef struct {
 
 // ideally this whole setup should probably be in the meta.py file
 static const GPIO_driver_channel_t gpio_driver_channel_mappings[NUM_DRIVER_CHANNELS] = {
-    [0] = { GPIO_1, IRQ_UNUSED }, // need to claim these channels in meta.py
-    [1] = { GPIO_2, IRQ_UNUSED },
-    [2] = { GPIO_3, IRQ_UNUSED },
-    [3] = { GPIO_4, IRQ_UNUSED },
+    [0] = { PIN_1, IRQ_UNUSED }, // need to claim these channels in meta.py
+    [1] = { PIN_2, IRQ_UNUSED },
+    [2] = { PIN_3, IRQ_UNUSED },
+    [3] = { PIN_4, IRQ_UNUSED },
     UNUSED_CH(4),
     UNUSED_CH(5),
     UNUSED_CH(6),

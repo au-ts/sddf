@@ -10,7 +10,6 @@
 #include <sddf/util/printf.h>
 #include <sddf/timer/client.h>
 #include <sddf/timer/config.h>
-#include <sddf/gpio/meson/gpio.h>
 
 #define CONTROL_STOP (0)
 #define CONTROL_FORWARD (1)

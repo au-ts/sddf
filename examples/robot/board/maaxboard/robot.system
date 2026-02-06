@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<system>
+    <memory_region name="gpio@30200000/drivers/gpio/imx/regs" size="0x10000" phys_addr="0x30200000" />
+    <memory_region name="timer@302d0000/drivers/timer/imx/regs" size="0x10000" phys_addr="0x302d0000" />
+    <protection_domain name="timer" priority="254" passive="true">
+        <program_image path="timer_driver.elf" />
+        <map mr="timer@302d0000/drivers/timer/imx/regs" vaddr="0x20000000" perms="rw" cached="false" />
+        <irq irq="87" id="0" trigger="level" />
+    </protection_domain>
+    <protection_domain name="client" priority="1">
+        <program_image path="client.elf" />
+    </protection_domain>
+    <protection_domain name="gpio_driver" priority="100" passive="true">
+        <program_image path="gpio_driver.elf" />
+        <map mr="gpio@30200000/drivers/gpio/imx/regs" vaddr="0x20000000" perms="rw" cached="false" />
+        <irq irq="96" id="60" trigger="level" />
+        <irq irq="97" id="61" trigger="level" />
+    </protection_domain>
+    <protection_domain name="telemetry" priority="1">
+        <program_image path="telemetry.elf" />
+    </protection_domain>
+    <channel>
+        <end pd="gpio_driver" id="3" />
+        <end pd="client" id="0" notify="false" pp="true" />
+    </channel>
+    <channel>
+        <end pd="gpio_driver" id="4" />
+        <end pd="client" id="1" notify="false" pp="true" />
+    </channel>
+    <channel>
+        <end pd="gpio_driver" id="5" />
+        <end pd="client" id="2" notify="false" pp="true" />
+    </channel>
+    <channel>
+        <end pd="gpio_driver" id="6" />
+        <end pd="client" id="3" notify="false" pp="true" />
+    </channel>
+    <channel>
+        <end pd="timer" id="1" />
+        <end pd="client" id="4" notify="false" pp="true" />
+    </channel>
+</system>

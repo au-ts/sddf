@@ -53,7 +53,8 @@ CFLAGS += \
           -I$(SDDF)/include \
           -I$(SDDF)/include/microkit \
           -I$(LIBCO) \
-          -I${ROBOT_TOP}
+          -I${ROBOT_TOP} \
+		  -I$(CONFIGS_DIR)
 
 LDFLAGS := -L$(BOARD_DIR)/lib -L$(SDDF)/lib
 LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
@@ -105,7 +106,7 @@ else
 	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --output ${SDFGEN_OUT} --sdf robot.system
 endif
 	$(OBJCOPY) --update-section .device_resources=${SDFGEN_OUT}/timer_device_resources.data timer_driver.elf
-	$(OBJCOPY) --update-section .gpio_client_config=gpio_client_client.data client.elf
+	$(OBJCOPY) --update-section .gpio_client_config=${SDFGEN_OUT}/gpio_client_client.data client.elf
 	$(OBJCOPY) --update-section .timer_client_config=${SDFGEN_OUT}/timer_client_client.data client.elf
 	touch $@
 

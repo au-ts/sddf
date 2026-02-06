@@ -1,20 +1,41 @@
 import os
 import sys
 import argparse
+from dataclasses import dataclass
+from typing import List
 from sdfgen import SystemDescription, Sddf, DeviceTree
 import importlib
 from importlib.metadata import version
 
 
 # WARNING: the system file this generates is incomplete (missing & vaddr-var mapping)
-
 sys.path.append(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../tools/meta")
 )
 
 # Use importlib to dynamically load. Using `from` import below other code is bad style.
-board_module = importlib.import_module("board")
-BOARDS = board_module.BOARDS
+@dataclass
+class Board:
+    name: str
+    arch: SystemDescription.Arch
+    paddr_top: int
+    gpio: str
+    # The example needs a timer driver to verify the IRQ based loop
+    # GPIO itself does not need a timer driver to work
+    timer: str
+
+
+BOARDS: List[Board] = [
+    Board(
+        name="maaxboard",
+        arch=SystemDescription.Arch.AARCH64,
+        paddr_top=0x7_0000_000,
+        gpio="soc@0/bus@30000000/gpio@30200000",
+        timer="soc@0/bus@30000000/timer@302d0000",
+    ),
+]
+
+# board_module = importlib.import_module("board")
 
 assert version("sdfgen").split(".")[1] == "28", "Unexpected sdfgen version"
 
@@ -22,15 +43,10 @@ ProtectionDomain = SystemDescription.ProtectionDomain
 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     # Memory regions
-    gpio_mr = SystemDescription.MemoryRegion(sdf, "gpio", 0x1000,  paddr=0xFF634000)
-    gpio_ao_mr = SystemDescription.MemoryRegion(sdf, "gpio_ao", 0x1000,  paddr=0xFF800000)
-    sdf.add_mr(gpio_mr)
-    sdf.add_mr(gpio_ao_mr)
 
     # Protection domains
     timer_node = None
     timer_driver = ProtectionDomain("timer", "timer_driver.elf", priority=254)
-
     telemetry = ProtectionDomain("telemetry", "telemetry.elf", priority=1)
 
     # setvar_vaddr="gpio_regs"

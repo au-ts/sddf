@@ -8,7 +8,7 @@
 #include <os/sddf.h>
 #include <sddf/gpio/client.h>
 #include <sddf/gpio/config.h>
-#include <sddf/gpio/protocol.h>
+// #include <sddf/gpio/protocol.h>
 #include "include/gpio_common/gpio_config.h"
 
 
