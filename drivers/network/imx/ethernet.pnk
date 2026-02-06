@@ -121,6 +121,7 @@ inline fun set_eir(1 eir)
   /@ unfold valid() @/
   !st32 eth_reg + ETH_EIR_OFF, eir;
   /@ fold valid() @/
+  /@ assert eir == IRQ_MASK ==> (eir & IRQ_MASK) == eir @/
   return 0;
 }
 
@@ -255,7 +256,7 @@ fun rx_provide()
     reprocess = false;
 
     empty = net_queue_empty(net_rx_free, net_rx_capacity);
-    if ((!empty) && (!full)) {
+    if (!empty + !full == 0) {
       net_cancel_signal(net_rx_free);
       reprocess = true;
     }
@@ -263,6 +264,17 @@ fun rx_provide()
     /@ fold valid() @/
   }
   return 0;
+}
+
+inline fun wrap_hw_rx_capacity(1 x)
+{
+  /@ requires valid_hw_meta() @/
+  /@ ensures valid_hw_meta() @/
+  /@ ensures unfolding valid_hw_meta() in retval < gv.hw_rx_capacity @/
+  /@ unfold valid_hw_meta() @/
+  var ret = x & (hw_rx_capacity - 1);
+  /@ fold valid_hw_meta() @/
+  return ret;
 }
 
 fun rx_return()
@@ -280,7 +292,10 @@ fun rx_return()
     /@ unfold valid() @/
     /@ unfold valid_hw_meta() @/
     /* If buffer slot is still empty, we have processed all packets the device has filled */
-    var idx = hw_rx_head & (hw_rx_capacity - 1);
+    var x = hw_rx_head;
+    /@ fold valid_hw_meta() @/
+    var idx = wrap_hw_rx_capacity(x);
+    /@ unfold valid_hw_meta() @/
 
     var dscr_addr = hw_rx_descr + idx * @biw;
     var stat = 0;
@@ -325,7 +340,7 @@ fun rx_return()
   /@ unfold valid() @/
   /@ unfold valid_virt_meta() @/
   var 1 to_signal = net_require_signal(net_rx_active, net_rx_capacity);
-  if (packets_transferred && to_signal) {
+  if (!!packets_transferred + !!to_signal == 2) {
     net_cancel_signal(net_rx_active);
     microkit_notify(rx_ch);
   }
@@ -399,7 +414,7 @@ fun tx_provide()
     /@ unfold valid() @/
     /@ unfold valid_virt_meta() @/
     empty = net_queue_empty(net_tx_active, net_tx_capacity);
-    if ((!empty) && (!full)) {
+    if (!empty + !full == 2) {
       net_cancel_signal(net_tx_active);
       reprocess = true;
     }
@@ -407,6 +422,17 @@ fun tx_provide()
     /@ fold valid() @/
   }
   return 0;
+}
+
+inline fun wrap_hw_tx_capacity(1 x)
+{
+  /@ requires valid_hw_meta() @/
+  /@ ensures valid_hw_meta() @/
+  /@ ensures unfolding valid_hw_meta() in retval < gv.hw_tx_capacity @/
+  /@ unfold valid_hw_meta() @/
+  var ret = x & (hw_tx_capacity - 1);
+  /@ fold valid_hw_meta() @/
+  return ret;
 }
 
 fun tx_return()
@@ -422,9 +448,12 @@ fun tx_return()
     /@ invariant valid() @/
 
     /@ unfold valid() @/
-    /@ unfold valid_hw_meta() @/
     /* Ensure that this buffer has been sent by the device */
-    var idx = hw_tx_head & (hw_tx_capacity - 1);
+    /@ unfold valid_hw_meta() @/
+    var x = hw_tx_head;
+    /@ fold valid_hw_meta() @/
+    var idx = wrap_hw_tx_capacity(x);
+    /@ unfold valid_hw_meta() @/
 
     var dscr_addr = hw_tx_descr + idx * DESCR_LEN;
     var stat = 0;
@@ -466,7 +495,7 @@ fun tx_return()
   /@ unfold valid() @/
   /@ unfold valid_virt_meta() @/
   var 1 to_signal = net_require_signal(net_tx_free, net_tx_capacity);
-  if (enqueued && to_signal) {
+  if (!!enqueued + !!to_signal == 2) {
     net_cancel_signal(net_tx_free);
     microkit_notify(tx_ch);
   }
@@ -476,26 +505,12 @@ fun tx_return()
   return 0;
 }
 
-fun bw_and_idempotent_IRQ_MASK(1 x) {
-  /@ ensures (retval == 0) ==> (retval & IRQ_MASK) == retval @/
-  /@ ensures (retval == 33554432) ==> (retval & IRQ_MASK) == retval @/
-  /@ ensures (retval == 134217728) ==> (retval & IRQ_MASK) == retval @/
-  /@ ensures (retval == 4194304) ==> (retval & IRQ_MASK) == retval @/
-  /@ ensures (retval == 167772160) ==> (retval & IRQ_MASK) == retval @/
-  /@ ensures (retval == 37748736) ==> (retval & IRQ_MASK) == retval @/
-  /@ ensures (retval == 138412032) ==> (retval & IRQ_MASK) == retval @/
-  /@ ensures (retval == 171966464) ==> (retval & IRQ_MASK) == retval @/
-  /@ ensures (retval & IRQ_MASK) == retval @/
-  return x & IRQ_MASK;
-  // each of the following are the possible values of retval
-}
-
 fun handle_irq() {
   /@ requires valid() @/
   /@ ensures valid() @/
 
   var 1 eir_full = get_eir_status();
-  var eir = bw_and_idempotent_IRQ_MASK(eir_full);
+  var eir = eir_full & IRQ_MASK;
   set_eir(eir);
 
   while (eir & IRQ_MASK)
@@ -510,7 +525,7 @@ fun handle_irq() {
       rx_provide();
     }
     eir_full = get_eir_status();
-    eir = bw_and_idempotent_IRQ_MASK(eir_full);
+    eir = eir_full & IRQ_MASK;
     set_eir(eir);
   }
   return 0;
