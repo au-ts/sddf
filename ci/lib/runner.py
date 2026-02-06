@@ -29,6 +29,7 @@ from .backends import (
     OUTPUT,
 )
 from ci.common import TestConfig, loader_img_path
+from ci.lib.backends.common import LockedBoardException
 
 type TestFunction = Callable[[HardwareBackend, TestConfig], Awaitable[None]]
 type BackendFunction = Callable[[TestConfig, Path], HardwareBackend]
@@ -36,9 +37,9 @@ type BackendFunction = Callable[[TestConfig, Path], HardwareBackend]
 
 # Task to monitor for inactivity
 async def _watch_stdout_inactivity(
-    tee: TeeOut, timeout_no_output: float, poll_s: float = 0.5
+    tee: TeeOut, timeout_no_output: float, main_task: asyncio.Task, poll_s: float = 0.5
 ):
-    while True:
+    while not main_task.done():
         await asyncio.sleep(poll_s)
         if tee.last_write_age_s() >= timeout_no_output:
             raise asyncio.TimeoutError(f"No output for more than {timeout_no_output}s")
@@ -50,11 +51,10 @@ async def _run_with_watchdog(
     tee.touch()
 
     async with asyncio.TaskGroup() as tg:
-        watchdog_task = tg.create_task(_watch_stdout_inactivity(tee, timeout_no_output))
-        try:
-            await main
-        finally:
-            watchdog_task.cancel()
+        main_task = tg.create_task(main, name="main")
+        tg.create_task(
+            _watch_stdout_inactivity(tee, timeout_no_output, main_task), name="watchdog"
+        )
 
 
 async def runner(
@@ -211,9 +211,18 @@ def run_test_config(
                         test_config.timeout_s,
                     )
                 )
+        # Propagate single exceptions from the exception group
         except* asyncio.TimeoutError as eg:
-            # turn ExceptionGroup into a plain TimeoutError
             raise asyncio.TimeoutError(str(eg.exceptions[0])) from None
+        except* LockedBoardException as eg:
+            raise TestRetryException(str(eg.exceptions[0])) from None
+        except* TestRetryException as eg:
+            raise eg.exceptions[0] from None
+        except* TestFailureException as eg:
+            raise eg.exceptions[0] from None
+        except* Exception as eg:
+            if len(eg.exceptions) == 1:
+                raise eg.exceptions[0] from None
     except TestFailureException as e:
         log.error(f"Test failed: {e}")
         return "fail"
