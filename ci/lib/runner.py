@@ -34,7 +34,6 @@ type TestFunction = Callable[[HardwareBackend, TestConfig], Awaitable[None]]
 type BackendFunction = Callable[[TestConfig, Path], HardwareBackend]
 
 
-# Task to monitor for inactivity
 async def _watch_stdout_inactivity(
     tee: TeeOut, timeout_no_output: float, poll_s: float = 0.5
 ):
@@ -49,12 +48,31 @@ async def _run_with_watchdog(
 ):
     tee.touch()
 
-    async with asyncio.TaskGroup() as tg:
-        watchdog_task = tg.create_task(_watch_stdout_inactivity(tee, timeout_no_output))
-        try:
-            await main
-        finally:
+    main_task = asyncio.create_task(main, name="main")
+    watchdog_task = asyncio.create_task(
+        _watch_stdout_inactivity(tee, timeout_no_output),
+        name="watchdog",
+    )
+
+    try:
+        done, _ = await asyncio.wait(
+            {main_task, watchdog_task},
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        # If watchdog fired first - cancel main and raise timeout
+        if watchdog_task in done:
+            exc = watchdog_task.exception()
+            if exc is not None:
+                main_task.cancel()
+                await asyncio.gather(main_task, return_exceptions=True)
+                raise exc
+
+        # Otherwise main finished first - propagate
+        await main_task
+    finally:
+        if not watchdog_task.done():
             watchdog_task.cancel()
+        await asyncio.gather(watchdog_task, return_exceptions=True)
 
 
 async def runner(
@@ -202,22 +220,19 @@ def run_test_config(
         log_file_cm = contextlib.nullcontext()
 
     try:
-        try:
-            with log_file_cm:
-                asyncio.run(
-                    _run_with_watchdog(
-                        runner(test_fn, backend, test_config),
-                        OUTPUT,
-                        test_config.timeout_s,
-                    )
+        with log_file_cm:
+            asyncio.run(
+                _run_with_watchdog(
+                    runner(test_fn, backend, test_config),
+                    OUTPUT,
+                    test_config.timeout_s,
                 )
-        except* asyncio.TimeoutError as eg:
-            # turn ExceptionGroup into a plain TimeoutError
-            raise asyncio.TimeoutError(str(eg.exceptions[0])) from None
+            )
+
     except TestFailureException as e:
         log.error(f"Test failed: {e}")
         return "fail"
-    except (TimeoutError, asyncio.TimeoutError) as e:
+    except (TimeoutError, asyncio.TimeoutError):
         log.error("Test timed out")
         return "fail"
     except TestRetryException as e:
