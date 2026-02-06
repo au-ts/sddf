@@ -158,6 +158,8 @@ var 1 eth_reg = ETH_REG;
   predicate valid_hw_meta() {
   	acc(gv.hw_tx_tail) && acc(gv.hw_tx_head) && acc(gv.hw_tx_capacity) && acc(gv.hw_tx_descr) &&
   	acc(gv.hw_rx_tail) && acc(gv.hw_rx_head) && acc(gv.hw_rx_capacity) && acc(gv.hw_rx_descr) &&
+    gv.hw_tx_capacity == 256 &&
+    gv.hw_rx_capacity == 256 &&
     bounded16(gv.hw_tx_tail) && bounded16(gv.hw_tx_head) && boundedW(gv.hw_tx_descr) && boundedW(gv.hw_tx_descr + gv.hw_tx_capacity * DESCR_LEN) && gv.hw_tx_capacity == QUEUE_CAPACITY &&
     bounded16(gv.hw_rx_tail) && bounded16(gv.hw_rx_head) && boundedW(gv.hw_rx_descr) && boundedW(gv.hw_rx_descr + gv.hw_rx_capacity * DESCR_LEN) && gv.hw_rx_capacity == QUEUE_CAPACITY &&
     gv.hw_tx_descr + gv.hw_tx_capacity * DESCR_LEN < RX_FREE_BASE &&
