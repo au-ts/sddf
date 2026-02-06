@@ -20,19 +20,19 @@
         <program_image path="telemetry.elf" />
     </protection_domain>
     <channel>
-        <end pd="gpio_driver" id="3" />
+        <end pd="gpio_driver" id="0" />
         <end pd="client" id="0" notify="false" pp="true" />
     </channel>
     <channel>
-        <end pd="gpio_driver" id="4" />
+        <end pd="gpio_driver" id="1" />
         <end pd="client" id="1" notify="false" pp="true" />
     </channel>
     <channel>
-        <end pd="gpio_driver" id="5" />
+        <end pd="gpio_driver" id="2" />
         <end pd="client" id="2" notify="false" pp="true" />
     </channel>
     <channel>
-        <end pd="gpio_driver" id="6" />
+        <end pd="gpio_driver" id="3" />
         <end pd="client" id="3" notify="false" pp="true" />
     </channel>
     <channel>

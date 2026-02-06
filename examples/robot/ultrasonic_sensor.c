@@ -80,8 +80,8 @@ void sensor_init(void) {
     // sddf_timer_set_timeout(timer_channel, 1*NS_IN_MS);
 
     LOG_SENSOR("init\n");
-    gpio_init(GPIO_CHANNEL_ECHO, GPIO_DIRECTION_INPUT);
-    gpio_init(GPIO_CHANNEL_TRIG, GPIO_DIRECTION_OUTPUT);  
+    gpio_init(gpio_channel_echo, GPIO_DIRECTION_INPUT);
+    gpio_init(gpio_channel_trigger, GPIO_DIRECTION_OUTPUT);  
 }
 
 // TODO: might want to buffer over multiple reads
@@ -104,7 +104,7 @@ void set_trig_high() {
 
 
 uint64_t read_distance() {
-    uint64_t duration = pulse_in(GPIO_CHANNEL_ECHO, GPIO_HIGH);
+    uint64_t duration = pulse_in(gpio_channel_echo, GPIO_HIGH);
     if (duration) {
         uint64_t distance = duration * 0.034 / 2;
         LOG_SENSOR("Sensor Reading Received: %ld\n", distance);

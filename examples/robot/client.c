@@ -33,8 +33,16 @@ cothread_t t_main;
 
 PriorityQueue timeout_queue = {{}, {}, 0};
 
-// Note: not the actual value for timer channel, actual timer channel id is set by timer_config.driver_id
+// Note: not the actual value for these channels, actual channel ids are set by driver_id in client init()
 sddf_channel timer_channel = 0;
+
+// Ultrasonic GPIO channels
+sddf_channel gpio_channel_echo = 0;
+sddf_channel gpio_channel_trigger = 0;
+
+// Motor GPIO channels
+sddf_channel gpio_channel_motor_a = 0;
+sddf_channel gpio_channel_motor_b = 0;
 
 bool delay_microseconds(size_t microseconds, int timeout_id)
 {
@@ -123,34 +131,30 @@ void notified(sddf_channel ch) {
     // check this switch
     // LOG_CLIENT("timer: %d\n", ch);
 
-    if (ch == timer_config.driver_id) {
+    if (ch == timer_channel) {
         int timeout_id = dequeue(&timeout_queue);
         // LOG_CLIENT("timeout id: %d\n", timeout_id);
 
-        switch (timeout_id)
-        {
-        case SENSOR_TIMEOUT_ID:
+        // TODO: horrible style, refactor this and how timeouts are handled (especially for motors)
+        if (timeout_id == SENSOR_TIMEOUT_ID) {
             LOG_CLIENT("sensor timeout\n");
             co_switch(t_main);
-            break;
-        case CLIENT_TIMEOUT_ID:
+        }
+        else if (timeout_id == CLIENT_TIMEOUT_ID) {
             co_switch(t_main);
-            break;
-        case MOTOR_CONTROL_TIMEOUT_ID:
+        }
+        else if (timeout_id == MOTOR_CONTROL_TIMEOUT_ID) {
             LOG_CLIENT("motor timeout\n");
             handle_motor_control_timeout();
             co_switch(t_main);
-            break;
-        case MOTOR_A_TIMEOUT_ID:
-            handle_pwm_timeout(MOTOR_A_TIMEOUT_ID);
-            LOG_CLIENT("motor A timeout %d\n", timeout_queue.size);
-            break;
-        case MOTOR_B_TIMEOUT_ID:
-            handle_pwm_timeout(MOTOR_B_TIMEOUT_ID);
+        }
+        else if (timeout_id == gpio_channel_motor_a) {
+            handle_pwm_timeout(gpio_channel_motor_b);
             LOG_CLIENT("motor B timeout %d\n", timeout_queue.size);
-            break;        
-        default:
-            break;
+        }
+        else if (timeout_id == gpio_channel_motor_b) {
+            handle_pwm_timeout(gpio_channel_motor_b);
+            LOG_CLIENT("motor B timeout %d\n", timeout_queue.size);
         }
     }
     else {
@@ -159,9 +163,16 @@ void notified(sddf_channel ch) {
 }
 
 void init(void) {
+    timer_channel = timer_config.driver_id;
+
+    // Motor GPIO channels
+    gpio_channel_motor_a = gpio_config.driver_channel_ids[0];
+    gpio_channel_motor_b = gpio_config.driver_channel_ids[1];
+    gpio_channel_echo = gpio_config.driver_channel_ids[2];
+    gpio_channel_trigger = gpio_config.driver_channel_ids[3];
+
     sensor_init();
     motors_init();
-
 
     // time_start = sddf_timer_time_now(TIMER_CHANNEL);
     LOG_CLIENT("Init\n");
@@ -171,7 +182,7 @@ void init(void) {
 
     /* derive main entry point */
     t_main = co_derive((void *)t_client_main_stack, STACK_SIZE, client_main);
-
+    
     co_switch(t_main);
 }
 

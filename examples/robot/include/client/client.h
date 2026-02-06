@@ -26,7 +26,6 @@
 /* Number of nanoseconds in a microsecond */
 #define NS_IN_US 1000ULL
 
-
 /* Timeout IDs */
 #define CLIENT_TIMEOUT_ID (0)
 #define SENSOR_TIMEOUT_ID (1)
@@ -38,6 +37,11 @@
 
 /* Shared Data */
 extern sddf_channel timer_channel;
+extern sddf_channel gpio_channel_motor_a;
+extern sddf_channel gpio_channel_motor_b;
+extern sddf_channel gpio_channel_echo;
+extern sddf_channel gpio_channel_trigger;
+
 extern PriorityQueue timeout_queue;
 
 
