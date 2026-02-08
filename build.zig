@@ -31,8 +31,11 @@ const DriverClass = struct {
     const Network = enum {
         imx,
         meson,
-        virtio,
         @"dwmac-5.10a",
+        const Virtio = enum {
+            pci,
+            mmio,
+        };
     };
 
     const I2cHost = enum {
@@ -359,6 +362,37 @@ fn addNetworkDriver(
     return driver;
 }
 
+fn addVirtioNetworkDriver(
+    b: *std.Build,
+    util: *std.Build.Step.Compile,
+    class: DriverClass.Network.Virtio,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+) *std.Build.Step.Compile {
+    const driver = addPd(b, .{
+        .name = b.fmt("driver_net_virtio_{s}.elf", .{@tagName(class)}),
+        .root_module = b.createModule(.{
+            .target = target,
+            .optimize = optimize,
+            .strip = false,
+        }),
+    });
+
+    driver.addCSourceFile(.{
+        .file = b.path("drivers/network/virtio/common/ethernet.c"),
+    });
+    driver.addCSourceFile(.{
+        .file = b.path(b.fmt("virtio/transport/{s}.c", .{@tagName(class)})),
+    });
+    driver.addIncludePath(b.path(b.fmt("drivers/network/{s}/", .{@tagName(class)})));
+    driver.addIncludePath(b.path("include"));
+    driver.addIncludePath(b.path("include/sddf/util/custom_libc"));
+    driver.addIncludePath(b.path("include/microkit"));
+    driver.linkLibrary(util);
+
+    return driver;
+}
+
 fn addGpuDriver(
     b: *std.Build,
     gpu_config_include: LazyPath,
@@ -664,6 +698,11 @@ pub fn build(b: *std.Build) !void {
         // Network drivers
         inline for (std.meta.fields(DriverClass.Network)) |class| {
             const driver = addNetworkDriver(b, util, @enumFromInt(class.value), target, optimize);
+            driver.linkLibrary(util_putchar_debug);
+            b.installArtifact(driver);
+        }
+        inline for (std.meta.fields(DriverClass.Network.Virtio)) |class| {
+            const driver = addVirtioNetworkDriver(b, util, @enumFromInt(class.value), target, optimize);
             driver.linkLibrary(util_putchar_debug);
             b.installArtifact(driver);
         }
