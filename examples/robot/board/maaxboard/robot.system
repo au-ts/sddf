@@ -7,7 +7,7 @@
         <map mr="timer@302d0000/drivers/timer/imx/regs" vaddr="0x20000000" perms="rw" cached="false" />
         <irq irq="87" id="0" trigger="level" />
     </protection_domain>
-    <protection_domain name="client" priority="1">
+    <protection_domain name="client" priority="2" budget="1500000" period="2000000">
         <program_image path="client.elf" />
     </protection_domain>
     <protection_domain name="gpio_driver" priority="254" passive="true">
@@ -16,7 +16,7 @@
         <irq irq="96" id="60" trigger="level" />
         <irq irq="97" id="61" trigger="level" />
     </protection_domain>
-    <protection_domain name="telemetry" priority="1">
+    <protection_domain name="telemetry" priority="1" budget="2000" period="8000">
         <program_image path="telemetry.elf" />
     </protection_domain>
     <channel>

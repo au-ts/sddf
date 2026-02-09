@@ -105,7 +105,7 @@ void client_main(void) {
     // wait for all sensors to initialise first
     // control_forward();
 
-    time_start = sddf_timer_time_now(timer_channel);
+    // time_start = sddf_timer_time_now(timer_channel);
 
     while(true)
     {
@@ -126,10 +126,9 @@ void client_main(void) {
             control_forward(1000);
         }
 
-        time_end = sddf_timer_time_now(timer_channel);
+        // time_end = sddf_timer_time_now(timer_channel);
 
-        LOG_CLIENT("Execution Time: %lu\n", time_end - time_start);
-        break;
+        // LOG_CLIENT("Execution Time: %lu\n", time_end - time_start);
     }
 }
 
