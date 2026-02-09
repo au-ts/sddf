@@ -54,7 +54,7 @@ uint64_t pulse_in(int gpio_ch, int value) {
         else {
             // Timeout not seeing GPIO HIGH from sensor
             uint64_t time_now = get_time_now();
-            if (((time_now - time_start) / NS_IN_MS) > (SENSOR_TIMEOUT * 100)) {
+            if (((time_now - time_start) / NS_IN_MS) > (SENSOR_TIMEOUT * 2)) {
                 LOG_SENSOR("timeout 2\n");
                 return 0;
             }

@@ -105,6 +105,8 @@ void client_main(void) {
     // wait for all sensors to initialise first
     // control_forward();
 
+    time_start = sddf_timer_time_now(timer_channel);
+
     while(true)
     {
         delay_miliseconds(1, CLIENT_TIMEOUT_ID);
@@ -126,7 +128,7 @@ void client_main(void) {
 
         time_end = sddf_timer_time_now(timer_channel);
 
-        sddf_printf("Execution Time: %lu\n", time_end - time_start);
+        LOG_CLIENT("Execution Time: %lu\n", time_end - time_start);
         break;
     }
 }
@@ -151,16 +153,16 @@ void notified(sddf_channel ch) {
         }
         else if (timeout_id == MOTOR_CONTROL_TIMEOUT_ID) {
             LOG_CLIENT("motor timeout\n");
-            // handle_motor_control_timeout();
-            // co_switch(t_main);
+            handle_motor_control_timeout();
+            co_switch(t_main);
         }
         else if (timeout_id == gpio_channel_motor_a) {
-            // handle_pwm_timeout(gpio_channel_motor_a);
-            // LOG_CLIENT("motor A timeout %d\n", timeout_queue.size);
+            handle_pwm_timeout(gpio_channel_motor_a);
+            LOG_CLIENT("motor A timeout %d\n", timeout_queue.size);
         }
         else if (timeout_id == gpio_channel_motor_b) {
-            // handle_pwm_timeout(gpio_channel_motor_b);
-            // LOG_CLIENT("motor B timeout %d\n", timeout_queue.size);
+            handle_pwm_timeout(gpio_channel_motor_b);
+            LOG_CLIENT("motor B timeout %d\n", timeout_queue.size);
         }
     }
     else {
@@ -169,7 +171,6 @@ void notified(sddf_channel ch) {
 }
 
 void init(void) {
-    time_start = sddf_timer_time_now(timer_channel);
     timer_channel = timer_config.driver_id;
 
     // Motor GPIO channels
