@@ -113,16 +113,21 @@ void client_main(void) {
 
         uint64_t dist = get_ultrasonic_reading();
 
-        // LOG_CLIENT("Reading received: %lu\n", dist);
+        LOG_CLIENT("Reading received: %lu\n", dist);
 
-        // if (dist < 10) {
-        //     control_stop();
-        //     // turn left every time there's an obstacle
-        //     control_left(1000);
-        // }
-        // else {
-        //     control_forward(1000);
-        // }
+        if (dist < 10) {
+            control_stop();
+            // turn left every time there's an obstacle
+            control_left(1000);
+        }
+        else {
+            control_forward(1000);
+        }
+
+        time_end = sddf_timer_time_now(timer_channel);
+
+        sddf_printf("Execution Time: %lu\n", time_end - time_start);
+        break;
     }
 }
 
@@ -164,6 +169,7 @@ void notified(sddf_channel ch) {
 }
 
 void init(void) {
+    time_start = sddf_timer_time_now(timer_channel);
     timer_channel = timer_config.driver_id;
 
     // Motor GPIO channels
@@ -176,8 +182,6 @@ void init(void) {
     motors_init();
 
     // client_main();
-
-    // time_start = sddf_timer_time_now(TIMER_CHANNEL);
     LOG_CLIENT("Init\n");
 
     /* Define the event loop/notified thread as the active co-routine */
