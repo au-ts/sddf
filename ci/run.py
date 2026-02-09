@@ -33,7 +33,7 @@ if __name__ == "__main__":
     backend_fns: dict[str, BackendFunction] = {}
 
     for example in examples_list:
-        mod = importlib.import_module(f"examples.{example}")
+        mod = importlib.import_module(f"ci.examples.{example}")
         matrix.extend(mod.TEST_MATRIX)
         test_fns[example] = mod.test
         custom_backend_fn = callable(getattr(mod, "backend_fn", None))
