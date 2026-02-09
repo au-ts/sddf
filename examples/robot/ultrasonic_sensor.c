@@ -89,16 +89,14 @@ void sensor_init(void) {
 void set_trig_low() {
     LOG_SENSOR("Setting trigger low\n");
 
-    digital_write(GPIO_CHANNEL_TRIG, GPIO_LOW);
-        // enqueue(&timeout_queue, sddf_timer_time_now(timer_channel) + micro_s, gpio_ch);
-
+    digital_write(gpio_channel_trigger, GPIO_LOW);
     delay_microseconds(2, SENSOR_TIMEOUT_ID);
 }
 
 void set_trig_high() {
     LOG_SENSOR("Setting trigger high\n");
 
-    digital_write(GPIO_CHANNEL_TRIG, GPIO_HIGH);
+    digital_write(gpio_channel_trigger, GPIO_HIGH);
     delay_microseconds(10, SENSOR_TIMEOUT_ID);
 }
 

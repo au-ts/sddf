@@ -27,13 +27,10 @@
 #define NS_IN_US 1000ULL
 
 /* Timeout IDs */
-#define CLIENT_TIMEOUT_ID (0)
-#define SENSOR_TIMEOUT_ID (1)
-// Note: motor timeout IDs are the same as their gpio channel IDs
-#define MOTOR_A_TIMEOUT_ID (5)
-#define MOTOR_B_TIMEOUT_ID (6)
 // Used to timeout duration of motor control
-#define MOTOR_CONTROL_TIMEOUT_ID (4)
+#define MOTOR_CONTROL_TIMEOUT_ID (5)
+#define CLIENT_TIMEOUT_ID (6)
+#define SENSOR_TIMEOUT_ID (7)
 
 /* Shared Data */
 extern sddf_channel timer_channel;

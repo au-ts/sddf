@@ -57,7 +57,6 @@ void set_pwm(int gpio_ch, uint64_t micro_s) {
     }
 
     enqueue(&timeout_queue, get_time_now() + time_ns, gpio_ch);
-    // timeout to drive motor forward
     set_timeout(micro_s);
 }
 

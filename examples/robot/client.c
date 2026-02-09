@@ -113,16 +113,16 @@ void client_main(void) {
 
         uint64_t dist = get_ultrasonic_reading();
 
-        LOG_CLIENT("Reading received: %lu\n", dist);
+        // LOG_CLIENT("Reading received: %lu\n", dist);
 
-        if (dist < 10) {
-            control_stop();
-            // turn left every time there's an obstacle
-            control_left(1000);
-        }
-        else {
-            control_forward(1000);
-        }
+        // if (dist < 10) {
+        //     control_stop();
+        //     // turn left every time there's an obstacle
+        //     control_left(1000);
+        // }
+        // else {
+        //     control_forward(1000);
+        // }
     }
 }
 
@@ -141,20 +141,21 @@ void notified(sddf_channel ch) {
             co_switch(t_main);
         }
         else if (timeout_id == CLIENT_TIMEOUT_ID) {
+            LOG_CLIENT("client timeout\n");
             co_switch(t_main);
         }
         else if (timeout_id == MOTOR_CONTROL_TIMEOUT_ID) {
             LOG_CLIENT("motor timeout\n");
-            handle_motor_control_timeout();
-            co_switch(t_main);
+            // handle_motor_control_timeout();
+            // co_switch(t_main);
         }
         else if (timeout_id == gpio_channel_motor_a) {
-            handle_pwm_timeout(gpio_channel_motor_b);
-            LOG_CLIENT("motor B timeout %d\n", timeout_queue.size);
+            // handle_pwm_timeout(gpio_channel_motor_a);
+            // LOG_CLIENT("motor A timeout %d\n", timeout_queue.size);
         }
         else if (timeout_id == gpio_channel_motor_b) {
-            handle_pwm_timeout(gpio_channel_motor_b);
-            LOG_CLIENT("motor B timeout %d\n", timeout_queue.size);
+            // handle_pwm_timeout(gpio_channel_motor_b);
+            // LOG_CLIENT("motor B timeout %d\n", timeout_queue.size);
         }
     }
     else {
@@ -173,6 +174,8 @@ void init(void) {
 
     sensor_init();
     motors_init();
+
+    // client_main();
 
     // time_start = sddf_timer_time_now(TIMER_CHANNEL);
     LOG_CLIENT("Init\n");

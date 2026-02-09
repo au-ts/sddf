@@ -1,5 +1,8 @@
 #include "include/gpio_common/gpio_common.h"
 
+#define LOG_GPIO(...) do{ sddf_printf("GPIO COMMON|INFO: "); sddf_printf(__VA_ARGS__); }while(0)
+#define LOG_GPIO_ERR(...) do{ sddf_printf("GPIO COMMON|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
+
 void gpio_init(int gpio_ch, int direction) {
     int ret = 0;
 
@@ -7,14 +10,14 @@ void gpio_init(int gpio_ch, int direction) {
         // set gpio to initial value of zero
         ret = sddf_gpio_direction_output(gpio_ch, GPIO_LOW);
         if (ret < 0) {
-            // LOG_CLIENT("Failed to set direction to output. Error code : %d!\n", ret);
+            LOG_GPIO_ERR("Failed to set direction to output. Error code : %d!\n", ret);
             assert(false);
         }
     }
     else if (direction == GPIO_DIRECTION_OUTPUT) {
         ret = sddf_gpio_direction_input(gpio_ch);
         if (ret < 0) {
-            // LOG_CLIENT_ERR("Failed to set direction to input. Error code : %d!\n", ret);
+            LOG_GPIO_ERR("Failed to set direction to input. Error code : %d!\n", ret);
             assert(false);
         }
     }
@@ -23,7 +26,7 @@ void gpio_init(int gpio_ch, int direction) {
 void digital_write(int gpio_ch, int value) {
     int ret = sddf_gpio_set(gpio_ch, value);
     if (ret < 0) {
-        // LOG_CLIENT_ERR("Failed to set value. Error code : %d!\n", ret);
+        LOG_GPIO_ERR("Failed to set value. Error code : %d!\n", ret);
         assert(false);
     }
 }
@@ -31,7 +34,7 @@ void digital_write(int gpio_ch, int value) {
 int digital_read(int gpio_ch) {
     int value_received = sddf_gpio_get(gpio_ch);
     if (value_received < 0) {
-        // LOG_CLIENT_ERR("Failed to get value. Error code : %d!\n", value_received);
+        LOG_GPIO_ERR("Failed to get value. Error code : %d!\n", value_received);
         assert(false);
     }
 

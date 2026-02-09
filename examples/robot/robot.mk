@@ -106,6 +106,7 @@ else
 	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --output ${SDFGEN_OUT} --sdf robot.system
 endif
 	$(OBJCOPY) --update-section .device_resources=${SDFGEN_OUT}/timer_device_resources.data timer_driver.elf
+	$(OBJCOPY) --update-section .device_resources=${SDFGEN_OUT}/gpio_driver_device_resources.data gpio_driver.elf
 	$(OBJCOPY) --update-section .gpio_client_config=${SDFGEN_OUT}/gpio_client_client.data client.elf
 	$(OBJCOPY) --update-section .timer_client_config=${SDFGEN_OUT}/timer_client_client.data client.elf
 	touch $@

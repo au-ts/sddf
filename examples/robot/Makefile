@@ -15,7 +15,7 @@ endif
 
 export BUILD_DIR ?= build
 export MICROKIT_CONFIG ?= debug
-export MICROKIT_BOARD ?= odroidc4
+export MICROKIT_BOARD ?= maaxboard
 export SDDF := $(abspath ../..)
 
 IMAGE_FILE := $(BUILD_DIR)/loader.img
