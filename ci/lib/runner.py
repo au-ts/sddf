@@ -30,8 +30,8 @@ from .backends import (
 )
 from ci.common import TestConfig, loader_img_path
 
-type TestFunction = Callable[[HardwareBackend, TestConfig], Awaitable[None]]
-type BackendFunction = Callable[[TestConfig, Path], HardwareBackend]
+TestFunction = Callable[[HardwareBackend, TestConfig], Awaitable[None]]
+BackendFunction = Callable[[TestConfig, Path], HardwareBackend]
 
 
 async def _watch_stdout_inactivity(
