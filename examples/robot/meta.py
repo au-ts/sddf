@@ -42,18 +42,13 @@ assert version("sdfgen").split(".")[1] == "28", "Unexpected sdfgen version"
 ProtectionDomain = SystemDescription.ProtectionDomain
 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
-    # Memory regions
+    timer_node = None
+    gpio_node = None
 
     # Protection domains
-    timer_node = None
-    timer_driver = ProtectionDomain("timer", "timer_driver.elf", priority=254)
+    timer_driver = ProtectionDomain("timer", "timer_driver.elf", priority=254, passive=True)
+    gpio_driver = ProtectionDomain("gpio_driver", "gpio_driver.elf", priority=254, passive=True)
     telemetry = ProtectionDomain("telemetry", "telemetry.elf", priority=1)
-
-    # setvar_vaddr="gpio_regs"
-    # setvar_vaddr="gpio_ao_regs"
-
-    # TODO: make this passive for scheduling
-    gpio_driver = ProtectionDomain("gpio_driver", "gpio_driver.elf", priority=100)
     client = ProtectionDomain("client", "client.elf", priority=1)
 
     timer_node = dtb.node(board.timer)
@@ -75,7 +70,6 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
     assert gpio_system.connect()
     assert gpio_system.serialise_config(output_dir)
-
 
     assert timer_system.connect()
     assert timer_system.serialise_config(output_dir)

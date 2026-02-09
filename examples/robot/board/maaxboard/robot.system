@@ -10,7 +10,7 @@
     <protection_domain name="client" priority="1">
         <program_image path="client.elf" />
     </protection_domain>
-    <protection_domain name="gpio_driver" priority="100" passive="true">
+    <protection_domain name="gpio_driver" priority="254" passive="true">
         <program_image path="gpio_driver.elf" />
         <map mr="gpio@30200000/drivers/gpio/imx/regs" vaddr="0x20000000" perms="rw" cached="false" />
         <irq irq="96" id="60" trigger="level" />
