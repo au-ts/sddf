@@ -8,6 +8,7 @@
 #include <sddf/blk/config.h>
 #include <sddf/blk/storage_info.h>
 #include <sddf/util/util.h>
+#include <sddf/util/ialloc.h>
 #include <sddf/util/printf.h>
 #include <sddf/resources/device.h>
 #include <sddf/timer/config.h>
@@ -107,6 +108,8 @@ __attribute__((__section__(".timer_client_config"))) timer_client_config_t timer
 
 /* Map sDDF IDs to NVMe CIDs */
 #define MAX_PENDING_REQS 1024
+static ialloc_t cid_ialloc;
+static uint32_t cid_ialloc_idxlist[MAX_PENDING_REQS];
 static uint32_t cid_to_id[MAX_PENDING_REQS];
 static uint16_t cid_to_count[MAX_PENDING_REQS];
 
@@ -196,10 +199,10 @@ static void handle_request(void)
         uint64_t lba = block_number * 8;
         uint32_t nlb = (count * 8) - 1;
 
-        /* Find a CID that isn't in use */
-        static uint16_t next_cid = 0;
-        uint16_t cid = next_cid;
-        next_cid = (next_cid + 1) % MAX_PENDING_REQS;
+        /* Allocate a CID */
+        uint32_t cid;
+        int err = ialloc_alloc(&cid_ialloc, &cid);
+        assert(err == 0);
         cid_to_id[cid] = id;
         cid_to_count[cid] = count;
 
@@ -367,9 +370,13 @@ static void handle_io_completions(void)
         uint16_t count = cid_to_count[cid];
         uint16_t status = (cq_entry.phase_tag_and_status >> 1) & 0x7fff;
 
+        /* Free the CID */
+        int err = ialloc_free(&cid_ialloc, cid);
+        assert(err == 0);
+
         blk_resp_status_t resp_status = (status == 0) ? BLK_RESP_OK : BLK_RESP_ERR_UNSPEC;
         /* Return the original requested count on success */
-        int err = blk_enqueue_resp(&blk_queue, resp_status, (resp_status == BLK_RESP_OK) ? count : 0, id);
+        err = blk_enqueue_resp(&blk_queue, resp_status, (resp_status == BLK_RESP_OK) ? count : 0, id);
         assert(!err);
         notify = true;
     }
@@ -571,6 +578,9 @@ void init(void)
 
     nvme_io_cq_region = (void *)NVME_IO_CQ_VADDR;
     nvme_io_cq_region_paddr = NVME_IO_CQ_PADDR;
+
+    /* Initialise CID allocator */
+    ialloc_init(&cid_ialloc, cid_ialloc_idxlist, MAX_PENDING_REQS);
 
     /* NVMe Controller Init */
     nvme_controller_init();
