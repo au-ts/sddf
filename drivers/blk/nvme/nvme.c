@@ -106,13 +106,6 @@ __attribute__((__section__(".timer_client_config"))) timer_client_config_t timer
 
 #define NVME_IRQ 17
 
-/* Map sDDF IDs to NVMe CIDs */
-#define MAX_PENDING_REQS 1024
-static ialloc_t cid_ialloc;
-static uint32_t cid_ialloc_idxlist[MAX_PENDING_REQS];
-static uint32_t cid_to_id[MAX_PENDING_REQS];
-static uint16_t cid_to_count[MAX_PENDING_REQS];
-
 #define NVME_ASQ_CAPACITY (NVME_ADMIN_QUEUE_SIZE / sizeof(nvme_submission_queue_entry_t))
 #define NVME_ACQ_CAPACITY (NVME_ADMIN_QUEUE_SIZE / sizeof(nvme_completion_queue_entry_t))
 _Static_assert(NVME_ASQ_CAPACITY <= 0x1000, "capacity of ASQ must be <=4096 (entries)");
@@ -122,6 +115,23 @@ _Static_assert(NVME_ACQ_CAPACITY <= 0x1000, "capacity of ACQ must be <=4096 (ent
 // §3.3.3.1
 _Static_assert(NVME_IO_SQ_CAPACITY <= 0x10000, "capacity of IO SQ must be <=65536 (entries)");
 _Static_assert(NVME_IO_CQ_CAPACITY <= 0x10000, "capacity of IO CQ must be <=65536 (entries)");
+
+/* Map sDDF IDs to NVMe CIDs - align with I/O queue depth */
+#define MAX_PENDING_REQS NVME_IO_SQ_CAPACITY
+
+/* PRP List Configuration */
+#define MAX_TRANSFER_PAGES 32   /* 128KB max transfer (32 * 4KB pages) */
+#define PRP_LIST_SLOT_SIZE 256
+#define PRP_LIST_REGION_SIZE (MAX_PENDING_REQS * PRP_LIST_SLOT_SIZE)
+
+/* Ensure PRP list region doesn't overflow into the data region */
+_Static_assert(PRP_LIST_REGION_SIZE <= NVME_DATA_REGION_VADDR - NVME_PRP_LIST_VADDR,
+               "PRP list region exceeds metadata space");
+
+static ialloc_t cid_ialloc;
+static uint32_t cid_ialloc_idxlist[MAX_PENDING_REQS];
+static uint32_t cid_to_id[MAX_PENDING_REQS];
+static uint16_t cid_to_count[MAX_PENDING_REQS];
 
 /* I/O Port Configuration */
 #define PCI_CONFIG_ADDR_IOPORT_ID 1
@@ -180,6 +190,7 @@ static void handle_request(void)
     uint64_t block_number;
     uint16_t count;
     uint32_t id;
+    int err;
 
     while (blk_dequeue_req(&blk_queue, &code, &req_paddr, &block_number, &count, &id) == 0) {
         uint8_t opcode;
@@ -195,13 +206,21 @@ static void handle_request(void)
             continue;
         }
 
+        /* Reject oversized transfers */
+        if (count > MAX_TRANSFER_PAGES) {
+            sddf_dprintf("NVMe: request too large (%u pages, max %u)\n", count, MAX_TRANSFER_PAGES);
+            err = blk_enqueue_resp(&blk_queue, BLK_RESP_ERR_UNSPEC, 0, id);
+            assert(!err);
+            continue;
+        }
+
         /* Translate sDDF 4096B blocks to NVMe 512B sectors. */
         uint64_t lba = block_number * 8;
         uint32_t nlb = (count * 8) - 1;
 
         /* Allocate a CID */
         uint32_t cid;
-        int err = ialloc_alloc(&cid_ialloc, &cid);
+        err = ialloc_alloc(&cid_ialloc, &cid);
         assert(err == 0);
         cid_to_id[cid] = id;
         cid_to_count[cid] = count;
@@ -223,8 +242,9 @@ static void handle_request(void)
         } else if (count > 2) {
             /* PRP2 points to a PRP List stored in the metadata region. */
             /* x86 hardcoded addresses */
-            uint64_t *prp_list = (uint64_t *)(NVME_PRP_LIST_VADDR);
-            uint64_t prp_list_paddr = NVME_PRP_LIST_PADDR;
+            /* Each CID gets its own PRP list slot in the PRP region */
+            uint64_t *prp_list = (uint64_t *)(NVME_PRP_LIST_VADDR + (uint64_t)cid * PRP_LIST_SLOT_SIZE);
+            uint64_t prp_list_paddr = NVME_PRP_LIST_PADDR + (uint64_t)cid * PRP_LIST_SLOT_SIZE;
 
             /* Fill the PRP List */
             for (int i = 1; i < count; i++) {
