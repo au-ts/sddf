@@ -22,6 +22,7 @@ The definitions are specific to ARMv8 - different definitions will need to used 
 #define SEL4BENCH_EVENT_TLB_L1D_MISS                0x05
 #define SEL4BENCH_EVENT_EXECUTE_INSTRUCTION         0x08
 #define SEL4BENCH_EVENT_BRANCH_MISPREDICT           0x10
+#define SEL4BENCH_EVENT_CHAIN                       0x1E
 
 /* Armv8 constants. */
 #define SEL4BENCH_ARMV8A_COUNTER_CCNT 31
