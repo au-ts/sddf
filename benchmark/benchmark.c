@@ -15,34 +15,38 @@
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 
+#ifndef BENCH_PMU_EVENTS
+#define BENCH_PMU_EVENTS "CACHE_L1I_MISS,CACHE_L1D_MISS,TLB_L1I_MISS,TLB_L1D_MISS,EXECUTE_INSTRUCTION,BRANCH_MISPREDICT"
+#endif
+
 #define LOG_BUFFER_CAP 7
 
 __attribute__((__section__(".benchmark_config"))) benchmark_config_t benchmark_config;
 
 __attribute__((__section__(".serial_client_config"))) serial_client_config_t serial_config;
 
+typedef struct {
+    const char *config_name;
+    const char *print_name;
+    int value;
+} sel4bench_event_t;
+
+sel4bench_event_t event_table[] = {
+    {"CACHE_L1I_MISS", "L1 i-cache misses", SEL4BENCH_EVENT_CACHE_L1I_MISS },
+    {"CACHE_L1D_MISS", "L1 d-cache misses", SEL4BENCH_EVENT_CACHE_L1D_MISS },
+    {"TLB_L1I_MISS", "L1 i-tlb misses", SEL4BENCH_EVENT_TLB_L1I_MISS },
+    {"TLB_L1D_MISS", "L1 d-tlb misses", SEL4BENCH_EVENT_TLB_L1D_MISS },
+    {"EXECUTE_INSTRUCTION", "Instructions", SEL4BENCH_EVENT_EXECUTE_INSTRUCTION },
+    {"BRANCH_MISPREDICT", "Branch mispredictions", SEL4BENCH_EVENT_BRANCH_MISPREDICT },
+    {"CHAIN", "Overflow", SEL4BENCH_EVENT_CHAIN},
+};
+
+uint32_t benchmarking_events[8];
+uint32_t num_benchmarking_events = 0;
 ccnt_t counter_values[8];
 counter_bitfield_t benchmark_bf;
 
 serial_queue_handle_t serial_tx_queue_handle;
-
-char *counter_names[] = {
-    "L1 i-cache misses",
-    "L1 d-cache misses",
-    "L1 i-tlb misses",
-    "L1 d-tlb misses",
-    "Instructions",
-    "Branch mispredictions",
-};
-
-event_id_t benchmarking_events[] = {
-    SEL4BENCH_EVENT_CACHE_L1I_MISS,
-    SEL4BENCH_EVENT_CACHE_L1D_MISS,
-    SEL4BENCH_EVENT_TLB_L1I_MISS,
-    SEL4BENCH_EVENT_TLB_L1D_MISS,
-    SEL4BENCH_EVENT_EXECUTE_INSTRUCTION,
-    SEL4BENCH_EVENT_BRANCH_MISPREDICT,
-};
 
 static char *child_name(uint8_t child_id)
 {
@@ -134,8 +138,8 @@ static void benchmark_init(void)
 #if ENABLE_PMU_EVENTS
     sel4bench_init();
     seL4_Word n_counters = sel4bench_get_num_counters();
-    for (seL4_Word counter = 0; counter < MIN(n_counters, ARRAY_SIZE(benchmarking_events)); counter++) {
-        sel4bench_set_count_event(counter, benchmarking_events[counter]);
+    for (seL4_Word counter = 0; counter < MIN(n_counters, num_benchmarking_events); counter++) {
+        sel4bench_set_count_event(counter, event_table[benchmarking_events[counter]].value);
         benchmark_bf |= BIT(counter);
     }
 
@@ -196,8 +200,16 @@ static void benchmark_stop(void)
     sel4bench_stop_counters(benchmark_bf);
 
     sddf_printf("{CORE %u: \n", benchmark_config.core);
-    for (int i = 0; i < ARRAY_SIZE(benchmarking_events); i++) {
-        sddf_printf("%s: %lu\n", counter_names[i], counter_values[i]);
+    for (int i = 0; i < num_benchmarking_events; i++) {
+         if (i + 1 < num_benchmarking_events &&
+             event_table[benchmarking_events[i+1]].value == SEL4BENCH_EVENT_CHAIN) {
+             sddf_printf("%s: %lu\n", event_table[benchmarking_events[i]].print_name,
+                         counter_values[i] + (counter_values[i+1] << 32));
+             i++;
+         } else {
+             sddf_printf("%s: %lu\n", event_table[benchmarking_events[i]].print_name,
+                         counter_values[i]);
+         }
     }
     sddf_printf("}\n");
 #endif
@@ -221,6 +233,39 @@ static void benchmark_stop(void)
     /* Notify benchmark PD running on next core */
     if (!benchmark_config.last_core) {
         microkit_notify(benchmark_config.tx_stop_ch);
+    }
+}
+
+static inline int sel4bench_get_event_idx_by_name(char *event_name)
+{
+    int event_table_len = sizeof(event_table) / sizeof(sel4bench_event_t);
+    for (int i = 0; i < event_table_len; i++) {
+        if (strcmp(event_name, event_table[i].config_name) == 0) {
+            return i;
+        }
+    }
+    sddf_printf("BENCH|ERROR: PMU event '%s' is not supported\n", event_name);
+    return -1;
+}
+
+void benchmark_events_init()
+{
+    char configs[] = BENCH_PMU_EVENTS;
+    char event_name[20];
+    sddf_printf("Benchmark events: %s\n", configs);
+    int i = 0, event_name_idx = 0;
+    for (;;) {
+        if (configs[i] == ',' || configs[i] == '\0') {
+            event_name[event_name_idx] = '\0';
+            event_name_idx = 0;
+            benchmarking_events[num_benchmarking_events] = sel4bench_get_event_idx_by_name(event_name);
+            num_benchmarking_events += 1;
+        } else {
+            event_name[event_name_idx] = configs[i];
+            event_name_idx += 1;
+        }
+        if (configs[i] == '\0') break;
+        i += 1;
     }
 }
 
@@ -256,6 +301,7 @@ void init(void)
     sddf_printf("BENCH|LOG: CONFIG_BENCHMARK_TRACK_KERNEL_ENTRIES defined\n");
 #endif
 
+    benchmark_events_init();
     benchmark_init();
     /* Notify the idle thread that the sel4bench library is initialised. */
     microkit_notify(benchmark_config.init_ch);

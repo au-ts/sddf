@@ -10,6 +10,7 @@ BENCH_OBJS := benchmark/benchmark.o
 IDLE_OBJS := benchmark/idle.o
 LIBUTIL_DBG := libsddf_util_debug.a
 LIBUTIL := libsddf_util.a
+CFLAGS += $(BENCH_EVENT_FLAG)
 
 ${BENCH_OBJS} ${IDLE_OBJS}: ${CHECK_FLAGS_BOARD_MD5} |benchmark $(SDDF_LIBC_INCLUDE)
 benchmark:

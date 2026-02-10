@@ -38,6 +38,10 @@ NETWORK_COMPONENTS := $(SDDF)/network/components
 
 SDDF_CUSTOM_LIBC := 1
 
+ifdef BENCH_PMU_EVENTS
+export BENCH_EVENT_FLAG := -DBENCH_PMU_EVENTS=\"$(BENCH_PMU_EVENTS)\"
+endif
+
 vpath %.c ${SDDF} ${ECHO_SERVER}
 
 IMAGES := eth_driver.elf echo.elf benchmark.elf idle.elf \
