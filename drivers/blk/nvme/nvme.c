@@ -64,6 +64,8 @@ typedef struct {
 
 static nvme_state_ctx_t state_ctx;
 
+#define fallthrough __attribute__((__fallthrough__))
+
 __attribute__((__section__(".device_resources"))) device_resources_t device_resources;
 __attribute__((__section__(".blk_driver_config"))) blk_driver_config_t blk_config;
 __attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
@@ -441,7 +443,7 @@ static void nvme_poll_controller_status(void)
         // Transition to wait for ready (reset timeout per CAP.TO spec)
         state_ctx.waited_ms = 0;
         state_ctx.state = NVME_STATE_WAIT_READY;
-        // Fall through to check immediately
+        fallthrough;
 
     case NVME_STATE_WAIT_READY:
         // 6. Wait for ready
