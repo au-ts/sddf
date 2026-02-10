@@ -31,11 +31,7 @@
 */
 typedef struct nvme_controller {
     uint64_t cap;     /* Controller Capabilities (RO) */
-    struct vs {
-        uint8_t ter;  /* Tertiary Version */
-        uint8_t mnr;  /* Minor Version */
-        uint16_t mjr; /* Major Version */
-    } vs;             /* Version (RO) */
+    uint32_t vs;      /* Version (RO) */
     uint32_t intms;   /* Interrupt Mask Set (RWS) */
     uint32_t intmc;   /* Interrupt Mask Clear (RWC) */
     uint32_t cc;      /* Controller Configuration (RW) */
@@ -72,6 +68,14 @@ _Static_assert(offsetof(nvme_controller_t, _reserved2) == 0x6C, "nvme_controller
 #define NVME_CAP_NCSS        BIT(37 + 0)   /* NVM Command Set Support    */
 #define NVME_CAP_DSTRD_SHIFT 32            /* Doorbell Stride (2 ^ (2 + DSTRD)) */
 #define NVME_CAP_DSTRD_MASK  _MASK(32, 35) /* Doorbell Stride (2 ^ (2 + DSTRD)) */
+
+/* [NVMe-2.1] 3.1.4.2 Offset 8h: VS – Version */
+#define NVME_VS_TER _MASK(0, 7)
+#define NVME_VS_TER_SHIFT 0
+#define NVME_VS_MNR _MASK(8, 15)
+#define NVME_VS_MNR_SHIFT 8
+#define NVME_VS_MJR _MASK(16, 31)
+#define NVME_VS_MJR_SHIFT 16
 
 /* [NVMe-2.1] 3.1.4.5 Offset 14h: CC – Controller Configuration */
 #define NVME_CC_IOCQES_SHIFT 20            /* I/O Completion Queue Entry Size */

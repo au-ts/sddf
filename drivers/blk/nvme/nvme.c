@@ -486,8 +486,10 @@ static void nvme_poll_controller_status(void)
 void nvme_controller_init()
 {
     LOG_NVME("CAP: %016lx\n", nvme_controller->cap);
-    LOG_NVME("VS: major: %u, minor: %u, tertiary: %u\n", nvme_controller->vs.mjr, nvme_controller->vs.mnr,
-             nvme_controller->vs.ter);
+    /* Read version as single 32-bit access to avoid unaligned device access. */
+    uint32_t vs = nvme_controller->vs;
+    LOG_NVME("VS: major: %lu, minor: %lu, tertiary: %lu\n", (vs & NVME_VS_MJR) >> NVME_VS_MJR_SHIFT,
+             (vs & NVME_VS_MNR) >> NVME_VS_MNR_SHIFT, (vs & NVME_VS_TER) >> NVME_VS_TER_SHIFT);
     LOG_NVME("CC: %08x\n", nvme_controller->cc);
 
     nvme_controller->cc &= ~NVME_CC_EN;

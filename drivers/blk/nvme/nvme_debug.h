@@ -17,8 +17,9 @@
 static void nvme_debug_dump_controller_regs(volatile nvme_controller_t *nvme_controller)
 {
     LOG_NVME("CAP: %016lx\n", nvme_controller->cap);
-    LOG_NVME("VS: major: %u, minor: %u, tertiary: %u\n", nvme_controller->vs.mjr, nvme_controller->vs.mnr,
-             nvme_controller->vs.ter);
+    uint32_t vs = nvme_controller->vs;
+    LOG_NVME("VS: major: %lu, minor: %lu, tertiary: %lu\n", (vs & NVME_VS_MJR) >> NVME_VS_MJR_SHIFT,
+             (vs & NVME_VS_MNR) >> NVME_VS_MNR_SHIFT, (vs & NVME_VS_TER) >> NVME_VS_TER_SHIFT);
     LOG_NVME("INTMS: %08x\n", nvme_controller->intms);
     LOG_NVME("INTMC: %08x\n", nvme_controller->intmc);
     LOG_NVME("CC: %08x\n", nvme_controller->cc);
