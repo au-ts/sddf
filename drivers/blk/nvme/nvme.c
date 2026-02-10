@@ -167,7 +167,7 @@ void nvme_irq_unmask(void)
     */
 
     /* For now -- we mask in only vector 0, as it's the only one */
-    nvme_controller->intmc = 0xffffffff;
+    nvme_controller->intmc = 0x1;
 }
 
 static void handle_request(void)
