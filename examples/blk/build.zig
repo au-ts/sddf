@@ -349,7 +349,7 @@ pub fn build(b: *std.Build) !void {
         }
 
         const qemu_virtio_device = switch (target.result.cpu.arch) {
-            .x86_64 => "-device virtio-blk-pci,drive=hd,addr=0x3.0",
+            .x86_64 => "virtio-blk-pci,drive=hd,addr=0x3.0",
             else => "virtio-blk-device,drive=hd,bus=virtio-mmio-bus.1",
         };
 
