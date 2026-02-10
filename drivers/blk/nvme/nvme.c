@@ -8,6 +8,7 @@
 #include <sddf/blk/config.h>
 #include <sddf/blk/storage_info.h>
 #include <sddf/util/util.h>
+#include <sddf/util/printf.h>
 #include <sddf/resources/device.h>
 #include <sddf/timer/config.h>
 #include <sddf/timer/client.h>
@@ -15,9 +16,13 @@
 #include "nvme.h"
 #include "nvme_queue.h"
 
-#define DEBUG_DRIVER
+//#define DEBUG_DRIVER
 #ifdef DEBUG_DRIVER
 #include "nvme_debug.h"
+#define UNUSED
+#else
+#define LOG_NVME(...)
+#define UNUSED __attribute__((unused))
 #endif
 
 #if __BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__
@@ -491,7 +496,7 @@ void nvme_controller_init()
 {
     LOG_NVME("CAP: %016lx\n", nvme_controller->cap);
     /* Read version as single 32-bit access to avoid unaligned device access. */
-    uint32_t vs = nvme_controller->vs;
+    uint32_t vs UNUSED = nvme_controller->vs;
     LOG_NVME("VS: major: %lu, minor: %lu, tertiary: %lu\n", (vs & NVME_VS_MJR) >> NVME_VS_MJR_SHIFT,
              (vs & NVME_VS_MNR) >> NVME_VS_MNR_SHIFT, (vs & NVME_VS_TER) >> NVME_VS_TER_SHIFT);
     LOG_NVME("CC: %08x\n", nvme_controller->cc);
@@ -535,10 +540,10 @@ void init(void)
     assert(timer_config_check_magic(&timer_config));
 
     /* Check device presence first */
-    uint32_t vid_did = pci_config_read_32(NVME_PCI_BUS, NVME_PCI_DEV, NVME_PCI_FUNC, 0x00);
+    uint32_t vid_did UNUSED = pci_config_read_32(NVME_PCI_BUS, NVME_PCI_DEV, NVME_PCI_FUNC, 0x00);
     LOG_NVME("VendorID:DeviceID = %08x\n", vid_did);
 
-    uint32_t bar0 = pci_config_read_32(NVME_PCI_BUS, NVME_PCI_DEV, NVME_PCI_FUNC, 0x10);
+    uint32_t bar0 UNUSED = pci_config_read_32(NVME_PCI_BUS, NVME_PCI_DEV, NVME_PCI_FUNC, 0x10);
     LOG_NVME("NVMe PCI BAR0 readback: %08x\n", bar0);
 
     /* Enable Bus Master and Memory Space */
@@ -548,8 +553,8 @@ void init(void)
 
     /* Check Interrupt Configuration */
     uint32_t intr_info = pci_config_read_32(NVME_PCI_BUS, NVME_PCI_DEV, NVME_PCI_FUNC, 0x3C);
-    uint8_t intr_line = intr_info & 0xFF;
-    uint8_t intr_pin = (intr_info >> 8) & 0xFF;
+    uint8_t intr_line UNUSED = intr_info & 0xFF;
+    uint8_t intr_pin UNUSED = (intr_info >> 8) & 0xFF;
     LOG_NVME("PCI Interrupt Line: %d, Pin: %d\n", intr_line, intr_pin);
 
     /* Map Controller and Metadata - x86 uses hardcoded addresses */
