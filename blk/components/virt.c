@@ -245,10 +245,13 @@ void notified(sddf_channel ch)
         initialised = virt_partition_init();
     }
 
-    if (ch == config.driver.conn.id) {
-        handle_driver();
-        handle_clients();
-    } else {
-        handle_clients();
+    /* Do not handle driver/clients until we have finished initialisation. */
+    if (initialised) {
+        if (ch == config.driver.conn.id) {
+            handle_driver();
+            handle_clients();
+        } else {
+            handle_clients();
+        }
     }
 }
