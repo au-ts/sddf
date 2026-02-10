@@ -17,24 +17,28 @@
 
 #define unchanged(x) (x == old(x))
 #define unfolding_queue(x) unfolding valid_net_queue(gv.x, QUEUE_CAPACITY)
-#define queue_unchanged(x) (unchanged(unfolding_queue(x) in gv.x.net_tail) && unchanged(unfolding_queue(x) in gv.x.net_head)  && unchanged(unfolding_queue(x) in gv.x.net_signal))
+#define queue_unchanged(x) (unchanged(unfolding_queue(x) in gv.x.net_tail) && unchanged(unfolding_queue(x) in gv.x.net_head) && unchanged(unfolding_queue(x) in gv.x.net_signal))
 #define queues_unchanged() (queue_unchanged(rx_free) && queue_unchanged(rx_active) && queue_unchanged(tx_free) && queue_unchanged(tx_active))
 
-inline fun net_queue_empty(1 queue_ptr, 1 capacity)
+inline fun net_queue_empty(1 queue_ptr)
 {
   /@ requires VALID_QUEUE_PTR(queue_ptr) @/
-  /@ requires queue_ptr == RX_FREE_BASE ==> acc(gv.rx_free) && valid_net_queue(gv.rx_free, QUEUE_CAPACITY) @/
-  /@ requires queue_ptr == RX_ACTIVE_BASE ==> acc(gv.rx_active) && valid_net_queue(gv.rx_active, QUEUE_CAPACITY) @/
-  /@ requires queue_ptr == TX_FREE_BASE ==> acc(gv.tx_free) && valid_net_queue(gv.tx_free, QUEUE_CAPACITY) @/
-  /@ requires queue_ptr == TX_ACTIVE_BASE ==> acc(gv.tx_active) && valid_net_queue(gv.tx_active, QUEUE_CAPACITY) @/
-  /@ ensures queue_ptr == RX_FREE_BASE ==> acc(gv.rx_free) && valid_net_queue(gv.rx_free, QUEUE_CAPACITY) && queue_unchanged(rx_free) @/
-  /@ ensures queue_ptr == RX_ACTIVE_BASE ==> acc(gv.rx_active) && valid_net_queue(gv.rx_active, QUEUE_CAPACITY) && queue_unchanged(rx_active) @/
-  /@ ensures queue_ptr == TX_FREE_BASE ==> acc(gv.tx_free) && valid_net_queue(gv.tx_free, QUEUE_CAPACITY) && queue_unchanged(tx_free) @/
-  /@ ensures queue_ptr == TX_ACTIVE_BASE ==> acc(gv.tx_active) && valid_net_queue(gv.tx_active, QUEUE_CAPACITY) && queue_unchanged(tx_active) @/
-  /@ ensures queue_ptr == RX_FREE_BASE ==> retval == unfolding_queue(rx_free) in (gv.rx_free.net_tail == gv.rx_free.net_head) @/
-  /@ ensures queue_ptr == RX_ACTIVE_BASE ==> retval == unfolding_queue(rx_active) in (gv.rx_active.net_tail == gv.rx_active.net_head) @/
-  /@ ensures queue_ptr == TX_FREE_BASE ==> retval == unfolding_queue(tx_free) in (gv.tx_free.net_tail == gv.tx_free.net_head) @/
-  /@ ensures queue_ptr == TX_ACTIVE_BASE ==> retval == unfolding_queue(tx_active) in (gv.tx_active.net_tail == gv.tx_active.net_head) @/
+  /@ requires queue_ptr == RX_FREE_BASE ==> acc(gv.rx_free, 1/2) && acc(gv.rx_free.net_tail, 1/2) && acc(gv.rx_free.net_head, 1/2) @/
+  /@ requires queue_ptr == RX_ACTIVE_BASE ==> acc(gv.rx_active, 1/2) && acc(gv.rx_active.net_tail, 1/2) && acc(gv.rx_active.net_head, 1/2) @/
+  /@ requires queue_ptr == TX_FREE_BASE ==> acc(gv.tx_free, 1/2) && acc(gv.tx_free.net_tail, 1/2) && acc(gv.tx_free.net_head, 1/2) @/
+  /@ requires queue_ptr == TX_ACTIVE_BASE ==> acc(gv.tx_active, 1/2) && acc(gv.tx_active.net_tail, 1/2) && acc(gv.tx_active.net_head, 1/2) @/
+  /@ requires queue_ptr == RX_FREE_BASE ==> valid_net_tail(gv.rx_free.net_tail) && valid_net_head(gv.rx_free.net_head) @/
+  /@ requires queue_ptr == RX_ACTIVE_BASE ==> valid_net_tail(gv.rx_active.net_tail) && valid_net_head(gv.rx_active.net_head) @/
+  /@ requires queue_ptr == TX_FREE_BASE ==> valid_net_tail(gv.tx_free.net_tail) && valid_net_head(gv.tx_free.net_head) @/
+  /@ requires queue_ptr == TX_ACTIVE_BASE ==> valid_net_tail(gv.tx_active.net_tail) && valid_net_head(gv.tx_active.net_head) @/
+  /@ ensures queue_ptr == RX_FREE_BASE ==> acc(gv.rx_free, 1/2) && acc(gv.rx_free.net_tail, 1/2) && acc(gv.rx_free.net_head, 1/2) @/
+  /@ ensures queue_ptr == RX_ACTIVE_BASE ==> acc(gv.rx_active, 1/2) && acc(gv.rx_active.net_tail, 1/2) && acc(gv.rx_active.net_head, 1/2) @/
+  /@ ensures queue_ptr == TX_FREE_BASE ==> acc(gv.tx_free, 1/2) && acc(gv.tx_free.net_tail, 1/2) && acc(gv.tx_free.net_head, 1/2) @/
+  /@ ensures queue_ptr == TX_ACTIVE_BASE ==> acc(gv.tx_active, 1/2) && acc(gv.tx_active.net_tail, 1/2) && acc(gv.tx_active.net_head, 1/2) @/
+  /@ ensures queue_ptr == RX_FREE_BASE ==> retval == (gv.rx_free.net_tail == gv.rx_free.net_head) @/
+  /@ ensures queue_ptr == RX_ACTIVE_BASE ==> retval == (gv.rx_active.net_tail == gv.rx_active.net_head) @/
+  /@ ensures queue_ptr == TX_FREE_BASE ==> retval == (gv.tx_free.net_tail == gv.tx_free.net_head) @/
+  /@ ensures queue_ptr == TX_ACTIVE_BASE ==> retval == (gv.tx_active.net_tail == gv.tx_active.net_head) @/
 
   var tail = 0;
   var head = 0;
@@ -47,18 +51,22 @@ inline fun net_queue_full(1 queue_ptr, 1 capacity)
 {
   /@ requires VALID_QUEUE_PTR(queue_ptr) @/
   /@ requires bounded16(capacity) @/
-  /@ requires queue_ptr == RX_FREE_BASE ==> acc(gv.rx_free) && valid_net_queue(gv.rx_free, QUEUE_CAPACITY) @/
-  /@ requires queue_ptr == RX_ACTIVE_BASE ==> acc(gv.rx_active) && valid_net_queue(gv.rx_active, QUEUE_CAPACITY) @/
-  /@ requires queue_ptr == TX_FREE_BASE ==> acc(gv.tx_free) && valid_net_queue(gv.tx_free, QUEUE_CAPACITY) @/
-  /@ requires queue_ptr == TX_ACTIVE_BASE ==> acc(gv.tx_active) && valid_net_queue(gv.tx_active, QUEUE_CAPACITY) @/
-  /@ ensures queue_ptr == RX_FREE_BASE ==> acc(gv.rx_free) && valid_net_queue(gv.rx_free, QUEUE_CAPACITY) && queue_unchanged(rx_free) @/
-  /@ ensures queue_ptr == RX_ACTIVE_BASE ==> acc(gv.rx_active) && valid_net_queue(gv.rx_active, QUEUE_CAPACITY) && queue_unchanged(rx_active) @/
-  /@ ensures queue_ptr == TX_FREE_BASE ==> acc(gv.tx_free) && valid_net_queue(gv.tx_free, QUEUE_CAPACITY) && queue_unchanged(tx_free) @/
-  /@ ensures queue_ptr == TX_ACTIVE_BASE ==> acc(gv.tx_active) && valid_net_queue(gv.tx_active, QUEUE_CAPACITY) && queue_unchanged(tx_active) @/
-  /@ ensures queue_ptr == RX_FREE_BASE ==> retval == ((unfolding_queue(rx_free) in (gv.rx_free.net_tail - gv.rx_free.net_head) % (MAX_INT16 + 1)) == capacity) @/
-  /@ ensures queue_ptr == RX_ACTIVE_BASE ==> retval == ((unfolding_queue(rx_active) in (gv.rx_active.net_tail - gv.rx_active.net_head) % (MAX_INT16 + 1)) == capacity) @/
-  /@ ensures queue_ptr == TX_FREE_BASE ==> retval == ((unfolding_queue(tx_free) in (gv.tx_free.net_tail - gv.tx_free.net_head) % (MAX_INT16 + 1)) == capacity) @/
-  /@ ensures queue_ptr == TX_ACTIVE_BASE ==> retval == ((unfolding_queue(tx_active) in (gv.tx_active.net_tail - gv.tx_active.net_head) % (MAX_INT16 + 1)) == capacity) @/
+  /@ requires queue_ptr == RX_FREE_BASE ==> acc(gv.rx_free, 1/2) && acc(gv.rx_free.net_tail, 1/2) && acc(gv.rx_free.net_head, 1/2) @/
+  /@ requires queue_ptr == RX_ACTIVE_BASE ==> acc(gv.rx_active, 1/2) && acc(gv.rx_active.net_tail, 1/2) && acc(gv.rx_active.net_head, 1/2) @/
+  /@ requires queue_ptr == TX_FREE_BASE ==> acc(gv.tx_free, 1/2) && acc(gv.tx_free.net_tail, 1/2) && acc(gv.tx_free.net_head, 1/2) @/
+  /@ requires queue_ptr == TX_ACTIVE_BASE ==> acc(gv.tx_active, 1/2) && acc(gv.tx_active.net_tail, 1/2) && acc(gv.tx_active.net_head, 1/2) @/
+  /@ requires queue_ptr == RX_FREE_BASE ==> valid_net_tail(gv.rx_free.net_tail) && valid_net_head(gv.rx_free.net_head) @/
+  /@ requires queue_ptr == RX_ACTIVE_BASE ==> valid_net_tail(gv.rx_active.net_tail) && valid_net_head(gv.rx_active.net_head) @/
+  /@ requires queue_ptr == TX_FREE_BASE ==> valid_net_tail(gv.tx_free.net_tail) && valid_net_head(gv.tx_free.net_head) @/
+  /@ requires queue_ptr == TX_ACTIVE_BASE ==> valid_net_tail(gv.tx_active.net_tail) && valid_net_head(gv.tx_active.net_head) @/
+  /@ ensures queue_ptr == RX_FREE_BASE ==> acc(gv.rx_free, 1/2) && acc(gv.rx_free.net_tail, 1/2) && acc(gv.rx_free.net_head, 1/2) @/
+  /@ ensures queue_ptr == RX_ACTIVE_BASE ==> acc(gv.rx_active, 1/2) && acc(gv.rx_active.net_tail, 1/2) && acc(gv.rx_active.net_head, 1/2) @/
+  /@ ensures queue_ptr == TX_FREE_BASE ==> acc(gv.tx_free, 1/2) && acc(gv.tx_free.net_tail, 1/2) && acc(gv.tx_free.net_head, 1/2) @/
+  /@ ensures queue_ptr == TX_ACTIVE_BASE ==> acc(gv.tx_active, 1/2) && acc(gv.tx_active.net_tail, 1/2) && acc(gv.tx_active.net_head, 1/2) @/
+  /@ ensures queue_ptr == RX_FREE_BASE ==> retval == ((gv.rx_free.net_tail - gv.rx_free.net_head) % (MAX_INT16 + 1) == capacity) @/
+  /@ ensures queue_ptr == RX_ACTIVE_BASE ==> retval == ((gv.rx_active.net_tail - gv.rx_active.net_head) % (MAX_INT16 + 1) == capacity) @/
+  /@ ensures queue_ptr == TX_FREE_BASE ==> retval == ((gv.tx_free.net_tail - gv.tx_free.net_head) % (MAX_INT16 + 1) == capacity) @/
+  /@ ensures queue_ptr == TX_ACTIVE_BASE ==> retval == ((gv.tx_active.net_tail - gv.tx_active.net_head) % (MAX_INT16 + 1) == capacity) @/
 
   var tail = 0;
   var head = 0;
@@ -75,19 +83,22 @@ inline fun net_enqueue(1 queue_ptr, 1 io_addr, 1 len, 1 capacity)
 {
   /@ requires bounded32(io_addr) @/
   /@ requires bounded16(len) @/
+  /@ requires capacity == QUEUE_CAPACITY @/
   /@ requires queue_ptr == TX_FREE_BASE || queue_ptr == RX_ACTIVE_BASE @/
-  /@ requires capacity == 256 @/
-  /@ requires bounded64(queue_ptr + BUFFERS_OFFSET + capacity * NET_BUFF_DESC_SIZE) @/ // field access
-  /@ requires queue_ptr == RX_ACTIVE_BASE ==> acc(gv.rx_active) && valid_net_queue(gv.rx_active, QUEUE_CAPACITY) @/
-  /@ requires queue_ptr == TX_FREE_BASE ==> acc(gv.tx_free) && valid_net_queue(gv.tx_free, QUEUE_CAPACITY) @/
-  /@ requires queue_ptr == RX_ACTIVE_BASE ==> unfolding_queue(rx_active) in (gv.rx_active.net_tail - gv.rx_active.net_head) % (MAX_INT16 + 1) != capacity @/
-  /@ requires queue_ptr == TX_FREE_BASE ==> unfolding_queue(tx_free) in (gv.tx_free.net_tail - gv.tx_free.net_head) % (MAX_INT16 + 1) != capacity @/
-  /@ ensures queue_ptr == RX_ACTIVE_BASE ==> acc(gv.rx_active) && valid_net_queue(gv.rx_active, QUEUE_CAPACITY) @/
-  /@ ensures queue_ptr == TX_FREE_BASE ==> acc(gv.tx_free) && valid_net_queue(gv.tx_free, QUEUE_CAPACITY) @/
-  /@ ensures queue_ptr == RX_ACTIVE_BASE ==> unchanged(unfolding_queue(rx_active) in gv.rx_active.net_head) && unchanged(unfolding_queue(rx_active) in gv.rx_active.net_signal) @/
-  /@ ensures queue_ptr == TX_FREE_BASE ==> unchanged(unfolding_queue(tx_free) in gv.tx_free.net_head) && unchanged(unfolding_queue(tx_free) in gv.tx_free.net_signal) @/
-  /@ ensures queue_ptr == RX_ACTIVE_BASE ==> (unfolding_queue(rx_active) in gv.rx_active.net_tail) == ((old(unfolding_queue(rx_active) in gv.rx_active.net_tail) + 1) % (MAX_INT16 + 1)) @/
-  /@ ensures queue_ptr == TX_FREE_BASE ==> (unfolding_queue(tx_free) in gv.tx_free.net_tail) == ((old(unfolding_queue(tx_free) in gv.tx_free.net_tail) + 1) % (MAX_INT16 + 1)) @/
+  /@ requires bounded64(queue_ptr + BUFFERS_OFFSET + capacity * NET_BUFF_DESC_SIZE) @/ // array access
+  /@ requires queue_ptr == RX_ACTIVE_BASE ==> acc(gv.rx_active, 1/2) && acc(gv.rx_active.net_tail) && acc(gv.rx_active.net_head, 1/2) @/
+  /@ requires queue_ptr == TX_FREE_BASE ==> acc(gv.tx_free, 1/2) && acc(gv.tx_free.net_tail) && acc(gv.tx_free.net_head, 1/2) @/
+  // non-full queue
+  /@ requires queue_ptr == RX_ACTIVE_BASE ==> (gv.rx_active.net_tail - gv.rx_active.net_head) % (MAX_INT16 + 1) != capacity @/
+  /@ requires queue_ptr == TX_FREE_BASE ==> (gv.tx_free.net_tail - gv.tx_free.net_head) % (MAX_INT16 + 1) != capacity @/
+  /@ requires queue_ptr == RX_ACTIVE_BASE ==> valid_net_tail(gv.rx_active.net_tail) @/
+  /@ requires queue_ptr == TX_FREE_BASE ==> valid_net_tail(gv.tx_free.net_tail) @/
+  /@ ensures queue_ptr == RX_ACTIVE_BASE ==> acc(gv.rx_active, 1/2) && acc(gv.rx_active.net_tail) && acc(gv.rx_active.net_head, 1/2) @/
+  /@ ensures queue_ptr == TX_FREE_BASE ==> acc(gv.tx_free, 1/2) && acc(gv.tx_free.net_tail) && acc(gv.tx_free.net_head, 1/2) @/
+  /@ ensures queue_ptr == RX_ACTIVE_BASE ==> gv.rx_active.net_tail == (old(gv.rx_active.net_tail) + 1) % (MAX_INT16 + 1) @/
+  /@ ensures queue_ptr == TX_FREE_BASE ==> gv.tx_free.net_tail == (old(gv.tx_free.net_tail) + 1) % (MAX_INT16 + 1) @/
+  /@ ensures queue_ptr == RX_ACTIVE_BASE ==> valid_net_tail(gv.rx_active.net_tail) @/
+  /@ ensures queue_ptr == TX_FREE_BASE ==> valid_net_tail(gv.tx_free.net_tail) @/
 
   /* capacity must be a power of 2 */
   var tail = 0;
@@ -111,22 +122,22 @@ inline fun net_enqueue(1 queue_ptr, 1 io_addr, 1 len, 1 capacity)
 
 inline fun {1,1} net_dequeue(1 queue_ptr, 1 capacity)
 {
+  /@ requires capacity == QUEUE_CAPACITY @/
+  /@ requires bounded64(queue_ptr + BUFFERS_OFFSET + capacity * NET_BUFF_DESC_SIZE) @/ // array access
   /@ requires queue_ptr == TX_ACTIVE_BASE || queue_ptr == RX_FREE_BASE @/
-  /@ requires capacity == 256 @/
-  /@ requires bounded64(queue_ptr + BUFFERS_OFFSET + capacity * NET_BUFF_DESC_SIZE) @/ // field access
-  /@ requires valid_virt() @/
+  /@ requires queue_ptr == TX_ACTIVE_BASE ==> acc(gv.tx_active, 1/2) && acc(gv.tx_active.net_head) && acc(gv.tx_active.net_tail, 1/2) @/
+  /@ requires queue_ptr == RX_FREE_BASE ==> acc(gv.rx_free, 1/2) && acc(gv.rx_free.net_head) && acc(gv.rx_free.net_tail, 1/2) @/
   // non-empty queue
-  /@ requires queue_ptr == TX_ACTIVE_BASE ==> unfolding_queue(tx_active) in gv.tx_active.net_tail != gv.tx_active.net_head @/
-  /@ requires queue_ptr == RX_FREE_BASE ==> unfolding_queue(rx_free) in gv.rx_free.net_tail != gv.rx_free.net_head @/
+  /@ requires queue_ptr == TX_ACTIVE_BASE ==> gv.tx_active.net_tail != gv.tx_active.net_head @/
+  /@ requires queue_ptr == RX_FREE_BASE ==> gv.rx_free.net_tail != gv.rx_free.net_head @/
+  /@ requires queue_ptr == TX_ACTIVE_BASE ==> valid_net_head(gv.tx_active.net_head) @/
+  /@ requires queue_ptr == RX_FREE_BASE ==> valid_net_head(gv.rx_free.net_head) @/
+  /@ ensures queue_ptr == TX_ACTIVE_BASE ==> acc(gv.tx_active, 1/2) && acc(gv.tx_active.net_head) && acc(gv.tx_active.net_tail, 1/2) @/
+  /@ ensures queue_ptr == RX_FREE_BASE ==> acc(gv.rx_free, 1/2) && acc(gv.rx_free.net_head) && acc(gv.rx_free.net_tail, 1/2) @/
+  /@ ensures queue_ptr == TX_ACTIVE_BASE ==> valid_net_head(gv.tx_active.net_head) @/
+  /@ ensures queue_ptr == RX_FREE_BASE ==> valid_net_head(gv.rx_free.net_head) @/
   /@ ensures bounded32(retval.0) @/
   /@ ensures bounded16(retval.1) @/
-  /@ ensures valid_virt() @/
-  /@ ensures queue_ptr == TX_ACTIVE_BASE ==> unchanged(unfolding_queue(tx_active) in gv.tx_active.net_tail) && unchanged(unfolding_queue(tx_active) in gv.tx_active.net_signal) @/
-  /@ ensures queue_ptr == RX_FREE_BASE ==> unchanged(unfolding_queue(rx_free) in gv.rx_free.net_tail) && unchanged(unfolding_queue(rx_free) in gv.rx_free.net_signal) @/
-  /@ ensures queue_ptr == TX_ACTIVE_BASE ==> queue_unchanged(rx_free) && queue_unchanged(rx_active) && queue_unchanged(tx_free) @/
-  /@ ensures queue_ptr == RX_FREE_BASE ==> queue_unchanged(rx_active) && queue_unchanged(tx_free) && queue_unchanged(tx_active) @/
-
-  /@ unfold valid_virt() @/
 
   /* capacity must be a power of 2 */
   var head = 0;
@@ -145,35 +156,24 @@ inline fun {1,1} net_dequeue(1 queue_ptr, 1 capacity)
 #endif
 
   head = wrap_int16(head + 1);
-  /* head == head % (MAX_INT16 + 1) */
   !st16 queue_ptr + HEAD_OFFSET, head;
-
-  /@ fold valid_virt() @/
 
   return <io_addr, len>;
 }
 
-inline fun net_request_signal(1 queue_ptr, 1 capacity)
+inline fun net_request_signal(1 queue_ptr)
 {
   /@ requires VALID_QUEUE_PTR(queue_ptr) @/
-  /@ requires valid_virt() @/
-  /@ ensures valid_virt() @/
-  /@ ensures queue_ptr == TX_FREE_BASE ==> unfolding_queue(tx_free) in gv.tx_free.net_signal == false @/
-  /@ ensures queue_ptr == TX_ACTIVE_BASE ==> unfolding_queue(tx_active) in gv.tx_active.net_signal == false @/
-  /@ ensures queue_ptr == RX_FREE_BASE ==> unfolding_queue(rx_free) in gv.rx_free.net_signal == false @/
-  /@ ensures queue_ptr == RX_ACTIVE_BASE ==> unfolding_queue(rx_active) in gv.rx_active.net_signal == false @/
-  /@ ensures queue_ptr == TX_FREE_BASE ==> unchanged(unfolding_queue(tx_free) in gv.tx_free.net_head) && unchanged(unfolding_queue(tx_free) in gv.tx_free.net_tail) @/
-  /@ ensures queue_ptr == TX_ACTIVE_BASE ==> unchanged(unfolding_queue(tx_active) in gv.tx_active.net_head) && unchanged(unfolding_queue(tx_active) in gv.tx_active.net_tail) @/
-  /@ ensures queue_ptr == RX_ACTIVE_BASE ==> unchanged(unfolding_queue(rx_active) in gv.rx_active.net_head) && unchanged(unfolding_queue(rx_active) in gv.rx_active.net_tail) @/
-  /@ ensures queue_ptr == RX_FREE_BASE ==> unchanged(unfolding_queue(rx_free) in gv.rx_free.net_head) && unchanged(unfolding_queue(rx_free) in gv.rx_free.net_tail) @/
-  /@ ensures queue_ptr == TX_FREE_BASE ==> queue_unchanged(tx_active) && queue_unchanged(rx_free) && queue_unchanged(rx_active) @/
-  /@ ensures queue_ptr == TX_ACTIVE_BASE ==> queue_unchanged(tx_free) && queue_unchanged(rx_active) && queue_unchanged(rx_free) @/
-  /@ ensures queue_ptr == RX_ACTIVE_BASE ==> queue_unchanged(tx_free) && queue_unchanged(tx_active) && queue_unchanged(rx_free) @/
-  /@ ensures queue_ptr == RX_FREE_BASE ==> queue_unchanged(tx_active) && queue_unchanged(tx_free) && queue_unchanged(rx_active) @/
+  /@ requires queue_ptr == TX_FREE_BASE ==> acc(gv.tx_free, 1/2) && acc(gv.tx_free.net_signal) @/
+  /@ requires queue_ptr == TX_ACTIVE_BASE ==> acc(gv.tx_active, 1/2) && acc(gv.tx_active.net_signal) @/
+  /@ requires queue_ptr == RX_FREE_BASE ==> acc(gv.rx_free, 1/2) && acc(gv.rx_free.net_signal) @/
+  /@ requires queue_ptr == RX_ACTIVE_BASE ==> acc(gv.rx_active, 1/2) && acc(gv.rx_active.net_signal) @/
+  /@ ensures queue_ptr == TX_FREE_BASE ==> acc(gv.tx_free, 1/2) && acc(gv.tx_free.net_signal) && gv.tx_free.net_signal == false @/
+  /@ ensures queue_ptr == TX_ACTIVE_BASE ==> acc(gv.tx_active, 1/2) && acc(gv.tx_active.net_signal) && gv.tx_active.net_signal == false @/
+  /@ ensures queue_ptr == RX_FREE_BASE ==> acc(gv.rx_free, 1/2) && acc(gv.rx_free.net_signal) && gv.rx_free.net_signal == false @/
+  /@ ensures queue_ptr == RX_ACTIVE_BASE ==> acc(gv.rx_active, 1/2) && acc(gv.rx_active.net_signal) && gv.rx_active.net_signal == false @/
 
-  /@ unfold valid_virt() @/
   !st32 queue_ptr + CONSUMER_SIGNALLED_OFFSET, 0;
-  /@ fold valid_virt() @/
 
   return 0;
 }
@@ -181,24 +181,16 @@ inline fun net_request_signal(1 queue_ptr, 1 capacity)
 inline fun net_cancel_signal(1 queue_ptr)
 {
   /@ requires VALID_QUEUE_PTR(queue_ptr) @/
-  /@ requires valid_virt() @/
-  /@ ensures valid_virt() @/
-  /@ ensures queue_ptr == TX_FREE_BASE ==> unfolding_queue(tx_free) in gv.tx_free.net_signal == true @/
-  /@ ensures queue_ptr == TX_ACTIVE_BASE ==> unfolding_queue(tx_active) in gv.tx_active.net_signal == true @/
-  /@ ensures queue_ptr == RX_FREE_BASE ==> unfolding_queue(rx_free) in gv.rx_free.net_signal == true @/
-  /@ ensures queue_ptr == RX_ACTIVE_BASE ==> unfolding_queue(rx_active) in gv.rx_active.net_signal == true @/
-  /@ ensures queue_ptr == TX_FREE_BASE ==> unchanged(unfolding_queue(tx_free) in gv.tx_free.net_head) && unchanged(unfolding_queue(tx_free) in gv.tx_free.net_tail) @/
-  /@ ensures queue_ptr == TX_ACTIVE_BASE ==> unchanged(unfolding_queue(tx_active) in gv.tx_active.net_head) && unchanged(unfolding_queue(tx_active) in gv.tx_active.net_tail) @/
-  /@ ensures queue_ptr == RX_ACTIVE_BASE ==> unchanged(unfolding_queue(rx_active) in gv.rx_active.net_head) && unchanged(unfolding_queue(rx_active) in gv.rx_active.net_tail) @/
-  /@ ensures queue_ptr == RX_FREE_BASE ==> unchanged(unfolding_queue(rx_free) in gv.rx_free.net_head) && unchanged(unfolding_queue(rx_free) in gv.rx_free.net_tail) @/
-  /@ ensures queue_ptr == TX_FREE_BASE ==> queue_unchanged(tx_active) && queue_unchanged(rx_free) && queue_unchanged(rx_active) @/
-  /@ ensures queue_ptr == TX_ACTIVE_BASE ==> queue_unchanged(tx_free) && queue_unchanged(rx_active) && queue_unchanged(rx_free) @/
-  /@ ensures queue_ptr == RX_ACTIVE_BASE ==> queue_unchanged(tx_free) && queue_unchanged(tx_active) && queue_unchanged(rx_free) @/
-  /@ ensures queue_ptr == RX_FREE_BASE ==> queue_unchanged(tx_active) && queue_unchanged(tx_free) && queue_unchanged(rx_active) @/
+  /@ requires queue_ptr == TX_FREE_BASE ==> acc(gv.tx_free, 1/2) && acc(gv.tx_free.net_signal) @/
+  /@ requires queue_ptr == TX_ACTIVE_BASE ==> acc(gv.tx_active, 1/2) && acc(gv.tx_active.net_signal) @/
+  /@ requires queue_ptr == RX_FREE_BASE ==> acc(gv.rx_free, 1/2) && acc(gv.rx_free.net_signal) @/
+  /@ requires queue_ptr == RX_ACTIVE_BASE ==> acc(gv.rx_active, 1/2) && acc(gv.rx_active.net_signal) @/
+  /@ ensures queue_ptr == TX_FREE_BASE ==> acc(gv.tx_free, 1/2) && acc(gv.tx_free.net_signal) && gv.tx_free.net_signal == true @/
+  /@ ensures queue_ptr == TX_ACTIVE_BASE ==> acc(gv.tx_active, 1/2) && acc(gv.tx_active.net_signal) && gv.tx_active.net_signal == true @/
+  /@ ensures queue_ptr == RX_FREE_BASE ==> acc(gv.rx_free, 1/2) && acc(gv.rx_free.net_signal) && gv.rx_free.net_signal == true @/
+  /@ ensures queue_ptr == RX_ACTIVE_BASE ==> acc(gv.rx_active, 1/2) && acc(gv.rx_active.net_signal) && gv.rx_active.net_signal == true @/
 
-  /@ unfold valid_virt() @/
   !st32 queue_ptr + CONSUMER_SIGNALLED_OFFSET, 1;
-  /@ fold valid_virt() @/
 
   return 0;
 }
@@ -206,17 +198,20 @@ inline fun net_cancel_signal(1 queue_ptr)
 inline fun net_require_signal(1 queue_ptr, 1 capacity)
 {
   /@ requires VALID_QUEUE_PTR(queue_ptr) @/
-  /@ requires valid_virt() @/
-  /@ ensures valid_virt() @/
-  /@ ensures queues_unchanged() @/
-  /@ ensures queue_ptr == RX_FREE_BASE ==> retval == unfolding_queue(rx_free) in (gv.rx_free.net_signal ? 0 : 1) @/
-  /@ ensures queue_ptr == RX_ACTIVE_BASE ==> retval == unfolding_queue(rx_active) in (gv.rx_active.net_signal ? 0 : 1) @/
-  /@ ensures queue_ptr == TX_ACTIVE_BASE ==> retval == unfolding_queue(tx_active) in (gv.tx_active.net_signal ? 0 : 1) @/
-  /@ ensures queue_ptr == TX_FREE_BASE ==> retval == unfolding_queue(tx_free) in (gv.tx_free.net_signal ? 0 : 1) @/
+  /@ requires queue_ptr == TX_FREE_BASE ==> acc(gv.tx_free, 1/2) && acc(gv.tx_free.net_signal, 1/2) @/
+  /@ requires queue_ptr == TX_ACTIVE_BASE ==> acc(gv.tx_active, 1/2) && acc(gv.tx_active.net_signal, 1/2) @/
+  /@ requires queue_ptr == RX_FREE_BASE ==> acc(gv.rx_free, 1/2) && acc(gv.rx_free.net_signal, 1/2) @/
+  /@ requires queue_ptr == RX_ACTIVE_BASE ==> acc(gv.rx_active, 1/2) && acc(gv.rx_active.net_signal, 1/2) @/
+  /@ ensures queue_ptr == TX_FREE_BASE ==> acc(gv.tx_free, 1/2) && acc(gv.tx_free.net_signal, 1/2) @/
+  /@ ensures queue_ptr == TX_ACTIVE_BASE ==> acc(gv.tx_active, 1/2) && acc(gv.tx_active.net_signal, 1/2) @/
+  /@ ensures queue_ptr == RX_FREE_BASE ==> acc(gv.rx_free, 1/2) && acc(gv.rx_free.net_signal, 1/2) @/
+  /@ ensures queue_ptr == RX_ACTIVE_BASE ==> acc(gv.rx_active, 1/2) && acc(gv.rx_active.net_signal, 1/2) @/
+  /@ ensures queue_ptr == TX_FREE_BASE ==> retval == (gv.tx_free.net_signal ? 0 : 1) @/
+  /@ ensures queue_ptr == TX_ACTIVE_BASE ==> retval == (gv.tx_active.net_signal ? 0 : 1) @/
+  /@ ensures queue_ptr == RX_FREE_BASE ==> retval == (gv.rx_free.net_signal ? 0 : 1) @/
+  /@ ensures queue_ptr == RX_ACTIVE_BASE ==> retval == (gv.rx_active.net_signal ? 0 : 1) @/
 
-  /@ unfold valid_virt() @/
   var signalled = 0;
   !ld32 signalled, queue_ptr + CONSUMER_SIGNALLED_OFFSET;
-  /@ fold valid_virt() @/
   return !signalled;
 }
