@@ -180,7 +180,8 @@ static void handle_request(void)
             opcode = 0x01;
         } else {
             /* Support for FLUSH/BARRIER can be added here */
-            blk_enqueue_resp(&blk_queue, BLK_RESP_OK, 0, id);
+            int err = blk_enqueue_resp(&blk_queue, BLK_RESP_OK, 0, id);
+            assert(!err);
             continue;
         }
 
@@ -361,7 +362,8 @@ static void handle_io_completions(void)
 
         blk_resp_status_t resp_status = (status == 0) ? BLK_RESP_OK : BLK_RESP_ERR_UNSPEC;
         /* Return the original requested count on success */
-        blk_enqueue_resp(&blk_queue, resp_status, (resp_status == BLK_RESP_OK) ? count : 0, id);
+        int err = blk_enqueue_resp(&blk_queue, resp_status, (resp_status == BLK_RESP_OK) ? count : 0, id);
+        assert(!err);
         notify = true;
     }
 
