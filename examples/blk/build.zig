@@ -94,6 +94,7 @@ pub fn build(b: *std.Build) !void {
     const python = b.option([]const u8, "python", "Path to Python to use") orelse default_python;
 
     const partition = b.option(usize, "partition", "Block device partition for client to use") orelse null;
+    const nvme = b.option(bool, "nvme", "Use NVMe driver") orelse false;
 
     const microkit_sdk = b.option(LazyPath, "sdk", "Path to Microkit SDK") orelse {
         std.log.err("Missing -Dsdk=<sdk> argument", .{});
@@ -125,6 +126,10 @@ pub fn build(b: *std.Build) !void {
 
     const timer_driver_class = switch (microkit_board_option) {
         .maaxboard => "imx",
+        .x86_64_generic => switch (nvme) {
+            true => @as([]const u8, "hpet"),
+            false => null,
+        },
         else => null,
     };
     var timer_driver_install: ?*Step.InstallArtifact = null;
@@ -133,8 +138,6 @@ pub fn build(b: *std.Build) !void {
         // To match what our SDF expects
         timer_driver_install = b.addInstallArtifact(driver, .{ .dest_sub_path = "timer_driver.elf" });
     }
-
-    const nvme = b.option(bool, "nvme", "Use NVMe driver") orelse false;
 
     const blk_driver_class = switch (microkit_board_option) {
         .qemu_virt_aarch64, .qemu_virt_riscv64 => "virtio_mmio",
@@ -354,7 +357,10 @@ pub fn build(b: *std.Build) !void {
         }
 
         const qemu_virtio_device = switch (target.result.cpu.arch) {
-            .x86_64 => "virtio-blk-pci,drive=hd,addr=0x3.0",
+            .x86_64 => switch (nvme) {
+                true => "nvme,drive=hd,serial=TEST1234,addr=0x4.0",
+                false => "virtio-blk-pci,drive=hd,addr=0x3.0",
+            },
             else => "virtio-blk-device,drive=hd,bus=virtio-mmio-bus.1",
         };
 
