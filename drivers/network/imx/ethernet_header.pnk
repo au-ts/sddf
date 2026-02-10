@@ -79,15 +79,18 @@ var 1 hw_tx_ptr       = HW_TX_PTR;
 var 1 eth_reg = ETH_REG;
 
 /@ extern predicate valid_device @/
+/@ extern predicate valid_virt @/
 /@ extern predicate valid_hardware_ring_rx_addr @/
+/@ extern predicate valid_hardware_ring_rx_stat @/
 /@ extern predicate valid_hardware_ring_rx_len @/
 /@ extern predicate valid_hardware_ring_tx_addr @/
+/@ extern predicate valid_hardware_ring_tx_stat @/
 /@ extern predicate valid_hardware_ring_tx_len @/
 /@ extern field hardware_ring_rx_addr: Seq[Int] @/
-/@ extern field hardware_ring_tx_addr: Seq[Int] @/
 /@ extern field hardware_ring_rx_stat: Seq[Int] @/
-/@ extern field hardware_ring_tx_stat: Seq[Int] @/
 /@ extern field hardware_ring_rx_len: Seq[Int] @/
+/@ extern field hardware_ring_tx_addr: Seq[Int] @/
+/@ extern field hardware_ring_tx_stat: Seq[Int] @/
 /@ extern field hardware_ring_tx_len: Seq[Int] @/
 
 #define HW_RING_BASE         35651584
@@ -110,6 +113,9 @@ var 1 eth_reg = ETH_REG;
 #define RDAR_ADDR     HW_ETH_BASE + ETH_RDAR_OFF
 #define TDAR_ADDR     HW_ETH_BASE + ETH_TDAR_OFF
 #define EIR_ADDR      HW_ETH_BASE + ETH_EIR_OFF
+
+#define valid_net_tail(x) bounded16(x)
+#define valid_net_head(x) bounded16(x)
 
 /@ shared w u32 hw_ring_rx_addr[HW_RING_RX_ADDR_LO..HW_RING_RX_ADDR_HI] @/
 /@ shared w u32 hw_ring_tx_addr[HW_RING_TX_ADDR_LO..HW_RING_TX_ADDR_HI] @/
@@ -155,7 +161,10 @@ var 1 eth_reg = ETH_REG;
 #define MAX_WORD    MAX_INT64
 
 /@
-  predicate valid_hw_meta() {
+  predicate valid() {
+  	valid_device() &&
+  	valid_virt() &&
+  	acc(gv.eth_reg) && gv.eth_reg == HW_ETH_BASE &&
   	acc(gv.hw_tx_tail) && acc(gv.hw_tx_head) && acc(gv.hw_tx_capacity) && acc(gv.hw_tx_descr) &&
   	acc(gv.hw_rx_tail) && acc(gv.hw_rx_head) && acc(gv.hw_rx_capacity) && acc(gv.hw_rx_descr) &&
     gv.hw_tx_capacity == 256 &&
@@ -169,39 +178,13 @@ var 1 eth_reg = ETH_REG;
     gv.hw_rx_descr + gv.hw_rx_capacity * DESCR_LEN < RX_FREE_BASE &&
     gv.hw_rx_descr + gv.hw_rx_capacity * DESCR_LEN < RX_ACTIVE_BASE &&
     gv.hw_rx_descr + gv.hw_rx_capacity * DESCR_LEN < TX_FREE_BASE &&
-    gv.hw_rx_descr + gv.hw_rx_capacity * DESCR_LEN < TX_ACTIVE_BASE
-  }
-@/
-
-/@
-  predicate valid_virt_meta() {
+    gv.hw_rx_descr + gv.hw_rx_capacity * DESCR_LEN < TX_ACTIVE_BASE &&
     acc(gv.net_rx_free) && gv.net_rx_free == RX_FREE_BASE &&
     acc(gv.net_rx_active) && gv.net_rx_active == RX_ACTIVE_BASE &&
     acc(gv.net_tx_free) && gv.net_tx_free == TX_FREE_BASE &&
     acc(gv.net_tx_active) && gv.net_tx_active == TX_ACTIVE_BASE &&
   	acc(gv.net_tx_capacity) && gv.net_tx_capacity == QUEUE_CAPACITY &&
-  	acc(gv.net_rx_capacity) && gv.net_rx_capacity == QUEUE_CAPACITY
-  }
-@/
-
-// WLOG we can say the overlap is one way or another
-/*/@
-  predicate non_overlap() {
-    acc(valid_hw_meta()) && unfolding valid_hw_meta() in
-    (gv.hw_tx_descr + gv.hw_tx_capacity * DESCR_LEN < RX_FREE_BASE &&
-    gv.hw_tx_descr + gv.hw_tx_capacity * DESCR_LEN < RX_ACTIVE_BASE &&
-    gv.hw_tx_descr + gv.hw_tx_capacity * DESCR_LEN < TX_FREE_BASE &&
-    gv.hw_tx_descr + gv.hw_tx_capacity * DESCR_LEN < TX_ACTIVE_BASE)
-  }
-@/*/
-
-/@
-  predicate valid() {
-  	valid_device() &&
-  	valid_virt() &&
-  	acc(gv.eth_reg) && gv.eth_reg == HW_ETH_BASE &&
-  	valid_hw_meta() &&
-    valid_virt_meta() &&
+  	acc(gv.net_rx_capacity) && gv.net_rx_capacity == QUEUE_CAPACITY &&
     acc(gv.hw_rx_ptr) && acc(gv.hw_tx_ptr) &&
     boundedW(gv.hw_rx_ptr) && boundedW(gv.hw_tx_ptr) &&
     acc(gv.irq_ch) && acc(gv.rx_ch) && acc(gv.tx_ch)

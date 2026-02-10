@@ -17,7 +17,8 @@ rx_update_ring_slot Int
 wrap_hw_rx_capacity Bitvec
 rx_return Int
 rx_provide Int
-handle_irq Bitvec
+handle_irq Int
+irq_get_set_eir Bitvec
 main Int
 net_cancel_signal Int
 net_dequeue Int
