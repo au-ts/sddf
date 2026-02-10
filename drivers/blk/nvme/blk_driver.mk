@@ -20,6 +20,8 @@ blk_driver.elf: blk_driver.o
 blk_driver.o: ${BLK_DRIVER_DIR}/nvme.c ${CHECK_NVME_FLAGS_MD5}
 	$(CC) -c $(CFLAGS) -I${BLK_DRIVER_DIR} -o $@ $<
 
+-include blk_driver.d
+
 clean::
 	rm -f blk_driver.o
 
