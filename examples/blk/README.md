@@ -13,6 +13,7 @@ The following platforms are supported:
 * maaxboard
 * qemu_virt_aarch64
 * qemu_virt_riscv64
+* x86_64_generic (only QEMU right now)
 
 Note that this example depends on `dosfstools` and `gdisk`.
 
