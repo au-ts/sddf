@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from sdfgen import SystemDescription, Sddf, DeviceTree
 from importlib.metadata import version
 
-assert version("sdfgen").split(".")[1] == "24", "Unexpected sdfgen version"
+assert version("sdfgen").split(".")[1] == "28", "Unexpected sdfgen version"
 
 ProtectionDomain = SystemDescription.ProtectionDomain
 Irq = SystemDescription.Irq
