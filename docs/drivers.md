@@ -10,7 +10,7 @@ Below is a list of all the available drivers in sDDF, grouped by their device
 class.
 
 Each driver is listed by the device family it is written for and a list of
-Device Tree compatible strings it is known to work with.
+Device Tree compatible strings/platforms it is known to work with.
 
 ## Block
 
@@ -18,6 +18,9 @@ Device Tree compatible strings it is known to work with.
     * `fsl,imx8mq-usdhc`
 * virtIO block
     * `virtio,mmio`
+    * PCI is also supported for x86-64 platforms.
+* NVMe
+    * Currently targeting x86-64 platforms via PCI.
 
 ## I<sup>2</sup>C
 
@@ -55,6 +58,7 @@ Device Tree compatible strings it is known to work with.
     * `brcm,bcm2835-aux-uart`
     * `starfive,jh7110-uart`
     * `ns16550a`
+    * `pc99`
 * AMD Zynq UltraScale+ MPSoC UART
     * `xlnx,zynqmp-uart`
 * virtIO console
