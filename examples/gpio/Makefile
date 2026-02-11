@@ -11,6 +11,8 @@ endif
 ifeq ($(strip $(MICROKIT_BOARD)),)
 $(error MICROKIT_BOARD must be specified)
 endif
+
+export MICROKIT_CONFIG ?= debug
 export MICROKIT_BOARD
 BUILD_DIR ?= build
 export SDDF := $(abspath ../..)
