@@ -14,6 +14,7 @@
 #include <sddf/util/printf.h>
 #include <sddf/timer/protocol.h>
 #include <sddf/timer/config.h>
+#include <sddf/timer/timer_driver.h>
 
 #define GPT_STATUS_REGISTER_CLEAR 0x3F
 #define CR 0
@@ -35,11 +36,12 @@ __attribute__((__section__(".device_resources"))) device_resources_t device_reso
 
 static volatile uint32_t *gpt;
 static uint32_t overflow_count;
-static uint64_t timeouts[MAX_TIMEOUTS];
+static timer_heap_t timeouts;
 
 static uint64_t get_ticks(void)
 {
     uint64_t overflow = overflow_count;
+
     uint32_t sr1 = gpt[SR];
     uint32_t cnt = gpt[CNT];
     uint32_t sr2 = gpt[SR];
@@ -47,30 +49,45 @@ static uint64_t get_ticks(void)
         /* rolled-over during - 64-bit time must be the overflow */
         cnt = gpt[CNT];
         overflow++;
+
     }
     return (overflow << 32) | cnt;
 }
 
 static void process_timeouts(uint64_t curr_time)
 {
-    for (int i = 0; i < MAX_TIMEOUTS; i++) {
-        if (timeouts[i] <= curr_time) {
-            sddf_notify(i);
-            timeouts[i] = UINT64_MAX;
-        }
+    while (timer_heap_peek(&timeouts) != NULL && timer_heap_peek(&timeouts)->timestamp <= curr_time) {
+        timeout_t expired;
+        bool ret = timer_heap_pop(&timeouts, &expired);
+        assert(ret); // This should never happen! Peek should catch empty queue
+        sddf_notify(expired.client_channel);
     }
 
-    uint64_t next_timeout = UINT64_MAX;
-    for (int i = 0; i < MAX_TIMEOUTS; i++) {
-        if (timeouts[i] < next_timeout) {
-            next_timeout = timeouts[i];
-        }
-    }
+    timeout_t *next = timer_heap_peek(&timeouts);
 
-    if (next_timeout != UINT64_MAX && overflow_count == (next_timeout >> 32)) {
-        gpt[OCR1] = (uint32_t)next_timeout;
+    if (next != NULL && overflow_count == (next->timestamp >> 32)) {
+        gpt[OCR1] = (uint32_t)next->timestamp;
         gpt[IR] |= 1;
     }
+
+    // for (int i = 0; i < MAX_TIMEOUTS; i++) {
+    //     if (timeouts[i] <= curr_time) {
+    //         sddf_notify(i);
+    //         timeouts[i] = UINT64_MAX;
+    //     }
+    // }
+
+    // uint64_t next_timeout = UINT64_MAX;
+    // for (int i = 0; i < MAX_TIMEOUTS; i++) {
+    //     if (timeouts[i] < next_timeout) {
+    //         next_timeout = timeouts[i];
+    //     }
+    // }
+
+    // if (next_timeout != UINT64_MAX && overflow_count == (next_timeout >> 32)) {
+    //     gpt[OCR1] = (uint32_t)next_timeout;
+    //     gpt[IR] |= 1;
+    // }
 }
 
 void notified(sddf_channel ch)
@@ -108,7 +125,8 @@ seL4_MessageInfo_t protected(sddf_channel ch, seL4_MessageInfo_t msginfo)
     case SDDF_TIMER_SET_TIMEOUT: {
         uint64_t curr_time = get_ticks();
         uint64_t offset_ticks = (sddf_get_mr(0) / NS_IN_US) * (uint64_t)GPT_FREQ;
-        timeouts[ch] = curr_time + offset_ticks;
+
+        timer_heap_insert(&timeouts, curr_time + offset_ticks, ch);
         process_timeouts(curr_time);
         break;
     }
@@ -126,10 +144,6 @@ void init(void)
     assert(device_resources_check_magic(&device_resources));
     assert(device_resources.num_irqs == 1);
     assert(device_resources.num_regions == 1);
-
-    for (int i = 0; i < MAX_TIMEOUTS; i++) {
-        timeouts[i] = UINT64_MAX;
-    }
 
     gpt = (volatile uint32_t *)device_resources.regions[0].region.vaddr;
 
