@@ -84,5 +84,5 @@ spi_status_t spi_read_resp(libspi_conf_t *conf, spi_resp_t *resp)
     spi_handle_t handle;
     assert(spi_handle_init(&handle, conf->virt.cmd_queue.vaddr, conf->virt.resp_queue.vaddr, NULL, NULL,
                            conf->virt.queue_capacity_bits));
-    return spi_dequeue_resp(&handle, &resp->err, &resp->err_cmd_idx) ? SPI_STATUS_ERR_RESP_QUEUE_EMPTY : SPI_STATUS_OK;
+    return spi_dequeue_resp(&handle, &resp->status, &resp->err_cmd_idx) ? SPI_STATUS_ERR_RESP_QUEUE_EMPTY : SPI_STATUS_OK;
 }

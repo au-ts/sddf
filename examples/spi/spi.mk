@@ -58,6 +58,7 @@ LIBMICROKITCO_OPT_PATH := $(LIBMICROKITCO_OPTS_DIR)
 LIBMICROKITCO_OBJ := libmicrokitco.a
 
 LLVM := 1
+SDDF_CUSTOM_LIBC := 1
 TOP:= ${SDDF}/examples/spi
 METAPROGRAM := $(TOP)/meta.py
 UTIL := $(SDDF)/util

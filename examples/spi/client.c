@@ -5,9 +5,9 @@
 
 #include <stdint.h>
 #include <microkit.h>
+#include <string.h>
 #include <sddf/spi/config.h>
 #include <sddf/util/printf.h>
-#include <sddf/util/string.h>
 #include <sddf/spi/libspi.h>
 #include <sddf/spi/devices/w25qxx.h>
 

@@ -7,8 +7,8 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <string.h>
 #include <sddf/util/fence.h>
-#include <sddf/util/string.h>
 #include <sddf/spi/config.h>
 
 typedef enum spi_status {
@@ -246,7 +246,7 @@ static inline bool spi_mass_enqueue_cmd(spi_handle_t *handle, spi_cmd_t *element
     spi_cmd_queue_t *queue = handle->spi_cmd_queue;
     for (uint32_t i = 0; i < len; i++) {
         uint32_t index = (queue->tail + i) % (1 << handle->queue_capacity_bits);
-        sddf_memcpy(&queue->element[index], &element[i], sizeof(spi_cmd_t));
+        memcpy(&queue->element[index], &element[i], sizeof(spi_cmd_t));
     }
 
     THREAD_MEMORY_RELEASE();
@@ -364,7 +364,7 @@ static inline bool spi_mass_enqueue_resp(spi_handle_t *handle, spi_resp_t *eleme
     spi_resp_queue_t *queue = handle->spi_resp_queue;
     for (uint32_t i = 0; i < len; i++) {
         uint32_t index = (queue->tail + i) % (1 << handle->queue_capacity_bits);
-        sddf_memcpy(&queue->element[index], &element[i], sizeof(spi_resp_t));
+        memcpy(&queue->element[index], &element[i], sizeof(spi_resp_t));
     }
 
     THREAD_MEMORY_RELEASE();
@@ -478,7 +478,7 @@ static inline bool spi_mass_enqueue_cmd_cs(spi_handle_t *handle, spi_cs_t *eleme
     spi_cmd_cs_queue_t *queue = handle->spi_cmd_cs_queue;
     for (uint32_t i = 0; i < len; i++) {
         uint32_t index = (queue->tail + i) % (1 << handle->queue_capacity_bits);
-        sddf_memcpy(&queue->element[index], &element[i], sizeof(spi_cs_t));
+        memcpy(&queue->element[index], &element[i], sizeof(spi_cs_t));
     }
 
     THREAD_MEMORY_RELEASE();
@@ -592,7 +592,7 @@ static inline bool spi_mass_enqueue_resp_cs(spi_handle_t *handle, spi_cs_t *elem
     spi_resp_cs_queue_t *queue = handle->spi_resp_cs_queue;
     for (uint32_t i = 0; i < len; i++) {
         uint32_t index = (queue->tail + i) % (1 << handle->queue_capacity_bits);
-        sddf_memcpy(&queue->element[index], &element[i], sizeof(spi_cs_t));
+        memcpy(&queue->element[index], &element[i], sizeof(spi_cs_t));
     }
 
     THREAD_MEMORY_RELEASE();
