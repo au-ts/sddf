@@ -3,16 +3,18 @@
 # SPDX-License-Identifier: BSD-2-Clause
 
 import asyncio
-import sys
 from pathlib import Path
+import sys
 
 sys.path.insert(1, Path(__file__).parents[2].as_posix())
 
-from ci import common, matrix
 from ci.lib.backends import *
-from ci.lib.runner import TestConfig, cli, matrix_product
+from ci.lib.runner import run_single_example, matrix_product
+from ci.common import TestConfig
+from ci import common, matrix
 
 TEST_MATRIX = matrix_product(
+    example=["gpio"],
     board=matrix.EXAMPLES["gpio"]["boards_test"],
     config=matrix.EXAMPLES["gpio"]["configs"],
     build_system=matrix.EXAMPLES["gpio"]["build_systems"],
@@ -30,4 +32,8 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
 
 
 if __name__ == "__main__":
-    cli("gpio", test, TEST_MATRIX, backend_fn, common.loader_img_path)
+    run_single_example(
+        test,
+        TEST_MATRIX,
+        backend_fn,
+    )
