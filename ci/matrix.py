@@ -111,7 +111,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
     },
     "gpio": {
         "configs": ["debug", "release", "benchmark"],
-        "build_systems": ["make"],
+        "build_systems": ["make", "zig"],
         "boards_build": [
             "maaxboard",
         ],
