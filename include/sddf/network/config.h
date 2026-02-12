@@ -78,6 +78,15 @@ typedef struct net_client_config {
     uint8_t mac_addr[6];
 } net_client_config_t;
 
+typedef struct net_vswitch_config {
+    char magic[SDDF_NET_MAGIC_LEN];
+    // TODO: what to put here?
+    // TODO: open questions?
+    // should I rewrite this to be like other components?
+    // should vswitch_channel be just a net_connection_resource_t?
+    // allow_list should probably stay
+} net_vswitch_config_t;
+
 static inline bool net_config_check_magic(void *config)
 {
     char *magic = (char *)config;

@@ -13,11 +13,28 @@
 #include <sddf/util/fence.h>
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
-#define VSWITCH_IMPL
-#include <vswitch_config.h>
 
 _Static_assert(VSWITCH_PORT_COUNT <= VSWITCH_MAX_PORT_COUNT, "Too many ports");
 #define UNKNOWN_PORT -1
+
+// TODO: what to put in net_vswitch_config??
+__attribute__((__section__(".net_vswitch_config"))) net_vswitch_config_t config;
+
+typedef struct vswitch_channel {
+    net_queue_handle_t q;
+    microkit_channel ch;
+    char *data_region;
+} vswitch_channel_t;
+
+/* These ports are analogous to ports on a physical switch.
+ * They represent a medium you can send to and receive from. */
+typedef struct vswitch_port {
+    /* For clients, incoming is TX, outgoing is RX.
+     * For virtualisers, incoming is RX, outgoing is TX. */
+    vswitch_channel_t incoming;
+    vswitch_channel_t outgoing;
+    vswitch_port_bitmap_t allow_list;
+} vswitch_port_t;
 
 typedef struct mac_addr {
     uint8_t addr[6];
@@ -162,6 +179,8 @@ void notified(microkit_channel ch)
 
 void init(void)
 {
+    assert(net_config_check_magic(&config));
+
     for (int i = 0; i < VSWITCH_PORT_COUNT; i++) {
         net_vswitch_init_port(i, &vswitch.ports[i]);
         net_buffers_init(&vswitch.ports[i].outgoing.q, 0);
