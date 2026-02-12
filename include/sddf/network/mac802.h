@@ -24,6 +24,10 @@
 
 #define MAC802_BYTES 6
 
+typedef struct mac_addr {
+    uint8_t addr[6];
+} mac_addr_t;
+
 /* This is a name for the 96 bit ethernet addresses available on many
    systems.  */
 struct ether_addr {

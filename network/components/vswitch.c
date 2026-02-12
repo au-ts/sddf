@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+#include "sddf/network/config.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <microkit.h>
@@ -14,44 +15,31 @@
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 
-_Static_assert(VSWITCH_PORT_COUNT <= VSWITCH_MAX_PORT_COUNT, "Too many ports");
 #define UNKNOWN_PORT -1
 
-// TODO: what to put in net_vswitch_config??
 __attribute__((__section__(".net_vswitch_config"))) net_vswitch_config_t config;
 
-typedef struct vswitch_channel {
-    net_queue_handle_t q;
-    microkit_channel ch;
-    char *data_region;
-} vswitch_channel_t;
-
 /* These ports are analogous to ports on a physical switch.
- * They represent a medium you can send to and receive from. */
-typedef struct vswitch_port {
-    /* For clients, incoming is TX, outgoing is RX.
-     * For virtualisers, incoming is RX, outgoing is TX. */
-    vswitch_channel_t incoming;
-    vswitch_channel_t outgoing;
-    vswitch_port_bitmap_t allow_list;
-} vswitch_port_t;
+* They represent a medium you can send to and receive from. */
+/* For clients, incoming is TX, outgoing is RX.
+ * For virtualisers, incoming is RX, outgoing is TX. */
+// Store macs contiguously for better cache performance during lookup.
+// Since all MACs not on our internal MAC->port mapping are not ours, we don't need the mapping
+// If we want to dynamically add/remove allowed connections, we will just update the allowlist
+// TODO: better allow or deny in principle?
 
-typedef struct mac_addr {
-    uint8_t addr[6];
-} mac_addr_t;
+typedef struct vswitch_state {
+    // Queues for clients
+    net_queue_handle_t rx_queues_clients[SDDF_NET_MAX_CLIENTS];
+    net_queue_handle_t tx_queues_clients[SDDF_NET_MAX_CLIENTS];
+    // Queues for the virt
+    net_queue_handle_t rx_queue_virt;
+    net_queue_handle_t tx_queue_virt;
 
-typedef struct channel_map {
-    // Store macs contiguously for better cache performance during lookup.
-    mac_addr_t macs[VSWITCH_LOOKUP_SIZE];
-    uint8_t port[VSWITCH_LOOKUP_SIZE];
-    uint32_t len;
-} channel_map_t;
+    vswitch_port_bitmap_t allow_list[SDDF_NET_MAX_CLIENTS]; // TODO: should it be denylist instead?
+} vswitch_state_t;
 
-static struct {
-    vswitch_port_t ports[VSWITCH_PORT_COUNT];
-    channel_map_t map;
-} vswitch;
-
+static vswitch_state_t state;
 
 static int channel_map_find(channel_map_t *map, const uint8_t *dest_macaddr)
 {
@@ -163,6 +151,9 @@ static void notified_by_port(int port)
 
 void notified(microkit_channel ch)
 {
+
+
+
     // This could be optimised but port count is usually low.
     for (int port = 0; port < VSWITCH_PORT_COUNT; port++) {
         if (ch == vswitch.ports[port].incoming.ch) {
@@ -181,8 +172,22 @@ void init(void)
 {
     assert(net_config_check_magic(&config));
 
-    for (int i = 0; i < VSWITCH_PORT_COUNT; i++) {
-        net_vswitch_init_port(i, &vswitch.ports[i]);
-        net_buffers_init(&vswitch.ports[i].outgoing.q, 0);
+    /* Set up client queues and buffers for copying? */
+    uint8_t num_clients = config.num_clients;
+    for (int i = 0; i < num_clients; i++) {
+        net_queue_init(&state.rx_queues_clients[i], config.clients_rx[i].free_queue.vaddr, config.clients_rx[i].active_queue.vaddr,
+                       config.clients_rx[i].num_buffers);
+        net_queue_init(&state.tx_queues_clients[i], config.clients_tx[i].free_queue.vaddr, config.clients_tx[i].active_queue.vaddr,
+                       config.clients_tx[i].num_buffers);
+        net_buffers_init(&state.rx_queues_clients[i], 0); // TODO: should the offset be set?
+        net_buffers_init(&state.tx_queues_clients[i], 0);
     }
+
+    /* Set virt queues */
+    net_queue_init(&state.rx_queue_virt, config.virt_rx.free_queue.vaddr, config.virt_rx.active_queue.vaddr,
+                   config.virt_rx.num_buffers);
+    net_queue_init(&state.tx_queue_virt, config.virt_tx.free_queue.vaddr, config.virt_tx.active_queue.vaddr,
+                   config.virt_tx.num_buffers);
+
+    // Seed the allow_list based on predefined settings */
 }
