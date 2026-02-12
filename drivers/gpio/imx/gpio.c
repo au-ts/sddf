@@ -8,7 +8,6 @@
 #include <microkit.h>
 #include <sddf/resources/device.h>
 #include <sddf/util/printf.h>
-#include <sddf/util/arm_barriers.h>
 #include <sddf/gpio/protocol.h>
 #include <gpio_config.h>
 #include "gpio.h"
@@ -96,9 +95,6 @@ static void handle_gpio_irq(int ch, int start_pin, int end_pin)
     gpio_regs->imr &= ~clear_mask;
 
     // We want it to be cleared before the microkit acknowledges so we dont enter notified again.
-
-    // We use dsb because the the gpio and gic are seperate peripherals
-    DSB_ISHST();
     microkit_deferred_irq_ack(ch);
 }
 
@@ -358,9 +354,6 @@ void validate_gpio_config()
 void disable_all_interrupts()
 {
     gpio_regs->imr = 0;
-
-    // We use dsb because the the gpio and gic are seperate peripherals
-    DSB_ISHST();
 
     microkit_irq_ack(device_resources.irqs[0].id);
     microkit_irq_ack(device_resources.irqs[1].id);
