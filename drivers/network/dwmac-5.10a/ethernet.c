@@ -24,6 +24,12 @@ __attribute__((__section__(".net_driver_config"))) net_driver_config_t config;
 uintptr_t resets = 0x3000000;
 #endif /* CONFIG_PLAT_STAR64 */
 
+#ifdef CONFIG_PLAT_RK3568
+uintptr_t resets = 0x3000000;
+#define RK3568_CRU_SOFTRST 0x400
+#define RK3568_CRU_SOFTRST_CON13 0x34
+#endif /* CONFIG_PLAT_RK3568 */
+
 #define RX_COUNT 256
 #define TX_COUNT 256
 #define MAX_COUNT MAX(RX_COUNT, TX_COUNT)
@@ -241,7 +247,7 @@ static void handle_irq()
  * the EEPROM.
  * See https://github.com/au-ts/sddf/issues/437 for more details.
  */
-#if defined(CONFIG_PLAT_IMX8MP_EVK)
+#if defined(CONFIG_PLAT_IMX8MP_EVK) || defined(CONFIG_PLAT_RK3568)
 #define USE_MAC_ADDR_REGS 1
 #elif defined(CONFIG_PLAT_STAR64)
 #define USE_MAC_ADDR_REGS 0
@@ -449,6 +455,15 @@ void init(void)
         *reset_eth = reset_val;
     }
 #endif /* CONFIG_PLAT_STAR64 */
+
+#ifdef CONFIG_PLAT_RK3568
+    volatile uint32_t *reset_eth = (volatile uint32_t *)(resets + RK3568_CRU_SOFTRST + RK3568_CRU_SOFTRST_CON13);
+    uint32_t reset_val = *reset_eth;
+    /* Bit 23 is WE to bit 7 and bit 7 is aresetn_gmac0 */
+    reset_val &= ~BIT(7);
+    reset_val |= BIT(23);
+    *reset_eth = reset_val;
+#endif /* CONFIG_PLAT_RK3568 */
 
     // Check if the PHY device is up
     uint32_t phy_stat = *MAC_REG(MAC_PHYIF_CONTROL_STATUS);
