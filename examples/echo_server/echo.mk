@@ -11,12 +11,20 @@
 MICROKIT_TOOL ?= $(MICROKIT_SDK)/bin/microkit
 ECHO_SERVER:=${SDDF}/examples/echo_server
 
-SUPPORTED_BOARDS := odroidc4 odroidc2 maaxboard \
-				imx8mm_evk qemu_virt_aarch64 \
-				imx8mq_evk imx8mp_evk \
-				imx8mp_iotgate \
-				star64 qemu_virt_riscv64 \
-				x86_64_generic
+SUPPORTED_BOARDS := \
+		    imx8mm_evk \
+		    imx8mp_evk \
+			imx8mq_evk \
+		    imx8mp_iotgate \
+			maaxboard \
+			odroidc2 \
+			odroidc4 \
+			qemu_virt_aarch64 \
+		    qemu_virt_riscv64 \
+			rock3b \
+			star64 \
+			x86_64_generic
+
 TOOLCHAIN ?= clang
 MICROKIT_CONFIG ?= debug
 SYSTEM_FILE := echo_server.system
