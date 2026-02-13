@@ -1,0 +1,21 @@
+{
+    "compatible": [
+        "rockchip,rk3568-timer"
+    ],
+    "resources": {
+        "regions": [
+            {
+                "name": "regs",
+                "dt_index": 0
+            }
+        ],
+        "irqs": [
+            {
+                "dt_index": 0
+            },
+            {
+                "dt_index": 1
+            }
+        ]
+    }
+}
