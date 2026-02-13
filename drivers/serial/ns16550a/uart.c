@@ -25,7 +25,7 @@ volatile uintptr_t uart_base;
 
 /* TODO: Use the value from the device tree*/
 #if defined(CONFIG_PLAT_STAR64) || defined(CONFIG_PLAT_CHESHIRE) || defined(CONFIG_PLAT_BCM2711)                       \
-    || defined(CONFIG_PLAT_HIFIVE_P550)
+    || defined(CONFIG_PLAT_HIFIVE_P550) || defined(CONFIG_PLAT_RK3568)
 #define REG_IO_WIDTH 4
 #define REG_SHIFT 2
 #define REG_PTR(off)     ((volatile uint32_t *)((uart_base) + (off << REG_SHIFT)))
