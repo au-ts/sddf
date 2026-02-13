@@ -17,6 +17,7 @@ const MicrokitBoard = enum {
     maaxboard,
     qemu_virt_aarch64,
     qemu_virt_riscv64,
+    rock3b,
     rpi4b_1gb,
     serengeti,
     star64,
@@ -166,6 +167,16 @@ const targets = [_]Target{
         },
     },
     .{
+        .board = MicrokitBoard.rock3b,
+        .zig_target = std.Target.Query{
+            .cpu_arch = .aarch64,
+            .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a55 },
+            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{.strict_align}),
+            .os_tag = .freestanding,
+            .abi = .none,
+        },
+    },
+    .{
         .board = MicrokitBoard.x86_64_generic,
         .zig_target = std.Target.Query{
             .cpu_arch = .x86_64,
@@ -242,7 +253,7 @@ pub fn build(b: *std.Build) !void {
         .qemu_virt_aarch64 => "arm",
         .odroidc2, .odroidc4 => "meson",
         .maaxboard, .imx8mm_evk, .imx8mp_evk, .imx8mq_evk => "imx",
-        .rpi4b_1gb, .star64, .qemu_virt_riscv64, .cheshire, .hifive_p550, .serengeti => "ns16550a",
+        .rock3b, .rpi4b_1gb, .star64, .qemu_virt_riscv64, .cheshire, .hifive_p550, .serengeti => "ns16550a",
         .zcu102 => "zynqmp",
         .x86_64_generic => "pc99",
     };

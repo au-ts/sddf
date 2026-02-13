@@ -18,6 +18,7 @@ const MicrokitBoard = enum {
     imx8mp_evk,
     imx8mq_evk,
     zcu102,
+    rock3b,
     rpi4b_1gb,
     x86_64_generic,
 };
@@ -146,6 +147,16 @@ const targets = [_]Target{
         },
     },
     .{
+        .board = MicrokitBoard.rock3b,
+        .zig_target = std.Target.Query{
+            .cpu_arch = .aarch64,
+            .cpu_model = .{ .explicit = &std.Target.aarch64.cpu.cortex_a55 },
+            .cpu_features_add = std.Target.aarch64.featureSet(&[_]std.Target.aarch64.Feature{.strict_align}),
+            .os_tag = .freestanding,
+            .abi = .none,
+        },
+    },
+    .{
         .board = MicrokitBoard.x86_64_generic,
         .zig_target = std.Target.Query{
             .cpu_arch = .x86_64,
@@ -226,6 +237,7 @@ pub fn build(b: *std.Build) !void {
         .serengeti => "apb_timer",
         .maaxboard, .imx8mm_evk, .imx8mp_evk, .imx8mq_evk => "imx",
         .zcu102 => "cdns",
+        .rock3b => "rk3568",
         .rpi4b_1gb => "bcm2835",
         .x86_64_generic => "hpet",
     };
