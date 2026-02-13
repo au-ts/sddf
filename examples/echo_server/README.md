@@ -43,6 +43,10 @@ clients for logging DHCP messages, and by the benchmarking component to print
 results. The timer subsystem is used by the echo server clients to create the
 regular timeouts that the IP stack requires to function.
 
+In addition to an ethernet driver, we also make use of a serial driver and timer driver.
+The serial driver is used for logging DHCP messages, benchmarking results, etc.
+The timer driver is used as the IP stack needs to be able to set regular timeouts to function.
+
 To learn more about the benchmarking architecture and setup, see the
 [benchmarking section below](#benchmarking).
 
@@ -59,6 +63,7 @@ The following platforms are supported:
 * odroidc4
 * qemu_virt_aarch64
 * qemu_virt_riscv64
+* rock3b
 * star64
 * x86_64_generic (only QEMU right now)
 
@@ -354,7 +359,7 @@ data](#difference-between-echo-server-clients).
 
 You can see all the possible arguments with
 ```sh
-python3 script/benchmark.py -h
+python3 scripts/benchmark.py -h
 ```
 
 Note that for gathering benchmark results you should not change the default
