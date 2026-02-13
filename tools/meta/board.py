@@ -118,7 +118,7 @@ BOARDS: List[Board] = [
     Board(
         name="rock3b",
         arch=SystemDescription.Arch.AARCH64,
-        paddr_top=0xECC9C000,
+        paddr_top=0xEC000000,
         serial="serial@fe660000",
         timer="rktimer@fe5f0000",
         ethernet="ethernet@fe2a0000",
