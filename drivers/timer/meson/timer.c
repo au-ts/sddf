@@ -53,7 +53,8 @@ volatile struct timer_regs *regs;
 /* Right now, we only service a single timeout per client.
  * This timeout array indicates when a timeout should occur,
  * indexed by client ID. */
-static uint64_t timeouts[MAX_TIMEOUTS];
+
+static timer_heap_t timeouts;
 
 static uint64_t get_ticks(void)
 {
@@ -70,25 +71,36 @@ static uint64_t get_ticks(void)
 
 static void process_timeouts(uint64_t curr_time)
 {
-    for (int i = 0; i < MAX_TIMEOUTS; i++) {
-        if (timeouts[i] <= curr_time) {
-            sddf_notify(i);
-            timeouts[i] = UINT64_MAX;
-        }
+    // Pop from priority heap until all timeouts are serviced
+    while (timer_heap_peek(&timeouts) != NULL && timer_heap_peek(&timeouts)->timestamp <= curr_time) {
+        timeout_t expired;
+        bool ret = timer_heap_pop(&timeouts, &expired);
+        assert(ret); // This should never happen! Peek should catch empty queue
+        sddf_notify(expired.client_channel);
     }
 
-    uint64_t next_timeout = UINT64_MAX;
-    for (int i = 0; i < MAX_TIMEOUTS; i++) {
-        if (timeouts[i] < next_timeout) {
-            next_timeout = timeouts[i];
-        }
-    }
+    timeout_t *next = timer_heap_peek(&timeouts);
 
-    if (next_timeout != UINT64_MAX) {
+    // Reissue next timeout irq, if needed.
+    if (next != NULL) {
+        uint64_t next_delay = next->timestamp - curr_time;
         regs->mux &= ~TIMER_A_MODE;
-        regs->timer_a = next_timeout - curr_time;
+        regs->timer_a = next_delay;
         regs->mux |= TIMER_A_EN;
     }
+
+    // uint64_t next_timeout = UINT64_MAX;
+    // for (int i = 0; i < MAX_TIMEOUTS; i++) {
+    //     if (timeouts[i] < next_timeout) {
+    //         next_timeout = timeouts[i];
+    //     }
+    // }
+
+    // if (next_timeout != UINT64_MAX) {
+    //     regs->mux &= ~TIMER_A_MODE;
+    //     regs->timer_a = next_timeout - curr_time;
+    //     regs->mux |= TIMER_A_EN;
+    // }
 }
 
 void notified(sddf_channel ch)
@@ -116,7 +128,8 @@ seL4_MessageInfo_t protected(sddf_channel ch, seL4_MessageInfo_t msginfo)
     case SDDF_TIMER_SET_TIMEOUT: {
         uint64_t curr_time = get_ticks();
         uint64_t offset_us = sddf_get_mr(0) / NS_IN_US;
-        timeouts[ch] = curr_time + offset_us;
+        timer_heap_insert(&timeouts, curr_time + offset_us, ch);
+
         process_timeouts(curr_time);
         break;
     }
@@ -135,10 +148,6 @@ void init(void)
     assert(device_resources.num_irqs == 1);
     assert(device_resources.num_regions == 1);
 
-    for (int i = 0; i < MAX_TIMEOUTS; i++) {
-        timeouts[i] = UINT64_MAX;
-    }
-
     regs = (void *)((uintptr_t)device_resources.regions[0].region.vaddr + TIMER_REG_START);
 
     /* Start timer E acts as a clock, while timer A can be used for timeouts from clients */
@@ -146,4 +155,5 @@ void init(void)
                 (TIMEOUT_TIMEBASE_1_US << TIMER_A_INPUT_CLK);
 
     regs->timer_e = 0;
+    timer_heap_init(&timeouts);
 }
