@@ -42,6 +42,7 @@ Files:
     drivers/timer/bcm2835/config.json
     drivers/timer/apb_timer/config.json
     drivers/dvfs/Cargo.lock
+    drivers/timer/rk3568/config.json
 Copyright: UNSW
 License: BSD-2-Clause
 
