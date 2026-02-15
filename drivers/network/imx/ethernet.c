@@ -31,6 +31,7 @@ struct descriptor {
     uint32_t addr;
 };
 
+
 /* HW ring buffer data type */
 typedef struct {
 #ifdef PANCAKE_NETWORK_DRIVER
