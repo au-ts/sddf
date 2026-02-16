@@ -10,6 +10,8 @@ import sys
 import tempfile
 import types
 
+assert list(map(int, sys.version.split(" ")[0].split("."))) > [3, 9, 0]
+
 sys.path.insert(1, Path(__file__).parents[2].as_posix())
 
 from ci.lib.backends import *

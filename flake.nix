@@ -7,6 +7,8 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-25.05";
+    # Python 3.9 is not in the official repo anymore
+    python39.url = "github:NixOS/nixpkgs/c5dd43934613ae0f8ff37c59f61c507c2e8f980d";
     zig-overlay.url = "github:mitchellh/zig-overlay";
     zig-overlay.inputs.nixpkgs.follows = "nixpkgs";
     sdfgen.url = "github:au-ts/microkit_sdf_gen/0.28.1";
@@ -16,6 +18,7 @@
   outputs =
     {
       nixpkgs,
+      python39,
       zig-overlay,
       sdfgen,
       ...
@@ -39,13 +42,16 @@
           pkgs = import nixpkgs {
             inherit system;
           };
+          pkgs39 = import python39 {
+            inherit system;
+          };
 
           llvm = pkgs.llvmPackages_18;
           zig = zig-overlay.packages.${system}."0.15.1";
 
           pysdfgen = sdfgen.packages.${system}.pysdfgen.override {
             zig = zig;
-            pythonPackages = pkgs.python312Packages;
+            pythonPackages = pkgs39.python39Packages;
           };
 
           clang-complete = (pkgs.symlinkJoin {
@@ -73,9 +79,16 @@
 
           genmc = pkgs.callPackage ./ci/genmc/nix/package.nix { inherit clang-complete; llvm = pkgs.llvmPackages_20.llvm; };
 
-          pythonTool = pkgs.python312.withPackages (ps: [
+          pythonTool = pkgs39.python39.withPackages (ps: [
             pysdfgen
           ]);
+          ## Fixup python and python3 resolving
+          pythonShim = pkgs.writeShellScriptBin "python" ''
+            exec ${pythonTool}/bin/python3 "$@"
+          '';
+          python3Shim = pkgs.writeShellScriptBin "python3" ''
+            exec ${pythonTool}/bin/python3 "$@"
+          '';
         in
         {
           genmc = pkgs.mkShell rec {
@@ -131,6 +144,8 @@
               llvm.libllvm
               dtc
               pythonTool
+              pythonShim
+              python3Shim
             ];
 
             # To avoid Nix adding compiler flags that are not available on a freestanding
