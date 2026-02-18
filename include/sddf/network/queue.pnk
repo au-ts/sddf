@@ -107,8 +107,8 @@ inline fun net_enqueue(1 queue_ptr, 1 io_addr, 1 len, 1 capacity)
   var mod_tail = tail & (capacity - 1);
   // TODO: find a way to model the below?
   var buff_addr = queue_ptr + BUFFERS_OFFSET + mod_tail * NET_BUFF_DESC_SIZE;
-  !st32 buff_addr + QUEUE_IO_OFF, io_addr;
-  !st16 buff_addr + QUEUE_LEN_OFF, len;
+  !st32 buff_addr + NDESC_ADDR_OFF, io_addr;
+  !st16 buff_addr + NDESC_LEN_OFF, len;
 
 #ifdef CONFIG_ENABLE_SMP_SUPPORT
   THREAD_MEMORY_RELEASE()
@@ -148,8 +148,8 @@ inline fun {1,1} net_dequeue(1 queue_ptr, 1 capacity)
   var buff_addr = queue_ptr + BUFFERS_OFFSET + mod_head * NET_BUFF_DESC_SIZE;
   var io_addr = 0;
   var len = 0;
-  !ld32 io_addr, buff_addr + QUEUE_IO_OFF;
-  !ld16 len, buff_addr + QUEUE_LEN_OFF;
+  !ld32 io_addr, buff_addr + NDESC_ADDR_OFF;
+  !ld16 len, buff_addr + NDESC_LEN_OFF;
 
 #ifdef CONFIG_ENABLE_SMP_SUPPORT
   THREAD_MEMORY_RELEASE()

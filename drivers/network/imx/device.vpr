@@ -8,6 +8,10 @@ define f_valid_hardware_ring_rx_read(x, y) valid_hardware_ring_rx_read(x, y)
 define f_valid_hardware_ring_rx_write(x, y) valid_hardware_ring_rx_write(x, y)
 define f_valid_hardware_ring_tx_read(x, y) valid_hardware_ring_tx_read(x, y)
 define f_valid_hardware_ring_tx_write(x, y) valid_hardware_ring_tx_write(x, y)
+define f_valid_hardware_ring_rx_mdata_read(x, y) valid_hardware_ring_rx_mdata_read(x, y)
+define f_valid_hardware_ring_rx_mdata_write(x, y) valid_hardware_ring_rx_mdata_write(x, y)
+define f_valid_hardware_ring_tx_mdata_read(x, y) valid_hardware_ring_tx_mdata_read(x, y)
+define f_valid_hardware_ring_tx_mdata_write(x, y) valid_hardware_ring_tx_mdata_write(x, y)
 define f_slot(_, _, x, y) slot(x, y)
 define f_is_RXD_EMPTY(_, _, x) is_RXD_EMPTY(x)
 define f_is_TXD_READY(_, _, x) is_TXD_READY(x)
@@ -167,6 +171,7 @@ predicate valid_hardware_ring_rx_read(heap: IArray, gv: Ref)
 predicate valid_hardware_ring_rx_mdata_read(heap: IArray, gv: Ref)
 {
     acc(gv.hw_rx_tail, 1/100) && acc(gv.hw_rx_head, 1/100) && acc(gv.hw_rx_capacity, 1/100) &&
+    0 <= (gv.hw_rx_tail - gv.hw_rx_head) % (MAX_INT16 + 1) && (gv.hw_rx_tail - gv.hw_rx_head) % (MAX_INT16 + 1) <= gv.hw_rx_capacity &&
     gv.hw_rx_capacity == 256 &&
     valid_hardware_ring_rx_read(heap, gv) &&
     unfolding valid_hardware_ring_rx_read(heap, gv) in
@@ -197,6 +202,7 @@ predicate valid_hardware_ring_rx_write(heap: IArray, gv: Ref)
 predicate valid_hardware_ring_rx_mdata_write(heap: IArray, gv: Ref)
 {
     acc(gv.hw_rx_tail, 1/100) && acc(gv.hw_rx_head, 1/100) && acc(gv.hw_rx_capacity, 1/100) &&
+    0 <= (gv.hw_rx_tail - gv.hw_rx_head) % (MAX_INT16 + 1) && (gv.hw_rx_tail - gv.hw_rx_head) % (MAX_INT16 + 1) <= gv.hw_rx_capacity &&
     gv.hw_rx_capacity == 256 &&
     valid_hardware_ring_rx_write(heap, gv) &&
     unfolding valid_hardware_ring_rx_write(heap, gv) in
@@ -226,6 +232,7 @@ predicate valid_hardware_ring_tx_read(heap: IArray, gv: Ref)
 predicate valid_hardware_ring_tx_mdata_read(heap: IArray, gv: Ref)
 {
     acc(gv.hw_tx_tail, 1/100) && acc(gv.hw_tx_head, 1/100) && acc(gv.hw_tx_capacity, 1/100) &&
+    0 <= (gv.hw_tx_tail - gv.hw_tx_head) % (MAX_INT16 + 1) && (gv.hw_tx_tail - gv.hw_tx_head) % (MAX_INT16 + 1) <= gv.hw_tx_capacity &&
     gv.hw_tx_capacity == 256 &&
     valid_hardware_ring_tx_read(heap, gv) &&
     unfolding valid_hardware_ring_tx_read(heap, gv) in
@@ -256,6 +263,7 @@ predicate valid_hardware_ring_tx_write(heap: IArray, gv: Ref)
 predicate valid_hardware_ring_tx_mdata_write(heap: IArray, gv: Ref)
 {
     acc(gv.hw_tx_tail, 1/100) && acc(gv.hw_tx_head, 1/100) && acc(gv.hw_tx_capacity, 1/100) &&
+    0 <= (gv.hw_tx_tail - gv.hw_tx_head) % (MAX_INT16 + 1) && (gv.hw_tx_tail - gv.hw_tx_head) % (MAX_INT16 + 1) <= gv.hw_tx_capacity && 
     gv.hw_tx_capacity == 256 &&
     valid_hardware_ring_tx_write(heap, gv) &&
     unfolding valid_hardware_ring_tx_write(heap, gv) in
