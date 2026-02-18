@@ -67,7 +67,7 @@ static void print_irq_pin_subscribers()
     }
 }
 
-static inline seL4_MessageInfo_t error_response(gpio_error_t error_code)
+static inline microkit_msginfo error_response(gpio_error_t error_code)
 {
     uint32_t e = error_code | BIT(SDDF_GPIO_RESPONSE_ERROR_BIT);
     return microkit_msginfo_new(e, 0);
@@ -94,7 +94,7 @@ static void handle_gpio_irq(int ch, int start_pin, int end_pin)
 
     gpio_regs->imr &= ~clear_mask;
 
-    // We want it to be cleared before the microkit acknowledges so we dont enter notified again.
+    // We want it to be cleared before the microkit acknowledges so we don't enter notified again.
     microkit_deferred_irq_ack(ch);
 }
 
@@ -116,7 +116,7 @@ void notified(microkit_channel ch)
     }
 }
 
-static inline seL4_MessageInfo_t set(int pin, uint32_t value)
+static inline microkit_msginfo set(int pin, uint32_t value)
 {
     if (value) {
         gpio_regs->dr |= BIT(pin);
@@ -127,14 +127,14 @@ static inline seL4_MessageInfo_t set(int pin, uint32_t value)
     return microkit_msginfo_new(0, 0);
 }
 
-static inline seL4_MessageInfo_t get(int pin)
+static inline microkit_msginfo get(int pin)
 {
     uint32_t value = (gpio_regs->psr >> pin) & BIT(0);
 
     return microkit_msginfo_new(value, 0);
 }
 
-static inline seL4_MessageInfo_t set_direction_output(int pin, uint32_t value)
+static inline microkit_msginfo set_direction_output(int pin, uint32_t value)
 {
     if (value) {
         gpio_regs->dr |= BIT(pin);
@@ -148,26 +148,26 @@ static inline seL4_MessageInfo_t set_direction_output(int pin, uint32_t value)
     return microkit_msginfo_new(0, 0);
 }
 
-static inline seL4_MessageInfo_t set_direction_input(int pin)
+static inline microkit_msginfo set_direction_input(int pin)
 {
     gpio_regs->gdir &= ~BIT(pin);
 
     return microkit_msginfo_new(0, 0);
 }
 
-static inline seL4_MessageInfo_t get_direction(int pin)
+static inline microkit_msginfo get_direction(int pin)
 {
     uint32_t dir = (gpio_regs->gdir >> pin) & BIT(0);
 
     return microkit_msginfo_new(dir, 0);
 }
 
-static inline seL4_MessageInfo_t set_config(int pin, uint32_t value, uint32_t argument)
+static inline microkit_msginfo set_config(int pin, uint32_t value, uint32_t argument)
 {
     return error_response(SDDF_GPIO_EOPNOTSUPP);
 }
 
-static inline seL4_MessageInfo_t irq_enable(int pin)
+static inline microkit_msginfo irq_enable(int pin)
 {
     // Clear all noise that happened before the interrupt started
     gpio_regs->isr = BIT(pin);
@@ -177,16 +177,16 @@ static inline seL4_MessageInfo_t irq_enable(int pin)
     return microkit_msginfo_new(0, 0);
 }
 
-// The semantic of disbale also means unchecking the status register
-static inline seL4_MessageInfo_t irq_disable(int pin)
+// The semantic of disable also means unchecking the status register
+static inline microkit_msginfo irq_disable(int pin)
 {
     gpio_regs->imr &= ~BIT(pin);
 
-    // Since its the same peripheral a read back will mean it completes
+    // Since it's the same peripheral a read back will mean it completes
     (void)gpio_regs->imr;
 
     // Now that we have unmasked we uncheck the status register
-    // so that if we go to notified we dont process this irq if
+    // so that if we go to notified we don't process this irq if
     // it was set before we unmasked
 
     gpio_regs->isr = BIT(pin);
@@ -194,7 +194,7 @@ static inline seL4_MessageInfo_t irq_disable(int pin)
     return microkit_msginfo_new(0, 0);
 }
 
-static inline seL4_MessageInfo_t irq_set_type(int pin, uint32_t type)
+static inline microkit_msginfo irq_set_type(int pin, uint32_t type)
 {
     uint32_t shift = (pin % 16) * 2;
     uint32_t icr_val = (pin < 16) ? ((gpio_regs->icr1 >> shift) & 0x3u) : ((gpio_regs->icr2 >> shift) & 0x3u);
@@ -237,7 +237,7 @@ static inline seL4_MessageInfo_t irq_set_type(int pin, uint32_t type)
     return microkit_msginfo_new(0, 0);
 }
 
-seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
+microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
 {
     uint32_t label = microkit_msginfo_get_label(msginfo);
     uint32_t interface_function = label & SDDF_REQUEST_INTERFACE_MASK;
@@ -268,8 +268,8 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
         return get_direction(pin);
     }
     case SDDF_GPIO_SET_CONFIG: {
-        uint32_t arguement = seL4_GetMR(0);
-        return set_config(pin, value, arguement);
+        uint32_t argument = microkit_mr_get(0);
+        return set_config(pin, value, argument);
     }
     case SDDF_GPIO_IRQ_ENABLE: {
         if (check_irq_permission(ch)) {
@@ -346,7 +346,7 @@ void validate_gpio_config()
         // For fast lookups in notify
         pin_subscriber[pin] = ch;
 
-        // Since we can only bind each pin to one designated interrupt we dont validate the irq picked
+        // Since we can only bind each pin to one designated interrupt we don't validate the irq picked
         // Other then it being above 0
     }
 }

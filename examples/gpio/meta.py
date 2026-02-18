@@ -1,39 +1,25 @@
 # Copyright 2025, UNSW
 # SPDX-License-Identifier: BSD-2-Clause
 import argparse
+import sys
+import os
 from typing import List
 from dataclasses import dataclass
 from sdfgen import SystemDescription, Sddf, DeviceTree
 from importlib.metadata import version
 
-# assert version('sdfgen').split(".")[1] == "24", "Unexpected sdfgen version"
+sys.path.append(
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../tools/meta")
+)
+from board import BOARDS
+
+assert version("sdfgen").split(".")[1] == "28", "Unexpected sdfgen version"
 
 ProtectionDomain = SystemDescription.ProtectionDomain
 Irq = SystemDescription.Irq
 MemoryRegion = SystemDescription.MemoryRegion
 Map = SystemDescription.Map
 
-
-@dataclass
-class Board:
-    name: str
-    arch: SystemDescription.Arch
-    paddr_top: int
-    gpio: str
-    # The example needs a timer driver to verify the IRQ based loop
-    # GPIO itself does not need a timer driver to work
-    timer: str
-
-
-BOARDS: List[Board] = [
-    Board(
-        name="maaxboard",
-        arch=SystemDescription.Arch.AARCH64,
-        paddr_top=0x7_0000_000,
-        gpio="soc@0/bus@30000000/gpio@30200000",
-        timer="soc@0/bus@30000000/timer@302d0000",
-    ),
-]
 
 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
