@@ -2,10 +2,9 @@
 #define HEAD_OFFSET               2
 #define CONSUMER_SIGNALLED_OFFSET 4
 #define BUFFERS_OFFSET            8
-#define QUEUE_LENGTH              8 + @biw
 
-#define QUEUE_IO_OFF           0
-#define QUEUE_OFFSET_OFF       0
-#define QUEUE_LEN_OFF          8
+#define NDESC_ADDR_OFF         0
+#define NDESC_LEN_OFF          8
+#define NDESC_LEN              10
 
 #define QUEUE_CAPACITY  256

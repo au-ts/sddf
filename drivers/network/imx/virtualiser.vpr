@@ -57,10 +57,16 @@ method microkit_notify(heap: IArray, virt: Ref, x1: Int, x2: Int, x3: Int, x4: I
 field net_tail: Int
 field net_head: Int
 field net_signal: Bool
+field net_descr: IArray
+field ndescr_addr: Int
+field ndescr_len: Int
 
 predicate valid_net_queue(heap: IArray, virt: Ref, queue: Ref, capacity: Int)
 {
   acc(queue.net_tail) && acc(queue.net_head) && acc(queue.net_signal) &&
+  acc(queue.net_descr) &&
+  (forall i :: Int : 0 <= i && i < QUEUE_CAPACITY ==>
+    acc(slot(queue.net_descr, i).ndescr_addr) && acc(slot(queue.net_descr, i).ndescr_len)) &&
   (capacity == RX_QUEUE_CAPACITY || capacity == TX_QUEUE_CAPACITY) &&
   valid_net_tail(queue.net_tail) && valid_net_head(queue.net_head)
 }
@@ -92,6 +98,7 @@ method store_rx_free_tail(heap: IArray, gv: Ref, address: Int, value: Int)
   ensures gv.rx_free.net_tail == value
 {
   gv.rx_free.net_tail := value
+  refute false
 }
 
 method store_rx_free_head(heap: IArray, gv: Ref, address: Int, value: Int)
@@ -102,6 +109,7 @@ method store_rx_free_head(heap: IArray, gv: Ref, address: Int, value: Int)
   ensures gv.rx_free.net_head == value
 {
   gv.rx_free.net_head := value
+  refute false
 }
 
 method load_rx_free_tail(heap: IArray, gv: Ref, address: Int)
@@ -113,8 +121,8 @@ method load_rx_free_tail(heap: IArray, gv: Ref, address: Int)
   ensures retval == gv.rx_free.net_tail
   ensures valid_net_tail(retval)
 {
-    retval := gv.rx_free.net_tail
-    refute false
+  retval := gv.rx_free.net_tail
+  refute false
 }
 
 method load_rx_free_head(heap: IArray, gv: Ref, address: Int)
@@ -126,8 +134,8 @@ method load_rx_free_head(heap: IArray, gv: Ref, address: Int)
   ensures retval == gv.rx_free.net_head
   ensures valid_net_head(retval)
 {
-    retval := gv.rx_free.net_head
-    refute false
+  retval := gv.rx_free.net_head
+  refute false
 }
 
 method store_rx_free_consumer_signalled(heap: IArray, gv: Ref, address: Int, value: Int)
@@ -148,8 +156,66 @@ method load_rx_free_consumer_signalled(heap: IArray, gv: Ref, address: Int)
   ensures acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_signal, 1/4)
   ensures retval == (gv.rx_free.net_signal ? 1 : 0)
 {
-    retval := (gv.rx_free.net_signal ? 1 : 0)
-    refute false
+  retval := (gv.rx_free.net_signal ? 1 : 0)
+  refute false
+}
+
+method store_rx_free_addr(heap: IArray, gv: Ref, address: Int, value: Int)
+  requires acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_descr, 1/4)
+  requires (address - NDESC_ADDR_OFF) % NDESC_LEN == 0
+  requires (address - NDESC_ADDR_OFF) >= RX_FREE_BASE + BUFFERS_OFFSET && (address - NDESC_ADDR_OFF) < RX_FREE_BASE + BUFFERS_OFFSET + NDESC_LEN * QUEUE_CAPACITY
+  requires acc(slot(gv.rx_free.net_descr, (address - NDESC_ADDR_OFF - RX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN))
+  ensures acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_descr, 1/4)
+  ensures acc(slot(gv.rx_free.net_descr, (address - NDESC_ADDR_OFF - RX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN))
+  ensures slot(gv.rx_free.net_descr, (address - NDESC_ADDR_OFF - RX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN) == value
+{
+  var index: Int := (address - NDESC_ADDR_OFF - RX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN
+  slot(gv.rx_free.net_descr, index).ndescr_addr := value
+  refute false
+}
+
+method load_rx_free_addr(heap: IArray, gv: Ref, address: Int)
+  returns (retval: Int)
+  requires acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_descr, 1/4)
+  requires (address - NDESC_ADDR_OFF) % NDESC_LEN == 0
+  requires (address - NDESC_ADDR_OFF) >= RX_FREE_BASE + BUFFERS_OFFSET && (address - NDESC_ADDR_OFF) < RX_FREE_BASE + BUFFERS_OFFSET + NDESC_LEN * QUEUE_CAPACITY
+  requires acc(slot(gv.rx_free.net_descr, (address - NDESC_ADDR_OFF - RX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN))
+  ensures acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_descr, 1/4)
+  ensures acc(slot(gv.rx_free.net_descr, (address - NDESC_ADDR_OFF - RX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN))
+  ensures retval == slot(gv.rx_free.net_descr, (address - NDESC_ADDR_OFF - RX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN)
+{
+  var index: Int := (address - NDESC_ADDR_OFF - RX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN
+  retval := slot(gv.rx_free.net_descr, index).ndescr_addr
+  refute false
+}
+
+method store_rx_free_len(heap: IArray, gv: Ref, address: Int, value: Int)
+  requires acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_descr, 1/4)
+  requires (address - NDESC_LEN_OFF) % NDESC_LEN == 0
+  requires (address - NDESC_LEN_OFF) >= RX_FREE_BASE + BUFFERS_OFFSET && (address - NDESC_LEN_OFF) < RX_FREE_BASE + BUFFERS_OFFSET + NDESC_LEN * QUEUE_CAPACITY
+  requires acc(slot(gv.rx_free.net_descr, (address - NDESC_LEN_OFF - RX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN))
+  ensures acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_descr, 1/4)
+  ensures acc(slot(gv.rx_free.net_descr, (address - NDESC_LEN_OFF - RX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN))
+  ensures slot(gv.rx_free.net_descr, (address - NDESC_LEN_OFF - RX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN) == value
+{
+  var index: Int := (address - NDESC_LEN_OFF - RX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN
+  slot(gv.rx_free.net_descr, index).ndescr_len := value
+  refute false
+}
+
+method load_rx_free_len(heap: IArray, gv: Ref, address: Int)
+  returns (retval: Int)
+  requires acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_descr, 1/4)
+  requires (address - NDESC_LEN_OFF) % NDESC_LEN == 0
+  requires (address - NDESC_LEN_OFF) >= RX_FREE_BASE + BUFFERS_OFFSET && (address - NDESC_LEN_OFF) < RX_FREE_BASE + BUFFERS_OFFSET + NDESC_LEN * QUEUE_CAPACITY
+  requires acc(slot(gv.rx_free.net_descr, (address - NDESC_LEN_OFF - RX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN))
+  ensures acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_descr, 1/4)
+  ensures acc(slot(gv.rx_free.net_descr, (address - NDESC_LEN_OFF - RX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN))
+  ensures retval == slot(gv.rx_free.net_descr, (address - NDESC_LEN_OFF - RX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN)
+{
+  var index: Int := (address - NDESC_LEN_OFF - RX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN
+  retval := slot(gv.rx_free.net_descr, index).ndescr_len
+  refute false
 }
 
 /////////////////////// RX_ACTIVE queue
@@ -162,8 +228,8 @@ method load_rx_active_tail(heap: IArray, gv: Ref, address: Int)
   ensures retval == gv.rx_active.net_tail
   ensures valid_net_tail(retval)
 {
-    retval := gv.rx_active.net_tail
-    refute false
+  retval := gv.rx_active.net_tail
+  refute false
 }
 
 method load_rx_active_head(heap: IArray, gv: Ref, address: Int)
@@ -175,8 +241,8 @@ method load_rx_active_head(heap: IArray, gv: Ref, address: Int)
   ensures retval == gv.rx_active.net_head
   ensures valid_net_head(retval)
 {
-    retval := gv.rx_active.net_head
-    refute false
+  retval := gv.rx_active.net_head
+  refute false
 }
 
 method store_rx_active_head(heap: IArray, gv: Ref, address: Int, value: Int)
@@ -219,8 +285,66 @@ method load_rx_active_consumer_signalled(heap: IArray, gv: Ref, address: Int)
   ensures acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_signal, 1/4)
   ensures retval == (gv.rx_active.net_signal ? 1 : 0)
 {
-    retval := (gv.rx_active.net_signal ? 1 : 0)
-    refute false
+  retval := (gv.rx_active.net_signal ? 1 : 0)
+  refute false
+}
+
+method store_rx_active_addr(heap: IArray, gv: Ref, address: Int, value: Int)
+  requires acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_descr, 1/4)
+  requires (address - NDESC_ADDR_OFF) % NDESC_LEN == 0
+  requires (address - NDESC_ADDR_OFF) >= RX_ACTIVE_BASE + BUFFERS_OFFSET && (address - NDESC_ADDR_OFF) < RX_ACTIVE_BASE + BUFFERS_OFFSET + NDESC_LEN * QUEUE_CAPACITY
+  requires acc(slot(gv.rx_active.net_descr, (address - NDESC_ADDR_OFF - RX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN))
+  ensures acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_descr, 1/4)
+  ensures acc(slot(gv.rx_active.net_descr, (address - NDESC_ADDR_OFF - RX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN))
+  ensures slot(gv.rx_active.net_descr, (address - NDESC_ADDR_OFF - RX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN) == value
+{
+  var index: Int := (address - NDESC_ADDR_OFF - RX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN
+  slot(gv.rx_active.net_descr, index).ndescr_addr := value
+  refute false
+}
+
+method load_rx_active_addr(heap: IArray, gv: Ref, address: Int)
+  returns (retval: Int)
+  requires acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_descr, 1/4)
+  requires (address - NDESC_ADDR_OFF) % NDESC_LEN == 0
+  requires (address - NDESC_ADDR_OFF) >= RX_ACTIVE_BASE + BUFFERS_OFFSET && (address - NDESC_ADDR_OFF) < RX_ACTIVE_BASE + BUFFERS_OFFSET + NDESC_LEN * QUEUE_CAPACITY
+  requires acc(slot(gv.rx_active.net_descr, (address - NDESC_ADDR_OFF - RX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN))
+  ensures acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_descr, 1/4)
+  ensures acc(slot(gv.rx_active.net_descr, (address - NDESC_ADDR_OFF - RX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN))
+  ensures retval == slot(gv.rx_active.net_descr, (address - NDESC_ADDR_OFF - RX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN)
+{
+  var index: Int := (address - NDESC_ADDR_OFF - RX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN
+  retval := slot(gv.rx_active.net_descr, index).ndescr_addr
+  refute false
+}
+
+method store_rx_active_len(heap: IArray, gv: Ref, address: Int, value: Int)
+  requires acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_descr, 1/4)
+  requires (address - NDESC_LEN_OFF) % NDESC_LEN == 0
+  requires (address - NDESC_LEN_OFF) >= RX_ACTIVE_BASE + BUFFERS_OFFSET && (address - NDESC_LEN_OFF) < RX_ACTIVE_BASE + BUFFERS_OFFSET + NDESC_LEN * QUEUE_CAPACITY
+  requires acc(slot(gv.rx_active.net_descr, (address - NDESC_LEN_OFF - RX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN))
+  ensures acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_descr, 1/4)
+  ensures acc(slot(gv.rx_active.net_descr, (address - NDESC_LEN_OFF - RX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN))
+  ensures slot(gv.rx_active.net_descr, (address - NDESC_LEN_OFF - RX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN) == value
+{
+  var index: Int := (address - NDESC_LEN_OFF - RX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN
+  slot(gv.rx_active.net_descr, index).ndescr_len := value
+  refute false
+}
+
+method load_rx_active_len(heap: IArray, gv: Ref, address: Int)
+  returns (retval: Int)
+  requires acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_descr, 1/4)
+  requires (address - NDESC_LEN_OFF) % NDESC_LEN == 0
+  requires (address - NDESC_LEN_OFF) >= RX_ACTIVE_BASE + BUFFERS_OFFSET && (address - NDESC_LEN_OFF) < RX_ACTIVE_BASE + BUFFERS_OFFSET + NDESC_LEN * QUEUE_CAPACITY
+  requires acc(slot(gv.rx_active.net_descr, (address - NDESC_LEN_OFF - RX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN))
+  ensures acc(gv.rx_active, 1/4) && acc(gv.rx_active.net_descr, 1/4)
+  ensures acc(slot(gv.rx_active.net_descr, (address - NDESC_LEN_OFF - RX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN))
+  ensures retval == slot(gv.rx_active.net_descr, (address - NDESC_LEN_OFF - RX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN)
+{
+  var index: Int := (address - NDESC_LEN_OFF - RX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN
+  retval := slot(gv.rx_active.net_descr, index).ndescr_len
+  refute false
 }
 
 /////////////////////// TX_ACTIVE queue
@@ -294,6 +418,64 @@ method load_tx_active_consumer_signalled(heap: IArray, gv: Ref, address: Int)
   refute false
 }
 
+method store_tx_active_addr(heap: IArray, gv: Ref, address: Int, value: Int)
+  requires acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_descr, 1/4)
+  requires (address - NDESC_ADDR_OFF) % NDESC_LEN == 0
+  requires (address - NDESC_ADDR_OFF) >= TX_ACTIVE_BASE + BUFFERS_OFFSET && (address - NDESC_ADDR_OFF) < TX_ACTIVE_BASE + BUFFERS_OFFSET + NDESC_LEN * QUEUE_CAPACITY
+  requires acc(slot(gv.tx_active.net_descr, (address - NDESC_ADDR_OFF - TX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN))
+  ensures acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_descr, 1/4)
+  ensures acc(slot(gv.tx_active.net_descr, (address - NDESC_ADDR_OFF - TX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN))
+  ensures slot(gv.tx_active.net_descr, (address - NDESC_ADDR_OFF - TX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN) == value
+{
+  var index: Int := (address - NDESC_ADDR_OFF - TX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN
+  slot(gv.tx_active.net_descr, index).ndescr_addr := value
+  refute false
+}
+
+method load_tx_active_addr(heap: IArray, gv: Ref, address: Int)
+  returns (retval: Int)
+  requires acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_descr, 1/4)
+  requires (address - NDESC_ADDR_OFF) % NDESC_LEN == 0
+  requires (address - NDESC_ADDR_OFF) >= TX_ACTIVE_BASE + BUFFERS_OFFSET && (address - NDESC_ADDR_OFF) < TX_ACTIVE_BASE + BUFFERS_OFFSET + NDESC_LEN * QUEUE_CAPACITY
+  requires acc(slot(gv.tx_active.net_descr, (address - NDESC_ADDR_OFF - TX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN))
+  ensures acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_descr, 1/4)
+  ensures acc(slot(gv.tx_active.net_descr, (address - NDESC_ADDR_OFF - TX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN))
+  ensures retval == slot(gv.tx_active.net_descr, (address - NDESC_ADDR_OFF - TX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN)
+{
+  var index: Int := (address - NDESC_ADDR_OFF - TX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN
+  retval := slot(gv.tx_active.net_descr, index).ndescr_addr
+  refute false
+}
+
+method store_tx_active_len(heap: IArray, gv: Ref, address: Int, value: Int)
+  requires acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_descr, 1/4)
+  requires (address - NDESC_LEN_OFF) % NDESC_LEN == 0
+  requires (address - NDESC_LEN_OFF) >= TX_ACTIVE_BASE + BUFFERS_OFFSET && (address - NDESC_LEN_OFF) < TX_ACTIVE_BASE + BUFFERS_OFFSET + NDESC_LEN * QUEUE_CAPACITY
+  requires acc(slot(gv.tx_active.net_descr, (address - NDESC_LEN_OFF - TX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN))
+  ensures acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_descr, 1/4)
+  ensures acc(slot(gv.tx_active.net_descr, (address - NDESC_LEN_OFF - TX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN))
+  ensures slot(gv.tx_active.net_descr, (address - NDESC_LEN_OFF - TX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN) == value
+{
+  var index: Int := (address - NDESC_LEN_OFF - TX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN
+  slot(gv.tx_active.net_descr, index).ndescr_len := value
+  refute false
+}
+
+method load_tx_active_len(heap: IArray, gv: Ref, address: Int)
+  returns (retval: Int)
+  requires acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_descr, 1/4)
+  requires (address - NDESC_LEN_OFF) % NDESC_LEN == 0
+  requires (address - NDESC_LEN_OFF) >= TX_ACTIVE_BASE + BUFFERS_OFFSET && (address - NDESC_LEN_OFF) < TX_ACTIVE_BASE + BUFFERS_OFFSET + NDESC_LEN * QUEUE_CAPACITY
+  requires acc(slot(gv.tx_active.net_descr, (address - NDESC_LEN_OFF - TX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN))
+  ensures acc(gv.tx_active, 1/4) && acc(gv.tx_active.net_descr, 1/4)
+  ensures acc(slot(gv.tx_active.net_descr, (address - NDESC_LEN_OFF - TX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN))
+  ensures retval == slot(gv.tx_active.net_descr, (address - NDESC_LEN_OFF - TX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN)
+{
+  var index: Int := (address - NDESC_LEN_OFF - TX_ACTIVE_BASE - BUFFERS_OFFSET) / NDESC_LEN
+  retval := slot(gv.tx_active.net_descr, index).ndescr_len
+  refute false
+}
+
 /////////////////////// TX_FREE queue
 method load_tx_free_tail(heap: IArray, gv: Ref, address: Int)
   returns (retval: Int)
@@ -362,6 +544,64 @@ method load_tx_free_consumer_signalled(heap: IArray, gv: Ref, address: Int)
   ensures retval == (gv.tx_free.net_signal ? 1 : 0)
 {
   retval := (gv.tx_free.net_signal ? 1 : 0)
+  refute false
+}
+
+method store_tx_free_addr(heap: IArray, gv: Ref, address: Int, value: Int)
+  requires acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_descr, 1/4)
+  requires (address - NDESC_ADDR_OFF) % NDESC_LEN == 0
+  requires (address - NDESC_ADDR_OFF) >= TX_FREE_BASE + BUFFERS_OFFSET && (address - NDESC_ADDR_OFF) < TX_FREE_BASE + BUFFERS_OFFSET + NDESC_LEN * QUEUE_CAPACITY
+  requires acc(slot(gv.tx_free.net_descr, (address - NDESC_ADDR_OFF - TX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN))
+  ensures acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_descr, 1/4)
+  ensures acc(slot(gv.tx_free.net_descr, (address - NDESC_ADDR_OFF - TX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN))
+  ensures slot(gv.tx_free.net_descr, (address - NDESC_ADDR_OFF - TX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN) == value
+{
+  var index: Int := (address - NDESC_ADDR_OFF - TX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN
+  slot(gv.tx_free.net_descr, index).ndescr_addr := value
+  refute false
+}
+
+method load_tx_free_addr(heap: IArray, gv: Ref, address: Int)
+  returns (retval: Int)
+  requires acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_descr, 1/4)
+  requires (address - NDESC_ADDR_OFF) % NDESC_LEN == 0
+  requires (address - NDESC_ADDR_OFF) >= TX_FREE_BASE + BUFFERS_OFFSET && (address - NDESC_ADDR_OFF) < TX_FREE_BASE + BUFFERS_OFFSET + NDESC_LEN * QUEUE_CAPACITY
+  requires acc(slot(gv.tx_free.net_descr, (address - NDESC_ADDR_OFF - TX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN))
+  ensures acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_descr, 1/4)
+  ensures acc(slot(gv.tx_free.net_descr, (address - NDESC_ADDR_OFF - TX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN))
+  ensures retval == slot(gv.tx_free.net_descr, (address - NDESC_ADDR_OFF - TX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN)
+{
+  var index: Int := (address - NDESC_ADDR_OFF - TX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN
+  retval := slot(gv.tx_free.net_descr, index).ndescr_addr
+  refute false
+}
+
+method store_tx_free_len(heap: IArray, gv: Ref, address: Int, value: Int)
+  requires acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_descr, 1/4)
+  requires (address - NDESC_LEN_OFF) % NDESC_LEN == 0
+  requires (address - NDESC_LEN_OFF) >= TX_FREE_BASE + BUFFERS_OFFSET && (address - NDESC_LEN_OFF) < TX_FREE_BASE + BUFFERS_OFFSET + NDESC_LEN * QUEUE_CAPACITY
+  requires acc(slot(gv.tx_free.net_descr, (address - NDESC_LEN_OFF - TX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN))
+  ensures acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_descr, 1/4)
+  ensures acc(slot(gv.tx_free.net_descr, (address - NDESC_LEN_OFF - TX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN))
+  ensures slot(gv.tx_free.net_descr, (address - NDESC_LEN_OFF - TX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN) == value
+{
+  var index: Int := (address - NDESC_LEN_OFF - TX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN
+  slot(gv.tx_free.net_descr, index).ndescr_len := value
+  refute false
+}
+
+method load_tx_free_len(heap: IArray, gv: Ref, address: Int)
+  returns (retval: Int)
+  requires acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_descr, 1/4)
+  requires (address - NDESC_LEN_OFF) % NDESC_LEN == 0
+  requires (address - NDESC_LEN_OFF) >= TX_FREE_BASE + BUFFERS_OFFSET && (address - NDESC_LEN_OFF) < TX_FREE_BASE + BUFFERS_OFFSET + NDESC_LEN * QUEUE_CAPACITY
+  requires acc(slot(gv.tx_free.net_descr, (address - NDESC_LEN_OFF - TX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN))
+  ensures acc(gv.tx_free, 1/4) && acc(gv.tx_free.net_descr, 1/4)
+  ensures acc(slot(gv.tx_free.net_descr, (address - NDESC_LEN_OFF - TX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN))
+  ensures retval == slot(gv.tx_free.net_descr, (address - NDESC_LEN_OFF - TX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN)
+{
+  var index: Int := (address - NDESC_LEN_OFF - TX_FREE_BASE - BUFFERS_OFFSET) / NDESC_LEN
+  retval := slot(gv.tx_free.net_descr, index).ndescr_len
   refute false
 }
 
