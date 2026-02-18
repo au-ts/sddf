@@ -126,11 +126,11 @@ static int sddf_gpio_set(uint32_t channel, uint32_t value)
 }
 
 /**
- * Request the configuration of GPIO line associated with channel (from gpio_config.h) to requested config (+ arguement) value(s).
+ * Request the configuration of GPIO line associated with channel (from gpio_config.h) to requested config (+ argument) value(s).
  *
  * @param microkit channel of gpio driver.
  * @param configuration
- * @param optional arguement of config (usually a continuous value rather than flag)
+ * @param optional argument of config (usually a continuous value rather than flag)
  *
  * @return negative error code or 0.
  */
