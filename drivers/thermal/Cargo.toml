@@ -1,0 +1,16 @@
+[package]
+name = "thermal_sensor_driver"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+sel4-microkit = { git = "https://github.com/seL4/rust-sel4.git", rev = "ac5627ba7a67e71f33a8eb1c5d05de09bf94ef5e" }
+sel4-microkit-message = { git = "https://github.com/seL4/rust-sel4.git", rev = "ac5627ba7a67e71f33a8eb1c5d05de09bf94ef5e" }
+serde = { version = "1.0", default-features = false, features = ["derive"] }
+bincode = { version = "2.0", default-features = false, features = ["serde"] }
+sddf_thermal = { path = "../../include/sddf_rust/thermal/" }
+microkit_error = { path = "../../include/sddf_rust/error/" }
+thermal-hal = { path = "./thermal_hal/rockchip" }
+thermal-protocol = { path = "./thermal_protocol" }
+# thermal-hal = { git = "ssh://git@github.com/Cheng-Li1/thermal-rs.git" }
+# thermal-protocol = { git = "ssh://git@github.com/Cheng-Li1/thermal-rs.git" }

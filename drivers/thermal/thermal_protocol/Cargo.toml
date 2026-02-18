@@ -1,0 +1,11 @@
+[package]
+name = "thermal-protocol"
+version = "0.1.0"
+edition = "2021"
+authors = ["Cheng Li 李澄 <lichengchaoreng@gmail.com>"]
+
+[lib]
+name = "thermal_protocol"
+path = "lib.rs"
+
+[dependencies]
