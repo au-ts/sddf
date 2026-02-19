@@ -17,9 +17,9 @@ IMX:
 #define PIN_1 (16) // IMX gpio3_16 // IMX physical 7
 #define PIN_2 (17) // IMX gpio3_17 // IMX physical 11
 
-// Trigger Pin
-#define PIN_3 (8) // IMX gpio3_8 // IMX physical 13
 // Echo Pin
+#define PIN_3 (8) // IMX gpio3_8 // IMX physical 13
+// Trigger Pin
 #define PIN_4 (9) // IMX gpio3_9 // IMX physical 15
 
 

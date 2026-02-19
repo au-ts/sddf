@@ -49,8 +49,10 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     # Protection domains
     timer_driver = ProtectionDomain("timer", "timer_driver.elf", priority=254, passive=True)
     gpio_driver = ProtectionDomain("gpio_driver", "gpio_driver.elf", priority=254, passive=True)
-    telemetry = ProtectionDomain("telemetry", "telemetry.elf", priority=1, budget=2000, period=8000)
-    client = ProtectionDomain("client", "client.elf", priority=2, budget=1500000, period=2000000)
+    # telemetry = ProtectionDomain("telemetry", "telemetry.elf", priority=1, budget=2000, period=8000)
+    # client = ProtectionDomain("client", "client.elf", priority=2, budget=1500000, period=2000000)
+    client = ProtectionDomain("client", "client.elf", priority=2)
+
 
     timer_node = dtb.node(board.timer)
     assert timer_node is not None
@@ -65,7 +67,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     driver_channel_ids = [0, 1, 2, 3]
     gpio_system.add_client(client, driver_channel_ids=driver_channel_ids)
 
-    pds = [timer_driver, client, gpio_driver, telemetry]
+    pds = [timer_driver, client, gpio_driver]
     for pd in pds:
         sdf.add_pd(pd)
 

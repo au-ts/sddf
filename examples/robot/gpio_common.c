@@ -4,17 +4,19 @@
 #define LOG_GPIO_ERR(...) do{ sddf_printf("GPIO COMMON|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
 
 void gpio_init(int gpio_ch, int direction) {
+    sddf_printf("GPIO INIT called\n");
     int ret = 0;
 
-    if (direction == GPIO_DIRECTION_INPUT) {
+    if (direction == GPIO_DIRECTION_OUTPUT) {
         // set gpio to initial value of zero
+        LOG_GPIO("Setting direction of %d to output\n", gpio_ch);
         ret = sddf_gpio_direction_output(gpio_ch, GPIO_LOW);
         if (ret < 0) {
             LOG_GPIO_ERR("Failed to set direction to output. Error code : %d!\n", ret);
             assert(false);
         }
     }
-    else if (direction == GPIO_DIRECTION_OUTPUT) {
+    else if (direction == GPIO_DIRECTION_INPUT) {
         ret = sddf_gpio_direction_input(gpio_ch);
         if (ret < 0) {
             LOG_GPIO_ERR("Failed to set direction to input. Error code : %d!\n", ret);

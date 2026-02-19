@@ -54,7 +54,7 @@ uint64_t pulse_in(int gpio_ch, int value) {
         else {
             // Timeout not seeing GPIO HIGH from sensor
             uint64_t time_now = get_time_now();
-            if (((time_now - time_start) / NS_IN_MS) > (SENSOR_TIMEOUT * 2)) {
+            if (((time_now - time_start) / NS_IN_MS) > (SENSOR_TIMEOUT * 4)) {
                 LOG_SENSOR("timeout 2\n");
                 return 0;
             }
@@ -87,14 +87,14 @@ void sensor_init(void) {
 // TODO: might want to buffer over multiple reads
 // set trigger pin to LOW then HIGH to fire sensor
 void set_trig_low() {
-    LOG_SENSOR("Setting trigger low\n");
+    // LOG_SENSOR("Setting trigger low\n");
 
     digital_write(gpio_channel_trigger, GPIO_LOW);
     delay_microseconds(2, SENSOR_TIMEOUT_ID);
 }
 
 void set_trig_high() {
-    LOG_SENSOR("Setting trigger high\n");
+    // LOG_SENSOR("Setting trigger high\n");
 
     digital_write(gpio_channel_trigger, GPIO_HIGH);
     delay_microseconds(10, SENSOR_TIMEOUT_ID);

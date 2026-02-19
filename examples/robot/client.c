@@ -111,20 +111,20 @@ void client_main(void) {
     {
         delay_miliseconds(1, CLIENT_TIMEOUT_ID);
 
-        LOG_CLIENT("Client main\n");
+        // LOG_CLIENT("Client main\n");
 
         uint64_t dist = get_ultrasonic_reading();
 
         LOG_CLIENT("Reading received: %lu\n", dist);
 
-        if (dist < 10) {
-            control_stop();
-            // turn left every time there's an obstacle
-            control_left(1000);
-        }
-        else {
-            control_forward(1000);
-        }
+        // if (dist < 10) {
+        //     control_stop();
+        //     // turn left every time there's an obstacle
+        //     control_left(1000);
+        // }
+        // else {
+        //     control_forward(1000);
+        // }
 
         // time_end = sddf_timer_time_now(timer_channel);
 
@@ -143,25 +143,25 @@ void notified(sddf_channel ch) {
 
         // TODO: horrible style, refactor this and how timeouts are handled (especially for motors)
         if (timeout_id == SENSOR_TIMEOUT_ID) {
-            LOG_CLIENT("sensor timeout\n");
+            // LOG_CLIENT("sensor timeout\n");
             co_switch(t_main);
         }
         else if (timeout_id == CLIENT_TIMEOUT_ID) {
-            LOG_CLIENT("client timeout\n");
+            // LOG_CLIENT("client timeout\n");
             co_switch(t_main);
         }
         else if (timeout_id == MOTOR_CONTROL_TIMEOUT_ID) {
-            LOG_CLIENT("motor timeout\n");
+            // LOG_CLIENT("motor timeout\n");
             handle_motor_control_timeout();
             co_switch(t_main);
         }
         else if (timeout_id == gpio_channel_motor_a) {
             handle_pwm_timeout(gpio_channel_motor_a);
-            LOG_CLIENT("motor A timeout %d\n", timeout_queue.size);
+            // LOG_CLIENT("motor A timeout %d\n", timeout_queue.size);
         }
         else if (timeout_id == gpio_channel_motor_b) {
             handle_pwm_timeout(gpio_channel_motor_b);
-            LOG_CLIENT("motor B timeout %d\n", timeout_queue.size);
+            // LOG_CLIENT("motor B timeout %d\n", timeout_queue.size);
         }
     }
     else {
