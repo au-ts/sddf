@@ -93,23 +93,60 @@ def generate(
             )
             blk_driver.add_map(nvme_bar0_map)
 
-            # Metadata (ASQ/ACQ, etc.)
-            nvme_metadata_mr = SystemDescription.MemoryRegion(
-                sdf, "nvme_metadata", 0x10000, paddr=0x5FFF0000
+            nvme_admin_sq_mr = SystemDescription.MemoryRegion(
+                sdf, "nvme_admin_sq", 0x1000, paddr=0x5FDF0000
             )
-            sdf.add_mr(nvme_metadata_mr)
-            nvme_metadata_map = SystemDescription.Map(
-                nvme_metadata_mr, 0x20100000, "rw", cached=False
+            sdf.add_mr(nvme_admin_sq_mr)
+            nvme_admin_sq_map = SystemDescription.Map(
+                nvme_admin_sq_mr, 0x20100000, "rw", cached=False
             )
-            blk_driver.add_map(nvme_metadata_map)
+            blk_driver.add_map(nvme_admin_sq_map)
 
-            # Data Region
-            data_region_mr = SystemDescription.MemoryRegion(
-                sdf, "data_region", 0x200000, paddr=0x5FDF0000
+            nvme_admin_cq_mr = SystemDescription.MemoryRegion(
+                sdf, "nvme_admin_cq", 0x1000, paddr=0x5FDF1000
             )
-            sdf.add_mr(data_region_mr)
-            data_region_map = SystemDescription.Map(data_region_mr, 0x20200000, "rw")
-            blk_driver.add_map(data_region_map)
+            sdf.add_mr(nvme_admin_cq_mr)
+            nvme_admin_cq_map = SystemDescription.Map(
+                nvme_admin_cq_mr, 0x20101000, "rw", cached=False
+            )
+            blk_driver.add_map(nvme_admin_cq_map)
+
+            nvme_io_sq_mr = SystemDescription.MemoryRegion(
+                sdf, "nvme_io_sq", 0x1000, paddr=0x5FDF2000
+            )
+            sdf.add_mr(nvme_io_sq_mr)
+            nvme_io_sq_map = SystemDescription.Map(
+                nvme_io_sq_mr, 0x20102000, "rw", cached=False
+            )
+            blk_driver.add_map(nvme_io_sq_map)
+
+            nvme_io_cq_mr = SystemDescription.MemoryRegion(
+                sdf, "nvme_io_cq", 0x1000, paddr=0x5FDF3000
+            )
+            sdf.add_mr(nvme_io_cq_mr)
+            nvme_io_cq_map = SystemDescription.Map(
+                nvme_io_cq_mr, 0x20103000, "rw", cached=False
+            )
+            blk_driver.add_map(nvme_io_cq_map)
+
+            nvme_identify_mr = SystemDescription.MemoryRegion(
+                sdf, "nvme_identify", 0x2000, paddr=0x5FDF4000
+            )
+            sdf.add_mr(nvme_identify_mr)
+            nvme_identify_map = SystemDescription.Map(
+                nvme_identify_mr, 0x20104000, "rw"
+            )
+            blk_driver.add_map(nvme_identify_map)
+
+            # PRP list slots region (not used when SGL is active; kept for PRP fallback).
+            nvme_prp_slots_mr = SystemDescription.MemoryRegion(
+                sdf, "nvme_prp_slots", 0x80000, paddr=0x5FE00000
+            )
+            sdf.add_mr(nvme_prp_slots_mr)
+            nvme_prp_slots_map = SystemDescription.Map(
+                nvme_prp_slots_mr, 0x20200000, "rw", cached=False
+            )
+            blk_driver.add_map(nvme_prp_slots_map)
 
             # IRQ
             nvme_irq = SystemDescription.IrqIoapic(ioapic_id=0, pin=10, vector=1, id=17)

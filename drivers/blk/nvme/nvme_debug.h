@@ -5,94 +5,42 @@
 
 #pragma once
 
-#include <stdint.h>
-#include "nvme.h"
-#include "nvme_queue.h"
-#include <sddf/util/printf.h>
+/*
+ * Debug-only helpers.
+ */
 
+#include <stdint.h>
+#include <sddf/util/printf.h>
+#include "nvme_queue.h"
+
+/* Debug logging and one-off diagnostics helpers. */
 // clang-format off
-#define LOG_NVME(...) do{ sddf_dprintf("NVME|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
+#define LOG_NVME(...) do { sddf_dprintf("NVME|INFO: "); sddf_dprintf(__VA_ARGS__); } while (0)
 // clang-format on
 
-static void nvme_debug_dump_controller_regs(volatile nvme_controller_t *nvme_controller)
+#define NVME_DEBUG_ADMIN_CID_GET_LOG_PAGE 0x0009U
+/* 0x100 dwords = 1024 bytes = 16 × 64-byte Error Information log entries. [NVMe-2.1 §5.1.12, Fig. 197; §5.1.12.1.2] */
+#define NVME_DEBUG_ERROR_LOG_NUMDL        0x0100U
+
+/* Get Log Page CDW10 fields (LID, NUMDL). [NVMe-2.1 §5.1.12, Fig. 197] */
+#define NVME_ADMIN_GET_LOG_PAGE_CDW10_LID_SHIFT   0
+#define NVME_ADMIN_GET_LOG_PAGE_CDW10_LID_MASK    NVME_BITS_MASK(0, 7)
+#define NVME_ADMIN_GET_LOG_PAGE_CDW10_NUMDL_SHIFT 16
+#define NVME_ADMIN_GET_LOG_PAGE_CDW10_NUMDL_MASK  NVME_BITS_MASK(16, 31)
+
+/* Build Get Log Page CDW10. [NVMe-2.1 §5.1.12, Fig. 197] */
+static inline uint32_t nvme_build_get_log_page_cdw10(uint16_t numdl, uint8_t lid)
 {
-    LOG_NVME("CAP: %016lx\n", nvme_controller->cap);
-    uint32_t vs = nvme_controller->vs;
-    LOG_NVME("VS: major: %lu, minor: %lu, tertiary: %lu\n", (vs & NVME_VS_MJR) >> NVME_VS_MJR_SHIFT,
-             (vs & NVME_VS_MNR) >> NVME_VS_MNR_SHIFT, (vs & NVME_VS_TER) >> NVME_VS_TER_SHIFT);
-    LOG_NVME("INTMS: %08x\n", nvme_controller->intms);
-    LOG_NVME("INTMC: %08x\n", nvme_controller->intmc);
-    LOG_NVME("CC: %08x\n", nvme_controller->cc);
-    LOG_NVME("CSTS: %08x\n", nvme_controller->csts);
-    LOG_NVME("AQA: %08x\n", nvme_controller->aqa);
-    LOG_NVME("ASQ: %016lx\n", nvme_controller->asq);
-    LOG_NVME("ACQ: %016lx\n", nvme_controller->acq);
+    return (((uint32_t)numdl << NVME_ADMIN_GET_LOG_PAGE_CDW10_NUMDL_SHIFT) & NVME_ADMIN_GET_LOG_PAGE_CDW10_NUMDL_MASK)
+         | (((uint32_t)lid << NVME_ADMIN_GET_LOG_PAGE_CDW10_LID_SHIFT) & NVME_ADMIN_GET_LOG_PAGE_CDW10_LID_MASK);
 }
 
-static nvme_completion_queue_entry_t nvme_queue_submit_and_consume_poll(nvme_queue_info_t *queue,
-                                                                        nvme_submission_queue_entry_t *entry)
-{
-    nvme_queue_submit(queue, entry);
+/* Log Page Identifier values used by this driver. [NVMe-2.1 Fig. 202] */
+#define NVME_LOG_PAGE_LID_ERROR_INFO 0x01U /* Error Information */
 
-    nvme_completion_queue_entry_t response;
-    int i = 0;
-    while (true) {
-        int ret = nvme_queue_consume(queue, &response);
-        if (ret == 0) {
-            LOG_NVME("received a response for submission with CDW0: %x\n", entry->cdw0);
-            return response;
-        }
-
-        if (i % 100 == 0) {
-            LOG_NVME("waiting for response to submission with CDW0: %x\n", entry->cdw0);
-        }
-    }
-}
-
-/* 5.1.12.1.2  Error Information (Log Page Identifier 01h) */
-typedef struct {
-    uint64_t ecnt; /* Error Count; unique ID for this error. (retained across power off) */
-    uint16_t sqid; /* Submission Queue ID */
-    uint16_t cid;  /* Command ID */
-    uint16_t sts;  /* Status Info (from the completion queue entry - Status + Phase) */
-    uint16_t pel;  /* Parameter Error location (!!!!) */
-    uint64_t lba;  /* Logical Block Address */
-    uint32_t nsid;
-    uint8_t vsia; /* vendor specific info available */
-    uint8_t trtype; /* transport type */
-    uint8_t csi; /* command set indiciator (valid if version > 0x1)*/
-    uint8_t opc; /* opcode (valid if version > 0x1)*/
-    uint64_t csinfo; /* command specific information (if specified in the command) */
-    uint16_t ttsi; /* transport type specification information */
-    uint8_t _reserved[20];
-    uint8_t lpver; /* log page version */
-} nvme_error_information_log_page_t;
-_Static_assert(sizeof(nvme_error_information_log_page_t) == 64, "should be 64 bytes.");
-
-static void nvme_debug_get_error_information_log_page(nvme_queue_info_t *admin_queue, uint64_t data_paddr,
-                                                      volatile void *data)
-{
-    LOG_NVME("!!! LOG PAGE !!!\n");
-    nvme_completion_queue_entry_t entry;
-    entry = nvme_queue_submit_and_consume_poll(
-        admin_queue, &(nvme_submission_queue_entry_t) {
-                         .cdw0 = /* CID */ (0b1001 << 16) | /* PSDT */ 0 | /* FUSE */ 0 | /* OPC */ 0x2,
-                         .prp2 = 0,
-                         .prp1 = data_paddr,
-                         .cdw10 = /* NUMDL*/ (0x100 << 16) | /* LID*/ 0x01,
-                         .cdw11 = 0x0,
-                         .cdw12 = 0x0,
-                     });
-
-    assert((entry.phase_tag_and_status & _MASK(1, 15)) == 0x0); // §4.2.3 Status Field
-
-    volatile nvme_error_information_log_page_t *errors = data;
-    for (int i = 0; i < 2; i++) {
-        LOG_NVME("Error 0x%lx\n", errors[i].ecnt);
-        LOG_NVME("\tSQID: 0x%x\n", errors[i].sqid);
-        LOG_NVME("\t CID: 0x%x\n", errors[i].cid);
-        LOG_NVME("\t STS: 0x%x\n", errors[i].sts);
-        LOG_NVME("\t PEL: 0x%x\n", errors[i].pel);
-        LOG_NVME("\t(elided)\n");
-    }
-}
+/* Debug API. */
+void nvme_debug_dump_controller_regs(volatile nvme_controller_t *nvme_controller);
+nvme_completion_queue_entry_t nvme_queue_submit_and_consume_poll(nvme_queue_info_t *queue,
+                                                                 nvme_submission_queue_entry_t *entry);
+void nvme_debug_get_error_information_log_page(nvme_queue_info_t *admin_queue, uint64_t data_paddr,
+                                               volatile void *data);
