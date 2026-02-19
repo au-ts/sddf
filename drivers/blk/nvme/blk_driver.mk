@@ -14,16 +14,20 @@ ${CHECK_NVME_FLAGS_MD5}:
 	-rm -f .nvme_cflags-*
 	touch $@
 
-blk_driver.elf: blk_driver.o
+blk_driver.elf: blk_driver.o blk_driver_debug.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 blk_driver.o: ${BLK_DRIVER_DIR}/nvme.c ${CHECK_NVME_FLAGS_MD5}
 	$(CC) -c $(CFLAGS) -I${BLK_DRIVER_DIR} -o $@ $<
 
+blk_driver_debug.o: ${BLK_DRIVER_DIR}/nvme_debug.c ${CHECK_NVME_FLAGS_MD5}
+	$(CC) -c $(CFLAGS) -I${BLK_DRIVER_DIR} -o $@ $<
+
 -include blk_driver.d
+-include blk_driver_debug.d
 
 clean::
-	rm -f blk_driver.o
+	rm -f blk_driver.o blk_driver_debug.o
 
 clobber::
 	rm -f blk_driver.elf
