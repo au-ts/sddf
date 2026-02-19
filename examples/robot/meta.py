@@ -30,6 +30,7 @@ BOARDS: List[Board] = [
         name="maaxboard",
         arch=SystemDescription.Arch.AARCH64,
         paddr_top=0x7_0000_000,
+        # Use GPIO bank 3 - gpio2 in dts
         gpio="soc@0/bus@30000000/gpio@30220000",
         timer="soc@0/bus@30000000/timer@302d0000",
     ),

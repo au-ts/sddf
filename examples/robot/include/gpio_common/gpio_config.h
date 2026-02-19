@@ -13,21 +13,14 @@ IMX:
 - For irqs write a value > 0 because irq lines are shared.
 */
 
-//  Motor pins
-// #define GPIO_1 (MESON_GPIO_X + 1)
-// #define GPIO_2 (MESON_GPIO_X + 2)
+// Motor Pins
+#define PIN_1 (16) // IMX gpio3_16 // IMX physical 7
+#define PIN_2 (17) // IMX gpio3_17 // IMX physical 11
 
-// Ultrasonic pins
-// Echo pin
-// #define GPIO_3 (MESON_GPIO_X + 3)
-// Trig pin
-// #define GPIO_4 (MESON_GPIO_X + 4)
-
-
-#define PIN_1 (15) // IMX gpio1_15 // IMX physical 32
-#define PIN_2 (13) // IMX gpio1_13 // IMX physical 33
-#define PIN_3 (14) // IMX gpio1_15 // IMX physical 32
-#define PIN_4 (16) // IMX gpio1_13 // IMX physical 33
+// Trigger Pin
+#define PIN_3 (8) // IMX gpio3_8 // IMX physical 13
+// Echo Pin
+#define PIN_4 (9) // IMX gpio3_9 // IMX physical 15
 
 
 #define IRQ_1 (1)
