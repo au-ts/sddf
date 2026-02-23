@@ -5,6 +5,6 @@
 
 #define NDESC_ADDR_OFF         0
 #define NDESC_LEN_OFF          8
-#define NDESC_LEN              10
+#define NDESC_LEN              16
 
 #define QUEUE_CAPACITY  256

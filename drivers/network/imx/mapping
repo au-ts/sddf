@@ -32,3 +32,4 @@ or_WRAP Bitvec
 rx_hw_ring_empty Int
 rx_hw_ring_full Int
 rx_provide_helper Int
+mod_capacity Bitvec

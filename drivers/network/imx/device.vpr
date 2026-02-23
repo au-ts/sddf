@@ -159,6 +159,7 @@ predicate valid_hardware_ring_rx_read(heap: IArray, gv: Ref)
     forall i: Int :: { slot(gv.hardware_ring_rx, i) }
         (i >= 0 && i < hw_capacity ==> 
             acc(slot(gv.hardware_ring_rx, i).hw_stat, 3/4) &&
+            bounded16(slot(gv.hardware_ring_rx, i).hw_stat) &&
             (!is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat) ==>
                 acc(slot(gv.hardware_ring_rx, i).hw_addr, 3/4) &&
                 is_valid_data_addr(slot(gv.hardware_ring_rx, i).hw_addr) &&
@@ -189,6 +190,7 @@ predicate valid_hardware_ring_rx_write(heap: IArray, gv: Ref)
     forall i: Int :: { slot(gv.hardware_ring_rx, i) }
         (i >= 0 && i < hw_capacity ==>
             acc(slot(gv.hardware_ring_rx, i).hw_stat, 3/4) &&
+            bounded16(slot(gv.hardware_ring_rx, i).hw_stat) &&
             (!is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat) ==>
                 acc(slot(gv.hardware_ring_rx, i).hw_addr, write) &&
                 is_valid_data_addr(slot(gv.hardware_ring_rx, i).hw_addr) &&
@@ -220,6 +222,7 @@ predicate valid_hardware_ring_tx_read(heap: IArray, gv: Ref)
     forall i: Int :: { slot(gv.hardware_ring_tx, i) }
         (i >= 0 && i < hw_capacity ==>
             acc(slot(gv.hardware_ring_tx, i).hw_stat, 3/4) &&
+            bounded16(slot(gv.hardware_ring_tx, i).hw_stat) &&
             (!is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat) ==>
                 acc(slot(gv.hardware_ring_tx, i).hw_addr, 3/4) &&
                 is_valid_data_addr(slot(gv.hardware_ring_tx, i).hw_addr) &&
@@ -250,6 +253,7 @@ predicate valid_hardware_ring_tx_write(heap: IArray, gv: Ref)
     forall i: Int :: { slot(gv.hardware_ring_tx, i) }
         (i >= 0 && i < hw_capacity ==>
             acc(slot(gv.hardware_ring_tx, i).hw_stat, 3/4) &&
+            bounded16(slot(gv.hardware_ring_tx, i).hw_stat) &&
             (!is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat) ==>
                 acc(slot(gv.hardware_ring_tx, i).hw_addr, write) &&
                 is_valid_data_addr(slot(gv.hardware_ring_tx, i).hw_addr) &&
@@ -364,9 +368,11 @@ method load_hw_ring_rx_stat(heap: IArray, gv: Ref, address: Int)
     requires (address - 2) >= hw_ring_rx_addr && (address - 2) < (hw_ring_rx_addr + hw_ring_rx_size)
     requires acc(gv.hardware_ring_rx, 1/2) &&
         acc(slot(gv.hardware_ring_rx, (address - 2 - hw_ring_rx_addr) / hw_descriptor_size).hw_stat, 1/2)
+    requires bounded16(slot(gv.hardware_ring_rx, (address - 2 - hw_ring_rx_addr) / hw_descriptor_size).hw_stat)
     ensures acc(gv.hardware_ring_rx, 1/2) && acc(slot(gv.hardware_ring_rx, (address - 2 - hw_ring_rx_addr) / hw_descriptor_size).hw_stat, 1/2)
     ensures retval == slot(gv.hardware_ring_rx, (address - 2 - hw_ring_rx_addr) / hw_descriptor_size).hw_stat
     ensures is_valid_rx_stat(slot(gv.hardware_ring_rx, (address - 2 - hw_ring_rx_addr) / hw_descriptor_size).hw_stat) ==> is_valid_rx_stat(retval)
+    ensures bounded16(retval)
 {
     retval := slot(gv.hardware_ring_rx, (address - 2 - hw_ring_rx_addr) / hw_descriptor_size).hw_stat
     refute false
@@ -399,9 +405,11 @@ method load_hw_ring_tx_stat(heap: IArray, gv: Ref, address: Int)
     requires (address - 2) >= hw_ring_tx_addr && (address - 2) < (hw_ring_tx_addr + hw_ring_tx_size)
     requires acc(gv.hardware_ring_tx, 1/2) &&
         acc(slot(gv.hardware_ring_tx, (address - 2 - hw_ring_tx_addr) / hw_descriptor_size).hw_stat, 1/2)
+    requires bounded16(slot(gv.hardware_ring_tx, (address - 2 - hw_ring_tx_addr) / hw_descriptor_size).hw_stat)
     ensures acc(gv.hardware_ring_tx, 1/2) && acc(slot(gv.hardware_ring_tx, (address - 2 - hw_ring_tx_addr) / hw_descriptor_size).hw_stat, 1/2)
     ensures retval == slot(gv.hardware_ring_tx, (address - 2 - hw_ring_tx_addr) / hw_descriptor_size).hw_stat
     ensures is_valid_tx_stat(slot(gv.hardware_ring_tx, (address - 2 - hw_ring_tx_addr) / hw_descriptor_size).hw_stat) ==> is_valid_tx_stat(retval)
+    ensures bounded16(retval)
 {
     retval := slot(gv.hardware_ring_tx, (address - 2 - hw_ring_tx_addr) / hw_descriptor_size).hw_stat
     refute false
