@@ -110,12 +110,14 @@ void client_main(void) {
     while(true)
     {
         delay_miliseconds(1, CLIENT_TIMEOUT_ID);
+        control_stop();
+        control_forward(1000);
 
         // LOG_CLIENT("Client main\n");
 
-        uint64_t dist = get_ultrasonic_reading();
+        // uint64_t dist = get_ultrasonic_reading();
 
-        LOG_CLIENT("Reading received: %lu\n", dist);
+        // LOG_CLIENT("Reading received: %lu\n", dist);
 
         // if (dist < 10) {
         //     control_stop();
