@@ -90,29 +90,24 @@ typedef struct net_client_config {
 // TODO: remove
 #define TEMP_MAX_MACS_PER_CLIENT 3
 
-typedef struct net_vswitch_client_config {
-    net_connection_resource_t copy_rx;
+typedef struct net_vswitch_port_config {
+    net_connection_resource_t rx;
     region_resource_t rx_data; // TODO: check that we need that
     net_connection_resource_t tx;
     region_resource_t tx_data;
-    uint64_t allow_list;
+    /* unused for the device */
     mac_addr_t mac_addrs[TEMP_MAX_MACS_PER_CLIENT]; // TODO: fix the dimension
-    uint8_t cid;
-} net_vswitch_client_config_t;
+    uint8_t id;
+} net_vswitch_port_config_t;
 
 typedef struct net_vswitch_config {
     char magic[SDDF_NET_MAGIC_LEN];
 
     // TODO: we need the data buffers mapped since we are forwarding packets and need to access them, unless we specify a way of proxying them without introspection
-    // Clients (indexed by PD index? when we have a vswitch with other clients)
-    net_vswitch_client_config_t clients[SDDF_NET_MAX_CLIENTS]; // TODO: think if we can merge this with the device
-    uint8_t num_clients;
-
-    // Device
-    net_connection_resource_t virt_rx;
-    region_resource_t virt_rx_data;
-    net_connection_resource_t virt_tx;  // TODO: do we need to pass all data regions when returning buffers via virtTx?
-    uint64_t virt_allow_list;
+    // Ports
+    /* Rx/Tx swapped for the virtualizer */
+    net_vswitch_port_config_t ports[SDDF_NET_MAX_CLIENTS];
+    uint8_t num_ports;
 
     // Reference counting buffers; interfaced as array[NUM_CLIENTS + 1][drv_queue_capacity]
     // The system designer must allocate a buffer big enough to contain reference counters for buffers.
