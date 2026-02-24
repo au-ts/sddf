@@ -17,7 +17,9 @@ typedef struct net_buff_desc {
     /* offset of buffer within buffer memory region or io address of buffer */
     uint64_t io_or_offset;
     /* length of data inside buffer */
-    uint16_t len;
+    uint16_t len: 10;
+    /* id of the owning PD */
+    uint16_t oid: 6;
 } net_buff_desc_t;
 
 typedef struct net_queue {
