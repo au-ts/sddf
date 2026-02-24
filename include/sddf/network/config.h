@@ -35,10 +35,18 @@ typedef struct net_virt_tx_client_config {
     device_region_resource_t data;
 } net_virt_tx_client_config_t;
 
+// TODO: this could be commonalized with net_virt_tx_vswitch_config, but who cares for now
+typedef struct net_virt_tx_vswitch_config {
+    net_connection_resource_t conn;
+    device_region_resource_t data[SDDF_NET_MAX_CLIENTS];
+    uint8_t data_id[SDDF_NET_MAX_CLIENTS];
+} net_virt_tx_vswitch_config_t;
+
 typedef struct net_virt_tx_config {
     char magic[SDDF_NET_MAGIC_LEN];
     net_connection_resource_t driver;
     net_virt_tx_client_config_t clients[SDDF_NET_MAX_CLIENTS];
+    net_virt_tx_vswitch_config_t vswitch;
     uint8_t num_clients;
 } net_virt_tx_config_t;
 
@@ -53,7 +61,7 @@ typedef struct net_virt_rx_config {
     device_region_resource_t data;
     // The system designer must allocate a buffer metadata region for internal
     // use by the RX virtualiser. The size of this region must be at least
-    // 4*drv_queue_capacity. It must be mapped R-W and zero-initialised.
+    // sizeof(int*)*drv_queue_capacity. It must be mapped R-W and zero-initialised.
     region_resource_t buffer_metadata;
     net_virt_rx_config_client_t clients[SDDF_NET_MAX_CLIENTS];
     uint8_t num_clients;
@@ -79,21 +87,38 @@ typedef struct net_client_config {
     uint8_t mac_addr[MAC802_BYTES];
 } net_client_config_t;
 
+// TODO: remove
+#define TEMP_MAX_MACS_PER_CLIENT 3
+
+typedef struct net_vswitch_client_config {
+    net_connection_resource_t copy_rx;
+    region_resource_t rx_data; // TODO: check that we need that
+    net_connection_resource_t tx;
+    region_resource_t tx_data;
+    uint64_t allow_list;
+    mac_addr_t mac_addrs[TEMP_MAX_MACS_PER_CLIENT]; // TODO: fix the dimension
+    uint8_t cid;
+} net_vswitch_client_config_t;
+
 typedef struct net_vswitch_config {
     char magic[SDDF_NET_MAGIC_LEN];
 
-    // Clients (indexed by client index)
-    net_connection_resource_t clients_rx[SDDF_NET_MAX_CLIENTS];
-    net_connection_resource_t clients_tx[SDDF_NET_MAX_CLIENTS];
-    region_resource_t clients_data_rx[SDDF_NET_MAX_CLIENTS]; // TODO: do we need to copy both?
-    region_resource_t clients_data_tx[SDDF_NET_MAX_CLIENTS];
-    mac_addr_t mac_addrs[SDDF_NET_MAX_CLIENTS];
+    // TODO: we need the data buffers mapped since we are forwarding packets and need to access them, unless we specify a way of proxying them without introspection
+    // Clients (indexed by PD index? when we have a vswitch with other clients)
+    net_vswitch_client_config_t clients[SDDF_NET_MAX_CLIENTS]; // TODO: think if we can merge this with the device
     uint8_t num_clients;
 
     // Device
-    // TODO: can we have more devices connected to the vswitch?
     net_connection_resource_t virt_rx;
-    net_connection_resource_t virt_tx;
+    region_resource_t virt_rx_data;
+    net_connection_resource_t virt_tx;  // TODO: do we need to pass all data regions when returning buffers via virtTx?
+    uint64_t virt_allow_list;
+
+    // Reference counting buffers; interfaced as array[NUM_CLIENTS + 1][drv_queue_capacity]
+    // The system designer must allocate a buffer big enough to contain reference counters for buffers.
+    // The size of this region must be at least (NUM_CLIENTS + 1) * drv_queue_capacity * sizeof(int*).
+    // It must be mapped R-W and zero-initialised.
+    region_resource_t buffer_metadata;
 } net_vswitch_config_t;
 
 static inline bool net_config_check_magic(void *config)
