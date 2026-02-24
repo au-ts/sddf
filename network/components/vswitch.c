@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
+#include "os/sddf.h"
 #include "sddf/network/config.h"
 #include <stdbool.h>
 #include <stdint.h>
@@ -14,138 +15,143 @@
 #include <sddf/util/util.h>
 #include <sddf/util/printf.h>
 
-#define UNKNOWN_CID -1
-
 __attribute__((__section__(".net_vswitch_config"))) net_vswitch_config_t config;
 
 typedef struct vswitch_state {
-    // Queues for clients
-    net_queue_handle_t rx_copy_queues_clients[SDDF_NET_MAX_CLIENTS];
-    net_queue_handle_t tx_queues_clients[SDDF_NET_MAX_CLIENTS];
-    // Queues for the virt
-    net_queue_handle_t rx_queue_virt;
-    net_queue_handle_t tx_queue_virt;
-
-    vswitch_port_bitmap_t allow_list[SDDF_NET_MAX_CLIENTS];
+    /* Rx/Tx swapped for the virtualizer */ // TODO: is that truly true? I am not 100% sure yet
+    net_queue_handle_t rx_queues[SDDF_NET_MAX_CLIENTS];
+    net_queue_handle_t tx_queues[SDDF_NET_MAX_CLIENTS];
+    uint64_t allow_list[SDDF_NET_MAX_CLIENTS];
 } vswitch_state_t;
 
 static vswitch_state_t state;
 
-static void forward_frame(int src_cid, int dst_cid, net_buff_desc_t *src_buf)
+uint32_t **buffer_refs;
+
+// TODO: do the buffer incremeting here, let's keep things localised
+static void forward_frame(net_vswitch_port_config_t *src, net_vswitch_port_config_t *dst, net_buff_desc_t *src_buf)
 {
-    // 2 cases here - src_cid is virt or a client, can we already commonalize that?
-    const char *src_data = src->data_region + src_buf->io_or_offset;
+    const char *src_data = src->tx_data.vaddr + src_buf->io_or_offset;
 
     net_buff_desc_t d_buffer;
-    if (net_dequeue_free(&dest->q, &d_buffer) != 0) {
+    if (net_dequeue_free(&state.rx_queues[dst->id], &d_buffer) != 0) {
         return;
     }
-    // TODO: make fast memcpy
-    sddf_memcpy(dest->data_region + d_buffer.io_or_offset, src_data, src_buf->len);
 
     d_buffer.len = src_buf->len;
-    net_enqueue_active(&dest->q, d_buffer);
+    d_buffer.io_or_offset = src_buf->io_or_offset;
+    d_buffer.oid = src->id; // tag the owner of this buffer so we know which reference slot increment
+    net_enqueue_active(&state.rx_queues[dst->id], d_buffer);
 
-    if (net_require_signal_active(&dest->q)) {
-        net_cancel_signal_active(&dest->q);
-        microkit_notify(dest->ch);
+    // TODO: recheck if my logic is not funky here - offsets etc
+    // mark that this buffer has been passed once
+    int ref_index = src_buf->io_or_offset / NET_BUFFER_SIZE;
+    buffer_refs[src->id][ref_index]++;
+
+    if (net_require_signal_active(&state.rx_queues[dst->id])) {
+        net_cancel_signal_active(&state.rx_queues[dst->id]);
+        sddf_notify(dst->rx.id);
     }
 }
 
-static bool vswitch_can_send_to(int src_cid, int dst_cid) {
-    return config.clients[src_cid].allow_list & (1 << (uint64_t)dst_cid);
+static bool vswitch_can_send_to(int src_id, int dst_id)
+{
+    return state.allow_list[src_id] & (1 << (uint64_t)dst_id);
 }
 
 int mac_addr_find(const uint8_t *dest_macaddr) {
-    mac_addr_t *client_mac;
-    // try matching each MAC in the list
-    for (int i = 0; i < SDDF_NET_MAX_CLIENTS; i++) { // TODO: can we simplify that loop?
+    mac_addr_t *mac;
+    // try matching each MAC in the list (skip ID 0)
+    for (int i = 1; i < SDDF_NET_MAX_CLIENTS; i++) { // TODO: can we simplify that loop?
         for (int j = 0; j < TEMP_MAX_MACS_PER_CLIENT; j++) {
-            client_mac = &config.clients[i].mac_addrs[j];
-            if (mac802_addr_eq(client_mac->addr, dest_macaddr)) {
+            mac = &config.ports[i].mac_addrs[j];
+            if (mac802_addr_eq(mac->addr, dest_macaddr)) {
                 return i; // this is the ID of the client we matched
             }
         }
     }
-    // I tried so hard and got so far, and in the end it doesn't even matter
-    return UNKNOWN_CID;
+    // I tried so hard and got so far, and in the end it doesn't even matter - default to forward to external port
+    return 0;
 }
 
-static void try_broadcast(uint8_t src_cid, net_buff_desc_t *buffer)
+static void try_broadcast(net_vswitch_port_config_t *src, net_buff_desc_t *buffer)
 {
     // Only broadcast to allowed
-    //for (int i = 0; i < VSWITCH_PORT_COUNT; i++) {
-    //    if (i != src_port && vswitch_can_send_to(src, i)) {
-    //        vswitch_channel_t *outgoing = &vswitch.ports[i].outgoing;
-    //        forward_frame(&src->incoming, outgoing, buffer);
-    //    }
-    //}
+    for (int i = 0; i < SDDF_NET_MAX_CLIENTS; i++) {
+        if (i != src->id && vswitch_can_send_to(src->id, config.ports[i].id)) {
+            forward_frame(src, &config.ports[i], buffer);
+        }
+    }
 }
 
-static void try_send(uint8_t src_cid, const uint8_t *dest_macaddr, net_buff_desc_t *buffer)
+static void try_send(net_vswitch_port_config_t *src, const uint8_t *dest_macaddr, net_buff_desc_t *buffer)
 {
-    int dest_cid = mac_addr_find(dest_macaddr);
+    int dst_id = mac_addr_find(dest_macaddr);
 
-    // we don't know this CID - forward via virts
-    if (dest_cid == UNKNOWN_CID) {
-
-    } else if (!vswitch_can_send_to((int)src_cid, dest_cid)) {
-        // we have to drop this packet - allow_list disallows
+    if (vswitch_can_send_to(src->id, dst_id)) {
+        forward_frame(src, &config.ports[dst_id], buffer);
+    } else {
+        // drop the packet
+        // TODO: impl, do we have to do anything here?
         return;
     }
-
-    forward_frame(src_cid, dest_cid, buffer);
 }
 
-//static void notified_by_port(int port)
-//{
-//    net_buff_desc_t sddf_buffer;
-//
-//    vswitch_port_t *src = &vswitch.ports[port];
-//    net_queue_handle_t *src_queue = &src->incoming.q;
-//
-//    bool reprocess = true;
-//    while (reprocess) {
-//        while (net_dequeue_active(src_queue, &sddf_buffer) != -1) {
-//            const char *frame_data = src->incoming.data_region + sddf_buffer.io_or_offset;
-//            const struct ether_addr *macaddr = (void *)frame_data;
-//
-//            // Add forwarding table entry from source MAC to port
-//            channel_map_add(&vswitch.map, macaddr->ether_src_addr_octet, port);
-//
-//            // Forward frame
-//            if (mac802_addr_is_bcast(macaddr->ether_dest_addr_octet)) {
-//                try_broadcast(port, src, &buffer);
-//            } else {
-//                try_send(src, macaddr->ether_dest_addr_octet, &sddf_buffer);
-//            }
-//
-//            sddf_buffer.len = 0;
-//            net_enqueue_free(src_queue, sddf_buffer);
-//        }
-//
-//        net_request_signal_active(src_queue);
-//        reprocess = false;
-//
-//        if (!net_queue_empty_active()) {
-//            net_cancel_signal_active(src_queue);
-//            reprocess = true;
-//        }
-//    }
-//}
+static void rx_provide()
+{
+    // TODO: not sure if I have to handle that like it is handled in rx_virt?
+    uint64_t notifications = 0;
+    // Return empty buffers
+    for (int i = 0; i < config.num_ports; i++) {
+        bool reprocess = true;
+        net_queue_handle_t *src = &state.rx_queues[i];
+        while (reprocess) {
+            while (!net_queue_empty_free(src)) {
+                net_buff_desc_t buffer;
+                int err = net_dequeue_free(src, &buffer);
+                assert(!err);
+                // TODO: handle if we need to handle the offsets etc in any special way
+                int ref_index = buffer.io_or_offset / NET_BUFFER_SIZE;
+                assert(buffer_refs[buffer.oid][ref_index] != 0);
 
-// TODO: honestly, think if we need the split between client/virt - this doubles a lot of effort.
-static void forward_traffic_from_virt() {
-    //bool reprocess = true;
+                buffer_refs[buffer.oid][ref_index]--;
 
-    //while (reprocess) {
-    //    while (net_dequeue_active(net_queue_handle_t *queue, net_buff_desc_t *buffer)
+                if (buffer_refs[buffer.oid][ref_index] != 0) {
+                    continue;
+                }
 
-    //}
+                // return the buffer to its owner
+                // TODO: should I handle the offsets like virt does?
+                net_queue_handle_t *dst = &state.rx_queues[buffer.oid];
+                err = net_enqueue_free(dst, buffer);
+                assert(!err);
+                notifications |= (1 << buffer.oid);
+            }
+
+            net_request_signal_free(src);
+            reprocess = false;
+
+            if (!net_queue_empty_free(src)) {
+                net_cancel_signal_free(src);
+                reprocess = true;
+            }
+        }
+    }
+
+    // Notify every owner
+    for (int i = 0; i < config.num_ports; i++) {
+        if (notifications & (1 << i) && net_require_signal_free(&state.rx_queues[i])) {
+            net_cancel_signal_free(&state.rx_queues[i]);
+            sddf_deferred_notify(config.ports[i].id);
+        }
+    }
 }
 
-static void forward_traffic_from_client(uint8_t cid) {
-    net_queue_handle_t *src = &state.rx_copy_queues_clients[cid];
+static void forward_traffic_from(net_vswitch_port_config_t *port)
+{
+    // Here we read from TX and fill in the corresponding RX (switched for virtualizer but we handle that in SDF)
+    // TODO: Think if we don't need to do some other handling for virt, should be fine
+    net_queue_handle_t *src = &state.tx_queues[port->id];
 
     bool reprocess = true;
     while (reprocess) {
@@ -155,20 +161,20 @@ static void forward_traffic_from_client(uint8_t cid) {
             int err = net_dequeue_active(src, &buffer);
             assert(!err);
 
-            const char *frame_data = config.clients[cid].tx_data.vaddr + buffer.io_or_offset;
+            const char *frame_data = port->tx_data.vaddr + buffer.io_or_offset;
             const struct ether_addr *macaddr = (void *)frame_data;
             // find the receiver(s)
             // Forward frame
             // queue packets for the receivers (inside forward_frame)
             if (mac802_addr_is_bcast(macaddr->ether_dest_addr_octet)) {
-                try_broadcast(cid, &buffer);
+                try_broadcast(port, &buffer);
             } else {
-                try_send(cid, macaddr->ether_dest_addr_octet, &buffer);
+                try_send(port, macaddr->ether_dest_addr_octet, &buffer);
             }
 
-            // return the buffers
-            buffer.len = 0;
-            net_enqueue_free(src, buffer);
+            // We do not return the buffers here
+            //buffer.len = 0;
+            //net_enqueue_free(src, buffer);
         }
 
         net_request_signal_active(src);
@@ -181,48 +187,34 @@ static void forward_traffic_from_client(uint8_t cid) {
     }
 }
 
-void notified(microkit_channel_t ch)
+void notified(sddf_channel ch)
 {
-    // TODO: smartly find out which ch corresponds to what client?
-    // upon notification, forward the packet to corresponding client
-
-    if (ch == config.virt_rx.id) {
-        // TODO: do we need a special case for this?
-        forward_traffic_from_virt(ch);
-    } else {
-        // TODO: we assume client assumes it's PD's ID - need to be enforced - or we have to create additional mapping of CLient ID -> idx in the array
-        for (int cid = 0; cid < SDDF_NET_MAX_CLIENTS; cid++) {
-            if (ch == config.clients[cid].copy_rx.id) {
-                forward_traffic_from_client(cid);
-                return;
-            }
+    for (int i = 0; i < SDDF_NET_MAX_CLIENTS; i++) {
+        if (ch == config.ports[i].rx.id) {
+            forward_traffic_from(&config.ports[i]);
+            break;
         }
-        sddf_dprintf("FAILED TO MATCH\n");
-        // not for us? error?
-        return;
     }
+    rx_provide();
 }
 
 void init(void)
 {
     assert(net_config_check_magic(&config));
 
+    buffer_refs = config.buffer_metadata.vaddr;
+
     /* Set up client queues and buffers for copying? */
-    uint8_t num_clients = config.num_clients;
-    for (int i = 0; i < num_clients; i++) {
-        net_queue_init(&state.rx_copy_queues_clients[i], config.clients[i].copy_rx.free_queue.vaddr, config.clients[i].copy_rx.active_queue.vaddr,
-                       config.clients[i].copy_rx.num_buffers);
-        net_queue_init(&state.tx_queues_clients[i], config.clients[i].tx.free_queue.vaddr, config.clients[i].tx.active_queue.vaddr,
-                       config.clients[i].tx.num_buffers);
-        net_buffers_init(&state.rx_copy_queues_clients[i], 0); // TODO: should the offset be set? - probably not because this is device-only offset
+    for (int i = 0; i < config.num_ports; i++) {
+        net_queue_init(&state.rx_queues[i], config.ports[i].rx.free_queue.vaddr, config.ports[i].rx.active_queue.vaddr,
+                       config.ports[i].rx.num_buffers);
+        net_queue_init(&state.tx_queues[i], config.ports[i].tx.free_queue.vaddr, config.ports[i].tx.active_queue.vaddr,
+                       config.ports[i].tx.num_buffers);
+        net_buffers_init(&state.rx_queues[i], 0); // TODO: should the offset be set? - probably not because this is device-only offset
     }
 
-    /* Set virt queues */
-    net_queue_init(&state.rx_queue_virt, config.virt_rx.free_queue.vaddr, config.virt_rx.active_queue.vaddr,
-                   config.virt_rx.num_buffers);
-    net_queue_init(&state.tx_queue_virt, config.virt_tx.free_queue.vaddr, config.virt_tx.active_queue.vaddr,
-                   config.virt_tx.num_buffers);
-    net_buffers_init(&state.rx_queue_virt, 0);
-
-    // Seed the allow_list based on predefined settings */
+    /* Seed the allow_list based on predefined settings */
+    // for now quick hack, send all to all
+    for (int i = 0; i < config.num_ports; i++)
+        state.allow_list[i] = UINT64_MAX;
 }
