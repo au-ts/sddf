@@ -17,6 +17,13 @@
 #define SDDF_NET_MAGIC_LEN 5
 static char SDDF_NET_MAGIC[SDDF_NET_MAGIC_LEN] = { 's', 'D', 'D', 'F', 0x5 };
 
+// TODO: this might be superfluous as found out in RX and TX
+typedef enum net_connection_type {
+    CLIENT = 0,
+    VSWITCH = 1,
+    INVALID = -1,
+} net_connection_type_e;
+
 typedef struct net_connection_resource {
     region_resource_t free_queue;
     region_resource_t active_queue;
