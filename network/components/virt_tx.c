@@ -22,11 +22,22 @@ state_t state;
 int extract_offset(uintptr_t *phys)
 {
     for (int client = 0; client < config.num_clients; client++) {
-        if (*phys >= config.clients[client].data.io_addr
-            && *phys
-                   < config.clients[client].data.io_addr + state.tx_queue_clients[client].capacity * NET_BUFFER_SIZE) {
-            *phys = *phys - config.clients[client].data.io_addr;
-            return client;
+        if (config.clients[client].type == VSWITCH) {
+            for (int i = 0; i < config.clients[client].num_data; i++) {
+                if (*phys >= config.clients[client].data[i].io_addr
+                    && *phys
+                           < config.clients[client].data[i].io_addr + state.tx_queue_clients[client].capacity * NET_BUFFER_SIZE) {
+                    *phys = *phys - config.clients[client].data[i].io_addr;
+                    return client;
+                }
+            }
+        } else if (config.clients[client].type == CLIENT) {
+            if (*phys >= config.clients[client].data[0].io_addr
+                && *phys
+                       < config.clients[client].data[0].io_addr + state.tx_queue_clients[client].capacity * NET_BUFFER_SIZE) {
+                *phys = *phys - config.clients[client].data[0].io_addr;
+                return client;
+            }
         }
     }
     return -1;
@@ -52,10 +63,10 @@ void tx_provide(void)
                     continue;
                 }
 
-                uintptr_t buffer_vaddr = buffer.io_or_offset + (uintptr_t)config.clients[client].data.region.vaddr;
+                uintptr_t buffer_vaddr = buffer.io_or_offset + (uintptr_t)config.clients[client].data[buffer.oid].region.vaddr;
                 cache_clean(buffer_vaddr, buffer_vaddr + buffer.len);
 
-                buffer.io_or_offset = buffer.io_or_offset + config.clients[client].data.io_addr;
+                buffer.io_or_offset = buffer.io_or_offset + config.clients[client].data[buffer.oid].io_addr;
                 err = net_enqueue_active(&state.tx_queue_drv, buffer);
                 assert(!err);
                 enqueued = true;

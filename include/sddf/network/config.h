@@ -17,6 +17,13 @@
 #define SDDF_NET_MAGIC_LEN 5
 static char SDDF_NET_MAGIC[SDDF_NET_MAGIC_LEN] = { 's', 'D', 'D', 'F', 0x5 };
 
+// TODO: this might be superfluous as found out in RX and TX
+typedef enum net_connection_type {
+    CLIENT = 0,
+    VSWITCH = 1,
+    INVALID = -1,
+} net_connection_type_e;
+
 typedef struct net_connection_resource {
     region_resource_t free_queue;
     region_resource_t active_queue;
@@ -32,27 +39,28 @@ typedef struct net_driver_config {
 
 typedef struct net_virt_tx_client_config {
     net_connection_resource_t conn;
-    device_region_resource_t data;
-} net_virt_tx_client_config_t;
-
-// TODO: this could be commonalized with net_virt_tx_vswitch_config, but who cares for now
-typedef struct net_virt_tx_vswitch_config {
-    net_connection_resource_t conn;
     device_region_resource_t data[SDDF_NET_MAX_CLIENTS];
-    uint8_t data_id[SDDF_NET_MAX_CLIENTS];
-} net_virt_tx_vswitch_config_t;
+    uint8_t data_id[SDDF_NET_MAX_CLIENTS]; // TODO: do we need that?
+    uint8_t num_data;
+    net_connection_type_e type;
+} net_virt_tx_client_config_t;
 
 typedef struct net_virt_tx_config {
     char magic[SDDF_NET_MAGIC_LEN];
     net_connection_resource_t driver;
     net_virt_tx_client_config_t clients[SDDF_NET_MAX_CLIENTS];
-    net_virt_tx_vswitch_config_t vswitch;
     uint8_t num_clients;
 } net_virt_tx_config_t;
 
+// TODO: remove
+#define TEMP_MAX_MACS_PER_CLIENT 3
+
+// TODO: later rename? Connections instead of clients?
 typedef struct net_virt_rx_config_client {
     net_connection_resource_t conn;
-    uint8_t mac_addr[MAC802_BYTES];
+    mac_addr_t mac_addrs[TEMP_MAX_MACS_PER_CLIENT * SDDF_NET_MAX_CLIENTS];
+    uint8_t num_macs;
+    net_connection_type_e type;
 } net_virt_rx_config_client_t;
 
 typedef struct net_virt_rx_config {
@@ -86,9 +94,6 @@ typedef struct net_client_config {
 
     uint8_t mac_addr[MAC802_BYTES];
 } net_client_config_t;
-
-// TODO: remove
-#define TEMP_MAX_MACS_PER_CLIENT 3
 
 typedef struct net_vswitch_port_config {
     net_connection_resource_t rx;
