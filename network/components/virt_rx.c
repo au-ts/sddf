@@ -6,13 +6,14 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <os/sddf.h>
+#include <sddf/network/config.h>
 #include <sddf/network/constants.h>
+#include <sddf/network/mac802.h>
 #include <sddf/network/queue.h>
 #include <sddf/network/util.h>
-#include <sddf/network/config.h>
-#include <sddf/util/util.h>
-#include <sddf/util/printf.h>
 #include <sddf/util/cache.h>
+#include <sddf/util/printf.h>
+#include <sddf/util/util.h>
 
 /* Used to signify that a packet has come in for the broadcast address and does not match with
  * any particular client. */
@@ -36,28 +37,24 @@ state_t state;
 static bool notify_drv;
 
 /* Return the client ID if the Mac address is a match to a client, return the broadcast ID if MAC address
-  is a broadcast address. */
+  is a broadcast address, return -1 if we have not found the match. */
 int get_mac_addr_match(struct ethernet_header *buffer)
 {
     for (int client = 0; client < config.num_clients; client++) {
-        bool match = true;
-        for (int i = 0; (i < ETH_HWADDR_LEN) && match; i++) {
-            if (buffer->dest.addr[i] != config.clients[client].mac_addr[i]) {
-                match = false;
+        if (config.clients[client].type == VSWITCH) {
+            for (int i = 0; i < config.clients[client].num_macs; i++) {
+                if (mac802_addr_eq(buffer->dest.addr, config.clients[client].mac_addrs[i].addr)) {
+                    return client;
+                }
             }
-        }
-        if (match) {
-            return client;
+        } else if (config.clients[client].type == CLIENT) {
+            if (mac802_addr_eq(buffer->dest.addr, config.clients[client].mac_addrs[0].addr)) {
+                return client;
+            }
         }
     }
 
-    bool broadcast_match = true;
-    for (int i = 0; (i < ETH_HWADDR_LEN) && broadcast_match; i++) {
-        if (buffer->dest.addr[i] != 0xFF) {
-            broadcast_match = false;
-        }
-    }
-    if (broadcast_match) {
+    if (mac802_addr_is_bcast(buffer->dest.addr)) {
         return BROADCAST_ID;
     }
 
@@ -144,7 +141,7 @@ void rx_provide(void)
                 int err = net_dequeue_free(&state.rx_queue_clients[client], &buffer);
                 assert(!err);
                 assert(!(buffer.io_or_offset % NET_BUFFER_SIZE)
-                       && (buffer.io_or_offset < NET_BUFFER_SIZE * state.rx_queue_clients[client].capacity));
+                       && (buffer.io_or_offset < NET_BUFFER_SIZE * state.rx_queue_drv.capacity));
 
                 int ref_index = buffer.io_or_offset / NET_BUFFER_SIZE;
                 assert(buffer_refs[ref_index] != 0);

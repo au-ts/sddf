@@ -45,7 +45,7 @@ void cache_clean_and_invalidate(unsigned long start, unsigned long end)
     }
     asm volatile("dsb sy" ::: "memory");
 #elif defined(CONFIG_ARCH_RISCV) || defined(CONFIG_ARCH_X86_64)
-    /* While not all RISC-V platforms are DMA cache-cohernet,
+    /* While not all RISC-V platforms are DMA cache-coherent,
      * we assume we are targeting one that is and so there is nothing to do. */
     /* x86 is DMA coherent so nothing to do. */
 #else
@@ -71,7 +71,7 @@ void cache_clean(unsigned long start, unsigned long end)
     }
     asm volatile("dmb sy" ::: "memory");
 #elif defined(CONFIG_ARCH_RISCV) || defined(CONFIG_ARCH_X86_64)
-    /* While not all RISC-V platforms are DMA cache-cohernet,
+    /* While not all RISC-V platforms are DMA cache-coherent,
      * we assume we are targeting one that is and so there is nothing to do. */
     /* x86 is DMA coherent so nothing to do. */
 #else

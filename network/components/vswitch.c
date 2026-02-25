@@ -28,14 +28,13 @@ static vswitch_state_t state;
 
 uint32_t **buffer_refs;
 
-// TODO: do the buffer incremeting here, let's keep things localised
-static void forward_frame(net_vswitch_port_config_t *src, net_vswitch_port_config_t *dst, net_buff_desc_t *src_buf)
+static bool forward_frame(net_vswitch_port_config_t *src, net_vswitch_port_config_t *dst, net_buff_desc_t *src_buf)
 {
     const char *src_data = src->tx_data.vaddr + src_buf->io_or_offset;
 
     net_buff_desc_t d_buffer;
     if (net_dequeue_free(&state.rx_queues[dst->id], &d_buffer) != 0) {
-        return;
+        return false;
     }
 
     d_buffer.len = src_buf->len;
@@ -52,6 +51,7 @@ static void forward_frame(net_vswitch_port_config_t *src, net_vswitch_port_confi
         net_cancel_signal_active(&state.rx_queues[dst->id]);
         sddf_notify(dst->rx.id);
     }
+    return true;
 }
 
 static bool vswitch_can_send_to(int src_id, int dst_id)
@@ -74,27 +74,28 @@ int mac_addr_find(const uint8_t *dest_macaddr) {
     return 0;
 }
 
-static void try_broadcast(net_vswitch_port_config_t *src, net_buff_desc_t *buffer)
+static bool try_broadcast(net_vswitch_port_config_t *src, net_buff_desc_t *buffer)
 {
+    // just need one success to not drop?
+    bool success = false;
     // Only broadcast to allowed
     for (int i = 0; i < SDDF_NET_MAX_CLIENTS; i++) {
         if (i != src->id && vswitch_can_send_to(src->id, config.ports[i].id)) {
-            forward_frame(src, &config.ports[i], buffer);
+            success = forward_frame(src, &config.ports[i], buffer);
         }
     }
+    return success;
 }
 
-static void try_send(net_vswitch_port_config_t *src, const uint8_t *dest_macaddr, net_buff_desc_t *buffer)
+static bool try_send(net_vswitch_port_config_t *src, const uint8_t *dest_macaddr, net_buff_desc_t *buffer)
 {
+    bool success = false;
     int dst_id = mac_addr_find(dest_macaddr);
 
     if (vswitch_can_send_to(src->id, dst_id)) {
-        forward_frame(src, &config.ports[dst_id], buffer);
-    } else {
-        // drop the packet
-        // TODO: impl, do we have to do anything here?
-        return;
+        success = forward_frame(src, &config.ports[dst_id], buffer);
     }
+    return success;
 }
 
 static void rx_provide()
@@ -125,6 +126,7 @@ static void rx_provide()
                 net_queue_handle_t *dst = &state.rx_queues[buffer.oid];
                 err = net_enqueue_free(dst, buffer);
                 assert(!err);
+                // TODO: do I need it at all - seems like it is necessary for rx because it's shared for the whole driver
                 notifications |= (1 << buffer.oid);
             }
 
@@ -163,18 +165,20 @@ static void forward_traffic_from(net_vswitch_port_config_t *port)
 
             const char *frame_data = port->tx_data.vaddr + buffer.io_or_offset;
             const struct ether_addr *macaddr = (void *)frame_data;
+            bool transmitted = false;
             // find the receiver(s)
             // Forward frame
             // queue packets for the receivers (inside forward_frame)
             if (mac802_addr_is_bcast(macaddr->ether_dest_addr_octet)) {
-                try_broadcast(port, &buffer);
+                transmitted = try_broadcast(port, &buffer);
             } else {
-                try_send(port, macaddr->ether_dest_addr_octet, &buffer);
+                transmitted = try_send(port, macaddr->ether_dest_addr_octet, &buffer);
             }
 
-            // We do not return the buffers here
-            //buffer.len = 0;
-            //net_enqueue_free(src, buffer);
+            if (!transmitted) {
+                net_enqueue_free(src, buffer);
+                net_request_signal_free(src);
+            }
         }
 
         net_request_signal_active(src);
