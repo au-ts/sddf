@@ -3,7 +3,7 @@
  * licensed under the MIT License and is Copyright (c) 2019-2025, hatach
  * (tinyusb.org).
  * 
- * All other source code has a BSD 2-Clause License and is Copyright UNSW, 2025.
+ * All other source code has a BSD 2-Clause License and is Copyright 2025, UNSW.
  * 
  * SPDX-License-Identifier: BSD-2-Clause AND MIT
  */
