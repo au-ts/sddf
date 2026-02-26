@@ -118,7 +118,7 @@ BOARDS: List[Board] = [
         name="rpi4b_1gb",
         arch=SystemDescription.Arch.AARCH64,
         paddr_top=0x2_000_000,
-        serial="soc/serial@7e215040",
+        serial="soc/serial@7e201400",
         timer="soc/timer@7e003000",
     ),
     Board(

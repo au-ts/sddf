@@ -1,0 +1,4 @@
+[submodule "examples/usb/tinyusb"]
+	path = examples/usb/tinyusb
+	url = https://github.com/au-ts/tinyusb
+	branch = alexd
