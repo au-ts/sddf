@@ -27,7 +27,7 @@ network/virtio/pci/ethernet.o: ${ETHERNET_COMMON_DIR}/ethernet.c ${CHECK_NETDRV_
 	mkdir -p network/virtio/pci
 	${CC} -c ${CFLAGS} ${CFLAGS_network} -I ${ETHERNET_DRIVER_DIR} -o $@ $<
 
-network/virtio/pci/transport.o: ${VIRTIO_TRANSPORT_DIR}/pci.c ${CHECK_NETDRV_FLAGS}
+network/virtio/pci/transport.o: ${VIRTIO_TRANSPORT_DIR}/pci.c ${CHECK_NETDRV_FLAGS} | $(SDDF_LIBC_INCLUDE)
 	mkdir -p network/virtio/pci
 	${CC} -c ${CFLAGS} -o $@ $<
 

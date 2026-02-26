@@ -22,7 +22,7 @@ blk/virtio/blk_driver.o: ${VIRTIO_BLK_DRIVER_DIR}/block.c ${CHECK_BLKDRV_FLAGS_M
 	mkdir -p blk/virtio/mmio
 	$(CC) -c $(CFLAGS) -I${VIRTIO_BLK_DRIVER_DIR}/include -o $@ $<
 
-blk/virtio/mmio/transport.o: ${VIRTIO_TRANSPORT_DIR}/mmio.c ${CHECK_BLKDRV_FLAGS_MD5}
+blk/virtio/mmio/transport.o: ${VIRTIO_TRANSPORT_DIR}/mmio.c ${CHECK_BLKDRV_FLAGS_MD5} | $(SDDF_LIBC_INCLUDE)
 	mkdir -p blk/virtio/mmio
 	${CC} -c ${CFLAGS} -o $@ $<
 
