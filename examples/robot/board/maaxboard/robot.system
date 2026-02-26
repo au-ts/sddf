@@ -33,7 +33,23 @@
         <end pd="client" id="3" notify="false" pp="true" />
     </channel>
     <channel>
-        <end pd="timer" id="1" />
+        <end pd="gpio_driver" id="4" />
         <end pd="client" id="4" notify="false" pp="true" />
+    </channel>
+    <channel>
+        <end pd="gpio_driver" id="5" />
+        <end pd="client" id="5" notify="false" pp="true" />
+    </channel>
+    <channel>
+        <end pd="gpio_driver" id="6" />
+        <end pd="client" id="6" notify="false" pp="true" />
+    </channel>
+    <channel>
+        <end pd="gpio_driver" id="7" />
+        <end pd="client" id="7" notify="false" pp="true" />
+    </channel>
+    <channel>
+        <end pd="timer" id="1" />
+        <end pd="client" id="8" notify="false" pp="true" />
     </channel>
 </system>

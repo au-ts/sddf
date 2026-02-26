@@ -24,5 +24,5 @@
 #define SENSOR_TIMEOUT (38)
 
 /* Client-side Ultrasonic Functions */
-uint64_t get_ultrasonic_reading();
-void sensor_init(void);
+uint64_t get_ultrasonic_reading(int echo_ch, int trigger_ch);
+void sensor_init(int echo_ch, int trigger_ch);

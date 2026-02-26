@@ -75,34 +75,34 @@ uint64_t pulse_in(int gpio_ch, int value) {
     return 0;
 }
 
-void sensor_init(void) {
+void sensor_init(int echo_ch, int trigger_ch) {
     // TODO: hopefully commeting this out does not break anything
     // sddf_timer_set_timeout(timer_channel, 1*NS_IN_MS);
 
     LOG_SENSOR("init\n");
-    gpio_init(gpio_channel_echo, GPIO_DIRECTION_INPUT);
-    gpio_init(gpio_channel_trigger, GPIO_DIRECTION_OUTPUT);  
+    gpio_init(echo_ch, GPIO_DIRECTION_INPUT);
+    gpio_init(trigger_ch, GPIO_DIRECTION_OUTPUT);  
 }
 
 // TODO: might want to buffer over multiple reads
 // set trigger pin to LOW then HIGH to fire sensor
-void set_trig_low() {
+void set_trig_low(int trigger_ch) {
     // LOG_SENSOR("Setting trigger low\n");
 
-    digital_write(gpio_channel_trigger, GPIO_LOW);
+    digital_write(trigger_ch, GPIO_LOW);
     delay_microseconds(2, SENSOR_TIMEOUT_ID);
 }
 
-void set_trig_high() {
+void set_trig_high(int trigger_ch) {
     // LOG_SENSOR("Setting trigger high\n");
 
-    digital_write(gpio_channel_trigger, GPIO_HIGH);
+    digital_write(trigger_ch, GPIO_HIGH);
     delay_microseconds(10, SENSOR_TIMEOUT_ID);
 }
 
 
-uint64_t read_distance() {
-    uint64_t duration = pulse_in(gpio_channel_echo, GPIO_HIGH);
+uint64_t read_distance(int echo_ch) {
+    uint64_t duration = pulse_in(echo_ch, GPIO_HIGH);
     if (duration) {
         uint64_t distance = duration * 0.034 / 2;
         LOG_SENSOR("Sensor Reading Received: %ld\n", distance);
@@ -114,9 +114,9 @@ uint64_t read_distance() {
 
 // TODO: timeout state
 // returns distance in cm
-uint64_t get_ultrasonic_reading() {
-    set_trig_low();
-    set_trig_high();
-    return read_distance();
+uint64_t get_ultrasonic_reading(int echo_ch, int trigger_ch) {
+    set_trig_low(trigger_ch);
+    set_trig_high(trigger_ch);
+    return read_distance(echo_ch);
 }
 

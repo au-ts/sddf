@@ -64,7 +64,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     timer_system.add_client(client)
 
     gpio_system = Sddf.Gpio(sdf, gpio_node, gpio_driver)
-    driver_channel_ids = [0, 1, 2, 3]
+    driver_channel_ids = [0, 1, 2, 3, 4, 5, 6, 7]
     gpio_system.add_client(client, driver_channel_ids=driver_channel_ids)
 
     pds = [timer_driver, client, gpio_driver]

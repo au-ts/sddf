@@ -37,8 +37,14 @@ PriorityQueue timeout_queue = {{}, {}, 0};
 sddf_channel timer_channel = 0;
 
 // Ultrasonic GPIO channels
-sddf_channel gpio_channel_echo = 0;
-sddf_channel gpio_channel_trigger = 0;
+sddf_channel gpio_channel_echo_a = 0;
+sddf_channel gpio_channel_trigger_a = 0;
+
+sddf_channel gpio_channel_echo_b = 0;
+sddf_channel gpio_channel_trigger_b = 0;
+
+sddf_channel gpio_channel_echo_c = 0;
+sddf_channel gpio_channel_trigger_c = 0;
 
 // Motor GPIO channels
 sddf_channel gpio_channel_motor_a = 0;
@@ -115,22 +121,30 @@ void client_main(void) {
 
         // LOG_CLIENT("Client main\n");
 
-        // uint64_t dist = get_ultrasonic_reading();
+        uint64_t dist_sensor_a = get_ultrasonic_reading(gpio_channel_echo_a, gpio_channel_trigger_a);
+        uint64_t dist_sensor_b = get_ultrasonic_reading(gpio_channel_echo_b, gpio_channel_trigger_b);
+        uint64_t dist_sensor_c = get_ultrasonic_reading(gpio_channel_echo_c, gpio_channel_trigger_c);
 
-        // LOG_CLIENT("Reading received: %lu\n", dist);
-
-        // if (dist < 10) {
-        //     control_stop();
-        //     // turn left every time there's an obstacle
-        //     control_left(1000);
-        // }
-        // else {
-        //     control_forward(1000);
-        // }
-
-        // time_end = sddf_timer_time_now(timer_channel);
-
-        // LOG_CLIENT("Execution Time: %lu\n", time_end - time_start);
+        // NOTE: a is front, b is right, c is left
+        if (dist_sensor_a < 5) {
+            control_stop();
+            // move left/right depending on where bot is located
+            if (dist_sensor_b > dist_sensor_a) {
+                control_right(1000);
+            }
+            else {
+                control_left(1000);
+            }
+        }
+        else if (dist_sensor_b < 5) {
+            control_left(1000);
+        }
+        else if (dist_sensor_c < 5) {
+            control_right(1000);
+        }
+        else {
+            control_forward(1000);
+        }
     }
 }
 
@@ -177,10 +191,18 @@ void init(void) {
     // Motor GPIO channels
     gpio_channel_motor_a = gpio_config.driver_channel_ids[0];
     gpio_channel_motor_b = gpio_config.driver_channel_ids[1];
-    gpio_channel_echo = gpio_config.driver_channel_ids[2];
-    gpio_channel_trigger = gpio_config.driver_channel_ids[3];
 
-    sensor_init();
+    // Ultrasonic channels
+    gpio_channel_echo_a = gpio_config.driver_channel_ids[2];
+    gpio_channel_trigger_a = gpio_config.driver_channel_ids[3];
+
+    gpio_channel_echo_b = gpio_config.driver_channel_ids[4];
+    gpio_channel_trigger_b = gpio_config.driver_channel_ids[5];
+
+    gpio_channel_echo_c = gpio_config.driver_channel_ids[6];
+    gpio_channel_trigger_c = gpio_config.driver_channel_ids[7];
+
+    sensor_init(gpio_channel_echo_a, gpio_channel_trigger_a);
     motors_init();
 
     // client_main();

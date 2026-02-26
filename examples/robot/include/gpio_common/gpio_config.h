@@ -17,11 +17,17 @@ IMX:
 #define PIN_1 (16) // IMX gpio3_16 // IMX physical 7
 #define PIN_2 (17) // IMX gpio3_17 // IMX physical 11
 
-// Echo Pin
+// Ultrasonic Pins (A)
 #define PIN_3 (8) // IMX gpio3_8 // IMX physical 13
-// Trigger Pin
 #define PIN_4 (9) // IMX gpio3_9 // IMX physical 15
 
+// Ultrasonic Pins (B)
+#define PIN_5 (10) // IMX gpio3_10 // IMX physical 31
+#define PIN_6 (11) // IMX gpio3_11 // IMX physical 37
+
+// Ultrasonic Pins (C)
+#define PIN_7 (15) // IMX gpio3_15 // IMX physical 22
+#define PIN_8 (2) // IMX gpio3_2 // IMX physical 26
 
 #define IRQ_1 (1)
 
@@ -43,10 +49,10 @@ static const GPIO_driver_channel_t gpio_driver_channel_mappings[NUM_DRIVER_CHANN
     [1] = { PIN_2, IRQ_UNUSED },
     [2] = { PIN_3, IRQ_UNUSED },
     [3] = { PIN_4, IRQ_UNUSED },
-    UNUSED_CH(4),
-    UNUSED_CH(5),
-    UNUSED_CH(6),
-    UNUSED_CH(7),
+    [4] = { PIN_5, IRQ_UNUSED },
+    [5] = { PIN_6, IRQ_UNUSED },
+    [6] = { PIN_7, IRQ_UNUSED },
+    [7] = { PIN_8, IRQ_UNUSED },
     UNUSED_CH(8),
     UNUSED_CH(9),
     UNUSED_CH(10),
