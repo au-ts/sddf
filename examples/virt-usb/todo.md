@@ -1,0 +1,2 @@
+- stop hard coding vaddrs in the components
+- use config sections?

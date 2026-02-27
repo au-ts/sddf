@@ -17,34 +17,52 @@ assert version("sdfgen").split(".")[1] == "28", "Unexpected sdfgen version"
 ProtectionDomain = SystemDescription.ProtectionDomain
 MemoryRegion = SystemDescription.MemoryRegion
 Map = SystemDescription.Map
+Channel = SystemDescription.Channel
+IrqConventional = SystemDescription.IrqConventional
 
 
 def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
-    client = ProtectionDomain("client", "client.elf", priority=1)
 
-    pcie = ProtectionDomain("pcie", "pcie.elf")
+    timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=250)
+    client = ProtectionDomain("client", "client.elf", priority=1)
+    pcie = ProtectionDomain("pcie", "pcie.elf", priority=240)
+    usb = ProtectionDomain("usb", "usb.elf", priority=230)
 
     # maybe hard-coded paddr for qemu_virt_aarch64?
     pcie_config = MemoryRegion(sdf, "pcie_config", 0x100_0000, paddr=0x3eff_0000)
 
     ehci_regs = MemoryRegion(sdf, "ehci_regs", 0x1000, paddr=0x3800_0000)
 
-    pcie.add_map(Map(pcie_config, 0x20_000_000, "rw", cached=False))
+    pcie_usb_ch = Channel(pcie, usb, a_id=3, b_id=3)
 
-    # TODO: this is mapped into USB component, NOT pcie
-    pcie.add_map(Map(ehci_regs, 0x30_000_000, "rw", cached=False))
+    pcie.add_map(Map(pcie_config, 0x20_000_000, "rw", cached=False))
+    usb.add_map(Map(ehci_regs, 0x30_000_000, "rw", cached=False))
+
+    sdf.add_channel(pcie_usb_ch)
 
     sdf.add_mr(pcie_config)
     sdf.add_mr(ehci_regs)
 
+    # i think this is required?
+    usb.add_irq(IrqConventional(0x49 + 32, id=1))
+
+    # need timer for tinyUSB
+    timer_system = Sddf.Timer(sdf, dtb.node(board.timer), timer_driver)
+    timer_system.add_client(usb)
+
 
     pds = [
         client,
-        pcie
+        pcie,
+        usb,
+        timer_driver
     ]
 
     for pd in pds:
         sdf.add_pd(pd)
+
+    assert timer_system.connect()
+    assert timer_system.serialise_config(output_dir)
 
     with open(f"{output_dir}/{sdf_file}", "w+") as f:
         f.write(sdf.render())

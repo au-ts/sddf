@@ -29,10 +29,11 @@ include ${SDDF}/tools/make/board/common.mk
 TOP := ${SDDF}/examples/virt-usb
 METAPROGRAM := $(TOP)/meta.py
 UTIL := $(SDDF)/util
+TIMER_DRIVER := $(SDDF)/drivers/timer/$(TIMER_DRIV_DIR)
 SYSTEM_FILE := virt-usb.system
 SDDF_CUSTOM_LIBC := 1
 
-IMAGES := client.elf pcie.elf
+IMAGES := client.elf pcie.elf usb.elf timer_driver.elf
 CFLAGS +=  -Wno-unused-function -Werror
 
 LDFLAGS := -L$(BOARD_DIR)/lib -L$(SDDF)/lib
@@ -45,6 +46,7 @@ CFLAGS += \
 
 ${IMAGES}: libsddf_util_debug.a
 
+include ${TIMER_DRIVER}/timer_driver.mk
 include ${SDDF}/util/util.mk
 
 client.elf: client.o
@@ -59,6 +61,11 @@ pcie.elf: pcie.o
 pcie.o: ${TOP}/pcie.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
+usb.elf: usb.o
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+
+usb.o: ${TOP}/usb.c
+	$(CC) $(CFLAGS) -c -o $@ $^
 
 
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
@@ -69,12 +76,8 @@ ifneq ($(strip $(DTS)),)
 else
 	$(PYTHON) $(METAPROGRAM) --sddf $(SDDF) --board $(MICROKIT_BOARD) --output . --sdf $(SYSTEM_FILE)
 endif
-# 	$(OBJCOPY) --update-section .device_resources=serial_driver_device_resources.data serial_driver.elf
-# 	$(OBJCOPY) --update-section .serial_driver_config=serial_driver_config.data serial_driver.elf
-# 	$(OBJCOPY) --update-section .serial_virt_rx_config=serial_virt_rx.data serial_virt_rx.elf
-# 	$(OBJCOPY) --update-section .serial_virt_tx_config=serial_virt_tx.data serial_virt_tx.elf
-# 	$(OBJCOPY) --update-section .serial_client_config=serial_client_client0.data client0.elf
-# 	$(OBJCOPY) --update-section .serial_client_config=serial_client_client1.data client1.elf
+	$(OBJCOPY) --update-section .device_resources=timer_driver_device_resources.data timer_driver.elf
+	$(OBJCOPY) --update-section .timer_client_config=timer_client_usb.data usb.elf
 	touch $@
 
 $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
@@ -83,6 +86,9 @@ $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 # NOTE: highmem=off is REQUIRED for it to boot
 # I have otherwise removed "secure=off" but it may
 # be in the end required
+# I believe the default behaviour (highmem=on) allows PCIE physical memory
+# to be mapped in high memory, which is not correctly handled by the existing PCIE code
+# and I am not going to be fixing it right at this moment
 qemu: ${IMAGE_FILE}
 	$(QEMU) -machine virt,virtualization=on,highmem=off \
 	-cpu cortex-a53 \

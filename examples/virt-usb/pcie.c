@@ -89,6 +89,9 @@ _Static_assert(sizeof(pcie_header_type0_t) == 64, "Type 0 Configuration Space He
 uintptr_t pcie_config = 0x20000000; // don't like this being hardcoded but cannot figure out that part of sddfgen
 uintptr_t ehci_regs = 0x30000000;
 
+
+sddf_channel pcie_channel = 3;
+
 static bool found_ehci = false;
 static uint8_t ehci_bus;
 static uint8_t ehci_device;
@@ -321,13 +324,6 @@ capability in the list.*/
     }
 }
 
-void print_ehci(void) {
-    sddf_printf("caplength=0x%x\n", *(uint8_t*)(ehci_regs + 0));
-    sddf_printf("ver=0x%x\n", *(uint16_t*)(ehci_regs + 2));
-    sddf_printf("sparams=0x%x\n", *(uint32_t*)(ehci_regs + 4));
-    sddf_printf("cparams=0x%x\n", *(uint32_t*)(ehci_regs + 8));
-    sddf_printf("port route desc=0x%x\n", *(uint32_t*)(ehci_regs + 12));
-}
 
 void init(void)
 {
@@ -358,7 +354,9 @@ enum_done:
 
     print_pci_info(ehci_bus, ehci_device, ehci_function, false);
 
-    print_ehci();
+    sddf_notify(pcie_channel);
+
+    // print_ehci();
 
     sddf_printf("complete\n");
 }
