@@ -87,6 +87,7 @@ var 1 eth_reg = ETH_REG;
 /@ extern field net_descr: IArray @/
 /@ extern field ndescr_addr: Int @/
 /@ extern field ndescr_len: Int @/
+/@ extern field net_removed: Set[Int] @/
 
 /@ extern predicate valid_hardware_ring_rx_write @/
 /@ extern predicate valid_hardware_ring_rx_read @/
@@ -98,8 +99,9 @@ var 1 eth_reg = ETH_REG;
 /@ extern predicate valid_hardware_ring_tx_mdata_read @/
 /@ extern field hardware_ring_tx: IArray @/
 /@ extern field hardware_ring_rx: IArray @/
-/@ extern field tx_await_ack: Set[Int] @/
-/@ extern field rx_await_ack: Set[Int] @/
+/@ extern field tx_await_ack: Seq[Int] @/
+/@ extern field rx_await_ack: Seq[Int] @/
+/@ extern field rx_handled: Set[Int] @/
 /@ extern field hw_addr: Int @/
 /@ extern field hw_stat: Int @/
 /@ extern field hw_len: Int @/
@@ -107,6 +109,8 @@ var 1 eth_reg = ETH_REG;
 /@ extern function union_elem(s: Set[Int], t: Set[Int], e: Int): Bool @/
 /@ extern function empty_set(): Set[Int] @/
 /@ extern function element_set(e: Int): Set[Int] @/
+/@ extern function empty_seq(): Seq[Int] @/
+/@ extern function append_elem(s: Seq[Int], t: Seq[Int], e: Int): Bool @/
 /@ extern function is_RXD_EMPTY(value: Int): Bool @/
 /@ extern function is_TXD_READY(value: Int): Bool @/
 /@ extern function is_WRAP(value: Int): Bool @/
@@ -211,7 +215,8 @@ var 1 eth_reg = ETH_REG;
     boundedW(gv.hw_rx_ptr) && boundedW(gv.hw_tx_ptr) &&
     acc(gv.irq_ch) && acc(gv.rx_ch) && acc(gv.tx_ch) &&
 	acc(gv.tx_await_ack) && acc(gv.rx_await_ack) &&
-	gv.tx_await_ack == empty_set() && gv.rx_await_ack == empty_set() &&
+	gv.tx_await_ack == empty_seq() && gv.rx_await_ack == empty_seq() &&
+	acc(gv.rx_handled) &&
     0 <= (gv.hw_rx_tail - gv.hw_rx_head) % (MAX_INT16 + 1) && (gv.hw_rx_tail - gv.hw_rx_head) % (MAX_INT16 + 1) <= gv.hw_rx_capacity &&
     0 <= (gv.hw_tx_tail - gv.hw_tx_head) % (MAX_INT16 + 1) && (gv.hw_tx_tail - gv.hw_tx_head) % (MAX_INT16 + 1) <= gv.hw_tx_capacity
   }

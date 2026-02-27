@@ -64,6 +64,7 @@ field net_signal: Bool
 field net_descr: IArray
 field ndescr_addr: Int
 field ndescr_len: Int
+field net_removed: Set[Int]
 
 predicate valid_net_queue_produce(heap: IArray, virt: Ref, queue: Ref, capacity: Int)
 {
@@ -128,12 +129,17 @@ method store_rx_free_tail(heap: IArray, gv: Ref, address: Int, value: Int)
 }
 
 method store_rx_free_head(heap: IArray, gv: Ref, address: Int, value: Int)
-  requires acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_head)
+  requires acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_head) && acc(gv.rx_free.net_removed) &&
+    acc(gv.rx_free.net_descr, 1/4) && acc(slot(gv.rx_free.net_descr, gv.rx_free.net_head % QUEUE_CAPACITY).ndescr_addr, 1/4)
   requires address == RX_FREE_BASE + HEAD_OFFSET
   requires valid_net_head(value)
-  ensures acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_head)
+  requires value == (gv.rx_free.net_head + 1) % (MAX_INT16 + 1)
+  ensures acc(gv.rx_free, 1/4) && acc(gv.rx_free.net_head) && acc(gv.rx_free.net_removed) &&
+    acc(gv.rx_free.net_descr, 1/4) && acc(slot(gv.rx_free.net_descr, old(gv.rx_free.net_head) % QUEUE_CAPACITY).ndescr_addr, 1/4)
+  ensures gv.rx_free.net_removed == old(gv.rx_free.net_removed) union Set(slot(gv.rx_free.net_descr, old(gv.rx_free.net_head) % QUEUE_CAPACITY).ndescr_addr)
   ensures gv.rx_free.net_head == value
 {
+  gv.rx_free.net_removed := gv.rx_free.net_removed union Set(slot(gv.rx_free.net_descr, gv.rx_free.net_head % QUEUE_CAPACITY).ndescr_addr)
   gv.rx_free.net_head := value
   refute false
 }
