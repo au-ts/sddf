@@ -50,6 +50,7 @@ CFLAGS += \
 	-I${TINYUSB}/src/portable/ehci \
 	-I$(TINYUSB)/src/class \
 	-I$(TINYUSB)/test \
+	-I$(SDDF)/include/sddf/util \
 	-DCFG_TUSB_MCU=TUP_USBIP_EHCI \
 
 ${IMAGES}: libsddf_util_debug.a
