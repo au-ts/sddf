@@ -2,3 +2,6 @@
 	path = examples/usb/tinyusb
 	url = https://github.com/au-ts/tinyusb
 	branch = alexd
+[submodule "examples/virt-usb/tinyusb"]
+	path = examples/virt-usb/tinyusb
+	url = git@github.com:au-ts/tinyusb.git

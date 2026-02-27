@@ -46,7 +46,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     # i think this is required?
     usb.add_irq(IrqConventional(0x49 + 32, id=1))
 
-    # need timer for tinyUSB
+    # need timer for tinyUSB (this would need to be modified for x86 support)
     timer_system = Sddf.Timer(sdf, dtb.node(board.timer), timer_driver)
     timer_system.add_client(usb)
 

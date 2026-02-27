@@ -39,10 +39,18 @@ CFLAGS +=  -Wno-unused-function -Werror
 LDFLAGS := -L$(BOARD_DIR)/lib -L$(SDDF)/lib
 LIBS := --start-group -lmicrokit -Tmicrokit.ld libsddf_util_debug.a --end-group
 
+TINYUSB := ${TOP}/tinyusb
+
 CFLAGS += \
 	-I${TOP}/include \
 	-I${SDDF}/include \
-	-I${SDDF}/include/microkit
+	-I${SDDF}/include/microkit \
+	-I${TOP} \
+	-I${TINYUSB}/src \
+	-I${TINYUSB}/src/portable/ehci \
+	-I$(TINYUSB)/src/class \
+	-I$(TINYUSB)/test \
+	-DCFG_TUSB_MCU=TUP_USBIP_EHCI \
 
 ${IMAGES}: libsddf_util_debug.a
 
@@ -61,11 +69,37 @@ pcie.elf: pcie.o
 pcie.o: ${TOP}/pcie.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-usb.elf: usb.o
-	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+
+# tinyUSB source
+
+tusb.o: $(TINYUSB)/src/tusb.c
+	$(CC) -c $(CFLAGS) $< -o $@
+
+hub.o: $(TINYUSB)/src/host/hub.c
+	$(CC) -c $(CFLAGS) $< -o $@
+
+usbh.o: $(TINYUSB)/src/host/usbh.c
+	$(CC) -c $(CFLAGS) $< -o $@
 
 usb.o: ${TOP}/usb.c
-	$(CC) $(CFLAGS) -c -o $@ $^
+	$(CC) -c $(CFLAGS) $< -o usb.o
+
+cdc_host.o: $(TINYUSB)/src/class/cdc/cdc_host.c
+	$(CC) -c $(CFLAGS) $< -o $@
+
+hid_host.o: $(TINYUSB)/src/class/hid/hid_host.c
+	$(CC) -c $(CFLAGS) $< -o $@
+
+msc_host.o: $(TINYUSB)/src/class/msc/msc_host.c
+	$(CC) -c $(CFLAGS) $< -o $@
+
+
+# usb elf 
+
+usb.elf: usb.o tusb.o hub.o usbh.o cdc_host.o hid_host.o msc_host.o
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+
+
 
 
 $(SYSTEM_FILE): $(METAPROGRAM) $(IMAGES) $(DTB)
