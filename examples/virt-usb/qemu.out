@@ -1,0 +1,96 @@
+mkdir -p /Users/ablackmore/Work/ts/thesis-a/sddf/examples/virt-usb/build
+cp virt-usb.mk /Users/ablackmore/Work/ts/thesis-a/sddf/examples/virt-usb/build/Makefile
+/Library/Developer/CommandLineTools/usr/bin/make -C /Users/ablackmore/Work/ts/thesis-a/sddf/examples/virt-usb/build  MICROKIT_SDK=/Users/ablackmore/Work/ts/thesis-a/microkit-sdk-2.1.0 qemu 
+qemu-system-aarch64 -machine virt,virtualization=on -cpu cortex-a53 -m size=2G -serial mon:stdio -global virtio-mmio.force-legacy=false -device loader,file=loader.img,addr=0x70000000,cpu-num=0 \
+			-nographic \
+			-d guest_errors \
+			-usb \
+			-device usb-ehci,id=ehci
+LDR|INFO: Setting all interrupts to Group 1
+LDR|INFO: GICv2 ITLinesNumber: 0x00000008
+LDR|INFO: disabling MMU (if it was enabled)
+LDR|INFO: PSCI version is 1.1
+LDR|INFO: altloader for seL4 starting
+LDR|INFO: flags:
+             seL4 configured as hypervisor
+LDR|INFO: kernel:      entry:   0x0000008060000000
+LDR|INFO: root server: physmem: 0x0000000060246000 -- 0x000000006031c000
+LDR|INFO:              virtmem: 0x0000000000200000 -- 0x00000000002d6000
+LDR|INFO:              entry  : 0x0000000000212044
+LDR|INFO: region: 0x00000000   addr: 0x0000000060000000   size: 0x0000000000246000   offset: 0x0000000000000000   type: 0x0000000000000001
+LDR|INFO: region: 0x00000001   addr: 0x0000000060246000   size: 0x0000000000009170   offset: 0x0000000000246000   type: 0x0000000000000001
+LDR|INFO: region: 0x00000002   addr: 0x0000000060250170   size: 0x0000000000015d28   offset: 0x000000000024f170   type: 0x0000000000000001
+LDR|INFO: region: 0x00000003   addr: 0x0000000060266e98   size: 0x00000000000100a8   offset: 0x0000000000264e98   type: 0x0000000000000001
+LDR|INFO: region: 0x00000004   addr: 0x0000000060277000   size: 0x000000000009244c   offset: 0x0000000000274f40   type: 0x0000000000000001
+LDR|INFO: region: 0x00000005   addr: 0x000000006030a000   size: 0x0000000000012000   offset: 0x000000000030738c   type: 0x0000000000000001
+LDR|INFO: copying region 0x00000000
+LDR|INFO: copying region 0x00000001
+LDR|INFO: copying region 0x00000002
+LDR|INFO: copying region 0x00000003
+LDR|INFO: copying region 0x00000004
+LDR|INFO: copying region 0x00000005
+LDR|INFO|CPU0: active CPUs to start: 0x00000001
+LDR|INFO|CPU0: enabling MMU
+LDR|INFO|CPU0: CurrentEL=EL2
+LDR|INFO|CPU0: Resetting CNTVOFF
+LDR|INFO|CPU0: enabling MMU
+LDR|INFO|CPU0: jumping to kernel
+Bootstrapping kernel
+Warning: Could not infer GIC interrupt target ID, assuming 0.
+available phys memory regions: 1
+  [60000000..c0000000)
+reserved virt address space regions: 2
+  [8060000000..8060246000)
+  [8060246000..806031c000)
+Booting all finished, dropped to user space
+INFO  [sel4_capdl_initializer::initialize] Starting CapDL initializer
+INFO  [sel4_capdl_initializer::initialize] Starting threads
+MON|INFO: Microkit Monitor started!
+client init
+pcie_config at 0x30000000
+enumerating pcie...
+MON|ERROR: received message 0x00000006  badge: 0x0000000000000002  tcb cap: 0x000000000000000b
+MON|ERROR: faulting PD: pcie
+Registers: 
+pc : 0x00000000002000a8
+sp: 0x000000ffffffff10
+spsr : 0x0000000080000040
+x0 : 0x0000000000000000
+x1 : 0x0000000000000002
+x2 : 0x0000000000000000
+x3 : 0xffffffffffffffff
+x4 : 0x0000000000000000
+x5 : 0x0000000000000000
+x6 : 0x0000000000000000
+x7 : 0xfffffffffffffff4
+x8 : 0x0000000030000000
+x16 : 0x0000000000000000
+x17 : 0x0000000000000000
+x18 : 0x0000000000000000
+x29 : 0x000000ffffffff20
+x30 : 0x00000000002004c0
+x9 : 0x0000000000000000
+x10 : 0x0000000000000000
+x11 : 0x000000000000000a
+x12 : 0x0000000000000013
+x13 : 0x0000000000000033
+x14 : 0x000000000000015a
+x15 : 0x000000fffffffde0
+x19 : 0x0000000000000000
+x20 : 0x0000000000000002
+x21 : 0x0000000000000000
+x22 : 0x0000000030010000
+x23 : 0x0000000000000000
+x24 : 0x0000000000000000
+x25 : 0x0000000000000000
+x26 : 0x0000000000000000
+x27 : 0x0000000000000000
+x28 : 0x0000000000000000
+tpidr_el0 : 0x0000000000000000
+tpidrro_el0 : 0x0000000000000000
+MON|ERROR: VMFault: ip=0x00000000002000a8  fault_addr=0x0000000030010001  fsr=0x0000000092000010  (data fault)
+MON|ERROR:   ec: 0x00000024  Data Abort from a lower Exception level   il: 1   iss: 0x00000010
+MON|ERROR:   dfsc = synchronuos external abort (0x00000010)
+[0m[1m<<[0m[32mseL4(CPU 0)[0m[1m [receiveIPC/142 T0x806033ac00 "tcb_monitor" @20049c]: Reply object already has unexecuted reply!>>[0m
+QEMU: Terminated
+
