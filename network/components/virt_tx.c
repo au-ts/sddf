@@ -22,20 +22,11 @@ state_t state;
 int extract_offset(uintptr_t *phys)
 {
     for (int client = 0; client < config.num_clients; client++) {
-        if (config.clients[client].type == VSWITCH) {
-            for (int i = 0; i < config.clients[client].num_data; i++) {
-                if (*phys >= config.clients[client].data[i].io_addr
-                    && *phys
-                           < config.clients[client].data[i].io_addr + state.tx_queue_clients[client].capacity * NET_BUFFER_SIZE) {
-                    *phys = *phys - config.clients[client].data[i].io_addr;
-                    return client;
-                }
-            }
-        } else if (config.clients[client].type == CLIENT) {
-            if (*phys >= config.clients[client].data[0].io_addr
+        for (int i = 0; i < config.clients[client].num_data; i++) {
+            if (*phys >= config.clients[client].data[i].io_addr
                 && *phys
-                       < config.clients[client].data[0].io_addr + state.tx_queue_clients[client].capacity * NET_BUFFER_SIZE) {
-                *phys = *phys - config.clients[client].data[0].io_addr;
+                       < config.clients[client].data[i].io_addr + state.tx_queue_clients[client].capacity * NET_BUFFER_SIZE) {
+                *phys = *phys - config.clients[client].data[i].io_addr;
                 return client;
             }
         }

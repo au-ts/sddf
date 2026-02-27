@@ -17,13 +17,6 @@
 #define SDDF_NET_MAGIC_LEN 5
 static char SDDF_NET_MAGIC[SDDF_NET_MAGIC_LEN] = { 's', 'D', 'D', 'F', 0x5 };
 
-// TODO: this might be superfluous as found out in RX and TX
-typedef enum net_connection_type {
-    CLIENT = 0,
-    VSWITCH = 1,
-    INVALID = -1,
-} net_connection_type_e;
-
 typedef struct net_connection_resource {
     region_resource_t free_queue;
     region_resource_t active_queue;
@@ -40,9 +33,10 @@ typedef struct net_driver_config {
 typedef struct net_virt_tx_client_config {
     net_connection_resource_t conn;
     device_region_resource_t data[SDDF_NET_MAX_CLIENTS];
-    uint8_t data_id[SDDF_NET_MAX_CLIENTS]; // TODO: do we need that?
+    //uint8_t data_id[SDDF_NET_MAX_CLIENTS]; // TODO: do we need that?
+    // should we maintain that? Right now we have 2 ways of doing that - indexing by client_id in vswitch and here it's sequential
+    // when we receive a buffer then it's oid is the owning ID -> client_id which is not necessarily an index here
     uint8_t num_data;
-    net_connection_type_e type;
 } net_virt_tx_client_config_t;
 
 typedef struct net_virt_tx_config {
@@ -60,7 +54,6 @@ typedef struct net_virt_rx_config_client {
     net_connection_resource_t conn;
     mac_addr_t mac_addrs[TEMP_MAX_MACS_PER_CLIENT * SDDF_NET_MAX_CLIENTS];
     uint8_t num_macs;
-    net_connection_type_e type;
 } net_virt_rx_config_client_t;
 
 typedef struct net_virt_rx_config {
@@ -99,10 +92,11 @@ typedef struct net_vswitch_port_config {
     net_connection_resource_t rx;
     region_resource_t rx_data; // TODO: check that we need that
     net_connection_resource_t tx;
-    region_resource_t tx_data;
-    /* unused for the device */
+    device_region_resource_t tx_data;
+    /* unused for the virts */
     mac_addr_t mac_addrs[TEMP_MAX_MACS_PER_CLIENT]; // TODO: fix the dimension
-    uint8_t id;
+    uint8_t id; // TODO: might not need that
+    bool connected;
 } net_vswitch_port_config_t;
 
 typedef struct net_vswitch_config {
