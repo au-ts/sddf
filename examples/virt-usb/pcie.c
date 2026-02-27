@@ -86,7 +86,13 @@ typedef struct pcie_header_type0 {
 _Static_assert(sizeof(pcie_header_type0_t) == 64, "Type 0 Configuration Space Header must be 64 bytes");
 
 
-uintptr_t pcie_config = 0x30000000; // don't like this being hardcoded but cannot figure out that part of sddfgen
+uintptr_t pcie_config = 0x20000000; // don't like this being hardcoded but cannot figure out that part of sddfgen
+uintptr_t ehci_regs = 0x30000000;
+
+static bool found_ehci = false;
+static uint8_t ehci_bus;
+static uint8_t ehci_device;
+static uint8_t ehci_function;
 
 #define PCIE_CONFIG_SIZE 0x1000000
 
@@ -134,6 +140,19 @@ void device_print(uint8_t bus, uint8_t device, uint8_t function)
                  header->header_type & PCIE_HEADER_TYPE_HAS_MULTI_FUNCTIONS ? "yes" : "no");
     sddf_dprintf("\tlayout variant: 0x%02lx\n", header->header_type & PCIE_HEADER_TYPE_LAYOUT_MASK);
 
+    /* enable EHCI device */
+    if (header->base_class_code == 0x0c && header->subclass_code == 0x03 && !found_ehci) {
+        sddf_printf("enabling ehci pci device..\n");
+        found_ehci = true;
+        ehci_bus = bus;
+        ehci_device = device;
+        ehci_function = function;
+        volatile pcie_header_type0_t *type0_header = (pcie_header_type0_t *) config_base;
+        header->command &= ~BIT(1);
+        type0_header->base_address_registers[0] = 0x38000000;
+        type0_header->base_address_registers[1] = 0;
+        header->command |= BIT(1);
+    }
 
     if ((header->header_type & PCIE_HEADER_TYPE_LAYOUT_MASK) == PCIE_HEADER_TYPE_GENERAL) {
         volatile pcie_header_type0_t *type0_header = (pcie_header_type0_t *)config_base;
@@ -155,6 +174,27 @@ void device_print(uint8_t bus, uint8_t device, uint8_t function)
                 case 0b00:
                     sddf_dprintf("32-bit space\n");
                     sddf_dprintf("\tfull address: 0x%08lx\n", bar & ~(BIT(4) - 1));
+                    
+                    sddf_printf("negotiate BAR...\n");
+
+
+                    header->command &= ~(BIT(1));
+
+                    type0_header->base_address_registers[i] = 0xffffffff;
+
+                    uint32_t bar_size = type0_header->base_address_registers[i];
+                    
+                    bar_size &= ~(BIT(3) | BIT(2) | BIT(1) | BIT(0));
+                    bar_size = ~bar_size;
+                    bar_size += 1;
+
+                    sddf_dprintf("\tsize: 0x%x\n", bar_size);
+
+                    type0_header->base_address_registers[i] = bar;                    
+
+                    header->command |= BIT(1);
+
+
                     break;
 
                 case 0b10:
@@ -207,6 +247,87 @@ void device_print(uint8_t bus, uint8_t device, uint8_t function)
     }
 }
 
+void print_pci_info(uint8_t bus, uint8_t device, uint8_t function, bool to_mask)
+{
+    uintptr_t offset = get_bdf_offset(bus, device, function);
+    assert(offset < PCIE_CONFIG_SIZE);
+    void *config_base = (void *)(pcie_config + offset);
+    volatile pcie_header_t *header = (pcie_header_t *)config_base;
+
+    if (header->vendor_id == PCIE_VENDOR_INVALID) return;
+
+    sddf_dprintf("\nB.D:F: %02x:%02x.%01x\n", bus, device, function);
+    sddf_dprintf("ACK: command register: 0x%04x\n", header->command);
+    sddf_dprintf("ACK: status register: 0x%04x\n", header->status);
+    sddf_dprintf("\t(PIN-based) interrupt disable: %s\n", (header->command & BIT(10)) ? "is disabled" : "is not disabled");
+    sddf_dprintf("\t(PIN-based) interrupt status: %s\n", (header->status & BIT(3)) ? "asserted" : "none");
+
+    return;
+
+    /* mask out the interrupt... */
+    // https://elixir.bootlin.com/linux/v5.18-rc4/source/drivers/pci/pci.c#L4595
+    if (to_mask) {
+        header->command |= BIT(10);
+    } else {
+        header->command &= ~BIT(10);
+    }
+
+    // we only access IRQ PIn and Line an Capiblites which are actually comon (TODO)
+    // assert((header->header_type & PCIE_HEADER_TYPE_LAYOUT_MASK) == PCIE_HEADER_TYPE_GENERAL);
+    volatile pcie_header_type0_t *type0_header = (pcie_header_type0_t *)config_base;
+        // 0xff (255) means "unknown" or "no connection" on interrupt line
+    // interrupt pin: 0 = no, 1 => INTA#, 2 => INTB#, 3 => INTC#, 4 => INTD#
+    sddf_printf("\t(PIN-based) interrupt line: %02x, interrupt pin: %02x\n", type0_header->interrupt_line, type0_header->interrupt_pin);
+
+    if (!(header->status & BIT(4))) {
+        sddf_dprintf("no capabilities??\n");
+    }; /* assert capabilities list status exists */
+    sddf_dprintf("start capabilities PTR: %u\n", type0_header->capabilities_pointer);
+
+    /* ach capability
+must be DWORD aligned. The bottom two bits of all pointers (including the initial pointer
+at 34h) are reserved and must be implemented as 00b although software must mask them to
+allow for future uses of these bits. A pointer value of 00h is used to indicate the last
+capability in the list.*/
+    uint8_t current_ptr = type0_header->capabilities_pointer & ~0b11;
+    /* process capabilities list to get MSI */
+    while (current_ptr != 0) {
+        volatile uint8_t *capability = (void *)(config_base + current_ptr);
+        /* 6.8.1 of the pci spec */
+        uint8_t cap_id = capability[0];
+        sddf_dprintf("cap ptr: %x, id: %x\n", current_ptr, cap_id);
+        uint8_t PCIE_CAPABILITY_ID_MSI = 0x05; /* #define this. */
+        uint8_t PCIE_CAPABILITY_ID_MSIX = 0x11; /* #define this. */
+        uint8_t PCIE_CAPABILITY_ID_PM = 0x1; /* #define this. */
+        if (cap_id == PCIE_CAPABILITY_ID_MSI) {
+            uint16_t message_control = capability[2] | ((uint16_t)capability[3] << 8);
+            sddf_dprintf("\tmessage control(msi): %x\n", message_control);
+        } else if (cap_id == PCIE_CAPABILITY_ID_MSIX) {
+            uint16_t message_control = capability[2] | ((uint16_t)capability[3] << 8);
+            sddf_dprintf("\tmessage control(msix): %x\n", message_control);
+        } else if (cap_id == PCIE_CAPABILITY_ID_PM) {
+            // https://lekensteyn.nl/files/docs/PCI_Power_Management_12.pdf¸ §3.2
+            // not this...
+            uint16_t control = capability[4] | ((uint16_t)capability[5] << 8);
+            sddf_dprintf("\tpower management ctrl: %x\n", control);
+        } else if (cap_id == 0x10 /* PCI Express */) {
+            sddf_dprintf("\troot control(pcie): %x\n", *(uint16_t *)&(capability[0x1C]));
+            sddf_dprintf("\troot status(pcie): %x\n", *(uint32_t *)&(capability[0x20]));
+        } else {
+            sddf_dprintf("\tunknown\n");
+        }
+
+        current_ptr = (capability[1] & ~0b11);
+    }
+}
+
+void print_ehci(void) {
+    sddf_printf("caplength=0x%x\n", *(uint8_t*)(ehci_regs + 0));
+    sddf_printf("ver=0x%x\n", *(uint16_t*)(ehci_regs + 2));
+    sddf_printf("sparams=0x%x\n", *(uint32_t*)(ehci_regs + 4));
+    sddf_printf("cparams=0x%x\n", *(uint32_t*)(ehci_regs + 8));
+    sddf_printf("port route desc=0x%x\n", *(uint32_t*)(ehci_regs + 12));
+}
 
 void init(void)
 {
@@ -217,7 +338,7 @@ void init(void)
         for (uint8_t device = 0; device < 32; device++) {
 
             // for (uint8_t function = 0; function < 8; function++) {
-            for (uint8_t function = 0; function < 1; function++) {
+            for (uint8_t function = 0; function < 8; function++) {
                 // sddf_printf("enumerating at bus=%d, device=%d, function=%d, vaddr=0x%lx\n", bus, device, function, pcie_config + get_bdf_offset(bus, device, function));
                 uintptr_t offset = get_bdf_offset(bus, device, function);
                 if (offset >= PCIE_CONFIG_SIZE) {
@@ -232,6 +353,13 @@ void init(void)
     }
 
 enum_done:
+
+    assert(found_ehci);
+
+    print_pci_info(ehci_bus, ehci_device, ehci_function, false);
+
+    print_ehci();
+
     sddf_printf("complete\n");
 }
 

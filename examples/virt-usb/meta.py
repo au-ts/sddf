@@ -27,8 +27,15 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     # maybe hard-coded paddr for qemu_virt_aarch64?
     pcie_config = MemoryRegion(sdf, "pcie_config", 0x100_0000, paddr=0x3eff_0000)
 
-    pcie.add_map(Map(pcie_config, 0x30_000_000, "rw", cached=False))
+    ehci_regs = MemoryRegion(sdf, "ehci_regs", 0x1000, paddr=0x3800_0000)
+
+    pcie.add_map(Map(pcie_config, 0x20_000_000, "rw", cached=False))
+
+    # TODO: this is mapped into USB component, NOT pcie
+    pcie.add_map(Map(ehci_regs, 0x30_000_000, "rw", cached=False))
+
     sdf.add_mr(pcie_config)
+    sdf.add_mr(ehci_regs)
 
 
     pds = [
