@@ -126,7 +126,7 @@ def output_and_reset():
             pd_total_util = pd["data"]["total"] / total_core_cycles
             if pd_total_util > 1:
                 print(
-                    f"Error - pd {pd["name"]} has CPU utilisation {pd_total_util} > 1"
+                    f"Error - pd {pd['name']} has CPU utilisation {pd_total_util} > 1"
                 )
             results_output["cores"] += result_string(
                 pd["name"],
@@ -144,7 +144,7 @@ def output_and_reset():
     # Create system totals results output
     total_board_cycles = test["system"]["data"]["total"]
     results_output["system"] += result_string(
-        f"System Total {test_string[test["test"] - 1]}Mb/s",
+        f"System Total {test_string[test['test'] - 1]}Mb/s",
         total_board_cycles,
         test["system"]["pd_total"],
         test["system"]["pd_kernel"],
@@ -178,7 +178,7 @@ with open(file, "r") as f:
             test["test"] += 1
             results_output[
                 "cores"
-            ] += f"\n\nTEST {test["test"]}: {test_string[test["test"]-1]}Mb/s"
+            ] += f"\n\nTEST {test['test']}: {test_string[test['test']-1]}Mb/s"
             continue
 
         # Benchmark has not started yet
