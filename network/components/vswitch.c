@@ -61,7 +61,7 @@ static bool vswitch_can_send_to(int src_id, int dst_id)
 
 int mac_addr_find(const uint8_t *dest_macaddr) {
     mac_addr_t *mac;
-    // try matching each MAC in the list (skip ID 0)
+    // try matching each MAC in the list (skip ID 0) - virts
     for (int i = 1; i < SDDF_NET_MAX_CLIENTS; i++) { // TODO: can we simplify that loop?
         for (int j = 0; j < TEMP_MAX_MACS_PER_CLIENT; j++) {
             mac = &config.ports[i].mac_addrs[j];
@@ -80,7 +80,7 @@ static bool try_broadcast(net_vswitch_port_config_t *src, net_buff_desc_t *buffe
     bool success = false;
     // Only broadcast to allowed
     for (int i = 0; i < SDDF_NET_MAX_CLIENTS; i++) {
-        if (i != src->id && vswitch_can_send_to(src->id, config.ports[i].id)) {
+        if (config.ports[i].connected && i != src->id && vswitch_can_send_to(src->id, config.ports[i].id)) {
             success = forward_frame(src, &config.ports[i], buffer);
         }
     }
@@ -103,7 +103,8 @@ static void rx_provide()
     // TODO: not sure if I have to handle that like it is handled in rx_virt?
     uint64_t notifications = 0;
     // Return empty buffers
-    for (int i = 0; i < config.num_ports; i++) {
+    for (int i = 0; i < SDDF_NET_MAX_CLIENTS; i++) {
+        if (!config.ports[i].connected) continue;
         bool reprocess = true;
         net_queue_handle_t *src = &state.rx_queues[i];
         while (reprocess) {
@@ -141,8 +142,8 @@ static void rx_provide()
     }
 
     // Notify every owner
-    for (int i = 0; i < config.num_ports; i++) {
-        if (notifications & (1 << i) && net_require_signal_free(&state.rx_queues[i])) {
+    for (int i = 0; i < SDDF_NET_MAX_CLIENTS; i++) {
+        if (config.ports[i].connected && notifications & (1 << i) && net_require_signal_free(&state.rx_queues[i])) {
             net_cancel_signal_free(&state.rx_queues[i]);
             sddf_deferred_notify(config.ports[i].id);
         }
@@ -209,16 +210,16 @@ void init(void)
     buffer_refs = config.buffer_metadata.vaddr;
 
     /* Set up client queues and buffers for copying? */
-    for (int i = 0; i < config.num_ports; i++) {
+    for (int i = 0; i < SDDF_NET_MAX_CLIENTS; i++) {
+        if (!config.ports[i].connected) continue;
         net_queue_init(&state.rx_queues[i], config.ports[i].rx.free_queue.vaddr, config.ports[i].rx.active_queue.vaddr,
                        config.ports[i].rx.num_buffers);
         net_queue_init(&state.tx_queues[i], config.ports[i].tx.free_queue.vaddr, config.ports[i].tx.active_queue.vaddr,
                        config.ports[i].tx.num_buffers);
         net_buffers_init(&state.rx_queues[i], 0); // TODO: should the offset be set? - probably not because this is device-only offset
-    }
 
-    /* Seed the allow_list based on predefined settings */
-    // for now quick hack, send all to all
-    for (int i = 0; i < config.num_ports; i++)
+        /* Seed the allow_list based on predefined settings */
+        // for now quick hack, send all to all
         state.allow_list[i] = UINT64_MAX;
+    }
 }

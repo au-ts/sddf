@@ -41,14 +41,8 @@ static bool notify_drv;
 int get_mac_addr_match(struct ethernet_header *buffer)
 {
     for (int client = 0; client < config.num_clients; client++) {
-        if (config.clients[client].type == VSWITCH) {
-            for (int i = 0; i < config.clients[client].num_macs; i++) {
-                if (mac802_addr_eq(buffer->dest.addr, config.clients[client].mac_addrs[i].addr)) {
-                    return client;
-                }
-            }
-        } else if (config.clients[client].type == CLIENT) {
-            if (mac802_addr_eq(buffer->dest.addr, config.clients[client].mac_addrs[0].addr)) {
+        for (int i = 0; i < config.clients[client].num_macs; i++) {
+            if (mac802_addr_eq(buffer->dest.addr, config.clients[client].mac_addrs[i].addr)) {
                 return client;
             }
         }
