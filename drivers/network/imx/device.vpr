@@ -120,8 +120,10 @@ field hw_stat: Int
 field hw_len: Int
 field hardware_ring_rx: IArray
 field hardware_ring_tx: IArray
-field rx_await_ack: Set[Int]
-field tx_await_ack: Set[Int]
+field rx_await_ack: Seq[Int]
+field tx_await_ack: Seq[Int]
+field rx_handled: Set[Int]
+field tx_handled: Set[Int]
 /////////////////////////////
 
 /* Hardware ring stat WRAP:
@@ -350,15 +352,23 @@ method store_hw_ring_rx_stat(heap: IArray, gv: Ref, address: Int, value: Int)
     requires acc(gv.rx_await_ack)
     // make sure the given value is wrapped properly
     requires (((address - 2 - hw_ring_rx_addr) / hw_descriptor_size) == (hw_capacity - 1)) <==> is_WRAP(value)
+    requires forall i: Int, j: Int :: 0 <= i && i < |gv.rx_await_ack| && 0 <= j && j < |gv.rx_await_ack| && i != j ==>
+        gv.rx_await_ack[i] != gv.rx_await_ack[j]
     ensures acc(gv.hardware_ring_rx, 1/2) && acc(slot(gv.hardware_ring_rx, (address - 2 - hw_ring_rx_addr) / hw_descriptor_size).hw_stat)
     // check that the specified slot in the hardware ring is updated
     ensures slot(gv.hardware_ring_rx, (address - 2 - hw_ring_rx_addr) / hw_descriptor_size).hw_stat == value
     ensures acc(gv.rx_await_ack)
-    ensures gv.rx_await_ack == old(gv.rx_await_ack) union Set((address - 2 - hw_ring_rx_addr) / hw_descriptor_size)
+    ensures (address - 2 - hw_ring_rx_addr) / hw_descriptor_size in gv.rx_await_ack
+    ensures (address - 2 - hw_ring_rx_addr) / hw_descriptor_size in old(gv.rx_await_ack) ==> gv.rx_await_ack == old(gv.rx_await_ack)
+    ensures !((address - 2 - hw_ring_rx_addr) / hw_descriptor_size in old(gv.rx_await_ack)) ==> gv.rx_await_ack == old(gv.rx_await_ack) ++ Seq((address - 2 - hw_ring_rx_addr) / hw_descriptor_size) 
+    ensures forall i: Int, j: Int :: 0 <= i && i < |gv.rx_await_ack| && 0 <= j && j < |gv.rx_await_ack| && i != j ==>
+        gv.rx_await_ack[i] != gv.rx_await_ack[j]
 {
     var index: Int := (address - 2 - hw_ring_rx_addr) / hw_descriptor_size
     slot(gv.hardware_ring_rx, index).hw_stat := value
-    gv.rx_await_ack := gv.rx_await_ack union Set(index)
+    if (!(index in gv.rx_await_ack)) {
+        gv.rx_await_ack := gv.rx_await_ack ++ Seq(index)
+    }
     refute false
 }
 
@@ -391,11 +401,11 @@ method store_hw_ring_tx_stat(heap: IArray, gv: Ref, address: Int, value: Int)
     // check that the specified slot in the hardware ring is updated
     ensures slot(gv.hardware_ring_tx, (address - 2 - hw_ring_tx_addr) / hw_descriptor_size).hw_stat == value
     ensures acc(gv.tx_await_ack)
-    ensures gv.tx_await_ack == old(gv.tx_await_ack) union Set((address - 2 - hw_ring_tx_addr) / hw_descriptor_size)
+    ensures gv.tx_await_ack == old(gv.tx_await_ack) ++ Seq((address - 2 - hw_ring_tx_addr) / hw_descriptor_size)
 {
     var index: Int := (address - 2 - hw_ring_tx_addr) / hw_descriptor_size
     slot(gv.hardware_ring_tx, index).hw_stat := value
-    gv.tx_await_ack := gv.tx_await_ack union Set(index)
+    gv.tx_await_ack := gv.tx_await_ack ++ Seq(index)
     refute false
 }
 
@@ -486,16 +496,43 @@ define TDAR_TDAR        16777216    // 1 << 24
 method store_RDAR(heap: IArray, gv: Ref, address: Int, value: Int)
     requires address == (REG_BASE + RDAR_offset)
     requires value == RDAR_RDAR
-    requires acc(gv.rx_await_ack) && acc(gv.hardware_ring_rx, 1/2)
+    requires acc(gv.rx_await_ack) && acc(gv.rx_handled) && acc(gv.hardware_ring_rx, 1/2)
+    requires forall i: Int, j: Int :: 0 <= i && i < |gv.rx_await_ack| && 0 <= j && j < |gv.rx_await_ack| && i != j ==>
+        gv.rx_await_ack[i] != gv.rx_await_ack[j]
     requires forall i: Int :: i in gv.rx_await_ack ==>
                 acc(slot(gv.hardware_ring_rx, i).hw_addr) &&
                 acc(slot(gv.hardware_ring_rx, i).hw_stat, 1/2) &&
                 acc(slot(gv.hardware_ring_rx, i).hw_len) &&
                 is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat)
-    ensures acc(gv.rx_await_ack) && gv.rx_await_ack == Set[Int]() && acc(gv.hardware_ring_rx, 1/2)
+    ensures acc(gv.rx_await_ack) && gv.rx_await_ack == Seq[Int]() && acc(gv.rx_handled) && acc(gv.hardware_ring_rx, 1/2)
     ensures forall i: Int :: i in old(gv.rx_await_ack) ==> acc(slot(gv.hardware_ring_rx, i).hw_stat, 1/2)
+    ensures forall x: Int :: x in old(gv.rx_handled) ==> x in gv.rx_handled
+    ensures forall i: Int :: 0 <= i && i < old(|gv.rx_await_ack|) ==> old(slot(gv.hardware_ring_rx, gv.rx_await_ack[i]).hw_addr) in gv.rx_handled
 {
-    gv.rx_await_ack := Set[Int]()
+    var ix: Int := 0
+    while (ix < |gv.rx_await_ack|)
+        invariant acc(gv.rx_await_ack, 1/2) && acc(gv.rx_handled) && acc(gv.hardware_ring_rx, 1/2)
+        invariant forall i: Int, j: Int :: 0 <= i && i < |gv.rx_await_ack| && 0 <= j && j < |gv.rx_await_ack| && i != j ==>
+            gv.rx_await_ack[i] != gv.rx_await_ack[j]
+        invariant forall j: Int :: 0 <= j && j < |gv.rx_await_ack| ==>
+            gv.rx_await_ack[j] in gv.rx_await_ack
+        invariant forall i: Int :: i in gv.rx_await_ack ==>
+            acc(slot(gv.hardware_ring_rx, i).hw_addr, 1/2) &&
+            acc(slot(gv.hardware_ring_rx, i).hw_stat, 1/2) &&
+            acc(slot(gv.hardware_ring_rx, i).hw_len, 1/2) &&
+            is_RXD_EMPTY(slot(gv.hardware_ring_rx, i).hw_stat)
+        invariant |gv.rx_await_ack| == old(|gv.rx_await_ack|)
+        invariant forall i: Int :: 0 <= i && i < old(|gv.rx_await_ack|) ==>
+            old(slot(gv.hardware_ring_rx, gv.rx_await_ack[i]).hw_addr) == slot(gv.hardware_ring_rx, gv.rx_await_ack[i]).hw_addr
+        invariant forall x: Int :: x in old(gv.rx_handled) ==> x in gv.rx_handled
+        invariant 0 <= ix
+        invariant forall i: Int :: 0 <= i && i < ix && i < |gv.rx_await_ack| ==> slot(gv.hardware_ring_rx, gv.rx_await_ack[i]).hw_addr in gv.rx_handled
+    {
+        gv.rx_handled := gv.rx_handled union Set(slot(gv.hardware_ring_rx, gv.rx_await_ack[ix]).hw_addr)
+        ix := ix + 1
+    }
+    assert gv.rx_await_ack == old(gv.rx_await_ack)
+    gv.rx_await_ack := Seq[Int]()
     refute false
 }
 
@@ -508,10 +545,10 @@ method store_TDAR(heap: IArray, gv: Ref, address: Int, value: Int)
                 acc(slot(gv.hardware_ring_tx, i).hw_stat, 1/2) &&
                 acc(slot(gv.hardware_ring_tx, i).hw_len) &&
                 is_TXD_READY(slot(gv.hardware_ring_tx, i).hw_stat)
-    ensures acc(gv.tx_await_ack) && gv.tx_await_ack == Set[Int]() && acc(gv.hardware_ring_tx, 1/2)
+    ensures acc(gv.tx_await_ack) && gv.tx_await_ack == Seq[Int]() && acc(gv.hardware_ring_tx, 1/2)
     ensures forall i: Int :: i in old(gv.tx_await_ack) ==> acc(slot(gv.hardware_ring_tx, i).hw_stat, 1/2)
 {
-    gv.tx_await_ack := Set[Int]()
+    gv.tx_await_ack := Seq[Int]()
     refute false
 }
 /////////////////////////////
@@ -563,9 +600,19 @@ function f_union_elem(heap: IArray, gv: Ref, s: Set[Int], t: Set[Int], e: Int): 
     s == t union Set(e)
 }
 
+function f_append_elem(heap: IArray, gv: Ref, s: Seq[Int], t: Seq[Int], e: Int): Bool
+{
+    s == t ++ Seq(e)
+}
+
 function f_empty_set(heap: IArray, gv: Ref): Set[Int]
 {
     Set[Int]()
+}
+
+function f_empty_seq(heap: IArray, gv: Ref): Seq[Int]
+{
+    Seq[Int]()
 }
 
 function f_element_set(heap: IArray, gv: Ref, e: Int): Set[Int]
