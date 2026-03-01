@@ -16,7 +16,7 @@ NETWORK_IMAGES:= network_virt_rx.elf network_virt_tx.elf network_arp.elf network
 network/components/%.o: ${SDDF}/network/components/%.c
 	${CC} ${CFLAGS} -c -o $@ $<
 
-NETWORK_COMPONENT_OBJ := $(addprefix network/components/, network_copy.o network_arp.o network_virt_tx.o network_virt_rx.o vswitch.o)
+NETWORK_COMPONENT_OBJ := $(addprefix network/components/, network_copy.o network_arp.o network_virt_tx.o network_virt_rx.o network_vswitch.o)
 
 CHECK_NETWORK_FLAGS_MD5:=.network_cflags-$(shell echo -- ${CFLAGS} ${CFLAGS_network} | shasum | sed 's/ *-//')
 
@@ -42,7 +42,7 @@ network/components/network_copy.o: ${SDDF}/network/components/copy.c
 network/components/network_arp.o: ${SDDF}/network/components/arp.c
 	${CC} ${CFLAGS} -c -o $@ $<
 
-network/components/vswitch.o: ${SDDF}/network/components/vswitch.c
+network/components/network_vswitch.o: ${SDDF}/network/components/vswitch.c
 	${CC} ${CFLAGS} -c -o $@ $<
 
 %.elf: network/components/%.o
