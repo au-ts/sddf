@@ -46,6 +46,8 @@
 #define dma_rmb() asm volatile("dmb ld" ::: "memory")
 #elif defined(CONFIG_ARCH_RISCV)
 #define dma_rmb() asm volatile("fence r, r" ::: "memory")
+#else
+#error "Unknown architecture for dma_rmb"
 #endif
 
 /*
@@ -57,6 +59,8 @@
 #define dma_wmb() asm volatile("dmb st" ::: "memory")
 #elif defined(CONFIG_ARCH_RISCV)
 #define dma_wmb() asm volatile("fence w, w" ::: "memory")
+#else
+#error "Unknown architecture for dma_wmb"
 #endif
 
 /*
@@ -70,6 +74,8 @@
 #define iormb() asm volatile("dmb ld" ::: "memory")
 #elif defined(CONFIG_ARCH_RISCV)
 #define iormb() asm volatile("fence i, r" ::: "memory")
+#else
+#error "Unknown architecture for iormb"
 #endif
 
 /*
@@ -83,6 +89,8 @@
 #define iowmb() asm volatile("dmb st" ::: "memory")
 #elif defined(CONFIG_ARCH_RISCV)
 #define iowmb() asm volatile("fence w, o" ::: "memory")
+#else
+#error "Unknown architecture for iowmb"
 #endif
 
 /* load_acquire_32: synchronises with a store_release_32 that writes the same value to the same location
