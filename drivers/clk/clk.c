@@ -8,19 +8,19 @@
 
 #include <microkit.h>
 #include <stdint.h>
-#include <sddf/util/string.h>
+#include <string.h>
 #include <sddf/util/printf.h>
 #include <sddf/clk/protocol.h>
 #include <clk.h>            /* common definitions and interfaces */
 #include <clk-operations.h> /* ops of common clocks e.g., div, mux, fixed factor, and gate*/
 #include <clk_config.h>     /* configuration parsed from device tree */
 
-#ifdef BOARD_CLASS_meson
+#ifdef CONFIG_PLAT_ODROIDC4
 #include <clk-meson.h>      /* operations for meson-specific clocks */
 #include <clk-measure.h>    /* implementation of clock measurements */
 #include <clk-sm1.h>       /* g12a-specific definitions */
 #include <g12a-regs.h>      /* offsets of control registers */
-#elif BOARD_CLASS_imx
+#elif CONFIG_PLAT_MAAXBOARD
 #include <clk-imx.h>        /* operations for imx-specific clocks */
 #include <clk-imx8mq.h>     /* imx8mq-specific definitions */
 #else
@@ -49,7 +49,7 @@ struct clk **clk_list;
 struct clk *get_clk_by_name(const char *name)
 {
     for (int i = 0; i < NUM_CLK_LIST; i++) {
-        if (clk_list[i] && sddf_strcmp(clk_list[i]->hw.init->name, name) == 0) {
+        if (clk_list[i] && strcmp(clk_list[i]->hw.init->name, name) == 0) {
             return clk_list[i];
         }
     }

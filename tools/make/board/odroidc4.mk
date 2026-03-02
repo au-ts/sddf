@@ -12,5 +12,6 @@ NET_DRIV_DIR := ${PLATFORM}
 ETH_DRIV := eth_driver_meson.elf
 TIMER_DRIV_DIR := ${PLATFORM}
 UART_DRIV_DIR := ${PLATFORM}
+CLK_DRIV_DIR := ${PLATFORM}
 
 CPU := cortex-a55

@@ -27,8 +27,8 @@ clk_driver/%.o: $(CLK_DRIVER_COMMON_DIR)/%.c $(CLK_CONFIG_HEADER)
 clk_driver.elf: $(CLK_DRIVER_OBJS) libsddf_util_debug.a
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
-$(CLK_CONFIG_HEADER): $(DTS_FILE) $(CLK_DRIVER_COMMON_DIR)/create_clk_config.py
-	$(PYTHON) $(CLK_DRIVER_COMMON_DIR)/create_clk_config.py $(DTS_FILE) $(BUILD_DIR)
+$(CLK_CONFIG_HEADER): $(DTS) $(CLK_DRIVER_COMMON_DIR)/create_clk_config.py
+	$(PYTHON) $(CLK_DRIVER_COMMON_DIR)/create_clk_config.py $(DTS) $(BUILD_DIR)
 
 clean::
 	rm -f clk_driver.o

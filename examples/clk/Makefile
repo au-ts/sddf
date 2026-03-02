@@ -1,5 +1,5 @@
 #
-# Copyright 2024, UNSW
+# Copyright 2026, UNSW
 #
 # SPDX-License-Identifier: BSD-2-Clause
 #
@@ -9,23 +9,14 @@ $(error MICROKIT_SDK must be specified)
 endif
 override MICROKIT_SDK := $(abspath ${MICROKIT_SDK})
 
-ifeq ($(strip $(MICROKIT_BOARD)),)
-$(error MICROKIT_BOARD must be specified)
-endif
-export MICROKIT_BOARD
-
 BUILD_DIR ?= build
-# By default we make a debug build so that the client debug prints can be seen.
-MICROKIT_CONFIG ?= debug
+override BUILD_DIR := $(abspath ${BUILD_DIR})
+export BUILD_DIR
+export MICROKIT_CONFIG ?= debug
+export MICROKIT_BOARD ?= odroidc4
 
-export TOP:= $(abspath $(dir ${MAKEFILE_LIST}))
+export SDDF := $(abspath ../../)
 
-CC := clang
-LD := ld.lld
-export MICROKIT_TOOL ?= $(abspath $(MICROKIT_SDK)/bin/microkit)
-
-export BOARD_DIR := $(abspath $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG))
-export SDDF := $(abspath ../..)
 IMAGE_FILE := $(BUILD_DIR)/loader.img
 REPORT_FILE := $(BUILD_DIR)/report.txt
 
