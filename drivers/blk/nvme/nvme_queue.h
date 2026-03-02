@@ -38,8 +38,8 @@ typedef struct nvme_queue_info {
 
 static inline void nvme_queues_init(nvme_queue_info_t *queue, uint16_t queue_id,
                                     volatile nvme_controller_t *nvme_controller,
-                                    nvme_submission_queue_entry_t *submission_queue, uint16_t submission_capacity,
-                                    nvme_completion_queue_entry_t *completion_queue, uint16_t completion_capacity)
+                                    nvme_submission_queue_entry_t *submission_queue, uint32_t submission_capacity,
+                                    nvme_completion_queue_entry_t *completion_queue, uint32_t completion_capacity)
 {
     uint8_t doorbell_stride = (nvme_controller->cap & NVME_CAP_DSTRD_MASK) >> NVME_CAP_DSTRD_SHIFT;
 
@@ -54,13 +54,13 @@ static inline void nvme_queues_init(nvme_queue_info_t *queue, uint16_t queue_id,
     *queue = (nvme_queue_info_t){
         .submission = {
             .queue = submission_queue,
-            .capacity = submission_capacity,
+            .capacity = (uint16_t)(submission_capacity - 1),
             .tail = 0,
             .doorbell = submission_doorbell,
         },
         .completion = {
             .queue = completion_queue,
-            .capacity = completion_capacity,
+            .capacity = (uint16_t)(completion_capacity - 1),
             .head = 0,
             .doorbell = completion_doorbell,
             /* Initial phase is 0 before controller ownership. [NVMe-2.1 §4.2.4, Fig. 98, Fig. 108] */
