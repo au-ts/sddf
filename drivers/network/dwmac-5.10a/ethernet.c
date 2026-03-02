@@ -80,7 +80,7 @@ static void update_ring_slot(hw_ring_t *ring, unsigned int idx, uint32_t addr_lo
     /* Ensure all writes to the descriptor are ordered before we set the flags
      * that makes hardware aware of this slot.
      */
-    dma_wmb();
+    wmb();
     d->des3 = des3;
 }
 
@@ -101,7 +101,7 @@ static void rx_provide()
             /* The following barrier orders the write to the DMA register to be after the write to
              * the 'des3' field of the descriptor in function update_ring_slot().
              */
-            iowmb();
+            wmb();
 
             /* We will update the hardware register that stores the tail address. This tells
              * the device that we have new descriptors to use.
@@ -135,7 +135,7 @@ static void rx_return(void)
          * The following barrier orders the following reads to the descriptor to be after
          * the read to the 'des3' field of the descriptor.
          */
-        dma_rmb();
+        rmb();
 
         net_buff_desc_t buffer = rx.descr_mdata[idx];
         if (d->des3 & DESC_RXSTS_ERROR) {
@@ -148,7 +148,7 @@ static void rx_return(void)
             /* The following barrier orders the write to the DMA register to be after the write to
              * the 'des3' field of the descriptor in function update_ring_slot().
              */
-            iowmb();
+            wmb();
 
             /* We will update the hardware register that stores the tail address. This tells
             the device that we have new descriptors to use. */
@@ -194,7 +194,7 @@ static void tx_provide(void)
             /* The following barrier orders the write to the DMA register to be after the write to
              * the 'des3' field of the descriptor in function update_ring_slot().
              */
-            iowmb();
+            wmb();
 
             tx.tail++;
             /* Set the tail in hardware to the latest tail we have inserted in.
@@ -229,7 +229,7 @@ static void tx_return(void)
          * The following barrier orders the following reads to the descriptor to be after
          * the read to the 'des3' field of the descriptor.
          */
-        dma_rmb();
+        rmb();
 
         net_buff_desc_t buffer = tx.descr_mdata[idx];
         int err = net_enqueue_free(&tx_queue, buffer);

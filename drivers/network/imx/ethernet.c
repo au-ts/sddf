@@ -69,7 +69,7 @@ static void update_ring_slot(hw_ring_t *ring, unsigned int idx, uintptr_t phys,
     /* Ensure all writes to the descriptor are ordered before we set the flags
      * that makes hardware aware of this slot.
      */
-    dma_wmb();
+    wmb();
     d->stat = stat;
 }
 
@@ -91,7 +91,7 @@ static void rx_provide(void)
             /* The following barrier orders the write to the 'rdar' MMIO register to be after the write to
              * the 'stat' field of the descriptor in function update_ring_slot().
              */
-            iowmb();
+            wmb();
             rx.tail++;
             eth->rdar = RDAR_RDAR;
         }
@@ -126,7 +126,7 @@ static void rx_return(void)
          * The following barrier orders the following reads to the descriptor to be after
          * the read to the 'stat' field of the descriptor.
          */
-        dma_rmb();
+        rmb();
 
         net_buff_desc_t buffer = { d->addr, d->len };
         int err = net_enqueue_active(&rx_queue, buffer);
@@ -160,7 +160,7 @@ static void tx_provide(void)
             /* The following barrier orders the write to the 'tdar' MMIO register to be after the write to
              * the 'stat' field of the descriptor in function update_ring_slot().
              */
-            iowmb();
+            wmb();
             tx.tail++;
             eth->tdar = TDAR_TDAR;
         }
@@ -190,7 +190,7 @@ static void tx_return(void)
          * The following barrier orders the following reads to the descriptor to be after
          * the read to the 'stat' field of the descriptor.
          */
-        dma_rmb();
+        rmb();
 
         net_buff_desc_t buffer = { d->addr, 0 };
         int err = net_enqueue_free(&tx_queue, buffer);
