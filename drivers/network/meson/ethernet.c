@@ -64,10 +64,10 @@ static void update_ring_slot(hw_ring_t *ring, unsigned int idx, uint32_t status,
     d->addr = phys;
     d->next = next;
     d->cntl = cntl;
-    /* Ensure all writes to the descriptor complete, before we set the flags
+    /* Ensure all writes to the descriptor are ordered before we set the flags
      * that makes hardware aware of this slot.
      */
-    THREAD_MEMORY_RELEASE();
+    dma_wmb();
     d->status = status;
 }
 
@@ -87,6 +87,12 @@ static void rx_provide()
             }
 
             update_ring_slot(&rx, idx, DESC_RXSTS_OWNBYDMA, cntl, buffer.io_or_offset, 0);
+
+            /* The following barrier orders the write to the DMA register to be after the write to
+             * the 'status' field of the descriptor in function update_ring_slot().
+             */
+            iowmb();
+
             eth_dma->rxpolldemand = POLL_DATA;
 
             rx.tail++;
@@ -113,7 +119,11 @@ static void rx_return(void)
             break;
         }
 
-        THREAD_MEMORY_ACQUIRE();
+        /*
+         * The following barrier orders the following reads to the descriptor to be after
+         * the read to the 'status' field of the descriptor.
+         */
+        dma_rmb();
 
         if (d->status & DESC_RXSTS_ERROR) {
             sddf_dprintf("ETH|ERROR: RX descriptor returned with error status %x\n", d->status);
@@ -124,6 +134,12 @@ static void rx_return(void)
             }
 
             update_ring_slot(&rx, idx, DESC_RXSTS_OWNBYDMA, cntl, d->addr, 0);
+
+            /* The following barrier orders the write to the DMA register to be after the write to
+             * the 'des3' field of the descriptor in function update_ring_slot().
+             */
+            iowmb();
+
             eth_dma->rxpolldemand = POLL_DATA;
             rx.tail++;
         } else {
@@ -172,6 +188,12 @@ static void tx_provide(void)
             reprocess = true;
         }
     }
+
+    /* The following barrier orders the write to the DMA register to be after the write to
+     * the 'status' field of the descriptor in function update_ring_slot().
+     */
+    iowmb();
+
     eth_dma->txpolldemand = POLL_DATA;
 }
 
@@ -186,7 +208,11 @@ static void tx_return(void)
             break;
         }
 
-        THREAD_MEMORY_ACQUIRE();
+        /*
+         * The following barrier orders the following reads to the descriptor to be after
+         * the read to the 'status' field of the descriptor.
+         */
+        dma_rmb();
 
         net_buff_desc_t buffer = { d->addr, 0 };
         int err = net_enqueue_free(&tx_queue, buffer);
