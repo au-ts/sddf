@@ -37,9 +37,6 @@ uint32_t board_millis(void)
 }
 
 
-void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t const *report, uint16_t len) {
-    LOG_USB("recieved HID report\n");
-}
 
 void init(void)
 {
@@ -82,9 +79,9 @@ void notified(sddf_channel ch)
         };
 
         // TODO: rhport is for companion controller, which I have not configured (yet?)
-        uint8_t caplength = *(uint8_t*)(ehci_regs + 0);
+        // uint8_t caplength = *(uint8_t*)(ehci_regs + 0);
 
-        ehci_init(0, ehci_regs, ehci_regs + caplength);
+        // ehci_init(0, ehci_regs, ehci_regs + caplength);
         
         tusb_init(BOARD_TUH_RHPORT, &host_init);
 
@@ -94,7 +91,32 @@ void notified(sddf_channel ch)
     else if (ch == usb_irq_channel) {
         LOG_USB("recieved interrupt!\n");
         /* copied verbatim from alexd */
-
+        tusb_int_handler(0, true);
+        sddf_irq_ack(ch);
+        tuh_task();
     }
 }
 
+// Invoked when device with hid interface is mounted
+// Report descriptor is also available for use. tuh_hid_parse_report_descriptor()
+// can be used to parse common/simple enough descriptor.
+// Note: if report descriptor length > CFG_TUH_ENUMERATION_BUFSIZE, it will be skipped
+// therefore report_desc = NULL, desc_len = 0
+void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const *desc_report, uint16_t desc_len) {
+  LOG_USB("HID device address = %d, instance = %d is mounted\n", dev_addr, instance);
+
+  // request to receive report
+  // tuh_hid_report_received_cb() will be invoked when report is available
+  if (!tuh_hid_receive_report(dev_addr, instance)) {
+    LOG_USB("Error: cannot request to receive report\n");
+  }
+}
+
+// Invoked when device with hid interface is un-mounted
+void tuh_hid_umount_cb(uint8_t dev_addr, uint8_t instance) {
+  LOG_USB("HID device address = %d, instance = %d is unmounted\n", dev_addr, instance);
+}
+
+void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t const *report, uint16_t len) {
+    LOG_USB("recieved HID report\n");
+}

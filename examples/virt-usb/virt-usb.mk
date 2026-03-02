@@ -53,7 +53,11 @@ CFLAGS += \
 	-I$(SDDF)/include/sddf/util \
 	-DCFG_TUH_ENABLED=1 \
 	-DTUP_USBIP_EHCI=1 \
-	-DCFG_TUSB_MCU=OPT_MCU_VIRTAARCH64
+	-DCFG_TUSB_MCU=OPT_MCU_VIRTAARCH64 \
+	-DCFG_TUSB_DEBUG=3 \
+    -DPRIu32='"u"' \
+    -DPRIX32='"x"'
+
 
 ${IMAGES}: libsddf_util_debug.a
 
@@ -137,15 +141,21 @@ $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 # I believe the default behaviour (highmem=on) allows PCIE physical memory
 # to be mapped in high memory, which is not correctly handled by the existing PCIE code
 # and I am not going to be fixing it right at this moment
+# highmem-off could all break the hci driver which is 32bit only
 qemu: ${IMAGE_FILE}
 	$(QEMU) -machine virt,virtualization=on,highmem=off \
 	-cpu cortex-a53 \
 	-serial mon:stdio \
 	-device loader,file=$(IMAGE_FILE),addr=0x70000000,cpu-num=0 \
 	-m size=2G \
-	-nographic \
-	-usb \
-	-device usb-ehci,id=ehci
+	--trace "usb_*" \
+ 	-device usb-ehci,id=ehci \
+ 	-nographic
+
+#	-device usb-tablet,bus=ehci.0 \
+# 	--trace "memory_region_ops_*" \
+# 	-usb \
+# 	-device usb-kbd,id=kbd,bus=ehci.0 \
 
 clean::
 	${RM} -f *.elf
