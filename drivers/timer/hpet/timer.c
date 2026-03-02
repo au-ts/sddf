@@ -167,8 +167,8 @@ void init(void)
 
     /* Don't deliver IRQ via the Front Side Bus */
     t0_cfg &= ~BIT(TN_FSB_EN_CNF);
-    /* Use level IRQ */
-    t0_cfg |= BIT(TN_INT_TYPE_CNF);
+    /* Use edge IRQ */
+    t0_cfg &= ~BIT(TN_INT_TYPE_CNF);
     /* Switch on IRQ */
     t0_cfg |= BIT(TN_INT_ENB_CNF);
     timer_0->config = t0_cfg;
@@ -180,13 +180,7 @@ void init(void)
         timeouts[i] = UINT64_MAX;
     }
 
-    /* Clear ISR */
-    volatile uint64_t *isr = (void *)HPET_REGION + GENERAL_ISR_REG;
-    *isr = 1;
-
     microkit_deferred_irq_ack(IRQ_CH);
-
-    sddf_dprintf("hpet timer init returns\n");
 }
 
 seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
@@ -218,8 +212,6 @@ void notified(microkit_channel ch)
     if (ch != IRQ_CH) {
         return;
     }
-    volatile uint64_t *isr = (void *)HPET_REGION + GENERAL_ISR_REG;
-    *isr = 1;
 
     microkit_deferred_irq_ack(IRQ_CH);
 

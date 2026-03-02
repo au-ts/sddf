@@ -151,4 +151,11 @@ BOARDS: List[Board] = [
         timer=None,
         serial=None,
     ),
+    Board(
+        name="x86_64_generic_vtx",
+        arch=SystemDescription.Arch.X86_64,
+        paddr_top=0x7FFDF000,
+        timer=None,
+        serial=None,
+    ),
 ]

@@ -32,7 +32,8 @@ SUPPORTED_BOARDS := \
 		    serengeti \
 		    star64 \
 		    zcu102 \
-		    x86_64_generic
+		    x86_64_generic \
+			x86_64_generic_vtx
 
 ifeq ($(strip $(TOOLCHAIN)),)
 	TOOLCHAIN := clang
