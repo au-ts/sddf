@@ -105,12 +105,14 @@ uint64_t next_timeout = UINT64_MAX;
 
 uint64_t ns_to_ticks(uint64_t ns)
 {
-    return ns * 1000000 / tick_period_fs;
+    uint64_t fs = ns * 1000000;
+    return fs / tick_period_fs;
 }
 
 uint64_t ticks_to_ns(uint64_t ticks)
 {
-    return ticks * tick_period_fs / 1000000;
+    uint64_t counter_as_fs = ticks * tick_period_fs;
+    return counter_as_fs / 1000000;
 }
 
 uint64_t get_time(void)
