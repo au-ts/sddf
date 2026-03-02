@@ -294,6 +294,21 @@ static void handle_request(void)
             opcode = NVME_OP_READ;
         } else if (code == BLK_REQ_WRITE) {
             opcode = NVME_OP_WRITE;
+        } else if (code == BLK_REQ_FLUSH) {
+            uint32_t cid;
+            err = ialloc_alloc(&cid_ialloc, &cid);
+            assert(err == 0);
+            cid_to_id[cid] = id;
+            cid_to_count[cid] = 0;
+
+            nvme_queue_submit(&io_queue,
+                              &(nvme_submission_queue_entry_t) {
+                                  .cdw0 = nvme_build_cdw0((uint16_t)cid, NVME_OP_FLUSH, NVME_CDW0_PSDT_PRP),
+                                  .nsid = NVME_DEFAULT_NSID,
+                              });
+
+            LOG_NVME("Submitted FLUSH: cid=%u req_id=%u\n", cid, id);
+            continue;
         } else if (code == BLK_REQ_BARRIER) {
             err = blk_enqueue_resp(&blk_queue, BLK_RESP_OK, 0, id);
             assert(!err);
