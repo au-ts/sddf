@@ -51,7 +51,9 @@ CFLAGS += \
 	-I$(TINYUSB)/src/class \
 	-I$(TINYUSB)/test \
 	-I$(SDDF)/include/sddf/util \
-	-DCFG_TUSB_MCU=TUP_USBIP_EHCI \
+	-DCFG_TUH_ENABLED=1 \
+	-DTUP_USBIP_EHCI=1 \
+	-DCFG_TUSB_MCU=OPT_MCU_VIRTAARCH64
 
 ${IMAGES}: libsddf_util_debug.a
 
@@ -72,6 +74,15 @@ pcie.o: ${TOP}/pcie.c
 
 
 # tinyUSB source
+
+tusb_fifo.o: $(TINYUSB)/src/common/tusb_fifo.c
+	$(CC) -c $(CFLAGS) $< -o $@
+
+ehci.o: $(TINYUSB)/src/portable/ehci/ehci.c
+	$(CC) -c $(CFLAGS) $< -o $@
+
+hcd_ehci_virt.o: $(TINYUSB)/src/portable/qemu/virt_aarch64/hcd_ehci_virt.c
+	$(CC) -c $(CFLAGS) $< -o $@
 
 tusb.o: $(TINYUSB)/src/tusb.c
 	$(CC) -c $(CFLAGS) $< -o $@
@@ -94,10 +105,12 @@ hid_host.o: $(TINYUSB)/src/class/hid/hid_host.c
 msc_host.o: $(TINYUSB)/src/class/msc/msc_host.c
 	$(CC) -c $(CFLAGS) $< -o $@
 
+board.o: $(TINYUSB)/hw/bsp/board.c
+	$(CC) -c $(CFLAGS) $< -o $@
 
 # usb elf 
 
-usb.elf: usb.o tusb.o hub.o usbh.o cdc_host.o hid_host.o msc_host.o
+usb.elf: usb.o tusb.o hub.o usbh.o cdc_host.o hid_host.o msc_host.o ehci.o tusb_fifo.o board.o hcd_ehci_virt.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 
