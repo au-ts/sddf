@@ -37,6 +37,54 @@
  */
 #define THREAD_MEMORY_ACQUIRE() __atomic_thread_fence(__ATOMIC_ACQUIRE)
 
+/*
+ * dma_rmb: Prevent read-read reordering on normal and DMA memory.
+ */
+#if defined(CONFIG_ARCH_X86_64)
+#define dma_rmb() asm volatile("" ::: "memory")
+#elif defined(CONFIG_ARCH_AARCH64)
+#define dma_rmb() asm volatile("dmb ld" ::: "memory")
+#elif defined(CONFIG_ARCH_RISCV)
+#define dma_rmb() asm volatile("fence r, r" ::: "memory")
+#endif
+
+/*
+ * dma_wmb: Prevent write-write reordering on normal and DMA memory.
+ */
+#if defined(CONFIG_ARCH_X86_64)
+#define dma_wmb() asm volatile("" ::: "memory")
+#elif defined(CONFIG_ARCH_AARCH64)
+#define dma_wmb() asm volatile("dmb st" ::: "memory")
+#elif defined(CONFIG_ARCH_RISCV)
+#define dma_wmb() asm volatile("fence w, w" ::: "memory")
+#endif
+
+/*
+ * iormb: Prevent read-read reordering,
+ * in which the first read is to an MMIO register in I/O memory,
+ * and the second read is to normal and DMA memory.
+ */
+#if defined(CONFIG_ARCH_X86_64)
+#define iormb() asm volatile("" ::: "memory")
+#elif defined(CONFIG_ARCH_AARCH64)
+#define iormb() asm volatile("dmb ld" ::: "memory")
+#elif defined(CONFIG_ARCH_RISCV)
+#define iormb() asm volatile("fence i, r" ::: "memory")
+#endif
+
+/*
+ * iowmb: Prevent write-write reordering,
+ * in which the first write is to normal and DMA memory,
+ * and the second write is to an MMIO register in I/O memory.
+ */
+#if defined(CONFIG_ARCH_X86_64)
+#define iowmb() asm volatile("" ::: "memory")
+#elif defined(CONFIG_ARCH_AARCH64)
+#define iowmb() asm volatile("dmb st" ::: "memory")
+#elif defined(CONFIG_ARCH_RISCV)
+#define iowmb() asm volatile("fence w, o" ::: "memory")
+#endif
+
 /* load_acquire_32: synchronises with a store_release_32 that writes the same value to the same location
  */
 static inline uint32_t load_acquire_32(const uint32_t *ptr)
