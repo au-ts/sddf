@@ -84,6 +84,8 @@ typedef struct {
     uint32_t waited_ms;         // Time waited in current state
     uint32_t io_queue_depth;    // Configured I/O queue depth based on CAP.MQES
     uint32_t sectors_per_block; // Derived from Identify Namespace data
+    uint8_t cap_mpsmin;         // CAP.MPSMIN used for MDTS calculation
+    uint32_t max_io_pages;      // Maximum number of I/O pages per transfer based on MDTS/CAP.MPSMIN
 } nvme_state_ctx_t;
 
 static nvme_state_ctx_t state_ctx;
@@ -196,6 +198,9 @@ static void validate_identify_entry_size_limits(void)
                      NVME_HOST_IOCQES_EXP);
         assert(false);
     }
+
+    LOG_NVME("SQES range [%u, %u], using IOSQES=%u; CQES range [%u, %u], using IOCQES=%u\n", minsqes, maxsqes,
+             NVME_HOST_IOSQES_EXP, mincqes, maxcqes, NVME_HOST_IOCQES_EXP);
 }
 
 /* Resolve namespace logical-sector size from active FLBAS/LBAF selection. */
@@ -310,8 +315,8 @@ static void handle_request(void)
         }
 
         /* Reject oversized transfers */
-        if (count > MAX_TRANSFER_PAGES) {
-            sddf_dprintf("NVMe: request too large (%u pages, max %u)\n", count, MAX_TRANSFER_PAGES);
+        if (count > state_ctx.max_io_pages) {
+            sddf_dprintf("NVMe: request too large (%u pages, max %u)\n", count, state_ctx.max_io_pages);
             err = blk_enqueue_resp(&blk_queue, BLK_RESP_ERR_UNSPEC, 0, id);
             assert(!err);
             notify_virt = true;
@@ -389,6 +394,40 @@ static void handle_admin_completions(void)
         LOG_NVME("  SN:  %.20s\n", nvme_identify_ctrl->sn);
         LOG_NVME("  MN:  %.40s\n", nvme_identify_ctrl->mn);
         LOG_NVME("  FR:  %.8s\n", nvme_identify_ctrl->fr);
+
+        /*
+         * MDTS scaling:
+         * max transfer bytes = 2^MDTS * 2^(12 + CAP.MPSMIN), MDTS=0 means no limit.
+         * [NVMe-2.1 §5.1.13.2.1, Fig. 312]
+         */
+        uint8_t mdts = nvme_identify_ctrl->mdts;
+
+        uint32_t static_max_pages = NVME_PRP_ENTRIES_PER_PAGE;
+
+        if (mdts == 0) {
+            state_ctx.max_io_pages = static_max_pages;
+            LOG_NVME("MDTS: controller has no limit, capping to %u pages\n", state_ctx.max_io_pages);
+        } else {
+            uint8_t shift = mdts + state_ctx.cap_mpsmin;
+            uint32_t pages;
+
+            if (shift >= 32U) {
+                LOG_NVME("MDTS: raw=%u, MPSMIN=%u gives shift=%u (overflow)\n", mdts, state_ctx.cap_mpsmin, shift);
+                pages = UINT32_MAX;
+            } else {
+                pages = 1U << (uint32_t)shift;
+            }
+
+            LOG_NVME("MDTS: raw=%u, MPSMIN=%u -> max %u pages (%u KiB)\n", mdts, state_ctx.cap_mpsmin, pages,
+                     pages * 4);
+
+            if (pages > static_max_pages) {
+                LOG_NVME("MDTS: %u pages exceeds PRP slot capacity (%u), clamping\n", pages, static_max_pages);
+                pages = static_max_pages;
+            }
+
+            state_ctx.max_io_pages = pages;
+        }
 
         // 8. The host determines any I/O Command Set specific configuration information
         //    For now, we assume that the controller supports only the NVM Command Set.
@@ -633,6 +672,7 @@ static void nvme_poll_controller_status(void)
         /* CAP.MPSMIN/MPSMAX bound host page size; minimum bytes = 2^(12 + MPSMIN). [NVMe-2.1 §3.1.4.1, Fig. 36] */
         uint8_t cap_mps_max = (nvme_controller->cap & NVME_CAP_MPSMAX_MASK) >> NVME_CAP_MPSMAX_SHIFT;
         uint8_t cap_mps_min = (nvme_controller->cap & NVME_CAP_MPSMIN_MASK) >> NVME_CAP_MPSMIN_SHIFT;
+        state_ctx.cap_mpsmin = cap_mps_min;
 
         // The maximum memory page size  is (2 ^ (12 + MPSMAX))
         assert(cap_mps_max >= (NVME_PAGE_SIZE_LOG2 - 12));
