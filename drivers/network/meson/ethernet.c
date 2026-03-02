@@ -120,8 +120,8 @@ static void rx_return(void)
         }
 
         /*
-         * The following barrier orders the following reads to the descriptor to be after
-         * the read to the 'status' field of the descriptor.
+         * The following barrier orders the following reads from the descriptor to be after
+         * the read from the 'status' field of the descriptor.
          */
         rmb();
 

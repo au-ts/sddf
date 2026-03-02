@@ -132,8 +132,8 @@ static void rx_return(void)
         }
 
         /*
-         * The following barrier orders the following reads to the descriptor to be after
-         * the read to the 'des3' field of the descriptor.
+         * The following barrier orders the following reads from the descriptor to be after
+         * the read from the 'des3' field of the descriptor.
          */
         rmb();
 
@@ -196,12 +196,13 @@ static void tx_provide(void)
              */
             wmb();
 
-            tx.tail++;
             /* Set the tail in hardware to the latest tail we have inserted in.
              * This tells the hardware that it has new buffers to send.
              * NOTE: Setting this on every enqueued packet for sanity, change this to once per batch.
              */
             *DMA_REG(DMA_CH0_TXDESC_TAIL_PTR) = tx_desc_base + sizeof(struct descriptor) * (idx);
+
+            tx.tail++;
         }
 
         net_request_signal_active(&tx_queue);
@@ -226,8 +227,8 @@ static void tx_return(void)
         }
 
         /*
-         * The following barrier orders the following reads to the descriptor to be after
-         * the read to the 'des3' field of the descriptor.
+         * The following barrier orders the following reads from the descriptor to be after
+         * the read from the 'des3' field of the descriptor.
          */
         rmb();
 
