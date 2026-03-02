@@ -30,6 +30,12 @@ typedef struct __attribute__((packed)) hpet_timer {
 /* 1 if LegacyReplacementRoute is being used */
 #define LEG_RT_CNF 1
 
+/* General HPET capability bits */
+/* 1 if device is legacy IRQ replacement capable */
+#define LEG_RT_CAP 15
+/* 1 if main counter is 64-bit capable */
+#define COUNT_SIZE_CAP 13
+
 /* HPET timer config bits - these can't be changed, but allow us to
  * find out details of the timer */
 /* 0 is reserved */
@@ -140,6 +146,12 @@ void init(void)
     volatile uint64_t capability = *((uint64_t *)(HPET_REGION + CAP_ID_REG));
     tick_period_fs = capability >> 32;
     
+    /* Make sure that the main counter is 64-bit and legacy irq capable */
+    assert(capability & BIT(COUNT_SIZE_CAP));
+    assert(capability & BIT(LEG_RT_CAP));
+
+    sddf_dprintf("HPET frequency %llu Hz\n", 1000000000000000ull / (uint64_t) tick_period_fs);
+
     volatile uint64_t *general_config_reg = (void *)HPET_REGION + GENERAL_CONFIG_REG;
     /* Enable main counter */
     *general_config_reg |= (1ul << ENABLE_CNF);
@@ -149,6 +161,10 @@ void init(void)
     timer_0 = (hpet_timer_t *)(HPET_REGION + TIMER0_OFFSET);
 
     uint64_t t0_cfg = timer_0->config;
+
+    /* Make sure counter 0 is 64-bit capable */
+    assert(t0_cfg & BIT(TN_SIZE_CAP));
+
     /* Don't deliver IRQ via the Front Side Bus */
     t0_cfg &= ~BIT(TN_FSB_EN_CNF);
     /* Use level IRQ */
@@ -169,6 +185,8 @@ void init(void)
     *isr = 1;
 
     microkit_deferred_irq_ack(IRQ_CH);
+
+    sddf_dprintf("hpet timer init returns\n");
 }
 
 seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
