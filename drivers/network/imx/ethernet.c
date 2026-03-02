@@ -88,12 +88,15 @@ static void rx_provide(void)
                 stat |= WRAP;
             }
             update_ring_slot(&rx, idx, buffer.io_or_offset, 0, stat);
+
             /* The following barrier orders the write to the 'rdar' MMIO register to be after the write to
              * the 'stat' field of the descriptor in function update_ring_slot().
              */
             wmb();
-            rx.tail++;
+
             eth->rdar = RDAR_RDAR;
+
+            rx.tail++;
         }
 
         /* Only request a notification from virtualiser if HW ring not full */
@@ -123,7 +126,7 @@ static void rx_return(void)
         }
 
         /*
-         * The following barrier orders the following reads to the descriptor to be after
+         * The following barrier orders the following reads from the descriptor to be after
          * the read to the 'stat' field of the descriptor.
          */
         rmb();
@@ -157,12 +160,15 @@ static void tx_provide(void)
                 stat |= WRAP;
             }
             update_ring_slot(&tx, idx, buffer.io_or_offset, buffer.len, stat);
+
             /* The following barrier orders the write to the 'tdar' MMIO register to be after the write to
              * the 'stat' field of the descriptor in function update_ring_slot().
              */
             wmb();
-            tx.tail++;
+
             eth->tdar = TDAR_TDAR;
+
+            tx.tail++;
         }
 
         net_request_signal_active(&tx_queue);
@@ -187,8 +193,8 @@ static void tx_return(void)
         }
 
         /*
-         * The following barrier orders the following reads to the descriptor to be after
-         * the read to the 'stat' field of the descriptor.
+         * The following barrier orders the following reads from the descriptor to be after
+         * the read from the 'stat' field of the descriptor.
          */
         rmb();
 
