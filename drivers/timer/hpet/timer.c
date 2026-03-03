@@ -124,7 +124,7 @@ uint64_t get_time(void)
 void set_timeout(uint64_t timeout)
 {
     timer_0->comparator = ns_to_ticks(timeout);
-    
+
 }
 
 static void process_timeouts(uint64_t curr_time)
@@ -155,12 +155,6 @@ void init(void)
 
     sddf_dprintf("HPET frequency %llu Hz\n", 1000000000000000ull / (uint64_t) tick_period_fs);
 
-    volatile uint64_t *general_config_reg = (void *)HPET_REGION + GENERAL_CONFIG_REG;
-    /* Enable main counter */
-    *general_config_reg |= (1ul << ENABLE_CNF);
-    /* Use legacy routing, so that comparator 0's IRQ always come in on I/O APIC pin 2 */
-    *general_config_reg |= (1ul << LEG_RT_CNF);
-
     timer_0 = (hpet_timer_t *)(HPET_REGION + TIMER0_OFFSET);
 
     uint64_t t0_cfg = timer_0->config;
@@ -181,6 +175,12 @@ void init(void)
 
     timer_0->config = t0_cfg;
 
+    volatile uint64_t *general_config_reg = (void *)HPET_REGION + GENERAL_CONFIG_REG;
+    /* Enable main counter */
+    *general_config_reg |= (1ul << ENABLE_CNF);
+    /* Use legacy routing, so that comparator 0's IRQ always come in on I/O APIC pin 2 */
+    *general_config_reg |= (1ul << LEG_RT_CNF);
+
     next_timeout = UINT64_MAX;
     for (int i = 0; i < MAX_TIMEOUTS; i++) {
         timeouts[i] = UINT64_MAX;
@@ -193,13 +193,13 @@ seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
 {
     switch (microkit_msginfo_get_label(msginfo)) {
 
-    case 0: {
+    case SDDF_TIMER_GET_TIME: {
         uint64_t now = get_time();
         microkit_mr_set(0, now);
         return microkit_msginfo_new(0, 1);
     }
 
-    case 1: {
+    case SDDF_TIMER_SET_TIMEOUT: {
         uint64_t delta = microkit_mr_get(0);
         uint64_t now = get_time();
 
