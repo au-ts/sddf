@@ -105,6 +105,7 @@ uint64_t next_timeout = UINT64_MAX;
 
 uint64_t ns_to_ticks(uint64_t ns)
 {
+    // @billn fix integer promotion but ld.lld: error: undefined symbol: __udivti3 
     unsigned __int128 fs = ns * 1000000;
     return fs / tick_period_fs;
 }
@@ -117,7 +118,7 @@ uint64_t ticks_to_ns(uint64_t ticks)
 
 uint64_t get_time(void)
 {
-    uint64_t time = *(uint64_t *)(HPET_REGION + HPET_MAIN_COUNTER_REG);
+    volatile uint64_t time = *(volatile uint64_t *)(HPET_REGION + HPET_MAIN_COUNTER_REG);
     return ticks_to_ns(time);
 }
 
@@ -144,8 +145,11 @@ static void process_timeouts(uint64_t curr_time)
     }
 }
 
+// extern bool microkit_passive;
+
 void init(void)
 {
+    // microkit_passive = false;
     volatile uint64_t capability = *((uint64_t *)(HPET_REGION + CAP_ID_REG));
     tick_period_fs = capability >> 32;
     
