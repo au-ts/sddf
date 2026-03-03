@@ -158,6 +158,42 @@ void nvme_irq_unmask(void)
     nvme_controller->intmc = 0x1;
 }
 
+/* Ensure host SQE/CQE entry sizes fall within controller-advertised limits. */
+static void validate_identify_entry_size_limits(void)
+{
+    /* SQES/CQES bytes encode min/max 2^n entry-size bounds. [NVMe-2.1 Fig. 312] */
+    uint8_t minsqes = (nvme_identify_ctrl->sqes & NVME_IDENTIFY_ENTRY_SIZE_MIN_MASK)
+                   >> NVME_IDENTIFY_ENTRY_SIZE_MIN_SHIFT;
+    uint8_t maxsqes = (nvme_identify_ctrl->sqes & NVME_IDENTIFY_ENTRY_SIZE_MAX_MASK)
+                   >> NVME_IDENTIFY_ENTRY_SIZE_MAX_SHIFT;
+    uint8_t mincqes = (nvme_identify_ctrl->cqes & NVME_IDENTIFY_ENTRY_SIZE_MIN_MASK)
+                   >> NVME_IDENTIFY_ENTRY_SIZE_MIN_SHIFT;
+    uint8_t maxcqes = (nvme_identify_ctrl->cqes & NVME_IDENTIFY_ENTRY_SIZE_MAX_MASK)
+                   >> NVME_IDENTIFY_ENTRY_SIZE_MAX_SHIFT;
+
+    if (minsqes > maxsqes) {
+        sddf_dprintf("NVMe SQES invalid: min %u > max %u\n", minsqes, maxsqes);
+        assert(false);
+    }
+
+    if (mincqes > maxcqes) {
+        sddf_dprintf("NVMe CQES invalid: min %u > max %u\n", mincqes, maxcqes);
+        assert(false);
+    }
+
+    if (NVME_HOST_IOSQES_EXP < minsqes || NVME_HOST_IOSQES_EXP > maxsqes) {
+        sddf_dprintf("NVMe SQES mismatch: controller range [%u, %u], host IOSQES=%u\n", minsqes, maxsqes,
+                     NVME_HOST_IOSQES_EXP);
+        assert(false);
+    }
+
+    if (NVME_HOST_IOCQES_EXP < mincqes || NVME_HOST_IOCQES_EXP > maxcqes) {
+        sddf_dprintf("NVMe CQES mismatch: controller range [%u, %u], host IOCQES=%u\n", mincqes, maxcqes,
+                     NVME_HOST_IOCQES_EXP);
+        assert(false);
+    }
+}
+
 /* Build PRP pointers for a request using a single non-chained PRP list model. */
 static int build_prp_dptr(uint32_t cid, uintptr_t data_paddr, uint16_t count, uint64_t *dptr1, uint64_t *dptr2)
 {
@@ -207,17 +243,38 @@ static void handle_request(void)
     uint16_t count;
     uint32_t id;
 
-    while (blk_dequeue_req(&blk_queue, &code, &req_paddr, &block_number, &count, &id) == 0) {
+    while (true) {
+        if (ialloc_num_free(&cid_ialloc) == 0U) {
+            LOG_NVME("No free CIDs, deferring request dequeue until completions free slots\n");
+            break;
+        }
+
+        int err = blk_dequeue_req(&blk_queue, &code, &req_paddr, &block_number, &count, &id);
+        if (err != 0) {
+            break;
+        }
+
         uint8_t opcode = 0;
-        int err;
 
         if (code == BLK_REQ_READ) {
             opcode = NVME_OP_READ;
         } else if (code == BLK_REQ_WRITE) {
             opcode = NVME_OP_WRITE;
+        } else if (code == BLK_REQ_BARRIER) {
+            err = blk_enqueue_resp(&blk_queue, BLK_RESP_OK, 0, id);
+            assert(!err);
+            notify_virt = true;
+            continue;
         } else {
-            /* Support for FLUSH/BARRIER can be added here */
-            int err = blk_enqueue_resp(&blk_queue, BLK_RESP_OK, 0, id);
+            err = blk_enqueue_resp(&blk_queue, BLK_RESP_ERR_INVALID_PARAM, 0, id);
+            assert(!err);
+            notify_virt = true;
+            continue;
+        }
+
+        if (count == 0) {
+            sddf_dprintf("NVMe: rejecting zero-length request\n");
+            err = blk_enqueue_resp(&blk_queue, BLK_RESP_ERR_INVALID_PARAM, 0, id);
             assert(!err);
             notify_virt = true;
             continue;
@@ -280,6 +337,11 @@ static void handle_admin_completions(void)
         return;
     }
 
+    if (entry.cid >= MAX_PENDING_REQS || !ialloc_in_use(&cid_ialloc, entry.cid)) {
+        sddf_dprintf("NVMe: admin completion with invalid CID=%u dropped\n", entry.cid);
+        return;
+    }
+
     int err = ialloc_free(&cid_ialloc, entry.cid);
     assert(err == 0);
 
@@ -306,6 +368,7 @@ static void handle_admin_completions(void)
         //    supported using the Set Features command with the Number of Queues feature identifier.
         //    After determining the number of I/O Queues, the NVMe Transport specific interrupt registers
         //    (e.g., MSI and/or MSI-X registers) should be configured
+        validate_identify_entry_size_limits();
         uint16_t io_queue_id = NVME_DEFAULT_IO_Q_ID;
         assert(nvme_io_sq_region != 0x0);
         assert(nvme_io_cq_region != 0x0);
@@ -408,6 +471,11 @@ static void handle_io_completions(void)
 
     while (nvme_queue_consume(&io_queue, &cq_entry) == 0) {
         uint16_t cid = cq_entry.cid;
+        if (cid >= MAX_PENDING_REQS || !ialloc_in_use(&cid_ialloc, cid)) {
+            sddf_dprintf("NVMe: completion with invalid CID=%u dropped\n", cid);
+            continue;
+        }
+
         uint32_t id = cid_to_id[cid];
         uint16_t count = cid_to_count[cid];
         uint16_t status = (cq_entry.phase_tag_and_status & NVME_CQE_STATUS_MASK) >> NVME_CQE_STATUS_SHIFT;
@@ -636,8 +704,11 @@ void init(void)
 
 void notified(microkit_channel ch)
 {
-    if (ch == NVME_IRQ) { /* NVMe IRQ - hardcoded for x86 */
-        handle_irq();
+    if (ch == NVME_IRQ) {
+        /* Guard against early IRQ delivery before admin queues are initialised. */
+        if (state_ctx.state > NVME_STATE_WAIT_READY) {
+            handle_irq();
+        }
         sddf_irq_ack(ch);
         return;
     }
