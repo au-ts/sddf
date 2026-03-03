@@ -177,9 +177,9 @@ void init(void)
 
     volatile uint64_t *general_config_reg = (void *)HPET_REGION + GENERAL_CONFIG_REG;
     /* Enable main counter */
-    *general_config_reg |= (1ul << ENABLE_CNF);
+    *general_config_reg |= BIT(ENABLE_CNF);
     /* Use legacy routing, so that comparator 0's IRQ always come in on I/O APIC pin 2 */
-    *general_config_reg |= (1ul << LEG_RT_CNF);
+    *general_config_reg |= BIT(LEG_RT_CNF);
 
     next_timeout = UINT64_MAX;
     for (int i = 0; i < MAX_TIMEOUTS; i++) {
