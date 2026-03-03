@@ -182,6 +182,7 @@ def generate(
     output_dir: str,
     dtb: Optional[DeviceTree],
     get_core: Callable[[str], int],
+    net_need_timer: bool,
 ):
     uart_node = None
     ethernet_node = None
@@ -344,6 +345,8 @@ def generate(
     serial_system.add_client(client1)
     timer_system.add_client(client0)
     timer_system.add_client(client1)
+    if net_need_timer:
+        timer_system.add_client(ethernet_driver)
     net_system.add_client_with_copier(client0, client0_net_copier)
     net_system.add_client_with_copier(client1, client1_net_copier)
 
@@ -521,6 +524,7 @@ if __name__ == "__main__":
     parser.add_argument("--board", required=True, choices=[b.name for b in BOARDS])
     parser.add_argument("--output", required=True)
     parser.add_argument("--sdf", required=True)
+    parser.add_argument("--need_timer", action="store_true", default=False)
     parser.add_argument("--objcopy", required=True)
     parser.add_argument("--smp", required=True)
 
@@ -543,4 +547,4 @@ if __name__ == "__main__":
         with open(args.dtb, "rb") as f:
             dtb = DeviceTree(f.read())
 
-    generate(args.sdf, args.output, dtb, get_core)
+    generate(args.sdf, args.output, dtb, get_core, args.need_timer)
