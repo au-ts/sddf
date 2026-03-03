@@ -310,6 +310,12 @@ _Static_assert(offsetof(nvme_identify_ctrl_t, sqes) == 512, "SQES must be at byt
 _Static_assert(offsetof(nvme_identify_ctrl_t, cqes) == 513, "CQES must be at byte offset 513");
 _Static_assert(offsetof(nvme_identify_ctrl_t, sgls) == 536, "SGLS must be at byte offset 536");
 
+/* Min/max SQES/CQES (min in bits 3:0, max in bits 7:4). [NVMe-2.1 Fig. 312] */
+#define NVME_IDENTIFY_ENTRY_SIZE_MIN_SHIFT 0
+#define NVME_IDENTIFY_ENTRY_SIZE_MIN_MASK  NVME_BITS_MASK(0, 3)
+#define NVME_IDENTIFY_ENTRY_SIZE_MAX_SHIFT 4
+#define NVME_IDENTIFY_ENTRY_SIZE_MAX_MASK  NVME_BITS_MASK(4, 7)
+
 /* ═══════════════════════════════════════════════════════════════════════
  *  PCIe Transport
  * ═══════════════════════════════════════════════════════════════════════ */
