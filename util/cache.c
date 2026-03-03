@@ -47,11 +47,9 @@ void cache_clean_and_invalidate(unsigned long start, unsigned long end)
 #elif defined(CONFIG_ARCH_RISCV)
     /* While not all RISC-V platforms are DMA cache-cohernet,
      * we assume we are targeting one that is.
-     * The function still prevents read-read reordering,
-     * in which the first read is to both normal and device memory,
-     * and the second read is to normal and DMA memory.
+     * The function still prevents read-read reordering.
      */
-    asm volatile("fence ir, r" ::: "memory");
+    asm volatile("fence ir, ir" ::: "memory");
 #elif defined(CONFIG_ARCH_X86_64)
     /* x86 is DMA coherent, and the function acts as a compiler barrier. */
     asm volatile("" ::: "memory");
@@ -80,11 +78,9 @@ void cache_clean(unsigned long start, unsigned long end)
 #elif defined(CONFIG_ARCH_RISCV)
     /* While not all RISC-V platforms are DMA cache-cohernet,
      * we assume we are targeting one that is.
-     * The function still prevents write-write reordering,
-     * in which the first write is to normal and DMA memory,
-     * and the second write is to both normal and device memory.
+     * The function still prevents write-write reordering.
      */
-    asm volatile("fence w, ow" ::: "memory");
+    asm volatile("fence ow, ow" ::: "memory");
 #elif defined(CONFIG_ARCH_X86_64)
     /* x86 is DMA coherent, and the function acts as a compiler barrier. */
     asm volatile("" ::: "memory");
