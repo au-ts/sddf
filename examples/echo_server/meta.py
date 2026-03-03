@@ -195,7 +195,7 @@ def generate(
         assert timer_node is not None
 
     timer_driver = ProtectionDomain(
-        "timer_driver", "timer_driver.elf", priority=101, cpu=get_core("timer_driver")
+        "timer_driver", "timer_driver.elf", priority=102, cpu=get_core("timer_driver")
     )
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
 
@@ -273,6 +273,13 @@ def generate(
         ethernet_driver.add_map(
             Map(clock_controller, 0x3000000, perms="rw", cached=False)
         )
+    elif board.name == "rpi4b_1gb":
+        # Ethernet driver requires timer access to wait for reconfiguration
+        timer_system.add_client(ethernet_driver)
+
+        mbox = MemoryRegion(sdf, "mbox", 0x10_000, paddr=0xFE00B000)
+        sdf.add_mr(mbox)
+        ethernet_driver.add_map(Map(mbox, 0x3000000, perms="rw", cached=False))
 
     if board.arch == SystemDescription.Arch.X86_64:
         hw_net_rings = SystemDescription.MemoryRegion(
@@ -482,6 +489,11 @@ def generate(
     assert client0_lib_sddf_lwip.serialise_config(output_dir)
     assert client1_lib_sddf_lwip.connect()
     assert client1_lib_sddf_lwip.serialise_config(output_dir)
+
+    if board.name == "rpi4b_1gb":
+        update_elf_section(
+            "eth_driver.elf", "timer_client_config", "timer_client_ethernet_driver"
+        )
 
     with open(f"{output_dir}/benchmark_client_config.data", "wb+") as f:
         f.write(bench_client_config.serialise())
