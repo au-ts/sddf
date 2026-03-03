@@ -148,14 +148,15 @@ qemu: ${IMAGE_FILE}
 	-serial mon:stdio \
 	-device loader,file=$(IMAGE_FILE),addr=0x70000000,cpu-num=0 \
 	-m size=2G \
-	--trace "usb_*" \
  	-device usb-ehci,id=ehci \
- 	-nographic
+ 	-device usb-kbd,id=kbd,bus=ehci.0 \
+ 	--trace events="trace.txt",file="trace.out" \
 
 #	-device usb-tablet,bus=ehci.0 \
+ 	-nographic \
+# 	--trace "usb_*" \
 # 	--trace "memory_region_ops_*" \
 # 	-usb \
-# 	-device usb-kbd,id=kbd,bus=ehci.0 \
 
 clean::
 	${RM} -f *.elf

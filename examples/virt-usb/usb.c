@@ -4,6 +4,9 @@
 #include <sddf/timer/client.h>
 #include <sddf/timer/config.h>
 
+#include <sddf/util/cache.h>
+
+
 #include <tusb.h>
 #include <common/tusb_debug.h>
 

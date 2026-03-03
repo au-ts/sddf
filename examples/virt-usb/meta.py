@@ -32,16 +32,19 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     pcie_config = MemoryRegion(sdf, "pcie_config", 0x100_0000, paddr=0x3eff_0000)
 
     ehci_regs = MemoryRegion(sdf, "ehci_regs", 0x1000, paddr=0x3800_0000)
+    ehci_dma = MemoryRegion(sdf, "ehci_dma", 0x10000, paddr=0x7000_0000)
 
     pcie_usb_ch = Channel(pcie, usb, a_id=3, b_id=3)
 
     pcie.add_map(Map(pcie_config, 0x20_000_000, "rw", cached=False))
     usb.add_map(Map(ehci_regs, 0x30_000_000, "rw", cached=False))
+    usb.add_map(Map(ehci_dma, 0x7000_0000, "rw", cached=False)) # identity mapping
 
     sdf.add_channel(pcie_usb_ch)
 
     sdf.add_mr(pcie_config)
     sdf.add_mr(ehci_regs)
+    sdf.add_mr(ehci_dma)
 
     # i think this is required?
     usb.add_irq(IrqConventional(0x49 + 32, id=1))
