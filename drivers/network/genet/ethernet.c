@@ -70,11 +70,6 @@ static void update_ring_slot(hw_ring_t *ring, unsigned int idx, uintptr_t phys, 
     d->addr_lo = phys & 0xFFFFFFFF;
     d->addr_hi = phys >> 32;
     d->status = stat;
-
-    /* Ensure all writes to the descriptor complete, before we set the flags
-     * that makes hardware aware of this slot.
-     */
-    THREAD_MEMORY_RELEASE();
 }
 
 static void sleep_us(uint32_t us)
@@ -120,6 +115,7 @@ static void rx_provide(void)
             update_ring_slot(&rx, idx, buffer.io_or_offset, 0);
             rx.tail++;
         }
+        THREAD_MEMORY_RELEASE();
         // Doorbell the device
         ring_rx->cons_index = (rx.tail - NUM_DESCS) & rx.index_mask;
 
@@ -146,14 +142,13 @@ static void rx_return(void)
     // for optimisation. The packets arrived before clearing IRQ status will
     // be handled in next iteration.
     uint32_t prod_index = ring_rx->prod_index & rx.index_mask;
+    THREAD_MEMORY_ACQUIRE();
     while (!hw_ring_empty(&rx)) {
         if ((rx.head & rx.index_mask) == prod_index) {
             break;
         }
         uint32_t idx = rx.head & rx.desc_id_mask;
         volatile struct genet_dma_desc *d = &(rx.descr[idx]);
-
-        THREAD_MEMORY_ACQUIRE();
 
         uint64_t addr = ((uint64_t)(d->addr_hi) << 32) | d->addr_lo;
         net_buff_desc_t buffer = { addr, d->status >> DMA_BUFLENGTH_SHIFT };
@@ -186,6 +181,7 @@ static void tx_provide()
 
             tx.tail++;
         }
+        THREAD_MEMORY_RELEASE();
         ring_tx->prod_index = tx.tail & tx.index_mask;
 
         net_request_signal_active(&tx_queue);
@@ -202,14 +198,13 @@ static void tx_return(void)
 {
     bool enqueued = false;
     uint32_t cons_index = ring_tx->cons_index & tx.index_mask;
+    THREAD_MEMORY_ACQUIRE();
     while (!hw_ring_empty(&tx)) {
         if ((tx.head & tx.index_mask) == cons_index) {
             break;
         }
         uint32_t idx = tx.head & tx.desc_id_mask;
         volatile struct genet_dma_desc *d = &(tx.descr[idx]);
-
-        THREAD_MEMORY_ACQUIRE();
 
         uint64_t addr = ((uint64_t)(d->addr_hi) << 32) | d->addr_lo;
         net_buff_desc_t buffer = { addr, 0 };
