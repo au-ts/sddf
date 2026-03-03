@@ -103,9 +103,14 @@ uint64_t tick_period_fs; // main counter tick period in femtoseconds
 uint64_t timeouts[MAX_TIMEOUTS];
 uint64_t next_timeout = UINT64_MAX;
 
+uint64_t get_ticks(void)
+{
+    return *(volatile uint64_t *)(HPET_REGION + HPET_MAIN_COUNTER_REG);
+}
+
 uint64_t ns_to_ticks(uint64_t ns)
 {
-    // @billn fix integer promotion but ld.lld: error: undefined symbol: __udivti3 
+    // @billn fix integer promotion but ld.lld: error: undefined symbol: __udivti3
     unsigned __int128 fs = ns * 1000000;
     return fs / tick_period_fs;
 }
@@ -116,23 +121,16 @@ uint64_t ticks_to_ns(uint64_t ticks)
     return counter_as_fs / 1000000;
 }
 
-uint64_t get_time(void)
-{
-    volatile uint64_t time = *(volatile uint64_t *)(HPET_REGION + HPET_MAIN_COUNTER_REG);
-    return ticks_to_ns(time);
-}
-
 void set_timeout(uint64_t timeout)
 {
-    timer_0->comparator = ns_to_ticks(timeout);
-
+    timer_0->comparator = timeout;
 }
 
-static void process_timeouts(uint64_t curr_time)
+static void process_timeouts(uint64_t curr_ticks)
 {
     uint64_t next_timeout = UINT64_MAX;
     for (int i = 0; i < MAX_TIMEOUTS; i++) {
-        if (timeouts[i] <= curr_time) {
+        if (timeouts[i] <= curr_ticks) {
             sddf_notify(i);
             timeouts[i] = UINT64_MAX;
         } else if (timeouts[i] < next_timeout) {
@@ -145,19 +143,19 @@ static void process_timeouts(uint64_t curr_time)
     }
 }
 
-// extern bool microkit_passive;
+extern bool microkit_passive;
 
 void init(void)
 {
-    // microkit_passive = false;
+    microkit_passive = false;
     volatile uint64_t capability = *((uint64_t *)(HPET_REGION + CAP_ID_REG));
     tick_period_fs = capability >> 32;
-    
+
     /* Make sure that the main counter is 64-bit and legacy irq capable */
     assert(capability & BIT(COUNT_SIZE_CAP));
     assert(capability & BIT(LEG_RT_CAP));
 
-    sddf_dprintf("HPET frequency %llu Hz\n", 1000000000000000ull / (uint64_t) tick_period_fs);
+    sddf_dprintf("HPET frequency %llu Hz\n", 1000000000000000ull / (uint64_t)tick_period_fs);
 
     timer_0 = (hpet_timer_t *)(HPET_REGION + TIMER0_OFFSET);
 
@@ -179,6 +177,8 @@ void init(void)
 
     timer_0->config = t0_cfg;
 
+    *(volatile uint64_t *)(HPET_REGION + HPET_MAIN_COUNTER_REG) = 0;
+
     volatile uint64_t *general_config_reg = (void *)HPET_REGION + GENERAL_CONFIG_REG;
     /* Enable main counter */
     *general_config_reg |= BIT(ENABLE_CNF);
@@ -195,20 +195,22 @@ void init(void)
 
 seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
 {
+    uint64_t ticks_now = get_ticks();
+
     switch (microkit_msginfo_get_label(msginfo)) {
 
     case SDDF_TIMER_GET_TIME: {
-        uint64_t now = get_time();
+        uint64_t now = ticks_to_ns(ticks_now);
         microkit_mr_set(0, now);
         return microkit_msginfo_new(0, 1);
     }
 
     case SDDF_TIMER_SET_TIMEOUT: {
         uint64_t delta = microkit_mr_get(0);
-        uint64_t now = get_time();
+        uint64_t delta_ticks = ns_to_ticks(delta);
 
-        timeouts[ch] = now + delta;
-        process_timeouts(now);
+        timeouts[ch] = ticks_now + delta_ticks;
+        process_timeouts(ticks_now);
         return microkit_msginfo_new(0, 0);
     }
 
@@ -225,7 +227,5 @@ void notified(microkit_channel ch)
 
     microkit_deferred_irq_ack(IRQ_CH);
 
-    uint64_t now = get_time();
-
-    process_timeouts(now);
+    process_timeouts(get_ticks());
 }
