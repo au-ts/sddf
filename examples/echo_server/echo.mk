@@ -23,7 +23,8 @@ SUPPORTED_BOARDS := \
 		    qemu_virt_riscv64 \
 			rock3b \
 			star64 \
-			x86_64_generic
+			x86_64_generic \
+			rpi4b_1gb
 
 TOOLCHAIN ?= clang
 MICROKIT_CONFIG ?= debug

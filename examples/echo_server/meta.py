@@ -196,7 +196,7 @@ def generate(
         assert timer_node is not None
 
     timer_driver = ProtectionDomain(
-        "timer_driver", "timer_driver.elf", priority=101, cpu=get_core("timer_driver")
+        "timer_driver", "timer_driver.elf", priority=102, cpu=get_core("timer_driver")
     )
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
 
@@ -340,6 +340,11 @@ def generate(
         budget=20000,
         cpu=get_core("client1_net_copier"),
     )
+
+    if board.name == "rpi4b_1gb":
+        mbox = MemoryRegion(sdf, "mbox", 0x10_000, paddr=0xFE00B000)
+        sdf.add_mr(mbox)
+        ethernet_driver.add_map(Map(mbox, 0x3000000, perms="rw", cached=False))
 
     serial_system.add_client(client0)
     serial_system.add_client(client1)
