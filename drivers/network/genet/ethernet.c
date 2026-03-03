@@ -375,6 +375,7 @@ static void eth_setup(void)
     ring_rx->xon_xoff_thresh = (NUM_DESCS >> 4) | (5 << 16);
     // We only use the default ring (i.e. ring 16)
     eth->dma_rx.ring_cfg = BIT(DEFAULT_Q);
+    eth->rbuf_ctrl |= RBUF_64B_EN;
 
     // Tx Ring Init
     ring_tx = (struct genet_dma_ring_tx *)&eth->dma_tx.ring;
@@ -388,6 +389,7 @@ static void eth_setup(void)
     ring_tx->flow_period = 0;
     ring_tx->buf_size = (NUM_DESCS << 16) | RX_BUF_LENGTH;
     eth->dma_tx.ring_cfg = BIT(DEFAULT_Q);
+    eth->tbuf_ctrl |= TBUF_64B_EN;
     // No timeout for Tx Coalescing but IRQs generated after mbuf_done_thresh or empty buffer
 
     // Enable DMA

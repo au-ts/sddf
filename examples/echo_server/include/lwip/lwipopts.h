@@ -102,6 +102,14 @@
 #define CHECKSUM_GEN_ICMP               0
 #define CHECKSUM_GEN_ICMP6              0
 
+#elif defined(NETWORK_HW_HAS_TRANSPORT_CHECKSUM)
+
+#define CHECKSUM_GEN_IP                 1
+#define CHECKSUM_GEN_UDP                0
+#define CHECKSUM_GEN_TCP                0
+#define CHECKSUM_GEN_ICMP               1
+#define CHECKSUM_GEN_ICMP6              1
+
 #else
 
 #define CHECKSUM_GEN_IP                 1
