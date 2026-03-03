@@ -187,3 +187,126 @@ void sddf_lwip_init(lib_sddf_lwip_config_t *lib_sddf_lwip_config, net_client_con
                     sddf_lwip_handle_empty_tx_free_fn handle_empty_tx_free,
                     sddf_lwip_tx_intercept_condition_fn tx_intercept_condition,
                     sddf_lwip_tx_handle_intercept_fn tx_handle_intercept);
+
+/**
+ * Protocol headers for hanlding special cases of transmission packets.
+ * Borrowed from the Lionsos/Firewall project.
+ */
+typedef struct __attribute__((__packed__)) sddf_eth_hdr {
+    /* destination MAC address */
+    uint8_t ethdst_addr[ETH_HWADDR_LEN];
+    /* source MAC address */
+    uint8_t ethsrc_addr[ETH_HWADDR_LEN];
+    /* if ethtype <= 1500 it holds the length of the frame. Otherwise, it holds
+    the protocol of payload encapsulated in the frame */
+    uint16_t ethtype;
+} eth_hdr_t;
+
+typedef struct __attribute__((__packed__)) sddf_ipv4_hdr {
+    /* internet header length in 32-bit words, variable due to optional fields */
+    uint8_t ihl : 4;
+    /* IP version, always 4 for IPv4 */
+    uint8_t version : 4;
+    /* explicit congestion notification, optional */
+    uint8_t ecn : 2;
+    /* differentiated services code point */
+    uint8_t dscp : 6;
+    /* total packet length in bytes, including header and data */
+    uint16_t tot_len;
+    /* identifier of packet, used in packet fragmentation */
+    uint16_t id;
+    /* offset in 8 bytes of fragment relative to the beginning of the original
+    unfragmented IP datagram. Fragment offset is a 13 byte value split accross
+    frag_offset1 and frag_offset2 */
+    uint8_t frag_offset1 : 5;
+    /* if packet belongs to fragmented group, 1 indicates this is not the last
+    fragment */
+    uint8_t more_frag : 1;
+    /* specifies whether datagram can be fragmented or not */
+    uint8_t no_frag : 1;
+    /* reserved, set to 0 */
+    uint8_t reserved : 1;
+    /* offset in 8 bytes of fragment relative to the beginning of the original
+    unfragmented IP datagram. Fragment offset is a 13 byte value split accross
+    frag_offset1 and frag_offset2 */
+    uint8_t frag_offset2;
+    /* time to live, in seconds but in practice router hops */
+    uint8_t ttl;
+    /* transport layer protocol of encapsulated packet */
+    uint8_t protocol;
+    /* internet checksum of IPv4 header */
+    uint16_t check;
+    /* source IP address */
+    uint32_t src_ip;
+    /* destination IP address */
+    uint32_t dst_ip;
+    /* optional fields excluded */
+} ipv4_hdr_t;
+
+typedef struct __attribute__((__packed__)) sddf_udp_hdr {
+    /* source port */
+    uint16_t src_port;
+    /* destination port */
+    uint16_t dst_port;
+    /* length in bytes of the UDP datagram including header */
+    uint16_t len;
+    /* checksum over the UDP datagram and psuedo-header, optional for IPv4 */
+    uint16_t check;
+} udp_hdr_t;
+
+typedef struct __attribute__((__packed__)) tcp_hdr {
+    /* source port */
+    uint16_t src_port;
+    /* destination port */
+    uint16_t dst_port;
+    /* sequence number */
+    uint32_t seq;
+    /* acknowledgement number */
+    uint32_t ack_seq;
+    /* reserved, set to 0 */
+    uint16_t reserved : 4;
+    /* size of the TCP header in 32 bit words */
+    uint16_t doff : 4;
+    /* fin */
+    uint16_t fin : 1;
+    /* syn */
+    uint16_t syn : 1;
+    /* reset */
+    uint16_t rst : 1;
+    /* push */
+    uint16_t psh : 1;
+    /* ack */
+    uint16_t ack : 1;
+    /* urgent pointer is valid */
+    uint16_t urg : 1;
+    /* ECN-Echo*/
+    uint16_t ece : 1;
+    /* congestion window reduced */
+    uint16_t cwr : 1;
+    /* size of the receive window*/
+    uint16_t window;
+    /* checksum over the TCP packet and psuedo-header */
+    uint16_t check;
+    /* urgent pointer */
+    uint16_t urg_ptr;
+    /* optional fields excluded */
+} tcp_hdr_t;
+
+#define ETH_HDR_LEN sizeof(eth_hdr_t)
+#define IPV4_HDR_OFFSET ETH_HDR_LEN
+#define IPV4_HDR_LEN_MIN sizeof(ipv4_hdr_t)
+
+/* TSB structure for BCM GENET hardware chcksum offload */
+struct bcmgenet_tsb {
+    uint32_t length_status;      /* length and peripheral status */
+    uint32_t ext_status;         /* Extended status*/
+    uint32_t rx_csum;            /* partial rx checksum */
+    uint32_t unused1[9];         /* unused */
+    uint32_t tx_csum_info;       /* Tx checksum info. */
+    uint32_t unused2[3];         /* unused */
+};
+
+#define SDDF_PROTO_IP       0x800
+#define SDDF_PROTO_ARP      0x806
+#define SDDF_PROTO_TCP      6
+#define SDDF_PROTO_UDP      17

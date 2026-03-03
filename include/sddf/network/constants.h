@@ -36,3 +36,10 @@ struct ethernet_header {
     || defined(CONFIG_PLAT_ODROIDC2)
 #define NETWORK_HW_HAS_CHECKSUM
 #endif
+
+#if defined(CONFIG_PLAT_BCM2711)
+#define PBUF_LINK_ENCAPSULATION_HLEN 64
+#define NETWORK_HW_HAS_TRANSPORT_CHECKSUM
+#else
+#define PBUF_LINK_ENCAPSULATION_HLEN 0
+#endif

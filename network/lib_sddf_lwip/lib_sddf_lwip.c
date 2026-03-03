@@ -264,7 +264,7 @@ static void interface_free_buffer(struct pbuf *p)
     SYS_ARCH_DECL_PROTECT(old_level);
     pbuf_custom_offset_t *custom_pbuf_offset = (pbuf_custom_offset_t *)p;
     SYS_ARCH_PROTECT(old_level);
-    net_buff_desc_t buffer = { custom_pbuf_offset->offset, 0 };
+    net_buff_desc_t buffer = { custom_pbuf_offset->offset - PBUF_LINK_ENCAPSULATION_HLEN, 0 };
     int err = net_enqueue_free(&(sddf_state.rx_queue), buffer);
     assert(!err);
     sddf_state.notify_rx = true;
@@ -297,6 +297,74 @@ static struct pbuf *create_interface_buffer(uint64_t offset, size_t length)
 
     return pbuf_alloced_custom(PBUF_RAW, length, PBUF_REF, &custom_pbuf_offset->custom,
                                (void *)(offset + sddf_state.rx_buffer_data_region), NET_BUFFER_SIZE);
+}
+
+/**
+ * Pseudo checksum calculation for GENET NICs with hardware checksum offload
+ * enabled. Either trasnport layer checksum or network layer checksum can be
+ * supported, but not both, hence we do software checksum for IP, and hardware
+ * checksum for TCP/UDP.
+ *
+ */
+static uintptr_t bcmgenet_add_chksum(uintptr_t frame, struct pbuf *p)
+{
+    eth_hdr_t *ethhdr = (eth_hdr_t *)p->payload;
+    uint16_t eth_type = htons(ethhdr->ethtype);
+    struct bcmgenet_tsb *tsb = (struct bcmgenet_tsb *)frame;
+    uint32_t sum = 0;
+
+    if (eth_type == SDDF_PROTO_IP) {
+        ipv4_hdr_t *iphdr = (ipv4_hdr_t *)((void *)p->payload + IPV4_HDR_OFFSET);
+        if (iphdr->protocol == SDDF_PROTO_UDP) {
+            sum += ntohs(iphdr->src_ip & 0xFFFF);
+            sum += ntohs(iphdr->src_ip >> 16);
+
+            sum += ntohs(iphdr->dst_ip & 0xFFFF);
+            sum += ntohs(iphdr->dst_ip >> 16);
+
+            sum += SDDF_PROTO_UDP;
+
+            udp_hdr_t *udphdr = (udp_hdr_t *)((void *)iphdr + IPV4_HDR_LEN_MIN);
+            sum += ntohs(udphdr->len);
+
+            // Fold 32-bit sum into 16 bits
+            sum = (sum & 0xFFFF) + (sum >> 16);
+
+            udphdr->check = htons(sum);
+
+            // Bits 31-16: the offset of first byte to be checksummed
+            // Bits 15-0: the offset of checksum destination
+            tsb->tx_csum_info = (((uintptr_t)udphdr - (uintptr_t)p->payload) << 16)
+                              | ((uintptr_t)&udphdr->check - (uintptr_t)p->payload) | 0x80000000 | 0x8000;
+        } else if (iphdr->protocol == SDDF_PROTO_TCP) {
+            sum += ntohs(iphdr->src_ip & 0xFFFF);
+            sum += ntohs(iphdr->src_ip >> 16);
+
+            sum += ntohs(iphdr->dst_ip & 0xFFFF);
+            sum += ntohs(iphdr->dst_ip >> 16);
+
+            sum += SDDF_PROTO_TCP;
+
+            sum += ntohs(iphdr->tot_len) - IPV4_HDR_LEN_MIN;
+
+            // Fold 32-bit sum into 16 bits
+            sum = (sum & 0xFFFF) + (sum >> 16);
+
+            tcp_hdr_t *tcphdr = (tcp_hdr_t *)((void *)iphdr + IPV4_HDR_LEN_MIN);
+            tcphdr->check = htons(sum);
+
+            // Bits 31-16: the offset of first byte to be checksummed
+            // Bits 15-0: the offset of checksum destination
+            tsb->tx_csum_info = (((uintptr_t)tcphdr - (uintptr_t)p->payload) << 16)
+                              | ((uintptr_t)&tcphdr->check - (uintptr_t)p->payload) | 0x80000000 | 0x8000;
+        }
+    } else if (eth_type == SDDF_PROTO_ARP) {
+        // No checksum is needed for ARP packets, so we point the hardware to
+        // the end of packets for calculation. Hardware might append paddings
+        // to form a minimum 60-byte frame.
+        tsb->tx_csum_info = (MAX(0x3c, p->tot_len) << 16) | MAX(0x3c, p->tot_len);
+    }
+    return 64;
 }
 
 /**
@@ -340,6 +408,11 @@ static err_t lwip_eth_send(struct netif *netif, struct pbuf *p)
 
     uintptr_t frame = buffer.io_or_offset + sddf_state.tx_buffer_data_region;
     uint16_t copied = 0;
+
+    if (PBUF_LINK_ENCAPSULATION_HLEN > 0) {
+        copied = bcmgenet_add_chksum(frame, p);
+    }
+
     for (struct pbuf *curr = p; curr != NULL; curr = curr->next) {
         memcpy((void *)(frame + copied), curr->payload, curr->len);
         copied += curr->len;
@@ -374,7 +447,8 @@ void sddf_lwip_process_rx(void)
             int err = net_dequeue_active(&sddf_state.rx_queue, &buffer);
             assert(!err);
 
-            struct pbuf *p = create_interface_buffer(buffer.io_or_offset, buffer.len);
+            struct pbuf *p = create_interface_buffer(buffer.io_or_offset + PBUF_LINK_ENCAPSULATION_HLEN,
+                                                     buffer.len - PBUF_LINK_ENCAPSULATION_HLEN);
             assert(p != NULL);
             if (lwip_state.netif.input(p, &lwip_state.netif) != ERR_OK) {
                 lwip_state.err_output("LWIP|ERROR: unknown error inputting pbuf into network stack\n");
