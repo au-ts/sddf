@@ -105,13 +105,13 @@ uint64_t next_timeout = UINT64_MAX;
 
 uint64_t ns_to_ticks(uint64_t ns)
 {
-    uint64_t fs = ns * 1000000;
+    unsigned __int128 fs = ns * 1000000;
     return fs / tick_period_fs;
 }
 
 uint64_t ticks_to_ns(uint64_t ticks)
 {
-    uint64_t counter_as_fs = ticks * tick_period_fs;
+    unsigned __int128 counter_as_fs = ticks * tick_period_fs;
     return counter_as_fs / 1000000;
 }
 
@@ -124,6 +124,7 @@ uint64_t get_time(void)
 void set_timeout(uint64_t timeout)
 {
     timer_0->comparator = ns_to_ticks(timeout);
+    
 }
 
 static void process_timeouts(uint64_t curr_time)
@@ -164,7 +165,7 @@ void init(void)
 
     uint64_t t0_cfg = timer_0->config;
 
-    /* Make sure counter 0 is 64-bit capable */
+    /* Make sure the counter 0 is 64-bit wide */
     assert(t0_cfg & BIT(TN_SIZE_CAP));
 
     /* Don't deliver IRQ via the Front Side Bus */
@@ -173,9 +174,12 @@ void init(void)
     t0_cfg &= ~BIT(TN_INT_TYPE_CNF);
     /* Switch on IRQ */
     t0_cfg |= BIT(TN_INT_ENB_CNF);
-    timer_0->config = t0_cfg;
+    /* 64-bit counter */
+    t0_cfg &= ~BIT(TN_32MODE_CNF);
+    /* Non periodic counter */
+    t0_cfg &= ~BIT(TN_TYPE_CNF);
 
-    __atomic_signal_fence(__ATOMIC_ACQ_REL);
+    timer_0->config = t0_cfg;
 
     next_timeout = UINT64_MAX;
     for (int i = 0; i < MAX_TIMEOUTS; i++) {
