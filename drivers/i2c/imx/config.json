@@ -1,6 +1,7 @@
 {
     "compatible": [
-        "fsl,imx8mq-i2c,imx21-i2c"
+        "fsl,imx8mq-i2c",
+        "fsl,imx21-i2c"
     ],
     "resources": {
         "regions": [

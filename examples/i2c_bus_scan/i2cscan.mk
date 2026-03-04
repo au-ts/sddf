@@ -20,6 +20,7 @@ export PYTHONPATH
 
 SUPPORTED_BOARDS := \
 		odroidc4 \
+		maaxboard \
 		serengeti
 
 include ${SDDF}/tools/make/board/common.mk
