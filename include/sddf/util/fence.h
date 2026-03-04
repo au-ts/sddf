@@ -7,7 +7,7 @@
 #pragma once
 
 #include <stdint.h>
-#include <microkit.h>
+#include <os/sddf.h>
 
 /* Prevent the compiler from re-ordering any read or write across the fence. */
 #define COMPILER_MEMORY_FENCE() __atomic_signal_fence(__ATOMIC_ACQ_REL)
