@@ -100,7 +100,7 @@ static void rx_provide()
             /* We will update the hardware register that stores the tail address. This tells
             the device that we have new descriptors to use. */
             THREAD_MEMORY_RELEASE();
-            *DMA_REG(DMA_CH0_RXDESC_TAIL_PTR) = rx_desc_base + sizeof(struct descriptor) * rx.tail;
+            *DMA_REG(DMA_CH0_RXDESC_TAIL_PTR) = rx_desc_base + sizeof(struct descriptor) * idx;
             rx.tail++;
         }
 
