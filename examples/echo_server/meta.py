@@ -13,9 +13,9 @@ from importlib.metadata import version
 sys.path.append(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../tools/meta")
 )
-from board import BOARDS
+from board import BOARDS, add_x86_hpet
 
-assert version("sdfgen").split(".")[1] == "28", "Unexpected sdfgen version"
+assert version("sdfgen").split(".")[1] == "29", "Unexpected sdfgen version"
 
 ProtectionDomain = SystemDescription.ProtectionDomain
 MemoryRegion = SystemDescription.MemoryRegion
@@ -200,19 +200,7 @@ def generate(
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
 
     if board.arch == SystemDescription.Arch.X86_64:
-        hpet_irq = SystemDescription.IrqMsi(
-            pci_bus=0, pci_device=0, pci_func=0, vector=0, handle=0, id=0
-        )
-        timer_driver.add_irq(hpet_irq)
-
-        hpet_regs = SystemDescription.MemoryRegion(
-            sdf, "hpet_regs", 0x1000, paddr=0xFED00000
-        )
-        hpet_regs_map = SystemDescription.Map(
-            hpet_regs, 0x5000_0000, "rw", cached=False
-        )
-        timer_driver.add_map(hpet_regs_map)
-        sdf.add_mr(hpet_regs)
+        add_x86_hpet(sdf, timer_driver)
 
     uart_driver = ProtectionDomain("serial_driver", "serial_driver.elf", priority=100)
     serial_virt_tx = ProtectionDomain(
