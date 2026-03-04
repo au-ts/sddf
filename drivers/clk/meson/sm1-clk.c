@@ -21,8 +21,8 @@
 #include <sddf/util/util.h>
 #include <sddf/clk/g12a-bindings.h>
 
-uintptr_t clk_regs;
-uintptr_t msr_clk_base;
+uintptr_t clk_regs = 0x3200000;
+uintptr_t msr_clk_base = 0x3200000;
 
 static struct clk g12a_xtal = { .data =
                                     &(struct clk_source_data) {
