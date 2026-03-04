@@ -7,13 +7,20 @@ import re
 from pathlib import Path
 import sys
 
-sys.path.insert(1, Path(__file__).parents[2].as_posix())
+from ts_ci import (
+    matrix_product,
+    run_test,
+    TestConfig,
+    TestMetadata,
+    HardwareBackend,
+    QemuBackend,
+    TestFailureException,
+    log,
+    reset_terminal,
+    wait_for_output,
+)
 
-from ci.lib.backends import *
-from ci.lib.runner import run_single_example, matrix_product
-from ci.common import TestConfig
-from ci.matrix import NO_OUTPUT_DEFAULT_TIMEOUT_S
-from ci.lib import log
+sys.path.insert(1, Path(__file__).parents[2].as_posix())
 from ci import common, matrix
 
 TEST_MATRIX = matrix_product(
@@ -21,7 +28,6 @@ TEST_MATRIX = matrix_product(
     board=matrix.EXAMPLES["echo_server"]["boards_test"],
     config=matrix.EXAMPLES["echo_server"]["configs"],
     build_system=matrix.EXAMPLES["echo_server"]["build_systems"],
-    timeout_s=[NO_OUTPUT_DEFAULT_TIMEOUT_S],
 )
 
 
@@ -73,9 +79,13 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
         log.info(f"client IPs: client1={ip1}, client0={ip0}")
 
 
+# export
+TEST_METADATA = TestMetadata(
+    test_fn=test,
+    backend_fn=backend_fn,
+    loader_img_fn=common.loader_img_path,
+    no_output_timeout_s=matrix.NO_OUTPUT_DEFAULT_TIMEOUT_S,
+)
+
 if __name__ == "__main__":
-    run_single_example(
-        test,
-        TEST_MATRIX,
-        backend_fn,
-    )
+    run_test(TEST_METADATA, TEST_MATRIX)

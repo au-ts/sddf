@@ -23,6 +23,14 @@ website](https://trustworthy.systems/github/ci-artifacts/). Both the raw log
 files, built images, and pre-rendered HTML logs are available. The archive is
 updated on an hourly basis.
 
+### Setup
+
+Install the `ts_ci` library from `systems-ci`.
+
+```sh
+$ pip install git+https://github.com/au-ts/systems-ci#subdirectory=ts_ci
+```
+
 ### Builds
 
 You can reproduce what the CI builds with:

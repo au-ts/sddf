@@ -7,11 +7,9 @@ import os
 from pathlib import Path
 import sys
 
-sys.path.insert(1, Path(__file__).parents[1].as_posix())
+from ts_ci import log, TestConfig, TestMetadata, run_tests
 
-from ci.common import TestConfig, backend_fn
-from ci.lib.log import error
-from ci.lib.runner import TestFunction, BackendFunction, run_all_examples
+sys.path.insert(1, Path(__file__).parents[1].as_posix())
 
 EXAMPLES_DIR = Path(__file__).parent / "examples"
 EXAMPLES_LIST = sorted(
@@ -25,21 +23,15 @@ EXAMPLES_LIST = sorted(
 if __name__ == "__main__":
     examples_list = sorted(set(EXAMPLES_LIST))
     if len(examples_list) == 0:
-        error("no examples found")
+        log.error("no examples found")
         exit(1)
 
     matrix: list[TestConfig] = []
-    test_fns: dict[str, TestFunction] = {}
-    backend_fns: dict[str, BackendFunction] = {}
+    test_fn_sets: dict[str, TestMetadata] = {}
 
     for example in examples_list:
         mod = importlib.import_module(f"ci.examples.{example}")
         matrix.extend(mod.TEST_MATRIX)
-        test_fns[example] = mod.test
-        custom_backend_fn = callable(getattr(mod, "backend_fn", None))
-        if custom_backend_fn:
-            backend_fns[example] = mod.backend_fn
-        else:
-            backend_fns[example] = backend_fn
+        test_fn_sets[example] = mod.TEST_METADATA
 
-    run_all_examples(matrix, test_fns, backend_fns)
+    run_tests(test_fn_sets, matrix)

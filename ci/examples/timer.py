@@ -6,13 +6,18 @@ import asyncio
 from pathlib import Path
 import sys
 
-sys.path.insert(1, Path(__file__).parents[2].as_posix())
+from ts_ci import (
+    matrix_product,
+    HardwareBackend,
+    TestConfig,
+    wait_for_output,
+    log,
+    TestFailureException,
+    TestMetadata,
+    run_test,
+)
 
-from ci.lib.backends import *
-from ci.lib.runner import run_single_example, matrix_product
-from ci.common import TestConfig
-from ci.matrix import NO_OUTPUT_DEFAULT_TIMEOUT_S
-from ci.lib import log
+sys.path.insert(1, Path(__file__).parents[2].as_posix())
 from ci import common, matrix
 
 TEST_MATRIX = matrix_product(
@@ -20,7 +25,6 @@ TEST_MATRIX = matrix_product(
     board=matrix.EXAMPLES["timer"]["boards_test"],
     config=matrix.EXAMPLES["timer"]["configs"],
     build_system=matrix.EXAMPLES["timer"]["build_systems"],
-    timeout_s=[NO_OUTPUT_DEFAULT_TIMEOUT_S],
 )
 
 DRIFT_THRESHOLD = 0.05  # 5 percent.
@@ -58,9 +62,13 @@ async def test(backend: HardwareBackend, test_config: TestConfig):
     log.info(f"Deltas within {DRIFT_THRESHOLD:.0%} threshold")
 
 
+# export
+TEST_METADATA = TestMetadata(
+    test_fn=test,
+    backend_fn=common.backend_fn,
+    loader_img_fn=common.loader_img_path,
+    no_output_timeout_s=matrix.NO_OUTPUT_DEFAULT_TIMEOUT_S,
+)
+
 if __name__ == "__main__":
-    run_single_example(
-        test,
-        TEST_MATRIX,
-        common.backend_fn,
-    )
+    run_test(TEST_METADATA, TEST_MATRIX)
