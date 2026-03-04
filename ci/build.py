@@ -12,8 +12,7 @@ import contextlib
 
 sys.path.insert(1, Path(__file__).parents[1].as_posix())
 
-from ci.lib.runner import ArgparseActionList, TestConfig, matrix_product
-from ci.lib import log
+from ts_ci import log, ArgparseActionList, TestConfig, matrix_product
 from ci import common, matrix
 
 

@@ -8,27 +8,16 @@ from dataclasses import dataclass
 
 sys.path.insert(1, Path(__file__).parents[1].as_posix())
 
-from ci.lib.backends import HardwareBackend, QemuBackend, MachineQueueBackend
-from ci.matrix import (
+from ts_ci import (
+    HardwareBackend,
+    QemuBackend,
+    MachineQueueBackend,
     MACHINE_QUEUE_BOARDS,
     MACHINE_QUEUE_BOARD_OPTIONS,
-    NO_OUTPUT_DEFAULT_TIMEOUT_S,
+    TestConfig,
 )
 
 CI_BUILD_DIR = Path(__file__).parents[1] / "ci_build"
-
-
-@dataclass(order=True, frozen=True)
-class TestConfig:
-    example: str
-    board: str
-    config: str
-    build_system: str
-    timeout_s: int = NO_OUTPUT_DEFAULT_TIMEOUT_S
-
-    def is_qemu(self):
-        # TODO: x86_64_generic assumes QEMU for the moment.
-        return self.board.startswith("qemu") or self.board == "x86_64_generic"
 
 
 def example_build_path(test_config: TestConfig):
