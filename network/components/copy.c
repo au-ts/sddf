@@ -77,11 +77,13 @@ void rx_return(void)
     }
 
     if (client_enqueued && net_require_signal_active(&rx_queue_cli)) {
+        sddf_printf_("COPY returning to CLIENT\n");
         net_cancel_signal_active(&rx_queue_cli);
         sddf_notify(config.client.id);
     }
 
     if (virt_enqueued && net_require_signal_free(&rx_queue_virt)) {
+        sddf_printf_("COPY returning to VSWITCH\n");
         net_cancel_signal_free(&rx_queue_virt);
         sddf_deferred_notify(config.virt_rx.id);
     }
