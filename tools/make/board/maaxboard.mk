@@ -19,5 +19,6 @@ PINCTRL_DRIV_DIR := imx
 TMU_DRIV_DIR := imx8mq
 PMIC_DRIV_DIR := bd71837amwv
 CLK_DRIV_DIR := ${PLATFORM}
+DVFS_DRIV_DIR := maaxboard
 
 CPU := cortex-a53
