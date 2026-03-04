@@ -37,7 +37,6 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     assert serial_node is not None
 
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
-    timer_system.add_client(client)
     serial_system = Sddf.Serial(
         sdf, serial_node, serial_driver, serial_virt_tx, enable_color=False
     )

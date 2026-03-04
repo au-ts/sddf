@@ -6,10 +6,8 @@
 #include <microkit.h>
 #include <stdint.h>
 #include <sddf/util/printf.h>
-#include <sddf/timer/client.h>
 #include <sddf/clk/client.h>
 #include <sddf/serial/config.h>
-#include <sddf/timer/config.h>
 
 #define CLK_DRIVER_CH 0
 
@@ -21,7 +19,6 @@
 #error "The target board is not supported\n"
 #endif
 
-__attribute__((__section__(".timer_client_config"))) timer_client_config_t timer_config;
 __attribute__((__section__(".serial_client_config"))) serial_client_config_t serial_config;
 
 void init(void)
