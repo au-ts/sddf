@@ -9,6 +9,7 @@
 #include <sddf/resources/device.h>
 #include <sddf/timer/protocol.h>
 #include <sddf/timer/config.h>
+#include <sddf/util/udivmodti4.h>
 
 __attribute__((__section__(".device_resources"), retain, used)) device_resources_t device_resources;
 
@@ -31,9 +32,13 @@ typedef struct __attribute__((packed)) hpet_timer {
 /* 1 if LegacyReplacementRoute is being used */
 #define LEG_RT_CNF 1
 
-/* HPET timer config bits - these can't be changed, but allow us to
- * find out details of the timer */
-/* 0 is reserved */
+/* General HPET capability bits */
+/* 1 if device is legacy IRQ replacement capable */
+#define LEG_RT_CAP 15
+/* 1 if main counter is 64-bit capable */
+#define COUNT_SIZE_CAP 13
+
+/* HPET timer config register bits */
 /* 0 if edge triggered, 1 if level triggered. */
 #define TN_INT_TYPE_CNF 1
 /* Set to 1 to cause an interrupt when main timer hits comparator for this timer */
@@ -61,17 +66,20 @@ typedef struct __attribute__((packed)) hpet_timer {
    to take */
 #define TN_INT_ROUTE_CAP 32
 
+/* Femtoseconds in nanosecond */
+#define FS_IN_NS 1000000
+
 #define HPET_GENERAL_CAP_ID_REG 0x0
 #define HPET_GENERAL_CONFIG_REG 0x10
 #define HPET_GENERAL_ISR_REG 0x20
 #define HPET_MAIN_COUNTER_REG 0xF0
-#define HPET_TIMER1_OFFSET 0x120
+#define HPET_TIMER0_OFFSET 0x100
 
-#define LOCAL_APIC_ADDR 0x0FEE00000llu
+#define LOW_WORD(x) (x & 0xffffffffffffffff)
+#define HIGH_WORD(x) (x >> 64)
 
 // @terryb: remove hard-coded IRQ channel
 #define IRQ_CH 0
-#define IRQ_NUM 0x30
 uintptr_t HPET_REGION = 0x50000000;
 
 volatile hpet_timer_t *timer_0;
@@ -82,32 +90,35 @@ uint64_t tick_period_fs; // main counter tick period in femtoseconds
 uint64_t timeouts[MAX_TIMEOUTS];
 uint64_t next_timeout = UINT64_MAX;
 
+uint64_t get_ticks(void)
+{
+    return *(volatile uint64_t *)(HPET_REGION + HPET_MAIN_COUNTER_REG);
+}
+
 uint64_t ns_to_ticks(uint64_t ns)
 {
-    return ns * 1000000 / tick_period_fs;
+    __uint128_t fs = (__uint128_t)ns * FS_IN_NS;
+    uint64_t rem = 0;
+    return udiv128by64to64(HIGH_WORD(fs), LOW_WORD(fs), tick_period_fs, &rem);
 }
 
 uint64_t ticks_to_ns(uint64_t ticks)
 {
-    return ticks * tick_period_fs / 1000000;
-}
-
-uint64_t get_time(void)
-{
-    uint64_t time = *(uint64_t *)(HPET_REGION + HPET_MAIN_COUNTER_REG);
-    return ticks_to_ns(time);
+    __uint128_t counter_as_fs = (__uint128_t)ticks * (__uint128_t)tick_period_fs;
+    uint64_t rem = 0;
+    return udiv128by64to64(HIGH_WORD(counter_as_fs), LOW_WORD(counter_as_fs), FS_IN_NS, &rem);
 }
 
 void set_timeout(uint64_t timeout)
 {
-    timer_0->comparator = ns_to_ticks(timeout);
+    timer_0->comparator = timeout;
 }
 
-static void process_timeouts(uint64_t curr_time)
+static void process_timeouts(uint64_t curr_ticks)
 {
     uint64_t next_timeout = UINT64_MAX;
     for (int i = 0; i < MAX_TIMEOUTS; i++) {
-        if (timeouts[i] <= curr_time) {
+        if (timeouts[i] <= curr_ticks) {
             sddf_notify(i);
             timeouts[i] = UINT64_MAX;
         } else if (timeouts[i] < next_timeout) {
@@ -122,21 +133,44 @@ static void process_timeouts(uint64_t curr_time)
 
 void init(void)
 {
-    // Read COUNTER_CLK_PERIOD 32:63 from General Capabilities and ID Register
-    volatile uint64_t cap = *((uint64_t *)HPET_REGION + HPET_GENERAL_CAP_ID_REG);
-    tick_period_fs = cap >> 32;
-
-    // Enable all timer interrupts
+    /* Stop main counter */
     volatile uint64_t *general_config_reg = (void *)HPET_REGION + HPET_GENERAL_CONFIG_REG;
-    *general_config_reg |= BIT(ENABLE_CNF);
+    *general_config_reg = 0;
 
-    timer_0 = (void *)HPET_REGION + HPET_TIMER1_OFFSET;
-    // Enable Timer 0 interrupts
-    timer_0->config |= BIT(TN_FSB_EN_CNF) | BIT(TN_INT_ENB_CNF);
-    // Direct timer interrupts to local APIC: write address and value (interrupt vector)
-    // interrupt vector = vector (in SDF) + irq_user_min(0x10) + IRQ_INT_OFFSET(0x20)
-    // @terryb: remove hard-coded IRQ number
-    timer_0->fsb_irr = (LOCAL_APIC_ADDR << 32llu) | IRQ_NUM;
+    /* Read the tick period so we can convert between ticks <-> nanoseconds. */
+    volatile uint64_t capability = *((uint64_t *)(HPET_REGION + HPET_GENERAL_CAP_ID_REG));
+    tick_period_fs = capability >> 32;
+
+    /* Make sure that the main counter is 64-bit wide and legacy IRQ routing capable. */
+    assert(capability & BIT(COUNT_SIZE_CAP));
+    assert(capability & BIT(LEG_RT_CAP));
+
+    timer_0 = (volatile hpet_timer_t *)(HPET_REGION + HPET_TIMER0_OFFSET);
+    uint64_t t0_cfg = timer_0->config;
+
+    /* Make sure the comparator 0 is 64-bit wide */
+    assert(t0_cfg & BIT(TN_SIZE_CAP));
+
+    /* Don't deliver IRQ via the Front Side Bus */
+    t0_cfg &= ~BIT(TN_FSB_EN_CNF);
+    /* Use edge triggered IRQ */
+    t0_cfg &= ~BIT(TN_INT_TYPE_CNF);
+    /* Turn on IRQ */
+    t0_cfg |= BIT(TN_INT_ENB_CNF);
+    /* 64-bit wide comparator */
+    t0_cfg &= ~BIT(TN_32MODE_CNF);
+    /* Non periodic comparator */
+    t0_cfg &= ~BIT(TN_TYPE_CNF);
+
+    timer_0->config = t0_cfg;
+
+    /* Reset the main counter */
+    *(volatile uint64_t *)(HPET_REGION + HPET_MAIN_COUNTER_REG) = 0;
+
+    /* Enable main counter */
+    *general_config_reg |= BIT(ENABLE_CNF);
+    /* Use legacy routing, so that comparator 0's IRQ always come in on I/O APIC pin 2 */
+    *general_config_reg |= BIT(LEG_RT_CNF);
 
     next_timeout = UINT64_MAX;
     for (int i = 0; i < MAX_TIMEOUTS; i++) {
@@ -148,20 +182,22 @@ void init(void)
 
 seL4_MessageInfo_t protected(microkit_channel ch, microkit_msginfo msginfo)
 {
+    uint64_t ticks_now = get_ticks();
+
     switch (microkit_msginfo_get_label(msginfo)) {
 
-    case 0: {
-        uint64_t now = get_time();
+    case SDDF_TIMER_GET_TIME: {
+        uint64_t now = ticks_to_ns(ticks_now);
         microkit_mr_set(0, now);
         return microkit_msginfo_new(0, 1);
     }
 
-    case 1: {
+    case SDDF_TIMER_SET_TIMEOUT: {
         uint64_t delta = microkit_mr_get(0);
-        uint64_t now = get_time();
+        uint64_t delta_ticks = ns_to_ticks(delta);
 
-        timeouts[ch] = now + delta;
-        process_timeouts(now);
+        timeouts[ch] = ticks_now + delta_ticks;
+        process_timeouts(ticks_now);
         return microkit_msginfo_new(0, 0);
     }
 
@@ -178,7 +214,5 @@ void notified(microkit_channel ch)
 
     microkit_deferred_irq_ack(IRQ_CH);
 
-    uint64_t now = get_time();
-
-    process_timeouts(now);
+    process_timeouts(get_ticks());
 }
