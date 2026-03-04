@@ -21,7 +21,7 @@ on:
 env:
   MICROKIT_VERSION: 2.1.0-dev.19+cce4a8d
   MICROKIT_URL: https://trustworthy.systems/Downloads/microkit/
-  SDFGEN_VERSION: 0.28.1
+  SDFGEN_VERSION: 0.29.0
   ZIG_VERSION: 0.15.1
 
 jobs:
