@@ -79,6 +79,7 @@ void rx_return(void)
             // [1]: https://developer.arm.com/documentation/ddi0595/2021-06/AArch64-Instructions/DC-IVAC--Data-or-unified-Cache-line-Invalidate-by-VA-to-PoC
             cache_clean_and_invalidate(buffer_vaddr, buffer_vaddr + buffer.len);
             int client = get_mac_addr_match((struct ethernet_header *) buffer_vaddr);
+            sddf_printf_("VIRT RX active from client: %d\n", client);
             if (client == BROADCAST_ID) {
                 int ref_index = buffer.io_or_offset / NET_BUFFER_SIZE;
                 assert(buffer_refs[ref_index] == 0);
@@ -138,6 +139,7 @@ void rx_provide(void)
                        && (buffer.io_or_offset < NET_BUFFER_SIZE * state.rx_queue_drv.capacity));
 
                 int ref_index = buffer.io_or_offset / NET_BUFFER_SIZE;
+                sddf_printf_("VIRT RX free ref_index: %d, buffer_refs: %d\n",ref_index, buffer_refs[ref_index]);
                 assert(buffer_refs[ref_index] != 0);
 
                 buffer_refs[ref_index]--;
