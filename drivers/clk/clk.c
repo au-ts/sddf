@@ -222,6 +222,7 @@ int clk_set_rate(struct clk *clk, uint64_t req_rate, uint64_t *rate)
             pclk->hw.init->ops->set_rate(pclk, prate, pprate);
             return 0;
         }
+        LOG_DRIVER_ERR("Failed to set clock rate!!!\n");
         return err;
     }
 

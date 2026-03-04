@@ -14,5 +14,6 @@ ETH_DRIV := eth_driver_${PLATFORM}.elf
 TIMER_DRIV_DIR := ${PLATFORM}
 UART_DRIV_DIR := ${PLATFORM}
 CLK_DRIV_DIR := ${PLATFORM}
+DVFS_DRIV_DIR := maaxboard
 
 CPU := cortex-a53
