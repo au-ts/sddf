@@ -144,17 +144,18 @@ $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 # highmem-off could all break the hci driver which is 32bit only
 qemu: ${IMAGE_FILE}
 	$(QEMU) -machine virt,virtualization=on,highmem=off \
+	-drive if=none,id=stick,format=raw,file=test.img \
 	-cpu cortex-a53 \
 	-serial mon:stdio \
 	-device loader,file=$(IMAGE_FILE),addr=0x70000000,cpu-num=0 \
 	-m size=2G \
+	-nographic \
  	-device usb-ehci,id=ehci \
- 	-device usb-kbd,id=kbd,bus=ehci.0 \
  	--trace events="trace.txt",file="trace.out" \
 
 #	-device usb-tablet,bus=ehci.0 \
- 	-nographic \
-# 	--trace "usb_*" \
+# 	-device usb-storage,bus=ehci.0,drive=stick,id=flash \
+#	-device usb-kbd,id=kbd,bus=ehci.0 \
 # 	--trace "memory_region_ops_*" \
 # 	-usb \
 

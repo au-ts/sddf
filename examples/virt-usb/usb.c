@@ -100,6 +100,10 @@ void notified(sddf_channel ch)
     }
 }
 
+void tuh_msc_mount_cb(uint8_t dev_addr) {
+  LOG_USB("A MassStorage device is mounted\n");
+}
+
 // Invoked when device with hid interface is mounted
 // Report descriptor is also available for use. tuh_hid_parse_report_descriptor()
 // can be used to parse common/simple enough descriptor.
