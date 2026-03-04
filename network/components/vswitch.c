@@ -26,12 +26,11 @@ typedef struct vswitch_state {
 
 static vswitch_state_t state;
 
-uint32_t **buffer_refs;
+uint32_t *buffer_refs;
 
 static bool forward_frame(net_vswitch_port_config_t *src, net_vswitch_port_config_t *dst, net_buff_desc_t *src_buf)
 {
-    const char *src_data = src->tx_data.vaddr + src_buf->io_or_offset;
-
+    sddf_printf_("VSWITCH Forwarding frame 1 src->id: %d dst->id: %d\n", src->id, dst->id);
     net_buff_desc_t d_buffer;
     if (net_dequeue_free(&state.rx_queues[dst->id], &d_buffer) != 0) {
         return false;
@@ -45,7 +44,10 @@ static bool forward_frame(net_vswitch_port_config_t *src, net_vswitch_port_confi
     // TODO: recheck if my logic is not funky here - offsets etc
     // mark that this buffer has been passed once
     int ref_index = src_buf->io_or_offset / NET_BUFFER_SIZE;
-    buffer_refs[src->id][ref_index]++;
+    sddf_printf_("VSWITCH index: %d src->id: %d\n", ref_index, src->id);
+    //sddf_printf_("address  of buffer_refs: %p\n", buffer_refs);
+    buffer_refs[src->id * SDDF_NET_MAX_CLIENTS + ref_index]++;
+    sddf_printf_("VSWITCH id: %d buffer_refs[idx]: %d\n", src->id, buffer_refs[src->id * SDDF_NET_MAX_CLIENTS + ref_index]);
 
     if (net_require_signal_active(&state.rx_queues[dst->id])) {
         net_cancel_signal_active(&state.rx_queues[dst->id]);
@@ -61,8 +63,8 @@ static bool vswitch_can_send_to(int src_id, int dst_id)
 
 int mac_addr_find(const uint8_t *dest_macaddr) {
     mac_addr_t *mac;
-    // try matching each MAC in the list (skip ID 0) - virts
-    for (int i = 1; i < SDDF_NET_MAX_CLIENTS; i++) { // TODO: can we simplify that loop?
+    // try matching each MAC in the list (skip ID SDDF_NET_MAX_CLIENTS - 1) - virts
+    for (int i = 0; i < SDDF_NET_MAX_CLIENTS - 1; i++) { // TODO: can we simplify that loop?
         for (int j = 0; j < TEMP_MAX_MACS_PER_CLIENT; j++) {
             mac = &config.ports[i].mac_addrs[j];
             if (mac802_addr_eq(mac->addr, dest_macaddr)) {
@@ -78,10 +80,13 @@ static bool try_broadcast(net_vswitch_port_config_t *src, net_buff_desc_t *buffe
 {
     // just need one success to not drop?
     bool success = false;
-    // Only broadcast to allowed
+    // Only broadcast to allowed, exclude myself
     for (int i = 0; i < SDDF_NET_MAX_CLIENTS; i++) {
+        //sddf_printf_("Bcasting to id %d\n", i);
         if (config.ports[i].connected && i != src->id && vswitch_can_send_to(src->id, config.ports[i].id)) {
+            //sddf_printf_("Can bcast to id %d\n", i);
             success = forward_frame(src, &config.ports[i], buffer);
+            sddf_printf_("VSWITCH Success of bcast is %d\n", success);
         }
     }
     return success;
@@ -105,6 +110,7 @@ static void rx_provide()
     // Return empty buffers
     for (int i = 0; i < SDDF_NET_MAX_CLIENTS; i++) {
         if (!config.ports[i].connected) continue;
+        sddf_printf_("VSWITCH Returning buffers from %d\n", i);
         bool reprocess = true;
         net_queue_handle_t *src = &state.rx_queues[i];
         while (reprocess) {
@@ -114,11 +120,12 @@ static void rx_provide()
                 assert(!err);
                 // TODO: handle if we need to handle the offsets etc in any special way
                 int ref_index = buffer.io_or_offset / NET_BUFFER_SIZE;
-                assert(buffer_refs[buffer.oid][ref_index] != 0);
+                sddf_printf_("VSWITCH buffer oid: %d, ref_index: %d\n", buffer.oid, ref_index);
+                assert(buffer_refs[buffer.oid * SDDF_NET_MAX_CLIENTS + ref_index] != 0);
 
-                buffer_refs[buffer.oid][ref_index]--;
+                buffer_refs[buffer.oid * SDDF_NET_MAX_CLIENTS + ref_index]--;
 
-                if (buffer_refs[buffer.oid][ref_index] != 0) {
+                if (buffer_refs[buffer.oid * SDDF_NET_MAX_CLIENTS + ref_index] != 0) {
                     continue;
                 }
 
@@ -156,6 +163,7 @@ static void forward_traffic_from(net_vswitch_port_config_t *port)
     // TODO: Think if we don't need to do some other handling for virt, should be fine
     net_queue_handle_t *src = &state.tx_queues[port->id];
 
+    sddf_printf_("VSWITCH Forward traffic from port: %d\n", port->id);
     bool reprocess = true;
     while (reprocess) {
         // read from active queue
@@ -164,17 +172,24 @@ static void forward_traffic_from(net_vswitch_port_config_t *port)
             int err = net_dequeue_active(src, &buffer);
             assert(!err);
 
-            const char *frame_data = port->tx_data.vaddr + buffer.io_or_offset;
+            sddf_printf_("VSWITCH Address of region is: %p size: %ld buffer offset: %ld\n", port->tx_data.region.vaddr, port->tx_data.region.size, buffer.io_or_offset);
+            const char *frame_data = port->tx_data.region.vaddr + buffer.io_or_offset;
             const struct ether_addr *macaddr = (void *)frame_data;
+            sddf_printf_(PR_MAC802_ADDR"\n", PR_MAC802_SRC_ADDR_ARGS(macaddr));
+            sddf_printf_(PR_MAC802_ADDR"\n", PR_MAC802_DEST_ADDR_ARGS(macaddr));
             bool transmitted = false;
             // find the receiver(s)
             // Forward frame
             // queue packets for the receivers (inside forward_frame)
+            sddf_printf_("VSWITCH Transmitting\n");
             if (mac802_addr_is_bcast(macaddr->ether_dest_addr_octet)) {
+                sddf_printf_("VSWITCH Bcasting\n");
                 transmitted = try_broadcast(port, &buffer);
             } else {
+                sddf_printf_("VSWITCH Sending\n");
                 transmitted = try_send(port, macaddr->ether_dest_addr_octet, &buffer);
             }
+            sddf_printf_("VSWITCH Transmitted\n");
 
             if (!transmitted) {
                 net_enqueue_free(src, buffer);
@@ -194,24 +209,36 @@ static void forward_traffic_from(net_vswitch_port_config_t *port)
 
 void notified(sddf_channel ch)
 {
+    sddf_printf_("VSWITCH Notified on channel %d\n", ch);
     for (int i = 0; i < SDDF_NET_MAX_CLIENTS; i++) {
-        if (ch == config.ports[i].rx.id) {
+        if (!config.ports[i].connected) continue;
+        sddf_printf_("VSWITCH i: %d Port ids RX: %d TX: %d\n", i, config.ports[i].rx.id, config.ports[i].tx.id);
+        if (ch == config.ports[i].tx.id) {
+            sddf_printf_("VSWITCH Found a match TX i: %d\n", i);
             forward_traffic_from(&config.ports[i]);
             break;
+        } else if (ch == config.ports[i].rx.id) {
+            sddf_printf_("VSWITCH Found a match RX i: %d\n", i);
+            //rx_provide(&config.ports[i]);
         }
     }
-    rx_provide();
+    //rx_provide(); // TODO: uncomment - some logic fallacy here - where/when we should be notified to return it? A different channel maybe?
 }
 
 void init(void)
 {
     assert(net_config_check_magic(&config));
 
+    sddf_printf_("num_ports: %d\n", config.num_ports);
+
     buffer_refs = config.buffer_metadata.vaddr;
+    sddf_printf_("buffer_metadata.vaddr : %p size: %ld\n", config.buffer_metadata.vaddr, config.buffer_metadata.size);
+    sddf_printf_("Buffer refs assigned: %p\n", buffer_refs);
 
     /* Set up client queues and buffers for copying? */
     for (int i = 0; i < SDDF_NET_MAX_CLIENTS; i++) {
         if (!config.ports[i].connected) continue;
+        sddf_printf_("Port %d connected\n", i);
         net_queue_init(&state.rx_queues[i], config.ports[i].rx.free_queue.vaddr, config.ports[i].rx.active_queue.vaddr,
                        config.ports[i].rx.num_buffers);
         net_queue_init(&state.tx_queues[i], config.ports[i].tx.free_queue.vaddr, config.ports[i].tx.active_queue.vaddr,

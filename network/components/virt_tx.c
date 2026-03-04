@@ -44,6 +44,7 @@ void tx_provide(void)
                 net_buff_desc_t buffer;
                 int err = net_dequeue_active(&state.tx_queue_clients[client], &buffer);
                 assert(!err);
+                sddf_printf_("VIRT TX active from client: %d\n", client);
 
                 if (buffer.io_or_offset % NET_BUFFER_SIZE
                     || buffer.io_or_offset >= NET_BUFFER_SIZE * state.tx_queue_clients[client].capacity) {
@@ -108,6 +109,7 @@ void tx_return(void)
 
     for (int client = 0; client < config.num_clients; client++) {
         if (notify_clients[client] && net_require_signal_free(&state.tx_queue_clients[client])) {
+            sddf_printf_("VIRT TX free to client: %d\n", client);
             net_cancel_signal_free(&state.tx_queue_clients[client]);
             sddf_notify(config.clients[client].conn.id);
         }
