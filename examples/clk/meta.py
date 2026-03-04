@@ -27,11 +27,9 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
         "serial_virt_tx", "serial_virt_tx.elf", priority=199, stack_size=0x2000
     )
 
-    timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=4)
+    timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=200)
     client = ProtectionDomain("client", "client.elf", priority=1)
-    clk_driver = ProtectionDomain("clk_driver", "clk_driver.elf", priority=100)
-    clk_channel = Channel(clk_driver, client)
-    sdf.add_channel(clk_channel)
+    clk_driver = ProtectionDomain("clk_driver", "clk_driver.elf", priority=100, passive=True)
 
     timer_node = dtb.node(board.timer)
     assert timer_node is not None
@@ -40,11 +38,49 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
     timer_system.add_client(client)
-
     serial_system = Sddf.Serial(
         sdf, serial_node, serial_driver, serial_virt_tx, enable_color=False
     )
     serial_system.add_client(client)
+
+    # HACK: sdfgen doesn't support multiple regions for a device resource yet
+    #       or the clk class. This will be removed in the pending sdfgen refactor.
+    #       We can add direct support for the Maaxboard via boards.py, but
+    #       the odroid clk driver depends on numerous maps that aren't in the DTS
+    #       at all, meaning this switch is the best we can do for now.
+    regions = []    # tuples of (mr, map var name)
+    if board.name == "maaxboard":
+        clk_ccm_mr = MemoryRegion(sdf, "clk_ccm", 0xd000, paddr=0x30380000)
+        clk_ccm_analog_mr = MemoryRegion(sdf, "clk_ccm_analog", 0x1000, paddr=0x30360000)
+        sdf.add_mr(clk_ccm_mr)
+        sdf.add_mr(clk_ccm_analog_mr)
+
+        clk_ccm_map = Map(clk_ccm_mr, 0x3200000, "rw", cached=False)
+        clk_ccm_analog_map = Map(clk_ccm_analog_mr, 0x3300000, "rw", cached=False)
+        clk_driver.add_map(clk_ccm_map)
+        clk_driver.add_map(clk_ccm_analog_map)
+
+    elif board.name == "odroidc4":
+        clk_mr = MemoryRegion(sdf, "clk", 0x1000, paddr=0xFF63C000)
+        msr_clk_mr = MemoryRegion(sdf, "msr_clk", 0x1000, paddr=0xFFD18000)
+        sdf.add_mr(clk_mr)
+        sdf.add_mr(msr_clk_mr)
+
+        clk_map = Map(clk_mr, 0x3200000, "rw", cached=False)
+        msr_clk_map = Map(msr_clk_mr, 0x3300000, "rw", cached=False)
+        clk_driver.add_map(clk_map)
+        clk_driver.add_map(msr_clk_map)
+
+        timer_system.add_client(clk_driver)
+
+    else:
+        print("Unsupported board!")
+        exit(-1)
+
+
+
+    clk_channel = Channel(clk_driver, client, pp_b=True)
+    sdf.add_channel(clk_channel)
 
     pds = [
         clk_driver,

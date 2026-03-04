@@ -12,8 +12,8 @@
 #include <sddf/util/printf.h>
 #include <clk-imx8mq.h>
 
-uintptr_t ccm_base;
-uintptr_t ccm_analog_base;
+uintptr_t ccm_base = 0x3200000;
+uintptr_t ccm_analog_base = 0x3300000;
 
 static struct clk_parent_data pll_ref_sels[] = {
     {
