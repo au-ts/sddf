@@ -15,7 +15,7 @@ sys.path.append(
 board_module = importlib.import_module("board")
 BOARDS = board_module.BOARDS
 
-assert version("sdfgen").split(".")[1] == "28", "Unexpected sdfgen version"
+assert version("sdfgen").split(".")[1] == "29", "Unexpected sdfgen version"
 
 ProtectionDomain = SystemDescription.ProtectionDomain
 
@@ -25,19 +25,8 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     timer_driver = ProtectionDomain("timer_driver", "timer_driver.elf", priority=253)
     client = ProtectionDomain("client", "client.elf", priority=1)
 
-    if board.name == "x86_64_generic":
-        # actual interrupt vector = 0 + irq_user_min(0x10) + IRQ_INT_OFFSET(0x20) = 0x30
-        hpet_irq = SystemDescription.IrqMsi(0, 0, 0, 0, 0, 0)
-        timer_driver.add_irq(hpet_irq)
-
-        hept_regs = SystemDescription.MemoryRegion(
-            sdf, "hept_regs", 0x1000, paddr=0xFED00000
-        )
-        hept_regs_map = SystemDescription.Map(
-            hept_regs, 0x5000_0000, "rw", cached=False
-        )
-        timer_driver.add_map(hept_regs_map)
-        sdf.add_mr(hept_regs)
+    if board.arch == SystemDescription.Arch.X86_64:
+        board_module.add_x86_hpet(sdf, timer_driver)
     else:
         timer_node = dtb.node(board.timer)
         assert timer_node is not None
