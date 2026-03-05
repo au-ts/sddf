@@ -48,6 +48,18 @@ def build_zig(args: argparse.Namespace, test_config: TestConfig):
     zig_env["ZIG_GLOBAL_CACHE_DIR"] = str(common.CI_BUILD_DIR / "zig-cache")
     zig_env["ZIG_LOCAL_CACHE_DIR"] = str(common.CI_BUILD_DIR / "zig-cache")
 
+    # Explicitly handle each config in case of unexpected future Microkit
+    # configurations
+    zig_optimize_table = {
+        "debug": "Debug",
+        "debug-smp": "Debug",
+        "release": "ReleaseSafe",
+        "release-smp": "ReleaseSafe",
+        "benchmark": "ReleaseSafe",
+        "benchmark-smp": "ReleaseSafe",
+    }
+    zig_optimize = zig_optimize_table[test_config.config]
+
     with contextlib.chdir(example_dir):
         subprocess.run(
             [
@@ -56,6 +68,7 @@ def build_zig(args: argparse.Namespace, test_config: TestConfig):
                 f"-Dsdk={args.microkit_sdk}",
                 f"-Dboard={test_config.board}",
                 f"-Dconfig={test_config.config}",
+                f"-Doptimize={zig_optimize}",
                 "-p",
                 build_dir,
                 f"-j{args.num_jobs}",
