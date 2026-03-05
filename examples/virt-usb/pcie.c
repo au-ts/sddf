@@ -265,7 +265,7 @@ void print_pci_info(uint8_t bus, uint8_t device, uint8_t function, bool to_mask)
     sddf_dprintf("\t(PIN-based) interrupt disable: %s\n", (header->command & BIT(10)) ? "is disabled" : "is not disabled");
     sddf_dprintf("\t(PIN-based) interrupt status: %s\n", (header->status & BIT(3)) ? "asserted" : "none");
 
-    return;
+    // return;
 
     /* mask out the interrupt... */
     // https://elixir.bootlin.com/linux/v5.18-rc4/source/drivers/pci/pci.c#L4595

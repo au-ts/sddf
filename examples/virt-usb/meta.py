@@ -47,7 +47,7 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     sdf.add_mr(ehci_dma)
 
     # i think this is required?
-    usb.add_irq(IrqConventional(0x49 + 32, id=1))
+    usb.add_irq(IrqConventional(36, id=1))
 
     # need timer for tinyUSB (this would need to be modified for x86 support)
     timer_system = Sddf.Timer(sdf, dtb.node(board.timer), timer_driver)

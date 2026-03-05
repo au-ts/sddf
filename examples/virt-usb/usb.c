@@ -55,6 +55,7 @@ void init(void)
     uint64_t time = sddf_timer_time_now(timer_channel);
     LOG_USB("Time is: %lu\n", time);
 
+    tuh_task(); // run this once
 }
 
 
