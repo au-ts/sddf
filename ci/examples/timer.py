@@ -25,17 +25,17 @@ async def test(backend: HardwareBackend, test_config: common.TestConfig):
     await wait_for_output(backend, b"CLIENT|INFO: starting\r\n")
 
     async with asyncio.timeout(5 + TIME_MEASURE_COUNT):
-        await wait_for_output(backend, b"The time now is: ")
-        await wait_for_output(backend, b"Setting a time out for 1 second\r\n")
+        await wait_for_output(backend, b"The time was is: ")
+        await wait_for_output(backend, b"Set a time out for 1 second\r\n")
 
         times: list[int] = []
         for _ in range(TIME_MEASURE_COUNT):
             await wait_for_output(backend, b"Got a timeout!\r\n")
-            # "CLIENT|INFO: Now the time (in nanoseconds) is: 1015768000"
+            # "CLIENT|INFO: The time (in nanoseconds) was: 1015768000"
             line = await wait_for_output(backend, b"\r\n")
-            assert line.startswith(b"CLIENT|INFO: Now the time (in nanoseconds) is: ")
+            assert line.startswith(b"CLIENT|INFO: The time (in nanoseconds) was: ")
             time = int(
-                line.replace(b"CLIENT|INFO: Now the time (in nanoseconds) is: ", b"")
+                line.replace(b"CLIENT|INFO: The time (in nanoseconds) was: ", b"")
             )
             times.append(time)
 
