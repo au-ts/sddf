@@ -8,6 +8,7 @@ name: Examples
 
 on:
   pull_request:
+    types: [opened, labeled, synchronize]
   push:
     branches: [ "main" ]
   schedule:
@@ -158,8 +159,17 @@ jobs:
   run_hardware:
     name: Run (hardware)
     runs-on: ubuntu-latest
-    if: ${{ contains(github.event.pull_request.labels.*.name, 'hardware-test') ||
-            (github.event_name == 'schedule') }}
+    if: ${{ github.repository_owner == 'au-ts' &&
+              (
+                (github.event_name == 'schedule') ||
+                (github.event_name == 'pull_request' &&
+                  (
+                    (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'hardware-test')) ||
+                    (github.event.action == 'labeled' && github.event.label.name == 'hardware-test')
+                  )
+                )
+              )
+         }}
     needs: build_linux_x86_64_nix
     concurrency:
       group: ${{ github.workflow }}-sddf-hardware-tests-${{ github.event.number }}-${{ strategy.job-index }}
