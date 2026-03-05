@@ -68,6 +68,13 @@ BOARDS: List[Board] = [
         ethernet="soc@0/bus@30800000/ethernet@30be0000",
     ),
     Board(
+        name="kria_k26",
+        arch=SystemDescription.Arch.AARCH64,
+        paddr_top=0x70000000,
+        timer="axi/timer@ff140000",
+        serial="axi/serial@ff010000",
+    ),
+    Board(
         name="maaxboard",
         arch=SystemDescription.Arch.AARCH64,
         paddr_top=0x70000000,

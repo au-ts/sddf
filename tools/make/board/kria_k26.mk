@@ -1,0 +1,12 @@
+#
+# Copyright 2023, UNSW
+#
+# SPDX-License-Identifier: BSD-2-Clause
+#
+# Set up variables for kria_k26
+# Should be included _before_ toolchain makefile.
+PLATFORM := zynqmp
+TIMER_DRIV_DIR := cdns
+UART_DRIV_DIR := ${PLATFORM}
+
+CPU := cortex-a53
