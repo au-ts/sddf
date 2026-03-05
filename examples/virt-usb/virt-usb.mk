@@ -150,7 +150,7 @@ qemu: ${IMAGE_FILE}
 	-device loader,file=$(IMAGE_FILE),addr=0x70000000,cpu-num=0 \
 	-m size=2G \
  	-device usb-ehci,id=ehci \
-	-device usb-kbd,id=kbd,bus=ehci.0 \
+	-device usb-kbd,id=kbd,bus=ehci.0,port=1 \
  	--trace events="trace.txt",file="trace.out" \
 
 #	-device usb-tablet,bus=ehci.0 \
@@ -159,6 +159,7 @@ qemu: ${IMAGE_FILE}
 #	-device usb-kbd,id=kbd,bus=ehci.0 \
 # 	--trace "memory_region_ops_*" \
 # 	-usb \
+#	-s -S
 
 clean::
 	${RM} -f *.elf

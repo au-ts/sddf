@@ -55,7 +55,8 @@ void init(void)
     uint64_t time = sddf_timer_time_now(timer_channel);
     LOG_USB("Time is: %lu\n", time);
 
-    tuh_task(); // run this once
+    // set timeout to call tuh task every 1s
+    sddf_timer_set_timeout(timer_channel, NS_IN_S);
 }
 
 
@@ -74,7 +75,6 @@ void notified(sddf_channel ch)
         LOG_USB("pcie says hello: ehci init complete!\n");
 
         print_ehci();
-        LOG_USB("init tinyUSB stack...\n");
 
         LOG_USB("Initialising TinyUSB...\n");
         tusb_rhport_init_t host_init = {
@@ -96,8 +96,16 @@ void notified(sddf_channel ch)
         LOG_USB("recieved interrupt!\n");
         /* copied verbatim from alexd */
         tusb_int_handler(0, true);
-        sddf_irq_ack(ch);
         tuh_task();
+        sddf_irq_ack(ch);
+    }
+
+    else if (ch == timer_channel) {
+        LOG_USB("received timeout\n");
+
+        tuh_task();
+
+        sddf_timer_set_timeout(timer_channel, NS_IN_S);
     }
 }
 
