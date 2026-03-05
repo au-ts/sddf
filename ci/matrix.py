@@ -92,8 +92,6 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             # not in machine queue
             {"board": "imx8mp_evk"},
             {"board": "rock3b"},
-            # ???
-            {"board": "x86_64_generic"},
         ],
     },
     "serial": {
