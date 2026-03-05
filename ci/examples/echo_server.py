@@ -23,11 +23,8 @@ from ts_ci import (
 sys.path.insert(1, Path(__file__).parents[2].as_posix())
 from ci import common, matrix
 
-TEST_MATRIX = matrix_product(
-    example=["echo_server"],
-    board=matrix.EXAMPLES["echo_server"]["boards_test"],
-    config=matrix.EXAMPLES["echo_server"]["configs"],
-    build_system=matrix.EXAMPLES["echo_server"]["build_systems"],
+TEST_MATRIX = matrix.generate_example_test_matrix(
+    "echo_server", matrix.EXAMPLES["echo_server"]
 )
 
 

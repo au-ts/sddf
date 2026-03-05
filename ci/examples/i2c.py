@@ -19,12 +19,7 @@ from ts_ci import (
 sys.path.insert(1, Path(__file__).parents[2].as_posix())
 from ci import common, matrix
 
-TEST_MATRIX = matrix_product(
-    example=["i2c"],
-    board=matrix.EXAMPLES["i2c"]["boards_test"],
-    config=matrix.EXAMPLES["i2c"]["configs"],
-    build_system=matrix.EXAMPLES["i2c"]["build_systems"],
-)
+TEST_MATRIX = matrix.generate_example_test_matrix("i2c", matrix.EXAMPLES["i2c"])
 
 
 def backend_fn(test_config: TestConfig, loader_img: Path) -> HardwareBackend:

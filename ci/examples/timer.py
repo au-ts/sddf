@@ -20,12 +20,7 @@ from ts_ci import (
 sys.path.insert(1, Path(__file__).parents[2].as_posix())
 from ci import common, matrix
 
-TEST_MATRIX = matrix_product(
-    example=["timer"],
-    board=matrix.EXAMPLES["timer"]["boards_test"],
-    config=matrix.EXAMPLES["timer"]["configs"],
-    build_system=matrix.EXAMPLES["timer"]["build_systems"],
-)
+TEST_MATRIX = matrix.generate_example_test_matrix("timer", matrix.EXAMPLES["timer"])
 
 DRIFT_THRESHOLD = 0.05  # 5 percent.
 TIME_MEASURE_COUNT = 5
