@@ -11,6 +11,8 @@
     zig-overlay.inputs.nixpkgs.follows = "nixpkgs";
     sdfgen.url = "github:au-ts/microkit_sdf_gen/0.28.1";
     sdfgen.inputs.nixpkgs.follows = "nixpkgs";
+    systems-ci.url = "github:au-ts/systems-ci/main";
+    systems-ci.flake = false;
   };
 
   outputs =
@@ -18,6 +20,7 @@
       nixpkgs,
       zig-overlay,
       sdfgen,
+      systems-ci,
       ...
     }:
     let
@@ -48,6 +51,10 @@
             pythonPackages = pkgs.python312Packages;
           };
 
+          ts_ci = pkgs.callPackage "${systems-ci}/ts_ci/package.nix" {
+            python3Packages = pkgs.python312Packages;
+          };
+
           clang-complete = (pkgs.symlinkJoin {
             name = "clang-complete";
             paths = llvm.clang-unwrapped.all;
@@ -75,6 +82,7 @@
 
           pythonTool = pkgs.python312.withPackages (ps: [
             pysdfgen
+            ts_ci
           ]);
         in
         {
