@@ -4,47 +4,77 @@
 
 from __future__ import annotations
 from itertools import chain
-from typing import TYPE_CHECKING, Any, Literal, TypedDict
+from typing import TYPE_CHECKING, Any, Literal, Optional, Sequence, TypedDict
 
-from ts_ci import MACHINE_QUEUE_BOARDS
+from ts_ci import MACHINE_QUEUE_BOARDS, matrix_product, TestConfig
 
 NO_OUTPUT_DEFAULT_TIMEOUT_S: int = 60
+
+
+def generate_example_test_matrix(
+    example: str, example_matrix: _ExampleMatrixType
+) -> list[TestConfig]:
+    def listify(s: str | Sequence[str]) -> Sequence[str]:
+        if isinstance(s, str):
+            return [s]
+        else:
+            return s
+
+    matrix = set(
+        matrix_product(
+            example=[example],
+            board=example_matrix["boards"],
+            config=example_matrix["configs"],
+            build_system=example_matrix["build_systems"],
+        )
+    )
+
+    for exclude in example_matrix["tests_exclude"]:
+        to_exclude = set(
+            matrix_product(
+                example=[example],
+                board=listify(exclude.get("board", example_matrix["boards"])),
+                config=listify(exclude.get("config", example_matrix["configs"])),
+                build_system=listify(
+                    exclude.get("build_system", example_matrix["build_systems"])
+                ),
+            )
+        )
+        matrix -= to_exclude
+
+    return list(matrix)
+
 
 EXAMPLES: dict[str, _ExampleMatrixType] = {
     "blk": {
         "configs": ["debug", "release"],
         "build_systems": ["make", "zig"],
-        "boards_build": [
+        "boards": [
             "maaxboard",
             "qemu_virt_aarch64",
             "qemu_virt_riscv64",
             "x86_64_generic",
         ],
-        "boards_test": [
-            "maaxboard",
-            "qemu_virt_aarch64",
-            "qemu_virt_riscv64",
-            "x86_64_generic",
-        ],
+        "tests_exclude": [],
     },
     "i2c": {
         "configs": ["debug", "release"],
         "build_systems": ["make", "zig"],
-        "boards_build": ["odroidc4"],
-        "boards_test": ["odroidc4"],
+        "boards": ["odroidc4"],
+        "tests_exclude": [],
     },
     # Use i2c bus scan for all devices that don't have an I2C test board
     # attached.
     "i2c_bus_scan": {
         "configs": ["debug", "release"],
         "build_systems": ["make", "zig"],
-        "boards_build": ["serengeti"],
-        "boards_test": ["serengeti"],
+        "boards": ["serengeti"],
+        "tests_exclude": [],
     },
     "echo_server": {
         "configs": ["debug", "release", "benchmark"],
         "build_systems": ["make"],
-        "boards_build": [
+        "boards": [
             "imx8mm_evk",
             "imx8mq_evk",
             "imx8mp_evk",
@@ -58,22 +88,18 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "star64",
             "x86_64_generic",
         ],
-        "boards_test": [
-            "imx8mm_evk",
-            "imx8mq_evk",
-            "imx8mp_iotgate",
-            "maaxboard",
-            "odroidc2",
-            "odroidc4",
-            "qemu_virt_aarch64",
-            "qemu_virt_riscv64",
-            "star64",
+        "tests_exclude": [
+            # not in machine queue
+            {"board": "imx8mp_evk"},
+            {"board": "rock3b"},
+            # ???
+            {"board": "x86_64_generic"},
         ],
     },
     "serial": {
         "configs": ["debug", "release"],
         "build_systems": ["make", "zig"],
-        "boards_build": [
+        "boards": [
             "cheshire",
             "hifive_p550",
             "imx8mm_evk",
@@ -91,32 +117,17 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "x86_64_generic",
             "zcu102",
         ],
-        "boards_test": [
-            "hifive_p550",
-            "imx8mm_evk",
-            "imx8mq_evk",
-            "maaxboard",
-            "odroidc2",
-            "odroidc4",
-            "qemu_virt_aarch64",
-            "qemu_virt_riscv64",
-            "rpi4b_1gb",
-            "serengeti",
-            "star64",
-            "x86_64_generic",
-            "zcu102",
+        "tests_exclude": [
+            # not in machine queue
+            {"board": "cheshire"},
+            {"board": "imx8mp_evk"},
+            {"board": "rock3b"},
         ],
     },
     "timer": {
-        # Only works in debug mode so as to not depend on serial
-        "configs": ["debug"],
+        "configs": ["debug", "release"],
         "build_systems": ["make", "zig"],
-        # TODO:
-        # "tests_exclude": [
-        #     { "config": "release "},
-        #     { "config", "debug", "build": "zig", board: "odroid"}
-        # ],
-        "boards_build": [
+        "boards": [
             "imx8mq_evk",
             "imx8mp_evk",
             "maaxboard",
@@ -131,18 +142,12 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "x86_64_generic",
             "zcu102",
         ],
-        "boards_test": [
-            "imx8mq_evk",
-            "maaxboard",
-            "odroidc2",
-            "odroidc4",
-            "qemu_virt_aarch64",
-            "qemu_virt_riscv64",
-            "rpi4b_1gb",
-            "serengeti",
-            "star64",
-            "x86_64_generic",
-            "zcu102",
+        "tests_exclude": [
+            # does not print anything in release mode, so we don't depend on serial
+            {"config": "release"},
+            # not in machine queue
+            {"board": "imx8mp_evk"},
+            {"board": "rock3b"},
         ],
     },
 }
@@ -180,16 +185,18 @@ known_board_names = set(MACHINE_QUEUE_BOARDS.keys()) | {
     "cheshire",
 }
 assert (
-    set(_BoardNames.__args__) <= known_board_names
-), f"_BoardNames contains a board that is not valid {known_board_names ^ set(_BoardNames.__args__)}"
+    set(_BoardNames.__args__) <= known_board_names  # type: ignore
+), f"_BoardNames contains a board that is not valid {known_board_names ^ set(_BoardNames.__args__)}"  # type: ignore
 
 for ex in EXAMPLES.values():
-    for board in chain(ex["boards_build"], ex["boards_test"]):
+    for board in chain(
+        ex["boards"], (excl["board"] for excl in ex["tests_exclude"] if "board" in excl)
+    ):
         assert board in known_board_names, f"{board} not a valid board"
 
 
 class _ExampleMatrixType(TypedDict):
     configs: list[Literal["debug", "release", "benchmark"]]
     build_systems: list[Literal["make", "zig"]]
-    boards_build: list[_BoardNames]
-    boards_test: list[_BoardNames]
+    boards: list[_BoardNames]
+    tests_exclude: list[dict[str, str]]

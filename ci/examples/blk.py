@@ -23,12 +23,7 @@ from ts_ci import (
 sys.path.insert(1, Path(__file__).parents[2].as_posix())
 from ci import common, matrix
 
-TEST_MATRIX = matrix_product(
-    example=["blk"],
-    board=matrix.EXAMPLES["blk"]["boards_test"],
-    config=matrix.EXAMPLES["blk"]["configs"],
-    build_system=matrix.EXAMPLES["blk"]["build_systems"],
-)
+TEST_MATRIX = matrix.generate_example_test_matrix("blk", matrix.EXAMPLES["blk"])
 
 SDDF = Path(__file__).parents[2]
 mkvirtdisk = (SDDF / "tools" / "mkvirtdisk").resolve()

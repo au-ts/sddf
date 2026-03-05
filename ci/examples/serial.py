@@ -20,12 +20,7 @@ from ts_ci import (
 sys.path.insert(1, Path(__file__).parents[2].as_posix())
 from ci import common, matrix
 
-TEST_MATRIX = matrix_product(
-    example=["serial"],
-    board=matrix.EXAMPLES["serial"]["boards_test"],
-    config=matrix.EXAMPLES["serial"]["configs"],
-    build_system=matrix.EXAMPLES["serial"]["build_systems"],
-)
+TEST_MATRIX = matrix.generate_example_test_matrix("serial", matrix.EXAMPLES["serial"])
 
 ANSI_RED = b"\x1b[31m"
 ANSI_GREEN = b"\x1b[32m"

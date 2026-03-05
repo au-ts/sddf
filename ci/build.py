@@ -128,7 +128,7 @@ if __name__ == "__main__":
 
         example_matrix = matrix_product(
             example=[example_name],
-            board=options["boards_build"],
+            board=options["boards"],
             config=options["configs"],
             build_system=options["build_systems"],
         )

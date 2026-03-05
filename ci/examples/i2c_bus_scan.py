@@ -18,11 +18,8 @@ from ts_ci import (
 sys.path.insert(1, Path(__file__).parents[2].as_posix())
 from ci import common, matrix
 
-TEST_MATRIX = matrix_product(
-    example=["i2c_bus_scan"],
-    board=matrix.EXAMPLES["i2c_bus_scan"]["boards_test"],
-    config=matrix.EXAMPLES["i2c_bus_scan"]["configs"],
-    build_system=matrix.EXAMPLES["i2c_bus_scan"]["build_systems"],
+TEST_MATRIX = matrix.generate_example_test_matrix(
+    "i2c_bus_scan", matrix.EXAMPLES["i2c_bus_scan"]
 )
 
 
