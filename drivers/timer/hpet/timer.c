@@ -10,7 +10,7 @@
 #include <sddf/timer/protocol.h>
 #include <sddf/timer/config.h>
 
-__attribute__((__section__(".device_resources"))) device_resources_t device_resources;
+__attribute__((__section__(".device_resources"), retain, used)) device_resources_t device_resources;
 
 /* hpet data structures / memory maps
  * each timer has its own configuration registers:
