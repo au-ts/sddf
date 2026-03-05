@@ -16,6 +16,7 @@ The following platforms are supported:
 * imx8mm_evk
 * imx8mp_evk
 * imx8mq_evk
+* kria_k26
 * maaxboard
 * odroidc2
 * odroidc4

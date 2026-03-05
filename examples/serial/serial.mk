@@ -27,6 +27,7 @@ SUPPORTED_BOARDS:= cheshire \
 		   imx8mp_evk \
 		   imx8mp_iotgate \
 		   imx8mq_evk \
+		   kria_k26 \
 		   maaxboard \
 		   odroidc2 \
 		   odroidc4 \
