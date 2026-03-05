@@ -33,7 +33,8 @@ SUPPORTED_BOARDS := \
 		    serengeti \
 		    star64 \
 		    zcu102 \
-		    x86_64_generic
+		    x86_64_generic \
+		    kria_k26
 
 ifeq ($(strip $(TOOLCHAIN)),)
 	TOOLCHAIN := clang
