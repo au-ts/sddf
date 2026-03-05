@@ -182,6 +182,7 @@ def generate(
     output_dir: str,
     dtb: Optional[DeviceTree],
     get_core: Callable[[str], int],
+    net_need_timer: bool,
 ):
     uart_node = None
     ethernet_node = None
@@ -195,7 +196,7 @@ def generate(
         assert timer_node is not None
 
     timer_driver = ProtectionDomain(
-        "timer_driver", "timer_driver.elf", priority=101, cpu=get_core("timer_driver")
+        "timer_driver", "timer_driver.elf", priority=102, cpu=get_core("timer_driver")
     )
     timer_system = Sddf.Timer(sdf, timer_node, timer_driver)
 
@@ -340,10 +341,17 @@ def generate(
         cpu=get_core("client1_net_copier"),
     )
 
+    if board.name == "rpi4b_1gb":
+        mbox = MemoryRegion(sdf, "mbox", 0x10_000, paddr=0xFE00B000)
+        sdf.add_mr(mbox)
+        ethernet_driver.add_map(Map(mbox, 0x3000000, perms="rw", cached=False))
+
     serial_system.add_client(client0)
     serial_system.add_client(client1)
     timer_system.add_client(client0)
     timer_system.add_client(client1)
+    if net_need_timer:
+        timer_system.add_client(ethernet_driver)
     net_system.add_client_with_copier(client0, client0_net_copier)
     net_system.add_client_with_copier(client1, client1_net_copier)
 
@@ -521,6 +529,7 @@ if __name__ == "__main__":
     parser.add_argument("--board", required=True, choices=[b.name for b in BOARDS])
     parser.add_argument("--output", required=True)
     parser.add_argument("--sdf", required=True)
+    parser.add_argument("--need_timer", action="store_true", default=False)
     parser.add_argument("--objcopy", required=True)
     parser.add_argument("--smp", required=True)
 
@@ -543,4 +552,4 @@ if __name__ == "__main__":
         with open(args.dtb, "rb") as f:
             dtb = DeviceTree(f.read())
 
-    generate(args.sdf, args.output, dtb, get_core)
+    generate(args.sdf, args.output, dtb, get_core, args.need_timer)
