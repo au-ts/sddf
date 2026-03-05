@@ -10,6 +10,8 @@ import subprocess
 import sys
 import contextlib
 
+assert list(map(int, sys.version.split(" ")[0].split("."))) > [3, 9, 0]
+
 sys.path.insert(1, Path(__file__).parents[1].as_posix())
 
 from ci.lib.runner import ArgparseActionList, TestConfig, matrix_product

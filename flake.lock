@@ -100,9 +100,26 @@
         "type": "github"
       }
     },
+    "python39": {
+      "locked": {
+        "lastModified": 1742943473,
+        "narHash": "sha256-u7+CYuAuCiJH3scDvMV9oj3p22ygnFhTXUefXUgd/LI=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "c5dd43934613ae0f8ff37c59f61c507c2e8f980d",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "c5dd43934613ae0f8ff37c59f61c507c2e8f980d",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
         "nixpkgs": "nixpkgs",
+        "python39": "python39",
         "sdfgen": "sdfgen",
         "zig-overlay": "zig-overlay_2"
       }
