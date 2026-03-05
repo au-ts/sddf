@@ -47,7 +47,7 @@ uint64_t pulse_in(int gpio_ch, int value) {
             uint64_t time_now = get_time_now();
 
             if (((time_now - time_start) / NS_IN_MS) > SENSOR_TIMEOUT) {
-                LOG_SENSOR("timeout 1\n");
+                // LOG_SENSOR("timeout 1\n");
                 return 0;
             }
         } 
@@ -55,7 +55,7 @@ uint64_t pulse_in(int gpio_ch, int value) {
             // Timeout not seeing GPIO HIGH from sensor
             uint64_t time_now = get_time_now();
             if (((time_now - time_start) / NS_IN_MS) > (SENSOR_TIMEOUT * 4)) {
-                LOG_SENSOR("timeout 2\n");
+                // LOG_SENSOR("timeout 2\n");
                 return 0;
             }
 
@@ -105,7 +105,7 @@ uint64_t read_distance(int echo_ch) {
     uint64_t duration = pulse_in(echo_ch, GPIO_HIGH);
     if (duration) {
         uint64_t distance = duration * 0.034 / 2;
-        LOG_SENSOR("Sensor Reading Received: %ld\n", distance);
+        // LOG_SENSOR("Sensor Reading Received: %ld\n", distance);
         return distance;
     }
 

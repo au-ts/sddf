@@ -61,8 +61,6 @@ void set_pwm(int gpio_ch, uint64_t micro_s) {
 }
 
 void control_forward(uint64_t miliseconds) {
-    delay_miliseconds(miliseconds, MOTOR_CONTROL_TIMEOUT_ID);
-
     is_control_fulfilled = 1;
 
     motor_a_state = CONTROL_FORWARD;
@@ -70,6 +68,8 @@ void control_forward(uint64_t miliseconds) {
 
     set_pwm(gpio_channel_motor_a, pwm_delay_mappings[CONTROL_FORWARD - 1][PWM_TIME_HIGH]);
     set_pwm(gpio_channel_motor_b, pwm_delay_mappings[CONTROL_FORWARD - 1][PWM_TIME_HIGH]);
+
+    delay_miliseconds(miliseconds, MOTOR_CONTROL_TIMEOUT_ID);
 }
 
 // TODO complete these
@@ -140,12 +140,14 @@ void handle_motor_control_timeout() {
 }
 
 // upon pwm timeout, send next gpio signal
-void handle_pwm_timeout(int gpio_ch) {
+int handle_pwm_timeout(int gpio_ch) {
+    // LOG_CONTROL("is control fulfilled in timeout %d\n", is_control_fulfilled);
+
     // new request coming in
     if (!is_control_fulfilled) {
         LOG_CONTROL("control timeout\n");
         control_stop();
-        return;
+        return 1;
     }
 
     // TODO: refactor this
@@ -176,6 +178,8 @@ void handle_pwm_timeout(int gpio_ch) {
             set_pwm(gpio_ch, pwm_delay_mappings[motor_b_state - 1][PWM_TIME_HIGH]);
         }
     }
+
+    return 0;
 }
 
 void motors_init(void) {

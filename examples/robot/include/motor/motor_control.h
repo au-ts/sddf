@@ -47,6 +47,6 @@ void control_right(uint64_t miliseconds);
 void control_stop();
 
 void handle_motor_control_timeout();
-void handle_pwm_timeout(int gpio_ch);
+int handle_pwm_timeout(int gpio_ch);
 void motors_init();
 
