@@ -33,20 +33,23 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
 
     ehci_regs = MemoryRegion(sdf, "ehci_regs", 0x1000, paddr=0x3800_0000)
     ehci_dma = MemoryRegion(sdf, "ehci_dma", 0x10000, paddr=0x7000_0000)
+    ehci_dma2 = MemoryRegion(sdf, "ehci_dma2", 0x10000, paddr=0x7001_0000)
 
     pcie_usb_ch = Channel(pcie, usb, a_id=3, b_id=3)
 
     pcie.add_map(Map(pcie_config, 0x20_000_000, "rw", cached=False))
     usb.add_map(Map(ehci_regs, 0x30_000_000, "rw", cached=False))
     usb.add_map(Map(ehci_dma, 0x7000_0000, "rw", cached=False)) # identity mapping
+    usb.add_map(Map(ehci_dma2, 0x7001_0000, "rw", cached=False))
 
     sdf.add_channel(pcie_usb_ch)
 
     sdf.add_mr(pcie_config)
     sdf.add_mr(ehci_regs)
     sdf.add_mr(ehci_dma)
+    sdf.add_mr(ehci_dma2)
 
-    # i think this is required?
+    # hardcoded for EHCI PCI pin#4
     usb.add_irq(IrqConventional(36, id=1))
 
     # need timer for tinyUSB (this would need to be modified for x86 support)

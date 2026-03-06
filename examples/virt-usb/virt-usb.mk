@@ -142,6 +142,9 @@ $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 # to be mapped in high memory, which is not correctly handled by the existing PCIE code
 # and I am not going to be fixing it right at this moment
 # highmem-off could all break the hci driver which is 32bit only
+
+# $(QEMU)
+# ~/Work/qemu/build/qemu-system-aarch64-unsigned
 qemu: ${IMAGE_FILE}
 	$(QEMU) -machine virt,virtualization=on,highmem=off \
 	-drive if=none,id=stick,format=raw,file=test.img \
@@ -149,12 +152,12 @@ qemu: ${IMAGE_FILE}
 	-serial mon:stdio \
 	-device loader,file=$(IMAGE_FILE),addr=0x70000000,cpu-num=0 \
 	-m size=2G \
+	-nographic \
  	-device usb-ehci,id=ehci \
 	-device usb-kbd,id=kbd,bus=ehci.0,port=1 \
  	--trace events="trace.txt",file="trace.out" \
 
 #	-device usb-tablet,bus=ehci.0 \
-#	-nographic \
 # 	-device usb-storage,bus=ehci.0,drive=stick,id=flash \
 #	-device usb-kbd,id=kbd,bus=ehci.0 \
 # 	--trace "memory_region_ops_*" \

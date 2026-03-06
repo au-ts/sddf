@@ -93,7 +93,7 @@ void notified(sddf_channel ch)
     }
 
     else if (ch == usb_irq_channel) {
-        LOG_USB("recieved interrupt!\n");
+        // LOG_USB("recieved interrupt!\n");
         /* copied verbatim from alexd */
         tusb_int_handler(0, true);
         tuh_task();
@@ -101,11 +101,12 @@ void notified(sddf_channel ch)
     }
 
     else if (ch == timer_channel) {
-        LOG_USB("received timeout\n");
+        // not needed
+        // LOG_USB("received timeout\n");
 
-        tuh_task();
+        // tuh_task();
 
-        sddf_timer_set_timeout(timer_channel, NS_IN_S);
+        // sddf_timer_set_timeout(timer_channel, NS_IN_S);
     }
 }
 
