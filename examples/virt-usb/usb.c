@@ -114,6 +114,13 @@ void tuh_msc_mount_cb(uint8_t dev_addr) {
   LOG_USB("A MassStorage device is mounted\n");
 }
 
+#define MAX_REPORT 4
+
+static struct {
+  uint8_t report_count;
+  tuh_hid_report_info_t report_info[MAX_REPORT];
+} hid_info[CFG_TUH_HID];
+
 // Invoked when device with hid interface is mounted
 // Report descriptor is also available for use. tuh_hid_parse_report_descriptor()
 // can be used to parse common/simple enough descriptor.
@@ -121,6 +128,15 @@ void tuh_msc_mount_cb(uint8_t dev_addr) {
 // therefore report_desc = NULL, desc_len = 0
 void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const *desc_report, uint16_t desc_len) {
   LOG_USB("HID device address = %d, instance = %d is mounted\n", dev_addr, instance);
+
+  const char *protocol_str[] = {"None", "Keyboard", "Mouse"};
+  uint8_t const itf_protocol = tuh_hid_interface_protocol(dev_addr, instance);
+
+  LOG_USB("HID Interface Protocol = %s\n", protocol_str[itf_protocol]);
+  if (itf_protocol == HID_ITF_PROTOCOL_NONE) {
+    hid_info[instance].report_count = tuh_hid_parse_report_descriptor(hid_info[instance].report_info, MAX_REPORT, desc_report, desc_len);
+    LOG_USB("HID has %u reports \n", hid_info[instance].report_count);
+  }
 
   // request to receive report
   // tuh_hid_report_received_cb() will be invoked when report is available
@@ -134,6 +150,166 @@ void tuh_hid_umount_cb(uint8_t dev_addr, uint8_t instance) {
   LOG_USB("HID device address = %d, instance = %d is unmounted\n", dev_addr, instance);
 }
 
+
+static inline bool find_key_in_report(hid_keyboard_report_t const *report, uint8_t keycode) {
+  for (uint8_t i = 0; i < 6; i++) {
+    if (report->keycode[i] == keycode) {
+      return true;
+    }
+  }
+  return false;
+}
+
+
+static uint8_t const keycode2ascii[128][2] = {HID_KEYCODE_TO_ASCII};
+
+static void process_kbd_report(hid_keyboard_report_t const *report) {
+  static hid_keyboard_report_t prev_report = {0, 0, {0}};// previous report to check key released
+
+  //------------- example code ignore control (non-printable) key affects -------------//
+  for (uint8_t i = 0; i < 6; i++) {
+    if (report->keycode[i]) {
+      if (find_key_in_report(&prev_report, report->keycode[i])) {
+        // exist in previous report means the current key is holding
+      } else {
+        // not existed in previous report means the current key is pressed
+        bool const is_shift = report->modifier & (KEYBOARD_MODIFIER_LEFTSHIFT | KEYBOARD_MODIFIER_RIGHTSHIFT);
+        uint8_t ch = keycode2ascii[report->keycode[i]][is_shift ? 1 : 0];
+        // putchar(ch);
+        // microkit_dbg_putc(ch);
+        LOG_USB("%c\n", ch);
+        // sddf_dprintf("%c\n", ch);
+        
+        if (ch == '\0') {
+          // LOG_USB("%c", '\n');
+        // microkit_dbg_puts("\n");
+          // sddf_dprintf(" \n");
+        LOG_USB(" \n");
+
+          // sddf_dprintf("\n");
+        //   putchar('\n');
+        }
+
+        // #ifndef __ICCARM__     // TODO IAR doesn't support stream control ?
+        // fflush(stdout);// flush right away, else nanolib will wait for newline
+        // #endif
+      }
+    }
+    // TODO example skips key released
+  }
+
+  prev_report = *report;
+}
+
+static void cursor_movement(int8_t x, int8_t y, int8_t wheel) {
+  LOG_USB("(%d %d %d)\n", x, y, wheel);
+}
+
+static void process_mouse_report(hid_mouse_report_t const *report) {
+  static hid_mouse_report_t prev_report = {0};
+
+  // button state
+  uint8_t button_changed_mask = report->buttons ^ prev_report.buttons;
+  if (button_changed_mask & report->buttons) {
+    LOG_USB(" %c%c%c \n",
+           report->buttons & MOUSE_BUTTON_LEFT ? 'L' : '-',
+           report->buttons & MOUSE_BUTTON_MIDDLE ? 'M' : '-',
+           report->buttons & MOUSE_BUTTON_RIGHT ? 'R' : '-');
+  }
+
+  // cursor movement
+  cursor_movement(report->x, report->y, report->wheel);
+}
+
+static void process_generic_report(uint8_t dev_addr, uint8_t instance, uint8_t const *report, uint16_t len) {
+  (void) dev_addr;
+  (void) len;
+
+  uint8_t const rpt_count = hid_info[instance].report_count;
+  tuh_hid_report_info_t *rpt_info_arr = hid_info[instance].report_info;
+  tuh_hid_report_info_t *rpt_info = NULL;
+
+  if (rpt_count == 1 && rpt_info_arr[0].report_id == 0) {
+    // Simple report without report ID as 1st byte
+    rpt_info = &rpt_info_arr[0];
+  } else {
+    // Composite report, 1st byte is report ID, data starts from 2nd byte
+    uint8_t const rpt_id = report[0];
+
+    // Find report id in the array
+    for (uint8_t i = 0; i < rpt_count; i++) {
+      if (rpt_id == rpt_info_arr[i].report_id) {
+        rpt_info = &rpt_info_arr[i];
+        break;
+      }
+    }
+
+    report++;
+    len--;
+  }
+
+  if (!rpt_info) {
+    LOG_USB("Couldn't find report info !\n");
+    return;
+  }
+
+  // For complete list of Usage Page & Usage checkout src/class/hid/hid.h. For examples:
+  // - Keyboard                     : Desktop, Keyboard
+  // - Mouse                        : Desktop, Mouse
+  // - Gamepad                      : Desktop, Gamepad
+  // - Consumer Control (Media Key) : Consumer, Consumer Control
+  // - System Control (Power key)   : Desktop, System Control
+  // - Generic (vendor)             : 0xFFxx, xx
+  if (rpt_info->usage_page == HID_USAGE_PAGE_DESKTOP) {
+    switch (rpt_info->usage) {
+      case HID_USAGE_DESKTOP_KEYBOARD:
+        TU_LOG2("HID receive keyboard report\n");
+        // Assume keyboard follow boot report layout
+        process_kbd_report((hid_keyboard_report_t const *) report);
+        break;
+
+      case HID_USAGE_DESKTOP_MOUSE:
+        TU_LOG2("HID receive mouse report\n");
+        // Assume mouse follow boot report layout
+        process_mouse_report((hid_mouse_report_t const *) report);
+        break;
+
+      default:
+        LOG_USB("report[%u] ", rpt_info->report_id);
+        for (uint8_t i = 0; i < len; i++) {
+          LOG_USB("%02X ", report[i]);
+        }
+        LOG_USB("\n");
+        break;
+    }
+  }
+}
+
+
 void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t const *report, uint16_t len) {
     LOG_USB("recieved HID report\n");
+    uint8_t const itf_protocol = tuh_hid_interface_protocol(dev_addr, instance);
+  
+    switch (itf_protocol) {
+    case HID_ITF_PROTOCOL_KEYBOARD:
+        TU_LOG2("HID receive boot keyboard report\n");
+        process_kbd_report((hid_keyboard_report_t const *) report);
+        break;
+
+    case HID_ITF_PROTOCOL_MOUSE:
+        TU_LOG2("HID receive boot mouse report\n");
+        process_mouse_report((hid_mouse_report_t const *) report);
+        break;
+
+    default:
+        // Generic report requires matching ReportID and contents with previous parsed report info
+        process_generic_report(dev_addr, instance, report, len);
+        break;
+  }
+
+
+  // continue to request to receive report
+  if (!tuh_hid_receive_report(dev_addr, instance)) {
+    LOG_USB("Error: cannot request to receive report\n");
+  }
 }

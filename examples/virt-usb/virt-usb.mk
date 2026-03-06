@@ -144,7 +144,7 @@ $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 # highmem-off could all break the hci driver which is 32bit only
 
 # $(QEMU)
-# ~/Work/qemu/build/qemu-system-aarch64-unsigned
+# QEMU = ~/Work/qemu/build/qemu-system-aarch64-unsigned
 qemu: ${IMAGE_FILE}
 	$(QEMU) -machine virt,virtualization=on,highmem=off \
 	-drive if=none,id=stick,format=raw,file=test.img \
@@ -157,7 +157,8 @@ qemu: ${IMAGE_FILE}
  	--trace events="trace.txt",file="trace.out"
 
 #	-device usb-tablet,bus=ehci.0 \
-	-device usb-kbd,id=kbd,bus=ehci.0,port=1 \
+	-device usb-mouse,id=mouse,bus=ehci.0,port=1 \
+	-device usb-tablet,bus=ehci.0,id=tablet,port=1 \
  	-device usb-storage,bus=ehci.0,drive=stick,id=flash \
 	-nographic \
  	--trace "memory_region_ops_*" \
