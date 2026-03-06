@@ -88,6 +88,14 @@ def build(args: argparse.Namespace, test_config: TestConfig):
         )
     )
 
+    build_dir = common.example_build_path(test_config)
+
+    if not args.no_clean:
+        try:
+            shutil.rmtree(build_dir)
+        except FileNotFoundError:
+            pass
+
     if test_config.build_system == "make":
         build_make(args, test_config)
     elif test_config.build_system == "zig":
@@ -115,12 +123,6 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-
-    if not args.no_clean:
-        try:
-            shutil.rmtree(common.CI_BUILD_DIR)
-        except FileNotFoundError:
-            pass
 
     for example_name, options in matrix.EXAMPLES.items():
         if example_name not in args.examples:
