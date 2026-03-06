@@ -28,7 +28,7 @@
 
 #pragma once
 
-// #define DEBUG_I2C_DRIVER
+#define DEBUG_I2C_DRIVER
 #ifdef DEBUG_I2C_DRIVER
 #define LOG_I2C_DRIVER(...) do{ sddf_dprintf("I2C DRIVER|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
 #else
