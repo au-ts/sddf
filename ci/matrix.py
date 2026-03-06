@@ -153,12 +153,11 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
 ## Type Hinting + Sanity Checks ##
 _BoardNames = Literal[
     "cheshire",
-    "odroidc4",
+    "hifive_p550",
     "imx8mm_evk",
     "imx8mp_evk",
     "imx8mq_evk",
     "imx8mp_iotgate",
-    "hifive_p550",
     "maaxboard",
     "odroidc2",
     "odroidc4",

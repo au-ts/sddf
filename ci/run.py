@@ -27,11 +27,11 @@ if __name__ == "__main__":
         exit(1)
 
     matrix: list[TestConfig] = []
-    test_fn_sets: dict[str, TestMetadata] = {}
+    test_metadatas: dict[str, TestMetadata] = {}
 
     for example in examples_list:
         mod = importlib.import_module(f"ci.examples.{example}")
         matrix.extend(mod.TEST_MATRIX)
-        test_fn_sets[example] = mod.TEST_METADATA
+        test_metadatas[example] = mod.TEST_METADATA
 
-    run_tests(test_fn_sets, matrix)
+    run_tests(test_metadatas, matrix)
