@@ -31,15 +31,26 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     client_pn532 = ProtectionDomain("client_pn532", "client_pn532.elf", priority=1)
     client_ds3231 = ProtectionDomain("client_ds3231", "client_ds3231.elf", priority=1)
 
-    # Right now we do not have separate clk and GPIO drivers and so our I2C driver does manual
-    # clk/GPIO setup for I2C.
-    clk_mr = MemoryRegion(sdf, "clk", 0x1000, paddr=0xFF63C000)
-    gpio_mr = MemoryRegion(sdf, "gpio", 0x1000, paddr=0xFF634000)
-    sdf.add_mr(clk_mr)
-    sdf.add_mr(gpio_mr)
+    # HACK: sdfgen doesn't support multiple regions for a device resource yet
+    #       or the clk class. This will be removed in the pending sdfgen refactor.
+    regions = []    # tuples of (mr, map var name)
+    if board.name == "maaxboard":
+        # HACK: override DTS node to enable external I2C bus (I2C2).
+        # This should also be fixed in the sdfgen refactor
+        board.i2c = "soc@0/bus@30800000/i2c@30a30000"
 
-    i2c_driver.add_map(Map(clk_mr, 0x30_000_000, "rw", cached=False))
-    i2c_driver.add_map(Map(gpio_mr, 0x30_100_000, "rw", cached=False))
+    elif board.name == "odroidc4":
+        # Right now we do not have separate clk and GPIO drivers and so our I2C driver does manual
+        # clk/GPIO setup for I2C.
+        clk_mr = MemoryRegion(sdf, "clk", 0x1000, paddr=0xFF63C000)
+        gpio_mr = MemoryRegion(sdf, "gpio", 0x1000, paddr=0xFF634000)
+        sdf.add_mr(clk_mr)
+        sdf.add_mr(gpio_mr)
+        i2c_driver.add_map(Map(clk_mr, 0x30_000_000, "rw", cached=False))
+        i2c_driver.add_map(Map(gpio_mr, 0x30_100_000, "rw", cached=False))
+    else:
+        print("Unsupported board!")
+        exit(-1)
 
     i2c_node = dtb.node(board.i2c)
     assert i2c_node is not None
