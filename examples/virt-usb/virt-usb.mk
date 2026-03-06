@@ -152,17 +152,17 @@ qemu: ${IMAGE_FILE}
 	-serial mon:stdio \
 	-device loader,file=$(IMAGE_FILE),addr=0x70000000,cpu-num=0 \
 	-m size=2G \
-	-nographic \
  	-device usb-ehci,id=ehci \
-	-device usb-kbd,id=kbd,bus=ehci.0,port=1 \
- 	--trace events="trace.txt",file="trace.out" \
+	-device usb-mouse,id=mouse,bus=ehci.0,port=1 \
+ 	--trace events="trace.txt",file="trace.out"
 
 #	-device usb-tablet,bus=ehci.0 \
-# 	-device usb-storage,bus=ehci.0,drive=stick,id=flash \
-#	-device usb-kbd,id=kbd,bus=ehci.0 \
-# 	--trace "memory_region_ops_*" \
-# 	-usb \
-#	-s -S
+	-device usb-kbd,id=kbd,bus=ehci.0,port=1 \
+ 	-device usb-storage,bus=ehci.0,drive=stick,id=flash \
+	-nographic \
+ 	--trace "memory_region_ops_*" \
+ 	-usb \
+	-s -S
 
 clean::
 	${RM} -f *.elf
