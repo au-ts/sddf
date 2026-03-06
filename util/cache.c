@@ -44,10 +44,15 @@ void cache_clean_and_invalidate(unsigned long start, unsigned long end)
         asm volatile("dc civac, %0" : : "r"(vaddr));
     }
     asm volatile("dsb sy" ::: "memory");
-#elif defined(CONFIG_ARCH_RISCV) || defined(CONFIG_ARCH_X86_64)
+#elif defined(CONFIG_ARCH_RISCV)
     /* While not all RISC-V platforms are DMA cache-cohernet,
-     * we assume we are targeting one that is and so there is nothing to do. */
-    /* x86 is DMA coherent so nothing to do. */
+     * we assume we are targeting one that is.
+     * The function still prevents read-read reordering.
+     */
+    asm volatile("fence ir, ir" ::: "memory");
+#elif defined(CONFIG_ARCH_X86_64)
+    /* x86 is DMA coherent, and the function acts as a compiler barrier. */
+    asm volatile("" ::: "memory");
 #else
 #error "Unknown architecture for cache_clean_and_invalidate"
 #endif
@@ -70,10 +75,15 @@ void cache_clean(unsigned long start, unsigned long end)
         asm volatile("dc cvac, %0" : : "r"(vaddr));
     }
     asm volatile("dmb sy" ::: "memory");
-#elif defined(CONFIG_ARCH_RISCV) || defined(CONFIG_ARCH_X86_64)
+#elif defined(CONFIG_ARCH_RISCV)
     /* While not all RISC-V platforms are DMA cache-cohernet,
-     * we assume we are targeting one that is and so there is nothing to do. */
-    /* x86 is DMA coherent so nothing to do. */
+     * we assume we are targeting one that is.
+     * The function still prevents write-write reordering.
+     */
+    asm volatile("fence ow, ow" ::: "memory");
+#elif defined(CONFIG_ARCH_X86_64)
+    /* x86 is DMA coherent, and the function acts as a compiler barrier. */
+    asm volatile("" ::: "memory");
 #else
 #error "Unknown architecture for cache_clean"
 #endif
