@@ -1,0 +1,1 @@
+make MICROKIT_BOARD=x86_64_generic MICROKIT_SDK=/home/cheng/system/microkit-sdk-2.1.0 qemu

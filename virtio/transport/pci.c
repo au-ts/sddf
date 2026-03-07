@@ -172,34 +172,34 @@ bool virtio_transport_probe(device_resources_t *device_resources, virtio_device_
     uint8_t dev = device_handle_ret->pci_dev;
     uint8_t func = device_handle_ret->pci_func;
 
-    uint8_t pci_class_code = device_handle_ret->pci_class_code;
-    uint8_t pci_subclass = device_handle_ret->pci_subclass;
-    uint16_t pci_vendor_id = device_handle_ret->pci_vendor_id;
-    uint16_t pci_device_id = device_handle_ret->pci_device_id;
+    // uint8_t pci_class_code = device_handle_ret->pci_class_code;
+    // uint8_t pci_subclass = device_handle_ret->pci_subclass;
+    // uint16_t pci_vendor_id = device_handle_ret->pci_vendor_id;
+    // uint16_t pci_device_id = device_handle_ret->pci_device_id;
 
     pci_gen_dev_hdr_t pci_device_header;
     assert(read_pci_general_device_header(bus, dev, func, &pci_device_header));
 
-    if (pci_device_header.common_hdr.class_code != pci_class_code) {
-        LOG_VIRTIO_ERR("PCI device @ %u:%u.%u, expected class code 0x%x, got 0x%x!\n", bus, dev, func, pci_class_code,
-                       pci_device_header.common_hdr.class_code);
-        return false;
-    }
-    if (pci_device_header.common_hdr.subclass != pci_subclass) {
-        LOG_VIRTIO_ERR("PCI device @ %u:%u.%u, expected subclass code 0x%x, got 0x%x!\n", bus, dev, func, pci_subclass,
-                       pci_device_header.common_hdr.subclass);
-        return false;
-    }
-    if (pci_device_header.common_hdr.vendor_id != pci_vendor_id) {
-        LOG_VIRTIO_ERR("PCI device @ %u:%u.%u, expected vendor id 0x%x, got 0x%x!\n", bus, dev, func, pci_vendor_id,
-                       pci_device_header.common_hdr.vendor_id);
-        return false;
-    }
-    if (pci_device_header.common_hdr.device_id != pci_device_id) {
-        LOG_VIRTIO_ERR("PCI device @ %u:%u.%u, expected device id 0x%x, got 0x%x!\n", bus, dev, func, pci_device_id,
-                       pci_device_header.common_hdr.device_id);
-        return false;
-    }
+    // if (pci_device_header.common_hdr.class_code != pci_class_code) {
+    //     LOG_VIRTIO_ERR("PCI device @ %u:%u.%u, expected class code 0x%x, got 0x%x!\n", bus, dev, func, pci_class_code,
+    //                    pci_device_header.common_hdr.class_code);
+    //     return false;
+    // }
+    // if (pci_device_header.common_hdr.subclass != pci_subclass) {
+    //     LOG_VIRTIO_ERR("PCI device @ %u:%u.%u, expected subclass code 0x%x, got 0x%x!\n", bus, dev, func, pci_subclass,
+    //                    pci_device_header.common_hdr.subclass);
+    //     return false;
+    // }
+    // if (pci_device_header.common_hdr.vendor_id != pci_vendor_id) {
+    //     LOG_VIRTIO_ERR("PCI device @ %u:%u.%u, expected vendor id 0x%x, got 0x%x!\n", bus, dev, func, pci_vendor_id,
+    //                    pci_device_header.common_hdr.vendor_id);
+    //     return false;
+    // }
+    // if (pci_device_header.common_hdr.device_id != pci_device_id) {
+    //     LOG_VIRTIO_ERR("PCI device @ %u:%u.%u, expected device id 0x%x, got 0x%x!\n", bus, dev, func, pci_device_id,
+    //                    pci_device_header.common_hdr.device_id);
+    //     return false;
+    // }
 
     pci_debug_print_header(bus, dev, func, &pci_device_header);
 
