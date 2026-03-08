@@ -154,11 +154,11 @@ qemu: ${IMAGE_FILE}
 	-serial mon:stdio \
 	-vnc :0 \
  	-device usb-ehci,id=ehci \
- 	-device usb-storage,bus=ehci.0,drive=stick,id=flash \
  	--trace events="trace.txt",file="trace.out"
 
 #	-device usb-tablet,bus=ehci.0 \
 	-device usb-mouse,id=mouse,bus=ehci.0,port=1 \
+ 	-device usb-storage,bus=ehci.0,drive=stick,id=flash \
 	-device usb-kbd,bus=ehci.0,id=kbd,port=1 \
 	-device usb-tablet,bus=ehci.0,id=tablet,port=1 \
 	-nographic \
