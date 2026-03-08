@@ -110,10 +110,6 @@ void notified(sddf_channel ch)
     }
 }
 
-void tuh_msc_mount_cb(uint8_t dev_addr) {
-  LOG_USB("A MassStorage device is mounted\n");
-}
-
 #define MAX_REPORT 4
 
 static struct {
@@ -312,4 +308,90 @@ void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t cons
   if (!tuh_hid_receive_report(dev_addr, instance)) {
     LOG_USB("Error: cannot request to receive report\n");
   }
+}
+
+static scsi_inquiry_resp_t inquiry_resp;
+
+bool msc_data_written_cb(uint8_t dev_addr, const tuh_msc_complete_data_t *cb_data)
+{
+  LOG_USB("Apparentely we finished writing to the disk\n");
+  return true;
+}
+
+static bool inquiry_complete_cb(uint8_t dev_addr, tuh_msc_complete_data_t const * cb_data) {
+  msc_cbw_t const* cbw = cb_data->cbw;
+  msc_csw_t const* csw = cb_data->csw;
+
+  if (csw->status != 0) {
+    LOG_USB("Inquiry failed\n");
+    return false;
+  }
+
+  // Print out Vendor ID, Product ID and Rev
+  LOG_USB("%.8s %.16s rev %.4s\n", inquiry_resp.vendor_id, inquiry_resp.product_id, inquiry_resp.product_rev);
+
+  // Get capacity of device
+  uint32_t const block_count = tuh_msc_get_block_count(dev_addr, cbw->lun);
+  uint32_t const block_size = tuh_msc_get_block_size(dev_addr, cbw->lun);
+
+  LOG_USB("Disk Size: %u MB\n", block_count / ((1024*1024)/block_size));
+  LOG_USB("Block Count = %u, Block Size: %u\n", block_count, block_size);
+
+  // Block write test
+//   char hello[512] = "Hello world!"; need buffer in dma memory
+//   char *hello = (char*) 0x70031000;
+//   char *hello2 = "Hello World!";
+
+//   for (; *hello2; hello++ && hello2++) {
+//     *hello = *hello2;
+//   }
+
+//   if (tuh_msc_write10(dev_addr, 0, hello, 10000, 1, msc_data_written_cb, 0)) {
+//       LOG_USB("Write queued\n");
+//   } else {
+//       LOG_USB("Write was not queued\n");
+//   }
+
+  return true;
+}
+
+//------------- IMPLEMENTATION -------------//
+
+bool msc_sync_cb(uint8_t dev_addr, const tuh_msc_complete_data_t *cb_data)
+{
+  LOG_USB("Apparentely we synced\n");
+  return true;
+}
+
+void tuh_msc_mount_cb(uint8_t dev_addr) {
+  LOG_USB("A MassStorage device is mounted\n");
+
+  uint8_t const lun = 0;
+  tuh_msc_inquiry(dev_addr, lun, &inquiry_resp, inquiry_complete_cb, 0);
+
+  // msc_cbw_t cbw;
+  // tu_memclr(&cbw, sizeof(msc_cbw_t));
+  // cbw.signature = MSC_CBW_SIGNATURE;
+  // cbw.tag       = 0x54555342; // TUSB
+  // cbw.lun       = lun;
+  // cbw.dir       = 0; // change
+  // cbw.lun       = lun;
+  // cbw.tag       = -0; // ?
+  // cbw.total_bytes = 512;
+
+  // msc_cbw_t cbw = {
+  //   .cmd_len = 0,
+  //   .command = 0,
+  //   .dir = 0,
+  //   .tag = 0,
+  // };
+
+  // if (!tuh_msc_scsi_command(dev_addr, &cbw, NULL, msc_sync_cb, 0)) {
+  //   LOG_USB("Operation already pending\n");
+  // }
+}
+
+void tuh_msc_umount_cb(uint8_t dev_addr) {
+  (void) dev_addr;
+  LOG_USB("A MassStorage device is unmounted\n");
 }

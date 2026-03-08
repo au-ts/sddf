@@ -144,23 +144,25 @@ $(IMAGE_FILE) $(REPORT_FILE): $(IMAGES) $(SYSTEM_FILE)
 # highmem-off could all break the hci driver which is 32bit only
 
 # $(QEMU)
-# QEMU = ~/Work/qemu/build/qemu-system-aarch64-unsigned
+QEMU = ~/Work/qemu/build/qemu-system-aarch64-unsigned
 qemu: ${IMAGE_FILE}
 	$(QEMU) -machine virt,virtualization=on,highmem=off \
 	-drive if=none,id=stick,format=raw,file=test.img \
 	-cpu cortex-a53 \
-	-serial mon:stdio \
 	-device loader,file=$(IMAGE_FILE),addr=0x70000000,cpu-num=0 \
 	-m size=2G \
+	-serial mon:stdio \
+	-vnc :0 \
  	-device usb-ehci,id=ehci \
-	-device usb-mouse,id=mouse,bus=ehci.0,port=1 \
+ 	-device usb-storage,bus=ehci.0,drive=stick,id=flash \
  	--trace events="trace.txt",file="trace.out"
 
 #	-device usb-tablet,bus=ehci.0 \
 	-device usb-mouse,id=mouse,bus=ehci.0,port=1 \
+	-device usb-kbd,bus=ehci.0,id=kbd,port=1 \
 	-device usb-tablet,bus=ehci.0,id=tablet,port=1 \
- 	-device usb-storage,bus=ehci.0,drive=stick,id=flash \
 	-nographic \
+	-display cocoa,full-grab=on \
  	--trace "memory_region_ops_*" \
  	-usb \
 	-s -S
