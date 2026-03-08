@@ -28,34 +28,25 @@ def generate(sdf_file: str, output_dir: str, dtb: DeviceTree):
     pcie = ProtectionDomain("pcie", "pcie.elf", priority=240)
     usb = ProtectionDomain("usb", "usb.elf", priority=230)
 
-    # maybe hard-coded paddr for qemu_virt_aarch64?
+    # hard-coded paddr for qemu_virt_aarch64?
     pcie_config = MemoryRegion(sdf, "pcie_config", 0x100_0000, paddr=0x3eff_0000)
 
-    ehci_regs = MemoryRegion(sdf, "ehci_regs", 0x1000, paddr=0x3800_0000)
-    ehci_dma = MemoryRegion(sdf, "ehci_dma", 0x10000, paddr=0x7000_0000)
-    ehci_dma2 = MemoryRegion(sdf, "ehci_dma2", 0x10000, paddr=0x7001_0000)
-    ehci_dma3 = MemoryRegion(sdf, "ehci_dma3", 0x10000, paddr=0x7002_0000)
-    ehci_dma4 = MemoryRegion(sdf, "ehci_dma4", 0x10000, paddr=0x7003_0000)
+    ehci_regs = MemoryRegion(sdf, "ehci_regs", 0x1000, paddr=0x3800_0000) # dodgy low physical address, not sure why this works
+    ehci_dma = MemoryRegion(sdf, "ehci_dma", 0x40000, paddr=0x7000_0000)
 
     pcie_usb_ch = Channel(pcie, usb, a_id=3, b_id=3)
 
     pcie.add_map(Map(pcie_config, 0x20_000_000, "rw", cached=False))
     usb.add_map(Map(ehci_regs, 0x30_000_000, "rw", cached=False))
     usb.add_map(Map(ehci_dma, 0x7000_0000, "rw", cached=False)) # identity mapping
-    usb.add_map(Map(ehci_dma2, 0x7001_0000, "rw", cached=False))
-    usb.add_map(Map(ehci_dma3, 0x7002_0000, "rw", cached=False))
-    usb.add_map(Map(ehci_dma4, 0x7003_0000, "rw", cached=False))
 
     sdf.add_channel(pcie_usb_ch)
 
     sdf.add_mr(pcie_config)
     sdf.add_mr(ehci_regs)
     sdf.add_mr(ehci_dma)
-    sdf.add_mr(ehci_dma2)
-    sdf.add_mr(ehci_dma3)
-    sdf.add_mr(ehci_dma4)
 
-    # hardcoded for EHCI PCI pin#4
+    # hardcoded for EHCI PCI pin#4 over PCI legacy interrupts
     usb.add_irq(IrqConventional(36, id=1))
 
     # need timer for tinyUSB (this would need to be modified for x86 support)

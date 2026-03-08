@@ -76,6 +76,8 @@ pcie.elf: pcie.o
 pcie.o: ${TOP}/pcie.c
 	$(CC) $(CFLAGS) -c -o $@ $<
 
+dma.o: ${TOP}/dma.c
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 # tinyUSB source
 
@@ -112,9 +114,10 @@ msc_host.o: $(TINYUSB)/src/class/msc/msc_host.c
 board.o: $(TINYUSB)/hw/bsp/board.c
 	$(CC) -c $(CFLAGS) $< -o $@
 
+
 # usb elf 
 
-usb.elf: usb.o tusb.o hub.o usbh.o cdc_host.o hid_host.o msc_host.o ehci.o tusb_fifo.o board.o hcd_ehci_virt.o
+usb.elf: usb.o tusb.o hub.o usbh.o cdc_host.o hid_host.o msc_host.o ehci.o tusb_fifo.o board.o hcd_ehci_virt.o dma.o
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 
@@ -158,8 +161,8 @@ qemu: ${IMAGE_FILE}
 
 #	-device usb-tablet,bus=ehci.0 \
 	-device usb-mouse,id=mouse,bus=ehci.0,port=1 \
- 	-device usb-storage,bus=ehci.0,drive=stick,id=flash \
 	-device usb-kbd,bus=ehci.0,id=kbd,port=1 \
+ 	-device usb-storage,bus=ehci.0,drive=stick,id=flash \
 	-device usb-tablet,bus=ehci.0,id=tablet,port=1 \
 	-nographic \
 	-display cocoa,full-grab=on \
