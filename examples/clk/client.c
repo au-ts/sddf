@@ -102,6 +102,7 @@ void init(void)
     /**
      * IMX8MQ_CLK_SAI1_ROOT = 196
      * IMX8MQ_CLK_I2C1      = 144
+     * IMX8MQ_CLK_A53_DIV   = 90
      *
      * see `sddf/drivers/clk/imx/include/imx8mq-bindings.h` for more clock indices.
      * */
@@ -132,6 +133,16 @@ void init(void)
         sddf_dprintf("The parent of clock %u has been set to: %u\n", clk_id_to_test_parent, parent_id);
     }
 
+    uint32_t cpu_clk_id = IMX8MQ_CLK_A53_CORE;
+    uint64_t rate = 0;
+    ret = sddf_clk_get_rate(CLK_DRIVER_CH, cpu_clk_id, &rate);
+    sddf_dprintf("cpu frequency: %lu\n", rate);
+
+    ret = sddf_clk_set_cpu_freq(CLK_DRIVER_CH, 1500000000);
+    sddf_dprintf("set CPU freq - err: %d\n", ret);
+
+    ret = sddf_clk_get_rate(CLK_DRIVER_CH, cpu_clk_id, &rate);
+    sddf_dprintf("cpu frequency: %lu\n", rate);
 #else
     sddf_dprintf("No tests for the target board\n", ret);
 #endif

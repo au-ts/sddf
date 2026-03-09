@@ -149,7 +149,6 @@ static inline int clk_div_set_rate(const struct clk *clk, uint64_t rate, uint64_
     uint32_t div = DIV_ROUND_UP(parent_rate, rate);
 
     if (data->flags & CLK_DIVIDER_ONE_BASED) {
-        /* TODO: to be implemented */
         ;
     } else if (data->flags & CLK_DIVIDER_POWER_OF_TWO) {
         /* div = __ffs(div); */

@@ -2955,3 +2955,31 @@ void clk_probe(struct clk *clk_list[])
         }
     }
 }
+
+int clk_set_cpu_freq(struct clk **clk_list, uint64_t req_rate, uint64_t *rate)
+{
+    // Switch parent clock to void race condition
+    struct clk *cpu_clk = clk_list[IMX8MQ_CLK_A53_CORE];
+    int err = cpu_clk->hw.init->ops->set_parent(cpu_clk, 0);
+    if (err) {
+        LOG_DRIVER_ERR("Failed to switch parent clock for IMX8MQ_CLK_A53_CORE\n");
+        return err;
+    }
+
+    // Adjust clock rate of IMX8MQ_ARM_PLL
+    struct clk *arm_pll_clk = clk_list[IMX8MQ_ARM_PLL];
+    err = clk_set_rate(arm_pll_clk, req_rate, rate);
+    if (err) {
+        LOG_DRIVER_ERR("Failed to adjust frequency for IMX8MQ_ARM_PLL\n");
+        return err;
+    }
+
+    // Switch parent clock back to IMX8MQ_ARM_PLL
+    err = cpu_clk->hw.init->ops->set_parent(cpu_clk, 1);
+    if (err) {
+        LOG_DRIVER_ERR("Failed to switch parent clock for IMX8MQ_CLK_A53_CORE\n");
+        return err;
+    }
+
+    return 0;
+}

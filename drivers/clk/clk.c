@@ -27,17 +27,6 @@
 #error "The platform is not supported!\n"
 #endif
 
-// Logging
-/* #define DEBUG_DRIVER */
-
-#ifdef DEBUG_DRIVER
-#define LOG_DRIVER(...) do{ sddf_dprintf("CLK DRIVER|INFO: "); sddf_dprintf(__VA_ARGS__); }while(0)
-#else
-#define LOG_DRIVER(...) do{}while(0)
-#endif
-
-#define LOG_DRIVER_ERR(...) do{ sddf_printf("CLK DRIVER|ERROR: "); sddf_printf(__VA_ARGS__); }while(0)
-
 #ifndef NUM_CLK_LIST
 #error "Constant \"NUM_CLK_LIST\" should be defined\n")
 #endif
@@ -351,8 +340,21 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
         ret_num = 1;
         break;
     }
+    case SDDF_CLK_SET_CPU_FREQ: {
+        if (argc != 1) {
+            LOG_DRIVER_ERR("Incorrect number of arguments %u != 1\n", argc);
+            err = CLK_INCORRECT_ARGS;
+            break;
+        }
+        uint64_t req_freq = (uint32_t)microkit_mr_get(SDDF_CLK_PARAM_CPU_FREQ);
+        uint64_t freq = 0;
+        err = clk_set_cpu_freq(clk_list, req_freq, &freq);
+        microkit_mr_set(0, freq);
+        ret_num = 1;
+        break;
+    }
     default:
-        LOG_DRIVER_ERR("Unknown request %lu to clockk driver from channel %u\n", microkit_msginfo_get_label(msginfo),
+        LOG_DRIVER_ERR("Unknown request %lu to clock driver from channel %u\n", microkit_msginfo_get_label(msginfo),
                        ch);
         err = CLK_UNKNOWN_REQ;
     }

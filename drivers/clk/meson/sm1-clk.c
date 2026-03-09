@@ -1590,3 +1590,8 @@ struct clk **get_clk_list(void)
 {
     return sm1_clks;
 }
+
+int clk_set_cpu_freq(struct clk **clk_list, uint64_t req_rate, uint64_t *rate)
+{
+    return 0;
+}

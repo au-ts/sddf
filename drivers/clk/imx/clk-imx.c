@@ -72,8 +72,6 @@ const struct clk_ops clk_gate2_ops = {
 
 static uint64_t clk_pll_recalc_rate(const struct clk *clk, uint64_t prate)
 {
-    /* TODO: This function is derived from Linux codebase, but seems wrong
-     * according to the datasheet as PLL_REFCLK_DIV_VAL[5:10] is never used. */
     struct clk_frac_pll_data *data = (struct clk_frac_pll_data *)(clk->data);
     uint64_t temp_rate = prate;
     uint64_t rate;
@@ -85,10 +83,10 @@ static uint64_t clk_pll_recalc_rate(const struct clk *clk, uint64_t prate)
     /* Valid Frac Divider value is 1 to 2^24 */
     uint32_t frac_div_val = regmap_read_bits(clk->base, data->offset + 0x4, 7, MASK(24));
 
-    /* Valid Int Divider value is 1 to 32 */
+    /* The specs say "Valid Int Divider value is 1 to 32", but seems wrong */
     uint32_t int_div_val = regmap_read_bits(clk->base, data->offset + 0x4, 0, MASK(7));
 
-    temp_rate *= prate;
+    temp_rate *= 8;
     temp_rate *= frac_div_val;
     do_div(temp_rate, PLL_FRAC_DENOM);
     do_div(temp_rate, output_div_val);
@@ -125,37 +123,42 @@ static int clk_pll_set_rate(const struct clk *clk, uint64_t rate, uint64_t paren
      */
 
     /* Write PLL_FRAC_DIV_CTL */
-    ret = regmap_update_bits(clk->base, data->offset + 0x4, 7, 24, divff);
+    ret = regmap_update_bits(clk->base, data->offset + 0x4, 7, MASK(24), divff);
     if (ret)
         return ret;
 
     /* Write PLL_INT_DIV_CTL */
-    ret = regmap_update_bits(clk->base, data->offset + 0x4, 0, 7, divfi - 1);
+    ret = regmap_update_bits(clk->base, data->offset + 0x4, 0, MASK(7), divfi - 1);
     if (ret)
         return ret;
 
     /* Clear PLL_OUTPUT_DIV_VAL */
-    ret = regmap_update_bits(clk->base, data->offset, 0, 5, 0);
+    ret = regmap_update_bits(clk->base, data->offset, 0, MASK(5), 0);
     if (ret)
         return ret;
 
     /* Set the NEV_DIV_VAL to reload the DIVFI and DIVFF */
-    ret = regmap_update_bits(clk->base, data->offset, 12, 1, 1);
+    ret = regmap_update_bits(clk->base, data->offset, 12, MASK(1), 1);
     if (ret)
         return ret;
 
     // Wait ack
-    uint32_t timeout = 1000;
-    while (timeout--) {
-        if (regmap_read_bits(clk->base, data->offset, 12, 1)) {
+    uint32_t timeout = 10000000;
+    while (--timeout) {
+        if (regmap_read_bits(clk->base, data->offset, 11, MASK(1))) {
             break;
         }
     }
+
     if (!timeout)
         return CLK_FAILED_OP;
 
+    ret = regmap_update_bits(clk->base, data->offset, 14, MASK(1), 0);
+    if (ret)
+        return ret;
+
     /* clear the NEV_DIV_VAL */
-    return regmap_update_bits(clk->base, data->offset, 12, 1, 1);
+    return regmap_update_bits(clk->base, data->offset, 12, MASK(1), 1);
 }
 
 const struct clk_ops clk_frac_pll_ops = {
@@ -192,14 +195,14 @@ static uint64_t clk_sscg_pll_recalc_rate(const struct clk *clk, uint64_t prate)
     return 0;
 }
 
-static int clk_sscg_pll_set_rate(const struct clk *clk, uint64_t rate, uint64_t parent_rate)
-{
-    /* struct clk_sscg_pll_data *data = (struct clk_sscg_pll_data *)(clk->data); */
+/* static int clk_sscg_pll_set_rate(const struct clk *clk, uint64_t rate, uint64_t parent_rate) */
+/* { */
+/*     /\* struct clk_sscg_pll_data *data = (struct clk_sscg_pll_data *)(clk->data); *\/ */
 
-    /* TODO: to be implemented. */
+/*     /\* TODO: to be implemented. *\/ */
 
-    return 0;
-}
+/*     return 0; */
+/* } */
 
 static int clk_sscg_pll_get_parent(const struct clk *clk, uint8_t *index)
 {
@@ -444,3 +447,4 @@ const struct clk_ops clk_bus_slice_ops = {
     .get_parent = imx8m_clk_bus_slice_get_parent,
     .set_parent = imx8m_clk_bus_slice_set_parent,
 };
+

@@ -398,3 +398,13 @@ int clk_disable(struct clk *clk);
  * @rate:   pointer to result variable
  */
 int clk_set_rate(struct clk *clk, uint64_t req_rate, uint64_t *rate);
+
+/**
+ * function clk_set_cpu_freq() - set the cpu frequency to the requested reate.
+ *
+ *
+ * @clk:    pointer to the current clk
+ * @req_rate:    request rate
+ * @rate:   pointer to result variable
+ */
+int clk_set_cpu_freq(struct clk **clk, uint64_t req_rate, uint64_t *rate);

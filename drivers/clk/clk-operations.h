@@ -7,6 +7,7 @@
 
 #include <clk.h>
 #include <clk_utils.h>
+#include <sddf/util/printf.h>
 #include <sddf/timer/client.h>
 
 #define CLK_INCORRECT_ARGS -1
