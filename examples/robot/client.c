@@ -130,9 +130,9 @@ void client_main(void) {
         LOG_CLIENT("dist sensor a: %lu\n", dist_sensor_a);
         // LOG_CLIENT("dist sensor c: %d", dist_sensor_c);
         
-        if (dist_sensor_a > 5) {
+        if (dist_sensor_a > 15) {
             LOG_CLIENT("attempting drive\n");
-            control_forward(10000);
+            control_forward(1000);
             LOG_CLIENT("returned from drive\n");
         }
 

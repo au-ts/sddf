@@ -115,7 +115,7 @@ uint64_t read_distance(int echo_ch) {
 // TODO: timeout state
 // returns distance in cm
 uint64_t get_ultrasonic_reading(int echo_ch, int trigger_ch) {
-    LOG_SENSOR("New loop\n");
+    // LOG_SENSOR("New loop\n");
     set_trig_low(trigger_ch);
     set_trig_high(trigger_ch);
     return read_distance(echo_ch);
