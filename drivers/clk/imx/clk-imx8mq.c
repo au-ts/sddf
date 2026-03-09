@@ -2654,11 +2654,7 @@ static IMX_CLK_GATE4(sdma2_clk, { &ipg_audio_root }, CCM_BASE, 0x43b0, 0);
 static IMX_CLK_FIXED_FACTOR(gpt_3m, { &osc_25m }, 1, 8);
 static IMX_CLK_FIXED_FACTOR(dram_alt_root, { &dram_alt }, 1, 4);
 
-/* hws[IMX8MQ_CLK_ARM] = imx_clk_hw_cpu("arm", "arm_a53_core", */
-/*   hws[IMX8MQ_CLK_A53_CORE]->clk, */
-/*   hws[IMX8MQ_CLK_A53_CORE]->clk, */
-/*   hws[IMX8MQ_ARM_PLL_OUT]->clk, */
-/*   hws[IMX8MQ_CLK_A53_DIV]->clk); */
+static IMX_CLK_CPU(arm_clk, { &arm_a53_div }, &arm_a53_core, &arm_a53_div, &arm_pll_out, &arm_a53_core);
 
 static struct clk *imx8mq_clks[IMX8MQ_CLK_END] = {
     [IMX8MQ_CLK_DUMMY] = &dummy,
@@ -2843,6 +2839,7 @@ static struct clk *imx8mq_clks[IMX8MQ_CLK_END] = {
     [IMX8MQ_CLK_ECSPI2_ROOT] = &ecspi2_root_clk,
     [IMX8MQ_CLK_ECSPI3_ROOT] = &ecspi3_root_clk,
     [IMX8MQ_CLK_ENET1_ROOT] = &enet1_root_clk,
+    [IMX8MQ_CLK_ARM] = &arm_clk,
     [IMX8MQ_CLK_GPIO1_ROOT] = &gpio1_root_clk,
     [IMX8MQ_CLK_GPIO2_ROOT] = &gpio2_root_clk,
     [IMX8MQ_CLK_GPIO3_ROOT] = &gpio3_root_clk,
@@ -2954,32 +2951,4 @@ void clk_probe(struct clk *clk_list[])
             init_data->ops->init(clk_list[i]);
         }
     }
-}
-
-int clk_set_cpu_freq(struct clk **clk_list, uint64_t req_rate, uint64_t *rate)
-{
-    // Switch parent clock to void race condition
-    struct clk *cpu_clk = clk_list[IMX8MQ_CLK_A53_CORE];
-    int err = cpu_clk->hw.init->ops->set_parent(cpu_clk, 0);
-    if (err) {
-        LOG_DRIVER_ERR("Failed to switch parent clock for IMX8MQ_CLK_A53_CORE\n");
-        return err;
-    }
-
-    // Adjust clock rate of IMX8MQ_ARM_PLL
-    struct clk *arm_pll_clk = clk_list[IMX8MQ_ARM_PLL];
-    err = clk_set_rate(arm_pll_clk, req_rate, rate);
-    if (err) {
-        LOG_DRIVER_ERR("Failed to adjust frequency for IMX8MQ_ARM_PLL\n");
-        return err;
-    }
-
-    // Switch parent clock back to IMX8MQ_ARM_PLL
-    err = cpu_clk->hw.init->ops->set_parent(cpu_clk, 1);
-    if (err) {
-        LOG_DRIVER_ERR("Failed to switch parent clock for IMX8MQ_CLK_A53_CORE\n");
-        return err;
-    }
-
-    return 0;
 }

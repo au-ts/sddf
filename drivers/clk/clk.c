@@ -199,22 +199,17 @@ int clk_set_rate(struct clk *clk, uint64_t req_rate, uint64_t *rate)
         return err;
     }
 
+    if (clk->hw.init->ops == &clk_source_ops) {
+        // source clock cannot be adjusted
+        return CLK_INVALID_OP;
+    }
+
     if (clk->hw.init->ops->set_rate) {
         *rate = clk->hw.init->ops->set_rate(clk, req_rate, prate);
         return 0;
     }
-    if (pclk && pclk->hw.init->ops->set_rate) {
-        const struct clk *ppclk = get_parent(pclk);
-        uint64_t pprate = 0;
-        int err = clk_get_rate(ppclk, &pprate);
-        if (!err) {
-            pclk->hw.init->ops->set_rate(pclk, prate, pprate);
-            return 0;
-        }
-        return err;
-    }
 
-    return CLK_INVALID_OP;
+    return clk_set_rate(pclk, req_rate, rate);
 }
 
 void notified(microkit_channel ch)
@@ -337,19 +332,6 @@ microkit_msginfo protected(microkit_channel ch, microkit_msginfo msginfo)
         uint32_t pclk_idx = (uint32_t)microkit_mr_get(SDDF_CLK_PARAM_PCLK_IDX);
         err = clk_set_parent_by_val(clk_list[clk_id], pclk_idx);
         microkit_mr_set(0, pclk_idx);
-        ret_num = 1;
-        break;
-    }
-    case SDDF_CLK_SET_CPU_FREQ: {
-        if (argc != 1) {
-            LOG_DRIVER_ERR("Incorrect number of arguments %u != 1\n", argc);
-            err = CLK_INCORRECT_ARGS;
-            break;
-        }
-        uint64_t req_freq = (uint32_t)microkit_mr_get(SDDF_CLK_PARAM_CPU_FREQ);
-        uint64_t freq = 0;
-        err = clk_set_cpu_freq(clk_list, req_freq, &freq);
-        microkit_mr_set(0, freq);
         ret_num = 1;
         break;
     }

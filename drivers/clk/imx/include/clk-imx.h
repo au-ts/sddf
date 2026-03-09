@@ -130,12 +130,23 @@ struct clk_common_slice_data {
     uint8_t postdiv_width;
 };
 
+/**
+ * A virutal clock for CPU frequency adjusting
+ * */
+struct clk_cpu_data {
+    struct clk *mux;
+    struct clk *step;
+    struct clk *pll;
+    struct clk *div;
+};
+
 extern const struct clk_ops clk_gate2_ops;
 extern const struct clk_ops clk_frac_pll_ops;
 extern const struct clk_ops clk_sscg_pll_ops;
 extern const struct clk_ops clk_core_slice_ops;
 extern const struct clk_ops clk_bus_slice_ops;
 extern const struct clk_ops clk_common_slice_ops;
+extern const struct clk_ops clk_cpu_ops;
 
 struct clk **get_clk_list(void);
 
@@ -366,3 +377,21 @@ IMX_CLK_COMPOSITE_FLAGS(_name, _parent_data, _base, _offset,               \
                         (CLK_SET_RATE_NO_REPARENT |                        \
                          CLK_OPS_PARENT_ENABLE |                           \
                          CLK_GET_RATE_NOCACHE | CLK_IS_CRITICAL))
+
+#define IMX_CLK_CPU(_name, _parent_clks, _mux, _step, _pll, _div)   \
+struct clk _name = {                                                \
+    .base = 0,                                                      \
+    .data = &(struct clk_cpu_data) {                                \
+        .mux = _mux,                                                \
+        .step = _step,                                              \
+        .pll = _pll,                                                \
+        .div = _div,                                                \
+    },                                                              \
+    .hw.init = &(struct clk_init_data) {                            \
+        .name = #_name,                                             \
+        .ops = &clk_cpu_ops,                                        \
+        .parent_clks = (const struct clk *[]) _parent_clks,         \
+        .num_parents = 1,                                           \
+        .flags = 0,                                                 \
+    },                                                              \
+}

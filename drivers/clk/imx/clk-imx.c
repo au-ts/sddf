@@ -448,3 +448,55 @@ const struct clk_ops clk_bus_slice_ops = {
     .set_parent = imx8m_clk_bus_slice_set_parent,
 };
 
+static int imx8m_cpu_set_rate(const struct clk *clk, uint64_t rate, uint64_t parent_rate)
+{
+    // Switch parent clock to void race condition
+    struct clk_cpu_data *data = (struct clk_cpu_data *)clk->data;
+    struct clk *cpu_clk = data->mux;
+
+    int i;
+    uint32_t num_parents = cpu_clk->hw.init->num_parents;
+    for (i = 0; i < num_parents; i++) {
+        if (get_clk_by_name(cpu_clk->hw.init->parent_data[i].name) == data->step) {
+            cpu_clk->hw.init->ops->set_parent(clk, i);
+            break;
+        }
+    }
+    if (i == num_parents) {
+        LOG_DRIVER_ERR("Failed to switch parent clock 1\n");
+        return CLK_FAILED_OP;
+    }
+
+    // Adjust clock rate of IMX8MQ_ARM_PLL_OUT
+    struct clk *arm_pll_clk = data->pll;
+    uint64_t res_rate = 0;
+    int err = clk_set_rate(arm_pll_clk, rate, &res_rate);
+    if (err) {
+        LOG_DRIVER_ERR("Failed to adjust CPU frequency\n");
+        return err;
+    }
+
+    // Switch parent clock back to IMX8MQ_ARM_PLL
+    for (i = 0; i < num_parents; i++) {
+        if (get_clk_by_name(cpu_clk->hw.init->parent_data[i].name) == data->pll) {
+            cpu_clk->hw.init->ops->set_parent(clk, i);
+            break;
+        }
+    }
+    if (i == num_parents) {
+        LOG_DRIVER_ERR("Failed to switch parent clock 3\n");
+        return CLK_FAILED_OP;
+    }
+
+}
+
+static uint64_t imx8m_cpu_recalc_rate(const struct clk *clk, uint64_t prate)
+{
+    (void *)clk;
+    return prate;
+}
+
+const struct clk_ops clk_cpu_ops = {
+    .recalc_rate = imx8m_cpu_recalc_rate,
+    .set_rate = imx8m_cpu_set_rate,
+};

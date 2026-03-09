@@ -336,6 +336,12 @@ struct clk_mux_data {
 };
 
 /**
+ * function get_clk_by_name() - get the pointer to clk struction by id
+ *
+ */
+struct clk *get_clk_by_name(const char *name);
+
+/**
  * function clk_msr_stat() - measure clock rates
  *
  * @clk_list:    array of pointers to the clocks on SoC
@@ -398,13 +404,3 @@ int clk_disable(struct clk *clk);
  * @rate:   pointer to result variable
  */
 int clk_set_rate(struct clk *clk, uint64_t req_rate, uint64_t *rate);
-
-/**
- * function clk_set_cpu_freq() - set the cpu frequency to the requested reate.
- *
- *
- * @clk:    pointer to the current clk
- * @req_rate:    request rate
- * @rate:   pointer to result variable
- */
-int clk_set_cpu_freq(struct clk **clk, uint64_t req_rate, uint64_t *rate);

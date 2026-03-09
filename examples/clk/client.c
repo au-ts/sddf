@@ -138,8 +138,8 @@ void init(void)
     ret = sddf_clk_get_rate(CLK_DRIVER_CH, cpu_clk_id, &rate);
     sddf_dprintf("cpu frequency: %lu\n", rate);
 
-    ret = sddf_clk_set_cpu_freq(CLK_DRIVER_CH, 1500000000);
-    sddf_dprintf("set CPU freq - err: %d\n", ret);
+    ret = sddf_clk_set_rate(CLK_DRIVER_CH, IMX8MQ_CLK_ARM, 150000000, &rate);
+    sddf_dprintf("Set CPU freq - err: %d\n", ret);
 
     ret = sddf_clk_get_rate(CLK_DRIVER_CH, cpu_clk_id, &rate);
     sddf_dprintf("cpu frequency: %lu\n", rate);

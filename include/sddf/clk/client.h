@@ -114,19 +114,3 @@ static inline int sddf_clk_set_parent(microkit_channel channel, uint32_t clk_id,
 
     return (int)microkit_msginfo_get_label(msginfo);
 }
-
-/**
- * Send a clock set_cpu_freq request via PPC into the passive clock driver.
- * Use the label to indicate this request.
- * @param channel of clock driver.
- * @param target CPU frequency.
- */
-static inline int sddf_clk_set_cpu_freq(microkit_channel channel, uint64_t req_freq)
-{
-    microkit_msginfo msginfo = microkit_msginfo_new(SDDF_CLK_SET_CPU_FREQ, 1);
-    microkit_mr_set(SDDF_CLK_PARAM_CPU_FREQ, req_freq);
-
-    msginfo = microkit_ppcall(channel, msginfo);
-
-    return (int)microkit_msginfo_get_label(msginfo);
-}
