@@ -131,13 +131,10 @@ void client_main(void) {
         // LOG_CLIENT("dist sensor c: %d", dist_sensor_c);
         
         if (dist_sensor_a > 5) {
-            LOG_CLIENT("attempting drive\n", dist_sensor_a);
-            control_forward(1000);
+            LOG_CLIENT("attempting drive\n");
+            control_forward(10000);
             LOG_CLIENT("returned from drive\n");
-
         }
-
-
 
         // NOTE: a is front, b is right, c is left
         // if (dist_sensor_a < 5) {
@@ -177,7 +174,7 @@ void notified(sddf_channel ch) {
             co_switch(t_main);
         }
         else if (timeout_id == CLIENT_TIMEOUT_ID) {
-            LOG_CLIENT("client timeout\n");
+            // LOG_CLIENT("client timeout\n");
             co_switch(t_main);
         }
         else if (timeout_id == MOTOR_CONTROL_TIMEOUT_ID) {
@@ -189,7 +186,8 @@ void notified(sddf_channel ch) {
             int should_switch = handle_pwm_timeout(gpio_channel_motor_a);
 
             if (should_switch) {
-                co_switch(t_main);
+                LOG_CLIENT("pwm timeout\n");
+                // co_switch(t_main);
             }
             // LOG_CLIENT("motor A timeout %d\n", timeout_queue.size);
         }
@@ -197,7 +195,8 @@ void notified(sddf_channel ch) {
             int should_switch = handle_pwm_timeout(gpio_channel_motor_b);
 
             if (should_switch) {
-                co_switch(t_main);
+                LOG_CLIENT("pwm timeout\n");
+                // co_switch(t_main);
             }
             // LOG_CLIENT("motor B timeout %d\n", timeout_queue.size);
         }

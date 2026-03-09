@@ -43,6 +43,8 @@ typedef struct {
     int irq;
 } GPIO_driver_channel_t;
 
+
+
 // ideally this whole setup should probably be in the meta.py file
 static const GPIO_driver_channel_t gpio_driver_channel_mappings[NUM_DRIVER_CHANNELS] = {
     [0] = { PIN_1, IRQ_UNUSED }, // need to claim these channels in meta.py

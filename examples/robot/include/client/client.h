@@ -39,7 +39,6 @@ extern sddf_channel timer_channel;
 extern sddf_channel gpio_channel_motor_a;
 extern sddf_channel gpio_channel_motor_b;
 extern sddf_channel gpio_channel_echo;
-extern sddf_channel gpio_channel_trigger;
 
 extern PriorityQueue timeout_queue;
 
