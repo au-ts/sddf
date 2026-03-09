@@ -107,6 +107,8 @@ _Static_assert(NVME_IO_CQ_CAPACITY <= 0x10000, "capacity of IO CQ must be <=6553
 #define MAX_TRANSFER_PAGES 32   /* 128KB max transfer (32 * 4KB pages) */
 #define PRP_LIST_SLOT_SIZE 256
 #define PRP_LIST_REGION_SIZE (MAX_PENDING_REQS * PRP_LIST_SLOT_SIZE)
+#define NVME_PRP_ENTRIES_PER_PAGE       ((uint32_t)(PRP_LIST_SLOT_SIZE / sizeof(uint64_t)))
+#define NVME_PRP_NON_CHAINED_MAX_PAGES  (1 + NVME_PRP_ENTRIES_PER_PAGE) // PRP1 + List slot
 
 _Static_assert(PRP_LIST_REGION_SIZE <= NVME_PRP_LIST_REGION_SIZE,
                "PRP list region exceeds configured nvme_prp_list region size");
@@ -156,17 +158,58 @@ void nvme_irq_unmask(void)
     nvme_controller->intmc = 0x1;
 }
 
+/* Build PRP pointers for a request using a single non-chained PRP list model. */
+static int build_prp_dptr(uint32_t cid, uintptr_t data_paddr, uint16_t count, uint64_t *dptr1, uint64_t *dptr2)
+{
+    /* Driver currently supports a single PRP-list page only (no chained PRP-list traversal). */
+    if (count > NVME_PRP_NON_CHAINED_MAX_PAGES) {
+        sddf_dprintf("NVMe: PRP transfer too large for non-chained list (%u pages, max %u)\n", count,
+                     NVME_PRP_NON_CHAINED_MAX_PAGES);
+        return -1;
+    }
+
+    /*
+     * PRP handling:
+     * - PRP1 = first 4KB page
+     * - PRP2 = second 4KB page (for 8KB transfer) or PRP list pointer (for >8KB)
+     */
+    *dptr1 = data_paddr;
+    *dptr2 = 0;
+
+    if (count == 2) {
+        /* Simple case: 2 pages. PRP2 points directly to 2nd page. */
+        *dptr2 = data_paddr + BLK_TRANSFER_SIZE;
+    } else if (count > 2) {
+        /* PRP2 points to a PRP List stored in the metadata region. */
+        /* x86 hardcoded addresses */
+        /* Each CID gets its own PRP list slot in the PRP region */
+        uint64_t *prp_list = (uint64_t *)(NVME_PRP_LIST_VADDR + (uint64_t)cid * PRP_LIST_SLOT_SIZE);
+        uint64_t prp_list_paddr = NVME_PRP_LIST_PADDR + (uint64_t)cid * PRP_LIST_SLOT_SIZE;
+
+        /* Fill the PRP List */
+        for (uint16_t i = 1; i < count; i++) {
+            prp_list[i - 1] = data_paddr + ((uint64_t)i * BLK_TRANSFER_SIZE);
+        }
+
+        *dptr2 = prp_list_paddr;
+    }
+
+    return 0;
+}
+
 static void handle_request(void)
 {
+    bool notify_virt = false;
+
     blk_req_code_t code;
     uintptr_t req_paddr;
     uint64_t block_number;
     uint16_t count;
     uint32_t id;
-    int err;
 
     while (blk_dequeue_req(&blk_queue, &code, &req_paddr, &block_number, &count, &id) == 0) {
-        uint8_t opcode;
+        uint8_t opcode = 0;
+        int err;
 
         if (code == BLK_REQ_READ) {
             opcode = NVME_OP_READ;
@@ -176,6 +219,7 @@ static void handle_request(void)
             /* Support for FLUSH/BARRIER can be added here */
             int err = blk_enqueue_resp(&blk_queue, BLK_RESP_OK, 0, id);
             assert(!err);
+            notify_virt = true;
             continue;
         }
 
@@ -184,6 +228,7 @@ static void handle_request(void)
             sddf_dprintf("NVMe: request too large (%u pages, max %u)\n", count, MAX_TRANSFER_PAGES);
             err = blk_enqueue_resp(&blk_queue, BLK_RESP_ERR_UNSPEC, 0, id);
             assert(!err);
+            notify_virt = true;
             continue;
         }
 
@@ -198,33 +243,16 @@ static void handle_request(void)
         cid_to_id[cid] = id;
         cid_to_count[cid] = count;
 
-        /*
-         * PRP handling:
-         * - PRP1 = first 4KB page
-         * - PRP2 = second 4KB page (for 8KB transfer) or PRP list pointer (for >8KB)
-         *
-         * Note: req_paddr is the physical address of the client's data buffer.
-         */
-        uintptr_t data_paddr = req_paddr;
-        uint64_t prp1 = data_paddr;
-        uint64_t prp2 = 0;
-
-        if (count == 2) {
-            /* Simple case: 2 pages. PRP2 points directly to 2nd page. */
-            prp2 = data_paddr + 0x1000;
-        } else if (count > 2) {
-            /* PRP2 points to a PRP List stored in the metadata region. */
-            /* x86 hardcoded addresses */
-            /* Each CID gets its own PRP list slot in the PRP region */
-            uint64_t *prp_list = (uint64_t *)(NVME_PRP_LIST_VADDR + (uint64_t)cid * PRP_LIST_SLOT_SIZE);
-            uint64_t prp_list_paddr = NVME_PRP_LIST_PADDR + (uint64_t)cid * PRP_LIST_SLOT_SIZE;
-
-            /* Fill the PRP List */
-            for (int i = 1; i < count; i++) {
-                prp_list[i - 1] = data_paddr + (i * BLK_TRANSFER_SIZE);
-            }
-
-            prp2 = prp_list_paddr;
+        uint64_t dptr1 = 0;
+        uint64_t dptr2 = 0;
+        err = build_prp_dptr(cid, req_paddr, count, &dptr1, &dptr2);
+        if (err != 0) {
+            err = ialloc_free(&cid_ialloc, cid);
+            assert(!err);
+            err = blk_enqueue_resp(&blk_queue, BLK_RESP_ERR_UNSPEC, 0, id);
+            assert(!err);
+            notify_virt = true;
+            continue;
         }
 
         nvme_queue_submit(&io_queue, &(nvme_submission_queue_entry_t) {
@@ -233,9 +261,13 @@ static void handle_request(void)
                                          .cdw10 = (uint32_t)lba,
                                          .cdw11 = (uint32_t)(lba >> 32),
                                          .cdw12 = nvme_build_rw_cdw12((uint16_t)nlb, true),
-                                         .prp1 = prp1,
-                                         .prp2 = prp2,
+                                         .prp1 = dptr1,
+                                         .prp2 = dptr2,
                                      });
+    }
+
+    if (notify_virt) {
+        sddf_notify(blk_config.virt.id);
     }
 }
 
