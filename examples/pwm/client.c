@@ -7,6 +7,7 @@
 #include <sddf/util/printf.h>
 #include <sddf/serial/queue.h>
 #include <sddf/serial/config.h>
+#include <sddf/pwm/client.h>
 
 static serial_queue_handle_t serial_tx_queue_handle;
 __attribute__((__section__(".serial_client_config"))) serial_client_config_t serial_config;
@@ -25,8 +26,8 @@ void init(void)
 
     LOG_CLIENT("starting\n");
 
-    microkit_msginfo ret = sddf_ppcall(CH_PWM_CONTROL_PPC, microkit_msginfo_new(0, 0));
-    (void)ret;
+    bool success = sddf_pwm_set_ns(CH_PWM_CONTROL_PPC, 0, /* period ns */ 500, /* pulse width ns */ 200, 0);
+    assert(success);
 
     LOG_CLIENT("done\n");
 }
