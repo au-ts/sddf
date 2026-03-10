@@ -1,0 +1,46 @@
+/*
+ * Copyright 2026, UNSW
+ * SPDX-License-Identifier: BSD-2-Clause
+ */
+
+/* SPDX-License-Identifier: GPL-2.0-or-later */
+/* Copyright (C) 2018 ROHM Semiconductors */
+// (for snippets derived from rohm-bd718x7.h in Linux kernel)
+
+typedef enum {
+	BD718XX_BUCK1 = 0,
+	BD718XX_BUCK2,
+	BD718XX_BUCK3,
+	BD718XX_BUCK4,
+	BD718XX_BUCK5,
+	BD718XX_BUCK6,
+	BD718XX_BUCK7,
+	BD718XX_BUCK8,
+	BD718XX_LDO1,
+	BD718XX_LDO2,
+	BD718XX_LDO3,
+	BD718XX_LDO4,
+	BD718XX_LDO5,
+	BD718XX_LDO6,
+	BD718XX_LDO7,
+	BD718XX_REGULATOR_AMOUNT,
+} bd718xx_regulators;
+
+/* Common voltage configurations */
+#define BD718XX_DVS_BUCK_VOLTAGE_NUM		0x3D
+#define BD718XX_4TH_NODVS_BUCK_VOLTAGE_NUM	0x3D
+
+#define BD718XX_LDO1_VOLTAGE_NUM	0x08
+#define BD718XX_LDO2_VOLTAGE_NUM	0x02
+#define BD718XX_LDO3_VOLTAGE_NUM	0x10
+#define BD718XX_LDO4_VOLTAGE_NUM	0x0A
+#define BD718XX_LDO6_VOLTAGE_NUM	0x0A
+
+/* BD71837 specific voltage configurations */
+#define BD71837_BUCK5_VOLTAGE_NUM	0x10
+#define BD71837_BUCK6_VOLTAGE_NUM	0x04
+#define BD71837_BUCK7_VOLTAGE_NUM	0x08
+#define BD71837_LDO5_VOLTAGE_NUM	0x10
+#define BD71837_LDO7_VOLTAGE_NUM	0x10
+
+
