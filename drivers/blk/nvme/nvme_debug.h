@@ -49,6 +49,25 @@ static nvme_completion_queue_entry_t nvme_queue_submit_and_consume_poll(nvme_que
     }
 }
 
+/* 0x100 dwords = 1024 bytes = 16 × 64-byte Error Information log entries. [NVMe-2.1 §5.1.12, Fig. 197; §5.1.12.1.2] */
+#define NVME_DEBUG_ERROR_LOG_NUMDL        0x0100U
+
+/* Get Log Page CDW10 fields (LID, NUMDL). [NVMe-2.1 §5.1.12, Fig. 197] */
+#define NVME_ADMIN_GET_LOG_PAGE_CDW10_LID_SHIFT   0
+#define NVME_ADMIN_GET_LOG_PAGE_CDW10_LID_MASK    NVME_BITS_MASK(0, 7)
+#define NVME_ADMIN_GET_LOG_PAGE_CDW10_NUMDL_SHIFT 16
+#define NVME_ADMIN_GET_LOG_PAGE_CDW10_NUMDL_MASK  NVME_BITS_MASK(16, 31)
+
+/* Build Get Log Page CDW10. [NVMe-2.1 §5.1.12, Fig. 197] */
+static inline uint32_t nvme_build_get_log_page_cdw10(uint16_t numdl, uint8_t lid)
+{
+    return (((uint32_t)numdl << NVME_ADMIN_GET_LOG_PAGE_CDW10_NUMDL_SHIFT) & NVME_ADMIN_GET_LOG_PAGE_CDW10_NUMDL_MASK)
+         | (((uint32_t)lid << NVME_ADMIN_GET_LOG_PAGE_CDW10_LID_SHIFT) & NVME_ADMIN_GET_LOG_PAGE_CDW10_LID_MASK);
+}
+
+/* Log Page Identifier values used by this driver. [NVMe-2.1 Fig. 202] */
+#define NVME_LOG_PAGE_LID_ERROR_INFO 0x01U /* Error Information */
+
 /* 5.1.12.1.2  Error Information (Log Page Identifier 01h) */
 typedef struct {
     uint64_t ecnt; /* Error Count; unique ID for this error. (retained across power off) */
@@ -76,15 +95,15 @@ static void nvme_debug_get_error_information_log_page(nvme_queue_info_t *admin_q
     nvme_completion_queue_entry_t entry;
     entry = nvme_queue_submit_and_consume_poll(
         admin_queue, &(nvme_submission_queue_entry_t) {
-                         .cdw0 = /* CID */ (0b1001 << 16) | /* PSDT */ 0 | /* FUSE */ 0 | /* OPC */ 0x2,
+                         .cdw0 = nvme_build_cdw0(0b1001, NVME_ADMIN_OP_GET_LOG_PAGE, NVME_CDW0_PSDT_PRP),
                          .prp2 = 0,
                          .prp1 = data_paddr,
-                         .cdw10 = /* NUMDL*/ (0x100 << 16) | /* LID*/ 0x01,
+                         .cdw10 = nvme_build_get_log_page_cdw10(NVME_DEBUG_ERROR_LOG_NUMDL, NVME_LOG_PAGE_LID_ERROR_INFO),
                          .cdw11 = 0x0,
                          .cdw12 = 0x0,
                      });
 
-    assert((entry.phase_tag_and_status & NVME_BITS_MASK(1, 15)) == 0x0); // §4.2.3 Status Field
+    assert((entry.phase_tag_and_status & NVME_CQE_STATUS_MASK) >> NVME_CQE_STATUS_SHIFT == 0); // §4.2.3 Status Field
 
     volatile nvme_error_information_log_page_t *errors = data;
     for (int i = 0; i < 2; i++) {

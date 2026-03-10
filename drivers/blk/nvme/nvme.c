@@ -40,6 +40,20 @@ nvme_completion_queue_entry_t *nvme_io_cq_region;
 uintptr_t nvme_io_sq_region_paddr;
 uintptr_t nvme_io_cq_region_paddr;
 
+/* Timed polling used while waiting for controller reset/enable transitions. */
+#define NVME_CONTROLLER_STATUS_POLL_INTERVAL_MS 10
+#define NVME_CONTROLLER_STATUS_POLL_INTERVAL_NS (NVME_CONTROLLER_STATUS_POLL_INTERVAL_MS * NS_IN_MS)
+
+/* Admin queue has ID 0 [NVMe-2.1 §1.5.4]; I/O queues use IDs 1-65535. [NVMe-2.1 §3.3.3.2] */
+/* Only one I/O queue pair is supported and share ID 1. */
+#define NVME_DEFAULT_IO_Q_ID 1
+/* One IV corresponds to one I/O queue pair. [NVMe-2.1 §5.2.1, Fig. 475] */
+#define NVME_CREATE_IO_Q_INTERRUPT_VECTOR 0
+
+/* Valid NSIDs are 1h through FFFFFFFFh. [NVMe-2.1 §3.2.1.1] */
+/* Only a single namespace is supported. */
+#define NVME_DEFAULT_NSID 1
+
 static nvme_queue_info_t admin_queue;
 static nvme_queue_info_t io_queue;
 
@@ -100,6 +114,17 @@ static uint32_t cid_ialloc_idxlist[MAX_PENDING_REQS];
 static uint32_t cid_to_id[MAX_PENDING_REQS];
 static uint16_t cid_to_count[MAX_PENDING_REQS];
 
+/*
+ * Host queue entry-size exponents for CC.IOSQES/CC.IOCQES.
+ * CC stores n where entry size is 2^n; Identify SQES/CQES report valid ranges.
+ * [NVMe-2.1 §3.1.4.5; §5.1.13.2.1, Fig. 312]
+ */
+#define NVME_HOST_IOSQES_EXP ((uint8_t)__builtin_ctz((unsigned int)sizeof(nvme_submission_queue_entry_t)))
+#define NVME_HOST_IOCQES_EXP ((uint8_t)__builtin_ctz((unsigned int)sizeof(nvme_completion_queue_entry_t)))
+_Static_assert(NVME_HOST_IOSQES_EXP == 6, "Common SQE layout requires 64-byte entries (2^6)");
+_Static_assert(NVME_HOST_IOCQES_EXP == 4, "Common CQE layout requires 16-byte entries (2^4)");
+
+/* [NVMe-2.1 §3.1.4.3] */
 void nvme_irq_mask(void)
 {
     /* [NVMe-PCIe-1.1] 3.5.1.1 Differences between Pin Based and MSI Interrupts
@@ -114,6 +139,7 @@ void nvme_irq_mask(void)
     nvme_controller->intms = 0xffffffff;
 }
 
+/* [NVMe-2.1 §3.1.4.4] */
 void nvme_irq_unmask(void)
 {
     /* [NVMe-PCIe-1.1] 3.5.1.1 Differences between Pin Based and MSI Interrupts
@@ -141,9 +167,9 @@ static void handle_request(void)
         uint8_t opcode;
 
         if (code == BLK_REQ_READ) {
-            opcode = 0x02;
+            opcode = NVME_OP_READ;
         } else if (code == BLK_REQ_WRITE) {
-            opcode = 0x01;
+            opcode = NVME_OP_WRITE;
         } else {
             /* Support for FLUSH/BARRIER can be added here */
             int err = blk_enqueue_resp(&blk_queue, BLK_RESP_OK, 0, id);
@@ -193,18 +219,18 @@ static void handle_request(void)
 
             /* Fill the PRP List */
             for (int i = 1; i < count; i++) {
-                prp_list[i - 1] = data_paddr + (i * 0x1000);
+                prp_list[i - 1] = data_paddr + (i * BLK_TRANSFER_SIZE);
             }
 
             prp2 = prp_list_paddr;
         }
 
         nvme_queue_submit(&io_queue, &(nvme_submission_queue_entry_t) {
-                                         .cdw0 = (cid << 16) | opcode,
-                                         .nsid = 0x1,
+                                         .cdw0 = nvme_build_cdw0((uint16_t)cid, opcode, NVME_CDW0_PSDT_PRP),
+                                         .nsid = NVME_DEFAULT_NSID,
                                          .cdw10 = (uint32_t)lba,
                                          .cdw11 = (uint32_t)(lba >> 32),
-                                         .cdw12 = (1U << 31) | nlb, /* LR=1 (Limited Retry) */
+                                         .cdw12 = nvme_build_rw_cdw12((uint16_t)nlb, true),
                                          .prp1 = prp1,
                                          .prp2 = prp2,
                                      });
@@ -220,7 +246,10 @@ static void handle_admin_completions(void)
         return;
     }
 
-    uint16_t status = (entry.phase_tag_and_status >> 1) & 0x7fff;
+    int err = ialloc_free(&cid_ialloc, entry.cid);
+    assert(err == 0);
+
+    uint16_t status = (entry.phase_tag_and_status & NVME_CQE_STATUS_MASK) >> NVME_CQE_STATUS_SHIFT;
     if (status != 0) {
         sddf_dprintf("NVMe admin command failed with status 0x%x in state %d\n", status, state_ctx.state);
         return;
@@ -239,7 +268,7 @@ static void handle_admin_completions(void)
         //    supported using the Set Features command with the Number of Queues feature identifier.
         //    After determining the number of I/O Queues, the NVMe Transport specific interrupt registers
         //    (e.g., MSI and/or MSI-X registers) should be configured
-        uint16_t io_queue_id = 1;
+        uint16_t io_queue_id = NVME_DEFAULT_IO_Q_ID;
         assert(nvme_io_sq_region != 0x0);
         assert(nvme_io_cq_region != 0x0);
         assert(nvme_io_sq_region_paddr != 0x0);
@@ -250,16 +279,23 @@ static void handle_admin_completions(void)
         // §3.3.1.1 Queue Setup & Initialization
         // => Configures the size of the I/O Submission Queues (CC.IOSQES) and I/O Completion Queues (CC.IOCQES)
         /* n.b. CQ/SQ entry sizes are specified as 2^n; i.e. 2^4 = 16 and 2^6 = 64. */
-        nvme_controller->cc |= (4 << NVME_CC_IOCQES_SHIFT) | (6 << NVME_CC_IOSQES_SHIFT);
+        nvme_controller->cc &= ~(NVME_CC_IOCQES_MASK | NVME_CC_IOSQES_MASK);
+        nvme_controller->cc |= ((uint32_t)NVME_HOST_IOCQES_EXP << NVME_CC_IOCQES_SHIFT)
+                             | ((uint32_t)NVME_HOST_IOSQES_EXP << NVME_CC_IOSQES_SHIFT);
 
         // 10. Allocate the appropriate number of I/O Completion Queues [...]
         //     The I/O Completion Queues are allocated using the Create I/O Completion Queue command.
         // §5.2.1
+        uint32_t admin_cid;
+        int err = ialloc_alloc(&cid_ialloc, &admin_cid);
+        assert(err == 0);
+        assert(admin_cid <= UINT16_MAX);
+
         nvme_queue_submit(&admin_queue,
                           &(nvme_submission_queue_entry_t) {
-                              .cdw0 = /* CID */ (0b1010 << 16) | /* PSDT */ 0 | /* FUSE */ 0 | /* OPC */ 0x5,
-                              .cdw10 = /* QSIZE */ ((NVME_IO_CQ_CAPACITY - 1U) << 16) | /* QID */ io_queue_id,
-                              .cdw11 = /* IV */ (0x0 << 16) | /* IEN */ 1 << 1 | /* PC */ 0x1,
+                              .cdw0 = nvme_build_cdw0((uint16_t)admin_cid, NVME_ADMIN_OP_CREATE_IO_CQ, NVME_CDW0_PSDT_PRP),
+                              .cdw10 = nvme_build_create_io_q_cdw10(NVME_DEFAULT_IO_Q_ID, NVME_IO_CQ_CAPACITY - 1U),
+                              .cdw11 = nvme_build_create_io_cq_cdw11(NVME_CREATE_IO_Q_INTERRUPT_VECTOR, true, true),
                               .prp2 = 0,
                               .prp1 = nvme_io_cq_region_paddr,
                           });
@@ -275,13 +311,16 @@ static void handle_admin_completions(void)
         // 11. Allocate the appropriate number of I/O Submission Queues [...]
         //     The I/O Submission Queues are allocated using the Create I/O Submission Queue command.
         // §5.2.2
-        uint16_t io_queue_id = 1;
+        uint32_t admin_cid;
+        int err = ialloc_alloc(&cid_ialloc, &admin_cid);
+        assert(err == 0);
+        assert(admin_cid <= UINT16_MAX);
 
         nvme_queue_submit(&admin_queue,
                           &(nvme_submission_queue_entry_t) {
-                              .cdw0 = /* CID */ (0b1110 << 16) | /* PSDT */ 0 | /* FUSE */ 0 | /* OPC */ 0x1,
-                              .cdw10 = /* QSIZE */ ((NVME_IO_SQ_CAPACITY - 1U) << 16) | /* QID */ io_queue_id,
-                              .cdw11 = /* CQID */ (io_queue_id << 16) | /* QPRIO */ (0b00 << 1) | /* PC */ 0b1,
+                              .cdw0 = nvme_build_cdw0((uint16_t)admin_cid, NVME_ADMIN_OP_CREATE_IO_SQ, NVME_CDW0_PSDT_PRP),
+                              .cdw10 = nvme_build_create_io_q_cdw10(NVME_DEFAULT_IO_Q_ID, NVME_IO_SQ_CAPACITY - 1U),
+                              .cdw11 = nvme_build_create_io_sq_cdw11(NVME_DEFAULT_IO_Q_ID, NVME_CREATE_IO_SQ_QPRIO_URGENT, true),
                               .cdw12 = 0,
                               .prp2 = 0,
                               .prp1 = nvme_io_sq_region_paddr,
@@ -333,7 +372,7 @@ static void handle_io_completions(void)
         uint16_t cid = cq_entry.cid;
         uint32_t id = cid_to_id[cid];
         uint16_t count = cid_to_count[cid];
-        uint16_t status = (cq_entry.phase_tag_and_status >> 1) & 0x7fff;
+        uint16_t status = (cq_entry.phase_tag_and_status & NVME_CQE_STATUS_MASK) >> NVME_CQE_STATUS_SHIFT;
 
         /* Free the CID */
         int err = ialloc_free(&cid_ialloc, cid);
@@ -371,8 +410,8 @@ static void nvme_poll_controller_status(void)
 
         if (nvme_controller->csts & NVME_CSTS_RDY) {
             if (state_ctx.waited_ms < state_ctx.timeout_ms) {
-                sddf_timer_set_timeout(timer_config.driver_id, 10 * NS_IN_MS);
-                state_ctx.waited_ms += 10;
+                sddf_timer_set_timeout(timer_config.driver_id, NVME_CONTROLLER_STATUS_POLL_INTERVAL_NS);
+                state_ctx.waited_ms += NVME_CONTROLLER_STATUS_POLL_INTERVAL_MS;
                 return;
             }
             sddf_dprintf("NVMe reset timeout after %u ms\n", state_ctx.waited_ms);
@@ -381,7 +420,7 @@ static void nvme_poll_controller_status(void)
         LOG_NVME("controller reset complete\n");
 
         // 2. Configure Admin Queue(s); §3.5.1 steps 2-5
-        nvme_queues_init(&admin_queue, /* y */ 0, nvme_controller, nvme_asq_region, NVME_ASQ_CAPACITY, nvme_acq_region,
+        nvme_queues_init(&admin_queue, 0, nvme_controller, nvme_asq_region, NVME_ASQ_CAPACITY, nvme_acq_region,
                          NVME_ACQ_CAPACITY);
         nvme_irq_mask();
         assert(nvme_asq_region_paddr != 0x0);
@@ -396,23 +435,22 @@ static void nvme_poll_controller_status(void)
         // QEMU NVMe workaround: Always use NVM Command Set (CSS=0b000)
         // https://gitlab.com/qemu-project/qemu/-/issues/1691
         nvme_controller->cc &= ~(NVME_CC_CSS_MASK);
-        nvme_controller->cc |= 0b000 << NVME_CC_CSS_SHIFT;
+        nvme_controller->cc |= (NVME_CC_CSS_NVM << NVME_CC_CSS_SHIFT) & NVME_CC_CSS_MASK;
 
         // 4a. Arbitration Mechanism
         // 4b. Memory Page Size
-        int8_t cap_mps_max = (nvme_controller->cap >> 52) & 0xF;
-        int8_t cap_mps_min = (nvme_controller->cap >> 48) & 0xF;
+        /* CAP.MPSMIN/MPSMAX bound host page size; minimum bytes = 2^(12 + MPSMIN). [NVMe-2.1 §3.1.4.1, Fig. 36] */
+        uint8_t cap_mps_max = (nvme_controller->cap & NVME_CAP_MPSMAX_MASK) >> NVME_CAP_MPSMAX_SHIFT;
+        uint8_t cap_mps_min = (nvme_controller->cap & NVME_CAP_MPSMIN_MASK) >> NVME_CAP_MPSMIN_SHIFT;
 
         // The maximum memory page size  is (2 ^ (12 + MPSMAX))
-        assert(cap_mps_max >= 0);
+        assert(cap_mps_max >= (NVME_PAGE_SIZE_LOG2 - 12));
 
         // The minimum memory page size is (2 ^ (12 + MPSMIN))
-        assert(cap_mps_min <= 0);
+        assert(cap_mps_min <= (NVME_PAGE_SIZE_LOG2 - 12));
 
         nvme_controller->cc &= ~NVME_CC_MPS_MASK;
-        /* n.b. page size = 2 ^ (12 + MPS) */
-        uint8_t page_size_log2 = 12; /* all architectures we care about have page size 2^12. */
-        nvme_controller->cc |= ((page_size_log2 - 12) << NVME_CC_MPS_SHIFT) & NVME_CC_MPS_MASK;
+        nvme_controller->cc |= ((NVME_PAGE_SIZE_LOG2 - 12) << NVME_CC_MPS_SHIFT) & NVME_CC_MPS_MASK;
 
         // 5. Enable the controller
         nvme_controller->cc |= NVME_CC_EN;
@@ -428,8 +466,8 @@ static void nvme_poll_controller_status(void)
 
         if (!(nvme_controller->csts & NVME_CSTS_RDY)) {
             if (state_ctx.waited_ms < state_ctx.timeout_ms) {
-                sddf_timer_set_timeout(timer_config.driver_id, 10 * NS_IN_MS);
-                state_ctx.waited_ms += 10;
+                sddf_timer_set_timeout(timer_config.driver_id, NVME_CONTROLLER_STATUS_POLL_INTERVAL_NS);
+                state_ctx.waited_ms += NVME_CONTROLLER_STATUS_POLL_INTERVAL_MS;
                 return;
             }
             sddf_dprintf("NVMe enable timeout after %u ms\n", state_ctx.waited_ms);
@@ -441,10 +479,15 @@ static void nvme_poll_controller_status(void)
         // Unmask interrupts before submitting admin commands
         nvme_irq_unmask();
 
+        uint32_t admin_cid;
+        int err = ialloc_alloc(&cid_ialloc, &admin_cid);
+        assert(err == 0);
+        assert(admin_cid <= UINT16_MAX);
+
         nvme_queue_submit(&admin_queue,
                           &(nvme_submission_queue_entry_t) {
-                              .cdw0 = /* CID */ (0b1111 << 16) | /* PSDT */ 0 | /* FUSE */ 0 | /* OPC */ 0x6,
-                              .cdw10 = /* CNTID[31:16] */ 0x0 | /* CNS */ 0x01,
+                              .cdw0 = nvme_build_cdw0((uint16_t)admin_cid, NVME_ADMIN_OP_IDENTIFY, NVME_CDW0_PSDT_PRP),
+                              .cdw10 = NVME_IDENTIFY_CNS_CONTROLLER,
                               .prp2 = 0,
                               .prp1 = NVME_IDENTIFY_CTRL_PADDR, /* Data region for identify - hardcoded for x86 */
                           });
@@ -490,7 +533,7 @@ void nvme_controller_init()
     This field is in 500 millisecond units. The maximum value of this field is FFh, which
     indicates a 127.5 second timeout.
     */
-    uint8_t cap_to = (nvme_controller->cap >> 24) & 0xFF;
+    uint8_t cap_to = (uint8_t)((nvme_controller->cap & NVME_CAP_TO_MASK) >> NVME_CAP_TO_SHIFT);
 
     // Initialize state machine context
     state_ctx = (nvme_state_ctx_t) {
