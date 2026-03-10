@@ -7,6 +7,15 @@
 
 #include "nvme.h"
 
+#include <sddf/util/fence.h>
+
+/*
+ * DW3 layout is STATUS[31:17], P[16], CID[15:0]; DW3[31:16] is stored in
+ * phase_tag_and_status, so P maps to bit 0 and STATUS maps to bits 15:01.
+ * [NVMe-2.1 §4.2.1, Fig. 98; §4.2.3, Fig. 100]
+ */
+#define NVME_CQE_PHASE_MASK BIT(0)
+
 typedef struct nvme_queue_info {
     struct {
         nvme_submission_queue_entry_t *queue;
@@ -52,6 +61,7 @@ static inline void nvme_queues_init(nvme_queue_info_t *queue, uint16_t queue_id,
             .capacity = completion_capacity,
             .head = 0,
             .doorbell = completion_doorbell,
+            /* Initial phase is 0 before controller ownership. [NVMe-2.1 §4.2.4, Fig. 98, Fig. 108] */
             .phase = 0,
         },
     };
@@ -59,7 +69,10 @@ static inline void nvme_queues_init(nvme_queue_info_t *queue, uint16_t queue_id,
 
 static inline void nvme_queue_submit(nvme_queue_info_t *queue, nvme_submission_queue_entry_t *entry)
 {
+    //TODO: consider mapping the queue regions cached and add appropriate cache maintenance operations here
     queue->submission.queue[queue->submission.tail] = *entry;
+
+    THREAD_MEMORY_RELEASE();
 
     queue->submission.tail++;
     if (queue->submission.tail == queue->submission.capacity) {
@@ -71,11 +84,14 @@ static inline void nvme_queue_submit(nvme_queue_info_t *queue, nvme_submission_q
 
 static inline int nvme_queue_consume(nvme_queue_info_t *queue, nvme_completion_queue_entry_t *entry)
 {
+    //TODO: consider mapping the queue regions cached and add appropriate cache maintenance operations here
     nvme_completion_queue_entry_t *cq_head_entry = &queue->completion.queue[queue->completion.head];
 
-    if ((cq_head_entry->phase_tag_and_status & BIT(0)) == queue->completion.phase) {
+    if ((cq_head_entry->phase_tag_and_status & NVME_CQE_PHASE_MASK) == queue->completion.phase) {
         return -1;
     }
+
+    THREAD_MEMORY_ACQUIRE();
 
     *entry = *cq_head_entry;
 
