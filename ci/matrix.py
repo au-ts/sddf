@@ -117,6 +117,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             "imx8mm_evk",
             "imx8mq_evk",
             "imx8mp_evk",
+            "kria_k26",
             "maaxboard",
             "odroidc2",
             "odroidc4",
@@ -134,6 +135,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             {"board": "cheshire"},
             {"board": "imx8mp_evk"},
             {"board": "rock3b"},
+            {"board": "kria_k26"},
         ],
     },
     "timer": {
@@ -142,6 +144,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
         "boards": [
             "imx8mq_evk",
             "imx8mp_evk",
+            "kria_k26",
             "maaxboard",
             "odroidc2",
             "odroidc4",
@@ -160,6 +163,7 @@ EXAMPLES: dict[str, _ExampleMatrixType] = {
             # not in machine queue
             {"board": "imx8mp_evk"},
             {"board": "rock3b"},
+            {"board": "kria_k26"},
         ],
     },
 }
@@ -172,6 +176,7 @@ _BoardNames = Literal[
     "imx8mp_evk",
     "imx8mq_evk",
     "imx8mp_iotgate",
+    "kria_k26",
     "maaxboard",
     "odroidc2",
     "odroidc4",
@@ -194,6 +199,7 @@ known_board_names = set(MACHINE_QUEUE_BOARDS.keys()) | {
     "imx8mp_evk",
     "rock3b",
     "cheshire",
+    "kria_k26",
 }
 assert (
     set(_BoardNames.__args__) <= known_board_names  # type: ignore
