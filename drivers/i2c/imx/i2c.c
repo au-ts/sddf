@@ -104,8 +104,13 @@ static inline void imx_i2c_start(bool repeat) {
     if (!repeat) {
         regs->i2cr |= REG_CR_MSTA;
         // wait until bus is clear
-        while (regs->i2sr & REG_SR_IBB) {
-            LOG_I2C_DRIVER("AHHHHH AHHH OHH MY GOD AHHHH\n");
+        for (uint32_t i = 0; (i < 10000) && (regs->i2sr & REG_SR_IBB); i++) {
+        }
+
+        // if our short busy wait failed, die
+        if (regs->i2sr & REG_SR_IBB) {
+            LOG_I2C_DRIVER_ERR("Failed to claim bus on start! Is there another master?\n");
+            assert(0);
         }
 
         // write other start flags
