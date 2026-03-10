@@ -17,7 +17,7 @@
 #include "nvme.h"
 #include "nvme_queue.h"
 
-//#define DEBUG_DRIVER
+#define DEBUG_DRIVER
 #ifdef DEBUG_DRIVER
 #include "nvme_debug.h"
 #define UNUSED
@@ -157,7 +157,7 @@ static void pci_config_write_32(uint8_t bus, uint8_t dev, uint8_t func, uint8_t 
 
 void nvme_irq_mask(void)
 {
-    /* [NVMe-Transport-PCIe-1.1] 3.5.1.1 Differences between Pin Based and MSI Interrupts
+    /* [NVMe-PCIe-1.1] 3.5.1.1 Differences between Pin Based and MSI Interrupts
         > Pin-based and single MSI only use one interrupt vector.
         > Multiple MSI may use up to 32 interrupt vectors.
 
@@ -171,7 +171,7 @@ void nvme_irq_mask(void)
 
 void nvme_irq_unmask(void)
 {
-    /* [NVMe-Transport-PCIe-1.1] 3.5.1.1 Differences between Pin Based and MSI Interrupts
+    /* [NVMe-PCIe-1.1] 3.5.1.1 Differences between Pin Based and MSI Interrupts
         > Pin-based and single MSI only use one interrupt vector.
         > Multiple MSI may use up to 32 interrupt vectors.
 

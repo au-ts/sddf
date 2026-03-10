@@ -25,18 +25,20 @@ typedef struct nvme_queue_info {
 
 } nvme_queue_info_t;
 
-// y is the submission queue index
-static inline void nvme_queues_init(nvme_queue_info_t *queue, uint16_t y, volatile nvme_controller_t *nvme_controller,
+static inline void nvme_queues_init(nvme_queue_info_t *queue, uint16_t queue_id,
+                                    volatile nvme_controller_t *nvme_controller,
                                     nvme_submission_queue_entry_t *submission_queue, uint16_t submission_capacity,
                                     nvme_completion_queue_entry_t *completion_queue, uint16_t completion_capacity)
 {
-    uint8_t DSTRD = (nvme_controller->cap & NVME_CAP_DSTRD_MASK) >> NVME_CAP_DSTRD_SHIFT;
+    uint8_t doorbell_stride = (nvme_controller->cap & NVME_CAP_DSTRD_MASK) >> NVME_CAP_DSTRD_SHIFT;
 
     /* [NVMEe-Transport-PCIe-1.1] 3.1.2.1 SQyTDBL & 3.1.2.2 CQyHDBL
        Note: "The host should not read the doorbell registers"
     */
-    volatile uint32_t *submission_doorbell = (void *)nvme_controller + NVME_PCIE_DOORBELL_OFFSET(2 * y, DSTRD);
-    volatile uint32_t *completion_doorbell = (void *)nvme_controller + NVME_PCIE_DOORBELL_OFFSET(2 * y + 1, DSTRD);
+    volatile uint32_t *submission_doorbell = (void *)nvme_controller
+                                           + NVME_PCIE_SQTDBL_OFFSET(queue_id, doorbell_stride);
+    volatile uint32_t *completion_doorbell = (void *)nvme_controller
+                                           + NVME_PCIE_CQHDBL_OFFSET(queue_id, doorbell_stride);
 
     *queue = (nvme_queue_info_t){
         .submission = {
