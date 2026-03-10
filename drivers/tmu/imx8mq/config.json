@@ -1,0 +1,19 @@
+{
+    "compatible": [
+        "fsl,imx8mq-tmu"
+    ],
+    "resources": {
+        "regions": [
+            {
+                "name": "regs",
+                "perms": "rw",
+                "dt_index": 0
+            }
+        ],
+        "irqs": [
+            {
+                "dt_index": 0
+            }
+        ]
+    }
+}
