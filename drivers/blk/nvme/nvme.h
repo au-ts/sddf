@@ -15,13 +15,26 @@
 
     [NVMe-2.1] NVM Express Base Specification Revision 2.1 (Aug 5, 2024)
         https://nvmexpress.org/wp-content/uploads/NVM-Express-Base-Specification-Revision-2.1-2024.08.05-Ratified.pdf
-
-    [NVMEe-Transport-PCIe-1.1] NVMe over PCIe Transport Specification, Revision 1.1 (Aug 5, 2024)
+    [NVMe-PCIe-1.1] NVMe over PCIe Transport Specification, Revision 1.1 (Aug 5, 2024)
         https://nvmexpress.org/wp-content/uploads/NVM-Express-PCI-Express-Transport-Specification-Revision-1.1-2024.08.05-Ratified.pdf
-
-    [NVMe-CommandSet-1.1] NVM Command Set Specification, Revision 1.1 (Aug 5, 2024)
+    [NVM-CommandSet-1.1] NVM Command Set Specification, Revision 1.1 (Aug 5, 2024)
         https://nvmexpress.org/wp-content/uploads/NVM-Express-NVM-Command-Set-Specification-Revision-1.1-2024.08.05-Ratified.pdf
+    [PCIe2-0.9] PCI Express(R) 2.0 Base Specification Revision 0.9 (Sep 11, 2006)
+        https://community.intel.com/cipcp26785/attachments/cipcp26785/fpga-intellectual-property/8220/1/PCI_Express_Base_Specification_v20.pdf
+    [PCI-3.0] PCI Local Bus Specification Revision 3.0 (Feb 3, 2004)
+        https://lekensteyn.nl/files/docs/PCI_SPEV_V3_0.pdf
 */
+
+/* ═══════════════════════════════════════════════════════════════════════
+ *  Bitfield Helpers
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+/* Inclusive bitfield mask helper. */
+#define NVME_BITS_MASK(start, end) ((BIT(((end) - (start)) + 1U) - 1U) << (start))
+
+/* ═══════════════════════════════════════════════════════════════════════
+ *  Controller Registers
+ * ═══════════════════════════════════════════════════════════════════════ */
 
 /* [NVMe-2.1] Section 3.1.4 Controller Properties
     RO = Read Only
@@ -59,50 +72,68 @@ typedef struct nvme_controller {
 
 _Static_assert(offsetof(nvme_controller_t, _reserved2) == 0x6C, "nvme_controller_t must match spec layout");
 
-#define _LEN(start, end) ((end - start) + 1)
-#define _MASK(start, end)  ((BIT(_LEN(start, end)) - 1) << (start))
+/* Controller Capabilities. [NVMe-2.1 §3.1.4.1, Fig. 36] */
+#define NVME_CAP_MQES_MASK      NVME_BITS_MASK(0, 15)   /* Maximum Queue Entries Supported (0-based) */
+#define NVME_CAP_NOIOCSS        BIT(37 + 7)             /* No I/O Command Set Support */
+#define NVME_CAP_IOCSS          BIT(37 + 6)             /* I/O Command Set Support    */
+#define NVME_CAP_NCSS           BIT(37 + 0)             /* NVM Command Set Support    */
+#define NVME_CAP_TO_SHIFT       24                      /* Controller Ready Timeout (500 ms units) */
+#define NVME_CAP_TO_MASK        NVME_BITS_MASK(24, 31)
+#define NVME_CAP_MPSMIN_SHIFT   48                      /* Memory Page Size Minimum   */
+#define NVME_CAP_MPSMIN_MASK    NVME_BITS_MASK(48, 51)
+#define NVME_CAP_MPSMAX_SHIFT   52                      /* Memory Page Size Maximum   */
+#define NVME_CAP_MPSMAX_MASK    NVME_BITS_MASK(52, 55)
+#define NVME_CAP_DSTRD_SHIFT    32                      /* Doorbell Stride (2 ^ (2 + DSTRD)) */
+#define NVME_CAP_DSTRD_MASK     NVME_BITS_MASK(32, 35)
 
-/* [NVMe-2.1] 3.1.4.1 Offset 0h: CAP – Controller Capabilities */
-#define NVME_CAP_NOIOCSS     BIT(37 + 7)   /* No I/O Command Set Support */
-#define NVME_CAP_IOCSS       BIT(37 + 6)   /* I/O Command Set Support    */
-#define NVME_CAP_NCSS        BIT(37 + 0)   /* NVM Command Set Support    */
-#define NVME_CAP_DSTRD_SHIFT 32            /* Doorbell Stride (2 ^ (2 + DSTRD)) */
-#define NVME_CAP_DSTRD_MASK  _MASK(32, 35) /* Doorbell Stride (2 ^ (2 + DSTRD)) */
+/* Version. [NVMe-2.1 §3.1.4.2, Fig. 37] */
+#define NVME_VS_TER_SHIFT       0
+#define NVME_VS_TER             NVME_BITS_MASK(0, 7)    /* Tertiary Version */
+#define NVME_VS_MNR_SHIFT       8
+#define NVME_VS_MNR             NVME_BITS_MASK(8, 15)   /* Minor Version */
+#define NVME_VS_MJR_SHIFT       16
+#define NVME_VS_MJR             NVME_BITS_MASK(16, 31)  /* Major Version */
 
-/* [NVMe-2.1] 3.1.4.2 Offset 8h: VS – Version */
-#define NVME_VS_TER _MASK(0, 7)
-#define NVME_VS_TER_SHIFT 0
-#define NVME_VS_MNR _MASK(8, 15)
-#define NVME_VS_MNR_SHIFT 8
-#define NVME_VS_MJR _MASK(16, 31)
-#define NVME_VS_MJR_SHIFT 16
+/* Controller Configuration. [NVMe-2.1 §3.1.4.5, Fig. 41] */
+#define NVME_CC_IOCQES_SHIFT    20                      /* I/O CQ Entry Size (2^IOCQES bytes) */
+#define NVME_CC_IOCQES_MASK     NVME_BITS_MASK(20, 23)
+#define NVME_CC_IOSQES_SHIFT    16                      /* I/O SQ Entry Size (2^IOSQES bytes) */
+#define NVME_CC_IOSQES_MASK     NVME_BITS_MASK(16, 19)
+#define NVME_CC_MPS_SHIFT       7                       /* Host Memory Page Size (2^(12+MPS) bytes) */
+#define NVME_CC_MPS_MASK        NVME_BITS_MASK(7, 10)
+#define NVME_CC_CSS_SHIFT       4                       /* I/O Command Set Selected */
+#define NVME_CC_CSS_MASK        NVME_BITS_MASK(4, 6)
+#define NVME_CC_CSS_NVM         0x0U                    /* NVM Command Set */
+#define NVME_CC_EN              BIT(0)                  /* Controller Enable */
 
-/* [NVMe-2.1] 3.1.4.5 Offset 14h: CC – Controller Configuration */
-#define NVME_CC_IOCQES_SHIFT 20            /* I/O Completion Queue Entry Size */
-#define NVME_CC_IOCQES_MASK  _MASK(20, 23) /* I/O Completion Queue Entry Size */
-#define NVME_CC_IOSQES_SHIFT 16            /* I/O Submission Queue Entry Size */
-#define NVME_CC_IOSQES_MASK  _MASK(16, 19) /* I/O Submission Queue Entry Size */
-#define NVME_CC_MPS_SHIFT    7             /* Host Memory Page Size */
-#define NVME_CC_MPS_MASK     _MASK(7, 10)  /* Host Memory Page Size */
-#define NVME_CC_CSS_SHIFT    4             /* I/O Command Set Selected */
-#define NVME_CC_CSS_MASK     _MASK(4, 6)   /* I/O Command Set Selected */
-#define NVME_CC_EN           BIT(0)        /* Controller Enable */
+/* Controller Status. [NVMe-2.1 §3.1.4.6, Fig. 42] */
+#define NVME_CSTS_RDY           BIT(0)                  /* Controller Ready */
 
-/* [NVMe-2.1] 3.1.4.6 Offset 1Ch: CSTS – Controller Status */
-#define NVME_CSTS_RDY BIT(0) /* Controller Ready (RO) */
+/* NVM Subsystem Reset. [NVMe-2.1 §3.1.4.7, Fig. 43] */
+#define NVME_NSSRC_VALUE        (0x4E564D65)            /* NVM Subsystem Reset Control - Reset value */
 
-/* [NVMe-2.1] 3.1.4.7 Offset 20h: NSSR – NVM Subsystem Reset */
-#define NVME_NSSRC_VALUE (0x4E564D65) /* NVM Subsystem Reset Control - Reset value */
+/* Admin Queue Attributes. [NVMe-2.1 §3.1.4.8, Fig. 44] */
+#define NVME_AQA_ACQS_SHIFT     16                      /* Admin Completion Queue Size (#entries) */
+#define NVME_AQA_ACQS_MASK      NVME_BITS_MASK(16, 27)
+#define NVME_AQA_ASQS_SHIFT     0                       /* Admin Submission Queue Size (#entries) */
+#define NVME_AQA_ASQS_MASK      NVME_BITS_MASK(0, 11)
 
-/* [NVMe-2.1] 3.1.4.8 Offset 24h: AQA – Admin Queue Attributes */
-#define NVME_AQA_ACQS_SHIFT 16             /* Admin Completion Queue Size (#entries) */
-#define NVME_AQA_ACQS_MASK  _MASK(16, 27)  /* Admin Completion Queue Size (#entries) */
-#define NVME_AQA_ASQS_SHIFT 0              /* Admin Submission Queue Size (#entries) */
-#define NVME_AQA_ASQS_MASK  _MASK(0, 11)   /* Admin Submission Queue Size (#entries) */
+/* Doorbell stride in bytes = 2^(2 + DSTRD). [NVMe-2.1 §3.1.4.1, Fig. 36] */
+#define NVME_DOORBELL_STRIDE_BYTES(DSTRD) (4U << (DSTRD))
 
-/**
- * Queue Structures
+/*
+ * Doorbell offsets. [NVMe-PCIe-1.1 §3.1.2, Fig. 4-6]
+ * - SQyTDBL offset = 1000h + ((2y)   * stride)
+ * - CQyHDBL offset = 1000h + ((2y+1) * stride)
  */
+#define NVME_PCIE_SQTDBL_OFFSET(queue_id, DSTRD) \
+    (0x1000U + ((2U * (uint32_t)(queue_id)) * NVME_DOORBELL_STRIDE_BYTES(DSTRD)))
+#define NVME_PCIE_CQHDBL_OFFSET(queue_id, DSTRD) \
+    (0x1000U + (((2U * (uint32_t)(queue_id)) + 1U) * NVME_DOORBELL_STRIDE_BYTES(DSTRD)))
+
+/* ═══════════════════════════════════════════════════════════════════════
+ *  Commands / SQE / CQE
+ * ═══════════════════════════════════════════════════════════════════════ */
 
 /* [NVMe-2.1] 4.1 Submission Queue Entry */
 typedef struct nvme_submission_queue_entry {
@@ -133,12 +164,3 @@ typedef struct nvme_completion_queue_entry {
 } nvme_completion_queue_entry_t;
 _Static_assert(sizeof(nvme_completion_queue_entry_t) == 16,
                "The Common Completion Queue Entry Layout is 16 bytes in size");
-
-/**
- * Below here is NVMe PCIe Transport Specific Properties.
- */
-
-#define NVME_PCIE_SQT_MASK _MASK(0, 15) /* Submission Queue Tail*/
-#define NVME_PCIE_CQH_MASK _MASK(0, 15) /* Completion Queue Head */
-
-#define NVME_PCIE_DOORBELL_OFFSET(i, DSTRD) (0x1000 + ((i) * (4 << (DSTRD))))

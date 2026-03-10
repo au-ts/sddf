@@ -84,7 +84,7 @@ static void nvme_debug_get_error_information_log_page(nvme_queue_info_t *admin_q
                          .cdw12 = 0x0,
                      });
 
-    assert((entry.phase_tag_and_status & _MASK(1, 15)) == 0x0); // §4.2.3 Status Field
+    assert((entry.phase_tag_and_status & NVME_BITS_MASK(1, 15)) == 0x0); // §4.2.3 Status Field
 
     volatile nvme_error_information_log_page_t *errors = data;
     for (int i = 0; i < 2; i++) {
