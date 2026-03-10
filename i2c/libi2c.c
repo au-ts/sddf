@@ -33,6 +33,7 @@ static inline int check_data_buf(void *data_buf)
     return 0;
 }
 
+#ifndef LIBI2C_NOCO
 /**
  *  Block on a notification using libco or libmicrokitco for blocking calls.
  */
@@ -48,6 +49,7 @@ static void __i2c_block(libi2c_conf_t *conf)
     microkit_cothread_wait_on_channel(i2c_config.virt.id);
 #endif
 }
+#endif
 
 /**
  * Given a buffer pointer from the DATA region, create an I2C op, dispatch and return when
@@ -130,6 +132,7 @@ static i2c_err_t __i2c_handle_response(libi2c_conf_t *conf, i2c_addr_t *returned
 
 // #### Blocking API using libco/libmicrokitco ####
 
+#ifndef LIBI2C_NOCO
 /**
  * Perform a simple I2C write given a DATA region buffer containing data.
  * To perform a write to a device register, ensure the FIRST byte of write_buf contains
@@ -215,6 +218,7 @@ int sddf_i2c_dispatch(libi2c_conf_t *conf, i2c_addr_t address, void *buf, uint16
     assert(returned_addr == address);
     return err;
 }
+#endif
 
 // #### Non-blocking API ####
 /**
