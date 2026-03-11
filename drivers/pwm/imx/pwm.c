@@ -154,66 +154,31 @@ static bool pwm_configure(int channel, uint64_t period_ns, uint64_t pulse_width_
         return false;
     }
 
-    // _v suffix means the interpretation of the value (for math) not the value you put somewhere.
+    // TODO: I ignore overflow etc
 
-    // Want: maximise the period register for precision
-    // Want: minimise the prescale for precision
+    uint64_t period_cycles = period_ns / clk_period_ns;
+    // add 1 to prevent div-by-zero
+    uint64_t prescale_v = period_cycles / max_period_register_v + 1;
+    period_cycles /= prescale_v;
+    uint64_t pulse_width_cycles = pulse_width_ns / clk_period_ns;
+    pulse_width_cycles /= prescale_v;
 
-    // TODO: should be possible to do this just based on the slope or whatever but I seem to be incapable of doing that
-    //       in my head.
+    LOG_DRIVER("value of prescalar: %ld, period: %ld, sample: %ld\n", prescale_v, period_cycles, pulse_width_cycles);
 
-
-    // XXXX: this is just really wrong for the higher prescales...
-    // kinda assumes == 0.
-
-    // Find the range that covers `low_period` <... `period_ns` ...= `high_period`
-    // that has the largest values. Note we do equality on high and inequality on low.
-    uint64_t period_reg_v = max_period_register_v;
-    uint64_t high_period_ns = max_period;
-    uint64_t prescale_v = max_prescale_v;
-    while (prescale_v > min_prescale_v) {
-        // lower is considered the "next"
-        uint64_t low_period_ns = clk_period_ns * (prescale_v - 1) * period_reg_v;
-
-        // LOG_DRIVER("Considering prescale %ld covering range %ld... %ld.... %ld\n", prescale_v, low_period_ns, period_ns, high_period_ns);
-
-        if (low_period_ns < period_ns && period_ns <= high_period_ns) {
-            // LOG_DRIVER("... it fits\n");
-            break;
-        }
-
-        high_period_ns = low_period_ns;
-        prescale_v--;
-    }
-
-    if (prescale_v == min_prescale_v) {
-        while (period_reg_v > min_period_register_v) {
-            uint64_t low_period_ns = clk_period_ns * prescale_v * (period_reg_v - 1);
-
-            // LOG_DRIVER("Considering period reg %ld covering range %ld... %ld.... %ld\n", period_reg_v, low_period_ns, period_ns, high_period_ns);
-
-            if (low_period_ns < period_ns && period_ns <= high_period_ns) {
-                // LOG_DRIVER("... it fits\n");
-                break;
-            }
-
-            high_period_ns = low_period_ns;
-            period_reg_v--;
-        }
-    }
+    assert(period_cycles <= max_period_register_v);
+    assert(period_cycles >= min_period_register_v);
+    uint16_t period = period_cycles - 2;
 
     // Done by the error checks earlier this cannot happen.
-    assert(period_reg_v != min_period_register_v);
-
+    assert(prescale_v <= max_prescale_v);
+    assert(prescale_v >= min_prescale_v);
     uint16_t prescalar = prescale_v - 1;
-    uint16_t period = period_reg_v - 2;
 
-    // The sample (duty cycle) uses the same scale as the period.
-    uint64_t sample_v = ((clk_period_ns * prescale_v * period_reg_v) / period_ns) * pulse_width_ns;
-    // TODO: offset does this make sense?
-    uint16_t sample = sample_v - 1;
+    assert(pulse_width_cycles < BIT(16));
+    assert(pulse_width_cycles >= 0);
+    uint16_t sample = pulse_width_cycles;
 
-    LOG_DRIVER("prescalar in registers: %d, period: %d, sample: %d\n", prescalar, period, sample);
+    LOG_DRIVER("in registers prescalar: %d, period: %d, sample: %d\n", prescalar, period, sample);
 
     pwm_regs->control = pwm_mk_control(prescalar, poutc);
     pwm_regs->sample = sample;
