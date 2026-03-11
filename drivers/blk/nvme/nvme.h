@@ -273,7 +273,8 @@ _Static_assert(sizeof(nvme_completion_queue_entry_t) == 16,
  *  Identify Structures
  * ═══════════════════════════════════════════════════════════════════════ */
 
-/* Identify CNS value for controller. [NVMe-2.1 §5.1.13, Fig. 310] */
+/* Identify CNS values used by this driver. [NVMe-2.1 §5.1.13, Fig. 310] */
+#define NVME_IDENTIFY_CNS_NAMESPACE  0x00U
 #define NVME_IDENTIFY_CNS_CONTROLLER 0x01U
 
 /*
@@ -315,6 +316,44 @@ _Static_assert(offsetof(nvme_identify_ctrl_t, sgls) == 536, "SGLS must be at byt
 #define NVME_IDENTIFY_ENTRY_SIZE_MIN_MASK  NVME_BITS_MASK(0, 3)
 #define NVME_IDENTIFY_ENTRY_SIZE_MAX_SHIFT 4
 #define NVME_IDENTIFY_ENTRY_SIZE_MAX_MASK  NVME_BITS_MASK(4, 7)
+
+/* LBA Format entry layout. [NVM-CommandSet-1.1 Fig. 116] */
+typedef struct nvme_lba_format {
+    uint16_t ms;
+    uint8_t lbads; /* 2^LBADS bytes; values < 9 are invalid. */
+    uint8_t rp;    /* Bits 1:0 are RP; upper bits are reserved. */
+} nvme_lba_format_t;
+_Static_assert(sizeof(nvme_lba_format_t) == 4, "Each LBAF entry is 4 bytes");
+
+/*
+ * Identify Namespace response for NVM Command Set (CNS=00h).
+ * Currently unused fields are modeled as reserved spans while preserving spec-defined offsets.
+ * [NVM-CommandSet-1.1 §4.1.5.1, Fig. 114]
+ */
+typedef struct nvme_identify_ns {
+    uint64_t nsze;
+    uint8_t _reserved0[26 - 8];
+    uint8_t flbas;
+    uint8_t _reserved1[128 - 27];
+    nvme_lba_format_t lbaf[64]; /* 64 LBA format descriptors */
+    uint8_t _reserved2[4096 - 384];
+} nvme_identify_ns_t;
+_Static_assert(sizeof(nvme_identify_ns_t) == 4096, "Identify Namespace (CNS=00h) data structure must be 4096 bytes");
+_Static_assert(offsetof(nvme_identify_ns_t, nsze) == 0, "NSZE must be at byte offset 0");
+_Static_assert(offsetof(nvme_identify_ns_t, flbas) == 26, "FLBAS must be at byte offset 26");
+_Static_assert(offsetof(nvme_identify_ns_t, lbaf) == 128, "LBAF array must start at byte offset 128");
+
+/* FLBAS field layout. [NVM-CommandSet-1.1 §4.1.5.1, Fig. 114] */
+#define NVME_IDENTIFY_FLBAS_FIDXL_MASK  NVME_BITS_MASK(0, 3)
+#define NVME_IDENTIFY_FLBAS_FIDXU_SHIFT 5
+#define NVME_IDENTIFY_FLBAS_FIDXU_MASK  NVME_BITS_MASK(5, 6)
+
+static inline uint8_t nvme_identify_flbas_format_index(uint8_t flbas)
+{
+    uint8_t idx_low = (uint8_t)(flbas & NVME_IDENTIFY_FLBAS_FIDXL_MASK);
+    uint8_t idx_high = (uint8_t)(((flbas & NVME_IDENTIFY_FLBAS_FIDXU_MASK) >> NVME_IDENTIFY_FLBAS_FIDXU_SHIFT) << 4);
+    return (uint8_t)(idx_low | idx_high);
+}
 
 /* ═══════════════════════════════════════════════════════════════════════
  *  PCIe Transport
@@ -404,13 +443,15 @@ static inline void pci_config_write_32(uint8_t bus, uint8_t dev, uint8_t func, u
 #define NVME_ACQ_REGION_SIZE        0x1000
 #define NVME_IO_SQ_REGION_SIZE      0x1000
 #define NVME_IO_CQ_REGION_SIZE      0x1000
-#define NVME_IDENTIFY_REGION_SIZE   0x1000
+#define NVME_IDENTIFY_REGION_SIZE   0x2000
 #define NVME_PRP_LIST_REGION_SIZE   0x80000
 
 /* Identify response buffers (one page each). */
 #define NVME_IDENTIFY_BUFFER_BYTES 0x1000
 #define NVME_IDENTIFY_CTRL_VADDR   (NVME_IDENTIFY_VADDR)
 #define NVME_IDENTIFY_CTRL_PADDR   (NVME_IDENTIFY_PADDR)
+#define NVME_IDENTIFY_NS_VADDR     (NVME_IDENTIFY_VADDR + NVME_IDENTIFY_BUFFER_BYTES)
+#define NVME_IDENTIFY_NS_PADDR     (NVME_IDENTIFY_PADDR + NVME_IDENTIFY_BUFFER_BYTES)
 
 #define NVME_IRQ 17
 
@@ -426,3 +467,7 @@ _Static_assert(NVME_IO_QUEUE_SIZE <= NVME_IO_CQ_REGION_SIZE, "IO CQ allocation e
 /* Identify buffers must fit in their shared region and not overlap. */
 _Static_assert(sizeof(nvme_identify_ctrl_t) <= NVME_IDENTIFY_BUFFER_BYTES,
                "Identify Controller structure must fit within one Identify buffer");
+_Static_assert(NVME_IDENTIFY_CTRL_VADDR + NVME_IDENTIFY_BUFFER_BYTES <= NVME_IDENTIFY_NS_VADDR,
+               "Identify Controller buffer must not overlap Identify Namespace buffer");
+_Static_assert((2 * NVME_IDENTIFY_BUFFER_BYTES) <= NVME_IDENTIFY_REGION_SIZE,
+               "NVMe identify region must fit both Identify buffers");
