@@ -84,14 +84,14 @@
 #include <sddf/util/printf.h>
 #include <clk_utils.h>
 
-static inline int clk_gate_enable(struct clk *clk)
+static inline int clk_gate_enable(const struct clk *clk)
 {
     struct clk_gate_data *data = (struct clk_gate_data *)(clk->data);
 
     return regmap_update_bits(clk->base, data->offset, data->bit_idx, MASK(1), 1);
 }
 
-static inline int clk_gate_disable(struct clk *clk)
+static inline int clk_gate_disable(const struct clk *clk)
 {
     struct clk_gate_data *data = (struct clk_gate_data *)(clk->data);
 
@@ -99,7 +99,7 @@ static inline int clk_gate_disable(struct clk *clk)
     return 0;
 }
 
-static inline int clk_gate_is_enabled(struct clk *clk)
+static inline int clk_gate_is_enabled(const struct clk *clk)
 {
     struct clk_gate_data *data = (struct clk_gate_data *)(clk->data);
 
@@ -202,7 +202,7 @@ static inline int clk_mux_get_parent(const struct clk *clk, uint8_t *index)
     return 0;
 }
 
-static inline int clk_mux_set_parent(struct clk *clk, uint8_t index)
+static inline int clk_mux_set_parent(const struct clk *clk, uint8_t index)
 {
     struct clk_mux_data *data = (struct clk_mux_data *)(clk->data);
 
@@ -215,7 +215,8 @@ static inline int clk_mux_set_parent(struct clk *clk, uint8_t index)
 }
 
 const struct clk_ops clk_mux_ops = {
-    .get_parent = clk_mux_get_parent, .set_parent = clk_mux_set_parent,
+    .get_parent = clk_mux_get_parent,
+    .set_parent = clk_mux_set_parent,
     /* .determine_rate = clk_mux_determine_rate, */
 };
 
